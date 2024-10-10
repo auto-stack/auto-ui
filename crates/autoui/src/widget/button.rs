@@ -6,7 +6,7 @@ pub struct Button {
     text: String,
     base: Div,
     style: ButtonStyles,
-    onclick: Box<dyn Fn(&MouseDownEvent, &mut WindowContext) + 'static>,
+    on_click: Box<dyn Fn(&MouseDownEvent, &mut WindowContext) + 'static>,
 }
 
 struct ButtonStyle {
@@ -26,18 +26,18 @@ impl Button {
         Self {
             text,
             base: div(),
-            onclick: Box::new(|_, _| {}),
+            on_click: Box::new(|_, _| {}),
             style: ButtonStyles::Primary,
         }
     }
 
     pub fn on_click(mut self, handler: impl Fn(&MouseDownEvent, &mut WindowContext) + 'static) -> Self {
-        self.onclick = Box::new(handler);
+        self.on_click = Box::new(handler);
         self
     }
 
     pub fn on_click_mut<T: Render>(mut self, cx: &mut ViewContext<T>, handler: impl Fn(&mut T, &MouseDownEvent, &mut ViewContext<'_, T>) + 'static) -> Self {
-        self.onclick = Box::new(cx.listener(move |view, ev, cx| {
+        self.on_click = Box::new(cx.listener(move |view, ev, cx| {
             (handler)(view, ev, cx);
         }));
         self
@@ -53,21 +53,22 @@ impl Button {
     }
 
     fn get_style(&self, cx: &mut WindowContext) -> ButtonStyle {
+        let theme = cx.active_theme();
         match self.style {
             ButtonStyles::Primary => ButtonStyle {
-                bg: cx.active_theme().primary,
-                text_color: cx.active_theme().primary_foreground,
-                hover_color: cx.active_theme().primary_hover,
+                bg: theme.primary,
+                text_color: theme.primary_foreground,
+                hover_color: theme.primary_hover,
             },
             ButtonStyles::Secondary => ButtonStyle {
-                bg: cx.active_theme().secondary,
-                text_color: cx.active_theme().secondary_foreground,
-                hover_color: cx.active_theme().secondary_hover,
+                bg: theme.secondary,
+                text_color: theme.secondary_foreground,
+                hover_color: theme.secondary_hover,
             },
             ButtonStyles::Destructive => ButtonStyle {
-                bg: cx.active_theme().destructive,
-                text_color: cx.active_theme().destructive_foreground,
-                hover_color: cx.active_theme().destructive_hover,
+                bg: theme.destructive,
+                text_color: theme.destructive_foreground,
+                hover_color: theme.destructive_hover,
             },
         }
     }
@@ -90,7 +91,7 @@ impl RenderOnce for Button {
             .justify_center()
             .child(self.text)
             .on_mouse_down(MouseButton::Left, move |event, ctx| {
-                (self.onclick)(event, ctx);
+                (self.on_click)(event, ctx);
             })
     }
 }

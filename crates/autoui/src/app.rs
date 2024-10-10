@@ -1,3 +1,4 @@
+use crate::assets::Assets;
 use crate::theme::{ActiveTheme, init_theme};
 use gpui::*;
 
@@ -39,7 +40,7 @@ impl<T: Viewable + Render> Render for SimpleRootView<T> {
 
 impl SimpleApp {
     pub fn new() -> Self {
-        Self { app: App::new() }
+        Self { app: App::new().with_assets(Assets) }
     }
 
     pub fn run<T>(self, build_root_view: impl FnOnce(&mut WindowContext) -> View<T> + 'static)
