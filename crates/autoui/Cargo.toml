@@ -5,5 +5,8 @@ edition = "2021"
 
 [dependencies]
 gpui = { workspace = true }
-autoui-widgets = { workspace = true }
-autoui-theme = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+paste = { workspace = true }
+once_cell = { workspace = true }

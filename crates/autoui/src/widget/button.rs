@@ -1,5 +1,5 @@
 use gpui::*;
-use autoui_theme::theme::*;
+use crate::theme::*;
 
 #[derive(IntoElement)]
 pub struct Button {
@@ -36,6 +36,13 @@ impl Button {
         self
     }
 
+    pub fn on_click_mut<T: Render>(mut self, cx: &mut ViewContext<T>, handler: impl Fn(&mut T, &MouseDownEvent, &mut ViewContext<'_, T>) + 'static) -> Self {
+        self.onclick = Box::new(cx.listener(move |view, ev, cx| {
+            (handler)(view, ev, cx);
+        }));
+        self
+    }
+
     fn is_digit(&self) -> bool {
         self.text.chars().all(|c| c.is_digit(10))
     }
@@ -48,19 +55,19 @@ impl Button {
     fn get_style(&self, cx: &mut WindowContext) -> ButtonStyle {
         match self.style {
             ButtonStyles::Primary => ButtonStyle {
-                bg: cx.theme().primary,
-                text_color: cx.theme().primary_foreground,
-                hover_color: cx.theme().primary_hover,
+                bg: cx.active_theme().primary,
+                text_color: cx.active_theme().primary_foreground,
+                hover_color: cx.active_theme().primary_hover,
             },
             ButtonStyles::Secondary => ButtonStyle {
-                bg: cx.theme().secondary,
-                text_color: cx.theme().secondary_foreground,
-                hover_color: cx.theme().secondary_hover,
+                bg: cx.active_theme().secondary,
+                text_color: cx.active_theme().secondary_foreground,
+                hover_color: cx.active_theme().secondary_hover,
             },
             ButtonStyles::Destructive => ButtonStyle {
-                bg: cx.theme().destructive,
-                text_color: cx.theme().destructive_foreground,
-                hover_color: cx.theme().destructive_hover,
+                bg: cx.active_theme().destructive,
+                text_color: cx.active_theme().destructive_foreground,
+                hover_color: cx.active_theme().destructive_hover,
             },
         }
     }

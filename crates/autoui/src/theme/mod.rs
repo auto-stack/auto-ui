@@ -1,3 +1,4 @@
+pub mod color;
 use std::ops::Deref;
 
 use gpui::{
@@ -5,35 +6,35 @@ use gpui::{
     ViewContext, WindowAppearance, WindowContext,
 };
 
-pub fn init(cx: &mut AppContext) {
+pub fn init_theme(cx: &mut AppContext) {
     Theme::sync_system_appearance(cx)
 }
 
 pub trait ActiveTheme {
-    fn theme(&self) -> &Theme;
+    fn active_theme(&self) -> &Theme;
 }
 
 impl ActiveTheme for AppContext {
-    fn theme(&self) -> &Theme {
+    fn active_theme(&self) -> &Theme {
         Theme::get_global(self)
     }
 }
 
 impl<'a, V> ActiveTheme for ViewContext<'a, V> {
-    fn theme(&self) -> &Theme {
-        self.deref().theme()
+    fn active_theme(&self) -> &Theme {
+        self.deref().active_theme()
     }
 }
 
 impl<'a, V> ActiveTheme for ModelContext<'a, V> {
-    fn theme(&self) -> &Theme {
-        self.deref().theme()
+    fn active_theme(&self) -> &Theme {
+        self.deref().active_theme()
     }
 }
 
 impl<'a> ActiveTheme for WindowContext<'a> {
-    fn theme(&self) -> &Theme {
-        self.deref().theme()
+    fn active_theme(&self) -> &Theme {
+        self.deref().active_theme()
     }
 }
 
@@ -376,7 +377,7 @@ impl From<Colors> for Theme {
             scrollbar_thumb: colors.scrollbar_thumb,
             panel: colors.panel,
             selection: colors.selection,
-            drag_border: crate::colors::blue_500(),
+            drag_border: color::blue_500(),
             drop_target: colors.drop_target,
             tab_bar: colors.tab_bar,
             tab: gpui::transparent_black(),

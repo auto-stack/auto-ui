@@ -1,8 +1,0 @@
-[package]
-name = "autoui-widgets"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-gpui = { workspace = true }
-autoui-theme = { workspace = true }

@@ -57,7 +57,7 @@ impl ColorExt for Hsla {
 
 pub(crate) static DEFAULT_COLOR: once_cell::sync::Lazy<ShadcnColors> =
     once_cell::sync::Lazy::new(|| {
-        serde_json::from_str(include_str!("../default-colors.json"))
+        serde_json::from_str(include_str!("../../assets/default-colors.json"))
             .expect("failed to parse default-json")
     });
 

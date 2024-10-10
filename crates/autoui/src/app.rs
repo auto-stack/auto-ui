@@ -1,5 +1,4 @@
-use autoui_theme::theme;
-use autoui_theme::theme::ActiveTheme;
+use crate::theme::{ActiveTheme, init_theme};
 use gpui::*;
 
 pub struct SimpleApp {
@@ -7,7 +6,7 @@ pub struct SimpleApp {
 }
 
 pub trait Viewable: 'static + Sized {
-    fn view(cx: &mut WindowContext) -> View<Self>;
+    fn new(cx: &mut ViewContext<Self>) -> Self;
 }
 
 pub struct SimpleRootView<T: Viewable + Render> {
@@ -22,7 +21,7 @@ impl<T: Viewable + Render> SimpleRootView<T> {
 
 impl<T: Viewable + Render> Render for SimpleRootView<T> {
     fn render(&mut self, cx: &mut ViewContext<'_, Self>) -> impl IntoElement {
-        let theme = cx.theme();
+        let theme = cx.active_theme();
         div()
             .flex()
             .bg(theme.background)
@@ -48,7 +47,7 @@ impl SimpleApp {
         T: 'static + Render,
     {
         self.app.run(move |cx| {
-            theme::init(cx);
+            init_theme(cx);
 
             cx.open_window(WindowOptions::default(), |cx| {
                 build_root_view(cx)
@@ -59,8 +58,8 @@ impl SimpleApp {
 
     pub fn run_simple<T: Viewable + Render>(self) {
         self.run(|cx| {
-            let view = T::view(cx);
-            cx.new_view(|cx| SimpleRootView::new(view))
+            let view = cx.new_view(|cx| T::new(cx));
+            cx.new_view(|_cx| SimpleRootView::new(view))
         });
     }
 }
