@@ -4,6 +4,7 @@ use gpui::*;
 
 pub struct SimpleApp {
     app: App,
+    title: String,
 }
 
 pub trait Viewable: 'static + Sized {
@@ -39,8 +40,8 @@ impl<T: Viewable + Render> Render for SimpleRootView<T> {
 }
 
 impl SimpleApp {
-    pub fn new() -> Self {
-        Self { app: App::new().with_assets(Assets) }
+    pub fn new(title: &str) -> Self {
+        Self { app: App::new().with_assets(Assets), title: title.to_string() }
     }
 
     pub fn run<T>(self, build_root_view: impl FnOnce(&mut WindowContext) -> View<T> + 'static)
@@ -50,7 +51,22 @@ impl SimpleApp {
         self.app.run(move |cx| {
             init_theme(cx);
 
-            cx.open_window(WindowOptions::default(), |cx| {
+            // window options
+            let window_options = WindowOptions {
+                titlebar: Some(TitlebarOptions {
+                    title: Some(self.title.into()),
+                    // appears_transparent: true,
+                    // traffic_light_position: Some(point(px(9.0), px(9.0))),
+                    ..Default::default()
+                }),
+                window_min_size: Some(gpui::Size {
+                    width: px(640.),
+                    height: px(480.),
+                }),
+                ..WindowOptions::default()
+            };
+
+            cx.open_window(window_options, |cx| {
                 build_root_view(cx)
             })
             .unwrap();

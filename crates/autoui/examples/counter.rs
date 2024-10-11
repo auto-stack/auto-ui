@@ -1,5 +1,5 @@
 use gpui::*;
-use autoui::widget::Button;
+use autoui::widget::button::*;
 use autoui::app::SimpleApp;
 use autoui::app::Viewable;
 
@@ -35,6 +35,6 @@ impl Render for CounterView {
 }
 
 fn main() {
-    SimpleApp::new().run_simple::<CounterView>();
+    SimpleApp::new("Counter Example").run_simple::<CounterView>();
 }
 

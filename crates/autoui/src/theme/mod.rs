@@ -8,6 +8,7 @@ use gpui::{
 
 pub fn init_theme(cx: &mut AppContext) {
     Theme::sync_system_appearance(cx)
+    // Theme::change(ThemeMode::Dark, cx);
 }
 
 pub trait ActiveTheme {

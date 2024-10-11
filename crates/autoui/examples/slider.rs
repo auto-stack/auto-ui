@@ -37,6 +37,6 @@ impl Render for SliderView {
 }
 
 fn main() {
-    SimpleApp::new().run_simple::<SliderView>();
+    SimpleApp::new("Slider Example").run_simple::<SliderView>();
 }
 

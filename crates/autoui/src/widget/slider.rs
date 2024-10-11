@@ -126,8 +126,8 @@ impl Render for Slider {
                     .bg(theme.slider_bar.opacity(0.2))
                     .active(|this| this.bg(theme.slider_bar.opacity(0.4)))
                     .rounded(px(3.))
+                    // slider track
                     .child(
-                        // slider track
                         div()
                             .absolute()
                             .top_0()
@@ -137,7 +137,9 @@ impl Render for Slider {
                             .bg(theme.slider_bar)
                             .rounded_l(px(3.))
                     )
+                    // thumb
                     .child(self.render_thumb(cx))
+                    // canvas used for rendering draggable thumb. TODO: figure out how it works
                     .child({
                         let view = cx.view().clone();
                         canvas(

@@ -1,5 +1,5 @@
 use gpui::*;
-use autoui::widget::Button;
+use autoui::widget::button::*;
 use autoui::app::SimpleApp;
 use autoui::app::Viewable;
 
@@ -28,6 +28,6 @@ impl Render for ButtonView {
 }
 
 fn main() {
-    SimpleApp::new().run_simple::<ButtonView>();
+    SimpleApp::new("Button Example").run_simple::<ButtonView>();
 }
 
