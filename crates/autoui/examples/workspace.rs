@@ -1,5 +1,6 @@
 use gpui::*;
 use autoui::widget::pane::*;
+use autoui::widget::toolbar::*;
 use autoui::theme::ActiveTheme;
 use autoui::widget::workspace::Workspace;
 use autoui::app::SimpleApp;
@@ -79,12 +80,14 @@ impl Render for BottomContent {
 
 impl RootView {
     fn new(cx: &mut WindowContext) -> Self {
+       let toolbar = cx.new_view(|_cx| Toolbar{});
        let left = Pane::new(PaneSide::Left, Pixels(250.0)).child(cx.new_view(|_cx| LeftContent { text: "Left".to_string() }));
        let right = Pane::new(PaneSide::Right, Pixels(250.0)).child(cx.new_view(|_cx| RightContent { text: "Right".to_string() }));
        let top = Pane::new(PaneSide::Top, Pixels(100.0)).child(cx.new_view(|_cx| TopContent { text: "Top".to_string() }));
        let bottom = Pane::new(PaneSide::Bottom, Pixels(100.0)).child(cx.new_view(|_cx| BottomContent { text: "Bottom".to_string() }));
        let center = cx.new_view(|_cx| CenterContent { text: "Center".to_string() });
        let workspace = Workspace::new()
+        .toolbar(toolbar)
         .left(cx.new_view(|_cx| left))
         .right(cx.new_view(|_cx| right))
         .top(cx.new_view(|_cx| top))
@@ -109,7 +112,7 @@ impl Render for RootView {
 }
 
 fn main() {
-    SimpleApp::new("Workspace Example").run(|cx| {
+    SimpleApp::new().run(false, |cx| {
         cx.new_view(|cx| RootView::new(cx))
     });
 }

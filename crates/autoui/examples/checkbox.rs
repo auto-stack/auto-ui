@@ -34,6 +34,6 @@ impl Render for CheckboxView {
 }
 
 fn main() {
-    SimpleApp::new("Checkbox Example").run_simple::<CheckboxView>();
+    SimpleApp::new().title("Checkbox Example").run_simple::<CheckboxView>();
 }
 

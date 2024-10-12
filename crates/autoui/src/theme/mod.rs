@@ -119,7 +119,7 @@ impl Colorize for Hsla {
 
     /// Return a new color with the lightness increased by the given factor.
     fn lighten(&self, factor: f32) -> Hsla {
-        let l = (self.l * 1.0 - factor.clamp(0.0, 1.0)).min(1.0);
+        let l = (self.l * 1.0 + factor.clamp(0.0, 1.0)).min(1.0);
 
         Hsla { l, ..*self }
     }

@@ -23,5 +23,5 @@ impl Render for HelloWorldView {
 }
 
 fn main() {
-    SimpleApp::new("Hello World Example").run_simple::<HelloWorldView>();
+    SimpleApp::new().title("Hello World Example").run_simple::<HelloWorldView>();
 }

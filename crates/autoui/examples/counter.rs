@@ -35,6 +35,6 @@ impl Render for CounterView {
 }
 
 fn main() {
-    SimpleApp::new("Counter Example").run_simple::<CounterView>();
+    SimpleApp::new().title("Counter Example").run_simple::<CounterView>();
 }
 

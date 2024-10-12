@@ -1,8 +1,11 @@
 use crate::widget::pane::*;
+use crate::widget::toolbar::*;
 use gpui::*;
 use prelude::FluentBuilder;
+use crate::theme::{ActiveTheme, Colorize, ThemeMode};
 
 pub struct Workspace {
+    toolbar: Option<View<Toolbar>>,
     left: Option<View<Pane>>,
     right: Option<View<Pane>>,
     top: Option<View<Pane>>,
@@ -13,12 +16,18 @@ pub struct Workspace {
 impl Workspace {
     pub fn new() -> Self {
         Self {
+            toolbar: None,
             left: None,
             right: None,
             top: None,
             bottom: None,
             child: None,
         }
+    }
+
+    pub fn toolbar(mut self, toolbar: impl Into<View<Toolbar>>) -> Self {
+        self.toolbar = Some(toolbar.into());
+        self
     }
 
     pub fn child(mut self, child: impl Into<AnyView>) -> Self {
@@ -51,44 +60,88 @@ impl FluentBuilder for Workspace {}
 
 impl Render for Workspace {
     fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
+        let theme = cx.active_theme();
+        // let status_color = match theme.mode {
+        //     ThemeMode::Dark => {
+        //         theme.background.lighten(0.05)
+        //     }
+        //     ThemeMode::Light => {
+        //         theme.background.darken(0.05)
+        //     }
+        // };
+        let status_color = theme.background;
         div()
             .flex()
-            .flex_row()
+            .flex_col()
             .size_full()
             .border_0()
-            // Left Pane
-            .when(self.left.is_some(), |s| {
-                if let Some(left) = self.left.as_ref() {
-                    s.child(div().w(left.read(cx).size).h_full().child(left.clone()))
+            // Toolbar
+            .when(self.toolbar.is_some(), |s| {
+                if let Some(toolbar) = self.toolbar.as_ref() {
+                    s.child(toolbar.clone())
                 } else {
                     s
                 }
             })
-            // Center Panes
+            // Workarea
             .child(
                 div()
-                    .w_full()
-                    .h_full()
                     .flex()
-                    .flex_col()
-                    // Center Content
-                    .child(div().size_full().p_4().child(self.child.as_ref().unwrap().clone()))
-                    // Bottom Pane
-                    .when(self.bottom.is_some(), |s| {
-                        if let Some(bottom) = self.bottom.as_ref() {
-                            s.child(div().w_full().h(bottom.read(cx).size).child(bottom.clone()))
+                    .flex_row()
+                    .size_full()
+                    .border_0()
+                    // Left Pane
+                    .when(self.left.is_some(), |s| {
+                        if let Some(left) = self.left.as_ref() {
+                            s.child(div().w(left.read(cx).size).h_full().child(left.clone()))
+                        } else {
+                            s
+                        }
+                    })
+                    // Center Panes
+                    .child(
+                        div()
+                            .w_full()
+                            .h_full()
+                            .flex()
+                            .flex_col()
+                            // Center Content
+                            .child(
+                                div()
+                                    .size_full()
+                                    .p_4()
+                                    .child(self.child.as_ref().unwrap().clone()),
+                            )
+                            // Bottom Pane
+                            .when(self.bottom.is_some(), |s| {
+                                if let Some(bottom) = self.bottom.as_ref() {
+                                    s.child(
+                                        div()
+                                            .w_full()
+                                            .h(bottom.read(cx).size)
+                                            .child(bottom.clone()),
+                                    )
+                                } else {
+                                    s
+                                }
+                            }),
+                    )
+                    // Right Pane
+                    .when(self.right.is_some(), |s| {
+                        if let Some(right) = self.right.as_ref() {
+                            s.child(div().w(right.read(cx).size).h_full().child(right.clone()))
                         } else {
                             s
                         }
                     }),
             )
-            // Right Pane
-            .when(self.right.is_some(), |s| {
-                if let Some(right) = self.right.as_ref() {
-                    s.child(div().w(right.read(cx).size).h_full().child(right.clone()))
-                } else {
-                    s
-                }
-            })
+            .child(
+                div()
+                    .w_full()
+                    .h(px(25.0))
+                    .border_t_1()
+                    .border_color(theme.border)
+                    .bg(status_color)
+            )
     }
 }

@@ -28,6 +28,6 @@ impl Render for ButtonView {
 }
 
 fn main() {
-    SimpleApp::new("Button Example").run_simple::<ButtonView>();
+    SimpleApp::new().title("Button Example").run_simple::<ButtonView>();
 }
 

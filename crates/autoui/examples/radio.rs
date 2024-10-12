@@ -43,6 +43,6 @@ impl Render for RadioView {
 }
 
 fn main() {
-    SimpleApp::new("Radio Example").run_simple::<RadioView>();
+    SimpleApp::new().title("Radio Example").run_simple::<RadioView>();
 }
 

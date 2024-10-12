@@ -1,5 +1,5 @@
 use crate::assets::Assets;
-use crate::theme::{ActiveTheme, init_theme};
+use crate::theme::{init_theme, ActiveTheme};
 use gpui::*;
 
 pub struct SimpleApp {
@@ -40,25 +40,44 @@ impl<T: Viewable + Render> Render for SimpleRootView<T> {
 }
 
 impl SimpleApp {
-    pub fn new(title: &str) -> Self {
-        Self { app: App::new().with_assets(Assets), title: title.to_string() }
+    pub fn new() -> Self {
+        Self {
+            app: App::new().with_assets(Assets),
+            title: String::new(),
+        }
     }
 
-    pub fn run<T>(self, build_root_view: impl FnOnce(&mut WindowContext) -> View<T> + 'static)
-    where
+    pub fn title(mut self, title: &str) -> Self {
+        self.title = title.to_string();
+        self
+    }
+
+    pub fn run<T>(
+        self,
+        is_simple: bool,
+        build_root_view: impl FnOnce(&mut WindowContext) -> View<T> + 'static,
+    ) where
         T: 'static + Render,
     {
         self.app.run(move |cx| {
             init_theme(cx);
 
+            let title_options = if is_simple {
+                TitlebarOptions {
+                    title: Some(self.title.into()),
+                    ..Default::default()
+                }
+            } else {
+                TitlebarOptions {
+                    appears_transparent: true,
+                    traffic_light_position: Some(point(px(9.0), px(9.0))),
+                    ..Default::default()
+                }
+            };
+
             // window options
             let window_options = WindowOptions {
-                titlebar: Some(TitlebarOptions {
-                    title: Some(self.title.into()),
-                    // appears_transparent: true,
-                    // traffic_light_position: Some(point(px(9.0), px(9.0))),
-                    ..Default::default()
-                }),
+                titlebar: Some(title_options),
                 window_min_size: Some(gpui::Size {
                     width: px(640.),
                     height: px(480.),
@@ -66,15 +85,13 @@ impl SimpleApp {
                 ..WindowOptions::default()
             };
 
-            cx.open_window(window_options, |cx| {
-                build_root_view(cx)
-            })
-            .unwrap();
+            cx.open_window(window_options, |cx| build_root_view(cx))
+                .unwrap();
         });
     }
 
     pub fn run_simple<T: Viewable + Render>(self) {
-        self.run(|cx| {
+        self.run(true, |cx| {
             let view = cx.new_view(|cx| T::new(cx));
             cx.new_view(|_cx| SimpleRootView::new(view))
         });
