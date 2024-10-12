@@ -1,5 +1,5 @@
 use gpui::*;
-use crate::theme::color::black;
+use crate::style::color::black;
 
 #[derive(IntoElement)]
 pub struct Icon {
@@ -38,6 +38,12 @@ pub enum SysIcon {
     Check,
     Sun,
     Moon,
+}
+
+impl SysIcon {
+    pub fn icon(self) -> Icon {
+        Icon::from(self)
+    }
 }
 
 impl From<SysIcon> for Icon {

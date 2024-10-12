@@ -1,5 +1,5 @@
 use crate::assets::Assets;
-use crate::theme::{init_theme, ActiveTheme};
+use crate::style::theme::{init_theme, ActiveTheme};
 use gpui::*;
 
 pub struct SimpleApp {

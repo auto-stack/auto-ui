@@ -1,9 +1,12 @@
 use gpui::*;
-use crate::theme::*;
+use crate::style::theme::*;
+use crate::widget::icon::*;
+use gpui::prelude::FluentBuilder;
 
 #[derive(IntoElement)]
 pub struct Button {
-    text: String,
+    icon: Option<Icon>,
+    label: Option<SharedString>,
     base: Div,
     style: ButtonStyles,
     on_click: Box<dyn Fn(&MouseDownEvent, &mut WindowContext) + 'static>,
@@ -15,20 +18,50 @@ struct ButtonStyle {
     hover_color: Hsla,
 }
 
-enum ButtonStyles {
+pub enum ButtonStyles {
     Primary,
     Secondary,
-    Destructive,
+    Bare,
 }
 
 impl Button {
-    pub fn new(text: String) -> Self {
+    // constructors
+    pub fn new() -> Self {
         Self {
-            text,
+            icon: None,
+            label: None,
             base: div(),
             on_click: Box::new(|_, _| {}),
             style: ButtonStyles::Primary,
         }
+    }
+
+    pub fn primary(label: &str) -> Self {
+        Self::new().label(label.to_string().into()).style(ButtonStyles::Primary)
+    }
+
+    pub fn button(label: &str) -> Self {
+        Self::new().label(label.to_string().into())
+    }
+
+    pub fn iconed(icon: Icon) -> Self {
+        Self::new().icon(icon).style(ButtonStyles::Bare)
+    }
+
+    // builders
+    pub fn icon(mut self, icon: Icon) -> Self {
+        self.icon = Some(icon);
+        self
+    }
+
+    pub fn label(mut self, label: SharedString) -> Self {
+        self.label = Some(label);
+        self
+    }
+
+    pub fn style(mut self, style: ButtonStyles) -> Self {
+        self.style = style;
+        self
     }
 
     pub fn on_click(mut self, handler: impl Fn(&MouseDownEvent, &mut WindowContext) + 'static) -> Self {
@@ -40,15 +73,6 @@ impl Button {
         self.on_click = Box::new(cx.listener(move |view, ev, cx| {
             (handler)(view, ev, cx);
         }));
-        self
-    }
-
-    fn is_digit(&self) -> bool {
-        self.text.chars().all(|c| c.is_digit(10))
-    }
-
-    fn style(&mut self, style: ButtonStyles) -> &mut Self {
-        self.style = style;
         self
     }
 
@@ -65,10 +89,10 @@ impl Button {
                 text_color: theme.secondary_foreground,
                 hover_color: theme.secondary_hover,
             },
-            ButtonStyles::Destructive => ButtonStyle {
-                bg: theme.destructive,
-                text_color: theme.destructive_foreground,
-                hover_color: theme.destructive_hover,
+            ButtonStyles::Bare => ButtonStyle {
+                bg: theme.transparent,
+                text_color: theme.secondary_foreground,
+                hover_color: theme.secondary_hover,
             },
         }
     }
@@ -81,6 +105,7 @@ impl RenderOnce for Button {
         let style = self.get_style(cx);
         self.base
             .flex()
+            .flex_row()
             .cursor_pointer()
             .bg(style.bg)
             .text_color(style.text_color)
@@ -89,7 +114,15 @@ impl RenderOnce for Button {
             .p(px(4.0))
             .items_center()
             .justify_center()
-            .child(self.text)
+            .overflow_hidden()
+            .map(move |this| {
+                match self.style {
+                    ButtonStyles::Bare => this.size_6(),
+                    _ => this.h_8().px_1(),
+                }
+            })
+            .when_some(self.icon, |this, icon| this.child(icon))
+            .when_some(self.label, |this, label| this.child(label.clone()))
             .on_mouse_down(MouseButton::Left, move |event, ctx| {
                 (self.on_click)(event, ctx);
             })

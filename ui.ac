@@ -1,0 +1,26 @@
+node counter(id) {
+    // Model
+    var count: i32 = 0
+
+    // View
+    cols(gap=1) {
+        button("+") {
+            on_click: () => count += 1
+        }
+
+        text(f"Count: {count}")
+
+        button("-") {
+            on_click: () => count -= 1
+        }
+    }
+
+    // Style
+    items_center: true
+    font_weight: "bold"
+}
+
+
+ui {
+    counter("counter_1")
+}

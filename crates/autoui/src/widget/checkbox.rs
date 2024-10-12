@@ -1,7 +1,7 @@
 use gpui::*;
 use gpui::div;
 use gpui::prelude::FluentBuilder as _;
-use crate::theme::ActiveTheme;
+use crate::style::theme::ActiveTheme;
 
 #[derive(IntoElement)]
 pub struct Checkbox {

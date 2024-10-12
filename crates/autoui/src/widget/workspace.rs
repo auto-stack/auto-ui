@@ -2,7 +2,7 @@ use crate::widget::pane::*;
 use crate::widget::toolbar::*;
 use gpui::*;
 use prelude::FluentBuilder;
-use crate::theme::{ActiveTheme, Colorize, ThemeMode};
+use crate::style::theme::ActiveTheme;
 
 pub struct Workspace {
     toolbar: Option<View<Toolbar>>,

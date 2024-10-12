@@ -1,6 +1,8 @@
 use gpui::*;
 use prelude::FluentBuilder;
-use crate::theme::{ActiveTheme, Colorize, ThemeMode};
+use crate::style::color::Colorize;
+use crate::style::theme::{ActiveTheme, ThemeMode};
+
 
 pub const PANE_MIN_SIZE: Pixels = Pixels(100.);
 
@@ -63,7 +65,7 @@ impl Render for Pane {
             .flex_grow()
             .size_full()
             .relative()
-            .p_4()
+            .p_2()
             .map(|s| {
                 match self.side {
                     PaneSide::Left => s.border_r_1(),

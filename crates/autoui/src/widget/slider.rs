@@ -1,6 +1,6 @@
 use gpui::*;
 use gpui::prelude::*;
-use crate::theme::ActiveTheme;
+use crate::style::theme::ActiveTheme;
 
 pub struct Slider {
     id: ElementId,

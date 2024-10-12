@@ -11,3 +11,4 @@ serde_json = { workspace = true }
 paste = { workspace = true }
 once_cell = { workspace = true }
 rust-embed = { workspace = true }
+smallvec = { workspace = true }

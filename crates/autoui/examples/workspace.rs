@@ -1,7 +1,7 @@
 use gpui::*;
 use autoui::widget::pane::*;
 use autoui::widget::toolbar::*;
-use autoui::theme::ActiveTheme;
+use autoui::style::theme::ActiveTheme;
 use autoui::widget::workspace::Workspace;
 use autoui::app::SimpleApp;
 
@@ -34,7 +34,6 @@ impl Render for LeftContent {
                 }
                 items
             }).h_full())
-            .child("End of Sidebar")
     }
 }
 
