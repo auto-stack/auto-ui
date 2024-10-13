@@ -12,3 +12,5 @@ paste = { workspace = true }
 once_cell = { workspace = true }
 rust-embed = { workspace = true }
 smallvec = { workspace = true }
+unicode-segmentation = { workspace = true }
+regex = { workspace = true }

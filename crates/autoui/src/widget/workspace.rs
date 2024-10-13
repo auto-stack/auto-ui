@@ -2,6 +2,7 @@ use crate::widget::pane::*;
 use crate::widget::toolbar::*;
 use gpui::*;
 use prelude::FluentBuilder;
+use crate::style::color::Colorize;
 use crate::style::theme::ActiveTheme;
 
 pub struct Workspace {
@@ -105,22 +106,15 @@ impl Render for Workspace {
                             .h_full()
                             .flex()
                             .flex_col()
+                            .justify_center()
+                            .items_center()
+                            .bg(theme.background.darken(0.03))
                             // Center Content
-                            .child(
-                                div()
-                                    .size_full()
-                                    .p_4()
-                                    .child(self.child.as_ref().unwrap().clone()),
-                            )
+                            .child(self.child.as_ref().unwrap().clone())
                             // Bottom Pane
                             .when(self.bottom.is_some(), |s| {
                                 if let Some(bottom) = self.bottom.as_ref() {
-                                    s.child(
-                                        div()
-                                            .w_full()
-                                            .h(bottom.read(cx).size)
-                                            .child(bottom.clone()),
-                                    )
+                                    s.child(div().h(bottom.read(cx).size).child(bottom.clone()))
                                 } else {
                                     s
                                 }

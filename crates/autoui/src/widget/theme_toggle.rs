@@ -31,6 +31,7 @@ impl RenderOnce for ThemeToggle {
                     }
                 }).style(ButtonStyles::Bare)
                 .on_click(move |_ev, cx| {
+                    println!("clicked theme toggle");
                     if mode == ThemeMode::Light {
                         Theme::change(ThemeMode::Dark, cx);
                     } else {

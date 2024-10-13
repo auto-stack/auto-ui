@@ -1,6 +1,7 @@
+// Node form
 node counter(id) {
     // Model
-    var count: i32 = 0
+    var count = 0
 
     // View
     cols(gap=1) {
@@ -23,4 +24,35 @@ node counter(id) {
 
 ui {
     counter("counter_1")
+}
+
+// Sleek form
+widget counter(id) {
+    model {
+        var count: i32 = 0
+
+        fn reset() {
+            count = 0
+        }
+    }
+
+    view {
+        cols(gap=1) {
+            button("➕") {
+                on_click: || count += 1
+            }
+            text(f"Count: {count}")
+            button("➖") {
+                on_click: || count -= 1
+            }
+            icon("🔄") {
+                on_click: || reset()
+            }
+        }
+    }
+
+    style {
+        items_center: true
+        font_weight: "bold"
+    }   
 }

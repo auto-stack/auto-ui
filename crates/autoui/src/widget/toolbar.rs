@@ -2,6 +2,7 @@ use gpui::*;
 use crate::style::color::Colorize;
 use crate::style::theme::{ActiveTheme, ThemeMode};
 use crate::widget::theme_toggle::ThemeToggle;
+use crate::widget::button::Button;
 
 #[derive(IntoElement)]
 pub struct WindowControlIcon {
@@ -66,7 +67,8 @@ impl Render for Toolbar {
             .child(
                 div()
                     .items_center()
-                    .child("Toolbar"))
+                    .child("Toolbar")
+            )
             // Middle
             .child(
                 div()

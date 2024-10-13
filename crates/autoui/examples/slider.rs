@@ -29,8 +29,10 @@ impl Viewable for SliderView {
 impl Render for SliderView {
     fn render(&mut self, _cx: &mut ViewContext<Self>) -> impl IntoElement {
         div()
+            .flex()
+            .flex_col()
+            .gap_4()
             .child("Slider Demo:")
-            .gap_1()
             .child(self.slider.clone())
             .child(div().child(self.value.to_string()))
     }

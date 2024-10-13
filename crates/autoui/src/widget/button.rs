@@ -1,6 +1,7 @@
 use gpui::*;
 use crate::style::theme::*;
 use crate::widget::icon::*;
+use crate::style::size::SizeScale;
 use gpui::prelude::FluentBuilder;
 
 #[derive(IntoElement)]
@@ -9,7 +10,8 @@ pub struct Button {
     label: Option<SharedString>,
     base: Div,
     style: ButtonStyles,
-    on_click: Box<dyn Fn(&MouseDownEvent, &mut WindowContext) + 'static>,
+    size_scale: SizeScale,
+    on_click: Option<Box<dyn Fn(&ClickEvent, &mut WindowContext) + 'static>>,
 }
 
 struct ButtonStyle {
@@ -31,8 +33,9 @@ impl Button {
             icon: None,
             label: None,
             base: div(),
-            on_click: Box::new(|_, _| {}),
-            style: ButtonStyles::Primary,
+            size_scale: SizeScale::M,
+            on_click: None,
+            style: ButtonStyles::Secondary,
         }
     }
 
@@ -64,15 +67,20 @@ impl Button {
         self
     }
 
-    pub fn on_click(mut self, handler: impl Fn(&MouseDownEvent, &mut WindowContext) + 'static) -> Self {
-        self.on_click = Box::new(handler);
+    pub fn size_scale(mut self, size: SizeScale) -> Self {
+        self.size_scale = size;
         self
     }
 
-    pub fn on_click_mut<T: Render>(mut self, cx: &mut ViewContext<T>, handler: impl Fn(&mut T, &MouseDownEvent, &mut ViewContext<'_, T>) + 'static) -> Self {
-        self.on_click = Box::new(cx.listener(move |view, ev, cx| {
+    pub fn on_click(mut self, handler: impl Fn(&ClickEvent, &mut WindowContext) + 'static) -> Self {
+        self.on_click = Some(Box::new(handler));
+        self
+    }
+
+    pub fn on_click_mut<T: Render>(mut self, cx: &mut ViewContext<T>, handler: impl Fn(&mut T, &ClickEvent, &mut ViewContext<'_, T>) + 'static) -> Self {
+        self.on_click = Some(Box::new(cx.listener(move |view, ev, cx| {
             (handler)(view, ev, cx);
-        }));
+        })));
         self
     }
 
@@ -104,6 +112,7 @@ impl RenderOnce for Button {
     fn render(self, cx: &mut WindowContext) -> impl IntoElement {
         let style = self.get_style(cx);
         self.base
+            .id("button")
             .flex()
             .flex_row()
             .cursor_pointer()
@@ -123,8 +132,12 @@ impl RenderOnce for Button {
             })
             .when_some(self.icon, |this, icon| this.child(icon))
             .when_some(self.label, |this, label| this.child(label.clone()))
-            .on_mouse_down(MouseButton::Left, move |event, ctx| {
-                (self.on_click)(event, ctx);
+            .when_some(self.on_click, |this, on_click| {
+                this.on_mouse_down(MouseButton::Left, move |_ev, cx| {
+                    cx.prevent_default();
+                }).on_click(move |ev, cx| {
+                    (on_click)(&ev, cx);
+                })
             })
     }
 }

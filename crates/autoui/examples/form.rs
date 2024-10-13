@@ -1,42 +1,62 @@
 use autoui::app::SimpleApp;
 use autoui::style::theme::ActiveTheme;
 use autoui::widget::button::Button;
-use autoui::widget::card::Card;
 use autoui::widget::checkbox::Checkbox;
+use autoui::widget::input::TextInput;
 use autoui::widget::toolbar::*;
 use autoui::widget::workspace::Workspace;
+use autoui::widget::util::*;
 use gpui::*;
 
 struct RootView {
     workspace: View<Workspace>,
 }
 
-struct CenterContent {}
+struct CenterContent {
+    input: View<TextInput>,
+}
 
 impl Render for CenterContent {
-    fn render(&mut self, _cx: &mut ViewContext<Self>) -> impl IntoElement {
+    fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
         let label_width = 100.;
         div()
             .flex()
             .flex_col()
+            .w_1_3()
             .items_center()
             .gap_4()
-            .child(Card::new("Section_1")
-                .child(
-                    div().flex().flex_row()
-                        .child(div().w(Pixels(label_width)).child("IsSigned: "))
-                        .child(Checkbox::new("is_signed")))
-                .child(Button::button("Don't click me")))
-            .child(Card::new("Section_2")
-                .child("World")
-                .child(Button::button("Don't click me")))
+            .child(
+                card("Section_1", cx)
+                    .child(
+                        div()
+                            .flex()
+                            .flex_row()
+                            .child(div().w(Pixels(label_width)).child("IsSigned: "))
+                            .child(Checkbox::new("is_signed")),
+                    )
+                    .child(Button::button("Don't click me")),
+            )
+            .child(
+                card("Section_2", cx)
+                    .child("World")
+                    .child(
+                        div()
+                            .flex()
+                            .flex_row()
+                            .w_full()
+                            .child(self.input.clone())
+                    )
+                    .child(Button::button("Don't click me")),
+            )
     }
 }
 
 impl RootView {
     fn new(cx: &mut WindowContext) -> Self {
         let toolbar = cx.new_view(|_cx| Toolbar {});
-        let center = cx.new_view(|_cx| CenterContent {});
+        let center = cx.new_view(|cx| CenterContent {
+            input: cx.new_view(|cx| TextInput::new(cx)),
+        });
         let workspace = Workspace::new().toolbar(toolbar).child(center);
 
         Self {
