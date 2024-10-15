@@ -52,6 +52,8 @@ widget counter(id) {
     }
 
     style {
+        w-24
+        h-24        
         items_center: true
         font_weight: "bold"
     }   
