@@ -2,6 +2,7 @@ use gpui::*;
 use gpui::prelude::*;
 use crate::style::theme::ActiveTheme;
 use std::{cell::Cell, rc::Rc};
+use crate::widget::Axis;
 
 #[derive(IntoElement)]
 pub struct Radio {
@@ -99,6 +100,7 @@ pub struct RadioGroup {
     id: ElementId,
     selected: Option<usize>,
     radios: Vec<Radio>,
+    axis: Axis,
     on_click: Option<Box<dyn Fn(&usize, &mut WindowContext) + 'static>>,
 }
 
@@ -109,11 +111,17 @@ impl RadioGroup {
             selected: None,
             radios: Vec::new(),
             on_click: None,
+            axis: Axis::Horiz,
         }
     }
 
     pub fn add(mut self, radio: Radio) -> Self {
         self.radios.push(radio);
+        self
+    }
+
+    pub fn axis(mut self, axis: Axis) -> Self {
+        self.axis = axis;
         self
     }
 
@@ -133,7 +141,13 @@ impl RenderOnce for RadioGroup {
         let state = Rc::new(Cell::new(None));
         div()
             .id(self.id)
-            .gap_y_2()
+            .flex()
+            .map(|this| {
+                match self.axis {
+                    Axis::Horiz => this.flex_row().gap_x_4(),
+                    Axis::Vert => this.flex_col().gap_y_4(),
+                }
+            })
             .children(
                 self.radios.into_iter().enumerate().map(|(i, radio)| {
                     let state = Rc::clone(&state);
