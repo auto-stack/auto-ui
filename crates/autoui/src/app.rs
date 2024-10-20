@@ -25,6 +25,7 @@ impl<T: Viewable + Render> Render for SimpleRootView<T> {
     fn render(&mut self, cx: &mut ViewContext<'_, Self>) -> impl IntoElement {
         let theme = cx.active_theme();
         div()
+            .id("Root")
             .flex()
             .bg(theme.background)
             .size_full()

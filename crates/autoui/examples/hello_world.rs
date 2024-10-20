@@ -17,8 +17,7 @@ impl Viewable for HelloWorldView {
 
 impl Render for HelloWorldView {
     fn render(&mut self, _cx: &mut ViewContext<Self>) -> impl IntoElement {
-        div()
-            .child(format!("Hello, {}!", self.label))
+        div().child(format!("Hello, {}!", self.label))
     }
 }
 

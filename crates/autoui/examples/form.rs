@@ -44,6 +44,7 @@ struct CenterContent {
     byte_order: ByteOrder,
     default_value: SharedString,
 
+    byte_order_dropdown: View<Dropdown>,
     input: View<TextInput>,
 }
 
@@ -85,13 +86,7 @@ impl Render for CenterContent {
                     .child(
                         row()
                             .child(div().w(Pixels(label_width)).child("Byte Order: "))
-                            .child(cx.new_view(|cx| {
-                                Dropdown::new(
-                                    SharedString::from("dropdown"),
-                                    vec!["Motorola".into(), "Intel".into()],
-                                    cx,
-                                )
-                            })),
+                            .child(self.byte_order_dropdown.clone())
                     ),
             )
             .child(
@@ -112,6 +107,11 @@ impl RootView {
             is_signed: false,
             byte_order: ByteOrder::Motorola,
             default_value: "0".into(),
+            byte_order_dropdown: cx.new_view(|cx| Dropdown::new(
+                SharedString::from("Byte Order"),
+                vec!["Motorola".into(), "Intel".into()],
+                cx,
+            )),
             input: cx.new_view(|cx| TextInput::new(cx)),
         });
         let workspace = Workspace::new().toolbar(toolbar).child(center);

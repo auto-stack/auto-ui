@@ -46,6 +46,11 @@ impl Dropdown {
             is_open: false,
         }
     }
+
+    pub fn toggle(&mut self, _ev: &ClickEvent, _cx: &mut ViewContext<Self>) {
+        println!("toggle on dropdown!");
+        self.is_open = !self.is_open;
+    }
 }
 
 impl Render for Dropdown {
@@ -62,6 +67,7 @@ impl Render for Dropdown {
                     .id("dropdown-head")
                     .relative()
                     .flex()
+                    .flex_row()
                     .items_center()
                     .justify_between()
                     .bg(theme.background)
@@ -69,8 +75,10 @@ impl Render for Dropdown {
                     .border_color(theme.border)
                     .rounded(px(theme.radius))
                     .overflow_hidden()
+                    .cursor_pointer()
                     .w_full()
-                    .on_click(cx.listener(self.toggle))
+                    .on_click(cx.listener(Self::toggle))
+                    .px_4()
                     .child(
                         "This is a dropdown"
                     )
