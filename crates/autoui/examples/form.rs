@@ -87,7 +87,7 @@ impl Render for CenterContent {
                         row()
                             .child(div().w(Pixels(label_width)).child("Byte Order: "))
                             .child(self.byte_order_dropdown.clone())
-                    ),
+                    )
             )
             .child(
                 card("Section_2", cx)

@@ -8,6 +8,7 @@ pub mod slider;
 pub mod theme_toggle;
 pub mod toolbar;
 pub mod workspace;
+pub mod list;
 pub mod dropdown;
 pub mod util;
 

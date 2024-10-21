@@ -1,34 +1,13 @@
-use gpui::*;
-use gpui::prelude::FluentBuilder;
 use crate::style::theme::ActiveTheme;
+use super::list::List;
 use crate::widget::util::*;
-
-pub struct DropList {
-    focus_handle: FocusHandle,
-    items: Vec<SharedString>,
-}
-
-impl DropList {
-    pub fn new(cx: &mut WindowContext, items: Vec<SharedString>) -> Self {
-        let focus_handle = cx.focus_handle();
-        Self {
-            focus_handle,
-            items,
-        }
-    }
-}
-
-impl Render for DropList {
-    fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
-        div()
-            .child(format!("List: {:?}", self.items))
-    }
-}
+use gpui::prelude::FluentBuilder;
+use gpui::*;
 
 pub struct Dropdown {
     id: ElementId,
     focus_handle: FocusHandle,
-    list: View<DropList>,
+    list: View<List>,
     bounds: Bounds<Pixels>,
     is_open: bool,
 }
@@ -41,7 +20,7 @@ impl Dropdown {
         Self {
             id: id.into(),
             focus_handle,
-            list: cx.new_view(|cx| DropList::new(cx, items)),
+            list: cx.new_view(|cx| List::new(cx, items).select(0)),
             bounds: Bounds::default(),
             is_open: false,
         }
@@ -79,41 +58,35 @@ impl Render for Dropdown {
                     .w_full()
                     .on_click(cx.listener(Self::toggle))
                     .px_4()
-                    .child(
-                        "This is a dropdown"
-                    )
+                    .child("This is a dropdown"),
             )
             .when(self.is_open, |this| {
                 this.child(deferred(
                     anchored().snap_to_window_with_margin(px(8.)).child(
-                        div().id("dropdown-list")
-                            .occlude()
-                            .w(self.bounds.size.width)
-                            .child(
-                                col()
-                                    .occlude()
-                                    .mt_1p5()
-                                    .bg(theme.background)
-                                    .border_1()
-                                    .border_color(theme.border)
-                                    .rounded(px(theme.radius))
-                                    .shadow_md()
-                                    .on_mouse_down_out(|_, cx| {
-                                        cx.dispatch_action(Box::new(Escape));
-                                    })
-                                    .child(self.list.clone())
-                            )
-                    )
+                        div().id("dropdown-list").occlude().w(px(200.0)).child(
+                            col()
+                                .occlude()
+                                .mt_1p5()
+                                .bg(theme.background)
+                                .border_1()
+                                .border_color(theme.border)
+                                .rounded(px(theme.radius))
+                                .shadow_md()
+                                .on_mouse_down_out(|_, cx| {
+                                    cx.dispatch_action(Box::new(Escape));
+                                })
+                                .child(self.list.clone()),
+                        ),
+                    ),
                 ))
             })
     }
 }
 
-pub trait DropItem{
+pub trait DropItem {
     type Value: Clone;
     fn text(&self) -> SharedString;
     fn value(&self) -> &Self::Value;
-
 }
 
 impl DropItem for String {
@@ -134,7 +107,7 @@ impl DropItem for SharedString {
     fn text(&self) -> SharedString {
         self.clone()
     }
-    
+
     fn value(&self) -> &Self::Value {
         &self
     }
