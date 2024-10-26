@@ -21,6 +21,22 @@ impl<T: Viewable + Render> SimpleRootView<T> {
     }
 }
 
+pub struct HelloView {
+    label: String,
+}
+
+impl Viewable for HelloView {
+    fn new(_cx: &mut ViewContext<Self>) -> Self {
+        Self { label: "world".into() }
+    }
+}
+
+impl Render for HelloView {
+    fn render(&mut self, _cx: &mut ViewContext<Self>) -> impl IntoElement {
+        div().child(format!("Hello, {}!", self.label))
+    }
+}
+
 impl<T: Viewable + Render> Render for SimpleRootView<T> {
     fn render(&mut self, cx: &mut ViewContext<'_, Self>) -> impl IntoElement {
         let theme = cx.active_theme();
@@ -96,5 +112,12 @@ impl SimpleApp {
             let view = cx.new_view(|cx| T::new(cx));
             cx.new_view(|_cx| SimpleRootView::new(view))
         });
+    }
+
+    pub fn run_hello(self) {
+        self.run(false, |cx| {
+            let view = cx.new_view(|cx| HelloView::new(cx));
+            cx.new_view(|_cx| SimpleRootView::new(view))
+        }); 
     }
 }
