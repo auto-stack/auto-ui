@@ -12,8 +12,8 @@ AutoUI的设计和实现参考了[GPUI-Componets组件库](https://github.com/Ze
 ### HelloWorld和Counter
 
 <p float="left">
-    <img src="https://foruda.gitee.com/images/1730020919636079815/3c8f4d9e_142056.png" alt="HelloWorlld" width="400"/>
-    <img src="https://foruda.gitee.com/images/1730021021429704035/4625e3ce_142056.png" alt="Counter" width="400"/>
+    <img src="https://foruda.gitee.com/images/1730020919636079815/3c8f4d9e_142056.png" alt="HelloWorlld" width="300"/>
+    <img src="https://foruda.gitee.com/images/1730021021429704035/4625e3ce_142056.png" alt="Counter" width="300"/>
 </p>
 
 ### 登录框
