@@ -25,3 +25,11 @@ AutoUI的设计和实现参考了[GPUI-Component组件库](https://github.com/lo
 深色主题：
 
 ![Login Dark](https://foruda.gitee.com/images/1730020232074825410/43d51b5c_142056.png "Login Dark")
+
+## 参考
+
+- [GPUI](https://gpui.rs)
+- [Zed Editor](https://zed.dev/)
+- [GPUI-Component](https://github.com/longbridgeapp/gpui-component)
+
+这里是[GPUI](references/LICENSE_GPUI)和[GPUI-Component](references/LICENSE_GPUI-Component)的许可证。
