@@ -1,5 +1,6 @@
 use crate::style::theme::ActiveTheme;
 use super::list::List;
+use super::list::ListEvent;
 use crate::widget::util::*;
 use gpui::prelude::FluentBuilder;
 use gpui::*;
@@ -10,25 +11,56 @@ pub struct Dropdown {
     list: View<List>,
     bounds: Bounds<Pixels>,
     is_open: bool,
+    selected: Option<usize>,
 }
 
 actions!(dropdown, [Up, Down, Enter, Escape]);
 
 impl Dropdown {
-    pub fn new(id: impl Into<ElementId>, items: Vec<SharedString>, cx: &mut WindowContext) -> Self {
+    pub fn new(id: impl Into<ElementId>, items: Vec<SharedString>, cx: &mut ViewContext<Self>) -> Self {
         let focus_handle = cx.focus_handle();
+        let list = cx.new_view(|cx| List::new(cx, items)); 
+
+        cx.subscribe(&list, Self::on_list_event).detach();
+        
+        cx.on_blur(&list.focus_handle(cx), Self::on_blur).detach();
+        cx.on_blur(&focus_handle, Self::on_blur).detach();
         Self {
             id: id.into(),
             focus_handle,
-            list: cx.new_view(|cx| List::new(cx, items).select(0)),
+            list,
             bounds: Bounds::default(),
             is_open: false,
+            selected: None,
         }
     }
 
     pub fn toggle(&mut self, _ev: &ClickEvent, _cx: &mut ViewContext<Self>) {
         println!("toggle on dropdown!");
         self.is_open = !self.is_open;
+    }
+
+    fn on_blur(&mut self, cx: &mut ViewContext<Self>) {
+
+        // When the dropdown and dropdown menu are both not focused, close the dropdown menu.
+        if self.list.focus_handle(cx).is_focused(cx) || self.focus_handle.is_focused(cx) {
+            return;
+        }
+
+        self.is_open = false;
+        cx.notify();
+
+    }
+
+    fn on_list_event(&mut self, _list: View<List>, ev: &ListEvent, cx: &mut ViewContext<Self>) {
+        match ev {
+            ListEvent::Selected(i) => {
+                println!("List selected: {}", i);
+                self.selected = Some(*i);
+                self.is_open = false;
+                cx.notify();
+            }
+        }
     }
 }
 
@@ -58,7 +90,7 @@ impl Render for Dropdown {
                     .w_full()
                     .on_click(cx.listener(Self::toggle))
                     .px_4()
-                    .child("This is a dropdown"),
+                    .child(self.list.read(cx).selected_text()),
             )
             .when(self.is_open, |this| {
                 this.child(deferred(
@@ -72,9 +104,10 @@ impl Render for Dropdown {
                                 .border_color(theme.border)
                                 .rounded(px(theme.radius))
                                 .shadow_md()
-                                .on_mouse_down_out(|_, cx| {
-                                    cx.dispatch_action(Box::new(Escape));
-                                })
+                                .on_mouse_down_out(cx.listener(move |this, _ev, cx| {
+                                    this.is_open = false;
+                                    cx.notify();
+                                }))
                                 .child(self.list.clone()),
                         ),
                     ),

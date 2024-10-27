@@ -7,7 +7,20 @@ pub struct List {
     focus_handle: FocusHandle,
     items: Vec<SharedString>,
     selected: Option<usize>,
+    on_selected: Option<Box<dyn Fn(&usize, &mut WindowContext) + 'static>>,
 }
+
+impl FocusableView for List {
+    fn focus_handle(&self, cx: &AppContext) -> FocusHandle {
+        self.focus_handle.clone()
+    }
+}
+
+pub enum ListEvent {
+    Selected(usize),
+}
+
+impl EventEmitter<ListEvent> for List {}
 
 impl List {
     pub fn new(cx: &mut WindowContext, items: Vec<SharedString>) -> Self {
@@ -15,6 +28,7 @@ impl List {
             focus_handle: cx.focus_handle(),
             items,
             selected: None,
+            on_selected: None,
         }
     }
 
@@ -26,6 +40,19 @@ impl List {
     pub fn unselect(mut self) -> Self {
         self.selected = None;
         self
+    }
+
+    pub fn on_selected(mut self, on_selected: impl Fn(&usize, &mut WindowContext) + 'static) -> Self {
+        self.on_selected = Some(Box::new(on_selected));
+        self
+    }
+
+    pub fn selected_text(&self) -> SharedString {
+        if let Some(i) = self.selected {
+            self.items[i].clone()
+        } else {
+            "--".into()
+        }
     }
 }
 
@@ -55,8 +82,10 @@ impl Render for List {
                                     .w_full()
                                     .when(selected == Some(i), |s| s.bg(cx.active_theme().selection))
                                     .child(list.items[i].clone())
+
                                     .on_click(cx.listener(move |this, _ev, cx| {
                                         this.selected = Some(i);
+                                        cx.emit(ListEvent::Selected(i));
                                         cx.notify();
                                     }))
                             })
