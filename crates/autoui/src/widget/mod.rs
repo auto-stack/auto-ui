@@ -10,6 +10,7 @@ pub mod toolbar;
 pub mod workspace;
 pub mod list;
 pub mod dropdown;
+pub mod field;
 pub mod util;
 
 mod widget;

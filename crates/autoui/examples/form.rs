@@ -46,54 +46,37 @@ struct CenterContent {
 
     byte_order_dropdown: View<Dropdown>,
     input: View<TextInput>,
+    default_value_input: View<TextInput>,
 }
 
 impl Render for CenterContent {
     fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
-        let label_width = 100.;
         div()
             .flex()
             .flex_col()
-            .w_1_3()
+            .w_1_2()
             .items_center()
             .gap_4()
             .child(
                 card("Signal Properties", cx)
-                    .child(
-                        row()
-                            .child(div().w(Pixels(label_width)).child("Is Signed: "))
-                            .child(
-                                Checkbox::new("is_signed")
-                                    .checked(self.is_signed)
-                                    .on_click_mut(cx, |this, checked, cx| {
-                                        this.is_signed = *checked;
-                                    }),
-                            ),
-                    )
-                    .child(
-                        row()
-                            .child(div().w(Pixels(label_width)).child("Byte Order: "))
-                            .child(
-                                RadioGroup::new("byte_order")
-                                    .add(Radio::new("motorola").label("Motorola"))
-                                    .add(Radio::new("intel").label("Intel"))
-                                    .select(self.byte_order as usize)
-                                    .on_click(cx.listener(|this, v: &usize, _cx| {
-                                        this.byte_order = ByteOrder::from(*v);
-                                    })),
-                            ),
-                    )
-                    .child(
-                        row()
-                            .child(div().w(Pixels(label_width)).child("Byte Order: "))
-                            .child(self.byte_order_dropdown.clone())
-                    )
-            )
-            .child(
-                card("Section_2", cx)
-                    .child("World")
-                    .child(div().flex().flex_row().w_full().child(self.input.clone()))
-                    .child(Button::button("Don't click me")),
+                    .child(field("Name: ", self.name.clone()))
+                    .child(field("Message: ", self.message.clone()))
+                    .child(field("Is Signed: ", Checkbox::new("is_signed")
+                        .checked(self.is_signed)
+                        .on_click_mut(cx, |this, checked, _cx| {
+                            this.is_signed = *checked;
+                        }),
+                    ))
+                    .child(field("Byte Order: ", RadioGroup::new("byte_order")
+                        .add(Radio::new("motorola").label("Motorola"))
+                        .add(Radio::new("intel").label("Intel"))
+                        .select(self.byte_order as usize)
+                        .on_click(cx.listener(|this, v: &usize, _cx| {
+                            this.byte_order = ByteOrder::from(*v);
+                        })),
+                    ))
+                    // .child(field("Byte Order: ", self.byte_order_dropdown.clone()))
+                    .child(field("Init Value: ", self.default_value_input.clone()))
             )
     }
 }
@@ -113,6 +96,7 @@ impl RootView {
                 cx,
             )),
             input: cx.new_view(|cx| TextInput::new(cx)),
+            default_value_input: cx.new_view(|cx| TextInput::new(cx)),
         });
         let workspace = Workspace::new().toolbar(toolbar).child(center);
 

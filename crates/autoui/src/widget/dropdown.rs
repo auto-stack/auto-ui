@@ -71,8 +71,8 @@ impl Render for Dropdown {
         div()
             .id(self.id.clone())
             .track_focus(&self.focus_handle)
-            .size_full()
             .relative()
+            .min_w(px(100.0))
             .child(
                 div()
                     .id("dropdown-head")
