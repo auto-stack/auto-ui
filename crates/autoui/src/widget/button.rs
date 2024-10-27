@@ -120,7 +120,7 @@ impl RenderOnce for Button {
             .text_color(style.text_color)
             .hover(|this| this.bg(style.hover_color))
             .rounded_sm()
-            .p(px(4.0))
+            .p(px(6.0))
             .items_center()
             .justify_center()
             .overflow_hidden()

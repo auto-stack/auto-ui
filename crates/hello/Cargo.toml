@@ -7,5 +7,5 @@ edition = "2021"
 rustflags = ["-C", "prefer-dynamic"]
 
 [dependencies]
-autoui = { path = "../autoui" }
+autoui = { workspace = true }
 
