@@ -17,7 +17,7 @@ impl Viewable for HelloView {
 impl Render for HelloView {
     fn render(&mut self, _cx: &mut ViewContext<Self>) -> impl IntoElement {
         div()
-            .child(format!("Hell just now!, {}!", self.label))
+            .child(format!("Hello, {}!", self.label))
             .child(Button::new().label("Click me!".into()).on_click(|_cx, _ev| {
                 println!("Button clicked!");
             }))
