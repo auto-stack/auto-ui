@@ -2,9 +2,9 @@
 
 AutoUI是AutoStack的UI库，基于Auto和Rust语言实现。
 
-AutoUI的底层调用的是[Zed编辑器](https://zed.dev/)的[GPUI图形库](https://www.gpui.rs/)。
+AutoUI的底层采用[Zed编辑器](https://zed.dev/)的[GPUI图形库](https://www.gpui.rs/)。
 
-AutoUI的设计和实现参考了[GPUI-Componets组件库](https://github.com/Zed-Editor/gpui-components)。
+AutoUI的设计和实现参考了[GPUI-Component组件库](https://github.com/longbridgeapp/gpui-component)。
 
 
 ## 截图
