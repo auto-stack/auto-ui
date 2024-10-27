@@ -20,14 +20,14 @@ impl Render for CounterView {
         div()
             .flex()
             .flex_col()
-            .child(Button::new().label("+".into()).on_click_mut(cx, |this, _ev, cx| {
+            .child(Button::primary("+".into()).on_click_mut(cx, |this, _ev, cx| {
                 this.count += 1;
                 cx.notify();
             }))
             .gap_1()
             .child(format!("Count: {}", self.count))
             .gap_1()
-            .child(Button::new().label("-".into()).on_click_mut(cx, |this, _ev, cx| {
+            .child(Button::primary("-".into()).on_click_mut(cx, |this, _ev, cx| {
                 this.count -= 1;
                 cx.notify();
             }))
