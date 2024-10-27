@@ -71,7 +71,7 @@ impl SimpleApp {
                     },
                     Some(WindowBounds::Windowed(Bounds::centered(
                         None,
-                        size(px(640.0), px(480.0)),
+                        size(px(320.0), px(240.0)),
                         cx,
                     ))),
                 )
