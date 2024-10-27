@@ -3,9 +3,6 @@ name = "hello"
 version = "0.1.0"
 edition = "2021"
 
-[build]
-rustflags = ["-C", "prefer-dynamic"]
-
 [dependencies]
-autoui = { workspace = true }
+autoui.workspace = true
 

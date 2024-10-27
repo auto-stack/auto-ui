@@ -3,8 +3,8 @@ name = "gpui-dynamic"
 version = "0.1.0"
 edition = "2021"
 
-[dependencies]
-gpui = { git = "https://github.com/zed-industries/zed" }
-
 [lib]
 crate-type = ["dylib"]
+
+[dependencies]
+gpui = { git = "https://github.com/zed-industries/zed" }

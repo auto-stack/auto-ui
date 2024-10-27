@@ -10,22 +10,16 @@ opt-level = 1
 opt-level = 3
 
 [lib]
-crate-type = ["lib"]
-
-[build]
-rustflags = ["-C", "prefer-dynamic"]
+crate-type = ["dylib"]
 
 [dependencies]
-# switch to this dynamic lib for debug mode
-gpui = { version = "0.1.0", path = "../gpui-dynamic", package = "gpui-dynamic" }
-# switch to this static lib for release mode
-# gpui = { git = "https://github.com/zed-industries/zed" }
-anyhow = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-paste = { workspace = true }
-once_cell = { workspace = true }
-rust-embed = { workspace = true }
-smallvec = { workspace = true }
-unicode-segmentation = { workspace = true }
-regex = { workspace = true }
+gpui.workspace = true
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+paste.workspace = true
+once_cell.workspace = true
+rust-embed.workspace = true
+smallvec.workspace = true
+unicode-segmentation.workspace = true
+regex.workspace = true
