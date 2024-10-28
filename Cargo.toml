@@ -3,8 +3,9 @@ members = ["crates/*"]
 resolver = "2"
 
 [workspace.dependencies]
-autolang = { git = "https://gitee.com/auto-stack/auto-lang"}
-autoui = { path = "crates/autoui" }
+# autolang = { git = "https://gitee.com/auto-stack/auto-lang"}
+autolang = { path = "../auto-lang/" }
+autogui = { path = "crates/autogui" }
 
 # switch to this dynamic lib for debug mode
 gpui = { version = "0.1.0", path = "crates/gpui-dynamic", package = "gpui-dynamic" }

@@ -1,4 +1,4 @@
-use autoui::app::SimpleApp;
+use autogui::app::SimpleApp;
 fn main() {
     println!("Hello, world!");
     

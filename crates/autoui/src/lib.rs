@@ -1,8 +1,2 @@
-pub mod app;
-pub mod widget;
-pub mod style;
-pub mod assets;
-pub mod event;
-pub mod indicator;
-
-pub use gpui as baseui;
+pub mod ui;
+pub mod spec;
