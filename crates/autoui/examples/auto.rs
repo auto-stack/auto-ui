@@ -2,7 +2,7 @@ use autogui::app::SimpleApp;
 use autogui::app::SimpleRootView;
 use autogui::app::Viewable;
 use autogui::widget::button::*;
-use autoui::ui::*;
+use autoui::dyna::state::*;
 use gpui::*;
 
 
@@ -14,7 +14,7 @@ struct CounterView {
 impl Viewable for CounterView {
     fn new(_cx: &mut ViewContext<Self>) -> Self {
         let mut state = State::new();
-        state.insert("count".into(), SimpleState::dft_int());
+        state.insert("count".into(), Dot::dft_int());
         Self {
             state,
             builder: None,
