@@ -21,6 +21,30 @@ impl<T: Viewable + Render> SimpleRootView<T> {
     }
 }
 
+pub struct SimpleStrView {
+    text: SharedString,
+}
+
+impl Viewable for SimpleStrView {
+    fn new(_cx: &mut ViewContext<Self>) -> Self {
+        Self { text: "".into() }
+    }
+}
+
+impl SimpleStrView {
+    pub fn text(mut self, text: SharedString) -> Self {
+        self.text = text.clone();
+        self
+    }
+}
+
+impl Render for SimpleStrView {
+    fn render(&mut self, cx: &mut ViewContext<'_, Self>) -> impl IntoElement {
+        div().child(self.text.clone())
+    }
+}   
+
+
 impl<T: Viewable + Render> Render for SimpleRootView<T> {
     fn render(&mut self, cx: &mut ViewContext<'_, Self>) -> impl IntoElement {
         let theme = cx.active_theme();
@@ -105,6 +129,14 @@ impl SimpleApp {
     pub fn run_simple<T: Viewable + Render>(self) {
         self.run(true, |cx| {
             let view = cx.new_view(|cx| T::new(cx));
+            cx.new_view(|_cx| SimpleRootView::new(view))
+        });
+    }
+
+    pub fn run_text(self, text: &str) {
+        let shared_text: SharedString = text.to_string().into();
+        self.run(true, move |cx| {
+            let view = cx.new_view(|_cx| SimpleStrView::new(_cx).text(shared_text));
             cx.new_view(|_cx| SimpleRootView::new(view))
         });
     }

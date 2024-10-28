@@ -11,6 +11,7 @@ pub mod workspace;
 pub mod list;
 pub mod dropdown;
 pub mod field;
+pub mod label;
 pub mod util;
 
 mod widget;
