@@ -1,6 +1,6 @@
+use gpui::*;
 use crate::assets::Assets;
 use crate::style::theme::{init_theme, ActiveTheme};
-use gpui::*;
 
 pub struct SimpleApp {
     app: App,
@@ -39,11 +39,10 @@ impl SimpleStrView {
 }
 
 impl Render for SimpleStrView {
-    fn render(&mut self, cx: &mut ViewContext<'_, Self>) -> impl IntoElement {
+    fn render(&mut self, _cx: &mut ViewContext<'_, Self>) -> impl IntoElement {
         div().child(self.text.clone())
     }
 }   
-
 
 impl<T: Viewable + Render> Render for SimpleRootView<T> {
     fn render(&mut self, cx: &mut ViewContext<'_, Self>) -> impl IntoElement {
@@ -61,6 +60,31 @@ impl<T: Viewable + Render> Render for SimpleRootView<T> {
             .text_xl()
             .text_color(theme.foreground)
             .child(self.view.clone())
+    }
+}
+
+// type State = HashMap<String, usize>;
+
+pub struct ElemView {
+    builder: Option<Box<dyn Fn(Div) -> Div + 'static>>,
+}
+
+impl Viewable for ElemView {
+    fn new(_cx: &mut ViewContext<Self>) -> Self {
+        Self { builder: None }
+    }
+}
+
+impl ElemView {
+    pub fn set_builder(mut self, builder: impl Fn(Div) -> Div + 'static) -> Self {
+        self.builder = Some(Box::new(builder));
+        self
+    }
+}
+
+impl Render for ElemView {
+    fn render(&mut self, _cx: &mut ViewContext<'_, Self>) -> impl IntoElement {
+        self.builder.as_ref().unwrap()(div())
     }
 }
 
@@ -138,6 +162,14 @@ impl SimpleApp {
         self.run(true, move |cx| {
             let view = cx.new_view(|_cx| SimpleStrView::new(_cx).text(shared_text));
             cx.new_view(|_cx| SimpleRootView::new(view))
+        });
+    }
+
+    pub fn run_elems(self, builder: impl Fn(Div) -> Div + 'static) {
+        self.run(true, |cx| {
+            cx.new_view(|cx| SimpleRootView::new(cx.new_view(|cx| {
+                ElemView::new(cx).set_builder(builder)
+            })))
         });
     }
 }
