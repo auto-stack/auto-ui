@@ -1,6 +1,6 @@
 use gpui::*;
 use std::collections::HashMap;
-use crate::app::Viewable;
+use autoui::app::Viewable;
 
 pub enum SimpleState {
     Int(i32),
@@ -75,12 +75,12 @@ impl StateExt for State {
     }
 }
 
-pub struct DynamicView {
+pub struct AutoView {
     state: State,
     builder: Option<Box<dyn Fn(Div, &mut State, &mut ViewContext<Self>) -> Div + 'static>>,
 }
 
-impl Viewable for DynamicView {
+impl Viewable for AutoView {
     fn new(_cx: &mut ViewContext<Self>) -> Self {
         let mut state = State::new();
         state.insert("count".into(), SimpleState::dft_int());
@@ -91,7 +91,7 @@ impl Viewable for DynamicView {
     }
 }
 
-impl DynamicView {
+impl AutoView {
     pub fn contents(
         mut self,
         builder: impl Fn(Div, &mut State, &mut ViewContext<Self>) -> Div + 'static,
@@ -101,7 +101,7 @@ impl DynamicView {
     }
 }
 
-impl Render for DynamicView {
+impl Render for AutoView {
     fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
         let div = div().flex().flex_col();
         if let Some(builder) = self.builder.as_ref() {
@@ -111,4 +111,3 @@ impl Render for DynamicView {
         }
     }
 }
-

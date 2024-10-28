@@ -12,7 +12,6 @@ pub mod list;
 pub mod dropdown;
 pub mod field;
 pub mod label;
-pub mod dynamic;
 pub mod util;
 
 mod widget;

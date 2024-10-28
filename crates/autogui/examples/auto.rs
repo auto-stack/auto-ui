@@ -2,7 +2,7 @@ use autoui::app::SimpleApp;
 use autoui::app::SimpleRootView;
 use autoui::app::Viewable;
 use autoui::widget::button::*;
-use autoui::widget::dynamic::*;
+use autogui::ui::*;
 use gpui::*;
 
 
@@ -49,9 +49,9 @@ fn main() {
             CounterView::new(cx)
                 .contents(|div, state, cx| {
                     div.child(format!("Count: {}", state.get_int("count")))
-                        .child(Button::primary("+").on_click(cx.listener(|this, _ev, _cx| {
+                        .child(Button::primary("+").on_click_mut::<CounterView>(cx, |this, _ev, _cx| {
                             this.state.inc_int("count");
-                        })))
+                        }))
                 })
         })))
     });
