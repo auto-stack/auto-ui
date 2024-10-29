@@ -1,6 +1,6 @@
 use autolang::ast::{Code, Expr, Stmt, View, Widget};
 use autolang::parse;
-use crate::dyna::state::{State, StateExt};
+use crate::dyna::state::State;
 
 pub struct Spec {
     code: Code,
@@ -23,6 +23,12 @@ impl Spec {
                 panic!("{}", e);
             }
         }
+    }
+
+    pub fn read_file(&mut self, path: &str) {
+        let source = std::fs::read_to_string(path).unwrap();
+        println!("source :{}", source);
+        self.read_str(&source);
     }
 
     fn find_widget(&self) -> &Widget {

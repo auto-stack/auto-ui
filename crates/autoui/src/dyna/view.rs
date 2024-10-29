@@ -13,7 +13,7 @@ pub struct DynaView {
 impl Viewable for DynaView {
     fn new(_cx: &mut ViewContext<Self>) -> Self {
         let mut state = State::new();
-        state.insert("count".into(), Dot::Int(0));
+        state.set_int("count", 0);
         Self {
             state,
             builder: None,
@@ -60,7 +60,14 @@ impl DynaView {
 
 impl Render for DynaView {
     fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
-        let div = div().flex().flex_col();
+        let div = div().flex().flex_col()
+            .child(Button::primary("Refresh").on_click_mut(cx, |this, _ev, cx| {
+                let mut spec = Spec::new();
+                spec.read_file("counter.au");
+                this.update_spec(spec);
+                cx.notify();
+            })).gap_2();
+
         if let Some(builder) = self.builder.as_ref() {
             builder(div, &mut self.state, cx)
         } else {

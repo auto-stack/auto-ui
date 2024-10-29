@@ -1,3 +1,4 @@
+use autolang::ast::Lambda;
 use gpui::*;
 use std::collections::HashMap;
 pub enum Dot {
@@ -25,68 +26,70 @@ impl Dot {
     }
 }
 
-pub type State = HashMap<String, Dot>;
-
-pub trait StateExt {
-    fn get_int(&self, key: &str) -> i32;
-    fn get_str(&self, key: &str) -> String;
-    fn get_usize(&self, key: &str) -> usize;
-    fn get_bool(&self, key: &str) -> bool;
-
-    fn set_int(&mut self, key: &str, value: i32);
-    fn set_str(&mut self, key: &str, value: String);
-    fn set_usize(&mut self, key: &str, value: usize);
-    fn set_bool(&mut self, key: &str, value: bool);
-
-    fn inc_int(&mut self, key: &str);
+pub struct State {
+    dots: HashMap<String, Dot>
 }
 
-impl StateExt for State {
-    fn get_int(&self, key: &str) -> i32 {
-        match self.get(key) {
+impl State {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl Default for State {
+    fn default() -> Self {
+        Self {
+            dots: HashMap::default()
+        }
+    }
+}
+
+impl State {
+    pub fn get_int(&self, key: &str) -> i32 {
+        match self.dots.get(key) {
             Some(Dot::Int(v)) => *v,
             _ => 0,
         }
     }
 
-    fn get_str(&self, key: &str) -> String {
-        match self.get(key) {
+    pub fn get_str(&self, key: &str) -> String {
+        match self.dots.get(key) {
             Some(Dot::Str(v)) => v.clone(),
             _ => String::default(),
         }
     }
 
-    fn get_usize(&self, key: &str) -> usize {
-        match self.get(key) {
+    pub fn get_usize(&self, key: &str) -> usize {
+        match self.dots.get(key) {
             Some(Dot::Usize(v)) => *v,
             _ => 0,
         }
     }
 
-    fn get_bool(&self, key: &str) -> bool {
-        match self.get(key) {
+    pub fn get_bool(&self, key: &str) -> bool {
+        match self.dots.get(key) {
             Some(Dot::Bool(v)) => *v,
             _ => false,
         }
     }
 
-    fn set_int(&mut self, key: &str, value: i32) {
-        self.insert(key.to_string(), Dot::Int(value));
+    pub fn set_int(&mut self, key: &str, value: i32) {
+        self.dots.insert(key.to_string(), Dot::Int(value));
     }
 
-    fn set_str(&mut self, key: &str, value: String) {
-        self.insert(key.to_string(), Dot::Str(value));
+    pub fn set_str(&mut self, key: &str, value: String) {
+        self.dots.insert(key.to_string(), Dot::Str(value));
     }
 
-    fn set_usize(&mut self, key: &str, value: usize) {
-        self.insert(key.to_string(), Dot::Usize(value));
+    pub fn set_usize(&mut self, key: &str, value: usize) {
+        self.dots.insert(key.to_string(), Dot::Usize(value));
     }
 
-    fn inc_int(&mut self, key: &str) {
+    pub fn inc_int(&mut self, key: &str) {
         self.set_int(key, self.get_int(key) + 1);
     }
 
-    fn set_bool(&mut self, key: &str, value: bool) {
-        self.insert(key.to_string(), Dot::Bool(value));
+    pub fn set_bool(&mut self, key: &str, value: bool) {
+        self.dots.insert(key.to_string(), Dot::Bool(value));
     }
 }

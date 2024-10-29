@@ -6,23 +6,11 @@ use autoui::spec::*;
 use gpui::*;
 
 fn main() {
-    let source = r#"
-    widget counter {
-        model {
-            var count = 0
-        }
-        view {
-            button("+") {
-                onclick: || count = count + 1
-            }
-            text("Count: {}")
-        }
-    }
-    "#;
+    println!("current working directory: {}", std::env::current_dir().unwrap().display());
     SimpleApp::new().run(true, |cx| {
         cx.new_view(|cx| SimpleRootView::new(cx.new_view(|cx| {
             let mut spec = Spec::new();
-            spec.read_str(source);
+            spec.read_file("counter.au");
             let mut view = DynaView::new(cx);
             view.update_spec(spec);
             view
