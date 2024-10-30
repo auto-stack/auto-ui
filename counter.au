@@ -9,6 +9,5 @@ widget counter {
         text("Count: {}")
         button("-")
         text("halal")
-
     }
 }

@@ -41,6 +41,7 @@ struct CenterContent {
     name: SharedString,
     message: SharedString,
     is_signed: bool,
+    fullcan: usize,
     byte_order: ByteOrder,
     default_value: SharedString,
 
@@ -67,15 +68,15 @@ impl Render for CenterContent {
                             this.is_signed = *checked;
                         }),
                     ))
-                    .child(field("Byte Order: ", RadioGroup::new("byte_order")
-                        .add(Radio::new("motorola").label("Motorola"))
-                        .add(Radio::new("intel").label("Intel"))
-                        .select(self.byte_order as usize)
+                    .child(field("FullCAN: ", RadioGroup::new("fullcan")
+                        .add(Radio::new("normal").label("Normal"))
+                        .add(Radio::new("fullcan").label("FullCAN"))
+                        .select(self.fullcan)
                         .on_click(cx.listener(|this, v: &usize, _cx| {
-                            this.byte_order = ByteOrder::from(*v);
+                            this.fullcan = *v;
                         })),
                     ))
-                    // .child(field("Byte Order: ", self.byte_order_dropdown.clone()))
+                    .child(field("Byte Order: ", self.byte_order_dropdown.clone()))
                     .child(field("Init Value: ", self.default_value_input.clone()))
             )
     }
@@ -88,11 +89,13 @@ impl RootView {
             name: "ACC_Kilometre_Mile".into(),
             message: "ICM_5".into(),
             is_signed: false,
+            fullcan: 0,
             byte_order: ByteOrder::Motorola,
             default_value: "0".into(),
             byte_order_dropdown: cx.new_view(|cx| Dropdown::new(
                 SharedString::from("Byte Order"),
                 vec!["Motorola".into(), "Intel".into()],
+                Some(1),
                 cx,
             )),
             input: cx.new_view(|cx| TextInput::new(cx)),

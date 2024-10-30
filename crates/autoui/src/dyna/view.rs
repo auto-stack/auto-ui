@@ -31,14 +31,14 @@ impl DynaView {
             for (name, node) in spec_view.nodes.iter() {
                 match name.text.as_str() {
                     "button" => {
-                        let text_arg = &node.args[0];
-                        if let Expr::Str(text) = text_arg {
+                        let text_arg = node.args.get(0);
+                        if let Some(Expr::Str(text)) = text_arg {
                             div = div.child(Button::primary(text.as_str()));
                         }
                     },
                     "text" => {
-                        let text_arg = &node.args[0];   
-                        if let Expr::Str(text) = text_arg {
+                        let text_arg = node.args.get(0);
+                        if let Some(Expr::Str(text)) = text_arg {
                             div = div.child(format!("{}", text.as_str()));
                         }
                     },

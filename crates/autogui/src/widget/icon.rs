@@ -50,6 +50,8 @@ pub enum SysIcon {
     Sun,
     Moon,
     Loader,
+    ArrowUp,
+    ArrowDown,
 }
 
 impl SysIcon {
@@ -65,6 +67,8 @@ impl From<SysIcon> for Icon {
             SysIcon::Sun => Icon::new("icons/sun.svg".into()),
             SysIcon::Moon => Icon::new("icons/moon.svg".into()),
             SysIcon::Loader => Icon::new("icons/loader.svg".into()),
+            SysIcon::ArrowUp => Icon::new("icons/arrow_up.svg".into()),
+            SysIcon::ArrowDown => Icon::new("icons/arrow_down.svg".into()),
         }
     }
 }

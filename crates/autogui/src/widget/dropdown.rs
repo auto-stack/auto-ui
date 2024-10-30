@@ -2,6 +2,7 @@ use crate::style::theme::ActiveTheme;
 use super::list::List;
 use super::list::ListEvent;
 use crate::widget::util::*;
+use crate::widget::icon::{SysIcon, Icon};
 use gpui::prelude::FluentBuilder;
 use gpui::*;
 
@@ -11,15 +12,14 @@ pub struct Dropdown {
     list: View<List>,
     bounds: Bounds<Pixels>,
     is_open: bool,
-    selected: Option<usize>,
 }
 
 actions!(dropdown, [Up, Down, Enter, Escape]);
 
 impl Dropdown {
-    pub fn new(id: impl Into<ElementId>, items: Vec<SharedString>, cx: &mut ViewContext<Self>) -> Self {
+    pub fn new(id: impl Into<ElementId>, items: Vec<SharedString>, selected: Option<usize>, cx: &mut ViewContext<Self>) -> Self {
         let focus_handle = cx.focus_handle();
-        let list = cx.new_view(|cx| List::new(cx, items)); 
+        let list = cx.new_view(|cx| List::new(cx, items).select(selected.unwrap_or(0))); 
 
         cx.subscribe(&list, Self::on_list_event).detach();
         
@@ -31,7 +31,6 @@ impl Dropdown {
             list,
             bounds: Bounds::default(),
             is_open: false,
-            selected: None,
         }
     }
 
@@ -55,8 +54,7 @@ impl Dropdown {
     fn on_list_event(&mut self, _list: View<List>, ev: &ListEvent, cx: &mut ViewContext<Self>) {
         match ev {
             ListEvent::Selected(i) => {
-                println!("List selected: {}", i);
-                self.selected = Some(*i);
+                self.list.update(cx, |list, _cx| list.update_selected(*i));
                 self.is_open = false;
                 cx.notify();
             }
@@ -90,7 +88,15 @@ impl Render for Dropdown {
                     .w_full()
                     .on_click(cx.listener(Self::toggle))
                     .px_4()
-                    .child(self.list.read(cx).selected_text()),
+                    .child(self.list.read(cx).selected_text())
+                    .map(|this| {
+                        let icon = if self.is_open {
+                            SysIcon::ArrowUp.icon()
+                        } else {
+                            SysIcon::ArrowDown.icon()
+                        };
+                        this.child(icon)
+                    })
             )
             .when(self.is_open, |this| {
                 this.child(deferred(

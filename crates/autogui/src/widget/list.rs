@@ -42,6 +42,10 @@ impl List {
         self
     }
 
+    pub fn update_selected(&mut self, index: usize) {
+        self.selected = Some(index);
+    }
+
     pub fn on_selected(mut self, on_selected: impl Fn(&usize, &mut WindowContext) + 'static) -> Self {
         self.on_selected = Some(Box::new(on_selected));
         self
