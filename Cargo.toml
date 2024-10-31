@@ -4,7 +4,7 @@ resolver = "2"
 
 [workspace.dependencies]
 # autolang = { git = "https://gitee.com/auto-stack/auto-lang"}
-autolang = { path = "../auto-lang/" }
+autolang = { path = "../auto-lang/crates/autolang" }
 autogui = { path = "crates/autogui" }
 
 # switch to this dynamic lib for debug mode
