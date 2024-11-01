@@ -3,6 +3,7 @@ use crate::spec::Spec;
 use crate::dyna::state::{State, Dot};
 use autolang::ast::Expr;
 use autogui::widget::button::Button;
+use autogui::widget::table::{ColConfig, Row, Table};
 use gpui::*;
 
 pub struct DynaView {
@@ -42,11 +43,24 @@ impl DynaView {
                             div = div.child(format!("{}", text.as_str()));
                         }
                     },
+                    // "table" => {
+                    //     let config = node.args.get(0);
+                    //     let data = node.args.get(1);
+                    //     self.add_table(div, config, data);
+                    // }
                     _ => ()
                 };
             }
             div
         }));
+    }
+
+    pub fn add_table(&mut self, div: Div, config: Option<Expr>, data: Option<Expr>) {
+        // convert config to table's col_config
+        // let col_config = Vec::new();
+        // println!("config: {:?}", config);
+        // println!("data: {:?}", data);
+        // div.child(Table::new(config, data));
     }
 
     pub fn contents(

@@ -5,13 +5,17 @@ resolver = "2"
 [workspace.dependencies]
 # autolang = { git = "https://gitee.com/auto-stack/auto-lang"}
 autolang = { path = "../auto-lang/crates/autolang" }
-autogui = { path = "crates/autogui" }
+# autoval = { git = "https://gitee.com/auto-stack/auto-lang"}
+autoval = { path = "../auto-lang/crates/autoval" }
 
 # switch to this dynamic lib for debug mode
 gpui = { version = "0.1.0", path = "crates/gpui-dynamic", package = "gpui-dynamic" }
 # switch to this static lib for release mode
 # gpui = { git = "https://github.com/zed-industries/zed" }
 
+autogui = { path = "crates/autogui" }
+
+# tools
 serde = "1.0.210"
 serde_json = "1.0.128"
 paste = "1.0.15"

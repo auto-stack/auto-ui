@@ -13,8 +13,7 @@ impl Spec {
     }
 
     pub fn read_str(&mut self, source: &str) {
-        let code = parse(source);
-        match code {
+        match parse(source) {
             Ok(code) => {
                 self.code = code;
                 self.source = source.to_string();
@@ -55,6 +54,9 @@ impl Spec {
                 }
                 Expr::Bool(b) => {
                     state.set_bool(&name, *b);
+                }
+                Expr::Ident(ident) => {
+                    println!("ident: {}", ident.text);
                 }
                 _ => panic!("expected int or str value"),
             }

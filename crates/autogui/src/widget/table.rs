@@ -7,7 +7,7 @@ use crate::widget::checkbox::Checkbox;
 use crate::widget::dropdown::Dropdown;
 use crate::widget::input::TextInput;
 use crate::style::theme::ActiveTheme;
-use autolang::value::Value;
+use autoval::value::Value;
 
 pub enum WidthMode {
     Pixels(f32),
