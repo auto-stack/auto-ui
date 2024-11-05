@@ -1,11 +1,17 @@
 widget counter {
     model {
-        var count = 10
+        var count = 0
     }
     view {
         button("+") {
-            onclick: || count = count + 5
+            onclick: || count = count + 1
         }
         text(f"Count: $count")
+        button("-") {
+            onclick: || count = count - 1
+        }
+        button("reset") {
+            onclick: || count = 0
+        }
     }
 }

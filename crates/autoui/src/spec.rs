@@ -24,7 +24,6 @@ impl Spec {
     pub fn read_str(&mut self, source: &str) {
         match interpret(source) {
             Ok(result) => {
-                self.path = "".to_string();
                 self.source = source.to_string();
                 self.scope = Some(result.scope);
             }
@@ -42,6 +41,7 @@ impl Spec {
     }
 
     pub fn reload(&mut self) {
+        println!("re read file: {}", self.path);
         if !self.path.is_empty() {
             let path = self.path.clone();
             self.read_file(&path);
@@ -117,9 +117,9 @@ impl Spec {
     pub fn run_lambda(&mut self, lambda: Lambda) -> Value {
         let mut evaler = Evaler::new(self.scope.as_mut().unwrap());
         let fn_decl: &Fn = &lambda.into();
-        evaler.eval_fn_call_no_enter(fn_decl, &Args::new());
+        evaler.eval_fn_call(fn_decl, &Args::new());
         self.scope.as_mut().map(|s| {
-            let cnt = s.get_local("count");
+            let cnt = s.lookup_val("count").unwrap_or(Value::Nil);
             println!("cnt: {:?}", cnt);
             cnt
         }).unwrap_or(Value::Nil)

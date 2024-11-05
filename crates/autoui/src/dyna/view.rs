@@ -50,25 +50,19 @@ impl DynaView {
                     "button" => {
                         let text_arg = node.args.get(0);
                         if let Some(Expr::Str(text)) = text_arg {
-                            println!("props: {:?}", node.props);
                             let mut button = Button::primary(text.as_str());
 
                             let onclick = node.props.get(&Key::NamedKey(Name::new("onclick".to_string())));
                             match onclick {
                                 Some(Expr::Lambda(lambda)) => {
-                                    // println!("lambda: {:?}", lambda);
-                                    // spec.run_lambda(lambda);
                                     let lambda = lambda.clone();
-                                    button = button.on_click_mut(cx, move |this, ev, cx| {
-                                        // println!("lambda: {:?}", lambda);
-                                        let val = this.spec.run_lambda(lambda.clone());
-                                        println!("val: {:?}", val);
+                                    button = button.on_click_mut(cx, move |this, _ev, cx| {
+                                        this.spec.run_lambda(lambda.clone());
                                         cx.notify();
                                     });
                                 }
                                 _ => (),
                             }
-                            
                             div = div.child(button);
                         }
                     },
@@ -80,16 +74,18 @@ impl DynaView {
                                     div = div.child(format!("{}", text));
                                 }
                                 Expr::FStr(fstr) => {
+                                    let mut sb = String::new();
                                     for p in fstr.parts.iter() {
                                         match p {
-                                            Expr::Str(text) => div = div.child(format!("{}", text)),
+                                            Expr::Str(text) => sb.push_str(&format!("{}", text)),
                                             Expr::Ident(_) => {
                                                 let val = spec.eval_ident(p);
-                                                div = div.child(format!("{}", val));
+                                                sb.push_str(&format!("{}", val));
                                             }
                                             _ => (),
                                         }
                                     }
+                                    div = div.child(sb);
                                 }
                                 _ => (),
                             }
@@ -120,6 +116,7 @@ impl Render for DynaView {
     fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
         let div = div().flex().flex_col()
             .child(Button::primary("Refresh").on_click_mut(cx, |this, _ev, cx| {
+                println!("reload");
                 this.reload();
                 cx.notify();
             })).gap_2();
