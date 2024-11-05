@@ -8,5 +8,6 @@ crate-type = ["dylib"]
 
 [dependencies]
 autolang = { workspace = true }
+autoval = { workspace = true }
 autogui = { workspace = true }
 gpui = { workspace = true }

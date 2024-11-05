@@ -1,0 +1,15 @@
+widget hello {
+    model {
+        var name
+    }
+
+    view {
+        text(f"Hello $name")
+    }
+}
+
+app() {
+    center() {
+        hello(name="You")
+    }
+}

@@ -1,0 +1,11 @@
+widget counter {
+    model {
+        var count = 10
+    }
+    view {
+        button("+") {
+            onclick: || count = count + 5
+        }
+        text(f"Count: $count")
+    }
+}
