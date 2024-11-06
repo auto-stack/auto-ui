@@ -8,7 +8,13 @@ var ServiceInfo = [
     { id: 0x27, name: "SecurityAccess",  desc: "安全访问", support: true }
     { id: 0x28, name: "CommunicationControl",  desc: "通信控制 ", support: true }
     { id: 0x2A, name: "ReadDataByPeriodicIdentifier",  desc: "读取数据（周期标识符）", support: false}
-
+    // { id: 0x2C, name: "DynamicallyDefineDataIdentifier",  desc: "动态定义数据标识符", support: true }
+    // { id: 0x2D, name: "WriteDataByIdentifier",  desc: "写入数据", support: true }
+    // { id: 0x2E, name: "InputOutputControlByIdentifier",  desc: "输入输出控制", support: false}
+    // { id: 0x30, name: "RoutineControl",  desc: "例程控制", support: true }
+    // { id: 0x3C, name: "WriteMemoryByAddress",  desc: "写入内存", support: true }
+    // { id: 0x3D, name: "TesterPresent",  desc: "诊断设备在线", support: true }
+    // { id: 0x84, name: "ControlDTCSetting",  desc: "控制DTC设置", support: true }
 ]
 
 var Config = [
