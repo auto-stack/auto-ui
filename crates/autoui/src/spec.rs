@@ -114,6 +114,11 @@ impl Spec {
         evaler.eval_expr(ident)
     }
 
+    pub fn eval_expr(&mut self, expr: &Expr) -> Value {
+        let mut evaler = Evaler::new(self.scope.as_mut().unwrap());
+        evaler.eval_expr(expr)
+    }
+
     pub fn run_lambda(&mut self, lambda: Lambda) -> Value {
         let mut evaler = Evaler::new(self.scope.as_mut().unwrap());
         let fn_decl: &Fn = &lambda.into();

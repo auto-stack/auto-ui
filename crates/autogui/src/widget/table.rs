@@ -9,18 +9,21 @@ use crate::widget::input::TextInput;
 use crate::style::theme::ActiveTheme;
 use autoval::value::Value;
 
+#[derive(Debug, Clone)]
 pub enum WidthMode {
     Pixels(f32),
     Percent(f32),
     Stretch,
 }
 
+#[derive(Debug, Clone)]
 pub enum Align {
     Start,
     Center,
     End,
 }
 
+#[derive(Debug, Clone)]
 pub enum ShowAs {
     Hex,
     Text,
@@ -29,14 +32,52 @@ pub enum ShowAs {
     Input,
 }
 
+#[derive(Debug, Clone)]
 pub struct ColConfig {
     pub idx: usize,
+    pub id: String,
     pub title: String,
     pub width: WidthMode,
     pub align: Align,
     pub showas: ShowAs,
 }
 
+impl Default for WidthMode {
+    fn default() -> Self {
+        WidthMode::Pixels(100.0)
+    }
+}
+
+impl Into<WidthMode> for Value {
+    fn into(self) -> WidthMode {
+        match self {
+            Value::Float(f) => WidthMode::Pixels(f as f32),
+            Value::Str(s) => {
+                if s == "stretch" {
+                    WidthMode::Stretch
+                } else {
+                    WidthMode::default()
+                }
+            }
+            _ => WidthMode::default(),
+        }
+    }
+}
+
+// TODO: add Value::Enum
+impl Into<ShowAs> for String {
+    fn into(self) -> ShowAs {
+        match self.as_str() {
+            "Hex" => ShowAs::Hex,
+            "Checkbox" => ShowAs::Checkbox,
+            "Dropdown" => ShowAs::Dropdown,
+            "Input" => ShowAs::Input,
+            _ => ShowAs::Text,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Row {
     pub cells: Vec<Value>,
 }

@@ -7,13 +7,13 @@ use autogui::widget::button::Button;
 use autogui::widget::table::{ColConfig, Row, Table};
 use gpui::*;
 
-pub struct DynaView {
+pub struct SimpleDynaView {
     spec: Spec,
     // state: State,
     builder: Option<Box<dyn Fn(Div, &mut Spec, &mut ViewContext<Self>) -> Div + 'static>>,
 }
 
-impl Viewable for DynaView {
+impl Viewable for SimpleDynaView {
     fn new(_cx: &mut ViewContext<Self>) -> Self {
         // let mut state = State::new();
         // state.set_int("count", 0);
@@ -25,7 +25,7 @@ impl Viewable for DynaView {
     }
 }
 
-impl DynaView {
+impl SimpleDynaView {
 
     pub fn reload(&mut self) {
         self.spec.reload();
@@ -112,7 +112,7 @@ impl DynaView {
     }
 }
 
-impl Render for DynaView {
+impl Render for SimpleDynaView {
     fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
         let div = div().flex().flex_col()
             .child(Button::primary("Refresh").on_click_mut(cx, |this, _ev, cx| {

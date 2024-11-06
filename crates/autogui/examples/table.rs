@@ -6,7 +6,7 @@ use autogui::widget::util::*;
 use autogui::widget::workspace::Workspace;
 use autogui::widget::table::Table;
 use autogui::widget::table::{ColConfig, WidthMode, ShowAs, Align, Row};
-use autolang::value::{Value};
+use autoval::value::{Value};
 use gpui::*;
 
 struct RootView {
@@ -37,6 +37,7 @@ impl RootView {
         let col_config = vec![
             ColConfig{
                 idx: 0,
+                id: "id".into(),
                 title: "ID".into(),
                 width: WidthMode::Pixels(100.),
                 align: Align::Start,
@@ -44,6 +45,7 @@ impl RootView {
             },
             ColConfig{
                 idx: 1,
+                id: "name".into(),
                 title: "Name".into(),
                 width: WidthMode::Pixels(250.),
                 align: Align::Start,
@@ -51,6 +53,7 @@ impl RootView {
             },
             ColConfig {
                 idx: 2,
+                id: "callback".into(),
                 title: "Callback".into(),
                 width: WidthMode::Pixels(80.),
                 align: Align::Start,
@@ -58,6 +61,7 @@ impl RootView {
             },
             ColConfig{
                 idx: 3,
+                id: "desc".into(),
                 title: "Desc".into(),
                 width: WidthMode::Stretch,
                 align: Align::Start,
