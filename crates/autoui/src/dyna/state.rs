@@ -1,4 +1,3 @@
-use autolang::ast::Lambda;
 use gpui::*;
 use std::collections::HashMap;
 pub enum Dot {

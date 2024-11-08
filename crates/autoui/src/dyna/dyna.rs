@@ -49,16 +49,6 @@ impl DynaView {
                     div = parse_node(div, &name.text, &node, spec, cx);
                 }
             } 
-
-            // TODO: remove clone
-            match spec.widget.clone() {
-                Value::Node(node) => {
-                    for n in node.nodes.iter() {
-                        div = parse_value_node(div, n, spec, cx);
-                    }
-                }
-                _ => (),
-            }
             div
         }));
     }
@@ -87,19 +77,19 @@ fn add_button( mut div: Div, node: &autolang::ast::Node, _spec: &mut WidgetSpec,
     if let Some(Expr::Str(text)) = text_arg {
         let mut button = Button::primary(text.as_str());
 
-        let onclick = node
-            .props
-            .get(&Key::NamedKey(Name::new("onclick".to_string())));
-        match onclick {
-            Some(Expr::Lambda(lambda)) => {
-                let lambda = lambda.clone();
-                button = button.on_click_mut(cx, move |this, _ev, cx| {
-                    this.spec.as_mut().unwrap().run_lambda(lambda.clone());
-                    cx.notify();
-                });
-            }
-            _ => (),
-        }
+        // let onclick = node
+            // .body
+            // .get(&Key::NamedKey(Name::new("onclick".to_string())));
+        // match onclick {
+            // Some(Expr::Lambda(lambda)) => {
+                // let lambda = lambda.clone();
+                // button = button.on_click_mut(cx, move |this, _ev, cx| {
+                    // this.spec.as_mut().unwrap().run_lambda(lambda.clone());
+                    // cx.notify();
+                // });
+            // }
+            // _ => (),
+        // }
         div = div.child(button);
     }
     div
@@ -237,7 +227,7 @@ fn add_button_value(mut div: Div, node: &autoval::value::Node, spec: &mut Widget
 
         let onclick = node.get_prop("onclick");
         match onclick {
-            Value::Lambda => {
+            Value::Lambda(id) => {
                 button = button.on_click_mut(cx, move |this, _ev, cx| {
                     // this.spec.as_mut().unwrap().run_lambda(lambda.clone());
                     cx.notify();

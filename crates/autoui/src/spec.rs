@@ -3,7 +3,7 @@ use autolang::interpret;
 use autoval::value::*;
 use autolang::ast;
 use autolang::scope::{Universe, Meta};
-use autolang::ast::{Expr, Lambda, Fn, Args};
+use autolang::ast::{Expr, Fn, Args};
 use crate::dyna::state::State;
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -130,12 +130,13 @@ impl Spec {
         evaler.eval_expr(expr)
     }
 
-    pub fn run_lambda(&mut self, lambda: Lambda) -> Value {
+    pub fn run_lambda(&mut self, lambda: &Fn) -> Value {
         let mut uni = self.scope.as_ref().borrow_mut();
         let mut evaler = Evaler::new(&mut uni);
-        let fn_decl: &Fn = &lambda.into();
-        evaler.eval_fn_call(fn_decl, &Args::new());
-        uni.lookup_val("count").unwrap_or(Value::Nil)
+        evaler.eval_fn_call(lambda, &Args::new());
+        let count = uni.lookup_val("count").unwrap_or(Value::Nil);
+        println!("new count: {}", count);
+        count
     }
 }
 
@@ -210,11 +211,10 @@ impl WidgetSpec {
         evaler.eval_expr(expr)
     }
 
-    pub fn run_lambda(&mut self, lambda: Lambda) -> Value {
+    pub fn run_lambda(&mut self, lambda: &Fn) -> Value {
         let mut uni = self.scope.as_ref().borrow_mut();
         let mut evaler = Evaler::new(&mut uni);
-        let fn_decl: &Fn = &lambda.into();
-        evaler.eval_fn_call(fn_decl, &Args::new());
+        evaler.eval_fn_call(lambda, &Args::new());
         uni.lookup_val("count").unwrap_or(Value::Nil)
     }
 }
