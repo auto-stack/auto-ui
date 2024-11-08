@@ -14,7 +14,7 @@ struct CounterView {
 impl Viewable for CounterView {
     fn new(_cx: &mut ViewContext<Self>) -> Self {
         let mut state = State::new();
-        state.insert("count".into(), Dot::dft_int());
+        state.set_int("count", 0);
         Self {
             state,
             builder: None,

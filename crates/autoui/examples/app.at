@@ -35,10 +35,17 @@ widget service_table {
     }
 }
 
-/*
 app {
+    left {
+        text("hello")
+    }
     center {
-        serviceTable(cols, serviceInfo)
+        service_table()
+    }
+    right {
+        text("right")
+    }
+    bottom {
+        text("bottom")
     }
 }
-*/

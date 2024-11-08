@@ -1,9 +1,10 @@
 use autogui::app::SimpleApp;
 use autogui::app::Viewable;
-use autoui::dyna::dyna::DynaView;
+use autoui::dyna::simple::DynaView;
 use autogui::widget::workspace::Workspace;
 use autogui::widget::toolbar::Toolbar;
 use autogui::style::theme::ActiveTheme;
+use autoui::spec::Spec;
 use gpui::*;
 
 

@@ -11,6 +11,7 @@ pub enum PaneSide {
     Right,
     Top,
     Bottom,
+    Center,
 }
 
 pub struct Pane {
@@ -72,6 +73,7 @@ impl Render for Pane {
                     PaneSide::Right => s.border_l_1(),
                     PaneSide::Top => s.border_b_1(),
                     PaneSide::Bottom => s.border_t_1(),
+                    PaneSide::Center => s,
                 }
             })
             .bg(bg_color)
