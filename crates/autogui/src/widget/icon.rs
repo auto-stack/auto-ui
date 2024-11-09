@@ -52,6 +52,7 @@ pub enum SysIcon {
     Loader,
     ArrowUp,
     ArrowDown,
+    Reload,
 }
 
 impl SysIcon {
@@ -69,6 +70,7 @@ impl From<SysIcon> for Icon {
             SysIcon::Loader => Icon::new("icons/loader.svg".into()),
             SysIcon::ArrowUp => Icon::new("icons/arrow_up.svg".into()),
             SysIcon::ArrowDown => Icon::new("icons/arrow_down.svg".into()),
+            SysIcon::Reload => Icon::new("icons/reload.svg".into()),
         }
     }
 }

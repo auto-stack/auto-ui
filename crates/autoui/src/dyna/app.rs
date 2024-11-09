@@ -135,13 +135,16 @@ impl DynaApp {
     }
 
     fn create_widget(workspace: Workspace, side: PaneSide, spec: &Spec, block: &Node, path: &str, cx: &mut ViewContext<RootView>) -> Workspace {
+        println!("create_widget: {}", block);
         // let mut array_view = ArrayView::new();
         // look for block's nodes:
-        let widget_spec = if block.nodes.len() == 1 && block.nodes[0].name == "service_table" { 
-            spec.get_widget().clone()
-        } else {
-            node_to_widget(block)
-        };
+        // let widget_spec = if block.nodes.len() == 1 && block.nodes[0].name == "service_table" { 
+            // println!("service_table");
+            // spec.get_widget().clone()
+        // } else {
+            // node_to_widget(block)
+        // };
+        let widget_spec = node_to_widget(block);
 
         let view = cx.new_view(|cx| DynaContent {
             dyna: cx.new_view(|cx| {

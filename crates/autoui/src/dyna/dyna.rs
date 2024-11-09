@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::spec::WidgetSpec;
 use autogui::app::Viewable;
 use autogui::widget::button::Button;
@@ -39,11 +41,10 @@ impl DynaView {
     pub fn update_spec(&mut self) {
         // self.spec.set_state(&mut self.state);
 
-        self.builder = Some(Box::new(move |div, spec, cx| {
+        self.builder = Some(Box::new(|div, spec, cx| {
             let mut div = div;
 
             let spec_view = spec.get_ast_view();
-            println!("spec_view: {:?}", spec_view);
             if let Some(view) = spec_view {
                 for (name, node) in view.nodes.iter() {
                     let node = node.clone();
@@ -61,17 +62,40 @@ impl DynaView {
         self.builder = Some(Box::new(builder));
         self
     }
+
+
 }
 
 fn parse_node(mut div: Div, name: &str, node: &autolang::ast::Node, spec: &mut WidgetSpec, cx: &mut ViewContext<'_, DynaView>) -> Div {
-    println!("parse_node: {}", name);
     match name {
         "button" => div = add_button(div, &node, spec, cx),
         "text" => div = add_text(div, &node, spec, cx),
         "table" => div = add_table(div, &node, spec, cx),
-        _ => (),
+        _ => {
+            // try lookup widget in scope
+            let widget = &spec.scope.borrow().widget;
+            match widget {
+                Value::Widget(w) => {
+                    if w.name == name {
+                        // make a new dynamic widget
+                        let new_spec = WidgetSpec::new(widget.clone(), ".", spec.scope.clone());
+                        div = add_widget(div, new_spec, cx);
+                        cx.notify();
+                    }
+                }
+                _ => ()
+            }
+        }
     };
     div
+}
+
+
+fn add_widget(div: Div, spec: WidgetSpec, cx: &mut ViewContext<'_, DynaView>) -> Div {
+    let mut view = DynaView::new(cx);
+    view.set_spec(spec);
+    view.update_spec();
+    div.child(cx.new_view(|_cx| view))
 }
 
 fn add_button( mut div: Div, node: &autolang::ast::Node, _spec: &mut WidgetSpec, cx: &mut ViewContext<'_, DynaView>) -> Div {
@@ -194,13 +218,13 @@ impl Render for DynaView {
         let div = div()
             .flex()
             .flex_col()
-            .child(
-                Button::primary("Refresh").on_click_mut(cx, |this, _ev, cx| {
-                    println!("reload");
-                    this.reload();
-                    cx.notify();
-                }),
-            )
+            // .child(
+            //     Button::primary("Refresh").on_click_mut(cx, |this, _ev, cx| {
+            //         println!("reload");
+            //         this.reload();
+            //         cx.notify();
+            //     }),
+            // )
             .gap_2();
 
         if let Some(builder) = self.builder.as_ref() {

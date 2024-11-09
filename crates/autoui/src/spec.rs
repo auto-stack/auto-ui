@@ -167,7 +167,7 @@ impl Spec {
 pub struct WidgetSpec {
     pub widget: Value,
     pub path: String,
-    scope: Rc<RefCell<Universe>>,
+    pub scope: Rc<RefCell<Universe>>,
 }
 
 impl WidgetSpec {
@@ -208,7 +208,6 @@ impl WidgetSpec {
     pub fn get_ast_view(&self) -> Option<ast::View> {
         match &self.widget {
             Value::Widget(widget) => {
-                println!("looking for view: {:?}", widget.view_id);
                 self.scope.as_ref().borrow().lookup_view(&widget.view_id)
             }
             _ => None,

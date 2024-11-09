@@ -3,6 +3,8 @@ use crate::style::color::Colorize;
 use crate::style::theme::{ActiveTheme, ThemeMode};
 use crate::widget::theme_toggle::ThemeToggle;
 use crate::widget::button::Button;
+use crate::widget::icon::SysIcon;
+use crate::widget::button::ButtonStyles;
 
 #[derive(IntoElement)]
 pub struct WindowControlIcon {
@@ -78,6 +80,10 @@ impl Render for Toolbar {
                     .justify_center()
                     .items_center()
                     .child("Middle")
+            )
+            // Reload
+            .child(
+                Button::new().icon(SysIcon::Reload.icon()).style(ButtonStyles::Bare)
             )
             // Theme Toggle
             .child(ThemeToggle::new())
