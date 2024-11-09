@@ -91,47 +91,39 @@ impl DynaApp {
 
             cx.open_window(window_options, |cx| cx.new_view(|cx: &mut ViewContext<RootView>| {
 
-                let mut spec = Spec::new();
-                spec.read_file(&self.path);
+                let spec = Spec::from_file(&self.path);
                 // check for `app` block
-                let app_spec = &spec.result.clone();
-                if app_spec.is_nil() {
+                let app_spec = spec.get_app_node();
+                if app_spec.is_none() {
                     panic!("app spec not found in {}", self.path);
                 }
-
+                let app_spec = app_spec.unwrap();
 
                 // Prepare workspace
                 let toolbar = cx.new_view(|_cx| Toolbar {});
                 let mut workspace = Workspace::new().toolbar(toolbar);
                 let path = &self.path.clone();
 
-                match app_spec {
-                    Value::Node(node) => {
-                        for sub in node.nodes.iter() {
-                            match sub.name.as_str() {
-                                "center" => {
-                                    workspace = Self::create_widget(workspace, PaneSide::Center, &spec, sub, path, cx);
-                                }
-                                "bottom" => {
-                                    workspace = Self::create_widget(workspace, PaneSide::Bottom, &spec, sub, path, cx);
-                                }
-                                "left" => {
-                                    workspace = Self::create_widget(workspace, PaneSide::Left, &spec, sub, path, cx);
-                                }
-                                "right" => {
-                                    workspace = Self::create_widget(workspace, PaneSide::Right, &spec, sub, path, cx);
-                                }
-                                "top" => {
-                                    workspace = Self::create_widget(workspace, PaneSide::Top, &spec, sub, path, cx);
-                                }
-                                _ => {
-                                    panic!("unknown block: {}", sub.name);
-                                }
-                            }
+                for sub in app_spec.nodes.iter() {
+                    match sub.name.as_str() {
+                        "center" => {
+                            workspace = Self::create_widget(workspace, PaneSide::Center, &spec, sub, path, cx);
                         }
-                    }
-                    _ => {
-                        panic!("app spec is not a node");
+                        "bottom" => {
+                            workspace = Self::create_widget(workspace, PaneSide::Bottom, &spec, sub, path, cx);
+                        }
+                        "left" => {
+                            workspace = Self::create_widget(workspace, PaneSide::Left, &spec, sub, path, cx);
+                        }
+                        "right" => {
+                            workspace = Self::create_widget(workspace, PaneSide::Right, &spec, sub, path, cx);
+                        }
+                        "top" => {
+                            workspace = Self::create_widget(workspace, PaneSide::Top, &spec, sub, path, cx);
+                        }
+                        _ => {
+                            panic!("unknown block: {}", sub.name);
+                        }
                     }
                 }
                 
@@ -153,7 +145,7 @@ impl DynaApp {
 
         let view = cx.new_view(|cx| DynaContent {
             dyna: cx.new_view(|cx| {
-                let widget_spec = WidgetSpec::new(widget_spec, path, spec.scope.clone());
+                let widget_spec = WidgetSpec::new(widget_spec, path, spec.scope_shared());
                 let mut view = DynaView::new(cx);
                 view.set_spec(widget_spec);
                 view.update_spec();
@@ -173,7 +165,8 @@ impl DynaApp {
 }
 
 fn node_to_widget(block: &Node) -> Value {
-    Value::Widget(Widget { name: block.name.clone(), model: Model::new(), view_id: MetaID::Nil })
+    let node_body_id = block.body.clone();
+    Value::Widget(Widget { name: block.name.clone(), model: Model::new(), view_id: node_body_id })
 }
 
 struct StrView {

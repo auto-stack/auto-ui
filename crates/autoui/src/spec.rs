@@ -4,28 +4,41 @@ use autoval::value::*;
 use autolang::ast;
 use autolang::scope::{Universe, Meta};
 use autolang::ast::{Expr, Fn, Args};
+use autolang::interp::Interpreter;
 use crate::dyna::state::State;
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::cell::Ref;
+use std::cell::RefMut;
 
 pub struct Spec {
     path: String,
     source: String,
-    pub scope: Rc<RefCell<Universe>>,
-    pub result: Value,
+    interpreter: Interpreter,
+}
+
+impl Default for Spec {
+    fn default() -> Self {
+        Self::new(Interpreter::new())
+    }
 }
 
 impl Spec {
-    pub fn new() -> Self {
-        Self { path: String::new(), source: String::new(), scope: Rc::new(RefCell::new(Universe::new())), result: Value::Nil }
+    pub fn new(interpreter: Interpreter) -> Self {
+        Self { path: String::new(), source: String::new(), interpreter }
+    }
+
+    pub fn from_file(path: &str) -> Self {
+        let mut spec = Self::new(Interpreter::new());
+        spec.read_file(path);
+        spec
     }
 
     pub fn read_str(&mut self, source: &str) {
         match interpret(source) {
             Ok(result) => {
                 self.source = source.to_string();
-                self.scope = Rc::new(RefCell::new(result.scope));
-                self.result = result.result;
+                self.interpreter = result;
             }
             Err(e) => {
                 panic!("{}", e);
@@ -47,8 +60,20 @@ impl Spec {
         }
     }
 
+    pub fn scope_shared(&self) -> Rc<RefCell<Universe>> {
+        self.interpreter.scope.clone()
+    }
+
+    fn scope(&self) -> Ref<Universe> {
+        self.interpreter.scope.as_ref().borrow()
+    }
+
+    fn scope_mut(&mut self) -> RefMut<Universe> {
+        self.interpreter.scope.as_ref().borrow_mut()
+    }
+
     pub fn set_state(&self, state: &mut State) {
-        let widget = &self.scope.as_ref().borrow().widget;
+        let widget = &self.scope().widget;
         match widget {
             Value::Widget(widget) => {
                 let model = &widget.model;
@@ -77,12 +102,12 @@ impl Spec {
     }
 
     pub fn get_view(&self) -> ast::View {
-        match &self.scope.as_ref().borrow().widget {
+        match &self.scope().widget {
             Value::Widget(widget) => {
                 let metaid = &widget.view_id;
                 match metaid {
                     MetaID::View(metaid) => {
-                        let meta = self.scope.as_ref().borrow().get_symbol(metaid);
+                        let meta = self.scope().get_symbol(metaid);
                         match meta {
                             Some(meta) => {
                                 match meta.as_ref() {
@@ -100,41 +125,40 @@ impl Spec {
         }
     }
 
-    pub fn get_app(&self) -> Option<&Node> {
-        // self.scope.as_ref().unwrap().get_node("app")
-        None
+    pub fn get_app_node(&self) -> Option<Node> {
+        let result = self.interpreter.result.clone();
+        match result {
+            Value::Node(node) => Some(node),
+            _ => None,
+        }
     }
 
     pub fn get_widget(&self) -> Value {
-        self.scope.as_ref().borrow().widget.clone()
+        self.scope().widget.clone()
+    }
+
+    pub fn evaler(&mut self) -> &mut Evaler {
+        &mut self.interpreter.evaler
     }
 
     pub fn eval_value(&mut self, value: &Value) -> Value {
-        let mut uni = self.scope.as_ref().borrow_mut();
-        let mut evaler = Evaler::new(&mut uni);
         match value {
-            Value::Str(s) => evaler.eval_expr(&Expr::Str(s.clone())),
+            Value::Str(s) => self.evaler().eval_expr(&Expr::Str(s.clone())),
             _ => value.clone(),
         }
     }
 
     pub fn eval_ident(&mut self, ident: &Expr) -> Value {
-        let mut uni = self.scope.as_ref().borrow_mut();
-        let mut evaler = Evaler::new(&mut uni);
-        evaler.eval_expr(ident)
+        self.evaler().eval_expr(ident)
     }
 
     pub fn eval_expr(&mut self, expr: &Expr) -> Value {
-        let mut uni = self.scope.as_ref().borrow_mut();
-        let mut evaler = Evaler::new(&mut uni);
-        evaler.eval_expr(expr)
+        self.evaler().eval_expr(expr)
     }
 
     pub fn run_lambda(&mut self, lambda: &Fn) -> Value {
-        let mut uni = self.scope.as_ref().borrow_mut();
-        let mut evaler = Evaler::new(&mut uni);
-        evaler.eval_fn_call(lambda, &Args::new());
-        let count = uni.lookup_val("count").unwrap_or(Value::Nil);
+        self.evaler().eval_fn_call(lambda, &Args::new());
+        let count = self.scope().lookup_val("count").unwrap_or(Value::Nil);
         println!("new count: {}", count);
         count
     }
@@ -154,9 +178,9 @@ impl WidgetSpec {
     pub fn read_str(&mut self, source: &str) {
         match interpret(source) {
             Ok(result) => {
-                let scope = result.scope;
+                self.scope = result.scope.clone();
+                let scope = result.scope.borrow();
                 let widget = scope.widget.clone();
-                self.scope = Rc::new(RefCell::new(scope));
                 self.widget = widget;
             }
             Err(e) => {
@@ -184,6 +208,7 @@ impl WidgetSpec {
     pub fn get_ast_view(&self) -> Option<ast::View> {
         match &self.widget {
             Value::Widget(widget) => {
+                println!("looking for view: {:?}", widget.view_id);
                 self.scope.as_ref().borrow().lookup_view(&widget.view_id)
             }
             _ => None,
@@ -191,8 +216,8 @@ impl WidgetSpec {
     }
 
     pub fn eval_value(&mut self, value: &Value) -> Value {
-        let mut uni = self.scope.as_ref().borrow_mut();
-        let mut evaler = Evaler::new(&mut uni);
+        let uni = self.scope.clone();
+        let mut evaler = Evaler::new(uni);
         match value {
             Value::Str(s) => evaler.eval_expr(&Expr::Str(s.clone())),
             _ => value.clone(),
@@ -200,21 +225,22 @@ impl WidgetSpec {
     }
 
     pub fn eval_ident(&mut self, ident: &Expr) -> Value {
-        let mut uni = self.scope.as_ref().borrow_mut();
-        let mut evaler = Evaler::new(&mut uni);
+        let uni = self.scope.clone();
+        let mut evaler = Evaler::new(uni);
         evaler.eval_expr(ident)
     }
 
     pub fn eval_expr(&mut self, expr: &Expr) -> Value {
-        let mut uni = self.scope.as_ref().borrow_mut();
-        let mut evaler = Evaler::new(&mut uni);
+        let uni = self.scope.clone();
+        let mut evaler = Evaler::new(uni);
         evaler.eval_expr(expr)
     }
 
     pub fn run_lambda(&mut self, lambda: &Fn) -> Value {
-        let mut uni = self.scope.as_ref().borrow_mut();
-        let mut evaler = Evaler::new(&mut uni);
+        let uni = self.scope.clone();
+        let mut evaler = Evaler::new(uni);
         evaler.eval_fn_call(lambda, &Args::new());
-        uni.lookup_val("count").unwrap_or(Value::Nil)
+        let count = self.scope.borrow().lookup_val("count").unwrap_or(Value::Nil);
+        count
     }
 }

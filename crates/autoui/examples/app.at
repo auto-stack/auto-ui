@@ -37,7 +37,7 @@ widget service_table {
 
 app {
     left {
-        text("hello")
+        button("hello")
     }
     center {
         service_table()

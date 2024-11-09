@@ -43,6 +43,7 @@ impl DynaView {
             let mut div = div;
 
             let spec_view = spec.get_ast_view();
+            println!("spec_view: {:?}", spec_view);
             if let Some(view) = spec_view {
                 for (name, node) in view.nodes.iter() {
                     let node = node.clone();
@@ -63,6 +64,7 @@ impl DynaView {
 }
 
 fn parse_node(mut div: Div, name: &str, node: &autolang::ast::Node, spec: &mut WidgetSpec, cx: &mut ViewContext<'_, DynaView>) -> Div {
+    println!("parse_node: {}", name);
     match name {
         "button" => div = add_button(div, &node, spec, cx),
         "text" => div = add_text(div, &node, spec, cx),

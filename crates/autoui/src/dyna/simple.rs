@@ -15,7 +15,7 @@ impl Viewable for DynaView {
         // let mut state = State::new();
         // state.set_int("count", 0);
         Self {
-            spec: Spec::new(),
+            spec: Spec::default(),
             // state,
             builder: None,
         }
@@ -49,7 +49,6 @@ impl DynaView {
                         let text_arg = node.args.get(0);
                         if let Some(Expr::Str(text)) = text_arg {
                             let button = Button::primary(text.as_str());
-                            // TODO: instead of AST info, use the Value info
 
                             // let onclick = node.body.get(&Key::NamedKey(Name::new("onclick".to_string())));
                             // println!("onclick: {:?}", onclick);
