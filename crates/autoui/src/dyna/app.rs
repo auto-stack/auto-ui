@@ -20,9 +20,9 @@ pub struct RootView {
 }
 
 impl RootView {
-    pub fn new(cx: &mut WindowContext, workspace: Workspace) -> Self {
+    pub fn new(cx: &mut ViewContext<Self>, workspace: View<Workspace>) -> Self {
         Self {
-            workspace: cx.new_view(|_cx| workspace),
+            workspace,
         }
     }
 }
@@ -100,41 +100,42 @@ impl DynaApp {
                 let app_spec = app_spec.unwrap();
 
                 // Prepare workspace
-                let toolbar = cx.new_view(|_cx| Toolbar {});
-                let mut workspace = Workspace::new().toolbar(toolbar);
-                let path = &self.path.clone();
+                let workspace_view = cx.new_view(|cx| {
+                    let mut workspace = Workspace::new(cx);
+                    let path = &self.path.clone();
 
-                for sub in app_spec.nodes.iter() {
-                    match sub.name.as_str() {
-                        "center" => {
-                            workspace = Self::create_widget(workspace, PaneSide::Center, &spec, sub, path, cx);
-                        }
-                        "bottom" => {
-                            workspace = Self::create_widget(workspace, PaneSide::Bottom, &spec, sub, path, cx);
-                        }
-                        "left" => {
-                            workspace = Self::create_widget(workspace, PaneSide::Left, &spec, sub, path, cx);
-                        }
-                        "right" => {
-                            workspace = Self::create_widget(workspace, PaneSide::Right, &spec, sub, path, cx);
-                        }
-                        "top" => {
-                            workspace = Self::create_widget(workspace, PaneSide::Top, &spec, sub, path, cx);
-                        }
-                        _ => {
-                            panic!("unknown block: {}", sub.name);
+                    for sub in app_spec.nodes.iter() {
+                        match sub.name.as_str() {
+                            "center" => {
+                                workspace = Self::create_widget(workspace, PaneSide::Center, &spec, sub, path, cx);
+                            }
+                            "bottom" => {
+                                workspace = Self::create_widget(workspace, PaneSide::Bottom, &spec, sub, path, cx);
+                            }
+                            "left" => {
+                                workspace = Self::create_widget(workspace, PaneSide::Left, &spec, sub, path, cx);
+                            }
+                            "right" => {
+                                workspace = Self::create_widget(workspace, PaneSide::Right, &spec, sub, path, cx);
+                            }
+                            "top" => {
+                                workspace = Self::create_widget(workspace, PaneSide::Top, &spec, sub, path, cx);
+                            }
+                            _ => {
+                                panic!("unknown block: {}", sub.name);
+                            }
                         }
                     }
-                }
-                
-                RootView::new(cx, workspace)
+                    workspace
+                });
+                RootView::new(cx, workspace_view)
             }))
             .unwrap();
 
         });
     }
 
-    fn create_widget(workspace: Workspace, side: PaneSide, spec: &Spec, block: &Node, path: &str, cx: &mut ViewContext<RootView>) -> Workspace {
+    fn create_widget(workspace: Workspace, side: PaneSide, spec: &Spec, block: &Node, path: &str, cx: &mut ViewContext<Workspace>) -> Workspace {
         println!("create_widget: {}", block);
         // let mut array_view = ArrayView::new();
         // look for block's nodes:

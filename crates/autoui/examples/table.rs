@@ -2,9 +2,7 @@ use autogui::app::SimpleApp;
 use autogui::app::Viewable;
 use autoui::dyna::simple::DynaView;
 use autogui::widget::workspace::Workspace;
-use autogui::widget::toolbar::Toolbar;
 use autogui::style::theme::ActiveTheme;
-use autoui::spec::Spec;
 use gpui::*;
 
 
@@ -13,8 +11,7 @@ pub struct RootView {
 }
 
 impl RootView {
-    pub fn new(cx: &mut WindowContext) -> Self {
-        let toolbar = cx.new_view(|_cx| Toolbar {});
+    pub fn new(cx: &mut ViewContext<Self>) -> Self {
         let center = cx.new_view(|cx| CenterContent {
             dyna: cx.new_view(|cx| {
                 let mut view = DynaView::new(cx);
@@ -23,10 +20,9 @@ impl RootView {
                 view
             }),
         });
-        let workspace = Workspace::new().toolbar(toolbar).child(center);
 
         Self {
-            workspace: cx.new_view(|_cx| workspace),
+            workspace: cx.new_view(|cx| Workspace::new(cx).child(center)),
         }
     }
 }

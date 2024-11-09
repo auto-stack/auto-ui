@@ -4,9 +4,10 @@ use gpui::*;
 use prelude::FluentBuilder;
 use crate::style::color::Colorize;
 use crate::style::theme::ActiveTheme;
+use crate::event::ReloadEvent;
 
 pub struct Workspace {
-    toolbar: Option<View<Toolbar>>,
+    toolbar: View<Toolbar>,
     left: Option<View<Pane>>,
     right: Option<View<Pane>>,
     top: Option<View<Pane>>,
@@ -14,21 +15,24 @@ pub struct Workspace {
     child: Option<AnyView>,
 }
 
+impl EventEmitter<ReloadEvent> for Workspace {}
+
 impl Workspace {
-    pub fn new() -> Self {
+    pub fn new(cx: &mut ViewContext<Self>) -> Self {
+        let toolbar = cx.new_view(|_cx| Toolbar {});
+        cx.subscribe(&toolbar, |this, _view, _ev, cx| {
+            cx.emit(ReloadEvent);
+            // tell all the children to reload
+        })
+        .detach();
         Self {
-            toolbar: None,
+            toolbar,
             left: None,
             right: None,
             top: None,
             bottom: None,
             child: None,
         }
-    }
-
-    pub fn toolbar(mut self, toolbar: impl Into<View<Toolbar>>) -> Self {
-        self.toolbar = Some(toolbar.into());
-        self
     }
 
     pub fn child(mut self, child: impl Into<AnyView>) -> Self {
@@ -77,13 +81,7 @@ impl Render for Workspace {
             .size_full()
             .border_0()
             // Toolbar
-            .when(self.toolbar.is_some(), |s| {
-                if let Some(toolbar) = self.toolbar.as_ref() {
-                    s.child(toolbar.clone())
-                } else {
-                    s
-                }
-            })
+            .child(self.toolbar.clone())
             // Workarea
             .child(
                 div()

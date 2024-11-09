@@ -5,6 +5,7 @@ use crate::widget::theme_toggle::ThemeToggle;
 use crate::widget::button::Button;
 use crate::widget::icon::SysIcon;
 use crate::widget::button::ButtonStyles;
+use crate::event::ReloadEvent;
 
 #[derive(IntoElement)]
 pub struct WindowControlIcon {
@@ -84,6 +85,11 @@ impl Render for Toolbar {
             // Reload
             .child(
                 Button::new().icon(SysIcon::Reload.icon()).style(ButtonStyles::Bare)
+                    .on_click(cx.listener(move |_this, _ev, cx| {
+                        println!("Reload Cliecked! Event");
+                        cx.emit(ReloadEvent);
+                        cx.refresh();
+                    }))
             )
             // Theme Toggle
             .child(ThemeToggle::new())
@@ -101,3 +107,4 @@ impl Render for Toolbar {
     }
 }
 
+impl EventEmitter<ReloadEvent> for Toolbar {}

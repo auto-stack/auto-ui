@@ -1,5 +1,7 @@
 use gpui::{ClickEvent, Focusable, InteractiveElement, WindowContext};
 
+pub struct ReloadEvent;
+
 pub trait InteractiveElementExt: InteractiveElement {
     /// Set the listener for a double click event.
     fn on_double_click(

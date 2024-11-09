@@ -32,7 +32,7 @@ impl Render for CenterContent {
 }
 
 impl RootView {
-    fn new(cx: &mut WindowContext) -> Self {
+    fn new(cx: &mut ViewContext<Self>) -> Self {
 
         let col_config = vec![
             ColConfig{
@@ -88,14 +88,12 @@ impl RootView {
         //     Row { cells: vec![Value::Int(0x85), Value::Str("ControlDTCSetting".to_string()), Value::Str("控制DTC设置".to_string())] },
         ];
 
-        let toolbar = cx.new_view(|_cx| Toolbar {});
         let center = cx.new_view(|cx| CenterContent {
             table: cx.new_view(|cx| Table::new(cx, col_config, data)),
         });
-        let workspace = Workspace::new().toolbar(toolbar).child(center);
 
         Self {
-            workspace: cx.new_view(|_cx| workspace),
+            workspace: cx.new_view(|cx| Workspace::new(cx).child(center)),
         }
     }
 }
