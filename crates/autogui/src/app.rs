@@ -2,6 +2,12 @@ use gpui::*;
 use crate::assets::Assets;
 use crate::style::theme::{init_theme, ActiveTheme};
 
+pub struct GlobalState {
+    pub count: i32,
+}
+
+impl Global for GlobalState {}
+
 pub struct SimpleApp {
     app: App,
     title: String,

@@ -7,6 +7,9 @@ use crate::widget::icon::SysIcon;
 use crate::widget::button::ButtonStyles;
 use crate::event::ReloadEvent;
 
+use gpui::{UpdateGlobal, Global};
+use crate::app::GlobalState;
+
 #[derive(IntoElement)]
 pub struct WindowControlIcon {
     name: String,
@@ -88,6 +91,10 @@ impl Render for Toolbar {
                     .on_click(cx.listener(move |_this, _ev, cx| {
                         println!("Reload Cliecked! Event");
                         cx.emit(ReloadEvent);
+
+                        GlobalState::update_global(cx, |g, _| {
+                            g.count += 1;
+                        });
                         cx.refresh();
                     }))
             )

@@ -5,7 +5,6 @@ use autogui::assets::Assets;
 use autogui::style::theme::{init_theme, ActiveTheme};
 use autogui::app::Viewable;
 use autogui::widget::workspace::Workspace;
-use autogui::widget::toolbar::Toolbar;
 use autogui::widget::pane::PaneSide;
 use autogui::widget::pane::Pane;
 use autogui::widget::button::Button;
@@ -14,6 +13,8 @@ use autoval::value::MetaID;
 use autoval::value::Model;
 use crate::spec::{Spec, WidgetSpec};
 use crate::dyna::dyna::DynaView;
+use gpui::{ReadGlobal, UpdateGlobal};
+use autogui::app::GlobalState;
 
 pub struct RootView {
     workspace: View<Workspace>,
@@ -61,6 +62,8 @@ pub struct DynaApp {
     path: String,
 }
 
+
+
 impl DynaApp {
     pub fn new(path: &str) -> Self {
         Self {
@@ -72,6 +75,13 @@ impl DynaApp {
     pub fn run(self) {
         self.app.run(move |cx| {
             init_theme(cx);
+
+            let global = GlobalState { count: 0 };
+            cx.set_global(global);
+
+            cx.observe_global::<GlobalState>(|g| {
+                println!("global changed: {}", GlobalState::global(g).count);
+            }).detach();
 
             let title_options = TitlebarOptions {
                 appears_transparent: true,
