@@ -14,6 +14,7 @@ pub mod field;
 pub mod label;
 pub mod table;
 pub mod util;
+pub mod tab;
 
 mod widget;
 pub use widget::*;

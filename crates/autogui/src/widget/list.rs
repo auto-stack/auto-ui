@@ -11,7 +11,7 @@ pub struct List {
 }
 
 impl FocusableView for List {
-    fn focus_handle(&self, cx: &AppContext) -> FocusHandle {
+    fn focus_handle(&self, _cx: &AppContext) -> FocusHandle {
         self.focus_handle.clone()
     }
 }

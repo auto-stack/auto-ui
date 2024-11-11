@@ -1,45 +1,55 @@
 use autogui::app::SimpleApp;
 use autogui::style::theme::ActiveTheme;
-use autogui::widget::button::Button;
-use autogui::widget::input::TextInput;
-use autogui::widget::list::List;
-use autogui::widget::toolbar::*;
-use autogui::widget::util::*;
+use autogui::widget::tab::{Tab, TabBar};
 use autogui::widget::workspace::Workspace;
 use gpui::*;
+use std::fmt::Display;
+use autogui::widget::tab::TabPane;
 
 struct RootView {
     workspace: View<Workspace>,
 }
 
+#[derive(Debug, Clone, Copy)]
+enum ByteOrder {
+    Motorola = 0,
+    Intel = 1,
+}
+
+impl From<usize> for ByteOrder {
+    fn from(value: usize) -> Self {
+        match value {
+            0 => ByteOrder::Motorola,
+            1 => ByteOrder::Intel,
+            _ => panic!("Invalid byte order value"),
+        }
+    }
+}
+
+impl Display for ByteOrder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
 struct CenterContent {
-    list: View<List>,
+    tabpane: View<TabPane>,
 }
 
 impl Render for CenterContent {
-    fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
-        let label_width = 100.;
+    fn render(&mut self, _cx: &mut ViewContext<Self>) -> impl IntoElement {
         div()
             .flex()
             .flex_col()
-            .items_center()
-            .justify_center()
-            .gap_4()
-            .w_1_3()
-            .child(
-                card("List Demo", cx)
-                    .rounded_lg()
-                    .shadow_md()
-                    .gap_5()
-                    .child(self.list.clone())
-            )
+            .size_full()
+            .child(self.tabpane.clone())
     }
 }
 
 impl RootView {
     fn new(cx: &mut ViewContext<Self>) -> Self {
         let center = cx.new_view(|cx| CenterContent {
-            list: cx.new_view(|cx| List::new(cx, vec!["Apple".into(), "Banana".into(), "Cherry".into()])),
+            tabpane: cx.new_view(|cx| TabPane::new(cx))
         });
         let workspace = cx.new_view(|cx| Workspace::new(cx).child(center));
 
