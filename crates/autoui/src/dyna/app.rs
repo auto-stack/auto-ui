@@ -7,21 +7,22 @@ use autogui::app::Viewable;
 use autogui::widget::workspace::Workspace;
 use autogui::widget::pane::PaneSide;
 use autogui::widget::pane::Pane;
-use autogui::widget::button::Button;
 use autoval::value::Widget;
-use autoval::value::MetaID;
 use autoval::value::Model;
 use crate::spec::{Spec, WidgetSpec};
 use crate::dyna::dyna::DynaView;
-use gpui::{ReadGlobal, UpdateGlobal};
-use autogui::app::GlobalState;
+use gpui::ReadGlobal;
+use autogui::app::{GlobalState, ReloadState};
+use std::rc::Rc;
+use std::cell::RefCell;
+use autolang::scope::Universe;
 
 pub struct RootView {
     workspace: View<Workspace>,
 }
 
 impl RootView {
-    pub fn new(cx: &mut ViewContext<Self>, workspace: View<Workspace>) -> Self {
+    pub fn new(_cx: &mut ViewContext<Self>, workspace: View<Workspace>) -> Self {
         Self {
             workspace,
         }
@@ -57,11 +58,102 @@ impl Render for DynaContent {
     }
 }
 
+pub struct WidgetSpecs {
+    pub left: Option<WidgetSpec>,
+    pub right: Option<WidgetSpec>,
+    pub top: Option<WidgetSpec>,
+    pub bottom: Option<WidgetSpec>,
+    pub center: Option<WidgetSpec>,
+}
+
+impl WidgetSpecs {
+    pub fn new() -> Self {
+        Self {
+            left: None,
+            right: None,
+            top: None,
+            bottom: None,
+            center: None,
+        }
+    }
+}
+
+pub struct GlobalSpecState {
+    spec: Spec,
+    path: String,
+    pub widget_specs: WidgetSpecs,
+}
+
+impl Global for GlobalSpecState {}
+
+impl GlobalSpecState {
+    pub fn new(path: &str) -> Self {
+        let spec = Spec::from_file(path);
+        let widget_specs = Self::parse_sides(&spec, path);
+        Self {
+            spec,
+            path: path.to_string(),
+            widget_specs,
+        }
+    }
+
+    fn make_widget_spec(path: &str, id: &str, scope: Rc<RefCell<Universe>>, sub: &Node) -> WidgetSpec {
+        WidgetSpec::new(node_to_widget(sub), path, id, scope)
+    }
+
+    pub fn parse_sides(spec: &Spec, path: &str) -> WidgetSpecs {
+        let app_spec = spec.get_app_node();
+        let scope = spec.scope_shared();
+        if app_spec.is_none() {
+            panic!("app spec not found in {}", path);
+        }
+        let app_spec = app_spec.unwrap();
+        let mut widget_specs = WidgetSpecs::new();
+        for sub in app_spec.nodes.iter() {
+
+            match sub.name.as_str() {
+                "center" => {
+                    widget_specs.center = Some(Self::make_widget_spec(path, "center", scope.clone(), sub));
+                }
+                "bottom" => {
+                    widget_specs.bottom = Some(Self::make_widget_spec(path, "bottom", scope.clone(), sub));
+                }
+                "left" => {
+                    widget_specs.left = Some(Self::make_widget_spec(path, "left", scope.clone(), sub));
+                }
+                "right" => {
+                    widget_specs.right = Some(Self::make_widget_spec(path, "right", scope.clone(), sub));
+                }
+                "top" => {
+                    widget_specs.top = Some(Self::make_widget_spec(path, "top", scope.clone(), sub));
+                }
+                _ => {
+                    panic!("unknown block: {}", sub.name);
+                }
+            }
+        }
+        widget_specs
+    }
+
+    pub fn reload(&mut self) {
+        self.spec.reload();
+        self.widget_specs = Self::parse_sides(&self.spec, &self.path);
+    }
+
+    pub fn scope(&self) -> Rc<RefCell<Universe>> {
+        self.spec.scope_shared()
+    }
+
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+
+}
+
 pub struct DynaApp {
     app: App,
     path: String,
 }
-
 
 
 impl DynaApp {
@@ -79,8 +171,18 @@ impl DynaApp {
             let global = GlobalState { count: 0 };
             cx.set_global(global);
 
+            let reload = ReloadState { };
+            cx.set_global(reload);
+
+
+
             cx.observe_global::<GlobalState>(|g| {
                 println!("global changed: {}", GlobalState::global(g).count);
+            }).detach();
+
+            cx.observe_global::<ReloadState>(|cx| {
+                println!("reload changed: {:?}", ReloadState::global(cx));
+                cx.refresh();
             }).detach();
 
             let title_options = TitlebarOptions {
@@ -99,45 +201,40 @@ impl DynaApp {
                 ..WindowOptions::default()
             };
 
+            cx.observe_global::<ReloadState>(|cx| {
+                println!("reload changed: {:?}", ReloadState::global(cx));
+                // self.spec.reload();
+
+                GlobalSpecState::update_global(cx, |g, _cx| {
+                    g.reload();
+                });
+                // g.notify();
+            }).detach();
+
             cx.open_window(window_options, |cx| cx.new_view(|cx: &mut ViewContext<RootView>| {
-
-                let spec = Spec::from_file(&self.path);
-                // check for `app` block
-                let app_spec = spec.get_app_node();
-                if app_spec.is_none() {
-                    panic!("app spec not found in {}", self.path);
-                }
-                let app_spec = app_spec.unwrap();
-
+                let global_spec = GlobalSpecState::new(&self.path);
                 // Prepare workspace
                 let workspace_view = cx.new_view(|cx| {
                     let mut workspace = Workspace::new(cx);
-                    let path = &self.path.clone();
 
-                    for sub in app_spec.nodes.iter() {
-                        match sub.name.as_str() {
-                            "center" => {
-                                workspace = Self::create_widget(workspace, PaneSide::Center, &spec, sub, path, cx);
-                            }
-                            "bottom" => {
-                                workspace = Self::create_widget(workspace, PaneSide::Bottom, &spec, sub, path, cx);
-                            }
-                            "left" => {
-                                workspace = Self::create_widget(workspace, PaneSide::Left, &spec, sub, path, cx);
-                            }
-                            "right" => {
-                                workspace = Self::create_widget(workspace, PaneSide::Right, &spec, sub, path, cx);
-                            }
-                            "top" => {
-                                workspace = Self::create_widget(workspace, PaneSide::Top, &spec, sub, path, cx);
-                            }
-                            _ => {
-                                panic!("unknown block: {}", sub.name);
-                            }
-                        }
+                    if let Some(left) = global_spec.widget_specs.left.clone() {
+                        workspace = Self::create_widget(workspace, PaneSide::Left, left, cx);
+                    }
+                    if let Some(right) = global_spec.widget_specs.right.clone() {
+                        workspace = Self::create_widget(workspace, PaneSide::Right, right, cx);
+                    }
+                    if let Some(top) = global_spec.widget_specs.top.clone() {
+                        workspace = Self::create_widget(workspace, PaneSide::Top, top, cx);
+                    }
+                    if let Some(bottom) = global_spec.widget_specs.bottom.clone() {
+                        workspace = Self::create_widget(workspace, PaneSide::Bottom, bottom, cx);
+                    }
+                    if let Some(center) = global_spec.widget_specs.center.clone() {
+                        workspace = Self::create_widget(workspace, PaneSide::Center, center, cx);
                     }
                     workspace
                 });
+                cx.set_global(global_spec);
                 RootView::new(cx, workspace_view)
             }))
             .unwrap();
@@ -145,21 +242,10 @@ impl DynaApp {
         });
     }
 
-    fn create_widget(workspace: Workspace, side: PaneSide, spec: &Spec, block: &Node, path: &str, cx: &mut ViewContext<Workspace>) -> Workspace {
-        println!("create_widget: {}", block);
-        // let mut array_view = ArrayView::new();
-        // look for block's nodes:
-        // let widget_spec = if block.nodes.len() == 1 && block.nodes[0].name == "service_table" { 
-            // println!("service_table");
-            // spec.get_widget().clone()
-        // } else {
-            // node_to_widget(block)
-        // };
-        let widget_spec = node_to_widget(block);
+    fn create_widget(workspace: Workspace, side: PaneSide, widget_spec: WidgetSpec, cx: &mut ViewContext<Workspace>) -> Workspace {
 
         let view = cx.new_view(|cx| DynaContent {
             dyna: cx.new_view(|cx| {
-                let widget_spec = WidgetSpec::new(widget_spec, path, spec.scope_shared());
                 let mut view = DynaView::new(cx);
                 view.set_spec(widget_spec);
                 view.update_spec();
@@ -169,10 +255,10 @@ impl DynaApp {
         
         match side {
             PaneSide::Center => workspace.child(view),
-            PaneSide::Bottom => workspace.bottom(cx.new_view(|cx| Pane::new(side, Pixels(250.0)).child(view))),
-            PaneSide::Left => workspace.left(cx.new_view(|cx| Pane::new(side, Pixels(250.0)).child(view))),
-            PaneSide::Right => workspace.right(cx.new_view(|cx| Pane::new(side, Pixels(250.0)).child(view))),
-            PaneSide::Top => workspace.top(cx.new_view(|cx| Pane::new(side, Pixels(250.0)).child(view))),
+            PaneSide::Bottom => workspace.bottom(cx.new_view(|_cx| Pane::new(side, Pixels(250.0)).child(view))),
+            PaneSide::Left => workspace.left(cx.new_view(|_cx| Pane::new(side, Pixels(250.0)).child(view))),
+            PaneSide::Right => workspace.right(cx.new_view(|_cx| Pane::new(side, Pixels(250.0)).child(view))),
+            PaneSide::Top => workspace.top(cx.new_view(|_cx| Pane::new(side, Pixels(250.0)).child(view))),
         }
     }
 
@@ -181,41 +267,4 @@ impl DynaApp {
 fn node_to_widget(block: &Node) -> Value {
     let node_body_id = block.body.clone();
     Value::Widget(Widget { name: block.name.clone(), model: Model::new(), view_id: node_body_id })
-}
-
-struct StrView {
-    text: String,
-}
-
-impl Render for StrView {
-    fn render(&mut self, _cx: &mut ViewContext<Self>) -> impl IntoElement {
-        div().child(self.text.clone())
-    }
-}
-
-
-struct ArrayView {
-    array: Vec<AnyView>,
-}
-
-impl ArrayView {
-    pub fn new() -> Self {
-        Self { array: vec![] }
-    }
-
-    pub fn push(&mut self, view: AnyView) {
-        self.array.push(view);
-    }
-
-}
-
-impl Render for ArrayView {
-    fn render(&mut self, _cx: &mut ViewContext<Self>) -> impl IntoElement {
-        div().size_full()
-            .flex()
-            .flex_col()
-            .justify_center()
-            .items_center()
-            .children(self.array.clone())
-    }
 }

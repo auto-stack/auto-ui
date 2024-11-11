@@ -6,6 +6,7 @@ use autogui::widget::button::Button;
 use autogui::widget::table::{Align, ColConfig, Row, Table};
 use autolang::ast::{Expr, Key, Name};
 use autoval::value::Value;
+use crate::dyna::app::GlobalSpecState;
 use gpui::*;
 
 pub struct DynaView {
@@ -15,9 +16,35 @@ pub struct DynaView {
 }
 
 impl Viewable for DynaView {
-    fn new(_cx: &mut ViewContext<Self>) -> Self {
+    fn new(cx: &mut ViewContext<Self>) -> Self {
         // let mut state = State::new();
         // state.set_int("count", 0);
+        cx.observe_global::<GlobalSpecState>(|v, cx| {
+            let spec = GlobalSpecState::global(cx);
+            let widget_specs = &spec.widget_specs;
+            if v.spec.is_some() {
+                match v.spec.as_ref().unwrap().id.as_str() {
+                    "left" => {
+                        v.spec = widget_specs.left.clone();
+                    }
+                    "right" => {
+                        v.spec = widget_specs.right.clone();
+                    }
+                    "top" => {
+                        v.spec = widget_specs.top.clone();
+                    }
+                    "bottom" => {
+                        v.spec = widget_specs.bottom.clone();
+                    }
+                    "center" => {
+                        v.spec = widget_specs.center.clone();
+                    }
+                    _ => {}
+                }
+            }
+            v.update_spec();
+            println!("update spec for widget");
+        }).detach();
         Self {
             spec: None,
             // state,
@@ -78,7 +105,7 @@ fn parse_node(mut div: Div, name: &str, node: &autolang::ast::Node, spec: &mut W
                 Value::Widget(w) => {
                     if w.name == name {
                         // make a new dynamic widget
-                        let new_spec = WidgetSpec::new(widget.clone(), ".", spec.scope.clone());
+                        let new_spec = WidgetSpec::new(widget.clone(), ".", "", spec.scope.clone());
                         div = add_widget(div, new_spec, cx);
                         cx.notify();
                     }

@@ -19,12 +19,12 @@ impl EventEmitter<ReloadEvent> for Workspace {}
 
 impl Workspace {
     pub fn new(cx: &mut ViewContext<Self>) -> Self {
+
         let toolbar = cx.new_view(|_cx| Toolbar {});
         cx.subscribe(&toolbar, |this, _view, _ev, cx| {
             cx.emit(ReloadEvent);
             // tell all the children to reload
-        })
-        .detach();
+        }).detach();
         Self {
             toolbar,
             left: None,
@@ -59,6 +59,7 @@ impl Workspace {
         self.bottom = Some(bottom.into());
         self
     }
+
 }
 
 impl FluentBuilder for Workspace {}

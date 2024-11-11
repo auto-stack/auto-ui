@@ -7,8 +7,8 @@ use crate::widget::icon::SysIcon;
 use crate::widget::button::ButtonStyles;
 use crate::event::ReloadEvent;
 
-use gpui::{UpdateGlobal, Global};
-use crate::app::GlobalState;
+use gpui::UpdateGlobal;
+use crate::app::{GlobalState, ReloadState};
 
 #[derive(IntoElement)]
 pub struct WindowControlIcon {
@@ -49,9 +49,12 @@ impl RenderOnce for WindowControlIcon {
 }
 
 pub struct Toolbar {
+
 }
 
 impl Render for Toolbar {
+
+
     fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
         let theme = cx.active_theme();
         div()
@@ -95,6 +98,10 @@ impl Render for Toolbar {
                         GlobalState::update_global(cx, |g, _| {
                             g.count += 1;
                         });
+
+                        ReloadState::update_global(cx, |_g, _| {
+                        });
+
                         cx.refresh();
                     }))
             )

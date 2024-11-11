@@ -8,6 +8,15 @@ pub struct GlobalState {
 
 impl Global for GlobalState {}
 
+#[derive(Debug)]
+pub struct ReloadState {
+
+}
+
+
+
+impl Global for ReloadState {}
+
 pub struct SimpleApp {
     app: App,
     title: String,

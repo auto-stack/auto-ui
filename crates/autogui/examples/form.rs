@@ -83,8 +83,7 @@ impl Render for CenterContent {
 }
 
 impl RootView {
-    fn new(cx: &mut WindowContext) -> Self {
-        let toolbar = cx.new_view(|_cx| Toolbar {});
+    fn new(cx: &mut ViewContext<Self>) -> Self {
         let center = cx.new_view(|cx| CenterContent {
             name: "ACC_Kilometre_Mile".into(),
             message: "ICM_5".into(),
@@ -101,10 +100,10 @@ impl RootView {
             input: cx.new_view(|cx| TextInput::new(cx)),
             default_value_input: cx.new_view(|cx| TextInput::new(cx)),
         });
-        let workspace = Workspace::new().toolbar(toolbar).child(center);
+        let workspace = cx.new_view(|cx| Workspace::new(cx).child(center));
 
         Self {
-            workspace: cx.new_view(|_cx| workspace),
+            workspace,
         }
     }
 }

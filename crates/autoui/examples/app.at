@@ -43,9 +43,12 @@ app {
         service_table()
     }
     right {
-        text("right")
+        text("right now")
     }
     bottom {
-        text("bottom")
+        text("bottom here")
+    }
+    top {
+        text("top")
     }
 }

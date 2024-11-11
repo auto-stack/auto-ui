@@ -10,6 +10,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use std::cell::Ref;
 use std::cell::RefMut;
+use std::default::Default;
 
 pub struct Spec {
     path: String,
@@ -164,15 +165,23 @@ impl Spec {
     }
 }
 
+#[derive(Clone)]
 pub struct WidgetSpec {
     pub widget: Value,
     pub path: String,
+    pub id: String,
     pub scope: Rc<RefCell<Universe>>,
 }
 
+impl Default for WidgetSpec {
+    fn default() -> Self {
+        Self::new(Value::Nil, ".", "", Rc::new(RefCell::new(Universe::default())))
+    }
+}
+
 impl WidgetSpec {
-    pub fn new(widget: Value, path: &str, scope: Rc<RefCell<Universe>>) -> Self {
-        Self { widget, path: path.to_string(), scope }
+    pub fn new(widget: Value, path: &str, id: &str, scope: Rc<RefCell<Universe>>) -> Self {
+        Self { widget, path: path.to_string(), id: id.to_string(), scope }
     }
 
     pub fn read_str(&mut self, source: &str) {
@@ -196,7 +205,7 @@ impl WidgetSpec {
     }
 
     pub fn from_file(path: &str) -> Self {
-        let mut spec = Self::new(Value::Nil, path, Rc::new(RefCell::new(Universe::new())));
+        let mut spec = Self::new(Value::Nil, path, path, Rc::new(RefCell::new(Universe::new())));
         spec.read_file(path);
         spec
     }
