@@ -38,7 +38,7 @@ pub fn row() -> Div {
 }
 
 pub fn center() -> Div {
-    div().flex().items_center().justify_center()
+    div().flex().flex_col().size_full().items_center().justify_center()
 }
 
 pub fn field(label: &str, input: impl IntoElement) -> Div {

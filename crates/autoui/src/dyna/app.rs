@@ -40,24 +40,6 @@ impl Render for RootView {
     }
 }
 
-struct DynaContent {
-    dyna: View<DynaView>,
-}
-
-impl Render for DynaContent {
-    fn render(&mut self, _cx: &mut ViewContext<Self>) -> impl IntoElement {
-        div()
-            .flex()
-            .flex_col()
-            .size_full()
-            .items_center()
-            .justify_center()
-            .w_3_4()
-            .gap_4()
-            .child(self.dyna.clone())
-    }
-}
-
 pub struct WidgetSpecs {
     pub left: Option<WidgetSpec>,
     pub right: Option<WidgetSpec>,
@@ -244,21 +226,19 @@ impl DynaApp {
 
     fn create_widget(workspace: Workspace, side: PaneSide, widget_spec: WidgetSpec, cx: &mut ViewContext<Workspace>) -> Workspace {
 
-        let view = cx.new_view(|cx| DynaContent {
-            dyna: cx.new_view(|cx| {
-                let mut view = DynaView::new(cx);
-                view.set_spec(widget_spec);
-                view.update_spec();
-                view
-            }),
+        let view = cx.new_view(|cx| {
+            let mut view = DynaView::new(cx);
+            view.set_spec(widget_spec);
+            view.update_spec(cx);
+            view
         });
         
         match side {
             PaneSide::Center => workspace.child(view),
-            PaneSide::Bottom => workspace.bottom(cx.new_view(|_cx| Pane::new(side, Pixels(250.0)).child(view))),
-            PaneSide::Left => workspace.left(cx.new_view(|_cx| Pane::new(side, Pixels(250.0)).child(view))),
-            PaneSide::Right => workspace.right(cx.new_view(|_cx| Pane::new(side, Pixels(250.0)).child(view))),
-            PaneSide::Top => workspace.top(cx.new_view(|_cx| Pane::new(side, Pixels(250.0)).child(view))),
+            PaneSide::Bottom => workspace.bottom(cx.new_view(|_cx| Pane::new(side, Pixels(150.0)).child(view))),
+            PaneSide::Left => workspace.left(cx.new_view(|_cx| Pane::new(side, Pixels(150.0)).child(view))),
+            PaneSide::Right => workspace.right(cx.new_view(|_cx| Pane::new(side, Pixels(150.0)).child(view))),
+            PaneSide::Top => workspace.top(cx.new_view(|_cx| Pane::new(side, Pixels(150.0)).child(view))),
         }
     }
 

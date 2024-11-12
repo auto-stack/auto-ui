@@ -1,5 +1,6 @@
 use crate::widget::pane::*;
 use crate::widget::toolbar::*;
+use crate::widget::util::*;
 use gpui::*;
 use prelude::FluentBuilder;
 use crate::style::color::Colorize;
@@ -100,11 +101,8 @@ impl Render for Workspace {
                     })
                     // Center Panes
                     .child(
-                        div()
-                            .w_full()
-                            .h_full()
-                            .flex()
-                            .flex_col()
+                        col()
+                            .size_full()
                             .justify_center()
                             .items_center()
                             .bg(theme.background.darken(0.03))
