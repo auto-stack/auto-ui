@@ -3,14 +3,14 @@ use gpui::*;
 pub struct TabView {
     focus_handle: FocusHandle,
     pub title: String,
-    // view: AnyView,
+    view: AnyView,
 }
 
 
 impl TabView {
-    pub fn new(cx: &mut ViewContext<Self>, title: impl Into<String>) -> Self {
+    pub fn new(cx: &mut ViewContext<Self>, title: impl Into<String>, view: impl Into<AnyView>) -> Self {
         let focus_handle = cx.focus_handle();
-        Self { focus_handle, title: title.into() }
+        Self { focus_handle, title: title.into(), view: view.into() }
     }
 
 }
@@ -31,6 +31,6 @@ impl Render for TabView {
             .items_center()
             .justify_center()
             .track_focus(&focus_handle)
-            .child(self.title.clone())
+            .child(self.view.clone())
     }
 }

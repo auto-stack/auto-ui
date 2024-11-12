@@ -64,14 +64,16 @@ impl Render for CenterContent {
 
 impl RootView {
     fn new(cx: &mut WindowContext) -> Self {
-        let center = cx.new_view(|cx| CenterContent {
-            name_input: cx.new_view(|cx| TextInput::new(cx)),
-            password_input: cx.new_view(|cx| TextInput::new(cx)),
+        let workspace = cx.new_view(|cx| {
+            let center = cx.new_view(|cx| CenterContent {
+                name_input: cx.new_view(|cx| TextInput::new(cx)),
+                password_input: cx.new_view(|cx| TextInput::new(cx)),
+            });
+            Workspace::new(cx).child(center)
         });
-        let workspace = Workspace::new(cx).child(center);
 
         Self {
-            workspace: cx.new_view(|_cx| workspace),
+            workspace,
         }
     }
 }

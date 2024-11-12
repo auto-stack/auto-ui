@@ -65,6 +65,11 @@ impl DynaView {
         self.spec = Some(spec);
     }
 
+    pub fn from_file(&mut self, path: &str) {
+        let spec = WidgetSpec::from_file(path);
+        self.set_spec(spec);
+    }
+
     pub fn update_spec(&mut self) {
         // self.spec.set_state(&mut self.state);
 

@@ -1,10 +1,31 @@
 use autogui::app::SimpleApp;
 use autogui::style::theme::ActiveTheme;
-use autogui::widget::tab::{Tab, TabBar};
 use autogui::widget::workspace::Workspace;
 use gpui::*;
 use std::fmt::Display;
-use autogui::widget::tab::TabPane;
+use autogui::widget::tab::{TabPane, TabView};
+use autogui::widget::util::center;
+
+struct View1 {
+    text: String,
+}
+
+struct View2 {
+    text: String,
+}
+
+impl Render for View1 {
+    fn render(&mut self, _cx: &mut ViewContext<Self>) -> impl IntoElement {
+        center().child(self.text.clone())
+    }
+}
+
+impl Render for View2 {
+    fn render(&mut self, _cx: &mut ViewContext<Self>) -> impl IntoElement {
+        center().child(self.text.clone())
+    }
+}
+
 
 struct RootView {
     workspace: View<Workspace>,
@@ -26,31 +47,19 @@ impl From<usize> for ByteOrder {
     }
 }
 
-impl Display for ByteOrder {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
-
-struct CenterContent {
-    tabpane: View<TabPane>,
-}
-
-impl Render for CenterContent {
-    fn render(&mut self, _cx: &mut ViewContext<Self>) -> impl IntoElement {
-        div()
-            .flex()
-            .flex_col()
-            .size_full()
-            .child(self.tabpane.clone())
-    }
-}
-
 impl RootView {
     fn new(cx: &mut ViewContext<Self>) -> Self {
-        let center = cx.new_view(|cx| CenterContent {
-            tabpane: cx.new_view(|cx| TabPane::new(cx))
-        });
+        let center = cx.new_view(|cx| TabPane::new(cx)
+            .add(cx.new_view(|cx| {
+                    let view1 = cx.new_view(|_cx| View1 { text: "View A1".to_string() });
+                    TabView::new(cx, "View 1", view1)
+                }))
+                .add(cx.new_view(|cx| {
+                    let view2 = cx.new_view(|_cx| View2 { text: "View A2".to_string() });
+                    TabView::new(cx, "View 2", view2)
+                }))
+        );
+
         let workspace = cx.new_view(|cx| Workspace::new(cx).child(center));
 
         Self {

@@ -4,6 +4,7 @@ use autogui::widget::toolbar::*;
 use autogui::style::theme::ActiveTheme;
 use autogui::widget::workspace::Workspace;
 use autogui::app::SimpleApp;
+use autogui::widget::util::center;
 
 struct RootView {
     workspace: View<Workspace>,
@@ -43,7 +44,7 @@ struct RightContent {
 
 impl Render for RightContent {
     fn render(&mut self, _cx: &mut ViewContext<Self>) -> impl IntoElement {
-        div().child(self.text.clone())
+        center().child(self.text.clone())
     }
 }
 
@@ -53,7 +54,7 @@ struct CenterContent {
 
 impl Render for CenterContent {
     fn render(&mut self, _cx: &mut ViewContext<Self>) -> impl IntoElement {
-        div().child(self.text.clone())
+        center().child(self.text.clone())
     }
 }
 
@@ -63,7 +64,7 @@ struct TopContent {
 
 impl Render for TopContent {
     fn render(&mut self, _cx: &mut ViewContext<Self>) -> impl IntoElement {
-        div().child(self.text.clone())
+        center().child(self.text.clone())
     }
 }
 
@@ -73,26 +74,29 @@ struct BottomContent {
 
 impl Render for BottomContent {
     fn render(&mut self, _cx: &mut ViewContext<Self>) -> impl IntoElement {
-        div().child(self.text.clone())
+        center().child(self.text.clone())
     }
 }
 
 impl RootView {
     fn new(cx: &mut ViewContext<Self>) -> Self {
-       let left = Pane::new(PaneSide::Left, Pixels(250.0)).child(cx.new_view(|_cx| LeftContent { text: "Left".to_string() }));
-       let right = Pane::new(PaneSide::Right, Pixels(250.0)).child(cx.new_view(|_cx| RightContent { text: "Right".to_string() }));
-       let top = Pane::new(PaneSide::Top, Pixels(100.0)).child(cx.new_view(|_cx| TopContent { text: "Top".to_string() }));
-       let bottom = Pane::new(PaneSide::Bottom, Pixels(100.0)).child(cx.new_view(|_cx| BottomContent { text: "Bottom".to_string() }));
-       let center = cx.new_view(|_cx| CenterContent { text: "Center".to_string() });
-       let workspace = Workspace::new(cx)
-        .left(cx.new_view(|_cx| left))
-        .right(cx.new_view(|_cx| right))
-        .top(cx.new_view(|_cx| top))
-        .bottom(cx.new_view(|_cx| bottom))
-        .child(center);
+        let workspace = cx.new_view(|cx| {
+            let left = Pane::new(PaneSide::Left, Pixels(250.0)).child(cx.new_view(|_cx| LeftContent { text: "Left".to_string() }));
+            let right = Pane::new(PaneSide::Right, Pixels(250.0)).child(cx.new_view(|_cx| RightContent { text: "Right".to_string() }));
+            let top = Pane::new(PaneSide::Top, Pixels(100.0)).child(cx.new_view(|_cx| TopContent { text: "Top".to_string() }));
+            let bottom = Pane::new(PaneSide::Bottom, Pixels(100.0)).child(cx.new_view(|_cx| BottomContent { text: "Bottom".to_string() }));
+            let center = cx.new_view(|_cx| CenterContent { text: "Center".to_string() });
     
-       Self {
-            workspace: cx.new_view(|_cx| workspace),
+            Workspace::new(cx)
+                .left(cx.new_view(|_cx| left))
+                .right(cx.new_view(|_cx| right))
+                .top(cx.new_view(|_cx| top))
+                .bottom(cx.new_view(|_cx| bottom))
+                .child(center)
+        });
+        
+        Self {
+            workspace,
         }
     }
 }

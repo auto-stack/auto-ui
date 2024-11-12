@@ -21,9 +21,7 @@ impl FocusableView for TabPane {
 impl TabPane {
     pub fn new(cx: &mut ViewContext<Self>) -> Self {
         let focus_handle = cx.focus_handle();
-        let dummy_view_1 = cx.new_view(|cx| TabView::new(cx, "dummy 1"));
-        let dummy_view_2 = cx.new_view(|cx| TabView::new(cx, "dummy 2"));
-        Self { focus_handle, tab_views: vec![dummy_view_1, dummy_view_2], active: 1 }
+        Self { focus_handle, tab_views: Vec::new(), active: 0 }
     }
 
     pub fn active_tab(&self) -> &View<TabView> {
@@ -38,6 +36,11 @@ impl TabPane {
 
     pub fn focus_active(&mut self, cx: &mut ViewContext<Self>) {
         self.active_tab().focus_handle(cx).focus(cx);
+    }
+
+    pub fn add(mut self, view: View<TabView>) -> Self {
+        self.tab_views.push(view);
+        self
     }
 }
 

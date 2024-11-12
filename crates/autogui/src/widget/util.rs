@@ -37,6 +37,10 @@ pub fn row() -> Div {
     div().flex().flex_row()
 }
 
+pub fn center() -> Div {
+    div().flex().items_center().justify_center()
+}
+
 pub fn field(label: &str, input: impl IntoElement) -> Div {
     row().w_full().items_center()
         .child(div().min_w(px(100.0)).child(SharedString::from(label.to_string())))
