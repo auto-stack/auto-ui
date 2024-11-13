@@ -7,6 +7,9 @@ app {
                     onclick: || print("hello")
                 }
             }
+            tab("Tab2") {
+                text("world")
+            }
         }
     }
 }

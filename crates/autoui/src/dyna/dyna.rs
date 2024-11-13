@@ -17,7 +17,7 @@ pub struct DynaView {
 
 pub struct ViewBuilder {
     pub view_id: ElementId,
-    pub builder: Box<dyn Fn(Div, &autolang::ast::Node, &mut WidgetSpec, &mut ViewContext<DynaView>, AnyView) -> Div + 'static>,
+    pub builder: Box<dyn Fn(Div, &autolang::ast::Node, &mut WidgetSpec, &mut ViewContext<DynaView>, Option<AnyView>) -> Div + 'static>,
 }
 
 impl Viewable for DynaView {
@@ -78,6 +78,7 @@ impl DynaView {
         // self.spec.set_state(&mut self.state);
 
         let spec_view = self.spec.as_ref().unwrap().get_ast_view();
+        println!("spec_view: {:?}", spec_view);
         let mut all_builders = Vec::new();
         let mut all_views = Vec::new();
         if let Some(view) = spec_view {
@@ -124,15 +125,15 @@ impl DynaView {
 
 }
 
-fn find_view_by_id(id: &ElementId, views: &Vec<AnyView>) -> AnyView {
+fn find_view_by_id(id: &ElementId, views: &Vec<AnyView>) -> Option<AnyView> {
     for view in views.iter() {
         if let Some(view_id) = view.id() {
             if view_id == *id {
-                return view.clone();
+                return Some(view.clone());
             }
         }
     }
-    panic!("view not found");
+    None
 }
 
 fn parse_node(name: &str, node: &autolang::ast::Node, spec: &mut WidgetSpec, idx: usize, cx: &mut ViewContext<'_, DynaView>) -> (Vec<AnyView> , Vec<ViewBuilder>)  {
@@ -177,7 +178,7 @@ fn add_widget(div: Div, spec: WidgetSpec, cx: &mut ViewContext<'_, DynaView>) ->
 }
 
 // TODO: currently only support onclick property
-fn add_button(mut div: Div, node: &autolang::ast::Node, _spec: &mut WidgetSpec, cx: &mut ViewContext<'_, DynaView>, _view: AnyView) -> Div {
+fn add_button(mut div: Div, node: &autolang::ast::Node, _spec: &mut WidgetSpec, cx: &mut ViewContext<'_, DynaView>, _view: Option<AnyView>) -> Div {
     let text_arg = node.args.get(0);
     if let Some(Expr::Str(text)) = text_arg {
         let mut button = Button::primary(text.as_str());
@@ -206,7 +207,7 @@ fn add_button(mut div: Div, node: &autolang::ast::Node, _spec: &mut WidgetSpec, 
     div
 }
 
-fn add_text(mut div: Div, node: &autolang::ast::Node, spec: &mut WidgetSpec, _cx: &mut ViewContext<'_, DynaView>, _view: AnyView) -> Div {
+fn add_text(mut div: Div, node: &autolang::ast::Node, spec: &mut WidgetSpec, _cx: &mut ViewContext<'_, DynaView>, _view: Option<AnyView>) -> Div {
     let text_arg = node.args.get(0);
     if let Some(str) = text_arg {
         match str {
@@ -233,7 +234,7 @@ fn add_text(mut div: Div, node: &autolang::ast::Node, spec: &mut WidgetSpec, _cx
     div
 }
 
-pub fn add_table(mut div: Div, node: &autolang::ast::Node, spec: &mut WidgetSpec, cx: &mut ViewContext<'_, DynaView>, _view: AnyView) -> Div {
+pub fn add_table(mut div: Div, node: &autolang::ast::Node, spec: &mut WidgetSpec, cx: &mut ViewContext<'_, DynaView>, _view: Option<AnyView>) -> Div {
     let config = match node.args.get(0) {
         Some(ident) => spec.eval_expr(&ident),
         None => Value::Nil,
@@ -249,25 +250,54 @@ pub fn add_table(mut div: Div, node: &autolang::ast::Node, spec: &mut WidgetSpec
     div
 }
 
-pub fn add_tabs(div: Div, _node: &autolang::ast::Node, _spec: &mut WidgetSpec, _cx: &mut ViewContext<'_, DynaView>, view: AnyView) -> Div {
-    div.child(view.clone())
+pub fn add_tabs(div: Div, _node: &autolang::ast::Node, _spec: &mut WidgetSpec, _cx: &mut ViewContext<'_, DynaView>, view: Option<AnyView>) -> Div {
+    if let Some(view) = view {
+        div.child(view.clone())
+    } else {
+        div
+    }
+}
+
+
+fn node_to_tab(node: &autolang::ast::Node, spec: &mut WidgetSpec, idx: usize, cx: &mut ViewContext<'_, DynaView>) -> View<DynaView> {
+    let tab_widget = WidgetSpec::from_ast_node(node, &spec.path, spec.scope.clone());
+    let view = cx.new_view(|cx| {
+        let mut view = DynaView::new(cx);
+        view.set_spec(tab_widget);
+        view.update_spec(cx);
+        view
+    });
+    view
 }
 
 pub fn node_view_tabs(node: &autolang::ast::Node, spec: &mut WidgetSpec, idx: usize, cx: &mut ViewContext<'_, DynaView>) -> AnyView {
-    // for (idx, stmt) in node.body.stmts.iter().enumerate() {
-    //     let (views, builders) = parse_node(&name.text, &node, spec, idx, cx);
-    // }
+    let mut tabs = Vec::new();
+    for (idx, stmt) in node.body.stmts.iter().enumerate() {
+        match stmt {
+            Stmt::Node(node) => {
+                let tab_view = node_to_tab(node, spec, idx, cx);
+                tabs.push(tab_view);
+            }
+            _ => (),
+        }
+    }
+    let len = tabs.len();
     cx.new_view(|cx| {
-        let mut tabpane = TabPane::new(cx)
-            .add(cx.new_view(|cx| {
-                let view1 = cx.new_view(|_cx| StrView { text: "View A1".to_string() });
-                TabView::new(cx, "View 1", view1)
-            }))
-            .add(cx.new_view(|cx| {
-                let view2 = cx.new_view(|_cx| StrView { text: "View A2".to_string() });
-                TabView::new(cx, "View 2", view2)
-            }));
-        tabpane.set_active(1, cx);
+        let mut tabpane = TabPane::new(cx);
+        for (idx, tab) in tabs.into_iter().enumerate() {
+            tabpane = tabpane.add(cx.new_view(|cx| TabView::new(cx, &format!("View {}", idx), tab)));
+        }
+            // .add(cx.new_view(|cx| {
+                // let view1 = cx.new_view(|_cx| StrView { text: "View A1".to_string() });
+                // TabView::new(cx, "View 1", view1)
+            // }))
+            // .add(cx.new_view(|cx| {
+                // let view2 = cx.new_view(|_cx| StrView { text: "View A2".to_string() });
+                // TabView::new(cx, "View 2", view2)
+            // }));
+        if len > 0 {
+            tabpane.set_active(0, cx);
+        }
         tabpane
     }).into()
 }

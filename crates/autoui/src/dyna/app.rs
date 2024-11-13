@@ -244,7 +244,7 @@ impl DynaApp {
 
 }
 
-fn node_to_widget(block: &Node) -> Value {
+pub fn node_to_widget(block: &Node) -> Value {
     let node_body_id = block.body.clone();
     Value::Widget(Widget { name: block.name.clone(), model: Model::new(), view_id: node_body_id })
 }

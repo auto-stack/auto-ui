@@ -184,6 +184,20 @@ impl WidgetSpec {
         Self { widget, path: path.to_string(), id: id.to_string(), scope }
     }
 
+    pub fn from_ast_node(node: &ast::Node, path: &str, scope: Rc<RefCell<Universe>>) -> Self {
+        // make node into a `View` meta and put it in the scope
+        // TODO: this id may not be unique
+        let node_name = node.name.text.clone();
+        let node_arg0 = match node.args.get(0) {
+            Some(Expr::Str(s)) => s.clone(),
+            _ => "_".to_string(),
+        };
+        let body_id = format!("{}_{}.body", node_name, node_arg0);
+        scope.borrow_mut().define(&body_id, Rc::new(Meta::Body(node.body.clone())));
+        let widget = Widget { name: node_name.clone(), model: Model::new(), view_id: MetaID::Body(body_id.clone()) };
+        Self{ widget: Value::Widget(widget), path: path.to_string(), id: body_id, scope }
+    }
+
     pub fn read_str(&mut self, source: &str) {
         match interpret(source) {
             Ok(result) => {
