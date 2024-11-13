@@ -40,7 +40,11 @@ app {
         button("hello")
     }
     center {
-        service_table()
+        tabs {
+            tab("service") {
+                service_table()
+            }
+        }
     }
     right {
         text("right now")

@@ -151,13 +151,20 @@ fn parse_node(name: &str, node: &autolang::ast::Node, spec: &mut WidgetSpec, idx
         }
         _ => {
             // try lookup widget in scope
+            println!("lookup widget: {}", name);
             let widget = &spec.scope.borrow().widget;
             match widget {
                 Value::Widget(w) => {
                     if w.name == name {
                         // make a new dynamic widget
-                        // let new_spec = WidgetSpec::new(widget.clone(), ".", "", spec.scope.clone());
-                        // div = add_widget(div, new_spec, cx);
+                        let new_spec = WidgetSpec::new(widget.clone(), ".", "", spec.scope.clone());
+                        let mut view = DynaView::new(cx);
+                        view.set_spec(new_spec);
+                        view.update_spec(cx);
+                        let view = cx.new_view(|_cx| view);
+                        let id = view.id().unwrap();
+                        views.push(view.into());
+                        builders.push(ViewBuilder { view_id: id, builder: Box::new(add_widget) });
                         cx.notify();
                     }
                 }
@@ -168,13 +175,12 @@ fn parse_node(name: &str, node: &autolang::ast::Node, spec: &mut WidgetSpec, idx
     (views, builders)
 }
 
-// TODO: currently only support widget in scope
-#[allow(unused)]
-fn add_widget(div: Div, spec: WidgetSpec, cx: &mut ViewContext<'_, DynaView>) -> Div {
-    let mut view = DynaView::new(cx);
-    view.set_spec(spec);
-    view.update_spec(cx);
-    div.child(cx.new_view(|_cx| view))
+pub fn add_widget(div: Div, _node: &autolang::ast::Node, _spec: &mut WidgetSpec, _cx: &mut ViewContext<'_, DynaView>, view: Option<AnyView>) -> Div {
+    if let Some(view) = view {
+        div.child(view.clone())
+    } else {
+        div
+    }
 }
 
 // TODO: currently only support onclick property
@@ -276,7 +282,11 @@ pub fn node_view_tabs(node: &autolang::ast::Node, spec: &mut WidgetSpec, idx: us
         match stmt {
             Stmt::Node(node) => {
                 let tab_view = node_to_tab(node, spec, idx, cx);
-                tabs.push(tab_view);
+                let name = match node.args.get(0) {
+                    Some(Expr::Str(name)) => name,
+                    _ => format!("view {}", idx),
+                };
+                tabs.push((name, tab_view));
             }
             _ => (),
         }
@@ -284,17 +294,9 @@ pub fn node_view_tabs(node: &autolang::ast::Node, spec: &mut WidgetSpec, idx: us
     let len = tabs.len();
     cx.new_view(|cx| {
         let mut tabpane = TabPane::new(cx);
-        for (idx, tab) in tabs.into_iter().enumerate() {
-            tabpane = tabpane.add(cx.new_view(|cx| TabView::new(cx, &format!("View {}", idx), tab)));
+        for tab in tabs.into_iter() {
+            tabpane = tabpane.add(cx.new_view(|cx| TabView::new(cx, tab.0, tab.1)));
         }
-            // .add(cx.new_view(|cx| {
-                // let view1 = cx.new_view(|_cx| StrView { text: "View A1".to_string() });
-                // TabView::new(cx, "View 1", view1)
-            // }))
-            // .add(cx.new_view(|cx| {
-                // let view2 = cx.new_view(|_cx| StrView { text: "View A2".to_string() });
-                // TabView::new(cx, "View 2", view2)
-            // }));
         if len > 0 {
             tabpane.set_active(0, cx);
         }
