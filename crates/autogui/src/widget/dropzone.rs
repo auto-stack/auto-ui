@@ -26,8 +26,8 @@ impl DropZone {
         self.focus_handle.clone()
     }
 
-    pub fn on_drop(mut self, ondrop: Option<Box<dyn Fn(&str, &mut ViewContext<Self>) + 'static>>) -> Self {
-        self.ondrop = ondrop;
+    pub fn on_drop(mut self, ondrop: impl Fn(&str, &mut ViewContext<Self>) + 'static) -> Self {
+        self.ondrop = Some(Box::new(ondrop));
         self
     }
 }

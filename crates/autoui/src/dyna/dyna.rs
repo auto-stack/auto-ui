@@ -1,12 +1,14 @@
+use crate::dyna::app::GlobalSpecState;
+use gpui::UpdateGlobal;
 use crate::spec::WidgetSpec;
 use autogui::app::Viewable;
 use autogui::widget::button::Button;
-use autogui::widget::table::{Align, ColConfig, Row, Table};
 use autogui::widget::tab::{TabPane, TabView};
-use autolang::ast::{Stmt, Expr, Key, Name};
-use autoval::value::Value;
-use crate::dyna::app::GlobalSpecState;
+use autogui::widget::dropzone::DropZone;
+use autogui::widget::table::{Align, ColConfig, Row, Table};
 use autogui::widget::util::center;
+use autolang::ast::{Expr, Key, Name, Stmt};
+use autoval::value::Value;
 use gpui::*;
 
 pub struct DynaView {
@@ -17,7 +19,28 @@ pub struct DynaView {
 
 pub struct ViewBuilder {
     pub view_id: ElementId,
-    pub builder: Box<dyn Fn(Div, &autolang::ast::Node, &mut WidgetSpec, &mut ViewContext<DynaView>, Option<AnyView>) -> Div + 'static>,
+    pub builder: Box<
+        dyn Fn(
+                Div,
+                &autolang::ast::Node,
+                &mut WidgetSpec,
+                &mut ViewContext<DynaView>,
+                Option<AnyView>,
+            ) -> Div
+            + 'static,
+    >,
+}
+
+impl ViewBuilder {
+    pub fn unknown_node(name: &str) -> Self {
+        let name_string = SharedString::from(name.to_string());
+        Self {
+            view_id: ElementId::Name(name_string.clone()),
+            builder: Box::new(|div, node, _spec, _cx, _view| {
+                div.child(format!("unknown node: {}", node.name.text))
+            }),
+        }
+    }
 }
 
 impl Viewable for DynaView {
@@ -48,7 +71,8 @@ impl Viewable for DynaView {
                 }
             }
             v.update_spec(cx);
-        }).detach();
+        })
+        .detach();
         Self {
             spec: None,
             builder: None,
@@ -78,13 +102,13 @@ impl DynaView {
         // self.spec.set_state(&mut self.state);
 
         let spec_view = self.spec.as_ref().unwrap().get_ast_view();
-        println!("spec_view: {:?}", spec_view);
         let mut all_builders = Vec::new();
         let mut all_views = Vec::new();
         if let Some(view) = spec_view {
             for (idx, (name, node)) in view.nodes.iter().enumerate() {
                 let node = node.clone();
-                let (views, builders) = parse_node(&name.text, &node, self.spec.as_mut().unwrap(), idx, cx);
+                let (views, builders) =
+                    parse_node(&name.text, &node, self.spec.as_mut().unwrap(), idx, cx);
                 for view in views.into_iter() {
                     all_views.push(view);
                 }
@@ -93,7 +117,7 @@ impl DynaView {
                 }
                 // div = parse_node(div, &name.text, &node, spec, cx);
             }
-        } 
+        }
         for view in all_views.into_iter() {
             self.kids.push(view);
         }
@@ -122,7 +146,6 @@ impl DynaView {
         self.builder = Some(Box::new(builder));
         self
     }
-
 }
 
 fn find_view_by_id(id: &ElementId, views: &Vec<AnyView>) -> Option<AnyView> {
@@ -136,18 +159,45 @@ fn find_view_by_id(id: &ElementId, views: &Vec<AnyView>) -> Option<AnyView> {
     None
 }
 
-fn parse_node(name: &str, node: &autolang::ast::Node, spec: &mut WidgetSpec, idx: usize, cx: &mut ViewContext<'_, DynaView>) -> (Vec<AnyView> , Vec<ViewBuilder>)  {
+fn parse_node(
+    name: &str,
+    node: &autolang::ast::Node,
+    spec: &mut WidgetSpec,
+    idx: usize,
+    cx: &mut ViewContext<'_, DynaView>,
+) -> (Vec<AnyView>, Vec<ViewBuilder>) {
     let mut builders: Vec<ViewBuilder> = Vec::new();
     let mut views = Vec::new();
     match name {
-        "button" => builders.push(ViewBuilder { view_id: ElementId::Integer(idx), builder: Box::new(add_button) }),
-        "text" => builders.push(ViewBuilder { view_id: ElementId::Integer(idx), builder: Box::new(add_text) }),
-        "table" => builders.push(ViewBuilder { view_id: ElementId::Integer(idx), builder: Box::new(add_table) }),
+        "button" => builders.push(ViewBuilder {
+            view_id: ElementId::Integer(idx),
+            builder: Box::new(add_button),
+        }),
+        "text" => builders.push(ViewBuilder {
+            view_id: ElementId::Integer(idx),
+            builder: Box::new(add_text),
+        }),
+        "table" => builders.push(ViewBuilder {
+            view_id: ElementId::Integer(idx),
+            builder: Box::new(add_table),
+        }),
         "tabs" => {
             let view = node_view_tabs(&node, spec, idx, cx);
             let id = view.id().unwrap();
             views.push(view);
-            builders.push(ViewBuilder { view_id: id, builder: Box::new(add_tabs) });
+            builders.push(ViewBuilder {
+                view_id: id,
+                builder: Box::new(add_tabs),
+            });
+        }
+        "dropzone" => {
+            let view = node_view_dropzone(&node, spec, idx, cx);
+            let id = view.id().unwrap();
+            views.push(view);
+            builders.push(ViewBuilder {
+                view_id: id,
+                builder: Box::new(add_dropzone),
+            })
         }
         _ => {
             // try lookup widget in scope
@@ -164,18 +214,30 @@ fn parse_node(name: &str, node: &autolang::ast::Node, spec: &mut WidgetSpec, idx
                         let view = cx.new_view(|_cx| view);
                         let id = view.id().unwrap();
                         views.push(view.into());
-                        builders.push(ViewBuilder { view_id: id, builder: Box::new(add_widget) });
+                        builders.push(ViewBuilder {
+                            view_id: id,
+                            builder: Box::new(add_widget),
+                        });
                         cx.notify();
+                    } else {
+                        println!("widget not found: {}", name);
+                        builders.push(ViewBuilder::unknown_node(name))
                     }
                 }
-                _ => ()
+                _ => (),
             }
         }
     };
     (views, builders)
 }
 
-pub fn add_widget(div: Div, _node: &autolang::ast::Node, _spec: &mut WidgetSpec, _cx: &mut ViewContext<'_, DynaView>, view: Option<AnyView>) -> Div {
+pub fn add_widget(
+    div: Div,
+    _node: &autolang::ast::Node,
+    _spec: &mut WidgetSpec,
+    _cx: &mut ViewContext<'_, DynaView>,
+    view: Option<AnyView>,
+) -> Div {
     if let Some(view) = view {
         div.child(view.clone())
     } else {
@@ -184,7 +246,13 @@ pub fn add_widget(div: Div, _node: &autolang::ast::Node, _spec: &mut WidgetSpec,
 }
 
 // TODO: currently only support onclick property
-fn add_button(mut div: Div, node: &autolang::ast::Node, _spec: &mut WidgetSpec, cx: &mut ViewContext<'_, DynaView>, _view: Option<AnyView>) -> Div {
+fn add_button(
+    mut div: Div,
+    node: &autolang::ast::Node,
+    _spec: &mut WidgetSpec,
+    cx: &mut ViewContext<'_, DynaView>,
+    _view: Option<AnyView>,
+) -> Div {
     let text_arg = node.args.get(0);
     if let Some(Expr::Str(text)) = text_arg {
         let mut button = Button::primary(text.as_str());
@@ -193,10 +261,10 @@ fn add_button(mut div: Div, node: &autolang::ast::Node, _spec: &mut WidgetSpec, 
             if let Stmt::Expr(Expr::Pair(pair)) = stmt {
                 match &pair.key {
                     Key::NamedKey(Name { text }) => {
-                        if text == "onclick" { 
+                        if text == "onclick" {
                             // TODO: remove clone()
                             let v = pair.value.clone();
-                            if let Expr::Lambda(lambda) = *v {   
+                            if let Expr::Lambda(lambda) = *v {
                                 button = button.on_click_mut(cx, move |this, _ev, cx| {
                                     this.spec.as_mut().unwrap().run_lambda(&lambda);
                                     cx.notify();
@@ -213,7 +281,13 @@ fn add_button(mut div: Div, node: &autolang::ast::Node, _spec: &mut WidgetSpec, 
     div
 }
 
-fn add_text(mut div: Div, node: &autolang::ast::Node, spec: &mut WidgetSpec, _cx: &mut ViewContext<'_, DynaView>, _view: Option<AnyView>) -> Div {
+fn add_text(
+    mut div: Div,
+    node: &autolang::ast::Node,
+    spec: &mut WidgetSpec,
+    _cx: &mut ViewContext<'_, DynaView>,
+    _view: Option<AnyView>,
+) -> Div {
     let text_arg = node.args.get(0);
     if let Some(str) = text_arg {
         match str {
@@ -240,7 +314,13 @@ fn add_text(mut div: Div, node: &autolang::ast::Node, spec: &mut WidgetSpec, _cx
     div
 }
 
-pub fn add_table(mut div: Div, node: &autolang::ast::Node, spec: &mut WidgetSpec, cx: &mut ViewContext<'_, DynaView>, _view: Option<AnyView>) -> Div {
+pub fn add_table(
+    mut div: Div,
+    node: &autolang::ast::Node,
+    spec: &mut WidgetSpec,
+    cx: &mut ViewContext<'_, DynaView>,
+    _view: Option<AnyView>,
+) -> Div {
     let config = match node.args.get(0) {
         Some(ident) => spec.eval_expr(&ident),
         None => Value::Nil,
@@ -264,8 +344,12 @@ pub fn add_tabs(div: Div, _node: &autolang::ast::Node, _spec: &mut WidgetSpec, _
     }
 }
 
-
-fn node_to_tab(node: &autolang::ast::Node, spec: &mut WidgetSpec, idx: usize, cx: &mut ViewContext<'_, DynaView>) -> View<DynaView> {
+fn node_to_tab(
+    node: &autolang::ast::Node,
+    spec: &mut WidgetSpec,
+    idx: usize,
+    cx: &mut ViewContext<'_, DynaView>,
+) -> View<DynaView> {
     let tab_widget = WidgetSpec::from_ast_node(node, &spec.path, spec.scope.clone());
     let view = cx.new_view(|cx| {
         let mut view = DynaView::new(cx);
@@ -276,7 +360,7 @@ fn node_to_tab(node: &autolang::ast::Node, spec: &mut WidgetSpec, idx: usize, cx
     view
 }
 
-pub fn node_view_tabs(node: &autolang::ast::Node, spec: &mut WidgetSpec, idx: usize, cx: &mut ViewContext<'_, DynaView>) -> AnyView {
+pub fn node_view_tabs( node: &autolang::ast::Node, spec: &mut WidgetSpec, idx: usize, cx: &mut ViewContext<'_, DynaView>) -> AnyView {
     let mut tabs = Vec::new();
     for (idx, stmt) in node.body.stmts.iter().enumerate() {
         match stmt {
@@ -301,7 +385,59 @@ pub fn node_view_tabs(node: &autolang::ast::Node, spec: &mut WidgetSpec, idx: us
             tabpane.set_active(0, cx);
         }
         tabpane
-    }).into()
+    })
+    .into()
+}
+
+pub fn node_view_dropzone(node: &autolang::ast::Node, spec: &mut WidgetSpec, idx: usize, cx: &mut ViewContext<'_, DynaView>) -> AnyView {
+
+    let mut ondrop: Option<Box<dyn Fn(&str, &mut ViewContext<DropZone>)>> = None;
+        for stmt in node.body.stmts.iter() {
+            if let Stmt::Expr(Expr::Pair(pair)) = stmt {
+                match &pair.key {
+                    Key::NamedKey(Name { text }) => {
+                        if text == "ondrop" {
+                            let expr = &pair.value;
+                            match expr.as_ref() {
+                                Expr::Lambda(lambda) => {
+                                    let lb = lambda.clone();
+                                    ondrop = Some(Box::new(move |f, cx| {
+                                        // .run_lambda(&lambda);
+                                        println!("ondrop: {:?}", f);
+                                        // let cl = lambda.clone();
+                                        // GlobalSpecState::global(cx).run_lambda(&cl);
+                                        println!("ondrop: {:?}", lb);
+                                        GlobalSpecState::update_global(cx, |state, _cx| {
+                                            state.scope().borrow_mut().set_local("f", Value::Str(f.to_string()));
+                                            state.run_lambda(&lb);
+                                        });
+                                        cx.notify();
+                                    }));
+                                }
+                                _ => (),
+                            }
+                        }
+                    }
+                    _ => (),
+                }
+            }
+        }
+    cx.new_view(|cx| {
+        let mut drop = DropZone::new(cx);
+        if let Some(ondrop) = ondrop {
+            drop = drop.on_drop(ondrop);
+        }
+        drop
+    })
+    .into()
+}
+
+pub fn add_dropzone(div: Div, _node: &autolang::ast::Node, _spec: &mut WidgetSpec, _cx: &mut ViewContext<'_, DynaView>, view: Option<AnyView>) -> Div {
+    if let Some(view) = view {
+        div.child(view.clone())
+    } else {
+        div
+    }
 }
 
 pub fn convert_value_to_table_config(value: &Value) -> Vec<ColConfig> {
@@ -370,7 +506,7 @@ impl Render for DynaView {
 
 struct StrView {
     text: String,
-}   
+}
 
 impl Render for StrView {
     fn render(&mut self, _cx: &mut ViewContext<Self>) -> impl IntoElement {

@@ -16,9 +16,9 @@ impl Viewable for DropFileView {
         DropFileView {
             focus_handle: cx.focus_handle(),
             dropzone: cx.new_view(|cx| {
-                DropZone::new(cx).on_drop(Some(Box::new(move |path, _cx| {
+                DropZone::new(cx).on_drop(|path, _cx| {
                     println!("drop: {:?}", path);
-                })))
+                })
             }),
         }
     }

@@ -130,6 +130,10 @@ impl GlobalSpecState {
         &self.path
     }
 
+    pub fn run_lambda(&mut self, lambda: &autolang::ast::Fn) {
+        self.spec.run_lambda(lambda);
+    }
+
 }
 
 pub struct DynaApp {

@@ -29,7 +29,6 @@ impl TabPane {
     }
 
     pub fn set_active(&mut self, index: usize, cx: &mut ViewContext<Self>) {
-        println!("set_active: {}", index);
         self.active = index;
         self.focus_active(cx);
         cx.notify();
@@ -51,7 +50,6 @@ impl TabPane {
             .w_full()
             .child(
                 TabBar::new("tabbar").children(self.tab_views.iter().enumerate().map(|(i, v)| {
-                    println!("tabbar: {}", i);
                     let title = v.read(cx).title.clone();
                     Tab::new(SharedString::from(format!("tab-{}", i)), title)
                         .py_2()
