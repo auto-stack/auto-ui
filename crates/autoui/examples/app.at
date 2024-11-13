@@ -44,6 +44,12 @@ app {
             tab("service") {
                 service_table()
             }
+            tab("signals") {
+                text("signals")
+            }
+            tab("messages") {
+                text("messages")
+            }
         }
     }
     right {

@@ -46,13 +46,14 @@ impl RenderOnce for Icon {
 }
 
 pub enum SysIcon {
-    Check,
-    Sun,
-    Moon,
-    Loader,
-    ArrowUp,
     ArrowDown,
+    ArrowUp,
+    Check,
+    Inbox,
+    Loader,
+    Moon,
     Reload,
+    Sun,
 }
 
 impl SysIcon {
@@ -64,13 +65,14 @@ impl SysIcon {
 impl From<SysIcon> for Icon {
     fn from(value: SysIcon) -> Self {
         match value {
-            SysIcon::Check => Icon::new("icons/check.svg".into()),
-            SysIcon::Sun => Icon::new("icons/sun.svg".into()),
-            SysIcon::Moon => Icon::new("icons/moon.svg".into()),
-            SysIcon::Loader => Icon::new("icons/loader.svg".into()),
-            SysIcon::ArrowUp => Icon::new("icons/arrow_up.svg".into()),
             SysIcon::ArrowDown => Icon::new("icons/arrow_down.svg".into()),
+            SysIcon::ArrowUp => Icon::new("icons/arrow_up.svg".into()),
+            SysIcon::Check => Icon::new("icons/check.svg".into()),
+            SysIcon::Inbox => Icon::new("icons/inbox.svg".into()),
+            SysIcon::Loader => Icon::new("icons/loader.svg".into()),
+            SysIcon::Moon => Icon::new("icons/moon.svg".into()),
             SysIcon::Reload => Icon::new("icons/reload.svg".into()),
+            SysIcon::Sun => Icon::new("icons/sun.svg".into()),
         }
     }
 }
