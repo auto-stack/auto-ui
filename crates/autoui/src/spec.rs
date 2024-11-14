@@ -108,7 +108,7 @@ impl Spec {
                 let metaid = &widget.view_id;
                 match metaid {
                     MetaID::View(metaid) => {
-                        let meta = self.scope().get_symbol(metaid);
+                        let meta = self.scope().lookup_meta(metaid);
                         match meta {
                             Some(meta) => {
                                 match meta.as_ref() {

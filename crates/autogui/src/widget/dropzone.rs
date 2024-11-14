@@ -42,9 +42,9 @@ impl Render for DropZone {
             .bg(theme.background)
             .border_2()
             .border_color(theme.border)
-            .on_drag_move::<ExternalPaths>(cx.listener(move |_this, ev: &DragMoveEvent<ExternalPaths>, _cx| {
-                println!("drag move: {:?}", ev.event.position);
-            }))
+            // .on_drag_move::<ExternalPaths>(cx.listener(move |_this, ev: &DragMoveEvent<ExternalPaths>, _cx| {
+                // println!("drag move: {:?}", ev.event.position);
+            // }))
             .child(SysIcon::Inbox.icon().size(Rems(2.)))
             .text_size(Rems(1.))
             .child(self.message.clone())
