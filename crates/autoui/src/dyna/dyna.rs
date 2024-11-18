@@ -446,7 +446,7 @@ pub fn convert_value_to_table_config(value: &Value) -> Vec<ColConfig> {
             let mut cols = vec![];
             for (idx, item) in array.iter().enumerate() {
                 match item {
-                    Value::Object(obj) => {
+                    Value::Obj(obj) => {
                         let col = ColConfig {
                             idx,
                             id: obj.get_str_or("id", "").into(),
@@ -474,7 +474,7 @@ pub fn convert_value_to_table_data(value: &Value, config: &Vec<ColConfig>) -> Ve
                 let mut cells = Vec::new();
                 for col in config.iter() {
                     match item {
-                        Value::Object(obj) => {
+                        Value::Obj(obj) => {
                             let cell = obj.get_or(&col.id, Value::Nil);
                             cells.push(cell.clone());
                         }
