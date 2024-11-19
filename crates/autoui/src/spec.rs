@@ -29,17 +29,16 @@ impl Spec {
         Self { path: String::new(), source: String::new(), interpreter }
     }
 
-    pub fn from_file(path: &str) -> Self {
-        let mut spec = Self::new(Interpreter::new());
+    pub fn from_file(path: &str, interpreter: Interpreter) -> Self {
+        let mut spec = Self::new(interpreter);
         spec.read_file(path);
         spec
     }
 
     pub fn read_str(&mut self, source: &str) {
-        match interpret(source) {
-            Ok(result) => {
+        match self.interpreter.interpret(source) {
+            Ok(_) => {
                 self.source = source.to_string();
-                self.interpreter = result;
             }
             Err(e) => {
                 panic!("{}", e);

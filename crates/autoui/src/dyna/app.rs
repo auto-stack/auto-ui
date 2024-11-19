@@ -16,6 +16,7 @@ use autogui::app::{GlobalState, ReloadState};
 use std::rc::Rc;
 use std::cell::RefCell;
 use autolang::scope::Universe;
+use autolang::interp::Interpreter;
 
 pub struct RootView {
     workspace: View<Workspace>,
@@ -69,8 +70,8 @@ pub struct GlobalSpecState {
 impl Global for GlobalSpecState {}
 
 impl GlobalSpecState {
-    pub fn new(path: &str) -> Self {
-        let spec = Spec::from_file(path);
+    pub fn new(path: &str, interpreter: Interpreter) -> Self {
+        let spec = Spec::from_file(path, interpreter);
         let widget_specs = Self::parse_sides(&spec, path);
         Self {
             spec,
@@ -139,6 +140,7 @@ impl GlobalSpecState {
 pub struct DynaApp {
     app: App,
     path: String,
+    interpreter: Interpreter,
 }
 
 
@@ -147,6 +149,15 @@ impl DynaApp {
         Self {
             app: App::new().with_assets(Assets),
             path: path.to_string(),
+            interpreter: Interpreter::new(),
+        }
+    }
+
+    pub fn new_with_interpreter(path: &str, interpreter: Interpreter) -> Self {
+        Self {
+            app: App::new().with_assets(Assets),
+            path: path.to_string(),
+            interpreter,
         }
     }
 
@@ -198,7 +209,7 @@ impl DynaApp {
             }).detach();
 
             cx.open_window(window_options, |cx| cx.new_view(|cx: &mut ViewContext<RootView>| {
-                let global_spec = GlobalSpecState::new(&self.path);
+                let global_spec = GlobalSpecState::new(&self.path, self.interpreter);
                 // Prepare workspace
                 let workspace_view = cx.new_view(|cx| {
                     let mut workspace = Workspace::new(cx);
