@@ -6,6 +6,7 @@ use crate::style::theme::{ActiveTheme, ThemeMode};
 
 pub const PANE_MIN_SIZE: Pixels = Pixels(100.);
 
+#[derive(Clone, Debug)]
 pub enum PaneSide {
     Left,
     Right,

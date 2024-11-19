@@ -1,6 +1,6 @@
 use autolang::eval::Evaler;
 use autolang::interpret;
-use autoval::value::*;
+use autoval::*;
 use autolang::ast;
 use autolang::scope::{Universe, Meta};
 use autolang::ast::{Expr, Fn, Args};

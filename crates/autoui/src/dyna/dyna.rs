@@ -6,13 +6,17 @@ use autogui::widget::button::Button;
 use autogui::widget::tab::{TabPane, TabView};
 use autogui::widget::dropzone::DropZone;
 use autogui::widget::table::{Align, ColConfig, Row, Table};
-use autogui::widget::util::center;
+use autogui::widget::util::{col, center};
+use autogui::widget::list::List;
+use autogui::widget::pane::PaneSide;
 use autolang::ast::{Expr, Key, Name, Stmt};
-use autoval::value::Value;
-use gpui::*;
+use autoval::Value;
+use gpui::{Div, SharedString, ViewContext, View, AnyView, ElementId, Render, IntoElement, ReadGlobal};
+use gpui::prelude::*;
 
 pub struct DynaView {
     spec: Option<WidgetSpec>,
+    side: PaneSide,
     builder: Option<Box<dyn Fn(Div, &mut WidgetSpec, &mut ViewContext<Self>) -> Div + 'static>>,
     kids: Vec<AnyView>,
 }
@@ -77,6 +81,7 @@ impl Viewable for DynaView {
             spec: None,
             builder: None,
             kids: Vec::new(),
+            side: PaneSide::Center,
         }
     }
 }
@@ -96,6 +101,10 @@ impl DynaView {
     pub fn from_file(&mut self, path: &str) {
         let spec = WidgetSpec::from_file(path);
         self.set_spec(spec);
+    }
+
+    pub fn set_side(&mut self, side: PaneSide) {
+        self.side = side;
     }
 
     pub fn update_spec(&mut self, cx: &mut ViewContext<Self>) {
@@ -180,6 +189,10 @@ fn parse_node(
         "table" => builders.push(ViewBuilder {
             view_id: ElementId::Integer(idx),
             builder: Box::new(add_table),
+        }),
+        "list" => builders.push(ViewBuilder {
+            view_id: ElementId::Integer(idx),
+            builder: Box::new(add_list),
         }),
         "tabs" => {
             let view = node_view_tabs(&node, spec, idx, cx);
@@ -334,6 +347,20 @@ pub fn add_table(
 
     div = div.child(cx.new_view(|cx| Table::new(cx, config, data)));
     div
+}
+
+pub fn add_list(mut div: Div, node: &autolang::ast::Node, spec: &mut WidgetSpec, cx: &mut ViewContext<'_, DynaView>, _view: Option<AnyView>) -> Div {
+    let data = match node.args.get(0) {
+        Some(ident) => spec.eval_expr(&ident),
+        None => Value::Nil,
+    };
+    if let Value::Array(array) = data {
+        let array = array.iter().map(|v| v.to_string().into()).collect::<Vec<SharedString>>();
+        div = div.child(cx.new_view(|cx| List::new(cx, array)));
+        div
+    } else {
+        div
+    }
 }
 
 pub fn add_tabs(div: Div, _node: &autolang::ast::Node, _spec: &mut WidgetSpec, _cx: &mut ViewContext<'_, DynaView>, view: Option<AnyView>) -> Div {
@@ -491,7 +518,11 @@ pub fn convert_value_to_table_data(value: &Value, config: &Vec<ColConfig>) -> Ve
 
 impl Render for DynaView {
     fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
-        let div = center();
+        let div = match self.side {
+            PaneSide::Left => col(),
+            PaneSide::Right => col(),
+            _ => center(),
+        }.size_full();
 
         if self.builder.is_none() {
             println!("no builder");

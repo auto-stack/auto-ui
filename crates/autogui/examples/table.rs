@@ -6,7 +6,7 @@ use autogui::widget::util::*;
 use autogui::widget::workspace::Workspace;
 use autogui::widget::table::Table;
 use autogui::widget::table::{ColConfig, WidthMode, ShowAs, Align, Row};
-use autoval::value::{Value};
+use autoval::Value;
 use gpui::*;
 
 struct RootView {

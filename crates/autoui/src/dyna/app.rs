@@ -1,14 +1,11 @@
 use gpui::*;
-use autoval::value::Value;
-use autoval::value::Node;
+use autoval::{Value, Node, Widget, Model};
 use autogui::assets::Assets;
 use autogui::style::theme::{init_theme, ActiveTheme};
 use autogui::app::Viewable;
 use autogui::widget::workspace::Workspace;
 use autogui::widget::pane::PaneSide;
 use autogui::widget::pane::Pane;
-use autoval::value::Widget;
-use autoval::value::Model;
 use crate::spec::{Spec, WidgetSpec};
 use crate::dyna::dyna::DynaView;
 use gpui::ReadGlobal;
@@ -244,6 +241,7 @@ impl DynaApp {
         let view = cx.new_view(|cx| {
             let mut view = DynaView::new(cx);
             view.set_spec(widget_spec);
+            view.set_side(side.clone());
             view.update_spec(cx);
             view
         });
@@ -251,7 +249,7 @@ impl DynaApp {
         match side {
             PaneSide::Center => workspace.child(view),
             PaneSide::Bottom => workspace.bottom(cx.new_view(|_cx| Pane::new(side, Pixels(150.0)).child(view))),
-            PaneSide::Left => workspace.left(cx.new_view(|_cx| Pane::new(side, Pixels(150.0)).child(view))),
+            PaneSide::Left => workspace.left(cx.new_view(|_cx| Pane::new(side, Pixels(180.0)).child(view))),
             PaneSide::Right => workspace.right(cx.new_view(|_cx| Pane::new(side, Pixels(150.0)).child(view))),
             PaneSide::Top => workspace.top(cx.new_view(|_cx| Pane::new(side, Pixels(150.0)).child(view))),
         }
