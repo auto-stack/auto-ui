@@ -82,6 +82,19 @@ pub struct Row {
     pub cells: Vec<Value>,
 }
 
+pub struct TableUpdate {
+    pub row: usize,
+    pub col: usize,
+    pub old: Value,
+    pub new: Value,
+}
+
+impl TableUpdate {
+    pub fn new(row: usize, col: usize, old: Value, new: Value) -> Self {
+        Self { row, col, old, new }
+    }
+}
+
 pub struct Table {
     focus_handle: FocusHandle,
     num_rows: usize,
@@ -89,13 +102,28 @@ pub struct Table {
     row_height: f32,
     config: Vec<ColConfig>,
     data: Vec<Row>,
+    update_history: Vec<TableUpdate>,
 }
 
 impl Table {
     pub fn new(cx: &mut ViewContext<Self>, col_config: Vec<ColConfig>, data: Vec<Row>) -> Self {
         let num_cols = col_config.len();
         let num_rows = data.len();
-        Self { focus_handle: cx.focus_handle(), num_rows: num_rows, num_cols: num_cols, row_height: 50.0, config: col_config, data }
+        Self { focus_handle: cx.focus_handle(), num_rows: num_rows, num_cols: num_cols, row_height: 50.0, config: col_config, data, update_history: vec![] }
+    }
+
+    pub fn record_update(&mut self, update: TableUpdate) {
+        self.update_history.push(update);
+    }
+
+    pub fn get_update_history(&self) -> &Vec<TableUpdate> {
+        &self.update_history
+    }
+
+    pub fn get_update_history_as_string(&self) -> String {
+        self.update_history.iter().map(|u| {
+            format!("[{},{}]: {} -> {}", u.row, u.col, u.old, u.new)
+        }).collect::<Vec<_>>().join("\n")
     }
 }
 
@@ -104,7 +132,6 @@ impl Render for Table {
         let theme = cx.active_theme();
         let view = cx.view().clone();
         div()
-            .size_full()
             .rounded_sm()
             .border_1()
             .border_color(theme.border)
@@ -112,7 +139,6 @@ impl Render for Table {
             .child(col()
                 .id("table")
                 .track_focus(&self.focus_handle)
-                .size_full()
                 .overflow_hidden()
                 .child(self.render_header(cx))
                 .child(uniform_list(
@@ -128,7 +154,6 @@ impl Render for Table {
                     }
                 )
                 .flex_grow()
-                .size_full()
                 .with_sizing_behavior(ListSizingBehavior::Infer)
                 .into_any_element())
             )
@@ -148,7 +173,7 @@ impl Table {
             .border_color(theme.border)
             .hover(|this| this.bg(theme.table_hover))
             .child(
-                row().h_full().overflow_hidden().justify_center().items_center()
+                row().h_full().px_5().overflow_hidden().justify_start().items_center()
                     .children((0..num_cols).map(|colid| {
                         // cell
                         div().h_full().items_center()
@@ -183,13 +208,14 @@ impl Table {
         let is_even = rowid % 2 == 0;
         div()
             .w_full()
+            .justify_start()
             .h(px(self.row_height))
             .border_b_1()
             .border_color(theme.border)
             .when(is_even, |e| e.bg(theme.table_even))
             .hover(|this| this.bg(theme.table_hover))
             .child(
-                row().h_full().overflow_hidden().justify_center().items_center()
+                row().h_full().px_5().overflow_hidden().justify_start().items_center()
                     .children((0..num_cols).map(|colid| {
                         // cell
                         div().h_full().items_center()
@@ -216,14 +242,19 @@ impl Table {
                                 ShowAs::Text => div.child(cell.to_string()),
                                 ShowAs::Hex => {
                                     match cell {
-                                        Value::Int(i) => div.child(format!("0x{:x}", i)),
+                                        Value::Int(i) => div.child(format!("0x{:X}", i)),
+                                        Value::Uint(u) => div.child(format!("0x{:X}", u)),
                                         _ => div.child(cell.to_string()),
                                     }
                                 }
                                 ShowAs::Checkbox => {
                                     div.child(Checkbox::new("cb").checked(cell.to_bool())
                                         .on_click_mut(cx, move |this, b, cx| {
-                                            println!("checkbox clicked");
+                                            println!("check box clicked, {}", *b);
+                                            // let old = Value::Bool(!*b);
+                                            // let new = Value::Bool(*b);
+                                            // this.data[rowid].cells[colid] = new.clone();
+                                            // this.record_update(TableUpdate::new(rowid, colid, old, new));
                                             this.data[rowid].cells[colid] = Value::Bool(*b);
                                             cx.notify();
                                         })

@@ -87,14 +87,15 @@ impl Render for Workspace {
             // Workarea
             .child(
                 div()
+                    .flex_grow()
                     .flex()
                     .flex_row()
-                    .size_full()
+                    .w_full()
                     .border_0()
                     // Left Pane
                     .when(self.left.is_some(), |s| {
                         if let Some(left) = self.left.as_ref() {
-                            s.child(div().w(left.read(cx).size).h_full().child(left.clone()))
+                            s.child(div().w(left.read(cx).size).child(left.clone()))
                         } else {
                             s
                         }
@@ -102,8 +103,8 @@ impl Render for Workspace {
                     // Center Panes
                     .child(
                         col()
-                            .size_full()
-                            .justify_center()
+                            .flex_grow()
+                            .justify_start()
                             .items_center()
                             .bg(theme.background.darken(0.03))
                             // Center Content
@@ -120,7 +121,7 @@ impl Render for Workspace {
                     // Right Pane
                     .when(self.right.is_some(), |s| {
                         if let Some(right) = self.right.as_ref() {
-                            s.child(div().w(right.read(cx).size).h_full().child(right.clone()))
+                            s.child(div().w(right.read(cx).size).child(right.clone()))
                         } else {
                             s
                         }

@@ -30,6 +30,7 @@ impl Render for TabView {
             .size_full()
             .items_center()
             .justify_center()
+            .p_4()
             .track_focus(&focus_handle)
             .child(self.view.clone())
     }

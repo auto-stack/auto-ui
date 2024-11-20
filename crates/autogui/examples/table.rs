@@ -3,6 +3,7 @@ use autogui::style::theme::ActiveTheme;
 use autogui::widget::input::TextInput;
 use autogui::widget::toolbar::*;
 use autogui::widget::util::*;
+use autogui::widget::button::Button;
 use autogui::widget::workspace::Workspace;
 use autogui::widget::table::Table;
 use autogui::widget::table::{ColConfig, WidthMode, ShowAs, Align, Row};
@@ -28,6 +29,10 @@ impl Render for CenterContent {
             .w_3_4()
             .gap_4()
             .child(self.table.clone())
+            // .child(Button::primary("History").on_click(cx.listener(|this, ev, cx| {
+                // let history = this.table.read(cx).get_update_history_as_string();
+                // println!("{}", &history);
+            // })))
     }
 }
 
