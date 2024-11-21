@@ -52,11 +52,11 @@ impl RootView {
         let center = cx.new_view(|cx| TabPane::new(cx)
             .add(cx.new_view(|cx| {
                     let view1 = cx.new_view(|_cx| View1 { text: "View A1".to_string() });
-                    TabView::new(cx, "View 1", view1)
+                    TabView::new(cx, "View 1", "View 1", view1)
                 }))
                 .add(cx.new_view(|cx| {
                     let view2 = cx.new_view(|_cx| View2 { text: "View A2".to_string() });
-                    TabView::new(cx, "View 2", view2)
+                    TabView::new(cx, "View 2", "View 2", view2)
                 }))
         );
 

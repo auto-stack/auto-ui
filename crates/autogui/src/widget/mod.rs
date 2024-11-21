@@ -16,6 +16,7 @@ pub mod table;
 pub mod util;
 pub mod tab;
 pub mod dropzone;
+pub mod scroll;
 
 mod widget;
 pub use widget::*;

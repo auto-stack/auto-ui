@@ -1,5 +1,3 @@
-use core::num;
-
 use gpui::*;
 use gpui::prelude::FluentBuilder;
 use crate::app::{GlobalDataStoreSave, GlobalDatastore};
@@ -7,8 +5,11 @@ use crate::widget::util::*;
 use crate::widget::checkbox::Checkbox;
 use crate::widget::dropdown::Dropdown;
 use crate::widget::input::TextInput;
+use crate::widget::scroll::{ScrollbarState, Scrollbar};
 use crate::style::theme::ActiveTheme;
 use autoval::{Value, Obj};
+use std::rc::Rc;
+use std::cell::Cell;
 
 #[derive(Debug, Clone)]
 pub enum WidthMode {
@@ -98,7 +99,10 @@ impl TableUpdate {
 
 pub struct Table {
     id: String,
+    bounds: Bounds<Pixels>,
     focus_handle: FocusHandle,
+    v_scroll: UniformListScrollHandle,
+    scroll_state: Rc<Cell<ScrollbarState>>,
     num_rows: usize,
     num_cols: usize,
     row_height: f32,
@@ -120,7 +124,19 @@ impl Table {
                 g.set_new(table_id.clone(), data);
             });
         }).detach();
-        Self { id, focus_handle: cx.focus_handle(), num_rows: num_rows, num_cols: num_cols, row_height: 50.0, config: col_config, data, update_history: vec![] }
+        Self {
+            id, 
+            bounds: Bounds::default(),
+            focus_handle: cx.focus_handle(), 
+            v_scroll: UniformListScrollHandle::new(),
+            scroll_state: Rc::new(Cell::new(ScrollbarState::new())),
+            num_rows: num_rows, 
+            num_cols: num_cols, 
+            row_height: 50.0, 
+            config: col_config, 
+            data, 
+            update_history: vec![] 
+        }
     }
 
     pub fn record_update(&mut self, update: TableUpdate) {
@@ -157,7 +173,14 @@ impl Render for Table {
     fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
         let theme = cx.active_theme();
         let view = cx.view().clone();
+        let view1 = view.clone();
+        let v_scroll = self.v_scroll.clone();
+        let row_height = self.v_scroll.0.borrow().last_item_size.map(|size| size.item.height);
+        let total_height = self.v_scroll.0.borrow().base_handle.bounds().size.height;
+
+
         div()
+            .size_full()
             .rounded_sm()
             .border_1()
             .border_color(theme.border)
@@ -184,11 +207,34 @@ impl Render for Table {
                 .with_sizing_behavior(ListSizingBehavior::Infer)
                 .into_any_element())
             )
+            .child(canvas(
+                move |bounds, cx| view1.update(cx, |r, _| r.bounds = bounds),
+                |_, _, _| {},
+            ))
+            .children(self.render_scrollbar(cx))
         }
 }
 
 
 impl Table {
+    fn render_scrollbar(&mut self, cx: &mut ViewContext<Self>) -> Option<impl IntoElement> {
+        let state = self.scroll_state.clone();
+
+        Some(
+            div()
+                .absolute()
+                .top(px(self.row_height))
+                .left_0()
+                .right_0()
+                .bottom_0()
+                .child(Scrollbar::uniform_scroll(
+                    cx.view().entity_id(),
+                    state,
+                    self.v_scroll.clone(),
+                )),
+        )
+    }
+
     fn render_header(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
         let view = cx.view().clone();
         let theme = cx.active_theme();

@@ -26,7 +26,8 @@ impl Render for CenterContent {
             .flex_col()
             .items_center()
             .justify_center()
-            .w_3_4()
+            .w_full()
+            .p_4()
             .gap_4()
             .child(self.table.clone())
             // .child(Button::primary("History").on_click(cx.listener(|this, ev, cx| {
@@ -83,18 +84,18 @@ impl RootView {
             Row { cells: vec![Value::Int(0x23), Value::Str("ReadMemoryByAddress".to_string()), Value::Bool(false), Value::Str("读取内存".to_string())] },
             Row { cells: vec![Value::Int(0x27), Value::Str("SecurityAccess".to_string()), Value::Bool(false), Value::Str("安全访问".to_string())] },
             Row { cells: vec![Value::Int(0x28), Value::Str("CommunicationControl".to_string()), Value::Bool(false), Value::Str("通信控制".to_string())] },
-        //     Row { cells: vec![Value::Int(0x2A), Value::Str("ReadDataByPeriodicIdentifier".to_string()), Value::Str("读取数据（周期标识符）".to_string())] },
-        //     Row { cells: vec![Value::Int(0x2C), Value::Str("DynamicallyDefineDataIdentifier".to_string()), Value::Str("动态定义数据标识符".to_string())] },
-        //     Row { cells: vec![Value::Int(0x2E), Value::Str("WriteDataByIdentifier".to_string()), Value::Str("写入数据".to_string())] },
-        //     Row { cells: vec![Value::Int(0x2F), Value::Str("InputOutputControlByIdentifier".to_string()), Value::Str("输入输出控制".to_string())] },
-        //     Row { cells: vec![Value::Int(0x31), Value::Str("RoutineControl".to_string()), Value::Str("例程控制".to_string())] },
-        //     Row { cells: vec![Value::Int(0x3D), Value::Str("WriteMemoryByAddress".to_string()), Value::Str("写入内存".to_string())] },
-        //     Row { cells: vec![Value::Int(0x3E), Value::Str("TesterPresent".to_string()), Value::Str("诊断设备在线".to_string())] },
-        //     Row { cells: vec![Value::Int(0x85), Value::Str("ControlDTCSetting".to_string()), Value::Str("控制DTC设置".to_string())] },
+            Row { cells: vec![Value::Int(0x2A), Value::Str("ReadDataByPeriodicIdentifier".to_string()), Value::Bool(true), Value::Str("读取数据（周期标识符）".to_string())] },
+            Row { cells: vec![Value::Int(0x2C), Value::Str("DynamicallyDefineDataIdentifier".to_string()), Value::Bool(false), Value::Str("动态定义数据标识符".to_string())] },
+            Row { cells: vec![Value::Int(0x2E), Value::Str("WriteDataByIdentifier".to_string()), Value::Bool(false), Value::Str("写入数据".to_string())] },
+            Row { cells: vec![Value::Int(0x2F), Value::Str("InputOutputControlByIdentifier".to_string()), Value::Bool(false), Value::Str("输入输出控制".to_string())] },
+            Row { cells: vec![Value::Int(0x31), Value::Str("RoutineControl".to_string()), Value::Bool(false), Value::Str("例程控制".to_string())] },
+            Row { cells: vec![Value::Int(0x3D), Value::Str("WriteMemoryByAddress".to_string()), Value::Bool(false), Value::Str("写入内存".to_string())] },
+            Row { cells: vec![Value::Int(0x3E), Value::Str("TesterPresent".to_string()), Value::Bool(false), Value::Str("诊断设备在线".to_string())] },
+            Row { cells: vec![Value::Int(0x85), Value::Str("ControlDTCSetting".to_string()), Value::Bool(false), Value::Str("控制DTC设置".to_string())] },
         ];
 
         let center = cx.new_view(|cx| CenterContent {
-            table: cx.new_view(|cx| Table::new(cx, "my_table".to_string(), col_config, data)),
+            table: cx.new_view(|cx| Table::new(cx, "my_table".into(), col_config, data)),
         });
 
         Self {
