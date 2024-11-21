@@ -30,11 +30,11 @@ pub fn card(title: impl IntoElement, cx: &WindowContext) -> Div {
 // pub fn field()
 
 pub fn col() -> Div {
-    div().flex().flex_col()
+    div().flex().flex_col().items_center().justify_start()
 }
 
 pub fn row() -> Div {
-    div().flex().flex_row()
+    div().flex().flex_row().items_center().justify_start()
 }
 
 pub fn center() -> Div {

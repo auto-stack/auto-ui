@@ -10,7 +10,7 @@ use autogui::widget::util::{col, center};
 use autogui::widget::list::List;
 use autogui::widget::pane::PaneSide;
 use autolang::ast::{Node, Expr, Key, Name, Stmt};
-use autoval::Value;
+use autoval::{Value, Args};
 use gpui::{Div, SharedString, ViewContext, View, AnyView, ElementId, Render, IntoElement, ReadGlobal};
 use gpui::prelude::*;
 
@@ -51,32 +51,34 @@ impl Viewable for DynaView {
     fn new(cx: &mut ViewContext<Self>) -> Self {
         // let mut state = State::new();
         // state.set_int("count", 0);
-        cx.observe_global::<GlobalSpecState>(|v, cx| {
-            let spec = GlobalSpecState::global(cx);
-            let widget_specs = &spec.widget_specs;
-            if v.spec.is_some() {
-                match v.spec.as_ref().unwrap().id.as_str() {
-                    "left" => {
-                        v.spec = widget_specs.left.clone();
-                    }
-                    "right" => {
-                        v.spec = widget_specs.right.clone();
-                    }
-                    "top" => {
-                        v.spec = widget_specs.top.clone();
-                    }
-                    "bottom" => {
-                        v.spec = widget_specs.bottom.clone();
-                    }
-                    "center" => {
-                        v.spec = widget_specs.center.clone();
-                    }
-                    _ => {}
-                }
-            }
-            v.update_spec(cx);
-        })
-        .detach();
+        println!("DynaView created");
+        // cx.observe_global::<GlobalSpecState>(|v, cx| {
+        //     println!("Global Spec updated!");
+        //     let spec = GlobalSpecState::global(cx);
+        //     let widget_specs = &spec.widget_specs;
+        //     if v.spec.is_some() {
+        //         match v.spec.as_ref().unwrap().id.as_str() {
+        //             "left" => {
+        //                 v.spec = widget_specs.left.clone();
+        //             }
+        //             "right" => {
+        //                 v.spec = widget_specs.right.clone();
+        //             }
+        //             "top" => {
+        //                 v.spec = widget_specs.top.clone();
+        //             }
+        //             "bottom" => {
+        //                 v.spec = widget_specs.bottom.clone();
+        //             }
+        //             "center" => {
+        //                 v.spec = widget_specs.center.clone();
+        //             }
+        //             _ => {}
+        //         }
+        //     }
+        //     v.update_spec(cx);
+        // })
+        // .detach();
         Self {
             spec: None,
             builder: None,
@@ -106,6 +108,7 @@ impl DynaView {
     pub fn set_side(&mut self, side: PaneSide) {
         self.side = side;
     }
+
 
     pub fn update_spec(&mut self, cx: &mut ViewContext<Self>) {
         // self.spec.set_state(&mut self.state);
@@ -185,7 +188,7 @@ fn parse_node(name: &str, node: &Node, spec: &mut WidgetSpec, idx: usize, cx: &m
             builder: Box::new(add_list),
         }),
         "table" => {
-            let view = node_view_table(&node, spec, idx, cx);
+            let view = add_table_view(&node, spec, idx, cx);
             let id = view.id().unwrap();
             views.push(view);
             builders.push(ViewBuilder {
@@ -297,19 +300,24 @@ pub fn add_list(mut div: Div, node: &Node, spec: &mut WidgetSpec, cx: &mut ViewC
     }
 }
 
-pub fn node_view_table( node: &Node, spec: &mut WidgetSpec, idx: usize, cx: &mut ViewContext<'_, DynaView>) -> AnyView {
-    let config = match node.args.get(0) {
+pub fn add_table_view( node: &Node, spec: &mut WidgetSpec, idx: usize, cx: &mut ViewContext<'_, DynaView>) -> AnyView {
+    println!("add table view: {:?}", node.args);
+    let table_id = match node.args.get(0) {
+        Some(Expr::Str(id)) => id,
+        _ => format!("table_{}", idx),
+    }; 
+    let config = match node.args.get(1) {
         Some(ident) => spec.eval_expr(&ident),
         None => Value::Nil,
     };
     let config = convert_value_to_table_config(&config);
-    let data = match node.args.get(1) {
-        Some(ident) => spec.eval_expr(&ident),
+    let data = match node.args.get(2) {
+        Some(expr) => spec.eval_expr(&expr),
         None => Value::Nil,
     };
     let data = convert_value_to_table_data(&data, &config);
 
-    let view = cx.new_view(|cx| Table::new(cx, config, data));
+    let view = cx.new_view(|cx| Table::new(cx, table_id, config, data));
     view.into()
 }
 
@@ -342,7 +350,11 @@ pub fn node_view_tabs( node: &Node, spec: &mut WidgetSpec, idx: usize, cx: &mut 
                     Some(Expr::Str(name)) => name,
                     _ => format!("view {}", idx),
                 };
-                tabs.push((name, tab_view));
+                let title = match node.args.get(1) {
+                    Some(Expr::Str(title)) => title,
+                    _ => name.clone(),
+                };
+                tabs.push((name, title, tab_view));
             }
             _ => (),
         }
@@ -351,7 +363,7 @@ pub fn node_view_tabs( node: &Node, spec: &mut WidgetSpec, idx: usize, cx: &mut 
     cx.new_view(|cx| {
         let mut tabpane = TabPane::new(cx);
         for tab in tabs.into_iter() {
-            tabpane = tabpane.add(cx.new_view(|cx| TabView::new(cx, tab.0, tab.1)));
+            tabpane = tabpane.add(cx.new_view(|cx| TabView::new(cx, tab.0, tab.1, tab.2)));
         }
         if len > 0 {
             tabpane.set_active(0, cx);
@@ -455,11 +467,7 @@ pub fn convert_value_to_table_data(value: &Value, config: &Vec<ColConfig>) -> Ve
 
 impl Render for DynaView {
     fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
-        let div = match self.side {
-            PaneSide::Left => col(),
-            PaneSide::Right => col(),
-            _ => center(),
-        }.size_full();
+        let div = col().size_full();
 
         if self.builder.is_none() {
             println!("no builder");

@@ -2,12 +2,13 @@ use core::num;
 
 use gpui::*;
 use gpui::prelude::FluentBuilder;
+use crate::app::{GlobalDataStoreSave, GlobalDatastore};
 use crate::widget::util::*;
 use crate::widget::checkbox::Checkbox;
 use crate::widget::dropdown::Dropdown;
 use crate::widget::input::TextInput;
 use crate::style::theme::ActiveTheme;
-use autoval::Value;
+use autoval::{Value, Obj};
 
 #[derive(Debug, Clone)]
 pub enum WidthMode {
@@ -96,6 +97,7 @@ impl TableUpdate {
 }
 
 pub struct Table {
+    id: String,
     focus_handle: FocusHandle,
     num_rows: usize,
     num_cols: usize,
@@ -106,10 +108,19 @@ pub struct Table {
 }
 
 impl Table {
-    pub fn new(cx: &mut ViewContext<Self>, col_config: Vec<ColConfig>, data: Vec<Row>) -> Self {
+    pub fn new(cx: &mut ViewContext<Self>, id: String, col_config: Vec<ColConfig>, data: Vec<Row>) -> Self {
         let num_cols = col_config.len();
         let num_rows = data.len();
-        Self { focus_handle: cx.focus_handle(), num_rows: num_rows, num_cols: num_cols, row_height: 50.0, config: col_config, data, update_history: vec![] }
+        let table_id = id.clone();
+        cx.observe_global::<GlobalDataStoreSave>(move |this, cx| {
+            let data = this.collect_data();
+            println!("table data: {}", data);
+            let table_id = table_id.clone();
+            GlobalDatastore::update_global(cx, move |g, cx| {
+                g.set_new(table_id.clone(), data);
+            });
+        }).detach();
+        Self { id, focus_handle: cx.focus_handle(), num_rows: num_rows, num_cols: num_cols, row_height: 50.0, config: col_config, data, update_history: vec![] }
     }
 
     pub fn record_update(&mut self, update: TableUpdate) {
@@ -125,6 +136,21 @@ impl Table {
             format!("[{},{}]: {} -> {}", u.row, u.col, u.old, u.new)
         }).collect::<Vec<_>>().join("\n")
     }
+
+    pub fn collect_data(&self) -> Value {
+        let mut rows = Vec::new();
+        for row in self.data.iter() {
+            let mut obj = Obj::new();
+            for (idx, cell) in row.cells.iter().enumerate() {
+                match self.config.get(idx) {
+                    Some(col) => obj.set(col.id.clone(), cell.clone()),
+                    None => (),
+                }
+            }
+            rows.push(Value::Obj(obj));
+        }
+        Value::Array(rows)
+    }
 }
 
 impl Render for Table {
@@ -135,6 +161,7 @@ impl Render for Table {
             .rounded_sm()
             .border_1()
             .border_color(theme.border)
+            .shadow_md()    
             .bg(theme.table)
             .child(col()
                 .id("table")
@@ -210,8 +237,7 @@ impl Table {
             .w_full()
             .justify_start()
             .h(px(self.row_height))
-            .border_b_1()
-            .border_color(theme.border)
+            .when(rowid < num_rows - 1, |this| this.border_b_1().border_color(theme.border))
             .when(is_even, |e| e.bg(theme.table_even))
             .hover(|this| this.bg(theme.table_hover))
             .child(

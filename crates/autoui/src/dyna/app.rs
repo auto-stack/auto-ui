@@ -2,14 +2,13 @@ use gpui::*;
 use autoval::{Value, Node, Widget, Model};
 use autogui::assets::Assets;
 use autogui::style::theme::{init_theme, ActiveTheme};
-use autogui::app::Viewable;
+use autogui::app::{GlobalDataStoreSave, Viewable, GlobalState, ReloadState, GlobalDatastore};
 use autogui::widget::workspace::Workspace;
 use autogui::widget::pane::PaneSide;
 use autogui::widget::pane::Pane;
 use crate::spec::{Spec, WidgetSpec};
 use crate::dyna::dyna::DynaView;
 use gpui::ReadGlobal;
-use autogui::app::{GlobalState, ReloadState};
 use std::rc::Rc;
 use std::cell::RefCell;
 use autolang::scope::Universe;
@@ -168,7 +167,11 @@ impl DynaApp {
             let reload = ReloadState { };
             cx.set_global(reload);
 
+            let global_datastore = GlobalDatastore::new();
+            cx.set_global(global_datastore);
 
+            let global_datastore_save = GlobalDataStoreSave {};
+            cx.set_global(global_datastore_save);
 
             cx.observe_global::<GlobalState>(|g| {
                 println!("global changed: {}", GlobalState::global(g).count);
@@ -177,6 +180,10 @@ impl DynaApp {
             cx.observe_global::<ReloadState>(|cx| {
                 println!("reload changed: {:?}", ReloadState::global(cx));
                 cx.refresh();
+            }).detach();
+
+            cx.observe_global::<GlobalDataStoreSave>(|cx| {
+                println!("global datastore save changed");
             }).detach();
 
             let title_options = TitlebarOptions {

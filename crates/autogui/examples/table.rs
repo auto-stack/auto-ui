@@ -94,7 +94,7 @@ impl RootView {
         ];
 
         let center = cx.new_view(|cx| CenterContent {
-            table: cx.new_view(|cx| Table::new(cx, col_config, data)),
+            table: cx.new_view(|cx| Table::new(cx, "my_table".to_string(), col_config, data)),
         });
 
         Self {

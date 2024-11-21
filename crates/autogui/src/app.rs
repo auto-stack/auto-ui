@@ -1,6 +1,8 @@
 use gpui::*;
 use crate::assets::Assets;
 use crate::style::theme::{init_theme, ActiveTheme};
+use std::collections::HashMap;
+use autoval::Value;
 
 pub struct GlobalState {
     pub count: i32,
@@ -13,9 +15,32 @@ pub struct ReloadState {
 
 }
 
-
-
 impl Global for ReloadState {}
+
+pub struct GlobalDatastore {
+    pub old: HashMap<String, Value>,
+    pub new: HashMap<String, Value>,
+}
+
+impl GlobalDatastore {
+    pub fn new() -> Self {
+        Self { old: HashMap::new(), new: HashMap::new() }
+    }
+
+    pub fn set_old(&mut self, id: String, value: Value) {
+        self.old.insert(id, value);
+    }
+
+    pub fn set_new(&mut self, id: String, value: Value) {
+        self.new.insert(id, value);
+    }
+}
+
+impl Global for GlobalDatastore {}
+
+pub struct GlobalDataStoreSave {}
+impl Global for GlobalDataStoreSave {}
+
 
 pub struct SimpleApp {
     app: App,

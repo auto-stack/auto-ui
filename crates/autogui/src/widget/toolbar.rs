@@ -8,7 +8,7 @@ use crate::widget::button::ButtonStyles;
 use crate::event::ReloadEvent;
 
 use gpui::UpdateGlobal;
-use crate::app::{GlobalState, ReloadState};
+use crate::app::{GlobalDataStoreSave, GlobalState, ReloadState};
 
 #[derive(IntoElement)]
 pub struct WindowControlIcon {
@@ -83,7 +83,7 @@ impl Render for Toolbar {
                 div()
                     .flex()
                     .flex_row()
-                    .w_full()
+                    .flex_grow()
                     .justify_center()
                     .items_center()
                     .child("Middle")
@@ -92,7 +92,7 @@ impl Render for Toolbar {
             .child(
                 Button::new().icon(SysIcon::Reload.icon()).style(ButtonStyles::Bare)
                     .on_click(cx.listener(move |_this, _ev, cx| {
-                        println!("Reload Cliecked! Event");
+                        println!("Reload Clicked! Event");
                         cx.emit(ReloadEvent);
 
                         GlobalState::update_global(cx, |g, _| {
@@ -101,6 +101,16 @@ impl Render for Toolbar {
 
                         ReloadState::update_global(cx, |_g, _| {
                         });
+
+                        cx.refresh();
+                    }))
+            )
+            .child(
+                Button::new().icon(SysIcon::Download.icon()).style(ButtonStyles::Bare)
+                    .on_click(cx.listener(move |_this, _ev, cx| {
+                        println!("Download Clicked! Event");
+
+                        GlobalDataStoreSave::update_global(cx, |a, b| {});
 
                         cx.refresh();
                     }))
