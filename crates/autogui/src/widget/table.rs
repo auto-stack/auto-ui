@@ -42,6 +42,7 @@ pub struct ColConfig {
     pub width: WidthMode,
     pub align: Align,
     pub showas: ShowAs,
+    pub options: Vec<String>,
 }
 
 impl Default for WidthMode {
@@ -333,7 +334,8 @@ impl Table {
                                     )
                                 },
                                 ShowAs::Dropdown => {
-                                    div.child(cx.new_view(|cx| Dropdown::new("dd", vec!["Intel".into(), "Motorola".into()], Some(0), cx)))
+                                    let options = config.options.iter().map(|s| s.into()).collect::<Vec<SharedString>>();
+                                    div.child(cx.new_view(|cx| Dropdown::new("dropdown", options, Some(0), cx)))
                                 },
                                 ShowAs::Input => div.child(cx.new_view(|cx| {
                                     let mut input = TextInput::new(cx);

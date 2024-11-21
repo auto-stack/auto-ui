@@ -429,6 +429,7 @@ pub fn convert_value_to_table_config(value: &Value) -> Vec<ColConfig> {
                             title: obj.get_str_or("name", ""),
                             width: obj.get_or("width", Value::Float(0.0)).into(),
                             showas: obj.get_str_or("showas", "text").into(),
+                            options: obj.get_array_of("options").iter().map(|s| s.to_string()).collect::<Vec<String>>(),
                             align: Align::Start,
                         };
                         cols.push(col);
