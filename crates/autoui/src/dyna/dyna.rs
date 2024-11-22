@@ -6,7 +6,7 @@ use autogui::widget::button::Button;
 use autogui::widget::tab::{TabPane, TabView};
 use autogui::widget::dropzone::DropZone;
 use autogui::widget::table::{Align, ColConfig, Row, Table};
-use autogui::widget::util::{col, center};
+use autogui::widget::util::{col, row};
 use autogui::widget::list::List;
 use autogui::widget::pane::PaneSide;
 use autolang::ast::{Node, Expr, Key, Name, Stmt};
@@ -15,6 +15,7 @@ use gpui::{Div, SharedString, ViewContext, View, AnyView, ElementId, Render, Int
 use gpui::prelude::*;
 
 pub struct DynaView {
+    compact: bool,
     spec: Option<WidgetSpec>,
     side: PaneSide,
     builder: Option<Box<dyn Fn(Div, &mut WidgetSpec, &mut ViewContext<Self>) -> Div + 'static>>,
@@ -81,6 +82,7 @@ impl Viewable for DynaView {
         // .detach();
         Self {
             spec: None,
+            compact: false,
             builder: None,
             kids: Vec::new(),
             side: PaneSide::Center,
@@ -109,6 +111,9 @@ impl DynaView {
         self.side = side;
     }
 
+    pub fn set_compact(&mut self, compact: bool) {
+        self.compact = compact;
+    }
 
     pub fn update_spec(&mut self, cx: &mut ViewContext<Self>) {
         // self.spec.set_state(&mut self.state);
@@ -329,12 +334,15 @@ pub fn add_view_clone(div: Div, _node: &Node, _spec: &mut WidgetSpec, _cx: &mut 
     }
 }
 
-fn node_to_tab(node: &Node, spec: &mut WidgetSpec, idx: usize, cx: &mut ViewContext<'_, DynaView>) -> View<DynaView> {
+fn node_to_dynaview(node: &Node, spec: &mut WidgetSpec, idx: usize, compact: bool, cx: &mut ViewContext<'_, DynaView>) -> View<DynaView> {
     let tab_widget = WidgetSpec::from_ast_node(node, &spec.path, spec.scope.clone());
     let view = cx.new_view(|cx| {
         let mut view = DynaView::new(cx);
         view.set_spec(tab_widget);
         view.update_spec(cx);
+        if compact {
+            view.set_compact(true);
+        }
         view
     });
     view
@@ -342,19 +350,26 @@ fn node_to_tab(node: &Node, spec: &mut WidgetSpec, idx: usize, cx: &mut ViewCont
 
 pub fn node_view_tabs( node: &Node, spec: &mut WidgetSpec, idx: usize, cx: &mut ViewContext<'_, DynaView>) -> AnyView {
     let mut tabs = Vec::new();
+    let mut control = None;
     for (idx, stmt) in node.body.stmts.iter().enumerate() {
         match stmt {
             Stmt::Node(node) => {
-                let tab_view = node_to_tab(node, spec, idx, cx);
-                let name = match node.args.get(0) {
-                    Some(Expr::Str(name)) => name,
-                    _ => format!("view {}", idx),
-                };
-                let title = match node.args.get(1) {
-                    Some(Expr::Str(title)) => title,
-                    _ => name.clone(),
-                };
-                tabs.push((name, title, tab_view));
+                let tag = &node.name.text;
+                if tag == "tab" {
+                    let tab_view = node_to_dynaview(node, spec, idx, false, cx);
+                    let name = match node.args.get(0) {
+                        Some(Expr::Str(name)) => name,
+                        _ => format!("view {}", idx),
+                    };
+                    let title = match node.args.get(1) {
+                        Some(Expr::Str(title)) => title,
+                        _ => name.clone(),
+                    };
+                    tabs.push((name, title, tab_view));
+                } else if tag == "control" {
+                    let control_view = node_to_dynaview(node, spec, idx, true, cx);
+                    control = Some(control_view);
+                }
             }
             _ => (),
         }
@@ -367,6 +382,9 @@ pub fn node_view_tabs( node: &Node, spec: &mut WidgetSpec, idx: usize, cx: &mut 
         }
         if len > 0 {
             tabpane.set_active(0, cx);
+        }
+        if let Some(control) = control {
+            tabpane = tabpane.control(control.into());
         }
         tabpane
     })
@@ -468,7 +486,7 @@ pub fn convert_value_to_table_data(value: &Value, config: &Vec<ColConfig>) -> Ve
 
 impl Render for DynaView {
     fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
-        let div = col().size_full();
+        let div = if self.compact { row() } else { col().size_full() };
 
         if self.builder.is_none() {
             println!("no builder");

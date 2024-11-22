@@ -18,6 +18,8 @@ pub struct TabBar {
     children: SmallVec<[AnyElement; 2]>,
 }
 
+pub const TAB_BAR_HEIGHT: f32 = 42.0;   
+
 impl TabBar {
     pub fn new(id: impl Into<ElementId>) -> Self {
         Self {
@@ -70,6 +72,7 @@ impl RenderOnce for TabBar {
             .flex()
             .flex_none()
             .w_full()
+            .h(px(TAB_BAR_HEIGHT))
             .items_center()
             .bg(cx.active_theme().tab_bar)
             .text_color(cx.active_theme().tab_foreground)
@@ -91,6 +94,8 @@ impl RenderOnce for TabBar {
                     .track_scroll(&self.scroll_handle)
                     .children(self.children),
             )
-            .when_some(self.suffix, |this, suffix| this.child(suffix))
+            .when_some(self.suffix, |this, suffix| this.child(
+                div().flex().flex_row().pr_4().child(suffix)
+            ))
     }
 }

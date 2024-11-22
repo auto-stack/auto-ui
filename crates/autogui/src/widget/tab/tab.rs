@@ -5,6 +5,7 @@ use gpui::{
     div, px, AnyElement, Div, ElementId, InteractiveElement, IntoElement, ParentElement as _,
     RenderOnce, Stateful, StatefulInteractiveElement, Styled, WindowContext,
 };
+use super::tab_bar::TAB_BAR_HEIGHT;
 
 #[derive(IntoElement)]
 pub struct Tab {
@@ -86,6 +87,7 @@ impl RenderOnce for Tab {
             .overflow_hidden()
             .text_color(text_color)
             .bg(bg_color)
+            .h(px(TAB_BAR_HEIGHT))
             .border_x_1()
             .border_color(theme.transparent)
             .when(self.selected, |this| this.border_color(theme.border))

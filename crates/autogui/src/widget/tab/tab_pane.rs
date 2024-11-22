@@ -1,14 +1,17 @@
 use gpui::*;
+use gpui::prelude::FluentBuilder;
 use super::TabView;
 use super::TabBar;
 use super::Tab;
 use crate::style::theme::ActiveTheme;
 use crate::widget::util::*;
+use crate::widget::icon::SysIcon;
 
 
 pub struct TabPane {
     focus_handle: FocusHandle,
     tab_views: Vec<View<TabView>>,
+    control: Option<AnyView>,
     active: usize,
 }
 
@@ -21,7 +24,7 @@ impl FocusableView for TabPane {
 impl TabPane {
     pub fn new(cx: &mut ViewContext<Self>) -> Self {
         let focus_handle = cx.focus_handle();
-        Self { focus_handle, tab_views: Vec::new(), active: 0 }
+        Self { focus_handle, tab_views: Vec::new(), active: 0, control: None }
     }
 
     pub fn active_tab(&self) -> &View<TabView> {
@@ -42,21 +45,29 @@ impl TabPane {
         self.tab_views.push(view);
         self
     }
+
+    pub fn control(mut self, control: AnyView) -> Self {
+        self.control = Some(control);
+        self
+    }
 }
 
 impl TabPane {
     fn render_tab_bar(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
+        let mut tab_bar = TabBar::new("tabbar").children(self.tab_views.iter().enumerate().map(|(i, v)| {
+            let title = v.read(cx).title.clone();
+            Tab::new(SharedString::from(format!("tab-{}", i)), title)
+                .py_2()
+                .selected(i == self.active)
+                .on_click(cx.listener(move |v, _e, cx| v.set_active(i, cx)))
+        }));
+        if let Some(control) = self.control.as_ref() {
+            tab_bar = tab_bar.suffix(control.clone().into_any_element())
+        }
         row()
+            .id("tab-bar")
             .w_full()
-            .child(
-                TabBar::new("tabbar").children(self.tab_views.iter().enumerate().map(|(i, v)| {
-                    let title = v.read(cx).title.clone();
-                    Tab::new(SharedString::from(format!("tab-{}", i)), title)
-                        .py_2()
-                        .selected(i == self.active)
-                        .on_click(cx.listener(move |v, _e, cx| v.set_active(i, cx)))
-                }))
-            )
+            .child(tab_bar)
     }
 
     fn render_active_view(&mut self, _cx: &mut ViewContext<Self>) -> impl IntoElement {
