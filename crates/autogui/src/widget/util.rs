@@ -1,4 +1,5 @@
 use crate::style::theme::ActiveTheme;
+use crate::widget::icon::{Icon, SysIcon};
 use gpui::*;
 
 pub fn card(title: impl IntoElement, cx: &WindowContext) -> Div {
@@ -47,3 +48,6 @@ pub fn field(label: &str, input: impl IntoElement) -> Div {
         .child(div().flex().flex_row().w_full().max_w(px(200.)).child(input))
 }
 
+pub fn bool_icon(value: bool) -> Icon {
+    if value { SysIcon::Check.icon() } else { SysIcon::X.icon().opacity(0.5) }
+}

@@ -29,6 +29,11 @@ impl Icon {
         self
     }
 
+    pub fn opacity(mut self, opacity: f32) -> Self {
+        self.base = self.base.opacity(opacity);
+        self
+    }
+
     pub fn transform(mut self, transformation: gpui::Transformation) -> Self {
         self.base = self.base.with_transformation(transformation);
         self
@@ -55,6 +60,7 @@ pub enum SysIcon {
     Moon,
     Reload,
     Sun,
+    X,
 }
 
 impl SysIcon {
@@ -69,6 +75,7 @@ impl From<SysIcon> for Icon {
             SysIcon::ArrowDown => Icon::new("icons/arrow_down.svg".into()),
             SysIcon::ArrowUp => Icon::new("icons/arrow_up.svg".into()),
             SysIcon::Check => Icon::new("icons/check.svg".into()),
+            SysIcon::X => Icon::new("icons/x.svg".into()),
             SysIcon::Download => Icon::new("icons/download.svg".into()),
             SysIcon::Inbox => Icon::new("icons/inbox.svg".into()),
             SysIcon::Loader => Icon::new("icons/loader.svg".into()),

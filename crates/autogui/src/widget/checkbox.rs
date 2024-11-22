@@ -6,17 +6,23 @@ use crate::style::theme::ActiveTheme;
 #[derive(IntoElement)]
 pub struct Checkbox {
     checked: bool,
+    disabled: bool,
     id: ElementId,
     on_click: Option<Box<dyn Fn(&bool, &mut WindowContext) + 'static>>,
 }
 
 impl Checkbox {
     pub fn new(id: impl Into<ElementId>) -> Self {
-        Self { checked: true, id: id.into(), on_click: None }
+        Self { checked: true, disabled: false, id: id.into(), on_click: None }
     }
 
     pub fn checked(mut self, checked: bool) -> Self {
         self.checked = checked;
+        self
+    }
+
+    pub fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
         self
     }
 
@@ -36,6 +42,8 @@ impl Checkbox {
 impl RenderOnce for Checkbox {
     fn render(self, cx: &mut WindowContext) -> impl IntoElement {
         let theme = cx.active_theme();
+        let color = if self.disabled { theme.primary.opacity(0.5) } else { theme.primary };
+        let icon_color = if self.disabled { theme.primary_foreground.opacity(0.5) } else { theme.primary_foreground };
 
         div()
             .id(self.id)
@@ -50,13 +58,13 @@ impl RenderOnce for Checkbox {
                     .flex_col()
                     .relative()
                     .border_1()
-                    .border_color(theme.primary)
+                    .border_color(color)
                     .rounded_sm()
                     .size_4()
                     .flex_shrink_0()
                     .map(|this| match self.checked {
                         false => this.bg(theme.transparent),
-                        _ => this.bg(theme.primary)
+                        _ => this.bg(color)
                     })
                     .child(
                         svg()
@@ -64,15 +72,19 @@ impl RenderOnce for Checkbox {
                             .top_px()
                             .left_px()
                             .size_3()
-                            .text_color(theme.primary_foreground)
+                            .text_color(icon_color)
                             .map(|this| match self.checked {
                                 true => this.path("icons/check.svg"),
                                 _ => this,
                             })
                     )
            )
+           .when(self.disabled, |this| {
+                this.cursor_not_allowed()
+                    .text_color(theme.muted_foreground)
+           })
            .when_some(
-            self.on_click,
+            self.on_click.filter(|_| !self.disabled),
             |this, onclick| {
                 this.on_click(move |_ev, cx| {
                     let checked = !self.checked;

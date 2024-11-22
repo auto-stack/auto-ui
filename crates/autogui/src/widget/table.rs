@@ -7,6 +7,7 @@ use crate::widget::dropdown::{Dropdown, DropdownEvent};
 use crate::widget::input::{TextInput, InputEvent};
 use crate::widget::scroll::{ScrollbarState, Scrollbar};
 use crate::style::theme::ActiveTheme;
+use crate::widget::util::bool_icon;
 use autoval::{Value, Obj};
 use std::rc::Rc;
 use std::cell::Cell;
@@ -29,10 +30,23 @@ pub enum Align {
 pub enum ShowAs {
     Hex,
     Text,
-    Checkbox,
+    Checkbox(CheckboxConfig),
+    Bool,
     Dropdown,
     Input,
 }
+
+#[derive(Debug, Clone)]
+pub struct CheckboxConfig {
+    pub disabled: bool,
+}
+
+impl Default for CheckboxConfig {
+    fn default() -> Self {
+        Self { disabled: false }
+    }
+}
+
 
 #[derive(Debug, Clone)]
 pub struct ColConfig {
@@ -67,14 +81,34 @@ impl Into<WidthMode> for Value {
     }
 }
 
-// TODO: add Value::Enum
-impl Into<ShowAs> for String {
-    fn into(self) -> ShowAs {
-        match self.as_str() {
+impl From<String> for ShowAs {
+    fn from(s: String) -> Self {
+        match s.as_str() {
             "Hex" => ShowAs::Hex,
-            "Checkbox" => ShowAs::Checkbox,
+            "Checkbox" => ShowAs::Checkbox(CheckboxConfig::default()),
             "Dropdown" => ShowAs::Dropdown,
             "Input" => ShowAs::Input,
+            "Bool" => ShowAs::Bool,
+            _ => ShowAs::Text,
+        }
+    }
+}   
+
+// TODO: add Value::Enum
+impl From<Value> for ShowAs {
+    fn from(v: Value) -> Self {
+        match v {
+            Value::Str(s) => s.into(),
+            Value::Obj(obj) => {
+                let kind = obj.get_str_or("kind", "Text");
+                match kind.as_str() {
+                    "Checkbox" => {
+                        let disabled = obj.get_bool_or("disabled", false);
+                        ShowAs::Checkbox(CheckboxConfig { disabled })
+                    }
+                    _ => kind.into(),
+                }
+            }
             _ => ShowAs::Text,
         }
     }
@@ -404,7 +438,7 @@ impl Table {
                                 Align::End => div.justify_end(),
                             };
                             let cell = &self.data[rowid].cells[colid];
-                            match config.showas {
+                            match &config.showas {
                                 ShowAs::Text => div.child(cell.to_string()),
                                 ShowAs::Hex => {
                                     match cell {
@@ -413,8 +447,10 @@ impl Table {
                                         _ => div.child(cell.to_string()),
                                     }
                                 }
-                                ShowAs::Checkbox => {
-                                    div.child(Checkbox::new("cb").checked(cell.to_bool())
+                                ShowAs::Checkbox(config) => {
+                                    div.child(Checkbox::new("cb")
+                                        .disabled(config.disabled)
+                                        .checked(cell.to_bool())
                                         .on_click_mut(cx, move |this, b, cx| {
                                             println!("check box clicked, {}", *b);
                                             // let old = Value::Bool(!*b);
@@ -436,9 +472,10 @@ impl Table {
                                     let cell_views = &self.row_views.get(rowid).unwrap().cell_views;
                                     let cell_view = cell_views.iter().find(|cv| cv.colid == colid).unwrap();
                                     div.child(cell_view.view.clone())
-                                }
-                                
-                                ,
+                                },
+                                ShowAs::Bool => {
+                                    div.child(bool_icon(cell.to_bool()))
+                                },
                             }
                         })
 
