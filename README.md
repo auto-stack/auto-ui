@@ -26,6 +26,10 @@ autogui的设计和实现参考了[GPUI-Component组件库](https://github.com/l
 
 ![Login Dark](https://foruda.gitee.com/images/1730020232074825410/43d51b5c_142056.png "Login Dark")
 
+### 复杂表格
+
+![Tables](https://foruda.gitee.com/images/1732259086740205518/b291e9f9_142056.png "Tables")
+
 ## 参考
 
 - [GPUI](https://gpui.rs)
