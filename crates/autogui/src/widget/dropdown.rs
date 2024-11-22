@@ -6,20 +6,28 @@ use crate::widget::icon::{SysIcon, Icon};
 use gpui::prelude::FluentBuilder;
 use gpui::*;
 
+pub enum DropdownEvent {
+    Selected(usize),
+}
+
+
 pub struct Dropdown {
     id: ElementId,
     focus_handle: FocusHandle,
     list: View<List>,
     bounds: Bounds<Pixels>,
+    on_selected: Option<Box<dyn Fn(&usize, &mut WindowContext)>>,
     is_open: bool,
 }
+
+impl EventEmitter<DropdownEvent> for Dropdown {}
 
 actions!(dropdown, [Up, Down, Enter, Escape]);
 
 impl Dropdown {
     pub fn new(id: impl Into<ElementId>, items: Vec<SharedString>, selected: Option<usize>, cx: &mut ViewContext<Self>) -> Self {
         let focus_handle = cx.focus_handle();
-        let list = cx.new_view(|cx| List::new(cx, items).select(selected.unwrap_or(0))); 
+        let list = cx.new_view(|cx| List::new(cx, items).select(selected)); 
 
         cx.subscribe(&list, Self::on_list_event).detach();
         
@@ -31,7 +39,13 @@ impl Dropdown {
             list,
             bounds: Bounds::default(),
             is_open: false,
+            on_selected: None,
         }
+    }
+
+    pub fn on_selected(mut self, on_selected: impl Fn(&usize, &mut WindowContext) + 'static) -> Self {
+        self.on_selected = Some(Box::new(on_selected));
+        self
     }
 
     pub fn toggle(&mut self, _ev: &ClickEvent, _cx: &mut ViewContext<Self>) {
@@ -54,7 +68,11 @@ impl Dropdown {
     fn on_list_event(&mut self, _list: View<List>, ev: &ListEvent, cx: &mut ViewContext<Self>) {
         match ev {
             ListEvent::Selected(i) => {
-                self.list.update(cx, |list, _cx| list.update_selected(*i));
+                // self.list.update(cx, |list, _cx| list.update_selected(*i));
+                if let Some(on_selected) = &self.on_selected {
+                    on_selected(i, cx);
+                }
+                cx.emit(DropdownEvent::Selected(*i));
                 self.is_open = false;
                 cx.notify();
             }

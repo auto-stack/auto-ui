@@ -32,8 +32,8 @@ impl List {
         }
     }
 
-    pub fn select(mut self, index: usize) -> Self {
-        self.selected = Some(index);
+    pub fn select(mut self, index: Option<usize>) -> Self {
+        self.selected = index;
         self
     }
 

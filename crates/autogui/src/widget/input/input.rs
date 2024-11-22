@@ -1129,7 +1129,7 @@ impl Render for TextInput {
                 })
                 .border_color(theme.input)
                 .border_1()
-                .rounded(px(theme.radius))
+                // .rounded(px(theme.radius))
                 .when(theme.shadow, |this| this.shadow_sm())
                 .when(focused, |this| this.border_color(theme.ring))
                 .when(prefix.is_none(), |this| this.pl_for(self.size))

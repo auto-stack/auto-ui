@@ -3,8 +3,8 @@ use gpui::prelude::FluentBuilder;
 use crate::app::{GlobalDataStoreSave, GlobalDatastore};
 use crate::widget::util::*;
 use crate::widget::checkbox::Checkbox;
-use crate::widget::dropdown::Dropdown;
-use crate::widget::input::TextInput;
+use crate::widget::dropdown::{Dropdown, DropdownEvent};
+use crate::widget::input::{TextInput, InputEvent};
 use crate::widget::scroll::{ScrollbarState, Scrollbar};
 use crate::style::theme::ActiveTheme;
 use autoval::{Value, Obj};
@@ -85,6 +85,18 @@ pub struct Row {
     pub cells: Vec<Value>,
 }
 
+#[derive(Debug, Clone)]
+pub struct RowView {
+    pub rowid: usize,
+    pub cell_views: Vec<CellView>
+}
+
+#[derive(Debug, Clone)]
+pub struct CellView {
+    pub colid: usize,
+    pub view: AnyView
+}
+
 pub struct TableUpdate {
     pub row: usize,
     pub col: usize,
@@ -109,6 +121,7 @@ pub struct Table {
     row_height: f32,
     config: Vec<ColConfig>,
     data: Vec<Row>,
+    row_views: Vec<RowView>,
     update_history: Vec<TableUpdate>,
 }
 
@@ -125,6 +138,10 @@ impl Table {
                 g.set_new(table_id.clone(), data);
             });
         }).detach();
+        let row_views = Self::identify_row_views(cx, &col_config, &data);
+        if data.len() > 0 {
+            println!("first row data: {:?}", data[0].cells);
+        }
         Self {
             id, 
             bounds: Bounds::default(),
@@ -133,10 +150,79 @@ impl Table {
             scroll_state: Rc::new(Cell::new(ScrollbarState::new())),
             num_rows: num_rows, 
             num_cols: num_cols, 
-            row_height: 50.0, 
+            row_height: 42.0, 
             config: col_config, 
             data, 
+            row_views,
             update_history: vec![] 
+        }
+    }
+
+    pub fn identify_row_views(cx: &mut ViewContext<Self>, col_config: &Vec<ColConfig>, data: &Vec<Row>) -> Vec<RowView> {
+        let mut row_views = Vec::new();
+        for (rowid, row) in data.iter().enumerate() {
+            let mut cell_views = Vec::new();
+            for (colid, col) in col_config.iter().enumerate() {
+                let showas = &col.showas;
+                match showas {
+                    ShowAs::Dropdown => {
+                        let options = col.options.iter().map(|s| s.into()).collect::<Vec<SharedString>>();
+                        let selected = row.cells[colid].clone().as_uint() as usize;
+                        let view = cx.new_view(|cx| {
+                            Dropdown::new("dropdown", options, Some(selected), cx)
+                        });
+                        // &view.read(cx).on_selected(cx.listener(move |t, e, _cx| {
+                        //     t.update_cell(rowid, colid, Value::Uint(*e as u32));
+                        // }));
+                        let r = rowid.clone();
+                        let c = colid.clone();
+                        cx.subscribe(&view, move |t, _v, e, _cx| {
+                            let DropdownEvent::Selected(i) = e;
+                            t.update_cell(r, c, Value::Uint(*i as u32));
+                        }).detach();
+                        cell_views.push(CellView { colid, 
+                            view: view.into()
+                        });
+                    }
+                    ShowAs::Input => {
+                        let cell = &row.cells[colid];
+                        let view = cx.new_view(|cx| {
+                            let mut input = TextInput::new(cx);
+                            input.set_text(cell.to_string(), cx);
+                            input
+                        });
+                        let r = rowid.clone();
+                        let c = colid.clone();
+                        cx.subscribe(&view, move |t, _v, e, _cx| {
+                            match e {
+                                InputEvent::Change(s) => t.update_cell(r, c, Value::Str(s.clone().to_string())),
+                                _ => (),
+                            }
+                        }).detach();
+
+                        cell_views.push(CellView { colid, 
+                            view: view.into()
+                        });
+                    }
+                    _ => (),
+                }
+            }
+            if cell_views.len() > 0 {
+                row_views.push(RowView { rowid, cell_views });
+            }
+        }
+        row_views
+    }
+
+    pub fn update_cell(&mut self, rowid: usize, colid: usize, new: Value) {
+        self.data[rowid].cells[colid] = new;
+    }
+
+    pub fn on_dropdown_event(&mut self, _dd: View<Dropdown>, ev: &DropdownEvent, _cx: &mut ViewContext<Self>) {
+        match ev {
+            DropdownEvent::Selected(i) => {
+                println!("table: dropdown selected: {}", i);
+            }
         }
     }
 
@@ -191,22 +277,27 @@ impl Render for Table {
                 .id("table")
                 .track_focus(&self.focus_handle)
                 .overflow_hidden()
+                .size_full()
                 .child(self.render_header(cx))
-                .child(uniform_list(
-                    view,
-                    "table_rows",
-                    self.num_rows,
-                    {
-                        move |table, range, cx| {
-                            range.map(|idx| {
-                                table.render_row(idx, table.num_rows, table.num_cols, cx)
-                            })
-                        }.collect::<Vec<_>>()
-                    }
+                .child(row().id("table_body").size_full().child(
+                    uniform_list(
+                        view,
+                        "table_rows",
+                        self.num_rows,
+                        {
+                            move |table, range, cx| {
+                                range.map(|idx| {
+                                    table.render_row(idx, table.num_rows, table.num_cols, cx)
+                                })
+                            }.collect::<Vec<_>>()
+                        }
+                    )
+                    .flex_grow()
+                    .size_full()
+                    .with_sizing_behavior(ListSizingBehavior::Infer)
+                    .track_scroll(v_scroll)
+                    .into_any_element())
                 )
-                .flex_grow()
-                .with_sizing_behavior(ListSizingBehavior::Infer)
-                .into_any_element())
             )
             .child(canvas(
                 move |bounds, cx| view1.update(cx, |r, _| r.bounds = bounds),
@@ -220,6 +311,7 @@ impl Render for Table {
 impl Table {
     fn render_scrollbar(&mut self, cx: &mut ViewContext<Self>) -> Option<impl IntoElement> {
         let state = self.scroll_state.clone();
+        let theme = cx.active_theme();
 
         Some(
             div()
@@ -237,7 +329,6 @@ impl Table {
     }
 
     fn render_header(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
-        let view = cx.view().clone();
         let theme = cx.active_theme();
         let num_cols = self.num_cols;
         div()
@@ -245,6 +336,7 @@ impl Table {
             .h(px(self.row_height))
             .border_b_1()
             .border_color(theme.border)
+            .bg(theme.table_head)
             .hover(|this| this.bg(theme.table_hover))
             .child(
                 row().h_full().px_5().overflow_hidden().justify_start().items_center()
@@ -284,8 +376,9 @@ impl Table {
             .w_full()
             .justify_start()
             .h(px(self.row_height))
-            .when(rowid < num_rows - 1, |this| this.border_b_1().border_color(theme.border))
-            .when(is_even, |e| e.bg(theme.table_even))
+            // .when(rowid < num_rows - 1, |this| this.border_b_1().border_color(theme.border))
+            .border_b_1().border_color(theme.border)
+            .when(!is_even, |e| e.bg(theme.table_even))
             .hover(|this| this.bg(theme.table_hover))
             .child(
                 row().h_full().px_5().overflow_hidden().justify_start().items_center()
@@ -334,14 +427,18 @@ impl Table {
                                     )
                                 },
                                 ShowAs::Dropdown => {
-                                    let options = config.options.iter().map(|s| s.into()).collect::<Vec<SharedString>>();
-                                    div.child(cx.new_view(|cx| Dropdown::new("dropdown", options, Some(0), cx)))
+                                    // find the cell view
+                                    let cell_views = &self.row_views.get(rowid).unwrap().cell_views;
+                                    let cell_view = cell_views.iter().find(|cv| cv.colid == colid).unwrap();
+                                    div.child(cell_view.view.clone())
                                 },
-                                ShowAs::Input => div.child(cx.new_view(|cx| {
-                                    let mut input = TextInput::new(cx);
-                                    input.set_text(cell.to_string(), cx);
-                                    input
-                                })),
+                                ShowAs::Input =>  {
+                                    let cell_views = &self.row_views.get(rowid).unwrap().cell_views;
+                                    let cell_view = cell_views.iter().find(|cv| cv.colid == colid).unwrap();
+                                    div.child(cell_view.view.clone())
+                                }
+                                
+                                ,
                             }
                         })
 

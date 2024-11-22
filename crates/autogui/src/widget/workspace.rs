@@ -18,6 +18,8 @@ pub struct Workspace {
 
 impl EventEmitter<ReloadEvent> for Workspace {}
 
+const STATUS_BAR_HEIGHT: f32 = 25.0;
+
 impl Workspace {
     pub fn new(cx: &mut ViewContext<Self>) -> Self {
 
@@ -77,6 +79,8 @@ impl Render for Workspace {
         //     }
         // };
         let status_color = theme.background;
+        let window_height = cx.window_bounds().get_bounds().size.height;
+        let workarea_height = (window_height - px(TOOLBAR_HEIGHT) - px(STATUS_BAR_HEIGHT)).round();
         div()
             .flex()
             .flex_col()
@@ -90,6 +94,7 @@ impl Render for Workspace {
                     .flex_grow()
                     .flex()
                     .flex_row()
+                    .h(workarea_height)
                     .w_full()
                     .border_0()
                     // Left Pane
@@ -127,10 +132,11 @@ impl Render for Workspace {
                         }
                     }),
             )
+            // Status Bar
             .child(
                 div()
                     .w_full()
-                    .h(px(25.0))
+                    .h(px(STATUS_BAR_HEIGHT))
                     .border_t_1()
                     .border_color(theme.border)
                     .bg(status_color)

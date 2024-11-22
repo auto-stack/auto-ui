@@ -48,6 +48,7 @@ impl RootView {
                 width: WidthMode::Pixels(100.),
                 align: Align::Start,
                 showas: ShowAs::Hex,
+                options: vec![],
             },
             ColConfig{
                 idx: 1,
@@ -56,6 +57,7 @@ impl RootView {
                 width: WidthMode::Pixels(250.),
                 align: Align::Start,
                 showas: ShowAs::Text,
+                options: vec![],
             },
             ColConfig {
                 idx: 2,
@@ -64,6 +66,7 @@ impl RootView {
                 width: WidthMode::Pixels(80.),
                 align: Align::Start,
                 showas: ShowAs::Checkbox,
+                options: vec![],
             },
             ColConfig{
                 idx: 3,
@@ -72,6 +75,7 @@ impl RootView {
                 width: WidthMode::Stretch,
                 align: Align::Start,
                 showas: ShowAs::Text,
+                options: vec![],
             },
         ];
 

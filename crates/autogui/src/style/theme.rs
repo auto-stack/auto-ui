@@ -174,7 +174,7 @@ impl From<Colors> for Theme {
             list_head: colors.list_head,
             list_active: colors.list_active,
             list_hover: colors.list_active.opacity(0.6),
-            table_head: colors.list_head,
+            table_head: colors.list_active.opacity(0.6),
             table: colors.list,
             table_even: colors.list_even,
             table_active: colors.list_active,

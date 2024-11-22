@@ -168,7 +168,7 @@ impl Colors {
             border: hsl(240.0, 5.9, 90.0),
             input: hsl(240.0, 5.9, 90.0),
             ring: hsl(240.0, 5.9, 65.0),
-            selection: hsl(211.0, 97.0, 85.0),
+            selection: hsl(211.0, 97.0, 85.0).opacity(0.25),
             scrollbar: hsl(0., 0., 97.).opacity(0.7),
             scrollbar_thumb: hsl(0., 0., 69.),
             panel: hsl(0.0, 0.0, 100.0),

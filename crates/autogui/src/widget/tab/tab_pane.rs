@@ -61,6 +61,9 @@ impl TabPane {
 
     fn render_active_view(&mut self, _cx: &mut ViewContext<Self>) -> impl IntoElement {
         div()
+            // .max_h(px(700.0))
+            .w_full()
+            .h(DefiniteLength::Fraction(0.9))
             .id("tab-view")
             .group("")
             .overflow_y_scroll()

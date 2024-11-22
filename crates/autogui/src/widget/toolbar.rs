@@ -52,6 +52,8 @@ pub struct Toolbar {
 
 }
 
+pub const TOOLBAR_HEIGHT: f32 = 40.0;
+
 impl Render for Toolbar {
 
 
@@ -62,7 +64,7 @@ impl Render for Toolbar {
             .flex_row()
             .id("toolbar")
             .w_full()
-            .h(px(40.0))
+            .h(px(TOOLBAR_HEIGHT))
             .pl_2()
             .border_b_1()
             .border_color(theme.border)
