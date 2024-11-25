@@ -2,6 +2,7 @@ use crate::dyna::app::GlobalSpecState;
 use gpui::UpdateGlobal;
 use crate::spec::WidgetSpec;
 use autogui::app::Viewable;
+use autogui::app::GlobalDataStoreCollectAction;
 use autogui::widget::button::Button;
 use autogui::widget::tab::{TabPane, TabView};
 use autogui::widget::dropdown::Dropdown;
@@ -282,6 +283,16 @@ fn add_button(mut div: Div, node: &Node, _spec: &mut WidgetSpec, cx: &mut ViewCo
                             if let Expr::Lambda(lambda) = *v {
                                 button = button.on_click_mut(cx, move |this, _ev, cx| {
                                     this.spec.as_mut().unwrap().run_lambda(&lambda);
+                                    cx.notify();
+                                });
+                            }
+                        } else if text == "action" {
+                            let v = pair.value.clone();
+                            if let Expr::Str(action) = *v {
+                                button = button.on_click_mut(cx, move |this, _ev, cx| {
+                                    if action == "collect" {
+                                        GlobalDataStoreCollectAction::update_global(cx, |ds, _cx| {});
+                                    }
                                     cx.notify();
                                 });
                             }

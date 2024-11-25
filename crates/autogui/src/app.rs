@@ -17,12 +17,12 @@ pub struct ReloadState {
 
 impl Global for ReloadState {}
 
-pub struct GlobalDatastore {
+pub struct GlobalDataStore {
     pub old: HashMap<String, Value>,
     pub new: HashMap<String, Value>,
 }
 
-impl GlobalDatastore {
+impl GlobalDataStore {
     pub fn new() -> Self {
         Self { old: HashMap::new(), new: HashMap::new() }
     }
@@ -36,10 +36,10 @@ impl GlobalDatastore {
     }
 }
 
-impl Global for GlobalDatastore {}
+impl Global for GlobalDataStore {}
 
-pub struct GlobalDataStoreSave {}
-impl Global for GlobalDataStoreSave {}
+pub struct GlobalDataStoreCollectAction {}
+impl Global for GlobalDataStoreCollectAction {}
 
 
 pub struct SimpleApp {

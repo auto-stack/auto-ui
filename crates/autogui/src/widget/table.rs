@@ -1,6 +1,6 @@
 use gpui::*;
 use gpui::prelude::FluentBuilder;
-use crate::app::{GlobalDataStoreSave, GlobalDatastore};
+use crate::app::{GlobalDataStoreCollectAction, GlobalDataStore};
 use crate::widget::util::*;
 use crate::widget::checkbox::Checkbox;
 use crate::widget::dropdown::{Dropdown, DropdownEvent};
@@ -174,11 +174,10 @@ impl Table {
         let num_cols = col_config.len();
         let num_rows = data.len();
         let table_id = id.clone();
-        cx.observe_global::<GlobalDataStoreSave>(move |this, cx| {
+        cx.observe_global::<GlobalDataStoreCollectAction>(move |this, cx| {
             let data = this.collect_data();
-            println!("table data: {}", data);
             let table_id = table_id.clone();
-            GlobalDatastore::update_global(cx, move |g, cx| {
+            GlobalDataStore::update_global(cx, move |g, cx| {
                 g.set_new(table_id.clone(), data);
             });
         }).detach();

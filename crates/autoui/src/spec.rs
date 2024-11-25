@@ -15,28 +15,30 @@ use std::default::Default;
 pub struct Spec {
     path: String,
     source: String,
-    interpreter: Interpreter,
+    interpreter: Rc<RefCell<Interpreter>>,
+    scope: Rc<RefCell<Universe>>,
 }
 
 impl Default for Spec {
     fn default() -> Self {
-        Self::new(Interpreter::new())
+        Self::new(Rc::new(RefCell::new(Interpreter::new())))
     }
 }
 
 impl Spec {
-    pub fn new(interpreter: Interpreter) -> Self {
-        Self { path: String::new(), source: String::new(), interpreter }
+    pub fn new(interpreter: Rc<RefCell<Interpreter>>) -> Self {
+        let scope = interpreter.as_ref().borrow().scope.clone();
+        Self { path: String::new(), source: String::new(), interpreter, scope }
     }
 
-    pub fn from_file(path: &str, interpreter: Interpreter) -> Self {
+    pub fn from_file(path: &str, interpreter: Rc<RefCell<Interpreter>>) -> Self {
         let mut spec = Self::new(interpreter);
         spec.read_file(path);
         spec
     }
 
     pub fn read_str(&mut self, source: &str) {
-        match self.interpreter.interpret(source) {
+        match self.interpreter.borrow_mut().interpret(source) {
             Ok(_) => {
                 self.source = source.to_string();
             }
@@ -61,15 +63,15 @@ impl Spec {
     }
 
     pub fn scope_shared(&self) -> Rc<RefCell<Universe>> {
-        self.interpreter.scope.clone()
+        self.interpreter.as_ref().borrow().scope.clone()
     }
 
     fn scope(&self) -> Ref<Universe> {
-        self.interpreter.scope.as_ref().borrow()
+        self.scope.as_ref().borrow()
     }
 
     fn scope_mut(&mut self) -> RefMut<Universe> {
-        self.interpreter.scope.as_ref().borrow_mut()
+        self.scope.as_ref().borrow_mut()
     }
 
     pub fn set_state(&self, state: &mut State) {
@@ -126,7 +128,7 @@ impl Spec {
     }
 
     pub fn get_app_node(&self) -> Option<Node> {
-        let result = self.interpreter.result.clone();
+        let result = self.interpreter.as_ref().borrow().result.clone();
         match result {
             Value::Node(node) => Some(node),
             _ => None,
@@ -137,27 +139,23 @@ impl Spec {
         self.scope().widget.clone()
     }
 
-    pub fn evaler(&mut self) -> &mut Evaler {
-        &mut self.interpreter.evaler
-    }
-
     pub fn eval_value(&mut self, value: &Value) -> Value {
         match value {
-            Value::Str(s) => self.evaler().eval_expr(&Expr::Str(s.clone())),
+            Value::Str(s) => self.interpreter.as_ref().borrow_mut().evaler.eval_expr(&Expr::Str(s.clone())),
             _ => value.clone(),
         }
     }
 
     pub fn eval_ident(&mut self, ident: &Expr) -> Value {
-        self.evaler().eval_expr(ident)
+        self.interpreter.as_ref().borrow_mut().evaler.eval_expr(ident)
     }
 
     pub fn eval_expr(&mut self, expr: &Expr) -> Value {
-        self.evaler().eval_expr(expr)
+        self.interpreter.as_ref().borrow_mut().evaler.eval_expr(expr)
     }
 
     pub fn run_lambda(&mut self, lambda: &Fn) -> Value {
-        self.evaler().eval_fn_call(lambda, &Args::new());
+        self.interpreter.as_ref().borrow_mut().evaler.eval_fn_call(lambda, &Args::new());
         let count = self.scope().lookup_val("count").unwrap_or(Value::Nil);
         println!("new count: {}", count);
         count
@@ -260,9 +258,7 @@ impl WidgetSpec {
     pub fn run_lambda(&mut self, lambda: &Fn) -> Value {
         let uni = self.scope.clone();
         let mut evaler = Evaler::new(uni);
-        evaler.eval_fn_call(lambda, &Args::new());
-        let count = self.scope.borrow().lookup_val("count").unwrap_or(Value::Nil);
-        count
+        evaler.eval_fn_call(lambda, &Args::new())
     }
 
     pub fn eval_stmt(&mut self, stmt: &ast::Stmt) -> Value {

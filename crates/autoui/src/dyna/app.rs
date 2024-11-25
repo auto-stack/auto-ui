@@ -2,7 +2,7 @@ use gpui::*;
 use autoval::{Value, Node, Widget, Model};
 use autogui::assets::Assets;
 use autogui::style::theme::{init_theme, ActiveTheme};
-use autogui::app::{GlobalDataStoreSave, Viewable, GlobalState, ReloadState, GlobalDatastore};
+use autogui::app::{GlobalDataStoreCollectAction, Viewable, GlobalState, ReloadState, GlobalDataStore};
 use autogui::widget::workspace::Workspace;
 use autogui::widget::pane::PaneSide;
 use autogui::widget::pane::Pane;
@@ -66,7 +66,7 @@ pub struct GlobalSpecState {
 impl Global for GlobalSpecState {}
 
 impl GlobalSpecState {
-    pub fn new(path: &str, interpreter: Interpreter) -> Self {
+    pub fn new(path: &str, interpreter: Rc<RefCell<Interpreter>>) -> Self {
         let spec = Spec::from_file(path, interpreter);
         let widget_specs = Self::parse_sides(&spec, path);
         Self {
@@ -136,7 +136,7 @@ impl GlobalSpecState {
 pub struct DynaApp {
     app: App,
     path: String,
-    interpreter: Interpreter,
+    interpreter: Rc<RefCell<Interpreter>>,
 }
 
 
@@ -145,11 +145,11 @@ impl DynaApp {
         Self {
             app: App::new().with_assets(Assets),
             path: path.to_string(),
-            interpreter: Interpreter::new(),
+            interpreter: Rc::new(RefCell::new(Interpreter::new())),
         }
     }
 
-    pub fn new_with_interpreter(path: &str, interpreter: Interpreter) -> Self {
+    pub fn new_with_interpreter(path: &str, interpreter: Rc<RefCell<Interpreter>>) -> Self {
         Self {
             app: App::new().with_assets(Assets),
             path: path.to_string(),
@@ -157,7 +157,7 @@ impl DynaApp {
         }
     }
 
-    pub fn run(self) {
+    pub fn run(self, after_init: impl FnOnce(&mut AppContext) + 'static) {
         self.app.run(move |cx| {
             init_theme(cx);
 
@@ -167,10 +167,10 @@ impl DynaApp {
             let reload = ReloadState { };
             cx.set_global(reload);
 
-            let global_datastore = GlobalDatastore::new();
+            let global_datastore = GlobalDataStore::new();
             cx.set_global(global_datastore);
 
-            let global_datastore_save = GlobalDataStoreSave {};
+            let global_datastore_save = GlobalDataStoreCollectAction {};
             cx.set_global(global_datastore_save);
 
             cx.observe_global::<GlobalState>(|g| {
@@ -180,10 +180,6 @@ impl DynaApp {
             cx.observe_global::<ReloadState>(|cx| {
                 println!("reload changed: {:?}", ReloadState::global(cx));
                 cx.refresh();
-            }).detach();
-
-            cx.observe_global::<GlobalDataStoreSave>(|cx| {
-                println!("global datastore save changed");
             }).detach();
 
             let title_options = TitlebarOptions {
@@ -217,7 +213,7 @@ impl DynaApp {
             }).detach();
 
             cx.open_window(window_options, |cx| cx.new_view(|cx: &mut ViewContext<RootView>| {
-                let global_spec = GlobalSpecState::new(&self.path, self.interpreter);
+                let global_spec = GlobalSpecState::new(&self.path, self.interpreter.clone());
                 // Prepare workspace
                 let workspace_view = cx.new_view(|cx| {
                     let mut workspace = Workspace::new(cx);
@@ -243,6 +239,8 @@ impl DynaApp {
                 RootView::new(cx, workspace_view)
             }))
             .unwrap();
+
+            after_init(cx);
 
         });
     }

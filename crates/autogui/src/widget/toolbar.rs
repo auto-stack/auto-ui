@@ -8,7 +8,7 @@ use crate::widget::button::ButtonStyles;
 use crate::event::ReloadEvent;
 
 use gpui::UpdateGlobal;
-use crate::app::{GlobalDataStoreSave, GlobalState, ReloadState};
+use crate::app::{GlobalDataStoreCollectAction, GlobalState, ReloadState};
 
 #[derive(IntoElement)]
 pub struct WindowControlIcon {
@@ -112,7 +112,7 @@ impl Render for Toolbar {
                     .on_click(cx.listener(move |_this, _ev, cx| {
                         println!("Download Clicked! Event");
 
-                        GlobalDataStoreSave::update_global(cx, |a, b| {});
+                        GlobalDataStoreCollectAction::update_global(cx, |a, b| {});
 
                         cx.refresh();
                     }))
