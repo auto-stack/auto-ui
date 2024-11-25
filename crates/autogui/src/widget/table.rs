@@ -47,6 +47,16 @@ impl Default for CheckboxConfig {
     }
 }
 
+impl ShowAs {
+    pub fn checkbox() -> Self {
+        ShowAs::Checkbox(CheckboxConfig::default())
+    }
+
+    pub fn disabled_checkbox() -> Self {
+        ShowAs::Checkbox(CheckboxConfig { disabled: true })
+    }
+}
+
 
 #[derive(Debug, Clone)]
 pub struct ColConfig {

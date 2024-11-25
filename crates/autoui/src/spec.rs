@@ -264,4 +264,10 @@ impl WidgetSpec {
         let count = self.scope.borrow().lookup_val("count").unwrap_or(Value::Nil);
         count
     }
+
+    pub fn eval_stmt(&mut self, stmt: &ast::Stmt) -> Value {
+        let uni = self.scope.clone();
+        let mut evaler = Evaler::new(uni);
+        return evaler.eval_stmt(stmt)
+    }
 }

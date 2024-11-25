@@ -192,12 +192,16 @@ impl DynaApp {
                 ..Default::default()
             };
 
+            let window_size = cx.displays().first().unwrap().bounds();
+            println!("window size: {:?}", window_size);
+
             // window options
             let window_options = WindowOptions {
                 titlebar: Some(title_options),
+                window_bounds: Some(WindowBounds::Maximized(window_size)),
                 window_min_size: Some(gpui::Size {
-                    width: px(640.),
-                    height: px(480.),
+                    width: px(1440.),
+                    height: px(900.),
                 }),
                 ..WindowOptions::default()
             };

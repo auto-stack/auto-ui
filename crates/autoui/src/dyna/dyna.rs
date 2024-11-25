@@ -4,6 +4,7 @@ use crate::spec::WidgetSpec;
 use autogui::app::Viewable;
 use autogui::widget::button::Button;
 use autogui::widget::tab::{TabPane, TabView};
+use autogui::widget::dropdown::Dropdown;
 use autogui::widget::dropzone::DropZone;
 use autogui::widget::table::{Align, ColConfig, Row, Table};
 use autogui::widget::util::{col, row};
@@ -134,6 +135,11 @@ impl DynaView {
                 }
                 // div = parse_node(div, &name.text, &node, spec, cx);
             }
+            // Eval body
+            for stmt in view.body.stmts.iter() {
+                let val = self.spec.as_mut().unwrap().eval_stmt(stmt);
+                println!("Value: {}", val);
+            }
         }
         for view in all_views.into_iter() {
             self.kids.push(view);
@@ -218,6 +224,15 @@ fn parse_node(name: &str, node: &Node, spec: &mut WidgetSpec, idx: usize, cx: &m
                 view_id: id,
                 builder: Box::new(add_view_clone),
             })
+        }
+        "dropdown" => {
+            let view = node_view_dropdown(&node, spec, idx, cx);
+            let id = view.id().unwrap();
+            views.push(view);
+            builders.push(ViewBuilder {
+                view_id: id,
+                builder: Box::new(add_view_clone),
+            });
         }
         _ => {
             // try lookup widget in scope
@@ -434,6 +449,31 @@ pub fn node_view_dropzone(node: &Node, spec: &mut WidgetSpec, idx: usize, cx: &m
     .into()
 }
 
+pub fn node_view_dropdown(node: &Node, spec: &mut WidgetSpec, idx: usize, cx: &mut ViewContext<'_, DynaView>) -> AnyView {
+    // get options from props
+    let title = match node.args.get(0) {
+        Some(Expr::Str(title)) => title,
+        _ => "dropdown".into(),
+    };
+    println!("title: {:?}", title);
+    println!("args[1]: {:?}", node.args.get(1));
+    let options = match node.args.get(1) {
+        Some(expr) => {
+            let val = spec.eval_expr(&expr);
+            if let Value::Array(array) = val {
+                array
+            } else {
+                vec![]
+            }
+        }
+        _ => vec![],
+    };
+    println!("options: {:?}", options);
+    let options = options.iter().map(|o| o.to_string().into()).collect::<Vec<SharedString>>();
+    let view = cx.new_view(|cx| Dropdown::new(ElementId::Name(title.into()), options, None, cx));
+    view.into()
+}
+
 pub fn convert_value_to_table_config(value: &Value) -> Vec<ColConfig> {
     match value {
         Value::Array(array) => {
@@ -486,7 +526,7 @@ pub fn convert_value_to_table_data(value: &Value, config: &Vec<ColConfig>) -> Ve
 
 impl Render for DynaView {
     fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
-        let div = if self.compact { row() } else { col().size_full() };
+        let div = if self.compact { row().gap_4() } else { col().size_full() };
 
         if self.builder.is_none() {
             println!("no builder");

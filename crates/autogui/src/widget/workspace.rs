@@ -81,6 +81,10 @@ impl Render for Workspace {
         let status_color = theme.background;
         let window_height = cx.window_bounds().get_bounds().size.height;
         let workarea_height = (window_height - px(TOOLBAR_HEIGHT) - px(STATUS_BAR_HEIGHT)).round();
+        let mut center_height = workarea_height;
+        if let Some(bottom) = self.bottom.as_ref() {
+            center_height -= bottom.read(cx).size.clone();
+        }
         div()
             .flex()
             .flex_col()
@@ -113,7 +117,9 @@ impl Render for Workspace {
                             .items_center()
                             .bg(theme.background.darken(0.03))
                             // Center Content
-                            .child(self.child.as_ref().unwrap().clone())
+                            .child(
+                                div().h(center_height).child(self.child.as_ref().unwrap().clone())
+                            )
                             // Bottom Pane
                             .when(self.bottom.is_some(), |s| {
                                 if let Some(bottom) = self.bottom.as_ref() {
