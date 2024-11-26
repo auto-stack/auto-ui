@@ -178,7 +178,7 @@ impl Table {
             let data = this.collect_data();
             let table_id = table_id.clone();
             GlobalDataStore::update_global(cx, move |g, cx| {
-                g.set_new(table_id.clone(), data);
+                g.table_data.set(table_id, data);
             });
         }).detach();
         let row_views = Self::identify_row_views(cx, &col_config, &data);
@@ -231,7 +231,7 @@ impl Table {
                         let cell = &row.cells[colid];
                         let view = cx.new_view(|cx| {
                             let mut input = TextInput::new(cx);
-                            input.set_text(cell.to_string(), cx);
+                            input.set_text(cell.repr(), cx);
                             input
                         });
                         let r = rowid.clone();
@@ -448,12 +448,12 @@ impl Table {
                             };
                             let cell = &self.data[rowid].cells[colid];
                             match &config.showas {
-                                ShowAs::Text => div.child(cell.to_string()),
+                                ShowAs::Text => div.child(cell.repr()),
                                 ShowAs::Hex => {
                                     match cell {
                                         Value::Int(i) => div.child(format!("0x{:X}", i)),
                                         Value::Uint(u) => div.child(format!("0x{:X}", u)),
-                                        _ => div.child(cell.to_string()),
+                                        _ => div.child(cell.repr()),
                                     }
                                 }
                                 ShowAs::Checkbox(config) => {

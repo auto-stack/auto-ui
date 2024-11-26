@@ -2,7 +2,7 @@ use gpui::*;
 use crate::assets::Assets;
 use crate::style::theme::{init_theme, ActiveTheme};
 use std::collections::HashMap;
-use autoval::Value;
+use autoval::{Value, Obj};
 
 pub struct GlobalState {
     pub count: i32,
@@ -20,11 +20,12 @@ impl Global for ReloadState {}
 pub struct GlobalDataStore {
     pub old: HashMap<String, Value>,
     pub new: HashMap<String, Value>,
+    pub table_data: Obj,
 }
 
 impl GlobalDataStore {
     pub fn new() -> Self {
-        Self { old: HashMap::new(), new: HashMap::new() }
+        Self { old: HashMap::new(), new: HashMap::new(), table_data: Obj::new() }
     }
 
     pub fn set_old(&mut self, id: String, value: Value) {
