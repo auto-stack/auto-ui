@@ -312,7 +312,7 @@ fn add_text(mut div: Div, node: &Node, spec: &mut WidgetSpec, _cx: &mut ViewCont
     println!("text arg: {}", node.args);
     if let Some(str) = text_arg {
         let val = spec.eval_expr(&str);
-        div = div.child(format!("{}", val));
+        div = div.child(format!("{}", val.repr()));
     }
     div
 }
@@ -323,7 +323,7 @@ pub fn add_list(mut div: Div, node: &Node, spec: &mut WidgetSpec, cx: &mut ViewC
         None => Value::Nil,
     };
     if let Value::Array(array) = data {
-        let array = array.iter().map(|v| v.to_string().into()).collect::<Vec<SharedString>>();
+        let array = array.iter().map(|v| v.repr().into()).collect::<Vec<SharedString>>();
         div = div.child(cx.new_view(|cx| List::new(cx, array)));
         div
     } else {

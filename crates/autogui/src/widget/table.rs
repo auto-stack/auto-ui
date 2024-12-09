@@ -210,7 +210,7 @@ impl Table {
                 let showas = &col.showas;
                 match showas {
                     ShowAs::Dropdown => {
-                        let options = col.options.iter().map(|s| s.into()).collect::<Vec<SharedString>>();
+                        let options = col.options.iter().map(|s| s.clone().into()).collect::<Vec<SharedString>>();
                         let selected = row.cells[colid].clone().as_uint() as usize;
                         let view = cx.new_view(|cx| {
                             Dropdown::new("dropdown", options, Some(selected), cx)
