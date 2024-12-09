@@ -20,15 +20,16 @@ struct CenterContent {
 
 impl Render for CenterContent {
     fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
-        let label_width = 100.;
         div()
             .flex()
             .flex_col()
             .items_center()
             .justify_center()
-            .w_3_4()
+            // .w_3_4()
             .p_5()
-            .max_h(px(640.))
+            .h_full()
+            // .h(px(500.0))
+            // .max_h(px(640.))
             .gap_4()
             .child(self.table.clone())
             // .child(Button::primary("History").on_click(cx.listener(|this, ev, cx| {
@@ -73,7 +74,7 @@ impl RootView {
                 idx: 3,
                 id: "desc".into(),
                 title: "Desc".into(),
-                width: WidthMode::Stretch,
+                width: WidthMode::Auto,
                 align: Align::Start,
                 showas: ShowAs::Text,
                 options: vec![],
@@ -90,7 +91,7 @@ impl RootView {
             Row { cells: vec![Value::Int(0x27), Value::Str("SecurityAccess".to_string()), Value::Bool(false), Value::Str("安全访问".to_string())] },
             Row { cells: vec![Value::Int(0x28), Value::Str("CommunicationControl".to_string()), Value::Bool(false), Value::Str("通信控制".to_string())] },
             Row { cells: vec![Value::Int(0x2A), Value::Str("ReadDataByPeriodicIdentifier".to_string()), Value::Bool(true), Value::Str("读取数据（周期标识符）".to_string())] },
-            Row { cells: vec![Value::Int(0x2C), Value::Str("DynamicallyDefineDataIdentifier".to_string()), Value::Bool(false), Value::Str("动态定义数据标识符".to_string())] },
+            Row { cells: vec![Value::Int(0x2C), Value::Str("DynamicallyDefineDataIdentifier".to_string()), Value::Bool(false), Value::Str("动态定义数据标识符动态定义数据标识符".to_string())] },
             Row { cells: vec![Value::Int(0x2E), Value::Str("WriteDataByIdentifier".to_string()), Value::Bool(true), Value::Str("写入数据".to_string())] },
             Row { cells: vec![Value::Int(0x2F), Value::Str("InputOutputControlByIdentifier".to_string()), Value::Bool(false), Value::Str("输入输出控制".to_string())] },
             Row { cells: vec![Value::Int(0x31), Value::Str("RoutineControl".to_string()), Value::Bool(true), Value::Str("例程控制".to_string())] },

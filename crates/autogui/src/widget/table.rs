@@ -16,7 +16,7 @@ use std::cell::Cell;
 pub enum WidthMode {
     Pixels(f32),
     Percent(f32),
-    Stretch,
+    Auto,
 }
 
 #[derive(Debug, Clone)]
@@ -80,8 +80,9 @@ impl Into<WidthMode> for Value {
         match self {
             Value::Float(f) => WidthMode::Pixels(f as f32),
             Value::Str(s) => {
-                if s == "stretch" {
-                    WidthMode::Stretch
+                println!("width mode: {}", s);
+                if s == "Auto" || s == "auto" {
+                    WidthMode::Auto
                 } else {
                     WidthMode::default()
                 }
@@ -397,7 +398,9 @@ impl Table {
                             div = match config.width {
                                 WidthMode::Pixels(w) => div.w(px(w)),
                                 WidthMode::Percent(p) => div.w(DefiniteLength::Fraction(p)),
-                                WidthMode::Stretch => div.flex_grow(),
+                                WidthMode::Auto => {
+                                    div.flex_grow()
+                                }
                             };
                             div = match config.align {
                                 Align::Start => div.justify_start(),
@@ -439,7 +442,7 @@ impl Table {
                             div = match config.width {
                                 WidthMode::Pixels(w) => div.w(px(w)),
                                 WidthMode::Percent(p) => div.w(DefiniteLength::Fraction(p)),
-                                WidthMode::Stretch => div.flex_grow(),
+                                WidthMode::Auto => div.flex_grow(),
                             };
                             div = match config.align {
                                 Align::Start => div.justify_start(),

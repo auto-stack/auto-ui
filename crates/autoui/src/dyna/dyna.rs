@@ -436,7 +436,7 @@ pub fn node_view_dropzone(node: &Node, spec: &mut WidgetSpec, idx: usize, cx: &m
                                         // GlobalSpecState::global(cx).run_lambda(&cl);
                                         println!("ondrop: {:?}", lb);
                                         GlobalSpecState::update_global(cx, |state, _cx| {
-                                            state.scope().borrow_mut().set_local("f", Value::Str(f.to_string()));
+                                            state.scope().borrow_mut().set_local_val("f", Value::Str(f.to_string()));
                                             state.run_lambda(&lb);
                                         });
                                         cx.notify();

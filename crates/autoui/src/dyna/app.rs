@@ -157,7 +157,11 @@ impl DynaApp {
         }
     }
 
-    pub fn run(self, after_init: impl FnOnce(&mut AppContext) + 'static) {
+    pub fn run(self) {
+        self.run_and(|_| {});
+    }
+
+    pub fn run_and(self, after_init: impl FnOnce(&mut AppContext) + 'static) {
         self.app.run(move |cx| {
             init_theme(cx);
 
