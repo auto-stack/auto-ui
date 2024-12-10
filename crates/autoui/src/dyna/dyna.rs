@@ -531,6 +531,13 @@ pub fn convert_value_to_table_data(value: &Value, config: &Vec<ColConfig>) -> Ve
             }
             rows
         }
+        Value::Grid(grid) => {
+            let mut rows = vec![];
+            for row in grid.data.iter() {
+                rows.push(Row { cells: row.clone() });
+            }
+            rows
+        }
         _ => vec![],
     }
 }

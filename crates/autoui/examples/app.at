@@ -1,37 +1,56 @@
-var service_data = [
-    { id: 0x10, name: "DiagnosticSessionControl",  desc: "诊断会话控制", support: true }
-    { id: 0x11, name: "EcuReset",  desc: "电控单元复位", support: true }
-    { id: 0x14, name: "ClearDiagnosticInformation",  desc: "清除诊断信息", support: true }
-    { id: 0x19, name: "ReadDTCInformation",  desc: "读取DTC信息", support: true }
-    { id: 0x22, name: "ReadDataByIdentifier",  desc: "读取数据", support: false}
-    { id: 0x23, name: "ReadMemoryByAddress",  desc: "读取内存", support: true }
-    { id: 0x27, name: "SecurityAccess",  desc: "安全访问", support: true }
-    { id: 0x28, name: "CommunicationControl",  desc: "通信控制 ", support: true }
-    { id: 0x2A, name: "ReadDataByPeriodicIdentifier",  desc: "读取数据（周期标识符）", support: false}
-    { id: 0x2C, name: "DynamicallyDefineDataIdentifier",  desc: "动态定义数据标识符", support: true }
-    { id: 0x2D, name: "WriteDataByIdentifier",  desc: "写入数据", support: true }
-    { id: 0x2E, name: "InputOutputControlByIdentifier",  desc: "输入输出控制", support: false}
-    { id: 0x30, name: "RoutineControl",  desc: "例程控制", support: true }
-    { id: 0x3C, name: "WriteMemoryByAddress",  desc: "写入内存", support: true }
-    { id: 0x3D, name: "TesterPresent",  desc: "诊断设备在线", support: true }
-    { id: 0x84, name: "ControlDTCSetting",  desc: "控制DTC设置", support: true }
-    { id: 0x2A, name: "ReadDataByPeriodicIdentifier",  desc: "读取数据（周期标识符）", support: false}
-    { id: 0x2C, name: "DynamicallyDefineDataIdentifier",  desc: "动态定义数据标识符", support: true }
-    { id: 0x2D, name: "WriteDataByIdentifier",  desc: "写入数据", support: true }
-    { id: 0x2E, name: "InputOutputControlByIdentifier",  desc: "输入输出控制", support: false}
-    { id: 0x30, name: "RoutineControl",  desc: "例程控制", support: true }
-    { id: 0x3C, name: "WriteMemoryByAddress",  desc: "写入内存", support: true }
-    { id: 0x3D, name: "TesterPresent",  desc: "诊断设备在线", support: true }
-    { id: 0x84, name: "ControlDTCSetting",  desc: "控制DTC设置", support: true }
-    { id: 0x2A, name: "ReadDataByPeriodicIdentifier",  desc: "读取数据（周期标识符）", support: false}
-    { id: 0x2C, name: "DynamicallyDefineDataIdentifier",  desc: "动态定义数据标识符", support: true }
-    { id: 0x2D, name: "WriteDataByIdentifier",  desc: "写入数据", support: true }
-    { id: 0x2E, name: "InputOutputControlByIdentifier",  desc: "输入输出控制", support: false}
-    { id: 0x30, name: "RoutineControl",  desc: "例程控制", support: true }
-    { id: 0x3C, name: "WriteMemoryByAddress",  desc: "写入内存", support: true }
-    { id: 0x3D, name: "TesterPresent",  desc: "诊断设备在线", support: true }
-    { id: 0x84, name: "ControlDTCSetting",  desc: "控制DTC设置", support: true }
-]
+// var service_data = [
+//     { id: 0x10, name: "DiagnosticSessionControl",  desc: "诊断会话控制", support: true }
+//     { id: 0x11, name: "EcuReset",  desc: "电控单元复位", support: true }
+//     { id: 0x14, name: "ClearDiagnosticInformation",  desc: "清除诊断信息", support: true }
+//     { id: 0x19, name: "ReadDTCInformation",  desc: "读取DTC信息", support: true }
+//     { id: 0x22, name: "ReadDataByIdentifier",  desc: "读取数据", support: false}
+//     { id: 0x23, name: "ReadMemoryByAddress",  desc: "读取内存", support: true }
+//     { id: 0x27, name: "SecurityAccess",  desc: "安全访问", support: true }
+//     { id: 0x28, name: "CommunicationControl",  desc: "通信控制 ", support: true }
+//     { id: 0x2A, name: "ReadDataByPeriodicIdentifier",  desc: "读取数据（周期标识符）", support: false}
+//     { id: 0x2C, name: "DynamicallyDefineDataIdentifier",  desc: "动态定义数据标识符", support: true }
+//     { id: 0x2D, name: "WriteDataByIdentifier",  desc: "写入数据", support: true }
+//     { id: 0x2E, name: "InputOutputControlByIdentifier",  desc: "输入输出控制", support: false}
+//     { id: 0x30, name: "RoutineControl",  desc: "例程控制", support: true }
+//     { id: 0x3C, name: "WriteMemoryByAddress",  desc: "写入内存", support: true }
+//     { id: 0x3D, name: "TesterPresent",  desc: "诊断设备在线", support: true }
+//     { id: 0x84, name: "ControlDTCSetting",  desc: "控制DTC设置", support: true }
+//     { id: 0x2A, name: "ReadDataByPeriodicIdentifier",  desc: "读取数据（周期标识符）", support: false}
+//     { id: 0x2C, name: "DynamicallyDefineDataIdentifier",  desc: "动态定义数据标识符", support: true }
+//     { id: 0x2D, name: "WriteDataByIdentifier",  desc: "写入数据", support: true }
+//     { id: 0x2E, name: "InputOutputControlByIdentifier",  desc: "输入输出控制", support: false}
+//     { id: 0x30, name: "RoutineControl",  desc: "例程控制", support: true }
+//     { id: 0x3C, name: "WriteMemoryByAddress",  desc: "写入内存", support: true }
+//     { id: 0x3D, name: "TesterPresent",  desc: "诊断设备在线", support: true }
+//     { id: 0x84, name: "ControlDTCSetting",  desc: "控制DTC设置", support: true }
+//     { id: 0x2A, name: "ReadDataByPeriodicIdentifier",  desc: "读取数据（周期标识符）", support: false}
+//     { id: 0x2C, name: "DynamicallyDefineDataIdentifier",  desc: "动态定义数据标识符", support: true }
+//     { id: 0x2D, name: "WriteDataByIdentifier",  desc: "写入数据", support: true }
+//     { id: 0x2E, name: "InputOutputControlByIdentifier",  desc: "输入输出控制", support: false}
+//     { id: 0x30, name: "RoutineControl",  desc: "例程控制", support: true }
+//     { id: 0x3C, name: "WriteMemoryByAddress",  desc: "写入内存", support: true }
+//     { id: 0x3D, name: "TesterPresent",  desc: "诊断设备在线", support: true }
+//     { id: 0x84, name: "ControlDTCSetting",  desc: "控制DTC设置", support: true }
+// ]
+
+var service_grid = grid(id:"id", name:"name", desc:"desc", support:"support") {
+    [0x10, "DiagnosticSessionControl",          "诊断会话控制",          true]
+    [0x11, "EcuReset",                          "电控单元复位",          true]
+    [0x14, "ClearDiagnosticInformation",        "清除诊断信息",          true]
+    [0x19, "ReadDTCInformation",                "读取DTC信息",           true]
+    [0x22, "ReadDataByIdentifier",              "读取数据",             false]
+    [0x23, "ReadMemoryByAddress",               "读取内存",              true]
+    [0x27, "SecurityAccess",                    "安全访问",              true]
+    [0x28, "CommunicationControl",              "通信控制",              true]
+    [0x2A, "ReadDataByPeriodicIdentifier",      "读取数据（周期标识符）", false]
+    [0x2C, "DynamicallyDefineDataIdentifier",   "动态定义数据标识符",     true]
+    [0x2D, "WriteDataByIdentifier",             "写入数据",              true]
+    [0x2E, "InputOutputControlByIdentifier",    "输入输出控制",          false]
+    [0x30, "RoutineControl",                    "例程控制",              true]
+    [0x3C, "WriteMemoryByAddress",              "写入内存",              true]
+    [0x3D, "TesterPresent",                     "诊断设备在线",           true]
+    [0x84, "ControlDTCSetting",                 "控制DTC设置",           true]
+}
 
 var items = ["Item 1", "Item 2", "Item 3", "Item 4", "Item 5", "Item 6", "Item 7", "Item 8", "Item 9", "Item 10"]
 
@@ -49,7 +68,7 @@ app {
     center {
         tabs {
             tab("service") {
-                table("service", cols, ref service_data)
+                table("service", cols, ref service_grid)
             }
             tab("signals") {
                 text("signals")
