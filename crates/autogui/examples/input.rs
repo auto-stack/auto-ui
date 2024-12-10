@@ -32,6 +32,6 @@ impl Render for InputView {
 }
 
 fn main() {
-    SimpleApp::new().title("Checkbox Example").run_simple::<InputView>();
+    SimpleApp::new().title("Input Example").run_simple::<InputView>();
 }
 

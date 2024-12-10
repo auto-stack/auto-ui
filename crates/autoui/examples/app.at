@@ -36,10 +36,10 @@ var service_data = [
 var items = ["Item 1", "Item 2", "Item 3", "Item 4", "Item 5", "Item 6", "Item 7", "Item 8", "Item 9", "Item 10"]
 
 var cols = [
-    { id: "id", name: "服务ID", width: 100.0, showas: "Hex" }
-    { id: "name", name: "服务名称", width: 250.0, showas: "Text" }
-    { id: "support", name: "支持", width: 100.0, showas: "Checkbox" }
-    { id: "desc", name: "服务描述", width: 500.0, showas: "Text" }
+    { id: "id", name: "服务ID", width: 100.0, format: "Hex" }
+    { id: "name", name: "服务名称", width: 250.0, format: "Text" }
+    { id: "support", name: "支持", width: 100.0, format: "Checkbox" }
+    { id: "desc", name: "服务描述", width: 500.0, format: "Text" }
 ]
 
 app {

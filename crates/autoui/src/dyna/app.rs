@@ -1,7 +1,7 @@
 use gpui::*;
 use autoval::{Value, Node, Widget, Model};
 use autogui::assets::Assets;
-use autogui::style::theme::{init_theme, ActiveTheme};
+use autogui::style::theme::ActiveTheme;
 use autogui::app::{GlobalDataStoreCollectAction, Viewable, GlobalState, ReloadState, GlobalDataStore};
 use autogui::widget::workspace::Workspace;
 use autogui::widget::pane::PaneSide;
@@ -13,6 +13,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use autolang::scope::Universe;
 use autolang::interp::Interpreter;
+use autogui::app::init;
 
 pub struct RootView {
     workspace: View<Workspace>,
@@ -139,7 +140,6 @@ pub struct DynaApp {
     interpreter: Rc<RefCell<Interpreter>>,
 }
 
-
 impl DynaApp {
     pub fn new(path: &str) -> Self {
         Self {
@@ -163,7 +163,7 @@ impl DynaApp {
 
     pub fn run_and(self, after_init: impl FnOnce(&mut AppContext) + 'static) {
         self.app.run(move |cx| {
-            init_theme(cx);
+            init(cx);
 
             let global = GlobalState { count: 0 };
             cx.set_global(global);

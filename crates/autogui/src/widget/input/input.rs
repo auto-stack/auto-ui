@@ -318,6 +318,7 @@ impl TextInput {
     }
 
     fn left(&mut self, _: &Left, cx: &mut ViewContext<Self>) {
+        println!("input with left");
         self.pause_blink_cursor(cx);
         if self.selected_range.is_empty() {
             self.move_to(self.previous_boundary(self.cursor_offset()), cx);

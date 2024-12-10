@@ -1,8 +1,15 @@
 use gpui::*;
 use crate::assets::Assets;
-use crate::style::theme::{init_theme, ActiveTheme};
+use crate::style::theme::ActiveTheme;
 use std::collections::HashMap;
+use crate::widget::input;
+use crate::style::theme;
 use autoval::{Value, Obj};
+
+pub fn init(cx: &mut AppContext) {
+    theme::init(cx);
+    input::init(cx);
+}
 
 pub struct GlobalState {
     pub count: i32,
@@ -150,7 +157,7 @@ impl SimpleApp {
         T: 'static + Render,
     {
         self.app.run(move |cx| {
-            init_theme(cx);
+            init(cx);
 
             let (title_options, window_bounds) = if is_simple {
                 (

@@ -6,7 +6,7 @@ use autogui::widget::util::*;
 use autogui::widget::button::Button;
 use autogui::widget::workspace::Workspace;
 use autogui::widget::table::Table;
-use autogui::widget::table::{ColConfig, WidthMode, ShowAs, Align, Row};
+use autogui::widget::table::{ColConfig, WidthMode, Format, Align, Row};
 use autoval::Value;
 use gpui::*;
 
@@ -49,7 +49,7 @@ impl RootView {
                 title: "ID".into(),
                 width: WidthMode::Pixels(100.),
                 align: Align::Start,
-                showas: ShowAs::Hex,
+                format: Format::Hex,
                 options: vec![],
             },
             ColConfig{
@@ -58,7 +58,7 @@ impl RootView {
                 title: "Name".into(),
                 width: WidthMode::Pixels(250.),
                 align: Align::Start,
-                showas: ShowAs::Text,
+                format: Format::Text,
                 options: vec![],
             },
             ColConfig {
@@ -67,7 +67,7 @@ impl RootView {
                 title: "Callback".into(),
                 width: WidthMode::Pixels(80.),
                 align: Align::Start,
-                showas: ShowAs::checkbox(),
+                format: Format::checkbox(),
                 options: vec![],
             },
             ColConfig{
@@ -76,7 +76,7 @@ impl RootView {
                 title: "Desc".into(),
                 width: WidthMode::Auto,
                 align: Align::Start,
-                showas: ShowAs::Text,
+                format: Format::Text,
                 options: vec![],
             },
         ];

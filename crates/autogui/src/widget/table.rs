@@ -27,7 +27,7 @@ pub enum Align {
 }
 
 #[derive(Debug, Clone)]
-pub enum ShowAs {
+pub enum Format {
     Hex,
     Text,
     Checkbox(CheckboxConfig),
@@ -47,13 +47,13 @@ impl Default for CheckboxConfig {
     }
 }
 
-impl ShowAs {
+impl Format {
     pub fn checkbox() -> Self {
-        ShowAs::Checkbox(CheckboxConfig::default())
+        Format::Checkbox(CheckboxConfig::default())
     }
 
     pub fn disabled_checkbox() -> Self {
-        ShowAs::Checkbox(CheckboxConfig { disabled: true })
+        Format::Checkbox(CheckboxConfig { disabled: true })
     }
 }
 
@@ -65,7 +65,7 @@ pub struct ColConfig {
     pub title: String,
     pub width: WidthMode,
     pub align: Align,
-    pub showas: ShowAs,
+    pub format: Format,
     pub options: Vec<String>,
 }
 
@@ -92,21 +92,21 @@ impl Into<WidthMode> for Value {
     }
 }
 
-impl From<String> for ShowAs {
+impl From<String> for Format {
     fn from(s: String) -> Self {
         match s.as_str() {
-            "Hex" => ShowAs::Hex,
-            "Checkbox" => ShowAs::Checkbox(CheckboxConfig::default()),
-            "Dropdown" => ShowAs::Dropdown,
-            "Input" => ShowAs::Input,
-            "Bool" => ShowAs::Bool,
-            _ => ShowAs::Text,
+            "Hex" => Format::Hex,
+            "Checkbox" => Format::Checkbox(CheckboxConfig::default()),
+            "Dropdown" => Format::Dropdown,
+            "Input" => Format::Input,
+            "Bool" => Format::Bool,
+            _ => Format::Text,
         }
     }
 }   
 
 // TODO: add Value::Enum
-impl From<Value> for ShowAs {
+impl From<Value> for Format {
     fn from(v: Value) -> Self {
         match v {
             Value::Str(s) => s.into(),
@@ -115,12 +115,12 @@ impl From<Value> for ShowAs {
                 match kind.as_str() {
                     "Checkbox" => {
                         let disabled = obj.get_bool_or("disabled", false);
-                        ShowAs::Checkbox(CheckboxConfig { disabled })
+                        Format::Checkbox(CheckboxConfig { disabled })
                     }
                     _ => kind.into(),
                 }
             }
-            _ => ShowAs::Text,
+            _ => Format::Text,
         }
     }
 }
@@ -207,9 +207,9 @@ impl Table {
         for (rowid, row) in data.iter().enumerate() {
             let mut cell_views = Vec::new();
             for (colid, col) in col_config.iter().enumerate() {
-                let showas = &col.showas;
-                match showas {
-                    ShowAs::Dropdown => {
+                let format = &col.format;
+                match format {
+                    Format::Dropdown => {
                         let options = col.options.iter().map(|s| s.clone().into()).collect::<Vec<SharedString>>();
                         let selected = row.cells[colid].clone().as_uint() as usize;
                         let view = cx.new_view(|cx| {
@@ -228,7 +228,7 @@ impl Table {
                             view: view.into()
                         });
                     }
-                    ShowAs::Input => {
+                    Format::Input => {
                         let cell = &row.cells[colid];
                         let view = cx.new_view(|cx| {
                             let mut input = TextInput::new(cx);
@@ -450,16 +450,16 @@ impl Table {
                                 Align::End => div.justify_end(),
                             };
                             let cell = &self.data[rowid].cells[colid];
-                            match &config.showas {
-                                ShowAs::Text => div.child(cell.repr()),
-                                ShowAs::Hex => {
+                            match &config.format {
+                                Format::Text => div.child(cell.repr()),
+                                Format::Hex => {
                                     match cell {
                                         Value::Int(i) => div.child(format!("0x{:X}", i)),
                                         Value::Uint(u) => div.child(format!("0x{:X}", u)),
                                         _ => div.child(cell.repr()),
                                     }
                                 }
-                                ShowAs::Checkbox(config) => {
+                                Format::Checkbox(config) => {
                                     div.child(Checkbox::new("cb")
                                         .disabled(config.disabled)
                                         .checked(cell.to_bool())
@@ -474,18 +474,18 @@ impl Table {
                                         })
                                     )
                                 },
-                                ShowAs::Dropdown => {
+                                Format::Dropdown => {
                                     // find the cell view
                                     let cell_views = &self.row_views.get(rowid).unwrap().cell_views;
                                     let cell_view = cell_views.iter().find(|cv| cv.colid == colid).unwrap();
                                     div.child(cell_view.view.clone())
                                 },
-                                ShowAs::Input =>  {
+                                Format::Input =>  {
                                     let cell_views = &self.row_views.get(rowid).unwrap().cell_views;
                                     let cell_view = cell_views.iter().find(|cv| cv.colid == colid).unwrap();
                                     div.child(cell_view.view.clone())
                                 },
-                                ShowAs::Bool => {
+                                Format::Bool => {
                                     div.child(bool_icon(cell.to_bool()))
                                 },
                             }

@@ -9,6 +9,7 @@ fn main() {
     SimpleApp::new().run(true, |cx| {
         cx.new_view(|cx| SimpleRootView::new(cx.new_view(|cx| {
             let mut view = DynaView::new(cx);
+            view.set_compact(true);
             view.from_file("crates/autoui/examples/counter.at");
             view.update_spec(cx);
             view

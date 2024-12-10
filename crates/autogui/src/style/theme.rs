@@ -7,7 +7,7 @@ use gpui::{
     WindowContext,
 };
 
-pub fn init_theme(cx: &mut AppContext) {
+pub fn init(cx: &mut AppContext) {
     Theme::sync_system_appearance(cx)
     // Theme::change(ThemeMode::Dark, cx);
 }
