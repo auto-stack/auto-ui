@@ -12,7 +12,7 @@ use autogui::widget::util::{col, row};
 use autogui::widget::list::List;
 use autogui::widget::pane::PaneSide;
 use autolang::ast::{Node, Expr, Key, Name, Stmt};
-use autoval::{Value, Args};
+use autoval::{Value, Grid, Args};
 use gpui::{Div, SharedString, ViewContext, View, AnyView, ElementId, Render, IntoElement, ReadGlobal};
 use gpui::prelude::*;
 
@@ -337,19 +337,16 @@ pub fn add_table_view( node: &Node, spec: &mut WidgetSpec, idx: usize, cx: &mut 
         Some(Expr::Str(id)) => id,
         _ => format!("table_{}", idx),
     }; 
-    let config = match node.args.get(1) {
+    let grid = match node.args.get(1) {
         Some(ident) => spec.eval_expr(&ident),
         None => Value::Nil,
     };
-    let config = convert_value_to_table_config(&config);
-    let data = match node.args.get(2) {
-        Some(expr) => spec.eval_expr(&expr),
-        None => Value::Nil,
-    };
-    let data = convert_value_to_table_data(&data, &config);
-
-    let view = cx.new_view(|cx| Table::new(cx, table_id, config, data));
-    view.into()
+    if let Value::Grid(grid) = grid {
+        let view = cx.new_view(|cx| Table::from_grid(cx, table_id, grid));
+        view.into()
+    } else {
+        cx.new_view(|cx| Table::from_grid(cx, table_id, Grid::default())).into()
+    }
 }
 
 pub fn add_view_clone(div: Div, _node: &Node, _spec: &mut WidgetSpec, _cx: &mut ViewContext<'_, DynaView>, view: Option<AnyView>) -> Div {
@@ -512,10 +509,14 @@ pub fn convert_value_to_table_config(value: &Value) -> Vec<ColConfig> {
     }
 }
 
-pub fn convert_value_to_table_data(value: &Value, config: &Vec<ColConfig>) -> Vec<Row> {
+pub fn convert_value_to_table_data(value: &Value, config: &Vec<ColConfig>) -> Grid {
     match value {
         Value::Array(array) => {
-            let mut rows = vec![];
+            let mut head = Args::new();
+            for col in config.iter() {
+                head.add_named(col.id.as_str(), col.title.clone().into());
+            }
+            let mut rows = Vec::new();
             for item in array.iter() {
                 let mut cells = Vec::new();
                 for col in config.iter() {
@@ -527,18 +528,14 @@ pub fn convert_value_to_table_data(value: &Value, config: &Vec<ColConfig>) -> Ve
                         _ => (),
                     }
                 }
-                rows.push(Row { cells });
+                rows.push(cells);
             }
-            rows
+            Grid { head: head.named, data: rows }
         }
         Value::Grid(grid) => {
-            let mut rows = vec![];
-            for row in grid.data.iter() {
-                rows.push(Row { cells: row.clone() });
-            }
-            rows
+            grid.clone()
         }
-        _ => vec![],
+        _ => Grid::default(),
     }
 }
 

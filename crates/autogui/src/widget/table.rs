@@ -8,7 +8,7 @@ use crate::widget::input::{TextInput, InputEvent};
 use crate::widget::scroll::{ScrollbarState, Scrollbar};
 use crate::style::theme::ActiveTheme;
 use crate::widget::util::bool_icon;
-use autoval::{Value, Obj};
+use autoval::{ValueKey, Value, Obj, Grid};
 use std::rc::Rc;
 use std::cell::Cell;
 
@@ -24,6 +24,20 @@ pub enum Align {
     Start,
     Center,
     End,
+}
+
+impl From<Value> for Align {
+    fn from(v: Value) -> Self {
+        match v {
+            Value::Str(s) => match s.to_lowercase().as_str() {
+                "start" => Align::Start,
+                "center" => Align::Center,
+                "end" => Align::End,
+                _ => Align::Start,
+            }
+            _ => Align::Start,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -67,6 +81,40 @@ pub struct ColConfig {
     pub align: Align,
     pub format: Format,
     pub options: Vec<String>,
+}
+
+impl Default for ColConfig {
+    fn default() -> Self {
+        Self { idx: 0, id: "".to_string(), title: "".to_string(), width: WidthMode::default(), align: Align::Start, format: Format::Text, options: vec![] }
+    }
+}
+
+impl ColConfig {
+    pub fn from_grid_head(values: &Vec<(ValueKey, Value)>) -> Vec<Self> {
+        // default config 
+        let mut configs = Vec::new();
+
+        for (i, (key, val)) in values.iter().enumerate() {
+            let mut config = ColConfig::default();
+            config.idx = i;
+            config.id = key.to_string();
+            match val {
+                Value::Str(s) => {
+                    config.title = s.clone();
+                }
+                Value::Obj(obj) => {
+                    config.title = obj.get_str_or("title", "").to_string();
+                    config.width = obj.get_or("width", Value::Float(0.0)).into();
+                    config.align = obj.get_or("align", Value::from("start")).into();
+                    config.format = obj.get_or("format", Value::from("Text")).into();
+                    config.options = obj.get_array_of("options").iter().map(|s| s.repr()).collect::<Vec<String>>();
+                }
+                _ => (),
+            }
+            configs.push(config);
+        }
+        configs
+    }
 }
 
 impl Default for WidthMode {
@@ -165,13 +213,13 @@ pub struct Table {
     num_cols: usize,
     row_height: f32,
     config: Vec<ColConfig>,
-    data: Vec<Row>,
+    data: Vec<Vec<Value>>,
     row_views: Vec<RowView>,
     update_history: Vec<TableUpdate>,
 }
 
 impl Table {
-    pub fn new(cx: &mut ViewContext<Self>, id: String, col_config: Vec<ColConfig>, data: Vec<Row>) -> Self {
+    pub fn new(cx: &mut ViewContext<Self>, id: String, col_config: Vec<ColConfig>, data: Vec<Vec<Value>>) -> Self {
         let num_cols = col_config.len();
         let num_rows = data.len();
         let table_id = id.clone();
@@ -184,7 +232,7 @@ impl Table {
         }).detach();
         let row_views = Self::identify_row_views(cx, &col_config, &data);
         if data.len() > 0 {
-            println!("first row data: {:?}", data[0].cells);
+            println!("first row data: {:?}", data[0]);
         }
         Self {
             id, 
@@ -202,7 +250,13 @@ impl Table {
         }
     }
 
-    pub fn identify_row_views(cx: &mut ViewContext<Self>, col_config: &Vec<ColConfig>, data: &Vec<Row>) -> Vec<RowView> {
+    pub fn from_grid(cx: &mut ViewContext<Self>, id: String, grid: Grid) -> Self {
+        let data = grid.data;
+        let col_config = ColConfig::from_grid_head(&grid.head);
+        Self::new(cx, id, col_config, data)
+    }
+
+    pub fn identify_row_views(cx: &mut ViewContext<Self>, col_config: &Vec<ColConfig>, data: &Vec<Vec<Value>>) -> Vec<RowView> {
         let mut row_views = Vec::new();
         for (rowid, row) in data.iter().enumerate() {
             let mut cell_views = Vec::new();
@@ -210,8 +264,8 @@ impl Table {
                 let format = &col.format;
                 match format {
                     Format::Dropdown => {
-                        let options = col.options.iter().map(|s| s.clone().into()).collect::<Vec<SharedString>>();
-                        let selected = row.cells[colid].clone().as_uint() as usize;
+                        let options = col.options.iter().map(|s| s.into()).collect::<Vec<SharedString>>();
+                        let selected = row[colid].clone().as_uint() as usize;
                         let view = cx.new_view(|cx| {
                             Dropdown::new("dropdown", options, Some(selected), cx)
                         });
@@ -229,7 +283,7 @@ impl Table {
                         });
                     }
                     Format::Input => {
-                        let cell = &row.cells[colid];
+                        let cell = &row[colid];
                         let view = cx.new_view(|cx| {
                             let mut input = TextInput::new(cx);
                             input.set_text(cell.repr(), cx);
@@ -259,7 +313,7 @@ impl Table {
     }
 
     pub fn update_cell(&mut self, rowid: usize, colid: usize, new: Value) {
-        self.data[rowid].cells[colid] = new;
+        self.data[rowid][colid] = new;
     }
 
     pub fn on_dropdown_event(&mut self, _dd: View<Dropdown>, ev: &DropdownEvent, _cx: &mut ViewContext<Self>) {
@@ -288,7 +342,7 @@ impl Table {
         let mut rows = Vec::new();
         for row in self.data.iter() {
             let mut obj = Obj::new();
-            for (idx, cell) in row.cells.iter().enumerate() {
+            for (idx, cell) in row.iter().enumerate() {
                 match self.config.get(idx) {
                     Some(col) => obj.set(col.id.clone(), cell.clone()),
                     None => (),
@@ -449,7 +503,7 @@ impl Table {
                                 Align::Center => div.justify_center(),
                                 Align::End => div.justify_end(),
                             };
-                            let cell = &self.data[rowid].cells[colid];
+                            let cell = &self.data[rowid][colid];
                             match &config.format {
                                 Format::Text => div.child(cell.repr()),
                                 Format::Hex => {
@@ -469,7 +523,7 @@ impl Table {
                                             // let new = Value::Bool(*b);
                                             // this.data[rowid].cells[colid] = new.clone();
                                             // this.record_update(TableUpdate::new(rowid, colid, old, new));
-                                            this.data[rowid].cells[colid] = Value::Bool(*b);
+                                            this.data[rowid][colid] = Value::Bool(*b);
                                             cx.notify();
                                         })
                                     )
