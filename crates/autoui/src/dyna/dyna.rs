@@ -333,18 +333,35 @@ pub fn add_list(mut div: Div, node: &Node, spec: &mut WidgetSpec, cx: &mut ViewC
 
 pub fn add_table_view( node: &Node, spec: &mut WidgetSpec, idx: usize, cx: &mut ViewContext<'_, DynaView>) -> AnyView {
     println!("add table view: {:?}", node.args);
+    let len = node.args.len();
     let table_id = match node.args.get(0) {
         Some(Arg::Pos(Expr::Str(id))) => id,
         _ => format!("table_{}", idx),
     }; 
-    let grid = match node.args.get(1) {
-        Some(Arg::Pos(expr)) => spec.eval_expr(&expr),
-        _=> Value::Nil,
-    };
-    println!("grid: {}", &grid);
-    if let Value::Grid(grid) = grid {
-        let view = cx.new_view(|cx| Table::from_grid(cx, table_id, grid));
-        view.into()
+    if len == 2 {
+        let grid = match node.args.get(1) {
+            Some(Arg::Pos(expr)) => spec.eval_expr(&expr),
+            _=> Value::Nil,
+        };
+        println!("grid: {}", &grid);
+        if let Value::Grid(grid) = grid {
+            let view = cx.new_view(|cx| Table::from_grid(cx, table_id, grid));
+            view.into()
+        } else {
+            cx.new_view(|cx| Table::from_grid(cx, table_id, Grid::default())).into()
+        }
+    } else if len == 3 {
+        let config = match node.args.get(1) {
+            Some(Arg::Pos(expr)) => spec.eval_expr(&expr),
+            _=> Value::Nil,
+        };
+        let data = match node.args.get(2) {
+            Some(Arg::Pos(expr)) => spec.eval_expr(&expr),
+            _=> Value::Nil,
+        };
+        let config = convert_value_to_table_config(&config);
+        let data = convert_value_to_table_data(&data, &config);
+        cx.new_view(|cx| Table::new(cx, table_id, config, data)).into()
     } else {
         cx.new_view(|cx| Table::from_grid(cx, table_id, Grid::default())).into()
     }
@@ -510,13 +527,9 @@ pub fn convert_value_to_table_config(value: &Value) -> Vec<ColConfig> {
     }
 }
 
-pub fn convert_value_to_table_data(value: &Value, config: &Vec<ColConfig>) -> Grid {
+pub fn convert_value_to_table_data(value: &Value, config: &Vec<ColConfig>) -> Vec<Vec<Value>> {
     match value {
         Value::Array(array) => {
-            let mut head = Vec::new();
-            for col in config.iter() {
-                head.push((col.id.as_str().into(), col.title.clone().into()));
-            }
             let mut rows = Vec::new();
             for item in array.iter() {
                 let mut cells = Vec::new();
@@ -531,12 +544,9 @@ pub fn convert_value_to_table_data(value: &Value, config: &Vec<ColConfig>) -> Gr
                 }
                 rows.push(cells);
             }
-            Grid { head, data: rows }
+            rows
         }
-        Value::Grid(grid) => {
-            grid.clone()
-        }
-        _ => Grid::default(),
+        _ => vec![],
     }
 }
 
