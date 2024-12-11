@@ -48,6 +48,7 @@ pub enum Format {
     Bool,
     Dropdown,
     Input,
+    NumberInput,
 }
 
 #[derive(Debug, Clone)]
@@ -148,6 +149,7 @@ impl From<String> for Format {
             "Dropdown" => Format::Dropdown,
             "Input" => Format::Input,
             "Bool" => Format::Bool,
+            "NumberInput" => Format::NumberInput,
             _ => Format::Text,
         }
     }
@@ -304,6 +306,31 @@ impl Table {
                             view: view.into()
                         });
                     }
+                    Format::NumberInput => {
+                        let cell = &row[colid];
+                        let view = cx.new_view(|cx| {
+                            let mut input = TextInput::new(cx);
+                            input.set_text(cell.repr(), cx);
+                            input
+                        });
+                        let r = rowid.clone();
+                        let c = colid.clone();
+                        cx.subscribe(&view, move |t, _v, e, _cx| {
+                            match e {
+                                InputEvent::Change(s) => {
+                                    let i = s.parse::<i32>();
+                                    if let Ok(i) = i {
+                                        t.update_cell(r, c, Value::Int(i));
+                                    }
+                                }
+                                _ => (),
+                            }
+                        }).detach();
+
+                        cell_views.push(CellView { colid, 
+                            view: view.into()
+                        });
+                    }
                     _ => (),
                 }
             }
@@ -340,7 +367,15 @@ impl Table {
         }).collect::<Vec<_>>().join("\n")
     }
 
-    pub fn collect_data(&self) -> Value {
+    pub fn collect_data(&self) -> Vec<Vec<Value>> {
+        let mut rows = Vec::new();
+        for row in self.data.iter() {
+            rows.push(row.clone());
+        }
+        rows
+    }
+
+    pub fn collect_data_obj(&self) -> Value {
         let mut rows = Vec::new();
         for row in self.data.iter() {
             let mut obj = Obj::new();
@@ -510,8 +545,8 @@ impl Table {
                                 Format::Text => div.child(cell.repr()),
                                 Format::Hex => {
                                     match cell {
-                                        Value::Int(i) => div.child(format!("0x{:X}", i)),
-                                        Value::Uint(u) => div.child(format!("0x{:X}", u)),
+                                        Value::Int(i) => div.child(format!("0x{:04X}", i)),
+                                        Value::Uint(u) => div.child(format!("0x{:04X}", u)),
                                         _ => div.child(cell.repr()),
                                     }
                                 }
@@ -541,6 +576,11 @@ impl Table {
                                     let cell_view = cell_views.iter().find(|cv| cv.colid == colid).unwrap();
                                     div.child(cell_view.view.clone())
                                 },
+                                Format::NumberInput => {
+                                    let cell_views = &self.row_views.get(rowid).unwrap().cell_views;
+                                    let cell_view = cell_views.iter().find(|cv| cv.colid == colid).unwrap();
+                                    div.child(cell_view.view.clone())
+                                }
                                 Format::Bool => {
                                     div.child(bool_icon(cell.to_bool()))
                                 },
