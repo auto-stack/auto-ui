@@ -3,7 +3,7 @@ use autolang::interpret;
 use autoval::*;
 use autolang::ast;
 use autolang::scope::{Universe, Meta};
-use autolang::ast::{Expr, Fn, Args};
+use autolang::ast::{Expr, Fn, Args, Arg};
 use autolang::interp::Interpreter;
 use crate::dyna::state::State;
 use std::rc::Rc;
@@ -186,7 +186,7 @@ impl WidgetSpec {
         // TODO: this id may not be unique
         let node_name = node.name.text.clone();
         let node_arg0 = match node.args.get(0) {
-            Some(Expr::Str(s)) => s.clone(),
+            Some(Arg::Pos(Expr::Str(s))) => s.clone(),
             _ => "_".to_string(),
         };
         let body_id = format!("{}_{}.body", node_name, node_arg0);

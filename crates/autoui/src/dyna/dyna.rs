@@ -11,7 +11,7 @@ use autogui::widget::table::{Align, ColConfig, Row, Table};
 use autogui::widget::util::{col, row};
 use autogui::widget::list::List;
 use autogui::widget::pane::PaneSide;
-use autolang::ast::{Node, Expr, Key, Name, Stmt};
+use autolang::ast::{Node, Expr, Key, Name, Stmt, Arg};
 use autoval::{Value, Grid, Args};
 use gpui::{Div, SharedString, ViewContext, View, AnyView, ElementId, Render, IntoElement, ReadGlobal};
 use gpui::prelude::*;
@@ -270,7 +270,7 @@ fn parse_node(name: &str, node: &Node, spec: &mut WidgetSpec, idx: usize, cx: &m
 // TODO: currently only support onclick property
 fn add_button(mut div: Div, node: &Node, _spec: &mut WidgetSpec, cx: &mut ViewContext<'_, DynaView>, _view: Option<AnyView>) -> Div {
     let text_arg = node.args.get(0);
-    if let Some(Expr::Str(text)) = text_arg {
+    if let Some(Arg::Pos(Expr::Str(text))) = text_arg {
         let mut button = Button::primary(text.as_str());
 
         for stmt in node.body.stmts.iter() {
@@ -310,8 +310,8 @@ fn add_button(mut div: Div, node: &Node, _spec: &mut WidgetSpec, cx: &mut ViewCo
 fn add_text(mut div: Div, node: &Node, spec: &mut WidgetSpec, _cx: &mut ViewContext<'_, DynaView>, _view: Option<AnyView>) -> Div {
     let text_arg = node.args.get(0);
     println!("text arg: {}", node.args);
-    if let Some(str) = text_arg {
-        let val = spec.eval_expr(&str);
+    if let Some(arg) = text_arg {
+        let val = spec.eval_expr(&arg.get_expr());
         div = div.child(format!("{}", val.repr()));
     }
     div
@@ -319,8 +319,8 @@ fn add_text(mut div: Div, node: &Node, spec: &mut WidgetSpec, _cx: &mut ViewCont
 
 pub fn add_list(mut div: Div, node: &Node, spec: &mut WidgetSpec, cx: &mut ViewContext<'_, DynaView>, _view: Option<AnyView>) -> Div {
     let data = match node.args.get(0) {
-        Some(ident) => spec.eval_expr(&ident),
-        None => Value::Nil,
+        Some(Arg::Pos(expr)) => spec.eval_expr(&expr),
+        _ => Value::Nil,
     };
     if let Value::Array(array) = data {
         let array = array.iter().map(|v| v.repr().into()).collect::<Vec<SharedString>>();
@@ -334,13 +334,14 @@ pub fn add_list(mut div: Div, node: &Node, spec: &mut WidgetSpec, cx: &mut ViewC
 pub fn add_table_view( node: &Node, spec: &mut WidgetSpec, idx: usize, cx: &mut ViewContext<'_, DynaView>) -> AnyView {
     println!("add table view: {:?}", node.args);
     let table_id = match node.args.get(0) {
-        Some(Expr::Str(id)) => id,
+        Some(Arg::Pos(Expr::Str(id))) => id,
         _ => format!("table_{}", idx),
     }; 
     let grid = match node.args.get(1) {
-        Some(ident) => spec.eval_expr(&ident),
-        None => Value::Nil,
+        Some(Arg::Pos(expr)) => spec.eval_expr(&expr),
+        _=> Value::Nil,
     };
+    println!("grid: {}", &grid);
     if let Value::Grid(grid) = grid {
         let view = cx.new_view(|cx| Table::from_grid(cx, table_id, grid));
         view.into()
@@ -381,11 +382,11 @@ pub fn node_view_tabs( node: &Node, spec: &mut WidgetSpec, idx: usize, cx: &mut 
                 if tag == "tab" {
                     let tab_view = node_to_dynaview(node, spec, idx, false, cx);
                     let name = match node.args.get(0) {
-                        Some(Expr::Str(name)) => name,
+                        Some(Arg::Pos(Expr::Str(name))) => name,
                         _ => format!("view {}", idx),
                     };
                     let title = match node.args.get(1) {
-                        Some(Expr::Str(title)) => title,
+                        Some(Arg::Pos(Expr::Str(title))) => title,
                         _ => name.clone(),
                     };
                     tabs.push((name, title, tab_view));
@@ -460,14 +461,14 @@ pub fn node_view_dropzone(node: &Node, spec: &mut WidgetSpec, idx: usize, cx: &m
 pub fn node_view_dropdown(node: &Node, spec: &mut WidgetSpec, idx: usize, cx: &mut ViewContext<'_, DynaView>) -> AnyView {
     // get options from props
     let title = match node.args.get(0) {
-        Some(Expr::Str(title)) => title,
+        Some(Arg::Pos(Expr::Str(s))) => s.clone(),
         _ => "dropdown".into(),
     };
     println!("title: {:?}", title);
     println!("args[1]: {:?}", node.args.get(1));
     let options = match node.args.get(1) {
-        Some(expr) => {
-            let val = spec.eval_expr(&expr);
+        Some(arg) => {
+            let val = spec.eval_expr(&arg.get_expr());
             if let Value::Array(array) = val {
                 array
             } else {
@@ -512,9 +513,9 @@ pub fn convert_value_to_table_config(value: &Value) -> Vec<ColConfig> {
 pub fn convert_value_to_table_data(value: &Value, config: &Vec<ColConfig>) -> Grid {
     match value {
         Value::Array(array) => {
-            let mut head = Args::new();
+            let mut head = Vec::new();
             for col in config.iter() {
-                head.add_named(col.id.as_str(), col.title.clone().into());
+                head.push((col.id.as_str().into(), col.title.clone().into()));
             }
             let mut rows = Vec::new();
             for item in array.iter() {
@@ -530,7 +531,7 @@ pub fn convert_value_to_table_data(value: &Value, config: &Vec<ColConfig>) -> Gr
                 }
                 rows.push(cells);
             }
-            Grid { head: head.named, data: rows }
+            Grid { head, data: rows }
         }
         Value::Grid(grid) => {
             grid.clone()
