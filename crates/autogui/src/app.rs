@@ -27,12 +27,12 @@ impl Global for ReloadState {}
 pub struct GlobalDataStore {
     pub old: HashMap<String, Value>,
     pub new: HashMap<String, Value>,
-    pub table_data: Obj,
+    pub table_grids: Obj,
 }
 
 impl GlobalDataStore {
     pub fn new() -> Self {
-        Self { old: HashMap::new(), new: HashMap::new(), table_data: Obj::new() }
+        Self { old: HashMap::new(), new: HashMap::new(), table_grids: Obj::new() }
     }
 
     pub fn set_old(&mut self, id: String, value: Value) {

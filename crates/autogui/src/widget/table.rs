@@ -216,20 +216,21 @@ pub struct Table {
     row_height: f32,
     config: Vec<ColConfig>,
     data: Vec<Vec<Value>>,
+    grid_head: Vec<(ValueKey, Value)>,
     row_views: Vec<RowView>,
     update_history: Vec<TableUpdate>,
 }
 
 impl Table {
-    pub fn new(cx: &mut ViewContext<Self>, id: String, col_config: Vec<ColConfig>, data: Vec<Vec<Value>>) -> Self {
+    pub fn new(cx: &mut ViewContext<Self>, id: String, col_config: Vec<ColConfig>, data: Vec<Vec<Value>>, head: Vec<(ValueKey, Value)>) -> Self {
         let num_cols = col_config.len();
         let num_rows = data.len();
         let table_id = id.clone();
         cx.observe_global::<GlobalDataStoreCollectAction>(move |this, cx| {
-            let data = this.collect_data();
+            let grid = this.collect_data();
             let table_id = table_id.clone();
             GlobalDataStore::update_global(cx, move |g, cx| {
-                g.table_data.set(table_id, data);
+                g.table_grids.set(table_id, Value::Grid(grid));
             });
         }).detach();
         let row_views = Self::identify_row_views(cx, &col_config, &data);
@@ -247,17 +248,17 @@ impl Table {
             row_height: 42.0, 
             config: col_config, 
             data, 
+            grid_head: head,
             row_views,
             update_history: vec![] 
         }
     }
 
     pub fn from_grid(cx: &mut ViewContext<Self>, id: String, grid: Grid) -> Self {
-        let data = grid.data;
-        println!("grid head: {:?}", grid.head);
+        let data = grid.data.clone();
         let col_config = ColConfig::from_grid_head(&grid.head);
         println!("col_config: {:?}", col_config);
-        Self::new(cx, id, col_config, data)
+        Self::new(cx, id, col_config, data, grid.head)
     }
 
     pub fn identify_row_views(cx: &mut ViewContext<Self>, col_config: &Vec<ColConfig>, data: &Vec<Vec<Value>>) -> Vec<RowView> {
@@ -310,7 +311,12 @@ impl Table {
                         let cell = &row[colid];
                         let view = cx.new_view(|cx| {
                             let mut input = TextInput::new(cx);
-                            input.set_text(cell.repr(), cx);
+                            let text = cell.repr();
+                            if text.is_empty() {
+                                input.set_text("0", cx);
+                            } else {
+                                input.set_text(text, cx);
+                            }
                             input
                         });
                         let r = rowid.clone();
@@ -367,12 +373,16 @@ impl Table {
         }).collect::<Vec<_>>().join("\n")
     }
 
-    pub fn collect_data(&self) -> Vec<Vec<Value>> {
+    pub fn collect_data(&self) -> Grid {
         let mut rows = Vec::new();
         for row in self.data.iter() {
             rows.push(row.clone());
         }
-        rows
+        let grid = Grid {
+            head: self.grid_head.clone(),
+            data: rows,
+        };
+        grid
     }
 
     pub fn collect_data_obj(&self) -> Value {

@@ -7,13 +7,13 @@ use autogui::widget::button::Button;
 use autogui::widget::tab::{TabPane, TabView};
 use autogui::widget::dropdown::Dropdown;
 use autogui::widget::dropzone::DropZone;
-use autogui::widget::table::{Align, ColConfig, Row, Table};
+use autogui::widget::table::{Align, ColConfig, Table};
 use autogui::widget::util::{col, row};
 use autogui::widget::list::List;
 use autogui::widget::pane::PaneSide;
 use autolang::ast::{Node, Expr, Key, Name, Stmt, Arg};
-use autoval::{Value, Grid, Args};
-use gpui::{Div, SharedString, ViewContext, View, AnyView, ElementId, Render, IntoElement, ReadGlobal};
+use autoval::{ValueKey, Value, Grid};
+use gpui::{Div, SharedString, ViewContext, View, AnyView, ElementId, Render, IntoElement};
 use gpui::prelude::*;
 
 pub struct DynaView {
@@ -359,9 +359,10 @@ pub fn add_table_view( node: &Node, spec: &mut WidgetSpec, idx: usize, cx: &mut 
             Some(Arg::Pos(expr)) => spec.eval_expr(&expr),
             _=> Value::Nil,
         };
+        let head = convert_value_to_grid_head(&config);
         let config = convert_value_to_table_config(&config);
         let data = convert_value_to_table_data(&data, &config);
-        cx.new_view(|cx| Table::new(cx, table_id, config, data)).into()
+        cx.new_view(|cx| Table::new(cx, table_id, config, data, head)).into()
     } else {
         cx.new_view(|cx| Table::from_grid(cx, table_id, Grid::default())).into()
     }
@@ -498,6 +499,24 @@ pub fn node_view_dropdown(node: &Node, spec: &mut WidgetSpec, idx: usize, cx: &m
     let options = options.iter().map(|o| o.to_string().into()).collect::<Vec<SharedString>>();
     let view = cx.new_view(|cx| Dropdown::new(ElementId::Name(title.into()), options, None, cx));
     view.into()
+}
+
+pub fn convert_value_to_grid_head(value: &Value) -> Vec<(ValueKey, Value)> {    
+    match value {
+        Value::Array(array) => {
+            let mut head = vec![];
+            for item in array.iter() {
+                match item {
+                    Value::Obj(obj) => {
+                        head.push((ValueKey::Str(obj.get_str_or("id", "")), item.clone()))
+                    }
+                    _ => (),
+                }
+            }
+            head
+        }
+        _ => vec![],
+    }
 }
 
 pub fn convert_value_to_table_config(value: &Value) -> Vec<ColConfig> {
