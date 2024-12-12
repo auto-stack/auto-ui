@@ -50,26 +50,35 @@ widget counter {
 ### Table in a workspace
 
 ```rust
-widget counter {
-    model {
-        var count = 0
+app {
+    left {
+        list(items)
     }
-    view {
-        button("+") {
-            onclick: || count = count + 1
+    center {
+        tabs {
+            tab("service") {
+                table("service", ref service_grid)
+            }
+            tab("signals") {
+                text("signals")
+            }
+            tab("messages") {
+                text("messages")
+            }
         }
-        text(f"Count: $count")
-        button("-") {
-            onclick: || count = count - 1
+    }
+    right {
+        button("right now") {
+            onclick : || message("right now")
         }
-        button("reset") {
-            onclick: || count = 0
-        }
+    }
+    bottom {
+        text("bottom pane")
     }
 }
 ```
 
-![Tables](https://foruda.gitee.com/images/1733982315033044954/779f409d_142056.png "Tables")
+![Tables](./assets/table.png)
 
 ## References
 

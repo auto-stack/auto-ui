@@ -26,7 +26,7 @@ AutoUI底层采用[GPUI](https://www.gpui.rs/)图形库，
 
 ### 复杂表格
 
-![Tables](https://foruda.gitee.com/images/1732259086740205518/b291e9f9_142056.png "Tables")
+![Tables](./assets/table.png)
 
 ## 参考
 
