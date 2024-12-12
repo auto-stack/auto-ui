@@ -234,9 +234,6 @@ impl Table {
             });
         }).detach();
         let row_views = Self::identify_row_views(cx, &col_config, &data);
-        if data.len() > 0 {
-            println!("first row data: {:?}", data[0]);
-        }
         Self {
             id, 
             bounds: Bounds::default(),
@@ -257,7 +254,6 @@ impl Table {
     pub fn from_grid(cx: &mut ViewContext<Self>, id: String, grid: Grid) -> Self {
         let data = grid.data.clone();
         let col_config = ColConfig::from_grid_head(&grid.head);
-        println!("col_config: {:?}", col_config);
         Self::new(cx, id, col_config, data, grid.head)
     }
 

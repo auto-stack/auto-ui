@@ -54,7 +54,6 @@ impl Viewable for DynaView {
     fn new(cx: &mut ViewContext<Self>) -> Self {
         // let mut state = State::new();
         // state.set_int("count", 0);
-        println!("DynaView created");
         // cx.observe_global::<GlobalSpecState>(|v, cx| {
         //     println!("Global Spec updated!");
         //     let spec = GlobalSpecState::global(cx);
@@ -332,7 +331,6 @@ pub fn add_list(mut div: Div, node: &Node, spec: &mut WidgetSpec, cx: &mut ViewC
 }
 
 pub fn add_table_view( node: &Node, spec: &mut WidgetSpec, idx: usize, cx: &mut ViewContext<'_, DynaView>) -> AnyView {
-    println!("add table view: {:?}", node.args);
     let len = node.args.len();
     let table_id = match node.args.get(0) {
         Some(Arg::Pos(Expr::Str(id))) => id,
@@ -343,7 +341,6 @@ pub fn add_table_view( node: &Node, spec: &mut WidgetSpec, idx: usize, cx: &mut 
             Some(Arg::Pos(expr)) => spec.eval_expr(&expr),
             _=> Value::Nil,
         };
-        println!("grid: {}", &grid);
         if let Value::Grid(grid) = grid {
             let view = cx.new_view(|cx| Table::from_grid(cx, table_id, grid));
             view.into()
