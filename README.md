@@ -1,9 +1,9 @@
-## Auto UI
+## AutoUI
 
-Auto-ui is a UI Framework based on Rust and Auto lang.
+AutoUI is a UI Framework based on Rust and AutoLang.
 
-Auto-ui uses [GPUI](https://www.gpui.rs/) as the underlying graphics library,
-and refers to [GPUI-Component](https://github.com/longbridgeapp/gpui-component) for component design and implementation.
+AutoUI uses [GPUI](https://www.gpui.rs/) as the underlying graphics library,
+and refers to [GPUI-Component](https://github.com/longbridgeapp/gpui-component) for component design and implementations.
 
 
 ## Examples
