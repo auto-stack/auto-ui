@@ -115,6 +115,7 @@ impl RenderOnce for Button {
             .id("button")
             .flex()
             .flex_row()
+            .min_w(px(80.0))
             .cursor_pointer()
             .bg(style.bg)
             .text_color(style.text_color)

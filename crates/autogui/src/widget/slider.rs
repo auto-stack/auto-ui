@@ -59,7 +59,7 @@ impl Slider {
 
         div()
             .id("slider-thumb")
-            .on_drag(DragThumb(entity_id), |drag, cx| {
+            .on_drag(DragThumb(entity_id), |drag, points, cx| {
                 cx.stop_propagation();
                 cx.new_view(|_| drag.clone())
             })
