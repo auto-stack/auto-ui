@@ -13,6 +13,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use autolang::scope::Universe;
 use autolang::interp::Interpreter;
+use autolang::eval::EvalTempo;
 use autogui::app::init;
 
 pub struct RootView {
@@ -142,18 +143,17 @@ pub struct DynaApp {
 
 impl DynaApp {
     pub fn new(path: &str) -> Self {
+        let mut interpreter = Interpreter::new();
+        let evaler = &mut interpreter.evaler;
+        evaler.set_tempo("center", EvalTempo::LAZY);
+        evaler.set_tempo("top", EvalTempo::LAZY);
+        evaler.set_tempo("left", EvalTempo::LAZY);
+        evaler.set_tempo("right", EvalTempo::LAZY);
+        evaler.set_tempo("bottom", EvalTempo::LAZY);
         Self {
             app: App::new().with_assets(Assets),
             path: path.to_string(),
-            interpreter: Rc::new(RefCell::new(Interpreter::new())),
-        }
-    }
-
-    pub fn new_with_interpreter(path: &str, interpreter: Rc<RefCell<Interpreter>>) -> Self {
-        Self {
-            app: App::new().with_assets(Assets),
-            path: path.to_string(),
-            interpreter,
+            interpreter: Rc::new(RefCell::new(interpreter)),
         }
     }
 
