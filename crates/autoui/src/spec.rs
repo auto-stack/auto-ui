@@ -75,7 +75,7 @@ impl Spec {
     }
 
     pub fn set_state(&self, state: &mut State) {
-        let widget = &self.scope().widget;
+        let widget = &self.scope().widget();
         match widget {
             Value::Widget(widget) => {
                 let model = &widget.model;
@@ -104,7 +104,7 @@ impl Spec {
     }
 
     pub fn get_view(&self) -> ast::View {
-        match &self.scope().widget {
+        match &self.scope().widget() {
             Value::Widget(widget) => {
                 let metaid = &widget.view_id;
                 match metaid {
@@ -136,7 +136,7 @@ impl Spec {
     }
 
     pub fn get_widget(&self) -> Value {
-        self.scope().widget.clone()
+        self.scope().widget().clone()
     }
 
     pub fn eval_value(&mut self, value: &Value) -> Value {
@@ -200,7 +200,7 @@ impl WidgetSpec {
             Ok(result) => {
                 self.scope = result.scope.clone();
                 let scope = result.scope.borrow();
-                let widget = scope.widget.clone();
+                let widget = scope.widget().clone();
                 self.widget = widget;
             }
             Err(e) => {

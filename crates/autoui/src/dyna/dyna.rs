@@ -204,7 +204,7 @@ fn parse_node(name: &str, node: &Node, spec: &mut WidgetSpec, idx: usize, cx: &m
         _ => {
             // try lookup widget in scope
             println!("lookup widget: {}", name);
-            let widget = &spec.scope.borrow().widget;
+            let widget = &spec.scope.borrow().widget();
             match widget {
                 Value::Widget(w) => {
                     if w.name == name {
