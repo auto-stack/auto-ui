@@ -13,7 +13,11 @@ gpui = { version = "0.1.0", path = "crates/gpui-dynamic", package = "gpui-dynami
 # switch to this static lib for release mode
 # gpui = { git = "https://github.com/zed-industries/zed" }
 
-autogui = { path = "crates/autogui" }
+auto-widgets = { path = "crates/auto-widgets" }
+gpui-widgets = { path = "crates/gpui-widgets" }
+auto-adapter = { path = "crates/auto-adapter" }
+auto-gui = { path = "crates/auto-gui" }
+auto-ui = { path = "crates/auto-ui" }
 
 # tools
 serde = "1.0.210"

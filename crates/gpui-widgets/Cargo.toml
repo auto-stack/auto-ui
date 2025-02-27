@@ -1,0 +1,8 @@
+[package]
+name = "gpui-widgets"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+autoval = { workspace = true }
+gpui = { workspace = true }

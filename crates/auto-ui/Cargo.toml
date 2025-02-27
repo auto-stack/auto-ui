@@ -1,0 +1,15 @@
+[package]
+name = "auto-ui"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["dylib"]
+
+[dependencies]
+autolang = { workspace = true }
+autoval = { workspace = true }
+auto-widgets = { workspace = true }
+auto-gui = { workspace = true }
+gpui = { workspace = true }
+auto-adapter = { workspace = true }

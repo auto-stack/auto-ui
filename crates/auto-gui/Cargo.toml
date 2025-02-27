@@ -1,0 +1,30 @@
+[package]
+name = "auto-gui"
+version = "0.1.0"
+edition = "2021"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[lib]
+crate-type = ["dylib"]
+
+[dependencies]
+autolang = { workspace = true }
+autoval = { workspace = true }
+gpui = { workspace = true }
+gpui-widgets = { workspace = true }
+auto-widgets = { workspace = true }
+auto-adapter = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+paste = { workspace = true }
+once_cell = { workspace = true }
+rust-embed = { workspace = true }
+smallvec = { workspace = true }
+unicode-segmentation = { workspace = true }
+regex = { workspace = true }
