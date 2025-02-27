@@ -1,4 +1,5 @@
 use autoval::AutoStr;
+use crate::Widget;
 
 #[derive(Clone)]
 pub struct Text {
@@ -14,6 +15,12 @@ impl Text {
 impl Default for Text {
     fn default() -> Self {
         Self { text: AutoStr::new() }
+    }
+}
+
+impl Widget for Text {
+    fn id(&self) -> AutoStr {
+        self.text.clone()
     }
 }
 
