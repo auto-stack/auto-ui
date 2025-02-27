@@ -4,8 +4,9 @@ use std::rc::Rc;
 use std::cell::RefCell;
 
 
-#[derive(Clone)]
+#[derive(Default, Clone)]
 pub enum Pane {
+    #[default]
     Empty,
     // Raw(Kids),
     Center(Kids),
@@ -30,6 +31,6 @@ pub type Kids = Vec<Kid>;
 #[derive(Clone)]
 pub enum Kid{
     // Pane(Pane),
-    Widget(Rc<RefCell<Text>>),
+    Widget(Widget),
 }
 

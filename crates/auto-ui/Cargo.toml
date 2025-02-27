@@ -10,6 +10,6 @@ crate-type = ["dylib"]
 autolang = { workspace = true }
 autoval = { workspace = true }
 auto-widgets = { workspace = true }
+gpui-widgets = { workspace = true }
 auto-gui = { workspace = true }
 gpui = { workspace = true }
-auto-adapter = { workspace = true }

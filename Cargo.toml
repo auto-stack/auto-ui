@@ -15,7 +15,6 @@ gpui = { version = "0.1.0", path = "crates/gpui-dynamic", package = "gpui-dynami
 
 auto-widgets = { path = "crates/auto-widgets" }
 gpui-widgets = { path = "crates/gpui-widgets" }
-auto-adapter = { path = "crates/auto-adapter" }
 auto-gui = { path = "crates/auto-gui" }
 auto-ui = { path = "crates/auto-ui" }
 

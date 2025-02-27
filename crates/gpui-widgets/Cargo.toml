@@ -6,3 +6,14 @@ edition = "2024"
 [dependencies]
 autoval = { workspace = true }
 gpui = { workspace = true }
+auto-widgets = { workspace = true }
+
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+paste = { workspace = true }
+once_cell = { workspace = true }
+rust-embed = { workspace = true }
+smallvec = { workspace = true }
+unicode-segmentation = { workspace = true }
+regex = { workspace = true }

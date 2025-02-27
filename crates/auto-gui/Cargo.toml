@@ -18,7 +18,6 @@ autoval = { workspace = true }
 gpui = { workspace = true }
 gpui-widgets = { workspace = true }
 auto-widgets = { workspace = true }
-auto-adapter = { workspace = true }
 anyhow = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
