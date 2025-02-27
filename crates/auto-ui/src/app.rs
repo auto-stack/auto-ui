@@ -22,7 +22,7 @@ impl AutoApp {
 
     pub fn run(&self) {
         let pane = self.pane.clone();
-        self.base.run(move |_cx| PaneView::new(pane.clone()));
+        self.base.run(move |_cx| PaneView::new(pane));
     }
 }
 

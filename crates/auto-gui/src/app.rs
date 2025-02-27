@@ -10,7 +10,7 @@ impl AutoGuiApp {
         }
     }
 
-    pub fn run<T: Render>(&self, maker: impl Fn(&mut Context<T>) -> T + 'static) {
+    pub fn run<T: Render>(&self, maker: impl FnOnce(&mut Context<T>) -> T + 'static) {
         Application::new().run(move |cx: &mut App| {
             init(cx);
             let bounds = Bounds::centered(None, size(px(800.), px(600.0)), cx);
