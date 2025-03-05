@@ -3,19 +3,22 @@ members = ["crates/*"]
 resolver = "2"
 
 [workspace.dependencies]
-# autolang = { git = "https://gitee.com/auto-stack/auto-lang"}
-autolang = { path = "../auto-lang/crates/autolang" }
-# autoval = { git = "https://gitee.com/auto-stack/auto-lang"}
-autoval = { path = "../auto-lang/crates/autoval" }
+# auto-lang = { git = "https://gitee.com/auto-stack/auto-lang"}
+auto-lang = { path = "../auto-lang/crates/auto-lang" }
+# auto-val = { git = "https://gitee.com/auto-stack/auto-lang"}
+auto-val = { path = "../auto-lang/crates/auto-val" }
+
 
 # switch to this dynamic lib for debug mode
 gpui = { version = "0.1.0", path = "crates/gpui-dynamic", package = "gpui-dynamic" }
 # switch to this static lib for release mode
 # gpui = { git = "https://github.com/zed-industries/zed" }
+gpui-component = { git = "https://github.com/longbridge/gpui-component"}
+gpui-story = { git = "https://github.com/longbridge/gpui-component", package = "story" }
 
-auto-widgets = { path = "crates/auto-widgets" }
-gpui-widgets = { path = "crates/gpui-widgets" }
-auto-gui = { path = "crates/auto-gui" }
+# auto-widgets = { path = "crates/auto-widgets" }
+# gpui-widgets = { path = "crates/gpui-widgets" }
+# auto-gui = { path = "crates/auto-gui" }
 auto-ui = { path = "crates/auto-ui" }
 
 # tools
@@ -28,4 +31,7 @@ rust-embed = "8"
 smallvec = "1.13.2"
 unicode-segmentation = "1.10"
 regex = "1.11.0"
+reqwest = "0.12.11"
+reqwest_client = { git = "https://github.com/huacnlee/zed.git", branch = "webview" }
+
 

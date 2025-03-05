@@ -7,4 +7,6 @@ edition = "2021"
 crate-type = ["dylib"]
 
 [dependencies]
-gpui = { git = "https://github.com/zed-industries/zed" }
+# gpui = { git = "https://github.com/zed-industries/zed" }
+gpui = { git = "https://github.com/huacnlee/zed.git", branch = "webview" }
+
