@@ -1,0 +1,18 @@
+type Button {
+    // data fields
+    text str
+    onclick fn
+
+    // view
+    fn view() View {
+        // actural drawing of the button
+    }
+
+    // constructor
+    fn new(text str, onclick fn) Button {
+        Button {
+            text: text,
+            onclick: onclick
+        }
+    }
+}

@@ -1,13 +1,13 @@
 use auto_ui::story::*;
-// use gpui::prelude::FluentBuilder as _;
 
 use gpui::{
-    div, Application, Styled, App, AppContext, Context, Entity, Focusable, ClickEvent, InteractiveElement, IntoElement, ParentElement, Render, Window,
+    div, Application, Styled, App, AppContext, Context, Entity, Focusable, ClickEvent, 
+    InteractiveElement, IntoElement, ParentElement, Render, Window,
+    SharedString,
 };
 
 use gpui_component::{
     h_flex,
-    gray_800,
     input::TextInput,
     button::Button,
     form::{v_form, form_field}
@@ -17,6 +17,7 @@ pub struct LoginStory {
     focus_handle: gpui::FocusHandle,
     name_input: Entity<TextInput>,
     password_input: Entity<TextInput>,
+    status: SharedString,
 }
 
 impl Story for LoginStory {
@@ -39,15 +40,12 @@ impl LoginStory {
             focus_handle: cx.focus_handle(),
             name_input: cx.new(|cx| TextInput::new(w, cx)),
             password_input: cx.new(|cx| TextInput::new(w, cx)),
+            status: SharedString::default(),
         }
     }
 
     pub fn view(window: &mut Window, cx: &mut App) -> Entity<Self> {
         cx.new(|cx| Self::new(window, cx))
-    }
-
-    fn on_login(_ev: &ClickEvent, _w: &mut Window, _cx: &mut App) {
-        println!("Login");
     }
 
     fn on_cancel(_ev: &ClickEvent, _w: &mut Window, _cx: &mut App) {
@@ -62,7 +60,7 @@ impl Focusable for LoginStory {
 }
 
 impl Render for LoginStory {
-    fn render(&mut self, _: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         div()
             .flex()
             .id("login-story")
@@ -91,10 +89,15 @@ impl Render for LoginStory {
                 h_flex()
                     .w_full()
                     .gap_5()
-                    .child(Button::new("login").label("Login").on_click(Self::on_login))
+                    .child(Button::new("login").label("Login").on_click(
+                        cx.listener(|this, _, _, _cx| {
+                            this.status = SharedString::from("Logging in...");
+                        })
+                    ))
                     .child(div().flex_grow())
                     .child(Button::new("cancel").label("Cancel").on_click(Self::on_cancel))
             )
+            .child(self.status.clone())
     }
 }
 

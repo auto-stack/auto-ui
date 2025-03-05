@@ -1,0 +1,43 @@
+type Login {
+    // data fields
+    name str
+    pwd str
+
+    // view
+    fn view() View {
+        col {
+            input(name) {}
+            input_pwd(pwd) {}
+
+            row {
+                button("login") {
+                    onclick: do_login
+                }
+                button("cancel") {
+                    onclick: do_cancel
+                }
+            }
+        }
+    }
+
+    // node
+    fn login(args Args, props Obj) {
+    }
+
+    // actions
+    fn do_login() {
+        print("login");
+    }
+
+    fn do_cancel() {
+        print("cancel");
+    }
+}
+
+use ui:app
+
+app("login") {
+    center {
+        login() {}
+    }
+}
