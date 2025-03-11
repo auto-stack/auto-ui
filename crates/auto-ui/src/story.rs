@@ -447,7 +447,7 @@ impl Panel for StoryContainer {
     }
 
     fn popup_menu(&self, menu: PopupMenu, _window: &Window, _cx: &App) -> PopupMenu {
-        menu.track_focus(&self.focus_handle)
+        menu//.track_focus(&self.focus_handle)
             .menu("Info", Box::new(ShowPanelInfo))
     }
 

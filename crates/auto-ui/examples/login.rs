@@ -1,4 +1,7 @@
-use auto_ui::story::*;
+use auto_ui::*;
+use gpui_component::v_flex;
+use auto_ui::layout::center;
+use gpui_component::ActiveTheme;
 
 use gpui::{
     div, Application, Styled, App, AppContext, Context, Entity, Focusable, ClickEvent, 
@@ -61,13 +64,13 @@ impl Focusable for LoginStory {
 
 impl Render for LoginStory {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        div()
-            .flex()
+        center().child(
+            v_flex()
             .id("login-story")
-            .flex_col()
             .items_center()
             .justify_center()
             .border_1()
+            .border_color(cx.theme().border)
             .p_4()
             .rounded_lg()
             .gap_6()
@@ -97,29 +100,7 @@ impl Render for LoginStory {
                     .child(div().flex_grow())
                     .child(Button::new("cancel").label("Cancel").on_click(Self::on_cancel))
             )
-            .child(self.status.clone())
-    }
-}
-
-pub struct Login {
-    root: Entity<LoginStory>,
-}
-
-impl Login {
-    pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let root = LoginStory::view(window, cx);
-
-        Self { root }
-    }
-
-    fn view(window: &mut Window, cx: &mut App) -> Entity<Self> {
-        cx.new(|cx| Self::new(window, cx))
-    }
-}
-
-impl Render for Login {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        div().p_4().size_full().flex().flex_col().items_center().justify_center().child(self.root.clone())
+            .child(self.status.clone()))
     }
 }
 
@@ -130,6 +111,6 @@ fn main() {
         init(cx);
         cx.activate(true);
 
-        create_new_window_sized("Login Example", Login::view, cx, 800, 600);
+        create_new_window_sized("Login Example", StoryView::view::<LoginStory>, cx, 800, 600);
     });
 }

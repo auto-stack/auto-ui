@@ -1,5 +1,6 @@
 use auto_ui::story::*;
 use gpui::*;
+use auto_ui::StoryView;
 
 use gpui::{
     div, App, AppContext, Context, Entity, Focusable, IntoElement, ParentElement, Render, Window,
@@ -60,27 +61,6 @@ impl Render for HelloStory {
     }
 }
 
-pub struct Hello {
-    root: Entity<HelloStory>,
-}
-
-impl Hello {
-    pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let root = HelloStory::view(window, cx);
-
-        Self { root }
-    }
-
-    fn view(window: &mut Window, cx: &mut App) -> Entity<Self> {
-        cx.new(|cx| Self::new(window, cx))
-    }
-}
-
-impl Render for Hello {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        div().p_4().size_full().child(self.root.clone())
-    }
-}
 
 fn main() {
     let app = Application::new().with_assets(Assets);
@@ -89,6 +69,6 @@ fn main() {
         init(cx);
         cx.activate(true);
 
-        create_new_window_sized("Hello Example", Hello::view, cx, 800, 600);
+        create_new_window_sized("Hello Example", StoryView::view::<HelloStory>, cx, 800, 600);
     });
 }

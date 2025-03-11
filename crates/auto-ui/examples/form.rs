@@ -1,5 +1,6 @@
 use gpui::*;
 use auto_ui::story::*;
+use auto_ui::StoryView;
 
 use gpui::{
     actions, div, prelude::FluentBuilder as _, App, AppContext, Axis, Context, Entity, Focusable,
@@ -219,29 +220,6 @@ impl Render for FormStory {
     }
 }
 
-
-pub struct Example {
-    root: Entity<FormStory>,
-}
-
-impl Example {
-    pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let root = FormStory::view(window, cx);
-
-        Self { root }
-    }
-
-    fn view(window: &mut Window, cx: &mut App) -> Entity<Self> {
-        cx.new(|cx| Self::new(window, cx))
-    }
-}
-
-impl Render for Example {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        div().p_4().size_full().child(self.root.clone())
-    }
-}
-
 fn main() {
     let app = Application::new().with_assets(Assets);
 
@@ -249,6 +227,6 @@ fn main() {
         init(cx);
         cx.activate(true);
 
-        create_new_window_sized("Form Example", Example::view, cx, 1280, 768);
+        create_new_window_sized("Form Example", StoryView::view::<FormStory>, cx, 1280, 768);
     });
 }
