@@ -1,6 +1,6 @@
 use auto_ui::*;
-use gpui_component::v_flex;
-use auto_ui::layout::center;
+use gpui::prelude::FluentBuilder;
+use auto_ui::layout::row;
 use gpui_component::ActiveTheme;
 
 use gpui::{
@@ -64,11 +64,9 @@ impl Focusable for LoginStory {
 
 impl Render for LoginStory {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        center().child(
-            v_flex()
+        row().center().child(
+            col()
             .id("login-story")
-            .items_center()
-            .justify_center()
             .border_1()
             .border_color(cx.theme().border)
             .p_4()
@@ -76,18 +74,19 @@ impl Render for LoginStory {
             .gap_6()
             .w_2_5()
             .child(
-                v_form()
-                    .child(
-                        form_field()
-                            .label("Name: ")
-                            .child(self.name_input.clone()),
-                    )
-                    .child(
-                        form_field()
-                            .label("Password: ")
-                            .child(self.password_input.clone()),
-                    )
-                )
+                row().w_begin().child(
+                    v_form()
+                        .child(
+                            form_field()
+                                .label("Name: ")
+                                .child(self.name_input.clone()),
+                        )
+                        .child(
+                            form_field()
+                                .label("Password: ")
+                                .child(self.password_input.clone()),
+                        )
+                    ))
             .child(
                 h_flex()
                     .w_full()
@@ -100,7 +99,7 @@ impl Render for LoginStory {
                     .child(div().flex_grow())
                     .child(Button::new("cancel").label("Cancel").on_click(Self::on_cancel))
             )
-            .child(self.status.clone()))
+            .when(!self.status.is_empty(), |e| e.child(self.status.clone())))
     }
 }
 

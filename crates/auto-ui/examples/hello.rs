@@ -1,12 +1,13 @@
 use auto_ui::story::*;
 use gpui::*;
 use auto_ui::StoryView;
+use auto_ui::layout::*;
 
 use gpui::{
     div, App, AppContext, Context, Entity, Focusable, IntoElement, ParentElement, Render, Window,
 };
 
-use gpui_component::{h_flex, label::Label, v_flex};
+use gpui_component::label::Label;
 
 pub struct HelloStory {
     focus_handle: gpui::FocusHandle,
@@ -51,12 +52,8 @@ impl Focusable for HelloStory {
 
 impl Render for HelloStory {
     fn render(&mut self, _: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        v_flex().size_full().items_center().justify_center().child(
-            h_flex()
-                .w_full()
-                .justify_center()
-                .items_center()
-                .child(Label::new("Hello World!")),
+        center().child(
+                Label::new("Hello World!")
         )
     }
 }
