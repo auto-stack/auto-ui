@@ -3,9 +3,7 @@ use gpui::*;
 use auto_ui::StoryView;
 use auto_ui::layout::*;
 
-use gpui::{
-    div, App, AppContext, Context, Entity, Focusable, IntoElement, ParentElement, Render, Window,
-};
+use gpui::{App, AppContext, Context, Entity, Focusable, IntoElement, ParentElement, Render, Window};
 
 use gpui_component::label::Label;
 

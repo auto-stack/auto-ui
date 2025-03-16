@@ -18,3 +18,5 @@ reqwest = { workspace = true }
 anyhow = { workspace = true }
 reqwest_client = { workspace = true }
 rust-embed = { workspace = true }
+auto-gen = { workspace = true }
+auto-atom = { workspace = true }
