@@ -172,7 +172,7 @@ pub fn init(cx: &mut App) {
     AppState::init(cx);
 
     let http_client = std::sync::Arc::new(
-        reqwest_client::ReqwestClient::user_agent("gpui-component/story").unwrap(),
+        reqwest_client::ReqwestClient::user_agent("auto-ui/story").unwrap(),
     );
     cx.set_http_client(http_client);
 

@@ -8,7 +8,7 @@ fn main() {
     let atom = Atom::node(data.root);
     println!("{}", atom);
     let gen = AutoGen::new()
-        .molds(vec![Mold::from_file(AutoPath::new("crates/auto-ui/examples/story.at.rs"))])
+        .molds(vec![Mold::from_file(AutoPath::new("assets/templates/story.at.rs"))])
         .data(atom)
         .out(AutoPath::new("crates/auto-ui/examples/"));
     let result = gen.gen();
