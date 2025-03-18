@@ -74,6 +74,6 @@ fn main() {
         init(cx);
         cx.activate(true);
 
-        create_new_window_sized("Hello", StoryView::view::<LoginStory>, cx, 800, 600);
+        create_new_window_sized("Hello Example", StoryView::view::<LoginStory>, cx, 800, 600);
     });
 }

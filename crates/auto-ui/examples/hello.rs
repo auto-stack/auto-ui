@@ -36,10 +36,6 @@ impl HelloStory {
         cx.new(|cx| Self::new(window, cx))
     }
 
-    #[allow(unused)]
-    fn on_click(checked: &bool, window: &mut Window, cx: &mut App) {
-        println!("Check value changed: {}", checked);
-    }
 }
 
 impl Focusable for HelloStory {

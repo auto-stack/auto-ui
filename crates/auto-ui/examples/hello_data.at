@@ -1,0 +1,12 @@
+title: "Hello"
+description: "Hello Example"
+
+widgets: []
+
+data("hello") {
+    name: "hello",
+    value: "Hello World!",
+    kind: "SharedString",
+}
+
+code: "center().child(Label::new(self.hello.clone()))"

@@ -1,12 +1,18 @@
-title: "Hello"
-description: "Hello Example"
+// use ui:*
 
-widgets: []
+type Hello {
+    var msg str
 
-data("hello") {
-    name: "hello",
-    value: "Hello World!",
-    kind: "SharedString",
+    fn view() {
+        center {
+            label(self.msg) {}
+        }
+    }
 }
 
-code: "center().child(Label::new(self.hello.clone()))"
+fn main() {
+    app("Hello Example") {
+        hello("Hello World!") {}
+    }
+}
+
