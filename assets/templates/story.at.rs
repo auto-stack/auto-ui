@@ -4,9 +4,8 @@ use auto_ui::layout::row;
 use gpui_component::ActiveTheme;
 
 use gpui::{
-    div, Application, Styled, App, AppContext, Context, Entity, Focusable, ClickEvent, 
-    InteractiveElement, IntoElement, ParentElement, Render, Window,
-    SharedString,
+    Application, App, AppContext, Context, Entity, Focusable, ClickEvent, 
+    Render, Window, SharedString, IntoElement, ParentElement,
 };
 
 use gpui_component::{
@@ -17,23 +16,20 @@ use gpui_component::{
     form::{v_form, form_field}
 };
 
-pub struct LoginStory {
+pub struct ${story.name}Story {
     focus_handle: gpui::FocusHandle,
-    $ for w in widgets {
-        ${w.name}: Entity<${w.kind}>,
-    $ }
-    $ for d in datas {
-        ${d.name}: ${d.kind},
-    $ }
+$ for f in story.fields {
+    ${f.name}: ${f.kind},
+$ }
 }
 
-impl Story for LoginStory {
+impl Story for ${story.name}Story {
     fn title() -> &'static str {
-        "${title}"
+        "${story.name}"
     }
 
     fn description() -> &'static str {
-        "${description}"
+        "${story.name} Example"
     }
 
     fn new_view(window: &mut Window, cx: &mut App) -> Entity<impl Render + Focusable> {
@@ -41,16 +37,13 @@ impl Story for LoginStory {
     }
 }
 
-impl LoginStory {
+impl ${story.name}Story {
     pub(crate) fn new(w: &mut Window, cx: &mut App) -> Self {
         Self {
             focus_handle: cx.focus_handle(),
-            $ for w in widgets {
-                ${w.name}: cx.new(|cx| ${w.kind}::new(w, cx)),
-            $ }
-            $ for d in datas {
-                ${d.name}: ${d.kind}::new("${d.value}"),
-            $ }
+        $ for f in story.fields {
+            ${f.name}: ${f.kind}::new("${f.value}"),
+        $ }
         }
     }
 
@@ -58,20 +51,17 @@ impl LoginStory {
         cx.new(|cx| Self::new(window, cx))
     }
 
-    fn on_cancel(_ev: &ClickEvent, _w: &mut Window, _cx: &mut App) {
-        println!("Cancel");
-    }
 }
 
-impl Focusable for LoginStory {
+impl Focusable for ${story.name}Story {
     fn focus_handle(&self, _: &gpui::App) -> gpui::FocusHandle {
         self.focus_handle.clone()
     }
 }
 
-impl Render for LoginStory {
+impl Render for ${story.name}Story {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        ${code}
+        ${story.code}
     }
 }
 
@@ -82,6 +72,6 @@ fn main() {
         init(cx);
         cx.activate(true);
 
-        create_new_window_sized("${title}", StoryView::view::<LoginStory>, cx, 800, 600);
+        create_new_window_sized("${app.title}", StoryView::view::<${story.name}Story>, cx, 800, 600);
     });
 }

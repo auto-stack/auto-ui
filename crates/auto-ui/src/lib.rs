@@ -1,11 +1,14 @@
 mod app;
-pub mod layout;
-pub mod story;
-
-pub mod trans;
 pub use app::*;
+mod layout;
 pub use layout::*;
+pub mod story;
 pub use story::*;
+
+pub mod bridge;
+pub mod widget;
+pub mod trans;
+
 
 #[cfg(test)]
 mod tests {

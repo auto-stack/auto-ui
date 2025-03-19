@@ -1,7 +1,7 @@
 // use ui:*
 
-type Hello {
-    var msg str
+type Hello as View {
+    msg str = "Hello World"
 
     fn view() {
         center {
@@ -12,7 +12,7 @@ type Hello {
 
 fn main() {
     app("Hello Example") {
-        hello("Hello World!") {}
+        hello() {}
     }
 }
 

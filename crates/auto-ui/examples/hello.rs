@@ -1,14 +1,10 @@
-use auto_ui::story::*;
 use gpui::*;
-use auto_ui::StoryView;
-use auto_ui::layout::*;
-
-use gpui::{App, AppContext, Context, Entity, Focusable, IntoElement, ParentElement, Render, Window};
-
-use gpui_component::label::Label;
+use auto_ui::*;
+use auto_ui::bridge::*;
 
 pub struct HelloStory {
     focus_handle: gpui::FocusHandle,
+    msg: SharedString,
 }
 
 impl Story for HelloStory {
@@ -17,7 +13,7 @@ impl Story for HelloStory {
     }
 
     fn description() -> &'static str {
-        "Hello Examples"
+        "Hello Example"
     }
 
     fn new_view(window: &mut Window, cx: &mut App) -> Entity<impl Render + Focusable> {
@@ -26,9 +22,10 @@ impl Story for HelloStory {
 }
 
 impl HelloStory {
-    pub(crate) fn new(_: &mut Window, cx: &mut App) -> Self {
+    pub(crate) fn new(w: &mut Window, cx: &mut App) -> Self {
         Self {
             focus_handle: cx.focus_handle(),
+            msg: SharedString::new("Hello World"),
         }
     }
 
@@ -45,13 +42,10 @@ impl Focusable for HelloStory {
 }
 
 impl Render for HelloStory {
-    fn render(&mut self, _: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        center().child(
-                Label::new("Hello World!")
-        )
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        center().child(Label::new(self.msg.clone()))
     }
 }
-
 
 fn main() {
     let app = Application::new().with_assets(Assets);

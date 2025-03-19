@@ -30,6 +30,10 @@ impl Transpiler for UITranspiler {
     }
 }
 
+fn has_view(type_decl: &TypeDecl) -> bool {
+    type_decl.methods.iter().any(|m| m.name.text == "view")
+}
+
 impl UITranspiler {
     fn do_main(&mut self, fn_stmt: &Fn) -> AutoResult<()> {
         let mut main = Node::new("main");
@@ -43,8 +47,14 @@ impl UITranspiler {
 
     fn do_type(&mut self, type_decl: &TypeDecl) -> AutoResult<()> {
         println!("do_type");
+        if has_view(type_decl) { // View types
+            println!("has view");
+        } else { // Normal types
+
+        }
         Ok(())
     }
+
 }
 
 #[cfg(test)]
@@ -71,10 +81,10 @@ fn main() {
     }
 }
         "#;
-        let mut transpiler = UITranspiler {};
+        let mut trans = UITranspiler {};
         let mut out = Vec::new();
         let ast = parse(code).unwrap();
-        let result = transpiler.transpile(ast, &mut out);
+        let result = trans.transpile(ast, &mut out);
         println!("{}", String::from_utf8(out).unwrap());
     }
 }
