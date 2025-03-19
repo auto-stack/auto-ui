@@ -6,7 +6,6 @@ pub mod story;
 pub use story::*;
 
 pub mod bridge;
-pub mod widget;
 pub mod trans;
 
 

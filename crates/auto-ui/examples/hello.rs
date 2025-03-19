@@ -1,6 +1,20 @@
-use gpui::*;
 use auto_ui::*;
-use auto_ui::bridge::*;
+use gpui::prelude::FluentBuilder;
+use auto_ui::row;
+use gpui_component::ActiveTheme;
+
+use gpui::{
+    Application, App, AppContext, Context, Entity, Focusable, ClickEvent, 
+    Render, Window, SharedString, IntoElement, ParentElement,
+};
+
+use gpui_component::{
+    h_flex,
+    input::TextInput,
+    button::Button,
+    label::Label,
+    form::{v_form, form_field}
+};
 
 pub struct HelloStory {
     focus_handle: gpui::FocusHandle,
