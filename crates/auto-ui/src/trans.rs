@@ -4,7 +4,7 @@ use std::io::Write;
 use auto_lang::AutoResult;
 use auto_atom::Atom;
 use auto_gen::{AutoGen, Mold};
-use auto_val::{AutoStr, AutoPath, Type, Value};
+use auto_val::{AutoStr, AutoPath, Type, Value, Op};
 use auto_lang::ast;
 use auto_lang::eval;
 
@@ -76,35 +76,6 @@ impl WidgetInfo {
             root.add_kid(field_node);
         }
         root.set_prop("methods", self.methods.clone());
-        // code: "center().child(Label::new(self.msg.clone()))"
-        // evaluate fn view() code into Rust code
-        // let view_node = &self.view.root;
-        // if view_node.name.text == "center" {
-        //     code.push_str("center().child(");
-        //     for kid in &view_node.body.stmts {
-        //         if let ast::Stmt::Node(kid_node) = kid {
-        //             if kid_node.name.text == "label" {
-        //                 code.push_str("Label::new(");
-        //                 kid_node.args.args.iter().for_each(|arg| {
-        //                     match arg {
-        //                         auto_lang::ast::Arg::Pos(arg) => {
-        //                             let mut arg = arg.repr();
-        //                             if arg == "self.msg" {
-        //                                 arg = "self.msg.clone()".to_string();
-        //                             }
-        //                             code.push_str(&arg);
-
-        //                         }
-        //                         _ => {}
-        //                     }
-        //                 });
-        //                 code.push_str(")");
-        //             }
-        //         }
-        //     }
-        //     code.push_str(")");
-        // }
-        // println!("got code: {}", code);
         root.set_prop("code", Value::Str(self.view.clone()));
         root
     }
@@ -122,12 +93,12 @@ impl AppInfo {
     }
 }
 
-pub struct UITrans {
+pub struct GpuiTrans {
     pub widget: WidgetInfo,
     pub app: Option<AppInfo>,
 }
 
-impl Trans for UITrans {
+impl Trans for GpuiTrans {
     fn trans(&mut self, ast: Code, out: &mut impl Write) -> AutoResult<()> {
         for stmt in ast.stmts.into_iter() {
             match stmt {
@@ -156,7 +127,17 @@ fn has_view(type_decl: &TypeDecl) -> bool {
     type_decl.methods.iter().any(|m| m.name.text == "view")
 }
 
-impl UITrans {
+pub trait Indent {
+    fn indent(&self) -> String;
+}
+
+impl Indent for String {
+    fn indent(&self) -> String {
+        self.replace("\n", "\n    ")
+    }
+}
+
+impl GpuiTrans {
     fn new() -> Self {
         Self {
             widget: WidgetInfo::default(),
@@ -218,6 +199,8 @@ impl UITrans {
 
 
     fn do_view(&mut self, method: &ast::Fn) -> AutoResult<AutoStr> {
+
+
         let mut code: String = "".to_string();
         let view_node = &method.body.stmts.last();
         if let Some(view_node) = view_node {
@@ -226,7 +209,12 @@ impl UITrans {
                 code.push_str(&view_code);
             }
         }
-        Ok(code.into())
+
+        println!("CODE: {}", code);
+        let code = format!("fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {{ {} }}", code);
+        let parsed = syn::parse_str(code.as_str()).unwrap();
+        let pretty = prettyplease::unparse(&parsed).indent();
+        Ok(pretty.into())
     }
 
     fn do_on(&mut self, method: &ast::Fn) -> AutoResult<AutoStr> {
@@ -404,11 +392,18 @@ impl UITrans {
     fn do_args(&mut self, node: &ast::Node) -> AutoResult<AutoStr> {
         let mut args = vec![];
         for arg in node.args.args.iter() {
-            let mut arg = arg.to_code();
-            if arg == "self.msg" {
-                arg = "self.msg.clone()".to_string();
+            if let ast::Arg::Pos(pos) = arg {
+                if let ast::Expr::Bina(lhs, op, rhs) = pos {
+                    if let Op::Dot = op {
+                        let arg = lhs.to_code();
+                        let field = rhs.to_code();
+                        args.push(format!("{}.{}.clone()", arg, field));
+                        continue;
+                    }
+                }
             }
-            args.push(arg);
+            // else
+            args.push(arg.to_code());
         }
         let code = args.join(", ");
         Ok(code.into())
@@ -417,21 +412,23 @@ impl UITrans {
     fn gen(&mut self) -> AutoResult<()> {
         println!("gen");
         let mut story_node = auto_val::Node::new("story");
-        if let Some(app) = &self.app {
-            story_node.add_kid(self.widget.to_node());
-            story_node.add_kid(app.to_node());
-            story_node.set_prop("name", self.widget.name.clone());
-            let atom = Atom::node(story_node);
-            println!("{}", atom);
+        let Some(app) = &self.app else {
+            return Ok(());
+        };
 
-            // 3. feed atom to generator and generate code
-            let gen = AutoGen::new()
-                .molds(vec![Mold::from_file(AutoPath::new("../../assets/templates/story.at.rs"))])
-                .data(atom)
-                .out(AutoPath::new("../../crates/auto-ui/examples/"));
-            let result = gen.gen();
-            println!("{}", result);
-        }
+        story_node.add_kid(self.widget.to_node());
+        story_node.add_kid(app.to_node());
+        story_node.set_prop("name", self.widget.name.clone());
+        let atom = Atom::node(story_node);
+        println!("{}", atom);
+
+        // 3. feed atom to generator and generate code
+        let gen = AutoGen::new()
+            .molds(vec![Mold::from_file(AutoPath::new("../../assets/templates/story.at.rs"))])
+            .data(atom)
+            .out(AutoPath::new("../../crates/auto-ui/examples/"));
+        let result = gen.gen();
+        println!("{}", result);
     
         Ok(())
     }
@@ -447,12 +444,13 @@ mod tests {
         let code = r#"
 type Hello as View {
     msg str = "Hello World"
+    button_label str = "Click"
 
     fn view() {
         center {
             col {
                 label(self.msg) {}
-                button("Click me") {
+                button(self.button_label) {
                     onclick: "button-clicked"
                 }
             }
@@ -470,7 +468,7 @@ fn main() {
     }
 }
         "#;
-        let mut trans = UITrans::new();
+        let mut trans = GpuiTrans::new();
         let mut out = Vec::new();
         let ast = parse(code).unwrap();
         trans.trans(ast, &mut out).unwrap();
@@ -485,7 +483,7 @@ fn main() {
             self.msg = "Clicked"
         }
         "#;
-        let mut trans = UITrans::new();
+        let mut trans = GpuiTrans::new();
         let ast = parse(code).unwrap();
         trans.do_method(&ast.stmts[0].as_fn().unwrap()).unwrap();
         println!("{}", trans.widget.methods[0]);

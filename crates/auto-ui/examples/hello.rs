@@ -19,6 +19,7 @@ use gpui_component::{
 pub struct HelloStory {
     focus_handle: gpui::FocusHandle,
     msg: SharedString,
+    button_label: SharedString,
 }
 
 impl Story for HelloStory {
@@ -40,6 +41,7 @@ impl HelloStory {
         Self {
             focus_handle: cx.focus_handle(),
             msg: SharedString::new("Hello World"),
+            button_label: SharedString::new("Click"),
         }
     }
 
@@ -58,10 +60,22 @@ impl Focusable for HelloStory {
 
 impl Render for HelloStory {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        center().child(col().child(Label::new(self.msg.clone())).child(Button::new("Click me").label("Click me")
-                        .on_click(cx.listener(|v, _, _, cx| {
-                            v.on("button-clicked".into());cx.notify();
-                        }))))
+        center()
+            .child(
+                col()
+                    .child(Label::new(self.msg.clone()))
+                    .child(
+                        Button::new(self.button_label.clone())
+                            .label(self.button_label.clone())
+                            .on_click(
+                                cx
+                                    .listener(|v, _, _, cx| {
+                                        v.on("button-clicked".into());
+                                        cx.notify();
+                                    }),
+                            ),
+                    ),
+            )
     }
 }
 

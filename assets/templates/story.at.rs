@@ -63,9 +63,7 @@ impl Focusable for ${story.name}Story {
 }
 
 impl Render for ${story.name}Story {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        ${story.code}
-    }
+    ${story.code}
 }
 
 fn main() {

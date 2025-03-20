@@ -34,5 +34,8 @@ unicode-segmentation = "1.10"
 regex = "1.11.0"
 reqwest = "0.12.11"
 reqwest_client = { git = "https://github.com/huacnlee/zed.git", branch = "webview" }
+prettyplease = "0.2.10"
+syn = { version = "2", default-features = false, features = ["full", "parsing"] }
+
 
 

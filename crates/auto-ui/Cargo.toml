@@ -20,3 +20,5 @@ reqwest_client = { workspace = true }
 rust-embed = { workspace = true }
 auto-gen = { workspace = true }
 auto-atom = { workspace = true }
+prettyplease = { workspace = true }
+syn = { workspace = true }
