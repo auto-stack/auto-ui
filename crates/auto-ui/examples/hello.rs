@@ -47,6 +47,7 @@ impl HelloStory {
         cx.new(|cx| Self::new(window, cx))
     }
 
+    pub fn on(&mut self, ev: SharedString) {self.msg=ev}
 }
 
 impl Focusable for HelloStory {
@@ -57,7 +58,10 @@ impl Focusable for HelloStory {
 
 impl Render for HelloStory {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        center().child(Label::new(self.msg.clone()))
+        center().child(col().child(Label::new(self.msg.clone())).child(Button::new("Click me").label("Click me")
+                        .on_click(cx.listener(|v, _, _, cx| {
+                            v.on("button-clicked".into());cx.notify();
+                        }))))
     }
 }
 

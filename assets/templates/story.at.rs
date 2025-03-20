@@ -51,6 +51,9 @@ impl ${story.name}Story {
         cx.new(|cx| Self::new(window, cx))
     }
 
+$ for m in story.methods {
+    ${m}
+$ }
 }
 
 impl Focusable for ${story.name}Story {

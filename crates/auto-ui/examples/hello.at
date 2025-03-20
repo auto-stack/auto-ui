@@ -6,6 +6,9 @@ type Hello as View {
     fn view() {
         center {
             label(self.msg) {}
+            button("Click me") {
+                onclick: "button-click"
+            }
         }
     }
 }
