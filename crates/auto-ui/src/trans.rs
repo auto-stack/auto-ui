@@ -251,10 +251,8 @@ impl GpuiTrans {
         }
 
         let code = format!("fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {{ {} {} }}", code_header, code);
-        println!("CODE: {}", code);
-        let parsed = syn::parse_str(code.as_str()).unwrap();
-        let pretty = prettyplease::unparse(&parsed).indent();
-        Ok(pretty.into())
+        let pretty = self.pretty(&code);
+        Ok(pretty)
     }
 
     fn do_on(&mut self, method: &ast::Fn) -> AutoResult<AutoStr> {
@@ -262,8 +260,8 @@ impl GpuiTrans {
         let sig = self.do_sig(method)?;
         let body = self.do_method_body(method)?;
         let code = format!("{} {}", sig, body);
-        // self.methods.push(code.into());
-        Ok(code.into())
+        let pretty = self.pretty(&code);
+        Ok(pretty)
     }
 
     fn do_method_body(&mut self, method: &ast::Fn) -> AutoResult<AutoStr> {
@@ -569,6 +567,12 @@ impl GpuiTrans {
     
         Ok(())
     }
+
+    fn pretty(&mut self, code: impl Into<AutoStr>) -> AutoStr {
+        let parsed = syn::parse_str(code.into().as_str()).unwrap();
+        let pretty = prettyplease::unparse(&parsed).indent();
+        pretty.into()
+    }
 }
 
 #[cfg(test)]
@@ -633,7 +637,7 @@ type Login as View {
         center {
             col {
                 label("Username") {}
-                input(username) {}
+                input(self.username) {}
                 label("Password") {}
                 input(password) {}
                 button("Login") {

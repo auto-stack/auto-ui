@@ -55,7 +55,10 @@ impl LoginStory {
         cx.new(|cx| Self::new(window, cx))
     }
 
-    pub fn on(&mut self, ev: SharedString) {self.status = format!("Login {} ...", self.username).into();}
+    pub fn on(&mut self, ev: SharedString) {
+        self.status = format!("Login {} ...", self.username).into();
+    }
+    
 }
 
 impl Focusable for LoginStory {
