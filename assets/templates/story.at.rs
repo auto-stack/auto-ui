@@ -42,7 +42,7 @@ impl ${story.name}Story {
         Self {
             focus_handle: cx.focus_handle(),
         $ for f in story.fields {
-            ${f.name}: ${f.kind}::new("${f.value}"),
+            ${f.init_code}
         $ }
         }
     }

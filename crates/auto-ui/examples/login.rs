@@ -4,23 +4,25 @@ use auto_ui::row;
 use gpui_component::ActiveTheme;
 
 use gpui::{
-    div, Application, Styled, App, AppContext, Context, Entity, Focusable, ClickEvent, 
-    InteractiveElement, IntoElement, ParentElement, Render, Window,
-    SharedString,
+    Application, App, AppContext, Context, Entity, Focusable, ClickEvent, 
+    Render, Window, SharedString, IntoElement, ParentElement,
 };
 
 use gpui_component::{
     h_flex,
     input::TextInput,
     button::Button,
+    label::Label,
     form::{v_form, form_field}
 };
 
 pub struct LoginStory {
     focus_handle: gpui::FocusHandle,
-    name_input: Entity<TextInput>,
-    password_input: Entity<TextInput>,
+    username: SharedString,
+    password: SharedString,
     status: SharedString,
+    input_username: Entity<TextInput>,
+    input_password: Entity<TextInput>,
 }
 
 impl Story for LoginStory {
@@ -41,9 +43,11 @@ impl LoginStory {
     pub(crate) fn new(w: &mut Window, cx: &mut App) -> Self {
         Self {
             focus_handle: cx.focus_handle(),
-            name_input: cx.new(|cx| TextInput::new(w, cx)),
-            password_input: cx.new(|cx| TextInput::new(w, cx)),
-            status: SharedString::default(),
+            username: SharedString::new("nil"),
+            password: SharedString::new("nil"),
+            status: SharedString::new(""),
+            input_username: cx.new(|cx| TextInput::new(w, cx)),
+            input_password: cx.new(|cx| TextInput::new(w, cx)),
         }
     }
 
@@ -51,9 +55,7 @@ impl LoginStory {
         cx.new(|cx| Self::new(window, cx))
     }
 
-    fn on_cancel(_ev: &ClickEvent, _w: &mut Window, _cx: &mut App) {
-        println!("Cancel");
-    }
+    pub fn on(&mut self, ev: SharedString) {self.status = format!("Login {} ...", self.username).into();}
 }
 
 impl Focusable for LoginStory {
@@ -64,43 +66,31 @@ impl Focusable for LoginStory {
 
 impl Render for LoginStory {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        row().center().child(
-            col()
-            .id("login-story")
-            .border_1()
-            .border_color(cx.theme().border)
-            .p_4()
-            .rounded_lg()
-            .gap_6()
-            .w_2_5()
+        self.username = self.input_username.read(cx).text();
+        self.password = self.input_password.read(cx).text();
+        center()
             .child(
-                row().w_begin().child(
-                    v_form()
-                        .child(
-                            form_field()
-                                .label("Name: ")
-                                .child(self.name_input.clone()),
-                        )
-                        .child(
-                            form_field()
-                                .label("Password: ")
-                                .child(self.password_input.clone()),
-                        )
-                    ))
-            .child(
-                h_flex()
-                    .w_full()
-                    .gap_5()
-                    .child(Button::new("login").label("Login").on_click(
-                        cx.listener(|this, _, _, _cx| {
-                            this.status = SharedString::from("Logging in...");
-                        })
-                    ))
-                    .child(div().flex_grow())
-                    .child(Button::new("cancel").label("Cancel").on_click(Self::on_cancel))
+                col()
+                    .child(Label::new("Username"))
+                    .child(self.input_username.clone())
+                    .child(Label::new("Password"))
+                    .child(self.input_password.clone())
+                    .child(
+                        Button::new("Login")
+                            .label("Login")
+                            .on_click(
+                                cx
+                                    .listener(|v, _, _, cx| {
+                                        v.on("button-login".into());
+                                        cx.notify();
+                                    }),
+                            ),
+                    )
+                    .child(Label::new(self.username.clone()))
+                    .child(Label::new(self.status.clone())),
             )
-            .when(!self.status.is_empty(), |e| e.child(self.status.clone())))
     }
+    
 }
 
 fn main() {

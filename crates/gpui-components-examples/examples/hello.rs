@@ -49,7 +49,7 @@ impl HelloStory {
         cx.new(|cx| Self::new(window, cx))
     }
 
-    pub fn on(&mut self, ev: SharedString) {self.msg=(fstr (str "Hello ") (name ev))}
+    pub fn on(&mut self, ev: SharedString) {self.msg=ev}
 }
 
 impl Focusable for HelloStory {
@@ -77,7 +77,6 @@ impl Render for HelloStory {
                     ),
             )
     }
-    
 }
 
 fn main() {

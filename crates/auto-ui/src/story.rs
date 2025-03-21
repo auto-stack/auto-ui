@@ -6,6 +6,7 @@ pub use title_bar::AppTitleBar;
 
 use gpui::{
     actions, div, impl_internal_actions, prelude::FluentBuilder as _, px, size, AnyElement,
+    AsyncApp,
     AnyView, App, AppContext, Bounds, Context, Div, Entity, EventEmitter, Focusable, Global, Hsla,
     InteractiveElement, IntoElement, ParentElement, Render, SharedString,
     StatefulInteractiveElement, Styled as _, Window, WindowBounds, WindowKind, WindowOptions,
@@ -89,7 +90,7 @@ where
     let window_bounds = Bounds::centered(None, window_size, cx);
     let title = SharedString::from(title.to_string());
 
-    cx.spawn(|mut cx| async move {
+    cx.spawn(async move |cx| {
         let options = WindowOptions {
             window_bounds: Some(WindowBounds::Windowed(window_bounds)),
             titlebar: Some(TitleBar::title_bar_options()),
@@ -114,7 +115,7 @@ where
             .expect("failed to open window");
 
         window
-            .update(&mut cx, |_, window, _| {
+            .update(cx, |_, window, _| {
                 window.activate_window();
                 window.set_window_title(&title);
             })
