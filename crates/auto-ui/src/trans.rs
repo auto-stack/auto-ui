@@ -1,3 +1,7 @@
+mod templates;
+
+pub use templates::*;
+
 use auto_lang::trans::Trans;
 use auto_lang::ast::{Code, Stmt, Fn, TypeDecl, Expr};
 use std::io::Write;
@@ -165,7 +169,7 @@ impl Indent for String {
 }
 
 impl GpuiTrans {
-    fn new(universe: Shared<Universe>) -> Self {
+    pub fn new(universe: Shared<Universe>) -> Self {
         Self {
             widget: WidgetInfo::default(),
             app: None,
@@ -251,6 +255,7 @@ impl GpuiTrans {
         }
 
         let code = format!("fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {{ {} {} }}", code_header, code);
+        println!("code: {}", code);
         let pretty = self.pretty(&code);
         Ok(pretty)
     }
@@ -336,6 +341,9 @@ impl GpuiTrans {
             }
             ast::Expr::FStr(fstr) => {
                 self.do_fstr(fstr)?.to_string()
+            }
+            ast::Expr::Str(s) => {
+                format!("\"{}\".into()", s)
             }
             _ => {expr.to_code()}
         };
@@ -558,10 +566,13 @@ impl GpuiTrans {
         println!("{}", atom);
 
         // 3. feed atom to generator and generate code
+        let story_mold = Mold::new("story.at.rs", Templates::story().unwrap());
+        let outpath = AutoPath::crate_root().join("examples/");
+        println!("outpath: {}", outpath.to_astr());
         let gen = AutoGen::new()
-            .molds(vec![Mold::from_file(AutoPath::new("../../assets/templates/story.at.rs"))])
+            .molds(vec![story_mold])
             .data(atom)
-            .out(AutoPath::new("../../crates/auto-ui/examples/"));
+            .out(outpath);
         let result = gen.gen();
         println!("{}", result);
     
@@ -603,7 +614,7 @@ type Hello as View {
     }
 
     fn on(ev str) {
-        self.msg = `Hello ${ev}`
+        msg = `Hello Button clicked`
     }
 }
 
@@ -637,7 +648,7 @@ type Login as View {
         center {
             col {
                 label("Username") {}
-                input(self.username) {}
+                input(username) {}
                 label("Password") {}
                 input(password) {}
                 button("Login") {
@@ -650,7 +661,7 @@ type Login as View {
     }
 
     fn on(ev str) {
-        status = `Login ${username} ...`
+        status = `Login ${username}`
     }
 }
 

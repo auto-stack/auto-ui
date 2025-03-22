@@ -56,7 +56,7 @@ impl LoginStory {
     }
 
     pub fn on(&mut self, ev: SharedString) {
-        self.status = format!("Login {} ...", self.username).into();
+        self.status = format!("Login {}", self.username).into();
     }
     
 }

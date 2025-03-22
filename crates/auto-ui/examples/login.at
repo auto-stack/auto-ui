@@ -1,0 +1,35 @@
+type input {
+    text str = ""
+}
+
+type Login as View {
+    username str
+    password str
+    status str = ""
+
+    fn view() {
+        center {
+            col {
+                label("Username") {}
+                input(username) {}
+                label("Password") {}
+                input(password) {}
+                button("Login") {
+                    onclick: "button-login"
+                }
+                label(self.username) {}
+                label(self.status) {}
+            }
+        }
+    }
+
+    fn on(ev str) {
+        status = `Login ${username}`
+    }
+}
+
+fn main() {
+    app("Login Example") {
+        login() {}
+    }
+}

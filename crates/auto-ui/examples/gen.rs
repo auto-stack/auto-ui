@@ -1,31 +1,31 @@
-use auto_gen::*;
-use auto_val::{Obj, AutoPath, AutoStr, Value};
-use auto_atom::Atom;
-use auto_lang::config::AutoConfig;
-use auto_lang::parser::Parser;
-use auto_lang::scope::Meta;
-use auto_ui::trans::WidgetInfo;
-use auto_lang::ast::Type;
-use auto_lang::AutoResult;
-use auto_lang::universe::Universe;
-use std::rc::Rc;
-use std::cell::RefCell;
-
-#[allow(dead_code)]
-fn gen_from_data() {
-    let data = AutoConfig::from_file(AutoPath::new("crates/auto-ui/examples/hello_data.at").path(), &Obj::new()).unwrap();
-    let atom = Atom::node(data.root);
-    println!("{}", atom);
-
-    // 3. feed atom to generator and generate code
-    let gen = AutoGen::new()
-        .molds(vec![Mold::from_file(AutoPath::new("assets/templates/story.at.rs"))])
-        .data(atom)
-        .out(AutoPath::new("crates/auto-ui/examples/"));
-    let result = gen.gen();
-    println!("{}", result);
+use auto_lang::parse_with_scope;
+use auto_val::shared;
+use auto_lang::Universe;
+use auto_ui::trans::GpuiTrans;
+use auto_lang::trans::Trans;
+use auto_ui::trans::Templates;
+ 
+fn gen_example(example: &str) {
+    let code = std::fs::read_to_string(format!("crates/auto-ui/examples/{}.at", example)).unwrap();
+    let universe = shared(Universe::new());
+    let mut trans = GpuiTrans::new(universe.clone());
+    let mut out = Vec::new();
+    let ast = parse_with_scope(&code, universe.clone()).unwrap();
+    trans.trans(ast, &mut out).unwrap();
+    println!("{}", String::from_utf8(out).unwrap());
 }
 
 fn main() {
-    gen_from_data();
+    let examples = vec![
+        "hello",
+        "login",
+    ];
+
+    let story_template = Templates::story().unwrap();
+    println!("{}", story_template);
+
+    for example in examples {
+        println!("Generating Example: {}", example);
+        gen_example(example);
+    }
 }

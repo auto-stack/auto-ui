@@ -1,19 +1,26 @@
-use anyhow::anyhow;
-
-use gpui::AssetSource;
-use rust_embed::RustEmbed;
-
 use auto_val::AutoStr;
 use auto_lang::AutoError;
+use rust_embed::RustEmbed;
+use gpui::AssetSource;
+use anyhow::anyhow;
 
 #[derive(RustEmbed)]
-#[folder = "../../assets"]
-#[include = "fonts/**/*"]
-#[include = "icons/**/*"]
-#[exclude = "*.DS_Store"]
-pub struct Assets;
+#[folder = "../../assets/templates"]
+#[include = "*.at.rs"]
+pub struct Templates;
 
-impl AssetSource for Assets {
+impl Templates {
+
+    pub fn story() -> Result<AutoStr, AutoError> {
+        let file = Templates::get("story.at.rs").unwrap();
+        let str = String::from_utf8(file.data.as_ref().to_vec()).unwrap();
+        Ok(AutoStr::from(str))
+    }
+
+}
+
+impl AssetSource for Templates {
+
     fn load(&self, path: &str) -> gpui::Result<Option<std::borrow::Cow<'static, [u8]>>> {
         Self::get(path)
             .map(|f| Some(f.data))
@@ -32,4 +39,3 @@ impl AssetSource for Assets {
             .collect())
     }
 }
-

@@ -1,15 +1,20 @@
-// use ui:*
-
 type Hello as View {
     msg str = "Hello World"
+    button_label str = "Click"
 
     fn view() {
         center {
-            label(self.msg) {}
-            button("Click me") {
-                onclick: "button-click"
+            col {
+                label(self.msg) {}
+                button(self.button_label) {
+                    onclick: "button-clicked"
+                }
             }
         }
+    }
+
+    fn on(ev str) {
+        msg = "Hello Button clicked"
     }
 }
 
@@ -18,4 +23,3 @@ fn main() {
         hello() {}
     }
 }
-
