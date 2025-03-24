@@ -4,10 +4,15 @@ use auto_lang::Universe;
 use auto_ui::trans::GpuiTrans;
 use auto_lang::trans::Trans;
 use auto_ui::trans::Templates;
+use auto_lang::scope::Meta;
+use auto_lang::ast::Name;
+use std::rc::Rc;
  
 fn gen_example(example: &str) {
     let code = std::fs::read_to_string(format!("crates/auto-ui/examples/{}.at", example)).unwrap();
     let universe = shared(Universe::new());
+    // TODO: import real theme to scope
+    universe.borrow_mut().define("theme", Rc::new(Meta::Ref(Name::new("theme"))));
     let mut trans = GpuiTrans::new(universe.clone());
     let mut out = Vec::new();
     let ast = parse_with_scope(&code, universe.clone()).unwrap();

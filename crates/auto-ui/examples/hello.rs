@@ -5,7 +5,7 @@ use gpui_component::ActiveTheme;
 
 use gpui::{
     Application, App, AppContext, Context, Entity, Focusable, ClickEvent, 
-    Render, Window, SharedString, IntoElement, ParentElement,
+    Render, Window, SharedString, IntoElement, ParentElement, Styled, InteractiveElement,
 };
 
 use gpui_component::{

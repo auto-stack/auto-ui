@@ -5,7 +5,7 @@ use gpui_component::ActiveTheme;
 
 use gpui::{
     Application, App, AppContext, Context, Entity, Focusable, ClickEvent, 
-    Render, Window, SharedString, IntoElement, ParentElement,
+    Render, Window, SharedString, IntoElement, ParentElement, Styled, InteractiveElement,
 };
 
 use gpui_component::{
@@ -74,10 +74,30 @@ impl Render for LoginStory {
         center()
             .child(
                 col()
-                    .child(Label::new("Username"))
-                    .child(self.input_username.clone())
-                    .child(Label::new("Password"))
-                    .child(self.input_password.clone())
+                    .id("login-story")
+                    .border_1()
+                    .border_color(cx.theme().border)
+                    .p_4()
+                    .rounded_lg()
+                    .gap_6()
+                    .w_2_5()
+                    .child(
+                        row()
+                            .w_begin()
+                            .child(
+                                v_form()
+                                    .child(
+                                        form_field()
+                                            .label("Username")
+                                            .child(self.input_username.clone()),
+                                    )
+                                    .child(
+                                        form_field()
+                                            .label("Password")
+                                            .child(self.input_password.clone()),
+                                    ),
+                            ),
+                    )
                     .child(
                         Button::new("Login")
                             .label("Login")

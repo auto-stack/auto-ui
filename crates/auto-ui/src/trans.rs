@@ -426,7 +426,7 @@ impl GpuiTrans {
         let mut code = String::new();
         let name = node.name.text.clone();
         match name.as_str() {
-            "center" | "row" | "col" => {
+            "center" | "row" | "col" | "form" | "field" => {
                 let layout_code = self.do_layout(node)?;
                 code.push_str(&layout_code);
             }
@@ -441,6 +441,7 @@ impl GpuiTrans {
     fn do_layout(&mut self, node: &ast::Node) -> AutoResult<AutoStr> {
         println!("do_layout");
         let mut code = String::new();
+        let mut is_wrap = false;
         match node.name.text.as_str() {
             "center" => {
                 code.push_str("center()");
@@ -451,15 +452,107 @@ impl GpuiTrans {
             "col" => {
                 code.push_str("col()");
             }
+            "form" => {
+                code.push_str("row().w_begin().child(v_form()");
+                is_wrap = true;
+            }
+            "field" => {
+                // get main_arg
+                if node.args.len() != 0 {
+                    let main_arg = &node.args.args[0].repr();
+                    code.push_str(&format!("form_field().label(\"{}\")", main_arg));
+                } else {
+                    code.push_str("form_field()");
+                }
+            }
             _ => {}
         }
+        // do kids
         for kid in &node.body.stmts {
-            if let ast::Stmt::Node(kid_node) = kid {
-                code.push_str(".child(");
-                let kid_code = self.do_node(kid_node)?;
-                code.push_str(&kid_code);
-                code.push_str(")");
+            match kid {
+                ast::Stmt::Node(kid_node) => {
+                    if kid_node.name.text == "style" {
+                        let style_code = self.do_style(kid_node)?;
+                        code.push_str(&style_code);
+                    } else {
+                        code.push_str(".child(");
+                        let kid_code = self.do_node(kid_node)?;
+                        code.push_str(&kid_code);
+                        code.push_str(")");
+                    }
+                }
+                ast::Stmt::Expr(expr) => {
+                    match expr {
+                        ast::Expr::Pair(pair) => {
+                            let prop_code = self.do_prop(pair)?;
+                            code.push_str(&prop_code);
+                        }
+                        _ => {}
+                    }
+                }
+                _ => {}
             }
+        }
+        if is_wrap {
+            code.push_str(")");
+        }
+        Ok(code.into())
+    }
+
+    fn do_style(&mut self, node: &ast::Node) -> AutoResult<AutoStr> {
+        // TODO: import real theme to scope
+        // self.universe.borrow_mut().define("theme", std::rc::Rc::new(Meta::Ref(ast::Name::new("theme"))));
+        println!("do_style");
+        let mut code = String::new();
+        // Style node should contain these forms:
+        // 1. key: value
+        // 2. key
+        println!("node: {:?}", node);
+        for prop in &node.body.stmts {
+            if let ast::Stmt::Expr(expr) = prop {
+                match expr {
+                    ast::Expr::Ident(ident) => {
+                        code.push_str(&format!(".{}()", ident.text));
+                    }
+                    ast::Expr::Str(s) => {
+                        code.push_str(&format!(".{}()", s));
+                    }
+                    ast::Expr::Pair(pair) => {
+                        let key = pair.key.name().unwrap();
+                        code.push_str(&format!(".{}(", key));
+                        match &*pair.value {
+                            ast::Expr::Str(s) => {
+                                code.push_str(&format!(".{}()", s));
+                            }
+                            ast::Expr::Bina(lhs, op, rhs) => {
+                                let lhs_code = lhs.to_code();
+                                let rhs_code = rhs.to_code();
+                                if let Op::Dot = op {
+                                    if lhs_code == "theme" {
+                                        code.push_str(&format!("cx.theme().{}", rhs_code));
+                                    }
+                                } 
+                            }
+                            _ => {}
+                        }
+                        code.push_str(")");
+                    }
+                    _ => {}
+                }
+            }
+        }
+        Ok(code.into())
+    }
+
+    fn do_prop(&mut self, prop: &ast::Pair) -> AutoResult<AutoStr> {
+        println!("do_prop");
+        let mut code = String::new();
+        match prop.key.name() {
+            Some("id") => {
+                let id = prop.value.to_code();
+                code.push_str(&format!(".id({})", id));
+            }
+            _ => {}
         }
         Ok(code.into())
     }

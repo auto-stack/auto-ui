@@ -10,10 +10,16 @@ type Login as View {
     fn view() {
         center {
             col {
-                label("Username") {}
-                input(username) {}
-                label("Password") {}
-                input(password) {}
+                id: "login-story"
+                style { border_1, border_color: theme.border, p_4, rounded_lg, gap_6, w_2_5 }
+                form {
+                    field("Username") {
+                        input(username) {}
+                    }
+                    field("Password") {
+                        input(password) {}
+                    }
+                }
                 button("Login") {
                     onclick: "button-login"
                 }
