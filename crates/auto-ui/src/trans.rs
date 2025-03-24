@@ -179,12 +179,12 @@ impl GpuiTrans {
 
     fn do_main(&mut self, fn_stmt: &Fn) -> AutoResult<()> {
         let body = &fn_stmt.body;
-            let last_stmt = body.stmts.last().unwrap();
-            if let auto_lang::ast::Stmt::Node(node) = last_stmt {
-                // convert app code to rust code
-                if node.name.text == "app" {
-                    let title = node.args.args[0].repr();
-                    self.app = Some(AppInfo { title: title.into() });
+        let last_stmt = body.stmts.last().unwrap();
+        if let auto_lang::ast::Stmt::Node(node) = last_stmt {
+            // convert app code to rust code
+            if node.name.text == "app" {
+                let title = node.args.args[0].repr();
+                self.app = Some(AppInfo { title: title.into() });
             }
         }
         Ok(())
