@@ -13,7 +13,7 @@ fn gen_example(example: &str) {
     let universe = shared(Universe::new());
     // TODO: import real theme to scope
     universe.borrow_mut().define("theme", Rc::new(Meta::Ref(Name::new("theme"))));
-    let mut trans = GpuiTrans::new(universe.clone());
+    let mut trans = GpuiTrans::new(example, universe.clone());
     let mut out = Vec::new();
     let ast = parse_with_scope(&code, universe.clone()).unwrap();
     trans.trans(ast, &mut out).unwrap();
@@ -24,6 +24,7 @@ fn main() {
     let examples = vec![
         "hello",
         "login",
+        "docks",
     ];
 
     let story_template = Templates::story().unwrap();

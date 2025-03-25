@@ -8,7 +8,7 @@ use std::io::Write;
 use auto_lang::AutoResult;
 use auto_atom::Atom;
 use auto_gen::{AutoGen, Mold};
-use auto_val::{AutoStr, AutoPath, Type, Value, Op};
+use auto_val::{AutoStr, StrExt, AutoPath, Type, Value, Op};
 use auto_lang::ast;
 use auto_lang::eval;
 use auto_val::Shared;
@@ -16,7 +16,7 @@ use auto_lang::Universe;
 use auto_lang::scope::Meta;
 use auto_lang::ast::StoreKind;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct WidgetInfo {
     pub name: AutoStr,
     pub model: WidgetModel,
@@ -24,12 +24,12 @@ pub struct WidgetInfo {
     pub methods: Vec<AutoStr>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct WidgetModel {
     pub fields: Vec<WidgetField>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct WidgetField {
     pub name: AutoStr,
     pub ty: Type,
@@ -113,18 +113,35 @@ impl WidgetInfo {
 
 pub struct AppInfo {
     pub title: AutoStr,
+    // currently only support one widget in each side
+    pub left: AutoStr,
+    pub right: AutoStr,
+    pub middle: AutoStr,
+    pub bottom: AutoStr,
+    pub top: AutoStr,
 }
 
 impl AppInfo {
+    pub fn new(title: impl Into<AutoStr>) -> Self {
+        Self { title: title.into(), left: AutoStr::default(), right: AutoStr::default(), middle: AutoStr::default(), bottom: AutoStr::default(), top: AutoStr::default() }
+    }
+
     pub fn to_node(&self) -> auto_val::Node {
         let mut root = auto_val::Node::new("app");
         root.set_prop("title", self.title.clone());
+        root.set_prop("left", self.left.clone());
+        root.set_prop("right", self.right.clone());
+        root.set_prop("middle", self.middle.clone());
+        root.set_prop("bottom", self.bottom.clone());
+        root.set_prop("top", self.top.clone());
         root
     }
 }
 
 pub struct GpuiTrans {
+    pub name: AutoStr,
     pub widget: WidgetInfo,
+    pub widgets: Vec<WidgetInfo>,
     pub app: Option<AppInfo>,
     pub universe: Shared<Universe>,
 }
@@ -169,9 +186,11 @@ impl Indent for String {
 }
 
 impl GpuiTrans {
-    pub fn new(universe: Shared<Universe>) -> Self {
+    pub fn new(name: impl Into<AutoStr>, universe: Shared<Universe>) -> Self {
         Self {
+            name: name.into(),
             widget: WidgetInfo::default(),
+            widgets: vec![],
             app: None,
             universe,
         }
@@ -183,11 +202,58 @@ impl GpuiTrans {
         if let auto_lang::ast::Stmt::Node(node) = last_stmt {
             // convert app code to rust code
             if node.name.text == "app" {
-                let title = node.args.args[0].repr();
-                self.app = Some(AppInfo { title: title.into() });
+                self.do_app(node)?;
             }
         }
         Ok(())
+    }
+
+    fn do_app(&mut self, node: &ast::Node) -> AutoResult<()> {
+        let title = node.args.args[0].repr();
+        let mut app = AppInfo::new(title);
+        // check sides
+        for kid in &node.body.stmts {
+            match kid {
+                ast::Stmt::Node(node) => {
+                    let name = AutoStr::from(node.name.text.clone());
+                    println!("app node: {}", name);
+                    match name.as_str() {
+                        "left" => {
+                            app.left = self.get_first_kid_name(node)?;
+                        }
+                        "right" => {
+                            app.right = self.get_first_kid_name(node)?;
+                        }
+                        "middle" => {
+                            app.middle = self.get_first_kid_name(node)?;
+                        }
+                        "bottom" => {
+                            app.bottom = self.get_first_kid_name(node)?;
+                        }
+                        "top" => {
+                            app.top = self.get_first_kid_name(node)?;
+                        }
+                        _ => {
+                            app.middle = name.to_camel();
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        self.app = Some(app);
+        Ok(())
+    }
+
+    fn get_first_kid_name(&mut self, node: &ast::Node) -> AutoResult<AutoStr> {
+        let stmt = &node.body.stmts[0];
+        match stmt {
+            ast::Stmt::Node(node) => {
+                let name = AutoStr::from(node.name.text.clone()).to_camel();
+                Ok(name)
+            }
+            _ => Err("first kid is not a node".into()),
+        }
     }
 
     fn do_fn(&mut self, _fn: &Fn) -> AutoResult<()> {
@@ -198,17 +264,27 @@ impl GpuiTrans {
     fn do_type_decl(&mut self, type_decl: &TypeDecl) -> AutoResult<()> {
         println!("do_type_decl");
         if has_view(type_decl) { // View types
-            println!("has view");
-            let mut widget_info = WidgetInfo::new();
-            widget_info.name = type_decl.name.clone().into();
-            widget_info.model = WidgetModel::from(&type_decl.members);
-            self.widget = widget_info;
-            for method in type_decl.methods.iter() {
-                self.do_method(method)?;
-            }
+            self.do_widget(type_decl)?;
+            
         } else { // Normal types
             println!("no view");
         }
+        Ok(())
+    }
+
+    fn do_widget(&mut self, type_decl: &TypeDecl) -> AutoResult<()> {
+        let mut widget_info = WidgetInfo::new();
+        widget_info.name = type_decl.name.clone().into();
+        widget_info.model = WidgetModel::from(&type_decl.members);
+        self.widget = widget_info;
+        for method in type_decl.methods.iter() {
+            self.do_method(method)?;
+            println!("widget view now: {}", self.widget.view.clone());
+        }
+        println!("widget info: {}", self.widget.view.clone());
+        // widget completed, add to widgets
+        self.widgets.push(self.widget.clone());
+        self.widget = WidgetInfo::default();
         Ok(())
     }
 
@@ -228,14 +304,10 @@ impl GpuiTrans {
         Ok(())
     }
 
-
-
     fn do_view(&mut self, method: &ast::Fn) -> AutoResult<AutoStr> {
 
 
         let mut code: String = "".to_string();
-
-
 
         let view_node = &method.body.stmts.last();
         if let Some(view_node) = view_node {
@@ -647,23 +719,27 @@ impl GpuiTrans {
 
     fn gen(&mut self) -> AutoResult<()> {
         println!("gen");
-        let mut story_node = auto_val::Node::new("story");
+        let mut app_node = auto_val::Node::new("app");
         let Some(app) = &self.app else {
             return Ok(());
         };
 
-        story_node.add_kid(self.widget.to_node());
-        story_node.add_kid(app.to_node());
-        story_node.set_prop("name", self.widget.name.clone());
-        let atom = Atom::node(story_node);
-        println!("{}", atom);
+        for widget in &self.widgets {
+            println!("widget view: {}", widget.view.clone());
+            app_node.add_kid(widget.to_node());
+        }
+
+        app_node.add_kid(app.to_node());
+        app_node.set_prop("name", self.name.clone());
+        let atom = Atom::node(app_node);
+        println!("{}", auto_val::pretty(&atom.to_string().as_str(), 2));
 
         // 3. feed atom to generator and generate code
-        let story_mold = Mold::new("story.at.rs", Templates::story().unwrap());
+        let app_mold = Mold::new("app.at.rs", Templates::app().unwrap());
         let outpath = AutoPath::crate_root().join("examples/");
         println!("outpath: {}", outpath.to_astr());
         let gen = AutoGen::new()
-            .molds(vec![story_mold])
+            .molds(vec![app_mold])
             .data(atom)
             .out(outpath);
         let result = gen.gen();

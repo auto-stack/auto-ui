@@ -14,20 +14,22 @@ use gpui_component::{
 use auto_ui::*;
 use auto_ui::row;
 
+$ for story in storys {
 
-pub struct HelloStory {
+pub struct ${story.name}Story {
     focus_handle: gpui::FocusHandle,
-    msg: SharedString,
-    button_label: SharedString,
+$ for f in story.fields {
+    ${f.name}: ${f.kind},
+$ }
 }
 
-impl Story for HelloStory {
+impl Story for ${story.name}Story {
     fn title() -> &'static str {
-        "Hello"
+        "${story.name}"
     }
 
     fn description() -> &'static str {
-        "Hello Example"
+        "${story.name} Example"
     }
 
     fn new_view(window: &mut Window, cx: &mut App) -> Entity<impl Render + Focusable> {
@@ -35,12 +37,13 @@ impl Story for HelloStory {
     }
 }
 
-impl HelloStory {
+impl ${story.name}Story {
     pub(crate) fn new(w: &mut Window, cx: &mut App) -> Self {
         Self {
             focus_handle: cx.focus_handle(),
-            msg: SharedString::new("Hello World"),
-            button_label: SharedString::new("Click"),
+        $ for f in story.fields {
+            ${f.init_code}
+        $ }
         }
     }
 
@@ -48,40 +51,22 @@ impl HelloStory {
         cx.new(|cx| Self::new(window, cx))
     }
 
-    pub fn on(&mut self, ev: SharedString) {
-        self.msg = "Hello Button clicked".into();
-    }
-    
+$ for m in story.methods {
+    ${m}
+$ }
 }
 
-impl Focusable for HelloStory {
+impl Focusable for ${story.name}Story {
     fn focus_handle(&self, _: &gpui::App) -> gpui::FocusHandle {
         self.focus_handle.clone()
     }
 }
 
-impl Render for HelloStory {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        center()
-            .child(
-                col()
-                    .child(Label::new(self.msg.clone()))
-                    .child(
-                        Button::new(self.button_label.clone())
-                            .label(self.button_label.clone())
-                            .on_click(
-                                cx
-                                    .listener(|v, _, _, cx| {
-                                        v.on("button-clicked".into());
-                                        cx.notify();
-                                    }),
-                            ),
-                    ),
-            )
-    }
-    
+impl Render for ${story.name}Story {
+    ${story.code}
 }
 
+$ }
 
 pub struct Docks {
     dockarea: Entity<DockArea>,
@@ -114,19 +99,67 @@ impl Docks {
     }
 
     fn layout(dockarea: &WeakEntity<DockArea>, w: &mut Window, cx: &mut Context<Self>) {
-
-        let middle_item = DockItem::tab(
-            StoryContainer::panel::<HelloStory>(w, cx),
+        $ if app.left {
+        let left_item = DockItem::tab(
+            StoryContainer::panel::<${app.left}Story>(w, cx),
             &dockarea,
             w,
             cx,
         );
+        $ }
 
+        $ if app.middle {
+        let middle_item = DockItem::tab(
+            StoryContainer::panel::<${app.middle}Story>(w, cx),
+            &dockarea,
+            w,
+            cx,
+        );
+        $ }
 
+        $ if app.right {
+        let right_item = DockItem::tab(
+            StoryContainer::panel::<${app.right}Story>(w, cx),
+            &dockarea,
+            w,
+            cx,
+        );
+        $ }
 
+        $ if app.bottom {
+        let bottom_item = DockItem::tab(
+            StoryContainer::panel::<${app.bottom}Story>(w, cx),
+            &dockarea,
+            w,
+            cx,
+        );
+        $ }
+
+        $ if app.top {
+        let top_item = DockItem::tab(
+            StoryContainer::panel::<${app.top}Story>(w, cx),
+            &dockarea,
+            w,
+            cx,
+        );
+        $ }
 
         _ = dockarea.update(cx, |view, cx| {
+        $ if app.left {
+            view.set_left_dock(left_item, Some(px(350.)), true, w, cx);
+        $ }
+        $ if app.middle {
             view.set_center(middle_item, w, cx);
+        $ }
+        $ if app.right {
+            view.set_right_dock(right_item, Some(px(350.)), true, w, cx);
+        $ }
+        $ if app.bottom {
+            view.set_bottom_dock(bottom_item, Some(px(350.)), true, w, cx);
+        $ }
+        $ if app.top {
+            view.set_top_dock(top_item, Some(px(350.)), true, w, cx);
+        $ }
         })
     }
 }
@@ -150,6 +183,6 @@ fn main() {
         init(cx);
         cx.activate(true);
 
-        create_new_window_sized("Hello Example", |w, cx| cx.new(|cx| Docks::new(w, cx)), cx, 800, 600);
+        create_new_window_sized("${app.title}", |w, cx| cx.new(|cx| Docks::new(w, cx)), cx, 800, 600);
     });
 }

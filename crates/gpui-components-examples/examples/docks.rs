@@ -18,8 +18,7 @@ use gpui_component::{
     form::{v_form, form_field}
 };
 
-pub struct Workspace {
-    // title_bar: Entity<AppTitleBar>,
+pub struct Docks {
     dockarea: Entity<DockArea>,
 }
 
@@ -33,7 +32,7 @@ const MAIN_DOCK_AREA: DockAreaTab = DockAreaTab {
     version: 5,
 };
 
-impl Workspace {
+impl Docks {
     pub fn new(w: &mut Window, cx: &mut Context<Self>) -> Self {
         let dockarea = cx.new(|cx| DockArea::new(
             MAIN_DOCK_AREA.id,
@@ -77,7 +76,7 @@ impl Workspace {
     }
 }
 
-impl Render for Workspace {
+impl Render for Docks {
     fn render(&mut self, _: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
         div()
         .id("story-workspace")
@@ -181,6 +180,6 @@ fn main() {
         init(cx);
         cx.activate(true);
 
-        create_new_window_sized("Pane Example", |w, cx| cx.new(|cx| Workspace::new(w, cx)), cx, 800, 600);
+        create_new_window_sized("Pane Example", |w, cx| cx.new(|cx| Docks::new(w, cx)), cx, 800, 600);
     });
 }

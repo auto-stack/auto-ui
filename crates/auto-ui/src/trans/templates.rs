@@ -17,6 +17,12 @@ impl Templates {
         Ok(AutoStr::from(str))
     }
 
+    pub fn app() -> Result<AutoStr, AutoError> {
+        let file = Templates::get("app.at.rs").unwrap();
+        let str = String::from_utf8(file.data.as_ref().to_vec()).unwrap();
+        Ok(AutoStr::from(str))
+    }
+
 }
 
 impl AssetSource for Templates {
