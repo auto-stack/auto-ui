@@ -12,6 +12,7 @@ auto-atom = { path = "../auto-lang/crates/auto-atom" }
 
 # switch to this dynamic lib for debug mode
 gpui = { version = "0.1.0", path = "crates/gpui-dynamic", package = "gpui-dynamic" }
+markdown = { git = "https://github.com/zed-industries/zed", package = "markdown" }
 # switch to this static lib for release mode
 # gpui = { git = "https://github.com/zed-industries/zed" }
 gpui-component = { git = "https://github.com/longbridge/gpui-component"}

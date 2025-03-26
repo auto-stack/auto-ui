@@ -7,7 +7,29 @@ use auto_ui::trans::Templates;
 use auto_lang::scope::Meta;
 use auto_lang::ast::Name;
 use std::rc::Rc;
- 
+use auto_lang::token::TokenKind;
+use auto_lang::parser::BlockParser;
+use auto_lang::parser::Parser;
+use auto_lang::ast::Body;
+use auto_lang::parser::ParseError;
+use auto_lang::ast::Stmt;
+use auto_lang::ast::Expr;
+
+pub struct MarkdownParser;
+
+impl BlockParser for MarkdownParser {
+    fn parse(&self, parser: &mut Parser) -> Result<Body, ParseError> {
+        let mut code = Vec::new();
+        while !parser.is_kind(TokenKind::RBrace) {
+            code.push(parser.cur.text.clone());
+            parser.next();
+        }
+        let mut body = Body::new();
+        body.stmts.push(Stmt::Expr(Expr::Str(code.join("\n"))));
+        Ok(body)
+    }
+}
+
 fn gen_example(example: &str) {
     let code = std::fs::read_to_string(format!("crates/auto-ui/examples/{}.at", example)).unwrap();
     let universe = shared(Universe::new());
@@ -15,16 +37,39 @@ fn gen_example(example: &str) {
     universe.borrow_mut().define("theme", Rc::new(Meta::Ref(Name::new("theme"))));
     let mut trans = GpuiTrans::new(example, universe.clone());
     let mut out = Vec::new();
-    let ast = parse_with_scope(&code, universe.clone()).unwrap();
+    let mut parser = auto_lang::parser::Parser::new(code.as_str(), universe.clone());
+    parser.add_special_block("markdown".into(), Box::new(MarkdownParser));
+    let ast = parser.parse().unwrap();
     trans.trans(ast, &mut out).unwrap();
     println!("{}", String::from_utf8(out).unwrap());
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_markdown() {
+        let code = r#"
+        markdown
+        {
+            # Hello
+        }
+        "#;
+        let universe = shared(Universe::new());
+        let mut parser = auto_lang::parser::Parser::new(code, universe.clone());
+        parser.add_special_block("markdown".into(), Box::new(MarkdownParser));
+        let ast = parser.parse().unwrap();
+        println!("{:?}", ast);
+    }
+}
+
 fn main() {
     let examples = vec![
-        "hello",
-        "login",
-        "docks",
+        // "hello",
+        // "login",
+        // "docks",
+        "mark"
     ];
 
     let story_template = Templates::story().unwrap();

@@ -1,0 +1,19 @@
+var content = markdown {
+## Auto语言发布v0.1版啦！
+}
+
+type MarkView as View {
+    text str = content
+
+    fn view() {
+        center {
+            markdown(self.text) {}
+        }
+    }
+}
+
+fn main() {
+    app("Markdown") {
+        mark_view() {}
+    }
+}
