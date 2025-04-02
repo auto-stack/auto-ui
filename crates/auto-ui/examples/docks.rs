@@ -25,9 +25,9 @@ impl Story for LeftPaneStory {
         "LeftPane"
     }
 
-    fn description() -> &'static str {
-        "LeftPane Example"
-    }
+    // fn description() -> &'static str {
+    //     "LeftPane Example"
+    // }
 
     fn new_view(window: &mut Window, cx: &mut App) -> Entity<impl Render + Focusable> {
         Self::view(window, cx)
@@ -38,7 +38,7 @@ impl LeftPaneStory {
     pub(crate) fn new(w: &mut Window, cx: &mut App) -> Self {
         Self {
             focus_handle: cx.focus_handle(),
-            msg: SharedString::new("LeftPane"),
+            msg: SharedString::new(r#"LeftPane"#),
         }
     }
 
@@ -73,9 +73,9 @@ impl Story for RightPaneStory {
         "RightPane"
     }
 
-    fn description() -> &'static str {
-        "RightPane Example"
-    }
+    // fn description() -> &'static str {
+    //     "RightPane Example"
+    // }
 
     fn new_view(window: &mut Window, cx: &mut App) -> Entity<impl Render + Focusable> {
         Self::view(window, cx)
@@ -86,7 +86,7 @@ impl RightPaneStory {
     pub(crate) fn new(w: &mut Window, cx: &mut App) -> Self {
         Self {
             focus_handle: cx.focus_handle(),
-            msg: SharedString::new("RightPane"),
+            msg: SharedString::new(r#"RightPane"#),
         }
     }
 
@@ -125,9 +125,9 @@ impl Story for MiddlePaneStory {
         "MiddlePane"
     }
 
-    fn description() -> &'static str {
-        "MiddlePane Example"
-    }
+    // fn description() -> &'static str {
+    //     "MiddlePane Example"
+    // }
 
     fn new_view(window: &mut Window, cx: &mut App) -> Entity<impl Render + Focusable> {
         Self::view(window, cx)
@@ -138,9 +138,9 @@ impl MiddlePaneStory {
     pub(crate) fn new(w: &mut Window, cx: &mut App) -> Self {
         Self {
             focus_handle: cx.focus_handle(),
-            username: SharedString::new("nil"),
-            password: SharedString::new("nil"),
-            status: SharedString::new(""),
+            username: SharedString::new(r#"nil"#),
+            password: SharedString::new(r#"nil"#),
+            status: SharedString::new(r#""#),
             input_username: cx.new(|cx| TextInput::new(w, cx)),
             input_password: cx.new(|cx| TextInput::new(w, cx)),
         }

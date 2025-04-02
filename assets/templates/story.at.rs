@@ -28,9 +28,9 @@ impl Story for ${story.name}Story {
         "${story.name}"
     }
 
-    fn description() -> &'static str {
-        "${story.name} Example"
-    }
+    // fn description() -> &'static str {
+    //     "${story.name} Example"
+    // }
 
     fn new_view(window: &mut Window, cx: &mut App) -> Entity<impl Render + Focusable> {
         Self::view(window, cx)

@@ -29,9 +29,9 @@ impl Story for LoginStory {
         "Login"
     }
 
-    fn description() -> &'static str {
-        "Login Example"
-    }
+    // fn description() -> &'static str {
+    //     "Login Example"
+    // }
 
     fn new_view(window: &mut Window, cx: &mut App) -> Entity<impl Render + Focusable> {
         Self::view(window, cx)
@@ -42,9 +42,9 @@ impl LoginStory {
     pub(crate) fn new(w: &mut Window, cx: &mut App) -> Self {
         Self {
             focus_handle: cx.focus_handle(),
-            username: SharedString::new("nil"),
-            password: SharedString::new("nil"),
-            status: SharedString::new(""),
+            username: SharedString::new(r#"nil"#),
+            password: SharedString::new(r#"nil"#),
+            status: SharedString::new(r#""#),
             input_username: cx.new(|cx| TextInput::new(w, cx)),
             input_password: cx.new(|cx| TextInput::new(w, cx)),
         }

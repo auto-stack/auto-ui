@@ -25,9 +25,9 @@ impl Story for MarkViewStory {
         "MarkView"
     }
 
-    fn description() -> &'static str {
-        "MarkView Example"
-    }
+    // fn description() -> &'static str {
+    //     "MarkView Example"
+    // }
 
     fn new_view(window: &mut Window, cx: &mut App) -> Entity<impl Render + Focusable> {
         Self::view(window, cx)

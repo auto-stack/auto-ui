@@ -25,9 +25,9 @@ impl Story for CounterStory {
         "Counter"
     }
 
-    fn description() -> &'static str {
-        "Counter Example"
-    }
+    // fn description() -> &'static str {
+    //     "Counter Example"
+    // }
 
     fn new_view(window: &mut Window, cx: &mut App) -> Entity<impl Render + Focusable> {
         Self::view(window, cx)

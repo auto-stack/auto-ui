@@ -26,9 +26,9 @@ impl Story for HelloStory {
         "Hello"
     }
 
-    fn description() -> &'static str {
-        "Hello Example"
-    }
+    // fn description() -> &'static str {
+    //     "Hello Example"
+    // }
 
     fn new_view(window: &mut Window, cx: &mut App) -> Entity<impl Render + Focusable> {
         Self::view(window, cx)
@@ -39,8 +39,8 @@ impl HelloStory {
     pub(crate) fn new(w: &mut Window, cx: &mut App) -> Self {
         Self {
             focus_handle: cx.focus_handle(),
-            msg: SharedString::new("Hello World"),
-            button_label: SharedString::new("Click"),
+            msg: SharedString::new(r#"Hello World"#),
+            button_label: SharedString::new(r#"Click"#),
         }
     }
 

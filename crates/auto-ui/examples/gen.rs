@@ -25,7 +25,7 @@ impl BlockParser for MarkdownParser {
             parser.next();
         }
         let mut body = Body::new();
-        body.stmts.push(Stmt::Expr(Expr::Str(code.join("\n"))));
+        body.stmts.push(Stmt::Expr(Expr::Str(code.join("\n").into())));
         Ok(body)
     }
 }
@@ -34,7 +34,7 @@ fn gen_example(example: &str) {
     let code = std::fs::read_to_string(format!("crates/auto-ui/examples/{}.at", example)).unwrap();
     let universe = shared(Universe::new());
     // TODO: import real theme to scope
-    universe.borrow_mut().define("theme", Rc::new(Meta::Ref(Name::new("theme"))));
+    universe.borrow_mut().define("theme", Rc::new(Meta::Ref("theme".into())));
     let mut trans = GpuiTrans::new(example, universe.clone());
     let mut out = Vec::new();
     let mut parser = auto_lang::parser::Parser::new(code.as_str(), universe.clone());
@@ -66,10 +66,10 @@ mod tests {
 
 fn main() {
     let examples = vec![
-        // "hello",
-        // "login",
-        // "docks",
-        // "mark"
+        "hello",
+        "login",
+        "docks",
+        "mark",
         "counter"
     ];
 
