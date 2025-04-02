@@ -85,10 +85,14 @@ impl WidgetInfo {
                         typ.clone()
                     }
                 }
+                Type::Int => "i32".to_string(),
                 _ => field.ty.to_string(),
             };
             field_node.set_prop("value", if field.value.is_nil() { Value::str("") } else { field.value.clone() });
             let init_code = match &field.ty {
+                Type::Int => {
+                    format!("{}: {}", field.name.clone(), field.value.to_astr())
+                }
                 Type::User(typ) => {
                     if typ == "input" {
                         format!("{}: cx.new(|cx| {}::new(w, cx)),", field.name.clone(), kind.clone())
@@ -220,7 +224,6 @@ impl GpuiTrans {
             match kid {
                 ast::Stmt::Node(node) => {
                     let name = AutoStr::from(node.name.text.clone());
-                    println!("app node: {}", name);
                     match name.as_str() {
                         "left" => {
                             app.left = self.get_first_kid_name(node)?;
@@ -291,9 +294,7 @@ impl GpuiTrans {
         self.widget = widget_info;
         for method in type_decl.methods.iter() {
             self.do_method(method)?;
-            println!("widget view now: {}", self.widget.view.clone());
         }
-        println!("widget info: {}", self.widget.view.clone());
         // widget completed, add to widgets
         self.widgets.push(self.widget.clone());
         self.widget = WidgetInfo::default();
@@ -391,7 +392,6 @@ impl GpuiTrans {
         }
 
         let code = format!("fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {{ {} {} }}", code_header, code);
-        println!("code: {}", code);
         let pretty = self.pretty(&code);
         Ok(pretty)
     }
@@ -420,7 +420,6 @@ impl GpuiTrans {
             body.push_str(";");
         } 
         body.push_str("}");
-        println!("Got body: {}", body);
         Ok(body.into())
     }
 
@@ -437,17 +436,51 @@ impl GpuiTrans {
             ast::Stmt::Expr(expr) => {
                 code.push_str(&self.do_expr(expr)?);
             }
+            ast::Stmt::If(branches, else_stmt) => {
+                code.push_str(&self.do_if(branches, else_stmt)?);
+            }
             _ => {
                 println!("unknown stmt: {:?}", stmt);
             }
         }
-        println!("got code: {}", code);
+        Ok(code.into())
+    }
+
+    fn do_if(&mut self, branches: &Vec<ast::Branch>, else_stmt: &Option<ast::Body>) -> AutoResult<AutoStr> {
+        println!("do_if");
+        let mut code = String::new();
+        for (n, branch) in branches.iter().enumerate() {
+            if n > 0 {
+                code.push_str(" else if ");
+            } else {
+                code.push_str("if ");
+            }
+            code.push_str(&format!("{}", branch.cond.to_code()));
+            code.push_str(" {");
+            let body_code = self.do_body(&branch.body)?;
+            code.push_str(&body_code);
+            code.push_str("}");
+        }
+        if let Some(else_stmt) = else_stmt {
+            code.push_str(" else {");
+            let body_code = self.do_body(else_stmt)?;
+            code.push_str(&body_code);
+            code.push_str("}");
+        }
+        Ok(code.into())
+    }
+
+    fn do_body(&mut self, body: &ast::Body) -> AutoResult<AutoStr> {
+        println!("do_body");
+        let mut code = String::new();
+        for stmt in &body.stmts {
+            code.push_str(&self.do_stmt(stmt)?);
+        }
         Ok(code.into())
     }
 
     fn do_expr(&mut self, expr: &ast::Expr) -> AutoResult<AutoStr> {
         println!("do_expr");
-        println!("expr: {:?}", expr);
         let mut code = String::new();
         let value = match expr {
             ast::Expr::Bina(lhs, op, rhs) => {
@@ -456,7 +489,6 @@ impl GpuiTrans {
                 format!("{} {} {}", lhs_code, op.op(), rhs_code)
             }
             ast::Expr::Ident(name) => {
-                println!("name: {}", name.text.clone());
                 // TODO: get meta from universe, and check if the name is a field or a local store
                 let meta = self.universe.borrow().lookup_meta(name.text.as_str());
                 let Some(meta) = meta else {
@@ -484,7 +516,6 @@ impl GpuiTrans {
             _ => {expr.to_code()}
         };
         code.push_str(&value);
-        println!("got expr code: {}", code);
         Ok(code.into())
     }
 
@@ -634,7 +665,6 @@ impl GpuiTrans {
         // Style node should contain these forms:
         // 1. key: value
         // 2. key
-        println!("node: {:?}", node);
         for prop in &node.body.stmts {
             if let ast::Stmt::Expr(expr) = prop {
                 match expr {
@@ -754,7 +784,24 @@ impl GpuiTrans {
                     if let Op::Dot = op {
                         let arg = lhs.to_code();
                         let field = rhs.to_code();
-                        args.push(format!("{}.{}.clone()", arg, field));
+                        // lookup field in data model
+                        let field_name = self.universe.borrow().lookup_meta(field.as_str());
+                        let Some(field_name) = field_name else {
+                            return Err(format!("field {} not found in data model", field).into());
+                        };
+                        match field_name.as_ref() {
+                            Meta::Store(store) => {
+                                match store.ty {
+                                    ast::Type::Int => {
+                                        args.push(format!("{}.{}.to_string()", arg, field));
+                                    }
+                                    _ => {
+                                        args.push(format!("{}.{}.clone()", arg, field));
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
                         continue;
                     }
                 }
@@ -793,25 +840,21 @@ impl GpuiTrans {
         };
 
         for widget in &self.widgets {
-            println!("widget view: {}", widget.view.clone());
             app_node.add_kid(widget.to_node());
         }
 
         app_node.add_kid(app.to_node());
         app_node.set_prop("name", self.name.clone());
         let atom = Atom::node(app_node);
-        println!("{}", auto_val::pretty(&atom.to_string().as_str(), 2));
 
         // 3. feed atom to generator and generate code
         let app_mold = Mold::new("app.at.rs", Templates::app().unwrap());
         let outpath = AutoPath::crate_root().join("examples/");
-        println!("outpath: {}", outpath.to_astr());
         let gen = AutoGen::new()
             .molds(vec![app_mold])
             .data(atom)
             .out(outpath);
         let result = gen.gen();
-        println!("{}", result);
     
         Ok(())
     }

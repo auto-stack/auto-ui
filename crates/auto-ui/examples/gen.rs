@@ -69,7 +69,8 @@ fn main() {
         // "hello",
         // "login",
         // "docks",
-        "mark"
+        // "mark"
+        "counter"
     ];
 
     let story_template = Templates::story().unwrap();
