@@ -7,8 +7,8 @@ use autogui::widget::button::Button;
 use autogui::widget::workspace::Workspace;
 use autogui::widget::table::Table;
 use autogui::widget::table::{ColConfig, WidthMode, Format, Align, Row};
-use autoval::Value;
-use autoval::Grid;
+use auto_val::Value;
+use auto_val::Grid;
 use gpui::*;
 
 struct RootView {
@@ -83,25 +83,25 @@ impl RootView {
         ];
 
         let data = vec![
-            vec![Value::Int(0x10), Value::Str("DiagnosticSessionControl".to_string()), Value::Bool(false), Value::Str("诊断会话控制".to_string())],
-            vec![Value::Int(0x14), Value::Str("ClearDiagnosticInformation".to_string()), Value::Bool(true), Value::Str("清除诊断信息".to_string())],
-            vec![Value::Int(0x19), Value::Str("ReadDTCInformation".to_string()), Value::Bool(false), Value::Str("读取DTC信息".to_string())],
-            vec![Value::Int(0x22), Value::Str("ReadDataByIdentifier".to_string()), Value::Bool(true), Value::Str("读取数据".to_string())],
-            vec![Value::Int(0x23), Value::Str("ReadMemoryByAddress".to_string()), Value::Bool(false), Value::Str("读取内存".to_string())],
-            vec![Value::Int(0x27), Value::Str("SecurityAccess".to_string()), Value::Bool(false), Value::Str("安全访问".to_string())],
-            vec![Value::Int(0x28), Value::Str("CommunicationControl".to_string()), Value::Bool(false), Value::Str("通信控制".to_string())],
-            vec![Value::Int(0x2A), Value::Str("ReadDataByPeriodicIdentifier".to_string()), Value::Bool(true), Value::Str("读取数据（周期标识符）".to_string())],
-            vec![Value::Int(0x2C), Value::Str("DynamicallyDefineDataIdentifier".to_string()), Value::Bool(false), Value::Str("动态定义数据标识符动态定义数据标识符".to_string())],
-            vec![Value::Int(0x2E), Value::Str("WriteDataByIdentifier".to_string()), Value::Bool(true), Value::Str("写入数据".to_string())],
-            vec![Value::Int(0x2F), Value::Str("InputOutputControlByIdentifier".to_string()), Value::Bool(false), Value::Str("输入输出控制".to_string())],
-            vec![Value::Int(0x31), Value::Str("RoutineControl".to_string()), Value::Bool(true), Value::Str("例程控制".to_string())],
-            vec![Value::Int(0x3D), Value::Str("WriteMemoryByAddress".to_string()), Value::Bool(true), Value::Str("写入内存".to_string())],
-            vec![Value::Int(0x3E), Value::Str("TesterPresent".to_string()), Value::Bool(true), Value::Str("诊断设备在线".to_string())],
-            vec![Value::Int(0x85), Value::Str("ControlDTCSetting".to_string()), Value::Bool(true), Value::Str("控制DTC设置".to_string())],
+            vec![Value::Int(0x10), Value::Str("DiagnosticSessionControl".into()), Value::Bool(false), Value::Str("诊断会话控制".into())],
+            vec![Value::Int(0x14), Value::Str("ClearDiagnosticInformation".into()), Value::Bool(true), Value::Str("清除诊断信息".into())],
+            vec![Value::Int(0x19), Value::Str("ReadDTCInformation".into()), Value::Bool(false), Value::Str("读取DTC信息".into())],
+            vec![Value::Int(0x22), Value::Str("ReadDataByIdentifier".into()), Value::Bool(true), Value::Str("读取数据".into())],
+            vec![Value::Int(0x23), Value::Str("ReadMemoryByAddress".into()), Value::Bool(false), Value::Str("读取内存".into())],
+            vec![Value::Int(0x27), Value::Str("SecurityAccess".into()), Value::Bool(false), Value::Str("安全访问".into())],
+            vec![Value::Int(0x28), Value::Str("CommunicationControl".into()), Value::Bool(false), Value::Str("通信控制".into())],
+            vec![Value::Int(0x2A), Value::Str("ReadDataByPeriodicIdentifier".into()), Value::Bool(true), Value::Str("读取数据（周期标识符）".into())],
+            vec![Value::Int(0x2C), Value::Str("DynamicallyDefineDataIdentifier".into()), Value::Bool(false), Value::Str("动态定义数据标识符动态定义数据标识符".into())],
+            vec![Value::Int(0x2E), Value::Str("WriteDataByIdentifier".into()), Value::Bool(true), Value::Str("写入数据".into())],
+            vec![Value::Int(0x2F), Value::Str("InputOutputControlByIdentifier".into()), Value::Bool(false), Value::Str("输入输出控制".into())],
+            vec![Value::Int(0x31), Value::Str("RoutineControl".into()), Value::Bool(true), Value::Str("例程控制".into())],
+            vec![Value::Int(0x3D), Value::Str("WriteMemoryByAddress".into()), Value::Bool(true), Value::Str("写入内存".into())],
+            vec![Value::Int(0x3E), Value::Str("TesterPresent".into()), Value::Bool(true), Value::Str("诊断设备在线".into())],
+            vec![Value::Int(0x85), Value::Str("ControlDTCSetting".into()), Value::Bool(true), Value::Str("控制DTC设置".into())],
         ];
 
         let center = cx.new_view(|cx| CenterContent {
-            table: cx.new_view(|cx| Table::new(cx, "my_table".to_string(), col_config, data, vec![])),
+            table: cx.new_view(|cx| Table::new(cx, "my_table".into(), col_config, data, vec![])),
         });
 
         Self {

@@ -8,7 +8,7 @@ use crate::widget::input::{TextInput, InputEvent};
 use crate::widget::scroll::{ScrollbarState, Scrollbar};
 use crate::style::theme::ActiveTheme;
 use crate::widget::util::bool_icon;
-use autoval::{ValueKey, Value, Obj, Grid};
+use auto_val::{ValueKey, Value, Obj, Grid, AutoStr};
 use std::rc::Rc;
 use std::cell::Cell;
 
@@ -101,14 +101,14 @@ impl ColConfig {
             config.id = key.to_string();
             match val {
                 Value::Str(s) => {
-                    config.title = s.clone();
+                    config.title = s.to_string();
                 }
                 Value::Obj(obj) => {
                     config.title = obj.get_str_or("title", "").to_string();
                     config.width = obj.get_or("width", Value::Float(0.0)).into();
                     config.align = obj.get_or("align", Value::from("start")).into();
                     config.format = obj.get_or("format", Value::from("Text")).into();
-                    config.options = obj.get_array_of("options").iter().map(|s| s.repr()).collect::<Vec<String>>();
+                    config.options = obj.get_array_of("options").iter().map(|s| s.repr().to_string()).collect::<Vec<String>>();
                 }
                 _ => (),
             }
@@ -141,8 +141,8 @@ impl Into<WidthMode> for Value {
     }
 }
 
-impl From<String> for Format {
-    fn from(s: String) -> Self {
+impl From<AutoStr> for Format {
+    fn from(s: AutoStr) -> Self {
         match s.as_str() {
             "Hex" => Format::Hex,
             "Checkbox" => Format::Checkbox(CheckboxConfig::default()),
@@ -206,7 +206,7 @@ impl TableUpdate {
 }
 
 pub struct Table {
-    id: String,
+    id: AutoStr,
     bounds: Bounds<Pixels>,
     focus_handle: FocusHandle,
     v_scroll: UniformListScrollHandle,
@@ -222,7 +222,7 @@ pub struct Table {
 }
 
 impl Table {
-    pub fn new(cx: &mut ViewContext<Self>, id: String, col_config: Vec<ColConfig>, data: Vec<Vec<Value>>, head: Vec<(ValueKey, Value)>) -> Self {
+    pub fn new(cx: &mut ViewContext<Self>, id: AutoStr, col_config: Vec<ColConfig>, data: Vec<Vec<Value>>, head: Vec<(ValueKey, Value)>) -> Self {
         let num_cols = col_config.len();
         let num_rows = data.len();
         let table_id = id.clone();
@@ -251,7 +251,7 @@ impl Table {
         }
     }
 
-    pub fn from_grid(cx: &mut ViewContext<Self>, id: String, grid: Grid) -> Self {
+    pub fn from_grid(cx: &mut ViewContext<Self>, id: AutoStr, grid: Grid) -> Self {
         let data = grid.data.clone();
         let col_config = ColConfig::from_grid_head(&grid.head);
         Self::new(cx, id, col_config, data, grid.head)
@@ -287,14 +287,14 @@ impl Table {
                         let cell = &row[colid];
                         let view = cx.new_view(|cx| {
                             let mut input = TextInput::new(cx);
-                            input.set_text(cell.repr(), cx);
+                            input.set_text(cell.repr().to_string(), cx);
                             input
                         });
                         let r = rowid.clone();
                         let c = colid.clone();
                         cx.subscribe(&view, move |t, _v, e, _cx| {
                             match e {
-                                InputEvent::Change(s) => t.update_cell(r, c, Value::Str(s.clone().to_string())),
+                                InputEvent::Change(s) => t.update_cell(r, c, Value::Str(s.clone().to_string().into())),
                                 _ => (),
                             }
                         }).detach();
@@ -311,7 +311,7 @@ impl Table {
                             if text.is_empty() {
                                 input.set_text("0", cx);
                             } else {
-                                input.set_text(text, cx);
+                                input.set_text(text.to_string(), cx);
                             }
                             input
                         });
@@ -393,7 +393,7 @@ impl Table {
             }
             rows.push(Value::Obj(obj));
         }
-        Value::Array(rows)
+        Value::Array(rows.into())
     }
 }
 
@@ -548,12 +548,12 @@ impl Table {
                             };
                             let cell = &self.data[rowid][colid];
                             match &config.format {
-                                Format::Text => div.child(cell.repr()),
+                                Format::Text => div.child(cell.repr().to_string()),
                                 Format::Hex => {
                                     match cell {
                                         Value::Int(i) => div.child(format!("0x{:04X}", i)),
                                         Value::Uint(u) => div.child(format!("0x{:04X}", u)),
-                                        _ => div.child(cell.repr()),
+                                        _ => div.child(cell.repr().to_string()),
                                     }
                                 }
                                 Format::Checkbox(config) => {

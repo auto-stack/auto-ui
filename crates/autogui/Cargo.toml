@@ -13,8 +13,8 @@ opt-level = 3
 crate-type = ["dylib"]
 
 [dependencies]
-autolang = { workspace = true }
-autoval = { workspace = true }
+auto-lang = { workspace = true }
+auto-val = { workspace = true }
 gpui = { workspace = true }
 anyhow = { workspace = true }
 serde = { workspace = true }

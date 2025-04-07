@@ -13,8 +13,8 @@ use autogui::widget::table::{Align, ColConfig, Table};
 use autogui::widget::util::{col, row};
 use autogui::widget::list::List;
 use autogui::widget::pane::PaneSide;
-use autolang::ast::{Node, Expr, Key, Name, Stmt, Arg};
-use autoval::{ValueKey, Value, Grid};
+use auto_lang::ast::{Node, Expr, Key, Name, Stmt, Arg};
+use auto_val::{ValueKey, Value, Grid};
 use gpui::{Div, SharedString, ViewContext, View, AnyView, ElementId, Render, IntoElement};
 use gpui::prelude::*;
 
@@ -51,7 +51,7 @@ impl DynaComponent {
         Self {
             view: DynaComponentView::None,
             builder: Box::new(|div, node, _spec, _cx, _view| {
-                div.child(format!("unknown node: {}", node.name.text))
+                div.child(format!("unknown node: {}", node.name))
             }),
         }
     }
@@ -104,7 +104,7 @@ impl DynaView {
         if let Some(view) = spec_view {
             for (idx, (name, node)) in view.nodes.iter().enumerate() {
                 let node = node.clone();
-                let builder = parse_node(&name.text, &node, self.spec.as_mut().unwrap(), idx, cx);
+                let builder = parse_node(&name, &node, self.spec.as_mut().unwrap(), idx, cx);
                 all_components.push(builder);
             }
             // Eval body
@@ -236,14 +236,14 @@ fn node_view_with_subs(node: &Node, spec: &mut WidgetSpec, _idx: usize, cx: &mut
         println!("stmt: {:?}", stmt);
         match stmt {
             Stmt::Node(node) => {
-                let compo = parse_node(&node.name.text, &node, spec, idx, cx);
+                let compo = parse_node(&node.name, &node, spec, idx, cx);
                 subs.push(compo);
                 idx += 1;
             }
             Stmt::Expr(Expr::Call(call)) => {
                 let node: Node = call.clone().into();
                 println!("node: {:?}", node);
-                let compo = parse_node(&node.name.text, &node, spec, idx, cx);
+                let compo = parse_node(&node.name, &node, spec, idx, cx);
                 subs.push(compo);
                 idx += 1;
             }
@@ -322,7 +322,7 @@ fn add_button(mut div: Div, node: &Node, _spec: &mut WidgetSpec, cx: &mut ViewCo
         for stmt in node.body.stmts.iter() {
             if let Stmt::Expr(Expr::Pair(pair)) = stmt {
                 match &pair.key {
-                    Key::NamedKey(Name { text }) => {
+                    Key::NamedKey(text) => {
                         if text == "onclick" {
                             // TODO: remove clone()
                             let v = pair.value.clone();
@@ -369,7 +369,7 @@ pub fn add_list(mut div: Div, node: &Node, spec: &mut WidgetSpec, cx: &mut ViewC
         _ => Value::Nil,
     };
     if let Value::Array(array) = data {
-        let array = array.iter().map(|v| v.repr().into()).collect::<Vec<SharedString>>();
+        let array = array.iter().map(|v| v.repr().to_string().into()).collect::<Vec<SharedString>>();
         div = div.child(cx.new_view(|cx| List::new(cx, array)));
         div
     } else {
@@ -381,7 +381,7 @@ pub fn add_table_view( node: &Node, spec: &mut WidgetSpec, idx: usize, cx: &mut 
     let len = node.args.len();
     let table_id = match node.args.get(0) {
         Some(Arg::Pos(Expr::Str(id))) => id,
-        _ => format!("table_{}", idx),
+        _ => format!("table_{}", idx).into(),
     }; 
     if len == 2 {
         let grid = match node.args.get(1) {
@@ -417,13 +417,13 @@ pub fn add_input_view(node: &Node, spec: &mut WidgetSpec, _idx: usize, cx: &mut 
         Some(Arg::Pos(expr)) => match expr {
             Expr::Str(text) => text,
             Expr::Ident(_) => spec.eval_expr(&expr).repr(),
-            _ => "".to_string(),
+            _ => "".into(),
         }
-        _ => "".to_string(),
+        _ => "".into(),
     };
     let view = cx.new_view(|cx| {
         let mut input = TextInput::new(cx);
-        input.set_text(text, cx);
+        input.set_text(text.to_string(), cx);
         input
     });
     view.into()
@@ -457,12 +457,12 @@ pub fn node_view_tabs( node: &Node, spec: &mut WidgetSpec, _idx: usize, cx: &mut
     for (idx, stmt) in node.body.stmts.iter().enumerate() {
         match stmt {
             Stmt::Node(node) => {
-                let tag = &node.name.text;
+                let tag = &node.name;
                 if tag == "tab" {
                     let tab_view = node_to_dynaview(node, spec, idx, false, cx);
                     let name = match node.args.get(0) {
                         Some(Arg::Pos(Expr::Str(name))) => name,
-                        _ => format!("view {}", idx),
+                        _ => format!("view {}", idx).into(),
                     };
                     let title = match node.args.get(1) {
                         Some(Arg::Pos(Expr::Str(title))) => title,
@@ -502,7 +502,7 @@ pub fn node_view_dropzone(node: &Node, _spec: &mut WidgetSpec, _idx: usize, cx: 
         for stmt in node.body.stmts.iter() {
             if let Stmt::Expr(Expr::Pair(pair)) = stmt {
                 match &pair.key {
-                    Key::NamedKey(Name { text }) => {
+                    Key::NamedKey(text) => {
                         if text == "ondrop" {
                             let expr = &pair.value;
                             match expr.as_ref() {
@@ -515,7 +515,7 @@ pub fn node_view_dropzone(node: &Node, _spec: &mut WidgetSpec, _idx: usize, cx: 
                                         // GlobalSpecState::global(cx).run_lambda(&cl);
                                         println!("ondrop: {:?}", lb);
                                         GlobalSpecState::update_global(cx, |state, _cx| {
-                                            state.scope().borrow_mut().set_local_val("f", Value::Str(f.to_string()));
+                                            state.scope().borrow_mut().set_local_val("f", Value::Str(f.to_string().into()));
                                             state.run_lambda(&lb);
                                         });
                                         cx.notify();
@@ -547,11 +547,11 @@ pub fn node_view_dropdown(node: &Node, spec: &mut WidgetSpec, _idx: usize, cx: &
     };
     println!("title: {:?}", title);
     println!("args[1]: {:?}", node.args.get(1));
-    let options = match node.args.get(1) {
+    let options: Vec<Value> = match node.args.get(1) {
         Some(arg) => {
             let val = spec.eval_expr(&arg.get_expr());
             if let Value::Array(array) = val {
-                array
+                array.values
             } else {
                 vec![]
             }
@@ -559,8 +559,11 @@ pub fn node_view_dropdown(node: &Node, spec: &mut WidgetSpec, _idx: usize, cx: &
         _ => vec![],
     };
     println!("options: {:?}", options);
-    let options = options.iter().map(|o| o.to_string().into()).collect::<Vec<SharedString>>();
-    let view = cx.new_view(|cx| Dropdown::new(ElementId::Name(title.into()), options, None, cx));
+    let options = options.iter().map(|o: &Value| {
+        let s = o.to_string();
+        s.into()
+    }).collect::<Vec<SharedString>>();
+    let view = cx.new_view(|cx| Dropdown::new(ElementId::Name(title.to_string().into()), options, None, cx));
     view.into()
 }
 
@@ -592,10 +595,10 @@ pub fn convert_value_to_table_config(value: &Value) -> Vec<ColConfig> {
                         let col = ColConfig {
                             idx,
                             id: obj.get_str_or("id", "").into(),
-                            title: obj.get_str_or("name", ""),
+                            title: obj.get_str_or("name", "").to_string(),
                             width: obj.get_or("width", Value::Float(0.0)).into(),
                             format: obj.get_or("format", Value::from("Text")).into(),
-                            options: obj.get_array_of("options").iter().map(|s| s.repr()).collect::<Vec<String>>(),
+                            options: obj.get_array_of("options").iter().map(|s| s.repr().to_string()).collect::<Vec<String>>(),
                             align: Align::Start,
                         };
                         cols.push(col);

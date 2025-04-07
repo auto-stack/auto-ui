@@ -1,5 +1,5 @@
 use gpui::*;
-use autoval::{Value, Node, Widget, Model};
+use auto_val::{Value, Node, Widget, Model};
 use autogui::assets::Assets;
 use autogui::style::theme::ActiveTheme;
 use autogui::app::{GlobalDataStoreCollectAction, Viewable, GlobalState, ReloadState, GlobalDataStore};
@@ -11,9 +11,9 @@ use crate::dyna::dyna::DynaView;
 use gpui::ReadGlobal;
 use std::rc::Rc;
 use std::cell::RefCell;
-use autolang::scope::Universe;
-use autolang::interp::Interpreter;
-use autolang::eval::EvalTempo;
+use auto_lang::Universe;
+use auto_lang::interp::Interpreter;
+use auto_lang::eval::EvalTempo;
 use autogui::app::init;
 
 pub struct RootView {
@@ -129,7 +129,7 @@ impl GlobalSpecState {
         &self.path
     }
 
-    pub fn run_lambda(&mut self, lambda: &autolang::ast::Fn) {
+    pub fn run_lambda(&mut self, lambda: &auto_lang::ast::Fn) {
         self.spec.run_lambda(lambda);
     }
 
@@ -154,6 +154,20 @@ impl DynaApp {
             app: App::new().with_assets(Assets),
             path: path.to_string(),
             interpreter: Rc::new(RefCell::new(interpreter)),
+        }
+    }
+
+    pub fn new_with_interpreter(path: &str, interp: Rc<RefCell<Interpreter>>) -> Self {
+        let evaler = &mut interp.borrow_mut().evaler;
+        evaler.set_tempo("center", EvalTempo::LAZY);
+        evaler.set_tempo("top", EvalTempo::LAZY);
+        evaler.set_tempo("left", EvalTempo::LAZY);
+        evaler.set_tempo("right", EvalTempo::LAZY);
+        evaler.set_tempo("bottom", EvalTempo::LAZY);
+        Self {
+            app: App::new().with_assets(Assets),
+            path: path.to_string(),
+            interpreter: interp.clone(),
         }
     }
 

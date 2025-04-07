@@ -4,7 +4,7 @@ use crate::style::theme::ActiveTheme;
 use std::collections::HashMap;
 use crate::widget::input;
 use crate::style::theme;
-use autoval::{Value, Obj};
+use auto_val::{Value, Obj};
 
 pub fn init(cx: &mut AppContext) {
     theme::init(cx);

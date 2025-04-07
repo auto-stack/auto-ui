@@ -4,9 +4,9 @@ resolver = "2"
 
 [workspace.dependencies]
 # autolang = { git = "https://gitee.com/auto-stack/auto-lang"}
-autolang = { path = "../auto-lang/crates/autolang" }
+auto-lang = { path = "../auto-lang/crates/auto-lang" }
 # autoval = { git = "https://gitee.com/auto-stack/auto-lang"}
-autoval = { path = "../auto-lang/crates/autoval" }
+auto-val = { path = "../auto-lang/crates/auto-val" }
 
 # switch to this dynamic lib for debug mode
 gpui = { version = "0.1.0", path = "crates/gpui-dynamic", package = "gpui-dynamic" }

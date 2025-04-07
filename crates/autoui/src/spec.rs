@@ -1,10 +1,11 @@
-use autolang::eval::Evaler;
-use autolang::interpret;
-use autoval::*;
-use autolang::ast;
-use autolang::scope::{Universe, Meta};
-use autolang::ast::{Expr, Fn, Args, Arg};
-use autolang::interp::Interpreter;
+use auto_lang::eval::Evaler;
+use auto_lang::interpret;
+use auto_val::*;
+use auto_lang::ast;
+use auto_lang::scope::Meta;
+use auto_lang::Universe;
+use auto_lang::ast::{Expr, Fn, Args, Arg};
+use auto_lang::interp::Interpreter;
 use crate::dyna::state::State;
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -90,7 +91,7 @@ impl Spec {
                             state.set_int(&name, *n);
                         }
                         Value::Str(s) => {
-                            state.set_str(&name, s.clone());
+                            state.set_str(&name, s.to_string());
                         }
                         Value::Bool(b) => {
                             state.set_bool(&name, *b);
@@ -184,15 +185,15 @@ impl WidgetSpec {
     pub fn from_ast_node(node: &ast::Node, path: &str, scope: Rc<RefCell<Universe>>) -> Self {
         // make node into a `View` meta and put it in the scope
         // TODO: this id may not be unique
-        let node_name = node.name.text.clone();
+        let node_name = node.name.clone();
         let node_arg0 = match node.args.get(0) {
             Some(Arg::Pos(Expr::Str(s))) => s.clone(),
-            _ => "_".to_string(),
+            _ => "_".into(),
         };
-        let body_id = format!("{}_{}.body", node_name, node_arg0);
+        let body_id: AutoStr = format!("{}_{}.body", node_name, node_arg0).into();
         scope.borrow_mut().define(&body_id, Rc::new(Meta::Body(node.body.clone())));
         let widget = Widget { name: node_name.clone(), model: Model::new(), view_id: MetaID::Body(body_id.clone()) };
-        Self{ widget: Value::Widget(widget), path: path.to_string(), id: body_id, scope }
+        Self{ widget: Value::Widget(widget), path: path.to_string(), id: body_id.to_string(), scope }
     }
 
     pub fn read_str(&mut self, source: &str) {
