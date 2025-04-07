@@ -179,7 +179,7 @@ impl Trans for GpuiTrans {
     }
 }
 
-fn has_view(type_decl: &TypeDecl) -> bool {
+fn has_view_method(type_decl: &TypeDecl) -> bool {
     type_decl.methods.iter().any(|m| m.name == "view")
 }
 
@@ -278,7 +278,7 @@ impl GpuiTrans {
 
     fn do_type_decl(&mut self, type_decl: &TypeDecl) -> AutoResult<()> {
         println!("do_type_decl");
-        if has_view(type_decl) { // View types
+        if has_view_method(type_decl) { // View types
             self.do_widget(type_decl)?;
             
         } else { // Normal types
@@ -869,16 +869,13 @@ impl GpuiTrans {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use auto_lang::{parse, parse_with_scope};
+    use auto_lang::parse_with_scope;
     use auto_val::shared;
     use auto_lang::Universe;
-    use std::rc::Rc;
-    use auto_lang::scope::Meta;
-    use auto_lang::ast::{Type, TypeDecl};
     #[test]
     fn test_ui_hello() {
         let code = r#"
-type Hello as View {
+type Hello as Widget {
     msg str = "Hello World"
     button_label str = "Click"
 
@@ -919,7 +916,7 @@ type input {
     text str = ""
 }
 
-type Login as View {
+type Login as Widget {
     username str
     password str
     status str = ""

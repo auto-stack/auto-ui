@@ -1,0 +1,25 @@
+var cols = [
+    col("id") {
+        name: "ID"
+        typ: "int"
+    },
+    col("symbol") {
+        name: "Symbol"
+    },
+    col("name") {
+        name: "Name"
+    },
+]
+
+var rows = [
+    [1, "AAPL", "Apple Inc."],
+    [2, "GOOG", "Google Inc."],
+    [3, "MSFT", "Microsoft Corp."],
+]
+
+fn main() {
+    app {
+        table(cols, rows)
+    }
+}
+

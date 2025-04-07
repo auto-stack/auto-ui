@@ -49,7 +49,7 @@ impl HelloStory {
     }
 
     pub fn on(&mut self, ev: SharedString) {
-        self.msg = "Hello Button clicked".into();
+        self.msg = format!("Hello Button clicked").into();
     }
     
 }
