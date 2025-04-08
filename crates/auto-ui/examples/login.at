@@ -1,4 +1,4 @@
-type Login as View {
+type Login as Widget {
     username str
     password str
     status str = ""

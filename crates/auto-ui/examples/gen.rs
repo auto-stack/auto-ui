@@ -66,11 +66,12 @@ mod tests {
 
 fn main() {
     let examples = vec![
-        "hello",
-        "login",
-        "docks",
-        "mark",
-        "counter"
+    //     "hello",
+    //     "login",
+    //     "docks",
+    //     "mark",
+    //     "counter",
+        "table",
     ];
 
     let story_template = Templates::story().unwrap();

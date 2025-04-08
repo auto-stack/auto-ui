@@ -8,6 +8,9 @@ pub use story::*;
 pub mod bridge;
 pub mod trans;
 
+mod widgets;
+pub use widgets::*;
+
 
 #[cfg(test)]
 mod tests {

@@ -14,6 +14,10 @@ use gpui_component::{
 use auto_ui::*;
 use auto_ui::row;
 
+$ for embed in embeds {
+$embed
+$ }
+
 $ for story in storys {
 
 pub struct ${story.name}Story {

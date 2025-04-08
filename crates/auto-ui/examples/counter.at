@@ -1,4 +1,4 @@
-type Counter as View {
+type Counter as Widget {
     count int = 0
 
     fn view() {

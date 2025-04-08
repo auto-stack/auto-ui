@@ -1,5 +1,5 @@
 use auto_val::AutoStr;
-use auto_lang::AutoError;
+use auto_lang::AutoResult;
 use rust_embed::RustEmbed;
 use gpui::AssetSource;
 use anyhow::anyhow;
@@ -9,20 +9,25 @@ use anyhow::anyhow;
 #[include = "*.at.rs"]
 pub struct Templates;
 
+#[inline]
+fn load_template(name: &str) -> AutoResult<AutoStr> {
+    let file = Templates::get(name).unwrap();
+    let str = String::from_utf8(file.data.as_ref().to_vec()).unwrap();
+    Ok(AutoStr::from(str))
+}
+
 impl Templates {
-
-    pub fn story() -> Result<AutoStr, AutoError> {
-        let file = Templates::get("story.at.rs").unwrap();
-        let str = String::from_utf8(file.data.as_ref().to_vec()).unwrap();
-        Ok(AutoStr::from(str))
+    pub fn story() -> AutoResult<AutoStr> {
+        load_template("story.at.rs")
     }
 
-    pub fn app() -> Result<AutoStr, AutoError> {
-        let file = Templates::get("app.at.rs").unwrap();
-        let str = String::from_utf8(file.data.as_ref().to_vec()).unwrap();
-        Ok(AutoStr::from(str))
+    pub fn app() -> AutoResult<AutoStr> {
+        load_template("app.at.rs")
     }
 
+    pub fn table() -> AutoResult<AutoStr> {
+        load_template("table.at.rs")
+    }
 }
 
 impl AssetSource for Templates {

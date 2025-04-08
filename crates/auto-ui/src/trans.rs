@@ -8,15 +8,15 @@ use std::io::Write;
 use auto_lang::AutoResult;
 use auto_atom::Atom;
 use auto_gen::{AutoGen, Mold};
-use auto_val::{AutoStr, StrExt, AutoPath, Type, Value, Op};
+use auto_val::{shared, AutoPath, AutoStr, Op, StrExt, Type, Value};
 use auto_lang::ast;
 use auto_lang::eval;
 use auto_val::Shared;
 use auto_lang::Universe;
 use auto_lang::scope::Meta;
 use auto_lang::ast::StoreKind;
-use std::rc::Rc;
-
+use auto_lang::eval::Evaler;
+use auto_val::Node;
 #[derive(Debug, Default, Clone)]
 pub struct WidgetInfo {
     pub name: AutoStr,
@@ -34,6 +34,7 @@ pub struct WidgetModel {
 pub struct WidgetField {
     pub name: AutoStr,
     pub ty: Type,
+    pub delegate: AutoStr,
     pub value: Value,
 }
 
@@ -64,7 +65,7 @@ impl From<&ast::Member> for WidgetField {
             Some(value) => eval::eval_basic_expr(&value),
             None => Value::Nil,
         };
-        WidgetField { name, ty, value }
+        WidgetField { name, ty, delegate: AutoStr::default(), value }
     }
 }
 
@@ -79,10 +80,10 @@ impl WidgetInfo {
             let kind: AutoStr = match &field.ty {
                 Type::Str => "SharedString".into(),
                 Type::User(typ) => {
-                    if typ == "input" {
-                        "TextInput".into()
-                    } else {
-                        typ.clone().into()
+                    match typ.as_str() {
+                        "input" => "TextInput".into(),
+                        "table" => "Entity<Table<MyTableDelegate>>".into(),
+                        _ => typ.clone().into(),
                     }
                 }
                 Type::Int => "i32".into(),
@@ -94,10 +95,10 @@ impl WidgetInfo {
                     format!("{}: {}", field.name.clone(), field.value.to_astr())
                 }
                 Type::User(typ) => {
-                    if typ == "input" {
-                        format!("{}: cx.new(|cx| {}::new(w, cx)),", field.name.clone(), kind.clone())
-                    } else {
-                        format!("{}: {}::new(\"{}\"),", field.name.clone(), kind.clone(), field.value.to_astr())
+                    match typ.as_str() {
+                        "input" => format!("{}: cx.new(|cx| {}::new(w, cx)),", field.name.clone(), kind.clone()),
+                        "table" => format!("{}: cx.new(|cx| Table::new({}::new({}), w, cx)),", field.name.clone(), field.delegate.clone(), field.value.repr()),
+                        _ => format!("{}: {}::new(\"{}\"),", field.name.clone(), kind.clone(), field.value.to_astr()),
                     }
                 }
                 _ => format!("{}: {}::new(r#\"{}\"#),", field.name.clone(), kind.clone(), field.value.to_astr()),
@@ -109,6 +110,9 @@ impl WidgetInfo {
                 field_node.set_prop("kind", kind.clone());
             }
             root.add_kid(field_node);
+        }
+        if self.model.fields.is_empty() {
+            root.set_prop("fields", Value::empty_array());
         }
         root.set_prop("methods", self.methods.clone());
         root.set_prop("code", Value::Str(self.view.clone()));
@@ -145,10 +149,12 @@ impl AppInfo {
 
 pub struct GpuiTrans {
     pub name: AutoStr,
+    pub embeds: Vec<AutoStr>,
     pub widget: WidgetInfo,
     pub widgets: Vec<WidgetInfo>,
     pub app: Option<AppInfo>,
     pub universe: Shared<Universe>,
+    pub evaler: Shared<Evaler>,
 }
 
 impl Trans for GpuiTrans {
@@ -195,12 +201,15 @@ impl Indent for String {
 
 impl GpuiTrans {
     pub fn new(name: impl Into<AutoStr>, universe: Shared<Universe>) -> Self {
+        let evaler = shared(Evaler::new(universe.clone()));
         Self {
             name: name.into(),
+            embeds: vec![],
             widget: WidgetInfo::default(),
             widgets: vec![],
             app: None,
             universe,
+            evaler,
         }
     }
 
@@ -346,6 +355,10 @@ impl GpuiTrans {
                 } else {
                     return Err(format!("unsupported node {}", node.name).into());
                 }
+            }
+            ast::Expr::Array(_) => {
+                let result = self.evaler.borrow_mut().eval_expr(expr);
+                Ok(result)
             }
             _ => {
                 Ok(eval::eval_basic_expr(expr))
@@ -736,9 +749,126 @@ impl GpuiTrans {
                 let markdown_code = self.do_markdown(node)?;
                 code.push_str(&markdown_code);
             }
+            "table" => {
+                let table_code = self.do_table(node)?;
+                code.push_str(&table_code);
+            }
             _ => {}
         }
         Ok(code.into())
+    }
+
+    fn do_table(&mut self, node: &ast::Node) -> AutoResult<AutoStr> {
+        let mut code = String::new();
+        // get three args: id, cols and rows
+        let arg_count = node.args.args.len();
+        if arg_count != 3 {
+            return Err(format!("table expects 3 arguments (id, cols, rows), got {}", arg_count).into());
+        }
+        // do table delegate defs
+        self.do_table_delegate(node)?;
+        // id must be a string
+        let id = node.args.args[0].repr();
+        // cols and rows might be array or identifier
+        // let cols = self.do_arg_expr(&node.args.args[1])?;
+        let rows = &node.args.args[2];
+        let mut row_code = String::new();
+        row_code.push_str("vec![");
+        if let ast::Arg::Pos(pos) = rows {
+            if let ast::Expr::Ident(ident) = &*pos {
+                let name = ident;
+                let rows = self.universe.borrow().lookup_val(name).unwrap();
+                if let Value::Array(rows) = &rows {
+                    for row in rows.iter() {
+                        row_code.push_str("MyTableRow::new(");
+                        if let Value::Array(row) = row {
+                            for cell in row.iter() {
+                                row_code.push_str(&format!("{}, ", cell));
+                            }
+                        }
+                        row_code.push_str(")");
+                        row_code.push_str(", ");
+                    }
+                }
+            }
+        }
+        row_code.push_str("]");
+        println!("row_code: {}", row_code);
+        let id = format!("table_{}", id);
+        code.push_str(&format!("self.{}.clone()", id));
+        self.widget.model.fields.push(WidgetField {
+            name: id.into(),
+            ty: Type::User("table".into()),
+            delegate: "MyTableDelegate".into(),
+            value: row_code.into(),
+        });
+        Ok(code.into())
+    }
+
+    fn do_table_delegate(&mut self, node: &ast::Node) -> AutoResult<()> {
+        let cols = &node.args.args[1];
+        if let ast::Arg::Pos(arg) = cols {
+            if let ast::Expr::Ident(ident) = &*arg {
+                let name = ident;
+                let mut cols = self.universe.borrow().lookup_val(name).unwrap();
+                // translate col's type to rust type
+                cols = self.translate_cols(cols);
+                let mut root = Node::new("table_delegate");
+                root.set_prop("cols", cols);
+                let atom = Atom::node(root);
+                println!("atom: {}", atom);
+                // use table template to generate delegate code
+                let table_template = Templates::table().unwrap();
+                let gen = AutoGen::new()
+                    .molds(vec![Mold::new("table.at.rs", table_template)])
+                    .data(atom);
+                let code = gen.gen_str();
+                self.embed(code);
+            }
+            Ok(())
+        } else {
+            Ok(())
+        }
+    }
+
+    fn translate_cols(&mut self, mut cols: Value) -> Value {
+        if let Value::Array(cols) = &mut cols {
+            for col in cols.iter_mut() {
+                println!("col: {}", col);
+                if let Value::Obj(obj) = col {
+                    if let Value::Str(ty) = obj.get("typ").unwrap() {
+                        println!("ty: {}", ty);
+                        match ty.as_str() {
+                            "str" => {
+                                obj.set("typ", Value::Str("SharedString".into()));
+                                obj.set("arg_type", Value::Str("impl Into<SharedString>".into()));
+                                obj.set("to_str", Value::Str("clone()".into()));
+                                obj.set("arg_value", Value::Str(format!("{}.into()", obj.get_str_of("id")).into()));
+                            }
+                            "int" => {
+                                obj.set("typ", Value::Str("i32".into()));
+                                obj.set("arg_type", Value::Str("i32".into()));
+                                obj.set("to_str", Value::Str("to_string()".into()));
+                                obj.set("arg_value", Value::Str(obj.get_str_of("id").into()));
+                            }
+                            "float" => {
+                                obj.set("typ", Value::Str("f32".into()));
+                                obj.set("arg_type", Value::Str("f32".into()));
+                                obj.set("to_str", Value::Str("to_string()".into()));
+                                obj.set("arg_value", Value::Str(obj.get_str_of("id").into()));
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+        cols
+    }
+    
+
+    fn embed(&mut self, code: AutoStr) {
+        self.embeds.push(code);
     }
 
     fn do_markdown(&mut self, node: &ast::Node) -> AutoResult<AutoStr> {
@@ -827,6 +957,7 @@ impl GpuiTrans {
         self.widget.model.fields.push(WidgetField {
             name: name.into(),
             ty: Type::User("input".into()),
+            delegate: AutoStr::default(),
             value: Value::str(""),
         });
         Ok(code.into())
@@ -845,6 +976,8 @@ impl GpuiTrans {
 
         app_node.add_kid(app.to_node());
         app_node.set_prop("name", self.name.clone());
+        let embeds = std::mem::take(&mut self.embeds);
+        app_node.set_prop("embeds", embeds);
         let atom = Atom::node(app_node);
 
         // 3. feed atom to generator and generate code
@@ -860,7 +993,9 @@ impl GpuiTrans {
     }
 
     fn pretty(&mut self, code: impl Into<AutoStr>) -> AutoStr {
-        let parsed = syn::parse_str(code.into().as_str()).unwrap();
+        let code = code.into();
+        println!("prettying: {}", code);
+        let parsed = syn::parse_str(code.as_str()).unwrap();
         let pretty = prettyplease::unparse(&parsed).indent();
         pretty.into()
     }

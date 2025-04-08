@@ -1,5 +1,5 @@
 
-type LeftPane as View {
+type LeftPane as Widget {
     msg str = "LeftPane"
 
     fn view() {
@@ -9,7 +9,7 @@ type LeftPane as View {
     }
 }
 
-type RightPane as View {
+type RightPane as Widget {
     msg str = "RightPane"
 
     fn view() {
@@ -19,7 +19,7 @@ type RightPane as View {
     }
 }
 
-type MiddlePane as View {
+type MiddlePane as Widget {
     username str
     password str
     status str = ""

@@ -1,4 +1,4 @@
-type Hello as View {
+type Hello as Widget {
     msg str = "Hello World"
     button_label str = "Click"
 

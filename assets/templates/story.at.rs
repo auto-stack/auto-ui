@@ -38,7 +38,7 @@ impl Story for ${story.name}Story {
 }
 
 impl ${story.name}Story {
-    pub(crate) fn new(w: &mut Window, cx: &mut App) -> Self {
+    pub(crate) fn new(w: &mut Window, cx: &mut Context<Self>) -> Self {
         Self {
             focus_handle: cx.focus_handle(),
         $ for f in story.fields {

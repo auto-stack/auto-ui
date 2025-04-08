@@ -1,13 +1,18 @@
 var cols = [
-    col("id") {
+    {
+        id: "id",
         name: "ID"
         typ: "int"
     },
-    col("symbol") {
-        name: "Symbol"
+    {
+        id: "symbol",
+        name: "Symbol",
+        typ: "str"
     },
-    col("name") {
-        name: "Name"
+    {
+        id: "name",
+        name: "Name",
+        typ: "str"
     },
 ]
 
@@ -17,9 +22,20 @@ var rows = [
     [3, "MSFT", "Microsoft Corp."],
 ]
 
+type SimpleTable as Widget {
+    fn view() {
+        center {
+            table("MyTable", cols, rows)
+        }
+    }
+
+    fn on(ev str) {
+    }
+}
+
 fn main() {
-    app {
-        table(cols, rows)
+    app("TableExample") {
+        simple_table() {}
     }
 }
 
