@@ -6,9 +6,8 @@ pub use title_bar::AppTitleBar;
 
 use gpui::{
     actions, div, impl_internal_actions, prelude::FluentBuilder as _, px, size, AnyElement,
-    AsyncApp,
-    AnyView, App, AppContext, Bounds, Context, Div, Entity, EventEmitter, Focusable, Global, Hsla,
-    InteractiveElement, IntoElement, ParentElement, Render, SharedString,
+    AnyView, App, AppContext, AsyncApp, Bounds, Context, Div, Entity, EventEmitter, Focusable,
+    Global, Hsla, InteractiveElement, IntoElement, ParentElement, Render, SharedString,
     StatefulInteractiveElement, Styled as _, Window, WindowBounds, WindowKind, WindowOptions,
 };
 
@@ -24,8 +23,8 @@ use gpui_component::{
     v_flex, ActiveTheme, ContextModal, IconName, Root, TitleBar,
 };
 
-use serde::{Deserialize, Serialize};
 use reqwest_client::ReqwestClient;
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, PartialEq, Eq, Deserialize)]
 pub struct SelectScrollbarShow(ScrollbarShow);
@@ -76,8 +75,13 @@ where
     create_new_window_sized(title, crate_view_fn, cx, 1600, 1200);
 }
 
-pub fn create_new_window_sized<F, E>(title: &str, crate_view_fn: F, cx: &mut App, width: u32, height: u32)
-where
+pub fn create_new_window_sized<F, E>(
+    title: &str,
+    crate_view_fn: F,
+    cx: &mut App,
+    width: u32,
+    height: u32,
+) where
     E: Into<AnyView>,
     F: FnOnce(&mut Window, &mut App) -> E + Send + 'static,
 {
@@ -172,9 +176,8 @@ pub fn init(cx: &mut App) {
     gpui_component::init(cx);
     AppState::init(cx);
 
-    let http_client = std::sync::Arc::new(
-        reqwest_client::ReqwestClient::user_agent("auto-ui/story").unwrap(),
-    );
+    let http_client =
+        std::sync::Arc::new(reqwest_client::ReqwestClient::user_agent("auto-ui/story").unwrap());
     cx.set_http_client(http_client);
 
     register_panel(cx, PANEL_NAME, |_, _, info, window, cx| {
@@ -355,8 +358,8 @@ impl StoryState {
 
     fn to_story(
         &self,
-        window: &mut Window,
-        cx: &mut App,
+        _w: &mut Window,
+        _cx: &mut App,
     ) -> (
         &'static str,
         &'static str,
@@ -448,7 +451,7 @@ impl Panel for StoryContainer {
     }
 
     fn popup_menu(&self, menu: PopupMenu, _window: &Window, _cx: &App) -> PopupMenu {
-        menu//.track_focus(&self.focus_handle)
+        menu //.track_focus(&self.focus_handle)
             .menu("Info", Box::new(ShowPanelInfo))
     }
 

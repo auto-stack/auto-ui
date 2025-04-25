@@ -1,0 +1,3 @@
+app("Hello Example") {
+    label("Hello World") {}
+}
