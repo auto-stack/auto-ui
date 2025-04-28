@@ -4,10 +4,9 @@ mod layout;
 pub use layout::*;
 pub mod story;
 pub use story::*;
-mod dyna;
-pub use dyna::*;
 
 pub mod bridge;
+pub mod dyna;
 pub mod trans;
 
 mod widgets;
