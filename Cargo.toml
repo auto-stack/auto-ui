@@ -15,7 +15,7 @@ gpui = { version = "0.1.0", path = "crates/gpui-dynamic", package = "gpui-dynami
 markdown = { git = "https://github.com/zed-industries/zed", package = "markdown" }
 # switch to this static lib for release mode
 # gpui = { git = "https://github.com/zed-industries/zed" }
-gpui-component = { git = "https://github.com/longbridge/gpui-component"}
+gpui-component = { git = "https://github.com/longbridge/gpui-component" }
 gpui-story = { git = "https://github.com/longbridge/gpui-component", package = "story" }
 
 # auto-widgets = { path = "crates/auto-widgets" }
@@ -36,7 +36,10 @@ regex = "1.11.0"
 reqwest = "0.12.11"
 reqwest_client = { git = "https://github.com/huacnlee/zed.git", branch = "webview" }
 prettyplease = "0.2.10"
-syn = { version = "2", default-features = false, features = ["full", "parsing"] }
-
-
-
+syn = { version = "2", default-features = false, features = [
+    "full",
+    "parsing",
+] }
+notify = "8.0.0"
+notify-debouncer-mini = "0.6.0"
+futures = "0.3.30"

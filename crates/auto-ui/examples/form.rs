@@ -1,6 +1,6 @@
-use gpui::*;
 use auto_ui::story::*;
 use auto_ui::StoryView;
+use gpui::*;
 
 use gpui::{
     actions, div, prelude::FluentBuilder as _, App, AppContext, Axis, Context, Entity, Focusable,

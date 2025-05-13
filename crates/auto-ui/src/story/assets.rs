@@ -4,7 +4,7 @@ use gpui::AssetSource;
 use rust_embed::RustEmbed;
 
 use auto_val::AutoStr;
-use auto_lang::AutoError;
+use auto_val::AutoError;
 
 #[derive(RustEmbed)]
 #[folder = "../../assets"]
@@ -32,4 +32,3 @@ impl AssetSource for Assets {
             .collect())
     }
 }
-

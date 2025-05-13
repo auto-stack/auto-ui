@@ -1,19 +1,18 @@
-use std::sync::Arc;
-use gpui::*;
 use gpui::prelude::FluentBuilder;
+use gpui::*;
 use gpui_component::{
-    h_flex,
-    ActiveTheme,
-    input::TextInput,
     button::Button,
-    label::Label,
     dock::{DockArea, DockItem},
-    form::{v_form, form_field}
+    form::{form_field, v_form},
+    h_flex,
+    input::TextInput,
+    label::Label,
+    ActiveTheme,
 };
+use std::sync::Arc;
 
-use auto_ui::*;
 use auto_ui::row;
-
+use auto_ui::*;
 
 pub struct LeftPaneStory {
     focus_handle: gpui::FocusHandle,
@@ -45,8 +44,6 @@ impl LeftPaneStory {
     pub fn view(window: &mut Window, cx: &mut App) -> Entity<Self> {
         cx.new(|cx| Self::new(window, cx))
     }
-
-
 }
 
 impl Focusable for LeftPaneStory {
@@ -59,9 +56,7 @@ impl Render for LeftPaneStory {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         col().child(Label::new(self.msg.clone()))
     }
-    
 }
-
 
 pub struct RightPaneStory {
     focus_handle: gpui::FocusHandle,
@@ -93,8 +88,6 @@ impl RightPaneStory {
     pub fn view(window: &mut Window, cx: &mut App) -> Entity<Self> {
         cx.new(|cx| Self::new(window, cx))
     }
-
-
 }
 
 impl Focusable for RightPaneStory {
@@ -107,9 +100,7 @@ impl Render for RightPaneStory {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         col().child(Label::new(self.msg.clone()))
     }
-    
 }
-
 
 pub struct MiddlePaneStory {
     focus_handle: gpui::FocusHandle,
@@ -153,7 +144,6 @@ impl MiddlePaneStory {
     pub fn on(&mut self, ev: SharedString) {
         self.status = format!("Login {}", self.username).into();
     }
-    
 }
 
 impl Focusable for MiddlePaneStory {
@@ -164,53 +154,45 @@ impl Focusable for MiddlePaneStory {
 
 impl Render for MiddlePaneStory {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        self.username = self.input_username.read(cx).text();
-        self.password = self.input_password.read(cx).text();
-        center()
-            .child(
-                col()
-                    .id("login-story")
-                    .border_1()
-                    .border_color(cx.theme().border)
-                    .p_4()
-                    .rounded_lg()
-                    .gap_6()
-                    .w_2_5()
-                    .child(
-                        row()
-                            .w_begin()
+        self.username = self.input_username.read(cx).text().clone();
+        self.password = self.input_password.read(cx).text().clone();
+        center().child(
+            col()
+                .id("login-story")
+                .border_1()
+                .border_color(cx.theme().border)
+                .p_4()
+                .rounded_lg()
+                .gap_6()
+                .w_2_5()
+                .child(
+                    row().w_begin().child(
+                        v_form()
                             .child(
-                                v_form()
-                                    .child(
-                                        form_field()
-                                            .label("Username")
-                                            .child(self.input_username.clone()),
-                                    )
-                                    .child(
-                                        form_field()
-                                            .label("Password")
-                                            .child(self.input_password.clone()),
-                                    ),
+                                form_field()
+                                    .label("Username")
+                                    .child(self.input_username.clone()),
+                            )
+                            .child(
+                                form_field()
+                                    .label("Password")
+                                    .child(self.input_password.clone()),
                             ),
-                    )
-                    .child(
-                        Button::new("Login")
-                            .label("Login")
-                            .on_click(
-                                cx
-                                    .listener(|v, _, _, cx| {
-                                        v.on("button-login".into());
-                                        cx.notify();
-                                    }),
-                            ),
-                    )
-                    .child(Label::new(self.username.clone()))
-                    .child(Label::new(self.status.clone())),
-            )
+                    ),
+                )
+                .child(
+                    Button::new("Login")
+                        .label("Login")
+                        .on_click(cx.listener(|v, _, _, cx| {
+                            v.on("button-login".into());
+                            cx.notify();
+                        })),
+                )
+                .child(Label::new(self.username.clone()))
+                .child(Label::new(self.status.clone())),
+        )
     }
-    
 }
-
 
 pub struct Docks {
     dockarea: Entity<DockArea>,
@@ -228,18 +210,12 @@ const MAIN_DOCK_AREA: DockAreaTab = DockAreaTab {
 
 impl Docks {
     pub fn new(w: &mut Window, cx: &mut Context<Self>) -> Self {
-        let dockarea = cx.new(|cx| DockArea::new(
-            MAIN_DOCK_AREA.id,
-            Some(MAIN_DOCK_AREA.version),
-            w,
-            cx,
-        ));
+        let dockarea =
+            cx.new(|cx| DockArea::new(MAIN_DOCK_AREA.id, Some(MAIN_DOCK_AREA.version), w, cx));
         let weak_dockarea = dockarea.downgrade();
         Self::layout(&weak_dockarea, w, cx);
 
-        Self {
-            dockarea,
-        }
+        Self { dockarea }
     }
 
     fn layout(dockarea: &WeakEntity<DockArea>, w: &mut Window, cx: &mut Context<Self>) {
@@ -264,8 +240,6 @@ impl Docks {
             cx,
         );
 
-
-
         _ = dockarea.update(cx, |view, cx| {
             view.set_left_dock(left_item, Some(px(350.)), true, w, cx);
             view.set_center(middle_item, w, cx);
@@ -277,12 +251,12 @@ impl Docks {
 impl Render for Docks {
     fn render(&mut self, _: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
         div()
-        .id("story-workspace")
-        .relative()
-        .size_full()
-        .flex()
-        .flex_col()
-        .child(self.dockarea.clone())
+            .id("story-workspace")
+            .relative()
+            .size_full()
+            .flex()
+            .flex_col()
+            .child(self.dockarea.clone())
     }
 }
 
@@ -293,6 +267,12 @@ fn main() {
         init(cx);
         cx.activate(true);
 
-        create_new_window_sized("Docks Example", |w, cx| cx.new(|cx| Docks::new(w, cx)), cx, 800, 600);
+        create_new_window_sized(
+            "Docks Example",
+            |w, cx| cx.new(|cx| Docks::new(w, cx)),
+            cx,
+            800,
+            600,
+        );
     });
 }

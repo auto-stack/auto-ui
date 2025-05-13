@@ -1,8 +1,7 @@
-use auto_val::AutoStr;
-use auto_lang::AutoResult;
-use rust_embed::RustEmbed;
-use gpui::AssetSource;
 use anyhow::anyhow;
+use auto_val::{AutoError, AutoResult, AutoStr};
+use gpui::AssetSource;
+use rust_embed::RustEmbed;
 
 #[derive(RustEmbed)]
 #[folder = "../../assets/templates"]
@@ -31,7 +30,6 @@ impl Templates {
 }
 
 impl AssetSource for Templates {
-
     fn load(&self, path: &str) -> gpui::Result<Option<std::borrow::Cow<'static, [u8]>>> {
         Self::get(path)
             .map(|f| Some(f.data))

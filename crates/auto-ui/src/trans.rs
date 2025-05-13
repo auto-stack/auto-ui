@@ -2,21 +2,21 @@ mod templates;
 
 pub use templates::*;
 
-use auto_lang::trans::Trans;
-use auto_lang::ast::{Code, Stmt, Fn, TypeDecl, Expr};
-use std::io::Write;
-use auto_lang::AutoResult;
 use auto_atom::Atom;
 use auto_gen::{AutoGen, Mold};
-use auto_val::{shared, AutoPath, AutoStr, Op, StrExt, Type, Value};
 use auto_lang::ast;
-use auto_lang::eval;
-use auto_val::Shared;
-use auto_lang::Universe;
-use auto_lang::scope::Meta;
 use auto_lang::ast::StoreKind;
+use auto_lang::ast::{Code, Expr, Fn, Stmt, TypeDecl};
+use auto_lang::eval;
 use auto_lang::eval::Evaler;
+use auto_lang::scope::Meta;
+use auto_lang::trans::Trans;
+use auto_lang::Universe;
 use auto_val::Node;
+use auto_val::Shared;
+use auto_val::{shared, AutoPath, AutoStr, Op, StrExt, Type, Value};
+use auto_val::{AutoResult, NodeBody};
+use std::io::Write;
 #[derive(Debug, Default, Clone)]
 pub struct WidgetInfo {
     pub name: AutoStr,
@@ -40,7 +40,12 @@ pub struct WidgetField {
 
 impl WidgetInfo {
     fn new() -> Self {
-        Self { name: AutoStr::new(), model: WidgetModel::new(), view: AutoStr::new(), methods: vec![] }
+        Self {
+            name: AutoStr::new(),
+            model: WidgetModel::new(),
+            view: AutoStr::new(),
+            methods: vec![],
+        }
     }
 }
 
@@ -52,7 +57,10 @@ impl WidgetModel {
 
 impl From<&Vec<ast::Member>> for WidgetModel {
     fn from(members: &Vec<ast::Member>) -> Self {
-        let fields = members.iter().map(|member| WidgetField::from(member)).collect();
+        let fields = members
+            .iter()
+            .map(|member| WidgetField::from(member))
+            .collect();
         WidgetModel { fields }
     }
 }
@@ -65,7 +73,12 @@ impl From<&ast::Member> for WidgetField {
             Some(value) => eval::eval_basic_expr(&value),
             None => Value::Nil,
         };
-        WidgetField { name, ty, delegate: AutoStr::default(), value }
+        WidgetField {
+            name,
+            ty,
+            delegate: AutoStr::default(),
+            value,
+        }
     }
 }
 
@@ -79,29 +92,51 @@ impl WidgetInfo {
             field_node.set_prop("name", field.name.clone());
             let kind: AutoStr = match &field.ty {
                 Type::Str => "SharedString".into(),
-                Type::User(typ) => {
-                    match typ.as_str() {
-                        "input" => "TextInput".into(),
-                        "table" => "Entity<Table<MyTableDelegate>>".into(),
-                        _ => typ.clone().into(),
-                    }
-                }
+                Type::User(typ) => match typ.as_str() {
+                    "input" => "TextInput".into(),
+                    "table" => "Entity<Table<MyTableDelegate>>".into(),
+                    _ => typ.clone().into(),
+                },
                 Type::Int => "i32".into(),
                 _ => field.ty.to_string().into(),
             };
-            field_node.set_prop("value", if field.value.is_nil() { Value::str("") } else { field.value.clone() });
+            field_node.set_prop(
+                "value",
+                if field.value.is_nil() {
+                    Value::str("")
+                } else {
+                    field.value.clone()
+                },
+            );
             let init_code = match &field.ty {
                 Type::Int => {
                     format!("{}: {}", field.name.clone(), field.value.to_astr())
                 }
-                Type::User(typ) => {
-                    match typ.as_str() {
-                        "input" => format!("{}: cx.new(|cx| {}::new(w, cx)),", field.name.clone(), kind.clone()),
-                        "table" => format!("{}: cx.new(|cx| Table::new({}::new({}), w, cx)),", field.name.clone(), field.delegate.clone(), field.value.repr()),
-                        _ => format!("{}: {}::new(\"{}\"),", field.name.clone(), kind.clone(), field.value.to_astr()),
-                    }
-                }
-                _ => format!("{}: {}::new(r#\"{}\"#),", field.name.clone(), kind.clone(), field.value.to_astr()),
+                Type::User(typ) => match typ.as_str() {
+                    "input" => format!(
+                        "{}: cx.new(|cx| {}::new(w, cx)),",
+                        field.name.clone(),
+                        kind.clone()
+                    ),
+                    "table" => format!(
+                        "{}: cx.new(|cx| Table::new({}::new({}), w, cx)),",
+                        field.name.clone(),
+                        field.delegate.clone(),
+                        field.value.repr()
+                    ),
+                    _ => format!(
+                        "{}: {}::new(\"{}\"),",
+                        field.name.clone(),
+                        kind.clone(),
+                        field.value.to_astr()
+                    ),
+                },
+                _ => format!(
+                    "{}: {}::new(r#\"{}\"#),",
+                    field.name.clone(),
+                    kind.clone(),
+                    field.value.to_astr()
+                ),
             };
             field_node.set_prop("init_code", init_code);
             if kind == "TextInput" {
@@ -132,7 +167,14 @@ pub struct AppInfo {
 
 impl AppInfo {
     pub fn new(title: impl Into<AutoStr>) -> Self {
-        Self { title: title.into(), left: AutoStr::default(), right: AutoStr::default(), middle: AutoStr::default(), bottom: AutoStr::default(), top: AutoStr::default() }
+        Self {
+            title: title.into(),
+            left: AutoStr::default(),
+            right: AutoStr::default(),
+            middle: AutoStr::default(),
+            bottom: AutoStr::default(),
+            top: AutoStr::default(),
+        }
     }
 
     pub fn to_node(&self) -> auto_val::Node {
@@ -265,7 +307,9 @@ impl GpuiTrans {
         println!("do_store");
         let var = store.name.clone();
         let value = self.do_rhs_expr(&store.expr)?;
-        self.universe.borrow_mut().set_local_val(var.as_str(), value);
+        self.universe
+            .borrow_mut()
+            .set_local_val(var.as_str(), value);
         Ok(())
     }
 
@@ -287,10 +331,11 @@ impl GpuiTrans {
 
     fn do_type_decl(&mut self, type_decl: &TypeDecl) -> AutoResult<()> {
         println!("do_type_decl");
-        if has_view_method(type_decl) { // View types
+        if has_view_method(type_decl) {
+            // View types
             self.do_widget(type_decl)?;
-            
-        } else { // Normal types
+        } else {
+            // Normal types
             println!("no view");
         }
         Ok(())
@@ -313,7 +358,7 @@ impl GpuiTrans {
     fn do_model(&mut self, members: &Vec<ast::Member>) -> AutoResult<WidgetModel> {
         let mut model = WidgetModel::new();
         for member in members {
-            model.fields.push(self.do_field(member)?);  
+            model.fields.push(self.do_field(member)?);
         }
         Ok(model)
     }
@@ -341,7 +386,11 @@ impl GpuiTrans {
             ast::Expr::Node(node) => {
                 if node.name == "markdown" {
                     if node.body.stmts.len() != 1 {
-                        return Err(format!("markdown node should have exactly one statement, but got {}", node.body.stmts.len()).into());
+                        return Err(format!(
+                            "markdown node should have exactly one statement, but got {}",
+                            node.body.stmts.len()
+                        )
+                        .into());
                     }
                     let stmt = &node.body.stmts[0];
                     match stmt {
@@ -349,7 +398,11 @@ impl GpuiTrans {
                             return Ok(Value::Str(s.clone().into()));
                         }
                         _ => {
-                            return Err(format!("markdown node should have exactly one statement, but got {}", node.body.stmts.len()).into());
+                            return Err(format!(
+                                "markdown node should have exactly one statement, but got {}",
+                                node.body.stmts.len()
+                            )
+                            .into());
                         }
                     }
                 } else {
@@ -360,9 +413,7 @@ impl GpuiTrans {
                 let result = self.evaler.borrow_mut().eval_expr(expr);
                 Ok(result)
             }
-            _ => {
-                Ok(eval::eval_basic_expr(expr))
-            }
+            _ => Ok(eval::eval_basic_expr(expr)),
         }
     }
 
@@ -383,8 +434,6 @@ impl GpuiTrans {
     }
 
     fn do_view(&mut self, method: &ast::Fn) -> AutoResult<AutoStr> {
-
-
         let mut code: String = "".to_string();
 
         let view_node = &method.body.stmts.last();
@@ -400,7 +449,10 @@ impl GpuiTrans {
             if field.ty == Type::User("input".into()) {
                 let name = field.name.clone();
                 let text_name = name.split("_").last().unwrap();
-                code_header.push_str(&format!("self.{} = self.{}.read(cx).text();", text_name, name));
+                code_header.push_str(&format!(
+                    "self.{} = self.{}.read(cx).text();",
+                    text_name, name
+                ));
             }
         }
 
@@ -431,7 +483,7 @@ impl GpuiTrans {
         }
         if let ast::Type::Unknown = method.ret {
             body.push_str(";");
-        } 
+        }
         body.push_str("}");
         Ok(body.into())
     }
@@ -459,7 +511,11 @@ impl GpuiTrans {
         Ok(code.into())
     }
 
-    fn do_if(&mut self, branches: &Vec<ast::Branch>, else_stmt: &Option<ast::Body>) -> AutoResult<AutoStr> {
+    fn do_if(
+        &mut self,
+        branches: &Vec<ast::Branch>,
+        else_stmt: &Option<ast::Body>,
+    ) -> AutoResult<AutoStr> {
         println!("do_if");
         let mut code = String::new();
         for (n, branch) in branches.iter().enumerate() {
@@ -520,13 +576,11 @@ impl GpuiTrans {
                 };
                 out_name.to_string()
             }
-            ast::Expr::FStr(fstr) => {
-                self.do_fstr(fstr)?.to_string()
-            }
+            ast::Expr::FStr(fstr) => self.do_fstr(fstr)?.to_string(),
             ast::Expr::Str(s) => {
                 format!("\"{}\".into()", s)
             }
-            _ => {expr.to_code().to_string()}
+            _ => expr.to_code().to_string(),
         };
         code.push_str(&value);
         Ok(code.into())
@@ -577,7 +631,7 @@ impl GpuiTrans {
         }
 
         sig.push_str(")"); // TODO: return type?
-        
+
         Ok(sig.into())
     }
 
@@ -652,15 +706,13 @@ impl GpuiTrans {
                         code.push_str(")");
                     }
                 }
-                ast::Stmt::Expr(expr) => {
-                    match expr {
-                        ast::Expr::Pair(pair) => {
-                            let prop_code = self.do_prop(pair)?;
-                            code.push_str(&prop_code);
-                        }
-                        _ => {}
+                ast::Stmt::Expr(expr) => match expr {
+                    ast::Expr::Pair(pair) => {
+                        let prop_code = self.do_prop(pair)?;
+                        code.push_str(&prop_code);
                     }
-                }
+                    _ => {}
+                },
                 _ => {}
             }
         }
@@ -701,7 +753,7 @@ impl GpuiTrans {
                                     if lhs_code == "theme" {
                                         code.push_str(&format!("cx.theme().{}", rhs_code));
                                     }
-                                } 
+                                }
                             }
                             _ => {}
                         }
@@ -763,7 +815,11 @@ impl GpuiTrans {
         // get three args: id, cols and rows
         let arg_count = node.args.args.len();
         if arg_count != 3 {
-            return Err(format!("table expects 3 arguments (id, cols, rows), got {}", arg_count).into());
+            return Err(format!(
+                "table expects 3 arguments (id, cols, rows), got {}",
+                arg_count
+            )
+            .into());
         }
         // do table delegate defs
         self.do_table_delegate(node)?;
@@ -813,8 +869,8 @@ impl GpuiTrans {
                 let mut cols = self.universe.borrow().lookup_val(name).unwrap();
                 // translate col's type to rust type
                 cols = self.translate_cols(cols);
-                let mut root = Node::new("table_delegate");
-                root.set_prop("cols", cols);
+                let mut root = NodeBody::new();
+                root.add_prop("cols", cols);
                 let atom = Atom::node(root);
                 println!("atom: {}", atom);
                 // use table template to generate delegate code
@@ -843,7 +899,10 @@ impl GpuiTrans {
                                 obj.set("typ", Value::Str("SharedString".into()));
                                 obj.set("arg_type", Value::Str("impl Into<SharedString>".into()));
                                 obj.set("to_str", Value::Str("clone()".into()));
-                                obj.set("arg_value", Value::Str(format!("{}.into()", obj.get_str_of("id")).into()));
+                                obj.set(
+                                    "arg_value",
+                                    Value::Str(format!("{}.into()", obj.get_str_of("id")).into()),
+                                );
                             }
                             "int" => {
                                 obj.set("typ", Value::Str("i32".into()));
@@ -865,7 +924,6 @@ impl GpuiTrans {
         }
         cols
     }
-    
 
     fn embed(&mut self, code: AutoStr) {
         self.embeds.push(code);
@@ -895,10 +953,13 @@ impl GpuiTrans {
                 if let Some(name) = pair.key.name() {
                     if name == "onclick" {
                         let event = pair.value.to_code();
-                        code.push_str(&format!(r#"
+                        code.push_str(&format!(
+                            r#"
                         .on_click(cx.listener(|v, _, _, cx| {{
                             v.on({}.into());cx.notify();
-                        }}))"#, event));
+                        }}))"#,
+                            event
+                        ));
                     }
                 }
             }
@@ -920,16 +981,14 @@ impl GpuiTrans {
                             return Err(format!("field {} not found in data model", field).into());
                         };
                         match field_name.as_ref() {
-                            Meta::Store(store) => {
-                                match store.ty {
-                                    ast::Type::Int => {
-                                        args.push(format!("{}.{}.to_string()", arg, field));
-                                    }
-                                    _ => {
-                                        args.push(format!("{}.{}.clone()", arg, field));
-                                    }
+                            Meta::Store(store) => match store.ty {
+                                ast::Type::Int => {
+                                    args.push(format!("{}.{}.to_string()", arg, field));
                                 }
-                            }
+                                _ => {
+                                    args.push(format!("{}.{}.clone()", arg, field));
+                                }
+                            },
                             _ => {}
                         }
                         continue;
@@ -965,7 +1024,7 @@ impl GpuiTrans {
 
     fn gen(&mut self) -> AutoResult<()> {
         println!("gen");
-        let mut app_node = auto_val::Node::new("app");
+        let mut app_node = auto_val::NodeBody::new();
         let Some(app) = &self.app else {
             return Ok(());
         };
@@ -975,20 +1034,17 @@ impl GpuiTrans {
         }
 
         app_node.add_kid(app.to_node());
-        app_node.set_prop("name", self.name.clone());
+        app_node.add_prop("name", self.name.clone());
         let embeds = std::mem::take(&mut self.embeds);
-        app_node.set_prop("embeds", embeds);
+        app_node.add_prop("embeds", embeds);
         let atom = Atom::node(app_node);
 
         // 3. feed atom to generator and generate code
         let app_mold = Mold::new("app.at.rs", Templates::app().unwrap());
         let outpath = AutoPath::crate_root().join("examples/");
-        let gen = AutoGen::new()
-            .molds(vec![app_mold])
-            .data(atom)
-            .out(outpath);
+        let gen = AutoGen::new().molds(vec![app_mold]).data(atom).out(outpath);
         let result = gen.gen();
-    
+
         Ok(())
     }
 
@@ -1005,8 +1061,8 @@ impl GpuiTrans {
 mod tests {
     use super::*;
     use auto_lang::parse_with_scope;
-    use auto_val::shared;
     use auto_lang::Universe;
+    use auto_val::shared;
     #[test]
     fn test_ui_hello() {
         let code = r#"

@@ -22,3 +22,6 @@ auto-gen = { workspace = true }
 auto-atom = { workspace = true }
 prettyplease = { workspace = true }
 syn = { workspace = true }
+notify = { workspace = true }
+notify-debouncer-mini = { workspace = true }
+futures = { workspace = true }
