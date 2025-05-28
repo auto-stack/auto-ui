@@ -8,7 +8,7 @@ use gpui::{
 use gpui_component::{
     badge::Badge,
     button::{Button, ButtonVariants as _},
-    color_picker::{ColorPicker, ColorPickerEvent},
+    color_picker::{ColorPicker, ColorPickerEvent, ColorPickerState},
     locale,
     popup_menu::PopupMenuExt as _,
     scroll::ScrollbarShow,
@@ -16,15 +16,13 @@ use gpui_component::{
     TitleBar,
 };
 
-use crate::{SelectFont, SelectLocale, SelectRadius, SelectScrollbarShow};
-use crate::story::*;
+use super::{SelectFont, SelectLocale, SelectRadius, SelectScrollbarShow};
 
 pub struct AppTitleBar {
     title: SharedString,
-    theme_color: Option<Hsla>,
     locale_selector: Entity<LocaleSelector>,
     font_size_selector: Entity<FontSizeSelector>,
-    theme_color_picker: Entity<ColorPicker>,
+    theme_color: Entity<ColorPickerState>,
     child: Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>,
     _subscriptions: Vec<Subscription>,
 }
@@ -41,20 +39,14 @@ impl AppTitleBar {
         if cx.should_auto_hide_scrollbars() {
             Theme::global_mut(cx).scrollbar_show = ScrollbarShow::Scrolling;
         } else {
-            Theme::global_mut(cx).scrollbar_show = ScrollbarShow::Always;
+            Theme::global_mut(cx).scrollbar_show = ScrollbarShow::Hover;
         }
 
-        let theme_color_picker = cx.new(|cx| {
-            let mut picker = ColorPicker::new("theme-color-picker", window, cx)
-                .xsmall()
-                .anchor(Corner::TopRight)
-                .label("Theme Color");
-            picker.set_value(cx.theme().primary, window, cx);
-            picker
-        });
+        let theme_color =
+            cx.new(|cx| ColorPickerState::new(window, cx).default_value(cx.theme().primary));
 
         let _subscriptions = vec![cx.subscribe_in(
-            &theme_color_picker,
+            &theme_color,
             window,
             |this, _, ev: &ColorPickerEvent, window, cx| match ev {
                 ColorPickerEvent::Change(color) => {
@@ -65,10 +57,9 @@ impl AppTitleBar {
 
         Self {
             title: title.into(),
-            theme_color: None,
             locale_selector,
             font_size_selector,
-            theme_color_picker,
+            theme_color,
             child: Rc::new(|_, _| div().into_any_element()),
             _subscriptions,
         }
@@ -89,10 +80,12 @@ impl AppTitleBar {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        self.theme_color = color;
-        if let Some(color) = self.theme_color {
+        if let Some(color) = color {
             let theme = cx.global_mut::<Theme>();
             theme.apply_color(color);
+            self.theme_color.update(cx, |state, cx| {
+                state.set_value(color, window, cx);
+            });
             window.refresh();
         }
     }
@@ -104,7 +97,7 @@ impl AppTitleBar {
         };
 
         Theme::change(mode, None, cx);
-        self.set_theme_color(self.theme_color, window, cx);
+        self.set_theme_color(self.theme_color.read(cx).value(), window, cx);
     }
 }
 
@@ -123,8 +116,13 @@ impl Render for AppTitleBar {
                     .px_2()
                     .gap_2()
                     .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                    .child(self.theme_color_picker.clone())
                     .child((self.child.clone())(window, cx))
+                    .child(
+                        ColorPicker::new(&self.theme_color)
+                            .small()
+                            .anchor(Corner::TopRight)
+                            .icon(IconName::Palette),
+                    )
                     .child(
                         Button::new("theme-mode")
                             .map(|this| {
@@ -141,15 +139,13 @@ impl Render for AppTitleBar {
                     .child(self.locale_selector.clone())
                     .child(self.font_size_selector.clone())
                     .child(
-                        Badge::new().dot().count(1).child(
-                            Button::new("github")
-                                .icon(IconName::GitHub)
-                                .small()
-                                .ghost()
-                                .on_click(|_, _, cx| {
-                                    cx.open_url("https://github.com/auto-stack/auto-ui")
-                                }),
-                        ),
+                        Button::new("github")
+                            .icon(IconName::GitHub)
+                            .small()
+                            .ghost()
+                            .on_click(|_, _, cx| {
+                                cx.open_url("https://github.com/longbridge/gpui-component")
+                            }),
                     )
                     .child(
                         div().relative().child(
@@ -280,37 +276,42 @@ impl Render for FontSizeSelector {
                     .ghost()
                     .icon(IconName::Settings2)
                     .popup_menu(move |this, _, _| {
-                        this.menu_with_check(
-                            "Font Large",
-                            font_size == 18,
-                            Box::new(SelectFont(18)),
-                        )
-                        .menu_with_check("Font Default", font_size == 16, Box::new(SelectFont(16)))
-                        .menu_with_check("Font Small", font_size == 14, Box::new(SelectFont(14)))
-                        .separator()
-                        .menu_with_check("Radius 8px", radius == 8, Box::new(SelectRadius(8)))
-                        .menu_with_check(
-                            "Radius 4px (default)",
-                            radius == 4,
-                            Box::new(SelectRadius(4)),
-                        )
-                        .menu_with_check("Radius 0px", radius == 0, Box::new(SelectRadius(0)))
-                        .separator()
-                        .menu_with_check(
-                            "Scrolling to show Scrollbar",
-                            scroll_show == ScrollbarShow::Scrolling,
-                            Box::new(SelectScrollbarShow(ScrollbarShow::Scrolling)),
-                        )
-                        .menu_with_check(
-                            "Hover to show Scrollbar",
-                            scroll_show == ScrollbarShow::Hover,
-                            Box::new(SelectScrollbarShow(ScrollbarShow::Hover)),
-                        )
-                        .menu_with_check(
-                            "Always show Scrollbar",
-                            scroll_show == ScrollbarShow::Always,
-                            Box::new(SelectScrollbarShow(ScrollbarShow::Always)),
-                        )
+                        this.scrollable()
+                            .max_h(px(480.))
+                            .label("Font Size")
+                            .menu_with_check("Large", font_size == 18, Box::new(SelectFont(18)))
+                            .menu_with_check(
+                                "Medium (default)",
+                                font_size == 16,
+                                Box::new(SelectFont(16)),
+                            )
+                            .menu_with_check("Small", font_size == 14, Box::new(SelectFont(14)))
+                            .separator()
+                            .label("Border Radius")
+                            .menu_with_check("8px", radius == 8, Box::new(SelectRadius(8)))
+                            .menu_with_check(
+                                "4px (default)",
+                                radius == 4,
+                                Box::new(SelectRadius(4)),
+                            )
+                            .menu_with_check("0px", radius == 0, Box::new(SelectRadius(0)))
+                            .separator()
+                            .label("Scrollbar")
+                            .menu_with_check(
+                                "Scrolling to show",
+                                scroll_show == ScrollbarShow::Scrolling,
+                                Box::new(SelectScrollbarShow(ScrollbarShow::Scrolling)),
+                            )
+                            .menu_with_check(
+                                "Hover to show",
+                                scroll_show == ScrollbarShow::Hover,
+                                Box::new(SelectScrollbarShow(ScrollbarShow::Hover)),
+                            )
+                            .menu_with_check(
+                                "Always show",
+                                scroll_show == ScrollbarShow::Always,
+                                Box::new(SelectScrollbarShow(ScrollbarShow::Always)),
+                            )
                     })
                     .anchor(Corner::TopRight),
             )

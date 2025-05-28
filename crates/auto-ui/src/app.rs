@@ -26,8 +26,11 @@
 //     }
 // }
 
-use super::Story;
-use gpui::{Window, App, AppContext, Entity, Render, div, Styled as _, ParentElement, AnyView, IntoElement, Context};
+use super::story::Story;
+use gpui::{
+    div, AnyView, App, AppContext, Context, Entity, IntoElement, ParentElement, Render,
+    Styled as _, Window,
+};
 
 pub struct StoryView {
     root: AnyView,
@@ -37,7 +40,9 @@ impl StoryView {
     pub fn new<T: Story>(window: &mut Window, cx: &mut App) -> Self {
         let entity = T::new_view(window, cx);
 
-        Self { root: entity.into() }
+        Self {
+            root: entity.into(),
+        }
     }
 
     pub fn view<T: Story>(window: &mut Window, cx: &mut App) -> Entity<Self> {
@@ -50,7 +55,3 @@ impl Render for StoryView {
         div().p_4().size_full().child(self.root.clone())
     }
 }
-
-
-
-

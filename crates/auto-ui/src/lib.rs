@@ -3,7 +3,6 @@ pub use app::*;
 mod layout;
 pub use layout::*;
 pub mod story;
-pub use story::*;
 
 pub mod bridge;
 pub mod dyna;

@@ -25,7 +25,7 @@ var rows = [
 type SimpleTable as Widget {
     fn view() {
         center {
-            table("MyTable", cols, rows)
+            table("MyTable", cols, rows) {}
         }
     }
 
@@ -38,4 +38,3 @@ fn main() {
         simple_table() {}
     }
 }
-

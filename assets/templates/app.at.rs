@@ -12,6 +12,7 @@ use gpui_component::{
 };
 
 use auto_ui::*;
+use auto_ui::story::*;
 use auto_ui::row;
 
 $ for embed in embeds {

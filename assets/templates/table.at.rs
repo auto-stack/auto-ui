@@ -5,6 +5,7 @@ use gpui_component::{
 use std::ops::Range;
 
 use auto_ui::TableColumn;
+use auto_ui::story::*;
 
 use serde::Deserialize;
 use gpui::impl_internal_actions;

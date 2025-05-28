@@ -1,19 +1,17 @@
-use auto_lang::parse_with_scope;
-use auto_val::shared;
+use auto_lang::ast::Body;
+use auto_lang::ast::Expr;
+use auto_lang::ast::Stmt;
+use auto_lang::parser::BlockParser;
+use auto_lang::parser::ParseError;
+use auto_lang::parser::Parser;
+use auto_lang::scope::Meta;
+use auto_lang::token::TokenKind;
+use auto_lang::trans::Trans;
 use auto_lang::Universe;
 use auto_ui::trans::GpuiTrans;
-use auto_lang::trans::Trans;
 use auto_ui::trans::Templates;
-use auto_lang::scope::Meta;
-use auto_lang::ast::Name;
+use auto_val::shared;
 use std::rc::Rc;
-use auto_lang::token::TokenKind;
-use auto_lang::parser::BlockParser;
-use auto_lang::parser::Parser;
-use auto_lang::ast::Body;
-use auto_lang::parser::ParseError;
-use auto_lang::ast::Stmt;
-use auto_lang::ast::Expr;
 
 pub struct MarkdownParser;
 
@@ -25,7 +23,8 @@ impl BlockParser for MarkdownParser {
             parser.next();
         }
         let mut body = Body::new();
-        body.stmts.push(Stmt::Expr(Expr::Str(code.join("\n").into())));
+        body.stmts
+            .push(Stmt::Expr(Expr::Str(code.join("\n").into())));
         Ok(body)
     }
 }
@@ -34,7 +33,9 @@ fn gen_example(example: &str) {
     let code = std::fs::read_to_string(format!("crates/auto-ui/examples/{}.at", example)).unwrap();
     let universe = shared(Universe::new());
     // TODO: import real theme to scope
-    universe.borrow_mut().define("theme", Rc::new(Meta::Ref("theme".into())));
+    universe
+        .borrow_mut()
+        .define("theme", Rc::new(Meta::Ref("theme".into())));
     let mut trans = GpuiTrans::new(example, universe.clone());
     let mut out = Vec::new();
     let mut parser = auto_lang::parser::Parser::new(code.as_str(), universe.clone());
@@ -65,14 +66,7 @@ mod tests {
 }
 
 fn main() {
-    let examples = vec![
-    //     "hello",
-    //     "login",
-    //     "docks",
-    //     "mark",
-    //     "counter",
-        "table",
-    ];
+    let examples = vec!["hello", "login", "docks", "mark", "counter", "table"];
 
     let story_template = Templates::story().unwrap();
     println!("{}", story_template);

@@ -1,31 +1,29 @@
-use std::sync::Arc;
-use gpui::*;
 use gpui::prelude::FluentBuilder;
+use gpui::*;
 use gpui_component::{
-    h_flex,
-    ActiveTheme,
-    input::TextInput,
     button::Button,
-    label::Label,
     dock::{DockArea, DockItem},
-    form::{v_form, form_field}
+    form::{form_field, v_form},
+    h_flex,
+    input::TextInput,
+    label::Label,
+    ActiveTheme,
 };
+use std::sync::Arc;
 
-use auto_ui::*;
 use auto_ui::row;
+use auto_ui::story::*;
+use auto_ui::*;
 
-use gpui_component::{
-    StyleSized as _,
-    popup_menu::PopupMenu,
-};
+use gpui_component::{popup_menu::PopupMenu, StyleSized as _};
 use std::ops::Range;
 
 use auto_ui::TableColumn;
 
-use serde::Deserialize;
 use gpui::impl_internal_actions;
+use gpui_component::table::{ColFixed, ColSort, Table, TableDelegate};
 use gpui_component::Size;
-use gpui_component::table::{Table, TableDelegate, ColFixed, ColSort};
+use serde::Deserialize;
 
 #[derive(Clone, PartialEq, Eq, Deserialize)]
 struct ChangeSize(Size);
@@ -42,11 +40,7 @@ struct MyTableRow {
 }
 
 impl MyTableRow {
-    fn new(
-    id: i32,
-    symbol: impl Into<SharedString>,
-    name: impl Into<SharedString>,
-    ) -> Self {
+    fn new(id: i32, symbol: impl Into<SharedString>, name: impl Into<SharedString>) -> Self {
         Self {
             id: id,
             symbol: symbol.into(),
@@ -204,9 +198,7 @@ impl TableDelegate for MyTableDelegate {
         150
     }
 
-    fn load_more(&mut self, _: &mut Window, _cx: &mut Context<Table<Self>>) {
-
-    }
+    fn load_more(&mut self, _: &mut Window, _cx: &mut Context<Table<Self>>) {}
 
     fn visible_rows_changed(
         &mut self,
@@ -241,7 +233,6 @@ impl MyTableDelegate {
     }
 }
 
-
 pub struct SimpleTableStory {
     focus_handle: gpui::FocusHandle,
     table_MyTable: Entity<Table<MyTableDelegate>>,
@@ -265,7 +256,17 @@ impl SimpleTableStory {
     pub(crate) fn new(w: &mut Window, cx: &mut App) -> Self {
         Self {
             focus_handle: cx.focus_handle(),
-            table_MyTable: cx.new(|cx| Table::new(MyTableDelegate::new(vec![MyTableRow::new(1, "AAPL", "Apple Inc.", ), MyTableRow::new(2, "GOOG", "Google Inc.", ), MyTableRow::new(3, "MSFT", "Microsoft Corp.", ), ]), w, cx)),
+            table_MyTable: cx.new(|cx| {
+                Table::new(
+                    MyTableDelegate::new(vec![
+                        MyTableRow::new(1, "AAPL", "Apple Inc."),
+                        MyTableRow::new(2, "GOOG", "Google Inc."),
+                        MyTableRow::new(3, "MSFT", "Microsoft Corp."),
+                    ]),
+                    w,
+                    cx,
+                )
+            }),
         }
     }
 
@@ -274,7 +275,6 @@ impl SimpleTableStory {
     }
 
     pub fn on(&mut self, ev: SharedString) {}
-    
 }
 
 impl Focusable for SimpleTableStory {
@@ -287,9 +287,7 @@ impl Render for SimpleTableStory {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         center().child(self.table_MyTable.clone())
     }
-    
 }
-
 
 pub struct Docks {
     dockarea: Entity<DockArea>,
@@ -307,31 +305,21 @@ const MAIN_DOCK_AREA: DockAreaTab = DockAreaTab {
 
 impl Docks {
     pub fn new(w: &mut Window, cx: &mut Context<Self>) -> Self {
-        let dockarea = cx.new(|cx| DockArea::new(
-            MAIN_DOCK_AREA.id,
-            Some(MAIN_DOCK_AREA.version),
-            w,
-            cx,
-        ));
+        let dockarea =
+            cx.new(|cx| DockArea::new(MAIN_DOCK_AREA.id, Some(MAIN_DOCK_AREA.version), w, cx));
         let weak_dockarea = dockarea.downgrade();
         Self::layout(&weak_dockarea, w, cx);
 
-        Self {
-            dockarea,
-        }
+        Self { dockarea }
     }
 
     fn layout(dockarea: &WeakEntity<DockArea>, w: &mut Window, cx: &mut Context<Self>) {
-
         let middle_item = DockItem::tab(
             StoryContainer::panel::<SimpleTableStory>(w, cx),
             &dockarea,
             w,
             cx,
         );
-
-
-
 
         _ = dockarea.update(cx, |view, cx| {
             view.set_center(middle_item, w, cx);
@@ -342,12 +330,12 @@ impl Docks {
 impl Render for Docks {
     fn render(&mut self, _: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
         div()
-        .id("story-workspace")
-        .relative()
-        .size_full()
-        .flex()
-        .flex_col()
-        .child(self.dockarea.clone())
+            .id("story-workspace")
+            .relative()
+            .size_full()
+            .flex()
+            .flex_col()
+            .child(self.dockarea.clone())
     }
 }
 
@@ -358,6 +346,12 @@ fn main() {
         init(cx);
         cx.activate(true);
 
-        create_new_window_sized("TableExample", |w, cx| cx.new(|cx| Docks::new(w, cx)), cx, 800, 600);
+        create_new_window_sized(
+            "TableExample",
+            |w, cx| cx.new(|cx| Docks::new(w, cx)),
+            cx,
+            800,
+            600,
+        );
     });
 }

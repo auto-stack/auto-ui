@@ -1,5 +1,5 @@
 use super::{Dyna, Snip};
-use crate::Story;
+use crate::story::Story;
 use crate::{center, col, row};
 
 use gpui::{
