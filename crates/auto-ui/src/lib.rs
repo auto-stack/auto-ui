@@ -2,8 +2,8 @@ mod app;
 pub use app::*;
 mod layout;
 pub use layout::*;
-pub mod story;
 
+pub mod assets;
 pub mod bridge;
 pub mod dyna;
 pub mod trans;

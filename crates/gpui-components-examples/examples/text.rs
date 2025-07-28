@@ -1,8 +1,8 @@
 use auto_ui::*;
-use gpui::{
-    div, px, rems, Application, App, AppContext, Context, Entity, Focusable, IntoElement, Keystroke,
-    ParentElement, Render, SharedString, Styled, Window,
-};
+use gpui_story::*;
+use gpui::*;
+
+use crate::section;
 
 use gpui_component::{
     button::{Button, ButtonVariant, ButtonVariants as _},
@@ -15,7 +15,18 @@ use gpui_component::{
     v_flex, yellow_500, yellow_800, ColorName, IconName, Kbd, Sizable, StyledExt,
 };
 
-use crate::section;
+fn main() {
+    let app = Application::new().with_assets(Assets);
+
+    app.run(move |cx| {
+        init(cx);
+        cx.activate(true);
+
+        create_new_window("Text Example", StoryView::view::<TextStory>, cx);
+    });
+}
+
+
 
 pub struct TextStory {
     focus_handle: gpui::FocusHandle,
@@ -180,7 +191,6 @@ impl Render for TextStory {
                             .gap_2()
                             .child(Tag::primary().small().child("Tag"))
                             .child(Tag::secondary().small().child("Secondary"))
-                            .child(Tag::outline().small().child("Outline"))
                             .child(Tag::danger().small().child("danger"))
                             .child(
                                 Tag::custom(yellow_500(), yellow_800(), yellow_500())
@@ -193,7 +203,6 @@ impl Render for TextStory {
                             .gap_2()
                             .child(Tag::primary().child("Tag"))
                             .child(Tag::secondary().child("Secondary"))
-                            .child(Tag::outline().child("Outline"))
                             .child(Tag::danger().child("danger"))
                             .child(
                                 Tag::custom(yellow_500(), yellow_800(), yellow_500())
@@ -226,15 +235,4 @@ impl Render for TextStory {
                 ),
             )
     }
-}
-
-fn main() {
-    let app = Application::new().with_assets(Assets);
-
-    app.run(move |cx| {
-        init(cx);
-        cx.activate(true);
-
-        create_new_window_sized("Text Example", StoryView::view::<TextStory>, cx, 1024, 768);
-    });
 }

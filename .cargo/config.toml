@@ -1,5 +1,5 @@
 # rust-lld.exe + -Zshare-generics=off is used
 # to prevent "error: too many exported symbols" in windows
 [target.x86_64-pc-windows-msvc]
-rustflags = ["-Cprefer-dynamic", "-Zshare-generics=off"]
+# rustflags = ["-Cprefer-dynamic", "-Zshare-generics=n"]
 linker = "rust-lld.exe"

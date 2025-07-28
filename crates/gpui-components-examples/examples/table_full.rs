@@ -1,5 +1,6 @@
 use std::ops::Range;
 use auto_ui::*;
+use auto_ui::story::*;
 use gpui::{
     div, px, Application, App, AppContext, Context, Entity, Focusable, IntoElement,
     ParentElement, Render, SharedString, Styled, Window, Pixels, Edges,

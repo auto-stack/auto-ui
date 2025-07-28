@@ -11,12 +11,24 @@ auto-gen = { path = "../auto-lang/crates/auto-gen" }
 auto-atom = { path = "../auto-lang/crates/auto-atom" }
 
 # switch to this dynamic lib for debug mode
-gpui = { version = "0.1.0", path = "crates/gpui-dynamic", package = "gpui-dynamic" }
-markdown = { git = "https://github.com/zed-industries/zed", package = "markdown" }
+# gpui = { version = "0.1.0", path = "crates/gpui-dynamic", package = "gpui-dynamic" }
+# gpui = { git = "https://github.com/zed-industries/zed.git", rev = "ee2a3299815ea29770491b34592a448d95761cdb"}
+# markdown = { git = "https://github.com/zed-industries/zed", package = "markdown" }
 # switch to this static lib for release mode
 # gpui = { git = "https://github.com/zed-industries/zed" }
-gpui-component = { git = "https://github.com/longbridge/gpui-component" }
-gpui-story = { git = "https://github.com/longbridge/gpui-component", package = "story" }
+
+# gpui-component = { git = "https://github.com/longbridge/gpui-component" }
+# gpui-story = { git = "https://github.com/longbridge/gpui-component", package = "story" }
+# gpui-component-macros = { git = "https://github.com/longbridge/gpui-component", package = "gpui-component-macros" } 
+
+# NOTE: auto-ui currently refers to gpui tag v20250611, which refers to an old version of gpui
+# run `cargo update -p gpui --precise ee2a3299815ea29770491b34592a448d95761cdb` to set the gpui version
+gpui = { git = "https://github.com/zed-industries/zed.git" }
+markdown = { git = "https://github.com/zed-industries/zed.git", package = "markdown" }
+gpui-component = { git = "https://github.com/longbridge/gpui-component", tag = "v20250611"}
+gpui-story = { git = "https://github.com/longbridge/gpui-component", tag = "v20250611", package = "story" }
+gpui-component-macros = { git = "https://github.com/longbridge/gpui-component", tag = "v20250611", package = "gpui-component-macros" } 
+
 
 # auto-widgets = { path = "crates/auto-widgets" }
 # gpui-widgets = { path = "crates/gpui-widgets" }
@@ -34,7 +46,7 @@ smallvec = "1.13.2"
 unicode-segmentation = "1.10"
 regex = "1.11.0"
 reqwest = "0.12.11"
-reqwest_client = { git = "https://github.com/huacnlee/zed.git", branch = "webview" }
+reqwest_client = { git = "https://github.com/zed-industries/zed.git" }
 prettyplease = "0.2.10"
 syn = { version = "2", default-features = false, features = [
     "full",

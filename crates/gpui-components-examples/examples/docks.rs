@@ -1,4 +1,5 @@
 use auto_ui::*;
+use auto_ui::story::*;
 use gpui::prelude::FluentBuilder;
 use auto_ui::row;
 use gpui_component::ActiveTheme;

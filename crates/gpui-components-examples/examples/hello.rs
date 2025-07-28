@@ -1,16 +1,22 @@
+use gpui::*;
+use gpui_component::label::Label;
+use gpui_story::*;
 use auto_ui::*;
+use auto_ui::assets::Assets;
 
-use gpui::{
-    App, AppContext, Application, Context, Entity, Focusable, IntoElement, ParentElement, Render,
-    SharedString, Window,
-};
+fn main() {
+    let app = Application::new().with_assets(Assets);
 
-use gpui_component::{button::Button, label::Label};
+    app.run(move |cx| {
+        gpui_story::init(cx);
+        cx.activate(true);
+        gpui_story::create_new_window("Hello Example", StoryView::view::<HelloStory>, cx);
+    });
+}
 
 pub struct HelloStory {
     focus_handle: gpui::FocusHandle,
     msg: SharedString,
-    button_label: SharedString,
 }
 
 impl Story for HelloStory {
@@ -32,7 +38,6 @@ impl HelloStory {
         Self {
             focus_handle: cx.focus_handle(),
             msg: SharedString::new("Hello World"),
-            button_label: SharedString::new("Click"),
         }
     }
 
@@ -52,27 +57,10 @@ impl Focusable for HelloStory {
 }
 
 impl Render for HelloStory {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
         center().child(
-            col().child(Label::new(self.msg.clone())).child(
-                Button::new(self.button_label.clone())
-                    .label(self.button_label.clone())
-                    .on_click(cx.listener(|v, _, _, cx| {
-                        v.on("button-clicked".into());
-                        cx.notify();
-                    })),
-            ),
+            col().child(Label::new(self.msg.clone()).text_size(px(41.)))
         )
     }
 }
 
-fn main() {
-    let app = Application::new().with_assets(Assets);
-
-    app.run(move |cx| {
-        init(cx);
-        cx.activate(true);
-
-        create_new_window_sized("Hello Example", StoryView::view::<HelloStory>, cx, 800, 600);
-    });
-}

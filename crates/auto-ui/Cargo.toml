@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [lib]
-crate-type = ["dylib"]
+crate-type = ["lib"]
 
 [dependencies]
 auto-lang = { workspace = true }
@@ -12,11 +12,12 @@ auto-val = { workspace = true }
 gpui = { workspace = true }
 gpui-component = { workspace = true }
 gpui-story = { workspace = true }
+gpui-component-macros = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 reqwest = { workspace = true }
-anyhow = { workspace = true }
 reqwest_client = { workspace = true }
+anyhow = { workspace = true }
 rust-embed = { workspace = true }
 auto-gen = { workspace = true }
 auto-atom = { workspace = true }

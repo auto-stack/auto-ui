@@ -1,83 +1,7 @@
+use gpui::*;
+use gpui_component::{ button::Button, label::Label};
 use auto_ui::*;
-use gpui::prelude::FluentBuilder;
-use auto_ui::row;
-use gpui_component::ActiveTheme;
-
-use gpui::{
-    Application, App, AppContext, Context, Entity, Focusable, ClickEvent, 
-    Render, Window, SharedString, IntoElement, ParentElement,
-};
-
-use gpui_component::{
-    h_flex,
-    input::TextInput,
-    button::Button,
-    label::Label,
-    form::{v_form, form_field}
-};
-
-pub struct HelloStory {
-    focus_handle: gpui::FocusHandle,
-    msg: SharedString,
-    button_label: SharedString,
-}
-
-impl Story for HelloStory {
-    fn title() -> &'static str {
-        "Hello"
-    }
-
-    fn description() -> &'static str {
-        "Hello Example"
-    }
-
-    fn new_view(window: &mut Window, cx: &mut App) -> Entity<impl Render + Focusable> {
-        Self::view(window, cx)
-    }
-}
-
-impl HelloStory {
-    pub(crate) fn new(w: &mut Window, cx: &mut App) -> Self {
-        Self {
-            focus_handle: cx.focus_handle(),
-            msg: SharedString::new("Hello World"),
-            button_label: SharedString::new("Click"),
-        }
-    }
-
-    pub fn view(window: &mut Window, cx: &mut App) -> Entity<Self> {
-        cx.new(|cx| Self::new(window, cx))
-    }
-
-    pub fn on(&mut self, ev: SharedString) {self.msg=ev}
-}
-
-impl Focusable for HelloStory {
-    fn focus_handle(&self, _: &gpui::App) -> gpui::FocusHandle {
-        self.focus_handle.clone()
-    }
-}
-
-impl Render for HelloStory {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        center()
-            .child(
-                col()
-                    .child(Label::new(self.msg.clone()))
-                    .child(
-                        Button::new(self.button_label.clone())
-                            .label(self.button_label.clone())
-                            .on_click(
-                                cx
-                                    .listener(|v, _, _, cx| {
-                                        v.on("button-clicked".into());
-                                        cx.notify();
-                                    }),
-                            ),
-                    ),
-            )
-    }
-}
+use gpui_story::*;
 
 fn main() {
     let app = Application::new().with_assets(Assets);
@@ -85,7 +9,82 @@ fn main() {
     app.run(move |cx| {
         init(cx);
         cx.activate(true);
-
-        create_new_window_sized("Hello Example", StoryView::view::<HelloStory>, cx, 800, 600);
+        gpui_story::create_new_window("Counter Example", StoryView::view::<CounterStory>, cx);
     });
+}
+
+pub struct CounterStory {
+    focus_handle: gpui::FocusHandle,
+    count: i32,
+}
+
+impl Story for CounterStory {
+    fn title() -> &'static str {
+        "Counter"
+    }
+
+    fn new_view(window: &mut Window, cx: &mut App) -> Entity<impl Render + Focusable> {
+        Self::view(window, cx)
+    }
+}
+
+impl CounterStory {
+    pub(crate) fn new(_w: &mut Window, cx: &mut App) -> Self {
+        Self {
+            focus_handle: cx.focus_handle(),
+            count: 0
+        }
+    }
+
+    pub fn view(window: &mut Window, cx: &mut App) -> Entity<Self> {
+        cx.new(|cx| Self::new(window, cx))
+    }
+
+    pub fn on(&mut self, ev: SharedString) {
+        if ev == "button-inc" {
+            self.count = self.count + 1
+        } else if ev == "button-dec" {
+            self.count = self.count - 1
+        }
+    }
+    
+}
+
+impl Focusable for CounterStory {
+    fn focus_handle(&self, _: &gpui::App) -> gpui::FocusHandle {
+        self.focus_handle.clone()
+    }
+}
+
+impl Render for CounterStory {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        center()
+            .child(
+                col()
+                    .child(
+                        Button::new("+")
+                            .label("+")
+                            .on_click(
+                                cx
+                                    .listener(|v, _, _, cx| {
+                                        v.on("button-inc".into());
+                                        cx.notify();
+                                    }),
+                            ),
+                    )
+                    .child(Label::new(self.count.to_string()))
+                    .child(
+                        Button::new("-")
+                            .label("-")
+                            .on_click(
+                                cx
+                                    .listener(|v, _, _, cx| {
+                                        v.on("button-dec".into());
+                                        cx.notify();
+                                    }),
+                            ),
+                    ),
+            )
+    }
+    
 }

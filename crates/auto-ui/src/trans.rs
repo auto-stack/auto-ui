@@ -221,7 +221,7 @@ impl Trans for GpuiTrans {
         }
 
         // Trans to rust code
-        self.gen()?;
+        self.do_gen()?;
 
         Ok(())
     }
@@ -871,14 +871,14 @@ impl GpuiTrans {
                 cols = self.translate_cols(cols);
                 let mut root = NodeBody::new();
                 root.add_prop("cols", cols);
-                let atom = Atom::node(root);
+                let atom = Atom::node_body(root);
                 println!("atom: {}", atom);
                 // use table template to generate delegate code
                 let table_template = Templates::table().unwrap();
-                let gen = AutoGen::new()
+                let gn = AutoGen::new()
                     .molds(vec![Mold::new("table.at.rs", table_template)])
                     .data(atom);
-                let code = gen.gen_str();
+                let code = gn.gen_str();
                 self.embed(code);
             }
             Ok(())
@@ -1022,7 +1022,7 @@ impl GpuiTrans {
         Ok(code.into())
     }
 
-    fn gen(&mut self) -> AutoResult<()> {
+    fn do_gen(&mut self) -> AutoResult<()> {
         println!("gen");
         let mut app_node = auto_val::NodeBody::new();
         let Some(app) = &self.app else {
@@ -1037,14 +1037,13 @@ impl GpuiTrans {
         app_node.add_prop("name", self.name.clone());
         let embeds = std::mem::take(&mut self.embeds);
         app_node.add_prop("embeds", embeds);
-        let atom = Atom::node(app_node);
+        let atom = Atom::node_body(app_node);
 
         // 3. feed atom to generator and generate code
         let app_mold = Mold::new("app.at.rs", Templates::app().unwrap());
         let outpath = AutoPath::crate_root().join("examples/");
-        let gen = AutoGen::new().molds(vec![app_mold]).data(atom).out(outpath);
-        let result = gen.gen();
-
+        let gn = AutoGen::new().molds(vec![app_mold]).data(atom).out(outpath);
+        let result = gn.gen_all();
         Ok(())
     }
 
