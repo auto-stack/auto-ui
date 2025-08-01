@@ -92,9 +92,7 @@ impl Render for CounterStory {
                     ),
             )
     }
-    
 }
-
 
 pub struct Docks {
     dockarea: Entity<DockArea>,
@@ -134,9 +132,6 @@ impl Docks {
             w,
             cx,
         );
-
-
-
 
         _ = dockarea.update(cx, |view, cx| {
             view.set_center(middle_item, w, cx);

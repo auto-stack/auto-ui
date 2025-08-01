@@ -1,16 +1,12 @@
 use auto_ui::*;
-use auto_ui::story::*;
 use gpui::prelude::FluentBuilder;
 use auto_ui::row;
+use gpui_component::input::InputState;
+use gpui_story::*;
 use gpui_component::ActiveTheme;
 use gpui_component::dock::{DockArea, DockItem};
-use std::sync::Arc;
 
-use gpui::{
-    div, Application, Styled, App, AppContext, Context, Entity, Focusable, ClickEvent, 
-    InteractiveElement, IntoElement, ParentElement, Render, Window,
-    SharedString, WeakEntity, Axis, px,
-};
+use gpui::*;
 
 use gpui_component::{
     h_flex,
@@ -92,8 +88,8 @@ impl Render for Docks {
 
 pub struct PaneStory {
     focus_handle: gpui::FocusHandle,
-    name_input: Entity<TextInput>,
-    password_input: Entity<TextInput>,
+    name_input: Entity<InputState>,
+    password_input: Entity<InputState>,
     status: SharedString,
 }
 
@@ -111,8 +107,8 @@ impl PaneStory {
     pub(crate) fn new(w: &mut Window, cx: &mut App) -> Self {
         Self {
             focus_handle: cx.focus_handle(),
-            name_input: cx.new(|cx| TextInput::new(w, cx)),
-            password_input: cx.new(|cx| TextInput::new(w, cx)),
+            name_input: cx.new(|cx| InputState::new(w, cx)),
+            password_input: cx.new(|cx| InputState::new(w, cx)),
             status: SharedString::default(),
         }
     }
@@ -149,12 +145,12 @@ impl Render for PaneStory {
                         .child(
                             form_field()
                                 .label("Name: ")
-                                .child(self.name_input.clone()),
+                                .child(TextInput::new(&self.name_input)),
                         )
                         .child(
                             form_field()
                                 .label("Password: ")
-                                .child(self.password_input.clone()),
+                                .child(TextInput::new(&self.password_input)),
                         )
                     ))
             .child(
@@ -164,7 +160,7 @@ impl Render for PaneStory {
                     .child(Button::new("login").label("Login").on_click(
                         cx.listener(|this, _, _, cx| {
                             this.status = SharedString::from("Logging in...");
-                            println!("Username: {}", this.name_input.read(cx).text());
+                            println!("Username: {}", this.name_input.read(cx).value());
                         })
                     ))
                     .child(div().flex_grow())
@@ -181,6 +177,6 @@ fn main() {
         init(cx);
         cx.activate(true);
 
-        create_new_window_sized("Pane Example", |w, cx| cx.new(|cx| Docks::new(w, cx)), cx, 800, 600);
+        create_new_window("Pane Example", |w, cx| cx.new(|cx| Docks::new(w, cx)), cx);
     });
 }

@@ -1,6 +1,6 @@
 use std::ops::Range;
 use auto_ui::*;
-use auto_ui::story::*;
+use gpui_story::*;
 use gpui::{
     div, px, Application, App, AppContext, Context, Entity, Focusable, IntoElement,
     ParentElement, Render, SharedString, Styled, Window, Pixels, Edges,
@@ -317,6 +317,6 @@ fn main() {
         init(cx);
         cx.activate(true);
 
-        create_new_window_sized("Table Example", StoryView::view::<TableStory>, cx, 1024, 768);
+        create_new_window("Table Example", StoryView::view::<TableStory>, cx);
     });
 }

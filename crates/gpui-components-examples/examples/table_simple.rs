@@ -6,6 +6,7 @@ use gpui::{
     impl_internal_actions,
 };
 use fake::{Fake, Faker};
+use gpui_story::*;
 
 use gpui_component::{
     v_flex,
@@ -303,6 +304,6 @@ fn main() {
         init(cx);
         cx.activate(true);
 
-        create_new_window_sized("Table Example", StoryView::view::<TableStory>, cx, 1024, 768);
+        create_new_window("Table Example", StoryView::view::<TableStory>, cx);
     });
 }
