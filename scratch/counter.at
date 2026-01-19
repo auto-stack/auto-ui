@@ -1,41 +1,37 @@
-use auto.ui: Widget, View
-
-type Counter is Widget {
+widget Counter {
     // data fields
     count int
 
     // view
     fn view() View {
         col {
-            button("+") {
-                onclick: do_inc
+            button "+" {
+                onclick: Msg.Inc
             }
             text(count)
-            button("-") {
-                onclick: do_dec
+            button "-" {
+                onclick: Msg.Dec
             }
         }
     }
 
-    // constructor
-    fn new(c int) Counter {
-        Counter(c)
-    }
-
-    // actions
-    fn do_inc() {
-        count += 1
-    }
-    fn do_dec() {
-        count -= 1
+    // message handler
+    fn on(ev Msg) {
+        is ev {
+            Msg.Inc => {
+                .count += 1
+            }
+            Msg.Dec => {
+                .count -= 1
+            }
+        }
     }
 }
 
-use ui:app
-
-app("counter") {
+// Create an App
+app "counter-example" {
     center {
         // a counter view with initial value 0
-        counter(0)
+        Counter(count: 0)
     }
 }

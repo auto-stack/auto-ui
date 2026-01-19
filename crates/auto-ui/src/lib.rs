@@ -1,13 +1,21 @@
 // auto-ui: Core framework crate
 // Backend-agnostic UI framework built on Auto language
+//
+// This crate provides the abstraction layer that can be adapted to multiple backends
+// (iced, gpui, vue.js, etc.) through a unified Component trait and View system.
 
 pub mod prelude {
-    pub use crate::widget::Widget;
-    pub use crate::view::View;
+    pub use crate::component::Component;
+    pub use crate::view::{View, ViewBuilder};
 }
 
-pub mod widget;
-pub mod view;
 pub mod component;
+pub mod view;
 
-// Core traits and types will be defined here
+// Re-export core types for convenience
+pub use component::Component;
+pub use view::{View, ViewBuilder};
+
+// Note: widget.rs is kept for backward compatibility but may be deprecated
+// The new design uses Component trait directly instead of Widget trait
+pub mod widget;
