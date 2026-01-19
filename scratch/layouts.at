@@ -1,0 +1,59 @@
+// row / col layouts
+
+// row layout
+row {
+    text("1")
+    text("2")
+    text("3")
+}
+
+// column layout
+col {
+    text("1")
+    text("2")
+    text("3")
+}
+
+// position of items
+row {
+    start {
+        text("left")
+    }
+    mid {
+        text("center")
+    }
+    end {
+        text("right")
+    }
+}
+
+col {
+    start {
+        text("top")
+    }
+    mid {
+        text("center")
+    }
+    end {
+        text("bottom")
+    }
+}
+
+// panel layout
+app {
+    left {
+
+    }
+    right {
+
+    }
+    center {
+
+    }
+    top {
+
+    }
+    bottom {
+
+    }
+}

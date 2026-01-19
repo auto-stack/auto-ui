@@ -1,0 +1,19 @@
+[workspace]
+members = ["crates/*"]
+resolver = "2"
+
+[workspace.dependencies]
+# Local crates
+auto-ui = { path = "crates/auto-ui" }
+
+# UI Frameworks
+iced = { version = "0.14.0", features = ["tokio", "debug", "image", "svg", "advanced"] }
+gpui-component = "0.5.0"
+gpui-storybook = "0.5.0"
+
+# Common dependencies
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.0", features = ["full"] }
+anyhow = "1.0"
+thiserror = "2.0"

@@ -1,0 +1,41 @@
+use auto.ui: Widget, View
+
+type Counter is Widget {
+    // data fields
+    count int
+
+    // view
+    fn view() View {
+        col {
+            button("+") {
+                onclick: do_inc
+            }
+            text(count)
+            button("-") {
+                onclick: do_dec
+            }
+        }
+    }
+
+    // constructor
+    fn new(c int) Counter {
+        Counter(c)
+    }
+
+    // actions
+    fn do_inc() {
+        count += 1
+    }
+    fn do_dec() {
+        count -= 1
+    }
+}
+
+use ui:app
+
+app("counter") {
+    center {
+        // a counter view with initial value 0
+        counter(0)
+    }
+}

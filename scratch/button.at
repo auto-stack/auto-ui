@@ -1,0 +1,12 @@
+use auto.ui: Widget
+
+type Button is Widget {
+    // data fields
+    text str
+    onclick fn
+
+    // view
+    fn view() View {
+        // actural drawing of the button
+    }
+}

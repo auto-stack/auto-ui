@@ -1,0 +1,32 @@
+[package]
+name = "iced-examples"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "hello"
+path = "src/bin/hello.rs"
+
+[[bin]]
+name = "counter"
+path = "src/bin/counter.rs"
+
+[[bin]]
+name = "button"
+path = "src/bin/button.rs"
+
+[[bin]]
+name = "checkbox"
+path = "src/bin/checkbox.rs"
+
+[[bin]]
+name = "circle"
+path = "src/bin/circle.rs"
+
+[[bin]]
+name = "dropdown"
+path = "src/bin/dropdown.rs"
+
+[dependencies]
+iced = { workspace = true }
+auto-ui = { workspace = true }
