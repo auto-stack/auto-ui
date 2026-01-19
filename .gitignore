@@ -1,0 +1,40 @@
+# Rust build artifacts
+target/
+**/*.rs.bk
+*.pdb
+
+# Cargo
+Cargo.lock
+
+# IDEs and editors
+.vscode/
+.idea/
+.claude/
+*.swp
+*.swo
+*~
+.fleet/
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+*.iml
+
+# Debug and profiling
+*.profraw
+*.profdata
+
+# Testing
+.cargo/registry/.cache/
+
+# Build output (when using --release)
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Documentation
+doc/book/
+book/
