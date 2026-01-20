@@ -383,37 +383,40 @@ cfg_if::cfg_if! {
 
 ---
 
-### Phase 3: Iced 后端实现（3-4 周）
+### Phase 3: Iced 后端实现 ✅ **基础组件完成**（2025-01-20）
 
-#### 3.1 基础组件适配
+**状态**: 所有基础 UI 组件已实现完成，为 Phase 4 提供坚实的后端支持
+
+#### 3.1 基础组件适配 ✅
 - [x] Text / Label ✅
 - [x] Button ✅
-- [ ] Input / TextBox（需要改进设计以支持值获取）
+- [x] Input / TextBox ✅（Builder 模式重新设计）
 - [x] Container ✅
 
-#### 3.2 布局组件
+#### 3.2 布局组件 ✅
 - [x] Row / Column ✅
 - [x] Center / Align ✅（Container 支持 center_x/center_y）
 - [x] Padding / Margin ✅
 - [x] Scroll ✅
+- [x] List ✅
 
-#### 3.3 表单组件
-- [ ] TextInput
-- [ ] PasswordInput
+#### 3.3 表单组件 ✅
 - [x] CheckBox ✅
-- [ ] Radio
-- [ ] Select
+- [x] Radio ✅（使用 checkbox 模拟）
+- [x] Select ✅
 
-#### 3.4 高级组件
-- [ ] List / Table
-- [ ] Dialog / Modal
-- [ ] Menu
-- [ ] Tabs
+#### 3.4 数据展示组件 ✅
+- [x] Table ✅
 
-#### 3.5 样式系统
-- [ ] 主题定义
-- [ ] 样式继承
-- [ ] 动态样式绑定
+#### 3.5 高级组件（Phase 3.7）
+- [ ] Dialog / Modal（延后到 Phase 5）
+- [ ] Menu（延后到 Phase 5）
+- [ ] Tabs（延后到 Phase 5）
+
+#### 3.6 样式系统（Phase 3.8）
+- [ ] 主题定义（延后到 Phase 5）
+- [ ] 样式继承（延后到 Phase 5）
+- [ ] 动态样式绑定（延后到 Phase 5）
 
 #### 3.6 示例应用 ✅
 
@@ -498,51 +501,174 @@ cfg_if::cfg_if! {
   - 通过 `iced::widget::scrollable` 映射到 Iced
 - **运行**: `cargo run --package auto-ui-iced-examples --bin scroll_demo`
 
+**Radio 组件** (`radio_demo.rs`) ✅
+- **文件**: `crates/auto-ui-iced-examples/src/bin/radio_demo.rs`
+- **功能**: 单选按钮组（语言选择器）
+- **运行**: `cargo run --package auto-ui-iced-examples --bin radio_demo`
+
+**Select 组件** (`select_demo.rs`) ✅
+- **文件**: `crates/auto-ui-iced-examples/src/bin/select_demo.rs`
+- **功能**: 下拉选择框（主题选择器）
+- **运行**: `cargo run --package auto-ui-iced-examples --bin select_demo`
+
+**List 组件** (`list_demo.rs`) ✅
+- **文件**: `crates/auto-ui-iced-examples/src/bin/list_demo.rs`
+- **功能**: 任务列表管理（8 个任务，过滤功能）
+- **运行**: `cargo run --package auto-ui-iced-examples --bin list_demo`
+
+**Input 组件重新设计** (`input_demo.rs`) ✅
+- **文件**: `crates/auto-ui-iced-examples/src/bin/input_demo.rs`
+- **功能**: 用户信息表单（用户名、邮箱、密码、简介）
+- **API 改进**:
+  ```rust
+  View::input("Placeholder")
+      .value("text")
+      .width(300)
+      .password()
+      .on_change(Message::Change)
+      .build()
+  ```
+- **实现要点**: Builder 模式取代链式方法
+- **运行**: `cargo run --package auto-ui-iced-examples --bin input_demo`
+
+**Table 组件** (`table_demo.rs`) ✅
+- **文件**: `crates/auto-ui-iced-examples/src/bin/table_demo.rs`
+- **功能**: 表格数据展示（三种类型：简单/统计/复杂）
+- **API 设计**:
+  ```rust
+  View::table(headers, rows)
+      .spacing(8)
+      .col_spacing(16)
+      .build()
+  ```
+- **实现要点**:
+  - 使用嵌套的 Row/Column 实现
+  - 支持任意 View 内容作为单元格
+  - 与 Scrollable 配合支持大数据集
+- **运行**: `cargo run --package auto-ui-iced-examples --bin table_demo`
+
+#### 3.7 Phase 3 完成度总结
+
+**基础组件**: 100% 完成
+- Text, Button, Container, Input, Row/Column, Scrollable, List
+- CheckBox, Radio, Select, Table
+
+**示例应用**: 10 个完整示例
+- counter, todo, temp_converter
+- container_demo, scroll_demo, radio_demo
+- select_demo, list_demo, input_demo, table_demo
+
+**Builder 模式组件**: Container, Scrollable, Input, List, Table
+- 一致的 API 设计
+- 链式配置方法
+- 显式的 build() 调用
+
+**已导出的 Builder 类型**:
+- ViewBuilder (Row/Column)
+- ViewContainerBuilder
+- ViewScrollableBuilder
+- ViewListBuilder
+- ViewInputBuilder
+- ViewTableBuilder
+
 ---
 
-### Phase 4: Auto 语言集成（2-3 周）
+---
 
-#### 4.1 代码生成
-- [ ] 编写 Transpiler（Auto → Rust）
-- [ ] 生成 iced 应用代码
-- [ ] 模板系统
+### Phase 4: Auto 语言集成（2-3 周）**📅 当前阶段**
 
-#### 4.2 编译流程
-```
-.at 文件 → Parser → AST → Transpiler → Rust 代码 → 编译运行
-```
+#### 4.1 Auto 语言语法设计
+基于 [scratch/](../../scratch/) 原型和 Auto 语言规范：
+- [ ] 组件定义语法（type X as Widget）
+- [ ] 视图函数语法（fn view()）
+- [ ] 事件处理语法（fn on(ev)）
+- [ ] 消息定义和传递
+- [ ] 状态管理和生命周期
 
-#### 4.3 开发工具
+#### 4.2 Transpiler 实现（Auto → Rust）
+- [ ] 词法分析器（Lexer）
+- [ ] 语法分析器（Parser）
+- [ ] AST 定义
+- [ ] 代码生成器（Code Generator）
+- [ ] 类型推导和检查
+
+#### 4.3 代码生成模板
+- [ ] Component 模板
+- [ ] View 树生成
+- [ ] Message 枚举生成
+- [ ] Main 函数模板
+
+#### 4.4 集成和工具链
+- [ ] build.rs 集成
 - [ ] 热重载（file watcher）
-- [ ] 错误提示
-- [ ] 调试支持
+- [ ] 错误提示和调试
+- [ ] 交互式开发环境
+
+#### 4.5 示例迁移
+将 scratch/ 中的示例迁移到新语法：
+- [ ] hello.at → hello.rs
+- [ ] counter.at → counter.rs
+- [ ] button.at → button.rs
+- [ ] login.at → login.rs
+- [ ] todo.at → todo.rs
 
 ---
 
-### Phase 5: 示例与测试（2 周）
+### Phase 5: 高级功能和优化（3-4 周）
 
-#### 5.1 核心示例
-基于 [scratch/](scratch/) 的原型实现：
+#### 5.1 高级组件
+- [ ] Dialog / Modal
+- [ ] Menu 和上下文菜单
+- [ ] Tabs 标签页
+- [ ] Progress Bar 进度条
+- [ ] Tooltip 工具提示
+- [ ] SplitPane 分割面板
+
+#### 5.2 样式系统
+- [ ] 主题定义（Theme trait）
+- [ ] 颜色系统
+- [ ] 字体和排版
+- [ ] 样式继承和覆盖
+- [ ] CSS-like 语法（可选）
+
+#### 5.3 性能优化
+- [ ] 虚拟 DOM 差分算法
+- [ ] 组件记忆化（memoization）
+- [ ] 惰性求值
+- [ ] 增量渲染
+
+---
+
+### Phase 6: 示例与测试（2 周）
+
+#### 6.1 核心示例
 - [ ] Counter（计数器）
 - [ ] Button（按钮）
 - [ ] Login（登录表单）
 - [ ] Layouts（布局展示）
 - [ ] TodoMVC（完整应用）
 
-#### 5.2 测试
+#### 6.2 测试
 - [ ] 单元测试（核心逻辑）
 - [ ] 集成测试（组件渲染）
 - [ ] 跨平台测试（Win/Mac/Linux）
 
+#### 6.3 文档
+- [ ] API 文档
+- [ ] 用户指南
+- [ ] 教程和示例
+- [ ] 架构文档
+
 ---
 
-### Phase 6: GPUI 后端（第二阶段，未来）
+### Phase 7: GPUI 后端（第二阶段，未来）
 
 当 iced 后端稳定后，添加 gpui 支持：
 - [ ] GPUI widget 适配
 - [ ] 事件系统桥接
 - [ ] 渲染管线
 - [ ] 性能优化
+- [ ] auto-ui-gpui crate
 
 ---
 
@@ -552,11 +678,12 @@ cfg_if::cfg_if! {
 |--------|------|----------|------|
 | M1 | 项目结构搭建完成 | Week 1 | ✅ 完成 |
 | M2 | 核心抽象层定义完成 | Week 3 | ✅ 完成 |
-| M3 | Iced 基础组件可用 | Week 6 | ✅ 完成 |
-| M4 | Auto 语言可运行简单示例 | Week 9 | 📅 待开始 |
-| M5 | Counter/Login 示例完成 | Week 11 | 📅 待开始 |
-| M6 | 文档和测试完善 | Week 12 | 📅 待开始 |
-| M7 | GPUI 后端（可选） | 未来 | 📅 待开始 |
+| M3 | Iced 基础组件完成 | Week 6 | ✅ 完成 |
+| M4 | Auto 语言 Transpiler 可用 | Week 9 | 📅 进行中 |
+| M5 | 第一个 Auto 示例运行 | Week 10 | 📅 待开始 |
+| M6 | Counter/Login 示例完成 | Week 11 | 📅 待开始 |
+| M7 | 文档和测试完善 | Week 12 | 📅 待开始 |
+| M8 | GPUI 后端（可选） | 未来 | 📅 待开始 |
 
 ---
 
