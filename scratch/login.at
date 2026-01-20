@@ -1,4 +1,6 @@
-type Login {
+use auto.ui: View, widget, app, center
+
+widget Login {
     // data fields
     name str
     pwd str

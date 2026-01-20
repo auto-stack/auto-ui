@@ -1,3 +1,10 @@
+use auto.ui: View, widget, app, center
+
+enum Msg {
+    Inc
+    Dec
+}
+
 widget Counter {
     // data fields
     count int
@@ -29,7 +36,7 @@ widget Counter {
 }
 
 // Create an App
-app "counter-example" {
+app CounterExample {
     center {
         // a counter view with initial value 0
         Counter(count: 0)
