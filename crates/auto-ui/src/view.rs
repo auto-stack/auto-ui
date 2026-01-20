@@ -57,6 +57,13 @@ pub enum View<M: Clone + Debug> {
         center_x: bool,
         center_y: bool,
     },
+
+    /// Scrollable container for content overflow
+    Scrollable {
+        child: Box<View<M>>,
+        width: Option<u16>,
+        height: Option<u16>,
+    },
 }
 
 /// View builder for fluent layout construction
@@ -202,6 +209,45 @@ impl<M: Clone + Debug> View<M> {
             height: None,
             center_x: false,
             center_y: false,
+        }
+    }
+
+    /// Create a scrollable container
+    pub fn scrollable(child: View<M>) -> ViewScrollableBuilder<M> {
+        ViewScrollableBuilder {
+            child,
+            width: None,
+            height: None,
+        }
+    }
+}
+
+/// Builder for Scrollable with fluent API
+pub struct ViewScrollableBuilder<M: Clone + Debug> {
+    child: View<M>,
+    width: Option<u16>,
+    height: Option<u16>,
+}
+
+impl<M: Clone + Debug> ViewScrollableBuilder<M> {
+    /// Set width
+    pub fn width(mut self, width: u16) -> Self {
+        self.width = Some(width);
+        self
+    }
+
+    /// Set height
+    pub fn height(mut self, height: u16) -> Self {
+        self.height = Some(height);
+        self
+    }
+
+    /// Build the scrollable view
+    pub fn build(self) -> View<M> {
+        View::Scrollable {
+            child: Box::new(self.child),
+            width: self.width,
+            height: self.height,
         }
     }
 }

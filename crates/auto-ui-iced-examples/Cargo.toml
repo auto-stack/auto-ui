@@ -19,6 +19,10 @@ path = "src/bin/temp_converter.rs"
 name = "container_demo"
 path = "src/bin/container_demo.rs"
 
+[[bin]]
+name = "scroll_demo"
+path = "src/bin/scroll_demo.rs"
+
 [dependencies]
 iced = { workspace = true }
 auto-ui = { workspace = true }

@@ -137,6 +137,24 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
 
                 container_widget.into()
             }
+
+            AbstractView::Scrollable { child, width, height } => {
+                use iced::widget::scrollable;
+
+                let mut scrollable_widget = scrollable(child.into_iced());
+
+                // Apply width
+                if let Some(w) = width {
+                    scrollable_widget = scrollable_widget.width(iced::Length::Fixed(w as f32));
+                }
+
+                // Apply height
+                if let Some(h) = height {
+                    scrollable_widget = scrollable_widget.height(iced::Length::Fixed(h as f32));
+                }
+
+                scrollable_widget.into()
+            }
         }
     }
 }
