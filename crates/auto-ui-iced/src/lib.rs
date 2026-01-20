@@ -5,7 +5,7 @@
 
 use auto_ui::{View as AbstractView, Component};
 use std::fmt::Debug;
-use iced::widget::{button, checkbox, column, row, text, text_input};
+use iced::widget::{button, checkbox, column, pick_list, row, text, text_input};
 
 /// Trait for converting abstract View<M> into iced Element
 ///
@@ -177,6 +177,33 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 row![checkbox_with_handler, text(label)]
                     .spacing(4)
                     .into()
+            }
+
+            AbstractView::Select {
+                options,
+                selected_index,
+                on_select,
+            } => {
+                // Iced's pick_list for dropdown selection
+                let selected_value = selected_index.and_then(|i| options.get(i).cloned());
+
+                // We need to handle the case where on_select is None
+                // Since Iced's pick_list requires a closure that returns a message,
+                // we need to ensure on_select is always Some for functional selects
+                match on_select {
+                    Some(msg) => {
+                        let picklist_widget = pick_list(options, selected_value, move |_| {
+                            msg.clone()
+                        });
+                        picklist_widget.into()
+                    }
+                    None => {
+                        // No handler - display selected value or first option as text
+                        let display_text = selected_value
+                            .unwrap_or_else(|| options.first().cloned().unwrap_or_default());
+                        text(display_text).into()
+                    }
+                }
             }
         }
     }

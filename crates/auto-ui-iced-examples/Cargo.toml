@@ -27,6 +27,10 @@ path = "src/bin/scroll_demo.rs"
 name = "radio_demo"
 path = "src/bin/radio_demo.rs"
 
+[[bin]]
+name = "select_demo"
+path = "src/bin/select_demo.rs"
+
 [dependencies]
 iced = { workspace = true }
 auto-ui = { workspace = true }

@@ -71,6 +71,13 @@ pub enum View<M: Clone + Debug> {
         is_selected: bool,
         on_select: Option<M>,
     },
+
+    /// Select dropdown for choosing from multiple options
+    Select {
+        options: Vec<String>,
+        selected_index: Option<usize>,
+        on_select: Option<M>,
+    },
 }
 
 /// View builder for fluent layout construction
@@ -212,6 +219,15 @@ impl<M: Clone + Debug> View<M> {
         View::Radio {
             label: label.into(),
             is_selected,
+            on_select: None,
+        }
+    }
+
+    /// Create select dropdown with options
+    pub fn select(options: Vec<String>) -> Self {
+        View::Select {
+            options,
+            selected_index: None,
             on_select: None,
         }
     }
@@ -364,6 +380,25 @@ impl<M: Clone + Debug> View<M> {
     /// Set radio select handler
     pub fn on_select(mut self, msg: M) -> Self {
         if let View::Radio { on_select, .. } = &mut self {
+            *on_select = Some(msg);
+        }
+        self
+    }
+}
+
+// Chaining methods for Select
+impl<M: Clone + Debug> View<M> {
+    /// Set selected option by index
+    pub fn selected(mut self, index: usize) -> Self {
+        if let View::Select { selected_index, .. } = &mut self {
+            *selected_index = Some(index);
+        }
+        self
+    }
+
+    /// Set select change handler
+    pub fn on_choose(mut self, msg: M) -> Self {
+        if let View::Select { on_select, .. } = &mut self {
             *on_select = Some(msg);
         }
         self
