@@ -47,6 +47,16 @@ pub enum View<M: Clone + Debug> {
         label: String,
         on_toggle: Option<M>,
     },
+
+    /// Container wrapper for styling and layout
+    Container {
+        child: Box<View<M>>,
+        padding: u16,
+        width: Option<u16>,
+        height: Option<u16>,
+        center_x: bool,
+        center_y: bool,
+    },
 }
 
 /// View builder for fluent layout construction
@@ -180,6 +190,79 @@ impl<M: Clone + Debug> View<M> {
             is_checked,
             label: label.into(),
             on_toggle: None,
+        }
+    }
+
+    /// Create a container with a child
+    pub fn container(child: View<M>) -> ViewContainerBuilder<M> {
+        ViewContainerBuilder {
+            child,
+            padding: 0,
+            width: None,
+            height: None,
+            center_x: false,
+            center_y: false,
+        }
+    }
+}
+
+/// Builder for Container with fluent API
+pub struct ViewContainerBuilder<M: Clone + Debug> {
+    child: View<M>,
+    padding: u16,
+    width: Option<u16>,
+    height: Option<u16>,
+    center_x: bool,
+    center_y: bool,
+}
+
+impl<M: Clone + Debug> ViewContainerBuilder<M> {
+    /// Set padding
+    pub fn padding(mut self, padding: u16) -> Self {
+        self.padding = padding;
+        self
+    }
+
+    /// Set width
+    pub fn width(mut self, width: u16) -> Self {
+        self.width = Some(width);
+        self
+    }
+
+    /// Set height
+    pub fn height(mut self, height: u16) -> Self {
+        self.height = Some(height);
+        self
+    }
+
+    /// Center horizontally
+    pub fn center_x(mut self) -> Self {
+        self.center_x = true;
+        self
+    }
+
+    /// Center vertically
+    pub fn center_y(mut self) -> Self {
+        self.center_y = true;
+        self
+    }
+
+    /// Center both horizontally and vertically
+    pub fn center(mut self) -> Self {
+        self.center_x = true;
+        self.center_y = true;
+        self
+    }
+
+    /// Build the container view
+    pub fn build(self) -> View<M> {
+        View::Container {
+            child: Box::new(self.child),
+            padding: self.padding,
+            width: self.width,
+            height: self.height,
+            center_x: self.center_x,
+            center_y: self.center_y,
         }
     }
 }

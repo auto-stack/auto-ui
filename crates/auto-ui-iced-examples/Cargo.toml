@@ -15,6 +15,10 @@ path = "src/bin/todo.rs"
 name = "temp_converter"
 path = "src/bin/temp_converter.rs"
 
+[[bin]]
+name = "container_demo"
+path = "src/bin/container_demo.rs"
+
 [dependencies]
 iced = { workspace = true }
 auto-ui = { workspace = true }

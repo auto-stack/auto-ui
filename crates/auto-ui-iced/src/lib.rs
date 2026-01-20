@@ -99,6 +99,44 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                     .spacing(4)
                     .into()
             }
+
+            AbstractView::Container {
+                child,
+                padding,
+                width,
+                height,
+                center_x,
+                center_y,
+            } => {
+                use iced::widget::container;
+
+                let mut container_widget = container(child.into_iced());
+
+                // Apply padding
+                if padding > 0 {
+                    container_widget = container_widget.padding(padding as f32);
+                }
+
+                // Apply width
+                if let Some(w) = width {
+                    container_widget = container_widget.width(iced::Length::Fixed(w as f32));
+                }
+
+                // Apply height
+                if let Some(h) = height {
+                    container_widget = container_widget.height(iced::Length::Fixed(h as f32));
+                }
+
+                // Apply centering (aligns the container content)
+                if center_x {
+                    container_widget = container_widget.center_x(iced::Length::Fill);
+                }
+                if center_y {
+                    container_widget = container_widget.center_y(iced::Length::Fill);
+                }
+
+                container_widget.into()
+            }
         }
     }
 }

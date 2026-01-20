@@ -389,11 +389,11 @@ cfg_if::cfg_if! {
 - [x] Text / Label ✅
 - [x] Button ✅
 - [ ] Input / TextBox（需要改进设计以支持值获取）
-- [ ] Container
+- [x] Container ✅
 
 #### 3.2 布局组件
 - [x] Row / Column ✅
-- [ ] Center / Align
+- [x] Center / Align ✅（Container 支持 center_x/center_y）
 - [x] Padding / Margin ✅
 - [ ] Scroll
 
@@ -455,6 +455,29 @@ cfg_if::cfg_if! {
   - `auto-ui-iced-examples/` - 抽象层 + Iced 后端示例
   - `iced-examples/` - 纯 Iced 框架示例（学习参考）
 - 为未来添加 GPUI 后端建立清晰的命名模式
+
+**Container 组件** (`container_demo.rs`) ✅
+- **文件**: `crates/auto-ui-iced-examples/src/bin/container_demo.rs`
+- **功能**:
+  - 内边距（padding）控制
+  - 固定宽高（width/height）
+  - 水平/垂直居中（center_x/center_y）
+  - 嵌套容器支持
+- **API 设计**:
+  ```rust
+  View::container(child)
+      .padding(20)
+      .width(300)
+      .height(100)
+      .center_x()
+      .center_y()
+      .build()
+  ```
+- **实现要点**:
+  - 使用 Builder 模式（`ViewContainerBuilder`）提供链式 API
+  - 支持可选的宽高设置
+  - 通过 `iced::widget::container` 映射到 Iced
+- **运行**: `cargo run --package auto-ui-iced-examples --bin container_demo`
 
 ---
 
