@@ -12,6 +12,10 @@ pub mod prelude {
 pub mod component;
 pub mod view;
 
+// Transpiler module for Auto language support
+#[cfg(feature = "transpiler")]
+pub mod trans;
+
 // Re-export core types for convenience
 pub use component::Component;
 pub use view::{View, ViewBuilder, ViewContainerBuilder, ViewScrollableBuilder, ViewListBuilder, ViewInputBuilder, ViewTableBuilder};

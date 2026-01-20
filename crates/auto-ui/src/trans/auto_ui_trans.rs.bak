@@ -1,0 +1,399 @@
+// AutoUI Transpiler
+//
+// Transpiles Auto language .at files to auto-ui Rust code.
+
+use super::{CodeSink, Trans};
+use auto_lang::ast::*;
+use auto_lang::AutoResult;
+use auto_val::{AutoStr, shared, Shared};
+use auto_lang::universe::Universe;
+use std::collections::{HashMap, HashSet};
+
+pub struct AutoUITrans {
+    scope: Shared<Universe>,
+    current_widget: Option<String>,
+    messages: HashSet<String>,
+}
+
+impl AutoUITrans {
+    pub fn new() -> Self {
+        Self {
+            scope: shared(Universe::new()),
+            current_widget: None,
+            messages: HashSet::new(),
+        }
+    }
+
+    pub fn set_scope(&mut self, scope: Shared<Universe>) {
+        self.scope = scope;
+    }
+
+    /// Transpile a single .at file to Rust code
+    pub fn transpile_file(path: &str) -> AutoResult<String> {
+        // Read the .at file
+        let code = std::fs::read_to_string(path)
+            .map_err(|e| format!("Failed to read file {}: {}", path, e))?;
+
+        // Parse the code
+        let scope = shared(Universe::new());
+        let mut parser = Parser::new(&code, scope.clone());
+        let ast = parser.parse().map_err(|e| e.to_string())?;
+
+        // Transpile to Rust
+        let mut trans = Self::new();
+        trans.set_scope(scope);
+        let mut sink = CodeSink::new();
+        trans.trans(ast, &mut sink)?;
+
+        Ok(sink.done())
+    }
+}
+
+impl Trans for AutoUITrans {
+    fn trans(&mut self, ast: Code, sink: &mut CodeSink) -> AutoResult<()> {
+        // Add default imports
+        sink.add_import("auto_ui::{Component, View}");
+
+        // Process all statements
+        for stmt in ast.stmts {
+            self.trans_stmt(&stmt, sink)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl AutoUITrans {
+    fn trans_stmt(&mut self, stmt: &Stmt, sink: &mut CodeSink) -> AutoResult<()> {
+        match stmt {
+            // Type/Widget declaration
+            Stmt::TypeDecl(type_decl) => {
+                self.trans_widget(type_decl, sink)?;
+            }
+
+            // Function declaration (standalone functions)
+            Stmt::Fn(fn_decl) => {
+                self.trans_function(fn_decl, sink)?;
+            }
+
+            // Expr statements (like app() calls)
+            Stmt::Expr(expr) => {
+                self.trans_app_expr(expr, sink)?;
+            }
+
+            _ => {
+                // Ignore other statements for now
+            }
+        }
+        Ok(())
+    }
+
+    /// Transpile a Widget type declaration to Rust struct + Component impl
+    fn trans_widget(&mut self, type_decl: &TypeDecl, sink: &mut CodeSink) -> AutoResult<()> {
+        let widget_name = &type_decl.name;
+        self.current_widget = Some(widget_name.to_string());
+
+        // Generate struct definition
+        sink.writeln(&format!("// Widget: {}", widget_name));
+        sink.writeln("#[derive(Debug)]");
+        sink.writeln(&format!("pub struct {} {{", widget_name));
+        sink.indent();
+
+        // Add fields
+        for field in &type_decl.fields {
+            let field_name = &field.name;
+            let field_type = self.rust_type_name(&field.ty);
+            sink.writeln(&format!("pub {}: {},", field_name, field_type));
+        }
+
+        sink.dedent();
+        sink.writeln("}");
+        sink.writeln("");
+
+        // Collect messages from methods
+        self.collect_messages(type_decl);
+
+        // Generate Message enum if messages exist
+        if !self.messages.is_empty() {
+            self.trans_message_enum(widget_name, sink)?;
+        }
+
+        // Generate Component impl
+        self.trans_component_impl(type_decl, sink)?;
+
+        // Generate methods (view, on, etc.)
+        for method in &type_decl.methods {
+            self.trans_method(method, sink)?;
+        }
+
+        self.current_widget = None;
+        self.messages.clear();
+        Ok(())
+    }
+
+    /// Collect message names from widget methods
+    fn collect_messages(&mut self, type_decl: &TypeDecl) {
+        for method in &type_decl.methods {
+            if method.name == "view" || method.name == "on" {
+                // These are special methods, skip for message collection
+                continue;
+            }
+
+            // Action methods (like do_login) are not messages
+            // Messages are typically found in view() function
+        }
+    }
+
+    /// Generate Message enum for the widget
+    fn trans_message_enum(&mut self, widget_name: &str, sink: &mut CodeSink) -> AutoResult<()> {
+        sink.writeln(&format!("// Messages for {}", widget_name));
+        sink.writeln("#[derive(Clone, Debug)]");
+        sink.writeln(&format!("pub enum {}Msg {{", widget_name));
+        sink.indent();
+
+        // Add message variants
+        for msg in &self.messages {
+            sink.writeln(&format!("{},", msg));
+        }
+
+        sink.dedent();
+        sink.writeln("}");
+        sink.writeln("");
+        Ok(())
+    }
+
+    /// Generate Component trait implementation
+    fn trans_component_impl(&mut self, type_decl: &TypeDecl, sink: &mut CodeSink) -> AutoResult<()> {
+        let widget_name = &type_decl.name;
+
+        sink.writeln(&format!("// Component implementation for {}", widget_name));
+        sink.writeln(&format!("impl Component for {} {{", widget_name));
+        sink.indent();
+
+        // Type alias for Message
+        if !self.messages.is_empty() {
+            sink.writeln(&format!("type Msg = {}Msg;", widget_name));
+        } else {
+            // Empty message enum if no messages
+            sink.writeln(&format!("type Msg = ();", widget_name));
+        }
+        sink.writeln("");
+
+        // Default implementation
+        sink.writeln("#[allow(clippy::unused_self)]");
+        sink.writeln("fn on(&mut self, _msg: Self::Msg) {");
+        sink.writeln("    // Default message handler");
+        sink.writeln("}");
+        sink.writeln("");
+
+        sink.dedent();
+        sink.writeln("}");
+        sink.writeln("");
+
+        Ok(())
+    }
+
+    /// Transpile methods (view, on, actions)
+    fn trans_method(&mut self, method: &FnDecl, sink: &mut CodeSink) -> AutoResult<()> {
+        let widget_name = self.current_widget.as_ref().unwrap();
+
+        match method.name.as_str() {
+            "view" => {
+                // View function: fn view() -> View<Message>
+                sink.writeln(&format!("// View function for {}", widget_name));
+                sink.writeln(&format!("fn view(&self) -> View<{}Msg> {{", widget_name));
+                sink.indent();
+
+                // Transpile the view body
+                self.trans_block(&method.body, sink)?;
+
+                sink.dedent();
+                sink.writeln("}");
+                sink.writeln("");
+            }
+
+            "on" => {
+                // Message handler
+                sink.writeln(&format!("// Message handler for {}", widget_name));
+                // Override the default on() from Component impl
+                sink.writeln(&format!("fn on(&mut self, msg: {}Msg) {{", widget_name));
+                sink.indent();
+
+                // Transpile the on() body (should be an 'is' statement)
+                self.trans_block(&method.body, sink)?;
+
+                sink.dedent();
+                sink.writeln("}");
+                sink.writeln("");
+            }
+
+            _ => {
+                // Regular methods (actions)
+                sink.writeln(&format!("// Method: {}", method.name));
+                sink.writeln(&format!("pub fn {}(&self) {{", method.name));
+                sink.indent();
+                self.trans_block(&method.body, sink)?;
+                sink.dedent();
+                sink.writeln("}");
+                sink.writeln("");
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Transpile a block of statements
+    fn trans_block(&mut self, block: &Block, sink: &mut CodeSink) -> AutoResult<()> {
+        for stmt in &block.stmts {
+            self.trans_stmt_in_block(stmt, sink)?;
+        }
+        Ok(())
+    }
+
+    /// Transpile statements inside a block
+    fn trans_stmt_in_block(&mut self, stmt: &Stmt, sink: &mut CodeSink) -> AutoResult<()> {
+        match stmt {
+            Stmt::Expr(expr) => {
+                // Check if this is an 'is' expression (pattern matching)
+                if let Expr::Ident(name) = &expr {
+                    if name == "is" {
+                        // Pattern matching expression
+                        // This would be part of the on() handler
+                        sink.writeln("// TODO: Implement pattern matching for 'is' expression");
+                        return Ok(());
+                    }
+                }
+
+                // Try to transpile as View expression
+                if let Ok(view_code) = self.trans_view_expr(expr) {
+                    sink.writeln(&view_code);
+                } else {
+                    // Regular expression
+                    self.trans_expr(expr, sink)?;
+                }
+            }
+
+            _ => {
+                // Other statement types
+            }
+        }
+        Ok(())
+    }
+
+    /// Transpile a View expression (col, row, button, text, etc.)
+    fn trans_view_expr(&mut self, expr: &Expr) -> AutoResult<String> {
+        match expr {
+            // Node expression: col { ... }, button "text" { ... }
+            Expr::Node(node) => {
+                self.trans_view_node(node)
+            }
+
+            // Identifiers (field references like count)
+            Expr::Ident(name) => {
+                Ok(format!("View::text(\"{}\")", name))
+            }
+
+            // Other expressions
+            _ => {
+                Ok(format!("/* TODO: transpile view expr: {:?} */", expr))
+            }
+        }
+    }
+
+    /// Transpile a View node (col, row, button, text, input, etc.)
+    fn trans_view_node(&mut self, node: &Node) -> AutoResult<String> {
+        let widget_name = &node.name;
+
+        match widget_name.as_str() {
+            "col" => {
+                // Column layout
+                Ok(format!("View::col()\n    .build()"))
+            }
+
+            "row" => {
+                // Row layout
+                Ok(format!("View::row()\n    .build()"))
+            }
+
+            "button" => {
+                // Button widget
+                let label = node.main_arg.to_astr().to_string();
+                Ok(format!("View::button(\"{}\", Message::TODO)", label))
+            }
+
+            "text" => {
+                // Text widget
+                let content = node.main_arg.to_astr().to_string();
+                Ok(format!("View::text(\"{}\")", content))
+            }
+
+            "input" => {
+                // Input widget
+                Ok(format!("View::input(\"\").build()"))
+            }
+
+            "center" => {
+                // Center container
+                Ok(format!("View::container(View::empty()).center().build()"))
+            }
+
+            _ => {
+                // Unknown widget
+                Ok(format!("/* Unknown widget: {} */", widget_name))
+            }
+        }
+    }
+
+    /// Transpile a regular expression
+    fn trans_expr(&mut self, expr: &Expr, sink: &mut CodeSink) -> AutoResult<()> {
+        match expr {
+            Expr::Ident(name) => {
+                sink.writeln(name);
+            }
+
+            Expr::Int(i) => {
+                sink.writeln(&i.to_string());
+            }
+
+            Expr::Str(s) => {
+                sink.writeln(&format!("\"{}\"", s));
+            }
+
+            _ => {
+                sink.writeln(&format!("/* expr: {:?} */", expr));
+            }
+        }
+        Ok(())
+    }
+
+    /// Transpile standalone functions
+    fn trans_function(&mut self, fn_decl: &FnDecl, sink: &mut CodeSink) -> AutoResult<()> {
+        sink.writeln(&format!("// Function: {}", fn_decl.name));
+        sink.writeln(&format!("pub fn {}() {{", fn_decl.name));
+        sink.indent();
+        self.trans_block(&fn_decl.body, sink)?;
+        sink.dedent();
+        sink.writeln("}");
+        sink.writeln("");
+        Ok(())
+    }
+
+    /// Transpile app() expression
+    fn trans_app_expr(&mut self, expr: &Expr, sink: &mut CodeSink) -> AutoResult<()> {
+        sink.writeln("// App definition");
+        sink.writeln(&format!("/* app: {:?} */", expr));
+        Ok(())
+    }
+
+    /// Convert Auto type to Rust type name
+    fn rust_type_name(&self, ty: &Type) -> String {
+        match ty {
+            Type::Int => "i32".to_string(),
+            Type::Uint => "u32".to_string(),
+            Type::Str(_) => "String".to_string(),
+            Type::Bool => "bool".to_string(),
+            Type::User(user) => user.name.to_string(),
+            _ => format!("/* TODO: type {:?} */", ty),
+        }
+    }
+}

@@ -11,3 +11,11 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }
+
+# Auto language support for parsing .at files (optional)
+auto-lang = { path = "../../../auto-lang/crates/auto-lang", optional = true }
+auto-val = { path = "../../../auto-lang/crates/auto-val", optional = true }
+
+[features]
+default = []
+transpiler = ["auto-lang", "auto-val"]

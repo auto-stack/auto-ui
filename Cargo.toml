@@ -1,5 +1,6 @@
 [workspace]
 members = ["crates/*"]
+exclude = ["crates/auto-ui-transpiler"]  # Exclude transpiler for now, build separately
 resolver = "2"
 
 [workspace.dependencies]
