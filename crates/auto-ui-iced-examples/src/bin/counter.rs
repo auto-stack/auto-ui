@@ -41,7 +41,11 @@ impl Component for Counter {
 
 fn main() -> iced::Result {
     // Use the ComponentIced trait to run with iced
-    iced::run(Counter::update, Counter::view_iced)
+    iced::run(Counter::update, view)
+}
+
+fn view(counter: &Counter) -> iced::Element<'_, Message> {
+    counter.view_iced()
 }
 
 // Note: ComponentIced trait provides:

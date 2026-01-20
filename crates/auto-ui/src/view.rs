@@ -101,6 +101,12 @@ impl<M: Clone + Debug> ViewBuilder<M> {
         self
     }
 
+    /// Add multiple children to the layout
+    pub fn children(mut self, children: impl IntoIterator<Item = View<M>>) -> Self {
+        self.children.extend(children);
+        self
+    }
+
     /// Set spacing between children
     pub fn spacing(mut self, spacing: u16) -> Self {
         self.spacing = spacing;

@@ -121,7 +121,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
 /// }
 ///
 /// // Use with iced::run
-/// iced::run(MyComponent::update, MyComponent::view_iced)
+/// iced::run("Title", MyComponent::update, MyComponent::view_iced)
 /// ```
 pub trait ComponentIced: Component {
     /// Iced-compatible view function
@@ -138,7 +138,7 @@ impl<T: Component> ComponentIced for T
 where
     T::Msg: Clone + Debug + 'static,
 {
-    fn view_iced(&self) -> iced::Element<'static, Self::Msg> {
+    fn view_iced(&self) -> iced::Element<'static, T::Msg> {
         self.view().into_iced()
     }
 }

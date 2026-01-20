@@ -3,6 +3,8 @@ members = ["crates/*"]
 resolver = "2"
 
 [workspace.dependencies]
+# 强制启用 naga 的 termcolor feature 以避免 Windows WriteColor trait 错误
+naga = { version = "0.27", features = ["termcolor"] }
 # Local crates
 auto-ui = { path = "crates/auto-ui" }
 

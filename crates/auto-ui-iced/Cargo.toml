@@ -6,3 +6,6 @@ edition = "2021"
 [dependencies]
 auto-ui = { path = "../auto-ui" }
 iced = { workspace = true }
+
+# 强制启用 naga 的 termcolor feature 以避免 Windows WriteColor trait 错误
+naga = { version = "27.0.3", features = ["termcolor"] }

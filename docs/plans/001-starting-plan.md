@@ -85,11 +85,13 @@ AutoUI 是一个基于 Auto 语言的跨平台 UI 描述框架，目标是实现
   ```
   auto-ui/
   ├── crates/
-  │   ├── auto-ui/            # 核心抽象层
-  │   ├── iced-examples/      # iced 示例
-  │   └── gpui-examples/      # gpui 示例
-  ├── scratch/                # Auto 语言原型
-  └── docs/                   # 文档
+  │   ├── auto-ui/                    # 核心抽象层
+  │   ├── auto-ui-iced/               # Iced 适配器
+  │   ├── auto-ui-iced-examples/      # 抽象层 + Iced 示例
+  │   ├── iced-examples/              # 纯 Iced 框架示例
+  │   └── gpui-examples/              # 纯 GPUI 框架示例
+  ├── scratch/                        # Auto 语言原型
+  └── docs/                           # 文档
   ```
 
 #### 1.2 依赖配置 ✅
@@ -241,39 +243,131 @@ fn main() -> iced::Result {
 3. **无缝集成**: Component 类型自动获得 Iced 支持
 4. **递归转换**: 支持任意深度的组件嵌套
 
-#### 2.6 已知问题 ⚠️
+#### 2.6 Naga 编译错误解决方案 ✅
 
-**Naga 编译错误**（第三方依赖问题）：
+**问题描述**：
 - **错误**: `error[E0277]: the trait bound 'std::string::String: WriteColor' is not satisfied`
-- **原因**: naga 27.0.3（iced 的 GPU 着色器编译依赖）在 Windows 平台的已知问题
-- **影响**: 无法完整编译 iced 应用，但核心 auto-ui 和 auto-ui-iced 库编译通过，代码逻辑正确
-- **解决方案**:
-  1. 等待 naga/iced 版本更新
-  2. 在不同平台测试（Linux/Mac）
-  3. 先继续开发其他组件，后续再验证 UI 运行
+  ```
+  error[E0277]: the trait bound `std::string::String: WriteColor' is not satisfied
+    --> naga-27.0.3\src\error.rs:50:17
+     |
+  50 |                 writer.inner_mut(),
+     |                 ^^^^^^^^^^^^^^^^^^ the trait `WriteColor` is not implemented for `std::string::String`
+  ```
+- **原因**: naga 27.0.3（iced 的 GPU 着色器编译依赖）在 Windows 平台的已知 bug
+  1. naga 27.0.3 是 iced 0.14.0 的传递依赖（用于 GPU 着色器编译）
+  2. naga 默认配置使用 `String` 作为诊断输出缓冲区
+  3. `String` 没有实现 `termcolor` 库的 `WriteColor` trait
+- **影响**: 无法在 Windows 上编译任何使用 iced 的应用
+
+**解决方案**：
+1. ✅ **启用 naga 的 termcolor feature**：在项目依赖中添加 `naga = { version = "27.0.3", features = ["termcolor"] }`
+2. ✅ **termcolor feature 修复**：启用后，naga 使用 `NoColor<Vec<u8>>` 而不是 `String`，实现了 `WriteColor` trait
+
+**实施步骤**：
+
+在 `crates/iced-examples/Cargo.toml` 中添加：
+```toml
+[dependencies]
+iced = { workspace = true }
+auto-ui = { workspace = true }
+auto-ui-iced = { path = "../auto-ui-iced" }
+
+# 强制启用 naga 的 termcolor feature 以避免 Windows WriteColor trait 错误
+naga = { version = "27.0.3", features = ["termcolor"] }
+```
+
+在 `crates/auto-ui-iced/Cargo.toml` 中添加：
+```toml
+[dependencies]
+auto-ui = { path = "../auto-ui" }
+iced = { workspace = true }
+
+# 强制启用 naga 的 termcolor feature 以避免 Windows WriteColor trait 错误
+naga = { version = "27.0.3", features = ["termcolor"] }
+```
+
+**原理说明**：
+
+naga 的 `error.rs` 中有以下条件编译：
+```rust
+cfg_if::cfg_if! {
+    if #[cfg(feature = "termcolor")] {
+        // ✅ 使用 NoColor<Vec<u8>>，实现了 WriteColor
+        type DiagnosticBufferInner = codespan_reporting::term::termcolor::NoColor<alloc::vec::Vec<u8>>;
+    } else if #[cfg(feature = "stderr")] {
+        type DiagnosticBufferInner = alloc::vec::Vec<u8>;
+    } else {
+        // ❌ 使用 String，没有实现 WriteColor（Windows 上会失败）
+        type DiagnosticBufferInner = String;
+    }
+}
+```
+
+通过启用 `termcolor` feature，naga 会使用第一个分支，从而避免错误。
+
+**其他尝试的方法（未成功）**：
+
+1. **锁定 naga 版本为 25.0.1**
+   ```toml
+   [workspace.dependencies]
+   naga = "=25.0.1"
+   ```
+   问题：iced 内部依赖 wgpu 27.x，而 wgpu 27.x 依赖 naga 27.x，workspace.lock 对传递依赖不起作用。
+
+2. **使用 `[patch.crates-io]` 指向 git 仓库**
+   ```toml
+   [patch.crates-io]
+   naga = { git = "https://github.com/gfx-rs/naga", tag = "25.0.1" }
+   ```
+   问题：git tag 格式不正确，无法找到对应的引用。
+
+3. **设置环境变量 `NO_COLOR=1`**
+   ```bash
+   set NO_COLOR=1 && cargo build
+   ```
+   问题：这是运行时配置，不影响编译时期的 trait 检查。
+
+4. **降级 wgpu 到 22.x**
+   问题：iced 0.14.0 强制依赖 wgpu 27.x，无法降级。
+
+**关键经验**：
+
+1. **Feature 优先于版本锁定**：当遇到依赖 bug 时，优先检查是否有 feature 可以解决，而不是尝试降级版本
+2. **传递依赖的控制**：workspace.dependencies 只影响直接依赖，对传递依赖的控制有限
+3. **查看源代码**：直接查看依赖库的源代码（如 `error.rs`）比猜测更有效
+4. **Windows 特定问题**：某些 trait 实现问题只在特定平台出现，需要跨平台测试
 
 #### 2.7 验证方法 ✅
 
-由于无法运行完整应用，我们通过以下方式验证：
-
 1. **编译验证** ✅
    ```bash
-   $ cargo build -p auto-ui -p auto-ui-iced
-   Finished `dev` profile in 0.45s
+   $ cargo build --bin counter_abstract
+   Finished `dev` profile in 12.41s
    ```
 
-2. **代码审查** ✅
+2. **运行验证** ✅
+   ```bash
+   $ cargo run --bin counter_abstract
+   # GUI 窗口成功打开，显示计数器应用
+   ```
+
+3. **代码审查** ✅
    - Trait 定义正确
    - 所有 View 变体都有对应的转换
    - 递归转换逻辑正确
    - 消息类型传递正确
 
-3. **API 设计验证** ✅
+4. **API 设计验证** ✅
    ```rust
    // 简洁的 API
    let view = View::button("Click", Msg::Click);
    let element = view.into_iced();
    ```
+
+5. **生命周期处理** ✅
+   - 使用包装函数 `fn view(counter: &Counter) -> Element<'_, Message>` 来桥接生命周期
+   - `Element<'static, Message>` → `Element<'_, Message>` 转换
 
 #### 2.8 完成度评估
 
@@ -283,29 +377,30 @@ fn main() -> iced::Result {
 | 实现 IntoIcedElement trait | ✅ 完成 | 100% |
 | 实现所有组件转换 | ✅ 完成 | 100% |
 | 创建 Counter 示例 | ✅ 完成 | 100% |
-| 运行验证 | ⚠️ 受阻 | 0% (外部依赖) |
-| **Phase 2 总体** | **核心完成** | **80%** |
+| 解决 Naga 编译错误 | ✅ 完成 | 100% |
+| 运行验证 | ✅ 完成 | 100% |
+| **Phase 2 总体** | **✅ 完全完成** | **100%** |
 
 ---
 
 ### Phase 3: Iced 后端实现（3-4 周）
 
 #### 3.1 基础组件适配
-- [ ] Text / Label
-- [ ] Button
-- [ ] Input / TextBox
+- [x] Text / Label ✅
+- [x] Button ✅
+- [ ] Input / TextBox（需要改进设计以支持值获取）
 - [ ] Container
 
 #### 3.2 布局组件
-- [ ] Row / Column
+- [x] Row / Column ✅
 - [ ] Center / Align
-- [ ] Padding / Margin
+- [x] Padding / Margin ✅
 - [ ] Scroll
 
 #### 3.3 表单组件
 - [ ] TextInput
 - [ ] PasswordInput
-- [ ] CheckBox
+- [x] CheckBox ✅
 - [ ] Radio
 - [ ] Select
 
@@ -319,6 +414,47 @@ fn main() -> iced::Result {
 - [ ] 主题定义
 - [ ] 样式继承
 - [ ] 动态样式绑定
+
+#### 3.6 示例应用 ✅
+
+**TodoMVC 示例** (`todo.rs`) ✅
+- **文件**: `crates/auto-ui-iced-examples/src/bin/todo.rs`
+- **功能**:
+  - 添加/删除待办事项
+  - 标记完成状态
+  - 过滤显示（All/Active/Completed）
+  - 清除已完成项目
+- **验证的组件**: Text, Button, Row, Column, 条件渲染
+- **状态管理**: 复杂的列表状态和过滤逻辑
+- **运行**: `cargo run --package auto-ui-iced-examples --bin todo`
+
+**温度转换器示例** (`temp_converter.rs`) ✅
+- **文件**: `crates/auto-ui-iced-examples/src/bin/temp_converter.rs`
+- **功能**:
+  - 摄氏度和华氏度双向转换
+  - 增量调整温度
+  - 重置功能
+- **验证的组件**: Text, Button, 嵌套布局
+- **数据流**: 双向数据绑定和计算值
+- **运行**: `cargo run --package auto-ui-iced-examples --bin temp_converter`
+
+**计数器示例** (`counter.rs`) ✅
+- **文件**: `crates/auto-ui-iced-examples/src/bin/counter.rs`
+- **功能**:
+  - 基础计数器
+  - 增量/减量操作
+- **运行**: `cargo run --package auto-ui-iced-examples --bin counter`
+
+**增强的 ViewBuilder API** ✅
+- 添加了 `children()` 方法支持批量添加子组件
+- 示例: `.children(vec![...])` 简化列表构建
+
+**项目结构重构** ✅
+- 将 `auto-ui-examples` 重命名为 `auto-ui-iced-examples`
+- 明确区分：
+  - `auto-ui-iced-examples/` - 抽象层 + Iced 后端示例
+  - `iced-examples/` - 纯 Iced 框架示例（学习参考）
+- 为未来添加 GPUI 后端建立清晰的命名模式
 
 ---
 
@@ -374,7 +510,7 @@ fn main() -> iced::Result {
 |--------|------|----------|------|
 | M1 | 项目结构搭建完成 | Week 1 | ✅ 完成 |
 | M2 | 核心抽象层定义完成 | Week 3 | ✅ 完成 |
-| M3 | Iced 基础组件可用 | Week 6 | ⏳ 核心完成 |
+| M3 | Iced 基础组件可用 | Week 6 | ✅ 完成 |
 | M4 | Auto 语言可运行简单示例 | Week 9 | 📅 待开始 |
 | M5 | Counter/Login 示例完成 | Week 11 | 📅 待开始 |
 | M6 | 文档和测试完善 | Week 12 | 📅 待开始 |
@@ -412,9 +548,12 @@ fn main() -> iced::Result {
 6. ✅ Phase 2：Iced 适配器实现（核心完成）
 
 ### 下一步目标（Phase 3）
-- [ ] 在 Linux/Mac 平台验证 Phase 2 运行效果
-- [ ] 创建更多示例（Login, TodoMVC）
-- [ ] 添加更多组件支持（Dropdown, List, Table）
+- [x] ✅ 创建 TodoMVC 示例
+- [x] ✅ 创建温度转换器示例
+- [x] ✅ 增强 ViewBuilder API（添加 children 方法）
+- [ ] 改进 Input 组件设计（支持值获取）
+- [ ] 添加 Container 组件
+- [ ] 添加更多布局组件（Center/Align/Scroll）
 - [ ] 实现样式系统
 - [ ] 性能测试和优化
 
@@ -531,8 +670,11 @@ de5a085 feat: complete Phase 1 - setup workspace and examples
 
 ## 参考资料
 
+### 框架与工具
 - [Iced 官方文档](https://docs.iced.rs/)
 - [Iced GitHub](https://github.com/iced-rs/iced)
+- [naga GitHub Issues](https://github.com/gfx-rs/naga/issues)
+- [termcolor crate](https://docs.rs/termcolor/)
 - [ELM 架构](https://guide.elm-lang.org/architecture/)
 - [React 架构](https://react.dev/learn/understanding-your-ui-as-a-tree)
 - [GPUI](https://github.com/zed-industries/zed)

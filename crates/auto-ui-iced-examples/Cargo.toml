@@ -1,34 +1,24 @@
 [package]
-name = "iced-examples"
+name = "auto-ui-iced-examples"
 version = "0.1.0"
 edition = "2021"
-
-[[bin]]
-name = "hello"
-path = "src/bin/hello.rs"
 
 [[bin]]
 name = "counter"
 path = "src/bin/counter.rs"
 
 [[bin]]
-name = "button"
-path = "src/bin/button.rs"
+name = "todo"
+path = "src/bin/todo.rs"
 
 [[bin]]
-name = "checkbox"
-path = "src/bin/checkbox.rs"
-
-[[bin]]
-name = "circle"
-path = "src/bin/circle.rs"
-
-[[bin]]
-name = "dropdown"
-path = "src/bin/dropdown.rs"
+name = "temp_converter"
+path = "src/bin/temp_converter.rs"
 
 [dependencies]
 iced = { workspace = true }
+auto-ui = { workspace = true }
+auto-ui-iced = { path = "../auto-ui-iced" }
 
 # 强制启用 naga 的 termcolor feature 以避免 Windows WriteColor trait 错误
 naga = { version = "27.0.3", features = ["termcolor"] }
