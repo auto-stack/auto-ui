@@ -395,7 +395,7 @@ cfg_if::cfg_if! {
 - [x] Row / Column ✅
 - [x] Center / Align ✅（Container 支持 center_x/center_y）
 - [x] Padding / Margin ✅
-- [ ] Scroll
+- [x] Scroll ✅
 
 #### 3.3 表单组件
 - [ ] TextInput
@@ -478,6 +478,25 @@ cfg_if::cfg_if! {
   - 支持可选的宽高设置
   - 通过 `iced::widget::container` 映射到 Iced
 - **运行**: `cargo run --package auto-ui-iced-examples --bin container_demo`
+
+**Scrollable 组件** (`scroll_demo.rs`) ✅
+- **文件**: `crates/auto-ui-iced-examples/src/bin/scroll_demo.rs`
+- **功能**:
+  - 内容溢出时显示滚动条
+  - 固定尺寸的滚动容器
+  - 嵌套可滚动区域支持
+- **API 设计**:
+  ```rust
+  View::scrollable(child)
+      .width(300)
+      .height(200)
+      .build()
+  ```
+- **实现要点**:
+  - 使用 Builder 模式（`ViewScrollableBuilder`）提供链式 API
+  - 可选宽高设置（未设置时自适应内容）
+  - 通过 `iced::widget::scrollable` 映射到 Iced
+- **运行**: `cargo run --package auto-ui-iced-examples --bin scroll_demo`
 
 ---
 
