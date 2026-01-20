@@ -503,6 +503,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "auto-ui-iced"
+version = "0.1.0"
+dependencies = [
+ "auto-ui",
+ "iced",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3042,6 +3050,7 @@ name = "iced-examples"
 version = "0.1.0"
 dependencies = [
  "auto-ui",
+ "auto-ui-iced",
  "iced",
 ]
 

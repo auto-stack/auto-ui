@@ -1,0 +1,8 @@
+[package]
+name = "auto-ui-iced"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+auto-ui = { path = "../auto-ui" }
+iced = { workspace = true }

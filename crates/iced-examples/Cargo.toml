@@ -27,6 +27,11 @@ path = "src/bin/circle.rs"
 name = "dropdown"
 path = "src/bin/dropdown.rs"
 
+[[bin]]
+name = "counter_abstract"
+path = "src/bin/counter_abstract.rs"
+
 [dependencies]
 iced = { workspace = true }
 auto-ui = { workspace = true }
+auto-ui-iced = { path = "../auto-ui-iced" }
