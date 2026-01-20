@@ -228,6 +228,37 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
 
                 col_widget.into()
             }
+
+            AbstractView::Table {
+                headers,
+                rows,
+                spacing,
+                col_spacing,
+            } => {
+                // Table is implemented as a column of rows
+                let mut table_widget = column([]);
+                table_widget = table_widget.spacing(spacing as f32);
+
+                // Add header row
+                let mut header_row_widget = row([]);
+                header_row_widget = header_row_widget.spacing(col_spacing as f32);
+                for header in headers {
+                    header_row_widget = header_row_widget.push(header.into_iced());
+                }
+                table_widget = table_widget.push(header_row_widget);
+
+                // Add data rows
+                for row_data in rows {
+                    let mut row_widget = row([]);
+                    row_widget = row_widget.spacing(col_spacing as f32);
+                    for cell in row_data {
+                        row_widget = row_widget.push(cell.into_iced());
+                    }
+                    table_widget = table_widget.push(row_widget);
+                }
+
+                table_widget.into()
+            }
         }
     }
 }

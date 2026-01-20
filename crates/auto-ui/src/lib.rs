@@ -6,7 +6,7 @@
 
 pub mod prelude {
     pub use crate::component::Component;
-    pub use crate::view::{View, ViewBuilder, ViewContainerBuilder, ViewScrollableBuilder, ViewListBuilder, ViewInputBuilder};
+    pub use crate::view::{View, ViewBuilder, ViewContainerBuilder, ViewScrollableBuilder, ViewListBuilder, ViewInputBuilder, ViewTableBuilder};
 }
 
 pub mod component;
@@ -14,7 +14,7 @@ pub mod view;
 
 // Re-export core types for convenience
 pub use component::Component;
-pub use view::{View, ViewBuilder, ViewContainerBuilder, ViewScrollableBuilder, ViewListBuilder, ViewInputBuilder};
+pub use view::{View, ViewBuilder, ViewContainerBuilder, ViewScrollableBuilder, ViewListBuilder, ViewInputBuilder, ViewTableBuilder};
 
 // Note: widget.rs is kept for backward compatibility but may be deprecated
 // The new design uses Component trait directly instead of Widget trait

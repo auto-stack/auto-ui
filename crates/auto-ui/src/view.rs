@@ -86,6 +86,14 @@ pub enum View<M: Clone + Debug> {
         items: Vec<View<M>>,
         spacing: u16,
     },
+
+    /// Table for displaying structured data in rows and columns
+    Table {
+        headers: Vec<View<M>>,
+        rows: Vec<Vec<View<M>>>,
+        spacing: u16,
+        col_spacing: u16,
+    },
 }
 
 /// View builder for fluent layout construction
@@ -250,6 +258,16 @@ impl<M: Clone + Debug> View<M> {
         }
     }
 
+    /// Create a table with headers and rows
+    pub fn table(headers: Vec<View<M>>, rows: Vec<Vec<View<M>>>) -> ViewTableBuilder<M> {
+        ViewTableBuilder {
+            headers,
+            rows,
+            spacing: 0,
+            col_spacing: 0,
+        }
+    }
+
     /// Create a container with a child
     pub fn container(child: View<M>) -> ViewContainerBuilder<M> {
         ViewContainerBuilder {
@@ -366,6 +384,38 @@ impl<M: Clone + Debug> ViewInputBuilder<M> {
             on_change: self.on_change,
             width: self.width,
             password: self.password,
+        }
+    }
+}
+
+/// Builder for Table with fluent API
+pub struct ViewTableBuilder<M: Clone + Debug> {
+    headers: Vec<View<M>>,
+    rows: Vec<Vec<View<M>>>,
+    spacing: u16,
+    col_spacing: u16,
+}
+
+impl<M: Clone + Debug> ViewTableBuilder<M> {
+    /// Set spacing between rows
+    pub fn spacing(mut self, spacing: u16) -> Self {
+        self.spacing = spacing;
+        self
+    }
+
+    /// Set spacing between columns
+    pub fn col_spacing(mut self, col_spacing: u16) -> Self {
+        self.col_spacing = col_spacing;
+        self
+    }
+
+    /// Build the table view
+    pub fn build(self) -> View<M> {
+        View::Table {
+            headers: self.headers,
+            rows: self.rows,
+            spacing: self.spacing,
+            col_spacing: self.col_spacing,
         }
     }
 }
