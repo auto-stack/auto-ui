@@ -78,6 +78,12 @@ pub enum View<M: Clone + Debug> {
         selected_index: Option<usize>,
         on_select: Option<M>,
     },
+
+    /// List for displaying items in a vertical sequence
+    List {
+        items: Vec<View<M>>,
+        spacing: u16,
+    },
 }
 
 /// View builder for fluent layout construction
@@ -232,6 +238,14 @@ impl<M: Clone + Debug> View<M> {
         }
     }
 
+    /// Create a list with items
+    pub fn list(items: Vec<View<M>>) -> ViewListBuilder<M> {
+        ViewListBuilder {
+            items,
+            spacing: 0,
+        }
+    }
+
     /// Create a container with a child
     pub fn container(child: View<M>) -> ViewContainerBuilder<M> {
         ViewContainerBuilder {
@@ -280,6 +294,28 @@ impl<M: Clone + Debug> ViewScrollableBuilder<M> {
             child: Box::new(self.child),
             width: self.width,
             height: self.height,
+        }
+    }
+}
+
+/// Builder for List with fluent API
+pub struct ViewListBuilder<M: Clone + Debug> {
+    items: Vec<View<M>>,
+    spacing: u16,
+}
+
+impl<M: Clone + Debug> ViewListBuilder<M> {
+    /// Set spacing between items
+    pub fn spacing(mut self, spacing: u16) -> Self {
+        self.spacing = spacing;
+        self
+    }
+
+    /// Build the list view
+    pub fn build(self) -> View<M> {
+        View::List {
+            items: self.items,
+            spacing: self.spacing,
         }
     }
 }

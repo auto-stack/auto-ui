@@ -205,6 +205,19 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                     }
                 }
             }
+
+            AbstractView::List { items, spacing } => {
+                // List is essentially a column with spacing
+                let mut col_widget = column([]);
+                col_widget = col_widget.spacing(spacing as f32);
+
+                // Recursively convert items
+                for item in items {
+                    col_widget = col_widget.push(item.into_iced());
+                }
+
+                col_widget.into()
+            }
         }
     }
 }
