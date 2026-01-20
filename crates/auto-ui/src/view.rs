@@ -64,6 +64,13 @@ pub enum View<M: Clone + Debug> {
         width: Option<u16>,
         height: Option<u16>,
     },
+
+    /// Radio button for single selection from multiple options
+    Radio {
+        label: String,
+        is_selected: bool,
+        on_select: Option<M>,
+    },
 }
 
 /// View builder for fluent layout construction
@@ -197,6 +204,15 @@ impl<M: Clone + Debug> View<M> {
             is_checked,
             label: label.into(),
             on_toggle: None,
+        }
+    }
+
+    /// Create radio button
+    pub fn radio(is_selected: bool, label: impl Into<String>) -> Self {
+        View::Radio {
+            label: label.into(),
+            is_selected,
+            on_select: None,
         }
     }
 
@@ -338,6 +354,17 @@ impl<M: Clone + Debug> View<M> {
     pub fn on_toggle(mut self, msg: M) -> Self {
         if let View::Checkbox { on_toggle, .. } = &mut self {
             *on_toggle = Some(msg);
+        }
+        self
+    }
+}
+
+// Chaining methods for Radio
+impl<M: Clone + Debug> View<M> {
+    /// Set radio select handler
+    pub fn on_select(mut self, msg: M) -> Self {
+        if let View::Radio { on_select, .. } = &mut self {
+            *on_select = Some(msg);
         }
         self
     }

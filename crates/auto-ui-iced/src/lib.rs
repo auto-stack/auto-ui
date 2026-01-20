@@ -155,6 +155,29 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
 
                 scrollable_widget.into()
             }
+
+            AbstractView::Radio {
+                label,
+                is_selected,
+                on_select,
+            } => {
+                // Note: Iced's radio widget requires a closure, which doesn't fit our
+                // message-based abstraction. We simulate radio with checkbox styling.
+                // In a real implementation, we'd use Iced's radio widget with proper closures.
+                let checkbox_widget = checkbox(is_selected);
+
+                // Add select handler if provided
+                let checkbox_with_handler = if let Some(msg) = on_select {
+                    checkbox_widget.on_toggle(move |_| msg.clone())
+                } else {
+                    checkbox_widget
+                };
+
+                // Combine with label in a row
+                row![checkbox_with_handler, text(label)]
+                    .spacing(4)
+                    .into()
+            }
         }
     }
 }
