@@ -70,10 +70,20 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 col_widget.into()
             }
 
-            AbstractView::Input { placeholder, value, on_change } => {
-                // We need owned data for the text input, so we'll use placeholder as hint
-                // and value as the current content
-                let input_widget = text_input(&placeholder, &value);
+            AbstractView::Input {
+                placeholder,
+                value,
+                on_change,
+                width,
+                password: _,
+            } => {
+                // Create text input widget
+                let mut input_widget = text_input(&placeholder, &value);
+
+                // Apply width
+                if let Some(w) = width {
+                    input_widget = input_widget.width(iced::Length::Fixed(w as f32));
+                }
 
                 // Add change handler if provided
                 if let Some(msg) = on_change {

@@ -38,7 +38,9 @@ pub enum View<M: Clone + Debug> {
     Input {
         placeholder: String,
         value: String,
-        on_change: Option<M>,  // Optional because not all inputs need handlers
+        on_change: Option<M>,
+        width: Option<u16>,
+        password: bool,
     },
 
     /// Checkbox
@@ -202,12 +204,14 @@ impl<M: Clone + Debug> View<M> {
         ViewBuilder::col()
     }
 
-    /// Create input field
-    pub fn input(placeholder: impl Into<String>) -> Self {
-        View::Input {
+    /// Create input field with placeholder
+    pub fn input(placeholder: impl Into<String>) -> ViewInputBuilder<M> {
+        ViewInputBuilder {
             placeholder: placeholder.into(),
             value: String::new(),
             on_change: None,
+            width: None,
+            password: false,
         }
     }
 
@@ -320,6 +324,52 @@ impl<M: Clone + Debug> ViewListBuilder<M> {
     }
 }
 
+/// Builder for Input with fluent API
+pub struct ViewInputBuilder<M: Clone + Debug> {
+    placeholder: String,
+    value: String,
+    on_change: Option<M>,
+    width: Option<u16>,
+    password: bool,
+}
+
+impl<M: Clone + Debug> ViewInputBuilder<M> {
+    /// Set input value
+    pub fn value(mut self, val: impl Into<String>) -> Self {
+        self.value = val.into();
+        self
+    }
+
+    /// Set input change handler
+    pub fn on_change(mut self, msg: M) -> Self {
+        self.on_change = Some(msg);
+        self
+    }
+
+    /// Set width
+    pub fn width(mut self, width: u16) -> Self {
+        self.width = Some(width);
+        self
+    }
+
+    /// Enable password mode (hides input)
+    pub fn password(mut self) -> Self {
+        self.password = true;
+        self
+    }
+
+    /// Build the input view
+    pub fn build(self) -> View<M> {
+        View::Input {
+            placeholder: self.placeholder,
+            value: self.value,
+            on_change: self.on_change,
+            width: self.width,
+            password: self.password,
+        }
+    }
+}
+
 /// Builder for Container with fluent API
 pub struct ViewContainerBuilder<M: Clone + Debug> {
     child: View<M>,
@@ -378,25 +428,6 @@ impl<M: Clone + Debug> ViewContainerBuilder<M> {
             center_x: self.center_x,
             center_y: self.center_y,
         }
-    }
-}
-
-// Chaining methods for Input
-impl<M: Clone + Debug> View<M> {
-    /// Set input value
-    pub fn value(mut self, val: impl Into<String>) -> Self {
-        if let View::Input { value, .. } = &mut self {
-            *value = val.into();
-        }
-        self
-    }
-
-    /// Set input change handler
-    pub fn on_change(mut self, msg: M) -> Self {
-        if let View::Input { on_change, .. } = &mut self {
-            *on_change = Some(msg);
-        }
-        self
     }
 }
 

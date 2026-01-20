@@ -35,6 +35,10 @@ path = "src/bin/select_demo.rs"
 name = "list_demo"
 path = "src/bin/list_demo.rs"
 
+[[bin]]
+name = "input_demo"
+path = "src/bin/input_demo.rs"
+
 [dependencies]
 iced = { workspace = true }
 auto-ui = { workspace = true }
