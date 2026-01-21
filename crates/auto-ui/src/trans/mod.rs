@@ -8,8 +8,15 @@ use std::collections::HashSet;
 use std::io::Write;
 
 pub mod auto_ui_trans;
+pub mod rust_gen;
+pub mod api;
 
 pub use auto_ui_trans::AutoUITrans;
+pub use rust_gen::RustCodeGenerator;
+
+/// High-level transpilation API
+#[cfg(feature = "transpiler")]
+pub use api::{transpile_file, transpile_ast};
 
 /// Sink for collecting generated Rust code
 pub struct CodeSink {
