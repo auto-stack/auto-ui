@@ -1,64 +1,118 @@
 # AutoUI Examples Guide
 
-This guide shows you how to run AutoUI examples using both **runtime interpretation** and **transpilation** modes.
+This guide shows you how to run AutoUI examples and understand the different modes of operation.
 
 ## Quick Start
 
-### Option 1: Runtime Interpretation (Easiest)
+### ✅ Run Working Examples Now
 
-Run the counter example directly in Rust - no .at files needed:
-
-```bash
-cargo run --example runtime_counter
-```
-
-This demonstrates the **runtime mode** where you build UI programmatically using the View API.
-
-### Option 2: Transpilation (Auto Language Support)
-
-Transpile an `.at` file to Rust code:
+These examples work right now - no special features needed:
 
 ```bash
-# Requires transpiler feature
-cargo run --example transpile_counter --features transpiler
+# 1. Simple counter (Best starting point!)
+cargo run --example counter_component
+
+# 2. All 12 UI components demonstration
+cargo run --example all_components
+
+# 3. Styled counter with unified styling
+cargo run --example styled_counter
+
+# 4. Style system demos
+cargo run --example style_demo          # L1: Core features
+cargo run --example style_demo_l2       # L2: Important features
+cargo run --example style_demo_l3       # L3: Advanced features
+cargo run --example styling_showcase    # Complete styling demo
 ```
 
-This will:
-1. Read `scratch/counter.at`
-2. Generate Rust code
-3. Save it to `counter_generated.rs`
-4. Display the generated code
+### 🔬 Test the Transpiler
+
+The transpiler is tested but not yet available as a runnable example. Instead, you can:
+
+```bash
+# Run transpiler tests
+cargo test --package auto-ui --features transpiler --test transpiler_test
+
+# Run integration tests (includes transpilation)
+cargo test --package auto-ui --features transpiler --test integration_test
+```
 
 ## Available Examples
 
-### Runtime Examples (No Transpilation)
+### Core Examples
 
-| Example | Description | Command |
-|---------|-------------|---------|
-| `runtime_counter` | Simple counter UI | `cargo run --example runtime_counter` |
-| `counter_component` | Counter with View builder | `cargo run --example counter_component` |
-| `all_components` | Demonstrates all 12 UI components | `cargo run --example all_components` |
-| `styled_counter` | Counter with styling | `cargo run --example styled_counter` |
-| `style_demo` | Style system basics (L1) | `cargo run --example style_demo` |
-| `style_demo_l2` | Style system important features (L2) | `cargo run --example style_demo_l2` |
-| `style_demo_l3` | Style system advanced features (L3) | `cargo run --example style_demo_l3` |
+| Example | Description | Features Demonstrated |
+|---------|-------------|----------------------|
+| `counter_component` | Simple counter UI | Component trait, messages, View API, styling |
+| `all_components` | All 12 UI components | col, row, center, container, scrollable, text, button, input, checkbox, radio, select, list, table |
+| `styled_counter` | Counter with advanced styling | Unified styling system, L1/L2 features |
 
-### Transpilation Examples
+### Style System Examples
 
-| Example | Description | Command |
-|---------|-------------|---------|
-| `transpile_counter` | Transpile counter.at to Rust | `cargo run --example transpile_counter --features transpiler` |
+| Example | Description | Plan Reference |
+|---------|-------------|----------------|
+| `style_demo` | Core styling features (L1) | Plan 004 |
+| `style_demo_l2` | Important features (L2) | Plan 004 |
+| `style_demo_l3` | Advanced features (L3) | Plan 004 + Plan 005 |
+| `styling_showcase` | Complete styling system | Plan 004 + Plan 005 |
 
-## Auto Language Files
+## How AutoUI Works
 
-The following `.at` files are available in `scratch/`:
+### Mode 1: Pure Rust (Runtime) ✅ Working Now!
 
-### counter.at
-A simple counter widget with increment/decrement buttons:
+Write your UI directly in Rust using the View builder API. This is what all current examples demonstrate.
 
+```rust
+use auto_ui::{Component, View};
+
+struct Counter {
+    count: i32,
+}
+
+impl Component for Counter {
+    type Msg = Msg;
+
+    fn on(&mut self, msg: Self::Msg) {
+        match msg {
+            Msg::Inc => self.count += 1,
+            Msg::Dec => self.count -= 1,
+        }
+    }
+
+    fn view(&self) -> View<Self::Msg> {
+        View::col()
+            .spacing(16)
+            .child(View::button("+").on_click(Msg::Inc).build())
+            .child(View::text(&format!("Count: {}", self.count)).build())
+            .child(View::button("-").on_click(Msg::Dec).build())
+            .build()
+    }
+}
+```
+
+**Run it**: `cargo run --example counter_component`
+
+**Pros**:
+- ✅ Full type safety
+- ✅ IDE support (autocomplete, refactoring)
+- ✅ No build step
+- ✅ Production ready
+- ✅ Works with GPUI and Iced backends
+
+**Cons**:
+- More verbose than Auto language
+- No hot-reload
+
+### Mode 2: Auto Language (Transpilation) 🔧 In Development
+
+Write UI in `.at` files, then transpile to Rust code.
+
+**Status**: Transpiler implemented and tested, but not yet integrated into examples workflow.
+
+**Auto Language File** (`scratch/counter.at`):
 ```auto
 widget Counter {
-    count int
+    count int = 0
 
     fn view() View {
         col {
@@ -75,184 +129,244 @@ widget Counter {
         }
     }
 }
-
-app CounterExample {
-    center {
-        Counter(count: 0)
-    }
-}
 ```
 
-### hello.at
-Simple "Hello World" widget:
-
-```auto
-widget Hello {
-    msg str = "Hello, Auto!"
-
-    fn view() View {
-        text(self.msg) {}
-    }
-}
+**Transpile** (currently via tests):
+```bash
+cargo test --package auto-ui --features transpiler --test integration_test
 ```
 
-### login.at
-Login form with input fields:
+**Generated Rust Code** (what transpiler creates):
+```rust
+#[derive(Debug)]
+pub struct Counter {
+    pub count: i32,
+}
 
-```auto
-widget LoginForm {
-    username str
-    password str
+impl Component for Counter {
+    type Msg = Msg;
 
-    fn view() View {
-        col {
-            text("Login") {}
-            input(placeholder: "Username") {}
-            input(placeholder: "Password", password: true) {}
-            button("Login") {}
+    fn on(&mut self, msg: Self::Msg) {
+        match msg {
+            Inc => self.count += 1,
+            Dec => self.count -= 1,
+            _ => {}
         }
     }
-}
-```
-
-## How to Use AutoUI
-
-### Mode 1: Pure Rust (Runtime)
-
-Write your UI directly in Rust using the View builder:
-
-```rust
-use auto_ui::{Component, View};
-
-struct MyWidget {
-    count: i32,
-}
-
-impl Component for MyWidget {
-    type Msg = Msg;
 
     fn view(&self) -> View<Self::Msg> {
         View::col()
             .spacing(16)
-            .child(View::button("Click me").on_click(Msg::Click).build())
-            .child(View::text(&format!("Count: {}", self.count)).build())
+            .child(View::button("+").on_click("Inc").build())
+            .child(View::text(&format!("{}", self.count)).build())
+            .child(View::button("-").on_click("Dec").build())
             .build()
     }
 }
 ```
 
 **Pros**:
-- Full type safety
-- IDE support
-- No build step
-- Best for production apps
+- ✅ Less verbose (5-10x less code)
+- ✅ Declarative syntax
+- ✅ Auto-generates Component impl
+- ✅ Good for rapid development
 
 **Cons**:
-- More verbose
-- No hot-reload
+- ⚠️ Requires build step
+- ⚠️ Less mature (development phase)
+- ⚠️ Not integrated into examples yet
 
-### Mode 2: Auto Language (Transpilation)
+### Mode 3: Hot-Reload (Future) 🔮 Planned
 
-Write UI in `.at` files, then transpile to Rust:
+Live reloading of `.at` files during development.
 
-1. Create `my_widget.at`:
-```auto
-widget MyWidget {
-    count int = 0
-
-    fn view() View {
-        col {
-            button("Click me") { onclick: Msg.Click }
-            text(count)
-        }
-    }
-}
-```
-
-2. Transpile:
-```bash
-cargo run --example transpile_my_widget --features transpiler
-```
-
-3. Copy generated code into your project
-
-**Pros**:
-- Less verbose
-- Declarative syntax
-- Auto-generates Component impl
-- Good for rapid development
-
-**Cons**:
-- Requires build step
-- Less mature (development phase)
-
-### Mode 3: Auto Language (Hot-Reload - Future)
-
-Write UI in `.at` files with live reloading:
+**Status**: Infrastructure complete, needs full parser integration.
 
 ```rust
 use auto_ui::hot_reload::{HotReloadComponent, UIWatcher};
 
+// Load component from .at file
 let mut counter = HotReloadComponent::load("ui/counter.at")?;
 let view = counter.view()?;
 
-// Watch for changes
+// Watch for file changes
 let mut watcher = UIWatcher::new()?;
 watcher.watch("ui/")?;
 
-// File changes automatically reload the component
+// File changes automatically trigger reload
 ```
 
 **Pros**:
-- Fastest iteration
-- Live preview
-- Best for development
+- 🔜 Fastest iteration
+- 🔜 Live preview
+- 🔜 Best for development
 
 **Cons**:
 - Not fully implemented yet
 - Requires file watcher
 
-## Testing the Transpiler
+## Auto Language Files Available
 
-Run the test suite to see transpilation in action:
+The following `.at` files are available in `scratch/` for reference:
+
+### counter.at
+A counter widget with increment/decrement buttons.
+
+### hello.at
+Simple "Hello World" widget.
+
+### login.at
+Login form with input fields.
+
+**Note**: These are reference implementations showing the Auto language syntax. They are not yet integrated into the build system.
+
+## Running the Examples
+
+### Prerequisites
 
 ```bash
-# Run all tests
-cargo test --package auto-ui --features transpiler
+# From the auto-ui directory
+cd d:/autostack/auto-ui
 
-# Run transpiler-specific tests
-cargo test --package auto-ui --features transpiler --test transpiler_test
+# Ensure workspace is built
+cargo build
+```
 
-# Run integration tests
-cargo test --package auto-ui --features transpiler --test integration_test
+### Example 1: Counter Component
+
+```bash
+cargo run --example counter_component
+```
+
+**What you'll see**:
+- A counter widget with +/- buttons
+- Styled using the unified styling system
+- Demonstrates message handling
+- Shows View builder API
+
+### Example 2: All Components
+
+```bash
+cargo run --example all_components
+```
+
+**What you'll see**:
+- All 12 UI components demonstrated
+- Layout examples (col, row, center)
+- Container examples (container, scrollable)
+- Element examples (text, button, input, checkbox, radio, select, list, table)
+
+### Example 3: Styling System
+
+```bash
+cargo run --example styling_showcase
+```
+
+**What you'll see**:
+- Complete styling system demo
+- L1 (Core): Basic styling
+- L2 (Important): Common patterns
+- L3 (Advanced): Complex layouts
+
+## Understanding the Examples
+
+### Component Structure
+
+All examples follow this pattern:
+
+```rust
+// 1. Define your struct
+struct MyWidget {
+    field: Type,
+}
+
+// 2. Define messages
+#[derive(Clone, Copy)]
+enum Msg {
+    Message1,
+    Message2,
+}
+
+// 3. Implement Component trait
+impl Component for MyWidget {
+    type Msg = Msg;
+
+    fn on(&mut self, msg: Self::Msg) {
+        // Handle messages
+    }
+
+    fn view(&self) -> View<Self::Msg> {
+        // Build UI
+    }
+}
+```
+
+### View Builder API
+
+The View builder uses a fluent API:
+
+```rust
+View::col()                    // Create column
+    .spacing(16)                // Set spacing
+    .padding(8)                 // Add padding
+    .child(widget1)              // Add child
+    .child(widget2)              // Add child
+    .build()                     // Finish building
+```
+
+### Styling
+
+Two ways to apply styles:
+
+**Method 1: Style strings** (Plan 004)
+```rust
+View::text("Hello").style("text-xl font-bold")
+```
+
+**Method 2: Styled helpers**
+```rust
+View::text_styled("Hello", "text-xl font-bold")
 ```
 
 ## Current Status
 
-✅ **Implemented**:
-- Phase 0: auto.ui module (all 12 UI components)
-- Phase 1: Widget macro system
-- Phase 2: Node → View conversion (runtime mode)
-- Phase 3: Rust transpiler (transpile .at → .rs)
-- Phase 4: Hot-reload infrastructure
-- Phase 5: Testing and validation (99% pass rate)
+✅ **Fully Working**:
+- Runtime mode (all examples)
+- View builder API
+- Styling system (Plan 004 + Plan 005)
+- 12 UI components
+- Component trait
+- Message handling
 
-⚠️ **Limitations**:
-- Style parsing not complete (1 failing test)
-- Hot-reload uses placeholder parser
-- Integration with backends (GPUI/Iced) needs examples
+⚠️ **In Development**:
+- Transpiler (implemented, tested)
+- Hot-reload (infrastructure ready)
+- Auto language integration
 
 🔜 **Next Steps**:
-- Create complete GPUI backend example
-- Create complete Iced backend example
-- Fix style parsing
+- Create transpiler CLI tool
+- Build GPUI backend example
+- Build Iced backend example
 - Implement full AutoLang parser in hot-reload
+
+## Testing
+
+```bash
+# Run all tests
+cargo test --package auto-ui
+
+# Run tests with transpiler feature
+cargo test --package auto-ui --features transpiler
+
+# Test specific component
+cargo test --package auto-ui test_node_converter
+```
 
 ## Getting Help
 
 - **Plan 006**: [Auto Language Integration](../docs/plans/006-auto-language-integration.md)
 - **Test Report**: [Phase 5 Testing Report](../docs/reports/phase5-testing-report.md)
-- **Examples**: See `examples/` directory
+- **API Docs**: Check inline documentation in `src/lib.rs`
 
 ## Contributing
 
@@ -260,5 +374,8 @@ To add a new example:
 
 1. Create `examples/your_example.rs`
 2. Implement Component trait
-3. Add it to this README with description
+3. Add entry to this README
 4. Test it: `cargo run --example your_example`
+5. Ensure it compiles without special features
+
+**Important**: Examples should work with `cargo run --example <name>` without requiring additional features or setup.
