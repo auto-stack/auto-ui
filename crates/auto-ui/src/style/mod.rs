@@ -15,6 +15,9 @@ pub use parser::StyleParser;
 #[cfg(feature = "gpui")]
 pub mod gpui_adapter;
 
+#[cfg(feature = "gpui")]
+pub use gpui_adapter::GpuiStyle; // Re-export for backend adapters
+
 #[cfg(feature = "iced")]
 pub mod iced_adapter;
 

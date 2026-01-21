@@ -32,19 +32,19 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 text("").into()
             }
 
-            AbstractView::Text(content) => {
-                // Direct text rendering
+            AbstractView::Text { content, style: _ } => {
+                // Direct text rendering (style ignored for now in Iced)
                 text(content).into()
             }
 
-            AbstractView::Button { label, onclick } => {
-                // Button with click handler
+            AbstractView::Button { label, onclick, style: _ } => {
+                // Button with click handler (style ignored for now)
                 button(text(label))
                     .on_press(onclick)
                     .into()
             }
 
-            AbstractView::Row { children, spacing, padding } => {
+            AbstractView::Row { children, spacing, padding, style: _ } => {
                 let mut row_widget = row([]);
                 row_widget = row_widget.spacing(spacing as f32);
                 row_widget = row_widget.padding(padding as f32);
@@ -57,7 +57,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 row_widget.into()
             }
 
-            AbstractView::Column { children, spacing, padding } => {
+            AbstractView::Column { children, spacing, padding, style: _ } => {
                 let mut col_widget = column([]);
                 col_widget = col_widget.spacing(spacing as f32);
                 col_widget = col_widget.padding(padding as f32);
@@ -76,6 +76,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 on_change,
                 width,
                 password: _,
+                style: _,
             } => {
                 // Create text input widget
                 let mut input_widget = text_input(&placeholder, &value);
@@ -93,7 +94,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 }
             }
 
-            AbstractView::Checkbox { is_checked, label, on_toggle } => {
+            AbstractView::Checkbox { is_checked, label, on_toggle, style: _ } => {
                 // Checkbox with label - use row to combine checkbox and text
                 let checkbox_widget = checkbox(is_checked);
 
@@ -117,6 +118,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 height,
                 center_x,
                 center_y,
+                style: _,
             } => {
                 use iced::widget::container;
 
@@ -148,7 +150,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 container_widget.into()
             }
 
-            AbstractView::Scrollable { child, width, height } => {
+            AbstractView::Scrollable { child, width, height, style: _ } => {
                 use iced::widget::scrollable;
 
                 let mut scrollable_widget = scrollable(child.into_iced());
@@ -170,6 +172,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 label,
                 is_selected,
                 on_select,
+                style: _,
             } => {
                 // Note: Iced's radio widget requires a closure, which doesn't fit our
                 // message-based abstraction. We simulate radio with checkbox styling.
@@ -193,6 +196,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 options,
                 selected_index,
                 on_select,
+                style: _,
             } => {
                 // Iced's pick_list for dropdown selection
                 let selected_value = selected_index.and_then(|i| options.get(i).cloned());
@@ -216,7 +220,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 }
             }
 
-            AbstractView::List { items, spacing } => {
+            AbstractView::List { items, spacing, style: _ } => {
                 // List is essentially a column with spacing
                 let mut col_widget = column([]);
                 col_widget = col_widget.spacing(spacing as f32);
@@ -234,6 +238,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 rows,
                 spacing,
                 col_spacing,
+                style: _,
             } => {
                 // Table is implemented as a column of rows
                 let mut table_widget = column([]);

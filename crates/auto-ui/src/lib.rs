@@ -23,6 +23,7 @@ pub mod trans;
 pub use app::{App, AppResult};
 pub use component::Component;
 pub use view::{View, ViewBuilder, ViewContainerBuilder, ViewScrollableBuilder, ViewListBuilder, ViewInputBuilder, ViewTableBuilder};
+pub use style::Style; // Re-export Style for backend adapters
 
 // Note: widget.rs is kept for backward compatibility but may be deprecated
 // The new design uses Component trait directly instead of Widget trait

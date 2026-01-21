@@ -1,98 +1,120 @@
 // View tree representation - improved version with generic messages
+//
+// Phase 1 Integration: Added optional `style` field to all View variants
+// to support the unified styling system (Plan 004, 90% complete).
 
 use std::fmt::Debug;
+use crate::style::Style;
 
 /// Abstract view node - generic over message type M
 ///
 /// This enum represents the abstract UI tree that can be adapted to different backends.
 /// Messages are stored directly (not as Option) for simpler mapping to Auto language.
+///
+/// **Styling**: All variants support optional `style` field for unified styling system.
+/// - Style field takes priority over legacy hardcoded fields (spacing, padding, etc.)
+/// - Backward compatible: legacy fields still work when style is None
 #[derive(Debug, Clone)]
 pub enum View<M: Clone + Debug> {
     /// Empty placeholder
     Empty,
 
-    /// Text display
-    Text(String),
+    /// Text display with optional styling
+    Text {
+        content: String,
+        style: Option<Style>,  // ✅ NEW: Unified styling support
+    },
 
-    /// Button with label and click handler
+    /// Button with label, click handler, and optional styling
     Button {
         label: String,
         onclick: M,  // Direct message storage (Auto: `onclick: Msg.Inc`)
+        style: Option<Style>,  // ✅ NEW: Unified styling support
     },
 
-    /// Horizontal layout
+    /// Horizontal layout with optional styling
     Row {
         children: Vec<View<M>>,
-        spacing: u16,
-        padding: u16,
+        spacing: u16,        // Legacy field (kept for backward compatibility)
+        padding: u16,        // Legacy field (kept for backward compatibility)
+        style: Option<Style>,  // ✅ NEW: Takes priority over spacing/padding
     },
 
-    /// Vertical layout
+    /// Vertical layout with optional styling
     Column {
         children: Vec<View<M>>,
-        spacing: u16,
-        padding: u16,
+        spacing: u16,        // Legacy field (kept for backward compatibility)
+        padding: u16,        // Legacy field (kept for backward compatibility)
+        style: Option<Style>,  // ✅ NEW: Takes priority over spacing/padding
     },
 
-    /// Text input field
+    /// Text input field with optional styling
     Input {
         placeholder: String,
         value: String,
         on_change: Option<M>,
-        width: Option<u16>,
+        width: Option<u16>,   // Legacy field
         password: bool,
+        style: Option<Style>,  // ✅ NEW: Unified styling support
     },
 
-    /// Checkbox
+    /// Checkbox with optional styling
     Checkbox {
         is_checked: bool,
         label: String,
         on_toggle: Option<M>,
+        style: Option<Style>,  // ✅ NEW: Unified styling support
     },
 
     /// Container wrapper for styling and layout
     Container {
         child: Box<View<M>>,
-        padding: u16,
-        width: Option<u16>,
-        height: Option<u16>,
-        center_x: bool,
-        center_y: bool,
+        padding: u16,        // Legacy field
+        width: Option<u16>,  // Legacy field
+        height: Option<u16>, // Legacy field
+        center_x: bool,      // Legacy field
+        center_y: bool,      // Legacy field
+        style: Option<Style>,  // ✅ NEW: Takes priority over individual fields
     },
 
-    /// Scrollable container for content overflow
+    /// Scrollable container for content overflow with optional styling
     Scrollable {
         child: Box<View<M>>,
         width: Option<u16>,
         height: Option<u16>,
+        style: Option<Style>,  // ✅ NEW: Unified styling support
     },
 
-    /// Radio button for single selection from multiple options
+    /// Radio button with optional styling
     Radio {
         label: String,
         is_selected: bool,
         on_select: Option<M>,
+        style: Option<Style>,  // ✅ NEW: Unified styling support
     },
 
-    /// Select dropdown for choosing from multiple options
+    /// Select dropdown with optional styling
     Select {
         options: Vec<String>,
         selected_index: Option<usize>,
         on_select: Option<M>,
+        style: Option<Style>,  // ✅ NEW: Unified styling support
     },
 
-    /// List for displaying items in a vertical sequence
+    /// List with optional styling
     List {
         items: Vec<View<M>>,
-        spacing: u16,
+        spacing: u16,        // Legacy field
+        style: Option<Style>,  // ✅ NEW: Takes priority over spacing
     },
 
-    /// Table for displaying structured data in rows and columns
+    /// Table with optional styling
     Table {
         headers: Vec<View<M>>,
         rows: Vec<Vec<View<M>>>,
         spacing: u16,
         col_spacing: u16,
+        style: Option<Style>,  // ✅ NEW: Unified styling support
     },
 }
 
@@ -102,17 +124,23 @@ pub enum View<M: Clone + Debug> {
 ///
 /// # Example
 /// ```rust
+/// // Legacy API (still supported)
 /// View::col()
 ///     .spacing(10)
 ///     .padding(20)
 ///     .child(View::text("Hello"))
-///     .child(View::button("Click", Msg::Click))
+///
+/// // New unified styling API
+/// View::col()
+///     .style("gap-2 p-5 bg-white flex items-center")
+///     .child(View::text_styled("Hello", "text-lg font-bold"))
 /// ```
 pub struct ViewBuilder<M: Clone + Debug> {
     kind: ViewBuilderKind,
     children: Vec<View<M>>,
     spacing: u16,
     padding: u16,
+    style: Option<Style>,  // ✅ NEW: Unified styling support
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -129,6 +157,7 @@ impl<M: Clone + Debug> ViewBuilder<M> {
             children: Vec::new(),
             spacing: 0,
             padding: 0,
+            style: None,
         }
     }
 
@@ -139,6 +168,7 @@ impl<M: Clone + Debug> ViewBuilder<M> {
             children: Vec::new(),
             spacing: 0,
             padding: 0,
+            style: None,
         }
     }
 
@@ -154,15 +184,38 @@ impl<M: Clone + Debug> ViewBuilder<M> {
         self
     }
 
-    /// Set spacing between children
+    /// Set spacing between children (legacy API)
     pub fn spacing(mut self, spacing: u16) -> Self {
         self.spacing = spacing;
         self
     }
 
-    /// Set padding for the layout
+    /// Set padding for the layout (legacy API)
     pub fn padding(mut self, padding: u16) -> Self {
         self.padding = padding;
+        self
+    }
+
+    // ✅ NEW: Unified styling system support
+
+    /// Set style using Tailwind CSS class string
+    ///
+    /// # Example
+    /// ```
+    /// # use auto_ui::View;
+    /// View::col()
+    ///     .style("p-4 gap-2 bg-white flex items-center")
+    ///     .child(View::text("Hello"))
+    ///     .build()
+    /// ```
+    pub fn style(mut self, style_str: &str) -> Self {
+        self.style = Some(Style::parse(style_str).expect("Invalid style string"));
+        self
+    }
+
+    /// Set style using Style object
+    pub fn with_style(mut self, style: Style) -> Self {
+        self.style = Some(style);
         self
     }
 
@@ -173,11 +226,13 @@ impl<M: Clone + Debug> ViewBuilder<M> {
                 children: self.children,
                 spacing: self.spacing,
                 padding: self.padding,
+                style: self.style,
             },
             ViewBuilderKind::Column => View::Column {
                 children: self.children,
                 spacing: self.spacing,
                 padding: self.padding,
+                style: self.style,
             },
         }
     }
@@ -191,7 +246,10 @@ impl<M: Clone + Debug> View<M> {
 
     /// Create text view
     pub fn text(content: impl Into<String>) -> Self {
-        View::Text(content.into())
+        View::Text {
+            content: content.into(),
+            style: None,  // ✅ NEW: style field
+        }
     }
 
     /// Create button with click handler
@@ -199,6 +257,40 @@ impl<M: Clone + Debug> View<M> {
         View::Button {
             label: label.into(),
             onclick,
+            style: None,  // ✅ NEW: style field
+        }
+    }
+
+    // ✅ NEW: Styled convenience constructors
+
+    /// Create styled text view
+    ///
+    /// # Example
+    /// ```
+    /// # use auto_ui::View;
+    /// View::text_styled("Hello World", "text-lg font-bold text-blue-500")
+    /// ```
+    pub fn text_styled(content: impl Into<String>, style_str: &str) -> Self {
+        View::Text {
+            content: content.into(),
+            style: Some(Style::parse(style_str).expect("Invalid style")),
+        }
+    }
+
+    /// Create styled button with click handler
+    ///
+    /// # Example
+    /// ```
+    /// # use auto_ui::View;
+    /// # #[derive(Clone, Copy, Debug)]
+    /// # enum Msg { Click }
+    /// View::button_styled("Click Me", Msg::Click, "px-4 py-2 bg-blue-500 text-white rounded")
+    /// ```
+    pub fn button_styled(label: impl Into<String>, onclick: M, style_str: &str) -> Self {
+        View::Button {
+            label: label.into(),
+            onclick,
+            style: Some(Style::parse(style_str).expect("Invalid style")),
         }
     }
 
@@ -220,6 +312,7 @@ impl<M: Clone + Debug> View<M> {
             on_change: None,
             width: None,
             password: false,
+            style: None,  // ✅ NEW: style field
         }
     }
 
@@ -229,6 +322,7 @@ impl<M: Clone + Debug> View<M> {
             is_checked,
             label: label.into(),
             on_toggle: None,
+            style: None,  // ✅ NEW: style field
         }
     }
 
@@ -238,6 +332,7 @@ impl<M: Clone + Debug> View<M> {
             label: label.into(),
             is_selected,
             on_select: None,
+            style: None,  // ✅ NEW: style field
         }
     }
 
@@ -247,6 +342,7 @@ impl<M: Clone + Debug> View<M> {
             options,
             selected_index: None,
             on_select: None,
+            style: None,  // ✅ NEW: style field
         }
     }
 
@@ -255,6 +351,7 @@ impl<M: Clone + Debug> View<M> {
         ViewListBuilder {
             items,
             spacing: 0,
+            style: None,  // ✅ NEW: style field
         }
     }
 
@@ -265,6 +362,7 @@ impl<M: Clone + Debug> View<M> {
             rows,
             spacing: 0,
             col_spacing: 0,
+            style: None,  // ✅ NEW: style field
         }
     }
 
@@ -277,6 +375,7 @@ impl<M: Clone + Debug> View<M> {
             height: None,
             center_x: false,
             center_y: false,
+            style: None,  // ✅ NEW: style field
         }
     }
 
@@ -286,6 +385,7 @@ impl<M: Clone + Debug> View<M> {
             child,
             width: None,
             height: None,
+            style: None,  // ✅ NEW: style field
         }
     }
 }
@@ -295,6 +395,7 @@ pub struct ViewScrollableBuilder<M: Clone + Debug> {
     child: View<M>,
     width: Option<u16>,
     height: Option<u16>,
+    style: Option<Style>,  // ✅ NEW: Unified styling support
 }
 
 impl<M: Clone + Debug> ViewScrollableBuilder<M> {
@@ -310,12 +411,25 @@ impl<M: Clone + Debug> ViewScrollableBuilder<M> {
         self
     }
 
+    /// Set style using Tailwind CSS class string
+    pub fn style(mut self, style_str: &str) -> Self {
+        self.style = Some(Style::parse(style_str).expect("Invalid style string"));
+        self
+    }
+
+    /// Set style using Style object
+    pub fn with_style(mut self, style: Style) -> Self {
+        self.style = Some(style);
+        self
+    }
+
     /// Build the scrollable view
     pub fn build(self) -> View<M> {
         View::Scrollable {
             child: Box::new(self.child),
             width: self.width,
             height: self.height,
+            style: self.style,
         }
     }
 }
@@ -324,6 +438,7 @@ impl<M: Clone + Debug> ViewScrollableBuilder<M> {
 pub struct ViewListBuilder<M: Clone + Debug> {
     items: Vec<View<M>>,
     spacing: u16,
+    style: Option<Style>,  // ✅ NEW: Unified styling support
 }
 
 impl<M: Clone + Debug> ViewListBuilder<M> {
@@ -333,11 +448,24 @@ impl<M: Clone + Debug> ViewListBuilder<M> {
         self
     }
 
+    /// Set style using Tailwind CSS class string
+    pub fn style(mut self, style_str: &str) -> Self {
+        self.style = Some(Style::parse(style_str).expect("Invalid style string"));
+        self
+    }
+
+    /// Set style using Style object
+    pub fn with_style(mut self, style: Style) -> Self {
+        self.style = Some(style);
+        self
+    }
+
     /// Build the list view
     pub fn build(self) -> View<M> {
         View::List {
             items: self.items,
             spacing: self.spacing,
+            style: self.style,
         }
     }
 }
@@ -349,6 +477,7 @@ pub struct ViewInputBuilder<M: Clone + Debug> {
     on_change: Option<M>,
     width: Option<u16>,
     password: bool,
+    style: Option<Style>,  // ✅ NEW: Unified styling support
 }
 
 impl<M: Clone + Debug> ViewInputBuilder<M> {
@@ -376,6 +505,18 @@ impl<M: Clone + Debug> ViewInputBuilder<M> {
         self
     }
 
+    /// Set style using Tailwind CSS class string
+    pub fn style(mut self, style_str: &str) -> Self {
+        self.style = Some(Style::parse(style_str).expect("Invalid style string"));
+        self
+    }
+
+    /// Set style using Style object
+    pub fn with_style(mut self, style: Style) -> Self {
+        self.style = Some(style);
+        self
+    }
+
     /// Build the input view
     pub fn build(self) -> View<M> {
         View::Input {
@@ -384,6 +525,7 @@ impl<M: Clone + Debug> ViewInputBuilder<M> {
             on_change: self.on_change,
             width: self.width,
             password: self.password,
+            style: self.style,
         }
     }
 }
@@ -394,6 +536,7 @@ pub struct ViewTableBuilder<M: Clone + Debug> {
     rows: Vec<Vec<View<M>>>,
     spacing: u16,
     col_spacing: u16,
+    style: Option<Style>,  // ✅ NEW: Unified styling support
 }
 
 impl<M: Clone + Debug> ViewTableBuilder<M> {
@@ -409,6 +552,18 @@ impl<M: Clone + Debug> ViewTableBuilder<M> {
         self
     }
 
+    /// Set style using Tailwind CSS class string
+    pub fn style(mut self, style_str: &str) -> Self {
+        self.style = Some(Style::parse(style_str).expect("Invalid style string"));
+        self
+    }
+
+    /// Set style using Style object
+    pub fn with_style(mut self, style: Style) -> Self {
+        self.style = Some(style);
+        self
+    }
+
     /// Build the table view
     pub fn build(self) -> View<M> {
         View::Table {
@@ -416,6 +571,7 @@ impl<M: Clone + Debug> ViewTableBuilder<M> {
             rows: self.rows,
             spacing: self.spacing,
             col_spacing: self.col_spacing,
+            style: self.style,
         }
     }
 }
@@ -428,6 +584,7 @@ pub struct ViewContainerBuilder<M: Clone + Debug> {
     height: Option<u16>,
     center_x: bool,
     center_y: bool,
+    style: Option<Style>,  // ✅ NEW: Unified styling support
 }
 
 impl<M: Clone + Debug> ViewContainerBuilder<M> {
@@ -468,6 +625,18 @@ impl<M: Clone + Debug> ViewContainerBuilder<M> {
         self
     }
 
+    /// Set style using Tailwind CSS class string
+    pub fn style(mut self, style_str: &str) -> Self {
+        self.style = Some(Style::parse(style_str).expect("Invalid style string"));
+        self
+    }
+
+    /// Set style using Style object
+    pub fn with_style(mut self, style: Style) -> Self {
+        self.style = Some(style);
+        self
+    }
+
     /// Build the container view
     pub fn build(self) -> View<M> {
         View::Container {
@@ -477,6 +646,7 @@ impl<M: Clone + Debug> ViewContainerBuilder<M> {
             height: self.height,
             center_x: self.center_x,
             center_y: self.center_y,
+            style: self.style,
         }
     }
 }
@@ -519,5 +689,506 @@ impl<M: Clone + Debug> View<M> {
             *on_select = Some(msg);
         }
         self
+    }
+}
+
+// ========== Tests for Unified Styling System Integration ==========
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::style::{Style, StyleClass};
+
+    #[derive(Clone, Copy, Debug)]
+    enum TestMsg {
+        Click,
+        Change,
+    }
+
+    // Type alias for convenience
+    type TestView = View<TestMsg>;
+
+    // ========== Task 4.1: Test View enum style fields ==========
+
+    #[test]
+    fn test_text_with_style() {
+        let view: TestView = View::text_styled("Hello", "text-lg font-bold");
+        match view {
+            View::Text { content, style } => {
+                assert_eq!(content, "Hello");
+                assert!(style.is_some());
+                let classes = &style.unwrap().classes;
+                assert!(classes.iter().any(|c| matches!(c, StyleClass::TextLg)));
+                assert!(classes.iter().any(|c| matches!(c, StyleClass::FontBold)));
+            }
+            _ => panic!("Expected View::Text"),
+        }
+    }
+
+    #[test]
+    fn test_button_with_style() {
+        let view: TestView = View::button_styled("Click", TestMsg::Click, "px-4 py-2 bg-blue-500");
+        match view {
+            View::Button { label, style, .. } => {
+                assert_eq!(label, "Click");
+                assert!(style.is_some());
+                let classes = &style.unwrap().classes;
+                assert!(classes.iter().any(|c| matches!(c, StyleClass::PaddingX(_))));
+                assert!(classes.iter().any(|c| matches!(c, StyleClass::PaddingY(_))));
+                assert!(classes.iter().any(|c| matches!(c, StyleClass::BackgroundColor(_))));
+            }
+            _ => panic!("Expected View::Button"),
+        }
+    }
+
+    #[test]
+    fn test_row_with_style() {
+        let view: TestView = View::row()
+            .style("gap-4 p-4 bg-white")
+            .build();
+        match view {
+            View::Row { style, .. } => {
+                assert!(style.is_some());
+                let classes = &style.unwrap().classes;
+                assert!(classes.iter().any(|c| matches!(c, StyleClass::Gap(_))));
+                assert!(classes.iter().any(|c| matches!(c, StyleClass::Padding(_))));
+            }
+            _ => panic!("Expected View::Row"),
+        }
+    }
+
+    #[test]
+    fn test_column_with_style() {
+        let view: TestView = View::col()
+            .style("gap-2 p-6 flex flex-col")
+            .build();
+        match view {
+            View::Column { style, .. } => {
+                assert!(style.is_some());
+                let classes = &style.unwrap().classes;
+                assert!(classes.iter().any(|c| matches!(c, StyleClass::Gap(_))));
+                assert!(classes.iter().any(|c| matches!(c, StyleClass::Padding(_))));
+                assert!(classes.iter().any(|c| matches!(c, StyleClass::Flex)));
+            }
+            _ => panic!("Expected View::Column"),
+        }
+    }
+
+    #[test]
+    fn test_container_with_style() {
+        let child = View::text("Child content");
+        let view: TestView = View::container(child)
+            .style("p-6 bg-white rounded-lg shadow-md")
+            .build();
+        match view {
+            View::Container { style, .. } => {
+                assert!(style.is_some());
+                let classes = &style.unwrap().classes;
+                assert!(classes.iter().any(|c| matches!(c, StyleClass::Padding(_))));
+                assert!(classes.iter().any(|c| matches!(c, StyleClass::BackgroundColor(_))));
+            }
+            _ => panic!("Expected View::Container"),
+        }
+    }
+
+    #[test]
+    fn test_input_with_style() {
+        let view: TestView = View::input("Placeholder")
+            .style("px-3 py-2 border border-gray-300")
+            .build();
+        match view {
+            View::Input { style, .. } => {
+                assert!(style.is_some());
+                let classes = &style.unwrap().classes;
+                assert!(classes.iter().any(|c| matches!(c, StyleClass::PaddingX(_))));
+                assert!(classes.iter().any(|c| matches!(c, StyleClass::Border)));
+            }
+            _ => panic!("Expected View::Input"),
+        }
+    }
+
+    #[test]
+    fn test_scrollable_with_style() {
+        let child = View::text("Scrollable content");
+        let view: TestView = View::scrollable(child)
+            .style("w-full h-64 overflow-auto")
+            .build();
+        match view {
+            View::Scrollable { style, .. } => {
+                assert!(style.is_some());
+                let classes = &style.unwrap().classes;
+                assert!(classes.iter().any(|c| matches!(c, StyleClass::OverflowAuto)));
+            }
+            _ => panic!("Expected View::Scrollable"),
+        }
+    }
+
+    #[test]
+    fn test_list_with_style() {
+        let view: TestView = View::list(vec![
+            View::text("Item 1"),
+            View::text("Item 2"),
+        ])
+            .style("gap-2 p-4")
+            .build();
+        match view {
+            View::List { style, .. } => {
+                assert!(style.is_some());
+                let classes = &style.unwrap().classes;
+                assert!(classes.iter().any(|c| matches!(c, StyleClass::Gap(_))));
+                assert!(classes.iter().any(|c| matches!(c, StyleClass::Padding(_))));
+            }
+            _ => panic!("Expected View::List"),
+        }
+    }
+
+    #[test]
+    fn test_table_with_style() {
+        let headers = vec![View::text("Header 1"), View::text("Header 2")];
+        let rows = vec![
+            vec![View::text("Cell 1"), View::text("Cell 2")],
+        ];
+        let view: TestView = View::table(headers, rows)
+            .style("border p-4")
+            .build();
+        match view {
+            View::Table { style, .. } => {
+                assert!(style.is_some());
+            }
+            _ => panic!("Expected View::Table"),
+        }
+    }
+
+    // ========== Task 4.1: Test ViewBuilder style() method ==========
+
+    #[test]
+    fn test_view_builder_style() {
+        let view: TestView = View::row()
+            .style("gap-4 p-4")
+            .child(View::text("Child"))
+            .build();
+        match view {
+            View::Row { style, .. } => {
+                assert!(style.is_some());
+                let classes = &style.unwrap().classes;
+                assert_eq!(classes.len(), 2);
+            }
+            _ => panic!("Expected View::Row"),
+        }
+    }
+
+    #[test]
+    fn test_view_builder_with_style() {
+        let style = Style::parse("gap-4 p-4").unwrap();
+        let view: TestView = View::col()
+            .with_style(style)
+            .child(View::text("Child"))
+            .build();
+        match view {
+            View::Column { style, .. } => {
+                assert!(style.is_some());
+                assert_eq!(style.unwrap().classes.len(), 2);
+            }
+            _ => panic!("Expected View::Column"),
+        }
+    }
+
+    #[test]
+    fn test_view_builder_chainable() {
+        let view: TestView = View::row()
+            .style("gap-4")
+            .style("p-4")  // Note: Second style call replaces first
+            .child(View::text("Child"))
+            .build();
+        match view {
+            View::Row { style, .. } => {
+                assert!(style.is_some());
+                // Last style wins
+                let classes = &style.unwrap().classes;
+                assert_eq!(classes.len(), 1);
+            }
+            _ => panic!("Expected View::Row"),
+        }
+    }
+
+    // ========== Task 4.1: Test convenience constructors ==========
+
+    #[test]
+    fn test_text_styled_convenience() {
+        let view: TestView = View::text_styled("Hello", "text-lg font-bold");
+        match view {
+            View::Text { style, .. } => {
+                assert!(style.is_some());
+            }
+            _ => panic!("Expected View::Text with style"),
+        }
+    }
+
+    #[test]
+    fn test_button_styled_convenience() {
+        let view = View::button_styled("Click", TestMsg::Click, "px-4 py-2 bg-blue-500");
+        match view {
+            View::Button { style, .. } => {
+                assert!(style.is_some());
+            }
+            _ => panic!("Expected View::Button with style"),
+        }
+    }
+
+    // ========== Task 4.1: Test backward compatibility ==========
+
+    #[test]
+    fn test_legacy_api_without_style() {
+        // Test that legacy API still works without style
+        let view: TestView = View::col()
+            .spacing(10)
+            .padding(20)
+            .child(View::text("Hello"))
+            .build();
+        match view {
+            View::Column { spacing, padding, style, .. } => {
+                assert_eq!(spacing, 10);
+                assert_eq!(padding, 20);
+                assert!(style.is_none()); // No style set
+            }
+            _ => panic!("Expected View::Column with legacy fields"),
+        }
+    }
+
+    #[test]
+    fn test_mixed_legacy_and_style() {
+        // Test that both can coexist (style takes priority)
+        let view: TestView = View::row()
+            .spacing(10)
+            .padding(20)
+            .style("gap-4 p-6")
+            .child(View::text("Hello"))
+            .build();
+        match view {
+            View::Row { spacing, padding, style, .. } => {
+                assert_eq!(spacing, 10); // Legacy field preserved
+                assert_eq!(padding, 20); // Legacy field preserved
+                assert!(style.is_some()); // Style also present
+            }
+            _ => panic!("Expected View::Row with both legacy and style"),
+        }
+    }
+
+    #[test]
+    fn test_legacy_api_default_values() {
+        // Test that default values work correctly
+        let view: TestView = View::col()
+            .child(View::text("Hello"))
+            .build();
+        match view {
+            View::Column { spacing, padding, style, .. } => {
+                assert_eq!(spacing, 0); // Default
+                assert_eq!(padding, 0); // Default
+                assert!(style.is_none()); // No style
+            }
+            _ => panic!("Expected View::Column"),
+        }
+    }
+
+    // ========== Task 4.1: Test style parsing errors ==========
+
+    #[test]
+    #[should_panic(expected = "Invalid style")]
+    fn test_invalid_style_string_panics() {
+        let _ = View::<TestMsg>::text_styled("Hello", "invalid-class-name-12345");
+    }
+
+    // ========== Task 4.1: Test complex nested views with styles ==========
+
+    #[test]
+    fn test_nested_styled_views() {
+        let view: TestView = View::col()
+            .style("gap-4 p-6 bg-white")
+            .child(
+                View::row()
+                    .style("gap-2 p-4 bg-gray-100")
+                    .child(View::text_styled("Title", "text-lg font-bold"))
+                    .child(View::text("Subtitle"))
+                    .build()
+            )
+            .child(
+                View::button_styled("Click", TestMsg::Click, "px-4 py-2 bg-blue-500")
+            )
+            .build();
+
+        match view {
+            View::Column { children, style, .. } => {
+                assert!(style.is_some());
+                assert_eq!(children.len(), 2);
+
+                // First child is a styled row
+                match &children[0] {
+                    View::Row { style: row_style, .. } => {
+                        assert!(row_style.is_some());
+                    }
+                    _ => panic!("Expected View::Row as first child"),
+                }
+
+                // Second child is a styled button
+                match &children[1] {
+                    View::Button { style: button_style, .. } => {
+                        assert!(button_style.is_some());
+                    }
+                    _ => panic!("Expected View::Button as second child"),
+                }
+            }
+            _ => panic!("Expected View::Column"),
+        }
+    }
+
+    // ========== Task 4.1: Test all builder variants support styles ==========
+
+    #[test]
+    fn test_view_input_builder_style() {
+        let view: View<TestMsg> = View::input("Email")
+            .value("test@example.com")
+            .style("px-3 py-2 border")
+            .build();
+        match view {
+            View::Input { style, .. } => {
+                assert!(style.is_some());
+            }
+            _ => panic!("Expected View::Input with style"),
+        }
+    }
+
+    #[test]
+    fn test_view_container_builder_style() {
+        let view: View<TestMsg> = View::container(View::text("Content"))
+            .padding(10)
+            .style("bg-white rounded")
+            .build();
+        match view {
+            View::Container { style, .. } => {
+                assert!(style.is_some());
+            }
+            _ => panic!("Expected View::Container with style"),
+        }
+    }
+
+    #[test]
+    fn test_view_scrollable_builder_style() {
+        let view: View<TestMsg> = View::scrollable(View::text("Content"))
+            .width(100)
+            .style("overflow-auto")
+            .build();
+        match view {
+            View::Scrollable { style, .. } => {
+                assert!(style.is_some());
+            }
+            _ => panic!("Expected View::Scrollable with style"),
+        }
+    }
+
+    #[test]
+    fn test_view_list_builder_style() {
+        let view: View<TestMsg> = View::list(vec![
+            View::text("Item 1"),
+            View::text("Item 2"),
+        ])
+            .spacing(5)
+            .style("gap-2")
+            .build();
+        match view {
+            View::List { style, .. } => {
+                assert!(style.is_some());
+            }
+            _ => panic!("Expected View::List with style"),
+        }
+    }
+
+    #[test]
+    fn test_view_table_builder_style() {
+        let view: View<TestMsg> = View::table(
+            vec![View::text("Header")],
+            vec![vec![View::text("Cell")]],
+        )
+            .spacing(2)
+            .style("border p-2")
+            .build();
+        match view {
+            View::Table { style, .. } => {
+                assert!(style.is_some());
+            }
+            _ => panic!("Expected View::Table with style"),
+        }
+    }
+
+    // ========== Task 4.1: Test style composition ==========
+
+    #[test]
+    fn test_multiple_style_classes() {
+        let view: View<TestMsg> = View::col()
+            .style("gap-4 p-6 bg-white rounded-lg shadow-md flex items-center")
+            .build();
+        match view {
+            View::Column { style, .. } => {
+                let classes = &style.unwrap().classes;
+                assert!(classes.len() >= 6); // At least 6 style classes
+                assert!(classes.iter().any(|c| matches!(c, StyleClass::Gap(_))));
+                assert!(classes.iter().any(|c| matches!(c, StyleClass::Padding(_))));
+                assert!(classes.iter().any(|c| matches!(c, StyleClass::BackgroundColor(_))));
+            }
+            _ => panic!("Expected View::Column"),
+        }
+    }
+
+    #[test]
+    fn test_l1_core_features() {
+        // Test L1 core features work
+        let view: View<TestMsg> = View::container(View::text("L1 Features"))
+            .style("p-4 bg-white flex rounded")
+            .build();
+        match view {
+            View::Container { style, .. } => {
+                let classes = &style.unwrap().classes;
+                assert!(classes.iter().any(|c| matches!(c, StyleClass::Padding(_))));
+                assert!(classes.iter().any(|c| matches!(c, StyleClass::BackgroundColor(_))));
+                assert!(classes.iter().any(|c| matches!(c, StyleClass::Flex)));
+                assert!(classes.iter().any(|c| matches!(c, StyleClass::Rounded)));
+            }
+            _ => panic!("Expected View::Container"),
+        }
+    }
+
+    #[test]
+    fn test_l2_important_features() {
+        // Test L2 important features work
+        let view: View<TestMsg> = View::text_styled("L2 Features", "text-lg font-bold text-center px-4 border");
+        match view {
+            View::Text { style, .. } => {
+                let classes = &style.unwrap().classes;
+                assert!(classes.iter().any(|c| matches!(c, StyleClass::TextLg)));
+                assert!(classes.iter().any(|c| matches!(c, StyleClass::FontBold)));
+                assert!(classes.iter().any(|c| matches!(c, StyleClass::TextCenter)));
+                assert!(classes.iter().any(|c| matches!(c, StyleClass::PaddingX(_))));
+                assert!(classes.iter().any(|c| matches!(c, StyleClass::Border)));
+            }
+            _ => panic!("Expected View::Text"),
+        }
+    }
+
+    #[test]
+    fn test_l3_advanced_features() {
+        // Test L3 advanced features work
+        let view: View<TestMsg> = View::container(View::text("L3 Features"))
+            .style("shadow-md opacity-90 relative z-10 overflow-hidden")
+            .build();
+        match view {
+            View::Container { style, .. } => {
+                let classes = &style.unwrap().classes;
+                assert!(classes.iter().any(|c| matches!(c, StyleClass::ShadowMd)));
+                assert!(classes.iter().any(|c| matches!(c, StyleClass::Opacity(_))));
+                assert!(classes.iter().any(|c| matches!(c, StyleClass::Relative)));
+                assert!(classes.iter().any(|c| matches!(c, StyleClass::ZIndex(_))));
+                assert!(classes.iter().any(|c| matches!(c, StyleClass::OverflowHidden)));
+            }
+            _ => panic!("Expected View::Container"),
+        }
     }
 }

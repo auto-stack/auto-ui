@@ -91,9 +91,10 @@ impl App {
             return Self::run_iced::<C>();
         }
 
+        // TODO: Re-enable when auto-ui-gpui is properly set up
         #[cfg(all(feature = "gpui", not(feature = "iced")))]
         {
-            return Self::run_gpui::<C>();
+            return Err("GPUI backend is temporarily disabled while styling system integration is in progress".into());
         }
 
         #[cfg(not(any(feature = "iced", feature = "gpui")))]
@@ -153,11 +154,19 @@ impl App {
     ///     App::run_gpui::<MyComponent>()
     /// }
     /// ```
+    // TODO: Re-enable when auto-ui-gpui is properly set up as a dependency
+    // #[cfg(feature = "gpui")]
+    // pub fn run_gpui<C>() -> AppResult<()>
+    // where
+    //     C: Component + Default + 'static,
+    // {
+    //     auto_ui_gpui::run_app::<C>()
+    // }
+
+    // Empty function to satisfy doc comment
     #[cfg(feature = "gpui")]
-    pub fn run_gpui<C>() -> AppResult<()>
-    where
-        C: Component + Default + 'static,
-    {
-        auto_ui_gpui::run_app::<C>()
-    }
+    fn _run_gpui_placeholder() {}
 }
+
+
+

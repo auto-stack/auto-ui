@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-auto-ui = { workspace = true }
+auto-ui = { workspace = true, features = ["gpui"] }
 gpui = "0.2.2"
 gpui-component = { workspace = true }
 anyhow = "1.0"

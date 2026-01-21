@@ -4,6 +4,7 @@
 // builder method calls for styling components.
 
 use crate::style::{Style, StyleClass, SizeValue, Color};
+use gpui_lib as gpui;
 
 /// Apply a Style to a GPUI component builder
 ///
@@ -286,10 +287,10 @@ impl GpuiStyle {
 
             // ========== Sizing (L1) ==========
             StyleClass::Width(size) => {
-                self.width = Some(convert_size(size));
+                self.width = Some(convert_size(&size));
             }
             StyleClass::Height(size) => {
-                self.height = Some(convert_size(size));
+                self.height = Some(convert_size(&size));
             }
 
             // ========== Border Radius (L1 + L2) ==========
@@ -481,7 +482,7 @@ impl GpuiStyle {
 fn convert_size(size: &SizeValue) -> GpuiSize {
     match size {
         SizeValue::Full => GpuiSize::Full,
-        SizeValue::Fixed(units) => GpuiSize::Fixed(units.to_pixels() as f32),
+        SizeValue::Fixed(units) => GpuiSize::Fixed((*units * 4) as f32),
         _ => GpuiSize::Full, // Default to full for other variants
     }
 }

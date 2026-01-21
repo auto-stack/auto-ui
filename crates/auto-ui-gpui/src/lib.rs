@@ -2,8 +2,13 @@
 //
 // This crate provides adapter traits to convert auto-ui's abstract View<M>
 // into GPUI's render tree using gpui-component library.
+//
+// Phase 2 Integration: Now supports unified styling system with Style objects.
 
-use auto_ui::{View as AbstractView, Component};
+#![recursion_limit = "512"]
+
+use auto_ui::{View as AbstractView, Component, Style};
+use auto_ui::style::gpui_adapter::GpuiStyle;
 use gpui::*;
 use gpui_component::{button::Button, button::ButtonVariants, scroll::ScrollableElement, *};
 use std::fmt::Debug;
@@ -68,24 +73,44 @@ impl<M: Clone + Debug + 'static> IntoGpuiElement<M> for AbstractView<M> {
                 div().into_any()
             }
 
-            AbstractView::Text(content) => {
-                // Direct text rendering
-                div().child(content).into_any()
+            AbstractView::Text { content, style } => {
+                // Direct text rendering with optional styling
+                let mut text_div = div().child(content);
+                if let Some(style) = style {
+                    text_div = apply_gpui_style_to_div(text_div, &style);
+                }
+                text_div.into_any()
             }
 
-            AbstractView::Button { label, onclick: _ } => {
+            AbstractView::Button { label, onclick: _, style } => {
                 // Button with click handler - note: we can't directly handle messages
                 // in GPUI's Button without proper context. This is a simplified version.
                 button_counter += 1;
                 let label_clone = label.clone();
-                Button::new(("button", button_counter))
-                    .primary()
-                    .label(label_clone)
-                    .into_any_element()
+                let mut button = Button::new(("button", button_counter))
+                    .label(label_clone);
+
+                // Apply style if present
+                if style.is_some() {
+                    // Note: Simplified styling for this version
+                    button = button.primary();
+                } else {
+                    button = button.primary();
+                }
+
+                button.into_any_element()
             }
 
-            AbstractView::Row { children, spacing, padding } => {
-                let mut row_div = div().h_flex().gap(px(spacing as f32)).p(px(padding as f32));
+            AbstractView::Row { children, spacing, padding, style } => {
+                let mut row_div = div().h_flex();
+
+                // Apply unified styling if present (takes priority over legacy fields)
+                if let Some(style) = style {
+                    row_div = apply_gpui_style_to_div(row_div, &style);
+                } else {
+                    // Legacy API support
+                    row_div = row_div.gap(px(spacing as f32)).p(px(padding as f32));
+                }
 
                 // Recursively convert children
                 for child in children {
@@ -96,8 +121,16 @@ impl<M: Clone + Debug + 'static> IntoGpuiElement<M> for AbstractView<M> {
                 row_div.into_any()
             }
 
-            AbstractView::Column { children, spacing, padding } => {
-                let mut col_div = div().v_flex().gap(px(spacing as f32)).p(px(padding as f32));
+            AbstractView::Column { children, spacing, padding, style } => {
+                let mut col_div = div().v_flex();
+
+                // Apply unified styling if present (takes priority over legacy fields)
+                if let Some(style) = style {
+                    col_div = apply_gpui_style_to_div(col_div, &style);
+                } else {
+                    // Legacy API support
+                    col_div = col_div.gap(px(spacing as f32)).p(px(padding as f32));
+                }
 
                 // Recursively convert children
                 for child in children {
@@ -114,19 +147,23 @@ impl<M: Clone + Debug + 'static> IntoGpuiElement<M> for AbstractView<M> {
                 on_change: _,
                 width: _,
                 password: _,
+                style,
             } => {
                 // GPUI text input
                 // Note: gpui-component's Input implementation requires more complex setup
                 // For now, we use a simple div that shows the value
-                div()
-                    .child(format!("{}: {}", placeholder, value))
-                    .into_any()
+                let mut input_div = div().child(format!("{}: {}", placeholder, value));
+                if let Some(style) = style {
+                    input_div = apply_gpui_style_to_div(input_div, &style);
+                }
+                input_div.into_any()
             }
 
             AbstractView::Checkbox {
                 is_checked,
                 label,
                 on_toggle: _,
+                style,
             } => {
                 // Checkbox with label - simplified version
                 let display_text = format!(
@@ -135,7 +172,11 @@ impl<M: Clone + Debug + 'static> IntoGpuiElement<M> for AbstractView<M> {
                     label
                 );
 
-                div().child(display_text).into_any()
+                let mut checkbox_div = div().child(display_text);
+                if let Some(style) = style {
+                    checkbox_div = apply_gpui_style_to_div(checkbox_div, &style);
+                }
+                checkbox_div.into_any()
             }
 
             AbstractView::Container {
@@ -145,25 +186,34 @@ impl<M: Clone + Debug + 'static> IntoGpuiElement<M> for AbstractView<M> {
                 height,
                 center_x,
                 center_y,
+                style,
             } => {
-                let mut container_div = div().p(px(padding as f32));
+                let mut container_div = div();
 
-                // Apply width
-                if let Some(w) = width {
-                    container_div = container_div.w(px(w as f32));
-                }
+                // Apply unified styling if present (takes priority over legacy fields)
+                if let Some(style) = style {
+                    container_div = apply_gpui_style_to_div(container_div, &style);
+                } else {
+                    // Legacy API support
+                    container_div = container_div.p(px(padding as f32));
 
-                // Apply height
-                if let Some(h) = height {
-                    container_div = container_div.h(px(h as f32));
-                }
+                    // Apply width
+                    if let Some(w) = width {
+                        container_div = container_div.w(px(w as f32));
+                    }
 
-                // Apply centering
-                if center_x {
-                    container_div = container_div.items_center();
-                }
-                if center_y {
-                    container_div = container_div.justify_center();
+                    // Apply height
+                    if let Some(h) = height {
+                        container_div = container_div.h(px(h as f32));
+                    }
+
+                    // Apply centering
+                    if center_x {
+                        container_div = container_div.items_center();
+                    }
+                    if center_y {
+                        container_div = container_div.justify_center();
+                    }
                 }
 
                 // Add child
@@ -178,29 +228,34 @@ impl<M: Clone + Debug + 'static> IntoGpuiElement<M> for AbstractView<M> {
                 child,
                 width,
                 height,
+                style,
             } => {
                 let handle_msg_clone = handle_msg.clone();
                 let child_element = child.into_gpui(handle_msg_clone);
 
-                let mut scroll_div = div().overflow_scrollbar();
-
-                // Apply width
-                if let Some(w) = width {
-                    scroll_div = scroll_div.w(px(w as f32));
+                // Apply styling before wrapping in scrollable
+                let mut inner_div = div();
+                if let Some(style) = style {
+                    inner_div = apply_gpui_style_to_div(inner_div, &style);
+                } else {
+                    // Legacy API support
+                    if let Some(w) = width {
+                        inner_div = inner_div.w(px(w as f32));
+                    }
+                    if let Some(h) = height {
+                        inner_div = inner_div.h(px(h as f32));
+                    }
                 }
 
-                // Apply height
-                if let Some(h) = height {
-                    scroll_div = scroll_div.h(px(h as f32));
-                }
-
-                scroll_div.child(child_element).into_any_element()
+                let mut scroll_div = inner_div.child(child_element).overflow_scrollbar();
+                scroll_div.into_any_element()
             }
 
             AbstractView::Radio {
                 label,
                 is_selected,
                 on_select: _,
+                style,
             } => {
                 // Radio button - simplified version
                 let display_text = format!(
@@ -209,26 +264,41 @@ impl<M: Clone + Debug + 'static> IntoGpuiElement<M> for AbstractView<M> {
                     label
                 );
 
-                div().child(display_text).into_any()
+                let mut radio_div = div().child(display_text);
+                if let Some(style) = style {
+                    radio_div = apply_gpui_style_to_div(radio_div, &style);
+                }
+                radio_div.into_any()
             }
 
             AbstractView::Select {
                 options,
                 selected_index,
                 on_select: _,
+                style,
             } => {
                 // Select dropdown - simplified version
                 let selected = selected_index
                     .and_then(|i| options.get(i).cloned())
                     .unwrap_or_default();
 
-                div()
-                    .child(format!("Select: {}", selected))
-                    .into_any()
+                let mut select_div = div().child(format!("Select: {}", selected));
+                if let Some(style) = style {
+                    select_div = apply_gpui_style_to_div(select_div, &style);
+                }
+                select_div.into_any()
             }
 
-            AbstractView::List { items, spacing } => {
-                let mut list_div = div().v_flex().gap(px(spacing as f32));
+            AbstractView::List { items, spacing, style } => {
+                let mut list_div = div().v_flex();
+
+                // Apply unified styling if present (takes priority over legacy fields)
+                if let Some(style) = style {
+                    list_div = apply_gpui_style_to_div(list_div, &style);
+                } else {
+                    // Legacy API support
+                    list_div = list_div.gap(px(spacing as f32));
+                }
 
                 // Recursively convert items
                 for item in items {
@@ -244,8 +314,17 @@ impl<M: Clone + Debug + 'static> IntoGpuiElement<M> for AbstractView<M> {
                 rows,
                 spacing,
                 col_spacing,
+                style,
             } => {
-                let mut table_div = div().v_flex().gap(px(spacing as f32));
+                let mut table_div = div().v_flex();
+
+                // Apply unified styling if present
+                if let Some(style) = style {
+                    table_div = apply_gpui_style_to_div(table_div, &style);
+                } else {
+                    // Legacy API support
+                    table_div = table_div.gap(px(spacing as f32));
+                }
 
                 // Add header row
                 let mut header_row_div = div().h_flex().gap(px(col_spacing as f32));
@@ -269,6 +348,66 @@ impl<M: Clone + Debug + 'static> IntoGpuiElement<M> for AbstractView<M> {
             }
         }
     }
+}
+
+/// Apply a Style to a GPUI div element (simplified version for lib.rs)
+fn apply_gpui_style_to_div(div: Div, style: &Style) -> Div {
+    let gpui_style = GpuiStyle::from_style(style);
+    let mut result = div;
+
+    // Apply spacing (L1 + L2)
+    if let Some(gpui_padding) = &gpui_style.padding {
+        match gpui_padding {
+            auto_ui::style::gpui_adapter::GpuiPadding::Uniform(size) => {
+                result = result.p(px(*size));
+            }
+        }
+    }
+    if let Some(padding_x) = gpui_style.padding_x {
+        result = result.px(px(padding_x));
+    }
+    if let Some(padding_y) = gpui_style.padding_y {
+        result = result.py(px(padding_y));
+    }
+    if let Some(gap) = gpui_style.gap {
+        result = result.gap(px(gap));
+    }
+
+    // Apply colors (L1)
+    if let Some(bg_color) = gpui_style.background_color {
+        result = result.bg(bg_color);
+    }
+    if let Some(text_color) = gpui_style.text_color {
+        result = result.text_color(text_color);
+    }
+
+    // Apply border radius (L1 + L2)
+    if gpui_style.rounded {
+        if let Some(rounded_size) = gpui_style.rounded_size {
+            match rounded_size {
+                auto_ui::style::gpui_adapter::GpuiRoundedSize::Sm => {
+                    result = result.rounded(px(2.0));
+                }
+                auto_ui::style::gpui_adapter::GpuiRoundedSize::Md => {
+                    result = result.rounded(px(4.0));
+                }
+                auto_ui::style::gpui_adapter::GpuiRoundedSize::Lg => {
+                    result = result.rounded(px(8.0));
+                }
+                auto_ui::style::gpui_adapter::GpuiRoundedSize::Xl => {
+                    result = result.rounded(px(12.0));
+                }
+                auto_ui::style::gpui_adapter::GpuiRoundedSize::Xxl => {
+                    result = result.rounded(px(16.0));
+                }
+                auto_ui::style::gpui_adapter::GpuiRoundedSize::Full => {
+                    result = result.rounded(px(9999.0));
+                }
+            }
+        }
+    }
+
+    result
 }
 
 /// Extension trait for Component to add GPUI-compatible render method

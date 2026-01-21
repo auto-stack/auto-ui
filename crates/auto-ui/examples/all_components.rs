@@ -58,8 +58,9 @@ impl Component for AllComponents {
             // Input field
             .child(
                 View::input("Enter text...")
-                    .value(&self.input_value)
-                    .on_change(Msg::InputChanged("dummy".to_string())),
+                    .value(self.input_value.clone())
+                    .on_change(Msg::InputChanged("dummy".to_string()))
+                    .build(),
             )
             // Display input value
             .child(View::text(format!("Input value: {}", self.input_value)))
