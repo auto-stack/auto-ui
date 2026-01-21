@@ -8,6 +8,10 @@ use gpui::*;
 use gpui_component::{button::Button, button::ButtonVariants, scroll::ScrollableElement, *};
 use std::fmt::Debug;
 
+// Auto-conversion module
+pub mod auto_render;
+pub use auto_render::{GpuiComponentState, ViewExt};
+
 /// Context for GPUI rendering with message passing
 pub struct GpuiContext<M: Clone + Debug + 'static> {
     phantom: std::marker::PhantomData<M>,
@@ -348,8 +352,8 @@ impl<C: Component> std::ops::DerefMut for GpuiMessageBridge<C> {
 
 /// Run an auto-ui Component with GPUI backend
 ///
-/// This is the unified entry point for running auto-ui applications with GPUI.
-/// It's called by `auto_ui::App::run()` when the "gpui" feature is enabled.
+/// This function provides automatic conversion from enum-based messages
+/// to GPUI's closure-based event handling.
 ///
 /// # Example
 /// ```no_run
@@ -359,31 +363,69 @@ impl<C: Component> std::ops::DerefMut for GpuiMessageBridge<C> {
 /// struct MyComponent;
 ///
 /// impl Component for MyComponent {
-///     type Msg = ();
-///     fn on(&mut self, _msg: Self::Msg) {}
-///     fn view(&self) -> View<Self::Msg> {
-///         View::text("Hello!")
-///     }
+///     type Msg = MyMessage;
+///     fn on(&mut self, msg: Self::Msg) { /* ... */ }
+///     fn view(&self) -> View<Self::Msg> { /* ... */ }
 /// }
 ///
 /// fn main() -> auto_ui::AppResult<()> {
-///     run_app::<MyComponent>()
+///     run_app::<MyComponent>("My App")
 /// }
 /// ```
-///
-/// # Note
-/// This function requires the Component to implement its own `Render` trait
-/// implementation for GPUI. The auto-ui View abstraction is not used directly
-/// due to GPUI's different architecture (closures vs message enums).
-pub fn run_app<C>() -> auto_ui::AppResult<()>
+pub fn run_app<C>(title: &str) -> auto_ui::AppResult<()>
 where
     C: Component + Default + 'static,
     C::Msg: Clone + Debug + 'static,
 {
-    // Note: This is a placeholder. GPUI requires a different architecture
-    // where the Component implements GPUI's Render trait directly.
-    // See counter.rs example for the proper pattern.
-    Err("GPUI backend requires manual implementation. See auto-ui-gpui-examples for patterns.".into())
+    use crate::auto_render::GpuiComponentState;
+
+    // GPUI application runner with auto-conversion
+    struct GpuiAppRenderer<C: Component> {
+        state: GpuiComponentState<C>,
+    }
+
+    impl<C: Component> Render for GpuiAppRenderer<C> {
+        fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            // Use the auto-conversion mechanism
+            self.state.component.view().render_gpui_with(&mut self.state, cx)
+        }
+    }
+
+    // Run GPUI application
+    let app = gpui::Application::new();
+
+    app.run(move |cx| {
+        gpui_component::init(cx);
+
+        cx.spawn(async move |cx| {
+            cx.open_window(
+                WindowOptions {
+                    window_bounds: Some(WindowBounds::Windowed(Bounds {
+                        origin: Point { x: px(100.0), y: px(100.0) },
+                        size: gpui::Size {
+                            width: px(800.0),
+                            height: px(600.0),
+                        },
+                    })),
+                    titlebar: Some(TitlebarOptions {
+                        title: Some(title.into()),
+                        appears_transparent: false,
+                        traffic_light_position: None,
+                    }),
+                    ..Default::default()
+                },
+                |window, cx| {
+                    let state = cx.new(|_| GpuiComponentState::new(C::default()));
+                    cx.new(|cx| Root::new(state, window, cx))
+                },
+            )?;
+
+            Ok::<_, anyhow::Error>(())
+        })
+        .detach();
+    });
+
+    Ok(())
 }
 
 #[cfg(test)]
