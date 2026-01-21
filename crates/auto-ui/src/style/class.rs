@@ -30,17 +30,34 @@ impl SizeValue {
 
 /// Style class IR - represents a single parsed style property
 ///
-/// This enum contains only L1 Core features for the MVP prototype:
-/// - Spacing: p-*, gap-*
+/// This enum contains L1 Core + L2 Important features:
+/// - Spacing: p-*, px-*, py-*, m-*, mx-*, my-*, gap-*
 /// - Colors: bg-*, text-*
-/// - Layout: flex, flex-row/col, items-center
+/// - Layout: flex, flex-1, flex-row/col, items-*, justify-*
 /// - Sizing: w-full, w-*, h-full, h-*
-/// - Border Radius: rounded
+/// - Border Radius: rounded, rounded-*
+/// - Border: border, border-{color}
+/// - Typography: text-*, font-*
 #[derive(Debug, Clone, PartialEq)]
 pub enum StyleClass {
-    // ========== Spacing (L1 Core) ==========
+    // ========== Spacing (L1 Core + L2) ==========
     /// Padding: p-{0-12} (p-0, p-1, ..., p-12)
     Padding(SizeValue),
+
+    /// Padding X: px-{0-12} (L2)
+    PaddingX(SizeValue),
+
+    /// Padding Y: py-{0-12} (L2)
+    PaddingY(SizeValue),
+
+    /// Margin: m-{0-12} (L2) - Note: Iced doesn't support margin
+    Margin(SizeValue),
+
+    /// Margin X: mx-{0-12} (L2)
+    MarginX(SizeValue),
+
+    /// Margin Y: my-{0-12} (L2)
+    MarginY(SizeValue),
 
     /// Gap: gap-{0-12} (gap-0, gap-1, ..., gap-12)
     Gap(SizeValue),
@@ -52,9 +69,12 @@ pub enum StyleClass {
     /// Text color: text-{color}
     TextColor(Color),
 
-    // ========== Layout (L1 Core) ==========
+    // ========== Layout (L1 Core + L2) ==========
     /// Flex container
     Flex,
+
+    /// Flex: 1 (grow to fill space) - L2
+    Flex1,
 
     /// Flex direction: row (default)
     FlexRow,
@@ -65,11 +85,23 @@ pub enum StyleClass {
     /// Items center alignment
     ItemsCenter,
 
+    /// Items start alignment - L2
+    ItemsStart,
+
+    /// Items end alignment - L2
+    ItemsEnd,
+
     /// Justify center
     JustifyCenter,
 
     /// Justify between
     JustifyBetween,
+
+    /// Justify start - L2
+    JustifyStart,
+
+    /// Justify end - L2
+    JustifyEnd,
 
     // ========== Sizing (L1 Core) ==========
     /// Width: w-{size}
@@ -78,9 +110,80 @@ pub enum StyleClass {
     /// Height: h-{size}
     Height(SizeValue),
 
-    // ========== Border Radius (L1 Core) ==========
-    /// Border radius: rounded
+    // ========== Border Radius (L1 Core + L2) ==========
+    /// Border radius: rounded (default)
     Rounded,
+
+    /// Border radius: rounded-sm (L2)
+    RoundedSm,
+
+    /// Border radius: rounded-md (L2)
+    RoundedMd,
+
+    /// Border radius: rounded-lg (L2)
+    RoundedLg,
+
+    /// Border radius: rounded-xl (L2)
+    RoundedXl,
+
+    /// Border radius: rounded-2xl (L2)
+    Rounded2Xl,
+
+    /// Border radius: rounded-3xl (L2)
+    Rounded3Xl,
+
+    /// Border radius: rounded-full (L2)
+    RoundedFull,
+
+    // ========== Border (L2) ==========
+    /// Border: border (default width and color)
+    Border,
+
+    /// Border: 0 (no border) - L2
+    Border0,
+
+    /// Border color: border-{color} - L2
+    BorderColor(Color),
+
+    // ========== Typography (L2) ==========
+    /// Font size: text-xs (12px) - L2
+    TextXs,
+
+    /// Font size: text-sm (14px) - L2
+    TextSm,
+
+    /// Font size: text-base (16px) - L2
+    TextBase,
+
+    /// Font size: text-lg (18px) - L2
+    TextLg,
+
+    /// Font size: text-xl (20px) - L2
+    TextXl,
+
+    /// Font size: text-2xl (24px) - L2
+    Text2Xl,
+
+    /// Font size: text-3xl (30px) - L2
+    Text3Xl,
+
+    /// Font weight: font-bold (L2)
+    FontBold,
+
+    /// Font weight: font-medium (L2)
+    FontMedium,
+
+    /// Font weight: font-normal (L2)
+    FontNormal,
+
+    /// Text alignment: text-center (L2)
+    TextCenter,
+
+    /// Text alignment: text-left (L2)
+    TextLeft,
+
+    /// Text alignment: text-right (L2)
+    TextRight,
 }
 
 impl StyleClass {
@@ -93,10 +196,42 @@ impl StyleClass {
             return Err("Empty style class".to_string());
         }
 
-        // Parse spacing: p-{0-12}
+        // ========== Spacing (L1 + L2) ==========
+
+        // Parse padding: p-{0-12}
         if let Some(rest) = class.strip_prefix("p-") {
             let size = parse_size_value(rest)?;
             return Ok(StyleClass::Padding(size));
+        }
+
+        // Parse padding X: px-{0-12}
+        if let Some(rest) = class.strip_prefix("px-") {
+            let size = parse_size_value(rest)?;
+            return Ok(StyleClass::PaddingX(size));
+        }
+
+        // Parse padding Y: py-{0-12}
+        if let Some(rest) = class.strip_prefix("py-") {
+            let size = parse_size_value(rest)?;
+            return Ok(StyleClass::PaddingY(size));
+        }
+
+        // Parse margin: m-{0-12}
+        if let Some(rest) = class.strip_prefix("m-") {
+            let size = parse_size_value(rest)?;
+            return Ok(StyleClass::Margin(size));
+        }
+
+        // Parse margin X: mx-{0-12}
+        if let Some(rest) = class.strip_prefix("mx-") {
+            let size = parse_size_value(rest)?;
+            return Ok(StyleClass::MarginX(size));
+        }
+
+        // Parse margin Y: my-{0-12}
+        if let Some(rest) = class.strip_prefix("my-") {
+            let size = parse_size_value(rest)?;
+            return Ok(StyleClass::MarginY(size));
         }
 
         // Parse gap: gap-{0-12}
@@ -105,6 +240,8 @@ impl StyleClass {
             return Ok(StyleClass::Gap(size));
         }
 
+        // ========== Colors (L1) ==========
+
         // Parse background: bg-{color}
         if let Some(color_name) = class.strip_prefix("bg-") {
             let color = Color::from_tailwind(color_name)
@@ -112,16 +249,53 @@ impl StyleClass {
             return Ok(StyleClass::BackgroundColor(color));
         }
 
-        // Parse text color: text-{color}
+        // ========== Typography (L2) ==========
+
+        // Parse text size: text-{xs,sm,base,lg,xl,2xl,3xl}
+        match class {
+            "text-xs" => return Ok(StyleClass::TextXs),
+            "text-sm" => return Ok(StyleClass::TextSm),
+            "text-base" => return Ok(StyleClass::TextBase),
+            "text-lg" => return Ok(StyleClass::TextLg),
+            "text-xl" => return Ok(StyleClass::TextXl),
+            "text-2xl" => return Ok(StyleClass::Text2Xl),
+            "text-3xl" => return Ok(StyleClass::Text3Xl),
+            _ => {}
+        }
+
+        // Parse font weight
+        match class {
+            "font-bold" => return Ok(StyleClass::FontBold),
+            "font-medium" => return Ok(StyleClass::FontMedium),
+            "font-normal" => return Ok(StyleClass::FontNormal),
+            _ => {}
+        }
+
+        // Parse text alignment
+        match class {
+            "text-center" => return Ok(StyleClass::TextCenter),
+            "text-left" => return Ok(StyleClass::TextLeft),
+            "text-right" => return Ok(StyleClass::TextRight),
+            _ => {}
+        }
+
+        // Parse text color: text-{color} (must come after text-size/align)
         if let Some(color_name) = class.strip_prefix("text-") {
             let color = Color::from_tailwind(color_name)
                 .or_else(|_| Color::from_hex(color_name))?;
             return Ok(StyleClass::TextColor(color));
         }
 
+        // ========== Layout (L1 + L2) ==========
+
         // Parse flex
         if class == "flex" {
             return Ok(StyleClass::Flex);
+        }
+
+        // Parse flex-1
+        if class == "flex-1" {
+            return Ok(StyleClass::Flex1);
         }
 
         // Parse flex-row
@@ -134,20 +308,24 @@ impl StyleClass {
             return Ok(StyleClass::FlexCol);
         }
 
-        // Parse items-center
-        if class == "items-center" {
-            return Ok(StyleClass::ItemsCenter);
+        // Parse items-*
+        match class {
+            "items-center" => return Ok(StyleClass::ItemsCenter),
+            "items-start" => return Ok(StyleClass::ItemsStart),
+            "items-end" => return Ok(StyleClass::ItemsEnd),
+            _ => {}
         }
 
-        // Parse justify-center
-        if class == "justify-center" {
-            return Ok(StyleClass::JustifyCenter);
+        // Parse justify-*
+        match class {
+            "justify-center" => return Ok(StyleClass::JustifyCenter),
+            "justify-between" => return Ok(StyleClass::JustifyBetween),
+            "justify-start" => return Ok(StyleClass::JustifyStart),
+            "justify-end" => return Ok(StyleClass::JustifyEnd),
+            _ => {}
         }
 
-        // Parse justify-between
-        if class == "justify-between" {
-            return Ok(StyleClass::JustifyBetween);
-        }
+        // ========== Sizing (L1) ==========
 
         // Parse width: w-{size}
         if let Some(rest) = class.strip_prefix("w-") {
@@ -161,9 +339,42 @@ impl StyleClass {
             return Ok(StyleClass::Height(size));
         }
 
-        // Parse rounded
-        if class == "rounded" {
-            return Ok(StyleClass::Rounded);
+        // ========== Border Radius (L1 + L2) ==========
+
+        // Parse rounded-*
+        match class {
+            "rounded" => return Ok(StyleClass::Rounded),
+            "rounded-sm" => return Ok(StyleClass::RoundedSm),
+            "rounded-md" => return Ok(StyleClass::RoundedMd),
+            "rounded-lg" => return Ok(StyleClass::RoundedLg),
+            "rounded-xl" => return Ok(StyleClass::RoundedXl),
+            "rounded-2xl" => return Ok(StyleClass::Rounded2Xl),
+            "rounded-3xl" => return Ok(StyleClass::Rounded3Xl),
+            "rounded-full" => return Ok(StyleClass::RoundedFull),
+            _ => {}
+        }
+
+        // ========== Border (L2) ==========
+
+        // Parse border
+        if class == "border" {
+            return Ok(StyleClass::Border);
+        }
+
+        // Parse border-0
+        if class == "border-0" {
+            return Ok(StyleClass::Border0);
+        }
+
+        // Parse border color: border-{color}
+        if let Some(color_name) = class.strip_prefix("border-") {
+            // Skip border-0 which we already handled
+            if color_name == "0" {
+                return Ok(StyleClass::Border0);
+            }
+            let color = Color::from_tailwind(color_name)
+                .or_else(|_| Color::from_hex(color_name))?;
+            return Ok(StyleClass::BorderColor(color));
         }
 
         Err(format!("Unknown style class: {}", class))
@@ -192,6 +403,8 @@ fn parse_size_value(input: &str) -> Result<SizeValue, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ========== L1 Tests ==========
 
     #[test]
     fn test_parse_padding() {
@@ -232,5 +445,81 @@ mod tests {
     #[test]
     fn test_size_to_pixels() {
         assert_eq!(SizeValue::Fixed(4).to_pixels(), 16); // 4 * 4px = 16px
+    }
+
+    // ========== L2 Tests ==========
+
+    #[test]
+    fn test_parse_padding_xy() {
+        assert_eq!(StyleClass::parse_single("px-4"), Ok(StyleClass::PaddingX(SizeValue::Fixed(4))));
+        assert_eq!(StyleClass::parse_single("py-2"), Ok(StyleClass::PaddingY(SizeValue::Fixed(2))));
+    }
+
+    #[test]
+    fn test_parse_margin() {
+        assert_eq!(StyleClass::parse_single("m-4"), Ok(StyleClass::Margin(SizeValue::Fixed(4))));
+        assert_eq!(StyleClass::parse_single("mx-2"), Ok(StyleClass::MarginX(SizeValue::Fixed(2))));
+        assert_eq!(StyleClass::parse_single("my-2"), Ok(StyleClass::MarginY(SizeValue::Fixed(2))));
+    }
+
+    #[test]
+    fn test_parse_flex1() {
+        assert_eq!(StyleClass::parse_single("flex-1"), Ok(StyleClass::Flex1));
+    }
+
+    #[test]
+    fn test_parse_text_size() {
+        assert_eq!(StyleClass::parse_single("text-xs"), Ok(StyleClass::TextXs));
+        assert_eq!(StyleClass::parse_single("text-sm"), Ok(StyleClass::TextSm));
+        assert_eq!(StyleClass::parse_single("text-base"), Ok(StyleClass::TextBase));
+        assert_eq!(StyleClass::parse_single("text-lg"), Ok(StyleClass::TextLg));
+        assert_eq!(StyleClass::parse_single("text-xl"), Ok(StyleClass::TextXl));
+        assert_eq!(StyleClass::parse_single("text-2xl"), Ok(StyleClass::Text2Xl));
+        assert_eq!(StyleClass::parse_single("text-3xl"), Ok(StyleClass::Text3Xl));
+    }
+
+    #[test]
+    fn test_parse_font_weight() {
+        assert_eq!(StyleClass::parse_single("font-bold"), Ok(StyleClass::FontBold));
+        assert_eq!(StyleClass::parse_single("font-medium"), Ok(StyleClass::FontMedium));
+        assert_eq!(StyleClass::parse_single("font-normal"), Ok(StyleClass::FontNormal));
+    }
+
+    #[test]
+    fn test_parse_text_align() {
+        assert_eq!(StyleClass::parse_single("text-center"), Ok(StyleClass::TextCenter));
+        assert_eq!(StyleClass::parse_single("text-left"), Ok(StyleClass::TextLeft));
+        assert_eq!(StyleClass::parse_single("text-right"), Ok(StyleClass::TextRight));
+    }
+
+    #[test]
+    fn test_parse_items_align() {
+        assert_eq!(StyleClass::parse_single("items-start"), Ok(StyleClass::ItemsStart));
+        assert_eq!(StyleClass::parse_single("items-end"), Ok(StyleClass::ItemsEnd));
+    }
+
+    #[test]
+    fn test_parse_justify_align() {
+        assert_eq!(StyleClass::parse_single("justify-start"), Ok(StyleClass::JustifyStart));
+        assert_eq!(StyleClass::parse_single("justify-end"), Ok(StyleClass::JustifyEnd));
+    }
+
+    #[test]
+    fn test_parse_rounded_variants() {
+        assert_eq!(StyleClass::parse_single("rounded-sm"), Ok(StyleClass::RoundedSm));
+        assert_eq!(StyleClass::parse_single("rounded-md"), Ok(StyleClass::RoundedMd));
+        assert_eq!(StyleClass::parse_single("rounded-lg"), Ok(StyleClass::RoundedLg));
+        assert_eq!(StyleClass::parse_single("rounded-xl"), Ok(StyleClass::RoundedXl));
+        assert_eq!(StyleClass::parse_single("rounded-2xl"), Ok(StyleClass::Rounded2Xl));
+        assert_eq!(StyleClass::parse_single("rounded-3xl"), Ok(StyleClass::Rounded3Xl));
+        assert_eq!(StyleClass::parse_single("rounded-full"), Ok(StyleClass::RoundedFull));
+    }
+
+    #[test]
+    fn test_parse_border() {
+        assert_eq!(StyleClass::parse_single("border"), Ok(StyleClass::Border));
+        assert_eq!(StyleClass::parse_single("border-0"), Ok(StyleClass::Border0));
+        assert!(matches!(StyleClass::parse_single("border-white"), Ok(StyleClass::BorderColor(_))));
+        assert!(matches!(StyleClass::parse_single("border-red-500"), Ok(StyleClass::BorderColor(_))));
     }
 }

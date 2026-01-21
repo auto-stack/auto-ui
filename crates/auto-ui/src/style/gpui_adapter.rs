@@ -14,22 +14,84 @@ use crate::style::{Style, StyleClass, SizeValue, Color};
 pub struct GpuiStyle {
     // For GPUI, styles are typically applied via builder methods
     // This struct collects the style parameters
+
+    // Spacing (L1 + L2)
     pub padding: Option<GpuiPadding>,
+    pub padding_x: Option<f32>,
+    pub padding_y: Option<f32>,
+    pub margin: Option<f32>,
+    pub margin_x: Option<f32>,
+    pub margin_y: Option<f32>,
     pub gap: Option<f32>,
+
+    // Layout (L1 + L2)
     pub flex: Option<bool>,
+    pub flex1: bool,  // flex-1
     pub flex_direction: Option<GpuiFlexDirection>,
     pub items_align: Option<GpuiAlignment>,
     pub justify_align: Option<GpuiAlignment>,
+
+    // Sizing (L1)
     pub width: Option<GpuiSize>,
     pub height: Option<GpuiSize>,
+
+    // Colors (L1)
     pub background_color: Option<gpui::Rgba>,
     pub text_color: Option<gpui::Rgba>,
+
+    // Border Radius (L1 + L2)
     pub rounded: bool,
+    pub rounded_size: Option<GpuiRoundedSize>,
+
+    // Border (L2)
+    pub border: bool,
+    pub border_width: Option<f32>,
+    pub border_color: Option<gpui::Rgba>,
+
+    // Typography (L2)
+    pub font_size: Option<GpuiFontSize>,
+    pub font_weight: Option<GpuiFontWeight>,
+    pub text_align: Option<GpuiTextAlign>,
 }
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum GpuiPadding {
     Uniform(f32), // p-4 = 16px
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum GpuiRoundedSize {
+    Sm,
+    Md,
+    Lg,
+    Xl,
+    Xxl,
+    Full,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum GpuiFontSize {
+    Xs,   // 12px
+    Sm,   // 14px
+    Base, // 16px
+    Lg,   // 18px
+    Xl,   // 20px
+    Xxl,  // 24px
+    X3xl, // 30px
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum GpuiFontWeight {
+    Normal,
+    Medium,
+    Bold,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum GpuiTextAlign {
+    Left,
+    Center,
+    Right,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -57,8 +119,14 @@ impl GpuiStyle {
     pub fn from_style(style: &Style) -> Self {
         let mut gpui_style = GpuiStyle {
             padding: None,
+            padding_x: None,
+            padding_y: None,
+            margin: None,
+            margin_x: None,
+            margin_y: None,
             gap: None,
             flex: None,
+            flex1: false,
             flex_direction: None,
             items_align: None,
             justify_align: None,
@@ -67,6 +135,13 @@ impl GpuiStyle {
             background_color: None,
             text_color: None,
             rounded: false,
+            rounded_size: None,
+            border: false,
+            border_width: None,
+            border_color: None,
+            font_size: None,
+            font_weight: None,
+            text_align: None,
         };
 
         for class in &style.classes {
@@ -79,20 +154,44 @@ impl GpuiStyle {
     /// Apply a single StyleClass to this GpuiStyle
     fn apply_class(&mut self, class: &StyleClass) {
         match class {
+            // ========== Spacing (L1 + L2) ==========
             StyleClass::Padding(size) => {
                 self.padding = Some(GpuiPadding::Uniform(size.to_pixels() as f32));
+            }
+            StyleClass::PaddingX(size) => {
+                self.padding_x = Some(size.to_pixels() as f32);
+            }
+            StyleClass::PaddingY(size) => {
+                self.padding_y = Some(size.to_pixels() as f32);
+            }
+            StyleClass::Margin(size) => {
+                self.margin = Some(size.to_pixels() as f32);
+            }
+            StyleClass::MarginX(size) => {
+                self.margin_x = Some(size.to_pixels() as f32);
+            }
+            StyleClass::MarginY(size) => {
+                self.margin_y = Some(size.to_pixels() as f32);
             }
             StyleClass::Gap(size) => {
                 self.gap = Some(size.to_pixels() as f32);
             }
+
+            // ========== Colors (L1) ==========
             StyleClass::BackgroundColor(color) => {
                 self.background_color = Some(convert_color(color));
             }
             StyleClass::TextColor(color) => {
                 self.text_color = Some(convert_color(color));
             }
+
+            // ========== Layout (L1 + L2) ==========
             StyleClass::Flex => {
                 self.flex = Some(true);
+            }
+            StyleClass::Flex1 => {
+                self.flex = Some(true);
+                self.flex1 = true;
             }
             StyleClass::FlexRow => {
                 self.flex = Some(true);
@@ -105,20 +204,120 @@ impl GpuiStyle {
             StyleClass::ItemsCenter => {
                 self.items_align = Some(GpuiAlignment::Center);
             }
+            StyleClass::ItemsStart => {
+                self.items_align = Some(GpuiAlignment::Start);
+            }
+            StyleClass::ItemsEnd => {
+                self.items_align = Some(GpuiAlignment::End);
+            }
             StyleClass::JustifyCenter => {
                 self.justify_align = Some(GpuiAlignment::Center);
             }
             StyleClass::JustifyBetween => {
                 self.justify_align = Some(GpuiAlignment::Between);
             }
+            StyleClass::JustifyStart => {
+                self.justify_align = Some(GpuiAlignment::Start);
+            }
+            StyleClass::JustifyEnd => {
+                self.justify_align = Some(GpuiAlignment::End);
+            }
+
+            // ========== Sizing (L1) ==========
             StyleClass::Width(size) => {
                 self.width = Some(convert_size(size));
             }
             StyleClass::Height(size) => {
                 self.height = Some(convert_size(size));
             }
+
+            // ========== Border Radius (L1 + L2) ==========
             StyleClass::Rounded => {
                 self.rounded = true;
+                self.rounded_size = Some(GpuiRoundedSize::Md);
+            }
+            StyleClass::RoundedSm => {
+                self.rounded = true;
+                self.rounded_size = Some(GpuiRoundedSize::Sm);
+            }
+            StyleClass::RoundedMd => {
+                self.rounded = true;
+                self.rounded_size = Some(GpuiRoundedSize::Md);
+            }
+            StyleClass::RoundedLg => {
+                self.rounded = true;
+                self.rounded_size = Some(GpuiRoundedSize::Lg);
+            }
+            StyleClass::RoundedXl => {
+                self.rounded = true;
+                self.rounded_size = Some(GpuiRoundedSize::Xl);
+            }
+            StyleClass::Rounded2Xl => {
+                self.rounded = true;
+                self.rounded_size = Some(GpuiRoundedSize::Xxl);
+            }
+            StyleClass::Rounded3Xl => {
+                self.rounded = true;
+                self.rounded_size = Some(GpuiRoundedSize::Xxl);
+            }
+            StyleClass::RoundedFull => {
+                self.rounded = true;
+                self.rounded_size = Some(GpuiRoundedSize::Full);
+            }
+
+            // ========== Border (L2) ==========
+            StyleClass::Border => {
+                self.border = true;
+                self.border_width = Some(1.0);
+            }
+            StyleClass::Border0 => {
+                self.border = false;
+                self.border_width = Some(0.0);
+            }
+            StyleClass::BorderColor(color) => {
+                self.border = true;
+                self.border_color = Some(convert_color(color));
+            }
+
+            // ========== Typography (L2) ==========
+            StyleClass::TextXs => {
+                self.font_size = Some(GpuiFontSize::Xs);
+            }
+            StyleClass::TextSm => {
+                self.font_size = Some(GpuiFontSize::Sm);
+            }
+            StyleClass::TextBase => {
+                self.font_size = Some(GpuiFontSize::Base);
+            }
+            StyleClass::TextLg => {
+                self.font_size = Some(GpuiFontSize::Lg);
+            }
+            StyleClass::TextXl => {
+                self.font_size = Some(GpuiFontSize::Xl);
+            }
+            StyleClass::Text2Xl => {
+                self.font_size = Some(GpuiFontSize::Xxl);
+            }
+            StyleClass::Text3Xl => {
+                self.font_size = Some(GpuiFontSize::X3xl);
+            }
+            StyleClass::FontBold => {
+                self.font_weight = Some(GpuiFontWeight::Bold);
+            }
+            StyleClass::FontMedium => {
+                self.font_weight = Some(GpuiFontWeight::Medium);
+            }
+            StyleClass::FontNormal => {
+                self.font_weight = Some(GpuiFontWeight::Normal);
+            }
+            StyleClass::TextCenter => {
+                self.text_align = Some(GpuiTextAlign::Center);
+            }
+            StyleClass::TextLeft => {
+                self.text_align = Some(GpuiTextAlign::Left);
+            }
+            StyleClass::TextRight => {
+                self.text_align = Some(GpuiTextAlign::Right);
             }
         }
     }
