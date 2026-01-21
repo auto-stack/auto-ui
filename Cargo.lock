@@ -7785,15 +7785,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "unified-counter-v2"
-version = "0.1.0"
-dependencies = [
- "auto-ui",
- "auto-ui-gpui",
- "auto-ui-iced",
-]
-
-[[package]]
 name = "unsafe-libyaml"
 version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"

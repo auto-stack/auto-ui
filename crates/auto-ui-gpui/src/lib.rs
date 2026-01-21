@@ -377,19 +377,10 @@ where
     C: Component + Default + 'static,
     C::Msg: Clone + Debug + 'static,
 {
-    use crate::auto_render::GpuiComponentState;
+    use auto_render::GpuiComponentState;
 
-    // GPUI application runner with auto-conversion
-    struct GpuiAppRenderer<C: Component> {
-        state: GpuiComponentState<C>,
-    }
-
-    impl<C: Component> Render for GpuiAppRenderer<C> {
-        fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-            // Use the auto-conversion mechanism
-            self.state.component.view().render_gpui_with(&mut self.state, cx)
-        }
-    }
+    // Convert title to owned String to avoid lifetime issues
+    let title = title.to_owned();
 
     // Run GPUI application
     let app = gpui::Application::new();
@@ -415,7 +406,11 @@ where
                     ..Default::default()
                 },
                 |window, cx| {
+                    // Create the state as a GPUI entity
                     let state = cx.new(|_| GpuiComponentState::new(C::default()));
+
+                    // Build the UI using the state's render implementation
+                    // This first level on the window, should be a Root.
                     cx.new(|cx| Root::new(state, window, cx))
                 },
             )?;

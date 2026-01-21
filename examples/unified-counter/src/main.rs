@@ -1,7 +1,7 @@
-// Unified Counter Example
+// Unified Counter Example with Auto-Conversion
 //
-// This example demonstrates how to write a single Component
-// that works with both Iced and GPUI backends.
+// This example demonstrates TRUE unification - the same Component code
+// works with BOTH Iced and GPUI backends through automatic message conversion.
 //
 // Run with:
 //   cargo run --package unified-counter --features iced
@@ -41,29 +41,27 @@ impl Component for Counter {
     }
 }
 
-// Unified main() function - selects backend via feature flags
+// Unified main() - works with BOTH backends!
 fn main() -> auto_ui::AppResult<()> {
     #[cfg(feature = "iced")]
     {
-        println!("Running with Iced backend");
+        println!("🎨 Running with Iced backend");
         return auto_ui_iced::run_app::<Counter>();
     }
 
     #[cfg(feature = "gpui")]
     {
-        println!("Running with GPUI backend");
-        // Note: GPUI requires manual Render trait implementation
-        // This is a limitation of GPUI's architecture
-        return auto_ui_gpui::run_app::<Counter>();
+        println!("🎨 Running with GPUI backend (with auto-conversion!)");
+        return auto_ui_gpui::run_app::<Counter>("Counter - AutoUI");
     }
 
     #[cfg(not(any(feature = "iced", feature = "gpui")))]
     {
         Err(
-            "No backend enabled!\n\n\
+            "❌ No backend enabled!\n\n\
              Please run with a backend feature:\n\
-             - cargo run --features iced\n\
-             - cargo run --features gpui"
+             • cargo run --features iced\n\
+             • cargo run --features gpui"
                 .into(),
         )
     }
