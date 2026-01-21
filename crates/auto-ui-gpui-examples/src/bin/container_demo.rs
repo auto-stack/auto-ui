@@ -3,9 +3,8 @@
 // This shows how to use containers for padding, centering, and sizing
 
 use auto_ui::{Component, View};
-use auto_ui_gpui::ComponentGpui;
 use gpui::*;
-use gpui_component::Root;
+use gpui_component::{button::Button, *};
 use std::fmt::Debug;
 
 #[derive(Debug, Clone)]
@@ -168,7 +167,6 @@ impl ContainerApp {
 }
 
 // GPUI Renderer for ContainerApp
-#[derive(Clone)]
 struct ContainerRenderer {
     app: ContainerApp,
 }
@@ -182,8 +180,128 @@ impl ContainerRenderer {
 }
 
 impl Render for ContainerRenderer {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        self.app.view_gpui_static()
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let selected_example = self.app.selected_example;
+
+        div()
+            .v_flex()
+            .gap_4()
+            .p_4()
+            .size_full()
+            .child(div().text_xl().child("Container Examples"))
+            .child(
+                div()
+                    .h_flex()
+                    .gap_2()
+                    .child(
+                        Button::new("padding")
+                            .label("Padding")
+                            .selected(selected_example == Example::Padding)
+                            .on_click(cx.listener(|view, _, _, _cx| {
+                                view.app.on(Message::ShowExample(Example::Padding));
+                            })),
+                    )
+                    .child(
+                        Button::new("sizing")
+                            .label("Sizing")
+                            .selected(selected_example == Example::Sizing)
+                            .on_click(cx.listener(|view, _, _, _cx| {
+                                view.app.on(Message::ShowExample(Example::Sizing));
+                            })),
+                    )
+                    .child(
+                        Button::new("centering")
+                            .label("Centering")
+                            .selected(selected_example == Example::Centering)
+                            .on_click(cx.listener(|view, _, _, _cx| {
+                                view.app.on(Message::ShowExample(Example::Centering));
+                            })),
+                    )
+                    .child(
+                        Button::new("nested")
+                            .label("Nested")
+                            .selected(selected_example == Example::Nested)
+                            .on_click(cx.listener(|view, _, _, _cx| {
+                                view.app.on(Message::ShowExample(Example::Nested));
+                            })),
+                    ),
+            )
+            .child(match selected_example {
+                Example::Padding => div()
+                    .v_flex()
+                    .gap_4()
+                    .child(div().p_0().bg(gpui::rgb(0x333333)).child("No Padding"))
+                    .child(div().p_4().bg(gpui::rgb(0x333333)).child("Padding 20"))
+                    .child(div().p_10().bg(gpui::rgb(0x333333)).child("Padding 40")),
+                Example::Sizing => div()
+                    .v_flex()
+                    .gap_4()
+                    .child(
+                        div()
+                            .w(px(200.0))
+                            .p_2()
+                            .bg(gpui::rgb(0x333333))
+                            .child("Fixed Width: 200"),
+                    )
+                    .child(
+                        div()
+                            .w(px(200.0))
+                            .h(px(100.0))
+                            .p_2()
+                            .bg(gpui::rgb(0x333333))
+                            .child("Fixed Size: 200x100"),
+                    ),
+                Example::Centering => div()
+                    .v_flex()
+                    .gap_4()
+                    .child(
+                        div()
+                            .w(px(300.0))
+                            .p_2()
+                            .bg(gpui::rgb(0x333333))
+                            .items_center()
+                            .justify_center()
+                            .child("Centered X"),
+                    )
+                    .child(
+                        div()
+                            .w(px(300.0))
+                            .h(px(100.0))
+                            .p_2()
+                            .bg(gpui::rgb(0x333333))
+                            .items_center()
+                            .justify_center()
+                            .child("Centered Y"),
+                    )
+                    .child(
+                        div()
+                            .w(px(300.0))
+                            .h(px(100.0))
+                            .p_2()
+                            .bg(gpui::rgb(0x333333))
+                            .items_center()
+                            .justify_center()
+                            .child("Centered Both"),
+                    ),
+                Example::Nested => div()
+                    .w(px(400.0))
+                    .p_8()
+                    .bg(gpui::rgb(0x333333))
+                    .v_flex()
+                    .gap_2()
+                    .child("Outer Container")
+                    .child(
+                        div()
+                            .p_5()
+                            .bg(gpui::rgb(0x444444))
+                            .h_flex()
+                            .gap_2()
+                            .items_center()
+                            .justify_center()
+                            .child("Nested")
+                            .child("Layout"),
+                    ),
+            })
     }
 }
 

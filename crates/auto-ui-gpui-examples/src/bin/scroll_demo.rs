@@ -3,9 +3,8 @@
 // This shows how to use scrollable containers for content overflow
 
 use auto_ui::{Component, View};
-use auto_ui_gpui::ComponentGpui;
 use gpui::*;
-use gpui_component::Root;
+use gpui_component::{button::Button, *};
 use std::fmt::Debug;
 
 #[derive(Debug, Clone)]
@@ -155,7 +154,6 @@ impl ScrollApp {
 }
 
 // GPUI Renderer for ScrollApp
-#[derive(Clone)]
 struct ScrollRenderer {
     app: ScrollApp,
 }
@@ -169,8 +167,101 @@ impl ScrollRenderer {
 }
 
 impl Render for ScrollRenderer {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        self.app.view_gpui_static()
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let selected_example = self.app.selected_example;
+
+        div()
+            .v_flex()
+            .gap_4()
+            .p_4()
+            .size_full()
+            .child(div().text_xl().child("Scrollable Examples"))
+            .child(
+                div()
+                    .h_flex()
+                    .gap_2()
+                    .child(
+                        Button::new("basic")
+                            .label("Basic")
+                            .selected(selected_example == Example::Basic)
+                            .on_click(cx.listener(|view, _, _, _cx| {
+                                view.app.on(Message::ShowExample(Example::Basic));
+                            })),
+                    )
+                    .child(
+                        Button::new("long-content")
+                            .label("Long Content")
+                            .selected(selected_example == Example::LongContent)
+                            .on_click(cx.listener(|view, _, _, _cx| {
+                                view.app.on(Message::ShowExample(Example::LongContent));
+                            })),
+                    )
+                    .child(
+                        Button::new("nested")
+                            .label("Nested")
+                            .selected(selected_example == Example::NestedScrollable)
+                            .on_click(cx.listener(|view, _, _, _cx| {
+                                view.app.on(Message::ShowExample(Example::NestedScrollable));
+                            })),
+                    ),
+            )
+            .child(match selected_example {
+                Example::Basic => {
+                    let items: Vec<_> = (1..=10).map(|i| div().child(format!("Item {}", i))).collect();
+                    div()
+                        .w(px(300.0))
+                        .h(px(200.0))
+                        .bg(gpui::rgb(0x333333))
+                        .v_flex()
+                        .gap_2()
+                        .overflow_y_hidden()
+                        .children(items)
+                }
+                Example::LongContent => {
+                    let items: Vec<_> = (1..=50)
+                        .map(|i| div().child(format!("Item {}: Long content that scrolls", i)))
+                        .collect();
+                    div()
+                        .v_flex()
+                        .gap_4()
+                        .child("Scrollable with 50 items:")
+                        .child(
+                            div()
+                                .h(px(300.0))
+                                .bg(gpui::rgb(0x333333))
+                                .v_flex()
+                                .gap_2()
+                                .overflow_y_hidden()
+                                .children(items),
+                        )
+                }
+                Example::NestedScrollable => {
+                    let nested_items: Vec<_> =
+                        (1..=20).map(|i| div().child(format!("Nested item {}", i))).collect();
+                    div()
+                        .v_flex()
+                        .gap_4()
+                        .child("Nested Scrollable Containers")
+                        .child(
+                            div()
+                                .p_2()
+                                .bg(gpui::rgb(0x333333))
+                                .v_flex()
+                                .gap_2()
+                                .child("Outer container - fixed size")
+                                .child(
+                                    div()
+                                        .h(px(150.0))
+                                        .bg(gpui::rgb(0x444444))
+                                        .v_flex()
+                                        .gap_2()
+                                        .overflow_y_hidden()
+                                        .children(nested_items),
+                                )
+                                .child("More content outside scrollable"),
+                        )
+                }
+            })
     }
 }
 

@@ -3,9 +3,8 @@
 // This demonstrates bidirectional data flow and computed values
 
 use auto_ui::{Component, View};
-use auto_ui_gpui::ComponentGpui;
 use gpui::*;
-use gpui_component::Root;
+use gpui_component::{button::Button, button::ButtonVariants, *};
 use std::fmt::Debug;
 
 #[derive(Debug, Default, Clone)]
@@ -95,7 +94,6 @@ impl Component for TempConverter {
 }
 
 // GPUI Renderer for TempConverter
-#[derive(Clone)]
 struct TempConverterRenderer {
     converter: TempConverter,
 }
@@ -109,8 +107,77 @@ impl TempConverterRenderer {
 }
 
 impl Render for TempConverterRenderer {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        self.converter.view_gpui_static()
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let celsius = self.converter.celsius;
+        let fahrenheit = self.converter.fahrenheit;
+
+        div()
+            .v_flex()
+            .gap_3()
+            .p_6()
+            .size_full()
+            .items_center()
+            .justify_center()
+            .child(div().text_xl().child("Temperature Converter"))
+            .child(
+                div()
+                    .v_flex()
+                    .gap_2()
+                    .p_4()
+                    .child(div().child(format!("Celsius: {:.1}°C", celsius)))
+                    .child(
+                        div()
+                            .h_flex()
+                            .gap_2()
+                            .child(
+                                Button::new("dec-c")
+                                    .label("-1°C")
+                                    .on_click(cx.listener(|view, _, _, _cx| {
+                                        view.converter.on(Message::DecrementCelsius);
+                                    })),
+                            )
+                            .child(
+                                Button::new("inc-c")
+                                    .label("+1°C")
+                                    .on_click(cx.listener(|view, _, _, _cx| {
+                                        view.converter.on(Message::IncrementCelsius);
+                                    })),
+                            ),
+                    ),
+            )
+            .child(
+                div()
+                    .v_flex()
+                    .gap_2()
+                    .p_4()
+                    .child(div().child(format!("Fahrenheit: {:.1}°F", fahrenheit)))
+                    .child(
+                        div()
+                            .h_flex()
+                            .gap_2()
+                            .child(
+                                Button::new("dec-f")
+                                    .label("-1°F")
+                                    .on_click(cx.listener(|view, _, _, _cx| {
+                                        view.converter.on(Message::DecrementFahrenheit);
+                                    })),
+                            )
+                            .child(
+                                Button::new("inc-f")
+                                    .label("+1°F")
+                                    .on_click(cx.listener(|view, _, _, _cx| {
+                                        view.converter.on(Message::IncrementFahrenheit);
+                                    })),
+                            ),
+                    ),
+            )
+            .child(
+                Button::new("reset")
+                    .label("Reset")
+                    .on_click(cx.listener(|view, _, _, _cx| {
+                        view.converter.on(Message::Reset);
+                    })),
+            )
     }
 }
 

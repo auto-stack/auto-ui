@@ -330,9 +330,9 @@ where
 pub fn run_app<C>() -> auto_ui::AppResult<()>
 where
     C: Component + Default + 'static,
-    C::Msg: Clone + Debug + 'static,
+    C::Msg: Clone + Debug + Send + 'static,
 {
-    iced::run("AutoUI Application", C::update, view)
+    Ok(iced::run(C::update, view)?)
 }
 
 fn view<C>(component: &C) -> iced::Element<'_, C::Msg>

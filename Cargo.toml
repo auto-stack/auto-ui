@@ -1,6 +1,9 @@
 [workspace]
-members = ["crates/*"]
-exclude = ["crates/auto-ui-transpiler"]  # Exclude transpiler for now, build separately
+members = ["crates/*", "examples/*"]
+exclude = [
+    "crates/auto-ui-transpiler",  # Exclude transpiler for now, build separately
+    "examples/unified_app",         # Exclude simple example file
+]
 resolver = "2"
 
 [workspace.dependencies]

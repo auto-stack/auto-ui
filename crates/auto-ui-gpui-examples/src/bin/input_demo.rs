@@ -3,9 +3,8 @@
 // This shows how to use input fields for data entry with various configurations
 
 use auto_ui::{Component, View};
-use auto_ui_gpui::ComponentGpui;
 use gpui::*;
-use gpui_component::Root;
+use gpui_component::{button::Button, button::ButtonVariants, *};
 use std::fmt::Debug;
 
 #[derive(Debug, Default, Clone)]
@@ -153,7 +152,6 @@ impl InputApp {
 }
 
 // GPUI Renderer for InputApp
-#[derive(Clone)]
 struct InputRenderer {
     app: InputApp,
 }
@@ -167,8 +165,131 @@ impl InputRenderer {
 }
 
 impl Render for InputRenderer {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        self.app.view_gpui_static()
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let username = self.app.username.clone();
+        let email = self.app.email.clone();
+        let password = self.app.password.clone();
+        let bio = self.app.bio.clone();
+
+        div()
+            .v_flex()
+            .gap_4()
+            .p_4()
+            .size_full()
+            .child(div().text_xl().child("User Information Form"))
+            .child(
+                div()
+                    .v_flex()
+                    .gap_4()
+                    .child(
+                        div()
+                            .v_flex()
+                            .gap_1()
+                            .child(div().child("Username:"))
+                            .child(
+                                div()
+                                    .child(format!(
+                                        "{}",
+                                        if username.is_empty() {
+                                            "Enter your username"
+                                        } else {
+                                            &username
+                                        }
+                                    ))
+                                    .w(px(300.0))
+                                    .p_2()
+                                    .bg(gpui::rgb(0x333333)),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .v_flex()
+                            .gap_1()
+                            .child(div().child("Email:"))
+                            .child(
+                                div()
+                                    .child(format!(
+                                        "{}",
+                                        if email.is_empty() {
+                                            "user@example.com"
+                                        } else {
+                                            &email
+                                        }
+                                    ))
+                                    .w(px(300.0))
+                                    .p_2()
+                                    .bg(gpui::rgb(0x333333)),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .v_flex()
+                            .gap_1()
+                            .child(div().child("Password:"))
+                            .child(
+                                div()
+                                    .child(format!(
+                                        "{}",
+                                        if password.is_empty() {
+                                            "Enter password"
+                                        } else {
+                                            "••••••••"
+                                        }
+                                    ))
+                                    .w(px(300.0))
+                                    .p_2()
+                                    .bg(gpui::rgb(0x333333)),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .v_flex()
+                            .gap_1()
+                            .child(div().child("Bio:"))
+                            .child(
+                                div()
+                                    .child(format!(
+                                        "{}",
+                                        if bio.is_empty() {
+                                            "Tell us about yourself"
+                                        } else {
+                                            &bio
+                                        }
+                                    ))
+                                    .w(px(400.0))
+                                    .p_2()
+                                    .bg(gpui::rgb(0x333333)),
+                            ),
+                    )
+                    .child(
+                        Button::new("clear")
+                            .label("Clear Form")
+                            .small()
+                            .on_click(cx.listener(|view, _, _, _cx| {
+                                view.app.on(Message::Clear);
+                            })),
+                    ),
+            )
+            .child(
+                div()
+                    .p_5()
+                    .w(px(400.0))
+                    .bg(gpui::rgb(0x2a2a2a))
+                    .v_flex()
+                    .gap_2()
+                    .child("Form Summary:")
+                    .child(div().child(format!("Username: {}", username)))
+                    .child(div().child(format!("Email: {}", email)))
+                    .child(div().child(format!(
+                        "Password: {}",
+                        if password.is_empty() {
+                            "(empty)"
+                        } else {
+                            "••••••••"
+                        }
+                    )))
+                    .child(div().child(format!("Bio: {}", bio))),
+            )
     }
 }
 

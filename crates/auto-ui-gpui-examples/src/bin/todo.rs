@@ -4,9 +4,8 @@
 // list operations, and conditional rendering.
 
 use auto_ui::{Component, View};
-use auto_ui_gpui::ComponentGpui;
 use gpui::*;
-use gpui_component::Root;
+use gpui_component::{button::Button, button::ButtonVariants, *};
 use std::fmt::Debug;
 
 #[derive(Debug, Clone)]
@@ -140,7 +139,6 @@ impl Component for TodoApp {
 }
 
 // GPUI Renderer for TodoApp
-#[derive(Clone)]
 struct TodoRenderer {
     app: TodoApp,
 }
@@ -154,9 +152,93 @@ impl TodoRenderer {
 }
 
 impl Render for TodoRenderer {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        // Simplified version - just render the view without message handling
-        self.app.view_gpui_static()
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let filter = self.app.filter;
+        let todos = &self.app.todos;
+
+        let filtered_todos: Vec<_> = match filter {
+            Filter::All => todos.clone(),
+            Filter::Active => todos.iter().filter(|t| !t.completed).cloned().collect(),
+            Filter::Completed => todos.iter().filter(|t| t.completed).cloned().collect(),
+        };
+
+        div()
+            .v_flex()
+            .gap_3()
+            .p_4()
+            .size_full()
+            .child(div().text_xl().child("TodoMVC"))
+            .child(
+                Button::new("add-todo")
+                    .primary()
+                    .label("Add Todo")
+                    .on_click(cx.listener(|view, _, _, _cx| {
+                        view.app.on(Message::AddTodo);
+                    })),
+            )
+            .child(
+                div()
+                    .h_flex()
+                    .gap_2()
+                    .child(
+                        Button::new("filter-all")
+                            .label(format!("All ({})", todos.len()))
+                            .selected(filter == Filter::All)
+                            .on_click(cx.listener(|view, _, _, _cx| {
+                                view.app.on(Message::SetFilter(Filter::All));
+                            })),
+                    )
+                    .child(
+                        Button::new("filter-active")
+                            .label(format!(
+                                "Active ({})",
+                                todos.iter().filter(|t| !t.completed).count()
+                            ))
+                            .selected(filter == Filter::Active)
+                            .on_click(cx.listener(|view, _, _, _cx| {
+                                view.app.on(Message::SetFilter(Filter::Active));
+                            })),
+                    )
+                    .child(
+                        Button::new("filter-completed")
+                            .label(format!(
+                                "Completed ({})",
+                                todos.iter().filter(|t| t.completed).count()
+                            ))
+                            .selected(filter == Filter::Completed)
+                            .on_click(cx.listener(|view, _, _, _cx| {
+                                view.app.on(Message::SetFilter(Filter::Completed));
+                            })),
+                    )
+                    .child(
+                        Button::new("clear-completed")
+                            .small()
+                            .label("Clear Completed")
+                            .on_click(cx.listener(|view, _, _, _cx| {
+                                view.app.on(Message::ClearCompleted);
+                            })),
+                    ),
+            )
+            .children(filtered_todos.into_iter().enumerate().map(|(idx, todo)| {
+                let todo_id = todo.id;
+                div()
+                    .h_flex()
+                    .gap_2()
+                    .p_2()
+                    .child(div().child(format!(
+                        "{} {}",
+                        if todo.completed { "✓" } else { "○" },
+                        todo.text
+                    )))
+                    .child(
+                        Button::new(("remove", idx))
+                            .small()
+                            .label("Remove")
+                            .on_click(cx.listener(move |view, _, _, _cx| {
+                                view.app.on(Message::RemoveTodo(todo_id));
+                            })),
+                    )
+            }))
     }
 }
 
