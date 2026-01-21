@@ -8,10 +8,15 @@ widget Hello {
     fn view() View {
         text(msg) {}
     }
+
+    // styling
+    style: "p-1"
+
 }
 
 // Create an App
 app CounterExample {
+    theme: "default" // 这一行如果不写，也是选用默认主题
     center {
         Hello("Hello, World!")
     }

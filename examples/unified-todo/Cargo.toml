@@ -10,6 +10,6 @@ auto-ui-iced = { path = "../../crates/auto-ui-iced", optional = true }
 auto-ui-gpui = { path = "../../crates/auto-ui-gpui", optional = true }
 
 [features]
-default = ["iced"]
+default = ["gpui"]
 iced = ["auto-ui-iced"]
 gpui = ["auto-ui-gpui"]

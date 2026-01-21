@@ -89,9 +89,9 @@ pub enum View<M> {
 
 在 Auto 语言层面支持 Tailwind CSS 风格的样式类：
 
-```auto
+```rust
 // 期望的 Auto 语言语法
-col {
+center {
     button {
         onclick: Msg.Inc
         label: "Increment"
@@ -182,6 +182,7 @@ widget MyWidget {
             }
         }
     }
+    
 }
 ```
 
