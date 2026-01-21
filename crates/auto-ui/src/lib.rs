@@ -13,6 +13,7 @@ pub mod prelude {
 pub mod app;
 pub mod component;
 pub mod view;
+pub mod style; // Unified styling system
 
 // Transpiler module for Auto language support
 #[cfg(feature = "transpiler")]
