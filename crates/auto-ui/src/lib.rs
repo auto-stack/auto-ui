@@ -14,6 +14,7 @@ pub mod app;
 pub mod component;
 pub mod view;
 pub mod style; // Unified styling system
+pub mod node_converter; // AutoLang Node → View converter
 
 // Transpiler module for Auto language support
 #[cfg(feature = "transpiler")]
@@ -24,6 +25,9 @@ pub use app::{App, AppResult};
 pub use component::Component;
 pub use view::{View, ViewBuilder, ViewContainerBuilder, ViewScrollableBuilder, ViewListBuilder, ViewInputBuilder, ViewTableBuilder};
 pub use style::Style; // Re-export Style for backend adapters
+
+// Re-export AutoLang integration types
+pub use node_converter::{convert_node, ConversionError, ConversionResult};
 
 // Note: widget.rs is kept for backward compatibility but may be deprecated
 // The new design uses Component trait directly instead of Widget trait

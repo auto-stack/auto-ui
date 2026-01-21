@@ -12,9 +12,9 @@ serde_json = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }
 
-# Auto language support for parsing .at files (optional)
+# Auto language support
 auto-lang = { path = "../../../auto-lang/crates/auto-lang", optional = true }
-auto-val = { path = "../../../auto-lang/crates/auto-val", optional = true }
+auto-val = { path = "../../../auto-lang/crates/auto-val" }  # Required for runtime interpretation
 
 # Optional backend dependencies for style adapters
 gpui-lib = { version = "0.2.2", optional = true, package = "gpui" }
@@ -23,5 +23,5 @@ gpui-lib = { version = "0.2.2", optional = true, package = "gpui" }
 default = []
 gpui = ["dep:gpui-lib"]  # Enable GPUI backend adapter
 # iced = ["dep:iced"]  # Enable Iced backend adapter (TODO: add iced dependency)
-transpiler = ["auto-lang", "auto-val"]  # Auto language transpiler support
+transpiler = ["auto-lang"]  # Auto language transpiler support (auto-val always enabled)
 
