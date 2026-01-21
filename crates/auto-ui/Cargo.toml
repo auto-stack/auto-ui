@@ -12,6 +12,10 @@ serde_json = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }
 
+# Hot-reload support
+notify = "7.0"
+tokio = { workspace = true }
+
 # Auto language support
 auto-lang = { path = "../../../auto-lang/crates/auto-lang", optional = true }
 auto-val = { path = "../../../auto-lang/crates/auto-val" }  # Required for runtime interpretation

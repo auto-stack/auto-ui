@@ -15,6 +15,7 @@ pub mod component;
 pub mod view;
 pub mod style; // Unified styling system
 pub mod node_converter; // AutoLang Node → View converter
+pub mod hot_reload; // Hot-reload support for .at files
 
 // Transpiler module for Auto language support
 #[cfg(feature = "transpiler")]
@@ -28,6 +29,9 @@ pub use style::Style; // Re-export Style for backend adapters
 
 // Re-export AutoLang integration types
 pub use node_converter::{convert_node, ConversionError, ConversionResult};
+
+// Re-export hot-reload types
+pub use hot_reload::{HotReloadComponent, UIWatcher, HotReloadError, HotReloadResult};
 
 // Note: widget.rs is kept for backward compatibility but may be deprecated
 // The new design uses Component trait directly instead of Widget trait
