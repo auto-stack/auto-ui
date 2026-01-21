@@ -27,15 +27,22 @@ cargo run --example styling_showcase    # Complete styling demo
 
 ### 🔬 Test the Transpiler
 
-The transpiler is tested but not yet available as a runnable example. Instead, you can:
+The transpiler is tested and now available as a CLI tool!
 
 ```bash
+# Use the transpiler CLI tool
+cargo run --package auto-ui-transpiler -- --help
+cargo run --package auto-ui-transpiler -- transpile input.at --stdout
+cargo run --package auto-ui-transpiler -- info input.at
+
 # Run transpiler tests
 cargo test --package auto-ui --features transpiler --test transpiler_test
 
 # Run integration tests (includes transpilation)
 cargo test --package auto-ui --features transpiler --test integration_test
 ```
+
+See [crates/auto-ui-transpiler-cli/README.md](../crates/auto-ui-transpiler-cli/README.md) for detailed CLI usage.
 
 ## Available Examples
 
@@ -46,6 +53,19 @@ cargo test --package auto-ui --features transpiler --test integration_test
 | `counter_component` | Simple counter UI | Component trait, messages, View API, styling |
 | `all_components` | All 12 UI components | col, row, center, container, scrollable, text, button, input, checkbox, radio, select, list, table |
 | `styled_counter` | Counter with advanced styling | Unified styling system, L1/L2 features |
+
+### Unified Examples (Cross-Backend)
+
+| Example | Description | Features |
+|---------|-------------|----------|
+| `unified-hello-loader` | Loads scratch/hello.at with UI | Auto language file loading, transpiler integration |
+| `unified-container` | Container layout examples | Padding, sizing, centering, nesting |
+| `unified-counter` | Counter component | State management, messages |
+| `unified-input` | Text input handling | User input, text display |
+| `unified-list` | List components | Dynamic lists, scrolling |
+| `unified-todo` | Todo application | Complete app example |
+| `unified-table` | Table components | Data tables, multiple columns |
+| `unified-*` | Other component examples | Various UI patterns |
 
 ### Style System Examples
 
@@ -256,7 +276,25 @@ cargo run --example all_components
 - Container examples (container, scrollable)
 - Element examples (text, button, input, checkbox, radio, select, list, table)
 
-### Example 3: Styling System
+### Example 3: Hello Auto Language Loader
+
+```bash
+cargo run --package unified-hello-loader --features iced
+```
+
+**What you'll see**:
+- A UI that loads and displays [scratch/hello.at](scratch/hello.at)
+- Code preview showing the Auto language syntax
+- Information about how transpilation works
+- Cross-backend support (Iced and GPUI)
+
+**This demonstrates**:
+- Loading Auto language (.at) files
+- Transpiler integration (Plan 006)
+- Unified styling system
+- Cross-backend compatibility
+
+### Example 4: Styling System
 
 ```bash
 cargo run --example styling_showcase
