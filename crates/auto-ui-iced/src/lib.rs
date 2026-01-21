@@ -303,6 +303,46 @@ where
     }
 }
 
+/// Run an auto-ui Component with Iced backend
+///
+/// This is the unified entry point for running auto-ui applications with Iced.
+/// It's called by `auto_ui::App::run()` when the "iced" feature is enabled.
+///
+/// # Example
+/// ```no_run
+/// use auto_ui::{Component, View};
+/// use auto_ui_iced::run_app;
+///
+/// struct MyComponent;
+///
+/// impl Component for MyComponent {
+///     type Msg = ();
+///     fn on(&mut self, _msg: Self::Msg) {}
+///     fn view(&self) -> View<Self::Msg> {
+///         View::text("Hello!")
+///     }
+/// }
+///
+/// fn main() -> auto_ui::AppResult<()> {
+///     run_app::<MyComponent>()
+/// }
+/// ```
+pub fn run_app<C>() -> auto_ui::AppResult<()>
+where
+    C: Component + Default + 'static,
+    C::Msg: Clone + Debug + 'static,
+{
+    iced::run("AutoUI Application", C::update, view)
+}
+
+fn view<C>(component: &C) -> iced::Element<'_, C::Msg>
+where
+    C: Component,
+    C::Msg: Clone + Debug + 'static,
+{
+    component.view_iced()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

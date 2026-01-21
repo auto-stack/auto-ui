@@ -544,6 +544,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "auto-ui-gpui"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "auto-ui",
+ "gpui",
+ "gpui-component",
+]
+
+[[package]]
+name = "auto-ui-gpui-examples"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "auto-ui",
+ "auto-ui-gpui",
+ "gpui",
+ "gpui-component",
+]
+
+[[package]]
 name = "auto-ui-iced"
 version = "0.1.0"
 dependencies = [

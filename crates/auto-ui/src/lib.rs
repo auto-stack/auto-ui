@@ -5,10 +5,12 @@
 // (iced, gpui, vue.js, etc.) through a unified Component trait and View system.
 
 pub mod prelude {
+    pub use crate::app::{App, AppResult};
     pub use crate::component::Component;
     pub use crate::view::{View, ViewBuilder, ViewContainerBuilder, ViewScrollableBuilder, ViewListBuilder, ViewInputBuilder, ViewTableBuilder};
 }
 
+pub mod app;
 pub mod component;
 pub mod view;
 
@@ -17,6 +19,7 @@ pub mod view;
 pub mod trans;
 
 // Re-export core types for convenience
+pub use app::{App, AppResult};
 pub use component::Component;
 pub use view::{View, ViewBuilder, ViewContainerBuilder, ViewScrollableBuilder, ViewListBuilder, ViewInputBuilder, ViewTableBuilder};
 

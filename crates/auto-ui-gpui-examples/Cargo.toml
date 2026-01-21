@@ -1,0 +1,35 @@
+[package]
+name = "auto-ui-gpui-examples"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "counter"
+path = "src/bin/counter.rs"
+
+[[bin]]
+name = "todo"
+path = "src/bin/todo.rs"
+
+[[bin]]
+name = "temp_converter"
+path = "src/bin/temp_converter.rs"
+
+[[bin]]
+name = "container_demo"
+path = "src/bin/container_demo.rs"
+
+[[bin]]
+name = "scroll_demo"
+path = "src/bin/scroll_demo.rs"
+
+[[bin]]
+name = "input_demo"
+path = "src/bin/input_demo.rs"
+
+[dependencies]
+gpui = "0.2.2"
+gpui-component = { workspace = true }
+auto-ui = { workspace = true }
+auto-ui-gpui = { path = "../auto-ui-gpui" }
+anyhow = "1.0"

@@ -16,6 +16,3 @@ thiserror = { workspace = true }
 auto-lang = { path = "../../../auto-lang/crates/auto-lang", optional = true }
 auto-val = { path = "../../../auto-lang/crates/auto-val", optional = true }
 
-[features]
-default = []
-transpiler = ["auto-lang", "auto-val"]
