@@ -23,6 +23,9 @@ auto-val = { path = "../../../auto-lang/crates/auto-val" }  # Required for runti
 # Optional backend dependencies for style adapters
 gpui-lib = { version = "0.2.2", optional = true, package = "gpui" }
 
+[dev-dependencies]
+tempfile = "3.10"
+
 [features]
 default = []
 gpui = ["dep:gpui-lib"]  # Enable GPUI backend adapter
