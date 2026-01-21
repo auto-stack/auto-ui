@@ -184,6 +184,82 @@ pub enum StyleClass {
 
     /// Text alignment: text-right (L2)
     TextRight,
+
+    // ========== Effects (L3 Advanced) ==========
+    /// Shadow: shadow (default) - L3
+    Shadow,
+
+    /// Shadow: shadow-sm - L3
+    ShadowSm,
+
+    /// Shadow: shadow-md - L3
+    ShadowMd,
+
+    /// Shadow: shadow-lg - L3
+    ShadowLg,
+
+    /// Shadow: shadow-xl - L3
+    ShadowXl,
+
+    /// Shadow: shadow-2xl - L3
+    Shadow2Xl,
+
+    /// Shadow: shadow-none - L3
+    ShadowNone,
+
+    /// Opacity: opacity-{0-100} - L3
+    Opacity(u8),
+
+    // ========== Position (L3 Advanced) ==========
+    /// Position: relative - L3
+    Relative,
+
+    /// Position: absolute - L3 (Note: Iced doesn't support absolute positioning)
+    Absolute,
+
+    /// Z-index: z-{0-50} - L3
+    ZIndex(i16),
+
+    // ========== Overflow (L3 Advanced) ==========
+    /// Overflow: overflow-auto - L3
+    OverflowAuto,
+
+    /// Overflow: overflow-hidden - L3
+    OverflowHidden,
+
+    /// Overflow: overflow-visible - L3
+    OverflowVisible,
+
+    /// Overflow: overflow-scroll - L3
+    OverflowScroll,
+
+    /// Overflow X: overflow-x-auto - L3
+    OverflowXAuto,
+
+    /// Overflow Y: overflow-y-auto - L3
+    OverflowYAuto,
+
+    // ========== Grid (L3 Advanced) ==========
+    /// Display: grid - L3 (Note: Iced doesn't support grid)
+    Grid,
+
+    /// Grid columns: grid-cols-{1-12} - L3
+    GridCols(u8),
+
+    /// Grid rows: grid-rows-{1-6} - L3
+    GridRows(u8),
+
+    /// Grid column: col-span-{1-12} - L3
+    ColSpan(u8),
+
+    /// Grid row: row-span-{1-6} - L3
+    RowSpan(u8),
+
+    /// Grid column start: col-start-{1-7} - L3
+    ColStart(u8),
+
+    /// Grid row start: row-start-{1-7} - L3
+    RowStart(u8),
 }
 
 impl StyleClass {
@@ -377,6 +453,130 @@ impl StyleClass {
             return Ok(StyleClass::BorderColor(color));
         }
 
+        // ========== Effects (L3) ==========
+
+        // Parse shadow variants
+        match class {
+            "shadow" => return Ok(StyleClass::Shadow),
+            "shadow-sm" => return Ok(StyleClass::ShadowSm),
+            "shadow-md" => return Ok(StyleClass::ShadowMd),
+            "shadow-lg" => return Ok(StyleClass::ShadowLg),
+            "shadow-xl" => return Ok(StyleClass::ShadowXl),
+            "shadow-2xl" => return Ok(StyleClass::Shadow2Xl),
+            "shadow-none" => return Ok(StyleClass::ShadowNone),
+            _ => {}
+        }
+
+        // Parse opacity: opacity-{0-100}
+        if let Some(rest) = class.strip_prefix("opacity-") {
+            let value: u8 = rest.parse()
+                .map_err(|_| format!("Invalid opacity value: {}", rest))?;
+            if value > 100 {
+                return Err(format!("Opacity value must be 0-100, got: {}", value));
+            }
+            return Ok(StyleClass::Opacity(value));
+        }
+
+        // ========== Position (L3) ==========
+
+        // Parse position
+        match class {
+            "relative" => return Ok(StyleClass::Relative),
+            "absolute" => return Ok(StyleClass::Absolute),
+            _ => {}
+        }
+
+        // Parse z-index: z-{0-50}
+        if let Some(rest) = class.strip_prefix("z-") {
+            // Handle z-{0}, z-10, z-20, z-50, etc.
+            let value: i16 = rest.parse()
+                .map_err(|_| format!("Invalid z-index value: {}", rest))?;
+            if value < 0 || value > 50 {
+                return Err(format!("Z-index value must be 0-50, got: {}", value));
+            }
+            return Ok(StyleClass::ZIndex(value));
+        }
+
+        // ========== Overflow (L3) ==========
+
+        // Parse overflow variants
+        match class {
+            "overflow-auto" => return Ok(StyleClass::OverflowAuto),
+            "overflow-hidden" => return Ok(StyleClass::OverflowHidden),
+            "overflow-visible" => return Ok(StyleClass::OverflowVisible),
+            "overflow-scroll" => return Ok(StyleClass::OverflowScroll),
+            "overflow-x-auto" => return Ok(StyleClass::OverflowXAuto),
+            "overflow-y-auto" => return Ok(StyleClass::OverflowYAuto),
+            _ => {}
+        }
+
+        // ========== Grid (L3) ==========
+
+        // Parse grid
+        if class == "grid" {
+            return Ok(StyleClass::Grid);
+        }
+
+        // Parse grid-cols-{1-12}
+        if let Some(rest) = class.strip_prefix("grid-cols-") {
+            let value: u8 = rest.parse()
+                .map_err(|_| format!("Invalid grid-cols value: {}", rest))?;
+            if value < 1 || value > 12 {
+                return Err(format!("Grid columns must be 1-12, got: {}", value));
+            }
+            return Ok(StyleClass::GridCols(value));
+        }
+
+        // Parse grid-rows-{1-6}
+        if let Some(rest) = class.strip_prefix("grid-rows-") {
+            let value: u8 = rest.parse()
+                .map_err(|_| format!("Invalid grid-rows value: {}", rest))?;
+            if value < 1 || value > 6 {
+                return Err(format!("Grid rows must be 1-6, got: {}", value));
+            }
+            return Ok(StyleClass::GridRows(value));
+        }
+
+        // Parse col-span-{1-12}
+        if let Some(rest) = class.strip_prefix("col-span-") {
+            let value: u8 = rest.parse()
+                .map_err(|_| format!("Invalid col-span value: {}", rest))?;
+            if value < 1 || value > 12 {
+                return Err(format!("Column span must be 1-12, got: {}", value));
+            }
+            return Ok(StyleClass::ColSpan(value));
+        }
+
+        // Parse row-span-{1-6}
+        if let Some(rest) = class.strip_prefix("row-span-") {
+            let value: u8 = rest.parse()
+                .map_err(|_| format!("Invalid row-span value: {}", rest))?;
+            if value < 1 || value > 6 {
+                return Err(format!("Row span must be 1-6, got: {}", value));
+            }
+            return Ok(StyleClass::RowSpan(value));
+        }
+
+        // Parse col-start-{1-7}
+        if let Some(rest) = class.strip_prefix("col-start-") {
+            let value: u8 = rest.parse()
+                .map_err(|_| format!("Invalid col-start value: {}", rest))?;
+            if value < 1 || value > 7 {
+                return Err(format!("Column start must be 1-7, got: {}", value));
+            }
+            return Ok(StyleClass::ColStart(value));
+        }
+
+        // Parse row-start-{1-7}
+        if let Some(rest) = class.strip_prefix("row-start-") {
+            let value: u8 = rest.parse()
+                .map_err(|_| format!("Invalid row-start value: {}", rest))?;
+            if value < 1 || value > 7 {
+                return Err(format!("Row start must be 1-7, got: {}", value));
+            }
+            return Ok(StyleClass::RowStart(value));
+        }
+
         Err(format!("Unknown style class: {}", class))
     }
 }
@@ -521,5 +721,69 @@ mod tests {
         assert_eq!(StyleClass::parse_single("border-0"), Ok(StyleClass::Border0));
         assert!(matches!(StyleClass::parse_single("border-white"), Ok(StyleClass::BorderColor(_))));
         assert!(matches!(StyleClass::parse_single("border-red-500"), Ok(StyleClass::BorderColor(_))));
+    }
+
+    // ========== L3 Tests ==========
+
+    #[test]
+    fn test_parse_shadow() {
+        assert_eq!(StyleClass::parse_single("shadow"), Ok(StyleClass::Shadow));
+        assert_eq!(StyleClass::parse_single("shadow-sm"), Ok(StyleClass::ShadowSm));
+        assert_eq!(StyleClass::parse_single("shadow-md"), Ok(StyleClass::ShadowMd));
+        assert_eq!(StyleClass::parse_single("shadow-lg"), Ok(StyleClass::ShadowLg));
+        assert_eq!(StyleClass::parse_single("shadow-xl"), Ok(StyleClass::ShadowXl));
+        assert_eq!(StyleClass::parse_single("shadow-2xl"), Ok(StyleClass::Shadow2Xl));
+        assert_eq!(StyleClass::parse_single("shadow-none"), Ok(StyleClass::ShadowNone));
+    }
+
+    #[test]
+    fn test_parse_opacity() {
+        assert_eq!(StyleClass::parse_single("opacity-0"), Ok(StyleClass::Opacity(0)));
+        assert_eq!(StyleClass::parse_single("opacity-50"), Ok(StyleClass::Opacity(50)));
+        assert_eq!(StyleClass::parse_single("opacity-100"), Ok(StyleClass::Opacity(100)));
+    }
+
+    #[test]
+    fn test_parse_position() {
+        assert_eq!(StyleClass::parse_single("relative"), Ok(StyleClass::Relative));
+        assert_eq!(StyleClass::parse_single("absolute"), Ok(StyleClass::Absolute));
+    }
+
+    #[test]
+    fn test_parse_z_index() {
+        assert_eq!(StyleClass::parse_single("z-0"), Ok(StyleClass::ZIndex(0)));
+        assert_eq!(StyleClass::parse_single("z-10"), Ok(StyleClass::ZIndex(10)));
+        assert_eq!(StyleClass::parse_single("z-50"), Ok(StyleClass::ZIndex(50)));
+    }
+
+    #[test]
+    fn test_parse_overflow() {
+        assert_eq!(StyleClass::parse_single("overflow-auto"), Ok(StyleClass::OverflowAuto));
+        assert_eq!(StyleClass::parse_single("overflow-hidden"), Ok(StyleClass::OverflowHidden));
+        assert_eq!(StyleClass::parse_single("overflow-visible"), Ok(StyleClass::OverflowVisible));
+        assert_eq!(StyleClass::parse_single("overflow-scroll"), Ok(StyleClass::OverflowScroll));
+        assert_eq!(StyleClass::parse_single("overflow-x-auto"), Ok(StyleClass::OverflowXAuto));
+        assert_eq!(StyleClass::parse_single("overflow-y-auto"), Ok(StyleClass::OverflowYAuto));
+    }
+
+    #[test]
+    fn test_parse_grid() {
+        assert_eq!(StyleClass::parse_single("grid"), Ok(StyleClass::Grid));
+        assert_eq!(StyleClass::parse_single("grid-cols-2"), Ok(StyleClass::GridCols(2)));
+        assert_eq!(StyleClass::parse_single("grid-cols-12"), Ok(StyleClass::GridCols(12)));
+        assert_eq!(StyleClass::parse_single("grid-rows-3"), Ok(StyleClass::GridRows(3)));
+    }
+
+    #[test]
+    fn test_parse_grid_span() {
+        assert_eq!(StyleClass::parse_single("col-span-2"), Ok(StyleClass::ColSpan(2)));
+        assert_eq!(StyleClass::parse_single("col-span-6"), Ok(StyleClass::ColSpan(6)));
+        assert_eq!(StyleClass::parse_single("row-span-2"), Ok(StyleClass::RowSpan(2)));
+    }
+
+    #[test]
+    fn test_parse_grid_position() {
+        assert_eq!(StyleClass::parse_single("col-start-2"), Ok(StyleClass::ColStart(2)));
+        assert_eq!(StyleClass::parse_single("row-start-1"), Ok(StyleClass::RowStart(1)));
     }
 }

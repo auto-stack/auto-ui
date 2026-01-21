@@ -52,6 +52,52 @@ pub struct GpuiStyle {
     pub font_size: Option<GpuiFontSize>,
     pub font_weight: Option<GpuiFontWeight>,
     pub text_align: Option<GpuiTextAlign>,
+
+    // Effects (L3)
+    pub shadow: bool,
+    pub shadow_size: Option<GpuiShadowSize>,
+    pub opacity: Option<f32>,
+
+    // Position (L3)
+    pub position: Option<GpuiPosition>,
+    pub z_index: Option<i16>,
+
+    // Overflow (L3)
+    pub overflow_x: Option<GpuiOverflow>,
+    pub overflow_y: Option<GpuiOverflow>,
+
+    // Grid (L3)
+    pub grid: bool,
+    pub grid_cols: Option<u8>,
+    pub grid_rows: Option<u8>,
+    pub col_span: Option<u8>,
+    pub row_span: Option<u8>,
+    pub col_start: Option<u8>,
+    pub row_start: Option<u8>,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum GpuiShadowSize {
+    Sm,
+    Md,
+    Lg,
+    Xl,
+    Xxl,
+    None,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum GpuiPosition {
+    Relative,
+    Absolute,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum GpuiOverflow {
+    Auto,
+    Hidden,
+    Visible,
+    Scroll,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -142,6 +188,21 @@ impl GpuiStyle {
             font_size: None,
             font_weight: None,
             text_align: None,
+            // L3
+            shadow: false,
+            shadow_size: None,
+            opacity: None,
+            position: None,
+            z_index: None,
+            overflow_x: None,
+            overflow_y: None,
+            grid: false,
+            grid_cols: None,
+            grid_rows: None,
+            col_span: None,
+            row_span: None,
+            col_start: None,
+            row_start: None,
         };
 
         for class in &style.classes {
@@ -318,6 +379,99 @@ impl GpuiStyle {
             }
             StyleClass::TextRight => {
                 self.text_align = Some(GpuiTextAlign::Right);
+            }
+
+            // ========== Effects (L3) ==========
+            StyleClass::Shadow => {
+                self.shadow = true;
+                self.shadow_size = Some(GpuiShadowSize::Md);
+            }
+            StyleClass::ShadowSm => {
+                self.shadow = true;
+                self.shadow_size = Some(GpuiShadowSize::Sm);
+            }
+            StyleClass::ShadowMd => {
+                self.shadow = true;
+                self.shadow_size = Some(GpuiShadowSize::Md);
+            }
+            StyleClass::ShadowLg => {
+                self.shadow = true;
+                self.shadow_size = Some(GpuiShadowSize::Lg);
+            }
+            StyleClass::ShadowXl => {
+                self.shadow = true;
+                self.shadow_size = Some(GpuiShadowSize::Xl);
+            }
+            StyleClass::Shadow2Xl => {
+                self.shadow = true;
+                self.shadow_size = Some(GpuiShadowSize::Xxl);
+            }
+            StyleClass::ShadowNone => {
+                self.shadow = false;
+                self.shadow_size = Some(GpuiShadowSize::None);
+            }
+            StyleClass::Opacity(value) => {
+                self.opacity = Some(*value as f32 / 100.0);
+            }
+
+            // ========== Position (L3) ==========
+            StyleClass::Relative => {
+                self.position = Some(GpuiPosition::Relative);
+            }
+            StyleClass::Absolute => {
+                self.position = Some(GpuiPosition::Absolute);
+            }
+            StyleClass::ZIndex(z) => {
+                self.z_index = Some(*z);
+            }
+
+            // ========== Overflow (L3) ==========
+            StyleClass::OverflowAuto => {
+                self.overflow_x = Some(GpuiOverflow::Auto);
+                self.overflow_y = Some(GpuiOverflow::Auto);
+            }
+            StyleClass::OverflowHidden => {
+                self.overflow_x = Some(GpuiOverflow::Hidden);
+                self.overflow_y = Some(GpuiOverflow::Hidden);
+            }
+            StyleClass::OverflowVisible => {
+                self.overflow_x = Some(GpuiOverflow::Visible);
+                self.overflow_y = Some(GpuiOverflow::Visible);
+            }
+            StyleClass::OverflowScroll => {
+                self.overflow_x = Some(GpuiOverflow::Scroll);
+                self.overflow_y = Some(GpuiOverflow::Scroll);
+            }
+            StyleClass::OverflowXAuto => {
+                self.overflow_x = Some(GpuiOverflow::Auto);
+            }
+            StyleClass::OverflowYAuto => {
+                self.overflow_y = Some(GpuiOverflow::Auto);
+            }
+
+            // ========== Grid (L3) ==========
+            StyleClass::Grid => {
+                self.grid = true;
+            }
+            StyleClass::GridCols(cols) => {
+                self.grid = true;
+                self.grid_cols = Some(*cols);
+            }
+            StyleClass::GridRows(rows) => {
+                self.grid = true;
+                self.grid_rows = Some(*rows);
+            }
+            StyleClass::ColSpan(span) => {
+                self.col_span = Some(*span);
+            }
+            StyleClass::RowSpan(span) => {
+                self.row_span = Some(*span);
+            }
+            StyleClass::ColStart(start) => {
+                self.col_start = Some(*start);
+            }
+            StyleClass::RowStart(start) => {
+                self.row_start = Some(*start);
             }
         }
     }

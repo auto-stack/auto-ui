@@ -43,6 +43,54 @@ pub struct IcedStyle {
     pub font_size: Option<IcedFontSize>,
     pub font_weight: Option<IcedFontWeight>,
     pub text_align: Option<IcedTextAlign>,
+
+    // Effects (L3)
+    pub shadow: bool,
+    pub shadow_size: Option<IcedShadowSize>,
+    pub opacity: Option<f32>,
+
+    // Position (L3)
+    // NOTE: Iced doesn't support absolute positioning - these fields are ignored
+    pub position: Option<IcedPosition>,
+    pub z_index: Option<i16>,       // Not supported by Iced
+
+    // Overflow (L3)
+    pub overflow_x: Option<IcedOverflow>,
+    pub overflow_y: Option<IcedOverflow>,
+
+    // Grid (L3)
+    // NOTE: Iced doesn't support grid layout - these fields are ignored
+    pub grid: bool,                 // Not supported by Iced
+    pub grid_cols: Option<u8>,      // Not supported by Iced
+    pub grid_rows: Option<u8>,      // Not supported by Iced
+    pub col_span: Option<u8>,       // Not supported by Iced
+    pub row_span: Option<u8>,       // Not supported by Iced
+    pub col_start: Option<u8>,      // Not supported by Iced
+    pub row_start: Option<u8>,      // Not supported by Iced
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum IcedShadowSize {
+    Sm,
+    Md,
+    Lg,
+    Xl,
+    Xxl,
+    None,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum IcedPosition {
+    Relative,
+    Absolute, // Not supported by Iced
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum IcedOverflow {
+    Auto,
+    Hidden,
+    Visible,
+    Scroll,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -99,6 +147,21 @@ impl IcedStyle {
             font_size: None,
             font_weight: None,
             text_align: None,
+            // L3
+            shadow: false,
+            shadow_size: None,
+            opacity: None,
+            position: None,
+            z_index: None,      // Not supported by Iced
+            overflow_x: None,
+            overflow_y: None,
+            grid: false,        // Not supported by Iced
+            grid_cols: None,    // Not supported by Iced
+            grid_rows: None,    // Not supported by Iced
+            col_span: None,     // Not supported by Iced
+            row_span: None,     // Not supported by Iced
+            col_start: None,    // Not supported by Iced
+            row_start: None,    // Not supported by Iced
         };
 
         for class in &style.classes {
@@ -240,6 +303,106 @@ impl IcedStyle {
             }
             StyleClass::TextRight => {
                 self.text_align = Some(IcedTextAlign::Right);
+            }
+
+            // ========== Effects (L3) ==========
+            StyleClass::Shadow => {
+                self.shadow = true;
+                self.shadow_size = Some(IcedShadowSize::Md);
+            }
+            StyleClass::ShadowSm => {
+                self.shadow = true;
+                self.shadow_size = Some(IcedShadowSize::Sm);
+            }
+            StyleClass::ShadowMd => {
+                self.shadow = true;
+                self.shadow_size = Some(IcedShadowSize::Md);
+            }
+            StyleClass::ShadowLg => {
+                self.shadow = true;
+                self.shadow_size = Some(IcedShadowSize::Lg);
+            }
+            StyleClass::ShadowXl => {
+                self.shadow = true;
+                self.shadow_size = Some(IcedShadowSize::Xl);
+            }
+            StyleClass::Shadow2Xl => {
+                self.shadow = true;
+                self.shadow_size = Some(IcedShadowSize::Xxl);
+            }
+            StyleClass::ShadowNone => {
+                self.shadow = false;
+                self.shadow_size = Some(IcedShadowSize::None);
+            }
+            StyleClass::Opacity(value) => {
+                self.opacity = Some(*value as f32 / 100.0);
+            }
+
+            // ========== Position (L3) ==========
+            StyleClass::Relative => {
+                self.position = Some(IcedPosition::Relative);
+            }
+            StyleClass::Absolute => {
+                // Iced doesn't support absolute positioning - store but will be ignored
+                self.position = Some(IcedPosition::Absolute);
+            }
+            StyleClass::ZIndex(z) => {
+                // Iced doesn't support z-index - store but will be ignored
+                self.z_index = Some(*z);
+            }
+
+            // ========== Overflow (L3) ==========
+            StyleClass::OverflowAuto => {
+                self.overflow_x = Some(IcedOverflow::Auto);
+                self.overflow_y = Some(IcedOverflow::Auto);
+            }
+            StyleClass::OverflowHidden => {
+                self.overflow_x = Some(IcedOverflow::Hidden);
+                self.overflow_y = Some(IcedOverflow::Hidden);
+            }
+            StyleClass::OverflowVisible => {
+                self.overflow_x = Some(IcedOverflow::Visible);
+                self.overflow_y = Some(IcedOverflow::Visible);
+            }
+            StyleClass::OverflowScroll => {
+                self.overflow_x = Some(IcedOverflow::Scroll);
+                self.overflow_y = Some(IcedOverflow::Scroll);
+            }
+            StyleClass::OverflowXAuto => {
+                self.overflow_x = Some(IcedOverflow::Auto);
+            }
+            StyleClass::OverflowYAuto => {
+                self.overflow_y = Some(IcedOverflow::Auto);
+            }
+
+            // ========== Grid (L3) ==========
+            StyleClass::Grid => {
+                // Iced doesn't support grid - store but will be ignored
+                self.grid = true;
+            }
+            StyleClass::GridCols(cols) => {
+                // Iced doesn't support grid - store but will be ignored
+                self.grid_cols = Some(*cols);
+            }
+            StyleClass::GridRows(rows) => {
+                // Iced doesn't support grid - store but will be ignored
+                self.grid_rows = Some(*rows);
+            }
+            StyleClass::ColSpan(span) => {
+                // Iced doesn't support grid - store but will be ignored
+                self.col_span = Some(*span);
+            }
+            StyleClass::RowSpan(span) => {
+                // Iced doesn't support grid - store but will be ignored
+                self.row_span = Some(*span);
+            }
+            StyleClass::ColStart(start) => {
+                // Iced doesn't support grid - store but will be ignored
+                self.col_start = Some(*start);
+            }
+            StyleClass::RowStart(start) => {
+                // Iced doesn't support grid - store but will be ignored
+                self.row_start = Some(*start);
             }
 
             // ========== Layout styles ==========
