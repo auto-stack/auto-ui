@@ -27,8 +27,14 @@ pub fn transpile_file(input_path: impl AsRef<Path>, output_path: Option<&str>) -
         .map_err(|e| format!("Failed to read file {}: {}", input_path.display(), e))?;
 
     // Parse the Auto code
-    let parser = Parser::new();
-    let ast = parser.parse(&source)
+    // Parser::new requires code and universe scope
+    use std::rc::Rc;
+    use std::cell::RefCell;
+    use auto_lang::Universe;
+
+    let universe = Rc::new(RefCell::new(Universe::new()));
+    let mut parser = Parser::new(&source, universe);
+    let ast = parser.parse()
         .map_err(|e| format!("Failed to parse {}: {:?}", input_path.display(), e))?;
 
     // Generate Rust code
@@ -73,15 +79,16 @@ pub fn transpile_ast(ast: &auto_lang::ast::Code) -> Result<String, String> {
 
 /// Check if type declaration is a widget
 fn is_widget_type(type_decl: &auto_lang::ast::TypeDecl) -> bool {
-    // Check if has Widget trait
-    let has_widget_trait = type_decl.traits.iter()
-        .any(|t| t.name == "Widget");
+    // Check if has Widget in specs (traits/specs implemented)
+    // Spec is just a type alias for AutoStr (String)
+    let has_widget_spec = type_decl.specs.iter()
+        .any(|spec| spec.as_str() == "Widget");
 
     // Or check if has view method
     let has_view_method = type_decl.methods.iter()
         .any(|m| m.name == "view");
 
-    has_widget_trait || has_view_method
+    has_widget_spec || has_view_method
 }
 
 #[cfg(test)]

@@ -37,7 +37,7 @@ impl RustCodeGenerator {
 
     /// Generate complete Rust code from widget type declaration
     pub fn generate_widget(&mut self, type_decl: &TypeDecl) -> Result<String, String> {
-        self.current_widget = Some(type_decl.name.clone());
+        self.current_widget = Some(type_decl.name.to_string());
         self.messages.clear();
         self.imports.clear();
 
@@ -169,15 +169,17 @@ impl RustCodeGenerator {
         for stmt in &body.stmts {
             if let Stmt::Is(is_stmt) = stmt {
                 // Match statement on message - extract patterns from is statement
-                for (pattern, _body) in &is_stmt.arms {
-                    // Pattern is an expression - check if it's an identifier with Msg prefix
-                    if let Expr::Ident(name) = pattern {
-                        // Extract message variant name
-                        if let Some(msg_name) = name.strip_prefix("Msg.") {
-                            self.messages.insert(MessageVariant {
-                                name: msg_name.to_string(),
-                                has_fields: false, // TODO: detect field patterns
-                            });
+                for branch in &is_stmt.branches {
+                    if let auto_lang::ast::IsBranch::EqBranch(pattern, _body) = branch {
+                        // Pattern is an expression - check if it's an identifier with Msg prefix
+                        if let Expr::Ident(name) = pattern {
+                            // Extract message variant name
+                            if let Some(msg_name) = name.strip_prefix("Msg.") {
+                                self.messages.insert(MessageVariant {
+                                    name: msg_name.to_string(),
+                                    has_fields: false, // TODO: detect field patterns
+                                });
+                            }
                         }
                     }
                 }
@@ -222,7 +224,6 @@ impl RustCodeGenerator {
 
         code.push_str("#[derive(Debug)]\n");
         code.push_str(&format!("pub struct {} {{\n", type_decl.name));
-        self.indent += 1;
 
         for member in &type_decl.members {
             let field_name = &member.name;
@@ -230,7 +231,6 @@ impl RustCodeGenerator {
             code.push_str(&format!("    pub {}: {},\n", field_name, field_type));
         }
 
-        self.indent -= 1;
         code.push_str("}\n");
 
         code
@@ -242,7 +242,6 @@ impl RustCodeGenerator {
         let mut code = String::new();
 
         code.push_str(&format!("impl {} {{\n", widget_name));
-        self.indent += 1;
 
         // Parameter list
         let params: Vec<String> = type_decl.members.iter()
@@ -250,22 +249,13 @@ impl RustCodeGenerator {
             .collect();
 
         code.push_str(&format!("    pub fn new({}) -> Self {{\n", params.join(", ")));
-        self.indent += 1;
 
         code.push_str("        Self {\n");
-        self.indent += 1;
-
         for member in &type_decl.members {
             code.push_str(&format!("            {},\n", member.name));
         }
-
-        self.indent -= 1;
         code.push_str("        }\n");
-
-        self.indent -= 1;
         code.push_str("    }\n");
-
-        self.indent -= 1;
         code.push_str("}\n");
 
         code
@@ -277,7 +267,6 @@ impl RustCodeGenerator {
         let mut code = String::new();
 
         code.push_str(&format!("impl Component for {} {{\n", widget_name));
-        self.indent += 1;
 
         // Message type
         if self.messages.is_empty() {
@@ -307,7 +296,6 @@ impl RustCodeGenerator {
             code.push_str("    }\n");
         }
 
-        self.indent -= 1;
         code.push_str("}\n");
 
         code
@@ -318,23 +306,21 @@ impl RustCodeGenerator {
         let mut code = String::new();
 
         code.push_str("    fn on(&mut self, msg: Self::Msg) {\n");
-        self.indent += 1;
 
         // Generate match statement
-        self.indent += 1;
         code.push_str("        match msg {\n");
 
         // Process match arms from body
         for stmt in &method.body.stmts {
             if let Stmt::Is(is_stmt) = stmt {
-                for (pattern, body) in &is_stmt.arms {
-                    if let Expr::Ident(name) = pattern {
-                        let msg_name = name.strip_prefix("Msg.").unwrap_or(name);
-                        code.push_str(&format!("            {} => {{\n", msg_name));
-                        self.indent += 1;
-                        code.push_str(&self.generate_body_stmts(body));
-                        self.indent -= 1;
-                        code.push_str("            }\n");
+                for branch in &is_stmt.branches {
+                    if let auto_lang::ast::IsBranch::EqBranch(pattern, body) = branch {
+                        if let Expr::Ident(name) = pattern {
+                            let msg_name = name.strip_prefix("Msg.").unwrap_or(name);
+                            code.push_str(&format!("            {} => {{\n", msg_name));
+                            code.push_str(&self.generate_body_stmts(body));
+                            code.push_str("            }\n");
+                        }
                     }
                 }
             }
@@ -343,8 +329,6 @@ impl RustCodeGenerator {
         // Add wildcard arm if not complete
         code.push_str("            _ => {}\n");
         code.push_str("        }\n");
-
-        self.indent -= 2;
         code.push_str("    }\n");
 
         code
@@ -355,7 +339,6 @@ impl RustCodeGenerator {
         let mut code = String::new();
 
         code.push_str("    fn view(&self) -> View<Self::Msg> {\n");
-        self.indent += 1;
 
         // Generate view expressions
         for stmt in &method.body.stmts {
@@ -372,7 +355,6 @@ impl RustCodeGenerator {
             }
         }
 
-        self.indent -= 1;
         code.push_str("    }\n");
 
         code
@@ -625,39 +607,32 @@ impl RustCodeGenerator {
     // Helper methods
 
     fn get_main_arg(&self, node: &Node) -> Option<String> {
-        // Get first argument from args
-        if let Some(arg) = node.args.args.first() {
-            match arg {
-                auto_lang::ast::call::Arg::Pos(expr) => {
-                    Some(format!("\"{}\"", self.expr_to_string(expr)))
-                }
-                _ => None,
-            }
+        // Get first positional argument using args.get()
+        if let Some(arg) = node.args.get(0) {
+            // Use arg.get_expr() to get the expression
+            let expr = arg.get_expr();
+            Some(format!("\"{}\"", self.expr_to_string(&expr)))
         } else {
             None
         }
     }
 
     fn get_prop_string(&self, node: &Node, key: &str) -> Option<String> {
-        // Look for named arguments in args
-        for arg in &node.args.args {
-            if let auto_lang::ast::call::Arg::Pair(k, v) = arg {
-                if k.as_str() == key {
-                    return Some(format!("\"{}\"", self.expr_to_string(v)));
-                }
+        // Use args.lookup() to find named argument
+        if let Some(arg) = node.args.lookup(key) {
+            let expr = arg.get_expr();
+            if let Expr::Str(s) = &expr {
+                return Some(format!("\"{}\"", s));
             }
         }
         None
     }
 
     fn get_prop_u16(&self, node: &Node, key: &str) -> Option<u16> {
-        for arg in &node.args.args {
-            if let auto_lang::ast::call::Arg::Pair(k, v) = arg {
-                if k.as_str() == key {
-                    if let Expr::Int(n) = v {
-                        return Some(*n as u16);
-                    }
-                }
+        if let Some(arg) = node.args.lookup(key) {
+            let expr = arg.get_expr();
+            if let Expr::Int(n) = &expr {
+                return Some(*n as u16);
             }
         }
         None
@@ -668,13 +643,10 @@ impl RustCodeGenerator {
     }
 
     fn get_prop_bool(&self, node: &Node, key: &str) -> Option<bool> {
-        for arg in &node.args.args {
-            if let auto_lang::ast::call::Arg::Pair(k, v) = arg {
-                if k.as_str() == key {
-                    if let Expr::Bool(b) = v {
-                        return Some(*b);
-                    }
-                }
+        if let Some(arg) = node.args.lookup(key) {
+            let expr = arg.get_expr();
+            if let Expr::Bool(b) = &expr {
+                return Some(*b);
             }
         }
         None
@@ -682,10 +654,10 @@ impl RustCodeGenerator {
 
     fn expr_to_string(&self, expr: &Expr) -> String {
         match expr {
-            Expr::Str(s) => s.clone(),
+            Expr::Str(s) => s.to_string(),
             Expr::Int(n) => n.to_string(),
             Expr::Bool(b) => b.to_string(),
-            Expr::Ident(name) => name.clone(),
+            Expr::Ident(name) => name.to_string(),
             _ => "\"\"".to_string(),
         }
     }
@@ -695,14 +667,18 @@ impl RustCodeGenerator {
         for stmt in &body.stmts {
             match stmt {
                 Stmt::Store(store) => {
-                    if let Expr::Ident(name) = &store.target {
-                        if let Expr::Int(n) = &store.value {
-                            code.push_str(&format!("                self.{} = {},\n", name, n));
-                        } else if let Expr::Op(op) = &store.value {
-                            if let Expr::Ident(field_name) = &op.lhs {
-                                if op.op.as_str() == "+=" {
+                    // Store uses 'name' (of type Name) and 'expr' fields
+                    let name_str = store.name.to_string();
+                    if let Expr::Int(n) = &store.expr {
+                        code.push_str(&format!("                self.{} = {},\n", name_str, n));
+                    } else if let Expr::Bina(lhs, op, rhs) = &store.expr {
+                        // Handle binary operations like += and -=
+                        if let Expr::Ident(field_name) = lhs.as_ref() {
+                            if let Expr::Int(1) = rhs.as_ref() {
+                                // Check operator by string representation
+                                if op.to_string().contains("+") || op.to_string().contains("+=") {
                                     code.push_str(&format!("                self.{} += 1,\n", field_name));
-                                } else if op.op.as_str() == "-=" {
+                                } else if op.to_string().contains("-") || op.to_string().contains("-=") {
                                     code.push_str(&format!("                self.{} -= 1,\n", field_name));
                                 }
                             }
@@ -720,7 +696,7 @@ impl RustCodeGenerator {
             Type::Int => "i32".to_string(),
             Type::Str(_) => "String".to_string(),
             Type::Bool => "bool".to_string(),
-            Type::User(user) => user.name.clone(),
+            Type::User(user) => user.name.to_string(),
             _ => "/* unknown type */".to_string(),
         }
     }
