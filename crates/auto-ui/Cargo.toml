@@ -6,6 +6,10 @@ edition = "2021"
 [lib]
 crate-type = ["lib"]
 
+[[bin]]
+name = "auto-ui"
+path = "src/bin/auto-ui.rs"
+
 [dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -14,6 +18,7 @@ thiserror = { workspace = true }
 
 # Hot-reload support
 notify = "7.0"
+notify-debouncer-mini = { version = "0.4", optional = true }
 tokio = { workspace = true }
 
 # Auto language support
@@ -23,6 +28,12 @@ auto-val = { path = "../../../auto-lang/crates/auto-val" }  # Required for runti
 # Optional backend dependencies for style adapters
 gpui-lib = { version = "0.2.2", optional = true, package = "gpui" }
 
+# CLI dependencies (only when building the binary)
+clap = { version = "4.5", features = ["derive"], optional = true }
+console = { version = "0.15", optional = true }
+miette = { version = "7.0", features = ["fancy"], optional = true }
+regex = { version = "1.10", optional = true }
+
 [dev-dependencies]
 tempfile = "3.10"
 
@@ -31,4 +42,5 @@ default = []
 gpui = ["dep:gpui-lib"]  # Enable GPUI backend adapter
 # iced = ["dep:iced"]  # Enable Iced backend adapter (TODO: add iced dependency)
 transpiler = ["auto-lang"]  # Auto language transpiler support (auto-val always enabled)
+cli = ["clap", "console", "miette", "regex", "transpiler", "notify-debouncer-mini"]  # CLI tool support
 

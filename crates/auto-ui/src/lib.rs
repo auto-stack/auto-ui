@@ -17,6 +17,10 @@ pub mod style; // Unified styling system
 pub mod node_converter; // AutoLang Node → View converter
 pub mod hot_reload; // Hot-reload support for .at files
 
+// CLI module for command-line tool
+#[cfg(feature = "cli")]
+pub mod cli;
+
 // Transpiler module for Auto language support
 #[cfg(feature = "transpiler")]
 pub mod trans;

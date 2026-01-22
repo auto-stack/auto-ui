@@ -1,15 +1,13 @@
-// AutoUI Transpiler CLI
+// AutoUI CLI
 //
-// Command-line tool to transpile Auto language (.at) files to AutoUI Rust code.
-// Supports three modes:
-// - Single file transpilation
-// - Batch directory processing
-// - Watch mode for auto-recompilation
+// Command-line tool for AutoUI framework.
+// Supports transpiling Auto language (.at) files and running them directly.
 //
 // Usage:
-//   auto-ui-transpile file input.at [output.rs]
-//   auto-ui-transpile batch --input ./src --output ./gen
-//   auto-ui-transpile watch --input ./src --output ./gen
+//   cargo run --package auto-ui -- file input.at [output.rs]
+//   cargo run --package auto-ui -- run input.at -b gpui
+//   cargo run --package auto-ui -- batch --input ./src --output ./gen
+//   cargo run --package auto-ui -- watch --input ./src --output ./gen
 
 use anyhow::Result;
 use auto_ui::trans::transpile_file;
@@ -20,8 +18,7 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 use std::fs;
 
-mod error;
-use error::TranspileError;
+use auto_ui::cli::TranspileError;
 
 // Initialize miette for fancy error reporting
 fn init_miette() {
@@ -32,8 +29,8 @@ fn init_miette() {
 }
 
 #[derive(Parser)]
-#[command(name = "auto-ui-transpile")]
-#[command(about = "Transpile Auto language (.at) files to AutoUI Rust code", long_about = None)]
+#[command(name = "auto-ui")]
+#[command(about = "AutoUI Framework - Transpile and run Auto language apps", long_about = None)]
 #[command(version = "0.1.0")]
 struct Cli {
     #[command(subcommand)]
@@ -323,7 +320,7 @@ fn run_watch(input: &PathBuf, output: &PathBuf, verbose: bool) -> Result<()> {
     println!();
 
     // Setup file watcher
-    use notify::RecursiveMode;
+    use notify_debouncer_mini::notify::RecursiveMode;
     use notify_debouncer_mini::new_debouncer;
 
     let (tx, rx) = std::sync::mpsc::channel();

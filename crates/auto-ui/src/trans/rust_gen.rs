@@ -4,6 +4,7 @@
 
 use crate::style::Style;
 use auto_lang::ast::*;
+use auto_val::Op;
 use std::collections::HashSet;
 
 /// Rust code generator for widgets
@@ -182,15 +183,32 @@ impl RustCodeGenerator {
                 // Match statement on message - extract patterns from is statement
                 for branch in &is_stmt.branches {
                     if let auto_lang::ast::IsBranch::EqBranch(pattern, _body) = branch {
-                        // Pattern is an expression - check if it's an identifier with Msg prefix
-                        if let Expr::Ident(name) = pattern {
-                            // Extract message variant name
-                            if let Some(msg_name) = name.strip_prefix("Msg.") {
-                                self.messages.insert(MessageVariant {
-                                    name: msg_name.to_string(),
-                                    has_fields: false, // TODO: detect field patterns
-                                });
+                        // Pattern is an expression - check if it's a member access like Msg.Inc
+                        match pattern {
+                            Expr::Bina(lhs, op, rhs) => {
+                                // Handle Msg.Inc pattern (member access)
+                                if let Expr::Ident(type_name) = lhs.as_ref() {
+                                    if let Op::Dot = op {
+                                        if let Expr::Ident(variant_name) = rhs.as_ref() {
+                                            // Found enum pattern: Type::Variant
+                                            self.messages.insert(MessageVariant {
+                                                name: variant_name.to_string(),
+                                                has_fields: false, // TODO: detect field patterns
+                                            });
+                                        }
+                                    }
+                                }
                             }
+                            Expr::Ident(name) => {
+                                // Handle simple identifiers with Msg.Variant format
+                                if let Some(msg_name) = name.strip_prefix("Msg.") {
+                                    self.messages.insert(MessageVariant {
+                                        name: msg_name.to_string(),
+                                        has_fields: false, // TODO: detect field patterns
+                                    });
+                                }
+                            }
+                            _ => {}
                         }
                     }
                 }
@@ -944,6 +962,17 @@ impl RustCodeGenerator {
                 } else {
                     name.to_string()
                 }
+            }
+            Expr::Bina(lhs, op, rhs) => {
+                // Handle member access patterns like Msg.Inc
+                if let Op::Dot = op {
+                    if let Expr::Ident(type_name) = lhs.as_ref() {
+                        if let Expr::Ident(variant_name) = rhs.as_ref() {
+                            return format!("{}::{}", type_name, variant_name);
+                        }
+                    }
+                }
+                "_".to_string()
             }
             _ => "_".to_string(),
         }
