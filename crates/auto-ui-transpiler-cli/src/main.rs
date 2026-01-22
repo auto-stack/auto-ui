@@ -15,9 +15,22 @@ use anyhow::Result;
 use auto_ui::trans::transpile_file;
 use clap::{Parser, Subcommand};
 use console::style;
+use miette::{MietteHandler, NarratableReportHandler};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 use std::fs;
+
+mod error;
+use error::{TranspileError, into_transpile_error, string_to_transpile_error};
+
+// Initialize miette for fancy error reporting
+fn init_miette() {
+    // Enable fancy error reporting with colors
+    miette::set_hook(Box::new(|_| {
+        Box::new(MietteHandler::new())
+    }))
+    .expect("Failed to set miette hook");
+}
 
 #[derive(Parser)]
 #[command(name = "auto-ui-transpile")]
@@ -103,6 +116,9 @@ enum Commands {
 }
 
 fn main() -> Result<()> {
+    // Initialize miette for better error reporting
+    init_miette();
+
     let cli = Cli::parse();
 
     match cli.command {
@@ -142,9 +158,36 @@ fn run_file(input: &PathBuf, output: Option<&PathBuf>, check: bool) -> Result<()
     // Start timing
     let start = Instant::now();
 
+    // Read source code for better error reporting
+    let source_code = fs::read_to_string(input)
+        .map_err(|e| anyhow::anyhow!("{}: {}", style("Failed to read file").red(), e))?;
+
     // Transpile the file
     let rust_code = transpile_file(input, None)
-        .map_err(|e| anyhow::anyhow!("{}: {}", style("Transpilation failed").red(), e))?;
+        .map_err(|e| {
+            // Improved error reporting with source code snippet
+            eprintln!();
+            eprintln!("{} {}", style("✖").red(), style("Transpilation failed").red().bold());
+            eprintln!();
+            eprintln!("{}", style(&e).red());
+            eprintln!();
+
+            // Try to extract line number from error message
+            if e.contains("offset:") || e.contains("line:") {
+                eprintln!("{}", style("For better error reporting, try:").yellow());
+                eprintln!("  1. Check the syntax around the reported location");
+                eprintln!("  2. Make sure all braces are properly closed");
+                eprintln!("  3. Verify keyword spelling (type, fn, is, etc.)");
+                eprintln!();
+            }
+
+            // Show relevant source lines if error contains location
+            if let Some(pos) = extract_error_position(&e) {
+                show_error_context(&source_code, pos);
+            }
+
+            anyhow::anyhow!("Transpilation failed")
+        })?;
 
     let elapsed = start.elapsed();
 
@@ -174,6 +217,62 @@ fn run_file(input: &PathBuf, output: Option<&PathBuf>, check: bool) -> Result<()
     }
 
     Ok(())
+}
+
+/// Extract byte position from error message
+fn extract_error_position(error_msg: &str) -> Option<usize> {
+    // Try to extract offset from error messages like "offset: SourceOffset(377)"
+    if let Some(start) = error_msg.find("SourceOffset(") {
+        let end = error_msg[start..].find(')')?;
+        let num_str = &error_msg[start + 13..start + end];
+        num_str.parse().ok()
+    } else {
+        None
+    }
+}
+
+/// Show source code context around error position
+fn show_error_context(source: &str, pos: usize) {
+    let lines: Vec<&str> = source.lines().collect();
+
+    // Find the line containing the error position
+    let mut current_pos = 0;
+    let mut error_line = 0;
+    let mut error_col = 0;
+
+    for (i, line) in lines.iter().enumerate() {
+        if current_pos + line.len() >= pos {
+            error_line = i;
+            error_col = pos - current_pos;
+            break;
+        }
+        current_pos += line.len() + 1; // +1 for newline
+    }
+
+    // Show context: 2 lines before and after
+    let start_line = error_line.saturating_sub(2);
+    let end_line = (error_line + 3).min(lines.len());
+
+    eprintln!("{}", style("Source code context:").cyan().bold());
+    eprintln!();
+
+    for i in start_line..end_line {
+        let line_num = i + 1;
+        let prefix = if i == error_line {
+            format!("{} > ", style(line_num).red().bold())
+        } else {
+            format!("{} | ", style(line_num).dim())
+        };
+
+        eprintln!("{}{}", prefix, lines[i]);
+
+        // Show error indicator
+        if i == error_line && error_col > 0 {
+            let indent = "    ".len() + line_num.to_string().len() + error_col;
+            eprintln!("{}{} {}", " ".repeat(indent), style("^").red(), style("error here").red());
+        }
+    }
+    eprintln!();
 }
 
 /// Transpile all .at files in a directory

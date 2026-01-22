@@ -16,6 +16,7 @@ console = "0.15"
 notify = "6.0"
 notify-debouncer-mini = "0.4"
 regex = "1.10"
+miette = { version = "7.0", features = ["fancy"] }
 
 [features]
 default = ["transpiler"]

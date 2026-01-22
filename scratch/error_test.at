@@ -1,0 +1,21 @@
+// Test file with syntax errors
+
+type TestComponent {
+    count int = 0
+
+    fn view() {
+        col {
+            text("Hello")
+            // Missing closing brace for text - this should cause an error
+            text("World".
+        }
+    }
+
+    fn on(ev int) {
+        is ev {
+            1 => {
+                count += 1
+            }
+        }
+    }
+}
