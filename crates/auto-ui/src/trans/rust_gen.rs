@@ -341,18 +341,32 @@ impl RustCodeGenerator {
         code.push_str("    fn view(&self) -> View<Self::Msg> {\n");
 
         // Generate view expressions
+        let mut generated = false;
         for stmt in &method.body.stmts {
-            if let Stmt::Expr(expr) = stmt {
-                match self.generate_view_expr(expr) {
-                    Ok(view_code) => {
-                        code.push_str(&format!("        {}\n", view_code));
-                    }
-                    Err(_) => {
-                        code.push_str("        View::empty()\n");
-                    }
+            // Handle both Stmt::Expr(Expr::Node(...)) and Stmt::Node(...)
+            let result = match stmt {
+                Stmt::Expr(expr) => self.generate_view_expr(expr),
+                Stmt::Node(node) => self.generate_view_node(node),
+                _ => continue,
+            };
+
+            match result {
+                Ok(view_code) => {
+                    code.push_str(&format!("        {}\n", view_code));
+                    generated = true;
                 }
-                break; // Only first expression is returned
+                Err(e) => {
+                    // Log error but try to generate something
+                    eprintln!("[WARN] Failed to generate view expr: {}", e);
+                    code.push_str(&format!("        /* TODO: {} */\n", e));
+                    generated = true;
+                }
             }
+            break; // Only first expression is returned
+        }
+
+        if !generated {
+            code.push_str("        View::empty()\n");
         }
 
         code.push_str("    }\n");
@@ -364,11 +378,48 @@ impl RustCodeGenerator {
     fn generate_view_expr(&self, expr: &Expr) -> Result<String, String> {
         match expr {
             Expr::Node(node) => self.generate_view_node(node),
+            Expr::Call(call) => {
+                // Handle function call expressions like text(msg), button(label) {...}
+                self.generate_call_expr(call)
+            }
             Expr::Ident(name) => {
                 // Reference to field
                 Ok(format!("View::text(&self.{})", name))
             }
             _ => Ok("View::empty()".to_string()),
+        }
+    }
+
+    /// Generate call expression code (e.g., text(msg), button(label))
+    /// Note: This only handles simple function calls without body
+    /// Calls with body {} are handled as Node
+    fn generate_call_expr(&self, call: &Call) -> Result<String, String> {
+        // Get the function name from the expression
+        let name = match call.name.as_ref() {
+            Expr::Ident(n) => n.to_string(),
+            _ => return Ok("/* unknown call */".to_string()),
+        };
+
+        match name.as_str() {
+            "text" | "label" => {
+                // text(msg) -> View::text(&self.msg) or View::text(&"string")
+                let content = if call.args.len() > 0 {
+                    if let Some(arg) = call.args.get(0) {
+                        let expr = arg.get_expr();
+                        match &expr {
+                            Expr::Ident(name) => format!("&self.{}", name),
+                            Expr::Str(s) => format!("&\"{}\"", s),
+                            _ => "&\"\"".to_string(),
+                        }
+                    } else {
+                        "&\"\"".to_string()
+                    }
+                } else {
+                    "&\"\"".to_string()
+                };
+                Ok(format!("View::text({})", content))
+            }
+            _ => Ok(format!("/* unknown call: {} */", name)),
         }
     }
 
@@ -453,12 +504,33 @@ impl RustCodeGenerator {
     }
 
     fn generate_text_node(&self, node: &Node) -> Result<String, String> {
-        // Get main argument
-        let content = self.get_main_arg(node).unwrap_or("\"\"".to_string());
-        let style = self.get_prop_string(node, "style");
+        // Try to get the content argument
+        // In Auto: text(msg) where msg is the first positional argument
+        let content = if node.args.len() > 0 {
+            // Try to get first argument
+            if let Some(arg) = node.args.get(0) {
+                let expr = arg.get_expr();
+                // Format the expression for Rust code
+                // For text node, we need to pass a reference: &self.msg or &"string"
+                match &expr {
+                    Expr::Ident(name) => format!("&self.{}", name),
+                    Expr::Str(s) => format!("&\"{}\"", s),
+                    _ => "&\"\"".to_string(),
+                }
+            } else {
+                "&\"\"".to_string()
+            }
+        } else {
+            "&\"\"".to_string()
+        };
 
-        if let Some(s) = style {
-            Ok(format!("View::text_styled({}, \"{}\")", content, s))
+        // Try to get style if present
+        let has_style = node.args.args.iter().any(|arg| {
+            matches!(arg, Arg::Pair(name, _) if name.as_str() == "style")
+        });
+
+        if has_style {
+            Ok(format!("View::text_styled({}, /* style */)", content))
         } else {
             Ok(format!("View::text({})", content))
         }
@@ -652,12 +724,41 @@ impl RustCodeGenerator {
         None
     }
 
+    fn get_prop_u16_from_args(&self, args: &Args, key: &str) -> Option<u16> {
+        if let Some(arg) = args.lookup(key) {
+            let expr = arg.get_expr();
+            if let Expr::Int(n) = &expr {
+                return Some(*n as u16);
+            }
+        }
+        None
+    }
+
     fn expr_to_string(&self, expr: &Expr) -> String {
         match expr {
             Expr::Str(s) => s.to_string(),
             Expr::Int(n) => n.to_string(),
             Expr::Bool(b) => b.to_string(),
             Expr::Ident(name) => name.to_string(),
+            _ => "\"\"".to_string(),
+        }
+    }
+
+    fn expr_to_rust(&self, expr: &Expr) -> String {
+        match expr {
+            Expr::Str(s) => format!("\"{}\"", s),
+            Expr::Int(n) => n.to_string(),
+            Expr::Bool(b) => b.to_string(),
+            Expr::Ident(name) => format!("self.{}", name),
+            Expr::Bina(lhs, op, rhs) => {
+                // Handle expressions like Msg.Inc
+                if let Expr::Ident(lhs_name) = lhs.as_ref() {
+                    if let Expr::Ident(rhs_name) = rhs.as_ref() {
+                        return format!("{}::{}", lhs_name, rhs_name);
+                    }
+                }
+                "\"\"".to_string()
+            }
             _ => "\"\"".to_string(),
         }
     }

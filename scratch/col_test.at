@@ -1,0 +1,10 @@
+type Hello {
+    msg str = "Hello"
+
+    fn view() {
+        col {
+            text(msg)
+            text("World")
+        }
+    }
+}
