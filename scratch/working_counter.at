@@ -1,4 +1,5 @@
-// Minimal Counter Widget - Working version
+// Working Counter Widget
+// This demonstrates a basic counter with increment/decrement buttons
 
 type Counter {
     count int = 0

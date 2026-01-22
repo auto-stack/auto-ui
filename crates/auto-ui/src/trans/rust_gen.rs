@@ -12,6 +12,8 @@ pub struct RustCodeGenerator {
     current_widget: Option<String>,
     /// Message variants discovered during parsing
     messages: HashSet<MessageVariant>,
+    /// Message type (extracted from on() method parameter)
+    message_type: Option<String>,
     /// Imports needed for generated code
     imports: HashSet<String>,
     /// Current indent level
@@ -30,6 +32,7 @@ impl RustCodeGenerator {
         Self {
             current_widget: None,
             messages: HashSet::new(),
+            message_type: None,
             imports: HashSet::new(),
             indent: 0,
         }
@@ -39,6 +42,7 @@ impl RustCodeGenerator {
     pub fn generate_widget(&mut self, type_decl: &TypeDecl) -> Result<String, String> {
         self.current_widget = Some(type_decl.name.to_string());
         self.messages.clear();
+        self.message_type = None;
         self.imports.clear();
 
         let mut code = String::new();
@@ -87,7 +91,7 @@ impl RustCodeGenerator {
             if method.name == "view" {
                 self.analyze_view_method(&method.body)?;
             } else if method.name == "on" {
-                self.analyze_on_method(&method.body)?;
+                self.analyze_on_method(&method.params, &method.body)?;
             }
         }
 
@@ -164,8 +168,15 @@ impl RustCodeGenerator {
         Ok(())
     }
 
-    /// Analyze on() method to extract message variants
-    fn analyze_on_method(&mut self, body: &Body) -> Result<(), String> {
+    /// Analyze on() method to extract message type and variants
+    fn analyze_on_method(&mut self, params: &[Param], body: &Body) -> Result<(), String> {
+        // Extract message type from first parameter
+        if let Some(first_param) = params.first() {
+            let msg_type = self.rust_type_name(&first_param.ty);
+            self.message_type = Some(msg_type);
+        }
+
+        // Extract message variants from is statements
         for stmt in &body.stmts {
             if let Stmt::Is(is_stmt) = stmt {
                 // Match statement on message - extract patterns from is statement
@@ -268,12 +279,9 @@ impl RustCodeGenerator {
 
         code.push_str(&format!("impl Component for {} {{\n", widget_name));
 
-        // Message type
-        if self.messages.is_empty() {
-            code.push_str("    type Msg = ();\n");
-        } else {
-            code.push_str("    type Msg = Msg;\n");
-        }
+        // Message type - use extracted message type or default to ()
+        let msg_type = self.message_type.as_ref().map(|s| s.as_str()).unwrap_or("()");
+        code.push_str(&format!("    type Msg = {};\n", msg_type));
         code.push('\n');
 
         // Find on() method
@@ -315,12 +323,11 @@ impl RustCodeGenerator {
             if let Stmt::Is(is_stmt) = stmt {
                 for branch in &is_stmt.branches {
                     if let auto_lang::ast::IsBranch::EqBranch(pattern, body) = branch {
-                        if let Expr::Ident(name) = pattern {
-                            let msg_name = name.strip_prefix("Msg.").unwrap_or(name);
-                            code.push_str(&format!("            {} => {{\n", msg_name));
-                            code.push_str(&self.generate_body_stmts(body));
-                            code.push_str("            }\n");
-                        }
+                        // Generate pattern match for any expression type
+                        let pattern_code = self.generate_expr_pattern(pattern);
+                        code.push_str(&format!("            {} => {{\n", pattern_code));
+                        code.push_str(&self.generate_body_stmts(body));
+                        code.push_str("            }\n");
                     }
                 }
             }
@@ -418,6 +425,43 @@ impl RustCodeGenerator {
                     "&\"\"".to_string()
                 };
                 Ok(format!("View::text({})", content))
+            }
+            "button" => {
+                // button(label, onclick: value)
+                let label = if call.args.len() > 0 {
+                    if let Some(arg) = call.args.get(0) {
+                        let expr = arg.get_expr();
+                        match &expr {
+                            Expr::Ident(name) => format!("&self.{}", name),
+                            Expr::Str(s) => format!("\"{}\"", s),
+                            _ => "\"\"".to_string(),
+                        }
+                    } else {
+                        "\"\"".to_string()
+                    }
+                } else {
+                    "\"\"".to_string()
+                };
+
+                // Get onclick property from named args
+                let onclick = call.args.args.iter()
+                    .find(|arg| matches!(arg, Arg::Pair(name, _) if name.as_str() == "onclick"))
+                    .and_then(|arg| {
+                        if let Arg::Pair(_, expr) = arg {
+                            Some(expr)
+                        } else {
+                            None
+                        }
+                    });
+
+                let onclick_value = match onclick {
+                    Some(Expr::Int(n)) => n.to_string(),
+                    Some(Expr::Str(s)) => format!("\"{}\"", s),
+                    Some(Expr::Ident(name)) => name.to_string(),
+                    _ => "0".to_string(),
+                };
+
+                Ok(format!("View::button({}, {})", label, onclick_value))
             }
             _ => Ok(format!("/* unknown call: {} */", name)),
         }
@@ -760,6 +804,24 @@ impl RustCodeGenerator {
                 "\"\"".to_string()
             }
             _ => "\"\"".to_string(),
+        }
+    }
+
+    /// Generate pattern match code for match expressions
+    fn generate_expr_pattern(&self, expr: &Expr) -> String {
+        match expr {
+            Expr::Int(n) => n.to_string(),
+            Expr::Str(s) => format!("\"{}\"", s),
+            Expr::Bool(b) => b.to_string(),
+            Expr::Ident(name) => {
+                // Handle Msg.EnumVariant format
+                if let Some(msg_name) = name.strip_prefix("Msg.") {
+                    msg_name.to_string()
+                } else {
+                    name.to_string()
+                }
+            }
+            _ => "_".to_string(),
         }
     }
 
