@@ -5,7 +5,7 @@
 
 use auto_ui::{View as AbstractView, Component};
 use std::fmt::Debug;
-use iced::widget::{button, checkbox, column, pick_list, progress_bar, row, text, text_input};
+use iced::widget::{button, checkbox, column, pick_list, row, text, text_input};
 
 /// Trait for converting abstract View<M> into iced Element
 ///
@@ -208,7 +208,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                         let picklist_widget = pick_list(options, selected_value, move |selected_string| {
                             // Find the index of the selected string
                             let index = options_clone.iter()
-                                .position(|s| s == selected_string)
+                                .position(|s| *s == selected_string)
                                 .unwrap_or(0);
                             callback.call(index, selected_string.as_str())
                         });
