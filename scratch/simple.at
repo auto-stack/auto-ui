@@ -1,0 +1,11 @@
+type SimpleWidget is Widget {
+    message str = "Hello, World!"
+    count int = 42
+
+    fn view() {
+        col {
+            text(self.message) {}
+            text(self.count) {}
+        }
+    }
+}

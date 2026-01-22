@@ -1,0 +1,37 @@
+// Level 2: Counter
+// Adds state management and event handling
+
+use auto.ui: Widget
+
+type Counter is Widget {
+    count int = 0
+
+    fn view() {
+        col {
+            button("Increment") {
+                onclick: "inc"
+            }
+            text(self.count)
+            button("Decrement") {
+                onclick: "dec"
+            }
+        }
+    }
+
+    fn on(ev str) {
+        is ev {
+            "inc" => {
+                self.count += 1
+            }
+            "dec" => {
+                self.count -= 1
+            }
+        }
+    }
+}
+
+fn main() {
+    app("Counter Example") {
+        counter() {}
+    }
+}

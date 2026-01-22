@@ -1,0 +1,18 @@
+// Level 1: Hello World
+// The simplest Auto program - just displaying text
+
+use auto.ui: Widget
+
+type Hello is Widget {
+    msg str = "Hello, World!"
+
+    fn view() {
+        text(msg) {}
+    }
+}
+
+fn main() {
+    app("Hello World") {
+        hello() {}
+    }
+}

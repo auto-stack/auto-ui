@@ -1,0 +1,69 @@
+// Level 4: Input Form
+// Demonstrates user input with text fields
+
+use auto.ui: Widget
+
+type InputForm is Widget {
+    username str = ""
+    email str = ""
+    message str = ""
+
+    fn view() {
+        col {
+            text("User Information Form")
+
+            col {
+                text("Username:")
+                input(self.username) {
+                    placeholder: "Enter username"
+                    oninput: "username_changed"
+                }
+            }
+
+            col {
+                text("Email:")
+                input(self.email) {
+                    placeholder: "user@example.com"
+                    oninput: "email_changed"
+                }
+            }
+
+            col {
+                text("Message:")
+                input(self.message) {
+                    placeholder: "Type your message..."
+                    oninput: "message_changed"
+                }
+            }
+
+            col {
+                text("Summary:")
+                text("Username: " + self.username)
+                text("Email: " + self.email)
+                text("Message: " + self.message)
+            }
+        }
+    }
+
+    fn on(ev str) {
+        // Input values are automatically updated to the field value
+        // We just handle events here if needed
+        is ev {
+            "username_changed" => {
+                // Username field was updated automatically
+            }
+            "email_changed" => {
+                // Email field was updated automatically
+            }
+            "message_changed" => {
+                // Message field was updated automatically
+            }
+        }
+    }
+}
+
+fn main() {
+    app("Input Form Demo") {
+        input_form() {}
+    }
+}

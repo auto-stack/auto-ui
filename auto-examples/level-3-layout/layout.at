@@ -1,0 +1,49 @@
+// Level 3: Layout Showcase
+// Demonstrates various layout patterns
+
+use auto.ui: Widget
+
+type LayoutDemo is Widget {
+    fn view() {
+        col {
+            text("Layout Examples")
+
+            // Column layout - vertical stacking
+            col {
+                text("Column Layout")
+                text("Item 1")
+                text("Item 2")
+                text("Item 3")
+            }
+
+            // Row layout - horizontal arrangement
+            row {
+                text("Row Layout")
+                text("Left")
+                text("Middle")
+                text("Right")
+            }
+
+            // Nested layouts
+            col {
+                text("Nested Layout")
+                row {
+                    col {
+                        text("A1")
+                        text("A2")
+                    }
+                    col {
+                        text("B1")
+                        text("B2")
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn main() {
+    app("Layout Demo") {
+        layout_demo() {}
+    }
+}

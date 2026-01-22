@@ -1,0 +1,106 @@
+// Level 6: Todo List
+// A complete CRUD application with state management
+
+use auto.ui: Widget
+
+type Todo {
+    id int
+    description str
+    completed bool
+}
+
+type TodoList is Widget {
+    todos list<Todo> = []
+    next_id int = 1
+    input_value str = ""
+
+    fn view() {
+        col {
+            text("Todo List")
+
+            // Add new todo
+            col {
+                input(self.input_value) {
+                    placeholder: "What needs to be done?"
+                    oninput: "input_changed"
+                }
+                button("Add Todo") {
+                    onclick: "add_todo"
+                }
+            }
+
+            // Todo list
+            col {
+                // Display each todo
+                for todo in self.todos {
+                    row {
+                        checkbox(todo.completed) {
+                            oncheck: "toggle_" + todo.id
+                        }
+                        text(todo.description)
+                        button("×") {
+                            onclick: "delete_" + todo.id
+                        }
+                    }
+                }
+            }
+
+            // Footer with stats
+            col {
+                text("Total: " + len(self.todos))
+                text("Click checkbox to complete, × to delete")
+            }
+        }
+    }
+
+    fn on(ev str) {
+        is ev {
+            "add_todo" => {
+                if len(self.input_value) > 0 {
+                    self.todos += Todo {
+                        id: self.next_id
+                        description: self.input_value
+                        completed: false
+                    }
+                    self.next_id += 1
+                    self.input_value = ""
+                }
+            }
+            ev if starts_with(ev, "toggle_") {
+                // Extract ID from event name
+                let id_str = substring(ev, 7)
+                let id = int(id_str)
+
+                // Find and toggle the todo
+                for todo in self.todos {
+                    is todo.id == id {
+                        todo.completed = !todo.completed
+                    }
+                }
+            }
+            ev if starts_with(ev, "delete_") {
+                // Extract ID from event name
+                let id_str = substring(ev, 7)
+                let id = int(id_str)
+
+                // Remove the todo with matching ID
+                let new_list = []
+                for todo in self.todos {
+                    is todo.id != id {
+                        new_list += todo
+                    }
+                }
+                self.todos = new_list
+            }
+            _ => {
+                // Ignore other events
+            }
+        }
+    }
+}
+
+fn main() {
+    app("Todo List") {
+        todo_list() {}
+    }
+}

@@ -1,0 +1,9 @@
+use auto.ui: View
+
+type Hello is Widget {
+    msg str = "Hello, World!"
+
+    fn view() {
+        text(msg) {}
+    }
+}

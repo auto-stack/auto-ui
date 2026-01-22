@@ -1,0 +1,56 @@
+// Level 5: Slider and Progress Bar
+// Demonstrates numeric input and progress display
+
+use auto.ui: Widget
+
+type SliderDemo is Widget {
+    value float = 50.0
+    volume float = 0.5
+    progress float = 0.75
+
+    fn view() {
+        col {
+            text("Slider and Progress Demo")
+
+            // Value slider (0-100)
+            col {
+                text("Value: " + self.value)
+                slider(0.0, 100.0, self.value) {
+                    onchange: "value_changed"
+                }
+            }
+
+            // Volume slider (0-1)
+            col {
+                text("Volume: " + self.volume)
+                slider(0.0, 1.0, self.volume) {
+                    onchange: "volume_changed"
+                }
+            }
+
+            // Progress bar display
+            col {
+                text("Progress: " + (self.progress * 100.0))
+                progress_bar(0.0, 1.0, self.progress)
+            }
+        }
+    }
+
+    fn on(ev str) {
+        // Slider values are automatically updated
+        is ev {
+            "value_changed" => {
+                // self.value was updated automatically
+            }
+            "volume_changed" => {
+                // self.volume was updated automatically
+            }
+        }
+    }
+}
+
+fn main() {
+    app("Slider Demo") {
+        slider_demo() {}
+    }
+}
