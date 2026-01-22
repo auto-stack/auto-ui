@@ -15,6 +15,30 @@ path = "src/bin/counter.rs"
 name = "button"
 path = "src/bin/button.rs"
 
+[[bin]]
+name = "select"
+path = "src/bin/select.rs"
+
+[[bin]]
+name = "checkbox"
+path = "src/bin/checkbox.rs"
+
+[[bin]]
+name = "circle"
+path = "src/bin/circle.rs"
+
+[[bin]]
+name = "layout"
+path = "src/bin/layout.rs"
+
+[[bin]]
+name = "progress"
+path = "src/bin/progress.rs"
+
+[[bin]]
+name = "todos"
+path = "src/bin/todos.rs"
+
 [dependencies]
 gpui = "0.2.2"
 gpui-component = { workspace = true }

@@ -7,7 +7,7 @@
 pub mod prelude {
     pub use crate::app::{App, AppResult};
     pub use crate::component::Component;
-    pub use crate::view::{View, ViewBuilder, ViewContainerBuilder, ViewScrollableBuilder, ViewListBuilder, ViewInputBuilder, ViewTableBuilder};
+    pub use crate::view::{View, ViewBuilder, ViewContainerBuilder, ViewScrollableBuilder, ViewListBuilder, ViewInputBuilder, ViewTableBuilder, ViewSliderBuilder, SelectCallback};
 }
 
 pub mod app;
@@ -28,7 +28,7 @@ pub mod trans;
 // Re-export core types for convenience
 pub use app::{App, AppResult};
 pub use component::Component;
-pub use view::{View, ViewBuilder, ViewContainerBuilder, ViewScrollableBuilder, ViewListBuilder, ViewInputBuilder, ViewTableBuilder};
+pub use view::{View, ViewBuilder, ViewContainerBuilder, ViewScrollableBuilder, ViewListBuilder, ViewInputBuilder, ViewTableBuilder, ViewSliderBuilder, SelectCallback};
 pub use style::Style; // Re-export Style for backend adapters
 
 // Re-export AutoLang integration types

@@ -346,6 +346,93 @@ impl<M: Clone + Debug + 'static> IntoGpuiElement<M> for AbstractView<M> {
 
                 table_div.into_any()
             }
+
+            AbstractView::Slider {
+                min,
+                max,
+                value,
+                on_change: _,
+                step: _,
+                style,
+            } => {
+                // Calculate percentage
+                let range = max - min;
+                let percentage = ((value - min) / range).clamp(0.0, 1.0);
+
+                // Build visual slider with proper dimensions
+                // Container: 16px high, 300px wide
+                let slider_container = div()
+                    .h(px(16.0))
+                    .w(px(300.0))
+                    .relative()
+                    // Track: 4px high, centered vertically at top: 6px
+                    .child(
+                        div()
+                            .absolute()
+                            .left(px(0.0))
+                            .top(px(6.0))
+                            .h(px(4.0))
+                            .w(px(300.0))
+                            .bg(rgb(0x333333))
+                            .rounded_md()
+                    )
+                    // Fill: 4px high, centered vertically, width based on percentage
+                    .child(
+                        div()
+                            .absolute()
+                            .left(px(0.0))
+                            .top(px(6.0))
+                            .h(px(4.0))
+                            .w(px(percentage * 300.0))
+                            .bg(rgb(0x3b82f6))
+                            .rounded_md()
+                    )
+                    // Thumb: 16px square, positioned correctly
+                    .child(
+                        div()
+                            .absolute()
+                            .left(px(percentage * 300.0 - 8.0))
+                            .top(px(0.0))
+                            .w(px(16.0))
+                            .h(px(16.0))
+                            .bg(rgb(0xffffff))
+                            .rounded_full()
+                            .border_2()
+                            .border_color(rgb(0x3b82f6))
+                            .shadow_lg()
+                    );
+
+                // Apply unified styling if present
+                if let Some(style) = style {
+                    apply_gpui_style_to_div(slider_container, &style).into_any()
+                } else {
+                    slider_container.into_any()
+                }
+            }
+
+            AbstractView::ProgressBar { progress, style } => {
+                let filled_width = (progress * 200.0) as f32; // 200px max width
+
+                let mut progress_bar = div()
+                    .w(px(200.0))
+                    .h(px(20.0))
+                    .bg(rgb(0x222222))
+                    .border_1()
+                    .border_color(rgb(0x444444))
+                    .child(
+                        div()
+                            .w(px(filled_width))
+                            .h(px(20.0))
+                            .bg(rgb(0x3b82f6))
+                    );
+
+                // Apply unified styling if present
+                if let Some(style) = style {
+                    progress_bar = apply_gpui_style_to_div(progress_bar, &style);
+                }
+
+                progress_bar.into_any()
+            }
         }
     }
 }

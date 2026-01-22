@@ -4,7 +4,39 @@
 // to support the unified styling system (Plan 004, 90% complete).
 
 use std::fmt::Debug;
+use std::sync::Arc;
 use crate::style::Style;
+
+/// Callback for select dropdown changes
+///
+/// Wraps a function that receives the selected index and value,
+/// and returns a message. Arc is used for thread-safe cloning.
+#[derive(Clone)]
+pub struct SelectCallback<M> {
+    callback: Arc<dyn Fn(usize, &str) -> M + Send + Sync>,
+}
+
+impl<M> std::fmt::Debug for SelectCallback<M> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SelectCallback")
+            .finish()
+    }
+}
+
+impl<M> SelectCallback<M> {
+    pub fn new<F>(f: F) -> Self
+    where
+        F: Fn(usize, &str) -> M + Send + Sync + 'static,
+    {
+        Self {
+            callback: Arc::new(f),
+        }
+    }
+
+    pub fn call(&self, index: usize, value: &str) -> M {
+        (self.callback)(index, value)
+    }
+}
 
 /// Abstract view node - generic over message type M
 ///
@@ -97,7 +129,7 @@ pub enum View<M: Clone + Debug> {
     Select {
         options: Vec<String>,
         selected_index: Option<usize>,
-        on_select: Option<M>,
+        on_select: Option<SelectCallback<M>>,
         style: Option<Style>,  // ✅ NEW: Unified styling support
     },
 
@@ -115,6 +147,22 @@ pub enum View<M: Clone + Debug> {
         spacing: u16,
         col_spacing: u16,
         style: Option<Style>,  // ✅ NEW: Unified styling support
+    },
+
+    /// Slider for numeric value input with optional styling
+    Slider {
+        min: f32,
+        max: f32,
+        value: f32,
+        on_change: fn(f32) -> M,  // Function that creates message from new value
+        step: Option<f32>,
+        style: Option<Style>,
+    },
+
+    /// Progress bar for displaying progress with optional styling
+    ProgressBar {
+        progress: f32,  // 0.0 to 1.0
+        style: Option<Style>,
     },
 }
 
@@ -366,6 +414,54 @@ impl<M: Clone + Debug> View<M> {
         }
     }
 
+    /// Create a slider for numeric value input
+    ///
+    /// # Example
+    /// ```
+    /// # use auto_ui::View;
+    /// # #[derive(Clone, Copy, Debug)]
+    /// # enum Msg { ValueChanged(f32) }
+    /// View::slider(0.0..=100.0, 50.0, Msg::ValueChanged)
+    /// ```
+    pub fn slider(range: std::ops::RangeInclusive<f32>, value: f32, on_change: fn(f32) -> M) -> ViewSliderBuilder<M> {
+        ViewSliderBuilder {
+            min: *range.start(),
+            max: *range.end(),
+            value,
+            on_change,
+            step: None,
+            style: None,
+        }
+    }
+
+    /// Create a progress bar
+    ///
+    /// # Example
+    /// ```
+    /// # use auto_ui::View;
+    /// View::progress_bar(0.75)  // 75% progress
+    /// ```
+    pub fn progress_bar(progress: f32) -> Self {
+        View::ProgressBar {
+            progress: progress.clamp(0.0, 1.0),
+            style: None,
+        }
+    }
+
+    /// Create a styled progress bar
+    ///
+    /// # Example
+    /// ```
+    /// # use auto_ui::View;
+    /// View::progress_bar_styled(0.75, "h-4 bg-blue-500 rounded")
+    /// ```
+    pub fn progress_bar_styled(progress: f32, style_str: &str) -> Self {
+        View::ProgressBar {
+            progress: progress.clamp(0.0, 1.0),
+            style: Some(Style::parse(style_str).expect("Invalid style")),
+        }
+    }
+
     /// Create a container with a child
     pub fn container(child: View<M>) -> ViewContainerBuilder<M> {
         ViewContainerBuilder {
@@ -576,6 +672,48 @@ impl<M: Clone + Debug> ViewTableBuilder<M> {
     }
 }
 
+/// Builder for Slider with fluent API
+pub struct ViewSliderBuilder<M: Clone + Debug> {
+    min: f32,
+    max: f32,
+    value: f32,
+    on_change: fn(f32) -> M,
+    step: Option<f32>,
+    style: Option<Style>,
+}
+
+impl<M: Clone + Debug> ViewSliderBuilder<M> {
+    /// Set step increment for the slider
+    pub fn step(mut self, step: f32) -> Self {
+        self.step = Some(step);
+        self
+    }
+
+    /// Set style using Tailwind CSS class string
+    pub fn style(mut self, style_str: &str) -> Self {
+        self.style = Some(Style::parse(style_str).expect("Invalid style string"));
+        self
+    }
+
+    /// Set style using Style object
+    pub fn with_style(mut self, style: Style) -> Self {
+        self.style = Some(style);
+        self
+    }
+
+    /// Build the slider view
+    pub fn build(self) -> View<M> {
+        View::Slider {
+            min: self.min,
+            max: self.max,
+            value: self.value,
+            on_change: self.on_change,
+            step: self.step,
+            style: self.style,
+        }
+    }
+}
+
 /// Builder for Container with fluent API
 pub struct ViewContainerBuilder<M: Clone + Debug> {
     child: View<M>,
@@ -683,10 +821,30 @@ impl<M: Clone + Debug> View<M> {
         self
     }
 
-    /// Set select change handler
-    pub fn on_choose(mut self, msg: M) -> Self {
+    /// Set select change handler with callback
+    ///
+    /// The callback receives:
+    /// - `index`: the index of the selected option
+    /// - `value`: the string value of the selected option
+    ///
+    /// # Example
+    /// ```
+    /// # use auto_ui::View;
+    /// enum Message { SelectLanguage(Language) }
+    /// # enum Language { Chinese, English }
+    /// View::select(vec!["中文".to_string(), "English".to_string()])
+    ///     .on_choose(|index, value| match value {
+    ///         "中文" => Message::SelectLanguage(Language::Chinese),
+    ///         _ => Message::SelectLanguage(Language::English),
+    ///     })
+    /// # ;
+    /// ```
+    pub fn on_choose<F>(mut self, callback: F) -> Self
+    where
+        F: Fn(usize, &str) -> M + Send + Sync + 'static,
+    {
         if let View::Select { on_select, .. } = &mut self {
-            *on_select = Some(msg);
+            *on_select = Some(SelectCallback::new(callback));
         }
         self
     }

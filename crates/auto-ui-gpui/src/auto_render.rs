@@ -6,19 +6,41 @@
 // Phase 2 Integration: Now supports unified styling system with Style objects.
 
 use auto_ui::{Component, View, Style};
-use auto_ui::style::gpui_adapter::{GpuiStyle, GpuiFontSize, GpuiFontWeight, GpuiTextAlign};
+use auto_ui::style::gpui_adapter::{GpuiStyle, GpuiFontWeight};
 use gpui::*;
-use gpui_component::{button::Button, button::ButtonVariants, scroll::ScrollableElement, *};
+use gpui::{InteractiveElement, ParentElement, StatefulInteractiveElement};
+use gpui_component::{button::Button, button::ButtonVariants, scroll::ScrollableElement, select::*, *};
+use gpui_component::slider::SliderState;
 use std::fmt::Debug;
+use std::collections::HashMap;
+use std::sync::Arc;
+
+// Custom drag type for slider interaction
+#[derive(Clone, Debug)]
+struct SliderDrag;
+
+impl Render for SliderDrag {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        Empty
+    }
+}
 
 /// Internal state holder for GPUI rendering
 pub struct GpuiComponentState<C: Component> {
     pub component: C,
+    /// Cache of slider states to avoid recreating them on every render
+    slider_states: HashMap<String, Entity<SliderState>>,
+    /// Cache of select states to avoid recreating them on every render
+    select_states: HashMap<String, Entity<SelectState<Vec<String>>>>,
 }
 
 impl<C: Component> GpuiComponentState<C> {
     pub fn new(component: C) -> Self {
-        Self { component }
+        Self {
+            component,
+            slider_states: HashMap::new(),
+            select_states: HashMap::new(),
+        }
     }
 
     /// Handle a message and update the component
@@ -34,6 +56,68 @@ impl<C: Component> GpuiComponentState<C> {
     /// Get a mutable reference to the component
     pub fn component_mut(&mut self) -> &mut C {
         &mut self.component
+    }
+
+    /// Get or create a slider state entity for the given key
+    pub fn get_or_create_slider_state(
+        &mut self,
+        key: String,
+        min: f32,
+        max: f32,
+        step: f32,
+        value: f32,
+        cx: &mut Context<Self>,
+    ) -> Entity<SliderState> {
+        if let Some(existing) = self.slider_states.get(&key) {
+            // Return the existing state without modifying it
+            // The slider state manages its own value during drag operations
+            existing.clone()
+        } else {
+            // Create a new slider state with initial value
+            let new_state = cx.new(|_| {
+                SliderState::new()
+                    .min(min)
+                    .max(max)
+                    .step(step)
+                    .default_value(value)
+            });
+            self.slider_states.insert(key.clone(), new_state.clone());
+            new_state
+        }
+    }
+
+    /// Get the current value from a slider state
+    pub fn get_slider_value(&self, key: &str, cx: &Context<Self>) -> Option<f32> {
+        if let Some(state) = self.slider_states.get(key) {
+            Some(state.read(cx).value().start())
+        } else {
+            None
+        }
+    }
+
+    /// Get or create a select state entity for the given key
+    pub fn get_or_create_select_state(
+        &mut self,
+        key: String,
+        options: Vec<String>,
+        selected_index: Option<usize>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Entity<SelectState<Vec<String>>> {
+        if let Some(existing) = self.select_states.get(&key) {
+            existing.clone()
+        } else {
+            let new_state = cx.new(|cx| {
+                SelectState::new(
+                    options,
+                    selected_index.map(|i| IndexPath::default().row(i)),
+                    window,
+                    cx,
+                )
+            });
+            self.select_states.insert(key.clone(), new_state.clone());
+            new_state
+        }
     }
 }
 
@@ -75,6 +159,8 @@ impl<M: Clone + Debug + 'static> ViewExt<M> for View<M> {
         // 3. Closures would need to be FnMut, but GPUI needs Fn
         //
         // Solution: Pass the needed context through the conversion
+        // We need Window for Select widget creation, but it's not available here.
+        // For now, we'll pass None and Select will fall back to simpler rendering.
         self.clone().into_gpui_impl_with_context(state, cx)
     }
 }
@@ -246,12 +332,33 @@ impl<M: Clone + Debug + 'static> IntoGpuiElementWithHandler<M> for View<M> {
                 radio_div.into_any()
             }
 
-            View::Select { options, selected_index, style, .. } => {
-                let selected = selected_index.and_then(|i| options.get(i).cloned()).unwrap_or_default();
-                let mut select_div = div().child(format!("Select: {}", selected));
+            View::Select { options, selected_index, on_select, style } => {
+                // Note: We now have callback support! Full native Select widget with
+                // entity state management is coming soon. For now, showing the selection.
+                let selected = selected_index
+                    .and_then(|i| options.get(i).cloned())
+                    .unwrap_or_else(|| options.first().cloned().unwrap_or_default());
+
+                let options_text = options.join(", ");
+                let has_callback = on_select.is_some();
+
+                let mut select_div = div()
+                    .v_flex()
+                    .gap_1()
+                    .child(div().child(format!("Selected: {}", selected)))
+                    .child(div().text_sm().text_color(gpui::rgb(0x888888)).child(format!(
+                        "Options: [{}]{}",
+                        options_text,
+                        if has_callback { " ✅" } else { "" }
+                    )));
+
                 // Apply unified styling if present
                 if let Some(style) = style {
                     select_div = apply_style_to_div(select_div, &style);
+                } else {
+                    // Default padding style
+                    let default_style = Style::parse("p-2").unwrap_or_default();
+                    select_div = apply_style_to_div(select_div, &default_style);
                 }
                 select_div.into_any()
             }
@@ -299,6 +406,87 @@ impl<M: Clone + Debug + 'static> IntoGpuiElementWithHandler<M> for View<M> {
                 }
 
                 table_div.into_any()
+            }
+
+            View::Slider { min, max, value, on_change, step: _, style } => {
+                // Calculate percentage
+                let range = max - min;
+                let percentage = ((value - min) / range).clamp(0.0, 1.0);
+
+                // Build visual slider with proper dimensions
+                // Container: 16px high, 300px wide
+                let mut slider_container = div()
+                    .h(px(16.0))
+                    .w(px(300.0))
+                    .relative()
+                    // Track: 4px high, centered vertically at top: 6px
+                    .child(
+                        div()
+                            .absolute()
+                            .left(px(0.0))
+                            .top(px(6.0))
+                            .h(px(4.0))
+                            .w(px(300.0))
+                            .bg(rgb(0x333333))
+                            .rounded_md()
+                    )
+                    // Fill: 4px high, centered vertically, width based on percentage
+                    .child(
+                        div()
+                            .absolute()
+                            .left(px(0.0))
+                            .top(px(6.0))
+                            .h(px(4.0))
+                            .w(px(percentage * 300.0))
+                            .bg(rgb(0x3b82f6))
+                            .rounded_md()
+                    )
+                    // Thumb: 16px square, positioned correctly
+                    .child(
+                        div()
+                            .absolute()
+                            .left(px(percentage * 300.0 - 8.0))
+                            .top(px(0.0))
+                            .w(px(16.0))
+                            .h(px(16.0))
+                            .bg(rgb(0xffffff))
+                            .rounded_full()
+                            .border_2()
+                            .border_color(rgb(0x3b82f6))
+                            .shadow_lg()
+                    );
+
+                // Apply unified styling if present
+                if let Some(style) = style {
+                    slider_container = apply_style_to_div(slider_container, &style);
+                }
+
+                slider_container.into_any()
+            }
+
+            View::ProgressBar { progress, style } => {
+                let percentage = (progress * 100.0) as u32;
+                let filled_width = (progress * 200.0) as f32; // 200px max width
+
+                let mut progress_bar = div()
+                    .w(px(200.0))
+                    .h(px(20.0))
+                    .bg(rgb(0x222222))
+                    .border_1()
+                    .border_color(rgb(0x444444))
+                    .child(
+                        div()
+                            .w(px(filled_width))
+                            .h(px(20.0))
+                            .bg(rgb(0x3b82f6))
+                    );
+
+                // Apply unified styling if present
+                if let Some(style) = style {
+                    progress_bar = apply_style_to_div(progress_bar, &style);
+                }
+
+                progress_bar.into_any()
             }
         }
     }
@@ -456,12 +644,33 @@ impl<M: Clone + Debug + 'static> IntoGpuiElementWithHandler<M> for View<M> {
                 radio_div.into_any()
             }
 
-            View::Select { options, selected_index, style, .. } => {
-                let selected = selected_index.and_then(|i| options.get(i).cloned()).unwrap_or_default();
-                let mut select_div = div().child(format!("Select: {}", selected));
+            View::Select { options, selected_index, on_select, style } => {
+                // Note: We now have callback support! Full native Select widget with
+                // entity state management is coming soon. For now, showing the selection.
+                let selected = selected_index
+                    .and_then(|i| options.get(i).cloned())
+                    .unwrap_or_else(|| options.first().cloned().unwrap_or_default());
+
+                let options_text = options.join(", ");
+                let has_callback = on_select.is_some();
+
+                let mut select_div = div()
+                    .v_flex()
+                    .gap_1()
+                    .child(div().child(format!("Selected: {}", selected)))
+                    .child(div().text_sm().text_color(gpui::rgb(0x888888)).child(format!(
+                        "Options: [{}]{}",
+                        options_text,
+                        if has_callback { " ✅" } else { "" }
+                    )));
+
                 // Apply unified styling if present
                 if let Some(style) = style {
                     select_div = apply_style_to_div(select_div, &style);
+                } else {
+                    // Default padding style
+                    let default_style = Style::parse("p-2").unwrap_or_default();
+                    select_div = apply_style_to_div(select_div, &default_style);
                 }
                 select_div.into_any()
             }
@@ -509,6 +718,89 @@ impl<M: Clone + Debug + 'static> IntoGpuiElementWithHandler<M> for View<M> {
                 }
 
                 table_div.into_any()
+            }
+
+            View::Slider { min, max, value, on_change, step, style } => {
+                use gpui_component::slider::*;
+
+                // Generate a unique key for this slider based on its properties
+                let step_value = step.unwrap_or(0.01);
+                let slider_key = format!("slider_{}_{}_{}_{}", min, max, step_value, std::any::type_name::<C::Msg>());
+
+                // Get or create the slider state entity (cached across renders)
+                let slider_state = state.get_or_create_slider_state(
+                    slider_key.clone(),
+                    min,
+                    max,
+                    step_value,
+                    value,
+                    cx
+                );
+
+                // Subscribe to slider change events
+                // Note: We subscribe on every render. GPUI will handle deduplication.
+                // Also, subscriptions are tied to the entity lifetime, so they're
+                // automatically cleaned up when the entity is dropped.
+                {
+                    let msg_callback = on_change.clone();
+
+                    // Subscribe to slider change events
+                    // Signature: FnMut(&mut T, Entity<T2>, &Evt, &mut Context<T>)
+                    let subscription = cx.subscribe(&slider_state, move |comp_state, _entity, event, cx| {
+                        match event {
+                            SliderEvent::Change(slider_value) => {
+                                // Extract the value from the SliderValue enum
+                                let new_value = slider_value.start();
+
+                                // Call the user's callback with the new value
+                                let msg = msg_callback(new_value);
+                                comp_state.handle(msg);
+                                cx.notify();
+                            }
+                        }
+                    });
+
+                    // Keep the subscription alive
+                    std::mem::forget(subscription);
+                }
+
+                // Create the slider using gpui-component's Slider widget
+                let slider = Slider::new(&slider_state).horizontal();
+
+                // Wrap in a div for styling if needed
+                let mut slider_wrapper = div().child(slider);
+
+                // Apply unified styling if present
+                if let Some(style) = style {
+                    slider_wrapper = apply_style_to_div(slider_wrapper, &style);
+                }
+
+                slider_wrapper.into_any()
+            }
+
+            View::ProgressBar { progress, style } => {
+                let percentage = (progress * 100.0) as u32;
+                let filled_width = (progress * 200.0) as f32; // 200px max width
+
+                let mut progress_bar = div()
+                    .w(px(200.0))
+                    .h(px(20.0))
+                    .bg(rgb(0x222222))
+                    .border_1()
+                    .border_color(rgb(0x444444))
+                    .child(
+                        div()
+                            .w(px(filled_width))
+                            .h(px(20.0))
+                            .bg(rgb(0x3b82f6))
+                    );
+
+                // Apply unified styling if present
+                if let Some(style) = style {
+                    progress_bar = apply_style_to_div(progress_bar, &style);
+                }
+
+                progress_bar.into_any()
             }
         }
     }

@@ -8011,7 +8011,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "unified-layout"
+version = "0.1.0"
+dependencies = [
+ "auto-ui",
+ "auto-ui-gpui",
+ "auto-ui-iced",
+]
+
+[[package]]
 name = "unified-list"
+version = "0.1.0"
+dependencies = [
+ "auto-ui",
+ "auto-ui-gpui",
+ "auto-ui-iced",
+]
+
+[[package]]
+name = "unified-progress"
 version = "0.1.0"
 dependencies = [
  "auto-ui",
@@ -8047,6 +8065,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "unified-slider"
+version = "0.1.0"
+dependencies = [
+ "auto-ui",
+ "auto-ui-gpui",
+ "auto-ui-iced",
+]
+
+[[package]]
 name = "unified-table"
 version = "0.1.0"
 dependencies = [
@@ -8066,6 +8093,15 @@ dependencies = [
 
 [[package]]
 name = "unified-todo"
+version = "0.1.0"
+dependencies = [
+ "auto-ui",
+ "auto-ui-gpui",
+ "auto-ui-iced",
+]
+
+[[package]]
+name = "unified-todos"
 version = "0.1.0"
 dependencies = [
  "auto-ui",

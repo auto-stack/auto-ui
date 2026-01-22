@@ -1,7 +1,7 @@
 // Unified Select Example - Works with BOTH Iced and GPUI backends!
 //
-// This demonstrates dropdown selection from multiple options.
-// The same Component code works with both backends through automatic message conversion.
+// This demonstrates dropdown selection from multiple options using native widgets.
+// Now with callback-based API that receives the selected value!
 //
 // Run with:
 //   cargo run --package unified-select --features iced
@@ -11,40 +11,46 @@ use auto_ui::{Component, View};
 
 #[derive(Debug, Default)]
 struct SelectApp {
-    selected_theme: Theme,
+    selected_language: Language,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Default)]
-enum Theme {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Language {
     #[default]
-    Light,
-    Dark,
-    Auto,
-    HighContrast,
+    Chinese,
+    English,
 }
 
-impl Theme {
-    fn all() -> [Theme; 4] {
-        [Theme::Light, Theme::Dark, Theme::Auto, Theme::HighContrast]
+impl Language {
+    fn hello(&self) -> &str {
+        match self {
+            Language::Chinese => "你好",
+            Language::English => "Hello",
+        }
     }
 
-    fn as_str(&self) -> &'static str {
+    fn name(&self) -> &str {
         match self {
-            Theme::Light => "Light",
-            Theme::Dark => "Dark",
-            Theme::Auto => "Auto (System)",
-            Theme::HighContrast => "High Contrast",
+            Language::Chinese => "中文",
+            Language::English => "English",
+        }
+    }
+
+    fn from_str(s: &str) -> Self {
+        match s {
+            "中文" => Language::Chinese,
+            "English" | _ => Language::English,
         }
     }
 
     fn options() -> Vec<String> {
-        Theme::all().iter().map(|t| t.as_str().to_string()).collect()
+        vec!["中文".to_string(), "English".to_string()]
     }
 }
 
 #[derive(Clone, Copy, Debug)]
 enum Message {
-    SelectTheme(Theme),
+    SelectLanguage(Language),
 }
 
 impl Component for SelectApp {
@@ -52,8 +58,8 @@ impl Component for SelectApp {
 
     fn on(&mut self, msg: Self::Msg) {
         match msg {
-            Message::SelectTheme(theme) => {
-                self.selected_theme = theme;
+            Message::SelectLanguage(language) => {
+                self.selected_language = language;
             }
         }
     }
@@ -62,34 +68,19 @@ impl Component for SelectApp {
         View::col()
             .spacing(20)
             .padding(20)
-            .child(View::text("Settings".to_string()))
-            .child(self.view_theme_selector())
-            .child(self.view_result())
-            .build()
-    }
-}
-
-impl SelectApp {
-    fn view_theme_selector(&self) -> View<Message> {
-        View::col()
-            .spacing(8)
-            .child(View::text("Theme:".to_string()))
+            .child(View::text("Select Example".to_string()))
+            .child(View::text(self.selected_language.hello().to_string()))
+            .child(View::text("What is your language?".to_string()))
             .child(
-                View::select(Theme::options())
-                    .selected(self.selected_theme as usize)
-                    .on_choose(Message::SelectTheme(Theme::Light))
+                View::select(Language::options())
+                    .selected(self.selected_language as usize)
+                    .on_choose(|_index, value| {
+                        // ✅ Callback receives the selected value!
+                        Message::SelectLanguage(Language::from_str(value))
+                    })
             )
+            .child(View::text("Click the dropdown to select a language".to_string()))
             .build()
-    }
-
-    fn view_result(&self) -> View<Message> {
-        View::container(
-            View::text(format!("Selected theme: {}", self.selected_theme.as_str()))
-        )
-        .padding(20)
-        .width(300)
-        .center_x()
-        .build()
     }
 }
 
@@ -97,13 +88,13 @@ impl SelectApp {
 fn main() -> auto_ui::AppResult<()> {
     #[cfg(feature = "iced")]
     {
-        println!("🎨 Running with Iced backend");
+        println!("🎨 Running with Iced backend (using pick_list with callback)");
         return auto_ui_iced::run_app::<SelectApp>();
     }
 
     #[cfg(feature = "gpui")]
     {
-        println!("🎨 Running with GPUI backend (with auto-conversion!)");
+        println!("🎨 Running with GPUI backend (callback support enabled!)");
         return auto_ui_gpui::run_app::<SelectApp>("Select Demo - AutoUI");
     }
 
@@ -112,14 +103,10 @@ fn main() -> auto_ui::AppResult<()> {
         Err(
             "❌ No backend enabled!
 
-
              Please run with a backend feature:
-
              • cargo run --features iced
-
              • cargo run --features gpui"
                 .into(),
         )
     }
 }
-

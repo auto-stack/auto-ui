@@ -5,7 +5,7 @@
 
 use auto_ui::{View as AbstractView, Component};
 use std::fmt::Debug;
-use iced::widget::{button, checkbox, column, pick_list, row, text, text_input};
+use iced::widget::{button, checkbox, column, pick_list, progress_bar, row, text, text_input};
 
 /// Trait for converting abstract View<M> into iced Element
 ///
@@ -201,13 +201,16 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 // Iced's pick_list for dropdown selection
                 let selected_value = selected_index.and_then(|i| options.get(i).cloned());
 
-                // We need to handle the case where on_select is None
-                // Since Iced's pick_list requires a closure that returns a message,
-                // we need to ensure on_select is always Some for functional selects
+                // Use the callback to handle selection
                 match on_select {
-                    Some(msg) => {
-                        let picklist_widget = pick_list(options, selected_value, move |_| {
-                            msg.clone()
+                    Some(callback) => {
+                        let options_clone = options.clone();
+                        let picklist_widget = pick_list(options, selected_value, move |selected_string| {
+                            // Find the index of the selected string
+                            let index = options_clone.iter()
+                                .position(|s| s == selected_string)
+                                .unwrap_or(0);
+                            callback.call(index, selected_string.as_str())
                         });
                         picklist_widget.into()
                     }
@@ -263,6 +266,32 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 }
 
                 table_widget.into()
+            }
+
+            AbstractView::Slider {
+                min,
+                max,
+                value,
+                on_change,
+                step,
+                style: _,
+            } => {
+                use iced::widget::slider;
+                // Create slider widget with proper value handling
+                let mut slider_widget = slider(min..=max, value, on_change);
+
+                // Apply step if specified
+                if let Some(step_value) = step {
+                    slider_widget = slider_widget.step(step_value);
+                }
+
+                slider_widget.into()
+            }
+
+            AbstractView::ProgressBar { progress, style: _ } => {
+                use iced::widget::progress_bar;
+                // Progress bar in Iced
+                progress_bar(0.0..=1.0, progress).into()
             }
         }
     }
@@ -361,14 +390,14 @@ mod tests {
     #[test]
     fn test_text_conversion() {
         let view = AbstractView::text("Hello".to_string());
-        let element = view.into_iced();
+        let _element = view.into_iced();
         // Just ensure it compiles
     }
 
     #[test]
     fn test_button_conversion() {
         let view = AbstractView::button("Click me", TestMessage::Click);
-        let element = view.into_iced();
+        let _element = view.into_iced();
     }
 
     #[test]
@@ -380,13 +409,13 @@ mod tests {
             .child(AbstractView::button("Click", TestMessage::Click))
             .build();
 
-        let element = view.into_iced();
+        let _element = view.into_iced();
     }
 
     #[test]
     fn test_checkbox_conversion() {
         let view = AbstractView::checkbox(true, "Check me")
             .on_toggle(TestMessage::Toggle);
-        let element = view.into_iced();
+        let _element = view.into_iced();
     }
 }

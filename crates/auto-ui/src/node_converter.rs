@@ -367,7 +367,10 @@ fn convert_select(node: &Node) -> ConversionResult<View<String>> {
         view = view.selected(idx);
     }
     if let Some(msg) = on_select {
-        view = view.on_choose(msg);
+        // Create a callback that returns the message
+        // Note: This ignores the selected value and just returns the fixed message
+        // This is a limitation of the Auto language string-based message system
+        view = view.on_choose(move |_index, _value| msg.clone());
     }
     if let Some(style) = style {
         if let View::Select { style: s, .. } = &mut view {
