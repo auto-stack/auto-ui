@@ -347,8 +347,8 @@ impl RustCodeGenerator {
 
         code.push_str("    fn view(&self) -> View<Self::Msg> {\n");
 
-        // Generate view expressions
-        let mut generated = false;
+        // Collect all view expressions
+        let mut view_exprs: Vec<String> = Vec::new();
         for stmt in &method.body.stmts {
             // Handle both Stmt::Expr(Expr::Node(...)) and Stmt::Node(...)
             let result = match stmt {
@@ -359,21 +359,28 @@ impl RustCodeGenerator {
 
             match result {
                 Ok(view_code) => {
-                    code.push_str(&format!("        {}\n", view_code));
-                    generated = true;
+                    view_exprs.push(view_code);
                 }
                 Err(e) => {
-                    // Log error but try to generate something
+                    // Log error but continue
                     eprintln!("[WARN] Failed to generate view expr: {}", e);
-                    code.push_str(&format!("        /* TODO: {} */\n", e));
-                    generated = true;
                 }
             }
-            break; // Only first expression is returned
         }
 
-        if !generated {
+        // Generate code based on number of expressions
+        if view_exprs.is_empty() {
             code.push_str("        View::empty()\n");
+        } else if view_exprs.len() == 1 {
+            // Single expression - return it directly
+            code.push_str(&format!("        {}\n", view_exprs[0]));
+        } else {
+            // Multiple expressions - wrap in a col
+            code.push_str("        View::col().spacing(0).padding(0)\n");
+            for expr in &view_exprs {
+                code.push_str(&format!("        .child({})\n", expr));
+            }
+            code.push_str("        .build()\n");
         }
 
         code.push_str("    }\n");
@@ -607,10 +614,15 @@ impl RustCodeGenerator {
 
         // Process children from body statements
         for stmt in &node.body.stmts {
-            if let Stmt::Expr(expr) = stmt {
-                if let Ok(child_code) = self.generate_view_expr(expr) {
-                    code.push_str(&format!("\n    .child({})", child_code));
-                }
+            // Handle both Stmt::Expr and Stmt::Node
+            let child_result = match stmt {
+                Stmt::Expr(expr) => self.generate_view_expr(expr),
+                Stmt::Node(child_node) => self.generate_view_node(child_node),
+                _ => continue,
+            };
+
+            if let Ok(child_code) = child_result {
+                code.push_str(&format!("\n    .child({})", child_code));
             }
         }
 
@@ -631,10 +643,15 @@ impl RustCodeGenerator {
 
         // Process children from body statements
         for stmt in &node.body.stmts {
-            if let Stmt::Expr(expr) = stmt {
-                if let Ok(child_code) = self.generate_view_expr(expr) {
-                    code.push_str(&format!("\n    .child({})", child_code));
-                }
+            // Handle both Stmt::Expr and Stmt::Node
+            let child_result = match stmt {
+                Stmt::Expr(expr) => self.generate_view_expr(expr),
+                Stmt::Node(child_node) => self.generate_view_node(child_node),
+                _ => continue,
+            };
+
+            if let Ok(child_code) = child_result {
+                code.push_str(&format!("\n    .child({})", child_code));
             }
         }
 

@@ -1,0 +1,23 @@
+// Advanced Layout Options Demo
+// Demonstrates various layout properties and styling
+
+type LayoutDemo {
+    fn view() {
+        col(spacing: 20, padding: 10) {
+            text("Advanced Layout Demo")
+            text("────────────────────")
+            text("This example shows spacing and padding")
+        }
+    }
+
+    fn on(ev int) {
+        is ev {
+            1 => {
+                // Button 1 clicked
+            }
+            2 => {
+                // Button 2 clicked
+            }
+        }
+    }
+}

@@ -1,0 +1,66 @@
+// Layout Showcase - Demonstrates all layout properties
+// This example shows spacing, padding, and style attributes
+
+type LayoutShowcase {
+    count int = 0
+
+    fn view() {
+        // Example 1: Basic spacing and padding
+        col(spacing: 10, padding: 20) {
+            text("Example 1: Basic Spacing & Padding")
+            text("Items have 10px spacing between them")
+            text("Container has 20px padding")
+        }
+
+        // Example 2: Nested layouts
+        col(spacing: 15) {
+            text("Example 2: Nested Layouts")
+
+            row(spacing: 10, padding: 5) {
+                text("Row Item 1")
+                text("Row Item 2")
+                text("Row Item 3")
+            }
+        }
+
+        // Example 3: Center container
+        center {
+            text("Example 3: Centered Content")
+        }
+
+        // Example 4: Container with options
+        container(padding: 15) {
+            text("Example 4: Container with padding")
+            text("Containers wrap their content")
+        }
+
+        // Example 5: Row layout
+        row(spacing: 20, padding: 10) {
+            text("Example 5: Row Layout")
+            text("Item 2")
+            text("Item 3")
+        }
+
+        // Example 6: Interactive demo
+        col(spacing: 10) {
+            text("Example 6: Interactive Counter")
+            text(count)
+
+            row(spacing: 10) {
+                button("Increment", onclick: 1)
+                button("Decrement", onclick: 2)
+            }
+        }
+    }
+
+    fn on(ev int) {
+        is ev {
+            1 => {
+                count += 1
+            }
+            2 => {
+                count -= 1
+            }
+        }
+    }
+}
