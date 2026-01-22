@@ -18,5 +18,4 @@ path = "src/bin/button.rs"
 [dependencies]
 gpui = "0.2.2"
 gpui-component = { workspace = true }
-auto-ui = { workspace = true }
 anyhow = "1.0"
