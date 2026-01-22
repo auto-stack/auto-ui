@@ -96,36 +96,38 @@ impl Component for StylingShowcase {
                                         .style("gap-2")
                                         .child(
                                             View::container(
-                                                View::text("Padding Demo")
-                                                    .into())
-                                                .style("p-4 bg-blue-500 text-white rounded")
-                                                .build()
+                                                View::text("Padding Demo").into()
+                                            )
+                                            .style("p-4 bg-blue-500 text-white rounded")
+                                            .build()
                                         )
                                         .child(
                                             View::container(
-                                                View::text("Gap Demo")
-                                                    .into()
-                                                .style("gap-2 p-4 bg-green-500 text-white rounded")
-                                                .build()
+                                                View::text("Gap Demo").into()
+                                            )
+                                            .style("gap-2 p-4 bg-green-500 text-white rounded")
+                                            .build()
                                         )
+                                        .build()
                                 )
                                 .child(
                                     View::col()
                                         .style("gap-2")
                                         .child(
                                             View::container(
-                                                View::text("Colors Demo")
-                                                    .into()
-                                                .style("p-4 bg-red-500 text-white rounded")
-                                                .build()
+                                                View::text("Colors Demo").into()
+                                            )
+                                            .style("p-4 bg-red-500 text-white rounded")
+                                            .build()
                                         )
                                         .child(
                                             View::container(
-                                                View::text("Layout Demo")
-                                                    .into()
-                                                .style("p-4 bg-purple-500 text-white rounded flex items-center justify-center")
-                                                .build()
+                                                View::text("Layout Demo").into()
+                                            )
+                                            .style("p-4 bg-purple-500 text-white rounded flex items-center justify-center")
+                                            .build()
                                         )
+                                        .build()
                                 )
                                 .build()
                         )
@@ -162,6 +164,7 @@ impl Component for StylingShowcase {
                                                 "px-4 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600"
                                             )
                                         )
+                                        .build()
                                 )
                                 .child(
                                     View::col()
@@ -179,6 +182,7 @@ impl Component for StylingShowcase {
                                                 View::text_styled("Bold", "font-bold text-gray-900"),
                                             ]).build()
                                         )
+                                        .build()
                                 )
                                 .build()
                         )
@@ -217,23 +221,20 @@ impl Component for StylingShowcase {
                                         .style("gap-4 flex-wrap")
                                         .children(vec![
                                             View::container(
-                                                View::text("shadow-sm")
-                                                    .into())
-                                                .style("p-4 bg-white rounded-lg shadow-sm border")
-                                                .build()
-                                            ),
+                                                View::text("shadow-sm").into()
+                                            )
+                                            .style("p-4 bg-white rounded-lg shadow-sm border")
+                                            .build(),
                                             View::container(
-                                                View::text("shadow-md")
-                                                    .into())
-                                                .style("p-4 bg-white rounded-lg shadow-md border")
-                                                .build()
-                                            ),
+                                                View::text("shadow-md").into()
+                                            )
+                                            .style("p-4 bg-white rounded-lg shadow-md border")
+                                            .build(),
                                             View::container(
-                                                View::text("shadow-lg")
-                                                    .into())
-                                                .style("p-4 bg-white rounded-lg shadow-lg border")
-                                                .build()
-                                            ),
+                                                View::text("shadow-lg").into()
+                                            )
+                                            .style("p-4 bg-white rounded-lg shadow-lg border")
+                                            .build(),
                                         ])
                                         .build()
                                 )
@@ -243,52 +244,50 @@ impl Component for StylingShowcase {
                                         .style("gap-4")
                                         .children(vec![
                                             View::container(
-                                                View::text("opacity-50")
-                                                    .into())
-                                                .style("p-4 bg-gray-500 text-white rounded opacity-50")
-                                                .build()
-                                            ),
+                                                View::text("opacity-50").into()
+                                            )
+                                            .style("p-4 bg-gray-500 text-white rounded opacity-50")
+                                            .build(),
                                             View::container(
-                                                View::text("opacity-75")
-                                                    .into())
-                                                .style("p-4 bg-gray-500 text-white rounded opacity-75")
-                                                .build()
-                                            ),
+                                                View::text("opacity-75").into()
+                                            )
+                                            .style("p-4 bg-gray-500 text-white rounded opacity-75")
+                                            .build(),
                                         ])
                                         .build()
                                 )
-                                .child(if self.show_advanced {
-                                    // More advanced features when expanded
-                                    View::col()
-                                        .style("gap-3")
-                                        .child(
-                                            View::text_styled(
-                                                "Overflow Examples",
-                                                "text-lg font-semibold text-gray-700"
+                                .child({
+                                    if self.show_advanced {
+                                        // More advanced features when expanded
+                                        View::col()
+                                            .style("gap-3")
+                                            .child(
+                                                View::text_styled(
+                                                    "Overflow Examples",
+                                                    "text-lg font-semibold text-gray-700"
+                                                )
                                             )
-                                        )
-                                        .child(
-                                            View::row()
-                                                .style("gap-4")
-                                                .children(vec![
-                                                    View::container(
-                                                        View::text("overflow-hidden")
-                                                            .into())
+                                            .child(
+                                                View::row()
+                                                    .style("gap-4")
+                                                    .children(vec![
+                                                        View::container(
+                                                            View::text("overflow-hidden").into()
+                                                        )
                                                         .style("w-32 p-4 bg-red-500 text-white rounded overflow-hidden text-ellipsis")
-                                                        .build()
-                                                    ),
-                                                    View::container(
-                                                        View::text("overflow-auto")
-                                                            .into())
+                                                        .build(),
+                                                        View::container(
+                                                            View::text("overflow-auto").into()
+                                                        )
                                                         .style("w-32 p-4 bg-blue-500 text-white rounded overflow-auto")
-                                                        .build()
-                                                    ),
-                                                ])
-                                                .build()
-                                        )
-                                        .build()
-                                } else {
-                                    View::empty()
+                                                        .build(),
+                                                    ])
+                                                    .build()
+                                            )
+                                            .build()
+                                    } else {
+                                        View::empty()
+                                    }
                                 })
                                 .build()
                         )
@@ -328,10 +327,10 @@ impl Component for StylingShowcase {
                             View::container(
                                 View::text_styled(
                                     format!("Current: {}", self.bg_color.replace("bg-", "").replace("-", " ")),
-                                    "text-lg"
+                                    &format!("text-lg {}", self.bg_color)
                                 )
-                                .style(self.bg_color)
-                                .build()
+                            )
+                            .build()
                         )
                         .build()
                 )
