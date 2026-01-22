@@ -1,0 +1,60 @@
+// UI Components Showcase
+// Demonstrates all available UI components
+
+type ComponentsDemo {
+    // Text input state
+    username str = ""
+    email str = ""
+
+    // Checkbox state
+    agree_terms bool = false
+    subscribe_newsletter bool = false
+
+    // Radio selection
+    plan_choice int = 1
+
+    // Select dropdown
+    country str = "China"
+
+    fn view() {
+        col {
+            text("UI Components Showcase")
+            text("─────────────────────────")
+
+            text("Text Inputs:")
+            input("Enter username")
+            input("Enter email")
+
+            text("Checkboxes:")
+            checkbox("I agree to the terms", is_checked: false)
+            checkbox("Subscribe to newsletter", is_checked: false)
+
+            text("Choose a Plan:")
+            radio("Free Plan", is_selected: true)
+            radio("Pro Plan", is_selected: false)
+            radio("Enterprise Plan", is_selected: false)
+
+            text("Country:")
+            select("China")
+
+            button("Submit", onclick: 1)
+            button("Reset", onclick: 2)
+        }
+    }
+
+    fn on(ev int) {
+        is ev {
+            1 => {
+                // Submit button clicked
+            }
+            2 => {
+                // Reset button clicked
+                username = ""
+                email = ""
+                agree_terms = false
+                subscribe_newsletter = false
+                plan_choice = 1
+            }
+        }
+    }
+}

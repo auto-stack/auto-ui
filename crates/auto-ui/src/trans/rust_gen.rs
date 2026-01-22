@@ -466,6 +466,110 @@ impl RustCodeGenerator {
 
                 Ok(format!("View::button({}, {})", label, onclick_value))
             }
+            "input" => {
+                // input(placeholder, value: ..., style: ...)
+                let placeholder = if call.args.len() > 0 {
+                    if let Some(arg) = call.args.get(0) {
+                        let expr = arg.get_expr();
+                        match &expr {
+                            Expr::Str(s) => format!("\"{}\"", s),
+                            _ => "\"\"".to_string(),
+                        }
+                    } else {
+                        "\"\"".to_string()
+                    }
+                } else {
+                    "\"\"".to_string()
+                };
+
+                Ok(format!("View::input({}).build()", placeholder))
+            }
+            "checkbox" => {
+                // checkbox(label, is_checked: ...)
+                let label = if call.args.len() > 0 {
+                    if let Some(arg) = call.args.get(0) {
+                        let expr = arg.get_expr();
+                        match &expr {
+                            Expr::Str(s) => format!("\"{}\"", s),
+                            _ => "\"\"".to_string(),
+                        }
+                    } else {
+                        "\"\"".to_string()
+                    }
+                } else {
+                    "\"\"".to_string()
+                };
+
+                // Get is_checked property
+                let is_checked = call.args.args.iter()
+                    .find(|arg| matches!(arg, Arg::Pair(name, _) if name.as_str() == "is_checked"))
+                    .and_then(|arg| {
+                        if let Arg::Pair(_, expr) = arg {
+                            Some(expr)
+                        } else {
+                            None
+                        }
+                    });
+
+                let checked_value = match is_checked {
+                    Some(Expr::Bool(b)) => b.to_string(),
+                    _ => "false".to_string(),
+                };
+
+                Ok(format!("View::checkbox({}, {})", checked_value, label))
+            }
+            "radio" => {
+                // radio(label, is_selected: ...)
+                let label = if call.args.len() > 0 {
+                    if let Some(arg) = call.args.get(0) {
+                        let expr = arg.get_expr();
+                        match &expr {
+                            Expr::Str(s) => format!("\"{}\"", s),
+                            _ => "\"\"".to_string(),
+                        }
+                    } else {
+                        "\"\"".to_string()
+                    }
+                } else {
+                    "\"\"".to_string()
+                };
+
+                // Get is_selected property
+                let is_selected = call.args.args.iter()
+                    .find(|arg| matches!(arg, Arg::Pair(name, _) if name.as_str() == "is_selected"))
+                    .and_then(|arg| {
+                        if let Arg::Pair(_, expr) = arg {
+                            Some(expr)
+                        } else {
+                            None
+                        }
+                    });
+
+                let selected_value = match is_selected {
+                    Some(Expr::Bool(b)) => b.to_string(),
+                    _ => "false".to_string(),
+                };
+
+                Ok(format!("View::radio({}, {})", selected_value, label))
+            }
+            "select" => {
+                // select(options) or select("default_value")
+                let default = if call.args.len() > 0 {
+                    if let Some(arg) = call.args.get(0) {
+                        let expr = arg.get_expr();
+                        match &expr {
+                            Expr::Str(s) => format!("\"{}\"", s),
+                            _ => "\"\"".to_string(),
+                        }
+                    } else {
+                        "\"\"".to_string()
+                    }
+                } else {
+                    "\"\"".to_string()
+                };
+
+                Ok(format!("View::select(vec![{}])", default))
+            }
             _ => Ok(format!("/* unknown call: {} */", name)),
         }
     }

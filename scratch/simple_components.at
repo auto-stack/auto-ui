@@ -1,0 +1,48 @@
+// Simple components test
+
+type SimpleTest {
+    count int = 0
+    enabled bool = true
+
+    fn view() {
+        col {
+            text("Simple Components Test")
+
+            text("Counter:")
+            text(count)
+
+            row {
+                button("+", onclick: 1)
+                button("-", onclick: 2)
+            }
+
+            text("Form elements:")
+            input("Enter text")
+            checkbox("Enable", is_checked: self.enabled)
+
+            text("Radio options:")
+            radio("Option A", is_selected: true)
+            radio("Option B", is_selected: false)
+
+            text("Select:")
+            select("Default")
+
+            button("Reset", onclick: 3)
+        }
+    }
+
+    fn on(ev int) {
+        is ev {
+            1 => {
+                count += 1
+            }
+            2 => {
+                count -= 1
+            }
+            3 => {
+                count = 0
+                enabled = true
+            }
+        }
+    }
+}
