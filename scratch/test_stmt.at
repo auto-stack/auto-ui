@@ -1,0 +1,11 @@
+type Test {
+    count int = 0
+    
+    fn on(ev int) {
+        is ev {
+            1 => {
+                count += 1
+            }
+        }
+    }
+}

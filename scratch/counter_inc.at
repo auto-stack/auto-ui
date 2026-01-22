@@ -1,0 +1,18 @@
+type Counter {
+    count int = 0
+    
+    fn view() {
+        col {
+            button("+", onclick: 1)
+            text(count)
+        }
+    }
+    
+    fn on(ev int) {
+        is ev {
+            1 => {
+                count += 1
+            }
+        }
+    }
+}

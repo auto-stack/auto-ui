@@ -1,0 +1,21 @@
+// Counter Widget - View only, no on() method
+enum Msg {
+    Inc
+    Dec
+}
+
+type Counter {
+    count int = 0
+
+    fn view() {
+        col {
+            button "+" {
+                onclick: Msg.Inc
+            }
+            text(count)
+            button "-" {
+                onclick: Msg.Dec
+            }
+        }
+    }
+}

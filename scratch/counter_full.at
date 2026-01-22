@@ -1,0 +1,28 @@
+// Counter Widget - Full example with on() method
+enum Msg {
+    Inc
+    Dec
+}
+
+type Counter {
+    count int = 0
+
+    fn view() {
+        col {
+            button "+" {
+                onclick: Msg.Inc
+            }
+            text(count)
+            button "-" {
+                onclick: Msg.Dec
+            }
+        }
+    }
+
+    fn on(ev Msg) {
+        is ev {
+            Msg.Inc => self.count += 1
+            Msg.Dec => self.count -= 1
+        }
+    }
+}

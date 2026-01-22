@@ -836,22 +836,66 @@ impl RustCodeGenerator {
                     // Store uses 'name' (of type Name) and 'expr' fields
                     let name_str = store.name.to_string();
                     if let Expr::Int(n) = &store.expr {
-                        code.push_str(&format!("                self.{} = {},\n", name_str, n));
+                        code.push_str(&format!("                self.{} = {};\n", name_str, n));
                     } else if let Expr::Bina(lhs, op, rhs) = &store.expr {
                         // Handle binary operations like += and -=
                         if let Expr::Ident(field_name) = lhs.as_ref() {
                             if let Expr::Int(1) = rhs.as_ref() {
                                 // Check operator by string representation
                                 if op.to_string().contains("+") || op.to_string().contains("+=") {
-                                    code.push_str(&format!("                self.{} += 1,\n", field_name));
+                                    code.push_str(&format!("                self.{} += 1;\n", field_name));
                                 } else if op.to_string().contains("-") || op.to_string().contains("-=") {
-                                    code.push_str(&format!("                self.{} -= 1,\n", field_name));
+                                    code.push_str(&format!("                self.{} -= 1;\n", field_name));
                                 }
                             }
                         }
                     }
                 }
-                _ => {}
+                Stmt::Expr(expr) => {
+                    // Handle expression statements like count += 1
+                    if let Expr::Bina(lhs, op, rhs) = expr {
+                        if let Expr::Ident(field_name) = lhs.as_ref() {
+                            let op_str = op.to_string();
+
+                            // Generate code based on operator (use semicolon for statement termination)
+                            if op_str.contains("+=") {
+                                if let Expr::Int(n) = rhs.as_ref() {
+                                    code.push_str(&format!("                self.{} += {};\n", field_name, n));
+                                } else if let Expr::Ident(rhs_name) = rhs.as_ref() {
+                                    code.push_str(&format!("                self.{} += self.{};\n", field_name, rhs_name));
+                                }
+                            } else if op_str.contains("-=") {
+                                if let Expr::Int(n) = rhs.as_ref() {
+                                    code.push_str(&format!("                self.{} -= {};\n", field_name, n));
+                                } else if let Expr::Ident(rhs_name) = rhs.as_ref() {
+                                    code.push_str(&format!("                self.{} -= self.{};\n", field_name, rhs_name));
+                                }
+                            } else if op_str.contains("*=") {
+                                if let Expr::Int(n) = rhs.as_ref() {
+                                    code.push_str(&format!("                self.{} *= {};\n", field_name, n));
+                                } else if let Expr::Ident(rhs_name) = rhs.as_ref() {
+                                    code.push_str(&format!("                self.{} *= self.{};\n", field_name, rhs_name));
+                                }
+                            } else if op_str.contains("/=") {
+                                if let Expr::Int(n) = rhs.as_ref() {
+                                    code.push_str(&format!("                self.{} /= {};\n", field_name, n));
+                                } else if let Expr::Ident(rhs_name) = rhs.as_ref() {
+                                    code.push_str(&format!("                self.{} /= self.{};\n", field_name, rhs_name));
+                                }
+                            } else if op_str.contains("=") && !op_str.contains("+=") && !op_str.contains("-=") && !op_str.contains("*=") && !op_str.contains("/=") {
+                                // Simple assignment (not +=, -=, *=, /=)
+                                if let Expr::Int(n) = rhs.as_ref() {
+                                    code.push_str(&format!("                self.{} = {};\n", field_name, n));
+                                } else if let Expr::Ident(rhs_name) = rhs.as_ref() {
+                                    code.push_str(&format!("                self.{} = self.{};\n", field_name, rhs_name));
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => {
+                    // Ignore unknown statement types for now
+                }
             }
         }
         code

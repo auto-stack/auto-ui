@@ -1,0 +1,8 @@
+type Test {
+    count int = 0
+    fn view() {
+        text("hello")
+        text(123)
+        text(self.count)
+    }
+}

@@ -1,0 +1,7 @@
+type Hello {
+    msg str = "Hello, World!"
+
+    fn view() {
+        text(self.msg) {}
+    }
+}

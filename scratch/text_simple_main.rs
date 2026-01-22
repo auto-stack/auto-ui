@@ -1,0 +1,35 @@
+// Auto-generated from Auto language
+// DO NOT EDIT - changes will be overwritten
+
+use auto_ui::Component;
+use auto_ui::View;
+
+#[derive(Debug)]
+pub struct Hello {
+    pub msg: String,
+}
+
+impl Hello {
+    pub fn new(msg: String) -> Self {
+        Self {
+            msg,
+        }
+    }
+}
+
+impl Component for Hello {
+    type Msg = ();
+
+    fn on(&mut self, _msg: Self::Msg) {}
+
+    fn view(&self) -> View<Self::Msg> {
+        View::text(&self.msg)
+    }
+}
+
+// Main function to run the component
+fn main() {
+    let app = Hello::new("Hello from Auto!".to_string());
+    println!("Component created: {:?}", app);
+    println!("View: {:?}", app.view());
+}

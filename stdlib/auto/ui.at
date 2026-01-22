@@ -64,7 +64,6 @@ type Center is Widget {
 type Col is Widget {
     spacing u16 = 0
     padding u16 = 0
-    kids [~]Widget
 
     fn view() View {
         // Implemented by transpiler - converts to View::col()
@@ -75,7 +74,6 @@ type Col is Widget {
 type Row is Widget {
     spacing u16 = 0
     padding u16 = 0
-    kids [~]Widget
 
     fn view() View {
         // Implemented by transpiler - converts to View::row()
@@ -163,7 +161,6 @@ type Radio is Widget {
 
 // Select dropdown element
 type Select is Widget {
-    options [~]str
     selected_index u16
     on_select Msg
 
@@ -174,7 +171,6 @@ type Select is Widget {
 
 // List element
 type List is Widget {
-    items [~]Widget
     spacing u16 = 0
 
     fn view() View {
@@ -184,8 +180,6 @@ type List is Widget {
 
 // Table element
 type Table is Widget {
-    headers [~]Widget
-    rows [[~]Widget]
     spacing u16 = 0
     col_spacing u16 = 0
 
