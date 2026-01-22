@@ -15,19 +15,15 @@ use anyhow::Result;
 use auto_ui::trans::transpile_file;
 use clap::{Parser, Subcommand};
 use console::style;
-use miette::{MietteHandler, NarratableReportHandler};
+use miette::MietteHandler;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 use std::fs;
 
-mod error;
-use error::{TranspileError, into_transpile_error, string_to_transpile_error};
-
 // Initialize miette for fancy error reporting
 fn init_miette() {
-    // Enable fancy error reporting with colors
     miette::set_hook(Box::new(|_| {
-        Box::new(MietteHandler::new())
+        Box::new(miette::MietteHandler::new())
     }))
     .expect("Failed to set miette hook");
 }

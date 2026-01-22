@@ -628,6 +628,7 @@ dependencies = [
  "notify 6.1.1",
  "notify-debouncer-mini",
  "regex",
+ "thiserror 2.0.18",
 ]
 
 [[package]]

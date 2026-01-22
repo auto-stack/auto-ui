@@ -1,36 +1,26 @@
 // Error reporting module for AutoUI Transpiler
 //
-// Provides fancy error messages with source code highlighting using miette
+// Provides error messages with source code context
 
-use miette::{Diagnostic, NamedSource, SourceSpan};
 use std::path::PathBuf;
 use thiserror::Error;
 
 /// Transpiler error with source location information
-#[derive(Debug, Diagnostic, Error)]
+#[derive(Debug, Error)]
 pub enum TranspileError {
     /// Error parsing Auto language file
-    #[error("Failed to parse {file}")]
-    #[diagnostic(
-        code(auto_ui::parse_error),
-        help("Check the syntax of your Auto language code")
-    )]
+    #[error("Failed to parse {file}: {message}")]
     ParseError {
         /// File that failed to parse
         file: String,
-        /// Source code
-        #[source_code]
-        source: NamedSource<String>,
-        /// Underlying miette error
-        #[related]
-        related: Vec<miette::Error>,
+        /// Error message
+        message: String,
+        /// Source code (for error reporting)
+        source: String,
     },
 
     /// File I/O error
-    #[error("Failed to {action} {file}")]
-    #[diagnostic(
-        code(auto_ui::io_error)
-    )]
+    #[error("Failed to {action} {file}: {error}")]
     IoError {
         /// Action being performed (read/write)
         action: String,
@@ -42,48 +32,60 @@ pub enum TranspileError {
     },
 
     /// Code generation error
-    #[error("Failed to generate code: {message}")]
-    #[diagnostic(
-        code(auto_ui::codegen_error)
-    )]
+    #[error("Failed to generate code for {file}: {message}")]
     CodeGenError {
-        /// Error message
-        message: String,
         /// File being processed
         file: String,
+        /// Error message
+        message: String,
     },
+}
+
+impl TranspileError {
+    /// Get source code if available
+    pub fn source_code(&self) -> Option<&str> {
+        match self {
+            TranspileError::ParseError { source, .. } => Some(source),
+            _ => None,
+        }
+    }
+
+    /// Get file path
+    pub fn file_path(&self) -> &str {
+        match self {
+            TranspileError::ParseError { file, .. } => file,
+            TranspileError::IoError { file, .. } => file,
+            TranspileError::CodeGenError { file, .. } => file,
+        }
+    }
+
+    /// Get error message
+    pub fn error_message(&self) -> &str {
+        match self {
+            TranspileError::ParseError { message, .. } => message,
+            TranspileError::CodeGenError { message, .. } => message,
+            TranspileError::IoError { .. } => "I/O error",
+        }
+    }
 }
 
 /// Convert parser error to TranspileError with source code
 pub fn into_transpile_error(
     file_path: &PathBuf,
     source: &str,
-    parse_error: miette::Error,
+    parse_error: String,
 ) -> TranspileError {
-    let file_name = file_path.display().to_string();
-
-    // Try to extract related errors if it's a MultipleErrors
-    let related = if let Some(auto_err) = parse_error.downcast_ref::<auto_lang::error::AutoError>() {
-        if let auto_lang::error::AutoError::MultipleErrors { errors, .. } = auto_err {
-            errors.clone()
-        } else {
-            vec![]
-        }
-    } else {
-        vec![]
-    };
-
     TranspileError::ParseError {
-        file: file_name.clone(),
-        source: NamedSource::new(file_name, source.to_string()),
-        related,
+        file: file_path.display().to_string(),
+        message: parse_error,
+        source: source.to_string(),
     }
 }
 
 /// Convert string error to TranspileError
 pub fn string_to_transpile_error(file_path: &PathBuf, message: String) -> TranspileError {
     TranspileError::CodeGenError {
-        message,
         file: file_path.display().to_string(),
+        message,
     }
 }
