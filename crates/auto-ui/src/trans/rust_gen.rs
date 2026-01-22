@@ -414,7 +414,10 @@ impl RustCodeGenerator {
                     if let Some(arg) = call.args.get(0) {
                         let expr = arg.get_expr();
                         match &expr {
-                            Expr::Ident(name) => format!("&self.{}", name),
+                            Expr::Ident(name) => {
+                                // For field references, use .to_string() to handle int types
+                                format!("&self.{}.to_string()", name)
+                            }
                             Expr::Str(s) => format!("&\"{}\"", s),
                             _ => "&\"\"".to_string(),
                         }

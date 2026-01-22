@@ -535,6 +535,7 @@ fn generate_runnable_example(transpiled_code: &str, backend: &str) -> Result<Str
     };
 
     // We need to add Default impl and main function
+    let default_values = extract_field_default_values(&code_without_use);
     let wrapper = format!(
         r#"
 // Auto-generated runnable example
@@ -549,9 +550,9 @@ use auto_ui::{{Component, View}};
 // ===== Default Implementation =====
 impl Default for {actual_component_name} {{
     fn default() -> Self {{
-        // Create component with default values
+        // Generate default values based on field types
         Self::new(
-            "Hello from Auto!".to_string(),
+            {default_values}
         )
     }}
 }}
@@ -571,6 +572,7 @@ fn main() -> auto_ui::AppResult<()> {{
 "#,
         code_without_use = code_without_use,
         actual_component_name = actual_component_name,
+        default_values = default_values,
         backend = backend,
         main_function = main_function
     );
@@ -604,6 +606,38 @@ fn extract_component_name(code: &str) -> Result<String> {
             }
         }
         Err(anyhow::anyhow!("Could not extract component name from generated code"))
+    }
+}
+
+/// Extract fields from generated code and generate default values
+/// Looks for: pub name: Type,
+fn extract_field_default_values(code: &str) -> String {
+    use regex::Regex;
+
+    // Find all field definitions in the struct
+    let re = Regex::new(r"pub (\w+):\s*(\w+),?").unwrap();
+    let mut fields = Vec::new();
+
+    for caps in re.captures_iter(code) {
+        if let (Some(name), Some(type_str)) = (caps.get(1), caps.get(2)) {
+            let field_name = name.as_str();
+            let type_name = type_str.as_str();
+
+            let default_value = match type_name {
+                "String" | "str" => format!("\"\".to_string()"),
+                "i32" | "int" => "0".to_string(),
+                "bool" => "false".to_string(),
+                _ => "\"\"".to_string(),
+            };
+
+            fields.push(default_value);
+        }
+    }
+
+    if fields.is_empty() {
+        "\"Hello from Auto!\".to_string()".to_string()
+    } else {
+        fields.join(", ")
     }
 }
 
