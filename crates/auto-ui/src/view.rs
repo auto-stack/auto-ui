@@ -38,7 +38,180 @@ impl<M> SelectCallback<M> {
     }
 }
 
-/// Abstract view node - generic over message type M
+// ============================================================================
+// Plan 010: Unified Navigation Components - Helper Types
+// ============================================================================
+
+/// Callback for accordion toggle events
+///
+/// Wraps a function that receives the item index and expanded state,
+/// and returns a message. Arc is used for thread-safe cloning.
+#[derive(Clone)]
+pub struct AccordionToggleCallback<M> {
+    callback: Arc<dyn Fn(usize, bool) -> M + Send + Sync>,
+}
+
+impl<M> std::fmt::Debug for AccordionToggleCallback<M> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AccordionToggleCallback")
+            .finish()
+    }
+}
+
+impl<M> AccordionToggleCallback<M> {
+    pub fn new<F>(f: F) -> Self
+    where
+        F: Fn(usize, bool) -> M + Send + Sync + 'static,
+    {
+        Self {
+            callback: Arc::new(f),
+        }
+    }
+
+    pub fn call(&self, index: usize, expanded: bool) -> M {
+        (self.callback)(index, expanded)
+    }
+}
+
+/// Callback for tab selection events
+///
+/// Wraps a function that receives the selected tab index,
+/// and returns a message. Arc is used for thread-safe cloning.
+#[derive(Clone)]
+pub struct TabsSelectCallback<M> {
+    callback: Arc<dyn Fn(usize) -> M + Send + Sync>,
+}
+
+impl<M> std::fmt::Debug for TabsSelectCallback<M> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TabsSelectCallback")
+            .finish()
+    }
+}
+
+impl<M> TabsSelectCallback<M> {
+    pub fn new<F>(f: F) -> Self
+    where
+        F: Fn(usize) -> M + Send + Sync + 'static,
+    {
+        Self {
+            callback: Arc::new(f),
+        }
+    }
+
+    pub fn call(&self, index: usize) -> M {
+        (self.callback)(index)
+    }
+}
+
+/// Callback for navigation rail selection events
+///
+/// Wraps a function that receives the selected item index,
+/// and returns a message. Arc is used for thread-safe cloning.
+#[derive(Clone)]
+pub struct NavigationRailSelectCallback<M> {
+    callback: Arc<dyn Fn(usize) -> M + Send + Sync>,
+}
+
+impl<M> std::fmt::Debug for NavigationRailSelectCallback<M> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NavigationRailSelectCallback")
+            .finish()
+    }
+}
+
+impl<M> NavigationRailSelectCallback<M> {
+    pub fn new<F>(f: F) -> Self
+    where
+        F: Fn(usize) -> M + Send + Sync + 'static,
+    {
+        Self {
+            callback: Arc::new(f),
+        }
+    }
+
+    pub fn call(&self, index: usize) -> M {
+        (self.callback)(index)
+    }
+}
+
+/// Sidebar position (left or right)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SidebarPosition {
+    Left,
+    Right,
+}
+
+/// Tabs position (top, bottom, left, or right)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TabsPosition {
+    Top,
+    Bottom,
+    Left,
+    Right,
+}
+
+/// Accordion item (collapsible section)
+#[derive(Debug, Clone)]
+pub struct AccordionItem<M: Clone + Debug> {
+    pub title: String,
+    pub icon: Option<char>,
+    pub children: Vec<View<M>>,
+    pub expanded: bool,
+}
+
+impl<M: Clone + Debug> AccordionItem<M> {
+    pub fn new(title: impl Into<String>) -> Self {
+        Self {
+            title: title.into(),
+            icon: None,
+            children: Vec::new(),
+            expanded: false,
+        }
+    }
+
+    pub fn with_icon(mut self, icon: char) -> Self {
+        self.icon = Some(icon);
+        self
+    }
+
+    pub fn with_children(mut self, children: Vec<View<M>>) -> Self {
+        self.children = children;
+        self
+    }
+
+    pub fn with_expanded(mut self, expanded: bool) -> Self {
+        self.expanded = expanded;
+        self
+    }
+}
+
+/// Navigation rail item
+#[derive(Debug, Clone)]
+pub struct NavigationRailItem {
+    pub icon: char,
+    pub label: String,
+    pub badge: Option<String>,
+}
+
+impl NavigationRailItem {
+    pub fn new(icon: char, label: impl Into<String>) -> Self {
+        Self {
+            icon,
+            label: label.into(),
+            badge: None,
+        }
+    }
+
+    pub fn with_badge(mut self, badge: impl Into<String>) -> Self {
+        self.badge = Some(badge.into());
+        self
+    }
+}
+
+// ============================================================================
+// Abstract view node - generic over message type M
+// ============================================================================
 ///
 /// This enum represents the abstract UI tree that can be adapted to different backends.
 /// Messages are stored directly (not as Option) for simpler mapping to Auto language.
@@ -162,6 +335,47 @@ pub enum View<M: Clone + Debug> {
     /// Progress bar for displaying progress with optional styling
     ProgressBar {
         progress: f32,  // 0.0 to 1.0
+        style: Option<Style>,
+    },
+
+    /// Accordion (collapsible sections) with optional styling
+    /// Plan 010: Unified Navigation Components
+    Accordion {
+        items: Vec<AccordionItem<M>>,
+        allow_multiple: bool,  // Allow multiple sections expanded
+        on_toggle: Option<AccordionToggleCallback<M>>,
+        style: Option<Style>,
+    },
+
+    /// Sidebar (fixed-width side panel) with optional styling
+    /// Plan 010: Unified Navigation Components
+    Sidebar {
+        content: Box<View<M>>,
+        width: f32,
+        collapsible: bool,
+        position: SidebarPosition,
+        style: Option<Style>,
+    },
+
+    /// Tabs (horizontal tab navigation) with optional styling
+    /// Plan 010: Unified Navigation Components
+    Tabs {
+        labels: Vec<String>,
+        contents: Vec<View<M>>,
+        selected: usize,
+        position: TabsPosition,
+        on_select: Option<TabsSelectCallback<M>>,
+        style: Option<Style>,
+    },
+
+    /// NavigationRail (compact side navigation) with optional styling
+    /// Plan 010: Unified Navigation Components
+    NavigationRail {
+        items: Vec<NavigationRailItem>,
+        selected: usize,
+        width: f32,
+        show_labels: bool,
+        on_select: Option<NavigationRailSelectCallback<M>>,
         style: Option<Style>,
     },
 }
@@ -482,6 +696,113 @@ impl<M: Clone + Debug> View<M> {
             width: None,
             height: None,
             style: None,  // ✅ NEW: style field
+        }
+    }
+
+    // ============================================================================
+    // Plan 010: Unified Navigation Components - Static Constructors
+    // ============================================================================
+
+    /// Create an accordion (collapsible sections)
+    ///
+    /// # Example
+    /// ```
+    /// # use auto_ui::{View, AccordionItem};
+    /// # #[derive(Clone, Copy, Debug)]
+    /// # enum Msg { GroupToggled(usize, bool) }
+    /// View::accordion()
+    ///     .items(vec![
+    ///         AccordionItem::new("Getting Started").with_icon('🏠'),
+    ///         AccordionItem::new("Basic Widgets").with_icon('📦'),
+    ///     ])
+    ///     .allow_multiple(true)
+    ///     .on_toggle(|idx, expanded| Msg::GroupToggled(idx, expanded))
+    ///     .build()
+    /// ```
+    pub fn accordion() -> AccordionBuilder<M> {
+        AccordionBuilder {
+            items: Vec::new(),
+            allow_multiple: true,
+            on_toggle: None,
+            style: None,
+        }
+    }
+
+    /// Create a sidebar (fixed-width side panel)
+    ///
+    /// # Example
+    /// ```
+    /// # use auto_ui::View;
+    /// # #[derive(Clone, Copy, Debug)]
+    /// # enum Msg { ToggleSidebar }
+    /// View::sidebar(View::text("Content"), 300.0)
+    ///     .collapsible(true)
+    ///     .position(SidebarPosition::Left)
+    ///     .build()
+    /// ```
+    pub fn sidebar(content: View<M>, width: f32) -> SidebarBuilder<M> {
+        SidebarBuilder {
+            content,
+            width,
+            collapsible: false,
+            position: SidebarPosition::Left,
+            style: None,
+        }
+    }
+
+    /// Create tabs (horizontal tab navigation)
+    ///
+    /// # Example
+    /// ```
+    /// # use auto_ui::View;
+    /// # #[derive(Clone, Copy, Debug)]
+    /// # enum Msg { TabChanged(usize) }
+    /// View::tabs(vec!["Home".to_string(), "Settings".to_string()])
+    ///     .contents(vec![
+    ///         View::text("Home content"),
+    ///         View::text("Settings content"),
+    ///     ])
+    ///     .selected(0)
+    ///     .on_select(|idx| Msg::TabChanged(idx))
+    ///     .build()
+    /// ```
+    pub fn tabs(labels: Vec<String>) -> TabsBuilder<M> {
+        TabsBuilder {
+            labels,
+            contents: Vec::new(),
+            selected: 0,
+            position: TabsPosition::Top,
+            on_select: None,
+            style: None,
+        }
+    }
+
+    /// Create a navigation rail (compact side navigation)
+    ///
+    /// # Example
+    /// ```
+    /// # use auto_ui::{View, NavigationRailItem};
+    /// # #[derive(Clone, Copy, Debug)]
+    /// # enum Msg { Navigate(usize) }
+    /// View::navigation_rail()
+    ///     .items(vec![
+    ///         NavigationRailItem::new('🏠', "Home"),
+    ///         NavigationRailItem::new('⚙️', "Settings"),
+    ///     ])
+    ///     .selected(0)
+    ///     .width(72.0)
+    ///     .show_labels(true)
+    ///     .on_select(|idx| Msg::Navigate(idx))
+    ///     .build()
+    /// ```
+    pub fn navigation_rail() -> NavigationRailBuilder<M> {
+        NavigationRailBuilder {
+            items: Vec::new(),
+            selected: 0,
+            width: 72.0,
+            show_labels: true,
+            on_select: None,
+            style: None,
         }
     }
 }
@@ -847,6 +1168,195 @@ impl<M: Clone + Debug> View<M> {
             *on_select = Some(SelectCallback::new(callback));
         }
         self
+    }
+}
+
+// ============================================================================
+// Plan 010: Unified Navigation Components - Builder Types
+// ============================================================================
+
+/// Builder for Accordion with fluent API
+pub struct AccordionBuilder<M: Clone + Debug> {
+    items: Vec<AccordionItem<M>>,
+    allow_multiple: bool,
+    on_toggle: Option<AccordionToggleCallback<M>>,
+    style: Option<Style>,
+}
+
+impl<M: Clone + Debug> AccordionBuilder<M> {
+    pub fn items(mut self, items: Vec<AccordionItem<M>>) -> Self {
+        self.items = items;
+        self
+    }
+
+    pub fn allow_multiple(mut self, allow: bool) -> Self {
+        self.allow_multiple = allow;
+        self
+    }
+
+    pub fn on_toggle<F>(mut self, callback: F) -> Self
+    where
+        F: Fn(usize, bool) -> M + Send + Sync + 'static,
+    {
+        self.on_toggle = Some(AccordionToggleCallback::new(callback));
+        self
+    }
+
+    pub fn style(mut self, style_str: &str) -> Self {
+        self.style = Some(Style::parse(style_str).expect("Invalid style string"));
+        self
+    }
+
+    pub fn build(self) -> View<M> {
+        View::Accordion {
+            items: self.items,
+            allow_multiple: self.allow_multiple,
+            on_toggle: self.on_toggle,
+            style: self.style,
+        }
+    }
+}
+
+/// Builder for Sidebar with fluent API
+pub struct SidebarBuilder<M: Clone + Debug> {
+    content: View<M>,
+    width: f32,
+    collapsible: bool,
+    position: SidebarPosition,
+    style: Option<Style>,
+}
+
+impl<M: Clone + Debug> SidebarBuilder<M> {
+    pub fn collapsible(mut self, collapsible: bool) -> Self {
+        self.collapsible = collapsible;
+        self
+    }
+
+    pub fn position(mut self, position: SidebarPosition) -> Self {
+        self.position = position;
+        self
+    }
+
+    pub fn style(mut self, style_str: &str) -> Self {
+        self.style = Some(Style::parse(style_str).expect("Invalid style string"));
+        self
+    }
+
+    pub fn build(self) -> View<M> {
+        View::Sidebar {
+            content: Box::new(self.content),
+            width: self.width,
+            collapsible: self.collapsible,
+            position: self.position,
+            style: self.style,
+        }
+    }
+}
+
+/// Builder for Tabs with fluent API
+pub struct TabsBuilder<M: Clone + Debug> {
+    labels: Vec<String>,
+    contents: Vec<View<M>>,
+    selected: usize,
+    position: TabsPosition,
+    on_select: Option<TabsSelectCallback<M>>,
+    style: Option<Style>,
+}
+
+impl<M: Clone + Debug> TabsBuilder<M> {
+    pub fn contents(mut self, contents: Vec<View<M>>) -> Self {
+        self.contents = contents;
+        self
+    }
+
+    pub fn selected(mut self, index: usize) -> Self {
+        self.selected = index;
+        self
+    }
+
+    pub fn position(mut self, position: TabsPosition) -> Self {
+        self.position = position;
+        self
+    }
+
+    pub fn on_select<F>(mut self, callback: F) -> Self
+    where
+        F: Fn(usize) -> M + Send + Sync + 'static,
+    {
+        self.on_select = Some(TabsSelectCallback::new(callback));
+        self
+    }
+
+    pub fn style(mut self, style_str: &str) -> Self {
+        self.style = Some(Style::parse(style_str).expect("Invalid style string"));
+        self
+    }
+
+    pub fn build(self) -> View<M> {
+        View::Tabs {
+            labels: self.labels,
+            contents: self.contents,
+            selected: self.selected,
+            position: self.position,
+            on_select: self.on_select,
+            style: self.style,
+        }
+    }
+}
+
+/// Builder for NavigationRail with fluent API
+pub struct NavigationRailBuilder<M: Clone + Debug> {
+    items: Vec<NavigationRailItem>,
+    selected: usize,
+    width: f32,
+    show_labels: bool,
+    on_select: Option<NavigationRailSelectCallback<M>>,
+    style: Option<Style>,
+}
+
+impl<M: Clone + Debug> NavigationRailBuilder<M> {
+    pub fn items(mut self, items: Vec<NavigationRailItem>) -> Self {
+        self.items = items;
+        self
+    }
+
+    pub fn selected(mut self, index: usize) -> Self {
+        self.selected = index;
+        self
+    }
+
+    pub fn width(mut self, width: f32) -> Self {
+        self.width = width;
+        self
+    }
+
+    pub fn show_labels(mut self, show: bool) -> Self {
+        self.show_labels = show;
+        self
+    }
+
+    pub fn on_select<F>(mut self, callback: F) -> Self
+    where
+        F: Fn(usize) -> M + Send + Sync + 'static,
+    {
+        self.on_select = Some(NavigationRailSelectCallback::new(callback));
+        self
+    }
+
+    pub fn style(mut self, style_str: &str) -> Self {
+        self.style = Some(Style::parse(style_str).expect("Invalid style string"));
+        self
+    }
+
+    pub fn build(self) -> View<M> {
+        View::NavigationRail {
+            items: self.items,
+            selected: self.selected,
+            width: self.width,
+            show_labels: self.show_labels,
+            on_select: self.on_select,
+            style: self.style,
+        }
     }
 }
 

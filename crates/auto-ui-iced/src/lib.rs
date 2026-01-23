@@ -293,6 +293,158 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 // Progress bar in Iced
                 progress_bar(0.0..=1.0, progress).into()
             }
+
+            // Plan 010: Unified Navigation Components - Iced Implementation
+
+            AbstractView::Accordion {
+                items,
+                allow_multiple: _,
+                on_toggle,
+                style: _,
+            } => {
+                use auto_ui::AccordionItem;
+                use iced::widget::container;
+
+                // Accordion is implemented as a column of collapsible sections
+                let mut accordion_widget = column([]);
+
+                for (idx, item) in items.into_iter().enumerate() {
+                    // Create header button with icon + title
+                    let header_text = if let Some(icon) = item.icon {
+                        format!("{} {}", icon, item.title)
+                    } else {
+                        item.title.clone()
+                    };
+
+                    let header_button = if let Some(callback) = &on_toggle {
+                        // Toggle message - need to clone for closure
+                        let callback_clone = callback.clone();
+                        button(text(header_text))
+                            .on_press(callback_clone.call(idx, !item.expanded))
+                    } else {
+                        button(text(header_text))
+                    };
+
+                    // Create children (if expanded)
+                    let children_view: iced::Element<M> = if item.expanded && !item.children.is_empty() {
+                        let mut children_col = column([]);
+                        for child in item.children {
+                            children_col = children_col.push(child.into_iced());
+                        }
+                        children_col.into()
+                    } else {
+                        text("").into()
+                    };
+
+                    // Combine header and children in a container
+                    let section = container(column![header_button, children_view].spacing(4));
+                    accordion_widget = accordion_widget.push(section);
+                }
+
+                container(accordion_widget).padding(10).into()
+            }
+
+            AbstractView::Sidebar {
+                content,
+                width,
+                collapsible: _,
+                position,
+                style: _,
+            } => {
+                use iced::widget::container;
+                use iced::Length;
+
+                // Sidebar is a fixed-width container
+                let mut sidebar_container = container(content.into_iced())
+                    .width(Length::Fixed(width))
+                    .height(Length::Fill);
+
+                // Add border based on position
+                sidebar_container = match position {
+                    auto_ui::SidebarPosition::Left => sidebar_container,
+                    auto_ui::SidebarPosition::Right => sidebar_container,
+                };
+
+                sidebar_container.into()
+            }
+
+            AbstractView::Tabs {
+                labels,
+                contents,
+                selected,
+                position: _,
+                on_select: _,
+                style: _,
+            } => {
+                use iced::widget::{container, column};
+                use auto_ui::TabsPosition;
+
+                // Tabs are implemented as column with tab buttons + selected content
+                let mut tabs_widget = column([]);
+
+                // Create tab buttons row
+                let mut tab_buttons_row = row([]);
+                for (idx, label) in labels.iter().enumerate() {
+                    let is_selected = idx == selected;
+                    let label_text = if is_selected {
+                        format!("[{}]", label)  // Highlight selected
+                    } else {
+                        label.clone()
+                    };
+
+                    let tab_button = button(text(label_text));
+                    tab_buttons_row = tab_buttons_row.push(tab_button);
+                }
+
+                tabs_widget = tabs_widget.push(tab_buttons_row);
+
+                // Add selected content
+                if let Some(content) = contents.get(selected) {
+                    tabs_widget = tabs_widget.push(container(content.clone().into_iced()).padding(20));
+                }
+
+                container(tabs_widget).into()
+            }
+
+            AbstractView::NavigationRail {
+                items,
+                selected: _,
+                width,
+                show_labels,
+                on_select: _,
+                style: _,
+            } => {
+                use iced::widget::{container, column};
+                use iced::Length;
+
+                // NavigationRail is a compact vertical navigation
+                let mut rail_widget = column([]);
+
+                for item in items {
+                    // Create navigation item with icon
+                    let item_text = if show_labels {
+                        format!("{}  {}", item.icon, item.label)
+                    } else {
+                        item.icon.to_string()
+                    };
+
+                    // Add badge if present
+                    let item_text_with_badge = if let Some(badge) = &item.badge {
+                        format!("{} ({})", item_text, badge)
+                    } else {
+                        item_text
+                    };
+
+                    let nav_button = button(text(item_text_with_badge));
+                    rail_widget = rail_widget.push(nav_button);
+                }
+
+                container(rail_widget)
+                    .width(Length::Fixed(width))
+                    .height(Length::Fill)
+                    .padding(10)
+                    .into()
+            }
         }
     }
 }

@@ -414,17 +414,15 @@ impl IcedStyle {
         }
     }
 
-    /// Convert to iced::Style (for containers, buttons, etc.)
-    pub fn to_container_style(&self) -> iced::style::Container {
-        iced::style::Container::default()
-    }
+    // Note: Iced 0.14+ uses theme-based styling
+    // Style conversion methods are deprecated
 }
 
 /// Convert a SizeValue to IcedSize
 fn convert_size(size: &SizeValue) -> IcedSize {
     match size {
         SizeValue::Full => IcedSize::Full,
-        SizeValue::Fixed(units) => IcedSize::Fixed(units.to_pixels() as f32),
+        SizeValue::Fixed(units) => IcedSize::Fixed(*units as f32),
         _ => IcedSize::Full, // Default to full for other variants
     }
 }

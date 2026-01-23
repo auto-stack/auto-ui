@@ -1,0 +1,20 @@
+[package]
+name = "unified-sidebar"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+auto-ui = { path = "../../crates/auto-ui", default-features = false }
+
+auto-ui-iced = { path = "../../crates/auto-ui-iced", optional = true }
+auto-ui-gpui = { path = "../../crates/auto-ui-gpui", optional = true }
+
+[features]
+# default = ["gpui"]
+default = ["iced"]
+iced = ["auto-ui/iced", "auto-ui-iced"]
+gpui = ["auto-ui/gpui", "auto-ui-gpui"]
+
+[[bin]]
+name = "unified-sidebar"
+path = "src/main.rs"

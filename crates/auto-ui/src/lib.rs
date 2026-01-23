@@ -7,7 +7,14 @@
 pub mod prelude {
     pub use crate::app::{App, AppResult};
     pub use crate::component::Component;
-    pub use crate::view::{View, ViewBuilder, ViewContainerBuilder, ViewScrollableBuilder, ViewListBuilder, ViewInputBuilder, ViewTableBuilder, ViewSliderBuilder, SelectCallback};
+    pub use crate::view::{
+        View, ViewBuilder, ViewContainerBuilder, ViewScrollableBuilder, ViewListBuilder,
+        ViewInputBuilder, ViewTableBuilder, ViewSliderBuilder, SelectCallback,
+        // Plan 010: Unified Navigation Components
+        AccordionBuilder, SidebarBuilder, TabsBuilder, NavigationRailBuilder,
+        AccordionItem, NavigationRailItem, SidebarPosition, TabsPosition,
+        AccordionToggleCallback, TabsSelectCallback, NavigationRailSelectCallback,
+    };
 }
 
 pub mod app;
@@ -28,7 +35,14 @@ pub mod trans;
 // Re-export core types for convenience
 pub use app::{App, AppResult};
 pub use component::Component;
-pub use view::{View, ViewBuilder, ViewContainerBuilder, ViewScrollableBuilder, ViewListBuilder, ViewInputBuilder, ViewTableBuilder, ViewSliderBuilder, SelectCallback};
+pub use view::{
+    View, ViewBuilder, ViewContainerBuilder, ViewScrollableBuilder, ViewListBuilder,
+    ViewInputBuilder, ViewTableBuilder, ViewSliderBuilder, SelectCallback,
+    // Plan 010: Unified Navigation Components
+    AccordionBuilder, SidebarBuilder, TabsBuilder, NavigationRailBuilder,
+    AccordionItem, NavigationRailItem, SidebarPosition, TabsPosition,
+    AccordionToggleCallback, TabsSelectCallback, NavigationRailSelectCallback,
+};
 pub use style::Style; // Re-export Style for backend adapters
 
 // Re-export AutoLang integration types

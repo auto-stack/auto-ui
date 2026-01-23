@@ -596,6 +596,171 @@ impl<M: Clone + Debug + 'static> IntoGpuiElementWithHandler<M> for View<M> {
 
                 progress_bar.into_any()
             }
+
+            // Plan 010: Unified Navigation Components
+
+            View::Accordion {
+                items,
+                allow_multiple: _,
+                on_toggle: _,
+                style: _,
+            } => {
+                let mut accordion = div().flex().flex_col().gap_2().p_4();
+
+                for (_idx, item) in items.into_iter().enumerate() {
+                    let header_text = if let Some(icon) = item.icon {
+                        format!("{} {}", icon, item.title)
+                    } else {
+                        item.title.clone()
+                    };
+
+                    let header_div = div()
+                        .cursor_pointer()
+                        .px_4()
+                        .py_2()
+                        .bg(rgb(0x333333))
+                        .border_1()
+                        .border_color(rgb(0x444444))
+                        .rounded_md()
+                        .child(header_text);
+
+                    let children_div = if item.expanded && !item.children.is_empty() {
+                        let mut children_col = div().flex().flex_col().gap_1().p_2().pl_6();
+                        for child in item.children {
+                            let child_element = child.into_gpui_impl(handle_msg.clone());
+                            children_col = children_col.child(child_element);
+                        }
+                        children_col
+                    } else {
+                        div()
+                    };
+
+                    let section = div()
+                        .flex()
+                        .flex_col()
+                        .gap_1()
+                        .child(header_div)
+                        .child(children_div);
+
+                    accordion = accordion.child(section);
+                }
+
+                accordion.into_any()
+            }
+
+            View::Sidebar {
+                content,
+                width,
+                collapsible: _,
+                position: _,
+                style: _,
+            } => {
+                let sidebar = div()
+                    .flex()
+                    .flex_col()
+                    .w(px(width))
+                    .h(px(600.0))
+                    .bg(rgb(0x1a1a1a))
+                    .border_r_1()
+                    .border_color(rgb(0x333333))
+                    .child(content.into_gpui_impl(handle_msg));
+
+                sidebar.into_any()
+            }
+
+            View::Tabs {
+                labels,
+                contents,
+                selected,
+                position: _,
+                on_select: _,
+                style: _,
+            } => {
+                let mut tabs = div().flex().flex_col().gap_2().p_4();
+
+                let mut tab_buttons = div().flex().flex_row().gap_2();
+                for (idx, label) in labels.iter().enumerate() {
+                    let is_selected = idx == selected;
+                    let label_text = if is_selected {
+                        format!("[{}]", label)
+                    } else {
+                        label.clone()
+                    };
+
+                    let tab_button = div()
+                        .px_4()
+                        .py_2()
+                        .bg(if is_selected { rgb(0x3b82f6) } else { rgb(0x333333) })
+                        .rounded_md()
+                        .cursor_pointer()
+                        .child(label_text);
+
+                    tab_buttons = tab_buttons.child(tab_button);
+                }
+
+                tabs = tabs.child(tab_buttons);
+
+                if let Some(content) = contents.get(selected) {
+                    let content_div = div()
+                        .p_4()
+                        .border_1()
+                        .border_color(rgb(0x444444))
+                        .rounded_md()
+                        .child(content.clone().into_gpui_impl(handle_msg));
+
+                    tabs = tabs.child(content_div);
+                }
+
+                tabs.into_any()
+            }
+
+            View::NavigationRail {
+                items,
+                selected: _,
+                width,
+                show_labels,
+                on_select: _,
+                style: _,
+            } => {
+                let mut rail = div()
+                    .flex()
+                    .flex_col()
+                    .gap_2()
+                    .w(px(width))
+                    .h(px(600.0))
+                    .p_2()
+                    .bg(rgb(0x1a1a1a))
+                    .border_r_1()
+                    .border_color(rgb(0x333333));
+
+                for item in items {
+                    let item_text = if show_labels {
+                        format!("{}  {}", item.icon, item.label)
+                    } else {
+                        item.icon.to_string()
+                    };
+
+                    let item_text_with_badge = if let Some(badge) = &item.badge {
+                        format!("{} ({})", item_text, badge)
+                    } else {
+                        item_text
+                    };
+
+                    let nav_item = div()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .p_2()
+                        .bg(rgb(0x333333))
+                        .rounded_md()
+                        .cursor_pointer()
+                        .child(item_text_with_badge);
+
+                    rail = rail.child(nav_item);
+                }
+
+                rail.into_any()
+            }
         }
     }
 
@@ -925,6 +1090,171 @@ impl<M: Clone + Debug + 'static> IntoGpuiElementWithHandler<M> for View<M> {
                 }
 
                 progress_bar.into_any()
+            }
+
+            // Plan 010: Unified Navigation Components
+
+            View::Accordion {
+                items,
+                allow_multiple: _,
+                on_toggle: _,
+                style: _,
+            } => {
+                let mut accordion = div().flex().flex_col().gap_2().p_4();
+
+                for (_idx, item) in items.into_iter().enumerate() {
+                    let header_text = if let Some(icon) = item.icon {
+                        format!("{} {}", icon, item.title)
+                    } else {
+                        item.title.clone()
+                    };
+
+                    let header_div = div()
+                        .cursor_pointer()
+                        .px_4()
+                        .py_2()
+                        .bg(rgb(0x333333))
+                        .border_1()
+                        .border_color(rgb(0x444444))
+                        .rounded_md()
+                        .child(header_text);
+
+                    let children_div = if item.expanded && !item.children.is_empty() {
+                        let mut children_col = div().flex().flex_col().gap_1().p_2().pl_6();
+                        for child in item.children {
+                            let child_element = child.into_gpui_impl_with_context(state, cx);
+                            children_col = children_col.child(child_element);
+                        }
+                        children_col
+                    } else {
+                        div()
+                    };
+
+                    let section = div()
+                        .flex()
+                        .flex_col()
+                        .gap_1()
+                        .child(header_div)
+                        .child(children_div);
+
+                    accordion = accordion.child(section);
+                }
+
+                accordion.into_any()
+            }
+
+            View::Sidebar {
+                content,
+                width,
+                collapsible: _,
+                position: _,
+                style: _,
+            } => {
+                let sidebar = div()
+                    .flex()
+                    .flex_col()
+                    .w(px(width))
+                    .h(px(600.0))
+                    .bg(rgb(0x1a1a1a))
+                    .border_r_1()
+                    .border_color(rgb(0x333333))
+                    .child(content.into_gpui_impl_with_context(state, cx));
+
+                sidebar.into_any()
+            }
+
+            View::Tabs {
+                labels,
+                contents,
+                selected,
+                position: _,
+                on_select: _,
+                style: _,
+            } => {
+                let mut tabs = div().flex().flex_col().gap_2().p_4();
+
+                let mut tab_buttons = div().flex().flex_row().gap_2();
+                for (idx, label) in labels.iter().enumerate() {
+                    let is_selected = idx == selected;
+                    let label_text = if is_selected {
+                        format!("[{}]", label)
+                    } else {
+                        label.clone()
+                    };
+
+                    let tab_button = div()
+                        .px_4()
+                        .py_2()
+                        .bg(if is_selected { rgb(0x3b82f6) } else { rgb(0x333333) })
+                        .rounded_md()
+                        .cursor_pointer()
+                        .child(label_text);
+
+                    tab_buttons = tab_buttons.child(tab_button);
+                }
+
+                tabs = tabs.child(tab_buttons);
+
+                if let Some(content) = contents.get(selected) {
+                    let content_div = div()
+                        .p_4()
+                        .border_1()
+                        .border_color(rgb(0x444444))
+                        .rounded_md()
+                        .child(content.clone().into_gpui_impl_with_context(state, cx));
+
+                    tabs = tabs.child(content_div);
+                }
+
+                tabs.into_any()
+            }
+
+            View::NavigationRail {
+                items,
+                selected: _,
+                width,
+                show_labels,
+                on_select: _,
+                style: _,
+            } => {
+                let mut rail = div()
+                    .flex()
+                    .flex_col()
+                    .gap_2()
+                    .w(px(width))
+                    .h(px(600.0))
+                    .p_2()
+                    .bg(rgb(0x1a1a1a))
+                    .border_r_1()
+                    .border_color(rgb(0x333333));
+
+                for item in items {
+                    let item_text = if show_labels {
+                        format!("{}  {}", item.icon, item.label)
+                    } else {
+                        item.icon.to_string()
+                    };
+
+                    let item_text_with_badge = if let Some(badge) = &item.badge {
+                        format!("{} ({})", item_text, badge)
+                    } else {
+                        item_text
+                    };
+
+                    let nav_item = div()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .p_2()
+                        .bg(rgb(0x333333))
+                        .rounded_md()
+                        .cursor_pointer()
+                        .child(item_text_with_badge);
+
+                    rail = rail.child(nav_item);
+                }
+
+                rail.into_any()
             }
         }
     }

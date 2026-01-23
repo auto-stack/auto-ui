@@ -88,84 +88,33 @@ impl App {
     {
         #[cfg(feature = "iced")]
         {
-            return Self::run_iced::<C>();
+            return Err(
+                "Please use `auto_ui_iced::run_app::<YourComponent>()` directly. \
+                 Add `auto-ui-iced` to your Cargo.toml dependencies."
+                    .into(),
+            );
         }
 
-        // TODO: Re-enable when auto-ui-gpui is properly set up
         #[cfg(all(feature = "gpui", not(feature = "iced")))]
         {
-            return Err("GPUI backend is temporarily disabled while styling system integration is in progress".into());
+            return Err(
+                "Please use `auto_ui_gpui::run_app::<YourComponent>()` directly. \
+                 Add `auto-ui-gpui` to your Cargo.toml dependencies."
+                    .into(),
+            );
         }
 
         #[cfg(not(any(feature = "iced", feature = "gpui")))]
         {
             return Err(
                 "No backend enabled. Please enable either 'iced' or 'gpui' feature in Cargo.toml. \
-                 Example: auto-ui = { version = \"0.1\", features = [\"iced\"] }"
+                 Then use the corresponding backend crate directly:\n\
+                 - Iced: auto_ui_iced::run_app::<YourComponent>()\n\
+                 - GPUI: auto_ui_gpui::run_app::<YourComponent>()"
                     .into(),
             );
         }
     }
-
-    /// Run the application explicitly with Iced backend
-    ///
-    /// This requires the "iced" feature to be enabled.
-    ///
-    /// # Example
-    /// ```no_run
-    /// # use auto_ui::{Component, View, App};
-    /// # struct MyComponent;
-    /// # impl Component for MyComponent {
-    /// #     type Msg = ();
-    /// #     fn on(&mut self, _msg: Self::Msg) {}
-    /// #     fn view(&self) -> View<Self::Msg> { View::text("") }
-    /// # }
-    /// fn main() -> auto_ui::AppResult<()> {
-    ///     App::run_iced::<MyComponent>()
-    /// }
-    /// ```
-    #[cfg(feature = "iced")]
-    pub fn run_iced<C>() -> AppResult<()>
-    where
-        C: Component + Default + 'static,
-    {
-        auto_ui_iced::run_app::<C>()
-    }
-
-    /// Run the application explicitly with GPUI backend
-    ///
-    /// This requires the "gpui" feature to be enabled.
-    ///
-    /// # Note
-    /// GPUI backend requires manual implementation of the GPUI `Render` trait.
-    /// This function will return an error directing you to the examples.
-    /// See `auto-ui-gpui-examples/src/bin/counter.rs` for the proper pattern.
-    ///
-    /// # Example
-    /// ```no_run
-    /// # use auto_ui::{Component, View, App};
-    /// # struct MyComponent;
-    /// # impl Component for MyComponent {
-    /// #     type Msg = ();
-    /// #     fn on(&mut self, _msg: Self::Msg) {}
-    /// #     fn view(&self) -> View<Self::Msg> { View::text("") }
-    /// # }
-    /// fn main() -> auto_ui::AppResult<()> {
-    ///     App::run_gpui::<MyComponent>()
-    /// }
-    /// ```
-    // TODO: Re-enable when auto-ui-gpui is properly set up as a dependency
-    // #[cfg(feature = "gpui")]
-    // pub fn run_gpui<C>() -> AppResult<()>
-    // where
-    //     C: Component + Default + 'static,
-    // {
-    //     auto_ui_gpui::run_app::<C>()
-    // }
-
-    // Empty function to satisfy doc comment
-    #[cfg(feature = "gpui")]
-    fn _run_gpui_placeholder() {}
 }
 
 

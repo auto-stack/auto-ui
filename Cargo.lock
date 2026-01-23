@@ -591,6 +591,7 @@ dependencies = [
  "clap",
  "console",
  "gpui",
+ "iced",
  "miette",
  "notify 7.0.0",
  "notify-debouncer-mini",
@@ -7975,6 +7976,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4ac048d71ede7ee76d585517add45da530660ef4390e49b098733c6e897f254"
 
 [[package]]
+name = "unified-accordion"
+version = "0.1.0"
+dependencies = [
+ "auto-ui",
+ "auto-ui-gpui",
+ "auto-ui-iced",
+]
+
+[[package]]
 name = "unified-container"
 version = "0.1.0"
 dependencies = [
@@ -7985,6 +7995,15 @@ dependencies = [
 
 [[package]]
 name = "unified-counter"
+version = "0.1.0"
+dependencies = [
+ "auto-ui",
+ "auto-ui-gpui",
+ "auto-ui-iced",
+]
+
+[[package]]
+name = "unified-gallery"
 version = "0.1.0"
 dependencies = [
  "auto-ui",
@@ -8029,6 +8048,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "unified-navigation-rail"
+version = "0.1.0"
+dependencies = [
+ "auto-ui",
+ "auto-ui-gpui",
+ "auto-ui-iced",
+]
+
+[[package]]
 name = "unified-progress"
 version = "0.1.0"
 dependencies = [
@@ -8065,6 +8093,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "unified-sidebar"
+version = "0.1.0"
+dependencies = [
+ "auto-ui",
+ "auto-ui-gpui",
+ "auto-ui-iced",
+]
+
+[[package]]
 name = "unified-slider"
 version = "0.1.0"
 dependencies = [
@@ -8075,6 +8112,15 @@ dependencies = [
 
 [[package]]
 name = "unified-table"
+version = "0.1.0"
+dependencies = [
+ "auto-ui",
+ "auto-ui-gpui",
+ "auto-ui-iced",
+]
+
+[[package]]
+name = "unified-tabs"
 version = "0.1.0"
 dependencies = [
  "auto-ui",
