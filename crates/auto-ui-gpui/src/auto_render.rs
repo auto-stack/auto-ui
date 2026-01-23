@@ -4,8 +4,9 @@
 // message system to GPUI's closure-based event handling.
 //
 // Phase 2 Integration: Now supports unified styling system with Style objects.
+// Phase 3 Integration: Native GPUI Select widget support with pre-initialization.
 
-use auto_ui::{Component, View, Style};
+use auto_ui::{Component, View, Style, SelectCallback};
 use auto_ui::style::gpui_adapter::{GpuiStyle, GpuiFontWeight};
 use gpui::*;
 use gpui::{InteractiveElement, ParentElement, StatefulInteractiveElement};
@@ -32,14 +33,20 @@ pub struct GpuiComponentState<C: Component> {
     slider_states: HashMap<String, Entity<SliderState>>,
     /// Cache of select states to avoid recreating them on every render
     select_states: HashMap<String, Entity<SelectState<Vec<String>>>>,
+    /// Cache of select callbacks for event handling
+    select_callbacks: HashMap<String, SelectCallback<C::Msg>>,
 }
 
-impl<C: Component> GpuiComponentState<C> {
+impl<C: Component + 'static> GpuiComponentState<C>
+where
+    C::Msg: Clone + Debug + 'static,
+{
     pub fn new(component: C) -> Self {
         Self {
             component,
             slider_states: HashMap::new(),
             select_states: HashMap::new(),
+            select_callbacks: HashMap::new(),
         }
     }
 
@@ -96,27 +103,128 @@ impl<C: Component> GpuiComponentState<C> {
     }
 
     /// Get or create a select state entity for the given key
+    ///
+    /// This method creates a SelectState entity and optionally subscribes to its events.
+    /// When a callback is provided, it will be invoked when the user selects an option.
     pub fn get_or_create_select_state(
         &mut self,
         key: String,
         options: Vec<String>,
         selected_index: Option<usize>,
+        callback: Option<SelectCallback<C::Msg>>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Entity<SelectState<Vec<String>>> {
+        // Check if we already have a state for this key
         if let Some(existing) = self.select_states.get(&key) {
+            // Update callback if provided
+            if let Some(cb) = callback {
+                self.select_callbacks.insert(key.clone(), cb);
+            }
             existing.clone()
         } else {
+            // Create new SelectState
             let new_state = cx.new(|cx| {
                 SelectState::new(
-                    options,
+                    options.clone(),
                     selected_index.map(|i| IndexPath::default().row(i)),
                     window,
                     cx,
                 )
             });
+
+            // Store the state
             self.select_states.insert(key.clone(), new_state.clone());
+
+            // Subscribe to selection events if callback is provided
+            if let Some(cb) = callback {
+                let key_clone = key.clone();
+                let options_clone = options.clone();
+
+                // Store callback for later use
+                self.select_callbacks.insert(key_clone.clone(), cb.clone());
+
+                // Subscribe to Select events
+                // Note: closure takes 5 parameters: self, entity, event, window, cx
+                cx.subscribe_in(&new_state, window, move |comp: &mut Self, _entity: &Entity<SelectState<Vec<String>>>, event: &SelectEvent<Vec<String>>, _window: &mut Window, _cx: &mut Context<Self>| {
+                    if let SelectEvent::Confirm(value) = event {
+                        if let Some(lang_value) = value {
+                            // Find the index of the selected value
+                            let index = options_clone
+                                .iter()
+                                .position(|s| s.as_str() == *lang_value)
+                                .unwrap_or(0);
+
+                            // Get the callback and invoke it
+                            if let Some(callback) = comp.select_callbacks.get(&key_clone) {
+                                let msg = callback.call(index, lang_value);
+                                comp.handle(msg);
+                                _cx.notify();
+                            }
+                        }
+                    }
+                })
+                .detach();
+            }
+
             new_state
+        }
+    }
+
+    /// Scan the view tree and pre-create all SelectState entities
+    ///
+    /// This method should be called during component initialization (before rendering)
+    /// to ensure all Select widgets have their GPUI entities ready.
+    pub fn preinitialize_selects(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let view = self.component.view();
+        self.scan_view_for_selects(view, window, cx);
+    }
+
+    /// Recursively scan a view tree for Select widgets and create their states
+    fn scan_view_for_selects(
+        &mut self,
+        view: View<C::Msg>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        match view {
+            View::Select { options, selected_index, on_select, .. } => {
+                // Generate a unique key for this select widget
+                // Based on options list to ensure consistent keys
+                let key = format!("select_{:?}", options);
+
+                // Create the entity with callback
+                self.get_or_create_select_state(
+                    key,
+                    options,
+                    selected_index,
+                    on_select,
+                    window,
+                    cx,
+                );
+            }
+            View::Row { children, .. } | View::Column { children, .. } => {
+                for child in children {
+                    self.scan_view_for_selects(child, window, cx);
+                }
+            }
+            View::Container { child, .. } => {
+                self.scan_view_for_selects(*child, window, cx);
+            }
+            View::Scrollable { child, .. } => {
+                self.scan_view_for_selects(*child, window, cx);
+            }
+            View::List { items, .. } => {
+                for item in items {
+                    self.scan_view_for_selects(item, window, cx);
+                }
+            }
+            // Other view types don't contain Select widgets
+            _ => {}
         }
     }
 }
@@ -645,34 +753,50 @@ impl<M: Clone + Debug + 'static> IntoGpuiElementWithHandler<M> for View<M> {
             }
 
             View::Select { options, selected_index, on_select, style } => {
-                // Note: We now have callback support! Full native Select widget with
-                // entity state management is coming soon. For now, showing the selection.
-                let selected = selected_index
-                    .and_then(|i| options.get(i).cloned())
-                    .unwrap_or_else(|| options.first().cloned().unwrap_or_default());
+                // Generate the same key used during pre-initialization
+                let key = format!("select_{:?}", options);
 
-                let options_text = options.join(", ");
-                let has_callback = on_select.is_some();
+                // Try to get the pre-initialized SelectState entity
+                if let Some(select_state) = state.select_states.get(&key) {
+                    // ✅ Success: Use native GPUI Select widget!
+                    // Note: Select::new() takes a reference to the Entity
+                    let select = Select::new(select_state)
+                        .placeholder("Select an option");
 
-                let mut select_div = div()
-                    .v_flex()
-                    .gap_1()
-                    .child(div().child(format!("Selected: {}", selected)))
-                    .child(div().text_sm().text_color(gpui::rgb(0x888888)).child(format!(
-                        "Options: [{}]{}",
-                        options_text,
-                        if has_callback { " ✅" } else { "" }
-                    )));
+                    // Note: Styling for Select is limited in GPUI-component
+                    // Most styling is handled internally by the Select widget
 
-                // Apply unified styling if present
-                if let Some(style) = style {
-                    select_div = apply_style_to_div(select_div, &style);
+                    select.into_any_element()
                 } else {
-                    // Default padding style
-                    let default_style = Style::parse("p-2").unwrap_or_default();
-                    select_div = apply_style_to_div(select_div, &default_style);
+                    // Fallback: No pre-initialized state (shouldn't happen normally)
+                    // This can occur if the view changes dynamically at runtime
+                    let selected = selected_index
+                        .and_then(|i| options.get(i).cloned())
+                        .unwrap_or_else(|| options.first().cloned().unwrap_or_default());
+
+                    let options_text = options.join(", ");
+                    let has_callback = on_select.is_some();
+
+                    let mut select_div = div()
+                        .v_flex()
+                        .gap_1()
+                        .child(div().child(format!("Selected: {}", selected)))
+                        .child(div().text_sm().text_color(gpui::rgb(0x888888)).child(format!(
+                            "Options: [{}]{} (fallback mode)",
+                            options_text,
+                            if has_callback { " ✅" } else { "" }
+                        )));
+
+                    // Apply unified styling if present
+                    if let Some(style) = style {
+                        select_div = apply_style_to_div(select_div, &style);
+                    } else {
+                        // Default padding style
+                        let default_style = Style::parse("p-2").unwrap_or_default();
+                        select_div = apply_style_to_div(select_div, &default_style);
+                    }
+                    select_div.into_any()
                 }
-                select_div.into_any()
             }
 
             View::List { items, spacing, style } => {

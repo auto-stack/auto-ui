@@ -635,6 +635,12 @@ where
                     // Create the state as a GPUI entity
                     let state = cx.new(|_| GpuiComponentState::new(C::default()));
 
+                    // Pre-initialize all Select widgets
+                    // This must be done before rendering to create SelectState entities
+                    state.update(cx, |state, cx| {
+                        state.preinitialize_selects(window, cx);
+                    });
+
                     // Build the UI using the state's render implementation
                     // This first level on the window, should be a Root.
                     cx.new(|cx| Root::new(state, window, cx))
