@@ -39,7 +39,12 @@ path = "src/bin/progress.rs"
 name = "todos"
 path = "src/bin/todos.rs"
 
+[[bin]]
+name = "gallery"
+path = "src/main.rs"
+
 [dependencies]
 gpui = "0.2.2"
 gpui-component = { workspace = true }
 anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
