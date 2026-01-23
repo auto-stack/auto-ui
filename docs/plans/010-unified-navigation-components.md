@@ -1,10 +1,52 @@
 # Plan 010: Unified Navigation Components
 
-**Status**: 📋 Planning
+**Status**: ⚠️ Partially Complete - GPUI Backend Has Issues
 **Created**: 2025-01-23
+**Last Updated**: 2025-01-23
 **Priority**: High
 **Complexity**: Medium
 **Estimated Timeline**: 4-7 days (MVP: 2-3 days)
+
+## Current Status
+
+### ✅ Completed
+- **Phase 1 (核心抽象层)**: 完成
+  - ✅ `AccordionBuilder`, `SidebarBuilder`, `TabsBuilder`, `NavigationRailBuilder`
+  - ✅ 辅助类型: `AccordionItem`, `NavigationItem`, `SidebarPosition`, `TabsPosition`
+  - ✅ Builder 模式和方法链
+  - ✅ 在 `auto-ui/src/view.rs` 实现
+  - ✅ 回调类型: `AccordionToggleCallback`, `TabsSelectCallback`, `NavigationRailSelectCallback`
+
+- **Phase 2 (Iced 后端)**: 完成
+  - ✅ 所有组件在 Iced 中正常渲染
+  - ✅ 交互功能正常（展开/折叠，切换）
+  - ✅ 事件处理和消息传递
+  - ✅ 样式支持
+
+- **Phase 4 (Unified 示例)**: 部分完成
+  - ✅ `unified-accordion` - Iced 后端工作正常，GPUI 后端有栈溢出
+  - ✅ `unified-sidebar` - 两个后端都工作正常
+  - ✅ `unified-tabs` - 两个后端都工作正常
+  - ✅ `unified-navigation-rail` - 两个后端都工作正常
+  - ✅ `unified-gallery` - 使用 Sidebar 组件，布局正确
+
+### ⚠️ Issues
+
+**GPUI 后端栈溢出问题** (详见下方 "Known Issues" 章节)
+- `unified-accordion` 在 GPUI 后端运行时出现栈溢出错误
+- 错误信息: `thread 'main' has overflowed its stack`
+- 退出代码: `0xc00000fd (STATUS_STACK_OVERFLOW)`
+- **临时解决方案**: 使用 Iced 后端运行 Accordion 示例
+
+### 📋 In Progress
+- **Phase 3 (GPUI 后端)**: 阻塞
+  - ✅ 编译通过，代码实现在 `crates/auto-ui-gpui/src/auto_render.rs`
+  - ❌ 运行时栈溢出（Accordion 组件）
+  - ✅ Tabs, NavigationRail 组件正常工作
+  - ⏸️ **Blocked**: 需要解决栈溢出问题才能继续
+
+### 📝 Pending
+- **Phase 5 (Gallery 集成)**: 未开始
 
 ## Overview
 

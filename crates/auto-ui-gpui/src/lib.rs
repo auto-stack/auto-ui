@@ -434,19 +434,19 @@ impl<M: Clone + Debug + 'static> IntoGpuiElement<M> for AbstractView<M> {
                 progress_bar.into_any()
             }
 
-            // Plan 010: Unified Navigation Components - GPUI Implementation
+            // Plan 010: Unified Navigation Components - Simplified GPUI Implementation
+            // Note: Interactive versions with event handling are in auto_render.rs
 
             AbstractView::Accordion {
                 items,
                 allow_multiple: _,
-                on_toggle,
+                on_toggle: _,
                 style: _,
             } => {
-                // Accordion is implemented as a vertical flex container of collapsible sections
+                // Simplified Accordion without click handling
                 let mut accordion = div().flex().flex_col().gap_2().p_4();
 
-                for (idx, item) in items.into_iter().enumerate() {
-                    // Create header with icon + title
+                for item in items.into_iter() {
                     let header_text = if let Some(icon) = item.icon {
                         format!("{} {}", icon, item.title)
                     } else {
@@ -454,7 +454,6 @@ impl<M: Clone + Debug + 'static> IntoGpuiElement<M> for AbstractView<M> {
                     };
 
                     let header_div = div()
-                        .cursor_pointer()
                         .px_4()
                         .py_2()
                         .bg(rgb(0x333333))
@@ -463,12 +462,9 @@ impl<M: Clone + Debug + 'static> IntoGpuiElement<M> for AbstractView<M> {
                         .rounded_md()
                         .child(header_text);
 
-                    // Create children (if expanded)
                     let children_div = if item.expanded && !item.children.is_empty() {
                         let mut children_col = div().flex().flex_col().gap_1().p_2().pl_6();
                         for child in item.children {
-                            // Note: We need to handle the message conversion for children
-                            // This is simplified - in production, we'd need to bubble up messages
                             let child_element = child.into_gpui(handle_msg.clone());
                             children_col = children_col.child(child_element);
                         }
@@ -477,7 +473,6 @@ impl<M: Clone + Debug + 'static> IntoGpuiElement<M> for AbstractView<M> {
                         div()
                     };
 
-                    // Combine header and children
                     let section = div()
                         .flex()
                         .flex_col()
@@ -520,7 +515,7 @@ impl<M: Clone + Debug + 'static> IntoGpuiElement<M> for AbstractView<M> {
                 on_select: _,
                 style: _,
             } => {
-                // Tabs are implemented as column with tab buttons + selected content
+                // Simplified Tabs without click handling
                 let mut tabs = div().flex().flex_col().gap_2().p_4();
 
                 // Create tab buttons row
@@ -538,7 +533,6 @@ impl<M: Clone + Debug + 'static> IntoGpuiElement<M> for AbstractView<M> {
                         .py_2()
                         .bg(if is_selected { rgb(0x3b82f6) } else { rgb(0x333333) })
                         .rounded_md()
-                        .cursor_pointer()
                         .child(label_text);
 
                     tab_buttons = tab_buttons.child(tab_button);
@@ -569,7 +563,7 @@ impl<M: Clone + Debug + 'static> IntoGpuiElement<M> for AbstractView<M> {
                 on_select: _,
                 style: _,
             } => {
-                // NavigationRail is a compact vertical navigation
+                // Simplified NavigationRail without click handling
                 let mut rail = div()
                     .flex()
                     .flex_col()
@@ -603,7 +597,6 @@ impl<M: Clone + Debug + 'static> IntoGpuiElement<M> for AbstractView<M> {
                         .p_2()
                         .bg(rgb(0x333333))
                         .rounded_md()
-                        .cursor_pointer()
                         .child(item_text_with_badge);
 
                     rail = rail.child(nav_item);

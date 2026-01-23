@@ -1097,44 +1097,64 @@ impl<M: Clone + Debug + 'static> IntoGpuiElementWithHandler<M> for View<M> {
             View::Accordion {
                 items,
                 allow_multiple: _,
-                on_toggle: _,
+                on_toggle,
                 style: _,
             } => {
                 let mut accordion = div().flex().flex_col().gap_2().p_4();
 
-                for (_idx, item) in items.into_iter().enumerate() {
+                for (idx, item) in items.into_iter().enumerate() {
                     let header_text = if let Some(icon) = item.icon {
                         format!("{} {}", icon, item.title)
                     } else {
                         item.title.clone()
                     };
 
-                    let header_div = div()
-                        .cursor_pointer()
-                        .px_4()
-                        .py_2()
-                        .bg(rgb(0x333333))
-                        .border_1()
-                        .border_color(rgb(0x444444))
-                        .rounded_md()
-                        .child(header_text);
+                    // Create click handler if on_toggle is provided
+                    let header_button = if let Some(ref callback) = on_toggle {
+                        let callback_clone = callback.clone();
+                        let item_expanded = item.expanded;
+                        let header_static: &'static str = Box::leak(header_text.clone().into_boxed_str());
+                        let button_id = (header_static, idx as u64);
 
-                    let children_div = if item.expanded && !item.children.is_empty() {
-                        let mut children_col = div().flex().flex_col().gap_1().p_2().pl_6();
-                        for child in item.children {
-                            let child_element = child.into_gpui_impl_with_context(state, cx);
-                            children_col = children_col.child(child_element);
-                        }
-                        children_col
+                        Button::new(button_id)
+                            .label(header_text)
+                            .w(px(280.0))
+                            .on_click(cx.listener(move |state: &mut GpuiComponentState<C>, _event, _window, _cx| {
+                                let msg = callback_clone.call(idx, !item_expanded);
+                                state.handle(msg);
+                                _cx.notify();
+                            }))
+                            .into_any_element()
                     } else {
                         div()
+                            .px_4()
+                            .py_2()
+                            .bg(rgb(0x333333))
+                            .border_1()
+                            .border_color(rgb(0x444444))
+                            .rounded_md()
+                            .child(header_text)
+                            .into_any()
                     };
+
+                    // TEMPORARILY DISABLE CHILDREN RENDERING TO TEST STACK OVERFLOW
+                    let children_div = div();
+                    // let children_div = if item.expanded && !item.children.is_empty() {
+                    //     let mut children_col = div().flex().flex_col().gap_1().p_2().pl_6();
+                    //     for child in item.children {
+                    //         let child_element = child.into_gpui_impl_with_context(state, cx);
+                    //         children_col = children_col.child(child_element);
+                    //     }
+                    //     children_col
+                    // } else {
+                    //     div()
+                    // };
 
                     let section = div()
                         .flex()
                         .flex_col()
                         .gap_1()
-                        .child(header_div)
+                        .child(header_button)
                         .child(children_div);
 
                     accordion = accordion.child(section);
@@ -1168,7 +1188,7 @@ impl<M: Clone + Debug + 'static> IntoGpuiElementWithHandler<M> for View<M> {
                 contents,
                 selected,
                 position: _,
-                on_select: _,
+                on_select,
                 style: _,
             } => {
                 let mut tabs = div().flex().flex_col().gap_2().p_4();
@@ -1182,13 +1202,30 @@ impl<M: Clone + Debug + 'static> IntoGpuiElementWithHandler<M> for View<M> {
                         label.clone()
                     };
 
-                    let tab_button = div()
-                        .px_4()
-                        .py_2()
-                        .bg(if is_selected { rgb(0x3b82f6) } else { rgb(0x333333) })
-                        .rounded_md()
-                        .cursor_pointer()
-                        .child(label_text);
+                    // Use Button for clickable tab if on_select is provided
+                    let tab_button = if let Some(ref callback) = on_select {
+                        let callback_clone = callback.clone();
+                        let label_static: &'static str = Box::leak(label.clone().into_boxed_str());
+                        let button_id = (label_static, idx as u64);
+
+                        Button::new(button_id)
+                            .label(label_text)
+                            .small()
+                            .on_click(cx.listener(move |state: &mut GpuiComponentState<C>, _event, _window, _cx| {
+                                let msg = callback_clone.call(idx);
+                                state.handle(msg);
+                                _cx.notify();
+                            }))
+                            .into_any_element()
+                    } else {
+                        div()
+                            .px_4()
+                            .py_2()
+                            .bg(if is_selected { rgb(0x3b82f6) } else { rgb(0x333333) })
+                            .rounded_md()
+                            .child(label_text)
+                            .into_any()
+                    };
 
                     tab_buttons = tab_buttons.child(tab_button);
                 }
@@ -1214,7 +1251,7 @@ impl<M: Clone + Debug + 'static> IntoGpuiElementWithHandler<M> for View<M> {
                 selected: _,
                 width,
                 show_labels,
-                on_select: _,
+                on_select,
                 style: _,
             } => {
                 let mut rail = div()
@@ -1228,7 +1265,7 @@ impl<M: Clone + Debug + 'static> IntoGpuiElementWithHandler<M> for View<M> {
                     .border_r_1()
                     .border_color(rgb(0x333333));
 
-                for item in items {
+                for (idx, item) in items.into_iter().enumerate() {
                     let item_text = if show_labels {
                         format!("{}  {}", item.icon, item.label)
                     } else {
@@ -1238,18 +1275,36 @@ impl<M: Clone + Debug + 'static> IntoGpuiElementWithHandler<M> for View<M> {
                     let item_text_with_badge = if let Some(badge) = &item.badge {
                         format!("{} ({})", item_text, badge)
                     } else {
-                        item_text
+                        item_text.clone()
                     };
 
-                    let nav_item = div()
-                        .flex()
-                        .items_center()
-                        .justify_center()
-                        .p_2()
-                        .bg(rgb(0x333333))
-                        .rounded_md()
-                        .cursor_pointer()
-                        .child(item_text_with_badge);
+                    // Use Button for clickable nav item if on_select is provided
+                    let nav_item = if let Some(ref callback) = on_select {
+                        let callback_clone = callback.clone();
+                        let item_static: &'static str = Box::leak(item_text_with_badge.clone().into_boxed_str());
+                        let button_id = (item_static, idx as u64);
+
+                        Button::new(button_id)
+                            .label(item_text_with_badge)
+                            .small()
+                            .w(px(width - 16.0))
+                            .on_click(cx.listener(move |state: &mut GpuiComponentState<C>, _event, _window, _cx| {
+                                let msg = callback_clone.call(idx);
+                                state.handle(msg);
+                                _cx.notify();
+                            }))
+                            .into_any_element()
+                    } else {
+                        div()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .p_2()
+                            .bg(rgb(0x333333))
+                            .rounded_md()
+                            .child(item_text_with_badge)
+                            .into_any()
+                    };
 
                     rail = rail.child(nav_item);
                 }

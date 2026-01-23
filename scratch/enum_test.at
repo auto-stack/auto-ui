@@ -1,0 +1,14 @@
+// Simple test for enum pattern matching
+enum Msg {
+    Inc
+}
+
+type Test {
+    count int = 0
+
+    fn on(ev Msg) {
+        is ev {
+            Msg.Inc => self.count += 1
+        }
+    }
+}

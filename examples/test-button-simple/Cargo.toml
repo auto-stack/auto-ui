@@ -1,0 +1,16 @@
+[package]
+name = "test-button-simple"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+auto-ui = { path = "../../crates/auto-ui", default-features = false }
+auto-ui-gpui = { path = "../../crates/auto-ui-gpui", optional = true }
+
+[features]
+default = ["gpui"]
+gpui = ["auto-ui/gpui", "auto-ui-gpui"]
+
+[[bin]]
+name = "test-button-simple"
+path = "src/main.rs"
