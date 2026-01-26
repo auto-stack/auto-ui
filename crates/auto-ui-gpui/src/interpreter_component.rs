@@ -58,7 +58,7 @@ pub struct DynamicInterpreterComponent {
 impl DynamicInterpreterComponent {
     /// 从 .at 文件创建新组件
     #[cfg(feature = "interpreter")]
-    pub fn from_file(path: impl Into<PathBuf>, window: &mut Window, cx: &mut Context<Self>) -> Self {
+    pub fn from_file(path: impl Into<PathBuf>, _window: &mut Window, cx: &mut Context<Self>) -> Self {
         let path = path.into();
         let bridge = Arc::new(RwLock::new(InterpreterBridge::new()));
 
@@ -110,7 +110,8 @@ impl DynamicInterpreterComponent {
     /// 重新加载文件（热重载）
     #[cfg(feature = "interpreter")]
     pub fn reload(&mut self, cx: &mut Context<Self>) {
-        if let Err(e) = self.load_file(&self.file_path, cx) {
+        let path = self.file_path.clone();
+        if let Err(e) = self.load_file(&path, cx) {
             self.error = Some(format!("重载失败: {}", e));
             cx.notify();
         }
@@ -188,7 +189,40 @@ impl Render for DynamicInterpreterComponent {
         #[cfg(feature = "interpreter")]
         {
             if let Some(ref view) = self.current_view {
-                self.render_view(view.clone(), cx)
+                // 简化版本：使用 AnyElement 并转换为 impl IntoElement
+                // 通过直接调用 match 语句
+                match view {
+                    View::Empty => div().into_any(),
+                    View::Text { content, .. } => div().text_sm().child(content.clone()).into_any(),
+                    View::Button { label, .. } => {
+                        div()
+                            .px_4()
+                            .py_2()
+                            .bg(rgb(0x3c3c3c))
+                            .border_1()
+                            .border_color(rgb(0x6c6c6c))
+                            .rounded_md()
+                            .child(label.clone())
+                            .into_any()
+                    }
+                    View::Column { spacing, children, .. } => {
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap(px(*spacing as f32))
+                            .children(
+                                children.iter()
+                                    .map(|child| {
+                                        match child {
+                                            View::Text { content, .. } => div().text_sm().child(content).into_any(),
+                                            _ => div().child("(组件)").into_any(),
+                                        }
+                                    })
+                            )
+                            .into_any()
+                    }
+                    _ => div().child("(复杂组件暂未简化)").into_any(),
+                }
             } else {
                 // 加载中...
                 div()
@@ -229,9 +263,8 @@ impl DynamicInterpreterComponent {
                     .into_any()
             }
 
-            View::Button { label, onclick, style } => {
-                // TODO: 应用 style
-                let bridge = self.bridge.clone();
+            View::Button { label, onclick: _, style: _ } => {
+                // TODO: 重新启用点击事件处理
                 div()
                     .px_4()
                     .py_2()
@@ -239,30 +272,20 @@ impl DynamicInterpreterComponent {
                     .border_1()
                     .border_color(rgb(0x6c6c6c))
                     .rounded_md()
-                    .cursor_pointer()
-                    .hover(|div| {
-                        div.bg(rgb(0x4c4c4c))
-                    })
                     .child(label)
-                    .on_click(cx.listener(move |_this, _event, _window, _cx| {
-                        // 分发事件
-                        if let Ok(mut b) = bridge.write() {
-                            let _ = b.handle_message(onclick.clone());
-                        }
-                    }))
                     .into_any()
             }
 
-            View::Center { children, .. } => {
-                div()
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .size_full()
-                    .children(
-                        children.into_iter()
-                            .map(|child| self.render_view(child, cx))
-                    )
+            View::Container { child, center_x, center_y, .. } => {
+                let mut container = div().flex().size_full();
+                if center_x {
+                    container = container.items_center();
+                }
+                if center_y {
+                    container = container.justify_center();
+                }
+                container
+                    .child(self.render_view(*child, cx))
                     .into_any()
             }
 
@@ -270,7 +293,7 @@ impl DynamicInterpreterComponent {
                 div()
                     .flex()
                     .flex_col()
-                    .gap(spacing as f32)
+                    .gap(px(spacing as f32))
                     .children(
                         children.into_iter()
                             .map(|child| self.render_view(child, cx))
@@ -282,7 +305,7 @@ impl DynamicInterpreterComponent {
                 div()
                     .flex()
                     .flex_row()
-                    .gap(spacing as f32)
+                    .gap(px(spacing as f32))
                     .children(
                         children.into_iter()
                             .map(|child| self.render_view(child, cx))
@@ -290,33 +313,30 @@ impl DynamicInterpreterComponent {
                     .into_any()
             }
 
-            View::Container { children, .. } => {
+            View::Container { child, center_x, center_y, .. } => {
+                let mut container = div().flex().size_full();
+                if center_x {
+                    container = container.items_center();
+                }
+                if center_y {
+                    container = container.justify_center();
+                }
+                container
+                    .child(self.render_view(*child, cx))
+                    .into_any()
+            }
+
+            View::Scrollable { child, .. } => {
                 div()
                     .flex()
                     .flex_col()
                     .size_full()
-                    .children(
-                        children.into_iter()
-                            .map(|child| self.render_view(child, cx))
-                    )
+                    .child(self.render_view(*child, cx))
                     .into_any()
             }
 
-            View::Scrollable { children, .. } => {
-                div()
-                    .flex()
-                    .flex_col()
-                    .size_full()
-                    .overflow_y_scroll()
-                    .children(
-                        children.into_iter()
-                            .map(|child| self.render_view(child, cx))
-                    )
-                    .into_any()
-            }
-
-            View::Input { placeholder, on_change, .. } => {
-                let bridge = self.bridge.clone();
+            View::Input { placeholder, on_change: _, .. } => {
+                // TODO: 重新启用输入处理
                 div()
                     .px_3()
                     .py_2()
@@ -326,17 +346,11 @@ impl DynamicInterpreterComponent {
                     .rounded_md()
                     .text_sm()
                     .child(placeholder)
-                    .on_click(cx.listener(move |_this, _event, _window, _cx| {
-                        // TODO: 实现输入处理
-                        if let Ok(mut b) = bridge.write() {
-                            let _ = b.handle_message(on_change.clone());
-                        }
-                    }))
                     .into_any()
             }
 
-            View::Checkbox { label, checked, on_toggle, .. } => {
-                let bridge = self.bridge.clone();
+            View::Checkbox { label, is_checked, on_toggle: _, .. } => {
+                // TODO: 重新启用点击处理
                 div()
                     .flex()
                     .items_center()
@@ -346,23 +360,16 @@ impl DynamicInterpreterComponent {
                             .w_4()
                             .h_4()
                             .border_1()
-                            .border_color(if checked { rgb(0x3b82f6) } else { rgb(0x6c6c6c) })
-                            .bg(if checked { rgb(0x3b82f6) } else { rgb(0x2a2a2a) })
+                            .border_color(if is_checked { rgb(0x3b82f6) } else { rgb(0x6c6c6c) })
+                            .bg(if is_checked { rgb(0x3b82f6) } else { rgb(0x2a2a2a) })
                             .rounded_sm()
                     )
                     .child(label)
-                    .on_click(cx.listener(move |_this, _event, _window, _cx| {
-                        if let Some(ref msg) = on_toggle {
-                            if let Ok(mut b) = bridge.write() {
-                                let _ = b.handle_message(msg.clone());
-                            }
-                        }
-                    }))
                     .into_any()
             }
 
-            View::Radio { label, checked, on_select, .. } => {
-                let bridge = self.bridge.clone();
+            View::Radio { label, is_selected, on_select: _, .. } => {
+                // TODO: 重新启用点击处理
                 div()
                     .flex()
                     .items_center()
@@ -372,21 +379,14 @@ impl DynamicInterpreterComponent {
                             .w_4()
                             .h_4()
                             .border_1()
-                            .border_color(if checked { rgb(0x3b82f6) } else { rgb(0x6c6c6c) })
+                            .border_color(if is_selected { rgb(0x3b82f6) } else { rgb(0x6c6c6c) })
                             .rounded_full()
                     )
                     .child(label)
-                    .on_click(cx.listener(move |_this, _event, _window, _cx| {
-                        if let Some(ref msg) = on_select {
-                            if let Ok(mut b) = bridge.write() {
-                                let _ = b.handle_message(msg.clone());
-                            }
-                        }
-                    }))
                     .into_any()
             }
 
-            View::Select { options, selected, .. } => {
+            View::Select { options, selected_index, .. } => {
                 div()
                     .px_3()
                     .py_2()
@@ -396,7 +396,7 @@ impl DynamicInterpreterComponent {
                     .rounded_md()
                     .text_sm()
                     .child(
-                        selected
+                        selected_index
                             .and_then(|i| options.get(i))
                             .cloned()
                             .unwrap_or_else(|| "Select...".to_string())
@@ -404,25 +404,86 @@ impl DynamicInterpreterComponent {
                     .into_any()
             }
 
-            View::List { children, .. } => {
+            View::List { items, .. } => {
                 div()
                     .flex()
                     .flex_col()
                     .children(
-                        children.into_iter()
+                        items.into_iter()
                             .map(|child| self.render_view(child, cx))
                     )
                     .into_any()
             }
 
-            View::Table { children, .. } => {
+            View::Table { headers, rows, .. } => {
                 div()
                     .flex()
                     .flex_col()
-                    .children(
-                        children.into_iter()
-                            .map(|child| self.render_view(child, cx))
+                    .child(
+                        div()
+                            .flex()
+                            .flex_row()
+                            .children(
+                                headers.into_iter()
+                                    .map(|header| self.render_view(header, cx))
+                            )
                     )
+                    .children(
+                        rows.into_iter()
+                            .map(|row| {
+                                div()
+                                    .flex()
+                                    .flex_row()
+                                    .children(
+                                        row.into_iter()
+                                            .map(|cell| self.render_view(cell, cx))
+                                    )
+                                    .into_any()
+                            })
+                    )
+                    .into_any()
+            }
+
+            // TODO: 实现更多组件类型
+            View::Slider { .. } => {
+                div()
+                    .text_color(rgb(0xf59e0b))
+                    .child("🔧 Slider 组件暂未实现")
+                    .into_any()
+            }
+
+            View::ProgressBar { .. } => {
+                div()
+                    .text_color(rgb(0xf59e0b))
+                    .child("🔧 ProgressBar 组件暂未实现")
+                    .into_any()
+            }
+
+            View::Accordion { .. } => {
+                div()
+                    .text_color(rgb(0xf59e0b))
+                    .child("🔧 Accordion 组件暂未实现")
+                    .into_any()
+            }
+
+            View::Sidebar { .. } => {
+                div()
+                    .text_color(rgb(0xf59e0b))
+                    .child("🔧 Sidebar 组件暂未实现")
+                    .into_any()
+            }
+
+            View::Tabs { .. } => {
+                div()
+                    .text_color(rgb(0xf59e0b))
+                    .child("🔧 Tabs 组件暂未实现")
+                    .into_any()
+            }
+
+            View::NavigationRail { .. } => {
+                div()
+                    .text_color(rgb(0xf59e0b))
+                    .child("🔧 NavigationRail 组件暂未实现")
                     .into_any()
             }
         }

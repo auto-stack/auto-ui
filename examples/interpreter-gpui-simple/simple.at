@@ -1,0 +1,27 @@
+// 简化版演示 - 纯布局，无交互
+
+center {
+    col {
+        spacing: 20,
+
+        // 标题
+        label("AutoUI 动态解释器") {}
+
+        // 欢迎信息
+        label("这是一个纯布局演示") {}
+
+        // 一些装饰元素
+        container {
+            padding: 20,
+            label("容器内容") {}
+        }
+
+        // 行布局示例
+        row {
+            spacing: 10,
+            label("第一列") {}
+            label("第二列") {}
+            label("第三列") {}
+        }
+    }
+}

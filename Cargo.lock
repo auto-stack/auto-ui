@@ -3793,6 +3793,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "interpreter-gpui-demo"
+version = "0.1.0"
+dependencies = [
+ "auto-ui",
+ "auto-ui-gpui",
+ "gpui",
+]
+
+[[package]]
+name = "interpreter-gpui-simple"
+version = "0.1.0"
+dependencies = [
+ "auto-ui",
+ "auto-ui-gpui",
+ "gpui",
+]
+
+[[package]]
+name = "interpreter-test"
+version = "0.1.0"
+dependencies = [
+ "auto-ui",
+ "auto-ui-gpui",
+ "gpui",
+]
+
+[[package]]
+name = "interpreter-test-simple"
+version = "0.1.0"
+dependencies = [
+ "auto-ui",
+]
+
+[[package]]
 name = "inventory"
 version = "0.3.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"

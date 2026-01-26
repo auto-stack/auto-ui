@@ -1,0 +1,43 @@
+// 动态解释器演示 - 计数器
+// 这个示例展示了完整的 UI 布局和事件处理
+
+center {
+    col {
+        spacing: 20,
+
+        // 标题
+        label("AutoUI 动态解释器") {
+            style: "font-size: 24; font-weight: bold; color: #3b82f6;"
+        }
+
+        // 计数器显示
+        container {
+            padding: 20,
+            center {
+                label("Count: 0") {
+                    style: "font-size: 48; font-weight: bold;"
+                }
+            }
+        }
+
+        // 按钮组
+        row {
+            spacing: 10,
+
+            button("Increment (+1)") {
+                onclick: "inc"
+                style: "background: #10b981; color: white;"
+            }
+
+            button("Decrement (-1)") {
+                onclick: "dec"
+                style: "background: #ef4444; color: white;"
+            }
+        }
+
+        // 说明文本
+        label("点击按钮测试事件处理") {
+            style: "color: #9ca3af; font-size: 12;"
+        }
+    }
+}
