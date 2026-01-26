@@ -1,0 +1,11 @@
+[package]
+name = "interpreter-test-simple"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+auto-ui = { path = "../../crates/auto-ui", features = ["interpreter"] }
+
+[[bin]]
+name = "interpreter-test-simple"
+path = "src/main.rs"

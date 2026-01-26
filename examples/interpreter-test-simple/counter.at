@@ -1,0 +1,15 @@
+// 简单的计数器布局 - 用于测试动态解释器
+// 这个版本只包含 UI 布局，不包含状态和事件处理
+
+center {
+    col {
+        spacing: 10,
+        label("Count: 0") {}
+        button("Increment") {
+            onclick: "inc"
+        }
+        button("Decrement") {
+            onclick: "dec"
+        }
+    }
+}
