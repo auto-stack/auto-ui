@@ -17,6 +17,12 @@ use std::fmt::Debug;
 pub mod auto_render;
 pub use auto_render::{GpuiComponentState, ViewExt};
 
+// Dynamic interpreter component (Plan 011)
+#[cfg(feature = "interpreter")]
+pub mod interpreter_component;
+#[cfg(feature = "interpreter")]
+pub use interpreter_component::DynamicInterpreterComponent;
+
 /// Context for GPUI rendering with message passing
 pub struct GpuiContext<M: Clone + Debug + 'static> {
     phantom: std::marker::PhantomData<M>,

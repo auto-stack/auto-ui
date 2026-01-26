@@ -24,6 +24,12 @@ pub mod style; // Unified styling system
 pub mod node_converter; // AutoLang Node → View converter
 pub mod hot_reload; // Hot-reload support for .at files
 
+// Dynamic interpreter module (Plan 011)
+#[cfg(feature = "interpreter")]
+pub mod interpreter;
+#[cfg(feature = "interpreter")]
+pub use interpreter::{DynamicMessage, InterpreterBridge};
+
 // CLI module for command-line tool
 #[cfg(feature = "cli")]
 pub mod cli;

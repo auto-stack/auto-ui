@@ -4,8 +4,12 @@
 // to enable runtime interpretation mode without transpilation.
 
 use auto_val::{Value, Node};
-use crate::view::View;
+use crate::view::{View, SelectCallback};
 use crate::style::Style;
+
+// 导出动态消息类型（当 interpreter feature 启用时）
+#[cfg(feature = "interpreter")]
+use crate::interpreter::DynamicMessage;
 
 /// Errors that can occur during node conversion
 #[derive(Debug, Clone)]
@@ -494,6 +498,61 @@ fn extract_prop_bool(node: &Node, key: &str) -> Option<bool> {
     }
 }
 
+/// Extract property as u32
+fn extract_prop_u32(node: &Node, key: &str) -> Option<u32> {
+    let value = node.get_prop(key);
+    match value {
+        Value::Int(i) if i >= 0 => Some(i as u32),
+        Value::Uint(u) => Some(u as u32),
+        Value::USize(u) => {
+            if u <= u32::MAX as usize {
+                Some(u as u32)
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+/// Extract property as usize
+fn extract_prop_usize(node: &Node, key: &str) -> Option<usize> {
+    let value = node.get_prop(key);
+    match value {
+        Value::Int(i) if i >= 0 => Some(i as usize),
+        Value::Uint(u) => Some(u as usize),
+        Value::USize(u) => Some(u),
+        _ => None,
+    }
+}
+
+/// Extract children as strings (for Select options)
+fn extract_children_strings(node: &Node) -> ConversionResult<Vec<String>> {
+    let mut strings = Vec::new();
+
+    // 使用 kids_iter() 获取子节点
+    for (_, kid) in node.kids_iter() {
+        if let auto_val::Kid::Node(child_node) = kid {
+            // 尝试将节点的第一个参数转换为字符串
+            // 使用 main_arg() 获取主参数
+            let main_arg = child_node.main_arg();
+            match main_arg {
+                Value::Str(s) => strings.push(s.to_string()),
+                Value::OwnedStr(s) => strings.push(s.as_str().to_string()),
+                Value::Int(i) => strings.push(i.to_string()),
+                Value::Uint(u) => strings.push(u.to_string()),
+                Value::Bool(b) => strings.push(b.to_string()),
+                _ => {
+                    // 如果第一个参数不是简单值，使用节点名称
+                    strings.push(child_node.name.to_string());
+                }
+            }
+        }
+    }
+
+    Ok(strings)
+}
+
 /// Extract property as string array
 fn extract_prop_str_array(node: &Node, key: &str) -> Option<Vec<String>> {
     let value = node.get_prop(key);
@@ -724,6 +783,444 @@ mod tests {
                     }
                     _ => panic!("Expected first child to be View::Row"),
                 }
+            }
+            _ => panic!("Expected View::Column"),
+        }
+    }
+}
+
+// ============================================================================
+// 动态消息支持（Plan 011: Auto 动态解释器）
+// ============================================================================
+
+/// 将 Node 转换为使用动态消息的 View
+///
+/// 此函数与 `convert_node()` 类似，但使用 `DynamicMessage` 而非 `String` 作为消息类型，
+/// 保留类型信息用于运行时事件路由。
+///
+/// # 消息类型
+///
+/// - **简单事件**: 使用 `DynamicMessage::String(event_name)`
+/// - **类型化事件**: 使用 `DynamicMessage::Typed { widget_name, event_name, args }`
+///
+/// # 示例
+///
+/// ```ignore
+/// use auto_ui::interpreter::DynamicMessage;
+///
+/// // Button with simple string message
+/// let button = Node::new("button")
+///     .with_arg("Click")
+///     .with_prop("onclick", "button-clicked");
+///
+/// let view = convert_node_dynamic(&button, None)?;
+/// assert!(matches!(view, View::Button { onclick: DynamicMessage::String(..), .. }));
+///
+/// // Button with typed message (metadata provided)
+/// let view = convert_node_dynamic(&button, Some(("MyWidget", &symbol_table)))?;
+/// assert!(matches!(view, View::Button { onclick: DynamicMessage::Typed { .. }, .. }));
+/// ```
+#[cfg(feature = "interpreter")]
+pub fn convert_node_dynamic(
+    node: &Node,
+    metadata: Option<(&str, &auto_lang::Universe)>, // (widget_name, scope)
+) -> ConversionResult<View<DynamicMessage>> {
+    let kind = node.name.as_str();
+
+    match kind {
+        // 布局组件（递归处理子节点）
+        "center" => convert_center_dynamic(node, metadata),
+        "col" | "column" => convert_column_dynamic(node, metadata),
+        "row" => convert_row_dynamic(node, metadata),
+        "container" => convert_container_dynamic(node, metadata),
+        "scrollable" => convert_scrollable_dynamic(node, metadata),
+
+        // 元素组件
+        "text" | "label" => convert_text_dynamic(node),
+        "button" => convert_button_dynamic(node, metadata),
+        "input" => convert_input_dynamic(node, metadata),
+        "checkbox" => convert_checkbox_dynamic(node, metadata),
+        "radio" => convert_radio_dynamic(node, metadata),
+        "select" => convert_select_dynamic(node, metadata),
+        "list" => convert_list_dynamic(node, metadata),
+        "table" => convert_table_dynamic(node, metadata),
+
+        // 未知类型
+        _ => Err(ConversionError::UnknownKind {
+            kind: kind.to_string(),
+        }),
+    }
+}
+
+// ============================================================================
+// 动态消息转换辅助函数
+// ============================================================================
+
+/// 提取事件处理程序并转换为 DynamicMessage
+#[cfg(feature = "interpreter")]
+fn extract_event_handler(
+    node: &Node,
+    prop_name: &str,
+    _metadata: Option<&str>,
+) -> ConversionResult<DynamicMessage> {
+    let event_str = extract_prop_str(node, prop_name)
+        .ok_or_else(|| ConversionError::MissingProp {
+            kind: node.name.to_string(),  // AutoStr → String
+            prop: prop_name.to_string(),
+        })?;
+
+    // TODO: 如果提供了 metadata，尝试将其转换为类型化消息
+    // 目前先使用简单的字符串消息
+    Ok(DynamicMessage::String(event_str))
+}
+
+// 这里我们使用现有的转换函数，但包装返回类型
+// 由于 Rust 的类型系统，我们需要为每个组件类型实现动态版本
+
+#[cfg(feature = "interpreter")]
+fn convert_center_dynamic(
+    node: &Node,
+    metadata: Option<(&str, &auto_lang::Universe)>,
+) -> ConversionResult<View<DynamicMessage>> {
+    let children = extract_children_dynamic(node, metadata)?;
+    let style = extract_style(node)?;
+
+    // Center 使用 Container 实现，设置 center_x 和 center_y
+    let child = if children.is_empty() {
+        View::Empty
+    } else {
+        // 合并所有子节点到一个容器中
+        children.into_iter().fold(View::Empty, |acc, child| {
+            if matches!(acc, View::Empty) {
+                child
+            } else {
+                // 多个子节点，用 Column 包装
+                View::Column {
+                    children: vec![acc, child],
+                    spacing: 0,
+                    padding: 0,
+                    style: None,
+                }
+            }
+        })
+    };
+
+    Ok(View::Container {
+        child: Box::new(child),
+        padding: 0,
+        width: None,
+        height: None,
+        center_x: true,
+        center_y: true,
+        style,
+    })
+}
+
+#[cfg(feature = "interpreter")]
+fn convert_column_dynamic(
+    node: &Node,
+    metadata: Option<(&str, &auto_lang::Universe)>,
+) -> ConversionResult<View<DynamicMessage>> {
+    let spacing = extract_prop_u32(node, "spacing").unwrap_or(0) as u16;
+    let padding = extract_prop_u32(node, "padding").unwrap_or(0) as u16;
+    let children = extract_children_dynamic(node, metadata)?;
+    let style = extract_style(node)?;
+    Ok(View::Column { spacing, padding, children, style })
+}
+
+#[cfg(feature = "interpreter")]
+fn convert_row_dynamic(
+    node: &Node,
+    metadata: Option<(&str, &auto_lang::Universe)>,
+) -> ConversionResult<View<DynamicMessage>> {
+    let spacing = extract_prop_u32(node, "spacing").unwrap_or(0) as u16;
+    let padding = extract_prop_u32(node, "padding").unwrap_or(0) as u16;
+    let children = extract_children_dynamic(node, metadata)?;
+    let style = extract_style(node)?;
+    Ok(View::Row { spacing, padding, children, style })
+}
+
+#[cfg(feature = "interpreter")]
+fn convert_container_dynamic(
+    node: &Node,
+    metadata: Option<(&str, &auto_lang::Universe)>,
+) -> ConversionResult<View<DynamicMessage>> {
+    let children = extract_children_dynamic(node, metadata)?;
+    let padding = extract_prop_u32(node, "padding").unwrap_or(0) as u16;
+    let width = extract_prop_u32(node, "width").map(|w| w as u16);
+    let height = extract_prop_u32(node, "height").map(|h| h as u16);
+    let center_x = extract_prop_bool(node, "center_x").unwrap_or(false);
+    let center_y = extract_prop_bool(node, "center_y").unwrap_or(false);
+    let style = extract_style(node)?;
+
+    // 合并所有子节点
+    let child = if children.is_empty() {
+        View::Empty
+    } else {
+        children.into_iter().fold(View::Empty, |acc, child| {
+            if matches!(acc, View::Empty) {
+                child
+            } else {
+                View::Column {
+                    children: vec![acc, child],
+                    spacing: 0,
+                    padding: 0,
+                    style: None,
+                }
+            }
+        })
+    };
+
+    Ok(View::Container {
+        child: Box::new(child),
+        padding,
+        width,
+        height,
+        center_x,
+        center_y,
+        style,
+    })
+}
+
+#[cfg(feature = "interpreter")]
+fn convert_scrollable_dynamic(
+    node: &Node,
+    metadata: Option<(&str, &auto_lang::Universe)>,
+) -> ConversionResult<View<DynamicMessage>> {
+    let children = extract_children_dynamic(node, metadata)?;
+    let width = extract_prop_u32(node, "width").map(|w| w as u16);
+    let height = extract_prop_u32(node, "height").map(|h| h as u16);
+    let style = extract_style(node)?;
+
+    // 合并所有子节点
+    let child = if children.is_empty() {
+        View::Empty
+    } else {
+        children.into_iter().fold(View::Empty, |acc, child| {
+            if matches!(acc, View::Empty) {
+                child
+            } else {
+                View::Column {
+                    children: vec![acc, child],
+                    spacing: 0,
+                    padding: 0,
+                    style: None,
+                }
+            }
+        })
+    };
+
+    Ok(View::Scrollable {
+        child: Box::new(child),
+        width,
+        height,
+        style,
+    })
+}
+
+#[cfg(feature = "interpreter")]
+fn convert_text_dynamic(node: &Node) -> ConversionResult<View<DynamicMessage>> {
+    let content = extract_main_arg_str(node)
+        .unwrap_or_else(|| String::from(""));  // 默认空字符串
+    let style = extract_style(node)?;
+    Ok(View::Text { content, style })
+}
+
+#[cfg(feature = "interpreter")]
+fn convert_button_dynamic(
+    node: &Node,
+    metadata: Option<(&str, &auto_lang::Universe)>,
+) -> ConversionResult<View<DynamicMessage>> {
+    let label = extract_main_arg_str(node)
+        .unwrap_or_else(|| String::from("Button"));
+    let onclick = extract_event_handler(node, "onclick", metadata.map(|(name, _)|name))?;
+    let style = extract_style(node)?;
+    Ok(View::Button { label, onclick, style })
+}
+
+#[cfg(feature = "interpreter")]
+fn convert_input_dynamic(
+    node: &Node,
+    metadata: Option<(&str, &auto_lang::Universe)>,
+) -> ConversionResult<View<DynamicMessage>> {
+    let placeholder = extract_main_arg_str(node).unwrap_or_default();
+    let on_change = extract_event_handler(node, "onchange", metadata.map(|(name, _)|name))?;
+    let value = extract_prop_str(node, "value").unwrap_or_default();
+    let width = extract_prop_u32(node, "width");  // Option<u32>
+    let width = width.map(|w| w as u16);  // Option<u16>
+    let password = extract_prop_bool(node, "password").unwrap_or(false);
+    let style = extract_style(node)?;
+    Ok(View::Input { placeholder, value, on_change: Some(on_change), width, password, style })
+}
+
+#[cfg(feature = "interpreter")]
+fn convert_checkbox_dynamic(
+    node: &Node,
+    _metadata: Option<(&str, &auto_lang::Universe)>,
+) -> ConversionResult<View<DynamicMessage>> {
+    let label = extract_main_arg_str(node).unwrap_or_default();
+    let is_checked = extract_prop_bool(node, "checked").unwrap_or(false);
+    let on_toggle = extract_prop_str(node, "ontoggle")
+        .map(|s| Some(DynamicMessage::String(s)))
+        .unwrap_or(None);
+    let style = extract_style(node)?;
+    Ok(View::Checkbox { is_checked, label, on_toggle, style })
+}
+
+#[cfg(feature = "interpreter")]
+fn convert_radio_dynamic(
+    node: &Node,
+    _metadata: Option<(&str, &auto_lang::Universe)>,
+) -> ConversionResult<View<DynamicMessage>> {
+    let label = extract_main_arg_str(node).unwrap_or_default();
+    let is_selected = extract_prop_bool(node, "checked").unwrap_or(false);
+    let on_select = extract_prop_str(node, "onselect")
+        .map(|s| Some(DynamicMessage::String(s)))
+        .unwrap_or(None);
+    let style = extract_style(node)?;
+    Ok(View::Radio { label, is_selected, on_select, style })
+}
+
+#[cfg(feature = "interpreter")]
+fn convert_select_dynamic(
+    node: &Node,
+    _metadata: Option<(&str, &auto_lang::Universe)>,
+) -> ConversionResult<View<DynamicMessage>> {
+    let options = extract_children_strings(node)?;
+    let selected_index = extract_prop_usize(node, "selected");
+
+    // 创建 SelectCallback - 将选项索引转换为事件字符串
+    let on_select = extract_prop_str(node, "onselect")
+        .map(|event_str| {
+            SelectCallback::new(move |_index: usize, _selected: &str| {
+                DynamicMessage::String(event_str.clone())
+            })
+        });
+
+    let style = extract_style(node)?;
+    Ok(View::Select { options, selected_index, on_select, style })
+}
+
+#[cfg(feature = "interpreter")]
+fn convert_list_dynamic(
+    node: &Node,
+    metadata: Option<(&str, &auto_lang::Universe)>,
+) -> ConversionResult<View<DynamicMessage>> {
+    let items = extract_children_dynamic(node, metadata)?;
+    let spacing = extract_prop_u32(node, "spacing").unwrap_or(0) as u16;
+    let style = extract_style(node)?;
+    Ok(View::List { items, spacing, style })
+}
+
+#[cfg(feature = "interpreter")]
+fn convert_table_dynamic(
+    node: &Node,
+    metadata: Option<(&str, &auto_lang::Universe)>,
+) -> ConversionResult<View<DynamicMessage>> {
+    let children = extract_children_dynamic(node, metadata)?;
+
+    // Table 需要分离 headers 和 rows
+    // 假设第一个子节点是 header 行，其余是数据行
+    let headers = if !children.is_empty() {
+        // 尝试从第一个子节点提取 headers
+        match &children[0] {
+            View::Row { children: header_children, .. } => header_children.clone(),
+            _ => vec![],
+        }
+    } else {
+        vec![]
+    };
+
+    let rows = if children.len() > 1 {
+        children[1..].iter().filter_map(|child| {
+            if let View::Row { children: row_children, .. } = child {
+                Some(row_children.clone())
+            } else {
+                None
+            }
+        }).collect()
+    } else {
+        vec![]
+    };
+
+    let spacing = extract_prop_u32(node, "spacing").unwrap_or(0) as u16;
+    let col_spacing = extract_prop_u32(node, "col_spacing").unwrap_or(spacing as u32) as u16;
+    let style = extract_style(node)?;
+    Ok(View::Table { headers, rows, spacing, col_spacing, style })
+}
+
+/// 递归提取子节点并转换为动态消息 View
+#[cfg(feature = "interpreter")]
+fn extract_children_dynamic(
+    node: &Node,
+    metadata: Option<(&str, &auto_lang::Universe)>,
+) -> ConversionResult<Vec<View<DynamicMessage>>> {
+    let mut children = Vec::new();
+
+    // 使用 kids_iter() 获取子节点
+    for (_, kid) in node.kids_iter() {
+        if let auto_val::Kid::Node(child_node) = kid {
+            let view = convert_node_dynamic(&child_node, metadata)?;
+            children.push(view);
+        }
+    }
+
+    Ok(children)
+}
+
+// ============================================================================
+// 动态消息转换的测试
+// ============================================================================
+
+#[cfg(test)]
+#[cfg(feature = "interpreter")]
+mod tests_dynamic {
+    use super::*;
+    use crate::interpreter::DynamicMessage;
+
+    #[test]
+    fn test_convert_text_dynamic() {
+        let node = Node::new("text").with_arg("Hello");
+        let view = convert_node_dynamic(&node, None).unwrap();
+
+        match view {
+            View::Text { content, .. } => {
+                assert_eq!(content, "Hello");
+            }
+            _ => panic!("Expected View::Text"),
+        }
+    }
+
+    #[test]
+    fn test_convert_button_dynamic() {
+        let node = Node::new("button")
+            .with_arg("Click")
+            .with_prop("onclick", "button-clicked");
+
+        let view = convert_node_dynamic(&node, None).unwrap();
+
+        match view {
+            View::Button { label, onclick, .. } => {
+                assert_eq!(label, "Click");
+                assert!(matches!(onclick, DynamicMessage::String(_)));
+            }
+            _ => panic!("Expected View::Button"),
+        }
+    }
+
+    #[test]
+    fn test_convert_column_dynamic() {
+        let node = Node::new("col")
+            .with_prop("spacing", 10u32)
+            .with_child(Node::new("text").with_arg("A"))
+            .with_child(Node::new("text").with_arg("B"));
+
+        let view = convert_node_dynamic(&node, None).unwrap();
+
+        match view {
+            View::Column { spacing, children, .. } => {
+                assert_eq!(spacing, 10);
+                assert_eq!(children.len(), 2);
             }
             _ => panic!("Expected View::Column"),
         }

@@ -9,6 +9,7 @@ crate-type = ["lib"]
 [[bin]]
 name = "auto-ui"
 path = "src/bin/auto-ui.rs"
+required-features = ["cli"]
 
 [dependencies]
 serde = { workspace = true }
@@ -43,5 +44,6 @@ default = []
 gpui = ["dep:gpui-lib"]  # Enable GPUI backend adapter
 iced = ["dep:iced"]  # Enable Iced backend adapter
 transpiler = ["auto-lang"]  # Auto language transpiler support (auto-val always enabled)
+interpreter = ["auto-lang"]  # Auto language dynamic interpreter support (Plan 011)
 cli = ["clap", "console", "miette", "regex", "transpiler", "notify-debouncer-mini"]  # CLI tool support
 
