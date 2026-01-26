@@ -188,25 +188,31 @@ impl Render for DynamicInterpreterComponent {
         // 否则渲染当前视图
         #[cfg(feature = "interpreter")]
         {
-            if let Some(ref view) = self.current_view {
-                // 简化版本：使用 AnyElement 并转换为 impl IntoElement
-                // 通过直接调用 match 语句
-                match view {
-                    View::Empty => div().into_any(),
-                    View::Text { content, .. } => div().text_sm().child(content.clone()).into_any(),
+            if let Some(view) = self.current_view.clone() {
+                // 简化版本：只显示基本信息
+                return match &view {
+                    View::Text { content, .. } => {
+                        div()
+                            .size_full()
+                            .bg(rgb(0x1a1a1a))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .child(content.as_str())
+                    }
                     View::Button { label, .. } => {
                         div()
-                            .px_4()
-                            .py_2()
-                            .bg(rgb(0x3c3c3c))
-                            .border_1()
-                            .border_color(rgb(0x6c6c6c))
-                            .rounded_md()
-                            .child(label.clone())
-                            .into_any()
+                            .size_full()
+                            .bg(rgb(0x1a1a1a))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .child(label.as_str())
                     }
                     View::Column { spacing, children, .. } => {
                         div()
+                            .size_full()
+                            .bg(rgb(0x1a1a1a))
                             .flex()
                             .flex_col()
                             .gap(px(*spacing as f32))
@@ -214,24 +220,35 @@ impl Render for DynamicInterpreterComponent {
                                 children.iter()
                                     .map(|child| {
                                         match child {
-                                            View::Text { content, .. } => div().text_sm().child(content).into_any(),
-                                            _ => div().child("(组件)").into_any(),
+                                            View::Text { content, .. } => {
+                                                div().text_sm().child(content.as_str()).into_any()
+                                            }
+                                            _ => div().text_sm().child("(组件)").into_any()
                                         }
                                     })
+                                    .collect::<Vec<_>>()
                             )
-                            .into_any()
                     }
-                    _ => div().child("(复杂组件暂未简化)").into_any(),
-                }
+                    _ => {
+                        div()
+                            .size_full()
+                            .bg(rgb(0x1a1a1a))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .text_color(rgb(0xf59e0b))
+                            .child("🔧 组件渲染功能开发中...")
+                    }
+                };
             } else {
                 // 加载中...
-                div()
+                return div()
                     .size_full()
                     .bg(rgb(0x1a1a1a))
                     .flex()
                     .items_center()
                     .justify_center()
-                    .child("⏳ 正在加载...")
+                    .child("⏳ 正在加载...");
             }
         }
 
@@ -249,6 +266,56 @@ impl Render for DynamicInterpreterComponent {
 }
 
 impl DynamicInterpreterComponent {
+    /// 渲染 View 为 GPUI 元素（返回 AnyElement）
+    #[cfg(feature = "interpreter")]
+    fn render_view_element(&self, view: View<DynamicMessage>, _cx: &mut Context<Self>) -> AnyElement {
+        match view {
+            View::Empty => {
+                div().size_full().into_any()
+            }
+            View::Text { content, .. } => {
+                div()
+                    .size_full()
+                    .text_sm()
+                    .child(content.as_str())
+                    .into_any()
+            }
+            View::Button { label, .. } => {
+                div()
+                    .size_full()
+                    .px_4()
+                    .py_2()
+                    .bg(rgb(0x3c3c3c))
+                    .border_1()
+                    .border_color(rgb(0x6c6c6c))
+                    .rounded_md()
+                    .child(label.as_str())
+                    .into_any()
+            }
+            View::Column { spacing, children, .. } => {
+                div()
+                    .size_full()
+                    .flex()
+                    .flex_col()
+                    .gap(px(spacing as f32))
+                    .children(
+                        children.iter()
+                            .map(|child| self.render_view_element(child.clone(), _cx))
+                            .collect::<Vec<_>>()
+                    )
+                    .into_any()
+            }
+            _ => {
+                div()
+                    .size_full()
+                    .text_sm()
+                    .text_color(rgb(0xf59e0b))
+                    .child("🔧 复杂组件暂未简化")
+                    .into_any()
+            }
+        }
+    }
+
     /// 渲染单个 View 节点
     #[cfg(feature = "interpreter")]
     fn render_view(&mut self, view: View<DynamicMessage>, cx: &mut Context<Self>) -> AnyElement {
