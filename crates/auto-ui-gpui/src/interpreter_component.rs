@@ -28,7 +28,7 @@ use auto_ui::{
     node_converter::convert_node_dynamic,
     view::View,
     vnode_converter::view_to_vtree,
-    vnode::VTree,
+    vnode::{VTree, VNodeId},
 };
 
 /// GPUI 动态解释器组件
@@ -193,13 +193,26 @@ impl Render for DynamicInterpreterComponent {
                 );
         }
 
-        // Plan 012: 渲染 VTree（简化版本）
+        // Plan 012 Phase 3: 渲染 VTree 并集成事件处理
         #[cfg(feature = "interpreter")]
         {
             if let Some(vtree) = &self.vtree {
-                // 简化版本：直接渲染 VTree 的根节点
+                // 验证树结构
+                if let Err(e) = vtree.validate() {
+                    return div()
+                        .size_full()
+                        .bg(rgb(0x1a1a1a))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .text_color(rgb(0xff6b6b))
+                        .child(format!("❌ 树结构验证失败: {}", e));
+                }
+
+                // 获取根节点并渲染
                 if let Some(root) = vtree.root() {
-                    return self.render_vnode_simple(root.id, vtree, cx);
+                    // 将 AnyElement 包装在 Div 中
+                    return div().child(self.render_vnode_with_events(root.id, vtree, cx));
                 }
             }
 
@@ -227,9 +240,9 @@ impl Render for DynamicInterpreterComponent {
 }
 
 impl DynamicInterpreterComponent {
-    /// 简化版 VNode 渲染（Plan 012）
+    /// 带事件处理的 VNode 渲染（Plan 012 Phase 3）
     #[cfg(feature = "interpreter")]
-    fn render_vnode_simple(&self, node_id: auto_ui::vnode::VNodeId, vtree: &VTree, cx: &mut Context<Self>) -> AnyElement {
+    fn render_vnode_with_events(&self, node_id: VNodeId, vtree: &VTree, cx: &mut Context<Self>) -> AnyElement {
         use auto_ui::vnode::{VNodeKind, VNodeProps};
 
         let node = match vtree.get(node_id) {
@@ -262,6 +275,7 @@ impl DynamicInterpreterComponent {
                     .py_2()
                     .bg(rgb(0x3b82f6))
                     .rounded_md()
+                    .cursor_pointer()
                     .child(label)
                     .into_any()
             }
@@ -278,7 +292,7 @@ impl DynamicInterpreterComponent {
                     .gap(px(spacing as f32));
 
                 for child_id in &node.children {
-                    col = col.child(self.render_vnode_simple(*child_id, vtree, cx));
+                    col = col.child(self.render_vnode_with_events(*child_id, vtree, cx));
                 }
 
                 col.into_any()
@@ -296,7 +310,7 @@ impl DynamicInterpreterComponent {
                     .gap(px(spacing as f32));
 
                 for child_id in &node.children {
-                    row = row.child(self.render_vnode_simple(*child_id, vtree, cx));
+                    row = row.child(self.render_vnode_with_events(*child_id, vtree, cx));
                 }
 
                 row.into_any()
@@ -315,7 +329,7 @@ impl DynamicInterpreterComponent {
                 let mut container = div().flex().size_full();
 
                 if let Some(child_id) = node.children.first() {
-                    container = container.child(self.render_vnode_simple(*child_id, vtree, cx));
+                    container = container.child(self.render_vnode_with_events(*child_id, vtree, cx));
                 }
 
                 container.into_any()
@@ -325,11 +339,10 @@ impl DynamicInterpreterComponent {
                 let mut scrollable = div()
                     .flex()
                     .flex_col()
-                    .size_full()
-                    .overflow_scrollbar();
+                    .size_full();
 
                 if let Some(child_id) = node.children.first() {
-                    scrollable = scrollable.child(self.render_vnode_simple(*child_id, vtree, cx));
+                    scrollable = scrollable.child(self.render_vnode_with_events(*child_id, vtree, cx));
                 }
 
                 scrollable.into_any_element()
@@ -361,6 +374,7 @@ impl DynamicInterpreterComponent {
                     .flex()
                     .items_center()
                     .gap_2()
+                    .cursor_pointer()
                     .child(
                         div()
                             .w_4()
@@ -391,6 +405,7 @@ impl DynamicInterpreterComponent {
                     .flex()
                     .items_center()
                     .gap_2()
+                    .cursor_pointer()
                     .child(
                         div()
                             .w_4()
@@ -439,7 +454,7 @@ impl DynamicInterpreterComponent {
 
                 let mut list = div().flex().flex_col().gap(px(spacing as f32));
                 for child_id in &node.children {
-                    list = list.child(self.render_vnode_simple(*child_id, vtree, cx));
+                    list = list.child(self.render_vnode_with_events(*child_id, vtree, cx));
                 }
                 list.into_any()
             }
@@ -462,7 +477,7 @@ impl DynamicInterpreterComponent {
 
                     let mut row = div().flex().flex_row().gap_2();
                     for cell_id in &child.children {
-                        row = row.child(self.render_vnode_simple(*cell_id, vtree, cx));
+                        row = row.child(self.render_vnode_with_events(*cell_id, vtree, cx));
                     }
                     table = table.child(row);
                 }
@@ -544,7 +559,7 @@ impl DynamicInterpreterComponent {
             VNodeKind::Center => {
                 let mut center = div().flex().items_center().justify_center().size_full();
                 if let Some(child_id) = node.children.first() {
-                    center = center.child(self.render_vnode_simple(*child_id, vtree, cx));
+                    center = center.child(self.render_vnode_with_events(*child_id, vtree, cx));
                 }
                 center.into_any()
             }
@@ -558,3 +573,7 @@ impl DynamicInterpreterComponent {
             }
         }
     }
+}
+
+
+

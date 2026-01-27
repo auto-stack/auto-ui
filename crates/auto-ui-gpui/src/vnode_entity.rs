@@ -26,7 +26,7 @@
 //! let entity = cx.new(|cx| VNodeEntity::new(vtree, cx));
 //! ```
 
-use gpui::{prelude::*, *};
+use gpui::{prelude::*, InteractiveElement, *};
 use std::sync::Arc;
 
 // 导入 auto-ui 的 VNode 类型
@@ -34,6 +34,8 @@ use auto_ui::vnode::{VNodeId, VNodeKind, VNodeProps, VTree};
 
 #[cfg(feature = "interpreter")]
 use auto_ui::interpreter::DynamicMessage;
+
+use crate::event_router::{EventType};
 
 /// VNode Entity - GPUI 渲染器
 ///
@@ -96,9 +98,9 @@ impl VNodeEntity {
             VNodeKind::Row => self.render_row(node, cx),
             VNodeKind::Container => self.render_container(node, cx),
             VNodeKind::Scrollable => self.render_scrollable(node, cx),
-            VNodeKind::Input => self.render_input(node),
-            VNodeKind::Checkbox => self.render_checkbox(node),
-            VNodeKind::Radio => self.render_radio(node),
+            VNodeKind::Input => self.render_input(node, cx),
+            VNodeKind::Checkbox => self.render_checkbox(node, cx),
+            VNodeKind::Radio => self.render_radio(node, cx),
             VNodeKind::Select => self.render_select(node),
             VNodeKind::List => self.render_list(node, cx),
             VNodeKind::Table => self.render_table(node, cx),
@@ -137,9 +139,11 @@ impl VNodeEntity {
             .px_4()
             .py_2()
             .bg(rgb(0x3b82f6))
+            .hover(|div| div.bg(rgb(0x2563eb)))
             .border_1()
             .border_color(rgb(0x1d4ed8))
             .rounded_md()
+            .cursor_pointer()
             .child(label)
             .into_any()
     }
@@ -230,14 +234,21 @@ impl VNodeEntity {
     }
 
     /// 渲染输入框节点
-    fn render_input(&self, node: &auto_ui::vnode::VNode) -> AnyElement {
-        let (placeholder, _value, _password) = match &node.props {
+    fn render_input(&self, node: &auto_ui::vnode::VNode, _cx: &mut Context<Self>) -> AnyElement {
+        let (placeholder, value, _password) = match &node.props {
             VNodeProps::Input {
                 placeholder,
                 value,
                 password,
             } => (placeholder.clone(), value.clone(), *password),
             _ => (String::new(), String::new(), false),
+        };
+
+        // 简化版本：显示当前值
+        let display_text = if value.is_empty() {
+            placeholder.clone()
+        } else {
+            value.clone()
         };
 
         div()
@@ -248,12 +259,12 @@ impl VNodeEntity {
             .border_color(rgb(0x4a4a4a))
             .rounded_md()
             .text_sm()
-            .child(format!("{}: {}", placeholder, "(输入框)"))
+            .child(display_text)
             .into_any()
     }
 
     /// 渲染复选框节点
-    fn render_checkbox(&self, node: &auto_ui::vnode::VNode) -> AnyElement {
+    fn render_checkbox(&self, node: &auto_ui::vnode::VNode, _cx: &mut Context<Self>) -> AnyElement {
         let (label, is_checked) = match &node.props {
             VNodeProps::Checkbox { label, is_checked } => (label.clone(), *is_checked),
             _ => (String::new(), false),
@@ -263,6 +274,7 @@ impl VNodeEntity {
             .flex()
             .items_center()
             .gap_2()
+            .cursor_pointer()
             .child(
                 div()
                     .w_4()
@@ -285,7 +297,7 @@ impl VNodeEntity {
     }
 
     /// 渲染单选框节点
-    fn render_radio(&self, node: &auto_ui::vnode::VNode) -> AnyElement {
+    fn render_radio(&self, node: &auto_ui::vnode::VNode, _cx: &mut Context<Self>) -> AnyElement {
         let (label, is_selected) = match &node.props {
             VNodeProps::Radio { label, is_selected } => (label.clone(), *is_selected),
             _ => (String::new(), false),
@@ -295,6 +307,7 @@ impl VNodeEntity {
             .flex()
             .items_center()
             .gap_2()
+            .cursor_pointer()
             .child(
                 div()
                     .w_4()
