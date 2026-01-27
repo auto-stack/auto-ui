@@ -1,0 +1,53 @@
+// 简化版演示 - 纯文本布局
+//
+// 此文件专注于展示 AutoUI 的基本布局能力，不包含交互组件
+
+center {
+    col {
+        spacing: 20,
+
+        // 标题区域
+        label("欢迎使用 AutoUI") {
+            style: "font-size: 32; font-weight: bold; color: #60a5fa;"
+        }
+
+        // 副标题
+        label("动态解释器演示") {
+            style: "font-size: 24; color: #34d399;"
+        }
+
+        // 说明文本
+        label("这是一个简化的演示版本") {
+            style: "font-size: 16; color: #9ca3af;"
+        }
+
+        // 分隔线容器
+        container {
+            padding: 20,
+            center {
+                label("✅ 核心功能已实现") {
+                    style: "font-size: 18; color: #10b981;"
+                }
+            }
+        }
+
+        // 功能列表（使用 row 布局）
+        row {
+            spacing: 10,
+            label("📄 文件解析") {
+                style: "font-size: 14; color: #9ca3af;"
+            }
+            label("🔄 AST 转换") {
+                style: "font-size: 14; color: #9ca3af;"
+            }
+            label("🎨 GPUI 渲染") {
+                style: "font-size: 14; color: #9ca3af;"
+            }
+        }
+
+        // 底部说明
+        label("完整功能开发中...") {
+            style: "font-size: 12; color: #6b7280;"
+        }
+    }
+}

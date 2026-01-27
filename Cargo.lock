@@ -3802,6 +3802,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "interpreter-gpui-minimal"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "auto-ui",
+ "auto-ui-gpui",
+ "gpui",
+]
+
+[[package]]
 name = "interpreter-gpui-simple"
 version = "0.1.0"
 dependencies = [

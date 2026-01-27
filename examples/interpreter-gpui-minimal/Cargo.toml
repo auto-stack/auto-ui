@@ -1,0 +1,14 @@
+[package]
+name = "interpreter-gpui-minimal"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+auto-ui = { path = "../../crates/auto-ui", features = ["interpreter"] }
+auto-ui-gpui = { path = "../../crates/auto-ui-gpui", features = ["interpreter"] }
+gpui = { version = "0.2.2" }
+anyhow = "1.0"
+
+[[bin]]
+name = "interpreter-gpui-minimal"
+path = "src/main.rs"

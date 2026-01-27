@@ -5,7 +5,7 @@
 **Priority**: High
 **Complexity**: High
 **Estimated Timeline**: 4-6 周
-**Last Updated**: 2025-01-26
+**Last Updated**: 2025-01-27
 
 ## Overview
 
@@ -67,14 +67,47 @@
   GPUI/Iced 渲染（待实现）
   ```
 
+#### 5. auto-lang 兼容性修复 (2025-01-27)
+- ✅ 修复 auto-lang 编译错误
+  - 添加缺失的 TokenKind 类型：`Const`, `Bool`, `Byte`
+  - 将 `parse_type_param()` 返回类型从 `TypeParamOld` 更新为 `TypeParam`
+  - 解决 GPUI 0.2.2 API 兼容性问题
+- ✅ auto-lang 核心库编译通过（仅有警告）
+
+#### 6. GPUI 集成初步实现 (Phase 5 框架) (2025-01-27)
+- ✅ 创建 `interpreter-gpui-minimal` 简化演示示例
+  - 完整的 GPUI 应用框架（使用 `Application::new()` API）
+  - 实现了基础的 UI 布局（标题栏、渲染区、信息面板）
+  - 添加了 `Assets` 结构体实现 `AssetSource` trait
+  - 修复了 GPUI 0.2.2 API 差异：
+    - `ViewContext` → `Context`
+    - `px()` 宏用于 `Point`/`Size`
+    - 移除了不兼容的方法调用
+- ✅ GPUI API 兼容性文档化
+  - 记录了 GPUI 0.2.2 的正确使用方式
+  - 为后续开发提供了参考示例
+- ⚠️ **已知限制**：
+  - 由于 GPUI Entity 系统的限制，`DynamicInterpreterComponent` 暂时无法直接嵌入
+  - 当前示例使用静态 UI 展示架构，而非实际的动态渲染
+  - 需要设计新的架构来绕过 Entity 生命周期限制
+
 ### 🔄 进行中
 
 - **Phase 2: Node 转换器增强** - 基础完成，需要添加：
   - [ ] list 和 table 组件的动态转换
   - [ ] 样式元数据提取和类型化消息支持
 
-- **Phase 5: GPUI 集成** - 已有框架（`interpreter_component.rs`），需要：
-  - [ ] 完善 `DynamicInterpreterComponent::render()`
+- **Phase 5: GPUI 集成** - ⚠️ 架构重新设计中
+  - ✅ 创建了基础演示框架 (`interpreter-gpui-minimal`)
+  - ✅ 验证了 GPUI 0.2.2 API 兼容性
+  - 🔄 **技术挑战**：GPUI Entity 系统限制
+    - `DynamicInterpreterComponent` 无法在组件创建时初始化（需要 `Context`）
+    - Entity 生命周期与解释器需求不匹配
+    - 需要设计新的架构模式：
+      - 方案 1：使用全局状态管理器绕过 Entity 限制
+      - 方案 2：延迟初始化模式（首次 render 时创建解释器）
+      - 方案 3：将解释器完全独立于 GPUI Entity 系统
+  - [ ] 完善新的架构设计
   - [ ] 实现 View<DynamicMessage> → GPUI 元素的完整映射
   - [ ] 事件处理器连接
   - [ ] 热重载触发和重新渲染
@@ -1027,6 +1060,147 @@ auto-ui-transpile examples/counter.at
 cargo run --release
 ```
 
+## 技术挑战与解决方案
+
+### GPUI Entity 系统限制 (2025-01-27)
+
+**问题描述**：
+
+在尝试将 `DynamicInterpreterComponent` 集成到 GPUI 应用时遇到了 Entity 生命周期限制：
+
+1. **初始化时机问题**：
+   ```rust
+   // ❌ 不工作：DynamicInterpreterComponent::from_file 需要 Context
+   struct SimpleDemoApp {
+       interpreter: DynamicInterpreterComponent,  // 需要在 new() 中创建
+   }
+
+   impl SimpleDemoApp {
+       fn new(cx: &mut Context<Self>) -> Self {
+           // 问题：from_file 需要 &mut Window 和 &mut Context<Self>
+           // 但 DynamicInterpreterComponent 又需要在自己创建时传递 Context
+           let interpreter = DynamicInterpreterComponent::from_file(path, window, cx);
+           // 类型不匹配：期望 &mut Context<DynamicInterpreterComponent>
+           // 实际得到：&mut Context<SimpleDemoApp>
+       }
+   }
+   ```
+
+2. **Context 类型不匹配**：
+   - GPUI 的 Entity 系统要求每个组件有唯一的 `Context<T>`
+   - `DynamicInterpreterComponent::from_file` 需要 `&mut Context<DynamicInterpreterComponent>`
+   - 但在 `SimpleDemoApp::new()` 中只能访问 `&mut Context<SimpleDemoApp>`
+
+3. **嵌套 Entity 问题**：
+   - GPUI 不支持在一个 Entity 的创建过程中创建另一个 Entity
+   - `cx.new()` 只能在顶级调用，不能嵌套
+
+**尝试的解决方案**：
+
+1. **❌ Option 包装**：
+   ```rust
+   struct SimpleDemoApp {
+       interpreter: Option<DynamicInterpreterComponent>,
+   }
+   ```
+   - 问题：仍然需要在某个地方创建组件，同样遇到 Context 类型不匹配
+
+2. **❌ 延迟初始化**：
+   ```rust
+   fn render(&mut self, cx: &mut Context<Self>) {
+       if self.interpreter.is_none() {
+           self.interpreter = Some(DynamicInterpreterComponent::from_file(...));
+       }
+   }
+   ```
+   - 问题：render 中同样无法访问 `&mut Window` 和正确的 Context 类型
+
+**当前解决方案**：
+
+创建了 **简化演示版本** (`interpreter-gpui-minimal`)：
+- 使用静态 UI 展示架构和设计意图
+- 暂时不嵌入实际的 `DynamicInterpreterComponent`
+- 清晰标注"演示模式"和已知限制
+
+**未来解决方案方向**：
+
+1. **方案 1：全局状态管理器**
+   ```rust
+   // 使用全局 Arc<RwLock<>> 绕过 Entity 限制
+   static INTERPRETER_STATE: Lazy<Arc<RwLock<InterpreterState>>> = ...;
+
+   struct SimpleDemoApp {
+       interpreter_id: Uuid,  // 仅存储 ID
+   }
+   ```
+
+2. **方案 2：延迟初始化 + 消息传递**
+   ```rust
+   enum AppMessage {
+       InitializeInterpreter(PathBuf),
+   }
+
+   fn on(&mut self, msg: AppMessage, cx: &mut Context<Self>) {
+       match msg {
+           AppMessage::InitializeInterpreter(path) => {
+               // 通过特殊通道初始化
+           }
+       }
+   }
+   ```
+
+3. **方案 3：独立解释器进程**
+   - 将解释器运行在独立线程/进程
+   - 通过消息传递与 GPUI 通信
+   - 完全解耦 Entity 生命周期
+
+**经验教训**：
+
+- ✅ GPUI 的 Entity 系统与传统组件模型有显著差异
+- ✅ 在设计新架构时需要充分考虑 GPUI 的生命周期限制
+- ✅ 创建简化原型有助于快速发现架构问题
+- ✅ 文档化 API 兼容性问题对后续开发至关重要
+
+### GPUI 0.2.2 API 变更记录 (2025-01-27)
+
+**应用程序启动**：
+
+```rust
+// ❌ 旧方式（不工作）
+App::new().run(|cx: &mut AppContext| {
+    cx.open_window(..., |cx| {
+        cx.new_view(|cx| App::new(cx))
+    })
+})
+
+// ✅ 正确方式
+Application::new().run(|cx: &mut App| {
+    cx.open_window(options, |_window, cx| {
+        cx.new(|_| App::new_empty())  // 使用 new() 而非 new_view()
+    })
+})
+```
+
+**Context 类型**：
+
+```rust
+// ❌ ViewContext 不存在
+fn render(&mut self, _window: &mut Window, cx: &mut ViewContext<Self>)
+
+// ✅ 使用 Context
+fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>)
+```
+
+**AssetSource trait**：
+
+```rust
+// ❌ 错误的错误类型
+fn load(&self, path: &str) -> Result<..., Box<dyn std::error::Error>>
+
+// ✅ 正确：使用 anyhow::Error
+fn load(&self, path: &str) -> anyhow::Result<...>
+```
+
 ## Notes
 
 - 这是一个**增量式**实现计划，可以逐步添加功能
@@ -1036,7 +1210,31 @@ cargo run --release
 
 ---
 
-**Document Status**: Ready for Implementation
-**Last Updated**: 2025-01-24
+**Document Status**: 🔄 In Progress - Phase 5 架构重新设计
+**Last Updated**: 2025-01-27
 **Author**: Claude Sonnet 4.5
 **Review Status**: Pending
+
+---
+
+## 📝 今日总结 (2025-01-27)
+
+### 完成工作
+- ✅ 创建 `interpreter-gpui-minimal` 简化演示示例
+- ✅ 修复 GPUI 0.2.2 API 兼容性问题
+- ✅ 添加 auto-lang 缺失的 TokenKind 类型
+- ✅ 更新 Plan 011 文档，记录技术挑战
+
+### 发现的关键问题
+- ⚠️ GPUI Entity 系统与动态解释器架构存在生命周期冲突
+- ⚠️ 需要重新设计 Phase 5 的集成方案
+
+### 下一步行动
+1. 评估三种可能的解决方案（全局状态、消息传递、独立进程）
+2. 选择最优方案并实现原型
+3. 完成实际的动态渲染集成
+
+### 文件清单
+- [examples/interpreter-gpui-minimal/src/main.rs](examples/interpreter-gpui-minimal/src/main.rs) - 简化演示（编译通过）
+- [examples/interpreter-gpui-minimal/simple.at](examples/interpreter-gpui-minimal/simple.at) - 测试用 Auto 代码
+- [docs/plans/011-auto-interpreter.md](docs/plans/011-auto-interpreter.md) - 更新的计划文档

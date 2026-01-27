@@ -198,7 +198,7 @@ impl Render for DynamicInterpreterComponent {
                             .flex()
                             .items_center()
                             .justify_center()
-                            .child(content.as_str())
+                            .child(content.clone())
                     }
                     View::Button { label, .. } => {
                         div()
@@ -207,7 +207,7 @@ impl Render for DynamicInterpreterComponent {
                             .flex()
                             .items_center()
                             .justify_center()
-                            .child(label.as_str())
+                            .child(label.clone())
                     }
                     View::Column { spacing, children, .. } => {
                         div()
@@ -221,7 +221,7 @@ impl Render for DynamicInterpreterComponent {
                                     .map(|child| {
                                         match child {
                                             View::Text { content, .. } => {
-                                                div().text_sm().child(content.as_str()).into_any()
+                                                div().text_sm().child(content.clone()).into_any()
                                             }
                                             _ => div().text_sm().child("(组件)").into_any()
                                         }
@@ -277,7 +277,7 @@ impl DynamicInterpreterComponent {
                 div()
                     .size_full()
                     .text_sm()
-                    .child(content.as_str())
+                    .child(content.clone())
                     .into_any()
             }
             View::Button { label, .. } => {
@@ -289,7 +289,7 @@ impl DynamicInterpreterComponent {
                     .border_1()
                     .border_color(rgb(0x6c6c6c))
                     .rounded_md()
-                    .child(label.as_str())
+                    .child(label.clone())
                     .into_any()
             }
             View::Column { spacing, children, .. } => {
@@ -377,19 +377,6 @@ impl DynamicInterpreterComponent {
                         children.into_iter()
                             .map(|child| self.render_view(child, cx))
                     )
-                    .into_any()
-            }
-
-            View::Container { child, center_x, center_y, .. } => {
-                let mut container = div().flex().size_full();
-                if center_x {
-                    container = container.items_center();
-                }
-                if center_y {
-                    container = container.justify_center();
-                }
-                container
-                    .child(self.render_view(*child, cx))
                     .into_any()
             }
 
