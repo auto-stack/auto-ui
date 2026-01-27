@@ -27,6 +27,8 @@ use auto_ui::{
     interpreter::{InterpreterBridge, DynamicMessage},
     node_converter::convert_node_dynamic,
     view::View,
+    vnode_converter::view_to_vtree,
+    vnode::VTree,
 };
 
 /// GPUI 动态解释器组件
@@ -34,8 +36,9 @@ use auto_ui::{
 /// 此组件负责：
 /// 1. 加载并解释 Auto 代码
 /// 2. 将求值的 Node 转换为 View
-/// 3. 在 GPUI 中渲染 View
-/// 4. 处理用户交互事件
+/// 3. 将 View 转换为 VTree（扁平化）
+/// 4. 在 GPUI 中渲染 VTree
+/// 5. 处理用户交互事件
 pub struct DynamicInterpreterComponent {
     /// 解释器桥梁
     #[cfg(feature = "interpreter")]
@@ -44,9 +47,9 @@ pub struct DynamicInterpreterComponent {
     /// Auto 文件路径
     file_path: PathBuf,
 
-    /// 当前视图
+    /// 当前虚拟节点树（Plan 012: VNode 架构）
     #[cfg(feature = "interpreter")]
-    current_view: Option<View<DynamicMessage>>,
+    vtree: Option<VTree>,
 
     /// 焦点句柄
     focus_handle: FocusHandle,
@@ -66,7 +69,7 @@ impl DynamicInterpreterComponent {
         let mut component = Self {
             bridge: bridge.clone(),
             file_path: path.clone(),
-            current_view: None,
+            vtree: None,  // Plan 012: 使用 VTree 而不是 View
             focus_handle: cx.focus_handle(),
             error: None,
         };
@@ -94,11 +97,13 @@ impl DynamicInterpreterComponent {
             .map_err(|e| format!("获取视图失败: {}", e))?;
 
         // 转换 Node → View<DynamicMessage>
-        // TODO: 传递 metadata 参数以支持类型化消息
         let view = convert_node_dynamic(&node, None)
             .map_err(|e| format!("转换视图失败: {}", e))?;
 
-        self.current_view = Some(view);
+        // Plan 012: 将 View 转换为 VTree（扁平化）
+        let vtree = view_to_vtree(view);
+
+        self.vtree = Some(vtree);
         self.error = None;
 
         // 通知 GPUI 需要重新渲染
@@ -154,7 +159,10 @@ impl DynamicInterpreterComponent {
             }
         };
 
-        self.current_view = Some(view);
+        // Plan 012: 将 View 转换为 VTree
+        let vtree = view_to_vtree(view);
+
+        self.vtree = Some(vtree);
         self.error = None;
         cx.notify();
     }
@@ -185,71 +193,24 @@ impl Render for DynamicInterpreterComponent {
                 );
         }
 
-        // 否则渲染当前视图
+        // Plan 012: 渲染 VTree（简化版本）
         #[cfg(feature = "interpreter")]
         {
-            if let Some(view) = self.current_view.clone() {
-                // 简化版本：只显示基本信息
-                return match &view {
-                    View::Text { content, .. } => {
-                        div()
-                            .size_full()
-                            .bg(rgb(0x1a1a1a))
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .child(content.clone())
-                    }
-                    View::Button { label, .. } => {
-                        div()
-                            .size_full()
-                            .bg(rgb(0x1a1a1a))
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .child(label.clone())
-                    }
-                    View::Column { spacing, children, .. } => {
-                        div()
-                            .size_full()
-                            .bg(rgb(0x1a1a1a))
-                            .flex()
-                            .flex_col()
-                            .gap(px(*spacing as f32))
-                            .children(
-                                children.iter()
-                                    .map(|child| {
-                                        match child {
-                                            View::Text { content, .. } => {
-                                                div().text_sm().child(content.clone()).into_any()
-                                            }
-                                            _ => div().text_sm().child("(组件)").into_any()
-                                        }
-                                    })
-                                    .collect::<Vec<_>>()
-                            )
-                    }
-                    _ => {
-                        div()
-                            .size_full()
-                            .bg(rgb(0x1a1a1a))
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .text_color(rgb(0xf59e0b))
-                            .child("🔧 组件渲染功能开发中...")
-                    }
-                };
-            } else {
-                // 加载中...
-                return div()
-                    .size_full()
-                    .bg(rgb(0x1a1a1a))
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .child("⏳ 正在加载...");
+            if let Some(vtree) = &self.vtree {
+                // 简化版本：直接渲染 VTree 的根节点
+                if let Some(root) = vtree.root() {
+                    return self.render_vnode_simple(root.id, vtree, cx);
+                }
             }
+
+            // 加载中...
+            return div()
+                .size_full()
+                .bg(rgb(0x1a1a1a))
+                .flex()
+                .items_center()
+                .justify_center()
+                .child("⏳ 正在加载...");
         }
 
         #[cfg(not(feature = "interpreter"))]
@@ -266,131 +227,119 @@ impl Render for DynamicInterpreterComponent {
 }
 
 impl DynamicInterpreterComponent {
-    /// 渲染 View 为 GPUI 元素（返回 AnyElement）
+    /// 简化版 VNode 渲染（Plan 012）
     #[cfg(feature = "interpreter")]
-    fn render_view_element(&self, view: View<DynamicMessage>, _cx: &mut Context<Self>) -> AnyElement {
-        match view {
-            View::Empty => {
-                div().size_full().into_any()
-            }
-            View::Text { content, .. } => {
-                div()
-                    .size_full()
-                    .text_sm()
-                    .child(content.clone())
-                    .into_any()
-            }
-            View::Button { label, .. } => {
-                div()
-                    .size_full()
-                    .px_4()
-                    .py_2()
-                    .bg(rgb(0x3c3c3c))
-                    .border_1()
-                    .border_color(rgb(0x6c6c6c))
-                    .rounded_md()
-                    .child(label.clone())
-                    .into_any()
-            }
-            View::Column { spacing, children, .. } => {
-                div()
-                    .size_full()
-                    .flex()
-                    .flex_col()
-                    .gap(px(spacing as f32))
-                    .children(
-                        children.iter()
-                            .map(|child| self.render_view_element(child.clone(), _cx))
-                            .collect::<Vec<_>>()
-                    )
-                    .into_any()
-            }
-            _ => {
-                div()
-                    .size_full()
-                    .text_sm()
-                    .text_color(rgb(0xf59e0b))
-                    .child("🔧 复杂组件暂未简化")
-                    .into_any()
-            }
-        }
-    }
+    fn render_vnode_simple(&self, node_id: auto_ui::vnode::VNodeId, vtree: &VTree, cx: &mut Context<Self>) -> AnyElement {
+        use auto_ui::vnode::{VNodeKind, VNodeProps};
 
-    /// 渲染单个 View 节点
-    #[cfg(feature = "interpreter")]
-    fn render_view(&mut self, view: View<DynamicMessage>, cx: &mut Context<Self>) -> AnyElement {
-        match view {
-            View::Empty => div().into_any(),
-
-            View::Text { content, style } => {
-                // TODO: 应用 style
-                div()
-                    .text_sm()
-                    .child(content)
+        let node = match vtree.get(node_id) {
+            Some(n) => n,
+            None => {
+                return div()
+                    .text_color(rgb(0xff6b6b))
+                    .child(format!("❌ 节点 {} 不存在", node_id))
                     .into_any()
+            }
+        };
+
+        match &node.kind {
+            VNodeKind::Text => {
+                let content = match &node.props {
+                    VNodeProps::Text { content } => content.clone(),
+                    VNodeProps::Empty => String::new(),
+                    _ => String::from("(无效)"),
+                };
+                div().text_sm().child(content).into_any()
             }
 
-            View::Button { label, onclick: _, style: _ } => {
-                // TODO: 重新启用点击事件处理
+            VNodeKind::Button => {
+                let label = match &node.props {
+                    VNodeProps::Button { label } => label.clone(),
+                    _ => String::from("Button"),
+                };
                 div()
                     .px_4()
                     .py_2()
-                    .bg(rgb(0x3c3c3c))
-                    .border_1()
-                    .border_color(rgb(0x6c6c6c))
+                    .bg(rgb(0x3b82f6))
                     .rounded_md()
                     .child(label)
                     .into_any()
             }
 
-            View::Container { child, center_x, center_y, .. } => {
-                let mut container = div().flex().size_full();
-                if center_x {
-                    container = container.items_center();
-                }
-                if center_y {
-                    container = container.justify_center();
-                }
-                container
-                    .child(self.render_view(*child, cx))
-                    .into_any()
-            }
+            VNodeKind::Column => {
+                let (spacing, _padding) = match &node.props {
+                    VNodeProps::Layout { spacing, padding } => (*spacing, *padding),
+                    _ => (10, 0),
+                };
 
-            View::Column { spacing, children, .. } => {
-                div()
+                let mut col = div()
                     .flex()
                     .flex_col()
-                    .gap(px(spacing as f32))
-                    .children(
-                        children.into_iter()
-                            .map(|child| self.render_view(child, cx))
-                    )
-                    .into_any()
+                    .gap(px(spacing as f32));
+
+                for child_id in &node.children {
+                    col = col.child(self.render_vnode_simple(*child_id, vtree, cx));
+                }
+
+                col.into_any()
             }
 
-            View::Row { spacing, children, .. } => {
-                div()
+            VNodeKind::Row => {
+                let (spacing, _padding) = match &node.props {
+                    VNodeProps::Layout { spacing, padding } => (*spacing, *padding),
+                    _ => (10, 0),
+                };
+
+                let mut row = div()
                     .flex()
                     .flex_row()
-                    .gap(px(spacing as f32))
-                    .children(
-                        children.into_iter()
-                            .map(|child| self.render_view(child, cx))
-                    )
-                    .into_any()
+                    .gap(px(spacing as f32));
+
+                for child_id in &node.children {
+                    row = row.child(self.render_vnode_simple(*child_id, vtree, cx));
+                }
+
+                row.into_any()
             }
 
-            View::Scrollable { child, .. } => {
-                div()
+            VNodeKind::Container => {
+                let (_padding, _center_x, _center_y) = match &node.props {
+                    VNodeProps::Container {
+                        padding,
+                        center_x,
+                        center_y,
+                    } => (*padding, *center_x, *center_y),
+                    _ => (0, false, false),
+                };
+
+                let mut container = div().flex().size_full();
+
+                if let Some(child_id) = node.children.first() {
+                    container = container.child(self.render_vnode_simple(*child_id, vtree, cx));
+                }
+
+                container.into_any()
+            }
+
+            VNodeKind::Scrollable => {
+                let mut scrollable = div()
                     .flex()
                     .flex_col()
                     .size_full()
-                    .child(self.render_view(*child, cx))
-                    .into_any()
+                    .overflow_scrollbar();
+
+                if let Some(child_id) = node.children.first() {
+                    scrollable = scrollable.child(self.render_vnode_simple(*child_id, vtree, cx));
+                }
+
+                scrollable.into_any_element()
             }
 
-            View::Input { placeholder, on_change: _, .. } => {
-                // TODO: 重新启用输入处理
+            VNodeKind::Input => {
+                let placeholder = match &node.props {
+                    VNodeProps::Input { placeholder, .. } => placeholder.clone(),
+                    _ => String::new(),
+                };
                 div()
                     .px_3()
                     .py_2()
@@ -399,12 +348,15 @@ impl DynamicInterpreterComponent {
                     .border_color(rgb(0x4a4a4a))
                     .rounded_md()
                     .text_sm()
-                    .child(placeholder)
+                    .child(format!("{}: {}", placeholder, "(输入框)"))
                     .into_any()
             }
 
-            View::Checkbox { label, is_checked, on_toggle: _, .. } => {
-                // TODO: 重新启用点击处理
+            VNodeKind::Checkbox => {
+                let (label, is_checked) = match &node.props {
+                    VNodeProps::Checkbox { label, is_checked } => (label.clone(), *is_checked),
+                    _ => (String::new(), false),
+                };
                 div()
                     .flex()
                     .items_center()
@@ -414,132 +366,195 @@ impl DynamicInterpreterComponent {
                             .w_4()
                             .h_4()
                             .border_1()
-                            .border_color(if is_checked { rgb(0x3b82f6) } else { rgb(0x6c6c6c) })
-                            .bg(if is_checked { rgb(0x3b82f6) } else { rgb(0x2a2a2a) })
-                            .rounded_sm()
-                    )
-                    .child(label)
-                    .into_any()
-            }
-
-            View::Radio { label, is_selected, on_select: _, .. } => {
-                // TODO: 重新启用点击处理
-                div()
-                    .flex()
-                    .items_center()
-                    .gap_2()
-                    .child(
-                        div()
-                            .w_4()
-                            .h_4()
-                            .border_1()
-                            .border_color(if is_selected { rgb(0x3b82f6) } else { rgb(0x6c6c6c) })
-                            .rounded_full()
-                    )
-                    .child(label)
-                    .into_any()
-            }
-
-            View::Select { options, selected_index, .. } => {
-                div()
-                    .px_3()
-                    .py_2()
-                    .bg(rgb(0x2a2a2a))
-                    .border_1()
-                    .border_color(rgb(0x4a4a4a))
-                    .rounded_md()
-                    .text_sm()
-                    .child(
-                        selected_index
-                            .and_then(|i| options.get(i))
-                            .cloned()
-                            .unwrap_or_else(|| "Select...".to_string())
-                    )
-                    .into_any()
-            }
-
-            View::List { items, .. } => {
-                div()
-                    .flex()
-                    .flex_col()
-                    .children(
-                        items.into_iter()
-                            .map(|child| self.render_view(child, cx))
-                    )
-                    .into_any()
-            }
-
-            View::Table { headers, rows, .. } => {
-                div()
-                    .flex()
-                    .flex_col()
-                    .child(
-                        div()
-                            .flex()
-                            .flex_row()
-                            .children(
-                                headers.into_iter()
-                                    .map(|header| self.render_view(header, cx))
-                            )
-                    )
-                    .children(
-                        rows.into_iter()
-                            .map(|row| {
-                                div()
-                                    .flex()
-                                    .flex_row()
-                                    .children(
-                                        row.into_iter()
-                                            .map(|cell| self.render_view(cell, cx))
-                                    )
-                                    .into_any()
+                            .border_color(if is_checked {
+                                rgb(0x3b82f6)
+                            } else {
+                                rgb(0x6c6c6c)
                             })
+                            .bg(if is_checked {
+                                rgb(0x3b82f6)
+                            } else {
+                                rgb(0x2a2a2a)
+                            })
+                            .rounded_sm(),
+                    )
+                    .child(label)
+                    .into_any()
+            }
+
+            VNodeKind::Radio => {
+                let (label, is_selected) = match &node.props {
+                    VNodeProps::Radio { label, is_selected } => (label.clone(), *is_selected),
+                    _ => (String::new(), false),
+                };
+                div()
+                    .flex()
+                    .items_center()
+                    .gap_2()
+                    .child(
+                        div()
+                            .w_4()
+                            .h_4()
+                            .border_1()
+                            .border_color(if is_selected {
+                                rgb(0x3b82f6)
+                            } else {
+                                rgb(0x6c6c6c)
+                            })
+                            .rounded_full(),
+                    )
+                    .child(label)
+                    .into_any()
+            }
+
+            VNodeKind::Select => {
+                let (options, selected_index) = match &node.props {
+                    VNodeProps::Select {
+                        options,
+                        selected_index,
+                    } => (options.clone(), *selected_index),
+                    _ => (vec![], None),
+                };
+                let selected = selected_index
+                    .and_then(|i| options.get(i))
+                    .cloned()
+                    .unwrap_or_else(|| "Select...".to_string());
+                div()
+                    .px_3()
+                    .py_2()
+                    .bg(rgb(0x2a2a2a))
+                    .border_1()
+                    .border_color(rgb(0x4a4a4a))
+                    .rounded_md()
+                    .text_sm()
+                    .child(selected)
+                    .into_any()
+            }
+
+            VNodeKind::List => {
+                let spacing = match &node.props {
+                    VNodeProps::List { spacing } => *spacing,
+                    _ => 8,
+                };
+
+                let mut list = div().flex().flex_col().gap(px(spacing as f32));
+                for child_id in &node.children {
+                    list = list.child(self.render_vnode_simple(*child_id, vtree, cx));
+                }
+                list.into_any()
+            }
+
+            VNodeKind::Table => {
+                let (_spacing, _col_spacing) = match &node.props {
+                    VNodeProps::Table {
+                        spacing,
+                        col_spacing,
+                    } => (*spacing, *col_spacing),
+                    _ => (5, 10),
+                };
+
+                let mut table = div().flex().flex_col();
+                for child_id in &node.children {
+                    let child = match vtree.get(*child_id) {
+                        Some(c) => c,
+                        None => continue,
+                    };
+
+                    let mut row = div().flex().flex_row().gap_2();
+                    for cell_id in &child.children {
+                        row = row.child(self.render_vnode_simple(*cell_id, vtree, cx));
+                    }
+                    table = table.child(row);
+                }
+                table.into_any()
+            }
+
+            VNodeKind::Slider => {
+                let (min, max, value, _step) = match &node.props {
+                    VNodeProps::Slider {
+                        min,
+                        max,
+                        value,
+                        step,
+                    } => (*min, *max, *value, *step),
+                    _ => (0.0, 100.0, 50.0, None),
+                };
+
+                let range = max - min;
+                let percentage = ((value - min) / range).clamp(0.0, 1.0);
+
+                div()
+                    .h(px(16.0))
+                    .w(px(300.0))
+                    .relative()
+                    .child(
+                        div()
+                            .absolute()
+                            .left(px(0.0))
+                            .top(px(6.0))
+                            .h(px(4.0))
+                            .w(px(300.0))
+                            .bg(rgb(0x333333))
+                            .rounded_md(),
+                    )
+                    .child(
+                        div()
+                            .absolute()
+                            .left(px(0.0))
+                            .top(px(6.0))
+                            .h(px(4.0))
+                            .w(px(percentage * 300.0))
+                            .bg(rgb(0x3b82f6))
+                            .rounded_md(),
+                    )
+                    .child(
+                        div()
+                            .absolute()
+                            .left(px(percentage * 300.0 - 8.0))
+                            .top(px(0.0))
+                            .w(px(16.0))
+                            .h(px(16.0))
+                            .bg(rgb(0xffffff))
+                            .rounded_full()
+                            .border_2()
+                            .border_color(rgb(0x3b82f6))
+                            .shadow_lg(),
                     )
                     .into_any()
             }
 
-            // TODO: 实现更多组件类型
-            View::Slider { .. } => {
+            VNodeKind::ProgressBar => {
+                let progress = match &node.props {
+                    VNodeProps::ProgressBar { progress } => *progress,
+                    _ => 0.0,
+                };
+
+                let filled_width = (progress * 200.0) as f32;
+
                 div()
-                    .text_color(rgb(0xf59e0b))
-                    .child("🔧 Slider 组件暂未实现")
+                    .w(px(200.0))
+                    .h(px(20.0))
+                    .bg(rgb(0x222222))
+                    .border_1()
+                    .border_color(rgb(0x444444))
+                    .child(div().w(px(filled_width)).h(px(20.0)).bg(rgb(0x3b82f6)))
                     .into_any()
             }
 
-            View::ProgressBar { .. } => {
-                div()
-                    .text_color(rgb(0xf59e0b))
-                    .child("🔧 ProgressBar 组件暂未实现")
-                    .into_any()
+            VNodeKind::Center => {
+                let mut center = div().flex().items_center().justify_center().size_full();
+                if let Some(child_id) = node.children.first() {
+                    center = center.child(self.render_vnode_simple(*child_id, vtree, cx));
+                }
+                center.into_any()
             }
 
-            View::Accordion { .. } => {
+            // 高级组件占位符
+            VNodeKind::Accordion | VNodeKind::Sidebar | VNodeKind::Tabs | VNodeKind::NavigationRail => {
                 div()
                     .text_color(rgb(0xf59e0b))
-                    .child("🔧 Accordion 组件暂未实现")
-                    .into_any()
-            }
-
-            View::Sidebar { .. } => {
-                div()
-                    .text_color(rgb(0xf59e0b))
-                    .child("🔧 Sidebar 组件暂未实现")
-                    .into_any()
-            }
-
-            View::Tabs { .. } => {
-                div()
-                    .text_color(rgb(0xf59e0b))
-                    .child("🔧 Tabs 组件暂未实现")
-                    .into_any()
-            }
-
-            View::NavigationRail { .. } => {
-                div()
-                    .text_color(rgb(0xf59e0b))
-                    .child("🔧 NavigationRail 组件暂未实现")
+                    .child(format!("🔧 {:?} 组件暂未实现", node.kind))
                     .into_any()
             }
         }
     }
-}

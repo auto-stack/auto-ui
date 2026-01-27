@@ -23,6 +23,12 @@ pub mod interpreter_component;
 #[cfg(feature = "interpreter")]
 pub use interpreter_component::DynamicInterpreterComponent;
 
+// Plan 012: VNode architecture for GPUI
+pub mod vnode_entity;
+pub mod event_router;
+pub use vnode_entity::VNodeEntity;
+pub use event_router::{EventRouter, SharedEventRouter, EventContext, EventType};
+
 /// Context for GPUI rendering with message passing
 pub struct GpuiContext<M: Clone + Debug + 'static> {
     phantom: std::marker::PhantomData<M>,
