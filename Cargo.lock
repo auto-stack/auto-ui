@@ -3815,8 +3815,6 @@ dependencies = [
 name = "interpreter-gpui-simple"
 version = "0.1.0"
 dependencies = [
- "auto-ui",
- "auto-ui-gpui",
  "gpui",
 ]
 
