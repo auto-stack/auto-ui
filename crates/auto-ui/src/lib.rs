@@ -15,6 +15,9 @@ pub mod prelude {
         AccordionItem, NavigationRailItem, SidebarPosition, TabsPosition,
         AccordionToggleCallback, TabsSelectCallback, NavigationRailSelectCallback,
     };
+    // Plan 012: VNode types
+    pub use crate::vnode::{VNodeId, VNodeKind, VNode, VNodeProps, VTree, VTreeStats};
+    pub use crate::vnode_converter::view_to_vtree;
 }
 
 pub mod app;
@@ -23,6 +26,10 @@ pub mod view;
 pub mod style; // Unified styling system
 pub mod node_converter; // AutoLang Node → View converter
 pub mod hot_reload; // Hot-reload support for .at files
+
+// Plan 012: VNode architecture - flattened view representation
+pub mod vnode;
+pub mod vnode_converter;
 
 // Dynamic interpreter module (Plan 011)
 #[cfg(feature = "interpreter")]
