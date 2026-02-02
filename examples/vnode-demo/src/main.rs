@@ -7,13 +7,12 @@
 
 use auto_ui::{Component, View};
 use auto_ui::vnode::{VNode, VNodeId, VNodeKind, VNodeProps, VTree};
-use gpui::*;
 
-fn main() {
+fn main() -> auto_ui::AppResult<()> {
     auto_ui_gpui::run_app::<VNodeDemoApp>("VNode 架构演示 - Plan 012")
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct VNodeDemoApp {
     vtree: VTree,
 }
