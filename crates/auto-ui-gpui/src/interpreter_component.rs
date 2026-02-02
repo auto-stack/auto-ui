@@ -17,7 +17,7 @@
 //! cx.new(|cx| component)
 //! ```
 
-use gpui::{prelude::*, *};
+use gpui::{prelude::*, InteractiveElement, *};
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
@@ -34,6 +34,10 @@ use auto_ui::{
 // Plan 012 Phase 3: 导入 EventRouter (从 auto-ui)
 #[cfg(feature = "interpreter")]
 use auto_ui::event_router::{EventRouter, EventType};
+
+// 导入 gpui_component::Button 用于可点击的按钮
+#[cfg(feature = "interpreter")]
+use gpui_component::{button::Button, button::ButtonVariants};
 
 /// GPUI 动态解释器组件
 ///
@@ -184,11 +188,11 @@ impl DynamicInterpreterComponent {
         // 通过 EventRouter 获取消息
         let message = match &self.event_router {
             Some(router) => {
-                match event_type {
+                match &event_type {
                     EventType::Click => router.on_click(node_id),
-                    EventType::Change(value) => router.on_change(node_id, value),
-                    EventType::Toggle(checked) => router.on_toggle(node_id, checked),
-                    EventType::Select(index) => router.on_select(node_id, index),
+                    EventType::Change(value) => router.on_change(node_id, value.clone()),
+                    EventType::Toggle(checked) => router.on_toggle(node_id, *checked),
+                    EventType::Select(index) => router.on_select(node_id, *index),
                 }
             }
             None => None,
@@ -201,7 +205,7 @@ impl DynamicInterpreterComponent {
             // 兜底:如果未注册,生成默认消息
             let default_msg = match event_type {
                 EventType::Click => DynamicMessage::String(format!("click:{}", node_id.as_u64())),
-                EventType::Change(value) => DynamicMessage::String(format!("change:{}:{}", node_id.as_u64(), value)),
+                EventType::Change(ref value) => DynamicMessage::String(format!("change:{}:{}", node_id.as_u64(), value)),
                 EventType::Toggle(checked) => DynamicMessage::String(format!("toggle:{}:{}", node_id.as_u64(), checked)),
                 EventType::Select(index) => DynamicMessage::String(format!("select:{}:{}", node_id.as_u64(), index)),
             };
@@ -313,19 +317,21 @@ impl DynamicInterpreterComponent {
                     _ => String::from("Button"),
                 };
 
-                // Plan 012 Phase 3: 绑定点击事件
+                // Plan 012 Phase 3: 使用 gpui_component::Button 绑定点击事件
                 let node_id = node.id;
-                div()
-                    .px_4()
-                    .py_2()
-                    .bg(rgb(0x3b82f6))
-                    .rounded_md()
-                    .cursor_pointer()
+
+                // 将 VNodeId 转换为静态字符串作为按钮 ID
+                let id_str = format!("button-{}", node_id.as_u64());
+                let static_id: &'static str = Box::leak(id_str.into_boxed_str());
+                let button_id = (static_id, node_id.as_u64());
+
+                Button::new(button_id)
+                    .label(label)
+                    .primary()
                     .on_click(cx.listener(move |this, _event, _window, cx| {
                         this.handle_vnode_event(node_id, EventType::Click, cx);
                     }))
-                    .child(label)
-                    .into_any()
+                    .into_any_element()
             }
 
             VNodeKind::Column => {
@@ -419,13 +425,32 @@ impl DynamicInterpreterComponent {
                     _ => (String::new(), false),
                 };
 
-                // Plan 012 Phase 3: 绑定 toggle 事件
+                // Plan 012 Phase 3: 使用 gpui_component::Button 绑定 toggle 事件
                 let node_id = node.id;
-                div()
-                    .flex()
-                    .items_center()
-                    .gap_2()
-                    .cursor_pointer()
+
+                // 将 VNodeId 转换为静态字符串作为按钮 ID
+                let id_str = format!("checkbox-{}", node_id.as_u64());
+                let static_id: &'static str = Box::leak(id_str.into_boxed_str());
+                let button_id = (static_id, node_id.as_u64());
+
+                // 创建一个自定义样式的按钮来模拟 Checkbox
+                let checkbox_visual = div()
+                    .w_4()
+                    .h_4()
+                    .border_1()
+                    .border_color(if is_checked {
+                        rgb(0x3b82f6)
+                    } else {
+                        rgb(0x6c6c6c)
+                    })
+                    .bg(if is_checked {
+                        rgb(0x3b82f6)
+                    } else {
+                        rgb(0x2a2a2a)
+                    })
+                    .rounded_sm();
+
+                Button::new(button_id)
                     .on_click(cx.listener(move |this, _event, _window, cx| {
                         // 切换状态
                         let new_checked = !is_checked;
@@ -433,23 +458,13 @@ impl DynamicInterpreterComponent {
                     }))
                     .child(
                         div()
-                            .w_4()
-                            .h_4()
-                            .border_1()
-                            .border_color(if is_checked {
-                                rgb(0x3b82f6)
-                            } else {
-                                rgb(0x6c6c6c)
-                            })
-                            .bg(if is_checked {
-                                rgb(0x3b82f6)
-                            } else {
-                                rgb(0x2a2a2a)
-                            })
-                            .rounded_sm(),
+                            .flex()
+                            .items_center()
+                            .gap_2()
+                            .child(checkbox_visual)
+                            .child(label)
                     )
-                    .child(label)
-                    .into_any()
+                    .into_any_element()
             }
 
             VNodeKind::Radio => {
