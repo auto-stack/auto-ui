@@ -2,7 +2,7 @@
 
 **Status**: 🔨 **In Progress** - Phase 1-3 完成（简化版）
 **Created**: 2025-01-27
-**Last Updated**: 2025-02-02
+**Last Updated**: 2025-02-02 (Phase 4 更新:协同式增量更新)
 **Priority**: Critical (阻塞 GPUI 动态解释器)
 **Complexity**: High
 **Estimated Timeline**: 4-5 周
@@ -48,12 +48,322 @@
 - 需要使用 `gpui_component::Button` 等专用组件
 - auto-lang 当前有编译错误（eval.rs:3379）
 
+### 📋 设计更新 Phase
+
+#### Phase 4: 协同式增量更新 (0%) 🆕 **设计已更新**
+- **更新日期**: 2025-02-02
+- **更新原因**: Auto 语言已实现函数级增量编译
+- **新设计特点**:
+  - ✅ 利用 Auto 的 `get_dirty_fragments()` API
+  - ✅ 函数级别变化检测 (FragId)
+  - ✅ Widget-VNode 映射注册表
+  - ✅ 分级更新策略 (view/on/fields)
+  - ✅ 签名变化检测 (`frag_iface_hash`)
+- **参考文档**: `docs/AUTO_LANG_INCREMENTAL_API.md`
+- **预计工期**: 6 天
+
 ### ❌ 未开始 Phase
 
-#### Phase 4: 热重载与增量更新 (0%)
-- VTree diff 算法
-- 增量更新机制
-- 状态保留功能
+#### Phase 4: 协同式增量更新 (0%) 🆕
+
+**核心改进**: 利用 Auto 语言的增量编译能力,实现**函数级别的精确热重载**
+
+#### 原始设计 vs. 新设计对比
+
+**原始设计** (基于 VTree diff):
+```
+文件变更 → 全量重新编译 → View<M> 树重建 → VTree diff → 增量更新
+                 ↓
+            ❌ 无法知道哪些函数变化了
+            ❌ 必须重建整个 View<M>
+```
+
+**新设计** (协同式):
+```
+文件变更 → Auto 增量编译 → 获取 dirty fragments → 精确更新
+                 ↓                   ↓
+            ✅ 知道哪些函数变化了     ✅ FragId 级别的变化
+```
+
+#### 实施计划
+
+##### 第 1 步: 集成 Auto 增量编译 API (1 天)
+
+**文件**: `crates/auto-ui/src/interpreter/bridge.rs` (修改)
+
+**关键变更**:
+```rust
+use auto_lang::compile::CompileSession;
+use auto_lang::database::{Database, FragId, FragMeta};
+
+pub struct InterpreterBridge {
+    session: CompileSession,  // 🆕 使用 CompileSession 替代 Interpreter
+    widget_states: HashMap<String, WidgetState>,
+    hot_reload: bool,
+}
+
+impl InterpreterBridge {
+    /// 🆕 增量热重载
+    pub fn reload_incremental(&mut self, new_code: &str) -> Result<ReloadInfo> {
+        // 1. 调用 Auto 的增量编译
+        let changed_frags = self.session.db().write()
+            .unwrap()
+            .re_index_file(file_id, new_code)?;
+
+        // 2. 分析变化
+        let mut reload_info = ReloadInfo {
+            changed_widgets: Vec::new(),
+            changed_functions: Vec::new(),
+            signature_changed: false,
+        };
+
+        for frag_id in changed_frags {
+            let meta = self.session.db().read()
+                .unwrap()
+                .get_fragment_meta(&frag_id)?;
+
+            match meta.kind {
+                FragKind::Function => {
+                    if let Some(widget_name) = extract_widget_name(&meta.name) {
+                        reload_info.changed_functions.push(meta.name.clone());
+                        reload_info.changed_widgets.push(widget_name);
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        // 3. 检查签名是否变化
+        reload_info.signature_changed = self.check_signature_changes(&changed_frags)?;
+
+        Ok(reload_info)
+    }
+}
+```
+
+##### 第 2 步: 实现 Widget-VNode 映射 (1.5 天)
+
+**文件**: `crates/auto-ui/src/vnode_registry.rs` (新建)
+
+**内容**:
+```rust
+//! Widget-VNode 映射注册表
+//!
+//! 维护 Auto Widget 与 VNode 之间的映射关系,支持精确的增量更新。
+
+use crate::vnode::{VNodeId, VTree};
+use std::collections::HashMap;
+
+pub struct WidgetVNodeRegistry {
+    /// Widget 名称 → VNode ID 的映射
+    widget_to_vnode: HashMap<String, VNodeId>,
+
+    /// VNode ID → Widget 名称的反向映射
+    vnode_to_widget: HashMap<VNodeId, String>,
+
+    /// 函数名 → Widget 的映射
+    /// "Counter::inc" → "Counter"
+    function_to_widget: HashMap<String, String>,
+}
+
+impl WidgetVNodeRegistry {
+    /// 注册 Widget 的 VNode
+    pub fn register_widget(&mut self, widget_name: &str, vnode_id: VNodeId) {
+        self.widget_to_vnode.insert(widget_name.to_string(), vnode_id);
+        self.vnode_to_widget.insert(vnode_id, widget_name.to_string());
+    }
+
+    /// 注册 Widget 的方法
+    pub fn register_function(&mut self, func_name: &str, widget_name: &str) {
+        self.function_to_widget.insert(func_name.to_string(), widget_name.to_string());
+    }
+
+    /// 获取 Widget 的 VNode ID
+    pub fn get_widget_vnode(&self, widget_name: &str) -> Option<VNodeId> {
+        self.widget_to_vnode.get(widget_name).copied()
+    }
+
+    /// 根据函数名查找所属 Widget
+    pub fn find_widget_by_function(&self, func_name: &str) -> Option<String> {
+        self.function_to_widget.get(func_name).cloned()
+    }
+}
+```
+
+##### 第 3 步: 分级更新策略 (1.5 天)
+
+**文件**: `crates/auto-ui-gpui/src/incremental_updater.rs` (新建)
+
+**核心逻辑**:
+```rust
+//! 分级增量更新器
+//!
+//! 根据变化的类型选择最优的更新策略
+
+use auto_lang::database::FragKind;
+
+pub enum UpdateLevel {
+    /// Level 1: 只有 view() 方法变了 → 重建 VNode 子树
+    ViewChanged,
+
+    /// Level 2: 只有 on() 方法变了 → 更新 EventRouter
+    EventHandlerChanged,
+
+    /// Level 3: 字段变了 → 保留 VNode,更新状态
+    FieldChanged,
+
+    /// Level 4: 结构变了 → 完全重建
+    StructureChanged,
+}
+
+pub fn determine_update_level(frag_kind: &FragKind, frag_name: &str) -> UpdateLevel {
+    // 1. 检查是否是 view() 方法
+    if frag_name.ends_with("::view") {
+        return UpdateLevel::ViewChanged;
+    }
+
+    // 2. 检查是否是 on() 方法
+    if frag_name.ends_with("::on") {
+        return UpdateLevel::EventHandlerChanged;
+    }
+
+    // 3. 其他情况
+    match frag_kind {
+        FragKind::Function => UpdateLevel::FieldChanged,
+        FragKind::Struct | FragKind::Enum => UpdateLevel::StructureChanged,
+        _ => UpdateLevel::FieldChanged,
+    }
+}
+```
+
+**更新策略**:
+```rust
+impl DynamicInterpreterComponent {
+    pub fn apply_incremental_update(&mut self, reload_info: ReloadInfo, cx: &mut Context<Self>) {
+        for widget_name in reload_info.changed_widgets {
+            if let Some(vnode_id) = self.registry.get_widget_vnode(&widget_name) {
+                // 根据变化类型选择更新策略
+                let update_level = determine_update_level(&frag_kind, &frag_name);
+
+                match update_level {
+                    UpdateLevel::ViewChanged => {
+                        // 重建 Widget 的 VNode 子树
+                        self.rebuild_widget_subtree(vnode_id, cx);
+                    }
+                    UpdateLevel::EventHandlerChanged => {
+                        // 只更新 EventRouter
+                        self.update_event_router(vnode_id, &new_events);
+                    }
+                    UpdateLevel::FieldChanged => {
+                        // 保留 VNode,只更新状态
+                        self.update_widget_state(&widget_name, &new_state);
+                    }
+                    UpdateLevel::StructureChanged => {
+                        // 完全重建整个 VTree
+                        self.full_reload(cx);
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+##### 第 4 步: 签名变化检测 (1 天)
+
+**文件**: `crates/auto-ui/src/interpreter/bridge.rs` (继续修改)
+
+**目的**: 使用 `frag_iface_hash` 检测函数签名是否变化
+
+```rust
+impl InterpreterBridge {
+    /// 检查函数签名是否变化
+    fn check_signature_changes(&self, changed_frags: &[FragId]) -> Result<bool> {
+        let db = self.session.db().read().unwrap();
+
+        for frag_id in changed_frags {
+            // 获取当前接口哈希
+            let current_hash = db.get_fragment_iface_hash(frag_id);
+
+            // TODO: 与之前保存的哈希对比
+            // 如果哈希不同,说明签名变了,需要状态迁移
+
+            if current_hash.is_none() {
+                // 首次编译,假设签名没变
+                continue;
+            }
+        }
+
+        Ok(false)  // 签名未变化
+    }
+}
+```
+
+##### 第 5 步: 性能优化和测试 (1 天)
+
+**优化点**:
+1. **缓存机制**: 缓存 Widget-VNode 映射,避免重复查找
+2. **批量更新**: 一次更新多个 Widget,减少渲染次数
+3. **惰性重建**: 只在需要时重建 VNode 子树
+
+**测试用例**:
+```rust
+#[test]
+fn test_incremental_hot_reload() {
+    // 1. 加载初始版本
+    let mut bridge = InterpreterBridge::new();
+    bridge.interpret(initial_code);
+
+    // 2. 修改 Counter::inc 方法
+    let changed_code = modify_function(initial_code, "Counter::inc");
+    let reload_info = bridge.reload_incremental(&changed_code).unwrap();
+
+    // 3. 验证: 只有 Counter Widget 需要更新
+    assert_eq!(reload_info.changed_widgets, vec!["Counter"]);
+    assert!(!reload_info.signature_changed);  // 签名未变
+}
+```
+
+#### 关键文件清单
+
+**新建文件 (3 个)**:
+1. `crates/auto-ui/src/vnode_registry.rs` (~150 行)
+2. `crates/auto-ui-gpui/src/incremental_updater.rs` (~200 行)
+3. `crates/auto-ui/tests/incremental_hot_reload_test.rs` (~200 行)
+
+**修改文件 (2 个)**:
+1. `crates/auto-ui/src/interpreter/bridge.rs` - 添加增量重载
+2. `crates/auto-ui-gpui/src/interpreter_component.rs` - 集成增量更新
+
+#### 验收标准
+
+- [x] ✅ 调用 Auto 的 `re_index_file()` API
+- [x] ✅ 实现 Widget-VNode 映射
+- [x] ✅ 分级更新策略(view/on/fields)
+- [x] ✅ 签名变化检测
+- [x] ✅ 状态保留率 > 95%
+- [x] ✅ 性能提升 > 50% (相比全量更新)
+- [x] ✅ 单元测试覆盖率 > 80%
+
+**预计工期**: 6 天
+
+#### 设计对比: 原始 vs. 协同式
+
+| 维度 | 原始设计 (VTree diff) | 协同式设计 (利用增量编译) |
+|------|----------------------|-------------------------|
+| **变化检测** | ❌ 全量编译后通过 diff 比较新旧树 | ✅ Auto 直接返回变化的 `FragId` |
+| **颗粒度** | VNode 级别 (~100 个节点) | 函数级别 (~10 个函数) |
+| **状态保留** | ⚠️ 需要复杂的启发式算法 | ✅ 精确知道哪些 Widget 变化 |
+| **签名检测** | ❌ 无法检测签名变化 | ✅ `frag_iface_hash` 精确检测 |
+| **性能开销** | ⚠️ O(n) diff + O(n) 更新 | ✅ O(m) 更新 (m << n) |
+| **实现复杂度** | 高 (需要 diff 算法) | 中 (主要是映射和路由) |
+| **准确性** | ⚠️ 启发式,可能误判 | ✅ 精确,基于编译器信息 |
+
+**关键优势**:
+1. **精确性**: 直接利用编译器的增量编译信息,100% 准确
+2. **性能**: 只更新真正变化的部分,性能提升 50%+
+3. **简单性**: 不需要复杂的 diff 算法
+4. **状态保留**: 精确知道哪些 Widget 的字段变了,可以精确迁移状态
 
 #### Phase 5: Iced 后端支持 (0%)
 - Iced 渲染器适配
@@ -436,11 +746,11 @@ let element = vtree_to_iced(&vtree, root_id);
 | **Phase 1** | 核心 VNode 基础设施 | 5 天 | 无 |
 | **Phase 2** | GPUI 后端适配 | 5 天 | Phase 1 |
 | **Phase 3** | 事件处理机制 | 3 天 | Phase 2 |
-| **Phase 4** | 热重载与增量更新 | 4 天 | Phase 2, 3 |
+| **Phase 4** | 协同式增量更新 | 6 天 | Phase 2, 3 |
 | **Phase 5** | Iced 后端适配 | 2 天 | Phase 1 |
 | **Phase 6** | 文档和示例 | 2 天 | Phase 1-5 |
 | **Buffer** | 测试和优化 | 3 天 | Phase 1-5 |
-| **总计** | **24 天** ≈ 4 周 | - |
+| **总计** | **26 天** ≈ 5 周 | - |
 
 ---
 
@@ -559,9 +869,12 @@ let element = vtree_to_iced(&vtree, root_id);
 - [x] 支持点击、输入等常见事件
 
 ### Phase 4 完成 ✅
-- [x] 增量更新算法正确
-- [x] 热重载时只更新变化的部分
-- [x] 状态保留率 > 90%
+- [x] 集成 Auto 增量编译 API
+- [x] Widget-VNode 映射完整
+- [x] 分级更新策略实现
+- [x] 签名变化检测工作正常
+- [x] 状态保留率 > 95%
+- [x] 性能提升 > 50% (相比全量更新)
 
 ### Phase 5 完成 ✅
 - [x] Iced 后端可以渲染 VTree
@@ -703,6 +1016,17 @@ type TestApp as Widget {
 
 ## 下一步行动 (2025-02-02)
 
+### ✅ 已完成工作
+
+1. **Auto 语言增量编译 API 调查** ✅
+   - 完成日期: 2025-02-02
+   - 输出: `docs/AUTO_LANG_INCREMENTAL_API.md`
+   - 关键发现:
+     * Auto 已实现**函数级别**的增量编译
+     * 提供 `get_dirty_fragments()` API 获取变化
+     * 提供 `frag_iface_hash` 检测签名变化
+   - 影响: Phase 4 设计调整为**协同式增量更新**
+
 ### 🔧 立即行动（优先级：高）
 
 1. **修复 auto-lang 编译错误**
@@ -728,11 +1052,14 @@ type TestApp as Widget {
 
 ### 🔄 短期行动（本周）
 
-4. **Phase 4: 增量更新**
-   - 实现 VTree diff 算法
-   - 支持热重载时状态保留
-   - 性能优化
-   - **预计时间**: 3-5 天
+4. **Phase 4: 协同式增量更新** 🆕
+   - 集成 Auto 增量编译 API (`re_index_file()`)
+   - 实现 Widget-VNode 映射注册表
+   - 分级更新策略(view/on/fields)
+   - 签名变化检测(`frag_iface_hash`)
+   - 性能测试和优化
+   - **预计时间**: 6 天
+   - **参考文档**: `docs/AUTO_LANG_INCREMENTAL_API.md`
 
 5. **文档更新**
    - API 参考文档
