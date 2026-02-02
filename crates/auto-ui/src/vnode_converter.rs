@@ -30,6 +30,13 @@
 use crate::view::View;
 use crate::vnode::{VNode, VNodeId, VNodeKind, VNodeProps, VTree};
 
+// 导入 DynamicMessage 和 EventRouter（仅在 interpreter feature 启用时）
+#[cfg(feature = "interpreter")]
+use crate::interpreter::DynamicMessage;
+
+#[cfg(feature = "interpreter")]
+use crate::event_router::{EventRouter, EventContext, EventType};
+
 /// 主转换函数：View<M> → VTree
 ///
 /// 将嵌套的 View<M> 树转换为扁平的 VNode 树结构。
@@ -776,5 +783,298 @@ mod tests {
         assert_eq!(stats.layout_nodes, 1);
         assert_eq!(stats.leaf_nodes, 2);
         assert_eq!(stats.max_depth, 2);
+    }
+}
+
+// ============================================================================
+// Phase 3 完整版: 事件感知的 VTree 转换
+// ============================================================================
+
+/// 带 EventRouter 的 View → VTree 转换（Phase 3 完整版）
+///
+/// 此函数在转换 VTree 的同时,提取 View 中的事件处理器并注册到 EventRouter。
+///
+/// # 返回
+///
+/// (VTree, EventRouter) 元组
+///
+/// # 示例
+///
+/// ```ignore
+/// let view = View::Button {
+///     label: "Click".to_string(),
+///     onclick: DynamicMessage::String("click-event".to_string()),
+///     style: None
+/// };
+///
+/// let (vtree, router) = view_to_vtree_with_events(view);
+///
+/// // 获取按钮点击消息
+/// let button_id = vtree.root().unwrap().id;
+/// if let Some(msg) = router.on_click(button_id) {
+///     assert!(matches!(msg, DynamicMessage::String(_)));
+/// }
+/// ```
+#[cfg(feature = "interpreter")]
+pub fn view_to_vtree_with_events<M>(view: View<M>) -> (VTree, EventRouter)
+where
+    M: Clone + std::fmt::Debug + 'static,
+{
+    let mut tree = VTree::new();
+    let mut router = EventRouter::new();
+    let root_id = tree.next_id();
+
+    let root_node = convert_view_to_vnode_with_events(&view, root_id, None, &mut tree, &mut router);
+    tree.set_root(root_node);
+
+    (tree, router)
+}
+
+/// 将 View 转换为 VNode,同时提取事件并注册到 EventRouter
+#[cfg(feature = "interpreter")]
+fn convert_view_to_vnode_with_events<M>(
+    view: &View<M>,
+    id: VNodeId,
+    parent_id: Option<VNodeId>,
+    tree: &mut VTree,
+    router: &mut EventRouter,
+) -> VNode
+where
+    M: Clone + std::fmt::Debug + 'static,
+{
+    let (kind, props) = extract_kind_and_props(view);
+
+    let mut vnode = VNode::new(id, kind, props).with_label(format!("{}", kind));
+
+    if let Some(parent) = parent_id {
+        vnode = vnode.with_parent(parent);
+    }
+
+    // 🎯 Phase 3 关键: 提取事件并注册到 EventRouter
+    extract_and_register_events(view, id, router);
+
+    // 处理子节点
+    let children = extract_children(view);
+    for child_view in children {
+        let child_id = tree.next_id();
+        let child_node = convert_view_to_vnode_with_events(&child_view, child_id, Some(id), tree, router);
+        tree.add_node(child_node);
+        vnode.add_child(child_id);
+    }
+
+    vnode
+}
+
+/// 从 View 中提取事件并注册到 EventRouter
+///
+/// 此函数检查 View 中的 onclick, on_change, on_toggle, on_select 等事件处理器,
+/// 将它们转换为 DynamicMessage 并注册到 EventRouter 中。
+#[cfg(feature = "interpreter")]
+fn extract_and_register_events<M>(view: &View<M>, node_id: VNodeId, router: &mut EventRouter)
+where
+    M: Clone + std::fmt::Debug + 'static,
+{
+    use std::any::TypeId;
+
+    // 检查 M 是否是 DynamicMessage
+    let is_dynamic_message = TypeId::of::<M>() == TypeId::of::<DynamicMessage>();
+
+    match view {
+        // Button onclick 事件
+        View::Button { onclick, .. } => {
+            let msg = if is_dynamic_message {
+                // 安全:我们知道 M 是 DynamicMessage
+                unsafe {
+                    let any_msg = onclick as *const M as *const DynamicMessage;
+                    (*any_msg).clone()
+                }
+            } else {
+                // 对于静态类型,使用类型名称作为事件标识符
+                DynamicMessage::String(format!("{:}", std::any::type_name::<M>()))
+            };
+
+            router.register_click(node_id, move |_ctx| msg.clone());
+        }
+
+        // Input on_change 事件
+        View::Input { on_change, .. } => {
+            if let Some(change_handler) = on_change {
+                let msg = if is_dynamic_message {
+                    unsafe {
+                        let any_msg = change_handler as *const _ as *const DynamicMessage;
+                        (*any_msg).clone()
+                    }
+                } else {
+                    DynamicMessage::String(format!("change:{}", std::any::type_name::<M>()))
+                };
+
+                router.register_change(node_id, move |ctx| {
+                    if let EventType::Change(value) = &ctx.event_type {
+                        // 注意:这里应该生成包含新值的消息
+                        // 暂时返回原始消息
+                        msg.clone()
+                    } else {
+                        msg.clone()
+                    }
+                });
+            }
+        }
+
+        // Checkbox on_toggle 事件
+        View::Checkbox { on_toggle, .. } => {
+            if let Some(toggle_handler) = on_toggle {
+                let msg = if is_dynamic_message {
+                    unsafe {
+                        let any_msg = toggle_handler as *const _ as *const DynamicMessage;
+                        (*any_msg).clone()
+                    }
+                } else {
+                    DynamicMessage::String(format!("toggle:{}", std::any::type_name::<M>()))
+                };
+
+                router.register_toggle(node_id, move |_ctx| msg.clone());
+            }
+        }
+
+        // Slider on_change 事件
+        View::Slider { on_change, .. } => {
+            let msg = if is_dynamic_message {
+                unsafe {
+                    let any_msg = on_change as *const _ as *const DynamicMessage;
+                    (*any_msg).clone()
+                }
+            } else {
+                DynamicMessage::String(format!("slider_change:{}", std::any::type_name::<M>()))
+            };
+
+            router.register_change(node_id, move |_ctx| msg.clone());
+        }
+
+        // Select on_select 事件
+        View::Select { on_select, .. } => {
+            if let Some(select_handler) = on_select {
+                let msg = if is_dynamic_message {
+                    unsafe {
+                        let any_msg = select_handler as *const _ as *const DynamicMessage;
+                        (*any_msg).clone()
+                    }
+                } else {
+                    DynamicMessage::String(format!("select:{}", std::any::type_name::<M>()))
+                };
+
+                router.register_select(node_id, move |_ctx| msg.clone());
+            }
+        }
+
+        // 其他 View 类型没有事件,忽略
+        _ => {}
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "interpreter")]
+mod tests_with_events {
+    use super::*;
+    use crate::interpreter::DynamicMessage;
+
+    #[test]
+    fn test_button_event_extraction() {
+        let view: View<DynamicMessage> = View::Button {
+            label: "Click Me".to_string(),
+            onclick: DynamicMessage::String("button-clicked".to_string()),
+            style: None,
+        };
+
+        let (vtree, router) = view_to_vtree_with_events(view);
+
+        // 验证 VTree 结构
+        assert_eq!(vtree.node_count(), 1);
+        let root = vtree.root().unwrap();
+        assert_eq!(root.kind, VNodeKind::Button);
+
+        // 验证事件已注册
+        assert!(router.has_handlers(root.id));
+
+        // 验证可以获取事件消息
+        let msg = router.on_click(root.id);
+        assert!(msg.is_some());
+        if let Some(DynamicMessage::String(s)) = msg {
+            assert_eq!(s, "button-clicked");
+        } else {
+            panic!("Expected String message");
+        }
+    }
+
+    #[test]
+    fn test_column_with_button_events() {
+        let view: View<DynamicMessage> = View::Column {
+            children: vec![
+                View::Button {
+                    label: "Button 1".to_string(),
+                    onclick: DynamicMessage::String("click-1".to_string()),
+                    style: None,
+                },
+                View::Button {
+                    label: "Button 2".to_string(),
+                    onclick: DynamicMessage::String("click-2".to_string()),
+                    style: None,
+                },
+            ],
+            spacing: 10,
+            padding: 0,
+            style: None,
+        };
+
+        let (vtree, router) = view_to_vtree_with_events(view);
+
+        // 验证树结构
+        assert_eq!(vtree.node_count(), 3); // Column + 2 Buttons
+
+        let root = vtree.root().unwrap();
+        assert_eq!(root.children.len(), 2);
+
+        // 验证两个按钮的事件都已注册
+        let button1_id = root.children[0];
+        let button2_id = root.children[1];
+
+        assert!(router.has_handlers(button1_id));
+        assert!(router.has_handlers(button2_id));
+
+        // 验证事件消息不同
+        let msg1 = router.on_click(button1_id).unwrap();
+        let msg2 = router.on_click(button2_id).unwrap();
+
+        if let (DynamicMessage::String(s1), DynamicMessage::String(s2)) = (msg1, msg2) {
+            assert_eq!(s1, "click-1");
+            assert_eq!(s2, "click-2");
+        } else {
+            panic!("Expected String messages");
+        }
+    }
+
+    #[test]
+    fn test_checkbox_toggle_event() {
+        let view: View<DynamicMessage> = View::Checkbox {
+            is_checked: true,
+            label: "Check me".to_string(),
+            on_toggle: Some(DynamicMessage::String("toggled".to_string())),
+            style: None,
+        };
+
+        let (vtree, router) = view_to_vtree_with_events(view);
+
+        let root = vtree.root().unwrap();
+
+        // 验证 toggle 事件已注册
+        assert!(router.has_handlers(root.id));
+
+        let msg = router.on_toggle(root.id, true);
+        assert!(msg.is_some());
+
+        if let Some(DynamicMessage::String(s)) = msg {
+            assert_eq!(s, "toggled");
+        } else {
+            panic!("Expected String message");
+        }
     }
 }

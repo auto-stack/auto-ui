@@ -35,7 +35,8 @@ use auto_ui::vnode::{VNodeId, VNodeKind, VNodeProps, VTree};
 #[cfg(feature = "interpreter")]
 use auto_ui::interpreter::DynamicMessage;
 
-use crate::event_router::{EventType};
+#[cfg(feature = "interpreter")]
+use auto_ui::event_router::EventType;
 
 /// VNode Entity - GPUI 渲染器
 ///

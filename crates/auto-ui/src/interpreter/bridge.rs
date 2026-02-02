@@ -219,7 +219,7 @@ mod tests {
 
     #[test]
     fn test_default_bridge() {
-        let bridge = InterpreterBridge::default();
+        let mut bridge = InterpreterBridge::default();
         // Test that default bridge works
         let _ = bridge.get_main_view();
     }

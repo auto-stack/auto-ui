@@ -25,9 +25,11 @@ pub use interpreter_component::DynamicInterpreterComponent;
 
 // Plan 012: VNode architecture for GPUI
 pub mod vnode_entity;
-pub mod event_router;
 pub use vnode_entity::VNodeEntity;
-pub use event_router::{EventRouter, SharedEventRouter, EventContext, EventType};
+
+// Plan 012 Phase 3: Re-export EventRouter from auto-ui
+#[cfg(feature = "interpreter")]
+pub use auto_ui::event_router::{EventRouter, SharedEventRouter, EventContext, EventType};
 
 /// Context for GPUI rendering with message passing
 pub struct GpuiContext<M: Clone + Debug + 'static> {

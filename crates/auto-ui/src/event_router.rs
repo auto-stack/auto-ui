@@ -12,7 +12,7 @@
 //! ## 使用示例
 //!
 //! ```ignore
-//! use auto_ui_gpui::event_router::EventRouter;
+//! use auto_ui::event_router::EventRouter;
 //! use auto_ui::interpreter::DynamicMessage;
 //!
 //! let mut router = EventRouter::new();
@@ -30,11 +30,11 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 // 导入 VNodeId
-use auto_ui::vnode::VNodeId;
+use crate::vnode::VNodeId;
 
 // 导入 DynamicMessage（仅在 interpreter feature 启用时）
 #[cfg(feature = "interpreter")]
-use auto_ui::interpreter::DynamicMessage;
+use crate::interpreter::DynamicMessage;
 
 // 为非 interpreter 模式定义一个占位符类型
 #[cfg(not(feature = "interpreter"))]

@@ -27,9 +27,13 @@ use auto_ui::{
     interpreter::{InterpreterBridge, DynamicMessage},
     node_converter::convert_node_dynamic,
     view::View,
-    vnode_converter::view_to_vtree,
+    vnode_converter::{view_to_vtree, view_to_vtree_with_events},
     vnode::{VTree, VNodeId},
 };
+
+// Plan 012 Phase 3: 导入 EventRouter (从 auto-ui)
+#[cfg(feature = "interpreter")]
+use auto_ui::event_router::{EventRouter, EventType};
 
 /// GPUI 动态解释器组件
 ///
@@ -38,7 +42,7 @@ use auto_ui::{
 /// 2. 将求值的 Node 转换为 View
 /// 3. 将 View 转换为 VTree（扁平化）
 /// 4. 在 GPUI 中渲染 VTree
-/// 5. 处理用户交互事件
+/// 5. 处理用户交互事件（Plan 012 Phase 3: 集成 EventRouter）
 pub struct DynamicInterpreterComponent {
     /// 解释器桥梁
     #[cfg(feature = "interpreter")]
@@ -50,6 +54,10 @@ pub struct DynamicInterpreterComponent {
     /// 当前虚拟节点树（Plan 012: VNode 架构）
     #[cfg(feature = "interpreter")]
     vtree: Option<VTree>,
+
+    /// Plan 012 Phase 3: 事件路由器
+    #[cfg(feature = "interpreter")]
+    event_router: Option<EventRouter>,
 
     /// 焦点句柄
     focus_handle: FocusHandle,
@@ -70,6 +78,7 @@ impl DynamicInterpreterComponent {
             bridge: bridge.clone(),
             file_path: path.clone(),
             vtree: None,  // Plan 012: 使用 VTree 而不是 View
+            event_router: None,  // Plan 012 Phase 3: 初始化 EventRouter
             focus_handle: cx.focus_handle(),
             error: None,
         };
@@ -100,10 +109,11 @@ impl DynamicInterpreterComponent {
         let view = convert_node_dynamic(&node, None)
             .map_err(|e| format!("转换视图失败: {}", e))?;
 
-        // Plan 012: 将 View 转换为 VTree（扁平化）
-        let vtree = view_to_vtree(view);
+        // Plan 012 Phase 3: 将 View 转换为 VTree（扁平化）+ 提取事件到 EventRouter
+        let (vtree, event_router) = view_to_vtree_with_events(view);
 
         self.vtree = Some(vtree);
+        self.event_router = Some(event_router);
         self.error = None;
 
         // 通知 GPUI 需要重新渲染
@@ -159,12 +169,44 @@ impl DynamicInterpreterComponent {
             }
         };
 
-        // Plan 012: 将 View 转换为 VTree
-        let vtree = view_to_vtree(view);
+        // Plan 012 Phase 3: 将 View 转换为 VTree + 提取事件
+        let (vtree, event_router) = view_to_vtree_with_events(view);
 
         self.vtree = Some(vtree);
+        self.event_router = Some(event_router);
         self.error = None;
         cx.notify();
+    }
+
+    /// Plan 012 Phase 3: 处理 VNode 事件（通过 EventRouter 路由到 DynamicMessage）
+    #[cfg(feature = "interpreter")]
+    fn handle_vnode_event(&mut self, node_id: VNodeId, event_type: EventType, cx: &mut Context<Self>) {
+        // 通过 EventRouter 获取消息
+        let message = match &self.event_router {
+            Some(router) => {
+                match event_type {
+                    EventType::Click => router.on_click(node_id),
+                    EventType::Change(value) => router.on_change(node_id, value),
+                    EventType::Toggle(checked) => router.on_toggle(node_id, checked),
+                    EventType::Select(index) => router.on_select(node_id, index),
+                }
+            }
+            None => None,
+        };
+
+        // 如果找到了事件处理器,处理消息
+        if let Some(msg) = message {
+            self.handle_message(msg, cx);
+        } else {
+            // 兜底:如果未注册,生成默认消息
+            let default_msg = match event_type {
+                EventType::Click => DynamicMessage::String(format!("click:{}", node_id.as_u64())),
+                EventType::Change(value) => DynamicMessage::String(format!("change:{}:{}", node_id.as_u64(), value)),
+                EventType::Toggle(checked) => DynamicMessage::String(format!("toggle:{}:{}", node_id.as_u64(), checked)),
+                EventType::Select(index) => DynamicMessage::String(format!("select:{}:{}", node_id.as_u64(), index)),
+            };
+            self.handle_message(default_msg, cx);
+        }
     }
 }
 
@@ -270,12 +312,18 @@ impl DynamicInterpreterComponent {
                     VNodeProps::Button { label } => label.clone(),
                     _ => String::from("Button"),
                 };
+
+                // Plan 012 Phase 3: 绑定点击事件
+                let node_id = node.id;
                 div()
                     .px_4()
                     .py_2()
                     .bg(rgb(0x3b82f6))
                     .rounded_md()
                     .cursor_pointer()
+                    .on_click(cx.listener(move |this, _event, _window, cx| {
+                        this.handle_vnode_event(node_id, EventType::Click, cx);
+                    }))
                     .child(label)
                     .into_any()
             }
@@ -370,11 +418,19 @@ impl DynamicInterpreterComponent {
                     VNodeProps::Checkbox { label, is_checked } => (label.clone(), *is_checked),
                     _ => (String::new(), false),
                 };
+
+                // Plan 012 Phase 3: 绑定 toggle 事件
+                let node_id = node.id;
                 div()
                     .flex()
                     .items_center()
                     .gap_2()
                     .cursor_pointer()
+                    .on_click(cx.listener(move |this, _event, _window, cx| {
+                        // 切换状态
+                        let new_checked = !is_checked;
+                        this.handle_vnode_event(node_id, EventType::Toggle(new_checked), cx);
+                    }))
                     .child(
                         div()
                             .w_4()

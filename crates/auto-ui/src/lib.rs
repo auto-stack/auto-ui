@@ -18,6 +18,14 @@ pub mod prelude {
     // Plan 012: VNode types
     pub use crate::vnode::{VNodeId, VNodeKind, VNode, VNodeProps, VTree, VTreeStats};
     pub use crate::vnode_converter::view_to_vtree;
+
+    // Plan 012 Phase 3: Event-aware VTree conversion
+    #[cfg(feature = "interpreter")]
+    pub use crate::vnode_converter::view_to_vtree_with_events;
+
+    // Plan 012 Phase 3: Event router
+    #[cfg(feature = "interpreter")]
+    pub use crate::event_router::{EventRouter, EventType, EventContext, SharedEventRouter};
 }
 
 pub mod app;
@@ -30,6 +38,10 @@ pub mod hot_reload; // Hot-reload support for .at files
 // Plan 012: VNode architecture - flattened view representation
 pub mod vnode;
 pub mod vnode_converter;
+
+// Plan 012 Phase 3: Event router (moved from auto-ui-gpui)
+#[cfg(feature = "interpreter")]
+pub mod event_router;
 
 // Dynamic interpreter module (Plan 011)
 #[cfg(feature = "interpreter")]
