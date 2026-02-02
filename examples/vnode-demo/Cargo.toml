@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 auto-ui = { path = "../../crates/auto-ui" }
-gpui = { version = "0.2.2" }
+auto-ui-gpui = { path = "../../crates/auto-ui-gpui" }
 
 [[bin]]
 name = "vnode-demo"
