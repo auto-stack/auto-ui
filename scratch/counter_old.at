@@ -1,0 +1,45 @@
+use auto.ui: View, widget, app, center
+
+enum CounterMsg {
+    Inc
+    Dec
+}
+
+type Counter is Widget {
+    // data fields
+    count int
+
+    // view
+    fn view() View {
+        col {
+            button "+" {
+                onclick: CounterMsg.Inc
+            }
+            h2 `Current Count: ${count}`
+            button "-" {
+                onclick: CounterMsg.Dec
+            }
+        }
+    }
+
+    // message handler
+    fn on(ev CounterMsg) {
+        is ev {
+            CounterMsg.Inc => {
+                .count += 1
+            }
+            CounterMsg.Dec => {
+                .count -= 1
+            }
+        }
+    }
+}
+
+// Create an App
+app CounterExample {
+    center {
+        // a counter view with initial value 0
+        Counter(count: 0)
+    }
+}
+
