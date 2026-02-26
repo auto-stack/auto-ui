@@ -1,0 +1,39 @@
+enum Msg {
+    Inc
+    Dec
+}
+
+type Counter is Widget {
+    count int = 0
+    cards []Card
+    
+    fn view() {
+        col {
+            for c in cards { 
+                Card {
+                    button("+", onclick: Msg.Inc)
+                    text(c.count)
+                    button("-", onclick: Msg.Dec)
+                }
+            }
+        }
+    }
+    
+    fn on(ev Msg) {
+        is ev {
+            Inc => {
+                store(count, count + 1)
+            }
+            Dec => {
+                store(count, count - 1)
+            }
+        }
+    }
+}
+
+
+app Main {
+    center {
+        Counter(0)
+    }
+}

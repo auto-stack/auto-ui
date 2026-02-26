@@ -12,8 +12,14 @@ pub mod auto_ui_trans;
 pub mod dsl_preprocess;
 pub mod rust_gen;
 
+#[cfg(feature = "vue-backend")]
+pub mod vue_gen;
+
 pub use auto_ui_trans::AutoUITrans;
 pub use rust_gen::RustCodeGenerator;
+
+#[cfg(feature = "vue-backend")]
+pub use vue_gen::VueCodeGenerator;
 
 /// High-level transpilation API
 #[cfg(feature = "transpiler")]
