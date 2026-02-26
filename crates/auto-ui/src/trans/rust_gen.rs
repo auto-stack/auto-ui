@@ -273,11 +273,16 @@ impl RustCodeGenerator {
         code.push_str(&format!("impl {} {{\n", widget_name));
 
         // Parameter list
-        let params: Vec<String> = type_decl.members.iter()
+        let params: Vec<String> = type_decl
+            .members
+            .iter()
             .map(|m| format!("{}: {}", m.name, self.rust_type_name(&m.ty)))
             .collect();
 
-        code.push_str(&format!("    pub fn new({}) -> Self {{\n", params.join(", ")));
+        code.push_str(&format!(
+            "    pub fn new({}) -> Self {{\n",
+            params.join(", ")
+        ));
 
         code.push_str("        Self {\n");
         for member in &type_decl.members {
@@ -298,7 +303,11 @@ impl RustCodeGenerator {
         code.push_str(&format!("impl Component for {} {{\n", widget_name));
 
         // Message type - use extracted message type or default to ()
-        let msg_type = self.message_type.as_ref().map(|s| s.as_str()).unwrap_or("()");
+        let msg_type = self
+            .message_type
+            .as_ref()
+            .map(|s| s.as_str())
+            .unwrap_or("()");
         code.push_str(&format!("    type Msg = {};\n", msg_type));
         code.push('\n');
 
@@ -472,7 +481,10 @@ impl RustCodeGenerator {
                 };
 
                 // Get onclick property from named args
-                let onclick = call.args.args.iter()
+                let onclick = call
+                    .args
+                    .args
+                    .iter()
                     .find(|arg| matches!(arg, Arg::Pair(name, _) if name.as_str() == "onclick"))
                     .and_then(|arg| {
                         if let Arg::Pair(_, expr) = arg {
@@ -526,7 +538,10 @@ impl RustCodeGenerator {
                 };
 
                 // Get is_checked property
-                let is_checked = call.args.args.iter()
+                let is_checked = call
+                    .args
+                    .args
+                    .iter()
                     .find(|arg| matches!(arg, Arg::Pair(name, _) if name.as_str() == "is_checked"))
                     .and_then(|arg| {
                         if let Arg::Pair(_, expr) = arg {
@@ -560,7 +575,10 @@ impl RustCodeGenerator {
                 };
 
                 // Get is_selected property
-                let is_selected = call.args.args.iter()
+                let is_selected = call
+                    .args
+                    .args
+                    .iter()
                     .find(|arg| matches!(arg, Arg::Pair(name, _) if name.as_str() == "is_selected"))
                     .and_then(|arg| {
                         if let Arg::Pair(_, expr) = arg {
@@ -682,7 +700,10 @@ impl RustCodeGenerator {
         for stmt in &node.body.stmts {
             if let Stmt::Expr(expr) = stmt {
                 if let Ok(child_code) = self.generate_view_expr(expr) {
-                    return Ok(format!("View::container({})\n    .center()\n    .build()", child_code));
+                    return Ok(format!(
+                        "View::container({})\n    .center()\n    .build()",
+                        child_code
+                    ));
                 }
             }
         }
@@ -711,9 +732,11 @@ impl RustCodeGenerator {
         };
 
         // Try to get style if present
-        let has_style = node.args.args.iter().any(|arg| {
-            matches!(arg, Arg::Pair(name, _) if name.as_str() == "style")
-        });
+        let has_style = node
+            .args
+            .args
+            .iter()
+            .any(|arg| matches!(arg, Arg::Pair(name, _) if name.as_str() == "style"));
 
         if has_style {
             Ok(format!("View::text_styled({}, /* style */)", content))
@@ -724,12 +747,16 @@ impl RustCodeGenerator {
 
     fn generate_button_node(&self, node: &Node) -> Result<String, String> {
         let label = self.get_main_arg(node).unwrap_or("\"\"".to_string());
-        let onclick = self.get_prop_string(node, "onclick")
+        let onclick = self
+            .get_prop_string(node, "onclick")
             .ok_or_else(|| "Button missing 'onclick' property".to_string())?;
         let style = self.get_prop_string(node, "style");
 
         if let Some(s) = style {
-            Ok(format!("View::button_styled({}, {}, \"{}\")", label, onclick, s))
+            Ok(format!(
+                "View::button_styled({}, {}, \"{}\")",
+                label, onclick, s
+            ))
         } else {
             Ok(format!("View::button({}, {})", label, onclick))
         }
@@ -737,7 +764,9 @@ impl RustCodeGenerator {
 
     fn generate_input_node(&self, node: &Node) -> Result<String, String> {
         let placeholder = self.get_main_arg(node).unwrap_or("\"\"".to_string());
-        let value = self.get_prop_string(node, "value").unwrap_or("\"\"".to_string());
+        let value = self
+            .get_prop_string(node, "value")
+            .unwrap_or("\"\"".to_string());
         let style = self.get_prop_string(node, "style");
 
         let mut code = format!("View::input({}).value({})", placeholder, value);
@@ -844,7 +873,9 @@ impl RustCodeGenerator {
     }
 
     fn generate_select_node(&self, node: &Node) -> Result<String, String> {
-        let options = self.get_prop_string(node, "options").unwrap_or("\"[]\"".to_string());
+        let options = self
+            .get_prop_string(node, "options")
+            .unwrap_or("\"[]\"".to_string());
 
         Ok(format!("View::select(vec![{}])", options))
     }
@@ -859,7 +890,10 @@ impl RustCodeGenerator {
         let spacing = self.get_prop_u16(node, "spacing").unwrap_or(0);
         let col_spacing = self.get_prop_u16(node, "col_spacing").unwrap_or(0);
 
-        Ok(format!("View::table(vec![], vec![]).spacing({}).col_spacing({}).build()", spacing, col_spacing))
+        Ok(format!(
+            "View::table(vec![], vec![]).spacing({}).col_spacing({}).build()",
+            spacing, col_spacing
+        ))
     }
 
     // Helper methods
@@ -993,9 +1027,17 @@ impl RustCodeGenerator {
                             if let Expr::Int(1) = rhs.as_ref() {
                                 // Check operator by string representation
                                 if op.to_string().contains("+") || op.to_string().contains("+=") {
-                                    code.push_str(&format!("                self.{} += 1;\n", field_name));
-                                } else if op.to_string().contains("-") || op.to_string().contains("-=") {
-                                    code.push_str(&format!("                self.{} -= 1;\n", field_name));
+                                    code.push_str(&format!(
+                                        "                self.{} += 1;\n",
+                                        field_name
+                                    ));
+                                } else if op.to_string().contains("-")
+                                    || op.to_string().contains("-=")
+                                {
+                                    code.push_str(&format!(
+                                        "                self.{} -= 1;\n",
+                                        field_name
+                                    ));
                                 }
                             }
                         }
@@ -1010,34 +1052,69 @@ impl RustCodeGenerator {
                             // Generate code based on operator (use semicolon for statement termination)
                             if op_str.contains("+=") {
                                 if let Expr::Int(n) = rhs.as_ref() {
-                                    code.push_str(&format!("                self.{} += {};\n", field_name, n));
+                                    code.push_str(&format!(
+                                        "                self.{} += {};\n",
+                                        field_name, n
+                                    ));
                                 } else if let Expr::Ident(rhs_name) = rhs.as_ref() {
-                                    code.push_str(&format!("                self.{} += self.{};\n", field_name, rhs_name));
+                                    code.push_str(&format!(
+                                        "                self.{} += self.{};\n",
+                                        field_name, rhs_name
+                                    ));
                                 }
                             } else if op_str.contains("-=") {
                                 if let Expr::Int(n) = rhs.as_ref() {
-                                    code.push_str(&format!("                self.{} -= {};\n", field_name, n));
+                                    code.push_str(&format!(
+                                        "                self.{} -= {};\n",
+                                        field_name, n
+                                    ));
                                 } else if let Expr::Ident(rhs_name) = rhs.as_ref() {
-                                    code.push_str(&format!("                self.{} -= self.{};\n", field_name, rhs_name));
+                                    code.push_str(&format!(
+                                        "                self.{} -= self.{};\n",
+                                        field_name, rhs_name
+                                    ));
                                 }
                             } else if op_str.contains("*=") {
                                 if let Expr::Int(n) = rhs.as_ref() {
-                                    code.push_str(&format!("                self.{} *= {};\n", field_name, n));
+                                    code.push_str(&format!(
+                                        "                self.{} *= {};\n",
+                                        field_name, n
+                                    ));
                                 } else if let Expr::Ident(rhs_name) = rhs.as_ref() {
-                                    code.push_str(&format!("                self.{} *= self.{};\n", field_name, rhs_name));
+                                    code.push_str(&format!(
+                                        "                self.{} *= self.{};\n",
+                                        field_name, rhs_name
+                                    ));
                                 }
                             } else if op_str.contains("/=") {
                                 if let Expr::Int(n) = rhs.as_ref() {
-                                    code.push_str(&format!("                self.{} /= {};\n", field_name, n));
+                                    code.push_str(&format!(
+                                        "                self.{} /= {};\n",
+                                        field_name, n
+                                    ));
                                 } else if let Expr::Ident(rhs_name) = rhs.as_ref() {
-                                    code.push_str(&format!("                self.{} /= self.{};\n", field_name, rhs_name));
+                                    code.push_str(&format!(
+                                        "                self.{} /= self.{};\n",
+                                        field_name, rhs_name
+                                    ));
                                 }
-                            } else if op_str.contains("=") && !op_str.contains("+=") && !op_str.contains("-=") && !op_str.contains("*=") && !op_str.contains("/=") {
+                            } else if op_str.contains("=")
+                                && !op_str.contains("+=")
+                                && !op_str.contains("-=")
+                                && !op_str.contains("*=")
+                                && !op_str.contains("/=")
+                            {
                                 // Simple assignment (not +=, -=, *=, /=)
                                 if let Expr::Int(n) = rhs.as_ref() {
-                                    code.push_str(&format!("                self.{} = {};\n", field_name, n));
+                                    code.push_str(&format!(
+                                        "                self.{} = {};\n",
+                                        field_name, n
+                                    ));
                                 } else if let Expr::Ident(rhs_name) = rhs.as_ref() {
-                                    code.push_str(&format!("                self.{} = self.{};\n", field_name, rhs_name));
+                                    code.push_str(&format!(
+                                        "                self.{} = self.{};\n",
+                                        field_name, rhs_name
+                                    ));
                                 }
                             }
                         }

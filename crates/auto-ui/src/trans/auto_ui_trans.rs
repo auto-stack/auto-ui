@@ -3,7 +3,7 @@
 // Transpiles Auto language .at files to auto-ui Rust code.
 
 use super::{CodeSink, Trans};
-use auto_lang::{Parser, ast::*};
+use auto_lang::{ast::*, Parser};
 use std::collections::HashSet;
 
 // Type alias for Result
@@ -114,7 +114,11 @@ impl AutoUITrans {
         Ok(())
     }
 
-    fn trans_component_impl(&mut self, type_decl: &TypeDecl, sink: &mut CodeSink) -> AutoResult<()> {
+    fn trans_component_impl(
+        &mut self,
+        type_decl: &TypeDecl,
+        sink: &mut CodeSink,
+    ) -> AutoResult<()> {
         let widget_name = &type_decl.name;
 
         sink.writeln(&format!("impl Component for {} {{", widget_name));

@@ -42,3 +42,24 @@ app CounterExample {
         Counter(count: 0)
     }
 }
+
+
+app CounterApp {
+    model {
+        count int
+    }
+
+    view {
+        div .App {
+            h1 Hello CodeSandbox
+            h2 You clicked ${count} times!
+            button Decrement { onClick: => count -= 1 }
+            button Decrement { onClick: => count += 1 }
+        }
+    }
+
+    style {
+        use my.style
+    }
+}
+

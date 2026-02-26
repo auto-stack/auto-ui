@@ -7,16 +7,17 @@ use auto_lang::ast::Code;
 use std::collections::HashSet;
 use std::io::Write;
 
-pub mod auto_ui_trans;
-pub mod rust_gen;
 pub mod api;
+pub mod auto_ui_trans;
+pub mod dsl_preprocess;
+pub mod rust_gen;
 
 pub use auto_ui_trans::AutoUITrans;
 pub use rust_gen::RustCodeGenerator;
 
 /// High-level transpilation API
 #[cfg(feature = "transpiler")]
-pub use api::{transpile_file, transpile_ast};
+pub use api::{transpile_ast, transpile_auto, transpile_dsl, transpile_file};
 
 /// Sink for collecting generated Rust code
 pub struct CodeSink {

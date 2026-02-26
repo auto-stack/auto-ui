@@ -35,7 +35,6 @@ clap = { version = "4.5", features = ["derive"], optional = true }
 console = { version = "0.15", optional = true }
 miette = { version = "7.0", features = ["fancy"], optional = true }
 regex = { version = "1.10", optional = true }
-
 [dev-dependencies]
 tempfile = "3.10"
 
@@ -43,7 +42,7 @@ tempfile = "3.10"
 default = []
 gpui = ["dep:gpui-lib"]  # Enable GPUI backend adapter
 iced = ["dep:iced"]  # Enable Iced backend adapter
-transpiler = ["auto-lang"]  # Auto language transpiler support (auto-val always enabled)
+transpiler = ["auto-lang", "regex"]  # Auto language transpiler support (auto-val always enabled)
 interpreter = ["auto-lang"]  # Auto language dynamic interpreter support (Plan 011)
 cli = ["clap", "console", "miette", "regex", "transpiler", "notify-debouncer-mini"]  # CLI tool support
 
