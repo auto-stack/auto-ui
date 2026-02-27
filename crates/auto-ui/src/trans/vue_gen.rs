@@ -6,11 +6,45 @@
 //! - `<script setup lang="ts">` with Composition API
 //! - `<template>` with HTML + Tailwind CSS classes
 //! - `<style scoped>` for component styles
+//!
+//! # Deprecation Notice (Plan 096 Phase 5)
+//!
+//! This module is deprecated. Use `auto_lang::ui_gen::VueGenerator` instead.
+//!
+//! ## Migration Guide
+//!
+//! Old (deprecated):
+//! ```ignore
+//! use auto_ui::trans::VueCodeGenerator;
+//! let mut gen = VueCodeGenerator::new();
+//! let code = gen.generate_widget(&type_decl)?;
+//! ```
+//!
+//! New (recommended):
+//! ```ignore
+//! use auto_lang::ui_gen::VueGenerator;
+//! use auto_lang::ui_gen::BackendGenerator;
+//! use auto_lang::aura::extract_widget_from_decl;
+//!
+//! let aura_widget = extract_widget_from_decl(&widget_decl)?;
+//! let mut gen = VueGenerator::new();
+//! let code = gen.generate(&aura_widget)?;
+//! ```
+
+#![deprecated(
+    since = "0.2.0",
+    note = "Use auto_lang::ui_gen::VueGenerator instead. See module docs for migration guide."
+)]
 
 use auto_lang::ast::{Arg, Body, Expr, Fn, IsBranch, Member, Node, Stmt, Type, TypeDecl};
 use auto_val::Op;
 use std::collections::HashSet;
 
+/// Vue code generator for widgets
+///
+/// # Deprecated
+/// Use `auto_lang::ui_gen::VueGenerator` instead.
+#[deprecated(since = "0.2.0", note = "Use auto_lang::ui_gen::VueGenerator instead")]
 pub struct VueCodeGenerator {
     current_widget: Option<String>,
     imports: HashSet<String>,

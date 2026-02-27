@@ -1,6 +1,40 @@
 // Rust Code Generator for AutoUI Transpiler
 //
 // This module generates idiomatic Rust code from Auto language widget definitions.
+//
+// # Deprecation Notice (Plan 096 Phase 5)
+//
+// This module is deprecated. Use `auto_lang::ui_gen::RustGenerator` instead.
+//
+// ## Migration Guide
+//
+// Old (deprecated):
+// ```ignore
+// use auto_ui::trans::RustCodeGenerator;
+// let mut gen = RustCodeGenerator::new();
+// let code = gen.generate_widget(&type_decl)?;
+// ```
+//
+// New (recommended):
+// ```ignore
+// use auto_lang::ui_gen::RustGenerator;
+// use auto_lang::ui_gen::BackendGenerator;
+// use auto_lang::aura::extract_widget_from_decl;
+//
+// let aura_widget = extract_widget_from_decl(&widget_decl)?;
+// let mut gen = RustGenerator::new();
+// let code = gen.generate(&aura_widget)?;
+// ```
+//
+// The new AURA-based pipeline provides:
+// - Better separation of concerns
+// - Support for multiple backends (Vue3, Rust/GPUI)
+// - Cleaner architecture with WidgetDecl as first-class AST node
+
+#![deprecated(
+    since = "0.2.0",
+    note = "Use auto_lang::ui_gen::RustGenerator instead. See module docs for migration guide."
+)]
 
 use crate::style::Style;
 use auto_lang::ast::*;
@@ -8,6 +42,10 @@ use auto_val::Op;
 use std::collections::HashSet;
 
 /// Rust code generator for widgets
+///
+/// # Deprecated
+/// Use `auto_lang::ui_gen::RustGenerator` instead.
+#[deprecated(since = "0.2.0", note = "Use auto_lang::ui_gen::RustGenerator instead")]
 pub struct RustCodeGenerator {
     /// Current widget being processed
     current_widget: Option<String>,

@@ -23,7 +23,18 @@ pub use vue_gen::VueCodeGenerator;
 
 /// High-level transpilation API
 #[cfg(feature = "transpiler")]
-pub use api::{transpile_ast, transpile_auto, transpile_dsl, transpile_file};
+pub use api::{
+    // New AURA-based API (Plan 096)
+    transpile_aura,
+    transpile_vue_aura,
+    transpile_file,
+    // Legacy API (deprecated)
+    transpile_dsl,
+};
+
+// Legacy re-exports (deprecated)
+#[cfg(feature = "transpiler")]
+pub use api::{transpile_ast_legacy as transpile_ast, transpile_auto_legacy as transpile_auto};
 
 /// Sink for collecting generated Rust code
 pub struct CodeSink {

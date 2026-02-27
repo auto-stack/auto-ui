@@ -8,10 +8,36 @@
 //! - `button + { }` → `button "+" { }`
 //! - `h2 > ${x}` → `h2 \`${x}\`
 //! - `.count += 1` → `self.count += 1`
+//!
+//! # Deprecation Notice (Plan 096 Phase 5)
+//!
+//! This module is deprecated. The new AURA pipeline parses `widget` declarations
+//! directly without preprocessing. Use the new API:
+//!
+//! ```ignore
+//! // Instead of:
+//! let preprocessed = dsl_preprocess(source);
+//! let ast = Parser::from(&preprocessed).parse()?;
+//!
+//! // Use:
+//! use auto_lang::session::CompilerSession;
+//! let session = CompilerSession::ui();
+//! let mut parser = Parser::from(source).with_session(session);
+//! let ast = parser.parse()?;
+//! ```
+
+#![deprecated(
+    since = "0.2.0",
+    note = "Use AURA pipeline with CompilerSession::ui() instead"
+)]
 
 use regex::Regex;
 
 /// MVP: Transform DSL syntax to standard Auto syntax
+///
+/// # Deprecated
+/// Use AURA pipeline with `CompilerSession::ui()` instead.
+#[deprecated(since = "0.2.0", note = "Use AURA pipeline with CompilerSession::ui() instead")]
 pub fn dsl_preprocess(source: &str) -> String {
     let mut result = source.to_string();
 
