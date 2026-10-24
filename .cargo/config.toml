@@ -1,0 +1,8 @@
+# PLAN-831 T-06：UI 仓测试档位（承接语言仓 t/tu 拆分——语言侧别名只保
+# auto-lang 面，UI 包族的档位随 owner 迁本仓）。
+[alias]
+# UI 仓日常档（五包 lib+integration；轻池，nextest 并行）
+t = "nextest run --workspace --lib"
+# ui_gen 单进程档（fix-ui-tier 语义：WidgetRegistry OnceLock 单进程一次；
+# 承接语言仓旧 tu 中 -p auto-ui-compiler 部分）
+tu = "test -p auto-ui-compiler --lib ui_gen::"

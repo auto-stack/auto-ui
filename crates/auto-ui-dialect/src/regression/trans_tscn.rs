@@ -30,7 +30,7 @@ mod tests {
         let name = parts[1..].join("_");
 
         let d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let src_path = d.join(format!("../auto-lang/test/a2gd/tscn/{}/{}.at", case, name));
+        let src_path = d.join(format!("../../../auto-lang/crates/auto-lang/test/a2gd/tscn/{}/{}.at", case, name));
         let src = read_to_string(&src_path)?;
 
         let mut parser = Parser::from(src.as_str());
@@ -38,11 +38,11 @@ mod tests {
         let generated = generate_from_ast(&ast).ok_or("no SceneDecl found in input")?;
 
         let expected_path = d.join(format!(
-            "../auto-lang/test/a2gd/tscn/{}/{}.expected.tscn",
+            "../../../auto-lang/crates/auto-lang/test/a2gd/tscn/{}/{}.expected.tscn",
             case, name
         ));
         let wrong_path = d.join(format!(
-            "../auto-lang/test/a2gd/tscn/{}/{}.wrong.tscn",
+            "../../../auto-lang/crates/auto-lang/test/a2gd/tscn/{}/{}.wrong.tscn",
             case, name
         ));
 

@@ -3,8 +3,7 @@ target/
 **/*.rs.bk
 *.pdb
 
-# Cargo
-Cargo.lock
+# Cargo（lock 受管：PLAN-831 T-06 独立 workspace 锁=固定源合同）
 
 # IDEs and editors
 .vscode/

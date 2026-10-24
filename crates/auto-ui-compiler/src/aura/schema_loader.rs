@@ -835,7 +835,7 @@ impl Default for SchemaLoader {
 /// Load the default AURA schema from the embedded schema file
 pub fn load_default_schema() -> Result<AuraSchema, SchemaLoadError> {
     let mut loader = SchemaLoader::new();
-    loader.load(include_str!("../../../../docs/schema/aura.at"))
+    loader.load(include_str!("../../schema/aura.at"))
 }
 
 /// Plan 435 P3:进程级缓存的默认 schema(load_default_schema 会 Box::leak 构建

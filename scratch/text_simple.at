@@ -1,7 +1,0 @@
-type Hello {
-    msg str = "Hello"
-
-    fn view() {
-        text(msg)
-    }
-}

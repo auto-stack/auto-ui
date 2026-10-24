@@ -1,26 +1,13 @@
+# PLAN-831 T-06：auto-ui 独立 workspace（承接语言仓 UI 包组；旧 AURA/GPUI
+# legacy 已移除——历史分支与 784/T-02 保全快照在案）。
+#
+# 语言基础（auto-lang-core/auto-parser-api/auto-val/auto-atom/auto-media-core/
+# auto-text-core/auto-terminal-core/a2r-std/auto-project-model/auto-tool-protocol/
+# auto-tool-execution/auto-api-gen）与跨仓 optional autodown-core 以**组内兄弟
+# 相对 path**（../../../auto-lang/crates/…、../../../auto-down/…）依赖——本仓
+# 检出与 auto-lang（及启用 autodown feature 时的 auto-down）同级布局即可解析，
+# registry 依赖由受管 Cargo.lock 锁定（fresh/locked 可复现；重定位 A→B 同布局
+# 成立）。发布渠道/固定 rev 清单冻结归 T-07/T-09（SD-02/04）。
 [workspace]
-members = ["crates/*", "examples/*"]
-exclude = [
-    "crates/auto-ui-transpiler",  # Exclude transpiler for now, build separately
-    "examples/unified_app",         # Exclude simple example file
-]
+members = ["crates/*"]
 resolver = "2"
-
-[workspace.dependencies]
-# 强制启用 naga 的 termcolor feature 以避免 Windows WriteColor trait 错误
-naga = { version = "0.27", features = ["termcolor"] }
-# Local crates
-auto-ui = { path = "crates/auto-ui" }
-
-# UI Frameworks
-iced = { version = "0.14.0", features = ["tokio", "debug", "image", "svg", "advanced"] }
-gpui-component = "0.5.0"
-gpui-storybook = "0.5.0"
-
-# Common dependencies
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-tokio = { version = "1.0", features = ["full"] }
-anyhow = "1.0"
-thiserror = "2.0"
-chrono = "0.4"

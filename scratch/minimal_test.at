@@ -1,3 +1,0 @@
-type Hello {
-    msg str = "Hello"
-}

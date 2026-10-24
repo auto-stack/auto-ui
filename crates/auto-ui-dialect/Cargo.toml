@@ -2,6 +2,7 @@
 name = "auto-ui-dialect"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
 description = "AutoLang UI declaration grammar (msg/model) single-source implementation over the light dialect port (PLAN-806; depends only on auto-parser-api's light closure — no auto-lang/Parser/VM/renderer)"
 
 # PLAN-806: UI msg 与 model 声明文法正式外置。本 crate 是完整 msg/model
