@@ -461,14 +461,63 @@ mod root_resolution_tests {
     #[test]
     fn falls_back_to_compile_time_root_when_no_blueprints_upwards() {
         let _ser = lock_blueprints_root_for_test();
+        // 持锁窗口内 env 必须未设置（root_resolution 族 EnvGuard 恢复窗口
+        // 前值；外部残留设置会让 fallback 断言测到别的东西）。
+        assert!(
+            std::env::var_os("AUTO_BLUEPRINTS_ROOT").is_none(),
+            "fallback 窗口内 AUTO_BLUEPRINTS_ROOT 不应被设置"
+        );
         let tmp = std::env::temp_dir().join(format!("plan645-fallback-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&tmp);
         std::fs::create_dir_all(&tmp).unwrap();
-        // PLAN-831 T-09：编译期兜底=组内兄弟语言仓的 blueprints 单源。
-        let expected = resolve_blueprints_root(&tmp);
+        // PLAN-831 T-09 R1（F831-09-01）：独立构造期望——编译期兜底 = crate
+        // 目录三级上的组内兄弟语言仓 blueprints 单源（与生产同一编译期输入
+        // env!(CARGO_MANIFEST_DIR)，但不经被测函数回读）。精确比较取代
+        // contains 字串：死兜底（兄弟缺席时的相对 packages/blueprints）与
+        // 错 owner 路径都无法通过。原承诺范围 = 三仓组布局（T-07 DST 实测
+        // 形态）；无兄弟的独立 UI clone 不在生成支持矩阵内（blueprints 单
+        // 源居语言仓）。
+        let sibling = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../auto-lang/packages/blueprints");
+        let expected = sibling.canonicalize().unwrap_or_else(|_| sibling.clone());
+        let actual = resolve_blueprints_root(&tmp);
+        assert_eq!(
+            actual, expected,
+            "fallback 必须精确解析到组内兄弟语言仓 blueprints 单源"
+        );
+        // 实际输入可用：单源目录真实存在且可枚举出至少一个真实包
+        // （<kind>/<name>/spec.md fixture 读取，与 registry 扫描布局一致）
+        // ——不以路径字串替代真实输入可用性。
+        assert!(actual.is_dir(), "blueprints 单源必须实际存在: {actual:?}");
+        let mut specs = 0usize;
+        for kind in std::fs::read_dir(&actual)
+            .unwrap_or_else(|e| panic!("read {}: {e}", actual.display()))
+        {
+            let kind = kind.expect("kind dir entry").path();
+            if !kind.is_dir() {
+                continue;
+            }
+            for name in std::fs::read_dir(&kind)
+                .unwrap_or_else(|e| panic!("read {}: {e}", kind.display()))
+            {
+                if name.expect("name dir entry").path().join("spec.md").is_file() {
+                    specs += 1;
+                }
+            }
+        }
         assert!(
-            expected.ends_with("auto-lang/packages/blueprints") || expected.to_string_lossy().contains("blueprints"),
-            "fallback 应解析到语言仓 blueprints 单源，got {expected:?}"
+            specs >= 1,
+            "blueprints 单源必须含真实包（spec.md），got {specs} in {}",
+            actual.display()
+        );
+        // 错 owner 负控：UI 仓自身（非语言仓）的 packages/blueprints 不是
+        // 单源——即便存在同名目录也不得被解析为兜底。
+        let wrong_owner = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../packages/blueprints");
+        assert_ne!(
+            actual,
+            wrong_owner.canonicalize().unwrap_or(wrong_owner),
+            "不得解析到 UI 仓自身（错 owner）的 blueprints 路径"
         );
     }
 
