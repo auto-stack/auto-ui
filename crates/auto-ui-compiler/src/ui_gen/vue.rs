@@ -22982,7 +22982,6 @@ widget W {
     }
 
     #[test]
-    #[test]
     fn test_conditional_style_prop() {
         // Plan 346: `style: if cond { "a" } else { "b" }` must emit a
         // `:class="cond ? 'a' : 'b'"` binding — NOT be silently dropped.
@@ -27291,7 +27290,7 @@ widget L {
 
     /// `menubar {}` 占位标签 → shadcn Menubar 组件树（trigger 文本/sep/
     /// 条件转译），无 actions 时保持原行为。
-    #[test]
+    ///
     /// PLAN-630 T-02: declarative menubar component family → shadcn
     /// Menubar tree (tags route through the generic shadcn element path
     /// with the menubar_* prop arms).

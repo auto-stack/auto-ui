@@ -685,9 +685,16 @@ pub mod win32 {
 
     fn temp_drop_png_path() -> Option<std::path::PathBuf> {
         let dir = std::env::temp_dir();
+        // 临时名仅求唯一性。fastrand 属 dev-dependencies（#[cfg(test)] 面才
+        // 可见），lib 生产路径引用它在 native-dnd 门一开即编译红——F831-09-04
+        // tn 档列举实测暴露；std 时间戳纳秒 ^ pid 同样满足唯一性且零新依赖。
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos() as u64)
+            .unwrap_or(0);
         let name = format!(
             "auto-lang-drop-{}.png",
-            std::process::id() as u64 ^ fastrand::u64(..)
+            std::process::id() as u64 ^ nanos
         );
         let p = dir.join(name);
         p.is_absolute().then_some(p)
