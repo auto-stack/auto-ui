@@ -104,7 +104,7 @@ mod plan063_handler_float_arith {
     #[test]
     fn child_move_emits_to_parent_scroll_top() {
         std::env::set_var("AUTO_DEBUG_EMIT", "1");
-        let rel = "../auto-lang/test/ui/plan063_child_scrollbar/src/front/app.at";
+        let rel = "../../../auto-lang/test/ui/plan063_child_scrollbar/src/front/app.at";
         let manifest = [
             std::env::var("CARGO_MANIFEST_DIR")
                 .ok()

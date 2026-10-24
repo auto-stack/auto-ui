@@ -40,18 +40,22 @@ pub(crate) fn locate_gallery_file(gallery: &str, rel: &str) -> Option<PathBuf> {
 /// 顶层——顶层臂补 `resolve_os_top_dir` 解析序候选(env AUTO_OS_ROOT → 兄弟 →
 /// 主检出);examples/ui 臂(教学 demo 留架)不变。
 pub(crate) fn locate_example_app_at(example: &str) -> Option<PathBuf> {
+    // PLAN-831 T-09（F831-09-01）：examples 单源 owner=语言仓——crate 相对
+    // 候选基点自仓根 ../../ 改组内兄弟 ../../../auto-lang（原 ../../ 语义
+    // =语言仓根；CWD 相对候选保留供在语言仓内运行）。
     let rel = format!("examples/ui/{}/src/front/app.at", example);
+    let lang_examples = |sub: String| {
+        std::env::var("CARGO_MANIFEST_DIR").ok().map(|d| {
+            PathBuf::from(d).join("../../../auto-lang").join(sub)
+        })
+    };
     let candidates = [
-        std::env::var("CARGO_MANIFEST_DIR")
-            .ok()
-            .map(|d| PathBuf::from(d).join(format!("../../{}", rel))),
+        lang_examples(rel.clone()),
         Some(PathBuf::from(&rel)),
         Some(PathBuf::from(format!("../../{}", rel))),
         // Plan 409 §8: top-level examples (widgets-gallery) live directly under
         // examples/, not examples/ui/.
-        std::env::var("CARGO_MANIFEST_DIR")
-            .ok()
-            .map(|d| PathBuf::from(d).join(format!("../../examples/{}/src/front/app.at", example))),
+        lang_examples(format!("examples/{}/src/front/app.at", example)),
         Some(PathBuf::from(format!(
             "examples/{}/src/front/app.at",
             example

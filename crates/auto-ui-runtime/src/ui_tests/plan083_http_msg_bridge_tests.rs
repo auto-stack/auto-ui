@@ -148,7 +148,7 @@ mod two_phase_probe {
     use super::{poll_with_deadline, queue_test_lock, serve_once};
 
     fn locate_corpus() -> Option<std::path::PathBuf> {
-        let rel = "../auto-lang/test/ui/plan083_http_msg/src/front/app.at";
+        let rel = "../../../auto-lang/test/ui/plan083_http_msg/src/front/app.at";
         [
             std::env::var("CARGO_MANIFEST_DIR")
                 .ok()

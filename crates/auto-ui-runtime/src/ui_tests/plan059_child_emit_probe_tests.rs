@@ -11,7 +11,7 @@
 #[cfg(test)]
 mod plan059_child_emit_probe_tests {
     fn locate_corpus() -> Option<std::path::PathBuf> {
-        let rel = "../auto-lang/test/ui/plan059_child_emit/src/front/app.at";
+        let rel = "../../../auto-lang/test/ui/plan059_child_emit/src/front/app.at";
         [
             std::env::var("CARGO_MANIFEST_DIR")
                 .ok()

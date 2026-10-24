@@ -31,7 +31,7 @@ mod plan019_vm_own_module_link_tests {
     use auto_val::Value;
 
     fn locate_corpus() -> Option<std::path::PathBuf> {
-        let rel = "../auto-lang/test/ui/plan019_vm_own_module_link/src/front/app.at";
+        let rel = "../../../auto-lang/test/ui/plan019_vm_own_module_link/src/front/app.at";
         let candidates = [
             std::env::var("CARGO_MANIFEST_DIR")
                 .ok()

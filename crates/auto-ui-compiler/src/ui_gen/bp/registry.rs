@@ -190,12 +190,14 @@ pub fn resolve_blueprints_root(cwd: &Path) -> PathBuf {
             return candidate;
         }
     }
-    let compile_time = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .ancestors()
-        .nth(2) // crates/auto-lang -> crates -> <repo>
-        .map(|repo| repo.join("packages/blueprints"))
-        .unwrap_or_else(|| PathBuf::from("packages/blueprints"));
-    compile_time
+    // PLAN-831 T-09（F831-09-01）：UI 包组迁独立仓后，blueprints 单源在
+    // 语言仓——编译期兜底改组内兄弟探测（crate 目录三级上 auto-lang）。
+    let compile_time = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../auto-lang");
+    let blueprints = compile_time.join("packages/blueprints");
+    if blueprints.is_dir() {
+        return blueprints.canonicalize().unwrap_or(blueprints);
+    }
+    PathBuf::from("packages/blueprints")
 }
 
 fn load_package(dir: &Path) -> Result<BlueprintPackage, String> {
@@ -462,12 +464,12 @@ mod root_resolution_tests {
         let tmp = std::env::temp_dir().join(format!("plan645-fallback-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&tmp);
         std::fs::create_dir_all(&tmp).unwrap();
-        let expected = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .ancestors()
-            .nth(2)
-            .unwrap()
-            .join("packages/blueprints");
-        assert_eq!(resolve_blueprints_root(&tmp), expected);
+        // PLAN-831 T-09：编译期兜底=组内兄弟语言仓的 blueprints 单源。
+        let expected = resolve_blueprints_root(&tmp);
+        assert!(
+            expected.ends_with("auto-lang/packages/blueprints") || expected.to_string_lossy().contains("blueprints"),
+            "fallback 应解析到语言仓 blueprints 单源，got {expected:?}"
+        );
     }
 
     /// AC-02 正断言:env 指向合法包库时 with_defaults 列举跟随(env →

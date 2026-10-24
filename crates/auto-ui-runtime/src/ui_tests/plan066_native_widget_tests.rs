@@ -16,7 +16,7 @@ mod plan066_native_widget_tests {
     use crate::ui::view::View;
 
     fn locate_corpus(rel: &str) -> Option<std::path::PathBuf> {
-        let full = format!("../auto-lang/test/ui/plan066_native_widget/{}", rel);
+        let full = format!("../../../auto-lang/crates/auto-lang/test/ui/plan066_native_widget/{}", rel);
         let candidates = [
             std::env::var("CARGO_MANIFEST_DIR")
                 .ok()

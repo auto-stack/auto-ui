@@ -143,7 +143,7 @@ mod plan446_batch4_ui {
     use crate::plan370_test_support::build_component_from_app;
 
     fn build_d2_corpus() -> Option<crate::ui::dynamic::DynamicComponent> {
-        let rel = "../auto-lang/test/ui/plan446_d2_handler_read/src/front/app.at";
+        let rel = "../../../auto-lang/crates/auto-lang/test/ui/plan446_d2_handler_read/src/front/app.at";
         let candidates = [
             std::env::var("CARGO_MANIFEST_DIR")
                 .ok()

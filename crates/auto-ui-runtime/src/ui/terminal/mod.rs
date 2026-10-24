@@ -1876,7 +1876,7 @@ mod tests {
         // PLAN-814 T-04：语料单源留 crates/auto-lang/test/ui（auto-lang 侧
         // plan808 测试同源消费；测试源码 owner 迁移=T-07，届时随迁归位）。
         let at = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../auto-lang/test/ui/terminal_min/src/front/app.at");
+            .join("../../../auto-lang/crates/auto-lang/test/ui/terminal_min/src/front/app.at");
         let src = std::fs::read_to_string(&at)
             .unwrap_or_else(|e| panic!("failed to read {}: {e}", at.display()));
 

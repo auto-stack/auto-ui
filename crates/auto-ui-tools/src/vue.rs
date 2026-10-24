@@ -13373,9 +13373,7 @@ mod gallery_registry_at_tests {
     #[test]
     fn test_gallery_demo_row_routable() {
         let examples = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("..")
-            .join("..")
-            .join("examples")
+            .join("../../../auto-lang/examples")
             .join("ui");
         let entries = auto_ui_compiler::app_registry::scan_apps(
             &examples,
@@ -13430,9 +13428,7 @@ mod gallery_registry_at_tests {
     #[test]
     fn test_try_full_parse_018_api() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("..")
-            .join("..")
-            .join("examples")
+            .join("../../../auto-lang/examples")
             .join("ui")
             .join("018-book-reader")
             .join("src")

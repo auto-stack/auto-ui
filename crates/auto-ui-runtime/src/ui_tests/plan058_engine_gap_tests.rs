@@ -147,7 +147,7 @@ mod plan058_nanbox_int_float {
 #[cfg(all(test, feature = "ui-iced"))]
 mod plan058_child_emit_computed {
     fn build() -> Option<crate::ui::dynamic::DynamicComponent> {
-        let rel = "../auto-lang/test/ui/plan058_child_emit_computed/src/front/app.at";
+        let rel = "../../../auto-lang/test/ui/plan058_child_emit_computed/src/front/app.at";
         let manifest = [
             std::env::var("CARGO_MANIFEST_DIR")
                 .ok()

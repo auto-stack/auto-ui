@@ -19,7 +19,7 @@ mod plan739_input_pin_tests {
     use std::collections::HashMap;
 
     fn locate_corpus() -> Option<std::path::PathBuf> {
-        let rel = "../auto-lang/test/ui/plan739_input_pin/src/front/app.at";
+        let rel = "../../../auto-lang/test/ui/plan739_input_pin/src/front/app.at";
         let candidates = [
             std::env::var("CARGO_MANIFEST_DIR")
                 .ok()

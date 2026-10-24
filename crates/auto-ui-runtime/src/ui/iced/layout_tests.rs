@@ -3166,7 +3166,7 @@ fn p642_t12_overflow_frame_scrolls_and_centers() {
 #[test]
 fn p655_real_008_corpus_cards_visible_and_equal_height() {
     let src_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../examples/ui/008-pricing-table/src/front/app.at");
+        .join("../../../auto-lang/examples/ui/008-pricing-table/src/front/app.at");
     let src = std::fs::read_to_string(&src_path).expect("008 source");
     let session = auto_lang_core::session::CompilerSession::ui();
     let mut parser = crate::Parser::from(src.as_str()).with_session(session);

@@ -16,7 +16,7 @@ mod plan066_filter_projection_tests {
     use crate::plan370_test_support::build_component_from_app;
 
     fn locate(rel: &str) -> Option<std::path::PathBuf> {
-        let full = format!("../auto-lang/test/ui/plan066_filter_projection/{}", rel);
+        let full = format!("../../../auto-lang/crates/auto-lang/test/ui/plan066_filter_projection/{}", rel);
         [
             std::env::var("CARGO_MANIFEST_DIR")
                 .ok()

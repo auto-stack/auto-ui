@@ -281,7 +281,7 @@ pub fn create_note(title str, body str) Note {
             std::env::var("CARGO_MANIFEST_DIR")
                 .ok()
                 .map(|d| PathBuf::from(d))
-                .map(|d| d.join("../../examples/ui/015-notes/src/front/app.at")),
+                .map(|d| d.join("../../../auto-lang/examples/ui/015-notes/src/front/app.at")),
             Some(PathBuf::from("examples/ui/015-notes/src/front/app.at")),
         ];
         let manifest = candidates.iter().flatten().find(|p| p.exists()).cloned();
@@ -374,7 +374,7 @@ pub fn create_note(title str, body str) Note {
             std::env::var("CARGO_MANIFEST_DIR")
                 .ok()
                 .map(|d| PathBuf::from(d))
-                .map(|d| d.join("../../examples/ui/016-calendar/src/front/app.at")),
+                .map(|d| d.join("../../../auto-lang/examples/ui/016-calendar/src/front/app.at")),
             Some(PathBuf::from("examples/ui/016-calendar/src/front/app.at")),
         ];
         let manifest = candidates.iter().flatten().find(|p| p.exists()).cloned();

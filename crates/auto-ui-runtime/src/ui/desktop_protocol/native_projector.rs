@@ -5615,7 +5615,7 @@ mod tests {
     #[test]
     fn native_queue_golden_003_shape() {
         let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../auto-lang/test/parity/native");
+            .join("../../../auto-lang/crates/auto-lang/test/parity/native");
         std::fs::create_dir_all(&dir).expect("mkdir test/parity/native");
         let mut p = proj_center_off(
             Converter {
@@ -6615,7 +6615,7 @@ mod tests {
     fn p033_vm_input_writeback_zero_param() {
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../examples/ui/003-converter/src/front/app.at"
+            "/../../../auto-lang/examples/ui/003-converter/src/front/app.at"
         );
         let Ok(src) = std::fs::read_to_string(path) else {
             eprintln!("[p033] skip: 003-converter 载体缺席");

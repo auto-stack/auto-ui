@@ -252,7 +252,7 @@ mod tests {
     fn example_source(dir: &str) -> String {
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../examples/ui/P/src/front/app.at"
+            "/../../../auto-lang/examples/ui/P/src/front/app.at"
         )
         .replace('P', dir);
         std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {path}: {e}"))
@@ -728,7 +728,7 @@ mod host_body {
         for name in &apps {
             let path = concat!(
                 env!("CARGO_MANIFEST_DIR"),
-                "/../../examples/ui/P/src/front/app.at"
+                "/../../../auto-lang/examples/ui/P/src/front/app.at"
             )
             .replace('P', name);
             let code =
@@ -764,7 +764,7 @@ mod host_body {
         }));
         // outproc 生产 spawner：真 auto.exe + 测试隔离 broker 管道名。
         let exe = auto_exe();
-        let app_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/ui");
+        let app_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../auto-lang/examples/ui");
         let pipe_for_spawn = broker_pipe.clone();
         session.desktop.outproc_spawner = Some(Arc::new(move |child_name| {
             let mut cmd = std::process::Command::new(&exe);

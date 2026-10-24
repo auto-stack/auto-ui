@@ -29,7 +29,7 @@ mod plan442_store_facade_tests {
     use auto_val::Value;
 
     fn locate_corpus() -> Option<std::path::PathBuf> {
-        let rel = "../auto-lang/test/ui/plan442_store_facade/src/front/app.at";
+        let rel = "../../../auto-lang/crates/auto-lang/test/ui/plan442_store_facade/src/front/app.at";
         let candidates = [
             std::env::var("CARGO_MANIFEST_DIR")
                 .ok()

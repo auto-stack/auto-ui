@@ -449,7 +449,7 @@ mod tests {
         assert!(json.to_string().find("89504e47").is_none());
 
         let api_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../examples/ui/031-image-viewer/src/back/api.at");
+            .join("../../../auto-lang/examples/ui/031-image-viewer/src/back/api.at");
         let api = std::fs::read_to_string(api_path).unwrap();
         for endpoint in [
             "open_file",

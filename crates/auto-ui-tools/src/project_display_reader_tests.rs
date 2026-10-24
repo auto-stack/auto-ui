@@ -67,9 +67,10 @@ fn compat(reason: CompatReason) -> ReadPath {
 }
 
 fn repo_root() -> std::path::PathBuf {
+    // PLAN-831 T-09（F831-09-01）：受管语料（git ls-files *.at/pac.at）的
+    // 单源 owner=语言仓——组内兄弟探测。
     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("..")
+        .join("../../../auto-lang")
         .canonicalize()
         .expect("repo root")
 }

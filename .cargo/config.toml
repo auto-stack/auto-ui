@@ -6,3 +6,9 @@ t = "nextest run --workspace --lib"
 # ui_gen 单进程档（fix-ui-tier 语义：WidgetRegistry OnceLock 单进程一次；
 # 承接语言仓旧 tu 中 -p auto-ui-compiler 部分）
 tu = "test -p auto-ui-compiler --lib ui_gen::"
+
+# PLAN-831 T-09（F831-09-04，自语言仓 .cargo/config.toml 随迁）：深递归
+# 解析/构建测试超过 libtest 默认 2MB 线程栈（STATUS_STACK_OVERFLOW 实证
+# =coverage examples_001_005_all_covered）——仓库级抬高测试线程栈。
+[env]
+RUST_MIN_STACK = "16777216"

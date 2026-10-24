@@ -347,7 +347,7 @@ mod tests {
     fn example_source(dir: &str) -> String {
         // PLAN-552：构造语料双根——主根 examples/ui（001–005）优先，探针根
         // examples/capability-tests 兜底（p507/p515 随探针清退迁出）。
-        let base = concat!(env!("CARGO_MANIFEST_DIR"), "/../../");
+        let base = concat!(env!("CARGO_MANIFEST_DIR"), "/../../../auto-lang/");
         let path = ["examples/ui", "examples/capability-tests"]
             .iter()
             .map(|root| format!("{base}{root}/{dir}/src/front/app.at"))
@@ -360,7 +360,7 @@ mod tests {
     /// 018/021/024/041 的组件/页面引用需合体解析；仪器 native_flip_
     /// coverage_data_row 同径）。
     fn example_source_all(dir: &str) -> String {
-        let base = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/ui/");
+        let base = concat!(env!("CARGO_MANIFEST_DIR"), "/../../../auto-lang/examples/ui/");
         let front = format!("{base}{dir}/src/front");
         let mut srcs: Vec<std::path::PathBuf> = std::fs::read_dir(&front)
             .unwrap_or_else(|e| panic!("read {front}: {e}"))
@@ -597,7 +597,7 @@ mod tests {
         if mode == "native-full" || mode == "native-auto-full" {
             // 生产同型装载：单 app.at + path 上下文（`use` 模块声明由
             // loader 按 path 兄弟文件解析——018 book_store/021 页组件）。
-            let base = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/ui/");
+            let base = concat!(env!("CARGO_MANIFEST_DIR"), "/../../../auto-lang/examples/ui/");
             let path = format!("{base}{app}/src/front/app.at");
             let src = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {path}: {e}"));
             let component = crate::build_dynamic_component(&src, Some(&path))
@@ -676,18 +676,21 @@ mod tests {
         if std::env::var("AUTO_DESKTOP_E2E").as_deref() != Ok("1") {
             return;
         }
-        let manifest = env!("CARGO_MANIFEST_DIR");
+        let manifest = {
+            let r = crate::ui::desktop_protocol::e2e_exe::lang_repo_root();
+            r.to_string_lossy().into_owned()
+        };
         let exe_c = std::env::var("AUTO_025_NATIVE_EXE")
-            .unwrap_or_else(|_| format!("{manifest}/../../target/debug/converter.exe"));
+            .unwrap_or_else(|_| format!("{manifest}/target/debug/converter.exe"));
         let dir_c = std::path::PathBuf::from(
             std::env::var("AUTO_025_NATIVE_APP_DIR")
-                .unwrap_or_else(|_| format!("{manifest}/../../scratch025/003-converter")),
+                .unwrap_or_else(|_| format!("{manifest}/scratch025/003-converter")),
         );
         let exe_i = std::env::var("AUTO_025_INPUTS_EXE")
-            .unwrap_or_else(|_| format!("{manifest}/../../target/debug/inputs025.exe"));
+            .unwrap_or_else(|_| format!("{manifest}/target/debug/inputs025.exe"));
         let dir_i = std::path::PathBuf::from(
             std::env::var("AUTO_025_INPUTS_APP_DIR")
-                .unwrap_or_else(|_| format!("{manifest}/../../scratch025/025-inputs")),
+                .unwrap_or_else(|_| format!("{manifest}/scratch025/025-inputs")),
         );
         if !std::path::Path::new(&exe_c).is_file()
             || !dir_c.join("src/front/app.at").is_file()
@@ -960,7 +963,7 @@ mod tests {
         // 帧留痕（AUTO_025_ASSETS=1 → docs/plans/reports/assets/025/）。
         if std::env::var("AUTO_025_ASSETS").is_ok() {
             let assets = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../../docs/plans/reports/assets/025");
+                .join("../../../auto-lang/docs/plans/reports/assets/025");
             let _ = std::fs::create_dir_all(&assets);
             for (app, file) in [
                 ("003-converter", "converter-frame.txt"),
@@ -1480,7 +1483,7 @@ mod tests {
         if std::env::var("AUTO_036_ASSETS").is_ok() {
             let dir = concat!(
                 env!("CARGO_MANIFEST_DIR"),
-                "/../../docs/plans/reports/assets/036"
+                "/../../../auto-lang/docs/plans/reports/assets/036"
             );
             let _ = std::fs::create_dir_all(dir);
             let fmt = |l: &crate::ui::desktop_protocol::message::DrawList| {
@@ -1754,7 +1757,7 @@ mod tests {
         if std::env::var("AUTO_030_ASSETS").is_ok() {
             let dir = concat!(
                 env!("CARGO_MANIFEST_DIR"),
-                "/../../docs/plans/reports/assets/030"
+                "/../../../auto-lang/docs/plans/reports/assets/030"
             );
             let _ = std::fs::create_dir_all(dir);
             for (name, face) in [
@@ -1962,24 +1965,27 @@ mod tests {
         if std::env::var("AUTO_DESKTOP_E2E").as_deref() != Ok("1") {
             return;
         }
-        let manifest = env!("CARGO_MANIFEST_DIR");
+        let manifest = {
+            let r = crate::ui::desktop_protocol::e2e_exe::lang_repo_root();
+            r.to_string_lossy().into_owned()
+        };
         let exe_p = std::env::var("AUTO_026_PROFILE_EXE")
-            .unwrap_or_else(|_| format!("{manifest}/../../target/debug/profile-card.exe"));
+            .unwrap_or_else(|_| format!("{manifest}/target/debug/profile-card.exe"));
         let dir_p = std::path::PathBuf::from(
             std::env::var("AUTO_026_PROFILE_APP_DIR")
-                .unwrap_or_else(|_| format!("{manifest}/../../scratch026/profile-card")),
+                .unwrap_or_else(|_| format!("{manifest}/scratch026/profile-card")),
         );
         let exe_d = std::env::var("AUTO_026_DISPLAY_EXE")
-            .unwrap_or_else(|_| format!("{manifest}/../../target/debug/display026.exe"));
+            .unwrap_or_else(|_| format!("{manifest}/target/debug/display026.exe"));
         let dir_d = std::path::PathBuf::from(
             std::env::var("AUTO_026_DISPLAY_APP_DIR")
-                .unwrap_or_else(|_| format!("{manifest}/../../scratch026/026-display")),
+                .unwrap_or_else(|_| format!("{manifest}/scratch026/026-display")),
         );
         let exe_c = std::env::var("AUTO_026_IME_EXE")
-            .unwrap_or_else(|_| format!("{manifest}/../../target/debug/converter.exe"));
+            .unwrap_or_else(|_| format!("{manifest}/target/debug/converter.exe"));
         let dir_c = std::path::PathBuf::from(
             std::env::var("AUTO_026_IME_APP_DIR")
-                .unwrap_or_else(|_| format!("{manifest}/../../scratch026/003-converter")),
+                .unwrap_or_else(|_| format!("{manifest}/scratch026/003-converter")),
         );
         if !std::path::Path::new(&exe_p).is_file()
             || !dir_p.join("src/front/app.at").is_file()
@@ -2287,7 +2293,7 @@ mod tests {
         // 帧留痕（AUTO_026_ASSETS=1 → docs/plans/reports/assets/026/）。
         if std::env::var("AUTO_026_ASSETS").is_ok() {
             let assets = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../../docs/plans/reports/assets/026");
+                .join("../../../auto-lang/docs/plans/reports/assets/026");
             let _ = std::fs::create_dir_all(&assets);
             for (app, file) in [
                 ("profile-card", "profile-card-frame.txt"),
@@ -2550,7 +2556,7 @@ mod tests {
         // 帧留痕（AUTO_028_ASSETS=1 → docs/plans/reports/assets/028/）。
         if std::env::var("AUTO_028_ASSETS").is_ok() {
             let assets = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../../docs/plans/reports/assets/028");
+                .join("../../../auto-lang/docs/plans/reports/assets/028");
             let _ = std::fs::create_dir_all(&assets);
             for (app, file) in [
                 ("004-profile-card", "profile-card-frame.txt"),
@@ -2782,7 +2788,7 @@ mod tests {
         // 帧留痕（AUTO_029_ASSETS=1 → docs/plans/reports/assets/029/）。
         if std::env::var("AUTO_029_ASSETS").is_ok() {
             let assets = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../../docs/plans/reports/assets/029");
+                .join("../../../auto-lang/docs/plans/reports/assets/029");
             let _ = std::fs::create_dir_all(&assets);
             if let Some(list) = session
                 .broker_clients
@@ -2990,7 +2996,7 @@ mod tests {
         // 帧留痕（AUTO_029_ASSETS=1 → docs/plans/reports/assets/029/）。
         if std::env::var("AUTO_029_ASSETS").is_ok() {
             let assets = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../../docs/plans/reports/assets/029");
+                .join("../../../auto-lang/docs/plans/reports/assets/029");
             let _ = std::fs::create_dir_all(&assets);
             if let Some(list) = session
                 .broker_clients
@@ -4453,7 +4459,7 @@ mod tests {
         // 生产 spawner 的测试镜像：exe = 真 auto 二进制（与 spawn_outproc_child
         // 唯一差异 = broker 管道名测试隔离）。
         let exe = auto_exe();
-        let app_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/ui");
+        let app_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../auto-lang/examples/ui");
         let pipe_for_spawn = broker_pipe.clone();
         session.desktop.outproc_spawner = Some(std::sync::Arc::new(move |child_name| {
             let mut cmd = std::process::Command::new(&exe);
@@ -4974,7 +4980,7 @@ mod tests {
             std::env::var("AUTO_694_NATIVE_APP_DIR").unwrap_or_else(|_| {
                 concat!(
                     env!("CARGO_MANIFEST_DIR"),
-                    "/../../examples/ui/003-converter"
+                    "/../../../auto-lang/examples/ui/003-converter"
                 )
                 .to_string()
             }),
@@ -5583,7 +5589,7 @@ mod tests {
         ///（truncate/codeeditor）——queue 门 ensure_covered 拒绝退出，
         /// 缺项载荷逐字断言（I3/AC-04 纪律的 e2e 面）。
         {
-            let base = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/ui/");
+            let base = concat!(env!("CARGO_MANIFEST_DIR"), "/../../../auto-lang/examples/ui/");
             for (name, want) in [
                 ("018-book-reader", "style:truncate"),
                 ("041-auto-edit", "tag:codeeditor"),
@@ -5660,7 +5666,7 @@ mod tests {
         // 帧留痕（AUTO_032_ASSETS=1 → docs/plans/reports/assets/032/）。
         if std::env::var("AUTO_032_ASSETS").is_ok() {
             let assets = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../../docs/plans/reports/assets/032");
+                .join("../../../auto-lang/docs/plans/reports/assets/032");
             let _ = std::fs::create_dir_all(&assets);
             for (name, _, _) in legs {
                 if let Some(list) = session
@@ -5956,8 +5962,7 @@ mod tests {
         if std::env::var("AUTO_DESKTOP_E2E").as_deref() != Ok("1") {
             return;
         }
-        let manifest = env!("CARGO_MANIFEST_DIR");
-        let repo = std::path::Path::new(manifest).join("../../");
+        let repo = crate::ui::desktop_protocol::e2e_exe::lang_repo_root();
         let dir_converter = repo.join("examples/ui/003-converter");
         let dir_hello = repo.join("examples/ui/001-helloworld");
         if !dir_converter.join("src/front/app.at").is_file()
@@ -6417,8 +6422,7 @@ child:
         if std::env::var("AUTO_DESKTOP_E2E").as_deref() != Ok("1") {
             return;
         }
-        let manifest = env!("CARGO_MANIFEST_DIR");
-        let repo = std::path::Path::new(manifest).join("../../");
+        let repo = crate::ui::desktop_protocol::e2e_exe::lang_repo_root();
         let dir_fm = repo.join("examples/ui/027-file-manager");
         let dir_conv = repo.join("examples/ui/003-converter");
         if !dir_fm.join("src/front/app.at").is_file()
@@ -6628,8 +6632,7 @@ child:
         if std::env::var("AUTO_DESKTOP_E2E").as_deref() != Ok("1") {
             return;
         }
-        let manifest = env!("CARGO_MANIFEST_DIR");
-        let repo = std::path::Path::new(manifest).join("../../");
+        let repo = crate::ui::desktop_protocol::e2e_exe::lang_repo_root();
         let dir_converter = repo.join("examples/ui/003-converter");
         if !dir_converter.join("src/front/app.at").is_file() {
             eprintln!("[p034] skip: 载体缺席");
@@ -6856,8 +6859,7 @@ child:
         if std::env::var("AUTO_DESKTOP_E2E").as_deref() != Ok("1") {
             return;
         }
-        let manifest = env!("CARGO_MANIFEST_DIR");
-        let repo = std::path::Path::new(manifest).join("../../");
+        let repo = crate::ui::desktop_protocol::e2e_exe::lang_repo_root();
         let dir_canvas = repo.join("examples/capability-tests/043-canvas-paint");
         if !dir_canvas.join("src/front/app.at").is_file() {
             eprintln!("[p034] skip: 043 载体缺席");

@@ -14,11 +14,8 @@
 use std::path::PathBuf;
 
 fn repo_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .ancestors()
-        .nth(2)
-        .map(std::path::Path::to_path_buf)
-        .expect("CARGO_MANIFEST_DIR has a repo-root ancestor")
+    // PLAN-831 T-09（F831-09-01）：examples 单源 owner=语言仓（组内兄弟）。
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../auto-lang")
 }
 
 /// PLAN-689：047-bp-admin 迁出 examples/ui 升格独立示例 examples/bp-admin，

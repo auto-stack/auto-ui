@@ -16618,7 +16618,7 @@ widget T {
     fn test_tabs_codegen_046_compiles() {
         let src = std::fs::read_to_string(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../examples/capability-tests/tabs-variants/src/front/app.at"
+            "/../../../auto-lang/examples/capability-tests/tabs-variants/src/front/app.at"
         ))
         .expect("read 046 app.at");
         let session = auto_lang_core::session::CompilerSession::ui().with_backend("rust");

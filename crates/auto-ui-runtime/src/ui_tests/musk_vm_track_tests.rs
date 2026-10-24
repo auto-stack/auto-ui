@@ -1582,7 +1582,7 @@ mod musk_vm_track_p053_8_click_arg_drift {
 #[cfg(all(test, feature = "ui-iced"))]
 mod musk_vm_track_p053_8_corpus {
     fn build() -> Option<crate::ui::dynamic::DynamicComponent> {
-        let rel = "../auto-lang/test/ui/plan053_p8_click_arg/src/front/app.at";
+        let rel = "../../../auto-lang/test/ui/plan053_p8_click_arg/src/front/app.at";
         let manifest = [
             std::env::var("CARGO_MANIFEST_DIR")
                 .ok()
@@ -3977,7 +3977,7 @@ mod musk_vm_track_p057_nested_stringify {
 #[cfg(feature = "ui-interpreter")]
 mod musk_vm_track_p062_heap_soak {
     fn locate_corpus() -> Option<std::path::PathBuf> {
-        let rel = "../auto-lang/test/ui/plan062_memleak/src/front/app.at";
+        let rel = "../../../auto-lang/test/ui/plan062_memleak/src/front/app.at";
         [
             std::env::var("CARGO_MANIFEST_DIR")
                 .ok()
@@ -4080,7 +4080,7 @@ mod musk_vm_track_p062_heap_soak {
 #[cfg(feature = "ui-interpreter")]
 mod probe_rc_leak_soak {
     fn locate_corpus() -> Option<std::path::PathBuf> {
-        let rel = "../auto-lang/test/ui/probe_rc_leak/src/front/app.at";
+        let rel = "../../../auto-lang/test/ui/probe_rc_leak/src/front/app.at";
         [
             std::env::var("CARGO_MANIFEST_DIR")
                 .ok()

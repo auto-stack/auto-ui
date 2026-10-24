@@ -109,6 +109,20 @@ pub use transport::{Transport, TransportError};
 pub(crate) mod e2e_exe {
     use std::path::{Path, PathBuf};
 
+    /// PLAN-831 T-09（F831-09-01）：`auto` CLI / examples/ui / e2e 产物的
+    /// 单源 owner=语言仓（UI 包组迁出后）。定位序：AUTO_LANG_ROOT → 组内
+    /// 兄弟 ../../../auto-lang → D:/autostack 主检出（AGENTS 解析序）。
+    pub(crate) fn lang_repo_root() -> PathBuf {
+        if let Some(p) = std::env::var_os("AUTO_LANG_ROOT") {
+            return p.into();
+        }
+        let sibling = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../auto-lang");
+        if sibling.join("crates").join("auto").is_dir() {
+            return sibling;
+        }
+        PathBuf::from("D:/autostack/auto-lang")
+    }
+
     /// `crates/` 树下最新 `.rs` 的 (mtime, 路径)（跳过 target/node_modules）。
     fn newest_source(root: &Path) -> Option<(std::time::SystemTime, PathBuf)> {
         fn walk(dir: &Path, best: &mut Option<(std::time::SystemTime, PathBuf)>) {
@@ -148,11 +162,11 @@ pub(crate) mod e2e_exe {
 
     /// 定位 + 陈旧防护（stage3/remote 两处 `auto_exe()` 共用体）。
     pub fn locate_with_stale_guard() -> PathBuf {
-        let target = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target");
+        let target = lang_repo_root().join("target");
         let build = || {
             let status = std::process::Command::new("cargo")
                 .args(["build", "-p", "auto", "--bin", "auto"])
-                .current_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
+                .current_dir(lang_repo_root())
                 .status()
                 .expect("spawn cargo build -p auto");
             assert!(status.success(), "cargo build -p auto 失败");
@@ -175,7 +189,7 @@ pub(crate) mod e2e_exe {
         for profile in profiles {
             let p = target.join(profile).join("auto.exe");
             if p.exists() {
-                let src_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+                let src_root = lang_repo_root();
                 if let Some(newer) = stale_against(&p, &src_root.join("crates")) {
                     eprintln!(
                         "[auto_exe] 警告: {} 陈旧于最新源码（{}）——先重建再下\"回归\"结论；AUTO_FRESH_EXE=1 强制重建",

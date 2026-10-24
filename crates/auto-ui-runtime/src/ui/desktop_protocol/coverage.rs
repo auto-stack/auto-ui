@@ -1139,7 +1139,7 @@ mod tests {
     fn scan_example(dir: &str) -> ViewScan {
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../examples/ui/",
+            "/../../../auto-lang/examples/ui/",
             "PLACEHOLDER/src/front/app.at"
         )
         .replace("PLACEHOLDER", dir);
@@ -1579,8 +1579,8 @@ mod tests {
             .iter()
             .map(|root| {
                 std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                    .join("../../")
-                    .join(root)
+                    .join("../../../auto-lang/examples")
+                    .join(root.trim_start_matches("examples/"))
                     .join(dir)
                     .join("src/front")
             })
@@ -1695,7 +1695,7 @@ mod tests {
     /// component.view()）即本口径。
     #[test]
     fn native_gate_runtime_views_of_six() {
-        let base = concat!(env!("CARGO_MANIFEST_DIR"), "/../../");
+        let base = concat!(env!("CARGO_MANIFEST_DIR"), "/../../../auto-lang/");
         // (例, 期望缺项——None = Covered)。tabs-variants 已迁
         // capability-tests（双根解析）。
         let expect: &[(&str, Option<&str>)] = &[
@@ -1750,7 +1750,7 @@ mod tests {
         use crate::ui::vm_bridge::VmBridge;
 
         let examples_dir =
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/ui");
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../auto-lang/examples/ui");
         // (name, covered, 缺项/失败原因)
         let mut rows: Vec<(String, bool, String)> = Vec::new();
         let mut dirs: Vec<std::path::PathBuf> = std::fs::read_dir(&examples_dir)
@@ -1888,7 +1888,7 @@ mod tests {
         use crate::ui::vm_bridge::VmBridge;
         use std::collections::BTreeMap;
 
-        let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples");
+        let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../auto-lang/examples");
         let mut roots: Vec<(String, std::path::PathBuf)> = Vec::new();
         for root in ["ui", "capability-tests"] {
             let p = base.join(root);

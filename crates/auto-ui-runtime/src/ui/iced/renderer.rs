@@ -34916,9 +34916,7 @@ mod tests {
     fn t540_resolver_session() -> crate::ui::session::DesktopSession {
         let mut ds = t3_session_with_shell();
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("..")
-            .join("..")
-            .join("examples")
+            .join("../../../auto-lang/examples")
             .join("ui");
         let apps = std::sync::Arc::new(crate::ui::app_registry::scan_apps(
             &root,
@@ -38559,7 +38557,7 @@ mod tests {
         .iter()
         .map(|s| s.to_string())
         .collect();
-        if let Ok(entries) = std::fs::read_dir("../../examples/ui") {
+        if let Ok(entries) = std::fs::read_dir("../../../auto-lang/examples/ui") {
             for e in entries.flatten() {
                 let pac = e.path().join("pac.at");
                 if let Ok(content) = std::fs::read_to_string(&pac) {

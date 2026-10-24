@@ -953,13 +953,21 @@ mod tests {
         );
     }
 
-    /// 仓库 examples/ui 绝对路径（crate 目录两层上）。
+    /// examples/ui 绝对路径。PLAN-831 T-09（F831-09-01）：单源 owner=语言仓
+    /// （UI 包组迁出后）——定位序 AUTO_LANG_ROOT → 组内兄弟
+    /// ../../../auto-lang → D:/autostack 主检出（AGENTS 解析序）。
     fn repo_examples_ui() -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("..")
-            .join("..")
-            .join("examples")
-            .join("ui")
+        let lang = std::env::var_os("AUTO_LANG_ROOT")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| {
+                let sibling = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../auto-lang");
+                if sibling.join("examples").join("ui").is_dir() {
+                    sibling
+                } else {
+                    PathBuf::from("D:/autostack/auto-lang")
+                }
+            });
+        lang.join("examples").join("ui")
     }
 
     #[test]

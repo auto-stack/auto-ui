@@ -23,7 +23,7 @@
 #[cfg(test)]
 mod plan442_sched_tests {
     fn locate_corpus() -> Option<std::path::PathBuf> {
-        let rel = "../auto-lang/test/ui/plan442_sched/src/front/app.at";
+        let rel = "../../../auto-lang/crates/auto-lang/test/ui/plan442_sched/src/front/app.at";
         let candidates = [
             std::env::var("CARGO_MANIFEST_DIR")
                 .ok()

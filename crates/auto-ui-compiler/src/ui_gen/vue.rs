@@ -23487,7 +23487,7 @@ widget W {
         // use{package} → known_sub_widgets 折叠解析。
         use crate::ui_gen::{generate_component_from_file, ComponentGenOptions};
         let result = generate_component_from_file(
-            std::path::Path::new("../../examples/ui/024-charts/src/front/app.at"),
+            std::path::Path::new("../../../auto-lang/examples/ui/024-charts/src/front/app.at"),
             ComponentGenOptions {
                 shadcn: Some(true),
                 ..Default::default()

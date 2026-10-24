@@ -118,7 +118,7 @@ fn build_gallery_page(page_file: &str, widget_name: &str) -> Option<View<Dynamic
             .ok()
             .map(|d| {
                 std::path::PathBuf::from(d).join(format!(
-                    "../../examples/widgets-gallery/src/front/pages/{}",
+                    "../../../auto-lang/examples/widgets-gallery/src/front/pages/{}",
                     page_file
                 ))
             })

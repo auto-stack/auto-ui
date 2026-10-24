@@ -6838,9 +6838,11 @@ pub fn answer() int { return 42 }
             out_project.join("rust-workspace"),
             "仓外项目落 project-local"
         );
-        // 框架内：本仓（worktree）下的真实路径（包根 current_dir）→ 共享
-        // 工作区（零变化）。
-        let in_project = std::env::current_dir().unwrap();
+        // 框架内：语言仓（rust-workspace 单源 owner）下的真实路径 → 共享
+        // 工作区（PLAN-831 T-09：tools 迁独立 UI 仓后 cwd 不再是"框架内"
+        // 项目——样本改经解析序定位语言仓根，语义断言不变）。
+        let in_project = find_lang_repo_root(&std::env::current_dir().unwrap())
+            .expect("lang repo via 解析序");
         assert_eq!(
             resolve_rust_workspace_dir(&in_project),
             get_rust_workspace_dir(),

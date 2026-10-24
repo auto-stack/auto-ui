@@ -55,7 +55,7 @@ mod derive_event_name_contract {
 #[cfg(feature = "ui-interpreter")]
 mod backfill_seq_gate {
     fn locate_corpus() -> Option<std::path::PathBuf> {
-        let rel = "../auto-lang/test/ui/plan062_memleak/src/front/app.at";
+        let rel = "../../../auto-lang/test/ui/plan062_memleak/src/front/app.at";
         [
             std::env::var("CARGO_MANIFEST_DIR")
                 .ok()

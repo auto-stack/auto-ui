@@ -2405,11 +2405,11 @@ mod tests {
 
         let conv_path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../examples/ui/003-converter/src/front/app.at"
+            "/../../../auto-lang/examples/ui/003-converter/src/front/app.at"
         );
         let hello_path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../examples/ui/001-helloworld/src/front/app.at"
+            "/../../../auto-lang/examples/ui/001-helloworld/src/front/app.at"
         );
         let conv_src = match std::fs::read_to_string(conv_path) {
             Ok(s) => s,
@@ -2653,7 +2653,7 @@ mod tests {
 
         let conv_path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../examples/ui/003-converter/src/front/app.at"
+            "/../../../auto-lang/examples/ui/003-converter/src/front/app.at"
         );
         let conv_src = match std::fs::read_to_string(conv_path) {
             Ok(s) => s,
@@ -2849,7 +2849,7 @@ mod tests {
 
         let conv_path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../examples/ui/003-converter/src/front/app.at"
+            "/../../../auto-lang/examples/ui/003-converter/src/front/app.at"
         );
         let conv_src = match std::fs::read_to_string(conv_path) {
             Ok(s) => s,

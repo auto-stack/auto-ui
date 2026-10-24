@@ -25,7 +25,7 @@ use auto_lang_core::vm::virt_memory::VirtualFlash;
 
 fn fixtures_root() -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../examples/ui/031-image-viewer/tests/fixtures")
+        .join("../../../auto-lang/examples/ui/031-image-viewer/tests/fixtures")
 }
 
 fn task_vm() -> (AutoTask, AutoVM) {
@@ -38,7 +38,7 @@ fn task_vm() -> (AutoTask, AutoVM) {
 
 #[test]
 fn media_consumers_have_no_ui_path_references() {
-    let stdlib_rs = include_str!("../../../auto-lang-core/src/vm/ffi/stdlib.rs");
+    let stdlib_rs = include_str!("../../../../../auto-lang/crates/auto-lang-core/src/vm/ffi/stdlib.rs");
     assert!(
         !stdlib_rs.contains("ui::image_pipeline"),
         "vm/ffi/stdlib.rs 不得再含 ui::image_pipeline 直引形态（PLAN-811 \
@@ -94,7 +94,7 @@ fn sixteen_fixed_image_native_ids_are_frozen_and_thumb_has_no_fixed_id() {
         "auto.image.thumb 无固定 ID——按名注册语义冻结（PLAN-811 合同基线 §4）"
     );
     // 声明文件 17 项 #[vm] 与注册名一一对应。
-    let decl = include_str!("../../../../stdlib/auto/image.vm.at");
+    let decl = include_str!("../../../../../auto-lang/stdlib/auto/image.vm.at");
     let declared: Vec<&str> = decl
         .lines()
         .filter_map(|l| {

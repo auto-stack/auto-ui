@@ -78,7 +78,7 @@ fn build_gallery_page(page_file: &str, widget_name: &str) -> Option<View<Dynamic
             .ok()
             .map(|d| {
                 std::path::PathBuf::from(d).join(format!(
-                    "../../examples/widgets-gallery/src/front/pages/{}",
+                    "../../../auto-lang/examples/widgets-gallery/src/front/pages/{}",
                     page_file
                 ))
             })
@@ -235,7 +235,7 @@ fn plan412_layout_pages_generate_vue_sfc() {
         // PLAN-590:画廊迁 auto-os 顶层后的新家(解析序定位)。
         g.join("src/front/pages")
     } else {
-        manifest.join("../../examples/widgets-gallery/src/front/pages")
+        manifest.join("../../../auto-lang/examples/widgets-gallery/src/front/pages")
     };
     let base = if base.exists() {
         base
@@ -555,7 +555,7 @@ fn plan412_routes_registered() {
         std::env::var("CARGO_MANIFEST_DIR")
             .ok()
             .map(|d| {
-                std::path::PathBuf::from(d).join("../../examples/widgets-gallery/src/front/app.at")
+                std::path::PathBuf::from(d).join("../../../auto-lang/examples/widgets-gallery/src/front/app.at")
             })
             .filter(|p| p.exists()),
         Some(std::path::PathBuf::from(

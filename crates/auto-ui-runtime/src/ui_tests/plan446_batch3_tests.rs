@@ -123,7 +123,7 @@ mod plan446_batch3_d2_ui {
     #[cfg(feature = "ui-interpreter")]
     #[test]
     fn d2_handler_loop_var_field_read() {
-        let rel = "../auto-lang/test/ui/plan446_d2_handler_read/src/front/app.at";
+        let rel = "../../../auto-lang/crates/auto-lang/test/ui/plan446_d2_handler_read/src/front/app.at";
         let candidates = [
             std::env::var("CARGO_MANIFEST_DIR")
                 .ok()

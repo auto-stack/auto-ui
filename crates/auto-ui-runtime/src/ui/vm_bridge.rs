@@ -5615,9 +5615,7 @@ widget OpProbeOrig {
         use auto_lang_core::parser::Parser;
         use auto_lang_core::session::CompilerSession;
         let front = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("..")
-            .join("..")
-            .join("examples/ui/003-converter/src/front");
+            .join("../../../auto-lang/examples/ui/003-converter/src/front");
         let app_src = std::fs::read_to_string(front.join("app.at")).expect("read app.at");
         let session = CompilerSession::ui();
         let mut parser = Parser::from(&app_src).with_session(session);

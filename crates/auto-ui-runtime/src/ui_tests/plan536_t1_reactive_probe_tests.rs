@@ -20,7 +20,7 @@ mod plan536_t1_reactive_probe_tests {
     fn locate_corpus() -> Option<std::path::PathBuf> {
         // 指向 app.at（非 pac.at——build_component_from_app 从 manifest
         // 内容里找根 WidgetDecl，裸 manifest 会静默返回 None）。
-        let rel = "../auto-lang/test/ui/plan051_timer/src/front/app.at";
+        let rel = "../../../auto-lang/test/ui/plan051_timer/src/front/app.at";
         [
             std::env::var("CARGO_MANIFEST_DIR")
                 .ok()
@@ -214,7 +214,7 @@ mod plan536_t1_reactive_probe_tests {
     // ── 双臂语料（test/ui/plan536_reactive/）：直绑 vs 子件 prop ──────────
 
     fn locate_reactive_corpus() -> Option<std::path::PathBuf> {
-        let rel = "../auto-lang/test/ui/plan536_reactive/src/front/app.at";
+        let rel = "../../../auto-lang/test/ui/plan536_reactive/src/front/app.at";
         [
             std::env::var("CARGO_MANIFEST_DIR")
                 .ok()
@@ -360,7 +360,7 @@ mod plan536_t1_reactive_probe_tests {
     // ── T6 absolute 定位原语（题5）：row/button 载体全链 hoist ────────────
 
     fn locate_absolute_corpus() -> Option<std::path::PathBuf> {
-        let rel = "../auto-lang/test/ui/plan536_absolute/src/front/app.at";
+        let rel = "../../../auto-lang/test/ui/plan536_absolute/src/front/app.at";
         [
             std::env::var("CARGO_MANIFEST_DIR")
                 .ok()
@@ -698,7 +698,7 @@ mod plan536_t1_reactive_probe_tests {
     }
 
     fn locate_modal_corpus() -> Option<std::path::PathBuf> {
-        let rel = "../auto-lang/test/ui/plan536_modal/src/front/app.at";
+        let rel = "../../../auto-lang/test/ui/plan536_modal/src/front/app.at";
         [
             std::env::var("CARGO_MANIFEST_DIR")
                 .ok()
@@ -817,7 +817,7 @@ mod plan534_side_panel_probe_tests {
     use crate::ui::view::{PopoverPlacement, View};
 
     fn locate_corpus() -> Option<std::path::PathBuf> {
-        let rel = "../auto-lang/test/ui/plan534_side_panels/src/front/app.at";
+        let rel = "../../../auto-lang/test/ui/plan534_side_panels/src/front/app.at";
         [
             std::env::var("CARGO_MANIFEST_DIR")
                 .ok()

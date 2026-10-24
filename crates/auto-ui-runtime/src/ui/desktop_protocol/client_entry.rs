@@ -226,7 +226,7 @@ mod tests {
     use crate::ui::desktop_protocol::endpoint::FrameSource;
 
     fn example_source(dir: &str) -> Option<String> {
-        let base = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/ui/");
+        let base = concat!(env!("CARGO_MANIFEST_DIR"), "/../../../auto-lang/examples/ui/");
         let path = format!("{base}{dir}/src/front/app.at");
         std::fs::read_to_string(&path).ok()
     }

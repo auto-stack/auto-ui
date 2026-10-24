@@ -17,7 +17,7 @@
 mod plan051_ext_widget_tests {
     /// Corpus: src/front/app.at（含 use.web component Markdown + use.web.fn）。
     fn locate_corpus() -> Option<std::path::PathBuf> {
-        let rel = "../auto-lang/test/ui/plan051_ext_widget/src/front/app.at";
+        let rel = "../../../auto-lang/crates/auto-lang/test/ui/plan051_ext_widget/src/front/app.at";
         [
             std::env::var("CARGO_MANIFEST_DIR")
                 .ok()

@@ -34,7 +34,7 @@ mod plan622_store_facade_gap_tests {
     use auto_val::Value;
 
     fn locate_corpus(rel: &str) -> Option<std::path::PathBuf> {
-        let full = format!("../auto-lang/test/ui/plan622_store_facade/{}", rel);
+        let full = format!("../../../auto-lang/crates/auto-lang/test/ui/plan622_store_facade/{}", rel);
         let candidates = [
             std::env::var("CARGO_MANIFEST_DIR")
                 .ok()

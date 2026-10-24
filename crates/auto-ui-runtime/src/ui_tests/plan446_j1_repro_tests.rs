@@ -11,7 +11,7 @@ mod plan446_j1_repro {
     fn locate_b3_app() -> Option<std::path::PathBuf> {
         // 语料入库本仓 test/fixtures/plan446/(b955004 git archive 重建,PLAN-446 L 节):
         // crates/auto-lang → 3 级上溯 = worktree 根。
-        let rel = "../../test/fixtures/plan446/b3check/auto/src/front/app.at";
+        let rel = "../../../auto-lang/test/fixtures/plan446/b3check/auto/src/front/app.at";
         let cand = std::env::var("CARGO_MANIFEST_DIR")
             .ok()
             .map(|d| std::path::PathBuf::from(d).join(rel));
