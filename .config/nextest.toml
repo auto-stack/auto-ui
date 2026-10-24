@@ -1,0 +1,21 @@
+# PLAN-831 F831-09-04：UI 仓 nextest 档配置（承接语言仓 .config/nextest.toml
+# 中 UI 面的选择语义——五包 owner 迁入后原仓 default-filter 对本仓不再生效）。
+#
+# - ui_gen:: 排除日常档 t（fix-ui-tier 2026-09-30 语义随迁：代码生成测试族
+#   每进程重付 WidgetRegistry 构建税（OnceLock 在 nextest 每测试一进程模型下
+#   失效），归单进程 `cargo tu`（bare cargo test = 单进程 libtest，setup 全档
+#   只付一次）；t 不再双覆盖 ui_gen）。
+# - 本仓无登记的重内存测试（语言仓 .config/test-mem-weights.md 无 auto-ui 包
+#   条目；heavy_gate 体内守门在本仓无用户）→ 无需 test-groups 资源队列。
+#   机器级单实例闸门（画廊围栏/1M churn，D:/autostack/.locks/<family>.lock）
+#   仍归语言仓 heavy 族所有，不随五包迁移。
+# - slow-timeout 与语言仓同参（60s 警告 / 120s 终止）。
+# - t 档仅 --lib 面；integration 目标（tools 四件 + runtime osconfig）归
+#   `cargo ti` 档；native_dnd_e2e 为手工 native 门（`cargo tn`，双 feature
+#   真光标交互，不进日常/集成档）——三者共同保证原选择面零丢失。
+[profile.default]
+default-filter = "not test(ui_gen::)"
+
+[profile.default.slow-timeout]
+period = "60s"
+terminate-after = 2

@@ -1,11 +1,22 @@
 # PLAN-831 T-06：UI 仓测试档位（承接语言仓 t/tu 拆分——语言侧别名只保
 # auto-lang 面，UI 包族的档位随 owner 迁本仓）。
 [alias]
-# UI 仓日常档（五包 lib+integration；轻池，nextest 并行）
+# UI 仓日常档（五包 lib 面；ui_gen:: 经 .config/nextest.toml default-filter
+# 排除——F831-09-04：对齐语言仓 t 的 UI 面原语义，ui_gen 归 tu 单进程档，
+# t 不双覆盖；nextest 自动发现 .config/nextest.toml 的 filter/slow-timeout）
 t = "nextest run --workspace --lib"
 # ui_gen 单进程档（fix-ui-tier 语义：WidgetRegistry OnceLock 单进程一次；
 # 承接语言仓旧 tu 中 -p auto-ui-compiler 部分）
 tu = "test -p auto-ui-compiler --lib ui_gen::"
+# 集成档（F831-09-04）：tools 四目标（legacy 语义/lifecycle/资源清单/真进程
+# 协议）+ runtime osconfig（ui-iced 默认开；daemon 材料缺席测试体内自跳过）。
+# lifecycle 三测自带 heavy/env ignore——证据跑须 `--ignored` 串行，t/ti 默认
+# 不触发。
+ti = "nextest run -p auto-ui-tools -p auto-ui-runtime --test legacy_build_semantics --test lifecycle --test resources_manifest --test tool_process --test osconfig_integration"
+# native 手工档（原门保持：native-dnd+test-native-dock 双 feature × windows、
+# 真光标交互——开发机/专用 CI 档，不进日常/集成档；feature 关闭时目标编译
+# 为空）
+tn = "test -p auto-ui-runtime --features native-dnd,test-native-dock --test native_dnd_e2e"
 
 # PLAN-831 T-09（F831-09-04，自语言仓 .cargo/config.toml 随迁）：深递归
 # 解析/构建测试超过 libtest 默认 2MB 线程栈（STATUS_STACK_OVERFLOW 实证
