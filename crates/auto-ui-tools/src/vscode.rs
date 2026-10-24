@@ -686,6 +686,10 @@ fn run_vscode_project_inner(
 // Template generators
 // ---------------------------------------------------------------------------
 
+// PLAN-831 F831-09-03：scripts.build 不内嵌 `npm install`——安装归 build 流程的
+// Step 4（pkg::install 用当前请求的 PM）；pnpm 装的 node_modules 再被内嵌
+// npm install 混写会触发 npm 内部错（null matches 实测）。build=PM 无关
+// 直跑 compile 内容。
 fn generate_package_json(name: &str, config: &VscodeConfig) -> String {
     let command = &config.command;
     let title = &config.title;
@@ -732,7 +736,7 @@ fn generate_package_json(name: &str, config: &VscodeConfig) -> String {
     }},
     "scripts": {{
         "vscode:prepublish": "npm run compile",
-        "build": "npm install && npm run compile",
+        "build": "webpack --mode production",
         "compile": "webpack --mode production",
         "watch": "webpack --mode development --watch"
     }},
@@ -1232,7 +1236,10 @@ backend: ["vscode"]
         let json = generate_package_json("MyTool", &config);
         assert!(json.contains(r#""command": "my-tool.open""#));
         assert!(json.contains(r#""build""#));
-        assert!(json.contains(r#"npm install && npm run compile"#));
+        // F831-09-03：build=PM 无关直跑 webpack；内嵌 npm install 已移除
+        // （与 Step 4 的请求 PM 混用会 npm 内部错）。
+        assert!(json.contains(r#""build": "webpack --mode production""#));
+        assert!(!json.contains(r#"npm install"#));
         assert!(!json.contains(r#"webview"#)); // no webview scripts
         assert!(!json.contains(r#""dependencies""#)); // no vscode npm dep
     }
