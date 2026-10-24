@@ -1,0 +1,14 @@
+// Test for loop with array of simple values
+widget TestForLoop {
+    model {
+        items List = ["A", "B", "C"]
+    }
+
+    view {
+        Column() {
+            for item in .items {
+                Text item
+            }
+        }
+    }
+}
