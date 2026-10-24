@@ -3973,6 +3973,11 @@ const DELIVERY_ROOT_INPUTS: [&str; 5] = [
 struct DeliveryProjectionSpec {
     strip_deps: &'static [&'static str],
     feature_rewrites: &'static [(&'static str, &'static str)],
+    /// 跨仓 path 前缀改写（PLAN-831 T-06 起源仓分置：UI 仓 manifest 以
+    /// `../../../auto-lang/crates/` 指语言基础、语言仓 auto-lang 以
+    /// `../../../auto-ui/crates/` 指 UI 包组——拷入交付根后统一改写为
+    /// 包内兄弟 `../`）。子串替换，命中计入编辑记录（漂移判红面）。
+    path_rewrites: &'static [(&'static str, &'static str)],
 }
 
 const PROJECTION_AUTO_LANG: DeliveryProjectionSpec = DeliveryProjectionSpec {
@@ -3985,6 +3990,8 @@ const PROJECTION_AUTO_LANG: DeliveryProjectionSpec = DeliveryProjectionSpec {
         "test-cases = [\"dep:auto-test-case\", \"auto-lang-core/test-cases\"]",
         "test-cases = []",
     )],
+    // PLAN-831 T-06：auto-lang 对独立 UI 仓包组的跨仓 path → 交付根包内兄弟。
+    path_rewrites: &[("../../../auto-ui/crates/", "../")],
 };
 
 const PROJECTION_AUTO_UI_RUNTIME: DeliveryProjectionSpec = DeliveryProjectionSpec {
@@ -3997,11 +4004,21 @@ const PROJECTION_AUTO_UI_RUNTIME: DeliveryProjectionSpec = DeliveryProjectionSpe
         "autodown = [\"ui-iced\", \"dep:autodown-core\"]",
         "autodown = [\"ui-iced\"]",
     )],
+    path_rewrites: &[("../../../auto-lang/crates/", "../")],
 };
 
 const PROJECTION_AUTO_LANG_CORE: DeliveryProjectionSpec = DeliveryProjectionSpec {
     strip_deps: &["auto-test-case = { path = \"../auto-test-case\", optional = true }"],
     feature_rewrites: &[("test-cases = [\"dep:auto-test-case\"]", "test-cases = []")],
+    path_rewrites: &[],
+};
+
+/// PLAN-831 T-06 起 UI 仓侧受管 crate 的通用投影：跨仓语言基础 path 前缀
+/// 改写为交付根包内兄弟形态（runtime 另有 autodown 剥除 spec 覆盖）。
+const PROJECTION_AUTO_UI_CRATE: DeliveryProjectionSpec = DeliveryProjectionSpec {
+    strip_deps: &[],
+    feature_rewrites: &[],
+    path_rewrites: &[("../../../auto-lang/crates/", "../")],
 };
 
 /// 历史漂移家族（779/785 记录的 fresh-lock 失败面：wgpu-hal 宏边界 E0277
@@ -4144,6 +4161,34 @@ fn delivery_producer_root() -> AutoResult<PathBuf> {
     Err("delivery: producer 源根未解析（需含 crates/auto-lang 与根 Cargo.toml；可用 AUTO_DELIVERY_SOURCE_ROOT 钉死）".into())
 }
 
+/// PLAN-831 T-06 起受管 crate 源解析：语言根（producer_root/crates/<name>）
+/// 优先，缺席时按解析序查独立 UI 仓根——AUTO_UI_SOURCE_ROOT → producer
+/// 根的兄弟 auto-ui（组内 worktree/主检出同级布局均成立）。两根均缺=
+/// 具名判红（受管失败面）。
+fn delivery_crate_source(producer_root: &Path, name: &str) -> AutoResult<PathBuf> {
+    let primary = producer_root.join("crates").join(name);
+    if primary.is_dir() {
+        return Ok(primary);
+    }
+    let mut ui_candidates: Vec<PathBuf> = Vec::new();
+    if let Some(p) = std::env::var_os("AUTO_UI_SOURCE_ROOT") {
+        ui_candidates.push(PathBuf::from(p));
+    }
+    if let Some(sibling) = producer_root.parent() {
+        ui_candidates.push(sibling.join("auto-ui"));
+    }
+    for c in ui_candidates {
+        let src = c.join("crates").join(name);
+        if src.is_dir() {
+            return Ok(src);
+        }
+    }
+    Err(format!(
+        "delivery: 受管 crate 源未解析（crates/{name}；已查语言根与 UI 根[env AUTO_UI_SOURCE_ROOT / 兄弟 auto-ui]）——受管判红"
+    )
+    .into())
+}
+
 /// producer git 身份（best-effort：非 git 检出记录 null）。
 fn delivery_git_identity(root: &Path) -> (Option<String>, bool) {
     let run = |args: &[&str]| -> Option<String> {
@@ -4168,9 +4213,8 @@ fn delivery_git_identity(root: &Path) -> (Option<String>, bool) {
 /// ——PLAN-814 T-03 迁移后单源所在；blake3 over 排序 rel+内容，本指纹为
 /// 交付 manifest 的 producer 身份戳，算法独立于 build.rs 的 FNV 门）。
 fn delivery_ui_gen_fingerprint(root: &Path) -> AutoResult<String> {
-    let dir = root
-        .join("crates")
-        .join("auto-ui-compiler")
+    // PLAN-831 T-06 起单源在独立 UI 仓（delivery_crate_source 双根解析）。
+    let dir = delivery_crate_source(root, "auto-ui-compiler")?
         .join("src")
         .join("ui_gen");
     let mut entries: Vec<(String, Vec<u8>)> = Vec::new();
@@ -4439,17 +4483,28 @@ fn delivery_apply_projection(
         out.push(line);
     }
     let joined = out.join("\n");
-    let joined = if text.ends_with('\n') {
+    let mut joined = if text.ends_with('\n') {
         format!("{joined}\n")
     } else {
         joined
     };
+    // path_rewrites：跨仓 path 前缀 → 交付根包内兄弟（子串级；命中计入
+    // 编辑记录；**不参与严格计数**——无跨仓引用的 manifest 合法缺席该前缀，
+    // 与 strip/feature 的结构漂移判红性质不同）。
+    let mut path_edits: Vec<String> = Vec::new();
+    for &(from, to) in spec.path_rewrites {
+        if joined.contains(from) {
+            joined = joined.replace(from, to);
+            path_edits.push(format!("rewrite path: {from} -> {to}"));
+        }
+    }
     if joined != text {
         fs::write(vendored_manifest, &joined)
             .map_err(|e| format!("delivery: 写投影 manifest 失败: {e}"))?;
     }
     let expected = spec.strip_deps.len() + spec.feature_rewrites.len();
     if edits.len() == expected {
+        edits.extend(path_edits);
         return Ok(edits);
     }
     // 已投影形态（再交付/幂等重放）：strip 标记与改写前形态全缺席 + 改写后
@@ -4506,14 +4561,13 @@ fn delivery_guard_root(delivery_root: &Path) -> AutoResult<()> {
 fn delivery_preflight_producer(producer_root: &Path) -> AutoResult<()> {
     let mut missing: Vec<String> = Vec::new();
     for c in DELIVERY_CRATES {
-        if !producer_root
-            .join("crates")
-            .join(c)
-            .join("Cargo.toml")
-            .is_file()
+        if delivery_crate_source(producer_root, c)
+            .map(|src| src.join("Cargo.toml").is_file())
+            .unwrap_or(false)
         {
-            missing.push(format!("crates/{c}/Cargo.toml"));
+            continue;
         }
+        missing.push(format!("crates/{c}/Cargo.toml"));
     }
     for p in DELIVERY_PATCHES {
         if !producer_root
@@ -5179,12 +5233,7 @@ fn generate_rust_ui_delivery_inner(
     let mut projection_edits_core: Vec<String> = Vec::new();
     let mut projection_edits_runtime: Vec<String> = Vec::new();
     for name in DELIVERY_CRATES {
-        let src = producer_root.join("crates").join(name);
-        if !src.is_dir() {
-            return Err(
-                format!("delivery: producer 缺受管 crate 源（crates/{name}）——受管判红").into(),
-            );
-        }
+        let src = delivery_crate_source(&producer_root, name)?;
         let dst = delivery_root.join("crates").join(name);
         let copied = delivery_copy_dir(&src, &dst, &DELIVERY_COPY_SKIP_DIRS)?;
         total_files += copied.records.len() as u64;
@@ -5200,6 +5249,12 @@ fn generate_rust_ui_delivery_inner(
             edits =
                 delivery_apply_projection(&dst.join("Cargo.toml"), &PROJECTION_AUTO_UI_RUNTIME)?;
             projection_edits_runtime = edits.clone();
+        } else if matches!(
+            name,
+            "auto-ui-dialect" | "auto-ui-compiler" | "auto-ui-tools" | "shell-pack"
+        ) {
+            // PLAN-831 T-06：UI 仓侧受管 crate——跨仓语言基础 path 前缀投影。
+            edits = delivery_apply_projection(&dst.join("Cargo.toml"), &PROJECTION_AUTO_UI_CRATE)?;
         }
         crate_entries.push(serde_json::json!({
             "name": name,
@@ -6232,9 +6287,21 @@ mod tests {
     /// metadata 验收另由 driver/收尾证明承载）。
     #[test]
     fn delivery_crates_path_closure_is_complete() {
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        // PLAN-831 T-06 起双根布局：UI 仓 crate 在本仓 crates/，语言基础在
+        // 兄弟 auto-lang/crates/（与 delivery_crate_source 同序）。
+        let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let ui_crates = manifest_dir.parent().unwrap().to_path_buf();
+        let lang_crates = manifest_dir
+            .join("../../../auto-lang/crates")
+            .canonicalize()
+            .expect("兄弟 auto-lang/crates 在场（组布局）");
         for name in DELIVERY_CRATES {
-            let manifest_path = root.join(name).join("Cargo.toml");
+            let local = ui_crates.join(name);
+            let manifest_path = if local.join("Cargo.toml").is_file() {
+                local.join("Cargo.toml")
+            } else {
+                lang_crates.join(name).join("Cargo.toml")
+            };
             let manifest = std::fs::read_to_string(&manifest_path)
                 .unwrap_or_else(|e| panic!("{} manifest unreadable: {e}", name));
             let parsed: toml::Value = toml::from_str(&manifest)
@@ -6261,25 +6328,37 @@ mod tests {
                     let Some(path) = spec.get("path").and_then(|v| v.as_str()) else {
                         continue;
                     };
-                    if !path.replace(char::from(92), "/").starts_with("../") {
-                        continue; // 同 crate 内相对资源（tests/fixtures 等）不经 workspace 解析
+                    let norm = path.replace(char::from(92), "/");
+                    if !norm.starts_with("../") {
+                        continue; // 同 crate 内相对资源不经 workspace 解析
                     }
-                    let target = path.trim_start_matches("../");
-                    if target.contains("..") {
-                        continue; // 越出 workspace 的外部 path（如 auto-down）经投影剥除受管
-                    }
+                    // PLAN-831 T-06 跨仓前缀（交付投影改写前后的同一目标语义）：
+                    // ../../../auto-lang|auto-ui/crates/<n> → 目标=包名 <n>。
+                    let cross = norm
+                        .strip_prefix("../../../auto-lang/crates/")
+                        .or_else(|| norm.strip_prefix("../../../auto-ui/crates/"));
+                    let target: String = match cross {
+                        Some(t) => t.to_string(),
+                        None => {
+                            let t = norm.trim_start_matches("../");
+                            if t.contains("..") {
+                                continue; // 越出 workspace 的外部 path（如 auto-down）经投影剥除受管
+                            }
+                            t.to_string()
+                        }
+                    };
                     if stripped
                         .iter()
                         .any(|line| line.contains(&format!("{dep} = ")))
                     {
                         continue; // 投影 spec 已剥除该行
                     }
-                    let target = target.split('/').next().unwrap_or(target);
+                    let target = target.split('/').next().unwrap_or(&target).to_string();
                     if target == name {
                         continue;
                     }
                     assert!(
-                        DELIVERY_CRATES.contains(&target),
+                        DELIVERY_CRATES.contains(&target.as_str()),
                         "{name} 的 path 依赖 {target} 不在 DELIVERY_CRATES 且无投影剥除——交付根 fresh metadata 将 exit 101（R1-F01 缺陷类）"
                     );
                 }
@@ -7463,14 +7542,14 @@ pub fn create_item(name str) str {
 
     // ==================== PLAN-792 交付模式定向测试 ====================
 
-    /// 测试用 producer 源根（编译期 CARGO_MANIFEST_DIR 上溯到仓根——与
-    /// delivery_producer_root 的末位候选同源，测试内显式钉死避免 CWD 依赖）。
+    /// 测试用 producer 源根（PLAN-831 T-06 起双仓布局：语言根=兄弟仓
+    /// auto-lang；与 delivery_crate_source 的 UI 根推导同序——测试内显式
+    /// 钉死避免 CWD 依赖）。
     fn test_producer_root() -> PathBuf {
         let root = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .and_then(|p| p.parent())
-            .unwrap()
-            .to_path_buf();
+            .join("../../../auto-lang")
+            .canonicalize()
+            .expect("兄弟 auto-lang 仓在场（组布局）");
         assert!(root.join("crates").join("auto-lang").is_dir());
         root
     }
