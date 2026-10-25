@@ -15,14 +15,12 @@
 
 use crate::ui::app_registry::{scan_apps, ScanOptions};
 
-/// 仓库 examples/ui 绝对路径（crate 目录两层上）——与 compiler
+/// 组内兄弟语言仓 examples/ui 路径（crate 目录三层上到组根）——与 compiler
 /// `app_registry::tests` 同款 helper（本测试迁出后该处仍有 4 处消费，
 /// 各留单份不跨包共享测试私有件）。
 fn repo_examples_ui() -> std::path::PathBuf {
     // PLAN-831 T-09（F831-09-01）：examples/ui 单源 owner=语言仓（兄弟布局）。
     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("..")
         .join("..")
         .join("..")
         .join("..")
