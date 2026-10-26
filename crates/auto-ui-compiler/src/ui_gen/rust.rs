@@ -17306,9 +17306,7 @@ mod plan571_button_preset_codegen_tests {
     use super::*;
 
     fn gen_button_view(widget_src: &str) -> String {
-        let session = auto_lang_core::session::CompilerSession::ui();
-        let mut parser = auto_lang_core::Parser::from(widget_src).with_session(session);
-        let ast = crate::parse_ui(&src).expect("parse");
+        let ast = crate::parse_ui(widget_src).expect("parse");
         let mut codes = Vec::new();
         for stmt in ast.domain_stmts() {
             if let auto_ui_dialect::UiStmt::WidgetDecl(decl) = stmt {
