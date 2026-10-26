@@ -1916,10 +1916,7 @@ fn synthesize_state_type_from_decl(
 /// PR-3b: reads `decl.messages` directly. Returns `Type::StrSlice` as a
 /// permissive default when the payload type is absent/unresolvable (same
 /// behavior as the AuraWidget `handler_param_type`).
-fn handler_param_type_from_decl(
-    decl: &auto_ui_dialect::WidgetDecl,
-    handler_bare: &str,
-) -> Type {
+fn handler_param_type_from_decl(decl: &auto_ui_dialect::WidgetDecl, handler_bare: &str) -> Type {
     for msg in &decl.messages {
         if let Some(v) = msg
             .variants

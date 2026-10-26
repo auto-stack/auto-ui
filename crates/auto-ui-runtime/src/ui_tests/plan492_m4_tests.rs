@@ -8,7 +8,6 @@
 //! 点前缀 `.curve` 直接形态与带参 msg 声明在两链均正常。
 //! M6 后组件回归直接写法——本模块以无补丁基线钉住三副本直接形态。
 
-
 #[cfg(all(test, feature = "ui-iced"))]
 mod m4_pkg_compile_chain {
     use crate::ui_tests::plan492_tests::pkg_harness::{build_patched_gallery, render_dump};
@@ -124,7 +123,11 @@ mod m4_pkg_compile_chain {
         let code = std::fs::read_to_string(front.join("components/line_chart.at")).unwrap();
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = crate::Parser::from(code.as_str()).with_session(session);
-        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = auto_ui_dialect::UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let decl = ast
             .domain_stmts()
             .find_map(|s| match s {

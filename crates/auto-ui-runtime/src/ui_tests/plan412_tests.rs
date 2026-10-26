@@ -7,11 +7,10 @@
 //! 3. /grid-span 页 cell 的 col-span-N 进入 View::Grid 的 cell style(F2);
 //! 4. widgets-gallery 路由表含全部 12 条 Layout 路由。
 
-
 #![cfg(test)]
 
-use auto_ui_dialect::UiStmt;
 use auto_ui_dialect::UiCode;
+use auto_ui_dialect::UiStmt;
 
 use crate::ui::interpreter::DynamicMessage;
 use crate::ui::style::StyleClass;
@@ -102,9 +101,13 @@ fn build_gallery_page(page_file: &str, widget_name: &str) -> Option<View<Dynamic
     let code = std::fs::read_to_string(&path).ok()?;
     let session = auto_lang_core::session::CompilerSession::ui();
     let mut parser = crate::Parser::from(code.as_str()).with_session(session);
-    let ast = parser.parse_domain(&auto_ui_dialect::UiDialect).map(auto_ui_dialect::UiCode).ok()?;
+    let ast = parser
+        .parse_domain(&auto_ui_dialect::UiDialect)
+        .map(auto_ui_dialect::UiCode)
+        .ok()?;
     for stmt in ast.items() {
-        if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(decl)) = stmt {
+        if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(decl)) = stmt
+        {
             let widget = auto_ui_compiler::aura::extract_widget_from_decl(decl).ok()?;
             if widget.name != widget_name {
                 continue;
@@ -269,10 +272,11 @@ fn plan412_layout_pages_generate_vue_sfc() {
             .unwrap_or_else(|e| panic!("read {}: {}", file, e));
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = crate::Parser::from(code.as_str()).with_session(session);
-        let ast = auto_ui_dialect::UiCode(parser
+        let ast = auto_ui_dialect::UiCode(
+            parser
                 .parse_domain(&auto_ui_dialect::UiDialect)
-                .unwrap_or_else(|e| panic!("parse {}: {:?}", file, e))
-            );
+                .unwrap_or_else(|e| panic!("parse {}: {:?}", file, e)),
+        );
         let decl = ast
             .domain_stmts()
             .find_map(|s| match s {
@@ -303,7 +307,11 @@ fn build_view_from_src(src: &str) -> View<DynamicMessage> {
 
     let session = auto_lang_core::session::CompilerSession::ui();
     let mut parser = crate::Parser::from(src).with_session(session);
-    let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse app.at"));
+    let ast = UiCode(
+        parser
+            .parse_domain(&auto_ui_dialect::UiDialect)
+            .expect("parse app.at"),
+    );
     let decl = ast
         .domain_stmts()
         .find_map(|s| match s {
@@ -400,7 +408,11 @@ widget Sq {
 "#;
     let session = auto_lang_core::session::CompilerSession::ui();
     let mut parser = crate::Parser::from(src).with_session(session);
-    let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse app.at"));
+    let ast = UiCode(
+        parser
+            .parse_domain(&auto_ui_dialect::UiDialect)
+            .expect("parse app.at"),
+    );
     let decl = ast
         .domain_stmts()
         .find_map(|s| match s {
@@ -557,7 +569,8 @@ fn plan412_routes_registered() {
         std::env::var("CARGO_MANIFEST_DIR")
             .ok()
             .map(|d| {
-                std::path::PathBuf::from(d).join("../../../auto-lang/examples/widgets-gallery/src/front/app.at")
+                std::path::PathBuf::from(d)
+                    .join("../../../auto-lang/examples/widgets-gallery/src/front/app.at")
             })
             .filter(|p| p.exists()),
         Some(std::path::PathBuf::from(
@@ -574,10 +587,15 @@ fn plan412_routes_registered() {
     let code = std::fs::read_to_string(&path).expect("read app.at");
     let session = auto_lang_core::session::CompilerSession::ui();
     let mut parser = crate::Parser::from(code.as_str()).with_session(session);
-    let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse app.at"));
+    let ast = UiCode(
+        parser
+            .parse_domain(&auto_ui_dialect::UiDialect)
+            .expect("parse app.at"),
+    );
     let mut paths: Vec<String> = Vec::new();
     for stmt in ast.items() {
-        if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(decl)) = stmt {
+        if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(decl)) = stmt
+        {
             let widget =
                 auto_ui_compiler::aura::extract_widget_from_decl(decl).expect("extract App widget");
             if let Some(routes) = widget.routes {

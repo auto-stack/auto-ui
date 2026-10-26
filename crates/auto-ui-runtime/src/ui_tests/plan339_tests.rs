@@ -9,7 +9,6 @@
 //! `collect_module_imports` / `resolve_module_path` helpers and the
 //! `synthesize_widget_module` pipeline exactly as `run_file_dynamic_ui` does.
 
-
 #[cfg(test)]
 mod plan339_tests {
     use auto_lang_core::compile::CompileSession;
@@ -55,7 +54,10 @@ mod plan339_tests {
         };
         let mut parser = crate::Parser::new_with_type_store(code.as_str(), session.type_store())
             .with_session(parser_session);
-        let ast = match parser.parse_domain(&auto_ui_dialect::UiDialect).map(auto_ui_dialect::UiCode) {
+        let ast = match parser
+            .parse_domain(&auto_ui_dialect::UiDialect)
+            .map(auto_ui_dialect::UiCode)
+        {
             Ok(a) => a,
             Err(_) => return,
         };
@@ -296,10 +298,16 @@ pub fn create_note(title str, body str) Note {
         // 1. Extract the App widget.
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = crate::Parser::from(code.as_str()).with_session(session);
-        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse app.at"));
+        let ast = auto_ui_dialect::UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse app.at"),
+        );
         let mut widget = None;
         for stmt in ast.items() {
-            if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(decl)) = stmt {
+            if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(decl)) =
+                stmt
+            {
                 widget = Some(
                     auto_ui_compiler::aura::extract_widget_from_decl(decl)
                         .map_err(|e| e.to_string())
@@ -395,10 +403,16 @@ pub fn create_note(title str, body str) Note {
 
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = crate::Parser::from(code.as_str()).with_session(session);
-        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse app.at"));
+        let ast = auto_ui_dialect::UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse app.at"),
+        );
         let mut widget = None;
         for stmt in ast.items() {
-            if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(decl)) = stmt {
+            if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(decl)) =
+                stmt
+            {
                 widget = Some(
                     auto_ui_compiler::aura::extract_widget_from_decl(decl)
                         .map_err(|e| e.to_string())

@@ -2,15 +2,19 @@
 // styled_vtree 节点可见性 + path 对齐 + extract on_click。直接内联树体
 // (子 widget emit 路由由 child_emit::tests 的 T614Widget 用例另护)。
 #![cfg(test)]
-use auto_ui_dialect::UiStmt;
-use auto_ui_dialect::UiCode;
 use crate::ui::interpreter::DynamicMessage;
 use crate::ui::view::View;
+use auto_ui_dialect::UiCode;
+use auto_ui_dialect::UiStmt;
 
 fn build_view(src: &str) -> View<DynamicMessage> {
     let session = auto_lang_core::session::CompilerSession::ui();
     let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-    let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+    let ast = UiCode(
+        parser
+            .parse_domain(&auto_ui_dialect::UiDialect)
+            .expect("parse"),
+    );
     let decls: Vec<auto_ui_dialect::WidgetDecl> = ast
         .domain_stmts()
         .filter_map(|st| match st {

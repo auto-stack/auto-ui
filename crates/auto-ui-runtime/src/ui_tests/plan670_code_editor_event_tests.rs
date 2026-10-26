@@ -8,8 +8,8 @@
 
 #![cfg(test)]
 
-use auto_ui_dialect::UiStmt;
 use auto_ui_dialect::UiCode;
+use auto_ui_dialect::UiStmt;
 
 use crate::ui::interpreter::DynamicMessage;
 use crate::ui::view::View;
@@ -18,7 +18,11 @@ use crate::ui::view::View;
 fn build_view(src: &str) -> View<DynamicMessage> {
     let session = auto_lang_core::session::CompilerSession::ui();
     let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-    let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+    let ast = UiCode(
+        parser
+            .parse_domain(&auto_ui_dialect::UiDialect)
+            .expect("parse"),
+    );
     let decls: Vec<auto_ui_dialect::WidgetDecl> = ast
         .domain_stmts()
         .filter_map(|st| match st {

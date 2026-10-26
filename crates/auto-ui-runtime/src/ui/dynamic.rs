@@ -3550,7 +3550,7 @@ fn find_span_dfs(
 #[cfg(test)]
 mod tests {
     use super::*;
-        use auto_lang_core::ast::Expr;
+    use auto_lang_core::ast::Expr;
     use auto_lang_core::ast::Type;
     use auto_ui_compiler::aura::{
         AuraEvent, AuraNode, AuraPropValue, AuraStateDef, AuraTextContent,
@@ -3605,7 +3605,11 @@ mod tests {
         use auto_lang_core::parser::Parser;
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse plan654 corpus"));
+        let ast = auto_ui_dialect::UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse plan654 corpus"),
+        );
         let mut decls: Vec<auto_ui_dialect::WidgetDecl> = vec![];
         for s in &ast.0.items {
             if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(d)) = s {
@@ -3960,13 +3964,21 @@ mod tests {
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse plan654 corpus"));
+        let ast = auto_ui_dialect::UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse plan654 corpus"),
+        );
         let mut decls: Vec<auto_ui_dialect::WidgetDecl> = vec![];
         let mut import_stmts: Vec<auto_lang_core::ast::Stmt> = vec![];
         for st in &ast.0.items {
             match st {
-                auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(d)) => decls.push(d.clone()),
-                auto_parser_api::DomainStmt::Core(st @ auto_lang_core::ast::Stmt::Fn(_)) => import_stmts.push(st.clone()),
+                auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(d)) => {
+                    decls.push(d.clone())
+                }
+                auto_parser_api::DomainStmt::Core(st @ auto_lang_core::ast::Stmt::Fn(_)) => {
+                    import_stmts.push(st.clone())
+                }
                 _ => {}
             }
         }
@@ -4062,13 +4074,21 @@ mod tests {
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse plan654 corpus"));
+        let ast = auto_ui_dialect::UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse plan654 corpus"),
+        );
         let mut import_stmts: Vec<auto_lang_core::ast::Stmt> = vec![];
         let mut root = None;
         for st in &ast.0.items {
             match st {
-                auto_parser_api::DomainStmt::Core(st @ auto_lang_core::ast::Stmt::Fn(_)) => import_stmts.push(st.clone()),
-                auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(d)) => root = Some(d.clone()),
+                auto_parser_api::DomainStmt::Core(st @ auto_lang_core::ast::Stmt::Fn(_)) => {
+                    import_stmts.push(st.clone())
+                }
+                auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(d)) => {
+                    root = Some(d.clone())
+                }
                 _ => {}
             }
         }
@@ -5516,11 +5536,16 @@ widget Demo002Counter {
         let src = format!("{HOST}\n{DEMO_002_COUNTER_RENAMED}");
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src.as_str()).with_session(session);
-        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse plan654 corpus"));
+        let ast = auto_ui_dialect::UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse plan654 corpus"),
+        );
         let mut root_decl = None;
         let mut child_decls = Vec::new();
         for st in &ast.0.items {
-            if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(d)) = st {
+            if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(d)) = st
+            {
                 if d.name.as_str() == "GalleryHost" {
                     root_decl = Some(d.clone());
                 } else {
@@ -5684,7 +5709,11 @@ widget TimerChild652 {
     fn build(src: &str) -> DynamicComponent {
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse plan654 corpus"));
+        let ast = auto_ui_dialect::UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse plan654 corpus"),
+        );
         let mut decls: Vec<auto_ui_dialect::WidgetDecl> = vec![];
         for s in &ast.0.items {
             if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(d)) = s {
@@ -5969,7 +5998,11 @@ widget IfHost654 {
     fn build(src: &str) -> DynamicComponent {
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse plan654 corpus"));
+        let ast = auto_ui_dialect::UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse plan654 corpus"),
+        );
         let mut decls: Vec<auto_ui_dialect::WidgetDecl> = vec![];
         for s in &ast.0.items {
             if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(d)) = s {

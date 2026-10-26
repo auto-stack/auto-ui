@@ -8,7 +8,6 @@
 //! - P-053-1: computed 经 `use.web.fn` helper 链读扁平 store 字段产出空
 //!   （musk `filteredMessages` 消息列表恒空）。见下方 p1 模块。
 
-
 /// P-053-2: null 家族等值语义（脚本级：真实 codegen + 执行链）。
 #[cfg(test)]
 mod musk_vm_track_p053_2_null_equality {
@@ -338,7 +337,11 @@ mod musk_vm_track_p053_6_widget_content {
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = auto_ui_dialect::UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let mut decls: Vec<auto_ui_dialect::WidgetDecl> = vec![];
         let mut import_stmts: Vec<auto_lang_core::ast::Stmt> = vec![];
         for st in ast.items() {
@@ -419,7 +422,11 @@ mod musk_vm_track_p053_6_widget_content {
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = auto_ui_dialect::UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let mut decls: Vec<auto_ui_dialect::WidgetDecl> = vec![];
         let mut import_stmts: Vec<auto_lang_core::ast::Stmt> = vec![];
         for st in ast.items() {
@@ -586,7 +593,11 @@ mod musk_vm_track_p053_1_widget_computed {
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = auto_ui_dialect::UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let mut decls: Vec<auto_ui_dialect::WidgetDecl> = vec![];
         let mut import_stmts: Vec<auto_lang_core::ast::Stmt> = vec![];
         for st in ast.items() {
@@ -665,7 +676,11 @@ mod musk_vm_track_p053_1_widget_computed {
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = auto_ui_dialect::UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let mut decls: Vec<auto_ui_dialect::WidgetDecl> = vec![];
         let mut import_stmts: Vec<auto_lang_core::ast::Stmt> = vec![];
         for st in ast.items() {
@@ -732,7 +747,11 @@ mod musk_vm_track_p053_4_merged_api_call {
     ) {
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = auto_ui_dialect::UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let mut decls: Vec<auto_ui_dialect::WidgetDecl> = vec![];
         let mut import_stmts: Vec<auto_lang_core::ast::Stmt> = vec![];
         for st in ast.items() {
@@ -858,12 +877,19 @@ mod musk_vm_track_p053_4_merged_api_call {
         let caller = "fn p759_missing_impl_probe() { let r = chats_list_sessions() }\n";
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(caller).with_session(session);
-        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
-        let fn_stmt = ast.0.items.into_iter()
-                .find_map(|s| match s {
-                    auto_parser_api::DomainStmt::Core(f @ auto_lang_core::ast::Stmt::Fn(_)) => Some(f),
-                    _ => None,
-                })
+        let ast = auto_ui_dialect::UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
+        let fn_stmt = ast
+            .0
+            .items
+            .into_iter()
+            .find_map(|s| match s {
+                auto_parser_api::DomainStmt::Core(f @ auto_lang_core::ast::Stmt::Fn(_)) => Some(f),
+                _ => None,
+            })
             .expect("caller fn");
         codegen
             .compile_stmt(&fn_stmt)
@@ -889,12 +915,19 @@ mod musk_vm_track_p053_4_merged_api_call {
         let dep_src = "fn chats_list_sessions() str { return \"stub\" }\n";
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(dep_src).with_session(session);
-        let dep_ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
-        let dep_fn = dep_ast.0.items.into_iter()
-                .find_map(|s| match s {
-                    auto_parser_api::DomainStmt::Core(f @ auto_lang_core::ast::Stmt::Fn(_)) => Some(f),
-                    _ => None,
-                })
+        let dep_ast = auto_ui_dialect::UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
+        let dep_fn = dep_ast
+            .0
+            .items
+            .into_iter()
+            .find_map(|s| match s {
+                auto_parser_api::DomainStmt::Core(f @ auto_lang_core::ast::Stmt::Fn(_)) => Some(f),
+                _ => None,
+            })
             .expect("dep fn");
         let mut dep_codegen = auto_lang_core::vm::codegen::Codegen::new();
         dep_codegen.compile_stmt(&dep_fn).expect("compile dep");
@@ -977,10 +1010,15 @@ mod musk_vm_track_p053_7_sibling_handler_calls {
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = auto_ui_dialect::UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let mut decls: Vec<auto_ui_dialect::WidgetDecl> = vec![];
         for st in ast.items() {
-            if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(d)) = st {
+            if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(d)) = st
+            {
                 decls.push(d.clone());
             }
         }
@@ -1082,7 +1120,11 @@ mod musk_vm_track_p053_b4_title_tooltip {
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = auto_ui_dialect::UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let decls: Vec<auto_ui_dialect::WidgetDecl> = ast
             .domain_stmts()
             .filter_map(|st| match st {
@@ -1248,7 +1290,11 @@ mod musk_vm_track_p053_b4_title_tooltip {
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = auto_ui_dialect::UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let decl = ast
             .domain_stmts()
             .find_map(|st| match st {
@@ -1301,7 +1347,11 @@ mod musk_vm_track_p054_t1_title_content_subtree {
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = auto_ui_dialect::UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let decls: Vec<auto_ui_dialect::WidgetDecl> = ast
             .domain_stmts()
             .filter_map(|st| match st {
@@ -1358,10 +1408,10 @@ mod musk_vm_track_p054_t1_title_content_subtree {
             let session = auto_lang_core::session::CompilerSession::ui();
             let mut parser = Parser::from(src.as_str()).with_session(session);
             let ast = auto_ui_dialect::UiCode(
-                    parser
-                        .parse_domain(&auto_ui_dialect::UiDialect)
-                        .unwrap_or_else(|e| panic!("{tag}: parse {e}"))
-                );
+                parser
+                    .parse_domain(&auto_ui_dialect::UiDialect)
+                    .unwrap_or_else(|e| panic!("{tag}: parse {e}")),
+            );
             let decls: Vec<auto_ui_dialect::WidgetDecl> = ast
                 .domain_stmts()
                 .filter_map(|st| match st {
@@ -1519,7 +1569,11 @@ mod musk_vm_track_p053_8_click_arg_drift {
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = auto_ui_dialect::UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let decls: Vec<auto_ui_dialect::WidgetDecl> = ast
             .domain_stmts()
             .filter_map(|st| match st {
@@ -1870,7 +1924,11 @@ mod musk_vm_track_p054_t3_interp_i18n {
     fn build(src: &str) -> crate::ui::dynamic::DynamicComponent {
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = auto_ui_dialect::UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let decls: Vec<auto_ui_dialect::WidgetDecl> = ast
             .domain_stmts()
             .filter_map(|st| match st {
@@ -2022,7 +2080,11 @@ mod musk_vm_track_p054_t3_none_initial {
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = auto_ui_dialect::UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let decl = ast
             .domain_stmts()
             .find_map(|st| match st {
@@ -2057,7 +2119,11 @@ mod musk_vm_track_p054_t3_none_return {
     pub(super) fn build_bridge(src: &str) -> crate::ui::vm_bridge::VmBridge {
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = auto_ui_dialect::UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let decl = ast
             .domain_stmts()
             .find_map(|st| match st {
@@ -2124,7 +2190,11 @@ mod musk_vm_track_p054_t3_if_fallback {
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = auto_ui_dialect::UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let decl = ast
             .domain_stmts()
             .find_map(|st| match st {
@@ -2262,7 +2332,11 @@ mod musk_vm_track_p054_t4_styles {
         crate::ui::aura_view_builder::register_imported_components(vec!["Info".to_string()]);
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = auto_ui_dialect::UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let decls: Vec<auto_ui_dialect::WidgetDecl> = ast
             .domain_stmts()
             .filter_map(|st| match st {
@@ -2476,7 +2550,11 @@ mod musk_vm_track_p055_dump {
         crate::ui::aura_view_builder::register_imported_components(vec!["P55User".to_string()]);
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = auto_ui_dialect::UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let decls: Vec<auto_ui_dialect::WidgetDecl> = ast
             .domain_stmts()
             .filter_map(|st| match st {
@@ -2627,7 +2705,11 @@ mod musk_vm_track_p055_dump2 {
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = auto_ui_dialect::UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let decls: Vec<auto_ui_dialect::WidgetDecl> = ast
             .domain_stmts()
             .filter_map(|st| match st {
@@ -3006,7 +3088,11 @@ mod musk_vm_track_p055_dump3 {
     fn render(src: &str) -> String {
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = auto_ui_dialect::UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let decls: Vec<auto_ui_dialect::WidgetDecl> = ast
             .domain_stmts()
             .filter_map(|st| match st {
@@ -3185,7 +3271,11 @@ mod musk_vm_track_p055_input_event_text {
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = auto_ui_dialect::UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let decls: Vec<auto_ui_dialect::WidgetDecl> = ast
             .domain_stmts()
             .filter_map(|st| match st {
@@ -3236,7 +3326,11 @@ mod musk_vm_track_p055_pre_code_arm {
     fn build_view(src: &str) -> View<crate::ui::interpreter::DynamicMessage> {
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = auto_ui_dialect::UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let decls: Vec<auto_ui_dialect::WidgetDecl> = ast
             .domain_stmts()
             .filter_map(|st| match st {
@@ -3334,7 +3428,11 @@ mod musk_vm_track_p055_nav_active {
     fn build_nav(src: &str) -> View<crate::ui::interpreter::DynamicMessage> {
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = auto_ui_dialect::UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let decls: Vec<auto_ui_dialect::WidgetDecl> = ast
             .domain_stmts()
             .filter_map(|st| match st {

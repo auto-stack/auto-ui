@@ -6,7 +6,6 @@
 //! construct the real 015-notes App (with its `use notes_store` store +
 //! `use back.api` imports) exactly as production does.
 
-
 #![cfg(test)]
 
 use crate::ui::dynamic::DynamicComponent;
@@ -142,7 +141,8 @@ pub(crate) fn build_component_from_app_mode(
     let mut root_decl = None;
     let mut widget = None;
     for stmt in ast.items() {
-        if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(decl)) = stmt {
+        if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(decl)) = stmt
+        {
             root_decl = Some(decl.clone());
             widget = Some(
                 auto_ui_compiler::aura::extract_widget_from_decl(decl)
@@ -183,7 +183,7 @@ pub(crate) fn build_component_from_app_mode(
                         &mut seen_symbols,
                         &mut import_session,
                         None,
-                            &mut import_store_decls,
+                        &mut import_store_decls,
                     );
                 }
                 continue;
@@ -199,9 +199,15 @@ pub(crate) fn build_component_from_app_mode(
             let mod_session = CompilerSession::ui();
             let mut mod_parser =
                 crate::Parser::from(module_code.as_str()).with_session(mod_session);
-            if let Ok(mod_ast) = mod_parser.parse_domain(&auto_ui_dialect::UiDialect).map(auto_ui_dialect::UiCode) {
+            if let Ok(mod_ast) = mod_parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .map(auto_ui_dialect::UiCode)
+            {
                 for stmt in mod_ast.items() {
-                    if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(decl)) = stmt {
+                    if let auto_parser_api::DomainStmt::Domain(
+                        auto_ui_dialect::UiStmt::WidgetDecl(decl),
+                    ) = stmt
+                    {
                         if let Ok(child_widget) =
                             auto_ui_compiler::aura::extract_widget_from_decl(decl)
                         {
@@ -213,7 +219,10 @@ pub(crate) fn build_component_from_app_mode(
                                 registry.register(child_widget);
                             }
                         }
-                    } else if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::StoreDecl(store_decl)) = stmt {
+                    } else if let auto_parser_api::DomainStmt::Domain(
+                        auto_ui_dialect::UiStmt::StoreDecl(store_decl),
+                    ) = stmt
+                    {
                         // D-GAP-4: convert imported StoreDecl → view-less child
                         // WidgetDecl so its fields merge into root state.
                         let name = store_decl.name.clone();
@@ -310,7 +319,7 @@ pub(crate) fn build_component_from_app_mode(
                                 &mut seen_symbols,
                                 &mut import_session,
                                 None,
-                                    &mut import_store_decls,
+                                &mut import_store_decls,
                             );
                             if let Ok(code) = fs::read_to_string(&p) {
                                 for us in scan_use_statements(&code) {
@@ -335,7 +344,9 @@ pub(crate) fn build_component_from_app_mode(
     let mut store_as_child_decls = Vec::new();
     let mut root_store_names = HashSet::new();
     for stmt in ast.items() {
-        if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::StoreDecl(store_decl)) = stmt {
+        if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::StoreDecl(store_decl)) =
+            stmt
+        {
             root_store_names.insert(store_decl.name.to_string());
             store_as_child_decls.push(auto_ui_dialect::ast::WidgetDecl {
                 name: store_decl.name.clone(),

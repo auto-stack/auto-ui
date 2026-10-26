@@ -1,5 +1,6 @@
 use crate::{UiCode, UiStmt, ViewNode};
 use auto_parser_api::DomainStmt;
+use serde::Deserialize;
 
 pub const UI_AST_SCHEMA_VERSION: u32 = 1;
 pub const UI_AST_DOMAIN: &str = "auto-ui";
@@ -22,7 +23,9 @@ pub fn encode_ui_code(code: &UiCode) -> Result<Vec<u8>, String> {
 }
 
 pub fn decode_ui_code(input: &[u8]) -> Result<UiCode, String> {
-    let envelope: UiEnvelope = serde_json::from_slice(input)
+    let mut deserializer = serde_json::Deserializer::from_slice(input);
+    deserializer.disable_recursion_limit();
+    let envelope = UiEnvelope::deserialize(serde_stacker::Deserializer::new(&mut deserializer))
         .map_err(|error| format!("UI AST schema/tag validation failed: {error}"))?;
     if envelope.domain != UI_AST_DOMAIN {
         return Err(format!(
@@ -36,6 +39,7 @@ pub fn decode_ui_code(input: &[u8]) -> Result<UiCode, String> {
             envelope.schema
         ));
     }
+    crate::validate_ui(&envelope.code)?;
     Ok(envelope.code)
 }
 
@@ -225,6 +229,53 @@ mod tests {
             .expect("decoded element still carries its span");
         assert_eq!(original_span, decoded_span);
         assert!(decoded.core_stmts().any(|stmt| matches!(stmt, Stmt::Fn(_))));
+    }
+
+    #[test]
+    fn codec_roundtrips_supported_nested_views() {
+        std::thread::Builder::new()
+            .stack_size(32 * 1024 * 1024)
+            .spawn(|| {
+                for depth in [4usize, 16, 32, 48] {
+                    let source = format!(
+                        "widget App {{ view {{ {}text \"leaf\" {{}}{} }} }}",
+                        "col { ".repeat(depth),
+                        " }".repeat(depth)
+                    );
+                    let mut parser = auto_lang_core::parser::Parser::from(&source)
+                        .with_session(auto_lang_core::session::CompilerSession::ui());
+                    let ui = UiCode(
+                        parser
+                            .parse_domain(&crate::UiDialect)
+                            .expect("legal nested source parses"),
+                    );
+                    crate::validate_ui(&ui).expect("legal nested source validates");
+                    let bytes = encode_ui_code(&ui).expect("encoder accepts legal source");
+                    let decoded = decode_ui_code(&bytes)
+                        .expect("codec decodes its own supported nested output");
+                    assert_eq!(encode_ui_code(&decoded).unwrap(), bytes);
+                }
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+
+    #[test]
+    fn codec_rejects_decoded_invalid_domain_data() {
+        let mut invalid = sample();
+        let widget = match &invalid.0.items[0] {
+            DomainStmt::Domain(UiStmt::WidgetDecl(widget)) => widget.clone(),
+            _ => unreachable!(),
+        };
+        invalid
+            .0
+            .items
+            .push(DomainStmt::Domain(UiStmt::WidgetDecl(widget)));
+        let bytes = encode_ui_code(&invalid).expect("encode invalid probe input");
+        let error = decode_ui_code(&bytes).expect_err("decoded domain must be validated");
+        assert!(error.contains("UI domain validation failed"), "{error}");
+        assert!(error.contains("duplicate widget declaration"), "{error}");
     }
 
     #[test]

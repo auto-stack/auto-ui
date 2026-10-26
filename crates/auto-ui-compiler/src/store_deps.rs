@@ -44,7 +44,7 @@ pub fn extract_store_deps_from_file(path: &str) -> Vec<String> {
         Ok(c) => c,
         Err(_) => return Vec::new(),
     };
-    let mut deps = match crate::parse_ui(&code) {
+    let mut deps = match crate::parse_validated_ui(&code) {
         Ok(ast) => extract_store_imports_from_ast(&ast),
         Err(_) => Vec::new(),
     };

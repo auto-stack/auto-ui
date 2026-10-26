@@ -4,7 +4,6 @@ use auto_lang_core::parser::Parser;
 use auto_lang_core::session::CompilerSession;
 use auto_parser_api::DomainStmt;
 use auto_ui_dialect::{UiCode, UiDialect, UiStmt};
-use std::collections::HashSet;
 
 pub use auto_ui_dialect::UI_AST_SCHEMA_VERSION;
 
@@ -19,8 +18,13 @@ pub fn parse_ui(source: &str) -> AutoResult<UiCode> {
     parser.parse_domain(&UiDialect).map(UiCode)
 }
 
+pub fn parse_validated_ui(source: &str) -> AutoResult<UiCode> {
+    let ui = parse_ui(source)?;
+    lower_ui(&ui).map(|lowered| lowered.ui)
+}
+
 pub fn lower_ui(ui: &UiCode) -> AutoResult<LoweredUi> {
-    validate_ui(ui)?;
+    auto_ui_dialect::validate_ui(ui).map_err(AutoError::Msg)?;
     let mut stmts = Vec::new();
     let mut source_lines = Vec::new();
     for (index, item) in ui.0.items.iter().enumerate() {
@@ -37,81 +41,6 @@ pub fn lower_ui(ui: &UiCode) -> AutoResult<LoweredUi> {
             file_attrs: ui.0.file_attrs.clone(),
         },
     })
-}
-
-fn validate_ui(ui: &UiCode) -> AutoResult<()> {
-    let mut widgets = HashSet::new();
-    let mut stores = HashSet::new();
-    for stmt in ui.domain_stmts() {
-        match stmt {
-            UiStmt::WidgetDecl(widget) => {
-                if !widgets.insert(widget.name.as_str().to_string()) {
-                    return Err(validation_error(format!(
-                        "duplicate widget declaration `{}`",
-                        widget.name
-                    )));
-                }
-                if let Some(model) = &widget.model {
-                    validate_model(model)?;
-                }
-                validate_messages(&widget.messages)?;
-            }
-            UiStmt::StoreDecl(store) => {
-                if !stores.insert(store.name.as_str().to_string()) {
-                    return Err(validation_error(format!(
-                        "duplicate store declaration `{}`",
-                        store.name
-                    )));
-                }
-                if let Some(model) = &store.model {
-                    validate_model(model)?;
-                }
-                validate_messages(&store.messages)?;
-            }
-            UiStmt::MsgDecl(msg) => validate_messages(std::slice::from_ref(msg))?,
-            UiStmt::ModelBlock(model) => validate_model(model)?,
-            _ => {}
-        }
-    }
-    Ok(())
-}
-
-fn validate_model(model: &auto_ui_dialect::ModelBlock) -> AutoResult<()> {
-    let mut fields = HashSet::new();
-    for field in &model.fields {
-        if !fields.insert(field.name.as_str().to_string()) {
-            return Err(validation_error(format!(
-                "duplicate model field `{}`",
-                field.name
-            )));
-        }
-    }
-    Ok(())
-}
-
-fn validate_messages(messages: &[auto_ui_dialect::MsgDecl]) -> AutoResult<()> {
-    for message in messages {
-        let mut variants = HashSet::new();
-        for variant in &message.variants {
-            if !variants.insert(variant.name.as_str().to_string()) {
-                return Err(validation_error(format!(
-                    "duplicate message variant `{}`",
-                    variant.name
-                )));
-            }
-            if variant.payload_names.len() != variant.payload.len() {
-                return Err(validation_error(format!(
-                    "message variant `{}` has mismatched payload names and types",
-                    variant.name
-                )));
-            }
-        }
-    }
-    Ok(())
-}
-
-fn validation_error(message: String) -> AutoError {
-    AutoError::Msg(format!("UI domain validation failed: {}", message))
 }
 
 pub enum UseModuleResolution {
@@ -206,7 +135,7 @@ pub fn find_store_decl_files(
                         continue;
                     };
                     let source = auto_lang_core::back_prefix::apply(&path, source);
-                    let Ok(ast) = parse_ui(&source) else {
+                    let Ok(ast) = parse_validated_ui(&source) else {
                         continue;
                     };
                     for stmt in ast.domain_stmts() {

@@ -576,9 +576,7 @@ impl RustGenerator {
     /// （子字段 → int/str/bool/list;动态字段读默认 str——与
     /// object_literal_shape 容错口径一致）。机制通用,零消费方标识符。
     pub fn register_bare_fn_sigs_from_source(&mut self, code: &str) {
-        let session = auto_lang_core::session::CompilerSession::ui().with_backend("rust");
-        let mut parser = auto_lang_core::Parser::from(code).with_session(session);
-        let Ok(ast) = crate::parse_ui(code) else {
+        let Ok(ast) = crate::parse_validated_ui(code) else {
             return;
         };
         use auto_lang_core::ast::{Expr, Stmt, Type};

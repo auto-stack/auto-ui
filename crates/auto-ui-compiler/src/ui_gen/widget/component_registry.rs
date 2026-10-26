@@ -409,7 +409,8 @@ fn parse_package_widgets(
     // 解析失败沿用宽容语义（配方缺席 → parse 报错入 warning，不 panic）。
     let base_dir = path.parent().unwrap_or(Path::new(".")).to_path_buf();
     let _ = crate::design_tokens::recipe::prepare_style_recipe_imports(&base_dir, code);
-    let ast = crate::parse_ui(code).map_err(|e| format!("parse `{}`: {}", path.display(), e))?;
+    let ast = crate::parse_validated_ui(code)
+        .map_err(|e| format!("parse/validate `{}`: {}", path.display(), e))?;
     let mut out = Vec::new();
     for stmt in ast.domain_stmts() {
         if let auto_ui_dialect::UiStmt::WidgetDecl(d) = stmt {

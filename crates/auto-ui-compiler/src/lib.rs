@@ -25,8 +25,8 @@ pub mod ui_ast;
 pub mod ui_gen;
 
 pub use ui_ast::{
-    find_store_decl_files, lower_ui, parse_ui, resolve_use_module, LoweredUi, UseModuleResolution,
-    UI_AST_SCHEMA_VERSION,
+    find_store_decl_files, lower_ui, parse_ui, parse_validated_ui, resolve_use_module, LoweredUi,
+    UseModuleResolution, UI_AST_SCHEMA_VERSION,
 };
 
 /// 生成器源指纹（本 crate build.rs 对 src/ui_gen 扫描；Plan 692 W-1

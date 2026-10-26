@@ -21,7 +21,6 @@
 //!
 //! Corpus: `test/ui/plan051_timer/`（根 widget 计时器 + store 门控计时器）。
 
-
 #[cfg(test)]
 mod plan051_timer_tests {
     // ── parser：widget timer 块 ────────────────────────────────────────────
@@ -29,7 +28,9 @@ mod plan051_timer_tests {
     fn parse_ui(code: &str) -> Result<auto_ui_dialect::UiCode, auto_lang_core::error::AutoError> {
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = crate::Parser::from(code).with_session(session);
-        parser.parse_domain(&auto_ui_dialect::UiDialect).map(auto_ui_dialect::UiCode)
+        parser
+            .parse_domain(&auto_ui_dialect::UiDialect)
+            .map(auto_ui_dialect::UiCode)
     }
 
     /// widget timer 块解析：条目 event/every_ms/when 三元组形状。
@@ -134,7 +135,11 @@ widget Clock {
         let code = std::fs::read_to_string(&path).unwrap();
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = crate::Parser::from(code.as_str()).with_session(session);
-        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = auto_ui_dialect::UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let decl = ast
             .domain_stmts()
             .find_map(|s| match s {
@@ -174,7 +179,11 @@ widget App {
 "#;
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = crate::Parser::from(at).with_session(session);
-        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = auto_ui_dialect::UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let decl = ast
             .domain_stmts()
             .find_map(|s| match s {
@@ -207,12 +216,17 @@ widget App {
     #[cfg(feature = "ui")]
     #[test]
     fn plan051_timer_vue_store_composable_emits_interval() {
-        let path = locate_corpus("../../../auto-lang/test/ui/plan051_timer/src/front/ticker_store.at")
-            .expect("corpus store");
+        let path =
+            locate_corpus("../../../auto-lang/test/ui/plan051_timer/src/front/ticker_store.at")
+                .expect("corpus store");
         let code = std::fs::read_to_string(&path).unwrap();
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = crate::Parser::from(code.as_str()).with_session(session);
-        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = auto_ui_dialect::UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let decl = ast
             .domain_stmts()
             .find_map(|s| match s {
@@ -235,8 +249,8 @@ widget App {
     #[cfg(feature = "ui-interpreter")]
     #[test]
     fn plan051_timer_vm_collects_entries() {
-        let corpus =
-            locate_corpus("../../../auto-lang/test/ui/plan051_timer/pac.at").expect("corpus pac.at");
+        let corpus = locate_corpus("../../../auto-lang/test/ui/plan051_timer/pac.at")
+            .expect("corpus pac.at");
         let dc = match crate::plan370_test_support::build_component_from_app(&corpus) {
             Some(c) => c,
             None => {
@@ -264,8 +278,8 @@ widget App {
     #[cfg(feature = "ui-interpreter")]
     #[test]
     fn plan051_timer_vm_dispatch_fires_handlers() {
-        let corpus =
-            locate_corpus("../../../auto-lang/test/ui/plan051_timer/pac.at").expect("corpus pac.at");
+        let corpus = locate_corpus("../../../auto-lang/test/ui/plan051_timer/pac.at")
+            .expect("corpus pac.at");
         let mut dc = match crate::plan370_test_support::build_component_from_app(&corpus) {
             Some(c) => c,
             None => {
@@ -287,8 +301,8 @@ widget App {
     #[cfg(feature = "ui-interpreter")]
     #[test]
     fn plan051_timer_vm_when_guard_blocks_and_passes() {
-        let corpus =
-            locate_corpus("../../../auto-lang/test/ui/plan051_timer/pac.at").expect("corpus pac.at");
+        let corpus = locate_corpus("../../../auto-lang/test/ui/plan051_timer/pac.at")
+            .expect("corpus pac.at");
         let mut dc = match crate::plan370_test_support::build_component_from_app(&corpus) {
             Some(c) => c,
             None => {

@@ -287,7 +287,6 @@ pub fn prepare_style_recipe_imports(
 /// registration path.
 pub fn load_and_validate_style_recipes_with_imports(
     // PLAN-841 T-05: keep the parser-side checker installed on every entry.
-
     imports: &[(StyleRecipeDecl, String)],
     ast: &auto_ui_dialect::UiCode,
 ) -> Result<Vec<String>, StyleRecipeError> {
@@ -349,7 +348,7 @@ fn collect_style_recipe_imports(
         if module_path.components().any(|c| c.as_os_str() == "back") {
             continue;
         }
-        let module_ast = match crate::parse_ui(&code) {
+        let module_ast = match crate::parse_validated_ui(&code) {
             Ok(a) => a,
             Err(e) => {
                 log::warn!(

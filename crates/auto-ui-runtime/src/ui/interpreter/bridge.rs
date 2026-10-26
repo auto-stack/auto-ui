@@ -159,7 +159,8 @@ impl InterpreterBridge {
             // 绑定名:setup 体顶层的 let/var/const 声明。
             let names: Vec<String> = setup
                 .body
-                .stmts.iter()
+                .stmts
+                .iter()
                 .filter_map(|s| match s {
                     auto_lang_core::ast::Stmt::Store(store)
                         if matches!(

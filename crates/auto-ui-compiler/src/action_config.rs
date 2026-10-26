@@ -553,7 +553,8 @@ fn install_dsl_config(
 pub fn extract_actions_from_source(
     code: &str,
 ) -> Result<auto_ui_dialect::ast::ActionsBlock, String> {
-    let ast = crate::parse_ui(code).map_err(|e| format!("DSL source parse error: {e}"))?;
+    let ast = crate::parse_validated_ui(code)
+        .map_err(|e| format!("DSL source parse/validation error: {e}"))?;
     for stmt in ast.domain_stmts() {
         if let auto_ui_dialect::UiStmt::WidgetDecl(decl) = stmt {
             if let Some(ref acts) = decl.actions {

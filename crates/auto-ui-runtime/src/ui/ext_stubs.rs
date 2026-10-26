@@ -190,10 +190,16 @@ pub(crate) fn load_at_ext_imports(
                             let session = auto_lang_core::session::CompilerSession::ui();
                             let mut parser =
                                 crate::Parser::from(code.as_str()).with_session(session);
-                            if let Ok(ast) = parser.parse_domain(&auto_ui_dialect::UiDialect).map(auto_ui_dialect::UiCode) {
+                            if let Ok(ast) = parser
+                                .parse_domain(&auto_ui_dialect::UiDialect)
+                                .map(auto_ui_dialect::UiCode)
+                                .and_then(|ui| {
+                                    auto_ui_compiler::ui_ast::lower_ui(&ui)
+                                        .map(|lowered| lowered.ui)
+                                })
+                            {
                                 for nested_imp in collect_useweb_imports(&ast) {
-                                    if nested_imp.kind
-                                        == auto_ui_dialect::ExtImportKind::Component
+                                    if nested_imp.kind == auto_ui_dialect::ExtImportKind::Component
                                         && nested_imp.path.ends_with(".at")
                                     {
                                         if let Some(resolved_nested) =
@@ -240,7 +246,11 @@ pub(crate) fn load_at_ext_imports(
         if let Ok(code) = std::fs::read_to_string(&adapter) {
             let session = auto_lang_core::session::CompilerSession::ui();
             let mut parser = crate::Parser::from(code.as_str()).with_session(session);
-            if let Ok(ast) = parser.parse_domain(&auto_ui_dialect::UiDialect).map(auto_ui_dialect::UiCode) {
+            if let Ok(ast) = parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .map(auto_ui_dialect::UiCode)
+                .and_then(|ui| auto_ui_compiler::ui_ast::lower_ui(&ui).map(|lowered| lowered.ui))
+            {
                 nested.extend(collect_useweb_imports(&ast));
             }
         }

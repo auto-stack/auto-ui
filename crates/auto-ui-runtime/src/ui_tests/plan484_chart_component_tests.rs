@@ -2,8 +2,8 @@
 //! official 包裸名原语(line-chart/bar-chart/area-chart/donut-chart)消费,
 //! 流式滑窗数据变化 → 子组件 Init 重放 → 几何自动重算(ADR-19)。
 
-use auto_ui_dialect::UiStmt;
 use auto_ui_dialect::UiCode;
+use auto_ui_dialect::UiStmt;
 
 #[cfg(feature = "ui-iced")]
 mod plan484_smoke {
@@ -127,7 +127,11 @@ fn body_props_flow_to_component() {
     fn gen_sfc(src: &str) -> String {
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("widget source must parse"));
+        let ast = UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("widget source must parse"),
+        );
         let decl = ast
             .domain_stmts()
             .find_map(|s| match s {

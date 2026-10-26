@@ -1308,8 +1308,8 @@ pub fn terminal_dispose(key: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use auto_ui_dialect::UiCode;
     use auto_ui_dialect::UiStmt;
-use auto_ui_dialect::UiCode;
 
     #[test]
     fn terminal_get_or_create_and_feed() {
@@ -1884,7 +1884,11 @@ use auto_ui_dialect::UiCode;
 
         let session = CompilerSession::ui();
         let mut parser = Parser::from(src.as_str()).with_session(session);
-        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let decl = ast
             .domain_stmts()
             .find_map(|s| match s {

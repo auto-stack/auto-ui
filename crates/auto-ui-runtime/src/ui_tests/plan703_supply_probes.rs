@@ -1,4 +1,3 @@
-
 // PLAN-703 供⑤ supply-endpoint probes (the PLAN-701 time-族 probe shape:
 // minimal VM bridge + .at fn calling the native + envelope JSON assertions).
 //
@@ -16,7 +15,11 @@ mod plan703_diff_supply {
     fn build_probe_bridge(src: &str) -> crate::ui::vm_bridge::VmBridge {
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = auto_ui_dialect::UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let decl = ast
             .domain_stmts()
             .find_map(|st| match st {

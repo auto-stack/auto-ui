@@ -1,9 +1,9 @@
 // PLAN-814 T-04：UI 动态构建管线（原 auto-lang lib.rs Plan 015 UI glue 区整体随迁）——
 // collect_module_imports 模块装载链 → build_dynamic_component → run_file_dynamic_ui；
 // crate 根经 lib.rs 再导出保持旧 crate::* 路径（ui/ 内 98 处 build_dynamic_component 引用零改写）。
-use auto_ui_compiler::ui_ast::{resolve_use_module, UseModuleResolution};
 use crate::{AutoResult, Parser};
 use auto_lang_core::{resolve_module_path, store_name_snake};
+use auto_ui_compiler::ui_ast::{resolve_use_module, UseModuleResolution};
 /// Used by CLI to decide whether to run on main thread for iced.
 #[cfg(feature = "ui-iced")]
 pub fn has_ui_keywords(code: &str) -> bool {
@@ -93,7 +93,11 @@ pub(crate) fn load_ext_imports_for_vm(
             );
             let session = auto_lang_core::session::CompilerSession::ui();
             let mut parser = crate::Parser::from(code.as_str()).with_session(session);
-            if let Ok(mod_ast) = parser.parse_domain(&auto_ui_dialect::UiDialect).map(auto_ui_dialect::UiCode) {
+            if let Ok(mod_ast) = parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .map(auto_ui_dialect::UiCode)
+                .and_then(|ui| auto_ui_compiler::ui_ast::lower_ui(&ui).map(|lowered| lowered.ui))
+            {
                 ext_imports.extend(crate::ui::ext_stubs::collect_useweb_imports(&mod_ast));
             }
         }
@@ -146,7 +150,11 @@ pub(crate) fn load_ext_imports_for_vm(
         let code = auto_lang_core::back_prefix::apply(adapter, code);
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = crate::Parser::from(code.as_str()).with_session(session);
-        let Ok(adapter_ast) = parser.parse_domain(&auto_ui_dialect::UiDialect).map(auto_ui_dialect::UiCode) else {
+        let Ok(adapter_ast) = parser
+            .parse_domain(&auto_ui_dialect::UiDialect)
+            .map(auto_ui_dialect::UiCode)
+            .and_then(|ui| auto_ui_compiler::ui_ast::lower_ui(&ui).map(|lowered| lowered.ui))
+        else {
             continue;
         };
         for wd in adapter_ast.domain_stmts().filter_map(|s| match s {
@@ -206,7 +214,11 @@ pub(crate) fn load_ext_imports_for_vm(
             let code = auto_lang_core::back_prefix::apply(path, code);
             let session = auto_lang_core::session::CompilerSession::ui();
             let mut parser = crate::Parser::from(code.as_str()).with_session(session);
-            let Ok(_) = parser.parse_domain(&auto_ui_dialect::UiDialect).map(auto_ui_dialect::UiCode) else {
+            let Ok(_) = parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .map(auto_ui_dialect::UiCode)
+                .and_then(|ui| auto_ui_compiler::ui_ast::lower_ui(&ui).map(|lowered| lowered.ui))
+            else {
                 continue;
             };
             let mod_dir = path
@@ -251,24 +263,29 @@ pub(crate) fn load_ext_imports_for_vm(
                 let mod_session = auto_lang_core::session::CompilerSession::ui();
                 let mut mod_parser =
                     crate::Parser::from(module_code.as_str()).with_session(mod_session);
-                let Ok(target_ast) = mod_parser.parse_domain(&auto_ui_dialect::UiDialect).map(auto_ui_dialect::UiCode) else {
+                let Ok(target_ast) = mod_parser
+                    .parse_domain(&auto_ui_dialect::UiDialect)
+                    .map(auto_ui_dialect::UiCode)
+                    .and_then(|ui| {
+                        auto_ui_compiler::ui_ast::lower_ui(&ui).map(|lowered| lowered.ui)
+                    })
+                else {
                     continue;
                 };
                 for decl in target_ast.domain_stmts().filter_map(|s| match s {
                     auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d),
                     _ => None,
-                    }) {
-                        if swept.contains(decl.name.as_str()) {
-                            continue;
-                        }
-                        if use_stmt.is_wildcard
-                            || use_stmt.items.iter().any(|s| s == &decl.name.as_str())
-                        {
-                            swept.insert(decl.name.to_string());
-                            ext_widget_decls.push(decl.clone());
-                        }
-                                    }
-
+                }) {
+                    if swept.contains(decl.name.as_str()) {
+                        continue;
+                    }
+                    if use_stmt.is_wildcard
+                        || use_stmt.items.iter().any(|s| s == &decl.name.as_str())
+                    {
+                        swept.insert(decl.name.to_string());
+                        ext_widget_decls.push(decl.clone());
+                    }
+                }
             }
         }
     }
@@ -308,7 +325,11 @@ pub(crate) fn load_ext_imports_for_vm(
             let code = auto_lang_core::back_prefix::apply(path, code);
             let session = auto_lang_core::session::CompilerSession::ui();
             let mut parser = crate::Parser::from(code.as_str()).with_session(session);
-            let Ok(mod_ast) = parser.parse_domain(&auto_ui_dialect::UiDialect).map(auto_ui_dialect::UiCode) else {
+            let Ok(mod_ast) = parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .map(auto_ui_dialect::UiCode)
+                .and_then(|ui| auto_ui_compiler::ui_ast::lower_ui(&ui).map(|lowered| lowered.ui))
+            else {
                 continue;
             };
             let mod_dir = path
@@ -611,7 +632,11 @@ pub(crate) fn collect_module_imports(
     };
     let mut parser = Parser::new_with_type_store(code.as_str(), session.type_store())
         .with_session(parser_session);
-    let ast = match parser.parse_domain(&auto_ui_dialect::UiDialect).map(auto_ui_dialect::UiCode) {
+    let ast = match parser
+        .parse_domain(&auto_ui_dialect::UiDialect)
+        .map(auto_ui_dialect::UiCode)
+        .and_then(|ui| auto_ui_compiler::ui_ast::lower_ui(&ui).map(|lowered| lowered.ui))
+    {
         Ok(a) => a,
         Err(e) => {
             // Plan 398: surface parse failures instead of silently dropping the
@@ -728,7 +753,15 @@ pub(crate) fn collect_module_imports(
         }
         match resolve_use_module(module_dir, &dep) {
             UseModuleResolution::Module(dep_path) => {
-                collect_module_imports(&dep_path, visited, out, seen, session, override_scenario, import_store_decls);
+                collect_module_imports(
+                    &dep_path,
+                    visited,
+                    out,
+                    seen,
+                    session,
+                    override_scenario,
+                    import_store_decls,
+                );
             }
             UseModuleResolution::StoreFiles(found) => {
                 // Plan 442 A2: transitive `use store: X` (legacy facade form) —
@@ -737,7 +770,15 @@ pub(crate) fn collect_module_imports(
                 // compile into the VM module. Without this, a child widget's
                 // store stays uncollected and its handlers fail at link time.
                 for (_, path) in found {
-                    collect_module_imports(&path, visited, out, seen, session, override_scenario, import_store_decls);
+                    collect_module_imports(
+                        &path,
+                        visited,
+                        out,
+                        seen,
+                        session,
+                        override_scenario,
+                        import_store_decls,
+                    );
                 }
             }
             UseModuleResolution::None => {
@@ -846,9 +887,16 @@ fn register_transitive_widgets_inner(
         );
         let mod_session = auto_lang_core::session::CompilerSession::ui();
         let mut mod_parser = crate::Parser::from(sub_code.as_str()).with_session(mod_session);
-        if let Ok(sub_ast) = mod_parser.parse_domain(&auto_ui_dialect::UiDialect).map(auto_ui_dialect::UiCode) {
+        if let Ok(sub_ast) = mod_parser
+            .parse_domain(&auto_ui_dialect::UiDialect)
+            .map(auto_ui_dialect::UiCode)
+            .and_then(|ui| auto_ui_compiler::ui_ast::lower_ui(&ui).map(|lowered| lowered.ui))
+        {
             for stmt in sub_ast.items() {
-                if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(decl)) = stmt {
+                if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(
+                    decl,
+                )) = stmt
+                {
                     if let Ok(child_widget) = auto_ui_compiler::aura::extract_widget_from_decl(decl)
                     {
                         // 只注册 use 子句明确要的(或通配/裸装载的),且 registry
@@ -876,7 +924,10 @@ fn register_transitive_widgets_inner(
                 }
                 // Plan 044 M3: 传递性模块的 view fn 也注册(同类 EDGE-16c,
                 // 但 view fn 走 register_view_fragment 而非 widget registry)。
-                if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::ViewFragmentDecl(frag)) = stmt {
+                if let auto_parser_api::DomainStmt::Domain(
+                    auto_ui_dialect::UiStmt::ViewFragmentDecl(frag),
+                ) = stmt
+                {
                     auto_ui_compiler::aura::extract::register_view_fragment(frag);
                 }
             }
@@ -916,7 +967,10 @@ fn build_dynamic_component_inner(
         .cloned()
         .unwrap_or_else(CompilerSession::ui);
     let mut parser = Parser::from(code).with_session(session);
-    let ast = parser.parse_domain(&auto_ui_dialect::UiDialect).map(auto_ui_dialect::UiCode)?;
+    let ast = parser
+        .parse_domain(&auto_ui_dialect::UiDialect)
+        .map(auto_ui_dialect::UiCode)
+        .and_then(|ui| auto_ui_compiler::ui_ast::lower_ui(&ui).map(|lowered| lowered.ui))?;
 
     // 2. Extract first AuraWidget (and keep its WidgetDecl — PR-3b Step 4).
     // Plan 367 P2-3: register the root module's `view fn` fragments before
@@ -925,9 +979,9 @@ fn build_dynamic_component_inner(
     for frag in ast.domain_stmts().filter_map(|s| match s {
         auto_ui_dialect::UiStmt::ViewFragmentDecl(d) => Some(d),
         _ => None,
-        }) {
-            auto_ui_compiler::aura::extract::register_view_fragment(frag);
-            }
+    }) {
+        auto_ui_compiler::aura::extract::register_view_fragment(frag);
+    }
 
     // PLAN-607: register and validate style recipes before extracting widget.
     // PLAN-635: replay imported (source-tagged) + local recipes in order.
@@ -946,18 +1000,17 @@ fn build_dynamic_component_inner(
     for decl in ast.domain_stmts().filter_map(|s| match s {
         auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d),
         _ => None,
-        }) {
-            if root_decl.is_none() {
-                root_decl = Some(decl.clone());
-                widget = Some(
-                    auto_ui_compiler::aura::extract_widget_from_decl(decl)
-                        .map_err(|e| e.to_string())?,
-                );
-            } else {
-                sibling_decls.push(decl.clone());
-            }
-            }
-
+    }) {
+        if root_decl.is_none() {
+            root_decl = Some(decl.clone());
+            widget = Some(
+                auto_ui_compiler::aura::extract_widget_from_decl(decl)
+                    .map_err(|e| e.to_string())?,
+            );
+        } else {
+            sibling_decls.push(decl.clone());
+        }
+    }
 
     let widget = widget.ok_or("No widget declaration found")?;
     let root_decl = root_decl.ok_or("No widget declaration found")?;
@@ -1172,7 +1225,13 @@ fn build_dynamic_component_inner(
                 );
                 let mod_session = CompilerSession::ui();
                 let mut mod_parser = Parser::from(module_code.as_str()).with_session(mod_session);
-                if let Ok(mod_ast) = mod_parser.parse_domain(&auto_ui_dialect::UiDialect).map(auto_ui_dialect::UiCode) {
+                if let Ok(mod_ast) = mod_parser
+                    .parse_domain(&auto_ui_dialect::UiDialect)
+                    .map(auto_ui_dialect::UiCode)
+                    .and_then(|ui| {
+                        auto_ui_compiler::ui_ast::lower_ui(&ui).map(|lowered| lowered.ui)
+                    })
+                {
                     // Plan 367 P2-3: register this module's `view fn` fragments
                     // BEFORE extracting any widget view trees below. A widget in
                     // the same module (e.g. NavTree in sidebar.at) calls a
@@ -1183,12 +1242,15 @@ fn build_dynamic_component_inner(
                     for frag in mod_ast.domain_stmts().filter_map(|s| match s {
                         auto_ui_dialect::UiStmt::ViewFragmentDecl(d) => Some(d),
                         _ => None,
-                        }) {
-                            auto_ui_compiler::aura::extract::register_view_fragment(frag);
-                                            }
+                    }) {
+                        auto_ui_compiler::aura::extract::register_view_fragment(frag);
+                    }
 
                     for stmt in mod_ast.items() {
-                        if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(decl)) = stmt {
+                        if let auto_parser_api::DomainStmt::Domain(
+                            auto_ui_dialect::UiStmt::WidgetDecl(decl),
+                        ) = stmt
+                        {
                             if let Ok(child_widget) =
                                 auto_ui_compiler::aura::extract_widget_from_decl(decl)
                             {
@@ -1219,7 +1281,10 @@ fn build_dynamic_component_inner(
                                 child_decls.push(decl.clone());
                                 registry.register(child_widget);
                             }
-                        } else if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::StoreDecl(store_decl)) = stmt {
+                        } else if let auto_parser_api::DomainStmt::Domain(
+                            auto_ui_dialect::UiStmt::StoreDecl(store_decl),
+                        ) = stmt
+                        {
                             // Plan 370 D-GAP-4: stores imported via `use module: Store`
                             // (e.g. `use notes_store: NotesStore`) live in their own
                             // source file, NOT the root AST. Convert them to view-less
@@ -1335,17 +1400,26 @@ fn build_dynamic_component_inner(
                     let mod_session = CompilerSession::ui();
                     let mut mod_parser =
                         Parser::from(module_code.as_str()).with_session(mod_session);
-                    if let Ok(mod_ast) = mod_parser.parse_domain(&auto_ui_dialect::UiDialect).map(auto_ui_dialect::UiCode) {
+                    if let Ok(mod_ast) = mod_parser
+                        .parse_domain(&auto_ui_dialect::UiDialect)
+                        .map(auto_ui_dialect::UiCode)
+                        .and_then(|ui| {
+                            auto_ui_compiler::ui_ast::lower_ui(&ui).map(|lowered| lowered.ui)
+                        })
+                    {
                         // Register view-fn fragments from the page module too.
                         for frag in mod_ast.domain_stmts().filter_map(|s| match s {
                             auto_ui_dialect::UiStmt::ViewFragmentDecl(d) => Some(d),
                             _ => None,
-                            }) {
-                                auto_ui_compiler::aura::extract::register_view_fragment(frag);
-                                                    }
+                        }) {
+                            auto_ui_compiler::aura::extract::register_view_fragment(frag);
+                        }
 
                         for stmt in mod_ast.items() {
-                            if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(decl)) = stmt {
+                            if let auto_parser_api::DomainStmt::Domain(
+                                auto_ui_dialect::UiStmt::WidgetDecl(decl),
+                            ) = stmt
+                            {
                                 if let Ok(child_widget) =
                                     auto_ui_compiler::aura::extract_widget_from_decl(decl)
                                 {
@@ -1367,7 +1441,10 @@ fn build_dynamic_component_inner(
                             // route pages never enter all_decls → their handlers
                             // are undefined at link time. This mirrors the root-AST
                             // store conversion (line ~2582).
-                            if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::StoreDecl(store_decl)) = stmt {
+                            if let auto_parser_api::DomainStmt::Domain(
+                                auto_ui_dialect::UiStmt::StoreDecl(store_decl),
+                            ) = stmt
+                            {
                                 let name = store_decl.name.clone();
                                 child_decls.push(auto_ui_dialect::ast::WidgetDecl {
                                     name: name.clone(),
@@ -1413,15 +1490,13 @@ fn build_dynamic_component_inner(
     // Plan 451 P3: 顶层 actions 回退链（widget 块未安装时）：本文件顶层
     // 声明 → import_stmts 里首个模块声明（use 传递闭包已在此前收齐）。
     if !dsl_actions_installed {
-        let fallback = ast
-            .domain_stmts()
-            .find_map(|s| match s {
-                auto_ui_dialect::UiStmt::ActionsDecl(b) => Some(b.clone()),
-                _ => None,
-            });
-            // PLAN-841 T-05: the old or_else arm scanned import_stmts for
-            // ActionsDecl — no producer ever pushed one (dead arm), and the
-            // Core channel can no longer carry UI decls at all.
+        let fallback = ast.domain_stmts().find_map(|s| match s {
+            auto_ui_dialect::UiStmt::ActionsDecl(b) => Some(b.clone()),
+            _ => None,
+        });
+        // PLAN-841 T-05: the old or_else arm scanned import_stmts for
+        // ActionsDecl — no producer ever pushed one (dead arm), and the
+        // Core channel can no longer carry UI decls at all.
         if let Some(acts) = fallback {
             crate::ui::action_config::set_dsl_action_config_from_block(&acts, path);
         }
@@ -1559,7 +1634,7 @@ fn build_dynamic_component_inner(
                                         &mut seen_symbols,
                                         &mut import_session,
                                         None,
-                                            &mut import_store_decls,
+                                        &mut import_store_decls,
                                     );
                                     if let Ok(code) = std::fs::read_to_string(&p) {
                                         for us in
@@ -1756,7 +1831,7 @@ fn build_dynamic_component_inner(
                                         &mut seen_symbols,
                                         &mut import_session,
                                         None,
-                                            &mut import_store_decls,
+                                        &mut import_store_decls,
                                     );
                                     if let Ok(code) = std::fs::read_to_string(&p) {
                                         for us in
@@ -1855,7 +1930,11 @@ fn build_dynamic_component_inner(
             let code = auto_lang_core::back_prefix::apply(path, code);
             let session = auto_lang_core::session::CompilerSession::ui();
             let mut parser = crate::Parser::from(code.as_str()).with_session(session);
-            let Ok(mod_ast) = parser.parse_domain(&auto_ui_dialect::UiDialect).map(auto_ui_dialect::UiCode) else {
+            let Ok(mod_ast) = parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .map(auto_ui_dialect::UiCode)
+                .and_then(|ui| auto_ui_compiler::ui_ast::lower_ui(&ui).map(|lowered| lowered.ui))
+            else {
                 continue;
             };
             for entries in mod_ast.domain_stmts().filter_map(|s| match s {
@@ -1970,6 +2049,41 @@ fn run_file_dynamic_ui_inner(
 /// PLAN-814 T-04：唯一消费方为本管线，随 lib.rs 迁入。
 fn is_non_fs_module_use(u: &auto_lang_core::use_scanner::UseStatement) -> bool {
     u.is_python_import || u.module.starts_with("auto.") || u.module.starts_with(".web")
+}
+
+#[cfg(all(test, feature = "ui-iced"))]
+mod plan841_domain_validation_tests {
+    #[test]
+    fn dynamic_build_rejects_duplicate_widgets_and_accepts_valid_control() {
+        let good = "widget App { view { text \"ok\" {} } }";
+        let bad = format!("{good}\n{good}");
+        let error = crate::build_dynamic_component(&bad, None)
+            .expect_err("runtime must reject duplicate widgets before VM construction");
+        assert!(error.to_string().contains("duplicate widget declaration"));
+        crate::build_dynamic_component(good, None).expect("valid runtime control");
+    }
+
+    #[test]
+    fn dynamic_build_rejects_invalid_imported_module() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let child = dir.path().join("child.at");
+        let app = dir.path().join("app.at");
+        let valid_child = "widget Imported { view { text \"child\" {} } }";
+        std::fs::write(&child, format!("{valid_child}\n{valid_child}")).expect("child");
+        std::fs::write(
+            &app,
+            "use child: Imported\nwidget App { view { Imported {} } }",
+        )
+        .expect("app");
+        let error =
+            crate::build_dynamic_component(&std::fs::read_to_string(&app).unwrap(), app.to_str())
+                .expect_err("invalid imported module must fail before VM execution");
+        assert!(error.to_string().contains("duplicate widget declaration"));
+
+        std::fs::write(&child, valid_child).expect("valid child");
+        crate::build_dynamic_component(&std::fs::read_to_string(&app).unwrap(), app.to_str())
+            .expect("valid imported module still builds");
+    }
 }
 
 // =============================================================================

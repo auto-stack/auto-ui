@@ -136,7 +136,10 @@ fn p042_app_at_parses() {
     };
     let session = auto_lang_core::session::CompilerSession::ui();
     let mut parser = auto_lang_core::parser::Parser::from(src.as_str()).with_session(session);
-    match parser.parse_domain(&auto_ui_dialect::UiDialect).map(auto_ui_dialect::UiCode) {
+    match parser
+        .parse_domain(&auto_ui_dialect::UiDialect)
+        .map(auto_ui_dialect::UiCode)
+    {
         Ok(_) => {}
         Err(e) => panic!("039-syslog app.at parse 失败: {e:?}"),
     }

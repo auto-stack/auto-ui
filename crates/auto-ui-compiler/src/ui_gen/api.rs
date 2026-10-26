@@ -37,7 +37,7 @@ pub fn transpile_file(
 /// This is the preferred method for transpiling UI components.
 /// It uses the new AURA-based architecture without DSL preprocessing.
 pub fn transpile_aura(source: &str, output_path: Option<&str>) -> Result<String, String> {
-    let ast = crate::parse_ui(source).map_err(|e| format!("Failed to parse: {:?}", e))?;
+    let ast = crate::parse_validated_ui(source).map_err(|e| format!("Failed to parse: {:?}", e))?;
 
     // Extract and generate
     let mut code = String::new();
@@ -65,7 +65,7 @@ pub fn transpile_aura(source: &str, output_path: Option<&str>) -> Result<String,
 
 /// Transpile UI source code to Vue3 SFC using AURA pipeline (Plan 096)
 pub fn transpile_vue_aura(source: &str, output_path: Option<&str>) -> Result<String, String> {
-    let ast = crate::parse_ui(source).map_err(|e| format!("Failed to parse: {:?}", e))?;
+    let ast = crate::parse_validated_ui(source).map_err(|e| format!("Failed to parse: {:?}", e))?;
 
     // Extract and generate
     let mut code = String::new();
@@ -484,7 +484,7 @@ fn collect_use_module_actions(
         let Ok(module_code) = std::fs::read_to_string(&module_path) else {
             continue;
         };
-        let Ok(mod_ast) = crate::parse_ui(&module_code) else {
+        let Ok(mod_ast) = crate::parse_validated_ui(&module_code) else {
             eprintln!(
                 "[codegen] actions module {} failed to parse — skipped",
                 module_path.display()
@@ -522,7 +522,7 @@ pub fn collect_store_siblings(at_path: &std::path::Path, code: &str) -> Vec<Stri
         let Ok(module_code) = std::fs::read_to_string(&module_path) else {
             continue;
         };
-        let Ok(mod_ast) = crate::parse_ui(&module_code) else {
+        let Ok(mod_ast) = crate::parse_validated_ui(&module_code) else {
             continue;
         };
         for stmt in mod_ast.domain_stmts() {
@@ -588,7 +588,7 @@ pub fn collect_use_module_fns(
         let Ok(module_code) = std::fs::read_to_string(&module_path) else {
             continue;
         };
-        let Ok(mod_ast) = crate::parse_ui(&module_code) else {
+        let Ok(mod_ast) = crate::parse_validated_ui(&module_code) else {
             eprintln!(
                 "[codegen] use-fn module {} failed to parse — skipped",
                 module_path.display()
@@ -607,6 +607,36 @@ pub fn collect_use_module_fns(
         }
     }
     (fns, imported_names)
+}
+
+fn validate_use_modules(at_path: &Path, code: &str) -> Result<(), String> {
+    let base_dir = at_path.parent().unwrap_or(Path::new("."));
+    let mut validated = HashSet::new();
+    for use_stmt in auto_lang_core::use_scanner::scan_use_statements(code) {
+        if use_stmt.is_c_import || use_stmt.is_rust_import || use_stmt.is_python_import {
+            continue;
+        }
+        let paths = match crate::resolve_use_module(base_dir, &use_stmt) {
+            crate::UseModuleResolution::Module(path) => vec![path],
+            crate::UseModuleResolution::StoreFiles(paths) => paths.into_values().collect(),
+            crate::UseModuleResolution::None => continue,
+        };
+        for path in paths {
+            if !validated.insert(path.clone()) {
+                continue;
+            }
+            let Ok(module_code) = std::fs::read_to_string(&path) else {
+                continue;
+            };
+            crate::parse_validated_ui(&module_code).map_err(|error| {
+                format!(
+                    "UI module validation failed for {}: {error}",
+                    path.display()
+                )
+            })?;
+        }
+    }
+    Ok(())
 }
 
 pub fn generate_component_from_file(
@@ -640,8 +670,9 @@ pub fn generate_component_from_file(
         crate::design_tokens::recipe::prepare_style_recipe_imports(&base_dir, &code)
             .map_err(|e| e.to_string())?;
 
-    let ast = crate::parse_ui(&code)
-        .map_err(|e| format!("Parse error in {}: {:?}", at_path.display(), e))?;
+    let ast = crate::parse_validated_ui(&code)
+        .map_err(|e| format!("Parse/validation error in {}: {:?}", at_path.display(), e))?;
+    validate_use_modules(at_path, &code)?;
 
     // Auto-detect or use overrides
     let api_imports = opts
@@ -1315,7 +1346,7 @@ widget App {
         use auto_lang_core::session::CompilerSession;
         let session = CompilerSession::ui().with_backend("vue");
         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
-        let ast = crate::parse_ui(src).expect("parse");
+        let ast = crate::parse_validated_ui(src).expect("parse");
         let mut generated = None;
         for stmt in ast.domain_stmts() {
             if let auto_ui_dialect::UiStmt::WidgetDecl(w) = stmt {

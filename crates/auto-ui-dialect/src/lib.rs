@@ -33,11 +33,13 @@ pub mod declarations;
 pub mod grammar;
 pub mod model;
 pub mod route;
+pub mod validation;
 
 pub use ast::*;
 pub use codec::{decode_ui_code, encode_ui_code, UI_AST_DOMAIN, UI_AST_SCHEMA_VERSION};
 pub use model::{UiCode, UiStmt};
 pub use route::{RouteDef, RoutesBlock};
+pub use validation::validate_ui;
 // PLAN-814 R3-03b：UI 文法依赖回归测试组（随迁自 auto-lang-core 门控测试；
 // dev-dep 驱动，仅测试编译）。
 #[cfg(test)]
