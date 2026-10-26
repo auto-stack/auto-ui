@@ -188,6 +188,45 @@ pub fn request_front_dir(
     Some(root.join(trimmed))
 }
 
+pub(crate) fn validate_ui_file(path: &std::path::Path) -> Result<(), String> {
+    auto_ui_compiler::ui_gen::api::validate_ui_file_with_modules(path)
+}
+
+pub(crate) fn validate_ui_files(paths: &[std::path::PathBuf]) -> Result<(), String> {
+    for path in paths {
+        validate_ui_file(path)?;
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_ui_tree(root: &std::path::Path) -> Result<(), String> {
+    if !root.exists() {
+        return Ok(());
+    }
+    let mut stack = vec![root.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        for entry in std::fs::read_dir(&dir)
+            .map_err(|error| format!("Failed to read {}: {error}", dir.display()))?
+        {
+            let path = entry
+                .map_err(|error| format!("Failed to read {}: {error}", dir.display()))?
+                .path();
+            if path.is_dir() {
+                stack.push(path);
+            } else if path.extension().and_then(|ext| ext.to_str()) == Some("at")
+                && path.file_name().and_then(|name| name.to_str()) != Some("pac.at")
+            {
+                validate_ui_file(&path)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn domain_admission_failed(error: &str) -> bool {
+    error.contains("UI domain validation failed") || error.contains("UI module validation failed")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -609,6 +609,18 @@ pub fn collect_use_module_fns(
     (fns, imported_names)
 }
 
+pub fn validate_ui_file_with_modules(at_path: &Path) -> Result<(), String> {
+    let code = std::fs::read_to_string(at_path)
+        .map_err(|error| format!("Failed to read {}: {error}", at_path.display()))?;
+    crate::parse_validated_ui(&code).map_err(|error| {
+        format!(
+            "UI file validation failed for {}: {error}",
+            at_path.display()
+        )
+    })?;
+    validate_use_modules(at_path, &code)
+}
+
 fn validate_use_modules(at_path: &Path, code: &str) -> Result<(), String> {
     let base_dir = at_path.parent().unwrap_or(Path::new("."));
     let mut validated = HashSet::new();

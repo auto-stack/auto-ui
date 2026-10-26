@@ -221,6 +221,8 @@ impl JetProject {
             }
         };
 
+        crate::util::validate_ui_tree(&front_dir)?;
+
         // Output directory
         let output_dir = root_dir.join("gen").join("front").join("jet");
 
@@ -362,6 +364,7 @@ impl JetProject {
 
         let name = reads.name;
         let front_dir = root_dir.join("source").join("front");
+        crate::util::validate_ui_tree(&front_dir)?;
         let output_dir = root_dir.join("gen").join("front").join("jet");
 
         // Load cache
@@ -623,6 +626,7 @@ impl JetProject {
         let ast = parser
             .parse_domain(&auto_ui_dialect::UiDialect)
             .map(auto_ui_dialect::UiCode)
+            .and_then(|ui| auto_ui_compiler::ui_ast::lower_ui(&ui).map(|lowered| lowered.ui))
             .map_err(|e| format!("Parse error: {:?}", e))?;
 
         // Extract AURA widgets from AST

@@ -181,6 +181,8 @@ impl ArkProject {
             None => root_dir.join("src").join("front"),
         };
 
+        crate::util::validate_ui_tree(&front_dir)?;
+
         // Output directory
         let output_dir = root_dir.join("gen").join("front").join("ark");
 
@@ -364,6 +366,7 @@ impl ArkProject {
         let ast = parser
             .parse_domain(&auto_ui_dialect::UiDialect)
             .map(auto_ui_dialect::UiCode)
+            .and_then(|ui| auto_ui_compiler::ui_ast::lower_ui(&ui).map(|lowered| lowered.ui))
             .map_err(|e| format!("Parse error: {:?}", e))?;
 
         let mut files = Vec::new();

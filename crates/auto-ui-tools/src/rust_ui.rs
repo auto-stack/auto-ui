@@ -159,6 +159,7 @@ fn collect_component_prop_orders(at_files: &[std::path::PathBuf]) {
             if let Ok(ast) = parser
                 .parse_domain(&auto_ui_dialect::UiDialect)
                 .map(auto_ui_dialect::UiCode)
+                .and_then(|ui| auto_ui_compiler::ui_ast::lower_ui(&ui).map(|lowered| lowered.ui))
             {
                 for stmt in ast.domain_stmts() {
                     if let auto_ui_dialect::UiStmt::WidgetDecl(widget_decl) = stmt {
@@ -264,6 +265,7 @@ fn collect_store_decls(at_files: &[std::path::PathBuf]) -> Vec<auto_ui_dialect::
             if let Ok(ast) = parser
                 .parse_domain(&auto_ui_dialect::UiDialect)
                 .map(auto_ui_dialect::UiCode)
+                .and_then(|ui| auto_ui_compiler::ui_ast::lower_ui(&ui).map(|lowered| lowered.ui))
             {
                 for stmt in ast.domain_stmts() {
                     if let auto_ui_dialect::UiStmt::StoreDecl(ref store) = stmt {
@@ -291,6 +293,7 @@ fn collect_component_state_fields(
             if let Ok(ast) = parser
                 .parse_domain(&auto_ui_dialect::UiDialect)
                 .map(auto_ui_dialect::UiCode)
+                .and_then(|ui| auto_ui_compiler::ui_ast::lower_ui(&ui).map(|lowered| lowered.ui))
             {
                 for stmt in ast.domain_stmts() {
                     if let auto_ui_dialect::UiStmt::WidgetDecl(widget_decl) = stmt {
@@ -361,6 +364,7 @@ pub fn collect_component_semantics(
             if let Ok(ast) = parser
                 .parse_domain(&auto_ui_dialect::UiDialect)
                 .map(auto_ui_dialect::UiCode)
+                .and_then(|ui| auto_ui_compiler::ui_ast::lower_ui(&ui).map(|lowered| lowered.ui))
             {
                 for stmt in ast.domain_stmts() {
                     if let Stmt::WidgetDecl(widget_decl) = stmt {
@@ -450,6 +454,7 @@ fn regenerate_code_only(project_dir: &Path, rust_dir: &Path, src_: &PacSource) -
     };
     let mut at_files = collect_at_files(&front_dir)?;
     at_files.extend(bps_widget_files);
+    crate::util::validate_ui_files(&at_files)?;
     if at_files.is_empty() {
         return Ok(());
     }
@@ -498,6 +503,9 @@ fn regenerate_code_only(project_dir: &Path, rust_dir: &Path, src_: &PacSource) -
                 all_api_imports.extend(api_imports);
             }
             Err(e) => {
+                if crate::util::domain_admission_failed(&e.to_string()) {
+                    return Err(e);
+                }
                 let file_name = at_path.file_name().unwrap_or_default().to_string_lossy();
                 println!(
                     "{} Failed to compile {}: {}",
@@ -583,16 +591,6 @@ fn generate_rust_ui_inner(
 ) -> AutoResult<()> {
     println!("{}", "Generating Rust UI code".bright_cyan());
 
-    // Determine output directory — use shared workspace at examples/rust-workspace/
-    let ws_dir = ensure_shared_workspace(project_dir);
-    let member_name = front_member_name(project_dir);
-    let default_output = ws_dir.join(&member_name);
-    let output = output_dir
-        .map(|p| p.to_path_buf())
-        .unwrap_or(default_output);
-
-    fs::create_dir_all(&output).map_err(|e| format!("Failed to create output directory: {}", e))?;
-
     // PLAN-792：编译相位抽取为 compile_rust_ui_app（开发/交付共享）；
     // None = 无 .at/无 WidgetDecl（既有早退语义，输出字节与直写路径一致）。
     let Some(compiled) = compile_rust_ui_app(project_dir, source)? else {
@@ -601,6 +599,15 @@ fn generate_rust_ui_inner(
     let project_name = compiled.project_name;
     let main_widget = compiled.main_widget;
     let full_code = compiled.main_rs;
+
+    // Validate and compile the complete source set before creating any output.
+    let ws_dir = ensure_shared_workspace(project_dir);
+    let member_name = front_member_name(project_dir);
+    let default_output = ws_dir.join(&member_name);
+    let output = output_dir
+        .map(|p| p.to_path_buf())
+        .unwrap_or(default_output);
+    fs::create_dir_all(&output).map_err(|e| format!("Failed to create output directory: {}", e))?;
 
     // Write output as a Cargo project
     let src_dir = output.join("src");
@@ -680,6 +687,7 @@ pub(crate) fn compile_rust_ui_app(
     };
     let mut at_files = collect_at_files(&front_dir)?;
     at_files.extend(bps_widget_files);
+    crate::util::validate_ui_files(&at_files)?;
     if at_files.is_empty() {
         println!(
             "{}",
@@ -741,6 +749,9 @@ pub(crate) fn compile_rust_ui_app(
                 all_api_imports.extend(api_imports);
             }
             Err(e) => {
+                if crate::util::domain_admission_failed(&e.to_string()) {
+                    return Err(e);
+                }
                 println!(
                     "{} Failed to compile {}: {}",
                     "Warning:".bright_yellow(),
@@ -868,6 +879,7 @@ fn compile_at_file(
     let ast = parser
         .parse_domain(&auto_ui_dialect::UiDialect)
         .map(auto_ui_dialect::UiCode)
+        .and_then(|ui| auto_ui_compiler::ui_ast::lower_ui(&ui).map(|lowered| lowered.ui))
         .map_err(|e| format!("Parse error: {:?}", e))?;
 
     let mut output = String::new();
@@ -2914,6 +2926,7 @@ fn collect_dep_fn_imports(
         let Ok(ast) = parser
             .parse_domain(&auto_ui_dialect::UiDialect)
             .map(auto_ui_dialect::UiCode)
+            .and_then(|ui| auto_ui_compiler::ui_ast::lower_ui(&ui).map(|lowered| lowered.ui))
         else {
             continue;
         };
@@ -2974,6 +2987,7 @@ fn resolve_bps_dependencies(
         if let Ok(ast) = parser
             .parse_domain(&auto_ui_dialect::UiDialect)
             .map(auto_ui_dialect::UiCode)
+            .and_then(|ui| auto_ui_compiler::ui_ast::lower_ui(&ui).map(|lowered| lowered.ui))
         {
             for stmt in ast.domain_stmts() {
                 if let auto_ui_dialect::UiStmt::WidgetDecl(ref wd) = stmt {
@@ -3014,6 +3028,9 @@ fn resolve_bps_dependencies(
                     let Ok(ast) = parser
                         .parse_domain(&auto_ui_dialect::UiDialect)
                         .map(auto_ui_dialect::UiCode)
+                        .and_then(|ui| {
+                            auto_ui_compiler::ui_ast::lower_ui(&ui).map(|lowered| lowered.ui)
+                        })
                     else {
                         continue;
                     };
@@ -3662,6 +3679,7 @@ fn collect_shell_face_infos(pack_dir: &Path) -> AutoResult<Vec<ShellFaceInfo>> {
         let ast = parser
             .parse_domain(&auto_ui_dialect::UiDialect)
             .map(auto_ui_dialect::UiCode)
+            .and_then(|ui| auto_ui_compiler::ui_ast::lower_ui(&ui).map(|lowered| lowered.ui))
             .map_err(|e| format!("shell pack 解析失败 {file}: {e:?}"))?;
         let decl = ast
             .domain_stmts()

@@ -3312,6 +3312,7 @@ fn expand_at_module_web_imports(root_dir: &Path, ext_set: &mut std::collections:
         let Ok(ast) = parser
             .parse_domain(&auto_ui_dialect::UiDialect)
             .map(auto_ui_dialect::UiCode)
+            .and_then(|ui| auto_ui_compiler::ui_ast::lower_ui(&ui).map(|lowered| lowered.ui))
         else {
             continue;
         };
@@ -3731,6 +3732,10 @@ export default router
         let app_at = front_dir.join("app.at");
         if !app_at.exists() {
             return Err(format!("Entry file '{}' not found", app_at.display()).into());
+        }
+        crate::util::validate_ui_tree(&front_dir)?;
+        for (_, dep_front, _) in &dep_front_dirs {
+            crate::util::validate_ui_tree(dep_front)?;
         }
 
         let name = reads.name.clone();
@@ -4786,6 +4791,7 @@ export default router
         let ast = parser
             .parse_domain(&auto_ui_dialect::UiDialect)
             .map(auto_ui_dialect::UiCode)
+            .and_then(|ui| auto_ui_compiler::ui_ast::lower_ui(&ui).map(|lowered| lowered.ui))
             .map_err(|e| format!("Failed to parse fn module {}: {}", src.display(), e))?;
         let fns: Vec<auto_ui_compiler::aura::AuraModuleFn> = ast
             .core_stmts()
@@ -6808,6 +6814,7 @@ pub fn incremental_compile_changed(
 
     // Resolve front directory using same logic as VueProject::from_workspace
     let front_dir = resolve_front_dir(root_dir);
+    crate::util::validate_ui_tree(&front_dir)?;
     let output_dir = root_dir.join("gen").join("front").join("vue");
 
     // Plan 013: shadcn-vue mapping toggle from pac.at (`shadcn: off`).
@@ -7426,6 +7433,9 @@ fn resolve_stream_endpoints(root_dir: &Path) -> Vec<auto_ui_compiler::aura::Stre
 /// flow greps for that string — and, under `auto build --strict`, escalates
 /// to a hard build failure (non-zero exit), matching from_workspace.
 fn handle_compile_error(path: &Path, e: &str) -> Result<(), String> {
+    if crate::util::domain_admission_failed(e) {
+        return Err(format!("Failed to compile {}: {}", path.display(), e));
+    }
     // Plan 041a(strict 收口): fn-only 文件(helpers 等)是正常形态,降级。
     if e.contains("No widget or store declarations") {
         println!(
@@ -7458,6 +7468,9 @@ fn handle_compile_error_with_dep_shape(
     e: &str,
     library_dep: bool,
 ) -> Result<(), String> {
+    if crate::util::domain_admission_failed(e) {
+        return Err(format!("Failed to compile {}: {}", path.display(), e));
+    }
     let fn_only = e.contains("No widget or store declarations");
     if auto_ui_compiler::ui_gen::validators::strict_enabled() && !fn_only && !library_dep {
         return Err(format!("Failed to compile {}: {}", path.display(), e));
@@ -7482,6 +7495,7 @@ fn same_file_module_fns(code: &str) -> Vec<auto_ui_compiler::aura::AuraModuleFn>
     let Ok(ast) = parser
         .parse_domain(&auto_ui_dialect::UiDialect)
         .map(auto_ui_dialect::UiCode)
+        .and_then(|ui| auto_ui_compiler::ui_ast::lower_ui(&ui).map(|lowered| lowered.ui))
     else {
         return Vec::new();
     };
@@ -12088,6 +12102,7 @@ widget App {
         let ast = parser
             .parse_domain(&auto_ui_dialect::UiDialect)
             .map(auto_ui_dialect::UiCode)
+            .and_then(|ui| auto_ui_compiler::ui_ast::lower_ui(&ui).map(|lowered| lowered.ui))
             .expect("parse");
         let widgets: Vec<AuraWidget> = ast
             .domain_stmts()

@@ -27,6 +27,9 @@ pub fn decode_ui_code(input: &[u8]) -> Result<UiCode, String> {
     deserializer.disable_recursion_limit();
     let envelope = UiEnvelope::deserialize(serde_stacker::Deserializer::new(&mut deserializer))
         .map_err(|error| format!("UI AST schema/tag validation failed: {error}"))?;
+    deserializer
+        .end()
+        .map_err(|error| format!("UI AST schema/tag validation failed: {error}"))?;
     if envelope.domain != UI_AST_DOMAIN {
         return Err(format!(
             "UI AST domain mismatch: expected {UI_AST_DOMAIN}, got {}",
@@ -276,6 +279,50 @@ mod tests {
         let error = decode_ui_code(&bytes).expect_err("decoded domain must be validated");
         assert!(error.contains("UI domain validation failed"), "{error}");
         assert!(error.contains("duplicate widget declaration"), "{error}");
+    }
+
+    #[test]
+    fn codec_rejects_trailing_data_and_accepts_trailing_whitespace() {
+        let bytes = encode_ui_code(&sample()).expect("encode");
+        let mut whitespace = bytes.clone();
+        whitespace.extend_from_slice(b" \n\t");
+        decode_ui_code(&whitespace).expect("trailing whitespace is valid JSON");
+
+        for suffix in [
+            b"garbage".as_slice(),
+            b"{}".as_slice(),
+            b"{\"schema\":0}".as_slice(),
+        ] {
+            let mut input = bytes.clone();
+            input.extend_from_slice(suffix);
+            assert!(serde_json::from_slice::<serde_json::Value>(&input).is_err());
+            let error = decode_ui_code(&input)
+                .expect_err("decoder must consume the complete artifact, not a valid prefix");
+            assert!(error.contains("schema/tag validation failed"), "{error}");
+        }
+    }
+
+    #[test]
+    fn codec_rejects_invalid_message_payload_shape() {
+        let mut invalid = sample();
+        let widget = match &mut invalid.0.items[0] {
+            DomainStmt::Domain(UiStmt::WidgetDecl(widget)) => widget,
+            _ => unreachable!(),
+        };
+        widget.messages = vec![MsgDecl {
+            variants: vec![crate::MsgVariant {
+                name: "Go".into(),
+                quoted: false,
+                payload: vec![Type::Int],
+                payload_names: vec![],
+            }],
+        }];
+        let bytes = encode_ui_code(&invalid).expect("encode invalid probe input");
+        let error = decode_ui_code(&bytes).expect_err("invalid payload shape must be rejected");
+        assert!(
+            error.contains("mismatched payload names and types"),
+            "{error}"
+        );
     }
 
     #[test]
