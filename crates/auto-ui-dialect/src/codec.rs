@@ -245,6 +245,50 @@ mod tests {
     }
 
     #[test]
+    fn codec_clone_and_decode_have_bounded_last_owner_lifetimes() {
+        let shared = auto_val::shared(auto_ast::ast::Tag::new("Owned".into(), vec![]));
+        let original_weak = std::rc::Rc::downgrade(&shared);
+        let original = UiCode::from_domain(vec![UiStmt::ModelBlock(ModelBlock {
+            fields: vec![ModelField {
+                name: "value".into(),
+                ty: Type::Tag(shared),
+                init: Expr::Int(0),
+                mutable: false,
+                is_primary: false,
+                decorators: vec![],
+            }],
+        })]);
+        let cloned = original.clone();
+        let encoded = encode_ui_code(&original).expect("encode owned graph");
+        let decoded = decode_ui_code(&encoded).expect("decode owned graph");
+
+        drop(original);
+        assert!(original_weak.upgrade().is_some(), "clone retains the owner");
+        let decoded_weak = decoded
+            .domain_stmts()
+            .find_map(|stmt| match stmt {
+                UiStmt::ModelBlock(model) => Some(model.fields[0].ty.clone()),
+                _ => None,
+            })
+            .and_then(|ty| match ty {
+                Type::Tag(shared) => Some(std::rc::Rc::downgrade(&shared)),
+                _ => None,
+            })
+            .expect("decoded shared type");
+
+        drop(cloned);
+        assert!(
+            original_weak.upgrade().is_none(),
+            "decoded data must not retain the original through a global side table"
+        );
+        drop(decoded);
+        assert!(
+            decoded_weak.upgrade().is_none(),
+            "last decoded owner releases the graph"
+        );
+    }
+
+    #[test]
     fn visitor_observes_ui_view_and_core_items() {
         #[derive(Default)]
         struct Counts {

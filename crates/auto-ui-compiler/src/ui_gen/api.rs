@@ -617,10 +617,9 @@ pub fn generate_component_from_file(
     at_path: &std::path::Path,
     opts: ComponentGenOptions,
 ) -> Result<GeneratedComponent, String> {
-    // PLAN-814 T-03/R4-01：UICache 失效语义装配——生成器源指纹（本
-    // crate build.rs）注入 SDK 缓存（缺 build.rs 环境=None；None 不阻断
-    // 后续真实身份升级）；显式文法组合（入口首选；幂等）。
-    auto_lang_core::database::set_generator_fingerprint(crate::generator_fingerprint());
+    // UICache 身份由生成器源与 UI AST schema 组成，在 load/dirty 判定前
+    // 注入；显式文法组合保持入口首选、幂等。
+    auto_lang_core::database::set_generator_fingerprint(crate::ui_cache_fingerprint());
     crate::assemble_ui_grammar();
     use crate::aura::extract_store_from_decl;
     use crate::aura::extract_widget_from_decl;

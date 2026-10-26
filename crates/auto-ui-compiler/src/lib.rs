@@ -30,9 +30,15 @@ pub use ui_ast::{
 };
 
 /// 生成器源指纹（本 crate build.rs 对 src/ui_gen 扫描；Plan 692 W-1
-/// 失效语义单源）。SDK database::ui_cache 经注入消费；None=无 build.rs 环境。
+/// 失效语义单源）。None=无 build.rs 环境；UICache 使用下方组合身份。
 pub fn generator_fingerprint() -> Option<String> {
     option_env!("AUTO_UI_GEN_FINGERPRINT").map(|s| s.to_string())
+}
+
+/// UICache identity covers both generator code and the persisted UI AST schema.
+pub fn ui_cache_fingerprint() -> Option<String> {
+    let generator = generator_fingerprint().unwrap_or_else(|| "unknown".to_string());
+    Some(format!("{generator}:ui-ast-schema-{UI_AST_SCHEMA_VERSION}"))
 }
 
 pub fn assemble_ui_grammar() {}

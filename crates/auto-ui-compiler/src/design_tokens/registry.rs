@@ -240,7 +240,7 @@ pub fn rgb_to_hsl_str(rgb: (u8, u8, u8)) -> String {
         d / (mx + mn)
     };
     let h = if mx == r {
-        ((g - b) / d + if g < b { 6.0 } else { 0.0 })
+        (g - b) / d + if g < b { 6.0 } else { 0.0 }
     } else if mx == g {
         (b - r) / d + 2.0
     } else {

@@ -11,7 +11,7 @@
 
 use super::types::*;
 use auto_lang_core::ast::{Expr, Key, Type};
-use auto_ui_dialect::ast::{ViewEvent, ViewProp, ViewPropValue};
+use auto_ui_dialect::ast::{ViewEvent, ViewPropValue};
 use std::collections::HashMap;
 
 // Plan 367 P2-3: thread-local store for view fragments.

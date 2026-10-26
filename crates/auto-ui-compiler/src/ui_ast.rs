@@ -328,7 +328,11 @@ fn main() {
     fn representative_cross_file_import_uses_owned_domain_modules() {
         let temp = tempfile::tempdir().expect("tempdir");
         let answers = temp.path().join("answers.at");
-        std::fs::write(&answers, "fn answer() int { 42 }\n").expect("shared source");
+        let module_source = concat!(
+            "fn answer() int { 42 }\n",
+            "widget Imported { view { text \"module\" {} } }\n"
+        );
+        std::fs::write(&answers, module_source).expect("shared source");
         let app = temp.path().join("app.at");
         let source = "use answers: answer\nwidget App { view { text \"x\" {} } }\n";
         std::fs::write(&app, source).expect("app source");
@@ -338,9 +342,58 @@ fn main() {
         assert!(functions.iter().any(|function| function.name == "answer"));
         let ui = parse_ui(source).expect("host parse");
         assert!(ui.core_stmts().any(|stmt| matches!(stmt, Stmt::Use(_))));
-        assert!(ui
+        let host_widgets = ui
             .domain_stmts()
-            .any(|stmt| matches!(stmt, UiStmt::WidgetDecl(_))));
+            .filter_map(|stmt| match stmt {
+                UiStmt::WidgetDecl(widget) => Some(widget.name.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(host_widgets, vec!["App"]);
+
+        let module_ui = parse_ui(module_source).expect("module-owned parse");
+        let module_widgets = module_ui
+            .domain_stmts()
+            .filter_map(|stmt| match stmt {
+                UiStmt::WidgetDecl(widget) => Some(widget.name.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(module_widgets, vec!["Imported"]);
+    }
+
+    #[test]
+    fn all_ui_statement_families_require_the_domain_port() {
+        let sources = [
+            "widget App { view { text \"x\" {} } }",
+            "store Shared { model { count int = 0 } }",
+            "msg Msg { Save }",
+            "model { count int = 0 }",
+            "component fn Card() { view { text \"x\" {} } }",
+            "view fn Item() { text \"x\" {} }",
+            "actions { action (id: \"app.go\", handler: .Go, title: \"Go\") }",
+            "style card = \"bg-card\"",
+            "pub style card = \"bg-card\"",
+            "use.web.fn fetch from \"web\"",
+        ];
+        for source in sources {
+            let ui = parse_ui(source).unwrap_or_else(|error| {
+                panic!("domain port must accept UI statement `{source}`: {error}")
+            });
+            assert_eq!(
+                ui.domain_stmts().count(),
+                1,
+                "UI statement must remain in the owned domain: {source}"
+            );
+            assert!(
+                lower_ui(&ui)
+                    .expect("validated lowering")
+                    .core
+                    .stmts
+                    .is_empty(),
+                "domain statements must not leak into Core code: {source}"
+            );
+        }
     }
 
     #[test]

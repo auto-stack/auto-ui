@@ -206,7 +206,7 @@ pub(crate) fn load_ext_imports_for_vm(
             let code = auto_lang_core::back_prefix::apply(path, code);
             let session = auto_lang_core::session::CompilerSession::ui();
             let mut parser = crate::Parser::from(code.as_str()).with_session(session);
-            let Ok(mod_ast) = parser.parse_domain(&auto_ui_dialect::UiDialect).map(auto_ui_dialect::UiCode) else {
+            let Ok(_) = parser.parse_domain(&auto_ui_dialect::UiDialect).map(auto_ui_dialect::UiCode) else {
                 continue;
             };
             let mod_dir = path
