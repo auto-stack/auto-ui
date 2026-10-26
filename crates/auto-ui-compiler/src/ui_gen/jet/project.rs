@@ -30,7 +30,7 @@
 //! ## Usage
 //!
 //! ```rust
-//! use auto_lang::ui_gen::jet::{JetProjectConfig, ProjectGenerator, ThemeColors};
+//! use auto_ui_compiler::ui_gen::jet::{JetProjectConfig, ProjectGenerator, ThemeColors};
 //!
 //! // Create with defaults
 //! let config = JetProjectConfig::new("MyApp");
@@ -74,7 +74,7 @@ use crate::route::{RouteDef, RouteDiscovery, RouteMerger, RouteSource};
 /// # Example
 ///
 /// ```rust
-/// use auto_lang::ui_gen::jet::JetProjectConfig;
+/// use auto_ui_compiler::ui_gen::jet::JetProjectConfig;
 ///
 /// // Simple usage
 /// let config = JetProjectConfig::new("MyApp");
@@ -232,7 +232,7 @@ impl JetProjectConfig {
 /// # Example
 ///
 /// ```rust
-/// use auto_lang::ui_gen::jet::ThemeColors;
+/// use auto_ui_compiler::ui_gen::jet::ThemeColors;
 ///
 /// // Create with primary and secondary
 /// let theme = ThemeColors::new("#6750A4", "#625B71");
@@ -290,7 +290,7 @@ impl ThemeColors {
 /// # Example
 ///
 /// ```rust
-/// use auto_lang::ui_gen::jet::{JetProjectConfig, ProjectGenerator};
+/// use auto_ui_compiler::ui_gen::jet::{JetProjectConfig, ProjectGenerator};
 ///
 /// let config = JetProjectConfig::new("MyApp")
 ///     .with_application_id("com.company.myapp");

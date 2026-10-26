@@ -16769,10 +16769,10 @@ fn strings_from_values(items: &[Value]) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use auto_ui_dialect::UiStmt;
-use auto_ui_dialect::UiCode;
     use auto_lang_core::ast::Type;
     use auto_ui_compiler::aura::{AuraEvent, AuraStateDef, AuraWidget};
+    use auto_ui_dialect::UiCode;
+    use auto_ui_dialect::UiStmt;
     use std::collections::HashMap;
 
     /// PLAN-014 F-03：分支体语句筛合同——注释/空行不计入「单表达式」合同，
@@ -17364,7 +17364,11 @@ use auto_ui_dialect::UiCode;
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let decl = ast
             .domain_stmts()
             .find_map(|s| match s {
@@ -17427,7 +17431,11 @@ use auto_ui_dialect::UiCode;
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let decl = ast
             .domain_stmts()
             .find_map(|s| match s {
@@ -17467,7 +17475,11 @@ use auto_ui_dialect::UiCode;
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let decl = ast
             .domain_stmts()
             .find_map(|s| match s {
@@ -17515,7 +17527,11 @@ use auto_ui_dialect::UiCode;
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let mut decls = ast.domain_stmts().filter_map(|s| match s {
             UiStmt::WidgetDecl(d) => Some(d),
             _ => None,
@@ -17584,7 +17600,11 @@ use auto_ui_dialect::UiCode;
 
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let decl = ast
             .domain_stmts()
             .find_map(|s| match s {
@@ -17692,7 +17712,11 @@ use auto_ui_dialect::UiCode;
         set_menubar_open(Some("view".to_string()));
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let decl = ast
             .domain_stmts()
             .find_map(|s| match s {
@@ -17842,7 +17866,11 @@ use auto_ui_dialect::UiCode;
         set_menubar_open(Some("file".to_string()));
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let decl = ast
             .domain_stmts()
             .find_map(|s| match s {
@@ -17978,7 +18006,11 @@ use auto_ui_dialect::UiCode;
         use crate::ui::action_config::set_menubar_open;
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let decl = ast
             .domain_stmts()
             .find_map(|s| match s {
@@ -18146,7 +18178,11 @@ use auto_ui_dialect::UiCode;
         set_menubar_open(Some("file".to_string()));
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let decl = ast
             .domain_stmts()
             .find_map(|s| match s {
@@ -18321,7 +18357,11 @@ use auto_ui_dialect::UiCode;
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let decl = ast
             .domain_stmts()
             .find_map(|s| match s {
@@ -18401,7 +18441,11 @@ use auto_ui_dialect::UiCode;
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let decl = ast
             .domain_stmts()
             .find_map(|s| match s {
@@ -22029,7 +22073,11 @@ use auto_ui_dialect::UiCode;
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(child_src).with_session(session);
-        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let decl = ast
             .domain_stmts()
             .find_map(|s| match s {
@@ -22412,10 +22460,15 @@ use auto_ui_dialect::UiCode;
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let ast = UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
         let mut decls: Vec<auto_ui_dialect::WidgetDecl> = vec![];
         for st in &ast.0.items {
-            if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(d)) = st {
+            if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(d)) = st
+            {
                 decls.push(d.clone());
             }
         }
@@ -22546,26 +22599,23 @@ use auto_ui_dialect::UiCode;
     /// fallback → View::Empty，rail/设置面板图标全空。
     #[test]
     fn plan050_imported_component_icon_maps_to_lucide_image() {
-        let ext = auto_ui_dialect::ast::ExtImport {
-            kind: auto_ui_dialect::ast::ExtImportKind::Component,
-            symbols: vec![
-                auto_lang_core::ast::Name::from("Folder"),
-                auto_lang_core::ast::Name::from("Folder_icon"),
-            ],
-            path: "src/front/ports/icons.at".into(),
-            call_args: vec![],
-            ref_fields: vec![],
-        };
-        // PLAN-841 T-05: the import_stmts UseWeb detection path retired (Core
-// channel can no longer carry UI decls); these tests' oracle moves to the
-// register_imported_components registry path — rework owned by T-07.
-        let imports: Vec<auto_lang_core::ast::Stmt> = vec![];
-        let _ = ext;
+        struct ResetImportedComponents;
+        impl Drop for ResetImportedComponents {
+            fn drop(&mut self) {
+                crate::ui::aura_view_builder::clear_imported_components();
+            }
+        }
+        let _reset = ResetImportedComponents;
+        crate::ui::aura_view_builder::clear_imported_components();
+        crate::ui::aura_view_builder::register_imported_components(vec![
+            "Folder".to_string(),
+            "Folder_icon".to_string(),
+            "AppViewport".to_string(),
+        ]);
         let widget = make_test_widget("Test", vec![]);
         let bridge = VmBridge::new(&widget).unwrap();
         let registry = crate::ui::widget_registry::WidgetRegistry::new();
-        let builder =
-            AuraViewBuilder::with_registry_and_imports(&bridge, "Test", &registry, &imports);
+        let builder = AuraViewBuilder::with_registry_and_imports(&bridge, "Test", &registry, &[]);
 
         // PLAN-748 T-02：判别器改为 lucide 名集成员资格（含 "icon" 字样
         // 向后兼容）——Folder ∈ lucide 名集恢复 glyph（A-05 曾按
@@ -22638,6 +22688,7 @@ use auto_ui_dialect::UiCode;
         }
 
         // 未导入的同名 tag 不映射（registry/常规 fallback 优先语义不变）
+        crate::ui::aura_view_builder::register_imported_components(vec![]);
         let widget2 = make_test_widget("Test2", vec![]);
         let bridge2 = VmBridge::new(&widget2).unwrap();
         let registry2 = crate::ui::widget_registry::WidgetRegistry::new();

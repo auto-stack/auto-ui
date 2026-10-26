@@ -30,7 +30,7 @@
 //! ## Usage
 //!
 //! ```rust,no_run
-//! use auto_lang::route::{RouteDiscovery, RouteMerger, RouteDef};
+//! use auto_ui_compiler::route::{RouteDiscovery, RouteMerger, RouteDef};
 //! use std::path::PathBuf;
 //!
 //! // Discover routes from folder
@@ -180,7 +180,7 @@ impl From<AuraRoute> for RouteDef {
 /// # Examples
 ///
 /// ```
-/// use auto_lang::route::extract_path_params;
+/// use auto_ui_compiler::route::extract_path_params;
 ///
 /// let params = extract_path_params("/user/:id");
 /// assert_eq!(params, vec!["id"]);

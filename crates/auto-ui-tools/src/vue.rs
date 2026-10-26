@@ -3252,7 +3252,7 @@ fn collect_ext_import_files(widgets: &[AuraWidget], out: &mut std::collections::
             // Plan 437 Phase 2:包引用(`use { package: x from "..." }`)不产
             // ext 文件拷贝 —— 组件经 ComponentRegistry 加载生成,路径可含
             // `..`(页文件相对),进 ext 集会触发"escapes project root"误杀。
-            if matches!(imp.kind, auto_lang_core::ast::ui::ExtImportKind::Package) {
+            if matches!(imp.kind, auto_ui_dialect::ast::ExtImportKind::Package) {
                 continue;
             }
             let path = imp.path.as_str();
@@ -3309,9 +3309,14 @@ fn expand_at_module_web_imports(root_dir: &Path, ext_set: &mut std::collections:
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser =
             auto_lang_core::parser::Parser::from(source.as_str()).with_session(session);
-        let Ok(ast) = parser.parse() else { continue };
-        for stmt in &ast.stmts {
-            if let auto_lang_core::ast::Stmt::UseWeb(entries) = stmt {
+        let Ok(ast) = parser
+            .parse_domain(&auto_ui_dialect::UiDialect)
+            .map(auto_ui_dialect::UiCode)
+        else {
+            continue;
+        };
+        for stmt in ast.domain_stmts() {
+            if let auto_ui_dialect::UiStmt::UseWeb(entries) = stmt {
                 for imp in entries {
                     let path = imp.path.as_str();
                     if is_local_ext_path(path) {
@@ -4779,11 +4784,11 @@ export default router
         let mut parser =
             auto_lang_core::parser::Parser::from(source.as_str()).with_session(session);
         let ast = parser
-            .parse()
+            .parse_domain(&auto_ui_dialect::UiDialect)
+            .map(auto_ui_dialect::UiCode)
             .map_err(|e| format!("Failed to parse fn module {}: {}", src.display(), e))?;
         let fns: Vec<auto_ui_compiler::aura::AuraModuleFn> = ast
-            .stmts
-            .iter()
+            .core_stmts()
             .filter_map(|s| match s {
                 auto_lang_core::ast::Stmt::Fn(f) => auto_ui_compiler::aura::extract_module_fn(f),
                 _ => None,
@@ -4793,9 +4798,8 @@ export default router
         // pure forwarding port (re-exports only) — legitimate. A module with
         // neither fns nor web bindings transpiles to an empty module — error.
         let has_web_bindings = ast
-            .stmts
-            .iter()
-            .any(|s| matches!(s, auto_lang_core::ast::Stmt::UseWeb(_)));
+            .domain_stmts()
+            .any(|s| matches!(s, auto_ui_dialect::UiStmt::UseWeb(_)));
         if fns.is_empty() && !has_web_bindings {
             return Err(format!(
                 "use-block fn module {} declares no top-level fns or use.web bindings",
@@ -4808,11 +4812,10 @@ export default router
         // wrapper fns). Plan 424: component/composable kinds are re-exported
         // by the generator (ports symbol forwarding); fn kinds are both
         // imported (wrapper use) and re-exported (forwarding).
-        let web_imports: Vec<auto_lang_core::ast::ui::ExtImport> = ast
-            .stmts
-            .iter()
+        let web_imports: Vec<auto_ui_dialect::ast::ExtImport> = ast
+            .domain_stmts()
             .filter_map(|s| match s {
-                auto_lang_core::ast::Stmt::UseWeb(entries) => Some(entries.clone()),
+                auto_ui_dialect::UiStmt::UseWeb(entries) => Some(entries.clone()),
                 _ => None,
             })
             .flatten()
@@ -7476,11 +7479,13 @@ fn handle_compile_error_with_dep_shape(
 fn same_file_module_fns(code: &str) -> Vec<auto_ui_compiler::aura::AuraModuleFn> {
     let session = auto_lang_core::session::CompilerSession::ui();
     let mut parser = auto_lang_core::parser::Parser::from(code).with_session(session);
-    let Ok(ast) = parser.parse() else {
+    let Ok(ast) = parser
+        .parse_domain(&auto_ui_dialect::UiDialect)
+        .map(auto_ui_dialect::UiCode)
+    else {
         return Vec::new();
     };
-    ast.stmts
-        .iter()
+    ast.core_stmts()
         .filter_map(|s| match s {
             auto_lang_core::ast::Stmt::Fn(f) => auto_ui_compiler::aura::extract_module_fn(f),
             _ => None,
@@ -12080,12 +12085,14 @@ widget App {
 "#;
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = parser
+            .parse_domain(&auto_ui_dialect::UiDialect)
+            .map(auto_ui_dialect::UiCode)
+            .expect("parse");
         let widgets: Vec<AuraWidget> = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .filter_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => {
+                auto_ui_dialect::UiStmt::WidgetDecl(d) => {
                     auto_ui_compiler::aura::extract_widget_from_decl(d).ok()
                 }
                 _ => None,

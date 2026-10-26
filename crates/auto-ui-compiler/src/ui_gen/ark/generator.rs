@@ -50,8 +50,8 @@ use std::collections::{HashMap, HashSet};
 /// # Example
 ///
 /// ```rust
-/// use auto_lang::ui_gen::ark::ArkGenerator;
-/// use auto_lang::ui_gen::BackendGenerator;
+/// use auto_ui_compiler::ui_gen::ark::ArkGenerator;
+/// use auto_ui_compiler::ui_gen::BackendGenerator;
 ///
 /// let mut gen = ArkGenerator::new();
 /// // gen.generate(&widget); // Generate widget code

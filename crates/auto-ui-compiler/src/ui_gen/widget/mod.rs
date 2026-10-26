@@ -15,7 +15,7 @@
 //! ## Usage
 //!
 //! ```rust,ignore
-//! use auto_lang::ui_gen::widget::{WidgetSpec, WidgetCategory, BackendMapping};
+//! use auto_ui_compiler::ui_gen::widget::{WidgetSpec, WidgetCategory, BackendMapping};
 //!
 //! let mut spec = WidgetSpec::new("Button", WidgetCategory::Form);
 //! spec.primary_prop = Some("text".to_string());

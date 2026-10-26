@@ -116,8 +116,8 @@ fn needs_regeneration(project_dir: &Path, rust_dir: &Path, source: &PacSource) -
 
 /// PLAN-039 T-14（组件传型）：WidgetDecl view 树是否含 PascalCase
 /// 子件引用（CHILD_MSG_TYPES 预注册的口径面）。
-fn view_decl_has_pascal_child(node: &auto_lang_core::ast::ui::ViewNode) -> bool {
-    use auto_lang_core::ast::ui::ViewNode;
+fn view_decl_has_pascal_child(node: &auto_ui_dialect::ast::ViewNode) -> bool {
+    use auto_ui_dialect::ast::ViewNode;
     match node {
         ViewNode::Element { tag, children, .. } => {
             if tag
@@ -156,9 +156,12 @@ fn collect_component_prop_orders(at_files: &[std::path::PathBuf]) {
         if let Ok(code) = std::fs::read_to_string(at_path) {
             let session = CompilerSession::ui().with_backend("rust");
             let mut parser = Parser::from(code.as_str()).with_session(session);
-            if let Ok(ast) = parser.parse() {
-                for stmt in &ast.stmts {
-                    if let auto_lang_core::ast::Stmt::WidgetDecl(widget_decl) = stmt {
+            if let Ok(ast) = parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .map(auto_ui_dialect::UiCode)
+            {
+                for stmt in ast.domain_stmts() {
+                    if let auto_ui_dialect::UiStmt::WidgetDecl(widget_decl) = stmt {
                         let order: Vec<String> = widget_decl
                             .props
                             .iter()
@@ -252,15 +255,18 @@ fn register_api_typed_fns_for(project_dir: &Path) {
 /// passed an empty store list, starving the store-composable pipeline
 /// (struct/enum generation + `store.X` rewriting registration) and producing
 /// 86 errors on store-composable apps like 015-notes.
-fn collect_store_decls(at_files: &[std::path::PathBuf]) -> Vec<auto_lang_core::ast::ui::StoreDecl> {
-    let mut all_stores: Vec<auto_lang_core::ast::ui::StoreDecl> = Vec::new();
+fn collect_store_decls(at_files: &[std::path::PathBuf]) -> Vec<auto_ui_dialect::ast::StoreDecl> {
+    let mut all_stores: Vec<auto_ui_dialect::ast::StoreDecl> = Vec::new();
     for at_path in at_files {
         if let Ok(code) = std::fs::read_to_string(at_path) {
             let session = CompilerSession::ui().with_backend("rust");
             let mut parser = Parser::from(code.as_str()).with_session(session);
-            if let Ok(ast) = parser.parse() {
-                for stmt in &ast.stmts {
-                    if let auto_lang_core::ast::Stmt::StoreDecl(ref store) = stmt {
+            if let Ok(ast) = parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .map(auto_ui_dialect::UiCode)
+            {
+                for stmt in ast.domain_stmts() {
+                    if let auto_ui_dialect::UiStmt::StoreDecl(ref store) = stmt {
                         all_stores.push(store.clone());
                     }
                 }
@@ -282,9 +288,12 @@ fn collect_component_state_fields(
         if let Ok(code) = std::fs::read_to_string(at_path) {
             let session = CompilerSession::ui().with_backend("rust");
             let mut parser = Parser::from(code.as_str()).with_session(session);
-            if let Ok(ast) = parser.parse() {
-                for stmt in &ast.stmts {
-                    if let auto_lang_core::ast::Stmt::WidgetDecl(widget_decl) = stmt {
+            if let Ok(ast) = parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .map(auto_ui_dialect::UiCode)
+            {
+                for stmt in ast.domain_stmts() {
+                    if let auto_ui_dialect::UiStmt::WidgetDecl(widget_decl) = stmt {
                         let fields: Vec<(String, String)> = widget_decl
                             .model
                             .as_ref()
@@ -341,7 +350,7 @@ pub use auto_ui_compiler::ui_gen::rust::ComponentSemantics;
 pub fn collect_component_semantics(
     at_files: &[std::path::PathBuf],
 ) -> std::collections::HashMap<String, ComponentSemantics> {
-    use auto_lang_core::ast::Stmt;
+    use auto_ui_dialect::UiStmt as Stmt;
 
     let mut map: std::collections::HashMap<String, ComponentSemantics> =
         std::collections::HashMap::new();
@@ -349,8 +358,11 @@ pub fn collect_component_semantics(
         if let Ok(code) = std::fs::read_to_string(at_path) {
             let session = CompilerSession::ui().with_backend("rust");
             let mut parser = Parser::from(code.as_str()).with_session(session);
-            if let Ok(ast) = parser.parse() {
-                for stmt in &ast.stmts {
+            if let Ok(ast) = parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .map(auto_ui_dialect::UiCode)
+            {
+                for stmt in ast.domain_stmts() {
                     if let Stmt::WidgetDecl(widget_decl) = stmt {
                         let prop_names: std::collections::HashSet<String> = widget_decl
                             .props
@@ -799,10 +811,10 @@ pub(crate) fn compile_rust_ui_app(
 /// PLAN-627: 模块形态 `use back.api`（无符号清单）自 api.at 契约枚举
 /// （`auto_lang::config::api_contract_fn_names_for_front`，与 ui_gen/api.rs
 /// 双写同源语义）。
-fn extract_api_imports_from_ast(ast: &auto_lang_core::ast::Code, at_path: &Path) -> Vec<String> {
+fn extract_api_imports_from_ast(ast: &auto_ui_dialect::UiCode, at_path: &Path) -> Vec<String> {
     let mut imports = Vec::new();
     let mut module_form = false;
-    for stmt in &ast.stmts {
+    for stmt in ast.core_stmts() {
         if let auto_lang_core::ast::Stmt::Use(ref use_stmt) = stmt {
             if is_api_use(use_stmt) {
                 if use_stmt.items.is_empty() {
@@ -842,7 +854,7 @@ fn is_api_use(use_stmt: &auto_lang_core::ast::Use) -> bool {
 /// Returns (generated_code, api_imports) so callers can deduplicate API stubs.
 fn compile_at_file(
     at_path: &Path,
-    stores: &[auto_lang_core::ast::ui::StoreDecl],
+    stores: &[auto_ui_dialect::ast::StoreDecl],
     component_fields: &std::collections::HashMap<String, Vec<(String, String)>>,
     component_semantics: &std::collections::HashMap<String, ComponentSemantics>,
 ) -> AutoResult<(String, Vec<String>)> {
@@ -854,7 +866,8 @@ fn compile_at_file(
     let mut parser = Parser::from(code.as_str());
     parser = parser.with_session(session);
     let ast = parser
-        .parse()
+        .parse_domain(&auto_ui_dialect::UiDialect)
+        .map(auto_ui_dialect::UiCode)
         .map_err(|e| format!("Parse error: {:?}", e))?;
 
     let mut output = String::new();
@@ -874,8 +887,8 @@ fn compile_at_file(
 
     // Plan 374 Task 1: Register view fn fragments BEFORE extracting widgets.
     auto_ui_compiler::aura::extract::clear_view_fragments();
-    for stmt in &ast.stmts {
-        if let auto_lang_core::ast::Stmt::ViewFragmentDecl(frag) = stmt {
+    for stmt in ast.domain_stmts() {
+        if let auto_ui_dialect::UiStmt::ViewFragmentDecl(frag) = stmt {
             auto_ui_compiler::aura::extract::register_view_fragment(frag);
         }
     }
@@ -890,12 +903,11 @@ fn compile_at_file(
     }
     // Check if THIS file contains any StoreDecl — only generate from here.
     let file_has_store = ast
-        .stmts
-        .iter()
-        .any(|s| matches!(s, auto_lang_core::ast::Stmt::StoreDecl(_)));
+        .domain_stmts()
+        .any(|s| matches!(s, auto_ui_dialect::UiStmt::StoreDecl(_)));
     if file_has_store {
         for store in stores {
-            let fake_decl = auto_lang_core::ast::ui::WidgetDecl {
+            let fake_decl = auto_ui_dialect::ast::WidgetDecl {
                 name: store.name.clone(),
                 messages: store.messages.clone(),
                 model: store.model.clone(),
@@ -913,7 +925,7 @@ fn compile_at_file(
                 expose: Vec::new(),
                 setup: None,
                 actions: None,
-                timer: None,
+                timer: store.timer.clone(),
             };
             match auto_ui_compiler::aura::extract_widget_from_decl(&fake_decl) {
                 Ok(aura_widget) => {
@@ -940,8 +952,8 @@ fn compile_at_file(
     }
 
     // Extract AURA widgets from AST
-    for stmt in &ast.stmts {
-        if let auto_lang_core::ast::Stmt::WidgetDecl(widget_decl) = stmt {
+    for stmt in ast.domain_stmts() {
+        if let auto_ui_dialect::UiStmt::WidgetDecl(widget_decl) = stmt {
             let mut aura_widget = auto_ui_compiler::aura::extract_widget_from_decl(widget_decl)
                 .map_err(|e| e.to_string())?;
             aura_widget.api_imports = api_imports.clone();
@@ -958,7 +970,7 @@ fn compile_at_file(
     // Plan 374: Generate Rust type aliases from Auto type declarations.
     // User-defined types (like Note) are aliased to serde_json::Value since
     // the code generator uses Value-based dynamic field access (["field"]).
-    for stmt in &ast.stmts {
+    for stmt in ast.core_stmts() {
         if let auto_lang_core::ast::Stmt::TypeDecl(type_decl) = stmt {
             output.push_str(&generate_type_struct(type_decl));
             output.push('\n');
@@ -970,7 +982,7 @@ fn compile_at_file(
     // body JSON 转义）此前静默丢弃，生成 handler 报 cannot find function。
     // #[api]/test fn 由 extract_module_fn 门跳过；参数/返回按声明型直译，
     // 函数体复用 handler 语句翻译链（join/postprocess 全含）。
-    for stmt in &ast.stmts {
+    for stmt in ast.core_stmts() {
         if let auto_lang_core::ast::Stmt::Fn(fn_decl) = stmt {
             if auto_ui_compiler::aura::extract::extract_module_fn(fn_decl).is_some() {
                 output.push_str(&generate_module_fn_rust(&generator, fn_decl));
@@ -2899,8 +2911,13 @@ fn collect_dep_fn_imports(
         };
         let session = CompilerSession::ui().with_backend("rust");
         let mut parser = Parser::from(code.as_str()).with_session(session);
-        let Ok(ast) = parser.parse() else { continue };
-        for stmt in &ast.stmts {
+        let Ok(ast) = parser
+            .parse_domain(&auto_ui_dialect::UiDialect)
+            .map(auto_ui_dialect::UiCode)
+        else {
+            continue;
+        };
+        for stmt in ast.core_stmts() {
             if let auto_lang_core::ast::Stmt::Use(ref use_stmt) = stmt {
                 if let Some(first) = use_stmt.paths.first() {
                     if dep_names.iter().any(|d| d == first.as_str()) && use_stmt.paths.len() > 1 {
@@ -2954,9 +2971,12 @@ fn resolve_bps_dependencies(
         front_texts.push(code.clone());
         let session = CompilerSession::ui().with_backend("rust");
         let mut parser = Parser::from(code.as_str()).with_session(session);
-        if let Ok(ast) = parser.parse() {
-            for stmt in &ast.stmts {
-                if let auto_lang_core::ast::Stmt::WidgetDecl(ref wd) = stmt {
+        if let Ok(ast) = parser
+            .parse_domain(&auto_ui_dialect::UiDialect)
+            .map(auto_ui_dialect::UiCode)
+        {
+            for stmt in ast.domain_stmts() {
+                if let auto_ui_dialect::UiStmt::WidgetDecl(ref wd) = stmt {
                     local_widget_names.insert(wd.name.as_str().to_string());
                 }
             }
@@ -2991,10 +3011,15 @@ fn resolve_bps_dependencies(
                     };
                     let session = CompilerSession::ui().with_backend("rust");
                     let mut parser = Parser::from(code.as_str()).with_session(session);
-                    let Ok(ast) = parser.parse() else { continue };
+                    let Ok(ast) = parser
+                        .parse_domain(&auto_ui_dialect::UiDialect)
+                        .map(auto_ui_dialect::UiCode)
+                    else {
+                        continue;
+                    };
                     let mut hit = false;
-                    for stmt in &ast.stmts {
-                        if let auto_lang_core::ast::Stmt::WidgetDecl(ref wd) = stmt {
+                    for stmt in ast.domain_stmts() {
+                        if let auto_ui_dialect::UiStmt::WidgetDecl(ref wd) = stmt {
                             let name = wd.name.as_str();
                             if !local_widget_names.contains(name)
                                 && front_texts.iter().any(|t| {
@@ -3635,13 +3660,13 @@ fn collect_shell_face_infos(pack_dir: &Path) -> AutoResult<Vec<ShellFaceInfo>> {
         let session = CompilerSession::ui();
         let mut parser = Parser::from(src.as_str()).with_session(session);
         let ast = parser
-            .parse()
+            .parse_domain(&auto_ui_dialect::UiDialect)
+            .map(auto_ui_dialect::UiCode)
             .map_err(|e| format!("shell pack 解析失败 {file}: {e:?}"))?;
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) if d.name == widget => Some(d),
+                auto_ui_dialect::UiStmt::WidgetDecl(d) if d.name == widget => Some(d),
                 _ => None,
             })
             .ok_or_else(|| format!("shell pack {file} 缺根 widget {widget}"))?;

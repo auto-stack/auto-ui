@@ -621,13 +621,14 @@ impl JetProject {
         let mut parser = Parser::from(code.as_str());
         parser = parser.with_session(session);
         let ast = parser
-            .parse()
+            .parse_domain(&auto_ui_dialect::UiDialect)
+            .map(auto_ui_dialect::UiCode)
             .map_err(|e| format!("Parse error: {:?}", e))?;
 
         // Extract AURA widgets from AST
         let mut widgets = Vec::new();
-        for stmt in &ast.stmts {
-            if let auto_lang_core::ast::Stmt::WidgetDecl(widget_decl) = stmt {
+        for stmt in ast.domain_stmts() {
+            if let auto_ui_dialect::UiStmt::WidgetDecl(widget_decl) = stmt {
                 let aura_widget = auto_ui_compiler::aura::extract_widget_from_decl(widget_decl)
                     .map_err(|e| e.to_string())?;
                 widgets.push(aura_widget);

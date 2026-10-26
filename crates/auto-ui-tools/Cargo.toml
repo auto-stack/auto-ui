@@ -13,8 +13,10 @@ auto-project-model = { path = "../../../auto-lang/crates/auto-project-model", fe
 # ---- PLAN-815 T-04: 生成主体闭包(M814-A 公开面 + 单算法 api 生成) ----
 # UI 编译域(aura/ui_gen 四生成器/style/theme;指纹源)。
 auto-ui-compiler = { path = "../auto-ui-compiler" }
-# 纯语言 SDK(Parser/ast/api/config/design_tokens/vm/http 服务面)。
+# 纯语言 SDK(Parser/ast/api/config/vm/http 服务面)。
 auto-lang-core = { path = "../../../auto-lang/crates/auto-lang-core" }
+# UI owned AST 与显式领域方言；不经 Core Stmt 兼容臂。
+auto-ui-dialect = { path = "../auto-ui-dialect" }
 # ---- PLAN-815 T-05: 运行闭包(M814-B 公开面) ----
 # UI 运行域(iced renderer/back_proxy/back_provision/dynamic_build——vm 运行
 # 面与画廊 back-proxy 的依赖;default features 含 ui-iced,即 B 阶段组合

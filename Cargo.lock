@@ -845,6 +845,7 @@ dependencies = [
  "auto-tool-execution",
  "auto-tool-protocol",
  "auto-ui-compiler",
+ "auto-ui-dialect",
  "auto-ui-runtime",
  "auto-val",
  "base64 0.22.1",

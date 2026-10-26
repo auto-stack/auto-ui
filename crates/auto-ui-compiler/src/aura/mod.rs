@@ -23,8 +23,8 @@
 //! ## Example
 //!
 //! ```rust,ignore
-//! use auto_lang::aura::{AuraWidget, AuraNode, AuraStateDef, AuraMessage, AuraMsgVariant, LogicPayload};
-//! use auto_lang::ast::{Type, Expr};
+//! use auto_ui_compiler::aura::{AuraWidget, AuraNode, AuraStateDef, AuraMessage, AuraMsgVariant, LogicPayload};
+//! use auto_lang_core::ast::{Type, Expr};
 //!
 //! // Create a simple widget
 //! let widget = AuraWidget {

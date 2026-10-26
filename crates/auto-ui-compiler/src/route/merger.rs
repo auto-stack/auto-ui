@@ -15,7 +15,7 @@
 //! ## Usage
 //!
 //! ```rust
-//! use auto_lang::route::{RouteMerger, RouteDef, RouteSource};
+//! use auto_ui_compiler::route::{RouteMerger, RouteDef, RouteSource};
 //!
 //! let discovered = vec![
 //!     RouteDef::new("/about", "about").with_source(RouteSource::Convention),
@@ -59,7 +59,7 @@ impl RouteMerger {
     /// # Example
     ///
     /// ```rust
-    /// use auto_lang::route::{RouteMerger, RouteDef, RouteSource};
+    /// use auto_ui_compiler::route::{RouteMerger, RouteDef, RouteSource};
     ///
     /// let discovered = vec![
     ///     RouteDef::new("/about", "about").with_source(RouteSource::Convention),

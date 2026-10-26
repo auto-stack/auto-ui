@@ -32,8 +32,8 @@
 //! ### Generate a Widget
 //!
 //! ```rust,ignore
-//! use auto_lang::ui_gen::jet::JetGenerator;
-//! use auto_lang::ui_gen::BackendGenerator;
+//! use auto_ui_compiler::ui_gen::jet::JetGenerator;
+//! use auto_ui_compiler::ui_gen::BackendGenerator;
 //!
 //! let mut gen = JetGenerator::new();
 //! let kotlin_code = gen.generate(&aura_widget)?;
@@ -42,7 +42,7 @@
 //! ### Generate a Full Project
 //!
 //! ```rust
-//! use auto_lang::ui_gen::jet::JetGenerator;
+//! use auto_ui_compiler::ui_gen::jet::JetGenerator;
 //!
 //! let gen = JetGenerator::new();
 //!

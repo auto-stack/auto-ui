@@ -6,7 +6,7 @@
 //! ## Usage
 //!
 //! ```rust,ignore
-//! use auto_lang::a2ui::{export_widget, import_message, A2UIError};
+//! use auto_ui_compiler::a2ui::{export_widget, import_message, A2UIError};
 //!
 //! // Export AURA widget to A2UI JSON
 //! let aura_widget = extract_widget_from_ast(...);

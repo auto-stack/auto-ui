@@ -6,7 +6,7 @@
 //! ## Usage
 //!
 //! ```rust
-//! use auto_lang::ui_gen::shared::registry::ComponentRegistry;
+//! use auto_ui_compiler::ui_gen::shared::registry::ComponentRegistry;
 //!
 //! let registry = ComponentRegistry::new();
 //! let mapping = registry.get("button").unwrap();

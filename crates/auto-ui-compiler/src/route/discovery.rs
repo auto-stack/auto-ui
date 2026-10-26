@@ -14,7 +14,7 @@
 //! ## Usage
 //!
 //! ```rust,no_run
-//! use auto_lang::route::RouteDiscovery;
+//! use auto_ui_compiler::route::RouteDiscovery;
 //! use std::path::PathBuf;
 //!
 //! let discovery = RouteDiscovery::new(PathBuf::from("routes"));
@@ -87,7 +87,7 @@ impl RouteDiscovery {
     /// # Example
     ///
     /// ```rust
-    /// use auto_lang::route::RouteDiscovery;
+    /// use auto_ui_compiler::route::RouteDiscovery;
     /// use std::path::PathBuf;
     ///
     /// let discovery = RouteDiscovery::new(PathBuf::from("routes"));

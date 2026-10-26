@@ -63,9 +63,9 @@ use std::collections::{HashMap, HashSet};
 /// # Example
 ///
 /// ```rust
-/// use auto_lang::ui_gen::jet::JetGenerator;
-/// use auto_lang::ui_gen::BackendGenerator;
-/// use auto_lang::aura::AuraWidget;
+/// use auto_ui_compiler::ui_gen::jet::JetGenerator;
+/// use auto_ui_compiler::ui_gen::BackendGenerator;
+/// use auto_ui_compiler::aura::AuraWidget;
 ///
 /// let mut gen = JetGenerator::new();
 /// // gen.generate(&widget); // Generate widget code
@@ -130,7 +130,7 @@ impl JetGenerator {
     /// # Example
     ///
     /// ```rust
-    /// use auto_lang::ui_gen::jet::JetGenerator;
+    /// use auto_ui_compiler::ui_gen::jet::JetGenerator;
     ///
     /// let gen = JetGenerator::new();
     /// assert_eq!(gen.package_name(), "com.example.widgets");
@@ -2056,8 +2056,8 @@ fun {}Preview() {{
     /// # Example
     ///
     /// ```rust,no_run
-    /// use auto_lang::ui_gen::jet::JetGenerator;
-    /// use auto_lang::ui_gen::jet::JetProjectConfig;
+    /// use auto_ui_compiler::ui_gen::jet::JetGenerator;
+    /// use auto_ui_compiler::ui_gen::jet::JetProjectConfig;
     ///
     /// let gen = JetGenerator::new();
     /// let config = JetProjectConfig::new("MyApp")
@@ -2092,7 +2092,7 @@ fun {}Preview() {{
     /// # Example
     ///
     /// ```rust
-    /// use auto_lang::ui_gen::jet::JetGenerator;
+    /// use auto_ui_compiler::ui_gen::jet::JetGenerator;
     ///
     /// let gen = JetGenerator::new();
     /// let files = gen.generate_project_default("MyApp");
@@ -2120,7 +2120,7 @@ fun {}Preview() {{
     /// # Example
     ///
     /// ```rust
-    /// use auto_lang::ui_gen::jet::JetGenerator;
+    /// use auto_ui_compiler::ui_gen::jet::JetGenerator;
     ///
     /// let gen = JetGenerator::new();
     /// let files = gen.generate_project_with_package("MyApp", "com.company.myapp");
@@ -2155,7 +2155,7 @@ fun {}Preview() {{
     /// # Example
     ///
     /// ```rust
-    /// use auto_lang::ui_gen::jet::JetGenerator;
+    /// use auto_ui_compiler::ui_gen::jet::JetGenerator;
     ///
     /// let gen = JetGenerator::new();
     /// let files = gen.generate_project_with_theme("MyApp", "#FF0000", "#00FF00");

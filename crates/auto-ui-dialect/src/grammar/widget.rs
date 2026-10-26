@@ -1393,6 +1393,9 @@ pub(crate) fn parse_on_block(cx: &mut dyn UiParseContext) -> AutoResult<OnBlock>
         let prev_on_body = cx.set_in_on_body(true);
         let body_res = cx.parse_body();
         cx.set_in_on_body(prev_on_body);
+        if body_res.is_err() {
+            cx.exit_scope();
+        }
         let body = body_res?;
         cx.exit_scope();
 
