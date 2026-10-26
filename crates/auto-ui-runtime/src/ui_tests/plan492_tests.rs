@@ -286,12 +286,9 @@ pub(crate) mod pkg_harness {
         Ok(())
     }
 
-    /// 返回构建好的 DynamicComponent + 临时 app.at 路径(调试用)。
+    /// 准备真实包输入，保留 patch 落盘校验，允许负控观察正式构造错误。
     /// `tag` 用于隔离并发测试的临时目录(cargo test 并行)。
-    pub(crate) fn build_patched_gallery(
-        tag: &str,
-        patches: &[(&str, &str, &str)],
-    ) -> (crate::ui::dynamic::DynamicComponent, PathBuf) {
+    pub(crate) fn prepare_patched_gallery(tag: &str, patches: &[(&str, &str, &str)]) -> PathBuf {
         let front = crate::plan370_test_support::locate_example_app_at("charts-gallery")
             .expect("charts-gallery sources must exist")
             .parent()
@@ -319,7 +316,15 @@ pub(crate) mod pkg_harness {
                 "patch not on disk for {file}"
             );
         }
-        let app = tmp.join("app.at");
+        tmp.join("app.at")
+    }
+
+    /// 返回构建好的 DynamicComponent + 临时 app.at 路径(调试用)。
+    pub(crate) fn build_patched_gallery(
+        tag: &str,
+        patches: &[(&str, &str, &str)],
+    ) -> (crate::ui::dynamic::DynamicComponent, PathBuf) {
+        let app = prepare_patched_gallery(tag, patches);
         let code = std::fs::read_to_string(&app).unwrap();
         let dc = crate::build_dynamic_component(&code, Some(app.to_str().unwrap()))
             .expect("patched gallery must build");
@@ -396,7 +401,8 @@ mod m1_vue_fstr {
 /// 真失败;判定误归因与族 C1 同现场,详见计划 M1 记录。)
 #[cfg(all(test, feature = "ui-iced"))]
 mod m1_pkg_fstr {
-    use super::pkg_harness::{build_patched_gallery, render_dump};
+    use super::pkg_harness::{build_patched_gallery, prepare_patched_gallery, render_dump};
+    use crate::ui::vm_bridge::InitDemandPhase;
 
     /// dollar-brace 直写(M6 后组件原生形态,无补丁): 几何+band 全存活。
     #[test]
@@ -413,14 +419,17 @@ mod m1_pkg_fstr {
         );
     }
 
-    /// 金丝雀(负对照): 未定义变量必须杀死 bar Init——证明上方夹具可检出失败。
-    /// Plan 498: line/area 图例新增合法 mouse-area 后绝对上界过时,改
-    /// 健康态相对比较(canary < healthy),底线保留(其余图命中区不连坐)。
+    /// 保留原测试 ID：未定义变量是解析期负控；Init 金丝雀另用运行期零除。
+    /// 原健康态比较和兄弟图命中区底线不变，新增准入拒绝/恢复及 Failed 终态。
     #[test]
     fn pkg_canary_undefined_var_kills_bar_init() {
-        let (mut healthy_dc, _) = build_patched_gallery("m1-canary-healthy", &[]);
+        let (mut healthy_dc, healthy_app) = build_patched_gallery("m1-canary-healthy", &[]);
         let healthy = render_dump(&mut healthy_dc).matches("MouseArea").count();
-        let (mut dc, _) = build_patched_gallery(
+        assert_eq!(
+            healthy_dc.bridge().init_demand_phase("BarChart"),
+            Some(InitDemandPhase::Done)
+        );
+        let bad_app = prepare_patched_gallery(
             "m1-canary",
             &[(
                 "bar_chart.at",
@@ -428,15 +437,76 @@ mod m1_pkg_fstr {
                 "s: f\"w-[${undefined_var_xyz}px] h-full flex-1\"",
             )],
         );
+        let bad_child = bad_app.parent().unwrap().join("components/bar_chart.at");
+        let bad_source = std::fs::read_to_string(&bad_child).unwrap();
+        auto_ui_compiler::parse_ui(&bad_source)
+            .expect_err("the original undefined-variable injection is not parse-valid");
+        let host = std::fs::read_to_string(&bad_app).unwrap();
+        let error = crate::build_dynamic_component(&host, bad_app.to_str())
+            .expect_err("malformed imported module must reject construction");
+        let detail = error.to_string();
+        assert!(
+            detail.contains("failed to parse") && detail.contains("bar_chart.at"),
+            "original canary must be rejected at module admission: {detail}"
+        );
+        assert!(crate::ui_module_parse_failures().lock().unwrap().is_empty());
+        let healthy_child = healthy_app
+            .parent()
+            .unwrap()
+            .join("components/bar_chart.at");
+        std::fs::write(&bad_child, std::fs::read(healthy_child).unwrap()).unwrap();
+        let mut recovered = crate::build_dynamic_component(&host, bad_app.to_str())
+            .expect("repairing the same imported file must clear the rejection");
+        assert_eq!(
+            render_dump(&mut recovered).matches("MouseArea").count(),
+            healthy,
+            "repaired import must restore the healthy package, without stale errors"
+        );
+
+        // i3 是 Init 的整型循环变量；该表达式合法，零除只在真实 VM 执行时发生。
+        let (mut dc, runtime_app) = build_patched_gallery(
+            "m1-canary-runtime",
+            &[(
+                "bar_chart.at",
+                "s: f\"w-[${slot}px] h-full flex-1\"",
+                "s: f\"w-[${slot + 1 / (i3 - i3)}px] h-full flex-1\"",
+            )],
+        );
+        let runtime_child = runtime_app
+            .parent()
+            .unwrap()
+            .join("components/bar_chart.at");
+        auto_ui_compiler::parse_ui(&std::fs::read_to_string(runtime_child).unwrap())
+            .expect("runtime fault injection must pass the real domain parser");
         let dump = render_dump(&mut dc);
+        assert_eq!(
+            dc.bridge().init_demand_phase("BarChart"),
+            Some(InitDemandPhase::Failed),
+            "negative control must reach Init and fail there"
+        );
+        for sibling in ["LineChart", "AreaChart", "DonutChart"] {
+            assert_eq!(
+                dc.bridge().init_demand_phase(sibling),
+                Some(InitDemandPhase::Done),
+                "{sibling} Init must remain completed"
+            );
+        }
+        let error = dc
+            .call_widget_handler("BarChart", "Init", &[])
+            .expect_err("the injected handler must fail in the VM");
+        assert!(
+            format!("{error:?}").contains("DivisionByZero"),
+            "expected the injected runtime fault, got {error:?}"
+        );
         let mouse = dump.matches("MouseArea").count();
         assert!(
             mouse < healthy,
-            "canary: undefined var in f-string must kill bar bands (canary={mouse} healthy={healthy})"
+            "canary: runtime fault in f-string must kill bar bands (canary={mouse} healthy={healthy})"
         );
         assert!(
             mouse >= 12,
             "canary floor: sibling charts' hit areas stay alive (got {mouse})"
         );
+        println!("PLAN-841 canary: healthy={healthy}, runtime={mouse}; BarChart Failed, siblings Done; malformed import rejected and repaired");
     }
 }

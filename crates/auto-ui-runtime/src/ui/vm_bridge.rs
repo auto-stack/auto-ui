@@ -555,6 +555,17 @@ fn frame_rc_enabled() -> bool {
     })
 }
 
+impl Drop for VmBridge {
+    fn drop(&mut self) {
+        let queued = std::mem::take(self.init_demand_queue.get_mut());
+        for demand in queued {
+            for (_, value) in &demand.props {
+                self.release_init_value(value);
+            }
+        }
+    }
+}
+
 impl VmBridge {
     /// Audit B12(b): declared parameter count per `(widget, event)` handler.
     /// Dispatch sites use this to avoid pushing a phantom string argument at
@@ -1177,6 +1188,31 @@ impl VmBridge {
         }
     }
 
+    // Init props use the same typed references as VM state. Inline array props
+    // become ListData<Value>; its child_refs contract owns direct VmRef elements.
+    // In particular, a scalar Int matching an allocated heap id owns nothing.
+    fn visit_init_refs(value: &Value, mut visit: impl FnMut(u64)) {
+        match value {
+            Value::VmRef(reference) => visit(reference.id as u64),
+            Value::Array(array) => {
+                for item in &array.values {
+                    if let Value::VmRef(reference) = item {
+                        visit(reference.id as u64);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn stake_init_value(&self, value: &Value) {
+        Self::visit_init_refs(value, |id| self.vm.rc_retain_id(id));
+    }
+
+    fn release_init_value(&self, value: &Value) {
+        Self::visit_init_refs(value, |id| self.vm.rc_release_id(id));
+    }
+
     /// PLAN-062 T12: state 值获得持有——顶层堆引用 + Array 内层各 +1。
     fn stake_state_value(&self, v: &Value) {
         match v {
@@ -1729,9 +1765,11 @@ impl VmBridge {
                     // nanobox, so bytecode reads popped double garbage
                     // ([GET_FIELD] non-i32 obj_id) and silently aborted the
                     // whole handler (ghost text 的 .history 读取即此)。
-                    // Convert Array props to heap-stored ListData here.
+                    // Convert Array props to heap-stored ListData with a typed VmRef.
                     let storable = match val {
                         auto_val::Value::Array(arr) => {
+                            // The new ListData owns each typed child reference.
+                            self.stake_init_value(val);
                             let id =
                                 self.vm
                                     .insert_heap_object(auto_lang_core::vm::types::ListData {
@@ -1740,9 +1778,12 @@ impl VmBridge {
                                     });
                             // Plan 419: 字段持有列表引用。
                             self.vm.rc_retain_id(id);
-                            auto_val::Value::Int(id as i32)
+                            auto_val::Value::VmRef(auto_val::VmRef { id: id as usize })
                         }
-                        other => other.clone(),
+                        other => {
+                            self.stake_init_value(other);
+                            other.clone()
+                        }
                     };
                     if let Some(idx) = inst.field_names.iter().position(|n| n == name) {
                         // PLAN-045 T-02：prop 种子写入根态 = 状态面突变——但
@@ -1752,6 +1793,9 @@ impl VmBridge {
                         // 值变化才计突变；其余状态面突变（SET_FIELD/handler/
                         // write_state）自有通道 bump，不变值重种子不掩盖。
                         let changed = inst.get_field(idx) != Some(&storable);
+                        if let Some(old) = inst.get_field(idx) {
+                            self.release_init_value(old);
+                        }
                         let _ = inst.set_field(idx, storable);
                         if changed {
                             // PLAN-047 T-03: A 类定点归因（值变才 bump 语义不变）。
@@ -2338,12 +2382,20 @@ impl VmBridge {
         state_obj_id: u64,
         props: Vec<(String, auto_val::Value)>,
     ) -> InitDemandDecision {
+        // PLAN-841: delayed snapshots own their referenced values until replay/cancel.
+        // Retain before cancelling an older generation that may own the same values.
+        for (_, value) in &props {
+            self.stake_init_value(value);
+        }
         let mut records = self.init_demand_records.borrow_mut();
         let generation = self.init_generation.get();
         match records.get_mut(widget_name) {
             Some(rec) if rec.identity == identity => {
                 // 同代际：Queued/InFlight 不重复入队；Done/Failed 终态同样
                 // 不重派（Init 挂载语义每代际一次，PLAN-536 语义保持）。
+                for (_, value) in &props {
+                    self.release_init_value(value);
+                }
                 return match rec.phase {
                     InitDemandPhase::Queued | InitDemandPhase::InFlight => {
                         InitDemandDecision::InFlightKnown
@@ -2498,6 +2550,9 @@ impl VmBridge {
                     // 永久停留占位符）。
                     report.silent_done_transitions += 1;
                 }
+                for (_, value) in &demand.props {
+                    self.release_init_value(value);
+                }
                 report.missing += 1;
                 continue;
             }
@@ -2508,6 +2563,10 @@ impl VmBridge {
                 let props_map: std::collections::HashMap<String, auto_val::Value> =
                     demand.props.iter().cloned().collect();
                 self.ensure_child_state(&demand.widget_name, &[], &props_map);
+            }
+            // The root fields now own the replayed values, including failed Init paths.
+            for (_, value) in &demand.props {
+                self.release_init_value(value);
             }
             match self.call_handler_for_cpu_slice(
                 &demand.widget_name,
@@ -2554,9 +2613,15 @@ impl VmBridge {
     /// PLAN-711 T-03: 丢弃指定身份的排队 demand（代际取消——未执行项直接
     /// 丢弃，无副作用可回滚）。
     fn cancel_queued_init(&self, identity: &str) {
-        self.init_demand_queue
-            .borrow_mut()
-            .retain(|d| d.identity != identity);
+        self.init_demand_queue.borrow_mut().retain(|d| {
+            if d.identity != identity {
+                return true;
+            }
+            for (_, value) in &d.props {
+                self.release_init_value(value);
+            }
+            false
+        });
     }
 
     /// PLAN-711 T-03 (M-01): 取消指定 fn 的 parked 段（代际取消——已开始项
@@ -6347,5 +6412,218 @@ impl VmBridge {
             ));
         }
         out
+    }
+}
+
+#[cfg(test)]
+mod plan841_init_snapshot_tests {
+    use super::*;
+    use auto_lang_core::vm::engine::CpuSliceBudget;
+
+    fn bridge(failing_init: bool) -> VmBridge {
+        let body = if failing_init {
+            "var zero = 0; .n = 1 / zero"
+        } else {
+            ".n = 1"
+        };
+        let source = format!(
+            "widget Root {{ model {{ items List = []\n n int = 0 }}\n on {{ .Init -> {{ {body} }} }}\n view {{ text \"ok\" {{}} }} }}"
+        );
+        let ui = auto_ui_compiler::parse_ui(&source).expect("snapshot fixture parses");
+        let decl = ui
+            .domain_stmts()
+            .find_map(|stmt| match stmt {
+                auto_ui_dialect::UiStmt::WidgetDecl(decl) => Some(decl),
+                _ => None,
+            })
+            .unwrap();
+        VmBridge::new_from_decls(decl, &[], Vec::new(), &HashMap::new(), false).unwrap()
+    }
+
+    fn heap_id(value: &Value) -> u64 {
+        match value {
+            Value::VmRef(reference) => reference.id as u64,
+            other => panic!("expected typed state reference, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn queued_snapshot_transfers_live_reference_even_when_init_fails() {
+        let mut bridge = bridge(true);
+        let value = bridge.read_state("items").unwrap();
+        let id = heap_id(&value);
+        let weak = std::sync::Arc::downgrade(&bridge.vm.get_heap_object(id).unwrap());
+        bridge.register_init_demand(
+            "Root",
+            "Root#a",
+            bridge.state_obj_id,
+            vec![("items".into(), value)],
+        );
+        bridge.write_state("items", Value::Nil).unwrap();
+        bridge.vm.reap_all();
+        assert!(
+            weak.upgrade().is_some(),
+            "queued snapshot is now the only owner"
+        );
+        let report = bridge.dispatch_pending_inits(CpuSliceBudget::d2_default());
+        assert_eq!(report.failed.len(), 1);
+        assert!(report.failed[0].1.contains("DivisionByZero"));
+        assert_eq!(
+            bridge.init_demand_phase("Root"),
+            Some(InitDemandPhase::Failed)
+        );
+        bridge.vm.reap_all();
+        assert!(bridge.read_state_as_vec("items").unwrap().is_empty());
+        assert_eq!(
+            bridge.vm.rc_count(id),
+            1,
+            "state owns the replay, queue lease is released"
+        );
+        bridge.write_state("items", Value::Nil).unwrap();
+        bridge.vm.reap_all();
+        assert!(
+            weak.upgrade().is_none(),
+            "last state owner releases the object"
+        );
+    }
+
+    #[test]
+    fn cancelled_and_missing_demands_release_snapshot_owners() {
+        for cancel in [false, true] {
+            let mut bridge = bridge(false);
+            let value = bridge.read_state("items").unwrap();
+            let id = heap_id(&value);
+            let weak = std::sync::Arc::downgrade(&bridge.vm.get_heap_object(id).unwrap());
+            bridge.register_init_demand(
+                "Missing",
+                "Missing#a",
+                bridge.state_obj_id,
+                vec![("items".into(), value)],
+            );
+            bridge.write_state("items", Value::Nil).unwrap();
+            bridge.vm.reap_all();
+            assert!(weak.upgrade().is_some());
+            if cancel {
+                bridge.register_init_demand(
+                    "Missing",
+                    "Missing#b",
+                    bridge.state_obj_id,
+                    Vec::new(),
+                );
+            } else {
+                assert_eq!(
+                    bridge
+                        .dispatch_pending_inits(CpuSliceBudget::d2_default())
+                        .missing,
+                    1
+                );
+            }
+            bridge.vm.reap_all();
+            assert!(
+                weak.upgrade().is_none(),
+                "cancel={cancel}: abandoned snapshot must release"
+            );
+        }
+    }
+
+    #[test]
+    fn duplicate_generation_and_bridge_drop_do_not_leak_snapshot_owners() {
+        let mut bridge = bridge(false);
+        let value = bridge.read_state("items").unwrap();
+        let id = heap_id(&value);
+        let weak = std::sync::Arc::downgrade(&bridge.vm.get_heap_object(id).unwrap());
+        let props = vec![("items".into(), value)];
+        bridge.register_init_demand("Root", "Root#a", bridge.state_obj_id, props.clone());
+        assert_eq!(bridge.vm.rc_count(id), 2);
+        bridge.register_init_demand("Root", "Root#a", bridge.state_obj_id, props.clone());
+        assert_eq!(
+            bridge.vm.rc_count(id),
+            2,
+            "duplicate registration acquires no lasting owner"
+        );
+        bridge.write_state("items", Value::Nil).unwrap();
+        bridge.register_init_demand("Root", "Root#b", bridge.state_obj_id, props);
+        bridge.vm.reap_all();
+        assert_eq!(
+            bridge.vm.rc_count(id),
+            1,
+            "replacement transfers the sole queued owner"
+        );
+        drop(bridge);
+        assert!(
+            weak.upgrade().is_none(),
+            "no snapshot owner survives its bridge"
+        );
+    }
+
+    #[test]
+    fn inline_array_replay_owns_typed_child_references() {
+        let mut bridge = bridge(false);
+        let value = bridge.read_state("items").unwrap();
+        let id = heap_id(&value);
+        let weak = std::sync::Arc::downgrade(&bridge.vm.get_heap_object(id).unwrap());
+        bridge.register_init_demand(
+            "Root",
+            "Root#a",
+            bridge.state_obj_id,
+            vec![("bundle".into(), Value::array(vec![value]))],
+        );
+        bridge.write_state("items", Value::Nil).unwrap();
+        bridge.vm.reap_all();
+        assert_eq!(
+            bridge
+                .dispatch_pending_inits(CpuSliceBudget::d2_default())
+                .completed,
+            1
+        );
+        bridge.vm.reap_all();
+        assert!(
+            weak.upgrade().is_some(),
+            "replayed list owns its referenced child"
+        );
+        assert!(matches!(
+            bridge.read_state("bundle").unwrap(),
+            Value::VmRef(_)
+        ));
+        assert_eq!(heap_id(&bridge.read_state_as_vec("bundle").unwrap()[0]), id);
+        bridge.write_state("bundle", Value::Nil).unwrap();
+        bridge.vm.reap_all();
+        assert!(
+            weak.upgrade().is_none(),
+            "list destruction releases the last child owner"
+        );
+    }
+
+    #[test]
+    fn scalar_integer_matching_heap_id_is_not_a_property_reference() {
+        let mut bridge = bridge(false);
+        let value = bridge.read_state("items").unwrap();
+        let object_id = heap_id(&value);
+        let weak = std::sync::Arc::downgrade(&bridge.vm.get_heap_object(object_id).unwrap());
+        let scalar = Value::Int(object_id as i32);
+        bridge.register_init_demand(
+            "Root",
+            "Root#a",
+            bridge.state_obj_id,
+            vec![("number".into(), scalar.clone())],
+        );
+        bridge.ensure_child_state(
+            "Root",
+            &[],
+            &HashMap::from([("number".into(), scalar.clone())]),
+        );
+        bridge.write_state("items", Value::Nil).unwrap();
+        bridge.vm.reap_all();
+        assert!(
+            weak.upgrade().is_none(),
+            "scalar bits must not retain an unrelated heap object"
+        );
+        assert_eq!(
+            bridge
+                .dispatch_pending_inits(CpuSliceBudget::d2_default())
+                .completed,
+            1
+        );
+        assert_eq!(bridge.read_state("number").unwrap(), scalar);
     }
 }
