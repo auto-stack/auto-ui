@@ -74,7 +74,12 @@ impl fmt::Display for UiStmt {
             Self::MsgDecl(msg) => write!(f, "(msg {} variants)", msg.variants.len()),
             Self::ModelBlock(model) => write!(f, "(model {} fields)", model.fields.len()),
             Self::ViewBlock(_) => write!(f, "(view)"),
-            Self::UseWeb(entries) => write!(f, "use.web ({} web imports)", entries.len()),
+            Self::UseWeb(entries) => write!(
+                f,
+                "use.web ({} web import{})",
+                entries.len(),
+                if entries.len() == 1 { "" } else { "s" }
+            ),
         }
     }
 }
@@ -122,7 +127,10 @@ impl ToNode for UiStmt {
 
 impl ToAtom for UiStmt {
     fn to_atom(&self) -> AutoStr {
-        self.to_string().into()
+        match self {
+            Self::UseWeb(_) => AutoStr::from("use.web"),
+            _ => self.to_string().into(),
+        }
     }
 }
 

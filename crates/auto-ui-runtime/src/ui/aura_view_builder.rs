@@ -146,9 +146,6 @@ pub struct AuraViewBuilder<'a> {
     /// global（feature 门控内置注册）；测试经 with_native_registry 注入。
     native_registry: Option<&'a crate::ui::native_widget::NativeWidgetRegistry>,
 
-    /// Plan 318: imported declarations shared with child widgets.
-    import_stmts: Option<&'a [auto_lang_core::ast::Stmt]>,
-
     /// Plan 320: when rendering a child widget's view tree, this overrides the
     /// bridge's root state_obj_id so read_state reads from the child's state
     /// object instead of the root widget's. None = use root state.
@@ -322,7 +319,6 @@ impl<'a> AuraViewBuilder<'a> {
             widget_name: widget_name.to_string(),
             widget_registry: None,
             native_registry: Some(crate::ui::native_widget::global()),
-            import_stmts: None,
             override_state_obj_id: None,
             routes: None,
             computed: None,
@@ -347,7 +343,6 @@ impl<'a> AuraViewBuilder<'a> {
             widget_name: widget_name.to_string(),
             widget_registry: Some(registry),
             native_registry: Some(crate::ui::native_widget::global()),
-            import_stmts: None,
             override_state_obj_id: None,
             routes: None,
             computed: None,
@@ -361,22 +356,20 @@ impl<'a> AuraViewBuilder<'a> {
         }
     }
 
-    /// Create a builder with widget registry AND shared import declarations.
-    /// Plan 318: child widgets (EditorPanel) need back.api functions to be
-    /// available when their handlers are compiled; passing them here lets
-    /// render_child_widget reuse the parent's loaded imports.
+    /// Create a builder with widget registry. The final parameter is retained
+    /// temporarily for source compatibility; imported components use the
+    /// explicitly registered UI-owned names.
     pub fn with_registry_and_imports(
         bridge: &'a VmBridge,
         widget_name: &str,
         registry: &'a crate::ui::widget_registry::WidgetRegistry,
-        import_stmts: &'a [auto_lang_core::ast::Stmt],
+        _import_stmts: &'a [auto_lang_core::ast::Stmt],
     ) -> Self {
         Self {
             bridge,
             widget_name: widget_name.to_string(),
             widget_registry: Some(registry),
             native_registry: Some(crate::ui::native_widget::global()),
-            import_stmts: Some(import_stmts),
             override_state_obj_id: None,
             routes: None,
             computed: None,
@@ -4148,15 +4141,9 @@ impl<'a> AuraViewBuilder<'a> {
 
     /// Convert an AuraNode::Element to a View variant based on the tag name.
     /// PLAN-050 T7 (C5): tag 是否为 `use.web component` 声明的外部组件名
-    /// （musk 图标即此形态——ports/icons.at → lucide）。两个来源：单测直传
-    /// 的 import_stmts，以及装载器经 register_imported_components 注册的
-    /// 进程级表（生产管线 import_stmts 不含 UseWeb——Plan 442 ext 流单独
-    /// 消费——故后者是主路径）。
+    /// （musk 图标即此形态——ports/icons.at → lucide）。装载器经
+    /// register_imported_components 注册 UI-owned 名单。
     fn is_imported_component(&self, tag: &str) -> bool {
-        // PLAN-841 T-05: the old import_stmts UseWeb scan is statically dead —
-        // the Core channel can no longer carry UseWeb; the process-level
-        // registry (register_imported_components) remains the live path.
-        let _ = self.import_stmts;
         imported_components_registry()
             .map(|set| set.contains(tag))
             .unwrap_or(false)
@@ -8480,7 +8467,6 @@ impl<'a> AuraViewBuilder<'a> {
             widget_name: child_widget.name.clone(),
             widget_registry: self.widget_registry,
             native_registry: self.native_registry,
-            import_stmts: self.import_stmts,
             override_state_obj_id: Some(child_state_id),
             routes: None,
             computed: Some(&child_widget.computed),
@@ -8593,7 +8579,6 @@ impl<'a> AuraViewBuilder<'a> {
             widget_name: child_widget.name.clone(),
             widget_registry: self.widget_registry,
             native_registry: self.native_registry,
-            import_stmts: self.import_stmts,
             override_state_obj_id: Some(child_state_id),
             routes: None,
             computed: Some(&child_widget.computed),
@@ -22657,18 +22642,8 @@ mod tests {
 
         // PLAN-748 T-02：∉ lucide 名集的网页生态组件（AppViewport 形）保持
         // T-09(b) 占位卡路径（判别器换名集后意图面不动）。
-        let ext_vp = auto_ui_dialect::ast::ExtImport {
-            kind: auto_ui_dialect::ast::ExtImportKind::Component,
-            symbols: vec![auto_lang_core::ast::Name::from("AppViewport")],
-            path: "src/front/viewport.vue".into(),
-            call_args: vec![],
-            ref_fields: vec![],
-        };
-        // PLAN-841 T-05: retired import_stmts UseWeb path — oracle rework owned by T-07.
-        let imports_vp: Vec<auto_lang_core::ast::Stmt> = vec![];
-        let _ = ext_vp;
         let builder_vp =
-            AuraViewBuilder::with_registry_and_imports(&bridge, "Test", &registry, &imports_vp);
+            AuraViewBuilder::with_registry_and_imports(&bridge, "Test", &registry, &[]);
         let node_vp = AuraNode::element("AppViewport").with_prop("app", Expr::Str("demo-1".into()));
         let view_vp = builder_vp.build(&node_vp);
         match &view_vp {

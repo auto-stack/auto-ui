@@ -40,5 +40,3 @@ pub fn ui_cache_fingerprint() -> Option<String> {
     let generator = generator_fingerprint().unwrap_or_else(|| "unknown".to_string());
     Some(format!("{generator}:ui-ast-schema-{UI_AST_SCHEMA_VERSION}"))
 }
-
-pub fn assemble_ui_grammar() {}

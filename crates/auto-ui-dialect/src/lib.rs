@@ -1,20 +1,9 @@
-//! PLAN-806：UI msg 与 model 声明文法正式外置。
+//! UI owned AST、完整 UI 文法与版本化 codec 的单一来源。
 //!
-//! 本 crate 是完整 msg/model 声明算法的**单一份实现**（自 auto-lang
-//! `Parser::parse_msg_decl_inner` / `parse_model_block_inner` /
-//! `parse_model_field_annotations` 逐字迁出，行为冻结见 PLAN-806 T-01
-//! D1–D7）。只依赖 [`auto_parser_api`] 轻端口（其闭包为 auto-ast/
-//! auto-lex/auto-diagnostics + auto-val 轻层），**不依赖** auto-lang，
-//! 不复制 Parser/lexer/Pratt/类型文法——核心表达式与类型解析经端口
-//! 委托（`ParseContext::parse_expr` / `parse_type`）。
-//!
-//! 生产接线（auto-lang 上层，薄委托）：
-//! - 顶层：`UiDialect` builtin 派发段 `"msg"`/`"model"` 分支 →
-//!   `Parser::parse_msg_decl` / `parse_model_block` → 本 crate；
-//! - 结构路径：`parse_widget_decl` / `parse_store_decl` /
-//!   `parse_component_fn_decl` 体内直连 inner → 本 crate（同一实现，
-//!   无第二份算法）；
-//! - import：新 Parser 经 `with_session` 默认装配后同源。
+//! `UiDialect` 经中立 `DomainParseContext` 委托 Core expr/type/body，
+//! 不复制 Parser/Pratt。调用方以 `Parser::parse_domain(&UiDialect)`
+//! 显式组合并取得 `UiCode`，再校验/lowering 后进入执行与生成器；
+//! 无进程级文法表或 Core `Stmt` UI 兼容臂。
 //!
 //! 两个 model 合同面共用一份块循环与字段算法（T-01 D4）：
 //! - [`ModelGrammar::Builtin`]：内建完整文法（注解 + `var` + name +

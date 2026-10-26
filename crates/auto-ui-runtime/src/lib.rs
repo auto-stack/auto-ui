@@ -81,12 +81,9 @@ pub use dynamic_build::ui_module_parse_failures;
 #[cfg(feature = "ui-iced")]
 pub use dynamic_build::{build_dynamic_component, has_ui_keywords, run_file_dynamic_ui};
 
-// ── 宿主能力装配单点（原 auto-lang 实装随迁；文法装配留旧兼容包） ──
+// ── 宿主能力装配单点（原 auto-lang 实装随迁） ──
 //
-// PLAN-814 T-04：三处装配扇入（旧 lib.rs 安装器/run_file_dynamic_ui_inner/
-// ui::vm_bridge）收敛本 crate 单点。r3 §5.3：显式入口优先——本安装器不
-// 登记 UI 文法（auto-ui-dialect 依赖与 UiGrammarSource 提交权归旧
-// auto-lang 兼容包），缺文法时 SDK 面显式拒绝语义保持。
+// UI 文法由调用方经 parse_domain 显式组合；本安装器只注册宿主 provider。
 
 /// UI 宿主能力 provider 装配单点（frame/clipboard/scroll/terminal/
 /// code-editor/dnd/dialog + autodown 引擎 + i18n lookup 钩子）。

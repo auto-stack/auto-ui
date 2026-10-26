@@ -1048,11 +1048,9 @@ mod plan095_tests {
 
     /// PLAN-814 R3-05：T-02 大迁移时被丢的回归（203e2ce91 在册，V-05
     /// 勘误——测 design_tokens 配方注册与 aura 提取集成，归属
-    /// compiler（aura owner）；语义逐字保持，仅路径改写 + 文法表
-    /// 显式装配）。
+    /// compiler（aura owner）；语义逐字保持，经 UI 领域端口组合）。
     #[test]
     fn test_style_recipe_in_widget_extraction() {
-        crate::assemble_ui_grammar();
         clear_style_recipes();
 
         let code = r#"

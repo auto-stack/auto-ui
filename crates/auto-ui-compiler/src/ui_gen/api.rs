@@ -37,8 +37,6 @@ pub fn transpile_file(
 /// This is the preferred method for transpiling UI components.
 /// It uses the new AURA-based architecture without DSL preprocessing.
 pub fn transpile_aura(source: &str, output_path: Option<&str>) -> Result<String, String> {
-    // PLAN-814 R4-01：显式文法组合（入口首选；幂等）。
-    crate::assemble_ui_grammar();
     let ast = crate::parse_ui(source).map_err(|e| format!("Failed to parse: {:?}", e))?;
 
     // Extract and generate
@@ -67,8 +65,6 @@ pub fn transpile_aura(source: &str, output_path: Option<&str>) -> Result<String,
 
 /// Transpile UI source code to Vue3 SFC using AURA pipeline (Plan 096)
 pub fn transpile_vue_aura(source: &str, output_path: Option<&str>) -> Result<String, String> {
-    // PLAN-814 R4-01：显式文法组合（入口首选；幂等）。
-    crate::assemble_ui_grammar();
     let ast = crate::parse_ui(source).map_err(|e| format!("Failed to parse: {:?}", e))?;
 
     // Extract and generate
@@ -617,10 +613,8 @@ pub fn generate_component_from_file(
     at_path: &std::path::Path,
     opts: ComponentGenOptions,
 ) -> Result<GeneratedComponent, String> {
-    // UICache 身份由生成器源与 UI AST schema 组成，在 load/dirty 判定前
-    // 注入；显式文法组合保持入口首选、幂等。
+    // UICache 身份由生成器源与 UI AST schema 组成，在 load/dirty 判定前注入。
     auto_lang_core::database::set_generator_fingerprint(crate::ui_cache_fingerprint());
-    crate::assemble_ui_grammar();
     use crate::aura::extract_store_from_decl;
     use crate::aura::extract_widget_from_decl;
     use crate::ui_gen::{BackendGenerator, VueGenerator, VueMode};
