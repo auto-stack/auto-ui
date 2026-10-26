@@ -1188,17 +1188,19 @@ impl VmBridge {
         }
     }
 
-    // Init props use the same typed references as VM state. Inline array props
-    // become ListData<Value>; its child_refs contract owns direct VmRef elements.
-    // In particular, a scalar Int matching an allocated heap id owns nothing.
-    fn visit_init_refs(value: &Value, mut visit: impl FnMut(u64)) {
+    // Init snapshots retain typed references at every accepted Array/Object depth.
+    // Scalar Int values never acquire ownership merely by matching a heap id.
+    fn visit_init_refs(value: &Value, visit: &mut impl FnMut(u64)) {
         match value {
             Value::VmRef(reference) => visit(reference.id as u64),
             Value::Array(array) => {
                 for item in &array.values {
-                    if let Value::VmRef(reference) = item {
-                        visit(reference.id as u64);
-                    }
+                    Self::visit_init_refs(item, visit);
+                }
+            }
+            Value::Obj(object) => {
+                for (_, item) in object.iter() {
+                    Self::visit_init_refs(item, visit);
                 }
             }
             _ => {}
@@ -1206,11 +1208,45 @@ impl VmBridge {
     }
 
     fn stake_init_value(&self, value: &Value) {
-        Self::visit_init_refs(value, |id| self.vm.rc_retain_id(id));
+        Self::visit_init_refs(value, &mut |id| self.vm.rc_retain_id(id));
     }
 
     fn release_init_value(&self, value: &Value) {
-        Self::visit_init_refs(value, |id| self.vm.rc_release_id(id));
+        Self::visit_init_refs(value, &mut |id| self.vm.rc_release_id(id));
+    }
+
+    fn materialize_init_value(&self, value: &Value) -> Value {
+        match value {
+            Value::Array(array) => {
+                let elems = array
+                    .values
+                    .iter()
+                    .map(|item| self.materialize_init_value(item))
+                    .collect();
+                let id = self
+                    .vm
+                    .insert_heap_object(auto_lang_core::vm::types::ListData {
+                        elems,
+                        storage: None,
+                    });
+                self.vm.rc_retain_id(id);
+                Value::VmRef(auto_val::VmRef { id: id as usize })
+            }
+            Value::Obj(object) => {
+                let mut data = auto_lang_core::vm::types::ObjectData::new();
+                for (key, item) in object.iter() {
+                    data.set(key.clone(), self.materialize_init_value(item));
+                }
+                let id = self.vm.insert_heap_object(data);
+                self.vm.rc_retain_id(id);
+                Value::VmRef(auto_val::VmRef { id: id as usize })
+            }
+            Value::VmRef(reference) => {
+                self.vm.rc_retain_id(reference.id as u64);
+                value.clone()
+            }
+            _ => value.clone(),
+        }
     }
 
     /// PLAN-062 T12: state 值获得持有——顶层堆引用 + Array 内层各 +1。
@@ -1760,31 +1796,11 @@ impl VmBridge {
             if let Some(inst) = guard.as_any_mut().downcast_mut::<GenericInstanceData>() {
                 for (name, val) in props {
                     // Plan 057 (Bug 2): VM bytecode (GET_FIELD / index) expects
-                    // array-typed state slots to hold a heap id (Int ≥4M →
-                    // ListData), NOT a raw Value::Array — Value::Array can't
-                    // nanobox, so bytecode reads popped double garbage
-                    // ([GET_FIELD] non-i32 obj_id) and silently aborted the
-                    // whole handler (ghost text 的 .history 读取即此)。
-                    // Convert Array props to heap-stored ListData with a typed VmRef.
-                    let storable = match val {
-                        auto_val::Value::Array(arr) => {
-                            // The new ListData owns each typed child reference.
-                            self.stake_init_value(val);
-                            let id =
-                                self.vm
-                                    .insert_heap_object(auto_lang_core::vm::types::ListData {
-                                        elems: arr.values.clone(),
-                                        storage: None,
-                                    });
-                            // Plan 419: 字段持有列表引用。
-                            self.vm.rc_retain_id(id);
-                            auto_val::Value::VmRef(auto_val::VmRef { id: id as usize })
-                        }
-                        other => {
-                            self.stake_init_value(other);
-                            other.clone()
-                        }
-                    };
+                    // compound state slots to hold typed heap references; raw
+                    // Value::Array cannot nanobox and raw Value::Obj falls through
+                    // scalar dispatch. Materialize recursively so every container
+                    // owns only direct VmRef children under the Plan 419 RC protocol.
+                    let storable = self.materialize_init_value(val);
                     if let Some(idx) = inst.field_names.iter().position(|n| n == name) {
                         // PLAN-045 T-02：prop 种子写入根态 = 状态面突变——但
                         // ensure_child_state 由 render_child_widget 每帧调用，
@@ -6592,6 +6608,143 @@ mod plan841_init_snapshot_tests {
             weak.upgrade().is_none(),
             "list destruction releases the last child owner"
         );
+    }
+
+    fn check_compound_producer(expression: &str) {
+        let source = format!(
+            r#"
+widget App {{
+    model {{ source List = [7] }}
+    view {{ Child(data: {expression}) {{}} }}
+}}
+widget Child(data: List) {{
+    model {{ done bool = false }}
+    on {{ .Init -> {{ .done = true }} }}
+    view {{ text "child" {{}} }}
+}}
+"#
+        );
+        let mut dc = crate::build_dynamic_component(&source, None)
+            .expect("compound property is accepted by the production parser/lowering");
+        let source_value = dc.read_state("source").unwrap();
+        let source_id = heap_id(&source_value);
+        let weak = std::sync::Arc::downgrade(&dc.bridge().vm().get_heap_object(source_id).unwrap());
+        let _ = dc.view_with_debug_gated(true);
+        assert_eq!(
+            dc.bridge().init_demand_phase("Child"),
+            Some(InitDemandPhase::Queued)
+        );
+        assert_eq!(dc.bridge().pending_init_demand_count(), 1);
+        dc.write_state("source", Value::Nil).unwrap();
+        dc.bridge().vm().reap_all();
+        assert!(weak.upgrade().is_some(), "queue owns {expression}");
+        assert_eq!(
+            dc.bridge().vmref_to_vec(source_id as usize).unwrap(),
+            vec![Value::Int(7)]
+        );
+
+        dc.drive_scheduler_to_quiescence(8);
+        assert_eq!(
+            dc.bridge().init_demand_phase("Child"),
+            Some(InitDemandPhase::Done)
+        );
+        assert_eq!(dc.read_state("done").unwrap(), Value::Bool(true));
+        dc.bridge().vm().reap_all();
+        assert!(weak.upgrade().is_some(), "replayed root owns {expression}");
+        let outer = dc.read_state_as_vec("data").unwrap();
+        match expression {
+            "[[.source]]" => {
+                let nested = dc
+                    .bridge()
+                    .vmref_to_vec(heap_id(&outer[0]) as usize)
+                    .unwrap();
+                assert_eq!(heap_id(&nested[0]), source_id);
+            }
+            "[{inner: .source}]" => {
+                let object_id = heap_id(&outer[0]);
+                let object = dc.bridge().vm().get_heap_object(object_id).unwrap();
+                let guard = object.read().unwrap();
+                let data = guard
+                    .as_any()
+                    .downcast_ref::<auto_lang_core::vm::types::ObjectData>()
+                    .unwrap();
+                assert_eq!(heap_id(data.get(&"inner".into()).unwrap()), source_id);
+            }
+            _ => assert_eq!(heap_id(&outer[0]), source_id),
+        }
+        assert_eq!(
+            dc.bridge().vmref_to_vec(source_id as usize).unwrap(),
+            vec![Value::Int(7)]
+        );
+        dc.write_state("data", Value::Nil).unwrap();
+        dc.bridge().vm().reap_all();
+        assert!(
+            weak.upgrade().is_none(),
+            "last replayed container releases {expression}"
+        );
+    }
+
+    #[test]
+    fn direct_array_property_owns_queue_replay_and_last_release() {
+        check_compound_producer("[.source]");
+    }
+
+    #[test]
+    fn nested_array_property_owns_queue_replay_and_last_release() {
+        check_compound_producer("[[.source]]");
+    }
+
+    #[test]
+    fn object_inside_array_property_owns_queue_replay_and_last_release() {
+        check_compound_producer("[{inner: .source}]");
+    }
+
+    #[test]
+    fn compound_snapshot_cancel_missing_and_drop_release_shared_aliases() {
+        for exit in 0..3 {
+            let mut bridge = bridge(false);
+            let value = bridge.read_state("items").unwrap();
+            let id = heap_id(&value);
+            let weak = std::sync::Arc::downgrade(&bridge.vm.get_heap_object(id).unwrap());
+            let mut object = auto_val::Obj::new();
+            object.set("inner", value.clone());
+            let snapshot = Value::array(vec![Value::obj(object), Value::array(vec![value])]);
+            bridge.register_init_demand(
+                "Missing",
+                "Missing#a",
+                bridge.state_obj_id,
+                vec![("bundle".into(), snapshot)],
+            );
+            bridge.write_state("items", Value::Nil).unwrap();
+            bridge.vm.reap_all();
+            assert_eq!(bridge.vm.rc_count(id), 2, "two queued aliases");
+            match exit {
+                0 => {
+                    bridge.register_init_demand(
+                        "Missing",
+                        "Missing#b",
+                        bridge.state_obj_id,
+                        Vec::new(),
+                    );
+                }
+                1 => assert_eq!(
+                    bridge
+                        .dispatch_pending_inits(CpuSliceBudget::d2_default())
+                        .missing,
+                    1
+                ),
+                _ => {
+                    drop(bridge);
+                    assert!(weak.upgrade().is_none(), "drop releases both aliases");
+                    continue;
+                }
+            }
+            bridge.vm.reap_all();
+            assert!(
+                weak.upgrade().is_none(),
+                "exit={exit} releases both aliases"
+            );
+        }
     }
 
     #[test]
