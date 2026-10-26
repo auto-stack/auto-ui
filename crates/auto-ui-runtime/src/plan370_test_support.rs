@@ -228,7 +228,7 @@ pub(crate) fn build_component_from_app_mode(
                                 computed: store_decl.computed.clone(),
                                 setup: None, // Plan 426 field; test support defaults
                                 actions: None,
-                                timer: None,
+                                timer: store_decl.timer.clone(),
                                 view: None,
                                 named_views: Vec::new(),
                                 on: store_decl.on.clone(),
@@ -344,7 +344,7 @@ pub(crate) fn build_component_from_app_mode(
                 computed: store_decl.computed.clone(),
                 setup: None, // Plan 426 field; test support defaults
                 actions: None,
-                timer: None,
+                timer: store_decl.timer.clone(),
                 view: None,
                 named_views: Vec::new(),
                 on: store_decl.on.clone(),
@@ -375,7 +375,7 @@ pub(crate) fn build_component_from_app_mode(
                     computed: store_decl.computed.clone(),
                     setup: None,
                     actions: None,
-                    timer: None,
+                    timer: store_decl.timer.clone(),
                     view: None,
                     named_views: Vec::new(),
                     on: store_decl.on.clone(),
