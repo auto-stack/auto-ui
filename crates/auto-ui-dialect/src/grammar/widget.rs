@@ -9,13 +9,15 @@ use super::helpers::{
     on_handler_event_name, stmt_expr_contains_await, wire_modal_close_recursive,
 };
 use super::view::{parse_handler_params, parse_view_node, parse_view_root_nodes};
-use crate::UiParseContext;
+use crate::ast as ui_ast;
+use crate::ast::*;
+use crate::{UiParseContext, UiStmt};
 use auto_parser_api::ast;
 use auto_parser_api::ast::*;
 use auto_parser_api::error::{pos_to_span, AutoResult, SyntaxError};
 use auto_parser_api::token::TokenKind;
 
-pub fn parse_widget_decl(cx: &mut dyn UiParseContext) -> AutoResult<Stmt> {
+pub fn parse_widget_decl(cx: &mut dyn UiParseContext) -> AutoResult<UiStmt> {
     cx.expect_ident("widget")?;
     let name = cx.cur_text();
     cx.advance();
@@ -43,9 +45,9 @@ pub fn parse_widget_decl(cx: &mut dyn UiParseContext) -> AutoResult<Stmt> {
     let mut ext_imports = Vec::new();
     let mut watch = Vec::new();
     let mut expose = Vec::new();
-    let mut setup: Option<ast::ui::SetupBlock> = None;
-    let mut actions: Option<ast::ui::ActionsBlock> = None;
-    let mut timer: Option<ast::ui::TimerBlock> = None;
+    let mut setup: Option<ui_ast::SetupBlock> = None;
+    let mut actions: Option<ui_ast::ActionsBlock> = None;
+    let mut timer: Option<ui_ast::TimerBlock> = None;
 
     while !cx.is_kind(TokenKind::RBrace) {
         cx.skip_empty_lines();
@@ -274,7 +276,7 @@ pub fn parse_widget_decl(cx: &mut dyn UiParseContext) -> AutoResult<Stmt> {
             }
         }
     }
-    Ok(Stmt::WidgetDecl(decl))
+    Ok(UiStmt::WidgetDecl(decl))
 }
 
 /// Plan 448 B1: mint `onclick: () => { … }` inline-lambda event handlers
@@ -1056,7 +1058,7 @@ pub(crate) fn parse_watch_block_inner(cx: &mut dyn UiParseContext) -> AutoResult
 /// annotates ref fields (script-side access injects `.value`).
 pub(crate) fn parse_setup_block_inner(
     cx: &mut dyn UiParseContext,
-) -> AutoResult<ast::ui::SetupBlock> {
+) -> AutoResult<ui_ast::SetupBlock> {
     cx.expect_ident("setup")?;
     cx.expect(TokenKind::LBrace)?;
     cx.skip_empty_lines();
@@ -1108,7 +1110,7 @@ pub(crate) fn parse_setup_block_inner(
         body.stmts.push(stmt);
     }
     cx.expect(TokenKind::RBrace)?;
-    Ok(ast::ui::SetupBlock {
+    Ok(ui_ast::SetupBlock {
         body,
         ref_annotations,
     })
@@ -1313,7 +1315,7 @@ pub(crate) fn parse_on_block(cx: &mut dyn UiParseContext) -> AutoResult<OnBlock>
         // stream subscription. The handler body receives the PRE-PARSED
         // event object as `ev` (platform layer parses JSON, 已决③).
         // One-token lookahead: bare `stream -> …` stays a msg pattern.
-        let mut stream_sub: Option<ast::ui::StreamSubscription> = None;
+        let mut stream_sub: Option<ui_ast::StreamSubscription> = None;
         let is_stream_sub =
             if cx.cur_kind() == TokenKind::Ident && cx.cur_text().as_str() == "stream" {
                 // PLAN-810: advance_peek_kind 具名化（旧臂回推+手动恢复形态）。
@@ -1351,7 +1353,7 @@ pub(crate) fn parse_on_block(cx: &mut dyn UiParseContext) -> AutoResult<OnBlock>
                 "__stream_sse_{}",
                 url.replace(|c: char| !c.is_ascii_alphanumeric(), "_")
             );
-            stream_sub = Some(ast::ui::StreamSubscription { kind, url, event });
+            stream_sub = Some(ui_ast::StreamSubscription { kind, url, event });
             (pattern, vec!["ev".to_string()])
         } else if cx.is_kind(TokenKind::Dot) {
             cx.advance(); // consume the dot

@@ -18,9 +18,8 @@
 //! - 未知注解 `SyntaxError::Generic{.., pos_to_span(self.cur.pos)}` →
 //!   `ctx.syntax_error(msg)`（桥面实现逐字同构）。
 
-use auto_parser_api::ast::{
-    Decorator, Expr, ModelBlock, ModelField, MsgDecl, MsgVariant, Name, Type,
-};
+use crate::ast::{Decorator, ModelBlock, ModelField, MsgDecl, MsgVariant};
+use auto_parser_api::ast::{Expr, Name, Type};
 use auto_parser_api::error::AutoResult;
 use auto_parser_api::token::TokenKind;
 use auto_parser_api::ParseContext;

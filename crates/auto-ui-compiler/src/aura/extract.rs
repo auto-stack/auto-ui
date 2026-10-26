@@ -10,18 +10,19 @@
 //! - **Separation**: Handlers are extracted as LogicPayload
 
 use super::types::*;
-use auto_lang_core::ast::{Expr, Key, Type, ViewEvent, ViewProp, ViewPropValue};
+use auto_lang_core::ast::{Expr, Key, Type};
+use auto_ui_dialect::ast::{ViewEvent, ViewProp, ViewPropValue};
 use std::collections::HashMap;
 
 // Plan 367 P2-3: thread-local store for view fragments.
 // Populated during module-level extraction, consumed during view tree extraction.
 thread_local! {
-    static VIEW_FRAGMENTS: std::cell::RefCell<HashMap<String, auto_lang_core::ast::ui::ViewFragmentDecl>> =
+    static VIEW_FRAGMENTS: std::cell::RefCell<HashMap<String, auto_ui_dialect::ast::ViewFragmentDecl>> =
         std::cell::RefCell::new(HashMap::new());
 }
 
 /// Register a view fragment for inline expansion (Plan 367 P2-3).
-pub fn register_view_fragment(frag: &auto_lang_core::ast::ui::ViewFragmentDecl) {
+pub fn register_view_fragment(frag: &auto_ui_dialect::ast::ViewFragmentDecl) {
     VIEW_FRAGMENTS.with(|cell| {
         cell.borrow_mut()
             .insert(frag.name.as_str().to_string(), frag.clone());
@@ -534,7 +535,7 @@ pub fn extract_type(ty: &Type) -> Type {
 // Widget Declaration Extractor (Plan 096)
 // ============================================================================
 
-use auto_lang_core::ast::{
+use auto_ui_dialect::ast::{
     BindBlock, ModelBlock, MsgDecl, OnBlock, PropDecl, StoreDecl, ViewBlock, ViewNode, ViewText,
     WidgetDecl,
 };
@@ -543,7 +544,7 @@ use auto_lang_core::ast::{
 /// A store is a view-less widget: state + msg + handlers → module-level refs + actions.
 /// Plan 051 C7: timer 块条目提取（WidgetDecl/StoreDecl 同形）。
 fn extract_timer_entries(
-    timer: &Option<auto_lang_core::ast::ui::TimerBlock>,
+    timer: &Option<auto_ui_dialect::ast::TimerBlock>,
 ) -> Vec<crate::aura::types::AuraTimerEntry> {
     timer
         .as_ref()
@@ -952,8 +953,7 @@ fn take_inline_mints() -> Vec<(String, Vec<auto_lang_core::ast::Stmt>)> {
 /// widget's handlers + msg variants. Note: fragment-minted handlers reach the
 /// Vue/Rust/a2ui paths via that injection but NOT the decl-based VM synthesis
 /// — fragment inline lambdas on the iced/VM route are a known v1 edge.
-fn collect_inline_events(node: &mut auto_lang_core::ast::ViewNode) -> ExtractResult<()> {
-    use auto_lang_core::ast::ViewNode;
+fn collect_inline_events(node: &mut ViewNode) -> ExtractResult<()> {
     match node {
         ViewNode::Element {
             events, children, ..
@@ -1077,7 +1077,7 @@ fn extract_view_node(node: &ViewNode) -> ExtractResult<AuraNode> {
                 let value = match &p.value {
                     ViewPropValue::Expr(expr) => {
                         let desugared = if p.name == "style" || p.name == "class" {
-                            auto_lang_core::design_tokens::recipe::desugar_style_expr(expr)
+                            crate::design_tokens::recipe::desugar_style_expr(expr)
                                 .unwrap_or_else(|_| expr.clone())
                         } else {
                             expr.clone()
@@ -1349,7 +1349,7 @@ fn expand_fragment_node(node: &ViewNode, subs: &HashMap<String, Expr>) -> Extrac
             span,
         } => {
             // Transform props: substitute param references in expressions
-            let new_props: Vec<auto_lang_core::ast::ui::ViewProp> = props
+            let new_props: Vec<auto_ui_dialect::ast::ViewProp> = props
                 .iter()
                 .map(|p| {
                     let new_value = match &p.value {
@@ -1358,7 +1358,7 @@ fn expand_fragment_node(node: &ViewNode, subs: &HashMap<String, Expr>) -> Extrac
                         }
                         other => other.clone(),
                     };
-                    Ok(auto_lang_core::ast::ui::ViewProp {
+                    Ok(auto_ui_dialect::ast::ViewProp {
                         name: p.name.clone(),
                         value: new_value,
                     })
@@ -1440,7 +1440,7 @@ fn expand_fragment_node(node: &ViewNode, subs: &HashMap<String, Expr>) -> Extrac
             span,
         } => {
             // Nested component call — expand its props too
-            let new_props: Vec<auto_lang_core::ast::ui::ViewProp> = props
+            let new_props: Vec<auto_ui_dialect::ast::ViewProp> = props
                 .iter()
                 .map(|p| {
                     let new_value = match &p.value {
@@ -1449,7 +1449,7 @@ fn expand_fragment_node(node: &ViewNode, subs: &HashMap<String, Expr>) -> Extrac
                         }
                         other => other.clone(),
                     };
-                    Ok(auto_lang_core::ast::ui::ViewProp {
+                    Ok(auto_ui_dialect::ast::ViewProp {
                         name: p.name.clone(),
                         value: new_value,
                     })
@@ -1986,12 +1986,11 @@ mod tests {
     fn extract_widget_from_src(src: &str) -> AuraWidget {
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("widget source must parse");
+        let ast = crate::parse_ui(src).expect("widget source must parse");
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");
@@ -2080,17 +2079,16 @@ widget App {
 "#;
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("parse");
-        for stmt in &ast.stmts {
-            if let auto_lang_core::ast::Stmt::ViewFragmentDecl(f) = stmt {
+        let ast = crate::parse_ui(src).expect("parse");
+        for stmt in ast.domain_stmts() {
+            if let auto_ui_dialect::UiStmt::ViewFragmentDecl(f) = stmt {
                 register_view_fragment(f);
             }
         }
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");

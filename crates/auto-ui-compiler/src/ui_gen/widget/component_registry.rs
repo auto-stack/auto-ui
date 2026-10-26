@@ -78,7 +78,7 @@ pub struct LoadedPackage {
     pub families: std::collections::BTreeMap<String, Vec<String>>,
     /// Plan 435 P8-6(D13):全量 (decl, widget) 对 —— 桌面端(VM/iced)接入用:
     /// 视图注册进 WidgetRegistry,decl 并入 child_decls 编入单 VM。
-    pub full_widgets: Vec<(auto_lang_core::ast::ui::WidgetDecl, AuraWidget)>,
+    pub full_widgets: Vec<(auto_ui_dialect::ast::WidgetDecl, AuraWidget)>,
 }
 
 /// 注册被拒记录(与内置折叠名冲突 —— Plan 408 语义)。
@@ -156,7 +156,7 @@ impl ComponentRegistry {
 
         let manifest = Self::parse_manifest(&canonical)?;
         let mut widgets = HashMap::new();
-        let mut full_widgets: Vec<(auto_lang_core::ast::ui::WidgetDecl, AuraWidget)> = Vec::new();
+        let mut full_widgets: Vec<(auto_ui_dialect::ast::WidgetDecl, AuraWidget)> = Vec::new();
         let mut parse_warnings: Vec<String> = Vec::new();
         let entries = std::fs::read_dir(&canonical)
             .map_err(|e| format!("read package dir `{}`: {}", canonical.display(), e))?;
@@ -399,9 +399,7 @@ impl ComponentRegistry {
 fn parse_package_widgets(
     code: &str,
     path: &Path,
-) -> Result<Vec<(auto_lang_core::ast::ui::WidgetDecl, AuraWidget)>, String> {
-    let session =
-        auto_lang_core::session::CompilerSession::new(auto_lang_core::session::Scenario::UI);
+) -> Result<Vec<(auto_ui_dialect::ast::WidgetDecl, AuraWidget)>, String> {
     // PLAN-642 T-01: 跨包 style recipe 预注册——包文件可 `use stylekit.styles:
     // icon_base` 形态引用共享配方（027/018 tree_icon 实证），而 parse 期
     // name-check（PLAN-607/635）只认注册表内配方；本装载器此前不做
@@ -410,15 +408,11 @@ fn parse_package_widgets(
     // 解析序与编译入口一致（resolve_module_path 的 pac.at dep 上溯），
     // 解析失败沿用宽容语义（配方缺席 → parse 报错入 warning，不 panic）。
     let base_dir = path.parent().unwrap_or(Path::new(".")).to_path_buf();
-    let _ = auto_lang_core::design_tokens::recipe::prepare_style_recipe_imports(&base_dir, code);
-    let mut parser = auto_lang_core::Parser::from(code);
-    parser = parser.with_session(session);
-    let ast = parser
-        .parse()
-        .map_err(|e| format!("parse `{}`: {}", path.display(), e))?;
+    let _ = crate::design_tokens::recipe::prepare_style_recipe_imports(&base_dir, code);
+    let ast = crate::parse_ui(code).map_err(|e| format!("parse `{}`: {}", path.display(), e))?;
     let mut out = Vec::new();
-    for stmt in &ast.stmts {
-        if let auto_lang_core::ast::Stmt::WidgetDecl(d) = stmt {
+    for stmt in ast.domain_stmts() {
+        if let auto_ui_dialect::UiStmt::WidgetDecl(d) = stmt {
             let w = crate::aura::extract_widget_from_decl(d)
                 .map_err(|e| format!("extract `{}`: {}", path.display(), e))?;
             out.push((d.clone(), w));

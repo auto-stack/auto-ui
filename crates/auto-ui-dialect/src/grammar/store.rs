@@ -3,7 +3,9 @@
 
 use super::actions::parse_timer_block_inner;
 use super::widget::{parse_computed_block_inner, parse_on_block, parse_watch_block_inner};
-use crate::UiParseContext;
+use crate::ast as ui_ast;
+use crate::ast::*;
+use crate::{UiParseContext, UiStmt};
 use auto_parser_api::ast;
 use auto_parser_api::ast::*;
 use auto_parser_api::error::{pos_to_span, AutoResult, SyntaxError};
@@ -11,7 +13,7 @@ use auto_parser_api::token::TokenKind;
 
 /// Parse a `store` declaration (Plan 351 / Design 18).
 /// A store is a view-less widget: `store Name { model{} msg{} on{} }`.
-pub fn parse_store_decl(cx: &mut dyn UiParseContext) -> AutoResult<Stmt> {
+pub fn parse_store_decl(cx: &mut dyn UiParseContext) -> AutoResult<UiStmt> {
     cx.expect_ident("store")?;
     let name = cx.cur_text();
     cx.advance();
@@ -24,7 +26,7 @@ pub fn parse_store_decl(cx: &mut dyn UiParseContext) -> AutoResult<Stmt> {
     let mut on = None;
     let mut computed = None;
     let mut watch = Vec::new();
-    let mut timer: Option<ast::ui::TimerBlock> = None;
+    let mut timer: Option<ui_ast::TimerBlock> = None;
 
     while !cx.is_kind(TokenKind::RBrace) {
         cx.skip_empty_lines();
@@ -97,7 +99,7 @@ pub fn parse_store_decl(cx: &mut dyn UiParseContext) -> AutoResult<Stmt> {
         }
     }
 
-    Ok(Stmt::StoreDecl(StoreDecl {
+    Ok(UiStmt::StoreDecl(StoreDecl {
         name: name.into(),
         messages,
         model,

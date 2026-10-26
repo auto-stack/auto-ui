@@ -388,7 +388,7 @@ pub fn create_note(title str, body str) Note {
         // PLAN-668 R-17/A-01：stylekit 导入名 parse 前预注册（真实管线
         // build_dynamic_component 同序）——016 的 `use stylekit.styles:
         // caption_text` 此前裸 parse 落 UndefinedVariable + 恢复雪崩。
-        auto_lang_core::design_tokens::recipe::prepare_style_recipe_imports(&base_dir, &code)
+        auto_ui_compiler::design_tokens::recipe::prepare_style_recipe_imports(&base_dir, &code)
             .map_err(|e| e.to_string())
             .expect("stylekit 预注册");
 

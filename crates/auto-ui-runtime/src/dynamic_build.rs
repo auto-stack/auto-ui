@@ -85,7 +85,7 @@ pub(crate) fn load_ext_imports_for_vm(
             let code = auto_lang_core::back_prefix::apply(path, code);
             // PLAN-668 A-02：逐模块 stylekit 预注册（同主收集路径；前缀化不触
             // stylekit 导入面，变换后扫等价）。
-            let _ = auto_lang_core::design_tokens::recipe::prepare_style_recipe_imports(
+            let _ = auto_ui_compiler::design_tokens::recipe::prepare_style_recipe_imports(
                 path.parent().unwrap_or(std::path::Path::new(".")),
                 &code,
             );
@@ -830,7 +830,7 @@ fn register_transitive_widgets_inner(
 
         // PLAN-668 A-02：逐模块 stylekit 预注册（同 4244 主路径——模块级
         // `use stylekit.styles:` 缺预注册则整文件 parse 失败被静默吞）。
-        let _ = auto_lang_core::design_tokens::recipe::prepare_style_recipe_imports(
+        let _ = auto_ui_compiler::design_tokens::recipe::prepare_style_recipe_imports(
             sub_path.parent().unwrap_or(std::path::Path::new(".")),
             &sub_code,
         );
@@ -895,7 +895,7 @@ fn build_dynamic_component_inner(
                 .parent()
                 .unwrap_or(std::path::Path::new("."))
                 .to_path_buf();
-            auto_lang_core::design_tokens::recipe::prepare_style_recipe_imports(&base_dir, code)
+            auto_ui_compiler::design_tokens::recipe::prepare_style_recipe_imports(&base_dir, code)
                 .map_err(|e| e.to_string())?
         }
         None => Vec::new(),
@@ -919,7 +919,7 @@ fn build_dynamic_component_inner(
     }
     // PLAN-607: register and validate style recipes before extracting widget.
     // PLAN-635: replay imported (source-tagged) + local recipes in order.
-    auto_lang_core::design_tokens::recipe::load_and_validate_style_recipes_with_imports(
+    auto_ui_compiler::design_tokens::recipe::load_and_validate_style_recipes_with_imports(
         &recipe_imports,
         &ast.stmts,
     )
@@ -1149,7 +1149,7 @@ fn build_dynamic_component_inner(
                 // PLAN-037: 同上——子模块读点过前缀化 overlay。
                 let module_code = auto_lang_core::back_prefix::apply(&module_path, module_code);
                 // PLAN-668 A-02：逐模块文件 stylekit 预注册（同上，变换后扫等价）。
-                let _ = auto_lang_core::design_tokens::recipe::prepare_style_recipe_imports(
+                let _ = auto_ui_compiler::design_tokens::recipe::prepare_style_recipe_imports(
                     module_path.parent().unwrap_or(std::path::Path::new(".")),
                     &module_code,
                 );

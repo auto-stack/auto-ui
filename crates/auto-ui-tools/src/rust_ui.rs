@@ -3364,7 +3364,9 @@ impl<'a> PacSource<'a> {
                 for n in sidecar_nodes {
                     root.add_kid(n);
                 }
-                auto_api_gen::sidecar::from_decl(&auto_project_model::sidecar::sidecar_decl_from_root(&root))
+                auto_api_gen::sidecar::from_decl(
+                    &auto_project_model::sidecar::sidecar_decl_from_root(&root),
+                )
             }
             None => auto_api_gen::sidecar::load_sidecar(project_dir),
         }
@@ -3376,13 +3378,13 @@ impl<'a> PacSource<'a> {
         match self.req {
             Some(r) => {
                 let lite = r.theme_decl.as_ref()?;
-                let decl = auto_lang_core::design_tokens::decl::ThemeDecl {
+                let decl = auto_ui_compiler::design_tokens::decl::ThemeDecl {
                     name: lite.name.clone(),
                     extends: lite.extends.clone(),
                     mode: lite.mode.clone(),
                     colors: lite.colors.clone(),
                 };
-                match auto_lang_core::design_tokens::decl::compose(
+                match auto_ui_compiler::design_tokens::decl::compose(
                     &decl,
                     &std::collections::BTreeMap::new(),
                 ) {
@@ -6003,13 +6005,14 @@ fn apply_pac_theme_decl(project_dir: &Path) -> Option<String> {
     // （Pac::new 对 theme_decl 是 decl 字段直拷+语言类型直映；resolve() 只动
     // props/targets/依赖下载，不触及 theme_decl——冻结 oracle 不变）。
     let decl_lite = auto_project_model::pac_display::theme_decl_from_root(&config.root)?;
-    let decl = auto_lang_core::design_tokens::decl::ThemeDecl {
+    let decl = auto_ui_compiler::design_tokens::decl::ThemeDecl {
         name: decl_lite.name.clone(),
         extends: decl_lite.extends.clone(),
         mode: decl_lite.mode.clone(),
         colors: decl_lite.colors.clone(),
     };
-    match auto_lang_core::design_tokens::decl::compose(&decl, &std::collections::BTreeMap::new()) {
+    match auto_ui_compiler::design_tokens::decl::compose(&decl, &std::collections::BTreeMap::new())
+    {
         Ok(theme) => {
             let name = theme.name.clone();
             auto_ui_compiler::style::theme::set_theme_composed(std::sync::Arc::new(theme));
@@ -6747,7 +6750,7 @@ pub fn answer() int { return 42 }
         let composed =
             auto_ui_compiler::style::theme::active_composed().expect("合成主题在 ACTIVE_THEME 槽");
         let expected_primary =
-            auto_lang_core::design_tokens::decl::normalize_value("#8b5cf6").expect("声明值合法");
+            auto_ui_compiler::design_tokens::decl::normalize_value("#8b5cf6").expect("声明值合法");
         assert!(
             composed.light.iter().any(|(t, v)| *t
                 == auto_ui_compiler::style::theme::registry::TokenName::Primary
@@ -6841,8 +6844,8 @@ pub fn answer() int { return 42 }
         // 框架内：语言仓（rust-workspace 单源 owner）下的真实路径 → 共享
         // 工作区（PLAN-831 T-09：tools 迁独立 UI 仓后 cwd 不再是"框架内"
         // 项目——样本改经解析序定位语言仓根，语义断言不变）。
-        let in_project = find_lang_repo_root(&std::env::current_dir().unwrap())
-            .expect("lang repo via 解析序");
+        let in_project =
+            find_lang_repo_root(&std::env::current_dir().unwrap()).expect("lang repo via 解析序");
         assert_eq!(
             resolve_rust_workspace_dir(&in_project),
             get_rust_workspace_dir(),

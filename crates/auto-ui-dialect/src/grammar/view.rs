@@ -9,20 +9,22 @@ use super::widget::{
     parse_setup_block_inner, parse_style_block_inner, parse_watch_block_inner,
     parse_widget_use_block_inner,
 };
-use crate::UiParseContext;
+use crate::ast as ui_ast;
+use crate::ast::*;
+use crate::{UiParseContext, UiStmt};
 use auto_parser_api::ast;
 use auto_parser_api::ast::*;
 use auto_parser_api::error::{pos_to_span, AutoResult, SyntaxError};
 use auto_parser_api::token::TokenKind;
 
 /// Parse view block (UI scenario only)
-pub fn parse_view_block(cx: &mut dyn UiParseContext) -> AutoResult<Stmt> {
+pub fn parse_view_block(cx: &mut dyn UiParseContext) -> AutoResult<UiStmt> {
     let view = parse_view_block_inner(cx)?;
-    Ok(Stmt::ViewBlock(view))
+    Ok(UiStmt::ViewBlock(view))
 }
 
 /// Plan 367 P2-3: Parse either a view block or a view fragment declaration.
-pub fn parse_view_block_or_fragment(cx: &mut dyn UiParseContext) -> AutoResult<Stmt> {
+pub fn parse_view_block_or_fragment(cx: &mut dyn UiParseContext) -> AutoResult<UiStmt> {
     cx.expect_ident("view")?;
     cx.skip_empty_lines();
     if cx.cur_text().as_str() == "fn" {
@@ -30,14 +32,14 @@ pub fn parse_view_block_or_fragment(cx: &mut dyn UiParseContext) -> AutoResult<S
     } else {
         cx.expect(TokenKind::LBrace)?;
         let root = parse_view_root_nodes(cx)?;
-        Ok(Stmt::ViewBlock(ViewBlock { root }))
+        Ok(UiStmt::ViewBlock(ViewBlock { root }))
     }
 }
 
 /// Parse view fragment declaration body (after 'view' has been consumed).
 /// Plan 425: `view fn` only — `component fn` parses to a WidgetDecl via
 /// parse_component_fn_decl.
-pub(crate) fn parse_view_fragment_decl_body(cx: &mut dyn UiParseContext) -> AutoResult<Stmt> {
+pub(crate) fn parse_view_fragment_decl_body(cx: &mut dyn UiParseContext) -> AutoResult<UiStmt> {
     cx.expect_ident("fn")?;
     parse_fragment_decl_body_tail(cx)
 }
@@ -53,7 +55,7 @@ pub(crate) fn parse_view_fragment_decl_body(cx: &mut dyn UiParseContext) -> Auto
 /// style → body) is unchanged from the Plan 408 grammar; the fragment
 /// double track (ViewFragmentDecl + extract_widget_from_fragment) is
 /// retired — `view fn` (inline) keeps the fragment path.
-pub fn parse_component_fn_decl(cx: &mut dyn UiParseContext) -> AutoResult<Stmt> {
+pub fn parse_component_fn_decl(cx: &mut dyn UiParseContext) -> AutoResult<UiStmt> {
     cx.expect_ident("component")?;
     cx.expect_ident("fn")?;
     let name = cx.cur_text();
@@ -151,7 +153,7 @@ pub fn parse_component_fn_decl(cx: &mut dyn UiParseContext) -> AutoResult<Stmt> 
     cx.skip_empty_lines();
     // Plan 426: optional `setup { }` preamble (per-instance, before first
     // render) — mirrors widget.
-    let setup: Option<ast::ui::SetupBlock> = if cx.cur_text().as_str() == "setup" {
+    let setup: Option<ui_ast::SetupBlock> = if cx.cur_text().as_str() == "setup" {
         Some(parse_setup_block_inner(cx)?)
     } else {
         None
@@ -193,14 +195,14 @@ pub fn parse_component_fn_decl(cx: &mut dyn UiParseContext) -> AutoResult<Stmt> 
         timer: None,
     };
     mint_inline_event_handlers(&mut decl)?;
-    Ok(Stmt::WidgetDecl(decl))
+    Ok(UiStmt::WidgetDecl(decl))
 }
 
 /// Parse the param list + body of a `view fn` declaration (inline
 /// fragment, Plan 367 P2-3), after `fn` has been consumed.
 /// Plan 425: component fn left this shared path — only the inline view-fn
 /// form remains (params + single body node, no blocks).
-pub(crate) fn parse_fragment_decl_body_tail(cx: &mut dyn UiParseContext) -> AutoResult<Stmt> {
+pub(crate) fn parse_fragment_decl_body_tail(cx: &mut dyn UiParseContext) -> AutoResult<UiStmt> {
     let name = cx.cur_text();
     cx.advance();
     let mut params: Vec<(ast::Name, String)> = Vec::new();
@@ -243,7 +245,7 @@ pub(crate) fn parse_fragment_decl_body_tail(cx: &mut dyn UiParseContext) -> Auto
     cx.exit_scope();
     cx.skip_empty_lines();
     cx.expect(TokenKind::RBrace)?;
-    Ok(Stmt::ViewFragmentDecl(ViewFragmentDecl {
+    Ok(UiStmt::ViewFragmentDecl(ViewFragmentDecl {
         name: name.into(),
         params,
         body,

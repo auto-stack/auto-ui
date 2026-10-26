@@ -45,9 +45,9 @@ pub(crate) fn locate_example_app_at(example: &str) -> Option<PathBuf> {
     // =语言仓根；CWD 相对候选保留供在语言仓内运行）。
     let rel = format!("examples/ui/{}/src/front/app.at", example);
     let lang_examples = |sub: String| {
-        std::env::var("CARGO_MANIFEST_DIR").ok().map(|d| {
-            PathBuf::from(d).join("../../../auto-lang").join(sub)
-        })
+        std::env::var("CARGO_MANIFEST_DIR")
+            .ok()
+            .map(|d| PathBuf::from(d).join("../../../auto-lang").join(sub))
     };
     let candidates = [
         lang_examples(rel.clone()),
@@ -125,7 +125,7 @@ pub(crate) fn build_component_from_app_mode(
     // 029-photo-gallery 语料测试报 "undefined variable: caption_text"
     // （master 预存红实证）。
     let recipe_imports =
-        auto_lang_core::design_tokens::recipe::prepare_style_recipe_imports(&base_dir, &code)
+        auto_ui_compiler::design_tokens::recipe::prepare_style_recipe_imports(&base_dir, &code)
             .map_err(|e| e.to_string())
             .unwrap();
 
@@ -134,7 +134,7 @@ pub(crate) fn build_component_from_app_mode(
     let mut parser = crate::Parser::from(code.as_str()).with_session(session);
     let ast = parser.parse().unwrap();
     // PLAN-635: 回放导入配方 + 本地配方（生产路径同序）。
-    let _ = auto_lang_core::design_tokens::recipe::load_and_validate_style_recipes_with_imports(
+    let _ = auto_ui_compiler::design_tokens::recipe::load_and_validate_style_recipes_with_imports(
         &recipe_imports,
         &ast.stmts,
     );
@@ -189,7 +189,7 @@ pub(crate) fn build_component_from_app_mode(
         };
         if let Ok(module_code) = fs::read_to_string(&module_path) {
             // PLAN-668 A-02：逐模块 stylekit 预注册（镜像 lib.rs 主路径）。
-            let _ = auto_lang_core::design_tokens::recipe::prepare_style_recipe_imports(
+            let _ = auto_ui_compiler::design_tokens::recipe::prepare_style_recipe_imports(
                 module_path.parent().unwrap_or(Path::new(".")),
                 &module_code,
             );

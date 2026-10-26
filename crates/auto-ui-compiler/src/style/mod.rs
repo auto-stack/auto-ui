@@ -26,8 +26,8 @@ pub mod class;
 pub mod color;
 pub mod layout_extract;
 pub mod parser;
-pub use auto_lang_core::design_tokens::recipe;
-pub use auto_lang_core::design_tokens::recipe::*;
+pub use crate::design_tokens::recipe;
+pub use crate::design_tokens::recipe::*;
 pub use class::{GradientDir, ObjectFit, RoundedSize, SizeValue, StyleClass};
 pub use color::Color;
 pub use layout_extract::BoxLayout;
@@ -1071,14 +1071,13 @@ mod plan095_tests {
             }
         "#;
         let mut p = Parser::from(code).with_session(CompilerSession::ui());
-        let ast = p.parse().unwrap();
-        load_and_validate_style_recipes(&ast.stmts).unwrap();
+        let ast = crate::parse_ui(code).unwrap();
+        load_and_validate_style_recipes(&ast).unwrap();
 
         let widget_decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| {
-                if let auto_lang_core::ast::Stmt::WidgetDecl(d) = s {
+                if let auto_ui_dialect::UiStmt::WidgetDecl(d) = s {
                     Some(d)
                 } else {
                     None

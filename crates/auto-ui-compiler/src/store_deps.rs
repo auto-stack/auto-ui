@@ -3,8 +3,6 @@
 //! `auto_lang::extract_store_deps_from_file` 路径。
 
 use auto_lang_core::ast;
-use auto_lang_core::session::CompilerSession;
-use auto_lang_core::Parser;
 
 /// Check if a use statement targets a `store` module.
 ///
@@ -26,9 +24,9 @@ fn is_store_use_stmt(use_stmt: &ast::Use) -> bool {
 }
 
 /// Extract store names from `use store: <Name>` declarations.
-pub fn extract_store_imports_from_ast(code: &ast::Code) -> Vec<String> {
+pub fn extract_store_imports_from_ast(code: &auto_ui_dialect::UiCode) -> Vec<String> {
     let mut stores = Vec::new();
-    for stmt in &code.stmts {
+    for stmt in code.core_stmts() {
         if let ast::Stmt::Use(ref use_stmt) = stmt {
             if is_store_use_stmt(use_stmt) {
                 stores.extend(use_stmt.items.iter().map(|s| s.as_str().to_string()));
@@ -42,15 +40,11 @@ pub fn extract_store_imports_from_ast(code: &ast::Code) -> Vec<String> {
 /// Convenience for downstream tools (auto-man) that need store_deps when re-generating
 /// individual components.
 pub fn extract_store_deps_from_file(path: &str) -> Vec<String> {
-    use auto_lang_core::session::CompilerSession;
     let code = match std::fs::read_to_string(path) {
         Ok(c) => c,
         Err(_) => return Vec::new(),
     };
-    let session = CompilerSession::ui().with_backend("vue");
-    let mut parser = Parser::from(code.as_str());
-    parser = parser.with_session(session);
-    let mut deps = match parser.parse() {
+    let mut deps = match crate::parse_ui(&code) {
         Ok(ast) => extract_store_imports_from_ast(&ast),
         Err(_) => Vec::new(),
     };

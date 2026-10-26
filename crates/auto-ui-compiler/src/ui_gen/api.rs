@@ -12,8 +12,6 @@ use std::path::Path;
 
 use crate::aura::extract_widget_from_decl;
 use crate::ui_gen::{BackendGenerator, RustGenerator, VueGenerator};
-use auto_lang_core::parser::Parser;
-use auto_lang_core::session::CompilerSession;
 
 /// Transpile Auto UI file to Rust code using AURA pipeline
 ///
@@ -41,19 +39,14 @@ pub fn transpile_file(
 pub fn transpile_aura(source: &str, output_path: Option<&str>) -> Result<String, String> {
     // PLAN-814 R4-01：显式文法组合（入口首选；幂等）。
     crate::assemble_ui_grammar();
-    // Parse with UI scenario
-    let session = CompilerSession::ui();
-    let mut parser = Parser::from(source).with_session(session);
-    let ast = parser
-        .parse()
-        .map_err(|e| format!("Failed to parse: {:?}", e))?;
+    let ast = crate::parse_ui(source).map_err(|e| format!("Failed to parse: {:?}", e))?;
 
     // Extract and generate
     let mut code = String::new();
     let mut generator = RustGenerator::new();
 
-    for stmt in &ast.stmts {
-        if let auto_lang_core::ast::Stmt::WidgetDecl(widget_decl) = stmt {
+    for stmt in ast.domain_stmts() {
+        if let auto_ui_dialect::UiStmt::WidgetDecl(widget_decl) = stmt {
             let aura_widget = extract_widget_from_decl(widget_decl)
                 .map_err(|e| format!("Failed to extract widget: {}", e))?;
             let widget_code = generator
@@ -76,19 +69,14 @@ pub fn transpile_aura(source: &str, output_path: Option<&str>) -> Result<String,
 pub fn transpile_vue_aura(source: &str, output_path: Option<&str>) -> Result<String, String> {
     // PLAN-814 R4-01：显式文法组合（入口首选；幂等）。
     crate::assemble_ui_grammar();
-    // Parse with UI scenario
-    let session = CompilerSession::ui();
-    let mut parser = Parser::from(source).with_session(session);
-    let ast = parser
-        .parse()
-        .map_err(|e| format!("Failed to parse: {:?}", e))?;
+    let ast = crate::parse_ui(source).map_err(|e| format!("Failed to parse: {:?}", e))?;
 
     // Extract and generate
     let mut code = String::new();
     let mut generator = VueGenerator::new();
 
-    for stmt in &ast.stmts {
-        if let auto_lang_core::ast::Stmt::WidgetDecl(widget_decl) = stmt {
+    for stmt in ast.domain_stmts() {
+        if let auto_ui_dialect::UiStmt::WidgetDecl(widget_decl) = stmt {
             let aura_widget = extract_widget_from_decl(widget_decl)
                 .map_err(|e| format!("Failed to extract widget: {}", e))?;
             let widget_code = generator
@@ -412,7 +400,7 @@ pub struct GeneratedComponent {
 fn load_ui_config_actions(
     at_path: &std::path::Path,
     widgets: &[crate::aura::AuraWidget],
-) -> Option<auto_lang_core::ast::ui::ActionsBlock> {
+) -> Option<auto_ui_dialect::ast::ActionsBlock> {
     // PLAN-070 T-05: uniform handler-intersection participation gate — the
     // synthesis emits handler fns + a shortcut keymap that reference the
     // hosting file's own handlers, so ANY file (app shell or component)
@@ -480,38 +468,35 @@ fn load_ui_config_actions(
 fn load_ui_config_actions(
     _at_path: &std::path::Path,
     _widgets: &[crate::aura::AuraWidget],
-) -> Option<auto_lang_core::ast::ui::ActionsBlock> {
+) -> Option<auto_ui_dialect::ast::ActionsBlock> {
     None
 }
 
 fn collect_use_module_actions(
     at_path: &std::path::Path,
     code: &str,
-) -> Option<auto_lang_core::ast::ui::ActionsBlock> {
+) -> Option<auto_ui_dialect::ast::ActionsBlock> {
     let base_dir = at_path.parent().unwrap_or(std::path::Path::new("."));
     for use_stmt in auto_lang_core::use_scanner::scan_use_statements(code) {
         if use_stmt.is_c_import || use_stmt.is_rust_import {
             continue;
         }
-        let module_path = match auto_lang_core::resolve_use_module(base_dir, &use_stmt) {
-            auto_lang_core::UseModuleResolution::Module(p) => p,
+        let module_path = match crate::resolve_use_module(base_dir, &use_stmt) {
+            crate::UseModuleResolution::Module(p) => p,
             _ => continue,
         };
         let Ok(module_code) = std::fs::read_to_string(&module_path) else {
             continue;
         };
-        let session = auto_lang_core::session::CompilerSession::ui();
-        let mut parser =
-            auto_lang_core::parser::Parser::from(module_code.as_str()).with_session(session);
-        let Ok(mod_ast) = parser.parse() else {
+        let Ok(mod_ast) = crate::parse_ui(&module_code) else {
             eprintln!(
                 "[codegen] actions module {} failed to parse — skipped",
                 module_path.display()
             );
             continue;
         };
-        for stmt in &mod_ast.stmts {
-            if let auto_lang_core::ast::Stmt::ActionsDecl(acts) = stmt {
+        for stmt in mod_ast.domain_stmts() {
+            if let auto_ui_dialect::UiStmt::ActionsDecl(acts) = stmt {
                 return Some(acts.clone());
             }
         }
@@ -534,21 +519,18 @@ pub fn collect_store_siblings(at_path: &std::path::Path, code: &str) -> Vec<Stri
         if use_stmt.is_c_import || use_stmt.is_rust_import {
             continue;
         }
-        let module_path = match auto_lang_core::resolve_use_module(base_dir, &use_stmt) {
-            auto_lang_core::UseModuleResolution::Module(p) => p,
+        let module_path = match crate::resolve_use_module(base_dir, &use_stmt) {
+            crate::UseModuleResolution::Module(p) => p,
             _ => continue,
         };
         let Ok(module_code) = std::fs::read_to_string(&module_path) else {
             continue;
         };
-        let session = auto_lang_core::session::CompilerSession::ui();
-        let mut parser =
-            auto_lang_core::parser::Parser::from(module_code.as_str()).with_session(session);
-        let Ok(mod_ast) = parser.parse() else {
+        let Ok(mod_ast) = crate::parse_ui(&module_code) else {
             continue;
         };
-        for stmt in &mod_ast.stmts {
-            if let auto_lang_core::ast::Stmt::StoreDecl(store_decl) = stmt {
+        for stmt in mod_ast.domain_stmts() {
+            if let auto_ui_dialect::UiStmt::StoreDecl(store_decl) = stmt {
                 // The call head in bodies is the import item alias when one
                 // is given (os-config: `use collection_store: Collection`),
                 // else the store's own name. Both coincide in this codebase's
@@ -603,24 +585,21 @@ pub fn collect_use_module_fns(
             continue;
         }
         imported_names.extend(use_stmt.items.iter().cloned());
-        let module_path = match auto_lang_core::resolve_use_module(base_dir, &use_stmt) {
-            auto_lang_core::UseModuleResolution::Module(p) => p,
+        let module_path = match crate::resolve_use_module(base_dir, &use_stmt) {
+            crate::UseModuleResolution::Module(p) => p,
             _ => continue,
         };
         let Ok(module_code) = std::fs::read_to_string(&module_path) else {
             continue;
         };
-        let session = auto_lang_core::session::CompilerSession::ui();
-        let mut parser =
-            auto_lang_core::parser::Parser::from(module_code.as_str()).with_session(session);
-        let Ok(mod_ast) = parser.parse() else {
+        let Ok(mod_ast) = crate::parse_ui(&module_code) else {
             eprintln!(
                 "[codegen] use-fn module {} failed to parse — skipped",
                 module_path.display()
             );
             continue;
         };
-        for stmt in &mod_ast.stmts {
+        for stmt in mod_ast.core_stmts() {
             if let auto_lang_core::ast::Stmt::Fn(fn_decl) = stmt {
                 if let Some(mfn) = crate::aura::extract_module_fn(fn_decl) {
                     // 跨模块同名去重:use 顺序先到先得。
@@ -665,15 +644,10 @@ pub fn generate_component_from_file(
         .unwrap_or(std::path::Path::new("."))
         .to_path_buf();
     let recipe_imports =
-        auto_lang_core::design_tokens::recipe::prepare_style_recipe_imports(&base_dir, &code)
+        crate::design_tokens::recipe::prepare_style_recipe_imports(&base_dir, &code)
             .map_err(|e| e.to_string())?;
 
-    // Parse with UI scenario
-    let session = CompilerSession::ui().with_backend("vue");
-    let mut parser = Parser::from(code.as_str());
-    parser = parser.with_session(session);
-    let ast = parser
-        .parse()
+    let ast = crate::parse_ui(&code)
         .map_err(|e| format!("Parse error in {}: {:?}", at_path.display(), e))?;
 
     // Auto-detect or use overrides
@@ -731,8 +705,7 @@ pub fn generate_component_from_file(
     // the `store { ... }` block, e.g. `fn format_git_label` helpers). The vue
     // codegen emits them into the composable so handlers can call them by name.
     let module_fns: Vec<crate::aura::AuraModuleFn> = ast
-        .stmts
-        .iter()
+        .core_stmts()
         .filter_map(|stmt| {
             if let auto_lang_core::ast::Stmt::Fn(fn_decl) = stmt {
                 crate::aura::extract_module_fn(fn_decl)
@@ -747,8 +720,8 @@ pub fn generate_component_from_file(
     // PLAN-671 ③：store 路径用集合形态（widget 路径 :998/:1037 保持 Vec 传参）。
     let use_imported_set: std::collections::HashSet<String> =
         use_imported_names.iter().cloned().collect();
-    for stmt in &ast.stmts {
-        if let auto_lang_core::ast::Stmt::StoreDecl(store_decl) = stmt {
+    for stmt in ast.domain_stmts() {
+        if let auto_ui_dialect::UiStmt::StoreDecl(store_decl) = stmt {
             let mut store = extract_store_from_decl(store_decl).map_err(|e| e.to_string())?;
             store.api_imports = api_imports.clone();
             store.stream_endpoints = opts.stream_endpoints.clone().unwrap_or_default();
@@ -779,8 +752,8 @@ pub fn generate_component_from_file(
 
     // Register view fn fragments before widget extraction (Plan 367 P2-3)
     crate::aura::extract::clear_view_fragments();
-    for stmt in &ast.stmts {
-        if let auto_lang_core::ast::Stmt::ViewFragmentDecl(frag) = stmt {
+    for stmt in ast.domain_stmts() {
+        if let auto_ui_dialect::UiStmt::ViewFragmentDecl(frag) = stmt {
             crate::aura::extract::register_view_fragment(frag);
         }
     }
@@ -788,16 +761,16 @@ pub fn generate_component_from_file(
     // PLAN-635: replay imported (source-tagged) + local recipes in order —
     // same registration path as the VM track so both backends expand
     // identically.
-    auto_lang_core::design_tokens::recipe::load_and_validate_style_recipes_with_imports(
+    crate::design_tokens::recipe::load_and_validate_style_recipes_with_imports(
         &recipe_imports,
-        &ast.stmts,
+        &ast,
     )
     .map_err(|e| e.to_string())?;
 
     // Extract widgets
     let mut widgets: Vec<crate::aura::AuraWidget> = Vec::new();
-    for stmt in &ast.stmts {
-        if let auto_lang_core::ast::Stmt::WidgetDecl(widget_decl) = stmt {
+    for stmt in ast.domain_stmts() {
+        if let auto_ui_dialect::UiStmt::WidgetDecl(widget_decl) = stmt {
             let mut aura_widget =
                 extract_widget_from_decl(widget_decl).map_err(|e| e.to_string())?;
             aura_widget.api_imports = api_imports.clone();
@@ -811,11 +784,10 @@ pub fn generate_component_from_file(
     // resolution mirrors the vm loader (`{name}.at` / `{name}/mod.at`
     // relative to this file); unreadable/unparseable modules are skipped
     // with a warning, never fatal.
-    let fallback_actions: Option<auto_lang_core::ast::ui::ActionsBlock> = ast
-        .stmts
-        .iter()
+    let fallback_actions: Option<auto_ui_dialect::ast::ActionsBlock> = ast
+        .domain_stmts()
         .find_map(|s| match s {
-            auto_lang_core::ast::Stmt::ActionsDecl(b) => Some(b.clone()),
+            auto_ui_dialect::UiStmt::ActionsDecl(b) => Some(b.clone()),
             _ => None,
         })
         .or_else(|| collect_use_module_actions(at_path, &code))
@@ -842,9 +814,9 @@ pub fn generate_component_from_file(
     // PLAN-037 T6: file-level `use.web` statements attach their entries to
     // EVERY widget declared in the file (the import lands in each generated
     // SFC whose source references the symbol).
-    let mut web_ext_imports: Vec<auto_lang_core::ast::ui::ExtImport> = Vec::new();
-    for stmt in &ast.stmts {
-        if let auto_lang_core::ast::Stmt::UseWeb(entries) = stmt {
+    let mut web_ext_imports: Vec<auto_ui_dialect::ast::ExtImport> = Vec::new();
+    for stmt in ast.domain_stmts() {
+        if let auto_ui_dialect::UiStmt::UseWeb(entries) = stmt {
             web_ext_imports.extend(entries.iter().cloned());
         }
     }
@@ -859,9 +831,8 @@ pub fn generate_component_from_file(
         // use 引用到宿主）不产任何工件——actions 随宿主编译被拾取，本文件
         // 非错误。其余（纯 fn/类型模块）维持原错误。
         let has_actions_decl = ast
-            .stmts
-            .iter()
-            .any(|s| matches!(s, auto_lang_core::ast::Stmt::ActionsDecl(_)));
+            .domain_stmts()
+            .any(|s| matches!(s, auto_ui_dialect::UiStmt::ActionsDecl(_)));
         if !has_actions_decl {
             return Err("No widget or store declarations found in input file".into());
         }
@@ -913,7 +884,7 @@ pub fn generate_component_from_file(
         let mut package_names: Vec<String> = Vec::new();
         for w in &widgets {
             for imp in &w.ext_imports {
-                if matches!(imp.kind, auto_lang_core::ast::ui::ExtImportKind::Package) {
+                if matches!(imp.kind, auto_ui_dialect::ast::ExtImportKind::Package) {
                     let dir = std::path::Path::new(imp.path.as_str());
                     match registry.load_package(dir, &base) {
                         Ok(pkg) => {
@@ -1150,12 +1121,12 @@ pub fn generate_component_from_file(
 
 // Re-export helper functions from super (used by generate_component_from_file)
 fn extract_api_imports_from_ast(
-    ast: &auto_lang_core::ast::Code,
+    ast: &auto_ui_dialect::UiCode,
     front_at: Option<&std::path::Path>,
 ) -> Vec<String> {
     let mut imports = Vec::new();
     let mut module_form = false;
-    for stmt in &ast.stmts {
+    for stmt in ast.core_stmts() {
         if let auto_lang_core::ast::Stmt::Use(ref use_stmt) = stmt {
             if is_api_use_stmt(use_stmt) {
                 if use_stmt.items.is_empty() {
@@ -1196,9 +1167,9 @@ fn is_api_use_stmt(use_stmt: &auto_lang_core::ast::Use) -> bool {
     false
 }
 
-fn extract_store_imports_from_ast(ast: &auto_lang_core::ast::Code) -> Vec<String> {
+fn extract_store_imports_from_ast(ast: &auto_ui_dialect::UiCode) -> Vec<String> {
     let mut deps = Vec::new();
-    for stmt in &ast.stmts {
+    for stmt in ast.core_stmts() {
         if let auto_lang_core::ast::Stmt::Use(use_stmt) = stmt {
             let is_store = use_stmt.paths.len() == 1
                 && (use_stmt.paths[0].as_str() == "store"
@@ -1351,10 +1322,10 @@ widget App {
         use auto_lang_core::session::CompilerSession;
         let session = CompilerSession::ui().with_backend("vue");
         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = crate::parse_ui(src).expect("parse");
         let mut generated = None;
-        for stmt in &ast.stmts {
-            if let auto_lang_core::ast::Stmt::WidgetDecl(w) = stmt {
+        for stmt in ast.domain_stmts() {
+            if let auto_ui_dialect::UiStmt::WidgetDecl(w) = stmt {
                 let widget = crate::aura::extract_widget_from_decl(w).expect("extract");
                 let mut gen = VueGenerator::new().with_mode(VueMode::Shadcn);
                 generated = Some(gen.generate(&widget).expect("generate"));

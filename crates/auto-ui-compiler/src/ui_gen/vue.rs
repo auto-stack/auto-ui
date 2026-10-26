@@ -747,7 +747,7 @@ pub struct VueGenerator {
     /// Plan 451 P2: current widget's `actions {}` block (stashed in
     /// generate_sfc). The `menubar {}`/`toolbar {}` placeholder tags in the
     /// view synthesize their component trees from it.
-    current_actions: Option<auto_lang_core::ast::ui::ActionsBlock>,
+    current_actions: Option<auto_ui_dialect::ast::ActionsBlock>,
     /// Plan 451 P2: normalized shortcut → handler fn name (first declaration
     /// wins, mirroring the vm's shortcut_bindings collision rule). Emitted as
     /// the global keydown fallback layer in generate_script.
@@ -1453,16 +1453,16 @@ impl VueGenerator {
             match imp.kind {
                 // Plan 435 P4:包引用不产 ES import —— 包组件经 ComponentRegistry
                 // 注册,tag 走 sub-widget 生成路径(api 层已并入 sub_widgets)。
-                auto_lang_core::ast::ExtImportKind::Package => continue,
-                auto_lang_core::ast::ExtImportKind::Fn
-                | auto_lang_core::ast::ExtImportKind::ExplicitFn
-                | auto_lang_core::ast::ExtImportKind::Composable => {
+                auto_ui_dialect::ast::ExtImportKind::Package => continue,
+                auto_ui_dialect::ast::ExtImportKind::Fn
+                | auto_ui_dialect::ast::ExtImportKind::ExplicitFn
+                | auto_ui_dialect::ast::ExtImportKind::Composable => {
                     self.ext_import_lines.push((
                         symbols.clone(),
                         false,
                         format!("import {{ {} }} from '{}'\n", symbols.join(", "), specifier),
                     ));
-                    if imp.kind == auto_lang_core::ast::ExtImportKind::Composable {
+                    if imp.kind == auto_ui_dialect::ast::ExtImportKind::Composable {
                         // Plan 022: composable 调用参数 → JS 字符串（逗号分隔）。
                         // 空 call_args 生成 ""（→ 无参调用 useX()，向后兼容）。
                         // Plan 012 P0#13 follow-up: an arg form the bound-value
@@ -1500,7 +1500,7 @@ impl VueGenerator {
                         }
                     }
                 }
-                auto_lang_core::ast::ExtImportKind::Component => {
+                auto_ui_dialect::ast::ExtImportKind::Component => {
                     for sym in &symbols {
                         // Plan 408: empty `from` (no source path) means this is
                         // a reference to a same-project `component fn` SFC,
@@ -6854,10 +6854,10 @@ onMounted(() => {{ nextTick(__canvasRedraw_{i}) }})
             html.push_str(&format!("{}  <MenubarContent>\n", menu_ind));
             for item in &menu.items {
                 match item {
-                    auto_lang_core::ast::ui::MenuItemEntry::Sep => {
+                    auto_ui_dialect::ast::MenuItemEntry::Sep => {
                         html.push_str(&format!("{item_ind}<MenubarSeparator />\n"));
                     }
-                    auto_lang_core::ast::ui::MenuItemEntry::Action(id) => {
+                    auto_ui_dialect::ast::MenuItemEntry::Action(id) => {
                         let Some(a) = block.actions.iter().find(|a| a.id == *id) else {
                             continue;
                         };
@@ -7246,13 +7246,13 @@ onMounted(() => {{ nextTick(__canvasRedraw_{i}) }})
 
         for item in &toolbar.items {
             match item {
-                auto_lang_core::ast::ui::MenuItemEntry::Sep => {
+                auto_ui_dialect::ast::MenuItemEntry::Sep => {
                     html.push_str(&format!(
                         "{}  <span class=\"w-px h-4 bg-zinc-500 mx-1 shrink-0\" />\n",
                         ind
                     ));
                 }
-                auto_lang_core::ast::ui::MenuItemEntry::Action(id) => {
+                auto_ui_dialect::ast::MenuItemEntry::Action(id) => {
                     let Some(a) = block.actions.iter().find(|a| a.id == *id) else {
                         continue;
                     };
@@ -19053,7 +19053,7 @@ export function cn(...inputs: ClassValue[]) {
     /// caller side stays identical to a direct reference.
     pub fn generate_fn_module_full(
         fns: &[crate::aura::AuraModuleFn],
-        ext_imports: &[auto_lang_core::ast::ui::ExtImport],
+        ext_imports: &[auto_ui_dialect::ast::ExtImport],
     ) -> String {
         let mut code = String::new();
         code.push_str(
@@ -19079,9 +19079,9 @@ export function cn(...inputs: ClassValue[]) {
             let specifier = Self::ext_import_specifier(imp.path.as_str());
             match imp.kind {
                 // Plan 435 P4:包引用无模块转发语义(包组件按需生成)。
-                auto_lang_core::ast::ui::ExtImportKind::Package => continue,
-                auto_lang_core::ast::ui::ExtImportKind::Fn
-                | auto_lang_core::ast::ui::ExtImportKind::ExplicitFn => {
+                auto_ui_dialect::ast::ExtImportKind::Package => continue,
+                auto_ui_dialect::ast::ExtImportKind::Fn
+                | auto_ui_dialect::ast::ExtImportKind::ExplicitFn => {
                     // import:供本模块 wrapper fn 体内引用(仅实际使用的符号);
                     // export:纯转发(Plan 424)——把符号递给调用方。export-from
                     // 不引入局部绑定,两行共存合法。
@@ -19109,7 +19109,7 @@ export function cn(...inputs: ClassValue[]) {
                 // `.vue`/`platform:` 源是 default export(调用方直连时也是
                 // default import),re-export 需 `default as X` 别名;npm/.ts
                 // 源是命名导出,原样转发。
-                auto_lang_core::ast::ui::ExtImportKind::Component
+                auto_ui_dialect::ast::ExtImportKind::Component
                     if imp.path.starts_with("platform:") || imp.path.ends_with(".vue") =>
                 {
                     let aliased: Vec<String> =
@@ -19121,8 +19121,8 @@ export function cn(...inputs: ClassValue[]) {
                         specifier
                     ));
                 }
-                auto_lang_core::ast::ui::ExtImportKind::Component
-                | auto_lang_core::ast::ui::ExtImportKind::Composable => {
+                auto_ui_dialect::ast::ExtImportKind::Component
+                | auto_ui_dialect::ast::ExtImportKind::Composable => {
                     code.push_str(&format!(
                         "export {{ {} }} from '{}'
 ",
@@ -20043,7 +20043,7 @@ function getAccentNames(): string[] {
     /// appearance 语义（与桌面端 appearance.theme 同型）：同源 app 间共享
     /// 用户主题偏好，属预期行为。
     fn theme_runtime_js() -> String {
-        let palettes = auto_lang_core::design_tokens::registry::render_theme_palettes_js();
+        let palettes = crate::design_tokens::registry::render_theme_palettes_js();
         format!(
             r#"// PLAN-601 T-06: Named theme hot-switch runtime (applyAccent generalized
 // to the full token set). Values mirror the generated index.css registry
@@ -21449,11 +21449,11 @@ widget EditorDemo {
 
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::parser::Parser::from(src.as_str()).with_session(session);
-        let ast = parser.parse()?;
+        let ast = crate::parse_ui(&src)?;
 
         let mut widgets = Vec::new();
-        for stmt in &ast.stmts {
-            if let auto_lang_core::ast::Stmt::WidgetDecl(widget_decl) = stmt {
+        for stmt in ast.domain_stmts() {
+            if let auto_ui_dialect::UiStmt::WidgetDecl(widget_decl) = stmt {
                 let aura_widget = crate::aura::extract_widget_from_decl(widget_decl)?;
                 widgets.push(aura_widget);
             }
@@ -21814,10 +21814,9 @@ fn fetch_things() []Value {
 }
 "#;
         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("fn module must parse");
+        let ast = crate::parse_ui(&src).expect("fn module must parse");
         let fns: Vec<crate::aura::AuraModuleFn> = ast
-            .stmts
-            .iter()
+            .core_stmts()
             .filter_map(|s| match s {
                 auto_lang_core::ast::Stmt::Fn(f) => crate::aura::extract_module_fn(f),
                 _ => None,
@@ -21860,20 +21859,18 @@ fn rel_time(ts int) str {
 }
 "#;
         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("port module must parse");
+        let ast = crate::parse_ui(&src).expect("port module must parse");
         let fns: Vec<crate::aura::AuraModuleFn> = ast
-            .stmts
-            .iter()
+            .core_stmts()
             .filter_map(|s| match s {
                 auto_lang_core::ast::Stmt::Fn(f) => crate::aura::extract_module_fn(f),
                 _ => None,
             })
             .collect();
-        let web_imports: Vec<auto_lang_core::ast::ui::ExtImport> = ast
-            .stmts
-            .iter()
+        let web_imports: Vec<auto_ui_dialect::ast::ExtImport> = ast
+            .domain_stmts()
             .filter_map(|s| match s {
-                auto_lang_core::ast::Stmt::UseWeb(entries) => Some(entries.clone()),
+                auto_ui_dialect::UiStmt::UseWeb(entries) => Some(entries.clone()),
                 _ => None,
             })
             .flatten()
@@ -21939,20 +21936,18 @@ use.web component MessageSquare, ListTodo from "lucide-vue-next"
 use.web composable useT from "./i18n.ts"
 "#;
         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("pure port must parse");
+        let ast = crate::parse_ui(&src).expect("pure port must parse");
         let fns: Vec<crate::aura::AuraModuleFn> = ast
-            .stmts
-            .iter()
+            .core_stmts()
             .filter_map(|s| match s {
                 auto_lang_core::ast::Stmt::Fn(f) => crate::aura::extract_module_fn(f),
                 _ => None,
             })
             .collect();
-        let web_imports: Vec<auto_lang_core::ast::ui::ExtImport> = ast
-            .stmts
-            .iter()
+        let web_imports: Vec<auto_ui_dialect::ast::ExtImport> = ast
+            .domain_stmts()
             .filter_map(|s| match s {
-                auto_lang_core::ast::Stmt::UseWeb(entries) => Some(entries.clone()),
+                auto_ui_dialect::UiStmt::UseWeb(entries) => Some(entries.clone()),
                 _ => None,
             })
             .flatten()
@@ -22057,10 +22052,9 @@ fn new_session() {
 }
 "#;
         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("dom fn module must parse");
+        let ast = crate::parse_ui(&src).expect("dom fn module must parse");
         let fns: Vec<crate::aura::AuraModuleFn> = ast
-            .stmts
-            .iter()
+            .core_stmts()
             .filter_map(|s| match s {
                 auto_lang_core::ast::Stmt::Fn(f) => crate::aura::extract_module_fn(f),
                 _ => None,
@@ -23013,8 +23007,7 @@ widget W {
         // gen_sfc_from_widget_src doesn't register view-fn fragments (the
         // production path does via generate_component_from_file), so register
         // them here to exercise the inline path.
-        let session = auto_lang_core::session::CompilerSession::ui();
-        let mut parser = auto_lang_core::parser::Parser::from(
+        let ast = crate::parse_ui(
             r#"
 widget W {
     view {
@@ -23038,19 +23031,17 @@ view fn RenderT(a Any) {
 }
 "#,
         )
-        .with_session(session);
-        let ast = parser.parse().expect("widget source must parse");
+        .expect("widget source must parse");
         crate::aura::extract::clear_view_fragments();
-        for stmt in &ast.stmts {
-            if let auto_lang_core::ast::Stmt::ViewFragmentDecl(frag) = stmt {
+        for stmt in ast.domain_stmts() {
+            if let auto_ui_dialect::UiStmt::ViewFragmentDecl(frag) = stmt {
                 crate::aura::extract::register_view_fragment(frag);
             }
         }
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");
@@ -23908,8 +23899,7 @@ widget Test {
         );
 
         // JS 模式：无任何 TS 注解泄漏。
-        let session = auto_lang_core::session::CompilerSession::ui();
-        let mut parser = auto_lang_core::parser::Parser::from(
+        let ast = crate::parse_ui(
             r#"
 widget Test {
     model { var rsc str = "ag" }
@@ -23921,13 +23911,11 @@ widget Test {
 }
 "#,
         )
-        .with_session(session);
-        let ast = parser.parse().expect("parse");
+        .expect("parse");
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");
@@ -25054,15 +25042,12 @@ widget Icon(language: str) {
 "#;
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-        let ast = parser
-            .parse()
-            .expect("widget computed with bare ident/call must parse");
+        let ast = crate::parse_ui(src).expect("widget computed with bare ident/call must parse");
 
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");
@@ -25441,17 +25426,14 @@ widget Counter {
             "view 可选化:体即视图产物必须与显式 view 块逐字节相同"
         );
         // 解析层断言:无 view 块的 widget 得到 Some(ViewBlock{..})。
-        let session = auto_lang_core::session::CompilerSession::ui();
-        let mut parser = auto_lang_core::parser::Parser::from(
+        let ast = crate::parse_ui(
             "widget W {\n    model { var x int = 0 }\n    button { text \"go\" }\n}\n",
         )
-        .with_session(session);
-        let ast = parser.parse().expect("mixed order must parse");
+        .expect("mixed order must parse");
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");
@@ -25540,12 +25522,11 @@ store S {
 "#;
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = crate::parse_ui(&src).expect("parse");
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::StoreDecl(d) => Some(d.clone()),
+                auto_ui_dialect::UiStmt::StoreDecl(d) => Some(d.clone()),
                 _ => None,
             })
             .expect("store decl");
@@ -25867,12 +25848,11 @@ widget App {
     fn gen_sfc_from_widget_src(src: &str) -> String {
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("widget source must parse");
+        let ast = crate::parse_ui(&src).expect("widget source must parse");
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");
@@ -25887,12 +25867,11 @@ widget App {
     fn gen_sfc_from_widget_src_markers(src: &str) -> String {
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("widget source must parse");
+        let ast = crate::parse_ui(&src).expect("widget source must parse");
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");
@@ -26018,12 +25997,11 @@ widget SelectMarkers {
     fn gen_sfc_from_widget_src_shadcn(src: &str) -> String {
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("widget source must parse");
+        let ast = crate::parse_ui(&src).expect("widget source must parse");
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");
@@ -28198,12 +28176,11 @@ widget Icon(language: str) {
 "#;
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("widget use block must parse");
+        let ast = crate::parse_ui(&src).expect("widget use block must parse");
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");
@@ -28211,7 +28188,7 @@ widget Icon(language: str) {
         assert_eq!(decl.ext_imports.len(), 5, "all five entries parse");
         assert_eq!(
             decl.ext_imports[0].kind,
-            auto_lang_core::ast::ExtImportKind::Fn
+            auto_ui_dialect::ast::ExtImportKind::Fn
         );
         assert_eq!(decl.ext_imports[0].symbols.len(), 1);
         assert_eq!(
@@ -28227,11 +28204,11 @@ widget Icon(language: str) {
         assert_eq!(decl.ext_imports[1].symbols[1].as_str(), "purify");
         assert_eq!(
             decl.ext_imports[2].kind,
-            auto_lang_core::ast::ExtImportKind::Component
+            auto_ui_dialect::ast::ExtImportKind::Component
         );
         assert_eq!(
             decl.ext_imports[4].kind,
-            auto_lang_core::ast::ExtImportKind::Composable
+            auto_ui_dialect::ast::ExtImportKind::Composable
         );
     }
 
@@ -28855,12 +28832,11 @@ widget App {
         let parse_widget = |src: &str| {
             let session = auto_lang_core::session::CompilerSession::ui();
             let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-            let ast = parser.parse().expect("widget source must parse");
+            let ast = crate::parse_ui(&src).expect("widget source must parse");
             let decl = ast
-                .stmts
-                .iter()
+                .domain_stmts()
                 .find_map(|s| match s {
-                    auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                    auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d),
                     _ => None,
                 })
                 .expect("widget decl");
@@ -28962,30 +28938,29 @@ use.web composable useI18n refs: [locale] from "vue-i18n"
 widget App { view { col { text "x" { } } } }
 "#;
         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("parse");
-        let entries: Vec<&auto_lang_core::ast::ui::ExtImport> = ast
-            .stmts
-            .iter()
+        let ast = crate::parse_ui(&src).expect("parse");
+        let entries: Vec<&auto_ui_dialect::ast::ExtImport> = ast
+            .domain_stmts()
             .filter_map(|s| match s {
-                Stmt::UseWeb(v) => v.first(),
+                auto_ui_dialect::UiStmt::UseWeb(v) => v.first(),
                 _ => None,
             })
             .collect();
         assert_eq!(entries.len(), 4, "four use.web entries");
         assert!(matches!(
             entries[0].kind,
-            auto_lang_core::ast::ui::ExtImportKind::Fn
+            auto_ui_dialect::ast::ExtImportKind::Fn
         ));
         assert_eq!(entries[0].symbols.len(), 1);
         assert!(entries[0].symbols[0].as_str() == "agentAvatarData");
         assert!(matches!(
             entries[1].kind,
-            auto_lang_core::ast::ui::ExtImportKind::Component
+            auto_ui_dialect::ast::ExtImportKind::Component
         ));
         assert_eq!(entries[1].symbols.len(), 2);
         assert!(matches!(
             entries[2].kind,
-            auto_lang_core::ast::ui::ExtImportKind::Composable
+            auto_ui_dialect::ast::ExtImportKind::Composable
         ));
         assert!(entries[3].ref_fields.len() == 1);
         assert!(entries[3].ref_fields[0].as_str() == "locale");
@@ -29005,12 +28980,11 @@ widget App {
 }
 "#;
         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = crate::parse_ui(&src).expect("parse");
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");
@@ -29037,12 +29011,11 @@ widget App {
 }
 "#;
         let mut parser2 = auto_lang_core::parser::Parser::from(src2).with_session(session2);
-        let ast2 = parser2.parse().expect("parse");
+        let ast2 = crate::parse_ui(src2).expect("parse");
         let decl2 = ast2
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");
@@ -29071,12 +29044,11 @@ widget App {
     fn gen_sfc_with_sub_widgets(src: &str, subs: &[&str]) -> String {
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("widget source must parse");
+        let ast = crate::parse_ui(&src).expect("widget source must parse");
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");
@@ -29594,8 +29566,7 @@ widget VHtmlTextConflictProbe {
     /// content form is a hard codegen error, not a degraded binding.
     #[test]
     fn test_p013_catchall_vhtml_is_hard_error() {
-        let session = auto_lang_core::session::CompilerSession::ui();
-        let mut parser = auto_lang_core::parser::Parser::from(
+        let ast = crate::parse_ui(
             r#"
 widget VHtmlCatchAllProbe {
     model {
@@ -29612,13 +29583,11 @@ widget VHtmlCatchAllProbe {
 }
 "#,
         )
-        .with_session(session);
-        let ast = parser.parse().expect("widget source must parse");
+        .expect("widget source must parse");
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");
@@ -30354,12 +30323,11 @@ store Files {
     fn store_from_src(src: &str) -> crate::aura::AuraStore {
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("store source must parse");
+        let ast = crate::parse_ui(&src).expect("store source must parse");
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::StoreDecl(d) => Some(d),
+                auto_ui_dialect::UiStmt::StoreDecl(d) => Some(d),
                 _ => None,
             })
             .expect("store decl");
@@ -30955,12 +30923,11 @@ widget CodeView {
     ) -> (String, Vec<crate::ui_gen::validators::ValidationWarning>) {
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("widget source must parse");
+        let ast = crate::parse_ui(&src).expect("widget source must parse");
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");
@@ -31293,8 +31260,7 @@ widget ClassCatchAllProbe {
     /// condition form is a hard codegen error, not a degraded binding.
     #[test]
     fn test_p013_catchall_vshow_is_hard_error() {
-        let session = auto_lang_core::session::CompilerSession::ui();
-        let mut parser = auto_lang_core::parser::Parser::from(
+        let ast = crate::parse_ui(
             r#"
 widget VShowCatchAllProbe {
     model {
@@ -31311,13 +31277,11 @@ widget VShowCatchAllProbe {
 }
 "#,
         )
-        .with_session(session);
-        let ast = parser.parse().expect("widget source must parse");
+        .expect("widget source must parse");
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");
@@ -31940,12 +31904,11 @@ widget A1Probe {
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser =
             auto_lang_core::parser::Parser::from(A1_STORE_QUAL_SRC).with_session(session);
-        let ast = parser.parse().expect("widget source must parse");
+        let ast = crate::parse_ui(A1_STORE_QUAL_SRC).expect("widget source must parse");
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");
@@ -31977,12 +31940,11 @@ widget A1Probe {
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser =
             auto_lang_core::parser::Parser::from(A1_STORE_QUAL_SRC).with_session(session);
-        let ast = parser.parse().expect("widget source must parse");
+        let ast = crate::parse_ui(A1_STORE_QUAL_SRC).expect("widget source must parse");
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");
@@ -32769,10 +32731,10 @@ widget NullProbe {
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser =
             auto_lang_core::parser::Parser::from(DESKTOP_SURFACE_AT).with_session(session);
-        let ast = parser.parse().expect("desktop.at 解析");
+        let ast = crate::parse_ui(DESKTOP_SURFACE_AT).expect("desktop.at 解析");
         let mut widgets = Vec::new();
-        for stmt in &ast.stmts {
-            if let auto_lang_core::ast::Stmt::WidgetDecl(decl) = stmt {
+        for stmt in ast.domain_stmts() {
+            if let auto_ui_dialect::UiStmt::WidgetDecl(decl) = stmt {
                 widgets.push(
                     crate::aura::extract_widget_from_decl(decl).expect("desktop.at aura 提取"),
                 );
@@ -33013,12 +32975,11 @@ widget ClickZone {
 ";
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-        let ast = parser.parse().unwrap();
+        let ast = crate::parse_ui(&src).unwrap();
         let widget = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| {
-                if let auto_lang_core::ast::Stmt::WidgetDecl(w) = s {
+                if let auto_ui_dialect::UiStmt::WidgetDecl(w) = s {
                     crate::aura::extract_widget_from_decl(w).ok()
                 } else {
                     None
@@ -33065,12 +33026,11 @@ widget ClickZone {
         let src = std::fs::read_to_string(&src_path).unwrap();
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::parser::Parser::from(src.as_str()).with_session(session);
-        let ast = parser.parse().unwrap();
+        let ast = crate::parse_ui(&src).unwrap();
         let widget = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| {
-                if let auto_lang_core::ast::Stmt::WidgetDecl(w) = s {
+                if let auto_ui_dialect::UiStmt::WidgetDecl(w) = s {
                     crate::aura::extract_widget_from_decl(w).ok()
                 } else {
                     None
@@ -33102,12 +33062,11 @@ widget ClickZone {
         let src = std::fs::read_to_string(&src_path).unwrap();
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::parser::Parser::from(src.as_str()).with_session(session);
-        let ast = parser.parse().unwrap();
+        let ast = crate::parse_ui(&src).unwrap();
         let widget = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| {
-                if let auto_lang_core::ast::Stmt::WidgetDecl(w) = s {
+                if let auto_ui_dialect::UiStmt::WidgetDecl(w) = s {
                     crate::aura::extract_widget_from_decl(w).ok()
                 } else {
                     None
@@ -33275,12 +33234,11 @@ widget CompWithComposable {
 "#;
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-        let ast = parser.parse().unwrap();
+        let ast = crate::parse_ui(&src).unwrap();
         let widget = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| {
-                if let auto_lang_core::ast::Stmt::WidgetDecl(w) = s {
+                if let auto_ui_dialect::UiStmt::WidgetDecl(w) = s {
                     crate::aura::extract_widget_from_decl(w).ok()
                 } else {
                     None
@@ -33612,12 +33570,11 @@ widget TestSpacer {
 "#;
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-        let ast = parser.parse().unwrap();
+        let ast = crate::parse_ui(&src).unwrap();
         let widget = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| {
-                if let auto_lang_core::ast::Stmt::WidgetDecl(w) = s {
+                if let auto_ui_dialect::UiStmt::WidgetDecl(w) = s {
                     crate::aura::extract_widget_from_decl(w).ok()
                 } else {
                     None
@@ -33648,12 +33605,11 @@ widget TestGap {
 "#;
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-        let ast = parser.parse().unwrap();
+        let ast = crate::parse_ui(&src).unwrap();
         let widget = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| {
-                if let auto_lang_core::ast::Stmt::WidgetDecl(w) = s {
+                if let auto_ui_dialect::UiStmt::WidgetDecl(w) = s {
                     crate::aura::extract_widget_from_decl(w).ok()
                 } else {
                     None
@@ -33693,23 +33649,19 @@ widget TestGap {
     ) -> (String, Vec<crate::ui_gen::validators::ValidationWarning>) {
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::parser::Parser::from(widget_src).with_session(session);
-        let ast = parser.parse().expect("widget source must parse");
+        let ast = crate::parse_ui(widget_src).expect("widget source must parse");
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");
         let widget = crate::aura::extract_widget_from_decl(decl).expect("extract widget");
 
-        let mut mparser = auto_lang_core::parser::Parser::from(module_src)
-            .with_session(auto_lang_core::session::CompilerSession::ui());
-        let mast = mparser.parse().expect("module source must parse");
+        let mast = crate::parse_ui(module_src).expect("module source must parse");
         let pool: Vec<crate::aura::AuraModuleFn> = mast
-            .stmts
-            .iter()
+            .core_stmts()
             .filter_map(|s| {
                 if let auto_lang_core::ast::Stmt::Fn(f) = s {
                     crate::aura::extract_module_fn(f)

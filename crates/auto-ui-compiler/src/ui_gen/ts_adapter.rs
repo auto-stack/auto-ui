@@ -3249,9 +3249,9 @@ fn stamp() int {
 }
 ";
         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("must parse");
+        let ast = crate::parse_ui(src).expect("must parse");
         let mut mods = Vec::new();
-        for s in &ast.stmts {
+        for s in ast.core_stmts() {
             if let auto_lang_core::ast::Stmt::Fn(f) = s {
                 mods.push(crate::aura::extract_module_fn(f).unwrap());
             }
@@ -3283,8 +3283,8 @@ fn stamp() int {
 }
 ";
         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("must parse");
-        for s in &ast.stmts {
+        let ast = crate::parse_ui(src).expect("must parse");
+        for s in ast.core_stmts() {
             if let auto_lang_core::ast::Stmt::Fn(f) = s {
                 let m = crate::aura::extract_module_fn(f).unwrap();
                 let code = crate::ui_gen::vue::VueGenerator::generate_fn_module(&[m]);
@@ -3324,8 +3324,8 @@ fn stamp() int {
 }
 ";
         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("must parse");
-        for s in &ast.stmts {
+        let ast = crate::parse_ui(src).expect("must parse");
+        for s in ast.core_stmts() {
             if let auto_lang_core::ast::Stmt::Fn(f) = s {
                 let m = crate::aura::extract_module_fn(f).unwrap();
                 let code = crate::ui_gen::vue::VueGenerator::generate_fn_module(&[m]);

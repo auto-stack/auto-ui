@@ -130,11 +130,11 @@ impl UiActionConfig {
     /// Plan 451: build from a widget decl's `actions {}` block (DSL form).
     /// Same validation as the auto-atom parse (warnings, non-fatal).
     pub fn from_actions_block(
-        b: &auto_lang_core::ast::ui::ActionsBlock,
+        b: &auto_ui_dialect::ast::ActionsBlock,
     ) -> (UiActionConfig, Vec<String>) {
-        let map_item = |i: &auto_lang_core::ast::ui::MenuItemEntry| match i {
-            auto_lang_core::ast::ui::MenuItemEntry::Action(id) => MenuItem::Action(id.clone()),
-            auto_lang_core::ast::ui::MenuItemEntry::Sep => MenuItem::Separator,
+        let map_item = |i: &auto_ui_dialect::ast::MenuItemEntry| match i {
+            auto_ui_dialect::ast::MenuItemEntry::Action(id) => MenuItem::Action(id.clone()),
+            auto_ui_dialect::ast::MenuItemEntry::Sep => MenuItem::Separator,
         };
         let mut cfg = UiActionConfig {
             actions: b
@@ -183,16 +183,16 @@ impl UiActionConfig {
     /// `ui_config:` file the VM/desktop runtime loads. Inverse of
     /// [`Self::from_actions_block`]; shortcut_bindings (a derived index) are
     /// not carried — the SFC rebuilds its own keymap.
-    pub fn to_actions_block(&self) -> auto_lang_core::ast::ui::ActionsBlock {
+    pub fn to_actions_block(&self) -> auto_ui_dialect::ast::ActionsBlock {
         let map_item = |i: &MenuItem| match i {
-            MenuItem::Action(id) => auto_lang_core::ast::ui::MenuItemEntry::Action(id.clone()),
-            MenuItem::Separator => auto_lang_core::ast::ui::MenuItemEntry::Sep,
+            MenuItem::Action(id) => auto_ui_dialect::ast::MenuItemEntry::Action(id.clone()),
+            MenuItem::Separator => auto_ui_dialect::ast::MenuItemEntry::Sep,
         };
-        auto_lang_core::ast::ui::ActionsBlock {
+        auto_ui_dialect::ast::ActionsBlock {
             actions: self
                 .actions
                 .iter()
-                .map(|a| auto_lang_core::ast::ui::ActionEntry {
+                .map(|a| auto_ui_dialect::ast::ActionEntry {
                     id: a.id.clone(),
                     handler: a.handler.clone(),
                     title: (!a.title.is_empty()).then(|| a.title.clone()),
@@ -202,18 +202,18 @@ impl UiActionConfig {
                     checked_if: a.checked_if.clone(),
                 })
                 .collect(),
-            menubar: (!self.menus.is_empty()).then(|| auto_lang_core::ast::ui::MenubarBlock {
+            menubar: (!self.menus.is_empty()).then(|| auto_ui_dialect::ast::MenubarBlock {
                 menus: self
                     .menus
                     .iter()
-                    .map(|m| auto_lang_core::ast::ui::MenuEntry {
+                    .map(|m| auto_ui_dialect::ast::MenuEntry {
                         id: m.id.clone(),
                         title: m.title.clone(),
                         items: m.items.iter().map(map_item).collect(),
                     })
                     .collect(),
             }),
-            toolbar: (!self.toolbar.is_empty()).then(|| auto_lang_core::ast::ui::ToolbarBlock {
+            toolbar: (!self.toolbar.is_empty()).then(|| auto_ui_dialect::ast::ToolbarBlock {
                 items: self.toolbar.iter().map(map_item).collect(),
             }),
         }
@@ -503,7 +503,7 @@ pub fn action_config() -> Option<std::sync::Arc<UiActionConfig>> {
 /// 解析根 decl 后调用）：应用 OS 键位层、bump generation、记录 reload 摘要。
 /// source_path 是源 .at 文件路径，供热重载重读。
 pub fn set_dsl_action_config_from_block(
-    block: &auto_lang_core::ast::ui::ActionsBlock,
+    block: &auto_ui_dialect::ast::ActionsBlock,
     source_path: Option<&str>,
 ) -> Option<std::sync::Arc<UiActionConfig>> {
     let _ = DSL_SOURCE_PATH.set(source_path.map(|s| s.to_string()));
@@ -515,7 +515,7 @@ pub fn set_dsl_action_config_from_block(
 
 /// 校验 + 键位层 + 换装 + generation/reload-info 更新。
 fn install_dsl_config(
-    block: auto_lang_core::ast::ui::ActionsBlock,
+    block: auto_ui_dialect::ast::ActionsBlock,
 ) -> Option<std::sync::Arc<UiActionConfig>> {
     let (mut cfg, warnings) = UiActionConfig::from_actions_block(&block);
     for w in &warnings {
@@ -552,21 +552,17 @@ fn install_dsl_config(
 /// use 引入模块的声明改动需 touch 本文件触发）。
 pub fn extract_actions_from_source(
     code: &str,
-) -> Result<auto_lang_core::ast::ui::ActionsBlock, String> {
-    let session = auto_lang_core::session::CompilerSession::ui();
-    let mut parser = auto_lang_core::parser::Parser::from(code).with_session(session);
-    let ast = parser
-        .parse()
-        .map_err(|e| format!("DSL source parse error: {e}"))?;
-    for stmt in &ast.stmts {
-        if let auto_lang_core::ast::Stmt::WidgetDecl(decl) = stmt {
+) -> Result<auto_ui_dialect::ast::ActionsBlock, String> {
+    let ast = crate::parse_ui(code).map_err(|e| format!("DSL source parse error: {e}"))?;
+    for stmt in ast.domain_stmts() {
+        if let auto_ui_dialect::UiStmt::WidgetDecl(decl) = stmt {
             if let Some(ref acts) = decl.actions {
                 return Ok(acts.clone());
             }
         }
     }
-    for stmt in &ast.stmts {
-        if let auto_lang_core::ast::Stmt::ActionsDecl(acts) = stmt {
+    for stmt in ast.domain_stmts() {
+        if let auto_ui_dialect::UiStmt::ActionsDecl(acts) = stmt {
             return Ok(acts.clone());
         }
     }

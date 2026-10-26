@@ -92,8 +92,8 @@ pub struct CodeEditorTheme {
 /// H/S 两表恒一致，故归一为输出中性；原注释指向的 iced_adapter
 /// ACCENT_PALETTES 已不存在（失锚顺修，S1 对账 E6）。
 fn accent_hsl(name: &str) -> (u16, u8, u8) {
-    auto_lang_core::design_tokens::registry::accent_hsl(name)
-        .unwrap_or(auto_lang_core::design_tokens::registry::ACCENT_DEFAULT)
+    auto_ui_compiler::design_tokens::registry::accent_hsl(name)
+        .unwrap_or(auto_ui_compiler::design_tokens::registry::ACCENT_DEFAULT)
 }
 
 /// f32 版 HSL→RGB（编辑器 0.0–1.0 色域直算）。与 ui::style::theme 的 u8 版
@@ -185,11 +185,11 @@ impl CodeEditorTheme {
 
     /// 内置主题面：从 registry ThemeSpec 取 Background/Foreground。
     pub fn for_builtin(
-        spec: &auto_lang_core::design_tokens::registry::ThemeSpec,
+        spec: &auto_ui_compiler::design_tokens::registry::ThemeSpec,
         dark: bool,
         accent: &str,
     ) -> Self {
-        use auto_lang_core::design_tokens::registry::{resolve_rgb, TokenName};
+        use auto_ui_compiler::design_tokens::registry::{resolve_rgb, TokenName};
         let bg = resolve_rgb(spec, TokenName::Background, dark).unwrap_or(if dark {
             (28, 29, 36)
         } else {
@@ -205,11 +205,11 @@ impl CodeEditorTheme {
 
     /// 合成主题面：从 decl ComposedTheme 取 Background/Foreground。
     pub fn for_composed(
-        spec: &auto_lang_core::design_tokens::decl::ComposedTheme,
+        spec: &auto_ui_compiler::design_tokens::decl::ComposedTheme,
         dark: bool,
         accent: &str,
     ) -> Self {
-        use auto_lang_core::design_tokens::registry::TokenName;
+        use auto_ui_compiler::design_tokens::registry::TokenName;
         let bg = spec
             .resolve_rgb(TokenName::Background, dark)
             .unwrap_or(if dark { (28, 29, 36) } else { (251, 251, 253) });
@@ -358,7 +358,7 @@ fn light_body(ar: f32, ag: f32, ab: f32, bg: Rgba, fg: Rgba) -> CodeEditorTheme 
 /// 时回退 legacy 硬编码）。set_theme/set_theme_composed 换槽 + THEME_EPOCH
 /// 失效 → 下帧 sync 重取 = 编辑器随主题翻转。
 pub fn active_code_theme(dark: bool, accent: &str) -> CodeEditorTheme {
-    use auto_lang_core::design_tokens::registry::TokenName;
+    use auto_ui_compiler::design_tokens::registry::TokenName;
     let bg = crate::ui::style::theme::active_theme_rgb(TokenName::Background, dark);
     let fg = crate::ui::style::theme::active_theme_rgb(TokenName::Foreground, dark);
     match (bg, fg) {
@@ -414,10 +414,10 @@ mod tests {
     /// truth into the editor's 0.0-1.0 domain (V4 derivation contract).
     #[test]
     fn for_builtin_derives_from_registry_values() {
-        let stella = auto_lang_core::design_tokens::registry::builtin("stella").unwrap();
-        let bg = auto_lang_core::design_tokens::registry::resolve_rgb(
+        let stella = auto_ui_compiler::design_tokens::registry::builtin("stella").unwrap();
+        let bg = auto_ui_compiler::design_tokens::registry::resolve_rgb(
             stella,
-            auto_lang_core::design_tokens::registry::TokenName::Background,
+            auto_ui_compiler::design_tokens::registry::TokenName::Background,
             true,
         )
         .unwrap();

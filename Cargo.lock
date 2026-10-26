@@ -726,6 +726,7 @@ version = "0.1.0"
 dependencies = [
  "auto-atom",
  "auto-lang-core",
+ "auto-parser-api",
  "auto-ui-dialect",
  "auto-val",
  "inventory",
@@ -744,8 +745,10 @@ dependencies = [
 name = "auto-ui-dialect"
 version = "0.1.0"
 dependencies = [
+ "auto-ast",
  "auto-lang-core",
  "auto-parser-api",
+ "auto-val",
  "tempfile",
 ]
 

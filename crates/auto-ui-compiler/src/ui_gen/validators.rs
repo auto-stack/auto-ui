@@ -979,7 +979,7 @@ impl SchemaResolveScope {
             local_fold.insert(fold(&w.name));
             // ext 组件(`use { component: X from "..." }`)是合法 tag 来源
             for imp in &w.ext_imports {
-                if matches!(imp.kind, auto_lang_core::ast::ExtImportKind::Component) {
+                if matches!(imp.kind, auto_ui_dialect::ast::ExtImportKind::Component) {
                     for s in &imp.symbols {
                         local_fold.insert(fold(&s.to_string()));
                     }
@@ -1605,14 +1605,10 @@ function Foo() { emit('Save'); emit('Cancel'); }"#,
         }
     }
 }"#;
-        let session =
-            auto_lang_core::session::CompilerSession::new(auto_lang_core::session::Scenario::UI);
-        let mut parser = auto_lang_core::Parser::from(code);
-        parser = parser.with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = crate::parse_ui(code).expect("parse");
         let mut widgets = Vec::new();
-        for stmt in &ast.stmts {
-            if let auto_lang_core::ast::Stmt::WidgetDecl(d) = stmt {
+        for stmt in ast.domain_stmts() {
+            if let auto_ui_dialect::UiStmt::WidgetDecl(d) = stmt {
                 if let Ok(w) = crate::aura::extract_widget_from_decl(d) {
                     widgets.push(w);
                 }
@@ -1655,14 +1651,10 @@ function Foo() { emit('Save'); emit('Cancel'); }"#,
         }
     }
 }"#;
-        let session =
-            auto_lang_core::session::CompilerSession::new(auto_lang_core::session::Scenario::UI);
-        let mut parser = auto_lang_core::Parser::from(code);
-        parser = parser.with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = crate::parse_ui(code).expect("parse");
         let mut widgets = Vec::new();
-        for stmt in &ast.stmts {
-            if let auto_lang_core::ast::Stmt::WidgetDecl(d) = stmt {
+        for stmt in ast.domain_stmts() {
+            if let auto_ui_dialect::UiStmt::WidgetDecl(d) = stmt {
                 if let Ok(w) = crate::aura::extract_widget_from_decl(d) {
                     widgets.push(w);
                 }
@@ -1701,14 +1693,10 @@ widget CopyButton {
     on { .Go -> { } }
     view { button "copy" {} }
 }"#;
-        let session =
-            auto_lang_core::session::CompilerSession::new(auto_lang_core::session::Scenario::UI);
-        let mut parser = auto_lang_core::Parser::from(code);
-        parser = parser.with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = crate::parse_ui(code).expect("parse");
         let mut widgets = Vec::new();
-        for stmt in &ast.stmts {
-            if let auto_lang_core::ast::Stmt::WidgetDecl(d) = stmt {
+        for stmt in ast.domain_stmts() {
+            if let auto_ui_dialect::UiStmt::WidgetDecl(d) = stmt {
                 if let Ok(w) = crate::aura::extract_widget_from_decl(d) {
                     widgets.push(w);
                 }

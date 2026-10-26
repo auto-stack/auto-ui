@@ -2402,12 +2402,11 @@ mod tests {
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = crate::parse_ui(src).expect("parse");
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");
@@ -3596,12 +3595,12 @@ widget TestCardVariant {
         let session = CompilerSession::ui().with_backend("jet");
         let mut parser = Parser::from(source);
         parser = parser.with_session(session);
-        let ast = parser.parse().expect("Parse should succeed");
+        let ast = crate::parse_ui(source).expect("Parse should succeed");
 
         // Extract AURA widget
         let mut widgets = Vec::new();
-        for stmt in &ast.stmts {
-            if let auto_lang_core::ast::Stmt::WidgetDecl(widget_decl) = stmt {
+        for stmt in ast.domain_stmts() {
+            if let auto_ui_dialect::UiStmt::WidgetDecl(widget_decl) = stmt {
                 let aura_widget =
                     extract_widget_from_decl(widget_decl).expect("Extract should succeed");
                 widgets.push(aura_widget);
@@ -3870,12 +3869,12 @@ widget TestTextFlex {
     let session = CompilerSession::ui().with_backend("jet");
     let mut parser = Parser::from(source);
     parser = parser.with_session(session);
-    let ast = parser.parse().expect("Parse should succeed");
+    let ast = crate::parse_ui(source).expect("Parse should succeed");
 
     // Extract AURA widget
     let mut widgets = Vec::new();
-    for stmt in &ast.stmts {
-        if let auto_lang_core::ast::Stmt::WidgetDecl(widget_decl) = stmt {
+    for stmt in ast.domain_stmts() {
+        if let auto_ui_dialect::UiStmt::WidgetDecl(widget_decl) = stmt {
             let aura_widget =
                 extract_widget_from_decl(widget_decl).expect("Extract should succeed");
             widgets.push(aura_widget);

@@ -1,6 +1,7 @@
 //! 纯 helper（无游标）：自 auto-lang Parser 迁出的 UI 文法静态工具
 //! （PLAN-810 T-03/T-04 逐字迁移；端口映射见 contract-baseline §2）。
 
+use crate::ast::*;
 use crate::UiParseContext;
 use auto_parser_api::ast::*;
 use auto_parser_api::error::{pos_to_span, AutoResult, SyntaxError};

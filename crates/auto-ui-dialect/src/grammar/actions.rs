@@ -3,7 +3,10 @@
 
 use super::helpers::at_dot;
 use super::view::capture_condition_call_args;
-use crate::UiParseContext;
+use crate::ast as ui_ast;
+use crate::ast::*;
+use crate::route::{RouteDef, RoutesBlock};
+use crate::{UiParseContext, UiStmt};
 use auto_parser_api::ast;
 use auto_parser_api::ast::*;
 use auto_parser_api::error::{pos_to_span, AutoResult, SyntaxError};
@@ -85,7 +88,7 @@ pub(crate) fn parse_routes_block_inner(cx: &mut dyn UiParseContext) -> AutoResul
 /// 后继 `{` 时接管（否则返回 None 回退表达式路径——`actions = ...` 等
 /// 普通表达式不受影响）；handler 引用此时无宿主可校验，合并进宿主
 /// widget 后由消费端（vm 安装/vue 生成）落地。
-pub fn parse_actions_decl_stmt(cx: &mut dyn UiParseContext) -> AutoResult<Option<Stmt>> {
+pub fn parse_actions_decl_stmt(cx: &mut dyn UiParseContext) -> AutoResult<Option<UiStmt>> {
     // cur = "actions"；词法前瞻一格（取回再压回，parser 流式无回溯）。
     let next_is_brace = match cx.probe_next_token() {
         Ok(t) => t.kind == TokenKind::LBrace,
@@ -95,13 +98,13 @@ pub fn parse_actions_decl_stmt(cx: &mut dyn UiParseContext) -> AutoResult<Option
         return Ok(None);
     }
     let block = parse_actions_block_inner(cx)?;
-    Ok(Some(Stmt::ActionsDecl(block)))
+    Ok(Some(UiStmt::ActionsDecl(block)))
 }
 
 /// PLAN-607: 顶层 `style <name> = ...` 或 `style <name>(...) = ...` 声明。
 /// 仅在 `style` 后继 `Ident` 且接着 `=` 或 `(` 时接管；
 /// 否则返回 None 回退表达式路径（`style = ...` 等普通表达式不受影响）。
-pub fn parse_style_recipe_decl_stmt(cx: &mut dyn UiParseContext) -> AutoResult<Option<Stmt>> {
+pub fn parse_style_recipe_decl_stmt(cx: &mut dyn UiParseContext) -> AutoResult<Option<UiStmt>> {
     let cp = cx.raw_cursor_save();
 
     cx.advance(); // consume "style"
@@ -146,7 +149,7 @@ pub fn parse_style_recipe_decl_stmt(cx: &mut dyn UiParseContext) -> AutoResult<O
                 None
             };
 
-            params.push(ast::ui::StyleRecipeParam {
+            params.push(ui_ast::StyleRecipeParam {
                 name: param_name.into(),
                 param_type,
                 default_value,
@@ -171,17 +174,16 @@ pub fn parse_style_recipe_decl_stmt(cx: &mut dyn UiParseContext) -> AutoResult<O
     let body = cx.parse_expr()?;
     cx.set_skip_check(prev_skip);
 
-    let decl = ast::ui::StyleRecipeDecl {
+    let decl = ui_ast::StyleRecipeDecl {
         name: recipe_name.into(),
         params,
         body,
         is_pub: false,
         doc: doc.map(Into::into),
     };
-    // PLAN-607: register style recipe immediately so subsequent AST nodes recognize it
-    cx.register_style_recipe(&decl);
+    cx.bind_var(decl.name.as_str(), Type::Unknown);
 
-    Ok(Some(Stmt::StyleRecipeDecl(decl)))
+    Ok(Some(UiStmt::StyleRecipeDecl(decl)))
 }
 
 /// Plan 051 C7: `timer { ... }` 块体。已消费 `timer` 标识符。
@@ -197,12 +199,12 @@ pub fn parse_style_recipe_decl_stmt(cx: &mut dyn UiParseContext) -> AutoResult<O
 /// `when` 复用 `parse_actions_cond_attr`（引号串或裸 DSL 表达式源文本）。
 pub(crate) fn parse_timer_block_inner(
     cx: &mut dyn UiParseContext,
-) -> AutoResult<ast::ui::TimerBlock> {
+) -> AutoResult<ui_ast::TimerBlock> {
     cx.expect_ident("timer")?;
     cx.expect(TokenKind::LBrace)?;
     cx.skip_empty_lines();
 
-    let mut entries: Vec<ast::ui::TimerEntry> = Vec::new();
+    let mut entries: Vec<ui_ast::TimerEntry> = Vec::new();
     while !cx.is_kind(TokenKind::RBrace) {
         cx.skip_empty_lines();
         if cx.is_kind(TokenKind::RBrace) {
@@ -280,7 +282,7 @@ pub(crate) fn parse_timer_block_inner(
             ),
             span: pos_to_span(cx.cur_pos()),
         })?;
-        entries.push(ast::ui::TimerEntry {
+        entries.push(ui_ast::TimerEntry {
             event,
             // 运行期钳制下限 16ms 防忙轮询（解析期即归一）。
             every_ms: every_ms.max(16),
@@ -292,22 +294,22 @@ pub(crate) fn parse_timer_block_inner(
         }
     }
     cx.expect(TokenKind::RBrace)?;
-    Ok(ast::ui::TimerBlock { entries })
+    Ok(ui_ast::TimerBlock { entries })
 }
 
 /// Plan 451: `actions { ... }` 块——动作注册表 + menubar/toolbar 声明
-/// （语法见 ast::ui::ActionsBlock 文档）。enabled_if/checked_if 支持
+/// （语法见 ui_ast::ActionsBlock 文档）。enabled_if/checked_if 支持
 /// 引号字符串与裸表达式两种拼写（parse_actions_cond_attr）。
 pub(crate) fn parse_actions_block_inner(
     cx: &mut dyn UiParseContext,
-) -> AutoResult<ast::ui::ActionsBlock> {
+) -> AutoResult<ui_ast::ActionsBlock> {
     cx.expect_ident("actions")?;
     cx.expect(TokenKind::LBrace)?;
     cx.skip_empty_lines();
 
-    let mut actions: Vec<ast::ui::ActionEntry> = Vec::new();
-    let mut menubar: Option<ast::ui::MenubarBlock> = None;
-    let mut toolbar: Option<ast::ui::ToolbarBlock> = None;
+    let mut actions: Vec<ui_ast::ActionEntry> = Vec::new();
+    let mut menubar: Option<ui_ast::MenubarBlock> = None;
+    let mut toolbar: Option<ui_ast::ToolbarBlock> = None;
 
     while !cx.is_kind(TokenKind::RBrace) {
         cx.skip_empty_lines();
@@ -352,7 +354,7 @@ pub(crate) fn parse_actions_block_inner(
         cx.skip_empty_lines();
     }
     cx.expect(TokenKind::RBrace)?;
-    Ok(ast::ui::ActionsBlock {
+    Ok(ui_ast::ActionsBlock {
         actions,
         menubar,
         toolbar,
@@ -363,7 +365,7 @@ pub(crate) fn parse_actions_block_inner(
 ///          shortcut: "...", enabled_if: "...", checked_if: "...")`
 /// id 与 handler 必填；其余可选；均为引号字符串（handler 例外，前导点
 /// 事件引用）。
-pub(crate) fn parse_action_entry(cx: &mut dyn UiParseContext) -> AutoResult<ast::ui::ActionEntry> {
+pub(crate) fn parse_action_entry(cx: &mut dyn UiParseContext) -> AutoResult<ui_ast::ActionEntry> {
     cx.expect(TokenKind::LParen)?;
     let mut id: Option<String> = None;
     let mut handler: Option<String> = None;
@@ -412,7 +414,7 @@ pub(crate) fn parse_action_entry(cx: &mut dyn UiParseContext) -> AutoResult<ast:
         message: "action: `handler` is required".into(),
         span: pos_to_span(cx.cur_pos()),
     })?;
-    Ok(ast::ui::ActionEntry {
+    Ok(ui_ast::ActionEntry {
         id,
         handler,
         title,
@@ -560,9 +562,7 @@ pub(crate) fn parse_actions_cond_attr(cx: &mut dyn UiParseContext) -> AutoResult
 }
 
 /// `menubar { menu (id: "...", title: "...") { ... } ... }`
-pub(crate) fn parse_menubar_block(
-    cx: &mut dyn UiParseContext,
-) -> AutoResult<ast::ui::MenubarBlock> {
+pub(crate) fn parse_menubar_block(cx: &mut dyn UiParseContext) -> AutoResult<ui_ast::MenubarBlock> {
     cx.expect_ident("menubar")?;
     cx.expect(TokenKind::LBrace)?;
     cx.skip_empty_lines();
@@ -577,11 +577,11 @@ pub(crate) fn parse_menubar_block(
         cx.skip_empty_lines();
     }
     cx.expect(TokenKind::RBrace)?;
-    Ok(ast::ui::MenubarBlock { menus })
+    Ok(ui_ast::MenubarBlock { menus })
 }
 
 /// `menu (id: "...", title: "...") { item (action: "...") | sep ... }`
-pub(crate) fn parse_menu_entry(cx: &mut dyn UiParseContext) -> AutoResult<ast::ui::MenuEntry> {
+pub(crate) fn parse_menu_entry(cx: &mut dyn UiParseContext) -> AutoResult<ui_ast::MenuEntry> {
     cx.expect(TokenKind::LParen)?;
     let mut id: Option<String> = None;
     let mut title: Option<String> = None;
@@ -618,24 +618,22 @@ pub(crate) fn parse_menu_entry(cx: &mut dyn UiParseContext) -> AutoResult<ast::u
         span: pos_to_span(cx.cur_pos()),
     })?;
     let items = parse_menu_item_entries(cx)?;
-    Ok(ast::ui::MenuEntry { id, title, items })
+    Ok(ui_ast::MenuEntry { id, title, items })
 }
 
 /// `toolbar { item (action: "...") | sep ... }`
-pub(crate) fn parse_toolbar_block(
-    cx: &mut dyn UiParseContext,
-) -> AutoResult<ast::ui::ToolbarBlock> {
+pub(crate) fn parse_toolbar_block(cx: &mut dyn UiParseContext) -> AutoResult<ui_ast::ToolbarBlock> {
     cx.expect_ident("toolbar")?;
     // 开花括号由 parse_menu_item_entries 消费（与 menu 条目列表共用）。
     let items = parse_menu_item_entries(cx)?;
-    Ok(ast::ui::ToolbarBlock { items })
+    Ok(ui_ast::ToolbarBlock { items })
 }
 
 /// menu/toolbar 共用的条目列表：`item (action: "...")` 或 `sep`，
 /// 换行分隔（允许尾随逗号）。
 pub(crate) fn parse_menu_item_entries(
     cx: &mut dyn UiParseContext,
-) -> AutoResult<Vec<ast::ui::MenuItemEntry>> {
+) -> AutoResult<Vec<ui_ast::MenuItemEntry>> {
     cx.expect(TokenKind::LBrace)?;
     cx.skip_empty_lines();
     let mut items = Vec::new();
@@ -648,7 +646,7 @@ pub(crate) fn parse_menu_item_entries(
         match ident.as_str() {
             "sep" => {
                 cx.advance();
-                items.push(ast::ui::MenuItemEntry::Sep);
+                items.push(ui_ast::MenuItemEntry::Sep);
             }
             "item" => {
                 cx.advance();
@@ -683,7 +681,7 @@ pub(crate) fn parse_menu_item_entries(
                     message: "item: `action` is required".into(),
                     span: pos_to_span(cx.cur_pos()),
                 })?;
-                items.push(ast::ui::MenuItemEntry::Action(action));
+                items.push(ui_ast::MenuItemEntry::Action(action));
             }
             _ => {
                 return Err(SyntaxError::Generic {

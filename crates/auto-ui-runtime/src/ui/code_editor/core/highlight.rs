@@ -183,8 +183,8 @@ fn build_syntax_system() -> SyntaxSystem {
     // × accents). PLAN-601 T-10: every named builtin joins the baked set so
     // switching themes re-keys without re-synthesis; composed (declared)
     // themes register lazily via register_theme.
-    for &theme_id in auto_lang_core::design_tokens::registry::BUILTIN_NAMES.iter() {
-        let spec = auto_lang_core::design_tokens::registry::builtin(theme_id)
+    for &theme_id in auto_ui_compiler::design_tokens::registry::BUILTIN_NAMES.iter() {
+        let spec = auto_ui_compiler::design_tokens::registry::builtin(theme_id)
             .expect("BUILTIN_NAMES 与表互锁");
         for &accent in KNOWN_ACCENTS.iter() {
             for &dark in [true, false].iter() {
@@ -475,7 +475,7 @@ mod tests {
             register_theme(&dark, cosmic_text::SyntaxTheme::default()),
             dark
         );
-        for theme_id in auto_lang_core::design_tokens::registry::BUILTIN_NAMES {
+        for theme_id in auto_ui_compiler::design_tokens::registry::BUILTIN_NAMES {
             assert!(syntax_system()
                 .theme_set
                 .themes

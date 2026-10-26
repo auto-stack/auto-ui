@@ -112,13 +112,13 @@ fn run_internal_vm_session(entry: &str) -> i32 {
             .unwrap_or(None)
         {
             Some(lite) => {
-                let decl = auto_lang_core::design_tokens::decl::ThemeDecl {
+                let decl = auto_ui_compiler::design_tokens::decl::ThemeDecl {
                     name: lite.name,
                     extends: lite.extends,
                     mode: lite.mode,
                     colors: lite.colors,
                 };
-                match auto_lang_core::design_tokens::decl::compose(
+                match auto_ui_compiler::design_tokens::decl::compose(
                     &decl,
                     &std::collections::BTreeMap::new(),
                 ) {

@@ -16,8 +16,7 @@
 
 use crate::aura::schema::AuraSchema;
 use crate::ui_gen::widget::AUTO_IMPORTED_WIDGETS;
-use auto_lang_core::ast::ViewNode;
-use auto_lang_core::ast::WidgetDecl;
+use auto_ui_dialect::ast::{ViewNode, WidgetDecl};
 use miette::{Diagnostic, SourceSpan};
 use std::collections::HashSet;
 use thiserror::Error;
@@ -321,7 +320,7 @@ impl WidgetValidator {
     fn validate_element_props(
         &self,
         tag: &str,
-        props: &[auto_lang_core::ast::ViewProp],
+        props: &[auto_ui_dialect::ast::ViewProp],
         schema_props: &[crate::aura::schema::PropDef],
         errors: &mut Vec<ValidationError>,
     ) {

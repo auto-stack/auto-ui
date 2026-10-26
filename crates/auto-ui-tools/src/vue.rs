@@ -1233,7 +1233,7 @@ fn generate_postcss_config() -> String {
 pub fn generate_index_html(
     name: &str,
     title: Option<&str>,
-    composed_theme: Option<&auto_lang_core::design_tokens::decl::ComposedTheme>,
+    composed_theme: Option<&auto_ui_compiler::design_tokens::decl::ComposedTheme>,
 ) -> String {
     // Plan 043 M5: the shadcn template ships fully-populated `.dark` tokens
     // in index.css; the handwritten ash-gui (and the shadcn default) render
@@ -2175,7 +2175,7 @@ fn generate_app_vue(vue_code: &str) -> String {
 /// PLAN-601 T-06：pac.at theme{} 声明合成体（Some）替换 scaffold 成双 mode
 /// 块值源——声明面消费点；None = scaffold 缺省（零变化）。
 pub fn generate_index_css(
-    composed: Option<&auto_lang_core::design_tokens::decl::ComposedTheme>,
+    composed: Option<&auto_ui_compiler::design_tokens::decl::ComposedTheme>,
 ) -> String {
     use auto_ui_compiler::style::theme::registry;
     let (core_l, sb_l, core_d, sb_d) = match composed {
@@ -2411,7 +2411,7 @@ fn write_project_files(
     style_files: &[String],
     i18n: &I18nConfig,
     locale_files: &[String],
-    composed_theme: Option<&auto_lang_core::design_tokens::decl::ComposedTheme>,
+    composed_theme: Option<&auto_ui_compiler::design_tokens::decl::ComposedTheme>,
 ) -> Result<(), String> {
     // Plan 482: uses_autodown 的 main.ts 引 `@autodown/engine/style.css`，但
     // pac npm_deps 通常只链接 editor/core——engine 缺声明导致 vite 解析失败
@@ -2660,14 +2660,14 @@ pub struct VueReads {
     pub npm_deps: Vec<(String, String)>,
     pub style_files: Vec<String>,
     pub i18n: I18nConfig,
-    pub theme: Option<auto_lang_core::design_tokens::decl::ComposedTheme>,
+    pub theme: Option<auto_ui_compiler::design_tokens::decl::ComposedTheme>,
 }
 
 impl VueReads {
     /// legacy 自扫（行为冻结：与原 from_workspace 内联读取逐字段一致）。
     pub fn scan(_root_dir: &Path, pac_path: &Path, pac_content: &str) -> Self {
         // theme{} 声明 → 合成（PLAN-601；AutoConfig 臂保留给 legacy 路径）
-        let composed_theme: Option<auto_lang_core::design_tokens::decl::ComposedTheme> =
+        let composed_theme: Option<auto_ui_compiler::design_tokens::decl::ComposedTheme> =
             match auto_lang_core::config::AutoConfig::from_file(pac_path, &auto_val::Obj::new()) {
                 Ok(config) => {
                     // PLAN-815 T-04/831 T-05：声明读取单源在
@@ -2677,14 +2677,14 @@ impl VueReads {
                     let decl_lite =
                         auto_project_model::pac_display::theme_decl_from_root(&config.root);
                     decl_lite
-                        .map(|d| auto_lang_core::design_tokens::decl::ThemeDecl {
+                        .map(|d| auto_ui_compiler::design_tokens::decl::ThemeDecl {
                             name: d.name.clone(),
                             extends: d.extends.clone(),
                             mode: d.mode.clone(),
                             colors: d.colors.clone(),
                         })
                         .and_then(|decl| {
-                            match auto_lang_core::design_tokens::decl::compose(
+                            match auto_ui_compiler::design_tokens::decl::compose(
                                 &decl,
                                 &std::collections::BTreeMap::new(),
                             ) {
@@ -2755,13 +2755,13 @@ impl VueReads {
             .theme_decl
             .as_ref()
             .map(|lite| {
-                let decl = auto_lang_core::design_tokens::decl::ThemeDecl {
+                let decl = auto_ui_compiler::design_tokens::decl::ThemeDecl {
                     name: lite.name.clone(),
                     extends: lite.extends.clone(),
                     mode: lite.mode.clone(),
                     colors: lite.colors.clone(),
                 };
-                match auto_lang_core::design_tokens::decl::compose(
+                match auto_ui_compiler::design_tokens::decl::compose(
                     &decl,
                     &std::collections::BTreeMap::new(),
                 ) {
@@ -3487,7 +3487,7 @@ pub struct VueProject {
     /// PLAN-601 T-06：pac.at `theme: {}` 声明合成体（T-03 解析 → compose）。
     /// index.css 双 mode 块取其渲染、index.html 注入运行时种子；None =
     /// scaffold 缺省（零变化）。compose 失败回退 None 并告警（生成不硬失败）。
-    pub theme: Option<auto_lang_core::design_tokens::decl::ComposedTheme>,
+    pub theme: Option<auto_ui_compiler::design_tokens::decl::ComposedTheme>,
 }
 
 impl VueProject {
@@ -10637,7 +10637,10 @@ render: \"vue\"
 
         // vue 轨（探测 + 容器 + manifest 一体）。
         let vue_roots = desktop_extra_app_roots(&project);
-        assert_eq!(vue_roots.iter().filter(|(id, _)| id == "015-notes").count(), 1);
+        assert_eq!(
+            vue_roots.iter().filter(|(id, _)| id == "015-notes").count(),
+            1
+        );
         assert!(!vue_roots.iter().any(|(id, _)| id == "auto-notes"));
         // vm/iced 轨组合面（host_extra_roots 的纯函数形态，CWD 无关重演）。
         let front = tmp.path().join("auto-os-config").join("auto");
@@ -10940,18 +10943,40 @@ import { AlertDialogAction } from '@/components/ui/alert-dialog'
         let apps = tmp.path().join("apps");
         let notes = apps.join("auto-notes");
         fs::create_dir_all(notes.join("src/front")).unwrap();
-        fs::write(notes.join("pac.at"), "name: \"notes\"\nscene: \"ui\"\nrender: \"vue\"\n").unwrap();
-        fs::write(notes.join("src/front/app.at"), "widget App { view { text \"formal-notes-content\" } }\n").unwrap();
+        fs::write(
+            notes.join("pac.at"),
+            "name: \"notes\"\nscene: \"ui\"\nrender: \"vue\"\n",
+        )
+        .unwrap();
+        fs::write(
+            notes.join("src/front/app.at"),
+            "widget App { view { text \"formal-notes-content\" } }\n",
+        )
+        .unwrap();
         let syslog = apps.join("auto-syslog");
         fs::create_dir_all(syslog.join("src/front")).unwrap();
-        fs::write(syslog.join("pac.at"), "name: \"syslog\"\nscene: \"ui\"\nrender: \"vue\"\n").unwrap();
-        fs::write(syslog.join("src/front/app.at"), "widget App { view { text \"formal-syslog-content\" } }\n").unwrap();
-        fs::write(tmp.path().join("apps.manifest"), r#"{"apps":[
+        fs::write(
+            syslog.join("pac.at"),
+            "name: \"syslog\"\nscene: \"ui\"\nrender: \"vue\"\n",
+        )
+        .unwrap();
+        fs::write(
+            syslog.join("src/front/app.at"),
+            "widget App { view { text \"formal-syslog-content\" } }\n",
+        )
+        .unwrap();
+        fs::write(
+            tmp.path().join("apps.manifest"),
+            r#"{"apps":[
             {"id":"015-notes","repo":"apps/auto-notes","kind":"repo"},
             {"id":"039-syslog","repo":"apps/auto-syslog","kind":"local"}
-        ]}"#).unwrap();
+        ]}"#,
+        )
+        .unwrap();
         let project = VueProject::from_workspace(&notes).unwrap();
-        project.generate_desktop_host_from_roots(apps, Vec::new()).unwrap();
+        project
+            .generate_desktop_host_from_roots(apps, Vec::new())
+            .unwrap();
         let generated = project.output_dir.join("src");
         let registry = fs::read_to_string(generated.join("apps-registry.ts")).unwrap();
         assert!(registry.contains("015-notes"));
@@ -12647,8 +12672,8 @@ widget App {
 /// ③声明覆盖键以规范化值落位（非基座原值）。
 #[test]
 fn plan609_theme_decl_dual_face_same_source() {
-    use auto_lang_core::design_tokens::decl;
-    use auto_lang_core::design_tokens::decl::ThemeDecl;
+    use auto_ui_compiler::design_tokens::decl;
+    use auto_ui_compiler::design_tokens::decl::ThemeDecl;
 
     let decl = ThemeDecl {
         name: Some("dual-src".to_string()),
@@ -13110,7 +13135,7 @@ mod plan593_index_css_golden_tests {
 // ── PLAN-601 T-06: theme{} 声明 → vue 生成面消费 ────────────────────────
 #[cfg(test)]
 mod plan601_theme_declaration_tests {
-    use auto_lang_core::design_tokens::decl::{compose, normalize_value, ThemeDecl};
+    use auto_ui_compiler::design_tokens::decl::{compose, normalize_value, ThemeDecl};
     use std::collections::BTreeMap;
 
     fn decl(name: Option<&str>, extends: Option<&str>, colors: &[(&str, &str)]) -> ThemeDecl {
@@ -13136,14 +13161,14 @@ mod plan601_theme_declaration_tests {
         let primary = normalize_value("#8b5cf6").unwrap();
         assert!(css.contains(&format!("--primary: {primary};")), "{css}");
         // 双 mode 都吃到覆盖（compose 双 mode 同步覆盖语义）
-        let stella = auto_lang_core::design_tokens::registry::builtin("stella").unwrap();
+        let stella = auto_ui_compiler::design_tokens::registry::builtin("stella").unwrap();
         let bg = stella
             .light
             .iter()
             .find(|(tok, _)| {
                 matches!(
                     tok,
-                    auto_lang_core::design_tokens::registry::TokenName::Background
+                    auto_ui_compiler::design_tokens::registry::TokenName::Background
                 )
             })
             .unwrap()

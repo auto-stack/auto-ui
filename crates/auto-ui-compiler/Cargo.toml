@@ -25,6 +25,7 @@ ui-headless = []
 auto-lang-core = { path = "../../../auto-lang/crates/auto-lang-core" }
 # PLAN-814 R3-03b：UI 文法单源直连（函数表构造 + 装配自注册）。
 auto-ui-dialect = { path = "../auto-ui-dialect" }
+auto-parser-api = { path = "../../../auto-lang/crates/auto-parser-api" }
 # PLAN-814 R3-03b：UiGrammarSource inventory submit（SDK 收集点机制）。
 inventory = "0.3"
 # PLAN-814 T-03 Batch 1：action_config 解析消费的轻前端 crate（与 SDK 同源）。

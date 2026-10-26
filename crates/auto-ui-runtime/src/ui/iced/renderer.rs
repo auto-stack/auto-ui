@@ -7012,7 +7012,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 });
 
                 let dark = crate::ui::style::theme::dark_mode();
-                let token_rgb = |t: auto_lang_core::design_tokens::registry::TokenName| {
+                let token_rgb = |t: auto_ui_compiler::design_tokens::registry::TokenName| {
                     crate::ui::style::theme::active_theme_rgb(t, dark)
                         .map(|(r, g, b)| iced::Color::from_rgb8(r, g, b))
                 };
@@ -7059,22 +7059,22 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                         // ③ 内容面板自带边框（左/右/下，顶部开口）→ 边框的
                         //    连接可见。
                         let bg = token_rgb(
-                            auto_lang_core::design_tokens::registry::TokenName::Background,
+                            auto_ui_compiler::design_tokens::registry::TokenName::Background,
                         );
                         let strip_bg =
-                            token_rgb(auto_lang_core::design_tokens::registry::TokenName::Muted);
+                            token_rgb(auto_ui_compiler::design_tokens::registry::TokenName::Muted);
                         let cell_bg = token_rgb(
-                            auto_lang_core::design_tokens::registry::TokenName::Secondary,
+                            auto_ui_compiler::design_tokens::registry::TokenName::Secondary,
                         );
                         let active_fg = token_rgb(
-                            auto_lang_core::design_tokens::registry::TokenName::Foreground,
+                            auto_ui_compiler::design_tokens::registry::TokenName::Foreground,
                         );
                         let inactive_fg = token_rgb(
-                            auto_lang_core::design_tokens::registry::TokenName::MutedForeground,
+                            auto_ui_compiler::design_tokens::registry::TokenName::MutedForeground,
                         );
                         // 边框色：Border token，缺省走 iced adapter 的边框解析。
                         let frame_rgb = crate::ui::style::theme::active_theme_rgb(
-                            auto_lang_core::design_tokens::registry::TokenName::Border,
+                            auto_ui_compiler::design_tokens::registry::TokenName::Border,
                             dark,
                         )
                         .map(|(r, g, b)| iced::Color::from_rgb8(r, g, b))

@@ -8,7 +8,7 @@ use std::fmt;
 
 // Re-export Type from ast for convenience
 pub use auto_lang_core::ast::Type;
-use auto_lang_core::ast::{RouteDef, RoutesBlock};
+use auto_ui_dialect::{ExtImport, RouteDef, RoutesBlock};
 
 // ============================================================================
 // Stable Node ID (Plan 273)
@@ -125,7 +125,7 @@ pub struct AuraWidget {
     /// The Vue backend emits them as ES imports in `<script setup>`;
     /// `component` entries also become instantiable tags in the view tree.
     /// Other backends ignore them.
-    pub ext_imports: Vec<auto_lang_core::ast::ExtImport>,
+    pub ext_imports: Vec<ExtImport>,
 
     /// Reactive watchers from the widget-level `watch { ... }` block.
     /// The Vue backend emits them as `watch(source, handler, opts)` calls
@@ -141,13 +141,13 @@ pub struct AuraWidget {
     /// Per-instance setup preamble from the widget-level `setup { ... }` block
     /// (Plan 426). The Vue backend emits the statements at `<script setup>`
     /// top level (before state/computed definitions); other backends ignore.
-    pub setup: Option<auto_lang_core::ast::ui::SetupBlock>,
+    pub setup: Option<auto_ui_dialect::ast::SetupBlock>,
 
     /// Plan 451: `actions { ... }` 块（动作注册表 + menubar/toolbar 声明）。
     /// vm 渲染器不经此字段（run_file_dynamic_ui_inner 直接从 WidgetDecl
     /// 安装 action_config）；Vue 后端（Plan 451 P2）据此生成全局 keydown
     /// 回退层 + menubar/toolbar 组件树；其他后端忽略。
-    pub actions: Option<auto_lang_core::ast::ui::ActionsBlock>,
+    pub actions: Option<auto_ui_dialect::ast::ActionsBlock>,
 }
 
 /// A reactive watcher (widget-level `watch { ... }` entry).

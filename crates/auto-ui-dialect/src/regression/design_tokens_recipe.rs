@@ -3,9 +3,9 @@
 //! （输入为 UI 语句，依赖文法表装配）。测试体逐字保持，仅路径改写。
 
 use auto_lang_core::ast::*;
-use auto_lang_core::design_tokens::recipe::*;
 use auto_lang_core::parser::Parser;
 use auto_lang_core::session::CompilerSession;
+use auto_ui_compiler::design_tokens::recipe::*;
 
 #[cfg(test)]
 mod tests {
