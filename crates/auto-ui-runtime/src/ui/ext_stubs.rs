@@ -46,21 +46,22 @@ pub(crate) struct ExtImportRef {
     pub path: String,
     /// PLAN-051 C4: 携带声明 kind（ExplicitFn 校验 / Component widget 注册
     /// 消费）。
-    pub kind: auto_lang_core::ast::ExtImportKind,
+    pub kind: auto_ui_dialect::ExtImportKind,
 }
 
 /// Collect ext imports from an AST's top-level `use.web` statements.
-pub(crate) fn collect_useweb_imports(stmts: &[Stmt]) -> Vec<ExtImportRef> {
+pub(crate) fn collect_useweb_imports(code: &auto_ui_dialect::UiCode) -> Vec<ExtImportRef> {
     let mut out = Vec::new();
-    for stmt in stmts {
-        if let Stmt::UseWeb(imports) = stmt {
-            for imp in imports {
-                out.push(ExtImportRef {
-                    symbols: imp.symbols.iter().map(|s| s.to_string()).collect(),
-                    path: imp.path.to_string(),
-                    kind: imp.kind,
-                });
-            }
+    for imports in code.domain_stmts().filter_map(|s| match s {
+        auto_ui_dialect::UiStmt::UseWeb(imports) => Some(imports),
+        _ => None,
+    }) {
+        for imp in imports {
+            out.push(ExtImportRef {
+                symbols: imp.symbols.iter().map(|s| s.to_string()).collect(),
+                path: imp.path.to_string(),
+                kind: imp.kind,
+            });
         }
     }
     out
@@ -68,7 +69,7 @@ pub(crate) fn collect_useweb_imports(stmts: &[Stmt]) -> Vec<ExtImportRef> {
 
 /// Collect ext imports from widget-level `use { ... }` blocks.
 pub(crate) fn collect_widget_ext_imports(
-    decls: &[auto_lang_core::ast::ui::WidgetDecl],
+    decls: &[auto_ui_dialect::ast::WidgetDecl],
 ) -> Vec<ExtImportRef> {
     let mut out = Vec::new();
     for decl in decls {
@@ -174,7 +175,7 @@ pub(crate) fn load_at_ext_imports(
             // .vue 源的收口）：存在即装载为该组件的 VM widget 形态（C4 流
             // 注册进 registry），其内嵌套的 `.at` component 导入（Demo* 子
             // widget 源）随装随注册；否则维持 no-op stub 降级。
-            if imp.kind == auto_lang_core::ast::ExtImportKind::Component {
+            if imp.kind == auto_ui_dialect::ExtImportKind::Component {
                 if let Some(resolved_src) = resolve_ext_source(base_dir, &imp.path) {
                     let stem = resolved_src
                         .file_stem()
@@ -189,10 +190,10 @@ pub(crate) fn load_at_ext_imports(
                             let session = auto_lang_core::session::CompilerSession::ui();
                             let mut parser =
                                 crate::Parser::from(code.as_str()).with_session(session);
-                            if let Ok(ast) = parser.parse() {
-                                for nested_imp in collect_useweb_imports(&ast.stmts) {
+                            if let Ok(ast) = parser.parse_domain(&auto_ui_dialect::UiDialect).map(auto_ui_dialect::UiCode) {
+                                for nested_imp in collect_useweb_imports(&ast) {
                                     if nested_imp.kind
-                                        == auto_lang_core::ast::ExtImportKind::Component
+                                        == auto_ui_dialect::ExtImportKind::Component
                                         && nested_imp.path.ends_with(".at")
                                     {
                                         if let Some(resolved_nested) =
@@ -239,8 +240,8 @@ pub(crate) fn load_at_ext_imports(
         if let Ok(code) = std::fs::read_to_string(&adapter) {
             let session = auto_lang_core::session::CompilerSession::ui();
             let mut parser = crate::Parser::from(code.as_str()).with_session(session);
-            if let Ok(ast) = parser.parse() {
-                nested.extend(collect_useweb_imports(&ast.stmts));
+            if let Ok(ast) = parser.parse_domain(&auto_ui_dialect::UiDialect).map(auto_ui_dialect::UiCode) {
+                nested.extend(collect_useweb_imports(&ast));
             }
         }
         load_module(&adapter);
@@ -256,18 +257,48 @@ pub(crate) fn load_at_ext_imports(
 /// Record call arities for the target symbols while walking statements.
 /// Missing variants in the walker only risk under-counting a call site;
 /// ext symbols called with args in handler bodies are the coverage target.
-pub(crate) fn scan_call_arities(
-    stmts: &[Stmt],
+pub(crate) fn scan_call_arities<'a, I: IntoIterator<Item = &'a Stmt>>(
+    stmts: I,
     targets: &HashSet<String>,
     out: &mut HashMap<String, usize>,
 ) {
-    scan_stmts(stmts, targets, out);
+    for stmt in stmts {
+        scan_stmt(stmt, targets, out);
+    }
+}
+
+/// PLAN-841 T-05: scan a domain parse product — Core stmts plus UI-owned
+/// decls (widget bodies via [`scan_decl_arities`], store handler bodies).
+pub(crate) fn scan_ui_code_arities(
+    code: &auto_ui_dialect::UiCode,
+    targets: &HashSet<String>,
+    out: &mut HashMap<String, usize>,
+) {
+    for stmt in code.core_stmts() {
+        scan_stmt(stmt, targets, out);
+    }
+    for decl in code.domain_stmts().filter_map(|s| match s {
+        auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d),
+        _ => None,
+    }) {
+        scan_decl_arities(std::slice::from_ref(decl), targets, out);
+    }
+    for store in code.domain_stmts().filter_map(|s| match s {
+        auto_ui_dialect::UiStmt::StoreDecl(d) => Some(d),
+        _ => None,
+    }) {
+        if let Some(on) = &store.on {
+            for handler in &on.handlers {
+                scan_body(&handler.body, targets, out);
+            }
+        }
+    }
 }
 
 /// Scan a widget decl's executable bodies (on-handlers, lifecycle, setup,
 /// computed) for ext call sites.
 pub(crate) fn scan_decl_arities(
-    decls: &[auto_lang_core::ast::ui::WidgetDecl],
+    decls: &[auto_ui_dialect::ast::WidgetDecl],
     targets: &HashSet<String>,
     out: &mut HashMap<String, usize>,
 ) {
@@ -350,22 +381,6 @@ fn scan_stmt(stmt: &Stmt, targets: &HashSet<String>, out: &mut HashMap<String, u
         }
         Stmt::Block(b) => scan_body(b, targets, out),
         Stmt::Fn(f) => scan_body(&f.body, targets, out),
-        Stmt::WidgetDecl(d) => {
-            let decls = std::slice::from_ref(d);
-            scan_decl_arities(decls, targets, out);
-        }
-        Stmt::StoreDecl(s) => {
-            if let Some(ref on) = s.on {
-                for handler in &on.handlers {
-                    scan_body(&handler.body, targets, out);
-                }
-            }
-            if let Some(ref computed) = s.computed {
-                for c in &computed.properties {
-                    scan_expr(&c.expr, targets, out);
-                }
-            }
-        }
         _ => {}
     }
 }

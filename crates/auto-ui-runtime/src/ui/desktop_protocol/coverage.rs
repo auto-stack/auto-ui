@@ -1605,8 +1605,8 @@ mod tests {
         let ast = parser
             .parse()
             .unwrap_or_else(|e| panic!("parse {dir}: {e:?}"));
-        let mut app_decl: Option<&auto_lang_core::ast::WidgetDecl> = None;
-        let mut first_decl: Option<&auto_lang_core::ast::WidgetDecl> = None;
+        let mut app_decl: Option<&auto_ui_dialect::WidgetDecl> = None;
+        let mut first_decl: Option<&auto_ui_dialect::WidgetDecl> = None;
         for st in &ast.stmts {
             if let auto_lang_core::ast::Stmt::WidgetDecl(d) = st {
                 if first_decl.is_none() {
@@ -1788,8 +1788,8 @@ mod tests {
                 continue;
             };
             // App widget 优先（examples 惯例），缺省首个 WidgetDecl。
-            let mut app_decl: Option<&auto_lang_core::ast::WidgetDecl> = None;
-            let mut first_decl: Option<&auto_lang_core::ast::WidgetDecl> = None;
+            let mut app_decl: Option<&auto_ui_dialect::WidgetDecl> = None;
+            let mut first_decl: Option<&auto_ui_dialect::WidgetDecl> = None;
             for st in &ast.stmts {
                 if let auto_lang_core::ast::Stmt::WidgetDecl(d) = st {
                     if first_decl.is_none() {
@@ -1935,7 +1935,7 @@ mod tests {
                     eprintln!("[p674-not-yet] {name}: parse-fail（仪器桶——非覆盖缺项）");
                     continue;
                 };
-                let mut app_decl: Option<&auto_lang_core::ast::WidgetDecl> = None;
+                let mut app_decl: Option<&auto_ui_dialect::WidgetDecl> = None;
                 for st in &ast.stmts {
                     if let auto_lang_core::ast::Stmt::WidgetDecl(d) = st {
                         if app_decl.is_none() || d.name.as_str() == "App" {
@@ -2043,8 +2043,8 @@ mod tests {
             let Ok(ast) = parser.parse() else {
                 panic!("{name} 解析失败（shell pack 是 B 覆盖门硬前置——解析红必拦）");
             };
-            let mut app_decl: Option<&auto_lang_core::ast::WidgetDecl> = None;
-            let mut first_decl: Option<&auto_lang_core::ast::WidgetDecl> = None;
+            let mut app_decl: Option<&auto_ui_dialect::WidgetDecl> = None;
+            let mut first_decl: Option<&auto_ui_dialect::WidgetDecl> = None;
             for st in &ast.stmts {
                 if let auto_lang_core::ast::Stmt::WidgetDecl(d) = st {
                     if first_decl.is_none() {

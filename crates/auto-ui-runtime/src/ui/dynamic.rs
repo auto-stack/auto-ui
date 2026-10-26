@@ -607,8 +607,8 @@ impl DynamicComponent {
     /// only stores `AuraWidget`s, so the decls must be passed separately so the
     /// root widget's handlers can reference child handlers in the single VM.
     pub fn with_registry_and_imports_from_decls(
-        root_decl: &auto_lang_core::ast::WidgetDecl,
-        child_decls: &[auto_lang_core::ast::WidgetDecl],
+        root_decl: &auto_ui_dialect::WidgetDecl,
+        child_decls: &[auto_ui_dialect::WidgetDecl],
         view_widget: &auto_ui_compiler::aura::AuraWidget,
         registry: crate::ui::widget_registry::WidgetRegistry,
         import_stmts: Vec<auto_lang_core::ast::Stmt>,
@@ -676,7 +676,7 @@ impl DynamicComponent {
         let mut timers: Vec<TimerEntryRuntime> = Vec::new();
         {
             let mut seen: std::collections::HashSet<String> = Default::default();
-            let mut push = |d_name: &str, tb: &Option<auto_lang_core::ast::ui::TimerBlock>| {
+            let mut push = |d_name: &str, tb: &Option<auto_ui_dialect::ast::TimerBlock>| {
                 if let Some(tb) = tb {
                     for e in &tb.entries {
                         if seen.insert(format!("{}::{}", d_name, e.event)) {
@@ -3602,7 +3602,7 @@ mod tests {
     fn parse_widgets_for_decls(
         src: &str,
     ) -> (
-        Vec<auto_lang_core::ast::WidgetDecl>,
+        Vec<auto_ui_dialect::WidgetDecl>,
         AuraWidget,
         crate::ui::widget_registry::WidgetRegistry,
     ) {
@@ -3610,7 +3610,7 @@ mod tests {
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
         let ast = parser.parse().expect("parse");
-        let mut decls: Vec<auto_lang_core::ast::WidgetDecl> = vec![];
+        let mut decls: Vec<auto_ui_dialect::WidgetDecl> = vec![];
         for s in &ast.stmts {
             if let auto_lang_core::ast::Stmt::WidgetDecl(d) = s {
                 decls.push(d.clone());
@@ -3965,7 +3965,7 @@ mod tests {
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
         let ast = parser.parse().expect("parse");
-        let mut decls: Vec<auto_lang_core::ast::WidgetDecl> = vec![];
+        let mut decls: Vec<auto_ui_dialect::WidgetDecl> = vec![];
         let mut import_stmts: Vec<auto_lang_core::ast::Stmt> = vec![];
         for st in &ast.stmts {
             match st {
@@ -5689,7 +5689,7 @@ widget TimerChild652 {
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
         let ast = parser.parse().expect("parse plan652 corpus");
-        let mut decls: Vec<auto_lang_core::ast::WidgetDecl> = vec![];
+        let mut decls: Vec<auto_ui_dialect::WidgetDecl> = vec![];
         for s in &ast.stmts {
             if let auto_lang_core::ast::Stmt::WidgetDecl(d) = s {
                 decls.push(d.clone());
@@ -5974,7 +5974,7 @@ widget IfHost654 {
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
         let ast = parser.parse().expect("parse plan654 corpus");
-        let mut decls: Vec<auto_lang_core::ast::WidgetDecl> = vec![];
+        let mut decls: Vec<auto_ui_dialect::WidgetDecl> = vec![];
         for s in &ast.stmts {
             if let auto_lang_core::ast::Stmt::WidgetDecl(d) = s {
                 decls.push(d.clone());

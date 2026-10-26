@@ -767,6 +767,7 @@ dependencies = [
  "auto-terminal-core",
  "auto-text-core",
  "auto-ui-compiler",
+ "auto-ui-dialect",
  "auto-val",
  "autodown-core",
  "axum",

@@ -42,7 +42,7 @@ mod ui_tests;
 
 // ── 根再导出：旧 crate 根路径在 runtime 内保持（迁移引用零改写） ──
 
-pub use auto_lang_core::{AutoResult, Parser, UseModuleResolution};
+pub use auto_lang_core::{AutoResult, Parser, };
 
 // Re-export UI types when feature is enabled（与旧 auto-lang 根面同集）
 #[cfg(feature = "ui")]

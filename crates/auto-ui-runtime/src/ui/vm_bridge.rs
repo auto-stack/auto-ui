@@ -532,7 +532,7 @@ fn collect_param_names_from_widget(
 /// Audit B12(b): same collection from a WidgetDecl's on-block (decl-based
 /// synthesis path — `new_from_decls`).
 fn collect_param_names_from_decl(
-    decl: &auto_lang_core::ast::ui::WidgetDecl,
+    decl: &auto_ui_dialect::ast::WidgetDecl,
     out: &mut std::collections::HashMap<(String, String), Vec<String>>,
 ) {
     for on in &decl.on {
@@ -774,8 +774,8 @@ impl VmBridge {
     /// out of the state object (it is consumed by the tick scheduler, not a
     /// `ref()` state field).
     pub fn new_from_decls(
-        decl: &auto_lang_core::ast::WidgetDecl,
-        child_decls: &[auto_lang_core::ast::WidgetDecl],
+        decl: &auto_ui_dialect::WidgetDecl,
+        child_decls: &[auto_ui_dialect::WidgetDecl],
         import_stmts: Vec<Stmt>,
         import_aliases: &std::collections::HashMap<String, String>,
         api_over_http: bool,
@@ -851,7 +851,7 @@ impl VmBridge {
         //    field (it is consumed by the tick scheduler, not a ref() state).
         let tick_interval = crate::ui::handler_codegen::extract_tick_interval_from_decl(decl);
 
-        let model_fields: Vec<&auto_lang_core::ast::ModelField> = decl
+        let model_fields: Vec<&auto_ui_dialect::ast::ModelField> = decl
             .model
             .as_ref()
             .map(|m| {

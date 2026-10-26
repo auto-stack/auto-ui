@@ -4156,7 +4156,7 @@ impl<'a> AuraViewBuilder<'a> {
         if let Some(stmts) = self.import_stmts {
             if stmts.iter().any(|s| match s {
                 auto_lang_core::ast::Stmt::UseWeb(entries) => entries.iter().any(|e| {
-                    matches!(e.kind, auto_lang_core::ast::ui::ExtImportKind::Component)
+                    matches!(e.kind, auto_ui_dialect::ast::ExtImportKind::Component)
                         && e.symbols.iter().any(|n| n.as_str() == tag)
                 }),
                 _ => false,
@@ -22429,7 +22429,7 @@ mod tests {
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
         let ast = parser.parse().expect("parse");
-        let mut decls: Vec<auto_lang_core::ast::WidgetDecl> = vec![];
+        let mut decls: Vec<auto_ui_dialect::WidgetDecl> = vec![];
         for st in &ast.stmts {
             if let auto_lang_core::ast::Stmt::WidgetDecl(d) = st {
                 decls.push(d.clone());
@@ -22562,8 +22562,8 @@ mod tests {
     /// fallback → View::Empty，rail/设置面板图标全空。
     #[test]
     fn plan050_imported_component_icon_maps_to_lucide_image() {
-        let ext = auto_lang_core::ast::ui::ExtImport {
-            kind: auto_lang_core::ast::ui::ExtImportKind::Component,
+        let ext = auto_ui_dialect::ast::ExtImport {
+            kind: auto_ui_dialect::ast::ExtImportKind::Component,
             symbols: vec![
                 auto_lang_core::ast::Name::from("Folder"),
                 auto_lang_core::ast::Name::from("Folder_icon"),
@@ -22619,8 +22619,8 @@ mod tests {
 
         // PLAN-748 T-02：∉ lucide 名集的网页生态组件（AppViewport 形）保持
         // T-09(b) 占位卡路径（判别器换名集后意图面不动）。
-        let ext_vp = auto_lang_core::ast::ui::ExtImport {
-            kind: auto_lang_core::ast::ui::ExtImportKind::Component,
+        let ext_vp = auto_ui_dialect::ast::ExtImport {
+            kind: auto_ui_dialect::ast::ExtImportKind::Component,
             symbols: vec![auto_lang_core::ast::Name::from("AppViewport")],
             path: "src/front/viewport.vue".into(),
             call_args: vec![],

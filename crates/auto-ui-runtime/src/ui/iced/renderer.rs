@@ -41811,7 +41811,7 @@ widget ClickApp {
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = crate::Parser::from(src).with_session(session);
         let ast = parser.parse().expect("parse");
-        let decls: Vec<auto_lang_core::ast::WidgetDecl> = ast
+        let decls: Vec<auto_ui_dialect::WidgetDecl> = ast
             .stmts
             .iter()
             .filter_map(|s| match s {

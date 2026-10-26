@@ -1830,7 +1830,7 @@ pub fn synthesize_widget_module(
 /// exists, look for a model field named "interval" with an integer initial value.
 /// Defaults to 1000ms when the field is absent or not an int. Returns `None`
 /// when there is no `.Tick` handler.
-pub fn extract_tick_interval_from_decl(decl: &auto_lang_core::ast::WidgetDecl) -> Option<u32> {
+pub fn extract_tick_interval_from_decl(decl: &auto_ui_dialect::WidgetDecl) -> Option<u32> {
     let has_tick = decl
         .on
         .as_ref()
@@ -1860,7 +1860,7 @@ pub fn extract_tick_interval_from_decl(decl: &auto_lang_core::ast::WidgetDecl) -
 /// `AuraWidget.state_vars`. When `tick_interval` is `Some`, the "interval"
 /// field is skipped (it's consumed by the tick scheduler, not a ref() state).
 fn synthesize_state_type_from_decl(
-    decl: &auto_lang_core::ast::WidgetDecl,
+    decl: &auto_ui_dialect::WidgetDecl,
     tick_interval: Option<u32>,
 ) -> TypeDecl {
     let members: Vec<Member> = decl
@@ -1917,7 +1917,7 @@ fn synthesize_state_type_from_decl(
 /// permissive default when the payload type is absent/unresolvable (same
 /// behavior as the AuraWidget `handler_param_type`).
 fn handler_param_type_from_decl(
-    decl: &auto_lang_core::ast::WidgetDecl,
+    decl: &auto_ui_dialect::WidgetDecl,
     handler_bare: &str,
 ) -> Type {
     for msg in &decl.messages {
@@ -1939,7 +1939,7 @@ fn handler_param_type_from_decl(
 /// PR-3b: reads handler params from `decl.on` and the param type from
 /// `handler_param_type_from_decl`. Otherwise identical to `synthesize_handler_fn`.
 fn synthesize_handler_fn_from_decl(
-    decl: &auto_lang_core::ast::WidgetDecl,
+    decl: &auto_ui_dialect::WidgetDecl,
     widget_name: &str,
     state_type: &TypeDecl,
     state_fields: &HashSet<String>,
@@ -2074,7 +2074,7 @@ fn strip_callback_calls_expr(e: &mut Expr) -> Vec<crate::ui::child_emit::Strippe
 
 /// Plan 370 D-GAP-4: synthesize handler with store field rewriting support.
 fn synthesize_handler_fn_from_decl_with_store(
-    decl: &auto_lang_core::ast::WidgetDecl,
+    decl: &auto_ui_dialect::WidgetDecl,
     widget_name: &str,
     root_widget_name: &str,
     state_type: &TypeDecl,
@@ -2196,8 +2196,8 @@ fn synthesize_handler_fn_from_decl_with_store(
 /// handlers map) and the `interval` filtering for `.Tick` are replicated
 /// here so the synthesized module matches the AuraWidget path exactly.
 pub fn synthesize_from_decl(
-    decl: &auto_lang_core::ast::WidgetDecl,
-    child_decls: &[auto_lang_core::ast::WidgetDecl],
+    decl: &auto_ui_dialect::WidgetDecl,
+    child_decls: &[auto_ui_dialect::WidgetDecl],
     import_stmts: Vec<Stmt>,
     import_aliases: &std::collections::HashMap<String, String>,
     api_over_http: bool,
@@ -2384,7 +2384,7 @@ pub fn synthesize_from_decl(
 
     // 2. Compile state types + handlers for ALL widgets (root + children),
     //    reading directly from WidgetDecl.
-    let all_decls: Vec<&auto_lang_core::ast::WidgetDecl> =
+    let all_decls: Vec<&auto_ui_dialect::WidgetDecl> =
         std::iter::once(decl).chain(child_decls.iter()).collect();
 
     // Plan 370 D-GAP-4 + VM multi-store fix: collect ALL stores by their real
