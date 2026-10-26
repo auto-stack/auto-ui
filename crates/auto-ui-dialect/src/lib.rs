@@ -39,12 +39,14 @@
 //!   消息 + `pos_to_span(cur.pos)` 同位）。
 
 pub mod ast;
+pub mod codec;
 pub mod declarations;
 pub mod grammar;
 pub mod model;
 pub mod route;
 
 pub use ast::*;
+pub use codec::{decode_ui_code, encode_ui_code, UI_AST_DOMAIN, UI_AST_SCHEMA_VERSION};
 pub use model::{UiCode, UiStmt};
 pub use route::{RouteDef, RoutesBlock};
 // PLAN-814 R3-03b：UI 文法依赖回归测试组（随迁自 auto-lang-core 门控测试；

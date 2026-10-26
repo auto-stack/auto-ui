@@ -7,7 +7,7 @@ use auto_parser_api::{DomainCode, DomainStmt};
 use auto_val::{AutoStr, Node as AutoNode, Value};
 use std::fmt;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum UiStmt {
     WidgetDecl(WidgetDecl),
     StoreDecl(StoreDecl),
@@ -20,7 +20,7 @@ pub enum UiStmt {
     UseWeb(Vec<ExtImport>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct UiCode(pub DomainCode<UiStmt>);
 
 impl UiCode {

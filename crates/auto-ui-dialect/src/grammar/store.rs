@@ -6,8 +6,6 @@ use super::widget::{parse_computed_block_inner, parse_on_block, parse_watch_bloc
 use crate::ast as ui_ast;
 use crate::ast::*;
 use crate::{UiParseContext, UiStmt};
-use auto_parser_api::ast;
-use auto_parser_api::ast::*;
 use auto_parser_api::error::{pos_to_span, AutoResult, SyntaxError};
 use auto_parser_api::token::TokenKind;
 

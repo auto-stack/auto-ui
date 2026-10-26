@@ -6,7 +6,7 @@ use auto_parser_api::DomainStmt;
 use auto_ui_dialect::{UiCode, UiDialect, UiStmt};
 use std::collections::HashSet;
 
-pub const UI_AST_SCHEMA_VERSION: u32 = 1;
+pub use auto_ui_dialect::UI_AST_SCHEMA_VERSION;
 
 #[derive(Debug, Clone)]
 pub struct LoweredUi {

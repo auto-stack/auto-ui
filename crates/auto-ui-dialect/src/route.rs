@@ -44,7 +44,7 @@
 /// - `path`: `"/user/:id"`
 /// - `module`: `"user"` (maps to `@/pages/user.vue`)
 /// - `params`: `["id"]`
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct RouteDef {
     /// URL path pattern (e.g., "/button" or "/user/:id")
     pub path: String,
@@ -68,7 +68,7 @@ impl RouteDef {
     /// # Example
     ///
     /// ```
-    /// use auto_ast::ast::RouteDef;
+    /// use auto_ui_dialect::RouteDef;
     ///
     /// let route = RouteDef::new("/user/:id".to_string(), "user".to_string());
     /// assert_eq!(route.path, "/user/:id");
@@ -102,7 +102,7 @@ impl RouteDef {
 ///     "/user/:id" -> use user
 /// }
 /// ```
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct RoutesBlock {
     /// Collection of route definitions
     pub routes: Vec<RouteDef>,
@@ -150,7 +150,7 @@ impl Default for RoutesBlock {
 /// # Examples
 ///
 /// ```
-/// use auto_ast::ast::extract_route_params;
+/// use auto_ui_dialect::route::extract_route_params;
 ///
 /// assert_eq!(extract_route_params("/button"), vec![] as Vec<String>);
 /// assert_eq!(extract_route_params("/user/:id"), vec!["id"]);

@@ -4,24 +4,7 @@
 use crate::ast::*;
 use crate::UiParseContext;
 use auto_parser_api::ast::*;
-use auto_parser_api::error::{pos_to_span, AutoResult, SyntaxError};
 use auto_parser_api::token::TokenKind;
-
-/// Parse a string literal token, returning its (unquoted) text content.
-pub(crate) fn parse_string_lit(cx: &mut dyn UiParseContext) -> AutoResult<AutoStr> {
-    if cx.is_kind(TokenKind::Str) {
-        let s = cx.cur_text();
-        cx.advance();
-        Ok(s.into())
-    } else {
-        Err(SyntaxError::UnexpectedToken {
-            expected: "string literal".to_string(),
-            found: cx.cur_text().to_string(),
-            span: pos_to_span(cx.cur_pos()),
-        }
-        .into())
-    }
-}
 
 /// Get the primary (major) property name for a view element tag.
 /// This is used for the shorthand syntax: `tag "value"` → `tag (primary_prop: "value")`

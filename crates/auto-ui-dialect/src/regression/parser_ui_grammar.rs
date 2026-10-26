@@ -1,36 +1,34 @@
 //! PLAN-814 R3-03b：UI 文法回归（原 auto-lang-core `parser.rs` 的
 //! `ui-dialect` feature 门控测试随迁——SDK 清单消除 auto-ui-dialect 边后，
 //! 文法依赖测试以本 crate 为 owner，经 dev-dep auto-lang-core 驱动真
-//! Parser/方言派发）。测试体与迁移前逐字一致：仅 `crate::` 路径改写为
-//! `auto_lang_core::` 并注入文法表装配 `setup()`。
+//! Parser/方言派发）。
+//! PLAN-841 T-02：消费面迁领域端口——解析经 `parse_domain(&UiDialect)`
+//! 产出 `UiCode`（旧 `parser.parse()` + 进程级文法表注入退出）。
 
+use crate::ast::*;
+use crate::{UiCode, UiStmt};
 use auto_lang_core::ast::*;
-use auto_lang_core::error::{pos_to_span, AutoError, AutoResult, SyntaxError, Warning};
+use auto_lang_core::error::{pos_to_span, AutoResult, SyntaxError, Warning};
 use auto_lang_core::parser::Parser;
-use auto_lang_core::session::CompilerSession;
-use auto_lang_core::token::{Pos, Token, TokenKind};
+use auto_parser_api::DomainStmt;
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    /// PLAN-814 R3-03b：装配 UI 文法函数表（迁移前由 SDK `ui-dialect`
-    /// feature 编译期提供；此处进程级注入单源构造器，语义等价）。
-    fn setup() {
-        let _ = auto_lang_core::set_ui_grammar(crate::ui_grammar());
-    }
+    fn setup() {}
 
-    fn parse_once(code: &str) -> Code {
+    fn parse_once(code: &str) -> UiCode {
         let mut parser = Parser::from(code);
-        parser.parse().unwrap()
+        UiCode(parser.parse_domain(&crate::UiDialect).unwrap())
     }
 
-    fn parse_with_err(code: &str) -> AutoResult<Code> {
+    fn parse_with_err(code: &str) -> AutoResult<UiCode> {
         let mut parser = Parser::from(code);
-        parser.parse()
+        parser.parse_domain(&crate::UiDialect).map(UiCode)
     }
 
-    fn dlg_element_props(node: &ViewNode) -> &[auto_lang_core::ast::ui::ViewProp] {
+    fn dlg_element_props(node: &ViewNode) -> &[ViewProp] {
         match node {
             ViewNode::Element { props, .. } => props,
             _ => &[],
@@ -38,16 +36,19 @@ mod tests {
     }
 
     /// Parse a widget whose view root is a single for-loop; return it.
-    fn plan046_parse_root_for(src: &str) -> auto_lang_core::ast::ui::ViewNode {
+    fn plan046_parse_root_for(src: &str) -> ViewNode {
         let code = format!("widget App {{\n  view {{\n{}\n  }}\n}}", src);
         let mut parser =
             Parser::from(&code).with_session(auto_lang_core::session::CompilerSession::ui());
-        let ast = parser.parse().expect("widget must parse");
+        let ast = crate::UiCode(
+            parser
+                .parse_domain(&crate::UiDialect)
+                .expect("widget must parse"),
+        );
         let widget = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                Stmt::WidgetDecl(w) => Some(w),
+                UiStmt::WidgetDecl(w) => Some(w),
                 _ => None,
             })
             .expect("widget decl");
@@ -55,7 +56,7 @@ mod tests {
     }
 
     /// Parse a widget whose view root is a single memo block; return it.
-    fn plan046_parse_root_memo(src: &str) -> auto_lang_core::ast::ui::ViewNode {
+    fn plan046_parse_root_memo(src: &str) -> ViewNode {
         let code = format!(
             "widget App {{
   view {{
@@ -66,12 +67,15 @@ mod tests {
         );
         let mut parser =
             Parser::from(&code).with_session(auto_lang_core::session::CompilerSession::ui());
-        let ast = parser.parse().expect("widget must parse");
+        let ast = crate::UiCode(
+            parser
+                .parse_domain(&crate::UiDialect)
+                .expect("widget must parse"),
+        );
         let widget = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                Stmt::WidgetDecl(w) => Some(w),
+                UiStmt::WidgetDecl(w) => Some(w),
                 _ => None,
             })
             .expect("widget decl");
@@ -129,6 +133,30 @@ mod tests {
         }
     }
 
+    /// PLAN-841 T-02：领域端口（parse_domain）版"消费后让行"方言——
+    /// None 后派发器必须回滚游标，Core 语句路径从原位接管。
+    struct Plan778ConsumeThenNoneDomainDialect;
+
+    impl auto_parser_api::DomainDialect for Plan778ConsumeThenNoneDomainDialect {
+        type Output = UiStmt;
+
+        fn matches(&self, s: &auto_lang_core::session::CompilerSession) -> bool {
+            s.scenario == auto_lang_core::session::Scenario::UI
+        }
+        fn keywords(&self) -> &'static [&'static str] {
+            &["fn"]
+        }
+        fn try_parse_stmt(
+            &self,
+            cx: &mut dyn auto_parser_api::DomainParseContext,
+            _keyword: &str,
+        ) -> AutoResult<Option<auto_parser_api::DomainStmt<UiStmt>>> {
+            cx.advance(); // 吞 "fn"
+            cx.advance(); // 吞函数名
+            Ok(None) // 让行——游标必须被派发器回滚
+        }
+    }
+
     /// Plan 451: actions 块解析——注册表/menubar/toolbar 全字段。
     #[test]
     fn test_actions_block_parse() {
@@ -151,9 +179,13 @@ mod tests {
 }
 ";
         let mut parser = Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("actions block parses");
-        let decl = match ast.stmts.first() {
-            Some(auto_lang_core::ast::Stmt::WidgetDecl(d)) => d,
+        let ast = crate::UiCode(
+            parser
+                .parse_domain(&crate::UiDialect)
+                .expect("actions block parses"),
+        );
+        let decl = match ast.domain_stmts().next() {
+            Some(UiStmt::WidgetDecl(d)) => d,
             _ => panic!("expected widget decl"),
         };
         let acts = decl.actions.as_ref().expect("actions block present");
@@ -175,10 +207,7 @@ mod tests {
         assert_eq!(mb.menus[0].id, "file");
         assert_eq!(mb.menus[0].title, "文件");
         assert_eq!(mb.menus[0].items.len(), 3);
-        assert!(matches!(
-            mb.menus[0].items[1],
-            auto_lang_core::ast::ui::MenuItemEntry::Sep
-        ));
+        assert!(matches!(mb.menus[0].items[1], MenuItemEntry::Sep));
         let tb = acts.toolbar.as_ref().expect("toolbar");
         assert_eq!(tb.items.len(), 3);
     }
@@ -199,14 +228,18 @@ widget App {
 }
 ";
         let mut parser = Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("top-level actions decl parses");
-        let block = match ast.stmts.first() {
-            Some(auto_lang_core::ast::Stmt::ActionsDecl(b)) => b,
+        let ast = crate::UiCode(
+            parser
+                .parse_domain(&crate::UiDialect)
+                .expect("top-level actions decl parses"),
+        );
+        let block = match ast.domain_stmts().next() {
+            Some(UiStmt::ActionsDecl(b)) => b,
             _ => panic!(
                 "expected ActionsDecl, got {:?}",
-                ast.stmts
-                    .first()
-                    .map(|s| matches!(s, auto_lang_core::ast::Stmt::ActionsDecl(_)))
+                ast.domain_stmts()
+                    .next()
+                    .map(|s| matches!(s, UiStmt::ActionsDecl(_)))
             ),
         };
         assert_eq!(block.actions.len(), 1);
@@ -219,14 +252,15 @@ widget App {
 widget App { view { col { text \"hi\" {} } } }
 ";
         let mut parser2 = Parser::from(src2).with_session(session2);
-        let ast2 = parser2
-            .parse()
-            .expect("plain `actions` identifier unaffected");
+        let ast2 = UiCode(
+            parser2
+                .parse_domain(&crate::UiDialect)
+                .expect("plain `actions` identifier unaffected"),
+        );
         assert!(
             !ast2
-                .stmts
-                .iter()
-                .any(|s| matches!(s, auto_lang_core::ast::Stmt::ActionsDecl(_))),
+                .domain_stmts()
+                .any(|s| matches!(s, UiStmt::ActionsDecl(_))),
             "no ActionsDecl for non-block `actions` usage"
         );
     }
@@ -245,9 +279,13 @@ widget App { view { col { text \"hi\" {} } } }
 }
 ";
         let mut parser = Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("bare conditions parse");
-        let decl = match ast.stmts.first() {
-            Some(auto_lang_core::ast::Stmt::WidgetDecl(d)) => d,
+        let ast = crate::UiCode(
+            parser
+                .parse_domain(&crate::UiDialect)
+                .expect("bare conditions parse"),
+        );
+        let decl = match ast.domain_stmts().next() {
+            Some(UiStmt::WidgetDecl(d)) => d,
             _ => panic!("expected widget decl"),
         };
         let acts = decl.actions.as_ref().expect("actions");
@@ -269,10 +307,14 @@ widget App { view { col { text \"hi\" {} } } }
 }
 ";
         let mut parser = Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("near-miss still parses as element");
+        let ast = crate::UiCode(
+            parser
+                .parse_domain(&crate::UiDialect)
+                .expect("near-miss still parses as element"),
+        );
         assert!(matches!(
-            ast.stmts.first(),
-            Some(auto_lang_core::ast::Stmt::WidgetDecl(_))
+            ast.domain_stmts().next(),
+            Some(UiStmt::WidgetDecl(_))
         ));
         let hit = parser.warnings.iter().any(|w| {
             matches!(
@@ -293,7 +335,11 @@ widget App { view { col { text \"hi\" {} } } }
 }
 ";
         let mut parser2 = Parser::from(src2).with_session(session2);
-        parser2.parse().expect("legit element parses");
+        UiCode(
+            parser2
+                .parse_domain(&crate::UiDialect)
+                .expect("legit element parses"),
+        );
         assert!(
             !parser2
                 .warnings
@@ -306,18 +352,32 @@ widget App { view { col { text \"hi\" {} } } }
     #[test]
     fn test_with_session_registers_ui_dialect() {
         setup();
-        // PR-2: UI session 注册 UiDialect；Core session 方言表为空。
+        // PLAN-841 T-02：内建 UI 方言不再经旧三段注册表装配（表恒空）；
+        // UI 文法只在显式领域端口（parse_domain(&UiDialect)）下生效。
         let ui_parser =
             Parser::from("x = 1").with_session(auto_lang_core::session::CompilerSession::ui());
-        // builtin 段恰 1 个（UiDialect），外部段为空（PLAN-778 三段表）
-        assert_eq!(ui_parser.dialect_section_len(1), 1);
+        assert_eq!(ui_parser.dialect_section_len(0), 0, "pre 段为空");
         assert_eq!(
-            ui_parser.dialect_section_len(0) + ui_parser.dialect_section_len(2),
-            0
+            ui_parser.dialect_section_len(1),
+            0,
+            "builtin 段无内建 UI 方言"
         );
+        assert_eq!(ui_parser.dialect_section_len(2), 0, "post 段为空");
 
         let core_parser = Parser::from("x = 1");
         assert_eq!(core_parser.dialect_section_len(1), 0);
+
+        // 端口语义等价断言：UI session + 显式领域端口仍解析 widget；
+        // 无端口（纯 parse）下 UI 语句不再是合法 Core 输入。
+        let ui = UiCode(
+            Parser::from("widget App { view { text \"x\" {} } }")
+                .with_session(auto_lang_core::session::CompilerSession::ui())
+                .parse_domain(&crate::UiDialect)
+                .expect("domain port parses widget"),
+        );
+        assert!(ui
+            .domain_stmts()
+            .any(|s| matches!(s, UiStmt::WidgetDecl(_))));
     }
 
     #[test]
@@ -331,25 +391,26 @@ widget App { view { col { text \"hi\" {} } } }
             );
         assert!(parser.parse_stmt().is_err(), "方言恒 Err");
         // 旧缺陷下此处三段全空（Err 提前 return 未移回）。
+        // PLAN-841 T-02：builtin 段不再含内建 UI 方言（恒 0），外部注册不变量保留。
         assert_eq!(parser.dialect_section_len(0), 1, "Err 后 pre 段注册不丢");
-        assert_eq!(parser.dialect_section_len(1), 1, "Err 后 builtin 段不丢");
+        assert_eq!(parser.dialect_section_len(1), 0, "builtin 段无内建方言");
         assert_eq!(parser.dialect_section_len(2), 0);
     }
 
     #[test]
     fn test_plan778_none_rolls_back_cursor_for_next_dialect() {
         setup();
-        let ast = Parser::from("model { count int = 1 }")
-            .with_session(auto_lang_core::session::CompilerSession::ui())
-            .with_dialect(
-                Box::new(Plan778ConsumeThenNoneDialect),
-                auto_lang_core::dialect::DialectPriority::Override,
-            )
-            .parse()
-            .expect("None 回滚后内建必须从语句原位接管");
-        match &ast.stmts[0] {
-            Stmt::ModelBlock(b) => assert_eq!(b.fields.len(), 1),
-            other => panic!("expected ModelBlock after rollback, got {:?}", other),
+        // PLAN-841 T-02：经领域端口复现不变量——方言消费 token 后让行（None），
+        // 派发器必须回滚游标，Core 语句路径从语句原位接管解析。
+        let ast = UiCode(
+            Parser::from("fn main() int { 42 }")
+                .with_session(auto_lang_core::session::CompilerSession::ui())
+                .parse_domain(&Plan778ConsumeThenNoneDomainDialect)
+                .expect("None 回滚后 Core 路径必须从原位接管"),
+        );
+        match &ast.items()[0] {
+            DomainStmt::Core(Stmt::Fn(f)) => assert_eq!(f.name.as_str(), "main"),
+            other => panic!("expected intact fn decl after rollback, got {:?}", other),
         }
     }
 
@@ -357,6 +418,7 @@ widget App { view { col { text \"hi\" {} } } }
     fn test_plan778_with_session_preserves_external_registration() {
         setup();
         // 先注册、后 with_session：pre 段保留，builtin 段按新 session 重建。
+        // PLAN-841 T-02：重建后的 builtin 段恒空（内建 UI 方言已移入领域端口）。
         let parser = Parser::from("x = 1")
             .with_dialect(
                 Box::new(Plan778ConsumeThenNoneDialect),
@@ -370,8 +432,8 @@ widget App { view { col { text \"hi\" {} } } }
         );
         assert_eq!(
             parser.dialect_section_len(1),
-            1,
-            "builtin 段按 session 重建"
+            0,
+            "builtin 段按 session 重建（现恒空）"
         );
     }
 
@@ -382,10 +444,10 @@ widget App { view { col { text \"hi\" {} } } }
         // view 树用小写标签语法（col/text 等），与现有 widget view 测试一致。
         let mut parser = Parser::from("view {\n  col {\n    text \"hello\"\n  }\n}")
             .with_session(auto_lang_core::session::CompilerSession::ui());
-        let ast = parser.parse().unwrap();
-        let last = ast.stmts.last().unwrap();
+        let ast = UiCode(parser.parse_domain(&crate::UiDialect).unwrap());
+        let last = ast.domain_stmts().last().unwrap();
         assert!(
-            matches!(last, Stmt::ViewBlock(_)),
+            matches!(last, UiStmt::ViewBlock(_)),
             "expected ViewBlock, got {:?}",
             last
         );
@@ -415,8 +477,10 @@ widget App { view { col { text \"hi\" {} } } }
         );
         let mut parser =
             Parser::from(code_b).with_session(auto_lang_core::session::CompilerSession::ui());
-        let ast = parser.parse().unwrap();
-        assert!(ast.stmts.iter().any(|s| matches!(s, Stmt::WidgetDecl(_))));
+        let ast = UiCode(parser.parse_domain(&crate::UiDialect).unwrap());
+        assert!(ast
+            .domain_stmts()
+            .any(|s| matches!(s, UiStmt::WidgetDecl(_))));
 
         // (c) 括号表达式上的方法链
         let code_c = concat!(
@@ -432,8 +496,10 @@ widget App { view { col { text \"hi\" {} } } }
         );
         let mut parser =
             Parser::from(code_c).with_session(auto_lang_core::session::CompilerSession::ui());
-        let ast = parser.parse().unwrap();
-        assert!(ast.stmts.iter().any(|s| matches!(s, Stmt::WidgetDecl(_))));
+        let ast = UiCode(parser.parse_domain(&crate::UiDialect).unwrap());
+        assert!(ast
+            .domain_stmts()
+            .any(|s| matches!(s, UiStmt::WidgetDecl(_))));
     }
 
     /// Plan 041a⑥: 语句级 `.` 消息派发不得并入前一语句(对象字面量赋值后
@@ -465,12 +531,11 @@ widget App { view { col { text \"hi\" {} } } }
         let count = |code: &str| -> usize {
             let mut parser =
                 Parser::from(code).with_session(auto_lang_core::session::CompilerSession::ui());
-            let ast = parser.parse().unwrap();
+            let ast = UiCode(parser.parse_domain(&crate::UiDialect).unwrap());
             let widget = ast
-                .stmts
-                .iter()
+                .domain_stmts()
                 .find_map(|s| match s {
-                    Stmt::WidgetDecl(w) => Some(w),
+                    UiStmt::WidgetDecl(w) => Some(w),
                     _ => None,
                 })
                 .expect("widget decl");
@@ -484,22 +549,15 @@ widget App { view { col { text \"hi\" {} } } }
 ", "}
 ",
         );
-        let same_line = code.replace(
-            "};
-      .go",
-            "}
-      let _z = .go",
-        );
         assert_eq!(count(&with_semi), 2, "semi-terminated: two stmts");
         assert_eq!(count(&no_semi), 2, "newline-terminated: two stmts");
         let mut parser =
             Parser::from(code).with_session(auto_lang_core::session::CompilerSession::ui());
-        let ast = parser.parse().unwrap();
+        let ast = UiCode(parser.parse_domain(&crate::UiDialect).unwrap());
         let widget = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                Stmt::WidgetDecl(w) => Some(w),
+                UiStmt::WidgetDecl(w) => Some(w),
                 _ => None,
             })
             .expect("widget decl");
@@ -531,9 +589,9 @@ widget App { view { col { text \"hi\" {} } } }
         let code = "widget App {\n  model { count int = 0 }\n  view { text \"hello\" }\n}";
         let mut parser =
             Parser::from(code).with_session(auto_lang_core::session::CompilerSession::ui());
-        let ast = parser.parse().unwrap();
-        let last = ast.stmts.last().unwrap();
-        assert!(matches!(last, Stmt::WidgetDecl(_)));
+        let ast = UiCode(parser.parse_domain(&crate::UiDialect).unwrap());
+        let last = ast.domain_stmts().last().unwrap();
+        assert!(matches!(last, UiStmt::WidgetDecl(_)));
     }
 
     #[test]
@@ -555,12 +613,11 @@ widget App { view { col { text \"hi\" {} } } }
         );
         let mut parser =
             Parser::from(code).with_session(auto_lang_core::session::CompilerSession::ui());
-        let ast = parser.parse().unwrap();
+        let ast = UiCode(parser.parse_domain(&crate::UiDialect).unwrap());
         let widget = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                Stmt::WidgetDecl(w) => Some(w),
+                UiStmt::WidgetDecl(w) => Some(w),
                 _ => None,
             })
             .expect("widget decl");
@@ -607,12 +664,11 @@ widget App { view { col { text \"hi\" {} } } }
         );
         let mut parser =
             Parser::from(code).with_session(auto_lang_core::session::CompilerSession::ui());
-        let ast = parser.parse().unwrap();
+        let ast = UiCode(parser.parse_domain(&crate::UiDialect).unwrap());
         let widget = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                Stmt::WidgetDecl(w) => Some(w),
+                UiStmt::WidgetDecl(w) => Some(w),
                 _ => None,
             })
             .expect("widget decl");
@@ -649,12 +705,11 @@ widget App { view { col { text \"hi\" {} } } }
         );
         let mut parser =
             Parser::from(code).with_session(auto_lang_core::session::CompilerSession::ui());
-        let ast = parser.parse().unwrap();
+        let ast = UiCode(parser.parse_domain(&crate::UiDialect).unwrap());
         let widget = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                Stmt::WidgetDecl(w) => Some(w),
+                UiStmt::WidgetDecl(w) => Some(w),
                 _ => None,
             })
             .expect("widget decl");
@@ -699,12 +754,11 @@ widget App { view { col { text \"hi\" {} } } }
         );
         let mut parser =
             Parser::from(code).with_session(auto_lang_core::session::CompilerSession::ui());
-        let ast = parser.parse().unwrap();
+        let ast = UiCode(parser.parse_domain(&crate::UiDialect).unwrap());
         let widget = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                Stmt::WidgetDecl(w) => Some(w),
+                UiStmt::WidgetDecl(w) => Some(w),
                 _ => None,
             })
             .expect("widget decl");
@@ -746,12 +800,11 @@ widget App { view { col { text \"hi\" {} } } }
         );
         let mut parser =
             Parser::from(code).with_session(auto_lang_core::session::CompilerSession::ui());
-        let ast = parser.parse().unwrap();
+        let ast = UiCode(parser.parse_domain(&crate::UiDialect).unwrap());
         let widget = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                Stmt::WidgetDecl(w) => Some(w),
+                UiStmt::WidgetDecl(w) => Some(w),
                 _ => None,
             })
             .expect("widget decl");
@@ -808,9 +861,13 @@ widget App { view { col { text \"hi\" {} } } }
         );
         let mut parser =
             Parser::from(code).with_session(auto_lang_core::session::CompilerSession::ui());
-        let ast = parser.parse().expect("stmt after try/catch must parse");
-        match &ast.stmts[0] {
-            Stmt::Fn(f) => assert_eq!(f.body.stmts.len(), 3, "let+try+return"),
+        let ast = crate::UiCode(
+            parser
+                .parse_domain(&crate::UiDialect)
+                .expect("stmt after try/catch must parse"),
+        );
+        match &ast.items()[0] {
+            DomainStmt::Core(Stmt::Fn(f)) => assert_eq!(f.body.stmts.len(), 3, "let+try+return"),
             other => panic!("expected fn decl, got {:?}", other),
         }
 
@@ -829,14 +886,14 @@ widget App { view { col { text \"hi\" {} } } }
         );
         let mut p2 =
             Parser::from(code2).with_session(auto_lang_core::session::CompilerSession::ui());
-        let ast2 = p2
-            .parse()
-            .expect("stmt after try/catch in on-body must parse");
+        let ast2 = UiCode(
+            p2.parse_domain(&crate::UiDialect)
+                .expect("stmt after try/catch in on-body must parse"),
+        );
         let w = ast2
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                Stmt::WidgetDecl(w) => Some(w),
+                UiStmt::WidgetDecl(w) => Some(w),
                 _ => None,
             })
             .expect("widget");
@@ -869,12 +926,11 @@ widget App { view { col { text \"hi\" {} } } }
         );
         let mut parser =
             Parser::from(code).with_session(auto_lang_core::session::CompilerSession::ui());
-        let ast = parser.parse().unwrap();
+        let ast = UiCode(parser.parse_domain(&crate::UiDialect).unwrap());
         let widget = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                Stmt::WidgetDecl(w) => Some(w),
+                UiStmt::WidgetDecl(w) => Some(w),
                 _ => None,
             })
             .expect("widget decl");
@@ -912,12 +968,11 @@ widget App { view { col { text \"hi\" {} } } }
         );
         let mut parser =
             Parser::from(code).with_session(auto_lang_core::session::CompilerSession::ui());
-        let ast = parser.parse().unwrap();
+        let ast = UiCode(parser.parse_domain(&crate::UiDialect).unwrap());
         let widget = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                Stmt::WidgetDecl(w) => Some(w),
+                UiStmt::WidgetDecl(w) => Some(w),
                 _ => None,
             })
             .expect("widget decl");
@@ -955,12 +1010,11 @@ widget App { view { col { text \"hi\" {} } } }
         );
         let mut parser =
             Parser::from(code).with_session(auto_lang_core::session::CompilerSession::ui());
-        let ast = parser.parse().unwrap();
+        let ast = UiCode(parser.parse_domain(&crate::UiDialect).unwrap());
         let widget = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                Stmt::WidgetDecl(w) => Some(w),
+                UiStmt::WidgetDecl(w) => Some(w),
                 _ => None,
             })
             .expect("widget decl");
@@ -997,12 +1051,11 @@ widget App { view { col { text \"hi\" {} } } }
         );
         let mut parser =
             Parser::from(code).with_session(auto_lang_core::session::CompilerSession::ui());
-        let ast = parser.parse().unwrap();
+        let ast = UiCode(parser.parse_domain(&crate::UiDialect).unwrap());
         let widget = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                Stmt::WidgetDecl(w) => Some(w),
+                UiStmt::WidgetDecl(w) => Some(w),
                 _ => None,
             })
             .expect("widget decl");
@@ -1037,12 +1090,11 @@ widget App { view { col { text \"hi\" {} } } }
         );
         let mut parser =
             Parser::from(code).with_session(auto_lang_core::session::CompilerSession::ui());
-        let ast = parser.parse().unwrap();
+        let ast = UiCode(parser.parse_domain(&crate::UiDialect).unwrap());
         let widget = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                Stmt::WidgetDecl(w) => Some(w),
+                UiStmt::WidgetDecl(w) => Some(w),
                 _ => None,
             })
             .expect("widget decl");
@@ -1073,15 +1125,14 @@ widget App { view { col { text \"hi\" {} } } }
         );
         let mut parser =
             Parser::from(code).with_session(auto_lang_core::session::CompilerSession::ui());
-        let ast = parser.parse().unwrap();
+        let ast = UiCode(parser.parse_domain(&crate::UiDialect).unwrap());
         // Traverse: StoreDecl → on → handlers[0] → body stmts → the var Store.
         use auto_lang_core::ast::{Expr, Stmt};
         let stmt = ast
-            .stmts
-            .iter()
-            .find(|s| matches!(s, Stmt::StoreDecl(_)))
+            .domain_stmts()
+            .find(|s| matches!(s, UiStmt::StoreDecl(_)))
             .expect("store decl");
-        let Stmt::StoreDecl(decl) = stmt else {
+        let UiStmt::StoreDecl(decl) = stmt else {
             unreachable!()
         };
         let on = decl.on.as_ref().expect("on block");
@@ -1160,26 +1211,22 @@ widget App { view { col { text \"hi\" {} } } }
         );
         let mut parser =
             Parser::from(code).with_session(auto_lang_core::session::CompilerSession::ui());
-        let ast = parser
-            .parse()
-            .expect("widget view with PascalCase fields parses");
+        let ast = UiCode(
+            parser
+                .parse_domain(&crate::UiDialect)
+                .expect("widget view with PascalCase fields parses"),
+        );
         // RenderT's view body must contain the for loop with the text element.
-        use auto_lang_core::ast::Stmt;
         let view_fn = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                Stmt::ViewFragmentDecl(vf) if vf.name.as_str() == "RenderT" => Some(vf),
+                UiStmt::ViewFragmentDecl(vf) if vf.name.as_str() == "RenderT" => Some(vf),
                 _ => None,
             })
             .expect("RenderT view fn decl");
         let root = view_fn.body.clone();
         // Root → col element → for loop → text element with a Dot primary prop.
-        fn collect_text_primary(
-            node: &auto_lang_core::ast::ui::ViewNode,
-            out: &mut Vec<auto_lang_core::ast::Expr>,
-        ) {
-            use auto_lang_core::ast::ui::ViewNode;
+        fn collect_text_primary(node: &ViewNode, out: &mut Vec<auto_lang_core::ast::Expr>) {
             match node {
                 ViewNode::Element {
                     tag,
@@ -1190,7 +1237,7 @@ widget App { view { col { text \"hi\" {} } } }
                     if tag == "text" {
                         for p in props {
                             if p.name == "text" {
-                                if let auto_lang_core::ast::ui::ViewPropValue::Expr(e) = &p.value {
+                                if let ViewPropValue::Expr(e) = &p.value {
                                     out.push(e.clone());
                                 }
                             }
@@ -1269,12 +1316,14 @@ widget App { view { col { text \"hi\" {} } } }
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut p = Parser::from(code).with_session(session);
-        let ast = p.parse().expect("inline lambda event must parse");
+        let ast = UiCode(
+            p.parse_domain(&crate::UiDialect)
+                .expect("inline lambda event must parse"),
+        );
         let w = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                Stmt::WidgetDecl(w) => Some(w),
+                UiStmt::WidgetDecl(w) => Some(w),
                 _ => None,
             })
             .expect("widget");
@@ -1376,12 +1425,14 @@ widget App { view { col { text \"hi\" {} } } }
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut p = Parser::from(code).with_session(session);
-        let ast = p.parse().expect("bare value input must parse");
+        let ast = UiCode(
+            p.parse_domain(&crate::UiDialect)
+                .expect("bare value input must parse"),
+        );
         let w = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                Stmt::WidgetDecl(w) => Some(w),
+                UiStmt::WidgetDecl(w) => Some(w),
                 _ => None,
             })
             .expect("widget");
@@ -1520,12 +1571,14 @@ widget App { view { col { text \"hi\" {} } } }
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut p = Parser::from(code).with_session(session);
-        let ast = p.parse().expect("unbound dialog must parse");
+        let ast = UiCode(
+            p.parse_domain(&crate::UiDialect)
+                .expect("unbound dialog must parse"),
+        );
         let w = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                Stmt::WidgetDecl(w) => Some(w),
+                UiStmt::WidgetDecl(w) => Some(w),
                 _ => None,
             })
             .expect("widget");
@@ -1561,12 +1614,14 @@ widget App { view { col { text \"hi\" {} } } }
         let bound_code = "widget B { view { dialog (open: .show) { } } }";
         let mut p2 =
             Parser::from(bound_code).with_session(auto_lang_core::session::CompilerSession::ui());
-        let ast2 = p2.parse().expect("bound dialog parses");
+        let ast2 = UiCode(
+            p2.parse_domain(&crate::UiDialect)
+                .expect("bound dialog parses"),
+        );
         let w2 = ast2
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                Stmt::WidgetDecl(w) => Some(w),
+                UiStmt::WidgetDecl(w) => Some(w),
                 _ => None,
             })
             .expect("widget 2");
@@ -1688,12 +1743,14 @@ widget App { view { col { text \"hi\" {} } } }
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut p = Parser::from(code).with_session(session);
-        let ast = p.parse().expect("unbound hovercard must parse");
+        let ast = UiCode(
+            p.parse_domain(&crate::UiDialect)
+                .expect("unbound hovercard must parse"),
+        );
         let w = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                Stmt::WidgetDecl(w) => Some(w),
+                UiStmt::WidgetDecl(w) => Some(w),
                 _ => None,
             })
             .expect("widget");
@@ -1803,12 +1860,14 @@ widget App { view { col { text \"hi\" {} } } }
         );
         let mut p2 =
             Parser::from(bound_code).with_session(auto_lang_core::session::CompilerSession::ui());
-        let ast2 = p2.parse().expect("bound hovercard parses");
+        let ast2 = UiCode(
+            p2.parse_domain(&crate::UiDialect)
+                .expect("bound hovercard parses"),
+        );
         let w2 = ast2
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                Stmt::WidgetDecl(w) => Some(w),
+                UiStmt::WidgetDecl(w) => Some(w),
                 _ => None,
             })
             .expect("widget 2");
@@ -1851,12 +1910,14 @@ widget App { view { col { text \"hi\" {} } } }
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut p = Parser::from(code).with_session(session);
-        let ast = p.parse().expect("unnamed msg decl must parse");
+        let ast = UiCode(
+            p.parse_domain(&crate::UiDialect)
+                .expect("unnamed msg decl must parse"),
+        );
         let w = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                Stmt::WidgetDecl(w) => Some(w),
+                UiStmt::WidgetDecl(w) => Some(w),
                 _ => None,
             })
             .expect("widget");
@@ -1870,12 +1931,14 @@ widget App { view { col { text \"hi\" {} } } }
         let legacy = concat!("widget Counter {\n", "    msg Msg { Inc }\n", "}\n");
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut p2 = Parser::from(legacy).with_session(session);
-        let ast2 = p2.parse().expect("legacy named msg decl must still parse");
+        let ast2 = UiCode(
+            p2.parse_domain(&crate::UiDialect)
+                .expect("legacy named msg decl must still parse"),
+        );
         let w2 = ast2
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                Stmt::WidgetDecl(w) => Some(w),
+                UiStmt::WidgetDecl(w) => Some(w),
                 _ => None,
             })
             .expect("widget");
@@ -1908,19 +1971,15 @@ widget Counter {
         let session =
             auto_lang_core::session::CompilerSession::new(auto_lang_core::session::Scenario::UI);
         let mut parser = Parser::from(code).with_session(session);
-        let result = parser.parse();
+        let result = parser.parse_domain(&crate::UiDialect).map(UiCode);
 
         match result {
             Ok(ast) => {
                 // Check that we got a widget declaration
-                let non_empty: Vec<_> = ast
-                    .stmts
-                    .iter()
-                    .filter(|s| !matches!(s, Stmt::EmptyLine(_)))
-                    .collect();
+                let non_empty: Vec<_> = ast.domain_stmts().collect();
                 assert_eq!(non_empty.len(), 1, "Should have one widget statement");
 
-                if let Stmt::WidgetDecl(widget) = non_empty[0] {
+                if let UiStmt::WidgetDecl(widget) = non_empty[0] {
                     assert_eq!(widget.name.as_str(), "Counter");
                     assert_eq!(widget.messages.len(), 1);
                     assert_eq!(widget.messages[0].variants.len(), 2);
@@ -1963,18 +2022,14 @@ widget W {
         let session =
             auto_lang_core::session::CompilerSession::new(auto_lang_core::session::Scenario::UI);
         let mut parser = Parser::from(code).with_session(session);
-        let result = parser.parse();
+        let result = parser.parse_domain(&crate::UiDialect).map(UiCode);
 
         match result {
             Ok(ast) => {
-                let non_empty: Vec<_> = ast
-                    .stmts
-                    .iter()
-                    .filter(|s| !matches!(s, Stmt::EmptyLine(_)))
-                    .collect();
+                let non_empty: Vec<_> = ast.domain_stmts().collect();
                 assert_eq!(non_empty.len(), 1, "Should have one widget statement");
 
-                if let Stmt::WidgetDecl(widget) = non_empty[0] {
+                if let UiStmt::WidgetDecl(widget) = non_empty[0] {
                     let view = widget.view.as_ref().expect("View should be parsed");
                     // Multiple top-level siblings → implicit col wrapper
                     if let ViewNode::Element { tag, children, .. } = &view.root {
@@ -2020,16 +2075,12 @@ widget W {
         let session =
             auto_lang_core::session::CompilerSession::new(auto_lang_core::session::Scenario::UI);
         let mut parser = Parser::from(code).with_session(session);
-        let result = parser.parse();
+        let result = parser.parse_domain(&crate::UiDialect).map(UiCode);
 
         match result {
             Ok(ast) => {
-                let non_empty: Vec<_> = ast
-                    .stmts
-                    .iter()
-                    .filter(|s| !matches!(s, Stmt::EmptyLine(_)))
-                    .collect();
-                if let Stmt::WidgetDecl(widget) = non_empty[0] {
+                let non_empty: Vec<_> = ast.domain_stmts().collect();
+                if let UiStmt::WidgetDecl(widget) = non_empty[0] {
                     let view = widget.view.as_ref().expect("View should be parsed");
                     if let ViewNode::Element { tag, .. } = &view.root {
                         assert_eq!(tag, "div", "single root must stay the div itself");
@@ -2068,18 +2119,14 @@ widget App {
         let session =
             auto_lang_core::session::CompilerSession::new(auto_lang_core::session::Scenario::UI);
         let mut parser = Parser::from(code).with_session(session);
-        let result = parser.parse();
+        let result = parser.parse_domain(&crate::UiDialect).map(UiCode);
 
         match result {
             Ok(ast) => {
-                let non_empty: Vec<_> = ast
-                    .stmts
-                    .iter()
-                    .filter(|s| !matches!(s, Stmt::EmptyLine(_)))
-                    .collect();
+                let non_empty: Vec<_> = ast.domain_stmts().collect();
                 assert_eq!(non_empty.len(), 1, "Should have one widget statement");
 
-                if let Stmt::WidgetDecl(widget) = non_empty[0] {
+                if let UiStmt::WidgetDecl(widget) = non_empty[0] {
                     assert_eq!(widget.name.as_str(), "App");
 
                     // Check routes exist
@@ -2123,10 +2170,10 @@ widget T {
         let session =
             auto_lang_core::session::CompilerSession::new(auto_lang_core::session::Scenario::UI);
         let mut parser = Parser::from(code).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = crate::UiCode(parser.parse_domain(&crate::UiDialect).expect("parse"));
         let mut variants = vec![];
-        for stmt in &ast.stmts {
-            if let Stmt::WidgetDecl(w) = stmt {
+        for stmt in ast.items() {
+            if let DomainStmt::Domain(UiStmt::WidgetDecl(w)) = stmt {
                 if let Some(msg) = w.messages.first() {
                     variants = msg.variants.clone();
                 }
@@ -2161,18 +2208,14 @@ widget Test {
         let session =
             auto_lang_core::session::CompilerSession::new(auto_lang_core::session::Scenario::UI);
         let mut parser = Parser::from(code).with_session(session);
-        let result = parser.parse();
+        let result = parser.parse_domain(&crate::UiDialect).map(UiCode);
 
         match result {
             Ok(ast) => {
-                let non_empty: Vec<_> = ast
-                    .stmts
-                    .iter()
-                    .filter(|s| !matches!(s, Stmt::EmptyLine(_)))
-                    .collect();
+                let non_empty: Vec<_> = ast.domain_stmts().collect();
                 assert_eq!(non_empty.len(), 1, "Should have one widget statement");
 
-                if let Stmt::WidgetDecl(widget) = non_empty[0] {
+                if let UiStmt::WidgetDecl(widget) = non_empty[0] {
                     assert_eq!(widget.name.as_str(), "Test");
 
                     // Check view tree exists
@@ -2197,11 +2240,11 @@ widget Test {
         let session =
             auto_lang_core::session::CompilerSession::new(auto_lang_core::session::Scenario::UI);
         let mut parser = Parser::from(code).with_session(session);
-        let result = parser.parse();
+        let result = parser.parse_domain(&crate::UiDialect).map(UiCode);
         assert!(result.is_ok());
 
         if let Ok(ast) = result {
-            if let Stmt::WidgetDecl(widget) = &ast.stmts[0] {
+            if let DomainStmt::Domain(UiStmt::WidgetDecl(widget)) = &ast.items()[0] {
                 if let Some(view) = &widget.view {
                     if let ViewNode::Element { tag, children, .. } = &view.root {
                         assert_eq!(tag, "col");
@@ -2225,11 +2268,11 @@ widget Test {
         let session =
             auto_lang_core::session::CompilerSession::new(auto_lang_core::session::Scenario::UI);
         let mut parser = Parser::from(code).with_session(session);
-        let result = parser.parse();
+        let result = parser.parse_domain(&crate::UiDialect).map(UiCode);
         assert!(result.is_ok());
 
         if let Ok(ast) = result {
-            if let Stmt::WidgetDecl(widget) = &ast.stmts[0] {
+            if let DomainStmt::Domain(UiStmt::WidgetDecl(widget)) = &ast.items()[0] {
                 if let Some(view) = &widget.view {
                     if let ViewNode::Element { children, .. } = &view.root {
                         assert_eq!(children.len(), 1);
@@ -2254,7 +2297,7 @@ widget Test {
         let session =
             auto_lang_core::session::CompilerSession::new(auto_lang_core::session::Scenario::UI);
         let mut parser = Parser::from(code).with_session(session);
-        let result = parser.parse();
+        let result = parser.parse_domain(&crate::UiDialect).map(UiCode);
         assert!(result.is_ok());
     }
 
@@ -2267,11 +2310,11 @@ widget Test {
         let session =
             auto_lang_core::session::CompilerSession::new(auto_lang_core::session::Scenario::UI);
         let mut parser = Parser::from(code).with_session(session);
-        let result = parser.parse();
+        let result = parser.parse_domain(&crate::UiDialect).map(UiCode);
         assert!(result.is_ok());
 
         if let Ok(ast) = result {
-            if let Stmt::WidgetDecl(widget) = &ast.stmts[0] {
+            if let DomainStmt::Domain(UiStmt::WidgetDecl(widget)) = &ast.items()[0] {
                 if let Some(view) = &widget.view {
                     if let ViewNode::Element {
                         tag, props, events, ..
@@ -2298,14 +2341,14 @@ widget Test {
         let session =
             auto_lang_core::session::CompilerSession::new(auto_lang_core::session::Scenario::UI);
         let mut parser = Parser::from(code).with_session(session);
-        let result = parser.parse();
+        let result = parser.parse_domain(&crate::UiDialect).map(UiCode);
 
         // Parsing succeeds - `>` is treated as an element tag name
         assert!(result.is_ok());
 
         // Navigate to the child node and verify it's an element with tag ">"
         if let Ok(ast) = result {
-            if let Stmt::WidgetDecl(widget) = &ast.stmts[0] {
+            if let DomainStmt::Domain(UiStmt::WidgetDecl(widget)) = &ast.items()[0] {
                 if let Some(view) = &widget.view {
                     // Root is col, find the child
                     if let ViewNode::Element { tag, children, .. } = &view.root {
@@ -2333,7 +2376,7 @@ widget Test {
         let session =
             auto_lang_core::session::CompilerSession::new(auto_lang_core::session::Scenario::UI);
         let mut parser = Parser::from(code).with_session(session);
-        let result = parser.parse();
+        let result = parser.parse_domain(&crate::UiDialect).map(UiCode);
         assert!(result.is_ok(), "Pipe syntax should work for text nodes");
     }
 
@@ -2364,18 +2407,14 @@ widget Counter {
         let session =
             auto_lang_core::session::CompilerSession::new(auto_lang_core::session::Scenario::UI);
         let mut parser = Parser::from(code).with_session(session);
-        let result = parser.parse();
+        let result = parser.parse_domain(&crate::UiDialect).map(UiCode);
 
         match result {
             Ok(ast) => {
-                let non_empty: Vec<_> = ast
-                    .stmts
-                    .iter()
-                    .filter(|s| !matches!(s, Stmt::EmptyLine(_)))
-                    .collect();
+                let non_empty: Vec<_> = ast.domain_stmts().collect();
                 assert_eq!(non_empty.len(), 1, "Should have one widget statement");
 
-                if let Stmt::WidgetDecl(widget) = non_empty[0] {
+                if let UiStmt::WidgetDecl(widget) = non_empty[0] {
                     assert_eq!(widget.name.as_str(), "Counter");
                     assert_eq!(widget.messages.len(), 1);
                     assert_eq!(widget.messages[0].variants.len(), 2);
@@ -2432,11 +2471,11 @@ widget Test {
         let session =
             auto_lang_core::session::CompilerSession::new(auto_lang_core::session::Scenario::UI);
         let mut parser = Parser::from(mutable_code).with_session(session);
-        let result = parser.parse();
+        let result = parser.parse_domain(&crate::UiDialect).map(UiCode);
         assert!(result.is_ok());
 
         if let Ok(ast) = result {
-            if let Stmt::WidgetDecl(widget) = &ast.stmts[0] {
+            if let DomainStmt::Domain(UiStmt::WidgetDecl(widget)) = &ast.items()[0] {
                 let model = widget.model.as_ref().unwrap();
                 assert!(model.fields[0].mutable, "Field with var should be mutable");
             }
@@ -2446,11 +2485,11 @@ widget Test {
         let session2 =
             auto_lang_core::session::CompilerSession::new(auto_lang_core::session::Scenario::UI);
         let mut parser2 = Parser::from(immutable_code).with_session(session2);
-        let result2 = parser2.parse();
+        let result2 = parser2.parse_domain(&crate::UiDialect).map(UiCode);
         assert!(result2.is_ok());
 
         if let Ok(ast) = result2 {
-            if let Stmt::WidgetDecl(widget) = &ast.stmts[0] {
+            if let DomainStmt::Domain(UiStmt::WidgetDecl(widget)) = &ast.items()[0] {
                 let model = widget.model.as_ref().unwrap();
                 assert!(
                     !model.fields[0].mutable,
@@ -2476,16 +2515,12 @@ widget Shell {
         let session =
             auto_lang_core::session::CompilerSession::new(auto_lang_core::session::Scenario::UI);
         let mut parser = Parser::from(code).with_session(session);
-        let result = parser.parse();
+        let result = parser.parse_domain(&crate::UiDialect).map(UiCode);
 
         let ast = result.expect("multi-param msg should parse");
-        let non_empty: Vec<_> = ast
-            .stmts
-            .iter()
-            .filter(|s| !matches!(s, Stmt::EmptyLine(_)))
-            .collect();
+        let non_empty: Vec<_> = ast.domain_stmts().collect();
         let widget = match non_empty[0] {
-            Stmt::WidgetDecl(w) => w,
+            UiStmt::WidgetDecl(w) => w,
             other => panic!("expected WidgetDecl, got {:?}", other),
         };
         let msg = &widget.messages[0];
@@ -2541,13 +2576,12 @@ store S {
         let session =
             auto_lang_core::session::CompilerSession::new(auto_lang_core::session::Scenario::UI);
         let mut parser = Parser::from(code).with_session(session);
-        let result = parser.parse();
+        let result = parser.parse_domain(&crate::UiDialect).map(UiCode);
         let ast = result.expect("full shell_store msg should parse");
         let store = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                Stmt::StoreDecl(s) => Some(s),
+                UiStmt::StoreDecl(s) => Some(s),
                 _ => None,
             })
             .expect("store declaration present");
@@ -2593,12 +2627,12 @@ widget W {
         let session =
             auto_lang_core::session::CompilerSession::new(auto_lang_core::session::Scenario::UI);
         let mut parser = Parser::from(code).with_session(session);
-        let ast = parser.parse().expect("view None comparison should parse");
-        let non_empty: Vec<_> = ast
-            .stmts
-            .iter()
-            .filter(|s| !matches!(s, Stmt::EmptyLine(_)))
-            .collect();
+        let ast = crate::UiCode(
+            parser
+                .parse_domain(&crate::UiDialect)
+                .expect("view None comparison should parse"),
+        );
+        let non_empty: Vec<_> = ast.domain_stmts().collect();
         assert_eq!(non_empty.len(), 1, "one widget statement");
     }
 
@@ -2620,9 +2654,11 @@ store S {
         let session =
             auto_lang_core::session::CompilerSession::new(auto_lang_core::session::Scenario::UI);
         let mut parser = Parser::from(code).with_session(session);
-        let ast = parser
-            .parse()
-            .expect("undeclared PascalCase struct literal should construct");
+        let ast = UiCode(
+            parser
+                .parse_domain(&crate::UiDialect)
+                .expect("undeclared PascalCase struct literal should construct"),
+        );
         let _ = ast; // parsed OK is the contract
 
         // Lowercase idents must NOT be treated as struct construction (they
@@ -2636,9 +2672,11 @@ widget W {
         let session2 =
             auto_lang_core::session::CompilerSession::new(auto_lang_core::session::Scenario::UI);
         let mut parser2 = Parser::from(code2).with_session(session2);
-        let _ = parser2
-            .parse()
-            .expect("lowercase model fields parse normally");
+        let _ = UiCode(
+            parser2
+                .parse_domain(&crate::UiDialect)
+                .expect("lowercase model fields parse normally"),
+        );
     }
 
     /// Plan 043 M5: a parameterized on-handler must bind ALL its params, both
@@ -2654,12 +2692,15 @@ widget W {
                 auto_lang_core::session::Scenario::UI,
             );
             let mut parser = Parser::from(code).with_session(session);
-            let ast = parser.parse().expect("should parse");
+            let ast = crate::UiCode(
+                parser
+                    .parse_domain(&crate::UiDialect)
+                    .expect("should parse"),
+            );
             let store = ast
-                .stmts
-                .iter()
+                .domain_stmts()
                 .find_map(|s| match s {
-                    Stmt::StoreDecl(s) => Some(s),
+                    UiStmt::StoreDecl(s) => Some(s),
                     _ => None,
                 })
                 .expect("store present");
@@ -2740,17 +2781,15 @@ widget Counter {
         let session =
             auto_lang_core::session::CompilerSession::new(auto_lang_core::session::Scenario::UI);
         let mut parser = Parser::from(code).with_session(session);
-        let ast = parser
-            .parse()
-            .expect("multiline computed body should parse");
+        let ast = UiCode(
+            parser
+                .parse_domain(&crate::UiDialect)
+                .expect("multiline computed body should parse"),
+        );
 
-        let non_empty: Vec<_> = ast
-            .stmts
-            .iter()
-            .filter(|s| !matches!(s, Stmt::EmptyLine(_)))
-            .collect();
+        let non_empty: Vec<_> = ast.domain_stmts().collect();
         let widget = match non_empty[0] {
-            Stmt::WidgetDecl(w) => w,
+            UiStmt::WidgetDecl(w) => w,
             other => panic!("expected WidgetDecl, got {:?}", other),
         };
         let computed = widget.computed.as_ref().expect("computed block present");
@@ -2798,16 +2837,17 @@ style = 123
 "#;
         let mut parser =
             Parser::from(code).with_session(auto_lang_core::session::CompilerSession::ui());
-        let code_ast = parser
-            .parse()
-            .expect("should parse style recipes successfully");
+        let code_ast = UiCode(
+            parser
+                .parse_domain(&crate::UiDialect)
+                .expect("should parse style recipes successfully"),
+        );
 
         // 1. card_base
         let card_base = code_ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                Stmt::StyleRecipeDecl(r) if r.name == "card_base" => Some(r),
+                UiStmt::StyleRecipeDecl(r) if r.name == "card_base" => Some(r),
                 _ => None,
             })
             .expect("card_base style recipe should exist");
@@ -2817,10 +2857,9 @@ style = 123
 
         // 2. pill
         let pill = code_ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                Stmt::StyleRecipeDecl(r) if r.name == "pill" => Some(r),
+                UiStmt::StyleRecipeDecl(r) if r.name == "pill" => Some(r),
                 _ => None,
             })
             .expect("pill style recipe should exist");
@@ -2832,10 +2871,9 @@ style = 123
 
         // 3. pill_danger
         let pill_danger = code_ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                Stmt::StyleRecipeDecl(r) if r.name == "pill_danger" => Some(r),
+                UiStmt::StyleRecipeDecl(r) if r.name == "pill_danger" => Some(r),
                 _ => None,
             })
             .expect("pill_danger style recipe should exist");
@@ -2843,18 +2881,17 @@ style = 123
 
         // 4. brand_btn (pub)
         let brand_btn = code_ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                Stmt::StyleRecipeDecl(r) if r.name == "brand_btn" => Some(r),
+                UiStmt::StyleRecipeDecl(r) if r.name == "brand_btn" => Some(r),
                 _ => None,
             })
             .expect("brand_btn style recipe should exist");
         assert!(brand_btn.is_pub);
 
         // 5. style = 123 should NOT be a StyleRecipeDecl
-        let non_recipe = code_ast.stmts.iter().any(|s| match s {
-            Stmt::StyleRecipeDecl(r) if r.name == "style" => true,
+        let non_recipe = code_ast.domain_stmts().any(|s| match s {
+            UiStmt::StyleRecipeDecl(r) if r.name == "style" => true,
             _ => false,
         });
         assert!(
@@ -3037,12 +3074,15 @@ style = 123
         );
         let mut parser =
             Parser::from(code).with_session(auto_lang_core::session::CompilerSession::ui());
-        let ast = parser.parse().expect("outlet prop must parse");
+        let ast = crate::UiCode(
+            parser
+                .parse_domain(&crate::UiDialect)
+                .expect("outlet prop must parse"),
+        );
         let widget = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                Stmt::WidgetDecl(w) => Some(w),
+                UiStmt::WidgetDecl(w) => Some(w),
                 _ => None,
             })
             .expect("widget decl");
@@ -3064,12 +3104,15 @@ style = 123
 }";
         let mut parser =
             Parser::from(code).with_session(auto_lang_core::session::CompilerSession::ui());
-        let ast = parser.parse().expect("bare outlet must parse");
+        let ast = crate::UiCode(
+            parser
+                .parse_domain(&crate::UiDialect)
+                .expect("bare outlet must parse"),
+        );
         let widget = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                Stmt::WidgetDecl(w) => Some(w),
+                UiStmt::WidgetDecl(w) => Some(w),
                 _ => None,
             })
             .expect("widget decl");
@@ -3086,12 +3129,15 @@ style = 123
 }";
         let mut parser =
             Parser::from(code).with_session(auto_lang_core::session::CompilerSession::ui());
-        let ast = parser.parse().expect("explicit-false outlet must parse");
+        let ast = crate::UiCode(
+            parser
+                .parse_domain(&crate::UiDialect)
+                .expect("explicit-false outlet must parse"),
+        );
         let widget = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                Stmt::WidgetDecl(w) => Some(w),
+                UiStmt::WidgetDecl(w) => Some(w),
                 _ => None,
             })
             .expect("widget decl");
@@ -3108,7 +3154,10 @@ style = 123
 }";
         let mut parser =
             Parser::from(code).with_session(auto_lang_core::session::CompilerSession::ui());
-        assert!(parser.parse().is_err(), "non-memo outlet header must error");
+        assert!(
+            parser.parse_domain(&crate::UiDialect).is_err(),
+            "non-memo outlet header must error"
+        );
     }
 
     /// 嵌套形态：memo 块体内 for/if 照常解析。

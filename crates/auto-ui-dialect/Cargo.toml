@@ -24,6 +24,8 @@ description = "AutoLang UI declaration grammar (msg/model) single-source impleme
 auto-parser-api = { path = "../../../auto-lang/crates/auto-parser-api" }
 auto-ast = { path = "../../../auto-lang/crates/auto-ast" }
 auto-val = { path = "../../../auto-lang/crates/auto-val" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 
 # PLAN-814 R3-03b：UI 文法依赖回归测试（86 项随迁自 auto-lang-core 的
 # `ui-dialect` 门控测试）——真 Parser/方言派发/转译语料驱动。dev 边不进

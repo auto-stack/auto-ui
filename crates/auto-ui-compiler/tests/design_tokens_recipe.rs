@@ -1,4 +1,6 @@
-//! PLAN-814 R3-03b：样式配方（design_tokens::recipe）回归——原
+//! PLAN-841 T-02：随 UI owned 模型迁移至 auto-ui-compiler（原 PLAN-814 R3-03b 在
+//! auto-ui-dialect 的回归因 dev-循环依赖类型分裂不可行；本 crate 正向依赖
+//! auto-ui-dialect，Parser/UiCode 类型同源）。原
 //! auto-lang-core `design_tokens/recipe.rs` 的 `ui-dialect` 门控测试随迁
 //! （输入为 UI 语句，依赖文法表装配）。测试体逐字保持，仅路径改写。
 
@@ -6,6 +8,7 @@ use auto_lang_core::ast::*;
 use auto_lang_core::parser::Parser;
 use auto_lang_core::session::CompilerSession;
 use auto_ui_compiler::design_tokens::recipe::*;
+use auto_ui_dialect::{UiCode, UiDialect};
 
 #[cfg(test)]
 mod tests {
@@ -14,7 +17,9 @@ mod tests {
     /// PLAN-814 R3-03b：装配 UI 文法函数表（迁移前由 SDK `ui-dialect`
     /// feature 编译期提供；此处进程级注入单源构造器，语义等价）。
     fn setup() {
-        let _ = auto_lang_core::set_ui_grammar(crate::ui_grammar());
+        // PLAN-841 T-02: the process-level grammar table injection retired;
+        // parsing goes through the explicit domain port (parse_domain) or
+        // stays plain Core parse (these corpora carry no UI statements).
     }
 
     fn plan635_source(base: &std::path::Path, file: &str) -> String {
@@ -25,8 +30,8 @@ mod tests {
         let code = plan635_source(base, "app.at");
         let imports = prepare_style_recipe_imports(base, &code).unwrap();
         let mut p = Parser::from(code.as_str()).with_session(CompilerSession::ui());
-        let ast = p.parse().unwrap();
-        load_and_validate_style_recipes_with_imports(&imports, &ast.stmts).unwrap();
+        let ast = UiCode(p.parse_domain(&UiDialect).unwrap());
+        load_and_validate_style_recipes_with_imports(&imports, &ast).unwrap();
     }
 
     fn plan635_load_err(base: &std::path::Path) -> StyleRecipeError {
@@ -35,8 +40,8 @@ mod tests {
             Err(e) => e,
             Ok(imports) => {
                 let mut p = Parser::from(code.as_str()).with_session(CompilerSession::ui());
-                let ast = p.parse().unwrap();
-                load_and_validate_style_recipes_with_imports(&imports, &ast.stmts).unwrap_err()
+                let ast = UiCode(p.parse_domain(&UiDialect).unwrap());
+                load_and_validate_style_recipes_with_imports(&imports, &ast).unwrap_err()
             }
         }
     }
@@ -52,8 +57,8 @@ mod tests {
             style b = a
         "#;
         let mut p = Parser::from(code_cycle).with_session(CompilerSession::ui());
-        let ast = p.parse().unwrap();
-        let err = load_and_validate_style_recipes(&ast.stmts);
+        let ast = UiCode(p.parse_domain(&UiDialect).unwrap());
+        let err = load_and_validate_style_recipes(&ast);
         assert!(err.is_err(), "Expected error for circular references");
         let err_str = err.err().unwrap().to_string();
         assert!(
@@ -68,8 +73,8 @@ mod tests {
             style bad = pill(foo: "bar")
         "#;
         let mut p = Parser::from(code_param).with_session(CompilerSession::ui());
-        let ast = p.parse().unwrap();
-        let err = load_and_validate_style_recipes(&ast.stmts);
+        let ast = UiCode(p.parse_domain(&UiDialect).unwrap());
+        let err = load_and_validate_style_recipes(&ast);
         assert!(err.is_err(), "Expected error for unknown parameter");
         let err_str = err.err().unwrap().to_string();
         assert!(
@@ -84,8 +89,8 @@ mod tests {
             style bad = pill(pad: "p-4")
         "#;
         let mut p = Parser::from(code_req).with_session(CompilerSession::ui());
-        let ast = p.parse().unwrap();
-        let err = load_and_validate_style_recipes(&ast.stmts);
+        let ast = UiCode(p.parse_domain(&UiDialect).unwrap());
+        let err = load_and_validate_style_recipes(&ast);
         assert!(
             err.is_err(),
             "Expected error for missing required parameter"
@@ -102,8 +107,8 @@ mod tests {
             style good = missing_recipe
         "#;
         let mut p = Parser::from(code_undef).with_session(CompilerSession::ui());
-        let ast = p.parse().unwrap();
-        let err = load_and_validate_style_recipes(&ast.stmts);
+        let ast = UiCode(p.parse_domain(&UiDialect).unwrap());
+        let err = load_and_validate_style_recipes(&ast);
         assert!(err.is_err(), "Expected error for undefined recipe");
         let err_str = err.err().unwrap().to_string();
         assert!(
@@ -126,8 +131,8 @@ mod tests {
             style composite = "{card_base} mt-4"
         "#;
         let mut p = Parser::from(code).with_session(CompilerSession::ui());
-        let ast = p.parse().unwrap();
-        let res = load_and_validate_style_recipes(&ast.stmts);
+        let ast = UiCode(p.parse_domain(&UiDialect).unwrap());
+        let res = load_and_validate_style_recipes(&ast);
         assert!(res.is_ok(), "Validation failed: {:?}", res);
 
         // Test bare ident expansion
@@ -217,8 +222,8 @@ mod tests {
             style bad_recipe = "bg-blue-500 text-zinc-400 hover:bg-red-600/80"
         "#;
         let mut p = Parser::from(code).with_session(CompilerSession::ui());
-        let ast = p.parse().unwrap();
-        let warnings = load_and_validate_style_recipes(&ast.stmts).unwrap();
+        let ast = UiCode(p.parse_domain(&UiDialect).unwrap());
+        let warnings = load_and_validate_style_recipes(&ast).unwrap();
 
         // bad_recipe should generate warnings for bg-blue-500, text-zinc-400, hover:bg-red-600/80
         assert_eq!(

@@ -19,7 +19,9 @@ mod tests {
     /// PLAN-814 R3-03b：装配 UI 文法函数表（迁移前由 SDK `ui-dialect`
     /// feature 编译期提供；此处进程级注入单源构造器，语义等价）。
     fn setup() {
-        let _ = auto_lang_core::set_ui_grammar(crate::ui_grammar());
+        // PLAN-841 T-02: the process-level grammar table injection retired;
+        // parsing goes through the explicit domain port (parse_domain) or
+        // stays plain Core parse (these corpora carry no UI statements).
     }
 
     /// Parse `test/a2gd/tscn/{case}/{name}.at`, generate `.tscn`, and compare
@@ -30,7 +32,10 @@ mod tests {
         let name = parts[1..].join("_");
 
         let d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let src_path = d.join(format!("../../../auto-lang/crates/auto-lang/test/a2gd/tscn/{}/{}.at", case, name));
+        let src_path = d.join(format!(
+            "../../../auto-lang/crates/auto-lang/test/a2gd/tscn/{}/{}.at",
+            case, name
+        ));
         let src = read_to_string(&src_path)?;
 
         let mut parser = Parser::from(src.as_str());

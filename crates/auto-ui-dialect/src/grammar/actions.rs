@@ -4,7 +4,6 @@
 use super::helpers::at_dot;
 use super::view::capture_condition_call_args;
 use crate::ast as ui_ast;
-use crate::ast::*;
 use crate::route::{RouteDef, RoutesBlock};
 use crate::{UiParseContext, UiStmt};
 use auto_parser_api::ast;

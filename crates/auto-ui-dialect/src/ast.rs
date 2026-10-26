@@ -19,7 +19,7 @@ use auto_val::AutoStr;
 ///     "{pad} {bg} {fg} rounded-full text-sm font-medium shadow-sm hover:{bg}/90 transition-colors"
 /// style pill_danger = pill(bg: "bg-destructive", fg: "text-destructive-foreground")
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct StyleRecipeDecl {
     pub name: Name,
     pub params: Vec<StyleRecipeParam>,
@@ -28,7 +28,7 @@ pub struct StyleRecipeDecl {
     pub doc: Option<AutoStr>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct StyleRecipeParam {
     pub name: Name,
     pub param_type: Option<Type>,
@@ -50,7 +50,7 @@ pub struct StyleRecipeParam {
 ///     on { .Inc => { .count += 1 } }
 /// }
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct WidgetDecl {
     /// Widget name (e.g., "Counter")
     pub name: Name,
@@ -143,7 +143,7 @@ pub struct WidgetDecl {
 /// 裸 DSL 表达式（`enabled_if: .store.tab_count > 0`，解析期经 view if
 /// 条件同文法校验）。运行时经 `eval_condition_with` 对合并根 state 求值；
 /// vue 侧经 convert_condition 转译为模板表达式。
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ActionsBlock {
     pub actions: Vec<ActionEntry>,
     pub menubar: Option<MenubarBlock>,
@@ -151,7 +151,7 @@ pub struct ActionsBlock {
 }
 
 /// 单个 action 声明：`action (id: "...", handler: .ActXxx, ...)`。
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ActionEntry {
     /// 点分动作 id（OS 用户键位层的跨版本契约，如 "file.new"）。
     pub id: String,
@@ -167,14 +167,14 @@ pub struct ActionEntry {
 }
 
 /// `menubar { ... }` 子块。
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MenubarBlock {
     pub menus: Vec<MenuEntry>,
 }
 
 /// 单个菜单：`menu (id: "file", title: "文件") { ... }`。id 是开合内部消息
 /// `__menubar_toggle(id)` 的键，须稳定。
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MenuEntry {
     pub id: String,
     pub title: String,
@@ -182,7 +182,7 @@ pub struct MenuEntry {
 }
 
 /// 菜单/工具栏条目：action 引用或分隔线。
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum MenuItemEntry {
     /// 引用 action id（须存在于注册表，转换期校验）。
     Action(String),
@@ -191,7 +191,7 @@ pub enum MenuItemEntry {
 }
 
 /// `toolbar { ... }` 子块。
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ToolbarBlock {
     pub items: Vec<MenuItemEntry>,
 }
@@ -211,13 +211,13 @@ pub struct ToolbarBlock {
 ///
 /// 属性括号列表沿 actions `action (id: "…", handler: .ActX)` 先例；
 /// `if` 不作属性名（关键字冲突，actions 用 `enabled_if` 同因）。
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TimerBlock {
     pub entries: Vec<TimerEntry>,
 }
 
 /// 单条计时器声明：`PollStream (every_ms: 500, when: .streaming)`。
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TimerEntry {
     /// 条目头 = msg 变体名（裸名声明形）。须在本 widget/store 的 `msg {}`
     /// 块声明——解析期校验（沿 Plan 451 actions handler 校验承诺）。
@@ -248,7 +248,7 @@ pub struct TimerEntry {
 /// 后缀标注:列出的字段在 script 侧访问时注入 `.value`(复用 composable
 /// kind 的 facade_ref_fields 机制——composable 返回普通对象时 ref 字段
 /// 不自动解包)。
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SetupBlock {
     /// Statements (let / expression statements).
     pub body: crate::ast::Body,
@@ -271,7 +271,7 @@ pub struct SetupBlock {
 /// Each source is a single field name (model field, prop, or computed)
 /// written dot-prefixed in the DSL; the body uses the same conventions as
 /// `on` handlers (`.field` reads/writes state, template refs via `.value!`).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct WatchDecl {
     /// Watched source field names (without the leading dot). More than one
     /// source emits a multi-source watch (`watch([a, b], ...)` in Vue).
@@ -288,7 +288,7 @@ pub struct WatchDecl {
 }
 
 /// Kind of an external import declared in a widget `use { ... }` block.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Copy, PartialEq, Eq)]
 pub enum ExtImportKind {
     /// `fn: name from "path"` — a plain TS function/constant, callable from
     /// `on` handlers and `computed` expressions.
@@ -327,7 +327,7 @@ pub enum ExtImportKind {
 /// `npm_deps:`) or a project-root-relative file path; the build copies
 /// local files into the generated Vue project under `src/ext/` and
 /// rewrites the import specifier to `@/ext/...`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ExtImport {
     pub kind: ExtImportKind,
     /// Imported symbol names (comma-separated in the DSL).
@@ -351,7 +351,7 @@ pub struct ExtImport {
 
 /// A module-level shared store: a view-less widget (`model` + `msg` + `on`)
 /// whose state is shared across widgets/routes via `use store:`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct StoreDecl {
     /// Store name (e.g., "CounterStore")
     pub name: Name,
@@ -393,7 +393,7 @@ pub struct StoreDecl {
 /// at parse time (parse_component_fn_decl), carrying its msg/model/computed/
 /// on/use/watch/style blocks there. This struct keeps only the inline
 /// `view fn` surface: params + a single body node.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ViewFragmentDecl {
     pub name: Name,
     pub params: Vec<(Name, String)>,
@@ -412,7 +412,7 @@ pub struct ViewFragmentDecl {
 ///     aboutToDisappear => { ... }
 /// }
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LifecycleMethod {
     /// Method name (e.g., "aboutToAppear")
     pub name: String,
@@ -435,14 +435,14 @@ pub struct LifecycleMethod {
 /// resolves by variant (`.Inc` / `App.Inc` take the tail segment) and every
 /// backend derives the enum name from the widget name. A legacy
 /// `msg Msg { ... }` still parses with the name discarded.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MsgDecl {
     /// Message variants
     pub variants: Vec<MsgVariant>,
 }
 
 /// Message variant
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MsgVariant {
     /// Variant name (e.g., "Inc")
     pub name: Name,
@@ -483,7 +483,7 @@ pub struct MsgVariant {
 ///     #[Consume("pathStack")] pathStack NavPathStack
 /// }
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Decorator {
     /// Decorator name (e.g., "Consume", "Provide")
     pub name: Name,
@@ -500,14 +500,14 @@ pub struct Decorator {
 ///     name str = ""
 /// }
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ModelBlock {
     /// State variable declarations
     pub fields: Vec<ModelField>,
 }
 
 /// Model field: a single state variable
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ModelField {
     /// Field name
     pub name: Name,
@@ -547,14 +547,14 @@ pub struct ModelField {
 ///     }
 /// }
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ComputedBlock {
     /// Computed property declarations
     pub properties: Vec<ComputedProperty>,
 }
 
 /// Computed property: a derived value
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ComputedProperty {
     /// Property name
     pub name: Name,
@@ -577,14 +577,14 @@ pub struct ComputedProperty {
 ///     }
 /// }
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ViewBlock {
     /// Root node of the view tree
     pub root: ViewNode,
 }
 
 /// View node: element or text in the view tree
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum ViewNode {
     /// Element node with tag, props, events, and children
     Element {
@@ -712,7 +712,7 @@ pub enum ViewNode {
 }
 
 /// View property
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ViewProp {
     /// Property name
     pub name: String,
@@ -722,7 +722,7 @@ pub struct ViewProp {
 }
 
 /// View property value - can be an expression or a style binding
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum ViewPropValue {
     /// Regular expression value
     Expr(Expr),
@@ -732,7 +732,7 @@ pub enum ViewPropValue {
 }
 
 /// A single style binding entry
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct StyleBindingEntry {
     /// Style name (e.g., "completed")
     pub style_name: String,
@@ -742,7 +742,7 @@ pub struct StyleBindingEntry {
 }
 
 /// View event handler
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ViewEvent {
     /// Event name (e.g., "onclick")
     pub name: String,
@@ -761,7 +761,7 @@ pub struct ViewEvent {
 }
 
 /// View text content
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum ViewText {
     /// Literal text
     Literal(String),
@@ -788,14 +788,14 @@ pub enum ViewText {
 ///     .Dec => { .count -= 1 }
 /// }
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct OnBlock {
     /// Event handlers
     pub handlers: Vec<OnHandler>,
 }
 
 /// Event handler
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct OnHandler {
     /// Pattern to match (e.g., ".Inc", "Msg::Dec")
     pub pattern: String,
@@ -814,7 +814,7 @@ pub struct OnHandler {
 }
 
 /// Plan 028 F8/F9: platform stream subscription declaration.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct StreamSubscription {
     /// Protocol kind — "sse" for now (http polling etc. later).
     pub kind: String,
@@ -826,14 +826,14 @@ pub struct StreamSubscription {
 }
 
 /// Key binding block (Plan 275)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct BindBlock {
     /// Key bindings
     pub bindings: Vec<KeyBinding>,
 }
 
 /// A single key binding: "key" -> .Handler
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct KeyBinding {
     /// Key string (e.g., "1", "+", "Enter", "Escape")
     pub key: String,
@@ -850,7 +850,7 @@ pub struct KeyBinding {
 /// ```auto
 /// widget Button(text str, disabled bool = false) { ... }
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PropDecl {
     /// Prop name
     pub name: Name,

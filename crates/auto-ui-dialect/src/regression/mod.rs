@@ -6,7 +6,6 @@
 //! （V-05 映射表见 docs/plans/attachments/814/）。
 
 #[cfg(test)]
-pub mod design_tokens_recipe;
 #[cfg(test)]
 pub mod parser_ui_grammar;
 #[cfg(test)]

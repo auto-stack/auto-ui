@@ -566,7 +566,7 @@ pub(crate) fn mint_modal_dialog_toggle_inner(
         ViewNode::Element {
             tag,
             props,
-            events,
+            events: _,
             children,
             ..
         } => {

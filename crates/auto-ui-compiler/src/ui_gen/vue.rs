@@ -25360,9 +25360,11 @@ widget App {
     fn test_plan426_setup_rejects_await() {
         let session = auto_lang_core::session::CompilerSession::ui();
         let src = "widget App {\n    setup {\n        let x = load().await\n    }\n    view { col { text \"x\" } }\n}\n";
-        let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-        let err = parser
-            .parse()
+        // PLAN-841: UI sources enter through the explicit domain port;
+        // plain parse() no longer carries the UI grammar.
+        let err = auto_lang_core::parser::Parser::from(src)
+            .with_session(session)
+            .parse_domain(&auto_ui_dialect::UiDialect)
             .err()
             .expect("await in setup must fail to parse");
         let msg = format!("{:?}", err);

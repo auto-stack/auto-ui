@@ -19,7 +19,9 @@ mod tests {
     /// PLAN-814 R3-03b：装配 UI 文法函数表（迁移前由 SDK `ui-dialect`
     /// feature 编译期提供；此处进程级注入单源构造器，语义等价）。
     fn setup() {
-        let _ = auto_lang_core::set_ui_grammar(crate::ui_grammar());
+        // PLAN-841 T-02: the process-level grammar table injection retired;
+        // parsing goes through the explicit domain port (parse_domain) or
+        // stays plain Core parse (these corpora carry no UI statements).
     }
 
     fn test_a2gd(case: &str) -> AutoResult<()> {
@@ -29,7 +31,10 @@ mod tests {
         let name = name.as_str();
 
         let d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let src_path = format!("../../../auto-lang/crates/auto-lang/test/a2gd/{}/{}.at", case, name);
+        let src_path = format!(
+            "../../../auto-lang/crates/auto-lang/test/a2gd/{}/{}.at",
+            case, name
+        );
         let src_path = d.join(src_path);
         let src = read_to_string(src_path.as_path())?;
 
@@ -41,12 +46,18 @@ mod tests {
         trans.trans(ast, &mut sink)?;
         let gd_code = sink.done()?;
 
-        let expected_path = format!("../../../auto-lang/crates/auto-lang/test/a2gd/{}/{}.expected.gd", case, name);
+        let expected_path = format!(
+            "../../../auto-lang/crates/auto-lang/test/a2gd/{}/{}.expected.gd",
+            case, name
+        );
         let expected_path = d.join(expected_path);
         let expected = read_to_string(expected_path.as_path())?;
 
         if gd_code != expected.as_bytes() {
-            let gen_path = format!("../../../auto-lang/crates/auto-lang/test/a2gd/{}/{}.wrong.gd", case, name);
+            let gen_path = format!(
+                "../../../auto-lang/crates/auto-lang/test/a2gd/{}/{}.wrong.gd",
+                case, name
+            );
             let gen_path = d.join(gen_path);
             std::fs::write(&gen_path, gd_code)?;
         }
