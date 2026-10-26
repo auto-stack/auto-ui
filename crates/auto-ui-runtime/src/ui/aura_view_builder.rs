@@ -4153,17 +4153,10 @@ impl<'a> AuraViewBuilder<'a> {
     /// 进程级表（生产管线 import_stmts 不含 UseWeb——Plan 442 ext 流单独
     /// 消费——故后者是主路径）。
     fn is_imported_component(&self, tag: &str) -> bool {
-        if let Some(stmts) = self.import_stmts {
-            if stmts.iter().any(|s| match s {
-                auto_lang_core::ast::Stmt::UseWeb(entries) => entries.iter().any(|e| {
-                    matches!(e.kind, auto_ui_dialect::ast::ExtImportKind::Component)
-                        && e.symbols.iter().any(|n| n.as_str() == tag)
-                }),
-                _ => false,
-            }) {
-                return true;
-            }
-        }
+        // PLAN-841 T-05: the old import_stmts UseWeb scan is statically dead —
+        // the Core channel can no longer carry UseWeb; the process-level
+        // registry (register_imported_components) remains the live path.
+        let _ = self.import_stmts;
         imported_components_registry()
             .map(|set| set.contains(tag))
             .unwrap_or(false)
@@ -16776,6 +16769,8 @@ fn strings_from_values(items: &[Value]) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use auto_ui_dialect::UiStmt;
+use auto_ui_dialect::UiCode;
     use auto_lang_core::ast::Type;
     use auto_ui_compiler::aura::{AuraEvent, AuraStateDef, AuraWidget};
     use std::collections::HashMap;
@@ -17369,12 +17364,11 @@ mod tests {
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");
@@ -17433,12 +17427,11 @@ mod tests {
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");
@@ -17474,12 +17467,11 @@ mod tests {
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");
@@ -17523,9 +17515,9 @@ mod tests {
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("parse");
-        let mut decls = ast.stmts.iter().filter_map(|s| match s {
-            auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+        let mut decls = ast.domain_stmts().filter_map(|s| match s {
+            UiStmt::WidgetDecl(d) => Some(d),
             _ => None,
         });
         let store_decl = decls.next().expect("store decl");
@@ -17592,12 +17584,11 @@ mod tests {
 
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");
@@ -17701,12 +17692,11 @@ mod tests {
         set_menubar_open(Some("view".to_string()));
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");
@@ -17852,12 +17842,11 @@ mod tests {
         set_menubar_open(Some("file".to_string()));
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");
@@ -17989,12 +17978,11 @@ mod tests {
         use crate::ui::action_config::set_menubar_open;
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");
@@ -18158,12 +18146,11 @@ mod tests {
         set_menubar_open(Some("file".to_string()));
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");
@@ -18334,12 +18321,11 @@ mod tests {
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");
@@ -18415,12 +18401,11 @@ mod tests {
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");
@@ -22044,12 +22029,11 @@ mod tests {
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(child_src).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");
@@ -22428,10 +22412,10 @@ mod tests {
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
         let mut decls: Vec<auto_ui_dialect::WidgetDecl> = vec![];
-        for st in &ast.stmts {
-            if let auto_lang_core::ast::Stmt::WidgetDecl(d) = st {
+        for st in &ast.0.items {
+            if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(d)) = st {
                 decls.push(d.clone());
             }
         }
@@ -22572,7 +22556,11 @@ mod tests {
             call_args: vec![],
             ref_fields: vec![],
         };
-        let imports = vec![auto_lang_core::ast::Stmt::UseWeb(vec![ext])];
+        // PLAN-841 T-05: the import_stmts UseWeb detection path retired (Core
+// channel can no longer carry UI decls); these tests' oracle moves to the
+// register_imported_components registry path — rework owned by T-07.
+        let imports: Vec<auto_lang_core::ast::Stmt> = vec![];
+        let _ = ext;
         let widget = make_test_widget("Test", vec![]);
         let bridge = VmBridge::new(&widget).unwrap();
         let registry = crate::ui::widget_registry::WidgetRegistry::new();
@@ -22626,7 +22614,9 @@ mod tests {
             call_args: vec![],
             ref_fields: vec![],
         };
-        let imports_vp = vec![auto_lang_core::ast::Stmt::UseWeb(vec![ext_vp])];
+        // PLAN-841 T-05: retired import_stmts UseWeb path — oracle rework owned by T-07.
+        let imports_vp: Vec<auto_lang_core::ast::Stmt> = vec![];
+        let _ = ext_vp;
         let builder_vp =
             AuraViewBuilder::with_registry_and_imports(&bridge, "Test", &registry, &imports_vp);
         let node_vp = AuraNode::element("AppViewport").with_prop("app", Expr::Str("demo-1".into()));

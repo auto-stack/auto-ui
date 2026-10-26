@@ -104,12 +104,19 @@ impl InterpreterBridge {
     pub fn interpret(&mut self, code: &str) -> Result<()> {
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::parser::Parser::from(code).with_session(session);
-        match parser.parse() {
-            Ok(ast) => {
+        // PLAN-841 T-05: UI sources enter via the explicit domain port; the
+        // interpreter evaluates the validated/lowered Core program, and the
+        // setup preambles walk the UI-owned decls.
+        match parser
+            .parse_domain(&auto_ui_dialect::UiDialect)
+            .map(auto_ui_dialect::UiCode)
+            .and_then(|ui| auto_ui_compiler::ui_ast::lower_ui(&ui).map(|l| (ui, l)))
+        {
+            Ok((ui, lowered)) => {
                 self.interpreter
-                    .eval_ast(ast.clone())
+                    .eval_ast(lowered.core)
                     .map_err(|e| BridgeError::AutoLang(e.to_string()))?;
-                self.run_setup_preambles(&ast)?;
+                self.run_setup_preambles(&ui)?;
             }
             // 非 UI 场景程序(普通脚本):保持原有 VM 默认解析求值路径
             // (回退成功即行为不变)。若 VM 路径同样失败,把 UI 场景解析
@@ -139,12 +146,11 @@ impl InterpreterBridge {
     /// - 只有带 setup 块的 widget 会建立 WidgetState(L1 不构建完整的
     ///   组件 view 管线);
     /// - `refs` 标注(.value 语义)在解释器中不存在——Value 即值。
-    fn run_setup_preambles(&mut self, ast: &auto_lang_core::ast::Code) -> Result<()> {
-        for stmt in &ast.stmts {
-            let decl = match stmt {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => d,
-                _ => continue,
-            };
+    fn run_setup_preambles(&mut self, ui: &auto_ui_dialect::UiCode) -> Result<()> {
+        for decl in ui.domain_stmts().filter_map(|s| match s {
+            auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d),
+            _ => None,
+        }) {
             let setup = match &decl.setup {
                 Some(s) => s,
                 None => continue,
@@ -153,8 +159,7 @@ impl InterpreterBridge {
             // 绑定名:setup 体顶层的 let/var/const 声明。
             let names: Vec<String> = setup
                 .body
-                .stmts
-                .iter()
+                .stmts.iter()
                 .filter_map(|s| match s {
                     auto_lang_core::ast::Stmt::Store(store)
                         if matches!(

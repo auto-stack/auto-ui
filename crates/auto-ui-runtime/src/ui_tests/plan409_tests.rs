@@ -6,7 +6,10 @@
 //! (`link (to: "/") { text "Docs" }` / `link (to: "/button") { text "Components" }`)
 //! is the canonical probe: it used to render as `button "/"` / `button "/button"`.
 
+
 #![cfg(test)]
+
+use auto_ui_dialect::UiStmt;
 
 use crate::ui::dynamic::DynamicComponent;
 use crate::ui::interpreter::DynamicMessage;
@@ -138,9 +141,9 @@ fn build_gallery_page(page_file: &str, widget_name: &str) -> Option<View<Dynamic
     let code = std::fs::read_to_string(&path).ok()?;
     let session = auto_lang_core::session::CompilerSession::ui();
     let mut parser = crate::Parser::from(code.as_str()).with_session(session);
-    let ast = parser.parse().ok()?;
-    for stmt in &ast.stmts {
-        if let auto_lang_core::ast::Stmt::WidgetDecl(decl) = stmt {
+    let ast = parser.parse_domain(&auto_ui_dialect::UiDialect).map(auto_ui_dialect::UiCode).ok()?;
+    for stmt in ast.items() {
+        if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(decl)) = stmt {
             let widget = auto_ui_compiler::aura::extract_widget_from_decl(decl).ok()?;
             if widget.name != widget_name {
                 continue;

@@ -10,6 +10,7 @@
 //! 钉子:父组件持数据实例化子几何组件,断言渲染产物中出现 Init 计算的
 //! path 字符串(修复前为空)。
 
+
 #![cfg(test)]
 
 #[cfg(test)]
@@ -23,12 +24,12 @@ mod plan437_child_init {
         use auto_lang_core::ast::Stmt;
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = crate::Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
         let mut root_decl = None;
         let mut view_widget = None;
         let mut child_decls = Vec::new();
-        for stmt in &ast.stmts {
-            if let Stmt::WidgetDecl(decl) = stmt {
+        for stmt in ast.items() {
+            if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(decl)) = stmt {
                 if root_decl.is_none() {
                     root_decl = Some(decl.clone());
                     view_widget = Some(

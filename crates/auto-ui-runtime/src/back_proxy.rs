@@ -1387,6 +1387,9 @@ fn load_back_session(app_id: &str, back_entry: &std::path::Path) -> Result<Sessi
     let mut seen_symbols = std::collections::HashSet::new();
     let mut import_session = auto_lang_core::compile::CompileSession::new();
     let mut import_stmts: Vec<Stmt> = Vec::new();
+    // PLAN-841 T-05: UI-owned store channel — collected for interface parity;
+    // the back pipeline compiles Core statements only.
+    let mut import_store_decls: Vec<auto_ui_dialect::ast::StoreDecl> = Vec::new();
     crate::collect_module_imports(
         back_entry,
         &mut visited,
@@ -1394,6 +1397,7 @@ fn load_back_session(app_id: &str, back_entry: &std::path::Path) -> Result<Sessi
         &mut seen_symbols,
         &mut import_session,
         None,
+        &mut import_store_decls,
     );
 
     // 2. Codegen 有序编译（顺序语义见 handler_codegen::synthesize_widget_module

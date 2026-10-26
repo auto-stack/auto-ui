@@ -1126,6 +1126,7 @@ mod p034_ring_probe {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use auto_ui_dialect::UiStmt;
 
     /// 001–005 五示例源文件（真源扫描——G4 覆盖表与实例清单的一致性钉）。
     const EXAMPLES: [&str; 5] = [
@@ -1602,13 +1603,14 @@ mod tests {
         }
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = crate::Parser::from(combined.as_str()).with_session(session);
-        let ast = parser
-            .parse()
-            .unwrap_or_else(|e| panic!("parse {dir}: {e:?}"));
+        let ast = auto_ui_dialect::UiCode(parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .unwrap_or_else(|e| panic!("parse {dir}: {e:?}"))
+            );
         let mut app_decl: Option<&auto_ui_dialect::WidgetDecl> = None;
         let mut first_decl: Option<&auto_ui_dialect::WidgetDecl> = None;
-        for st in &ast.stmts {
-            if let auto_lang_core::ast::Stmt::WidgetDecl(d) = st {
+        for st in &ast.0.items {
+            if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(d)) = st {
                 if first_decl.is_none() {
                     first_decl = Some(d);
                 }
@@ -1783,15 +1785,15 @@ mod tests {
             }
             let session = auto_lang_core::session::CompilerSession::ui();
             let mut parser = crate::Parser::from(combined.as_str()).with_session(session);
-            let Ok(ast) = parser.parse() else {
+            let Ok(ast) = parser.parse_domain(&auto_ui_dialect::UiDialect).map(auto_ui_dialect::UiCode) else {
                 rows.push((name, false, "parse-fail".into()));
                 continue;
             };
             // App widget 优先（examples 惯例），缺省首个 WidgetDecl。
             let mut app_decl: Option<&auto_ui_dialect::WidgetDecl> = None;
             let mut first_decl: Option<&auto_ui_dialect::WidgetDecl> = None;
-            for st in &ast.stmts {
-                if let auto_lang_core::ast::Stmt::WidgetDecl(d) = st {
+            for st in &ast.0.items {
+                if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(d)) = st {
                     if first_decl.is_none() {
                         first_decl = Some(d);
                     }
@@ -1931,13 +1933,13 @@ mod tests {
                 }
                 let session = auto_lang_core::session::CompilerSession::ui();
                 let mut parser = crate::Parser::from(combined.as_str()).with_session(session);
-                let Ok(ast) = parser.parse() else {
+                let Ok(ast) = parser.parse_domain(&auto_ui_dialect::UiDialect).map(auto_ui_dialect::UiCode) else {
                     eprintln!("[p674-not-yet] {name}: parse-fail（仪器桶——非覆盖缺项）");
                     continue;
                 };
                 let mut app_decl: Option<&auto_ui_dialect::WidgetDecl> = None;
-                for st in &ast.stmts {
-                    if let auto_lang_core::ast::Stmt::WidgetDecl(d) = st {
+                for st in &ast.0.items {
+                    if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(d)) = st {
                         if app_decl.is_none() || d.name.as_str() == "App" {
                             app_decl = Some(d);
                         }
@@ -2040,13 +2042,13 @@ mod tests {
             };
             let session = auto_lang_core::session::CompilerSession::ui();
             let mut parser = crate::Parser::from(code.as_str()).with_session(session);
-            let Ok(ast) = parser.parse() else {
+            let Ok(ast) = parser.parse_domain(&auto_ui_dialect::UiDialect).map(auto_ui_dialect::UiCode) else {
                 panic!("{name} 解析失败（shell pack 是 B 覆盖门硬前置——解析红必拦）");
             };
             let mut app_decl: Option<&auto_ui_dialect::WidgetDecl> = None;
             let mut first_decl: Option<&auto_ui_dialect::WidgetDecl> = None;
-            for st in &ast.stmts {
-                if let auto_lang_core::ast::Stmt::WidgetDecl(d) = st {
+            for st in &ast.0.items {
+                if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(d)) = st {
                     if first_decl.is_none() {
                         first_decl = Some(d);
                     }

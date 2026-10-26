@@ -3,7 +3,7 @@
 //!
 //! ## Problem (musk KNOWN-DEBT 028 ③ "ext link")
 //!
-//! The VM-render loader ignored `Stmt::UseWeb` entirely: the use scanner
+//! The VM-render loader ignored `UiStmt::UseWeb` entirely: the use scanner
 //! produced garbage module strings for `use.web` lines, module resolution
 //! failed, and the failure was a silent skip. Pure-Auto symbols imported via
 //! `use.web platformInjectStyles from "…/platform.at"` therefore never got a

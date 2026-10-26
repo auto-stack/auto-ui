@@ -5,6 +5,7 @@
 //! - 族 B·vue 生成器: 文本内容位置的 Index/Dot 表达式求值缺臂。
 //! - 族 C·包组件单 VM 编译链: prop 字符串比较/带参 msg 声明静默破坏编译。
 
+
 #[cfg(test)]
 mod m1_fstr_bracket {
     use auto_lang_core::lexer::Lexer;
@@ -52,17 +53,16 @@ widget W {
 "##,
         )
         .with_session(session);
-        let ast = match parser.parse() {
+        let ast = match parser.parse_domain(&auto_ui_dialect::UiDialect).map(auto_ui_dialect::UiCode) {
             Ok(ast) => ast,
             Err(err) => {
                 panic!("parse failed: {err:?}");
             }
         };
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");
@@ -112,12 +112,12 @@ widget W {
             use auto_lang_core::ast::Stmt;
             let session = auto_lang_core::session::CompilerSession::ui();
             let mut parser = crate::Parser::from(src).with_session(session);
-            let ast = parser.parse().expect("parse");
+            let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
             let mut root_decl = None;
             let mut view_widget = None;
             let mut child_decls = Vec::new();
-            for stmt in &ast.stmts {
-                if let Stmt::WidgetDecl(decl) = stmt {
+            for stmt in ast.items() {
+                if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(decl)) = stmt {
                     if root_decl.is_none() {
                         root_decl = Some(decl.clone());
                         view_widget = Some(
@@ -348,12 +348,11 @@ mod m1_vue_fstr {
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = crate::Parser::from(patched.as_str()).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");

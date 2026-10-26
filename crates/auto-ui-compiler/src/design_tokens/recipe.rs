@@ -253,10 +253,19 @@ pub fn load_and_validate_style_recipes(
 /// may legitimately parse under a different scenario, e.g. a back/ module on
 /// the core grammar); its recipes are then simply unavailable, and a host
 /// reference surfaces as the parser's own undefined-name diagnostic.
+/// PLAN-841 T-05: install the neutral external-identifier existence check
+/// into the Core parser (idempotent). Bare references to imported recipes
+/// (e.g. `style: chip_on`) parse again exactly as before the grammar-table
+/// retirement; the registry stays owned here.
+pub fn install_recipe_ident_checker() {
+    auto_lang_core::set_external_ident_checker(has_style_recipe);
+}
+
 pub fn prepare_style_recipe_imports(
     base_dir: &std::path::Path,
     code: &str,
 ) -> Result<Vec<(StyleRecipeDecl, String)>, StyleRecipeError> {
+    install_recipe_ident_checker();
     let mut imports: Vec<(StyleRecipeDecl, String)> = Vec::new();
     let mut visited = std::collections::HashSet::new();
     let uses = auto_lang_core::use_scanner::scan_use_statements(code);
@@ -277,6 +286,8 @@ pub fn prepare_style_recipe_imports(
 /// and the Vue track so both backends expand cross-package recipes from one
 /// registration path.
 pub fn load_and_validate_style_recipes_with_imports(
+    // PLAN-841 T-05: keep the parser-side checker installed on every entry.
+
     imports: &[(StyleRecipeDecl, String)],
     ast: &auto_ui_dialect::UiCode,
 ) -> Result<Vec<String>, StyleRecipeError> {

@@ -42,7 +42,10 @@ mod ui_tests;
 
 // ── 根再导出：旧 crate 根路径在 runtime 内保持（迁移引用零改写） ──
 
-pub use auto_lang_core::{AutoResult, Parser, };
+pub use auto_lang_core::{AutoResult, Parser};
+// PLAN-841: use-module resolution moved with the UI-owned pipeline; old
+// crate-root paths stay valid for in-crate consumers.
+pub use auto_ui_compiler::ui_ast::{resolve_use_module, UseModuleResolution};
 
 // Re-export UI types when feature is enabled（与旧 auto-lang 根面同集）
 #[cfg(feature = "ui")]

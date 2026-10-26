@@ -13,6 +13,7 @@
 //!
 //! Corpus: `test/ui/plan051_ext_widget/`（mirrors musk ports 形态）。
 
+
 #[cfg(all(test, feature = "ui-interpreter"))]
 mod plan051_ext_widget_tests {
     /// Corpus: src/front/app.at（含 use.web component Markdown + use.web.fn）。
@@ -88,13 +89,13 @@ mod plan051_ext_widget_tests {
     /// 与旧空格形式 / 裸形式兼容等价。
     #[test]
     fn plan051_useweb_dotted_kind_parses() {
-        use auto_lang_core::ast::ui::ExtImportKind;
+        use auto_ui_dialect::ast::ExtImportKind;
         fn parse_first_kind(src: &str) -> ExtImportKind {
             let mut parser = crate::Parser::from(src)
                 .with_session(auto_lang_core::session::CompilerSession::ui());
-            let ast = parser.parse().expect("parse");
-            for stmt in &ast.stmts {
-                if let auto_lang_core::ast::Stmt::UseWeb(entries) = stmt {
+            let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+            for stmt in ast.items() {
+                if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::UseWeb(entries)) = stmt {
                     return entries[0].kind;
                 }
             }
@@ -160,12 +161,11 @@ mod plan051_ext_widget_tests {
         let code = std::fs::read_to_string(front.join("app.at")).unwrap();
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = crate::Parser::from(code.as_str()).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
         let root_decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d.clone()),
+                auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d.clone()),
                 _ => None,
             })
             .expect("root decl");
@@ -180,6 +180,7 @@ mod plan051_ext_widget_tests {
         let err = crate::load_ext_imports_for_vm(
             &base_dir,
             &ast,
+        &mut Vec::new(),
             &root_decl,
             &[],
             &mut visited,

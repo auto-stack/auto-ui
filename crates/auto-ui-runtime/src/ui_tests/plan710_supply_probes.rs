@@ -1,3 +1,4 @@
+
 // PLAN-710 供① supply-endpoint probes (the plan703 probe shape: minimal VM
 // bridge + .at fn calling the native; a2r track = generator-output form
 // asserts on the same .at shapes + a2r_std helper semantics on the same JSON
@@ -19,18 +20,16 @@ mod plan710_supply {
     fn build_probe_bridge(src: &str) -> crate::ui::vm_bridge::VmBridge {
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|st| match st {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d.clone()),
+                auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d.clone()),
                 _ => None,
             })
             .expect("decl");
         let fns: Vec<auto_lang_core::ast::Stmt> = ast
-            .stmts
-            .iter()
+            .core_stmts()
             .filter(|st| matches!(st, auto_lang_core::ast::Stmt::Fn(_)))
             .cloned()
             .collect();
@@ -83,12 +82,11 @@ widget App {{
         );
         let session = auto_lang_core::session::CompilerSession::ui().with_backend("rust");
         let mut parser = crate::Parser::from(src.as_str()).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");
@@ -389,12 +387,11 @@ widget App {{
     fn gen_rust_full(widget_src: &str) -> String {
         let session = auto_lang_core::session::CompilerSession::ui().with_backend("rust");
         let mut parser = crate::Parser::from(widget_src).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");

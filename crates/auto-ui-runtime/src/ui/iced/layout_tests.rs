@@ -204,12 +204,11 @@ fn w2_anchor_variant_diagnosis() {
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = crate::Parser::from(src.as_str()).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("decl");
@@ -272,12 +271,11 @@ fn w2_notification_panel_anchor_bottom_right() {
     );
     let session = auto_lang_core::session::CompilerSession::ui();
     let mut parser = crate::Parser::from(src).with_session(session);
-    let ast = parser.parse().expect("parse");
+    let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
     let decl = ast
-        .stmts
-        .iter()
+        .domain_stmts()
         .find_map(|s| match s {
-            auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+            UiStmt::WidgetDecl(d) => Some(d),
             _ => None,
         })
         .expect("decl");
@@ -503,12 +501,11 @@ fn center_parity_002_counter_end_to_end() {
     );
     let session = auto_lang_core::session::CompilerSession::ui();
     let mut parser = crate::Parser::from(src).with_session(session);
-    let ast = parser.parse().expect("parse");
+    let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
     let decl = ast
-        .stmts
-        .iter()
+        .domain_stmts()
         .find_map(|s| match s {
-            auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+            UiStmt::WidgetDecl(d) => Some(d),
             _ => None,
         })
         .expect("decl");
@@ -3094,11 +3091,11 @@ fn p642_t12_overflow_frame_scrolls_and_centers() {
         let _ = vmode;
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = crate::Parser::from(src.as_str()).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
         let mut registry = crate::ui::widget_registry::WidgetRegistry::new();
         let mut host_decl = None;
-        for stmt in &ast.stmts {
-            if let auto_lang_core::ast::Stmt::WidgetDecl(d) = stmt {
+        for stmt in &ast.0.items {
+            if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(d)) = stmt {
                 if d.name == "Host" {
                     host_decl = Some(d.clone());
                 } else {
@@ -3170,12 +3167,11 @@ fn p655_real_008_corpus_cards_visible_and_equal_height() {
     let src = std::fs::read_to_string(&src_path).expect("008 source");
     let session = auto_lang_core::session::CompilerSession::ui();
     let mut parser = crate::Parser::from(src.as_str()).with_session(session);
-    let ast = parser.parse().expect("parse");
+    let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
     let decl = ast
-        .stmts
-        .iter()
+        .domain_stmts()
         .find_map(|s| match s {
-            auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+            UiStmt::WidgetDecl(d) => Some(d),
             _ => None,
         })
         .expect("decl");

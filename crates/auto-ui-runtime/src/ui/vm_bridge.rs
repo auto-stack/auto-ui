@@ -621,12 +621,20 @@ impl VmBridge {
         // 此前 parse 失败仅 WARN,模块符号静默消失,应用以空壳/半壳渲染,
         // 极难定位(os-config C1/J1 现场共同诉求:显式报错优于静默)。
         {
-            let failures = crate::ui_module_parse_failures().lock().unwrap();
-            if !failures.is_empty() {
+            // PLAN-841 T-05: drain-on-check — each construction pays only for
+            // the failures accumulated by ITS OWN module loads (production is
+            // one build per process, so semantics are unchanged; long-lived
+            // test processes no longer poison every later bridge with an
+            // unrelated earlier failure).
+            let drained: Vec<String> = {
+                let mut failures = crate::ui_module_parse_failures().lock().unwrap();
+                std::mem::take(&mut *failures)
+            };
+            if !drained.is_empty() {
                 return Err(VmBridgeError::InvalidState(format!(
                     "{} module(s) failed to parse (plan-446 C1-3, see stderr): [{}]",
-                    failures.len(),
-                    failures.join(" | ")
+                    drained.len(),
+                    drained.join(" | ")
                 )));
             }
         }
@@ -3886,6 +3894,8 @@ fn json_to_value(json: &serde_json::Value) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use auto_ui_dialect::UiStmt;
+use auto_ui_dialect::UiCode;
     use auto_lang_core::ast::Type;
 
     /// Plan 423 P5 加固:runaway 守卫 —— 单次 handler 调用内字符串池增量
@@ -3908,12 +3918,11 @@ mod tests {
         "#;
         let session = CompilerSession::ui();
         let mut parser = Parser::from(model_src).with_session(session);
-        let ast = parser.parse().expect("parse model");
+        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("002-counter app.at should parse"));
         let inits: Vec<_> = ast
-            .stmts
-            .iter()
+            .core_stmts()
             .filter_map(|s| match s {
-                auto_lang_core::ast::Stmt::Store(st) => Some(st.clone()),
+            auto_lang_core::ast::Stmt::Store(st) => Some(st.clone()),
                 _ => None,
             })
             .collect();
@@ -3928,10 +3937,10 @@ mod tests {
             .tabs[0].a = 99
         "#;
         let mut parser = Parser::from(handler_src).with_session(CompilerSession::ui());
-        let ast2 = parser.parse().expect("parse handler");
+        let ast2 = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("002-counter app.at should parse"));
         widget
             .handlers
-            .insert(".Poke".to_string(), LogicPayload::AstStmts(ast2.stmts));
+            .insert(".Poke".to_string(), LogicPayload::AstStmts(ast2.core_stmts().cloned().collect::<Vec<_>>()));
         let mut bridge = VmBridge::new(&widget).expect("bridge");
         // 连续两次链式写:第一次若缺持有份额,receiver stake 死亡即 UAF。
         bridge
@@ -3970,12 +3979,11 @@ mod tests {
         "#;
         let session = CompilerSession::ui();
         let mut parser = Parser::from(model_src).with_session(session);
-        let ast = parser.parse().expect("parse model");
+        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("002-counter app.at should parse"));
         let inits: Vec<_> = ast
-            .stmts
-            .iter()
+            .core_stmts()
             .filter_map(|s| match s {
-                auto_lang_core::ast::Stmt::Store(st) => Some(st.clone()),
+            auto_lang_core::ast::Stmt::Store(st) => Some(st.clone()),
                 _ => None,
             })
             .collect();
@@ -3996,10 +4004,10 @@ mod tests {
             .count = .count + 1
         "#;
         let mut parser = Parser::from(handler_src).with_session(CompilerSession::ui());
-        let ast2 = parser.parse().expect("parse handler");
+        let ast2 = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("002-counter app.at should parse"));
         widget
             .handlers
-            .insert(".DoIt".to_string(), LogicPayload::AstStmts(ast2.stmts));
+            .insert(".DoIt".to_string(), LogicPayload::AstStmts(ast2.core_stmts().cloned().collect::<Vec<_>>()));
         let mut bridge = VmBridge::new(&widget).expect("bridge");
         bridge
             .call_handler("DoIt", &[])
@@ -4029,10 +4037,10 @@ mod tests {
         let mut widget2 = make_test_widget("MapWrite", vec![]);
         widget2.state_vars = widget.state_vars.clone();
         let mut parser = Parser::from(handler2_src).with_session(CompilerSession::ui());
-        let ast3 = parser.parse().expect("parse handler2");
+        let ast3 = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("002-counter app.at should parse"));
         widget2
             .handlers
-            .insert(".Poke".to_string(), LogicPayload::AstStmts(ast3.stmts));
+            .insert(".Poke".to_string(), LogicPayload::AstStmts(ast3.core_stmts().cloned().collect::<Vec<_>>()));
         let mut bridge2 = VmBridge::new(&widget2).expect("bridge2");
         bridge2
             .call_handler("Poke", &[])
@@ -4060,10 +4068,10 @@ mod tests {
             console_log("close requested")
         "#;
         let mut parser = Parser::from(handler_src).with_session(CompilerSession::ui());
-        let ast = parser.parse().expect("parse handler");
+        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("002-counter app.at should parse"));
         widget.handlers.insert(
             ".CloseRequest".to_string(),
-            LogicPayload::AstStmts(ast.stmts),
+            LogicPayload::AstStmts(ast.core_stmts().cloned().collect::<Vec<_>>()),
         );
         let bridge = VmBridge::new(&widget).expect("bridge");
         assert!(
@@ -4112,12 +4120,11 @@ mod tests {
         let mut widget = make_test_widget("ParkProbe", vec![]);
         let state_src = r#"var result str = """#;
         let mut parser = Parser::from(state_src).with_session(CompilerSession::ui());
-        let ast = parser.parse().expect("parse state");
+        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("002-counter app.at should parse"));
         let inits: Vec<_> = ast
-            .stmts
-            .iter()
+            .core_stmts()
             .filter_map(|s| match s {
-                Stmt::Store(st) => Some(st.clone()),
+            Stmt::Store(st) => Some(st.clone()),
                 _ => None,
             })
             .collect();
@@ -4136,10 +4143,10 @@ mod tests {
             port
         );
         let mut parser = Parser::from(&handler_src).with_session(CompilerSession::ui());
-        let ast2 = parser.parse().expect("parse handler");
+        let ast2 = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("002-counter app.at should parse"));
         widget
             .handlers
-            .insert(".Load".to_string(), LogicPayload::AstStmts(ast2.stmts));
+            .insert(".Load".to_string(), LogicPayload::AstStmts(ast2.core_stmts().cloned().collect::<Vec<_>>()));
         let mut bridge = VmBridge::new(&widget).expect("bridge");
 
         // 首次派发：立即返回（server 延迟 300ms 内 park 完成 = 零忙等）。
@@ -4224,10 +4231,10 @@ mod tests {
         "#;
         let session = CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("parse runaway snippet");
+        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("002-counter app.at should parse"));
         widget
             .handlers
-            .insert(".Boom".to_string(), LogicPayload::AstStmts(ast.stmts));
+            .insert(".Boom".to_string(), LogicPayload::AstStmts(ast.core_stmts().cloned().collect::<Vec<_>>()));
         let mut bridge = VmBridge::new(&widget).expect("bridge");
         let err = bridge
             .call_handler("Boom", &[])
@@ -4283,12 +4290,10 @@ widget SlideTest {
         "#;
         let session = CompilerSession::ui();
         let mut parser = Parser::from(app_src).with_session(session);
-        let ast = parser.parse().expect("parse app");
-        let decl = ast
-            .stmts
-            .into_iter()
-            .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("002-counter app.at should parse"));
+        let decl = ast.0.items.into_iter()
+                .find_map(|s| match s {
+                    auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(d)) => Some(d),
                 _ => None,
             })
             .expect("widget decl");
@@ -4351,12 +4356,13 @@ widget SvgProbe {
         "##;
         let session = CompilerSession::ui();
         let mut parser = Parser::from(app_src).with_session(session);
-        let ast = parser.parse().expect("parse app");
+        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("002-counter app.at should parse"));
         let (decl, widget) = ast
-            .stmts
+            .0
+            .items
             .into_iter()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => {
+                auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(d)) => {
                     let w = auto_ui_compiler::aura::extract_widget_from_decl(&d).expect("extract");
                     Some((d, w))
                 }
@@ -4451,12 +4457,10 @@ widget OpProbeOrig {
         "##;
         let session = CompilerSession::ui();
         let mut parser = Parser::from(app_src).with_session(session);
-        let ast = parser.parse().expect("parse");
-        let (decl, widget) = ast
-            .stmts
-            .into_iter()
-            .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => {
+        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("002-counter app.at should parse"));
+        let (decl, widget) = ast.0.items.into_iter()
+                .find_map(|s| match s {
+                    auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(d)) => {
                     let w = auto_ui_compiler::aura::extract_widget_from_decl(&d).expect("extract");
                     Some((d, w))
                 }
@@ -4789,11 +4793,12 @@ widget OpProbeOrig {
         use auto_ui_compiler::aura::LogicPayload;
         let ast = Parser::from(src)
             .with_session(CompilerSession::ui())
-            .parse()
+            .parse_domain(&auto_ui_dialect::UiDialect)
+            .map(auto_ui_dialect::UiCode)
             .expect("parse handler");
         widget
             .handlers
-            .insert(format!(".{event}"), LogicPayload::AstStmts(ast.stmts));
+            .insert(format!(".{event}"), LogicPayload::AstStmts(ast.core_stmts().cloned().collect::<Vec<_>>()));
     }
 
     #[test]
@@ -5521,12 +5526,11 @@ widget OpProbeOrig {
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("002-counter app.at should parse"));
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d.clone()),
+                UiStmt::WidgetDecl(d) => Some(d.clone()),
                 _ => None,
             })
             .expect("widget decl");
@@ -5579,12 +5583,11 @@ widget OpProbeOrig {
         );
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("002-counter app.at should parse"));
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");
@@ -5619,12 +5622,11 @@ widget OpProbeOrig {
         let app_src = std::fs::read_to_string(front.join("app.at")).expect("read app.at");
         let session = CompilerSession::ui();
         let mut parser = Parser::from(&app_src).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("002-counter app.at should parse"));
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");
@@ -5865,15 +5867,17 @@ widget Store {
 "#;
         let session = CompilerSession::ui();
         let mut parser = Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("repro src should parse");
+        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("002-counter app.at should parse"));
         let mut widget = None;
         let mut import_stmts: Vec<Stmt> = Vec::new();
-        for s in ast.stmts {
+        for s in ast.0.items {
             match s {
-                Stmt::WidgetDecl(d) => {
+                auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(d)) => {
                     widget = auto_ui_compiler::aura::extract_widget_from_decl(&d).ok()
                 }
-                Stmt::Fn(_) | Stmt::TypeDecl(_) | Stmt::Store(_) => import_stmts.push(s),
+                auto_parser_api::DomainStmt::Core(
+                    s @ (Stmt::Fn(_) | Stmt::TypeDecl(_) | Stmt::Store(_)),
+                ) => import_stmts.push(s.clone()),
                 _ => {}
             }
         }
@@ -6055,12 +6059,11 @@ widget Store {
 
         let session = CompilerSession::ui();
         let mut parser = Parser::from(app_src.as_str()).with_session(session);
-        let ast = parser.parse().expect("002-counter app.at should parse");
+        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("002-counter app.at should parse"));
         let widget = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => {
+                UiStmt::WidgetDecl(d) => {
                     auto_ui_compiler::aura::extract_widget_from_decl(d).ok()
                 }
                 _ => None,
@@ -6120,6 +6123,7 @@ widget Store {
         let mut seen = std::collections::HashSet::new();
         let mut import_stmts: Vec<auto_lang_core::ast::Stmt> = Vec::new();
         let mut session = auto_lang_core::compile::CompileSession::new();
+        let mut import_store_decls: Vec<auto_ui_dialect::ast::StoreDecl> = Vec::new();
         crate::collect_module_imports(
             &calendar_util_path,
             &mut visited,
@@ -6127,6 +6131,7 @@ widget Store {
             &mut seen,
             &mut session,
             None, // PR-6: no scenario override in test
+            &mut import_store_decls,
         );
 
         // The non-imported callees MUST be present (the bug was their absence).

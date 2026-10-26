@@ -53,6 +53,8 @@ pub(crate) fn stmt_symbol_name(stmt: &auto_lang_core::ast::Stmt) -> Option<Strin
 pub(crate) fn load_ext_imports_for_vm(
     base_dir: &std::path::Path,
     ui: &auto_ui_dialect::UiCode,
+    // PLAN-841 T-05: adapter-module store channel threaded to the collector.
+    import_store_decls: &mut Vec<auto_ui_dialect::ast::StoreDecl>,
     root_decl: &auto_ui_dialect::ast::WidgetDecl,
     all_child_decls: &[auto_ui_dialect::ast::WidgetDecl],
     visited: &mut std::collections::HashSet<std::path::PathBuf>,
@@ -108,6 +110,7 @@ pub(crate) fn load_ext_imports_for_vm(
                 seen_symbols,
                 import_session,
                 override_scenario,
+                import_store_decls,
             );
         });
     // PLAN-633: 适配器路径上交调用方（传递子 widget 注册用）。
@@ -365,6 +368,7 @@ pub(crate) fn load_ext_imports_for_vm(
                                     seen_symbols,
                                     import_session,
                                     None,
+                                    import_store_decls,
                                 );
                                 if let Ok(pc) = std::fs::read_to_string(&p) {
                                     for us in auto_lang_core::use_scanner::scan_use_statements(&pc)
@@ -413,7 +417,7 @@ pub(crate) fn load_ext_imports_for_vm(
     }
     let mut arities = std::collections::HashMap::new();
     crate::ui::ext_stubs::scan_ui_code_arities(ui, &targets, &mut arities);
-    crate::ui::ext_stubs::scan_call_arities(import_stmts, &targets, &mut arities);
+    crate::ui::ext_stubs::scan_call_arities(import_stmts.iter(), &targets, &mut arities);
     crate::ui::ext_stubs::scan_decl_arities(all_child_decls, &targets, &mut arities);
     let mut names: Vec<&String> = targets.iter().collect();
     names.sort();
@@ -557,6 +561,8 @@ pub(crate) fn collect_module_imports(
     seen: &mut std::collections::HashSet<String>,
     session: &mut auto_lang_core::compile::CompileSession,
     override_scenario: Option<&auto_lang_core::session::CompilerSession>,
+    // PLAN-841 T-05: parallel UI-owned store channel (see walk below).
+    import_store_decls: &mut Vec<auto_ui_dialect::ast::StoreDecl>,
 ) {
     let canon = module_path
         .canonicalize()
@@ -651,7 +657,7 @@ pub(crate) fn collect_module_imports(
     //    (e.g. db.at's create_note → db.create_note) so db.at and api.at's
     //    functions don't collide. This replaces the last-wins workaround
     //    (Plan 338) since qualified names are unique.
-    for stmt in &ast.stmts {
+    for stmt in ast.core_stmts() {
         match stmt {
             auto_lang_core::ast::Stmt::Fn(_) => {
                 if let Some(name) = stmt_symbol_name(stmt) {
@@ -690,25 +696,26 @@ pub(crate) fn collect_module_imports(
                     out.push(stmt.clone());
                 }
             }
-            // VM multi-store fix: collect StoreDecl (store Name { ... }) from
-            // imported modules so stores used only by route pages (not the root
-            // widget) are compiled into the VM module. Without this, the store's
-            // handlers are undefined at link time. Dedup by store name.
-            auto_lang_core::ast::Stmt::StoreDecl(sd) => {
-                // PLAN-733: 登记 store 源文件模块（file stem）——合成该
-                // store 的 handler 时作 own-module 裸名绑定域（同文件模块级
-                // fn 裸调用不再因跨模块同名歧义悬空）。
-                #[cfg(feature = "ui")]
-                crate::ui::handler_codegen::register_store_source_module(
-                    &sd.name.to_string(),
-                    &module_name,
-                );
-                let key = format!("__storedecl:{}", sd.name);
-                if seen.insert(key) {
-                    out.push(stmt.clone());
-                }
-            }
             _ => {}
+        }
+    }
+    // PLAN-841 T-05: StoreDecl is UI-owned — it flows through the parallel
+    // import_store_decls channel (never into the Core `out` vector).
+    for sd in ast.domain_stmts().filter_map(|s| match s {
+        auto_ui_dialect::UiStmt::StoreDecl(sd) => Some(sd),
+        _ => None,
+    }) {
+        // PLAN-733: 登记 store 源文件模块（file stem）——合成该
+        // store 的 handler 时作 own-module 裸名绑定域（同文件模块级
+        // fn 裸调用不再因跨模块同名歧义悬空）。
+        #[cfg(feature = "ui")]
+        crate::ui::handler_codegen::register_store_source_module(
+            &sd.name.to_string(),
+            &module_name,
+        );
+        let key = format!("__storedecl:{}", sd.name);
+        if seen.insert(key) {
+            import_store_decls.push(sd.clone());
         }
     }
     // 2. Recurse into this module's own `use` dependencies, each resolved
@@ -721,7 +728,7 @@ pub(crate) fn collect_module_imports(
         }
         match resolve_use_module(module_dir, &dep) {
             UseModuleResolution::Module(dep_path) => {
-                collect_module_imports(&dep_path, visited, out, seen, session, override_scenario);
+                collect_module_imports(&dep_path, visited, out, seen, session, override_scenario, import_store_decls);
             }
             UseModuleResolution::StoreFiles(found) => {
                 // Plan 442 A2: transitive `use store: X` (legacy facade form) —
@@ -730,7 +737,7 @@ pub(crate) fn collect_module_imports(
                 // compile into the VM module. Without this, a child widget's
                 // store stays uncollected and its handlers fail at link time.
                 for (_, path) in found {
-                    collect_module_imports(&path, visited, out, seen, session, override_scenario);
+                    collect_module_imports(&path, visited, out, seen, session, override_scenario, import_store_decls);
                 }
             }
             UseModuleResolution::None => {
@@ -840,8 +847,8 @@ fn register_transitive_widgets_inner(
         let mod_session = auto_lang_core::session::CompilerSession::ui();
         let mut mod_parser = crate::Parser::from(sub_code.as_str()).with_session(mod_session);
         if let Ok(sub_ast) = mod_parser.parse_domain(&auto_ui_dialect::UiDialect).map(auto_ui_dialect::UiCode) {
-            for stmt in &sub_ast.stmts {
-                if let auto_lang_core::ast::Stmt::WidgetDecl(decl) = stmt {
+            for stmt in sub_ast.items() {
+                if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(decl)) = stmt {
                     if let Ok(child_widget) = auto_ui_compiler::aura::extract_widget_from_decl(decl)
                     {
                         // 只注册 use 子句明确要的(或通配/裸装载的),且 registry
@@ -869,7 +876,7 @@ fn register_transitive_widgets_inner(
                 }
                 // Plan 044 M3: 传递性模块的 view fn 也注册(同类 EDGE-16c,
                 // 但 view fn 走 register_view_fragment 而非 widget registry)。
-                if let auto_lang_core::ast::Stmt::ViewFragmentDecl(frag) = stmt {
+                if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::ViewFragmentDecl(frag)) = stmt {
                     auto_ui_compiler::aura::extract::register_view_fragment(frag);
                 }
             }
@@ -990,6 +997,8 @@ fn build_dynamic_component_inner(
         child_decls.push(decl.clone());
     }
     let mut import_stmts: Vec<auto_lang_core::ast::Stmt> = Vec::new();
+    // PLAN-841 T-05: parallel UI-owned store channel.
+    let mut import_store_decls: Vec<auto_ui_dialect::ast::StoreDecl> = Vec::new();
     // Visited-module / seen-symbol sets span ALL top-level use stmts so shared
     // transitive deps load once.
     let mut visited = std::collections::HashSet::new();
@@ -1111,6 +1120,7 @@ fn build_dynamic_component_inner(
                             &mut seen_symbols,
                             &mut import_session,
                             override_scenario,
+                            &mut import_store_decls,
                         );
                     }
                     for name in &use_stmt.items {
@@ -1177,8 +1187,8 @@ fn build_dynamic_component_inner(
                             auto_ui_compiler::aura::extract::register_view_fragment(frag);
                                             }
 
-                    for stmt in &mod_ast.stmts {
-                        if let auto_lang_core::ast::Stmt::WidgetDecl(decl) = stmt {
+                    for stmt in mod_ast.items() {
+                        if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(decl)) = stmt {
                             if let Ok(child_widget) =
                                 auto_ui_compiler::aura::extract_widget_from_decl(decl)
                             {
@@ -1209,7 +1219,7 @@ fn build_dynamic_component_inner(
                                 child_decls.push(decl.clone());
                                 registry.register(child_widget);
                             }
-                        } else if let auto_lang_core::ast::Stmt::StoreDecl(store_decl) = stmt {
+                        } else if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::StoreDecl(store_decl)) = stmt {
                             // Plan 370 D-GAP-4: stores imported via `use module: Store`
                             // (e.g. `use notes_store: NotesStore`) live in their own
                             // source file, NOT the root AST. Convert them to view-less
@@ -1274,6 +1284,7 @@ fn build_dynamic_component_inner(
                 &mut seen_symbols,
                 &mut import_session,
                 override_scenario,
+                &mut import_store_decls,
             );
 
             // Plan 339 Phase 4: populate import_scope aliases directly from the
@@ -1333,8 +1344,8 @@ fn build_dynamic_component_inner(
                                 auto_ui_compiler::aura::extract::register_view_fragment(frag);
                                                     }
 
-                        for stmt in &mod_ast.stmts {
-                            if let auto_lang_core::ast::Stmt::WidgetDecl(decl) = stmt {
+                        for stmt in mod_ast.items() {
+                            if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(decl)) = stmt {
                                 if let Ok(child_widget) =
                                     auto_ui_compiler::aura::extract_widget_from_decl(decl)
                                 {
@@ -1356,7 +1367,7 @@ fn build_dynamic_component_inner(
                             // route pages never enter all_decls → their handlers
                             // are undefined at link time. This mirrors the root-AST
                             // store conversion (line ~2582).
-                            if let auto_lang_core::ast::Stmt::StoreDecl(store_decl) = stmt {
+                            if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::StoreDecl(store_decl)) = stmt {
                                 let name = store_decl.name.clone();
                                 child_decls.push(auto_ui_dialect::ast::WidgetDecl {
                                     name: name.clone(),
@@ -1390,6 +1401,7 @@ fn build_dynamic_component_inner(
                             &mut seen_symbols,
                             &mut import_session,
                             override_scenario,
+                            &mut import_store_decls,
                         );
                     }
                 }
@@ -1406,13 +1418,10 @@ fn build_dynamic_component_inner(
             .find_map(|s| match s {
                 auto_ui_dialect::UiStmt::ActionsDecl(b) => Some(b.clone()),
                 _ => None,
-            })
-            .or_else(|| {
-                import_stmts.iter().find_map(|s| match s {
-                    auto_lang_core::ast::Stmt::ActionsDecl(b) => Some(b.clone()),
-                    _ => None,
-                })
             });
+            // PLAN-841 T-05: the old or_else arm scanned import_stmts for
+            // ActionsDecl — no producer ever pushed one (dead arm), and the
+            // Core channel can no longer carry UI decls at all.
         if let Some(acts) = fallback {
             crate::ui::action_config::set_dsl_action_config_from_block(&acts, path);
         }
@@ -1460,8 +1469,8 @@ fn build_dynamic_component_inner(
         .iter()
         .map(|d| d.name.to_string())
         .collect();
-    for stmt in &import_stmts {
-        if let auto_lang_core::ast::Stmt::StoreDecl(store_decl) = stmt {
+    for store_decl in &import_store_decls {
+        {
             let sname = store_decl.name.to_string();
             if !root_store_names.contains(&sname) {
                 store_as_child_decls.push(auto_ui_dialect::ast::WidgetDecl {
@@ -1550,6 +1559,7 @@ fn build_dynamic_component_inner(
                                         &mut seen_symbols,
                                         &mut import_session,
                                         None,
+                                            &mut import_store_decls,
                                     );
                                     if let Ok(code) = std::fs::read_to_string(&p) {
                                         for us in
@@ -1596,7 +1606,7 @@ fn build_dynamic_component_inner(
     // declarations so they're compiled into the VM alongside imported ones.
     // Without this, a handler calling a top-level fn (e.g. fn eval_expr in
     // 011-calculator) fails with "Undefined symbol".
-    for stmt in &ast.stmts {
+    for stmt in ast.core_stmts() {
         match stmt {
             auto_lang_core::ast::Stmt::Fn(_)
             | auto_lang_core::ast::Stmt::TypeDecl(_)
@@ -1618,6 +1628,7 @@ fn build_dynamic_component_inner(
         load_ext_imports_for_vm(
             base_dir,
             &ast,
+            &mut import_store_decls,
             &root_decl,
             &all_child_decls,
             &mut visited,
@@ -1745,6 +1756,7 @@ fn build_dynamic_component_inner(
                                         &mut seen_symbols,
                                         &mut import_session,
                                         None,
+                                            &mut import_store_decls,
                                     );
                                     if let Ok(code) = std::fs::read_to_string(&p) {
                                         for us in
@@ -1782,8 +1794,8 @@ fn build_dynamic_component_inner(
         {
             let known: std::collections::HashSet<String> =
                 all_child_decls.iter().map(|d| d.name.to_string()).collect();
-            for stmt in &import_stmts {
-                if let auto_lang_core::ast::Stmt::StoreDecl(store_decl) = stmt {
+            for store_decl in &import_store_decls {
+                {
                     let sname = store_decl.name.to_string();
                     if !known.contains(&sname) {
                         all_child_decls.push(store_decl_as_widget_decl(store_decl));

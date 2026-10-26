@@ -6,6 +6,7 @@
 //! construct the real 015-notes App (with its `use notes_store` store +
 //! `use back.api` imports) exactly as production does.
 
+
 #![cfg(test)]
 
 use crate::ui::dynamic::DynamicComponent;
@@ -132,16 +133,16 @@ pub(crate) fn build_component_from_app_mode(
     // 1. Parse + extract root widget
     let session = CompilerSession::ui();
     let mut parser = crate::Parser::from(code.as_str()).with_session(session);
-    let ast = parser.parse().unwrap();
+    let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).unwrap());
     // PLAN-635: 回放导入配方 + 本地配方（生产路径同序）。
     let _ = auto_ui_compiler::design_tokens::recipe::load_and_validate_style_recipes_with_imports(
         &recipe_imports,
-        &ast.stmts,
+        &ast,
     );
     let mut root_decl = None;
     let mut widget = None;
-    for stmt in &ast.stmts {
-        if let Stmt::WidgetDecl(decl) = stmt {
+    for stmt in ast.items() {
+        if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(decl)) = stmt {
             root_decl = Some(decl.clone());
             widget = Some(
                 auto_ui_compiler::aura::extract_widget_from_decl(decl)
@@ -158,6 +159,7 @@ pub(crate) fn build_component_from_app_mode(
     let mut registry = WidgetRegistry::new();
     let mut child_decls = Vec::new();
     let mut import_stmts: Vec<Stmt> = Vec::new();
+    let mut import_store_decls: Vec<auto_ui_dialect::ast::StoreDecl> = Vec::new();
     let mut visited = HashSet::new();
     let mut seen_symbols = HashSet::new();
     let mut import_session = auto_lang_core::compile::CompileSession::new();
@@ -168,7 +170,7 @@ pub(crate) fn build_component_from_app_mode(
         if use_stmt.is_c_import || use_stmt.is_rust_import {
             continue;
         }
-        let module_path = match auto_lang_core::resolve_use_module(&base_dir, use_stmt) {
+        let module_path = match crate::resolve_use_module(&base_dir, use_stmt) {
             crate::UseModuleResolution::Module(p) => p,
             crate::UseModuleResolution::StoreFiles(found) => {
                 // Plan 442 A2: legacy `use store: X` facade — production
@@ -181,6 +183,7 @@ pub(crate) fn build_component_from_app_mode(
                         &mut seen_symbols,
                         &mut import_session,
                         None,
+                            &mut import_store_decls,
                     );
                 }
                 continue;
@@ -196,9 +199,9 @@ pub(crate) fn build_component_from_app_mode(
             let mod_session = CompilerSession::ui();
             let mut mod_parser =
                 crate::Parser::from(module_code.as_str()).with_session(mod_session);
-            if let Ok(mod_ast) = mod_parser.parse() {
-                for stmt in &mod_ast.stmts {
-                    if let Stmt::WidgetDecl(decl) = stmt {
+            if let Ok(mod_ast) = mod_parser.parse_domain(&auto_ui_dialect::UiDialect).map(auto_ui_dialect::UiCode) {
+                for stmt in mod_ast.items() {
+                    if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(decl)) = stmt {
                         if let Ok(child_widget) =
                             auto_ui_compiler::aura::extract_widget_from_decl(decl)
                         {
@@ -210,7 +213,7 @@ pub(crate) fn build_component_from_app_mode(
                                 registry.register(child_widget);
                             }
                         }
-                    } else if let Stmt::StoreDecl(store_decl) = stmt {
+                    } else if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::StoreDecl(store_decl)) = stmt {
                         // D-GAP-4: convert imported StoreDecl → view-less child
                         // WidgetDecl so its fields merge into root state.
                         let name = store_decl.name.clone();
@@ -218,7 +221,7 @@ pub(crate) fn build_component_from_app_mode(
                             || use_stmt.items.is_empty()
                             || use_stmt.items.iter().any(|s| *s == name.as_str())
                         {
-                            child_decls.push(auto_lang_core::ast::ui::WidgetDecl {
+                            child_decls.push(auto_ui_dialect::ast::WidgetDecl {
                                 name,
                                 messages: store_decl.messages.clone(),
                                 model: store_decl.model.clone(),
@@ -250,6 +253,7 @@ pub(crate) fn build_component_from_app_mode(
             &mut seen_symbols,
             &mut import_session,
             None,
+            &mut import_store_decls,
         );
         let module_qualifier = use_stmt
             .module
@@ -271,7 +275,7 @@ pub(crate) fn build_component_from_app_mode(
         let mut pkg_reg = auto_ui_compiler::ui_gen::widget::ComponentRegistry::new();
         let mut seen_dirs: HashSet<PathBuf> = HashSet::new();
         for imp in &widget.ext_imports {
-            if !matches!(imp.kind, auto_lang_core::ast::ui::ExtImportKind::Package) {
+            if !matches!(imp.kind, auto_ui_dialect::ast::ExtImportKind::Package) {
                 continue;
             }
             let dir = PathBuf::from(imp.path.as_str());
@@ -306,6 +310,7 @@ pub(crate) fn build_component_from_app_mode(
                                 &mut seen_symbols,
                                 &mut import_session,
                                 None,
+                                    &mut import_store_decls,
                             );
                             if let Ok(code) = fs::read_to_string(&p) {
                                 for us in scan_use_statements(&code) {
@@ -329,10 +334,10 @@ pub(crate) fn build_component_from_app_mode(
     // 3. Stores declared in the root AST → fake child widget decls (D-GAP-4)
     let mut store_as_child_decls = Vec::new();
     let mut root_store_names = HashSet::new();
-    for stmt in &ast.stmts {
-        if let Stmt::StoreDecl(store_decl) = stmt {
+    for stmt in ast.items() {
+        if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::StoreDecl(store_decl)) = stmt {
             root_store_names.insert(store_decl.name.to_string());
-            store_as_child_decls.push(auto_lang_core::ast::ui::WidgetDecl {
+            store_as_child_decls.push(auto_ui_dialect::ast::WidgetDecl {
                 name: store_decl.name.clone(),
                 messages: store_decl.messages.clone(),
                 model: store_decl.model.clone(),
@@ -357,13 +362,13 @@ pub(crate) fn build_component_from_app_mode(
     // Stores collected from imported modules (incl. the Plan 442 A2 legacy
     // facade path) → view-less child decls, deduped against root + children
     // (mirrors the production import_stmts conversion).
-    for stmt in &import_stmts {
-        if let Stmt::StoreDecl(store_decl) = stmt {
+    for store_decl in &import_store_decls {
+        {
             let sname = store_decl.name.to_string();
             if !root_store_names.contains(&sname)
                 && !child_decls.iter().any(|d| d.name.to_string() == sname)
             {
-                store_as_child_decls.push(auto_lang_core::ast::ui::WidgetDecl {
+                store_as_child_decls.push(auto_ui_dialect::ast::WidgetDecl {
                     name: store_decl.name.clone(),
                     messages: store_decl.messages.clone(),
                     model: store_decl.model.clone(),
@@ -391,7 +396,7 @@ pub(crate) fn build_component_from_app_mode(
 
     // Mirror of production Plan 403: root module's own top-level fn/type/enum
     // declarations compile into the VM alongside imported ones.
-    for stmt in &ast.stmts {
+    for stmt in ast.core_stmts() {
         match stmt {
             Stmt::Fn(_) | Stmt::TypeDecl(_) | Stmt::EnumDecl(_) => {
                 import_stmts.push(stmt.clone());
@@ -402,10 +407,11 @@ pub(crate) fn build_component_from_app_mode(
 
     // Mirror of production Plan 442 A3: `use.web` ext imports (adapter-chain
     // loading + platform stubs) via the shared production helper.
-    let mut ext_widget_decls: Vec<auto_lang_core::ast::ui::WidgetDecl> = Vec::new();
+    let mut ext_widget_decls: Vec<auto_ui_dialect::ast::WidgetDecl> = Vec::new();
     crate::load_ext_imports_for_vm(
         &base_dir,
         &ast,
+        &mut Vec::new(),
         &root_decl,
         &all_child_decls,
         &mut visited,

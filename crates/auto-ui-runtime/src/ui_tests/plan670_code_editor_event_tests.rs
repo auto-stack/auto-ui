@@ -5,7 +5,11 @@
 //! `parse_event_param_literal` 空串 → handler `SrcChanged(int)` 收
 //! `Str("")` → IndexError（auto-edit 矩阵 18 次，041 语料在案）。
 //! 断言面：循环变量/字面量/点路径三类实参（对齐 062 T9 断言形态）。
+
 #![cfg(test)]
+
+use auto_ui_dialect::UiStmt;
+use auto_ui_dialect::UiCode;
 
 use crate::ui::interpreter::DynamicMessage;
 use crate::ui::view::View;
@@ -14,12 +18,11 @@ use crate::ui::view::View;
 fn build_view(src: &str) -> View<DynamicMessage> {
     let session = auto_lang_core::session::CompilerSession::ui();
     let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
-    let ast = parser.parse().expect("parse");
-    let decls: Vec<auto_lang_core::ast::WidgetDecl> = ast
-        .stmts
-        .iter()
+    let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
+    let decls: Vec<auto_ui_dialect::WidgetDecl> = ast
+        .domain_stmts()
         .filter_map(|st| match st {
-            auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d.clone()),
+            UiStmt::WidgetDecl(d) => Some(d.clone()),
             _ => None,
         })
         .collect();

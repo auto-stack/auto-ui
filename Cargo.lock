@@ -764,6 +764,7 @@ dependencies = [
  "arboard",
  "auto-lang-core",
  "auto-media-core",
+ "auto-parser-api",
  "auto-terminal-core",
  "auto-text-core",
  "auto-ui-compiler",

@@ -9,7 +9,7 @@
 //! store, declared in its own source file and imported via
 //! `use notes_store: NotesStore`, was never converted to a child widget decl.
 //! The child-widget collection loop in `run_file_dynamic_ui_inner` only matched
-//! `Stmt::WidgetDecl`, ignoring `Stmt::StoreDecl`. As a result the store's
+//! `UiStmt::WidgetDecl`, ignoring `UiStmt::StoreDecl`. As a result the store's
 //! fields (`notes`, `active_id`, …) were never merged into the App's root state
 //! object, so `__state.notes` was undefined and handlers like
 //! `.notes = list_notes()` silently no-op'd.

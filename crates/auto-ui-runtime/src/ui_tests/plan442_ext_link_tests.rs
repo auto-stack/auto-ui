@@ -3,7 +3,7 @@
 //!
 //! ## Root cause (musk KNOWN-DEBT 028 ③ "ext link")
 //!
-//! The VM-render loader ignored `Stmt::UseWeb` entirely. Pure-Auto helpers
+//! The VM-render loader ignored `UiStmt::UseWeb` entirely. Pure-Auto helpers
 //! imported via `use.web platformInjectStyles from "…/ports/platform.at"`
 //! never got a definition, and a handler calling them left an unresolved
 //! CALL reloc — one missing web-platform helper killed the whole VmBridge

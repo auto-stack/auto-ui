@@ -87,6 +87,8 @@ auto-lang-core = { path = "../../../auto-lang/crates/auto-lang-core" }
 auto-ui-compiler = { path = "../auto-ui-compiler" }
 # PLAN-841 T-05: runtime consumes the UI-owned domain model (UiCode/UiStmt)
 auto-ui-dialect = { path = "../auto-ui-dialect" }
+# PLAN-841 T-05: DomainStmt/DomainCode path for the domain-port walks
+auto-parser-api = { path = "../../../auto-lang/crates/auto-parser-api" }
 auto-val = { path = "../../../auto-lang/crates/auto-val", features = ["serde"] }
 # PLAN-811: media foundation（image_pipeline/photo_service 门面语义随迁——
 # blake3-only 服务恒在，codec 走 image-pipeline feature）。

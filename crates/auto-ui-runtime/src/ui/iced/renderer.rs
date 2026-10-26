@@ -21551,9 +21551,12 @@ fn run_session(
 
                         let session = CompilerSession::ui();
                         let mut parser = Parser::from(&code).with_session(session);
-                        if let Ok(ast) = parser.parse() {
-                            for stmt in &ast.stmts {
-                                if let auto_lang_core::ast::Stmt::WidgetDecl(decl) = stmt {
+                        if let Ok(ast) = parser
+                            .parse_domain(&auto_ui_dialect::UiDialect)
+                            .map(auto_ui_dialect::UiCode)
+                        {
+                            for stmt in ast.items() {
+                                if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(decl)) = stmt {
                                     if let Ok(widget) =
                                         auto_ui_compiler::aura::extract_widget_from_decl(decl)
                                     {
@@ -40901,12 +40904,12 @@ widget LoginChild {
 "##;
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = crate::Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
         let mut root_decl = None;
         let mut view_widget = None;
         let mut child_decls = Vec::new();
-        for stmt in &ast.stmts {
-            if let Stmt::WidgetDecl(decl) = stmt {
+        for stmt in &ast.0.items {
+            if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(decl)) = stmt {
                 if root_decl.is_none() {
                     root_decl = Some(decl.clone());
                     view_widget = Some(
@@ -41810,12 +41813,11 @@ widget ClickApp {
 "##;
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = crate::Parser::from(src).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
         let decls: Vec<auto_ui_dialect::WidgetDecl> = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .filter_map(|s| match s {
-                Stmt::WidgetDecl(d) => Some(d.clone()),
+                UiStmt::WidgetDecl(d) => Some(d.clone()),
                 _ => None,
             })
             .collect();

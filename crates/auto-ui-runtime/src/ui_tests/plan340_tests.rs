@@ -6,6 +6,7 @@
 //!      `api_over_http=true` (and leaves it as a CALL reloc when false).
 //!   3. Regression: merge mode (api_over_http=false) still links for 015-notes.
 
+
 #[cfg(test)]
 mod plan340_tests {
     use auto_lang_core::run_with_capture;
@@ -191,10 +192,10 @@ widget App {
         let code = std::fs::read_to_string(front.join("app.at")).unwrap();
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = crate::Parser::from(code.as_str()).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
         let mut widget = None;
-        for stmt in &ast.stmts {
-            if let auto_lang_core::ast::Stmt::WidgetDecl(decl) = stmt {
+        for stmt in ast.items() {
+            if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(decl)) = stmt {
                 widget = Some(
                     auto_ui_compiler::aura::extract_widget_from_decl(decl)
                         .map_err(|e| e.to_string())
@@ -351,10 +352,10 @@ widget App {
         let code = std::fs::read_to_string(front.join("app.at")).unwrap();
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = crate::Parser::from(code.as_str()).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
         let mut widget = None;
-        for stmt in &ast.stmts {
-            if let auto_lang_core::ast::Stmt::WidgetDecl(decl) = stmt {
+        for stmt in ast.items() {
+            if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(decl)) = stmt {
                 widget = Some(
                     auto_ui_compiler::aura::extract_widget_from_decl(decl)
                         .map_err(|e| e.to_string())
@@ -506,10 +507,10 @@ widget App {
         let code = std::fs::read_to_string(front.join("app.at")).unwrap();
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = crate::Parser::from(code.as_str()).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
         let mut widget = None;
-        for stmt in &ast.stmts {
-            if let auto_lang_core::ast::Stmt::WidgetDecl(decl) = stmt {
+        for stmt in ast.items() {
+            if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(decl)) = stmt {
                 widget = Some(
                     auto_ui_compiler::aura::extract_widget_from_decl(decl)
                         .map_err(|e| e.to_string())
@@ -660,10 +661,10 @@ widget App {
         let code = std::fs::read_to_string(front.join("app.at")).unwrap();
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = crate::Parser::from(code.as_str()).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
         let mut widget = None;
-        for stmt in &ast.stmts {
-            if let auto_lang_core::ast::Stmt::WidgetDecl(decl) = stmt {
+        for stmt in ast.items() {
+            if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(decl)) = stmt {
                 widget = Some(
                     auto_ui_compiler::aura::extract_widget_from_decl(decl)
                         .map_err(|e| e.to_string())
@@ -796,10 +797,10 @@ widget App {
         let code = std::fs::read_to_string(front.join("app.at")).unwrap();
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = crate::Parser::from(code.as_str()).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
         let mut widget = None;
-        for stmt in &ast.stmts {
-            if let auto_lang_core::ast::Stmt::WidgetDecl(decl) = stmt {
+        for stmt in ast.items() {
+            if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(decl)) = stmt {
                 widget = Some(
                     auto_ui_compiler::aura::extract_widget_from_decl(decl)
                         .map_err(|e| e.to_string())
@@ -963,10 +964,10 @@ widget App {
         let code = std::fs::read_to_string(front.join("app.at")).unwrap();
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = crate::Parser::from(code.as_str()).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
         let mut widget = None;
-        for stmt in &ast.stmts {
-            if let auto_lang_core::ast::Stmt::WidgetDecl(decl) = stmt {
+        for stmt in ast.items() {
+            if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(decl)) = stmt {
                 widget = Some(
                     auto_ui_compiler::aura::extract_widget_from_decl(decl)
                         .map_err(|e| e.to_string())
@@ -1091,7 +1092,7 @@ widget App {
         };
         let mut parser = crate::Parser::new_with_type_store(code.as_str(), session.type_store())
             .with_session(parser_session);
-        let ast = match parser.parse() {
+        let ast = match parser.parse_domain(&auto_ui_dialect::UiDialect).map(auto_ui_dialect::UiCode) {
             Ok(a) => a,
             Err(_) => return,
         };
@@ -1100,7 +1101,7 @@ widget App {
             .and_then(|s| s.to_str())
             .unwrap_or("unknown")
             .to_string();
-        for stmt in &ast.stmts {
+        for stmt in ast.core_stmts() {
             match stmt {
                 auto_lang_core::ast::Stmt::Fn(_) => {
                     if let Some(name) = crate::stmt_symbol_name(stmt) {

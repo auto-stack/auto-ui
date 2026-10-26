@@ -21,14 +21,15 @@
 //!
 //! Corpus: `test/ui/plan051_timer/`（根 widget 计时器 + store 门控计时器）。
 
+
 #[cfg(test)]
 mod plan051_timer_tests {
     // ── parser：widget timer 块 ────────────────────────────────────────────
 
-    fn parse_ui(code: &str) -> Result<auto_lang_core::ast::Code, auto_lang_core::error::AutoError> {
+    fn parse_ui(code: &str) -> Result<auto_ui_dialect::UiCode, auto_lang_core::error::AutoError> {
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = crate::Parser::from(code).with_session(session);
-        parser.parse()
+        parser.parse_domain(&auto_ui_dialect::UiDialect).map(auto_ui_dialect::UiCode)
     }
 
     /// widget timer 块解析：条目 event/every_ms/when 三元组形状。
@@ -48,10 +49,9 @@ widget Clock {
 "#;
         let ast = parse_ui(code).expect("parse ok");
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d),
+                auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d),
                 _ => None,
             })
             .expect("widget decl");
@@ -78,10 +78,9 @@ store TickerStore {
 "#;
         let ast = parse_ui(code).expect("parse ok");
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::StoreDecl(d) => Some(d),
+                auto_ui_dialect::UiStmt::StoreDecl(d) => Some(d),
                 _ => None,
             })
             .expect("store decl");
@@ -135,12 +134,11 @@ widget Clock {
         let code = std::fs::read_to_string(&path).unwrap();
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = crate::Parser::from(code.as_str()).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d.clone()),
+                auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d.clone()),
                 _ => None,
             })
             .expect("widget decl");
@@ -176,12 +174,11 @@ widget App {
 "#;
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = crate::Parser::from(at).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::WidgetDecl(d) => Some(d.clone()),
+                auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d.clone()),
                 _ => None,
             })
             .expect("widget decl");
@@ -215,12 +212,11 @@ widget App {
         let code = std::fs::read_to_string(&path).unwrap();
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = crate::Parser::from(code.as_str()).with_session(session);
-        let ast = parser.parse().expect("parse");
+        let ast = auto_ui_dialect::UiCode(parser.parse_domain(&auto_ui_dialect::UiDialect).expect("parse"));
         let decl = ast
-            .stmts
-            .iter()
+            .domain_stmts()
             .find_map(|s| match s {
-                auto_lang_core::ast::Stmt::StoreDecl(d) => Some(d.clone()),
+                auto_ui_dialect::UiStmt::StoreDecl(d) => Some(d.clone()),
                 _ => None,
             })
             .expect("store decl");
