@@ -130,3 +130,104 @@ fn incremental_entries_validate_before_cache_or_output() {
     assert!(error.to_string().contains("duplicate widget declaration"));
     assert!(!vue_root.join("gen/front/vue").exists());
 }
+
+#[test]
+fn cold_recipe_imports_generate_actual_classes_in_full_and_incremental() {
+    for (label, prefix) in [
+        ("local", "style chip = \"rounded-full px-4\"\n"),
+        ("named", "use styles: chip\n"),
+        ("wildcard", "use styles: *\n"),
+    ] {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path();
+        let source = format!(
+            "{prefix}widget App {{ view {{ button (style: chip) {{ text \"ok\" {{}} }} }} }}\n"
+        );
+        write_project(root, "src/front", &source, "vue");
+        std::fs::write(
+            root.join("src/front/styles.at"),
+            "pub style chip = \"rounded-full px-4\"\n",
+        )
+        .expect("style module");
+        let app = root.join("src/front/app.at");
+        let req = request(root);
+
+        auto_ui_compiler::design_tokens::recipe::clear_style_recipes();
+        auto_ui_compiler::ui_gen::api::validate_ui_file_with_modules(&app)
+            .unwrap_or_else(|error| panic!("cold {label} preflight failed: {error}"));
+
+        auto_ui_compiler::design_tokens::recipe::clear_style_recipes();
+        let project = auto_ui_tools::vue::VueProject::from_workspace_with_request(root, &req)
+            .unwrap_or_else(|error| panic!("cold {label} full generation failed: {error}"));
+        assert!(
+            project.app_vue_code.contains("rounded-full"),
+            "cold {label} full generation did not expand the recipe"
+        );
+
+        auto_ui_compiler::design_tokens::recipe::clear_style_recipes();
+        auto_ui_tools::vue::incremental_compile_changed(root, Some(&req))
+            .unwrap_or_else(|error| panic!("cold {label} incremental failed: {error}"));
+        let generated = std::fs::read_to_string(root.join("gen/front/vue/src/App.vue"))
+            .expect("incremental App.vue");
+        assert!(
+            generated.contains("rounded-full"),
+            "cold {label} incremental did not expand the recipe"
+        );
+    }
+}
+
+#[test]
+fn recipe_preflight_rejects_private_missing_and_stale_registry_cases() {
+    let private_dir = tempfile::tempdir().expect("private tempdir");
+    let private_root = private_dir.path();
+    write_project(
+        private_root,
+        "src/front",
+        "use styles: chip\nwidget App { view { button (style: chip) { text \"ok\" {} } } }",
+        "vue",
+    );
+    std::fs::write(
+        private_root.join("src/front/styles.at"),
+        "style chip = \"rounded-full\"\n",
+    )
+    .expect("private recipe");
+    auto_ui_compiler::design_tokens::recipe::clear_style_recipes();
+    let error = auto_ui_compiler::ui_gen::api::validate_ui_file_with_modules(
+        &private_root.join("src/front/app.at"),
+    )
+    .expect_err("private named recipe import must remain rejected");
+    assert!(error.to_string().contains("chip"), "{error}");
+
+    let valid_dir = tempfile::tempdir().expect("valid tempdir");
+    let valid_root = valid_dir.path();
+    write_project(
+        valid_root,
+        "src/front",
+        "use styles: *\nwidget App { view { button (style: chip) { text \"ok\" {} } } }",
+        "vue",
+    );
+    std::fs::write(
+        valid_root.join("src/front/styles.at"),
+        "pub style chip = \"rounded-full\"\n",
+    )
+    .expect("public recipe");
+    auto_ui_compiler::design_tokens::recipe::clear_style_recipes();
+    auto_ui_compiler::ui_gen::api::validate_ui_file_with_modules(
+        &valid_root.join("src/front/app.at"),
+    )
+    .expect("valid imported recipe initializes the registry");
+
+    let missing_dir = tempfile::tempdir().expect("missing tempdir");
+    let missing_root = missing_dir.path();
+    write_project(
+        missing_root,
+        "src/front",
+        "widget App { view { button (style: missing) { text \"ok\" {} } } }",
+        "vue",
+    );
+    let error = auto_ui_compiler::ui_gen::api::validate_ui_file_with_modules(
+        &missing_root.join("src/front/app.at"),
+    )
+    .expect_err("a previous file's recipe must not make a missing name valid");
+    assert!(error.to_string().contains("undefined variable"), "{error}");
+}

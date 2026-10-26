@@ -612,6 +612,9 @@ pub fn collect_use_module_fns(
 pub fn validate_ui_file_with_modules(at_path: &Path) -> Result<(), String> {
     let code = std::fs::read_to_string(at_path)
         .map_err(|error| format!("Failed to read {}: {error}", at_path.display()))?;
+    let base_dir = at_path.parent().unwrap_or(Path::new("."));
+    crate::design_tokens::recipe::prepare_style_recipe_imports(&base_dir, &code)
+        .map_err(|error| error.to_string())?;
     crate::parse_validated_ui(&code).map_err(|error| {
         format!(
             "UI file validation failed for {}: {error}",
@@ -640,6 +643,9 @@ fn validate_use_modules(at_path: &Path, code: &str) -> Result<(), String> {
             let Ok(module_code) = std::fs::read_to_string(&path) else {
                 continue;
             };
+            let module_dir = path.parent().unwrap_or(Path::new("."));
+            crate::design_tokens::recipe::prepare_style_recipe_imports(&module_dir, &module_code)
+                .map_err(|error| error.to_string())?;
             crate::parse_validated_ui(&module_code).map_err(|error| {
                 format!(
                     "UI module validation failed for {}: {error}",
