@@ -2507,7 +2507,7 @@ fn wrap_example(
                 |r| {main_msg}::__InitLoaded(r)
             )
         ));
-        return auto_lang::ui::iced::run_app_with_task_devtools(move || {{
+        return auto_ui_runtime::ui::iced::run_app_with_task_devtools(move || {{
             let task = __init.borrow_mut().take().unwrap_or_else(iced::Task::none);
             ({main_widget}::default(), task)
         }});"#,
@@ -2520,7 +2520,7 @@ fn wrap_example(
         // F12 opens the rust-mode DevTools inspector (Plan 311).
         format!(
             r#"println!("Running with Iced backend");
-        return auto_lang::ui::iced::run_app_devtools::<{main_widget}>();"#,
+        return auto_ui_runtime::ui::iced::run_app_devtools::<{main_widget}>();"#,
             main_widget = main_widget,
         )
     };
@@ -2557,7 +2557,7 @@ fn wrap_example(
         let __has_launcher = __autodesk_args.iter().any(|a| a == "--autodesk-launcher");
         // PLAN-693：三模式 CLI 解析（未知参数容错透传；显式已知参数畸形
         // = 报错退出留痕）。
-        let __rc = match auto_lang::ui::desktop_protocol::render_cli::parse_render_cli(
+        let __rc = match auto_ui_runtime::ui::desktop_protocol::render_cli::parse_render_cli(
             &__autodesk_args,
         ) {{
             Ok(v) => v,
@@ -2578,8 +2578,8 @@ fn wrap_example(
             .iter()
             .rev()
             .find_map(|a| a.strip_prefix("--autodesk-render=").map(|s| s.to_string()))
-            .or_else(auto_lang::ui::desktop_protocol::render_cli::sidecar_pac_desktop_render);
-        let (__base, __base_log) = auto_lang::ui::desktop_protocol::render_cli::resolve_render_base(
+            .or_else(auto_ui_runtime::ui::desktop_protocol::render_cli::sidecar_pac_desktop_render);
+        let (__base, __base_log) = auto_ui_runtime::ui::desktop_protocol::render_cli::resolve_render_base(
             __rc.mode,
             std::env::var("AUTO_VM_RENDER").ok().as_deref(),
             __pac_leg.as_deref(),
@@ -2590,14 +2590,14 @@ fn wrap_example(
         match __base {{
             // rq 模式（`-q` 语义内联）：exe 侧孵化保活（探活→spawn auto
             // rqhost→退避）→ rendezvous 采纳 + remote 帧宿主。
-            auto_lang::ui::desktop_protocol::render_cli::RenderBase::Rq => {{
+            auto_ui_runtime::ui::desktop_protocol::render_cli::RenderBase::Rq => {{
                 // Box<dyn Error> 的 From<_> 非单射（anyhow/miette 等）——
                 // `?`+Into::into 推断二义（E0283 实测）；return 位显式
                 // into（旧臂同款，目标型钉死）。
-                if let Err(e) = auto_lang::ui::desktop_protocol::rqhost::ensure_rqhost_ready() {{
+                if let Err(e) = auto_ui_runtime::ui::desktop_protocol::rqhost::ensure_rqhost_ready() {{
                     return Err(e.into());
                 }}
-                let __wellknown = auto_lang::ui::desktop_protocol::rqhost::wellknown_pipe();
+                let __wellknown = auto_ui_runtime::ui::desktop_protocol::rqhost::wellknown_pipe();
                 eprintln!("[render] rq 模式：采纳 rqhost daemon（{{__wellknown}}）");
                 // --app386= Hello app_name 覆盖（PLAN-694 T-01 认领对称性
                 // ——宿主 spawn 按 `--app386=<目录名>` 传身份，认领按目录
@@ -2608,21 +2608,21 @@ fn wrap_example(
                         __app_name = v.to_string();
                     }}
                 }}
-                let (__w, __h) = auto_lang::ui::desktop_protocol::rqhost::vm_window_size();
+                let (__w, __h) = auto_ui_runtime::ui::desktop_protocol::rqhost::vm_window_size();
                 let __component = {main_widget}::default();
-                let __opts = auto_lang::ui::desktop_protocol::client_entry::ClientOpts {{
+                let __opts = auto_ui_runtime::ui::desktop_protocol::client_entry::ClientOpts {{
                     app_name: __app_name.clone(),
                     title: std::env::var("AUTO_VM_TITLE").unwrap_or_else(|_| __app_name.clone()),
                     width: __w,
                     height: __h,
-                    frame_mode: auto_lang::ui::desktop_protocol::message::FrameMode::Commands,
+                    frame_mode: auto_ui_runtime::ui::desktop_protocol::message::FrameMode::Commands,
                     auto_downgraded: false,
                     remote: true,
                 }};
-                return auto_lang::ui::desktop_protocol::client_entry::run_native_client(
+                return auto_ui_runtime::ui::desktop_protocol::client_entry::run_native_client(
                     __component,
                     __opts,
-                    auto_lang::ui::desktop_protocol::client_entry::ClientTarget::Rqhost {{
+                    auto_ui_runtime::ui::desktop_protocol::client_entry::ClientTarget::Rqhost {{
                         wellknown: __wellknown,
                         app_name: __app_name,
                     }},
@@ -2631,11 +2631,11 @@ fn wrap_example(
             }}
             // desktop 模式：虚拟桌面合成器端点——不孵化（桌面已在前），
             // 端点缺席 = 报错列探测过的 wellknown（AC-03）。
-            auto_lang::ui::desktop_protocol::render_cli::RenderBase::Desktop => {{
+            auto_ui_runtime::ui::desktop_protocol::render_cli::RenderBase::Desktop => {{
                 let Some(__endpoint) = __rc.desktop_endpoint else {{
                     return Err(format!(
                         "desktop 模式需要 --desktop-endpoint <pipe>（未指定；探测 wellknown: {{}}——请先启动虚拟桌面或补参）",
-                        auto_lang::ui::desktop_protocol::rqhost::wellknown_pipe(),
+                        auto_ui_runtime::ui::desktop_protocol::rqhost::wellknown_pipe(),
                     )
                     .into());
                 }};
@@ -2649,21 +2649,21 @@ fn wrap_example(
                         __app_name = v.to_string();
                     }}
                 }}
-                let (__w, __h) = auto_lang::ui::desktop_protocol::rqhost::vm_window_size();
+                let (__w, __h) = auto_ui_runtime::ui::desktop_protocol::rqhost::vm_window_size();
                 let __component = {main_widget}::default();
-                let __opts = auto_lang::ui::desktop_protocol::client_entry::ClientOpts {{
+                let __opts = auto_ui_runtime::ui::desktop_protocol::client_entry::ClientOpts {{
                     app_name: __app_name.clone(),
                     title: std::env::var("AUTO_VM_TITLE").unwrap_or_else(|_| __app_name.clone()),
                     width: __w,
                     height: __h,
-                    frame_mode: auto_lang::ui::desktop_protocol::message::FrameMode::Commands,
+                    frame_mode: auto_ui_runtime::ui::desktop_protocol::message::FrameMode::Commands,
                     auto_downgraded: false,
                     remote: true,
                 }};
-                return auto_lang::ui::desktop_protocol::client_entry::run_native_client(
+                return auto_ui_runtime::ui::desktop_protocol::client_entry::run_native_client(
                     __component,
                     __opts,
-                    auto_lang::ui::desktop_protocol::client_entry::ClientTarget::Desktop {{
+                    auto_ui_runtime::ui::desktop_protocol::client_entry::ClientTarget::Desktop {{
                         endpoint: __endpoint,
                         app_name: __app_name,
                     }},
@@ -2671,13 +2671,13 @@ fn wrap_example(
                 .map_err(Into::into);
             }}
             // independent（缺省/显式）：直落独立窗（下行 iced_entry）。
-            auto_lang::ui::desktop_protocol::render_cli::RenderBase::Independent => {{}}
+            auto_ui_runtime::ui::desktop_protocol::render_cli::RenderBase::Independent => {{}}
         }}
         // 旧孵化注入臂（PLAN-020/031/039 既有宿主编排面零变化；显式 CLI
         // 底座已在上方截走——independent 覆盖孵化注入 = CLI 顶优先语义）。
         if __rc.mode.is_none() && (__has_client || __has_incubate || __has_launcher) {{
             let mut __pipe: Option<String> = None;
-            let mut __broker = auto_lang::ui::desktop_protocol::broker::BROKER_PIPE.to_string();
+            let mut __broker = auto_ui_runtime::ui::desktop_protocol::broker::BROKER_PIPE.to_string();
             let mut __render: Option<String> = None;
             let mut __app_name = "{project_name_snake}".to_string();
             for __a in &__autodesk_args {{
@@ -2692,11 +2692,11 @@ fn wrap_example(
                 }}
             }}
             if let Some(arg) = __render.as_deref() {{
-                if auto_lang::ui::desktop_protocol::coverage::RenderMode::parse(arg).is_none() {{
+                if auto_ui_runtime::ui::desktop_protocol::coverage::RenderMode::parse(arg).is_none() {{
                     eprintln!("[autodesk-client] 未知 --autodesk-render={{arg}}（auto|queue|independent），回退 auto");
                 }}
             }}
-            let __mode = auto_lang::ui::desktop_protocol::coverage::RenderMode::resolve(
+            let __mode = auto_ui_runtime::ui::desktop_protocol::coverage::RenderMode::resolve(
                 __render.as_deref(),
                 None,
             );
@@ -2704,7 +2704,7 @@ fn wrap_example(
             // ——queue 优先 + NotCovered 降级 independent 留痕）。
             let __component = {main_widget}::default();
             let (__frame_mode, __downgraded, __log) =
-                auto_lang::ui::desktop_protocol::client_entry::resolve_native_frame_mode(
+                auto_ui_runtime::ui::desktop_protocol::client_entry::resolve_native_frame_mode(
                     __mode,
                     "{main_widget}",
                     &__component.view(),
@@ -2715,17 +2715,17 @@ fn wrap_example(
             let __rqhost = __autodesk_args.iter().any(|a| a == "--autodesk-rqhost");
             let __target = if __rqhost {{
                 // PLAN-031：rqhost 采纳（well-known rendezvous + exit-on-EOF）。
-                auto_lang::ui::desktop_protocol::client_entry::ClientTarget::Rqhost {{
+                auto_ui_runtime::ui::desktop_protocol::client_entry::ClientTarget::Rqhost {{
                     wellknown: __broker.clone(),
                     app_name: __app_name.clone(),
                 }}
             }} else {{ match __pipe {{
-                Some(p) => auto_lang::ui::desktop_protocol::client_entry::ClientTarget::Direct(p),
-                None => auto_lang::ui::desktop_protocol::client_entry::ClientTarget::Broker {{
+                Some(p) => auto_ui_runtime::ui::desktop_protocol::client_entry::ClientTarget::Direct(p),
+                None => auto_ui_runtime::ui::desktop_protocol::client_entry::ClientTarget::Broker {{
                     broker_pipe: __broker,
                 }},
             }} }};
-            let __opts = auto_lang::ui::desktop_protocol::client_entry::ClientOpts {{
+            let __opts = auto_ui_runtime::ui::desktop_protocol::client_entry::ClientOpts {{
                 app_name: __app_name.clone(),
                 title: __app_name,
                 width: 480.0,
@@ -2736,7 +2736,7 @@ fn wrap_example(
                 // false（remote 族走上方三模式臂；E0063 根修归位）。
                 remote: false,
             }};
-            return auto_lang::ui::desktop_protocol::client_entry::run_native_client(
+            return auto_ui_runtime::ui::desktop_protocol::client_entry::run_native_client(
                 __component,
                 __opts,
                 __target,
@@ -2779,7 +2779,7 @@ use auto_ui_runtime::ui::{{Component, View}};
 // 014 内存哨兵:记账分配器(存活字节 + 大块分配点回溯;超限冻结时
 // 自动落盘分配报告到 %TEMP%/auto-term-mem-report.txt)。
 #[global_allocator]
-static GUARD_ALLOC: auto_lang::ui::mem_guard::GuardAlloc = auto_lang::ui::mem_guard::GuardAlloc;
+static GUARD_ALLOC: auto_ui_runtime::ui::mem_guard::GuardAlloc = auto_ui_runtime::ui::mem_guard::GuardAlloc;
 
 // PLAN-039 T-12（批次 E）：内建方法 shim 家族——main.rs 组装级注入
 // 一次（per-file 注入会撞多 .at 文件拼接的重复定义）。
@@ -2787,7 +2787,7 @@ static GUARD_ALLOC: auto_lang::ui::mem_guard::GuardAlloc = auto_lang::ui::mem_gu
 
 {cleaned}
 
-fn main() -> auto_lang::ui::AppResult<()> {{
+fn main() -> auto_ui_runtime::ui::AppResult<()> {{
     #[cfg(feature = "ui-iced")]
     {{
 {env_inits}        // Plan 020 T-05：孵化参数在册 → native 协议 client 臂（返回即走）；
@@ -3488,16 +3488,13 @@ version = "0.1.0"
 edition = "2021"
 {bin_block}
 [features]
-ui-iced = ["auto-lang/ui-iced"]
-default = ["ui-iced", "auto-lang/default"]
+ui-iced = ["auto-ui-runtime/ui-iced"]
+default = ["ui-iced"]
 
 [dependencies]
-auto-lang.workspace = true
 # PLAN-814 T-05 canonical 双直依赖（import_policy.rs；PLAN-815 T-07 子批2
 # 接线）：rust 生成组件只 import `auto_ui_runtime::ui`/`auto_lang_core`，
-# 成员须直依赖两包（auto-ui-runtime default 含 ui-iced）。legacy 壳层
-# （wrap_example 头/mem_guard/内建 shim）仍发射 auto_lang::，auto-lang
-# 直依赖保留至壳层发射 canonical 化。
+# 成员须直依赖两包（auto-ui-runtime default 含 ui-iced）。
 auto-ui-runtime.workspace = true
 auto-lang-core.workspace = true
 # PLAN-811：viewer 桥函数直调媒体基础公开入口（auto_media_core::）。
@@ -4185,13 +4182,19 @@ fn delivery_dir_digest(records: &[DeliveryFileRecord]) -> String {
 /// 兄弟/主检出）→ 编译期 CARGO_MANIFEST_DIR 上溯。候选必须含
 /// crates/auto-lang 与根 Cargo.toml，否则受管判红。
 fn delivery_producer_root() -> AutoResult<PathBuf> {
-    let mut candidates: Vec<PathBuf> = Vec::new();
-    if let Some(p) = std::env::var_os("AUTO_DELIVERY_SOURCE_ROOT") {
-        candidates.push(PathBuf::from(p));
+    let valid = |p: &Path| p.join("crates/auto-lang").is_dir() && p.join("Cargo.toml").is_file();
+    // A caller-supplied root is authoritative: do not silently replace it with
+    // an installed or ambient checkout when it is absent or malformed.
+    for key in ["AUTO_DELIVERY_SOURCE_ROOT", "AUTO_LANG_ROOT"] {
+        if let Some(value) = std::env::var_os(key) {
+            let root = PathBuf::from(value);
+            if valid(&root) {
+                return Ok(root);
+            }
+            return Err(format!("delivery: producer 显式 {key} 无效: {}", root.display()).into());
+        }
     }
-    if let Some(p) = std::env::var_os("AUTO_LANG_ROOT") {
-        candidates.push(PathBuf::from(p));
-    }
+    let mut candidates = Vec::new();
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
             candidates.push(dir.join("sdk"));
@@ -4207,38 +4210,165 @@ fn delivery_producer_root() -> AutoResult<PathBuf> {
     {
         candidates.push(root.to_path_buf());
     }
-    for c in candidates {
-        if c.join("crates").join("auto-lang").is_dir() && c.join("Cargo.toml").is_file() {
-            return Ok(c);
-        }
-    }
-    Err("delivery: producer 源根未解析（需含 crates/auto-lang 与根 Cargo.toml；可用 AUTO_DELIVERY_SOURCE_ROOT 钉死）".into())
+    candidates.into_iter().find(|root| valid(root)).ok_or_else(||
+        "delivery: producer 源根未解析（需含 crates/auto-lang 与根 Cargo.toml；可用 AUTO_DELIVERY_SOURCE_ROOT 钉死）".into())
 }
 
-/// PLAN-831 T-06 起受管 crate 源解析：语言根（producer_root/crates/<name>）
-/// 优先，缺席时按解析序查独立 UI 仓根——AUTO_UI_SOURCE_ROOT → producer
-/// 根的兄弟 auto-ui（组内 worktree/主检出同级布局均成立）。两根均缺=
-/// 具名判红（受管失败面）。
+/// Verify the actual UI crate files against a managed Full installation's
+/// ownership and content receipt. This is consistency checking, not a signature.
+fn delivery_installed_ui_source(
+    producer_root: &Path,
+    name: &str,
+    copied_root: Option<&Path>,
+) -> AutoResult<Option<PathBuf>> {
+    use sha2::{Digest, Sha256};
+    if producer_root.file_name().and_then(|s| s.to_str()) != Some("sdk") {
+        return Ok(None);
+    }
+    let Some(install) = producer_root.parent() else {
+        return Ok(None);
+    };
+    let receipt = install.join("install-manifest.json");
+    if !receipt.is_file() {
+        return Ok(None);
+    }
+    let doc: serde_json::Value = serde_json::from_slice(&fs::read(&receipt)?)
+        .map_err(|e| format!("delivery: producer 安装清单无效: {e}"))?;
+    let ui_rev = doc["sources"]["auto-ui"].as_str().unwrap_or("");
+    if doc["schema"] != "man-install/1"
+        || doc["profile"] != "full"
+        || doc["source_closure"]["sdk_layout"] != "combined-crates"
+        || ui_rev.len() != 40
+        || !ui_rev.bytes().all(|b| b.is_ascii_hexdigit())
+    {
+        return Err("delivery: producer 安装清单版本、profile 或 UI 来源无效".into());
+    }
+    let packages = doc["source_closure"]["packages"]
+        .as_array()
+        .ok_or("delivery: producer 安装清单缺 source_closure.packages")?;
+    let owners: Vec<_> = packages.iter().filter(|p| p["name"] == name).collect();
+    let expected_path = format!("crates/{name}");
+    if owners.len() != 1
+        || owners[0]["source_repo"] != "auto-ui"
+        || owners[0]["installed_path"] != expected_path
+        || owners[0]["source_path"] != expected_path
+    {
+        return Err(format!("delivery: producer 安装 UI 源所有权无效: {name}").into());
+    }
+    let files = doc["files"]
+        .as_object()
+        .ok_or("delivery: producer 安装清单缺 files")?;
+    let prefix = format!("sdk/crates/{name}/");
+    let expected: std::collections::BTreeMap<_, _> = files
+        .iter()
+        .filter(|(path, _)| path.starts_with(&prefix))
+        .collect();
+    if expected.is_empty() {
+        return Err(format!("delivery: producer 安装 UI 文件清单为空: {name}").into());
+    }
+    let root = producer_root.join("crates").join(name);
+    let mut seen = std::collections::BTreeSet::new();
+    fn visit(
+        dir: &Path,
+        rel: &str,
+        prefix: &str,
+        expected: &std::collections::BTreeMap<&String, &serde_json::Value>,
+        seen: &mut std::collections::BTreeSet<String>,
+    ) -> AutoResult<()> {
+        for entry in fs::read_dir(dir)? {
+            let entry = entry?;
+            let ty = entry.file_type()?;
+            let name = entry.file_name().to_string_lossy().to_string();
+            let path = entry.path();
+            let child = if rel.is_empty() {
+                name.clone()
+            } else {
+                format!("{rel}/{name}")
+            };
+            if ty.is_symlink() {
+                return Err(
+                    format!("delivery: producer 安装源包含链接: {}", path.display()).into(),
+                );
+            }
+            if ty.is_dir() {
+                if DELIVERY_COPY_SKIP_DIRS.contains(&name.as_str()) {
+                    continue;
+                }
+                visit(&path, &child, prefix, expected, seen)?;
+            } else if ty.is_file() {
+                let key = format!("{prefix}{child}");
+                let record = expected
+                    .get(&key)
+                    .ok_or_else(|| format!("delivery: producer 安装 UI 文件未登记: {key}"))?;
+                let bytes = fs::read(&path)?;
+                let hash = format!("{:x}", Sha256::digest(&bytes));
+                if record["bytes"].as_u64() != Some(bytes.len() as u64)
+                    || record["sha256"].as_str() != Some(hash.as_str())
+                {
+                    return Err(format!("delivery: producer 安装 UI 文件校验失败: {key}").into());
+                }
+                seen.insert(key);
+            } else {
+                return Err(format!(
+                    "delivery: producer 安装 UI 源文件类型无效: {}",
+                    path.display()
+                )
+                .into());
+            }
+        }
+        Ok(())
+    }
+    // Validate the staged copy too: the source may change between the first
+    // check and copying, so a preflight-only hash is not output provenance.
+    visit(
+        copied_root.unwrap_or(&root),
+        "",
+        &prefix,
+        &expected,
+        &mut seen,
+    )?;
+    if seen.len() != expected.len() {
+        return Err(format!("delivery: producer 安装 UI 源缺少登记文件: {name}").into());
+    }
+    Ok(Some(root))
+}
+
+/// UI crates are selected from their UI owner or a receipt-validated
+/// installation. Other crates must come from the language producer itself.
 fn delivery_crate_source(producer_root: &Path, name: &str) -> AutoResult<PathBuf> {
-    let primary = producer_root.join("crates").join(name);
-    if primary.is_dir() {
-        return Ok(primary);
+    let ui = matches!(
+        name,
+        "auto-ui-dialect" | "auto-ui-compiler" | "auto-ui-runtime" | "auto-ui-tools" | "shell-pack"
+    );
+    if !ui {
+        let source = producer_root.join("crates").join(name);
+        return source
+            .is_dir()
+            .then_some(source)
+            .ok_or_else(|| format!("delivery: producer 语言源缺失: crates/{name}").into());
     }
-    let mut ui_candidates: Vec<PathBuf> = Vec::new();
-    if let Some(p) = std::env::var_os("AUTO_UI_SOURCE_ROOT") {
-        ui_candidates.push(PathBuf::from(p));
+    if let Some(value) = std::env::var_os("AUTO_UI_SOURCE_ROOT") {
+        let root = PathBuf::from(value);
+        let source = root.join("crates").join(name);
+        return source.is_dir().then_some(source).ok_or_else(|| {
+            format!(
+                "delivery: producer 显式 AUTO_UI_SOURCE_ROOT 无效或缺少 crates/{name}: {}",
+                root.display()
+            )
+            .into()
+        });
     }
-    if let Some(sibling) = producer_root.parent() {
-        ui_candidates.push(sibling.join("auto-ui"));
+    if let Some(source) = delivery_installed_ui_source(producer_root, name, None)? {
+        return Ok(source);
     }
-    for c in ui_candidates {
-        let src = c.join("crates").join(name);
-        if src.is_dir() {
-            return Ok(src);
+    if let Some(parent) = producer_root.parent() {
+        let source = parent.join("auto-ui/crates").join(name);
+        if source.is_dir() {
+            return Ok(source);
         }
     }
     Err(format!(
-        "delivery: 受管 crate 源未解析（crates/{name}；已查语言根与 UI 根[env AUTO_UI_SOURCE_ROOT / 兄弟 auto-ui]）——受管判红"
+        "delivery: producer UI owner 源缺失: crates/{name}（AUTO_UI_SOURCE_ROOT / 组内 auto-ui）"
     )
     .into())
 }
@@ -4467,11 +4597,10 @@ version = "0.1.0"
 edition = "2021"
 {bin_block}
 [features]
-ui-iced = ["auto-lang/ui-iced"]
-default = ["ui-iced", "auto-lang/default"]
+ui-iced = ["auto-ui-runtime/ui-iced"]
+default = ["ui-iced"]
 
 [dependencies]
-auto-lang = {{ path = "../crates/auto-lang" }}
 # PLAN-814 T-05 canonical 双直依赖（import_policy.rs；PLAN-815 T-07 子批2
 # 接线）：交付 app 的生成组件只 import `auto_ui_runtime::ui`/
 # `auto_lang_core`——直接依赖同交付根内两包（闭包成员 814 T-02/T-03 已
@@ -4671,13 +4800,11 @@ fn delivery_guard_root(delivery_root: &Path) -> AutoResult<()> {
 fn delivery_preflight_producer(producer_root: &Path) -> AutoResult<()> {
     let mut missing: Vec<String> = Vec::new();
     for c in DELIVERY_CRATES {
-        if delivery_crate_source(producer_root, c)
-            .map(|src| src.join("Cargo.toml").is_file())
-            .unwrap_or(false)
-        {
-            continue;
+        let source = delivery_crate_source(producer_root, c)
+            .map_err(|err| format!("delivery: producer 预检失败: {err}"))?;
+        if !source.join("Cargo.toml").is_file() {
+            missing.push(format!("crates/{c}/Cargo.toml"));
         }
-        missing.push(format!("crates/{c}/Cargo.toml"));
     }
     for p in DELIVERY_PATCHES {
         if !producer_root
@@ -5346,6 +5473,17 @@ fn generate_rust_ui_delivery_inner(
         let src = delivery_crate_source(&producer_root, name)?;
         let dst = delivery_root.join("crates").join(name);
         let copied = delivery_copy_dir(&src, &dst, &DELIVERY_COPY_SKIP_DIRS)?;
+        if matches!(
+            name,
+            "auto-ui-dialect"
+                | "auto-ui-compiler"
+                | "auto-ui-runtime"
+                | "auto-ui-tools"
+                | "shell-pack"
+        ) && std::env::var_os("AUTO_UI_SOURCE_ROOT").is_none()
+        {
+            delivery_installed_ui_source(&producer_root, name, Some(&dst))?;
+        }
         total_files += copied.records.len() as u64;
         total_bytes += copied.records.iter().map(|r| r.bytes).sum::<u64>();
         let mut edits: Vec<String> = Vec::new();
@@ -5366,9 +5504,22 @@ fn generate_rust_ui_delivery_inner(
             // PLAN-831 T-06：UI 仓侧受管 crate——跨仓语言基础 path 前缀投影。
             edits = delivery_apply_projection(&dst.join("Cargo.toml"), &PROJECTION_AUTO_UI_CRATE)?;
         }
+        let origin_repo = if matches!(
+            name,
+            "auto-ui-dialect"
+                | "auto-ui-compiler"
+                | "auto-ui-runtime"
+                | "auto-ui-tools"
+                | "shell-pack"
+        ) {
+            "auto-ui"
+        } else {
+            "auto-lang"
+        };
         crate_entries.push(serde_json::json!({
             "name": name,
             "kind": "source",
+            "origin_repo": origin_repo,
             "origin_rel": format!("crates/{name}"),
             "files": copied.records.len(),
             "bytes": copied.records.iter().map(|r| r.bytes).sum::<u64>(),
@@ -5479,7 +5630,29 @@ fn generate_rust_ui_delivery_inner(
         .map_err(|e| format!("delivery: 写 verify.py 失败: {e}"))?;
 
     // delivery-manifest.json（producer 身份/闭包规模/资源与 pin 清单）
-    let (git_head, git_dirty) = delivery_git_identity(&producer_root);
+    let (mut git_head, git_dirty) = delivery_git_identity(&producer_root);
+    let ui_crate_source = delivery_crate_source(&producer_root, "auto-ui-compiler")?;
+    let ui_root = ui_crate_source
+        .parent()
+        .and_then(Path::parent)
+        .ok_or("delivery: producer UI owner 根无效")?;
+    let (mut ui_git_head, ui_git_dirty) = delivery_git_identity(ui_root);
+    // Installed SDKs are not Git checkouts. Their verified receipt carries the
+    // original source revisions, which must not be replaced with the language SHA.
+    if producer_root.file_name().and_then(|s| s.to_str()) == Some("sdk") {
+        if let Some(install) = producer_root.parent() {
+            let receipt = install.join("install-manifest.json");
+            if receipt.is_file() {
+                let doc: serde_json::Value = serde_json::from_slice(&fs::read(receipt)?)?;
+                if git_head.is_none() {
+                    git_head = doc["sources"]["auto-lang"].as_str().map(str::to_owned);
+                }
+                if ui_git_head.is_none() && std::env::var_os("AUTO_UI_SOURCE_ROOT").is_none() {
+                    ui_git_head = doc["sources"]["auto-ui"].as_str().map(str::to_owned);
+                }
+            }
+        }
+    }
     let ui_gen_fp = delivery_ui_gen_fingerprint(&producer_root)?;
     use sha2::{Digest, Sha256};
     let root_lock_sha256 = format!(
@@ -5499,6 +5672,9 @@ fn generate_rust_ui_delivery_inner(
             "source_root": producer_root.to_string_lossy().replace('\\', "/"),
             "git_head": git_head,
             "git_dirty": git_dirty,
+            "ui_source_root": ui_root.to_string_lossy().replace('\\', "/"),
+            "ui_git_head": ui_git_head,
+            "ui_git_dirty": ui_git_dirty,
             "ui_gen_fingerprint": ui_gen_fp,
             "app_lock_source": "Cargo.lock (workspace root)",
             // R2：根锁为本地输入（非 git 跟踪）——绑定实际内容身份。
@@ -6488,7 +6664,8 @@ mod tests {
     #[test]
     fn image_stdlib_ui_cargo_uses_shared_runtime_feature() {
         let ui_cargo = generate_cargo_toml("image-ui", Path::new("."), &PacSource::legacy());
-        assert!(ui_cargo.contains("auto-lang/ui-iced"));
+        assert!(ui_cargo.contains("auto-ui-runtime/ui-iced"));
+        assert!(!ui_cargo.contains("auto-lang.workspace = true"));
     }
 
     /// PLAN-738 R5-01：workspace lock 新鲜度真值表（严格比较）。首次
@@ -7886,6 +8063,117 @@ pub fn create_item(name str) str {
             .is_empty());
     }
 
+    #[test]
+    fn plan842_ui_source_owner_beats_shadow_and_rejects_invalid_override() {
+        struct Restore(Option<std::ffi::OsString>);
+        impl Drop for Restore {
+            fn drop(&mut self) {
+                match &self.0 {
+                    Some(v) => std::env::set_var("AUTO_UI_SOURCE_ROOT", v),
+                    None => std::env::remove_var("AUTO_UI_SOURCE_ROOT"),
+                }
+            }
+        }
+        let _restore = Restore(std::env::var_os("AUTO_UI_SOURCE_ROOT"));
+        let dir = tempfile::tempdir().unwrap();
+        let lang = dir.path().join("lang");
+        let ui = dir.path().join("ui");
+        let shadow = lang.join("crates/auto-ui-dialect");
+        let canonical = ui.join("crates/auto-ui-dialect");
+        std::fs::create_dir_all(&shadow).unwrap();
+        std::fs::create_dir_all(&canonical).unwrap();
+        std::fs::write(shadow.join("marker"), "shadow").unwrap();
+        std::fs::write(canonical.join("marker"), "canonical").unwrap();
+        std::env::set_var("AUTO_UI_SOURCE_ROOT", &ui);
+        let chosen = delivery_crate_source(&lang, "auto-ui-dialect").unwrap();
+        assert_eq!(
+            std::fs::read_to_string(chosen.join("marker")).unwrap(),
+            "canonical"
+        );
+        std::env::set_var("AUTO_UI_SOURCE_ROOT", dir.path().join("missing"));
+        assert!(delivery_crate_source(&lang, "auto-ui-dialect").is_err());
+        std::env::remove_var("AUTO_UI_SOURCE_ROOT");
+        assert!(
+            delivery_crate_source(&lang, "auto-ui-dialect").is_err(),
+            "未登记的旧影子不得被单独选中"
+        );
+    }
+
+    #[test]
+    fn plan842_installed_ui_source_requires_owned_and_matching_files() {
+        use sha2::{Digest, Sha256};
+        struct Restore(Option<std::ffi::OsString>);
+        impl Drop for Restore {
+            fn drop(&mut self) {
+                match &self.0 {
+                    Some(v) => std::env::set_var("AUTO_UI_SOURCE_ROOT", v),
+                    None => std::env::remove_var("AUTO_UI_SOURCE_ROOT"),
+                }
+            }
+        }
+        let _restore = Restore(std::env::var_os("AUTO_UI_SOURCE_ROOT"));
+        std::env::remove_var("AUTO_UI_SOURCE_ROOT");
+        let dir = tempfile::tempdir().unwrap();
+        let sdk = dir.path().join("sdk");
+        let source = sdk.join("crates/auto-ui-dialect");
+        std::fs::create_dir_all(&source).unwrap();
+        let original = b"[package]\nname = \"auto-ui-dialect\"\n";
+        std::fs::write(source.join("Cargo.toml"), original).unwrap();
+        let path = "sdk/crates/auto-ui-dialect/Cargo.toml";
+        let mut manifest = serde_json::json!({
+            "schema": "man-install/1", "profile": "full",
+            "sources": {"auto-ui": "0123456789abcdef0123456789abcdef01234567"},
+            "source_closure": {"sdk_layout": "combined-crates", "packages": [{
+                "name": "auto-ui-dialect", "source_repo": "auto-ui",
+                "source_path": "crates/auto-ui-dialect", "installed_path": "crates/auto-ui-dialect"
+            }]},
+            "files": {path: {"bytes": original.len(), "sha256": format!("{:x}", Sha256::digest(original))}}
+        });
+        let receipt = dir.path().join("install-manifest.json");
+        std::fs::write(&receipt, serde_json::to_vec(&manifest).unwrap()).unwrap();
+        assert_eq!(
+            delivery_crate_source(&sdk, "auto-ui-dialect").unwrap(),
+            source
+        );
+        let copied = dir.path().join("staged-copy");
+        std::fs::create_dir_all(&copied).unwrap();
+        std::fs::write(copied.join("Cargo.toml"), original).unwrap();
+        assert!(delivery_installed_ui_source(&sdk, "auto-ui-dialect", Some(&copied)).is_ok());
+        std::fs::write(copied.join("Cargo.toml"), b"modified during copy").unwrap();
+        assert!(delivery_installed_ui_source(&sdk, "auto-ui-dialect", Some(&copied)).is_err());
+        std::fs::write(source.join("Cargo.toml"), b"tampered").unwrap();
+        assert!(delivery_crate_source(&sdk, "auto-ui-dialect").is_err());
+        std::fs::write(source.join("Cargo.toml"), original).unwrap();
+        std::fs::write(source.join("extra.rs"), b"unlisted").unwrap();
+        assert!(delivery_crate_source(&sdk, "auto-ui-dialect").is_err());
+        std::fs::remove_file(source.join("extra.rs")).unwrap();
+        manifest["schema"] = serde_json::json!("man-install/999");
+        std::fs::write(&receipt, serde_json::to_vec(&manifest).unwrap()).unwrap();
+        assert!(delivery_crate_source(&sdk, "auto-ui-dialect").is_err());
+        manifest["schema"] = serde_json::json!("man-install/1");
+        manifest["source_closure"]["packages"][0]["source_repo"] = serde_json::json!("auto-lang");
+        std::fs::write(&receipt, serde_json::to_vec(&manifest).unwrap()).unwrap();
+        assert!(delivery_crate_source(&sdk, "auto-ui-dialect").is_err());
+    }
+
+    #[test]
+    fn plan842_invalid_language_override_does_not_fall_back() {
+        struct Restore(Option<std::ffi::OsString>);
+        impl Drop for Restore {
+            fn drop(&mut self) {
+                match &self.0 {
+                    Some(v) => std::env::set_var("AUTO_DELIVERY_SOURCE_ROOT", v),
+                    None => std::env::remove_var("AUTO_DELIVERY_SOURCE_ROOT"),
+                }
+            }
+        }
+        let _restore = Restore(std::env::var_os("AUTO_DELIVERY_SOURCE_ROOT"));
+        let dir = tempfile::tempdir().unwrap();
+        std::env::set_var("AUTO_DELIVERY_SOURCE_ROOT", dir.path().join("missing"));
+        let err = delivery_producer_root().unwrap_err().to_string();
+        assert!(err.contains("AUTO_DELIVERY_SOURCE_ROOT"), "{err}");
+    }
+
     /// PLAN-792 端到端：generate_rust_ui_delivery 真实生成——镜像布局
     /// （crates/ + 根级编译输入）、自包含应用清单（path 依赖 + pin 块）、
     /// 资源 allowlist + hash、delivery-manifest.json 身份字段、外来目录
@@ -7956,7 +8244,7 @@ pub fn create_item(name str) str {
         assert!(vendored.contains("test-cases = []"));
         // 应用清单：自包含 path 依赖 + pin 块；无 workspace 继承
         let app_manifest = std::fs::read_to_string(delivery.join("app/Cargo.toml")).unwrap();
-        assert!(app_manifest.contains("auto-lang = { path = \"../crates/auto-lang\" }"));
+        assert!(!app_manifest.contains("auto-lang = { path = \"../crates/auto-lang\" }"));
         assert!(!app_manifest.contains(".workspace = true"));
         assert!(
             app_manifest.contains("wgpu-hal = { version = \"=27."),
@@ -7966,6 +8254,14 @@ pub fn create_item(name str) str {
         let main_rs = std::fs::read_to_string(delivery.join("app/src/main.rs")).unwrap();
         assert!(main_rs.contains("avatar.png"), "本地资产引用");
         assert!(main_rs.contains("count"), "handler 状态字段");
+        assert!(
+            main_rs.contains("auto_ui_runtime::ui::desktop_protocol"),
+            "桌面入口须使用 UI owner"
+        );
+        assert!(
+            !main_rs.contains("auto_lang::"),
+            "交付 main.rs 不得使用旧 auto-lang 门面"
+        );
         // 资源 allowlist + hash（R1-F01：sha256——随包 verify.py 可独立校验）
         let asset = delivery.join("assets/avatar.png");
         assert!(asset.is_file(), "资源入包");
@@ -7996,6 +8292,15 @@ pub fn create_item(name str) str {
         // producer 身份字段（git/ui_gen 指纹/来源可追溯）
         assert!(manifest["producer"]["ui_gen_fingerprint"].is_string());
         assert!(manifest["producer"]["source_root"].is_string());
+        assert!(manifest["producer"]["ui_source_root"].is_string());
+        assert!(manifest["producer"]["ui_git_head"].is_string());
+        let dialect = manifest["crates"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|entry| entry["name"] == "auto-ui-dialect")
+            .unwrap();
+        assert_eq!(dialect["origin_repo"], "auto-ui");
         // 闭包规模如实披露（受管包含语言源码——非纯 core）
         assert_eq!(manifest["disclosure"]["includes_language_source"], true);
         assert!(
@@ -8491,6 +8796,8 @@ pub fn create_item(name str) str {
             &crate::rust_ui::PacSource::legacy(),
         );
         assert!(ui_cargo.contains("auto-ui-runtime"));
+        assert!(!ui_cargo.contains("auto-lang.workspace = true"));
+        assert!(ui_cargo.contains("ui-iced = [\"auto-ui-runtime/ui-iced\"]"));
         assert!(
             ui_cargo.contains("auto-ui-runtime.workspace = true"),
             "canonical 双直依赖须 workspace 继承形态: {ui_cargo}"
