@@ -4193,11 +4193,7 @@ fn delivery_producer_root() -> AutoResult<PathBuf> {
         if let Some(value) = std::env::var_os(key) {
             let root = PathBuf::from(value);
             if valid(&root) {
-                if root.file_name().and_then(|name| name.to_str()) == Some("sdk")
-                    && root
-                        .parent()
-                        .is_some_and(|parent| parent.join("install-manifest.json").exists())
-                {
+                if auto_api_gen::source_owner::is_managed_sdk(&root) {
                     auto_api_gen::source_owner::validate_installed_language_source(&root)?;
                 }
                 return Ok(root);
