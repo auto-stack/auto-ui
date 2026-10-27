@@ -2787,7 +2787,15 @@ static GUARD_ALLOC: auto_ui_runtime::ui::mem_guard::GuardAlloc = auto_ui_runtime
 
 {cleaned}
 
+// Explicitly connect the SDK to the UI provider owner. The generated app no
+// longer links the legacy auto-lang package or its inventory fallback.
+fn install_generated_ui_host() {{
+    auto_lang_core::set_ui_host_install_hook(auto_ui_runtime::install_ui_host_capabilities);
+    auto_ui_runtime::install_ui_host_capabilities();
+}}
+
 fn main() -> auto_ui_runtime::ui::AppResult<()> {{
+    install_generated_ui_host();
     #[cfg(feature = "ui-iced")]
     {{
 {env_inits}        // Plan 020 T-05：孵化参数在册 → native 协议 client 臂（返回即走）；
@@ -8261,6 +8269,17 @@ pub fn create_item(name str) str {
         assert!(
             !main_rs.contains("auto_lang::"),
             "交付 main.rs 不得使用旧 auto-lang 门面"
+        );
+        let main_start = main_rs.find("fn main()").expect("generated main");
+        let install = main_rs[main_start..]
+            .find("install_generated_ui_host();")
+            .expect("main installs UI host");
+        let render = main_rs[main_start..]
+            .find("parse_render_cli")
+            .expect("desktop entry");
+        assert!(
+            install < render,
+            "UI host must be installed before desktop routing"
         );
         // 资源 allowlist + hash（R1-F01：sha256——随包 verify.py 可独立校验）
         let asset = delivery.join("assets/avatar.png");
