@@ -5558,26 +5558,25 @@ fn generate_rust_ui_delivery_inner(
         .map_err(|e| format!("delivery: 写 verify.py 失败: {e}"))?;
 
     // delivery-manifest.json（producer 身份/闭包规模/资源与 pin 清单）
-    let (mut git_head, git_dirty) = delivery_git_identity(&producer_root);
+    let (mut git_head, mut git_dirty) = delivery_git_identity(&producer_root);
     let ui_crate_source = delivery_crate_source(&producer_root, "auto-ui-compiler")?;
     let ui_root = ui_crate_source
         .parent()
         .and_then(Path::parent)
         .ok_or("delivery: producer UI owner 根无效")?;
-    let (mut ui_git_head, ui_git_dirty) = delivery_git_identity(ui_root);
-    // Installed SDKs are not Git checkouts. Their verified receipt carries the
-    // original source revisions, which must not be replaced with the language SHA.
-    if producer_root.file_name().and_then(|s| s.to_str()) == Some("sdk") {
-        if let Some(install) = producer_root.parent() {
-            let receipt = install.join("install-manifest.json");
-            if receipt.is_file() {
-                let doc: serde_json::Value = serde_json::from_slice(&fs::read(receipt)?)?;
-                if git_head.is_none() {
-                    git_head = doc["sources"]["auto-lang"].as_str().map(str::to_owned);
-                }
-                if ui_git_head.is_none() && std::env::var_os("AUTO_UI_SOURCE_ROOT").is_none() {
-                    ui_git_head = doc["sources"]["auto-ui"].as_str().map(str::to_owned);
-                }
+    let (mut ui_git_head, mut ui_git_dirty) = delivery_git_identity(ui_root);
+    // Use the validated frozen receipt for installed content, including an
+    // explicitly selected spelling of the same SDK. An external UI owner keeps
+    // its own identity instead of inheriting the installed UI revision.
+    if let Some(receipt) = &installed_receipt {
+        git_head = receipt.source_revision("auto-lang");
+        git_dirty = false;
+        if let (Ok(ui), Ok(producer)) =
+            (fs::canonicalize(ui_root), fs::canonicalize(&producer_root))
+        {
+            if ui == producer {
+                ui_git_head = receipt.source_revision("auto-ui");
+                ui_git_dirty = false;
             }
         }
     }
