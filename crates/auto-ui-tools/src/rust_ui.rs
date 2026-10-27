@@ -3527,16 +3527,12 @@ iced.workspace = true
 /// （文件级扫描 `pub fn NAME(&self)` → `self.NAME()` 调用点改写——跨
 /// widget computed 同捕）。
 fn prepare_generated_components(components: &str) -> String {
-    // Strip duplicate imports — RustGenerator already emits them. Both the
-    // canonical header (PLAN-814 T-05: `auto_ui_runtime::ui`) and the legacy
-    // facade form are stripped: the shell header (wrap_example) provides the
-    // single import, and a leftover per-block copy collides as E0252.
+    // RustGenerator emits this canonical header per block; the shared shell
+    // supplies it once, avoiding duplicate imports across generated widgets.
     let mut cleaned = components
         .trim()
         .replace("use auto_ui_runtime::ui::{Component, View};\n", "")
-        .replace("use auto_ui_runtime::ui::{Component, View};", "")
-        .replace("use auto_lang::ui::{Component, View};\n", "")
-        .replace("use auto_lang::ui::{Component, View};", "");
+        .replace("use auto_ui_runtime::ui::{Component, View};", "");
 
     // a2r fix: computed properties are generated as methods (fn name(&self)),
     // but all code accesses them as fields. Scan for `pub fn NAME(&self)` to
@@ -6946,7 +6942,7 @@ pub fn answer() int { return 42 }
             "widget P031Counter { model { var count int = 0 } view { text `c: ${.count}` } }\n",
         )
         .unwrap();
-        let components = "use auto_lang::ui::{Component, View};\npub struct P031Counter { pub count: i64 }\nimpl Component for P031Counter { type Msg = i64; fn view(&self) -> View<Self::Msg> { View::new() } }\n";
+        let components = "use auto_ui_runtime::ui::{Component, View};\npub struct P031Counter { pub count: i64 }\nimpl Component for P031Counter { type Msg = i64; fn view(&self) -> View<Self::Msg> { View::new() } }\n";
         let main_rs = wrap_example("p031-app", components, &project, &PacSource::legacy());
         assert!(main_rs.contains(r##"--autodesk-rqhost""##), "标记解析在场");
         assert!(
@@ -6974,7 +6970,7 @@ pub fn answer() int { return 42 }
             "widget P693App { model { var count int = 0 } view { text `c: ${.count}` } }\n",
         )
         .unwrap();
-        let components = "use auto_lang::ui::{Component, View};\npub struct P693App { pub count: i64 }\nimpl Component for P693App { type Msg = i64; fn view(&self) -> View<Self::Msg> { View::new() } }\n";
+        let components = "use auto_ui_runtime::ui::{Component, View};\npub struct P693App { pub count: i64 }\nimpl Component for P693App { type Msg = i64; fn view(&self) -> View<Self::Msg> { View::new() } }\n";
         let main_rs = wrap_example("p693-app", components, &project, &PacSource::legacy());
         // 三模式 CLI 解析 + 优先级链单源调用（CLI > env > pac > 独立轨）。
         assert!(
