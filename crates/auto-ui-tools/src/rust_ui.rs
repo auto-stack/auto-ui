@@ -4228,9 +4228,9 @@ fn delivery_producer_root() -> AutoResult<PathBuf> {
         "delivery: producer 源根未解析（需含 crates/auto-lang 与根 Cargo.toml；可用 AUTO_DELIVERY_SOURCE_ROOT 钉死）".into())
 }
 
-use auto_api_gen::source_owner::{
-    installed_ui_source as delivery_installed_ui_source, ui_crate_source as delivery_crate_source,
-};
+#[cfg(test)]
+use auto_api_gen::source_owner::installed_ui_source as delivery_installed_ui_source;
+use auto_api_gen::source_owner::ui_crate_source as delivery_crate_source;
 
 /// producer git 身份（best-effort：非 git 检出记录 null）。
 fn delivery_git_identity(root: &Path) -> (Option<String>, bool) {
@@ -5322,6 +5322,28 @@ fn generate_rust_ui_delivery_inner(
         receipt.verify_tree("", &producer_root)?;
         receipt.ensure_unchanged()?;
     }
+    // An explicit UI owner may be a different managed installation. Freeze
+    // its own receipt, not the language producer's receipt, before preflight
+    // and before any staging copies are made.
+    let explicit_ui_root = std::env::var_os("AUTO_UI_SOURCE_ROOT").map(PathBuf::from);
+    let explicit_ui_receipt = if let Some(root) = &explicit_ui_root {
+        if auto_api_gen::source_owner::is_managed_sdk(root) {
+            let receipt = auto_api_gen::source_owner::InstalledSdkReceipt::open(root)?
+                .ok_or("delivery: producer 显式 UI 安装源缺少收据")?;
+            receipt.verify_tree("", root)?;
+            receipt.ensure_unchanged()?;
+            Some(receipt)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    let ui_receipt = if explicit_ui_root.is_some() {
+        explicit_ui_receipt.as_ref()
+    } else {
+        installed_receipt.as_ref()
+    };
     let front_dir = front_dir_for(project_dir, source);
     if !front_dir.exists() {
         return Err(format!("Front directory not found: {}", front_dir.display()).into());
@@ -5377,31 +5399,25 @@ fn generate_rust_ui_delivery_inner(
         let src = delivery_crate_source(&producer_root, name)?;
         let dst = delivery_root.join("crates").join(name);
         let copied = delivery_copy_dir(&src, &dst, &DELIVERY_COPY_SKIP_DIRS)?;
-        if matches!(
+        let ui = matches!(
             name,
             "auto-ui-dialect"
                 | "auto-ui-compiler"
                 | "auto-ui-runtime"
                 | "auto-ui-tools"
                 | "shell-pack"
-        ) && std::env::var_os("AUTO_UI_SOURCE_ROOT").is_none()
-        {
-            delivery_installed_ui_source(&producer_root, name, Some(&dst))?;
-        }
-        if let Some(receipt) = &installed_receipt {
-            let ui = matches!(
-                name,
-                "auto-ui-dialect"
-                    | "auto-ui-compiler"
-                    | "auto-ui-runtime"
-                    | "auto-ui-tools"
-                    | "shell-pack"
-            );
-            if !ui || std::env::var_os("AUTO_UI_SOURCE_ROOT").is_none() {
-                let rel = format!("crates/{name}");
-                receipt.require_package(name, if ui { "auto-ui" } else { "auto-lang" }, &rel)?;
-                receipt.verify_tree(&rel, &dst)?;
-            }
+        );
+        let selected_receipt = if ui {
+            ui_receipt
+        } else {
+            installed_receipt.as_ref()
+        };
+        if let Some(receipt) = selected_receipt {
+            let rel = format!("crates/{name}");
+            receipt.require_package(name, if ui { "auto-ui" } else { "auto-lang" }, &rel)?;
+            // Verify the actual staged bytes against the receipt frozen for
+            // this particular owner, before any manifest projection.
+            receipt.verify_tree(&rel, &dst)?;
         }
         total_files += copied.records.len() as u64;
         total_bytes += copied.records.iter().map(|r| r.bytes).sum::<u64>();
@@ -5571,14 +5587,10 @@ fn generate_rust_ui_delivery_inner(
     if let Some(receipt) = &installed_receipt {
         git_head = receipt.source_revision("auto-lang");
         git_dirty = false;
-        if let (Ok(ui), Ok(producer)) =
-            (fs::canonicalize(ui_root), fs::canonicalize(&producer_root))
-        {
-            if ui == producer {
-                ui_git_head = receipt.source_revision("auto-ui");
-                ui_git_dirty = false;
-            }
-        }
+    }
+    if let Some(receipt) = ui_receipt {
+        ui_git_head = receipt.source_revision("auto-ui");
+        ui_git_dirty = false;
     }
     let ui_gen_fp = delivery_ui_gen_fingerprint(&delivery_root.join("crates/auto-ui-compiler"))?;
     use sha2::{Digest, Sha256};
@@ -5651,6 +5663,9 @@ fn generate_rust_ui_delivery_inner(
     // 显式 Err 返回并保留旧交付）。staging 属主标记随使命完成移除（换装
     // 后的交付根不带运行期标记）。
     if let Some(receipt) = &installed_receipt {
+        receipt.ensure_unchanged()?;
+    }
+    if let Some(receipt) = &explicit_ui_receipt {
         receipt.ensure_unchanged()?;
     }
     let _ = fs::remove_file(staging.join(DELIVERY_STAGING_MARKER));
