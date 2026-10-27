@@ -2049,6 +2049,9 @@ impl VmBridge {
                     if p.release_stack_on_complete {
                         self.vm.rc_release_task_stack(&mut p.task);
                     }
+                    // PLAN-841 M841-GATE-05: 段失败即需求终态——不回写则记录
+                    // 滞留 InFlight，下一轮派发把"已出册"误判为成功静默翻 Done。
+                    self.mark_init_demand_failed_by_fn(&p.fn_name);
                     eprintln!("[VM-PARKED] {} resume FAILED: {:?}", p.fn_name, e);
                     report.failed.push((p.fn_name.clone(), format!("{:?}", e)));
                 }
@@ -2296,6 +2299,9 @@ impl VmBridge {
                     if p.release_stack_on_complete {
                         self.vm.rc_release_task_stack(&mut p.task);
                     }
+                    // PLAN-841 M841-GATE-05: 段失败即需求终态——不回写则记录
+                    // 滞留 InFlight，下一轮派发把"已出册"误判为成功静默翻 Done。
+                    self.mark_init_demand_failed_by_fn(&p.fn_name);
                     eprintln!("[VM-CPU] {} slice-resume FAILED: {:?}", p.fn_name, e);
                     report.failed.push((p.fn_name.clone(), format!("{:?}", e)));
                 }
@@ -2503,6 +2509,22 @@ impl VmBridge {
     /// 在途段收敛后的再驱动：段完成会出 parked 注册表，本方法的 InFlight
     /// 探测（`is_handler_parked`）发现已不在册即记账 Done 并继续消费队列
     /// （调用方=泵臂，每轮 tick/帧通知都会重入本方法）。
+    ///
+    /// PLAN-841 M841-GATE-05：段**失败**同样会出 parked 注册表——失败终态必须
+    /// 在 resume 泵的失败臂当场回写（[`Self::mark_init_demand_failed_by_fn`]），
+    /// 否则上面的"已出册=收敛"探测只能看见 InFlight 并把失败静默翻成 Done。
+    fn mark_init_demand_failed_by_fn(&self, failed_fn_name: &str) {
+        let mut records = self.init_demand_records.borrow_mut();
+        for (widget, rec) in records.iter_mut() {
+            if rec.phase == InitDemandPhase::InFlight
+                && crate::ui::handler_codegen::namespaced_handler_fn_name(widget, "Init")
+                    == failed_fn_name
+            {
+                rec.phase = InitDemandPhase::Failed;
+            }
+        }
+    }
+
     pub fn dispatch_pending_inits(
         &self,
         budget: auto_lang_core::vm::engine::CpuSliceBudget,
@@ -3158,8 +3180,8 @@ impl VmBridge {
         }
         let mut task = AutoTask::new(0, 4096, 0);
         self.vm.rc_push_id(&mut task, self.state_obj_id()); // Plan 419
-                                                            // PLAN-702 T-05: legacy 同步驱动保留位②——block computed 求值（同
-                                                            // call_vm_fn：本次调用返回 Value 契约，无 park 形态）。
+        // PLAN-702 T-05: legacy 同步驱动保留位②——block computed 求值（同
+        // call_vm_fn：本次调用返回 Value 契约，无 park 形态）。
         self.vm
             .call_fn_by_name(&mut task, &fn_name, 1)
             .map_err(|e| {
@@ -5094,9 +5116,10 @@ widget OpProbeOrig {
         bridge.vm.record_heap_read_any(9);
         let rec = bridge.vm.take_dep_recorder();
         assert_eq!(rec.deps.len(), 2, "激活期两条落账");
-        assert!(rec
-            .deps
-            .contains(&crate::ui::memo_deps::DepKey::field(7, "count")));
+        assert!(
+            rec.deps
+                .contains(&crate::ui::memo_deps::DepKey::field(7, "count"))
+        );
         assert!(rec.deps.contains(&crate::ui::memo_deps::DepKey::any(9)));
         // take 后去激活：再录零账。
         bridge.vm.record_heap_read(1, "g");
@@ -6540,6 +6563,48 @@ mod plan841_init_snapshot_tests {
                 "cancel={cancel}: abandoned snapshot must release"
             );
         }
+    }
+
+    /// M841-GATE-05 回归：parked Init 段 resume 失败必须当场回写 Failed——
+    /// 否则滞留 InFlight 的记录会被下一轮派发的"已出册=收敛"探测静默翻
+    /// Done（整档并行负载下 plan492 金丝雀实录；本测试用小步预算确定性
+    /// 强制 park，不依赖负载时序）。
+    #[test]
+    fn resumed_init_failure_records_failed_not_silent_done() {
+        let bridge = bridge(true);
+        bridge.register_init_demand("Root", "Root#a", bridge.state_obj_id, Vec::new());
+        let tiny = CpuSliceBudget {
+            max_steps: 1,
+            ..CpuSliceBudget::d2_default()
+        };
+        let parked = bridge.dispatch_pending_inits(tiny);
+        assert_eq!(parked.failed.len(), 0, "tiny slice must park, not fail");
+        assert_eq!(
+            bridge.cpu_continuation_count(),
+            1,
+            "Init slice parked on the CPU budget"
+        );
+        assert_eq!(
+            bridge.init_demand_phase("Root"),
+            Some(InitDemandPhase::InFlight)
+        );
+        let resume = bridge.resume_cpu_slices(CpuSliceBudget::d2_default());
+        assert_eq!(resume.failed.len(), 1);
+        assert!(resume.failed[0].1.contains("DivisionByZero"));
+        assert_eq!(
+            bridge.init_demand_phase("Root"),
+            Some(InitDemandPhase::Failed),
+            "resume failure must reach the demand record synchronously"
+        );
+        let redispatch = bridge.dispatch_pending_inits(CpuSliceBudget::d2_default());
+        assert_eq!(
+            redispatch.silent_done_transitions, 0,
+            "terminal Failed must not be silently flipped to Done"
+        );
+        assert_eq!(
+            bridge.init_demand_phase("Root"),
+            Some(InitDemandPhase::Failed)
+        );
     }
 
     #[test]
