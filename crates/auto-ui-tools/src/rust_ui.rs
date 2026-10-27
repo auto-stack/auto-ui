@@ -5307,9 +5307,8 @@ fn generate_rust_ui_delivery_inner(
     // 守卫（外来非空目录拒绝；换装语义下不清理既有交付）。
     delivery_guard_root(delivery_root)?;
     let final_root = delivery_root.to_path_buf();
-    // R3-F01/R4-F01：陈残换出桩 GC——仅当交付根已是完整替代产物时回收
-    // 冗余残桩；根缺失/未完成（待恢复唯一旧包）时 GC 为 no-op。
-    delivery_gc_stale_backups(delivery_root);
+    // 不在准备阶段回收旧备份：现有根的清单存在并不证明其完整，
+    // 只有本次 staging 成功换入后才能认定备份已有可靠替代。
 
     // R1-F02/R2-F01：独立 staging 生成——成功前不动旧交付。staging 用
     // 本次运行独占的唯一名（pid+ns）+ 内置属主标记，绝不凭固定名认领同级
@@ -7953,6 +7952,13 @@ pub fn create_item(name str) str {
         std::fs::create_dir_all(&canonical).unwrap();
         std::fs::write(shadow.join("marker"), "shadow").unwrap();
         std::fs::write(canonical.join("marker"), "canonical").unwrap();
+        std::fs::write(
+            canonical.join("Cargo.toml"),
+            "[package]\nname = \"auto-ui-dialect\"\nversion = \"0.2.0\"\n",
+        )
+        .unwrap();
+        std::fs::create_dir_all(canonical.join("src")).unwrap();
+        std::fs::write(canonical.join("src/lib.rs"), "").unwrap();
         std::env::set_var("AUTO_UI_SOURCE_ROOT", &ui);
         let chosen = delivery_crate_source(&lang, "auto-ui-dialect").unwrap();
         assert_eq!(
@@ -7988,7 +7994,11 @@ pub fn create_item(name str) str {
         std::fs::create_dir_all(&source).unwrap();
         let original = b"[package]\nname = \"auto-ui-dialect\"\n";
         std::fs::write(source.join("Cargo.toml"), original).unwrap();
+        let lib = b"// fixture";
+        std::fs::create_dir_all(source.join("src")).unwrap();
+        std::fs::write(source.join("src/lib.rs"), lib).unwrap();
         let path = "sdk/crates/auto-ui-dialect/Cargo.toml";
+        let lib_path = "sdk/crates/auto-ui-dialect/src/lib.rs";
         let mut manifest = serde_json::json!({
             "schema": "man-install/1", "profile": "full",
             "sources": {"auto-ui": "0123456789abcdef0123456789abcdef01234567"},
@@ -7996,7 +8006,10 @@ pub fn create_item(name str) str {
                 "name": "auto-ui-dialect", "source_repo": "auto-ui",
                 "source_path": "crates/auto-ui-dialect", "installed_path": "crates/auto-ui-dialect"
             }]},
-            "files": {path: {"bytes": original.len(), "sha256": format!("{:x}", Sha256::digest(original))}}
+            "files": {
+                path: {"bytes": original.len(), "sha256": format!("{:x}", Sha256::digest(original))},
+                lib_path: {"bytes": lib.len(), "sha256": format!("{:x}", Sha256::digest(lib))}
+            }
         });
         let receipt = dir.path().join("install-manifest.json");
         std::fs::write(&receipt, serde_json::to_vec(&manifest).unwrap()).unwrap();
@@ -8007,6 +8020,8 @@ pub fn create_item(name str) str {
         let copied = dir.path().join("staged-copy");
         std::fs::create_dir_all(&copied).unwrap();
         std::fs::write(copied.join("Cargo.toml"), original).unwrap();
+        std::fs::create_dir_all(copied.join("src")).unwrap();
+        std::fs::write(copied.join("src/lib.rs"), lib).unwrap();
         assert!(delivery_installed_ui_source(&sdk, "auto-ui-dialect", Some(&copied)).is_ok());
         std::fs::write(copied.join("Cargo.toml"), b"modified during copy").unwrap();
         assert!(delivery_installed_ui_source(&sdk, "auto-ui-dialect", Some(&copied)).is_err());
@@ -8435,6 +8450,95 @@ pub fn create_item(name str) str {
             "失败诊断指向缺失模块（实际：{err}）"
         );
         assert!(!delivery.exists(), "失败后不落新包");
+        assert!(backup.is_dir(), "待恢复唯一旧包存活");
+        assert!(
+            backup.join("app").join("last-good-user-data.txt").is_file(),
+            "last-good 载荷存活"
+        );
+        assert_eq!(
+            std::fs::read(backup.join("delivery-manifest.json")).unwrap(),
+            manifest_before,
+            "备份清单字节不变"
+        );
+        assert!(
+            backup.join(DELIVERY_SWAP_MARKER).is_file(),
+            "换出标记保留（事务未完成）"
+        );
+
+        // 成功重试：新包落位后才允许回收已被替代的旧备份。
+        write_pac("");
+        generate_rust_ui_delivery(&project, &delivery).expect("成功重试失败");
+        assert!(
+            delivery.join("delivery-manifest.json").is_file(),
+            "成功重试后新交付在位"
+        );
+        assert!(!backup.exists(), "成功发布后旧备份才可回收");
+        assert!(!delivery.join(DELIVERY_STAGING_MARKER).exists());
+    }
+
+    #[test]
+    fn delivery_gc_preserves_backup_when_corrupt_replacement_retry_fails() {
+        let dir = tempfile::tempdir().unwrap();
+        let producer = test_producer_root();
+        let project = dir.path().join("proj");
+        let front = project.join("src").join("front");
+        std::fs::create_dir_all(&front).unwrap();
+        let write_pac = |modules: &str| {
+            std::fs::write(
+                project.join("pac.at"),
+                format!(
+                    "{{ name: \"uiminimal\", scene: \"ui\", render: \"rust\", window: \"fit\" }}\n{modules}"
+                ),
+            )
+            .unwrap();
+        };
+        write_pac("");
+        std::fs::write(
+            front.join("app.at"),
+            "widget App {\n    view {\n        col {\n            text `hi`\n        }\n    }\n}\n",
+        )
+        .unwrap();
+
+        struct Restore(Option<std::ffi::OsString>);
+        impl Drop for Restore {
+            fn drop(&mut self) {
+                match &self.0 {
+                    Some(v) => std::env::set_var("AUTO_DELIVERY_SOURCE_ROOT", v),
+                    None => std::env::remove_var("AUTO_DELIVERY_SOURCE_ROOT"),
+                }
+            }
+        }
+        let _restore = Restore(std::env::var_os("AUTO_DELIVERY_SOURCE_ROOT"));
+        std::env::set_var("AUTO_DELIVERY_SOURCE_ROOT", &producer);
+
+        let delivery = dir.path().join("recovery-target");
+        generate_rust_ui_delivery(&project, &delivery).expect("首交失败");
+        let last_good = delivery.join("app").join("last-good-user-data.txt");
+        std::fs::write(&last_good, b"last good artifact must survive failed retry").unwrap();
+        let manifest_before = std::fs::read(delivery.join("delivery-manifest.json")).unwrap();
+
+        // 模拟 delivery_swap_in 中断态：旧根已换出+事务标记已写，新包未落位。
+        let backup = dir.path().join(".recovery-target.delivery-old-999999-3");
+        std::fs::rename(&delivery, &backup).unwrap();
+        std::fs::write(backup.join(DELIVERY_SWAP_MARKER), "pid=999999\n").unwrap();
+        assert!(!delivery.exists(), "待恢复态：交付根缺失");
+        std::fs::create_dir_all(delivery.join("app")).unwrap();
+        std::fs::write(delivery.join("delivery-manifest.json"), &manifest_before).unwrap();
+        std::fs::write(delivery.join("app/Cargo.toml"), b"corrupt replacement").unwrap();
+
+        // 失败重试（sidecar 模块缺失——apply 阶段在 GC 之后判红）。
+        write_pac("\nrust_sidecar {\n    modules: [\"glue:missing.rs\"]\n}\n");
+        let err = generate_rust_ui_delivery(&project, &delivery)
+            .expect_err("缺 sidecar 模块的重试必须显式 Err");
+        assert!(
+            err.to_string().contains("module 'glue'") || err.to_string().contains("not found"),
+            "失败诊断指向缺失模块（实际：{err}）"
+        );
+        assert_eq!(
+            std::fs::read(delivery.join("app/Cargo.toml")).unwrap(),
+            b"corrupt replacement",
+            "失败后受损根原样保留"
+        );
         assert!(backup.is_dir(), "待恢复唯一旧包存活");
         assert!(
             backup.join("app").join("last-good-user-data.txt").is_file(),
