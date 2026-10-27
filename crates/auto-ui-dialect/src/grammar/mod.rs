@@ -1,4 +1,3 @@
-pub use auto_parser_api::DomainParseContext as UiParseContext;
 use auto_parser_api::DomainParseContext;
 
 pub mod actions;

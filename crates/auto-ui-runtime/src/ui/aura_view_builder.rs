@@ -356,33 +356,6 @@ impl<'a> AuraViewBuilder<'a> {
         }
     }
 
-    /// Create a builder with widget registry. The final parameter is retained
-    /// temporarily for source compatibility; imported components use the
-    /// explicitly registered UI-owned names.
-    pub fn with_registry_and_imports(
-        bridge: &'a VmBridge,
-        widget_name: &str,
-        registry: &'a crate::ui::widget_registry::WidgetRegistry,
-        _import_stmts: &'a [auto_lang_core::ast::Stmt],
-    ) -> Self {
-        Self {
-            bridge,
-            widget_name: widget_name.to_string(),
-            widget_registry: Some(registry),
-            native_registry: Some(crate::ui::native_widget::global()),
-            override_state_obj_id: None,
-            routes: None,
-            computed: None,
-            preview_states: None,
-            nav_group_states: None,
-            nav_memo_armed: std::cell::Cell::new(false),
-            slot_fills: None,
-            active_child_widgets: RefCell::new(HashSet::new()),
-            mounted_sink: None,
-            mount_path_sink: None,
-        }
-    }
-
     /// PLAN-652: 挂载登记 sink（DynamicComponent.mounted_types 共享 RefCell）。
     pub fn with_mounted_sink(mut self, sink: &'a RefCell<HashSet<String>>) -> Self {
         self.mounted_sink = Some(sink);

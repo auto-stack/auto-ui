@@ -48,4 +48,4 @@ mod regression;
 pub use declarations::{
     parse_model_block, parse_model_block_subset, parse_msg_decl, ModelGrammar, ModelSubset,
 };
-pub use grammar::{UiDialect, UiParseContext};
+pub use grammar::UiDialect;
