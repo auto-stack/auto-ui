@@ -2169,7 +2169,7 @@ fn generate_app_vue(vue_code: &str) -> String {
     vue_code.to_string()
 }
 
-/// PLAN-593 V1：色变量块整体取自 auto_lang registry（scaffold）单一事实源，
+/// PLAN-593 V1：色变量块取自 auto-ui-compiler registry（scaffold）单一事实源，
 /// 本函数零手写色值（--radius 为非色 token，留脚手架；dark 块无 --radius 沿
 /// 原 CSS 继承语义）。sidebar 族块经 extra 槽拼接。
 /// PLAN-601 T-06：pac.at theme{} 声明合成体（Some）替换 scaffold 成双 mode
@@ -13104,8 +13104,8 @@ mod plan571_css_secondary_interlock_tests {
     /// 生成的 index.css 必须携带分档后的 --secondary（light 40 24% 85.5% /
     /// dark 215 25% 27%），且不得再现 light 下与 --muted 同值的旧写法。
     /// PLAN-593 后色值单源在 design_tokens::registry（本函数色变量块经
-    /// scaffold 主题装配）；auto CLI 侧 cmd_tauri/cmd_vue 仍为手写副本
-    /// （P593-D5 在册，Phase 2 收编）。
+    /// scaffold 主题装配）；当前 Vue 与 Tauri 共用此生成器，历史未挂载
+    /// CLI 副本及其测试已退出，保留的值控制见 plan842_retired_palette_controls。
     #[test]
     fn index_css_secondary_is_differentiated_from_muted() {
         let css = super::generate_index_css(None);
