@@ -1,7 +1,7 @@
 //! PLAN-681: native open/save file dialogs — a2r host of the VM builtins
 //! `dialog_open` / `dialog_save` (natives 2927/2928, `auto.dialog.open/save`).
 //!
-//! The ui_gen builtin-call mapping table emits `auto_lang::ui::dialog::…`
+//! The ui_gen builtin-call mapping table emits `auto_ui_runtime::ui::dialog::…`
 //! for those names in generated apps.
 //!
 //! PLAN-804: 本模块收敛为**薄门面**——过滤解析、默认文件名种子、取消

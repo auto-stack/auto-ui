@@ -343,7 +343,7 @@ fn collect_component_state_fields(
 /// Used by the Rust generator to replace hardcoded special-case logic
 /// (Init forwarding, prop writeback, delete handling) with .at-source-driven
 /// general code. Mirrors `collect_component_state_fields` in structure.
-/// Defined in `auto_lang::ui_gen::rust` (the generator crate) and re-exported
+/// Defined in `auto_ui_compiler::ui_gen::rust` (the generator crate) and re-exported
 /// here so `auto-man` can use it without a reverse dependency.
 pub use auto_ui_compiler::ui_gen::rust::ComponentSemantics;
 

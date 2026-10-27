@@ -10,8 +10,8 @@
 //! # Example
 //!
 //! ```ignore
-//! use auto_lang::ui::headless::HeadlessRenderer;
-//! use auto_lang::ui::Component;
+//! use auto_ui_runtime::ui::headless::HeadlessRenderer;
+//! use auto_ui_runtime::ui::Component;
 //!
 //! let mut renderer = HeadlessRenderer::new();
 //! let vtree = renderer.render::<MyComponent>();
