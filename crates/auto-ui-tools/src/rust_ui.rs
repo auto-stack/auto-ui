@@ -4018,6 +4018,8 @@ const DELIVERY_ROOT_INPUTS: [&str; 5] = [
 struct DeliveryProjectionSpec {
     strip_deps: &'static [&'static str],
     feature_rewrites: &'static [(&'static str, &'static str)],
+    // Supported intermediate forms produced by the managed installer.
+    installed_rewrites: &'static [(&'static str, &'static str)],
     /// 跨仓 path 前缀改写（PLAN-831 T-06 起源仓分置：UI 仓 manifest 以
     /// `../../../auto-lang/crates/` 指语言基础、语言仓 auto-lang 以
     /// `../../../auto-ui/crates/` 指 UI 包组——拷入交付根后统一改写为
@@ -4035,6 +4037,10 @@ const PROJECTION_AUTO_LANG: DeliveryProjectionSpec = DeliveryProjectionSpec {
         "test-cases = [\"dep:auto-test-case\", \"auto-lang-core/test-cases\"]",
         "test-cases = []",
     )],
+    installed_rewrites: &[(
+        "test-cases = [\"auto-lang-core/test-cases\"]",
+        "test-cases = []",
+    )],
     // PLAN-831 T-06：auto-lang 对独立 UI 仓包组的跨仓 path → 交付根包内兄弟。
     path_rewrites: &[("../../../auto-ui/crates/", "../")],
 };
@@ -4049,12 +4055,14 @@ const PROJECTION_AUTO_UI_RUNTIME: DeliveryProjectionSpec = DeliveryProjectionSpe
         "autodown = [\"ui-iced\", \"dep:autodown-core\"]",
         "autodown = [\"ui-iced\"]",
     )],
+    installed_rewrites: &[],
     path_rewrites: &[("../../../auto-lang/crates/", "../")],
 };
 
 const PROJECTION_AUTO_LANG_CORE: DeliveryProjectionSpec = DeliveryProjectionSpec {
     strip_deps: &["auto-test-case = { path = \"../auto-test-case\", optional = true }"],
     feature_rewrites: &[("test-cases = [\"dep:auto-test-case\"]", "test-cases = []")],
+    installed_rewrites: &[],
     path_rewrites: &[],
 };
 
@@ -4063,6 +4071,7 @@ const PROJECTION_AUTO_LANG_CORE: DeliveryProjectionSpec = DeliveryProjectionSpec
 const PROJECTION_AUTO_UI_CRATE: DeliveryProjectionSpec = DeliveryProjectionSpec {
     strip_deps: &[],
     feature_rewrites: &[],
+    installed_rewrites: &[],
     path_rewrites: &[("../../../auto-lang/crates/", "../")],
 };
 
@@ -4503,11 +4512,93 @@ fn delivery_apply_projection(
 ) -> AutoResult<Vec<String>> {
     let text = fs::read_to_string(vendored_manifest)
         .map_err(|e| format!("delivery: 读 vendored manifest 失败: {e}"))?;
+    let active: Vec<&str> = text
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.starts_with('#'))
+        .collect();
+    let occurrences = |needle: &str| active.iter().filter(|line| **line == needle).count();
+    let dependency_counts: Vec<usize> = spec
+        .strip_deps
+        .iter()
+        .map(|needle| active.iter().filter(|line| line.contains(needle)).count())
+        .collect();
+    let valid_dependency_shapes =
+        spec.strip_deps
+            .iter()
+            .zip(&dependency_counts)
+            .all(|(expected, exact_count)| {
+                let Some((key, _)) = expected.split_once('=') else {
+                    return false;
+                };
+                active
+                    .iter()
+                    .filter(|line| {
+                        line.split_once('=')
+                            .is_some_and(|(name, _)| name.trim() == key.trim())
+                    })
+                    .count()
+                    == *exact_count
+            });
+    let unique_features = spec.feature_rewrites.iter().all(|(from, _)| {
+        let Some((key, _)) = from.split_once('=') else {
+            return false;
+        };
+        active
+            .iter()
+            .filter(|line| {
+                line.split_once('=')
+                    .is_some_and(|(name, _)| name.trim() == key.trim())
+            })
+            .count()
+            == 1
+    });
+    let original = valid_dependency_shapes
+        && unique_features
+        && dependency_counts.iter().all(|count| *count == 1)
+        && spec
+            .feature_rewrites
+            .iter()
+            .all(|(from, to)| occurrences(from) == 1 && occurrences(to) == 0)
+        && spec
+            .installed_rewrites
+            .iter()
+            .all(|(from, _)| occurrences(from) == 0);
+    let installed = !spec.installed_rewrites.is_empty()
+        && spec.installed_rewrites.len() == spec.feature_rewrites.len()
+        && valid_dependency_shapes
+        && unique_features
+        && dependency_counts.iter().all(|count| *count == 0)
+        && spec
+            .feature_rewrites
+            .iter()
+            .all(|(from, to)| occurrences(from) == 0 && occurrences(to) == 0)
+        && spec
+            .installed_rewrites
+            .iter()
+            .all(|(from, _)| occurrences(from) == 1);
+    let projected = valid_dependency_shapes
+        && unique_features
+        && dependency_counts.iter().all(|count| *count == 0)
+        && spec
+            .feature_rewrites
+            .iter()
+            .all(|(from, to)| occurrences(from) == 0 && occurrences(to) == 1)
+        && spec
+            .installed_rewrites
+            .iter()
+            .all(|(from, _)| occurrences(from) == 0);
+    if !original && !installed && !projected {
+        return Err("delivery: 投影修剪不完整——producer 清单结构漂移，受管判红".into());
+    }
+
     let mut edits = Vec::new();
     let mut out: Vec<String> = Vec::new();
     for line in text.lines() {
-        if spec.strip_deps.iter().any(|m| line.contains(m)) {
-            // Consecutively pop out all immediately adjacent comment lines above (belonging to the stripped dep's explanation block)——avoid dangling comments in the vendored copy
+        if original
+            && !line.trim_start().starts_with('#')
+            && spec.strip_deps.iter().any(|m| line.contains(m))
+        {
             while out
                 .last()
                 .map(|l: &String| l.trim().starts_with('#'))
@@ -4519,7 +4610,12 @@ fn delivery_apply_projection(
             continue;
         }
         let mut line = line.to_string();
-        for &(from, to) in spec.feature_rewrites {
+        let rewrites = if installed {
+            spec.installed_rewrites
+        } else {
+            spec.feature_rewrites
+        };
+        for &(from, to) in rewrites {
             if line.trim() == from {
                 line = line.replace(from, to);
                 edits.push(format!("rewrite feature: {from} -> {to}"));
@@ -4533,44 +4629,17 @@ fn delivery_apply_projection(
     } else {
         joined
     };
-    // path_rewrites：跨仓 path 前缀 → 交付根包内兄弟（子串级；命中计入
-    // 编辑记录；**不参与严格计数**——无跨仓引用的 manifest 合法缺席该前缀，
-    // 与 strip/feature 的结构漂移判红性质不同）。
-    let mut path_edits: Vec<String> = Vec::new();
     for &(from, to) in spec.path_rewrites {
         if joined.contains(from) {
             joined = joined.replace(from, to);
-            path_edits.push(format!("rewrite path: {from} -> {to}"));
+            edits.push(format!("rewrite path: {from} -> {to}"));
         }
     }
     if joined != text {
         fs::write(vendored_manifest, &joined)
             .map_err(|e| format!("delivery: 写投影 manifest 失败: {e}"))?;
     }
-    let expected = spec.strip_deps.len() + spec.feature_rewrites.len();
-    if edits.len() == expected {
-        edits.extend(path_edits);
-        return Ok(edits);
-    }
-    // 已投影形态（再交付/幂等重放）：strip 标记与改写前形态全缺席 + 改写后
-    // 形态全在位 → Ok（零编辑）；否则判 producer 清单结构漂移。
-    let already_projected = spec.strip_deps.iter().all(|m| !text.contains(m))
-        && spec
-            .feature_rewrites
-            .iter()
-            .all(|(from, _)| !text.contains(from))
-        && spec
-            .feature_rewrites
-            .iter()
-            .all(|(_, to)| text.contains(to));
-    if already_projected {
-        return Ok(Vec::new());
-    }
-    Err(format!(
-        "delivery: 投影修剪不完整（期望 {expected} 处，实际 {} 处）——producer 清单结构漂移，受管判红",
-        edits.len()
-    )
-    .into())
+    Ok(edits)
 }
 
 /// 交付根守卫：空目录或既往交付（有 delivery-manifest.json 标记）才允许；
@@ -7762,6 +7831,38 @@ pub fn create_item(name str) str {
         delivery_apply_projection(&sdk, &PROJECTION_AUTO_LANG_CORE).unwrap();
         assert_eq!(std::fs::read_to_string(&sdk).unwrap(), sdk_text, "SDK 幂等");
         assert!(delivery_apply_projection(&drift, &PROJECTION_AUTO_LANG_CORE).is_err());
+    }
+
+    /// An installed Full SDK has already stripped the optional dependency but
+    /// still forwards to the installed SDK feature. Its producer shape is not
+    /// the same as a corrupt or ambiguously duplicated feature declaration.
+    #[test]
+    fn plan842_installed_projection_accepts_only_exact_supported_states() {
+        let dir = tempfile::tempdir().unwrap();
+        let manifest = dir.path().join("Cargo.toml");
+        let installed = "[features]\ntest-cases = [\"auto-lang-core/test-cases\"]\n\n[dependencies]\nauto-val = { path = \"../auto-val\" }\n";
+        std::fs::write(&manifest, installed).unwrap();
+        let edits = delivery_apply_projection(&manifest, &PROJECTION_AUTO_LANG).unwrap();
+        assert_eq!(edits.len(), 1);
+        let actual = std::fs::read_to_string(&manifest).unwrap();
+        assert!(actual.contains("test-cases = []"));
+        assert!(actual.contains("auto-val = { path = \"../auto-val\" }"));
+        assert!(!actual.contains("auto-lang-core/test-cases"));
+        assert!(delivery_apply_projection(&manifest, &PROJECTION_AUTO_LANG)
+            .unwrap()
+            .is_empty());
+        assert_eq!(std::fs::read_to_string(&manifest).unwrap(), actual);
+        for bad in [
+            "[features]\ntest-cases = [\"auto-lang-core/test-cases\"]\ntest-cases = []\n[dependencies]\n",
+            "[features]\ntest-cases = [\"auto-lang-core/test-cases\"]\n[dependencies]\nauto-test-case = { path = \"../auto-test-case\", optional = true }\n",
+            "[features]\ntest-cases = [\"auto-lang-core/test-cases\"]\n[dependencies]\nauto-test-case = { version = \"9\" }\n",
+            "[features]\ntest-cases = [\"unexpected\"]\n[dependencies]\n",
+            "[dependencies]\nauto-val = { path = \"../auto-val\" }\n",
+        ] {
+            std::fs::write(&manifest, bad).unwrap();
+            assert!(delivery_apply_projection(&manifest, &PROJECTION_AUTO_LANG).is_err(), "unexpectedly accepted {bad}");
+            assert_eq!(std::fs::read_to_string(&manifest).unwrap(), bad, "failed projection must not rewrite input");
+        }
     }
 
     /// PLAN-792 端到端：generate_rust_ui_delivery 真实生成——镜像布局
