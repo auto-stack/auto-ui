@@ -4512,92 +4512,88 @@ fn delivery_apply_projection(
 ) -> AutoResult<Vec<String>> {
     let text = fs::read_to_string(vendored_manifest)
         .map_err(|e| format!("delivery: 读 vendored manifest 失败: {e}"))?;
-    let active: Vec<&str> = text
-        .lines()
-        .map(str::trim)
-        .filter(|line| !line.starts_with('#'))
-        .collect();
-    let occurrences = |needle: &str| active.iter().filter(|line| **line == needle).count();
-    let dependency_counts: Vec<usize> = spec
+
+    // TOML spans identify the owning table and preserve unrelated fields even
+    // when they share a name with a projected dependency or feature.
+    #[derive(serde::Deserialize, Default)]
+    struct ProjectionTables {
+        #[serde(default)]
+        features: std::collections::BTreeMap<String, toml::Spanned<toml::Value>>,
+        #[serde(default)]
+        dependencies: std::collections::BTreeMap<String, toml::Spanned<toml::Value>>,
+    }
+    let tables: ProjectionTables =
+        toml::from_str(&text).map_err(|e| format!("delivery: producer manifest TOML 无效: {e}"))?;
+    let line_index = |item: &toml::Spanned<toml::Value>| {
+        text.as_bytes()[..item.span().start]
+            .iter()
+            .filter(|byte| **byte == b'\n')
+            .count()
+    };
+    let lines: Vec<&str> = text.lines().collect();
+    let source_line = |item: &toml::Spanned<toml::Value>| lines[line_index(item)].trim();
+    let dependency_items: Vec<_> = spec
         .strip_deps
         .iter()
-        .map(|needle| active.iter().filter(|line| line.contains(needle)).count())
+        .map(|expected| {
+            let key = expected
+                .split_once('=')
+                .map(|(key, _)| key.trim())
+                .unwrap_or("");
+            tables.dependencies.get(key)
+        })
         .collect();
-    let valid_dependency_shapes =
-        spec.strip_deps
+    let feature_items: Vec<_> = spec
+        .feature_rewrites
+        .iter()
+        .map(|(expected, _)| {
+            let key = expected
+                .split_once('=')
+                .map(|(key, _)| key.trim())
+                .unwrap_or("");
+            tables.features.get(key)
+        })
+        .collect();
+    let valid_dependencies = dependency_items
+        .iter()
+        .zip(spec.strip_deps)
+        .all(|(item, expected)| item.is_none_or(|item| source_line(item).contains(expected)));
+    let all_features = feature_items.iter().all(|item| item.is_some());
+    let original = valid_dependencies
+        && all_features
+        && dependency_items.iter().all(|item| item.is_some())
+        && feature_items
             .iter()
-            .zip(&dependency_counts)
-            .all(|(expected, exact_count)| {
-                let Some((key, _)) = expected.split_once('=') else {
-                    return false;
-                };
-                active
-                    .iter()
-                    .filter(|line| {
-                        line.split_once('=')
-                            .is_some_and(|(name, _)| name.trim() == key.trim())
-                    })
-                    .count()
-                    == *exact_count
-            });
-    let unique_features = spec.feature_rewrites.iter().all(|(from, _)| {
-        let Some((key, _)) = from.split_once('=') else {
-            return false;
-        };
-        active
-            .iter()
-            .filter(|line| {
-                line.split_once('=')
-                    .is_some_and(|(name, _)| name.trim() == key.trim())
-            })
-            .count()
-            == 1
-    });
-    let original = valid_dependency_shapes
-        && unique_features
-        && dependency_counts.iter().all(|count| *count == 1)
-        && spec
-            .feature_rewrites
-            .iter()
-            .all(|(from, to)| occurrences(from) == 1 && occurrences(to) == 0)
-        && spec
-            .installed_rewrites
-            .iter()
-            .all(|(from, _)| occurrences(from) == 0);
-    let installed = !spec.installed_rewrites.is_empty()
+            .zip(spec.feature_rewrites)
+            .all(|(item, (from, _))| item.is_some_and(|item| source_line(item) == *from));
+    let installed = valid_dependencies
+        && all_features
+        && !spec.installed_rewrites.is_empty()
         && spec.installed_rewrites.len() == spec.feature_rewrites.len()
-        && valid_dependency_shapes
-        && unique_features
-        && dependency_counts.iter().all(|count| *count == 0)
-        && spec
-            .feature_rewrites
+        && dependency_items.iter().all(|item| item.is_none())
+        && feature_items
             .iter()
-            .all(|(from, to)| occurrences(from) == 0 && occurrences(to) == 0)
-        && spec
-            .installed_rewrites
+            .zip(spec.installed_rewrites)
+            .all(|(item, (from, _))| item.is_some_and(|item| source_line(item) == *from));
+    let projected = valid_dependencies
+        && all_features
+        && dependency_items.iter().all(|item| item.is_none())
+        && feature_items
             .iter()
-            .all(|(from, _)| occurrences(from) == 1);
-    let projected = valid_dependency_shapes
-        && unique_features
-        && dependency_counts.iter().all(|count| *count == 0)
-        && spec
-            .feature_rewrites
-            .iter()
-            .all(|(from, to)| occurrences(from) == 0 && occurrences(to) == 1)
-        && spec
-            .installed_rewrites
-            .iter()
-            .all(|(from, _)| occurrences(from) == 0);
+            .zip(spec.feature_rewrites)
+            .all(|(item, (_, to))| item.is_some_and(|item| source_line(item) == *to));
     if !original && !installed && !projected {
         return Err("delivery: 投影修剪不完整——producer 清单结构漂移，受管判红".into());
     }
 
     let mut edits = Vec::new();
     let mut out: Vec<String> = Vec::new();
-    for line in text.lines() {
+    for (index, line) in lines.iter().enumerate() {
         if original
-            && !line.trim_start().starts_with('#')
-            && spec.strip_deps.iter().any(|m| line.contains(m))
+            && dependency_items
+                .iter()
+                .flatten()
+                .any(|item| line_index(item) == index)
         {
             while out
                 .last()
@@ -4615,8 +4611,8 @@ fn delivery_apply_projection(
         } else {
             spec.feature_rewrites
         };
-        for &(from, to) in rewrites {
-            if line.trim() == from {
+        for (item, &(from, to)) in feature_items.iter().zip(rewrites) {
+            if item.is_some_and(|item| line_index(item) == index) && line.trim() == from {
                 line = line.replace(from, to);
                 edits.push(format!("rewrite feature: {from} -> {to}"));
             }
@@ -7863,6 +7859,31 @@ pub fn create_item(name str) str {
             assert!(delivery_apply_projection(&manifest, &PROJECTION_AUTO_LANG).is_err(), "unexpectedly accepted {bad}");
             assert_eq!(std::fs::read_to_string(&manifest).unwrap(), bad, "failed projection must not rewrite input");
         }
+    }
+
+    #[test]
+    fn plan842_projection_ignores_unrelated_metadata_keys() {
+        let dir = tempfile::tempdir().unwrap();
+        let manifest = dir.path().join("Cargo.toml");
+        let input = "[package]\nname = \"example\"\nversion = \"0.1.0\"\n[package.metadata]\ntest-cases = [\"unrelated\"]\nauto-test-case = \"unrelated\"\n[features]\ntest-cases = [\"auto-lang-core/test-cases\"]\n[dependencies]\n";
+        assert!(toml::from_str::<toml::Value>(input).is_ok());
+        std::fs::write(&manifest, input).unwrap();
+        delivery_apply_projection(&manifest, &PROJECTION_AUTO_LANG)
+            .expect("unrelated metadata must not affect projection");
+        let output = std::fs::read_to_string(&manifest).unwrap();
+        let parsed: toml::Value = toml::from_str(&output).unwrap();
+        assert_eq!(
+            parsed["package"]["metadata"]["auto-test-case"].as_str(),
+            Some("unrelated")
+        );
+        assert_eq!(
+            parsed["package"]["metadata"]["test-cases"][0].as_str(),
+            Some("unrelated")
+        );
+        assert!(parsed["features"]["test-cases"]
+            .as_array()
+            .unwrap()
+            .is_empty());
     }
 
     /// PLAN-792 端到端：generate_rust_ui_delivery 真实生成——镜像布局
