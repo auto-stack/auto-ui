@@ -4193,6 +4193,13 @@ fn delivery_producer_root() -> AutoResult<PathBuf> {
         if let Some(value) = std::env::var_os(key) {
             let root = PathBuf::from(value);
             if valid(&root) {
+                if root.file_name().and_then(|name| name.to_str()) == Some("sdk")
+                    && root
+                        .parent()
+                        .is_some_and(|parent| parent.join("install-manifest.json").exists())
+                {
+                    auto_api_gen::source_owner::validate_installed_language_source(&root)?;
+                }
                 return Ok(root);
             }
             return Err(format!("delivery: producer 显式 {key} 无效: {}", root.display()).into());
@@ -4201,7 +4208,14 @@ fn delivery_producer_root() -> AutoResult<PathBuf> {
     let mut candidates = Vec::new();
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
-            candidates.push(dir.join("sdk"));
+            let sdk = dir.join("sdk");
+            if sdk.exists() || dir.join("install-manifest.json").exists() {
+                auto_api_gen::source_owner::validate_installed_language_source(&sdk)?;
+                if valid(&sdk) {
+                    return Ok(sdk);
+                }
+                return Err(format!("delivery: producer 安装 SDK 无效: {}", sdk.display()).into());
+            }
         }
     }
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
