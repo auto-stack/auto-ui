@@ -11,20 +11,21 @@ use super::widget::{
 };
 use crate::ast as ui_ast;
 use crate::ast::*;
-use crate::{UiParseContext, UiStmt};
+use crate::UiStmt;
 use auto_parser_api::ast;
 use auto_parser_api::ast::*;
 use auto_parser_api::error::{pos_to_span, AutoResult, SyntaxError};
 use auto_parser_api::token::TokenKind;
+use auto_parser_api::DomainParseContext;
 
 /// Parse view block (UI scenario only)
-pub fn parse_view_block(cx: &mut dyn UiParseContext) -> AutoResult<UiStmt> {
+pub fn parse_view_block(cx: &mut dyn DomainParseContext) -> AutoResult<UiStmt> {
     let view = parse_view_block_inner(cx)?;
     Ok(UiStmt::ViewBlock(view))
 }
 
 /// Plan 367 P2-3: Parse either a view block or a view fragment declaration.
-pub fn parse_view_block_or_fragment(cx: &mut dyn UiParseContext) -> AutoResult<UiStmt> {
+pub fn parse_view_block_or_fragment(cx: &mut dyn DomainParseContext) -> AutoResult<UiStmt> {
     cx.expect_ident("view")?;
     cx.skip_empty_lines();
     if cx.cur_text().as_str() == "fn" {
@@ -39,7 +40,7 @@ pub fn parse_view_block_or_fragment(cx: &mut dyn UiParseContext) -> AutoResult<U
 /// Parse view fragment declaration body (after 'view' has been consumed).
 /// Plan 425: `view fn` only — `component fn` parses to a WidgetDecl via
 /// parse_component_fn_decl.
-pub(crate) fn parse_view_fragment_decl_body(cx: &mut dyn UiParseContext) -> AutoResult<UiStmt> {
+pub(crate) fn parse_view_fragment_decl_body(cx: &mut dyn DomainParseContext) -> AutoResult<UiStmt> {
     cx.expect_ident("fn")?;
     parse_fragment_decl_body_tail(cx)
 }
@@ -55,7 +56,7 @@ pub(crate) fn parse_view_fragment_decl_body(cx: &mut dyn UiParseContext) -> Auto
 /// style → body) is unchanged from the Plan 408 grammar; the fragment
 /// double track (ViewFragmentDecl + extract_widget_from_fragment) is
 /// retired — `view fn` (inline) keeps the fragment path.
-pub fn parse_component_fn_decl(cx: &mut dyn UiParseContext) -> AutoResult<UiStmt> {
+pub fn parse_component_fn_decl(cx: &mut dyn DomainParseContext) -> AutoResult<UiStmt> {
     cx.expect_ident("component")?;
     cx.expect_ident("fn")?;
     let name = cx.cur_text();
@@ -202,7 +203,7 @@ pub fn parse_component_fn_decl(cx: &mut dyn UiParseContext) -> AutoResult<UiStmt
 /// fragment, Plan 367 P2-3), after `fn` has been consumed.
 /// Plan 425: component fn left this shared path — only the inline view-fn
 /// form remains (params + single body node, no blocks).
-pub(crate) fn parse_fragment_decl_body_tail(cx: &mut dyn UiParseContext) -> AutoResult<UiStmt> {
+pub(crate) fn parse_fragment_decl_body_tail(cx: &mut dyn DomainParseContext) -> AutoResult<UiStmt> {
     let name = cx.cur_text();
     cx.advance();
     let mut params: Vec<(ast::Name, String)> = Vec::new();
@@ -253,7 +254,7 @@ pub(crate) fn parse_fragment_decl_body_tail(cx: &mut dyn UiParseContext) -> Auto
 }
 
 /// Parse view block, returning the ViewBlock directly
-pub(crate) fn parse_view_block_inner(cx: &mut dyn UiParseContext) -> AutoResult<ViewBlock> {
+pub(crate) fn parse_view_block_inner(cx: &mut dyn DomainParseContext) -> AutoResult<ViewBlock> {
     cx.expect_ident("view")?;
     cx.expect(TokenKind::LBrace)?;
     let root = parse_view_root_nodes(cx)?;
@@ -270,7 +271,7 @@ pub(crate) fn parse_view_block_inner(cx: &mut dyn UiParseContext) -> AutoResult<
 /// single node stays the root unchanged, and multiple siblings are
 /// wrapped in an implicit `col` (the documented workaround container).
 /// The opening `{` has been consumed; this consumes the closing `}`.
-pub(crate) fn parse_view_root_nodes(cx: &mut dyn UiParseContext) -> AutoResult<ViewNode> {
+pub(crate) fn parse_view_root_nodes(cx: &mut dyn DomainParseContext) -> AutoResult<ViewNode> {
     cx.skip_empty_lines();
 
     let mut roots = vec![parse_view_node(cx)?];
@@ -297,7 +298,7 @@ pub(crate) fn parse_view_root_nodes(cx: &mut dyn UiParseContext) -> AutoResult<V
 }
 
 /// Parse a single view node
-pub(crate) fn parse_view_node(cx: &mut dyn UiParseContext) -> AutoResult<ViewNode> {
+pub(crate) fn parse_view_node(cx: &mut dyn DomainParseContext) -> AutoResult<ViewNode> {
     let start_pos = cx.cur_pos();
     cx.skip_empty_lines();
 
@@ -805,7 +806,7 @@ pub(crate) fn parse_view_node(cx: &mut dyn UiParseContext) -> AutoResult<ViewNod
 
 /// Parse style binding: { completed: todo.done, editing: todo.editing }
 pub(crate) fn parse_style_binding(
-    cx: &mut dyn UiParseContext,
+    cx: &mut dyn DomainParseContext,
 ) -> AutoResult<Vec<StyleBindingEntry>> {
     cx.expect(TokenKind::LBrace)?;
     cx.skip_empty_lines();
@@ -854,7 +855,7 @@ pub(crate) fn parse_style_binding(
 }
 
 /// Parse for loop in view: for item in .list { body }
-pub(crate) fn parse_view_for_loop(cx: &mut dyn UiParseContext) -> AutoResult<ViewNode> {
+pub(crate) fn parse_view_for_loop(cx: &mut dyn DomainParseContext) -> AutoResult<ViewNode> {
     let start_pos = cx.cur_pos();
     cx.expect_ident("for")?;
 
@@ -991,7 +992,7 @@ pub(crate) fn parse_view_for_loop(cx: &mut dyn UiParseContext) -> AutoResult<Vie
 /// stops before the body `{` by construction (no call/index/object
 /// grammar is reachable). Keys are fingerprinted per item; VM code
 /// shapes are deliberately rejected with a pointed error.
-pub(crate) fn parse_view_key_expr(cx: &mut dyn UiParseContext) -> AutoResult<Expr> {
+pub(crate) fn parse_view_key_expr(cx: &mut dyn DomainParseContext) -> AutoResult<Expr> {
     let lhs: Expr = match cx.cur_kind() {
         TokenKind::Dot => {
             cx.advance(); // skip dot
@@ -1046,7 +1047,7 @@ pub(crate) fn parse_view_key_expr(cx: &mut dyn UiParseContext) -> AutoResult<Exp
 /// 声明的依赖面，值指纹进命中条件）; exact = bool 字面量，选择纯 deps
 /// 信任模式（canonical 档明示：陈旧风险由语料承担——正确性下限的唯一
 /// 显式豁口）。
-pub(crate) fn parse_view_memo_block(cx: &mut dyn UiParseContext) -> AutoResult<ViewNode> {
+pub(crate) fn parse_view_memo_block(cx: &mut dyn DomainParseContext) -> AutoResult<ViewNode> {
     let start_pos = cx.cur_pos();
     cx.expect_ident("memo")?;
     cx.expect(TokenKind::LParen)?;
@@ -1141,7 +1142,7 @@ pub(crate) fn parse_view_memo_block(cx: &mut dyn UiParseContext) -> AutoResult<V
 }
 
 /// Parse conditional in view: if condition { then_body } else { else_body }
-pub(crate) fn parse_view_conditional(cx: &mut dyn UiParseContext) -> AutoResult<ViewNode> {
+pub(crate) fn parse_view_conditional(cx: &mut dyn DomainParseContext) -> AutoResult<ViewNode> {
     let start_pos = cx.cur_pos();
     cx.expect_ident("if")?;
 
@@ -1208,7 +1209,7 @@ pub(crate) fn parse_view_conditional(cx: &mut dyn UiParseContext) -> AutoResult<
 
 /// Parse navigation link in view: link (to: "/path") { children } (Plan 105)
 /// Also supports: link (text: "label", href: "#") {} for external links
-pub(crate) fn parse_view_link(cx: &mut dyn UiParseContext) -> AutoResult<ViewNode> {
+pub(crate) fn parse_view_link(cx: &mut dyn DomainParseContext) -> AutoResult<ViewNode> {
     let start_pos = cx.cur_pos();
     cx.expect(TokenKind::Link)?;
 
@@ -1295,7 +1296,7 @@ pub(crate) fn parse_view_link(cx: &mut dyn UiParseContext) -> AutoResult<ViewNod
 }
 
 /// Parse condition expression (until '{')
-pub(crate) fn parse_condition_expr(cx: &mut dyn UiParseContext) -> AutoResult<String> {
+pub(crate) fn parse_condition_expr(cx: &mut dyn DomainParseContext) -> AutoResult<String> {
     let mut parts = Vec::new();
 
     while !cx.is_kind(TokenKind::LBrace) {
@@ -1423,7 +1424,7 @@ pub(crate) fn parse_condition_expr(cx: &mut dyn UiParseContext) -> AutoResult<St
 /// literals included (`isLastMessage(.msgs, m.id)`, `f(g(.x), 2)`).
 /// `self.cur` must be the opening LParen; on return the closing RParen is
 /// consumed. Unbalanced input stops at EOF without consuming a body brace.
-pub(crate) fn capture_condition_call_args(cx: &mut dyn UiParseContext, chain: &mut String) {
+pub(crate) fn capture_condition_call_args(cx: &mut dyn DomainParseContext, chain: &mut String) {
     chain.push('(');
     cx.advance();
     let mut depth = 1usize;
@@ -1464,7 +1465,7 @@ pub(crate) fn capture_condition_call_args(cx: &mut dyn UiParseContext, chain: &m
 ///
 /// Example: `onkeydown.up.prevent: .MoveUp`, `onwheel.document.capture: .Lock`
 pub(crate) fn parse_event_modifiers(
-    cx: &mut dyn UiParseContext,
+    cx: &mut dyn DomainParseContext,
     mut key: String,
 ) -> AutoResult<String> {
     while cx.is_kind(TokenKind::Dot) {
@@ -1497,7 +1498,7 @@ pub(crate) fn parse_event_modifiers(
 /// lambda's statements with an empty handler string; extraction mints the
 /// anonymous event name and injects the matching on-handler.
 pub(crate) fn parse_event_value(
-    cx: &mut dyn UiParseContext,
+    cx: &mut dyn DomainParseContext,
 ) -> AutoResult<(String, Vec<String>, Option<Vec<Stmt>>)> {
     if cx.is_kind(TokenKind::LParen) {
         let closure = cx.parse_closure()?;
@@ -1525,7 +1526,7 @@ pub(crate) fn parse_event_value(
 }
 
 pub(crate) fn parse_event_handler(
-    cx: &mut dyn UiParseContext,
+    cx: &mut dyn DomainParseContext,
 ) -> AutoResult<(String, Vec<String>)> {
     // Handle dot-prefixed handlers like .Inc (meaning Msg::Inc in widget scope)
     if cx.is_kind(TokenKind::Dot) {
@@ -1568,7 +1569,7 @@ pub(crate) fn parse_event_handler(
 /// leave the cursor stuck) produces a clean error instead of an infinite
 /// loop / OOM. This is the structural fix for the `tag`-as-argument bug,
 /// complementing the soft-identifier handling in `parse_event_arg`.
-pub(crate) fn parse_event_arg_list(cx: &mut dyn UiParseContext) -> AutoResult<Vec<String>> {
+pub(crate) fn parse_event_arg_list(cx: &mut dyn DomainParseContext) -> AutoResult<Vec<String>> {
     let mut args = Vec::new();
     let mut iters = 0u32;
     while !cx.is_kind(TokenKind::RParen) {
@@ -1595,7 +1596,7 @@ pub(crate) fn parse_event_arg_list(cx: &mut dyn UiParseContext) -> AutoResult<Ve
 }
 
 /// Parse a single event argument
-pub(crate) fn parse_event_arg(cx: &mut dyn UiParseContext) -> AutoResult<String> {
+pub(crate) fn parse_event_arg(cx: &mut dyn DomainParseContext) -> AutoResult<String> {
     // Handle object literals: { key: value, ... }
     if cx.is_kind(TokenKind::LBrace) {
         return parse_event_arg_object(cx);
@@ -1761,7 +1762,7 @@ pub(crate) fn parse_event_arg(cx: &mut dyn UiParseContext) -> AutoResult<String>
 }
 
 /// Parse an object literal as event argument: { key: value, ... }
-pub(crate) fn parse_event_arg_object(cx: &mut dyn UiParseContext) -> AutoResult<String> {
+pub(crate) fn parse_event_arg_object(cx: &mut dyn DomainParseContext) -> AutoResult<String> {
     cx.expect(TokenKind::LBrace)?;
     let mut parts = vec!["{ ".to_string()];
     let mut first = true;
@@ -1810,7 +1811,7 @@ pub(crate) fn parse_event_arg_object(cx: &mut dyn UiParseContext) -> AutoResult<
 /// Plan 435 挂账②续:on 块 handler 形参收集 —— `Name(p1, p2)` 或
 /// `Name(n1 t1, n2 t2)`(类型标注忽略,取每组首 token 为参数名)。
 /// 点前缀/无点前缀两种 pattern 形态共用。
-pub(crate) fn parse_handler_params(cx: &mut dyn UiParseContext) -> AutoResult<Vec<String>> {
+pub(crate) fn parse_handler_params(cx: &mut dyn DomainParseContext) -> AutoResult<Vec<String>> {
     if !cx.is_kind(TokenKind::LParen) {
         return Ok(Vec::new());
     }

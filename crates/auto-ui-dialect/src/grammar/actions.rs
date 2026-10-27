@@ -5,11 +5,12 @@ use super::helpers::at_dot;
 use super::view::capture_condition_call_args;
 use crate::ast as ui_ast;
 use crate::route::{RouteDef, RoutesBlock};
-use crate::{UiParseContext, UiStmt};
+use crate::UiStmt;
 use auto_parser_api::ast;
 use auto_parser_api::ast::*;
 use auto_parser_api::error::{pos_to_span, AutoResult, SyntaxError};
 use auto_parser_api::token::TokenKind;
+use auto_parser_api::DomainParseContext;
 
 /// Parse routes block, returning the RoutesBlock directly (Plan 105/106)
 ///
@@ -29,7 +30,7 @@ use auto_parser_api::token::TokenKind;
 ///     "/user/:id" -> UserPage {}
 /// }
 /// ```
-pub(crate) fn parse_routes_block_inner(cx: &mut dyn UiParseContext) -> AutoResult<RoutesBlock> {
+pub(crate) fn parse_routes_block_inner(cx: &mut dyn DomainParseContext) -> AutoResult<RoutesBlock> {
     cx.expect_ident("routes")?;
     cx.expect(TokenKind::LBrace)?;
     cx.skip_empty_lines();
@@ -87,7 +88,7 @@ pub(crate) fn parse_routes_block_inner(cx: &mut dyn UiParseContext) -> AutoResul
 /// 后继 `{` 时接管（否则返回 None 回退表达式路径——`actions = ...` 等
 /// 普通表达式不受影响）；handler 引用此时无宿主可校验，合并进宿主
 /// widget 后由消费端（vm 安装/vue 生成）落地。
-pub fn parse_actions_decl_stmt(cx: &mut dyn UiParseContext) -> AutoResult<Option<UiStmt>> {
+pub fn parse_actions_decl_stmt(cx: &mut dyn DomainParseContext) -> AutoResult<Option<UiStmt>> {
     // cur = "actions"；词法前瞻一格（取回再压回，parser 流式无回溯）。
     let next_is_brace = match cx.probe_next_token() {
         Ok(t) => t.kind == TokenKind::LBrace,
@@ -103,7 +104,7 @@ pub fn parse_actions_decl_stmt(cx: &mut dyn UiParseContext) -> AutoResult<Option
 /// PLAN-607: 顶层 `style <name> = ...` 或 `style <name>(...) = ...` 声明。
 /// 仅在 `style` 后继 `Ident` 且接着 `=` 或 `(` 时接管；
 /// 否则返回 None 回退表达式路径（`style = ...` 等普通表达式不受影响）。
-pub fn parse_style_recipe_decl_stmt(cx: &mut dyn UiParseContext) -> AutoResult<Option<UiStmt>> {
+pub fn parse_style_recipe_decl_stmt(cx: &mut dyn DomainParseContext) -> AutoResult<Option<UiStmt>> {
     let cp = cx.raw_cursor_save();
 
     cx.advance(); // consume "style"
@@ -197,7 +198,7 @@ pub fn parse_style_recipe_decl_stmt(cx: &mut dyn UiParseContext) -> AutoResult<O
 /// 条目 = 裸名（msg 变体）+ 括号属性列表（沿 actions `action (…)` 形）；
 /// `when` 复用 `parse_actions_cond_attr`（引号串或裸 DSL 表达式源文本）。
 pub(crate) fn parse_timer_block_inner(
-    cx: &mut dyn UiParseContext,
+    cx: &mut dyn DomainParseContext,
 ) -> AutoResult<ui_ast::TimerBlock> {
     cx.expect_ident("timer")?;
     cx.expect(TokenKind::LBrace)?;
@@ -300,7 +301,7 @@ pub(crate) fn parse_timer_block_inner(
 /// （语法见 ui_ast::ActionsBlock 文档）。enabled_if/checked_if 支持
 /// 引号字符串与裸表达式两种拼写（parse_actions_cond_attr）。
 pub(crate) fn parse_actions_block_inner(
-    cx: &mut dyn UiParseContext,
+    cx: &mut dyn DomainParseContext,
 ) -> AutoResult<ui_ast::ActionsBlock> {
     cx.expect_ident("actions")?;
     cx.expect(TokenKind::LBrace)?;
@@ -364,7 +365,9 @@ pub(crate) fn parse_actions_block_inner(
 ///          shortcut: "...", enabled_if: "...", checked_if: "...")`
 /// id 与 handler 必填；其余可选；均为引号字符串（handler 例外，前导点
 /// 事件引用）。
-pub(crate) fn parse_action_entry(cx: &mut dyn UiParseContext) -> AutoResult<ui_ast::ActionEntry> {
+pub(crate) fn parse_action_entry(
+    cx: &mut dyn DomainParseContext,
+) -> AutoResult<ui_ast::ActionEntry> {
     cx.expect(TokenKind::LParen)?;
     let mut id: Option<String> = None;
     let mut handler: Option<String> = None;
@@ -426,7 +429,7 @@ pub(crate) fn parse_action_entry(cx: &mut dyn UiParseContext) -> AutoResult<ui_a
 
 /// actions 块内 `key: "..."` 的引号字符串取值（去引号；text 带引号是
 /// lexer 惯例，见 style name 解析）。
-pub(crate) fn parse_actions_string_attr(cx: &mut dyn UiParseContext) -> AutoResult<String> {
+pub(crate) fn parse_actions_string_attr(cx: &mut dyn DomainParseContext) -> AutoResult<String> {
     let s = cx.cur_text().to_string();
     cx.expect(TokenKind::Str)?;
     Ok(s.trim_matches('"').to_string())
@@ -435,7 +438,7 @@ pub(crate) fn parse_actions_string_attr(cx: &mut dyn UiParseContext) -> AutoResu
 /// actions 块内 `handler: .ActXxx`——前导点事件引用。前导点的词法
 /// 形态两可（Dot token 或 text 为 "." 的标识符，parse_name 的 "." 特例
 /// 同源），两者都接受。
-pub(crate) fn parse_actions_handler_attr(cx: &mut dyn UiParseContext) -> AutoResult<String> {
+pub(crate) fn parse_actions_handler_attr(cx: &mut dyn DomainParseContext) -> AutoResult<String> {
     if cx.is_kind(TokenKind::Dot) || cx.cur_text().as_str() == "." {
         cx.advance();
     } else {
@@ -456,7 +459,7 @@ pub(crate) fn parse_actions_handler_attr(cx: &mut dyn UiParseContext) -> AutoRes
 /// 条件同一 token 文法捕获（空格连接的规范条件串），解析期即校验。
 /// 两种形态在 AST/运行时等价：vm 侧 eval_condition_with 对条件串求值，
 /// vue 侧 convert_condition 转译（与 view if 条件共用一张翻译表）。
-pub(crate) fn parse_actions_cond_attr(cx: &mut dyn UiParseContext) -> AutoResult<String> {
+pub(crate) fn parse_actions_cond_attr(cx: &mut dyn DomainParseContext) -> AutoResult<String> {
     if cx.is_kind(TokenKind::Str) {
         return parse_actions_string_attr(cx);
     }
@@ -561,7 +564,9 @@ pub(crate) fn parse_actions_cond_attr(cx: &mut dyn UiParseContext) -> AutoResult
 }
 
 /// `menubar { menu (id: "...", title: "...") { ... } ... }`
-pub(crate) fn parse_menubar_block(cx: &mut dyn UiParseContext) -> AutoResult<ui_ast::MenubarBlock> {
+pub(crate) fn parse_menubar_block(
+    cx: &mut dyn DomainParseContext,
+) -> AutoResult<ui_ast::MenubarBlock> {
     cx.expect_ident("menubar")?;
     cx.expect(TokenKind::LBrace)?;
     cx.skip_empty_lines();
@@ -580,7 +585,7 @@ pub(crate) fn parse_menubar_block(cx: &mut dyn UiParseContext) -> AutoResult<ui_
 }
 
 /// `menu (id: "...", title: "...") { item (action: "...") | sep ... }`
-pub(crate) fn parse_menu_entry(cx: &mut dyn UiParseContext) -> AutoResult<ui_ast::MenuEntry> {
+pub(crate) fn parse_menu_entry(cx: &mut dyn DomainParseContext) -> AutoResult<ui_ast::MenuEntry> {
     cx.expect(TokenKind::LParen)?;
     let mut id: Option<String> = None;
     let mut title: Option<String> = None;
@@ -621,7 +626,9 @@ pub(crate) fn parse_menu_entry(cx: &mut dyn UiParseContext) -> AutoResult<ui_ast
 }
 
 /// `toolbar { item (action: "...") | sep ... }`
-pub(crate) fn parse_toolbar_block(cx: &mut dyn UiParseContext) -> AutoResult<ui_ast::ToolbarBlock> {
+pub(crate) fn parse_toolbar_block(
+    cx: &mut dyn DomainParseContext,
+) -> AutoResult<ui_ast::ToolbarBlock> {
     cx.expect_ident("toolbar")?;
     // 开花括号由 parse_menu_item_entries 消费（与 menu 条目列表共用）。
     let items = parse_menu_item_entries(cx)?;
@@ -631,7 +638,7 @@ pub(crate) fn parse_toolbar_block(cx: &mut dyn UiParseContext) -> AutoResult<ui_
 /// menu/toolbar 共用的条目列表：`item (action: "...")` 或 `sep`，
 /// 换行分隔（允许尾随逗号）。
 pub(crate) fn parse_menu_item_entries(
-    cx: &mut dyn UiParseContext,
+    cx: &mut dyn DomainParseContext,
 ) -> AutoResult<Vec<ui_ast::MenuItemEntry>> {
     cx.expect(TokenKind::LBrace)?;
     cx.skip_empty_lines();

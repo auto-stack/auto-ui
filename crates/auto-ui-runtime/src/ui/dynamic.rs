@@ -1771,17 +1771,13 @@ impl DynamicComponent {
         crate::ui::debug::BuildProbe,
     ) {
         let prev = self.view_mount_frame_prepare();
-        let builder = AuraViewBuilder::with_registry_and_imports(
-            &self.bridge,
-            &self.widget_name,
-            &self.widget_registry,
-            &self.import_stmts,
-        )
-        .with_routes(&self.routes)
-        .with_preview_states(&self.preview_states)
-        .with_nav_group_states(&self.nav_group_states)
-        .with_mounted_sink(&self.mounted_types)
-        .with_mount_path_sink(self.mount_path_sink());
+        let builder =
+            AuraViewBuilder::with_registry(&self.bridge, &self.widget_name, &self.widget_registry)
+                .with_routes(&self.routes)
+                .with_preview_states(&self.preview_states)
+                .with_nav_group_states(&self.nav_group_states)
+                .with_mounted_sink(&self.mounted_types)
+                .with_mount_path_sink(self.mount_path_sink());
         let out = builder.build_with_debug(&self.view_template);
         self.view_mount_frame_finish(prev);
         out
@@ -1811,18 +1807,14 @@ impl DynamicComponent {
             None
         };
         let prev = self.view_mount_frame_prepare();
-        let builder = AuraViewBuilder::with_registry_and_imports(
-            &self.bridge,
-            &self.widget_name,
-            &self.widget_registry,
-            &self.import_stmts,
-        )
-        .with_routes(&self.routes)
-        .with_computed(&self.computed)
-        .with_preview_states(&self.preview_states)
-        .with_nav_group_states(&self.nav_group_states)
-        .with_mounted_sink(&self.mounted_types)
-        .with_mount_path_sink(self.mount_path_sink());
+        let builder =
+            AuraViewBuilder::with_registry(&self.bridge, &self.widget_name, &self.widget_registry)
+                .with_routes(&self.routes)
+                .with_computed(&self.computed)
+                .with_preview_states(&self.preview_states)
+                .with_nav_group_states(&self.nav_group_states)
+                .with_mounted_sink(&self.mounted_types)
+                .with_mount_path_sink(self.mount_path_sink());
         let out = builder.build_with_debug_gated(&self.view_template, capture_probe);
         self.view_mount_frame_finish(prev);
         if let Some(t0) = __diag_t0 {
@@ -1853,15 +1845,11 @@ impl DynamicComponent {
     /// not a screenshot). Returns None for an unknown name.
     pub fn view_named(&self, name: &str) -> Option<View<DynamicMessage>> {
         let template = self.named_templates.get(name)?;
-        let builder = AuraViewBuilder::with_registry_and_imports(
-            &self.bridge,
-            &self.widget_name,
-            &self.widget_registry,
-            &self.import_stmts,
-        )
-        .with_routes(&self.routes)
-        .with_mounted_sink(&self.mounted_types)
-        .with_mount_path_sink(self.mount_path_sink());
+        let builder =
+            AuraViewBuilder::with_registry(&self.bridge, &self.widget_name, &self.widget_registry)
+                .with_routes(&self.routes)
+                .with_mounted_sink(&self.mounted_types)
+                .with_mount_path_sink(self.mount_path_sink());
         Some(builder.build(template))
     }
 
@@ -2363,15 +2351,11 @@ impl Component for DynamicComponent {
     /// dirty flag is cleared.
     fn view(&self) -> View<Self::Msg> {
         let prev = self.view_mount_frame_prepare();
-        let builder = AuraViewBuilder::with_registry_and_imports(
-            &self.bridge,
-            &self.widget_name,
-            &self.widget_registry,
-            &self.import_stmts,
-        )
-        .with_routes(&self.routes)
-        .with_mounted_sink(&self.mounted_types)
-        .with_mount_path_sink(self.mount_path_sink());
+        let builder =
+            AuraViewBuilder::with_registry(&self.bridge, &self.widget_name, &self.widget_registry)
+                .with_routes(&self.routes)
+                .with_mounted_sink(&self.mounted_types)
+                .with_mount_path_sink(self.mount_path_sink());
         let view = builder.build(&self.view_template);
         self.view_mount_frame_finish(prev);
 

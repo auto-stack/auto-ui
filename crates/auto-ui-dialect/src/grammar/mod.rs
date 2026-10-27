@@ -1,4 +1,5 @@
 pub use auto_parser_api::DomainParseContext as UiParseContext;
+use auto_parser_api::DomainParseContext;
 
 pub mod actions;
 pub mod helpers;
@@ -36,7 +37,7 @@ impl DomainDialect for UiDialect {
 
     fn try_parse_stmt(
         &self,
-        cx: &mut dyn UiParseContext,
+        cx: &mut dyn DomainParseContext,
         keyword: &str,
     ) -> AutoResult<Option<DomainStmt<UiStmt>>> {
         if cx.in_on_body() || cx.in_fn_body() {
@@ -65,7 +66,7 @@ impl DomainDialect for UiDialect {
 
     fn try_parse_token_stmt(
         &self,
-        cx: &mut dyn UiParseContext,
+        cx: &mut dyn DomainParseContext,
         kind: TokenKind,
     ) -> AutoResult<Option<DomainStmt<UiStmt>>> {
         match kind {
@@ -84,7 +85,7 @@ impl DomainDialect for UiDialect {
 
     fn try_parse_pub_stmt(
         &self,
-        cx: &mut dyn UiParseContext,
+        cx: &mut dyn DomainParseContext,
     ) -> AutoResult<Option<DomainStmt<UiStmt>>> {
         cx.advance();
         if cx.cur_text() != "style" {

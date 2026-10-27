@@ -11,13 +11,14 @@ use super::helpers::{
 use super::view::{parse_handler_params, parse_view_node, parse_view_root_nodes};
 use crate::ast as ui_ast;
 use crate::ast::*;
-use crate::{UiParseContext, UiStmt};
+use crate::UiStmt;
 use auto_parser_api::ast;
 use auto_parser_api::ast::*;
 use auto_parser_api::error::{pos_to_span, AutoResult, SyntaxError};
 use auto_parser_api::token::TokenKind;
+use auto_parser_api::DomainParseContext;
 
-pub fn parse_widget_decl(cx: &mut dyn UiParseContext) -> AutoResult<UiStmt> {
+pub fn parse_widget_decl(cx: &mut dyn DomainParseContext) -> AutoResult<UiStmt> {
     cx.expect_ident("widget")?;
     let name = cx.cur_text();
     cx.advance();
@@ -763,7 +764,7 @@ pub(crate) fn mint_modal_dialog_toggle_inner(
 /// `npm_deps:`) or project-root-relative files (copied into the generated
 /// project under `src/ext/` by auto-man). See [`ExtImport`].
 pub(crate) fn parse_widget_use_block_inner(
-    cx: &mut dyn UiParseContext,
+    cx: &mut dyn DomainParseContext,
 ) -> AutoResult<Vec<ExtImport>> {
     cx.expect_ident("use")?;
     cx.expect(TokenKind::LBrace)?;
@@ -928,7 +929,9 @@ pub(crate) fn parse_widget_use_block_inner(
 /// model field, prop, or computed), optional `.immediate` / `.deep`
 /// modifiers after the source list, `->`, then a handler body parsed
 /// with the same conventions as `on` handlers.
-pub(crate) fn parse_watch_block_inner(cx: &mut dyn UiParseContext) -> AutoResult<Vec<WatchDecl>> {
+pub(crate) fn parse_watch_block_inner(
+    cx: &mut dyn DomainParseContext,
+) -> AutoResult<Vec<WatchDecl>> {
     cx.expect_ident("watch")?;
     cx.expect(TokenKind::LBrace)?;
     cx.skip_empty_lines();
@@ -1057,7 +1060,7 @@ pub(crate) fn parse_watch_block_inner(cx: &mut dyn UiParseContext) -> AutoResult
 /// separate task). A `refs: [f1, f2]` suffix after a `let` statement
 /// annotates ref fields (script-side access injects `.value`).
 pub(crate) fn parse_setup_block_inner(
-    cx: &mut dyn UiParseContext,
+    cx: &mut dyn DomainParseContext,
 ) -> AutoResult<ui_ast::SetupBlock> {
     cx.expect_ident("setup")?;
     cx.expect(TokenKind::LBrace)?;
@@ -1116,7 +1119,7 @@ pub(crate) fn parse_setup_block_inner(
     })
 }
 
-pub(crate) fn parse_expose_block_inner(cx: &mut dyn UiParseContext) -> AutoResult<Vec<Name>> {
+pub(crate) fn parse_expose_block_inner(cx: &mut dyn DomainParseContext) -> AutoResult<Vec<Name>> {
     cx.expect_ident("expose")?;
     cx.expect(TokenKind::LBrace)?;
     cx.skip_empty_lines();
@@ -1159,7 +1162,7 @@ pub(crate) fn parse_expose_block_inner(cx: &mut dyn UiParseContext) -> AutoResul
 /// ([`Lexer::capture_raw_block`]) — never tokenized — so nested `{}`,
 /// `/* */` comments, media queries, and pseudo-classes pass through
 /// unchanged. Returns the raw text between the braces.
-pub(crate) fn parse_style_block_inner(cx: &mut dyn UiParseContext) -> AutoResult<String> {
+pub(crate) fn parse_style_block_inner(cx: &mut dyn DomainParseContext) -> AutoResult<String> {
     cx.expect_ident("style")?;
     cx.skip_empty_lines();
 
@@ -1182,7 +1185,7 @@ pub(crate) fn parse_style_block_inner(cx: &mut dyn UiParseContext) -> AutoResult
 }
 
 /// Parse widget props: (name: type, name: type = default, ...)
-pub(crate) fn parse_widget_props(cx: &mut dyn UiParseContext) -> AutoResult<Vec<PropDecl>> {
+pub(crate) fn parse_widget_props(cx: &mut dyn DomainParseContext) -> AutoResult<Vec<PropDecl>> {
     cx.expect(TokenKind::LParen)?;
     let mut props = Vec::new();
 
@@ -1212,7 +1215,9 @@ pub(crate) fn parse_widget_props(cx: &mut dyn UiParseContext) -> AutoResult<Vec<
 }
 
 /// Parse computed block, returning the ComputedBlock directly
-pub(crate) fn parse_computed_block_inner(cx: &mut dyn UiParseContext) -> AutoResult<ComputedBlock> {
+pub(crate) fn parse_computed_block_inner(
+    cx: &mut dyn DomainParseContext,
+) -> AutoResult<ComputedBlock> {
     cx.expect_ident("computed")?;
     cx.expect(TokenKind::LBrace)?;
     cx.skip_empty_lines();
@@ -1294,7 +1299,7 @@ pub(crate) fn parse_computed_block_inner(cx: &mut dyn UiParseContext) -> AutoRes
     Ok(ComputedBlock { properties })
 }
 
-pub(crate) fn parse_on_block(cx: &mut dyn UiParseContext) -> AutoResult<OnBlock> {
+pub(crate) fn parse_on_block(cx: &mut dyn DomainParseContext) -> AutoResult<OnBlock> {
     cx.expect_ident("on")?;
     cx.expect(TokenKind::LBrace)?;
     cx.skip_empty_lines();
@@ -1414,7 +1419,7 @@ pub(crate) fn parse_on_block(cx: &mut dyn UiParseContext) -> AutoResult<OnBlock>
 
 /// Parse a bind block: bind { "key" -> .Handler, ... }
 /// Plan 275: Key bindings for AURA widgets
-pub(crate) fn parse_bind_block(cx: &mut dyn UiParseContext) -> AutoResult<BindBlock> {
+pub(crate) fn parse_bind_block(cx: &mut dyn DomainParseContext) -> AutoResult<BindBlock> {
     cx.expect_ident("bind")?;
     cx.expect(TokenKind::LBrace)?;
     cx.skip_empty_lines();

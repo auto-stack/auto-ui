@@ -2,9 +2,9 @@
 //! （PLAN-810 T-03/T-04 逐字迁移；端口映射见 contract-baseline §2）。
 
 use crate::ast::*;
-use crate::UiParseContext;
 use auto_parser_api::ast::*;
 use auto_parser_api::token::TokenKind;
+use auto_parser_api::DomainParseContext;
 
 /// Get the primary (major) property name for a view element tag.
 /// This is used for the shorthand syntax: `tag "value"` → `tag (primary_prop: "value")`
@@ -335,6 +335,6 @@ pub(crate) fn stmt_expr_contains_await(expr: &Expr) -> bool {
 /// 前导点两可判定（Dot token 或 text 为 "." 的标识符——条件 DSL 捕获用；
 /// 自 Parser parse_actions_cond_attr/parse_condition_expr 的同名闭包提升，
 /// 语义逐字保持）。
-pub(crate) fn at_dot(cx: &mut dyn UiParseContext) -> bool {
+pub(crate) fn at_dot(cx: &mut dyn DomainParseContext) -> bool {
     cx.is_kind(TokenKind::Dot) || cx.cur_text() == "."
 }

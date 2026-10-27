@@ -1,11 +1,12 @@
 use crate::ast::{ExtImport, ExtImportKind};
-use crate::{UiParseContext, UiStmt};
+use crate::UiStmt;
 use auto_parser_api::ast::{Expr, Name, Type};
 use auto_parser_api::error::{pos_to_span, AutoResult, SyntaxError};
 use auto_parser_api::token::TokenKind;
+use auto_parser_api::DomainParseContext;
 use auto_val::AutoStr;
 
-pub fn looks_like_use_web(cx: &mut dyn UiParseContext) -> AutoResult<bool> {
+pub fn looks_like_use_web(cx: &mut dyn DomainParseContext) -> AutoResult<bool> {
     let cp = cx.raw_cursor_save();
     cx.advance();
     let matches = cx.is_kind(TokenKind::Dot) && {
@@ -16,7 +17,7 @@ pub fn looks_like_use_web(cx: &mut dyn UiParseContext) -> AutoResult<bool> {
     Ok(matches)
 }
 
-pub fn parse_use_web(cx: &mut dyn UiParseContext) -> AutoResult<UiStmt> {
+pub fn parse_use_web(cx: &mut dyn DomainParseContext) -> AutoResult<UiStmt> {
     cx.advance();
     cx.expect(TokenKind::Dot)?;
     cx.expect_ident("web")?;

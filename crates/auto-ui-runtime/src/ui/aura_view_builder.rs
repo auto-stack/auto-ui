@@ -16836,7 +16836,7 @@ mod tests {
         let widget = make_test_widget("Test", vec![]);
         let bridge = VmBridge::new(&widget).unwrap();
         let registry = crate::ui::widget_registry::WidgetRegistry::new();
-        let builder = AuraViewBuilder::with_registry_and_imports(&bridge, "Test", &registry, &[]);
+        let builder = AuraViewBuilder::with_registry(&bridge, "Test", &registry);
         let node = AuraNode::element("icon")
             .with_prop("name", Expr::Str("copy".into()))
             .with_prop("size", Expr::Ident(auto_lang_core::ast::Name::from("size")));
@@ -22600,7 +22600,7 @@ mod tests {
         let widget = make_test_widget("Test", vec![]);
         let bridge = VmBridge::new(&widget).unwrap();
         let registry = crate::ui::widget_registry::WidgetRegistry::new();
-        let builder = AuraViewBuilder::with_registry_and_imports(&bridge, "Test", &registry, &[]);
+        let builder = AuraViewBuilder::with_registry(&bridge, "Test", &registry);
 
         // PLAN-748 T-02：判别器改为 lucide 名集成员资格（含 "icon" 字样
         // 向后兼容）——Folder ∈ lucide 名集恢复 glyph（A-05 曾按
@@ -22642,8 +22642,7 @@ mod tests {
 
         // PLAN-748 T-02：∉ lucide 名集的网页生态组件（AppViewport 形）保持
         // T-09(b) 占位卡路径（判别器换名集后意图面不动）。
-        let builder_vp =
-            AuraViewBuilder::with_registry_and_imports(&bridge, "Test", &registry, &[]);
+        let builder_vp = AuraViewBuilder::with_registry(&bridge, "Test", &registry);
         let node_vp = AuraNode::element("AppViewport").with_prop("app", Expr::Str("demo-1".into()));
         let view_vp = builder_vp.build(&node_vp);
         match &view_vp {
@@ -22667,8 +22666,7 @@ mod tests {
         let widget2 = make_test_widget("Test2", vec![]);
         let bridge2 = VmBridge::new(&widget2).unwrap();
         let registry2 = crate::ui::widget_registry::WidgetRegistry::new();
-        let builder2 =
-            AuraViewBuilder::with_registry_and_imports(&bridge2, "Test2", &registry2, &[]);
+        let builder2 = AuraViewBuilder::with_registry(&bridge2, "Test2", &registry2);
         let node2 = AuraNode::element("Folder_icon").with_prop("size", Expr::Int(14));
         assert!(
             !matches!(builder2.build(&node2), View::Image { .. }),
@@ -26122,8 +26120,7 @@ mod plan045_memo_tests {
         let node = menubar_node(true);
 
         let empty_registry = crate::ui::widget_registry::WidgetRegistry::new();
-        let b =
-            AuraViewBuilder::with_registry_and_imports(&bridge, "MemoApp", &empty_registry, &[]);
+        let b = AuraViewBuilder::with_registry(&bridge, "MemoApp", &empty_registry);
         // fill：probe enabled（build_with_debug 默认 enabled）。
         let (_, _, probe1) = b.build_with_debug(&node);
         assert!(!probe1.is_enabled() || true, "fill probe 在册");
@@ -26185,13 +26182,8 @@ mod plan045_memo_tests {
         }];
         let builder_registry = &registry;
         let build_once = |bridge: &VmBridge, memo: bool| {
-            let b = AuraViewBuilder::with_registry_and_imports(
-                bridge,
-                "MemoApp",
-                builder_registry,
-                &[],
-            )
-            .with_routes(&routes_static);
+            let b = AuraViewBuilder::with_registry(bridge, "MemoApp", builder_registry)
+                .with_routes(&routes_static);
             b.build(&AuraNode::Outlet { memo: Some(memo) })
         };
 
@@ -26346,13 +26338,8 @@ mod plan045_memo_tests {
         }];
         let builder_registry = &registry;
         let build_once = |bridge: &VmBridge| {
-            let b = AuraViewBuilder::with_registry_and_imports(
-                bridge,
-                "MemoApp",
-                builder_registry,
-                &[],
-            )
-            .with_routes(&routes_static);
+            let b = AuraViewBuilder::with_registry(bridge, "MemoApp", builder_registry)
+                .with_routes(&routes_static);
             // 裸 outlet：prop 未设（None）。
             b.build(&AuraNode::Outlet { memo: None })
         };
@@ -26404,13 +26391,8 @@ mod plan045_memo_tests {
         }];
         let builder_registry = &registry;
         let build_once = |bridge: &VmBridge| {
-            let b = AuraViewBuilder::with_registry_and_imports(
-                bridge,
-                "MemoApp",
-                builder_registry,
-                &[],
-            )
-            .with_routes(&routes_static);
+            let b = AuraViewBuilder::with_registry(bridge, "MemoApp", builder_registry)
+                .with_routes(&routes_static);
             b.build(&AuraNode::Outlet { memo: Some(true) })
         };
         let _v1 = build_once(&bridge);
@@ -26467,13 +26449,8 @@ mod plan045_memo_tests {
         }];
         let builder_registry = &registry;
         let build_once = |bridge: &VmBridge| {
-            let b = AuraViewBuilder::with_registry_and_imports(
-                bridge,
-                "MemoApp",
-                builder_registry,
-                &[],
-            )
-            .with_routes(&routes_static);
+            let b = AuraViewBuilder::with_registry(bridge, "MemoApp", builder_registry)
+                .with_routes(&routes_static);
             b.build(&AuraNode::Outlet { memo: Some(true) })
         };
         let _v1 = build_once(&bridge); // fill（epoch E）
@@ -26550,13 +26527,8 @@ mod plan045_memo_tests {
         let builder_registry = &registry;
 
         let build_once = |bridge: &VmBridge| {
-            let b = AuraViewBuilder::with_registry_and_imports(
-                bridge,
-                "MemoApp",
-                builder_registry,
-                &[],
-            )
-            .with_routes(&routes_static);
+            let b = AuraViewBuilder::with_registry(bridge, "MemoApp", builder_registry)
+                .with_routes(&routes_static);
             b.build(&AuraNode::Outlet { memo: Some(false) })
         };
 

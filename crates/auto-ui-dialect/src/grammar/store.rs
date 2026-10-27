@@ -5,13 +5,14 @@ use super::actions::parse_timer_block_inner;
 use super::widget::{parse_computed_block_inner, parse_on_block, parse_watch_block_inner};
 use crate::ast as ui_ast;
 use crate::ast::*;
-use crate::{UiParseContext, UiStmt};
+use crate::UiStmt;
 use auto_parser_api::error::{pos_to_span, AutoResult, SyntaxError};
 use auto_parser_api::token::TokenKind;
+use auto_parser_api::DomainParseContext;
 
 /// Parse a `store` declaration (Plan 351 / Design 18).
 /// A store is a view-less widget: `store Name { model{} msg{} on{} }`.
-pub fn parse_store_decl(cx: &mut dyn UiParseContext) -> AutoResult<UiStmt> {
+pub fn parse_store_decl(cx: &mut dyn DomainParseContext) -> AutoResult<UiStmt> {
     cx.expect_ident("store")?;
     let name = cx.cur_text();
     cx.advance();
