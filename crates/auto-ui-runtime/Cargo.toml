@@ -1,6 +1,6 @@
 [package]
 name = "auto-ui-runtime"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "UI runtime: the VM rendering track / desktop host stack (iced renderer, desktop session/protocol, editor/terminal/media widgets, host adapters and provider implementations), extracted from auto-lang (PLAN-814)."
 license = "MIT"

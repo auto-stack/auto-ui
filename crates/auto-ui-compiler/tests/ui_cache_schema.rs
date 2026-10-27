@@ -43,4 +43,10 @@ fn ui_ast_schema_survives_reload_and_invalidates_old_cache_identities() {
         "old AST schema drops artifacts"
     );
     assert!(invalidated.is_dirty(Path::new("app.at"), 42));
+    let mut rebuilt = invalidated;
+    rebuilt.update(source.clone(), 42, vec![]);
+    rebuilt.save(temp.path()).expect("save rebuilt cache");
+    let reloaded = UICache::load(temp.path());
+    assert_eq!(reloaded.file_count(), 1, "rebuilt cache survives reload");
+    assert!(!reloaded.is_dirty(&source, 42));
 }

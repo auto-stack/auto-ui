@@ -336,6 +336,10 @@ mod tests {
         assert!(decode_ui_code(old_schema.as_bytes())
             .unwrap_err()
             .contains("schema version mismatch"));
+        let future_schema = encoded.replace("\"schema\":1", "\"schema\":999");
+        assert!(decode_ui_code(future_schema.as_bytes())
+            .unwrap_err()
+            .contains("schema version mismatch"));
         let bad_tag = encoded.replace("WidgetDecl", "WidgetDeclZero");
         assert!(decode_ui_code(bad_tag.as_bytes())
             .unwrap_err()

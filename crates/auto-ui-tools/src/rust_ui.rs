@@ -4628,6 +4628,11 @@ fn delivery_guard_root(delivery_root: &Path) -> AutoResult<()> {
     }
     let marker = delivery_root.join("delivery-manifest.json");
     if marker.is_file() {
+        let doc: serde_json::Value = serde_json::from_slice(&fs::read(&marker)?)
+            .map_err(|e| format!("delivery: 旧交付清单无效: {e}"))?;
+        if doc.get("schema").and_then(|s| s.as_str()) != Some("generated-ui-delivery/1") {
+            return Err(format!("delivery: 不支持的旧交付 schema: {}", doc["schema"]).into());
+        }
         return Ok(());
     }
     let empty = fs::read_dir(delivery_root)
@@ -4816,16 +4821,28 @@ fn delivery_swap_in(staging: &Path, delivery_root: &Path) -> AutoResult<()> {
 
 /// R3-F01/R4-F01：既往换出残桩 GC——仅在**成功替代产物已在交付根落位**
 /// （`delivery_root` 含 delivery-manifest.json）时，回收同时具备换出事务
-/// 标记与清单的 `.{name}.delivery-old-*` 目录。
+/// 标记与受支持版本清单的 `.{name}.delivery-old-*` 目录。
 ///
 /// 换出事务标记只证明「本线曾把旧根换出」，**不证明新包已成功提交**；
 /// 根缺失/未完成时备份可能是唯一旧包（待恢复态），绝不可回收。清单+标记
 /// 双条件仍必要（排除无标记外来目录），但不再是充分条件。
+fn delivery_supported_manifest(root: &Path) -> bool {
+    fs::read(root.join("delivery-manifest.json"))
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+        .and_then(|doc| {
+            doc.get("schema")
+                .and_then(|schema| schema.as_str())
+                .map(str::to_owned)
+        })
+        .as_deref()
+        == Some("generated-ui-delivery/1")
+}
+
 fn delivery_gc_stale_backups(delivery_root: &Path) {
     // 成功替代证明：交付根在位且是完整交付包。缺此证明即视为可能存在
     // 待恢复的唯一旧备份——直接返回，不触碰任何 backup。
-    let replacement_ok =
-        delivery_root.is_dir() && delivery_root.join("delivery-manifest.json").is_file();
+    let replacement_ok = delivery_root.is_dir() && delivery_supported_manifest(delivery_root);
     if !replacement_ok {
         return;
     }
@@ -4847,14 +4864,14 @@ fn delivery_gc_stale_backups(delivery_root: &Path) {
         }
         let path = entry.path();
         let swap_marker = path.join(DELIVERY_SWAP_MARKER).is_file();
-        let manifest = path.join("delivery-manifest.json").is_file();
+        let manifest = delivery_supported_manifest(&path);
         if swap_marker && manifest {
             if let Err(e) = fs::remove_dir_all(&path) {
                 eprintln!("⚠ delivery: 陈残换出桩清理失败（{}）: {e}", path.display());
             }
         } else {
             eprintln!(
-                "⚠ delivery: 命名像换出残桩但缺事务标记/清单（{}）——不删除，请人工确认",
+                "⚠ delivery: 命名像换出残桩但缺事务标记或清单版本不支持（{}）——不删除，请人工确认",
                 path.display()
             );
         }
@@ -5190,6 +5207,9 @@ def main() -> int:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as e:
         print(f"[verify-delivery] FAIL delivery-manifest.json 不可读: {e}")
+        return 1
+    if not isinstance(manifest, dict) or manifest.get("schema") != "generated-ui-delivery/1":
+        print("[verify-delivery] FAIL unsupported delivery manifest schema")
         return 1
     problems = []
     listed = set()
@@ -8306,6 +8326,15 @@ pub fn create_item(name str) str {
         )
         .unwrap();
         std::fs::write(stale.join(DELIVERY_SWAP_MARKER), "pid=999999\n").unwrap();
+        let future_backup = dir.path().join(".delivery.delivery-old-777777-3");
+        std::fs::create_dir_all(future_backup.join("app")).unwrap();
+        std::fs::write(
+            future_backup.join("delivery-manifest.json"),
+            "{\"schema\":\"generated-ui-delivery/999\"}",
+        )
+        .unwrap();
+        std::fs::write(future_backup.join(DELIVERY_SWAP_MARKER), "pid=777777\n").unwrap();
+        std::fs::write(future_backup.join("app/mine.txt"), b"future backup").unwrap();
         let foreign_patterned = dir.path().join(".delivery.delivery-old-888888-2");
         std::fs::create_dir_all(foreign_patterned.join("app")).unwrap();
         std::fs::write(
@@ -8320,6 +8349,11 @@ pub fn create_item(name str) str {
         .unwrap();
         generate_rust_ui_delivery(&project, &delivery).expect("GC 轮次失败");
         assert!(!stale.exists(), "带事务标记的陈残被 GC 回收");
+        assert_eq!(
+            std::fs::read(future_backup.join("app/mine.txt")).unwrap(),
+            b"future backup",
+            "未知版本备份不能被 GC 删除"
+        );
         assert!(
             foreign_patterned.join("app").join("mine.txt").is_file(),
             "无事务标记的模式名外来目录不被删除"
@@ -8492,8 +8526,40 @@ pub fn create_item(name str) str {
             "失败后无残留 staging（或仅空壳）"
         );
 
-        // producer 恢复 → 再交付成功（新包换入，旧 sentinel 随旧包换出）
+        // A future manifest must not be interpreted or replaced by this version.
         std::env::set_var("AUTO_DELIVERY_SOURCE_ROOT", &producer);
+        let manifest_path = delivery.join("delivery-manifest.json");
+        let mut future: serde_json::Value = serde_json::from_str(&manifest_before).unwrap();
+        future["schema"] = serde_json::json!("generated-ui-delivery/999");
+        let future_bytes = serde_json::to_vec(&future).unwrap();
+        std::fs::write(&manifest_path, &future_bytes).unwrap();
+        let verify = std::process::Command::new("python")
+            .arg(delivery.join("verify.py"))
+            .output()
+            .expect("run installed delivery verifier");
+        assert!(!verify.status.success());
+        assert!(String::from_utf8_lossy(&verify.stdout)
+            .contains("unsupported delivery manifest schema"));
+        let error =
+            generate_rust_ui_delivery(&project, &delivery).expect_err("unknown schema must fail");
+        assert!(error.to_string().contains("schema"), "{error}");
+        assert_eq!(std::fs::read(&manifest_path).unwrap(), future_bytes);
+        assert_eq!(
+            std::fs::read(&sentinel).unwrap(),
+            b"old delivery must survive failed preparation"
+        );
+        std::fs::write(&manifest_path, &manifest_before).unwrap();
+        let verify = std::process::Command::new("python")
+            .arg(delivery.join("verify.py"))
+            .output()
+            .expect("run restored delivery verifier");
+        assert!(
+            verify.status.success(),
+            "{}",
+            String::from_utf8_lossy(&verify.stdout)
+        );
+
+        // producer 恢复 → 再交付成功（新包换入，旧 sentinel 随旧包换出）
         generate_rust_ui_delivery(&project, &delivery).expect("恢复后再交付失败");
         assert!(delivery.join("delivery-manifest.json").is_file());
     }
