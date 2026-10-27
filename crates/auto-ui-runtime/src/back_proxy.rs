@@ -35,8 +35,9 @@ use auto_lang_core::vm::loader::Linker;
 use auto_lang_core::vm::task::AutoTask;
 use auto_lang_core::vm::virt_memory::VirtualFlash;
 
-/// Default listening port (`AUTO_GALLERY_PROXY_PORT` can override; binding conflicts fall back to +1..+10,
-/// mirroring the MCP 9247 precedent).
+/// Default listening port (`AUTO_GALLERY_PROXY_PORT` can override; binding conflicts fall back to
+/// +1..+10 mirroring the MCP 9247 precedent, then to an OS-assigned port when the whole range is
+/// unavailable, e.g. swallowed by a Windows Hyper-V dynamic exclusion range).
 const DEFAULT_PROXY_PORT: u16 = 3358;
 /// Single source is `ui::handler_codegen::MODULE_INIT_FN` (behind the `ui` gate); this module is
 /// un-gated, so a local constant with the same name anchors it (change them together).
@@ -83,7 +84,7 @@ pub struct NativePhotoApp {
 #[derive(Debug, Clone, Default)]
 pub struct BackProxyConfig {
     /// 期望端口（0 = 由 `AUTO_GALLERY_PROXY_PORT`/默认值决定；绑定冲突
-    /// 自动回退）。
+    /// 自动回退 +1..+10，全段不可用（如 Windows 保留段）再回退 OS 临时分配）。
     pub port: u16,
     pub sessions: Vec<SessionSpec>,
     /// PLAN-675 T-08: lazy 档——启动零预 spawning，`sessions` 退化为目录表
@@ -280,7 +281,6 @@ pub fn start(config: BackProxyConfig) -> std::io::Result<RunningProxy> {
 }
 
 fn bind_with_fallback(want: u16) -> std::io::Result<(TcpListener, u16)> {
-    let mut last_err = None;
     for off in 0..10u32 {
         let port = want as u32 + off;
         if port > u16::MAX as u32 {
@@ -288,19 +288,28 @@ fn bind_with_fallback(want: u16) -> std::io::Result<(TcpListener, u16)> {
         }
         match TcpListener::bind(("127.0.0.1", port as u16)) {
             Ok(l) => return Ok((l, port as u16)),
-            Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {
-                log::warn!("[back-proxy] port {port} busy, trying next");
-                last_err = Some(e);
+            Err(e)
+                if matches!(
+                    e.kind(),
+                    std::io::ErrorKind::AddrInUse | std::io::ErrorKind::PermissionDenied
+                ) =>
+            {
+                log::warn!("[back-proxy] port {port} unavailable ({:?}), trying next", e.kind());
             }
             Err(e) => return Err(e),
         }
     }
-    Err(last_err.unwrap_or_else(|| {
-        std::io::Error::new(
-            std::io::ErrorKind::AddrInUse,
-            "no free port in fallback range",
-        )
-    }))
+    // Windows Hyper-V/WSL 动态保留段可整段吞掉 +1..+10 回退窗（WSAEACCES→
+    // PermissionDenied，2026-10-28 实测 3323-3422 覆盖默认 3358 全窗）；端口
+    // 本就可迁移（消费方一律读回 RunningProxy.port），固定段全败时回退 OS
+    // 临时分配，不因环境保留段把宿主会话拖入降级。
+    log::warn!(
+        "[back-proxy] preferred range {want}..={} exhausted, binding OS-assigned port",
+        want.saturating_add(9)
+    );
+    let listener = TcpListener::bind(("127.0.0.1", 0))?;
+    let port = listener.local_addr()?.port();
+    Ok((listener, port))
 }
 
 /// PLAN-675 T-08: 会话线程 spawn 提取共用（start eager 循环 / add_session /
