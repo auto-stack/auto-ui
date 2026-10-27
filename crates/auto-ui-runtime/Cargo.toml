@@ -71,7 +71,7 @@ highlight-treesitter = [
 ui-clipboard = ["dep:arboard"]
 ui-dialog = ["dep:rfd", "dep:raw-window-handle"]
 iced-layout-tests = ["ui-iced", "dep:iced_test"]
-mpv-native = ["ui"]
+mpv-native = ["ui", "dep:libloading"]
 mpv-gpu = ["mpv-native", "dep:iced_wgpu"]
 mpv-widget = ["mpv-gpu", "ui-iced"]
 mpv-spike = ["mpv-gpu", "ui-iced"]
@@ -132,6 +132,7 @@ iced_widget = { version = "0.14", optional = true }
 iced_futures = { version = "0.14", optional = true }
 iced_test = { version = "0.14", optional = true }
 iced_wgpu = { version = "0.14", optional = true }
+libloading = { version = "0.8", optional = true }
 iced_runtime = { version = "0.14", optional = true }
 iced_tiny_skia = { version = "0.14", optional = true }
 arboard = { version = "3", optional = true }
