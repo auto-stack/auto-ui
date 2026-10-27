@@ -14226,3 +14226,58 @@ pub fn open_file(path str) str {
         );
     }
 }
+
+// PLAN-842 T-08: preserve the two assertions from the unmounted historical
+// CLI templates while checking the generator actually used by Vue and Tauri.
+#[cfg(test)]
+mod plan842_retired_palette_controls {
+    use auto_ui_compiler::style::theme::registry;
+
+    fn verify_palette_and_active_scaffold(name: &str, sidebar: bool) {
+        let historical = registry::builtin(name).expect("historical palette");
+        for (dark, expected) in [
+            (false, "--secondary: 40 24% 85.5%"),
+            (true, "--secondary: 215 25% 27%"),
+        ] {
+            let rendered = registry::render_core(historical, dark);
+            assert!(
+                rendered.contains(expected),
+                "{name} @dark={dark}: {rendered}"
+            );
+            for line in rendered
+                .lines()
+                .filter(|line| line.trim_start().starts_with("--secondary:"))
+            {
+                assert!(
+                    !line.contains("210 40% 96.1%") && !line.contains("217.2 32.6% 17.5%"),
+                    "{line}"
+                );
+            }
+            if sidebar {
+                assert!(!registry::render_sidebar(historical, dark).is_empty());
+            }
+        }
+        // Current Vue and Tauri both generate through VueProject, which uses
+        // the shared scaffold palette rather than either unmounted template.
+        let active = super::generate_index_css(None);
+        let scaffold = registry::builtin("scaffold").unwrap();
+        for dark in [false, true] {
+            assert!(active.contains(&registry::render_core(scaffold, dark)));
+            assert!(active.contains(&registry::render_sidebar(scaffold, dark)));
+        }
+    }
+
+    mod cli_vue {
+        #[test]
+        fn index_css_secondary_is_differentiated_from_muted() {
+            super::verify_palette_and_active_scaffold("cli-vue", true);
+        }
+    }
+
+    mod tauri {
+        #[test]
+        fn index_css_secondary_is_differentiated_from_muted() {
+            super::verify_palette_and_active_scaffold("tauri", false);
+        }
+    }
+}
