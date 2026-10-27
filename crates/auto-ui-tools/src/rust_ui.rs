@@ -4679,7 +4679,8 @@ fn delivery_preflight_producer(producer_root: &Path) -> AutoResult<()> {
     if !auto_api_gen::source_owner::is_managed_sdk(producer_root) {
         auto_api_gen::source_owner::validate_development_dependencies(
             &producer_root.join("crates/auto-lang"),
-        )?;
+        )
+        .map_err(|err| format!("delivery: producer 预检失败: {err}"))?;
     }
     let mut missing: Vec<String> = Vec::new();
     for c in DELIVERY_CRATES {
