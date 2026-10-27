@@ -4674,6 +4674,13 @@ fn delivery_guard_root(delivery_root: &Path) -> AutoResult<()> {
 /// manifest 与根锁逐项在位检查。任何缺失在触碰旧交付或建 staging 之前
 /// 判红（失败保留旧交付字节，满足"失败不切换任何旧生产产物"）。
 fn delivery_preflight_producer(producer_root: &Path) -> AutoResult<()> {
+    // Unmanaged developer roots have no receipt; validate their actual Cargo
+    // path graph before creating staging or changing a previous delivery.
+    if !auto_api_gen::source_owner::is_managed_sdk(producer_root) {
+        auto_api_gen::source_owner::validate_development_dependencies(
+            &producer_root.join("crates/auto-lang"),
+        )?;
+    }
     let mut missing: Vec<String> = Vec::new();
     for c in DELIVERY_CRATES {
         let source = delivery_crate_source(producer_root, c)

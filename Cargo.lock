@@ -514,6 +514,7 @@ dependencies = [
  "auto-project-model",
  "auto-val",
  "regex",
+ "semver 1.0.28",
  "serde_json",
  "sha2 0.10.9",
  "toml",
