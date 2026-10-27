@@ -1030,15 +1030,27 @@ struct MergedRouteAImpl {
     companions: Vec<(String, String)>, // (mod name, rust source)
 }
 
+/// PLAN-842 T-15：route A 门控三分。`Inapplicable` = 设计上不走 route A
+/// （primary pub type 在案或 db.at 存在——db 吸收/结构契约臂是正式路径）；
+/// `TranspileFailed` = 本可走 route A（标量契约、无 db）但伴生/端点体
+/// 转译失败——CRUD 兜底仍生成（对齐 back 侧 generate_rust_server 的
+/// 「transpile failure falls back to the skeleton」既有语义），但生成物
+/// 必须留可观测标记，不得静默兜底。
+enum MergedRouteAOutcome {
+    Inapplicable,
+    Active(MergedRouteAImpl),
+    TranspileFailed(String),
+}
+
 fn merged_route_a_impl(
     project_dir: &Path,
     module: &auto_lang_core::api::ApiModule,
-) -> Option<MergedRouteAImpl> {
+) -> MergedRouteAOutcome {
     if auto_api_gen::api_gen::primary_type_name_pub(module).is_some() {
-        return None;
+        return MergedRouteAOutcome::Inapplicable;
     }
     if project_dir.join("src").join("back").join("db.at").exists() {
-        return None;
+        return MergedRouteAOutcome::Inapplicable;
     }
     let back_dir = project_dir.join("src").join("back");
     let mut companions = Vec::new();
@@ -1055,21 +1067,40 @@ fn merged_route_a_impl(
             .collect();
         stems.sort();
         for stem in stems {
-            let content = std::fs::read_to_string(back_dir.join(format!("{}.at", stem))).ok()?;
-            let rs = auto_api_gen::api_gen::transpile_back_module_to_rs(&stem, &content).ok()?;
-            companions.push((stem, auto_api_gen::api_gen::post_process_companion_rs(rs)));
+            let content = match std::fs::read_to_string(back_dir.join(format!("{stem}.at"))) {
+                Ok(c) => c,
+                Err(e) => {
+                    return MergedRouteAOutcome::TranspileFailed(format!(
+                        "read companion {stem}.at: {e}"
+                    ))
+                }
+            };
+            match auto_api_gen::api_gen::transpile_back_module_to_rs(&stem, &content) {
+                Ok(rs) => {
+                    companions.push((stem, auto_api_gen::api_gen::post_process_companion_rs(rs)))
+                }
+                Err(e) => {
+                    return MergedRouteAOutcome::TranspileFailed(format!(
+                        "transpile companion {stem}.at: {e}"
+                    ))
+                }
+            }
         }
     }
-    let api_at = std::fs::read_to_string(back_dir.join("api.at")).ok()?;
+    let api_at = match std::fs::read_to_string(back_dir.join("api.at")) {
+        Ok(c) => c,
+        Err(e) => return MergedRouteAOutcome::TranspileFailed(format!("read api.at: {e}")),
+    };
     let stripped: String = api_at
         .lines()
         .filter(|l| !l.trim_start().starts_with("#[api"))
         .collect::<Vec<_>>()
         .join("\n");
-    let api_impl =
-        auto_api_gen::api_gen::transpile_back_module_to_rs("api_impl", &stripped).ok()?;
-    let api_impl = auto_api_gen::api_gen::post_process_companion_rs(api_impl);
-    Some(MergedRouteAImpl {
+    let api_impl = match auto_api_gen::api_gen::transpile_back_module_to_rs("api_impl", &stripped) {
+        Ok(rs) => auto_api_gen::api_gen::post_process_companion_rs(rs),
+        Err(e) => return MergedRouteAOutcome::TranspileFailed(format!("transpile api.at: {e}")),
+    };
+    MergedRouteAOutcome::Active(MergedRouteAImpl {
         api_impl,
         companions,
     })
@@ -1765,8 +1796,12 @@ fn generate_merged_api_client(
     // PLAN-681 T-02（route A 前半）：伴生模块 + 端点体内嵌（db 吸收同款）。
     // api_impl 内 `crate::fsys` 路径在 front 上下文解析到下方兄弟内嵌
     // 模块（同为 main.rs 顶层 item）。
+    // PLAN-842 T-15：转译失败停用时在生成物留 ⚠ 标记后照常落兜底
+    // （非静默；见 MergedRouteAOutcome）。
     let route_a = merged_route_a_impl(project_dir, module);
-    if let Some(ra) = &route_a {
+    let mut route_a_active: Option<&MergedRouteAImpl> = None;
+    if let MergedRouteAOutcome::Active(ra) = &route_a {
+        route_a_active = Some(ra);
         code.push_str(
             "\n// PLAN-681 route A: companion + endpoint-body modules (in-process merged)\n",
         );
@@ -1779,6 +1814,10 @@ fn generate_merged_api_client(
         code.push_str("pub mod api_impl {\n#![allow(unused)]\n");
         code.push_str(&ra.api_impl);
         code.push_str("\n}\n\n");
+    } else if let MergedRouteAOutcome::TranspileFailed(reason) = &route_a {
+        code.push_str(&format!(
+            "// ⚠ route A inactive: {reason}; endpoints fall back to contract CRUD stubs\n"
+        ));
     }
 
     // Generate JSON initial data (not strong-typed structs).
@@ -1820,7 +1859,7 @@ fn generate_merged_api_client(
         // PLAN-681 T-02（route A）：真契约桩——参数/返回取 ApiEndpoint 标量
         // 面（str→String 以 &x 委派、int→i64），体委派内嵌 api_impl（端点
         // 体转译=fsys 委派链单源）。非标量参数/返回的端点落后续臂。
-        if route_a.is_some()
+        if route_a_active.is_some()
             && endpoint
                 .params
                 .iter()
@@ -1976,11 +2015,16 @@ fn generate_merged_api_client(
                         auto_type_to_rust(r)
                     }
                 };
+                // PLAN-710 D-7 + PLAN-842 T-15：缺省表达式按契约返回型收口
+                // ——列表面（[]str→Vec<String> 等）此前落 `_` 分支发
+                // `Value::Null`，与签名类型失配、生成物不可编译；补
+                // Vec<…>→Vec::new()（与声明类型臂空态语义同向）。
                 let default_expr = match ret_ty.as_str() {
                     "String" => "String::new()".to_string(),
                     "bool" => "false".to_string(),
                     "i32" | "i64" | "u32" | "u64" | "f32" | "f64" => "0".to_string(),
                     "()" => String::new(),
+                    _ if ret_ty.starts_with("Vec<") => "Vec::new()".to_string(),
                     _ => "serde_json::Value::Null".to_string(),
                 };
                 let discard = if endpoint.params.is_empty() {
@@ -7265,14 +7309,32 @@ pub fn ping() int {
 
     /// PLAN-648 T-03 生成器行为锁定 ②:CRUD 原型 = 明示保留的 demo
     /// 脚手架兜底(消费方 = 无 db.at 演示应用,如 020-music-player /
-    /// 031-image-viewer)。吸收臂不覆盖的端点回落 API_DATA 脚手架,
-    /// 形态锁定:GET 无参 = 全量列表、POST = 增记录。
+    /// 031-image-viewer)。吸收臂不覆盖的端点回落 API_DATA 脚手架。
+    ///
+    /// PLAN-842 T-15 有界决策后的形态锁定：兜底适用条件 = db 在案但不
+    /// 覆盖该端点（本 fixture），或结构契约（primary pub type）下返回
+    /// 非声明类型的端点；无 db 标量契约模块由 route A 接管（见
+    /// merged_api_client_route_a_wins_for_scalar_contract）。兜底内
+    /// GET/POST 按契约收口（PLAN-710 D-7）：[]str → Vec<String> 签名 +
+    /// Vec::new() 空态，POST 保留 id 分配插入。PLAN-648 的 GET 无参
+    /// `Vec<Value>` 全量列表形态按 PLAN-681/710 后续裁定退役（与契约
+    /// 签名收口矛盾）。
     #[test]
     fn merged_api_client_crud_fallback_for_uncovered_endpoints() {
         let tmp = tempfile::tempdir().unwrap();
         let back = tmp.path().join("src").join("back");
         std::fs::create_dir_all(&back).unwrap();
-        // 无 db.at —— 全部端点走 CRUD 兜底。
+        // db.at 只实现 helper（不覆盖任何端点）——db 在案使 route A 不
+        // 适用，list_items/create_item 落 CRUD 兜底。
+        std::fs::write(
+            back.join("db.at"),
+            r#"
+pub fn seed_note() int {
+    return 42
+}
+"#,
+        )
+        .unwrap();
         std::fs::write(
             back.join("api.at"),
             r#"
@@ -7296,13 +7358,128 @@ pub fn create_item(name str) str {
             code
         );
         assert!(
-            code.contains("fn list_items() -> Vec<Value>"),
-            "GET no-param fallback = list-all over API_DATA, got:\n{}",
+            code.contains("fn list_items() -> Vec<String>"),
+            "GET fallback = contract-typed stub over API_DATA ([]str → Vec<String>), got:\n{}",
+            code
+        );
+        assert!(
+            !code.contains("fn list_items() -> Vec<Value>"),
+            "PLAN-648 旧 Vec<Value> 形态已按 PLAN-710 D-7 契约收口退役, got:\n{}",
+            code
+        );
+        assert!(
+            !code.contains("serde_json::Value::Null")
+                || !code
+                    .split("fn list_items")
+                    .nth(1)
+                    .unwrap_or("")
+                    .lines()
+                    .take(8)
+                    .any(|l| l.contains("Value::Null")),
+            "GET 列表返回不得再发 Null 占位体（类型失配不可编译）, got:\n{}",
             code
         );
         assert!(
             code.contains("fn create_item(") && code.contains("API_NEXT_ID"),
             "POST fallback = id-allocating insert over API_DATA, got:\n{}",
+            code
+        );
+        assert!(
+            !code.contains("pub mod api_impl"),
+            "db 在案 → route A 不适用（设计门控）, got:\n{}",
+            code
+        );
+        assert!(
+            !code.contains("⚠ route A inactive"),
+            "db 门控属设计上不适用，不得发转译失败标记, got:\n{}",
+            code
+        );
+    }
+
+    /// PLAN-842 T-15（V-09 route A 真体优先）：无 db、标量契约模块的
+    /// 端点（含 []str 列界面）由 route A 委派内嵌 api_impl 真体——
+    /// 端点体转译嵌入，不再落 CRUD 脚手架签名。
+    #[test]
+    fn merged_api_client_route_a_wins_for_scalar_contract() {
+        let tmp = tempfile::tempdir().unwrap();
+        let back = tmp.path().join("src").join("back");
+        std::fs::create_dir_all(&back).unwrap();
+        std::fs::write(
+            back.join("api.at"),
+            r#"
+#[api(method = "GET", path = "/api/items")]
+pub fn list_items() []str {
+    return []
+}
+
+#[api(method = "POST", path = "/api/items")]
+pub fn create_item(name str) str {
+    return ""
+}
+"#,
+        )
+        .unwrap();
+        let module = super::parse_api_module(tmp.path()).expect("api module parses");
+        let code = super::generate_merged_api_client(&module, tmp.path());
+        assert!(
+            code.contains("pub mod api_impl"),
+            "route A 内嵌端点体模块在案, got:\n{}",
+            code
+        );
+        assert!(
+            code.contains("fn list_items() -> Vec<String> {\n    api_impl::list_items()"),
+            "GET 标量列界面由 route A 委派真体, got:\n{}",
+            code
+        );
+        assert!(
+            code.contains(
+                "fn create_item(name: String) -> String {\n    api_impl::create_item(&name)"
+            ),
+            "POST 标量端点由 route A 委派真体, got:\n{}",
+            code
+        );
+        assert!(
+            !code.contains("⚠ route A inactive"),
+            "route A 活跃时不得有停用标记, got:\n{}",
+            code
+        );
+    }
+
+    /// PLAN-842 T-15（V-09 转译失败不静默）：标量契约、无 db，但伴生
+    /// 模块不可转译 → route A 停用、生成物留 ⚠ 标记（可观测兜底，对齐
+    /// back 侧 `⚠ api_impl.rs transpile failed (route A inactive)` 语义），
+    /// 端点落契约化 CRUD 桩。
+    #[test]
+    fn merged_api_client_route_a_transpile_failure_leaves_marker() {
+        let tmp = tempfile::tempdir().unwrap();
+        let back = tmp.path().join("src").join("back");
+        std::fs::create_dir_all(&back).unwrap();
+        std::fs::write(
+            back.join("api.at"),
+            r#"
+#[api(method = "GET", path = "/api/items")]
+pub fn list_items() []str {
+    return []
+}
+"#,
+        )
+        .unwrap();
+        std::fs::write(back.join("broken.at"), "pub fn broken( {\n").unwrap();
+        let module = super::parse_api_module(tmp.path()).expect("api module parses");
+        let code = super::generate_merged_api_client(&module, tmp.path());
+        assert!(
+            code.contains("⚠ route A inactive"),
+            "转译失败停用必须在生成物留标记, got:\n{}",
+            code
+        );
+        assert!(
+            !code.contains("pub mod api_impl"),
+            "转译失败时不得嵌入半套真体, got:\n{}",
+            code
+        );
+        assert!(
+            code.contains("fn list_items() -> Vec<String>"),
+            "兜底端点按契约化 CRUD 桩生成, got:\n{}",
             code
         );
     }
