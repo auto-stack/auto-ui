@@ -515,6 +515,7 @@ dependencies = [
  "auto-val",
  "regex",
  "serde_json",
+ "sha2 0.10.9",
 ]
 
 [[package]]
