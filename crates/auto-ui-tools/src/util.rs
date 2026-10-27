@@ -216,7 +216,20 @@ pub(crate) fn validate_ui_tree(root: &std::path::Path) -> Result<(), String> {
             } else if path.extension().and_then(|ext| ext.to_str()) == Some("at")
                 && path.file_name().and_then(|name| name.to_str()) != Some("pac.at")
             {
-                validate_ui_file(&path)?;
+                // PLAN-842 T-16：前置整树预扫只对**受信准入失败**（UI
+                // domain/module 校验——Plan 841 合同：任何模式硬拒绝、
+                // cache/输出前）与严格模式硬拒绝。普通模式的语法解析
+                // 失败不在预扫硬拒——交还各生成路径的逐文件统一语义
+                // （Plan 012 Batch B：非严格警告跳过/严格失败），fresh
+                // 与增量一致；不得删除整树校验（domain/module 反例仍
+                // 在此拦截）。
+                if let Err(e) = validate_ui_file(&path) {
+                    if domain_admission_failed(&e)
+                        || auto_ui_compiler::ui_gen::validators::strict_enabled()
+                    {
+                        return Err(format!("Failed to compile {}: {}", path.display(), e));
+                    }
+                }
             }
         }
     }

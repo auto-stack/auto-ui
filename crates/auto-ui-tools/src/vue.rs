@@ -12334,6 +12334,47 @@ store BetaStore {
             "broken store must not emit a composable"
         );
 
+        // PLAN-842 T-16（V-10 fresh/增量一致）：fresh 路径同为非严格
+        // 警告跳过——健康 store 输出、坏 store 不输出、构建成功。
+        let fresh = VueProject::from_workspace(root)
+            .expect("non-strict fresh load must continue past broken store");
+        fresh
+            .generate()
+            .expect("non-strict fresh generate must continue");
+        assert!(
+            stores_dir.join("useAlphaStore.ts").exists(),
+            "fresh: healthy store still emitted"
+        );
+        assert!(
+            !stores_dir.join("useBetaStore.ts").exists(),
+            "fresh: broken store must not emit a composable"
+        );
+
+        // PLAN-842 T-16（V-10 受信准入反例）：普通模式下 UI domain 校验
+        // 失败（重复 widget 声明）仍须在 cache/输出前硬拒绝——前置整树
+        // 校验保留，语法失败的宽容不得扩大到受信准入。
+        let dom_tmp = tempfile::tempdir().unwrap();
+        let dom_root = dom_tmp.path();
+        make_multi_store_workspace(dom_root);
+        let good = "widget W { view { text \"ok\" {} } }\n";
+        fs::write(
+            dom_root.join("src").join("front").join("dup.at"),
+            format!("{good}\n{good}\n"),
+        )
+        .unwrap();
+        let err = match incremental_compile_changed(dom_root, None) {
+            Ok(_) => panic!("non-strict must still reject UI domain admission failure"),
+            Err(e) => e,
+        };
+        assert!(
+            err.to_string().contains("UI domain validation failed"),
+            "domain 反例错误须具名: {err}"
+        );
+        assert!(
+            !dom_root.join("gen").join("front").join("vue").exists(),
+            "domain 反例不得产生任何输出"
+        );
+
         // Strict: the same parse failure fails the build.
         struct StrictGuard;
         impl StrictGuard {
@@ -12356,6 +12397,16 @@ store BetaStore {
             err.to_string().contains("Failed to compile"),
             "error should name the compile failure: {}",
             err
+        );
+        // fresh 路径严格模式同样拒绝（V-10 一致性）。
+        let fresh_err = match VueProject::from_workspace(root) {
+            Ok(_) => panic!("strict fresh load must fail on parse error"),
+            Err(e) => e,
+        };
+        assert!(
+            fresh_err.to_string().contains("Failed to compile"),
+            "strict fresh error should name the compile failure: {}",
+            fresh_err
         );
     }
 }
@@ -13145,10 +13196,44 @@ mod plan593_index_css_golden_tests {
     fn index_css_values_match_p1_baseline() {
         let css = super::generate_index_css(None);
         let golden = include_str!("../tests/fixtures/plan593_index_css.golden");
+        let pairs = var_pairs(&css);
+        // PLAN-038 扩展 status token（Plan 842 T-14）：亮/暗两块各追加
+        // success/warning/info/error 四键（ring 之后），与 design_tokens
+        // registry 扩展色同源、双面同值。旧 55 对金样逐字保留，新增 8 对
+        // 精确锁定；缺项、值漂移、意外额外键或重复发射均不得通过。
+        let status = [
+            ("success", "142 71% 45%"),
+            ("warning", "45 93% 47%"),
+            ("info", "217 91% 60%"),
+            ("error", "0 84% 60%"),
+        ];
+        let dark_start = pairs
+            .iter()
+            .position(|(k, v)| k == "background" && v == "222.2 47% 7%")
+            .expect("暗面 background 起点");
+        for (key, value) in status {
+            let hits: Vec<usize> = pairs
+                .iter()
+                .enumerate()
+                .filter(|(_, (k, _))| k == key)
+                .map(|(i, _)| i)
+                .collect();
+            assert_eq!(hits.len(), 2, "{key} 须亮/暗各恰好一次，实际命中 {hits:?}");
+            assert!(hits[0] < dark_start, "{key} 亮面发射须在暗面块之前");
+            assert!(hits[1] > dark_start, "{key} 暗面发射须在暗面块之后");
+            assert_eq!(pairs[hits[0]].1, value, "{key} 亮面值漂移");
+            assert_eq!(pairs[hits[1]].1, value, "{key} 暗面值漂移");
+        }
+        let status_keys: Vec<&str> = status.iter().map(|(k, _)| *k).collect();
+        let stripped: Vec<(String, String)> = pairs
+            .iter()
+            .filter(|(k, _)| !status_keys.contains(&k.as_str()))
+            .cloned()
+            .collect();
         assert_eq!(
             var_pairs(golden),
-            var_pairs(&css),
-            "canonical 归一后 index.css 值对漂移"
+            stripped,
+            "canonical 归一后 index.css 旧 55 对值对漂移"
         );
     }
 }
