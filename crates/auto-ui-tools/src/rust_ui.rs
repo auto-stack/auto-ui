@@ -4259,11 +4259,10 @@ fn delivery_git_identity(root: &Path) -> (Option<String>, bool) {
 /// AUTO_UI_GEN_FINGERPRINT 同文件集：crates/auto-ui-compiler/src/ui_gen/**
 /// ——PLAN-814 T-03 迁移后单源所在；blake3 over 排序 rel+内容，本指纹为
 /// 交付 manifest 的 producer 身份戳，算法独立于 build.rs 的 FNV 门）。
-fn delivery_ui_gen_fingerprint(root: &Path) -> AutoResult<String> {
-    // PLAN-831 T-06 起单源在独立 UI 仓（delivery_crate_source 双根解析）。
-    let dir = delivery_crate_source(root, "auto-ui-compiler")?
-        .join("src")
-        .join("ui_gen");
+fn delivery_ui_gen_fingerprint(copied_compiler: &Path) -> AutoResult<String> {
+    // Fingerprint the verified staged copy, not a producer that may change
+    // after copying and before the delivery receipt is written.
+    let dir = copied_compiler.join("src").join("ui_gen");
     let mut entries: Vec<(String, Vec<u8>)> = Vec::new();
     fn walk(dir: &Path, rel: &str, out: &mut Vec<(String, Vec<u8>)>) {
         let Ok(rd) = fs::read_dir(dir) else {
@@ -4344,7 +4343,10 @@ fn delivery_lock_versions(lock_text: &str) -> Vec<(String, String)> {
 /// 交付 pin 集：单版本槽家族成员 → `=ver` 精确钉（直依赖边，仅约束解析
 /// 不增 feature）；多版本槽成员 → 显式登记为"冻结锁控制"（清单无法对同
 /// 名多槽包重复声明直依赖）。
-fn delivery_pins(producer_root: &Path) -> AutoResult<(Vec<(String, String)>, Vec<String>)> {
+fn delivery_pins(
+    producer_root: &Path,
+    receipt: Option<&auto_api_gen::source_owner::InstalledSdkReceipt>,
+) -> AutoResult<(Vec<(String, String)>, Vec<String>)> {
     // 根 Cargo.lock（本地实际输入——Cargo.lock 整体被 .gitignore 忽略、
     // examples/rust-workspace/ 同样不保证在位；消费其内容并以 SHA-256
     // 记入 manifest 绑定身份，图形栈版本与应用锁经比对一致）。
@@ -4355,6 +4357,9 @@ fn delivery_pins(producer_root: &Path) -> AutoResult<(Vec<(String, String)>, Vec
             lock_path.display()
         )
     })?;
+    if let Some(receipt) = receipt {
+        receipt.verify_bytes("Cargo.lock", lock_text.as_bytes())?;
+    }
     let versions = delivery_lock_versions(&lock_text);
     let mut pins = Vec::new();
     let mut multi_slot = Vec::new();
@@ -4379,9 +4384,16 @@ fn delivery_pins(producer_root: &Path) -> AutoResult<(Vec<(String, String)>, Vec
 }
 
 /// 交付根 workspace manifest（消费根 patch 就位于此，不写在依赖包内）。
-fn generate_delivery_root_manifest(producer_root: &Path, app_member: &str) -> AutoResult<String> {
+fn generate_delivery_root_manifest(
+    producer_root: &Path,
+    app_member: &str,
+    receipt: Option<&auto_api_gen::source_owner::InstalledSdkReceipt>,
+) -> AutoResult<String> {
     let root_manifest = fs::read_to_string(producer_root.join("Cargo.toml"))
         .map_err(|e| format!("delivery: producer 根 manifest 不可读: {e}"))?;
+    if let Some(receipt) = receipt {
+        receipt.verify_bytes("Cargo.toml", root_manifest.as_bytes())?;
+    }
     let ws_deps = delivery_extract_toml_section(&root_manifest, "[workspace.dependencies]")?;
     let profile_dev = delivery_extract_toml_section(&root_manifest, "[profile.dev]")?;
     let mut members: Vec<String> = Vec::new();
@@ -5300,6 +5312,13 @@ fn generate_rust_ui_delivery_inner(
     );
 
     let producer_root = delivery_producer_root()?;
+    // Freeze the installation receipt used for preflight and the actual staged
+    // bytes; the source can change between these phases.
+    let installed_receipt = auto_api_gen::source_owner::InstalledSdkReceipt::open(&producer_root)?;
+    if let Some(receipt) = &installed_receipt {
+        receipt.verify_tree("", &producer_root)?;
+        receipt.ensure_unchanged()?;
+    }
     let front_dir = front_dir_for(project_dir, source);
     if !front_dir.exists() {
         return Err(format!("Front directory not found: {}", front_dir.display()).into());
@@ -5366,6 +5385,21 @@ fn generate_rust_ui_delivery_inner(
         {
             delivery_installed_ui_source(&producer_root, name, Some(&dst))?;
         }
+        if let Some(receipt) = &installed_receipt {
+            let ui = matches!(
+                name,
+                "auto-ui-dialect"
+                    | "auto-ui-compiler"
+                    | "auto-ui-runtime"
+                    | "auto-ui-tools"
+                    | "shell-pack"
+            );
+            if !ui || std::env::var_os("AUTO_UI_SOURCE_ROOT").is_none() {
+                let rel = format!("crates/{name}");
+                receipt.require_package(name, if ui { "auto-ui" } else { "auto-lang" }, &rel)?;
+                receipt.verify_tree(&rel, &dst)?;
+            }
+        }
         total_files += copied.records.len() as u64;
         total_bytes += copied.records.iter().map(|r| r.bytes).sum::<u64>();
         let mut edits: Vec<String> = Vec::new();
@@ -5425,6 +5459,11 @@ fn generate_rust_ui_delivery_inner(
         }
         let dst = delivery_root.join("crates").join("patches").join(name);
         let copied = delivery_copy_dir(&src, &dst, &DELIVERY_COPY_SKIP_DIRS)?;
+        if let Some(receipt) = &installed_receipt {
+            let rel = format!("crates/patches/{name}");
+            receipt.require_package(name, "auto-lang", &rel)?;
+            receipt.verify_tree(&rel, &dst)?;
+        }
         total_files += copied.records.len() as u64;
         total_bytes += copied.records.iter().map(|r| r.bytes).sum::<u64>();
         crate_entries.push(serde_json::json!({
@@ -5446,6 +5485,9 @@ fn generate_rust_ui_delivery_inner(
         }
         let dst = delivery_root.join(rel);
         let content = fs::read(&src).map_err(|e| format!("delivery: 读 {rel} 失败: {e}"))?;
+        if let Some(receipt) = &installed_receipt {
+            receipt.verify_bytes(rel, &content)?;
+        }
         if let Some(parent) = dst.parent() {
             fs::create_dir_all(parent)
                 .map_err(|e| format!("delivery: 建 {} 失败: {e}", parent.display()))?;
@@ -5463,12 +5505,13 @@ fn generate_rust_ui_delivery_inner(
     // 根 manifest（消费根 patch）+ pin 集
     let app_package = to_snake_case(&compiled.project_name);
     // default-members 用 member 路径 "app"（固定应用位；包名是 ui_minimal 等）。
-    let root_manifest = generate_delivery_root_manifest(&producer_root, "app")?;
+    let root_manifest =
+        generate_delivery_root_manifest(&producer_root, "app", installed_receipt.as_ref())?;
     let root_manifest_path = delivery_root.join("Cargo.toml");
     fs::write(&root_manifest_path, &root_manifest)
         .map_err(|e| format!("delivery: 写交付根 manifest 失败: {e}"))?;
 
-    let (pins, multi_slot) = delivery_pins(&producer_root)?;
+    let (pins, multi_slot) = delivery_pins(&producer_root, installed_receipt.as_ref())?;
 
     // 应用 member（main.rs 与开发模式同一编译相位产物）
     let app_dir = delivery_root.join("app");
@@ -5535,15 +5578,14 @@ fn generate_rust_ui_delivery_inner(
             }
         }
     }
-    let ui_gen_fp = delivery_ui_gen_fingerprint(&producer_root)?;
+    let ui_gen_fp = delivery_ui_gen_fingerprint(&delivery_root.join("crates/auto-ui-compiler"))?;
     use sha2::{Digest, Sha256};
-    let root_lock_sha256 = format!(
-        "{:x}",
-        Sha256::digest(
-            &fs::read(producer_root.join("Cargo.lock"))
-                .map_err(|e| format!("delivery: 读 producer 根锁失败: {e}"))?
-        )
-    );
+    let root_lock = fs::read(producer_root.join("Cargo.lock"))
+        .map_err(|e| format!("delivery: 读 producer 根锁失败: {e}"))?;
+    if let Some(receipt) = &installed_receipt {
+        receipt.verify_bytes("Cargo.lock", &root_lock)?;
+    }
+    let root_lock_sha256 = format!("{:x}", Sha256::digest(&root_lock));
     let main_blake3 = blake3::hash(compiled.main_rs.as_bytes())
         .to_hex()
         .to_string();
@@ -5606,6 +5648,9 @@ fn generate_rust_ui_delivery_inner(
     // R1-F02：staging 全部生成且校验通过——整体换装（失败路径已在上方
     // 显式 Err 返回并保留旧交付）。staging 属主标记随使命完成移除（换装
     // 后的交付根不带运行期标记）。
+    if let Some(receipt) = &installed_receipt {
+        receipt.ensure_unchanged()?;
+    }
     let _ = fs::remove_file(staging.join(DELIVERY_STAGING_MARKER));
     delivery_swap_in(&staging, &final_root)?;
     // R4-F01：成功发布后回收冗余残桩——含根缺失待恢复态留下的旧备份
@@ -7740,7 +7785,7 @@ pub fn create_item(name str) str {
              [[package]]\nname = \"windows-core\"\nversion = \"0.62.2\"\n",
         )
         .unwrap();
-        let (pins, multi) = delivery_pins(dir.path()).unwrap();
+        let (pins, multi) = delivery_pins(dir.path(), None).unwrap();
         assert!(
             pins.contains(&("wgpu-hal".to_string(), "=27.0.4".to_string())),
             "单槽 wgpu-hal 精确钉扎：{pins:?}"
@@ -7749,7 +7794,7 @@ pub fn create_item(name str) str {
         assert!(!pins.iter().any(|(n, _)| n == "windows-core"));
 
         let missing = dir.path().join("absent");
-        assert!(delivery_pins(&missing).is_err(), "锁缺失受管判红");
+        assert!(delivery_pins(&missing, None).is_err(), "锁缺失受管判红");
     }
 
     /// PLAN-792：交付根 manifest 装配——[patch.crates-io] 在消费根（不写
@@ -7767,7 +7812,7 @@ pub fn create_item(name str) str {
              [patch.crates-io]\niced_widget = { path = \"crates/patches/iced_widget\" }\n",
         )
         .unwrap();
-        let manifest = generate_delivery_root_manifest(dir.path(), "app").unwrap();
+        let manifest = generate_delivery_root_manifest(dir.path(), "app", None).unwrap();
         assert!(
             manifest.contains(
                 "[patch.crates-io]\niced_widget = { path = \"crates/patches/iced_widget\" }"
@@ -7794,7 +7839,7 @@ pub fn create_item(name str) str {
         let bare = dir.path().join("bare");
         std::fs::create_dir_all(&bare).unwrap();
         std::fs::write(bare.join("Cargo.toml"), "[workspace]\nmembers = []\n").unwrap();
-        assert!(generate_delivery_root_manifest(&bare, "app").is_err());
+        assert!(generate_delivery_root_manifest(&bare, "app", None).is_err());
     }
 
     /// PLAN-792：投影修剪——剥闭包外 optional path 依赖 + feature 行改写保
