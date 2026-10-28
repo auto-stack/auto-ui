@@ -908,22 +908,6 @@ impl ViewNode {
     }
 
     /// Add an event handler with parameters
-    pub fn with_event_params(
-        mut self,
-        name: impl Into<String>,
-        handler: impl Into<String>,
-        params: Vec<String>,
-    ) -> Self {
-        if let ViewNode::Element { events, .. } = &mut self {
-            events.push(ViewEvent {
-                name: name.into(),
-                handler: handler.into(),
-                params,
-                inline: None,
-            });
-        }
-        self
-    }
 
     /// Add a child node
     pub fn with_child(mut self, child: ViewNode) -> Self {

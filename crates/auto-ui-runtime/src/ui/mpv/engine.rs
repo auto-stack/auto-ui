@@ -443,20 +443,6 @@ impl MpvEngine {
     }
 
     /// 读一个 int64 属性。
-    pub fn get_i64(&self, name: &str) -> Option<i64> {
-        let cname = cstring(name).ok()?;
-        let mut out: i64 = 0;
-        let rc = unsafe {
-            // SAFETY: 同上，INT64 需要 int64_t*。
-            (self.api.symbols.get_property)(
-                self.handle,
-                cname.as_ptr(),
-                super::loader::format::INT64,
-                &mut out as *mut i64 as *mut c_void,
-            )
-        };
-        (rc >= 0).then_some(out)
-    }
 
     /// 读一个 bool 属性（mpv 用 FLAG，底层是 int）。
     pub fn get_flag(&self, name: &str) -> Option<bool> {
@@ -515,26 +501,6 @@ impl MpvEngine {
     }
 
     /// 设一个 int64 属性。
-    pub fn set_i64(&self, name: &str, value: i64) -> Result<(), String> {
-        let cname = cstring(name)?;
-        let mut v = value;
-        let rc = unsafe {
-            // SAFETY: 同上。
-            (self.api.symbols.set_property)(
-                self.handle,
-                cname.as_ptr(),
-                super::loader::format::INT64,
-                &mut v as *mut i64 as *mut c_void,
-            )
-        };
-        if rc < 0 {
-            return Err(format!(
-                "设置 {name}={value} 失败：{}",
-                self.api.error_text(rc)
-            ));
-        }
-        Ok(())
-    }
 
     /// 设一个 bool（FLAG，底层 int）。
     pub fn set_flag(&self, name: &str, value: bool) -> Result<(), String> {
@@ -561,35 +527,8 @@ impl MpvEngine {
     /// 设一个字符串属性（PLAN-712 T-03：`target-trc`/`video-output-levels`
     /// 等色彩协商面是字符串选项；`None` = 恢复默认，同 `mpv_set_property_string`
     /// 传 NULL）。
-    pub fn set_string(&self, name: &str, value: Option<&str>) -> Result<(), String> {
-        let cname = cstring(name)?;
-        let vbuf;
-        let vptr = match value {
-            Some(v) => {
-                vbuf = cstring(v)?;
-                vbuf.as_ptr()
-            }
-            None => std::ptr::null(),
-        };
-        let rc = unsafe {
-            // SAFETY: handle 非空；cname/vbuf 在本次调用期间存活，vbuf 满足
-            // NUL 结尾约定（cstring 保证）。
-            (self.api.symbols.set_property_string)(self.handle, cname.as_ptr(), vptr)
-        };
-        if rc < 0 {
-            return Err(format!(
-                "设置 {name}={value:?} 失败：{}",
-                self.api.error_text(rc)
-            ));
-        }
-        Ok(())
-    }
 
     /// `mpv_get_time_us()`：mpv 内部单调递增时钟（微秒）。
-    pub fn time_us(&self) -> i64 {
-        // SAFETY: 无参查询。
-        unsafe { (self.api.symbols.get_time_us)(self.handle) }
-    }
 
     /// 运行库是否可用（不构造引擎的廉价探测；渲染层用它决定是否走降级）。
     pub fn is_available() -> bool {

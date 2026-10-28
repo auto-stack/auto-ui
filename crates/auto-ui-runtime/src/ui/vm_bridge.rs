@@ -3180,8 +3180,8 @@ impl VmBridge {
         }
         let mut task = AutoTask::new(0, 4096, 0);
         self.vm.rc_push_id(&mut task, self.state_obj_id()); // Plan 419
-        // PLAN-702 T-05: legacy 同步驱动保留位②——block computed 求值（同
-        // call_vm_fn：本次调用返回 Value 契约，无 park 形态）。
+                                                            // PLAN-702 T-05: legacy 同步驱动保留位②——block computed 求值（同
+                                                            // call_vm_fn：本次调用返回 Value 契约，无 park 形态）。
         self.vm
             .call_fn_by_name(&mut task, &fn_name, 1)
             .map_err(|e| {
@@ -3620,9 +3620,6 @@ impl VmBridge {
     }
 
     /// Get a mutable reference to the underlying AutoVM.
-    pub fn vm_mut(&mut self) -> &mut AutoVM {
-        &mut self.vm
-    }
 
     /// Check if a handler exists for the given event name.
     ///
@@ -5116,10 +5113,9 @@ widget OpProbeOrig {
         bridge.vm.record_heap_read_any(9);
         let rec = bridge.vm.take_dep_recorder();
         assert_eq!(rec.deps.len(), 2, "激活期两条落账");
-        assert!(
-            rec.deps
-                .contains(&crate::ui::memo_deps::DepKey::field(7, "count"))
-        );
+        assert!(rec
+            .deps
+            .contains(&crate::ui::memo_deps::DepKey::field(7, "count")));
         assert!(rec.deps.contains(&crate::ui::memo_deps::DepKey::any(9)));
         // take 后去激活：再录零账。
         bridge.vm.record_heap_read(1, "g");

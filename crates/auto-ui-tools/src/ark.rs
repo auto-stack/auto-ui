@@ -822,9 +822,6 @@ fn assemble_hap(ark_dir: &Path, strict: bool) -> AutoResult<Option<std::path::Pa
 }
 
 /// Run ArkTS project (auto run command for ark backend)
-pub fn run_ark_project(root_dir: &Path, args: Vec<String>) -> AutoResult<()> {
-    run_ark_project_inner(root_dir, args, None)
-}
 
 /// 请求路径（PLAN-809 R1-F02）。
 pub fn run_ark_project_with_request(

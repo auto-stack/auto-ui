@@ -42,10 +42,8 @@ pub enum BridgeError {
 /// 动态消息（保留类型信息）
 #[derive(Clone, Debug)]
 pub enum DynamicMessage {
-    /// 字符串事件（向后兼容）
     String(String),
 
-    /// 类型化事件
     Typed {
         widget_name: String, // Widget 名称
         event_name: String,  // 事件名（如 "Inc"）
@@ -55,14 +53,9 @@ pub enum DynamicMessage {
 
 /// 解释器桥梁 - 连接 auto-lang 和 auto-ui
 pub struct InterpreterBridge {
-    /// auto-lang 解释器
     interpreter: AutoInterpreter,
 
-    /// Widget 实例状态（widget_name → state）
     widget_states: HashMap<String, WidgetState>,
-
-    /// 是否启用热重载
-    hot_reload: bool,
 }
 
 /// Widget 状态
@@ -84,7 +77,6 @@ impl InterpreterBridge {
         Self {
             interpreter: AutoInterpreter::new(),
             widget_states: HashMap::new(),
-            hot_reload: true,
         }
     }
 
@@ -246,59 +238,6 @@ impl InterpreterBridge {
         }
     }
 
-    /// 处理事件消息
-    pub fn handle_message(&mut self, msg: DynamicMessage) -> Result<()> {
-        match msg {
-            DynamicMessage::String(event) => {
-                // 解析事件字符串并调用相应的 on() 方法
-                self.handle_string_event(&event)
-            }
-            DynamicMessage::Typed {
-                widget_name,
-                event_name,
-                args,
-            } => {
-                // 调用特定 Widget 的 on() 方法
-                self.handle_typed_event(&widget_name, &event_name, &args)
-            }
-        }
-    }
-
-    /// 处理字符串事件
-    fn handle_string_event(&mut self, event: &str) -> Result<()> {
-        // 解析 "widget.event" 格式
-        if let Some(dot_pos) = event.find('.') {
-            let widget_name = &event[..dot_pos];
-            let event_name = &event[dot_pos + 1..];
-            self.handle_typed_event(widget_name, event_name, &[])?;
-        } else {
-            // 尝试调用默认 Widget 的 on() 方法
-            // TODO: 实现默认 Widget 查找
-        }
-        Ok(())
-    }
-
-    /// 处理类型化事件
-    fn handle_typed_event(
-        &mut self,
-        widget_name: &str,
-        _event_name: &str,
-        _args: &[Value],
-    ) -> Result<()> {
-        // 查找 Widget 状态
-        if let Some(state) = self.widget_states.get_mut(widget_name) {
-            // 标记视图为脏（需要重建）
-            state.view_dirty = true;
-        }
-
-        // 调用 Widget 的 on() 方法
-        // TODO: 实现通过解释器调用 on() 方法
-        // let widget = self.interpreter.scope.borrow().get_val(widget_name);
-        // call_method(widget, "on", &[Value::Str(event_name.into())]);
-
-        Ok(())
-    }
-
     /// 重新加载代码（热重载）
     pub fn reload(&mut self, code: &str) -> Result<()> {
         // 保存旧状态（用于状态迁移）
@@ -327,16 +266,6 @@ impl InterpreterBridge {
             }
         }
     }
-
-    /// 启用热重载
-    pub fn enable_hot_reload(&mut self) {
-        self.hot_reload = true;
-    }
-
-    /// 禁用热重载
-    pub fn disable_hot_reload(&mut self) {
-        self.hot_reload = false;
-    }
 }
 
 impl Default for InterpreterBridge {
@@ -352,7 +281,6 @@ mod tests {
     #[test]
     fn test_bridge_creation() {
         let bridge = InterpreterBridge::new();
-        assert!(!bridge.hot_reload || bridge.hot_reload); // Just to use the variable
     }
 
     /// Plan 436 L1:含 setup 块的 widget 源经 bridge 加载——UI 场景解析

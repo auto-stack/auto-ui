@@ -2660,14 +2660,8 @@ impl WidgetRegistry {
     }
 
     /// Check if a widget is auto-imported (no explicit `use` statement needed)
-    pub fn is_auto_imported(tag: &str) -> bool {
-        AUTO_IMPORTED_WIDGETS.contains(&tag.to_lowercase().as_str())
-    }
 
     /// Get the list of auto-imported widgets
-    pub fn auto_imported_widgets() -> &'static [&'static str] {
-        AUTO_IMPORTED_WIDGETS
-    }
 
     // ========================================================================
     // Backend-specific helper methods for generators
@@ -2683,18 +2677,6 @@ impl WidgetRegistry {
 
     /// Get all component names for a widget in a specific backend
     /// Returns empty vec if widget doesn't exist
-    pub fn get_backend_components(&self, backend: &str, tag: &str) -> Vec<String> {
-        self.get(tag)
-            .and_then(|spec| spec.backend(backend))
-            .map(|mapping| {
-                mapping
-                    .all_components()
-                    .iter()
-                    .map(|s| s.to_string())
-                    .collect()
-            })
-            .unwrap_or_default()
-    }
 
     /// Get the primary component name for a widget in a specific backend
     pub fn get_primary_component(&self, backend: &str, tag: &str) -> Option<String> {
@@ -2712,52 +2694,12 @@ impl WidgetRegistry {
 
     /// Get all unique imports needed for a set of tags in a specific backend
     /// Returns a map of import_path -> component_names
-    pub fn collect_backend_imports(
-        &self,
-        backend: &str,
-        tags: &[&str],
-    ) -> HashMap<String, Vec<String>> {
-        let mut imports: HashMap<String, Vec<String>> = HashMap::new();
-
-        for tag in tags {
-            if let Some(spec) = self.get(tag) {
-                if let Some(mapping) = spec.backend(backend) {
-                    if let Some(ref import_path) = mapping.import {
-                        let components = mapping.all_components();
-                        let entry = imports.entry(import_path.clone()).or_default();
-                        for comp in components {
-                            if !entry.contains(&comp.to_string()) {
-                                entry.push(comp.to_string());
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        imports
-    }
 
     /// Get property mapping for a widget in a specific backend
-    pub fn get_prop_mapping(&self, backend: &str, tag: &str, aura_prop: &str) -> Option<String> {
-        self.get(tag)
-            .and_then(|spec| spec.backend(backend))
-            .and_then(|mapping| mapping.props.get(aura_prop).cloned())
-    }
 
     /// Get event mapping for a widget in a specific backend
-    pub fn get_event_mapping(&self, backend: &str, tag: &str, aura_event: &str) -> Option<String> {
-        self.get(tag)
-            .and_then(|spec| spec.backend(backend))
-            .and_then(|mapping| mapping.events.get(aura_event).cloned())
-    }
 
     /// Get default props for a widget
-    pub fn get_default_props(&self, tag: &str) -> HashMap<String, String> {
-        self.get(tag)
-            .map(|spec| spec.default_props.clone())
-            .unwrap_or_default()
-    }
 
     /// Iterate over all registered widgets
     pub fn iter(&self) -> impl Iterator<Item = (&String, &WidgetSpec)> {

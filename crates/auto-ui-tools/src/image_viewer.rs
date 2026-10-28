@@ -20,25 +20,11 @@ pub struct ImageEntry {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ImageAsset {
-    pub entry: ImageEntry,
-    pub revision: u64,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ViewerSnapshot {
     pub root: String,
     pub entries: Vec<ImageEntry>,
     pub selected: usize,
     pub generation: u64,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ViewRequest {
-    pub index: usize,
-    pub viewport_width: u32,
-    pub viewport_height: u32,
-    pub quality: u8,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

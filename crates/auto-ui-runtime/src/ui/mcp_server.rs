@@ -539,9 +539,6 @@ impl SharedState {
 
     /// Take (move out) the latest styled VTree snapshot, if any (Plan 314).
     /// Leaves `None` behind so a stale frame is never served twice.
-    pub fn take_styled_vtree(&mut self) -> Option<std::sync::Arc<StyledNodeSnapshot>> {
-        self.styled_vtree.take()
-    }
 
     /// Peek (clone) the latest styled VTree snapshot, if any (Plan 314).
     /// PLAN-066 T-02a：O(1) Arc 克隆——调用方拿到后应尽快释放锁，再对
@@ -623,18 +620,6 @@ impl SharedState {
 pub type SharedStateHandle = Arc<Mutex<SharedState>>;
 
 /// Action request sent from MCP thread to iced thread.
-pub enum ActionRequest {
-    /// Call a handler by event name.
-    CallHandler {
-        event_name: String,
-        args: Vec<auto_val::Value>,
-    },
-    /// Write a state field.
-    WriteState {
-        field: String,
-        value: auto_val::Value,
-    },
-}
 
 // ============================================================================
 // MCP UI Server

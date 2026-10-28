@@ -131,19 +131,6 @@ pub fn socket_addr_of(url: &str) -> Option<std::net::SocketAddr> {
 /// Running → `("ready", "")`；Offline("未检活") → `("unknown", "")`——
 /// boot 不预检，首次 launch 前的真实未知态；Offline(其他) →
 /// `("offline", reason)`；Spawning → unknown（瞬态，面板不展示）。
-pub fn badge_projection(status: &DaemonStatus) -> (&'static str, String) {
-    match status {
-        DaemonStatus::Running(_) => ("ready", String::new()),
-        DaemonStatus::Spawning => ("unknown", String::new()),
-        DaemonStatus::Offline(reason) => {
-            if reason == "未检活" {
-                ("unknown", String::new())
-            } else {
-                ("offline", reason.clone())
-            }
-        }
-    }
-}
 
 /// 裸 TCP 检活：connect → `GET /api/health` → 响应行 2xx 即通。
 /// std 单依赖、无 tokio TLS 上下文风险；loopback 足够（daemon 恒本地）。
@@ -174,9 +161,6 @@ pub fn tcp_ping(url: &str, timeout: std::time::Duration) -> bool {
 static DID_SPAWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// 本会话是否曾 spawn daemon（T4 复用断言用）。
-pub fn did_spawn() -> bool {
-    DID_SPAWN.load(std::sync::atomic::Ordering::Relaxed)
-}
 
 /// 真实执行环境：std TCP ping + detached spawn。
 pub struct RealDaemonIo;

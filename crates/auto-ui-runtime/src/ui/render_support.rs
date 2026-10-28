@@ -408,14 +408,8 @@ fn get_support_details(tag: &str) -> TagSupport {
 }
 
 /// Check if a tag is fully supported.
-pub fn is_full(tag: &str) -> bool {
-    get_support(tag).level == SupportLevel::Full
-}
 
 /// Check if a tag has any level of issue (not Full).
-pub fn has_issue(tag: &str) -> bool {
-    get_support(tag).level != SupportLevel::Full
-}
 
 #[cfg(test)]
 mod tests {

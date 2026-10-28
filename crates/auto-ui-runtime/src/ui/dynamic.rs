@@ -1748,14 +1748,6 @@ impl DynamicComponent {
     /// Find the source span for a specific element by kind and occurrence index.
     /// Traverses the AuraNode tree in DFS order, counting Element nodes by tag name.
     /// Returns the span of the `target_index`-th occurrence of `target_kind`.
-    pub fn find_element_span(
-        &self,
-        target_kind: &str,
-        target_index: usize,
-    ) -> Option<(usize, usize)> {
-        let mut counter = 0;
-        find_span_dfs(&self.view_template, target_kind, target_index, &mut counter)
-    }
 
     /// Build a View with debug sideband data (Plan 274 / 307 Task 9).
     /// Returns (View, DebugIdMap, BuildProbe) for use by DevTools.
@@ -1858,9 +1850,6 @@ impl DynamicComponent {
     /// late load/error/pointer message cannot be associated with a recycled
     /// node after a sibling changes.  Keeping the helper on DynamicComponent
     /// makes the VM contract explicit without introducing per-frame counters.
-    pub fn stable_vnode_id_for_path(&self, path: &[u16]) -> crate::ui::vnode::VNodeId {
-        crate::ui::vnode::VNodeId::new(crate::ui::vnode::id_from_path(path))
-    }
 
     /// Plan 401/VM-routing: set the current route (from a `link` click) and
     /// re-resolve its params. Called by the iced renderer when it intercepts a
@@ -3460,72 +3449,6 @@ pub fn sched_diag_t0() -> std::time::Instant {
 
 /// DFS traversal to find the span of the N-th Element node with matching tag.
 /// Returns the span when found, or None.
-fn find_span_dfs(
-    node: &auto_ui_compiler::aura::AuraNode,
-    target_kind: &str,
-    target_index: usize,
-    counter: &mut usize,
-) -> Option<(usize, usize)> {
-    use auto_ui_compiler::aura::AuraNode;
-    match node {
-        AuraNode::Element {
-            tag,
-            children,
-            span,
-            ..
-        } => {
-            if tag == target_kind {
-                let idx = *counter;
-                *counter += 1;
-                if idx == target_index {
-                    return *span;
-                }
-            }
-            for child in children {
-                if let Some(s) = find_span_dfs(child, target_kind, target_index, counter) {
-                    return Some(s);
-                }
-            }
-            None
-        }
-        AuraNode::ForLoop { body, .. } => {
-            for child in body {
-                if let Some(s) = find_span_dfs(child, target_kind, target_index, counter) {
-                    return Some(s);
-                }
-            }
-            None
-        }
-        AuraNode::Conditional {
-            then_body,
-            else_body,
-            ..
-        } => {
-            for child in then_body {
-                if let Some(s) = find_span_dfs(child, target_kind, target_index, counter) {
-                    return Some(s);
-                }
-            }
-            if let Some(else_nodes) = else_body {
-                for child in else_nodes {
-                    if let Some(s) = find_span_dfs(child, target_kind, target_index, counter) {
-                        return Some(s);
-                    }
-                }
-            }
-            None
-        }
-        AuraNode::Link { children, .. } => {
-            for child in children {
-                if let Some(s) = find_span_dfs(child, target_kind, target_index, counter) {
-                    return Some(s);
-                }
-            }
-            None
-        }
-        _ => None,
-    }
-}
 
 // ============================================================================
 // Tests

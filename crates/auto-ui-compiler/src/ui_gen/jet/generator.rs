@@ -204,17 +204,6 @@ fun {}(
     }
 
     /// Generate public @Composable function (with pub modifier for cross-file access)
-    pub fn generate_public_composable(&mut self, name: &str, body: &str) -> String {
-        format!(
-            r#"@Composable
-fun {}(
-    modifier: Modifier = Modifier
-) {{
-    {}
-}}"#,
-            name, body
-        )
-    }
 
     /// Generate @Preview function
     pub fn generate_preview(&self, name: &str) -> String {
@@ -1964,9 +1953,6 @@ fun {}Preview() {{
     }
 
     /// Get layout-specific imports
-    pub fn get_layout_imports(&self) -> &[String] {
-        self.layout_generator.get_imports()
-    }
 
     /// Generate list element code based on tag type
     pub fn generate_list_element(
@@ -1993,9 +1979,6 @@ fun {}Preview() {{
     }
 
     /// Get list-specific imports
-    pub fn get_list_imports(&self) -> &[String] {
-        self.list_generator.get_imports()
-    }
 
     /// Add a navigation route
     pub fn add_nav_route(&mut self, name: &str, screen: &str) {
@@ -2026,9 +2009,6 @@ fun {}Preview() {{
     }
 
     /// Get navigation-specific imports
-    pub fn get_navigation_imports(&self) -> &[String] {
-        self.navigation_generator.get_imports()
-    }
 
     // =========================================================================
     // Project Generation Methods (Phase 6)

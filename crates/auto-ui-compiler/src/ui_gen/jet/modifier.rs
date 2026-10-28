@@ -413,13 +413,6 @@ impl ModifierDsl {
     pub fn parse(&self, class: &str) -> ComputedStyle {
         self.parser.parse(class)
     }
-
-    /// Convert a single Tailwind class to Modifier code (for backward compatibility)
-    pub fn convert_single(&self, class: &str) -> Option<String> {
-        let style = self.parser.parse(class);
-        let result = self.from_style(&style);
-        result.modifiers.into_iter().next()
-    }
 }
 
 impl Default for ModifierDsl {

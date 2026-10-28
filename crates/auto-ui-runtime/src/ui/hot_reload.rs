@@ -222,15 +222,6 @@ impl UIWatcher {
 /// Message wrapper for hot-reload components
 ///
 /// Use this to wrap your component's message type and add reload messages.
-#[derive(Clone)]
-pub enum HotReloadMessage<M> {
-    /// A message from the user component
-    UserMessage(M),
-    /// The UI was reloaded
-    Reloaded,
-    /// Reload failed
-    ReloadError(String),
-}
 
 /// Helper function to create a hot-reloadable application
 ///

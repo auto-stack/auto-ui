@@ -56,9 +56,6 @@ pub fn limit() -> u64 {
 }
 
 /// 最近一次采样说明(供 MCP/调试面读取;采样节流窗口内更新)。
-pub fn last_note() -> Option<String> {
-    LAST_LOG.lock().ok()?.clone()
-}
 
 // ── 记账分配器(GuardAlloc)────────────────────────────────────────────
 // 生成应用以 #[global_allocator] 挂接;目标:冻结瞬间回答「哪个分配点
@@ -237,9 +234,6 @@ static FREEZE_HOOK: Mutex<Option<Box<dyn Fn() + Send>>> = Mutex::new(None);
 static WATCHER: OnceLock<()> = OnceLock::new();
 
 /// 宿主注册冻结回调(at-app:挂起子 shell 进程,掐断产出侧)。
-pub fn set_freeze_hook(f: Box<dyn Fn() + Send + 'static>) {
-    *FREEZE_HOOK.lock().unwrap() = Some(f);
-}
 
 /// 独立看门狗线程:1s 采样,不依赖消息循环(懒启动一次)。
 fn ensure_watcher() {

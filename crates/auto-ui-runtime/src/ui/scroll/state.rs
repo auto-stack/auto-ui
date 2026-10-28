@@ -87,14 +87,6 @@ impl ScrollState {
         self.axis_state(axis)
             .unwrap_or(ScrollAxisState::degenerate())
     }
-
-    pub fn with_axis(mut self, axis: Axis, state: ScrollAxisState) -> Self {
-        match axis {
-            Axis::X => self.x = Some(state),
-            Axis::Y => self.y = Some(state),
-        }
-        self
-    }
 }
 
 /// pane → hosted content 的 viewport 下发通道（plan r2 §3.3）。

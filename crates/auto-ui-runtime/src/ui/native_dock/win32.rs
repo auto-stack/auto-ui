@@ -1106,23 +1106,6 @@ pub mod drag_sim {
     }
 
     /// 撤销 [`raise_top`] 的 topmost 位（清理用）。
-    pub fn unraise(hwnd: NativeHwnd) -> bool {
-        use windows::Win32::UI::WindowsAndMessaging::{
-            SetWindowPos, HWND_NOTOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
-        };
-        unsafe {
-            SetWindowPos(
-                hwnd_of(hwnd),
-                HWND_NOTOPMOST,
-                0,
-                0,
-                0,
-                0,
-                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
-            )
-        }
-        .is_ok()
-    }
 
     /// 强制前台（AttachThreadInput 经典技巧）：后台进程的
     /// `SetForegroundWindow` 受前台锁限制，附着到当前前台窗口线程的输入

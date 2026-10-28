@@ -34,7 +34,6 @@ use cosmic_text::{
 };
 
 use super::draw::Rect;
-use super::theme::CodeEditorTheme;
 
 pub use super::draw::EditorDrawList;
 
@@ -1262,9 +1261,6 @@ impl CodeEditorCore {
     }
 
     /// Current search pattern.
-    pub fn search_pattern(&self) -> String {
-        self.search.lock().unwrap().pattern.clone()
-    }
 
     /// Jump to the next regex match after the caret, selecting it and
     /// scrolling it into view (wraps around). Returns false when there is
@@ -2567,16 +2563,6 @@ pub fn code_editor_caret_offset_y(key: &str) -> Option<f32> {
 /// PLAN-629 T-03: drain pending follow-scroll requests from ALL editors —
 /// (key, content-space target offset) pairs; the session funnel turns them
 /// into `operation::scroll_to` tasks targeting `editor-scroll-<key>`.
-pub fn code_editor_drain_caret_follows() -> Vec<(String, f32)> {
-    let map = CODE_EDITORS.lock().unwrap();
-    let mut out = Vec::new();
-    for (key, core) in map.iter() {
-        if let Some(y) = core.take_caret_follow() {
-            out.push((key.clone(), y));
-        }
-    }
-    out
-}
 
 /// Read the cursor position of an editor: (line 0-based, char column,
 /// selection length in bytes).
@@ -2861,11 +2847,6 @@ pub fn code_editor_count() -> usize {
 
 /// Resolve the effective theme for an editor and make sure the syntect
 /// theme is registered under its stable name.
-pub fn registered_theme_name(theme: &CodeEditorTheme, dark: bool, accent: &str) -> String {
-    let theme_id = crate::ui::style::theme::theme_name();
-    let name = highlight::theme_name(&theme_id, dark, accent);
-    highlight::register_theme(&name, theme.syntax_theme())
-}
 
 // ---------------------------------------------------------------------------
 // Core-layer tests — no backend required (layering promise: the state

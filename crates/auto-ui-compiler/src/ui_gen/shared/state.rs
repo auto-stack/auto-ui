@@ -89,7 +89,6 @@ pub struct EventHandler {
 
 /// State analyzer
 pub struct StateAnalyzer {
-    /// Current widget state
     state: WidgetState,
 }
 
@@ -184,36 +183,6 @@ impl StateAnalyzer {
         lines.join("\n")
     }
 
-    /// Generate Vue event handlers
-    pub fn generate_vue_handlers(&self) -> String {
-        let mut lines = Vec::new();
-
-        for (_, handler) in &self.state.handlers {
-            let vue_body = Self::convert_handler_to_vue(&handler.body);
-            lines.push(format!(
-                "const handle{} = () => {{\n  {}\n}}",
-                handler.message, vue_body
-            ));
-        }
-
-        lines.join("\n\n")
-    }
-
-    /// Generate Jetpack Compose event handlers
-    pub fn generate_jet_handlers(&self) -> String {
-        let mut lines = Vec::new();
-
-        for (_, handler) in &self.state.handlers {
-            let jet_body = Self::convert_handler_to_jet(&handler.body);
-            lines.push(format!(
-                "val on{} = {{\n  {}\n}}",
-                handler.message, jet_body
-            ));
-        }
-
-        lines.join("\n\n")
-    }
-
     /// Convert default value to Jet syntax
     fn convert_default_to_jet(type_annotation: &str, default: &str) -> String {
         match type_annotation {
@@ -239,33 +208,6 @@ impl StateAnalyzer {
             // ${.prop} -> $prop
             result = result.replace("${.", "$");
         }
-
-        result
-    }
-
-    /// Convert handler body to Vue syntax
-    fn convert_handler_to_vue(body: &str) -> String {
-        let mut result = body.to_string();
-
-        // property = value -> property.value = value
-        for prop_name in ["count", "name", "text", "value", "selected"] {
-            result = result.replace(
-                &format!("{} = ", prop_name),
-                &format!("{}.value = ", prop_name),
-            );
-        }
-
-        result
-    }
-
-    /// Convert handler body to Jet syntax
-    fn convert_handler_to_jet(body: &str) -> String {
-        let mut result = body.to_string();
-
-        // property = value -> property = value (already correct for Jet)
-        // Just need to handle increment/decrement
-        result = result.replace("count + 1", "count + 1");
-        result = result.replace("count - 1", "count - 1");
 
         result
     }

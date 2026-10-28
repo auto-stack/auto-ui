@@ -773,12 +773,6 @@ pub fn prop_to_modifier(key: &str, value: &str, _value_type: Option<&Type>) -> O
 }
 
 /// Convert a single Tailwind style to ArkTS modifier (legacy, use ArkModifierDsl instead)
-#[allow(dead_code)]
-pub fn style_str_to_modifier(style_name: &str) -> Option<String> {
-    let dsl = ArkModifierDsl::new();
-    let modifiers = dsl.convert_style(style_name);
-    modifiers.into_iter().next()
-}
 
 #[cfg(test)]
 mod tests {

@@ -1187,16 +1187,6 @@ impl WmState {
 
     /// 移除槽位（宿主层完成恢复动作后的注册表清理；正常路径经
     /// [`Self::advance_native_slot`] 终态自动移除，本方法供异常路径兜底）。
-    pub fn remove_native_slot(
-        &mut self,
-        id: crate::ui::native_dock::NativeSlotId,
-    ) -> Option<crate::ui::native_dock::NativeSlot> {
-        let removed = self.native_slots.remove(&id);
-        if removed.is_some() {
-            self.purge_native_slot_refs(id);
-        }
-        removed
-    }
 
     /// PLAN-709：槽位从统一序域摘除（`z_order`/`mru`/`focused`/交互态/
     /// 本地矩形缓存）。焦点回退口径与 `remove_win` 同款（当前分区 z 顶
@@ -3605,10 +3595,6 @@ impl DesktopSession {
 
     pub fn wm_focused_app(&self) -> Option<AppId> {
         self.host.as_ref()?.wm.focused_app()
-    }
-
-    pub fn wm_win_of_app(&self, app: AppId) -> Option<Wid> {
-        self.host.as_ref()?.wm.win_of_app(app)
     }
 
     /// 宿主窗视口（布局引擎/级联初位的基准；未登记时回退启动默认尺寸）。

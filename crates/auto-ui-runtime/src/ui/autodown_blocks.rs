@@ -54,7 +54,7 @@ pub fn table_header_rgb() -> (u8, u8, u8) {
 pub const FENCE_BG: (u8, u8, u8) = (9, 9, 11); // zinc-950
 pub const FENCE_HEADER_BG: (u8, u8, u8) = (39, 39, 42); // zinc-800
 pub const FENCE_HEADER_FG: (u8, u8, u8) = (161, 161, 166); // zinc-400
-pub const FENCE_BODY_FG: (u8, u8, u8) = (250, 250, 250); // zinc-50
+                                                           // zinc-50
 /// 编辑壳 fence 边线（view 轨 `border` 默认色的暗色面板取值，zinc-700）。
 pub const FENCE_BORDER: (u8, u8, u8) = (63, 63, 70);
 

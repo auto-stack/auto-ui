@@ -125,13 +125,6 @@ impl BlueprintRegistry {
             .find(|p| p.spec.kind == kind && p.spec.name == name)
     }
 
-    pub fn list_by_kind<'a>(
-        &'a self,
-        kind: &'a str,
-    ) -> impl Iterator<Item = &'a BlueprintPackage> + 'a {
-        self.packages.iter().filter(move |p| p.spec.kind == kind)
-    }
-
     /// Cross-check every package against the widget registry: each `palette`
     /// entry must exist in the legal set — AURA widget tags (exact or
     /// prefix-grouped, as in Plan 337) ∪ schema `package_origin` tags
@@ -490,17 +483,22 @@ mod root_resolution_tests {
         // ——不以路径字串替代真实输入可用性。
         assert!(actual.is_dir(), "blueprints 单源必须实际存在: {actual:?}");
         let mut specs = 0usize;
-        for kind in std::fs::read_dir(&actual)
-            .unwrap_or_else(|e| panic!("read {}: {e}", actual.display()))
+        for kind in
+            std::fs::read_dir(&actual).unwrap_or_else(|e| panic!("read {}: {e}", actual.display()))
         {
             let kind = kind.expect("kind dir entry").path();
             if !kind.is_dir() {
                 continue;
             }
-            for name in std::fs::read_dir(&kind)
-                .unwrap_or_else(|e| panic!("read {}: {e}", kind.display()))
+            for name in
+                std::fs::read_dir(&kind).unwrap_or_else(|e| panic!("read {}: {e}", kind.display()))
             {
-                if name.expect("name dir entry").path().join("spec.md").is_file() {
+                if name
+                    .expect("name dir entry")
+                    .path()
+                    .join("spec.md")
+                    .is_file()
+                {
                     specs += 1;
                 }
             }
@@ -512,8 +510,8 @@ mod root_resolution_tests {
         );
         // 错 owner 负控：UI 仓自身（非语言仓）的 packages/blueprints 不是
         // 单源——即便存在同名目录也不得被解析为兜底。
-        let wrong_owner = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../../packages/blueprints");
+        let wrong_owner =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../packages/blueprints");
         assert_ne!(
             actual,
             wrong_owner.canonicalize().unwrap_or(wrong_owner),

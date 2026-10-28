@@ -23,7 +23,7 @@
 //! vue/jet/ark 三生成器不发射 Rust import，不在本策略射面内。
 
 /// canonical runtime crate 名（UI 运行域）。
-pub const RUNTIME_CRATE: &str = "auto_ui_runtime";
+
 /// canonical runtime UI 前缀（生成物 UI 面唯一入口）。
 pub const RUNTIME_UI: &str = "auto_ui_runtime::ui";
 /// canonical SDK crate 名（语言/VM 面）。

@@ -317,9 +317,6 @@ pub fn flush_arms() {
 /// PLAN-731 T-00：纯计数臂（无时长事件——如 fill_text 段数）；与 arm_acc
 /// 共表，发布点随 `[P725-ARMS]` 行。`arm_count_n` 批量计（R1 F-3：段数
 /// 实计自 list.text_runs.len()，非 draw 调用数）。
-pub fn arm_count(name: &'static str) {
-    arm_count_n(name, 1);
-}
 
 pub fn arm_count_n(name: &'static str, n: u32) {
     if !enabled() {

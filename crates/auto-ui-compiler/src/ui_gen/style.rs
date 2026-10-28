@@ -19,11 +19,6 @@ impl StyleGenerator {
     }
 
     /// Create a style generator with Tailwind disabled
-    pub fn no_tailwind() -> Self {
-        Self {
-            use_tailwind: false,
-        }
-    }
 
     /// Generate scoped CSS from style definitions
     pub fn generate_scoped(&self, styles: &[(String, String)]) -> GenResult<String> {

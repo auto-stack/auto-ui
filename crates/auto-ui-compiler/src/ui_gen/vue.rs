@@ -1128,10 +1128,6 @@ impl VueGenerator {
     /// Mark whether the project depends on @autodown/editor (Plan 361).
     /// Drives R003 validation (CSS import check) and is consumed by
     /// auto-man's generate_main_ts to inject the stylesheet import.
-    pub fn with_uses_autodown(mut self, uses: bool) -> Self {
-        self.uses_autodown = uses;
-        self
-    }
 
     /// Check if a name is a known API function (static list OR project-specific)
     fn is_api_function(&self, name: &str) -> bool {
@@ -1210,9 +1206,6 @@ impl VueGenerator {
     }
 
     /// Check if outputting TypeScript (Plan 100)
-    pub fn is_typescript(&self) -> bool {
-        self.use_typescript
-    }
 
     /// Generate a self-contained SFC for a single primitive widget (Plan 331).
     ///

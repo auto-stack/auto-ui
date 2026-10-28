@@ -5271,7 +5271,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 
-
 def main() -> int:
     manifest_path = ROOT / "delivery-manifest.json"
     if not manifest_path.is_file():
@@ -5318,7 +5317,6 @@ def main() -> int:
         return 1
     print(f"[verify-delivery] PASS {len(listed)} 资源校验一致（SHA-256=清单记录）")
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main())
@@ -7329,12 +7327,7 @@ pub fn ping() int {
         std::fs::write(
             back.join("db.at"),
             r#"
-pub fn seed_note() int {
-    return 42
-}
-"#,
-        )
-        .unwrap();
+
         std::fs::write(
             back.join("api.at"),
             r#"

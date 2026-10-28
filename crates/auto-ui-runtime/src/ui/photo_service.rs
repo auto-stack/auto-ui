@@ -407,14 +407,6 @@ pub fn content_type(extension: &str) -> &'static str {
 
 /// Album label for an entry: first path segment of `rel_dir`, with root-level
 /// files grouped under "photos" (matches the legacy gallery's top-level album).
-pub fn album_of(entry: &PhotoEntry) -> &str {
-    entry
-        .rel_dir
-        .split('/')
-        .next()
-        .filter(|s| !s.is_empty())
-        .unwrap_or("photos")
-}
 
 /// Display title: the file name without its extension.
 pub fn display_title(name: &str) -> &str {

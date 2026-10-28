@@ -878,9 +878,6 @@ impl ComponentRegistry {
     }
 
     /// Get all supported tags
-    pub fn supported_tags(&self) -> Vec<&str> {
-        self.mappings.keys().map(|s| s.as_str()).collect()
-    }
 
     /// Get tags by category
     pub fn by_category(&self, category: ComponentCategory) -> Vec<&ComponentMapping> {

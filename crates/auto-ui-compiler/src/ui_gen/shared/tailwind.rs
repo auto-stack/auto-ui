@@ -145,20 +145,6 @@ impl Dimension {
             Dimension::Vh(_) => 0.0,
         }
     }
-
-    /// Convert to Compose dp string
-    pub fn to_compose_dp(&self) -> String {
-        match self {
-            Dimension::Px(v) => format!("{}.dp", v),
-            Dimension::Dp(v) => format!("{}.dp", v),
-            Dimension::Rem(v) => format!("{}.dp", v * 16.0),
-            Dimension::Percent(v) => format!("{}f", v / 100.0),
-            Dimension::Full => "1f".to_string(),
-            Dimension::Auto => "0f".to_string(),
-            Dimension::Vw(v) => format!("{}f", v / 100.0),
-            Dimension::Vh(v) => format!("{}f", v / 100.0),
-        }
-    }
 }
 
 /// Box spacing (padding/margin)
@@ -262,16 +248,6 @@ impl Color {
     pub const fn rgba(r: u8, g: u8, b: u8, a: f32) -> Self {
         Self { r, g, b, a }
     }
-
-    /// Convert to Compose Color format
-    pub fn to_compose(&self) -> String {
-        format!("Color(0x{:02X}{:02X}{:02X})", self.r, self.g, self.b)
-    }
-
-    /// Convert to CSS hex format
-    pub fn to_css(&self) -> String {
-        format!("#{:02X}{:02X}{:02X}", self.r, self.g, self.b)
-    }
 }
 
 /// Shadow definition
@@ -304,20 +280,7 @@ pub enum BorderRadiusSpec {
     },
 }
 
-impl BorderRadiusSpec {
-    /// Check if this is a simple all-corners radius
-    pub fn is_all(&self) -> bool {
-        matches!(self, BorderRadiusSpec::All(_))
-    }
-
-    /// Get the uniform radius if all corners are the same
-    pub fn as_uniform(&self) -> Option<&Dimension> {
-        match self {
-            BorderRadiusSpec::All(dim) => Some(dim),
-            BorderRadiusSpec::Corners { .. } => None,
-        }
-    }
-}
+impl BorderRadiusSpec {}
 
 /// Tailwind class parser
 pub struct TailwindParser {

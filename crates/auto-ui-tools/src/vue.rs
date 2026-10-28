@@ -2556,9 +2556,6 @@ fn write_project_files(
 /// 2. front: "./source/front" - explicit path (legacy)
 /// Resolve the front directory for a workspace root.
 /// Checks src/front, source/front, front — matching VueProject::from_workspace logic.
-pub(crate) fn resolve_front_dir_public(root_dir: &Path) -> std::path::PathBuf {
-    resolve_front_dir(root_dir)
-}
 
 pub fn resolve_front_dir(root_dir: &Path) -> std::path::PathBuf {
     if root_dir.join("src").join("front").exists() {

@@ -285,18 +285,6 @@ pub fn system_theme_bootstrap_js(indent: &str) -> String {
 
 /// Effective accent preset injected by `auto run` (AUTO_UI_ACCENT env,
 /// validated), or None (generators keep their stylesheet default = indigo).
-pub fn accent_pref_from_env() -> Option<&'static str> {
-    match std::env::var("AUTO_UI_ACCENT").as_deref() {
-        Ok(a) if ACCENT_PRESETS.contains(&a) => Some(match a {
-            "coral" => "coral",
-            "ocean" => "ocean",
-            "sage" => "sage",
-            "amber" => "amber",
-            _ => "indigo",
-        }),
-        _ => None,
-    }
-}
 
 /// `--primary` shadcn token as an HSL triplet string ("H S% L%") for the
 /// given accent preset + theme, or None for unknown preset names. Dark mode

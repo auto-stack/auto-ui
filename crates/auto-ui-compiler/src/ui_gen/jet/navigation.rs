@@ -117,11 +117,6 @@ impl NavigationGenerator {
     }
 
     /// Add multiple routes from merged RouteDefs (Plan 114: Hybrid Routing)
-    pub fn add_routes_from_defs(&mut self, routes: &[RouteDef]) {
-        for route in routes {
-            self.add_route_from_def(route);
-        }
-    }
 
     /// Add a route from an AuraRoute
     pub fn add_route_from_aura(&mut self, route: &crate::aura::AuraRoute) {

@@ -122,11 +122,6 @@ impl ArkGenerator {
     }
 
     /// Register multiple custom widget imports
-    pub fn register_custom_widgets(&mut self, names: &[&str]) {
-        for name in names {
-            self.custom_widgets.insert(name.to_string());
-        }
-    }
 
     /// Check if a tag looks like a custom component (starts with uppercase, not in registry)
     fn is_capitalized_component(&self, tag: &str) -> bool {
@@ -579,17 +574,6 @@ impl ArkGenerator {
     }
 
     /// Generate @Entry @Component struct from widget with custom imports
-    pub fn generate_entry_component_with_imports(
-        &mut self,
-        widget: &AuraWidget,
-        custom_imports: &[String],
-    ) -> GenResult<String> {
-        // Register custom widgets from imports
-        for import in custom_imports {
-            self.register_custom_widget(import);
-        }
-        self.generate_entry_component(widget)
-    }
 
     /// Generate @Entry @Component struct from widget
     pub fn generate_entry_component(&mut self, widget: &AuraWidget) -> GenResult<String> {

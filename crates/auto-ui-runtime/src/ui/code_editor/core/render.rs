@@ -639,9 +639,6 @@ fn push_fold_marker(
 
 /// Re-export for the iced adapter: the default theme resolution used when
 /// no explicit theme is passed.
-pub fn resolved_theme() -> CodeEditorTheme {
-    current_theme()
-}
 
 /// Convert an [`Rgba`] to cosmic-text's color for the raster path.
 pub fn rgba_to_cosmic(color: Rgba) -> cosmic_text::Color {

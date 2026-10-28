@@ -130,12 +130,6 @@ impl WidgetValidator {
     }
 
     /// Create a validator with a custom schema
-    pub fn with_schema(schema: AuraSchema) -> Self {
-        Self {
-            schema,
-            imports: HashSet::new(),
-        }
-    }
 
     /// Add an explicit import (from `use aura.widgets: WidgetName`)
     pub fn add_import(&mut self, widget_name: &str) {
@@ -162,25 +156,6 @@ impl WidgetValidator {
     }
 
     /// Validate a widget declaration
-    pub fn validate_widget(&self, widget: &WidgetDecl) -> Result<(), Vec<ValidationError>> {
-        let mut errors = Vec::new();
-
-        // Validate widget blocks (msg, model, view required)
-        if let Some(err) = self.validate_widget_blocks(widget) {
-            errors.extend(err);
-        }
-
-        // Validate view tree if present
-        if let Some(view_block) = &widget.view {
-            self.validate_view_tree(&view_block.root, &mut errors);
-        }
-
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(errors)
-        }
-    }
 
     /// Validate that widget has required blocks
     fn validate_widget_blocks(&self, widget: &WidgetDecl) -> Option<Vec<ValidationError>> {

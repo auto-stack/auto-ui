@@ -18,9 +18,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 /// Locate the 015-notes app.at regardless of cwd (tests vs. IDE).
-pub(crate) fn locate_app_at() -> Option<PathBuf> {
-    locate_example_app_at("015-notes")
-}
 
 /// PLAN-590(Stage B P-5): locate a file inside a top-level gallery's new home
 /// (auto-os top level, via `resolve_os_top_dir`). None when unresolved (solo

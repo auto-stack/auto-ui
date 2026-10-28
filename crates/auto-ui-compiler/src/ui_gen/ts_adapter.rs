@@ -512,21 +512,6 @@ fn transpile_receiver(expr: &Expr, ctx: &AuraTsContext, out: &mut Vec<u8>) {
 
 /// Convert a snake_case identifier to camelCase (for TS/JS output).
 /// e.g. `list_notes` → `listNotes`, `create_note` → `createNote`
-pub fn snake_to_camel(name: &str) -> String {
-    let mut result = String::new();
-    let mut capitalize_next = false;
-    for c in name.chars() {
-        if c == '_' {
-            capitalize_next = true;
-        } else if capitalize_next {
-            result.push(c.to_ascii_uppercase());
-            capitalize_next = false;
-        } else {
-            result.push(c);
-        }
-    }
-    result
-}
 
 /// Transpile a list of AutoLang statements to TypeScript, with AURA rewrites.
 pub fn transpile_handler_body(stmts: &[Stmt], ctx: &AuraTsContext) -> String {

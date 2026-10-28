@@ -19,10 +19,6 @@ use auto_parser_api::token::TokenKind;
 use auto_parser_api::DomainParseContext;
 
 /// Parse view block (UI scenario only)
-pub fn parse_view_block(cx: &mut dyn DomainParseContext) -> AutoResult<UiStmt> {
-    let view = parse_view_block_inner(cx)?;
-    Ok(UiStmt::ViewBlock(view))
-}
 
 /// Plan 367 P2-3: Parse either a view block or a view fragment declaration.
 pub fn parse_view_block_or_fragment(cx: &mut dyn DomainParseContext) -> AutoResult<UiStmt> {
@@ -254,12 +250,6 @@ pub(crate) fn parse_fragment_decl_body_tail(cx: &mut dyn DomainParseContext) -> 
 }
 
 /// Parse view block, returning the ViewBlock directly
-pub(crate) fn parse_view_block_inner(cx: &mut dyn DomainParseContext) -> AutoResult<ViewBlock> {
-    cx.expect_ident("view")?;
-    cx.expect(TokenKind::LBrace)?;
-    let root = parse_view_root_nodes(cx)?;
-    Ok(ViewBlock { root })
-}
 
 /// Parse the nodes inside `view { ... }` up to the closing brace.
 ///

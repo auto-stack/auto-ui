@@ -133,15 +133,6 @@ pub fn bind_controller(handle: &str, widget_id: &str) {
 }
 
 /// PLAN-781 T-01：pane 绑定代际读取（renderer drain 侧对照请求代际用）。
-pub fn controller_generation(handle: &str) -> u64 {
-    REGISTRY
-        .lock()
-        .unwrap()
-        .generations
-        .get(handle)
-        .copied()
-        .unwrap_or(0)
-}
 
 /// PLAN-781 T-01：managed pane 标记（renderer managed 桥 build 期调用）。
 /// PLAN-781 T-05 勘定：upsert 形态——renderer 侧标记先于 build_scrollable
@@ -418,9 +409,6 @@ pub fn drain_resolved_intents() -> (Vec<(String, String, f64, f64)>, Vec<String>
 
 /// 单轴 pane 语义辅助：唯一启用轴（natives 的 axis 简写与 pane 配置对齐
 /// 由调用面负责；此处只提供 Y 缺省）。
-pub fn default_axis() -> Axis {
-    Axis::Y
-}
 
 /// 读出某句柄的最近快照（未绑定 → 全零默认；`scroll_state()` native 与
 /// capability 验证断言面消费）。

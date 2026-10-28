@@ -170,18 +170,6 @@ pub fn generate_interface(interface: &InterfaceDef) -> String {
 }
 
 /// Generate all interfaces needed for a widget's state
-#[allow(dead_code)]
-pub fn generate_interfaces(widget: &AuraWidget) -> Vec<InterfaceDef> {
-    let mut interfaces = Vec::new();
-
-    for state_var in &widget.state_vars {
-        if let Some(interface) = extract_interface_from_array(&state_var.name, &state_var.initial) {
-            interfaces.push(interface);
-        }
-    }
-
-    interfaces
-}
 
 /// Generate all interfaces needed for a widget's state with widget name prefix
 ///

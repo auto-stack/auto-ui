@@ -2,7 +2,7 @@ use crate::ast::{
     ActionsBlock, ExtImport, ModelBlock, MsgDecl, StoreDecl, StyleRecipeDecl, ViewBlock,
     ViewFragmentDecl, WidgetDecl,
 };
-use auto_ast::ast::{AtomWriter, Name, ToAtom, ToAtomStr, ToNode};
+use auto_ast::ast::{AtomWriter, ToAtom, ToAtomStr, ToNode};
 use auto_parser_api::{DomainCode, DomainStmt};
 use auto_val::{AutoStr, Node as AutoNode, Value};
 use std::fmt;
@@ -42,10 +42,6 @@ impl UiCode {
 
     pub fn items(&self) -> &[DomainStmt<UiStmt>] {
         &self.0.items
-    }
-
-    pub fn into_items(self) -> Vec<DomainStmt<UiStmt>> {
-        self.0.items
     }
 
     pub fn core_stmts(&self) -> impl Iterator<Item = &auto_ast::ast::Stmt> {
@@ -139,8 +135,4 @@ impl AtomWriter for UiStmt {
         write!(f, "{}", self.to_atom_str())?;
         Ok(())
     }
-}
-
-pub fn domain_name() -> Name {
-    Name::from("auto-ui")
 }

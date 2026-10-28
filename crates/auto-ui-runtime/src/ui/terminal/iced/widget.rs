@@ -157,9 +157,6 @@ const ROW_CACHE_CAP: usize = 512;
 static ROW_REBUILDS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 /// 重建计数读数(累计)。
-pub(crate) fn row_rebuilds() -> u64 {
-    ROW_REBUILDS.load(std::sync::atomic::Ordering::Relaxed)
-}
 
 /// 重建计数取走清零(测试差分用)。
 pub(crate) fn row_rebuilds_reset() -> u64 {

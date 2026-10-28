@@ -34,7 +34,7 @@ pub struct RenderParam {
 pub mod render_param {
     pub const INVALID: i32 = 0;
     pub const API_TYPE: i32 = 1;
-    pub const OPENGL_INIT_PARAMS: i32 = 2;
+
     pub const ADVANCED_CONTROL: i32 = 10;
     pub const BLOCK_FOR_TARGET_TIME: i32 = 12;
     pub const SW_SIZE: i32 = 17;
@@ -60,7 +60,7 @@ pub struct MpvEvent {
 pub mod format {
     pub const NONE: i32 = 0;
     pub const STRING: i32 = 1;
-    pub const OSD_STRING: i32 = 2;
+
     pub const FLAG: i32 = 3;
     pub const INT64: i32 = 4;
     pub const DOUBLE: i32 = 5;

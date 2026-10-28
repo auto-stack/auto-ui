@@ -11,7 +11,7 @@
 
 use std::sync::{Mutex, OnceLock};
 
-use cosmic_text::{FontSystem, SyntaxSystem};
+use cosmic_text::SyntaxSystem;
 use syntect::highlighting::Theme as SynTheme;
 
 /// AutoLang grammar for `lang: "auto"` — keyword set mirrors the VM
@@ -419,12 +419,6 @@ pub(crate) fn highlight_segments_syntect(
 
 /// Reset all buffers' syntax after the syntax set changed (not currently
 /// needed — the set is static after boot).
-#[allow(dead_code)]
-pub fn warm_up(font_system: &mut FontSystem) {
-    // Touch the lazy system once so the first editor doesn't pay the cost.
-    let _ = syntax_system();
-    let _ = font_system;
-}
 
 #[cfg(test)]
 mod tests {

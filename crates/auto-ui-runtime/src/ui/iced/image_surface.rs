@@ -113,25 +113,6 @@ pub fn image_surface_geometry(
 }
 
 /// Alias used by renderers that describe the operation as a layout pass.
-pub fn layout_geometry(
-    viewport: Rectangle,
-    source: Size,
-    fit: ImageSurfaceFit,
-    zoom: f32,
-    offset_x: f32,
-    offset_y: f32,
-    rotation_degrees: f32,
-) -> ImageSurfaceGeometry {
-    image_surface_geometry(
-        viewport,
-        source,
-        fit,
-        zoom,
-        offset_x,
-        offset_y,
-        rotation_degrees,
-    )
-}
 
 /// Resource state consumed by the paint path. It deliberately carries no
 /// bytes: decoded pixels remain in the bounded media pipeline/cache.

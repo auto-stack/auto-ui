@@ -344,10 +344,6 @@ impl JetProject {
 
     /// Generate Kotlin files with incremental support
     /// Returns (project, changed_files)
-    pub fn from_workspace_incremental(root_dir: &Path) -> AutoResult<(Self, Vec<String>)> {
-        let reads = JetReads::scan(root_dir)?;
-        Self::build_incremental(root_dir, reads)
-    }
 
     /// 请求路径的增量形态（PLAN-809 T-06c）。
     pub fn from_workspace_incremental_with_request(
@@ -875,9 +871,6 @@ fn generate_jet_project_with_project(
 /// 2. Generate project structure if not exists
 /// 3. Build the project
 /// 4. Install and run on connected device/emulator
-pub fn run_jet_project(root_dir: &Path, args: Vec<String>) -> AutoResult<()> {
-    run_jet_project_inner(root_dir, args, None)
-}
 
 /// 请求路径（PLAN-809 R1-F02）。
 pub fn run_jet_project_with_request(

@@ -147,16 +147,6 @@ impl ElementDef {
     pub fn get_prop(&self, name: &str) -> Option<&PropDef> {
         self.props.iter().find(|p| p.name == name)
     }
-
-    /// Get list of required props
-    pub fn required_props(&self) -> Vec<&PropDef> {
-        self.props.iter().filter(|p| p.required).collect()
-    }
-
-    /// Get list of optional props
-    pub fn optional_props(&self) -> Vec<&PropDef> {
-        self.props.iter().filter(|p| !p.required).collect()
-    }
 }
 
 /// Widget block constraints
@@ -360,19 +350,10 @@ impl AuraSchema {
     }
 
     /// Plan 435:元素的 meta(tier/aliases/backends/sub_widgets);无则默认。
-    pub fn element_meta(&self, tag: &str) -> ElementMeta {
-        self.meta.get(tag).cloned().unwrap_or_default()
-    }
 
     /// 折叠键(公开给校验/补全共用)
-    pub fn fold_key_of(tag: &str) -> String {
-        fold_key(tag)
-    }
 
     /// Check if a tag is a valid element
-    pub fn is_valid_element(&self, tag: &str) -> bool {
-        self.elements.contains_key(tag)
-    }
 
     /// Get all element tags
     pub fn all_tags(&self) -> Vec<&'static str> {

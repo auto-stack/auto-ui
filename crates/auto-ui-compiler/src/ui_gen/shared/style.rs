@@ -44,20 +44,6 @@ impl ResolvedStyle {
             }
         }
     }
-
-    /// Generate CSS class string for Vue
-    pub fn to_class_string(&self) -> String {
-        self.css_classes.join(" ")
-    }
-
-    /// Generate inline style string for Vue
-    pub fn to_style_string(&self) -> String {
-        self.inline_styles
-            .iter()
-            .map(|(prop, value)| format!("{}: {}", prop, value))
-            .collect::<Vec<_>>()
-            .join("; ")
-    }
 }
 
 /// Tailwind spacing scale (4px per unit)

@@ -182,11 +182,6 @@ impl FrameChannelStats {
         let p50 = self.p50();
         self.upload_ms.iter().filter(|&&v| v > p50 * 3.0).count()
     }
-
-    /// 是否已经不再保留逐帧耗时（长会话下避免无界增长）。
-    pub fn is_trimmed(&self) -> bool {
-        STATS_SAMPLE_CAP > 0 && self.upload_ms.len() >= STATS_SAMPLE_CAP
-    }
 }
 
 /// 逐帧耗时的保留上限：只用于诊断，超过就停止累积（避免长会话内存无界增长）。
@@ -517,9 +512,6 @@ pub fn is_native_stride(width: u32) -> bool {
 }
 
 /// [`MPV_ALIGN`] 对外的只读入口（测试用）。
-pub fn mpv_align() -> usize {
-    MPV_ALIGN
-}
 
 impl std::fmt::Debug for VideoFrameChannel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

@@ -467,9 +467,6 @@ impl VTree {
     }
 
     /// 获取可变根节点
-    pub fn root_mut(&mut self) -> Option<&mut VNode> {
-        self.root.and_then(|id| self.get_mut(id))
-    }
 
     /// 获取子节点列表
     ///
@@ -494,9 +491,6 @@ impl VTree {
     }
 
     /// 获取可变所有节点
-    pub fn nodes_mut(&mut self) -> &mut [VNode] {
-        &mut self.nodes
-    }
 
     /// 计算节点总数
     pub fn node_count(&self) -> usize {
@@ -599,12 +593,6 @@ impl VTree {
         stats.max_depth = self.depth();
 
         stats
-    }
-
-    /// 由逻辑路径派生稳定的 VNodeId。
-    /// 结构不变 → id 不变；for 不同迭代 path 不同 → id 不同。
-    pub fn id_for_path(&self, path: &[u16]) -> VNodeId {
-        VNodeId(id_from_path(path))
     }
 }
 

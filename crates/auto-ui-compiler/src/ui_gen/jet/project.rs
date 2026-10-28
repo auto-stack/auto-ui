@@ -54,7 +54,7 @@
 
 use std::collections::HashMap;
 
-use crate::route::{RouteDef, RouteDiscovery, RouteMerger, RouteSource};
+use crate::route::{RouteDef, RouteDiscovery};
 
 /// Android project configuration
 ///
@@ -348,9 +348,6 @@ impl ProjectGenerator {
     }
 
     /// Set configuration
-    pub fn set_config(&mut self, config: JetProjectConfig) {
-        self.config = config;
-    }
 
     /// Generate all project files
     pub fn generate(&mut self) -> HashMap<String, String> {
@@ -558,7 +555,6 @@ goto fail
 
 set CLASSPATH=%APP_HOME%\gradle\wrapper\gradle-wrapper.jar
 
-
 @rem Execute Gradle
 "%JAVA_EXE%" %DEFAULT_JVM_OPTS% %JAVA_OPTS% %GRADLE_OPTS% "-Dorg.gradle.appname=%APP_BASE_NAME%" -classpath "%CLASSPATH%" org.gradle.wrapper.GradleWrapperMain %*
 
@@ -658,7 +654,6 @@ esac
 
 CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
 
-
 # Determine the Java command to use to start the JVM.
 if [ -n "$JAVA_HOME" ] ; then
     if [ -x "$JAVA_HOME/jre/sh/java" ] ; then
@@ -736,7 +731,6 @@ if "$cygwin" || "$msys" ; then
         shift
     done
 fi
-
 
 # Add default JVM options here. You can also use JAVA_OPTS and GRADLE_OPTS to pass JVM options to this script.
 DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
@@ -1403,20 +1397,8 @@ fun {theme_name}(
     // =========================================================================
 
     /// Set the routes directory for convention-based route discovery
-    pub fn with_routes_dir(mut self, routes_dir: std::path::PathBuf) -> Self {
-        self.routes_dir = Some(routes_dir);
-        self
-    }
 
     /// Add routes from config (routes {} block)
-    pub fn add_config_routes(&mut self, routes: Vec<crate::aura::AuraRoute>) {
-        for route in routes {
-            self.routes.push(
-                crate::route::RouteDef::new(&route.path, &route.module)
-                    .with_source(RouteSource::Config),
-            );
-        }
-    }
 
     /// Discover routes from routes/ folder (convention-based)
     ///
@@ -1442,18 +1424,6 @@ fun {theme_name}(
     /// Merge discovered routes with config routes
     ///
     /// Config routes take precedence over convention routes when paths match
-    pub fn merge_routes(&mut self) {
-        let discovered = self.discover_routes();
-        if discovered.is_empty() && self.routes.is_empty() {
-            return;
-        }
-
-        // Extract config routes from current routes
-        let config_routes: Vec<RouteDef> = self.routes.drain(..).collect();
-
-        // Merge (config overrides convention)
-        self.routes = RouteMerger::merge(discovered, config_routes);
-    }
 
     /// Get merged routes
     pub fn get_routes(&self) -> &[RouteDef] {
@@ -1464,40 +1434,6 @@ fun {theme_name}(
     pub fn has_routes(&self) -> bool {
         !self.routes.is_empty()
     }
-
-    /// Generate navigation screen from merged routes
-    ///
-    /// This creates a Navigation.kt file with NavHost containing all routes
-    pub fn generate_navigation_file(&mut self) -> Option<String> {
-        if self.routes.is_empty() {
-            return None;
-        }
-
-        let package = &self.config.application_id;
-        let mut nav_gen = super::NavigationGenerator::new();
-
-        // Add all routes
-        for route in &self.routes {
-            // Convert path to screen name: /user/:id -> UserScreen
-            let screen_name = path_to_screen_name(&route.path);
-            nav_gen.add_route(&route.path, &screen_name);
-        }
-
-        // Generate NavHost
-        let start_dest = self.routes.first().map(|r| r.path.as_str()).unwrap_or("/");
-
-        match nav_gen.generate_nav_host(start_dest) {
-            Ok(code) => {
-                let full_code = format!(
-                    "package {package}\n\n{}\n\n{}",
-                    nav_gen.generate_nav_imports(),
-                    code
-                );
-                Some(full_code)
-            }
-            Err(_) => None,
-        }
-    }
 }
 
 /// Convert a route path to a screen name
@@ -1507,29 +1443,6 @@ fun {theme_name}(
 /// - `/about` -> `AboutScreen`
 /// - `/user/:id` -> `UserScreen`
 /// - `/admin/settings` -> `AdminSettingsScreen`
-fn path_to_screen_name(path: &str) -> String {
-    let segments: Vec<&str> = path
-        .split('/')
-        .filter(|s| !s.is_empty() && !s.starts_with(':'))
-        .collect();
-
-    if segments.is_empty() {
-        return "HomeScreen".to_string();
-    }
-
-    let name: String = segments
-        .iter()
-        .map(|s| {
-            let mut chars = s.chars();
-            match chars.next() {
-                None => String::new(),
-                Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
-            }
-        })
-        .collect();
-
-    format!("{}Screen", name)
-}
 
 impl Default for ProjectGenerator {
     fn default() -> Self {

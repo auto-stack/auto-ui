@@ -157,22 +157,11 @@ pub fn drain_events(id: u64) -> Vec<VideoContractEvent> {
 }
 
 /// 某 widget 当前是否因缺库/初始化失败而不可用；`Some(原因)` 供上层显示降级文案。
-pub fn unavailable_reason(id: u64) -> Option<String> {
-    with_runtime(id, |rt| rt.unavailable.clone()).flatten()
-}
 
 /// 某 widget 是否已经拿到引擎（可播）。
-pub fn is_native_available(id: u64) -> bool {
-    with_runtime(id, |rt| rt.engine.is_some()).unwrap_or(false)
-}
 
 /// 释放某 widget 的运行时（Drop 会把 mpv 按
 /// 「先 render context 后 core」的正确顺序拆掉，见 T-16）。
-pub fn release_runtime(id: u64) {
-    RUNTIMES.with(|m| {
-        m.borrow_mut().remove(&id);
-    });
-}
 
 // ───────────────────────── Program / Primitive / Pipeline ─────────────────────────
 
@@ -471,9 +460,4 @@ impl std::fmt::Debug for VideoPipeline {
             .field("targets_created", &self.targets_created)
             .finish()
     }
-}
-
-/// 目标尺寸下的行距（256 对齐；同时满足 mpv 的 64 与 wgpu 的 256）。
-pub fn target_stride(width: u32) -> usize {
-    stride_for(width)
 }

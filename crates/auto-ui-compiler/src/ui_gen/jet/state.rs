@@ -115,15 +115,6 @@ impl StateConverter {
             name, param_name, kotlin_type, body
         )
     }
-
-    /// Generate handler with multiple parameters
-    pub fn generate_handler_with_params(name: &str, params: &[(&str, &str)], body: &str) -> String {
-        let params_str: Vec<String> = params
-            .iter()
-            .map(|(pname, ptype)| format!("{}: {}", pname, Self::map_type(ptype)))
-            .collect();
-        format!("fun {}({}) {{ {} }}", name, params_str.join(", "), body)
-    }
 }
 
 impl Default for StateConverter {

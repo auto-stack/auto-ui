@@ -81,11 +81,6 @@ impl BackendMapping {
     }
 
     /// Add extra components
-    pub fn with_extra_components(mut self, components: &[&str]) -> Self {
-        self.extra_components
-            .extend(components.iter().map(|s| s.to_string()));
-        self
-    }
 
     /// Get all component names (primary + extras)
     pub fn all_components(&self) -> Vec<&str> {

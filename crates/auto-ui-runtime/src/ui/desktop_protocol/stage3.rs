@@ -360,7 +360,10 @@ mod tests {
     /// 018/021/024/041 的组件/页面引用需合体解析；仪器 native_flip_
     /// coverage_data_row 同径）。
     fn example_source_all(dir: &str) -> String {
-        let base = concat!(env!("CARGO_MANIFEST_DIR"), "/../../../auto-lang/examples/ui/");
+        let base = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../auto-lang/examples/ui/"
+        );
         let front = format!("{base}{dir}/src/front");
         let mut srcs: Vec<std::path::PathBuf> = std::fs::read_dir(&front)
             .unwrap_or_else(|e| panic!("read {front}: {e}"))
@@ -597,7 +600,10 @@ mod tests {
         if mode == "native-full" || mode == "native-auto-full" {
             // 生产同型装载：单 app.at + path 上下文（`use` 模块声明由
             // loader 按 path 兄弟文件解析——018 book_store/021 页组件）。
-            let base = concat!(env!("CARGO_MANIFEST_DIR"), "/../../../auto-lang/examples/ui/");
+            let base = concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../../auto-lang/examples/ui/"
+            );
             let path = format!("{base}{app}/src/front/app.at");
             let src = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {path}: {e}"));
             let component = crate::build_dynamic_component(&src, Some(&path))
@@ -4459,7 +4465,8 @@ mod tests {
         // 生产 spawner 的测试镜像：exe = 真 auto 二进制（与 spawn_outproc_child
         // 唯一差异 = broker 管道名测试隔离）。
         let exe = auto_exe();
-        let app_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../auto-lang/examples/ui");
+        let app_root =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../auto-lang/examples/ui");
         let pipe_for_spawn = broker_pipe.clone();
         session.desktop.outproc_spawner = Some(std::sync::Arc::new(move |child_name| {
             let mut cmd = std::process::Command::new(&exe);
@@ -5589,7 +5596,10 @@ mod tests {
         ///（truncate/codeeditor）——queue 门 ensure_covered 拒绝退出，
         /// 缺项载荷逐字断言（I3/AC-04 纪律的 e2e 面）。
         {
-            let base = concat!(env!("CARGO_MANIFEST_DIR"), "/../../../auto-lang/examples/ui/");
+            let base = concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../../auto-lang/examples/ui/"
+            );
             for (name, want) in [
                 ("018-book-reader", "style:truncate"),
                 ("041-auto-edit", "tag:codeeditor"),
@@ -5817,11 +5827,6 @@ mod tests {
         /// MK_LBUTTON 1/0）；键入 = WM_CHAR 0x0102（wParam = UTF-16 码元）。
         pub fn post_msg(hwnd: isize, msg: u32, wparam: usize, lparam: isize) -> bool {
             unsafe { PostMessageW(hwnd, msg, wparam, lparam) != 0 }
-        }
-
-        /// 客户区 (x, y) → lParam（低 16 位 x / 高 16 位 y）。
-        pub fn lparam_of(x: i32, y: i32) -> isize {
-            (x as u16 as isize) | ((y as u16 as isize) << 16)
         }
     }
 

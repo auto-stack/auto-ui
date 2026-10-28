@@ -57,10 +57,6 @@ impl Drop for StrictGuard {
     }
 }
 
-pub fn generate_report(request: &GenerationRequest) -> Result<GenerationReport, ToolError> {
-    generate_report_with(request, &GenerateOptions::default())
-}
-
 pub fn generate_report_with(
     request: &GenerationRequest,
     options: &GenerateOptions,
@@ -246,9 +242,6 @@ fn generate_profile(
 
 /// `build_ui` (T-06): dispatch the request's render profile onto the real
 /// build path.
-pub fn build_report(request: &GenerationRequest) -> Result<BuildReport, ToolError> {
-    build_report_with(request, None)
-}
 
 /// PLAN-816 T-05 R1（F-05）：build 的 strict 信号（旧 CLI build 默认严格
 /// 校验——跨进程显式传递，不用工具进程的全局状态冒充）。
@@ -309,9 +302,6 @@ pub fn build_report_with(
 }
 
 /// The `run_ui` dispatch (T-06: full matrix): every profile's real run path.
-pub fn run_report(request: &GenerationRequest) -> Result<RunReport, ToolError> {
-    run_report_with(request, Vec::new())
-}
 
 /// PLAN-816 T-05 R1（F-05）：run 的命令行透传参数（`auto run -- <args>`
 /// 旧语义）——穿进程边界到各 profile 真实运行链的既有 args 形参。
