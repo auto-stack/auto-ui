@@ -1,0 +1,21 @@
+var actor= -1
+var marker= -1
+var point_marker= -1
+var door= -1
+var speed=8.0
+var clearance=0.02
+fn app_start(){actor=ag_actor(2);marker=ag_node_at(2);point_marker=ag_node_at(4);door=ag_node_at(3)}
+fn app_update(dt float){
+ var dx=0.0;var tangent=0.0
+ if ag_input_space()==2 {dx=ag_input_x()*speed;tangent=(ag_input_y()+ag_input_x()*0.4)*speed}
+ ag_set_local(actor,0,ag_local(actor,0))
+ let q=ag_move_and_slide(actor,1,dx,tangent,0.0,clearance)
+ let status=ag_motion_status(q);let node=ag_motion_node(q);let contacts=ag_motion_contacts(q)
+ let px=ag_motion_origin(q,0);let pt=ag_motion_origin(q,1);let nx=ag_motion_normal(q,0);let nt=ag_motion_normal(q,1)
+ if dx!=0.0 || tangent!=0.0 {
+ ag_set_local(marker,0,-100.0+node*5.0);ag_set_local(marker,1,50.0+status*10.0)
+ ag_set_local(point_marker,0,-150.0+px);ag_set_local(point_marker,1,100.0+nx*5.0+nt)
+ if contacts==0 {ag_set_visible(door,0)} else {ag_set_visible(door,1)}
+ }
+ let stable=ag_motion_status(q);if stable==status {ag_set_visible(marker,1)} else {ag_set_visible(marker,0)}
+}

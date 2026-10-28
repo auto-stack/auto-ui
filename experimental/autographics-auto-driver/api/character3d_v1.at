@@ -1,0 +1,250 @@
+// autographics.character3d/1 trusted unit (PLAN-874). Appended after the v5
+// motion chain by the character3d assembly; public names are ag_char3_*/ag_action_*.
+// Public move = unchanged v5 ag_move_and_slide plus one fused geometric
+// final-support determination in the same call (contract r1 sections 2/4/6);
+// the frozen three-axis solid/character translation snapshot enforces the
+// read-only solid surface at each tick begin.
+var _ag_char3_node= -1
+var _ag_char3_frozen=0
+var _ag_char3_moved=0
+var _ag_char3_ptick= -1
+var _ag_char3_hl=0
+var _ag_char3_hr=0
+var _ag_char3_hf=0
+var _ag_char3_hb=0
+var _ag_char3_hj=0
+var _ag_char3_hn=0
+var _ag_char3_pl=0
+var _ag_char3_pr=0
+var _ag_char3_pf=0
+var _ag_char3_pb=0
+var _ag_char3_pj=0
+var _ag_char3_pn=0
+var _ag_char3_grounded_state=0
+var _ag_char3_support_state= -1
+var _ag_char3_init_grounded=0
+var _ag_char3_init_support= -1
+var _ag_char3_solids=[]
+var _ag_char3_ids=[]
+var _ag_char3_nodes=[]
+var _ag_char3_member=[]
+var _ag_char3_w=[]
+var _ag_char3_total=0
+fn _ag_char3_map(stable_id int, node int) {_ag_char3_ids.push(stable_id);_ag_char3_nodes.push(node)}
+fn _ag_char3_input(held int, pressed int) {
+ _ag_char3_hl=(held%2)
+ _ag_char3_hr=((held/2)%2)
+ _ag_char3_hf=((held/4)%2)
+ _ag_char3_hb=((held/8)%2)
+ _ag_char3_hj=((held/16)%2)
+ _ag_char3_hn=((held/32)%2)
+ _ag_char3_pl=(pressed%2)
+ _ag_char3_pr=((pressed/2)%2)
+ _ag_char3_pf=((pressed/4)%2)
+ _ag_char3_pb=((pressed/8)%2)
+ _ag_char3_pj=((pressed/16)%2)
+ _ag_char3_pn=((pressed/32)%2)
+ _ag_char3_ptick= -1
+}
+fn _ag_char3_resolve(stable_id int) int {
+ for i in 0.._ag_char3_ids.len() {
+  if _ag_char3_ids[i]==stable_id {return _ag_char3_nodes[i]}
+ }
+ return -1
+}
+fn _ag_char3_leaf(node int) int {
+ for n in 0..identities.len() {
+  if parents[n]==node {return 0}
+ }
+ return 1
+}
+fn _ag_char3_shape(node int) int {
+ let bi=node*7
+ let dx_box=_ag_spatial_boxes[bi+4] - _ag_spatial_boxes[bi+1]
+ let dy_box=_ag_spatial_boxes[bi+5] - _ag_spatial_boxes[bi+2]
+ let dz_box=_ag_spatial_boxes[bi+6] - _ag_spatial_boxes[bi+3]
+ if dx_box<0.7999 || dx_box>0.8001 {return 0}
+ if dy_box<0.9999 || dy_box>1.0001 {return 0}
+ if dz_box<0.7999 || dz_box>0.8001 {return 0}
+ return 1
+}
+fn _ag_char3_target(stable_id int, want_shape int) int {
+ if _ag_error!=0 {return -1}
+ if _ag_char3_frozen==1 {_ag_fail(22,-1,stable_id);return -1}
+ let node=_ag_char3_resolve(stable_id)
+ if node<0 {_ag_fail(23,-1,stable_id);return -1}
+ if kinds[node]==5 {_ag_fail(24,node,stable_id);return -1}
+ if dimensions[node]!=3 {_ag_fail(24,node,stable_id);return -1}
+ if _ag_char3_leaf(node)==0 {_ag_fail(24,node,stable_id);return -1}
+ if want_shape==1 {
+  if _ag_char3_shape(node)==0 {_ag_fail(24,node,stable_id);return -1}
+ }
+ return node
+}
+fn ag_char3_bind(stable_id int) int {
+ let node=_ag_char3_target(stable_id,1)
+ if node<0 {return 0}
+ if _ag_char3_node>=0 {_ag_fail(23,_ag_char3_node,stable_id);return 0}
+ _ag_char3_node=node
+ return 1
+}
+fn ag_char3_solid(stable_id int) int {
+ let node=_ag_char3_target(stable_id,0)
+ if node<0 {return 0}
+ if node==_ag_char3_node {_ag_fail(24,node,stable_id);return 0}
+ for i in 0.._ag_char3_solids.len() {
+  if _ag_char3_solids[i]==node {_ag_fail(23,node,stable_id);return 0}
+ }
+ if _ag_char3_solids.len()>=128 {_ag_fail(23,node,0);return 0}
+ _ag_char3_solids.push(node)
+ return 1
+}
+fn _ag_char3_scan_down(node int) int {
+ // Exact vertical final-support scan (contract section 4/6). Equivalent to the
+ // v5 downward 0.01 probe for a zero-dx/dz sweep: a solid supports the
+ // character iff its top face lies in [feet-0.01, feet] and the character
+ // centre is strictly inside the direction-expanded footprint (the v5
+ // boundary rule treats axis-boundary equality as leaving). A second full
+ // _ag_motion_three traversal cannot be paid inside the frozen
+ // cumulative 100000-step callback guard at 128 overlapping nodes.
+ let wi=node*3
+ let ax=worlds[wi]
+ let ay=worlds[wi+1]
+ let az=worlds[wi+2]
+ let bi=node*7
+ let ml0=_ag_spatial_boxes[bi+1]
+ let mh0=_ag_spatial_boxes[bi+4]
+ let ml1=_ag_spatial_boxes[bi+2]
+ let ml2=_ag_spatial_boxes[bi+3]
+ let mh2=_ag_spatial_boxes[bi+6]
+ let feet=ay+ml1
+ var best= -1
+ var top=0.0
+ for n in 0..identities.len() {
+  if n==node {continue}
+  if kinds[n]==5 {continue}
+  if dimensions[n]!=3 {continue}
+  let b=n*7
+  if _ag_spatial_boxes[b]==0.0 {continue}
+  let w=n*3
+  let solid_top=worlds[w+1]+_ag_spatial_boxes[b+5]
+  // Cheapest discriminating test first: only faces within the support skin
+  // can support, so bodies that are not floors cost three reads.
+  if solid_top>feet {continue}
+  if solid_top<feet - 0.01 {continue}
+  let lox=worlds[w]+_ag_spatial_boxes[b+1] - mh0
+  let hix=worlds[w]+_ag_spatial_boxes[b+4] - ml0
+  if ax<=lox || ax>=hix {continue}
+  let loz=worlds[w+2]+_ag_spatial_boxes[b+3] - mh2
+  let hiz=worlds[w+2]+_ag_spatial_boxes[b+6] - ml2
+  if az<=loz || az>=hiz {continue}
+  if best<0 || solid_top>top {best=n;top=solid_top}
+ }
+ if best<0 {return 0}
+ _ag_char3_support_state=best
+ _ag_char3_grounded_state=1
+ return 1
+}
+fn _ag_char3_freeze() {
+ if _ag_char3_node<0 {_ag_fail(25,-1,0);return}
+ for i in 0.._ag_char3_solids.len() {
+  if _ag_char3_solids[i]==_ag_char3_node {_ag_fail(23,_ag_char3_node,0);return}
+ }
+ _ag_char3_frozen=1
+ _ag_char3_moved=0
+ _ag_char3_grounded_state=0
+ _ag_char3_support_state= -1
+ _ag_char3_init_grounded=0
+ _ag_char3_init_support= -1
+ if _ag_dirty==1 {_ag_derive();_ag_dirty=0}
+ _ag_char3_member=[]
+ for i in 0.._ag_char3_solids.len() {_ag_char3_member.push(_ag_char3_solids[i])}
+ _ag_char3_member.push(_ag_char3_node)
+ _ag_char3_total=_ag_char3_member.len()
+ _ag_char3_w=[]
+ for i in 0.._ag_char3_total {
+  let n=_ag_char3_member[i]
+  _ag_char3_w.push(worlds[n*3]);_ag_char3_w.push(worlds[n*3+1]);_ag_char3_w.push(worlds[n*3+2])
+ }
+ let keep_grounded=_ag_char3_grounded_state
+ let keep_support=_ag_char3_support_state
+ _ag_char3_scan_down(_ag_char3_node)
+ _ag_char3_init_grounded=_ag_char3_grounded_state
+ _ag_char3_init_support=_ag_char3_support_state
+ _ag_char3_grounded_state=keep_grounded
+ _ag_char3_support_state=keep_support
+ _ag_cast_token=0
+}
+fn _ag_char3_tick_begin() {
+ if _ag_char3_frozen==0 {return}
+ if _ag_char3_pl+_ag_char3_pr+_ag_char3_pf+_ag_char3_pb+_ag_char3_pj+_ag_char3_pn!=0 {_ag_char3_ptick=_ag_tick_id()}
+ for i in 0.._ag_char3_total {
+  let n=_ag_char3_member[i]
+  let b=i*3
+  let w=n*3
+  if worlds[w]!=_ag_char3_w[b] || worlds[w+1]!=_ag_char3_w[b+1] || worlds[w+2]!=_ag_char3_w[b+2] {
+   if i==_ag_char3_total-1 {_ag_fail(21,n,0)} else {_ag_fail(20,n,0)}
+   return
+  }
+ }
+}
+fn ag_char3_move(dx float, dy float, dz float, clearance float) int {
+ if _ag_char3_frozen==0 {_ag_fail(26,-1,0);return 0}
+ if _ag_cast_charge(1)==0 {return 0}
+ _ag_char3_grounded_state=0
+ _ag_char3_support_state= -1
+ let token=ag_move_and_slide(_ag_char3_node,0,dx,dy,dz,clearance)
+ if token<=0 {return 0}
+ if _ag_motion_state==3 {return token}
+ if kinds[_ag_char3_node]==5 {return token}
+ if _ag_cast_charge(1)==0 {return 0}
+ _ag_char3_scan_down(_ag_char3_node)
+ _ag_char3_moved=1
+ let wi=_ag_char3_node*3
+ let b=(_ag_char3_total-1)*3
+ _ag_char3_w[b]=worlds[wi];_ag_char3_w[b+1]=worlds[wi+1];_ag_char3_w[b+2]=worlds[wi+2]
+ return token
+}
+fn _ag_char3_state(token int) int {
+ if _ag_cast_charge(1)==0 {return -1}
+ if token==0 {
+  if _ag_char3_moved==0 {return 0}
+  _ag_fail(13,-1,0);return -1
+ }
+ if token!=_ag_cast_token {_ag_fail(13,-1,0);return -1}
+ return 1
+}
+fn ag_char3_grounded(token int) int {
+ let ok=_ag_char3_state(token)
+ if ok<0 {return 0}
+ if ok==0 {return _ag_char3_init_grounded}
+ return _ag_char3_grounded_state
+}
+fn ag_char3_support(token int) int {
+ let ok=_ag_char3_state(token)
+ if ok<0 {return 0}
+ if ok==0 {return _ag_char3_init_support}
+ return _ag_char3_support_state
+}
+fn ag_action_held(action int) int {
+ if _ag_cast_charge(1)==0 {return 0}
+ if action<0 || action>5 {_ag_fail(7,-1,action);return 0}
+ if action==0 {return _ag_char3_hl}
+ if action==1 {return _ag_char3_hr}
+ if action==2 {return _ag_char3_hf}
+ if action==3 {return _ag_char3_hb}
+ if action==4 {return _ag_char3_hj}
+ return _ag_char3_hn
+}
+fn ag_action_pressed(action int) int {
+ if _ag_cast_charge(1)==0 {return 0}
+ if action<0 || action>5 {_ag_fail(7,-1,action);return 0}
+ if _ag_tick_id()!=_ag_char3_ptick {return 0}
+ if action==0 {if _ag_char3_pl==1 {_ag_char3_pl=0;return 1};return 0}
+ if action==1 {if _ag_char3_pr==1 {_ag_char3_pr=0;return 1};return 0}
+ if action==2 {if _ag_char3_pf==1 {_ag_char3_pf=0;return 1};return 0}
+ if action==3 {if _ag_char3_pb==1 {_ag_char3_pb=0;return 1};return 0}
+ if action==4 {if _ag_char3_pj==1 {_ag_char3_pj=0;return 1};return 0}
+ if _ag_char3_pn==1 {_ag_char3_pn=0;return 1}
+ return 0
+}

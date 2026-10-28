@@ -1,0 +1,137 @@
+/// Storage-agnostic dynamic list (Vec-like) for storing elements
+/// Uses pluggable storage strategies via the Storage<T> spec
+/// Plan 052: Storage-based list implementation
+///
+/// LIMITATIONS (to be addressed in future plans):
+/// - Trait bounds (S: Storage<T>) require Plan 058
+/// - Generic ext blocks require parser enhancement
+/// - For now, methods use VM/C implementations directly
+
+type List<T, S> {
+    // Number of elements currently in the list
+    len u32
+
+    // Storage backend (Heap<T>, Inline<T, N>, etc.)
+    // Must implement Storage<T> spec
+    store S
+
+    // ========================================================================
+    // Static Methods - Creation
+    // ========================================================================
+
+    /// Create a new empty List with the given storage strategy
+    /// Example: List<int, Heap>.new()
+    #[c, vm, pub]
+    static fn new() List<T, S>
+
+    // ========================================================================
+    // Instance Methods - Access
+    // ========================================================================
+
+    /// Get the number of elements in the list
+    /// Example: list.len()
+    #[c, vm, pub]
+    fn len() int
+
+    /// Check if the list is empty
+    /// Example: list.is_empty()
+    #[c, vm, pub]
+    fn is_empty() bool
+
+    /// Get the total capacity (from storage)
+    /// Example: list.capacity()
+    #[c, vm, pub]
+    fn capacity() int
+
+    /// Get element at index (bounds checking required)
+    /// Example: list.get(0)
+    #[c, vm, pub]
+    fn get(index int) T
+
+    // ========================================================================
+    // Instance Methods - Modification
+    // ========================================================================
+
+    /// Push element to the end (grows storage if needed)
+    /// Example: list.push(item)
+    #[c, vm, pub]
+    fn push(elem T)
+
+    /// Pop element from the end
+    /// Example: list.pop()
+    #[c, vm, pub]
+    fn pop() T
+
+    /// Set element at index
+    /// Example: list.set(0, item)
+    #[c, vm, pub]
+    fn set(index int, elem T) int
+
+    /// Remove all elements (keeps capacity)
+    /// Example: list.clear()
+    #[c, vm, pub]
+    fn clear()
+
+    // ========================================================================
+    // Instance Methods - Lifecycle
+    // ========================================================================
+
+    /// Free the list's resources (drops storage)
+    /// Example: list.drop()
+    #[c, vm, pub]
+    fn drop()
+
+    // ========================================================================
+    // Iteration Support (Plan 051)
+    // ========================================================================
+
+    /// Get an iterator over list elements
+    /// Example: list.iter()
+    #[c, vm, pub]
+    fn iter() ListIter<T, S>
+}
+
+// ============================================================================
+// Spec Conformance (Plan 019 Stage 8.5)
+// ============================================================================
+
+/// List conforms to Iterable<T>
+/// This allows list.map(), list.filter(), list.reduce(), etc. to work directly
+/// These methods use the default implementations from Iterable<T> spec
+type List<T, S> as Iterable<T> {
+    // The iter() method is already implemented above (line 90-91)
+    // Default methods from Iterable<T> spec provide map, filter, reduce, etc.
+}
+
+/// Iterator for List<T, S>
+/// Plan 051: Basic iterator implementation
+type ListIter<T, S> {
+    list *const List<T, S>
+    index u32
+}
+
+impl<T, S> ListIter<T, S> {
+    /// Create a new list iterator
+    /// Plan 051: Initialize with list starting at index 0
+    #[c, vm, pub]
+    fn new(list *const List<T, S>) ListIter<T, S> {
+        return ListIter {
+            list: list,
+            index: 0
+        }
+    }
+
+    /// Get the next element from the iterator
+    /// Returns nil when iteration is complete
+    /// Plan 051: Implements Iter<T> spec
+    #[c, vm, pub]
+    fn next() May<T> {
+        if .index >= .list.len() {
+            return nil
+        }
+
+        let item = .list.get(.index)
+        .index = .index + 1
+        return item
+    }
+}

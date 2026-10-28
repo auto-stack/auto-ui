@@ -1,0 +1,51 @@
+[workspace]
+resolver = "2"
+members = ["crates/a2r-std", "crates/auto-ast", "crates/auto-atom", "crates/auto-bindgen", "crates/auto-cache", "crates/auto-diagnostics", "crates/auto-lang-core", "crates/auto-lex", "crates/auto-macros", "crates/auto-media-core", "crates/auto-parser-api", "crates/auto-terminal-core", "crates/auto-test-case", "crates/auto-text-core", "crates/auto-val", "crates/shim-metadata", "vendor/autodown-test-parser"]
+
+[workspace.dependencies]
+clap = { version = "4.5.17", features = ["derive"] }
+dirs = "6.0.0"
+rustyline = { version = "14.0.0", features = ["with-file-history"] }
+# Plan 446 D6: preserve_order — json.keys/遍历保持插入序，与 vue 轨
+# Object.entries 语义对齐（跨后端 UI 字段顺序 parity）。
+serde_json = { version = "1.0", features = ["preserve_order"] }
+serde = { version = "1.0", features = ["derive"] }
+miette = { version = "7.2", features = ["fancy"] }
+thiserror = "2.0.12"
+regex = "1.11.1"
+strum = "0.26"
+strum_macros = "0.26"
+ecow = "0.2.3"
+normalize-path = "0.2.1"
+roxmltree = "0.18.0"
+dashmap = "6.1"
+tokio = { version = "1.49", features = ["full"] }
+blake3 = "1.5"
+bincode = "1.3"
+glob-match = "0.2.1"
+chrono = "0.4"
+notify = "7.0"
+urlencoding = "2.1"
+# Plan 541: System monitor host & a2r native metrics
+sysinfo = "0.33"
+
+# AutoMan dependencies (Phase 1)
+tabled = "0.18"
+simplelog = "0.12"
+log = "0.4"
+dialoguer = "0.11"
+glob = "0.3"
+reqwest = { version = "0.12", features = ["blocking"] }
+version-compare = "0.0"
+colored = "3"
+zip = "3.0"
+encoding_rs = "0.8"
+is_executable = "1.0"
+toml = "0.8"
+indicatif = "0.17"
+rust-embed = { version = "8.5", features = ["compression"] }
+tempfile = "3.14"
+
+# Plan 466: dev 瘦身——行号级调试信息(panic 回溯仍有行号),显著缩小 target
+# 与链接开销(每个 worktree 的 target 从 ~26G 明显下降);AI agent 流程无交互式
+# 调试需求,代价极低。需要完整变量调试时临时覆盖 CARGO_PROFILE_DEV_DEBUG=2。

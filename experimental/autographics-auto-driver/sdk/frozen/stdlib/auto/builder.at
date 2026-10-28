@@ -1,0 +1,75 @@
+/// StringBuilder - Efficient string concatenation
+///
+/// StringBuilder provides efficient string building for code generation
+/// and other scenarios where many string concatenations are needed.
+/// It avoids the O(n²) cost of repeated string concatenation.
+///
+/// Phase 2: StringBuilder Implementation (Plan 027)
+
+
+/// StringBuilder type for efficient string concatenation
+type StringBuilder {
+    buffer *char
+    len int
+    capacity int
+
+    // ========================================================================
+    // Static Methods - Creation
+    // ========================================================================
+    /// Create a new StringBuilder with initial capacity
+    /// Example: StringBuilder.new(1024)
+    #[c, vm, pub]
+    static fn new(capacity int) StringBuilder
+
+    /// Create a new StringBuilder with default capacity
+    /// Example: StringBuilder.new_with_default()
+    #[c, vm, pub]
+    static fn new_with_default() StringBuilder
+
+    // ========================================================================
+    // Instance Methods - Building
+    // ========================================================================
+
+    /// Append a string to the builder
+    /// Example: sb.append("hello")
+    #[c, vm, pub]
+    fn append(str str)
+
+    /// Append a character to the builder
+    /// Example: sb.append_char('!')
+    #[c, vm, pub]
+    fn append_char(c char)
+
+    /// Append an integer to the builder
+    /// Example: sb.append_int(42)
+    #[c, vm, pub]
+    fn append_int(value int)
+
+    // ========================================================================
+    // Instance Methods - Finalization
+    // ========================================================================
+
+    /// Build and return the final string
+    /// Example: sb.build()  // returns "hello world!"
+    #[c, vm, pub]
+    fn build() str
+
+    /// Clear the builder (keeps capacity)
+    /// Example: sb.clear()
+    #[c, vm, pub]
+    fn clear()
+
+    /// Get the current length of the builder
+    /// Example: sb.len()  // returns 11
+    #[c, vm, pub]
+    fn len() int
+
+    // ========================================================================
+    // Instance Methods - Lifecycle
+    // ========================================================================
+
+    /// Free the StringBuilder's resources
+    /// Example: sb.drop()
+    #[c, vm, pub]
+    fn drop()
+}

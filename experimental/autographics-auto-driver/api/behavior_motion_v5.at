@@ -1,0 +1,118 @@
+var _ag_motion_published=0
+// Bounded virtual-local motion. Shares the latest query slot.
+var _ag_motion_state=0
+var _ag_motion_count=0
+var _ag_motion_dx=0.0
+var _ag_motion_dy=0.0
+var _ag_motion_dz=0.0
+var _ag_motion_ux=0.0
+var _ag_motion_uy=0.0
+var _ag_motion_uz=0.0
+fn _ag_motion_read(token int) int {
+ if _ag_cast_charge(1)==0 {return 0}
+ if token<=0 || token!=_ag_cast_token || _ag_query_kind!=3 {_ag_fail(13,-1,0);return 0};return 1
+}
+fn ag_motion_status(token int) int {if _ag_motion_read(token)==0 {return 0};return _ag_motion_state}
+fn ag_motion_contacts(token int) int {if _ag_motion_read(token)==0 {return 0};return _ag_motion_count}
+fn ag_motion_node(token int) int {if _ag_motion_read(token)==0 {return -1};return _ag_cast_target}
+fn ag_motion_origin(token int, axis int) float {if _ag_motion_read(token)==0 {return 0.0};if _ag_cast_axis(axis)==0 {return 0.0};if axis==0 {return _ag_cast_px};if axis==1 {return _ag_cast_py};return _ag_cast_pz}
+fn ag_motion_delta(token int, axis int) float {if _ag_motion_read(token)==0 {return 0.0};if _ag_cast_axis(axis)==0 {return 0.0};if axis==0 {return _ag_motion_dx};if axis==1 {return _ag_motion_dy};return _ag_motion_dz}
+fn ag_motion_unapplied(token int, axis int) float {if _ag_motion_read(token)==0 {return 0.0};if _ag_cast_axis(axis)==0 {return 0.0};if axis==0 {return _ag_motion_ux};if axis==1 {return _ag_motion_uy};return _ag_motion_uz}
+fn ag_motion_normal(token int, axis int) float {if _ag_motion_read(token)==0 {return 0.0};if _ag_cast_axis(axis)==0 {return 0.0};if axis==0 {return _ag_cast_nx};if axis==1 {return _ag_cast_ny};return _ag_cast_nz}
+fn ag_move_and_slide(node int, visible_only int, dx float, dy float, dz float, clearance float) int {
+ _ag_cast_token=0;_ag_query_kind=3
+ if _ag_cast_charge(24)==0 {return 0}
+ if _ag_cast_seq==2147483647 {_ag_fail(14,-1,0);return 0}
+ if _ag_check(node)==0 {return 0}
+ if kinds[node]==5 {_ag_fail(6,node,0);return 0}
+ if visible_only!=0 && visible_only!=1 {_ag_fail(7,node,1);return 0}
+ let space=dimensions[node]
+ if space==2 && dz!=0.0 {_ag_fail(7,node,2);return 0}
+ if (dx - dx)+(dy - dy)+(dz - dz)+(clearance - clearance)!=0.0 {_ag_fail(12,node,0);return 0}
+ if clearance<=0.0 {_ag_fail(7,node,5);return 0}
+ if _ag_dirty==1 {_ag_derive();_ag_dirty=0}
+ let wi=node*3;let fi=node*12;let bi=node*7
+ if _ag_spatial_boxes[bi]==0.0 {_ag_fail(9,node,0);return 0}
+ for a in 0..space {
+ if worlds[wi+a] - worlds[wi+a]!=0.0 {_ag_fail(9,node,a);return 0}
+ let low float=worlds[wi+a]+_ag_spatial_boxes[bi+1+a];let high float=worlds[wi+a]+_ag_spatial_boxes[bi+4+a]
+ if (low - low)+(high - high)!=0.0 {_ag_fail(9,node,a);return 0}
+ if high<=low || _ag_spatial_boxes[bi+4+a]<=_ag_spatial_boxes[bi+1+a] {_ag_fail(15,node,a);return 0}
+}
+ let ox=worlds[wi];let oy=worlds[wi+1];let oz=worlds[wi+2]
+ var lx=fields[fi];var ly=fields[fi+1];var lz=fields[fi+2]
+ var px=0.0;var py=0.0;var pz=0.0;let parent=parents[node]
+ if parent>=0 {px=worlds[parent*3];py=worlds[parent*3+1];pz=worlds[parent*3+2]}
+ var x=ox;var y=oy;var z=oz;var rx=dx;var ry=dy;var rz=dz
+ var requested_advance=0;var status=0;var contacts=0;var hitnode= -1;var nx=0.0;var ny=0.0;var nz=0.0
+ _ag_motion_checked=0;_ag_motion_initial= -1
+ {
+  for stage in 0..2 {
+   var ok=0
+   if space==2 {ok=_ag_motion_two(space,node,visible_only,x,y,z,rx,ry,rz)} else {ok=_ag_motion_three(space,node,visible_only,x,y,z,rx,ry,rz)}
+   if ok==0 {return 0}
+   if _ag_motion_initial>=0 {status=3;hitnode=_ag_motion_initial;break}
+   _ag_motion_checked=1
+   var safe=1.0
+   if _ag_cast_found==1 {
+    contacts=contacts+1;status=1;if contacts==2 {status=2}
+    hitnode=_ag_cast_target;nx=_ag_cast_nx;ny=_ag_cast_ny;nz=_ag_cast_nz
+    var speed=rx*nx+ry*ny+rz*nz;if speed<0.0 {speed= -speed}
+    if speed==0.0 {_ag_fail(12,node,0);return 0}
+    safe=0.0;if clearance<_ag_cast_fraction*speed {safe=_ag_cast_fraction - clearance/speed}
+   }
+   if rx*safe!=0.0 || ry*safe!=0.0 || rz*safe!=0.0 {requested_advance=1}
+   lx=lx+rx*safe;ly=ly+ry*safe;lz=lz+rz*safe
+   x=lx+px;y=ly+py;z=lz+pz
+   if (x - x)+(y - y)+(z - z)+(lx - lx)+(ly - ly)+(lz - lz)!=0.0 {_ag_fail(12,node,0);return 0}
+   if _ag_cast_found==0 {break}
+   rx=rx*(1.0 - safe);ry=ry*(1.0 - safe);rz=rz*(1.0 - safe)
+   if nx!=0.0 {rx=0.0};if ny!=0.0 {ry=0.0};if nz!=0.0 {rz=0.0}
+   if rx==0.0 && ry==0.0 && rz==0.0 {break}
+  }
+  for a in 0..space {
+   var v=x;if a==1 {v=y};if a==2 {v=z}
+   let low float=v+_ag_spatial_boxes[bi+1+a];let high float=v+_ag_spatial_boxes[bi+4+a]
+   if (low - low)+(high - high)!=0.0 {_ag_fail(12,node,a);return 0};if low>=high {status=4}
+  }
+  let cw=worlds;let cb=_ag_spatial_boxes;let ck=kinds;let cd=dimensions;let cv=effective
+  let ml0=cb[bi+1];let ml1=cb[bi+2];let ml2=cb[bi+3];let mh0=cb[bi+4];let mh1=cb[bi+5];let mh2=cb[bi+6]
+  for n in 0..identities.len() {
+   if n==node || kinds[n]==5 || dimensions[n]!=space {continue}
+   if visible_only==1 && effective[n]==0 {continue}
+   var inside=1
+   let b=n*7;let w=n*3
+   let low0 float=(cw[w+0]+cb[b+1]) - mh0;let high0 float=(cw[w+0]+cb[b+4]) - ml0
+   if x<=low0 || x>=high0 {continue}
+   let low1 float=(cw[w+1]+cb[b+2]) - mh1;let high1 float=(cw[w+1]+cb[b+5]) - ml1
+   if y<=low1 || y>=high1 {continue}
+   if space==3 {
+   let low2 float=(cw[w+2]+cb[b+3]) - mh2;let high2 float=(cw[w+2]+cb[b+6]) - ml2
+   if z<=low2 || z>=high2 {continue}
+   }
+   if status!=3 && inside==1 {status=4}
+  }
+  if status!=3 && requested_advance==1 && x==ox && y==oy && z==oz {status=4}
+ }
+ if status==4 {x=ox;y=oy;z=oz;contacts=0;hitnode= -1;nx=0.0;ny=0.0;nz=0.0}
+ _ag_motion_state=status;_ag_motion_count=contacts
+ _ag_motion_dx=x - ox;_ag_motion_dy=y - oy;_ag_motion_dz=z - oz
+ _ag_motion_ux=dx - _ag_motion_dx;_ag_motion_uy=dy - _ag_motion_dy;_ag_motion_uz=dz - _ag_motion_dz
+ if (_ag_motion_dx - _ag_motion_dx)+(_ag_motion_dy - _ag_motion_dy)+(_ag_motion_dz - _ag_motion_dz)+(_ag_motion_ux - _ag_motion_ux)+(_ag_motion_uy - _ag_motion_uy)+(_ag_motion_uz - _ag_motion_uz)!=0.0 {_ag_fail(12,node,0);return 0}
+ if status!=3 && status!=4 {fields[fi]=lx;fields[fi+1]=ly;if space==3 {fields[fi+2]=lz};worlds[wi]=x;worlds[wi+1]=y;worlds[wi+2]=z;_ag_dirty=1;_ag_motion_published=1}
+ _ag_cast_px=x;_ag_cast_py=y;_ag_cast_pz=z;_ag_cast_target=hitnode;_ag_cast_nx=nx;_ag_cast_ny=ny;_ag_cast_nz=nz
+ _ag_cast_seq=_ag_cast_seq+1;_ag_cast_token=_ag_cast_seq;return _ag_cast_token
+}
+
+// A leaf has no consumers below it. A clean axis can update the original row
+// immediately; group or already-dirty axes retain the shared full derive path.
+fn _ag_motion_set_leaf(node int, axis int, value float) int {
+ if kinds[node]==5 {return 0}
+ if axis==0 && _ag_segment_dx!=0 {return 0}
+ if axis==1 && _ag_segment_dy!=0 {return 0}
+ if axis==2 && _ag_segment_dz!=0 {return 0}
+ var world=value;let parent=parents[node]
+ if parent>=0 {world=world+worlds[parent*3+axis]}
+ fields[node*12+axis]=value;worlds[node*3+axis]=world
+ _ag_dirty=1;_ag_motion_published=1;return 1
+}

@@ -1,0 +1,1497 @@
+{
+  "plan": "PLAN-849",
+  "revision": 1,
+  "review_before_running": true,
+  "legacy_unique_command_groups": 77,
+  "legacy_graphics_semantic_denominator": 87,
+  "legacy_agp": "163 tests/16native; original23 unmodified AGP slots retain source-bound848 receipts only if unchanged; see848 validated.json.txt/audit.py",
+  "driver_expected_inventory": "original216 + new31; exact selected/list/skip audit required, not an assertion of a full test run",
+  "source": "848 merge-r2/gates.json.txt final invocation by name, parameters rebased to849, all status pending",
+  "gates": [
+    {
+      "gate_id": "producer-test",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 producer-test"
+    },
+    {
+      "gate_id": "producer-build",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "cargo",
+        "build",
+        "--locked",
+        "--bins"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 producer-build"
+    },
+    {
+      "gate_id": "prepare-sdk",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/prepare_sdk.py",
+        "--repository",
+        "D:/autostack/auto-lang",
+        "--verify-only"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 prepare-sdk"
+    },
+    {
+      "gate_id": "source-controls",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/verify_plan849.py",
+        "--controls"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 source-controls"
+    },
+    {
+      "gate_id": "check",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "cargo",
+        "check",
+        "--locked",
+        "--all-targets"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 check"
+    },
+    {
+      "gate_id": "fmt",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "cargo",
+        "fmt",
+        "--package",
+        "autographics-auto-driver",
+        "--",
+        "--check"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 fmt"
+    },
+    {
+      "gate_id": "stack-autographics-auto-driver",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "cargo",
+        "rustc",
+        "--locked",
+        "--offline",
+        "--bin",
+        "autographics-auto-driver",
+        "--",
+        "-C",
+        "link-arg=/STACK:33554432"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 stack-autographics-auto-driver"
+    },
+    {
+      "gate_id": "stack-autographics-authoring",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "cargo",
+        "rustc",
+        "--locked",
+        "--offline",
+        "--bin",
+        "autographics-authoring",
+        "--",
+        "-C",
+        "link-arg=/STACK:33554432"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 stack-autographics-authoring"
+    },
+    {
+      "gate_id": "consumer-export",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/package_consumer.py",
+        "D:\\autostack\\.wt\\lang-849\\consumer-merge849"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-export"
+    },
+    {
+      "gate_id": "consumer-source",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/verify_source.py"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-source"
+    },
+    {
+      "gate_id": "consumer-source-controls",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/verify_plan849.py",
+        "--controls"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-source-controls"
+    },
+    {
+      "gate_id": "consumer-check",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "cargo",
+        "check",
+        "--locked",
+        "--all-targets"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-check"
+    },
+    {
+      "gate_id": "consumer-test",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-test"
+    },
+    {
+      "gate_id": "consumer-build",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "cargo",
+        "build",
+        "--locked",
+        "--bins"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-build"
+    },
+    {
+      "gate_id": "consumer-fmt",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "cargo",
+        "fmt",
+        "--package",
+        "autographics-auto-driver",
+        "--",
+        "--check"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-fmt"
+    },
+    {
+      "gate_id": "consumer-stack-autographics-auto-driver",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "cargo",
+        "rustc",
+        "--locked",
+        "--offline",
+        "--bin",
+        "autographics-auto-driver",
+        "--",
+        "-C",
+        "link-arg=/STACK:33554432"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-stack-autographics-auto-driver"
+    },
+    {
+      "gate_id": "consumer-stack-autographics-authoring",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "cargo",
+        "rustc",
+        "--locked",
+        "--offline",
+        "--bin",
+        "autographics-authoring",
+        "--",
+        "-C",
+        "link-arg=/STACK:33554432"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-stack-autographics-authoring"
+    },
+    {
+      "gate_id": "game-scene",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver\\target\\debug\\autographics-auto-driver.exe",
+        "--sample",
+        "scene",
+        "--window-probe",
+        "--report",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\game-scene"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 game-scene"
+    },
+    {
+      "gate_id": "game-scene-negative",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver\\target\\debug\\autographics-auto-driver.exe",
+        "--sample",
+        "scene",
+        "--window-probe",
+        "--sabotage-focus",
+        "--report",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\game-scene-negative"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 1,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 game-scene-negative"
+    },
+    {
+      "gate_id": "game-squash",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver\\target\\debug\\autographics-auto-driver.exe",
+        "--sample",
+        "squash",
+        "--window-probe",
+        "--report",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\game-squash"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 game-squash"
+    },
+    {
+      "gate_id": "game-squash-negative",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver\\target\\debug\\autographics-auto-driver.exe",
+        "--sample",
+        "squash",
+        "--window-probe",
+        "--sabotage-focus",
+        "--report",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\game-squash-negative"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 1,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 game-squash-negative"
+    },
+    {
+      "gate_id": "authoring",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+        "--window-probe",
+        "--report",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\authoring.json"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 authoring"
+    },
+    {
+      "gate_id": "authoring-negative",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+        "--window-probe",
+        "--sabotage-target",
+        "--frames",
+        "280",
+        "--report",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\authoring-negative.json"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 1,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 authoring-negative"
+    },
+    {
+      "gate_id": "interaction",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+        "--interaction-check",
+        "--report",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\interaction.json"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 interaction"
+    },
+    {
+      "gate_id": "interaction-wrong",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+        "--interaction-check",
+        "--sabotage-target",
+        "--report",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\interaction-wrong.json"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 1,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 interaction-wrong"
+    },
+    {
+      "gate_id": "interaction-drop",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+        "--interaction-check",
+        "--drop-release",
+        "--report",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\interaction-drop.json"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 1,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 interaction-drop"
+    },
+    {
+      "gate_id": "interaction-partial",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+        "--interaction-check",
+        "--frames",
+        "52",
+        "--report",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\interaction-partial.json"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 1,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 interaction-partial"
+    },
+    {
+      "gate_id": "interaction-truncated",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+        "--interaction-check",
+        "--frames",
+        "1",
+        "--report",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\interaction-truncated.json"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 1,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 interaction-truncated"
+    },
+    {
+      "gate_id": "observation",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+        "--interaction-probe",
+        "--frames",
+        "1",
+        "--report",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\observation.json"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 observation"
+    },
+    {
+      "gate_id": "interaction-reopen",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+        "--inspect",
+        "\\\\?\\D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver\\research\\authoring-native-18224.agscene"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 interaction-reopen"
+    },
+    {
+      "gate_id": "hierarchy",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/check_hierarchy.py",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\hierarchy"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 hierarchy"
+    },
+    {
+      "gate_id": "pixel-faults",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/check_hierarchy_pixel_faults.py",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\pixel-faults"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 pixel-faults"
+    },
+    {
+      "gate_id": "assets",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/check_scene_assets.py",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\assets"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 assets"
+    },
+    {
+      "gate_id": "play",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/check_scene_play.py",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\play"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 play"
+    },
+    {
+      "gate_id": "user",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/check_user_behavior.py",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\user"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 user"
+    },
+    {
+      "gate_id": "step",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/check_play_step_ack.py",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\step"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 step"
+    },
+    {
+      "gate_id": "projects",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/check_behavior_project.py",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\projects",
+        "--cases",
+        "bind-move,bind-patrol,update-fast,move,patrol,fast,partial,transparent,missing-part,wrong-asset,override,missing-source,bad-source,bad-actor,missing-glb"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 projects"
+    },
+    {
+      "gate_id": "ui-relocation",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\846\\merge-r1\\relocate-ui.py",
+        "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\projects",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\ui-relocation"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 ui-relocation"
+    },
+    {
+      "gate_id": "spatial",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/check_spatial_queries.py",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\spatial",
+        "--cases",
+        "zone2d,zone3d,zone2d-narrow,zone3d-narrow,partial,transparent,missing-part,wrong-asset,missing-code,bad-code,bad-api,missing-glb"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 spatial"
+    },
+    {
+      "gate_id": "segment",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/check_segment_queries.py",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\segment",
+        "--cases",
+        "beam2d,sight3d,beam2d-short,sight3d-short,beam2d-bind,sight3d-bind,partial,transparent,missing-part,wrong-asset,missing-code,bad-code,bad-api,missing-glb"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 segment"
+    },
+    {
+      "gate_id": "clock-controls",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/check_play_clock_pause.py",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\clock-controls"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 clock-controls"
+    },
+    {
+      "gate_id": "consumer-game-scene",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver\\target\\debug\\autographics-auto-driver.exe",
+        "--sample",
+        "scene",
+        "--window-probe",
+        "--report",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\consumer-game-scene"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-game-scene"
+    },
+    {
+      "gate_id": "consumer-game-scene-negative",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver\\target\\debug\\autographics-auto-driver.exe",
+        "--sample",
+        "scene",
+        "--window-probe",
+        "--sabotage-focus",
+        "--report",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\consumer-game-scene-negative"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 1,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-game-scene-negative"
+    },
+    {
+      "gate_id": "consumer-game-squash",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver\\target\\debug\\autographics-auto-driver.exe",
+        "--sample",
+        "squash",
+        "--window-probe",
+        "--report",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\consumer-game-squash"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-game-squash"
+    },
+    {
+      "gate_id": "consumer-game-squash-negative",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver\\target\\debug\\autographics-auto-driver.exe",
+        "--sample",
+        "squash",
+        "--window-probe",
+        "--sabotage-focus",
+        "--report",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\consumer-game-squash-negative"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 1,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-game-squash-negative"
+    },
+    {
+      "gate_id": "consumer-authoring",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+        "--window-probe",
+        "--report",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\consumer-authoring.json"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-authoring"
+    },
+    {
+      "gate_id": "consumer-authoring-negative",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+        "--window-probe",
+        "--sabotage-target",
+        "--frames",
+        "280",
+        "--report",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\consumer-authoring-negative.json"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 1,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-authoring-negative"
+    },
+    {
+      "gate_id": "consumer-interaction",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+        "--interaction-check",
+        "--report",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\consumer-interaction.json"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-interaction"
+    },
+    {
+      "gate_id": "consumer-interaction-wrong",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+        "--interaction-check",
+        "--sabotage-target",
+        "--report",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\consumer-interaction-wrong.json"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 1,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-interaction-wrong"
+    },
+    {
+      "gate_id": "consumer-interaction-drop",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+        "--interaction-check",
+        "--drop-release",
+        "--report",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\consumer-interaction-drop.json"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 1,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-interaction-drop"
+    },
+    {
+      "gate_id": "consumer-interaction-partial",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+        "--interaction-check",
+        "--frames",
+        "52",
+        "--report",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\consumer-interaction-partial.json"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 1,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-interaction-partial"
+    },
+    {
+      "gate_id": "consumer-interaction-truncated",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+        "--interaction-check",
+        "--frames",
+        "1",
+        "--report",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\consumer-interaction-truncated.json"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 1,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-interaction-truncated"
+    },
+    {
+      "gate_id": "consumer-observation",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+        "--interaction-probe",
+        "--frames",
+        "1",
+        "--report",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\consumer-observation.json"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-observation"
+    },
+    {
+      "gate_id": "consumer-interaction-reopen",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+        "--inspect",
+        "\\\\?\\D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver\\research\\authoring-native-53908.agscene"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-interaction-reopen"
+    },
+    {
+      "gate_id": "consumer-hierarchy",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/check_hierarchy.py",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\consumer-hierarchy"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-hierarchy"
+    },
+    {
+      "gate_id": "consumer-pixel-faults",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/check_hierarchy_pixel_faults.py",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\consumer-pixel-faults"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-pixel-faults"
+    },
+    {
+      "gate_id": "consumer-assets",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/check_scene_assets.py",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\consumer-assets"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-assets"
+    },
+    {
+      "gate_id": "consumer-play",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/check_scene_play.py",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\consumer-play"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-play"
+    },
+    {
+      "gate_id": "consumer-user",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/check_user_behavior.py",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\consumer-user"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-user"
+    },
+    {
+      "gate_id": "consumer-step",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/check_play_step_ack.py",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\consumer-step"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-step"
+    },
+    {
+      "gate_id": "consumer-projects",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/check_behavior_project.py",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\consumer-projects",
+        "--cases",
+        "bind-move,bind-patrol,update-fast,move,patrol,fast,partial,transparent,missing-part,wrong-asset,override,missing-source,bad-source,bad-actor,missing-glb"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-projects"
+    },
+    {
+      "gate_id": "consumer-ui-relocation",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\846\\merge-r1\\relocate-ui.py",
+        "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\consumer-projects",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\consumer-ui-relocation"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-ui-relocation"
+    },
+    {
+      "gate_id": "consumer-spatial",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/check_spatial_queries.py",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\consumer-spatial",
+        "--cases",
+        "zone2d,zone3d,zone2d-narrow,zone3d-narrow,partial,transparent,missing-part,wrong-asset,missing-code,bad-code,bad-api,missing-glb"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-spatial"
+    },
+    {
+      "gate_id": "consumer-segment",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/check_segment_queries.py",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\consumer-segment",
+        "--cases",
+        "beam2d,sight3d,beam2d-short,sight3d-short,beam2d-bind,sight3d-bind,partial,transparent,missing-part,wrong-asset,missing-code,bad-code,bad-api,missing-glb"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-segment"
+    },
+    {
+      "gate_id": "consumer-clock-controls",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/check_play_clock_pause.py",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\consumer-clock-controls"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-clock-controls"
+    },
+    {
+      "gate_id": "asset-owners",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/check_asset_owners.py",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\asset-owners"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 asset-owners"
+    },
+    {
+      "gate_id": "play-owners",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/check_play_owners.py",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\play-owners"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 play-owners"
+    },
+    {
+      "gate_id": "user-owners",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/check_play_owners.py",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\user-owners",
+        "--user"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 user-owners"
+    },
+    {
+      "gate_id": "project-owners",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/check_behavior_project_owners.py",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\project-owners"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 project-owners"
+    },
+    {
+      "gate_id": "spatial-owners",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/check_spatial_owners.py",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\spatial-owners"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 spatial-owners"
+    },
+    {
+      "gate_id": "segment-owners",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/check_segment_owners.py",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\segment-owners"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\auto-lang\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 segment-owners"
+    },
+    {
+      "gate_id": "consumer-asset-owners",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/check_asset_owners.py",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\consumer-asset-owners"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-asset-owners"
+    },
+    {
+      "gate_id": "consumer-play-owners",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/check_play_owners.py",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\consumer-play-owners"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-play-owners"
+    },
+    {
+      "gate_id": "consumer-user-owners",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/check_play_owners.py",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\consumer-user-owners",
+        "--user"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-user-owners"
+    },
+    {
+      "gate_id": "consumer-project-owners",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/check_behavior_project_owners.py",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\consumer-project-owners"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-project-owners"
+    },
+    {
+      "gate_id": "consumer-spatial-owners",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/check_spatial_owners.py",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\consumer-spatial-owners"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-spatial-owners"
+    },
+    {
+      "gate_id": "consumer-segment-owners",
+      "owner": "merge",
+      "status": "pending",
+      "command": [
+        "python",
+        "tools/check_segment_owners.py",
+        "D:\\autostack\\auto-lang\\docs\\plans\\attachments\\848\\merge-r2\\consumer-segment-owners"
+      ],
+      "cwd": "D:\\autostack\\.wt\\lang-849\\consumer-merge849\\experimental\\autographics-auto-driver",
+      "expected_exit": 0,
+      "env": {
+        "RUSTFLAGS": "-C link-arg=/STACK:33554432",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "origin": "PLAN848 consumer-segment-owners"
+    },
+    {
+      "gate_id": "producer-sweep-native",
+      "owner": "merge",
+      "status": "pending",
+      "cwd": "D:/autostack/.wt/lang-849/auto-lang/experimental/autographics-auto-driver",
+      "command": [
+        "python",
+        "tools/check_swept_aabb.py",
+        "D:/autostack/plan-artifacts/plan-849/merge/producer/sweep",
+        "--cases",
+        "dash2d,dash3d,dash2d-short,dash3d-short,dash2d-bind,dash3d-bind,partial,transparent,missing-part,wrong-asset,missing-code,bad-code,bad-api,missing-glb"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "gate_id": "producer-sweep-owners",
+      "owner": "merge",
+      "status": "pending",
+      "cwd": "D:/autostack/.wt/lang-849/auto-lang/experimental/autographics-auto-driver",
+      "command": [
+        "python",
+        "tools/check_sweep_owners.py",
+        "D:/autostack/plan-artifacts/plan-849/merge/producer/owners"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "gate_id": "consumer-sweep-native",
+      "owner": "merge",
+      "status": "pending",
+      "cwd": "D:/autostack/.wt/lang-849/consumer-merge849/experimental/autographics-auto-driver",
+      "command": [
+        "python",
+        "tools/check_swept_aabb.py",
+        "D:/autostack/plan-artifacts/plan-849/merge/consumer/sweep",
+        "--cases",
+        "dash2d,dash3d,dash2d-short,dash3d-short,dash2d-bind,dash3d-bind,partial,transparent,missing-part,wrong-asset,missing-code,bad-code,bad-api,missing-glb"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "gate_id": "consumer-sweep-owners",
+      "owner": "merge",
+      "status": "pending",
+      "cwd": "D:/autostack/.wt/lang-849/consumer-merge849/experimental/autographics-auto-driver",
+      "command": [
+        "python",
+        "tools/check_sweep_owners.py",
+        "D:/autostack/plan-artifacts/plan-849/merge/consumer/owners"
+      ],
+      "expected_exit": 0
+    }
+  ],
+  "excluded": "root cargo t/tv/tt/tb/tu/taa/docs_gen: driver-only change; tf remains main single-instance due check/B845-FEATURE-01 assigned847"
+}

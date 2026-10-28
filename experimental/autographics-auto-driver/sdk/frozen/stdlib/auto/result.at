@@ -1,0 +1,93 @@
+/// Result Module — Plan 250
+///
+/// Provides Result<T,E> for error handling, inspired by Rust's Result,
+/// Go's error interface, and Python's try/except pattern.
+///
+/// Usage:
+///   let r = Ok(42)
+///   let e = Err("something went wrong")
+///   is r {
+///     Ok(v) -> print("got: ", v)
+///     Err(msg) -> print("error: ", msg)
+///   }
+
+/// Result<T,E> — represents either success (Ok) or failure (Err).
+enum Result<T, E> {
+    Ok T
+    Err E
+
+    fn is_ok() bool {
+        is self {
+            Ok(_) -> true
+            _ -> false
+        }
+    }
+
+    fn is_err() bool {
+        is self {
+            Err(_) -> true
+            _ -> false
+        }
+    }
+
+    fn unwrap() T {
+        is self {
+            Ok(v) -> v
+            Err(e) -> panic(f"unwrap on Err: $e")
+        }
+    }
+
+    fn unwrap_or(default T) T {
+        is self {
+            Ok(v) -> v
+            _ -> default
+        }
+    }
+
+    fn unwrap_err() E {
+        is self {
+            Err(e) -> e
+            Ok(_) -> panic("unwrap_err on Ok")
+        }
+    }
+
+    /// Map the Ok value using a function. Err passes through unchanged.
+    fn map(f fn(T) U) Result<U, E> {
+        is self {
+            Ok(v) -> Ok(f(v))
+            Err(e) -> Err(e)
+        }
+    }
+
+    /// Chain a function that returns Result. Err passes through unchanged.
+    fn and_then(f fn(T) Result<U, E>) Result<U, E> {
+        is self {
+            Ok(v) -> f(v)
+            Err(e) -> Err(e)
+        }
+    }
+
+    /// Map the Err value using a function. Ok passes through unchanged.
+    fn map_err(f fn(E) F) Result<T, F> {
+        is self {
+            Ok(v) -> Ok(v)
+            Err(e) -> Err(f(e))
+        }
+    }
+
+    /// Convert to May: Ok(v) becomes May.val(v), Err becomes May.nil()
+    fn ok() May<T> {
+        is self {
+            Ok(v) -> May.value(v)
+            Err(_) -> May.empty()
+        }
+    }
+
+    /// Convert Err to May: Err(e) becomes May.val(e), Ok becomes May.nil()
+    fn err() May<E> {
+        is self {
+            Ok(_) -> May.empty()
+            Err(e) -> May.value(e)
+        }
+    }
+}

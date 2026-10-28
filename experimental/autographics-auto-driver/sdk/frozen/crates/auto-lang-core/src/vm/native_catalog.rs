@@ -1,0 +1,3216 @@
+// Plan 249: Single source of truth for native function IDs.
+// Each entry: (ID, CONST_NAME, shim_function, "canonical.name")
+// Covers all functions with self.register() calls in native.rs.
+// Functions registered via register_shim_by_name (stdlib.rs) are NOT here — they stay manual.
+
+/// Master catalog of native functions with shim bindings.
+/// Each entry generates a NATIVE_* constant via gen_native_constants!
+/// and a shim binding via bind_shims!
+/// 4-tuple format: (ID, CONST_NAME, shim_function, "canonical.name")
+#[macro_export]
+macro_rules! for_each_native {
+    ($mac:ident) => {
+        $mac! {
+            // === Print/Assert ===
+            (1, NATIVE_PRINT_I32, shim_print_i32, "auto.print_i32"),
+            (2, NATIVE_PRINT_F32, shim_print_f32, "auto.print_f32"),
+            (4, NATIVE_PRINT_F64, shim_print_f64, "auto.print_f64"),
+            (3, NATIVE_PRINT_STR, shim_print_str, "auto.print_str"),
+            // Plan 378: u64/i64 print (pops 2 slots: [low, high])
+            (9, NATIVE_PRINT_U64, shim_print_u64, "auto.print_u64"),
+            // Plan 377 §3.1: 统一 print（单槽，按 tag 解码任意类型）。
+            // codegen 的 print() 路由到此，取代按 ObjectType 分发到 I32/F32/F64/U64。
+            (10, NATIVE_PRINT_UNIFIED, shim_print_unified, "auto.print_unified"),
+            (2900, NATIVE_WRITE_STR, shim_write_str, "auto.write_str"),
+            // === Plan 413: code editor payload accessors (UI bridge) ===
+            (2910, NATIVE_CODE_EDITOR_TEXT, shim_code_editor_text, "auto.code_editor.text"),
+            (2911, NATIVE_CODE_EDITOR_CURSOR_LINE, shim_code_editor_cursor_line, "auto.code_editor.cursor_line"),
+            (2912, NATIVE_CODE_EDITOR_CURSOR_COL, shim_code_editor_cursor_col, "auto.code_editor.cursor_col"),
+            (2913, NATIVE_CODE_EDITOR_SELECTION_LEN, shim_code_editor_selection_len, "auto.code_editor.selection_len"),
+            (2914, NATIVE_CODE_EDITOR_FIND, shim_code_editor_find, "auto.code_editor.find"),
+            (2915, NATIVE_CODE_EDITOR_SET_TEXT, shim_code_editor_set_text, "auto.code_editor.set_text"),
+            // === Plan 673 T-01: unified delta queue — read side ===
+            // NB: 2930/2931 are taken by auto.host.call/_value (Plan 060 M3,
+            // below in this catalog) — 2939 is the next free 29xx id.
+            (2939, NATIVE_CODE_EDITOR_DELTA, shim_code_editor_delta, "auto.code_editor.delta"),
+            // === Plan 673 T-02: structured write — write side ===
+            // 29xx 带已耗尽(2940-2999 全被 image/term/rc/autodown 族占满,
+            // 2960=auto.image.queue)——沿 PLAN-656 scroll 族先例取 9900+
+            // 高段(dynamic shim 自 10000 起,stdlib 动态计数永不达此)。
+            (9906, NATIVE_CODE_EDITOR_EDIT, shim_code_editor_edit, "auto.code_editor.edit"),
+            // PLAN-687: bulk load endpoint (native-side file → editor; dual of the
+            // registered code_editor_save want). 9900+ band per P673-D2.
+            (9908, NATIVE_CODE_EDITOR_LOAD_FILE, shim_code_editor_load_file, "auto.code_editor.load_file"), // 9907 已被 Env.track 占（P673-D2 无守卫坑实测：错派发返垃圾值）
+            // === PLAN-701 供①/供②: save 直写 + 光标/滚动端点（9909-9913，
+            // 沿 9900+ 高段惯例续段；013/010/009 下游 want 集中清偿）===
+            (9909, NATIVE_CODE_EDITOR_SAVE, shim_code_editor_save, "auto.code_editor.save"),
+            (9910, NATIVE_CODE_EDITOR_SET_CURSOR, shim_code_editor_set_cursor, "auto.code_editor.set_cursor"),
+            (9911, NATIVE_CODE_EDITOR_SCROLL_OFFSET_X, shim_code_editor_scroll_offset_x, "auto.code_editor.scroll_offset_x"),
+            (9912, NATIVE_CODE_EDITOR_SCROLL_OFFSET_Y, shim_code_editor_scroll_offset_y, "auto.code_editor.scroll_offset_y"),
+            (9913, NATIVE_CODE_EDITOR_SCROLL_TO, shim_code_editor_scroll_to, "auto.code_editor.scroll_to"),
+            // === PLAN-701 供⑥: shell 跳转列表 Recent 一调用 shim
+            // （SHAddToRecentDocs(SHARD_PATHW)；非 Windows no-op 返 false；
+            // 零注册表关联面——auto-edit PLAN-014 T-01 裁定 (b) 消费前置）。
+            (9914, NATIVE_SHELL_ADD_RECENT, shim_shell_add_recent, "auto.shell.add_recent"),
+            // === PLAN-703 供⑤: diff engine consumption endpoints (9915-9917，
+            // 沿 9900+ 高段续段；9914 已被 701 供⑥占——计划草案"9914 起"
+            // 前提漂移修正，见计划 §9 入场记录）===
+            (9915, NATIVE_DIFF_FILES, shim_diff_files, "auto.diff_files"),
+            (9916, NATIVE_DIFF_SNAPSHOTS, shim_diff_snapshots, "auto.diff_snapshots"),
+            (9917, NATIVE_DIFF_DIRS, shim_diff_dirs, "auto.diff_dirs"),
+            // === PLAN-716 组B: 帧时间戳观测通道（供②——AUTO_FRAME_BENCH
+            // 门控零开销；701 time 族只读内建先例；9918/9919 空闲位实勘）===
+            (9918, NATIVE_FRAME_BEGIN_MS, shim_frame_begin_ms, "auto.frame.begin_ms"),
+            (9919, NATIVE_FRAME_PRESENT_MS, shim_frame_present_ms, "auto.frame.present_ms"),
+            // === PLAN-716 组C: diff rows 窗口投影（diff-engine-supply §6
+            // want——021 FAIL 清偿路径；9915 签名冻结，窗口走新端点）===
+            // PLAN-716 Phase 2 (供⑧): 9920 与 PLAN-095 ui.focus 撞号——本表
+            // shim 槽按清单序后注册者覆盖（:419 ui_focus 在后），VM 轨窗口
+            // 调用恒派发 ui_focus shim（静默 no-op→Int(0)，下游 plan-022
+            // 挂死实测根因）。窗口件改签 9921；ui.focus 已交付消费面不回改。
+            (9921, NATIVE_DIFF_FILES_WINDOW, shim_diff_files_window, "auto.diff_files_window"),
+            // === Plan 413 follow-up: console natives (in-app Console panel) ===
+            (2916, NATIVE_CONSOLE_LOG, shim_console_log, "auto.console.log"),
+            (2917, NATIVE_CONSOLE_LINES, shim_console_lines, "auto.console.lines"),
+            (2918, NATIVE_CONSOLE_CLEAR, shim_console_clear, "auto.console.clear"),
+            // === Plan 418: editor actions + clipboard + dialogs (menu/toolbar) ===
+            (2919, NATIVE_CODE_EDITOR_UNDO, shim_code_editor_undo, "auto.code_editor.undo"),
+            (2920, NATIVE_CODE_EDITOR_REDO, shim_code_editor_redo, "auto.code_editor.redo"),
+            (2921, NATIVE_CODE_EDITOR_SELECT_ALL, shim_code_editor_select_all, "auto.code_editor.select_all"),
+            (2922, NATIVE_CODE_EDITOR_CUT, shim_code_editor_cut, "auto.code_editor.cut"),
+            (2923, NATIVE_CODE_EDITOR_COPY, shim_code_editor_copy, "auto.code_editor.copy"),
+            (2924, NATIVE_CODE_EDITOR_PASTE, shim_code_editor_paste, "auto.code_editor.paste"),
+            (2925, NATIVE_CLIPBOARD_TEXT, shim_clipboard_text, "auto.clipboard.text"),
+            (2926, NATIVE_CLIPBOARD_SET_TEXT, shim_clipboard_set_text, "auto.clipboard.set_text"),
+            // === Plan 485: native clipboard files/images (CF_HDROP / DIBV5+PNG) ===
+            (2934, NATIVE_CLIPBOARD_FILES_GET, shim_clipboard_files_get, "auto.clipboard.files_get"),
+            (2935, NATIVE_CLIPBOARD_FILES_SET, shim_clipboard_files_set, "auto.clipboard.files_set"),
+            (2936, NATIVE_CLIPBOARD_IMAGE_GET, shim_clipboard_image_get, "auto.clipboard.image_get"),
+            (2937, NATIVE_CLIPBOARD_IMAGE_SET, shim_clipboard_image_set, "auto.clipboard.image_set"),
+            // === Plan 488: OLE 拖出（DoDragDrop 受理即返；效果经 on_dnd_finished 回注） ===
+            (2938, NATIVE_DND_START, shim_dnd_start, "auto.dnd.start"),
+            (2927, NATIVE_DIALOG_OPEN, shim_dialog_open, "auto.dialog.open"),
+            (2928, NATIVE_DIALOG_SAVE, shim_dialog_save, "auto.dialog.save"),
+            (2929, NATIVE_FILE_BASENAME, shim_file_basename, "auto.file.basename"),
+            // === Plan 541: System Monitor (auto.sys.*) ===
+            (2421, NATIVE_SYS_CPU_USAGE, shim_sys_cpu_usage, "auto.sys.cpu_usage"),
+            (2422, NATIVE_SYS_CPU_COUNT, shim_sys_cpu_count, "auto.sys.cpu_count"),
+            (2423, NATIVE_SYS_CPU_CORE_USAGE, shim_sys_cpu_core_usage, "auto.sys.cpu_core_usage"),
+            (2424, NATIVE_SYS_CPU_BRAND, shim_sys_cpu_brand, "auto.sys.cpu_brand"),
+            (2425, NATIVE_SYS_MEM_TOTAL_MB, shim_sys_mem_total_mb, "auto.sys.mem_total_mb"),
+            (2426, NATIVE_SYS_MEM_USED_MB, shim_sys_mem_used_mb, "auto.sys.mem_used_mb"),
+            (2427, NATIVE_SYS_NET_SENT_KBS, shim_sys_net_sent_kbs, "auto.sys.net_sent_kbs"),
+            (2428, NATIVE_SYS_NET_RECV_KBS, shim_sys_net_recv_kbs, "auto.sys.net_recv_kbs"),
+            (2429, NATIVE_SYS_PROCESSES, shim_sys_processes, "auto.sys.processes"),
+            (2431, NATIVE_SYS_KILL, shim_sys_kill, "auto.sys.kill"),
+            (2432, NATIVE_SYS_OS_NAME, shim_sys_os_name, "auto.sys.os_name"),
+            (2433, NATIVE_SYS_OS_VERSION, shim_sys_os_version, "auto.sys.os_version"),
+            (2434, NATIVE_SYS_KERNEL_VERSION, shim_sys_kernel_version, "auto.sys.kernel_version"),
+            (2435, NATIVE_SYS_HOSTNAME, shim_sys_hostname, "auto.sys.hostname"),
+            (2436, NATIVE_SYS_UPTIME_S, shim_sys_uptime_s, "auto.sys.uptime_s"),
+            (2437, NATIVE_SYS_DISKS, shim_sys_disks, "auto.sys.disks"),
+            (2438, NATIVE_SYS_USERS, shim_sys_users, "auto.sys.users"),
+            // === Plan 428 P1: code folding (view state) ===
+            (2932, NATIVE_CODE_EDITOR_FOLD_TOGGLE, shim_code_editor_fold_toggle, "auto.code_editor.fold_toggle"),
+            (2933, NATIVE_CODE_EDITOR_FOLD_HIDDEN_COUNT, shim_code_editor_fold_hidden_count, "auto.code_editor.fold_hidden_count"),
+            (8, NATIVE_ASSERT, shim_assert, "auto.assert"),
+            (5, NATIVE_ASSERT_EQ, shim_assert_eq, "auto.assert_eq"),
+            (6, NATIVE_ASSERT_NE, shim_assert_ne, "auto.assert_ne"),
+            (7, NATIVE_RUNTIME_PANIC, shim_runtime_panic, "auto.runtime_panic"),
+
+            // === List (100-110, 205, 2060-2080) ===
+            (100, NATIVE_LIST_NEW, shim_list_new, "auto.list.new"),
+            (101, NATIVE_LIST_PUSH, shim_list_push, "auto.list.push"),
+            (102, NATIVE_LIST_POP, shim_list_pop, "auto.list.pop"),
+            (103, NATIVE_LIST_LEN, shim_list_len, "auto.list.len"),
+            (104, NATIVE_LIST_IS_EMPTY, shim_list_is_empty, "auto.list.is_empty"),
+            (105, NATIVE_LIST_CLEAR, shim_list_clear, "auto.list.clear"),
+            (106, NATIVE_LIST_GET, shim_list_get, "auto.list.get"),
+            (107, NATIVE_LIST_SET, shim_list_set, "auto.list.set"),
+            (108, NATIVE_LIST_INSERT, shim_list_insert, "auto.list.insert"),
+            (109, NATIVE_LIST_REMOVE, shim_list_remove, "auto.list.remove"),
+            (110, NATIVE_LIST_DROP, shim_list_drop, "auto.list.drop"),
+            (118, NATIVE_LIST_RESERVE, shim_list_reserve, "auto.list.reserve"),
+            (205, NATIVE_LIST_CAPACITY, shim_list_capacity, "auto.list.capacity"),
+            (2060, NATIVE_LIST_MAP, shim_list_map, "auto.list.map"),
+            (2061, NATIVE_LIST_FILTER, shim_list_filter, "auto.list.filter"),
+            (2062, NATIVE_LIST_FOREACH, shim_list_for_each, "auto.list.for_each"),
+            (2063, NATIVE_LIST_FIND, shim_list_find, "auto.list.find"),
+            (2064, NATIVE_LIST_ANY, shim_list_any, "auto.list.any"),
+            (2065, NATIVE_LIST_ALL, shim_list_all, "auto.list.all"),
+            (2066, NATIVE_LIST_REDUCE, shim_list_reduce, "auto.list.reduce"),
+            (2067, NATIVE_LIST_SORT, shim_list_sort, "auto.list.sort"),
+            (2068, NATIVE_LIST_SORT_BY, shim_list_sort_by, "auto.list.sort_by"),
+            (2071, NATIVE_LIST_SPLICE, shim_list_splice, "auto.list.splice"),
+            (2072, NATIVE_LIST_FIND_INDEX, shim_list_find_index, "auto.list.find_index"),
+            (2080, NATIVE_LIST_JOIN, shim_list_join, "auto.list.join"),
+            // === Plan 046 (auto-musk T2): dynamic-receiver (obj) family ===
+            (2090, NATIVE_OBJ_KEYS, shim_obj_keys, "auto.obj.keys"),
+            (2091, NATIVE_OBJ_VALUES, shim_obj_values, "auto.obj.values"),
+            (2092, NATIVE_OBJ_FIND, shim_obj_find, "auto.obj.find"),
+            (2069, NATIVE_LIST_CONTAINS, shim_list_contains, "auto.list.contains"),
+
+            // === Result HOF ===
+            (2070, NATIVE_RESULT_MAP_ERR, shim_result_map_err, "auto.result.map_err"),
+
+            // === Iterator (111-118) ===
+            (111, NATIVE_LIST_ITER, shim_list_iter, "auto.list.iter"),
+            (112, NATIVE_ITERATOR_NEXT, shim_iterator_next, "auto.iterator.next"),
+            (113, NATIVE_ITERATOR_MAP, shim_iterator_map, "auto.iterator.map"),
+            (114, NATIVE_ITERATOR_FILTER, shim_iterator_filter, "auto.iterator.filter"),
+            (115, NATIVE_ITERATOR_COLLECT, shim_iterator_collect, "auto.iterator.collect"),
+            (116, NATIVE_ITERATOR_REDUCE, shim_iterator_reduce, "auto.iterator.reduce"),
+            (117, NATIVE_ITERATOR_FIND, shim_iterator_find, "auto.iterator.find"),
+            (119, NATIVE_ITERATOR_ENUMERATE, shim_iterator_enumerate, "auto.iterator.enumerate"),
+
+            // === HashMap (120-128, 1290-1292) ===
+            (120, NATIVE_HASHMAP_NEW, shim_hashmap_new, "auto.hashmap.new"),
+            (121, NATIVE_HASHMAP_INSERT_STR, shim_hashmap_insert_str, "auto.hashmap.insert_str"),
+            (122, NATIVE_HASHMAP_INSERT_INT, shim_hashmap_insert_int, "auto.hashmap.insert_int"),
+            (123, NATIVE_HASHMAP_GET_STR, shim_hashmap_get_str, "auto.hashmap.get_str"),
+            (124, NATIVE_HASHMAP_GET_INT, shim_hashmap_get_int, "auto.hashmap.get_int"),
+            (125, NATIVE_HASHMAP_CONTAINS, shim_hashmap_contains, "auto.hashmap.contains"),
+            (126, NATIVE_HASHMAP_REMOVE, shim_hashmap_remove, "auto.hashmap.remove"),
+            (127, NATIVE_HASHMAP_SIZE, shim_hashmap_size, "auto.hashmap.size"),
+            (128, NATIVE_HASHMAP_CLEAR, shim_hashmap_clear, "auto.hashmap.clear"),
+            (129, NATIVE_HASHMAP_DROP, shim_hashmap_drop, "auto.hashmap.drop"),
+            (1290, NATIVE_HASHMAP_IS_EMPTY, shim_hashmap_is_empty, "auto.hashmap.is_empty"),
+            (1291, NATIVE_HASHMAP_GET_OR, shim_hashmap_get_or, "auto.hashmap.get_or"),
+            (1292, NATIVE_HASHMAP_KEYS, shim_hashmap_keys, "auto.hashmap.keys"),
+
+            // === HashSet (129-135;new=1293 —— 129 原与 hashmap.drop 撞号,2026-08-22 移出) ===
+            (1293, NATIVE_HASHSET_NEW, shim_hashset_new, "auto.hashset.new"),
+            (130, NATIVE_HASHSET_INSERT, shim_hashset_insert, "auto.hashset.insert"),
+            (131, NATIVE_HASHSET_CONTAINS, shim_hashset_contains, "auto.hashset.contains"),
+            (132, NATIVE_HASHSET_REMOVE, shim_hashset_remove, "auto.hashset.remove"),
+            (133, NATIVE_HASHSET_SIZE, shim_hashset_size, "auto.hashset.size"),
+            (134, NATIVE_HASHSET_CLEAR, shim_hashset_clear, "auto.hashset.clear"),
+            (135, NATIVE_HASHSET_DROP, shim_hashset_drop, "auto.hashset.drop"),
+
+            // === StringBuilder (160-167) ===
+            (160, NATIVE_STRINGBUILDER_NEW, shim_stringbuilder_new, "auto.stringbuilder.new"),
+            (161, NATIVE_STRINGBUILDER_APPEND, shim_stringbuilder_append, "auto.stringbuilder.append"),
+            (162, NATIVE_STRINGBUILDER_APPEND_INT, shim_stringbuilder_append_int, "auto.stringbuilder.append_int"),
+            (163, NATIVE_STRINGBUILDER_APPEND_CHAR, shim_stringbuilder_append_char, "auto.stringbuilder.append_char"),
+            (164, NATIVE_STRINGBUILDER_LEN, shim_stringbuilder_len, "auto.stringbuilder.len"),
+            (165, NATIVE_STRINGBUILDER_CLEAR, shim_stringbuilder_clear, "auto.stringbuilder.clear"),
+            (166, NATIVE_STRINGBUILDER_DROP, shim_stringbuilder_drop, "auto.stringbuilder.drop"),
+            (167, NATIVE_STRINGBUILDER_BUILD, shim_stringbuilder_build, "auto.stringbuilder.build"),
+
+            // === VecDeque (136-146) ===
+            (136, NATIVE_VECDEQUE_NEW, shim_vecdeque_new, "auto.vecdeque.new"),
+            (137, NATIVE_VECDEQUE_PUSH_BACK, shim_vecdeque_push_back, "auto.vecdeque.push_back"),
+            (138, NATIVE_VECDEQUE_PUSH_FRONT, shim_vecdeque_push_front, "auto.vecdeque.push_front"),
+            (139, NATIVE_VECDEQUE_POP_BACK, shim_vecdeque_pop_back, "auto.vecdeque.pop_back"),
+            (140, NATIVE_VECDEQUE_POP_FRONT, shim_vecdeque_pop_front, "auto.vecdeque.pop_front"),
+            (141, NATIVE_VECDEQUE_FRONT, shim_vecdeque_front, "auto.vecdeque.front"),
+            (142, NATIVE_VECDEQUE_BACK, shim_vecdeque_back, "auto.vecdeque.back"),
+            (143, NATIVE_VECDEQUE_SIZE, shim_vecdeque_size, "auto.vecdeque.size"),
+            (144, NATIVE_VECDEQUE_IS_EMPTY, shim_vecdeque_is_empty, "auto.vecdeque.is_empty"),
+            (145, NATIVE_VECDEQUE_CLEAR, shim_vecdeque_clear, "auto.vecdeque.clear"),
+            (146, NATIVE_VECDEQUE_DROP, shim_vecdeque_drop, "auto.vecdeque.drop"),
+
+            // === BTreeMap (147-157) ===
+            (147, NATIVE_BTREEMAP_NEW, shim_btreemap_new, "auto.btreemap.new"),
+            (148, NATIVE_BTREEMAP_INSERT, shim_btreemap_insert, "auto.btreemap.insert"),
+            (149, NATIVE_BTREEMAP_GET, shim_btreemap_get, "auto.btreemap.get"),
+            (150, NATIVE_BTREEMAP_CONTAINS, shim_btreemap_contains, "auto.btreemap.contains"),
+            (151, NATIVE_BTREEMAP_REMOVE, shim_btreemap_remove, "auto.btreemap.remove"),
+            (152, NATIVE_BTREEMAP_SIZE, shim_btreemap_size, "auto.btreemap.size"),
+            (153, NATIVE_BTREEMAP_IS_EMPTY, shim_btreemap_is_empty, "auto.btreemap.is_empty"),
+            (154, NATIVE_BTREEMAP_CLEAR, shim_btreemap_clear, "auto.btreemap.clear"),
+            (155, NATIVE_BTREEMAP_FIRST_KEY, shim_btreemap_first_key, "auto.btreemap.first_key"),
+            (156, NATIVE_BTREEMAP_LAST_KEY, shim_btreemap_last_key, "auto.btreemap.last_key"),
+            (157, NATIVE_BTREEMAP_DROP, shim_btreemap_drop, "auto.btreemap.drop"),
+
+            // === String (170-186) ===
+            (170, NATIVE_STR_LEN, shim_str_len, "auto.str.len"),
+            (171, NATIVE_STRING_LEN, shim_string_len, "auto.string.len"),
+            (172, NATIVE_STR_NEW, shim_str_new, "auto.str.new"),
+            (173, NATIVE_STR_APPEND, shim_str_append, "auto.str.append"),
+            (174, NATIVE_INT_STR, shim_int_str, "auto.int.str"),
+            (175, NATIVE_STR_UPPER, shim_str_upper, "auto.str.upper"),
+            (176, NATIVE_STRING_FROM, shim_string_from, "auto.string.from"),
+            (177, NATIVE_STRING_NEW, shim_string_new, "auto.string.new"),
+            (178, NATIVE_STRING_PUSH, shim_string_push, "auto.string.push"),
+            (179, NATIVE_STRING_POP, shim_string_pop, "auto.string.pop"),
+            (180, NATIVE_STRING_GET, shim_string_get, "auto.string.get"),
+            (181, NATIVE_STRING_SET, shim_string_set, "auto.string.set"),
+            (182, NATIVE_STRING_INSERT, shim_string_insert, "auto.string.insert"),
+            (183, NATIVE_STRING_REMOVE, shim_string_remove, "auto.string.remove"),
+            (184, NATIVE_STRING_CLEAR, shim_string_clear, "auto.string.clear"),
+            (185, NATIVE_STRING_IS_EMPTY, shim_string_is_empty, "auto.string.is_empty"),
+            (186, NATIVE_STRING_RESERVE, shim_string_reserve, "auto.string.reserve"),
+
+            // === String/Uint Extensions ===
+            (235, NATIVE_STR_BYTES, shim_str_bytes, "auto.str.bytes"),
+            (236, NATIVE_UINT_TO_HEX, shim_uint_to_hex, "auto.uint.to_hex"),
+
+            // === Memory Allocation (190-192) ===
+            (190, NATIVE_ALLOC_ARRAY, shim_alloc_array, "auto.alloc.array"),
+            (191, NATIVE_REALLOC_ARRAY, shim_realloc_array, "auto.realloc.array"),
+            (192, NATIVE_FREE_ARRAY, shim_free_array, "auto.free.array"),
+
+            // === Heap/Storage (195-202) ===
+            (195, NATIVE_HEAP_NEW, shim_heap_new, "auto.heap.new"),
+            (196, NATIVE_HEAP_CAPACITY, shim_heap_capacity, "auto.heap.capacity"),
+            (197, NATIVE_HEAP_TRY_GROW, shim_heap_try_grow, "auto.heap.try_grow"),
+            (198, NATIVE_HEAP_DROP, shim_heap_drop, "auto.heap.drop"),
+            (199, NATIVE_INLINE_INT64_NEW, shim_inline_int64_new, "auto.inline_int64.new"),
+            (200, NATIVE_INLINE_INT64_CAPACITY, shim_inline_int64_capacity, "auto.inline_int64.capacity"),
+            (201, NATIVE_INLINE_INT64_TRY_GROW, shim_inline_int64_try_grow, "auto.inline_int64.try_grow"),
+            (202, NATIVE_INLINE_INT64_DROP, shim_inline_int64_drop, "auto.inline_int64.drop"),
+
+            // === Bit Operations (210-234) — Plan 178 ===
+            (210, NATIVE_INT_AND, shim_int_and, "auto.int.and"),
+            (211, NATIVE_INT_OR, shim_int_or, "auto.int.or"),
+            (212, NATIVE_INT_XOR, shim_int_xor, "auto.int.xor"),
+            (213, NATIVE_INT_NOT, shim_int_not, "auto.int.not"),
+            (214, NATIVE_INT_SHL, shim_int_shl, "auto.int.shl"),
+            (215, NATIVE_INT_SHR, shim_int_shr, "auto.int.shr"),
+            (216, NATIVE_INT_SAR, shim_int_sar, "auto.int.sar"),
+            (217, NATIVE_INT_ROL, shim_int_rol, "auto.int.rol"),
+            (218, NATIVE_INT_ROR, shim_int_ror, "auto.int.ror"),
+            (220, NATIVE_INT_COUNT_ONES, shim_int_count_ones, "auto.int.count_ones"),
+            (221, NATIVE_INT_LEADING_ZEROS, shim_int_leading_zeros, "auto.int.leading_zeros"),
+            (222, NATIVE_INT_TRAILING_ZEROS, shim_int_trailing_zeros, "auto.int.trailing_zeros"),
+            (223, NATIVE_INT_BITREV, shim_int_bitrev, "auto.int.bitrev"),
+            (230, NATIVE_INT_BIT_READ, shim_int_bit_read, "auto.int.bit_read"),
+            (231, NATIVE_INT_BIT_TEST, shim_int_bit_test, "auto.int.bit_test"),
+            (232, NATIVE_INT_BIT_ON, shim_int_bit_on, "auto.int.bit_on"),
+            (233, NATIVE_INT_BIT_OFF, shim_int_bit_off, "auto.int.bit_off"),
+            (234, NATIVE_INT_BIT_FLIP, shim_int_bit_flip, "auto.int.bit_flip"),
+
+            // === Rand (1850-1854) — Plan 212 ===
+            (1850, NATIVE_RAND_THREAD_RNG, shim_rand_thread_rng, "auto.rand.thread_rng"),
+            (1851, NATIVE_RNG_GEN_RANGE, shim_rng_gen_range, "auto.rng.gen_range"),
+            (1852, NATIVE_RNG_GEN, shim_rng_gen, "auto.rng.gen"),
+            (1853, NATIVE_RNG_DROP, shim_rng_drop, "auto.rng.drop"),
+            (1854, NATIVE_RAND_RANDOM, shim_rand_random, "auto.rand.random"),
+
+            // === Log ===
+            (1804, NATIVE_LOG_NOOP, shim_log_noop, "auto.log.noop"),
+
+            // === Regex Opaque (2450-2459) — Plan 212 ===
+            (2450, NATIVE_RE_OPAQUE_NEW, shim_re_opaque_new, "auto.re_opaque.new"),
+            (2451, NATIVE_RE_OPAQUE_IS_MATCH, shim_re_opaque_is_match, "auto.re_opaque.is_match"),
+            (2452, NATIVE_RE_OPAQUE_FIND, shim_re_opaque_find, "auto.re_opaque.find"),
+            (2453, NATIVE_RE_OPAQUE_FIND_ALL, shim_re_opaque_find_all, "auto.re_opaque.find_all"),
+            (2454, NATIVE_RE_OPAQUE_REPLACE_ALL, shim_re_opaque_replace_all, "auto.re_opaque.replace_all"),
+            (2455, NATIVE_RE_OPAQUE_CAPTURES, shim_re_opaque_captures, "auto.re_opaque.captures"),
+            (2459, NATIVE_RE_OPAQUE_DROP, shim_re_opaque_drop, "auto.re_opaque.drop"),
+
+            // === URL Opaque (2500-2511) — Plan 212 ===
+            (2500, NATIVE_URL_OPAQUE_PARSE, shim_url_opaque_parse, "auto.url_opaque.parse"),
+            (2501, NATIVE_URL_OPAQUE_SCHEME, shim_url_opaque_scheme, "auto.url_opaque.scheme"),
+            (2502, NATIVE_URL_OPAQUE_HOST_STR, shim_url_opaque_host_str, "auto.url_opaque.host_str"),
+            (2503, NATIVE_URL_OPAQUE_PATH, shim_url_opaque_path, "auto.url_opaque.path"),
+            (2504, NATIVE_URL_OPAQUE_FRAGMENT, shim_url_opaque_fragment, "auto.url_opaque.fragment"),
+            (2505, NATIVE_URL_OPAQUE_PORT, shim_url_opaque_port, "auto.url_opaque.port"),
+            (2506, NATIVE_URL_OPAQUE_QUERY_PAIRS, shim_url_opaque_query_pairs, "auto.url_opaque.query_pairs"),
+            (2510, NATIVE_URL_OPAQUE_QUERY, shim_url_opaque_query, "auto.url_opaque.query"),
+            (2511, NATIVE_URL_OPAQUE_TO_STRING, shim_url_opaque_to_string, "auto.url_opaque.to_string"),
+            (2507, NATIVE_URL_OPAQUE_JOIN, shim_url_opaque_join, "auto.url_opaque.join"),
+            (2508, NATIVE_URL_OPAQUE_ORIGIN, shim_url_opaque_origin, "auto.url_opaque.origin"),
+            (2509, NATIVE_URL_OPAQUE_DROP, shim_url_opaque_drop, "auto.url_opaque.drop"),
+
+            // === Semver Opaque (2600-2609) — Plan 212 ===
+            (2600, NATIVE_SEMVER_OPAQUE_PARSE, shim_semver_opaque_parse, "auto.semver_opaque.parse"),
+            (2601, NATIVE_SEMVER_OPAQUE_MAJOR, shim_semver_opaque_major, "auto.semver_opaque.major"),
+            (2602, NATIVE_SEMVER_OPAQUE_MINOR, shim_semver_opaque_minor, "auto.semver_opaque.minor"),
+            (2603, NATIVE_SEMVER_OPAQUE_PATCH, shim_semver_opaque_patch, "auto.semver_opaque.patch"),
+            (2604, NATIVE_SEMVER_OPAQUE_PRE, shim_semver_opaque_pre, "auto.semver_opaque.pre"),
+            (2605, NATIVE_SEMVER_OPAQUE_TO_STRING, shim_semver_opaque_to_string, "auto.semver_opaque.to_string"),
+            (2606, NATIVE_SEMVER_OPAQUE_CMP_GT, shim_semver_opaque_cmp_gt, "auto.semver_opaque.cmp_gt"),
+            (2609, NATIVE_SEMVER_OPAQUE_DROP, shim_semver_opaque_drop, "auto.semver_opaque.drop"),
+            (2610, NATIVE_SEMVER_OPAQUE_VERSIONREQ_PARSE, shim_semver_opaque_versionreq_parse, "auto.semver_opaque_versionreq.parse"),
+            (2611, NATIVE_SEMVER_OPAQUE_VERSIONREQ_MATCHES, shim_semver_opaque_versionreq_matches, "auto.semver_opaque_versionreq.matches"),
+
+            // === Chrono Opaque (2700-2709) — Plan 212 ===
+            (2700, NATIVE_CHRONO_LOCAL_NOW, shim_chrono_local_now, "auto.chrono_opaque.local_now"),
+            (2701, NATIVE_CHRONO_YEAR, shim_chrono_year, "auto.chrono_opaque.year"),
+            (2702, NATIVE_CHRONO_MONTH, shim_chrono_month, "auto.chrono_opaque.month"),
+            (2703, NATIVE_CHRONO_DAY, shim_chrono_day, "auto.chrono_opaque.day"),
+            (2704, NATIVE_CHRONO_HOUR, shim_chrono_hour, "auto.chrono_opaque.hour"),
+            (2705, NATIVE_CHRONO_MINUTE, shim_chrono_minute, "auto.chrono_opaque.minute"),
+            (2706, NATIVE_CHRONO_SECOND, shim_chrono_second, "auto.chrono_opaque.second"),
+            (2707, NATIVE_CHRONO_TIMESTAMP, shim_chrono_timestamp, "auto.chrono_opaque.timestamp"),
+            (2708, NATIVE_CHRONO_FORMAT, shim_chrono_format, "auto.chrono_opaque.format"),
+            (2709, NATIVE_CHRONO_DROP, shim_chrono_drop, "auto.chrono_opaque.drop"),
+
+            // === Base64 (2710-2711) — Plan 212 ===
+            (2710, NATIVE_BASE64_ENCODE, shim_base64_encode, "auto.base64.encode"),
+            (2711, NATIVE_BASE64_DECODE, shim_base64_decode, "auto.base64.decode"),
+
+            // === Hex (2720-2721) — Plan 212 ===
+            (2720, NATIVE_HEX_ENCODE, shim_hex_encode, "auto.hex.encode"),
+            (2721, NATIVE_HEX_DECODE, shim_hex_decode, "auto.hex.decode"),
+
+            // === SHA2 Opaque (2730-2739) — Plan 212 ===
+            (2730, NATIVE_SHA2_SHA256_NEW, shim_sha2_sha256_new, "auto.sha2_opaque.sha256_new"),
+            (2731, NATIVE_SHA2_UPDATE, shim_sha2_update, "auto.sha2_opaque.update"),
+            (2732, NATIVE_SHA2_FINALIZE, shim_sha2_finalize, "auto.sha2_opaque.finalize"),
+            (2739, NATIVE_SHA2_DROP, shim_sha2_drop, "auto.sha2_opaque.drop"),
+
+            // === Mime (2740) — Plan 212 ===
+            (2740, NATIVE_MIME_FROM_PATH, shim_mime_from_path, "auto.mime.from_path"),
+
+            // === Math (1710-1733) — Plan 240 VM-1 ===
+            (1716, NATIVE_MATH_SIN, shim_math_sin, "auto.math.sin"),
+            (1717, NATIVE_MATH_COS, shim_math_cos, "auto.math.cos"),
+            (1718, NATIVE_MATH_TAN, shim_math_tan, "auto.math.tan"),
+            (1723, NATIVE_MATH_ABS_F, shim_math_abs_f, "auto.math.abs_f"),
+            (1710, NATIVE_MATH_FLOOR, shim_math_floor, "auto.math.floor"),
+            (1711, NATIVE_MATH_CEIL, shim_math_ceil, "auto.math.ceil"),
+            (1712, NATIVE_MATH_ROUND, shim_math_round, "auto.math.round"),
+            (1713, NATIVE_MATH_POW, shim_math_pow, "auto.math.pow"),
+            (1731, NATIVE_MATH_POWF, shim_math_powf, "auto.math.powf"),
+            (1730, NATIVE_MATH_POWI, shim_math_powi, "auto.math.powi"),
+            (1719, NATIVE_MATH_EXP, shim_math_exp, "auto.math.exp"),
+            (1720, NATIVE_MATH_LN, shim_math_ln, "auto.math.ln"),
+            (1721, NATIVE_MATH_LOG2, shim_math_log2, "auto.math.log2"),
+            (1722, NATIVE_MATH_LOG10, shim_math_log10, "auto.math.log10"),
+            (1724, NATIVE_MATH_SIGNUM, shim_math_signum, "auto.math.signum"),
+            (1726, NATIVE_MATH_ASIN, shim_math_asin, "auto.math.asin"),
+            (1727, NATIVE_MATH_ACOS, shim_math_acos, "auto.math.acos"),
+            (1728, NATIVE_MATH_ATAN, shim_math_atan, "auto.math.atan"),
+            (1729, NATIVE_MATH_ATAN2, shim_math_atan2, "auto.math.atan2"),
+            (1732, NATIVE_MATH_TO_RADIANS, shim_math_to_radians, "auto.math.to_radians"),
+            (1733, NATIVE_MATH_TO_DEGREES, shim_math_to_degrees, "auto.math.to_degrees"),
+
+            // === Instant (1203-1204) — Plan 240 ===
+            (1203, NATIVE_INSTANT_NOW, shim_instant_now, "auto.time.instant_now"),
+            // PLAN-701 供④: elapsed 约定勘定——毫秒 int（名表同步 Void→I64，
+            // 见 register_bigvm 段）；此前字符串+null 双推、.at 侧实得 None
+            // （m1-supply §9）。
+            (1204, NATIVE_INSTANT_ELAPSED, shim_instant_elapsed, "auto.time.instant_elapsed"),
+            // === Time (1200/1201/1205) — PLAN-701 供④: epoch 三件实装
+            // （此前仅名表登记无 shim，裸/use 两形态均返 0——m1-supply §9）。
+            // 语义与 a2r-std/src/time.rs 三方一致（GOAL-003）。
+            (1200, NATIVE_TIME_NOW_MS, shim_time_now_ms, "auto.time.now_ms"),
+            (1201, NATIVE_TIME_NOW_SEC, shim_time_now_sec, "auto.time.now_sec"),
+            (1205, NATIVE_TIME_NOW, shim_time_now, "auto.time.now"),
+
+            // === Scheduler (1206-1207) — Plan 442 A5: one-shot timers ===
+            (1206, NATIVE_SCHED_SET_TIMEOUT, shim_sched_set_timeout, "auto.sched.set_timeout"),
+            (1207, NATIVE_SCHED_CLEAR_TIMEOUT, shim_sched_clear_timeout, "auto.sched.clear_timeout"),
+
+            // === Plan 442 B-support: web-platform globals ===
+            // url.encode (2000) completes the ID-map-only entry with a shim;
+            // localStorage bridge uses the JS shape (getItem -> None when
+            // missing) over the Plan 401 session KV store.
+            (2000, NATIVE_URL_ENCODE, shim_url_encode, "auto.url.encode"),
+            // plan-022 (auto-down): axum {*path} wildcard client encode —
+            // segments encoded, `/` separators preserved (browser fetch
+            // parity). 2004's ENCODE_PATH_SEGMENT const is hand-declared in
+            // stdlib.rs with no shim; this entry mints its own id.
+            (2013, NATIVE_URL_ENCODE_PATH, shim_url_encode_path, "auto.url.encode_path"),
+            (2771, NATIVE_LOCALSTORAGE_GET_ITEM, shim_localstorage_get_item, "auto.localstorage.get_item"),
+            (2772, NATIVE_LOCALSTORAGE_SET_ITEM, shim_localstorage_set_item, "auto.localstorage.set_item"),
+            (2773, NATIVE_LOCALSTORAGE_REMOVE_ITEM, shim_localstorage_remove_item, "auto.localstorage.remove_item"),
+            // Plan 442 C2: rust-form env::var bridge (Option-shaped producer).
+            (2795, NATIVE_ENV_VAR, shim_env_var, "auto.env.var"),
+            // === Plan 442 Phase B: `dom.*` / `location.reload()` web globals ===
+            // The iced VM renderer is dark-fixed, so prefers_dark -> true and
+            // set_dark/set_css_var are recorded no-ops; focus/click/reload are
+            // desktop-semantics stubs; open_url really opens the OS browser.
+            (2774, NATIVE_DOM_SET_DARK, shim_dom_set_dark, "auto.dom.set_dark"),
+            (2775, NATIVE_DOM_PREFERS_DARK, shim_dom_prefers_dark, "auto.dom.prefers_dark"),
+            (2776, NATIVE_DOM_SET_CSS_VAR, shim_dom_set_css_var, "auto.dom.set_css_var"),
+            (2777, NATIVE_DOM_FOCUS_FIRST, shim_dom_focus_first, "auto.dom.focus_first"),
+            (2778, NATIVE_DOM_CLICK_FIRST, shim_dom_click_first, "auto.dom.click_first"),
+            // PLAN-095 T-04: 平台中立程序化聚焦（desktop 真实现；web=dom.focus_first 同义直译）。
+            (9920, NATIVE_UI_FOCUS, shim_ui_focus, "auto.ui.focus"),
+            (2779, NATIVE_DOM_OPEN_URL, shim_dom_open_url, "auto.dom.open_url"),
+            (2784, NATIVE_DOM_RELOAD, shim_dom_reload, "auto.dom.reload"),
+
+            // === OnceCell (2850-2852) — Plan 240 ===
+            (2850, NATIVE_ONCE_NEW, shim_once_new, "auto.cell.once_new"),
+            (2851, NATIVE_ONCE_SET, shim_once_set, "auto.cell.once_set"),
+            (2852, NATIVE_ONCE_GET, shim_once_get, "auto.cell.once_get"),
+
+            // === File I/O Opaque (1010-1013) — Plan 240 ===
+            (1010, NATIVE_FILE_CREATE_HANDLE, shim_file_create_handle, "auto.file.create_handle"),
+            (1011, NATIVE_FILE_OPEN_HANDLE, shim_file_open_handle, "auto.file.open_handle"),
+            (1012, NATIVE_FILE_WRITE_HANDLE, shim_file_write_handle, "auto.file.write_handle"),
+            (1013, NATIVE_FILE_TRY_CLONE, shim_file_try_clone, "auto.file.try_clone"),
+
+            // === Bool to String (2750) — Plan 250 ===
+            (2750, NATIVE_BOOL_TO_STR, shim_bool_to_str, "auto.bool.to_str"),
+
+            // === Float to String (2751) — Plan 250 ===
+            (2751, NATIVE_F64_TO_STR, shim_f64_to_str, "auto.f64.to_str"),
+
+            // === Result (2760-2769) — Plan 250 ===
+            (2760, NATIVE_RESULT_IS_OK, shim_result_is_ok, "auto.result.is_ok"),
+            (2761, NATIVE_RESULT_IS_ERR, shim_result_is_err, "auto.result.is_err"),
+            (2762, NATIVE_RESULT_UNWRAP, shim_result_unwrap, "auto.result.unwrap"),
+            (2763, NATIVE_RESULT_UNWRAP_OR, shim_result_unwrap_or, "auto.result.unwrap_or"),
+            (2764, NATIVE_RESULT_UNWRAP_ERR, shim_result_unwrap_err, "auto.result.unwrap_err"),
+            (2765, NATIVE_RESULT_OK, shim_result_ok, "auto.result.ok"),
+            (2766, NATIVE_RESULT_ERR, shim_result_err, "auto.result.err"),
+
+            // === List Reverse (2770) — Plan 250 ===
+            (2770, NATIVE_LIST_REVERSE, shim_list_reverse, "auto.list.reverse"),
+
+            // === Random convenience (2780-2783) — Plan 250 ===
+            (2780, NATIVE_RAND_INT, shim_rand_int, "auto.rand.int"),
+            (2781, NATIVE_RAND_FLOAT, shim_rand_float, "auto.rand.float"),
+            (2782, NATIVE_RAND_BOOL, shim_rand_bool, "auto.rand.bool"),
+            (2783, NATIVE_RAND_SHUFFLE, shim_rand_shuffle, "auto.rand.shuffle"),
+
+            // === DateTime extended (2790-2793) — Plan 250 ===
+            (2790, NATIVE_CHRONO_FROM_TIMESTAMP, shim_chrono_from_timestamp, "auto.chrono_opaque.from_timestamp"),
+            (2791, NATIVE_CHRONO_FROM_YMD, shim_chrono_from_ymd, "auto.chrono_opaque.from_ymd"),
+            (2792, NATIVE_CHRONO_WEEKDAY, shim_chrono_weekday, "auto.chrono_opaque.weekday"),
+
+            // === CSV (2800-2803) — Plan 250 ===
+            (2800, NATIVE_CSV_PARSE, shim_csv_parse, "auto.csv.parse"),
+            (2801, NATIVE_CSV_PARSE_DELIM, shim_csv_parse_delim, "auto.csv.parse_delim"),
+            (2802, NATIVE_CSV_ENCODE, shim_csv_encode, "auto.csv.encode"),
+            (2803, NATIVE_CSV_ENCODE_DELIM, shim_csv_encode_delim, "auto.csv.encode_delim"),
+
+            // === Hashing (2810-2815) — Plan 250 ===
+            (2810, NATIVE_HASH_MD5, shim_hash_md5, "auto.hash.md5"),
+            (2811, NATIVE_HASH_SHA1, shim_hash_sha1, "auto.hash.sha1"),
+            (2812, NATIVE_HASH_SHA256, shim_hash_sha256, "auto.hash.sha256"),
+            (2813, NATIVE_HASH_SHA512, shim_hash_sha512, "auto.hash.sha512"),
+
+            // === Test assertions (2820-2827) — Plan 250 ===
+            (2820, NATIVE_TEST_ASSERT_TRUE, shim_test_assert_true, "auto.test.assert_true"),
+            (2821, NATIVE_TEST_ASSERT_FALSE, shim_test_assert_false, "auto.test.assert_false"),
+            (2822, NATIVE_TEST_ASSERT_CONTAINS, shim_test_assert_contains, "auto.test.assert_contains"),
+            (2823, NATIVE_TEST_ASSERT_LEN, shim_test_assert_len, "auto.test.assert_len"),
+            (2824, NATIVE_TEST_ASSERT_OK, shim_test_assert_ok, "auto.test.assert_ok"),
+            (2825, NATIVE_TEST_ASSERT_ERR, shim_test_assert_err, "auto.test.assert_err"),
+
+            // === Format (2830-2832) — Plan 250 ===
+            (2830, NATIVE_FMT_SPRINTF, shim_fmt_sprintf, "auto.fmt.sprintf"),
+            (2831, NATIVE_FMT_PRINTF, shim_fmt_printf, "auto.fmt.printf"),
+            (2832, NATIVE_FMT_EPRINTF, shim_fmt_eprintf, "auto.fmt.eprintf"),
+
+            // === FS extended (2840-2847) — Plan 250 ===
+            (2840, NATIVE_FS_TEMP_DIR, shim_fs_temp_dir, "auto.fs.temp_dir"),
+            (2841, NATIVE_FS_TEMP_FILE, shim_fs_temp_file, "auto.fs.temp_file"),
+            // 2026-09-14(PLAN-016 T-05):rename/canonical/ext 由 2842/2844/2845
+            // 迁 2983/2984/2985——原 id 与 bigvm 表 File.read/Path.new/Path.join
+            // 撞号（read_dir 2843→2866 同症先例），VM 模式派发错位非确定挂起。
+            // 2026-09-15(PLAN-016 merge master):2983-2987 已被 master 侧
+            // PLAN-018 D5/PLAN-015 D4 term engine natives 占用——四件再迁
+            // 2994-2997（2994-2999 全仓空闲带，防撞号重演）。
+            (2994, NATIVE_FS_RENAME, shim_fs_rename, "auto.fs.rename"),
+            // 2026-08-22:auto.fs.read_dir 换用 2866 —— 原 2843 与 BIGVM 表的
+            // File.position(:1281/:2009)撞号(shim 按 ID 注册,File.position 的
+            // CALL_NAT 2843 会错派到 read_dir shim)。read_dir 此前只在 shim 表
+            // 登记、白名单(for_each_bigvm_native/NATIVE_ID_ENTRIES)缺失,VM 模式
+            // 下 widget/back 模块调用报 Undefined symbol —— 一并补齐。
+            (2866, NATIVE_FS_READ_DIR, shim_fs_read_dir, "auto.fs.read_dir"),
+            // Plan 626 T-04:嵌套目录树 JSON(参数 str,int;返回 str;
+            // 2875 取 random 段 2870-2874 与 2880 之间的空档,防撞号重演)。
+            (2875, NATIVE_FS_TREE, shim_fs_tree, "auto.fs.tree"),
+            // Plan 060:merged 模式 shell 执行提交(api.at 契约归一的传输件)。
+            (2867, NATIVE_SHELL_EXEC_SUBMIT, shim_shell_exec_submit, "auto.shell.exec_submit"),
+            // Plan 060 M2:builtin 直发(语义在 .at 提交侧算好)。
+            (2868, NATIVE_SHELL_EMIT_RESULT, shim_shell_emit_result, "auto.shell.emit_result"),
+            // 2026-08-22 show 下沉:读文件+高亮+payload 全在 Rust(.at 拼巨串
+            // 损坏 VM 堆;参数 int,str,path;str,cwd;返回 void)。
+            (2869, NATIVE_SHELL_EMIT_SHOW, shim_shell_emit_show, "auto.shell.emit_show"),
+            // Plan 060 M3:通用宿主桥(merged 进程内直调;实现由 ash-runner 注册)。
+            // 2026-08-22(注册秩序根因修复):原 2870/2871 与下方 Random 段
+            // (2870-2874)撞号 —— bind_shims 后注册覆盖先注册,native_interface
+            // 表派发错位(M3 当时靠引擎直调特例绕过)。挪到空闲段 2930-2931,
+            // 特例已回收,恢复正常表派发。
+            (2930, NATIVE_HOST_CALL, shim_host_call, "auto.host.call"),
+            (2931, NATIVE_HOST_CALL_VALUE, shim_host_call_value, "auto.host.call_value"),
+            // === Plan 419: 引用计数诊断 natives ===
+            (2940, NATIVE_RC_LIVE, shim_rc_live, "auto.rc.live"),
+            (2941, NATIVE_RC_COUNT, shim_rc_count, "auto.rc.count"),
+            (2942, NATIVE_RC_ASSERT_UNIQUE, shim_rc_assert_unique, "auto.rc.assert_unique"),
+            // === auto-os Plan 013 T2: AutoTerm 引擎桥(libloading → autoterm_core.dll)===
+            (2943, NATIVE_TERM_ENGINE_SPAWN, shim_term_spawn, "auto.term.engine_spawn"),
+            (2944, NATIVE_TERM_ENGINE_WRITE_LINE, shim_term_write_line, "auto.term.engine_write_line"),
+            (2945, NATIVE_TERM_ENGINE_ROWS, shim_term_rows, "auto.term.engine_rows"),
+            (2946, NATIVE_TERM_ENGINE_RESIZE, shim_term_resize, "auto.term.engine_resize"),
+            (2947, NATIVE_TERM_ENGINE_INTERRUPT, shim_term_interrupt, "auto.term.engine_interrupt"),
+            (2948, NATIVE_TERM_ENGINE_IS_EXITED, shim_term_is_exited, "auto.term.engine_is_exited"),
+            (2949, NATIVE_TERM_ENGINE_FREE, shim_term_free, "auto.term.engine_free"),
+            // === PLAN-656: scroll-pane controller 原生族（ui::scroll::controller
+            // 队列；renderer update 期排空消费）。id 取 9900+ 高段：review F-3
+            // 实证 register_stdlib_ffi 的动态分配器（next_id 顺序增长）已越过
+            // 29xx 带，经 register_shim_by_name 覆写静态表——避开动态可达区间 ===
+            (9900, NATIVE_SCROLL_CONTROLLER, shim_scroll_controller, "auto.scroll.controller"),
+            (9901, NATIVE_SCROLL_TO_START, shim_scroll_to_start, "auto.scroll.to_start"),
+            (9902, NATIVE_SCROLL_TO_END, shim_scroll_to_end, "auto.scroll.to_end"),
+            (9903, NATIVE_SCROLL_BY, shim_scroll_by, "auto.scroll.by"),
+            (9904, NATIVE_SCROLL_TO, shim_scroll_to, "auto.scroll.to"),
+            (9905, NATIVE_SCROLL_STATE, shim_scroll_state, "auto.scroll.state"),
+            // === PLAN-781 阶段B: 子内容锚点族（T-01 冻结；id 实勘 9906–9921
+            // 全占（code_editor/Env.track/diff/frame/ui.focus），9922/9923 空闲、
+            // 下一占用 9930 http.transfer——沿 9900+ 高段续段纪律）===
+            (9922, NATIVE_SCROLL_TO_CHILD, shim_scroll_to_child, "auto.scroll.to_child"),
+            (9923, NATIVE_SCROLL_ANCHOR_STATE, shim_scroll_anchor_state, "auto.scroll.anchor_state"),
+            // 014 直键入:terminal 键入队列 → 引擎裸写(键盘直键入泵)。
+            (2957, NATIVE_TERM_ENGINE_PUMP_INPUT, shim_term_pump_input, "auto.term.engine_pump_input"),
+            // 014:几何随动 + 光标格(apply_resize 取注册表待定几何;
+            // viewport/cursor 读 glue 采样静态量)。
+            (2958, NATIVE_TERM_ENGINE_CURSOR_ROW, shim_term_cursor_row, "auto.term.engine_cursor_row"),
+            (2959, NATIVE_TERM_ENGINE_CURSOR_COL, shim_term_cursor_col, "auto.term.engine_cursor_col"),
+            (2976, NATIVE_TERM_ENGINE_APPLY_RESIZE, shim_term_apply_resize, "auto.term.engine_apply_resize"),
+            (2977, NATIVE_TERM_ENGINE_VIEWPORT_COLS, shim_term_viewport_cols, "auto.term.engine_viewport_cols"),
+            (2978, NATIVE_TERM_ENGINE_VIEWPORT_ROWS, shim_term_viewport_rows, "auto.term.engine_viewport_rows"),
+            // 014 积压报警回读面(db.at 同源:pending/paused/take-alerts/dropped)。
+            (2979, NATIVE_TERM_ENGINE_BACKLOG_PENDING_MB, shim_term_backlog_pending_mb, "auto.term.engine_backlog_pending_mb"),
+            (2980, NATIVE_TERM_ENGINE_BACKLOG_PAUSED, shim_term_backlog_paused, "auto.term.engine_backlog_paused"),
+            (2981, NATIVE_TERM_ENGINE_BACKLOG_TAKE_ALERTS, shim_term_backlog_take_alerts, "auto.term.engine_backlog_take_alerts"),
+            (2982, NATIVE_TERM_ENGINE_BACKLOG_DROPPED, shim_term_backlog_dropped, "auto.term.engine_backlog_dropped"),
+            // PLAN-018 D5:SpawnSpec(spawn_ex)+ 定向泵三件(per-key 泵面;
+            // 广播/任意旧件保留为兼容面)。
+            (2983, NATIVE_TERM_ENGINE_SPAWN_EX, shim_term_spawn_ex, "auto.term.engine_spawn_ex"),
+            (2984, NATIVE_TERM_ENGINE_ROWS_FOR, shim_term_rows_for, "auto.term.engine_rows_for"),
+            (2985, NATIVE_TERM_ENGINE_PUMP_FOR, shim_term_pump_for, "auto.term.engine_pump_for"),
+            (2986, NATIVE_TERM_ENGINE_APPLY_RESIZE_FOR, shim_term_apply_resize_for, "auto.term.engine_apply_resize_for"),
+            // PLAN-015 D4:菜单动作载荷(0=Copy 1=Paste 2=SelectAll
+            // 3=Interrupt;-1=无载荷;注册表任意端)。
+            (2987, NATIVE_TERM_ENGINE_MENU_TAKE, shim_term_menu_take, "auto.term.engine_menu_take"),
+            // PLAN-025(B 部 VM 臂 stub + T-04 探针):config_* 空集 stub
+            // (profile 消费非目标 §10.2;auto-lang 不依赖 autoterm-config
+            // 无环铁律,空集 = G6 降级语义)+ 滚动待排探针(泵节拍门)。
+            (2988, NATIVE_TERM_CONFIG_PROFILES, shim_term_config_profiles, "auto.term.config_profiles"),
+            (2989, NATIVE_TERM_CONFIG_DEFAULT_PROFILE, shim_term_config_default_profile, "auto.term.config_default_profile"),
+            (2990, NATIVE_TERM_CONFIG_PROFILES_FULL, shim_term_config_profiles_full, "auto.term.config_profiles_full"),
+            (2991, NATIVE_TERM_CONFIG_SPAWN_PROGRAM, shim_term_config_spawn_program, "auto.term.config_spawn_program"),
+            (2992, NATIVE_TERM_CONFIG_SPAWN_ARGV, shim_term_config_spawn_argv, "auto.term.config_spawn_argv"),
+            (2993, NATIVE_TERM_CONFIG_SPAWN_CWD, shim_term_config_spawn_cwd, "auto.term.config_spawn_cwd"),
+            (3001, NATIVE_TERM_ENGINE_SCROLL_PENDING_FOR, shim_term_scroll_pending_for, "auto.term.engine_scroll_pending_for"),
+            // PLAN-028:分体轨 resize 断链桥——pend 几何跨界写入(geom 串
+            // 形态,.at 侧零解析)+ 引擎 history 查询(nums 尾段数据源)。
+            // id 续 3000 带(026 write_raw/scroll_pending_for 先例)。
+            (3002, NATIVE_TERM_ENGINE_PEND_RESIZE_GEOM, shim_term_engine_pend_resize_geom, "auto.term.engine_pend_resize_geom"),
+            (3003, NATIVE_TERM_ENGINE_HISTORY, shim_term_engine_history, "auto.term.engine_history"),
+            // PLAN-020 T-00b:窗口尺寸面(逻辑 px;分屏矩形投影 px 类几何的
+            // 标定源)。读 iced_adapter 窗口全局(renderer 每帧 set),零引擎
+            // 耦合;vue back 无窗口降级返缺省槽位值。
+            (2998, NATIVE_TERM_WINDOW_WIDTH, shim_term_window_width, "auto.term.window_width"),
+            (2999, NATIVE_TERM_WINDOW_HEIGHT, shim_term_window_height, "auto.term.window_height"),
+            // PLAN-026 needs_fix: engine_write_raw(键入 VT 裸写;id 3000 起)。
+            (3000, NATIVE_TERM_ENGINE_WRITE_RAW, shim_term_write_raw, "auto.term.engine_write_raw"),
+            (2995, NATIVE_FS_CANONICAL, shim_fs_canonical, "auto.fs.canonical"),
+            (2996, NATIVE_FS_EXT, shim_fs_ext, "auto.fs.ext"),
+            // 2026-09-14(PLAN-016 T-05):mtime 走 rust_fn 宏自注册
+            //（ffi/stdlib.rs，同 File.size 形态），不进本表（id 载于
+            // 签名/白名单表，2997）。
+            (2846, NATIVE_FS_STEM, shim_fs_stem, "auto.fs.stem"),
+            (2847, NATIVE_FS_WALK_FILES, shim_fs_walk_files, "auto.fs.walk_files"),
+
+            // === FS more (2860-2865) ===
+            (2860, NATIVE_FS_WALK, shim_fs_walk, "auto.fs.walk"),
+            (2861, NATIVE_FS_METADATA, shim_fs_metadata, "auto.fs.metadata"),
+            (2862, NATIVE_FS_COPY_RECURSIVE, shim_fs_copy_recursive, "auto.fs.copy_recursive"),
+            (2863, NATIVE_FS_FILENAME, shim_fs_filename, "auto.fs.filename"),
+            (2864, NATIVE_FS_PARENT, shim_fs_parent, "auto.fs.parent"),
+            (2865, NATIVE_FS_JOIN, shim_fs_join, "auto.fs.join"),
+
+            // === Hash extended (2814-2816) ===
+            (2814, NATIVE_HASH_HMAC_SHA256, shim_hash_hmac_sha256, "auto.hash.hmac_sha256"),
+            (2815, NATIVE_HASH_FILE_MD5, shim_hash_file_md5, "auto.hash.file_md5"),
+            (2816, NATIVE_HASH_FILE_SHA256, shim_hash_file_sha256, "auto.hash.file_sha256"),
+
+            // === Random type (2870-2874) ===
+            (2870, NATIVE_RANDOM_NEW, shim_random_new, "auto.random._vm_new"),
+            (2871, NATIVE_RANDOM_SEEDED, shim_random_seeded, "auto.random._vm_seeded"),
+            (2872, NATIVE_RANDOM_INSTANCE_INT, shim_random_instance_int, "auto.random.int"),
+            (2873, NATIVE_RANDOM_INSTANCE_FLOAT, shim_random_instance_float, "auto.random.float"),
+            (2874, NATIVE_RANDOM_INSTANCE_BOOL, shim_random_instance_bool, "auto.random.bool"),
+
+            // === Fmt (2752) ===
+            (2752, NATIVE_F64_DEBUG, shim_f64_debug, "auto.fmt.f64_debug"),
+
+            // === Cmp (2880) ===
+            (2880, NATIVE_STR_CMP, shim_str_cmp, "auto.cmp.str_cmp"),
+
+            // === Plan 019 批次八: autodown 文档 natives（编辑壳可编程操作轨，
+            // JSON 传输循 read_dir 先例；feature "autodown" 门控实现，
+            // 无 feature 时 shim 返回构建错误）===
+            (2950, NATIVE_AUTODOWN_PARSE, shim_autodown_parse, "auto.autodown.parse"),
+            (2951, NATIVE_AUTODOWN_SERIALIZE, shim_autodown_serialize, "auto.autodown.serialize"),
+            (2952, NATIVE_AUTODOWN_TEXT, shim_autodown_text, "auto.autodown.text"),
+            (2953, NATIVE_AUTODOWN_FIND_BLOCK, shim_autodown_find_block, "auto.autodown.find_block"),
+            (2954, NATIVE_AUTODOWN_INSERT_TEXT, shim_autodown_insert_text, "auto.autodown.insert_text"),
+            (2955, NATIVE_AUTODOWN_INSERT_TEMPLATE, shim_autodown_insert_template, "auto.autodown.insert_template"),
+            // === Plan 019 批次九: 编辑壳 payload 回读（on_change 回环口）===
+            (2956, NATIVE_AUTODOWN_EDITOR_TEXT, shim_autodown_editor_text, "auto.autodown_editor.text"),
+
+            // === DateTime cmp (2794) ===
+            (2794, NATIVE_DATETIME_CMP, shim_datetime_cmp, "auto.datetime.cmp")
+        }
+    };
+}
+
+/// Generate `pub const NATIVE_XXX: u16 = NNN;` for all catalog entries.
+#[macro_export]
+macro_rules! gen_native_constants {
+    (($id:expr, $name:ident, $fn:ident, $canonical:expr) $(, $rest:tt)*) => {
+        pub const $name: u16 = $id;
+        gen_native_constants!($($rest),*);
+    };
+    () => {};
+}
+
+/// Consumer macro for for_each_native! that generates shim bindings.
+/// IMPORTANT: This macro cannot use `self` directly due to #[macro_export] hygiene.
+/// Instead, use it from a local wrapper in native.rs:
+///   macro_rules! __bind_all { ... self.register($name, $fn); ... }
+///   for_each_native!(__bind_all);
+#[macro_export]
+macro_rules! bind_shims {
+    (($id:expr, $name:ident, $fn:ident, $canonical:expr) $(, $rest:tt)*) => {
+        self.register($name, $fn);
+        $crate::bind_shims!($($rest),*);
+    };
+    () => {};
+}
+
+// Plan 249 Phase 4: Unified opaque method dispatch table.
+// Each entry: (method_name, canonical_native_name).
+// Used by both codegen.rs (compile-time) and engine.rs (runtime).
+// Constructors (new, parse, now) are included — callers decide whether to filter.
+
+/// Returns the canonical native function name for an opaque type + method,
+/// or None if not found.
+/// `type_key` is the crate/module name: "regex", "url", "semver", "chrono",
+/// "base64", "hex", "sha2", "mime_guess", "std".
+pub fn lookup_opaque_dispatch(type_key: &str, method: &str) -> Option<&'static str> {
+    let entries = match type_key {
+        "regex" => &OPAQUE_DISPATCH_REGEX[..],
+        "url" => &OPAQUE_DISPATCH_URL[..],
+        "semver" => &OPAQUE_DISPATCH_SEMVER[..],
+        "chrono" => &OPAQUE_DISPATCH_CHRONO[..],
+        "base64" => &OPAQUE_DISPATCH_BASE64[..],
+        "hex" => &OPAQUE_DISPATCH_HEX[..],
+        "sha2" => &OPAQUE_DISPATCH_SHA2[..],
+        "mime_guess" => &OPAQUE_DISPATCH_MIME[..],
+        _ => return None,
+    };
+    for &(m, native) in entries {
+        if m == method {
+            return Some(native);
+        }
+    }
+    None
+}
+
+/// Runtime opaque dispatch by heap object type name.
+/// Matches substrings in the type name (e.g., "regex::Regex", "Url").
+/// Returns only instance methods (no constructors).
+pub fn lookup_opaque_dispatch_by_type(type_name: &str, method: &str) -> Option<&'static str> {
+    let entries: &[(&[&str], &[(&str, &str)])] = &[
+        (&["regex::Regex", "Regex"], &OPAQUE_DISPATCH_REGEX_METHODS),
+        (&["url::Url", "Url"], &OPAQUE_DISPATCH_URL_METHODS),
+        (
+            &["semver::Version", "Version"],
+            &OPAQUE_DISPATCH_SEMVER_METHODS,
+        ),
+        (
+            &["semver::VersionReq", "VersionReq"],
+            &OPAQUE_DISPATCH_VERSIONREQ_METHODS,
+        ),
+        (
+            &["Instant", "std::time::Instant"],
+            &[("elapsed", "auto.time.instant_elapsed")],
+        ),
+        (
+            &["OnceCell", "std::cell::OnceCell"],
+            &[("get", "auto.cell.once_get"), ("set", "auto.cell.once_set")],
+        ),
+        (
+            &["std::fs::File", "FileWriter"],
+            &[
+                ("write", "auto.file.write_handle"),
+                ("try_clone", "auto.file.try_clone"),
+            ],
+        ),
+    ];
+    for &(type_patterns, methods) in entries {
+        if type_patterns.iter().any(|p| type_name.contains(p)) {
+            for &(m, native) in methods {
+                if m == method {
+                    return Some(native);
+                }
+            }
+        }
+    }
+    None
+}
+
+// Per-type dispatch tables: (method_name, canonical_native_name)
+// Includes both constructors and methods — callers filter as needed.
+
+const OPAQUE_DISPATCH_REGEX: &[(&str, &str)] = &[
+    ("new", "auto.re_opaque.new"),
+    ("is_match", "auto.re_opaque.is_match"),
+    ("find", "auto.re_opaque.find"),
+    ("find_iter", "auto.re_opaque.find_all"),
+    ("find_all", "auto.re_opaque.find_all"),
+    ("replace_all", "auto.re_opaque.replace_all"),
+    ("captures", "auto.re_opaque.captures"),
+];
+
+/// Regex instance methods only (no constructors) — for runtime dispatch.
+const OPAQUE_DISPATCH_REGEX_METHODS: &[(&str, &str)] = &[
+    ("is_match", "auto.re_opaque.is_match"),
+    ("find", "auto.re_opaque.find"),
+    ("find_iter", "auto.re_opaque.find_all"),
+    ("find_all", "auto.re_opaque.find_all"),
+    ("replace_all", "auto.re_opaque.replace_all"),
+    ("captures", "auto.re_opaque.captures"),
+];
+
+const OPAQUE_DISPATCH_URL: &[(&str, &str)] = &[
+    ("parse", "auto.url_opaque.parse"),
+    ("scheme", "auto.url_opaque.scheme"),
+    ("host", "auto.url_opaque.host_str"),
+    ("host_str", "auto.url_opaque.host_str"),
+    ("path", "auto.url_opaque.path"),
+    ("query", "auto.url_opaque.query"),
+    ("fragment", "auto.url_opaque.fragment"),
+    ("port", "auto.url_opaque.port"),
+    ("query_pairs", "auto.url_opaque.query_pairs"),
+    ("query_params", "auto.url_opaque.query_pairs"),
+    ("to_string", "auto.url_opaque.to_string"),
+    ("join", "auto.url_opaque.join"),
+    ("origin", "auto.url_opaque.origin"),
+];
+
+/// URL instance methods only (no constructors) — for runtime dispatch.
+const OPAQUE_DISPATCH_URL_METHODS: &[(&str, &str)] = &[
+    ("scheme", "auto.url_opaque.scheme"),
+    ("host", "auto.url_opaque.host_str"),
+    ("host_str", "auto.url_opaque.host_str"),
+    ("path", "auto.url_opaque.path"),
+    ("query", "auto.url_opaque.query"),
+    ("fragment", "auto.url_opaque.fragment"),
+    ("port", "auto.url_opaque.port"),
+    ("query_pairs", "auto.url_opaque.query_pairs"),
+    ("query_params", "auto.url_opaque.query_pairs"),
+    ("join", "auto.url_opaque.join"),
+    ("origin", "auto.url_opaque.origin"),
+    ("to_string", "auto.url_opaque.to_string"),
+];
+
+const OPAQUE_DISPATCH_SEMVER: &[(&str, &str)] = &[
+    ("parse", "auto.semver_opaque.parse"),
+    ("major", "auto.semver_opaque.major"),
+    ("minor", "auto.semver_opaque.minor"),
+    ("patch", "auto.semver_opaque.patch"),
+    ("pre", "auto.semver_opaque.pre"),
+    ("to_string", "auto.semver_opaque.to_string"),
+    ("matches", "auto.semver_opaque_versionreq.matches"),
+];
+
+/// Semver instance methods only — for runtime dispatch.
+const OPAQUE_DISPATCH_SEMVER_METHODS: &[(&str, &str)] = &[
+    ("major", "auto.semver_opaque.major"),
+    ("minor", "auto.semver_opaque.minor"),
+    ("patch", "auto.semver_opaque.patch"),
+    ("pre", "auto.semver_opaque.pre"),
+    ("to_string", "auto.semver_opaque.to_string"),
+];
+
+/// VersionReq methods — for runtime dispatch.
+const OPAQUE_DISPATCH_VERSIONREQ_METHODS: &[(&str, &str)] = &[
+    ("parse", "auto.semver_opaque_versionreq.parse"),
+    ("matches", "auto.semver_opaque_versionreq.matches"),
+];
+
+const OPAQUE_DISPATCH_CHRONO: &[(&str, &str)] = &[
+    ("now", "auto.chrono_opaque.local_now"),
+    ("year", "auto.chrono_opaque.year"),
+    ("month", "auto.chrono_opaque.month"),
+    ("day", "auto.chrono_opaque.day"),
+    ("hour", "auto.chrono_opaque.hour"),
+    ("minute", "auto.chrono_opaque.minute"),
+    ("second", "auto.chrono_opaque.second"),
+    ("timestamp", "auto.chrono_opaque.timestamp"),
+    ("format", "auto.chrono_opaque.format"),
+];
+
+const OPAQUE_DISPATCH_BASE64: &[(&str, &str)] = &[
+    ("encode", "auto.base64.encode"),
+    ("decode", "auto.base64.decode"),
+];
+
+const OPAQUE_DISPATCH_HEX: &[(&str, &str)] =
+    &[("encode", "auto.hex.encode"), ("decode", "auto.hex.decode")];
+
+const OPAQUE_DISPATCH_SHA2: &[(&str, &str)] = &[
+    ("new", "auto.sha2_opaque.sha256_new"),
+    ("update", "auto.sha2_opaque.update"),
+    ("finalize", "auto.sha2_opaque.finalize"),
+];
+
+const OPAQUE_DISPATCH_MIME: &[(&str, &str)] = &[("from_path", "auto.mime.from_path")];
+
+// Plan 249 Phase 3: BIGVM native registry entries — single source of truth.
+// Each entry: (canonical_name, numeric_id, return_type_tag).
+// return_type_tag: Void (default) → register_with_id; others → register_with_id_and_type.
+// Uses numeric IDs directly (not NATIVE_* consts) to avoid cross-module dependency.
+// The IDs must match for_each_native! shim entries — verified by tests.
+#[macro_export]
+macro_rules! for_each_bigvm_native {
+    ($mac:ident) => {
+        $mac! {
+            // === List (100-110, 118, 205) ===
+            // === Plan 413: code editor payload accessors (UI bridge) ===
+            ("auto.code_editor.text", 2910, String),
+            ("auto.code_editor.cursor_line", 2911, Int),
+            ("auto.code_editor.cursor_col", 2912, Int),
+            ("auto.code_editor.selection_len", 2913, Int),
+            ("auto.code_editor.find", 2914, Bool),
+            ("auto.code_editor.set_text", 2915, Void),
+            // === Plan 673 T-01: unified delta queue — read side (nat 2939;
+            // 2930/2931 already taken by auto.host.call/_value) ===
+            ("auto.code_editor.delta", 2939, String),
+            // === Plan 673 T-02: structured write — write side (nat 9906;
+            // 29xx band exhausted, 9900+ high band per PLAN-656 precedent) ===
+            ("auto.code_editor.edit", 9906, Bool),
+            // === PLAN-687: bulk load endpoint (nat 9907) ===
+            ("auto.code_editor.load_file", 9908, Int),
+            // === PLAN-703 供⑤: diff envelope endpoints (String returns) ===
+            ("auto.diff_files", 9915, String),
+            ("auto.diff_snapshots", 9916, String),
+            ("auto.diff_dirs", 9917, String),
+            // PLAN-716 组B: 帧时间戳（供⑨-a Phase 2 改判 int——原 I64 形
+            // 驱动 2 槽消费路径致 .at 值流三断；值域=进程单调 ms<2^31）。
+            ("auto.frame.begin_ms", 9918, Int),
+            ("auto.frame.present_ms", 9919, Int),
+            // PLAN-716 Phase 2 (供⑧): 9921——原 9920 与 ui.focus 撞号（见
+            // for_each_native 组C 注）。
+            ("auto.diff_files_window", 9921, String),
+            // === Plan 413 follow-up: console natives (in-app Console panel) ===
+            ("auto.console.log", 2916, Bool),
+            ("auto.console.lines", 2917, String),
+            ("auto.console.clear", 2918, Bool),
+            // === Plan 418: editor actions + clipboard + dialogs (menu/toolbar) ===
+            ("auto.code_editor.undo", 2919, Bool),
+            ("auto.code_editor.redo", 2920, Bool),
+            ("auto.code_editor.select_all", 2921, Bool),
+            ("auto.code_editor.cut", 2922, Bool),
+            ("auto.code_editor.copy", 2923, Bool),
+            ("auto.code_editor.paste", 2924, Bool),
+            ("auto.clipboard.text", 2925, String),
+            ("auto.clipboard.set_text", 2926, Bool),
+            // === Plan 485: native clipboard files/images (image_get 返回
+            // {path,width,height} Record 或 null，ret tag 取 Map) ===
+            ("auto.clipboard.files_get", 2934, List),
+            ("auto.clipboard.files_set", 2935, Bool),
+            ("auto.clipboard.image_get", 2936, Map),
+            ("auto.clipboard.image_set", 2937, Bool),
+            // === Plan 488: OLE 拖出（受理即返 Bool；效果经事件回注） ===
+            ("auto.dnd.start", 2938, Bool),
+            ("auto.dialog.open", 2927, String),
+            ("auto.dialog.save", 2928, String),
+            ("auto.file.basename", 2929, String),
+            // === Plan 541: System Monitor (auto.sys.*) ===
+            ("auto.sys.cpu_usage", 2421, Float),
+            ("auto.sys.cpu_count", 2422, Int),
+            ("auto.sys.cpu_core_usage", 2423, Float),
+            ("auto.sys.cpu_brand", 2424, String),
+            ("auto.sys.mem_total_mb", 2425, Int),
+            ("auto.sys.mem_used_mb", 2426, Int),
+            ("auto.sys.net_sent_kbs", 2427, Float),
+            ("auto.sys.net_recv_kbs", 2428, Float),
+            ("auto.sys.processes", 2429, List),
+            ("auto.sys.kill", 2431, Bool),
+            ("auto.sys.os_name", 2432, String),
+            ("auto.sys.os_version", 2433, String),
+            ("auto.sys.kernel_version", 2434, String),
+            ("auto.sys.hostname", 2435, String),
+            ("auto.sys.uptime_s", 2436, Int),
+            ("auto.sys.disks", 2437, List),
+            ("auto.sys.users", 2438, List),
+            // === Plan 428 P1: code folding ===
+            ("auto.code_editor.fold_toggle", 2932, Bool),
+            ("auto.code_editor.fold_hidden_count", 2933, Int),
+
+            ("auto.list.new", 100, Void),
+            ("auto.list.push", 101, Void),
+            ("auto.list.pop", 102, Void),
+            ("auto.list.len", 103, Void),
+            ("auto.list.is_empty", 104, Void),
+            ("auto.list.clear", 105, Void),
+            ("auto.list.get", 106, Void),
+            ("auto.list.set", 107, Void),
+            ("auto.list.insert", 108, Void),
+            ("auto.list.remove", 109, Void),
+            ("auto.list.splice", 2071, List),
+            ("auto.list.find_index", 2072, Void),
+            // PLAN-057 T6：Array.isArray 静态名/ID（shim 由 engine 覆盖块绑定，
+            // 沿 auto.json.parse 惯例——rust_fn 宏不适配 raw-nv 分派）。
+            ("auto.list.is_array", 1919, Bool),
+            ("auto.list.drop", 110, Void),
+            ("auto.list.reserve", 118, Void),
+            ("auto.list.capacity", 205, Void),
+
+            // === List HOF (2060-2069) ===
+            ("auto.list.map", 2060, List),
+            ("auto.list.filter", 2061, List),
+            ("auto.list.for_each", 2062, Void),
+            ("auto.list.find", 2063, Void),
+            ("auto.list.any", 2064, Bool),
+            ("auto.list.all", 2065, Bool),
+            ("auto.list.reduce", 2066, Void),
+            ("auto.list.sort", 2067, Void),
+            ("auto.list.sort_by", 2068, Void),
+            ("auto.list.contains", 2069, Bool),
+
+            // === Iterator (111-118) ===
+            ("auto.list.iter", 111, Void),
+            ("auto.iterator.next", 112, Void),
+            ("auto.iterator.map", 113, Void),
+            ("auto.iterator.filter", 114, Void),
+            ("auto.iterator.collect", 115, List),
+            ("auto.iterator.reduce", 116, Void),
+            ("auto.iterator.find", 117, Void),
+            ("auto.iterator.enumerate", 119, Void),
+
+            // === HashMap (120-129, 1290-1292) ===
+            ("auto.hashmap.new", 120, Void),
+            ("Map.new", 120, Map),
+            ("HashMap.new", 120, Void),
+            ("auto.hashmap.insert_str", 121, Void),
+            ("auto.hashmap.insert_int", 122, Void),
+            ("auto.hashmap.get_str", 123, String),    // Plan 036 workaround-5: returns string (push_str_idx)
+            ("auto.hashmap.get_int", 124, Int),       // Plan 036 workaround-5: returns int or null
+            ("auto.hashmap.contains", 125, Bool),     // Plan 036 workaround-5: returns 0/1
+            ("auto.hashmap.remove", 126, Void),
+            ("auto.hashmap.size", 127, Int),          // Plan 036 workaround-5: returns count
+            ("auto.hashmap.clear", 128, Void),
+            ("auto.hashmap.drop", 129, Void),
+            ("auto.hashmap.is_empty", 1290, Bool),    // Plan 036 workaround-5: returns bool
+            ("auto.hashmap.get_or", 1291, Int),       // Plan 036 workaround-5: returns value or default
+            ("auto.hashmap.insert", 121, Void),
+            ("auto.hashmap.get", 123, String),        // Plan 036 workaround-5: alias for get_str
+            ("auto.hashmap.keys", 1292, List),        // Plan 036 workaround-5: returns list of keys
+
+            // === HashSet (129-135) ===
+            ("auto.hashset.new", 1293, Void),
+            ("auto.hashset.insert", 130, Void),
+            ("auto.hashset.contains", 131, Bool),
+            ("auto.hashset.remove", 132, Void),
+            ("auto.hashset.size", 133, Void),
+            ("auto.hashset.clear", 134, Void),
+            ("auto.hashset.drop", 135, Void),
+
+            // === VecDeque (136-146) ===
+            ("auto.vecdeque.new", 136, Void),
+            ("auto.vecdeque.push_back", 137, Void),
+            ("auto.vecdeque.push_front", 138, Void),
+            ("auto.vecdeque.pop_back", 139, Void),
+            ("auto.vecdeque.pop_front", 140, Void),
+            ("auto.vecdeque.front", 141, Void),
+            ("auto.vecdeque.back", 142, Void),
+            ("auto.vecdeque.size", 143, Void),
+            ("auto.vecdeque.is_empty", 144, Void),
+            ("auto.vecdeque.clear", 145, Void),
+            ("auto.vecdeque.drop", 146, Void),
+
+            // === BTreeMap (147-157) ===
+            ("auto.btreemap.new", 147, Void),
+            ("auto.btreemap.insert", 148, Void),
+            ("auto.btreemap.get", 149, Void),
+            ("auto.btreemap.contains", 150, Void),
+            ("auto.btreemap.remove", 151, Void),
+            ("auto.btreemap.size", 152, Void),
+            ("auto.btreemap.is_empty", 153, Void),
+            ("auto.btreemap.clear", 154, Void),
+            ("auto.btreemap.first_key", 155, Void),
+            ("auto.btreemap.last_key", 156, Void),
+            ("auto.btreemap.drop", 157, Void),
+
+            // === StringBuilder (160-167) ===
+            ("auto.stringbuilder.new", 160, Void),
+            ("auto.stringbuilder.append", 161, Void),
+            ("auto.stringbuilder.append_int", 162, Void),
+            ("auto.stringbuilder.append_char", 163, Void),
+            ("auto.stringbuilder.len", 164, Void),
+            ("auto.stringbuilder.clear", 165, Void),
+            ("auto.stringbuilder.drop", 166, Void),
+            ("auto.stringbuilder.build", 167, Void),
+
+            // === Heap/Storage (190-202) ===
+            ("auto.heap.new", 195, Void),
+            ("auto.heap.capacity", 196, Void),
+            ("auto.heap.try_grow", 197, Void),
+            ("auto.heap.drop", 198, Void),
+            ("auto.inline_int64.new", 199, Void),
+            ("auto.inline_int64.capacity", 200, Void),
+            ("auto.inline_int64.try_grow", 201, Void),
+            ("auto.inline_int64.drop", 202, Void),
+
+            // === Memory Allocation (190-192) ===
+            ("auto.alloc.array", 190, Void),
+            ("auto.realloc.array", 191, Void),
+            ("auto.free.array", 192, Void),
+
+            // === String operations (170-186, 1500-1520) ===
+            ("auto.str.len", 170, Int),
+            ("auto.str.is_empty", 1501, Bool),
+            ("auto.str.is_digit", 1525, Bool),
+            ("auto.str.byte_len", 1526, Int),
+            ("auto.type_of", 1527, String),
+            ("auto.str.char_at", 1502, Int),
+            ("auto.str.substr", 1503, String),
+            ("auto.str.sub", 1524, Void),
+            ("auto.str.slice", 1524, Void),
+            ("auto.str.contains", 1504, Bool),
+            ("auto.str.starts_with", 1505, Bool),
+            ("auto.str.ends_with", 1506, Bool),
+            ("auto.str.trim", 1507, String),
+            ("auto.str.split", 1508, List),
+            ("auto.str.repeat", 1509, String),
+            ("auto.str.replace", 1510, String),
+            ("auto.str.to_upper", 1511, String),
+            ("auto.str.to_lower", 1512, String),
+            // Plan 368 W8: bare upper/lower map to the same natives as
+            // to_upper/to_lower (id 1511/1512) and return String — were Void.
+            ("auto.str.upper", 175, String),
+            ("auto.str.lower", 1512, String),
+            ("auto.str.reverse", 1513, String),
+            ("auto.str.find", 1514, Int),
+            ("auto.str.lines", 1515, List),
+            ("auto.str.parse_int", 1516, Int),
+            ("auto.str.to_int", 1516, Void),
+            ("auto.str.parse_float", 1517, Float),
+            ("auto.str.new", 172, Void),
+            ("auto.str.push", 178, Void),
+            ("auto.str.pop", 179, Void),
+            ("auto.str.get", 180, Void),
+            ("auto.str.set", 181, Void),
+            ("auto.str.insert", 182, Void),
+            ("auto.str.remove", 183, Void),
+            ("auto.str.clear", 184, Void),
+            ("auto.str.reserve", 186, Void),
+            ("auto.str.bytes", 235, Void),
+
+            // === Bit Operations (210-234) ===
+            ("auto.int.and", 210, Int),
+            ("auto.int.or", 211, Int),
+            ("auto.int.xor", 212, Int),
+            ("auto.int.not", 213, Int),
+            ("auto.int.shl", 214, Int),
+            ("auto.int.shr", 215, Int),
+            ("auto.int.sar", 216, Int),
+            ("auto.int.rol", 217, Int),
+            ("auto.int.ror", 218, Int),
+            ("auto.int.count_ones", 220, Int),
+            ("auto.int.leading_zeros", 221, Int),
+            ("auto.int.trailing_zeros", 222, Int),
+            ("auto.int.flip", 223, Int),
+            ("auto.int.bit_read", 230, Int),
+            ("auto.int.bit_test", 231, Bool),
+            ("auto.int.bit_on", 232, Int),
+            ("auto.int.bit_off", 233, Int),
+            ("auto.int.bit_flip", 234, Int),
+
+            // === File (1000-1015) ===
+            ("auto.file.read_text", 1000, Void),
+            ("auto.file.write_text", 1001, Void),
+            ("auto.file.exists", 1002, Void),
+            ("auto.file.delete", 1003, Void),
+            ("auto.file.create_dir", 1004, Void),
+            ("auto.file.read_bytes", 1005, Void),
+            ("auto.file.write_bytes", 1006, Void),
+            ("auto.file.copy", 1007, Void),
+            ("auto.file.size", 1008, Void),
+            ("auto.file.is_dir", 1009, Void),
+            ("auto.file.walk", 1010, Void),
+            ("auto.file.append_text", 1011, Void),
+            ("auto.file.read_lines", 1012, Void),
+            ("auto.file.remove_dir", 1014, Void),
+            ("auto.file.remove_dir_all", 1015, Void),
+
+            // === FS module aliases ===
+            ("auto.fs.read_text", 1000, Void),
+            ("auto.fs.read", 1000, Void),
+            ("auto.fs.write_text", 1001, Void),
+            ("auto.fs.write", 1001, Void),
+            ("auto.fs.append_text", 1011, Void),
+            ("auto.fs.append", 1011, Void),
+            ("auto.fs.exists", 1002, Void),
+            ("auto.fs.delete", 1003, Void),
+            ("auto.fs.create_dir", 1004, Void),
+            ("auto.fs.remove_dir", 1014, Void),
+            ("auto.fs.remove_dir_all", 1015, Void),
+            ("auto.fs.read_bytes", 1005, Void),
+            ("auto.fs.write_bytes", 1006, Void),
+            ("auto.fs.copy", 1007, Void),
+            ("auto.fs.size", 1008, Void),
+            ("auto.fs.is_dir", 1009, Void),
+
+            // === FS extended (2860-2866) ===
+            // 2026-09-14(PLAN-016 T-05):rename/canonical/ext 白名单补登记
+            // （id 迁 2983/2984/2985 免撞号，注册行同批迁移）。
+            ("auto.fs.rename", 2994, Void),
+            ("auto.fs.canonical", 2995, String),
+            ("auto.fs.ext", 2996, String),
+            ("auto.fs.mtime", 2997, Int),
+            ("auto.fs.walk", 2860, String),
+            ("auto.fs.metadata", 2861, String),
+            ("auto.fs.copy_recursive", 2862, Void),
+            ("auto.fs.filename", 2863, String),
+            ("auto.fs.parent", 2864, String),
+            ("auto.fs.join", 2865, String),
+            // 2026-08-22:read_dir 白名单补登记(ash-gui cd 目录补全用)。
+            ("auto.fs.read_dir", 2866, String),
+            // Plan 626 T-04:嵌套目录树 JSON(TreeView 节点 schema 直配)。
+            ("auto.fs.tree", 2875, String),
+            // Plan 060:merged 模式 shell 执行提交(参数 int,str,str;返回 void)。
+            ("auto.shell.exec_submit", 2867, Void),
+            ("auto.shell.emit_result", 2868, Void),
+            ("auto.shell.emit_show", 2869, Void),
+            ("auto.host.call", 2930, String),
+            ("auto.host.call_value", 2931, Void),
+            ("auto.rc.live", 2940, Int),
+            ("auto.rc.count", 2941, Int),
+            ("auto.rc.assert_unique", 2942, Void),
+            // === auto-os Plan 013 T2: AutoTerm 引擎桥(返回类型面)===
+            ("auto.term.engine_spawn", 2943, Int),
+            ("auto.term.engine_write_line", 2944, Void),
+            ("auto.term.engine_rows", 2945, List),
+            ("auto.term.engine_resize", 2946, Void),
+            ("auto.term.engine_interrupt", 2947, Int),
+            ("auto.term.engine_is_exited", 2948, Bool),
+            ("auto.term.engine_free", 2949, Void),
+            ("auto.term.engine_pump_input", 2957, Int),
+            ("auto.term.engine_cursor_row", 2958, Int),
+            ("auto.term.engine_cursor_col", 2959, Int),
+            ("auto.term.engine_apply_resize", 2976, Int),
+            ("auto.term.engine_viewport_cols", 2977, Int),
+            ("auto.term.engine_viewport_rows", 2978, Int),
+            ("auto.term.engine_backlog_pending_mb", 2979, Int),
+            ("auto.term.engine_backlog_paused", 2980, Int),
+            ("auto.term.engine_backlog_take_alerts", 2981, Int),
+            ("auto.term.engine_backlog_dropped", 2982, Int),
+            ("auto.term.window_width", 2998, Int),
+            ("auto.term.window_height", 2999, Int),
+            // PLAN-026 needs_fix: 键入 VT 裸写(void 返回)。
+            ("auto.term.engine_write_raw", 3000, Void),
+            ("auto.term.config_profiles", 2988, List),
+            ("auto.term.config_default_profile", 2989, String),
+            ("auto.term.config_profiles_full", 2990, List),
+            ("auto.term.config_spawn_program", 2991, String),
+            ("auto.term.config_spawn_argv", 2992, List),
+            ("auto.term.config_spawn_cwd", 2993, String),
+            ("auto.term.engine_scroll_pending_for", 3001, Int),
+            ("auto.term.engine_pend_resize_geom", 3002, Int),
+            ("auto.term.engine_history", 3003, Int),
+
+            // === Hash extended (2814-2816) ===
+            ("auto.hash.md5", 2810, String),
+            ("auto.hash.sha1", 2811, String),
+            ("auto.hash.sha256", 2812, String),
+            ("auto.hash.sha512", 2813, String),
+            ("auto.hash.hmac_sha256", 2814, String),
+            ("auto.hash.file_md5", 2815, String),
+            ("auto.hash.file_sha256", 2816, String),
+
+            // === Random type (2870-2874) ===
+            ("auto.random._vm_new", 2870, Void),
+            ("auto.random._vm_seeded", 2871, Void),
+            ("auto.random.int", 2872, Void),
+            ("auto.random.float", 2873, Void),
+            ("auto.random.bool", 2874, Void),
+            ("auto.random.rand_int", 2780, Int),
+            ("auto.random.rand_float", 2781, Float),
+            ("auto.random.rand_bool", 2782, Bool),
+
+            // === Fmt (2752) ===
+            ("auto.fmt.f64_debug", 2752, String),
+
+            // === Cmp (2880) ===
+            ("auto.cmp.str_cmp", 2880, Int),
+
+            // === DateTime cmp (2794) ===
+            ("auto.datetime.cmp", 2794, Int),
+
+            // === File I/O opaque handles (1010-1013) ===
+            ("auto.file.create_handle", 1010, Void),
+            ("auto.file.open_handle", 1011, Void),
+            ("auto.file.write_handle", 1012, Void),
+            ("auto.file.try_clone", 1013, Void),
+
+            // === Env (1100-1105, 9907) ===
+            ("auto.env.get", 1100, Void),
+            ("auto.env.set", 1101, Void),
+            ("auto.env.remove", 1102, Void),
+            ("auto.env.get_or", 1103, Void),
+            ("Env.get_or", 1103, Void),
+            ("auto.env.local_data_dir", 1104, Void),
+            ("env.local_data_dir", 1104, Void),
+            ("auto.env.home_dir", 1105, Void),
+            ("env.home_dir", 1105, Void),
+            // PLAN-680 Q1: track identification — VM runtime "vm"; the vue
+            // generator folds `Env.track()` to the "vue" literal (9900+ high
+            // band per PLAN-656 precedent; 9900-9906 taken by scroll/code_editor).
+            ("auto.env.track", 9907, String),
+            ("Env.track", 9907, String),
+
+            // === Storage (1106-1108) — Plan 401: localStorage-style KV store ===
+            ("auto.storage.get", 1106, String),
+            ("Storage.get", 1106, String),
+            ("storage.get", 1106, String),
+            ("auto.storage.set", 1107, Void),
+            ("Storage.set", 1107, Void),
+            ("storage.set", 1107, Void),
+            ("auto.storage.remove", 1108, Void),
+            ("Storage.remove", 1108, Void),
+            ("storage.remove", 1108, Void),
+
+            // === Time (1200-1205) ===
+            ("auto.time.now_ms", 1200, I64),
+            ("auto.time.now_sec", 1201, I64),
+            ("auto.time.sleep_ms", 1202, Void),
+            ("auto.time.instant_now", 1203, Void),
+            // PLAN-701 供④: elapsed 返回毫秒 int（shim 同步改形）——.at 侧
+            // 自此得真实值而非 None（m1-supply §9 观察清偿）。
+            ("auto.time.instant_elapsed", 1204, I64),
+            ("auto.time.now", 1205, String),
+            ("Time.now", 1205, String),
+
+            // === Scheduler (1206-1207) — Plan 442 A5 ===
+            ("auto.sched.set_timeout", 1206, I64),
+            ("auto.sched.clear_timeout", 1207, Bool),
+
+            // === Plan 442 B-support: web-platform globals ===
+            ("auto.localstorage.get_item", 2771, String),
+            ("auto.localstorage.set_item", 2772, Void),
+            ("auto.localstorage.remove_item", 2773, Void),
+            ("auto.env.var", 2795, String),
+
+            // === Plan 442 Phase B: dom/location web globals ===
+            ("auto.dom.set_dark", 2774, Void),
+            ("auto.dom.prefers_dark", 2775, Bool),
+            ("auto.dom.set_css_var", 2776, Void),
+            ("auto.dom.focus_first", 2777, Void),
+            ("auto.ui.focus", 9920, Void),
+            ("auto.dom.click_first", 2778, Void),
+            ("auto.dom.open_url", 2779, Void),
+            ("auto.dom.reload", 2784, Void),
+
+            // === IO (1150) ===
+            ("auto.io.read_line", 1150, String),
+            ("IO.read_line", 1150, String),
+            ("io.read_line", 1150, String),
+
+            // === OnceCell (2850-2852) ===
+            ("auto.cell.once_new", 2850, Void),
+            ("auto.cell.once_set", 2851, Void),
+            ("auto.cell.once_get", 2852, Void),
+
+            // === Process (1300-1305) ===
+            ("auto.process.exit", 1300, Void),
+            ("auto.process.args", 1301, Void),
+            ("auto.process.current_dir", 1302, Void),
+            ("auto.process.set_current_dir", 1303, Void),
+            ("auto.process.spawn", 1304, Void),
+            ("auto.process.spawn_with_output", 1305, Void),
+
+            // === Path (1400-1404) ===
+            ("auto.path.join", 1400, Void),
+            ("auto.path.parent", 1401, Void),
+            ("auto.path.extension", 1402, Void),
+            ("auto.path.filename", 1403, Void),
+            ("auto.path.canonicalize", 1404, Void),
+
+            // === Char (1600-1607) — Plan 368 W8/W5: return types corrected
+            // (were all Void; same bug family as Str.*). is_alpha etc return
+            // Bool, to_lower/to_upper return Int (codepoint), to_str returns
+            // String (Plan 368 W5 codepoint→str primitive).
+            ("auto.char.is_alpha", 1600, Bool),
+            ("auto.char.is_digit", 1601, Bool),
+            ("auto.char.is_alphanum", 1602, Bool),
+            ("auto.char.is_whitespace", 1603, Bool),
+            ("auto.char.is_ident", 1604, Bool),
+            ("auto.char.to_lower", 1605, Int),
+            ("auto.char.to_upper", 1606, Int),
+            ("auto.char.to_str", 1607, String),
+
+            // === Log (1805-1808;noop=1804) ===
+            // P499-7/Plan 510: Log 四名原登 1800-1803,与 Shell 族
+            // (NATIVE_SHELL_SYSTEM..EXIT,Plan 011,engine.rs 显式注册)
+            // 撞号——CALL_NAT 派发到 shell shim(#error→shim_shell_exit
+            // →ExitRequested)。移至 1805-1808,inventory 注册自动跟进。
+            ("auto.log.debug", 1805, Void),
+            ("auto.log.info", 1806, Void),
+            ("auto.log.warn", 1807, Void),
+            ("auto.log.error", 1808, Void),
+            ("auto.log.noop", 1804, Void),
+            ("Log.debug", 1805, Void),
+            ("Log.info", 1806, Void),
+            ("Log.warn", 1807, Void),
+            ("Log.error", 1808, Void),
+
+            // === Math (1700-1735) ===
+            // Plan 437 §0.6.H：三角/指对数族 shim 均经原生栈 push_f64 返回
+            // （native.rs math_unary/binary_shim、stdlib sqrt/min_f/max_f/clamp），
+            // 此前整族误标 Void → Plan 378 跳过 Void → 推断 Unknown → 混合
+            // 算术回退 int 路径（cx 被 i64.to.f64 位读）。abs/min/max 为 int
+            // 语义保持 Int。
+            ("auto.math.abs", 1700, Int),
+            ("auto.math.min", 1701, Int),
+            ("auto.math.max", 1702, Int),
+            ("auto.math.sqrt", 1750, Float),
+            ("auto.math.floor", 1710, Float),
+            ("auto.math.ceil", 1711, Float),
+            ("auto.math.round", 1712, Float),
+            ("auto.math.pow", 1713, Float),
+            ("auto.math.min_f", 1714, Float),
+            ("auto.math.max_f", 1715, Float),
+            ("auto.math.sin", 1716, Float),
+            ("auto.math.cos", 1717, Float),
+            ("auto.math.tan", 1718, Float),
+            ("auto.math.exp", 1719, Float),
+            ("auto.math.ln", 1720, Float),
+            ("auto.math.log2", 1721, Float),
+            ("auto.math.log10", 1722, Float),
+            ("auto.math.abs_f", 1723, Float),
+            ("auto.math.signum", 1724, Float),
+            ("auto.math.clamp", 1725, Float),
+            ("auto.math.asin", 1726, Float),
+            ("auto.math.acos", 1727, Float),
+            ("auto.math.atan", 1728, Float),
+            ("auto.math.atan2", 1729, Float),
+            ("auto.math.powi", 1730, Float),
+            ("auto.math.powf", 1731, Float),
+            ("auto.math.to_radians", 1732, Float),
+            ("auto.math.to_degrees", 1733, Float),
+            // PLAN-057 T6：trunc int 恒等/imul i32 回绕乘（Int 语义）
+            ("auto.math.trunc", 1734, Int),
+            ("auto.math.imul", 1735, Int),
+
+            // === Rand (1850-1854) ===
+            ("auto.rand.thread_rng", 1850, Void),
+            ("auto.rng.gen_range", 1851, Void),
+            ("auto.rng.gen", 1852, Void),
+            ("auto.rng.drop", 1853, Void),
+            ("auto.rand.random", 1854, Void),
+
+            // === JSON (1900-1918) ===
+            ("auto.json.encode", 1900, Void),
+            ("auto.json.decode", 1901, Void),
+            ("auto.json.parse", 1902, Void),
+            // PLAN-057 T6：JSON.stringify → JSON 文本
+            ("auto.json.stringify", 1918, String),
+            ("auto.json.prettify", 1903, Void),
+            ("auto.json.minify", 1904, Void),
+            ("auto.json.is_valid", 1905, Void),
+            ("auto.json.get", 1906, Void),
+            ("auto.json.get_at", 1907, Void),
+            ("auto.json.len", 1908, Void),
+            ("auto.json.type_of", 1909, Void),
+            ("auto.json.as_string", 1910, Void),
+            ("auto.json.as_number", 1911, Void),
+            ("auto.json.as_int", 1912, Void),
+            ("auto.json.as_bool", 1913, Void),
+            ("auto.json.is_null", 1914, Void),
+            ("auto.json.keys", 1915, Void),
+            ("auto.json.has_key", 1917, Void),
+
+            // === Plan 340: JSON ↔ VM value conversion + JSON HTTP helpers (3100-3106) ===
+            ("auto.json.to_value", 3100, Void),
+            ("auto.json.from_value", 3101, Void),
+            ("Json.to_value", 3100, Void),
+            ("Json.from_value", 3101, Void),
+            ("auto.http.get_json", 3102, Void),
+            ("auto.http.post_json", 3103, Void),
+            ("auto.http.put_json", 3104, Void),
+            ("auto.http.delete_json", 3105, Void),
+            ("auto.http.patch_json", 3107, Void),
+            ("auto.http.sse_get_stream", 3106, Void),
+
+            // === serde_json aliases ===
+            ("auto.serde_json.to_string", 1900, Void),
+            ("auto.json.to_string", 1900, Void),
+            ("json.to_string", 1900, Void),
+            ("Json.to_string", 1900, Void),
+            ("auto.serde_json.from_str", 1902, Void),
+
+            // === TOML (2750-2751) ===
+            ("auto.toml.from_str", 2750, Void),
+            ("auto.toml.to_string", 2751, Void),
+
+            // === URL (2000-2015) ===
+            ("auto.url.encode", 2000, Void),
+            ("auto.url.decode", 2001, Void),
+            ("auto.url.encode_query", 2002, Void),
+            ("auto.url.decode_query", 2003, Void),
+            ("auto.url.encode_path", 2013, Void),
+            ("auto.url.parse", 2006, Void),
+            // plan-022 (auto-down): `.length` property aliases (see
+            // NATIVE_ID_ENTRIES) — Int return type for codegen typing.
+            ("auto.list.length", 103, Int),
+            ("auto.str.length", 170, Int),
+            ("auto.url.scheme", 2007, Void),
+            ("auto.url.host", 2008, Void),
+            ("auto.url.port", 2009, Void),
+            ("auto.url.path", 2010, Void),
+            ("auto.url.query", 2011, Void),
+            ("auto.url.fragment", 2012, Void),
+            ("auto.url.join_path", 2015, Void),
+
+            // === Net/TCP (2100-2113) ===
+            ("auto.net.tcp_bind", 2100, Void),
+            ("auto.net.tcp_listener_accept", 2101, Void),
+            ("auto.net.tcp_listener_local_addr", 2102, Void),
+            ("auto.net.tcp_listener_close", 2103, Void),
+            ("auto.net.tcp_connect", 2104, Void),
+            ("auto.net.tcp_stream_read", 2105, Void),
+            ("auto.net.tcp_stream_write", 2106, Void),
+            ("auto.net.tcp_stream_read_all", 2107, Void),
+            ("auto.net.tcp_stream_read_line", 2108, Void),
+            ("auto.net.tcp_stream_write_str", 2109, Void),
+            ("auto.net.tcp_stream_close", 2110, Void),
+            ("auto.net.tcp_stream_peer_addr", 2111, Void),
+            ("auto.net.tcp_stream_set_read_timeout", 2112, Void),
+            ("auto.net.tcp_stream_set_write_timeout", 2113, Void),
+            // Plan 313: TCP flush + nodelay for SSE
+            ("auto.net.tcp_stream_flush", 2114, Void),
+            ("auto.net.tcp_stream_set_nodelay", 2115, Void),
+
+            // === HTTP server (2200-2215) ===
+            ("auto.http.server", 2200, Void),
+            ("auto.http.server_get", 2201, Void),
+            ("auto.http.server_post", 2202, Void),
+            ("auto.http.server_put", 2203, Void),
+            ("auto.http.server_delete", 2204, Void),
+            ("auto.http.server_static", 2205, Void),
+            ("auto.http.server_listen", 2206, Void),
+            ("auto.http.response", 2210, Void),
+            ("auto.http.response_status", 2211, Void),
+            ("auto.http.response_header", 2212, Void),
+            ("auto.http.response_text", 2213, Void),
+            ("auto.http.response_html", 2214, Void),
+            ("auto.http.response_bytes", 2215, Void),
+            ("auto.http.response_redirect", 3108, Void),
+            // Plan 346 5e (B6): Rate limiting
+            ("auto.http.rate_limit", 3109, Void),
+            ("http.rate_limit", 3109, Void),
+            // Plan 346: Redirect
+            ("auto.http.response.redirect", 2219, Void),
+            ("http.response.redirect", 2219, Void),
+            // plan-022 (auto-down D4): byte-faithful client body accessor —
+            // binary (zip) responses must round-trip without UTF-8 loss.
+            ("auto.http.response.body_bytes", 2225, Void),
+            ("auto.http.response.body_to_file", 2226, Void),
+            // Plan 352: Session management
+            ("auto.session.create", 2284, Void),
+            ("session.create", 2284, Void),
+            ("auto.session.get", 2285, Void),
+            ("session.get", 2285, Void),
+            ("auto.session.set", 2286, Void),
+            ("session.set", 2286, Void),
+            ("auto.session.destroy", 2287, Void),
+            ("session.destroy", 2287, Void),
+            // Plan 352: Middleware chain
+            ("auto.http.server_use", 2288, Void),
+            ("http.server.use", 2288, Void),
+            ("auto.http.server_middleware", 2288, Void),
+            ("http.server.middleware", 2288, Void),
+            // Plan 352: Template engine (SSR)
+            ("auto.template.compile", 2289, Void),
+            ("template.compile", 2289, Void),
+            ("auto.template.render", 2290, Void),
+            ("template.render", 2290, Void),
+            // Plan 352: OpenAPI auto-generation
+            ("auto.openapi.generate", 2291, Void),
+            ("openapi.generate", 2291, Void),
+
+            // === HTTP response access (2216-2218) ===
+            ("auto.http.response.status_code", 2216, Void),
+            ("auto.http.response.header_get", 2217, Void),
+            ("auto.http.response.body", 2218, Void),
+
+            // === HTTP client helpers (2220-2224) ===
+            ("auto.http.ok", 2220, Void),
+            ("auto.http.created", 2221, Void),
+            ("auto.http.bad_request", 2222, Void),
+            ("auto.http.not_found", 2223, Void),
+            ("auto.http.internal_error", 2224, Void),
+
+            // === HTTP client (2230-2239) ===
+            ("auto.http.get", 2230, Void),
+            // Plan 446 E4: 认证面默认头/默认 query(注入于两 send 汇聚处)
+            ("auto.http.set_default_header", 3139, Void),
+            ("auto.http.set_default_query", 3140, Void),
+            ("auto.http.clear_default_auth", 3141, Void),
+            // PLAN-053 P-053-4: merged mode #[api] no-op warning
+            ("auto.vm.warn_api_noop", 3142, Void),
+            // PLAN-658 T-04 立项 / PLAN-698 T-02 转正：~Stream 端点的事件
+            // 总线订阅。原为编译面 seam（执行压 -1 哨兵）；698 起为真运行面
+            // ——进程内 broadcast bus（镜像生成侧 events.rs）+ AsyncHttpStream
+            // 迭代器，SSE serve 循环与 .at iterator 家族同面消费。
+            ("auto.bus.subscribe", 3144, Void),
+            // PLAN-658 T-04: Plan 341 SSE 客户端的逐步拉取面（挂 auto.http.*
+            // ——`http` 已在 codegen 内建命名空间白名单，`http_stream` 前缀
+            // 不在，避免为此扩白名单）——sse_open 返回流句柄（非迭代器），
+            // sse_poll 非阻塞 try_recv（Data→载荷 / 缓冲空→"" / 结束→
+            // "[DONE]"），供 Tick 驱动的消费循环用。
+            ("auto.http.sse_open", 3145, Void),
+            ("auto.http.sse_poll", 3146, Void),
+            // PLAN-658 T-06: 崩溃隔离测试面——真 Rust panic（VM 内建 panic
+            // 有意映射 RuntimeError；本原生专供 AC-05 隔离路径可控触发）。
+            ("auto.sys.panic_hard", 3147, Void),
+            // PLAN-083 T-01: 异步消息桥 GET——fire-and-forget，完成经
+            // HTTP_MSG_QUEUE 由渲染层订阅泵以字符串载荷回填 store handler。
+            ("auto.http.get_msg", 3148, Void),
+            ("auto.http.post", 2231, Void),
+            ("auto.http.put", 2232, Void),
+            ("auto.http.delete", 2233, Void),
+            ("auto.http.request", 2234, Void),
+            ("auto.http.request_builder_header", 2235, Void),
+            ("auto.http.request_builder_body", 2236, Void),
+            ("auto.http.request_builder_timeout", 2237, Void),
+            ("auto.http.request_builder_json", 2238, Void),
+            ("auto.http.request_builder_send", 2239, Void),
+
+            // === HTTP streaming (2240-2258) ===
+            ("auto.http_stream.get_stream", 2240, Void),
+            ("auto.http_stream.post_stream", 2241, Void),
+            ("auto.http_stream.stream_next", 2242, Void),
+            ("auto.http_stream.stream_is_done", 2243, Void),
+            ("auto.http_stream.stream_close", 2244, Void),
+            ("auto.http_stream.stream_iter", 2245, Void), // Plan 321: Iter protocol
+            // PLAN-707 T-04: http.at 声明面路由（裸 `Http.*` 命名空间，经
+            // to_canonical 归一命中）——此前 Http.get_stream 静默 no-op
+            //（707 红测 G-C 定罪）；ID 与 http_stream.* 族共享。
+            ("auto.http.get_stream", 2240, Void),
+            ("auto.http.post_stream", 2241, Void),
+            ("auto.http.stream_next", 2242, Void),
+            ("auto.http.stream_is_done", 2243, Void),
+            ("auto.http.stream_close", 2244, Void),
+            ("auto.http.stream_iter", 2245, Void),
+            // PLAN-707 T-04: SSE 显式 close 与终态错误查询。
+            ("auto.http.sse_close", 3149, Void),
+            ("auto.http.sse_error", 3150, Void),
+            ("auto.http.post_stream_with_headers", 2255, Void),
+            ("auto.http.post_sync", 2256, Void),
+            ("auto.http.last_status", 2257, Void),
+            ("auto.http.post_bearer", 2258, Void),
+            ("auto.http.listen", 2259, Void),
+            ("auto.http.get_sync", 2253, Void),
+            ("http.get_sync", 2254, Void),
+
+            // === RequestBuilder chaining (2260-2264) ===
+            ("RequestBuilder.header", 2260, Void),
+            ("RequestBuilder.body", 2261, Void),
+            ("RequestBuilder.timeout", 2262, Void),
+            ("RequestBuilder.json", 2263, Void),
+            ("RequestBuilder.send", 2264, Void),
+            // Plan 350: TLS configuration
+            ("RequestBuilder.tls_ca_cert", 2265, Void),
+            ("RequestBuilder.tls_skip_verify", 2266, Void),
+            ("RequestBuilder.tls_client_cert", 2267, Void),
+            // Plan 349: Multipart file upload
+            ("RequestBuilder.multipart_file", 2268, Void),
+            ("RequestBuilder.multipart_text", 2269, Void),
+            // Plan 349: Multipart file upload
+            ("auto.http.upload", 2270, Void),
+            ("http.upload", 2270, Void),
+            // Plan 349: File download + resume + progress
+            ("auto.http.download", 2271, Void),
+            ("http.download", 2271, Void),
+            ("auto.http.download_resume", 2272, Void),
+            ("http.download_resume", 2272, Void),
+            ("auto.http.download_with_progress", 2273, Void),
+            ("http.download_with_progress", 2273, Void),
+            // Plan 349 步骤 7/8 (W2): Cookie / retry / compression — moved out of the
+            // 2270-2273 download range to fix an ID collision (cookie_store/retry
+            // previously aliased download_resume/download_with_progress, so the
+            // later-registered shim overwrote the other name's binding).
+            ("RequestBuilder.cookie_store", 3110, Void),
+            ("RequestBuilder.retry", 3111, Void),
+            ("RequestBuilder.gzip", 3112, Void),
+            ("RequestBuilder.brotli", 3113, Void),
+            // PLAN-727 T-05: 可取消文件传输公共面（RetType 与实际返回形状一致；
+            // 9930+ 高段——3114..3119 已被 *_response 族占用，撞号教训见
+            // 2270..2273 注）。
+            ("auto.http.transfer_download", 9930, Int),
+            ("http.transfer_download", 9930, Int),
+            ("auto.http.transfer_upload", 9931, Int),
+            ("http.transfer_upload", 9931, Int),
+            ("auto.http.transfer_wait", 9932, String),
+            ("http.transfer_wait", 9932, String),
+            ("auto.http.transfer_next_progress", 9933, String),
+            ("http.transfer_next_progress", 9933, String),
+            ("auto.http.transfer_cancel", 9934, Void),
+            ("http.transfer_cancel", 9934, Void),
+            ("auto.http.transfer_error", 9935, String),
+            ("http.transfer_error", 9935, String),
+            // PLAN-729 T-04: 服务端文件响应描述符构造（Int = 描述符句柄；
+            // 编组由声明返回类型门+登记命中共同识别，普通 int 不误判）。
+            ("auto.http.file_response", 9936, Int),
+            ("http.file_response", 9936, Int),
+            // PLAN-730 T-02/T-05: 服务端上传公共面（receive/commit/reject
+            // 返回句柄 Int；park 经 live-op；编组门同 9936 三重命中形态）。
+            ("auto.http.upload_receive", 9937, Int),
+            ("http.upload_receive", 9937, Int),
+            ("auto.http.upload_metadata", 9938, String),
+            ("http.upload_metadata", 9938, String),
+            ("auto.http.upload_commit", 9939, Int),
+            ("http.upload_commit", 9939, Int),
+            ("auto.http.upload_reject", 9940, Int),
+            ("http.upload_reject", 9940, Int),
+            ("auto.http.upload_error", 9941, Int),
+            ("http.upload_error", 9941, Int),
+            // Plan 350: WebSocket client
+            ("auto.ws.connect", 2280, Void),
+            ("ws.connect", 2280, Void),
+            ("auto.ws.send", 2281, Void),
+            ("ws.send", 2281, Void),
+            ("auto.ws.on_message", 2282, Void),
+            ("ws.on_message", 2282, Void),
+            ("auto.ws.close", 2283, Void),
+            ("ws.close", 2283, Void),
+
+            // === Task/Msg (2300-2311) ===
+            ("auto.task.spawn", 2300, Void),
+            ("auto.task.send", 2301, Void),
+            ("auto.task.handle_is_null", 2302, Void),
+            ("auto.task.handle_type", 2303, Void),
+            ("auto.task.handle_id", 2304, Void),
+            ("auto.task.send_await", 2308, Void),
+            ("auto.task.ask", 2309, Void),
+            ("auto.ctx.reply", 2310, Void),
+            ("auto.task.singleton_send", 2311, Void),
+
+            // === TaskSystem (2305-2307) ===
+            ("auto.task_system.start", 2305, Void),
+            ("auto.task_system.run", 2306, Void),
+            ("auto.task_system.stop", 2307, Void),
+
+            // === Regex (2400-2410) ===
+            ("auto.regex.is_match", 2400, Void),
+            ("auto.regex.find_all", 2401, Void),
+            // PLAN-053 P-053-6: web 生态静态形态（Regex.replace/test，
+            // musk 消息渲染链消费）。
+            ("auto.regex.replace", 2402, Void),
+            ("auto.regex.test", 2403, Void),
+            ("auto.regex.match", 2410, Void),
+
+            // === I18N (2460) — PLAN-066 T-12 (F-W1) ===
+            ("auto.i18n.t", 2460, String),
+
+            // === STR INSTANCE METHODS (2461..) — PLAN-066 T-06 (055-4⑥) ===
+            ("auto.str.includes", 2461, Bool),
+
+            // === System (2420-2430) ===
+            ("auto.sys.exec", 2420, Void),
+            ("auto.fs.is_binary", 2430, Void),
+
+            // === Regex opaque (2450-2459) ===
+            ("auto.re_opaque.new", 2450, Void),
+            ("auto.re_opaque.is_match", 2451, Void),
+            ("auto.re_opaque.find", 2452, Void),
+            ("auto.re_opaque.find_all", 2453, Void),
+            ("auto.re_opaque.replace_all", 2454, Void),
+            ("auto.re_opaque.captures", 2455, Void),
+            ("auto.re_opaque.drop", 2459, Void),
+
+            // === URL opaque (2500-2511) ===
+            ("auto.url_opaque.parse", 2500, Void),
+            ("auto.url_opaque.scheme", 2501, Void),
+            ("auto.url_opaque.host_str", 2502, Void),
+            ("auto.url_opaque.path", 2503, Void),
+            ("auto.url_opaque.fragment", 2504, Void),
+            ("auto.url_opaque.port", 2505, Void),
+            ("auto.url_opaque.query_pairs", 2506, Void),
+            ("auto.url_opaque.join", 2507, Void),
+            ("auto.url_opaque.origin", 2508, Void),
+            ("auto.url_opaque.drop", 2509, Void),
+            ("auto.url_opaque.query", 2510, Void),
+            ("auto.url_opaque.to_string", 2511, Void),
+
+            // === Semver opaque (2600-2609) ===
+            ("auto.semver_opaque.parse", 2600, Void),
+            ("auto.semver_opaque.major", 2601, Void),
+            ("auto.semver_opaque.minor", 2602, Void),
+            ("auto.semver_opaque.patch", 2603, Void),
+            ("auto.semver_opaque.pre", 2604, Void),
+            ("auto.semver_opaque.to_string", 2605, Void),
+            ("auto.semver_opaque.cmp_gt", 2606, Void),
+            ("auto.semver_opaque.drop", 2609, Void),
+
+            // === Chrono opaque (2700-2709) ===
+            ("auto.chrono_opaque.local_now", 2700, Int),
+            ("auto.chrono_opaque.year", 2701, Int),
+            ("auto.chrono_opaque.month", 2702, Int),
+            ("auto.chrono_opaque.day", 2703, Int),
+            ("auto.chrono_opaque.hour", 2704, Int),
+            ("auto.chrono_opaque.minute", 2705, Int),
+            ("auto.chrono_opaque.second", 2706, Int),
+            ("auto.chrono_opaque.timestamp", 2707, I64),
+            ("auto.chrono_opaque.format", 2708, String),
+            ("auto.chrono_opaque.drop", 2709, Void),
+
+            // === Base64 (2710-2711) ===
+            ("auto.base64.encode", 2710, String),
+            ("auto.base64.decode", 2711, String),
+
+            // === Hex (2720-2721) ===
+            ("auto.hex.encode", 2720, String),
+            ("auto.hex.decode", 2721, String),
+
+            // === SHA2 opaque (2730-2739) ===
+            ("auto.sha2_opaque.sha256_new", 2730, Void),
+            ("auto.sha2_opaque.update", 2731, Void),
+            ("auto.sha2_opaque.finalize", 2732, String),
+            ("auto.sha2_opaque.drop", 2739, Void),
+
+            // === Mime (2740) ===
+            ("auto.mime.from_path", 2740, String),
+
+            // === Test runner (2826-2829) — Plan 263 Phase 2-3 ===
+            ("auto.test.run_a2r_dir", 2826, Int),
+            ("auto.test.run_vm_dir", 2827, Int),
+            ("auto.test.run_a2c_dir", 2828, Int),
+            ("auto.test.run_a2ts_dir", 2829, Int),
+            // Plan 353: IO stream natives
+            ("auto.io.lines", 2830, Void),
+            ("io.lines", 2830, Void),
+            ("auto.io.chunks", 2831, Void),
+            ("io.chunks", 2831, Void),
+            // Plan 353: eprint/eprintln
+            ("auto.io.eprint", 2832, Void),
+            ("eprint", 2832, Void),
+            ("auto.io.eprintln", 2833, Void),
+            ("eprintln", 2833, Void),
+            // Plan 353 stages 3-8
+            ("auto.fs.entries", 2834, Void),
+            ("fs.entries", 2834, Void),
+            ("auto.io.buffered_writer", 2835, Void),
+            ("io.buffered_writer", 2835, Void),
+            ("auto.io.buffered_reader", 2836, Void),
+            ("io.buffered_reader", 2836, Void),
+            ("BufWriter.write_line", 2837, Void),
+            ("BufWriter.flush", 2838, Void),
+            ("BufReader.read_line", 2839, Void),
+            ("auto.io.open", 2840, Void),
+            ("io.open", 2840, Void),
+            ("File.seek", 2841, Void),
+            ("File.read", 2842, Void),
+            ("File.position", 2843, Void),
+            ("auto.path.new", 2844, Void),
+            ("Path.new", 2844, Void),
+            ("Path.join", 2845, Void),
+            ("Path.exists", 2846, Void),
+            ("Path.to_string", 2847, Void),
+            ("auto.io.scanner", 2848, Void),
+            ("io.scanner", 2848, Void),
+            // Plan 353 stage 6: Async file IO
+            ("auto.io.read_text_async", 2849, Void),
+            ("io.read_text_async", 2849, Void),
+            ("auto.io.write_text_async", 2850, Void),
+            ("io.write_text_async", 2850, Void),
+            // Plan 394 Phase A: external-future test fixtures (bare names)
+            ("delay_async", 2990, Void),
+            ("fail_async", 2991, Void),
+            // Plan 394 Phase C: combinators
+            ("future_all", 2992, Void),
+            ("future_race", 2993, Void),
+            // === Rust stdlib dispatch (3000) ===
+            ("auto.rust_stdlib.dispatch", 3000, Void),
+
+            // === Bare names (no canonical equivalent) ===
+            ("sleep", 1202, Void),
+            ("parse_sse", 2250, Void),
+            ("str_new", 172, Void),
+            ("str_append", 173, Void),
+            ("int.str", 174, Void),
+            ("uint.to_hex", 236, Void),
+            ("alloc_array", 190, Void),
+            ("realloc_array", 191, Void),
+            ("free_array", 192, Void),
+
+            // === Plan 442 C2: musk backend extern response constructors ===
+            // Bare extern_sigs names (no canonical prefix) — the handlers call
+            // them to build HTTP responses; constructors return an i32
+            // HttpResponseData handle, resp_* read the {"error":...} envelope.
+            ("ok_response", 3114, Int),
+            ("err_response", 3115, Int),
+            ("json_response", 3116, Int),
+            ("error_response", 3117, Int),
+            ("text_response", 3118, Int),
+            ("empty_response", 3119, Int),
+            ("err_json_response", 3120, Int),
+            ("to_response", 3121, Int),
+            ("resp_is_err", 3122, Bool),
+            ("resp_err_code", 3123, Int),
+            ("resp_err_message", 3124, String),
+            ("sse_named_event", 3125, Int),
+            ("sse_event", 3126, Int),
+            ("sse_plain_event", 3127, Int),
+            // Pure-logic value accessors (no Rust-registry dependency).
+            ("value_get_str", 3128, String),
+            // PLAN-044: generic musk extern dispatcher — extern_sigs.at stub
+            // bodies call this with (name, [args]); forwards to a registered
+            // host call (path (a)) or pushes null as the no-host fallback.
+            // P442-4: 原登 3129 与 value_get_bool 撞号（id→shim 后写覆盖，
+            // CALL_NAT 3129 恒派发本 shim → e2e_value_accessors 500），
+            // 移段 3143。
+            ("musk_extern_dispatch", 3143, Void),
+            ("value_get_bool", 3129, Bool),
+            ("value_is_null", 3130, Bool),
+            ("value_get", 3131, Int),
+            ("value_get_array", 3132, Int),
+            // Pure utility externs (auto-lang has fastrand + hex).
+            ("new_id", 3133, String),
+            ("random_hex", 3134, String),
+            ("hash_password", 3135, String),
+            ("path_inner", 3136, String),
+            // Data-source extern (path (a) forwarding; default = constant).
+            ("app_config_effective_daemon_url", 3137, String),
+            // Value-returning data extern (path (a) forwarding; default = empty).
+            ("relay_runs_list", 3138, Int),
+
+            // === ID-conflicting short names ===
+            ("str.len", 170, Void),
+            ("String.len", 171, Void),
+            ("str.upper", 175, Void),
+            ("String.from", 176, Void),
+            ("String.is_empty", 185, Void),
+
+            // === FFI shim name aliases (#[rust_fn]) ===
+            ("File.read_text", 1000, Void),
+            ("File.write_text", 1001, Void),
+            ("File.exists", 1002, Void),
+            ("File.delete", 1003, Void),
+            ("File.create_dir", 1004, Void),
+            ("File.read_bytes", 1005, Void),
+            ("File.write_bytes", 1006, Void),
+            ("File.copy", 1007, Void),
+            ("File.size", 1008, Void),
+            ("File.is_dir", 1009, Void),
+            ("File.append_text", 1011, Void),
+            ("File.remove_dir", 1014, Void),
+            ("File.remove_dir_all", 1015, Void),
+
+            // === Str.* aliases (#[rust_fn]) — Plan 368 W8: return types must
+            // match the authoritative auto.str.* entries above, NOT Void. The
+            // old Void tags made the codegen treat e.g. s.replace(...) as a
+            // void call, dropping its String return value (the c_text_app /
+            // string_utils "return method-call drops value" bug, Plan 359 C2).
+            ("Str.len", 1500, Int),
+            ("Str.is_empty", 1501, Bool),
+            ("Str.is_digit", 1525, Bool),
+            ("Str.byte_len", 1526, Int),
+            ("Str.char_at", 1502, Int),
+            ("Str.substr", 1503, String),
+            ("Str.contains", 1504, Bool),
+            ("Str.starts_with", 1505, Bool),
+            ("Str.ends_with", 1506, Bool),
+            ("Str.trim", 1507, String),
+            ("Str.split", 1508, List),
+            ("Str.repeat", 1509, String),
+            ("Str.replace", 1510, String),
+            ("Str.to_upper", 1511, String),
+            ("Str.to_lower", 1512, String),
+            ("Str.reverse", 1513, String),
+            ("Str.find", 1514, Int),
+            ("Str.lines", 1515, List),
+            ("Str.parse_int", 1516, Int),
+            ("Str.parse_float", 1517, Float),
+            ("Str.split_once", 1518, List),
+            ("Str.match_count", 1519, Int),
+            ("Str.replace_first", 1520, String),
+            ("Str.uuid", 1521, String),
+            ("Str.from_uint", 1522, String),
+            ("Str.to_uint", 1523, I64),
+
+            // === Runtime aliases (CALL_SPEC lowercase type) — Plan 368 W8:
+            // same correction as Str.* above. Added the missing lower/upper/
+            // reverse/char_at/substr/repeat/split_once/match_count entries.
+            ("str.len", 170, Int),
+            ("str.is_empty", 1501, Bool),
+            ("str.is_digit", 1525, Bool),
+            ("str.byte_len", 1526, Int),
+            ("str.char_at", 1502, Int),
+            ("str.substr", 1503, String),
+            ("str.contains", 1504, Bool),
+            ("str.starts_with", 1505, Bool),
+            ("str.ends_with", 1506, Bool),
+            ("str.trim", 1507, String),
+            ("str.split", 1508, List),
+            ("str.repeat", 1509, String),
+            ("str.replace", 1510, String),
+            ("str.to_upper", 1511, String),
+            ("str.to_lower", 1512, String),
+            ("str.upper", 175, String),
+            ("str.lower", 1512, String),
+            ("str.reverse", 1513, String),
+            ("str.find", 1514, Int),
+            ("str.lines", 1515, List),
+            ("str.parse_int", 1516, Int),
+            ("str.parse_float", 1517, Float),
+
+            // === Task.* aliases ===
+            ("Task.spawn", 2300, Void),
+            ("TaskHandle.send", 2301, Void),
+            ("Task.singleton_send", 2311, Void),
+            ("TaskHandle.send_await", 2308, Void),
+            ("TaskHandle.ask", 2309, Void),
+            ("TaskHandle.is_null", 2302, Void),
+            ("TaskHandle.task_type", 2303, Void),
+            ("TaskHandle.instance_id", 2304, Void),
+            ("TaskSystem.start", 2305, Void),
+            ("TaskSystem.stop", 2307, Void),
+
+            // === Option/Result ===
+            ("auto.option.or", 1550, Void),
+            ("auto.option.unwrap_or", 1551, Void),
+            ("auto.result.map_err", 2070, Void),
+            ("auto.result.Ok.map_err", 2070, Void),
+            ("auto.result.Err.map_err", 2070, Void),
+
+            // === str.* typed entries ===
+            ("str.split_once", 1518, List),
+            ("str.match_count", 1519, Int),
+            ("str.replace_first", 1520, String),
+            ("str.uuid", 1521, String),
+            ("str.from_uint", 1522, String),
+            ("str.to_uint", 1523, I64)
+        }
+    };
+}
+
+/// Consumer: generates registration calls for each BIGVM entry.
+/// Must be called inside a method that has `registry` in scope (use local macro wrapper).
+/// Entry format: ("name", id, ret_type_tag).
+/// Void → register_with_id; others → register_with_id_and_type.
+#[macro_export]
+macro_rules! register_bigvm {
+    (($name:expr, $id:expr, Void) $(, $rest:tt)*) => {
+        registry.register_with_id($name, $id);
+        $crate::register_bigvm!($($rest),*);
+    };
+    (($name:expr, $id:expr, List) $(, $rest:tt)*) => {
+        registry.register_with_id_and_type($name, $id, NativeRetType::List);
+        $crate::register_bigvm!($($rest),*);
+    };
+    (($name:expr, $id:expr, Bool) $(, $rest:tt)*) => {
+        registry.register_with_id_and_type($name, $id, NativeRetType::Bool);
+        $crate::register_bigvm!($($rest),*);
+    };
+    (($name:expr, $id:expr, Int) $(, $rest:tt)*) => {
+        registry.register_with_id_and_type($name, $id, NativeRetType::Int);
+        $crate::register_bigvm!($($rest),*);
+    };
+    (($name:expr, $id:expr, I64) $(, $rest:tt)*) => {
+        registry.register_with_id_and_type($name, $id, NativeRetType::I64);
+        $crate::register_bigvm!($($rest),*);
+    };
+    (($name:expr, $id:expr, String) $(, $rest:tt)*) => {
+        registry.register_with_id_and_type($name, $id, NativeRetType::String);
+        $crate::register_bigvm!($($rest),*);
+    };
+    (($name:expr, $id:expr, Float) $(, $rest:tt)*) => {
+        registry.register_with_id_and_type($name, $id, NativeRetType::Float);
+        $crate::register_bigvm!($($rest),*);
+    };
+    (($name:expr, $id:expr, Map) $(, $rest:tt)*) => {
+        registry.register_with_id_and_type($name, $id, NativeRetType::Map);
+        $crate::register_bigvm!($($rest),*);
+    };
+    () => {};
+}
+
+// Plan 378: Build a flat `(name, NativeRetType)` table from the BIGVM catalog
+// WITHOUT deep macro recursion. `for_each_bigvm_native!($mac)` expands to
+// `$mac!(tuple1, tuple2, ...)`; this consumer matches the whole tuple list with
+// a single repetition pattern and emits a flat array literal. The ID-only
+// `NATIVE_ID_ENTRIES` table (and Plan 250's lazy `resolve_qualified`) discard
+// return types, so lazily-registered natives (e.g. `str.to_uint -> I64`) had no
+// return type available to codegen type inference. This table restores them.
+#[macro_export]
+macro_rules! native_ret_tag {
+    (Void) => {
+        $crate::vm::native_registry::NativeRetType::Void
+    };
+    (List) => {
+        $crate::vm::native_registry::NativeRetType::List
+    };
+    (Bool) => {
+        $crate::vm::native_registry::NativeRetType::Bool
+    };
+    (Int) => {
+        $crate::vm::native_registry::NativeRetType::Int
+    };
+    (I64) => {
+        $crate::vm::native_registry::NativeRetType::I64
+    };
+    (String) => {
+        $crate::vm::native_registry::NativeRetType::String
+    };
+    (Float) => {
+        $crate::vm::native_registry::NativeRetType::Float
+    };
+    (Map) => {
+        $crate::vm::native_registry::NativeRetType::Map
+    };
+}
+
+#[macro_export]
+macro_rules! build_native_ret_entries {
+    ( $( ($n:expr, $i:expr, $t:ident) ),* $(,)? ) => {
+        &[ $( ($n, $crate::native_ret_tag!($t)) ),* ]
+    };
+}
+
+/// Plan 378: Flat `(name, NativeRetType)` table for all BIGVM catalog entries.
+/// Imported by `build_fn_return_types()` so codegen sees the return types of
+/// natives that are otherwise lazily ID-registered without a return type.
+pub static NATIVE_RET_ENTRIES: &[(&str, crate::vm::native_registry::NativeRetType)] =
+    crate::for_each_bigvm_native!(build_native_ret_entries);
+// Plan 250: Known native function names → fixed IDs.
+// Used by resolve_qualified() for lazy registration.
+// IDs must match NATIVE_* constants in for_each_native! (shim bindings).
+pub const NATIVE_ID_ENTRIES: &[(&str, u16)] = &[
+    // PLAN-095 T-04: ui.focus 固定 id（9920，9900+ 高段惯例）——惰性注册
+    // 白名单条目；缺行时编译期 func_name 重写落空、运行时静默 no-op。
+    ("auto.ui.focus", 9920),
+    // Plan 673: code_editor delta/edit fixed IDs. 2939 pins the delta read
+    // side against register_vm_declarations' dynamic #[vm] id counter (which
+    // walks up from 100 through the 29xx band — T-02 e2e caught a stdlib
+    // #[vm] fn landing on a catalog id and its inventory shim overwriting the
+    // static binding). 9906 sits in the 9900+ high band (PLAN-656 scroll
+    // family precedent; dynamic shims start at 10000, the counter never
+    // reaches it) but is pinned here for a uniform ownership record.
+    ("auto.code_editor.delta", 2939),
+    ("auto.code_editor.edit", 9906),
+    ("auto.code_editor.load_file", 9908),
+    // PLAN-716 组B: 帧时间戳观测（9918/9919 空闲位）。
+    ("auto.frame.begin_ms", 9918),
+    ("auto.frame.present_ms", 9919),
+    // PLAN-716 Phase 2 (供⑧): 9921——原 9920 与 ui.focus 撞号（见
+    // for_each_native 组C 注）。
+    ("auto.diff_files_window", 9921),
+    // PLAN-781 T-01: 子内容锚点族（for_each_native 9922/9923 同源行——
+    // 缺行时 register_vm_declarations 动态分配器不避让，stdlib #[vm] 声明
+    // （http.Request.method 族）会占号后被静态 shim 覆写，2939 同款坑）。
+    ("auto.scroll.to_child", 9922),
+    ("auto.scroll.anchor_state", 9923),
+    // Plan 555 T06: 分发组合子（interop.* 限定名 + 裸名别名——裸名
+    // resolve_qualified 经 NATIVE_ID_MAP 惰性注册命中）。
+    ("interop.obj_get", 1860),
+    ("obj_get", 1860),
+    ("interop.obj_set", 1861),
+    ("obj_set", 1861),
+    ("interop.obj_call", 1862),
+    ("obj_call", 1862),
+    ("interop.obj_len", 1863),
+    ("obj_len", 1863),
+    ("interop.obj_iter", 1864),
+    ("obj_iter", 1864),
+    ("interop.obj_type_name", 1865),
+    ("obj_type_name", 1865),
+    ("auto.list.new", 100),
+    ("auto.list.push", 101),
+    ("auto.list.pop", 102),
+    ("auto.list.len", 103),
+    ("auto.list.is_empty", 104),
+    ("auto.list.clear", 105),
+    ("auto.list.get", 106),
+    ("auto.list.set", 107),
+    ("auto.list.insert", 108),
+    ("auto.list.remove", 109),
+    ("auto.list.splice", 2071),
+    ("auto.list.find_index", 2072),
+    ("auto.list.drop", 110),
+    // PLAN-057 T6: Array.isArray（shim 由 engine 覆盖块绑定）。双行别名：
+    // resolve 的 canonical 化保留方法名大小写——"Array.isArray" 规整为
+    // "auto.list.isArray"（camelCase），而注册惯例是 snake_case；两形同指 111。
+    ("auto.list.is_array", 1919),
+    ("auto.list.isArray", 1919),
+    ("auto.list.reserve", 118),
+    ("auto.list.capacity", 205),
+    ("auto.list.map", 2060),
+    ("auto.list.filter", 2061),
+    ("auto.list.for_each", 2062),
+    ("auto.list.find", 2063),
+    ("auto.list.any", 2064),
+    ("auto.list.all", 2065),
+    ("auto.list.reduce", 2066),
+    ("auto.list.sort", 2067),
+    ("auto.list.sort_by", 2068),
+    // Plan 046 (auto-musk T2): dynamic-receiver family
+    ("auto.obj.keys", 2090),
+    ("auto.obj.values", 2091),
+    ("auto.obj.find", 2092),
+    ("auto.list.contains", 2069),
+    ("auto.list.iter", 111),
+    ("auto.iterator.next", 112),
+    ("auto.iterator.map", 113),
+    ("auto.iterator.filter", 114),
+    ("auto.iterator.collect", 115),
+    ("auto.iterator.reduce", 116),
+    ("auto.iterator.find", 117),
+    ("auto.iterator.enumerate", 119),
+    ("auto.hashmap.new", 120),
+    ("Map.new", 120),
+    ("HashMap.new", 120),
+    ("auto.hashmap.insert_str", 121),
+    ("auto.hashmap.insert_int", 122),
+    ("auto.hashmap.get_str", 123),
+    ("auto.hashmap.get_int", 124),
+    ("auto.hashmap.contains", 125),
+    ("auto.hashmap.remove", 126),
+    ("auto.hashmap.size", 127),
+    ("auto.hashmap.clear", 128),
+    ("auto.hashmap.drop", 129),
+    ("auto.hashmap.insert", 121),
+    ("auto.hashmap.get", 123),
+    ("auto.hashmap.keys", 1292),
+    ("auto.hashset.new", 1293),
+    ("auto.hashset.insert", 130),
+    ("auto.hashset.contains", 131),
+    ("auto.hashset.remove", 132),
+    ("auto.hashset.size", 133),
+    ("auto.hashset.clear", 134),
+    ("auto.hashset.drop", 135),
+    ("auto.vecdeque.new", 136),
+    ("auto.vecdeque.push_back", 137),
+    ("auto.vecdeque.push_front", 138),
+    ("auto.vecdeque.pop_back", 139),
+    ("auto.vecdeque.pop_front", 140),
+    ("auto.vecdeque.front", 141),
+    ("auto.vecdeque.back", 142),
+    ("auto.vecdeque.size", 143),
+    ("auto.vecdeque.is_empty", 144),
+    ("auto.vecdeque.clear", 145),
+    ("auto.vecdeque.drop", 146),
+    ("auto.btreemap.new", 147),
+    ("auto.btreemap.insert", 148),
+    ("auto.btreemap.get", 149),
+    ("auto.btreemap.contains", 150),
+    ("auto.btreemap.remove", 151),
+    ("auto.btreemap.size", 152),
+    ("auto.btreemap.is_empty", 153),
+    ("auto.btreemap.clear", 154),
+    ("auto.btreemap.first_key", 155),
+    ("auto.btreemap.last_key", 156),
+    ("auto.btreemap.drop", 157),
+    ("auto.stringbuilder.new", 160),
+    ("auto.stringbuilder.append", 161),
+    ("auto.stringbuilder.append_int", 162),
+    ("auto.stringbuilder.append_char", 163),
+    ("auto.stringbuilder.len", 164),
+    ("auto.stringbuilder.clear", 165),
+    ("auto.stringbuilder.drop", 166),
+    ("auto.stringbuilder.build", 167),
+    ("auto.heap.new", 195),
+    ("auto.heap.capacity", 196),
+    ("auto.heap.try_grow", 197),
+    ("auto.heap.drop", 198),
+    ("auto.inline_int64.new", 199),
+    ("auto.inline_int64.capacity", 200),
+    ("auto.inline_int64.try_grow", 201),
+    ("auto.inline_int64.drop", 202),
+    ("auto.alloc.array", 190),
+    ("auto.realloc.array", 191),
+    ("auto.free.array", 192),
+    ("auto.str.len", 170),
+    ("auto.str.is_empty", 1501),
+    ("auto.str.is_digit", 1525),
+    ("auto.str.byte_len", 1526),
+    ("auto.type_of", 1527),
+    ("type_of", 1527),
+    ("auto.str.char_at", 1502),
+    ("auto.str.substr", 1503),
+    ("auto.str.sub", 1524),
+    ("auto.str.slice", 1524),
+    ("auto.str.contains", 1504),
+    ("auto.str.starts_with", 1505),
+    ("auto.str.ends_with", 1506),
+    ("auto.str.trim", 1507),
+    ("auto.str.split", 1508),
+    ("auto.str.repeat", 1509),
+    ("auto.str.replace", 1510),
+    ("auto.str.to_upper", 1511),
+    ("auto.str.to_lower", 1512),
+    ("auto.str.upper", 175),
+    ("auto.str.lower", 1512),
+    ("auto.str.reverse", 1513),
+    ("auto.str.find", 1514),
+    ("auto.str.lines", 1515),
+    ("auto.str.parse_int", 1516),
+    ("auto.str.to_int", 1516),
+    ("auto.str.parse_float", 1517),
+    ("auto.str.new", 172),
+    ("auto.str.push", 178),
+    ("auto.str.pop", 179),
+    ("auto.str.get", 180),
+    ("auto.str.set", 181),
+    ("auto.str.insert", 182),
+    ("auto.str.remove", 183),
+    ("auto.str.clear", 184),
+    ("auto.str.reserve", 186),
+    ("auto.str.bytes", 235),
+    ("auto.int.and", 210),
+    ("auto.int.or", 211),
+    ("auto.int.xor", 212),
+    ("auto.int.not", 213),
+    ("auto.int.shl", 214),
+    ("auto.int.shr", 215),
+    ("auto.int.sar", 216),
+    ("auto.int.rol", 217),
+    ("auto.int.ror", 218),
+    ("auto.int.count_ones", 220),
+    ("auto.int.leading_zeros", 221),
+    ("auto.int.trailing_zeros", 222),
+    ("auto.int.flip", 223),
+    ("auto.int.bit_read", 230),
+    ("auto.int.bit_test", 231),
+    ("auto.int.bit_on", 232),
+    ("auto.int.bit_off", 233),
+    ("auto.int.bit_flip", 234),
+    ("auto.file.read_text", 1000),
+    ("auto.file.write_text", 1001),
+    ("auto.file.exists", 1002),
+    ("auto.file.delete", 1003),
+    ("auto.file.create_dir", 1004),
+    ("auto.file.read_bytes", 1005),
+    ("auto.file.write_bytes", 1006),
+    ("auto.file.copy", 1007),
+    ("auto.file.size", 1008),
+    ("auto.file.is_dir", 1009),
+    ("auto.file.walk", 1010),
+    ("auto.file.append_text", 1011),
+    ("auto.file.read_lines", 1012),
+    ("auto.file.remove_dir", 1014),
+    ("auto.file.remove_dir_all", 1015),
+    ("auto.file.read_text_range", 1016),
+    ("auto.fs.read_text", 1000),
+    ("auto.fs.read", 1000),
+    ("auto.fs.write_text", 1001),
+    ("auto.fs.write", 1001),
+    ("auto.fs.append_text", 1011),
+    ("auto.fs.append", 1011),
+    ("auto.fs.exists", 1002),
+    ("auto.fs.delete", 1003),
+    ("auto.fs.create_dir", 1004),
+    ("auto.fs.remove_dir", 1014),
+    ("auto.fs.remove_dir_all", 1015),
+    ("auto.fs.read_bytes", 1005),
+    ("auto.fs.write_bytes", 1006),
+    ("auto.fs.copy", 1007),
+    ("auto.fs.size", 1008),
+    ("auto.fs.is_dir", 1009),
+    ("auto.file.create_handle", 1010),
+    ("auto.file.open_handle", 1011),
+    ("auto.file.write_handle", 1012),
+    ("auto.file.try_clone", 1013),
+    ("auto.env.get", 1100),
+    ("auto.env.set", 1101),
+    ("auto.env.remove", 1102),
+    ("auto.env.get_or", 1103),
+    ("Env.get_or", 1103),
+    ("auto.env.local_data_dir", 1104),
+    ("env.local_data_dir", 1104),
+    ("auto.env.home_dir", 1105),
+    ("env.home_dir", 1105),
+    // PLAN-680 Q1: track identification (see ret-type table Env block).
+    ("auto.env.track", 9907),
+    ("Env.track", 9907),
+    ("auto.storage.get", 1106),
+    ("Storage.get", 1106),
+    ("storage.get", 1106),
+    ("auto.storage.set", 1107),
+    ("Storage.set", 1107),
+    ("storage.set", 1107),
+    ("auto.storage.remove", 1108),
+    ("Storage.remove", 1108),
+    ("storage.remove", 1108),
+    ("auto.time.now_ms", 1200),
+    ("auto.time.now_sec", 1201),
+    ("auto.time.sleep_ms", 1202),
+    ("auto.time.instant_now", 1203),
+    ("auto.time.instant_elapsed", 1204),
+    ("auto.cell.once_new", 2850),
+    ("auto.cell.once_set", 2851),
+    ("auto.cell.once_get", 2852),
+    ("auto.process.exit", 1300),
+    ("auto.process.args", 1301),
+    ("auto.process.current_dir", 1302),
+    ("auto.process.set_current_dir", 1303),
+    ("auto.process.spawn", 1304),
+    ("auto.process.spawn_with_output", 1305),
+    ("auto.path.join", 1400),
+    ("auto.path.parent", 1401),
+    ("auto.path.extension", 1402),
+    ("auto.path.filename", 1403),
+    ("auto.path.canonicalize", 1404),
+    ("auto.char.is_alpha", 1600),
+    ("auto.char.is_digit", 1601),
+    ("auto.char.is_alphanum", 1602),
+    ("auto.char.is_whitespace", 1603),
+    ("auto.char.is_ident", 1604),
+    ("auto.char.to_lower", 1605),
+    ("auto.char.to_upper", 1606),
+    ("auto.char.to_str", 1607),
+    ("auto.log.debug", 1805),
+    ("auto.log.info", 1806),
+    ("auto.log.warn", 1807),
+    ("auto.log.error", 1808),
+    ("auto.log.noop", 1804),
+    ("Log.debug", 1805),
+    ("Log.info", 1806),
+    ("Log.warn", 1807),
+    ("Log.error", 1808),
+    ("auto.math.abs", 1700),
+    ("auto.math.min", 1701),
+    ("auto.math.max", 1702),
+    ("auto.math.sqrt", 1750),
+    ("auto.math.floor", 1710),
+    ("auto.math.ceil", 1711),
+    ("auto.math.round", 1712),
+    ("auto.math.pow", 1713),
+    ("auto.math.min_f", 1714),
+    ("auto.math.max_f", 1715),
+    ("auto.math.sin", 1716),
+    ("auto.math.cos", 1717),
+    ("auto.math.tan", 1718),
+    ("auto.math.exp", 1719),
+    ("auto.math.ln", 1720),
+    ("auto.math.log2", 1721),
+    ("auto.math.log10", 1722),
+    ("auto.math.abs_f", 1723),
+    ("auto.math.signum", 1724),
+    ("auto.math.clamp", 1725),
+    ("auto.math.asin", 1726),
+    ("auto.math.acos", 1727),
+    ("auto.math.atan", 1728),
+    ("auto.math.atan2", 1729),
+    ("auto.math.powi", 1730),
+    ("auto.math.powf", 1731),
+    ("auto.math.to_radians", 1732),
+    ("auto.math.to_degrees", 1733),
+    // PLAN-057 T6: web 内建（shim 由 engine 覆盖块绑定）
+    ("auto.math.trunc", 1734),
+    ("auto.math.imul", 1735),
+    ("auto.rand.thread_rng", 1850),
+    ("auto.rng.gen_range", 1851),
+    ("auto.rng.gen", 1852),
+    ("auto.rng.drop", 1853),
+    ("auto.rand.random", 1854),
+    ("auto.json.encode", 1900),
+    ("auto.json.decode", 1901),
+    ("auto.json.parse", 1902),
+    // PLAN-057 T6: JSON.stringify（shim 由 engine 覆盖块绑定；codegen 缺参补位）
+    ("auto.json.stringify", 1918),
+    ("auto.json.prettify", 1903),
+    ("auto.json.minify", 1904),
+    ("auto.json.is_valid", 1905),
+    ("auto.json.get", 1906),
+    ("auto.json.get_at", 1907),
+    ("auto.json.len", 1908),
+    ("auto.json.type_of", 1909),
+    ("auto.json.as_string", 1910),
+    ("auto.json.as_number", 1911),
+    ("auto.json.as_int", 1912),
+    ("auto.json.as_bool", 1913),
+    ("auto.json.is_null", 1914),
+    ("auto.json.keys", 1915),
+    ("auto.json.has_key", 1917),
+    // Plan 340: JSON ↔ VM value + JSON HTTP helpers
+    ("auto.json.to_value", 3100),
+    ("auto.json.from_value", 3101),
+    ("Json.to_value", 3100),
+    ("Json.from_value", 3101),
+    ("auto.http.get_json", 3102),
+    ("auto.http.post_json", 3103),
+    ("auto.http.put_json", 3104),
+    ("auto.http.delete_json", 3105),
+    ("auto.http.patch_json", 3107),
+    // Plan 341: 异步 SSE 流式接收
+    ("auto.http.sse_get_stream", 3106),
+    ("http.sse_get_stream", 3106),
+    ("http.sse_stream", 3106),
+    ("auto.serde_json.to_string", 1900),
+    ("auto.json.to_string", 1900),
+    ("json.to_string", 1900),
+    ("Json.to_string", 1900),
+    ("auto.serde_json.from_str", 1902),
+    ("auto.toml.from_str", 2750),
+    ("auto.toml.to_string", 2751),
+    ("auto.url.encode", 2000),
+    ("auto.url.decode", 2001),
+    ("auto.url.encode_path", 2013),
+    ("auto.url.encode_query", 2002),
+    // plan-022 (auto-down): property-form `.length` — the JS-side spelling
+    // engine/vue/front sources use. The Dot builtin-native lookup builds
+    // "List.length"/"str.length" → canonical here; without these lazy
+    // entries the access falls through to GET_FIELD and yields 0 on heap
+    // lists. IDs alias the catalog len shims (103 / 170).
+    ("auto.list.length", 103),
+    ("auto.str.length", 170),
+    ("auto.url.decode_query", 2003),
+    ("auto.url.parse", 2006),
+    ("auto.url.scheme", 2007),
+    ("auto.url.host", 2008),
+    ("auto.url.port", 2009),
+    ("auto.url.path", 2010),
+    ("auto.url.query", 2011),
+    ("auto.url.fragment", 2012),
+    ("auto.url.join_path", 2015),
+    ("auto.net.tcp_bind", 2100),
+    ("auto.net.tcp_listener_accept", 2101),
+    ("auto.net.tcp_listener_local_addr", 2102),
+    ("auto.net.tcp_listener_close", 2103),
+    ("auto.net.tcp_connect", 2104),
+    ("auto.net.tcp_stream_read", 2105),
+    ("auto.net.tcp_stream_write", 2106),
+    ("auto.net.tcp_stream_read_all", 2107),
+    ("auto.net.tcp_stream_read_line", 2108),
+    ("auto.net.tcp_stream_write_str", 2109),
+    ("auto.net.tcp_stream_close", 2110),
+    ("auto.net.tcp_stream_peer_addr", 2111),
+    ("auto.net.tcp_stream_set_read_timeout", 2112),
+    ("auto.net.tcp_stream_set_write_timeout", 2113),
+    ("auto.net.tcp_stream_flush", 2114),
+    ("auto.net.tcp_stream_set_nodelay", 2115),
+    ("auto.http.server", 2200),
+    ("auto.http.server_get", 2201),
+    ("auto.http.server_post", 2202),
+    ("auto.http.server_put", 2203),
+    ("auto.http.server_delete", 2204),
+    ("auto.http.server_static", 2205),
+    ("auto.http.server_listen", 2206),
+    ("auto.http.response", 2210),
+    ("auto.http.response_status", 2211),
+    ("auto.http.response_header", 2212),
+    ("auto.http.response_text", 2213),
+    ("auto.http.response_html", 2214),
+    ("auto.http.response_bytes", 2215),
+    ("auto.http.response.body_bytes", 2225),
+    ("auto.http.response.body_to_file", 2226),
+    ("auto.http.response_redirect", 3108),
+    ("auto.http.rate_limit", 3109),
+    ("http.rate_limit", 3109),
+    ("auto.http.response.redirect", 2219),
+    ("http.response.redirect", 2219),
+    ("auto.session.create", 2284),
+    ("session.create", 2284),
+    ("auto.session.get", 2285),
+    ("session.get", 2285),
+    ("auto.session.set", 2286),
+    ("session.set", 2286),
+    ("auto.session.destroy", 2287),
+    ("session.destroy", 2287),
+    ("auto.http.server_use", 2288),
+    ("http.server.use", 2288),
+    ("auto.http.server_middleware", 2288),
+    ("http.server.middleware", 2288),
+    ("auto.template.compile", 2289),
+    ("template.compile", 2289),
+    ("auto.template.render", 2290),
+    ("template.render", 2290),
+    ("auto.openapi.generate", 2291),
+    ("openapi.generate", 2291),
+    ("auto.http.response.status_code", 2216),
+    ("auto.http.response.header_get", 2217),
+    ("auto.http.response.body", 2218),
+    ("auto.http.ok", 2220),
+    ("auto.http.created", 2221),
+    ("auto.http.bad_request", 2222),
+    ("auto.http.not_found", 2223),
+    ("auto.http.internal_error", 2224),
+    ("auto.http.get", 2230),
+    ("auto.http.set_default_header", 3139),
+    ("auto.http.set_default_query", 3140),
+    ("auto.http.clear_default_auth", 3141),
+    ("auto.vm.warn_api_noop", 3142),
+    ("auto.bus.subscribe", 3144),
+    ("auto.http.sse_open", 3145),
+    ("auto.http.sse_poll", 3146),
+    ("auto.sys.panic_hard", 3147),
+    ("auto.http.get_msg", 3148),
+    ("auto.http.post", 2231),
+    ("auto.http.put", 2232),
+    ("auto.http.delete", 2233),
+    ("auto.http.request", 2234),
+    ("auto.http.request_builder_header", 2235),
+    ("auto.http.request_builder_body", 2236),
+    ("auto.http.request_builder_timeout", 2237),
+    ("auto.http.request_builder_json", 2238),
+    ("auto.http.request_builder_send", 2239),
+    ("auto.http_stream.get_stream", 2240),
+    ("auto.http_stream.post_stream", 2241),
+    ("auto.http_stream.stream_next", 2242),
+    ("auto.http_stream.stream_is_done", 2243),
+    ("auto.http_stream.stream_close", 2244),
+    ("auto.http_stream.stream_iter", 2245),
+    // PLAN-707 T-04: `Http.*` 命名空间别名（同 ID）+ SSE close/error。
+    ("auto.http.get_stream", 2240),
+    ("auto.http.post_stream", 2241),
+    ("auto.http.stream_next", 2242),
+    ("auto.http.stream_is_done", 2243),
+    ("auto.http.stream_close", 2244),
+    ("auto.http.stream_iter", 2245),
+    ("auto.http.sse_close", 3149),
+    ("auto.http.sse_error", 3150),
+    ("auto.http.post_stream_with_headers", 2255),
+    ("auto.http.post_sync", 2256),
+    ("auto.http.last_status", 2257),
+    ("auto.http.get_sync", 2253),
+    ("http.get_sync", 2254),
+    ("auto.http.post_bearer", 2258),
+    ("auto.http.listen", 2259),
+    ("RequestBuilder.header", 2260),
+    ("RequestBuilder.body", 2261),
+    ("RequestBuilder.timeout", 2262),
+    ("RequestBuilder.json", 2263),
+    ("RequestBuilder.send", 2264),
+    ("RequestBuilder.tls_ca_cert", 2265),
+    ("RequestBuilder.tls_skip_verify", 2266),
+    ("RequestBuilder.tls_client_cert", 2267),
+    ("RequestBuilder.multipart_file", 2268),
+    ("RequestBuilder.multipart_text", 2269),
+    ("auto.http.upload", 2270),
+    ("http.upload", 2270),
+    ("auto.http.download", 2271),
+    ("http.download", 2271),
+    ("auto.http.download_resume", 2272),
+    ("http.download_resume", 2272),
+    ("auto.http.download_with_progress", 2273),
+    ("http.download_with_progress", 2273),
+    // Plan 349 步骤 7/8 (W2): relocated to resolve ID collision with download_*.
+    ("RequestBuilder.cookie_store", 3110),
+    ("RequestBuilder.retry", 3111),
+    ("RequestBuilder.gzip", 3112),
+    ("RequestBuilder.brotli", 3113),
+    // PLAN-727 T-05: 可取消文件传输公共面。
+    ("auto.http.transfer_download", 9930),
+    ("http.transfer_download", 9930),
+    ("auto.http.transfer_upload", 9931),
+    ("http.transfer_upload", 9931),
+    ("auto.http.transfer_wait", 9932),
+    ("http.transfer_wait", 9932),
+    ("auto.http.transfer_next_progress", 9933),
+    ("http.transfer_next_progress", 9933),
+    ("auto.http.transfer_cancel", 9934),
+    ("http.transfer_cancel", 9934),
+    ("auto.http.transfer_error", 9935),
+    ("http.transfer_error", 9935),
+    ("auto.http.file_response", 9936),
+    ("http.file_response", 9936),
+    // PLAN-730 T-02: 服务端上传公共面。
+    ("auto.http.upload_receive", 9937),
+    ("http.upload_receive", 9937),
+    ("auto.http.upload_metadata", 9938),
+    ("http.upload_metadata", 9938),
+    ("auto.http.upload_commit", 9939),
+    ("http.upload_commit", 9939),
+    ("auto.http.upload_reject", 9940),
+    ("http.upload_reject", 9940),
+    ("auto.http.upload_error", 9941),
+    ("http.upload_error", 9941),
+    ("auto.ws.connect", 2280),
+    ("ws.connect", 2280),
+    ("auto.ws.send", 2281),
+    ("ws.send", 2281),
+    ("auto.ws.on_message", 2282),
+    ("ws.on_message", 2282),
+    ("auto.ws.close", 2283),
+    ("ws.close", 2283),
+    ("auto.task.spawn", 2300),
+    ("auto.task.send", 2301),
+    ("auto.task.handle_is_null", 2302),
+    ("auto.task.handle_type", 2303),
+    ("auto.task.handle_id", 2304),
+    ("auto.task.send_await", 2308),
+    ("auto.task.ask", 2309),
+    ("auto.ctx.reply", 2310),
+    ("auto.task.singleton_send", 2311),
+    ("auto.task_system.start", 2305),
+    ("auto.task_system.run", 2306),
+    ("auto.task_system.stop", 2307),
+    ("auto.regex.is_match", 2400),
+    ("auto.regex.find_all", 2401),
+    ("auto.regex.replace", 2402),
+    ("auto.regex.test", 2403),
+    ("auto.regex.match", 2410),
+    ("auto.i18n.t", 2460),
+    ("auto.str.includes", 2461),
+    ("auto.sys.exec", 2420),
+    ("auto.sys.cpu_usage", 2421),
+    ("auto.sys.cpu_count", 2422),
+    ("auto.sys.cpu_core_usage", 2423),
+    ("auto.sys.cpu_brand", 2424),
+    ("auto.sys.mem_total_mb", 2425),
+    ("auto.sys.mem_used_mb", 2426),
+    ("auto.sys.net_sent_kbs", 2427),
+    ("auto.sys.net_recv_kbs", 2428),
+    ("auto.sys.processes", 2429),
+    ("auto.sys.kill", 2431),
+    ("auto.sys.os_name", 2432),
+    ("auto.sys.os_version", 2433),
+    ("auto.sys.kernel_version", 2434),
+    ("auto.sys.hostname", 2435),
+    ("auto.sys.uptime_s", 2436),
+    ("auto.sys.disks", 2437),
+    ("auto.sys.users", 2438),
+    ("auto.fs.is_binary", 2430),
+    ("auto.re_opaque.new", 2450),
+    ("auto.re_opaque.is_match", 2451),
+    ("auto.re_opaque.find", 2452),
+    ("auto.re_opaque.find_all", 2453),
+    ("auto.re_opaque.replace_all", 2454),
+    ("auto.re_opaque.captures", 2455),
+    ("auto.re_opaque.drop", 2459),
+    ("auto.url_opaque.parse", 2500),
+    ("auto.url_opaque.scheme", 2501),
+    ("auto.url_opaque.host_str", 2502),
+    ("auto.url_opaque.path", 2503),
+    ("auto.url_opaque.fragment", 2504),
+    ("auto.url_opaque.port", 2505),
+    ("auto.url_opaque.query_pairs", 2506),
+    ("auto.url_opaque.join", 2507),
+    ("auto.url_opaque.origin", 2508),
+    ("auto.url_opaque.drop", 2509),
+    ("auto.url_opaque.query", 2510),
+    ("auto.url_opaque.to_string", 2511),
+    ("auto.semver_opaque.parse", 2600),
+    ("auto.semver_opaque.major", 2601),
+    ("auto.semver_opaque.minor", 2602),
+    ("auto.semver_opaque.patch", 2603),
+    ("auto.semver_opaque.pre", 2604),
+    ("auto.semver_opaque.to_string", 2605),
+    ("auto.semver_opaque.cmp_gt", 2606),
+    ("auto.semver_opaque.drop", 2609),
+    ("auto.semver_opaque_versionreq.parse", 2610),
+    ("auto.semver_opaque_versionreq.matches", 2611),
+    ("auto.chrono_opaque.local_now", 2700),
+    ("auto.chrono_opaque.year", 2701),
+    ("auto.chrono_opaque.month", 2702),
+    ("auto.chrono_opaque.day", 2703),
+    ("auto.chrono_opaque.hour", 2704),
+    ("auto.chrono_opaque.minute", 2705),
+    ("auto.chrono_opaque.second", 2706),
+    ("auto.chrono_opaque.timestamp", 2707),
+    ("auto.chrono_opaque.format", 2708),
+    ("auto.chrono_opaque.drop", 2709),
+    ("auto.base64.encode", 2710),
+    ("auto.base64.decode", 2711),
+    ("auto.hex.encode", 2720),
+    ("auto.hex.decode", 2721),
+    ("auto.sha2_opaque.sha256_new", 2730),
+    ("auto.sha2_opaque.update", 2731),
+    ("auto.sha2_opaque.finalize", 2732),
+    ("auto.sha2_opaque.drop", 2739),
+    ("auto.mime.from_path", 2740),
+    ("auto.test.run_a2r_dir", 2826),
+    ("auto.test.run_vm_dir", 2827),
+    ("auto.test.run_a2c_dir", 2828),
+    ("auto.test.run_a2ts_dir", 2829),
+    ("auto.io.lines", 2830),
+    ("io.lines", 2830),
+    ("auto.io.chunks", 2831),
+    ("io.chunks", 2831),
+    ("auto.io.eprint", 2832),
+    ("eprint", 2832),
+    ("auto.io.eprintln", 2833),
+    ("eprintln", 2833),
+    ("auto.fs.entries", 2834),
+    ("fs.entries", 2834),
+    ("auto.io.buffered_writer", 2835),
+    ("io.buffered_writer", 2835),
+    ("auto.io.buffered_reader", 2836),
+    ("io.buffered_reader", 2836),
+    ("BufWriter.write_line", 2837),
+    ("BufWriter.flush", 2838),
+    ("BufReader.read_line", 2839),
+    ("auto.io.open", 2840),
+    ("io.open", 2840),
+    ("File.seek", 2841),
+    ("File.read", 2842),
+    ("File.position", 2843),
+    ("auto.path.new", 2844),
+    ("Path.new", 2844),
+    ("Path.join", 2845),
+    ("Path.exists", 2846),
+    ("Path.to_string", 2847),
+    ("auto.io.scanner", 2848),
+    ("io.scanner", 2848),
+    ("auto.io.read_text_async", 2849),
+    ("io.read_text_async", 2849),
+    ("auto.io.write_text_async", 2850),
+    ("io.write_text_async", 2850),
+    ("delay_async", 2990),
+    ("fail_async", 2991),
+    ("future_all", 2992),
+    ("future_race", 2993),
+    ("auto.rust_stdlib.dispatch", 3000),
+    ("sleep", 1202),
+    ("parse_sse", 2250),
+    ("str_new", 172),
+    ("str_append", 173),
+    ("int.str", 174),
+    ("uint.to_hex", 236),
+    ("alloc_array", 190),
+    ("realloc_array", 191),
+    ("free_array", 192),
+    // === Plan 442 C2: musk backend extern response constructors ===
+    ("ok_response", 3114),
+    ("err_response", 3115),
+    ("json_response", 3116),
+    ("error_response", 3117),
+    ("text_response", 3118),
+    ("empty_response", 3119),
+    ("err_json_response", 3120),
+    ("to_response", 3121),
+    ("resp_is_err", 3122),
+    ("resp_err_code", 3123),
+    ("resp_err_message", 3124),
+    ("sse_named_event", 3125),
+    ("sse_event", 3126),
+    ("sse_plain_event", 3127),
+    // Pure-logic value accessors.
+    ("value_get_str", 3128),
+    ("musk_extern_dispatch", 3143),
+    ("value_get_bool", 3129),
+    ("value_is_null", 3130),
+    ("value_get", 3131),
+    ("value_get_array", 3132),
+    // Pure utility externs.
+    ("new_id", 3133),
+    ("random_hex", 3134),
+    ("hash_password", 3135),
+    ("path_inner", 3136),
+    // Data-source extern (path (a) forwarding).
+    ("app_config_effective_daemon_url", 3137),
+    ("relay_runs_list", 3138),
+    ("str.len", 170),
+    ("String.len", 171),
+    ("str.upper", 175),
+    ("String.from", 176),
+    ("String.is_empty", 185),
+    ("File.read_text", 1000),
+    ("File.write_text", 1001),
+    ("File.exists", 1002),
+    ("File.delete", 1003),
+    ("File.create_dir", 1004),
+    ("File.read_bytes", 1005),
+    ("File.write_bytes", 1006),
+    ("File.copy", 1007),
+    ("File.size", 1008),
+    ("File.is_dir", 1009),
+    ("File.append_text", 1011),
+    ("File.remove_dir", 1014),
+    ("File.remove_dir_all", 1015),
+    ("Str.len", 1500),
+    ("Str.is_empty", 1501),
+    ("Str.is_digit", 1525),
+    ("Str.byte_len", 1526),
+    ("Str.char_at", 1502),
+    ("Str.substr", 1503),
+    ("Str.contains", 1504),
+    ("Str.starts_with", 1505),
+    ("Str.ends_with", 1506),
+    ("Str.trim", 1507),
+    ("Str.split", 1508),
+    ("Str.repeat", 1509),
+    ("Str.replace", 1510),
+    ("Str.to_upper", 1511),
+    ("Str.to_lower", 1512),
+    ("Str.reverse", 1513),
+    ("Str.find", 1514),
+    ("Str.lines", 1515),
+    ("Str.parse_int", 1516),
+    ("Str.parse_float", 1517),
+    ("Str.split_once", 1518),
+    ("Str.match_count", 1519),
+    ("Str.replace_first", 1520),
+    ("Str.uuid", 1521),
+    ("Str.from_uint", 1522),
+    ("Str.to_uint", 1523),
+    ("str.len", 1500),
+    ("str.contains", 1504),
+    ("str.starts_with", 1505),
+    ("str.ends_with", 1506),
+    ("str.trim", 1507),
+    ("str.split", 1508),
+    ("str.repeat", 1509),
+    ("str.replace", 1510),
+    ("str.to_upper", 1511),
+    ("str.to_lower", 1512),
+    ("str.find", 1514),
+    ("str.lines", 1515),
+    ("str.parse_int", 1516),
+    ("str.parse_float", 1517),
+    ("str.is_empty", 1501),
+    ("str.is_digit", 1525),
+    ("str.byte_len", 1526),
+    ("str.substr", 1503),
+    ("Task.spawn", 2300),
+    ("TaskHandle.send", 2301),
+    ("Task.singleton_send", 2311),
+    ("TaskHandle.send_await", 2308),
+    ("TaskHandle.ask", 2309),
+    ("TaskHandle.is_null", 2302),
+    ("TaskHandle.task_type", 2303),
+    ("TaskHandle.instance_id", 2304),
+    ("TaskSystem.start", 2305),
+    ("TaskSystem.stop", 2307),
+    ("auto.option.or", 1550),
+    ("auto.option.unwrap_or", 1551),
+    ("auto.result.map_err", 2070),
+    ("auto.result.Ok.map_err", 2070),
+    ("auto.result.Err.map_err", 2070),
+    ("str.split_once", 1518),
+    ("str.match_count", 1519),
+    ("str.replace_first", 1520),
+    ("str.uuid", 1521),
+    ("str.from_uint", 1522),
+    ("str.to_uint", 1523),
+    // === Time (1200-1205) ===
+    ("auto.time.now", 1205),
+    ("Time.now", 1205),
+    // === Scheduler (1206-1207) — Plan 442 A5 ===
+    ("auto.sched.set_timeout", 1206),
+    ("auto.sched.clear_timeout", 1207),
+    // === Plan 442 B-support: web-platform globals ===
+    ("auto.localstorage.get_item", 2771),
+    ("auto.localstorage.set_item", 2772),
+    ("auto.localstorage.remove_item", 2773),
+    ("localStorage.getItem", 2771),
+    ("localStorage.setItem", 2772),
+    ("localStorage.removeItem", 2773),
+    ("auto.env.var", 2795),
+    // === Plan 442 Phase B: dom/location web globals ===
+    ("auto.dom.set_dark", 2774),
+    ("auto.dom.prefers_dark", 2775),
+    ("auto.dom.set_css_var", 2776),
+    ("auto.dom.focus_first", 2777),
+    ("auto.dom.click_first", 2778),
+    ("auto.dom.open_url", 2779),
+    ("auto.dom.reload", 2784),
+    ("dom.set_dark", 2774),
+    ("dom.prefers_dark", 2775),
+    ("dom.set_css_var", 2776),
+    ("dom.focus_first", 2777),
+    ("ui.focus", 9920),
+    ("dom.click_first", 2778),
+    ("dom.open_url", 2779),
+    ("dom.copy_text", 2926),
+    ("location.reload", 2784),
+    // === IO (1150) ===
+    ("auto.io.read_line", 1150),
+    ("IO.read_line", 1150),
+    ("io.read_line", 1150),
+    ("auto.io.read_line_opt", 1151),
+    ("IO.read_line_opt", 1151),
+    ("io.read_line_opt", 1151),
+    // === FS extended (2860-2866) ===
+    // 2026-09-14(PLAN-016 T-05):rename/canonical/ext 补登记（id 2983/2984/2985）。
+    ("auto.fs.rename", 2994),
+    ("auto.fs.canonical", 2995),
+    ("auto.fs.ext", 2996),
+    ("auto.fs.mtime", 2997),
+    ("auto.fs.walk", 2860),
+    ("auto.fs.metadata", 2861),
+    ("auto.fs.copy_recursive", 2862),
+    ("auto.fs.filename", 2863),
+    ("auto.fs.parent", 2864),
+    ("auto.fs.join", 2865),
+    ("auto.fs.read_dir", 2866),
+    // Plan 626 T-04:嵌套目录树 JSON。
+    ("auto.fs.tree", 2875),
+    ("auto.shell.exec_submit", 2867),
+    ("auto.shell.emit_result", 2868),
+    ("auto.shell.emit_show", 2869),
+    ("auto.host.call", 2930),
+    ("auto.host.call_value", 2931),
+    ("auto.rc.live", 2940),
+    ("auto.rc.count", 2941),
+    ("auto.rc.assert_unique", 2942),
+    // === auto-os Plan 013 T2: AutoTerm 引擎桥(ID 面)===
+    ("auto.term.engine_spawn", 2943),
+    ("auto.term.engine_write_line", 2944),
+    ("auto.term.engine_rows", 2945),
+    ("auto.term.engine_resize", 2946),
+    ("auto.term.engine_interrupt", 2947),
+    ("auto.term.engine_is_exited", 2948),
+    ("auto.term.engine_free", 2949),
+    ("auto.term.engine_pump_input", 2957),
+    ("auto.term.engine_cursor_row", 2958),
+    ("auto.term.engine_cursor_col", 2959),
+    ("auto.term.engine_apply_resize", 2976),
+    ("auto.term.engine_viewport_cols", 2977),
+    ("auto.term.engine_viewport_rows", 2978),
+    ("auto.term.engine_backlog_pending_mb", 2979),
+    ("auto.term.engine_backlog_paused", 2980),
+    ("auto.term.engine_backlog_take_alerts", 2981),
+    ("auto.term.engine_backlog_dropped", 2982),
+    ("auto.term.engine_spawn_ex", 2983),
+    ("auto.term.engine_rows_for", 2984),
+    ("auto.term.engine_pump_for", 2985),
+    ("auto.term.engine_apply_resize_for", 2986),
+    ("auto.term.engine_menu_take", 2987),
+    // PLAN-026 needs_fix: 键入 VT 裸写(qualified 名表——engine_write_raw
+    // 的 term. 前缀限定解析经此;主表之外的第二登记面)。
+    ("auto.term.engine_write_raw", 3000),
+    ("auto.term.config_profiles", 2988),
+    ("auto.term.config_default_profile", 2989),
+    ("auto.term.config_profiles_full", 2990),
+    ("auto.term.config_spawn_program", 2991),
+    ("auto.term.config_spawn_argv", 2992),
+    ("auto.term.config_spawn_cwd", 2993),
+    ("auto.term.engine_scroll_pending_for", 3001),
+    ("auto.term.engine_pend_resize_geom", 3002),
+    ("auto.term.engine_history", 3003),
+    ("auto.term.window_width", 2998),
+    ("auto.term.window_height", 2999),
+    // === Plan 489 / Plan 541: Image native pipeline (2960-2975) ===
+    ("auto.image.queue", 2960),
+    ("auto.image.open", 2961),
+    ("auto.image.scan", 2962),
+    ("auto.image.request", 2963),
+    ("auto.image.retain", 2964),
+    ("auto.image.release", 2965),
+    ("auto.image.close", 2966),
+    ("auto.image.stats", 2967),
+    ("auto.image.open_session", 2968),
+    ("auto.image.snapshot", 2969),
+    ("auto.image.current_uri", 2970),
+    ("auto.image.names", 2971),
+    ("auto.image.navigate", 2972),
+    ("auto.image.request_view", 2973),
+    ("auto.image.close_session", 2974),
+    ("auto.image.session_stats", 2975),
+    // === Hash extended (2814-2816) ===
+    ("auto.hash.md5", 2810),
+    ("auto.hash.sha1", 2811),
+    ("auto.hash.sha256", 2812),
+    ("auto.hash.sha512", 2813),
+    ("auto.hash.hmac_sha256", 2814),
+    ("auto.hash.file_md5", 2815),
+    ("auto.hash.file_sha256", 2816),
+    // === Random type (2870-2874) ===
+    ("auto.random._vm_new", 2870),
+    ("auto.random._vm_seeded", 2871),
+    ("auto.random.int", 2872),
+    ("auto.random.float", 2873),
+    ("auto.random.bool", 2874),
+    ("auto.random.rand_int", 2780),
+    ("auto.random.rand_float", 2781),
+    ("auto.random.rand_bool", 2782),
+    // === Fmt (2752) ===
+    ("auto.fmt.f64_debug", 2752),
+    // === Cmp (2880) ===
+    ("auto.cmp.str_cmp", 2880),
+    // === DateTime cmp (2794) ===
+    ("auto.datetime.cmp", 2794),
+];
+
+// ============================================================================
+// 2026-08-22(注册秩序根因修复)catalog 完整性锁。
+// 事故:host.call 复用了 Random 段已占的 2870/2871 —— bind_shims 后注册
+// 覆盖先注册,native_interface 表派发错位,引擎被迫加直调特例绕过。
+// 此处锁死:两宏内 ID/名字唯一 + NATIVE_ID_ENTRIES 与 catalog 一致。
+// ============================================================================
+#[cfg(test)]
+mod catalog_integrity_tests {
+    macro_rules! collect_native_ids {
+        ($( ($id:expr, $const:ident, $shim:expr, $name:expr) ),* $(,)?) => {
+            vec![$(($id, $name)),*]
+        };
+    }
+    macro_rules! collect_bigvm_ids {
+        ($( ($name:expr, $id:expr, $ret:expr) ),* $(,)?) => {
+            vec![$(($name, $id)),*]
+        };
+    }
+
+    #[test]
+    fn native_catalog_ids_and_names_unique() {
+        let entries: Vec<(u16, &str)> = crate::for_each_native!(collect_native_ids);
+        let mut seen_ids = std::collections::HashSet::new();
+        let mut seen_names = std::collections::HashSet::new();
+        for (id, name) in &entries {
+            assert!(
+                seen_ids.insert(*id),
+                "catalog ID 撞号: {} ({} 与既有条目重复 —— bind_shims 后注册覆盖先注册,native_interface 表派发将错位)",
+                id,
+                name
+            );
+            assert!(seen_names.insert(*name), "catalog 名字重复登记: {}", name);
+        }
+        // bigvm 表:同名字下 ID 必须与 catalog 一致。
+        let bigvm: Vec<(&str, u16)> = crate::for_each_bigvm_native!(collect_bigvm_ids);
+        let mut bigvm_seen = std::collections::HashSet::new();
+        let catalog_map: std::collections::HashMap<&str, u16> =
+            entries.iter().map(|(i, n)| (*n, *i)).collect();
+        // bigvm 表限定名 + 短名别名成对是有意设计;同名必须同 ID(异 ID
+        // 才是真错位,如 str.len 曾同时挂 170/1500)。
+        let mut bigvm_name_ids: std::collections::HashMap<&str, u16> =
+            std::collections::HashMap::new();
+        for (name, id) in &bigvm {
+            if let Some(prev) = bigvm_name_ids.get(name) {
+                assert_eq!(
+                    prev, id,
+                    "for_each_bigvm_native 同名异 ID: {} ({} vs {})",
+                    name, prev, id
+                );
+            } else {
+                bigvm_name_ids.insert(name, *id);
+            }
+        }
+        for (name, id) in &bigvm {
+            let _ = bigvm_seen.insert(*name);
+            if let Some(&cat_id) = catalog_map.get(name) {
+                assert_eq!(
+                    cat_id, *id,
+                    "bigvm 表与 catalog ID 不一致: {} (catalog={}, bigvm={})",
+                    name, cat_id, id
+                );
+            }
+        }
+        // P442-4: 442 extern/ctor 家族靶向撞号钉。历史事故：PLAN-044 把
+        // musk_extern_dispatch 登到 3129,与 442 先落的 value_get_bool 撞号
+        // ——id→shim 后写覆盖先注册,CALL_NAT 3129 恒派发 dispatch shim,
+        // e2e_value_accessors 500 长期漏网(修复:dispatch 移段 3143)。
+        // 通用同 ID 撞号检测在当前别名设计下不可行(108 组同 native 多名
+        // 别名共享 ID 属有意设计,其中 5 组返回 Type 还不一致——见
+        // KNOWN-DEBT P442-5),故对本高危家族做两两异 ID 钉死。
+        let family = [
+            "ok_response",
+            "err_response",
+            "json_response",
+            "error_response",
+            "text_response",
+            "empty_response",
+            "err_json_response",
+            "to_response",
+            "resp_is_err",
+            "resp_err_code",
+            "resp_err_message",
+            "sse_named_event",
+            "sse_event",
+            "sse_plain_event",
+            "value_get_str",
+            "value_get_bool",
+            "value_is_null",
+            "value_get",
+            "value_get_array",
+            "new_id",
+            "random_hex",
+            "hash_password",
+            "path_inner",
+            "app_config_effective_daemon_url",
+            "relay_runs_list",
+            "musk_extern_dispatch",
+        ];
+        let mut fam_ids: std::collections::HashMap<u16, &str> = Default::default();
+        for name in family {
+            let id = crate::vm::native_registry::NATIVE_ID_MAP[name];
+            if let Some(prev) = fam_ids.insert(id, name) {
+                panic!(
+                    "442 extern/ctor 家族 native ID 撞号: {} ({} 与 {} —— \
+                     id→shim 后写覆盖先注册,CALL_NAT 派发将错位)",
+                    id, name, prev
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn native_id_entries_consistent_with_catalog() {
+        let entries: Vec<(u16, &str)> = crate::for_each_native!(collect_native_ids);
+        let catalog_map: std::collections::HashMap<&str, u16> =
+            entries.iter().map(|(i, n)| (*n, *i)).collect();
+        for (name, id) in crate::vm::native_catalog::NATIVE_ID_ENTRIES {
+            if let Some(&cat_id) = catalog_map.get(name) {
+                assert_eq!(
+                    cat_id, *id,
+                    "NATIVE_ID_ENTRIES 与 catalog 不一致: {} (catalog={}, entries={})",
+                    name, cat_id, id
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn image_native_ids_unique_and_match_catalog() {
+        let image_names = [
+            "auto.image.queue",
+            "auto.image.open",
+            "auto.image.scan",
+            "auto.image.request",
+            "auto.image.retain",
+            "auto.image.release",
+            "auto.image.close",
+            "auto.image.stats",
+            "auto.image.open_session",
+            "auto.image.snapshot",
+            "auto.image.current_uri",
+            "auto.image.names",
+            "auto.image.navigate",
+            "auto.image.request_view",
+            "auto.image.close_session",
+            "auto.image.session_stats",
+        ];
+        let mut seen = std::collections::HashSet::new();
+        for name in image_names {
+            let id = crate::vm::native_registry::NATIVE_ID_MAP
+                .get(name)
+                .unwrap_or_else(|| panic!("missing {} from NATIVE_ID_MAP", name));
+            assert!(
+                seen.insert(*id),
+                "duplicate image native id {} for {}",
+                id,
+                name
+            );
+            // Ensure image native IDs do not collide with auto.sys.* IDs (2421..2438)
+            assert!(
+                *id < 2420 || *id > 2440,
+                "image native id {} for {} collides with auto.sys.* range",
+                id,
+                name
+            );
+        }
+    }
+
+    #[test]
+    fn hashset_contains_is_typed_as_bool() {
+        assert!(
+            crate::vm::native_catalog::NATIVE_RET_ENTRIES
+                .iter()
+                .any(|(name, ret)| *name == "auto.hashset.contains"
+                    && *ret == crate::vm::native_registry::NativeRetType::Bool),
+            "HashSet.contains returns a boolean encoded as 0/1"
+        );
+    }
+
+    #[test]
+    fn hash_native_ids_are_pinned_and_typed() {
+        let expected = [
+            ("auto.hash.md5", 2810),
+            ("auto.hash.sha1", 2811),
+            ("auto.hash.sha256", 2812),
+            ("auto.hash.sha512", 2813),
+        ];
+        for (name, id) in expected {
+            assert_eq!(
+                crate::vm::native_registry::NATIVE_ID_MAP.get(name),
+                Some(&id),
+                "hash native must use its catalog ID"
+            );
+            assert!(
+                crate::vm::native_catalog::NATIVE_RET_ENTRIES
+                    .iter()
+                    .any(|(entry, ret)| *entry == name
+                        && *ret == crate::vm::native_registry::NativeRetType::String),
+                "hash native return type must be registered as String: {name}"
+            );
+        }
+    }
+}

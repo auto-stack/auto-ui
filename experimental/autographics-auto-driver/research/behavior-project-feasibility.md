@@ -1,0 +1,9 @@
+# PLAN-845 feasibility (r2)
+
+Baseline: autographics-dev 8b62db5cba54b9bfe7f759f4920b22ccb9b75e88; SDK932, unchanged two locks. No SDK/AGP/root writes.
+
+Selected local extension: Document behavior metadata + immutable CodePayload; Editor/current/pending/history and Storage/Snapshot share Arc payloads. SourceSnapshot::from_bytes and Session::new_with_diagnostics are the existing admission/compiler path; no temporary source file, second parser or callback dispatch at bind/Open. The bounded weak pool accounts live payload identities including save receipts. No package/transaction abstraction introduced. An alternative generalized resource descriptor would duplicate the existing GLB decoder/registry separation without simplifying source compilation and was not built.
+
+Executed exploratory path: behavior_project_document 2/2; behavior_project_session 2/2; behavior_project_storage 2/2, including pre-code-install/pre-entry failure preserving original entry, post-entry pending receipt and corrupt-code Verify rejection/restoration, Save As after original source/blob root deletion, Open and actual Auto initialization value7. behavior_project_host 1/1: actual accepted 2-part GLB, nonzero parent, binding/Undo/Redo without original file, twenty alternating sources/Run/Stop cycles, independent red/green mesh pixels, VM weak release, actual mesh Arc reuse, moved-root Save As/Open/Run, bad Open preserving current identity, callback-infinite source compiled without execution. Test commands use --locked --test named_target -- --nocapture --test-threads=1; raw logs kept in the Plan group and copied to shared evidence at handoff. These tests establish feasibility, not completed AC or final review.
+
+Next: harden schema/owner/storage boundaries and formal UI/CLI/native relocation controls. Whole-tier regression remains merge-owned after final acceptance review. New-process/OS evidence is not claimed by the in-process spike.

@@ -1,0 +1,27 @@
+// A private timer reverses a group every 160 logical ticks. Input controls only 2D.
+var steps=0
+var direction=1.0
+fn app_start() {}
+fn app_update(dt float) {
+    if steps==160 {direction=-direction; steps=0}
+    steps=steps+1
+    let model=ag_actor(3)
+    let two=ag_actor(2)
+    if ag_valid(model)==1 {
+        let group=ag_parent(model)
+        if ag_valid(group)==1 {
+            ag_move_local(group,direction*3.0*dt,0.0,0.0)
+            // Read current child world/effective after the group write, then
+            // change a different object using that observed value.
+            let world=ag_world(model,0)
+            let shown=ag_visible(model)
+            if ag_valid(two)==1 {if shown==1 {ag_set_local(two,1,world)}}
+        }
+    }
+    if ag_valid(two)==1 {
+        if ag_input_space()==2 {
+            ag_move_local(two,ag_input_x()*60.0*dt,0.0,0.0)
+            if ag_toggle()==1 {ag_set_visible(two,1-ag_local_visible(two))}
+        }
+    }
+}

@@ -1,0 +1,22 @@
+{
+  "plan": "PLAN-836",
+  "base_commit": "2a7b10250245332f46b7867dc140da1a4f9d0969",
+  "sdk_commit": "9576b4dad5ceb8b201adedd46f9689f25c2dd5f9",
+  "files_lf_sha256": {
+    "Cargo.lock": "84182b4c30ad44ac4d6c43f0c68d49dbfbbbe6d390f41f2d7433a26182a88e7d",
+    "Cargo.toml": "346855ade728b7890c571e9cab5e5d70cb89fbbf098aad93c573bcd0ad9b219a",
+    "research/source-lock.json": "6bb461ecad67a4a88a70d84e8365a1c69201c629d488c9e9f709d0ac95fd8f0c",
+    "research/sdk-Cargo.lock.txt": "5192d08d502a8f17e277ad8912f5884175659bef642b614e25b394243d1ff091",
+    "research/baseline.json.txt": "32692be28b6349b7794f8db0142a5a050b0d230058cfe15d6bbc80b18902c25d",
+    "research/plan835-identity.json": "684197da9b32145c69a22467f34b877e2b6c7e4dd4421157c3375365ec11a83c",
+    "tools/verify_plan835.py": "19e31d0ab543e9da40b7530df29e3ccc58a6ac8eb51f9957e93cd2b826f4ade9",
+    ".gitignore": "51b29a55be53fdf482a84ca5735dcb1a310e35c15a104515a156f23a50afdf73"
+  },
+  "source_assets": "216 entries in reconciled plan835-identity.json",
+  "verified": [
+    "prepare_sdk --verify-only",
+    "verify_source.py",
+    "verify_plan835.py --controls"
+  ],
+  "scope": "T-01 entry; implementation will require a new frozen manifest"
+}

@@ -1,0 +1,16 @@
+// autographics.behavior/1: business code only. Node zero and absent actors are valid.
+fn app_start() {
+    if ag_node_count()>0 {if ag_valid(0)==1 {let space=ag_space(0)}}
+}
+fn app_update(dt float) {
+    let space=ag_input_space()
+    var actor=-1
+    var speed=0.0
+    if space==2 {actor=ag_actor(2); speed=60.0}
+    if space==3 {actor=ag_actor(3); speed=3.0}
+    if ag_valid(actor)==1 {
+        if space==2 {ag_move_local(actor,ag_input_x()*speed*dt,ag_input_y()*speed*dt,0.0)}
+        if space==3 {ag_move_local(actor,ag_input_x()*speed*dt,0.0,-ag_input_y()*speed*dt)}
+        if ag_toggle()==1 {ag_set_visible(actor,1-ag_local_visible(actor))}
+    }
+}

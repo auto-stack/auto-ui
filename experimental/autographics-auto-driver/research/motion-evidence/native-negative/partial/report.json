@@ -1,0 +1,302 @@
+{
+  "spatial_check": true,
+  "spatial_phase": 0,
+  "spatial_records": [],
+  "play_runtime": null,
+  "play_check": false,
+  "play_phase": null,
+  "play_records": null,
+  "frames": 1,
+  "interaction_check": false,
+  "interaction_phase": null,
+  "interaction_records": null,
+  "inputs": [
+    {
+      "event": "resize",
+      "size": [
+        2854,
+        1740
+      ],
+      "gesture": false,
+      "frame": 0
+    },
+    {
+      "event": "resize",
+      "size": [
+        2400,
+        1600
+      ],
+      "gesture": false,
+      "frame": 0
+    },
+    {
+      "event": "resize",
+      "size": [
+        2400,
+        1600
+      ],
+      "gesture": false,
+      "frame": 0
+    }
+  ],
+  "probe": false,
+  "phase": 0,
+  "passed": false,
+  "error": "native spatial check incomplete at phase 0 after 1 frames",
+  "document": {
+    "behavior": {
+      "api": "autographics.behavior/5",
+      "source": {
+        "format": "auto-source",
+        "sha256": "7c22cb93d61bca7e9cde7b8dec79db370d9a936ed294b1f3418e319ee47f34e1",
+        "byte_length": 1036
+      },
+      "actors": {
+        "two_d": null,
+        "three_d": 1
+      }
+    },
+    "schema": "autographics.scene/4",
+    "document_id": "corridor3d",
+    "resources": [
+      "circle",
+      "quad",
+      "cylinder",
+      "player",
+      "mob"
+    ],
+    "objects": [
+      {
+        "id": 1,
+        "name": "model 1",
+        "kind": "model",
+        "translation": [
+          -4.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.4000000059604645,
+          0.699999988079071,
+          0.5
+        ],
+        "yaw": 0.20000000298023224,
+        "pitch": 0.15000000596046448,
+        "rgba": [
+          0.8999999761581421,
+          0.30000001192092896,
+          0.20000000298023224,
+          1.0
+        ],
+        "visible": true,
+        "parent": 10,
+        "resource": "sha256:42c9da673fc67ccb0c65d4b337608834efd28a499f7e460866dcfc5ff2a0c671"
+      },
+      {
+        "id": 2,
+        "name": "model 2",
+        "kind": "model",
+        "translation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.0,
+          0.800000011920929,
+          0.10000000149011612
+        ],
+        "yaw": 1.5707963705062866,
+        "pitch": 0.0,
+        "rgba": [
+          0.8999999761581421,
+          0.30000001192092896,
+          0.20000000298023224,
+          1.0
+        ],
+        "visible": true,
+        "parent": null,
+        "resource": "sha256:42c9da673fc67ccb0c65d4b337608834efd28a499f7e460866dcfc5ff2a0c671"
+      },
+      {
+        "id": 3,
+        "name": "cylinder 3",
+        "kind": "quad",
+        "translation": [
+          100.0,
+          80.0,
+          0.0
+        ],
+        "scale": [
+          10.0,
+          10.0,
+          1.0
+        ],
+        "yaw": 0.0,
+        "pitch": 0.0,
+        "rgba": [
+          0.8999999761581421,
+          0.30000001192092896,
+          0.20000000298023224,
+          1.0
+        ],
+        "visible": false,
+        "parent": null,
+        "resource": null
+      },
+      {
+        "id": 4,
+        "name": "quad 4",
+        "kind": "quad",
+        "translation": [
+          -100.0,
+          50.0,
+          0.0
+        ],
+        "scale": [
+          10.0,
+          10.0,
+          1.0
+        ],
+        "yaw": 0.0,
+        "pitch": 0.0,
+        "rgba": [
+          0.10000000149011612,
+          0.699999988079071,
+          0.8999999761581421,
+          1.0
+        ],
+        "visible": true,
+        "parent": null,
+        "resource": null
+      },
+      {
+        "id": 5,
+        "name": "Far target",
+        "kind": "model",
+        "translation": [
+          -2.0,
+          0.0,
+          3.0
+        ],
+        "scale": [
+          4.0,
+          0.800000011920929,
+          0.019999999552965164
+        ],
+        "yaw": -0.10000000149011612,
+        "pitch": 0.10000000149011612,
+        "rgba": [
+          0.8999999761581421,
+          0.30000001192092896,
+          0.20000000298023224,
+          1.0
+        ],
+        "visible": true,
+        "parent": null,
+        "resource": "sha256:42c9da673fc67ccb0c65d4b337608834efd28a499f7e460866dcfc5ff2a0c671"
+      },
+      {
+        "id": 6,
+        "name": "Query point and normal",
+        "kind": "quad",
+        "translation": [
+          -150.0,
+          100.0,
+          0.0
+        ],
+        "scale": [
+          10.0,
+          10.0,
+          1.0
+        ],
+        "yaw": 0.0,
+        "pitch": 0.0,
+        "rgba": [
+          0.10000000149011612,
+          0.699999988079071,
+          0.8999999761581421,
+          1.0
+        ],
+        "visible": true,
+        "parent": null,
+        "resource": null
+      }
+    ],
+    "groups": [
+      {
+        "id": 10,
+        "name": "Moving group",
+        "dimension": "3d",
+        "parent": null,
+        "translation": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "visible": true
+      }
+    ],
+    "assets": [
+      {
+        "format": "glb",
+        "sha256": "42c9da673fc67ccb0c65d4b337608834efd28a499f7e460866dcfc5ff2a0c671",
+        "byte_length": 1528
+      }
+    ]
+  },
+  "two": "4a590dcc819ea91ff52d2c88a9d0a898e2dc100b4a36d1879c6bc9608e8f64c1",
+  "three": "34e58a3e7ac6850c151d476360093fb123e9ebbb8e17f679ff253e53bb3d73a5",
+  "cold_frame_us": 44923,
+  "warm_p50_us": 2256,
+  "warm_p95_us": 2256,
+  "p50_us": 2256,
+  "p95_us": 2256,
+  "compile_us": 27618,
+  "accepted": 1,
+  "resources": {
+    "play_metrics": {
+      "run_command_us": [],
+      "stop_command_us": [],
+      "pump_round_us": []
+    },
+    "target_bytes": 7584000,
+    "target_count": 4,
+    "mesh_bytes": 137208,
+    "mesh_count": 9,
+    "mesh_uploads": {
+      "buffer_rewrites": 18,
+      "bytes_rewritten": 137208
+    },
+    "scene_pipeline_buffers": 32992,
+    "depth_texture_bytes": 18057216,
+    "two_buffers": 196672,
+    "buffer_rewrites": 32,
+    "bytes_rewritten": 139256,
+    "asset_union": {
+      "count": 1,
+      "raw_bytes": 1528,
+      "cpu_geometry_bytes": 168,
+      "gpu_expected_bytes": 256,
+      "decode_attempts": 1,
+      "decode_us": [
+        336
+      ]
+    },
+    "exclusions": "Transient JSON/parser allocations, Iced internal buffers/atlas and driver allocations are not resident geometry budgets; GPU timestamps unavailable"
+  },
+  "window_scale": 2.0,
+  "window_px": [
+    2400,
+    1600
+  ],
+  "working_set_bytes": 355151872,
+  "target_bytes": 7584000,
+  "uploads": "UploadStats { buffer_rewrites: 32, bytes_rewritten: 139256 }",
+  "asset_check": false,
+  "asset_phase": null,
+  "asset_records": null,
+  "hierarchy_check": false,
+  "hierarchy_phase": null,
+  "hierarchy_records": null
+}

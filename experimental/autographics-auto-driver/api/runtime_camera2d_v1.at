@@ -1,0 +1,53 @@
+// autographics.runtime_camera2d/1 trusted unit (PLAN-875). Appended after the
+// character2d unit by the runtime_camera2d assembly; public name is
+// ag_camera_follow_2d. The user configures the Run-owned 2D follow camera once
+// in app_start: the target must be the Run bound character, inside a world
+// rectangle with a visible viewport that fits it. Host-side Rust owns the
+// pointer/projection/letterbox math; this unit validates, freezes and echoes
+// the configuration for the host frame admission. Camera reads never touch
+// spatial state, so they stay outside the 32-credit spatial query budget.
+var _ag_cam2_node= -1
+var _ag_cam2_frozen=0
+var _ag_cam2_min_x=0.0
+var _ag_cam2_min_y=0.0
+var _ag_cam2_max_x=0.0
+var _ag_cam2_max_y=0.0
+var _ag_cam2_view_w=0.0
+var _ag_cam2_view_h=0.0
+fn ag_camera_follow_2d(stable_id int, min_x float, min_y float, max_x float, max_y float, view_w float, view_h float) int {
+ if _ag_error!=0 {return 0}
+ if _ag_cam2_frozen==1 {_ag_fail(29,-1,0);return 0}
+ if _ag_cam2_node>=0 {_ag_fail(29,_ag_cam2_node,stable_id);return 0}
+ if view_w<=0.0 {_ag_fail(27,-1,0);return 0}
+ if view_h<=0.0 {_ag_fail(27,-1,0);return 0}
+ if min_x>=max_x {_ag_fail(27,-1,0);return 0}
+ if min_y>=max_y {_ag_fail(27,-1,0);return 0}
+ if view_w>max_x - min_x {_ag_fail(27,-1,0);return 0}
+ if view_h>max_y - min_y {_ag_fail(27,-1,0);return 0}
+ let node=_ag_char_resolve(stable_id)
+ if node<0 {_ag_fail(30,-1,stable_id);return 0}
+ if node!=_ag_char_node {_ag_fail(30,node,stable_id);return 0}
+ _ag_cam2_node=node
+ _ag_cam2_min_x=min_x
+ _ag_cam2_min_y=min_y
+ _ag_cam2_max_x=max_x
+ _ag_cam2_max_y=max_y
+ _ag_cam2_view_w=view_w
+ _ag_cam2_view_h=view_h
+ return 1
+}
+fn _ag_cam2_freeze() {
+ if _ag_error!=0 {return}
+ if _ag_cam2_node<0 {_ag_fail(27,-1,0);return}
+ _ag_cam2_frozen=1
+}
+fn _ag_cam2_status() int {if _ag_cam2_frozen==1 {if _ag_error==0 {return 1}};return 0}
+fn _ag_cam2_target() int {return _ag_cam2_node}
+fn _ag_cam2_run() int {return _ag_run_id()}
+fn _ag_cam2_tick() int {return _ag_tick_id()}
+fn _ag_cam2_min_x_v() float {return _ag_cam2_min_x}
+fn _ag_cam2_min_y_v() float {return _ag_cam2_min_y}
+fn _ag_cam2_max_x_v() float {return _ag_cam2_max_x}
+fn _ag_cam2_max_y_v() float {return _ag_cam2_max_y}
+fn _ag_cam2_view_w_v() float {return _ag_cam2_view_w}
+fn _ag_cam2_view_h_v() float {return _ag_cam2_view_h}

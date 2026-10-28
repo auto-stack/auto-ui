@@ -1,0 +1,141 @@
+{
+  "passed": true,
+  "primary_cases": 14,
+  "new_process_reopens": 4,
+  "binary_sha256": "2591a08ef9bb16f811dc13f78c7021f24acff8714f54b70182b46ce895ecaf61",
+  "root": "D:\\autostack\\plan-artifacts\\plan-849\\work-native-final",
+  "metrics": {
+    "dash2d": {
+      "stopped_world": [
+        -5.119998931884766,
+        0.0,
+        0.0
+      ],
+      "last_held_query": {
+        "node": 1,
+        "t": 0.00019999027426820248,
+        "origin": [
+          -5.099999904632568,
+          0.0,
+          0.0
+        ],
+        "normal": [
+          -1.0,
+          0.0,
+          0.0
+        ],
+        "start_overlap": false,
+        "hit": true,
+        "stopped_world": [
+          -5.119998931884766,
+          0.0,
+          0.0
+        ]
+      },
+      "working_set_bytes": 362749952,
+      "tick_elapsed_us_minmax": [
+        1301,
+        4184
+      ]
+    },
+    "dash3d": {
+      "stopped_world": [
+        -0.9396318197250366,
+        0.0,
+        0.0
+      ],
+      "last_held_query": {
+        "node": 2,
+        "t": 0.0001999974192585796,
+        "origin": [
+          -0.9376318454742432,
+          0.0,
+          0.0
+        ],
+        "normal": [
+          -1.0,
+          0.0,
+          0.0
+        ],
+        "start_overlap": false,
+        "hit": true,
+        "stopped_world": [
+          -0.9396318197250366,
+          0.0,
+          0.0
+        ]
+      },
+      "working_set_bytes": 364441600,
+      "tick_elapsed_us_minmax": [
+        1631,
+        4675
+      ]
+    },
+    "dash2d-short": {
+      "stopped_world": [
+        -5.1399993896484375,
+        0.0,
+        0.0
+      ],
+      "last_held_query": {
+        "node": 1,
+        "t": 0.0007999896770343184,
+        "origin": [
+          -5.099999904632568,
+          0.0,
+          0.0
+        ],
+        "normal": [
+          -1.0,
+          0.0,
+          0.0
+        ],
+        "start_overlap": false,
+        "hit": true,
+        "stopped_world": [
+          -5.1399993896484375,
+          0.0,
+          0.0
+        ]
+      },
+      "working_set_bytes": 365264896,
+      "tick_elapsed_us_minmax": [
+        1313,
+        4253
+      ]
+    },
+    "dash3d-short": {
+      "stopped_world": [
+        -0.9416317939758301,
+        0.0,
+        0.0
+      ],
+      "last_held_query": {
+        "node": 2,
+        "t": 0.0007999896770343184,
+        "origin": [
+          -0.9376318454742432,
+          0.0,
+          0.0
+        ],
+        "normal": [
+          -1.0,
+          0.0,
+          0.0
+        ],
+        "start_overlap": false,
+        "hit": true,
+        "stopped_world": [
+          -0.9416317939758301,
+          0.0,
+          0.0
+        ]
+      },
+      "working_set_bytes": 374669312,
+      "tick_elapsed_us_minmax": [
+        1660,
+        5078
+      ]
+    }
+  }
+}

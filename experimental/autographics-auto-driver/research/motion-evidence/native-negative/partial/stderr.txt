@@ -1,0 +1,1 @@
+native spatial check incomplete at phase 0 after 1 frames

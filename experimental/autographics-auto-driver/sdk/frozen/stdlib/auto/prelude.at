@@ -1,0 +1,91 @@
+// ============================================================================
+// AutoLang Prelude
+// ============================================================================
+// This file is automatically imported into every module.
+// It defines symbols that are available without explicit imports.
+//
+// Design Principles:
+// - Minimal: Only includes truly ubiquitous symbols
+// - Explicit: Re-exports from other modules (no new definitions here)
+// - Documented: Each symbol has a rationale for inclusion
+// ============================================================================
+
+// ============================================================================
+// I/O Operations
+// ============================================================================
+// Rationale: Printing/output is needed in almost every program for
+// debugging, logging, and user interaction. The 'say' function is
+// the most commonly used I/O operation.
+
+use auto.io: say
+
+// Process-local image tickets and bounded-pipeline metrics (Plan 547).
+use auto.image: ImageTicket, ImageStats, queue, open, scan, request, retain, release, close, stats
+
+
+// ============================================================================
+// Collections
+// ============================================================================
+// Rationale: Lists, HashMaps, HashSets, VecDeques, and BTreeMaps are fundamental
+// data structures used in most programs. These types provide dynamic collection
+// functionality backed by efficient Rust implementations (Vec, HashMap, HashSet,
+// VecDeque, BTreeMap).
+use auto.list: List
+use auto.hashmap: HashMap
+use auto.hashset: HashSet
+use auto.vecdeque: VecDeque
+use auto.btreemap: BTreeMap
+
+
+// ============================================================================
+// Iteration & Functional Programming (Plan 051)
+// ============================================================================
+// Rationale: Iterator patterns are ubiquitous in data processing, enabling
+// zero-cost abstractions for chaining operations like map, filter, and reduce.
+// These specs provide the foundation for functional programming in AutoLang.
+
+use auto.iter.spec: Iter, Iterable
+
+// Iterator adapters (Plan 051 Phase 2)
+use auto.iter.adapters.map: MapIter
+use auto.iter.adapters.filter: FilterIter
+
+// ============================================================================
+// Error Handling with May<T>
+// ============================================================================
+// NOTE: The ?T syntax sugar (?int, ?str, etc.) is built into the parser
+// (Plan 049). It creates May<T> types automatically without needing imports.
+
+// ============================================================================
+// Core Specs (Plan 250)
+// ============================================================================
+// Rationale: These specs are the foundation for type behaviors. Ordering for
+// comparisons, Display/Debug for string representation, Clone for copying.
+
+use auto.cmp: Ordering, Cmp
+use auto.clone: Clone
+use auto.default: Default
+use auto.fmt: Display, Debug
+
+// ============================================================================
+// Error Handling (Plan 250)
+// ============================================================================
+// Result<T,E> for structured error handling (Rust/Go style).
+// Error type for simple error values.
+
+use auto.result: Result
+use auto.error: Error
+
+// ============================================================================
+// Sorting (Plan 250)
+// ============================================================================
+// Sorting operations are commonly needed for data processing.
+
+use auto.sort: sort, sorted, reverse
+
+// ============================================================================
+// Random (Plan 250)
+// ============================================================================
+// Random number generation — frequently used in games, simulations, testing.
+
+use auto.random: rand_int, rand_float, rand_bool

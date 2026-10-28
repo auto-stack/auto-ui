@@ -1,0 +1,38 @@
+[
+  {
+    "case": "dash2d",
+    "command": [
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+      "--sweep-check",
+      "--spatial-space",
+      "2",
+      "--open",
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\motion-legacy-native\\dash2d\\moved\\scene.agscene",
+      "--report",
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\motion-legacy-native\\dash2d\\report.json"
+    ],
+    "exit": 0,
+    "binary_sha256": "13a6d0cb5da88d73fb7d77148337ff5a62201a810b302a9c4d1d1110e25dd375",
+    "user_sha256": "fc50cde034d8b76e225835b1678a1f3bfc33c76673fa09caa1951fb79c121b1f",
+    "report": "report.json",
+    "phase": 14
+  },
+  {
+    "case": "dash3d",
+    "command": [
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+      "--sweep-check",
+      "--spatial-space",
+      "3",
+      "--open",
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\motion-legacy-native\\dash3d\\moved\\scene.agscene",
+      "--report",
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\motion-legacy-native\\dash3d\\report.json"
+    ],
+    "exit": 0,
+    "binary_sha256": "13a6d0cb5da88d73fb7d77148337ff5a62201a810b302a9c4d1d1110e25dd375",
+    "user_sha256": "f1d4d01a1640a11d2ae4cfa7da072d626f34822f3452aa8dca56cd90c2ca4711",
+    "report": "report.json",
+    "phase": 14
+  }
+]

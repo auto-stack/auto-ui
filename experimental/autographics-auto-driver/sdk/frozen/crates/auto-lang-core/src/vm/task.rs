@@ -1,0 +1,325 @@
+use crate::vm::virt_memory::VirtualRAM;
+use std::time::Instant;
+
+pub type TaskId = u64;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum TaskStatus {
+    Ready,
+    Running,
+    Waiting(String), // Reason for waiting
+    Terminated,
+}
+
+/// Plan 118: Track result type for proper output formatting
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ResultType {
+    #[default]
+    Int,
+    Float,
+    Byte,
+    Uint,
+}
+
+/// Plan 199: Structured call frame for stack trace debugging
+#[derive(Debug, Clone)]
+pub struct CallFrame {
+    pub return_ip: usize,
+    pub old_bp: usize,
+    pub fn_name: Option<String>,
+    pub line: u32,
+    pub old_fn_n_args: usize,
+    pub old_fn_n_locals: usize,
+}
+
+/// Represents a single concurrent task in the AutoVM
+/// Holds its own stack, instruction pointer, and execution state.
+pub struct AutoTask {
+    pub(crate) assembly_checked: Option<(usize, u64)>,
+    pub id: TaskId,
+    pub ram: VirtualRAM,
+    pub ip: usize,
+    pub bp: usize,         // Base Pointer
+    pub prev_sp: usize,    // Debug: previous sp for tracking drift
+    pub num_locals: usize, // Number of local variables in current stack frame
+    pub status: TaskStatus,
+    pub wake_time: Option<Instant>, // For SLEEP opcode
+    /// Plan 696: `Time.sleep_ms` inside an HTTP SSE generator is represented
+    /// as a task wake deadline so the LocalSet can serve other connections.
+    pub cooperative_http_sleep: bool,
+    pub current_closure_id: Option<u32>, // Plan 071: Current closure being executed
+    pub saved_closure_id: Option<u32>,   // Saved closure ID for restoration on RET
+    // Plan 088 Phase 4: Function metadata from FN_PROLOG instruction
+    pub current_fn_n_args: usize, // Number of arguments in current function
+    pub current_fn_n_locals: usize, // Number of local variables in current function (from prologue)
+    // Plan 117/118: Track result type for proper output formatting
+    pub last_result_type: ResultType,
+    // Plan 118: Store last error for proper error propagation
+    pub last_error: Option<String>,
+    /// Plan 773 F-08: typed identity of `last_error` — the `VMError` variant
+    /// name, decided where the typed error still exists (run-task loop).
+    /// `None` for synthetic errors (deadline kills) and non-trap paths; the
+    /// staged run API surfaces it so the run-stage oracle channel is
+    /// type-derived instead of message-text-parsed.
+    pub last_error_code: Option<&'static str>,
+    // Plan 127: Task message loop support
+    pub in_message_loop: bool, // Whether task is in message processing loop
+    pub task_type_name: Option<String>, // Task type name for handler lookup
+    pub current_handler_has_context: bool, // Whether current handler has ctx parameter
+    pub current_msg_context: Option<crate::vm::message_context::MessageContext>, // Current reply context
+    // Plan 317: Actor state fields (persist across handler invocations).
+    // Indexed by field_idx (assigned by codegen per task type). Stored here
+    // (not in ram) so they survive handler RET and are independent of bp.
+    // Accessed via LOAD_STATE_FIELD / STORE_STATE_FIELD opcodes.
+    pub state_vars: Vec<auto_val::NanoValue>,
+    /// VM bug fix (Plan 390 M1 + state-default fix interaction): field indices
+    /// set at spawn via Task.spawn init args. STORE_STATE_FIELD in the #start
+    /// hook skips these so the (now-working) default initializers don't clobber
+    /// the spawn-injected values. Cleared at TASK_LOOP so handler writes are
+    /// unaffected.
+    pub locked_state_fields: std::collections::HashSet<u8>,
+    /// Plan 390 §15 G2-refactor (方案 B): stable re-park ip captured when
+    /// TASK_LOOP yields (the RET after TASK_LOOP in #start). On handler RET,
+    /// the RET-catch resets task.ip here so the actor cleanly re-parks for
+    /// the next message — independent of whatever ip the handler's RET
+    /// restored (which points at #start's RET and would execute/advance,
+    /// corrupting the next wake's saved_ip). None until the task parks.
+    pub park_ip: Option<usize>,
+    // Plan 199: Source line tracking for debugging
+    pub current_line: u32,
+    pub current_source: Option<String>,
+    // Plan 199: Structured call stack for debugging
+    pub call_stack: Vec<CallFrame>,
+    // Plan 348: SSE stream this task is waiting on (None = not waiting).
+    // When set, run_task_loop checks the channel and wakes the task when data arrives.
+    pub waiting_sse_stream_id: Option<u64>,
+    // Plan 349 step 7: HTTP request this task is waiting on (None = not waiting).
+    pub waiting_http_request_id: Option<u64>,
+    // PLAN-707: HTTP/SSE stream this task is waiting on (None = not waiting).
+    // Set by stream next/pull shims when the stream has no data yet; the
+    // engine CALL_NAT arm rewinds IP + yields, wake sources check stream_ready.
+    pub waiting_http_stream_id: Option<u64>,
+    // PLAN-707 T-06（D-7 第二线）：本任务打开的上游流 id——generator 体/
+    // 段内 open 都登记（scope 守卫只覆盖 dispatch 段，generator 首次 pull
+    // 发生在 SSE serve 循环，thread-local scope 已退出）。清理点：
+    // cleanup_sse_iterator（SSE 输出终结）、abort_parked_request（请求废弃）。
+    pub owned_stream_ids: Vec<u64>,
+    // PLAN-093 (G-9 系加固): 段模式等待计时起点（首次置位时打点）——重入臂
+    // 超时判定用，对齐忙等臂 30s 上限；结果丢失时不再无限 rewind+re-park。
+    pub waiting_http_since: Option<std::time::Instant>,
+    // Plan 010 (MS3-A): try/catch exception handler stack. Each frame records
+    // the catch handler's absolute instruction pointer; when a runtime error
+    // is raised, the top frame is popped and execution jumps to its pc.
+    pub handler_stack: Vec<HandlerFrame>,
+    // Plan 369 Task 10: Number of args pushed for the in-progress CALL_NAT_COUNTED.
+    // Set by the engine's CALL_NAT_COUNTED handler from the call-site arg-count byte so
+    // the Python shim pops the ACTUAL number of args at runtime — the count
+    // cannot be baked into the shim because C builtins (datetime.date,
+    // struct.pack) defeat inspect.signature and struct.pack is variadic.
+    pub pending_native_arg_count: u8,
+    // Plan 364 Step 5: Config-mode accumulation container stack. Empty in
+    // Script/Transpile modes; only PUSH_ACCUM pushes onto it.
+    pub accum_stack: Vec<AccumContainer>,
+    /// Plan 394: external future this task is awaiting (top-level `.await`).
+    /// When set, run_task_loop wake source 6 polls the future registry;
+    /// on Ready/Failed the result is pushed and the field cleared.
+    pub waiting_future_id: Option<u32>,
+    /// Plan 394 Phase B: suspended `~{}` body continuations (resume_ip/bp).
+    /// Empty for Phase A top-level external await.
+    pub async_frames: Vec<AsyncFrame>,
+    /// PLAN-667 (F-01): 活跃帧身份表 (bp, uid)。uid 由 frame_uid_gen 单调
+    /// 发号，唯一标识一次帧实例——同 bp 复用的新帧拿新 uid，旧闭包按
+    /// (task_id, uid) 判定创建帧存亡。uid 0 保留给根帧（任务终身存活）。
+    /// push 时截断 bp >= 新帧 bp 的陈旧条目（自愈防泄漏）。
+    pub frame_ids: Vec<(usize, u64)>,
+    /// PLAN-667: 帧实例 uid 发号器（从 1 起；0 = 根帧哨兵）。
+    pub frame_uid_gen: u64,
+    /// PLAN-705 T-03: 段驱动模式标志——置位时 CALL_SPEC 的 RequestBuilder
+    /// send 拦截**不做** 30s 同步 drain，而是 rewind ip + Yield，由段驱动
+    /// park 成 HttpRequest（handler 等待不占住执行线程）。段入口
+    /// (call_fn_by_name_segment / resume_fn_by_name_segment / call_closure
+    /// 段形态)置位，legacy 同步入口保持 false（忙等语义留给非段调用图）。
+    pub segment_no_busy_wait: bool,
+    /// PLAN-711 T-11 (M-02/D-2): 跨 CPU 片累计指令数。I/O 等待不计（只统计
+    /// 实际执行的指令）；累计达 `CPU_CUMULATIVE_STEP_BUDGET` 即硬错——
+    /// 逐片让出不得重置护栏绕过原 runaway 保护。仅 CPU slice 驱动写入，
+    /// 其余路径恒 0（惰性字段，对既有调用图零影响）。
+    pub cpu_steps_total: u64,
+    /// PLAN-711 T-11: 跨片延续的 runaway 内存基线（字符串池长度）。首片
+    /// 初始化，后续片沿用——慢速泄漏摊薄到逐片基线下方也能被累计视角
+    /// 捕获；legacy 单调用路径不读此字段（保留段独立基线语义）。
+    pub cpu_baseline_strings: Option<usize>,
+    /// PLAN-711 T-11: 跨片延续的 runaway 内存基线（堆对象数），同上。
+    pub cpu_baseline_heap: Option<usize>,
+}
+
+/// Plan 394: continuation snapshot for a suspended async body.
+#[derive(Debug, Clone, Copy)]
+pub struct AsyncFrame {
+    /// IP of the instruction after the pending AWAIT_FUTURE.
+    pub resume_ip: usize,
+    /// Base pointer when the body was suspended.
+    pub resume_bp: usize,
+    /// External future that caused the suspend.
+    pub future_id: u32,
+    /// The internal `~{}` future whose body is suspended.
+    pub outer_future_id: u32,
+    /// Caller IP to restore when the body completes.
+    pub outer_saved_ip: usize,
+}
+
+/// Plan 010 (MS3-A): An entry on the task's try/catch handler stack.
+#[derive(Debug, Clone, Copy)]
+pub struct HandlerFrame {
+    /// Absolute IP of the catch handler block.
+    pub catch_pc: usize,
+    /// Base pointer at try-entry, used to restore the stack frame on unwind.
+    pub bp: usize,
+    /// Stack pointer at try-entry, used to truncate any pushed values.
+    pub sp: usize,
+}
+
+/// Plan 364 Step 5: A Config-mode accumulation container — always a Node.
+///
+/// Config eval accumulates per-block statement results into a Node rather
+/// than only taking the last value (Script semantics). `PUSH_ACCUM` pushes a
+/// fresh Node container (with its `name`); `ACCUM_PAIR` sets a prop;
+/// `ACCUM_NODE` adds a sub-node directly into the container Node's `kids`
+/// (via `Node::add_kid`, which uses integer-indexed keys to preserve order and
+/// allow duplicates) — so the materialized Node is queryable via
+/// `nodes("name")` / `get_nodes("name")` with zero downstream changes;
+/// `ACCUM_MERGE` folds an object literal's fields in; `POP_ACCUM` pops the
+/// Node and pushes its id onto the VM data stack.
+#[derive(Debug, Clone)]
+pub struct AccumContainer {
+    /// The node being accumulated.
+    pub node: auto_val::Node,
+}
+
+impl AccumContainer {
+    /// Create a fresh Node container with the given name and optional id.
+    /// An empty `id` means no id (main_arg will fall back to args[0] or name).
+    pub fn new_node(name: auto_val::AutoStr, id: auto_val::AutoStr) -> Self {
+        let mut node = auto_val::Node::new(name);
+        if !id.is_empty() {
+            node.id = id;
+        }
+        Self { node }
+    }
+
+    /// Add a `(key, value)` prop to the node.
+    pub fn set_field(&mut self, key: auto_val::ValueKey, value: auto_val::Value) {
+        self.node.set_prop(key, value);
+    }
+
+    /// Append a sub-node to the container Node's kids (integer-indexed key,
+    /// preserving order and allowing duplicates), matching how AutoConfig
+    /// expects child nodes to be discoverable via `nodes(name)`.
+    pub fn add_kid(&mut self, kid: auto_val::Node) {
+        self.node.add_kid(kid);
+    }
+
+    /// Merge all fields of an object into the node's props.
+    pub fn merge_obj(&mut self, other: &auto_val::Obj) {
+        for (k, v) in other.iter() {
+            self.node.set_prop(k.clone(), v.clone());
+        }
+    }
+
+    /// Convert the container into its final Node value.
+    pub fn into_value(self) -> auto_val::Value {
+        auto_val::Value::node(self.node)
+    }
+}
+
+impl AutoTask {
+    pub fn new(id: TaskId, ram_size: usize, start_ip: usize) -> Self {
+        Self {
+            assembly_checked: None,
+            id,
+            ram: VirtualRAM::new(ram_size),
+            ip: start_ip,
+            bp: 0,
+            prev_sp: 0,
+            num_locals: 0,
+            status: TaskStatus::Ready,
+            wake_time: None,
+            cooperative_http_sleep: false,
+            current_closure_id: None,
+            saved_closure_id: None,
+            current_fn_n_args: 0,   // Plan 088 Phase 4: Initialize to 0
+            current_fn_n_locals: 0, // Plan 088 Phase 4: Initialize to 0
+            last_result_type: ResultType::default(), // Plan 118: Initialize to Int
+            last_error: None,       // Plan 118: Initialize to None
+            last_error_code: None,  // Plan 773 F-08: no typed trap yet
+            in_message_loop: false,
+            task_type_name: None,
+            current_handler_has_context: false,
+            current_msg_context: None,
+            state_vars: Vec::new(), // Plan 317: actor state fields
+            locked_state_fields: std::collections::HashSet::new(),
+            park_ip: None,
+            current_line: 0,
+            current_source: None,
+            call_stack: Vec::new(),
+            waiting_sse_stream_id: None,
+            waiting_http_request_id: None,
+            waiting_http_stream_id: None,
+            owned_stream_ids: Vec::new(),
+            waiting_http_since: None,
+            handler_stack: Vec::new(),
+            pending_native_arg_count: 0, // Plan 369 Task 10: runtime arg count for py-FFI shims
+            accum_stack: Vec::new(),
+            waiting_future_id: None,
+            async_frames: Vec::new(),
+            frame_ids: Vec::new(),       // PLAN-667: 帧身份表
+            frame_uid_gen: 0,            // PLAN-667: 首个真帧 uid 从 1 起
+            segment_no_busy_wait: false, // PLAN-705 T-03: 段驱动模式标志
+            cpu_steps_total: 0,          // PLAN-711 T-11: 跨片累计指令数
+            cpu_baseline_strings: None,  // PLAN-711 T-11: 跨片 runaway 基线
+            cpu_baseline_heap: None,     // PLAN-711 T-11: 跨片 runaway 基线
+        }
+    }
+}
+
+impl AutoTask {
+    /// PLAN-667 (F-01): 帧身份咽喉——帧建立时调用（bp 为新帧基址）。
+    /// 截断 bp >= 新帧 bp 的陈旧条目：同地址复用的新帧令旧 uid 失效，
+    /// 深帧保留（祖先仍存活）。漏截断的路径最多退化为"误接受"（与守卫
+    /// 引入前同行为），漏 push 则是可闻的错误拒绝——不对称风险可接受。
+    pub fn push_frame_id(&mut self, bp: usize) {
+        self.frame_uid_gen += 1;
+        let uid = self.frame_uid_gen;
+        self.frame_ids.retain(|(b, _)| *b < bp);
+        self.frame_ids.push((bp, uid));
+    }
+
+    /// PLAN-667: 帧退栈时调用（returned_bp 为刚退帧的 bp）。仅当栈顶
+    /// 恰是该帧时弹出——错误展开等非标准退栈路径靠 push 侧截断自愈。
+    pub fn pop_frame_id(&mut self, returned_bp: usize) {
+        if self.frame_ids.last().map(|(b, _)| *b) == Some(returned_bp) {
+            self.frame_ids.pop();
+        }
+    }
+
+    /// PLAN-667: 当前帧 uid（bp 匹配栈顶帧）；无匹配 = 根帧（0）。
+    pub fn current_frame_uid(&self) -> u64 {
+        self.frame_ids
+            .last()
+            .filter(|(b, _)| *b == self.bp)
+            .map(|(_, u)| *u)
+            .unwrap_or(0)
+    }
+
+    /// PLAN-667: (task_id, uid) 帧身份是否仍活跃。uid 0 = 根帧
+    /// （任务存活期内恒活）。跨任务一律拒绝（帧偏移按任务 ram 解释）。
+    pub fn frame_alive(&self, task_id: TaskId, uid: u64) -> bool {
+        if task_id != self.id {
+            return false;
+        }
+        if uid == 0 {
+            return true;
+        }
+        self.frame_ids.iter().any(|(_, u)| *u == uid)
+    }
+}

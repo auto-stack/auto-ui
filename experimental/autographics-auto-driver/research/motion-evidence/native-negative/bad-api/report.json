@@ -1,0 +1,19 @@
+{
+  "spatial_check": true,
+  "spatial_phase": 0,
+  "spatial_records": [],
+  "play_check": false,
+  "play_phase": null,
+  "play_records": null,
+  "frames": 0,
+  "probe": false,
+  "interaction_check": false,
+  "passed": false,
+  "error": "unsupported behavior API",
+  "interaction_records": null,
+  "asset_check": false,
+  "asset_phase": null,
+  "asset_records": null,
+  "hierarchy_check": false,
+  "hierarchy_phase": null
+}

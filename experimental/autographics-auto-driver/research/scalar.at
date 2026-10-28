@@ -1,0 +1,5 @@
+var position = 0.0
+fn mix(a int, b float) float { return a * 10.0 - b }
+fn update(a int, b float) float { position = position + a * b; return position }
+fn spin() { var i = 0; while true { i = i + 1 } }
+fn main() {}

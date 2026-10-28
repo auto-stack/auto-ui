@@ -1,0 +1,26 @@
+{
+  "plan": "PLAN-835",
+  "base_commit": "19adeebf1b1031554c71acabaa219731b3a28b96",
+  "branch": "plan-835-dev",
+  "sdk_commit": "9576b4dad5ceb8b201adedd46f9689f25c2dd5f9",
+  "inputs": {
+    "Cargo.toml": "f478a528db13402af98bef6bc21fe467eed3c9a92ed882005c1e8de156923f08",
+    "Cargo.lock": "f01c231218b2f1534f971df128b9d188fa19648e5a4399dbe81ce37e5386063d",
+    "research/source-lock.json": "6bb461ecad67a4a88a70d84e8365a1c69201c629d488c9e9f709d0ac95fd8f0c",
+    "research/plan834-identity.json": "89b6a279ea22080b262cb87e4e29cb897ece01075f499d1ca68c8524e67b1b44",
+    "../autographics-prototype/Cargo.toml": "0706b9bea76c1cbc71e928adebcf28d6d5ec4b267819996c1fa737b35e9da029",
+    "../autographics-prototype/Cargo.lock": "c3df168e7234b8bfa876dfbab8afa71af8773d1d7241ac010ad5d8054930b3bf"
+  },
+  "verification": {
+    "sdk_files": 680,
+    "local_packages": 17,
+    "path_edges": 29,
+    "metadata_closure": 479,
+    "forbidden": 0,
+    "prior_authored_hashes": 180
+  },
+  "build_environment": {
+    "RUSTC_WRAPPER": "",
+    "reason": "process-local bypass of sccache socket permission failure; no global configuration changes"
+  }
+}

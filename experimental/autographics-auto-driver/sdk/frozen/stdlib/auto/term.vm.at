@@ -1,0 +1,85 @@
+/// VM declarations for the AutoTerm engine bridge (auto-os Plan 013).
+/// Implementations live in vm/ffi/term_engine.rs (libloading →
+/// autoterm_core.dll, in-process 003 §5 contract).
+#[vm]
+fn engine_spawn(cols int, rows int) int
+
+#[vm]
+fn engine_write_line(handle int, line str) void
+
+#[vm]
+fn engine_write_raw(handle int, vt str) void
+
+#[vm]
+fn engine_rows(handle int) []str
+
+#[vm]
+fn engine_resize(handle int, cols int, rows int) void
+
+#[vm]
+fn engine_interrupt(handle int) int
+
+#[vm]
+fn engine_is_exited(handle int) bool
+
+#[vm]
+fn engine_free(handle int) void
+
+/// 014 直键入:排空 terminal 组件键入队列并逐键裸写引擎(无 \r\n 补缀),
+/// 返回泵送键数(iced widget 键盘捕获 → TerminalCore 队列 → 本泵)。
+#[vm]
+fn engine_pump_input(handle int) int
+
+/// 014 光标格:feed 时的引擎光标采样(glue 静态量;未采样为 0)。
+#[vm]
+fn engine_cursor_row(handle int) int
+
+#[vm]
+fn engine_cursor_col(handle int) int
+
+/// 014 几何随动:应用 widget 请求的待定几何并刷新视口静态量
+/// (1=已应用 0=无请求);viewport_* 回读当前几何。
+#[vm]
+fn engine_apply_resize(handle int) int
+
+#[vm]
+fn engine_viewport_cols(handle int) int
+
+#[vm]
+fn engine_viewport_rows(handle int) int
+
+/// 014 积压报警回读面(vm/ffi/term_engine.rs 实现)。
+#[vm]
+fn engine_backlog_pending_mb(handle int) int
+
+#[vm]
+fn engine_backlog_paused(handle int) int
+
+#[vm]
+fn engine_backlog_take_alerts(handle int) int
+
+#[vm]
+fn engine_backlog_dropped(handle int) int
+
+/// PLAN-018 D5 SpawnSpec:扩展 spawn(program/argv/cwd/几何)。
+/// argv 逐项透传(可空);cwd 空 = 继承宿主;返回句柄(0 = 失败)。
+#[vm]
+fn engine_spawn_ex(program str, argv []str, cwd str, cols int, rows int) int
+
+/// PLAN-018 D5 定向快照:样式旁路只投喂 `key` 对应的 terminal
+/// (多 Pane 各 key,广播旧件 engine_rows 保留为兼容面)。
+#[vm]
+fn engine_rows_for(handle int, key str) []str
+
+/// PLAN-018 D5 定向键入泵:只排空 `key` terminal 的队列并裸写该柄。
+#[vm]
+fn engine_pump_for(handle int, key str) int
+
+/// PLAN-018 D5 定向几何泵:只消费 `key` terminal 的待定 resize 请求。
+#[vm]
+fn engine_apply_resize_for(handle int, key str) int
+
+/// PLAN-015 D4 菜单动作载荷:terminal 右键菜单命中项(0=Copy 1=Paste
+/// 2=SelectAll 3=Interrupt;-1=无载荷;注册表任意端)。
+#[vm]
+fn engine_menu_take() int

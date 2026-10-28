@@ -1,0 +1,55 @@
+fn root(n float) float {
+ if n == 0.0 { return 0.0 }
+ var x float = 1.0
+ var i = 0
+ while i < 32 { var next float = (x + n / x) * 0.5; if next == x { return x }; x = next; i = i + 1 }
+ return x
+}
+fn sine(x float) float {
+ while x > 3.141592653589793 { x = x - 6.283185307179586 }
+ while x < -3.141592653589793 { x = x + 6.283185307179586 }
+ if x > 1.5707963267948966 { x = 3.141592653589793 - x }
+ if x < -1.5707963267948966 { x = -3.141592653589793 - x }
+ var t float = x
+ var result float = x
+ var n = 1
+ while n < 6 {
+  t = -t * x * x / ((2 * n) * (2 * n + 1))
+  result = result + t; n = n + 1
+ }
+ return result
+}
+fn cosine(x float) float { return sine(x + 1.5707963267948966) }
+fn ag_abs(x float) float { if x < 0.0 { return -x }; return x }
+fn small_atan(x float) float {
+ var t float = x; var result float = x; var n = 1
+ while n < 8 {
+  t = -t * x * x
+  result = result + t / (2 * n + 1)
+  n = n + 1
+ }
+ return result
+}
+fn positive_atan(x float) float {
+ if x > 1.0 { return 1.5707963267948966 - positive_atan(1.0 / x) }
+ if x > 0.414213562373095 { return 0.7853981633974483 + small_atan((x - 1.0) / (x + 1.0)) }
+ return small_atan(x)
+}
+fn angle(y float, x float) float {
+ if x == 0.0 {
+  if y > 0.0 { return 1.5707963267948966 }
+  if y < 0.0 { return -1.5707963267948966 }
+  return 0.0
+ }
+ var a float = positive_atan(ag_abs(y / x))
+ if x < 0.0 { a = 3.141592653589793 - a }
+ if y < 0.0 { a = -a }
+ return a
+}
+
+// atan2(-dx,-dz): subtraction/digital-input zero is +0 before negation.
+// Preserve the frozen -PI branch rather than a matrix-equivalent +PI.
+fn ag_heading(dx float, dz float) float {
+ if dx == 0.0 && dz > 0.0 { return -3.141592653589793 }
+ return angle(-dx,-dz)
+}

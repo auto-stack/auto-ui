@@ -1,0 +1,117 @@
+use super::{Expr, Name, Type};
+use crate::ast::{AtomWriter, ToAtomStr};
+use std::{fmt, io as stdio};
+
+#[derive(Debug, Clone)]
+pub enum StoreKind {
+    Let,
+    Var,
+    Const,  // const declaration (Plan 6B-3.4)
+    Shared, // shared = static storage (Plan 6B-4.19)
+    CVar,   // C variable declaration
+    Field,  // field of struct
+}
+
+#[derive(Debug, Clone)]
+pub struct Store {
+    pub kind: StoreKind,
+    pub name: Name,
+    pub ty: Type,
+    pub expr: Expr,
+    /// Source-level annotations (e.g. `export` from `#[export] var ...`).
+    /// Transpiler metadata only — NOT serialized by to_atom/to_node, since it
+    /// is reconstructed from source on every parse and is irrelevant to the
+    /// VM/IR. GDScript reads `attrs` to emit `@export` and similar prefixes.
+    pub attrs: Vec<Name>,
+    /// C8: `pub const` (top-level const or ext-block associated const) →
+    /// emits `pub const` in Rust. Metadata only, not serialized.
+    pub is_pub: bool,
+}
+
+impl fmt::Display for Store {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let ty_str = if matches!(self.ty, Type::Unknown) {
+            " ".to_string()
+        } else {
+            format!(" (type {}) ", self.ty)
+        };
+        match self.kind {
+            StoreKind::Let => write!(f, "(let (name {}){}{})", self.name, ty_str, self.expr),
+            StoreKind::Var => write!(f, "(var (name {}) {})", self.name, self.expr),
+            StoreKind::Const => write!(f, "(const (name {}){}{})", self.name, ty_str, self.expr),
+            StoreKind::Shared => write!(f, "(shared (name {}){}{})", self.name, ty_str, self.expr),
+            StoreKind::Field => write!(f, "(field (name {}) {})", self.name, self.expr),
+            StoreKind::CVar => write!(f, "(cvar (name {}))", self.name),
+        }
+    }
+}
+
+impl fmt::Display for StoreKind {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            StoreKind::Let => write!(f, "let"),
+            StoreKind::Var => write!(f, "var"),
+            StoreKind::Const => write!(f, "const"),
+            StoreKind::Shared => write!(f, "shared"),
+            StoreKind::Field => write!(f, "field"),
+            StoreKind::CVar => write!(f, "cvar"),
+        }
+    }
+}
+
+// ToAtom and ToNode implementations
+
+use crate::ast::{ToAtom, ToNode};
+use auto_val::{AutoStr, Node as AutoNode, Value};
+
+impl AtomWriter for Store {
+    fn write_atom(&self, f: &mut impl stdio::Write) -> auto_val::AutoResult<()> {
+        // Output format: kind(name, type, expr) or kind(name, expr) for var
+        let kind_name = match self.kind {
+            StoreKind::Let => "let",
+            StoreKind::Var => "var",
+            StoreKind::Const => "const",
+            StoreKind::Shared => "shared",
+            StoreKind::Field => "field",
+            StoreKind::CVar => "cvar",
+        };
+
+        write!(f, "{}({}", kind_name, self.name)?;
+
+        if !matches!(self.ty, Type::Unknown) {
+            write!(f, ", {}", self.ty.to_atom_str())?;
+        }
+
+        write!(f, ", {})", self.expr.to_atom_str())?;
+        Ok(())
+    }
+}
+
+impl ToNode for Store {
+    fn to_node(&self) -> AutoNode {
+        let node_name = match &self.kind {
+            StoreKind::Let => "let",
+            StoreKind::Var => "var",
+            StoreKind::Const => "const",
+            StoreKind::Shared => "shared",
+            StoreKind::CVar => "cvar",
+            StoreKind::Field => "field",
+        };
+
+        let mut node = AutoNode::new(node_name);
+        node.set_prop("name", Value::str(self.name.as_str()));
+
+        if !matches!(self.ty, Type::Unknown) {
+            node.set_prop("type", Value::str(&*self.ty.to_atom()));
+        }
+
+        node.add_kid(self.expr.to_node()); // Changed from expr.to_atom().to_node()
+        node
+    }
+}
+
+impl ToAtom for Store {
+    fn to_atom(&self) -> AutoStr {
+        self.to_atom_str()
+    }
+}

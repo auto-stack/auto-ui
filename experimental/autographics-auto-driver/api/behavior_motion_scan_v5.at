@@ -1,0 +1,174 @@
+var _ag_motion_checked=0
+var _ag_motion_initial= -1
+// Private motion scan candidate A. No user token issuance.
+fn _ag_motion_two(space int, ignore int, visible_only int, ax float, ay float, az float, dx float, dy float, dz float) int {
+ if space!=2 {if space!=3 {_ag_fail(7,-1,0); return 0}}
+ if visible_only!=0 {if visible_only!=1 {_ag_fail(7,-1,2); return 0}}
+ if ignore != -1 {
+  if _ag_check(ignore)==0 {return 0}
+  if kinds[ignore]==5 {_ag_fail(6,ignore,0); return 0}
+  if dimensions[ignore]!=space {_ag_fail(8,ignore,0); return 0}
+ }
+ let bx=ax+dx; let by=ay+dy; let bz=az+dz
+ if space==2 {if az!=0.0 {_ag_fail(7,-1,2); return 0}; if bz!=0.0 {_ag_fail(7,-1,5); return 0}}
+ if ax - ax != 0.0 {_ag_fail(12,-1,0); return 0}; if ay - ay != 0.0 {_ag_fail(12,-1,0); return 0}; if az - az != 0.0 {_ag_fail(12,-1,0); return 0}
+ if bx - bx != 0.0 {_ag_fail(12,-1,0); return 0}; if by - by != 0.0 {_ag_fail(12,-1,0); return 0}; if bz - bz != 0.0 {_ag_fail(12,-1,0); return 0}
+ if dx - dx != 0.0 {_ag_fail(12,-1,0); return 0}; if dy - dy != 0.0 {_ag_fail(12,-1,0); return 0}; if dz - dz != 0.0 {_ag_fail(12,-1,0); return 0}
+ var negx=0; var signx=-1.0; if dx<0.0 {negx=1; signx=1.0};var n0=1;var f0=4;if negx==1 {n0=4;f0=1}
+ var negy=0; var signy=-1.0; if dy<0.0 {negy=1; signy=1.0};var n1=2;var f1=5;if negy==1 {n1=5;f1=2}
+ var negz=0; var signz=-1.0; if dz<0.0 {negz=1; signz=1.0};var n2=3;var f2=6;if negz==1 {n2=6;f2=3}
+ if _ag_dirty==1 {_ag_derive(); _ag_dirty=0}
+ var target=-1; var fraction=2.0;
+ let validate=_ag_motion_checked==0
+ let cw=worlds; let cb=_ag_spatial_boxes; let ck=kinds; let cd=dimensions; let cv=effective; let count=identities.len()
+ let mi=ignore*7;let ml0=cb[mi+1];let ml1=cb[mi+2];let ml2=cb[mi+3];let mh0=cb[mi+4];let mh1=cb[mi+5];let mh2=cb[mi+6]
+ var mn0=ml0;var mf0=mh0;if negx==1 {mn0=mh0;mf0=ml0};var mn1=ml1;var mf1=mh1;if negy==1 {mn1=mh1;mf1=ml1};var mn2=ml2;var mf2=mh2;if negz==1 {mn2=mh2;mf2=ml2}
+ for node in 0..count {
+  if node==ignore {continue}; if ck[node]==5 {continue}; if cd[node]!=space {continue}; if visible_only==1 {if cv[node]==0 {continue}}
+  let wi=node*3; let bi=node*7
+  if validate {if cb[bi]==0.0 {_ag_fail(9,node,0); return 0}}
+  let wx=cw[wi+0]; if validate {if wx - wx != 0.0 {_ag_fail(9,node,0); return 0}}; let rawlox float=wx+cb[bi+n0]; let rawhix float=wx+cb[bi+f0]; let lox float=rawlox - mf0; let hix float=rawhix - mn0
+  if validate==false {if dx==0.0 {if ax<lox || ax>hix {continue}} else {if negx==0 {if bx<lox || ax>hix {continue}} else {if bx>lox || ax<hix {continue}}}}
+  let wy=cw[wi+1]; if validate {if wy - wy != 0.0 {_ag_fail(9,node,1); return 0}}; let rawloy float=wy+cb[bi+n1]; let rawhiy float=wy+cb[bi+f1]; let loy float=rawloy - mf1; let hiy float=rawhiy - mn1
+  if validate==false {if dy==0.0 {if ay<loy || ay>hiy {continue}} else {if negy==0 {if by<loy || ay>hiy {continue}} else {if by>loy || ay<hiy {continue}}}}
+  if validate {if (rawlox - rawlox)+(rawhix - rawhix) + (rawloy - rawloy)+(rawhiy - rawhiy) != 0.0 {_ag_fail(9,node,0); return 0}}
+  if validate {if (lox - lox) + (loy - loy) != (hix - hix) + (hiy - hiy) {_ag_fail(12,node,0); return 0}}
+  if validate {if ((ax>lox && ax<hix) || (ax>hix && ax<lox)) && ((ay>loy && ay<hiy) || (ay>hiy && ay<loy)) {if _ag_motion_initial<0 {_ag_motion_initial=node};continue}}
+  var boundary_leave=0
+  if ax==lox && dx==0.0 {boundary_leave=1};if ax==hix {boundary_leave=1}
+  if ay==loy && dy==0.0 {boundary_leave=1};if ay==hiy {boundary_leave=1}
+  if boundary_leave==1 {if ((ax>=lox && ax<=hix) || (ax>=hix && ax<=lox)) && ((ay>=loy && ay<=hiy) || (ay>=hiy && ay<=loy)) {continue}}
+  var enter=0.0; var leave=1.0;
+  if dx==0.0 {
+   if ax<lox || ax>hix {continue}
+  } else {
+   var near float=(lox - ax)/dx; var far float=(hix - ax)/dx
+   if (near - near) != (far - far) {_ag_fail(12,node,0); return 0}
+
+   if near>enter {enter=near}
+   if far<leave {leave=far}
+   if enter>leave {continue}
+  }
+  if enter>=fraction {continue}
+  if dy==0.0 {
+   if ay<loy || ay>hiy {continue}
+  } else {
+   var near float=(loy - ay)/dy; var far float=(hiy - ay)/dy
+   if (near - near) != (far - far) {_ag_fail(12,node,1); return 0}
+
+   if near>enter {enter=near}
+   if far<leave {leave=far}
+   if enter>leave {continue}
+  }
+  if enter>=fraction {continue}
+  target=node; fraction=enter
+ }
+ var found=0; var pxout=bx; var pyout=by; var pzout=bz; var nxout=0.0; var nyout=0.0; var nzout=0.0
+ if target>=0 {
+  found=1
+  pxout=ax+fraction*dx; pyout=ay+fraction*dy; pzout=az+fraction*dz
+  if (pxout - pxout)+(pyout - pyout)+(pzout - pzout)!=0.0 {_ag_fail(12,-1,0); return 0}
+  let wi=target*3; let bi=target*7; var faced=0
+  let lox float=(cw[wi+0]+cb[bi+1]) - mh0; let hix float=(cw[wi+0]+cb[bi+4]) - ml0
+  if faced==0 && dx!=0.0 {if ax<=lox || ax>=hix {if negx==0 {if (lox - ax)/dx==fraction {nxout= -1.0; faced=1}} else {if (hix - ax)/dx==fraction {nxout=1.0; faced=1}}}}
+  let loy float=(cw[wi+1]+cb[bi+2]) - mh1; let hiy float=(cw[wi+1]+cb[bi+5]) - ml1
+  if faced==0 && dy!=0.0 {if ay<=loy || ay>=hiy {if negy==0 {if (loy - ay)/dy==fraction {nyout= -1.0; faced=1}} else {if (hiy - ay)/dy==fraction {nyout=1.0; faced=1}}}}
+
+ } else {fraction=1.0}
+ _ag_sweep_overlap=0; if found==1 {if nxout==0.0 && nyout==0.0 && nzout==0.0 {_ag_sweep_overlap=1}}
+ _ag_cast_found=found; _ag_cast_target=target; _ag_cast_fraction=fraction; _ag_cast_px=pxout; _ag_cast_py=pyout; _ag_cast_pz=pzout; _ag_cast_nx=nxout; _ag_cast_ny=nyout; _ag_cast_nz=nzout;
+ return 1
+}
+fn _ag_motion_three(space int, ignore int, visible_only int, ax float, ay float, az float, dx float, dy float, dz float) int {
+ if space!=2 {if space!=3 {_ag_fail(7,-1,0); return 0}}
+ if visible_only!=0 {if visible_only!=1 {_ag_fail(7,-1,2); return 0}}
+ if ignore != -1 {
+  if _ag_check(ignore)==0 {return 0}
+  if kinds[ignore]==5 {_ag_fail(6,ignore,0); return 0}
+  if dimensions[ignore]!=space {_ag_fail(8,ignore,0); return 0}
+ }
+ let bx=ax+dx; let by=ay+dy; let bz=az+dz
+ if space==2 {if az!=0.0 {_ag_fail(7,-1,2); return 0}; if bz!=0.0 {_ag_fail(7,-1,5); return 0}}
+ if ax - ax != 0.0 {_ag_fail(12,-1,0); return 0}; if ay - ay != 0.0 {_ag_fail(12,-1,0); return 0}; if az - az != 0.0 {_ag_fail(12,-1,0); return 0}
+ if bx - bx != 0.0 {_ag_fail(12,-1,0); return 0}; if by - by != 0.0 {_ag_fail(12,-1,0); return 0}; if bz - bz != 0.0 {_ag_fail(12,-1,0); return 0}
+ if dx - dx != 0.0 {_ag_fail(12,-1,0); return 0}; if dy - dy != 0.0 {_ag_fail(12,-1,0); return 0}; if dz - dz != 0.0 {_ag_fail(12,-1,0); return 0}
+ var negx=0; var signx=-1.0; if dx<0.0 {negx=1; signx=1.0};var n0=1;var f0=4;if negx==1 {n0=4;f0=1}
+ var negy=0; var signy=-1.0; if dy<0.0 {negy=1; signy=1.0};var n1=2;var f1=5;if negy==1 {n1=5;f1=2}
+ var negz=0; var signz=-1.0; if dz<0.0 {negz=1; signz=1.0};var n2=3;var f2=6;if negz==1 {n2=6;f2=3}
+ if _ag_dirty==1 {_ag_derive(); _ag_dirty=0}
+ var target=-1; var fraction=2.0;
+ let validate=_ag_motion_checked==0
+ let cw=worlds; let cb=_ag_spatial_boxes; let ck=kinds; let cd=dimensions; let cv=effective; let count=identities.len()
+ let mi=ignore*7;let ml0=cb[mi+1];let ml1=cb[mi+2];let ml2=cb[mi+3];let mh0=cb[mi+4];let mh1=cb[mi+5];let mh2=cb[mi+6]
+ var mn0=ml0;var mf0=mh0;if negx==1 {mn0=mh0;mf0=ml0};var mn1=ml1;var mf1=mh1;if negy==1 {mn1=mh1;mf1=ml1};var mn2=ml2;var mf2=mh2;if negz==1 {mn2=mh2;mf2=ml2}
+ for node in 0..count {
+  if node==ignore {continue}; if ck[node]==5 {continue}; if cd[node]!=space {continue}; if visible_only==1 {if cv[node]==0 {continue}}
+  let wi=node*3; let bi=node*7
+  if validate {if cb[bi]==0.0 {_ag_fail(9,node,0); return 0}}
+  let wx=cw[wi+0]; if validate {if wx - wx != 0.0 {_ag_fail(9,node,0); return 0}}; let rawlox float=wx+cb[bi+n0]; let rawhix float=wx+cb[bi+f0]; let lox float=rawlox - mf0; let hix float=rawhix - mn0
+  if validate==false {if dx==0.0 {if ax<lox || ax>hix {continue}} else {if negx==0 {if bx<lox || ax>hix {continue}} else {if bx>lox || ax<hix {continue}}}}
+  let wy=cw[wi+1]; if validate {if wy - wy != 0.0 {_ag_fail(9,node,1); return 0}}; let rawloy float=wy+cb[bi+n1]; let rawhiy float=wy+cb[bi+f1]; let loy float=rawloy - mf1; let hiy float=rawhiy - mn1
+  if validate==false {if dy==0.0 {if ay<loy || ay>hiy {continue}} else {if negy==0 {if by<loy || ay>hiy {continue}} else {if by>loy || ay<hiy {continue}}}}
+  let wz=cw[wi+2]; if validate {if wz - wz != 0.0 {_ag_fail(9,node,2); return 0}}; let rawloz float=wz+cb[bi+n2]; let rawhiz float=wz+cb[bi+f2]; let loz float=rawloz - mf2; let hiz float=rawhiz - mn2
+  if validate {if (rawlox - rawlox)+(rawhix - rawhix) + (rawloy - rawloy)+(rawhiy - rawhiy) + (rawloz - rawloz)+(rawhiz - rawhiz) != 0.0 {_ag_fail(9,node,0); return 0}}
+  if validate {if (lox - lox) + (loy - loy) + (loz - loz) != (hix - hix) + (hiy - hiy) + (hiz - hiz) {_ag_fail(12,node,0); return 0}}
+  if validate {if ((ax>lox && ax<hix) || (ax>hix && ax<lox)) && ((ay>loy && ay<hiy) || (ay>hiy && ay<loy)) && ((az>loz && az<hiz) || (az>hiz && az<loz)) {if _ag_motion_initial<0 {_ag_motion_initial=node};continue}}
+  var boundary_leave=0
+  if ax==lox && dx==0.0 {boundary_leave=1};if ax==hix {boundary_leave=1}
+  if ay==loy && dy==0.0 {boundary_leave=1};if ay==hiy {boundary_leave=1}
+  if space==3 {if az==loz && dz==0.0 {boundary_leave=1};if az==hiz {boundary_leave=1}}
+  if boundary_leave==1 {if ((ax>=lox && ax<=hix) || (ax>=hix && ax<=lox)) && ((ay>=loy && ay<=hiy) || (ay>=hiy && ay<=loy)) && ((az>=loz && az<=hiz) || (az>=hiz && az<=loz)) {continue}}
+  var enter=0.0; var leave=1.0;
+  if dx==0.0 {
+   if ax<lox || ax>hix {continue}
+  } else {
+   var near float=(lox - ax)/dx; var far float=(hix - ax)/dx
+   if (near - near) != (far - far) {_ag_fail(12,node,0); return 0}
+
+   if near>enter {enter=near}
+   if far<leave {leave=far}
+   if enter>leave {continue}
+  }
+  if enter>=fraction {continue}
+  if dy==0.0 {
+   if ay<loy || ay>hiy {continue}
+  } else {
+   var near float=(loy - ay)/dy; var far float=(hiy - ay)/dy
+   if (near - near) != (far - far) {_ag_fail(12,node,1); return 0}
+
+   if near>enter {enter=near}
+   if far<leave {leave=far}
+   if enter>leave {continue}
+  }
+  if enter>=fraction {continue}
+  if dz==0.0 {
+   if az<loz || az>hiz {continue}
+  } else {
+   var near float=(loz - az)/dz; var far float=(hiz - az)/dz
+   if (near - near) != (far - far) {_ag_fail(12,node,2); return 0}
+
+   if near>enter {enter=near}
+   if far<leave {leave=far}
+   if enter>leave {continue}
+  }
+  if enter>=fraction {continue}
+  target=node; fraction=enter
+ }
+ var found=0; var pxout=bx; var pyout=by; var pzout=bz; var nxout=0.0; var nyout=0.0; var nzout=0.0
+ if target>=0 {
+  found=1
+  pxout=ax+fraction*dx; pyout=ay+fraction*dy; pzout=az+fraction*dz
+  if (pxout - pxout)+(pyout - pyout)+(pzout - pzout)!=0.0 {_ag_fail(12,-1,0); return 0}
+  let wi=target*3; let bi=target*7; var faced=0
+  let lox float=(cw[wi+0]+cb[bi+1]) - mh0; let hix float=(cw[wi+0]+cb[bi+4]) - ml0
+  if faced==0 && dx!=0.0 {if ax<=lox || ax>=hix {if negx==0 {if (lox - ax)/dx==fraction {nxout= -1.0; faced=1}} else {if (hix - ax)/dx==fraction {nxout=1.0; faced=1}}}}
+  let loy float=(cw[wi+1]+cb[bi+2]) - mh1; let hiy float=(cw[wi+1]+cb[bi+5]) - ml1
+  if faced==0 && dy!=0.0 {if ay<=loy || ay>=hiy {if negy==0 {if (loy - ay)/dy==fraction {nyout= -1.0; faced=1}} else {if (hiy - ay)/dy==fraction {nyout=1.0; faced=1}}}}
+  let loz float=(cw[wi+2]+cb[bi+3]) - mh2; let hiz float=(cw[wi+2]+cb[bi+6]) - ml2
+  if faced==0 && dz!=0.0 {if az<=loz || az>=hiz {if negz==0 {if (loz - az)/dz==fraction {nzout= -1.0; faced=1}} else {if (hiz - az)/dz==fraction {nzout=1.0; faced=1}}}}
+
+ } else {fraction=1.0}
+ _ag_sweep_overlap=0; if found==1 {if nxout==0.0 && nyout==0.0 && nzout==0.0 {_ag_sweep_overlap=1}}
+ _ag_cast_found=found; _ag_cast_target=target; _ag_cast_fraction=fraction; _ag_cast_px=pxout; _ag_cast_py=pyout; _ag_cast_pz=pzout; _ag_cast_nx=nxout; _ag_cast_ny=nyout; _ag_cast_nz=nzout;
+ return 1
+}

@@ -1,0 +1,9 @@
+# AGP is an application workspace (probe runner + games): its Cargo.lock is
+# committed reproducibility evidence. The repository-root .gitignore ignores
+# Cargo.lock (library convention); re-include it here.
+# target/ stays ignored via the root rule.
+!Cargo.lock
+# The frozen breakout golden trace IS committed oracle evidence (the root
+# *.json ignore targets config dumps; re-include it here).
+!testdata/breakout/golden_trace.json
+!testdata/squash/golden_squash_trace.json

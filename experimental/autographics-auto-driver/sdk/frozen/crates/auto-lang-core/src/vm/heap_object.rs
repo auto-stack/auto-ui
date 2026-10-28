@@ -1,0 +1,918 @@
+// Plan 077 Phase 1: HeapObject Trait
+// Unified object registry infrastructure for AutoVM
+
+use std::any::Any;
+
+/// Trait for all heap-allocated objects in AutoVM
+///
+/// This trait enables the unified object registry design where a single
+/// DashMap<u64, Arc<RwLock<dyn HeapObject>>> can store objects of any type.
+///
+/// # Type Safety
+///
+/// The trait combines `Any` (for downcasting) with runtime type tags
+/// to provide both compile-time and runtime type safety.
+///
+/// # Example
+///
+/// ```rust
+/// use auto_lang::vm::heap_object::{HeapObject, TypeTag};
+/// use std::any::Any;
+/// use std::sync::{Arc, RwLock};
+///
+/// pub struct MyData {
+///     value: i32,
+/// }
+///
+/// impl HeapObject for MyData {
+///     fn type_tag(&self) -> TypeTag { TypeTag::CustomType }
+///     fn as_any(&self) -> &dyn Any { self }
+///     fn as_any_mut(&mut self) -> &mut dyn Any { self }
+/// }
+///
+/// // Usage in unified registry:
+/// let obj: Arc<RwLock<dyn HeapObject>> = Arc::new(RwLock::new(MyData { value: 42 }));
+/// let guard = obj.read().unwrap();
+/// let my_data = guard.as_any().downcast_ref::<MyData>().unwrap();
+/// assert_eq!(my_data.value, 42);
+/// ```
+pub trait HeapObject: Any + Send + Sync {
+    /// Get the type tag for runtime type checking
+    ///
+    /// This returns a TypeTag enum value that identifies the concrete type
+    /// of the object at runtime. Used for:
+    /// - Type checking before downcasting
+    /// - Debugging and logging
+    /// - Error messages
+    fn type_tag(&self) -> TypeTag;
+
+    /// Convert to `Any` for downcasting
+    ///
+    /// This enables safe downcasting to the concrete type using
+    /// `Any::downcast_ref()` and `Any::downcast_mut()`.
+    fn as_any(&self) -> &dyn Any;
+
+    /// Convert to mutable `Any` for downcasting
+    ///
+    /// This enables mutable downcasting for modifying the concrete type.
+    fn as_any_mut(&mut self) -> &mut dyn Any;
+
+    /// Plan 555 T05: 外对象协议（ForeignObject）接入钩子。
+    ///
+    /// 分发组合子（vm/interop.rs）经此取协议面做宿主分派（py 句柄/
+    /// 未来 JS/ArkTS 宿主），替代 isinstance 式硬编码 downcast。默认
+    /// None（非外对象）；宿主句柄类型覆写为 Some(self)。engine 热臂
+    /// 不调用本方法（仅组合子层查表，§10 裁决"架构"行）。
+    fn as_foreign_object(&self) -> Option<&dyn crate::vm::interop::ForeignObject> {
+        None
+    }
+
+    /// Plan 419 Phase 1: 本对象直接持有的子堆引用 id 集合。
+    ///
+    /// RC 归零释放对象时,这些子引用的 stakes 随之死亡(递归 decref,
+    /// "父回收 → 子传递回收")。默认空(标量型容器 / 不透明 Rust 对象)。
+    /// 持有 VmRef 的容器(ListData<Value>/ObjectData/GenericInstanceData/
+    /// Node props / Value 携带的 SpecializedPair)必须实现。
+    fn child_refs(&self) -> Vec<u64> {
+        Vec::new()
+    }
+
+    /// Plan 432 D26: 本对象直接持有的字符串池索引集合(容器侧份额)。
+    ///
+    /// ListData<i32> 以负哨兵 -(idx+1) 持有池条目(push/set 时 retain);
+    /// 容器 RC 归零时这些份额随之释放。默认空。与 child_refs 分离是因为
+    /// 池计数与堆计数走不同记账通道(pool_release vs rc_release_id)。
+    fn child_pool_idxs(&self) -> Vec<usize> {
+        Vec::new()
+    }
+}
+
+/// Type tags for all heap-allocated objects in AutoVM
+///
+/// Each variant corresponds to a concrete type that implements `HeapObject`.
+/// Used for runtime type checking and debugging.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum TypeTag {
+    // List types (monomorphized generics)
+    /// `ListData<i32>` - List of 32-bit integers
+    ListInt,
+    /// `ListData<char>` - List of characters
+    ListChar,
+    /// `ListData<bool>` - List of booleans
+    ListBool,
+    /// `ListData<String>` - List of strings
+    ListString,
+    /// `ListData<Value>` - Fallback for mixed-type lists
+    ListValue,
+
+    // Map types
+    /// `HashMap<String, i32>` - Hash map with integer values (Plan 087)
+    HashMapInt,
+    /// `HashMap<String, bool>` - Hash map with boolean values (Plan 087)
+    HashMapBool,
+    /// `HashMap<String, String>` - Hash map with string values (Plan 087)
+    HashMapString,
+    /// `HashMap<String, Value>` - Generic hash map with any values (Plan 087)
+    HashMapValue,
+    /// `TreeMapData<K, V>` - Tree map implementation
+    TreeMap,
+
+    // Set types
+    /// `HashSetData<T>` - Hash set implementation
+    HashSet,
+    /// `TreeSetData<T>` - Tree set implementation
+    TreeSet,
+
+    // String types
+    /// AutoVM string object
+    String,
+    /// Byte string / bytes object
+    Bytes,
+
+    // StringBuilder (Plan 118 Phase 3)
+    /// StringBuilder for efficient string concatenation
+    StringBuilder,
+
+    // VecDeque (Plan 118 Phase 3)
+    /// Double-ended queue for FIFO/LIFO operations
+    VecDeque,
+
+    // Plan 377: BigInt —— 超过 48 位范围的 i64/u64 堆装箱兜底
+    /// Big integer (>2^48) heap-boxed value (full 64-bit i64/u64)
+    BigInt,
+
+    // Generic instances (Plan 087)
+    /// User-defined generic instance (e.g., Pair<int, string>)
+    /// Stores mono_name for identification
+    GenericInstance(String), // mono_name: "Pair_int_str"
+    /// Specialized pair storage (Plan 087 Phase 4)
+    /// Stores mono_name for identification
+    SpecializedPair(String), // mono_name: "Pair_int_int", "Pair_int_Value", etc.
+
+    // Future types
+    /// User-defined or custom types
+    CustomType,
+
+    // Rust stdlib types (Plan 192)
+    /// Opaque Rust stdlib type wrapper (Instant, Duration, PathBuf, etc.)
+    /// String stores the Rust type name for dynamic dispatch
+    RustStdlib(String),
+
+    // Plan 390 §15 Phase H1: ObjectData (CREATE_OBJ-produced key-value objects)
+    /// Object literal / struct instance stored as HashMap<ValueKey, Value>.
+    /// Migrated from the standalone `objects` registry to `heap_objects`.
+    ObjectData,
+
+    // Plan 390 §15 Phase H3a: Node (CREATE_NODE/POP_ACCUM-produced config nodes)
+    /// Config node (mold templates / device.at manifests) stored as
+    /// `auto_val::Node`. Migrated from the standalone `nodes` registry to
+    /// `heap_objects`.
+    Node,
+
+    // PLAN-776: HTTP 返回资源凭据（handler 成功终值的身份载体——status/
+    // headers/body 快照、SSE iterator、File 描述符、Upload 收据的按值来源；
+    /// 与普通数值 tag（i32/i64）分离，算术不可伪造）。
+    HttpReturnResource,
+}
+
+impl TypeTag {
+    /// Get the name of this type tag as a string
+    pub fn name(&self) -> std::borrow::Cow<'static, str> {
+        match self {
+            TypeTag::ListInt => "List<int>".into(),
+            TypeTag::ListChar => "List<char>".into(),
+            TypeTag::ListBool => "List<bool>".into(),
+            TypeTag::ListString => "List<string>".into(),
+            TypeTag::ListValue => "List<Value>".into(),
+            TypeTag::HashMapInt => "HashMap<String, int>".into(),
+            TypeTag::HashMapBool => "HashMap<String, bool>".into(),
+            TypeTag::HashMapString => "HashMap<String, String>".into(),
+            TypeTag::HashMapValue => "HashMap<String, Value>".into(),
+            TypeTag::TreeMap => "TreeMap".into(),
+            TypeTag::HashSet => "HashSet".into(),
+            TypeTag::TreeSet => "TreeSet".into(),
+            TypeTag::String => "String".into(),
+            TypeTag::Bytes => "Bytes".into(),
+            TypeTag::StringBuilder => "StringBuilder".into(),
+            TypeTag::VecDeque => "VecDeque".into(),
+            TypeTag::BigInt => "BigInt".into(),
+            TypeTag::GenericInstance(name) => format!("<{}>", name).into(),
+            TypeTag::SpecializedPair(name) => format!("[Specialized:{}]", name).into(),
+            TypeTag::CustomType => "CustomType".into(),
+            TypeTag::RustStdlib(name) => name.clone().into(),
+            TypeTag::ObjectData => "ObjectData".into(),
+            TypeTag::Node => "Node".into(),
+            TypeTag::HttpReturnResource => "HttpReturnResource".into(),
+        }
+    }
+
+    /// Check if this type tag represents a list type
+    pub fn is_list(&self) -> bool {
+        matches!(
+            self,
+            TypeTag::ListInt
+                | TypeTag::ListChar
+                | TypeTag::ListBool
+                | TypeTag::ListString
+                | TypeTag::ListValue
+        )
+    }
+
+    /// Check if this type tag represents a map type
+    pub fn is_map(&self) -> bool {
+        matches!(
+            self,
+            TypeTag::HashMapInt
+                | TypeTag::HashMapBool
+                | TypeTag::HashMapString
+                | TypeTag::HashMapValue
+                | TypeTag::TreeMap
+        )
+    }
+
+    /// Check if this type tag represents a set type
+    pub fn is_set(&self) -> bool {
+        matches!(self, TypeTag::HashSet | TypeTag::TreeSet)
+    }
+}
+
+impl std::fmt::Display for TypeTag {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name())
+    }
+}
+
+/// Helper function to check if an object is of a specific type
+///
+/// # Example
+///
+/// ```rust
+/// use auto_lang::vm::heap_object::{is_type, TypeTag, HeapObject};
+/// use auto_lang::vm::types::ListData;
+///
+/// let list: ListData<i32> = ListData::new();
+/// let obj: &dyn HeapObject = &list;
+/// assert!(is_type(obj, TypeTag::ListInt));
+/// ```
+pub fn is_type(obj: &dyn HeapObject, tag: TypeTag) -> bool {
+    obj.type_tag() == tag
+}
+
+// ============================================================================
+// Plan 377: BigInt —— 超过 48 位范围的 i64/u64 堆装箱兜底
+//
+// NaN-box 单槽 payload 只有 48 位，超过 2^48 的 i64/u64（如 u64::MAX）无法内联，
+// 改存为堆对象（TAG_BIGINT handle）。算术/print/FFI 路径在检测到 BIGINT tag 时
+// 解引用堆对象读取完整 64 位值。现实场景（§2.6 验证）极少触发，但保证语义完整。
+// ============================================================================
+
+/// 堆装箱的 64 位整数（i64 或 u64，由 `is_unsigned` 区分）。
+#[derive(Debug, Clone, Copy)]
+pub struct BigIntData {
+    /// 完整 64 位值（按 is_unsigned 决定如何解释）
+    pub bits: u64,
+    /// true = u64（无符号），false = i64（有符号）
+    pub is_unsigned: bool,
+}
+
+impl BigIntData {
+    pub fn from_i64(v: i64) -> Self {
+        Self {
+            bits: v as u64,
+            is_unsigned: false,
+        }
+    }
+    pub fn from_u64(v: u64) -> Self {
+        Self {
+            bits: v,
+            is_unsigned: true,
+        }
+    }
+    /// 按存储符号读回 i64
+    pub fn as_i64(&self) -> i64 {
+        if self.is_unsigned {
+            self.bits as i64
+        } else {
+            self.bits as i64
+        }
+    }
+    /// 按存储符号读回 u64
+    pub fn as_u64(&self) -> u64 {
+        self.bits
+    }
+}
+
+impl HeapObject for BigIntData {
+    fn type_tag(&self) -> TypeTag {
+        TypeTag::BigInt
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+}
+
+// ============================================================================
+// Plan 390 §15 H3a: Node 迁入统一 heap_objects registry。
+//
+// orphan rule 允许本地 trait impl 外部类型（auto_val::Node）——Node 所有字段
+// （AutoStr/usize/Args/Obj/Kids）都是 owned 数据，无 Rc/RefCell/裸指针，
+// 自动满足 HeapObject: Send + Sync。CREATE_NODE/POP_ACCUM/inject_value 改存
+// heap_objects 后，GET_FIELD / pop_auto_value / extract_value_from_vm 统一经
+// get_heap_object + downcast 取回。
+// ============================================================================
+impl HeapObject for auto_val::Node {
+    fn type_tag(&self) -> TypeTag {
+        TypeTag::Node
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+    // Plan 419: props 中的 VmRef 是子引用(kids 为内联 owned Node,非引用)。
+    fn child_refs(&self) -> Vec<u64> {
+        self.props_clone()
+            .iter()
+            .filter_map(|(_k, v)| match v {
+                auto_val::Value::VmRef(r) => Some(r.id as u64),
+                _ => None,
+            })
+            .collect()
+    }
+}
+
+/// Helper function to downcast a HeapObject to a concrete type
+///
+/// Returns `None` if the object is not of the requested type.
+///
+/// # Example
+///
+/// ```rust
+/// use auto_lang::vm::heap_object::downcast;
+/// use auto_lang::vm::heap_object::HeapObject;
+/// use auto_lang::vm::types::ListData;
+///
+/// let list: ListData<i32> = ListData::new();
+/// let obj: &dyn HeapObject = &list;
+///
+/// if let Some(list_int) = downcast::<ListData<i32>>(obj) {
+///     println!("Got List<int> with {} elements", list_int.elems.len());
+/// }
+/// ```
+pub fn downcast<T: Any>(obj: &dyn HeapObject) -> Option<&T> {
+    obj.as_any().downcast_ref::<T>()
+}
+
+/// Mutable version of downcast helper
+///
+/// Returns `None` if the object is not of the requested type.
+///
+/// # Example
+///
+/// ```rust
+/// use auto_lang::vm::heap_object::downcast_mut;
+/// use auto_lang::vm::heap_object::HeapObject;
+/// use auto_lang::vm::types::ListData;
+///
+/// let mut list: ListData<i32> = ListData::new();
+/// let obj: &mut dyn HeapObject = &mut list;
+///
+/// if let Some(list_int) = downcast_mut::<ListData<i32>>(obj) {
+///     list_int.elems.push(42);
+/// }
+/// ```
+pub fn downcast_mut<T: Any>(obj: &mut dyn HeapObject) -> Option<&mut T> {
+    obj.as_any_mut().downcast_mut::<T>()
+}
+
+/// Helper function to get type tag as a string
+///
+/// Convenience function for debugging and error messages.
+///
+/// # Example
+///
+/// ```rust
+/// use auto_lang::vm::heap_object::type_name;
+/// use auto_lang::vm::heap_object::HeapObject;
+/// use auto_lang::vm::types::ListData;
+///
+/// let list: ListData<i32> = ListData::new();
+/// let obj: &dyn HeapObject = &list;
+/// println!("Object type: {}", type_name(obj));
+/// ```
+pub fn type_name(obj: &dyn HeapObject) -> String {
+    obj.type_tag().name().to_string()
+}
+
+// ============================================================================
+// Plan 077 Phase 7: Optimized Downcast Helpers
+// ============================================================================
+
+/// Optimized checked downcast with type tag verification
+///
+/// This function combines type tag checking and downcasting into a single
+/// operation to reduce overhead in hot paths. It's designed to be inlined
+/// for maximum performance.
+///
+/// Returns `None` if:
+/// - The type tag doesn't match the expected tag
+/// - The downcast fails (shouldn't happen if tags match)
+///
+/// # Performance
+///
+/// - Inline-able for zero function call overhead
+/// - Single type tag check before downcast
+/// - Optimized for hot paths (e.g., LIST_PUSH_INT, LIST_GET_INT)
+///
+/// # Example
+///
+/// ```rust
+/// use auto_lang::vm::heap_object::{try_downcast_checked, TypeTag, HeapObject};
+/// use auto_lang::vm::types::ListData;
+///
+/// let list: ListData<i32> = ListData::new();
+/// let obj: &dyn HeapObject = &list;
+///
+/// if let Some(list) = try_downcast_checked::<ListData<i32>>(obj, TypeTag::ListInt) {
+///     // Use list...
+/// }
+/// ```
+#[inline]
+pub fn try_downcast_checked<T: Any>(obj: &dyn HeapObject, expected_tag: TypeTag) -> Option<&T> {
+    // Fast path: type tag matches (most common case)
+    if obj.type_tag() == expected_tag {
+        obj.as_any().downcast_ref::<T>()
+    } else {
+        None
+    }
+}
+
+/// Mutable version of optimized checked downcast
+///
+/// Same as `try_downcast_checked` but for mutable access.
+///
+/// # Example
+///
+/// ```rust
+/// use auto_lang::vm::heap_object::{try_downcast_checked_mut, TypeTag, HeapObject};
+/// use auto_lang::vm::types::ListData;
+///
+/// let mut list: ListData<i32> = ListData::new();
+/// let obj: &mut dyn HeapObject = &mut list;
+///
+/// if let Some(list) = try_downcast_checked_mut::<ListData<i32>>(obj, TypeTag::ListInt) {
+///     list.elems.push(42);
+/// }
+/// ```
+#[inline]
+pub fn try_downcast_checked_mut<T: Any>(
+    obj: &mut dyn HeapObject,
+    expected_tag: TypeTag,
+) -> Option<&mut T> {
+    // Fast path: type tag matches (most common case)
+    if obj.type_tag() == expected_tag {
+        obj.as_any_mut().downcast_mut::<T>()
+    } else {
+        None
+    }
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::{Arc, RwLock};
+
+    // Mock implementations for testing
+    struct MockIntList {
+        elems: Vec<i32>,
+    }
+
+    impl HeapObject for MockIntList {
+        fn type_tag(&self) -> TypeTag {
+            TypeTag::ListInt
+        }
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
+        fn as_any_mut(&mut self) -> &mut dyn Any {
+            self
+        }
+    }
+
+    struct MockCharList {
+        elems: Vec<char>,
+    }
+
+    impl HeapObject for MockCharList {
+        fn type_tag(&self) -> TypeTag {
+            TypeTag::ListChar
+        }
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
+        fn as_any_mut(&mut self) -> &mut dyn Any {
+            self
+        }
+    }
+
+    struct MockString {
+        value: String,
+    }
+
+    impl HeapObject for MockString {
+        fn type_tag(&self) -> TypeTag {
+            TypeTag::String
+        }
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
+        fn as_any_mut(&mut self) -> &mut dyn Any {
+            self
+        }
+    }
+
+    #[test]
+    fn test_type_tag_names() {
+        assert_eq!(TypeTag::ListInt.name(), "List<int>");
+        assert_eq!(TypeTag::ListChar.name(), "List<char>");
+        assert_eq!(TypeTag::ListBool.name(), "List<bool>");
+        assert_eq!(TypeTag::ListString.name(), "List<string>");
+        assert_eq!(TypeTag::ListValue.name(), "List<Value>");
+        assert_eq!(TypeTag::HashMapInt.name(), "HashMap<String, int>");
+        assert_eq!(TypeTag::TreeMap.name(), "TreeMap");
+        assert_eq!(TypeTag::HashSet.name(), "HashSet");
+        assert_eq!(TypeTag::TreeSet.name(), "TreeSet");
+        assert_eq!(TypeTag::String.name(), "String");
+        assert_eq!(TypeTag::Bytes.name(), "Bytes");
+        assert_eq!(TypeTag::CustomType.name(), "CustomType");
+    }
+
+    #[test]
+    fn test_type_tag_display() {
+        assert_eq!(format!("{}", TypeTag::ListInt), "List<int>");
+        assert_eq!(format!("{}", TypeTag::HashMapInt), "HashMap<String, int>");
+        assert_eq!(format!("{}", TypeTag::String), "String");
+    }
+
+    #[test]
+    fn test_type_tag_is_list() {
+        assert!(TypeTag::ListInt.is_list());
+        assert!(TypeTag::ListChar.is_list());
+        assert!(TypeTag::ListBool.is_list());
+        assert!(TypeTag::ListString.is_list());
+        assert!(TypeTag::ListValue.is_list());
+        assert!(!TypeTag::HashMapInt.is_list());
+        assert!(!TypeTag::String.is_list());
+    }
+
+    #[test]
+    fn test_type_tag_is_map() {
+        assert!(TypeTag::HashMapInt.is_map());
+        assert!(TypeTag::TreeMap.is_map());
+        assert!(!TypeTag::ListInt.is_map());
+        assert!(!TypeTag::HashSet.is_map());
+    }
+
+    #[test]
+    fn test_type_tag_is_set() {
+        assert!(TypeTag::HashSet.is_set());
+        assert!(TypeTag::TreeSet.is_set());
+        assert!(!TypeTag::HashMapInt.is_set());
+        assert!(!TypeTag::ListInt.is_set());
+    }
+
+    #[test]
+    fn test_type_tag_equality() {
+        assert_eq!(TypeTag::ListInt, TypeTag::ListInt);
+        assert_ne!(TypeTag::ListInt, TypeTag::ListChar);
+        assert_ne!(TypeTag::HashMapInt, TypeTag::HashSet);
+    }
+
+    #[test]
+    fn test_type_tag_hash() {
+        use std::collections::HashSet;
+
+        let mut set = HashSet::new();
+        set.insert(TypeTag::ListInt);
+        set.insert(TypeTag::ListChar);
+        set.insert(TypeTag::HashMapInt);
+
+        assert_eq!(set.len(), 3);
+        assert!(set.contains(&TypeTag::ListInt));
+        assert!(set.contains(&TypeTag::ListChar));
+        assert!(set.contains(&TypeTag::HashMapInt));
+        assert!(!set.contains(&TypeTag::String));
+    }
+
+    #[test]
+    fn test_heap_object_type_tag() {
+        let list = MockIntList {
+            elems: vec![1, 2, 3],
+        };
+        assert_eq!(list.type_tag(), TypeTag::ListInt);
+
+        let char_list = MockCharList {
+            elems: vec!['a', 'b'],
+        };
+        assert_eq!(char_list.type_tag(), TypeTag::ListChar);
+
+        let string = MockString {
+            value: "hello".to_string(),
+        };
+        assert_eq!(string.type_tag(), TypeTag::String);
+    }
+
+    #[test]
+    fn test_is_type_helper() {
+        let list = MockIntList {
+            elems: vec![1, 2, 3],
+        };
+
+        assert!(is_type(&list, TypeTag::ListInt));
+        assert!(!is_type(&list, TypeTag::ListChar));
+        assert!(!is_type(&list, TypeTag::String));
+    }
+
+    #[test]
+    fn test_downcast_success() {
+        let list = MockIntList {
+            elems: vec![1, 2, 3],
+        };
+        let obj: &dyn HeapObject = &list;
+
+        let downcasted = downcast::<MockIntList>(obj);
+        assert!(downcasted.is_some());
+        assert_eq!(downcasted.unwrap().elems, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn test_downcast_failure() {
+        let list = MockIntList {
+            elems: vec![1, 2, 3],
+        };
+        let obj: &dyn HeapObject = &list;
+
+        let downcasted = downcast::<MockCharList>(obj);
+        assert!(downcasted.is_none());
+    }
+
+    #[test]
+    fn test_downcast_mut_success() {
+        let mut list = MockIntList {
+            elems: vec![1, 2, 3],
+        };
+        let obj: &mut dyn HeapObject = &mut list;
+
+        let downcasted = downcast_mut::<MockIntList>(obj);
+        assert!(downcasted.is_some());
+
+        let list_ref = downcasted.unwrap();
+        list_ref.elems.push(4);
+        assert_eq!(list_ref.elems, vec![1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn test_downcast_mut_failure() {
+        let mut list = MockIntList {
+            elems: vec![1, 2, 3],
+        };
+        let obj: &mut dyn HeapObject = &mut list;
+
+        let downcasted = downcast_mut::<MockCharList>(obj);
+        assert!(downcasted.is_none());
+    }
+
+    #[test]
+    fn test_type_name_helper() {
+        let list = MockIntList {
+            elems: vec![1, 2, 3],
+        };
+        let obj: &dyn HeapObject = &list;
+
+        assert_eq!(type_name(obj), "List<int>");
+    }
+
+    #[test]
+    fn test_arc_rwlock_heap_object() {
+        let list = MockIntList {
+            elems: vec![1, 2, 3],
+        };
+        let obj: Arc<RwLock<dyn HeapObject>> = Arc::new(RwLock::new(list));
+
+        // Test read access
+        let guard = obj.read().unwrap();
+        assert_eq!(guard.type_tag(), TypeTag::ListInt);
+        assert!(is_type(&*guard, TypeTag::ListInt));
+
+        let downcasted = downcast::<MockIntList>(&*guard);
+        assert!(downcasted.is_some());
+        assert_eq!(downcasted.unwrap().elems, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn test_arc_rwlock_heap_object_mut() {
+        let list = MockIntList {
+            elems: vec![1, 2, 3],
+        };
+        let obj: Arc<RwLock<dyn HeapObject>> = Arc::new(RwLock::new(list));
+
+        // Test write access
+        let mut guard = obj.write().unwrap();
+        assert_eq!(guard.type_tag(), TypeTag::ListInt);
+
+        let downcasted = downcast_mut::<MockIntList>(&mut *guard);
+        assert!(downcasted.is_some());
+
+        let list_ref = downcasted.unwrap();
+        list_ref.elems.push(4);
+        assert_eq!(list_ref.elems, vec![1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn test_multiple_object_types_in_registry() {
+        use dashmap::DashMap;
+
+        let registry: DashMap<u64, Arc<RwLock<dyn HeapObject>>> = DashMap::new();
+
+        // Insert different object types
+        registry.insert(
+            1,
+            Arc::new(RwLock::new(MockIntList {
+                elems: vec![1, 2, 3],
+            })),
+        );
+        registry.insert(
+            2,
+            Arc::new(RwLock::new(MockCharList {
+                elems: vec!['a', 'b'],
+            })),
+        );
+        registry.insert(
+            3,
+            Arc::new(RwLock::new(MockString {
+                value: "hello".to_string(),
+            })),
+        );
+
+        // Retrieve and verify types
+        let obj1 = registry.get(&1).unwrap();
+        let guard1 = obj1.read().unwrap();
+        assert_eq!(guard1.type_tag(), TypeTag::ListInt);
+        let list1 = downcast::<MockIntList>(&*guard1).unwrap();
+        assert_eq!(list1.elems, vec![1, 2, 3]);
+
+        let obj2 = registry.get(&2).unwrap();
+        let guard2 = obj2.read().unwrap();
+        assert_eq!(guard2.type_tag(), TypeTag::ListChar);
+        let list2 = downcast::<MockCharList>(&*guard2).unwrap();
+        assert_eq!(list2.elems, vec!['a', 'b']);
+
+        let obj3 = registry.get(&3).unwrap();
+        let guard3 = obj3.read().unwrap();
+        assert_eq!(guard3.type_tag(), TypeTag::String);
+        let string = downcast::<MockString>(&*guard3).unwrap();
+        assert_eq!(string.value, "hello");
+    }
+
+    #[test]
+    fn test_clone_type_tag() {
+        let tag = TypeTag::ListInt;
+        let cloned = tag.clone();
+        assert_eq!(tag, cloned);
+    }
+
+    #[test]
+    fn test_clone_hashmap_type_tag() {
+        let tag = TypeTag::HashMapInt;
+        let cloned = tag.clone();
+        assert_eq!(tag, cloned);
+    }
+
+    // Plan 077 Phase 7: Tests for optimized downcast helpers
+    #[test]
+    fn test_try_downcast_checked_success() {
+        let list = MockIntList {
+            elems: vec![1, 2, 3],
+        };
+
+        // Correct type tag should succeed
+        let result =
+            crate::vm::heap_object::try_downcast_checked::<MockIntList>(&list, TypeTag::ListInt);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().elems, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn test_try_downcast_checked_wrong_type() {
+        let list = MockIntList {
+            elems: vec![1, 2, 3],
+        };
+
+        // Wrong type tag should fail
+        let result =
+            crate::vm::heap_object::try_downcast_checked::<MockIntList>(&list, TypeTag::ListChar);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_try_downcast_checked_mut_success() {
+        let mut list = MockIntList {
+            elems: vec![1, 2, 3],
+        };
+
+        // Correct type tag should succeed
+        let result = crate::vm::heap_object::try_downcast_checked_mut::<MockIntList>(
+            &mut list,
+            TypeTag::ListInt,
+        );
+        assert!(result.is_some());
+        result.unwrap().elems.push(4);
+        assert_eq!(list.elems, vec![1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn test_try_downcast_checked_mut_wrong_type() {
+        let mut list = MockIntList {
+            elems: vec![1, 2, 3],
+        };
+
+        // Wrong type tag should fail
+        let result = crate::vm::heap_object::try_downcast_checked_mut::<MockIntList>(
+            &mut list,
+            TypeTag::ListChar,
+        );
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_optimized_downcast_performance() {
+        // This test verifies the optimized helpers work correctly
+        use crate::vm::heap_object::{try_downcast_checked, try_downcast_checked_mut};
+
+        let list = MockIntList {
+            elems: vec![1, 2, 3],
+        };
+
+        // Read path
+        let read_result = try_downcast_checked::<MockIntList>(&list, TypeTag::ListInt);
+        assert!(read_result.is_some());
+
+        // Write path
+        let mut list2 = MockIntList {
+            elems: vec![4, 5, 6],
+        };
+        let write_result = try_downcast_checked_mut::<MockIntList>(&mut list2, TypeTag::ListInt);
+        assert!(write_result.is_some());
+        write_result.unwrap().elems.push(7);
+        assert_eq!(list2.elems, vec![4, 5, 6, 7]);
+    }
+
+    // Plan 377: BigInt 堆装箱单元测试
+    #[test]
+    fn test_bigint_data_roundtrip_i64() {
+        // 边界值：48 位内联范围外的大数
+        let vals = [
+            1i64 << 47,
+            -(1i64 << 47) - 1,
+            i64::MAX,
+            i64::MIN,
+            0x_FFFF_FFFF_FFFF_FFFFu64 as i64,
+        ];
+        for v in vals {
+            let big = BigIntData::from_i64(v);
+            assert_eq!(big.as_i64(), v, "i64 {} round-trip", v);
+            assert_eq!(big.type_tag(), TypeTag::BigInt);
+        }
+    }
+
+    #[test]
+    fn test_bigint_data_roundtrip_u64() {
+        let vals = [
+            1u64 << 48,
+            u64::MAX,
+            (1u64 << 63) + 1,
+            0x_FFFF_FFFF_0000_0000u64,
+        ];
+        for v in vals {
+            let big = BigIntData::from_u64(v);
+            assert_eq!(big.as_u64(), v, "u64 {} round-trip", v);
+        }
+    }
+
+    #[test]
+    fn test_bigint_downcast() {
+        let big = BigIntData::from_u64(u64::MAX);
+        let obj: &dyn HeapObject = &big;
+        assert!(is_type(obj, TypeTag::BigInt));
+        let recovered = downcast::<BigIntData>(obj).unwrap();
+        assert_eq!(recovered.as_u64(), u64::MAX);
+    }
+}

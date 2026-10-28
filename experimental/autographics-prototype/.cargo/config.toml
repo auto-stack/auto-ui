@@ -1,0 +1,14 @@
+# PLAN-879: this workspace previously inherited these settings from the
+# auto-lang repository root .cargo/config.toml. They are restated here so the
+# moved workspace — and any package_consumer.py export of it — keeps identical
+# stack behavior instead of silently inheriting auto-ui production config (or
+# no config at all, the old export gap). Aliases/jobs/patches are intentionally
+# not restated: nothing beyond the stack profile is part of the move contract.
+[target.x86_64-pc-windows-msvc]
+# /STACK sets the PE-header stack reserve for the main thread; the old repo
+# root carried 32MB for deep recursive view/render trees.
+rustflags = ["-C", "link-arg=/STACK:33554432"]  # 32 MB
+
+[env]
+# Repository-level worker/test thread stack, also inherited from the old root.
+RUST_MIN_STACK = "16777216"

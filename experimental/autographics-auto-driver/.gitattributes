@@ -1,0 +1,14 @@
+research/sdk-Cargo.lock.txt -text
+research/sdk-Cargo.toml.txt -text
+Cargo.lock text eol=lf
+
+# Content-addressed behavior blobs retain their exact original bytes.
+samples/behavior_projects/*/scripts/*.at -text
+
+# New motion source blobs and exact verification receipts retain raw bytes.
+samples/motion_projects/*/scripts/*.at -text
+research/motion-evidence/** -text whitespace=cr-at-eol,-blank-at-eof
+
+# PLAN-879: frozen SDK source snapshot must round-trip byte-exactly against
+# research/source-lock.json (some SDK blobs contain CRLF); never normalize.
+sdk/frozen/** -text

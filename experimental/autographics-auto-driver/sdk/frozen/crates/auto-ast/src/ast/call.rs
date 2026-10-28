@@ -1,0 +1,460 @@
+use super::{Expr, Name, Type};
+use crate::ast::{AtomWriter, ToAtomStr};
+use auto_lex::token::Pos;
+use auto_val::AutoStr;
+use std::{fmt, io as stdio};
+
+#[derive(Debug, Clone)]
+pub struct Call {
+    pub name: Box<Expr>,
+    pub args: Args,
+    pub ret: Type,
+    /// Plan 061: Type argument bindings (generic param name -> concrete type)
+    /// E.g., for `duplicate(42)`, this might contain [("T", Int)]
+    pub type_args: Vec<(Name, Type)>,
+    /// Plan 395: Explicit generic type args on a call (turbofish) — user-supplied
+    /// `<Type, ...>` in Auto source (`foo<Bar>(x)`), transpiled to Rust `::<Bar>`.
+    /// Distinct from `type_args` (Plan 061 inference bindings): this is source
+    /// syntax, not inference output.
+    pub generic_args: Vec<Type>,
+    /// Source position of the call site (the opening parenthesis)
+    pub pos: Option<Pos>,
+}
+
+impl Call {
+    pub fn get_name_text(&self) -> AutoStr {
+        match &self.name.as_ref() {
+            Expr::Ident(name) => name.clone(),
+            _ => panic!("Expected identifier, got {:?}", self.name),
+        }
+    }
+
+    /// Non-panicking version that returns None for complex names (e.g. method calls).
+    pub fn get_name_text_safe(&self) -> Option<AutoStr> {
+        match &self.name.as_ref() {
+            Expr::Ident(name) => Some(name.clone()),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for Call {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "(call {})", self.args)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Args {
+    // pub array: Vec<Expr>,
+    // pub map: Vec<(Name, Expr)>,
+    pub args: Vec<Arg>,
+}
+
+impl Default for Args {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum Arg {
+    Pos(Expr),
+    Name(Name),
+    Pair(Name, Expr),
+}
+
+impl Arg {
+    pub fn get_expr(&self) -> Expr {
+        match self {
+            Arg::Pos(expr) => expr.clone(),
+            Arg::Name(name) => Expr::Str(name.clone()),
+            Arg::Pair(_, expr) => expr.clone(),
+        }
+    }
+
+    pub fn repr(&self) -> AutoStr {
+        match self {
+            Arg::Pos(expr) => expr.repr(),
+            Arg::Name(name) => name.clone(),
+            Arg::Pair(key, expr) => format!("{}:{}", key, expr.repr()).into(),
+        }
+    }
+
+    pub fn to_code(&self) -> AutoStr {
+        match self {
+            Arg::Pos(expr) => expr.to_code(),
+            Arg::Name(name) => name.clone(),
+            Arg::Pair(key, expr) => format!("{}:{}", key, expr.to_code()).into(),
+        }
+    }
+}
+
+impl Args {
+    pub fn new() -> Self {
+        Self { args: Vec::new() }
+    }
+
+    pub fn len(&self) -> usize {
+        self.args.len()
+    }
+    pub fn get(&self, idx: usize) -> Option<Arg> {
+        self.args.get(idx).cloned()
+    }
+
+    pub fn lookup(&self, name: &str) -> Option<Arg> {
+        for arg in self.args.iter() {
+            match arg {
+                Arg::Name(n) => {
+                    if n == name {
+                        return Some(arg.clone());
+                    }
+                }
+                Arg::Pair(n, _) => {
+                    if n == name {
+                        return Some(arg.clone());
+                    }
+                }
+                _ => {}
+            }
+        }
+        None
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.args.is_empty()
+    }
+
+    pub fn id(&self) -> AutoStr {
+        let empty = "".into();
+        let id = match self.args.first() {
+            Some(Arg::Name(name)) => name.clone(),
+            Some(Arg::Pair(k, v)) => {
+                if k == "id" {
+                    v.repr().clone()
+                } else {
+                    empty
+                }
+            }
+            Some(Arg::Pos(p)) => match p {
+                Expr::Str(s) => s.clone(),
+                Expr::Ident(n) => n.clone(),
+                _ => empty,
+            },
+            _ => empty,
+        };
+        let id = if id.is_empty() {
+            // try all args
+            let arg = self.args.iter().find_map(|arg| match arg {
+                Arg::Pair(k, v) => {
+                    if k == "id" {
+                        Some(v.repr().clone())
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            });
+            if let Some(arg) = arg {
+                arg
+            } else {
+                id
+            }
+        } else {
+            id
+        };
+        id
+    }
+
+    pub fn major(&self) -> Option<&Arg> {
+        self.args.first()
+    }
+
+    pub fn first_arg(&self) -> Option<Expr> {
+        let arg = self.args.first()?;
+        match arg {
+            Arg::Pos(expr) => Some(expr.clone()),
+            Arg::Name(n) => Some(Expr::Ident(n.clone())),
+            Arg::Pair(key, expr) => {
+                // If it's an id: value pair, return the value
+                if key == "id" {
+                    Some(expr.clone())
+                } else {
+                    None
+                }
+            }
+        }
+    }
+}
+
+impl fmt::Display for Args {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "(args")?;
+        if !self.args.is_empty() {
+            for arg in self.args.iter() {
+                write!(f, " {}", arg)?;
+            }
+        }
+        write!(f, ")")
+    }
+}
+
+impl fmt::Display for Arg {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Arg::Pos(expr) => write!(f, "{}", expr),
+            Arg::Name(name) => write!(f, "(name {})", name),
+            Arg::Pair(name, expr) => write!(f, "(pair (name {}) {})", name, expr),
+        }
+    }
+}
+
+pub fn fmt_call(f: &mut fmt::Formatter, call: &Call) -> fmt::Result {
+    write!(f, "(call ")?;
+    write!(f, "{}", call.name)?;
+    if !call.args.is_empty() {
+        write!(f, " {}", call.args)?;
+    }
+    write!(f, ")")?;
+    Ok(())
+}
+
+// ToAtom and ToNode implementations
+
+use crate::ast::{ToAtom, ToNode};
+use auto_val::{Arg as AutoValArg, Array, Node as AutoNode, Value};
+
+impl AtomWriter for Arg {
+    fn write_atom(&self, f: &mut impl stdio::Write) -> auto_val::AutoResult<()> {
+        match self {
+            Arg::Pos(expr) => write!(f, "{}", expr.to_atom_str())?,
+            Arg::Name(name) => write!(f, "{}", name)?,
+            Arg::Pair(key, expr) => write!(f, "pair({}, {})", key, expr.to_atom_str())?,
+        }
+        Ok(())
+    }
+}
+
+impl ToNode for Arg {
+    fn to_node(&self) -> AutoNode {
+        match self {
+            Arg::Pos(expr) => expr.to_node(), // Changed from expr.to_atom().to_node()
+            Arg::Name(name) => {
+                let mut node = AutoNode::new("name");
+                node.add_arg(AutoValArg::Pos(Value::Str(name.clone())));
+                node
+            }
+            Arg::Pair(key, expr) => {
+                let mut node = AutoNode::new("pair");
+                node.add_arg(AutoValArg::Pos(Value::str(key.as_str())));
+                node.add_arg(AutoValArg::Pos(Value::str(&*expr.to_atom())));
+                node
+            }
+        }
+    }
+}
+
+impl ToAtom for Arg {
+    fn to_atom(&self) -> AutoStr {
+        self.to_atom_str()
+    }
+}
+
+impl AtomWriter for Args {
+    fn write_atom(&self, f: &mut impl stdio::Write) -> auto_val::AutoResult<()> {
+        if self.args.is_empty() {
+            write!(f, "()")?;
+        } else {
+            write!(f, "args(")?;
+            for (i, arg) in self.args.iter().enumerate() {
+                write!(f, "{}", arg.to_atom_str())?;
+                if i < self.args.len() - 1 {
+                    write!(f, ", ")?;
+                }
+            }
+            write!(f, ")")?;
+        }
+        Ok(())
+    }
+}
+
+impl ToNode for Args {
+    fn to_node(&self) -> AutoNode {
+        let mut node = AutoNode::new("args");
+        let items: Vec<Value> = self
+            .args
+            .iter()
+            .map(|arg| Value::str(&*arg.to_atom()))
+            .collect();
+        node.add_arg(AutoValArg::Pos(Value::array(Array::from_vec(items))));
+        node
+    }
+}
+
+impl ToAtom for Args {
+    fn to_atom(&self) -> AutoStr {
+        self.to_atom_str()
+    }
+}
+
+impl AtomWriter for Call {
+    fn write_atom(&self, f: &mut impl stdio::Write) -> auto_val::AutoResult<()> {
+        // Get the function name
+        let name_str = match self.name.as_ref() {
+            Expr::Ident(name) => name.clone(),
+            _ => self.name.to_atom_str(),
+        };
+        write!(f, "call {}", name_str)?;
+        // Plan 395: explicit generic type args (turbofish) — `<T1, T2>`
+        if !self.generic_args.is_empty() {
+            let types_str = self
+                .generic_args
+                .iter()
+                .map(|t| t.to_atom().to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
+            write!(f, "<{}>", types_str)?;
+        }
+        // Output arguments in parentheses with space before (
+        write!(f, " (")?;
+        for (i, arg) in self.args.args.iter().enumerate() {
+            match arg {
+                Arg::Pos(expr) => write!(f, "{}", expr.to_atom_str())?,
+                Arg::Name(name) => write!(f, "{}", name)?,
+                Arg::Pair(name, expr) => write!(f, "{}: {}", name, expr.to_atom_str())?,
+            }
+            if i < self.args.args.len() - 1 {
+                write!(f, ", ")?;
+            }
+        }
+        write!(f, ")")?;
+        Ok(())
+    }
+}
+
+impl ToNode for Call {
+    fn to_node(&self) -> AutoNode {
+        let mut node = AutoNode::new("call");
+        node.add_kid(self.name.to_node()); // Changed from name.to_atom().to_node()
+        node.add_kid(self.args.to_node());
+
+        if !matches!(self.ret, Type::Unknown) {
+            node.set_prop("return", Value::str(&*self.ret.to_atom()));
+        }
+
+        // Plan 061: Add type args if present (for debugging)
+        if !self.type_args.is_empty() {
+            for (param_name, concrete_type) in &self.type_args {
+                let mut type_arg_node = AutoNode::new("type_arg");
+                type_arg_node.set_prop("param", Value::str(param_name.as_str()));
+                type_arg_node.set_prop("type", Value::str(&*concrete_type.to_atom()));
+                node.add_kid(type_arg_node);
+            }
+        }
+
+        // Plan 395: Add explicit generic args (turbofish) if present (debugging)
+        if !self.generic_args.is_empty() {
+            for concrete_type in &self.generic_args {
+                let mut gen_arg_node = AutoNode::new("generic_arg");
+                gen_arg_node.set_prop("type", Value::str(&*concrete_type.to_atom()));
+                node.add_kid(gen_arg_node);
+            }
+        }
+
+        node
+    }
+}
+
+impl ToAtom for Call {
+    fn to_atom(&self) -> AutoStr {
+        self.to_atom_str()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_arg_to_atom_pos() {
+        let arg = Arg::Pos(Expr::Int(42));
+        let atom = arg.to_atom();
+        assert_eq!(atom, "42");
+    }
+
+    #[test]
+    fn test_arg_to_atom_name() {
+        let arg = Arg::Name("x".into());
+        let atom = arg.to_atom();
+        assert_eq!(atom, "x");
+    }
+
+    #[test]
+    fn test_arg_to_atom_pair() {
+        let arg = Arg::Pair("key".into(), Expr::Int(42));
+        let atom = arg.to_atom();
+        assert_eq!(atom, "pair(key, 42)");
+    }
+
+    #[test]
+    fn test_args_to_atom_empty() {
+        let args = Args::new();
+        let atom = args.to_atom();
+        assert_eq!(atom, "()");
+    }
+
+    #[test]
+    fn test_args_to_atom_with_args() {
+        let mut args = Args::new();
+        args.args.push(Arg::Pos(Expr::Int(1)));
+        args.args.push(Arg::Pos(Expr::Int(2)));
+        let atom = args.to_atom();
+        assert_eq!(atom, "args(1, 2)");
+    }
+
+    #[test]
+    fn test_call_to_atom_simple() {
+        let call = Call {
+            name: Box::new(Expr::Ident("print".into())),
+            args: Args::new(),
+            ret: Type::Unknown,
+            type_args: Vec::new(),
+            generic_args: Vec::new(),
+            pos: None,
+        };
+        let atom = call.to_atom();
+        assert_eq!(atom, "call print ()");
+    }
+
+    #[test]
+    fn test_call_to_atom_with_return_type() {
+        let call = Call {
+            name: Box::new(Expr::Ident("get_int".into())),
+            args: Args::new(),
+            ret: Type::Int,
+            type_args: Vec::new(),
+            generic_args: Vec::new(),
+            pos: None,
+        };
+        let atom = call.to_atom();
+        // Call atom doesn't include return type (only in function signature)
+        assert_eq!(atom, "call get_int ()");
+    }
+
+    #[test]
+    fn test_call_to_atom_with_args() {
+        let mut args = Args::new();
+        args.args.push(Arg::Pos(Expr::Int(42)));
+
+        let call = Call {
+            name: Box::new(Expr::Ident("print".into())),
+            args,
+            ret: Type::Unknown,
+            type_args: Vec::new(),
+            generic_args: Vec::new(),
+            pos: None,
+        };
+        let atom = call.to_atom();
+        assert_eq!(atom, "call print (42)");
+    }
+}

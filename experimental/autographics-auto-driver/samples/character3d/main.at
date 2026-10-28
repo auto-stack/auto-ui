@@ -1,0 +1,41 @@
+// PLAN-874 character3d sample: the user owns every gameplay parameter.
+// Editing `speed` 4.0 -> 5.0 below and re-running is the real source-change
+// proof (V-05); main-fast.at is that edited state kept as a separate file.
+// Default horizontal basis: Forward F=(0,0,-1), Right R=(1,0,0). Rotating the
+// basis here rotates the published world motion (the camera seam; the runtime
+// camera itself belongs to PLAN-875).
+var speed=4.0
+var jump=8.0
+var gravity=20.0
+var vy=0.0
+var grounded=0
+var ok=0
+var face_x=0.0
+var face_z= -1.0
+fn app_start() {
+ ok=ok+ag_char3_bind(1)
+ ok=ok+ag_char3_solid(2)
+ ok=ok+ag_char3_solid(3)
+}
+fn app_update(dt float) {
+ let jp=ag_action_pressed(4)
+ if jp==1 {if grounded==1 {vy = jump}}
+ vy = vy - gravity*dt
+ let hr=ag_action_held(1)
+ let hl=ag_action_held(0)
+ let hf=ag_action_held(2)
+ let hb=ag_action_held(3)
+ var mx = hr - hl
+ var mz = hb - hf
+ var n = 1.0
+ if mx != 0 {if mz != 0 {n = 0.70710678}}
+ mx = mx*n
+ mz = mz*n
+ if mx != 0 {face_x = mx;face_z = mz}
+ if mz != 0 {face_x = mx;face_z = mz}
+ let dx = mx*speed*dt
+ let dz = mz*speed*dt
+ let q=ag_char3_move(dx,vy*dt,dz,0.002)
+ grounded=ag_char3_grounded(q)
+ if grounded==1 {vy=0.0}
+}

@@ -1,0 +1,149 @@
+mod value;
+
+pub use value::*;
+
+mod nano_value;
+pub use nano_value::*;
+
+mod to_value;
+pub use to_value::ToAutoValue;
+
+mod types;
+pub use types::*;
+
+mod string;
+pub use string::*;
+
+mod owned_str;
+pub use owned_str::*;
+
+mod str_slice;
+pub use str_slice::*;
+
+mod cstr;
+pub use cstr::*;
+
+mod linear;
+pub use linear::*;
+
+mod shared;
+pub use shared::*;
+
+mod array;
+pub use array::*;
+
+mod pair;
+pub use pair::*;
+
+mod obj;
+pub use obj::*;
+
+mod meta;
+pub use meta::*;
+
+mod kids;
+pub use kids::*;
+
+mod node;
+pub use node::*;
+
+mod path;
+pub use path::*;
+
+mod emit;
+pub use emit::*;
+
+// Plan 566: Value 装箱瘦身——尺寸审计表 + 防回退断言（各阶段收紧上限）。
+mod size_report;
+
+// Plan 381: optional serde Deserialize support for Value/Node.
+#[cfg(feature = "serde")]
+mod de;
+#[cfg(feature = "serde")]
+pub use de::ValueDeserializer;
+#[cfg(feature = "serde")]
+pub use de::{
+    lenient_bool, lenient_bool_opt, lenient_f64, lenient_f64_opt, nonempty_string, string_or_list,
+    string_or_list_opt,
+};
+
+// Plan 332 S1: optional serde Serialize support (mirror of de).
+#[cfg(feature = "serde")]
+mod ser;
+#[cfg(feature = "serde")]
+pub use ser::{
+    node_from_value, node_to_at_source, to_value, SerError, SerializeArray, SerializeObjMap,
+    SerializeObjStruct, ValueSerializer,
+};
+
+pub type AutoError = Box<dyn std::error::Error>;
+pub type AutoResult<T> = Result<T, AutoError>;
+
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum IOError {
+    #[error("IO error occurred with `{}`: {}", .src, .err)]
+    FileError { err: std::io::Error, src: AutoStr },
+    #[error("Error occurred `{}` -> `{}`: {}", .src, .dst, .err)]
+    DualError {
+        src: AutoStr,
+        dst: AutoStr,
+        err: std::io::Error,
+    },
+}
+
+pub enum CommonResult<T> {
+    Ok(T),
+    Err(IOError),
+}
+
+impl From<std::io::Error> for IOError {
+    fn from(err: std::io::Error) -> Self {
+        IOError::FileError {
+            err,
+            src: AutoStr::new(),
+        }
+    }
+}
+
+impl IOError {
+    pub fn file(err: std::io::Error, src: impl Into<AutoStr>) -> Self {
+        IOError::FileError {
+            err,
+            src: src.into(),
+        }
+    }
+
+    pub fn dual(err: std::io::Error, src: impl Into<AutoStr>, dst: impl Into<AutoStr>) -> Self {
+        IOError::DualError {
+            src: src.into(),
+            dst: dst.into(),
+            err,
+        }
+    }
+}
+
+impl<T> From<std::io::Result<T>> for CommonResult<T> {
+    fn from(result: std::io::Result<T>) -> Self {
+        match result {
+            Ok(value) => CommonResult::Ok(value),
+            Err(err) => CommonResult::Err(IOError::from(err)),
+        }
+    }
+}
+
+impl From<IOError> for CommonResult<()> {
+    fn from(err: IOError) -> Self {
+        CommonResult::Err(err)
+    }
+}
+
+impl<T> From<CommonResult<T>> for AutoResult<T> {
+    fn from(result: CommonResult<T>) -> Self {
+        match result {
+            CommonResult::Ok(value) => AutoResult::Ok(value),
+            CommonResult::Err(err) => AutoResult::Err(err.into()),
+        }
+    }
+}

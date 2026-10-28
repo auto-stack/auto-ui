@@ -1,0 +1,28 @@
+[package]
+name = "auto-cache"
+version = "0.1.0"
+edition = "2021"
+description = "Global build cache for AutoLang projects with cross-project artifact sharing"
+
+[dependencies]
+rusqlite = { version = "0.30", features = ["bundled"] }
+blake3 = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+bincode = { workspace = true }
+dirs = { workspace = true }
+log = { workspace = true }
+chrono = "0.4"
+
+# Plan 092: Rust FFI Sandbox
+libloading = "0.8"
+
+# Plan 212 Phase 3C-v2: syn AST signature scanning
+syn = { version = "2", features = ["full", "parsing"] }
+
+# Plan 430 C2: rustdoc 元信息提取 + shim 包生成(进程内调用)
+shim-metadata = { path = "../shim-metadata" }
+
+[dev-dependencies]
+tempfile = "3"

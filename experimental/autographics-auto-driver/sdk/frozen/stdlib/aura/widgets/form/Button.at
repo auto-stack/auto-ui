@@ -1,0 +1,54 @@
+// stdlib/aura/widgets/form/Button.at
+
+#[spec(category = Form, primary_prop = "text")]
+#[backend(ark, component = "Button", import = "@kit.ArkUI")]
+#[backend(jet, component = "Button", import = "androidx.compose.material3.Button")]
+#[backend(vue, component = "Button", import = "@/components/ui/button/Button")]
+
+/// Button component for user interactions.
+///
+/// # Props
+/// - text: Button label text (primary prop - can use shorthand syntax)
+/// - variant: "default" | "outline" | "ghost" | "destructive"
+/// - size: "sm" | "md" | "lg"
+/// - disabled: Whether button is disabled
+///
+/// # Events
+/// - onclick: Click event (Msg.Click)
+///
+/// # Example
+/// ```auto
+/// Button "Submit" { onclick: .Submit }
+/// Button (text: "Submit", variant: "primary", onclick: .Submit) {}
+/// Button (text: "Cancel", variant: "outline") {}
+/// ```
+widget Button {
+    msg { Click }
+
+    model {
+        #[primary]
+        text str = ""
+        variant str = "default"  // default, outline, ghost, destructive
+        size str = "md"          // sm, md, lg
+        disabled bool = false
+    }
+
+    computed {
+        classes => f"btn btn-${.variant} btn-${.size}"
+    }
+
+    view {
+        button {
+            style: .classes
+            text: .text
+            onclick: .Click
+            disabled: .disabled
+        }
+    }
+
+    on {
+        Click -> {
+            // Emit click event (handled by parent)
+        }
+    }
+}

@@ -1,0 +1,3 @@
+PASS PLAN-851 source/asset identity: 430 hashes; corrected SDK frozen; .agscene LF/CRLF transport equivalent
+PASS PLAN-851 source/asset identity: 430 hashes; corrected SDK frozen; .agscene LF/CRLF transport equivalent
+PASS new API / stale SDK pin / source-lock drift / missing project GLB controls and restored accepted control

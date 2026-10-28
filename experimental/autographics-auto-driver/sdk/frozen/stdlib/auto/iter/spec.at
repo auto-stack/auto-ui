@@ -1,0 +1,112 @@
+/// Auto Flow - Iterator and Functional Programming System (Plan 051)
+/// This module provides zero-cost iterator abstractions for AutoLang
+
+/// Core iterator spec - produces values of type T
+spec Iter<T> {
+    /// Try to get the next value
+    /// Returns nil when iteration is complete
+    fn next() May<T>
+
+    // --- Lazy adapters ---
+
+    /// Transform each element using function f
+    /// Returns a new iterator that maps each element
+    fn map(f: fn(T)T) MapIter<Self, T, T>
+
+    /// Filter elements by predicate p
+    /// Returns a new iterator with only matching elements
+    fn filter(p: fn(T)bool) FilterIter<Self, T>
+
+    // --- Terminal operators ---
+
+    /// Fold/reduce: consume iterator, accumulating values
+    fn reduce(init: T, f: fn(T,T)T) T
+
+    /// Count elements in iterator
+    fn count() u32
+
+    /// Call function f for each element
+    fn for_each(f: fn(T)void) void
+
+    /// Collect all elements into a collection
+    fn collect() List<T, Heap>
+
+    /// Check if any element satisfies predicate
+    fn any(p: fn(T)bool) bool
+
+    /// Check if all elements satisfy predicate
+    fn all(p: fn(T)bool) bool
+
+    /// Find first element matching predicate
+    fn find(p: fn(T)bool) May<T>
+}
+
+/// Type that can be iterated over
+/// Simplified approach: no associated types, just return Iter<T>
+spec Iterable<T> {
+    /// Get an iterator for this collection
+    fn iter() Iter<T>
+
+    // --- Default method implementations that forward to iter() ---
+
+    /// Transform each element using function f
+    /// Default implementation: forwards to self.iter().map(f)
+    fn map(f: fn(T)T) MapIter<Iter<T>, T, T> {
+        return self.iter().map(f)
+    }
+
+    /// Filter elements by predicate p
+    /// Default implementation: forwards to self.iter().filter(p)
+    fn filter(p: fn(T)bool) FilterIter<Iter<T>, T> {
+        return self.iter().filter(p)
+    }
+
+    /// Fold/reduce: consume iterator, accumulating values
+    /// Default implementation: forwards to self.iter().reduce(init, f)
+    fn reduce(init: T, f: fn(T,T)T) T {
+        return self.iter().reduce(init, f)
+    }
+
+    /// Count elements in iterator
+    /// Default implementation: forwards to self.iter().count()
+    fn count() u32 {
+        return self.iter().count()
+    }
+
+    /// Call function f for each element
+    /// Default implementation: forwards to self.iter().for_each(f)
+    fn for_each(f: fn(T)void) void {
+        return self.iter().for_each(f)
+    }
+
+    /// Collect all elements into a collection
+    /// Default implementation: forwards to self.iter().collect()
+    fn collect() List<T, Heap> {
+        return self.iter().collect()
+    }
+
+    /// Check if any element satisfies predicate
+    /// Default implementation: forwards to self.iter().any(p)
+    fn any(p: fn(T)bool) bool {
+        return self.iter().any(p)
+    }
+
+    /// Check if all elements satisfy predicate
+    /// Default implementation: forwards to self.iter().all(p)
+    fn all(p: fn(T)bool) bool {
+        return self.iter().all(p)
+    }
+
+    /// Find first element matching predicate
+    /// Default implementation: forwards to self.iter().find(p)
+    fn find(p: fn(T)bool) May<T> {
+        return self.iter().find(p)
+    }
+}
+
+/// Type that can collect from an iterator
+/// This allows different collection strategies (List, Array, etc.)
+spec Collect<T> {
+    /// Collect iterator elements into this collection type
+    fn from_iter(iter: Iter<T>) Self
+}

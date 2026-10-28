@@ -1,0 +1,64 @@
+type.c List
+
+type dstr {
+    data List
+
+    pub static fn new() dstr {
+        dstr(data: List.new())
+    }
+    pub static fn from_byte(b char) dstr {
+        let list = List.new()
+        list.push(b)
+        dstr(data: list)
+    }
+
+    pub static fn from_bytes(b1 char, b2 char) dstr {
+        let list = List.new()
+        list.push(b1)
+        list.push(b2)
+        dstr(data: list)
+    }
+
+    pub fn len() int {
+        let data = .data
+        data.len()
+    }
+
+    pub fn is_empty() bool {
+        let data = .data
+        data.is_empty()
+    }
+
+    pub fn get(index int) char {
+        let data = .data
+        data.get(index)
+    }
+
+    pub fn push(b char) {
+        .data.push(b)
+    }
+
+    pub fn pop() char {
+        .data.pop()
+    }
+
+    pub fn set(index int, b char) int {
+        .data.set(index, b)
+    }
+
+    pub fn insert(index int, b char) {
+        .data.insert(index, b)
+    }
+
+    pub fn remove(index int) char {
+        .data.remove(index)
+    }
+
+    pub fn clear() {
+        .data.clear()
+    }
+
+    pub fn reserve(capacity int) {
+        .data.reserve(capacity)
+    }
+}

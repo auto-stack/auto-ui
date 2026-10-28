@@ -1,0 +1,10 @@
+// stdlib/aura/widgets/mod.at
+
+// Re-export all widgets for short imports
+pub use layout: Col, Row, Center, Card, ScrollArea, AspectRatio, Collapsible, Accordion
+pub use form: Button, Input, Checkbox, Switch, Select, Slider, RadioGroup, Textarea, Form
+pub use display: Text, Image, Badge, Avatar, Separator, Skeleton
+pub use overlay: Dialog, AlertDialog, Sheet, Drawer, Popover, Tooltip, HoverCard, ContextMenu
+pub use navigation: Tabs, Breadcrumb, NavigationMenu, Pagination, Sidebar, MenuBar, DropdownMenu, NavLink
+pub use feedback: Alert, Toast, Progress, Sonner
+pub use data: Table, DataTable, Calendar

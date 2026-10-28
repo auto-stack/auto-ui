@@ -1,0 +1,74 @@
+// stdlib/aura/widgets/display/Text.at
+
+#[spec(category = Display, primary_prop = "text")]
+#[backend(ark, component = "Text")]
+#[backend(jet, component = "Text", import = "androidx.compose.material3.Text")]
+#[backend(vue, component = "span")]
+
+/// Text display component.
+///
+/// # Props
+/// - text: Text content to display (primary prop - can use shorthand syntax)
+/// - style: Text style ("default", "heading", "paragraph", "code", "muted")
+/// - truncate: Whether to truncate long text
+/// - maxLength: Maximum length before truncation (0 = no limit)
+///
+/// # Example
+/// ```auto
+/// Text "Hello, World!" {}
+/// Text (text: "Hello, World!") {}
+/// Text (text: "Long text...", truncate: true, maxLength: 30) {}
+/// ```
+widget Text {
+    model {
+        #[primary]
+        text str = ""
+        style str = "default"  // default, heading, paragraph, code, muted
+        truncate bool = false
+        maxLength int = 0  // 0 = no limit
+    }
+
+    computed {
+        displayText => if .truncate && .maxLength > 0 {
+            if .text.len() > .maxLength {
+                f"${.text.slice(0, .maxLength)}..."
+            } else {
+                .text
+            }
+        } else {
+            .text
+        }
+        textClass => f"text text-${.style}"
+    }
+
+    view {
+        text {
+            style: .textClass
+            content: .displayText
+        }
+    }
+}
+
+/// Heading 1 component.
+widget H1 {
+    model { #[primary] text str = "" }
+    view { text { style: "heading-1", content: .text } }
+}
+
+/// Heading 2 component.
+widget H2 {
+    model { #[primary] text str = "" }
+    view { text { style: "heading-2", content: .text } }
+}
+
+/// Heading 3 component.
+widget H3 {
+    model { #[primary] text str = "" }
+    view { text { style: "heading-3", content: .text } }
+}
+
+/// Paragraph component.
+widget Paragraph {
+    model { #[primary] text str = "" }
+    view { text { style: "paragraph", content: .text } }
+}

@@ -1,0 +1,1482 @@
+use crate::array::*;
+use crate::cstr::CStr;
+use crate::meta::*;
+use crate::node::*;
+use crate::obj::*;
+use crate::owned_str::*;
+use crate::pair::*;
+use crate::str_slice::StrSlice;
+use crate::string::*;
+use crate::types::Type;
+use crate::AutoStr;
+use std::fmt::{self, Display, Formatter};
+
+/// Unique identifier for a value stored in Universe
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ValueID(pub usize);
+
+impl Display for ValueID {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "VID({})", self.0)
+    }
+}
+
+/// Closure value: captured environment + function body (Plan 060 Phase 3+)
+#[derive(Debug, Clone, PartialEq)]
+pub struct Closure {
+    /// Unique closure ID for looking up closure data in evaluator
+    pub id: usize,
+
+    /// Parameter names
+    pub params: Vec<String>,
+
+    /// Closure name (for debugging/error reporting)
+    pub name: String,
+}
+
+/// Plan 124: Future value for async operations
+/// Represents a value that will be available later (~T type)
+#[derive(Debug, Clone, PartialEq)]
+pub struct FutureData {
+    /// Unique future ID for tracking
+    pub id: usize,
+
+    /// Current state of the future
+    pub state: FutureState,
+
+    /// The result value when Ready
+    pub result: Option<Box<Value>>,
+}
+
+/// State of a Future value
+#[derive(Debug, Clone, PartialEq)]
+pub enum FutureState {
+    /// Future is still being computed
+    Pending,
+    /// Future has completed with a value
+    Ready,
+    /// Future computation failed
+    Failed,
+}
+
+impl FutureData {
+    pub fn new(id: usize) -> Self {
+        Self {
+            id,
+            state: FutureState::Pending,
+            result: None,
+        }
+    }
+
+    pub fn with_value(id: usize, value: Value) -> Self {
+        Self {
+            id,
+            state: FutureState::Ready,
+            result: Some(Box::new(value)),
+        }
+    }
+}
+
+/// Actual value data (stored in Universe, separate from ID)
+/// This is the same as Value but with nested references replaced by ValueIDs
+#[derive(Debug, Clone)]
+pub enum ValueData {
+    // Primitives (same as Value)
+    Byte(u8),
+    Int(i32),
+    Uint(u32),
+    USize(usize),
+    I8(i8),
+    U8(u8),
+    I64(i64),
+    Float(f64),
+    Double(f64),
+    Bool(bool),
+    Char(char),
+    Nil,
+    Str(AutoStr),
+    String(Str),        // NEW: Owned string with move semantics (Phase 2)
+    StrSlice(StrSlice), // NEW: Borrowed string slice (Phase 3)
+    CStr(CStr),         // NEW: C-compatible null-terminated string (Plan 025)
+
+    // Complex types with nested IDs (CHANGED from Value)
+    Array(Vec<ValueID>),
+    Obj(Vec<(ValueKey, ValueID)>),
+    Pair(Box<ValueID>, Box<ValueID>),
+
+    // Other variants (from Value, to be expanded as needed)
+    Range(i32, i32),
+    RangeEq(i32, i32),
+
+    /// Opaque value storage for types that don't need deep mutation
+    /// Stores the full Value inline (functions, types, nodes, etc.)
+    Opaque(Box<Value>),
+    // TODO: Add more variants as needed during implementation
+    // Fn, ExtFn, Type, Node, Widget, Model, View, Meta, Method, Instance, Args, etc.
+}
+
+/// Path for nested mutation (obj.field = value, arr[0] = value)
+#[derive(Debug, Clone)]
+pub enum AccessPath {
+    Field(AutoStr),
+    Index(usize),
+    Nested(Box<AccessPath>, Box<AccessPath>),
+}
+
+#[derive(Debug)]
+pub enum AccessError {
+    NotAnObject,
+    NotAnArray,
+    IndexOutOfBounds,
+    FieldNotFound,
+}
+
+/// Component of a flattened access path for iterative processing
+#[derive(Debug, Clone)]
+pub enum PathComponent {
+    Field(AutoStr),
+    Index(usize),
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct VmRef {
+    pub id: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub enum Value {
+    Byte(u8),
+    Int(i32),
+    Uint(u32),
+    USize(usize),
+    I8(i8),
+    U8(u8),
+    I64(i64),
+    Float(f64),
+    Double(f64),
+    Bool(bool),
+    Char(char),
+    Str(AutoStr),
+    String(Str),        // NEW: Owned string with move semantics (Phase 2)
+    StrSlice(StrSlice), // NEW: Borrowed string slice (Phase 3)
+    CStr(CStr),         // NEW: C-compatible null-terminated string (Plan 025)
+    Array(Array),
+    Block(Array),
+    Pair(ValueKey, Box<Value>),
+    /// Plan 566 Phase B: Obj 装箱（Obj 72B；232 调用点，构造走
+    /// `Value::obj()` helper，匹配经 Box 自动解引用）。
+    Obj(Box<Obj>),
+    /// Plan 566 Phase A: Node 装箱（Node 296B 是 Value 296B 的唯一鲸鱼；
+    /// 构造走 `Value::node()` helper，匹配经 Box 自动解引用）。
+    Node(Box<Node>),
+    Range(i32, i32),
+    RangeEq(i32, i32),
+    /// Plan 566 Phase C: Fn/ExtFn/Type 装箱（Fn 72B 为 48B 终态的最后约束；
+    /// Str 40B 是地板设定者——热路径字符串不装箱，终态即 48B）。
+    Fn(Box<Fn>),
+    ExtFn(Box<ExtFn>),
+    Type(Box<Type>),
+    #[default]
+    Nil,
+    Null,
+    Lambda(AutoStr),
+    Void,
+    /// Plan 566 Phase B 装箱（Widget 112B/Model/View 为单点变体；
+    /// 构造走 `Value::widget()` 等 helper）。
+    Widget(Box<Widget>),
+    Model(Box<Model>),
+    View(Box<View>),
+    /// Plan 566 Phase B: MetaID 72B 装箱（11 调用点）。
+    Meta(Box<MetaID>),
+
+    Method(Box<Method>),
+    /// Plan 566 Phase B: Instance 96B 装箱（103 调用点）。
+    Instance(Box<Instance>),
+    Args(Args),
+    Ref(AutoStr),
+    Error(AutoStr),
+    /// Plan 566 Phase B: Grid 装箱（单点变体，计划原文成员）。
+    Grid(Box<Grid>),
+    VmRef(VmRef),
+    /// Reference to value stored in Universe (NEW)
+    ValueRef(ValueID),
+    /// Closure value: captured environment + function body (Plan 060 Phase 3)
+    Closure(Box<Closure>),
+    // Plan 120: Option and Result types
+    /// Optional value - Some(value) or None
+    /// Represents ?T type - value might not exist
+    Some(Box<Value>),
+    None,
+    /// Result value - Ok(value) or Err(message)
+    /// Represents !T type - operation might have failed
+    Ok(Box<Value>),
+    Err(AutoStr),
+    // Plan 124: Future type for async operations
+    /// Future value - represents a value that will be available later
+    /// ~T type - async computation that produces T
+    Future(Box<FutureData>),
+}
+
+// constructors
+impl Value {
+    /// Plan 566 Phase A: Node 构造 helper（收敛调用点，集中未来调整）。
+    pub fn node(n: Node) -> Self {
+        Value::Node(Box::new(n))
+    }
+
+    /// Plan 566 Phase B: 胖变体构造 helper（同 Node 模式收敛调用点）。
+    pub fn obj(o: Obj) -> Self {
+        Value::Obj(Box::new(o))
+    }
+
+    pub fn widget(w: Widget) -> Self {
+        Value::Widget(Box::new(w))
+    }
+
+    pub fn model(m: Model) -> Self {
+        Value::Model(Box::new(m))
+    }
+
+    pub fn view(v: View) -> Self {
+        Value::View(Box::new(v))
+    }
+
+    pub fn meta(m: MetaID) -> Self {
+        Value::Meta(Box::new(m))
+    }
+
+    pub fn method(m: Method) -> Self {
+        Value::Method(Box::new(m))
+    }
+
+    pub fn instance(i: Instance) -> Self {
+        Value::Instance(Box::new(i))
+    }
+
+    pub fn closure(c: Closure) -> Self {
+        Value::Closure(Box::new(c))
+    }
+
+    pub fn grid(g: Grid) -> Self {
+        Value::Grid(Box::new(g))
+    }
+
+    pub fn future(f: FutureData) -> Self {
+        Value::Future(Box::new(f))
+    }
+
+    pub fn str(text: impl Into<AutoStr>) -> Self {
+        Value::Str(text.into())
+    }
+
+    pub fn empty_str() -> Self {
+        Value::Str(ASTR_EMPTY.clone())
+    }
+
+    /// Create an owned string value (with move semantics)
+    pub fn owned_str(text: &str) -> Self {
+        Value::String(Str::from_str(text))
+    }
+
+    /// Create an empty owned string value
+    pub fn empty_owned_str() -> Self {
+        Value::String(Str::from_str(""))
+    }
+
+    /// Create a StrSlice from a string slice
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure the string outlives the StrSlice
+    pub unsafe fn str_slice(s: &str) -> Self {
+        Value::StrSlice(StrSlice::from_str(s))
+    }
+
+    /// Create a StrSlice from an AutoStr
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure the AutoStr outlives the StrSlice
+    pub unsafe fn str_slice_from_auto_str(s: &AutoStr) -> Self {
+        Value::StrSlice(StrSlice::from_auto_str(s))
+    }
+
+    /// Create an empty StrSlice
+    pub fn empty_str_slice() -> Self {
+        Value::StrSlice(StrSlice::empty())
+    }
+
+    /// Create a C-compatible null-terminated string
+    pub fn cstr(text: &str) -> Self {
+        Value::CStr(CStr::from_str(text))
+    }
+
+    /// Create a CStr from an AutoStr
+    pub fn cstr_from_astr(text: &AutoStr) -> Self {
+        Value::CStr(CStr::from_astr(text))
+    }
+
+    /// Create an empty CStr
+    pub fn empty_cstr() -> Self {
+        Value::CStr(CStr::from_str(""))
+    }
+
+    pub fn error(text: impl Into<AutoStr>) -> Self {
+        Value::Error(text.into())
+    }
+
+    pub fn empty_array() -> Self {
+        Value::Array(Array::default())
+    }
+
+    pub fn array(items: impl Into<Array>) -> Self {
+        Value::Array(items.into())
+    }
+
+    pub fn array_of(values: Vec<impl Into<Value>>) -> Self {
+        Value::Array(Array::from_vec(values))
+    }
+
+    pub fn str_array(values: Vec<impl Into<AutoStr>>) -> Self {
+        Value::Array(
+            values
+                .into_iter()
+                .map(|s| Value::Str(s.into()))
+                .collect::<Vec<Value>>()
+                .into(),
+        )
+    }
+
+    pub fn pair(key: impl Into<ValueKey>, value: impl Into<Value>) -> Self {
+        Value::Pair(key.into(), Box::new(value.into()))
+    }
+
+    pub fn repr(&self) -> AutoStr {
+        match self {
+            Value::Str(s) => s.clone(),
+            _ => self.to_astr(),
+        }
+    }
+
+    pub fn is_error(&self) -> bool {
+        matches!(self, Value::Error(_))
+    }
+
+    /// Convert Value to ValueData (for storage in Universe)
+    pub fn into_data(self) -> ValueData {
+        match self {
+            Value::Byte(v) => ValueData::Byte(v),
+            Value::Int(v) => ValueData::Int(v),
+            Value::Uint(v) => ValueData::Uint(v),
+            Value::USize(v) => ValueData::USize(v),
+            Value::I8(v) => ValueData::I8(v),
+            Value::U8(v) => ValueData::U8(v),
+            Value::I64(v) => ValueData::I64(v),
+            Value::Float(v) => ValueData::Float(v),
+            Value::Double(v) => ValueData::Double(v),
+            Value::Bool(v) => ValueData::Bool(v),
+            Value::Char(v) => ValueData::Char(v),
+            Value::Nil => ValueData::Nil,
+            Value::Str(v) => ValueData::Str(v),
+            Value::String(v) => ValueData::String(v),
+            Value::Array(v) => {
+                // Convert Array values to ValueIDs (simplified - allocates each)
+                // TODO: This is inefficient - needs batch allocation
+                let vids = v.iter().map(|_| ValueID(0)).collect();
+                ValueData::Array(vids)
+            }
+            Value::Obj(v) => {
+                // Convert Obj values to ValueIDs (simplified)
+                let fields = v.iter().map(|(k, _)| (k.clone(), ValueID(0))).collect();
+                ValueData::Obj(fields)
+            }
+            Value::Pair(_k, _v) => {
+                // TODO: Convert nested values
+                ValueData::Pair(Box::new(ValueID(0)), Box::new(ValueID(0)))
+            }
+            Value::Range(l, r) => ValueData::Range(l, r),
+            Value::RangeEq(l, r) => ValueData::RangeEq(l, r),
+            Value::StrSlice(v) => ValueData::StrSlice(v),
+            Value::CStr(v) => ValueData::CStr(v),
+            Value::Instance(v) => ValueData::Opaque(Box::new(Value::Instance(v))),
+            // Other variants not yet supported in ValueData
+            _ => ValueData::Nil,
+        }
+    }
+
+    /// Convert ValueData to Value (for reading from Universe)
+    /// Note: Nested ValueIDs remain as references, not fully resolved
+    pub fn from_data(data: ValueData) -> Self {
+        match data {
+            ValueData::Byte(v) => Value::Byte(v),
+            ValueData::Int(v) => Value::Int(v),
+            ValueData::Uint(v) => Value::Uint(v),
+            ValueData::USize(v) => Value::USize(v),
+            ValueData::I8(v) => Value::I8(v),
+            ValueData::U8(v) => Value::U8(v),
+            ValueData::I64(v) => Value::I64(v),
+            ValueData::Float(v) => Value::Float(v),
+            ValueData::Double(v) => Value::Double(v),
+            ValueData::Bool(v) => Value::Bool(v),
+            ValueData::Char(v) => Value::Char(v),
+            ValueData::Nil => Value::Nil,
+            ValueData::Str(v) => Value::Str(v),
+            ValueData::String(v) => Value::String(v),
+            ValueData::StrSlice(v) => Value::StrSlice(v),
+            ValueData::CStr(v) => Value::CStr(v),
+            ValueData::Array(vids) => {
+                // Convert ValueIDs to ValueRefs for later resolution
+                let values: Vec<Value> = vids.iter().map(|vid| Value::ValueRef(*vid)).collect();
+                Value::Array(values.into())
+            }
+            ValueData::Obj(fields) => {
+                // Convert ValueIDs to ValueRefs for later resolution
+                let mut obj = Obj::new();
+                for (k, vid) in fields.iter() {
+                    obj.set(k.clone(), Value::ValueRef(*vid));
+                }
+                Value::obj(obj)
+            }
+            ValueData::Pair(_l, _r) => {
+                // TODO: This needs proper resolution via Universe
+                Value::Pair(ValueKey::Int(0), Box::new(Value::Nil))
+            }
+            ValueData::Range(l, r) => Value::Range(l, r),
+            ValueData::RangeEq(l, r) => Value::RangeEq(l, r),
+            // Opaque values - unwrap and return the stored Value
+            ValueData::Opaque(v) => *v,
+        }
+    }
+}
+
+impl Value {
+    pub fn is_nil(&self) -> bool {
+        matches!(self, Value::Nil)
+    }
+
+    pub fn is_void(&self) -> bool {
+        matches!(self, Value::Void)
+    }
+
+    pub fn get_type(&self) -> Type {
+        match self {
+            Value::Str(_) | Value::String(_) => Type::Str,
+            Value::Int(_) => Type::Int,
+            Value::Uint(_) => Type::Int,
+            Value::Float(_) => Type::Float,
+            Value::Bool(_) => Type::Bool,
+            Value::Char(_) => Type::Char,
+            Value::Array(_) => Type::Array,
+            Value::Void => Type::Void,
+            _ => Type::Any,
+        }
+    }
+}
+
+// arithmetic
+impl Value {
+    pub fn inc(&mut self) {
+        match self {
+            Value::Int(value) => *value += 1,
+            Value::Uint(value) => *value += 1,
+            _ => {}
+        }
+    }
+
+    pub fn dec(&mut self) {
+        match self {
+            Value::Int(value) => *value -= 1,
+            Value::Uint(value) => *value -= 1,
+            _ => {}
+        }
+    }
+}
+
+fn float_eq(a: f64, b: f64) -> bool {
+    let epsilon = 0.000001;
+    (a - b).abs() < epsilon
+}
+
+impl Display for Value {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Value::Char(value) => write!(f, "'{}'", value),
+            Value::Str(value) => write!(f, "\"{}\"", value),
+            Value::String(value) => write!(f, "\"{}\"", value.as_str()),
+            Value::StrSlice(value) => write!(f, "\"{}\"", value),
+            Value::CStr(value) => write!(f, "\"{}\"", value.as_str()),
+            Value::Int(value) => write!(f, "{}", value),
+            Value::Uint(value) => write!(f, "{}u", value),
+            Value::USize(value) => write!(f, "{}", value),
+            Value::I8(value) => write!(f, "{}", value),
+            Value::U8(value) => write!(f, "{}", value),
+            Value::I64(value) => write!(f, "{}", value),
+            Value::Byte(value) => write!(f, "0x{:X}", value),
+            Value::Float(value) => write!(f, "{}", value),
+            Value::Double(value) => write!(f, "{}", value),
+            Value::Bool(value) => write!(f, "{}", value),
+            Value::Nil => write!(f, "nil"),
+            Value::Null => write!(f, "null"),
+            Value::Void => write!(f, "void"),
+            Value::Array(value) => print_array(f, value),
+            Value::Block(value) => print_array(f, value),
+            Value::Range(left, right) => write!(f, "{}..{}", left, right),
+            Value::RangeEq(left, right) => write!(f, "{}..={}", left, right),
+            Value::Error(value) => write!(f, "<Error: {}>", value),
+            Value::Fn(fun) => write!(f, "fn {}", fun.sig.name),
+            Value::ExtFn(fun) => write!(f, "<extfn {}>", fun.name),
+            Value::Lambda(name) => write!(f, "lambda {}", name),
+            Value::Pair(key, value) => write!(f, "{} : {}", key, value),
+            Value::Obj(value) => print_object(f, value),
+            Value::Node(node) => write!(f, "{}", node),
+            Value::Widget(widget) => write!(f, "{}", widget),
+            Value::Meta(meta) => write!(f, "{}", meta),
+            Value::Model(model) => write!(f, "{}", model),
+            Value::Method(method) => write!(f, "{}", method),
+            Value::Args(args) => write!(f, "{}", args),
+            Value::View(view) => write!(f, "{}", view),
+            Value::Ref(target) => write!(f, "(ref {})", target),
+            Value::Instance(instance) => write!(f, "{}", instance),
+            Value::Grid(grid) => write!(f, "{}", grid),
+            Value::Type(typ) => write!(f, "{}", typ.name()),
+            Value::VmRef(_) => write!(f, "<vmref>"),
+            Value::ValueRef(vid) => write!(f, "{}", vid), // NEW: Display ValueID
+            Value::Closure(closure) => write!(f, "<closure {}>", closure.name),
+            // Plan 120: Option and Result display
+            Value::Some(inner) => write!(f, "Some({})", inner),
+            Value::None => write!(f, "None"),
+            Value::Ok(inner) => write!(f, "Ok({})", inner),
+            Value::Err(msg) => write!(f, "Err(\"{}\")", msg),
+            // Plan 124: Future display
+            Value::Future(future) => match &future.state {
+                FutureState::Pending => write!(f, "<future#{}:pending>", future.id),
+                FutureState::Ready => {
+                    if let Some(ref result) = future.result {
+                        write!(f, "<future#{}:ready:{}>", future.id, result)
+                    } else {
+                        write!(f, "<future#{}:ready>", future.id)
+                    }
+                }
+                FutureState::Failed => write!(f, "<future#{}:failed>", future.id),
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Op {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+    AddEq,
+    SubEq,
+    MulEq,
+    DivEq,
+    ModEq,
+    Not,
+    Bang, // Postfix bang operator for eager collection (!)
+    And,  // Logical and (Plan 072)
+    Or,   // Logical or (Plan 072)
+    LSquare,
+    LParen,
+    LBrace,
+    Asn,
+    Eq,
+    Neq,
+    Lt,
+    Gt,
+    Le,
+    Ge,
+    Range,
+    RangeEq,
+    Dot,
+    Colon,
+    In,
+    // Property keywords (Phase 3: postfix property syntax)
+    DotView,
+    DotMut,
+    DotMove, // Plan 122: .move accessor (ownership transfer)
+    DotTake, // DEPRECATED - use DotMove instead
+    // May type operators (Phase 1b.3)
+    QuestionQuestion, // ?? - null-coalescing operator
+    DotQuestion,      // ?. - error propagation operator (legacy May<T>)
+    DotQuest,         // .? - error propagation operator (Plan 120: Option/Result)
+}
+
+impl Value {
+    pub fn neg(&self) -> Value {
+        match self {
+            Value::Int(value) => Value::Int(-value),
+            Value::Float(value) => Value::Float(-value),
+            // TODO: check if uint is bigger than i32.MAX
+            Value::Uint(value) => Value::Int(-(*value as i32)),
+            // TODO: add signed byte
+            Value::Byte(value) => Value::Int(-(*value as i32)),
+            _ => Value::Nil,
+        }
+    }
+
+    pub fn not(&self) -> Value {
+        match self {
+            Value::Bool(value) => Value::Bool(!value),
+            Value::Nil => Value::Bool(true),
+            _ => Value::Nil,
+        }
+    }
+
+    pub fn comp(&self, op: &Op, other: &Value) -> Value {
+        match (self, other) {
+            (Value::Int(a), Value::Int(b)) => match op {
+                Op::Eq => Value::Bool(a == b),
+                Op::Neq => Value::Bool(a != b),
+                Op::Lt => Value::Bool(a < b),
+                Op::Gt => Value::Bool(a > b),
+                Op::Le => Value::Bool(a <= b),
+                Op::Ge => Value::Bool(a >= b),
+                _ => Value::Nil,
+            },
+            (Value::Uint(a), Value::Uint(b)) => match op {
+                Op::Eq => Value::Bool(a == b),
+                Op::Neq => Value::Bool(a != b),
+                Op::Lt => Value::Bool(a < b),
+                Op::Gt => Value::Bool(a > b),
+                Op::Le => Value::Bool(a <= b),
+                Op::Ge => Value::Bool(a >= b),
+                _ => Value::Nil,
+            },
+            (Value::Float(a), Value::Float(b)) => match op {
+                Op::Eq => Value::Bool(float_eq(*a, *b)),
+                Op::Neq => Value::Bool(!float_eq(*a, *b)),
+                Op::Lt => Value::Bool(*a < *b),
+                Op::Gt => Value::Bool(*a > *b),
+                Op::Le => Value::Bool(*a <= *b),
+                Op::Ge => Value::Bool(*a >= *b),
+                _ => Value::Nil,
+            },
+            (Value::Bool(a), Value::Bool(b)) => match op {
+                Op::Eq => Value::Bool(*a == *b),
+                Op::Neq => Value::Bool(*a != *b),
+                _ => Value::Nil,
+            },
+            (Value::Byte(a), Value::Byte(b)) => match op {
+                Op::Eq => Value::Bool(a == b),
+                Op::Neq => Value::Bool(a != b),
+                Op::Lt => Value::Bool(a < b),
+                Op::Gt => Value::Bool(a > b),
+                Op::Le => Value::Bool(a <= b),
+                Op::Ge => Value::Bool(a >= b),
+                _ => Value::Nil,
+            },
+            (Value::Str(a), Value::Str(b)) => match op {
+                Op::Eq => Value::Bool(a == b),
+                Op::Neq => Value::Bool(a != b),
+                _ => Value::Nil,
+            },
+            _ => Value::Nil,
+        }
+    }
+
+    pub fn is_true(&self) -> bool {
+        match self {
+            Value::Bool(value) => *value,
+            Value::Int(value) => *value > 0,
+            Value::Uint(value) => *value > 0,
+            Value::Float(value) => *value > 0.0,
+            Value::Str(value) => !value.is_empty(),
+            Value::Byte(value) => *value > 0,
+            _ => false,
+        }
+    }
+
+    pub fn to_bool(&self) -> bool {
+        self.is_true()
+    }
+}
+
+static NODE_NIL: std::sync::OnceLock<Node> = std::sync::OnceLock::new();
+
+fn node_nil() -> &'static Node {
+    NODE_NIL.get_or_init(Node::empty)
+}
+
+static OBJ_EMPTY: std::sync::OnceLock<Obj> = std::sync::OnceLock::new();
+
+fn obj_empty() -> &'static Obj {
+    OBJ_EMPTY.get_or_init(Obj::new)
+}
+
+// Quick Readers
+impl Value {
+    pub fn v_str(&self) -> Value {
+        Value::Str(self.to_astr())
+    }
+
+    pub fn v_upper(&self) -> Value {
+        match self {
+            Value::Str(s) => Value::Str(s.to_uppercase()),
+            Value::String(s) => Value::String(Str::from_str(s.as_str().to_uppercase().as_str())),
+            _ => Value::Nil,
+        }
+    }
+
+    pub fn v_lower(&self) -> Value {
+        match self {
+            Value::Str(s) => Value::Str(s.to_lowercase()),
+            Value::String(s) => Value::String(Str::from_str(s.as_str().to_lowercase().as_str())),
+            _ => Value::Nil,
+        }
+    }
+
+    pub fn v_len(&self) -> Value {
+        match self {
+            Value::Str(s) => Value::Int(s.len() as i32),
+            Value::String(s) => Value::Int(s.len() as i32),
+            _ => Value::Nil,
+        }
+    }
+
+    pub fn as_array(&self) -> &Array {
+        match self {
+            Value::Array(value) => value,
+            _ => &ARRAY_EMPTY,
+        }
+    }
+
+    pub fn to_str_vec(&self) -> Vec<AutoStr> {
+        match self {
+            Value::Array(value) => value.to_str_vec(),
+            _ => vec![],
+        }
+    }
+
+    pub fn as_obj(&self) -> &Obj {
+        match self {
+            Value::Obj(ref value) => value,
+            _ => obj_empty(),
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            Value::Str(value) => value.as_str(),
+            _ => "",
+        }
+    }
+
+    pub fn as_astr(&self) -> &AutoStr {
+        match self {
+            Value::Str(value) => value,
+            _ => &ASTR_EMPTY,
+        }
+    }
+
+    pub fn as_bool(&self) -> bool {
+        match self {
+            Value::Bool(value) => *value,
+            _ => false,
+        }
+    }
+
+    pub fn as_uint(&self) -> u32 {
+        match self {
+            Value::Uint(value) => *value,
+            Value::Int(value) => *value as u32,
+            _ => 0,
+        }
+    }
+
+    pub fn as_int(&self) -> i32 {
+        match self {
+            Value::Int(value) => *value,
+            Value::Uint(value) => *value as i32,
+            _ => 0,
+        }
+    }
+
+    pub fn as_byte(&self) -> u8 {
+        match self {
+            Value::Byte(value) => *value,
+            _ => 0,
+        }
+    }
+
+    pub fn as_node(&self) -> &Node {
+        match self {
+            Value::Node(value) => value,
+            _ => node_nil(),
+        }
+    }
+
+    pub fn to_node(self) -> Node {
+        match self {
+            Value::Node(value) => *value,
+            _ => node_nil().clone(),
+        }
+    }
+
+    pub fn update_node(&mut self, f: impl FnOnce(&mut Node)) {
+        if let Value::Node(value) = self {
+            f(value);
+        }
+    }
+
+    pub fn pretty(&self, max_indent: usize) -> AutoStr {
+        pretty(format!("{}", self).as_str(), max_indent)
+    }
+
+    pub fn to_astr(&self) -> AutoStr {
+        match self {
+            Value::Str(s) => s.clone(),
+            Value::String(s) => s.as_str().into(),
+            Value::Nil => "".into(),
+            Value::Void => "".into(),
+            _ => self.to_string().into(),
+        }
+    }
+
+    pub fn to_astr_or(&self, default: &str) -> AutoStr {
+        match self {
+            Value::Str(s) => s.clone(),
+            Value::String(s) => s.as_str().into(),
+            Value::Nil => default.into(),
+            _ => self.to_string().into(),
+        }
+    }
+
+    pub fn to_uint(&self) -> u32 {
+        match self {
+            Value::Int(n) => *n as u32,
+            Value::Uint(n) => *n,
+            _ => 0,
+        }
+    }
+
+    pub fn name(&self) -> AutoStr {
+        match self {
+            Value::Node(node) => node.name.clone(),
+            Value::Str(s) => s.clone(),
+            Value::String(s) => s.as_str().into(),
+            Value::Fn(f) => f.sig.name.clone(),
+            _ => self.to_astr(),
+        }
+    }
+}
+
+impl fmt::Display for Op {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Op::Add => write!(f, "(op +)"),
+            Op::Sub => write!(f, "(op -)"),
+            Op::Mul => write!(f, "(op *)"),
+            Op::Div => write!(f, "(op /)"),
+            Op::Mod => write!(f, "(op %)"),
+            Op::AddEq => write!(f, "(op +=)"),
+            Op::SubEq => write!(f, "(op -=)"),
+            Op::MulEq => write!(f, "(op *=)"),
+            Op::DivEq => write!(f, "(op /=)"),
+            Op::ModEq => write!(f, "(op %=)"),
+            Op::Not => write!(f, "(op !)"),
+            Op::Bang => write!(f, "(op !)"), // Bang operator (postfix)
+            Op::And => write!(f, "(op &&)"),
+            Op::Or => write!(f, "(op ||)"),
+            Op::LSquare => write!(f, "(op [)"),
+            Op::Asn => write!(f, "(op =)"),
+            Op::Eq => write!(f, "(op ==)"),
+            Op::Neq => write!(f, "(op !=)"),
+            Op::Lt => write!(f, "(op <)"),
+            Op::Gt => write!(f, "(op >)"),
+            Op::Le => write!(f, "(op <=)"),
+            Op::Ge => write!(f, "(op >=)"),
+            Op::Range => write!(f, "(op ..)"),
+            Op::RangeEq => write!(f, "(op ..=)"),
+            Op::Dot => write!(f, "(op .)"),
+            Op::LParen => write!(f, "(op ()"),
+            Op::LBrace => write!(f, "(op {{)"),
+            Op::Colon => write!(f, "(op :)"),
+            Op::In => write!(f, "(op in)"),
+            Op::DotView => write!(f, "(op .view)"),
+            Op::DotMut => write!(f, "(op .mut)"),
+            Op::DotMove => write!(f, "(op .move)"),
+            Op::DotTake => write!(f, "(op .take)"),
+            Op::QuestionQuestion => write!(f, "(op ??)"),
+            Op::DotQuestion => write!(f, "(op ?.)"),
+            Op::DotQuest => write!(f, "(op .?)"),
+        }
+    }
+}
+
+impl Op {
+    #[inline]
+    pub fn repr(&self) -> &str {
+        self.op()
+    }
+
+    pub fn op(&self) -> &str {
+        match self {
+            Op::Add => "+",
+            Op::Sub => "-",
+            Op::Mul => "*",
+            Op::Div => "/",
+            Op::Mod => "%",
+            Op::AddEq => "+=",
+            Op::SubEq => "-=",
+            Op::MulEq => "*=",
+            Op::DivEq => "/=",
+            Op::ModEq => "%=",
+            Op::Not => "!",
+            Op::Bang => "!", // Bang operator (postfix)
+            Op::And => "&&",
+            Op::Or => "||",
+            Op::LSquare => "[",
+            Op::LParen => "(",
+            Op::LBrace => "{",
+            Op::Asn => "=",
+            Op::Eq => "==",
+            Op::Neq => "!=",
+            Op::Lt => "<",
+            Op::Gt => ">",
+            Op::Le => "<=",
+            Op::Ge => ">=",
+            Op::Range => "..",
+            Op::RangeEq => "..=",
+            Op::Dot => ".",
+            Op::Colon => ":",
+            Op::In => "in",
+            Op::DotView => ".view",
+            Op::DotMut => ".mut",
+            Op::DotMove => ".move",
+            Op::DotTake => ".take",
+            Op::QuestionQuestion => "??",
+            Op::DotQuestion => "?.",
+            Op::DotQuest => ".?",
+        }
+    }
+}
+
+fn try_promote(a: Value, b: Value) -> (Value, Value) {
+    match (&a, &b) {
+        // int => float
+        (Value::Int(a), Value::Float(_)) => (Value::Float(*a as f64), b),
+        (Value::Float(_), Value::Int(b)) => (a, Value::Float(*b as f64)),
+        // int => double
+        (Value::Int(a), Value::Double(_)) => (Value::Double(*a as f64), b),
+        (Value::Double(_), Value::Int(b)) => (a, Value::Double(*b as f64)),
+        // float => double
+        (Value::Float(a), Value::Double(_)) => (Value::Double(*a as f64), b),
+        (Value::Double(_), Value::Float(b)) => (a, Value::Double(*b as f64)),
+        // byte => uint
+        (Value::Byte(a), Value::Uint(b)) => (Value::Uint(*a as u32), Value::Uint(*b)),
+        (Value::Uint(a), Value::Byte(b)) => (Value::Uint(*a), Value::Uint(*b as u32)),
+        _ => (a, b),
+    }
+}
+
+pub fn add(a: Value, b: Value) -> Value {
+    // TODO: make a thorough mechanism for promoting types
+    let (a, b) = try_promote(a, b);
+    match (a, b) {
+        (Value::Uint(left), Value::Uint(right)) => Value::Uint(left + right),
+        (Value::Int(left), Value::Int(right)) => Value::Int(left + right),
+        (Value::Byte(left), Value::Byte(right)) => Value::Byte(left + right),
+        (Value::Float(left), Value::Float(right)) => Value::Float(left + right),
+        (Value::Double(left), Value::Double(right)) => Value::Double(left + right),
+
+        (Value::I8(left), Value::I8(right)) => Value::I8(left + right),
+        (Value::I8(left), Value::Int(right)) => Value::Int((left as i32) + right),
+        (Value::Int(left), Value::I8(right)) => Value::Int(left + (right as i32)),
+
+        (Value::U8(left), Value::U8(right)) => Value::U8(left + right),
+        (Value::U8(left), Value::Uint(right)) => Value::Uint((left as u32) + right),
+        (Value::Uint(left), Value::U8(right)) => Value::Uint(left + (right as u32)),
+
+        // str
+        (Value::Str(left), Value::Str(right)) => Value::Str(format!("{}{}", left, right).into()),
+        // array
+        (Value::Array(left), Value::Array(right)) => Value::Array({
+            let mut res = left.clone();
+            res.extend(&right);
+            res
+        }),
+        // TODO: what if sum is bigger than u8?
+        _ => Value::Nil,
+    }
+}
+
+pub fn sub(a: Value, b: Value) -> Value {
+    let (a, b) = try_promote(a, b);
+    match (a, b) {
+        (Value::Int(left), Value::Int(right)) => Value::Int(left - right),
+        (Value::Float(left), Value::Float(right)) => Value::Float(left - right),
+        (Value::Double(left), Value::Double(right)) => Value::Double(left - right),
+        // TODO: what if diff is negative?
+        (Value::Byte(left), Value::Byte(right)) => Value::Byte(left - right),
+        _ => Value::Nil,
+    }
+}
+
+pub fn mul(a: Value, b: Value) -> Value {
+    let (a, b) = try_promote(a, b);
+    match (a, b) {
+        (Value::Int(left), Value::Int(right)) => Value::Int(left * right),
+        (Value::Float(left), Value::Float(right)) => Value::Float(left * right),
+        (Value::Double(left), Value::Double(right)) => Value::Double(left * right),
+        // TODO: what if product is bigger than u8?
+        (Value::Byte(left), Value::Byte(right)) => Value::Byte(left * right),
+        _ => Value::Nil,
+    }
+}
+
+pub fn div(a: Value, b: Value) -> Value {
+    let (a, b) = try_promote(a, b);
+    if b == Value::Int(0) {
+        // TODO: Value::Infinity?
+        return Value::Nil;
+    }
+    match (a, b) {
+        (Value::Int(left), Value::Int(right)) => Value::Int(left / right),
+        (Value::Float(left), Value::Float(right)) => Value::Float(left / right),
+        (Value::Double(left), Value::Double(right)) => Value::Double(left / right),
+        (Value::Byte(left), Value::Byte(right)) => Value::Byte(left / right),
+        _ => Value::Nil,
+    }
+}
+
+pub fn mod_(a: Value, b: Value) -> Value {
+    let (a, b) = try_promote(a, b);
+    if b == Value::Int(0) {
+        // TODO: Value::Infinity?
+        return Value::Nil;
+    }
+    match (a, b) {
+        (Value::Int(left), Value::Int(right)) => Value::Int(left % right),
+        (Value::Float(left), Value::Float(right)) => Value::Float(left % right),
+        (Value::Byte(left), Value::Byte(right)) => Value::Byte(left % right),
+        _ => Value::Nil,
+    }
+}
+
+pub fn comp(a: &Value, op: &Op, b: &Value) -> Value {
+    a.comp(op, b)
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Widget {
+    pub name: AutoStr,
+    pub model: Model,
+    pub view_id: MetaID,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Model {
+    pub values: Vec<(ValueKey, Value)>,
+}
+
+impl Default for Model {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Model {
+    pub fn new() -> Self {
+        Self { values: vec![] }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct View {
+    pub nodes: Vec<Node>,
+}
+
+impl Default for View {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl View {
+    pub fn new() -> Self {
+        Self { nodes: vec![] }
+    }
+}
+
+impl fmt::Display for Widget {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(f, "widget {} {{", self.name)?;
+        writeln!(f, "    {}", self.model)?;
+        writeln!(f, "    {}", self.view_id)?;
+        writeln!(f, "}}")
+    }
+}
+
+impl fmt::Display for Model {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "model {{")?;
+        for (i, (key, value)) in self.values.iter().enumerate() {
+            write!(f, " {} = {}", key, value)?;
+            if i < self.values.len() - 1 {
+                write!(f, ", ")?;
+            }
+        }
+        write!(f, " }}")
+    }
+}
+
+impl fmt::Display for View {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "view {{")?;
+        for node in &self.nodes {
+            write!(f, " {}", node)?;
+        }
+        write!(f, " }}")
+    }
+}
+
+impl Model {
+    pub fn find(&self, key: &str) -> Option<Value> {
+        self.values
+            .iter()
+            .find(|(k, _)| k.to_string() == key)
+            .map(|(_, v)| v.clone())
+    }
+}
+
+impl View {
+    pub fn find(&self, key: &str) -> Option<Value> {
+        self.nodes
+            .iter()
+            .find(|n| n.name == key)
+            .map(|n| Value::node(n.clone()))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Method {
+    pub name: AutoStr,
+    pub target: Box<Value>,
+}
+
+impl fmt::Display for Method {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}.{}", self.target, self.name)
+    }
+}
+
+impl Method {
+    pub fn new(target: Value, name: AutoStr) -> Self {
+        Self {
+            target: Box::new(target),
+            name,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct Grid {
+    pub head: Vec<(ValueKey, Value)>,
+    pub data: Vec<Vec<Value>>,
+}
+
+impl Grid {
+    pub fn to_array_of_objects(&self) -> Value {
+        let colids = self
+            .head
+            .iter()
+            .map(|(_, col)| col.as_obj().get_str_of("id"))
+            .collect::<Vec<_>>();
+        let mut result = Vec::new();
+        for row in self.data.iter() {
+            let mut obj = Obj::new();
+            for (j, cell) in row.iter().enumerate() {
+                obj.set(colids[j].clone(), cell.clone());
+            }
+            result.push(Value::obj(obj));
+        }
+        Value::array(result)
+    }
+}
+
+impl fmt::Display for Grid {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "grid")?;
+        write!(f, "(")?;
+        for (key, value) in &self.head {
+            write!(f, "{}:{}", key, value)?;
+            write!(f, ",")?;
+        }
+        write!(f, ")")?;
+        write!(f, " {{")?;
+        for (i, row) in self.data.iter().enumerate() {
+            write!(f, "[")?;
+            for (j, cell) in row.iter().enumerate() {
+                write!(f, "{}", cell)?;
+                if j < row.len() - 1 {
+                    write!(f, ", ")?;
+                }
+            }
+            write!(f, "]")?;
+            if i < self.data.len() - 1 {
+                write!(f, ";")?;
+            }
+        }
+        write!(f, "}}")
+    }
+}
+
+pub fn pretty(text: &str, max_indent: usize) -> AutoStr {
+    let mut result = String::new();
+    let mut indent = 0;
+    let mut level = 0;
+    let mut in_str = false;
+    let tab = "    ";
+    let mut last_c = ' ';
+
+    for c in text.chars() {
+        match c {
+            ' ' if !in_str => {
+                if last_c.is_alphanumeric() || last_c == ')' || level > max_indent {
+                    result.push(c);
+                }
+            }
+            ':' if !in_str => {
+                result.push(c);
+                result.push(' ');
+            }
+            '{' | '[' if !in_str => {
+                if indent < max_indent {
+                    result.push(c);
+                    result.push('\n');
+                    indent += 1;
+                    result.push_str(&tab.repeat(indent));
+                } else {
+                    result.push(c);
+                }
+                level += 1;
+            }
+            '}' | ']' if !in_str => {
+                if indent == max_indent {
+                    if level <= max_indent {
+                        result.push('\n');
+                        indent -= 1;
+                        result.push_str(&tab.repeat(indent));
+                    }
+                } else if indent < max_indent && indent > 0 {
+                    result.push('\n');
+                    indent -= 1;
+                    result.push_str(&tab.repeat(indent));
+                }
+                result.push(c);
+                level -= 1;
+            }
+            ',' if !in_str => {
+                if indent == max_indent {
+                    if level <= max_indent {
+                        result.push(c);
+                        result.push('\n');
+                        result.push_str(&tab.repeat(indent));
+                    } else {
+                        result.push(c);
+                    }
+                } else if indent < max_indent {
+                    result.push(c);
+                    result.push('\n');
+                    result.push_str(&tab.repeat(indent));
+                } else {
+                    result.push(c);
+                }
+            }
+            ';' if !in_str => {
+                result.push('\n');
+                result.push_str(&tab.repeat(indent));
+            }
+            '"' => {
+                in_str = !in_str;
+                result.push(c);
+            }
+            _ => result.push(c),
+        }
+        last_c = c;
+    }
+    result.into()
+}
+
+impl From<AutoStr> for Value {
+    fn from(astr: AutoStr) -> Value {
+        Value::Str(astr)
+    }
+}
+
+impl From<Obj> for Value {
+    fn from(obj: Obj) -> Value {
+        Value::obj(obj)
+    }
+}
+
+impl From<Node> for Value {
+    fn from(node: Node) -> Value {
+        Value::node(node)
+    }
+}
+
+impl From<String> for Value {
+    fn from(s: String) -> Value {
+        Value::Str(s.into())
+    }
+}
+
+impl From<bool> for Value {
+    fn from(b: bool) -> Value {
+        Value::Bool(b)
+    }
+}
+
+impl From<u8> for Value {
+    fn from(u: u8) -> Value {
+        Value::Uint(u as u32)
+    }
+}
+
+impl From<i32> for Value {
+    fn from(i: i32) -> Value {
+        Value::Int(i)
+    }
+}
+
+impl From<u32> for Value {
+    fn from(u: u32) -> Value {
+        Value::Uint(u)
+    }
+}
+
+impl From<f64> for Value {
+    fn from(f: f64) -> Value {
+        Value::Float(f)
+    }
+}
+
+impl From<i64> for Value {
+    fn from(i: i64) -> Value {
+        Value::Int(i as i32)
+    }
+}
+
+impl From<u64> for Value {
+    fn from(u: u64) -> Value {
+        Value::Uint(u as u32)
+    }
+}
+
+impl From<f32> for Value {
+    fn from(f: f32) -> Value {
+        Value::Float(f as f64)
+    }
+}
+
+// impl From<Vec<Value>> for Value {
+//     fn from(v: Vec<Value>) -> Value {
+//         Value::Array(v)
+//     }
+// }
+
+impl<T> From<Vec<T>> for Value
+where
+    T: Into<Value>,
+{
+    fn from(v: Vec<T>) -> Value {
+        let array = Array {
+            values: v.into_iter().map(|v| v.into()).collect(),
+        };
+        Value::Array(array)
+    }
+}
+
+impl From<&str> for Value {
+    fn from(s: &str) -> Value {
+        Value::Str(s.into())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Pair {
+    pub key: ValueKey,
+    pub value: Value,
+}
+
+impl Pair {
+    pub fn new(key: ValueKey, value: Value) -> Self {
+        Self { key, value }
+    }
+}
+
+impl fmt::Display for Pair {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}: {}", self.key, self.value)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_simple_vals() {
+        let a = Value::Int(1);
+        println!("{}", a);
+
+        let b = Value::Float(1.0);
+        println!("{}", b);
+
+        let c = add(a, b);
+        assert_eq!(c, Value::Float(2.0));
+    }
+
+    // #[test]
+    // fn test_widget() {
+    //     let model = Model { values: vec![(ValueKey::Str("a".to_string()), Value::Int(1))], };
+    //     let node = Node { name: "button".to_string(), args: vec![Value::Str("Hello".to_string())], props: BTreeMap::new() };
+    //     let view = View { nodes: vec![node] };
+    //     let widget = Widget { name: "counter".to_string(), model, view };
+    //     println!("{}", widget);
+    // }
+
+    #[test]
+    fn test_modify_obj() {
+        let mut obj = Obj::new();
+        let mut s1 = Obj::new();
+        s1.set("timeout", 1000);
+        let mut s2 = Obj::new();
+        s2.set("timeout", 2000);
+        let mut s3 = Obj::new();
+        s3.set("timeout", 3000);
+        obj.set("a", Value::from(vec![s1, s2, s3]));
+        if let Some(Value::Array(a)) = obj.get_mut("a") {
+            for s in a.iter_mut() {
+                if let Value::Obj(o) = s {
+                    if let Some(Value::Int(timeout)) = o.get_mut("timeout") {
+                        *timeout += 1000;
+                    }
+                }
+            }
+        }
+        assert_eq!(
+            obj.get_array_of("a")[2].as_obj().get_uint_of("timeout"),
+            4000
+        );
+    }
+
+    #[test]
+    fn test_pretty() {
+        let text = r#"{"a":[[1, 2, 3], [4, 5, 6]], "b":[[7, 8, 9], [10, 11, 12]], "c":[[13, 14, 15], [16, 17, 18]]}"#;
+        let pretty = pretty(text, 2);
+        println!("{}", pretty);
+    }
+
+    #[test]
+    fn test_pretty_with_space() {
+        let code = r#"dep log { x: 1, y: 2, z: 3 }"#;
+        let pretty = pretty(code, 2);
+        println!("{}", pretty);
+    }
+}

@@ -1,0 +1,39 @@
+{
+  "plan": "PLAN-834",
+  "base_commit": "540c1e70f0a4682af245191ffb36fa0d8a636665",
+  "branch": "plan-834-dev",
+  "sdk_commit": "9576b4dad5ceb8b201adedd46f9689f25c2dd5f9",
+  "source_verification": "680 files; 17 local packages; 29 path edges; 479 metadata packages; forbidden=0",
+  "inputs": {
+    "experimental\\autographics-auto-driver\\Cargo.lock": "f01c231218b2f1534f971df128b9d188fa19648e5a4399dbe81ce37e5386063d",
+    "experimental\\autographics-prototype\\Cargo.lock": "c3df168e7234b8bfa876dfbab8afa71af8773d1d7241ac010ad5d8054930b3bf",
+    "experimental\\autographics-auto-driver\\research\\source-lock.json": "6bb461ecad67a4a88a70d84e8365a1c69201c629d488c9e9f709d0ac95fd8f0c"
+  },
+  "sdk_inputs": {
+    "sdk-Cargo.lock.txt": "5192d08d502a8f17e277ad8912f5884175659bef642b614e25b394243d1ff091",
+    "sdk-Cargo.toml.txt": "3ee98ad8a1276a4886eca330b980ed2b21c3176c545bad0ac04b07bb7112c2c3",
+    "source-lock.json": "6bb461ecad67a4a88a70d84e8365a1c69201c629d488c9e9f709d0ac95fd8f0c",
+    "baseline.json.txt": "32692be28b6349b7794f8db0142a5a050b0d230058cfe15d6bbc80b18902c25d"
+  },
+  "assets": {
+    "assets\\squash_the_creeps\\art\\House In a Forest Loop.ogg": "32680f2b2631eb9f6e2902ebbbec1b43ab82b4dbf154fdc9bfbfa17b03270504",
+    "assets\\squash_the_creeps\\art\\mob.glb": "8a82adb5bfba8c22f9c1a0d692e4d25c2f9055cb7e6f6acd6f61ac169079818c",
+    "assets\\squash_the_creeps\\art\\player.glb": "05d8588e8032a674e309ccb4d04578fb578b8da1629096b1036f628593801942",
+    "assets\\squash_the_creeps\\fonts\\LICENSE.txt": "7a05af5e0552b46fbca086d777a251897082e77b840ab59199916a83cbab24f7",
+    "assets\\squash_the_creeps\\fonts\\Montserrat-Medium.ttf": "92b3d3c6e135eb1dc95f88e6ca75bd6113d9eb3261a95ca39f733e3897e53675"
+  },
+  "canonical_input_text_equal": true,
+  "canonical_input_hashes": {
+    "auto-source-driver.md": "820a631e5c7c089a473246dacd6b8c3606313be6e6414c8176b2eee2cd45c14e",
+    "integration-contract.md": "123b9022e1b12cf5d58987ae9eea9e14d9e4658e23b8e581f46dafb1f6280f3b",
+    "prototype-profile.md": "4526cd91004cff3106638f3172703642f848af820cd55aa2aaaaa7a056d9e260",
+    "project.md": "51c4a3be1ede7e789416291dd9ec363c8622e0851204ae4e9ec76f5188d0f838"
+  },
+  "build_profile": {
+    "windows_pe_stack_bytes": 33554432,
+    "test_worker_stack_bytes": 16777216,
+    "root_config_sha256": "49183f4ea9cb6d7e2477447c0182ed528ea79e132db0fc8e67f6da772d657d65",
+    "rustc": "rustc 1.98.0 (88d9e12ae 2026-08-18)\nbinary: rustc\ncommit-hash: 88d9e12ae178fab0fb5cc050a94da85685d449ea\ncommit-date: 2026-08-18\nhost: x86_64-pc-windows-msvc\nrelease: 1.98.0\nLLVM version: 22.1.8",
+    "cargo": "cargo 1.98.0 (797e8a9bc 2026-08-05)"
+  }
+}

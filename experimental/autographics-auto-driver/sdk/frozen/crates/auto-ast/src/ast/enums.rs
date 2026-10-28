@@ -1,0 +1,225 @@
+use std::{fmt, io as stdio};
+
+use super::{Fn, Type};
+use crate::ast::{AtomWriter, GenericParam, ToAtomStr};
+use auto_val::AutoStr;
+
+/// A field definition inside an enum variant (Plan 201 Phase 1).
+/// Example: `status uint` in `Api { status uint, message str }`
+#[derive(Debug, Clone)]
+pub struct EnumField {
+    pub name: AutoStr,
+    pub field_type: Type,
+}
+
+/// The kind of enum, determining its semantics.
+///
+/// - **Scalar**: C-style enumerations with optional integer values and optional repr type.
+///   Examples: `enum Color { Red, Green }`, `enum HttpCode u16 { OK = 200 }`
+///
+/// - **Homogeneous**: All variants share a single payload type.
+///   Example: `enum Vertex Point { LeftTop, RightTop }`
+///
+/// - **Heterogeneous**: Each variant may have a different payload type (algebraic data type).
+///   Example: `enum Msg { Quit, Move Point, Write string }`
+#[derive(Debug, Clone)]
+pub enum EnumKind {
+    /// C-style scalar enumeration with optional explicit representation type.
+    /// `enum Color { Red, Green }` or `enum HttpCode u16 { OK = 200 }`
+    Scalar {
+        /// Optional explicit representation type (e.g., `u16` in `enum HttpCode u16`).
+        repr_type: Option<Type>,
+    },
+
+    /// All variants share the same payload type.
+    /// `enum Vertex Point { LeftTop, RightTop }` — every variant is a `Point`.
+    Homogeneous {
+        /// The shared payload type for all variants.
+        payload_type: Type,
+    },
+
+    /// Each variant may carry a different payload type (sum type / ADT).
+    /// `enum Msg { Quit, Move Point, Write string }`
+    Heterogeneous {
+        /// Generic parameters for the enum (e.g., `T` in `enum Option<T>`).
+        generic_params: Vec<GenericParam>,
+        /// Methods defined on the enum.
+        methods: Vec<Fn>,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub struct EnumDecl {
+    pub name: AutoStr,
+    pub items: Vec<EnumItem>,
+    pub kind: EnumKind,
+    pub doc: Option<AutoStr>,
+    pub is_pub: bool,
+    /// Plan 376: User-supplied attributes (`#[derive(...)]`, `#[serde(...)]`, etc.)
+    /// captured before `enum`/`tag`. When non-empty, the Rust transpiler emits
+    /// these verbatim instead of the auto-generated `#[derive(Clone, Debug, PartialEq)]`.
+    /// Needed because foreign payload types (e.g. `ClientError`) may not impl
+    /// Clone/PartialEq, which the default derive requires.
+    pub attrs: Vec<AutoStr>,
+}
+
+#[derive(Debug, Clone)]
+pub struct EnumItem {
+    pub name: AutoStr,
+    /// Scalar form: optional explicit integer value (e.g., `OK = 200`).
+    pub scalar_value: Option<i32>,
+    /// Plan 306 Phase 5b: true ONLY when the user wrote an explicit `= N` in source.
+    /// Distinguishes from the parser's auto-increment gap-fill (which also sets
+    /// `scalar_value`). GDScript emits `= N` only when this is true, so value-less
+    /// enums like `enum Dir { Up, Down, Left, Right }` stay clean.
+    pub value_explicit: bool,
+    /// Heterogeneous form: the payload type for this variant (e.g., `Point` in `Move Point`).
+    pub payload_type: Option<Type>,
+    /// Multi-argument tuple variant: `ToolUse str str str` → ToolUse(String, String, String).
+    /// When non-empty, `payload_type` should be None.
+    pub payload_types: Vec<Type>,
+    /// Plan 201 Phase 1: Multi-field struct-like variant.
+    /// Example: `Api { status uint, message str }` has fields [EnumField("status", uint), EnumField("message", str)]
+    /// When non-empty, `payload_type` and `payload_types` should be empty.
+    pub fields: Vec<EnumField>,
+    /// Plan 382: variant-level attributes (`#[from]`, `#[error("...")]`, ...).
+    /// Example: `#[from] Client(ClientError)` → attrs = ["from"].
+    /// The Rust transpiler uses `from` to emit `impl From<Payload> for Enum`.
+    pub attrs: Vec<AutoStr>,
+}
+
+impl EnumItem {
+    /// Backward-compatible helper: returns the scalar value or 0 if not set.
+    pub fn value(&self) -> i32 {
+        self.scalar_value.unwrap_or(0)
+    }
+
+    /// Returns true if this variant has struct-like fields.
+    pub fn has_fields(&self) -> bool {
+        !self.fields.is_empty()
+    }
+
+    /// Returns true if this variant has multi-argument tuple payload.
+    pub fn has_tuple_payload(&self) -> bool {
+        !self.payload_types.is_empty()
+    }
+
+    /// Returns the number of data fields (either struct fields or single payload).
+    pub fn field_count(&self) -> usize {
+        if self.has_fields() {
+            self.fields.len()
+        } else if self.has_tuple_payload() {
+            self.payload_types.len()
+        } else if self.payload_type.is_some() {
+            1
+        } else {
+            0
+        }
+    }
+}
+
+impl fmt::Display for EnumItem {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "(item (name {}) (value {}))", self.name, self.value())
+    }
+}
+
+impl fmt::Display for EnumDecl {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "(enum (name {}) ", self.name)?;
+        for (i, item) in self.items.iter().enumerate() {
+            if i > 0 {
+                write!(f, " ")?;
+            }
+            write!(f, "{}", item)?;
+        }
+        write!(f, ")")
+    }
+}
+
+impl EnumDecl {
+    pub fn new(name: AutoStr, items: Vec<EnumItem>) -> Self {
+        Self {
+            name,
+            items,
+            kind: EnumKind::Scalar { repr_type: None },
+            doc: None,
+            is_pub: false,
+            attrs: Vec::new(),
+        }
+    }
+
+    pub fn unique_name(&self) -> AutoStr {
+        format!("{}", self.name).into()
+    }
+
+    pub fn get_item(&self, name: &str) -> Option<&EnumItem> {
+        self.items.iter().find(|item| item.name == name)
+    }
+
+    pub fn default_value(&self) -> i32 {
+        self.items.first().map_or(0, |item| item.value())
+    }
+}
+
+// ToAtom and ToNode implementations
+
+use crate::ast::{ToAtom, ToNode};
+use auto_val::{Node as AutoNode, Value};
+
+impl ToNode for EnumDecl {
+    fn to_node(&self) -> AutoNode {
+        let mut node = AutoNode::new("enum");
+        node.set_prop("name", Value::str(self.name.as_str()));
+
+        for item in &self.items {
+            node.add_kid(item.to_node());
+        }
+
+        node
+    }
+}
+
+impl AtomWriter for EnumDecl {
+    fn write_atom(&self, f: &mut impl stdio::Write) -> auto_val::AutoResult<()> {
+        write!(f, "enum(name(\"{}\")) {{", self.name)?;
+        for item in &self.items {
+            write!(f, " {}", item.to_atom_str())?;
+        }
+        write!(f, " }}")?;
+        Ok(())
+    }
+}
+
+impl ToAtom for EnumDecl {
+    fn to_atom(&self) -> AutoStr {
+        self.to_atom_str()
+    }
+}
+
+impl AtomWriter for EnumItem {
+    fn write_atom(&self, f: &mut impl stdio::Write) -> auto_val::AutoResult<()> {
+        write!(
+            f,
+            "item(name(\"{}\"), value(int({})))",
+            self.name,
+            self.value()
+        )?;
+        Ok(())
+    }
+}
+
+impl ToNode for EnumItem {
+    fn to_node(&self) -> AutoNode {
+        let mut node = AutoNode::new("item");
+        node.set_prop("name", Value::str(self.name.as_str()));
+        node.set_prop("value", Value::Int(self.value()));
+        node
+    }
+}
+
+impl ToAtom for EnumItem {
+    fn to_atom(&self) -> AutoStr {
+        self.to_atom_str()
+    }
+}

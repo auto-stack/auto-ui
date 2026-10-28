@@ -1,0 +1,36 @@
+// PLAN-860 G2 route, candidate A (public behavior/5 composition only).
+// Frozen inputs per probe-contract r3: right steps 1..383, jump edges {78,127,180,237},
+// clearance 0.002, dt from tick. grounded = status{1,2} & contacts>=1 & dy<0 & unapplied_y<0.
+//grounded-rule
+var vy=0.0
+var grounded=0
+var jprev=0
+var stepn=0
+fn app_start() {ag_set_local(0,0,2.0);ag_set_local(0,1,1.0)}
+fn app_update(dt float) {
+ stepn=stepn+1
+ let s=stepn
+ var jp=0
+ if s==78 {jp=1}
+ if s==127 {jp=1}
+ if s==180 {jp=1}
+ if s==237 {jp=1}
+ if jp==1 {if jprev==0 {if grounded==1 {vy=8.0}}}
+ jprev=jp
+ vy=vy-20.0*dt
+ var vx=0.0
+ if s<=383 {vx=4.0}
+ let dx=vx*dt
+ let dy=vy*dt
+ let q=ag_move_and_slide(0,0,dx,dy,0.0,0.002)
+ let st=ag_motion_status(q)
+ let cc=ag_motion_contacts(q)
+ let uy=ag_motion_unapplied(q,1)
+ grounded=0
+ if st==1 {grounded=1}
+ if st==2 {grounded=1}
+ if cc<1 {grounded=0}
+ if dy>=0.0 {grounded=0}
+ if uy>=0.0 {grounded=0}
+ if grounded==1 {vy=0.0}
+}

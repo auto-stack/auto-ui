@@ -1,0 +1,202 @@
+[
+  {
+    "case": "maze2d-short",
+    "command": [
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+      "--motion-check",
+      "--spatial-space",
+      "2",
+      "--open",
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\motion-native-numeric\\maze2d-short\\moved\\scene.agscene",
+      "--report",
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\motion-native-numeric\\maze2d-short\\report.json",
+      "--behavior",
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\motion-native-numeric\\maze2d-short\\changed.at",
+      "--behavior-api",
+      "v5",
+      "--spatial-narrow",
+      "--motion-update"
+    ],
+    "exit": 0,
+    "binary_sha256": "13a6d0cb5da88d73fb7d77148337ff5a62201a810b302a9c4d1d1110e25dd375",
+    "user_sha256": "c47420066cd25a62d9efb0a8fc05dca03758b88376b76f332b794341815d92fe",
+    "report": "report.json",
+    "phase": 14
+  },
+  {
+    "case": "corridor3d-short",
+    "command": [
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+      "--motion-check",
+      "--spatial-space",
+      "3",
+      "--open",
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\motion-native-numeric\\corridor3d-short\\moved\\scene.agscene",
+      "--report",
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\motion-native-numeric\\corridor3d-short\\report.json",
+      "--behavior",
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\motion-native-numeric\\corridor3d-short\\changed.at",
+      "--behavior-api",
+      "v5",
+      "--spatial-narrow",
+      "--motion-update"
+    ],
+    "exit": 0,
+    "binary_sha256": "13a6d0cb5da88d73fb7d77148337ff5a62201a810b302a9c4d1d1110e25dd375",
+    "user_sha256": "ca6ef520e903a421f762a8fd46dddc6f73e95f5f8c96d48a0bd490922a805e7c",
+    "report": "report.json",
+    "phase": 14
+  },
+  {
+    "case": "partial",
+    "command": [
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+      "--motion-check",
+      "--spatial-space",
+      "3",
+      "--open",
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\motion-native-numeric\\partial\\moved\\scene.agscene",
+      "--report",
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\motion-native-numeric\\partial\\report.json",
+      "--frames",
+      "1"
+    ],
+    "exit": 1,
+    "binary_sha256": "13a6d0cb5da88d73fb7d77148337ff5a62201a810b302a9c4d1d1110e25dd375",
+    "user_sha256": "7c22cb93d61bca7e9cde7b8dec79db370d9a936ed294b1f3418e319ee47f34e1",
+    "report": "report.json",
+    "phase": 0
+  },
+  {
+    "case": "transparent",
+    "command": [
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+      "--motion-check",
+      "--spatial-space",
+      "3",
+      "--open",
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\motion-native-numeric\\transparent\\moved\\scene.agscene",
+      "--report",
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\motion-native-numeric\\transparent\\report.json",
+      "--play-gpu-fault",
+      "transparent"
+    ],
+    "exit": 1,
+    "binary_sha256": "13a6d0cb5da88d73fb7d77148337ff5a62201a810b302a9c4d1d1110e25dd375",
+    "user_sha256": "7c22cb93d61bca7e9cde7b8dec79db370d9a936ed294b1f3418e319ee47f34e1",
+    "report": "report.json",
+    "phase": 5
+  },
+  {
+    "case": "missing-part",
+    "command": [
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+      "--motion-check",
+      "--spatial-space",
+      "3",
+      "--open",
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\motion-native-numeric\\missing-part\\moved\\scene.agscene",
+      "--report",
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\motion-native-numeric\\missing-part\\report.json",
+      "--play-gpu-fault",
+      "missing-part"
+    ],
+    "exit": 1,
+    "binary_sha256": "13a6d0cb5da88d73fb7d77148337ff5a62201a810b302a9c4d1d1110e25dd375",
+    "user_sha256": "7c22cb93d61bca7e9cde7b8dec79db370d9a936ed294b1f3418e319ee47f34e1",
+    "report": "report.json",
+    "phase": 5
+  },
+  {
+    "case": "wrong-asset",
+    "command": [
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+      "--motion-check",
+      "--spatial-space",
+      "3",
+      "--open",
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\motion-native-numeric\\wrong-asset\\moved\\scene.agscene",
+      "--report",
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\motion-native-numeric\\wrong-asset\\report.json",
+      "--play-gpu-fault",
+      "wrong-asset"
+    ],
+    "exit": 1,
+    "binary_sha256": "13a6d0cb5da88d73fb7d77148337ff5a62201a810b302a9c4d1d1110e25dd375",
+    "user_sha256": "7c22cb93d61bca7e9cde7b8dec79db370d9a936ed294b1f3418e319ee47f34e1",
+    "report": "report.json",
+    "phase": 5
+  },
+  {
+    "case": "missing-code",
+    "command": [
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+      "--motion-check",
+      "--spatial-space",
+      "3",
+      "--open",
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\motion-native-numeric\\missing-code\\moved\\scene.agscene",
+      "--report",
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\motion-native-numeric\\missing-code\\report.json"
+    ],
+    "exit": 1,
+    "binary_sha256": "13a6d0cb5da88d73fb7d77148337ff5a62201a810b302a9c4d1d1110e25dd375",
+    "user_sha256": "7c22cb93d61bca7e9cde7b8dec79db370d9a936ed294b1f3418e319ee47f34e1",
+    "report": "report.json",
+    "phase": 0
+  },
+  {
+    "case": "bad-code",
+    "command": [
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+      "--motion-check",
+      "--spatial-space",
+      "3",
+      "--open",
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\motion-native-numeric\\bad-code\\moved\\scene.agscene",
+      "--report",
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\motion-native-numeric\\bad-code\\report.json"
+    ],
+    "exit": 1,
+    "binary_sha256": "13a6d0cb5da88d73fb7d77148337ff5a62201a810b302a9c4d1d1110e25dd375",
+    "user_sha256": "7c22cb93d61bca7e9cde7b8dec79db370d9a936ed294b1f3418e319ee47f34e1",
+    "report": "report.json",
+    "phase": 0
+  },
+  {
+    "case": "bad-api",
+    "command": [
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+      "--motion-check",
+      "--spatial-space",
+      "3",
+      "--open",
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\motion-native-numeric\\bad-api\\moved\\scene.agscene",
+      "--report",
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\motion-native-numeric\\bad-api\\report.json"
+    ],
+    "exit": 1,
+    "binary_sha256": "13a6d0cb5da88d73fb7d77148337ff5a62201a810b302a9c4d1d1110e25dd375",
+    "user_sha256": "7c22cb93d61bca7e9cde7b8dec79db370d9a936ed294b1f3418e319ee47f34e1",
+    "report": "report.json",
+    "phase": 0
+  },
+  {
+    "case": "missing-glb",
+    "command": [
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+      "--motion-check",
+      "--spatial-space",
+      "3",
+      "--open",
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\motion-native-numeric\\missing-glb\\moved\\scene.agscene",
+      "--report",
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\motion-native-numeric\\missing-glb\\report.json"
+    ],
+    "exit": 1,
+    "binary_sha256": "13a6d0cb5da88d73fb7d77148337ff5a62201a810b302a9c4d1d1110e25dd375",
+    "user_sha256": "7c22cb93d61bca7e9cde7b8dec79db370d9a936ed294b1f3418e319ee47f34e1",
+    "report": "report.json",
+    "phase": 0
+  }
+]

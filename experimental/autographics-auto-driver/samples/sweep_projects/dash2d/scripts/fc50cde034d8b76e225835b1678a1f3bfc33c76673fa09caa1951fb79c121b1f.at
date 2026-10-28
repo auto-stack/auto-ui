@@ -1,0 +1,23 @@
+var actor=-1
+var marker=-1
+var door=-1
+var point_marker=-1
+var speed=100.0
+var clearance=0.02
+fn app_start(){actor=ag_actor(2); marker=ag_node_at(2); door=ag_node_at(3); point_marker=ag_node_at(4)}
+fn app_update(dt float){
+ var dx=0.0
+ if ag_input_space()==2 {dx=ag_input_x()*speed}
+  let q=ag_sweep_aabb(actor,1,dx,0.0,0.0)
+ let hit=ag_sweep_hit(q); let node=ag_sweep_node(q); let t=ag_sweep_t(q)
+ let px=ag_sweep_origin(q,0); let nx=ag_sweep_normal(q,0); let overlap=ag_sweep_start_overlap(q)
+ var move=dx
+ if hit==1 {move=0.0; if overlap==0 {var distance=dx; if distance<0.0 {distance=0.0 - distance};distance=distance*t - clearance; if distance>0.0 {move=distance; if dx<0.0 {move=0.0 - distance}}}}
+ ag_set_local(actor,0,ag_local(actor,0)+move)
+ var snapshot_ok=1; if ag_sweep_origin(q,0)!=px {snapshot_ok=0}
+ if dx!=0.0 {
+ ag_set_local(marker,0,-100.0+node*5.0); ag_set_local(marker,1,50.0+t*10.0)
+ ag_set_local(point_marker,0,-150.0+px); ag_set_local(point_marker,1,100.0+nx*5.0)
+ ag_set_visible(marker,snapshot_ok); ag_set_visible(door,hit)
+ }
+}

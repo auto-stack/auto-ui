@@ -1,0 +1,51 @@
+# AGP — AutoGraphics Prototype (PLAN-829).
+# Independent workspace: intentionally NOT a member of the repository root
+# workspace (root members are an explicit list; see root Cargo.toml). This
+# file's empty [workspace] table stops cargo from inheriting the root
+# workspace, so the root lock/build is untouched and AGP owns its Cargo.lock.
+[workspace]
+
+[package]
+name = "agp"
+version = "0.1.0"
+edition = "2021"
+description = "wgpu-based 2D/3D game prototype workspace (frozen-sample oracles: Bevy Breakout, Godot Squash the Creeps)"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+# --- GPU/window foundation -------------------------------------------------
+# Version alignment contract (PLAN-829 T-02): the wgpu instance MUST be the
+# same 27.x version the production iced_wgpu 0.14.0 stack locks in the root
+# Cargo.lock (wgpu 27.0.1 / wgpu-hal 27.0.4), so the T-08 Iced seam can share
+# one Device/Queue. 27.0.1 is the newest 27.x; re-verify on entry (see
+# research/support-profile.md).
+wgpu = "27.0.1"
+winit = "0.30.13"
+
+# --- Bounded selections (decisions recorded in research/support-profile.md) ---
+glam = "0.34"      # math: f32-first, matches the samples' Transform idioms
+image = { version = "0.25", default-features = false, features = ["png"] } # keyframe capture
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"   # probe reports
+sha2 = "0.10"      # real keyframe hashing for probe reports
+fontdue = "0.9"    # text: HUD glyph rasterization (glyphon has no wgpu-27 line)
+# T-08 Iced seam: iced 0.14 aligns with the production stack (see
+# research/support-profile.md §1); iced_wgpu pulls the SAME wgpu 27.0.1
+# instance. Stock crates.io iced_widget 0.14.2 is used UNPATCHED (review
+# r1 F09): the production PLAN-043 container-layout race fix is NOT
+# necessary for this minimal static spike — verified 2026-10-21 (layout,
+# views, resize, DPI, canonical case green; see
+# research/integration-handoff.md). Production retains the patch.
+iced = { version = "0.14.0", features = ["tokio", "advanced", "unconditional-rendering"] }
+iced_wgpu = "0.14.0"
+iced_widget = "0.14.2"
+# PLAN-830 T-02: the offscreen-UI seam uses the PUBLIC runtime API
+# (`UserInterface::{build,update,draw}`) directly; same 0.14 version line,
+# stock crates.io, no patches.
+iced_runtime = "0.14.0"
+kira = { version = "0.9", features = ["ogg"] } # audio: one-shot SFX + looping music (symphonia/ogg)
+gltf = "1.4"       # model loading: frozen GLBs (T-05); standard GLB parser
+
+[profile.release]
+# Probe binaries are latency-sensitive but tiny; keep defaults otherwise.
+debug = "line-tables-only"

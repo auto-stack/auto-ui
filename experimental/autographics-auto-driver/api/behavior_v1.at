@@ -1,0 +1,51 @@
+// autographics.behavior/1 -- experimental trusted single-file behavior API.
+// Managed globals and transport are private, ag_* functions below are public.
+var _ag_error=0
+var _ag_node=-1
+var _ag_argument=0
+var _ag_dirty=1
+fn _ag_fail(code int, node int, arg int) { if _ag_error==0 { _ag_error=code; _ag_node=node; _ag_argument=arg } }
+fn ag_valid(node int) int { if node>=0 { if node<identities.len() {return 1} }; return 0 }
+fn _ag_check(node int) int { if ag_valid(node)==1 {return 1}; _ag_fail(1,node,0); return 0 }
+fn _ag_axis(node int, axis int) int {
+    if _ag_check(node)==0 {return 0}
+    if axis<0 { _ag_fail(2,node,axis); return 0 }
+    if axis>2 { _ag_fail(2,node,axis); return 0 }
+    return 1
+}
+fn ag_node_count() int {return identities.len()}
+fn ag_node_at(index int) int {if _ag_check(index)==1 {return index}; return -1}
+fn ag_actor(space int) int {if space==2 {return actor2}; if space==3 {return actor3}; _ag_fail(3,-1,space); return -1}
+fn ag_space(node int) int {if _ag_check(node)==1 {return dimensions[node]}; return 0}
+fn ag_is_group(node int) int {if _ag_check(node)==1 {if kinds[node]==5 {return 1}}; return 0}
+fn ag_parent(node int) int {if _ag_check(node)==1 {return parents[node]}; return -1}
+fn ag_local(node int, axis int) float {if _ag_axis(node,axis)==1 {return fields[node*12+axis]}; return 0.0}
+fn ag_world(node int, axis int) float {if _ag_axis(node,axis)==1 {if _ag_dirty==1 {derive(); _ag_dirty=0}; return worlds[node*3+axis]}; return 0.0}
+fn ag_local_visible(node int) int {if _ag_check(node)==1 {return flags[node]}; return 0}
+fn ag_visible(node int) int {if _ag_check(node)==1 {if _ag_dirty==1 {derive(); _ag_dirty=0}; return effective[node]}; return 0}
+fn ag_set_local(node int, axis int, value float) {
+    if _ag_axis(node,axis)==1 {
+        if dimensions[node]==2 {if axis==2 {if value!=0.0 {_ag_fail(4,node,axis); return}}}
+        fields[node*12+axis]=value; _ag_dirty=1
+    }
+}
+fn ag_move_local(node int, dx float, dy float, dz float) {
+    if _ag_check(node)==1 {
+        if dimensions[node]==2 {if dz!=0.0 {_ag_fail(4,node,2); return}}
+        fields[node*12]=fields[node*12]+dx
+        fields[node*12+1]=fields[node*12+1]+dy
+        fields[node*12+2]=fields[node*12+2]+dz
+        _ag_dirty=1
+    }
+}
+fn ag_set_visible(node int, flag int) {
+    if _ag_check(node)==1 {
+        if flag!=0 {if flag!=1 {_ag_fail(5,node,flag); return}}
+        flags[node]=flag; _ag_dirty=1
+    }
+}
+fn ag_input_space() int {return input_space}
+fn ag_input_x() int {return input_x}
+fn ag_input_y() int {return input_y}
+fn ag_toggle() int {return toggled}
+fn ag_tick() int {return sequence}

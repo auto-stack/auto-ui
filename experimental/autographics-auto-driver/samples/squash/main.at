@@ -1,0 +1,226 @@
+var order = []
+var spawn_yaws = []
+// PLAN-834. All gameplay state, decisions and collision classification are Auto-owned.
+var px = 0.0; var py = 0.792278; var pz = 0.0; var vy = 0.0
+var jump_count = 0
+var facing = 0.0; var anim = 0.0; var dead = 0; var score = 0; var step = 0
+var mx = []; var my = []; var mz = []; var mvx = []; var mvz = []; var speeds = []; var ages = []
+var alive = []; var generations = []; var ids = []
+var eventk = []; var eventi = []; var events = []; var eventv = []
+var slot_count = 0
+var spawn_count = 0; var random_sequence = 0; var random_values = []
+var inputx = 0; var inputz = 0; var inputjump = 0
+var request = 0; var failure = 0; var workcursor = 0
+var camera = []
+fn init() {
+ jump_count = 0
+ px = 0.0; py = 0.792278; pz = 0.0; vy = 0.0
+ facing = 0.0; anim = 0.0; dead = 0; score = 0; step = 0; spawn_count = 0
+ order = []
+ slot_count = 0
+ random_sequence = 0; random_values = []; failure = 0; request = 0
+ mx = []; my = []; mz = []; mvx = []; mvz = []; speeds = []; ages = []; spawn_yaws = []; alive = []; generations = []; ids = []
+ var i = 0
+ while i < 64 {
+  mx.push(0.0); my.push(0.0); mz.push(0.0); mvx.push(0.0); mvz.push(0.0); speeds.push(0.0); ages.push(0.0); spawn_yaws.push(0.0)
+  alive.push(0); generations.push(0); ids.push(0); i = i + 1
+ }
+ clear_events()
+}
+fn clear_events() { eventk = []; eventi = []; events = []; eventv = [] }
+fn emit(k int, i int, s int, v int) { eventk.push(k); eventi.push(i); events.push(s); eventv.push(v) }
+fn ag_clamp(v float, lo float, hi float) float { if v < lo { return lo }; if v > hi { return hi }; return v }
+fn setup_camera(i int, value float) { if i == 0 { camera = [] }; camera.push(value) }
+fn random_request() int { return request }
+fn random_count() int { return random_sequence }
+fn random_value(sequence int, value float) int {
+ if request != 1 || sequence != random_sequence + 1 || value < 0.0 || value >= 1.0 { return 0 }
+ random_sequence = sequence; random_values.push(value)
+ if random_values.len() == 3 { request = 0; spawn_mob() }
+ return 1
+}
+fn spawn_mob() {
+ var slot = 0
+ while slot < 64 && alive[slot] == 1 { slot = slot + 1 }
+ if slot == 64 { failure = 1; return }
+ var d float = random_values[0] * 116.0
+ var x float = 14.0; var z float = -15.0
+ if d <= 27.0 { x = 14.0 - d }
+ else { d = d - 27.0
+  if d <= 31.0 { x = -13.0; z = -15.0 + d }
+  else { d = d - 31.0
+   if d <= 27.0 { x = -13.0 + d; z = 16.0 }
+   else { d = d - 27.0; x = 14.0; z = 16.0 - d }
+  }
+ }
+ var jitter float = -0.7853981633974483 + 1.5707963267948966 * random_values[1]
+ var speed float = 10.0 + 8.0 * random_values[2]
+ var yaw float = ag_heading(px - x,pz - z) + jitter
+ mx[slot] = x; my[slot] = 0.0; mz[slot] = z; mvx[slot] = -speed * sine(yaw); mvz[slot] = -speed * cosine(yaw)
+ spawn_yaws[slot] = yaw
+ speeds[slot] = speed; ages[slot] = 0.0; alive[slot] = 1
+ generations[slot] = generations[slot] + 1; ids[slot] = spawn_count; spawn_count = spawn_count + 1
+ if slot + 1 > slot_count { slot_count = slot + 1 }
+ order.push(slot)
+ emit(0,ids[slot],slot,0)
+}
+fn begin_tick(x int, z int, jump int) {
+ clear_events(); inputx = x; inputz = z; inputjump = jump; workcursor = 0
+ random_values = []
+ if dead == 0 && step > 0 && step % 60 == 0 { request = 1 }
+}
+fn on_screen(x float,y float,z float) int {
+ var i = 0
+ while i < 8 {
+  var cx float = x - 1.19986; var cy float = y + 0.251327; var cz float = z - 1.57098
+  if i % 2 == 1 { cx = cx + 2.41047 }
+  if (i / 2) % 2 == 1 { cy = cy + 1.09305 }
+  if i / 4 == 1 { cz = cz + 3.17223 }
+  var ox float = camera[0] * cx + camera[4] * cy + camera[8] * cz + camera[12]
+  var oy float = camera[1] * cx + camera[5] * cy + camera[9] * cz + camera[13]
+  var oz float = camera[2] * cx + camera[6] * cy + camera[10] * cz + camera[14]
+  var ow float = camera[3] * cx + camera[7] * cy + camera[11] * cz + camera[15]
+  if ow > 0.0 && ag_abs(ox / ow) <= 1.0 && ag_abs(oy / ow) <= 1.0 && oz / ow >= 0.0 && oz / ow <= 1.0 { return 1 }
+  i = i + 1
+ }
+ return 0
+}
+fn move_chunk() {
+ var stop = workcursor + 8
+ while workcursor < stop && workcursor < order.len() {
+  var i = order[workcursor]
+  if alive[i] == 1 {
+   mx[i] = mx[i] + mvx[i] * (1.0 / 120.0); mz[i] = mz[i] + mvz[i] * (1.0 / 120.0)
+   ages[i] = ages[i] + (1.0 / 120.0)
+   if on_screen(mx[i],my[i],mz[i]) == 0 { alive[i] = 0; emit(2,ids[i],i,0) }
+  }
+  workcursor = workcursor + 1
+ }
+}
+// Return 0=no body contact, 1=top landing, 2=fatal. Same frozen yaw-only OBB approximation.
+fn contact(i int) int {
+ var yaw float = angle(-mvx[i],-mvz[i]); var c float = cosine(yaw); var s float = sine(yaw)
+ var dx float = px - mx[i]; var dz float = pz - mz[i]
+ var x float = c * dx - s * dz; var y float = py - (my[i] + 0.52793); var z float = s * dx + c * dz
+ var ox float = x - ag_clamp(x,-0.67911,0.67911)
+ var oy float = y - ag_clamp(y,-0.544175,0.544175)
+ var oz float = z - ag_clamp(z,-1.10029,1.10029)
+ var dist float = ox * ox + oy * oy + oz * oz
+ if dist > 0.792278 * 0.792278 { return 0 }
+ if dist > 0.000000000001 { if oy / root(dist) > 0.1 { return 1 }; return 2 }
+ var ax float = 0.67911 - ag_abs(x); var ay float = 0.544175 - ag_abs(y); var az float = 1.10029 - ag_abs(z)
+ if ax <= ay && ax <= az { return 2 }
+ if ay <= az && y >= 0.0 { return 1 }
+ return 2
+}
+fn detector(i int) int {
+ var yaw float = angle(-mvx[i],-mvz[i])
+ var c float = cosine(facing); var s float = sine(facing)
+ var dx float = mx[i] - px; var dz float = mz[i] - pz
+ var bx float = c * dx - s * dz; var bz float = s * dx + c * dz
+ var by float = my[i] + 0.52793 - py
+ var rc float = cosine(facing - yaw); var rs float = sine(facing - yaw)
+ var k = 0
+ while k < 5 {
+  var cx float = 0.0; var cy float = 1.06491; var cz float = 0.0; var radius float = 0.907607; var height float = 0.1438
+  if k > 0 {
+   cy = 0.95; radius = 0.2; height = 0.144
+   if k == 1 { cx = 0.455268; cz = 1.1423 }
+   if k == 2 { cx = 0.716365; cz = 1.71889 }
+   if k == 3 { cx = -0.730546; cz = 1.69713 }
+   if k == 4 { cx = -0.45857; cz = 1.15318 }
+  }
+  if ag_abs(by - cy) <= height / 2.0 + 0.544175 {
+   var xx float = rc * (cx - bx) + rs * (cz - bz)
+   var zz float = -rs * (cx - bx) + rc * (cz - bz)
+   var ox float = xx - ag_clamp(xx,-0.67911,0.67911)
+   var oz float = zz - ag_clamp(zz,-1.10029,1.10029)
+   if ox * ox + oz * oz <= radius * radius { return 1 }
+  }
+  k = k + 1
+ }
+ return 0
+}
+fn finish_tick() {
+ var dt float = 1.0 / 120.0
+ if dead == 0 {
+  if py - 0.792278 < 0.01 && inputjump == 1 { vy = vy + 20.0; jump_count = jump_count + 1 }
+  var hx float = 14.0 * inputx; var hz float = 14.0 * inputz
+  if inputx != 0 && inputz != 0 { hx = hx * 0.7071067811865476; hz = hz * 0.7071067811865476 }
+  if inputx != 0 || inputz != 0 { facing = ag_heading(hx,hz); anim = anim + dt * 4.0 }
+  else { anim = anim + dt }
+  vy = vy - 75.0 * dt
+  px = px + hx * dt; py = py + vy * dt; pz = pz + hz * dt
+  if py - 0.792278 < 0.0 { py = 0.792278; if vy < 0.0 { vy = 0.0 } }
+  px = ag_clamp(px,-13.0 + 0.792278,14.0 - 0.792278)
+  pz = ag_clamp(pz,-15.0 + 0.792278,16.0 - 0.792278)
+  var i = 0; var hit = -1; var fatal = 0
+  while i < order.len() {
+   var slot = order[i]
+   if alive[slot] == 1 {
+    var result = contact(slot)
+    if result == 1 { hit = slot; break }
+    if result == 2 { fatal = 1; break }
+   }
+   i = i + 1
+  }
+  if hit == -1 && fatal == 0 {
+   i = 0
+   while i < order.len() { if alive[order[i]] == 1 && detector(order[i]) == 1 { fatal = 1; break }; i = i + 1 }
+  }
+  if hit >= 0 { alive[hit] = 0; score = score + 1; vy = 16.0; emit(1,ids[hit],hit,score) }
+  else { if fatal == 1 { dead = 1; emit(3,0,0,score) } }
+ }
+ var live_order = []; var prune = 0
+ while prune < order.len() { if alive[order[prune]] == 1 { live_order.push(order[prune]) }; prune = prune + 1 }
+ order = live_order
+ step = step + 1
+}
+fn state(i int) float {
+ if i == 0 { return px }; if i == 1 { return py }; if i == 2 { return pz }; if i == 3 { return vy }
+ if i == 4 { return facing }; return anim
+}
+fn status(i int) int {
+ if i == 0 { return score }; if i == 1 { return dead }; if i == 2 { return step }
+ if i == 3 { return spawn_count }; if i == 5 { return jump_count }; return failure
+}
+fn object_alive(i int) int { if i == 0 { return 1 - dead }; return alive[i - 1] }
+fn generation(i int) int { if i == 0 { return 1 }; return generations[i - 1] }
+fn identity(i int) int { if i == 0 { return -1 }; return ids[i - 1] }
+fn field(i int,f int) float {
+ if i == 0 {
+  if f == 0 { return px }; if f == 1 { return py }; if f == 2 { return pz }
+  if f == 3 { return facing }; if f == 4 { return 0.5235987755982988 * vy / 20.0 }; return anim
+ }
+ var k = i - 1
+ if f == 0 { return mx[k] }; if f == 1 { return my[k] }; if f == 2 { return mz[k] }
+ if f == 3 { return angle(-mvx[k],-mvz[k]) }; if f == 4 { return 0.0 }; return ages[k] * (speeds[k] / 10.0)
+}
+fn event_count() int { return eventk.len() }
+fn event_field(i int,f int) int { if f == 0 { return eventk[i] }; if f == 1 { return eventi[i] }; if f == 2 { return events[i] + 1 }; return eventv[i] }
+fn mob_value(i int,f int) float {
+ if f == 0 { return mx[i] }; if f == 1 { return mz[i] }; if f == 2 { return mvx[i] }; if f == 3 { return mvz[i] }; if f == 4 { return speeds[i] }; return spawn_yaws[i]
+}
+
+fn profile() int { return 2 }
+fn role(i int) int { if i == 0 { return 0 }; return 1 }
+fn bob(time float, rotation int) float {
+ var t float = time % 1.2
+ var t0 float = 0.22; var t1 float = 0.7; var t2 float = 1.18
+ var v0 float = 0.329753; var v1 float = 0.660351; var v2 float = 0.349734
+ if rotation == 1 { t0 = 0.1; t1 = 0.46; v0 = -5.0326; v1 = 10.0; v2 = -10.0 }
+ var v float = v2
+ if t <= t0 { v = v0 }
+ else { if t <= t1 { v = v0 + (v1 - v0) * ((t - t0) / (t1 - t0)) }
+ else { if t <= t2 { v = v1 + (v2 - v1) * ((t - t1) / (t2 - t1)) } } }
+ if rotation == 1 { return v * 0.017453292519943295 }; return v
+}
+fn transform_field(i int,f int) float {
+ if f == 5 { return 0.0 }; if f >= 6 { return 1.0 }
+ var time float = field(i,5)
+ if f == 1 { if i == 0 { return py + bob(time,0) - 0.792278 }; return my[i - 1] + bob(time,0) }
+ if f == 4 { return field(i,4) + bob(time,1) }
+ return field(i,f)
+}
+
+fn object_count() int { return slot_count + 1 }

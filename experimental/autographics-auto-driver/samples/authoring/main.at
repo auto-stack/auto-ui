@@ -1,0 +1,16 @@
+// Explicit authoring profile 3: full bounded configuration, no game state.
+var fields = []
+var identities = []
+var kinds = []
+var flags = []
+fn main() {}
+fn profile() int { return 3 }
+fn reset() { fields=[]; identities=[]; kinds=[]; flags=[] }
+fn identity(id int, kind int, visible int) { identities.push(id); kinds.push(kind); flags.push(visible) }
+fn append_field(value float) { fields.push(value) }
+fn count() int { return identities.len() }
+fn id(i int) int { return identities[i] }
+fn kind(i int) int { return kinds[i] }
+fn visible(i int) int { return flags[i] }
+fn field(i int, f int) float { return fields[i * 12 + f] }
+

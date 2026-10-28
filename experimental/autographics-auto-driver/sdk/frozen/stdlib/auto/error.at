@@ -1,0 +1,28 @@
+/// Error Module — Plan 250
+///
+/// Simple error type for structured error handling.
+/// Flat hierarchy — not deep OOP inheritance.
+
+/// Error type with code and message
+type Error {
+    code int
+    message str
+
+    fn new(code int, message str) Error {
+        return Error(code: code, message: message)
+    }
+
+    fn to_str() str {
+        return f"Error($code): $message"
+    }
+}
+
+/// Create an Error value
+fn err(code int, message str) Error {
+    return Error.new(code, message)
+}
+
+/// Display extension for Error
+ext Error for Display {
+    fn fmt() str { return self.to_str() }
+}

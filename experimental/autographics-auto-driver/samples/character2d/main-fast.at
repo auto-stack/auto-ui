@@ -1,0 +1,27 @@
+// PLAN-861 character2d sample: the user owns every gameplay parameter.
+// Editing `speed` 4.0 -> 5.0 below and re-running is the real source-change
+// proof (V-05); main-fast.at is that edited state kept as a separate file.
+var speed=5.0
+var jump=8.0
+var gravity=20.0
+var vy=0.0
+var grounded=0
+var ok=0
+fn app_start() {
+ ok=ok+ag_char_bind(1)
+ ok=ok+ag_char_solid(2)
+ ok=ok+ag_char_solid(3)
+ ok=ok+ag_char_solid(4)
+ ok=ok+ag_char_solid(5)
+}
+fn app_update(dt float) {
+ let jp=ag_action_pressed(2)
+ if jp==1 {if grounded==1 {vy = jump}}
+ vy = vy - gravity*dt
+ let hr=ag_action_held(1)
+ let hl=ag_action_held(0)
+ let dx = (hr - hl)*speed*dt
+ let q=ag_char_move(dx,vy*dt,0.002)
+ grounded=ag_char_grounded(q)
+ if grounded==1 {vy=0.0}
+}

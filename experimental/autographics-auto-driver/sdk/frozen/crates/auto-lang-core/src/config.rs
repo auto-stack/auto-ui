@@ -1,0 +1,507 @@
+use crate::eval_config_with_vm;
+use crate::AutoResult;
+use auto_val::Obj;
+use auto_val::{AutoPath, AutoStr, Node, Value};
+use std::path::Path;
+use std::path::PathBuf;
+
+pub struct AutoConfigReader {
+    args: Obj,
+}
+
+impl AutoConfigReader {
+    pub fn new() -> Self {
+        Self { args: Obj::new() }
+    }
+
+    pub fn skip_check(self) -> Self {
+        // No-op in AutoVM mode (skip_check was an Interpreter feature)
+        self
+    }
+
+    pub fn args(mut self, args: &Obj) -> Self {
+        self.args = args.clone();
+        self
+    }
+
+    pub fn parse(&mut self, code: impl Into<AutoStr>) -> AutoResult<AutoConfig> {
+        let code = code.into();
+
+        // Plan 091: Use AutoVM without Universe
+        let result = eval_config_with_vm(code.as_str(), &self.args)?;
+
+        Ok(AutoConfig {
+            code: code.to_string(),
+            root: result.to_node(),
+            args: self.args.clone(),
+        })
+    }
+
+    pub fn read(&mut self, path: impl Into<PathBuf>) -> AutoResult<AutoConfig> {
+        let path = path.into();
+        let content = std::fs::read_to_string(&path).map_err(|e| {
+            format!(
+                "Failed to read config file {}: {}",
+                path.to_str().unwrap(),
+                e
+            )
+        })?;
+        self.parse(content)
+    }
+}
+
+pub struct AutoConfig {
+    pub code: String,
+    pub root: Node,
+    pub args: Obj,
+}
+
+impl AutoConfig {
+    pub fn read(path: &Path) -> AutoResult<Self> {
+        Self::from_file(path, &Obj::default())
+    }
+
+    pub fn from_file(path: &Path, args: &Obj) -> AutoResult<Self> {
+        let content = std::fs::read_to_string(path).map_err(|e| {
+            format!(
+                "Failed to read config file {}: {}",
+                path.to_str().unwrap(),
+                e
+            )
+        })?;
+        Self::from_code(content, args)
+    }
+
+    pub fn new(code: impl Into<String>) -> AutoResult<Self> {
+        Self::from_code(code, &Obj::new())
+    }
+
+    pub fn save(&mut self, path: &AutoPath) -> AutoResult<()> {
+        let contents = self.root.contents();
+        std::fs::write(path.path(), contents.join("\n"))
+            .map_err(|e| format!("Failed to write file: {}", e))?;
+        Ok(())
+    }
+
+    pub fn from_code(code: impl Into<String>, args: &Obj) -> AutoResult<Self> {
+        let code = code.into();
+
+        // Plan 091: Use AutoVM without Universe
+        let result = eval_config_with_vm(&code, args)?;
+
+        if let Value::Node(root) = result {
+            Ok(Self {
+                code: code.clone(),
+                args: args.clone(),
+                root: *root,
+            })
+        } else {
+            // For empty config files (Nil result), return an empty root Node instead of error
+            if matches!(result, Value::Nil) {
+                return Ok(Self {
+                    code: code.clone(),
+                    args: args.clone(),
+                    root: auto_val::Node::new("root"),
+                });
+            }
+
+            Err(format!("Invalid config result: {}", result.repr()).into())
+        }
+    }
+
+    pub fn name(&self) -> AutoStr {
+        self.root.get_prop("name").to_astr()
+    }
+
+    pub fn version(&self) -> AutoStr {
+        self.root.get_prop("version").to_astr()
+    }
+
+    pub fn list_target_names(&self) -> Vec<AutoStr> {
+        self.root
+            .kids_iter()
+            .filter(|(_, kid)| matches!(kid, auto_val::Kid::Node(_)))
+            .map(|(_, kid)| {
+                if let auto_val::Kid::Node(n) = kid {
+                    n.title()
+                } else {
+                    unreachable!()
+                }
+            })
+            .collect()
+    }
+
+    pub fn to_xml(&self) -> AutoStr {
+        AutoStr::new()
+    }
+
+    // pub fn eval(&mut self, code: impl Into<AutoStr>) -> Value {
+    // self.interpreter.eval(code.into().as_str())
+    // }
+}
+
+/// 后端类型
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum BackendType {
+    Vue,
+    Jet,
+    Tauri,
+    Gpui,
+    Iced,
+    Arkts,
+    Cangjie,
+    Godot,
+    Rust,
+    Vm,
+    Vscode,
+}
+
+impl BackendType {
+    /// 从字符串解析后端类型
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s.trim().to_lowercase().as_str() {
+            "vue" => Some(Self::Vue),
+            "jet" => Some(Self::Jet),
+            "tauri" => Some(Self::Tauri),
+            "gpui" => Some(Self::Gpui),
+            "iced" => Some(Self::Iced),
+            "arkts" | "ark" => Some(Self::Arkts),
+            "cangjie" => Some(Self::Cangjie),
+            "godot" => Some(Self::Godot),
+            "rust" => Some(Self::Rust),
+            "vm" => Some(Self::Vm),
+            // PLAN-690 T-04：remote = vm 前端 + remote 帧载荷（headless
+            // iced 宿主轨）——main.rs render-queue 臂 RenderMode::Remote
+            // 分岔，auto-man 侧按 vm 前端解析（帧模式不属 BackendType）。
+            "remote" => Some(Self::Vm),
+            "vscode" => Some(Self::Vscode),
+            _ => None,
+        }
+    }
+
+    /// 获取输出目录名
+    pub fn output_dir(&self) -> &'static str {
+        match self {
+            Self::Vue => "vue",
+            Self::Jet => "jet",
+            Self::Tauri => "tauri",
+            Self::Gpui => "gpui",
+            Self::Iced => "iced",
+            Self::Arkts => "arkts",
+            Self::Cangjie => "cangjie",
+            Self::Godot => "godot",
+            Self::Rust => "back",
+            Self::Vm => "vm",
+            Self::Vscode => "vscode",
+        }
+    }
+
+    /// 获取后端类型名称字符串
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Vue => "vue",
+            Self::Jet => "jet",
+            Self::Tauri => "tauri",
+            Self::Gpui => "gpui",
+            Self::Iced => "iced",
+            Self::Arkts => "arkts",
+            Self::Cangjie => "cangjie",
+            Self::Godot => "godot",
+            Self::Rust => "rust",
+            Self::Vm => "vm",
+            Self::Vscode => "vscode",
+        }
+    }
+
+    /// 返回所有可用的后端类型
+    pub fn all_variants() -> Vec<BackendType> {
+        vec![
+            Self::Vue,
+            Self::Jet,
+            Self::Tauri,
+            Self::Gpui,
+            Self::Iced,
+            Self::Arkts,
+            Self::Cangjie,
+            Self::Godot,
+            Self::Rust,
+            Self::Vm,
+            Self::Vscode,
+        ]
+    }
+}
+
+/// 后端配置（单后端或多后端）
+#[derive(Debug, Clone, PartialEq)]
+pub enum BackendConfig {
+    /// 单后端：整个项目都是同一种类型
+    Single(BackendType),
+    /// 多前端：多个前端框架（如 vue + tauri）
+    Multi(Vec<BackendType>),
+    /// 前后端分离
+    Split {
+        front: Vec<BackendType>,
+        back: BackendType,
+    },
+}
+
+impl BackendConfig {
+    /// 从字符串解析
+    pub fn parse(s: &str) -> Option<Self> {
+        BackendType::from_str(s).map(Self::Single)
+    }
+
+    /// 从 Value 解析（支持对象形式和数组形式）
+    /// - 字符串: backend: "vue"
+    /// - 数组: backend: ["vue", "tauri"] (多个前端框架)
+    /// - 对象: backend: { front: "vue", back: "rust" }
+    pub fn from_value(value: &Value) -> Option<Self> {
+        match value {
+            Value::Str(s) => Self::parse(&s),
+            Value::Array(arr) => {
+                // 数组形式：backend: ["vue", "tauri"]
+                let frontends: Vec<BackendType> = arr
+                    .iter()
+                    .filter_map(|v| match v {
+                        Value::Str(s) => BackendType::from_str(&s),
+                        _ => None,
+                    })
+                    .collect();
+                if frontends.len() == 1 {
+                    Some(Self::Single(frontends[0].clone()))
+                } else if !frontends.is_empty() {
+                    Some(Self::Multi(frontends))
+                } else {
+                    None
+                }
+            }
+            Value::Obj(obj) => {
+                let front = obj.get("front").and_then(|v| match v {
+                    Value::Str(s) => BackendType::from_str(&s).map(|t| vec![t]),
+                    Value::Array(arr) => Some(
+                        arr.iter()
+                            .filter_map(|v| match v {
+                                Value::Str(s) => BackendType::from_str(&s),
+                                _ => None,
+                            })
+                            .collect(),
+                    ),
+                    _ => None,
+                });
+                let back = obj.get("back").and_then(|v| match v {
+                    Value::Str(s) => BackendType::from_str(&s),
+                    _ => None,
+                });
+                match (front, back) {
+                    (Some(f), Some(b)) => Some(Self::Split { front: f, back: b }),
+                    _ => None,
+                }
+            }
+            _ => None,
+        }
+    }
+
+    /// 获取所有前端后端类型
+    pub fn frontends(&self) -> Vec<&BackendType> {
+        match self {
+            Self::Single(t) => vec![t],
+            Self::Multi(types) => types.iter().collect(),
+            Self::Split { front, .. } => front.iter().collect(),
+        }
+    }
+
+    /// 获取后端类型
+    pub fn backend(&self) -> Option<&BackendType> {
+        match self {
+            Self::Single(_) => None,
+            Self::Multi(_) => None,
+            Self::Split { back, .. } => Some(back),
+        }
+    }
+}
+
+// ── Plan 061:外部后端(契约定位统一帮助函数)─────────────────────────────
+// 供 auto-man(gen/server 编排)与 ui_gen(SSE 接线)共用:前端项目无本地
+// back/ 目录时,经 pac.at `back: { project }` 解析到外部后端项目的 api.at。
+
+/// 读项目 pac.at 的外部后端目录(pac.at `back: { project: "../x" }` 对象
+/// 形式;裸字符串 `back: "../x"` 兼容)。相对路径相对项目根解析。
+/// None = 无 pac.at / 无配置 / 解析失败。
+pub fn external_backend_dir(project_dir: &Path) -> Option<std::path::PathBuf> {
+    let pac = project_dir.join("pac.at");
+    if !pac.is_file() {
+        return None;
+    }
+    // 探针参数与 Automan::parse_pac 一致(port=win32 占位,Config 求值用)。
+    let mut probe = Obj::new();
+    probe.set("port", Value::Str(AutoStr::from("win32")));
+    let cfg = AutoConfig::from_file(&pac, &probe).ok()?;
+    let dir = match cfg.root.get_prop("back") {
+        Value::Obj(obj) => obj
+            .get("project")
+            .map(|v| v.to_astr().trim().to_string())
+            .filter(|s| !s.is_empty())?,
+        v => {
+            let s = v.to_astr().trim().to_string();
+            if s.is_empty() {
+                return None;
+            }
+            s
+        }
+    };
+    let p = project_dir.join(dir);
+    Some(p.canonicalize().unwrap_or(p))
+}
+
+/// 统一契约文件定位:src/back/api.at → back/api.at → 外部后端 <project>/api.at。
+/// 三个读取点(gen 的 generate_api / SSE 的 resolve_stream_endpoints /
+/// --server=vm)共用,保证外部后端配置对全部启动/生成形态生效。
+pub fn resolve_back_api(project_dir: &Path) -> Option<std::path::PathBuf> {
+    let local = [
+        project_dir.join("src").join("back").join("api.at"),
+        project_dir.join("back").join("api.at"),
+    ];
+    if let Some(p) = local.iter().find(|p| p.is_file()) {
+        return Some(p.clone());
+    }
+    let api = external_backend_dir(project_dir)?.join("api.at");
+    api.is_file().then_some(api)
+}
+
+/// PLAN-627: 模块形态 `use back.api`（无符号清单）的函数名枚举——读
+/// [`resolve_back_api`] 定位的契约文件，收集 `#[api]` 注解 fn 名。契约
+/// 缺席/解析失败返回空（solo 或残缺工程静默降级，宽容读取纪律）。
+pub fn api_contract_fn_names(project_dir: &Path) -> Vec<String> {
+    let Some(api_path) = resolve_back_api(project_dir) else {
+        return Vec::new();
+    };
+    let Ok(code) = std::fs::read_to_string(&api_path) else {
+        return Vec::new();
+    };
+    let Ok(ast) = crate::Parser::from(code.as_str()).parse() else {
+        return Vec::new();
+    };
+    ast.stmts
+        .iter()
+        .filter_map(|stmt| match stmt {
+            crate::ast::Stmt::Fn(f) if f.api_attrs.is_some() => Some(f.name.to_string()),
+            _ => None,
+        })
+        .collect()
+}
+
+/// PLAN-627: 前端 .at 路径形态的 [`api_contract_fn_names`]——兼容两种
+/// 布局（`<root>/app.at` 与 `<root>/src/front/*.at`），向上至多三层寻
+/// `src/back/api.at` 命中层为工程根（外部后端 `back: { project }` 形态
+/// 的模块形态枚举暂不支持——现网消费者均为符号形态，按需再补）。
+pub fn api_contract_fn_names_for_front(front_at: &Path) -> Vec<String> {
+    let mut ancestor = front_at.parent();
+    for _ in 0..3 {
+        let Some(dir) = ancestor else { break };
+        if dir.join("src").join("back").join("api.at").is_file()
+            || dir.join("back").join("api.at").is_file()
+        {
+            return api_contract_fn_names(dir);
+        }
+        ancestor = dir.parent();
+    }
+    Vec::new()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use auto_val::{Obj, Value};
+
+    // Plan 375: an Object arg injected via `from_code` must be readable inside
+    // the config via `${obj.field}`. Reproduces SCU001's `dep osal { kernel:
+    // kernel_config }` → osal's `dep("kernel") { port: `${kernel.port}` }` chain.
+    #[test]
+    fn test_injected_object_arg_field_access() {
+        let mut args = Obj::new();
+        let mut kobj = Obj::new();
+        kobj.set("port", Value::str("IAR/ARM_CM4F"));
+        kobj.set("heap", Value::str("heap_4"));
+        args.set("kernel", Value::Obj(Box::new(kobj)));
+
+        // Child config: a default `kernel` Pair (must NOT override the injected
+        // arg), then a dep node whose prop reads `${kernel.port}`.
+        let code = r#"
+kernel: { port: "msvc/x64", heap: "heap_5" }
+dep("kernel") {
+    port: `${kernel.port}`
+    heap: `${kernel.heap}`
+}
+"#;
+        let cfg = AutoConfig::from_code(code, &args).unwrap();
+        // Find the dep("kernel") kid and read its `port` prop.
+        let mut got = String::new();
+        for (_, kid) in cfg.root.kids_iter() {
+            if let auto_val::Kid::Node(n) = kid {
+                got = n.get_prop("port").to_astr().as_str().to_string();
+            }
+        }
+        assert_eq!(
+            got, "IAR/ARM_CM4F",
+            "injected kernel.port must override the default; got {:?}",
+            got
+        );
+    }
+
+    #[test]
+    fn test_injected_bool_arg() {
+        let mut args = Obj::new();
+        args.set("use_rtt", Value::Bool(true));
+        let code = r#"
+use_rtt: false
+dep("log") {
+    use_rtt: use_rtt
+}
+"#;
+        let cfg = AutoConfig::from_code(code, &args).unwrap();
+        let mut got = Value::Nil;
+        for (_, kid) in cfg.root.kids_iter() {
+            if let auto_val::Kid::Node(n) = kid {
+                got = n.get_prop("use_rtt");
+            }
+        }
+        assert_eq!(got, Value::Bool(true), "injected bool must propagate");
+    }
+
+    // Plan 013: `on`/`off` are built-in config globals (true/false) so manifest
+    // toggles like pac.at `shadcn: off` evaluate instead of aborting the whole
+    // config with "Undefined variable".
+    #[test]
+    fn test_on_off_builtin_config_globals() {
+        let cfg = AutoConfig::from_code("shadcn: off\nfeature_x: on\n", &Obj::new()).unwrap();
+        assert_eq!(cfg.root.get_prop("shadcn"), Value::Bool(false));
+        assert_eq!(cfg.root.get_prop("feature_x"), Value::Bool(true));
+
+        // Absent toggle → no prop (caller applies its own default).
+        let cfg = AutoConfig::from_code("name: \"x\"\n", &Obj::new()).unwrap();
+        assert!(!cfg.root.has_prop("shadcn"));
+
+        // Quoted strings and real booleans still work as before.
+        let cfg = AutoConfig::from_code("shadcn: \"off\"\n", &Obj::new()).unwrap();
+        assert_eq!(cfg.root.get_prop("shadcn").to_astr().as_str(), "off");
+        let cfg = AutoConfig::from_code("shadcn: false\n", &Obj::new()).unwrap();
+        assert_eq!(cfg.root.get_prop("shadcn"), Value::Bool(false));
+    }
+
+    // Plan 014: pac.at `default_classes: off` evaluates through the same
+    // built-in on/off globals as `shadcn` (Bool(false) / Str("off")).
+    #[test]
+    fn test_default_classes_config_toggle() {
+        let cfg = AutoConfig::from_code("default_classes: off\n", &Obj::new()).unwrap();
+        assert_eq!(cfg.root.get_prop("default_classes"), Value::Bool(false));
+
+        let cfg = AutoConfig::from_code("default_classes: \"off\"\n", &Obj::new()).unwrap();
+        assert_eq!(
+            cfg.root.get_prop("default_classes").to_astr().as_str(),
+            "off"
+        );
+
+        let cfg = AutoConfig::from_code("name: \"x\"\n", &Obj::new()).unwrap();
+        assert!(!cfg.root.has_prop("default_classes"));
+    }
+}

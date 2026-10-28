@@ -1,0 +1,76 @@
+// autographics.runtime_camera3d/1 trusted unit (PLAN-875). Appended after the
+// character3d unit by the runtime_camera3d assembly; public names are
+// ag_camera_orbit_3d and ag_cam3_*. The user configures the Run-owned orbit
+// camera once in app_start: the target must be the Run bound character,
+// with the frozen distance/pitch/projection domains and yaw always starting
+// normalized at 0. Each dispatch the host sends the candidate orbit and the
+// horizontal basis components (pointer/projection system math is Rust-side);
+// this unit mirrors them for the user relative movement and echoes them for
+// the host frame admission. Camera reads never touch spatial state, so they
+// stay outside the 32-credit spatial query budget.
+var _ag_cam3_node= -1
+var _ag_cam3_frozen=0
+var _ag_cam3_fx=0.0
+var _ag_cam3_fz= -1.0
+var _ag_cam3_rx=1.0
+var _ag_cam3_rz=0.0
+var _ag_cam3_yaw=0.0
+var _ag_cam3_pitch=0.0
+var _ag_cam3_dist=0.0
+var _ag_cam3_proj=0
+var _ag_cam3_size=0.0
+fn ag_camera_orbit_3d(stable_id int, distance float, pitch_deg float, projection int, ortho_size float) int {
+ if _ag_error!=0 {return 0}
+ if _ag_cam3_frozen==1 {_ag_fail(29,-1,0);return 0}
+ if _ag_cam3_node>=0 {_ag_fail(29,_ag_cam3_node,stable_id);return 0}
+ if distance<4.0 {_ag_fail(27,-1,0);return 0}
+ if distance>12.0 {_ag_fail(27,-1,0);return 0}
+ if pitch_deg<15.0 {_ag_fail(27,-1,0);return 0}
+ if pitch_deg>75.0 {_ag_fail(27,-1,0);return 0}
+ if projection<0 {_ag_fail(27,-1,projection);return 0}
+ if projection>1 {_ag_fail(27,-1,projection);return 0}
+ if projection==1 {if ortho_size<1.0 {_ag_fail(27,-1,0);return 0};if ortho_size>64.0 {_ag_fail(27,-1,0);return 0}}
+ let node=_ag_char3_resolve(stable_id)
+ if node<0 {_ag_fail(30,-1,stable_id);return 0}
+ if node!=_ag_char3_node {_ag_fail(30,node,stable_id);return 0}
+ _ag_cam3_node=node
+ _ag_cam3_dist=distance
+ _ag_cam3_pitch=pitch_deg
+ _ag_cam3_proj=projection
+ _ag_cam3_size=ortho_size
+ return 1
+}
+// The host Session call profile caps arguments at four, so one dispatch sends
+// the basis and the orbit candidate as two ordered calls.
+fn _ag_cam3_basis(fx float, fz float, rx float, rz float) {
+ _ag_cam3_fx=fx
+ _ag_cam3_fz=fz
+ _ag_cam3_rx=rx
+ _ag_cam3_rz=rz
+}
+fn _ag_cam3_orbit(yaw float, pitch float, dist float) {
+ _ag_cam3_yaw=yaw
+ _ag_cam3_pitch=pitch
+ _ag_cam3_dist=dist
+}
+fn _ag_cam3_freeze() {
+ if _ag_error!=0 {return}
+ if _ag_cam3_node<0 {_ag_fail(27,-1,0);return}
+ _ag_cam3_frozen=1
+}
+fn ag_cam3_forward_x() float {return _ag_cam3_fx}
+fn ag_cam3_forward_z() float {return _ag_cam3_fz}
+fn ag_cam3_right_x() float {return _ag_cam3_rx}
+fn ag_cam3_right_z() float {return _ag_cam3_rz}
+fn ag_cam3_yaw() float {return _ag_cam3_yaw}
+fn ag_cam3_pitch() float {return _ag_cam3_pitch}
+fn ag_cam3_distance() float {return _ag_cam3_dist}
+fn _ag_cam3_status() int {if _ag_cam3_frozen==1 {if _ag_error==0 {return 1}};return 0}
+fn _ag_cam3_target() int {return _ag_cam3_node}
+fn _ag_cam3_run() int {return _ag_run_id()}
+fn _ag_cam3_tick() int {return _ag_tick_id()}
+fn _ag_cam3_proj_v() int {return _ag_cam3_proj}
+fn _ag_cam3_size_v() float {return _ag_cam3_size}
+fn _ag_cam3_yaw_v() float {return _ag_cam3_yaw}
+fn _ag_cam3_pitch_v() float {return _ag_cam3_pitch}
+fn _ag_cam3_dist_v() float {return _ag_cam3_dist}

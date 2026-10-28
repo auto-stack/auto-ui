@@ -1,0 +1,25 @@
+var actor=-1
+var region=-1
+var marker=-1
+var door=-1
+var previous=0
+var enters=0
+var stays=0
+var exits=0
+fn inside_now() int {return ag_aabb_overlaps(actor,region)}
+fn feedback(){
+ ag_set_visible(door,previous)
+ ag_set_local(marker,0,-100.0+enters*10.0)
+ ag_set_local(marker,1,50.0+exits*10.0)
+ ag_set_local(door,1,1.0+stays*0.01)
+}
+fn app_start(){
+ actor=ag_actor(3); region=ag_node_at(2); door=ag_node_at(3); marker=ag_node_at(4)
+ enters=0; stays=0; exits=0; previous=inside_now(); feedback()
+}
+fn app_update(dt float){
+ if ag_input_space()==3 {ag_move_local(ag_parent(actor),ag_input_x()*3.0*dt,0.0,0.0-ag_input_y()*3.0*dt)}
+ let current=inside_now()
+ if current==1 {if previous==0 {enters=enters+1} else {stays=stays+1}} else {if previous==1 {exits=exits+1}}
+ previous=current; feedback()
+}

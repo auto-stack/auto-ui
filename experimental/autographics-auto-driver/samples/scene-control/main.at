@@ -1,0 +1,32 @@
+var x = 0.0
+var y = 0.0
+var ticks = 0
+var visible = 1
+var presses = 0
+fn main() {}
+fn init() { x = 0.0; y = 0.0; ticks = 0; visible = 1; presses = 0 }
+fn update(direction int) { x = x + direction * 2.0; ticks = ticks + 1 }
+fn pointer(px float, py float) { x = px - 200.0; y = 150.0 - py; presses = presses + 1 }
+fn destroy() { visible = 0 }
+fn protocol() int { return 1 }
+fn object_count() int { return 2 }
+fn object_alive(i int) int { return visible }
+fn generation(i int) int { return 1 }
+fn shape(i int) int { if i == 0 { return 1 }; return 2 }
+fn integer(i int) int { if i == 1 { return 0 }; if i == 2 { return presses }; return ticks }
+fn field(i int,f int) float {
+ if f == 0 { return x }; if f == 1 { return y }; if f == 2 { return 0.0 }
+ if f == 3 { return 40.0 }; if f == 4 { return 40.0 }; if f == 5 { return 40.0 }
+ if f == 6 { return 0.8 }; if f == 7 { return 0.2 }; if f == 8 { return 0.4 }; return 1.0
+}
+
+fn key(code int) { x = x + code * 3.0 }
+
+fn event_count() int { return 0 }
+fn event_kind(i int) int { return 0 }
+fn event_a(i int) int { return 0 }
+fn event_b(i int) int { return 0 }
+
+fn changed(i int) int { return 1 }
+
+fn background(i int) float { if i == 0 { return 0.04 }; if i == 1 { return 0.05 }; if i == 2 { return 0.08 }; return 1.0 }

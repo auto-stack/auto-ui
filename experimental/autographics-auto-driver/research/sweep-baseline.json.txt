@@ -1,0 +1,17 @@
+{
+  "plan": "PLAN-849",
+  "revision": 1,
+  "base_commit": "dd7076a7f40b35ffda6b876c36f826af3443fb97",
+  "branch": "plan-849-dev",
+  "worktree": "D:/autostack/.wt/lang-849/auto-lang",
+  "sdk_commit": "7b987ca8b12f2eec3c076a1bfbf3ff4663aa8467",
+  "frozen_files": {
+    "Cargo.lock": "2b131d3dd33a968b43d53664cb8649d6c24225fa0f2c28c1add603be98a358db",
+    "../autographics-prototype/Cargo.lock": "c3df168e7234b8bfa876dfbab8afa71af8773d1d7241ac010ad5d8054930b3bf",
+    "research/sdk-Cargo.lock.txt": "5192d08d502a8f17e277ad8912f5884175659bef642b614e25b394243d1ff091",
+    "research/source-lock.json": "f5d7f1f8e3e2bfedf70775ee4b9741080d712b809640ee334ae075a335a54959"
+  },
+  "prior_delivery": "PLAN-848 archive final pass; source dd7076a7f; canonical f126a98d7; ledger dbeb8d463/v87; cleaned true",
+  "verification": "prepare_sdk PASS 681; verify_source PASS 374, metadata 479/17local/29edges/forbidden0",
+  "old_semantic_denominator": "848 87 graphics slots; driver216; AGP163/16native; merge-owned rerun/reuse matrix pending"
+}

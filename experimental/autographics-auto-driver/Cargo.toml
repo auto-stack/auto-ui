@@ -1,0 +1,27 @@
+[workspace]
+exclude = [".sdk-source"]
+
+[package]
+name = "autographics-auto-driver"
+default-run = "autographics-auto-driver"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+auto-lang-core = { path = ".sdk-source/crates/auto-lang-core" }
+auto-val = { path = ".sdk-source/crates/auto-val" }
+
+serde_json = "1"
+serde = { version = "1", features = ["derive"] }
+agp = { path = "../autographics-prototype" }
+glam = "0.34"
+gltf = { version = "1.4", features = ["extras"] }
+winit = "0.30.13"
+iced = "0.14.0"
+iced_wgpu = "0.14.0"
+kira = { version = "0.9", features = ["ogg"] }
+
+
+[profile.dev]
+debug = 0
+

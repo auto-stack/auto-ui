@@ -1,0 +1,132 @@
+{
+ "schema": "autographics.game-runtime-decision/1",
+ "plan": 860,
+ "date": "2026-10-28",
+ "base_commit": "81b0974ac2512126790b0ef2af79235edf45b485",
+ "sdk_commit": "7b987ca8b12f2eec3c076a1bfbf3ff4663aa8467",
+ "contract": {
+  "path": "docs/plans/attachments/860/work/probe-contract.md",
+  "revisions": [
+   "r2 candidate-B support simplification",
+   "r3 clearance 0.002 / support skin 0.01",
+   "r4 G3 phase table + spawn placement + load layout notes"
+  ]
+ },
+ "decision": "go",
+ "decision_scope": "861 may freeze the public actions + single 2D character profile against this evidence; probe success is NOT a public API, user admission, or game implementation claim.",
+ "candidates": {
+  "A": {
+   "definition": "public behavior/5 composition: ag_move_and_slide + status/contacts/unapplied inference (frozen rule in research/game-runtime/*_a.at)",
+   "grounded_rule": "status in {1,2} and contacts>=1 and dy_req<0 and unapplied_y<0",
+   "credits_per_step": 27,
+   "residual_gaps": [
+    "PrecisionStop (status 4) steps report grounded=0; the frozen scenes contain zero such steps on the accepted routes (quantified), and status 4 implies no within-step support contact, so the loss is not observable as a wrong grounded answer inside this denominator",
+    "a 3-surface single step exceeds the two-stage bound and reverts (bounded v5 semantics, jitter class); G2/G3 frozen geometry never produces it"
+   ],
+   "verdict": "sufficient for the M2 G2/G3 necessary semantics within original hard limits"
+  },
+  "B": {
+   "definition": "probe-only trusted unit agp_move: v5 move unchanged + fused geometric final-support determination (down-scan skin 0.01) inside the same single character-update call",
+   "grounded_rule": "support scan hit with up-normal at the final (or reverted) position; independent of last-normal/unapplied inference",
+   "credits_per_step": 26,
+   "scans_per_step": "2 typical (move + support), max 2 on all accepted routes/loads",
+   "state_scalars": "3 _agp_* globals (contract cap 6)",
+   "cpu_vs_A": "+8% G2 route, +19% G3 route, +16/17% 128 wide/deep (tick p50 medians)",
+   "verdict": "sufficient and mechanically independent; its fused support needs a public credit/pricing decision at 861 (this probe charged support as 1 within the same 32-pool)"
+  }
+ },
+ "resource_bounds_measured": {
+  "session_budgets_unchanged": "1000 steps/slice, 100k cumulative per callback, 120 resumes/250ms, credits 32/tick, play 30s/2s/8ms, 256KiB/64KiB/320KiB source",
+  "route_steps": {
+   "g2": 400,
+   "g3": 410,
+   "bound": 1800
+  },
+  "tick_cpu_ns_p50_median_debug": {
+   "deep128-a": 17272500,
+   "deep128-b": 19062100,
+   "g2-a": 1399000,
+   "g2-b": 1622200,
+   "g3-a": 1941300,
+   "g3-b": 2330700,
+   "wide128-a": 15041900,
+   "wide128-b": 17312900
+  },
+  "tick_cpu_ns_p95_median_debug": {
+   "deep128-a": 20608400,
+   "deep128-b": 20970100,
+   "g2-a": 1658600,
+   "g2-b": 1927600,
+   "g3-a": 2089000,
+   "g3-b": 3419800,
+   "wide128-a": 25862800,
+   "wide128-b": 22313800
+  },
+  "working_set_max_mb": {
+   "deep128-a": 64.8,
+   "deep128-b": 64.6,
+   "g2-a": 64.7,
+   "g2-b": 64.5,
+   "g3-a": 63.8,
+   "g3-b": 66.0,
+   "wide128-a": 64.6,
+   "wide128-b": 64.8
+  },
+  "credits_max_observed": {
+   "deep128-a": 26,
+   "deep128-b": 26,
+   "g2-a": 27,
+   "g2-b": 26,
+   "g3-a": 27,
+   "g3-b": 26,
+   "wide128-a": 26,
+   "wide128-b": 26
+  },
+  "sampling": "5 fresh processes x 4 classes x 2 candidates against the controlled-build proven runner at the frozen review commit 83a503c92 (runner-receipt.json, origin_verified), 5 warmup ticks dropped, external 10ms working-set sampling, debug profile",
+  "source_bytes": "route user sources 740-1231B; probe unit 1516B; combined well under caps (identity-bound)"
+ },
+ "semantics_measured": {
+  "floor_wall_corner": "both candidates grounded through floor+wall same-step contact; MUT-2 last-normal-only rule goes red on the same gate",
+  "edge_leave": "support lost when the box fully passes the edge (~step 85 on the SC-04 scene); MUT-1 stale-grounded rule produces the mid-air jump (red)",
+  "air_rejump": "denied for both candidates without mutation",
+  "ceiling": "classified, never grounded, y clamped at the face for both candidates",
+  "initial_overlap": "status 3, no motion, no fault, not grounded, for both candidates",
+  "precision_stop": "zero-progress revert classified (f32-ulp repro at x=3e6); A grounded 0, B support runs and correctly reports no floor",
+  "wall_top": "jump lands and stays grounded on a 1.25-high wall top for both candidates",
+  "faults": "clearance 0 and 2D dz fault 7, NaN fault 12, sticky bridge skip, last-good preserved; credit overflow faults 10; budget exhaustion closes the VM without a partial frame",
+  "routes": "G2/G3 all three collectibles + goal reached by both candidates under the frozen input tables; enemy/hazard/pit step-level oracles clean; unreachable would be recorded, no map edits",
+  "load128": "nearest blocker last-iterated wins for both wide and deep; deep adds derive cost (~15-17.5ms/tick p50 debug) with identical geometry",
+  "host_publication": "G2+G3 trajectories through real Host/Play/GPU: published frames bitwise-match the Session trace at init/jump/land/final checkpoints; Stop restores editing pixels exactly; 20 run/stop cycles release VM+spatial owners (weak references); fresh Run starts at the frozen spawn",
+  "mutations": "MUT-1 stale-grounded, MUT-2 last-normal, MUT-3 dropped integration output (numeric oracle), MUT-4 frozen input (frozen-expectation oracle) all go red on the same gates and restore green"
+ },
+ "limitations": [
+  "G3 pixel hashes are identical across checkpoints at the default 3D editing camera (scene not visibly framed); the 3D publication is verified numerically plus restore-exactness, while visible-motion pixel discrimination is proven on the G2 2D surface. Runtime camera framing remains 861+ work.",
+  "Probe input replay is fixed frozen tables; no OS keyboard support is claimed (861 scope).",
+  "Trace recording is Rust-side, bounded at 1800 entries/case and under 5MiB; Auto-side state carries no trace.",
+  "CPU numbers are debug-profile aggregate callback observations, not 60Hz guarantees; yields are not exact instruction counts."
+ ],
+ "evidence": {
+  "sampling_summary": "D:/autostack/plan-artifacts/plan-860/sampling/sampling-summary.json",
+  "sampling_receipts": "D:/autostack/plan-artifacts/plan-860/sampling/sampling-receipts.json",
+  "host_reports": [
+   "D:/autostack/plan-artifacts/plan-860/work-t04/ht-g2-report.json",
+   "D:/autostack/plan-artifacts/plan-860/work-t04/ht-g3-report.json"
+  ],
+  "host_report_shas": [
+   "1e2a174dd6c996afe47fcf63624117ec6ee5b16425a8f68690bd16de95d191b5",
+   "93fec4a86a2fb14a97c3dede9ec206fcd2bb1db69def9af169bf605afbc742c0"
+  ],
+  "named_tests": "tests/game_runtime_feasibility.rs (20 tests, single-threaded)",
+  "verifier": "tools/verify_plan860.py --controls PASS (406 files at freeze)",
+  "checker": "tools/check_game_feasibility.py --controls PASS",
+  "runner_receipt": "D:/autostack/plan-artifacts/plan-860/sampling/runner-receipt.json (origin_verified, controlled-build at 8c93270f4)",
+  "consumer": "D:/autostack/plan-artifacts/plan-860/consumer-package: own-SDK offline build, probe actually ran g2-a/g3-b, checker PASS bound to consumer-built runner sha b059f73c (export without git is unverified attribution by design, 857 precedent)"
+ },
+ "unmeasured": [
+  "release-profile timings, GPU latency, 60Hz real-time behavior",
+  "user-script admission through a public character API (861)",
+  "enemy patrol as an Auto-driven game object (routes used the deterministic Rust-side model)",
+  "sprites/models/audio/HUD/game camera"
+ ],
+ "entry_861": "Freeze the public actions + single 2D character profile over this evidence: input edges -> user Auto callback -> trusted bounded controller -> v5-class bounded contact/support op (pricing decision recorded above) -> complete candidate admission -> original Host/GPU publication. B's fused support may be promoted only with an explicit public contract; A remains the fallback composition."
+}

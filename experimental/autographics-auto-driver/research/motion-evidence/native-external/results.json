@@ -1,0 +1,136 @@
+[
+  {
+    "case": "maze2d",
+    "command": [
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+      "--motion-check",
+      "--spatial-space",
+      "2",
+      "--open",
+      "D:\\autostack\\.verify\\lang-851-native-r4-1\\maze2d\\moved\\scene.agscene",
+      "--report",
+      "D:\\autostack\\.verify\\lang-851-native-r4-1\\maze2d\\report.json"
+    ],
+    "exit": 0,
+    "binary_sha256": "13a6d0cb5da88d73fb7d77148337ff5a62201a810b302a9c4d1d1110e25dd375",
+    "user_sha256": "1fb2707271b3e46dfe3bb76b3331acea3360d89906dd334cba4bd0e809fcaf02",
+    "report": "report.json",
+    "phase": 14
+  },
+  {
+    "case": "corridor3d",
+    "command": [
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+      "--motion-check",
+      "--spatial-space",
+      "3",
+      "--open",
+      "D:\\autostack\\.verify\\lang-851-native-r4-1\\corridor3d\\moved\\scene.agscene",
+      "--report",
+      "D:\\autostack\\.verify\\lang-851-native-r4-1\\corridor3d\\report.json"
+    ],
+    "exit": 0,
+    "binary_sha256": "13a6d0cb5da88d73fb7d77148337ff5a62201a810b302a9c4d1d1110e25dd375",
+    "user_sha256": "7c22cb93d61bca7e9cde7b8dec79db370d9a936ed294b1f3418e319ee47f34e1",
+    "report": "report.json",
+    "phase": 14
+  },
+  {
+    "case": "maze2d-bind",
+    "command": [
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+      "--motion-check",
+      "--spatial-space",
+      "2",
+      "--open",
+      "D:\\autostack\\.verify\\lang-851-native-r4-1\\maze2d-bind\\moved\\scene.agscene",
+      "--report",
+      "D:\\autostack\\.verify\\lang-851-native-r4-1\\maze2d-bind\\report.json",
+      "--behavior",
+      "D:\\autostack\\.verify\\lang-851-native-r4-1\\maze2d-bind\\moved\\new.at",
+      "--behavior-api",
+      "v5",
+      "--motion-update",
+      "--motion-saveas",
+      "D:\\autostack\\.verify\\lang-851-native-r4-1\\maze2d-bind\\export\\scene.agscene"
+    ],
+    "exit": 0,
+    "binary_sha256": "13a6d0cb5da88d73fb7d77148337ff5a62201a810b302a9c4d1d1110e25dd375",
+    "user_sha256": "1fb2707271b3e46dfe3bb76b3331acea3360d89906dd334cba4bd0e809fcaf02",
+    "report": "report.json",
+    "phase": 14
+  },
+  {
+    "case": "corridor3d-bind",
+    "command": [
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+      "--motion-check",
+      "--spatial-space",
+      "3",
+      "--open",
+      "D:\\autostack\\.verify\\lang-851-native-r4-1\\corridor3d-bind\\moved\\scene.agscene",
+      "--report",
+      "D:\\autostack\\.verify\\lang-851-native-r4-1\\corridor3d-bind\\report.json",
+      "--behavior",
+      "D:\\autostack\\.verify\\lang-851-native-r4-1\\corridor3d-bind\\moved\\new.at",
+      "--behavior-api",
+      "v5",
+      "--motion-update",
+      "--motion-saveas",
+      "D:\\autostack\\.verify\\lang-851-native-r4-1\\corridor3d-bind\\export\\scene.agscene"
+    ],
+    "exit": 0,
+    "binary_sha256": "13a6d0cb5da88d73fb7d77148337ff5a62201a810b302a9c4d1d1110e25dd375",
+    "user_sha256": "7c22cb93d61bca7e9cde7b8dec79db370d9a936ed294b1f3418e319ee47f34e1",
+    "report": "report.json",
+    "phase": 14
+  },
+  {
+    "case": "maze2d-short",
+    "command": [
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+      "--motion-check",
+      "--spatial-space",
+      "2",
+      "--open",
+      "D:\\autostack\\.verify\\lang-851-native-r4-1\\maze2d-short\\moved\\scene.agscene",
+      "--report",
+      "D:\\autostack\\.verify\\lang-851-native-r4-1\\maze2d-short\\report.json",
+      "--behavior",
+      "D:\\autostack\\.verify\\lang-851-native-r4-1\\maze2d-short\\changed.at",
+      "--behavior-api",
+      "v5",
+      "--spatial-narrow",
+      "--motion-update"
+    ],
+    "exit": 0,
+    "binary_sha256": "13a6d0cb5da88d73fb7d77148337ff5a62201a810b302a9c4d1d1110e25dd375",
+    "user_sha256": "c47420066cd25a62d9efb0a8fc05dca03758b88376b76f332b794341815d92fe",
+    "report": "report.json",
+    "phase": 14
+  },
+  {
+    "case": "corridor3d-short",
+    "command": [
+      "D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\debug\\autographics-authoring.exe",
+      "--motion-check",
+      "--spatial-space",
+      "3",
+      "--open",
+      "D:\\autostack\\.verify\\lang-851-native-r4-1\\corridor3d-short\\moved\\scene.agscene",
+      "--report",
+      "D:\\autostack\\.verify\\lang-851-native-r4-1\\corridor3d-short\\report.json",
+      "--behavior",
+      "D:\\autostack\\.verify\\lang-851-native-r4-1\\corridor3d-short\\changed.at",
+      "--behavior-api",
+      "v5",
+      "--spatial-narrow",
+      "--motion-update"
+    ],
+    "exit": 0,
+    "binary_sha256": "13a6d0cb5da88d73fb7d77148337ff5a62201a810b302a9c4d1d1110e25dd375",
+    "user_sha256": "ca6ef520e903a421f762a8fd46dddc6f73e95f5f8c96d48a0bd490922a805e7c",
+    "report": "report.json",
+    "phase": 14
+  }
+]

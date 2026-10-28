@@ -1,0 +1,37 @@
+// PLAN-860 probe-only trusted unit (candidate B), appended after assembly.
+// Not a public API: no admission path, no user visibility, no v5 changes.
+// grounded is a geometric final-support determination inside the same single
+// character-update call; per-contract r2/r3 (attachments/860/work).
+var _agp_grounded=0
+var _agp_support= -1
+var _agp_scans=0
+fn agp_grounded(token int) int {
+ if _ag_cast_charge(1)==0 {return 0}
+ if token<=0 || token!=_ag_cast_token {_ag_fail(13,-1,0);return 0}
+ return _agp_grounded
+}
+fn agp_support_node(token int) int {
+ if _ag_cast_charge(1)==0 {return 0}
+ if token<=0 || token!=_ag_cast_token {_ag_fail(13,-1,0);return 0}
+ return _agp_support
+}
+fn agp_move(node int, dx float, dy float, dz float, clearance float) int {
+ _agp_grounded=0;_agp_support= -1;_agp_scans=0
+ let token=ag_move_and_slide(node,0,dx,dy,dz,clearance)
+ if token<=0 {return 0}
+ _agp_scans=1
+ if _ag_motion_state==3 {return token}
+ if _ag_kinds[node]==5 {return token}
+ if _ag_cast_charge(1)==0 {return 0}
+ _agp_scans=_agp_scans+1
+ let wi=node*3
+ let ox=_ag_worlds[wi];let oy=_ag_worlds[wi+1];let oz=_ag_worlds[wi+2]
+ _ag_motion_checked=1
+ _ag_motion_initial= -1
+ var ok=0
+ if _ag_dimensions[node]==2 {ok=_ag_motion_two(2,node,0,ox,oy,oz,0.0, -0.01,0.0)}
+ if _ag_dimensions[node]==3 {ok=_ag_motion_three(3,node,0,ox,oy,oz,0.0, -0.01,0.0)}
+ if ok==0 {return 0}
+ if _ag_cast_found==1 {if _ag_cast_ny==1.0 {if _ag_cast_nx==0.0 {if _ag_cast_nz==0.0 {_agp_grounded=1;_agp_support=_ag_cast_target}}}}
+ return token
+}

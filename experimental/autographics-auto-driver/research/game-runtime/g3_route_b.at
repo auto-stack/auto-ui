@@ -1,0 +1,38 @@
+// PLAN-860 G3 route, candidate B (probe-only agp_move support unit).
+// Frozen inputs per probe-contract r4: (ix,iz) phases 1-42=(1,1) 43-84=(1,-1)
+// 85-309=(1,0) 310-351=(1,1) 352-355=(1,0) 356-402=(1,1); jump {112,261};
+// clearance 0.002; diagonal normalized to speed 4.
+//grounded-rule
+var vy=0.0
+var grounded=0
+var jprev=0
+var stepn=0
+fn app_start() {ag_set_local(0,0,2.0);ag_set_local(0,1,1.0);ag_set_local(0,2,2.0)}
+fn app_update(dt float) {
+ stepn=stepn+1
+ let s=stepn
+ var jp=0
+ if s==112 {jp=1}
+ if s==261 {jp=1}
+ if jp==1 {if jprev==0 {if grounded==1 {vy=8.0}}}
+ jprev=jp
+ vy=vy-20.0*dt
+ var fx=0.0
+ var fz=0.0
+ if s<=42 {fx=1.0;fz=1.0}
+ if s>=43 {if s<=84 {fx=1.0;fz= -1.0}}
+ if s>=85 {if s<=309 {fx=1.0}}
+ if s>=310 {if s<=351 {fx=1.0;fz=1.0}}
+ if s>=352 {if s<=355 {fx=1.0}}
+ if s>=356 {fx=1.0;fz=1.0}
+ var k=4.0
+ if fx!=0.0 {if fz!=0.0 {k=2.8284271}}
+ let vx=k*fx
+ let vz=k*fz
+ let dx=vx*dt
+ let dy=vy*dt
+ let dz=vz*dt
+ let q=agp_move(0,dx,dy,dz,0.002)
+ grounded=agp_grounded(q)
+ if grounded==1 {vy=0.0}
+}

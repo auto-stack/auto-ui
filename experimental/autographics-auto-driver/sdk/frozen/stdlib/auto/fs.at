@@ -1,0 +1,70 @@
+/// Filesystem Module — Plan 250
+///
+/// Enhanced filesystem operations beyond basic file.at.
+/// Inspired by Python's pathlib/os, Go's os package, Rust's std::fs.
+
+/// Get system temporary directory path.
+#[vm]
+fn temp_dir() str
+
+/// Create a temporary file and return its path.
+#[vm]
+fn temp_file() str
+
+/// Rename a file or directory.
+#[vm]
+fn rename(old str, new str) void
+
+/// Read directory entries (non-recursive). Returns JSON array of filenames.
+#[vm]
+fn read_dir(dir str) str
+
+/// List direct child names (non-recursive; dotfiles skipped; sorted).
+/// Returns an empty list when the directory cannot be read.
+#[vm]
+fn dir_names(dir str) []str
+
+/// Get canonical (absolute, resolved) path.
+#[vm]
+fn canonical(path str) str
+
+/// Get file extension (e.g., "txt" from "doc.txt").
+#[vm]
+fn ext(path str) str
+
+/// Get file modification time as epoch seconds (PLAN-016 T-05).
+/// Returns -1 on failure or if the mtime predates 1970.
+#[vm]
+fn mtime(path str) int
+
+/// Get filename stem (e.g., "doc" from "doc.txt").
+#[vm]
+fn stem(path str) str
+
+/// Walk directory recursively returning only files. Returns JSON array of paths.
+#[vm]
+fn walk_files(dir str) str
+
+/// Walk directory recursively returning all entries (files + dirs). Returns JSON array of paths.
+#[vm]
+fn walk(dir str) str
+
+/// Get file metadata (size, is_dir, is_file, modified timestamp).
+#[vm]
+fn metadata(path str) str
+
+/// Copy a file or directory recursively.
+#[vm]
+fn copy_recursive(src str, dst str) void
+
+/// Get filename component of a path (e.g., "doc.txt" from "/home/user/doc.txt").
+#[vm]
+fn filename(path str) str
+
+/// Get parent directory of a path.
+#[vm]
+fn parent(path str) str
+
+/// Join path components with the OS separator.
+#[vm]
+fn join(base str, rest str) str

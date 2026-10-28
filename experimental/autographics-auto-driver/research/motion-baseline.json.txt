@@ -1,0 +1,21 @@
+{
+  "plan": "PLAN-851",
+  "revision": 1,
+  "base_commit": "6bb85f354e718f6541256f4b3d75ca97af75b8c4",
+  "worktree": "D:/autostack/.wt/lang-851/auto-lang",
+  "branch": "plan-851-dev",
+  "sdk_commit": "7b987ca8b12f2eec3c076a1bfbf3ff4663aa8467",
+  "frozen_files": {
+    "Cargo.lock": "2b131d3dd33a968b43d53664cb8649d6c24225fa0f2c28c1add603be98a358db",
+    "../autographics-prototype/Cargo.lock": "c3df168e7234b8bfa876dfbab8afa71af8773d1d7241ac010ad5d8054930b3bf",
+    "research/sdk-Cargo.lock.txt": "5192d08d502a8f17e277ad8912f5884175659bef642b614e25b394243d1ff091",
+    "research/source-lock.json": "f5d7f1f8e3e2bfedf70775ee4b9741080d712b809640ee334ae075a335a54959"
+  },
+  "prior_delivery": "PLAN-849 archive final pass; canonical 8087a6bbd6bc81518e469e0a65592a856b4caf3d; ledger fa7711d0222c9e9852f56eb32fe986fa16dab45e/v92; cleaned true",
+  "source_verification": "prepare_sdk PASS 681 files/17 local; verify_source PASS 402 hashes; metadata 479 packages/29 path edges/forbidden=0",
+  "prior_denominator": "849 producer and fresh consumer each 247 tests; 81 command groups; unchanged AGP 23 slots/163 tests/16 native reused with identity proof; 87 graphics semantic slots preserved",
+  "open_risks": [
+    "R849-NATIVE-CLOCK: isolated native reopen may auto-Pause from backlog; no threshold changes authorized"
+  ],
+  "implementation": "T-02..T-08 pending; no MotionV5 runtime implementation or verification claimed"
+}

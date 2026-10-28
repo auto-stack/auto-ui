@@ -1,0 +1,45 @@
+// PLAN-875 runtime_camera3d/1 second public configuration: a different orbit
+// and projection pair proving the host projects from the user source (no
+// frozen constants): distance 6, pitch 30 deg, orthographic size 16.
+var speed=5.0
+var jump=7.0
+var gravity=18.0
+var vy=0.0
+var grounded=0
+var ok=0
+var face_x=0.0
+var face_z= -1.0
+fn app_start() {
+ ok=ok+ag_char3_bind(1)
+ ok=ok+ag_char3_solid(2)
+ ok=ok+ag_char3_solid(3)
+ ok=ok+ag_camera_orbit_3d(1, 6.0, 30.0, 1, 16.0)
+}
+fn app_update(dt float) {
+ let jp=ag_action_pressed(4)
+ if jp==1 {if grounded==1 {vy = jump}}
+ vy = vy - gravity*dt
+ let hr=ag_action_held(1)
+ let hl=ag_action_held(0)
+ let hf=ag_action_held(2)
+ let hb=ag_action_held(3)
+ var mx = hr - hl
+ var mz = hb - hf
+ var n = 1.0
+ if mx != 0 {if mz != 0 {n = 0.70710678}}
+ mx = mx*n
+ mz = mz*n
+ let fx=ag_cam3_forward_x()
+ let fz=ag_cam3_forward_z()
+ let rx=ag_cam3_right_x()
+ let rz=ag_cam3_right_z()
+ let wx=(fx*mz+rx*mx)
+ let wz=(fz*mz+rz*mx)
+ if wx != 0.0 {face_x=wx*0.70710678;face_z=wz*0.70710678}
+ if wz != 0.0 {face_x=wx*0.70710678;face_z=wz*0.70710678}
+ let dx = wx*n*speed*dt
+ let dz = wz*n*speed*dt
+ let q=ag_char3_move(dx,vy*dt,dz,0.002)
+ grounded=ag_char3_grounded(q)
+ if grounded==1 {vy=0.0}
+}

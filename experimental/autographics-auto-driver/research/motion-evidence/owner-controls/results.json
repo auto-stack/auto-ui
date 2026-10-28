@@ -1,0 +1,121 @@
+[
+  {
+    "case": "source",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--test",
+      "motion_owners",
+      "twenty_real_v1_v2_v3_v4_v5_cancel_fault_history_open_owners_and_warm_geometry",
+      "--",
+      "--exact",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "exit": 101,
+    "oracle": "only authorized external source pin may survive"
+  },
+  {
+    "case": "vm",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--test",
+      "motion_owners",
+      "twenty_real_v1_v2_v3_v4_v5_cancel_fault_history_open_owners_and_warm_geometry",
+      "--",
+      "--exact",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "exit": 101,
+    "oracle": "runtime VM must release at Stop"
+  },
+  {
+    "case": "spatial",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--test",
+      "motion_owners",
+      "twenty_real_v1_v2_v3_v4_v5_cancel_fault_history_open_owners_and_warm_geometry",
+      "--",
+      "--exact",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "exit": 101,
+    "oracle": "spatial descriptor must release at Stop"
+  },
+  {
+    "case": "rescan",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--test",
+      "motion_owners",
+      "twenty_real_v1_v2_v3_v4_v5_cancel_fault_history_open_owners_and_warm_geometry",
+      "--",
+      "--exact",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "exit": 101,
+    "oracle": "warm geometry must not rescan vertices"
+  },
+  {
+    "case": "upload",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--test",
+      "motion_owners",
+      "twenty_real_v1_v2_v3_v4_v5_cancel_fault_history_open_owners_and_warm_geometry",
+      "--",
+      "--exact",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "exit": 101,
+    "oracle": "warm model must retain actual GPU Arc"
+  },
+  {
+    "case": "content",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--test",
+      "motion_owners",
+      "twenty_real_v1_v2_v3_v4_v5_cancel_fault_history_open_owners_and_warm_geometry",
+      "--",
+      "--exact",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "exit": 101,
+    "oracle": "warm canvas content must match accepted editing scene"
+  },
+  {
+    "case": "restored",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--test",
+      "motion_owners",
+      "twenty_real_v1_v2_v3_v4_v5_cancel_fault_history_open_owners_and_warm_geometry",
+      "--",
+      "--exact",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "oracle": null
+  }
+]

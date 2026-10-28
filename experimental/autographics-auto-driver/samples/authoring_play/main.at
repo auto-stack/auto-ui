@@ -1,0 +1,74 @@
+// Profile 6: one retained world; host supplies actions, never movement.
+var resources=[]
+var fields=[]
+var identities=[]
+var kinds=[]
+var dimensions=[]
+var parents=[]
+var flags=[]
+var worlds=[]
+var effective=[]
+var sequence=0
+var run=0
+var actor2=-1
+var actor3=-1
+var toggled=0
+var input_space=0
+var input_x=0
+var input_y=0
+fn main() {}
+fn profile() int { return 6 }
+fn reset(token int, two int, three int) {
+    resources=[]; fields=[]; identities=[]; kinds=[]; dimensions=[]; parents=[]; flags=[]; worlds=[]; effective=[]
+    sequence=0; run=token; actor2=two; actor3=three; toggled=0
+}
+fn identity(id int, kind int, dimension int, parent int) { identities.push(id); kinds.push(kind); dimensions.push(dimension); parents.push(parent) }
+fn append_field(value float) { fields.push(value) }
+fn visibility(value int) { flags.push(value) }
+fn bind_resource(value int) { resources.push(value) }
+fn derive() {
+    worlds=[]; effective=[]
+    for i in 0..identities.len() {
+        let parent=parents[i]
+        for axis in 0..3 {
+            var world=fields[i*12+axis]
+            if parent>=0 { world=world+worlds[parent*3+axis] }
+            worlds.push(world)
+        }
+        var shown=flags[i]
+        if parent>=0 { if effective[parent]==0 { shown=0 } }
+        effective.push(shown)
+    }
+}
+fn action(space int, x int, y int, value int) { input_space=space; input_x=x; input_y=y; toggled=value }
+fn tick(next int, dt float) {
+    let space=input_space
+    let x=input_x
+    let y=input_y
+    var actor=-1
+    var speed=0.0
+    if space==2 { actor=actor2; speed=60.0 }
+    if space==3 { actor=actor3; speed=3.0 }
+    if actor>=0 {
+        fields[actor*12]=fields[actor*12]+x*speed*dt
+        if space==2 { fields[actor*12+1]=fields[actor*12+1]+y*speed*dt }
+        if space==3 { fields[actor*12+2]=fields[actor*12+2]-y*speed*dt }
+        if toggled==1 { flags[actor]=1-flags[actor] }
+    }
+    toggled=0; sequence=next; derive()
+}
+fn run_id() int { return run }
+fn tick_id() int { return sequence }
+fn count() int { return identities.len() }
+fn id(i int) int { return identities[i] }
+fn kind(i int) int { return kinds[i] }
+fn dimension(i int) int { return dimensions[i] }
+fn parent(i int) int { return parents[i] }
+fn visible(i int) int { return effective[i] }
+fn local_visible(i int) int { return flags[i] }
+fn resource(i int) int { return resources[i] }
+fn local(i int, f int) float { return fields[i*12+f] }
+fn field(i int, f int) float {
+    if f<3 { return worlds[i*3+f] }
+    return fields[i*12+f]
+}

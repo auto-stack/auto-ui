@@ -1,0 +1,28 @@
+// PLAN-875 runtime-camera2d/1 second public configuration: a different
+// rect/viewport pair proving the host projects from the user source (no
+// frozen constants). rect x[4,26] y[-2,10], viewport 8x6 letterboxes to
+// 506.67x380 centered (bars ~146.67 logical px each side).
+var speed=5.0
+var jump=7.0
+var gravity=18.0
+var vy=0.0
+var grounded=0
+var ok=0
+fn app_start() {
+ ok=ok+ag_char_bind(1)
+ ok=ok+ag_char_solid(2)
+ ok=ok+ag_char_solid(3)
+ ok=ok+ag_char_solid(4)
+ ok=ok+ag_camera_follow_2d(1, 4.0, -2.0, 26.0, 10.0, 8.0, 6.0)
+}
+fn app_update(dt float) {
+ let jp=ag_action_pressed(2)
+ if jp==1 {if grounded==1 {vy = jump}}
+ vy = vy - gravity*dt
+ let hr=ag_action_held(1)
+ let hl=ag_action_held(0)
+ let dx = (hr - hl)*speed*dt
+ let q=ag_char_move(dx,vy*dt,0.002)
+ grounded=ag_char_grounded(q)
+ if grounded==1 {vy=0.0}
+}

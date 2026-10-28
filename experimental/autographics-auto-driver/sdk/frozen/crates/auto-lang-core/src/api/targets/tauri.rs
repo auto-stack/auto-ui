@@ -1,0 +1,469 @@
+//! Tauri Command Generator
+//!
+//! Plan 102 Phase 5.2: Generate Tauri commands from API definitions
+
+use super::TargetGenerator;
+use crate::api::{ApiEndpoint, ApiModule};
+
+/// Tauri command generator
+pub struct TauriGenerator {
+    /// Indentation string
+    indent: String,
+}
+
+impl TauriGenerator {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl Default for TauriGenerator {
+    fn default() -> Self {
+        Self {
+            indent: "    ".to_string(),
+        }
+    }
+}
+
+impl TauriGenerator {
+    /// Convert Auto type to Rust type
+    fn to_rust_type(&self, auto_type: &str) -> String {
+        let trimmed = auto_type.trim();
+
+        // Plan 329: ~Iter<T> / ~Stream<T> → extract inner element type T
+        // (SSE handlers use Channel, not the stream type directly)
+        if trimmed.starts_with("~Iter<") || trimmed.starts_with("~Stream<") {
+            let inner = &trimmed[6..trimmed.len() - 1];
+            return self.to_rust_type(inner);
+        }
+
+        // Handle optional types (ending with ?)
+        let (base_type, is_optional) = if let Some(inner) = trimmed.strip_suffix('?') {
+            (inner, true)
+        } else {
+            (trimmed, false)
+        };
+
+        // Handle slice types []T
+        let rust_type = if let Some(inner) = base_type.strip_prefix("[]") {
+            if inner.is_empty() {
+                "Vec<()>".to_string()
+            } else {
+                format!("Vec<{}>", self.to_rust_type(inner))
+            }
+        } else if base_type.starts_with('[') {
+            // Handle fixed array types [N]T -> Vec<T>
+            if let Some(close_idx) = base_type.find(']') {
+                let rest = &base_type[close_idx + 1..];
+                if !rest.is_empty() {
+                    format!("Vec<{}>", self.to_rust_type(rest))
+                } else {
+                    base_type.to_string()
+                }
+            } else {
+                base_type.to_string()
+            }
+        } else {
+            // Basic type mappings
+            match base_type {
+                "int" | "i32" => "i32".to_string(),
+                "i64" | "long" => "i64".to_string(),
+                "u32" | "uint" => "u32".to_string(),
+                "u64" | "ulong" => "u64".to_string(),
+                "i8" | "byte" => "i8".to_string(),
+                "u8" | "ubyte" => "u8".to_string(),
+                "float" | "f32" => "f32".to_string(),
+                "double" | "f64" => "f64".to_string(),
+                "bool" | "boolean" => "bool".to_string(),
+                "str" | "string" | "String" => "String".to_string(),
+                "void" => "()".to_string(),
+                _ => base_type.to_string(), // Use as-is for custom types
+            }
+        };
+
+        if is_optional {
+            format!("Option<{}>", rust_type)
+        } else {
+            rust_type
+        }
+    }
+
+    /// Generate Tauri command function
+    fn generate_command(&self, endpoint: &ApiEndpoint) -> String {
+        let mut lines = Vec::new();
+
+        // Add documentation
+        if let Some(ref doc) = endpoint.doc {
+            lines.push(format!("/// {}", doc));
+        }
+
+        // Add Tauri command attribute
+        lines.push("#[tauri::command]".to_string());
+
+        // Plan 329: SSE handler → Channel command (async, streaming via emit)
+        // PLAN-734 T-05：契约分类（身份判定）。
+        let is_sse = endpoint.response == crate::api::contract::ResponseKind::Stream;
+
+        // Build function signature
+        let mut params: Vec<String> = endpoint
+            .params
+            .iter()
+            .map(|p| {
+                let rust_type = self.to_rust_type(&p.ty);
+                let final_type = if p.optional {
+                    format!("Option<{}>", rust_type)
+                } else {
+                    rust_type
+                };
+                format!("{}: {}", p.name, final_type)
+            })
+            .collect();
+
+        // SSE: add on_event: tauri::ipc::Channel parameter
+        if is_sse {
+            params.push("on_event: tauri::ipc::Channel".to_string());
+        }
+
+        let call_args: Vec<String> = endpoint.params.iter().map(|p| p.name.to_string()).collect();
+
+        let signature = if is_sse {
+            format!(
+                "pub async fn {}({}) {{",
+                endpoint.fn_name,
+                params.join(", ")
+            )
+        } else {
+            let return_type = self.to_rust_type(&endpoint.return_type);
+            let return_sig = if return_type == "()" {
+                "".to_string()
+            } else {
+                format!("-> {}", return_type)
+            };
+            if return_sig.is_empty() {
+                format!("pub fn {}({}) {{", endpoint.fn_name, params.join(", "))
+            } else {
+                format!(
+                    "pub fn {}({}) {} {{",
+                    endpoint.fn_name,
+                    params.join(", "),
+                    return_sig
+                )
+            }
+        };
+        lines.push(signature);
+
+        // PLAN-730 T-06: 上传端点不经 Tauri IPC——UploadRequest 是宿主注入
+        // 能力（不可序列化句柄；明确 Unsupported 诊断 + HTTP URL 指引）。
+        let is_upload_endpoint = endpoint
+            .params
+            .iter()
+            .any(|p| crate::api::contract::is_upload_param(&p.ty))
+            || endpoint.response == crate::api::contract::ResponseKind::Upload;
+        if is_upload_endpoint {
+            lines.clear();
+            lines.push(format!(
+                "// PLAN-730: upload endpoint `{}` — Tauri IPC is unsupported for uploads;",
+                endpoint.fn_name
+            ));
+            lines.push("// call the HTTP URL directly instead.".to_string());
+            lines.push("#[tauri::command]".to_string());
+            lines.push(format!(
+                "pub fn {}() -> Result<String, String> {{",
+                endpoint.fn_name
+            ));
+            lines.push(format!(
+                "{}Err(\"PLAN-730: upload endpoint `{}` requires HTTP transport; call the HTTP URL directly instead of the Tauri IPC bridge\".to_string())",
+                self.indent, endpoint.fn_name
+            ));
+            lines.push("}".to_string());
+            return lines.join("\n");
+        }
+
+        // PLAN-729 T-05: 文件端点不经 Tauri IPC——描述符不是可序列化数据
+        // （明确 Unsupported 诊断 + 改走 HTTP URL 指引，不 opaque 当成功数据）。
+        if endpoint.response == crate::api::contract::ResponseKind::File {
+            lines.clear();
+            lines.push(format!(
+                "// PLAN-729: file endpoint `{}` — Tauri IPC is unsupported for file responses;",
+                endpoint.fn_name
+            ));
+            lines.push("// call the HTTP URL directly instead.".to_string());
+            lines.push("#[tauri::command]".to_string());
+            lines.push(format!(
+                "pub fn {}() -> Result<String, String> {{",
+                endpoint.fn_name
+            ));
+            lines.push(format!(
+                "{}Err(\"PLAN-729: file endpoint `{}` requires HTTP transport; call the HTTP URL directly instead of the Tauri IPC bridge\".to_string())",
+                self.indent, endpoint.fn_name
+            ));
+            lines.push("}".to_string());
+            return lines.join(
+                "
+",
+            );
+        }
+
+        // Plan 329: SSE handler → for loop + channel.emit (streaming).
+        // Non-SSE → call api::fn and return result.
+        if is_sse {
+            // SSE: iterate the generator stream and emit each item via Channel
+            lines.push(format!(
+                "{}for item in api::{}({}) {{",
+                self.indent,
+                endpoint.fn_name,
+                call_args.join(", ")
+            ));
+            lines.push(format!(
+                "{}{}let _ = on_event.emit(serde_json::json!(item));",
+                self.indent, self.indent
+            ));
+            lines.push(format!("{}}}", self.indent));
+        } else {
+            let rt = endpoint.return_type.trim();
+            if rt == "()" || rt == "void" {
+                lines.push(format!(
+                    "{}api::{}({})",
+                    self.indent,
+                    endpoint.fn_name,
+                    call_args.join(", ")
+                ));
+            } else {
+                lines.push(format!(
+                    "{}api::{}({})",
+                    self.indent,
+                    endpoint.fn_name,
+                    call_args.join(", ")
+                ));
+            }
+        }
+
+        lines.push("}".to_string());
+        lines.join("\n")
+    }
+
+    /// Generate command registration code
+    fn generate_registration(&self, endpoints: &[ApiEndpoint]) -> String {
+        let mut lines = vec![
+            "use tauri::Manager;".to_string(),
+            "".to_string(),
+            "/// Register all API commands with the Tauri app".to_string(),
+            "pub fn register_commands(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> {".to_string(),
+            format!("{}builder.invoke_handler(tauri::generate_handler![", self.indent),
+        ];
+
+        for endpoint in endpoints {
+            lines.push(format!(
+                "{}{}{},",
+                self.indent, self.indent, endpoint.fn_name
+            ));
+        }
+
+        lines.push(format!("{}])", self.indent));
+        lines.push("}".to_string());
+
+        lines.join("\n")
+    }
+
+    /// Plan 328 IPC: Generate the complete commands.rs file (types + commands + registration).
+    pub fn generate_full(&self, module: &ApiModule) -> String {
+        let mut output = Vec::new();
+
+        // Use declarations
+        output.push("// Plan 328 IPC: Auto-generated Tauri commands (a2r)".to_string());
+        output.push("use serde::{Serialize, Deserialize};".to_string());
+        output.push("use serde_json; // Plan 329: for SSE channel emit".to_string());
+        output.push("".to_string());
+
+        // Type definitions
+        let types = self.generate_types(module);
+        if !types.is_empty() {
+            output.push(types);
+            output.push("".to_string());
+        }
+
+        // Commands (call real api::fn business logic)
+        output.push("// Tauri Commands (IPC)".to_string());
+        output.push("".to_string());
+        for endpoint in &module.endpoints {
+            output.push(self.generate_command(endpoint));
+            output.push("".to_string());
+        }
+
+        // Registration
+        output.push("// Command Registration".to_string());
+        output.push(self.generate_registration(&module.endpoints));
+
+        output.join("\n")
+    }
+
+    /// Plan 328 IPC: Generate the Tauri main.rs entry point.
+    /// Unlike Axum's server (TcpListener + serve), Tauri uses Builder +
+    /// invoke_handler to register IPC commands.
+    pub fn generate_server_main(&self, endpoints: &[ApiEndpoint]) -> String {
+        let mut lines = Vec::new();
+        lines.push("#[tokio::main]".to_string());
+        lines.push("async fn main() {".to_string());
+        lines.push("    tauri::Builder::default()".to_string());
+        lines.push("        .invoke_handler(tauri::generate_handler![".to_string());
+        for endpoint in endpoints {
+            lines.push(format!("            {},", endpoint.fn_name));
+        }
+        lines.push("        ])".to_string());
+        lines.push("        .run(tauri::generate_context!())".to_string());
+        lines.push("        .expect(\"error while running tauri application\");".to_string());
+        lines.push("}".to_string());
+        lines.join("\n")
+    }
+
+    /// Generate type definitions
+    fn generate_types(&self, module: &ApiModule) -> String {
+        if module.types.is_empty() {
+            return String::new();
+        }
+
+        let mut lines = vec![
+            "use serde::{Deserialize, Serialize};".to_string(),
+            "".to_string(),
+        ];
+
+        for api_type in &module.types {
+            // Add documentation
+            if let Some(ref doc) = api_type.doc {
+                lines.push(format!("/// {}", doc));
+            }
+
+            lines.push("#[derive(Debug, Clone, Default, Serialize, Deserialize)]".to_string());
+            lines.push(format!("pub struct {} {{", api_type.name));
+
+            for field in &api_type.fields {
+                let rust_type = self.to_rust_type(&field.ty);
+                let serde_skip = if field.optional {
+                    format!(
+                        "#[serde(skip_serializing_if = \"Option::is_none\")]\n{}",
+                        self.indent
+                    )
+                } else {
+                    "".to_string()
+                };
+                lines.push(format!(
+                    "{}{}pub {}: {},",
+                    self.indent, serde_skip, field.name, rust_type
+                ));
+            }
+
+            lines.push("}".to_string());
+            lines.push("".to_string());
+        }
+
+        lines.join("\n")
+    }
+}
+
+impl TargetGenerator for TauriGenerator {
+    fn generate(&self, module: &ApiModule) -> String {
+        let mut output = Vec::new();
+
+        // Generate type definitions
+        let types = self.generate_types(module);
+        if !types.is_empty() {
+            output.push(types);
+        }
+
+        // Generate commands
+        output.push("// Tauri Commands".to_string());
+        output.push("".to_string());
+
+        for endpoint in &module.endpoints {
+            output.push(self.generate_command(endpoint));
+            output.push("".to_string());
+        }
+
+        // Generate registration
+        output.push("// Command Registration".to_string());
+        output.push(self.generate_registration(&module.endpoints));
+
+        output.join("\n")
+    }
+
+    fn extension(&self) -> &str {
+        ".rs"
+    }
+
+    fn subdirectory(&self) -> &str {
+        "tauri"
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    /// PLAN-729 R1 [G-02]：文件端点 → Tauri IPC 明确 Unsupported 诊断
+    /// （Err + 改走 HTTP URL 指引；不 opaque 当成功数据）。
+    #[test]
+    fn test_plan729_file_endpoint_unsupported_diagnostic() {
+        use crate::api::{ApiAttrs, ApiEndpoint};
+        let mut attrs = ApiAttrs::new();
+        attrs.method = Some("GET".to_string());
+        attrs.path = Some("/api/files/:name".to_string());
+        let endpoint = ApiEndpoint {
+            fn_name: "download".to_string(),
+            params: Vec::new(),
+            return_type: "FileResponse".to_string(),
+            attrs,
+            body: None,
+            doc: None,
+            response: crate::api::contract::ResponseKind::File,
+        };
+        let gen = super::TauriGenerator::default();
+        let cmd = gen.generate_command(&endpoint);
+        assert!(cmd.contains("#[tauri::command]"), "{cmd}");
+        assert!(cmd.contains("Result<String, String>"), "{cmd}");
+        assert!(
+            cmd.contains("requires HTTP transport"),
+            "改走 HTTP URL 指引: {cmd}"
+        );
+        assert!(
+            cmd.contains("call the HTTP URL directly"),
+            "指引文案: {cmd}"
+        );
+        assert!(
+            !cmd.contains("a2r_std::http::FileResponse"),
+            "不得回 opaque 数据: {cmd}"
+        );
+    }
+
+    use super::*;
+    use crate::api::{ApiAttrs, ApiParam};
+
+    #[test]
+    fn test_to_rust_type() {
+        let gen = TauriGenerator::new();
+
+        assert_eq!(gen.to_rust_type("int"), "i32");
+        assert_eq!(gen.to_rust_type("str"), "String");
+        assert_eq!(gen.to_rust_type("bool"), "bool");
+        assert_eq!(gen.to_rust_type("void"), "()");
+        assert_eq!(gen.to_rust_type("User"), "User");
+        assert_eq!(gen.to_rust_type("User?"), "Option<User>");
+        assert_eq!(gen.to_rust_type("[]int"), "Vec<i32>");
+    }
+
+    #[test]
+    fn test_generate_command() {
+        let gen = TauriGenerator::new();
+
+        let endpoint = ApiEndpoint {
+            fn_name: "get_user".to_string(),
+            attrs: ApiAttrs::new(),
+            params: vec![ApiParam::new("id".to_string(), "int".to_string())],
+            return_type: "User".to_string(),
+            doc: Some("Get user by ID".to_string()),
+            body: None,
+            response: Default::default(),
+        };
+
+        let result = gen.generate_command(&endpoint);
+        assert!(result.contains("#[tauri::command]"));
+        assert!(result.contains("pub fn get_user(id: i32) -> User"));
+    }
+}

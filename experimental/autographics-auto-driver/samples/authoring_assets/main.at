@@ -1,0 +1,42 @@
+// Explicit finite hierarchy profile 5. Parent ordinals are zero-based; -1 is root.
+var resources = []
+var fields = []
+var identities = []
+var kinds = []
+var dimensions = []
+var parents = []
+var flags = []
+var worlds = []
+var effective = []
+fn main() {}
+fn profile() int { return 5 }
+fn reset() { resources=[]; fields=[]; identities=[]; kinds=[]; dimensions=[]; parents=[]; flags=[]; worlds=[]; effective=[] }
+fn identity(id int, kind int, dimension int, parent int) { identities.push(id); kinds.push(kind); dimensions.push(dimension); parents.push(parent) }
+fn append_field(value float) { fields.push(value) }
+fn visibility(value int) { flags.push(value) }
+fn derive() {
+    for i in 0..identities.len() {
+        let parent = parents[i]
+        for axis in 0..3 {
+            var world = fields[i * 12 + axis]
+            if parent >= 0 { world = world + worlds[parent * 3 + axis] }
+            worlds.push(world)
+        }
+        var shown = flags[i]
+        if parent >= 0 { if effective[parent] == 0 { shown = 0 } }
+        effective.push(shown)
+    }
+}
+fn count() int { return identities.len() }
+fn id(i int) int { return identities[i] }
+fn kind(i int) int { return kinds[i] }
+fn dimension(i int) int { return dimensions[i] }
+fn parent(i int) int { return parents[i] }
+fn visible(i int) int { return effective[i] }
+fn field(i int, f int) float {
+    if f < 3 { return worlds[i * 3 + f] }
+    return fields[i * 12 + f]
+}
+
+fn bind_resource(value int) { resources.push(value) }
+fn resource(i int) int { return resources[i] }

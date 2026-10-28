@@ -1,0 +1,22 @@
+var actor=-1
+var target=-1
+var marker=-1
+var door=-1
+var point_marker=-1
+var snapshot_ok=1
+var reach=20.0
+fn app_start(){
+ actor=ag_actor(2); target=ag_node_at(1); marker=ag_node_at(2); door=ag_node_at(3); point_marker=ag_node_at(4)
+ snapshot_ok=1
+}
+fn app_update(dt float){
+ if ag_input_space()==2 {ag_move_local(actor,ag_input_x()*60.0*dt,ag_input_y()*60.0*dt,0.0)}
+
+ let ax=ag_world(actor,0); let ay=ag_world(actor,1); let az=ag_world(actor,2)
+ let q=ag_cast_segment(2,actor,1,ax,ay,az,ax+reach,ay,az)
+ var hit=ag_cast_hit(q); var node=ag_cast_node(q); var fraction=ag_cast_t(q); var px=ag_cast_point(q,0); var nx=ag_cast_normal(q,0)
+
+ ag_set_local(marker,0,-100.0+node*5.0); ag_set_local(marker,1,50.0+fraction*10.0)
+ ag_set_local(point_marker,0,-150.0+px); ag_set_local(point_marker,1,100.0+nx*5.0)
+ ag_set_visible(marker,snapshot_ok); ag_set_visible(door,hit)
+}

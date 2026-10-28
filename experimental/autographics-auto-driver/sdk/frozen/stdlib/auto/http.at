@@ -1,0 +1,410 @@
+/// HTTP module - HTTP server and client
+///
+/// This module provides HTTP server and client functionality.
+/// Built on the net module for TCP transport.
+
+// ═══════════════════════════════════════════════════════════
+// HTTP Server
+// ═══════════════════════════════════════════════════════════
+
+/// HTTP Server type
+type Server
+
+/// Create a new HTTP server
+/// Example: let server = http.server()
+pub fn server() Server;
+
+/// Add a GET route
+/// Example: server.get("/users", fn(req) { http.ok("users") })
+pub fn Server.get(self Server, path str, handler fn(Request) Response) Server;
+
+/// Add a POST route
+/// Example: server.post("/users", fn(req) { http.ok("created") })
+pub fn Server.post(self Server, path str, handler fn(Request) Response) Server;
+
+/// Add a PUT route
+pub fn Server.put(self Server, path str, handler fn(Request) Response) Server;
+
+/// Add a DELETE route
+pub fn Server.delete(self Server, path str, handler fn(Request) Response) Server;
+
+/// Add a static file route
+/// Example: server.static("/static", "./public")
+pub fn Server.static(self Server, prefix str, dir str) Server;
+
+/// Start listening for connections (blocking)
+/// Example: server.listen("127.0.0.1:8080")
+pub fn Server.listen(self Server, addr str) void;
+
+/// Start a simple HTTP server with a callback dispatcher (blocking)
+/// Example: http.listen("127.0.0.1", 8080, fn(method, path, body) { "OK" })
+pub fn listen(host str, port int, handler fn(str, str, str) str) void;
+
+// ═══════════════════════════════════════════════════════════
+// HTTP Request
+// ═══════════════════════════════════════════════════════════
+
+/// HTTP Request type
+type Request
+
+/// Get the HTTP method (GET, POST, etc.)
+pub fn Request.method(self Request) str;
+
+/// Get the request path
+pub fn Request.path(self Request) str;
+
+/// Get the HTTP version
+pub fn Request.version(self Request) str;
+
+/// Get a query parameter
+pub fn Request.query(self Request, key str) str;
+
+/// Get all query parameters as a string
+pub fn Request.query_string(self Request) str;
+
+/// Get a header value
+pub fn Request.header(self Request, key str) str;
+
+/// Get the request body as bytes
+pub fn Request.body(self Request) []byte;
+
+/// Get the request body as text
+pub fn Request.text(self Request) str;
+
+/// Get the request body as JSON
+/// Example: let user = req.json[User]()
+pub fn Request.json[T](self Request) T?;
+
+/// Get a path parameter (for routes like /users/:id)
+pub fn Request.param(self Request, key str) str;
+
+/// Get the content length
+pub fn Request.content_length(self Request) int;
+
+/// Get the content type
+pub fn Request.content_type(self Request) str;
+
+// ═══════════════════════════════════════════════════════════
+// HTTP Response
+// ═══════════════════════════════════════════════════════════
+
+/// HTTP Response type
+type Response
+
+/// Create a new response
+/// Example: let res = http.response()
+pub fn response() Response;
+
+/// Set the status code
+/// Example: res.status(200) or res.status(404)
+pub fn Response.status(self Response, code int) Response;
+
+/// Set a header
+/// Example: res.header("Content-Type", "application/json")
+pub fn Response.header(self Response, key str, value str) Response;
+
+/// Set the body as text
+/// Example: res.text("Hello World")
+pub fn Response.text(self Response, body str) Response;
+
+/// Set the body as HTML
+/// Example: res.html("<h1>Hello</h1>")
+pub fn Response.html(self Response, body str) Response;
+
+/// Set the body as JSON
+/// Example: res.json({ "name": "Alice" })
+pub fn Response.json[T](self Response, data T) Response;
+
+/// Set the body as bytes
+pub fn Response.bytes(self Response, data []byte) Response;
+
+/// Create a redirect response (Plan 346 3c)
+/// Example: return http.response_redirect("/new", 302)
+pub fn response_redirect(url str, code int) Response;
+
+// ═══════════════════════════════════════════════════════════
+// Quick Response Helpers
+// ═══════════════════════════════════════════════════════════
+
+/// Create a 200 OK response
+/// Example: http.ok("Success")
+pub fn ok(body str) Response;
+
+/// Create a 201 Created response
+pub fn created(body str) Response;
+
+/// Create a 400 Bad Request response
+pub fn bad_request(msg str) Response;
+
+/// Create a 404 Not Found response
+/// Example: http.not_found("User not found")
+pub fn not_found(msg str) Response;
+
+/// Create a 500 Internal Server Error response
+pub fn internal_error(msg str) Response;
+
+/// Create a JSON response with status
+pub fn json_response[T](status int, data T) Response;
+
+// ═══════════════════════════════════════════════════════════
+// HTTP Client
+// ═══════════════════════════════════════════════════════════
+
+/// Perform a GET request
+/// Example: let res = http.get("https://api.example.com/users")
+pub fn get(url str) Response;
+
+/// Perform a POST request
+/// Example: let res = http.post("https://api.example.com/users", body)
+pub fn post(url str, body str) Response;
+
+/// Synchronous POST: returns the response BODY as a string directly (no
+/// Response handle). The HTTP status code from the call is stored and can be
+/// retrieved with http.last_status(). api_key is sent as a bearer/authorization
+/// header (empty string to omit). Plan 368 FU-4: declared here (was missing —
+/// the VM shim http_post_sync and a2r a2r_std::http::post_sync already existed,
+/// but the omission caused an auto_link_E0401 undefined-symbol error).
+/// Example: let body = http.post_sync(url, payload, "")
+pub fn post_sync(url str, body str, api_key str) str;
+
+/// Synchronous POST with Bearer auth. Same return/status convention as
+/// post_sync. Plan 368 FU-4: declared here (was missing).
+pub fn post_bearer(url str, body str, api_key str) str;
+
+/// Return the HTTP status code from the last post_sync / post_bearer call
+/// (thread-local). Plan 368 FU-4: declared here (was missing).
+/// Example: let code = http.last_status()
+pub fn last_status() int;
+
+/// Perform a PUT request
+pub fn put(url str, body str) Response;
+
+/// Perform a DELETE request
+pub fn delete(url str) Response;
+
+/// Create a new request builder
+pub fn request(method str, url str) RequestBuilder;
+
+// ═══════════════════════════════════════════════════════════
+// Request Builder (for advanced client requests)
+// ═══════════════════════════════════════════════════════════
+
+type RequestBuilder
+
+/// Add a header
+pub fn RequestBuilder.header(self RequestBuilder, key str, value str) RequestBuilder;
+
+/// Set the body
+pub fn RequestBuilder.body(self RequestBuilder, body str) RequestBuilder;
+
+/// Set JSON body
+pub fn RequestBuilder.json[T](self RequestBuilder, data T) RequestBuilder;
+
+/// Set timeout in milliseconds
+pub fn RequestBuilder.timeout(self RequestBuilder, ms int) RequestBuilder;
+
+/// Send the request
+pub fn RequestBuilder.send(self RequestBuilder) Response;
+
+// ═══════════════════════════════════════════════════════════
+// Response Access Methods
+// ═══════════════════════════════════════════════════════════
+
+/// Get the status code from a response
+/// Example: let code = res.status_code()
+pub fn Response.status_code(self Response) int;
+
+/// Get a header value by key (case-insensitive)
+/// Example: let ct = res.header_get("Content-Type")
+pub fn Response.header_get(self Response, key str) str;
+
+/// Get the raw body as byte array
+/// Example: let bytes = res.body_bytes()
+pub fn Response.body_bytes(self Response) []byte;
+
+// ═══════════════════════════════════════════════════════════
+// HTTP Stream (SSE)
+// ═══════════════════════════════════════════════════════════
+
+/// HTTP streaming response for SSE and chunked data
+type HTTPStream
+
+/// Create a streaming GET request
+pub fn get_stream(url str) HTTPStream;
+
+/// Create a streaming POST request
+pub fn post_stream(url str, body str) HTTPStream;
+
+/// Create a streaming POST request with custom headers
+pub fn post_stream_with_headers(url str, body str, headers str) HTTPStream;
+
+/// Read next chunk from stream
+pub fn HTTPStream.next(self HTTPStream) str;
+
+/// Check if stream is done (1 = done, 0 = active)
+pub fn HTTPStream.is_done(self HTTPStream) int;
+
+/// Close stream and release resources
+pub fn HTTPStream.close(self HTTPStream) void;
+
+/// PLAN-707: Get an iterator id over stream chunks (for c in s.iter() { }).
+/// The stream handle stays owned by the caller; close it when done.
+pub fn HTTPStream.iter(self HTTPStream) int;
+
+/// PLAN-707: Read next chunk (free-function form of HTTPStream.next).
+pub fn stream_next(stream HTTPStream) str;
+
+/// PLAN-707: Check stream done flag (free-function form).
+pub fn stream_is_done(stream HTTPStream) int;
+
+/// PLAN-707: Close stream (free-function form).
+pub fn stream_close(stream HTTPStream) void;
+
+/// PLAN-707: Create an iterator over the stream (free-function form).
+pub fn stream_iter(stream HTTPStream) int;
+
+/// PLAN-707: Open an SSE stream, return stream id for sse_poll/sse_close.
+pub fn sse_open(url str) int;
+
+/// PLAN-707: Non-blocking poll — data payload; "" = pending; "[DONE]" = ended.
+pub fn sse_poll(stream_id int) str;
+
+/// PLAN-707: Explicitly close an SSE stream (release upstream connection).
+pub fn sse_close(stream_id int) void;
+
+/// PLAN-707: Query terminal error — "" = not terminated / no error.
+pub fn sse_error(stream_id int) str;
+
+// ═══════════════════════════════════════════════════════════
+// PLAN-727: File Transfer (cancellable, incremental, atomic-commit)
+// ═══════════════════════════════════════════════════════════
+
+/// Cancellable file transfer handle (download or upload).
+/// Execution runs on the shared transfer core: incremental I/O with bounded
+/// blocks, temp-file staging with atomic commit, failure/cancel preserves
+/// the original target.
+type FileTransfer
+
+/// Start a file download (non-blocking submit).
+/// options is strict JSON: {"headers":{...},"offset":N,"validator":{"etag":"..."}|
+/// {"last_modified":"..."},"max_bytes":N,"timeout_ms":N,"idle_timeout_ms":N,
+/// "on_exists":"overwrite"|"fail"}. Bad options fail terminally without a request.
+/// Example: let t = http.transfer_download(url, path, "{}")
+pub fn transfer_download(url str, path str, options str) FileTransfer;
+
+/// Start a file upload (non-blocking submit). Default mode is multipart with
+/// field "file"; use {"mode":"raw"} for an octet-stream body, "fields" for
+/// extra multipart text fields, "filename" to override, "retries" to opt in
+/// to retry (source re-opened and re-verified each attempt).
+/// Example: let t = http.transfer_upload(url, path, "{\"fields\":{\"note\":\"x\"}}")
+pub fn transfer_upload(url str, path str, options str) FileTransfer;
+
+/// Wait until the transfer reaches a terminal state; returns the receipt JSON:
+/// {"kind":"success|failed|cancelled","status":N|null,"bytes":N,"total":N|null,
+///  "headers":{...},"error":null|{"kind":"...","message":"..."},"body":"..."}.
+/// Only a committed file is reported as success.
+/// Example: let receipt = http.transfer_wait(t)
+pub fn transfer_wait(t FileTransfer) str;
+
+/// Read the latest progress: {"kind":"progress","bytes":N,"total":N|null,
+/// "percent":P|null} ("" = nothing new); the terminal receipt is delivered
+/// exactly once, then "" forever.
+pub fn transfer_next_progress(t FileTransfer) str;
+
+/// Cancel the transfer (idempotent). In-flight file operations close out
+/// before the terminal state; the original target is preserved unless the
+/// commit already succeeded.
+pub fn transfer_cancel(t FileTransfer) void;
+
+/// Terminal error message ("" = none / not terminated).
+pub fn transfer_error(t FileTransfer) str;
+
+/// PLAN-727: Attach a file part to the multipart form (declared previously
+/// only at the native layer). Budgets: ≤16 file parts, ≤64 text fields,
+/// text value ≤64 KiB, text total ≤1 MiB — exceeding fails the send
+/// terminally. File contents are streamed at send time; a missing/unreadable
+/// file fails the request (parts are never silently skipped).
+pub fn RequestBuilder.multipart_file(self RequestBuilder, field str, path str) RequestBuilder;
+
+/// PLAN-727: Attach a text field to the multipart form (see multipart_file
+/// budgets).
+pub fn RequestBuilder.multipart_text(self RequestBuilder, field str, value str) RequestBuilder;
+
+// ═══════════════════════════════════════════════════════════
+// PLAN-729: Server-side File Response (GET/HEAD download face)
+// ═══════════════════════════════════════════════════════════
+
+/// Server file response descriptor. Constructing one never touches the
+/// filesystem: it only records the trusted root, the (untrusted) relative
+/// path and strictly-parsed options. Returning it from a `#[api]` GET/HEAD
+/// handler makes the HTTP layer serve the file with GET/HEAD, single-range
+/// and conditional-request semantics (VM default HTTP and generated Rust
+/// services alike); the body streams bounded blocks and holds its resources
+/// until completion. Not a JSON model, not a FileTransfer, and never a
+/// serializable handle for non-HTTP call forms.
+type FileResponse
+
+/// Build a file response descriptor (no I/O; safe to call anywhere).
+/// `root` comes from trusted app config; `relative_path` may come from route
+/// params — traversal (".."), absolute/drive/UNC paths, NUL and DOS device
+/// names are rejected (403 at serve time). `options` is strict JSON, `{}`
+/// valid: {"content_type":str, "download_name":str,
+/// "disposition":"attachment"|"inline", "etag":str}. Unknown keys, wrong
+/// types, unsafe header values and weak ("W/") etags fail the descriptor
+/// (500 at serve time); they never silently fall back to defaults.
+/// Example: return http.file_response(files_root, name, "{}")
+pub fn file_response(root str, relative_path str, options str) FileResponse;
+
+// ═══════════════════════════════════════════════════════════
+// PLAN-730: Server-side Upload Ingress (multipart/raw receive)
+// ═══════════════════════════════════════════════════════════
+
+/// HTTP-injected upload request capability. Only the HTTP host constructs
+/// one (POST/PUT `#[api]` handler parameter); it cannot be built from JSON,
+/// query data, or any request field, and is consumed exactly once. Routing
+/// and header/path/query auth run before any byte of the body is parsed or
+/// written — returning `http.upload_error(401, ...)` before receive never
+/// touches disk.
+type UploadRequest
+
+/// Receive outcome snapshot (id + bounded metadata; may carry a receive
+/// failure — inspect with upload_metadata, settle with upload_reject).
+type UploadSession
+
+/// Owned terminal result (real HTTP status + bounded JSON; copies do not
+/// re-commit). Returning it from an `#[api]` handler makes the HTTP layer
+/// reply with the receipt's status and JSON body.
+type UploadReceipt
+
+/// Receive the full upload into private staging (awaitable inside `~`
+/// handlers; parks VM tasks without blocking the owner). `root` and
+/// `staging_root` are trusted app config (never request data): staging must
+/// exist, live on the same volume as root, and sit outside the public root.
+/// `options` is strict JSON: {"mode":"multipart"|"raw", "file_field":str,
+/// "text_fields":[str], "raw_content_types":[str], "max_file_bytes":n, ...}
+/// — every limit can only tighten the server caps; unknown keys fail before
+/// any I/O. Single file + bounded ordered text fields; multipart without a
+/// file part, a second file, or unknown fields are explicit errors.
+pub fn upload_receive(req UploadRequest, root str, staging_root str, options str) UploadSession;
+
+/// Bounded receive-snapshot JSON (sync): received → {"state":"received",
+/// "mode","field","filename","size":"<decimal-string>","content_type",
+/// "fields":[ordered, duplicates kept]}; failed → {"state":"failed",
+/// "kind","message","suggested_status"}.
+pub fn upload_metadata(session UploadSession) str;
+
+/// Publish the staged file to `relative_target` under the receive root
+/// (awaitable). Atomic create-only: an existing target is a 409 receipt and
+/// the old file's bytes stay untouched; traversal/drive/UNC/device targets
+/// are 403; the client filename never becomes the storage path.
+pub fn upload_commit(session UploadSession, relative_target str) UploadReceipt;
+
+/// Reject the session: staging is cleaned up (awaitable) and the receipt
+/// carries your status (400..599; 0 on a failed session adopts the
+/// suggested status). A staged lease (30s default) expires sessions that
+/// neither commit nor reject.
+pub fn upload_reject(session UploadSession, status int, message str) UploadReceipt;
+
+/// Early-reject receipt with no I/O (sync) — use it for auth/target gate
+/// failures before receive; it can never fabricate a 201 success.
+pub fn upload_error(status int, message str) UploadReceipt;

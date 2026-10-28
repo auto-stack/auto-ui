@@ -1,0 +1,6 @@
+# The golden-frame manifest is a REQUIRED runtime input of
+# host/cases/frame_oracle.rs (review r6 F829-R6-03): the games' content
+# gates read it at probe runtime. The repo-wide `*.json` ignore exists for
+# throwaway report.json files — this negation versions the manifest while
+# keeping that convention.
+!manifest.json

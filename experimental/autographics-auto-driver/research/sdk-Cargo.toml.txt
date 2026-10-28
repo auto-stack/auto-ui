@@ -1,0 +1,375 @@
+[workspace]
+members = [
+    "crates/a2r-std",
+    # Plan 430: rustdoc 元信息工具(离线,不入 auto-lang 依赖树)
+    "crates/shim-metadata",
+    # Plan 387 W5b: behavior-parity tests — transpile .at → compile+run → compare
+    # stdout to the VM actor suite. Slow (cargo build per case), so #[ignore]d.
+    "crates/a2r-actor-tests",
+    "crates/auto",
+    "crates/auto-atom",
+    # Plan 768: AutoDown TestCase protocol core (dependency-light; adapters
+    # live in auto-lang/src/test_cases and depend on this crate).
+    "crates/auto-test-case",
+    "crates/auto-gen",
+    # PLAN-791: interpreter-free generation core (guard/output/error/report);
+    # auto-gen stays the Auto executable-template adapter over it.
+    "crates/auto-gen-core",
+    # PLAN-811: media foundation crate (renderer-neutral image asset
+    # pipeline data plane/runtime + local media file service), extracted
+    # verbatim from auto-lang's ui/{image_pipeline,media_service};
+    # auto-lang keeps thin re-export facades at the old paths. No
+    # auto-lang/auto-man/auto-ui/auto-vm deps (closure pinned by
+    # test/fixtures/modularity/media-core-consumer).
+    "crates/auto-media-core",
+    "crates/auto-lang",
+    # PLAN-814: 纯语言 SDK——非 UI 语言栈单一来源（use_scanner 起步，
+    # parser/compile/VM/trans 随 T-02..T-06 迁入）；normal/build/dev 闭包
+    # 无 UI 实现/Man（闭包钉：test/fixtures/modularity/language-sdk-consumer）。
+    "crates/auto-lang-core",
+    # PLAN-814: UI 编译/生成域——aura 提取/design tokens/四生成器
+    # （T-03 迁入）；依赖 SDK，不被 SDK 反向依赖。
+    "crates/auto-ui-compiler",
+    # PLAN-814: UI 运行/renderer/宿主域——VM 渲染轨与桌面栈（T-04 迁入）；
+    # 依赖 SDK 与 UI compiler；宿主能力装配收敛于此。
+    "crates/auto-ui-runtime",
+    # PLAN-807: text foundation crate (persistent rope, file-backed paging,
+    # snapshots, diff engine), extracted verbatim from auto-lang's
+    # ui/code_editor; auto-lang keeps thin re-export facades at the old
+    # paths. No auto-lang/auto-man/auto-ui/auto-vm deps (closure pinned by
+    # test/fixtures/modularity/text-core-consumer).
+    "crates/auto-text-core",
+    # PLAN-801: dialect port API crate (light CompilerSession/Scenario +
+    # ExternalDialect + object-safe ParseContext; depends only on
+    # auto-ast/auto-lex/auto-diagnostics — no Parser/VM/UI/Man implementation
+    # in its closure; external grammar impls depend on this crate only).
+    "crates/auto-parser-api",
+    # PLAN-806: UI msg/model 声明文法单一份实现 crate（完整算法自 Parser
+    # 逐字迁出，经 dyn ParseContext 驱动；闭包仅 auto-parser-api 轻层，
+    # 无 auto-lang/Parser/VM/renderer）。
+    "crates/auto-ui-dialect",
+    # PLAN-799: AST model crate (Code/Stmt/Expr/Type/UI-compat nodes +
+    # ToNode/ToAtom/AtomWriter serialization; extracted verbatim from
+    # auto-lang; no Parser/TypeStore/inference/VM/UI deps).
+    "crates/auto-ast",
+    # PLAN-789: lexical foundation crate (Token/Lexer single source,
+    # extracted verbatim from auto-lang; no auto-lang/auto-man/UI deps).
+    "crates/auto-lex",
+    # PLAN-793: diagnostics foundation crate (AutoError aggregation +
+    # syntax/type/name/runtime/comptime/warning families, extracted verbatim
+    # from auto-lang; no AST/parser/VM/UI deps).
+    "crates/auto-diagnostics",
+    # PLAN-780: light static project-model for pac.at (pilot probe; depends
+    # only on auto-atom/auto-val — no compiler/VM/UI types cross this boundary)
+    "crates/auto-project-model",
+    "crates/auto-macros",
+    # Plan 078: AutoMan migration from ../auto-man
+    "crates/auto-man",
+    # PLAN-809: management/build-planning rules core — pac.at declaration
+    # normalization, target/link closure, source selection and build planning
+    # as pure rules over auto-val nodes; language execution, Git/FS
+    # observation and Builder execution stay in auto-man adapters.
+    "crates/auto-man-core",
+    # PLAN-795: pac.lock core (model/TOML-JSON codec/verify rules), extracted
+    # Target-free from auto-man; auto-man keeps the Target→projection, Git
+    # observation and compatibility facade over this crate.
+    "crates/auto-package-lock",
+    # PLAN-800: resolved dependency view & module path resolution core,
+    # extracted language-free from auto-man resolver.rs; auto-man keeps
+    # ExecutionMode/pac.at scanning/ModuleResolver trait as the adapter.
+    "crates/auto-package-resolver",
+    # PLAN-803: Man template/builder asset single source + pure scaffold
+    # path planning, extracted language-free from auto-man asset.rs
+    # (rust-embed resources; auto-man keeps the Auto-eval/IO adapter).
+    "crates/auto-man-assets",
+    # PLAN-805: toolchain config model / flag mapping / command template
+    # core, extracted verbatim from auto-man builder/ninja
+    # (config.rs/mapper.rs/templates.rs); auto-man keeps the am.at loading,
+    # PATH/disk/process resolution and Ninja execution as upper layers.
+    "crates/auto-toolchain-core",
+    # PLAN-816 T-02: unified owned subprocess execution facility (argv/cwd/env/
+    # stdio policy/exit classification/deadline/cancel with owned reaping/
+    # reader termination/child-tree exit). std-only closure; the scattered
+    # spawn sites (main.rs run_command_live, pkg.rs run_script_live, git.rs,
+    # http_service.rs serve_rust) migrate onto it in T-03/T-05/T-06.
+    "crates/auto-tool-execution",
+    # PLAN-816 T-12 (M816-A): real I-TOOL client — spawns actual tool host
+    # processes through auto-tool-execution and speaks the auto-tool-protocol
+    # single-source framing (describe/validate_project, version/capability
+    # rejections as data, per-request deadline with owned-tree reaping and
+    # reader joins). Closure = protocol/project-model (data) + execution
+    # (man-ecosystem); no tool-host static linking, no discovery (T-04).
+    "crates/auto-tool-client",
+    # PLAN-808: terminal host-domain core (owned cell/color/geometry contract,
+    # runtime autoterm_core.dll engine service + 34-method terminal capability
+    # port); auto-lang keeps the VM codec, UI view/input adapter and assembly.
+    "crates/auto-terminal-core",
+    "crates/auto-lsp",
+    "crates/auto-val",
+    # PLAN-036 T-02: shell pack a2r 生成物（无窗组件库——入库=真编译门）
+    "crates/shell-pack",
+    "crates/auto-vm",
+    # Plan 330: auto-shell + ash-core moved to separate repo (../auto-shell)
+    # "crates/auto-shell",
+    # "crates/ash-core",
+    # Plan 325: AI crates moved to separate auto-ai repo (../auto-ai)
+    # "crates/auto-xml",  # Temporarily disabled due to Cargo.toml issues
+    # Plan 082: AutoCache global build cache
+    "crates/auto-cache",
+    # Plan 202: Auto Playground
+    "crates/auto-playground",
+    # Plan 216: C FFI Bindgen
+    "crates/auto-bindgen",
+    # Plan 365 W2–W4: COSMIC replication — ports, demo, libcosmic host, Linux adapters.
+    # W3/W4 use cfg(target_os) so they compile on all platforms (Windows falls
+    # back to mock/headless stubs; Linux compiles real zbus/libcosmic code).
+    "crates/auto-cosmic/ports",
+    "crates/auto-cosmic/demo",
+    "crates/auto-cosmic/host-libcosmic",
+    "crates/auto-cosmic/ports-linux",
+    # Plan 509 route B: Smithay compositor host (Linux-gated smithay dep;
+    # non-Linux compiles a cfg stub — Windows dev flow unaffected).
+    "crates/auto-cosmic/host-smithay",
+    # PLAN-815 T-03: I-TOOL light tool protocol (version/capability/budget/
+    # error/framing over stdio; pure data — reuses the one-source
+    # auto-project-model request + wire codec, no AST/VM/renderer/Man).
+    "crates/auto-tool-protocol",
+    # PLAN-815 T-12: UI engineering tool package (lib + `auto-ui-tool` bin).
+    # M815-A scope: describe/validate_project host over the light protocol;
+    # generation/build/run closure lands with M815-B. No Man/legacy big-lib
+    # deps (closure pinned by test/fixtures/modularity/ui-tool-consumer).
+    "crates/auto-ui-tools",
+    # PLAN-815 T-04: API generation core — single-algorithm api_gen +
+    # rust_sidecar effect adapter + shared rust workspace layout, extracted
+    # from auto-man (owner: lang-service-adapter; man/ui域双消费).
+    "crates/auto-api-gen",
+    # "crates/xdm-gen",  # Temporarily disabled: broken dependency paths + gitignored
+]
+exclude = [
+    # Generated Rust UI examples live in their own workspace with a shared
+    # target-dir pointing back at the main workspace target/.
+    "examples/rust-workspace",
+    # PLAN-780: external consumer gate for the light project-model — built
+    # standalone via --manifest-path to prove the model has no compiler/VM
+    # dependency (V-01); must stay outside workspace membership.
+    "test/fixtures/modularity/project-model/consumer",
+    # Plan 768: pinned parser snapshot — frozen outside workspace settings;
+    # see vendor/autodown-test-parser/PROVENANCE.md.
+    "vendor/autodown-test-parser",
+    # PLAN-778: 外部 UI 方言消费方探针——独立 fixture crate（自带空
+    # [workspace]，模拟 crate 边界外的真实消费者），门禁经
+    # cargo test --manifest-path test/fixtures/modularity/ui-dialect-consumer/Cargo.toml
+    "test/fixtures/modularity/ui-dialect-consumer",
+    # PLAN-814 M814-A 纯 SDK 消费方探针（V-01/AC-08；闭包钉：
+    # cargo test --manifest-path test/fixtures/modularity/language-sdk-consumer/Cargo.toml）
+    "test/fixtures/modularity/language-sdk-consumer",
+    # PLAN-814 M814-A UI 编译包消费方探针（V-03/AC-08；闭包钉：
+    # cargo test --manifest-path test/fixtures/modularity/ui-package-consumer/Cargo.toml）
+    "test/fixtures/modularity/ui-package-consumer",
+    # PLAN-801: 外部方言 API 消费方探针——独立 fixture crate（唯一依赖
+    # auto-parser-api，证明外部文法实现闭包无 auto-lang/Parser/VM/UI；
+    # model 单份实现迁此，解析集成测试在上层 ui-dialect-consumer
+    # driver），门禁经
+    # cargo test --manifest-path test/fixtures/modularity/dialect-api-consumer/Cargo.toml
+    # 依赖闭包断言：bash test/fixtures/modularity/dialect-api-consumer/verify-deps.sh
+    "test/fixtures/modularity/dialect-api-consumer",
+    # PLAN-806: UI 声明文法轻消费方探针——独立 fixture crate（依赖仅
+    # auto-ui-dialect + auto-lex，证明完整 msg/model 声明算法在无
+    # auto-lang 闭包内可驱动；生产接线/字节级对照在上层 driver），门禁经
+    # cargo test --manifest-path test/fixtures/modularity/ui-declarations-consumer/Cargo.toml
+    # 依赖闭包断言：bash test/fixtures/modularity/ui-declarations-consumer/verify-deps.sh
+    "test/fixtures/modularity/ui-declarations-consumer",
+    # PLAN-810 V-06 完整 UI 文法轻消费方（同 806 模式）：
+    # cargo test --manifest-path test/fixtures/modularity/ui-grammar-consumer/Cargo.toml
+    # 依赖闭包断言：bash test/fixtures/modularity/ui-grammar-consumer/verify-deps.sh
+    "test/fixtures/modularity/ui-grammar-consumer",
+    # PLAN-779: 外部 native provider 消费方探针——独立 fixture crate
+    #（无 UI feature 构建，证明 frame 族 core 供值链在 crate 边界外真实
+    # 工作），门禁经
+    # cargo test --manifest-path test/fixtures/modularity/native-provider-consumer/Cargo.toml
+    "test/fixtures/modularity/native-provider-consumer",
+    # PLAN-785: 外部 clipboard text provider 消费方探针——独立 fixture
+    # crate（无 UI feature 构建，证明文本剪贴板 2925/2926 core 供值链在
+    # crate 边界外真实工作），门禁经
+    # cargo test --manifest-path test/fixtures/modularity/clipboard-provider-consumer/Cargo.toml
+    "test/fixtures/modularity/clipboard-provider-consumer",
+    # PLAN-799: 外部 AST 模型消费方探针——独立 fixture crate（唯一依赖
+    # auto-ast，证明 AST 模型无 auto-lang/Parser/VM/UI 依赖 + V02 旧实现
+    # golden 重放），门禁经
+    # cargo test --manifest-path test/fixtures/modularity/ast-model-consumer/Cargo.toml
+    "test/fixtures/modularity/ast-model-consumer",
+    # PLAN-789: 外部词法消费方探针——独立 fixture crate（唯一依赖
+    # auto-lex，证明词法基础无 auto-lang/auto-man/UI 依赖），门禁经
+    # cargo test --manifest-path test/fixtures/modularity/lex-consumer/Cargo.toml
+    "test/fixtures/modularity/lex-consumer",
+    # PLAN-790: 外部 clipboard media provider 消费方探针——独立 fixture
+    # crate（无 UI feature 构建，证明 files/image 剪贴板 2934..2937 core
+    # 供值链在 crate 边界外真实工作），门禁经
+    # cargo test --manifest-path test/fixtures/modularity/clipboard-media-provider-consumer/Cargo.toml
+    "test/fixtures/modularity/clipboard-media-provider-consumer",
+    # PLAN-791: 外部生成核心消费方探针——独立 fixture crate（仅依赖
+    # auto-gen-core，证明纯生成核心无解释器/无 auto-lang 闭包可用），
+    # 门禁经
+    # cargo test --manifest-path test/fixtures/modularity/gen-core-consumer/Cargo.toml
+    # 依赖闭包断言：bash test/fixtures/modularity/gen-core-consumer/verify-deps.sh
+    "test/fixtures/modularity/gen-core-consumer",
+    # PLAN-795: 外部锁核心消费方探针——独立 fixture crate（仅依赖
+    # auto-package-lock/auto-val，证明 pac.lock 模型/codec/校验核心无
+    # auto-lang/auto-man/生成器/renderer 闭包可用），门禁经
+    # cargo test --manifest-path test/fixtures/modularity/package-lock-consumer/Cargo.toml
+    # 依赖闭包断言：bash test/fixtures/modularity/package-lock-consumer/verify-deps.sh
+    "test/fixtures/modularity/package-lock-consumer",
+    # PLAN-807: 外部文本基础消费方探针——独立 fixture crate（唯一依赖
+    # auto-text-core，证明 rope/分页/快照/diff 闭包无 auto-lang/auto-man/
+    # auto-ui/auto-vm/解释器栈），门禁经
+    # cargo test --manifest-path test/fixtures/modularity/text-core-consumer/Cargo.toml
+    # 依赖闭包断言：bash test/fixtures/modularity/text-core-consumer/verify-deps.sh
+    "test/fixtures/modularity/text-core-consumer",
+    # PLAN-811: 外部媒体基础消费方探针——独立 fixture crate（唯一依赖
+    # auto-media-core，证明图像资产管线/媒体文件服务闭包无 auto-lang/
+    # auto-man/auto-ui/auto-vm/解释器栈/renderer），门禁经
+    # cargo test --manifest-path test/fixtures/modularity/media-core-consumer/Cargo.toml
+    # 依赖闭包断言：bash test/fixtures/modularity/media-core-consumer/verify-deps.sh
+    "test/fixtures/modularity/media-core-consumer",
+    # PLAN-800: 外部解析核心消费方探针——独立 fixture crate（仅依赖
+    # auto-package-resolver/std，证明依赖视图/路径候选/依赖内模块判定核心
+    # 无 auto-lang/auto-man/auto-val/VM/UI 闭包可用），门禁经
+    # cargo test --manifest-path test/fixtures/modularity/package-resolver-consumer/Cargo.toml
+    # 依赖闭包断言：bash test/fixtures/modularity/package-resolver-consumer/verify-deps.sh
+    "test/fixtures/modularity/package-resolver-consumer",
+    # PLAN-803: 外部 Man 资源层消费方探针——独立 fixture crate（唯一依赖
+    # auto-man-assets，证明三组资源与纯路径规划无 auto-lang/auto-man/VM/UI
+    # 依赖），门禁经
+    # cargo test --manifest-path test/fixtures/modularity/man-assets-consumer/Cargo.toml
+    "test/fixtures/modularity/man-assets-consumer",
+    # PLAN-805: 外部工具链规则核心消费方探针——独立 fixture crate（唯一依赖
+    # auto-toolchain-core，证明八类配置/flag 映射/命令模板无 auto-lang/
+    # auto-man/auto-gen/VM/UI/AST 闭包可用；auto-val 为合法数据层），门禁经
+    # cargo test --manifest-path test/fixtures/modularity/toolchain-core-consumer/Cargo.toml
+    # 依赖闭包断言：bash test/fixtures/modularity/toolchain-core-consumer/verify-deps.sh
+    "test/fixtures/modularity/toolchain-core-consumer",
+    # PLAN-793: 外部诊断消费方探针——独立 fixture crate（仅依赖
+    # auto-diagnostics/auto-lex/miette，证明诊断基础无 auto-lang/Man/UI
+    # 闭包可用），门禁经
+    # cargo test --manifest-path test/fixtures/modularity/diagnostics-consumer/Cargo.toml
+    # 依赖闭包断言：bash test/fixtures/modularity/diagnostics-consumer/verify-deps.sh
+    "test/fixtures/modularity/diagnostics-consumer",
+    # PLAN-793: 互操作消费方探针——独立 fixture crate（同时依赖 auto-lang
+    # 与 auto-diagnostics，证明新旧路径同一类型互传+真实管线错误阶段保持），
+    # 门禁经
+    # cargo test --manifest-path test/fixtures/modularity/diagnostics-interop-consumer/Cargo.toml
+    "test/fixtures/modularity/diagnostics-interop-consumer",
+    # PLAN-794: 外部 scroll host provider 消费方探针——独立 fixture crate
+    #（无 UI feature 构建，证明 scroll controller/子锚点
+    # 9900..9905/9922/9923 core 供值链在 crate 边界外真实工作），门禁经
+    # cargo test --manifest-path test/fixtures/modularity/scroll-provider-consumer/Cargo.toml
+    "test/fixtures/modularity/scroll-provider-consumer",
+    # PLAN-802: 外部 code editor host provider 消费方探针——独立 fixture
+    # crate（无 UI feature 构建，证明 code_editor 22 native 全族 core 供值
+    # 链在 crate 边界外真实工作），门禁经
+    # cargo test --manifest-path test/fixtures/modularity/code-editor-provider-consumer/Cargo.toml
+    "test/fixtures/modularity/code-editor-provider-consumer",
+    # PLAN-804: 外部 dialog/dnd host provider 消费方探针——独立 fixture
+    # crate（无 UI feature 构建，证明对话框 2927/2928 与拖出 2938 core
+    # 供值链在 crate 边界外真实工作），门禁经
+    # cargo test --manifest-path test/fixtures/modularity/dialog-dnd-provider-consumer/Cargo.toml
+    "test/fixtures/modularity/dialog-dnd-provider-consumer",
+    # PLAN-808: 外部 terminal 域核心消费方探针——独立 fixture crate（唯一
+    # 依赖 auto-terminal-core，证明 owned cell/geometry 合同、DLL 服务与
+    # 34 方法端口无 auto-lang/UI/auto-man/auto-term 闭包可用），门禁经
+    # cargo test --manifest-path test/fixtures/modularity/terminal-core-consumer/Cargo.toml
+    # 依赖闭包断言：bash test/fixtures/modularity/terminal-core-consumer/verify-deps.sh
+    "test/fixtures/modularity/terminal-core-consumer",
+    # PLAN-792: 生成式 Rust UI 独立消费方探针——非 cargo 消费者本身；消费
+    # bundle 由正式生成入口（auto gen --delivery-root）在受管 scratch 生成，
+    # 门禁经
+    # python test/fixtures/modularity/generated-ui-consumer/driver.py
+    # （V01..V04 真实 fresh-lock build/重定位 locked 重放/负控；生成器内容门 =
+    # cargo test -p auto-man --lib delivery -- --test-threads=1）
+    "test/fixtures/modularity/generated-ui-consumer",
+    # PLAN-809: 生成请求数据合同（I-PROJECT）消费方探针——独立 fixture
+    # crate（唯一依赖 auto-project-model，证明 generation_request 合同
+    # 闭包无 auto-lang/auto-man/auto-vm/UI；静态准入/动态求值双臂），
+    # 门禁经
+    # cargo test --manifest-path test/fixtures/modularity/project-request-consumer/Cargo.toml
+    # 依赖闭包断言：bash test/fixtures/modularity/project-request-consumer/verify-deps.sh
+    "test/fixtures/modularity/project-request-consumer",
+    # PLAN-809: 管理规则核心消费方探针——独立 fixture crate（唯一依赖
+    # auto-man-core，证明声明归一/链接闭包（含环准入合同）/选择与规划
+    # 规则闭包无 auto-lang/auto-man/auto-vm/UI），门禁经
+    # cargo test --manifest-path test/fixtures/modularity/man-core-consumer/Cargo.toml
+    # 依赖闭包断言：bash test/fixtures/modularity/man-core-consumer/verify-deps.sh
+    "test/fixtures/modularity/man-core-consumer",
+    # PLAN-815: 外部 UI 工具消费方探针——独立 fixture crate（依赖仅
+    # auto-ui-tools/auto-tool-protocol/auto-project-model，证明 M815-A 工具
+    # 闭包无 auto-man/auto-lang/auto-vm/auto-gen；并经 AUTO_UI_TOOL_BIN 以
+    # 真实子进程消费 auto-ui-tool 二进制），门禁经
+    # cargo build -p auto-ui-tools && AUTO_UI_TOOL_BIN=... cargo test --manifest-path test/fixtures/modularity/ui-tool-consumer/Cargo.toml
+    # 依赖闭包断言：bash test/fixtures/modularity/ui-tool-consumer/verify-deps.sh
+    "test/fixtures/modularity/ui-tool-consumer",
+    # PLAN-816 T-12: 外部 I-TOOL 客户端消费方探针——独立 fixture crate
+    # （依赖仅 auto-tool-client/auto-project-model，证明 M816-A 客户端闭包
+    # 无 auto-ui-tools 静态链接、无 auto-man/auto-lang/auto-vm/auto-gen；
+    # 经 AUTO_UI_TOOL_BIN 真实子进程消费 M815-A 窄能力，TE_CHILD_BIN 补
+    # 长运行/孙进程/reader 真停/流污染寿命反例），门禁经
+    # cargo build -p auto-ui-tools -p auto-tool-execution && AUTO_UI_TOOL_BIN=... cargo test --manifest-path test/fixtures/modularity/tool-client-consumer/Cargo.toml
+    # 依赖闭包断言：bash test/fixtures/modularity/tool-client-consumer/verify-deps.sh
+    "test/fixtures/modularity/tool-client-consumer",
+]
+resolver = "2"
+
+[workspace.dependencies]
+clap = { version = "4.5.17", features = ["derive"] }
+dirs = "6.0.0"
+rustyline = { version = "14.0.0", features = ["with-file-history"] }
+# Plan 446 D6: preserve_order — json.keys/遍历保持插入序，与 vue 轨
+# Object.entries 语义对齐（跨后端 UI 字段顺序 parity）。
+serde_json = { version = "1.0", features = ["preserve_order"] }
+serde = { version = "1.0", features = ["derive"] }
+miette = { version = "7.2", features = ["fancy"] }
+thiserror = "2.0.12"
+regex = "1.11.1"
+strum = "0.26"
+strum_macros = "0.26"
+ecow = "0.2.3"
+normalize-path = "0.2.1"
+roxmltree = "0.18.0"
+dashmap = "6.1"
+tokio = { version = "1.49", features = ["full"] }
+blake3 = "1.5"
+bincode = "1.3"
+glob-match = "0.2.1"
+chrono = "0.4"
+notify = "7.0"
+urlencoding = "2.1"
+# Plan 541: System monitor host & a2r native metrics
+sysinfo = "0.33"
+
+# AutoMan dependencies (Phase 1)
+tabled = "0.18"
+simplelog = "0.12"
+log = "0.4"
+dialoguer = "0.11"
+glob = "0.3"
+reqwest = { version = "0.12", features = ["blocking"] }
+version-compare = "0.0"
+colored = "3"
+zip = "3.0"
+encoding_rs = "0.8"
+is_executable = "1.0"
+toml = "0.8"
+indicatif = "0.17"
+rust-embed = { version = "8.5", features = ["compression"] }
+tempfile = "3.14"
+
+# Plan 466: dev 瘦身——行号级调试信息(panic 回溯仍有行号),显著缩小 target
+# 与链接开销(每个 worktree 的 target 从 ~26G 明显下降);AI agent 流程无交互式
+# 调试需求,代价极低。需要完整变量调试时临时覆盖 CARGO_PROFILE_DEV_DEBUG=2。
+[profile.dev]
+debug = "line-tables-only"
+
+# PLAN-043 走查（2026-09-25）：iced_widget 本地补丁——container.rs 布局
+# 空窗容错（P041-D1 竞态族 unwrap 崩桌面的宿主侧根治），见 crates/patches/README.md。
+# 升级 iced 版本时需重审本补丁。
+[patch.crates-io]
+iced_widget = { path = "crates/patches/iced_widget" }

@@ -1,0 +1,28 @@
+/.sdk-source/
+/target/
+/driver-report/
+/research/*.txt
+!/research/baseline.json.txt
+!/research/sdk-Cargo.toml.txt
+!/research/sdk-Cargo.lock.txt
+/research/*.png
+/research/*/
+!/research/source-lock.json
+!/research/code-identity.json
+/research/*.agscene
+!/research/asset-probe/
+/research/asset-probe/*
+!/research/asset-probe/two-parts.glb
+!/research/asset-probe/generate.py
+!/research/asset-probe/README.md
+# PLAN-860 probe-only trusted unit and route sources (load-bearing includes),
+# plus the frozen decision and source identity.
+!/research/game-runtime/
+/research/game-runtime/*
+!/research/game-runtime/*.at
+!/research/game-runtime/decision.json
+!/research/plan860-identity.json
+
+# PLAN-879: staging directory for prepare_sdk.py --from-snapshot; residue
+# from an interrupted preparation must never be committed or consumed.
+/.sdk-source.prepare-tmp/

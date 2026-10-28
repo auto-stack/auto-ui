@@ -1,0 +1,201 @@
+// autographics.character/1 trusted unit (PLAN-861). Appended after the v5
+// chain by the character assembly; public names are ag_char_*/ag_action_*.
+// Public move = unchanged v5 ag_move_and_slide plus one fused geometric
+// final-support determination in the same call (PLAN-860 candidate B,
+// contract r1 sections 2/5/6); the frozen solid/character translation
+// snapshot enforces the read-only solid surface at each tick begin.
+var _ag_char_node= -1
+var _ag_char_frozen=0
+var _ag_char_moved=0
+var _ag_char_ptick= -1
+var _ag_char_held_l=0
+var _ag_char_held_r=0
+var _ag_char_held_j=0
+var _ag_char_held_n=0
+var _ag_char_pressed_l=0
+var _ag_char_pressed_r=0
+var _ag_char_pressed_j=0
+var _ag_char_pressed_n=0
+var _ag_char_grounded_state=0
+var _ag_char_support_state= -1
+var _ag_char_init_grounded=0
+var _ag_char_init_support= -1
+var _ag_char_solids=[]
+var _ag_char_ids=[]
+var _ag_char_nodes=[]
+var _ag_char_member=[]
+var _ag_char_w=[]
+var _ag_char_total=0
+fn _ag_char_map(stable_id int, node int) {_ag_char_ids.push(stable_id);_ag_char_nodes.push(node)}
+fn _ag_char_input(held int, pressed int) {
+ _ag_char_held_l=(held%2)
+ _ag_char_held_r=((held/2)%2)
+ _ag_char_held_j=((held/4)%2)
+ _ag_char_held_n=((held/8)%2)
+ _ag_char_pressed_l=(pressed%2)
+ _ag_char_pressed_r=((pressed/2)%2)
+ _ag_char_pressed_j=((pressed/4)%2)
+ _ag_char_pressed_n=((pressed/8)%2)
+ _ag_char_ptick= -1
+}
+fn _ag_char_resolve(stable_id int) int {
+ for i in 0.._ag_char_ids.len() {
+  if _ag_char_ids[i]==stable_id {return _ag_char_nodes[i]}
+ }
+ return -1
+}
+fn _ag_char_leaf(node int) int {
+ for n in 0..identities.len() {
+  if parents[n]==node {return 0}
+ }
+ return 1
+}
+fn _ag_char_shape(node int) int {
+ let bi=node*7
+ let dx_box=_ag_spatial_boxes[bi+4] - _ag_spatial_boxes[bi+1]
+ let dy_box=_ag_spatial_boxes[bi+5] - _ag_spatial_boxes[bi+2]
+ if dx_box<0.7999 || dx_box>0.8001 {return 0}
+ if dy_box<0.9999 || dy_box>1.0001 {return 0}
+ return 1
+}
+fn _ag_char_target(stable_id int, want_shape int) int {
+ if _ag_error!=0 {return -1}
+ if _ag_char_frozen==1 {_ag_fail(22,-1,stable_id);return -1}
+ let node=_ag_char_resolve(stable_id)
+ if node<0 {_ag_fail(23,-1,stable_id);return -1}
+ if kinds[node]==5 {_ag_fail(24,node,stable_id);return -1}
+ if dimensions[node]!=2 {_ag_fail(24,node,stable_id);return -1}
+ if _ag_char_leaf(node)==0 {_ag_fail(24,node,stable_id);return -1}
+ if want_shape==1 {
+  if _ag_char_shape(node)==0 {_ag_fail(24,node,stable_id);return -1}
+ }
+ return node
+}
+fn ag_char_bind(stable_id int) int {
+ let node=_ag_char_target(stable_id,1)
+ if node<0 {return 0}
+ if _ag_char_node>=0 {_ag_fail(23,_ag_char_node,stable_id);return 0}
+ _ag_char_node=node
+ return 1
+}
+fn ag_char_solid(stable_id int) int {
+ let node=_ag_char_target(stable_id,0)
+ if node<0 {return 0}
+ if node==_ag_char_node {_ag_fail(24,node,stable_id);return 0}
+ for i in 0.._ag_char_solids.len() {
+  if _ag_char_solids[i]==node {_ag_fail(23,node,stable_id);return 0}
+ }
+ if _ag_char_solids.len()>=128 {_ag_fail(23,node,0);return 0}
+ _ag_char_solids.push(node)
+ return 1
+}
+fn _ag_char_scan_down(node int) int {
+ let wi=node*3
+ _ag_motion_checked=1
+ _ag_motion_initial= -1
+ let ok=_ag_motion_two(2,node,0,worlds[wi],worlds[wi+1],worlds[wi+2],0.0, -0.01,0.0)
+ if ok==0 {return 0}
+ if _ag_cast_found!=1 {return 0}
+ if _ag_cast_ny!=1.0 {return 0}
+ if _ag_cast_nx!=0.0 {return 0}
+ if _ag_cast_nz!=0.0 {return 0}
+ _ag_char_support_state=_ag_cast_target
+ _ag_char_grounded_state=1
+ return 1
+}
+fn _ag_char_freeze() {
+ if _ag_char_node<0 {_ag_fail(25,-1,0);return}
+ _ag_char_frozen=1
+ _ag_char_moved=0
+ _ag_char_grounded_state=0
+ _ag_char_support_state= -1
+ _ag_char_init_grounded=0
+ _ag_char_init_support= -1
+ if _ag_dirty==1 {_ag_derive();_ag_dirty=0}
+ _ag_char_member=[]
+ for i in 0.._ag_char_solids.len() {_ag_char_member.push(_ag_char_solids[i])}
+ _ag_char_member.push(_ag_char_node)
+ _ag_char_total=_ag_char_member.len()
+ _ag_char_w=[]
+ for i in 0.._ag_char_total {
+  let n=_ag_char_member[i]
+  _ag_char_w.push(worlds[n*3]);_ag_char_w.push(worlds[n*3+1]);_ag_char_w.push(worlds[n*3+2])
+ }
+ let keep_grounded=_ag_char_grounded_state
+ let keep_support=_ag_char_support_state
+ _ag_char_scan_down(_ag_char_node)
+ _ag_char_init_grounded=_ag_char_grounded_state
+ _ag_char_init_support=_ag_char_support_state
+ _ag_char_grounded_state=keep_grounded
+ _ag_char_support_state=keep_support
+ _ag_cast_token=0
+}
+fn _ag_char_tick_begin() {
+ if _ag_char_frozen==0 {return}
+ if _ag_char_pressed_l+_ag_char_pressed_r+_ag_char_pressed_j+_ag_char_pressed_n!=0 {_ag_char_ptick=_ag_tick_id()}
+ for i in 0.._ag_char_total {
+  let n=_ag_char_member[i]
+  let b=i*3
+  let w=n*3
+  if worlds[w]!=_ag_char_w[b] || worlds[w+1]!=_ag_char_w[b+1] {
+   if i==_ag_char_total-1 {_ag_fail(21,n,0)} else {_ag_fail(20,n,0)}
+   return
+  }
+ }
+}
+fn ag_char_move(dx float, dy float, clearance float) int {
+ if _ag_char_frozen==0 {_ag_fail(26,-1,0);return 0}
+ if _ag_cast_charge(1)==0 {return 0}
+ _ag_char_grounded_state=0
+ _ag_char_support_state= -1
+ let token=ag_move_and_slide(_ag_char_node,0,dx,dy,0.0,clearance)
+ if token<=0 {return 0}
+ if _ag_motion_state==3 {return token}
+ if kinds[_ag_char_node]==5 {return token}
+ if _ag_cast_charge(1)==0 {return 0}
+ _ag_char_scan_down(_ag_char_node)
+ _ag_char_moved=1
+ let wi=_ag_char_node*3
+ let b=(_ag_char_total-1)*3
+ _ag_char_w[b]=worlds[wi];_ag_char_w[b+1]=worlds[wi+1]
+ return token
+}
+fn _ag_char_state(token int) int {
+ if _ag_cast_charge(1)==0 {return -1}
+ if token==0 {
+  if _ag_char_moved==0 {return 0}
+  _ag_fail(13,-1,0);return -1
+ }
+ if token!=_ag_cast_token {_ag_fail(13,-1,0);return -1}
+ return 1
+}
+fn ag_char_grounded(token int) int {
+ let ok=_ag_char_state(token)
+ if ok<0 {return 0}
+ if ok==0 {return _ag_char_init_grounded}
+ return _ag_char_grounded_state
+}
+fn ag_char_support(token int) int {
+ let ok=_ag_char_state(token)
+ if ok<0 {return 0}
+ if ok==0 {return _ag_char_init_support}
+ return _ag_char_support_state
+}
+fn ag_action_held(action int) int {
+ if _ag_cast_charge(1)==0 {return 0}
+ if action<0 || action>3 {_ag_fail(7,-1,action);return 0}
+ if action==0 {return _ag_char_held_l}
+ if action==1 {return _ag_char_held_r}
+ if action==2 {return _ag_char_held_j}
+ return _ag_char_held_n
+}
+fn ag_action_pressed(action int) int {
+ if _ag_cast_charge(1)==0 {return 0}
+ if action<0 || action>3 {_ag_fail(7,-1,action);return 0}
+ if _ag_tick_id()!=_ag_char_ptick {return 0}
+ if action==0 {if _ag_char_pressed_l==1 {_ag_char_pressed_l=0;return 1};return 0}
+ if action==1 {if _ag_char_pressed_r==1 {_ag_char_pressed_r=0;return 1};return 0}
+ if action==2 {if _ag_char_pressed_j==1 {_ag_char_pressed_j=0;return 1};return 0}
+ if _ag_char_pressed_n==1 {_ag_char_pressed_n=0;return 1}
+ return 0
+}

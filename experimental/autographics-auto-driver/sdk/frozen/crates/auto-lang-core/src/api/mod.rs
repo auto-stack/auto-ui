@@ -1,0 +1,409 @@
+//! API Code Generation Module
+//!
+//! Plan 102 Phase 5: Parse `#[api]` annotations and generate code for Tauri and Web targets
+//!
+//! ## Overview
+//!
+//! This module provides functionality to:
+//! 1. Parse `#[api]` annotations from Auto source code
+//! 2. Extract API endpoint definitions
+//! 3. Generate TypeScript types and API clients
+//! 4. Generate Tauri commands (Rust)
+//! 5. Generate Axum HTTP routes (Rust)
+//!
+//! ## Usage
+//!
+//! ```rust,ignore
+//! use auto_lang::api::{ApiExtractor, ApiModule, Target};
+//!
+//! // Extract API definitions from AST
+//! let extractor = ApiExtractor::new();
+//! let api_module = extractor.extract(&ast);
+//!
+//! // Generate TypeScript types
+//! let ts_gen = Target::TypeScript.generator();
+//! let ts_code = ts_gen.generate(&api_module);
+//!
+//! // Generate Tauri commands
+//! let tauri_gen = Target::Tauri.generator();
+//! let tauri_code = tauri_gen.generate(&api_module);
+//! ```
+
+pub mod contract;
+pub mod diagnostic;
+pub mod targets;
+pub mod types;
+
+// Re-export main types
+pub use contract::{
+    is_meta_alias, is_upload_param, ApiContract, EndpointContract, ParamKind, ParamPlan,
+    ParamSource, ResponseKind, META_PARAM_NAMES,
+};
+pub use diagnostic::{ApiDiagnostic, DiagnosticStage};
+pub use targets::{AxumGenerator, Target, TargetGenerator, TauriGenerator, TypeScriptGenerator};
+pub use types::{ApiAttrs, ApiEndpoint, ApiField, ApiModule, ApiParam, ApiType};
+
+use crate::ast::{Fn, Stmt, Type};
+
+/// API annotation parser
+///
+/// Parses `#[api]` annotations from function declarations
+pub struct ApiAnnotationParser;
+
+impl ApiAnnotationParser {
+    /// Parse API annotation string (content inside `#[api(...)]`)
+    ///
+    /// Supports formats:
+    /// - `#[api]` - Simple annotation
+    /// - `#[api(method = "GET")]` - With method
+    /// - `#[api(path = "/users/:id")]` - With path
+    /// - `#[api(method = "POST", path = "/users")]` - Multiple attributes
+    pub fn parse(annotation_content: &str) -> ApiAttrs {
+        let mut attrs = ApiAttrs::new();
+
+        if annotation_content.trim().is_empty() {
+            return attrs;
+        }
+
+        // Parse key=value pairs
+        for part in annotation_content.split(',') {
+            let part = part.trim();
+            if let Some((key, value)) = part.split_once('=') {
+                let key = key.trim();
+                let value = value.trim().trim_matches('"').trim_matches('\'');
+
+                match key {
+                    "method" => attrs.method = Some(value.to_string()),
+                    "path" => attrs.path = Some(value.to_string()),
+                    "name" => attrs.name = Some(value.to_string()),
+                    "auth" => attrs.auth = value.eq_ignore_ascii_case("true"),
+                    "cache" => {
+                        if let Ok(seconds) = value.parse::<u32>() {
+                            attrs.cache = Some(seconds);
+                        }
+                    }
+                    _ => {
+                        attrs.custom.insert(key.to_string(), value.to_string());
+                    }
+                }
+            }
+        }
+
+        attrs
+    }
+}
+
+/// API extractor from AST
+///
+/// Walks through AST statements and extracts functions with `#[api]` annotations
+pub struct ApiExtractor {
+    /// Whether to include functions without explicit `#[api]` annotation
+    include_all_public: bool,
+}
+
+impl ApiExtractor {
+    /// Create new API extractor
+    pub fn new() -> Self {
+        Self {
+            include_all_public: false,
+        }
+    }
+
+    /// Configure to include all public functions as APIs
+    pub fn with_include_all_public(mut self, include: bool) -> Self {
+        self.include_all_public = include;
+        self
+    }
+
+    /// Extract API module from AST statements
+    pub fn extract(&self, module_name: &str, stmts: &[Stmt]) -> ApiModule {
+        let mut api_module = ApiModule::new(module_name.to_string());
+
+        // PLAN-776 T-06：两遍提取——先收全部类型声明（struct/enum）成完整
+        // 名集，再提取 endpoints 并按解析来源身份分类（同裸名用户声明 →
+        // Json；声明序无关）。类型别名由 TypeDecl 形态覆盖（extract_type）。
+        for stmt in stmts {
+            match stmt {
+                Stmt::TypeDecl(type_decl) => {
+                    if let Some(api_type) = self.extract_type(type_decl) {
+                        api_module.types.push(api_type);
+                    }
+                }
+                Stmt::EnumDecl(enum_decl) => {
+                    api_module.types.push(ApiType {
+                        name: enum_decl.name.to_string(),
+                        fields: Vec::new(),
+                        doc: None,
+                        alias_of: None,
+                    });
+                }
+                // PLAN-776 R1-F05/R2-07/R6-02：type alias 的来源身份按**目标**
+                // 解析（`type Download = FileResponse` → File 种类；target 是
+                // 用户名/内建 → Json）——alias_of 携带 target **完整形态**
+                //（保 Future<…>/泛型结构，F776-R6-02：`type D =
+                // Future<FileResponse>` 需按 File 分类；裸名在 bare_type_name
+                // 中丢失实参不可恢复）——分类侧按需解包/规范化。
+                Stmt::TypeAlias(alias) => {
+                    api_module.types.push(ApiType {
+                        name: alias.name.to_string(),
+                        fields: Vec::new(),
+                        doc: None,
+                        alias_of: Some(type_to_string(&alias.target)),
+                    });
+                }
+                _ => {}
+            }
+        }
+        for stmt in stmts {
+            if let Stmt::Fn(fn_decl) = stmt {
+                if let Some(mut endpoint) = self.extract_endpoint(fn_decl) {
+                    endpoint.response = crate::api::contract::ResponseKind::from_return_identity(
+                        &endpoint.return_type,
+                        &api_module.types,
+                    );
+                    api_module.add_endpoint(endpoint);
+                }
+            }
+        }
+
+        api_module
+    }
+
+    /// Extract API endpoint from function declaration.
+    /// Plan 328: now reads Fn.api_attrs (set by parser from #[api(method, path)]),
+    /// not a name-based heuristic. Only functions with #[api] become endpoints.
+    fn extract_endpoint(&self, fn_decl: &Fn) -> Option<ApiEndpoint> {
+        let ast_attrs = fn_decl.api_attrs.as_ref()?;
+        // Convert ast::ApiAttrs (String method/path) to api::types::ApiAttrs (Option)
+        let api_attrs = ApiAttrs {
+            method: Some(ast_attrs.method.clone()),
+            path: Some(ast_attrs.path.clone()),
+            ..Default::default()
+        };
+        let mut endpoint = ApiEndpoint::new(fn_decl.name.to_string(), api_attrs);
+
+        // Extract parameters
+        for param in &fn_decl.params {
+            let api_param = ApiParam {
+                name: param.name.to_string(),
+                ty: type_to_string(&param.ty),
+                default: param.default.as_ref().map(expr_to_string),
+                optional: is_optional_type(&param.ty),
+            };
+            endpoint.params.push(api_param);
+        }
+
+        // Extract return type
+        endpoint.return_type = type_to_string(&fn_decl.ret);
+
+        // Plan musk-022 CRUD 智能扩展: capture the function body AST so a
+        // future "route A" can transpile real business logic (a2r) instead of
+        // a CRUD template. NOTE: Plan 399 第4-5 步 shipped "route B" (db-
+        // delegation in api_gen.rs) which does NOT read this; it stays
+        // populated for the eventual route A. See ApiEndpoint::body doc.
+        endpoint.body = Some(fn_decl.body.clone());
+
+        Some(endpoint)
+    }
+
+    /// Extract API type from type declaration
+    fn extract_type(&self, type_decl: &crate::ast::TypeDecl) -> Option<ApiType> {
+        // PLAN-776 R1-F05：**名字**是来源身份的键——空成员声明（`type
+        // Response {}`）同样进入名集（字段为空），不再被丢弃；字段提取
+        // 保持原语义（仅 struct-like members）。
+        let fields: Vec<ApiField> = type_decl
+            .members
+            .iter()
+            .map(|m| ApiField {
+                name: m.name.to_string(),
+                ty: type_to_string(&m.ty),
+                optional: matches!(&m.ty, Type::Option(_)),
+                default: m.value.as_ref().map(expr_to_string),
+            })
+            .collect();
+
+        Some(ApiType {
+            name: type_decl.name.to_string(),
+            fields,
+            doc: None,
+            alias_of: None,
+        })
+    }
+}
+
+impl Default for ApiExtractor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Convert Type to string representation
+/// PLAN-776 R2-07：类型引用的裸名（alias target 展开输入）——User/泛型
+/// 实例取声明名，内建按显示首词。
+fn type_to_string(ty: &Type) -> String {
+    match ty {
+        Type::Int => "int".to_string(),
+        Type::Byte => "byte".to_string(),
+        Type::I64 => "i64".to_string(),
+        Type::Uint => "uint".to_string(),
+        Type::U64 => "u64".to_string(),
+        Type::USize => "usize".to_string(),
+        Type::Float => "float".to_string(),
+        Type::Double => "double".to_string(),
+        Type::Bool => "bool".to_string(),
+        Type::StrFixed(len) => format!("str[{}]", len),
+        Type::CStrLit => "cstr".to_string(),
+        Type::StrSlice => "str".to_string(),
+        Type::StrOwned => "String".to_string(),
+        Type::Char => "char".to_string(),
+        Type::Void => "void".to_string(),
+        Type::Unknown => "unknown".to_string(),
+        Type::Array(array_type) => {
+            let elem_str = type_to_string(&array_type.elem);
+            format!("[{}]{}", array_type.len, elem_str)
+        }
+        Type::RuntimeArray(rta) => {
+            let elem_str = type_to_string(&rta.elem);
+            format!("[runtime:{}]", elem_str)
+        }
+        Type::List(elem) => format!("List<{}>", type_to_string(elem)),
+        Type::Map(k, v) => format!("Map<{}, {}>", type_to_string(k), type_to_string(v)),
+        Type::Slice(slice_type) => format!("[]{}", type_to_string(&slice_type.elem)),
+        Type::Ptr(ptr_type) => format!("*{}", type_to_string(&ptr_type.of.borrow())),
+        Type::Reference(inner) => format!("&{}", type_to_string(inner)),
+        Type::User(type_decl) => type_decl.name.to_string(),
+        Type::Enum(enum_decl) => enum_decl.borrow().name.to_string(),
+        Type::Tag(tag) => tag.borrow().name.to_string(),
+        Type::Spec(spec_decl) => spec_decl.borrow().name.to_string(),
+        Type::GenericInstance(inst) => {
+            if inst.args.is_empty() {
+                inst.base_name.to_string()
+            } else {
+                let args: Vec<String> = inst.args.iter().map(type_to_string).collect();
+                format!("{}<{}>", inst.base_name, args.join(", "))
+            }
+        }
+        Type::CStruct(type_decl) => format!("struct {}", type_decl.name),
+        Type::Linear(inner) => format!("linear<{}>", type_to_string(inner)),
+        Type::Variadic => "...".to_string(),
+        Type::Fn(params, ret) => {
+            let param_str: Vec<String> = params.iter().map(type_to_string).collect();
+            format!("fn({}) {}", param_str.join(", "), type_to_string(ret))
+        }
+        Type::Storage(storage) => storage.to_string(),
+        Type::Union(union) => format!("union({})", union.name),
+        Type::Option(inner) => format!("?{}", type_to_string(inner)), // Plan 120
+        Type::Result(inner) => format!("!{}", type_to_string(inner)), // Plan 120
+        Type::Handle { task_type } => format!("Handle<{}>", type_to_string(task_type)), // Plan 121
+        Type::Rust(source) => source.full_path.clone(),               // Plan 190
+        Type::Tuple(ts) => {
+            let elems: Vec<String> = ts.iter().map(type_to_string).collect();
+            format!("({})", elems.join(", "))
+        }
+    }
+}
+
+/// Check if type is optional (May<T>)
+fn is_optional_type(ty: &Type) -> bool {
+    // Check if this is a GenericInstance with base_name "May"
+    match ty {
+        Type::GenericInstance(inst) => inst.base_name.as_ref() == "May",
+        _ => false,
+    }
+}
+
+/// Convert expression to string (simplified)
+fn expr_to_string(_expr: &crate::ast::Expr) -> String {
+    // Simplified implementation
+    "...".to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_simple_annotation() {
+        let attrs = ApiAnnotationParser::parse("");
+        assert!(attrs.is_simple());
+    }
+
+    #[test]
+    fn test_parse_method_annotation() {
+        let attrs = ApiAnnotationParser::parse(r#"method = "GET""#);
+        assert_eq!(attrs.method, Some("GET".to_string()));
+    }
+
+    #[test]
+    fn test_parse_multiple_attributes() {
+        let attrs = ApiAnnotationParser::parse(r#"method = "POST", path = "/users", auth = true"#);
+        assert_eq!(attrs.method, Some("POST".to_string()));
+        assert_eq!(attrs.path, Some("/users".to_string()));
+        assert!(attrs.auth);
+    }
+
+    #[test]
+    fn test_parse_cache_attribute() {
+        let attrs = ApiAnnotationParser::parse(r#"cache = 60"#);
+        assert_eq!(attrs.cache, Some(60));
+    }
+
+    #[test]
+    fn test_parse_custom_attribute() {
+        let attrs = ApiAnnotationParser::parse(r#"custom = "value""#);
+        assert_eq!(attrs.custom.get("custom"), Some(&"value".to_string()));
+    }
+}
+
+// Phase 5.4: Integration tests
+#[cfg(test)]
+mod integration_tests;
+
+#[cfg(test)]
+mod type_extraction_tests {
+    use super::*;
+    use crate::Parser;
+
+    #[test]
+    fn test_extract_type_definition() {
+        let code = r#"
+type User {
+    id int
+    name str
+    email str
+}
+"#;
+        let mut parser = Parser::from(code);
+        let ast = parser.parse().unwrap();
+
+        let extractor = ApiExtractor::new();
+        let module = extractor.extract("test", &ast.stmts);
+
+        assert_eq!(module.types.len(), 1);
+        assert_eq!(module.types[0].name, "User");
+        assert_eq!(module.types[0].fields.len(), 3);
+    }
+
+    /// Plan musk-022 CRUD 智能扩展: extract_endpoint must capture the body AST.
+    #[test]
+    fn test_extract_endpoint_captures_body() {
+        let code = r#"
+pub type Note = { id: int, title: str }
+
+#[api(method = "POST", path = "/api/notes")]
+pub fn create_note(title str) Note {
+    let n = Note { id: 1, title: title }
+    return n
+}
+"#;
+        let mut parser = Parser::from(code);
+        let ast = parser.parse().unwrap();
+        let module = ApiExtractor::new().extract("test", &ast.stmts);
+        assert_eq!(module.endpoints.len(), 1);
+        let ep = &module.endpoints[0];
+        assert_eq!(ep.fn_name, "create_note");
+        assert!(ep.body.is_some(), "endpoint body AST must be captured");
+        let body = ep.body.as_ref().unwrap();
+        assert!(!body.stmts.is_empty(), "captured body must be non-empty");
+    }
+}

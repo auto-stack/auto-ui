@@ -1,0 +1,115 @@
+/// URL module - URL encoding and parsing
+///
+/// This module provides URL encoding, decoding, and parsing utilities.
+/// Essential for HTTP query strings and web applications.
+
+// ═══════════════════════════════════════════════════════════
+// URL Encoding/Decoding
+// ═══════════════════════════════════════════════════════════
+
+/// URL encode a string
+/// Encodes special characters as %XX
+/// Example: encode("hello world") -> "hello%20world"
+pub fn encode(s str) str;
+
+/// URL decode a string
+/// Decodes %XX sequences
+/// Example: decode("hello%20world") -> "hello world"
+pub fn decode(s str) str;
+
+/// Encode a string for use in URL path segments
+/// Like encode but also encodes /
+pub fn encode_path_segment(s str) str;
+
+/// Encode a string for use in URL query component
+/// Encodes spaces as +
+pub fn encode_query_component(s str) str;
+
+/// Decode a query component (handles + as space)
+pub fn decode_query_component(s str) str;
+
+// ═══════════════════════════════════════════════════════════
+// Query String Parsing
+// ═══════════════════════════════════════════════════════════
+
+/// Encode query parameters from key-value pairs
+/// Example: encode_query({ "name": "john", "age": "30" })
+///          -> "name=john&age=30"
+pub fn encode_query(params Map[str, str]) str;
+
+/// Decode a query string to key-value pairs
+/// Example: decode_query("name=john&age=30")
+///          -> { "name": "john", "age": "30" }
+pub fn decode_query(query str) Map[str, str];
+
+/// Parse form data (application/x-www-form-urlencoded)
+pub fn parse_form(body str) Map[str, str];
+
+// ═══════════════════════════════════════════════════════════
+// URL Parsing
+// ═══════════════════════════════════════════════════════════
+
+/// URL type - Parsed URL components
+type Url
+
+/// Parse a URL string into components
+/// Returns null if the URL is invalid
+/// Example: let u = parse("https://example.com/path?q=1")
+pub fn parse(url str) Url?;
+
+// ═══════════════════════════════════════════════════════════
+// URL Instance Methods
+// ═══════════════════════════════════════════════════════════
+
+ext Url {
+    /// Get the scheme (protocol)
+    /// Example: "https"
+    fn scheme() str
+
+    /// Get the host (domain)
+    /// Example: "example.com"
+    fn host() str
+
+    /// Get the port number
+    /// Returns 0 if not specified
+    fn port() int
+
+    /// Get the path
+    /// Example: "/path/to/resource"
+    fn path() str
+
+    /// Get the query string (without ?)
+    /// Example: "q=1&page=2"
+    fn query() str
+
+    /// Get the fragment (hash, without #)
+    /// Example: "section-1"
+    fn fragment() str
+
+    /// Get the username (for URLs with credentials)
+    fn username() str
+
+    /// Get the password (for URLs with credentials)
+    fn password() str
+
+    /// Get query parameters as a map
+    fn query_params() Map[str, str]
+
+    /// Get a specific query parameter
+    fn query_param(key str) str
+
+    /// Reconstruct the full URL string
+    fn to_string() str
+}
+
+// ═══════════════════════════════════════════════════════════
+// URL Building
+// ═══════════════════════════════════════════════════════════
+
+/// Build a URL from components
+/// Example: build({ "scheme": "https", "host": "example.com", "path": "/api" })
+pub fn build(components Map[str, str]) str;
+
+/// Join URL path segments
+/// Example: join_path(["api", "v1", "users"]) -> "/api/v1/users"
+pub fn join_path(segments []str) str;

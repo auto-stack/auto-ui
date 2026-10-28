@@ -1,0 +1,19 @@
+{
+  "spatial_check": true,
+  "spatial_phase": 0,
+  "spatial_records": [],
+  "play_check": false,
+  "play_phase": null,
+  "play_records": null,
+  "frames": 0,
+  "probe": false,
+  "interaction_check": false,
+  "passed": false,
+  "error": "io: \\\\?\\D:\\autostack\\.wt\\lang-851\\auto-lang\\experimental\\autographics-auto-driver\\target\\motion-native-numeric\\missing-code\\moved\\scripts\\7c22cb93d61bca7e9cde7b8dec79db370d9a936ed294b1f3418e319ee47f34e1.at: 系统找不到指定的文件。 (os error 2)",
+  "interaction_records": null,
+  "asset_check": false,
+  "asset_phase": null,
+  "asset_records": null,
+  "hierarchy_check": false,
+  "hierarchy_phase": null
+}

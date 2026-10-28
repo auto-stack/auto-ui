@@ -1,0 +1,573 @@
+{
+  "plan_id": "PLAN-833",
+  "plan_revision": 2,
+  "frozen_at": "2026-10-22",
+  "graphics": {
+    "branch": "autographics-dev",
+    "commit": "764e87559cff016d9e0d6b2141e5f1f9903398c5",
+    "subtree": "fdfdf351e91f52ff1848bff51134eb85a5f8928f",
+    "cargo_lock_sha256": "c3df168e7234b8bfa876dfbab8afa71af8773d1d7241ac010ad5d8054930b3bf",
+    "review": "R5 pass",
+    "delivery": "archived delivered 10/10"
+  },
+  "sdk": {
+    "repository_commit": "7b987ca8b12f2eec3c076a1bfbf3ff4663aa8467",
+    "repository_role": "PLAN-846:r2 nonfinite encoding/classification correction; only nano_value.rs on original delivered SDK",
+    "last_sdk_change": "7b987ca8b12f2eec3c076a1bfbf3ff4663aa8467",
+    "path_closure_count": 17,
+    "path_sources": [
+      {
+        "path": "crates/a2r-std",
+        "git_tree": "f48970cf663803016445502bfb7d5d0d14e8c7b2",
+        "working_manifest_sha256": "d7aae89c2842c27feeaba3bc3a1e4926ed380d9fb17bd216b639968becf76a81",
+        "git_manifest_sha256": "d7aae89c2842c27feeaba3bc3a1e4926ed380d9fb17bd216b639968becf76a81"
+      },
+      {
+        "path": "crates/auto-ast",
+        "git_tree": "65181b9f9c0654f6bbee6afdc9889c16175fcf5e",
+        "working_manifest_sha256": "f6d140587d9776c5ceec9d38a170d06a3ab196c3b555156d687859131864e376",
+        "git_manifest_sha256": "f6d140587d9776c5ceec9d38a170d06a3ab196c3b555156d687859131864e376"
+      },
+      {
+        "path": "crates/auto-atom",
+        "git_tree": "5f91f1c3c3e1cde99ab48eeacd1fded50ab42b86",
+        "working_manifest_sha256": "975e7dfdbce5f94144a8ce99409ca11b3b03d111597c02e221eee6e9ae6d9dec",
+        "git_manifest_sha256": "975e7dfdbce5f94144a8ce99409ca11b3b03d111597c02e221eee6e9ae6d9dec"
+      },
+      {
+        "path": "crates/auto-bindgen",
+        "git_tree": "457f76bdc65843f65aa33b04a307e3027274447a",
+        "working_manifest_sha256": "ac0f55e279b7c4ef3f7d63d7a74e5f7a2788fe64f119d6120bba670f69cb4eee",
+        "git_manifest_sha256": "ac0f55e279b7c4ef3f7d63d7a74e5f7a2788fe64f119d6120bba670f69cb4eee"
+      },
+      {
+        "path": "crates/auto-cache",
+        "git_tree": "c4524240cf1a0e6c50a9176fe673cdf2527076e9",
+        "working_manifest_sha256": "ae0a1d6cfd6c48d10100c2975189a848fd29e435bfb37ded5814eb548aab5d84",
+        "git_manifest_sha256": "ae0a1d6cfd6c48d10100c2975189a848fd29e435bfb37ded5814eb548aab5d84"
+      },
+      {
+        "path": "crates/auto-diagnostics",
+        "git_tree": "14220c909d0814256427f61962f47e83324bb61d",
+        "working_manifest_sha256": "a1d982c382bddaa80fff32c75a1530db498a2818177f5d1bf8088c78069cb368",
+        "git_manifest_sha256": "a1d982c382bddaa80fff32c75a1530db498a2818177f5d1bf8088c78069cb368"
+      },
+      {
+        "path": "crates/auto-lang-core",
+        "git_tree": "52448d8dfaf66b52ffd766b3f440c30ab5cf2675",
+        "working_manifest_sha256": "df6405dab1ef21112a1f3476bf2976da8828e1dc5ddeeeb4d2b2f249c113a2e3",
+        "git_manifest_sha256": "df6405dab1ef21112a1f3476bf2976da8828e1dc5ddeeeb4d2b2f249c113a2e3"
+      },
+      {
+        "path": "crates/auto-lex",
+        "git_tree": "0ec95bb4659480022ba49482b1311605411a5e40",
+        "working_manifest_sha256": "04423934d304bccc94e43dcb066e064e0eff361a4f64c5edf36ee7bdecf65863",
+        "git_manifest_sha256": "04423934d304bccc94e43dcb066e064e0eff361a4f64c5edf36ee7bdecf65863"
+      },
+      {
+        "path": "crates/auto-macros",
+        "git_tree": "6aada364760aa56c3e8e568289b9863f00343b27",
+        "working_manifest_sha256": "b4b012f1ee295f5aff1943a75a14ff171ddfcb42513bf98d9157281c0b595f8b",
+        "git_manifest_sha256": "b4b012f1ee295f5aff1943a75a14ff171ddfcb42513bf98d9157281c0b595f8b"
+      },
+      {
+        "path": "crates/auto-media-core",
+        "git_tree": "82070bc85e32a50429ffb66d2cc16bc7d21b8b09",
+        "working_manifest_sha256": "eb581d1a1a393408689f8a20ccc043994579bc45053c551bd0040d21481f9f5c",
+        "git_manifest_sha256": "eb581d1a1a393408689f8a20ccc043994579bc45053c551bd0040d21481f9f5c"
+      },
+      {
+        "path": "crates/auto-parser-api",
+        "git_tree": "5699e019894110481985e4923e0baa254da9d5f3",
+        "working_manifest_sha256": "781bf43b117687fe6ebad175cbf47fb25bb9c666da411607b6c2a2844fd99640",
+        "git_manifest_sha256": "781bf43b117687fe6ebad175cbf47fb25bb9c666da411607b6c2a2844fd99640"
+      },
+      {
+        "path": "crates/auto-terminal-core",
+        "git_tree": "7ca72b8d76e125b16469a4b90e6e4bc91a7de663",
+        "working_manifest_sha256": "f3d6d5bb369f18e063050953f50b7d6be7073438a46aed91070b975beccfff4d",
+        "git_manifest_sha256": "f3d6d5bb369f18e063050953f50b7d6be7073438a46aed91070b975beccfff4d"
+      },
+      {
+        "path": "crates/auto-test-case",
+        "git_tree": "4efd4314782bdcd73d6920d43d6c51e9e6b33421",
+        "working_manifest_sha256": "75745ed4719eb0aff254d29498f17d57a608ce8f846f65c53170da76fa9ee5c2",
+        "git_manifest_sha256": "75745ed4719eb0aff254d29498f17d57a608ce8f846f65c53170da76fa9ee5c2"
+      },
+      {
+        "path": "crates/auto-text-core",
+        "git_tree": "68d1163b4b0f29e92dfaeb0b6cf62580bad18563",
+        "working_manifest_sha256": "153a89a31e24919d2433fbd74e1552f48775f07392c17c93288611c5769993a5",
+        "git_manifest_sha256": "153a89a31e24919d2433fbd74e1552f48775f07392c17c93288611c5769993a5"
+      },
+      {
+        "path": "crates/auto-val",
+        "git_tree": "d41a0c288f115e73d355d6b98692293091ea0d73",
+        "working_manifest_sha256": "6cb5db1605d0b8fabb82a7b8871877aaffb96a74884b4e31c7ec99de98fd093d",
+        "git_manifest_sha256": "6cb5db1605d0b8fabb82a7b8871877aaffb96a74884b4e31c7ec99de98fd093d"
+      },
+      {
+        "path": "crates/shim-metadata",
+        "git_tree": "6ffceaaa1761cfe722e8c8cf39583a71a313aa12",
+        "working_manifest_sha256": "85c89e8da1371eede6e96cd50df3e4d31284a891a9edab999dfa1c58e3f6f592",
+        "git_manifest_sha256": "85c89e8da1371eede6e96cd50df3e4d31284a891a9edab999dfa1c58e3f6f592"
+      },
+      {
+        "path": "vendor/autodown-test-parser",
+        "git_tree": "dc2673512bcabaff992c60672c6d8c3860742af4",
+        "working_manifest_sha256": "3c53c55597821e0159be745b91ab88bea9b5b6ed6b43e6864276cd1306f7e9dc",
+        "git_manifest_sha256": "3c53c55597821e0159be745b91ab88bea9b5b6ed6b43e6864276cd1306f7e9dc"
+      }
+    ],
+    "stdlib_tree": "4fcb4787a91cc4055a0ebf06d08a6a797e76f1a6",
+    "root_manifest_sha256": "3ee98ad8a1276a4886eca330b980ed2b21c3176c545bad0ac04b07bb7112c2c3",
+    "root_manifest_snapshot": "sdk-Cargo.toml.txt",
+    "root_lock_sha256": "5192d08d502a8f17e277ad8912f5884175659bef642b614e25b394243d1ff091",
+    "root_lock_bytes": 274244,
+    "root_lock_snapshot": "sdk-Cargo.lock.txt",
+    "critical_inputs": [
+      {
+        "path": "Cargo.toml",
+        "git_blob": "4f7171c210eb5c9bb94ea6baf78af077ad00e7d1",
+        "git_content_sha256": "3ee98ad8a1276a4886eca330b980ed2b21c3176c545bad0ac04b07bb7112c2c3",
+        "working_copy_sha256": "3ee98ad8a1276a4886eca330b980ed2b21c3176c545bad0ac04b07bb7112c2c3"
+      },
+      {
+        "path": "stdlib/assembly-providers.json",
+        "git_blob": "9b11e9ad5d26153e77314d05dd3bf3a70bc03c5e",
+        "git_content_sha256": "9943e06ec1a83043dc40d752d61dfbb4fc78e94d0b2d74445ab1412b5aa04b5e",
+        "working_copy_sha256": "9943e06ec1a83043dc40d752d61dfbb4fc78e94d0b2d74445ab1412b5aa04b5e"
+      },
+      {
+        "path": "stdlib/auto/image.at",
+        "git_blob": "29cd8a91f043f949b7e7f527d269b117c25617b4",
+        "git_content_sha256": "1c349bb05a2273a654747004b8f358791cf112c53f974d44224cbb8e23ea4bd0",
+        "working_copy_sha256": "1c349bb05a2273a654747004b8f358791cf112c53f974d44224cbb8e23ea4bd0"
+      },
+      {
+        "path": "stdlib/auto/image.rs.at",
+        "git_blob": "a6cbc505a491a40c31717c2bd28c9bf7725274b6",
+        "git_content_sha256": "0782c9e767442665a00080da6c59fdba95682f624b2a4b7189131f8a7cc94109",
+        "working_copy_sha256": "0782c9e767442665a00080da6c59fdba95682f624b2a4b7189131f8a7cc94109"
+      },
+      {
+        "path": "stdlib/auto/image.vm.at",
+        "git_blob": "011ea36e0b7452f69d5b71b5c5a7b2c1d6cfc989",
+        "git_content_sha256": "30129add6bb08c4beac33c74b2ae929fc910c7d7cb0900176b2ac0b700fd482a",
+        "working_copy_sha256": "30129add6bb08c4beac33c74b2ae929fc910c7d7cb0900176b2ac0b700fd482a"
+      },
+      {
+        "path": "crates/auto-lang-core/build.rs",
+        "git_blob": "32e68380a147709c20977a91c3cf16264df7445f",
+        "git_content_sha256": "854bc92dc48272a99fa0066bbec3d53809004f512bac764814b49becc87e9695",
+        "working_copy_sha256": "854bc92dc48272a99fa0066bbec3d53809004f512bac764814b49becc87e9695"
+      },
+      {
+        "path": "crates/auto-lang-core/src/lib.rs",
+        "git_blob": "538f61648849e9c5ae2644306ad11b78a78b5c95",
+        "git_content_sha256": "990d13774ed38c81f7958706356ca81dc316135f1dce941a722c31866bb39fbd",
+        "working_copy_sha256": "990d13774ed38c81f7958706356ca81dc316135f1dce941a722c31866bb39fbd"
+      },
+      {
+        "path": "crates/auto-lang-core/src/interpreter/vm_interpreter.rs",
+        "git_blob": "9693157b994f9a36d2e97bb6621e1d527c2ea1cb",
+        "git_content_sha256": "10444b3cfef60a57253ebd3a711f6e7d918b955df72e4a05220d08129daffa58",
+        "working_copy_sha256": "10444b3cfef60a57253ebd3a711f6e7d918b955df72e4a05220d08129daffa58"
+      },
+      {
+        "path": "crates/auto-lang-core/src/vm/engine.rs",
+        "git_blob": "4d1b28e10ffde4a952577c8d9500b45247b71cf2",
+        "git_content_sha256": "4c0db1077a77e79e9f7314c96f18f2ccab510623042c4afcdd8ad9569d1a5b86",
+        "working_copy_sha256": "4c0db1077a77e79e9f7314c96f18f2ccab510623042c4afcdd8ad9569d1a5b86"
+      },
+      {
+        "path": "crates/auto-lang-core/src/vm/ffi/convert.rs",
+        "git_blob": "e582f4068b2d1acb411df0efbd3c00157b67a41e",
+        "git_content_sha256": "c5d0cfefecd59638c6d847bf6c7e7e8b589d7d3167527c09c612b4c0275d0966",
+        "working_copy_sha256": "c5d0cfefecd59638c6d847bf6c7e7e8b589d7d3167527c09c612b4c0275d0966"
+      }
+    ],
+    "forbidden_path_packages": [
+      "auto-lang",
+      "auto-man",
+      "auto-ui-dialect",
+      "auto-ui-compiler",
+      "auto-ui-runtime",
+      "auto-ui-tools"
+    ],
+    "workspace_patch_policy": "root iced_widget patch is not consumed by pure SDK; record and exclude from projected SDK workspace, do not pull UI patch sources",
+    "local_dependency_edges": [
+      {
+        "source": "crates/auto-ast",
+        "section": "dependencies",
+        "name": "auto-val",
+        "target": "crates/auto-val",
+        "optional": false
+      },
+      {
+        "source": "crates/auto-ast",
+        "section": "dependencies",
+        "name": "auto-lex",
+        "target": "crates/auto-lex",
+        "optional": false
+      },
+      {
+        "source": "crates/auto-atom",
+        "section": "dependencies",
+        "name": "auto-val",
+        "target": "crates/auto-val",
+        "optional": false
+      },
+      {
+        "source": "crates/auto-cache",
+        "section": "dependencies",
+        "name": "shim-metadata",
+        "target": "crates/shim-metadata",
+        "optional": false
+      },
+      {
+        "source": "crates/auto-diagnostics",
+        "section": "dependencies",
+        "name": "auto-val",
+        "target": "crates/auto-val",
+        "optional": false
+      },
+      {
+        "source": "crates/auto-diagnostics",
+        "section": "dependencies",
+        "name": "auto-lex",
+        "target": "crates/auto-lex",
+        "optional": false
+      },
+      {
+        "source": "crates/auto-lang-core",
+        "section": "dependencies",
+        "name": "auto-ast",
+        "target": "crates/auto-ast",
+        "optional": false
+      },
+      {
+        "source": "crates/auto-lang-core",
+        "section": "dependencies",
+        "name": "auto-lex",
+        "target": "crates/auto-lex",
+        "optional": false
+      },
+      {
+        "source": "crates/auto-lang-core",
+        "section": "dependencies",
+        "name": "auto-diagnostics",
+        "target": "crates/auto-diagnostics",
+        "optional": false
+      },
+      {
+        "source": "crates/auto-lang-core",
+        "section": "dependencies",
+        "name": "auto-parser-api",
+        "target": "crates/auto-parser-api",
+        "optional": false
+      },
+      {
+        "source": "crates/auto-lang-core",
+        "section": "dependencies",
+        "name": "auto-val",
+        "target": "crates/auto-val",
+        "optional": false
+      },
+      {
+        "source": "crates/auto-lang-core",
+        "section": "dependencies",
+        "name": "a2r-std",
+        "target": "crates/a2r-std",
+        "optional": false
+      },
+      {
+        "source": "crates/auto-lang-core",
+        "section": "dependencies",
+        "name": "auto-atom",
+        "target": "crates/auto-atom",
+        "optional": false
+      },
+      {
+        "source": "crates/auto-lang-core",
+        "section": "dependencies",
+        "name": "auto-cache",
+        "target": "crates/auto-cache",
+        "optional": false
+      },
+      {
+        "source": "crates/auto-lang-core",
+        "section": "dependencies",
+        "name": "shim-metadata",
+        "target": "crates/shim-metadata",
+        "optional": false
+      },
+      {
+        "source": "crates/auto-lang-core",
+        "section": "dependencies",
+        "name": "auto-test-case",
+        "target": "crates/auto-test-case",
+        "optional": true
+      },
+      {
+        "source": "crates/auto-lang-core",
+        "section": "dependencies",
+        "name": "auto-bindgen",
+        "target": "crates/auto-bindgen",
+        "optional": false
+      },
+      {
+        "source": "crates/auto-lang-core",
+        "section": "dependencies",
+        "name": "auto-terminal-core",
+        "target": "crates/auto-terminal-core",
+        "optional": false
+      },
+      {
+        "source": "crates/auto-lang-core",
+        "section": "dependencies",
+        "name": "auto-text-core",
+        "target": "crates/auto-text-core",
+        "optional": false
+      },
+      {
+        "source": "crates/auto-lang-core",
+        "section": "dependencies",
+        "name": "auto-media-core",
+        "target": "crates/auto-media-core",
+        "optional": false
+      },
+      {
+        "source": "crates/auto-lang-core",
+        "section": "dependencies",
+        "name": "auto-macros",
+        "target": "crates/auto-macros",
+        "optional": false
+      },
+      {
+        "source": "crates/auto-lex",
+        "section": "dependencies",
+        "name": "auto-val",
+        "target": "crates/auto-val",
+        "optional": false
+      },
+      {
+        "source": "crates/auto-macros",
+        "section": "dev-dependencies",
+        "name": "auto-lang-core",
+        "target": "crates/auto-lang-core",
+        "optional": false
+      },
+      {
+        "source": "crates/auto-macros",
+        "section": "dev-dependencies",
+        "name": "auto-val",
+        "target": "crates/auto-val",
+        "optional": false
+      },
+      {
+        "source": "crates/auto-parser-api",
+        "section": "dependencies",
+        "name": "auto-ast",
+        "target": "crates/auto-ast",
+        "optional": false
+      },
+      {
+        "source": "crates/auto-parser-api",
+        "section": "dependencies",
+        "name": "auto-lex",
+        "target": "crates/auto-lex",
+        "optional": false
+      },
+      {
+        "source": "crates/auto-parser-api",
+        "section": "dependencies",
+        "name": "auto-diagnostics",
+        "target": "crates/auto-diagnostics",
+        "optional": false
+      },
+      {
+        "source": "crates/auto-test-case",
+        "section": "dependencies",
+        "name": "autodown-test-parser",
+        "target": "vendor/autodown-test-parser",
+        "optional": false
+      },
+      {
+        "source": "crates/auto-test-case",
+        "section": "dev-dependencies",
+        "name": "auto-atom",
+        "target": "crates/auto-atom",
+        "optional": false
+      }
+    ],
+    "plan840_original_pin": "9576b4dad5ceb8b201adedd46f9689f25c2dd5f9",
+    "plan840_patch_paths": [
+      "crates/auto-lang-core/src/use_scanner.rs",
+      "crates/auto-lang-core/src/dep_scanner.rs",
+      "crates/auto-lang-core/src/dependency_scan.rs",
+      "crates/auto-lang-core/src/lib.rs"
+    ]
+  },
+  "evidence": [
+    {
+      "path": "docs/plans/archive/830-autographics-surface-portal-composition-and-input.md",
+      "sha256": "92a6e3cb2e0c6cc088220efeabc86aaf8526daa5109782d1f5bb3e43e739ec20"
+    },
+    {
+      "path": "docs/plans/attachments/830/review-r5/review.md",
+      "sha256": "af9d357a684565d8dfa339bc9da076c80e8233a77f2c12d9c6e152ab51d96645"
+    },
+    {
+      "path": "docs/plans/attachments/830/work-r6/merge-gates.txt",
+      "sha256": "eb13d30b455e24ba6d23afb4fc1eb6334f9fb06ab1948af32058ce078bdb6b83"
+    },
+    {
+      "path": "docs/plans/attachments/830/work-r6/merge/gates.txt",
+      "sha256": "f5e84642119bb976275fdafee7e26151f6618fe282308c5ebe54015b7ddee044"
+    },
+    {
+      "path": "docs/specs/auto-graphics/integration-contract.md",
+      "sha256": "4e0f0e808d20be0683e558ee7bdf79c986ce8c63b5abf332bbcba346f4725468"
+    },
+    {
+      "path": "docs/specs/auto-graphics/surface-composition.md",
+      "sha256": "e68bba42d91e76feea78fe0c57bd6bc01468c09658c268f9c2b428f118a95d5b"
+    },
+    {
+      "path": "docs/specs/auto-graphics/nested-input.md",
+      "sha256": "68b3b38fda584254923be56476299f3709c2733eb3e45365afd2074503d6c5c1"
+    },
+    {
+      "path": "docs/specs/auto-graphics/prototype-profile.md",
+      "sha256": "0458308ff02da49d485310de313a6a4ede291a77b1ce917bf2b75a1ab7cbadd6"
+    },
+    {
+      "path": "docs/specs/language-sdk/project.md",
+      "sha256": "b2d721bf27aa2904ae62a512d073f45152fe0f802bc66300044b9175ece88aec"
+    }
+  ],
+  "existing_merge_reports": [
+    {
+      "case": "surface-offscreen",
+      "path": "docs/plans/attachments/830/work-r6/merge/surface-offscreen/report.json",
+      "sha256": "e84328a99e9b7ff8ff8c435923fbf3198a64d9192bd7240ae84b2c93d5671ecb",
+      "exit": "pass",
+      "fingerprints": {
+        "agp_commit": "764e87559cff",
+        "cargo_lock_sha256": "c3df168e7234b8bfa876dfbab8afa71af8773d1d7241ac010ad5d8054930b3bf",
+        "asset_set_sha256": "983a78f540d9c9b02de2fbe09cad52c162a84ffe92b6458b4fc1cd36845a6d3a"
+      }
+    },
+    {
+      "case": "surface-compose",
+      "path": "docs/plans/attachments/830/work-r6/merge/surface-compose/report.json",
+      "sha256": "625ddb3019fabd7f968c6f2ba3a02c8f853a2a5c5de5c80d653983410619e0e2",
+      "exit": "pass",
+      "fingerprints": {
+        "agp_commit": "764e87559cff",
+        "cargo_lock_sha256": "c3df168e7234b8bfa876dfbab8afa71af8773d1d7241ac010ad5d8054930b3bf",
+        "asset_set_sha256": "983a78f540d9c9b02de2fbe09cad52c162a84ffe92b6458b4fc1cd36845a6d3a"
+      }
+    },
+    {
+      "case": "surface-input",
+      "path": "docs/plans/attachments/830/work-r6/merge/surface-input/report.json",
+      "sha256": "21af51ba5889c998684b19b5b027c72f2d1cf14be132bb11aa4b2f217696d889",
+      "exit": "pass",
+      "fingerprints": {
+        "agp_commit": "764e87559cff",
+        "cargo_lock_sha256": "c3df168e7234b8bfa876dfbab8afa71af8773d1d7241ac010ad5d8054930b3bf",
+        "asset_set_sha256": "983a78f540d9c9b02de2fbe09cad52c162a84ffe92b6458b4fc1cd36845a6d3a"
+      }
+    },
+    {
+      "case": "surface-scenarios",
+      "path": "docs/plans/attachments/830/work-r6/merge/surface-scenarios/report.json",
+      "sha256": "db72c09a2bf32f8b6bd01cbb3f9f5fa762f7b473548a73d4bec7bda413761c17",
+      "exit": "pass",
+      "fingerprints": {
+        "agp_commit": "764e87559cff",
+        "cargo_lock_sha256": "c3df168e7234b8bfa876dfbab8afa71af8773d1d7241ac010ad5d8054930b3bf",
+        "asset_set_sha256": "983a78f540d9c9b02de2fbe09cad52c162a84ffe92b6458b4fc1cd36845a6d3a"
+      }
+    },
+    {
+      "case": "surface-lifecycle",
+      "path": "docs/plans/attachments/830/work-r6/merge/surface-lifecycle/report.json",
+      "sha256": "aaa8adafda82b8e8bd2d719fd453031fdfd0b75bb78e0811764707f468700533",
+      "exit": "pass",
+      "fingerprints": {
+        "agp_commit": "764e87559cff",
+        "cargo_lock_sha256": "c3df168e7234b8bfa876dfbab8afa71af8773d1d7241ac010ad5d8054930b3bf",
+        "asset_set_sha256": "983a78f540d9c9b02de2fbe09cad52c162a84ffe92b6458b4fc1cd36845a6d3a"
+      }
+    },
+    {
+      "case": "surface-ime-os",
+      "path": "docs/plans/attachments/830/work-r6/merge/surface-ime-os/report.json",
+      "sha256": "bd9d8f58df4411510ee63f7b36c7e2a4fdeea7f8b018d186039686c369836a8f",
+      "exit": "pass",
+      "fingerprints": {
+        "agp_commit": "764e87559cff",
+        "cargo_lock_sha256": "c3df168e7234b8bfa876dfbab8afa71af8773d1d7241ac010ad5d8054930b3bf",
+        "asset_set_sha256": "983a78f540d9c9b02de2fbe09cad52c162a84ffe92b6458b4fc1cd36845a6d3a"
+      }
+    },
+    {
+      "case": "ag2d-breakout",
+      "path": "docs/plans/attachments/830/work-r6/merge/ag2d-breakout/report.json",
+      "sha256": "08a0616b0a32a5784df89a0b9b9f8c3fb5b06b5e52ea26168329e0dc34654dca",
+      "exit": "pass",
+      "fingerprints": {
+        "agp_commit": "764e87559cff",
+        "cargo_lock_sha256": "c3df168e7234b8bfa876dfbab8afa71af8773d1d7241ac010ad5d8054930b3bf",
+        "asset_set_sha256": "983a78f540d9c9b02de2fbe09cad52c162a84ffe92b6458b4fc1cd36845a6d3a"
+      }
+    },
+    {
+      "case": "ag3d-squash",
+      "path": "docs/plans/attachments/830/work-r6/merge/ag3d-squash/report.json",
+      "sha256": "198fc31d0112baede23e7c5b4c62213a169e6df9685cc9fcbbbe7b0bdc5dae7d",
+      "exit": "pass",
+      "fingerprints": {
+        "agp_commit": "764e87559cff",
+        "cargo_lock_sha256": "c3df168e7234b8bfa876dfbab8afa71af8773d1d7241ac010ad5d8054930b3bf",
+        "asset_set_sha256": "983a78f540d9c9b02de2fbe09cad52c162a84ffe92b6458b4fc1cd36845a6d3a"
+      }
+    },
+    {
+      "case": "independent-consumer",
+      "path": "docs/plans/attachments/830/work-r6/merge/independent-consumer/report.json",
+      "sha256": "86857235e6b722f9cd76a4f0893395a6bfd3af8e351afafb5908420565661474",
+      "exit": "pass",
+      "fingerprints": {
+        "agp_commit": "764e87559cff",
+        "cargo_lock_sha256": "c3df168e7234b8bfa876dfbab8afa71af8773d1d7241ac010ad5d8054930b3bf",
+        "asset_set_sha256": "983a78f540d9c9b02de2fbe09cad52c162a84ffe92b6458b4fc1cd36845a6d3a"
+      }
+    },
+    {
+      "case": "iced-shared-device-retry",
+      "path": "docs/plans/attachments/830/work-r6/merge/iced-shared-device-retry/report.json",
+      "sha256": "6d3d7481da56bc5221106e613fd4c08be9d45239c379326c440baf4c18463228",
+      "exit": "pass",
+      "fingerprints": {
+        "agp_commit": "764e87559cff",
+        "cargo_lock_sha256": "c3df168e7234b8bfa876dfbab8afa71af8773d1d7241ac010ad5d8054930b3bf",
+        "asset_set_sha256": "983a78f540d9c9b02de2fbe09cad52c162a84ffe92b6458b4fc1cd36845a6d3a"
+      }
+    }
+  ],
+  "pending_work": [
+    "T-01 actual worktree/source revalidation and read-only SDK preparation",
+    "T-02 whole-path callback/state/f32/RC/budget probe",
+    "T-03 managed relocatable SDK carrier and its own dependency lock"
+  ],
+  "runtime_tests_executed_this_turn": false,
+  "plan_contract": {
+    "path": "docs/plans/833-autographics-auto-source-minimal-loop.md",
+    "sha256": "1068c0a508a54adb9333eb8da7412fe48a26aa2336377050ab31ad8668c39c59",
+    "revision": 2
+  }
+}

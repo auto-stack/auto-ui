@@ -1,0 +1,10 @@
+/// DEPRECATED: Use `http` module directly instead.
+///
+/// This module re-exports HTTPStream types from http.
+///
+/// Migration guide:
+///   use http_stream: { http_get_stream }  →  use http: { get_stream }
+///   use http_stream: { http_post_stream } →  use http: { post_stream }
+///   use http_stream: { http_post_stream_with_headers } →  use http: { post_stream_with_headers }
+
+use http: get_stream, post_stream, post_stream_with_headers

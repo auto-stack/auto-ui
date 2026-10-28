@@ -1,0 +1,24 @@
+{
+ "provenance": "frames captured from the bit-exact canonical runs of the CURRENT implementation (PLAN-829 T-04/T-06 rendering; re-frozen review-r1 F07 2026-10-21). Original-engine ground-truth capture: attempted, see research/result.md F07. RE-FREEZE 2026-10-21 #1 (review r4 F829-R4-01): ag3d-squash/retry_overlay.png re-frozen from the role-identity-fixed run (source: Player.gd die() = queue_free()). RE-FREEZE 2026-10-21 #2 (review r6 F829-R6-01): ag3d-squash/squash_moment.png and retry_overlay.png re-frozen from the source-spawn-height-corrected run (mobs at y=0 per Main.gd:37 local position + review-r6 Godot fixture receipt). final_frame.png verified content-unchanged (end-state scene, no live mobs in frame) and kept. Both re-freezes are source-derived expectation corrections \u2014 NOT oracle redefinitions: tolerances, sha256 integrity and corruption-discrimination are unchanged.",
+ "games": {
+  "ag2d-breakout": {
+   "mean_tol": 2.0,
+   "p99_tol": 8.0,
+   "frames": [
+    "first_paddle_contact",
+    "first_brick_contact",
+    "final_frame"
+   ]
+  },
+  "ag3d-squash": {
+   "mean_tol": 3.0,
+   "p99_tol": 12.0,
+   "frames": [
+    "squash_moment",
+    "retry_overlay",
+    "final_frame"
+   ]
+  }
+ },
+ "sha256sums": "SHA256SUMS"
+}

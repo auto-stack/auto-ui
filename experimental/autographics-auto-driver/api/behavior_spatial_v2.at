@@ -1,0 +1,77 @@
+// autographics.behavior/2 explicit extension; shared v1 unit precedes this unit.
+
+var _ag_spatial_boxes=[]
+var _ag_spatial_calls=0
+var _ag_spatial_expected=0
+var _ag_spatial_ready=0
+fn _ag_spatial_reset(count int) {_ag_spatial_boxes=[]; _ag_spatial_expected=count*7; _ag_spatial_ready=0; _ag_spatial_calls=0}
+fn _ag_spatial_config(index int, value float) {
+ if _ag_spatial_ready==1 {_ag_fail(11,-1,index); return}
+ if index!=_ag_spatial_boxes.len() {_ag_fail(11,-1,index); return}
+ if index>=_ag_spatial_expected {_ag_fail(11,-1,index); return}
+ _ag_spatial_boxes.push(value)
+}
+fn _ag_spatial_begin() {
+ _ag_spatial_calls=0
+ if _ag_spatial_boxes.len()!=_ag_spatial_expected {_ag_fail(11,-1,0); return}
+ _ag_spatial_ready=1
+}
+fn _ag_spatial_finite(v float) int {
+ if v - v != 0.0 {return 0}
+ return 1
+}
+fn _ag_spatial_attempt(node int) int {
+ _ag_spatial_calls=_ag_spatial_calls+1
+ if _ag_spatial_calls>32 {_ag_fail(10,node,0); return 0}
+ if _ag_spatial_ready!=1 {_ag_fail(11,node,0); return 0}
+ if _ag_check(node)==0 {return 0}
+ if _ag_kinds[node]==5 {_ag_fail(6,node,0); return 0}
+ if _ag_spatial_boxes[node*7]==0.0 {_ag_fail(9,node,0); return 0}
+ if _ag_dirty==1 {_ag_derive(); _ag_dirty=0}
+ for axis in 0.._ag_dimensions[node] {
+ if _ag_spatial_finite(_ag_spatial_edge(node,axis,0))==0 {_ag_fail(9,node,axis); return 0}
+ if _ag_spatial_finite(_ag_spatial_edge(node,axis,1))==0 {_ag_fail(9,node,axis); return 0}
+ }
+ return 1
+}
+fn _ag_spatial_edge(node int, axis int, high int) float {return _ag_worlds[node*3+axis]+_ag_spatial_boxes[node*7+1+high*3+axis]}
+fn ag_aabb_min(node int, axis int) float {
+ if _ag_spatial_attempt(node)==0 {return 0.0}
+ if _ag_axis(node,axis)==0 {return 0.0}
+ return _ag_spatial_edge(node,axis,0)
+}
+fn ag_aabb_max(node int, axis int) float {
+ if _ag_spatial_attempt(node)==0 {return 0.0}
+ if _ag_axis(node,axis)==0 {return 0.0}
+ return _ag_spatial_edge(node,axis,1)
+}
+fn ag_aabb_contains(node int, x float, y float, z float) int {
+ if _ag_spatial_attempt(node)==0 {return 0}
+ if _ag_dimensions[node]==2 {if z!=0.0 {_ag_fail(7,node,2); return 0}}
+ if _ag_spatial_finite(x)==0 {_ag_fail(7,node,0); return 0}
+ if _ag_spatial_finite(y)==0 {_ag_fail(7,node,1); return 0}
+ if _ag_spatial_finite(z)==0 {_ag_fail(7,node,2); return 0}
+ if x<_ag_spatial_edge(node,0,0) {return 0}; if x>_ag_spatial_edge(node,0,1) {return 0}
+ if y<_ag_spatial_edge(node,1,0) {return 0}; if y>_ag_spatial_edge(node,1,1) {return 0}
+ if _ag_dimensions[node]==3 {
+ if z<_ag_spatial_edge(node,2,0) {return 0}; if z>_ag_spatial_edge(node,2,1) {return 0}
+ }
+ return 1
+}
+fn ag_aabb_overlaps(a int, b int) int {
+ if _ag_spatial_attempt(a)==0 {return 0}
+ if _ag_check(b)==0 {return 0}
+ if _ag_kinds[b]==5 {_ag_fail(6,b,0); return 0}
+ if _ag_spatial_boxes[b*7]==0.0 {_ag_fail(9,b,0); return 0}
+ if _ag_dimensions[a]!=_ag_dimensions[b] {_ag_fail(8,b,0); return 0}
+ for axis in 0.._ag_dimensions[b] {
+ if _ag_spatial_finite(_ag_spatial_edge(b,axis,0))==0 {_ag_fail(9,b,axis); return 0}
+ if _ag_spatial_finite(_ag_spatial_edge(b,axis,1))==0 {_ag_fail(9,b,axis); return 0}
+ }
+ let dims=_ag_dimensions[a]
+ for axis in 0..dims {
+ if _ag_spatial_edge(a,axis,1)<_ag_spatial_edge(b,axis,0) {return 0}
+ if _ag_spatial_edge(b,axis,1)<_ag_spatial_edge(a,axis,0) {return 0}
+ }
+ return 1
+}
