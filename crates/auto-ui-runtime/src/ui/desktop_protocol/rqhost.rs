@@ -99,30 +99,60 @@ fn spawn_rqhost_default(wellknown: &str) -> std::io::Result<()> {
     cmd.spawn().map(|_| ())
 }
 
-/// `auto` 本体寻址（session.rs `outproc_auto_binary` 同型）：current_exe
-/// 自命中（auto/auto.exe）或同目录向上至多三级。
-fn rqhost_auto_binary() -> std::io::Result<std::path::PathBuf> {
-    let exe = std::env::current_exe()?;
-    let is_auto = exe
-        .file_name()
-        .is_some_and(|n| n == "auto" || n == "auto.exe");
-    if is_auto {
-        return Ok(exe);
-    }
-    let name = if cfg!(windows) { "auto.exe" } else { "auto" };
-    let mut dir = exe.parent();
-    for _ in 0..3 {
-        let Some(d) = dir else { break };
-        let candidate = d.join(name);
-        if candidate.is_file() {
-            return Ok(candidate);
+/// `auto` 本体寻址（session.rs `outproc_auto_binary` 同型）：
+/// env `AUTO_BIN`/`AUTO_CLI` → current_exe 自命中（auto/auto.exe）或同目录
+/// 向上至多两级 → PATH。
+///
+/// PLAN-876 T-03：原实现只有"同目录向上三级"。桌面入口迁到 auto-os 后，
+/// `ui-desktop.exe` 与 `auto.exe` 不再有固定目录关系（`auto` 可能来自 SDK
+/// 或 PATH），只按目录探测会把"未构建"误报成"不在旁边"。补 PATH/env 两臂，
+/// 失败信息改成可执行动作；本函数同时是 boot 自检
+/// （`[desktop-health] auto_cli=`）的读源。
+pub fn resolve_auto_cli() -> Option<std::path::PathBuf> {
+    // ① 显式覆盖（脚本/隔离测试）。
+    for key in ["AUTO_BIN", "AUTO_CLI"] {
+        if let Some(p) = std::env::var_os(key) {
+            let p = std::path::PathBuf::from(p);
+            if p.is_file() {
+                return Some(p);
+            }
         }
-        dir = d.parent();
     }
-    Err(std::io::Error::new(
-        std::io::ErrorKind::NotFound,
-        format!("rqhost binary `auto` not found beside {}", exe.display()),
-    ))
+    // ② 同目录自命中 / 向上两级（既有行为保序在前，零回归）。
+    if let Ok(exe) = std::env::current_exe() {
+        let is_auto = exe
+            .file_name()
+            .is_some_and(|n| n == "auto" || n == "auto.exe");
+        if is_auto {
+            return Some(exe);
+        }
+        let name = if cfg!(windows) { "auto.exe" } else { "auto" };
+        let mut dir = exe.parent();
+        for _ in 0..2 {
+            let Some(d) = dir else { break };
+            let candidate = d.join(name);
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+            dir = d.parent();
+        }
+    }
+    // ③ PATH（SDK/用户安装形态）。
+    let name = if cfg!(windows) { "auto.exe" } else { "auto" };
+    std::env::split_paths(&std::env::var_os("PATH")?)
+        .map(|d| d.join(name))
+        .find(|c| c.is_file())
+}
+
+fn rqhost_auto_binary() -> std::io::Result<std::path::PathBuf> {
+    resolve_auto_cli().ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "未找到 `auto` 可执行文件（查找序：AUTO_BIN/AUTO_CLI → 自身目录及上两级 → PATH）\
+             ——先 `cargo build -p auto`，或把 auto.exe 放进 PATH"
+                .to_string(),
+        )
+    })
 }
 
 /// 发现与孵化序（G6/D2；T-05 测试暴露的设计修正：**不在此采纳**——
