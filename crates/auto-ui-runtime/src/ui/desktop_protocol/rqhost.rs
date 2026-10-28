@@ -99,30 +99,75 @@ fn spawn_rqhost_default(wellknown: &str) -> std::io::Result<()> {
     cmd.spawn().map(|_| ())
 }
 
-/// `auto` 本体寻址（session.rs `outproc_auto_binary` 同型）：current_exe
-/// 自命中（auto/auto.exe）或同目录向上至多三级。
-fn rqhost_auto_binary() -> std::io::Result<std::path::PathBuf> {
-    let exe = std::env::current_exe()?;
-    let is_auto = exe
-        .file_name()
-        .is_some_and(|n| n == "auto" || n == "auto.exe");
-    if is_auto {
-        return Ok(exe);
+/// `auto` 本体候选名（Windows 含 `auto.cmd` 包装——CLAUDE.md 记录的
+/// `~/.cargo/bin` 形态；`resolve_auto_cli` 与单测共用）。
+fn auto_binary_names() -> &'static [&'static str] {
+    if cfg!(windows) {
+        &["auto.exe", "auto.cmd", "auto"]
+    } else {
+        &["auto"]
     }
-    let name = if cfg!(windows) { "auto.exe" } else { "auto" };
-    let mut dir = exe.parent();
-    for _ in 0..3 {
-        let Some(d) = dir else { break };
-        let candidate = d.join(name);
-        if candidate.is_file() {
-            return Ok(candidate);
+}
+
+/// 在单个目录里找 `auto`（按候选名顺序，首个命中）。
+fn find_auto_in(dir: &std::path::Path) -> Option<std::path::PathBuf> {
+    auto_binary_names()
+        .iter()
+        .map(|name| dir.join(name))
+        .find(|candidate| candidate.is_file())
+}
+
+/// `auto` 本体寻址（session.rs `outproc_auto_binary` 同型）：
+/// env `AUTO_BIN`/`AUTO_CLI` → current_exe 自命中或同目录向上至多三级 → PATH。
+///
+/// PLAN-876 T-03：原实现只有"同目录向上三级"。桌面入口迁到 auto-os 后，
+/// `ui-desktop.exe` 与 `auto.exe` 不再有固定目录关系（`auto` 可能来自 SDK
+/// 或 PATH），只按目录探测会把"未构建"误报成"不在旁边"。补 PATH/env 两臂，
+/// 失败信息改成可执行动作；本函数同时是 boot 自检
+/// （`[desktop-health] auto_cli=`）的读源。
+pub fn resolve_auto_cli() -> Option<std::path::PathBuf> {
+    // ① 显式覆盖（脚本/隔离测试）。
+    for key in ["AUTO_BIN", "AUTO_CLI"] {
+        if let Some(p) = std::env::var_os(key) {
+            let p = std::path::PathBuf::from(p);
+            if p.is_file() {
+                return Some(p);
+            }
         }
-        dir = d.parent();
     }
-    Err(std::io::Error::new(
-        std::io::ErrorKind::NotFound,
-        format!("rqhost binary `auto` not found beside {}", exe.display()),
-    ))
+    // ② 同目录自命中 / 向上三级（REV2：保持既有 3 级语义，不缩为 2 级）。
+    if let Ok(exe) = std::env::current_exe() {
+        let is_auto = exe.file_name().is_some_and(|n| {
+            auto_binary_names()
+                .iter()
+                .any(|name| n == std::ffi::OsStr::new(name))
+        });
+        if is_auto {
+            return Some(exe);
+        }
+        let mut dir = exe.parent();
+        for _ in 0..3 {
+            let Some(d) = dir else { break };
+            if let Some(candidate) = find_auto_in(d) {
+                return Some(candidate);
+            }
+            dir = d.parent();
+        }
+    }
+    // ③ PATH（SDK/用户安装形态）。
+    std::env::split_paths(&std::env::var_os("PATH")?)
+        .find_map(|d| find_auto_in(&d))
+}
+
+fn rqhost_auto_binary() -> std::io::Result<std::path::PathBuf> {
+    resolve_auto_cli().ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "未找到 `auto` 可执行文件（查找序：AUTO_BIN/AUTO_CLI → 自身目录及上三级 → PATH）\
+             ——先 `cargo build -p auto`，或把 auto.exe/auto.cmd 放进 PATH"
+                .to_string(),
+        )
+    })
 }
 
 /// 发现与孵化序（G6/D2；T-05 测试暴露的设计修正：**不在此采纳**——
@@ -1674,6 +1719,25 @@ pub fn run_bridge(wellknown: &str, ws_port: u16, token: &str) -> Result<(), Stri
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// PLAN-876 REV2（F-876-R-07）：`auto` 目录探测含 Windows `auto.cmd`
+    /// 包装名；名字优先级 `.exe` > `.cmd` > 无后缀，且只认真实存在的文件。
+    #[test]
+    fn p876_find_auto_prefers_exe_then_cmd() {
+        let dir = std::env::temp_dir().join(format!("p876-auto-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        assert_eq!(find_auto_in(&dir), None, "空目录 = 无命中");
+
+        std::fs::write(dir.join("auto.cmd"), b"@echo off").unwrap();
+        let hit = find_auto_in(&dir).expect("cmd 包装要命中");
+        assert_eq!(hit.file_name().unwrap(), std::ffi::OsStr::new("auto.cmd"));
+
+        std::fs::write(dir.join("auto.exe"), b"MZ").unwrap();
+        let hit = find_auto_in(&dir).expect("exe 优先");
+        assert_eq!(hit.file_name().unwrap(), std::ffi::OsStr::new("auto.exe"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     fn pid_pipe(tag: &str) -> String {
         format!("{RQHOST_PIPE}-t{tag}-{}", std::process::id())

@@ -2745,6 +2745,18 @@ impl Default for LaunchSpec {
     }
 }
 
+/// PLAN-876 T-06：launch 形态裁定结果（见
+/// [`DesktopSession::decide_native_launch`]）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum NativeLaunchDecision {
+    /// 走 native exe 子进程。
+    Outproc,
+    /// 解释态直挂（含"声明了但产物缺失"的降级）。
+    Inproc,
+    /// `launch:"native"` 声明但产物缺失：严格失败，提示可执行动作。
+    StrictMissing,
+}
+
 /// Plan 463 T5：shell 特权 App 的窗口级字段垫片。shell 无虚拟窗/无独立
 /// OS 窗，但拆借视图（`SessionViewRef`）形状要求这些字段存在；垫片全零值
 /// 即正确语义（响应式 window_* 变量对 shell 不生效，vwin_rect 恒 None）。
@@ -3700,22 +3712,57 @@ impl DesktopSession {
         )
     }
 
-    /// Plan 020 T-06：native exe 发现序（待澄清②定案：pac 声明为主 + 约定
-    /// 路径兜底）——①`LaunchSpec.exe`（pac `desktop_exe:`，resolver 装配期已
-    /// 相对 App 根解析；声明即信，缺失在 spawn 臂报错——"声明了但未构建"
-    /// 走 toast，不静默回退解释臂）→ ②rust-workspace 约定路径扫描（约定
-    /// 单源 = [`crate::ui::app_registry::convention_native_exe`]：组内约定
+    /// Plan 020 T-06：native exe 发现序（pac 声明为主 + 约定路径兜底）——
+    /// ①`LaunchSpec.exe`（pac `desktop_exe:`，resolver 装配期已相对 App 根
+    /// 解析；**PLAN-876 T-06 改判：声明且在场才命中**——旧"声明即信"会把
+    /// 缺失路径直接交给 spawn，产出 `os error 3`，用户只看到"打不开"）→
+    /// ②rust-workspace 约定路径扫描（约定单源 =
+    /// [`crate::ui::app_registry::convention_native_exe`]：组内约定
     /// + PLAN-694 共享工作区两落点；exe 名 pac name 蛇形 > 原名 > 目录名）。
-    /// 两者皆无 → None = 现行解释态 outproc 臂。
+    /// 两者皆无 → None；是否降级由 [`Self::decide_native_launch`] 按
+    /// apps.manifest `launch` 字段裁定。
     pub(crate) fn outproc_native_exe(spec: &LaunchSpec) -> Option<std::path::PathBuf> {
-        if spec.exe.is_some() {
-            return spec.exe.clone();
+        if let Some(exe) = spec.exe.as_ref() {
+            return exe.is_file().then(|| exe.clone());
         }
         let dir = spec
             .source_path
             .as_deref()
             .and_then(|p| std::path::Path::new(p).ancestors().nth(3))?;
         crate::ui::app_registry::convention_native_exe(dir, spec.name.as_deref())
+    }
+
+    /// PLAN-876 T-06：launch 形态裁定（纯函数，单测铆钉）。
+    ///
+    /// 规则：
+    /// - `launch:"native"`（显式要原生）+ 产物在场 → Outproc；
+    /// - `launch:"native"` + 产物缺失 → StrictMissing（launch_app 转可执行错误，
+    ///   不静默换形态）；
+    /// - `launch:"vm"` → Inproc（编译产物在场也不附着）；
+    /// - 未声明（None）+ 产物在场 → Outproc（既有"exe App 天然 outproc"）；
+    ///   缺失 → Inproc（**降级**，launch_app 打一行 warn）。
+    pub(crate) fn decide_native_launch(
+        manifest_launch: Option<&str>,
+        spec: Option<&LaunchSpec>,
+    ) -> NativeLaunchDecision {
+        match (manifest_launch, spec) {
+            (Some("native"), Some(spec)) => {
+                if Self::outproc_native_exe(spec).is_some() {
+                    NativeLaunchDecision::Outproc
+                } else {
+                    NativeLaunchDecision::StrictMissing
+                }
+            }
+            (Some("vm"), _) => NativeLaunchDecision::Inproc,
+            (_, Some(spec)) => {
+                if Self::outproc_native_exe(spec).is_some() {
+                    NativeLaunchDecision::Outproc
+                } else {
+                    NativeLaunchDecision::Inproc
+                }
+            }
+            (_, None) => NativeLaunchDecision::Inproc,
+        }
     }
 
     /// Plan 020 T-06：native exe 子进程 spawn——a2r 编译产物自带孵化参数解析
@@ -3864,16 +3911,41 @@ impl DesktopSession {
         // （"vm"|"native"；缺席 = 既有 exe 存在即原生）——"vm" 声明的 app
         // 恒 inproc 解释（编译产物存在也不走原生附着；RQHost 路线缓行期
         // 的 per-app 主启动方式声明，apps.manifest 为配置单源）。
+        // PLAN-876 T-06：产物缺失的两种收口——`launch:"native"` 严格失败并
+        // 给可执行提示；其余降级 in-proc 并 warn（不再把缺失路径交给 spawn
+        // 变成 `os error 3`）。裁定本身是纯函数 `decide_native_launch`。
         let manifest_launch =
             crate::ui::app_registry::manifest_launch_lookup(std::path::Path::new("."), name);
-        if manifest_launch.as_deref() != Some("native") {
-            if let Some(resolver) = self.desktop.app_resolver.clone() {
-                if let Some(spec) = resolver(name) {
-                    let native_ok =
-                        manifest_launch.as_deref() == Some("native") || manifest_launch.is_none();
-                    if native_ok && Self::outproc_native_exe(&spec).is_some() {
-                        eprintln!("[session] launch_app(outproc-native) {name}");
-                        return self.launch_app_outproc(name);
+        let launch_spec = self
+            .desktop
+            .app_resolver
+            .clone()
+            .and_then(|resolver| resolver(name));
+        match Self::decide_native_launch(manifest_launch.as_deref(), launch_spec.as_ref()) {
+            NativeLaunchDecision::Outproc => {
+                eprintln!("[session] launch_app(outproc-native) {name}");
+                return self.launch_app_outproc(name);
+            }
+            NativeLaunchDecision::StrictMissing => {
+                let declared = launch_spec
+                    .as_ref()
+                    .and_then(|s| s.exe.as_ref())
+                    .map(|p| p.display().to_string())
+                    .unwrap_or_else(|| "<rust-workspace 约定路径>".to_string());
+                return Err(format!(
+                    "native 启动声明但产物缺失: {name}（{declared}）——先在该 App 跑 `auto build -r rust`，\
+                     或把 apps.manifest 的 \"launch\" 改回 \"vm\"",
+                ));
+            }
+            NativeLaunchDecision::Inproc => {
+                // REV2（F-876-R-06）：只为"缺产物降级"报警——`launch:"vm"` 是
+                // 显式要解释态，即使产物在场也不算缺失，不得打假警报。
+                if manifest_launch.as_deref() != Some("vm") {
+                    if let Some(declared) = launch_spec.as_ref().and_then(|s| s.exe.as_ref()) {
+                        eprintln!(
+                            "[session] declared desktop_exe missing ({}), falling back to in-proc: {name}",
+                            declared.display()
+                        );
                     }
                 }
             }
@@ -8340,12 +8412,20 @@ mod tests {
             ..Default::default()
         };
 
-        // ① pac 声明即信（路径甚至不必存在——缺失在 spawn 臂报错）。
+        // ① PLAN-876 T-06 改判：声明**且在场**才优先于约定路径——旧语义
+        // "路径不必存在"会把缺失路径交给 spawn，产出 os error 3。
         let declared = root.join("custom").join("elsewhere.exe");
+        assert_eq!(
+            DesktopSession::outproc_native_exe(&spec(Some(declared.clone()))),
+            None,
+            "声明但产物缺失 = 不命中（由 launch 裁定降级/严格失败）"
+        );
+        std::fs::create_dir_all(declared.parent().unwrap()).unwrap();
+        std::fs::write(&declared, b"MZ").unwrap();
         assert_eq!(
             DesktopSession::outproc_native_exe(&spec(Some(declared.clone()))).as_ref(),
             Some(&declared),
-            "pac 声明优先于约定路径"
+            "声明且在场 = 优先于约定路径"
         );
 
         // ② 约定路径：release 先于 debug；exe 名 = pac name 蛇形。
@@ -8392,6 +8472,49 @@ mod tests {
             DesktopSession::outproc_native_exe(&inline),
             None,
             "内联 spec 无发现面"
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// PLAN-876 T-06（AC-06）：缺产物语义两臂——未声明 launch 时降级解释态，
+    /// `launch:"native"` 时严格失败；产物在场则照旧原生；`launch:"vm"` 恒定
+    /// 解释态。判据全在 `decide_native_launch` 纯函数上，便于逐臂断言。
+    #[test]
+    fn p876_native_launch_decision_on_missing_artifact() {
+        let root = std::env::temp_dir().join(format!("p876-decide-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let missing = root.join("missing.exe");
+        let present = root.join("present.exe");
+        std::fs::write(&present, b"MZ").unwrap();
+        let spec_with = |exe: &std::path::Path| LaunchSpec {
+            exe: Some(exe.to_path_buf()),
+            ..Default::default()
+        };
+
+        // 未声明 launch：缺失 → 降级（用户双击仍有窗口）；在场 → 原生。
+        assert_eq!(
+            DesktopSession::decide_native_launch(None, Some(&spec_with(&missing))),
+            NativeLaunchDecision::Inproc,
+            "缺产物 + 未声明 launch = 降级解释态"
+        );
+        assert_eq!(
+            DesktopSession::decide_native_launch(None, Some(&spec_with(&present))),
+            NativeLaunchDecision::Outproc
+        );
+        // launch:"native"：缺失 → 严格失败（不静默换形态）；在场 → 原生。
+        assert_eq!(
+            DesktopSession::decide_native_launch(Some("native"), Some(&spec_with(&missing))),
+            NativeLaunchDecision::StrictMissing
+        );
+        assert_eq!(
+            DesktopSession::decide_native_launch(Some("native"), Some(&spec_with(&present))),
+            NativeLaunchDecision::Outproc
+        );
+        // launch:"vm"：恒解释态（产物在场也不附着）。
+        assert_eq!(
+            DesktopSession::decide_native_launch(Some("vm"), Some(&spec_with(&present))),
+            NativeLaunchDecision::Inproc
         );
         let _ = std::fs::remove_dir_all(&root);
     }
