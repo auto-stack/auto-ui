@@ -3938,11 +3938,15 @@ impl DesktopSession {
                 ));
             }
             NativeLaunchDecision::Inproc => {
-                if let Some(declared) = launch_spec.as_ref().and_then(|s| s.exe.as_ref()) {
-                    eprintln!(
-                        "[session] declared desktop_exe missing ({}), falling back to in-proc: {name}",
-                        declared.display()
-                    );
+                // REV2（F-876-R-06）：只为"缺产物降级"报警——`launch:"vm"` 是
+                // 显式要解释态，即使产物在场也不算缺失，不得打假警报。
+                if manifest_launch.as_deref() != Some("vm") {
+                    if let Some(declared) = launch_spec.as_ref().and_then(|s| s.exe.as_ref()) {
+                        eprintln!(
+                            "[session] declared desktop_exe missing ({}), falling back to in-proc: {name}",
+                            declared.display()
+                        );
+                    }
                 }
             }
         }
