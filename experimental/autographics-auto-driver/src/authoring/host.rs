@@ -96,6 +96,10 @@ struct Prepared {
     draws: Vec<DrawCmd>,
     instances: Vec<MeshInstance>,
     highlight: Vec<DrawCmd>,
+    /// PLAN-004 textured visuals of this frame and the staged image cache they
+    /// draw from; both publish with the same transaction as the rest.
+    sprites: Vec<agp::renderer::SpriteCmd>,
+    sprite_store: agp::renderer::SpriteStore,
     /// Runtime-camera projection published with the same transaction; None
     /// keeps the installed editor/sample camera.
     camera_vp: Option<Mat4>,

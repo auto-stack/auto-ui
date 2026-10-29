@@ -10,6 +10,7 @@ use autographics_auto_driver::authoring::{
     behavior::{Api, SourceSnapshot},
     document::{Document, Kind, Object, SpriteBinding},
     hierarchy,
+    host::Host,
     play::{Action, Play},
     runtime_objects::{self, Dim, RuntimeObjectsFrame, Slot},
     runtime_sprites::{self, Target},
@@ -276,6 +277,7 @@ fn real_auto_drives_frames_flip_and_the_whole_2d_composition_in_one_tick() {
     play.char_key(1, true, false);
     let mut frames = vec![];
     let mut positions = vec![];
+    let mut slots: Vec<Option<(i32, [u32; 4], bool)>> = vec![];
     let mut ticks_us: Vec<u128> = vec![];
     for _ in 0..24 {
         play.dispatch(Action::default()).expect("dispatch");
@@ -286,6 +288,11 @@ fn real_auto_drives_frames_flip_and_the_whole_2d_composition_in_one_tick() {
         let sprite = f.sprites.as_ref().expect("sprite block");
         frames.push(sprite.targets[0].frame[0]);
         positions.push(f.nodes[&1].translation[0]);
+        slots.push(
+            sprite
+                .slot_visual(0)
+                .map(|s| (s.generation, s.visual.frame, s.visual.flip)),
+        );
     }
 
     assert!(
@@ -325,6 +332,23 @@ fn real_auto_drives_frames_flip_and_the_whole_2d_composition_in_one_tick() {
     // One instance frame write is admitted from the real event read: the coin
     // pair is entered on the walk and Auto advances that slot to frame 2 with
     // the flipped sample, which is the slot default only until Auto writes it.
+    // The unit keeps the auto-written frame for its own generation, then a new
+    // generation of the same slot falls back to the template default.
+    let written = slots
+        .iter()
+        .flatten()
+        .find(|(gen, frame, flip)| *gen == 1 && *frame == [64, 0, 32, 32] && *flip)
+        .copied();
+    assert!(written.is_some(), "auto wrote slot frame 2: {slots:?}");
+    let respawned = slots
+        .iter()
+        .flatten()
+        .find(|(gen, _, _)| *gen == 2)
+        .copied();
+    assert!(
+        respawned.is_some_and(|(_, frame, flip)| frame == [32, 0, 32, 32] && !flip),
+        "a respawned slot uses the template default: {slots:?}"
+    );
     let final_frame = play.last.as_ref().unwrap();
     let slot = final_frame
         .sprites
@@ -332,12 +356,6 @@ fn real_auto_drives_frames_flip_and_the_whole_2d_composition_in_one_tick() {
         .unwrap()
         .slot_visual(0)
         .expect("coin slot");
-    assert_eq!(
-        slot.visual.frame,
-        [64, 0, 32, 32],
-        "auto wrote slot frame 2"
-    );
-    assert!(slot.visual.flip, "the slot write carries the flip");
     // The admitted instance table and the sprite table agree on generation.
     assert_eq!(
         slot.generation,
@@ -1229,4 +1247,179 @@ fn host_imports_binds_and_detaches_a_png_visual() {
     assert!(send(&mut host, "import-sprite", json!(bad.to_str().unwrap())).is_err());
     assert_eq!(host.editor.document, before);
     std::fs::remove_file(bad).unwrap();
+}
+
+// ---------------------------------------------------------------------------
+// V-02: real pixels. The 2D surface is probed at the exact points the
+// presentation code projects, so the oracle covers the whole path from the
+// accepted binding/Auto output through UV construction to the drawn texel.
+// ---------------------------------------------------------------------------
+
+fn sample_registry(dir: &Path, name: &str) -> (assets::Registry, String) {
+    let empty: assets::Registry = Default::default();
+    let asset = assets::import_png(&dir.join(name), &empty).expect("png import");
+    let key = asset.identity.key();
+    let mut registry = empty;
+    assets::insert(&mut registry, asset).expect("registry");
+    (registry, key)
+}
+
+fn settle_host(h: &mut autographics_auto_driver::authoring::host::Host) {
+    let end = Instant::now() + Duration::from_secs(60);
+    while h.play.as_ref().is_some_and(|p| p.pending()) {
+        assert!(Instant::now() < end, "host deadline");
+        h.frame(None).expect("frame");
+    }
+}
+
+#[test]
+fn editor_preview_draws_the_bound_image_and_flips_only_the_uv() {
+    let dir = sample_dir();
+    let (registry, key) = sample_registry(&dir, "padded.png");
+    let mut doc = Document::empty("sprite-pixels".into());
+    doc.assets
+        .push(registry.get(&key).unwrap().identity.clone());
+    let mut leaf = Object::new(1, Kind::Quad);
+    leaf.scale = [64.0, 64.0, 1.0];
+    leaf.sprite = Some(SpriteBinding {
+        asset: key.clone(),
+        frame: [0, 0, 32, 32],
+        flip: false,
+    });
+    doc.objects.push(leaf.clone());
+    doc.validate().expect("document");
+    let geometry = Descriptor::build(&doc, |_| None)
+        .expect("descriptor")
+        .rows()
+        .to_vec();
+    let mut host = Host::with_project(doc, registry, None).expect("host");
+    host.frame(None).expect("frame");
+    // view2d default: world (0,0) is screen (400,190) and zoom 1, so the 64x64
+    // leaf spans 368..432 x 158..222 with an 8px transparent border.
+    let probe = |host: &mut Host, dx: f32| {
+        host.rt
+            .probe_pixel(host.two, [400.0 + dx, 190.0])
+            .expect("pixel")
+    };
+    let left = probe(&mut host, -16.0);
+    let right = probe(&mut host, 16.0);
+    let border = probe(&mut host, -30.0);
+    assert!(left[0] > 180 && left[2] < 60, "left red {left:?}");
+    assert!(right[2] > 180 && right[0] < 60, "right blue {right:?}");
+    assert!(
+        border[0] < 70 && border[2] < 70 && border[1] < 70,
+        "a transparent border shows the canvas instead of a tint quad {border:?}"
+    );
+    // The flip is a document edit of the same binding and mirrors U only.
+    host.editor.select(Some(1)).expect("select");
+    let mut flipped = leaf.clone();
+    flipped.sprite = Some(SpriteBinding {
+        asset: key.clone(),
+        frame: [0, 0, 32, 32],
+        flip: true,
+    });
+    host.editor
+        .begin(host.editor.stamp, Edit::Replace(flipped))
+        .expect("begin");
+    host.settle().expect("settle");
+    host.frame(None).expect("frame");
+    let left = probe(&mut host, -16.0);
+    let right = probe(&mut host, 16.0);
+    assert!(left[2] > 180 && left[0] < 60, "flipped left blue {left:?}");
+    assert!(
+        right[0] > 180 && right[2] < 60,
+        "flipped right red {right:?}"
+    );
+    // A frame or flip change is a UV fact only: the entity's spatial boxes and
+    // therefore every collision rule stay exactly the same.
+    let after_geometry = Descriptor::build(&host.editor.document, |_| None)
+        .expect("descriptor")
+        .rows()
+        .to_vec();
+    assert_eq!(
+        after_geometry, geometry,
+        "flip must not change the entity bounds"
+    );
+}
+
+fn hero_probe(host: &mut Host, sign: f32) -> [u8; 4] {
+    let (center, scale) = {
+        let play = host.play.as_ref().expect("play");
+        let frame = play.last.as_ref().expect("frame");
+        let cam = frame.camera.as_ref().expect("camera");
+        let t = frame.nodes[&1].translation;
+        let follow = cam
+            .follow_center_2d(glam::Vec2::new(t[0], t[1]))
+            .expect("camera centre");
+        let screen = cam
+            .screen_2d(glam::Vec2::new(t[0], t[1]), follow)
+            .expect("camera projection");
+        (screen, cam.letterbox_2d().expect("letterbox").0.x)
+    };
+    let half = 0.8 * scale * 0.5;
+    host.rt
+        .probe_pixel(host.two, [center.x + sign * half * 0.55, center.y])
+        .expect("hero pixel")
+}
+
+#[test]
+fn real_auto_frame_and_flip_change_the_drawn_pixels() {
+    let dir = sample_dir();
+    let (doc, registry) = sprite_document(&dir);
+    let mut host = Host::with_project(doc, registry, None).expect("host");
+    let source = std::fs::read_to_string(dir.join("main.at")).expect("source");
+    let snapshot =
+        SourceSnapshot::from_bytes_for(&dir.join("main.at"), source.into_bytes(), Api::Sprites2V1)
+            .expect("snapshot");
+    host.start_user_snapshot(snapshot).expect("start");
+    host.pause_play("");
+    settle_host(&mut host);
+    // One neutral tick: frame 0 with no flip.
+    host.play.as_mut().unwrap().resume().expect("resume");
+    host.play
+        .as_mut()
+        .unwrap()
+        .dispatch(Action::default())
+        .expect("dispatch");
+    host.frame(None).expect("frame");
+    let left = hero_probe(&mut host, -1.0);
+    let right = hero_probe(&mut host, 1.0);
+    assert!(left[0] > 150 && left[2] < 70, "frame 0 left red {left:?}");
+    assert!(
+        right[2] > 150 && right[0] < 70,
+        "frame 0 right blue {right:?}"
+    );
+    // Hold left until the admitted flip reaches the pixels.
+    host.play.as_mut().unwrap().char_key(0, true, false);
+    let mut flipped = false;
+    for _ in 0..10 {
+        host.play
+            .as_mut()
+            .unwrap()
+            .dispatch(Action::default())
+            .expect("dispatch");
+        host.frame(None).expect("frame");
+        let admitted = host
+            .play
+            .as_ref()
+            .unwrap()
+            .last
+            .as_ref()
+            .and_then(|f| f.sprites.as_ref())
+            .is_some_and(|s| s.targets[0].flip);
+        if admitted {
+            flipped = true;
+            break;
+        }
+    }
+    assert!(flipped, "the real Auto admitted a flip");
+    let left = hero_probe(&mut host, -1.0);
+    let right = hero_probe(&mut host, 1.0);
+    assert!(left[2] > 150 && left[0] < 70, "flipped left blue {left:?}");
+    assert!(
+        right[0] > 150 && right[2] < 70,
+        "flipped right red {right:?}"
+    );
+    host.play.as_mut().unwrap().char_key(0, false, false);
+    host.stop_play();
 }

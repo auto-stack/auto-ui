@@ -114,6 +114,11 @@ pub struct Game2dContent {
     /// Optional renderer-owned text data; contains no language or game state.
     pub text_overlay: Option<TextOverlay>,
     pub quad: QuadPipeline,
+    /// PLAN-004 textured visual pass drawn over the flat quads, plus the
+    /// persistent content-identified image cache it draws from.
+    pub sprite: crate::renderer::sprite::SpritePipeline,
+    pub sprite_store: crate::renderer::sprite::SpriteStore,
+    pub sprites: Vec<crate::renderer::sprite::SpriteCmd>,
     pub clear: crate::core::scene::Color,
     pub commands: Vec<DrawCmd>,
 }
@@ -123,6 +128,10 @@ impl Game2dContent {
         Game2dContent {
             text_overlay: None,
             quad: QuadPipeline::new(gpu, OffscreenTarget::FORMAT).expect("2d quad pipeline"),
+            sprite: crate::renderer::sprite::SpritePipeline::new(gpu, OffscreenTarget::FORMAT)
+                .expect("2d sprite pipeline"),
+            sprite_store: Default::default(),
+            sprites: Vec::new(),
             clear,
             commands: Vec::new(),
         }
@@ -154,6 +163,11 @@ impl SurfaceContent {
                         return None;
                     }
                 }
+                if g.sprite.device_ordinal? != quad
+                    || g.sprite_store.device_owners().any(|o| o != Some(quad))
+                {
+                    return None;
+                }
                 Some(quad)
             }
             SurfaceContent::Scene3d(s) => {
@@ -184,6 +198,10 @@ impl SurfaceContent {
         match self {
             Self::Game2d(game) => {
                 check(game.quad.device_ordinal)?;
+                check(game.sprite.device_ordinal)?;
+                for owner in game.sprite_store.device_owners() {
+                    check(owner)?;
+                }
                 if let Some(text) = &game.text_overlay {
                     check(Some(text.renderer.device_ordinal))?;
                 }
@@ -226,6 +244,7 @@ impl SurfaceContent {
         match self {
             Self::Game2d(game) => {
                 let mut out = game.quad.uploads.snapshot();
+                out.merge(&game.sprite.uploads.snapshot());
                 if let Some(text) = &game.text_overlay {
                     out.merge(&text.renderer.uploads.snapshot());
                 }
@@ -943,6 +962,7 @@ impl SurfaceRuntime {
         };
         let gpu = &self.gpu;
         let mut changed = false;
+        let mut sprite_error: Option<CompositionError> = None;
         match &mut slot.content {
             SurfaceContent::Iced(iced) => {
                 let cursor = match cursor_local {
@@ -1008,10 +1028,32 @@ impl SurfaceRuntime {
                     Some(game.clear),
                     &game.commands,
                 );
-                if let Some(text) = &game.text_overlay {
-                    text.renderer
-                        .set_ortho_camera(gpu, 0.0, w as f32, h as f32, 0.0);
-                    text.renderer.render(gpu, slot.target.view(), &text.glyphs);
+                // PLAN-004: textured visuals draw over the flat quads with the
+                // same ortho camera; a missing texture rejects the frame rather
+                // than silently drawing nothing. The slot is re-inserted before
+                // the error propagates, so a failed pass never loses the surface
+                // (its last accepted target stays readable).
+                if !game.sprites.is_empty() {
+                    game.sprite
+                        .set_ortho_camera_with(gpu.queue(), 0.0, w as f32, h as f32, 0.0);
+                    if let Err(e) = game.sprite.render_with(
+                        gpu.device(),
+                        gpu.queue(),
+                        slot.target.view(),
+                        &game.sprites,
+                        &game.sprite_store,
+                    ) {
+                        sprite_error = Some(CompositionError::InvalidSurface {
+                            detail: format!("sprite pass: {e:?}"),
+                        });
+                    }
+                }
+                if sprite_error.is_none() {
+                    if let Some(text) = &game.text_overlay {
+                        text.renderer
+                            .set_ortho_camera(gpu, 0.0, w as f32, h as f32, 0.0);
+                        text.renderer.render(gpu, slot.target.view(), &text.glyphs);
+                    }
                 }
             }
         }
@@ -1019,6 +1061,9 @@ impl SurfaceRuntime {
         slot.last_render_frame = self.stats.frames;
         *self.stats.last_frame_renders.entry(id).or_insert(0) += 1;
         self.slots.insert(id, slot);
+        if let Some(error) = sprite_error {
+            return Err(error);
+        }
         Ok(changed)
     }
 

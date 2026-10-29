@@ -66,14 +66,16 @@ pub struct SlotVisual {
 pub struct SpriteFrame {
     pub run_id: i32,
     pub tick: i32,
+    /// Stable document ids of the bound leaves, in table order (frozen per Run).
+    pub target_ids: Vec<u64>,
     pub targets: Vec<Visual>,
     pub slots: [Option<SlotVisual>; SLOTS],
 }
 
 impl SpriteFrame {
     /// The visual of one bound document leaf, by stable id.
-    pub fn target_visual(&self, targets: &[Target], id: u64) -> Option<&Visual> {
-        let index = targets.iter().position(|t| t.node_id == id)?;
+    pub fn visual_for(&self, id: u64) -> Option<&Visual> {
+        let index = self.target_ids.iter().position(|t| *t == id)?;
         self.targets.get(index)
     }
     pub fn slot_visual(&self, slot: usize) -> Option<&SlotVisual> {
@@ -268,6 +270,7 @@ pub fn admit_block(
     Ok(SpriteFrame {
         run_id,
         tick,
+        target_ids: targets.iter().map(|t| t.node_id).collect(),
         targets: admitted,
         slots,
     })

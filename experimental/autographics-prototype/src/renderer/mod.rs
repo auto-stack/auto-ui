@@ -60,6 +60,7 @@ pub mod device;
 pub mod error;
 pub mod pipeline;
 pub mod resources;
+pub mod sprite;
 pub mod target;
 pub mod witness;
 
@@ -67,6 +68,7 @@ pub use device::{AdapterInfoReport, DeviceToken, GpuDevice};
 pub use error::RendererError;
 pub use pipeline::{DrawCmd, QuadPipeline, Shape};
 pub use resources::{CacheKey, CacheStats, ResourceCache};
+pub use sprite::{frame_uv, SpriteCmd, SpritePipeline, SpriteStore, SpriteTexture};
 pub use target::{OffscreenTarget, RenderOutcome, WindowTarget};
 pub use witness::{DropWitness, Tracked};
 

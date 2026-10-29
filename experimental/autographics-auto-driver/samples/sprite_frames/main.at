@@ -13,6 +13,7 @@ var h2=0
 var ok=0
 var bag=0
 var state=0
+var respawn=0
 fn app_start() {
  ok=ok+ag_char_bind(1)
  ok=ok+ag_char_solid(5)
@@ -27,7 +28,7 @@ fn app_start() {
  ok=ok+ag_sprite_slot(h0, 32, 0, 32, 32, 0)
 }
 fn app_update(dt float) {
- if state==0 {
+ if state==0 && respawn==0 {
   let right=ag_action_held(1)
   let left=ag_action_held(0)
   if right==1 {dir=0}
@@ -44,8 +45,15 @@ fn app_update(dt float) {
  if n==1 {
   let p=ag_event_pair()
   if p==0 {
-   if bag==0 {bag=1; ok=ok+ag_sprite_slot(h0, 64, 0, 32, 32, 1)}
+   if bag==0 {bag=1; ok=ok+ag_sprite_slot(h0, 64, 0, 32, 32, 1); respawn=2}
   }
   if p==1 {if bag==1 {state=1}}
+ }
+ if respawn>0 {
+  respawn=respawn-1
+  if respawn==0 {
+   ok=ok+ag_object_despawn(h0)
+   h0=ag_object_spawn(0, 2, 5.0, 1.0, 0.0)
+  }
  }
 }

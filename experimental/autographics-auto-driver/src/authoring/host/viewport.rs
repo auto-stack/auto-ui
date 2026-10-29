@@ -12,6 +12,7 @@ impl Host {
             &preview.nodes,
             None,
             None,
+            None,
         )
     }
     pub(super) fn prepare_frame(
@@ -21,6 +22,7 @@ impl Host {
         nodes: &std::collections::BTreeMap<u64, crate::authoring::hierarchy::Derived>,
         camera: Option<&crate::authoring::runtime_camera::RuntimeCameraFrame>,
         instances: Option<&crate::authoring::runtime_objects::RuntimeObjectsFrame>,
+        sprites: Option<&crate::authoring::runtime_sprites::SpriteFrame>,
     ) -> Result<Prepared, String> {
         if self.fail_resource {
             return Err("resource preparation rejected".into());
@@ -29,6 +31,13 @@ impl Host {
             return Err("scene unavailable".into());
         };
         let mut store = scene.store.staged();
+        // PLAN-004: the textured pass reuses the accepted image cache of the 2D
+        // surface. Existing textures are shared; new ones stay staged until the
+        // whole candidate is accepted.
+        let mut sprite_store = match self.rt.content(self.two) {
+            Some(SurfaceContent::Game2d(g)) => g.sprite_store.staged(),
+            _ => return Err("2D sprite surface unavailable".into()),
+        };
         let assets = self.active_assets()?;
         crate::authoring::assets::check_registry(&assets)?;
         let template = |id: u64| -> Result<Object, String> {
@@ -79,6 +88,8 @@ impl Host {
             draws: vec![],
             instances: vec![],
             highlight: vec![],
+            sprites: vec![],
+            sprite_store: Default::default(),
             camera_vp: None,
         };
         // Runtime camera transaction: the accepted frame's camera rides the
@@ -149,17 +160,31 @@ impl Host {
                         shape: Shape::Rect,
                     });
                 }
-                p.draws.push(DrawCmd {
-                    center,
-                    size: [o.scale[0] * zoom, o.scale[1] * zoom],
-                    z: 0.0,
-                    color: Color::rgba(o.rgba[0], o.rgba[1], o.rgba[2], o.rgba[3]),
-                    shape: if o.kind == Kind::Circle {
-                        Shape::Circle
-                    } else {
-                        Shape::Rect
-                    },
-                });
+                // A bound leaf draws its accepted PNG instead of the flat shape:
+                // Auto's frame/flip while a Run is publishing, the accepted
+                // document default otherwise. Transparent pixels therefore show
+                // the background, never a hidden tint quad.
+                match Self::sprite_visual(document, sprites, o.id) {
+                    Some(visual) => p.sprites.push(self.sprite_command(
+                        &assets,
+                        &mut sprite_store,
+                        &visual,
+                        center,
+                        [o.scale[0] * zoom, o.scale[1] * zoom],
+                        o.rgba,
+                    )?),
+                    None => p.draws.push(DrawCmd {
+                        center,
+                        size: [o.scale[0] * zoom, o.scale[1] * zoom],
+                        z: 0.0,
+                        color: Color::rgba(o.rgba[0], o.rgba[1], o.rgba[2], o.rgba[3]),
+                        shape: if o.kind == Kind::Circle {
+                            Shape::Circle
+                        } else {
+                            Shape::Rect
+                        },
+                    }),
+                }
             } else {
                 if self.editor.selection == Some(o.id) {
                     let vp = self.camera();
@@ -256,17 +281,27 @@ impl Host {
                             view.zoom,
                         ),
                     };
-                    p.draws.push(DrawCmd {
-                        center,
-                        size: [o.scale[0] * zoom, o.scale[1] * zoom],
-                        z: 0.0,
-                        color: Color::rgba(o.rgba[0], o.rgba[1], o.rgba[2], o.rgba[3]),
-                        shape: if o.kind == Kind::Circle {
-                            Shape::Circle
-                        } else {
-                            Shape::Rect
-                        },
-                    });
+                    match Self::sprite_visual(document, sprites, t.id) {
+                        Some(visual) => p.sprites.push(self.sprite_command(
+                            &assets,
+                            &mut sprite_store,
+                            &visual,
+                            center,
+                            [o.scale[0] * zoom, o.scale[1] * zoom],
+                            o.rgba,
+                        )?),
+                        None => p.draws.push(DrawCmd {
+                            center,
+                            size: [o.scale[0] * zoom, o.scale[1] * zoom],
+                            z: 0.0,
+                            color: Color::rgba(o.rgba[0], o.rgba[1], o.rgba[2], o.rgba[3]),
+                            shape: if o.kind == Kind::Circle {
+                                Shape::Circle
+                            } else {
+                                Shape::Rect
+                            },
+                        }),
+                    }
                 } else {
                     let model = self.model(&o).ok_or("missing object template model")?;
                     let transform = Mat4::from_translation(Vec3::from(o.translation))
@@ -379,8 +414,64 @@ impl Host {
         {
             return Err("2D draw capacity or finite projection rejected".into());
         }
+        if p.sprites.len() > agp::renderer::sprite::MAX_SPRITES {
+            return Err("2D sprite capacity rejected".into());
+        }
+        p.sprite_store = sprite_store;
         Ok(p)
     }
+    /// One textured visual of the accepted frame. The texture is content
+    /// identified and prepared here, before the frame is accepted, so a failed
+    /// texture keeps the whole last-good frame.
+    fn sprite_command(
+        &self,
+        assets: &crate::authoring::assets::Registry,
+        store: &mut agp::renderer::SpriteStore,
+        visual: &crate::authoring::runtime_sprites::Visual,
+        center: [f32; 2],
+        size: [f32; 2],
+        rgba: [f32; 4],
+    ) -> Result<agp::renderer::SpriteCmd, String> {
+        let asset = assets.get(&visual.asset).ok_or("missing sprite payload")?;
+        let image = asset.image_data()?;
+        let uv = agp::renderer::frame_uv(visual.frame, image.width, image.height, visual.flip)?;
+        store
+            .get_or_upload(self.rt.gpu(), &visual.asset, image)
+            .map_err(|e| format!("sprite texture preparation: {e:?}"))?;
+        // The PNG is the art: the object colour is the flat-shape fallback, so
+        // a sprite is drawn with a neutral tint and only the object alpha is
+        // honoured. Tinting by the default 2D colour would distort every
+        // imported image.
+        Ok(agp::renderer::SpriteCmd {
+            center,
+            size,
+            uv,
+            color: [1.0, 1.0, 1.0, rgba[3]],
+            texture: visual.asset.clone(),
+        })
+    }
+    /// The visual of one accepted 2D leaf: Auto's admitted frame when a Run is
+    /// publishing, the accepted document default otherwise.
+    fn sprite_visual(
+        document: &Document,
+        frame: Option<&crate::authoring::runtime_sprites::SpriteFrame>,
+        id: u64,
+    ) -> Option<crate::authoring::runtime_sprites::Visual> {
+        if let Some(visual) = frame.and_then(|f| f.visual_for(id)) {
+            return Some(visual.clone());
+        }
+        document
+            .objects
+            .iter()
+            .find(|o| o.id == id)
+            .and_then(|o| o.sprite.as_ref())
+            .map(|b| crate::authoring::runtime_sprites::Visual {
+                asset: b.asset.clone(),
+                frame: b.frame,
+                flip: b.flip,
+            })
+    }
+
     pub(super) fn publish(&mut self, mut p: Prepared) {
         if let Some(fault) = &self.asset_render_fault {
             let asset_shas: std::collections::BTreeSet<_> = self
@@ -414,6 +505,15 @@ impl Host {
         }
         if let Some(SurfaceContent::Game2d(g)) = self.rt.content_mut(self.two) {
             g.commands = p.draws;
+            if g.sprite_store.len() != p.sprite_store.len()
+                || g.sprite_store
+                    .keys()
+                    .any(|k| p.sprite_store.get(k).is_none())
+            {
+                g.sprite.invalidate_bind_groups();
+            }
+            g.sprites = p.sprites;
+            g.sprite_store = p.sprite_store;
         }
         if let Some(SurfaceContent::Scene3d(c)) = self.rt.content_mut(self.three) {
             c.store = p.store;

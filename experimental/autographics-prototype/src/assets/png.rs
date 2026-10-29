@@ -142,7 +142,8 @@ pub fn preflight(bytes: &[u8]) -> Result<PngHeader, String> {
 }
 
 /// Decode an admitted PNG into RGBA8, re-checking the header facts.
-pub fn decode_png_bytes(bytes: &[u8], source_sha256: &str) -> Result<ImageData, String> {    let header = preflight(bytes)?;
+pub fn decode_png_bytes(bytes: &[u8], source_sha256: &str) -> Result<ImageData, String> {
+    let header = preflight(bytes)?;
     let image = image::load_from_memory_with_format(bytes, image::ImageFormat::Png)
         .map_err(|e| format!("invalid: PNG decoder {e}"))?;
     let rgba = image.to_rgba8();

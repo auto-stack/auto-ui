@@ -41,6 +41,12 @@ def sheet_pixel(x, y):
     return (255, 0, 0, 255) if lx < 16 else (0, 0, 255, 255)
 
 
+def padded_pixel(x, y):
+    if x < 4 or x >= 28 or y < 4 or y >= 28:
+        return (0, 0, 0, 0)  # transparent border
+    return (255, 0, 0, 255) if x < 16 else (0, 0, 255, 255)
+
+
 def other_pixel(x, y):
     return (0, 255, 255, 255) if x < y else (255, 255, 0, 255)
 
@@ -52,6 +58,7 @@ def main():
     outputs = {
         "sheet.png": png(96, 32, sheet_pixel),
         "other.png": png(16, 16, other_pixel),
+        "padded.png": png(32, 32, padded_pixel),
     }
     ok = True
     for name, data in outputs.items():

@@ -538,6 +538,13 @@ pub fn run(replay: &str, report_dir: &Path, mode: &str) -> i32 {
                 crate::host::surface_runtime::SurfaceContent::Game2d(Box::new(Game2dContent {
                     text_overlay: None,
                     quad: QuadPipeline::new(rt.gpu(), OffscreenTarget::FORMAT).expect("quad"),
+                    sprite: crate::renderer::sprite::SpritePipeline::new(
+                        rt.gpu(),
+                        OffscreenTarget::FORMAT,
+                    )
+                    .expect("sprite"),
+                    sprite_store: Default::default(),
+                    sprites: Vec::new(),
                     clear: Color::rgb(0.05, 0.05, 0.08),
                     commands: game.draw(),
                 })),
