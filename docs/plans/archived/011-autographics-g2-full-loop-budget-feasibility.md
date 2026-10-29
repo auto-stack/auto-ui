@@ -9,7 +9,7 @@ plan_revision: 2
 completion_kind: delivered
 delivery_commit: c4143af68697f65813cbea9fe941face3fa945bd
 knowledge_commit: b5556e1696d029d0b4deca8748f985018be5740c
-current_step: 9
+current_step: 10
 total_steps: 10
 depends_on: [auto-ui/PLAN-004, auto-ui/PLAN-008, ag-examples/PLAN-002]
 affects: [auto-ui-research]
@@ -144,7 +144,7 @@ T-02冻结可复现固定输入与种子；每候选每条基础route最多2400�
 | T-07 | review | T-06 | 同树独立final review，核结论边界及全部V/S；merge门pending | AC-06 | [x] |
 | T-08 | merge | T-07 pass | 冻结研究门/有效复用后仅合本仓研究，不带入005/006 WIP | AC-07 | [x] |
 | T-09 | merge | T-08 | 按SD沉淀auto-lang知识/ledger/索引，本仓归档与真实decision/delivery | AC-08 | [x] |
-| T-10 | merge | T-09 | Git Bash wt-guard clean后清唯一树/分支/空组，保原始证据和恢复收据 | AC-08 | [ ] |
+| T-10 | merge | T-09 | Git Bash wt-guard clean后清唯一树/分支/空组，保原始证据和恢复收据 | AC-08 | [x] |
 
 ## 9. 复审记录
 
@@ -218,6 +218,18 @@ ledger_refreshed=auto-lang/.autoos/specs.json（tracked）经知识worktree受�
 
 `stage: merge | plan_id: PLAN-011 | plan_revision: 2 | checkpoint: landed,ledger_refreshed | delivery_commit: c4143af68697f65813cbea9fe941face3fa945bd | knowledge_commit: b5556e1696d029d0b4deca8748f985018be5740c | outcome: cleanup_pending | next: archive commit then guarded cleanup`
 
+2026-10-30 最终归档/清理核验：归档文档与7份契约/复审/修复摘要已提交auto-ui/master 56ec340c226a26208286ebae6fe0dc4d0c9d747f，实际归档10任务/9完成/cleanup pending门19链接通过；随后T-10实际完成：auto-ui与auto-lang唯一本Plan树在Git Bash wt-guard clean后逐个移除，两个已合入分支删除，空ui-011组删除。未触碰其它计划树。
+
+通用递归删除命令被自动审核拒绝且未提供具体原因；采用更窄的Cargo专用clean命令成功清理本Plan target，报告16810files/7.8GiB；target实际不存在。261份exe（328137728字节）事先复制至retained-executables，源/副本SHA256逐一相等，清理后再核全部哈希；原始源/consumer/日志/JSON/PNG/反例全部保留，剩余pdb0。清理收据 `D:/autostack/plan-artifacts/auto-ui/plan-011/cleanup-receipt.json` SHA256bce05fdc3774f893d2ae25e9203b62c1c3b58c835c13206a46f572473bd2fc1e；exe manifest SHA2561ff46aa37b3ebfdf2c10612fe82b9f032de50a7d3d10c6c5e03716c313ccb2b7。
+
+main landing smoke `verify.py --controls` exit0/20拒绝，代码/固定SDK/证据均未因归档或清缓存改变。生产落点检查：本仓根Cargo/crates/experimental均零改，独立非成员研究workspace不被backend/daemon/web bundle消费，无需部署/重启；实际新建并验收的研究exe已保留。语言仓batch due check：上次覆盖887收据年龄2.80h<48，本次为UI011研究+docs-only知识，无新语言仓%5触发，not due；未跑全AG或根cargo档。
+
+最终10/10，completion_kind=delivered，状态archived，独立final pass及等价rebase、代码/知识/ledger/归档/guard/缓存/落点门均完成，无本Plan未提交修改。两个主检出进入时既有其它计划文档WIP原样保留（含007/008/theme等），主树无代码WIP；遵守本计划“其它路线WIP原样保留、不混入提交”的边界，不声称整个跨任务工作区全局无文档改动。
+
+`stage: merge | plan_id: PLAN-011 | plan_revision: 2 | outcome: pass | completion_kind: delivered | delivery_commit: c4143af68697f65813cbea9fe941face3fa945bd | reviewed_commit: cb02a86ea272bb167858876ccfb2a2d7cc058cd6 | knowledge_commit: b5556e1696d029d0b4deca8748f985018be5740c | ledger: auto-lang/.autoos/specs.json v145 | archive: docs/plans/archived/011-autographics-g2-full-loop-budget-feasibility.md | cleanup: trees/branches/group/target/pdb removed;exe/evidence retained | next: done`
+
+`stage: goal | plan_id: PLAN-011 | plan_revision: r2 | round: 10 | from: merge | to: done | status: archived | outcome: pass | worktree: removed after guard | commit: c4143af68697f65813cbea9fe941face3fa945bd | next: done`
+
 ## 10. 待澄清事项
 
 无新增产品决策。计价/全组合能否成立是本研究待实测问题，不是既成go；最多两候选，失败以有据no_go/requires_capability交付，不顺势扩大成引擎修复。G2-09公共声音/HUD尚缺，不能预先承诺完整M2可行；需要新接口/预算或正式游戏时据本结论另立Plan。正式游戏/资源发行仍独立仓，未来ID另核，不在本轮创建。
@@ -227,3 +239,6 @@ ledger_refreshed=auto-lang/.autoos/specs.json（tracked）经知识worktree受�
 
 
 当前状态：用户已确认计量口径并明确发送 `/goal resume`；验收阻塞已解除，无待澄清事项。应用get_goal仍返回旧blocked，不能由工具改active；依用户明确继续指令按无自动续跑模式在本轮顺序完成，不虚构active状态、不再要求重复resume。实施与预算约束保持原范围。
+
+
+最终状态：已交付并归档，10/10，无待澄清事项。已批准的不可观测标注与no_go研究边界保留；历史waiting/blocked记录不再是当前阻塞。
