@@ -6877,6 +6877,47 @@ pub fn incremental_compile_changed(
                                                                         // the LAST compiled file's stores — unusable for multi-store workspaces.
     let mut store_files: Vec<(String, String)> = Vec::new();
 
+    // PLAN-010: 增量路径也聚合 store 暴露面（与 from_workspace_reads 同源），
+    // 供本函数内全部 compile_at_to_vue* 调用做裸 store.Method 归属路由。
+    let mut store_surface: std::collections::HashMap<String, Vec<String>> = Default::default();
+    {
+        let mut surface_files: Vec<PathBuf> = Vec::new();
+        if let Ok(entries) = fs::read_dir(&front_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().map(|e| e == "at").unwrap_or(false)
+                    && path.file_name().map(|n| n != "pac.at").unwrap_or(false)
+                {
+                    surface_files.push(path);
+                }
+            }
+        }
+        let pages_dir = front_dir.join("pages");
+        if pages_dir.exists() {
+            VueProject::collect_at_files_recursive(&pages_dir, &mut surface_files);
+        }
+        for path in &surface_files {
+            if let Ok(text) = fs::read_to_string(path) {
+                if let Ok(ast) = auto_ui_compiler::parse_ui(&text) {
+                    for stmt in ast.domain_stmts() {
+                        if let auto_ui_dialect::UiStmt::StoreDecl(decl) = stmt {
+                            if let Ok(store) =
+                                auto_ui_compiler::aura::extract::extract_store_from_decl(&decl)
+                            {
+                                let entry = store_surface.entry(store.name.clone()).or_default();
+                                for name in store.handlers.keys() {
+                                    if !entry.contains(name) {
+                                        entry.push(name.clone());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // Phase 1: Scan sub-widget .at files in front_dir (e.g. editor.at, sidebar.at)
     // Collect their names for app.at compilation and generate their .vue files
     let mut sub_widget_names: Vec<String> = Vec::new();
@@ -6913,7 +6954,14 @@ pub fn incremental_compile_changed(
 
                     if source_changed || output_missing {
                         println!("  {} (changed)", file_name.bright_yellow());
-                        match compile_at_to_vue(&path, &content, root_dir, shadcn, default_classes)
+                        match compile_at_to_vue(
+                            &path,
+                            &content,
+                            root_dir,
+                            shadcn,
+                            default_classes,
+                            Some(&store_surface),
+                        )
                         {
                             Ok((vue_code, widgets, stores)) => {
                                 store_files.extend(stores);
@@ -6950,7 +6998,14 @@ pub fn incremental_compile_changed(
                         }
                     } else {
                         // Cached: still need sub-widget names for app.at compilation
-                        match compile_at_to_vue(&path, &content, root_dir, shadcn, default_classes)
+                        match compile_at_to_vue(
+                            &path,
+                            &content,
+                            root_dir,
+                            shadcn,
+                            default_classes,
+                            Some(&store_surface),
+                        )
                         {
                             Ok((_vue_code, widgets, _stores)) => {
                                 for widget_name in &widgets {
@@ -6991,7 +7046,14 @@ pub fn incremental_compile_changed(
                 if let Ok(content) = fs::read_to_string(&path) {
                     let hash = hash_string(&content);
                     let source_changed = cache.is_dirty(&path, hash);
-                    match compile_at_to_vue(&path, &content, root_dir, shadcn, default_classes) {
+                    match compile_at_to_vue(
+                            &path,
+                            &content,
+                            root_dir,
+                            shadcn,
+                            default_classes,
+                            Some(&store_surface),
+                        ) {
                         Ok((vue_code, widgets, stores)) => {
                             store_files.extend(stores);
                             let artifacts: Vec<UIArtifact> = widgets
@@ -7067,7 +7129,14 @@ pub fn incremental_compile_changed(
             };
             let hash = hash_string(&content);
             let source_changed = cache.is_dirty(&path, hash);
-            match compile_at_to_vue(&path, &content, root_dir, shadcn, default_classes) {
+            match compile_at_to_vue(
+                            &path,
+                            &content,
+                            root_dir,
+                            shadcn,
+                            default_classes,
+                            Some(&store_surface),
+                        ) {
                 Ok((vue_code, widgets, stores)) => {
                     store_files.extend(stores);
                     for widget_name in &widgets {
@@ -7137,6 +7206,7 @@ pub fn incremental_compile_changed(
                     root_dir,
                     shadcn,
                     default_classes,
+                    Some(&store_surface),
                 ) {
                     Ok((vue_code, widgets, stores)) => {
                         store_files.extend(stores);
@@ -7187,6 +7257,7 @@ pub fn incremental_compile_changed(
                                 root_dir,
                                 shadcn,
                                 default_classes,
+                                Some(&store_surface),
                             ) {
                                 Ok((vue_code, widgets, stores)) => {
                                     store_files.extend(stores);
@@ -7267,6 +7338,7 @@ pub fn incremental_compile_changed(
                                 root_dir,
                                 shadcn,
                                 default_classes,
+                                Some(&store_surface),
                             ) {
                                 Ok((vue_code, widgets, stores)) => {
                                     store_files.extend(stores);
@@ -7549,14 +7621,18 @@ fn compile_at_to_vue(
     root_dir: &Path,
     shadcn: bool,
     default_classes: bool,
+    store_surface: Option<&std::collections::HashMap<String, Vec<String>>>,
 ) -> Result<(String, Vec<String>, Vec<(String, String)>), String> {
     use auto_ui_compiler::ui_gen::{generate_component_from_file, ComponentGenOptions};
 
+    // PLAN-010: 增量路径与全量路径同源——多 store widget 裸 `store.Method()`
+    // 依赖 surface 路由，增量编译缺参会让修复在 run 增量下失效。
     let opts = ComponentGenOptions {
         root_dir_for_validation: Some(root_dir.to_path_buf()),
         stream_endpoints: Some(resolve_stream_endpoints(root_dir)),
         shadcn: Some(shadcn),
         default_classes: Some(default_classes),
+        store_surface: store_surface.cloned(),
         ..Default::default()
     };
     let result = generate_component_from_file(at_path, opts).map_err(|e| format!("{}", e))?;
@@ -7585,6 +7661,7 @@ fn compile_at_to_vue_with_sub_widgets(
     root_dir: &Path,
     shadcn: bool,
     default_classes: bool,
+    store_surface: Option<&std::collections::HashMap<String, Vec<String>>>,
 ) -> Result<(String, Vec<String>, Vec<(String, String)>), String> {
     use auto_ui_compiler::ui_gen::{generate_component_from_file, ComponentGenOptions};
 
@@ -7594,6 +7671,7 @@ fn compile_at_to_vue_with_sub_widgets(
         stream_endpoints: Some(resolve_stream_endpoints(root_dir)),
         shadcn: Some(shadcn),
         default_classes: Some(default_classes),
+        store_surface: store_surface.cloned(),
         ..Default::default()
     };
     let result = generate_component_from_file(at_path, opts).map_err(|e| format!("{}", e))?;
