@@ -115,3 +115,10 @@ header:  status, bound_count, run_id, tick_id           (4)
   - AGP `tests/sprite_resources.rs` 3 cases：真实像素的 nearest/边界夹取/翻向/裁剪（2×2 图 64×64 四边形，四象限逐一验证）、透明纹素显示 clear 色、暖帧三次换帧/翻向不新增纹理也不重传像素（`created`=1、`bytes_uploaded`=16，实例缓冲仍有重写）、同内容异尺寸/异设备/缺失纹理命名拒绝、纹理 weak owner 在最后一个 owner 释放后失效、`frame_uv` 越界拒绝。
   - 驱动 `tests/public_sprite_frames.rs` 新增 2 cases：编辑预览在 400±16/±30 处验证左红右蓝、透明边框露出画布、翻向只镜像 U；真实 Auto 在相机投影点上验证 frame 0 左红右蓝、左向输入后同矩形变左蓝右红；两者都断言 `Descriptor::rows()` 在换帧/翻向后逐值不变（碰撞与 UV 独立）。
 - 未在本任务完成（属 T-05）：Pause/Step/Stop/新局、prepare 失败注入与整组 last-good、纹理 owner 弱引用随关闭释放、暖帧换帧不重解码的端到端计数。
+
+## 12. T-05 交付事实（生命周期、失败注入与 owner）
+
+- Pause：不推进 tick、不改变已发布视觉；`step` 只推进一个中立 tick 并按真实 phase 更新帧；Stop 撤销 runtime owner 并恢复编辑 preview（文档默认帧）；同一文档再次 Run 得到全新 Auto 会话（tick 0、初始化帧）。
+- 失败注入：`fail_resource` 使 prepare 拒绝整个候选，位置/相机/实例/精灵全部保持 last-good（tick 不前进、已发布 UV 与槽帧不变），Play 记录命名错误；清除注入后 Stop + 重新 Run 恢复正常。
+- owner/寿命：20 轮 Play/Stop（每轮含暖帧换帧）只创建 1 张纹理、只上传 12288 字节（96×32×4），arc 身份不变；关闭项目后注册表释放载荷，下一帧 prune 清空缓存并使纹理 weak owner 失效，同时删除引用已释放纹理的已发布命令，避免「有命令无纹理」的分帧。
+- 新增测试（`tests/public_sprite_frames.rs`，共 15 cases）：`pause_step_stop_and_a_new_run_bound_the_visual_lifecycle`、`failed_prepare_keeps_the_whole_previous_group_and_recovers`、`twenty_play_stop_rounds_reuse_one_texture_and_release_the_last_owner`；连续三次运行均 15 passed。
