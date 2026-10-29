@@ -1,0 +1,46 @@
+{
+  "format": "pcm16-wave-stereo",
+  "rate": 44100,
+  "frames": 22504,
+  "byte_length": 90060,
+  "sha256": "b0b740dc49e51abefff9bb1af830080fe00f817b468614992040d438d6171c3d",
+  "mono_transform": "duplicate channel; no resampling",
+  "sources": [
+    {
+      "name": "jump.ogg",
+      "sha256": "f090c16689e9ec04c4bef80bfcbf68bc4b63ab4ce29f7fbb5cee05a5641d5694",
+      "byte_length": 5805,
+      "rate": 44100,
+      "channels": 1,
+      "frames": 7403,
+      "start_frame": 0,
+      "end_frame": 7403,
+      "peak": 0.43783286213874817,
+      "max_quantization_error": 0.0000152587890625
+    },
+    {
+      "name": "coin.ogg",
+      "sha256": "df55e931e6b78e5aecc015922e873a0e8bfa4e97cfb19abc64149d54afe89216",
+      "byte_length": 6620,
+      "rate": 44100,
+      "channels": 2,
+      "frames": 12643,
+      "start_frame": 7403,
+      "end_frame": 20046,
+      "peak": 0.2651979923248291,
+      "max_quantization_error": 0.000015258199709933251
+    },
+    {
+      "name": "land.ogg",
+      "sha256": "145a1c17125dc4d344ac135bc5073e35ea12e19700ca30ee6e1e477010b4dca0",
+      "byte_length": 5885,
+      "rate": 44100,
+      "channels": 2,
+      "frames": 2458,
+      "start_frame": 20046,
+      "end_frame": 22504,
+      "peak": 0.09626015275716782,
+      "max_quantization_error": 0.000015255063772201538
+    }
+  ]
+}

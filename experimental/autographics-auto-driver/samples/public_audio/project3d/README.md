@@ -1,0 +1,1 @@
+PLAN-012 finite project3d engine fixture. scene.agscene binds immutable Auto, visuals and one three-cue PCM16 bank. Sources and CC0 art/sound provenance: SOURCE-README.md; upstream code license separately in SOURCE-LICENSE.md. Generated two-color image (2D) is original test art, CC0. No font/HUD/full-game delivery.

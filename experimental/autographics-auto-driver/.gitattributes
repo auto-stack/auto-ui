@@ -10,6 +10,13 @@ samples/node_animation/scripts/*.at -text
 samples/node_animation/main.at text eol=lf
 research/plan006-identity.json text eol=lf
 
+# PLAN-012 content-addressed audio projects and original sources.
+samples/public_audio/*/scripts/*.at -text
+samples/public_audio/*.at text eol=lf
+samples/public_audio/**/*.wav -text
+samples/public_audio/sounds/*.ogg -text
+research/plan012-identity.json text eol=lf
+
 # New motion source blobs and exact verification receipts retain raw bytes.
 samples/motion_projects/*/scripts/*.at -text
 research/motion-evidence/** -text whitespace=cr-at-eol,-blank-at-eof

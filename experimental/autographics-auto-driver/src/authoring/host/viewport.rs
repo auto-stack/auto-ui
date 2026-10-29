@@ -485,6 +485,7 @@ impl Host {
     }
 
     pub(super) fn publish(&mut self, mut p: Prepared) {
+        let measurement_start = self.publish_measurement.start();
         if let Some(fault) = &self.asset_render_fault {
             let asset_shas: std::collections::BTreeSet<_> = self
                 .editor
@@ -540,6 +541,7 @@ impl Host {
         self.prune_resources();
         self.rt.graph.mark_content_dirty(self.two);
         self.rt.graph.mark_content_dirty(self.three);
+        self.publish_measurement.finish(measurement_start);
     }
     pub fn click(&mut self, p: [f32; 2]) {
         if let Some(InputOutcome::Delivered { surface, local }) =
