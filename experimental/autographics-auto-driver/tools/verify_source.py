@@ -1,8 +1,11 @@
 """Check locked metadata's actual SDK dependency closure and pinned local inputs."""
 import json,pathlib,subprocess,sys,tomllib
 root=pathlib.Path(__file__).resolve().parents[1]
+current004=(root/'research/plan004-identity.json').exists()or(root/'tools/verify_plan004.py').exists()
+if current004 and '--sdk-only' not in sys.argv:
+ subprocess.run([sys.executable,str(root/'tools/verify_plan004.py')],check=True)
 current002=(root/'research/plan002-identity.json').exists()or(root/'tools/verify_plan002.py').exists()
-if current002 and '--sdk-only' not in sys.argv:
+if current002 and not current004 and '--sdk-only' not in sys.argv:
  subprocess.run([sys.executable,str(root/'tools/verify_plan002.py')],check=True)
 current001=(root/'research/plan001-identity.json').exists()or(root/'tools/verify_plan001.py').exists()
 if current001 and not current002 and '--sdk-only' not in sys.argv:
@@ -69,7 +72,9 @@ print(f'PASS SDK metadata closure: {len(seen)} packages; 17 declared local packa
 if '--sdk-only' in sys.argv:
  sys.exit(0)
 
-if current860 or current857:
+if current004:
+ pass # current complete closure already checked
+elif current860 or current857:
  pass # current complete closure already checked
 elif current856:
  pass # historical closure is retained but superseded

@@ -378,6 +378,17 @@ fn real_auto_drives_frames_flip_and_the_whole_2d_composition_in_one_tick() {
         play.source_hash,
         vm(),
     );
+    report_case(
+        "profile20",
+        serde_json::json!({
+            "managed_hash": play.source_hash,
+            "block_len": runtime_sprites::block_len(targets.len()),
+            "frames": frames,
+            "ticks": ticks_us.len(),
+            "tick_median_us": median,
+            "vm_owner": vm(),
+        }),
+    );
 }
 
 fn block_for(
@@ -717,6 +728,16 @@ fn png_admission_rejects_out_of_domain_inputs_before_decoding() {
         error.contains("decoded image") || error.contains("dimensions"),
         "{error}"
     );
+    report_case(
+        "admission",
+        serde_json::json!({
+            "rejected_cases": 10,
+            "accepted_sha": sheet.identity.sha256,
+            "accepted_width": 96,
+            "accepted_height": 32,
+            "decode_attempts_after_rejections": attempts,
+        }),
+    );
 }
 
 #[test]
@@ -781,6 +802,29 @@ fn temp_root(tag: &str) -> PathBuf {
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).expect("temp root");
     dir
+}
+
+/// PLAN-004 acceptance reports. When `PLAN004_REPORT_DIR` is set (the
+/// `tools/check_sprite_frames.py` gate does this), each key case writes one
+/// bounded JSON file; normal test runs never touch the tree. A missing file is
+/// therefore a real "case did not run" signal for the checker.
+fn report_case(case: &str, value: serde_json::Value) {
+    let Some(dir) = std::env::var_os("PLAN004_REPORT_DIR") else {
+        return;
+    };
+    let dir = PathBuf::from(dir);
+    std::fs::create_dir_all(&dir).expect("report dir");
+    let body = serde_json::json!({
+        "schema": "autographics.plan004.report/1",
+        "case": case,
+        "runner": "public_sprite_frames",
+        "value": value,
+    });
+    std::fs::write(
+        dir.join(format!("{case}.json")),
+        serde_json::to_vec_pretty(&body).expect("report json"),
+    )
+    .expect("report write");
 }
 
 fn settle_editor(e: &mut Editor) {
@@ -1168,6 +1212,18 @@ fn png_side_and_decoded_budget_are_checked_before_decoding() {
     );
     assert_eq!(assets::MAX_GEOMETRY, 64 * 1024 * 1024);
     assert_eq!(assets::MAX_ASSETS, 8);
+    report_case(
+        "budgets",
+        serde_json::json!({
+            "max_side": assets::MAX_IMAGE_SIDE,
+            "max_decoded": assets::MAX_IMAGE_DECODED,
+            "max_cpu_gpu_union": assets::MAX_GEOMETRY,
+            "max_assets": assets::MAX_ASSETS,
+            "max_raw_total": assets::MAX_RAW_TOTAL,
+            "accepted_16mib": asset.cpu_bytes,
+            "fifth_rejected_before_decode": true,
+        }),
+    );
 }
 
 #[test]
@@ -1407,6 +1463,8 @@ fn real_auto_frame_and_flip_change_the_drawn_pixels() {
     host.frame(None).expect("frame");
     let left = hero_probe(&mut host, -1.0);
     let right = hero_probe(&mut host, 1.0);
+    let frame0_left = left;
+    let frame0_right = right;
     assert!(left[0] > 150 && left[2] < 70, "frame 0 left red {left:?}");
     assert!(
         right[2] > 150 && right[0] < 70,
@@ -1436,12 +1494,24 @@ fn real_auto_frame_and_flip_change_the_drawn_pixels() {
         }
     }
     assert!(flipped, "the real Auto admitted a flip");
-    let left = hero_probe(&mut host, -1.0);
-    let right = hero_probe(&mut host, 1.0);
-    assert!(left[2] > 150 && left[0] < 70, "flipped left blue {left:?}");
+    let flip_left = hero_probe(&mut host, -1.0);
+    let flip_right = hero_probe(&mut host, 1.0);
     assert!(
-        right[0] > 150 && right[2] < 70,
-        "flipped right red {right:?}"
+        flip_left[2] > 150 && flip_left[0] < 70,
+        "flipped left blue {flip_left:?}"
+    );
+    assert!(
+        flip_right[0] > 150 && flip_right[2] < 70,
+        "flipped right red {flip_right:?}"
+    );
+    report_case(
+        "pixels",
+        serde_json::json!({
+            "frame0_left": frame0_left,
+            "frame0_right": frame0_right,
+            "flipped_left": flip_left,
+            "flipped_right": flip_right,
+        }),
     );
     host.play.as_mut().unwrap().char_key(0, false, false);
     host.stop_play();
@@ -1675,6 +1745,7 @@ fn twenty_play_stop_rounds_reuse_one_texture_and_release_the_last_owner() {
     let sheet = doc.assets[0].key();
     let mut host = Host::with_project(doc, registry, None).expect("host");
     let mut weak = None;
+    let mut last = (0u64, 0u64, 0usize);
     for round in 0..20 {
         host.start_user_snapshot(play_snapshot(&dir))
             .expect("start");
@@ -1688,6 +1759,7 @@ fn twenty_play_stop_rounds_reuse_one_texture_and_release_the_last_owner() {
         assert_eq!(created, 1, "round {round} reused one content texture");
         assert_eq!(bytes, 96 * 32 * 4, "round {round} uploaded the pixels once");
         assert_eq!(textures, 1);
+        last = (created, bytes, textures);
         if weak.is_none() {
             weak = Some(sprite_weak(&host, &sheet));
         }
@@ -1706,5 +1778,15 @@ fn twenty_play_stop_rounds_reuse_one_texture_and_release_the_last_owner() {
     assert!(
         weak.upgrade().is_none(),
         "the last owner released the texture"
+    );
+    report_case(
+        "warm",
+        serde_json::json!({
+            "rounds": 20,
+            "textures_created": last.0,
+            "bytes_uploaded": last.1,
+            "textures_after_close": sprite_stats(&host).2,
+            "owner_released": weak.upgrade().is_none(),
+        }),
     );
 }
