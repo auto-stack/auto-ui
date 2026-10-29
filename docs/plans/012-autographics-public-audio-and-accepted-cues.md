@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-012
-status: executing
+status: execution_done
 feature_name: AutoGraphics公共音频资源与接受后一次播放
 author: [Codex]
 created_at: 2026-10-30
 updated_at: 2026-10-30
 plan_revision: 1
-current_step: 5
+current_step: 6
 total_steps: 10
 depends_on: [auto-ui/PLAN-006]
 supersedes_spec_components: [docs/specs/auto-graphics/scene-assets.md, docs/specs/auto-graphics/behavior-api.md]
@@ -118,7 +118,7 @@ work自查后同树独立上下文review全部AC/V/S/SD、计价/codec/不可逆
 | T-03 | work | T-02通过 | 有限codec/cue/asset闭包与存储版本化，V-01 | AC-01/02 | [x] 0bb1ce1；resources9/codec6通过，30schema/cue负控、8/32MiB/CPU实际并集、保存故障/损坏修复冷重开/ancestor junction拒；t03-t04-closure.md |
 | T-04 | work | T-03 | Auto/Host有界请求与mixer/native输出、接受幂等/32-33/错bundle，V-02/03 | AC-03 | [x] b10cc6a；两维各24实际VM输出破坏、精确大ordinal/4-5请求、整段PCM span/gain/tail/三rate及真实native/multimount重放通过；t03-t04-closure.md |
 | T-05 | work | T-04 | 生命周期/设备故障/容量/20轮owner及完整账，V-03/04 | AC-04 | [x] 4400661；两维真实8/第9拒整帧、postaccept Fault/下一quantum静音/新stream恢复、各20轮实际VM/manager/PCM弱owner及warm0；Pause非恒定波形cursor/Step无积压、restart故障负控及启动失败camera恢复；t05-lifecycle-closure.md |
-| T-06 | work | T-05 | fresh两维消费/预算/兼容/identity controls、fmt/提交、SD与G12a交付说明，V-05 | AC-01..05 | [ ] |
+| T-06 | work | T-05 | fresh两维消费/预算/兼容/identity controls、fmt/提交、SD与G12a交付说明，V-05 | AC-01..05 | [x] 8741443；正式scene7两维bound/三cue bank与provenance，真实选段/gain/运动变源敏感，A→B无SDK/target冷准备离线重编译2case通过；1529完整identity/SDK681/locks/负控与SD/G12a说明，见t06-readiness.md；final41case门merge-owned pending |
 | T-07 | review | T-06 | 同树独立final review，merge门pending | AC-06 | [ ] |
 | T-08 | merge | T-07 pass | 冻结定向门/有效复用后合master，不带Gallery内容 | AC-07 | [ ] |
 | T-09 | merge | T-08 | 知识SD/ledger/索引、本仓归档与实际delivery | AC-08 | [ ] |
@@ -152,6 +152,18 @@ T05提交4400661，3Host定向case（两维各8/9voice、真实已发PCM后同CP
 
 2026-10-30 goal round3：`stage: goal | plan_id: PLAN-012 | plan_revision: r1 | round: 3 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-012/auto-ui | commit: 4400661a04c456b710e757cfa697876bc98adcc9 | next: work T-06`。本轮关闭T03/04/05并以设备恢复反例修正同源边界，实质进展；5/10，0failed final review/0repaircycle，无用户待答。下一轮关闭两维fresh离线消费/完整预算/identity/规范增量后才交独立复审，不把本轮定向绿等同全部AC通过。
 
+2026-10-30 work final handoff：`stage: work | plan_id: auto-ui/PLAN-012 | plan_revision: 1 | outcome: pass | worktree_path: D:/autostack/.wt/ui-012/auto-ui | branch: codex/plan-012-dev | base_commit: f7c83c6fbe55b51b4c1e830a4175c94ec5c0d131 | code_commit: 87414431b9a1dbda6eb54aad999af7f734a14516 | dependency_revisions: SDK7b987ca8/681/17local/29edges/479metadata,driver lock4a0b3040,AGP lockc3df168e,no package version/dependency code change | task_ids: T-06 closed,T01..06 complete | evidence: attachments/012/work/t06-readiness.md | blockers: no work-owned runtime/contract finding; review-context action authorization pending §10 | next_responsible_role: final review on frozen same tree`。AC01..05/V01..05工作侧全闭合映射见readiness；新增两份普通公开scene7接受项目，production bank派生与import/CodePayload/Editor/Storage保存生成，原始模型/图/声音及许可不变，bank-audit与项目脚本/资产为永久承重夹具，不是本地probe日志。真实Auto的tick1选cue0+2、event101后tick2选cue1+2，改源码选cue2/gain0.75/speed0.25时实际12645frames完整独立PCM16波形与运动随之变化；SaveAs到A、drop旧Host、搬B冷读/新VM复验成功。
+
+源identity现1529files，SHA a5a861cd5275c8f8d1d02cea7deae49a3ea67c986a7513c712c183fb33cffbe6；正确012完整源guard已取代旧006默认guard，SDK/两locks全绑定。Python compile/identity edit-delete-unlisted-stable-scene-wrongpins-escape-target-PID-exact-source controls通过。真实complete2case log接受、partial1/wrongrunner/实际不存在filter0selected及6观察字段突变共9负控拒绝；最终整体manifest/41case gate不以这些局部控制冒充已执行。fresh工具只导出identity列出源码+SDK快照，A→B前无preparedSDK/target，再在B冷准备SDK/离线独立重编译、真实2tests/0filtered通过，PEmain32MiB/worker16MiB，实际B binarySHA97157b1f651845820bdb3b1dfd0a93786fba3a2f8c3416fb9247997227ff536d；manifestSHA d2c02d7a905ea3ac9d2f7278dc3b852b212aff83f506505d6fd0a7d24e9fa108。实际破坏B preparedSDK被拒、finally修复后重新verify_source/metadata接受，先前保护修订前的fresh旧identity拒绝。未复制producer target/.sdk-source/Git或第二实施树，所有consumer/PCM/log仅仓外本地。
+
+两个12tick完整组合callback分别5092steps/6slices、7037/8，managed85055/84143B，资源CPU308844/1479646B、GPU256/1145956B、raw2/90202B及6/236544B，warmdecode/mesh/texture上传0。最终独立副本tickmax4860/13443us；Hostpumpmax4867us/met与8046us/missed，3D有1次yield故13pump观察/12tick，8ms目标超46us明确记录不拿2s硬限替代。VM-output/admit/prepare/publish/pump与native分别观测，native441frames/44100Hz stereoF32、max621/169us、deadline_misses0、nonzero9699各；Resume到首次PCM观察上界8390/3169us，1ms轮询/硬件缓冲及无CPAL underrun计数明确边界。producer先前两维pumpmet结果不覆盖fresh3Dmissed。全部硬帽保持，导入decode同步计时不藏到异步线程。
+
+SD01/02/03与ag-examples005/G12a下游说明冻结在research/public-audio-spec-delta.md，SHA551376a3654baf3c8f916ff1c858879b6660c10dbd598361dab2e23337a89f82。fmt/diff/源与SDK校验通过，无本期新增warning，SDK146既有warning保留。除4行有界opt-in Hostpublish观察外此前资源/codec/wire/native/lifecycle/legacy实现与输入不变，相关已标识T02..05证据按路径复用，最终冻结定向门明确merge所有且pending。实现已提交clean并暂停写入；主检出其他所有者文档WIP原样保留。当前6/10、execution_done；未做独立review、未生成finalpass、未跑root/全AG、未发布canonical Specs/ledger、未merge归档清树。
+
+2026-10-30 goal round4：`stage: goal | plan_id: PLAN-012 | plan_revision: r1 | round: 4 | from: work | to: review | status: execution_done | outcome: waiting | worktree: D:/autostack/.wt/ui-012/auto-ui | commit: 87414431b9a1dbda6eb54aad999af7f734a14516 | next: user review-context authorization then review`。前轮分类progress；本轮关闭最后work任务、独立消费/性能/身份控制与SD实质推进。0failed final review/0repaircycle；首次等待§10上下文约束决定，不因未经授权新建agent/chat，亦不把实施自查称独立复审。所需下一动作已具体到冻结树/commit的只读独立审查；未消耗finalreview尝试或开展未授权复审。若用户允许例外则进入T07；若保持限制则等待用户安排独立复审，不改验收/阈值。
+
 ## 10. 待澄清事项
 
-当前无用户待答问题。T-01..05已完成，5/10；支持域/版本/wire/效果时序与资源账冻结，完整资源存储负控、请求/PCM/native幂等与生命周期8/9/设备Fault/各20轮实际owner已闭合。round1 padded Vorbis帧数早期基础长度已由独立libsndfile oracle纠正，不作为当前cue/bank验收依据。下一步T-06 fresh两维离线consumer/完整性能/012identity controls/SD与G12a说明；T-07独立review、T-08冻结定向合并门和T-09/10规范ledger归档清理均pending。若原合同不可行回new，不扩录音/空间音频或抬预算。011不自动升级，完整游戏G2-09/G3-08仍需真实消费者后继验证。
+待答：T01..06已完成，6/10，实施树87414431clean/冻结。§6同时规定“同树独立上下文review”与“不新建agent/chat”。auto-plan-review技能Entry还规定“Do not create another task or agent without the applicable authorization.” 仅实施会话变更角色不能声称独立；当前没有可用的既有独立复审上下文。已通过异步问题请求：是否允许一个只读复审子代理使用同一唯一树/冻结commit（不新建用户聊天、不复制代码、不修改实现），作为此项禁止新agent的明确例外？或用户保持限制并安排独立复审。未得到答复不启动agent、不把elapsed视为同意、不降低AC06。此为T07复审方式决策，无工作侧功能/证据缺口；全链merge授权仍有效，review pass前不得merge。首次waiting round4；目标仍active，未达到blocked阈值。
+
+参考约束：[本Plan§6](#6-测试设计)，[auto-plan-review技能](C:/Users/zhaop/.codex/skills/auto-plan-review/SKILL.md)。下一步答复后同树独立review全部AC/V/SD，T08冻结定向门与T09/10知识ledger/归档guard清理仍pending。完整游戏G2-09/G3-08、011/HUD/font/完整AG里程碑不自动升级。
