@@ -14,6 +14,7 @@ Volatile run reports and the identity file itself are excluded from the walk.
 import json
 import hashlib
 import pathlib
+import re
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 BASE = ROOT.parent
@@ -45,6 +46,11 @@ SKIP_NAMES = {
     "runtime-triggers-reports",
     "sprite-frames-reports",
 }
+# The native authoring window probe writes a PID-named scene into research/.
+# It is ephemeral evidence, not part of the PLAN-004 source closure.
+VOLATILE_PROBE_SCENE = re.compile(
+    r"autographics-auto-driver/research/authoring-native-[0-9]+\.agscene"
+)
 # auto-ui master at this worktree's base (docs-only commits above 002's archive).
 BASE_COMMIT = "d3bd6b495dc8b690925e88deee9fbf2c42e7f991"
 # The actual delivered dependency this plan builds on (not a development tip).
@@ -108,12 +114,17 @@ def main():
             relative = path.relative_to(BASE).as_posix()
             if any(part in SKIP_DIRS for part in path.parts):
                 continue
+            if VOLATILE_PROBE_SCENE.fullmatch(relative):
+                continue
             if path.name in SKIP_NAMES:
                 continue
             files[relative] = digest(path)
         for path in sorted(package_root.rglob("*")):
-            if path.is_dir() and path.name not in SKIP_DIRS:
-                relative = path.relative_to(BASE).as_posix()
+            if path.is_dir():
+                relative_path = path.relative_to(BASE)
+                if any(part in SKIP_DIRS for part in relative_path.parts):
+                    continue
+                relative = relative_path.as_posix()
                 if relative not in folders:
                     folders.append(relative)
     baseline = json.loads((ROOT / "research/baseline.json.txt").read_text())

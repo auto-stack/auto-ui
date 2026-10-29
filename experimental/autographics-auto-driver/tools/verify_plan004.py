@@ -13,6 +13,7 @@ everything before the final pass.
 import hashlib
 import json
 import pathlib
+import re
 import subprocess
 import sys
 
@@ -20,6 +21,9 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 BASE = ROOT.parent
 PLAN_PIN = "0ee5ad0747ec3bb67e1288401fcc31daf3901c6e"
 BASE_COMMIT = "d3bd6b495dc8b690925e88deee9fbf2c42e7f991"
+VOLATILE_PROBE_SCENE = re.compile(
+    r"autographics-auto-driver/research/authoring-native-[0-9]+\.agscene"
+)
 REQUIRED = [
     "autographics-auto-driver/api/sprite2d_v1.at",
     "autographics-auto-driver/src/authoring/runtime_sprites.rs",
@@ -66,6 +70,9 @@ def verify():
     identity_path = ROOT / "research/plan004-identity.json"
     identity = json.loads(identity_path.read_text())
     suffixes = identity["text_suffixes"]
+    assert not any(
+        VOLATILE_PROBE_SCENE.fullmatch(relative) for relative in identity["files"]
+    ), "PID-named native probe scene must not be pinned"
     skip_dirs = {"target", "__pycache__", ".sdk-source", ".sdk-source.prepare-tmp"}
     skip_names = {
         "window-report.json",
@@ -97,6 +104,8 @@ def verify():
                 continue
             parts = path.relative_to(BASE).parts
             if any(part in skip_dirs or part in skip_names for part in parts):
+                continue
+            if VOLATILE_PROBE_SCENE.fullmatch(path.relative_to(BASE).as_posix()):
                 continue
             actual.add(path.relative_to(BASE).as_posix())
         expected = {p for p in identity["files"] if p.startswith(folder + "/")}
@@ -130,6 +139,7 @@ def controls():
     ]
     originals = [p.read_bytes() for p in victims]
     added = ROOT / "samples/sprite_frames/unlisted_control.png"
+    volatile_probe = ROOT / "research/authoring-native-987654321.agscene"
 
     def rejected():
         result = subprocess.run([sys.executable, __file__], capture_output=True)
@@ -164,8 +174,17 @@ def controls():
         rejected()
     finally:
         added.unlink()
+    assert not volatile_probe.exists()
+    volatile_probe.write_text("transient probe output\n", encoding="utf-8")
+    try:
+        verify()
+    finally:
+        volatile_probe.unlink()
     verify()
-    print("PASS PLAN-004 identity controls: edited/deleted/unlisted/wrong-pin all rejected")
+    print(
+        "PASS PLAN-004 identity controls: edited/deleted/unlisted/wrong-pin rejected; "
+        "PID-named probe output ignored"
+    )
 
 
 if __name__ == "__main__":
