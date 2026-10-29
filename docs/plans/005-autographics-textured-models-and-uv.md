@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-005
-status: execution_done
+status: executing
 feature_name: AutoGraphics有限纹理模型与UV资源闭包
 author: [Codex]
 created_at: 2026-10-29
 updated_at: 2026-10-29
 plan_revision: 3
-current_step: 6
+current_step: 3
 total_steps: 10
 depends_on: [auto-ui/PLAN-004]
 supersedes_spec_components:
@@ -112,10 +112,10 @@ T-03..06建立新入口：`cargo test --manifest-path experimental/autographics-
 |---|---|---|---|---|---|
 | T-01 | work | 004实际交付、用户启动 | 核004/SDK/两锁/owner；恢复固定素材逐文件清单/许可/来源，建唯一ui-005树 | AC-01/05 | [x] base 2b88bd69、004与修复均已合入；SDK681冷准备通过；固定提交原件/许可/逐文件SHA恢复，见attachments/005/work/fixed-source.md |
 | T-02 | work | T-01 | textured-model-contract：支持表/身份/预算/节点关联、原件全链可行性，失败回new | AC-01/03/05 | [x] 9a0f722：固定三原件经public Host import→save→move→open→GPU capture全链通过；同根换PNG闭包及真实像素必变，切线准入澄清r3；两项测试通过，详见执行合同 |
-| T-03 | work | T-02通过 | 无任意IO的GLB/PNG闭包准入、持久化/编辑绑定、V-01/02 | AC-01/02 | [x] 8809e54修复R1两不变量：全材质四类通道先检/损坏引用invalid；内容绑定排除显示名、保完整依赖重读。两永久case+错边恢复定向及原独立21输入/缓存正控均绿；见repair-r1.md，待独立复审 |
+| T-03 | work | T-02通过 | 无任意IO的GLB/PNG闭包准入、持久化/编辑绑定、V-01/02 | AC-01/02 | [ ] R2：F-005-R1-01已独立确认closed；F-005-R1-02仅warm Open闭合，后续Save/SaveAs仍snapshot asset identity，须统一内容绑定比较并补实际生命周期；见review-r2.md |
 | T-04 | work | T-03 | UV/材质/纹理shader与cache接线、V-03深度和变异 | AC-03 | [x] 6d67642：36采样组合/144实际GPU探针最大误差1；GLB变换4探针误差0/AABB与节点关联保持；深度/背面/阴影及真实负控通过，修复缩小时mag过滤误选；见pixels-and-lifetimes.md |
-| T-05 | work | T-04 | 候选故障/预算/20轮/owner/共享/静态暖上传V-04 | AC-04 | [x] 621d2b9：driver3+AGP1通过，20轮真实Auto+相机/对象/Stop，warm上传/解码0、20VM释放、CPU1075810/GPU1080904与实际GPU相符；候选整帧/像素及实际Weak最后pin验证，修复关闭悬空实例和新key设备代次接缝；见pixels-and-lifetimes.md |
-| T-06 | work | T-05 | fresh consumer/兼容/identity controls、fmt/warnings/提交、SD与006交付说明 | AC-01..05 | [x] 8809e54：身份1456项重新冻结及源码负控；全新consumer-repair-r1冷SDK/独立target离线20+4/12case与全部报告负控通过，fmt/clean；SD/锁/SDK与未变兼容证据明确复用，见repair-r1.md |
+| T-05 | work | T-04 | 候选故障/预算/20轮/owner/共享/静态暖上传V-04 | AC-04 | [ ] R2重开warm alias状态：Host Play仍报play asset identity；621d2b9及R1普通状态20轮/事务/owner证据保持有效，须补同内容不同显示名Open→Play/Stop/Save闭合；见review-r2.md |
+| T-06 | work | T-05 | fresh consumer/兼容/identity controls、fmt/warnings/提交、SD与006交付说明 | AC-01..05 | [ ] R2依赖重开：8809e54/source1456/consumer20+4证据仅适用该baseline，warm alias工作流未完成；修复后重绑定当前源码/consumer与readiness |
 | T-07 | review | T-06 | 同树独立review并绑定实际revision；merge门pending | AC-06 | [ ] |
 | T-08 | merge | T-07 pass | 冻结提交定向门/有效复用，通过才合master | AC-07 | [ ] |
 | T-09 | merge | T-08 | Specs/ledger/索引与本地归档、delivery SHA/闭包/节点表示接口 | AC-08 | [ ] |
@@ -156,6 +156,11 @@ F-005-R1-01：四种未支持贴图通道normal/occlusion/emissive/metallicRough
 2026-10-29 work repair cycle1（r3，pass）：`stage: work | plan_id: auto-ui/PLAN-005 | plan_revision: 3 | outcome: pass | worktree_path: D:/autostack/.wt/ui-005/auto-ui | branch: codex/plan-005-dev | base_commit: 2b88bd69 | code_commit: 8809e545830a2d0ed6f587517e6d4d8a29a575ca | dependency_revisions: SDK/两锁/SD与R1相同 | task_ids: T-03,T-06 | evidence: attachments/005/work/repair-r1.md | blockers: none | next_responsible_role: independent affected final re-review`。F-005-R1-01原重放exit1→0，四通道used/unused合法引用unsupported、坏引用invalid并均decode0；F-005-R1-02原重放exit101→0，cold/same-name/different-name warm全接受，Host真实Open保持文档显示名与缓存Arc；坏依赖/错边/修复再开仍受检。两个永久case及原21holdout/5正控、既有dependencies定向通过。current identity1456/SHA19d19280…已重冻结及负控通过；全新独立consumer-repair-r1 snapshot冷SDK、离线20+4/12报告case与全报告负控通过（manifest SHA256d8005629f13b51791fc37ad62c66254f2f4c0146212a1cf84cac4391ab93becc）。只改4个driver源码/测试/identity/checker文件；未改AGP/SDK/两锁/规范草案，R1未受影响像素/owner/兼容及A搬B证明按不变输入复用，fresh本轮亦实跑全部资源/像素/事务及项目搬迁路径。树clean，fmt/diff干净，停止实施写入交复审；无已知work缺口，AC-06/merge仍pending。
 
 2026-10-29 goal round 7：`stage: goal | plan_id: PLAN-005 | plan_revision: r3 | round: 7 | from: work | to: review | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-005/auto-ui | commit: 8809e545830a2d0ed6f587517e6d4d8a29a575ca | next: review`。本轮修复两处真实缺口并新增永久反例、完成新闭包消费证明；6/10，下一轮受影响独立复审，尚未合入/归档/清理。
+2026-10-29 independent affected review R2（final，needs_fix）：`stage: review | review_scope: final | reviewer_identity: /root/ui005_final_review，原独立上下文 | plan_id: auto-ui/PLAN-005 | plan_revision: 3 | outcome: needs_fix | worktree_path: D:/autostack/.wt/ui-005/auto-ui | branch: codex/plan-005-dev | reviewed_commit: 8809e545830a2d0ed6f587517e6d4d8a29a575ca | base_commit: 9d680f9 (repair),2b88bd69(original) | dependency_revisions: SDK/两锁/SD及canonical hashes同R1 | spec_inputs: SD SHA14b5aa1… unchanged | acceptance_results: AC-01/V-01 pass,F-005-R1-01 closed; AC-02/V-02 fail,F-005-R1-02 partial; AC-03 pass; AC-04/05 partial(warm workflow); AC-06 needs_fix | pending_closeout_gates: cycle2诊断/修复/复审、冻结producer门、合入/规范/ledger/归档/清理 | evidence: attachments/005/work/review-r2.md，local report SHA256a6ef6faa0c808384c6cbd984557ebdf834887d320e447a3761a7c1cc13e52358 | next: work`。
+
+R2独立重放：21准入反例/5正控通过，原different-name warm Open通过；延伸真实Host Open→Play返回play asset identity，Host Save/current及SaveAs返回snapshot asset identity，而cold Save+Play/same-name Save正控均通过。确认同因完整比较仍在storage.rs:268、play.rs:501和sprites分支:429；pending Verify仍完整校验snapshot/blob，但前置Save已拒。独立current source1456/SDK681/479/29及修复consumer20+4/12case全报告/实际zero-controls验证通过，不能代替漏掉的后续公共状态。HEAD仍clean8809e54，无实现改动。F-005-R1-02原样例闭合而完整不变量开放，不能凭旧绿再次交审。连续两次final失败触发诊断checkpoint，下一cycle2须在提交前记录调用方清单与共享内容绑定设计及更新oracle，并实际验证；T-03/05/06重开，保留T-01/02/04与未受影响普通生命周期证据，3/10。
+
+2026-10-29 goal round 8：`stage: goal | plan_id: PLAN-005 | plan_revision: r3 | round: 8 | from: review | to: work | status: executing | outcome: needs_fix | worktree: D:/autostack/.wt/ui-005/auto-ui | commit: 8809e545830a2d0ed6f587517e6d4d8a29a575ca | next: work cycle2 diagnosis`。本轮独立验证确认F-01闭合，并发现同因后继Save/Play路径未闭合；取得可重放实际生命周期红与冷/同名正控，属有效进展；尚未合入，目标不缩减。
 ## 10. 待澄清事项
 
-R1两finding已在8809e54完成不变量修复及原独立反例/正控重放，永久用例与新consumer20+4全绿，当前6/10且无已知work缺口/待用户决策；下一任务T-07受影响独立复审（尚未获得pass）。具体闭合行见attachments/005/work/repair-r1.md。merge冻结门、知识沉淀、归档清理保持pending；003最终批回归仍交BLOG-004。Gallery/完整character动画不在本期承诺内。
+独立R2 needs_fix：F-005-R1-01已closed，F-005-R1-02原warm Open样例已过但Save/Play调用方仍比较显示名，完整不变量未闭合。T-03/T-05/T-06重开，3/10。下一轮work cycle2须先完成连续两次final失败的诊断：完整AssetRef内容比较调用方清单、为何旧用例漏掉后继状态、统一绑定规则及Open→Play/Stop→Save/SaveAs→重开oracle，验证调整后再交审。无须用户扩大支持域/决策。merge/知识沉淀/归档清理pending；003批回归仍交BLOG-004。
