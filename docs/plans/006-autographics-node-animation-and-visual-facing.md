@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-006
-status: executing
+status: execution_done
 feature_name: AutoGraphics无蒙皮节点动画与视觉朝向
 author: [Codex]
 created_at: 2026-10-29
 updated_at: 2026-10-30
 plan_revision: 2
-current_step: 5
+current_step: 6
 total_steps: 10
 depends_on: [auto-ui/PLAN-005]
 supersedes_spec_components:
@@ -45,7 +45,7 @@ GLB原始层级/clip轨道→有界声明/数值/资源准入→不可变model+a
 
 2026-10-29 执行授权：用户 `/goal 完成AG计划006` 授予本计划 work→独立review→有界repair→merge/规范/归档/guard清理全链授权，后续阶段继承；目标、范围、验收与预算保持r1。005现已实际交付，前置核验与原件实读见[执行基线](attachments/006/work/source-preflight.md)。
 
-2026-10-30 r2有界修订：F-006-W1-INPUT-BUDGET实测证明r1逐键读取设计无法承载原完整组合。按原§5.1路由，仅调整尚未发布新profile的输入读取设计；目标、AC阈值、32credits、CPU/源/内存、旧接口兼容、仓库及动作范围均保持，继承上述授权。事实、Spec指纹、消费规则与下一执行入口见[输入预算修订](attachments/006/work/input-budget-revision-r2.md)；新getter尚未实现，不将设计和式当成实测通过。
+2026-10-30 r2有界修订：F-006-W1-INPUT-BUDGET实测证明r1逐键读取设计无法承载原完整组合。按原§5.1路由，仅调整尚未发布新profile的输入读取设计；目标、AC阈值、32credits、CPU/源/内存、旧接口兼容、仓库及动作范围均保持，继承上述授权。事实、Spec指纹与消费规则见[输入预算修订](attachments/006/work/input-budget-revision-r2.md)。修订当时getter待实现，现已在04042f8实现，完整当前关闭及最终消费证据见§9，不以设计和式代替实测。
 
 2026-10-29规划背景（历史，当前执行进度见§8/9）：用户要求规划下一阶段；规划轮仅合同/设计/引用，无实施、agent、窗口/GPU/Cargo门或发布。来源和指纹见[基线](attachments/004/planning/baseline.md)，资源与阶段边界见[设计](../design/autographics/m2-presentation-and-resources.md)。当时005/004尚未交付，未填写未来SHA/接口价格；实际前置现已由T-01核验。
 
@@ -59,9 +59,9 @@ T-01只接受005已合master、独立review与冻结门完成的实际delivery�
 
 保持32credits、原callback/step/时间与CPU目标、受管源96KiB/总352KiB、用户256KiB；不因006叠加再次抬限。应有单次有限setter设置clip/phase/yaw，输入实体绑定静态3D叶或合法001实例完整Run/slot/generation；旧身份拒绝，销毁撤销，复用槽从模板初始视觉重新开始。Auto计算角色状态、选择idle/walk/jump并由fixed tick推进phase；Host只执行明确的格式/采样，不按角色速度/grounded替Auto选动作。T-02证明真实组合预算不足则带反例回new，不能省相机/触发/原clip或转专用Rust业务。
 
-r2固定公开profile为`autographics.node_animation3d/1`（version110/profile21/CLI `node-animation3d`），视觉wire/phase/yaw和原`ag_visual_pose(kind,entity,clip,phase,looping,yaw)`成本1保持。只在该未发布profile的`api/node_animation3d_v1.at`新增成本1的`ag_actions_snapshot() int`（待T-02实现）：读取既有6held+6尚未消费pressed，返回`held + 64*pressed`（0..4095）；bit0..5为左/右/前/后/跳/重启。成功读取消费本tick所有未读pressed、保留held；重复和旧getter混读不得重放边沿，旧getter价格/旧14profile装配字节不改。app_start无运行输入为0，Pause/neutral Step/fresh Run沿原输入路由/clear规则，无跨tick或跨Run缓存，也不增Host wire或Rust玩法。
+r2固定公开profile为`autographics.node_animation3d/1`（version110/profile21/CLI `node-animation3d`），视觉wire/phase/yaw和原`ag_visual_pose(kind,entity,clip,phase,looping,yaw)`成本1保持。只在该未发布profile的`api/node_animation3d_v1.at`新增成本1的`ag_actions_snapshot() int`（已由T-02实现/实测）：读取既有6held+6尚未消费pressed，返回`held + 64*pressed`（0..4095）；bit0..5为左/右/前/后/跳/重启。成功读取消费本tick所有未读pressed、保留held；重复和旧getter混读不得重放边沿，旧getter价格/旧14profile装配字节不改。app_start无运行输入为0，Pause/neutral Step/fresh Run沿原输入路由/clear规则，无跨tick或跨Run缓存，也不增Host wire或Rust玩法。
 
-修复目标是同一活动回调实测 `1 snapshot +26 move +1 grounded +1 event_next +1 pair +1 phase +1 visual =32`，四向/跳跃解码、相机相对运动、选择clip/phase/yaw均由Auto完成；必须有真实事件读取分支、真实输入敏感结果，并用额外1credit超额负控证明没有旁路。此为待执行的关闭条件，不是当前已通过结论。已有原逐键error10反例保留；完整S-06入口/消费组合/owner状态见修订附件。
+修复关闭条件是同一活动回调实测 `1 snapshot +26 move +1 grounded +1 event_next +1 pair +1 phase +1 visual =32`，四向/跳跃解码、相机相对运动、选择clip/phase/yaw均由Auto完成；必须有真实事件读取分支、真实输入敏感结果，并用额外1credit超额负控证明没有旁路。此条件已通过T-02及T-06当前冻结重放，原逐键error10反例保留；完整S-06/owner证据见r2关闭附件。
 
 ### 5.2 支持表与确定性
 
@@ -87,7 +87,7 @@ phase固定为Auto显式给出的有限非负f32 seconds，不能同时存在两
 
 ## 6. 测试设计
 
-当前已建立并执行driver `--test public_node_animation` / `--test node_animation_resources`及AGP `--test node_animation`，`--locked --offline -- --test-threads=1`，实际结果/受影响范围见§9和T-02/T-03附件。driver正式运行工作目录为包目录以启用原32MiB主栈/16MiB worker配置。`python experimental/autographics-auto-driver/tools/check_node_animation.py --controls`与`verify_plan006.py --controls`仍由T-06待建，不提前称通过。只受影响面与可复现约1/10旧样本，新AC正反例不省；无窗口真实GPU单实例、OS抢焦点/置顶自动化暂停、全AG里程碑pending、根零改不跑根档。
+当前已建立并执行新模块30case及3个继承定向case，`--locked --offline -- --test-threads=1`，实际结果/受影响范围见§9及t06-consumer-and-identity.md。正式运行工作目录为包目录以启用原32MiB主栈/16MiB worker配置。`check_node_animation.py --controls`与`verify_plan006.py --controls`均由T-06实测通过，绑定1477文件当前身份、实际runner/log/数值/栈；最终仓外消费A→B亦通过。仅受影响面与明确旧样本，新AC正反例不省；无窗口真实GPU单实例、OS抢焦点/置顶自动化暂停、全AG里程碑pending、根零改不跑根档。
 
 | V/补充case | AC/owner_stage/启用任务 | 输入→实际路径 | 区分性判据/关闭条件 | 覆盖边界 |
 |---|---|---|---|---|
@@ -108,7 +108,7 @@ phase固定为Auto显式给出的有限非负f32 seconds，不能同时存在两
 | AC-02 | work | V-02已通过：原四clip21状态/双实例、独立源顶点/GPU、STEP旋转实际GPU与错误插值负控，见t04-pixels-and-input-diagnosis.md及r2-input-pixels-and-lifecycle.md |
 | AC-03 | work | V-03已通过：四向真实位移/可见朝向、stop/±pi、240tick动画开关物理/支撑/触发相同、独立同pose阴影ROI0误差及两负控，见r2-input-pixels-and-lifecycle.md |
 | AC-04 | work | V-04已通过：完整last-good/坏输出/prepare失败、Pause/neutral Step/fresh、20轮Play/restart/Stop真实weak/暖mesh与texture上传0增量/最终pin释放，见r2-input-pixels-and-lifecycle.md |
-| AC-05 | work | T-02整组合预算可行、仓外完整消费/重开与兼容/current identity，V-05；非Rust玩法 |
+| AC-05 | work | 已通过：T-02完整32/33真实预算、T-06仓外完整消费/冷重开/真实Auto源变异、继承兼容、1477文件current identity/controls与CPU包络，见t06-consumer-and-identity.md；非Rust玩法 |
 | AC-06 | review | 独立核全部AC/V/SD、无未处置finding，冻结门pending |
 | AC-07 | merge | 新冻结提交定向门绿后合master，保留全AG里程碑pending |
 | AC-08 | merge | SD/ledger/索引、本仓归档/delivery收据、guard clean清树，无Gallery/完整M2完成宣称 |
@@ -122,7 +122,7 @@ phase固定为Auto显式给出的有限非负f32 seconds，不能同时存在两
 | T-03 | work | T-02通过 | 有界节点/clip准入与持久化/资源计账，V-01 | AC-01/04 | [x] 2739324；t03-admission-and-storage.md |
 | T-04 | work | T-02 r2恢复通过、T-03 | Auto公开视觉输出/Host采样/renderer色图与shadow，V-02/03；r2输入路径驱动朝向/物理 | AC-02/03 | [x] ccfe6d9+04042f8；原四clip/顶点/GPU+STEP/四向/±pi/240tick物理/同pose阴影ROI与负控 |
 | T-05 | work | T-04 | 事务/实例代次/新局/暂停单步/owner与20轮V-04 | AC-04 | [x] 04042f8；完整last-good/新槽初pose/Pause/Step/40VM与pose释放/暖mesh与texture0上传/预算账 |
-| T-06 | work | T-05 | fresh消费/预算/兼容/identity controls、fmt/warnings/提交、SD与下游接口 | AC-01..05 | [ ] |
+| T-06 | work | T-05 | fresh消费/预算/兼容/identity controls、fmt/warnings/提交、SD与下游接口 | AC-01..05 | [x] 475d376源码/3a6404e交接；t06-consumer-and-identity.md；30新+3继承、仓外2/2、1477身份与raw-byte控制、SD备好 |
 | T-07 | review | T-06 | 同树独立review全部V/S与遗漏，merge门pending | AC-06 | [ ] |
 | T-08 | merge | T-07 pass | 冻结提交定向门/有效复用，通过才合本仓master | AC-07 | [ ] |
 | T-09 | merge | T-08 | Spec/ledger/索引、本仓归档与真实delivery SHA/clip接口/消费包身份 | AC-08 | [ ] |
@@ -166,8 +166,12 @@ F-006-W1-INPUT-BUDGET：补入真实4向held+跳跃pressed后，即使不读even
 
 2026-10-30 goal round 7：`stage: goal | plan_id: PLAN-006 | plan_revision: r2 | round: 7 | from: work | to: work | status: executing | outcome: pass (T-02,T-04,T-05 complete; work incomplete) | worktree: D:/autostack/.wt/ui-006/auto-ui | commit: 04042f827a1efd68b3e9d2188b97b2fa8f4e2100 | next: work T-06`。本轮有界输入修复与当前关闭反例、可见朝向/阴影、物理/所有权均取得实际新证据，非等待/无进展。AC-05的仓外fresh consumer/current identity及完整性能/SD尚待，不转交复审裁定未完成工作。
 
+2026-10-30 work T-06完成/ready-for-review：`stage: work | plan_id: auto-ui/PLAN-006 | plan_revision: 2 | outcome: pass | worktree_path: D:/autostack/.wt/ui-006/auto-ui | branch: codex/plan-006-dev | base_commit: 80d9bbe3095892fcf5507dd1b9e26af523111fd4 | code_commit: 475d376978c6af5acc87a73b277fc68c018c21be | handoff_commit: 3a6404ef24468cad081ec3332acdef83230b04e7 | dependency_revisions: SDK7b987ca8/两锁/005delivery351919c76b/004fix0261ae9未变 | task_ids: T-06 (T-01..05 current replay) | evidence: attachments/006/work/t06-consumer-and-identity.md | blockers: none | next_responsible_role: independent final review T-07`。源身份50a87a3c973b93f4a961fc00b81b39788cbd785f3775fba01811f6edc192a5da，1477完整文件均Gittracked，SDK681原字节/17本地包/29路径边、479 metadata packages、禁用UI/Man/旧生产包0。公开bound scene保留87624B原character四clip+PNG、内容寻址Auto；真实用户速度4→1变异改轨迹，60tick公开入口/保存A搬迁B/新Registry冷重开/初pose通过。最终仅用t06-closed-*：新30case+旧14profile/真实sprite/纹理项目3定向case=33通过，无新模块过滤/忽略；identity变异/删除/集合/pins/escape/PID与真实Auto blob LF→CRLF负控拒；gate stale/partial/runner/zero/pixel/warm/CPU/resource负控与实际零选执行均拒。producer/Git blob/最终仓外B身份文件逐字节相同；SDK/raw行为blob按原字节，身份LF稳定，历史001..005收据不改。仓外源码A→B重新prepare SDK、verify/source与公开项目check后locked/offline重新编译51.28s/执行10.79s，consumer2/2，实际exe manifest_dir在B，PE33554432；用户60tick6370steps/7slices、managed80021B、暖上传0。regular3/wide120(+8slots)/deep64分别7025/91382/68304steps；producer中位4106/42772/26949us，max4559/46616/36868us；deep120按原100000步guard拒且last-good保持，不把debug宽布局称60FPS。CPU含pose1131471B，GPU1101700B；原额度/源/CPU不变。B运行后producer冻结报告validate仍通过，两包fmt/差异check通过；SDK146旧warning保留、无新交付warning。SD-01..03与下游profile/签名/wire/限制/样例入口已备在research/node-animation-spec-delta.md，canonical/ledger未发布。最终log/manifest/portability-audit路径及8个SHA256见附件；早期identity换行与blob检查问题已实际修复并重新冻结/全新消费，不重标旧报告。AC-01..05 work-owned当前通过，开放finding/覆盖缺口/合同决策为空；实施已提交clean。T-07独立逐AC/V/S/SD审查、T-08新冻结merge门/有效复用、T-09规范ledger、T-10归档/guard清树仍pending，执行的work声明门不能代替review verdict。主检出其它计划011/012/013及README/.next-id文档WIP保留，无本期根UI或SDK代码改动。
+
+2026-10-30 goal round 8：`stage: goal | plan_id: PLAN-006 | plan_revision: r2 | round: 8 | from: work | to: review | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-006/auto-ui | commit: 3a6404ef24468cad081ec3332acdef83230b04e7 | next: independent final review T-07`。前轮为有效实施进展，本轮补齐完整消费/身份/原CPU包络/SD并关闭实际字节稳定性问题；6/10，无用户待答。保持原全链授权及范围，不提前合入或声称目标已达成。
+
 ## 10. 待澄清事项
 
-当前无用户待答问题。F-006-W1-INPUT-BUDGET已由04042f8及S-06真实预算正反例关闭；T-01..05完成，下一责任work在同树完成T-06 fresh SDK消费A→B保存/离线搬迁重开、current identity/源变异、完整性能/兼容及SD，再进入独立review/merge，不提前算完成或调整原额度。
+当前无用户待答问题。T-01..06 work完成，唯一树已提交clean，下一责任独立上下文final review在3a6404e上按r2全部AC/V/S/SD核验；当前work-owned开放finding/覆盖缺口为空。F-006-W1-INPUT-BUDGET及字节稳定性问题已用实测关闭。T-07..10复审/merge冻结门/规范ledger/归档/guard清理仍pending，目标保持active，不提前宣称完成。
 
 原规划的005交付身份与原clip实读风险已关闭；如后续发现必需clip需本期外插值或无法在既有预算内组合，仍带原件与反例回new，显式提出合同/预算变化，不能丢动作或换成Bob动画。声音/HUD、G09/G10内容、完整两关与最终发行另立后继合同，跨端不插入桌面M2前置。
