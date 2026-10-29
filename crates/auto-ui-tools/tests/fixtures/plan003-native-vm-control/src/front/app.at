@@ -1,0 +1,27 @@
+use acceptance_store: AcceptanceStore
+
+widget App {
+    msg { Init, InputChanged(str), Submit }
+
+    view {
+        col {
+            text "Native VM Acceptance Control" { style: "text-xl font-semibold" }
+            textarea {
+                value: .store.input
+                oninput: .InputChanged($event)
+                placeholder: "Enter multiline text"
+                style: "w-full min-h-[160px] border border-border rounded p-3"
+            }
+            button "Save through API" {
+                onclick: .Submit
+                style: "px-4 py-2 rounded bg-primary text-primary-foreground"
+            }
+        }
+    }
+
+    on {
+        .Init -> { store.Init() }
+        .InputChanged(value str) -> { store.SetInput(value) }
+        .Submit -> { store.Submit() }
+    }
+}

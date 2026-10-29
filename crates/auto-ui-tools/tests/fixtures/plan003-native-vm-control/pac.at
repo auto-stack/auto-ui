@@ -1,0 +1,8 @@
+name: "ui003-native-control"
+version: "1.0.0"
+scene: "ui"
+render: "vue"
+title: "Native Acceptance Control"
+title_zh: "原生交互验收"
+api: "rust"
+desktop: "true"

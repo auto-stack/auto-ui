@@ -1,0 +1,21 @@
+use back.api: list_todos, create_todo
+
+store AcceptanceStore {
+    model {
+        var todos []Todo = []
+        var input str = ""
+    }
+
+    msg { Init, SetInput(str), Submit }
+
+    on {
+        .Init -> { .todos = list_todos() }
+        .SetInput(value str) -> { .input = value }
+        .Submit -> {
+            if .input != "" {
+                create_todo(.input)
+                .todos = list_todos()
+            }
+        }
+    }
+}
