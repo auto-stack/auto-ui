@@ -10,7 +10,7 @@
 | 002 | [触发与新局（引擎）](archived/002-autographics-trigger-events-and-round-restart.md) | auto-lang/PLAN-883引擎部分 | archived r5；交付 0ee5ad0，SD/ledger 同步（auto-lang v130） |
 | 003 | [Blog原生VM运行与可交互验收前置](archived/003-blog-native-vm-run-and-acceptance.md) | BLOG-004消费前置，非AG工作 | archived/r2; AutoUI prerequisite delivered a2ea08c; BLOG-004 owns full Blog acceptance |
 | 004 | [公共图片与2D精灵帧](archived/004-autographics-public-images-and-sprite-frames.md) | AG M2表现 | archived；交付 e0fce13（reviewed 0e6e361），SD/ledger 沉淀 auto-lang v134 |
-| 005 | [3D纹理与UV](005-autographics-textured-models-and-uv.md) | AG M2表现 | drafting/r1；硬等004实际交付 |
+| 005 | [3D纹理与UV](archived/005-autographics-textured-models-and-uv.md) | AG M2表现 | archived r3；交付351919c，独立R3通过，SD/ledger v141已同步 |
 | 006 | [节点动画与视觉朝向](006-autographics-node-animation-and-visual-facing.md) | AG M2表现 | drafting/r1；硬等005实际交付 |
 | 011 | [2D完整玩法整链预算验证](011-autographics-g2-full-loop-budget-feasibility.md) | AG独立研究 | drafting/r1；固定004＋008，可与005/006并行；不实施引擎或正式游戏 |
 

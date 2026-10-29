@@ -1,13 +1,14 @@
 ---
 plan_id: PLAN-005
-status: reviewed
+status: archived
 feature_name: AutoGraphics有限纹理模型与UV资源闭包
 author: [Codex]
 created_at: 2026-10-29
 updated_at: 2026-10-29
 plan_revision: 3
-current_step: 7
+current_step: 9
 total_steps: 10
+completion_kind: delivered
 depends_on: [auto-ui/PLAN-004]
 supersedes_spec_components:
   - docs/specs/auto-graphics/scene-assets.md
@@ -42,9 +43,9 @@ touched_goals: [GOAL-008]
 
 ## 4. 需求分析与背景调查
 
-初始r1仅规划；2026-10-29用户在本会话授权完成UI-005全链，继承work/review/有界修复/merge/知识沉淀与清理授权。004实际交付e0fce138及身份修复0261ae9均已落地，当前实施base为2b88bd69；唯一树D:/autostack/.wt/ui-005/auto-ui，分支codex/plan-005-dev。用户另明确同意将有限材质域扩展至opaque双面，保留固定源原件，加入背面光照/阴影验证；其余范围/预算不变。原规划素材/知识指纹见[基线](attachments/004/planning/baseline.md)；总设计见[表现与资源](../design/autographics/m2-presentation-and-resources.md)。独立review在实现冻结后同树顺序执行，不并行写实现。
+初始r1仅规划；2026-10-29用户在本会话授权完成UI-005全链，继承work/review/有界修复/merge/知识沉淀与清理授权。004实际交付e0fce138及身份修复0261ae9均已落地，当前实施base为2b88bd69；唯一树D:/autostack/.wt/ui-005/auto-ui，分支codex/plan-005-dev。用户另明确同意将有限材质域扩展至opaque双面，保留固定源原件，加入背面光照/阴影验证；其余范围/预算不变。原规划素材/知识指纹见[基线](../attachments/004/planning/baseline.md)；总设计见[表现与资源](../../design/autographics/m2-presentation-and-resources.md)。独立review在实现冻结后同树顺序执行，不并行写实现。
 
-现有权威：[静态GLB规则](../../../auto-lang/docs/specs/auto-graphics/scene-assets.md)、[M2素材研究](../../../auto-lang/docs/specs/auto-graphics/m2-game-sample-research.md)、[游戏资源分母](../../../auto-lang/docs/design/autographics/m2-game-sample-matrix.md)。原始静态profile拒images/textures/URI/animation。研究记录四GLB引用Textures/colormap.png并声明KHR_texture_transform，角色有static/idle/walk/jump且无skin；这些是历史研究结论，本轮未重新读取原件。旧文档所引858原始JSON在当前master及保留autographics-dev路径未找到；同号语言master的858附件是另一条ACE路线，禁止拿它替代。T-01须恢复固定来源字节并重建逐文件身份，不凭历史总字节数通过素材准入。
+现有权威：[静态GLB规则](../../../../auto-lang/docs/specs/auto-graphics/scene-assets.md)、[M2素材研究](../../../../auto-lang/docs/specs/auto-graphics/m2-game-sample-research.md)、[游戏资源分母](../../../../auto-lang/docs/design/autographics/m2-game-sample-matrix.md)。原始静态profile拒images/textures/URI/animation。研究记录四GLB引用Textures/colormap.png并声明KHR_texture_transform，角色有static/idle/walk/jump且无skin；这些是历史研究结论，本轮未重新读取原件。旧文档所引858原始JSON在当前master及保留autographics-dev路径未找到；同号语言master的858附件是另一条ACE路线，禁止拿它替代。T-01须恢复固定来源字节并重建逐文件身份，不凭历史总字节数通过素材准入。
 
 ## 5. 详细设计
 
@@ -117,8 +118,8 @@ T-03..06建立新入口：`cargo test --manifest-path experimental/autographics-
 | T-05 | work | T-04 | 候选故障/预算/20轮/owner/共享/静态暖上传V-04 | AC-04 | [x] 7437879补闭warm alias完整实际Host Play非Fault/Stop/Save流程，legacy GLB与PNG sprites同因路径亦实测；新consumer完整21+4含20轮事务/owner通过，既有普通状态证据仍有效；见repair-r2.md |
 | T-06 | work | T-05 | fresh consumer/兼容/identity controls、fmt/warnings/提交、SD与006交付说明 | AC-01..05 | [x] 7437879：identity1456/134b4f73…重新冻结/负控；新consumer-repair-r2冷SDK/独立target/21+4/12报告及全负控通过，sprite实际Auto2/旧profiles字节1抽样及fmt通过；诊断与closure见repair-r2.md |
 | T-07 | review | T-06 | 同树独立review并绑定实际revision；merge门pending | AC-06 | [x] 独立R3 pass绑定r3/7437879；两finding完整闭合，诊断调整/全部六处绑定及真实后续状态验证通过，AC-01..06/V-01..05/SD均pass；见review-r3.md，冻结producer/merge门pending |
-| T-08 | merge | T-07 pass | 冻结提交定向门/有效复用，通过才合master | AC-07 | [ ] |
-| T-09 | merge | T-08 | Specs/ledger/索引与本地归档、delivery SHA/闭包/节点表示接口 | AC-08 | [ ] |
+| T-08 | merge | T-07 pass | 冻结提交定向门/有效复用，通过才合master | AC-07 | [x] 冻结producer21+4/12报告及负控、source/fmt通过；补丁全等rebase后ff-only交付351919c |
+| T-09 | merge | T-08 | Specs/ledger/索引与本地归档、delivery SHA/闭包/节点表示接口 | AC-08 | [x] SD01/02/索引与ledger v141在知识仓16555e450，代码交付351919c；本Plan实际归档，docs提交与清理验证见后续收据 |
 | T-10 | merge | T-09 | wt-guard clean后清唯一树/分支/空组，保必要恢复收据 | AC-08 | [ ] |
 
 ## 9. 复审记录
@@ -170,6 +171,12 @@ R2独立重放：21准入反例/5正控通过，原different-name warm Open通�
 R3独立检查完整8文件修复diff与两失败诊断：全部六处同一same_content保留全绑定仅忽略name，Eq/文档名/字节hash/磁盘/entry/Verify完整性保持。重编译原R2完整流程反例全12操作Ok；21准入/5正控、cached三项定向（纹理Host全流程/pending损坏恢复、legacy GLB、真实非Fault PNG sprites、坏length/错边拒绝）通过；current source1456/SDK681/479/29、consumer21+4/12报告全controls重新验证通过；canonical四源hash与SD不变，冻结HEAD clean7437879。R1/R2未变GPU/owner等证据明确复用，改变的后续Save/Play状态全部新鲜验证，无未关闭finding或未检查受影响风险。独立review没有发布规范/ledger或合入，T-07完成7/10，merge自有门仍pending。
 
 2026-10-29 goal round 10：`stage: goal | plan_id: PLAN-005 | plan_revision: r3 | round: 10 | from: review | to: merge | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-005/auto-ui | commit: 74378791b353cd285168fa43fb7fe4b27cd208fe | next: merge`。本轮独立确认完整不变量与诊断调整闭合，取得绑定当前修订的final pass；7/10，按既有全链授权进入merge，003最终批回归不接管。
+2026-10-29 merge PLAN-005:r3（prepared/landed/ledger verified）：独立final pass绑定74378791b353cd285168fa43fb7fe4b27cd208fe，SD草案hash14b5aa1…；7个提交rebase到主分支7ea5e59全部range-diff为=，实验子树逐字节相同，7437879→351919c76b4ef1d940fc7b8120254e321c41cba2。冻结producer check_textured_models --controls为21driver+4AGP/12case全绿，source1456/SDK681/479packages/29edges/负控与两包fmt均过，manifest SHA256d2fb3c8dba88f782030997613e7e6ef4d69ccb677ed8829f1f07e699dd61fbf5（本地merge-gate）；旧profile/sprite兼容与未变SDK/锁/源输入证据按R3明确复用。主分支ff-only落地tip等于351919c，无merge commit；原路径identity与公开工程check通过，原有main docs WIP集合前后相同。
+
+知识仓同组树auto-lang@codex/ui-005-specs从3b87715f6准备：b52d0ad2a精确发布SD01新增textured-model-resources.md、SD02追加scene-assets.md及overview/plans回写；spec-index.py生成62项目索引无语义diff（既有14未分组warning未改）。16555e450783bde1f9ad81ce494dc0e3c0e92988发布派生ledger v140→141：designs新增P005-TEXTURES/更新P838-ASSETS、tests P005-T、reviews P005-R3、reports P005-M，全部file/tags/完整schema；其它条目原字节与未知字段保持。Regime B guarded offline projection，无store writer可达：本会话无spec工具，监听进程无store，19999 /api/specs仅返回200 {}而非ledger；投影前字节备份ledger-backup-v140.json hash718255cc…，脚本project_ledger.py逐项/六节/唯一ID/readback守卫通过，tracked变更在工作树提交后ff-only合入main，主检出既有WIP集合不变。最终ledger hash a9613215faca0afeaefd288486a5ca0d204938b737dab21f9d9222a36b9dea9c；canonical新Spec hash72ac476e…、scene-assets hash5ab7578e…。知识仓仅docs/ledger，无Rust改动，按AGENTS纯文档档不跑cargo/docs_gen。
+
+本文件已实际移至archived/并修正相对链接，索引仅提交005行；其它会话README WIP不纳入本次提交。归档docs提交/读回和T10 guard清理尚待随后验证，本记录不提前宣称cleaned。
+
 ## 10. 待澄清事项
 
-独立R3已pass，绑定r3/7437879，T-01..07完成7/10，两finding完整闭合且无未决用户决策/已知缺口。下一阶段merge负责冻结producer定向门、实际交付、SD/ledger/索引、归档与guard清理，完成前不声称delivered；003批回归仍交BLOG-004，全AG里程碑仍按原合同pending。
+T01..09已交付，9/10；归档docs读回与T10安全清理待验证，完成前不声称cleaned。无未决实现/review问题；003最终批回归仍由BLOG-004负责，全AG里程碑保持原合同pending。
