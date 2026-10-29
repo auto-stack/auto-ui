@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-005
-status: executing
+status: execution_done
 feature_name: AutoGraphics有限纹理模型与UV资源闭包
 author: [Codex]
 created_at: 2026-10-29
 updated_at: 2026-10-29
 plan_revision: 3
-current_step: 5
+current_step: 6
 total_steps: 10
 depends_on: [auto-ui/PLAN-004]
 supersedes_spec_components:
@@ -115,7 +115,7 @@ T-03..06建立新入口：`cargo test --manifest-path experimental/autographics-
 | T-03 | work | T-02通过 | 无任意IO的GLB/PNG闭包准入、持久化/编辑绑定、V-01/02 | AC-01/02 | [x] e158660：union先检/共享实际Arc/嵌入与外图/旧schema拒绝/错边缓存与保存故障恢复；12个新测试已有11+1执行证据，旧模型2/17抽样及PNG闭包2项定向通过；见attachments/005/work/admission-and-storage.md |
 | T-04 | work | T-03 | UV/材质/纹理shader与cache接线、V-03深度和变异 | AC-03 | [x] 6d67642：36采样组合/144实际GPU探针最大误差1；GLB变换4探针误差0/AABB与节点关联保持；深度/背面/阴影及真实负控通过，修复缩小时mag过滤误选；见pixels-and-lifetimes.md |
 | T-05 | work | T-04 | 候选故障/预算/20轮/owner/共享/静态暖上传V-04 | AC-04 | [x] 621d2b9：driver3+AGP1通过，20轮真实Auto+相机/对象/Stop，warm上传/解码0、20VM释放、CPU1075810/GPU1080904与实际GPU相符；候选整帧/像素及实际Weak最后pin验证，修复关闭悬空实例和新key设备代次接缝；见pixels-and-lifetimes.md |
-| T-06 | work | T-05 | fresh consumer/兼容/identity controls、fmt/warnings/提交、SD与006交付说明 | AC-01..05 | [ ] |
+| T-06 | work | T-05 | fresh consumer/兼容/identity controls、fmt/warnings/提交、SD与006交付说明 | AC-01..05 | [x] 9d680f9：1456项完整身份/实际负控；fresh snapshot-only A搬B冷SDK/独立target离线18+4及12报告case全通过；公开bound工程保存搬迁重开、旧profile/PNG/GLB/AGP兼容、两包fmt通过；见consumer-and-handoff.md |
 | T-07 | review | T-06 | 同树独立review并绑定实际revision；merge门pending | AC-06 | [ ] |
 | T-08 | merge | T-07 pass | 冻结提交定向门/有效复用，通过才合master | AC-07 | [ ] |
 | T-09 | merge | T-08 | Specs/ledger/索引与本地归档、delivery SHA/闭包/节点表示接口 | AC-08 | [ ] |
@@ -145,6 +145,9 @@ T-03..06建立新入口：`cargo test --manifest-path experimental/autographics-
 
 2026-10-29 goal round 4：`stage: goal | plan_id: PLAN-005 | plan_revision: r3 | round: 4 | from: work | to: work | status: executing | outcome: pass (T-04,T-05; work incomplete) | worktree: D:/autostack/.wt/ui-005/auto-ui | commit: 621d2b98494631c79171cb9034599dc2194fb23e | next: work T-06`。本轮完成两个工作任务及真实像素/资源释放证据；未启动独立review，当前无用户决策或外部阻塞。
 
+2026-10-29 work T-06（r3，工作完成）：`stage: work | plan_id: auto-ui/PLAN-005 | plan_revision: 3 | outcome: pass | worktree_path: D:/autostack/.wt/ui-005/auto-ui | branch: codex/plan-005-dev | base_commit: 2b88bd69b2a48172bf761615cc4e78a1df563b62 | code_commit: 9d680f9574275d13a0f776ee321534f5a9d4c465 | dependency_revisions: 004 e0fce138/fix0261ae9、SDK7b987ca8/681files、两锁未变 | task_ids: T-06 (AC-01..05 complete) | evidence: attachments/005/work/consumer-and-handoff.md | blockers: none | next_responsible_role: independent final review T-07`。fresh consumer-B-final的完整当前source identity=6d0fc6d6…，snapshot冷准备、479依赖闭包、18+4/12case、全部源码/报告负控均通过；manifest SHA256 ff76986eb9615d0c4120ee2ee9c2dc60f974f86f872e6925bee9df6192d95ef1。兼容producer旧profile1/GLB1/AGP1及consumer旧profile1/PNG2通过，两包fmt干净。公开scene6绑定Auto并实际保存搬迁重开；SD草案已提交，canonical尚未发布。producer旧gate仅作未变runtime支持证据，final current checker完整证明来自fresh B；merge仍须冻结定向门。实施树clean，冻结后暂停实现写入；无已知work缺口。001/002进度字段与003延期不在本次修改范围。
+
+2026-10-29 goal round 5：`stage: goal | plan_id: PLAN-005 | plan_revision: r3 | round: 5 | from: work | to: review | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-005/auto-ui | commit: 9d680f9574275d13a0f776ee321534f5a9d4c465 | next: review`。上一轮状态查询为只读核验，本轮取得兼容补证并完成T-06权威交接；6/10，完整目标未缩减，003最终批回归按用户要求仍留BLOG-004会话。
 ## 10. 待澄清事项
 
-T-01..T-05已完成，当前无待用户决策；下一任务T-06 fresh consumer、当前源码identity/checker负控、公开工程/交付说明与SD草案。独立review/merge/知识沉淀/归档清理尚未开始。超出支持域/已有预算不得静默接受。Gallery内容/完整character动画由后继独立Plan负责，未在此承诺已可用。
+T-01..T-06已完成，当前无待用户决策、已知未决finding或work覆盖缺口；下一任务T-07同树独立上下文review。merge冻结门、知识沉淀、归档清理保持pending。超出支持域/已有预算不得静默接受。Gallery内容/完整character动画由后继独立Plan负责，未在此承诺已可用。
