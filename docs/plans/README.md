@@ -6,11 +6,14 @@
 
 | 本仓号 | 计划 | 旧仓来源 | 状态 |
 |---|---|---|---|
-| 001 | [运行对象生命周期](archived/001-autographics-runtime-object-lifecycle.md) | auto-lang/PLAN-882 | r4仅修G11归属引用；执行进度以本Plan/owner记录为准 |
+| 001 | [运行对象生命周期](archived/001-autographics-runtime-object-lifecycle.md) | auto-lang/PLAN-882 | archived r4；代码交付537122b，独立收据见归档 |
 | 002 | [触发与新局（引擎）](archived/002-autographics-trigger-events-and-round-restart.md) | auto-lang/PLAN-883引擎部分 | archived r5；交付 0ee5ad0，SD/ledger 同步（auto-lang v130） |
 | 003 | [Blog原生VM运行与可交互验收前置](003-blog-native-vm-run-and-acceptance.md) | BLOG-004消费前置，非AG工作 | drafting/r1；独立调查/驱动，不等本仓002 |
+| 004 | [公共图片与2D精灵帧](004-autographics-public-images-and-sprite-frames.md) | AG M2表现 | drafting/r1；002实际前置已满足，未启动 |
+| 005 | [3D纹理与UV](005-autographics-textured-models-and-uv.md) | AG M2表现 | drafting/r1；硬等004实际交付 |
+| 006 | [节点动画与视觉朝向](006-autographics-node-animation-and-visual-facing.md) | AG M2表现 | drafting/r1；硬等005实际交付 |
 
-下一份新计划为004，之后005…；不能因导入历史号882/883而跳过本地001/002。
+下一份本地新计划为007，以独占取号时`.next-id`与本地活动/归档最大号重核；不能因外仓号882/883跳号。003是Blog路线，004..006是AG表现阶段，均未实施。设计与并行/后继入口见[本仓设计](../design/autographics/m2-presentation-and-resources.md)。
 
 ## 债务/候选
 
@@ -18,7 +21,7 @@
 
 ## 管理规则
 
-- 本仓主检出`docs/plans/`持唯一活动合同、进度、复审和归档；归档目录为`archive/`。
+- 本仓主检出`docs/plans/`持唯一活动合同、进度、复审和归档；归档目录以已交付001/002的实际约定为`archived/`（取号兼扫历史`archive/`，避免遗漏）。
 - 取号只扫描本仓活动/归档的本地Plan；外仓历史来源、附件、重定向不计高水位。独占核`.next-id`和本地最大号后创建，禁止覆盖。
 - 跨仓计划由主责任仓持一份合同，参与仓只留定位指引；旧auto-lang编号保留为来源，不再作为本地编号。
 - 四阶段new/work/独立review/merge沿用；源码修改和构建在合同指定唯一worktree，Plan簿记在本仓主检出；禁止worktree链接，清理先guard。
