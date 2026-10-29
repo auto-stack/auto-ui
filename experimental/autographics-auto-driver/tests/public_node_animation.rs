@@ -428,6 +428,97 @@ fn full_input_movement_trigger_and_visual_combination_exposes_scalar_read_budget
 }
 
 #[test]
+fn packed_actions_encode_all_six_bits_and_share_pressed_consumption_with_legacy_getters() {
+    let mut s=session(&format!("{START}var packet=0\nvar repeated=0\nvar legacy=0\nvar oldjump=0\nvar premix=0\nfn setmix(v int){{premix=v}}\nfn getpacket() int{{return packet}}\nfn getrepeat() int{{return repeated}}\nfn getlegacy() int{{return legacy}}\nfn getoldjump() int{{return oldjump}}\nfn app_update(dt float){{if premix==1 {{oldjump=ag_action_pressed(4)}};packet=ag_actions_snapshot();repeated=ag_actions_snapshot();legacy=0;for i in 0..6 {{legacy=legacy+ag_action_pressed(i)}}}}\n"));
+    for (i, (held, pressed)) in [
+        (0, 0),
+        (1, 1),
+        (2, 2),
+        (4, 4),
+        (8, 8),
+        (16, 16),
+        (32, 32),
+        (63, 63),
+        (21, 42),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        s.call(
+            "_ag_char3_input",
+            &[Int(held), Int(pressed)],
+            ResultKind::Unit,
+        )
+        .unwrap();
+        s.call(
+            "_ag_tick",
+            &[Int(i as i32 + 1), Float(1. / 60.)],
+            ResultKind::Unit,
+        )
+        .unwrap();
+        assert_eq!(s.int("_ag_status", &[]).unwrap(), 0);
+        assert_eq!(s.int("getpacket", &[]).unwrap(), held + 64 * pressed);
+        assert_eq!(s.int("getrepeat", &[]).unwrap(), held);
+        assert_eq!(s.int("getlegacy", &[]).unwrap(), 0);
+    }
+    s.call("setmix", &[Int(1)], ResultKind::Unit).unwrap();
+    s.call("_ag_char3_input", &[Int(18), Int(18)], ResultKind::Unit)
+        .unwrap();
+    s.call("_ag_tick", &[Int(10), Float(1. / 60.)], ResultKind::Unit)
+        .unwrap();
+    assert_eq!(s.int("getoldjump", &[]).unwrap(), 1);
+    assert_eq!(s.int("getpacket", &[]).unwrap(), 18 + 64 * 2);
+    assert_eq!(s.int("getrepeat", &[]).unwrap(), 18);
+    assert_eq!(s.int("getlegacy", &[]).unwrap(), 0);
+}
+
+#[test]
+fn packed_input_full_movement_camera_event_fields_and_visual_use_exactly_thirty_two_credits() {
+    let update="let packet=ag_actions_snapshot();let held=packet%64;let pressed=packet/64;let left=held%2;let right=(held/2)%2;let forward=(held/4)%2;let back=(held/8)%2;let jump=(pressed/16)%2;let fx=ag_cam3_forward_x();let fz=ag_cam3_forward_z();let rx=ag_cam3_right_x();let rz=ag_cam3_right_z();let q=ag_char3_move(((right - left)*1.0*rx+(forward - back)*1.0*fx)*dt,jump*dt,((right - left)*1.0*rz+(forward - back)*1.0*fz)*dt,0.002);let grounded=ag_char3_grounded(q);let e=ag_event_next();let pair=ag_event_pair();let ep=ag_event_phase();ok=pair+ep+e;clip=1;if held%16!=0 {clip=2};if jump==1 {clip=3};phase=phase+dt;ok=ag_visual_pose(0,1,clip,phase,1,0.5);";
+    for extra in [false, true] {
+        let mut s = session(&format!(
+            "{}fn getevent() int{{return ok}}\nfn app_update(dt float){{{update}{}}}\n",
+            START
+                .replace(
+                    "ok=ag_char3_bind(1)",
+                    "ag_set_local(1,0,10.0);ag_set_local(2,0,20.0);ok=ag_char3_bind(1)"
+                )
+                .replace(
+                    "0.0,0.0,0.0);ok=ag_trigger_bind",
+                    "20.0,0.0,0.0);ok=ag_trigger_bind"
+                ),
+            if extra {
+                "let over=ag_actions_snapshot();"
+            } else {
+                ""
+            }
+        ));
+        for tick in 1..=2 {
+            s.call(
+                "_ag_char3_input",
+                &[Int(2), Int(if tick == 2 { 16 } else { 0 })],
+                ResultKind::Unit,
+            )
+            .unwrap();
+            s.call("_ag_tick", &[Int(tick), Float(1. / 60.)], ResultKind::Unit)
+                .unwrap();
+            assert_eq!(
+                s.int("_ag_status", &[]).unwrap(),
+                if extra { 10 } else { 0 }
+            );
+            if extra {
+                break;
+            }
+            assert_eq!(
+                s.int("_ag_vis_pi", &[Int(0), Int(2)]).unwrap(),
+                if tick == 2 { 3 } else { 2 }
+            );
+        }
+    }
+    println!("S06 full input+move26+grounded+event_next/pair/phase+visual=32 fault0; additional snapshot causes error10");
+}
+
+#[test]
 fn public_setter_rejects_stale_instance_and_invalid_clip_or_phase() {
     for expression in [
         "ag_visual_pose(0,1,4,0.0,1,0.0)",
@@ -451,4 +542,17 @@ fn public_setter_rejects_stale_instance_and_invalid_clip_or_phase() {
         .unwrap();
     assert_eq!(s.int("_ag_status", &[]).unwrap(), 0);
     assert_eq!(s.int("_ag_vis_qi", &[Int(0), Int(2)]).unwrap(), 2);
+}
+
+#[test]
+fn reused_slot_restores_template_initial_visual_instead_of_previous_generation() {
+    let start = START.replace("ok=ag_trigger_bind(0,1,1,obj,0,0.0)",
+        "ok=ag_visual_pose(1,obj,3,0.4,1,1.2);ok=ag_object_despawn(obj);obj=ag_object_spawn(0,3,2.0,0.0,0.0);ok=ag_trigger_bind(0,1,1,obj,0,0.0)");
+    let mut s = session(&format!("{start}fn app_update(dt float){{}}\n"));
+    assert_eq!(s.int("_ag_vis_qi", &[Int(0), Int(0)]).unwrap(), 2);
+    assert_eq!(s.int("_ag_vis_qi", &[Int(0), Int(2)]).unwrap(), -1);
+    assert_eq!(s.int("_ag_vis_qi", &[Int(0), Int(3)]).unwrap(), 0);
+    for field in 0..2 {
+        assert_eq!(s.float("_ag_vis_qf", &[Int(0), Int(field)]).unwrap(), 0.);
+    }
 }

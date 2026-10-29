@@ -680,6 +680,12 @@ impl Play {
     pub fn spatial_owner_probe(&self) -> Option<std::sync::Weak<super::spatial::Descriptor>> {
         self.spatial.as_ref().map(std::sync::Arc::downgrade)
     }
+    /// The same conservative CPU pose reservation used by Run admission.
+    pub fn animation_reserved_bytes(&self) -> usize {
+        self.animation_targets.as_ref().map_or(0, |targets| {
+            super::runtime_node_animation::pose_reservation(targets)
+        })
+    }
     pub fn spatial_scans(&self) -> usize {
         self.spatial.as_ref().map_or(0, |d| d.local_scans)
     }

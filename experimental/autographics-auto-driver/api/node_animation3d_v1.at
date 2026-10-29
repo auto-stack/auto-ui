@@ -1,4 +1,4 @@
-// autographics.node_animation3d/1; visual-only state on triggers3d.
+// autographics.node_animation3d/1; visual state and finite input on triggers3d.
 // One setter atomically chooses clip ordinal (-1=base), seconds, looping and
 // yaw radians. kind 0 uses a stable document id; kind 1 uses a full object token.
 // One shared callback credit. No Host gameplay or render-time phase advance.
@@ -17,6 +17,18 @@ var _ag_vis_sl=[]
 var _ag_vis_sy=[]
 var _ag_vis_sg=[]
 var _ag_vis_ops=0
+// One charged read of the existing dispatch snapshot. Pressed shares the
+// exact consume-once state with ag_action_pressed; held remains readable.
+fn ag_actions_snapshot() int {
+ if _ag_cast_charge(1)==0 {return 0}
+ let _ag_as_h=_ag_char3_hl+_ag_char3_hr*2+_ag_char3_hf*4+_ag_char3_hb*8+_ag_char3_hj*16+_ag_char3_hn*32
+ var _ag_as_p=0
+ if _ag_tick_id()==_ag_char3_ptick {
+  _ag_as_p=_ag_char3_pl+_ag_char3_pr*2+_ag_char3_pf*4+_ag_char3_pb*8+_ag_char3_pj*16+_ag_char3_pn*32
+  _ag_char3_pl=0;_ag_char3_pr=0;_ag_char3_pf=0;_ag_char3_pb=0;_ag_char3_pj=0;_ag_char3_pn=0
+ }
+ return _ag_as_h+64*_ag_as_p
+}
 fn _ag_vis_map(id int, node int, asset int, clips int) {
  if _ag_vis_frozen==1 {_ag_fail(11,node,0);return}
  if _ag_vis_ids.len()>=128 {_ag_fail(45,node,0);return}

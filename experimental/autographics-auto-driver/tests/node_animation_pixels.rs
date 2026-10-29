@@ -613,3 +613,467 @@ fn original_four_clips_phase_boundaries_and_independent_shared_instances_match_s
     println!("four original clips20 phase states+nonzero switch;source vertices={vertex_checks} max_error={maximum};GPU stable ROI probes={pixels};idle/walk/jump changed channels={dynamic_differences:?};shared instances independent;frozen-node ROI rejections={controls:?}");
     h.stop_play();
 }
+
+fn actor_triangles(
+    a: &Asset,
+    j: &Value,
+    bin: &[u8],
+    entity: Mat4,
+    clip: usize,
+    phase: f32,
+    yaw: f32,
+) -> Vec<[Vec3; 3]> {
+    let worlds = reference(j, bin, clip, phase, false);
+    let mut triangles = Vec::new();
+    for m in &a.model.meshes {
+        let meta = m.visual.as_ref().unwrap();
+        let matrix = entity
+            * Mat4::from_rotation_y(yaw)
+            * worlds[meta.node_index]
+            * Mat4::from_cols_array_2d(&meta.world).inverse();
+        for t in m.indices.chunks_exact(3) {
+            triangles.push(std::array::from_fn(|i| {
+                matrix.transform_point3(m.positions[t[i] as usize].into())
+            }));
+        }
+    }
+    triangles
+}
+fn fixed_view() -> Mat4 {
+    agp::render3d::Camera3d {
+        eye: Vec3::new(1.6, 1., 5.),
+        target: Vec3::new(0., 0.5, 0.),
+        up: Vec3::Y,
+        projection: agp::render3d::Projection::Orthographic {
+            size: 2.8,
+            aspect: 1.,
+            near: 0.1,
+            far: 20.,
+        },
+    }
+    .view_proj()
+}
+fn actor_instances(h: &Host, count: usize) -> Vec<MeshInstance> {
+    match h.rt.content(h.three).unwrap() {
+        agp::host::surface_runtime::SurfaceContent::Scene3d(s) => s.instances[..count].to_vec(),
+        _ => panic!(),
+    }
+}
+fn fixed_light() -> LightDef {
+    LightDef {
+        dir_to_light: Vec3::Z,
+        color: [1.; 3],
+        energy: 0.5,
+        shadow_vp: Mat4::IDENTITY,
+        shadow_bias: 0.0005,
+    }
+}
+
+#[test]
+fn camera_relative_four_directions_stop_and_pi_wrap_have_independent_visible_facing() {
+    let a = character();
+    let (j, bin) = chunks(&a);
+    let mut d = scene(&a);
+    d.objects[1].translation[0] = 30.;
+    let mut h = Host::with_assets(d, Registry::from([(a.identity.key(), a.clone())])).unwrap();
+    let user = r#"var ok=0
+var yaw=0.0
+fn app_start(){ok=ag_char3_bind(1);ok=ag_camera_orbit_3d(1,4.0,30.0,0,0.0)}
+fn app_update(dt float){
+ let h=ag_actions_snapshot()%64
+ if h%16!=0 {
+  yaw=ag_cam3_yaw()*0.01745329252
+  if h==4 {yaw=yaw+3.14159265359}
+  if h==2 {yaw=yaw+1.57079632679}
+  if h==1 {yaw=yaw-1.57079632679}
+ }
+ ok=ag_visual_pose(0,1,2,0.19,0,yaw)
+}
+"#;
+    h.start_user_snapshot(
+        SourceSnapshot::from_bytes_for(
+            Path::new("facing.at"),
+            user.as_bytes().to_vec(),
+            Api::NodeAnimation3V1,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    h.pause_play("");
+    pump(&mut h);
+    let target = OffscreenTarget::new(h.rt.gpu(), 320, 320).unwrap();
+    let mut pipeline = MeshPipeline::new(h.rt.gpu(), OffscreenTarget::FORMAT).unwrap();
+    let vp = fixed_view();
+    let light = fixed_light();
+    let mut prior = None;
+    let mut failures = Vec::new();
+    // These expected values derive directly from +Z model facing and the
+    // frozen camera basis, independently of the producer's yaw output.
+    for (i, (held, drag, expected)) in [
+        (4, 30., -150f32),
+        (8, 0., 30.),
+        (2, 0., 120.),
+        (1, 0., -60.),
+        (0, 0., -60.),
+        (8, 149.9, 179.9),
+        (8, 0.2, -179.9),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let p = h.play.as_mut().unwrap();
+        p.resume().unwrap();
+        for k in 0..6 {
+            p.char_key(k, held & (1 << k) != 0, false);
+        }
+        p.cam_drag(drag, 0.);
+        p.dispatch(Action::default()).unwrap();
+        h.pause_play("");
+        pump(&mut h);
+        let f = h.play.as_ref().unwrap().last.as_ref().unwrap();
+        let yaw = expected.to_radians();
+        let v = f.animations.as_ref().unwrap().visual_for(1).unwrap();
+        assert!((v.yaw - yaw).abs() < 1e-5, "case{i}: {} != {yaw}", v.yaw);
+        let instances = actor_instances(&h, a.model.meshes.len());
+        let actual = shot(&h, &mut pipeline, &target, vp, &light, &instances, false);
+        let expected_mask = mask(
+            &actor_triangles(
+                &a,
+                &j,
+                bin,
+                interaction::transform(&f.objects[0]),
+                2,
+                0.19,
+                yaw,
+            ),
+            vp,
+        );
+        let (n, errors) = silhouette_errors(&expected_mask, &actual.rgba);
+        assert!(errors <= 2, "facing{i}: {errors}/{n}");
+        if i == 4 {
+            assert_eq!(
+                prior.as_ref().unwrap(),
+                &actual.rgba,
+                "stopped retains facing"
+            );
+        }
+        if i < 4 {
+            let wrong: Vec<_> = instances
+                .iter()
+                .map(|x| {
+                    let mut x = x.clone();
+                    x.model = Mat4::from_rotation_y(0.7) * x.model;
+                    x
+                })
+                .collect();
+            let wrong = shot(&h, &mut pipeline, &target, vp, &light, &wrong, false);
+            let (_, error) = silhouette_errors(&expected_mask, &wrong.rgba);
+            assert!(error > 2);
+            failures.push(error);
+        }
+        report(&format!("facing-{i}"), &actual.png);
+        prior = Some(actual.rgba);
+    }
+    println!("four camera-relative directions + stop + +/-pi wrap; independent fixed-camera GPU silhouette rejects wrong yaw: {failures:?}");
+    h.stop_play();
+}
+
+#[test]
+fn step_rotation_holds_then_switches_in_actual_auto_host_gpu_path() {
+    let original = character();
+    let (mut j, bin) = chunks(&original);
+    let mut bin = bin.to_vec();
+    // Supplemental controlled fixture; the original four-clip file is intact.
+    let vi = j["bufferViews"].as_array().unwrap().len();
+    let ai = j["accessors"].as_array().unwrap().len();
+    let start = bin.len();
+    for f in [
+        0f32, 1., 2., 0., 0., 0., 1., 0., 0.70710677, 0., 0.70710677, 0., 1., 0., 0.,
+    ] {
+        bin.extend(f.to_le_bytes());
+    }
+    j["bufferViews"].as_array_mut().unwrap().extend([
+        serde_json::json!({"buffer":0,"byteOffset":start,"byteLength":12}),
+        serde_json::json!({"buffer":0,"byteOffset":start+12,"byteLength":48}),
+    ]);
+    j["accessors"].as_array_mut().unwrap().extend([serde_json::json!({"bufferView":vi,"componentType":5126,"count":3,"type":"SCALAR","min":[0],"max":[2]}),serde_json::json!({"bufferView":vi+1,"componentType":5126,"count":3,"type":"VEC4"})]);
+    j["animations"] = serde_json::json!([{"name":"step-root-rotation","samplers":[{"input":ai,"output":ai+1,"interpolation":"STEP"}],"channels":[{"sampler":0,"target":{"node":0,"path":"rotation"}}]}]);
+    j["buffers"][0]["byteLength"] = bin.len().into();
+    let mut text = serde_json::to_vec(&j).unwrap();
+    while text.len() % 4 != 0 {
+        text.push(b' ');
+    }
+    let mut bytes = b"glTF".to_vec();
+    bytes.extend(2u32.to_le_bytes());
+    bytes.extend(((28 + text.len() + bin.len()) as u32).to_le_bytes());
+    bytes.extend((text.len() as u32).to_le_bytes());
+    bytes.extend(b"JSON");
+    bytes.extend(text);
+    bytes.extend((bin.len() as u32).to_le_bytes());
+    bytes.extend(b"BIN\0");
+    bytes.extend(&bin);
+    let root = std::env::temp_dir().join(format!("ui006-step-pixels-{}", std::process::id()));
+    std::fs::create_dir_all(root.join("Textures")).unwrap();
+    std::fs::copy(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("samples/textured_models/models/Textures/colormap.png"),
+        root.join("Textures/colormap.png"),
+    )
+    .unwrap();
+    std::fs::write(root.join("step.glb"), bytes).unwrap();
+    let a = assets::import_animated(&root.join("step.glb"), &Registry::new()).unwrap();
+    let mut d = scene(&a);
+    d.objects[1].translation[0] = 30.;
+    let mut h = Host::with_assets(d, Registry::from([(a.identity.key(), a.clone())])).unwrap();
+    let user="var ok=0\nvar counter=0\nfn app_start(){ok=ag_char3_bind(1);ok=ag_camera_orbit_3d(1,4.0,30.0,0,0.0)}\nfn app_update(dt float){counter=counter+1;ok=ag_visual_pose(0,1,0,counter*0.5,0,0.0)}\n";
+    h.start_user_snapshot(
+        SourceSnapshot::from_bytes_for(
+            Path::new("step.at"),
+            user.as_bytes().to_vec(),
+            Api::NodeAnimation3V1,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    h.pause_play("");
+    pump(&mut h);
+    let target = OffscreenTarget::new(h.rt.gpu(), 320, 320).unwrap();
+    let mut pipeline = MeshPipeline::new(h.rt.gpu(), OffscreenTarget::FORMAT).unwrap();
+    let vp = fixed_view();
+    let light = fixed_light();
+    let mut previous = None;
+    let mut wrong_errors = 0;
+    for tick in 1..=3 {
+        step(&mut h);
+        let f = h.play.as_ref().unwrap().last.as_ref().unwrap();
+        let instances = actor_instances(&h, a.model.meshes.len());
+        let expected = mask(
+            &actor_triangles(
+                &a,
+                &j,
+                &bin,
+                interaction::transform(&f.objects[0]),
+                0,
+                tick as f32 * 0.5,
+                0.,
+            ),
+            vp,
+        );
+        let actual = shot(&h, &mut pipeline, &target, vp, &light, &instances, false);
+        let (_, errors) = silhouette_errors(&expected, &actual.rgba);
+        assert!(errors <= 2);
+        if tick == 1 {
+            let wrong: Vec<_> = instances
+                .iter()
+                .map(|x| {
+                    let mut x = x.clone();
+                    x.model = Mat4::from_rotation_y(std::f32::consts::FRAC_PI_4) * x.model;
+                    x
+                })
+                .collect();
+            let wrong = shot(&h, &mut pipeline, &target, vp, &light, &wrong, false);
+            wrong_errors = silhouette_errors(&expected, &wrong.rgba).1;
+            assert!(wrong_errors > 2);
+        }
+        if tick == 2 {
+            assert_ne!(
+                previous.as_ref().unwrap(),
+                &actual.rgba,
+                "key boundary changes pose"
+            );
+        }
+        if tick == 3 {
+            assert_eq!(
+                previous.as_ref().unwrap(),
+                &actual.rgba,
+                "STEP holds between keys"
+            );
+        }
+        report(&format!("step-rotation-{tick}"), &actual.png);
+        previous = Some(actual.rgba);
+    }
+    println!("STEP root quaternion: .5 holds first,1 switches,1.5 holds second; interpolated45deg wrong-pose ROI errors={wrong_errors}");
+    h.stop_play();
+}
+
+#[test]
+fn actual_original_walk_shadow_matches_independent_source_pose_and_rejects_frozen_pose() {
+    use agp::assets::{MaterialDef, MeshData, ModelData};
+    let a = character();
+    let (j, bin) = chunks(&a);
+    let mut d = scene(&a);
+    d.objects[1].translation[0] = 30.;
+    let mut h = Host::with_assets(d, Registry::from([(a.identity.key(), a.clone())])).unwrap();
+    let user="var ok=0\nfn app_start(){ok=ag_char3_bind(1);ok=ag_camera_orbit_3d(1,4.0,30.0,0,0.0);ok=ag_visual_pose(0,1,2,0.19,0,0.45)}\nfn app_update(dt float){}\n";
+    h.start_user_snapshot(
+        SourceSnapshot::from_bytes_for(
+            Path::new("walk-shadow.at"),
+            user.as_bytes().to_vec(),
+            Api::NodeAnimation3V1,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    h.pause_play("");
+    pump(&mut h);
+    let f = h.play.as_ref().unwrap().last.as_ref().unwrap();
+    let entity = interaction::transform(&f.objects[0]);
+    let triangles = actor_triangles(&a, &j, bin, entity, 2, 0.19, 0.45);
+    let shadow_triangles: Vec<_> = triangles
+        .iter()
+        .map(|t| t.map(|p| Vec3::new(p.x, p.y, -1.)))
+        .collect();
+    let receiver = ModelData {
+        source_sha256: "ui006-shadow-receiver".into(),
+        meshes: vec![MeshData {
+            visual: None,
+            name: "receiver".into(),
+            positions: vec![
+                [-2., -1., -1.],
+                [2., -1., -1.],
+                [2., 2., -1.],
+                [-2., 2., -1.],
+            ],
+            normals: vec![[0., 0., 1.]; 4],
+            indices: vec![0, 1, 2, 0, 2, 3],
+            material: MaterialDef {
+                name: "grey".into(),
+                base_color: [0.5, 0.5, 0.5, 1.],
+                metallic: 0.,
+                roughness: 1.,
+            },
+        }],
+    };
+    let mut store = match h.rt.content(h.three).unwrap() {
+        agp::host::surface_runtime::SurfaceContent::Scene3d(s) => s.store.staged(),
+        _ => panic!(),
+    };
+    store.get_or_upload(h.rt.gpu(), &receiver, 0).unwrap();
+    let mut actual = actor_instances(&h, a.model.meshes.len());
+    let mut frozen = actual.clone();
+    for i in &mut frozen {
+        i.model = entity * Mat4::from_rotation_y(0.45);
+    }
+    let plane = MeshInstance {
+        mesh: (receiver.source_sha256.clone(), "receiver".into()),
+        model: Mat4::IDENTITY,
+    };
+    actual.push(plane.clone());
+    frozen.push(plane);
+    let vp = agp::render3d::Camera3d {
+        eye: Vec3::new(3., 1.5, 5.),
+        target: Vec3::new(0., 0.5, -0.5),
+        up: Vec3::Y,
+        projection: agp::render3d::Projection::Orthographic {
+            size: 3.,
+            aspect: 1.,
+            near: 0.1,
+            far: 20.,
+        },
+    }
+    .view_proj();
+    let mut light = fixed_light();
+    light.shadow_vp = Mat4::from_cols_array(&[
+        0.6, 0., 0., 0., 0., 0.6, 0., 0., 0., 0., -0.1, 0., 0., -0.3, 0.5, 1.,
+    ]);
+    let target = OffscreenTarget::new(h.rt.gpu(), 320, 320).unwrap();
+    let mut pipeline = MeshPipeline::new(h.rt.gpu(), OffscreenTarget::FORMAT).unwrap();
+    let mut draw = |instances: &[MeshInstance], shadow: bool| {
+        pipeline.render(
+            h.rt.gpu(),
+            target.view(),
+            320,
+            320,
+            [1., 0., 1., 1.],
+            &vp,
+            &light,
+            &store,
+            instances,
+            shadow,
+        );
+        let (png, img) = capture_png(h.rt.gpu(), &target).unwrap();
+        Shot {
+            rgba: img.into_raw(),
+            png,
+        }
+    };
+    let on = draw(&actual, true);
+    let off = draw(&actual, false);
+    let wrong_on = draw(&frozen, true);
+    let wrong_off = draw(&frozen, false);
+    report("walk-shadow", &on.png);
+    report("walk-shadow-off", &off.png);
+    report("walk-shadow-frozen-control", &wrong_on.png);
+    let expected = mask(&shadow_triangles, vp);
+    let actor = mask(&triangles, vp);
+    let frozen_triangles: Vec<_> = a
+        .model
+        .meshes
+        .iter()
+        .flat_map(|m| {
+            m.indices.chunks_exact(3).map(|t| {
+                std::array::from_fn(|i| {
+                    (entity * Mat4::from_rotation_y(0.45))
+                        .transform_point3(m.positions[t[i] as usize].into())
+                })
+            })
+        })
+        .collect();
+    let frozen_actor = mask(&frozen_triangles, vp);
+    let mut probes = 0;
+    let mut shadow_pixels = 0;
+    let mut errors = 0;
+    let mut wrong_errors = 0;
+    let mut disabled_errors = 0;
+    for y in 3..317 {
+        for x in 3..317 {
+            let at = y * 320 + x;
+            let value = expected[at];
+            if (-2..=2).any(|dy| {
+                (-2..=2).any(|dx| {
+                    let n = ((y as i32 + dy) * 320 + x as i32 + dx) as usize;
+                    expected[n] != value || actor[n] || frozen_actor[n]
+                })
+            }) {
+                continue;
+            }
+            let p = at * 4;
+            let bright = &off.rgba[p..p + 3];
+            let wrong_bright = &wrong_off.rgba[p..p + 3];
+            if bright[0].abs_diff(bright[1]) > 1
+                || bright[1].abs_diff(bright[2]) > 1
+                || bright[0] < 140
+            {
+                continue;
+            }
+            if wrong_bright[0].abs_diff(wrong_bright[1]) > 1
+                || wrong_bright[1].abs_diff(wrong_bright[2]) > 1
+                || wrong_bright[0] < 140
+            {
+                continue;
+            }
+            probes += 1;
+            shadow_pixels += value as usize;
+            let dark = bright[0].saturating_sub(on.rgba[p]) > 20;
+            let wrong = wrong_bright[0].saturating_sub(wrong_on.rgba[p]) > 20;
+            errors += (dark != value) as usize;
+            wrong_errors += (wrong != value) as usize;
+            disabled_errors += value as usize;
+        }
+    }
+    assert!(
+        shadow_pixels > 100,
+        "visible independent shadow interior {shadow_pixels}"
+    );
+    assert!(
+        errors <= 2,
+        "animated shadow errors={errors}/{probes}, shadow_pixels={shadow_pixels}"
+    );
+    assert!(
+        wrong_errors > 20,
+        "frozen-pose shadow must fail oracle: {wrong_errors}"
+    );
+    assert!(disabled_errors > 100);
+    println!("same original walk pose color+shadow: independent receiver ROI probes={probes}, shadow_pixels={shadow_pixels}, errors={errors}; wrong frozen-pose={wrong_errors}, disabled={disabled_errors}");
+    h.stop_play();
+}
