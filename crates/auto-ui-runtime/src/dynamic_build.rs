@@ -1386,9 +1386,29 @@ fn build_dynamic_component_inner(
                 let page_module = format!("pages/{}", route.module);
                 let module_path = resolve_module_path(base_dir, &page_module);
                 let Some(module_path) = module_path else {
+                    registry.register_route_failure(&route.module, format!(
+                        "VM_ROUTE_PAGE_LOAD_ERROR: route={} module={} file={} stage=resolve: page module not found",
+                        route.path, route.module, base_dir.join(format!("{page_module}.at")).display()
+                    ));
                     continue;
                 };
-                if let Ok(module_code) = std::fs::read_to_string(&module_path) {
+                let diagnostic = |stage: &str, detail: String| {
+                    format!(
+                    "VM_ROUTE_PAGE_LOAD_ERROR: route={} module={} file={} stage={stage}: {detail}",
+                    route.path, route.module, module_path.display()
+                )
+                };
+                let module_code = match std::fs::read_to_string(&module_path) {
+                    Ok(code) => code,
+                    Err(error) => {
+                        registry.register_route_failure(
+                            &route.module,
+                            diagnostic("read", error.to_string()),
+                        );
+                        continue;
+                    }
+                };
+                {
                     // PLAN-037: 路由页读点同过前缀化 overlay——PLAN-712 T-17：
                     // 此前此处**裸读**（全部模块读点中唯一未包 apply 的），
                     // routes 页（pages/*.at）的相对 `/api/` 字面量不被改写 →
@@ -1397,15 +1417,43 @@ fn build_dynamic_component_inner(
                     // book_store.at 前缀生效、书架 2 REQ 到 proxy；pages/ 页
                     // 零 REQ + 86ms 秒拒）。
                     let module_code = auto_lang_core::back_prefix::apply(&module_path, module_code);
+                    // Route modules need the same recipe preparation as root/imported widgets.
+                    let page_recipes =
+                        match auto_ui_compiler::design_tokens::recipe::prepare_style_recipe_imports(
+                            module_path.parent().unwrap_or(base_dir),
+                            &module_code,
+                        ) {
+                            Ok(imports) => imports,
+                            Err(error) => {
+                                registry.register_route_failure(
+                                    &route.module,
+                                    diagnostic("style-import", error.to_string()),
+                                );
+                                continue;
+                            }
+                        };
                     let mod_session = CompilerSession::ui();
                     let mut mod_parser =
                         Parser::from(module_code.as_str()).with_session(mod_session);
-                    if let Ok(mod_ast) = mod_parser
+                    let mod_ast = match mod_parser
                         .parse_domain(&auto_ui_dialect::UiDialect)
                         .map(auto_ui_dialect::UiCode)
                         .and_then(|ui| {
                             auto_ui_compiler::ui_ast::lower_ui(&ui).map(|lowered| lowered.ui)
-                        })
+                        }) {
+                        Ok(ast) => ast,
+                        Err(error) => {
+                            registry.register_route_failure(
+                                &route.module,
+                                diagnostic("parse", positioned_parse_errors(&error, &module_code)),
+                            );
+                            continue;
+                        }
+                    };
+                    if let Err(error) = auto_ui_compiler::design_tokens::recipe::load_and_validate_style_recipes_with_imports(&page_recipes, &mod_ast) {
+                        registry.register_route_failure(&route.module, diagnostic("style-validation", error.to_string()));
+                        continue;
+                    }
                     {
                         // Register view-fn fragments from the page module too.
                         for frag in mod_ast.domain_stmts().filter_map(|s| match s {
@@ -1415,25 +1463,45 @@ fn build_dynamic_component_inner(
                             auto_ui_compiler::aura::extract::register_view_fragment(frag);
                         }
 
-                        for stmt in mod_ast.items() {
-                            if let auto_parser_api::DomainStmt::Domain(
-                                auto_ui_dialect::UiStmt::WidgetDecl(decl),
-                            ) = stmt
-                            {
-                                if let Ok(child_widget) =
+                        // Validate all page widgets before publishing an alias or child declaration.
+                        let page_widgets = mod_ast
+                            .domain_stmts()
+                            .filter_map(|stmt| match stmt {
+                                auto_ui_dialect::UiStmt::WidgetDecl(decl) => Some(
                                     auto_ui_compiler::aura::extract_widget_from_decl(decl)
-                                {
-                                    child_decls.push(decl.clone());
-                                    // Plan 408: record route.module → widget.name
-                                    // mapping so render_outlet can find the page.
-                                    // Using a separate alias map (not a registry
-                                    // entry) avoids shadowing built-in UI elements
-                                    // like <button>, <input>, etc.
-                                    registry
-                                        .register_route_alias(&route.module, &child_widget.name);
-                                    registry.register(child_widget);
-                                }
+                                        .map(|widget| (decl.clone(), widget)),
+                                ),
+                                _ => None,
+                            })
+                            .collect::<Result<Vec<_>, _>>();
+                        let page_widgets = match page_widgets {
+                            Ok(widgets) if !widgets.is_empty() => widgets,
+                            Ok(_) => {
+                                registry.register_route_failure(
+                                    &route.module,
+                                    diagnostic("extract", "no widget declaration found".into()),
+                                );
+                                continue;
                             }
+                            Err(error) => {
+                                registry.register_route_failure(
+                                    &route.module,
+                                    diagnostic("extract", error.to_string()),
+                                );
+                                continue;
+                            }
+                        };
+                        for (decl, child_widget) in page_widgets {
+                            child_decls.push(decl);
+                            // Plan 408: record route.module → widget.name
+                            // mapping so render_outlet can find the page.
+                            // Using a separate alias map (not a registry
+                            // entry) avoids shadowing built-in UI elements
+                            // like <button>, <input>, etc.
+                            registry.register_route_alias(&route.module, &child_widget.name);
+                            registry.register(child_widget);
+                        }
+                        for stmt in mod_ast.items() {
                             // VM multi-store fix: also collect StoreDecls declared
                             // in the page's own source (e.g. home.at has
                             // `use article_store: ArticleStore` → article_store.at
@@ -2124,5 +2192,129 @@ mod plan446_batch1_tests {
             let count = detail.lines().filter(|l| l.contains("error")).count();
             assert!(count >= 1 && count <= 20, "cap violated: {count}\n{detail}");
         }
+    }
+}
+
+#[cfg(all(test, feature = "ui-iced"))]
+mod plan015_route_loading_tests {
+    fn rendered(component: &mut crate::ui::dynamic::DynamicComponent, route: &str) -> String {
+        component.set_route(route);
+        component.view_with_debug();
+        component.drive_scheduler_to_quiescence(16);
+        format!("{:?}", component.view_with_debug().0)
+    }
+
+    #[test]
+    fn plan015_multi_page_features_init_and_failure_isolation() {
+        let app = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../auto-ui-tools/tests/fixtures/plan015-route-pages/src/front/app.at");
+        let mut component =
+            crate::build_dynamic_component(&std::fs::read_to_string(&app).unwrap(), app.to_str())
+                .unwrap();
+        let author = rendered(&mut component, "/");
+        for text in [
+            "Route author loaded",
+            "Route Init complete",
+            "Timer ready",
+            "entry first",
+            "entry second",
+        ] {
+            assert!(author.contains(text), "missing {text}: {author}");
+        }
+        assert!(component
+            .timesource_debug_rows()
+            .iter()
+            .any(|row| row.1 == "Author" && row.2 == "Tick" && row.4 == 3000 && row.6 && row.7));
+        let home = rendered(&mut component, "/demo");
+        assert!(
+            home.contains("Route home loaded") && home.contains("Home Init complete"),
+            "{home}"
+        );
+        let broken = rendered(&mut component, "/broken");
+        assert!(
+            broken.contains("VM_ROUTE_PAGE_LOAD_ERROR") && broken.contains("stage=resolve"),
+            "{broken}"
+        );
+        assert!(rendered(&mut component, "/").contains("Route Init complete"));
+        assert!(rendered(&mut component, "/unmatched").contains("no route for /unmatched"));
+    }
+
+    #[test]
+    fn plan015_page_without_widget_has_extraction_diagnostic() {
+        let mut component = build("fn helper() int { return 1 }").unwrap();
+        let view = rendered(&mut component, "/");
+        assert!(
+            view.contains("stage=extract") && view.contains("no widget declaration"),
+            "{view}"
+        );
+    }
+
+    #[test]
+    fn plan015_unreadable_utf8_page_has_read_diagnostic() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join("pages")).unwrap();
+        std::fs::write(dir.path().join("pages/author.at"), [0xff, 0xfe]).unwrap();
+        let mut component = crate::build_dynamic_component(
+            "widget App { routes { \"/\" -> use author } view { outlet } }",
+            dir.path().join("app.at").to_str(),
+        )
+        .unwrap();
+        let view = rendered(&mut component, "/");
+        assert!(
+            view.contains("stage=read") && view.contains("author"),
+            "{view}"
+        );
+    }
+
+    fn build(page: &str) -> crate::AutoResult<crate::ui::dynamic::DynamicComponent> {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join("pages")).unwrap();
+        std::fs::write(dir.path().join("pages/author.at"), page).unwrap();
+        std::fs::create_dir(dir.path().join("stylekit")).unwrap();
+        std::fs::write(
+            dir.path().join("stylekit/styles.at"),
+            "pub style route_field = \"px-3\"\n",
+        )
+        .unwrap();
+        let app = "widget App { routes { \"/\" -> use author } view { outlet } }";
+        crate::build_dynamic_component(app, dir.path().join("app.at").to_str())
+    }
+
+    #[test]
+    fn plan015_route_imported_style_is_loaded_before_page_parse() {
+        let mut component = build("use stylekit.styles: route_field\nwidget author { view { text \"route-style-loaded\" {} input { style: route_field } } }")
+            .expect("route page style imports must be prepared before parsing");
+        component.set_route("/");
+        let view = format!("{:?}", component.view_with_debug().0);
+        assert!(view.contains("route-style-loaded"), "{view}");
+    }
+
+    #[test]
+    fn plan015_invalid_page_is_named_in_error() {
+        let mut component =
+            build("widget author { view { input { style: undefined_route_style } } }")
+                .expect("shell stays usable");
+        component.set_route("/");
+        let error = format!("{:?}", component.view_with_debug().0);
+        assert!(
+            error.contains("author") && error.contains("parse"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn plan015_missing_route_is_named_in_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut component = crate::build_dynamic_component(
+            "widget App { routes { \"/\" -> use absent } view { outlet } }",
+            dir.path().join("app.at").to_str(),
+        )
+        .expect("shell stays usable");
+        component.set_route("/");
+        let error = format!("{:?}", component.view_with_debug().0);
+        assert!(
+            error.contains("absent") && error.contains("resolve"),
+            "{error}"
+        );
     }
 }

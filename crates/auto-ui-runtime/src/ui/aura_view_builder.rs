@@ -6689,10 +6689,11 @@ impl<'a> AuraViewBuilder<'a> {
                     tracked,
                 );
             }
-            // Page widget not registered → show a textual placeholder so the
-            // gap is visible (e.g. "page book_detail not loaded").
+            // Keep a failed declared page distinguishable from an unmatched route.
             return View::Text {
-                content: format!("<outlet: page {} not loaded>", route.module),
+                content: registry.route_failure(&route.module).map(str::to_owned).unwrap_or_else(|| {
+                    format!("VM_ROUTE_PAGE_LOAD_ERROR: module={} stage=registration: declared route has no registered page widget", route.module)
+                }),
                 style: None,
                 selectable: false,
             };

@@ -1,0 +1,6 @@
+name: "ui015-route-control"
+version: "1.0.0"
+scene: "ui"
+render: "vm"
+title: "Route Page Acceptance"
+desktop: "true"

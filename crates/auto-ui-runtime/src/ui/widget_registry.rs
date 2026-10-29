@@ -16,6 +16,8 @@ pub struct WidgetRegistry {
     /// name collisions with built-in UI elements (e.g. a route module named
     /// "button" must not shadow the `<button>` element).
     route_aliases: HashMap<String, String>,
+    /// Named load failures retained for outlet snapshots (PLAN-015).
+    route_failures: HashMap<String, String>,
 }
 
 impl WidgetRegistry {
@@ -24,6 +26,7 @@ impl WidgetRegistry {
         Self {
             widgets: HashMap::new(),
             route_aliases: HashMap::new(),
+            route_failures: HashMap::new(),
         }
     }
 
@@ -35,8 +38,19 @@ impl WidgetRegistry {
     /// Plan 408: Register a route module alias (module name → widget name).
     /// Used by render_outlet to look up page widgets by route.module.
     pub fn register_route_alias(&mut self, module: &str, widget_name: &str) {
+        self.route_failures.remove(module);
         self.route_aliases
             .insert(module.to_string(), widget_name.to_string());
+    }
+
+    pub fn register_route_failure(&mut self, module: &str, diagnostic: String) {
+        eprintln!("ERROR: {diagnostic}");
+        self.route_aliases.remove(module);
+        self.route_failures.insert(module.to_string(), diagnostic);
+    }
+
+    pub fn route_failure(&self, module: &str) -> Option<&str> {
+        self.route_failures.get(module).map(String::as_str)
     }
 
     /// Plan 408: Look up a widget by route module name via the alias map.

@@ -1,0 +1,24 @@
+use fields: route_field
+
+widget Author {
+    msg { Init, Tick }
+    model {
+        var ready bool = false
+        var ticks int = 0
+        var entries = ["first", "second"]
+    }
+    timer { Tick (every_ms: 3000) }
+    view {
+        col {
+            text "Route author loaded"
+            input { style: route_field }
+            if .ready { text "Route Init complete" }
+            if .ticks == 0 { text "Timer ready" }
+            for entry in .entries { text f"entry ${entry}" }
+        }
+    }
+    on {
+        .Init -> { .ready = true }
+        .Tick -> { .ticks = .ticks + 1 }
+    }
+}

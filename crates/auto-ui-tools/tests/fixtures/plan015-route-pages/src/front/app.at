@@ -1,0 +1,15 @@
+widget App {
+    routes {
+        "/" -> use author
+        "/demo" -> use home
+        "/broken" -> use absent
+    }
+    view {
+        col {
+            link (to: "/") { text "Author" }
+            link (to: "/demo") { text "Home" }
+            link (to: "/broken") { text "Broken" }
+            outlet
+        }
+    }
+}

@@ -1,0 +1,11 @@
+widget Home {
+    msg { Init }
+    model { var ready bool = false }
+    view {
+        col {
+            text "Route home loaded"
+            if .ready { text "Home Init complete" }
+        }
+    }
+    on { .Init -> { .ready = true } }
+}
