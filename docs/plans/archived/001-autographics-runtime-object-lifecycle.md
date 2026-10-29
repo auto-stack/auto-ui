@@ -190,6 +190,8 @@ work自查→独立上下文最终review→merge冻结受影响门，同一auto-
 
 2026-10-29 goal r4：`stage: goal | plan_id: PLAN-001 | plan_revision: r4 | round: 4 | from: merge | to: done | status: archived | outcome: pass | worktree: 已清理 | commit: 537122b（auto-ui master交付）；d9718cc6（auto-lang知识沉淀）| next: done`。
 
+2026-10-29 cleaned 检查点：wt-guard双树clean（无reparse point）后 `git worktree remove` D:/autostack/.wt/ui-001/{auto-ui,auto-lang}，分支 codex/plan-001-dev@537122b 与 sync-plan001-ag@d9718cc6 均已落地后删除，空组目录 .wt/ui-001/ 已删；plan-artifacts/auto-ui/plan-001 回收两个consumer target树（CACHEDIR.TAG确认后删除）与全部.pdb，8.6G→91M，.exe（无）/报告/reports-consumer/work契约与日志全部保留。auto-lang批量回归观察：.last-batch-regression.json为该仓计划门规则，本次auto-lang侧仅docs知识沉淀（d9718cc6）非auto-lang计划落地，不构成触发条件，观察在案。主检出版态：auto-ui master=19c1d14（干净）、auto-lang master=d9718cc6（其余WIP为既有他人文件，未触碰）。
+
 ## 10. 待澄清事项
 
 当前没有新增产品决策。8槽是第一版明确支持集，base+reserved仍≤128；不会借此关闭完整游戏的动态solid/任意拓扑等非目标。若角色/相机+对象/后继收集组合在原预算不可行，或须改SDK/旧版本/验收分母，先带反例回new由用户裁定；不静默抬限。002必须等本计划实际交付再冻结执行基线。
