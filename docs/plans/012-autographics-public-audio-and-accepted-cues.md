@@ -42,6 +42,8 @@ touched_goals: [GOAL-008]
 
 ## 4. 需求分析与背景调查
 
+2026-10-30 复审例外授权：用户对已具体化的只读复审问题明确回答“允许只读子代理独立复审”。这是§6“不新建agent/chat”的限定例外：仅同一唯一实施树/冻结commit的只读独立复审，不新建用户聊天、不复制代码、不修改实现；不改变功能、验收、阈值、仓库或merge前finalpass要求。根会话仍是共享Plan唯一写者。此前授权阻塞现已解除，可继续T07及原全链后续。
+
 2026-10-30 执行授权：用户 `/goal 完成UI的计划012` 授予既有合同的work→独立review→有界repair→merge/规范/台账/归档/guard清理全链。006已实际交付c681663并归档cleaned，master祖先与独立R2/冻结34case/SDK锁及current identity已经实读核验；历史“仅规划/006未交付”描述保留为当时背景。唯一ui-012树已由master f7c83c6创建，分支codex/plan-012-dev；主检出其他所有者文档WIP保留，未发现代码WIP。当前入口与T-02未关闭项见[执行合同](attachments/012/work/public-audio-contract.md)。
 
 用户2026-10-30要求“规划G10b和公共声音/HUD后继计划，按引擎与Gallery分仓，暂不实施”。本轮只新Plan/设计/附件/引用/取号，不建树、改源、生成资源、编译、输出声音、GPU/OS/agent或远端发布；未授权自动实施。005已交付351919c；006仍executing r2、最新记录T-05进行/完成，实际delivery尚待核；本Plan不能追其tip或按某个勾选认定交付。
@@ -167,6 +169,8 @@ SD01/02/03与ag-examples005/G12a下游说明冻结在research/public-audio-spec-
 2026-10-30 goal round6：`stage: goal | plan_id: PLAN-012 | plan_revision: r1 | round: 6 | from: review | to: review | status: execution_done | outcome: blocked | worktree: D:/autostack/.wt/ui-012/auto-ui | commit: 87414431b9a1dbda6eb54aad999af7f734a14516 | next: user review-context authorization then review`。前轮分类no progress（仅等待/簿记，不是已验证的运行中进程等待）；本轮仅复读§9/10确认仍无人工答复，无阶段工作/测试/agent/chat/合并。相同阻塞已连续round4/5/6三轮，且缺少授权无法满足既定独立复审要求，没有不依赖答复的必要交付工作可继续，现将host goal标为blocked，保留完整目标与全部实现/证据/唯一树。解除动作：用户明确允许仅本计划的同树只读复审子代理，或安排既有独立上下文完成冻结87414431的T07复审。不是因难度/预算/耗时阻塞，不宣称完成或降低AC06；0failed final review/0repaircycle。
 
 ## 10. 待澄清事项
+
+最新状态（2026-10-30）：用户已明确回答“允许只读子代理独立复审”，解除下列历史待答项。已核唯一树仍为87414431b9a1dbda6eb54aad999af7f734a14516且clean；只读独立上下文`/root/plan012_final_review`已开始T07，未新建用户聊天、源码副本或实施树。根会话暂停实现写入，reviewer只读源/允许最小定向检查，最终41case门仍merge-owned pending。host目标当前仍显示blocked（工具不提供恢复active接口），本次由用户明确答复继续授权任务，不创建第二目标；不声称host状态已恢复。无工作侧或复审方式待答事项。
 
 待答：T01..06已完成，6/10，实施树87414431clean/冻结。§6同时规定“同树独立上下文review”与“不新建agent/chat”。auto-plan-review技能Entry还规定“Do not create another task or agent without the applicable authorization.” 仅实施会话变更角色不能声称独立；当前没有可用的既有独立复审上下文。已通过异步问题请求：是否允许一个只读复审子代理使用同一唯一树/冻结commit（不新建用户聊天、不复制代码、不修改实现），作为此项禁止新agent的明确例外？或用户保持限制并安排独立复审。未得到答复不启动agent、不把elapsed视为同意、不降低AC06。此为T07复审方式决策，无工作侧功能/证据缺口；全链merge授权仍有效，review pass前不得merge。首次waiting round4；目标仍active，未达到blocked阈值。
 
