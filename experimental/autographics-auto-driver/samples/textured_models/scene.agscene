@@ -1,0 +1,217 @@
+{
+  "schema": "autographics.scene/6",
+  "document_id": "plan005-textured-models",
+  "resources": [
+    "circle",
+    "quad",
+    "cylinder",
+    "player",
+    "mob"
+  ],
+  "objects": [
+    {
+      "id": 1,
+      "name": "Character",
+      "kind": "cylinder",
+      "translation": [
+        0,
+        0.5,
+        0
+      ],
+      "scale": [
+        0.4,
+        0.5,
+        0.4
+      ],
+      "yaw": 0,
+      "pitch": 0,
+      "rgba": [
+        0.9,
+        0.3,
+        0.2,
+        1.0
+      ],
+      "visible": true,
+      "parent": null,
+      "resource": null,
+      "sprite": null
+    },
+    {
+      "id": 2,
+      "name": "Ground",
+      "kind": "cylinder",
+      "translation": [
+        0,
+        -0.5,
+        0
+      ],
+      "scale": [
+        10,
+        0.5,
+        10
+      ],
+      "yaw": 0,
+      "pitch": 0,
+      "rgba": [
+        0.9,
+        0.3,
+        0.2,
+        1.0
+      ],
+      "visible": true,
+      "parent": null,
+      "resource": null,
+      "sprite": null
+    },
+    {
+      "id": 3,
+      "name": "Platform",
+      "kind": "model",
+      "translation": [
+        3,
+        1,
+        -3
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "yaw": 0,
+      "pitch": 0,
+      "rgba": [
+        0.9,
+        0.3,
+        0.2,
+        1.0
+      ],
+      "visible": true,
+      "parent": null,
+      "resource": "closure:47fc0befa3a4b29fe90533fac4f13e90700c2c592ae639c73abe40a859c206b8",
+      "sprite": null
+    },
+    {
+      "id": 4,
+      "name": "Coin",
+      "kind": "model",
+      "translation": [
+        -3,
+        1.5,
+        -5
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "yaw": 0,
+      "pitch": 0,
+      "rgba": [
+        0.9,
+        0.3,
+        0.2,
+        1.0
+      ],
+      "visible": true,
+      "parent": null,
+      "resource": "closure:76657e1367fe78e3aa69585e4a2d6e462f7ca431a4c17d1b59a1e7fca7d3862e",
+      "sprite": null
+    },
+    {
+      "id": 5,
+      "name": "Flag",
+      "kind": "model",
+      "translation": [
+        0,
+        1,
+        -6
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "yaw": 0,
+      "pitch": 0,
+      "rgba": [
+        0.9,
+        0.3,
+        0.2,
+        1.0
+      ],
+      "visible": true,
+      "parent": null,
+      "resource": "closure:239a4ea37124b16664125ff424ce3574805449a56c2022aa3689a65c3a2a0ccd",
+      "sprite": null
+    }
+  ],
+  "groups": [],
+  "assets": [
+    {
+      "closure": {
+        "id": "47fc0befa3a4b29fe90533fac4f13e90700c2c592ae639c73abe40a859c206b8",
+        "images": [
+          {
+            "source": "uri:Textures/colormap.png",
+            "sha256": "106cf02e0d6dccded6d9f90c2ae6a51eb94c6301645fea159e834c44ed4708a3",
+            "byte_length": 10108,
+            "width": 512,
+            "height": 512
+          }
+        ]
+      },
+      "format": "glb",
+      "sha256": "78c5ed4da30c5a97f0747a54248bc9de05ba1b3fb6b94be527dd48599f5ef44c",
+      "byte_length": 13352,
+      "name": "platform.glb"
+    },
+    {
+      "closure": {
+        "id": "76657e1367fe78e3aa69585e4a2d6e462f7ca431a4c17d1b59a1e7fca7d3862e",
+        "images": [
+          {
+            "source": "uri:Textures/colormap.png",
+            "sha256": "106cf02e0d6dccded6d9f90c2ae6a51eb94c6301645fea159e834c44ed4708a3",
+            "byte_length": 10108,
+            "width": 512,
+            "height": 512
+          }
+        ]
+      },
+      "format": "glb",
+      "sha256": "a3fb8f779a6af1cd75e5a02da77a87546ca8a59f6fe52f79f25179c4a68fd0e5",
+      "byte_length": 22124,
+      "name": "coin.glb"
+    },
+    {
+      "closure": {
+        "id": "239a4ea37124b16664125ff424ce3574805449a56c2022aa3689a65c3a2a0ccd",
+        "images": [
+          {
+            "source": "uri:Textures/colormap.png",
+            "sha256": "106cf02e0d6dccded6d9f90c2ae6a51eb94c6301645fea159e834c44ed4708a3",
+            "byte_length": 10108,
+            "width": 512,
+            "height": 512
+          }
+        ]
+      },
+      "format": "glb",
+      "sha256": "0ba84ff43f0fea0a9f0b080cfa1be54ebda36c8c35174d1ac2553ae6da9f65ae",
+      "byte_length": 13276,
+      "name": "flag.glb"
+    }
+  ],
+  "behavior": {
+    "api": "autographics.objects3d/1",
+    "source": {
+      "format": "auto-source",
+      "sha256": "abd13fd5e9df825c872714253f84b9b699dbe51c4e0962638964619e0b1edb58",
+      "byte_length": 1597
+    },
+    "actors": {
+      "two_d": null,
+      "three_d": 1
+    }
+  }
+}

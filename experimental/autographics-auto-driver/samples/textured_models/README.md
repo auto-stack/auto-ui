@@ -37,3 +37,40 @@ cargo test --manifest-path experimental/autographics-auto-driver/Cargo.toml --lo
 This test imports all three through the public stamped Host command, saves,
 moves the project, reopens and compares actual GPU captures. It also changes
 only the external image and requires both a new closure and changed pixels.
+
+`scene.agscene` is a relocatable, bound project: `assets/` contains three
+unchanged original GLBs plus one shared PNG, and `scripts/` contains the exact
+accepted Auto source blob. It does not need the original `models/Textures/`
+directory. Open it through the public editor and select Run:
+
+```powershell
+cargo run --manifest-path experimental/autographics-auto-driver/Cargo.toml --config experimental/autographics-auto-driver/.cargo/config.toml --locked --offline --bin autographics-authoring -- --open experimental/autographics-auto-driver/samples/textured_models/scene.agscene
+```
+
+The bound objects3d source moves the character, orbits the camera and creates,
+moves, hides and recycles real instances of the platform and coin templates;
+the flag is another static textured original. These are engine fixtures.
+The explicit package config preserves the32MiB executable stack and16MiB
+worker default even when Cargo is started from the repository root.
+`main.at` is the editable source; `scripts/<sha>.at` is the immutable project
+payload. To run an edited file explicitly, use the public override:
+
+```powershell
+cargo run --manifest-path experimental/autographics-auto-driver/Cargo.toml --config experimental/autographics-auto-driver/.cargo/config.toml --locked --offline --bin autographics-authoring -- --open experimental/autographics-auto-driver/samples/textured_models/scene.agscene --behavior experimental/autographics-auto-driver/samples/textured_models/main.at --behavior-api objects3d
+```
+
+Check the deterministic fixture without overwriting it with
+`python experimental/autographics-auto-driver/samples/textured_models/generate_project.py --check`.
+The full finite resource, pixel, transaction and lifetime gate is
+`python experimental/autographics-auto-driver/tools/check_textured_models.py --controls`.
+It runs without windows; OS input automation and the full AG milestone remain
+outside this plan's acceptance gate.
+
+For an independent source export, run `tools/package_consumer.py <new-directory>
+--snapshot-only` from the driver package, then move that directory if desired.
+In its `experimental/autographics-auto-driver` package, prepare with
+`python tools/prepare_sdk.py --from-snapshot`, verify with
+`python tools/verify_source.py`, and run `python tools/check_textured_models.py
+--controls`. The export contains the frozen681-file SDK; its fresh `.sdk-source`
+and Cargo targets are local to the exported workspace. Both Cargo locks and the
+SDK pin remain unchanged.

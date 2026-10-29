@@ -705,6 +705,10 @@ fn raw_identity_union_at_eight_accepts_duplicates_and_refuses_the_ninth_before_d
         .unwrap_err()
         .contains("resource limit"));
     assert_eq!(assets::decode_attempts(), before);
+    lifecycle_report(
+        "identity-budget",
+        json!({"limit":assets::MAX_ASSETS,"accepted_identities":textured_models::usage(&r).0,"ninth_refused_before_decode":true,"duplicate_decodes":assets::decode_attempts()-before}),
+    );
 }
 
 #[test]
@@ -749,6 +753,10 @@ fn decoded_union_includes_unused_model_images_and_legacy_sprite_imports() {
         assets::decode_attempts(),
         before,
         "sprite shares the model image budget"
+    );
+    lifecycle_report(
+        "decoded-budget",
+        json!({"limit":assets::MAX_GEOMETRY,"accepted_cpu":usage.2,"accepted_gpu":usage.3,"unused_images_counted":true,"sprite_refused_before_decode":true}),
     );
 }
 
@@ -801,6 +809,10 @@ fn raw_byte_union_refuses_over_32_mib_before_decoder_and_reuses_exact_large_dupl
     assert!(e.contains("resource limit"), "{e}");
     assert_eq!(assets::decode_attempts(), before);
     assert!(textured_models::usage(&r).1 < assets::MAX_RAW_TOTAL);
+    lifecycle_report(
+        "raw-budget",
+        json!({"limit":assets::MAX_RAW_TOTAL,"accepted_raw":textured_models::usage(&r).1,"over_limit_refused_before_decode":true,"duplicate_decodes":assets::decode_attempts()-before}),
+    );
 }
 
 fn textured_quad_fixture(transform: bool, min_filter: u32) -> (Vec<u8>, Vec<u8>) {
@@ -1364,5 +1376,86 @@ fn textured_import_failure_drops_candidates_and_leaves_published_pixels_unchange
     lifecycle_report(
         "import-transaction",
         json!({"failure_stages":2,"new_upload_observed":true,"candidate_cpu_owners_released":true,"old_pixels_preserved":true,"successful_retry_changed_pixels":true}),
+    );
+}
+
+#[test]
+fn public_bound_project_runs_saves_moves_and_reopens_without_original_import_paths() {
+    let entry = samples().join("scene.agscene");
+    let (doc, registry, code, _) = Storage::load_project(&entry, &Registry::new()).unwrap();
+    assert!(code.is_some());
+    assert_eq!(registry.len(), 3);
+    assert_eq!(textured_models::usage(&registry).0, 4);
+    let mut host = Host::with_project(doc, registry, code).unwrap();
+    let reported = host.resource_snapshot();
+    let usage = textured_models::usage(&host.editor.assets);
+    assert_eq!(reported["asset_union"]["count"], usage.0);
+    assert_eq!(reported["asset_union"]["raw_bytes"], usage.1);
+    assert_eq!(reported["asset_union"]["cpu_geometry_bytes"], usage.2);
+    assert_eq!(reported["asset_union"]["gpu_expected_bytes"], usage.3);
+    assert_eq!(reported["asset_union"]["closure_count"], 3);
+    host.frame(None).unwrap();
+    let editor = host.editor.isolation_identity();
+    host.start_selected_play().unwrap();
+    host.pause_play("");
+    settle_play(&mut host);
+    host.play.as_mut().unwrap().resume().unwrap();
+    user_step(&mut host);
+    assert!(host
+        .play
+        .as_ref()
+        .unwrap()
+        .last
+        .as_ref()
+        .unwrap()
+        .instances
+        .is_some());
+    assert!(host
+        .play
+        .as_ref()
+        .unwrap()
+        .last
+        .as_ref()
+        .unwrap()
+        .camera
+        .is_some());
+    host.stop_play();
+    assert_eq!(host.editor.isolation_identity(), editor);
+    host.frame(None).unwrap();
+    let before = host
+        .rt
+        .capture(host.three, "ui005-public-original")
+        .unwrap()
+        .0;
+    let root = temp();
+    let a = root.join("a");
+    std::fs::create_dir(&a).unwrap();
+    let target = a.join("scene.agscene");
+    host.storage
+        .save(&mut host.editor, &target, Fault::None)
+        .unwrap();
+    let b = root.join("b");
+    std::fs::rename(a, &b).unwrap();
+    assert!(!b.join("models").exists() && !b.join("Textures").exists());
+    let (doc, registry, code, _) =
+        Storage::load_project(&b.join("scene.agscene"), &Registry::new()).unwrap();
+    let mut moved = Host::with_project(doc, registry, code).unwrap();
+    moved.frame(None).unwrap();
+    let after = moved
+        .rt
+        .capture(moved.three, "ui005-public-moved")
+        .unwrap()
+        .0;
+    assert_eq!(before, after);
+    moved.start_selected_play().unwrap();
+    moved.pause_play("");
+    settle_play(&mut moved);
+    moved.play.as_mut().unwrap().resume().unwrap();
+    user_step(&mut moved);
+    assert!(moved.play.as_ref().unwrap().error.is_none());
+    moved.stop_play();
+    lifecycle_report(
+        "public-project",
+        json!({"models":3,"raw_identities":4,"bound_auto":true,"runtime_instances":true,"runtime_camera":true,"saved_moved_reopened":true,"pixels_equal":true,"reopened_auto_runs":true}),
     );
 }

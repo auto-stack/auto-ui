@@ -4,6 +4,8 @@ Cargo.lock text eol=lf
 
 # Content-addressed behavior blobs retain their exact original bytes.
 samples/behavior_projects/*/scripts/*.at -text
+samples/textured_models/scripts/*.at -text
+samples/textured_models/main.at text eol=lf
 
 # New motion source blobs and exact verification receipts retain raw bytes.
 samples/motion_projects/*/scripts/*.at -text

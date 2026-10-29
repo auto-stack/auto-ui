@@ -561,7 +561,8 @@ impl Host {
         let uploads = self.rt.upload_stats();
         let asset_union = match self.active_assets() {
             Ok(assets) => {
-                json!({"count":assets.len(),"raw_bytes":assets.values().map(|a|a.bytes.len()).sum::<usize>(),"cpu_geometry_bytes":assets.values().map(|a|a.cpu_bytes).sum::<usize>(),"gpu_expected_bytes":assets.values().map(|a|a.gpu_bytes).sum::<usize>(),"decode_attempts":super::assets::decode_attempts(),"decode_us":assets.values().map(|a|a.decode_us).collect::<Vec<_>>()})
+                let (count, raw, cpu, gpu) = super::textured_models::usage(&assets);
+                json!({"count":count,"closure_count":assets.len(),"raw_bytes":raw,"cpu_geometry_bytes":cpu,"gpu_expected_bytes":gpu,"decode_attempts":super::assets::decode_attempts(),"decode_us":assets.values().map(|a|a.decode_us).collect::<Vec<_>>()})
             }
             Err(error) => json!({"error":error}),
         };

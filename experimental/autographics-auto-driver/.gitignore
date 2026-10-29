@@ -1,5 +1,6 @@
 /.sdk-source/
 /target/
+__pycache__/
 /driver-report/
 /research/*.txt
 !/research/baseline.json.txt
