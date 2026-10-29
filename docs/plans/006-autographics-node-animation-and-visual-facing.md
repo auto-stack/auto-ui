@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-006
-status: execution_done
+status: reviewed
 feature_name: AutoGraphics无蒙皮节点动画与视觉朝向
 author: [Codex]
 created_at: 2026-10-29
 updated_at: 2026-10-30
 plan_revision: 2
-current_step: 6
+current_step: 7
 total_steps: 10
 depends_on: [auto-ui/PLAN-005]
 supersedes_spec_components:
@@ -106,12 +106,12 @@ phase固定为Auto显式给出的有限非负f32 seconds，不能同时存在两
 
 | ID | owner_stage | 结果与证据 |
 |---|---|---|
-| AC-01 | work | R1 finding已由82ba57e修复并局部实测：22个used/unused反例、原始14复审fixture、合法模式/共享target/8192边界均通过，见work/r1-admission-repair.md；待独立R2确认 |
+| AC-01 | work | R2 pass：F-006-R1-UNUSED-SAMPLER关闭；原始14fixture/22内置反例及合法边界重放、独立7个末尾clip/offset/共享accessor/索引前插兄弟输入通过，见review/r2.md；原资源/保存证据有效保留 |
 | AC-02 | work | V-02已通过：原四clip21状态/双实例、独立源顶点/GPU、STEP旋转实际GPU与错误插值负控，见t04-pixels-and-input-diagnosis.md及r2-input-pixels-and-lifecycle.md |
 | AC-03 | work | V-03已通过：四向真实位移/可见朝向、stop/±pi、240tick动画开关物理/支撑/触发相同、独立同pose阴影ROI0误差及两负控，见r2-input-pixels-and-lifecycle.md |
 | AC-04 | work | V-04已通过：完整last-good/坏输出/prepare失败、Pause/neutral Step/fresh、20轮Play/restart/Stop真实weak/暖mesh与texture上传0增量/最终pin释放，见r2-input-pixels-and-lifecycle.md |
 | AC-05 | work | 已通过：T-02完整32/33真实预算、T-06仓外完整消费/冷重开/真实Auto源变异、继承兼容、1477文件current identity/controls与CPU包络，见t06-consumer-and-identity.md；非Rust玩法 |
-| AC-06 | review | R1 needs_fix历史保留；work已交F-006-R1-UNUSED-SAMPLER修复/新SD与身份，待原独立上下文R2；T-07未完成，merge冻结门pending |
+| AC-06 | review | R2 independent final pass，a85980c/e2994efa；R1唯一finding及共因/兄弟路径关闭，SD通过，无开放finding；T-07完成，新34case冻结merge门pending |
 | AC-07 | merge | 新冻结提交定向门绿后合master，保留全AG里程碑pending |
 | AC-08 | merge | SD/ledger/索引、本仓归档/delivery收据、guard clean清树，无Gallery/完整M2完成宣称 |
 
@@ -125,7 +125,7 @@ phase固定为Auto显式给出的有限非负f32 seconds，不能同时存在两
 | T-04 | work | T-02 r2恢复通过、T-03 | Auto公开视觉输出/Host采样/renderer色图与shadow，V-02/03；r2输入路径驱动朝向/物理 | AC-02/03 | [x] ccfe6d9+04042f8；原四clip/顶点/GPU+STEP/四向/±pi/240tick物理/同pose阴影ROI与负控 |
 | T-05 | work | T-04 | 事务/实例代次/新局/暂停单步/owner与20轮V-04 | AC-04 | [x] 04042f8；完整last-good/新槽初pose/Pause/Step/40VM与pose释放/暖mesh与texture0上传/预算账 |
 | T-06 | work | T-05 | fresh消费/预算/兼容/identity controls、fmt/warnings/提交、SD与下游接口 | AC-01..05 | [x] 82ba57e/a85980c修复交接；e2994efa当前1477身份/SD/新仓外消费1/1，未变CPU/兼容/画面owner有效证据保留；新34case冻结门归merge |
-| T-07 | review | T-06 | 同树独立review全部V/S与遗漏，merge门pending | AC-06 | [ ] |
+| T-07 | review | T-06 | 同树独立review全部V/S与遗漏，merge门pending | AC-06 | [x] a85980c上R2受影响独立final pass；原R1完整矩阵按不变路径复用，修复/SD/身份/消费关闭，review/r2.md |
 | T-08 | merge | T-07 pass | 冻结提交定向门/有效复用，通过才合本仓master | AC-07 | [ ] |
 | T-09 | merge | T-08 | Spec/ledger/索引、本仓归档与真实delivery SHA/clip接口/消费包身份 | AC-08 | [ ] |
 | T-10 | merge | T-09 | wt-guard clean后清唯一树/分支/空组与恢复收据 | AC-08 | [ ] |
@@ -180,8 +180,12 @@ F-006-W1-INPUT-BUDGET：补入真实4向held+跳跃pressed后，即使不读even
 
 2026-10-30 goal round 10：`stage: goal | plan_id: PLAN-006 | plan_revision: r2 | round: 10 | from: work | to: review | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-006/auto-ui | commit: a85980c1c123c793188623d9a5d3df8dd117d2d7 | next: affected independent final review R2`。前轮独立反例为有效进展，本轮第1个有界repair cycle完成同机制/兄弟路径与正式原始fixture重放、新当前身份/SD及受影响仓外消费；没有改目标、AC、额度或收缩支持。R1原始失败记录保留，review计数不重置；仍待T07..10。主检出并发的其它Plan/design/README文档改动保留。
 
+2026-10-30 independent final R2：`stage: review | review_scope: final | reviewer_identity: same independent R1 agent /root/review_plan006, separate from implementation; no other model/session identity asserted | plan_id: auto-ui/PLAN-006 | plan_revision: 2 | outcome: pass | worktree_path: D:/autostack/.wt/ui-006/auto-ui | branch: codex/plan-006-dev | reviewed_commit: a85980c1c123c793188623d9a5d3df8dd117d2d7 | base_commit: 80d9bbe3095892fcf5507dd1b9e26af523111fd4 | repair_base: 3a6404ef24468cad081ec3332acdef83230b04e7 | dependency_revisions: 005=351919c76b4ef1d940fc7b8120254e321c41cba2,004fix=0261ae9dacf786beb6dceb630be6af267f242625,SDK=7b987ca8b12f2eec3c076a1bfbf3ff4663aa8467/two locks unchanged | spec_inputs: auto-lang3e2b8b62053ab1724454bc6fe252987ed39c6ab4; six relevant raw hashes identical to R1, table in attachments/006/review/r2.md | acceptance_results: AC01..06 pass,AC07/08 merge pending | pending_closeout_gates: T08 new34case frozen gate+controls/valid reuse bound to e299 identity before merge,T09 SD/derived ledger/index/archive/delivery,T10 guard cleanup | findings: F-006-R1-UNUSED-SAMPLER closed; no open findings | evidence: attachments/006/review/r2.md; review-r2/baseline-audit.json SHA25621da77e1cbb1a64779105746670200f16e6ab87c164277e93c4382368a6ce7ed; frozen SD SHA2563d6af002bef2c30fb84417287be8422f13468f2b82f6b18f7d2734bbf28e7621 | next: merge T08`。独立在当前代码重跑新resources case，原14冻结GLB与22个used/unused反例/4合法模式/共享target/8192口径通过，1/1（5filtered）；另新编译链接当前producer的外置probe，独立7个末尾clip/非零offset/最后VEC4分量Inf/跨clip共享accessor/前插sampler索引重编号用例全部符合：3坏例invalid且decode0拒，4合法例原44channels、四clip duration、phase0/.19/2 pose及retained CPU bytes相同。当前identity verify exit0；逐文件核1477集合/Git/B和原14hash；旧50a/33整体报告在当前validator预期exit1拒绝stale身份，未给旧报告换标签。源码实际仅共同admission变化，sample/Auto/Host/renderer/physics/VM/owner/SDK/锁/素材均未改，故R1已核其余AC/V/S逐项有依据复用；受影响core5/资源6（最终新case扩断言1/1）与新B消费1/1（1filtered）原日志/数值/hash核验成立，不重复GPU/20owner/CPU矩阵/完整34case门。SD新增四行忠实阐明既有unused/target角色口径，三个目标/GOAL-008正确，无合同删弱或升额度。实施HEAD/clean结论前复核无漂移；T07完成，7/10、reviewed，未合入/发布规范/提交或清树。
+
+2026-10-30 goal round 11：`stage: goal | plan_id: PLAN-006 | plan_revision: r2 | round: 11 | from: review | to: merge | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-006/auto-ui | commit: a85980c1c123c793188623d9a5d3df8dd117d2d7 | next: merge T08..10`。上一轮为实际修复与当前消费证据进展；本轮原独立上下文R2按受影响面重放原始输入和7个自选兄弟控制，唯一R1 finding已闭且无新finding，全部work/review-owned AC通过，7/10。R2 Markdown SHA256 b5958ab5c8e3371f40045c6e898ccde811b5e3221dcfa926276628203eb51897、独立audit21da77e1cbb1a64779105746670200f16e6ab87c164277e93c4382368a6ce7ed、SD3d6af002...均已核原文件；实施HEAD/clean与e299身份未漂移。下一轮必须执行新34case冻结门+controls后才合入，再规范/ledger/索引/归档/delivery/guard清理；不以本pass提前算目标完成。用户已授权的全链与独立review授权继续有效，无待答问题；保留R1失败计数和所有历史证据，不重置goal cap12。
+
 ## 10. 待澄清事项
 
-当前无用户待答问题。R1唯一finding已由82ba57e修复并实测，6/10、execution_done；下一责任为已获用户授权的原独立上下文，在a85980c上做R2受影响final复审。修复当前证据见work/r1-admission-repair.md，原失败finding与输入仍在review/r1.md保留；work-owned开放finding/覆盖缺口为空但尚无R2 pass。T07..10及新34case冻结merge门/规范ledger/归档/guard清理仍pending，目标active，不提前宣称完成。
+当前无用户待答问题。R2已在a85980c/e2994efa上独立final pass，R1唯一finding关闭，T07完成、7/10、reviewed；完整判断及复用边界见[受影响复审](attachments/006/review/r2.md)，原R1失败finding/输入保持历史可追溯。下一责任merge T08先核当前新34case冻结门及controls/有效复用，绿后才合入；T09规范/derived ledger/索引/归档/delivery、T10 guard清树仍pending。reviewed不表示已经合入或目标完成。
 
 原规划的005交付身份与原clip实读风险已关闭；如后续发现必需clip需本期外插值或无法在既有预算内组合，仍带原件与反例回new，显式提出合同/预算变化，不能丢动作或换成Bob动画。声音/HUD、G09/G10内容、完整两关与最终发行另立后继合同，跨端不插入桌面M2前置。
