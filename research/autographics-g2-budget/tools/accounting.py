@@ -43,6 +43,10 @@ def account(source,case,frame,phase=None,ordinal=None):
     elif "goal-without-coins"in case or "enemy-contact"in case:events=0 if ordinal==1 else 1
     if "dropped-third-event"in case:events=2;despawns=2
     if "duplicate-coin-intent"in case or "dropped-coin-intent"in case or "intent-source-restored"in case:events=4;despawns=3
+    # Event reads consume the previous tick's queue. app_start never evaluates
+    # these fixtures; first app_update has no queued contacts, regardless of label.
+    first_update=(tick==1 and not error)or(tick==0 and bool(error))
+    if first_update:events=0;despawns=0
     cap=2 if "for i in 0..2"in body else 6
     calls.update(ag_event_next=[1,cap]if events is None else min(events+1,cap),ag_event_pair=[0,5]if events is None else events,ag_event_phase=[0,5]if events is None else events,ag_object_despawn=[0,3]if events is None else despawns)
    # Original first-callback failure is a normal26 movement/first sprite transition,
@@ -79,7 +83,7 @@ def build(evidence):
    source=path.read_text().replace("\r\n","\n")
    a=account(source,case,frame,phase,ordinal)
   else:a=dict(phase="host_lifecycle_no_callback",public_call_counts={},source_required_credit_range=[0,0],method="host operation;not an Auto callback")
-  entries.append(dict(evidence=e["path"],case=case,run=frame.get("run"),published_tick=frame.get("tick"),attempted_tick=frame.get("tick",0)+1 if frame.get("error")else frame.get("tick"),source_sha256=digest,account=a))
+  entries.append(dict(identity_basis=frame.get("identity_basis","raw frame or source-derived transition; unavailable Run stays null"),evidence=e["path"],case=case,run=frame.get("run"),published_tick=frame.get("tick"),attempted_tick=frame.get("tick",0)+1 if frame.get("error")else frame.get("tick"),source_sha256=digest,account=a))
  for e in evidence:
   bindings.append(dict(path=e["path"],sha256=e["sha256"]))
   d=json.loads(pathlib.Path(e["path"]).read_text())
@@ -93,7 +97,9 @@ def build(evidence):
     name=r["case"];digest=r.get("source_sha256")
     if "frame"in r:add(e,name,r["frame"],digest)
     elif "trajectory"in r:
-     for t in r["trajectory"]:add(e,name,{"tick":t["t"]+1},by["jump-rise"]["source_sha256"])
+     for t in r["trajectory"]:
+      anchor=by["jump-rise"]["frame"]
+      add(e,name,{"run":anchor["run"],"tick":anchor["tick"]+t["t"]+1,"identity_basis":"bound jump-rise Run/tick plus relative trajectory offset"},by["jump-rise"]["source_sha256"])
     elif "cycles"in r:
      for c in r["cycles"]:add(e,name,c["first"],by["exact-source-restored"]["source_sha256"]);add(e,name+"-Stop",c["first"])
     else:add(e,name,{})
@@ -114,3 +120,39 @@ def build(evidence):
  api=pathlib.Path("D:/autostack/plan-artifacts/auto-ui/plan-011/consumer/experimental/autographics-auto-driver/api")
  price_inputs=[dict(path=str(api/name),sha256=sha(api/name))for name in ["character2d_v1.at","behavior_motion_v5.at","runtime_objects_v1.at","runtime_triggers_v1.at","sprite2d_v1.at","runtime_camera2d_v1.at"]]
  return dict(price_inputs=price_inputs,calibration_cases=["boundary-32","boundary-33","b-cached-idle32","b-first-run-frame33"],schema="ui011-callback-account/1",basis="fixed0261 public source prices and measured32/33 controls",source_credit_meter="not_read",bindings=bindings,entries=entries)
+
+def validate_semantics(ledger,evidence):
+ """Independent protocol/observation constraints; not builder equality alone."""
+ entries=ledger["entries"]
+ for e in entries:
+  a=e["account"];lo,hi=a["source_required_credit_range"]
+  assert 0<=lo<=hi
+  if a["phase"]=="host_lifecycle_no_callback":
+   assert a["public_call_counts"]=={} and[lo,hi]==[0,0];continue
+  if a["diagnostics"]=="accepted frame":assert lo<=32,"accepted callback demands more than32"
+  if a["observed_limit_refusal"]:
+   assert a["first_refused_credit_demand"]==33 and a["diagnostics"]=="last_good_only"and a["unreached_suffix"],"Fault cannot publish fresh diagnostics"
+  calls=a["public_call_counts"]
+  if a["phase"]=="app_update" and e["attempted_tick"]==1 and "ag_event_next"in calls:
+   assert interval(calls["ag_event_next"])==[1,1],"first update reads one absent event"
+   assert all(interval(calls.get(n,0))==[0,0]for n in["ag_event_pair","ag_event_phase","ag_object_despawn"]),"first-update queue must be empty"
+  if e["case"]=="boundary-32":assert[lo,hi]==[32,32]
+  if e["case"]=="boundary-33":assert[lo,hi]==[33,33]
+  if a["phase"]=="app_start":assert[lo,hi]==[11,11]
+ for raw in evidence:
+  if raw["kind"]!="branches":continue
+  d=json.loads(pathlib.Path(raw["path"]).read_text());by={r["case"]:r for r in d["rows"]}
+  air=[e for e in entries if e["evidence"]==raw["path"]and e["case"]=="air-rejump-and-land"]
+  anchor=by["jump-rise"]["frame"];trajectory=by["air-rejump-and-land"]["trajectory"]
+  assert len(air)==len(trajectory)
+  for e,t in zip(air,trajectory):
+   assert e["run"]==anchor["run"]and e["published_tick"]==anchor["tick"]+t["t"]+1,"relative trajectory mislabelled as absolute identity"
+  for r in d["rows"]:
+   seq=r.get("states",[])
+   ledger_seq=[e for e in entries if e["evidence"]==raw["path"]and e["case"]==r["case"]+"-sequence"]
+   assert len(seq)==len(ledger_seq)
+   for n in range(1,len(seq)):
+    before=seq[n-1]["frame"];after=seq[n]["frame"]
+    if before.get("diagnostic")and before["diagnostic"][1]in[1,2]and before["run"]==after["run"]:
+     calls=ledger_seq[n]["account"]["public_call_counts"]
+     assert calls.get("ag_action_pressed")==1 and not any(calls.get(k)for k in["ag_char_move","ag_event_next","ag_object_move"]),"ended callback cannot continue running gameplay"

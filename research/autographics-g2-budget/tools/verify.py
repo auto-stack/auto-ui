@@ -76,6 +76,7 @@ def validate(d):
  assert d["performance_windows"]==bound.performance_windows(d["evidence"]),"performance summary contradicts raw"
  assert d["target_8ms"]==bound.target_status(d["performance_windows"]),"8ms classification contradicts raw"
  ledger=d["callback_ledger"];p=pathlib.Path(ledger["path"]);assert sha(p)==ledger["sha256"]
+ accounting.validate_semantics(json.loads(p.read_text()),d["evidence"])
  assert json.loads(p.read_text())==accounting.build(d["evidence"]),"callback account contradicts source/raw"
  assert all(d["denominator"][f"G2-{n:02d}"]=="not_established_budget_fault" for n in range(1,9))
  assert d["denominator"]["G2-09"]=="missing_public_capability"
@@ -121,5 +122,13 @@ def main():
   path=a.report.parent/"decision-controls/measured-9s-performance.json";path.write_text(json.dumps(raw));entry.update(path=str(path),sha256=sha(path))
   rejected(m)
   m["performance_windows"]=bound.performance_windows(m["evidence"]);m["target_8ms"]="met_for_measured_prefix_only";rejected(m)
+ if a.controls:
+  for mode in ["accepted-over-cap","shifted-air-tick"]:
+   m=copy.deepcopy(d);raw=json.loads(pathlib.Path(m["callback_ledger"]["path"]).read_text())
+   if mode=="accepted-over-cap":
+    row=next(e for e in raw["entries"]if e["case"].endswith("-peak-sequence")and e["account"]["diagnostics"]=="accepted frame");row["account"]["source_required_credit_range"]=[47,47]
+   else:
+    row=next(e for e in raw["entries"]if e["case"]=="air-rejump-and-land");row["published_tick"]=1;row["run"]=None
+   path=a.report.parent/"decision-controls"/f"{mode}.json";path.write_text(json.dumps(raw));m["callback_ledger"]={"path":str(path),"sha256":sha(path)};rejected(m)
  print(f"PASS honest bounded no-go decision; invalid reports rejected={n}")
 if __name__=="__main__":main()
