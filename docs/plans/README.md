@@ -1,25 +1,23 @@
 # auto-ui 计划管理
 
-2026-10-29：按用户裁定，计划在所属代码/内容仓的主检出管理，源码实施仍在独立worktree。
+本仓独立编号从001开始；本地下一号见`.next-id`。跨仓身份写作`auto-ui/PLAN-NNN`。
 
-- 活动合同、进度、复审与归档均在本仓docs/plans/；归档目录为docs/plans/archive/。
-- 跨仓计划由主责任仓持一份合同，其他仓只留指引，不复制状态机。
-- 导入的原编号保留，不重编号、不回收auto-lang已取号；跨仓引用必须带仓名。
-- 后续本仓取号以本地.next-id和活动/归档最大号复核，独占分配、创建不覆盖；不再到auto-lang创建本仓新计划。仓间号码可能相同，以“仓名/PLAN-NNN”区分。
-- 四阶段沿用new→work→独立review→merge；一Plan每仓一权威实现树，同树顺序复审，worktree禁止链接、清理先guard。
-- 计划簿记允许本仓主检出；源码修改/构建/测试在合同指定worktree，禁止把此迁移当作实现授权。
-- AG继续固定旧SDK/独立experimental workspace及最新受影响测试政策；完整AG留里程碑，OS抢焦点自动化暂停。
-- 原始非Markdown证据保留本地，不以此次文档迁移复制原始日志/截图/target。
+## 当前合同
 
-## 当前记录
+| 本仓号 | 计划 | 旧仓来源 | 状态 |
+|---|---|---|---|
+| 001 | [运行对象生命周期](001-autographics-runtime-object-lifecycle.md) | auto-lang/PLAN-882 | drafting r3，未执行 |
+| 002 | [触发、新局与G11](002-autographics-trigger-events-and-round-restart.md) | auto-lang/PLAN-883 | drafting r3，等本仓001交付 |
 
-- [882-autographics-runtime-object-lifecycle.md](882-autographics-runtime-object-lifecycle.md)：drafting r2。
-- [883-autographics-trigger-events-and-round-restart.md](883-autographics-trigger-events-and-round-restart.md)：drafting r2。
+下一份新计划为003，之后004…；不能因导入历史号882/883而跳过本地001/002。
 
-## 来源保全
+## 管理规则
 
-- `docs/plans/882-autographics-runtime-object-lifecycle.md` ← `auto-lang/docs/plans/882-autographics-runtime-object-lifecycle.md`；原字节SHA-256 `3610afd8cc9569fb7d7e6ad095c32dd7a58dd78c38d26a5e5e8c48b759964333`。
-- `docs/plans/883-autographics-trigger-events-and-round-restart.md` ← `auto-lang/docs/plans/883-autographics-trigger-events-and-round-restart.md`；原字节SHA-256 `5ca339b051af0a373fb3fb98664bd60d46329335cbd4dfe8262b040644e3fef5`。
-- `docs/plans/attachments/882/planning/baseline.md` ← `auto-lang/docs/plans/attachments/882/planning/baseline.md`；原字节SHA-256 `8b4bb73d5059ac649046f12deeed0ecf15699ec4837d5e6171150fb7803ee2dc`。
+- 本仓主检出`docs/plans/`持唯一活动合同、进度、复审和归档；归档目录为`archive/`。
+- 取号只扫描本仓活动/归档的本地Plan；外仓历史来源、附件、重定向不计高水位。独占核`.next-id`和本地最大号后创建，禁止覆盖。
+- 跨仓计划由主责任仓持一份合同，参与仓只留定位指引；旧auto-lang编号保留为来源，不再作为本地编号。
+- 四阶段new/work/独立review/merge沿用；源码修改和构建在合同指定唯一worktree，Plan簿记在本仓主检出；禁止worktree链接，清理先guard。
+- 当前两份仅规划；变更相关测试/全量AG里程碑/OS自动化暂停等原政策保持。
+- 旧Specs/设计的现有知识权威仍按Plan跨仓引用，本次没有批量复制历史知识。
 
-旧Specs/设计的当前存放位置由各Plan明确跨仓引用；本次没有批量迁移历史知识，也没有建立第二套同名canonical Specs。
+r2文档原貌保留于本仓提交`6c7bcdccb08b6320e5920e704990ab6eaa515e41`；r1保留于auto-lang提交`a5d8a4fa8`。编号更正不重写这些历史。

@@ -1,11 +1,11 @@
 ---
-plan_id: PLAN-882
+plan_id: PLAN-001
 status: drafting
 feature_name: AutoGraphics有限运行对象身份与生命周期
 author: [Codex]
 created_at: 2026-10-29
 updated_at: 2026-10-29
-plan_revision: 2
+plan_revision: 3
 supersedes_spec_components:
   - docs/specs/auto-graphics/scene-play-session.md
   - docs/specs/auto-graphics/auto-source-driver.md
@@ -13,26 +13,27 @@ new_spec_components:
   - docs/specs/auto-graphics/runtime-objects.md
 touched_goals: [GOAL-008]
 affects: [auto-graphics]
-depends_on: [PLAN-879]
+depends_on: [auto-lang/PLAN-879]
 current_step: 0
 total_steps: 10
 ---
 
-# [PLAN-882] AutoGraphics有限运行对象身份与生命周期
+# [PLAN-001] AutoGraphics有限运行对象身份与生命周期
 
-> **2026-10-29 管理归属修订 r2**：本计划的唯一合同、进度、复审、归档均在 **auto-ui/docs/plans/**，不再在auto-lang维护活动副本。保留原编号PLAN-882，跨仓引用写作`auto-ui/PLAN-882`；原功能AC/V/任务分母与源码基线不变，所有任务仍未执行。原r1完整文本可从auto-lang提交`a5d8a4fa8`恢复。既有Spec/设计尚在auto-lang的部分按下文跨仓链接读取，SD表路径暂以该现有知识仓为根；本次只迁Plan管理，不把历史Specs/设计批量复制成第二份权威。
+
+> **本仓编号更正 r3（2026-10-29）**：唯一身份为`auto-ui/PLAN-001`，来源为旧`auto-lang/PLAN-882`。本仓计划从001独立取号，旧号只作来源映射，不作为本仓编号高水位。功能/AC/V及任务进度保持，仍drafting、未执行；实施树和分支改为本仓新号。既有auto-lang Specs/设计继续明确跨仓引用，未批量迁移知识。
 
 ## 0. 变更摘要
 
-在879迁仓交付后的auto-ui实验源码上，交付用户Auto驱动的两维有限运行对象：从已接受叶模板spawn、平移/显隐、despawn、同槽新代重用与跨Run失效。运行对象与角色/相机同帧受检发布；不改编辑文档或旧profile。后续[883](883-autographics-trigger-events-and-round-restart.md)在本计划实际交付后接触发和新局。
+在879迁仓交付后的auto-ui实验源码上，交付用户Auto驱动的两维有限运行对象：从已接受叶模板spawn、平移/显隐、despawn、同槽新代重用与跨Run失效。运行对象与角色/相机同帧受检发布；不改编辑文档或旧profile。后续[002](002-autographics-trigger-events-and-round-restart.md)在本计划实际交付后接触发和新局。
 
 ## 1. 目标
 
 - 对象真实存在于受检Run对象表，生命周期不是仅切换visible；销毁后身份及消费者资格消失，同槽复用获得新generation。
 - 一套公开Auto合同覆盖2D/3D，复用现有单Host/Play/SDK/资源/GPU；两维最小项目可仓外运行并有真实内容/来源/owner证据。
-- 保持角色、相机、整帧失败last-good、Stop/新Run与编辑隔离；预留883需要的几何/代次接缝。
+- 保持角色、相机、整帧失败last-good、Stop/新Run与编辑隔离；预留002需要的几何/代次接缝。
 
-非目标：触发事件/新局服务（归883）、G11 Gallery（归883）、880 G07/G08、完整游戏、动态solid/移动平台/自由刚体、生成角色/相机目标、运行时导入资源、动态组/父子拓扑/任意prefab、缩放/旋转/材质writer、动画/声音/HUD、UI/ACE融合、WASM/迁仓/发布。实例是非solid叶，旧静态角色/solid合同不扩大。
+非目标：触发事件/新局服务（归002）、G11 Gallery（归002）、880 G07/G08、完整游戏、动态solid/移动平台/自由刚体、生成角色/相机目标、运行时导入资源、动态组/父子拓扑/任意prefab、缩放/旋转/材质writer、动画/声音/HUD、UI/ACE融合、WASM/迁仓/发布。实例是非solid叶，旧静态角色/solid合同不扩大。
 
 ## 2. 架构方案
 
@@ -52,7 +53,7 @@ total_steps: 10
 
 输入：`docs/specs/overview.md`、`auto-graphics/{source-repository-and-sdk,overview,behavior-api,scene-document,scene-play-session,spatial-query-profile,game-character3d,runtime-game-cameras}.md`、[Design45§13](../../../auto-lang/docs/design/45-autographics-wgpu-engine-and-game-prototypes.md#13-m2运行对象触发与新局事务2026-10-29拟议合同)、[运行设计](../../../auto-lang/docs/design/autographics/m2-runtime-and-character-control.md)、[游戏分母](../../../auto-lang/docs/design/autographics/m2-game-sample-matrix.md)。本轮不改canonical Specs。
 
-879实际交付auto-ui master=`4adf2d037a1804741adc9c5a012f08cfa566439d`，规划时clean；旧语言`autographics-dev=f07b5ec8`仅历史/指引，不再建引擎实现树。879迁移702文件，695恒等/7声明修改，SDK681文件快照在driver/sdk/frozen，当前身份1387条，冷准备`--from-snapshot`已交付；SDK pin仍7b987ca8、两AG锁不变。工作输入完整指纹见[本轮基线](attachments/882/planning/baseline.md)。
+879实际交付auto-ui master=`4adf2d037a1804741adc9c5a012f08cfa566439d`，规划时clean；旧语言`autographics-dev=f07b5ec8`仅历史/指引，不再建引擎实现树。879迁移702文件，695恒等/7声明修改，SDK681文件快照在driver/sdk/frozen，当前身份1387条，冷准备`--from-snapshot`已交付；SDK pin仍7b987ca8、两AG锁不变。工作输入完整指纹见[本轮基线](attachments/001/planning/baseline.md)。
 
 当前限制有源码证据：旧api ag_valid仅ordinal范围，所有count/拓扑/资源冻结；Play::admit要求`4+22*N+camera`及固定identity/kind/parent/resource，Frame是静态Document派生；Descriptor绑定base hash/行数≤128；viewport只渲染Frame.objects，潜在mesh≤512。故不能删count校验、隐藏金币或复用旧ordinal来宣称动态生命周期。新扩展必须携带独立受检Run表和转移边界。
 
@@ -62,9 +63,9 @@ total_steps: 10
 
 ### 5.1 实施入口和先行可行性门
 
-未来唯一实现树`D:/autostack/.wt/lang-882/auto-ui`、分支`codex/plan-882-dev`，从核实的auto-ui master（规划pin如上）建树，源码只合auto-ui/master；auto-ui主检出负责本Plan簿记；语言仓仅按现有知识归属同步Spec/历史索引，不建可写auto-lang引擎树。新增目标AGENTS若有须读。每Plan每仓一树，同树顺序work/独立review/merge；无junction/symlink，guard后清理。
+未来唯一实现树`D:/autostack/.wt/ui-001/auto-ui`、分支`codex/plan-001-dev`，从核实的auto-ui master（规划pin如上）建树，源码只合auto-ui/master；auto-ui主检出负责本Plan簿记；语言仓仅按现有知识归属同步Spec/历史索引，不建可写auto-lang引擎树。新增目标AGENTS若有须读。每Plan每仓一树，同树顺序work/独立review/merge；无junction/symlink，guard后清理。
 
-T-01核879实际切源与当前owner/base/SDK/锁/current identity。T-02在`attachments/882/work/runtime-objects-contract.md`先冻结公开函数、profile、整数token、对象输出/操作转移准入、实际计费与支持包络，再做真实Auto整路径检查：角色移动/归一/跳、相机、8槽对象创建/移动/销毁/同槽重用，及为883预留的“三物品同时收集”操作组合。不能只证明独立spawn不超限。
+T-01核879实际切源与当前owner/base/SDK/锁/current identity。T-02在`attachments/001/work/runtime-objects-contract.md`先冻结公开函数、profile、整数token、对象输出/操作转移准入、实际计费与支持包络，再做真实Auto整路径检查：角色移动/归一/跳、相机、8槽对象创建/移动/销毁/同槽重用，及为002预留的“三物品同时收集”操作组合。不能只证明独立spawn不超限。
 
 原hard limits不变：总节点128、32credits/callback、1000steps/slice、100000steps/callback、120resumes/250ms、用户256KiB/managed64KiB/combined320KiB、初始化30s/整tick2s/每轮8ms目标。879固定SDK不改。需要新profile专用紧凑动作快照/批量只读访问时，签名/价格由T-02先冻结且只在新profile生效；不把开多个callback或隐藏免费扫描当预算解决方案。若整组合不可行，保留计数/源长度/反例回new，不静默抬限或移Rust做玩法。
 
@@ -74,7 +75,7 @@ T-01核879实际切源与当前owner/base/SDK/锁/current identity。T-02在`att
 
 模板仅来自本Run接受的同维叶，公开注册使用受检base节点映射；未知/组/错维/不支持shape/非有限/越界拒绝。资源、kind、scale/yaw/pitch/材质冻结，可用当前支持的内建与静态GLB完整mesh；spawn提供根级世界xyz，2D z必须0，继承模板形状/资源而不继承父子依赖。模板本身仍为原静态节点（显隐由原接口决定），不能偷偷从Document删去以换预算。
 
-运行实例不能被当成角色、静态solid或相机target；是非solid对象，882不让它阻挡角色。运行对象参与的是正式对象注册和有界几何描述，883据此做触发；旧ordinal查询不自动接受实例token。存活但隐藏的实例仍具有身份/几何，和销毁不同。
+运行实例不能被当成角色、静态solid或相机target；是非solid对象，001不让它阻挡角色。运行对象参与的是正式对象注册和有界几何描述，002据此做触发；旧ordinal查询不自动接受实例token。存活但隐藏的实例仍具有身份/几何，和销毁不同。
 
 身份至少含Run、slot、正generation，Run/generation均整数传输，禁止浮点截断或低位别名；编码/整数边界T-02冻结，耗尽具名拒绝，禁止回绕。公开接口须显式携带或可验证绑定Run，不能仅一个每Run重置的slot数字；旧Run同值token无效。允许合法absence检查返回false，其他读写/二次销毁/错Run/旧generation为sticky first error，整callback Fault/闭VM，不返回伪成功。
 
@@ -123,7 +124,7 @@ work自查→独立上下文最终review→merge冻结受影响门，同一auto-
 
 新测试T-03/04建立：driver `cargo check --locked`、`cargo fmt -- --check`、`cargo test --locked --test runtime_objects_api --test runtime_objects_host --test runtime_objects_samples -- --test-threads=1`；现有runtime_camera_host/character3d/assembly/Play选受影响命名case（无原生窗口），checker实参/controls与报告集合T-02冻结。source验证必须含新identity `--controls`、`prepare_sdk --verify-only`、`verify_source`和独立consumer命令。AGP有修改才跑其受影响面，default UI manifest/锁/crates零功能diff；根语言无改动不跑根cargo t/tf/tv/tu/docs_gen，不跑全UI/全AG。
 
-原始探针/输出/截图本地`D:/autostack/plan-artifacts/plan-882/`，attachments只提交md摘要/契约（命令/exit/数字/路径/hash）。复用证据说明代码/依赖/配置/输入未变；新运行表/消费者不能只引用旧套件绿。
+原始探针/输出/截图本地`D:/autostack/plan-artifacts/auto-ui/plan-001/`，attachments只提交md摘要/契约（命令/exit/数字/路径/hash）。复用证据说明代码/依赖/配置/输入未变；新运行表/消费者不能只引用旧套件绿。
 
 ## 7. 验收标准
 
@@ -136,7 +137,7 @@ work自查→独立上下文最终review→merge冻结受影响门，同一auto-
 | AC-05 | work | 双布置/参数敏感、实际内容/多mesh/消费/预算与真实负控闭合，V-04/05 |
 | AC-06 | review | 独立逐项核AC/V/SD、身份/状态转移/遗漏/fmt/新增warnings，merge门pending |
 | AC-07 | merge | 冻结受影响抽样/新必需对照与复用审计通过，失败回work复审 |
-| AC-08 | merge | 源码与本Plan归档只落auto-ui；既有语言知识按SD同步索引，guard清理并交883实际SHA |
+| AC-08 | merge | 源码与本Plan归档只落auto-ui；既有语言知识按SD同步索引，guard清理并交002实际SHA |
 
 ## 8. 执行步骤
 
@@ -155,12 +156,18 @@ work自查→独立上下文最终review→merge冻结受影响门，同一auto-
 
 ## 9. 复审记录
 
+以下r1/r2记录保留原编号，属于历史来源，不是本仓新号的执行记录。
+
+
 2026-10-29 new r1：`stage: new | plan_id: PLAN-882 | plan_revision: 1 | outcome: pass | next: 用户启动work后T-01→T-02`。879实际交付已核，880固定输入可并行；本合同先限8槽非solid根叶，T-02拥有身份/帧/价格及整路径可行性冻结，不预填未测资源余量。未实现任何函数/新树/SDK准备/构建/OS/GPU/agent/远端动作，所有AC/V/T/SD未执行。
 
 2026-10-29 new合同预检：0..10节、唯一AC-01..08/V-01..05、分stage任务与SD覆盖已核；本批两Plan及五份路线文档109个本地链接均可解析、编号各唯一，880跟踪文件相对HEAD零diff。仅结构/路径/合同自查，不是实现或独立final review。
 
 2026-10-29 new r2：`stage: new | plan_id: PLAN-882 | plan_revision: 2 | outcome: pass | next: 用户启动work后T-01/T-02`。用户明确裁定AG计划在auto-ui、Gallery计划在ag-examples管理；本次只修正计划仓/路径/簿记归档位置，原功能范围、资源预算和AC/V不变；保留r1记录，不创建实现树/运行测试。ag-examples/PLAN-880最新收据已为delivered，G11的该项前置已满足；PLAN-882仍是883引擎硬前置。
 
+
+2026-10-29 new r3：`stage: new | plan_id: PLAN-001 | plan_revision: 3 | outcome: pass | next: 用户启动work后T-01/T-02`。用户纠正本仓001起独立编号；旧auto-lang/PLAN-882仅作来源，新合同/工作树/分支/证据目录按auto-ui本仓号。未改变功能分母、预算、进度或历史验收，未创建实现树/执行测试。ag-examples旧880已归legacy历史，不占该仓本地号。
+
 ## 10. 待澄清事项
 
-当前没有新增产品决策。8槽是第一版明确支持集，base+reserved仍≤128；不会借此关闭完整游戏的动态solid/任意拓扑等非目标。若角色/相机+对象/后继收集组合在原预算不可行，或须改SDK/旧版本/验收分母，先带反例回new由用户裁定；不静默抬限。883必须等本计划实际交付再冻结执行基线。
+当前没有新增产品决策。8槽是第一版明确支持集，base+reserved仍≤128；不会借此关闭完整游戏的动态solid/任意拓扑等非目标。若角色/相机+对象/后继收集组合在原预算不可行，或须改SDK/旧版本/验收分母，先带反例回new由用户裁定；不静默抬限。002必须等本计划实际交付再冻结执行基线。

@@ -1,11 +1,11 @@
 ---
-plan_id: PLAN-883
+plan_id: PLAN-002
 status: drafting
 feature_name: AutoGraphics有限触发事件与新局隔离及Gallery G11
 author: [Codex]
 created_at: 2026-10-29
 updated_at: 2026-10-29
-plan_revision: 2
+plan_revision: 3
 supersedes_spec_components:
   - docs/specs/auto-graphics/scene-play-session.md
   - docs/specs/auto-graphics/auto-source-driver.md
@@ -14,20 +14,21 @@ new_spec_components:
   - docs/specs/auto-graphics/gallery-runtime-objects.md
 touched_goals: [GOAL-008]
 affects: [auto-graphics, ag-examples]
-depends_on: [PLAN-882, PLAN-880]
+depends_on: [PLAN-001]
 current_step: 0
 total_steps: 11
 ---
 
-# [PLAN-883] AutoGraphics有限触发事件与新局隔离及Gallery G11
+# [PLAN-002] AutoGraphics有限触发事件与新局隔离及Gallery G11
 
-> **2026-10-29 管理归属修订 r2**：本计划的唯一合同、进度、复审、归档均在 **auto-ui/docs/plans/**，不再在auto-lang维护活动副本。保留原编号PLAN-883，跨仓引用写作`auto-ui/PLAN-883`；原功能AC/V/任务分母与源码基线不变，所有任务仍未执行。原r1完整文本可从auto-lang提交`a5d8a4fa8`恢复。既有Spec/设计尚在auto-lang的部分按下文跨仓链接读取，SD表路径暂以该现有知识仓为根；本次只迁Plan管理，不把历史Specs/设计批量复制成第二份权威。
+
+> **本仓编号更正 r3（2026-10-29）**：唯一身份为`auto-ui/PLAN-002`，来源为旧`auto-lang/PLAN-883`。本仓计划从001独立取号，旧号只作来源映射，不作为本仓编号高水位。功能/AC/V及任务进度保持，仍drafting、未执行；实施树和分支改为本仓新号。既有auto-lang Specs/设计继续明确跨仓引用，未批量迁移知识。
 
 ## 0. 变更摘要
 
-消费[882对象生命周期](882-autographics-runtime-object-lifecycle.md)实际交付，建立有界几何触发/一次事件读取及受检新Run请求。两维公开小工程验证三物品收集、危险/终点与胜负后新局，玩法仍由用户Auto负责。承接Gallery G11的两维仓外示例；内容阶段等880交付，不接管其在途树。
+消费[001对象生命周期](001-autographics-runtime-object-lifecycle.md)实际交付，建立有界几何触发/一次事件读取及受检新Run请求。两维公开小工程验证三物品收集、危险/终点与胜负后新局，玩法仍由用户Auto负责。承接Gallery G11的两维仓外示例；内容阶段等880交付，不接管其在途树。
 
-本稿是有前置的语义合同：882尚未实施，不能预填其最终版本/计费/接口。T-01/02在实际交付基线上冻结本计划；语义变化递增revision。不是完整G2/G3游戏或HUD/声音交付。
+本稿是有前置的语义合同：001尚未实施，不能预填其最终版本/计费/接口。T-01/02在实际交付基线上冻结本计划；语义变化递增revision。不是完整G2/G3游戏或HUD/声音交付。
 
 ## 1. 目标
 
@@ -42,21 +43,21 @@ total_steps: 11
 
 受信Auto按本tick接受前的实际世界位置计算有限形状相交、比较前态、提供callback内有界事件结果；用户Auto负责计数、巡逻、胜负和请求restart。Rust只做配置/身份/几何来源准入、新Run调度与GPU事务，不识别金币/终点名称执行玩法。
 
-复用一个Host/Play/Session调度栈；以新显式组合身份隔离882及所有旧profile。候选触发结果、实例生命周期、角色与相机共同准入/prepare/accept/publish；restart是候选中显式请求，在已接受边界启动全新Run，不在回调中递归建VM或复用旧globals。
+复用一个Host/Play/Session调度栈；以新显式组合身份隔离001及所有旧profile。候选触发结果、实例生命周期、角色与相机共同准入/prepare/accept/publish；restart是候选中显式请求，在已接受边界启动全新Run，不在回调中递归建VM或复用旧globals。
 
 ## 3. 技术栈
 
-auto-ui driver已有`src/authoring/{play.rs,behavior.rs,behavior/assembly.rs,game_input.rs,runtime_camera.rs,spatial.rs}`、`host/{play_adapter.rs,viewport.rs}`，882拟新增runtime_objects模块。当前实际路径与基线见[本批基线](attachments/882/planning/baseline.md)。无新增SDK/依赖。
+auto-ui driver已有`src/authoring/{play.rs,behavior.rs,behavior/assembly.rs,game_input.rs,runtime_camera.rs,spatial.rs}`、`host/{play_adapter.rs,viewport.rs}`，001拟新增runtime_objects模块。当前实际路径与基线见[本批基线](attachments/001/planning/baseline.md)。无新增SDK/依赖。
 
-本计划新路径拟为`api/runtime_triggers_v1.at`、`src/authoring/runtime_round.rs`、`tests/{runtime_triggers_api,runtime_round_host,runtime_trigger_samples}.rs`、`samples/runtime-triggers/{two,three}/`、新identity/checker；ag-examples新增`examples/g11-runtime-objects/{2d,3d}/`与README/元数据/锁。具体命名/签名/内部编号在882交付后T-02冻结，不虚构已存在API。
+本计划新路径拟为`api/runtime_triggers_v1.at`、`src/authoring/runtime_round.rs`、`tests/{runtime_triggers_api,runtime_round_host,runtime_trigger_samples}.rs`、`samples/runtime-triggers/{two,three}/`、新identity/checker；ag-examples新增`examples/g11-runtime-objects/{2d,3d}/`与README/元数据/锁。具体命名/签名/内部编号在001交付后T-02冻结，不虚构已存在API。
 
 ## 4. 需求分析与背景调查
 
-授权：用户2026-10-29要求879迁仓后规划下一阶段，880已开始开发。本轮只规划，无实现/新树/agent/880修改/远端动作；执行等待后续work指令。882是引擎硬前置；Gallery所需880已交付（ag-examples c36c412）。T-05仍要复核880后的实际工具schema及owner，不接管后续在途改动。
+授权：用户2026-10-29要求879迁仓后规划下一阶段，880已开始开发。本轮只规划，无实现/新树/agent/880修改/远端动作；执行等待后续work指令。001是引擎硬前置；Gallery所需880已交付（ag-examples c36c412）。T-05仍要复核880后的实际工具schema及owner，不接管后续在途改动。
 
-权威输入：`docs/specs/overview.md`、`auto-graphics/{source-repository-and-sdk,behavior-api,scene-play-session,spatial-query-profile,game-actions-and-character2d,game-character3d,runtime-game-cameras,gallery-basic-six}.md`；[Design45§13](../../../auto-lang/docs/design/45-autographics-wgpu-engine-and-game-prototypes.md#13-m2运行对象触发与新局事务2026-10-29拟议合同)、[游戏分母](../../../auto-lang/docs/design/autographics/m2-game-sample-matrix.md)、[Gallery矩阵](../../../auto-lang/docs/design/autographics/m2-gallery-and-capability-matrix.md)及882/880合同。本轮不改canonical Specs。
+权威输入：`docs/specs/overview.md`、`auto-graphics/{source-repository-and-sdk,behavior-api,scene-play-session,spatial-query-profile,game-actions-and-character2d,game-character3d,runtime-game-cameras,gallery-basic-six}.md`；[Design45§13](../../../auto-lang/docs/design/45-autographics-wgpu-engine-and-game-prototypes.md#13-m2运行对象触发与新局事务2026-10-29拟议合同)、[游戏分母](../../../auto-lang/docs/design/autographics/m2-game-sample-matrix.md)、[Gallery矩阵](../../../auto-lang/docs/design/autographics/m2-gallery-and-capability-matrix.md)及001/880合同。本轮不改canonical Specs。
 
-原r1只读auto-ui基线`4adf2d037a1804741adc9c5a012f08cfa566439d`（879），真实执行base必须换为882交付SHA并复核差异/SDK/锁/动态对象合同；AGSDK旧pin7b987ca8/681快照不变。ag-examples规划观察master6a223d9，880唯一树在lang-880；不能据drafting/clean断言其无owner或抢树。G11内容实际base必须为880交付，按其最终按项锁schema，不用本稿猜未来格式。
+原r1只读auto-ui基线`4adf2d037a1804741adc9c5a012f08cfa566439d`（879），真实执行base必须换为001交付SHA并复核差异/SDK/锁/动态对象合同；AGSDK旧pin7b987ca8/681快照不变。ag-examples规划观察master6a223d9，880唯一树在lang-880；不能据drafting/clean断言其无owner或抢树。G11内容实际base必须为880交付，按其最终按项锁schema，不用本稿猜未来格式。
 
 源码已核：旧v2 `ag_aabb_overlaps`是闭区间、单对查询，没有引擎事件队列；用户例子自己存前态。Play新Run会重建VM，Stop保编辑Prepared；缺少公开用户restart请求与保旧到新tick0的专用边界。已有游戏研究要求三个独立收集物、半径0.5触发区域、胜负后Enter新局、旧句柄不可影响新局。本Plan不能把触发AABB包围盒误当圆/球，或把Stop/Run命令发出算新局完成。
 
@@ -64,15 +65,15 @@ auto-ui driver已有`src/authoring/{play.rs,behavior.rs,behavior/assembly.rs,gam
 
 ### 5.1 唯一树与前置冻结
 
-引擎唯一树`D:/autostack/.wt/lang-883/auto-ui`，分支`codex/plan-883-dev`，882实际交付后从该auto-ui源码SHA创建；源码只合auto-ui/master。G11唯一内容树`D:/autostack/.wt/lang-883/ag-examples`、同名分支，在880交付且其树退出共享工具写入后创建。auto-ui主检出持本Plan唯一簿记；语言仓只按既有知识归属同步SD/索引。每仓一树，同树顺序work/独立review/merge；无链接，清理先guard。
+引擎唯一树`D:/autostack/.wt/ui-002/auto-ui`，分支`codex/plan-002-dev`，001实际交付后从该auto-ui源码SHA创建；源码只合auto-ui/master。G11唯一内容树`D:/autostack/.wt/ui-002/ag-examples`、同名分支，在880交付且其树退出共享工具写入后创建。auto-ui主检出持本Plan唯一簿记；语言仓只按既有知识归属同步SD/索引。每仓一树，同树顺序work/独立review/merge；无链接，清理先guard。
 
-T-01复核882实际接口/Run域/模板与活对象表、原SDK/两锁/current identity；T-02冻结`attachments/883/work/triggers-round-contract.md`：profile/签名、8对资源表、事件字段/顺序/读取/重绑规则、几何边界、restart状态图/失败路径、全部消费者和实际计费。
+T-01复核001实际接口/Run域/模板与活对象表、原SDK/两锁/current identity；T-02冻结`attachments/002/work/triggers-round-contract.md`：profile/签名、8对资源表、事件字段/顺序/读取/重绑规则、几何边界、restart状态图/失败路径、全部消费者和实际计费。
 
 先证明整路径：真实Auto单角色运动/跳/归一＋相机＋8对检测＋三物品同tick相交/消费/真实销毁＋结果输出。保持共享32credits、1000steps/slice、100000steps/callback、120resumes/250ms、256/64/320KiB、30s初始化/2s整tick/8ms目标。若需紧凑输入或有界批量几何，必须先冻结明确成本/正反例，不以回调拆分或免费无界扫描绕过限额；不足回new。第一次query成功不能替代该组合门。
 
 ### 5.2 有界触发与几何
 
-最多8对，用户显式注册/重绑，不自动扫描全世界所有对象对；每对一个同维subject（静态角色/受检叶）和一个静态或882活实例的触发源，稳定pair序号按注册表顺序。实例身份必须完整绑定Run/slot/generation，不能只存slot并自动追同槽新生；重绑新代是显式操作，prev态清零，旧事件不跨绑定代。非法/错维/组/未知/非有限/数量超限在使用前具名拒绝。
+最多8对，用户显式注册/重绑，不自动扫描全世界所有对象对；每对一个同维subject（静态角色/受检叶）和一个静态或001活实例的触发源，稳定pair序号按注册表顺序。实例身份必须完整绑定Run/slot/generation，不能只存slot并自动追同槽新生；重绑新代是显式操作，prev态清零，旧事件不跨绑定代。非法/错维/组/未知/非有限/数量超限在使用前具名拒绝。
 
 支持两种形状：受检实际资源AABB间闭区间相交（沿用旧边界），以及2D圆/3D球与subject实际AABB的最近点平方距离比较（<=radius²，radius>0有限；2D z=0）。默认样板radius=0.5；相切命中、角点在包围盒内却在圆/球外不命中，±1ULP分离须有反例。球半径由明确配置定义，不隐式取GLB包围盒当半径；静态/动态触发源center跟其当前接受前世界平移。隐藏不取消触发（显隐与生命周期分离），非solid触发不阻挡角色；销毁撤销资格。
 
@@ -126,15 +127,15 @@ G11单项ZIP包含两维、说明/许可/必要小资源/选中锁/通用工具�
 | V-04 | AC-04 事务/owner | 事件+销毁+orbit同tick、错event身份/重复记录/坏序/超预算，20轮 | 全旧或全新，未接受事件不外泄；weak owner最后释放、静态上传有界；冻结reset/泄漏事件变异红还原绿 | T-04；合法外部pin区分 |
 | V-05 | AC-01/05 仓外/预算 | 两维源码对照/fresh SDK consumer、新身份controls、G11两入口包A→B/错锁/旧报告 | 实际Auto状态与GPU内容敏感、共享32credits和原限额；0selected/partial/错runner拒；原G01..08选锁不变、坏包修复可用 | T-02/05；880实际交付后 |
 
-拟命令（新入口由T-03/04建立）：driver `cargo check --locked`、`cargo fmt -- --check`、`cargo test --locked --test runtime_triggers_api --test runtime_round_host --test runtime_trigger_samples -- --test-threads=1`；受影响882对象/Play/相机命名case，current verifier/checker `--controls`及fresh own-SDK离线消费。G11工具命令沿880实际交付`gallery list/validate/launch/package`合同，定向Python结构测试与新两入口无窗口数值/内容/包验收，禁止默认重跑旧窗口probe。
+拟命令（新入口由T-03/04建立）：driver `cargo check --locked`、`cargo fmt -- --check`、`cargo test --locked --test runtime_triggers_api --test runtime_round_host --test runtime_trigger_samples -- --test-threads=1`；受影响001对象/Play/相机命名case，current verifier/checker `--controls`及fresh own-SDK离线消费。G11工具命令沿880实际交付`gallery list/validate/launch/package`合同，定向Python结构测试与新两入口无窗口数值/内容/包验收，禁止默认重跑旧窗口probe。
 
-根语言/默认UI零代码diff，不跑根cargo t/tf/tv/tu/docs_gen或完整UI/AG档。GPU按机器单实例；新局需实测真实接受后下一次读取/运行，不以request计数代替闭环。原始证据本地`D:/autostack/plan-artifacts/plan-883/`，attachments只md摘要/契约，记录命令/exit/计数/路径/hash；产品小预览与验收索引放内容仓，非原始大日志。两仓冻结commit/源/runner/资源hash绑定，复用证明代码/依赖/配置/输入未变。
+根语言/默认UI零代码diff，不跑根cargo t/tf/tv/tu/docs_gen或完整UI/AG档。GPU按机器单实例；新局需实测真实接受后下一次读取/运行，不以request计数代替闭环。原始证据本地`D:/autostack/plan-artifacts/auto-ui/plan-002/`，attachments只md摘要/契约，记录命令/exit/计数/路径/hash；产品小预览与验收索引放内容仓，非原始大日志。两仓冻结commit/源/runner/资源hash绑定，复用证明代码/依赖/配置/输入未变。
 
 ## 7. 验收标准
 
 | ID | owner_stage | 可观察通过条件 |
 |---|---|---|
-| AC-01 | work | 882实际交付/唯一新源树/旧SDK锁及fresh包核实；内容T-05须880交付 |
+| AC-01 | work | 001实际交付/唯一新源树/旧SDK锁及fresh包核实；内容T-05须880交付 |
 | AC-02 | work | 新profile/签名/几何/事件/新局/资源先冻结，完整组合预算成立，旧版本保持 |
 | AC-03 | work | 两维有界触发/确定时序/一次读取/真销毁与代次绑定，V-01/02 |
 | AC-04 | work | 新Run完整复原/迟到隔离/失败last-good/20轮最后owner，V-03/04 |
@@ -147,7 +148,7 @@ G11单项ZIP包含两维、说明/许可/必要小资源/选中锁/通用工具�
 
 | ID | owner_stage | 依赖 | 实际位置/操作与产出 | AC | 状态 |
 |---|---|---|---|---|---|
-| T-01 | work | 882实际交付 | 唯一auto-ui树、实际SHA/签名/身份/价格/SDK/锁与closed/open核对 | AC-01 | [ ] |
+| T-01 | work | 001实际交付 | 唯一auto-ui树、实际SHA/签名/身份/价格/SDK/锁与closed/open核对 | AC-01 | [ ] |
 | T-02 | work | T-01 | triggers-round-contract先冻结几何/事件/Run状态图/价格与完整组合probe，不足回new | AC-02 | [ ] |
 | T-03 | work | T-02通过 | 新Auto/API/准入/触发时序与代次结果、V-01/02 | AC-02/03 | [ ] |
 | T-04 | work | T-03 | 同Host新Run事务/失败/owner、两维公开工程/真实GPU负控，V-03/04 | AC-03/04 | [ ] |
@@ -161,12 +162,18 @@ G11单项ZIP包含两维、说明/许可/必要小资源/选中锁/通用工具�
 
 ## 9. 复审记录
 
+以下r1/r2记录保留原编号，属于历史来源，不是本仓新号的执行记录。
+
+
 2026-10-29 new r1：`stage: new | plan_id: PLAN-883 | plan_revision: 1 | outcome: blocked | next: 等882实际交付后work T-01/02冻结；G11内容T-05另等880实际交付`。blocked是硬前置未满足，语义草案可审；不虚构882未来SHA/价格或880 schema。全部AC/V/T/SD未执行，无新树/实现/SDK准备/构建/OS/GPU/agent/远端操作，本轮不改880合同/进度/源码。
 
 2026-10-29 new合同预检：0..10节、唯一AC-01..08/V-01..05、分stage任务与SD覆盖已核；本批两Plan及五份路线文档109个本地链接均可解析、编号各唯一，880跟踪文件相对HEAD零diff。仅结构/路径/合同自查，不是实现或独立final review。
 
 2026-10-29 new r2：`stage: new | plan_id: PLAN-883 | plan_revision: 2 | outcome: blocked | next: 等auto-ui/PLAN-882实际交付后T-01/T-02`。用户明确裁定AG计划在auto-ui、Gallery计划在ag-examples管理；本次只修正计划仓/路径/簿记归档位置，原功能范围、资源预算和AC/V不变；保留r1记录，不创建实现树/运行测试。ag-examples/PLAN-880最新收据已为delivered，G11的该项前置已满足；PLAN-882仍是883引擎硬前置。
 
+
+2026-10-29 new r3：`stage: new | plan_id: PLAN-002 | plan_revision: 3 | outcome: blocked | next: 等auto-ui/PLAN-001实际交付后T-01/T-02`。用户纠正本仓001起独立编号；旧auto-lang/PLAN-883仅作来源，新合同/工作树/分支/证据目录按auto-ui本仓号。未改变功能分母、预算、进度或历史验收，未创建实现树/执行测试。ag-examples旧880已归legacy历史，不占该仓本地号。
+
 ## 10. 待澄清事项
 
-当前无新增产品决策。882交付后如触发/收集/新局组合在原限额不可行，或实际公开消费/880工具合同不能承接G11，带反例回new，不删同tick三物品/新局隔离/任一维或静默抬限。880已交付；T-05仍须复核内容仓owner/后续共享工具改动，冲突时明确等待，不建第二占用树、不在其WIP上接线。882/883仍不关闭动画/声音/HUD及完整M2分母。
+当前无新增产品决策。001交付后如触发/收集/新局组合在原限额不可行，或实际公开消费/880工具合同不能承接G11，带反例回new，不删同tick三物品/新局隔离/任一维或静默抬限。880已交付；T-05仍须复核内容仓owner/后续共享工具改动，冲突时明确等待，不建第二占用树、不在其WIP上接线。001/002仍不关闭动画/声音/HUD及完整M2分母。
