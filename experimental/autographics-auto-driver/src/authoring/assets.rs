@@ -36,6 +36,8 @@ pub(super) fn record_decode() {
 pub struct AssetRef {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub closure: Option<super::textured_models::Closure>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub audio: Option<super::public_audio::Metadata>,
     pub format: String,
     pub sha256: String,
     pub byte_length: usize,
@@ -58,6 +60,7 @@ impl AssetRef {
             && self.width == other.width
             && self.height == other.height
             && self.closure == other.closure
+            && self.audio == other.audio
     }
     pub fn key(&self) -> String {
         self.closure.as_ref().map_or_else(
@@ -65,12 +68,15 @@ impl AssetRef {
             |c| format!("closure:{}", c.id),
         )
     }
+    pub fn is_audio(&self) -> bool {
+        matches!(self.format.as_str(), "ogg" | "wav")
+    }
     pub fn is_image(&self) -> bool {
         self.format == FORMAT_PNG
     }
     pub fn validate(&self) -> Result<(), String> {
         super::textured_models::validate_ref(self)?;
-        if (self.format != FORMAT_GLB && self.format != FORMAT_PNG)
+        if (!matches!(self.format.as_str(), "glb" | "png" | "ogg" | "wav"))
             || self.sha256.len() != 64
             || !self
                 .sha256
@@ -84,6 +90,11 @@ impl AssetRef {
             || self.name.as_ref().is_some_and(|s| s.chars().count() > 128)
         {
             return Err("resource limit: asset metadata".into());
+        }
+        match (self.is_audio(), &self.audio) {
+            (true, Some(m)) => m.validate()?,
+            (false, None) => {}
+            _ => return Err("audio_invalid: metadata/format".into()),
         }
         match (self.is_image(), self.width, self.height) {
             (false, None, None) => {}
@@ -107,6 +118,7 @@ impl AssetRef {
 }
 #[derive(Debug)]
 pub struct Asset {
+    pub audio: Option<Arc<super::public_audio::mixer::Pcm>>,
     pub model_images: Vec<Arc<ImageData>>,
     /// Immutable external PNG blobs; embedded image raw bytes stay in the GLB.
     pub dependencies: BTreeMap<String, Arc<[u8]>>,
@@ -128,7 +140,7 @@ impl Asset {
     /// geometry/instance consumer goes through here so a PNG can never be
     /// mistaken for a zero-mesh model.
     pub fn model_data(&self) -> Result<&ModelData, String> {
-        if self.image.is_some() {
+        if self.image.is_some() || self.audio.is_some() {
             return Err("wrong asset kind: geometry required".into());
         }
         Ok(&self.model)
@@ -146,7 +158,7 @@ pub fn check_registry(r: &Registry) -> Result<(), String> {
 pub fn insert(r: &mut Registry, asset: Arc<Asset>) -> Result<(), String> {
     let key = asset.identity.key();
     if let Some(old) = r.get(&key) {
-        if old.bytes != asset.bytes {
+        if old.bytes != asset.bytes || !old.identity.same_content(&asset.identity) {
             return Err("conflict: SHA identity bytes".into());
         }
         return Ok(());
@@ -251,6 +263,17 @@ pub fn load_declared(path: &Path, a: &AssetRef, r: &Registry) -> Result<Arc<Asse
     a.validate()?;
     if a.closure.is_some() {
         return super::textured_models::load_declared(path, a, r);
+    }
+    if a.is_audio() {
+        let bytes = super::textured_models::RawPool::new(r).read(path)?;
+        if bytes.len() != a.byte_length || agp::renderer::capture::sha256_hex(&bytes) != a.sha256 {
+            return Err("audio_invalid: declared hash/length".into());
+        }
+        let loaded = super::public_audio::import_raw(bytes, r, a.name.clone())?;
+        if !loaded.identity.same_content(a) {
+            return Err("audio_invalid: declared sample identity".into());
+        }
+        return Ok(loaded);
     }
     if a.is_image() {
         let bytes = super::textured_models::RawPool::new(r).read(path)?;
@@ -831,6 +854,7 @@ pub fn decode_in(
         return Err("resource limit: decoded geometry".into());
     }
     let identity = AssetRef {
+        audio: None,
         closure: None,
         format: FORMAT_GLB.into(),
         sha256: original_sha,
@@ -844,6 +868,7 @@ pub fn decode_in(
         return Err("invalid: decoder source identity".into());
     }
     Ok(Arc::new(Asset {
+        audio: None,
         animation: None,
         model_images: vec![],
         dependencies: BTreeMap::new(),
@@ -905,6 +930,7 @@ pub fn decode_png_in(
         return Err("invalid: decoded image identity".into());
     }
     let identity = AssetRef {
+        audio: None,
         closure: None,
         format: FORMAT_PNG.into(),
         sha256: sha.clone(),
@@ -922,6 +948,7 @@ pub fn decode_png_in(
         }
     });
     Ok(Arc::new(Asset {
+        audio: None,
         animation: None,
         model_images: vec![],
         dependencies: BTreeMap::new(),
@@ -974,8 +1001,10 @@ fn import_png_raw(
         let n = image.rgba.len();
         super::textured_models::candidate_budget(existing, &hash, bytes.len(), n, n, true)?;
         Arc::new(Asset {
+            audio: None,
             animation: None,
             identity: AssetRef {
+                audio: None,
                 closure: None,
                 format: FORMAT_PNG.into(),
                 sha256: hash,

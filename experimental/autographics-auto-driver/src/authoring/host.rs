@@ -132,6 +132,7 @@ pub struct Host {
     pub project_default: bool,
     project_pending: bool,
     pub play: Option<super::play::Play>,
+    pub audio: Option<super::public_audio::native::Native>,
     pub play_start_us: Vec<u128>,
     pub play_stop_us: Vec<u128>,
     pub play_pump_us: Vec<u128>,
@@ -334,6 +335,7 @@ impl Host {
             play_stop_us: vec![],
             play_pump_us: vec![],
             play: None,
+            audio: None,
             play_restore: None,
             play_token: 0,
             actors,
@@ -549,6 +551,14 @@ impl Host {
 }
 
 impl Host {
+    pub fn audio_snapshot(&self) -> serde_json::Value {
+        let Some(audio) = &self.audio else {
+            return json!({"manager":false});
+        };
+        let m = audio.mixer.lock().unwrap();
+        let s = audio.observation.lock().unwrap();
+        json!({"manager":true,"run":m.run(),"voices":m.voices(),"fault":m.fault(),"device":audio.device,"rate":audio.rate,"callbacks":s.callbacks,"frames":s.frames,"nonzero":s.nonzero,"peak":s.peak,"max_us":s.max_us,"deadline_misses":s.deadline_misses,"quantum_frames":s.last_quantum,"reserved_cpu_bytes":super::public_audio::native::Native::reserved_bytes()})
+    }
     pub fn resource_snapshot(&self) -> serde_json::Value {
         let scene = match self.rt.content(self.three).unwrap() {
             SurfaceContent::Scene3d(c) => c,
@@ -571,7 +581,7 @@ impl Host {
             Err(error) => json!({"error":error}),
         };
 
-        json!({"view3d":{"revision":self.view3d.revision,"presented_revision":self.presented_view3d.revision,"target":self.view3d.target.to_array(),"yaw":self.view3d.yaw,"pitch":self.view3d.pitch,"distance":self.view3d.distance,"projection":format!("{:?}",self.view3d.mode),"grid":self.view3d.grid,"grid_vertices":self.view3d.grid_vertices().map(|(_,v)|v.len()).unwrap_or(0),"grid_gpu_bytes":scene.mesh.editor_grid_owned_bytes(),"grid_cpu_capacity_bytes":scene.mesh.editor_grid_cpu_capacity_bytes(),"grid_uploads":scene.mesh.editor_grid_uploads()},"view2d":{"revision":self.view2d.revision,"presented_revision":self.presented_view2d.revision,"center":self.view2d.center.to_array(),"zoom":self.view2d.zoom,"grid_spacing_world":self.active_view2d().grid_lines().0,"grid_rectangles":self.active_view2d().grid_lines().1.len(),"grid_cpu_capacity_bytes":if self.active_view2d().grid {128 * std::mem::size_of::<super::view2d::GridLine>()}else{0},"grid_payload_bytes_per_draw":self.active_view2d().grid_lines().1.len()*48,"two_quad_uploads":two.quad.uploads.snapshot()},"play_metrics":{"run_command_us":self.play_start_us,"stop_command_us":self.play_stop_us,"pump_round_us":self.play_pump_us},"target_bytes":self.rt.owned_target_bytes(),"target_count":self.rt.live_target_slots(),"mesh_bytes":scene.store.owned_buffer_bytes(),"mesh_count":scene.store.uploaded_count(),"mesh_uploads":scene.store.uploads.snapshot(),"model_texture_uploads":scene.store.texture_upload_counters(),"model_texture_count":scene.store.texture_count(),"scene_pipeline_buffers":scene.mesh.owned_buffer_bytes(),"depth_texture_bytes":scene.mesh.owned_depth_texture_bytes(),"two_buffers":two.quad.owned_buffer_bytes(),"buffer_rewrites":uploads.buffer_rewrites,"bytes_rewritten":uploads.bytes_rewritten,"asset_union":asset_union,"exclusions":"Transient JSON/parser allocations, Iced internal buffers/atlas and driver allocations are not resident geometry budgets; GPU timestamps unavailable"})
+        json!({"view3d":{"revision":self.view3d.revision,"presented_revision":self.presented_view3d.revision,"target":self.view3d.target.to_array(),"yaw":self.view3d.yaw,"pitch":self.view3d.pitch,"distance":self.view3d.distance,"projection":format!("{:?}",self.view3d.mode),"grid":self.view3d.grid,"grid_vertices":self.view3d.grid_vertices().map(|(_,v)|v.len()).unwrap_or(0),"grid_gpu_bytes":scene.mesh.editor_grid_owned_bytes(),"grid_cpu_capacity_bytes":scene.mesh.editor_grid_cpu_capacity_bytes(),"grid_uploads":scene.mesh.editor_grid_uploads()},"view2d":{"revision":self.view2d.revision,"presented_revision":self.presented_view2d.revision,"center":self.view2d.center.to_array(),"zoom":self.view2d.zoom,"grid_spacing_world":self.active_view2d().grid_lines().0,"grid_rectangles":self.active_view2d().grid_lines().1.len(),"grid_cpu_capacity_bytes":if self.active_view2d().grid {128 * std::mem::size_of::<super::view2d::GridLine>()}else{0},"grid_payload_bytes_per_draw":self.active_view2d().grid_lines().1.len()*48,"two_quad_uploads":two.quad.uploads.snapshot()},"play_metrics":{"run_command_us":self.play_start_us,"stop_command_us":self.play_stop_us,"pump_round_us":self.play_pump_us},"target_bytes":self.rt.owned_target_bytes(),"target_count":self.rt.live_target_slots(),"mesh_bytes":scene.store.owned_buffer_bytes(),"mesh_count":scene.store.uploaded_count(),"mesh_uploads":scene.store.uploads.snapshot(),"model_texture_uploads":scene.store.texture_upload_counters(),"model_texture_count":scene.store.texture_count(),"scene_pipeline_buffers":scene.mesh.owned_buffer_bytes(),"depth_texture_bytes":scene.mesh.owned_depth_texture_bytes(),"two_buffers":two.quad.owned_buffer_bytes(),"buffer_rewrites":uploads.buffer_rewrites,"bytes_rewritten":uploads.bytes_rewritten,"asset_union":asset_union,"audio":self.audio_snapshot(),"exclusions":"Transient JSON/parser allocations, Iced internal buffers/atlas and driver allocations are not resident geometry budgets; GPU timestamps unavailable"})
     }
 }
 

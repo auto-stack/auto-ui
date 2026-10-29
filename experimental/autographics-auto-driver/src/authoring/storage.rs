@@ -301,7 +301,9 @@ impl Storage {
                 .is_some_and(|s| s.eq_ignore_ascii_case("assets"))
                 && name.len() == 68
                 && (name.as_bytes()[64..].eq_ignore_ascii_case(b".glb")
-                    || name.as_bytes()[64..].eq_ignore_ascii_case(b".png"))
+                    || name.as_bytes()[64..].eq_ignore_ascii_case(b".png")
+                    || name.as_bytes()[64..].eq_ignore_ascii_case(b".ogg")
+                    || name.as_bytes()[64..].eq_ignore_ascii_case(b".wav"))
                 && name.as_bytes()[..64].iter().all(|b| b.is_ascii_hexdigit()))
         {
             return Err(
@@ -477,7 +479,10 @@ fn disk_budget(dir: &Path, reserve: usize) -> Result<(), String> {
             .ok_or("disk length overflow")?;
         let name = item.file_name().to_string_lossy().into_owned();
         if name.len() != 68
-            || !(name.ends_with(".glb") || name.ends_with(".png"))
+            || !(name.ends_with(".glb")
+                || name.ends_with(".png")
+                || name.ends_with(".ogg")
+                || name.ends_with(".wav"))
             || !name[..64]
                 .bytes()
                 .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
@@ -504,7 +509,13 @@ fn disk_budget(dir: &Path, reserve: usize) -> Result<(), String> {
 /// format extension. The image and model payloads live in the same assets
 /// directory and share one file/byte budget, so neither gains a separate quota.
 fn blob_name(a: &super::assets::AssetRef) -> Result<String, String> {
-    let extension = if a.is_image() { "png" } else { "glb" };
+    let extension = match a.format.as_str() {
+        "png" => "png",
+        "glb" => "glb",
+        "ogg" => "ogg",
+        "wav" => "wav",
+        _ => return Err("invalid: closure blob format".into()),
+    };
     if a.format != extension {
         return Err("invalid: closure blob format".into());
     }

@@ -15,6 +15,10 @@ pub struct Stamp {
 }
 #[derive(Clone, Debug)]
 pub enum Edit {
+    Audio {
+        asset: Option<std::sync::Arc<super::assets::Asset>>,
+        cues: Vec<super::public_audio::CueRef>,
+    },
     Behavior {
         binding: Option<super::behavior_project::Binding>,
         code: Option<super::behavior_project::Code>,
@@ -182,6 +186,22 @@ impl Editor {
         let mut doc = self.document.clone();
         let mut assets = self.assets.clone();
         let intent = match edit {
+            Edit::Audio { asset, cues } => {
+                if let Some(asset) = asset {
+                    if !asset.identity.is_audio() || asset.audio.is_none() {
+                        return Err("audio_invalid: audio payload required".into());
+                    }
+                    super::assets::insert(&mut assets, asset.clone())?;
+                    if !doc.assets.iter().any(|a| a.key() == asset.identity.key()) {
+                        doc.assets.push(asset.identity.clone());
+                    }
+                }
+                doc.schema = "autographics.scene/7".into();
+                doc.cues = Some(cues);
+                doc.validate()?;
+                super::public_audio::resolve_cues(&doc, &assets)?;
+                Intent::Edit
+            }
             Edit::Behavior {
                 binding,
                 code: next,
@@ -201,7 +221,7 @@ impl Editor {
                 }
                 if let Some(asset) = asset {
                     super::assets::insert(&mut assets, asset.clone())?;
-                    if asset.identity.closure.is_some() {
+                    if asset.identity.closure.is_some() && doc.schema != "autographics.scene/7" {
                         doc.schema = "autographics.scene/6".into();
                     }
                     if !doc.assets.iter().any(|a| a.key() == asset.identity.key()) {

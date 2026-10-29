@@ -1,7 +1,10 @@
 # Public audio engine fixtures (PLAN-012, in progress)
 
 These are finite engine verification inputs, not a Gallery/G12 release.
-The authoring Host integration and persisted cue project are not delivered yet.
+The development tree supports explicit audio2d/audio3d profiles, authoring Host
+acceptance and scene/7 cue declarations. Full lifecycle, portable bound samples,
+current identity and final acceptance gates remain in progress; this is not a
+delivery receipt.
 
 Unmodified sound sources are from `kenneyNL/Starter-Kit-3D-Platformer`, commit
 `3fa8a04b1c01ab23db43123d4ce814a34c3fc7f0`. `SOURCE-README.md` is the original

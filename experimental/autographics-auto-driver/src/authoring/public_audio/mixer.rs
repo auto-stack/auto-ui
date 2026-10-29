@@ -93,7 +93,8 @@ impl Packet {
         Ok(packet)
     }
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Accepted {
     Played,
     SuppressedByStep,
@@ -108,33 +109,34 @@ struct Voice {
 #[derive(Debug)]
 pub struct Mixer {
     run: i32,
+    run_high_water: i32,
     last: Option<Packet>,
     ordinal: i32,
     voices: [Option<Voice>; MAX_VOICES],
     paused: bool,
     fault: Option<String>,
-    pub decode_count: u64,
 }
 impl Default for Mixer {
     fn default() -> Self {
         Self {
             run: 0,
+            run_high_water: 0,
             last: None,
             ordinal: 0,
             voices: std::array::from_fn(|_| None),
             paused: false,
             fault: None,
-            decode_count: 0,
         }
     }
 }
 impl Mixer {
     pub fn begin(&mut self, run: i32) -> Result<(), String> {
-        if run <= 0 {
-            return Err("audio_invalid: Run".into());
+        if run <= self.run_high_water {
+            return Err("audio_invalid: stale/exhausted Run".into());
         }
         self.stop();
         self.run = run;
+        self.run_high_water = run;
         self.ordinal = 0;
         self.last = None;
         self.paused = false;
@@ -242,6 +244,25 @@ impl Mixer {
         } else {
             Accepted::Played
         })
+    }
+    /// The Host may finish the single candidate dispatched before Pause.
+    /// Its voices are inserted while remaining paused; no callback can observe
+    /// this temporary logical gate while the caller holds the manager mutex.
+    pub fn accept_inflight<F>(
+        &mut self,
+        packet: Packet,
+        cues: &[Cue],
+        step: bool,
+        accept: F,
+    ) -> Result<Accepted, String>
+    where
+        F: FnOnce() -> Result<(), String>,
+    {
+        let paused = self.paused;
+        self.paused = false;
+        let result = self.accept(packet, cues, step, accept);
+        self.paused = paused;
+        result
     }
     /// Exactly the same function feeds offline oracles and the native stream.
     /// A native callback locks for one whole quantum; control applies by next

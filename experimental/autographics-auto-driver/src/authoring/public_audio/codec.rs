@@ -11,6 +11,8 @@ pub struct Header {
     pub frames: usize,
     pub max_frames: usize,
     pub scratch: usize,
+    pub first_audio_page_is_last: bool,
+    pub max_window: usize,
 }
 fn invalid(message: &str) -> String {
     format!("audio_invalid: {message}")
@@ -128,6 +130,8 @@ fn wav(bytes: &[u8]) -> Result<(Header, std::ops::Range<usize>), String> {
             frames,
             max_frames: frames,
             scratch: 0,
+            first_audio_page_is_last: false,
+            max_window: 0,
         },
         data,
     ))
@@ -300,7 +304,9 @@ fn ogg(bytes: &[u8], available: usize) -> Result<Header, String> {
     let mut frames = 0;
     let mut eos = false;
     let mut scratch = 0;
-    reserve(bytes.len() * 5 + 12 * 1024 * 1024, available)?;
+    let mut first_audio_page_is_last = false;
+    let mut max_window = 0;
+    reserve(bytes.len() * 8 + 12 * 1024 * 1024, available)?;
     while offset < bytes.len() {
         if eos {
             return Err("audio_unsupported: chained/trailing Ogg stream".into());
@@ -338,7 +344,10 @@ fn ogg(bytes: &[u8], available: usize) -> Result<Header, String> {
         }
         let granule = u64::from_le_bytes(head[6..14].try_into().unwrap());
         if granule != u64::MAX {
-            if granule < frames as u64 || granule > 48000 * 10 {
+            if granule < frames as u64 {
+                return Err(invalid("Ogg nonmonotonic granule"));
+            }
+            if granule > 48000 * 10 {
                 return Err(limit("Ogg granule/duration"));
             }
             frames = granule as usize;
@@ -365,6 +374,7 @@ fn ogg(bytes: &[u8], available: usize) -> Result<Header, String> {
                         domain(rate, channels, 1)?;
                         let short = packet[28] & 15;
                         let long = packet[28] >> 4;
+                        max_window = (1usize << long) / 2;
                         if !(6..=13).contains(&short)
                             || !(short..=13).contains(&long)
                             || packet[29] != 1
@@ -378,9 +388,12 @@ fn ogg(bytes: &[u8], available: usize) -> Result<Header, String> {
                         }
                     }
                     2 => {
-                        scratch = codebook_reservation(&packet, available - bytes.len() * 5)?;
+                        scratch = codebook_reservation(&packet, available - bytes.len() * 8)?;
                     }
                     _ => {
+                        if packets == 3 {
+                            first_audio_page_is_last = flags & 4 != 0;
+                        }
                         if packet.is_empty() || packet[0] & 1 != 0 {
                             return Err(invalid("Vorbis audio packet"));
                         }
@@ -400,17 +413,18 @@ fn ogg(bytes: &[u8], available: usize) -> Result<Header, String> {
         return Err(invalid("incomplete Ogg"));
     }
     domain(rate, channels, frames)?;
-    // Ogg granules measure presentation timestamps; decoder overlap/padding
-    // may add a bounded final window. Preserve actual decoded samples rather
-    // than silently truncating to a timestamp. The envelope never exceeds10s.
-    let max_frames = (frames + 8192).min(rate as usize * 10);
-    reserve(bytes.len() * 5 + max_frames * 16 + scratch, available)?;
+    // Reserve bounded leading/trailing codec windows before decoder construction.
+    // Final PCM follows the container timeline, never raw padded block length.
+    let max_frames = frames + 2 * max_window;
+    reserve(bytes.len() * 8 + max_frames * 16 + scratch, available)?;
     Ok(Header {
         rate,
         channels,
         frames,
         max_frames,
         scratch,
+        first_audio_page_is_last,
+        max_window,
     })
 }
 pub fn inspect(bytes: &[u8], available: usize) -> Result<Header, String> {
@@ -455,7 +469,7 @@ pub fn decode(bytes: Arc<[u8]>, available: usize) -> Result<(Arc<Pcm>, Header), 
                 &Hint::new(),
                 stream,
                 &FormatOptions {
-                    enable_gapless: true,
+                    enable_gapless: false,
                     ..Default::default()
                 },
                 &MetadataOptions::default(),
@@ -468,6 +482,21 @@ pub fn decode(bytes: Arc<[u8]>, available: usize) -> Result<(Arc<Pcm>, Header), 
         if track.codec_params.codec != symphonia::core::codecs::CODEC_TYPE_VORBIS {
             return Err("audio_unsupported: Vorbis codec required".into());
         }
+        // The generic Ogg demuxer treats tail padding on a first-and-last
+        // audio page as start delay. Decode raw blocks and apply the bounded
+        // container interval explicitly. On multi-page streams its start bound
+        // still supplies the legitimate leading delay/positive timestamp.
+        let start_trim = if header.first_audio_page_is_last {
+            0
+        } else {
+            track.codec_params.delay.unwrap_or(0) as usize
+        };
+        let start_ts = usize::try_from(track.codec_params.start_ts)
+            .map_err(|_| invalid("Vorbis start timestamp"))?;
+        if start_trim > header.max_window || start_ts >= header.frames {
+            return Err(invalid("Vorbis leading interval"));
+        }
+        let valid_frames = header.frames - start_ts;
         let mut decoder = symphonia::default::get_codecs()
             .make(&track.codec_params, &DecoderOptions::default())
             .map_err(|e| invalid(&e.to_string()))?;
@@ -504,6 +533,16 @@ pub fn decode(bytes: Arc<[u8]>, available: usize) -> Result<(Arc<Pcm>, Header), 
                 }
                 frames.push([left, right]);
             }
+        }
+        let end = start_trim
+            .checked_add(valid_frames)
+            .ok_or_else(|| invalid("Vorbis interval overflow"))?;
+        if frames.len() < end || frames.len() - end > header.max_window {
+            return Err(invalid("Vorbis granule/decoded padding mismatch"));
+        }
+        frames.truncate(end);
+        if start_trim > 0 {
+            frames.drain(..start_trim);
         }
         domain(header.rate, header.channels, frames.len())?;
         header.frames = frames.len();

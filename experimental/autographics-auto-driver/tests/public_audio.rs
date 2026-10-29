@@ -253,6 +253,20 @@ fn real_auto_packet_common_accept_and_pcm_oracle_detect_replay_gain_and_failure(
         mixer.render(&mut output, 44100);
         assert_eq!(output, [[0.0; 2]; 32]);
         assert_eq!(mixer.voices(), 0);
+        assert!(
+            mixer.begin(1).is_err(),
+            "a stopped old Run cannot reactivate the retained manager"
+        );
+        mixer.begin(2).unwrap();
+        assert!(
+            mixer.pause(1, false).is_err(),
+            "old control loses authority after new Run"
+        );
+        assert!(mixer
+            .accept(packet(&mut s, 1), &cues, false, || panic!(
+                "old Run cannot accept"
+            ))
+            .is_err());
     }
 }
 #[test]

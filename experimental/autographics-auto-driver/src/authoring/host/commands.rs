@@ -31,6 +31,7 @@ impl Host {
                     c.instances.clear();
                     c.store.retain_models(|s| keep.contains(s));
                 }
+                self.audio = None;
                 self.closed = true;
             }
             Leave::Open(p) => {
@@ -340,6 +341,47 @@ impl Host {
                 )?;
                 self.asset_pending = true;
                 self.asset_token = next_token;
+            }
+            "import-audio" => {
+                if v["asset_generation"].as_u64() != Some(self.asset_token) {
+                    return Err("stale import generation".into());
+                }
+                let token = self
+                    .asset_token
+                    .checked_add(1)
+                    .ok_or("import token exhausted")?;
+                let registry = self.active_assets()?;
+                let asset = crate::authoring::public_audio::import(
+                    Path::new(p.as_str().ok_or("audio path")?),
+                    &registry,
+                )?;
+                let metadata = asset.identity.audio.as_ref().ok_or("audio metadata")?;
+                let mut cues = self.editor.document.cues.clone().unwrap_or_default();
+                if cues.len() >= 8 {
+                    return Err("audio_resource_limit: eight cues".into());
+                }
+                cues.push(crate::authoring::public_audio::CueRef {
+                    name: format!("cue{}", cues.len()),
+                    asset: asset.identity.key(),
+                    start_frame: 0,
+                    end_frame: metadata.frames,
+                    gain: 1.0,
+                });
+                self.editor.begin(
+                    stamp,
+                    Edit::Audio {
+                        asset: Some(asset),
+                        cues,
+                    },
+                )?;
+                self.asset_pending = true;
+                self.asset_token = token;
+            }
+            "audio-cues" => {
+                let cues = serde_json::from_value(p.clone())
+                    .map_err(|e| format!("audio_invalid: cue declarations: {e}"))?;
+                self.editor
+                    .begin(stamp, Edit::Audio { asset: None, cues })?;
             }
             "sprite-bind" | "sprite-create" | "sprite-detach" => {
                 if v["selection"] != json!(self.editor.selection) {

@@ -11,11 +11,36 @@ fn sound(name: &str) -> Vec<u8> {
 }
 #[test]
 fn original_three_vorbis_sources_decode_inside_shared_cpu_envelope() {
+    let reference: serde_json::Value = serde_json::from_str(include_str!(
+        "../research/public-audio-codec-reference.json"
+    ))
+    .unwrap();
     for name in ["jump.ogg", "coin.ogg", "land.ogg"] {
         let bytes = sound(name);
+        let expected = &reference["cases"][name];
+        assert_eq!(
+            agp::renderer::capture::sha256_hex(&bytes),
+            expected["source_sha256"].as_str().unwrap()
+        );
         let (pcm, header) = codec::decode(Arc::from(bytes), 64 * 1024 * 1024)
             .unwrap_or_else(|e| panic!("{name}: {e}"));
         assert_eq!(pcm.frames.len(), header.frames);
+        assert_eq!(
+            pcm.frames.len() as u64,
+            expected["frames"].as_u64().unwrap(),
+            "independent libsndfile interval; padded block output is not the clip length"
+        );
+        for sample in expected["samples"].as_array().unwrap() {
+            let i = sample["frame"].as_u64().unwrap() as usize;
+            for channel in 0..2 {
+                assert!(
+                    (pcm.frames[i][channel] - sample["stereo"][channel].as_f64().unwrap() as f32)
+                        .abs()
+                        <= 0.00002,
+                    "{name} frame{i} channel{channel}"
+                );
+            }
+        }
         assert!(pcm.frames.iter().flatten().any(|f| f.abs() > 0.01));
         assert!(pcm.frames.iter().flatten().all(|f| f.is_finite()));
         println!(

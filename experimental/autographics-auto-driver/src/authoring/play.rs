@@ -151,6 +151,8 @@ pub struct Frame {
     /// old frame.
     pub sprites: Option<super::runtime_sprites::SpriteFrame>,
     pub animations: Option<super::runtime_node_animation::AnimationFrame>,
+    pub audio: Option<super::public_audio::mixer::Packet>,
+    pub audio_disposition: Option<super::public_audio::mixer::Accepted>,
 }
 
 /// Per-tick camera output block sizes appended to the frame read layout.
@@ -244,6 +246,7 @@ pub struct Play {
     /// profile). The admitted block is validated against exactly this table.
     sprite_targets: Option<Vec<super::runtime_sprites::Target>>,
     animation_targets: Option<Vec<super::runtime_node_animation::Target>>,
+    pub audio_cues: Option<Vec<super::public_audio::mixer::Cue>>,
 }
 impl Play {
     pub fn new(e: &Editor, actors: [Option<u64>; 2], source: &str) -> Result<Self, String> {
@@ -283,6 +286,8 @@ impl Play {
             && snapshot.version != super::behavior::TRIGGERS3_VERSION
             && snapshot.version != super::behavior::SPRITES2_VERSION
             && snapshot.version != super::behavior::NODE_ANIMATION3_VERSION
+            && snapshot.version != super::behavior::AUDIO2_VERSION
+            && snapshot.version != super::behavior::AUDIO3_VERSION
         {
             return Err("spatial constructor API mismatch".into());
         }
@@ -346,23 +351,27 @@ impl Play {
                 | super::behavior::Api::Camera2V1
                 | super::behavior::Api::Objects2V1
                 | super::behavior::Api::Triggers2V1
-                | super::behavior::Api::Sprites2V1 => Some(CharProfile::TwoD),
+                | super::behavior::Api::Sprites2V1
+                | super::behavior::Api::Audio2V1 => Some(CharProfile::TwoD),
                 super::behavior::Api::Character3V1
                 | super::behavior::Api::Camera3V1
                 | super::behavior::Api::Objects3V1
                 | super::behavior::Api::Triggers3V1
-                | super::behavior::Api::NodeAnimation3V1 => Some(CharProfile::ThreeD),
+                | super::behavior::Api::NodeAnimation3V1
+                | super::behavior::Api::Audio3V1 => Some(CharProfile::ThreeD),
                 _ => None,
             };
             let camera_dim = match api {
                 super::behavior::Api::Camera2V1
                 | super::behavior::Api::Objects2V1
                 | super::behavior::Api::Triggers2V1
-                | super::behavior::Api::Sprites2V1 => Some(CameraDim::TwoD),
+                | super::behavior::Api::Sprites2V1
+                | super::behavior::Api::Audio2V1 => Some(CameraDim::TwoD),
                 super::behavior::Api::Camera3V1
                 | super::behavior::Api::Objects3V1
                 | super::behavior::Api::Triggers3V1
-                | super::behavior::Api::NodeAnimation3V1 => Some(CameraDim::ThreeD),
+                | super::behavior::Api::NodeAnimation3V1
+                | super::behavior::Api::Audio3V1 => Some(CameraDim::ThreeD),
                 _ => None,
             };
             let objects_dim = api.objects();
@@ -420,7 +429,7 @@ impl Play {
             play.push_camera_queries();
             play.push_objects_queries();
             play.push_round_queries();
-            if api == super::behavior::Api::NodeAnimation3V1 {
+            if api.node_animation() {
                 let targets =
                     super::runtime_node_animation::targets(&e.document, &play.order, &e.assets)?;
                 let position = play
@@ -521,6 +530,22 @@ impl Play {
                 play.push_sprite_queries();
             }
         }
+        if api.audio() {
+            play.audio_cues = Some(super::public_audio::resolve_cues(&e.document, &e.assets)?);
+            let position = play
+                .queue
+                .iter()
+                .position(|c| c.name == "_ag_start")
+                .ok_or("missing start boundary")?;
+            play.queue.insert(
+                position,
+                Call::unit(
+                    "_ag_audio_config",
+                    vec![Scalar::Int(play.audio_cues.as_ref().unwrap().len() as i32)],
+                ),
+            );
+            play.push_audio_queries();
+        }
         Ok(play)
     }
     fn new_program(
@@ -535,11 +560,18 @@ impl Play {
         e.document.validate()?;
         assets::check_registry(&e.assets)?;
         if e.assets.values().any(|a| a.animation.is_some())
-            && user_source
-                .as_ref()
-                .is_none_or(|s| s.version != super::behavior::NODE_ANIMATION3_VERSION)
+            && user_source.as_ref().is_none_or(|s| {
+                !super::behavior::Api::parse(&s.version).is_ok_and(|api| api.node_animation())
+            })
         {
             return Err("unsupported: animated payload requires node_animation3d profile".into());
+        }
+        if (e.document.cues.is_some() || e.document.assets.iter().any(|a| a.is_audio()))
+            && user_source.as_ref().is_none_or(|s| {
+                !super::behavior::Api::parse(&s.version).is_ok_and(|api| api.audio())
+            })
+        {
+            return Err("audio_unsupported: audio payload requires explicit audio profile".into());
         }
         for a in &e.document.assets {
             let payload = e.assets.get(&a.key()).ok_or("missing play asset")?;
@@ -673,9 +705,19 @@ impl Play {
             round_bind_water: [0; super::runtime_round::PAIRS],
             sprite_targets: None,
             animation_targets: None,
+            audio_cues: None,
         };
         p.queries();
         Ok(p)
+    }
+    pub fn run_id(&self) -> i32 {
+        self.run_id
+    }
+    pub fn is_neutral_step(&self) -> bool {
+        self.step
+    }
+    pub fn audio_paused(&self) -> bool {
+        self.pause_after_start || matches!(self.state, State::Pausing | State::Paused)
     }
     pub fn spatial_owner_probe(&self) -> Option<std::sync::Weak<super::spatial::Descriptor>> {
         self.spatial.as_ref().map(std::sync::Arc::downgrade)
@@ -1005,6 +1047,7 @@ impl Play {
         self.push_round_queries();
         self.push_sprite_queries();
         self.push_animation_queries();
+        self.push_audio_queries();
     }
 
     /// The camera output block rides every camera-Run tick after the node
@@ -1244,6 +1287,7 @@ impl Play {
                     .animation_targets
                     .as_ref()
                     .map_or(0, |t| super::runtime_node_animation::block_len(t.len()))
+                + if self.audio_cues.is_some() { 16 } else { 0 }
             || int(0)? != self.expected_profile
             || int(1)? != self.run_id
             || int(2)? != self.next_tick
@@ -1319,6 +1363,28 @@ impl Play {
         let rounds = self.admit_rounds(data, &expected, instances.as_ref())?;
         let sprites = self.admit_sprites(data, instances.as_ref())?;
         let animations = self.admit_animations(data, instances.as_ref())?;
+        let audio = if self.audio_cues.is_some() {
+            let block = &data[data.len() - 16..];
+            let count = match block[3] {
+                Scalar::Int(v) if (0..=4).contains(&v) => v as usize,
+                _ => return Err("audio_invalid: count wire".into()),
+            };
+            for row in count..4 {
+                if !matches!(block[4 + row * 3], Scalar::Int(0))
+                    || !matches!(block[5 + row * 3], Scalar::Int(0))
+                    || !matches!(block[6+row*3],Scalar::Float(v) if v==0.0)
+                {
+                    return Err("audio_invalid: noncanonical unused row".into());
+                }
+            }
+            Some(super::public_audio::mixer::Packet::from_wire(
+                &block[..4 + count * 3],
+                self.run_id,
+                self.next_tick,
+            )?)
+        } else {
+            None
+        };
         Ok(Frame {
             document: doc,
             objects,
@@ -1330,6 +1396,8 @@ impl Play {
             rounds,
             sprites,
             animations,
+            audio,
+            audio_disposition: None,
         })
     }
 
@@ -1789,13 +1857,45 @@ impl Play {
             + super::runtime_objects::BLOCK_LEN
             + super::runtime_round::BLOCK_LEN;
         super::runtime_node_animation::admit_block(
-            data.get(base..).ok_or("visual block output")?,
+            data.get(base..base + super::runtime_node_animation::block_len(targets.len()))
+                .ok_or("visual block output")?,
             self.run_id,
             self.next_tick,
             targets,
             instances,
         )
         .map(Some)
+    }
+    fn push_audio_queries(&mut self) {
+        if self.audio_cues.is_none() {
+            return;
+        }
+        for name in [
+            "_ag_audio_run",
+            "_ag_audio_tick",
+            "_ag_audio_bundle_id",
+            "_ag_audio_count",
+        ] {
+            self.queue.push_back(Call {
+                name,
+                args: vec![],
+                kind: ResultKind::Int,
+            });
+        }
+        for i in 0..4 {
+            for field in 0..2 {
+                self.queue.push_back(Call {
+                    name: "_ag_audio_i",
+                    args: vec![Scalar::Int(i), Scalar::Int(field)],
+                    kind: ResultKind::Int,
+                });
+            }
+            self.queue.push_back(Call {
+                name: "_ag_audio_g",
+                args: vec![Scalar::Int(i)],
+                kind: ResultKind::Float,
+            });
+        }
     }
     pub fn accept(&mut self) -> Result<(), String> {
         let frame = self.candidate.take().ok_or("no complete play frame")?;

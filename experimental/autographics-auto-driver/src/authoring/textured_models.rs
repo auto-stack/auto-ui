@@ -808,6 +808,7 @@ pub fn blobs(r: &Registry) -> Result<BTreeMap<String, Blob>, String> {
         for (id, b) in &a.dependencies {
             let h = agp::assets::preflight_png(b)?;
             let identity = AssetRef {
+                audio: None,
                 closure: None,
                 format: "png".into(),
                 sha256: id.clone(),
@@ -996,6 +997,7 @@ fn decode(
     }
     model.source_sha256 = id.clone();
     let identity = AssetRef {
+        audio: None,
         closure: Some(Closure {
             id,
             images: refs,
@@ -1010,6 +1012,7 @@ fn decode(
     };
     identity.validate()?;
     let a = Arc::new(Asset {
+        audio: None,
         animation,
         model_images: images,
         dependencies,

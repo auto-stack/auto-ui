@@ -84,7 +84,8 @@ pub fn targets(doc: &Document, order: &[Node], assets: &Registry) -> Result<Vec<
             .find(|(_, a)| a.key() == *key)
             .ok_or("visual asset missing")?;
         let asset = assets.get(key).ok_or("visual payload missing")?;
-        if !asset.identity.same_content(identity) || asset.image.is_some() {
+        if !asset.identity.same_content(identity) || asset.image.is_some() || asset.audio.is_some()
+        {
             return Err("visual asset identity".into());
         }
         out.push(Target {

@@ -252,13 +252,14 @@ impl SurfaceUi for Panel {
         }
         c = c
             .push(crate::authoring::tagged::tag(
-                text_input("Local GLB path", &self.import_path)
+                text_input("Local asset path (GLB/Ogg/WAV)", &self.import_path)
                     .id("authoring-asset-path")
                     .on_input(|v| format!("asset-path:{v}")),
                 "asset-path".into(),
                 self.bounds.clone(),
             ))
             .push(cmd("Import GLB", "import", json!(self.import_path)))
+            .push(cmd("Import Audio", "import-audio", json!(self.import_path)))
             .push(cmd(
                 "Import Animated GLB",
                 "import-animated",
@@ -290,7 +291,12 @@ impl SurfaceUi for Panel {
             cmd("+2D group", "create-group2", json!("2d")),
             cmd("+3D group", "create-group3", json!("3d"))
         ]);
-        for a in self.document.assets.iter().filter(|a| !a.is_image()) {
+        for a in self
+            .document
+            .assets
+            .iter()
+            .filter(|a| !a.is_image() && !a.is_audio())
+        {
             let key = a.key();
             c = c
                 .push(text(format!(

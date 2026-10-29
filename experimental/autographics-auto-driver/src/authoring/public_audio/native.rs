@@ -14,6 +14,8 @@ pub struct Observation {
     pub max_us: u64,
     pub deadline_misses: u64,
     pub last_quantum: usize,
+    pub last_run: i32,
+    pub last_nonzero: u64,
     pub ring: Box<[Stereo; TRACE_FRAMES]>,
     pub cursor: usize,
 }
@@ -27,6 +29,8 @@ impl Default for Observation {
             max_us: 0,
             deadline_misses: 0,
             last_quantum: 0,
+            last_run: 0,
+            last_nonzero: 0,
             ring: Box::new([[0.0; 2]; TRACE_FRAMES]),
             cursor: 0,
         }
@@ -103,6 +107,8 @@ fn build<T: cpal::SizedSample + cpal::FromSample<f32>>(
                 let begin = Instant::now();
                 let mut m = output.lock().unwrap();
                 let mut s = observe.lock().unwrap();
+                s.last_run = m.run();
+                s.last_nonzero = 0;
                 s.last_quantum = out.len() / channels;
                 // Fixed stack scratch; no callback heap allocation, even for a backend
                 // quantum longer than the retained observation ring.
@@ -122,6 +128,7 @@ fn build<T: cpal::SizedSample + cpal::FromSample<f32>>(
                         }
                         s.frames += 1;
                         s.nonzero += u64::from(src[0] != 0.0 || src[1] != 0.0);
+                        s.last_nonzero += u64::from(src[0] != 0.0 || src[1] != 0.0);
                         s.peak = s.peak.max(src[0].abs()).max(src[1].abs());
                         let i = s.cursor;
                         s.ring[i] = *src;

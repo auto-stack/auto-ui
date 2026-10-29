@@ -267,6 +267,22 @@ impl Host {
                 return Err(e);
             }
         };
+        if play.audio_cues.is_some() {
+            if self
+                .audio
+                .as_ref()
+                .is_none_or(|a| a.mixer.lock().unwrap().fault().is_some())
+            {
+                self.audio = Some(crate::authoring::public_audio::native::Native::open()?);
+            }
+            self.audio
+                .as_ref()
+                .unwrap()
+                .mixer
+                .lock()
+                .unwrap()
+                .begin(play.run_id())?;
+        }
         self.play_restore = Some(restore);
         self.play = Some(play);
         self.publish(runtime_view);
@@ -280,6 +296,9 @@ impl Host {
         Ok(())
     }
     pub fn stop_play(&mut self) {
+        if let Some(audio) = &self.audio {
+            audio.mixer.lock().unwrap().stop();
+        }
         self.cancel_camera_drag();
         if let Some(mut play) = self.play.take() {
             let begin = Instant::now();
@@ -307,6 +326,11 @@ impl Host {
         if let Some(p) = &mut self.play {
             p.input.clear();
             p.pause(reason);
+            if let Some(audio) = &self.audio {
+                if p.audio_cues.is_some() {
+                    let _ = audio.mixer.lock().unwrap().pause(p.run_id(), true);
+                }
+            }
         }
         self.sync_play_ui();
     }
@@ -387,6 +411,15 @@ impl Host {
             }
             _ => return Err("unknown play command".into()),
         }
+        if let (Some(audio), Some(p)) = (&self.audio, &self.play) {
+            if p.audio_cues.is_some() {
+                audio
+                    .mixer
+                    .lock()
+                    .unwrap()
+                    .pause(p.run_id(), p.audio_paused())?;
+            }
+        }
         self.play_token = self
             .play_token
             .checked_add(1)
@@ -399,6 +432,13 @@ impl Host {
         let Some(mut play) = self.play.take() else {
             return;
         };
+        if matches!(
+            play.state,
+            crate::authoring::play::State::Faulted | crate::authoring::play::State::Stopping
+        ) {
+            self.play = Some(play);
+            return;
+        }
         let deadline = now + std::time::Duration::from_millis(8);
         let mut round_requested = false;
         let result = (|| {
@@ -407,7 +447,25 @@ impl Host {
             {
                 return Err("accepted editor changed during play".into());
             }
+            if play.audio_cues.is_some() {
+                let audio = self
+                    .audio
+                    .as_ref()
+                    .ok_or("audio_unavailable: Host manager")?;
+                if let Some(error) = audio.mixer.lock().unwrap().fault() {
+                    return Err(error.to_owned());
+                }
+            }
             play.clock(now);
+            if let Some(audio) = &self.audio {
+                if play.audio_cues.is_some() {
+                    audio
+                        .mixer
+                        .lock()
+                        .unwrap()
+                        .pause(play.run_id(), play.audio_paused())?;
+                }
+            }
             let mut dispatched = 0;
             loop {
                 play.pump_until(deadline)?;
@@ -425,7 +483,25 @@ impl Host {
                     self.prepare_measurement.finish(measurement_start);
                     let prepared = prepared?;
                     // All preparation and transaction limits precede visible publication.
-                    play.accept()?;
+                    if let Some(packet) = frame.audio.clone() {
+                        let audio = self
+                            .audio
+                            .as_ref()
+                            .ok_or("audio_unavailable: Host manager")?;
+                        let mut mixer = audio.mixer.lock().unwrap();
+                        let cues = play
+                            .audio_cues
+                            .as_ref()
+                            .ok_or("audio_invalid: frozen cues")?
+                            .clone();
+                        let step = play.is_neutral_step();
+                        let disposition =
+                            mixer.accept_inflight(packet, &cues, step, || play.accept())?;
+                        play.last.as_mut().unwrap().audio_disposition = Some(disposition);
+                        mixer.pause(play.run_id(), play.audio_paused())?;
+                    } else {
+                        play.accept()?;
+                    }
                     self.camera_saturation = play.camera_saturation();
                     let frame = play.last.as_ref().unwrap();
                     self.presented = frame.objects.clone();
@@ -449,6 +525,11 @@ impl Host {
             Ok::<_, String>(())
         })();
         if let Err(error) = result {
+            if let Some(audio) = &self.audio {
+                if play.audio_cues.is_some() {
+                    audio.mixer.lock().unwrap().stop();
+                }
+            }
             play.fail(error);
         }
         self.play = Some(play);
@@ -475,6 +556,11 @@ impl Host {
         let Some(mut old) = self.play.take() else {
             return;
         };
+        if old.audio_cues.is_some() {
+            if let Some(audio) = &self.audio {
+                audio.mixer.lock().unwrap().stop();
+            }
+        }
         let built = (|| -> Result<crate::authoring::play::Play, String> {
             let snapshot = old
                 .user_source
@@ -494,6 +580,13 @@ impl Host {
         match built {
             Ok(mut fresh) => {
                 old.stop();
+                if fresh.audio_cues.is_some() {
+                    if let Some(audio) = &self.audio {
+                        if let Err(error) = audio.mixer.lock().unwrap().begin(fresh.run_id()) {
+                            fresh.fail(error);
+                        }
+                    }
+                }
                 fresh
                     .vm_output_measurement
                     .enable(self.prepare_measurement.enabled);

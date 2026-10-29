@@ -108,6 +108,8 @@ pub struct Document {
     pub objects: Vec<Object>,
     pub groups: Vec<Group>,
     pub assets: Vec<super::assets::AssetRef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cues: Option<Vec<super::public_audio::CueRef>>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -167,6 +169,7 @@ impl Document {
             objects: vec![],
             groups: vec![],
             assets: vec![],
+            cues: None,
         }
     }
     pub fn sample() -> Self {
@@ -187,9 +190,27 @@ impl Document {
         d
     }
     pub fn validate(&self) -> Result<(), String> {
-        if self.schema != "autographics.scene/5" && self.schema != "autographics.scene/6" {
+        if ![
+            "autographics.scene/5",
+            "autographics.scene/6",
+            "autographics.scene/7",
+        ]
+        .contains(&self.schema.as_str())
+        {
             return Err("unsupported schema".into());
         }
+        if (self.schema == "autographics.scene/7") != self.cues.is_some() {
+            return Err("audio_invalid: versioned cue field".into());
+        }
+        if self.schema != "autographics.scene/7"
+            && self
+                .assets
+                .iter()
+                .any(|a| a.is_audio() || a.audio.is_some())
+        {
+            return Err("legacy unknown audio format/metadata".into());
+        }
+        super::public_audio::validate_cues(self)?;
         if self.document_id.is_empty() || self.document_id.chars().count() > 128 {
             return Err("document identity".into());
         }
@@ -207,7 +228,9 @@ impl Document {
             if !assets.insert(a.key()) {
                 return Err("duplicate asset identity".into());
             }
-            if self.schema != "autographics.scene/6" && a.closure.is_some() {
+            if !["autographics.scene/6", "autographics.scene/7"].contains(&self.schema.as_str())
+                && a.closure.is_some()
+            {
                 return Err("legacy unknown model closure".into());
             }
             raw.insert(a.sha256.clone(), a.byte_length);
@@ -235,7 +258,7 @@ impl Document {
                     .iter()
                     .find(|a| Some(a.key()).as_ref() == o.resource.as_ref())
                     .ok_or_else(|| "model resource reference".to_string())?;
-                if payload.is_image() {
+                if payload.is_image() || payload.is_audio() {
                     return Err("model requires a geometry resource".into());
                 }
             } else if o.resource.is_some() {
@@ -325,7 +348,24 @@ impl Document {
             .and_then(Value::as_str)
             .ok_or("schema required")?
             .to_owned();
-        if schema != "autographics.scene/6"
+        if schema != "autographics.scene/7"
+            && (v.get("cues").is_some()
+                || v.get("assets").and_then(Value::as_array).is_some_and(|a| {
+                    a.iter().any(|a| {
+                        a.get("audio").is_some()
+                            || matches!(
+                                a.get("format").and_then(Value::as_str),
+                                Some("ogg" | "wav")
+                            )
+                    })
+                }))
+        {
+            return Err("legacy unknown audio fields/format".into());
+        }
+        if schema == "autographics.scene/7" && !v.get("cues").is_some_and(Value::is_array) {
+            return Err("explicit audio cues required".into());
+        }
+        if !["autographics.scene/6", "autographics.scene/7"].contains(&schema.as_str())
             && v.get("assets")
                 .and_then(Value::as_array)
                 .is_some_and(|a| a.iter().any(|a| a.get("closure").is_some()))
@@ -436,7 +476,13 @@ impl Document {
                 o["sprite"] = Value::Null;
             }
             v["schema"] = Value::String("autographics.scene/5".into());
-        } else if schema == "autographics.scene/5" || schema == "autographics.scene/6" {
+        } else if [
+            "autographics.scene/5",
+            "autographics.scene/6",
+            "autographics.scene/7",
+        ]
+        .contains(&schema.as_str())
+        {
             for o in v["objects"].as_array().ok_or("objects")? {
                 if o.get("sprite").is_none() {
                     return Err("explicit sprite required".into());
