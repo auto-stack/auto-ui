@@ -8,7 +8,7 @@
 |---|---|---|
 | [004 公共图片与2D精灵帧](../../plans/archived/004-autographics-public-images-and-sprite-frames.md) | 安全PNG/透明采样、版本化场景/完整离线closure、真实Auto取帧/翻向与共同发布 | 002实际交付已满足，用户启动work后T-01/T-02 |
 | [005 3D纹理与UV](../../plans/archived/005-autographics-textured-models-and-uv.md) | 固定静态素材色图/UV/变换、依赖闭包/身份、纹理绘制与寿命 | 004实际交付，先恢复固定源清单再验证素材整链 |
-| [006 节点动画与视觉朝向](../../plans/006-autographics-node-animation-and-visual-facing.md) | 无skin节点TRS clip、Auto phase/yaw、碰撞独立与same-tick呈现 | 005实际交付，先核原clip与整组合预算 |
+| [006 节点动画与视觉朝向](../../plans/archived/006-autographics-node-animation-and-visual-facing.md) | 无skin节点TRS clip、Auto phase/yaw、碰撞独立与same-tick呈现 | 005实际交付，先核原clip与整组合预算 |
 
 三份改动同一资源/Frame/assembly/renderer合同，按004→005→006实际delivery串行；T-02均先冻结有限支持、准入资源和真实整链，失败回new，不用接口名字或一个小动画掩盖不可组合。004不声称3D动画已可用，005仍不接受含动画的character，006才闭合原character四clip。004给2D的帧由Auto自行选，Host不代玩法；006亦然。
 

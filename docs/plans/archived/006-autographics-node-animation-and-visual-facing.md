@@ -1,13 +1,16 @@
 ---
 plan_id: PLAN-006
-status: reviewed
+status: archived
 feature_name: AutoGraphics无蒙皮节点动画与视觉朝向
 author: [Codex]
 created_at: 2026-10-29
 updated_at: 2026-10-30
 plan_revision: 2
-current_step: 7
+current_step: 9
 total_steps: 10
+completion_kind: delivered
+delivered_commit: c681663e6ff392d70471abbec560e9d9daf12622
+knowledge_commit: 664145b791a3bb2576a13414e0c2929203c74e56
 depends_on: [auto-ui/PLAN-005]
 supersedes_spec_components:
   - docs/specs/auto-graphics/behavior-api.md
@@ -43,15 +46,15 @@ GLB原始层级/clip轨道→有界声明/数值/资源准入→不可变model+a
 
 ## 4. 需求分析与背景调查
 
-2026-10-29 执行授权：用户 `/goal 完成AG计划006` 授予本计划 work→独立review→有界repair→merge/规范/归档/guard清理全链授权，后续阶段继承；目标、范围、验收与预算保持r1。005现已实际交付，前置核验与原件实读见[执行基线](attachments/006/work/source-preflight.md)。
+2026-10-29 执行授权：用户 `/goal 完成AG计划006` 授予本计划 work→独立review→有界repair→merge/规范/归档/guard清理全链授权，后续阶段继承；目标、范围、验收与预算保持r1。005现已实际交付，前置核验与原件实读见[执行基线](../attachments/006/work/source-preflight.md)。
 
 2026-10-30 reviewer上下文授权：用户明确答复“允许独立子代理复审”。据此启用 `/root/review_plan006`（fork_turns:none），在唯一实施树只读实现、独立重建验收结论；后续受影响复审可沿用该独立上下文，无需再问同一授权。主代理未将实现会话自检冒充独立最终复审。
 
-2026-10-30 r2有界修订：F-006-W1-INPUT-BUDGET实测证明r1逐键读取设计无法承载原完整组合。按原§5.1路由，仅调整尚未发布新profile的输入读取设计；目标、AC阈值、32credits、CPU/源/内存、旧接口兼容、仓库及动作范围均保持，继承上述授权。事实、Spec指纹与消费规则见[输入预算修订](attachments/006/work/input-budget-revision-r2.md)。修订当时getter待实现，现已在04042f8实现，完整当前关闭及最终消费证据见§9，不以设计和式代替实测。
+2026-10-30 r2有界修订：F-006-W1-INPUT-BUDGET实测证明r1逐键读取设计无法承载原完整组合。按原§5.1路由，仅调整尚未发布新profile的输入读取设计；目标、AC阈值、32credits、CPU/源/内存、旧接口兼容、仓库及动作范围均保持，继承上述授权。事实、Spec指纹与消费规则见[输入预算修订](../attachments/006/work/input-budget-revision-r2.md)。修订当时getter待实现，现已在04042f8实现，完整当前关闭及最终消费证据见§9，不以设计和式代替实测。
 
-2026-10-29规划背景（历史，当前执行进度见§8/9）：用户要求规划下一阶段；规划轮仅合同/设计/引用，无实施、agent、窗口/GPU/Cargo门或发布。来源和指纹见[基线](attachments/004/planning/baseline.md)，资源与阶段边界见[设计](../design/autographics/m2-presentation-and-resources.md)。当时005/004尚未交付，未填写未来SHA/接口价格；实际前置现已由T-01核验。
+2026-10-29规划背景（历史，当前执行进度见§8/9）：用户要求规划下一阶段；规划轮仅合同/设计/引用，无实施、agent、窗口/GPU/Cargo门或发布。来源和指纹见[基线](../attachments/004/planning/baseline.md)，资源与阶段边界见[设计](../../design/autographics/m2-presentation-and-resources.md)。当时005/004尚未交付，未填写未来SHA/接口价格；实际前置现已由T-01核验。
 
-现有权威：[样本研究](../../../auto-lang/docs/specs/auto-graphics/m2-game-sample-research.md)、[游戏分母](../../../auto-lang/docs/design/autographics/m2-game-sample-matrix.md)、[运行角色](../../../auto-lang/docs/specs/auto-graphics/game-actions-and-character2d.md)、[触发新局](../../../auto-lang/docs/specs/auto-graphics/runtime-triggers-and-rounds.md)、[静态资源](../../../auto-lang/docs/specs/auto-graphics/scene-assets.md)。研究记character含static/idle/walk/jump、无skin；具体轨道interpolation/keys/时间/层级尚须读取固定原始字节，不能从“有动画”推断是骨骼或只需移动根。旧858源清单缺失风险由005 T-01先恢复，006再核该收据，不换来源。
+现有权威：[样本研究](../../../../auto-lang/docs/specs/auto-graphics/m2-game-sample-research.md)、[游戏分母](../../../../auto-lang/docs/design/autographics/m2-game-sample-matrix.md)、[运行角色](../../../../auto-lang/docs/specs/auto-graphics/game-actions-and-character2d.md)、[触发新局](../../../../auto-lang/docs/specs/auto-graphics/runtime-triggers-and-rounds.md)、[静态资源](../../../../auto-lang/docs/specs/auto-graphics/scene-assets.md)。研究记character含static/idle/walk/jump、无skin；具体轨道interpolation/keys/时间/层级尚须读取固定原始字节，不能从“有动画”推断是骨骼或只需移动根。旧858源清单缺失风险由005 T-01先恢复，006再核该收据，不换来源。
 
 ## 5. 详细设计
 
@@ -111,9 +114,9 @@ phase固定为Auto显式给出的有限非负f32 seconds，不能同时存在两
 | AC-03 | work | V-03已通过：四向真实位移/可见朝向、stop/±pi、240tick动画开关物理/支撑/触发相同、独立同pose阴影ROI0误差及两负控，见r2-input-pixels-and-lifecycle.md |
 | AC-04 | work | V-04已通过：完整last-good/坏输出/prepare失败、Pause/neutral Step/fresh、20轮Play/restart/Stop真实weak/暖mesh与texture上传0增量/最终pin释放，见r2-input-pixels-and-lifecycle.md |
 | AC-05 | work | 已通过：T-02完整32/33真实预算、T-06仓外完整消费/冷重开/真实Auto源变异、继承兼容、1477文件current identity/controls与CPU包络，见t06-consumer-and-identity.md；非Rust玩法 |
-| AC-06 | review | R2 independent final pass，a85980c/e2994efa；R1唯一finding及共因/兄弟路径关闭，SD通过，无开放finding；T-07完成，新34case冻结merge门pending |
-| AC-07 | merge | 新冻结提交定向门绿后合master，保留全AG里程碑pending |
-| AC-08 | merge | SD/ledger/索引、本仓归档/delivery收据、guard clean清树，无Gallery/完整M2完成宣称 |
+| AC-06 | review | R2 independent final pass，a85980c/e2994efa；R1唯一finding及共因/兄弟路径关闭，SD通过，无开放finding；T-07完成，新34case冻结merge门通过 |
+| AC-07 | merge | pass：新34case/controls exit0，源码等价rebase并ff-only合master，完整AG里程碑仍pending |
+| AC-08 | merge | SD/ledger/索引及归档交付已验证；清理见最终T10收据 |
 
 ## 8. 执行步骤
 
@@ -126,8 +129,8 @@ phase固定为Auto显式给出的有限非负f32 seconds，不能同时存在两
 | T-05 | work | T-04 | 事务/实例代次/新局/暂停单步/owner与20轮V-04 | AC-04 | [x] 04042f8；完整last-good/新槽初pose/Pause/Step/40VM与pose释放/暖mesh与texture0上传/预算账 |
 | T-06 | work | T-05 | fresh消费/预算/兼容/identity controls、fmt/warnings/提交、SD与下游接口 | AC-01..05 | [x] 82ba57e/a85980c修复交接；e2994efa当前1477身份/SD/新仓外消费1/1，未变CPU/兼容/画面owner有效证据保留；新34case冻结门归merge |
 | T-07 | review | T-06 | 同树独立review全部V/S与遗漏，merge门pending | AC-06 | [x] a85980c上R2受影响独立final pass；原R1完整矩阵按不变路径复用，修复/SD/身份/消费关闭，review/r2.md |
-| T-08 | merge | T-07 pass | 冻结提交定向门/有效复用，通过才合本仓master | AC-07 | [ ] |
-| T-09 | merge | T-08 | Spec/ledger/索引、本仓归档与真实delivery SHA/clip接口/消费包身份 | AC-08 | [ ] |
+| T-08 | merge | T-07 pass | 冻结提交定向门/有效复用，通过才合本仓master | AC-07 | [x] verified merge receipt below |
+| T-09 | merge | T-08 | Spec/ledger/索引、本仓归档与真实delivery SHA/clip接口/消费包身份 | AC-08 | [x] verified merge receipt below |
 | T-10 | merge | T-09 | wt-guard clean后清唯一树/分支/空组与恢复收据 | AC-08 | [ ] |
 
 ## 9. 复审记录
@@ -184,8 +187,25 @@ F-006-W1-INPUT-BUDGET：补入真实4向held+跳跃pressed后，即使不读even
 
 2026-10-30 goal round 11：`stage: goal | plan_id: PLAN-006 | plan_revision: r2 | round: 11 | from: review | to: merge | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-006/auto-ui | commit: a85980c1c123c793188623d9a5d3df8dd117d2d7 | next: merge T08..10`。上一轮为实际修复与当前消费证据进展；本轮原独立上下文R2按受影响面重放原始输入和7个自选兄弟控制，唯一R1 finding已闭且无新finding，全部work/review-owned AC通过，7/10。R2 Markdown SHA256 b5958ab5c8e3371f40045c6e898ccde811b5e3221dcfa926276628203eb51897、独立audit21da77e1cbb1a64779105746670200f16e6ab87c164277e93c4382368a6ce7ed、SD3d6af002...均已核原文件；实施HEAD/clean与e299身份未漂移。下一轮必须执行新34case冻结门+controls后才合入，再规范/ledger/索引/归档/delivery/guard清理；不以本pass提前算目标完成。用户已授权的全链与独立review授权继续有效，无待答问题；保留R1失败计数和所有历史证据，不重置goal cap12。
 
+2026-10-30 `stage: merge | PLAN-006:r2 | round: 12 | prepared: verified | landed: verified | ledger_refreshed: verified | archived: delivered | cleanup: pending`。独立R2冻结a85980c，SD3d6af002bef2c30fb84417287be8422f13468f2b82f6b18f7d2734bbf28e7621；rebase至主干6a8db648，只保留主干已更新合同文档，9个实现提交range-diff全部等价，experimental整树仍2b31946b0c129c0d549ce8286bd952455f3bc7a7。旧→新：c7dceef→d5b32c1、9354e9e→1b58c89、2739324→a28025b、ccfe6d9→edcc9ac、04042f8→8586b20、12414c0→ee160d8、ab48d2e→e5e2a01、475d376→26e72a6、82ba57e→c681663。主干ff-only实际交付c681663e6ff392d70471abbec560e9d9daf12622，无merge commit；pre-landing.bundle已验证可恢复旧review基线。
+
+当前merge-gate全新冻结34/34（新31+继承3），public8/resources6/pixels5/lifecycle5/consumer2/core5/旧profile1/sprite1/texture1，新组0filtered，identity、runner、log/exe/count、PE32MiB/worker16MiB、oracle和预算负控及真实零选拒绝均通过，exit0。源e2994efa1b1ee6d55f79de7bd194bf59c1745c41f60b6c8bbaac7a67197e7243，1477文件，SDK681原字节、17包/29边/479metadata及两锁未变。实际main上verify_plan006与样例generate_project --check均exit0。正式规范在同组auto-lang独立树准备并精确核SD后，458276fd38b844b1f769cec50c7d9276e5b08fdf提交规范，664145b791a3bb2576a13414e0c2929203c74e56提交台账并ff-only入auto-lang/master；GOAL-008保持ongoing，AG/Gallery/G3/G10b与完整游戏pending。仅文档投影依AGENTS无需root测试，spec-index 62项目/14既有未分组警告，规范索引内容无实质变化。
+
+派生台账通道为guarded offline projection（无可达store writer，非HTTP成功），精确备份SHA951691355d75802680a0c275965a3c6f4089c2111ae5cb78036c27a8a8d55014；version142→143仅+1，六段完整schema/ID/file/tags回读通过，1449无关条目及其它顶层/段元数据逐字节保留。更新P838-ASSETS/P840-BEHAVIOR-API，新增P006-NODE-ANIMATION/P006-T/P006-R2/P006-M；最终ledger SHAde927a0be1073ed91ec6888e1c0a11c89f36f064bb7d4ddaa4c69c8f0ece3c34。review/report链接指向本归档文件；规范为当前知识源，无复制Plan章节。全部原始日志/manifest/备份/源码在D:/autostack/plan-artifacts/auto-ui/plan-006，未入Git。
+
+实盘证据SHA256：
+- `D:\autostack\plan-artifacts\auto-ui\plan-006\merge-gate\manifest.json`：`ea1e56943473e9383301e7a99264761d999de926b283d0cd970be28688579044`
+- `D:\autostack\plan-artifacts\auto-ui\plan-006\merge-gate.log`：`14c3ea4606a08beb048021cf7aa551c5908575fb8f3beeb185c309a3b672195b`
+- `D:\autostack\plan-artifacts\auto-ui\plan-006\landing-range-diff.txt`：`8fba087b89d77074276a69106d6c1379b385cb4cf7558283d7ba76c5daf19061`
+- `D:\autostack\plan-artifacts\auto-ui\plan-006\ledger-projection.json`：`cc55e280133e57ffd2d00b08717b4cb3ad28bf9e9290e88999f825c8c4a6cda9`
+- `D:\autostack\auto-lang\docs\specs\auto-graphics\node-animation-and-facing.md`：`42db8e3774d7bf6dba1d0ee8dda7ad2590a003ed67af79fd2d52042364933822`
+- `D:\autostack\auto-lang\docs\specs\auto-graphics\behavior-api.md`：`3a1ead71ea2b21f14c199915c7043a12d55dae0642174815c73f39abcd8ec1bc`
+- `D:\autostack\auto-lang\docs\specs\auto-graphics\scene-assets.md`：`b5362e41bb90ec6c9414792888a052ea566035f345d71732d8066a842f0b0a14`
+
+归档收据以本文件实际提交为准；工作树、分支与构建中间物清理完成后另记cleaned。生产backend/daemon/root UI未变，无需部署或重启；本期实验AG输出保留。语言批量回归按既有明确排除/延后不运行，不记为通过。
+
 ## 10. 待澄清事项
 
-当前无用户待答问题。R2已在a85980c/e2994efa上独立final pass，R1唯一finding关闭，T07完成、7/10、reviewed；完整判断及复用边界见[受影响复审](attachments/006/review/r2.md)，原R1失败finding/输入保持历史可追溯。下一责任merge T08先核当前新34case冻结门及controls/有效复用，绿后才合入；T09规范/derived ledger/索引/归档/delivery、T10 guard清树仍pending。reviewed不表示已经合入或目标完成。
+当前无用户待答问题。T01..09已交付验证，9/10；仅T10安全清理与最终收据待完成。本计划只交付节点动画/视觉朝向引擎能力，后继产品里程碑保持开放。
 
 原规划的005交付身份与原clip实读风险已关闭；如后续发现必需clip需本期外插值或无法在既有预算内组合，仍带原件与反例回new，显式提出合同/预算变化，不能丢动作或换成Bob动画。声音/HUD、G09/G10内容、完整两关与最终发行另立后继合同，跨端不插入桌面M2前置。
