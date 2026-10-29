@@ -25,31 +25,72 @@ use auto_ui_runtime::ui::native_dnd::win32::{self as dndw};
 use auto_ui_runtime::ui::native_dock::win32::drag_sim;
 use auto_ui_runtime::ui::native_dock::{win32 as ndw, NativeHwnd};
 
-/// fixture exe 路径（缺失时自动构建；与 native_dock_e2e 同款，独立
-/// target 防 flock 死锁）。
+/// fixture exe 路径：从 AutoLang 本地根/组内兄弟复制源码到 AutoUI target，
+/// 并在独立目录构建，防 flock 且不写依赖仓。
 fn fixture_bin() -> std::path::PathBuf {
     static BIN: OnceLock<std::path::PathBuf> = OnceLock::new();
     BIN.get_or_init(|| {
         let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-        let workspace_root = manifest_dir.join("../..");
-        let manifest = workspace_root.join("scripts/tools/native-fixture/Cargo.toml");
+        let workspace_root = manifest_dir
+            .parent()
+            .and_then(std::path::Path::parent)
+            .expect("AutoUI workspace root");
+        let fixture_manifest = std::path::Path::new("scripts/tools/native-fixture/Cargo.toml");
+        let fixture_roots = [
+            Some(workspace_root.to_path_buf()),
+            std::env::var_os("AUTO_LANG_ROOT").map(std::path::PathBuf::from),
+            workspace_root.parent().map(|group| group.join("auto-lang")),
+        ];
+        let fixture_root = fixture_roots
+            .into_iter()
+            .flatten()
+            .find(|root| root.join(fixture_manifest).is_file())
+            .unwrap_or_else(|| {
+                panic!(
+                    "native-fixture source not found under AutoUI root, AUTO_LANG_ROOT, or sibling auto-lang"
+                )
+            });
+        let fixture_target = workspace_root.join("target/native-fixture");
+        let fixture_source = fixture_target.join("source");
+        std::fs::create_dir_all(fixture_source.join("src"))
+            .expect("create AutoUI-local native-fixture source directory");
+        for (source, destination) in [
+            (fixture_manifest, std::path::Path::new("Cargo.toml")),
+            (
+                std::path::Path::new("scripts/tools/native-fixture/README.md"),
+                std::path::Path::new("README.md"),
+            ),
+            (
+                std::path::Path::new("scripts/tools/native-fixture/src/main.rs"),
+                std::path::Path::new("src/main.rs"),
+            ),
+        ] {
+            std::fs::copy(fixture_root.join(source), fixture_source.join(destination))
+                .unwrap_or_else(|error| {
+                    panic!(
+                        "copy native-fixture source {}: {error}",
+                        fixture_root.join(source).display()
+                    )
+                });
+        }
+        let manifest = fixture_source.join("Cargo.toml");
+        let build_target = fixture_target.join("build");
         let profile = if cfg!(debug_assertions) {
             "debug"
         } else {
             "release"
         };
-        let bin = workspace_root
-            .join("scripts/tools/native-fixture/target")
-            .join(profile)
-            .join("native-fixture.exe");
-        if !bin.exists() {
-            let status = Command::new("cargo")
-                .args(["build", "-q", "--manifest-path"])
-                .arg(&manifest)
-                .status()
-                .expect("cargo build native-fixture");
-            assert!(status.success(), "native-fixture 构建失败");
-        }
+        let bin = build_target.join(profile).join("native-fixture.exe");
+        let status = Command::new("cargo")
+            .args(["build", "-q", "--target-dir"])
+            .arg(&build_target)
+            .arg("--manifest-path")
+            .arg(&manifest)
+            .current_dir(workspace_root)
+            .status()
+            .expect("cargo build native-fixture");
+        assert!(status.success(), "native-fixture 构建失败");
+        assert!(bin.is_file(), "native-fixture binary missing: {}", bin.display());
         bin
     })
     .clone()
