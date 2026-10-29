@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-012
-status: drafting
+status: executing
 feature_name: AutoGraphics公共音频资源与接受后一次播放
 author: [Codex]
 created_at: 2026-10-30
 updated_at: 2026-10-30
 plan_revision: 1
-current_step: 0
+current_step: 1
 total_steps: 10
 depends_on: [auto-ui/PLAN-006]
 supersedes_spec_components: [docs/specs/auto-graphics/scene-assets.md, docs/specs/auto-graphics/behavior-api.md]
@@ -39,6 +39,8 @@ touched_goals: [GOAL-008]
 拟新增`driver/tests/public_audio.rs`、`driver/tools/check_public_audio.py`、`verify_plan012.py`及两维Auto夹具（driver=experimental/autographics-auto-driver）。当前都不存在，命令/selector/wire/schema号不预造为已支持。
 
 ## 4. 需求分析与背景调查
+
+2026-10-30 执行授权：用户 `/goal 完成UI的计划012` 授予既有合同的work→独立review→有界repair→merge/规范/台账/归档/guard清理全链。006已实际交付c681663并归档cleaned，master祖先与独立R2/冻结34case/SDK锁及current identity已经实读核验；历史“仅规划/006未交付”描述保留为当时背景。唯一ui-012树已由master f7c83c6创建，分支codex/plan-012-dev；主检出其他所有者文档WIP保留，未发现代码WIP。当前入口与T-02未关闭项见[执行合同](attachments/012/work/public-audio-contract.md)。
 
 用户2026-10-30要求“规划G10b和公共声音/HUD后继计划，按引擎与Gallery分仓，暂不实施”。本轮只新Plan/设计/附件/引用/取号，不建树、改源、生成资源、编译、输出声音、GPU/OS/agent或远端发布；未授权自动实施。005已交付351919c；006仍executing r2、最新记录T-05进行/完成，实际delivery尚待核；本Plan不能追其tip或按某个勾选认定交付。
 
@@ -109,7 +111,7 @@ work自查后同树独立上下文review全部AC/V/S/SD、计价/codec/不可逆
 
 | ID | owner_stage | 依赖 | 操作/产物 | AC | 状态 |
 |---|---|---|---|---|---|
-| T-01 | work | 用户启动、006实际delivery | 核公开合同/SDK/锁/identity/设备条件与owner，建唯一ui-012树 | AC-01/05 | [ ] |
+| T-01 | work | 用户启动、006实际delivery | 核公开合同/SDK/锁/identity/设备条件与owner，建唯一ui-012树 | AC-01/05 | [x] f7c83c6基线；006独立R2/实际c681663/1477identity controls与SDK681/17包29边479metadata通过；native输出设备可用，执行合同含边界 |
 | T-02 | work | T-01 | public-audio-contract先冻结支持/计价/bundle/效果时序/PCM入口，两维整链可行性probe，不足回new | AC-01..05 | [ ] |
 | T-03 | work | T-02通过 | 有限codec/cue/asset闭包与存储版本化，V-01 | AC-01/02 | [ ] |
 | T-04 | work | T-03 | Auto/Host有界请求与mixer/native输出、接受幂等/32-33/错bundle，V-02/03 | AC-03 | [ ] |
@@ -126,6 +128,10 @@ work自查后同树独立上下文review全部AC/V/S/SD、计价/codec/不可逆
 
 2026-10-30 文档预检：本批五Plan各0..10节、10个T/8个AC/5个V和S、职责/SD/依赖入口完整，87个本地链接可解析；编号/计数一致、依赖无环。9份固定原始文件与Git对象逐字节一致。仅只读身份/文档检查，未解码/播放/生成bank-font/运行GPU；预计32和式/资源数不是通过证据，此结果非独立final review。
 
+2026-10-30 work foundation checkpoint：`stage: work | plan_id: auto-ui/PLAN-012 | plan_revision: 1 | outcome: pass (checkpoint only; work_complete:false) | worktree_path: D:/autostack/.wt/ui-012/auto-ui | branch: codex/plan-012-dev | base_commit: f7c83c6fbe55b51b4c1e830a4175c94ec5c0d131 | code_commit: fe59bc0 | dependency_revisions: 006=c681663e6ff392d70471abbec560e9d9daf12622,SDK=7b987ca8b12f2eec3c076a1bfbf3ff4663aa8467; direct cpal/Symphonia references only, no package version change | task_ids: T-01 closed,T-02 partial | evidence: attachments/012/work/public-audio-contract.md; t02-current.log SHA256540b86452b6126274d6cfabed8b4bec969c12c4a7b1e4a9377973bea9a7b656 | blockers: none | next_responsible_role: work T-02 authoring Host/ledger/support closure`。用户全链授权已记录§4；006独立R2/冻结34case/实际master祖先/归档cleaned及1477identity controls实读通过，SDK681/17包29边479metadata通过。主检出其他所有者文档WIP保留；另一会话新增014/.next-id等只读观察，未纳入本提交。新显式audio2d/version111/profile22、audio3d/version112/profile23；固定1visual+4sound bundle共1credit，旧15profile文件未改。真实两维完整活动tick2均event101、32成功/再添1credit error10，managed85055/84143B；6producer+3codec共9case/0failed/0filtered通过。真实Auto受检packet经共同accept闭包到同一PCM mixer/native服务stream，stereo[0.1,-0.4]、970nonzeroframes、max135us、deadline_misses0，设备为ToDesk虚拟扬声器，不宣称物理声压或作者Host已接线。原3Ogg hash匹配，受限decode实际jump7872mono/coin12864stereo/land2496stereo均44100Hz；恶意codebook/维度/channels/blocksize/时长/CRC在decode前拒，合法重CRC控制仍接受。合法Vorbis overlap/padding用有界窗口预留并后检真实长度，不截断样本假装等于granule。fmt/diff/SDK681检查通过，SDK146既有warning保留、未见本期新增warning。合同新增codec边界解释与尚未关闭项；T-02作者Host完整同帧/资源存储账与旧15字节/支持域仍开放，T-03..10均pending，状态executing、1/10，不提交review/merge、不发布规范或新identity。原始log/PCM/EXE仅仓外本地保留。
+
+2026-10-30 goal round1：`stage: goal | plan_id: PLAN-012 | plan_revision: r1 | round: 1 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-012/auto-ui | commit: fe59bc0 | next: work T-02`。本轮为实质实施/准入/真实输出可行性进展，不是work-complete verdict；1/10，0failed final review/0repaircycle，无用户待答。下一轮复读本Plan与唯一树，继续T-02 Host/计账/旧装配域，仍须先关闭T-02才开放后续正式交付任务。
+
 ## 10. 待澄清事项
 
-无新增方向问题。函数/selector/编号、codec受限实现、整组合能否在原额内成立由T-02有界验证；若失败回new，不把本期扩大为录音/空间音频或抬预算。006未交付，当前不创建实现树。011不自动升级，完整游戏G2-09/G3-08仍需真实消费者后继验证。
+当前无用户待答问题。006实际交付已核验、唯一ui-012树已建立，T-01完成。T-02进行中：两维真实32/33credit事件分支、bounded codec基础/原始Ogg与WAV、Auto→typed packet→mixer→native stream探针通过；作者Host共同accept、完整资源/存储账、旧15profile字节核验及codec支持边界仍待关闭，不能先执行/宣告T-03..06完成。若原合同不可行回new，不扩录音/空间音频或抬预算。011不自动升级，完整游戏G2-09/G3-08仍需真实消费者后继验证。
