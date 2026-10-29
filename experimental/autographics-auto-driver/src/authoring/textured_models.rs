@@ -128,7 +128,7 @@ fn closure_id(root: &str, len: usize, images: &[ImageRef], animated: bool) -> St
 pub fn validate_ref(a: &AssetRef) -> Result<(), String> {
     if let Some(c) = &a.closure {
         if a.format != "glb"
-            || c.images.is_empty()
+            || (c.images.is_empty() && !c.node_animation)
             || c.images.len() > 8
             || c.id != closure_id(&a.sha256, a.byte_length, &c.images, c.node_animation)
         {
@@ -414,23 +414,31 @@ struct Plan {
     cpu: usize,
     gpu: usize,
     materials: Vec<Material>,
-    animation: Option<Arc<agp::assets::node_animation::Animation>>,
+    animation_bytes: usize,
 }
 fn inspect(bytes: &[u8], animated: bool) -> Result<Plan, String> {
-    let (j, end) = json(bytes)?;
+    let (mut j, end) = json(bytes)?;
     extensions(&j, "")?;
+    if animated {
+        // glTF optional arrays are empty by definition. The animated profile
+        // also admits untextured TRS fixtures; original identity bytes stay raw.
+        let object = j.as_object_mut().ok_or("invalid: GLB JSON object")?;
+        for name in ["images", "textures", "samplers", "materials"] {
+            object
+                .entry(name)
+                .or_insert_with(|| Value::Array(Vec::new()));
+        }
+    }
     if !animated
         && j.get("animations")
             .is_some_and(|v| v.as_array().is_none_or(|a| !a.is_empty()))
     {
         return Err("unsupported: animations require explicit node animation profile".into());
     }
-    let animation = if animated {
-        Some(Arc::new(
-            agp::assets::node_animation::Animation::from_parts(&j, &bytes[end + 8..])?,
-        ))
+    let animation_bytes = if animated {
+        agp::assets::node_animation::Animation::preflight(&j, &bytes[end + 8..])?
     } else {
-        None
+        0
     };
     // Validate original references before scratch removes image declarations.
     // Every material is admitted, including those unused by scene primitives.
@@ -482,7 +490,7 @@ fn inspect(bytes: &[u8], animated: bool) -> Result<Plan, String> {
         }
     }
     let images = array(&j, "images")?;
-    if images.is_empty() || images.len() > 8 {
+    if (images.is_empty() && !animated) || images.len() > 8 {
         return Err("resource limit: declared images".into());
     }
     let mut image_sources = BTreeSet::new();
@@ -616,7 +624,7 @@ fn inspect(bytes: &[u8], animated: bool) -> Result<Plan, String> {
         }
     }
     Ok(Plan {
-        animation,
+        animation_bytes,
         j,
         scratch: clean,
         cpu,
@@ -854,7 +862,7 @@ fn decode(
         .iter()
         .map(|i| 1024 + i.source.len() + i.sha256.len())
         .sum::<usize>();
-    let cpu = plan.cpu + extra + metadata + plan.animation.as_ref().map_or(0, |a| a.cpu_bytes);
+    let cpu = plan.cpu + extra + metadata + plan.animation_bytes;
     let gpu = plan.gpu
         + g.nodes()
             .filter_map(|n| n.mesh())
@@ -880,6 +888,20 @@ fn decode(
     }
     usage.geometry.insert(format!("closure:{id}"), (cpu, gpu));
     usage.check()?;
+    // No key/output payload or decoded image/geometry exists before the full
+    // closure + resident union gate. The immutable raw bytes cannot change.
+    let animation = if animated {
+        let payload = agp::assets::node_animation::Animation::from_parts(
+            &plan.j,
+            g.blob.as_deref().ok_or("invalid: BIN")?,
+        )?;
+        if payload.cpu_bytes != plan.animation_bytes {
+            return Err("invalid: animation preflight accounting drift".into());
+        }
+        Some(Arc::new(payload))
+    } else {
+        None
+    };
     let mut images: Vec<Arc<ImageData>> = vec![];
     let mut decoded: BTreeMap<String, Arc<ImageData>> = BTreeMap::new();
     for a in existing.values() {
@@ -988,7 +1010,7 @@ fn decode(
     };
     identity.validate()?;
     let a = Arc::new(Asset {
-        animation: plan.animation,
+        animation,
         model_images: images,
         dependencies,
         identity,

@@ -48,6 +48,25 @@ impl AnimationFrame {
 pub fn block_len(count: usize) -> usize {
     4 + (count + SLOTS) * 6
 }
+/// Reserve bounded last-good/candidate/prepare copies, including visual keys,
+/// Arc headers, the frozen target table and extra wire values. Hidden objects
+/// and all eight potential slots retain the same denominator.
+pub fn pose_reservation(targets: &[Target]) -> usize {
+    let instance = |t: &Target| {
+        let nodes = t.asset.animation.as_ref().map_or(0, |a| a.nodes.len());
+        nodes
+            * (std::mem::size_of::<(glam::Vec3, glam::Quat, glam::Vec3)>()
+                + 4 * std::mem::size_of::<Mat4>())
+            + 4 * (std::mem::size_of::<Visual>()
+                + 2 * std::mem::size_of::<usize>()
+                + t.asset.identity.key().len())
+    };
+    targets.iter().map(instance).sum::<usize>()
+        + SLOTS * targets.iter().map(instance).max().unwrap_or(0)
+        + 2 * std::mem::size_of::<AnimationFrame>()
+        + targets.len() * std::mem::size_of::<Target>()
+        + 2 * block_len(targets.len()) * std::mem::size_of::<Scalar>()
+}
 pub fn targets(doc: &Document, order: &[Node], assets: &Registry) -> Result<Vec<Target>, String> {
     let mut out = Vec::new();
     for (node_index, n) in order.iter().enumerate() {
@@ -80,10 +99,7 @@ pub fn targets(doc: &Document, order: &[Node], assets: &Registry) -> Result<Vec<
     }
     // Bound both retained last-good/candidate pose owners plus prepare scratch.
     // Every potential slot pays the largest template, independent of visibility.
-    let nodes = |t: &Target| t.asset.animation.as_ref().map_or(0, |a| a.nodes.len());
-    let scratch = (out.iter().map(nodes).sum::<usize>()
-        + SLOTS * out.iter().map(nodes).max().unwrap_or(0))
-        * (48 + 64 * 4);
+    let scratch = pose_reservation(&out);
     let cpu = super::textured_models::usage(assets).2;
     if cpu
         .checked_add(scratch)

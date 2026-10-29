@@ -4,6 +4,14 @@
 use glam::{Mat4, Quat, Vec3, Vec4};
 use serde_json::Value;
 use std::collections::BTreeSet;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+static CHANNEL_ALLOCATIONS: AtomicUsize = AtomicUsize::new(0);
+/// Admission diagnostic: actual pairs of key/output vector allocations.
+/// Metadata preflight, rejected union gates and sampling never increment this.
+pub fn channel_allocation_count() -> usize {
+    CHANNEL_ALLOCATIONS.load(Ordering::Relaxed)
+}
 
 pub const MAX_NODES: usize = 128;
 pub const MAX_CLIPS: usize = 16;
@@ -61,6 +69,18 @@ fn limit(s: &str) -> String {
 }
 fn unsupported(s: &str) -> String {
     format!("unsupported: node animation {s}")
+}
+fn interpolation(s: &Value) -> Result<Interpolation, String> {
+    match s
+        .get("interpolation")
+        .map(|v| v.as_str().ok_or_else(|| invalid("interpolation type")))
+        .transpose()?
+        .unwrap_or("LINEAR")
+    {
+        "LINEAR" => Ok(Interpolation::Linear),
+        "STEP" => Ok(Interpolation::Step),
+        _ => Err(unsupported("interpolation")),
+    }
 }
 fn array<'a>(v: &'a Value, key: &str) -> Result<&'a [Value], String> {
     match v.get(key) {
@@ -188,10 +208,37 @@ struct Track<'a> {
     input: Access<'a>,
     output: Access<'a>,
 }
+fn key(t: &Track<'_>, i: usize, previous: f32) -> Result<(f32, Vec4), String> {
+    let time = t.input.row(i)?.x;
+    if time < 0. || time <= previous {
+        return Err(invalid("strict nonnegative key times"));
+    }
+    let mut value = t.output.row(i)?;
+    match t.path {
+        Path::Rotation => {
+            value = Vec4::from_array(unit(Quat::from_array(value.to_array()))?.to_array())
+        }
+        Path::Scale => {
+            positive(value.truncate())?;
+        }
+        Path::Translation => {}
+    }
+    Ok((time, value))
+}
 impl Animation {
     /// No path access or decoding of images/geometry. `j` is the original GLB
     /// JSON and `bin` its bounded original BIN. Every declared clip is inspected.
     pub fn from_parts(j: &Value, bin: &[u8]) -> Result<Self, String> {
+        Self::build(j, bin, true)?
+            .0
+            .ok_or_else(|| invalid("retained payload"))
+    }
+    /// All declared track types/spans/counts/values, before allocating any key
+    /// or output payload. The enclosing asset gate must charge this exact size.
+    pub fn preflight(j: &Value, bin: &[u8]) -> Result<usize, String> {
+        Ok(Self::build(j, bin, false)?.1)
+    }
+    fn build(j: &Value, bin: &[u8], retain: bool) -> Result<(Option<Self>, usize), String> {
         let declared = array(j, "nodes")?;
         if declared.len() > MAX_NODES {
             return Err(limit("nodes128"));
@@ -240,6 +287,9 @@ impl Animation {
         let (mut total_channels, mut total_samples) = (0usize, 0usize);
         for clip in clips {
             let channels = array(clip, "channels")?;
+            if channels.is_empty() {
+                return Err(invalid("empty clip channels"));
+            }
             total_channels = total_channels
                 .checked_add(channels.len())
                 .ok_or_else(|| limit("channels128"))?;
@@ -255,6 +305,9 @@ impl Animation {
                 return Err(limit("clip name256"));
             }
             let samplers = array(clip, "samplers")?;
+            for s in samplers {
+                interpolation(s)?;
+            }
             let mut tracks = Vec::with_capacity(channels.len());
             let mut seen = BTreeSet::new();
             for c in channels {
@@ -277,16 +330,7 @@ impl Animation {
                 let s = samplers
                     .get(index(&c["sampler"])?)
                     .ok_or_else(|| invalid("sampler index"))?;
-                let interpolation = match s
-                    .get("interpolation")
-                    .map(|v| v.as_str().ok_or_else(|| invalid("interpolation type")))
-                    .transpose()?
-                    .unwrap_or("LINEAR")
-                {
-                    "LINEAR" => Interpolation::Linear,
-                    "STEP" => Interpolation::Step,
-                    _ => return Err(unsupported("interpolation")),
-                };
+                let interpolation = interpolation(s)?;
                 let input = access(j, bin, &s["input"], "SCALAR", 1)?;
                 let output = access(j, bin, &s["output"], ty, width)?;
                 if input.count != output.count {
@@ -338,32 +382,44 @@ impl Animation {
                 scale: positive(Vec3::from_array(components(n.get("scale"), [1.; 3])?))?,
             });
         }
+        let cpu_bytes = std::mem::size_of::<Self>()
+            + nodes.len() * (std::mem::size_of::<Node>() + std::mem::size_of::<usize>() + 48 + 64)
+            + plans.len() * std::mem::size_of::<Clip>()
+            + plans
+                .iter()
+                .map(|(name, tracks)| name.len() + tracks.len() * std::mem::size_of::<Channel>())
+                .sum::<usize>()
+            + total_samples * (4 + std::mem::size_of::<Vec4>());
+        for (_, tracks) in &plans {
+            for track in tracks {
+                let mut previous = -1.;
+                for i in 0..track.input.count {
+                    previous = key(track, i, previous)?.0;
+                }
+            }
+        }
+        if !retain {
+            let base = Self {
+                nodes,
+                clips: Vec::new(),
+                order,
+                cpu_bytes,
+            };
+            base.sample(None, 0., false)?;
+            return Ok((None, cpu_bytes));
+        }
         let mut result = Vec::with_capacity(plans.len());
         for (name, tracks) in plans {
             let mut channels = Vec::with_capacity(tracks.len());
             let mut duration = 0.0f32;
             for t in tracks {
+                CHANNEL_ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
                 let mut times = Vec::with_capacity(t.input.count);
                 let mut values = Vec::with_capacity(t.output.count);
                 let mut previous = -1.;
                 for i in 0..t.input.count {
-                    let time = t.input.row(i)?.x;
-                    if time < 0. || time <= previous {
-                        return Err(invalid("strict nonnegative key times"));
-                    }
+                    let (time, value) = key(&t, i, previous)?;
                     previous = time;
-                    let mut value = t.output.row(i)?;
-                    match t.path {
-                        Path::Rotation => {
-                            value = Vec4::from_array(
-                                unit(Quat::from_array(value.to_array()))?.to_array(),
-                            )
-                        }
-                        Path::Scale => {
-                            positive(value.truncate())?;
-                        }
-                        Path::Translation => {}
-                    }
                     times.push(time);
                     values.push(value);
                 }
@@ -382,14 +438,6 @@ impl Animation {
                 channels,
             });
         }
-        let cpu_bytes = std::mem::size_of::<Self>()
-            + nodes.len() * (std::mem::size_of::<Node>() + std::mem::size_of::<usize>() + 48 + 64)
-            + result.len() * std::mem::size_of::<Clip>()
-            + result
-                .iter()
-                .map(|c| c.name.len() + c.channels.len() * std::mem::size_of::<Channel>())
-                .sum::<usize>()
-            + total_samples * (4 + std::mem::size_of::<Vec4>());
         let out = Self {
             nodes,
             clips: result,
@@ -397,7 +445,7 @@ impl Animation {
             cpu_bytes,
         };
         out.sample(None, 0., false)?;
-        Ok(out)
+        Ok((Some(out), cpu_bytes))
     }
     /// Seconds supplied by Auto. None is the unanimated base pose; clip ordinal
     /// switches sample immediately. Exact loop end wraps to zero; one-shot holds.
@@ -438,8 +486,12 @@ impl Animation {
                     };
                 let target = &mut local[ch.node];
                 match ch.path {
-                    Path::Translation => target.0 = a.truncate().lerp(b.truncate(), factor),
-                    Path::Scale => target.2 = a.truncate().lerp(b.truncate(), factor),
+                    // Convex form avoids overflowing b-a for opposite finite
+                    // endpoints even when their correct interpolated pose fits.
+                    Path::Translation => {
+                        target.0 = a.truncate() * (1. - factor) + b.truncate() * factor
+                    }
+                    Path::Scale => target.2 = a.truncate() * (1. - factor) + b.truncate() * factor,
                     Path::Rotation => {
                         target.1 = Quat::from_array(a.to_array())
                             .slerp(Quat::from_array(b.to_array()), factor)

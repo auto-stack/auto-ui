@@ -327,3 +327,32 @@ fn matrix_parent_is_preserved_without_decomposition_and_sample_limit_is_exact() 
         .unwrap_err()
         .starts_with("resource limit:"));
 }
+
+#[test]
+fn preflight_and_retention_agree_and_large_finite_linear_endpoints_do_not_overflow() {
+    let (mut j, mut bin) = fixture(false, false);
+    // Child translation endpoints are -3e38 and +3e38 on X. Their midpoint
+    // is exactly zero; subtract-then-lerp would overflow before weighting.
+    bin[40..44].copy_from_slice(&(-3e38f32).to_le_bytes());
+    bin[52..56].copy_from_slice(&(3e38f32).to_le_bytes());
+    let bytes = Animation::preflight(&j, &bin).unwrap();
+    let a = Animation::from_parts(&j, &bin).unwrap();
+    assert_eq!(bytes, a.cpu_bytes);
+    near(
+        a.sample(Some(0), 1., false).unwrap()[1].transform_point3(Vec3::ZERO),
+        Vec3::ZERO,
+    );
+    // Direct public AGP admission also checks every channel's values before
+    // allocating any retained key/output vectors, not just the driver wrapper.
+    bin[8..12].copy_from_slice(&f32::NAN.to_le_bytes());
+    let before = agp::assets::node_animation::channel_allocation_count();
+    assert!(Animation::from_parts(&j, &bin).is_err());
+    assert_eq!(
+        agp::assets::node_animation::channel_allocation_count(),
+        before
+    );
+    j["animations"][0]["channels"] = serde_json::json!([]);
+    assert!(Animation::preflight(&j, &bin)
+        .unwrap_err()
+        .starts_with("invalid:"));
+}
