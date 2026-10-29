@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-015
-status: drafting
+status: executing
 feature_name: vm-route-page-dynamic-load
 author: [Codex]
 created_at: 2026-10-30
 updated_at: 2026-10-30
 plan_revision: 1
-current_step: 0
+current_step: 2
 total_steps: 5
 depends_on: ["auto-ui/PLAN-003"]
 supersedes_spec_components: []
@@ -49,7 +49,9 @@ BLOG-004 原生腿新鲜证据：多页 VM 应用（auto-blog，app.at 声明 8 
 
 ## 4. 需求分析与背景调查
 
-**授权**：BLOG-004 会话用户指示（2026-10-30）——按"选项 2 保守方式"先起草本计划；**实现开工前须与 auto-ui 在途 UI-005 会话协调**（该会话 2026-10-29/30 多次推进 master：2c5e4cb/6e9716b/a052bde/d69b7e8/f7c83c6 等，且 docs/plans/007、008、014 及 .next-id 为其未提交 WIP——编号避让已执行：009 留其用，011 已被占用，本计划取 015=当时最大前缀 014+1）。无额外预算/自动续跑授权。
+**本轮全链授权（2026-10-30）**：用户 `/goal 完成UI的计划015` 授权 work/review/有界修复/merge/归档清理。开工前置经磁盘核验已满足：UI-005 归档 final PASS，交付351919c，工作树已清理；当前活跃UI-012属独立AG音频面。保留主检出已有文档WIP，禁止纳入本计划。`git worktree list` 无UI-015旧树，新建 `D:/autostack/.wt/ui-015/auto-ui`，分支 `codex/plan-015-dev`（服从当前宿主前缀），base `45b196e03ce5978a095cf6fd0af940240ca7dc56`。
+
+**起草时授权历史**：BLOG-004 会话用户指示（2026-10-30）——按"选项 2 保守方式"先起草本计划；**实现开工前须与 auto-ui 在途 UI-005 会话协调**（该会话 2026-10-29/30 多次推进 master：2c5e4cb/6e9716b/a052bde/d69b7e8/f7c83c6 等，且 docs/plans/007、008、014 及 .next-id 为其未提交 WIP——编号避让已执行：009 留其用，011 已被占用，本计划取 015=当时最大前缀 014+1）。无额外预算/自动续跑授权。
 
 **证据（auto-blog `docs/plans/attachments/004/`，本地不入库）**：
 - `t06-run4.log`（`ee69070e`）：多 store 裸调用歧义错误（该 .at 缺陷已由 BLOG-004 T-03 修复 `7f9b675`，非本计划范围）。
@@ -110,8 +112,8 @@ BLOG-004 原生腿新鲜证据：多页 VM 应用（auto-blog，app.at 声明 8 
 
 ## 8. 执行步骤
 
-- [ ] T-01（owner_stage=work；依赖无；AC-01）：多页路由 fixture + 逐特性二分定界，输出 root-cause.md 决策工件（§5 T-01 设计）。
-- [ ] T-02（owner_stage=work；依赖T-01；AC-02/03）：按定界结论修复 + 具名错误化；V-02/V-03。
+- [x] T-01（owner_stage=work；依赖无；AC-01）：多页路由 fixture + 定界完成；[root-cause.md](attachments/015/root-cause.md)。原生旧工具失败/仅去样式导入全特性正控，源码绑定旧构建反例exit101。唯一根因=路由页缺样式预注册，解析Err被if-let吞掉。
+- [x] T-02（owner_stage=work；依赖T-01；AC-02/03）：按定界修复+具名错误化；V-02/V-03通过，6项永久定向测试、真实多页原生MCP、PLAN003原生单页输入/保存/HTTP读回通过。实现0e87054，证据补记e29ccab。
 - [ ] T-03（owner_stage=work；依赖T-02；AC-04）：重建交付二进制（auto-ui-tool 部署到消费发现路径），BLOG-004 native-vm-rust 全 profile 闭环（V-04）；提交消费回执。
 - [ ] T-04（owner_stage=review；依赖T-03；AC-05）：同树最终复审。
 - [ ] T-05（owner_stage=merge；依赖T-04；AC-06）：门/SD-01 Spec/归档/worktree 清理/BLOG-004 登记。
@@ -120,8 +122,18 @@ BLOG-004 原生腿新鲜证据：多页 VM 应用（auto-blog，app.at 声明 8 
 
 stage: new | plan_id: PLAN-015 | plan_revision: 1 | outcome: blocked（计划就绪；唯一缺项=开工协调确认） | next: user 确认 auto-ui UI-005 会话状态（暂停/结束）后 → work/T-01。起草为保守模式：仅本文件，未触实现、未建 worktree、未动他人在途文件（007/008/012/014、.next-id 等）。T-01 为有界调查（决策工件制），T-02 起的修复机制留给 T-01 结论定界，不预设实现细节。
 
+2026-10-30 work progress（r1）：`stage: work | plan_id: PLAN-015 | plan_revision: 1 | outcome: in_progress | worktree_path: D:/autostack/.wt/ui-015/auto-ui | branch: codex/plan-015-dev | base_commit: 45b196e03ce5978a095cf6fd0af940240ca7dc56 | code_commit: 0e87054d254e4b01c96ae5b55dd41ecf20a212fc | dependency_revisions: auto-lang eb6ecc937ce25546b46f4da510e669396ab78463, auto-down c3464d0a0d36e4f8a7988b0c0c26448fc52361b4 | task_ids: T-01 complete, T-02 code/partial validation complete | next_responsible_role: work`。开工前已核UI-005 archived/pass/树已清理；本轮用户全链授权已记§4。新树采用宿主codex前缀，依赖只读同组detached树；未动Blog源码及主检出已有文档WIP。
+
+定界采用更直接的差分对照：保留timer/多条件/列表/f-string全部特性，仅去掉样式导入及其input后旧原生工具成功；最小样式导入页单测在旧生产码上稳定失败，排除原嫌疑特性，未改变验收。修复为页面样式导入预注册+验证，resolve/read/parse/extract具名失败存registry并输出ERROR日志，outlet可见同一诊断，合法相邻页仍可导航。fixture与测试随0e87054提交；SD-01尚待最终review/merge发布。
+
+定向证据（均位于实施树本地 `docs/plans/attachments/015/`，原始材料不提交）：旧码`red-style.log` exit101 SHA256 d73c38ecd78c313c35f28f6ac56c0709fae43d9351877a6fa2123d6503b2efe6；旧码`red-missing.log` exit101 SHA256 d5ee396066f8ec0725e6088d6b0a2c9d392b2f189120B1FF4CA2571E2E509706；`cargo test -p auto-ui-runtime --lib plan015 -- --nocapture --test-threads=1` exit0，6通过/0忽略，`fixture.log` SHA256 633e903f0a31c2d3dd36a60061aeee7ddf22e13f5ce6cc147386eb2b412a21cc；既有`plan841_domain_validation_tests` 2通过。`native_probe.py` 经真实`auto run -r vm`和MCP驱动：旧窗口author占位/Home Init正控（`native-red-2/report.json` SHA256 b500d120fe20b4db48886b2adba98c54727cfeb29f4f83d405a0a4a483f3de9d）；新窗口Author Init+列表/Home Init/具名缺页/返回Author全通过，q退出0（`native-green/report.json` SHA256 fb924e42452200aa30949b9287ac9ae9803eb6515d08b4f886e002e1e233902d）。新工具SHA256 4d7a40524228004dcad772df9b0ab201220e76dc158b17166adb255fff2fd97c，构建exit0；未覆盖安装到其他会话的默认发现路径。fmt/diff检查通过。单页PLAN003回归仍在执行；不提前关闭T-02/AC-03。
+
+2026-10-30 work final checkpoint（r1，blocked at T-03）：`stage: work | plan_id: PLAN-015 | plan_revision: 1 | outcome: blocked | worktree_path: D:/autostack/.wt/ui-015/auto-ui | branch: codex/plan-015-dev | base_commit: 45b196e03ce5978a095cf6fd0af940240ca7dc56 | code_commit: 0e87054d254e4b01c96ae5b55dd41ecf20a212fc | current_commit: e29ccabcf2436eb9db284da99792ca1e6aa65ac7 | dependency_revisions: unchanged as work entry | task_ids: T-01,T-02 complete; T-03 blocked | blockers: consumer native driver is pending and consumer repository changes need scope decision (§10.3) | next_responsible_role: user`。PLAN003单页真实原生窗口→MCP中文多行输入/Save→独立GET /api/todos精确读回→q退出0；所有所属PID均退出，无活跃MCP/API监听，仅OS TIME_WAIT。`native-single-space-recovered/report.json` SHA256 64739ef54c06c3a24677a917f6aa0b00e20b4041873f102b1b03618e38642638；原始材料在实施树attachments/015。前两次因D盘不足在窗口前失败；目录级缓存清理被执行策略拒绝（blocked by policy，无更细原因），未执行；安全缩小到已确认的本计划PDB及两个完成态dep-graph.bin文件，保留exe/源码/证据，随后D盘可用恢复32GB后单页验证成功。`import-regression.log` SHA256 18b72e40c15d5a3214832ee783e47b660b39ad4c5e8d8e8e10043ed4ae6fd6a8，既有2控通过；root-cause.md补记全部当前结果，SHA256 3cca73441c1fce1dd06c356c8a898bdda7dde5c5b867787b0bf8e9f70bc21af2。Rust实现/依赖未再变化，前述6项及原生多页证据复用有效。AC01..03闭合；AC04未满足，不设execution_done，不进入final review/merge，不发布SD01/ledger、不归档/清树。原有主检出文档WIP保留。
+
+2026-10-30 goal round 1：`stage: goal | plan_id: PLAN-015 | plan_revision: r1 | round: 1 | from: work | to: user | status: executing | outcome: blocked | worktree: D:/autostack/.wt/ui-015/auto-ui | commit: e29ccabcf2436eb9db284da99792ca1e6aa65ac7 | next: user`。全链授权已记录，开工前置已解除；完成UI定界/修复/定向及原生回归，2/5。唯一待决=§10.3消费驱动仓库范围；收到决定后回work/T-03。目标未完成，宿主goal首个等待轮保持active（遵守三轮blocked门槛），不冒充已交付。
+
 ## 10. 待澄清事项
 
-1. **开工协调（唯一前置）**：auto-ui 在途 UI-005 会话状态。确认后本计划即可进 work；若其仍在途，可协商页面级并行（本计划触面 = run_vm 动态页加载/aura_view_builder outlet/注册表，与其 UI-005 的 G2 预算/回调相位面预计不重叠，但 master 移动需 rebase 纪律）。
-2. 未解假设 H1/H2/H3 已绑定 T-01 有界调查定界；不预设根因。
-3. 消费者闭环（T-03）需与 BLOG-004 会话（本起草者）协同执行 native profile；该侧接入面与 MCP 驱动模式已实证可用。
+1. **已解除**：UI-005已归档，交付351919c，其组工作树已清理，足以确认不再在途；未向其他会话发消息。
+2. **已定界**：H2缺页样式预注册→parse失败被吞→H1未注册；H3页名无关，见T-01决策工件。
+3. **待用户决定仓库范围**：auto-blog@22045f0832d2cfa60f1ad9127094fd47ac9e73b5 的 `tests/dual/verify_dual.py:366,395-404` 仍将`vm-ui.author_task`无条件列为pending，完整native-vm-rust不可能exit0；本计划禁止改Blog源码/未授权该仓实现。已异步询问是否允许在Blog专属树仅补齐tests/dual原生驱动（不改.at），或等待消费方提供驱动；不擅自改阈值、不以独立fixture冒充AC-04。
