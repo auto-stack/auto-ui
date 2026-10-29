@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-006
-status: drafting
+status: executing
 feature_name: AutoGraphics无蒙皮节点动画与视觉朝向
 author: [Codex]
 created_at: 2026-10-29
 updated_at: 2026-10-29
 plan_revision: 1
-current_step: 0
+current_step: 1
 total_steps: 10
 depends_on: [auto-ui/PLAN-005]
 supersedes_spec_components:
@@ -42,6 +42,8 @@ GLB原始层级/clip轨道→有界声明/数值/资源准入→不可变model+a
 拟新增`experimental/autographics-auto-driver/tests/public_node_animation.rs`、`experimental/autographics-prototype/tests/node_animation.rs`、driver `tools/check_node_animation.py`与`verify_plan006.py`；为T-03..06待建入口。采样数学复用glam，实际支持模式必须与准入表相符。
 
 ## 4. 需求分析与背景调查
+
+2026-10-29 执行授权：用户 `/goal 完成AG计划006` 授予本计划 work→独立review→有界repair→merge/规范/归档/guard清理全链授权，后续阶段继承；目标、范围、验收与预算保持r1。005现已实际交付，前置核验与原件实读见[执行基线](attachments/006/work/source-preflight.md)。
 
 用户2026-10-29要求规划下一阶段；本轮仅合同/设计/引用，无实施、agent、窗口/GPU/Cargo门或发布。来源和指纹见[基线](attachments/004/planning/baseline.md)，资源与阶段边界见[设计](../design/autographics/m2-presentation-and-resources.md)。005/004尚未交付，不填写其未来SHA/接口价格。
 
@@ -108,7 +110,7 @@ phase由Auto显式提供的有限非负时间或等价整数tick表达，T-02选
 
 | ID | owner_stage | 依赖 | 操作/产物 | AC | 状态 |
 |---|---|---|---|---|---|
-| T-01 | work | 005实际交付、用户启动 | 核005/004/SDK/两锁/素材收据与owner，建唯一ui-006树 | AC-01/05 | [ ] |
+| T-01 | work | 005实际交付、用户启动 | 核005/004/SDK/两锁/素材收据与owner，建唯一ui-006树 | AC-01/05 | [x] 11bc18b；source-preflight.md |
 | T-02 | work | T-01 | node-animation-contract：原clip/interpolation、phase/yaw/碰撞/价格/预算整链probe，失败回new | AC-01..05 | [ ] |
 | T-03 | work | T-02通过 | 有界节点/clip准入与持久化/资源计账，V-01 | AC-01/04 | [ ] |
 | T-04 | work | T-03 | Auto公开视觉输出/Host采样/renderer色图与shadow，V-02/03 | AC-02/03 | [ ] |
@@ -125,6 +127,12 @@ phase由Auto显式提供的有限非负时间或等价整数tick表达，T-02选
 
 2026-10-29 合同预检：三份Plan的0..10节、各10任务/8AC/5V、work/review/merge职责、依赖与SD引用检查通过；本批49个局部链接可解析，新增入口均标待建。此为文档预检，非实现测试或独立final review。
 
+2026-10-29 work T-01 checkpoint：`stage: work | plan_id: auto-ui/PLAN-006 | plan_revision: 1 | outcome: progress | worktree_path: D:/autostack/.wt/ui-006/auto-ui | branch: codex/plan-006-dev | base_commit: 80d9bbe3095892fcf5507dd1b9e26af523111fd4 | code_commit: 11bc18bc0c0b5d8cde54c2ef09a98f27f2df68d9 (source receipt only) | dependency_revisions: 005=351919c76b4ef1d940fc7b8120254e321c41cba2,004=e0fce138/fix0261ae9,SDK7b987ca8/681,two locks unchanged | task_ids: T-01 | evidence: attachments/006/work/source-preflight.md; verify_plan005 --controls exit0 1456 hashes/all controls; prepare_sdk --from-snapshot exit0; raw-source audit exit0 8nodes/4LINEAR clips/44channels/337samples/6456B, local report SHA2560ca84f059687a7e472d5750e4fc7553858edcd5c19953d18067b19e1973f24f4 | blockers: none | next_responsible_role: work T-02`。历史new记录的005等待已由实际归档/交付/清理收据解除，非用户待答；无relay并行记录。唯一树clean，未修改产品/SDK/锁或其他计划WIP，GPU/实际Auto整组合与其预算均尚未验收。
+
+2026-10-29 goal round 1：`stage: goal | plan_id: PLAN-006 | plan_revision: r1 | round: 1 | from: drafting | to: work | status: executing | outcome: pass (T-01 only; work incomplete) | worktree: D:/autostack/.wt/ui-006/auto-ui | commit: 11bc18bc0c0b5d8cde54c2ef09a98f27f2df68d9 | next: work T-02`。1/10；全链授权已记§4，未缩减合同，非等待轮。
+
 ## 10. 待澄清事项
+
+当前无用户待答问题。005交付身份与原clip数据已由T-01实测；T-02整路径预算、phase/yaw/wire合同仍待执行，不将T-01的素材检查计作其完成。
 
 005交付身份及原clip数据未实测，T-01/T-02认领；公开profile/签名/wire/价格/phase单位按本文有限语义冻结，不是再向用户索要相同方向授权。如必需clip需本期外插值或无法在既有预算内组合，应带原件与反例回new，显式提出合同/预算变化，不能丢动作或换成Bob动画。声音/HUD、G09/G10内容、完整两关与最终发行另立后继合同，跨端不插入桌面M2前置。
