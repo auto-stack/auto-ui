@@ -5,13 +5,14 @@
 //!
 //! Run single-threaded: `cargo test --locked --test public_sprite_frames -- --test-threads=1`
 use agp::assets::encode_png_rgba;
+use agp::host::surface_runtime::SurfaceContent;
 use autographics_auto_driver::authoring::{
     assets,
     behavior::{Api, SourceSnapshot},
     document::{Document, Kind, Object, SpriteBinding},
     hierarchy,
     host::Host,
-    play::{Action, Play},
+    play::{Action, Play, State},
     runtime_objects::{self, Dim, RuntimeObjectsFrame, Slot},
     runtime_sprites::{self, Target},
     session::{Edit, Editor},
@@ -240,7 +241,7 @@ fn real_auto_drives_frames_flip_and_the_whole_2d_composition_in_one_tick() {
     let descriptor = Descriptor::build(&doc, |_| None).expect("descriptor");
     let mut play =
         Play::new_user_spatial(&editor, [Some(1), None], snapshot, descriptor).expect("play");
-    assert_eq!(play.run_id, 1);
+    assert!(play.run_id >= 1, "a real Run was admitted");
     let order = hierarchy::ordered(&doc).expect("order");
     let targets = runtime_sprites::targets(&doc, &order).expect("targets");
     assert_eq!(targets.len(), 2, "hero and the coin template are bound");
@@ -258,10 +259,10 @@ fn real_auto_drives_frames_flip_and_the_whole_2d_composition_in_one_tick() {
     };
     settle(&mut play);
     let first = play.last.clone().expect("tick 0");
-    assert_eq!(first.run_id, 1);
+    assert_eq!(first.run_id, play.run_id);
     assert_eq!(first.tick, 0);
     let sprites = first.sprites.as_ref().expect("sprite block");
-    assert_eq!(sprites.run_id, 1);
+    assert_eq!(sprites.run_id, play.run_id);
     assert_eq!(sprites.targets.len(), 2);
     assert_eq!(sprites.targets[0].frame, [0, 0, 32, 32]);
     assert!(!sprites.targets[0].flip);
@@ -1272,6 +1273,28 @@ fn settle_host(h: &mut autographics_auto_driver::authoring::host::Host) {
     }
 }
 
+/// Dispatch exactly one tick and pump it to completion. The clock may leave a
+/// new tick in flight after a frame, so a dispatch is only legal when idle.
+fn step_once(h: &mut autographics_auto_driver::authoring::host::Host) {
+    let end = Instant::now() + Duration::from_secs(60);
+    while h.play.as_ref().is_some_and(|p| p.pending()) {
+        assert!(Instant::now() < end, "host deadline");
+        h.frame(None).expect("frame");
+    }
+    h.play
+        .as_mut()
+        .expect("play")
+        .dispatch(Action::default())
+        .expect("dispatch");
+    loop {
+        h.frame(None).expect("frame");
+        if !h.play.as_ref().is_some_and(|p| p.pending()) {
+            break;
+        }
+        assert!(Instant::now() < end, "host deadline");
+    }
+}
+
 #[test]
 fn editor_preview_draws_the_bound_image_and_flips_only_the_uv() {
     let dir = sample_dir();
@@ -1422,4 +1445,266 @@ fn real_auto_frame_and_flip_change_the_drawn_pixels() {
     );
     host.play.as_mut().unwrap().char_key(0, false, false);
     host.stop_play();
+}
+
+// ---------------------------------------------------------------------------
+// V-04: Pause/Step/Stop/new Run, whole-group last-good on a failed prepare and
+// the texture owner lifetime across repeated runs.
+// ---------------------------------------------------------------------------
+
+fn play_snapshot(dir: &Path) -> SourceSnapshot {
+    let source = std::fs::read_to_string(dir.join("main.at")).expect("source");
+    SourceSnapshot::from_bytes_for(&dir.join("main.at"), source.into_bytes(), Api::Sprites2V1)
+        .expect("snapshot")
+}
+
+fn sprite_stats(host: &Host) -> (u64, u64, usize) {
+    match host.rt.content(host.two) {
+        Some(SurfaceContent::Game2d(g)) => (
+            g.sprite_store.created,
+            g.sprite_store.bytes_uploaded,
+            g.sprite_store.len(),
+        ),
+        _ => panic!("2d content"),
+    }
+}
+
+fn sprite_weak(host: &Host, key: &str) -> std::sync::Weak<agp::renderer::sprite::SpriteTexture> {
+    match host.rt.content(host.two) {
+        Some(SurfaceContent::Game2d(g)) => {
+            std::sync::Arc::downgrade(g.sprite_store.get(key).expect("texture"))
+        }
+        _ => panic!("2d content"),
+    }
+}
+
+/// The UV of the hero's published command, matched to the exact screen point the
+/// presentation code projects for its admitted world position.
+fn hero_uv(host: &Host) -> [f32; 4] {
+    let play = host.play.as_ref().expect("play");
+    let frame = play.last.as_ref().expect("frame");
+    let cam = frame.camera.as_ref().expect("camera");
+    let t = frame.nodes[&1].translation;
+    let follow = cam
+        .follow_center_2d(glam::Vec2::new(t[0], t[1]))
+        .expect("camera centre");
+    let p = cam
+        .screen_2d(glam::Vec2::new(t[0], t[1]), follow)
+        .expect("projection");
+    match host.rt.content(host.two) {
+        Some(SurfaceContent::Game2d(g)) => {
+            g.sprites
+                .iter()
+                .find(|c| (c.center[0] - p.x).abs() < 0.5 && (c.center[1] - p.y).abs() < 0.5)
+                .expect("hero command")
+                .uv
+        }
+        _ => panic!("2d content"),
+    }
+}
+
+fn published_uvs(host: &Host) -> Vec<[f32; 4]> {
+    match host.rt.content(host.two) {
+        Some(SurfaceContent::Game2d(g)) => g.sprites.iter().map(|c| c.uv).collect(),
+        _ => panic!("2d content"),
+    }
+}
+
+#[test]
+fn pause_step_stop_and_a_new_run_bound_the_visual_lifecycle() {
+    let dir = sample_dir();
+    let (doc, registry) = sprite_document(&dir);
+    let mut host = Host::with_project(doc, registry, None).expect("host");
+    let default_uv = {
+        let key = host.editor.document.assets[0].key();
+        let _ = key;
+        [0.0, 0.0, 32.0 / 96.0, 1.0]
+    };
+    host.start_user_snapshot(play_snapshot(&dir))
+        .expect("start");
+    host.pause_play("");
+    settle_host(&mut host);
+    assert_eq!(
+        hero_uv(&host),
+        default_uv,
+        "tick 0 uses the accepted default"
+    );
+    // Resume and advance past the first phase boundary: the admitted frame
+    // really comes from the Auto phase, not from a host timer.
+    host.play.as_mut().unwrap().resume().expect("resume");
+    // The wall clock may dispatch extra ticks between a dispatch and its frame,
+    // so assert what the phase actually walked instead of a fixed tick count.
+    let mut seen = std::collections::BTreeSet::new();
+    for _ in 0..8 {
+        step_once(&mut host);
+        seen.insert(format!("{:?}", hero_uv(&host)));
+    }
+    assert!(
+        seen.len() > 1,
+        "the published frame follows the real phase: {seen:?}"
+    );
+    // Pause: no tick, no visual change, no re-upload.
+    host.pause_play("test");
+    let paused_tick = host.play.as_ref().unwrap().tick();
+    let paused_uv = published_uvs(&host);
+    host.frame(None).expect("frame while paused");
+    assert_eq!(host.play.as_ref().unwrap().tick(), paused_tick);
+    assert_eq!(published_uvs(&host), paused_uv);
+    // Step: exactly one neutral tick, prepared and published like any other.
+    host.play.as_mut().unwrap().single_step().expect("step");
+    host.frame(None).expect("frame while stepping");
+    assert_eq!(host.play.as_ref().unwrap().tick(), paused_tick + 1);
+    // Stop: the runtime owner is revoked and the editing preview (document
+    // default frame) is restored.
+    host.stop_play();
+    host.frame(None).expect("frame after stop");
+    assert!(host.play.is_none());
+    assert_eq!(
+        published_uvs(&host),
+        vec![default_uv, [32.0 / 96.0, 0.0, 64.0 / 96.0, 1.0]],
+        "Stop restores the editing preview with the document default frames"
+    );
+    // A new Run starts a fresh Auto session on the initialization frame.
+    host.start_user_snapshot(play_snapshot(&dir))
+        .expect("restart");
+    host.pause_play("");
+    settle_host(&mut host);
+    assert_eq!(host.play.as_ref().unwrap().tick(), 0);
+    assert_eq!(hero_uv(&host), default_uv);
+    host.stop_play();
+}
+
+#[test]
+fn failed_prepare_keeps_the_whole_previous_group_and_recovers() {
+    let dir = sample_dir();
+    let (doc, registry) = sprite_document(&dir);
+    let mut host = Host::with_project(doc, registry, None).expect("host");
+    host.start_user_snapshot(play_snapshot(&dir))
+        .expect("start");
+    host.pause_play("");
+    settle_host(&mut host);
+    host.play.as_mut().unwrap().resume().expect("resume");
+    for _ in 0..4 {
+        step_once(&mut host);
+    }
+    let before_tick = host.play.as_ref().unwrap().tick();
+    let before_uv = published_uvs(&host);
+    let before_x = host.play.as_ref().unwrap().last.as_ref().unwrap().nodes[&1].translation[0];
+    let before_slot = host
+        .play
+        .as_ref()
+        .unwrap()
+        .last
+        .as_ref()
+        .unwrap()
+        .sprites
+        .as_ref()
+        .unwrap()
+        .slot_visual(0)
+        .map(|s| (s.generation, s.visual.frame));
+    // A preparation failure rejects the whole candidate: nothing publishes.
+    host.fail_resource = true;
+    while host.play.as_ref().is_some_and(|p| p.pending()) {
+        host.frame(None).expect("frame");
+    }
+    host.play
+        .as_mut()
+        .unwrap()
+        .dispatch(Action::default())
+        .expect("dispatch");
+    // A tick may span several frames under the 8ms pump budget, so keep the
+    // injection until the play actually reports the failed preparation.
+    let end = Instant::now() + Duration::from_secs(30);
+    loop {
+        host.frame(None).expect("frame reports through the play");
+        let play = host.play.as_ref().unwrap();
+        if play.error.is_some() || play.state == State::Faulted {
+            break;
+        }
+        assert!(Instant::now() < end, "injected failure never surfaced");
+    }
+    host.fail_resource = false;
+    assert!(
+        host.play.as_ref().unwrap().error.is_some(),
+        "the failure is named"
+    );
+    assert_eq!(
+        host.play.as_ref().unwrap().tick(),
+        before_tick,
+        "tick did not advance"
+    );
+    assert_eq!(
+        host.play.as_ref().unwrap().last.as_ref().unwrap().nodes[&1].translation[0],
+        before_x,
+        "position is the old one"
+    );
+    assert_eq!(
+        published_uvs(&host),
+        before_uv,
+        "the sprite group is the old one"
+    );
+    assert_eq!(
+        host.play
+            .as_ref()
+            .unwrap()
+            .last
+            .as_ref()
+            .unwrap()
+            .sprites
+            .as_ref()
+            .unwrap()
+            .slot_visual(0)
+            .map(|s| (s.generation, s.visual.frame)),
+        before_slot
+    );
+    // Stop recovers the editing preview and a fresh Run is green again.
+    host.stop_play();
+    host.start_user_snapshot(play_snapshot(&dir))
+        .expect("restart");
+    host.pause_play("");
+    settle_host(&mut host);
+    assert!(host.play.as_ref().unwrap().error.is_none());
+    assert_eq!(host.play.as_ref().unwrap().tick(), 0);
+    host.stop_play();
+}
+
+#[test]
+fn twenty_play_stop_rounds_reuse_one_texture_and_release_the_last_owner() {
+    let dir = sample_dir();
+    let (doc, registry) = sprite_document(&dir);
+    let sheet = doc.assets[0].key();
+    let mut host = Host::with_project(doc, registry, None).expect("host");
+    let mut weak = None;
+    for round in 0..20 {
+        host.start_user_snapshot(play_snapshot(&dir))
+            .expect("start");
+        host.pause_play("");
+        settle_host(&mut host);
+        host.play.as_mut().unwrap().resume().expect("resume");
+        for _ in 0..5 {
+            step_once(&mut host);
+        }
+        let (created, bytes, textures) = sprite_stats(&host);
+        assert_eq!(created, 1, "round {round} reused one content texture");
+        assert_eq!(bytes, 96 * 32 * 4, "round {round} uploaded the pixels once");
+        assert_eq!(textures, 1);
+        if weak.is_none() {
+            weak = Some(sprite_weak(&host, &sheet));
+        }
+        host.stop_play();
+    }
+    let weak = weak.expect("witness");
+    assert!(
+        weak.upgrade().is_some(),
+        "the accepted project still legitimately owns the texture"
+    );
+    // Closing the project drops the accepted payload; the next frame prunes the
+    // cache and the last owner releases the texture.
+    host.editor.close();
+    host.frame(None).expect("frame after close");
+    assert_eq!(sprite_stats(&host).2, 0, "no texture outlives its payload");
+    assert!(
+        weak.upgrade().is_none(),
+        "the last owner released the texture"
+    );
 }

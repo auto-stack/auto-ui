@@ -494,6 +494,28 @@ impl Host {
         if let Some(SurfaceContent::Scene3d(c)) = self.rt.content_mut(self.three) {
             c.store.retain_models(|sha| keys.contains(sha));
         }
+        // PLAN-004: a textured visual may only outlive its accepted image while
+        // some owner still holds that payload (accepted, candidate or retained
+        // storage). Closing the project drops the registry, so the texture and
+        // its GPU allocation go with the last owner instead of accumulating
+        // across Open/Close cycles.
+        let sprite_keys: std::collections::BTreeSet<String> = std::iter::once(&self.editor.assets)
+            .chain(std::iter::once(self.editor.candidate_assets()))
+            .chain(self.storage.retained_assets())
+            .flat_map(|r| r.keys().cloned())
+            .collect();
+        if let Some(SurfaceContent::Game2d(g)) = self.rt.content_mut(self.two) {
+            let before = g.sprite_store.len();
+            g.sprite_store.retain(|k| sprite_keys.contains(k));
+            if g.sprite_store.len() != before {
+                g.sprite.invalidate_bind_groups();
+                // A published command may not outlive its texture: dropping the
+                // payload also drops the commands that referenced it.
+                let kept: std::collections::BTreeSet<String> =
+                    g.sprite_store.keys().map(str::to_owned).collect();
+                g.sprites.retain(|c| kept.contains(&c.texture));
+            }
+        }
     }
     fn model(&self, o: &Object) -> Option<&ModelData> {
         if o.kind == Kind::Model {
