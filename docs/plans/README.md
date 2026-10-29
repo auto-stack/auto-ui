@@ -6,10 +6,11 @@
 
 | 本仓号 | 计划 | 旧仓来源 | 状态 |
 |---|---|---|---|
-| 001 | [运行对象生命周期](001-autographics-runtime-object-lifecycle.md) | auto-lang/PLAN-882 | r4仅修G11归属引用；执行进度以本Plan/owner记录为准 |
+| 001 | [运行对象生命周期](archived/001-autographics-runtime-object-lifecycle.md) | auto-lang/PLAN-882 | r4仅修G11归属引用；执行进度以本Plan/owner记录为准 |
 | 002 | [触发与新局（引擎）](002-autographics-trigger-events-and-round-restart.md) | auto-lang/PLAN-883引擎部分 | drafting r4，等本仓001实际交付 |
+| 003 | [Blog原生VM运行与可交互验收前置](003-blog-native-vm-run-and-acceptance.md) | BLOG-004消费前置，非AG工作 | drafting/r1；独立调查/驱动，不等本仓002 |
 
-下一份新计划为003，之后004…；不能因导入历史号882/883而跳过本地001/002。
+下一份新计划为004，之后005…；不能因导入历史号882/883而跳过本地001/002。
 
 ## 债务/候选
 
