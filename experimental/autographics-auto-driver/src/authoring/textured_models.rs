@@ -410,11 +410,29 @@ struct Plan {
 fn inspect(bytes: &[u8]) -> Result<Plan, String> {
     let (j, end) = json(bytes)?;
     extensions(&j, "")?;
+    // Validate original references before scratch removes image declarations.
+    // Every material is admitted, including those unused by scene primitives.
+    let g = gltf::Gltf::from_slice(bytes).map_err(|e| format!("invalid: glTF {e}"))?;
+    for material in g.materials() {
+        let pbr = material.pbr_metallic_roughness();
+        for (channel, present) in [
+            ("normalTexture", material.normal_texture().is_some()),
+            ("occlusionTexture", material.occlusion_texture().is_some()),
+            ("emissiveTexture", material.emissive_texture().is_some()),
+            (
+                "metallicRoughnessTexture",
+                pbr.metallic_roughness_texture().is_some(),
+            ),
+        ] {
+            if present {
+                return Err(format!("unsupported: material {channel}"));
+            }
+        }
+    }
     let clean = scratch(&j, bytes, end)?;
     let (_, cpu, gpu, _) = assets::preflight(&clean)?;
     // Fixed Kenney meshes carry unused tangents. Check their semantic type
     // before typed reading, after the common all-accessor span validation.
-    let g = gltf::Gltf::from_slice(bytes).map_err(|e| format!("invalid: glTF {e}"))?;
     let bin = g.blob.as_deref().ok_or("invalid: BIN")?;
     for mesh in g.meshes() {
         for p in mesh.primitives() {
@@ -991,7 +1009,16 @@ pub fn load_declared(path: &Path, a: &AssetRef, existing: &Registry) -> Result<A
         }
         Ok(b)
     })?;
-    if loaded.identity != *a {
+    // Display names describe the document's asset, not immutable content.
+    // A cached Arc may have been imported through another filename.
+    let identity = &loaded.identity;
+    if identity.sha256 != a.sha256
+        || identity.byte_length != a.byte_length
+        || identity.format != a.format
+        || identity.width != a.width
+        || identity.height != a.height
+        || identity.closure != a.closure
+    {
         return Err("conflict: model closure binding".into());
     }
     Ok(loaded)

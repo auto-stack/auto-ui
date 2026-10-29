@@ -247,6 +247,62 @@ fn unsafe_declarations_are_rejected_and_source_control_remains_accepted() {
 }
 
 #[test]
+fn unsupported_material_channels_are_named_before_io_for_used_and_unused_materials() {
+    let root = temp();
+    let original = std::fs::read(samples().join("models/platform.glb")).unwrap();
+    let path = root.join("material.glb");
+    // No dependency directory exists: unsupported declarations must win over IO.
+    for channel in [
+        "normalTexture",
+        "occlusionTexture",
+        "emissiveTexture",
+        "metallicRoughnessTexture",
+    ] {
+        for unused in [false, true] {
+            let (mut j, bin) = chunks(&original);
+            let index = if unused {
+                let extra = j["materials"][0].clone();
+                j["materials"].as_array_mut().unwrap().push(extra);
+                1
+            } else {
+                0
+            };
+            let material = &mut j["materials"][index];
+            let target = if channel == "metallicRoughnessTexture" {
+                &mut material["pbrMetallicRoughness"]
+            } else {
+                material
+            };
+            target[channel] = json!({"index":0});
+            let bytes = pack(&j, &bin);
+            assert!(gltf::Gltf::from_slice(&bytes).is_ok());
+            std::fs::write(&path, bytes).unwrap();
+            let before = assets::decode_attempts();
+            let error = assets::import(&path, &Registry::new()).unwrap_err();
+            assert!(
+                error.starts_with("unsupported: material") && error.contains(channel),
+                "{unused}/{channel}: {error}"
+            );
+            assert_eq!(assets::decode_attempts(), before);
+            // A genuinely invalid texture reference must remain invalid.
+            let material = &mut j["materials"][index];
+            let target = if channel == "metallicRoughnessTexture" {
+                &mut material["pbrMetallicRoughness"]
+            } else {
+                material
+            };
+            target[channel]["index"] = json!(999);
+            std::fs::write(&path, pack(&j, &bin)).unwrap();
+            let error = assets::import(&path, &Registry::new()).unwrap_err();
+            assert!(error.starts_with("invalid:"), "{channel}: {error}");
+            assert_eq!(assets::decode_attempts(), before);
+        }
+    }
+    let accepted = input_copy(&root.join("accepted"));
+    assert!(assets::import(&accepted, &Registry::new()).is_ok());
+}
+
+#[test]
 fn nonfinite_uv_and_tangents_and_image_bombs_are_rejected_before_decode() {
     let root = temp();
     let path = input_copy(&root);
@@ -480,6 +536,50 @@ fn legacy_schema_controls_reject_closure_fields_even_null() {
             );
         }
     }
+}
+
+#[test]
+fn cached_closure_open_ignores_display_name_but_preserves_content_binding() {
+    let root = temp();
+    let path = input_copy(&root.join("input"));
+    let old = assets::import(&path, &Registry::new()).unwrap();
+    let alias_path = path.with_file_name("alias.glb");
+    std::fs::copy(&path, &alias_path).unwrap();
+    let alias = assets::import(&alias_path, &Registry::new()).unwrap();
+    assert_eq!(old.identity.key(), alias.identity.key());
+    assert_ne!(old.identity.name, alias.identity.name);
+    let (doc, registry) = scene_for(alias.clone());
+    let mut editor = Editor::with_assets(doc.clone(), registry.clone()).unwrap();
+    let entry = root.join("scene.agscene");
+    assert_eq!(
+        Storage::default()
+            .save(&mut editor, &entry, Fault::None)
+            .unwrap(),
+        Saved::Confirmed
+    );
+    let (cold, _, _) = Storage::load_assets(&entry, &Registry::new()).unwrap();
+    assert_eq!(cold.assets[0].name, alias.identity.name);
+    assert!(Storage::load_assets(&entry, &registry).is_ok());
+    let mut cache = Registry::new();
+    assets::insert(&mut cache, old.clone()).unwrap();
+    let (warm, loaded, _) = Storage::load_assets(&entry, &cache).unwrap();
+    assert_eq!(warm.assets[0].name, alias.identity.name);
+    assert!(Arc::ptr_eq(&loaded[&old.identity.key()], &old));
+    Editor::with_assets(warm, loaded).unwrap();
+    let (old_doc, _) = scene_for(old.clone());
+    let mut host = Host::with_assets(old_doc, cache.clone()).unwrap();
+    host.open(&entry).unwrap();
+    host.settle().unwrap();
+    assert_eq!(host.editor.document.assets[0].name, alias.identity.name);
+    assert!(Arc::ptr_eq(&host.editor.assets[&old.identity.key()], &old));
+    // Name-only acceptance must not bypass re-reading dependencies with a cache hit.
+    let image = &alias.identity.closure.as_ref().unwrap().images[0];
+    let blob = root.join(format!("assets/{}.png", image.sha256));
+    let bytes = std::fs::read(&blob).unwrap();
+    std::fs::write(&blob, b"corrupt").unwrap();
+    assert!(Storage::load_assets(&entry, &cache).is_err());
+    std::fs::write(&blob, bytes).unwrap();
+    assert!(Storage::load_assets(&entry, &cache).is_ok());
 }
 
 #[test]
