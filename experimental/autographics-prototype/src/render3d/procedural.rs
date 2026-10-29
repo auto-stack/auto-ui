@@ -20,6 +20,7 @@ pub fn ground_mesh() -> MeshData {
     let positions = vec![[-h, 0.0, -h], [h, 0.0, -h], [h, 0.0, h], [-h, 0.0, h]];
     let normals = vec![[0.0, 1.0, 0.0]; 4];
     MeshData {
+        visual: None,
         name: "ground#0".into(),
         positions,
         normals,
@@ -97,6 +98,7 @@ pub fn cylinder_mesh() -> MeshData {
     }
 
     MeshData {
+        visual: None,
         name: "cylinder#0".into(),
         positions,
         normals,

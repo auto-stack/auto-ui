@@ -52,6 +52,8 @@ pub struct MaterialDef {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MeshData {
+    /// Explicit, admitted PLAN-005 visual profile; legacy meshes keep None.
+    pub visual: Option<super::textured::MeshVisual>,
     pub name: String,
     pub positions: Vec<[f32; 3]>,
     pub normals: Vec<[f32; 3]>,
@@ -158,6 +160,7 @@ fn collect_node(
             let material = primitive.material();
             let pbr = material.pbr_metallic_roughness();
             out.push(MeshData {
+                visual: None,
                 name: format!("{name}#{i}"),
                 positions,
                 normals,

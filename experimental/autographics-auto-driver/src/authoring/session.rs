@@ -201,7 +201,10 @@ impl Editor {
                 }
                 if let Some(asset) = asset {
                     super::assets::insert(&mut assets, asset.clone())?;
-                    if !doc.assets.iter().any(|a| a.sha256 == asset.identity.sha256) {
+                    if asset.identity.closure.is_some() {
+                        doc.schema = "autographics.scene/6".into();
+                    }
+                    if !doc.assets.iter().any(|a| a.key() == asset.identity.key()) {
                         doc.assets.push(asset.identity.clone());
                     }
                 }
@@ -559,6 +562,7 @@ fn validate_assets(d: &Document, r: &super::assets::Registry) -> Result<(), Stri
     for a in &d.assets {
         let loaded = r.get(&a.key()).ok_or("missing asset payload")?;
         if loaded.identity.sha256 != a.sha256
+            || loaded.identity.closure != a.closure
             || loaded.identity.byte_length != a.byte_length
             || loaded.identity.format != a.format
             || loaded.identity.width != a.width

@@ -14,6 +14,7 @@ use glam::{Mat4, Vec3};
 
 fn mesh(name: &str, positions: Vec<[f32; 3]>, normal: [f32; 3], color: [f32; 4]) -> MeshData {
     MeshData {
+        visual: None,
         name: name.into(),
         positions,
         normals: vec![normal; 4],

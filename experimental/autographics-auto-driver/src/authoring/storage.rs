@@ -510,7 +510,8 @@ fn blob_name(a: &super::assets::AssetRef) -> Result<String, String> {
     Ok(format!("{}.{}", a.sha256, extension))
 }
 fn verify_closure(entry: &Path, assets: &super::assets::Registry) -> Result<(), String> {
-    for a in assets.values() {
+    let blobs = super::textured_models::blobs(assets)?;
+    for a in blobs.values() {
         let path = entry
             .parent()
             .ok_or("root")?
@@ -533,6 +534,7 @@ fn prepare_closure(
     residuals: &mut Vec<PathBuf>,
 ) -> Result<(), String> {
     super::assets::check_registry(assets)?;
+    let blobs = super::textured_models::blobs(assets)?;
     let dir = entry.parent().ok_or("root")?.join("assets");
     if assets.is_empty() {
         return Ok(());
@@ -541,7 +543,7 @@ fn prepare_closure(
     if !dir.exists() {
         fs::create_dir(&dir).map_err(|e| format!("create assets: {e}"))?;
     }
-    for asset in assets.values() {
+    for asset in blobs.values() {
         disk_budget(&dir, 0)?;
         let target = dir.join(blob_name(&asset.identity)?);
         if target.exists() {

@@ -3,6 +3,7 @@ use autographics_auto_driver::authoring::{document::*, host::Host, interaction::
 use glam::{Mat4, Vec3};
 fn proxy() -> ModelData {
     let mesh = |name: &str, positions: Vec<[f32; 3]>| MeshData {
+        visual: None,
         name: name.into(),
         positions,
         normals: vec![],

@@ -488,7 +488,7 @@ impl Host {
                 std::iter::once(&self.editor.assets)
                     .chain(std::iter::once(self.editor.candidate_assets()))
                     .chain(self.storage.retained_assets())
-                    .flat_map(|r| r.values().map(|a| a.identity.sha256.clone())),
+                    .flat_map(|r| r.values().map(|a| a.model.source_sha256.clone())),
             )
             .collect();
         if let Some(SurfaceContent::Scene3d(c)) = self.rt.content_mut(self.three) {

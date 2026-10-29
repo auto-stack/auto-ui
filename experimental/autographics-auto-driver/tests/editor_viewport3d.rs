@@ -565,6 +565,7 @@ fn perspective_multimesh_obb_pick_respects_nearest_and_clip() {
         interaction,
     };
     let mesh = |name: &str, positions| MeshData {
+        visual: None,
         name: name.into(),
         positions,
         normals: vec![],

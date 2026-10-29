@@ -187,7 +187,7 @@ impl Document {
         d
     }
     pub fn validate(&self) -> Result<(), String> {
-        if self.schema != "autographics.scene/5" {
+        if self.schema != "autographics.scene/5" && self.schema != "autographics.scene/6" {
             return Err("unsupported schema".into());
         }
         if self.document_id.is_empty() || self.document_id.chars().count() > 128 {
@@ -201,15 +201,27 @@ impl Document {
         }
         let mut ids = BTreeSet::new();
         let mut assets = BTreeSet::new();
-        let mut raw_bytes = 0;
+        let mut raw = std::collections::BTreeMap::new();
         for a in &self.assets {
             a.validate()?;
             if !assets.insert(a.key()) {
                 return Err("duplicate asset identity".into());
             }
-            raw_bytes += a.byte_length;
+            if self.schema != "autographics.scene/6" && a.closure.is_some() {
+                return Err("legacy unknown model closure".into());
+            }
+            raw.insert(a.sha256.clone(), a.byte_length);
+            if let Some(c) = &a.closure {
+                for i in &c.images {
+                    if i.source.starts_with("uri:") {
+                        raw.insert(i.sha256.clone(), i.byte_length);
+                    }
+                }
+            }
         }
-        if assets.len() > super::assets::MAX_ASSETS || raw_bytes > super::assets::MAX_RAW_TOTAL {
+        if raw.len() > super::assets::MAX_ASSETS
+            || raw.values().sum::<usize>() > super::assets::MAX_RAW_TOTAL
+        {
             return Err("asset manifest budget".into());
         }
         let mut bound = 0usize;
@@ -417,7 +429,7 @@ impl Document {
                 o["sprite"] = Value::Null;
             }
             v["schema"] = Value::String("autographics.scene/5".into());
-        } else if schema == "autographics.scene/5" {
+        } else if schema == "autographics.scene/5" || schema == "autographics.scene/6" {
             for o in v["objects"].as_array().ok_or("objects")? {
                 if o.get("sprite").is_none() {
                     return Err("explicit sprite required".into());

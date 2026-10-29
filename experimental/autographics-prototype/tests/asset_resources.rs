@@ -17,6 +17,7 @@ fn staged_same_device_last_pin_u16_boundary_and_aligned_actual_draw() {
     let model = ModelData {
         source_sha256: "p838-resource".into(),
         meshes: vec![MeshData {
+            visual: None,
             name: "primitive-0".into(),
             positions,
             normals: vec![[0.0, 0.0, 1.0]; 65536],

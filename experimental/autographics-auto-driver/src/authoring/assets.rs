@@ -31,6 +31,8 @@ pub fn decode_attempts() -> u64 {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AssetRef {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub closure: Option<super::textured_models::Closure>,
     pub format: String,
     pub sha256: String,
     pub byte_length: usize,
@@ -45,12 +47,16 @@ pub struct AssetRef {
 }
 impl AssetRef {
     pub fn key(&self) -> String {
-        format!("sha256:{}", self.sha256)
+        self.closure.as_ref().map_or_else(
+            || format!("sha256:{}", self.sha256),
+            |c| format!("closure:{}", c.id),
+        )
     }
     pub fn is_image(&self) -> bool {
         self.format == FORMAT_PNG
     }
     pub fn validate(&self) -> Result<(), String> {
+        super::textured_models::validate_ref(self)?;
         if (self.format != FORMAT_GLB && self.format != FORMAT_PNG)
             || self.sha256.len() != 64
             || !self
@@ -88,13 +94,16 @@ impl AssetRef {
 }
 #[derive(Debug)]
 pub struct Asset {
+    pub model_images: Vec<Arc<ImageData>>,
+    /// Immutable external PNG blobs; embedded image raw bytes stay in the GLB.
+    pub dependencies: BTreeMap<String, Arc<[u8]>>,
     pub identity: AssetRef,
     pub bytes: Arc<[u8]>,
     /// GLB payload. Empty for an image payload, which is never a model and is
     /// never uploaded as geometry; `model_data` refuses it by identity.
     pub model: ModelData,
     /// PNG payload (PLAN-004). `Some` exactly when the identity format is png.
-    pub image: Option<ImageData>,
+    pub image: Option<Arc<ImageData>>,
     /// Decoded CPU bytes: model geometry or RGBA pixels, one or the other.
     pub cpu_bytes: usize,
     pub gpu_bytes: usize,
@@ -112,20 +121,13 @@ impl Asset {
     }
     pub fn image_data(&self) -> Result<&ImageData, String> {
         self.image
-            .as_ref()
+            .as_deref()
             .ok_or_else(|| "wrong asset kind: image required".to_string())
     }
 }
 pub type Registry = BTreeMap<String, Arc<Asset>>;
 pub fn check_registry(r: &Registry) -> Result<(), String> {
-    if r.len() > MAX_ASSETS
-        || r.values().map(|a| a.bytes.len()).sum::<usize>() > MAX_RAW_TOTAL
-        || r.values().map(|a| a.cpu_bytes).sum::<usize>() > MAX_GEOMETRY
-        || r.values().map(|a| a.gpu_bytes).sum::<usize>() > MAX_GEOMETRY
-    {
-        return Err("resource limit: active asset union".into());
-    }
-    Ok(())
+    super::textured_models::check_union(r)
 }
 pub fn insert(r: &mut Registry, asset: Arc<Asset>) -> Result<(), String> {
     let key = asset.identity.key();
@@ -195,6 +197,10 @@ pub fn read_blob(path: &Path) -> Result<Vec<u8>, String> {
     Ok(bytes)
 }
 pub fn import(path: &Path, existing: &Registry) -> Result<Arc<Asset>, String> {
+    let original = read_blob(path)?;
+    if super::textured_models::is_textured(&original)? {
+        return super::textured_models::import(path, original, existing);
+    }
     let bytes = match read_for_import(path, existing)? {
         Input::Cached(a) => return Ok(a),
         Input::Fresh(b) => b,
@@ -262,6 +268,9 @@ fn read_for_import(path: &Path, r: &Registry) -> Result<Input, String> {
     }
 }
 pub fn load_declared(path: &Path, a: &AssetRef, r: &Registry) -> Result<Arc<Asset>, String> {
+    if a.closure.is_some() {
+        return super::textured_models::load_declared(path, a, r);
+    }
     regular_path(path, false)?;
     if fs::metadata(path).map_err(|e| format!("io: {e}"))?.len() != a.byte_length as u64 {
         return Err(format!("conflict: asset length {}", path.display()));
@@ -374,7 +383,7 @@ fn span(
     Ok(())
 }
 /// Predicted parts/CPU/GPU arrays and whether the sole scene needs selection.
-fn preflight(bytes: &[u8]) -> Result<(usize, usize, usize, bool), String> {
+pub(super) fn preflight(bytes: &[u8]) -> Result<(usize, usize, usize, bool), String> {
     if bytes.len() > MAX_RAW {
         return Err("resource limit: asset 8MiB".into());
     }
@@ -829,6 +838,7 @@ pub fn decode_in(
         return Err("resource limit: decoded geometry".into());
     }
     let identity = AssetRef {
+        closure: None,
         format: FORMAT_GLB.into(),
         sha256: original_sha,
         byte_length: bytes.len(),
@@ -841,6 +851,8 @@ pub fn decode_in(
         return Err("invalid: decoder source identity".into());
     }
     Ok(Arc::new(Asset {
+        model_images: vec![],
+        dependencies: BTreeMap::new(),
         identity,
         bytes: bytes.into(),
         model,
@@ -889,6 +901,7 @@ pub fn decode_png_in(
         return Err("invalid: decoded image identity".into());
     }
     let identity = AssetRef {
+        closure: None,
         format: FORMAT_PNG.into(),
         sha256: sha,
         byte_length: bytes.len(),
@@ -898,13 +911,15 @@ pub fn decode_png_in(
     };
     identity.validate()?;
     Ok(Arc::new(Asset {
+        model_images: vec![],
+        dependencies: BTreeMap::new(),
         identity,
         bytes: bytes.into(),
         model: ModelData {
             source_sha256: String::new(),
             meshes: vec![],
         },
-        image: Some(image),
+        image: Some(Arc::new(image)),
         cpu_bytes: decoded,
         gpu_bytes: decoded,
         decode_us: start.elapsed().as_micros(),

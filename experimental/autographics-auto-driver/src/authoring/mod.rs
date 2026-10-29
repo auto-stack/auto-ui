@@ -14,6 +14,7 @@ pub mod runtime_sprites;
 pub mod session;
 pub mod storage;
 mod tagged;
+pub mod textured_models;
 
 pub mod interaction;
 

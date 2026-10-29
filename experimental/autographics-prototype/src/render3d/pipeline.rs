@@ -16,6 +16,9 @@ pub const MAX_INSTANCES: usize = 512;
 
 /// A GPU-resident mesh uploaded from `MeshData`.
 pub struct GpuMesh {
+    pub texture: Option<std::sync::Arc<crate::renderer::sprite::SpriteTexture>>,
+    texture_bind_group: Option<wgpu::BindGroup>,
+    double_sided: bool,
     pub device_ordinal: Option<u64>,
     pub vertex_buf: wgpu::Buffer,
     pub index_buf: wgpu::Buffer,
@@ -26,6 +29,8 @@ pub struct GpuMesh {
 /// Uploaded once per identity; never rebuilt for unchanged models.
 #[derive(Default)]
 pub struct MeshStore {
+    device: Option<wgpu::Device>,
+    textures: crate::renderer::sprite::SpriteStore,
     meshes: HashMap<(String, String), std::sync::Arc<GpuMesh>>,
     pub uploads: std::sync::Arc<crate::renderer::UploadCounters>,
 }
@@ -35,6 +40,8 @@ impl MeshStore {
     /// remain local. Attempts stay counted even when the candidate is discarded.
     pub fn staged(&self) -> Self {
         Self {
+            device: self.device.clone(),
+            textures: self.textures.staged(),
             meshes: self.meshes.clone(),
             uploads: self.uploads.clone(),
         }
@@ -43,6 +50,12 @@ impl MeshStore {
     /// Release map ownership after current/history/candidate owners are reconciled.
     pub fn retain_models(&mut self, keep: impl Fn(&str) -> bool) {
         self.meshes.retain(|(sha, _), _| keep(sha));
+        let ids: std::collections::HashSet<_> = self
+            .meshes
+            .values()
+            .filter_map(|m| m.texture.as_ref().map(|t| t.source_sha256.clone()))
+            .collect();
+        self.textures.retain(|id| ids.contains(id));
     }
     pub fn get_or_upload(
         &mut self,
@@ -80,6 +93,12 @@ impl MeshStore {
         model: &ModelData,
         mesh_index: usize,
     ) -> Result<(String, u32), RendererError> {
+        if self.device.as_ref().is_some_and(|old| old != device) {
+            return Err(RendererError::ReportIo(
+                "mesh/texture device mismatch".into(),
+            ));
+        }
+        self.device = Some(device.clone());
         let mesh = model.meshes.get(mesh_index).ok_or_else(|| {
             RendererError::ReportIo(format!("mesh index {mesh_index} out of range"))
         })?;
@@ -98,11 +117,22 @@ impl MeshStore {
         if let Some(m) = self.meshes.get(&key) {
             return Ok((mesh.name.clone(), m.index_count));
         }
-        let mut verts: Vec<f32> = Vec::with_capacity(mesh.positions.len() * 10);
+        let visual = mesh.visual.as_ref();
+        let textured = visual.is_some_and(|v| v.image.is_some());
+        if visual.is_some_and(|v| {
+            v.uv.len() != mesh.positions.len() || v.uv.iter().flatten().any(|n| !n.is_finite())
+        }) {
+            return Err(RendererError::ReportIo("invalid mesh UV".into()));
+        }
+        let mut verts: Vec<f32> =
+            Vec::with_capacity(mesh.positions.len() * if textured { 12 } else { 10 });
         for (i, p) in mesh.positions.iter().enumerate() {
             verts.extend_from_slice(p);
             verts.extend_from_slice(&mesh.normals[i]);
             verts.extend_from_slice(&mesh.material.base_color);
+            if textured {
+                verts.extend_from_slice(&visual.unwrap().uv[i]);
+            }
         }
         if mesh.indices.iter().any(|i| *i > u16::MAX as u32) {
             return Err(RendererError::ReportIo(format!(
@@ -135,9 +165,66 @@ impl MeshStore {
         self.uploads.record(indices.len() as u64);
         queue.write_buffer(&index_buf, 0, &indices);
         let index_count = mesh.indices.len() as u32;
+        let texture = if let Some(image) = visual.and_then(|v| v.image.as_ref()) {
+            if let Some(t) = self.textures.get(&image.source_sha256) {
+                Some(t.clone())
+            } else {
+                Some(self.textures.get_or_upload_with(
+                    device,
+                    queue,
+                    &image.source_sha256,
+                    image,
+                    None,
+                )?)
+            }
+        } else {
+            None
+        };
+        let texture_bind_group = texture.as_ref().map(|t| {
+            let sampling = visual.unwrap().sampling;
+            let filter = |n| {
+                if n == 9728 {
+                    wgpu::FilterMode::Nearest
+                } else {
+                    wgpu::FilterMode::Linear
+                }
+            };
+            let wrap = |n| match n {
+                33071 => wgpu::AddressMode::ClampToEdge,
+                33648 => wgpu::AddressMode::MirrorRepeat,
+                _ => wgpu::AddressMode::Repeat,
+            };
+            let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+                label: Some("model sampler"),
+                address_mode_u: wrap(sampling.wrap_s),
+                address_mode_v: wrap(sampling.wrap_t),
+                mag_filter: filter(sampling.mag),
+                min_filter: filter(sampling.min),
+                lod_min_clamp: 0.,
+                lod_max_clamp: 0.,
+                ..Default::default()
+            });
+            device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("model texture binding"),
+                layout: &model_texture_layout(device),
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(&t.view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(&sampler),
+                    },
+                ],
+            })
+        });
         self.meshes.insert(
             key.clone(),
             std::sync::Arc::new(GpuMesh {
+                texture,
+                texture_bind_group,
+                double_sided: visual.is_some_and(|v| v.double_sided),
                 device_ordinal: None,
                 vertex_buf,
                 index_buf,
@@ -173,6 +260,19 @@ impl MeshStore {
         self.meshes
             .values()
             .map(|m| m.vertex_buf.size() + m.index_buf.size())
+            .sum()
+    }
+    pub fn texture_count(&self) -> usize {
+        self.textures.len()
+    }
+    pub fn texture_uploads(&self) -> u64 {
+        self.textures.created
+    }
+    pub fn owned_texture_bytes(&self) -> u64 {
+        self.textures
+            .keys()
+            .filter_map(|k| self.textures.get(k))
+            .map(|t| t.width as u64 * t.height as u64 * 4)
             .sum()
     }
     pub fn uploaded_count(&self) -> usize {
@@ -306,8 +406,8 @@ fn vs_shadow(
 }
 
 @fragment
-fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
-    let n = normalize(in.world_normal);
+fn fs_main(in: VsOut, @builtin(front_facing) front: bool) -> @location(0) vec4<f32> {
+    let n = normalize(in.world_normal) * select(-1.0, 1.0, front);
     let l = normalize(light.dir_to_light.xyz);
     let ndl = max(dot(n, l), 0.0);
     var shadow = 1.0;
@@ -333,6 +433,12 @@ pub struct Render3dStats {
 }
 
 pub struct MeshPipeline {
+    color_double: wgpu::RenderPipeline,
+    color_texture: wgpu::RenderPipeline,
+    color_texture_double: wgpu::RenderPipeline,
+    shadow_double: wgpu::RenderPipeline,
+    shadow_texture: wgpu::RenderPipeline,
+    shadow_texture_double: wgpu::RenderPipeline,
     target_format: wgpu::TextureFormat,
     editor_grid: Option<super::editor_grid::EditorGrid>,
     editor_grid_enabled: bool,
@@ -640,13 +746,13 @@ impl MeshPipeline {
                 module: &shader,
                 entry_point: Some("fs_main"),
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
-                targets: &[color_target],
+                targets: &[color_target.clone()],
             }),
             primitive: wgpu::PrimitiveState {
                 cull_mode: Some(wgpu::Face::Back),
                 ..Default::default()
             },
-            depth_stencil: Some(depth_state),
+            depth_stencil: Some(depth_state.clone()),
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
             cache: None,
@@ -666,11 +772,104 @@ impl MeshPipeline {
                 cull_mode: Some(wgpu::Face::Back),
                 ..Default::default()
             },
-            depth_stencil: Some(shadow_depth_state),
+            depth_stencil: Some(shadow_depth_state.clone()),
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
             cache: None,
         });
+        let texture_source=SHADER
+            .replace("struct VsOut {", "@group(1) @binding(0) var model_image: texture_2d<f32>;\n@group(1) @binding(1) var model_sampler: sampler;\nstruct VsOut {")
+            .replace("@location(2) shadow_pos: vec4<f32>,", "@location(2) shadow_pos: vec4<f32>,\n    @location(3) uv: vec2<f32>,")
+            .replace("@location(2) color: vec4<f32>,\n)", "@location(2) color: vec4<f32>,\n    @location(3) uv: vec2<f32>,\n)")
+            .replace("out.color = color;", "out.color = color; out.uv = uv;")
+            .replace("in.color.rgb * light.color_energy.rgb", "in.color.rgb * textureSample(model_image, model_sampler, in.uv).rgb * light.color_energy.rgb");
+        let texture_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("model texture shader"),
+            source: wgpu::ShaderSource::Wgsl(texture_source.into()),
+        });
+        let texture_layout = model_texture_layout(device);
+        let color_texture_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("model textured layout"),
+            bind_group_layouts: &[&color_layout, &texture_layout],
+            push_constant_ranges: &[],
+        });
+        let mut attributes = vertex_layout.attributes.to_vec();
+        attributes.push(wgpu::VertexAttribute {
+            offset: 40,
+            shader_location: 3,
+            format: wgpu::VertexFormat::Float32x2,
+        });
+        let texture_vertices = wgpu::VertexBufferLayout {
+            array_stride: 48,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &attributes,
+        };
+        let make_color = |textured: bool, double: bool| {
+            let plain_layout = mk_layout("model double sided color", &color_layout);
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("model visual color"),
+                layout: Some(if textured {
+                    &color_texture_layout
+                } else {
+                    &plain_layout
+                }),
+                vertex: wgpu::VertexState {
+                    module: if textured { &texture_shader } else { &shader },
+                    entry_point: Some("vs_main"),
+                    compilation_options: Default::default(),
+                    buffers: std::slice::from_ref(if textured {
+                        &texture_vertices
+                    } else {
+                        &vertex_layout
+                    }),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: if textured { &texture_shader } else { &shader },
+                    entry_point: Some("fs_main"),
+                    compilation_options: Default::default(),
+                    targets: &[color_target.clone()],
+                }),
+                primitive: wgpu::PrimitiveState {
+                    cull_mode: if double { None } else { Some(wgpu::Face::Back) },
+                    ..Default::default()
+                },
+                depth_stencil: Some(depth_state.clone()),
+                multisample: Default::default(),
+                multiview: None,
+                cache: None,
+            })
+        };
+        let make_shadow = |textured: bool, double: bool| {
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("model visual shadow"),
+                layout: Some(&mk_layout("model visual shadow layout", &shadow_layout)),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: Some("vs_shadow"),
+                    compilation_options: Default::default(),
+                    buffers: std::slice::from_ref(if textured {
+                        &texture_vertices
+                    } else {
+                        &vertex_layout
+                    }),
+                },
+                fragment: None,
+                primitive: wgpu::PrimitiveState {
+                    cull_mode: if double { None } else { Some(wgpu::Face::Back) },
+                    ..Default::default()
+                },
+                depth_stencil: Some(shadow_depth_state.clone()),
+                multisample: Default::default(),
+                multiview: None,
+                cache: None,
+            })
+        };
+        let color_double = make_color(false, true);
+        let color_texture = make_color(true, false);
+        let color_texture_double = make_color(true, true);
+        let shadow_double = make_shadow(false, true);
+        let shadow_texture = make_shadow(true, false);
+        let shadow_texture_double = make_shadow(true, true);
         if let Some(msg) = crate::renderer::pipeline::pop_error_scope_blocking(device) {
             return Err(RendererError::BadShader {
                 stage: "3d mesh",
@@ -679,6 +878,12 @@ impl MeshPipeline {
         }
 
         Ok(MeshPipeline {
+            color_double,
+            color_texture,
+            color_texture_double,
+            shadow_double,
+            shadow_texture,
+            shadow_texture_double,
             target_format,
             editor_grid: None,
             editor_grid_enabled: false,
@@ -837,6 +1042,12 @@ impl MeshPipeline {
             pass.set_pipeline(&self.shadow_pipeline);
             pass.set_bind_group(0, &self.shadow_bind_group, &[]);
             for (mesh, first, count) in &groups {
+                pass.set_pipeline(match (mesh.texture.is_some(), mesh.double_sided) {
+                    (true, true) => &self.shadow_texture_double,
+                    (true, false) => &self.shadow_texture,
+                    (false, true) => &self.shadow_double,
+                    (false, false) => &self.shadow_pipeline,
+                });
                 pass.set_vertex_buffer(0, mesh.vertex_buf.slice(..));
                 pass.set_index_buffer(mesh.index_buf.slice(..), wgpu::IndexFormat::Uint16);
                 pass.draw_indexed(0..mesh.index_count, 0, *first..*first + *count);
@@ -876,6 +1087,15 @@ impl MeshPipeline {
             pass.set_pipeline(&self.color_pipeline);
             pass.set_bind_group(0, &self.color_bind_group, &[]);
             for (mesh, first, count) in &groups {
+                pass.set_pipeline(match (mesh.texture.is_some(), mesh.double_sided) {
+                    (true, true) => &self.color_texture_double,
+                    (true, false) => &self.color_texture,
+                    (false, true) => &self.color_double,
+                    (false, false) => &self.color_pipeline,
+                });
+                if let Some(binding) = &mesh.texture_bind_group {
+                    pass.set_bind_group(1, binding, &[]);
+                }
                 pass.set_vertex_buffer(0, mesh.vertex_buf.slice(..));
                 pass.set_index_buffer(mesh.index_buf.slice(..), wgpu::IndexFormat::Uint16);
                 pass.draw_indexed(0..mesh.index_count, 0, *first..*first + *count);
@@ -925,4 +1145,28 @@ fn storage_entry(binding: u32, visibility: wgpu::ShaderStages) -> wgpu::BindGrou
 fn mat4_bytes(m: &Mat4) -> [u8; 64] {
     let arr: [f32; 16] = m.to_cols_array();
     unsafe { std::mem::transmute(arr) }
+}
+
+fn model_texture_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("model texture bgl"),
+        entries: &[
+            wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 1,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                count: None,
+            },
+        ],
+    })
 }

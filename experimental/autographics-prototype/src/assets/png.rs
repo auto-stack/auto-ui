@@ -25,7 +25,7 @@ pub struct PngHeader {
 
 /// A decoded, immutable RGBA8 image. `source_sha256` is the identity of the
 /// original file bytes, never of the decoded pixels.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ImageData {
     pub width: u32,
     pub height: u32,
