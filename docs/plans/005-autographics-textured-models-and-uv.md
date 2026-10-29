@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-005
-status: executing
+status: execution_done
 feature_name: AutoGraphics有限纹理模型与UV资源闭包
 author: [Codex]
 created_at: 2026-10-29
 updated_at: 2026-10-29
 plan_revision: 3
-current_step: 4
+current_step: 6
 total_steps: 10
 depends_on: [auto-ui/PLAN-004]
 supersedes_spec_components:
@@ -112,10 +112,10 @@ T-03..06建立新入口：`cargo test --manifest-path experimental/autographics-
 |---|---|---|---|---|---|
 | T-01 | work | 004实际交付、用户启动 | 核004/SDK/两锁/owner；恢复固定素材逐文件清单/许可/来源，建唯一ui-005树 | AC-01/05 | [x] base 2b88bd69、004与修复均已合入；SDK681冷准备通过；固定提交原件/许可/逐文件SHA恢复，见attachments/005/work/fixed-source.md |
 | T-02 | work | T-01 | textured-model-contract：支持表/身份/预算/节点关联、原件全链可行性，失败回new | AC-01/03/05 | [x] 9a0f722：固定三原件经public Host import→save→move→open→GPU capture全链通过；同根换PNG闭包及真实像素必变，切线准入澄清r3；两项测试通过，详见执行合同 |
-| T-03 | work | T-02通过 | 无任意IO的GLB/PNG闭包准入、持久化/编辑绑定、V-01/02 | AC-01/02 | [ ] R1重开：F-005-R1-01未支持贴图通道错误分类、F-005-R1-02同闭包不同显示名warm-open冲突；其余e158660既有union/持久化证据保留，须按review-r1.md修复不变量 |
+| T-03 | work | T-02通过 | 无任意IO的GLB/PNG闭包准入、持久化/编辑绑定、V-01/02 | AC-01/02 | [x] 8809e54修复R1两不变量：全材质四类通道先检/损坏引用invalid；内容绑定排除显示名、保完整依赖重读。两永久case+错边恢复定向及原独立21输入/缓存正控均绿；见repair-r1.md，待独立复审 |
 | T-04 | work | T-03 | UV/材质/纹理shader与cache接线、V-03深度和变异 | AC-03 | [x] 6d67642：36采样组合/144实际GPU探针最大误差1；GLB变换4探针误差0/AABB与节点关联保持；深度/背面/阴影及真实负控通过，修复缩小时mag过滤误选；见pixels-and-lifetimes.md |
 | T-05 | work | T-04 | 候选故障/预算/20轮/owner/共享/静态暖上传V-04 | AC-04 | [x] 621d2b9：driver3+AGP1通过，20轮真实Auto+相机/对象/Stop，warm上传/解码0、20VM释放、CPU1075810/GPU1080904与实际GPU相符；候选整帧/像素及实际Weak最后pin验证，修复关闭悬空实例和新key设备代次接缝；见pixels-and-lifetimes.md |
-| T-06 | work | T-05 | fresh consumer/兼容/identity controls、fmt/warnings/提交、SD与006交付说明 | AC-01..05 | [ ] R1依赖重开：9d680f9的fresh18+4/身份/兼容证据保留但不能覆盖修复后源码；永久反例修复后重新冻结身份及受影响consumer/readiness，见consumer-and-handoff.md与review-r1.md |
+| T-06 | work | T-05 | fresh consumer/兼容/identity controls、fmt/warnings/提交、SD与006交付说明 | AC-01..05 | [x] 8809e54：身份1456项重新冻结及源码负控；全新consumer-repair-r1冷SDK/独立target离线20+4/12case与全部报告负控通过，fmt/clean；SD/锁/SDK与未变兼容证据明确复用，见repair-r1.md |
 | T-07 | review | T-06 | 同树独立review并绑定实际revision；merge门pending | AC-06 | [ ] |
 | T-08 | merge | T-07 pass | 冻结提交定向门/有效复用，通过才合master | AC-07 | [ ] |
 | T-09 | merge | T-08 | Specs/ledger/索引与本地归档、delivery SHA/闭包/节点表示接口 | AC-08 | [ ] |
@@ -153,6 +153,9 @@ T-03..06建立新入口：`cargo test --manifest-path experimental/autographics-
 F-005-R1-01：四种未支持贴图通道normal/occlusion/emissive/metallicRoughness在used/unused合法材质均被scratch删textures后的glTF索引检查报invalid，违反具名unsupported准入规则；解码0，未放行，但分类错误。独立21输入含9条同因反例及5正控，源码/命令/原件及断言重放已留存。F-005-R1-02：同闭包不同显示名的已保存项目，save Confirmed、cold-open成功、same-name warm成功、different-name warm失败conflict:model closure binding；真实Storage→Host Open可达，原因load_declared对完整AssetRef含name比较。修复必须保持根/边/尺寸/SHA完整重查、同根不同外图隔离及错边/缺损拒绝，不能删内容验证。独立复跑producer事务/20Run3项、AGP owner1/采样1、source1456/SDK681/479/29及fresh B完整report controls均通过，其余高风险矩阵全检查并标明证据复用；两finding不因总体绿而豁免。T-03及依赖T-06重开，保留T-01/02/04/05四项，4/10。最终HEAD重查clean且未变化。
 
 2026-10-29 goal round 6：`stage: goal | plan_id: PLAN-005 | plan_revision: r3 | round: 6 | from: review | to: work | status: executing | outcome: needs_fix | worktree: D:/autostack/.wt/ui-005/auto-ui | commit: 9d680f9574275d13a0f776ee321534f5a9d4c465 | next: work`。本轮取得独立复审反例及真实正控、确认两处不变量缺口并重开相应任务，属有效进展；未改实现、未提前合入，下一轮在原树修复cycle1。
+2026-10-29 work repair cycle1（r3，pass）：`stage: work | plan_id: auto-ui/PLAN-005 | plan_revision: 3 | outcome: pass | worktree_path: D:/autostack/.wt/ui-005/auto-ui | branch: codex/plan-005-dev | base_commit: 2b88bd69 | code_commit: 8809e545830a2d0ed6f587517e6d4d8a29a575ca | dependency_revisions: SDK/两锁/SD与R1相同 | task_ids: T-03,T-06 | evidence: attachments/005/work/repair-r1.md | blockers: none | next_responsible_role: independent affected final re-review`。F-005-R1-01原重放exit1→0，四通道used/unused合法引用unsupported、坏引用invalid并均decode0；F-005-R1-02原重放exit101→0，cold/same-name/different-name warm全接受，Host真实Open保持文档显示名与缓存Arc；坏依赖/错边/修复再开仍受检。两个永久case及原21holdout/5正控、既有dependencies定向通过。current identity1456/SHA19d19280…已重冻结及负控通过；全新独立consumer-repair-r1 snapshot冷SDK、离线20+4/12报告case与全报告负控通过（manifest SHA256d8005629f13b51791fc37ad62c66254f2f4c0146212a1cf84cac4391ab93becc）。只改4个driver源码/测试/identity/checker文件；未改AGP/SDK/两锁/规范草案，R1未受影响像素/owner/兼容及A搬B证明按不变输入复用，fresh本轮亦实跑全部资源/像素/事务及项目搬迁路径。树clean，fmt/diff干净，停止实施写入交复审；无已知work缺口，AC-06/merge仍pending。
+
+2026-10-29 goal round 7：`stage: goal | plan_id: PLAN-005 | plan_revision: r3 | round: 7 | from: work | to: review | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-005/auto-ui | commit: 8809e545830a2d0ed6f587517e6d4d8a29a575ca | next: review`。本轮修复两处真实缺口并新增永久反例、完成新闭包消费证明；6/10，下一轮受影响独立复审，尚未合入/归档/清理。
 ## 10. 待澄清事项
 
-独立R1为needs_fix，T-03/T-06重开，当前4/10；待修F-005-R1-01材质通道具名unsupported及F-005-R1-02同闭包不同显示名warm-open。反例/正控/重放入口见attachments/005/work/review-r1.md与本地review-r1目录；无需用户决策或扩大支持域。完成不变量修复、永久用例和身份重绑定后再受影响独立复审。merge冻结门、知识沉淀、归档清理保持pending；003最终批回归仍交BLOG-004。Gallery/完整character动画不在本期承诺内。
+R1两finding已在8809e54完成不变量修复及原独立反例/正控重放，永久用例与新consumer20+4全绿，当前6/10且无已知work缺口/待用户决策；下一任务T-07受影响独立复审（尚未获得pass）。具体闭合行见attachments/005/work/repair-r1.md。merge冻结门、知识沉淀、归档清理保持pending；003最终批回归仍交BLOG-004。Gallery/完整character动画不在本期承诺内。
