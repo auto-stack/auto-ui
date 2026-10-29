@@ -3883,9 +3883,12 @@ export default router
                             if let auto_ui_dialect::UiStmt::StoreDecl(decl) = stmt {
                                 if let Ok(store) = auto_ui_compiler::aura::extract::extract_store_from_decl(&decl) {
                                     let entry = store_surface.entry(store.name.clone()).or_default();
+                                    // PLAN-010: on-handler 键约定带前导点（`.Init`），
+                                    // 归一化为方法名与调用侧一致。
                                     for name in store.handlers.keys() {
-                                        if !entry.contains(name) {
-                                            entry.push(name.clone());
+                                        let clean = name.trim_start_matches('.');
+                                        if !clean.is_empty() && !entry.iter().any(|e| e == clean) {
+                                            entry.push(clean.to_string());
                                         }
                                     }
                                 }
@@ -6905,9 +6908,11 @@ pub fn incremental_compile_changed(
                                 auto_ui_compiler::aura::extract::extract_store_from_decl(&decl)
                             {
                                 let entry = store_surface.entry(store.name.clone()).or_default();
+                                // PLAN-010: 归一化 on-handler 键的前导点。
                                 for name in store.handlers.keys() {
-                                    if !entry.contains(name) {
-                                        entry.push(name.clone());
+                                    let clean = name.trim_start_matches('.');
+                                    if !clean.is_empty() && !entry.iter().any(|e| e == clean) {
+                                        entry.push(clean.to_string());
                                     }
                                 }
                             }
@@ -12356,6 +12361,114 @@ store BetaStore {
     /// incremental path drained the STORE_EXTRA_FILES thread-local, which is
     /// cleared per compiled file — only the LAST store survived.
     #[test]
+    /// PLAN-010: 增量路径端到端——多 store 裸 `store.Method()` 依聚合 surface
+    /// 路由到归属 facade（与 Blog app.at 结构同形）。
+    #[test]
+    fn test_plan010_incremental_bare_store_routing() {
+        use std::fs;
+        use std::path::PathBuf;
+        let tmp = std::env::temp_dir().join(format!("plan010-inc-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        let front = tmp.join("src/front");
+        fs::create_dir_all(front.join("pages")).unwrap();
+
+        fs::write(
+            tmp.join("pac.at"),
+            "name: \"t\"
+version: \"1.0.0\"
+render: \"vue\"
+api: \"none\"",
+        )
+        .unwrap();
+        fs::write(
+            front.join("app.at"),
+            r#"use auth_store: AuthStore
+use article_store: ArticleStore
+
+widget App {
+    msg { Init }
+    view {
+        col {
+            outlet
+        }
+    }
+    on {
+        .Init -> {
+            store.Init()
+            store.LoadFeed()
+        }
+    }
+}
+"#,
+        )
+        .unwrap();
+        fs::write(
+            front.join("auth_store.at"),
+            r#"store AuthStore {
+    model {
+        var me int = 0
+    }
+    msg { Login }
+    on {
+        .Login -> {
+            .me = 1
+        }
+    }
+}
+"#,
+        )
+        .unwrap();
+        fs::write(
+            front.join("article_store.at"),
+            r#"store ArticleStore {
+    model {
+        var feed int = 0
+    }
+    msg { Init, LoadFeed }
+    on {
+        .Init -> {
+            .feed = 1
+        }
+        .LoadFeed -> {
+            .feed = 2
+        }
+    }
+}
+"#,
+        )
+        .unwrap();
+        fs::write(
+            front.join("pages").join("home.at"),
+            r#"widget home {
+    msg { Ping }
+    view {
+        col {
+            text "home"
+        }
+    }
+    on {
+        .Ping -> {}
+    }
+}
+"#,
+        )
+        .unwrap();
+
+        let root: PathBuf = tmp.clone();
+        let changed =
+            incremental_compile_changed(&root, None).expect("incremental compile must succeed");
+
+        assert!(changed > 0, "expected changed files, got 0");
+        let app_vue = fs::read_to_string(tmp.join("gen/front/vue/src/App.vue"))
+            .expect("App.vue must exist");
+        assert!(
+            app_vue.contains("articleStore.LoadFeed()"),
+            "LoadFeed 唯一归属 ArticleStore 必须路由到 facade:
+{app_vue}"
+        );
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
     fn test_incremental_build_emits_all_store_composables() {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path();

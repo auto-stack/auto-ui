@@ -5097,14 +5097,17 @@ onUnmounted(() => {{ if ({var} !== null) {{ clearInterval({var}); {var} = null }
                 let mut routing = std::collections::HashMap::new();
                 for dep in self.store_deps.iter().skip(1) {
                     if let Some(methods) = self.store_surface.get(dep.as_str()) {
-                        for m in methods {
-                            if owns(first, m)
+                        for raw in methods {
+                            // 归一化 on-handler 键的前导点（`.Init` → `Init`）。
+                            let m = raw.trim_start_matches('.');
+                            if m.is_empty()
+                                || owns(first, m)
                                 || routing.contains_key(m)
                                 || self.store_deps.iter().skip(1).any(|d| d != dep && owns(d, m))
                             {
                                 continue;
                             }
-                            routing.insert(m.clone(), facade_var_for(dep));
+                            routing.insert(m.to_string(), facade_var_for(dep));
                         }
                     }
                 }
