@@ -1,0 +1,70 @@
+// auto-ui PLAN-002 triggers3d/1 public engine fixture: the user Auto owns the
+// whole game state machine. Three runtime coins (slots 0/1/2 from the accepted
+// templates ShardA 3, ShardB 4, ShardC 5) sit on the character's walk line, a
+// non-solid hazard instance (slot 3, template 6 (Saw)) patrols above the line, and
+// the Beacon instance (slot 4, template 7) is the win square. Five explicit pairs:
+// three AABB coin pairs, the hazard pair and the goal pair. Entering a
+// coin counts it exactly once and destroys it (a true lifecycle death — the
+// same slot never re-fires), entering the goal wins only at count==3, the
+// hazard entry fails, and the Won/Failed state reads one fresh Enter edge and
+// asks the host for a new round. The frozen pricing shapes the loop: one
+// character sweep (~26 credits) per callback leaves room for a bounded
+// one-event read, so the walk consumes at most one event per tick while the
+// coins sit two world units apart. Editing `speed` (main-alt.at is the edited
+// state with the hazard dropped onto the walk line) changes the real
+// trajectory and the failure: run with --behavior-api triggers3d.
+var speed=2.0
+var hy=2.4
+var hdir=0.05
+var state=0
+var bag=0
+var req=0
+var ok=0
+var h0=0
+var h1=0
+var h2=0
+var h3=0
+var h4=0
+fn app_start() {
+ ag_set_local(0,1,0.5)
+ ok=ok+ag_char3_bind(1)
+ ok=ok+ag_char3_solid(2)
+ ok=ok+ag_camera_orbit_3d(1, 8.0, 45.0, 0, 0.0)
+ h0=ag_object_spawn(0, 3, 8.0, 1.0, -3.0)
+ h1=ag_object_spawn(1, 4, 10.0, 1.0, -3.0)
+ h2=ag_object_spawn(2, 5, 12.0, 1.0, -3.0)
+ h3=ag_object_spawn(3, 6, 9.0, hy, -3.0)
+ h4=ag_object_spawn(4, 7, 16.0, 1.0, -3.0)
+ ok=ok+ag_trigger_bind(0, 1, 1, h0, 0, 0.0)
+ ok=ok+ag_trigger_bind(1, 1, 1, h1, 0, 0.0)
+ ok=ok+ag_trigger_bind(2, 1, 1, h2, 0, 0.0)
+ ok=ok+ag_trigger_bind(3, 1, 1, h3, 0, 0.0)
+ ok=ok+ag_trigger_bind(4, 1, 1, h4, 0, 0.0)
+}
+fn app_update(dt float) {
+ if state==0 {
+  let hr=ag_action_held(1)
+  ok=ok+ag_char3_move(hr*1.0*speed*dt, 0.0, 0.0, 0.002)
+ }
+ hy=hy+hdir
+ if hy>2.6 {hdir=0.0 - 0.05}
+ if hy<2.2 {hdir=0.05}
+ ok=ok+ag_object_move(h3, 9.0, hy, -3.0)
+ let n0=ag_event_next()
+ if n0==1 {
+  let p=ag_event_pair()
+  if p<3 {
+   if state==0 {
+    bag=bag+1
+    if p==0 {ok=ok+ag_object_despawn(h0)}
+    if p==1 {ok=ok+ag_object_despawn(h1)}
+    if p==2 {ok=ok+ag_object_despawn(h2)}
+   }
+  }
+  if p==3 {state=2}
+  if p==4 {if bag==3 {state=1}}
+ }
+ if state!=0 {
+  if ag_action_pressed(5)==1 {req=ag_round_request()}
+ }
+}

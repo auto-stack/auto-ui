@@ -1,0 +1,351 @@
+// autographics.triggers2d/1 and autographics.triggers3d/1 trusted unit
+// (auto-ui PLAN-002). Appended after the runtime-objects unit by the triggers
+// assembly; public names are ag_trigger_*/ag_event_*/ag_round_*. The user
+// drives at most 8 explicit trigger pairs: one same-dimension static leaf
+// subject (the character node allowed) and one source that is either a static
+// leaf or a live PLAN-001 instance bound to its full Run/slot/generation
+// identity. Two shapes: 0 = closed-interval AABB overlap on the active axes,
+// 1 = 2D circle/3D sphere whose explicitly configured radius (never a GLB
+// bound) hits when the closest point of the subject actual AABB sits within
+// radius*radius. Evaluation runs exactly once per app_update after every this
+// tick movement and the post-tick derive, reads the same final positions and
+// freezes the snapshot: false->true enter, true->true stay, true->false exit.
+// Events are bounded (<=1 per pair per tick, pair order), read once each via
+// ag_event_next with an explicit absence 0, and never cross a binding
+// generation: rebinding is explicit, resets the previous state and new same
+// slot generations are never auto-attached. After evaluate the geometry is
+// locked (_ag_obj_locked, injected into the objects/character units at
+// assembly): move/spawn/bind and the character move are named rejections while
+// despawn and visibility stay allowed. A restart request is one bounded
+// pending marker per tick (idempotent merges), rejected at tick 0, consumed by
+// the host only after the carrying candidate is fully accepted. Hiding never
+// cancels a trigger, triggers are never solid, and destruction revokes
+// eligibility. The admitted block rides every triggers-Run tick after the
+// objects block: 8 header ints, 8 binding rows of (8 ints + radius float) and
+// 8 event rows of 8 ints in pair order. The row readers share one branched
+// body each to stay inside the frozen 64KiB managed-source envelope.
+var _ag_trg_dim=0
+var _ag_trg_frozen=0
+var _ag_trg_ops=0
+var _ag_trg_evaled=0
+var _ag_trg_count=0
+var _ag_trg_cursor=0
+var _ag_trg_alive=0
+var _ag_trg_seq=0
+var _ag_trg_req=0
+var _ag_trg_req_tick=0
+var _ag_trg_ids=[]
+var _ag_trg_nodes=[]
+var _ag_trg_bound=[]
+var _ag_trg_bg=[]
+var _ag_trg_subj=[]
+var _ag_trg_subj_id=[]
+var _ag_trg_sk=[]
+var _ag_trg_sr=[]
+var _ag_trg_sr_id=[]
+var _ag_trg_st=[]
+var _ag_trg_sg=[]
+var _ag_trg_shape=[]
+var _ag_trg_radius=[]
+var _ag_trg_prev=[]
+var _ag_trg_e_pair=[]
+var _ag_trg_e_phase=[]
+var _ag_trg_e_bg=[]
+var _ag_trg_e_sk=[]
+var _ag_trg_e_sr=[]
+var _ag_trg_e_st=[]
+var _ag_trg_e_sg=[]
+var _ag_trg_e_geo=[]
+fn _ag_trg_map(stable_id int, node int) {_ag_trg_ids.push(stable_id);_ag_trg_nodes.push(node)}
+fn _ag_trg_resolve(stable_id int) int {
+ for i in 0.._ag_trg_ids.len() {
+  if _ag_trg_ids[i]==stable_id {return _ag_trg_nodes[i]}
+ }
+ return -1
+}
+fn _ag_trg_freeze() {
+ if _ag_error!=0 {return}
+ if _ag_trg_frozen==1 {return}
+ if _ag_run_id()<1 {_ag_fail(38,-1,0);return}
+ if _ag_run_id()>4095 {_ag_fail(36,-1,_ag_run_id());return}
+ for i in 0..8 {
+  _ag_trg_bound.push(0);_ag_trg_bg.push(0);_ag_trg_subj.push(0);_ag_trg_subj_id.push(0)
+  _ag_trg_sk.push(0);_ag_trg_sr.push(0);_ag_trg_sr_id.push(0);_ag_trg_st.push(0)
+  _ag_trg_sg.push(0);_ag_trg_shape.push(0);_ag_trg_radius.push(0.0);_ag_trg_prev.push(0)
+  _ag_trg_e_pair.push(0);_ag_trg_e_phase.push(0);_ag_trg_e_bg.push(0);_ag_trg_e_sk.push(0)
+  _ag_trg_e_sr.push(0);_ag_trg_e_st.push(0);_ag_trg_e_sg.push(0);_ag_trg_e_geo.push(0)
+ }
+ _ag_trg_frozen=1
+}
+fn _ag_trg_tick_begin() {
+ if _ag_trg_frozen==0 {return}
+ _ag_trg_ops=0
+ _ag_trg_evaled=0
+ _ag_obj_locked=0
+ _ag_trg_req=0
+ _ag_trg_req_tick=0
+}
+fn _ag_trg_leaf(node int) int {
+ if node<0 {return 0}
+ if node>=identities.len() {return 0}
+ if kinds[node]==5 {return 0}
+ if dimensions[node]!=_ag_trg_dim {return 0}
+ for n in 0..identities.len() {
+  if parents[n]==node {return 0}
+ }
+ if _ag_spatial_boxes[node*7]!=1.0 {return 0}
+ return 1
+}
+fn _ag_trg_active(p int) int {
+ if _ag_trg_bound[p]==0 {return 0}
+ if _ag_trg_sk[p]==1 {
+  if _ag_obj_live[_ag_trg_sr[p]]==0 {return 0}
+  if _ag_obj_gen[_ag_trg_sr[p]]!=_ag_trg_sg[p] {return 0}
+ }
+ return 1
+}
+fn ag_trigger_bind(pair int, subject_id int, source_kind int, source_ref int, shape int, radius float) int {
+ if _ag_error!=0 {return 0}
+ if _ag_trg_frozen==0 {_ag_fail(38,-1,0);return 0}
+ if _ag_trg_evaled==1 {_ag_fail(40,-1,pair);return 0}
+ if pair<0 {_ag_fail(41,-1,pair);return 0}
+ if pair>7 {_ag_fail(41,-1,pair);return 0}
+ _ag_trg_ops=_ag_trg_ops+1
+ if _ag_trg_ops>32 {_ag_fail(37,pair,0);return 0}
+ if _ag_cast_charge(1)==0 {return 0}
+ let sub=_ag_trg_resolve(subject_id)
+ if _ag_trg_leaf(sub)==0 {_ag_fail(41,sub,subject_id);return 0}
+ if shape!=0 {if shape!=1 {_ag_fail(41,-1,shape);return 0}}
+ if shape==0 {if radius!=0.0 {_ag_fail(41,-1,shape);return 0}}
+ if shape==1 {
+  if radius - radius!=0.0 {_ag_fail(41,-1,shape);return 0}
+  if radius<=0.0 {_ag_fail(41,-1,shape);return 0}
+  if radius>100000.0 {_ag_fail(41,-1,shape);return 0}
+ }
+ if source_kind>0 {
+  let rel=source_ref - _ag_obj_base
+  if source_kind!=1 {_ag_fail(41,-1,source_kind);return 0}
+  if rel<0 {_ag_fail(33,-1,source_ref);return 0}
+  let slot=rel/65536
+  if slot>7 {_ag_fail(33,slot,source_ref);return 0}
+  let gen=rel - slot*65536
+  if gen<1 {_ag_fail(33,slot,gen);return 0}
+  if _ag_obj_gen[slot]!=gen {_ag_fail(33,slot,gen);return 0}
+  if _ag_obj_live[slot]==0 {_ag_fail(33,slot,gen);return 0}
+  let node=_ag_obj_tmpl[slot]
+  if _ag_spatial_boxes[node*7]!=1.0 {_ag_fail(9,node,source_ref);return 0}
+  let bgen=_ag_trg_bg[pair]+1
+  if bgen>65535 {_ag_fail(42,pair,bgen);return 0}
+  _ag_trg_bound[pair]=1
+  _ag_trg_bg[pair]=bgen
+  _ag_trg_subj[pair]=sub
+  _ag_trg_subj_id[pair]=subject_id
+  _ag_trg_sk[pair]=1
+  _ag_trg_sr[pair]=slot
+  _ag_trg_sr_id[pair]=source_ref
+  _ag_trg_st[pair]=node
+  _ag_trg_sg[pair]=gen
+  _ag_trg_shape[pair]=shape
+  _ag_trg_radius[pair]=radius
+  _ag_trg_prev[pair]=0
+  return 1
+ }
+ let src=_ag_trg_resolve(source_ref)
+ if _ag_trg_leaf(src)==0 {_ag_fail(41,src,source_ref);return 0}
+ let gen=_ag_trg_bg[pair]+1
+ if gen>65535 {_ag_fail(42,pair,gen);return 0}
+ _ag_trg_bound[pair]=1
+ _ag_trg_bg[pair]=gen
+ _ag_trg_subj[pair]=sub
+ _ag_trg_subj_id[pair]=subject_id
+ _ag_trg_sk[pair]=0
+ _ag_trg_sr[pair]=src
+ _ag_trg_sr_id[pair]=source_ref
+ _ag_trg_st[pair]=src
+ _ag_trg_sg[pair]=0
+ _ag_trg_shape[pair]=shape
+ _ag_trg_radius[pair]=radius
+ _ag_trg_prev[pair]=0
+ return 1
+}
+fn ag_round_request() int {
+ if _ag_error!=0 {return 0}
+ if _ag_trg_frozen==0 {_ag_fail(38,-1,0);return 0}
+ if _ag_tick_id()<1 {_ag_fail(41,-1,_ag_tick_id());return 0}
+ if _ag_trg_evaled==1 {_ag_fail(40,-1,_ag_tick_id());return 0}
+ if _ag_trg_req==1 {return 1}
+ if _ag_cast_charge(1)==0 {return 0}
+ _ag_trg_req=1
+ _ag_trg_req_tick=_ag_tick_id()
+ return 1
+}
+fn ag_event_next() int {
+ if _ag_error!=0 {return 0}
+ if _ag_trg_frozen==0 {return 0}
+ if _ag_cast_charge(1)==0 {return 0}
+ if _ag_trg_cursor>=_ag_trg_count {_ag_trg_alive=0;return 0}
+ _ag_trg_cursor=_ag_trg_cursor+1
+ _ag_trg_alive=1
+ return 1
+}
+fn _ag_trg_cur() int {
+ if _ag_trg_alive==0 {return -1}
+ let i=_ag_trg_cursor - 1
+ if i<0 {return -1}
+ if i>=_ag_trg_count {return -1}
+ return i
+}
+fn _ag_trg_ev(f int) int {
+ if _ag_error!=0 {return 0}
+ if _ag_trg_frozen==0 {return 0}
+ if _ag_cast_charge(1)==0 {return 0}
+ let i=_ag_trg_cur()
+ if i<0 {return 0}
+ if f==0 {return _ag_trg_e_pair[i]}
+ if f==1 {return _ag_trg_e_phase[i]}
+ if f==2 {return _ag_trg_e_bg[i]}
+ if f==3 {return _ag_trg_e_sk[i]}
+ if f==4 {return _ag_trg_e_sr[i]}
+ if f==5 {return _ag_trg_e_st[i]}
+ if f==6 {return _ag_trg_e_sg[i]}
+ return _ag_trg_e_geo[i]
+}
+fn ag_event_pair() int {return _ag_trg_ev(0)}
+fn ag_event_phase() int {return _ag_trg_ev(1)}
+fn ag_event_generation() int {return _ag_trg_ev(2)}
+fn ag_event_source_kind() int {return _ag_trg_ev(3)}
+fn ag_event_source() int {return _ag_trg_ev(4)}
+fn ag_event_geometry() int {return _ag_trg_ev(7)}
+fn _ag_trg_emit(p int, phase int) {
+ let i=_ag_trg_count
+ _ag_trg_e_pair[i]=p
+ _ag_trg_e_phase[i]=phase
+ _ag_trg_e_bg[i]=_ag_trg_bg[p]
+ _ag_trg_e_sk[i]=_ag_trg_sk[p]
+ _ag_trg_e_sr[i]=_ag_trg_sr_id[p]
+ _ag_trg_e_st[i]=_ag_trg_st[p]
+ _ag_trg_e_sg[i]=_ag_trg_sg[p]
+ _ag_trg_e_geo[i]=_ag_trg_shape[p]
+ _ag_trg_count=_ag_trg_count+1
+}
+fn _ag_trg_axis(alo float, ahi float, blo float, bhi float) int {
+ if ahi<blo {return 0}
+ if bhi<alo {return 0}
+ return 1
+}
+// One source-box edge: a static leaf rides its world translation, an instance
+// rides the template row plus the live instance translation (2D z stays 0).
+fn _ag_trg_edge(p int, side int, axis int) float {
+ let b=_ag_trg_st[p]*7+1+side*3+axis
+ if _ag_trg_sk[p]==0 {return _ag_spatial_edge(_ag_trg_sr[p],axis,side)}
+ if axis==0 {return _ag_spatial_boxes[b]+_ag_obj_x[_ag_trg_sr[p]]}
+ if axis==1 {return _ag_spatial_boxes[b]+_ag_obj_y[_ag_trg_sr[p]]}
+ return _ag_spatial_boxes[b]+_ag_obj_z[_ag_trg_sr[p]]
+}
+fn _ag_trg_center(p int, axis int) float {
+ if _ag_trg_sk[p]==0 {return _ag_worlds[_ag_trg_sr[p]*3+axis]}
+ if axis==0 {return _ag_obj_x[_ag_trg_sr[p]]}
+ if axis==1 {return _ag_obj_y[_ag_trg_sr[p]]}
+ return _ag_obj_z[_ag_trg_sr[p]]
+}
+fn _ag_trg_overlap(p int) int {
+ let sub=_ag_trg_subj[p]
+ if _ag_trg_shape[p]==0 {
+  if _ag_trg_axis(_ag_spatial_edge(sub,0,0),_ag_spatial_edge(sub,0,1),_ag_trg_edge(p,0,0),_ag_trg_edge(p,1,0))==0 {return 0}
+  if _ag_trg_axis(_ag_spatial_edge(sub,1,0),_ag_spatial_edge(sub,1,1),_ag_trg_edge(p,0,1),_ag_trg_edge(p,1,1))==0 {return 0}
+  if _ag_trg_dim==3 {
+   if _ag_trg_axis(_ag_spatial_edge(sub,2,0),_ag_spatial_edge(sub,2,1),_ag_trg_edge(p,0,2),_ag_trg_edge(p,1,2))==0 {return 0}
+  }
+  return 1
+ }
+ var d2=0.0
+ let r=_ag_trg_radius[p]
+ for a in 0..3 {
+  if _ag_trg_dim==2 {if a==2 {continue}}
+  let c=_ag_trg_center(p,a)
+  var d=0.0
+  if c<_ag_spatial_edge(sub,a,0) {d=_ag_spatial_edge(sub,a,0) - c}
+  if c>_ag_spatial_edge(sub,a,1) {d=c - _ag_spatial_edge(sub,a,1)}
+  d2=d2+d*d
+ }
+ if d2<=r*r {return 1}
+ return 0
+}
+fn _ag_trg_evaluate() {
+ if _ag_error!=0 {return}
+ if _ag_trg_frozen==0 {return}
+ if _ag_trg_evaled==1 {_ag_fail(40,-1,_ag_tick_id());return}
+ _ag_trg_evaled=1
+ _ag_obj_locked=1
+ _ag_trg_seq=_ag_tick_id()
+ _ag_trg_count=0
+ _ag_trg_cursor=0
+ _ag_trg_alive=0
+ for p in 0..8 {
+  _ag_trg_e_pair[p]=0;_ag_trg_e_phase[p]=0;_ag_trg_e_bg[p]=0;_ag_trg_e_sk[p]=0
+  _ag_trg_e_sr[p]=0;_ag_trg_e_st[p]=0;_ag_trg_e_sg[p]=0;_ag_trg_e_geo[p]=0
+  if _ag_trg_active(p)==0 {
+   _ag_trg_prev[p]=0
+  } else {
+   let now=_ag_trg_overlap(p)
+   if now==1 {
+    if _ag_trg_prev[p]==0 {
+     _ag_trg_emit(p,1)
+    } else {
+     _ag_trg_emit(p,2)
+    }
+    _ag_trg_prev[p]=1
+   } else {
+    if _ag_trg_prev[p]==1 {_ag_trg_emit(p,3)}
+    _ag_trg_prev[p]=0
+   }
+  }
+ }
+}
+fn _ag_trg_status() int {if _ag_trg_frozen==1 {if _ag_error==0 {return 1}};return 0}
+fn _ag_trg_run() int {return _ag_run_id()}
+fn _ag_trg_tick() int {return _ag_tick_id()}
+fn _ag_trg_count_v() int {return _ag_trg_count}
+fn _ag_trg_req_v() int {return _ag_trg_req}
+fn _ag_trg_req_tick_v() int {return _ag_trg_req_tick}
+fn _ag_trg_seq_v() int {return _ag_trg_seq}
+fn _ag_trg_zero() int {return 0}
+fn _ag_trg_bv(p int, f int) int {
+ if _ag_trg_active(p)==0 {return 0}
+ if f==0 {return 1}
+ if f==1 {return _ag_trg_bg[p]}
+ if f==2 {return _ag_trg_subj[p]}
+ if f==3 {return _ag_trg_sk[p]}
+ if f==4 {return _ag_trg_sr[p]}
+ if f==5 {return _ag_trg_st[p]}
+ if f==6 {return _ag_trg_sg[p]}
+ return _ag_trg_shape[p]
+}
+fn _ag_trg_b0(p int) int {return _ag_trg_bv(p,0)}
+fn _ag_trg_b1(p int) int {return _ag_trg_bv(p,1)}
+fn _ag_trg_b2(p int) int {return _ag_trg_bv(p,2)}
+fn _ag_trg_b3(p int) int {return _ag_trg_bv(p,3)}
+fn _ag_trg_b4(p int) int {return _ag_trg_bv(p,4)}
+fn _ag_trg_b5(p int) int {return _ag_trg_bv(p,5)}
+fn _ag_trg_b6(p int) int {return _ag_trg_bv(p,6)}
+fn _ag_trg_b7(p int) int {return _ag_trg_bv(p,7)}
+fn _ag_trg_b8(p int) float {if _ag_trg_b0(p)==0 {return 0.0};return _ag_trg_radius[p]}
+fn _ag_trg_row(r int, f int) int {
+ if r>=_ag_trg_count {return 0}
+ if f==0 {return _ag_trg_e_pair[r]}
+ if f==1 {return _ag_trg_e_phase[r]}
+ if f==2 {return _ag_trg_e_bg[r]}
+ if f==3 {return _ag_trg_e_sk[r]}
+ if f==4 {return _ag_trg_e_sr[r]}
+ if f==5 {return _ag_trg_e_st[r]}
+ if f==6 {return _ag_trg_e_sg[r]}
+ return _ag_trg_e_geo[r]
+}
+fn _ag_trg_e0(r int) int {return _ag_trg_row(r,0)}
+fn _ag_trg_e1(r int) int {return _ag_trg_row(r,1)}
+fn _ag_trg_e2(r int) int {return _ag_trg_row(r,2)}
+fn _ag_trg_e3(r int) int {return _ag_trg_row(r,3)}
+fn _ag_trg_e4(r int) int {return _ag_trg_row(r,4)}
+fn _ag_trg_e5(r int) int {return _ag_trg_row(r,5)}
+fn _ag_trg_e6(r int) int {return _ag_trg_row(r,6)}
+fn _ag_trg_e7(r int) int {return _ag_trg_row(r,7)}

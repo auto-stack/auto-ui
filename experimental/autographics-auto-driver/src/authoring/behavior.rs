@@ -32,6 +32,9 @@ pub const CAMERA3_API: &str = include_str!("../../api/runtime_camera3d_v1.at");
 pub const OBJECTS2_VERSION: &str = "autographics.objects2d/1";
 pub const OBJECTS3_VERSION: &str = "autographics.objects3d/1";
 pub const OBJECTS_API: &str = include_str!("../../api/runtime_objects_v1.at");
+pub const TRIGGERS2_VERSION: &str = "autographics.triggers2d/1";
+pub const TRIGGERS3_VERSION: &str = "autographics.triggers3d/1";
+pub const TRIGGERS_API: &str = include_str!("../../api/runtime_triggers_v1.at");
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Api {
     V1,
@@ -45,6 +48,8 @@ pub enum Api {
     Camera3V1,
     Objects2V1,
     Objects3V1,
+    Triggers2V1,
+    Triggers3V1,
 }
 impl Api {
     pub fn parse(value: &str) -> Result<Self, String> {
@@ -60,6 +65,8 @@ impl Api {
             CAMERA3_VERSION => Ok(Self::Camera3V1),
             OBJECTS2_VERSION => Ok(Self::Objects2V1),
             OBJECTS3_VERSION => Ok(Self::Objects3V1),
+            TRIGGERS2_VERSION => Ok(Self::Triggers2V1),
+            TRIGGERS3_VERSION => Ok(Self::Triggers3V1),
             _ => Err("unsupported behavior API".into()),
         }
     }
@@ -76,6 +83,8 @@ impl Api {
             Self::Camera3V1 => CAMERA3_VERSION,
             Self::Objects2V1 => OBJECTS2_VERSION,
             Self::Objects3V1 => OBJECTS3_VERSION,
+            Self::Triggers2V1 => TRIGGERS2_VERSION,
+            Self::Triggers3V1 => TRIGGERS3_VERSION,
         }
     }
     pub fn number(self) -> i32 {
@@ -91,6 +100,8 @@ impl Api {
             Self::Camera3V1 => 104,
             Self::Objects2V1 => 105,
             Self::Objects3V1 => 106,
+            Self::Triggers2V1 => 107,
+            Self::Triggers3V1 => 108,
         }
     }
     pub fn profile(self) -> i32 {
@@ -106,20 +117,37 @@ impl Api {
             Self::Camera3V1 => 15,
             Self::Objects2V1 => 16,
             Self::Objects3V1 => 17,
+            Self::Triggers2V1 => 18,
+            Self::Triggers3V1 => 19,
         }
     }
-    /// The finite run-object profiles: one dimension per Run, 8 reserved slots.
+    /// The finite run-object profiles including the trigger profiles that
+    /// carry the objects unit: one dimension per Run, 8 reserved slots.
     pub fn objects(self) -> Option<super::runtime_objects::Dim> {
         match self {
-            Self::Objects2V1 => Some(super::runtime_objects::Dim::TwoD),
-            Self::Objects3V1 => Some(super::runtime_objects::Dim::ThreeD),
+            Self::Objects2V1 | Self::Triggers2V1 => Some(super::runtime_objects::Dim::TwoD),
+            Self::Objects3V1 | Self::Triggers3V1 => Some(super::runtime_objects::Dim::ThreeD),
+            _ => None,
+        }
+    }
+    /// The finite trigger/round profiles (PLAN-002): 8 explicit pairs and an
+    /// audited restart request on top of the objects composition.
+    pub fn triggers(self) -> Option<super::runtime_objects::Dim> {
+        match self {
+            Self::Triggers2V1 => Some(super::runtime_objects::Dim::TwoD),
+            Self::Triggers3V1 => Some(super::runtime_objects::Dim::ThreeD),
             _ => None,
         }
     }
 }
 pub const API: &str = include_str!("../../api/behavior_v1.at");
+/// The managed bridge envelope. r5 (PLAN-002): the triggers composition
+/// measured 72141/74050 bytes assembled against the previous 64KiB limit
+/// (Objects2V1 fits at 61950), so the frozen envelope was raised explicitly —
+/// never silently — to 96KiB with the counterexample recorded in the Plan;
+/// the 256KiB user-source limit and every runtime budget are unchanged.
+pub const MAX_BRIDGE: usize = 96 * 1024;
 pub const MAX_USER: usize = 256 * 1024;
-pub const MAX_BRIDGE: usize = 64 * 1024;
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub struct Region {
     pub file: String,

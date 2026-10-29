@@ -1,0 +1,61 @@
+// auto-ui PLAN-002 triggers2d/1 parameter-edited twin of main.at: the walk
+// speed doubles (a different real trajectory — the parameter-sensitivity
+// oracle) and the hazard patrols ON the walk line at y 0.9..1.1, so the run
+// ends Failed at the hazard before any win. This is the fixture's failure
+// path: the hazard entry fails, the Failed state reads one fresh Enter edge
+// and requests a new round. Run with --behavior-api triggers2d.
+var speed=4.0
+var hy=1.0
+var hdir=0.02
+var state=0
+var bag=0
+var req=0
+var ok=0
+var h0=0
+var h1=0
+var h2=0
+var h3=0
+var h4=0
+fn app_start() {
+ ag_set_local(0,1,0.5)
+ ok=ok+ag_char_bind(1)
+ ok=ok+ag_char_solid(2)
+ ok=ok+ag_camera_follow_2d(1, 0.0, -4.0, 30.0, 12.0, 12.0, 8.0)
+ h0=ag_object_spawn(0, 3, 8.0, 1.0, 0.0)
+ h1=ag_object_spawn(1, 4, 10.0, 1.0, 0.0)
+ h2=ag_object_spawn(2, 3, 12.0, 1.0, 0.0)
+ h3=ag_object_spawn(3, 6, 9.0, hy, 0.0)
+ h4=ag_object_spawn(4, 7, 16.0, 1.0, 0.0)
+ ok=ok+ag_trigger_bind(0, 1, 1, h0, 0, 0.0)
+ ok=ok+ag_trigger_bind(1, 1, 1, h1, 0, 0.0)
+ ok=ok+ag_trigger_bind(2, 1, 1, h2, 0, 0.0)
+ ok=ok+ag_trigger_bind(3, 1, 1, h3, 0, 0.0)
+ ok=ok+ag_trigger_bind(4, 1, 1, h4, 0, 0.0)
+}
+fn app_update(dt float) {
+ if state==0 {
+  let hr=ag_action_held(1)
+  ok=ok+ag_char_move(hr*1.0*speed*dt, 0.0, 0.002)
+ }
+ hy=hy+hdir
+ if hy>1.1 {hdir=0.0 - 0.02}
+ if hy<0.9 {hdir=0.02}
+ ok=ok+ag_object_move(h3, 9.0, hy, 0.0)
+ let n0=ag_event_next()
+ if n0==1 {
+  let p=ag_event_pair()
+  if p<3 {
+   if state==0 {
+    bag=bag+1
+    if p==0 {ok=ok+ag_object_despawn(h0)}
+    if p==1 {ok=ok+ag_object_despawn(h1)}
+    if p==2 {ok=ok+ag_object_despawn(h2)}
+   }
+  }
+  if p==3 {state=2}
+  if p==4 {if bag==3 {state=1}}
+ }
+ if state!=0 {
+  if ag_action_pressed(3)==1 {req=ag_round_request()}
+ }
+}

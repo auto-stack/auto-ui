@@ -1,0 +1,130 @@
+---
+plan_id: PLAN-004
+status: drafting
+feature_name: AutoGraphics公共图片资源与2D精灵帧
+author: [Codex]
+created_at: 2026-10-29
+updated_at: 2026-10-29
+plan_revision: 1
+current_step: 0
+total_steps: 10
+depends_on: [auto-ui/PLAN-002]
+supersedes_spec_components:
+  - docs/specs/auto-graphics/scene-assets.md
+  - docs/specs/auto-graphics/behavior-api.md
+new_spec_components:
+  - docs/specs/auto-graphics/sprites-and-image-resources.md
+touched_goals: [GOAL-008]
+---
+
+# PLAN-004：公共图片资源与2D精灵帧
+
+## 0. 变更摘要
+
+在本仓002实际交付之上，建立可编辑、可保存、可离线消费的公共PNG资源、2D精灵矩形取帧/翻向与Auto驱动帧切换。只做引擎与必要验证夹具；G09产品内容以后在ag-examples独立立项，不改在途ag-examples/001。
+
+## 1. 目标
+
+公共入口可导入一张有透明度的PNG，绑定2D叶节点，显示完整图片或合法像素矩形帧；Auto按真实状态选择idle/run/jump/fall帧与左右翻向，角色运动、相机、对象/触发与精灵同一tick提交。保持碰撞形状独立，不用透明像素改变实体接触规则。新局、暂停、Stop与关闭符合既有事务/资源寿命。
+
+非目标：G09目录/示例包、正式角色美术制作、完整游戏、骨骼/3D billboard、声音/HUD、生产UI/HIR/ACE融合、新平台、通用图片浏览器/下载器。夹具图使用小型自有非对称颜色图，不冒充858候选美术已制作。
+
+## 2. 架构方案
+
+PNG原始字节→有界无IO准入/解码→不可变Registry→版本化scene与SourceSnapshot→真实Auto输出的受检视觉状态→Host prepare→同帧publish。编辑保存与Play都消费同一已接受字节，图片不能在帧中按路径重读。新增表示可与旧Model分开；不能把所有Asset.model强改成图片的空模型并绕过旧规则。
+
+唯一实现/顺序复审树拟`D:/autostack/.wt/ui-004/auto-ui`，分支`codex/plan-004-dev`，后续work才建立。主检出只Plan簿记；SDK准备、target和报告独立，不与ag-001/其他UI路线共用。禁止链接，清理先guard。
+
+## 3. 技术栈
+
+现有driver `src/authoring/{assets,document,storage,preview,session,play,behavior,behavior_project}.rs`、`behavior/assembly.rs`、`host/{viewport,play_adapter,panel,commands}.rs`；AGP `src/renderer/{pipeline,resources}.rs`与`src/render2d/`。`image 0.25`已有PNG feature，不因可解码推断已公开。新测试拟`driver/tests/public_sprite_frames.rs`（driver指experimental/autographics-auto-driver，下同）、`AGP/tests/sprite_resources.rs`、`driver/tools/check_sprite_frames.py`及`verify_plan004.py`；均为待T-03..06创建的新路径。
+
+## 4. 需求分析与背景调查
+
+授权：用户2026-10-29要求“ag-001在实施，规划AG下一阶段”。本轮只取auto-ui本地号、设计/合同/引用，不实施、建树、启动agent、跑窗口/GPU/Cargo或远端发布。功能沿已定桌面M2表现路线，不新增跨端前置。未授权自动续跑实施。
+
+已核基线与来源风险见[共用基线](attachments/004/planning/baseline.md)，架构见[表现与资源设计](../design/autographics/m2-presentation-and-resources.md)。当前UI HEAD `7e56dc8baa0b80f35ff7da757695e5e717047950`，002 delivery `0ee5ad0747ec3bb67e1288401fcc31daf3901c6e`，001 delivery `537122b09c025191355e260bc8e9880a4358cda2`。本仓003是Blog路线，不占AG实现范围。
+
+知识权威目前仍在auto-lang：[overview](../../../auto-lang/docs/specs/auto-graphics/overview.md)、[静态资源](../../../auto-lang/docs/specs/auto-graphics/scene-assets.md)、[行为](../../../auto-lang/docs/specs/auto-graphics/behavior-api.md)、[触发/新局](../../../auto-lang/docs/specs/auto-graphics/runtime-triggers-and-rounds.md)、[样本研究](../../../auto-lang/docs/specs/auto-graphics/m2-game-sample-research.md)。本Plan SD路径以该既有知识仓为根，不代表本仓已有这些Specs；merge按SD跨仓沉淀，不批量迁史。
+
+观察：Document仅Circle/Quad为2D且资源format仅glb；资产准入明确拒绝images/textures/animations，QuadPipeline只有平色/圆形。缓存有RGBA8槽不等于公共PNG精灵。现有Host prepare_frame统一相机/对象，不能另开一个未受检的贴图发布通道。
+
+## 5. 详细设计
+
+### 5.1 T-01/T-02执行入口与资源合同
+
+依赖002实际交付已满足；work先核master/owner/代码差异、SDK实际闭包、两锁与构建配置。保留002受管桥96KiB/组合352KiB、用户源256KiB、32credits/callback、1000steps/slice、100000steps/callback、120resumes/250ms、30s初始化/2s tick与8ms目标；不把上次显式上调变成再次抬限授权。
+
+T-02先在本树形成`attachments/004/work/sprite-resource-contract.md`，并做有界整路径可行性验证：真实Auto控制一角色移动/跳、相机、对象/触发、一次事件读取及一项精灵状态更新。公开绑定/批量帧与翻向setter的签名、价格、最大输出长度和profile由探针冻结；不得先猜可免费无界改节点。setter应能一次设置同对象的帧和翻向，有限输入/定长表由Host独立验证。旧profiles源码装配字节不变，新功能显式版本选择。无法保持完整组合预算则回new，不能用Rust选角色动作或拆多tick掩盖。
+
+新PNG子集：静态PNG、8bit RGB/RGBA，拒绝APNG/损坏/不支持格式；单图宽高各1..2048、解码RGBA最多16MiB、原始单资源仍<=8MiB。尺寸/乘法/总额先检后分配，带alpha按既有线性色彩/预乘混合接缝正确处理，nearest采样与clamp为本期固定规则，无mipmap。图片+模型合计仍<=8个原始内容身份/32MiB raw；解码像素、geometry和新增CPU retained payload合计<=64MiB，纹理分配/必要row对齐/mesh数组合计<=64MiB GPU，历史/候选/当前union去重计数，不是每类另给一份上限。旧静态GLB的已交付规则保持，新混合候选在现有总额内准入。以上是新输入的有限支持域，不是提高既有预算；必要素材无法容纳则保留反例回new。
+
+### 5.2 持久化、帧与身份
+
+原图身份以完整原始SHA/长度/format绑定，资源名不充当身份。新scene表示明确定义schema/profile版本；旧scene可照常开，不得旧schema静默接受新字段。存储将PNG纳入项目自有closure，规范路径含原始SHA与.png，安全本地路径/祖先reparse检查、无覆盖、root/entry锁与blob先落盘再单entry提交规则延续；SaveAs用已接受快照，坏图/缺图/坏SHA不确认保存成功。磁盘图片与旧模型合计仍8文件/32MiB（含临时预留/残留），脚本配额不借用；完整闭包搬迁A→B再从新位置实际打开运行。
+
+帧为整数像素矩形(x,y,w,h)，w/h>0且边界在图内；整数、非有限、溢出、错图身份/错维度/错Run/旧slot代次均受检拒绝。公共视觉绑定既支持已有静态2D叶，也支持001保留槽的合法2D实例；不扩大8槽/128节点或固体规则。销毁撤销视觉资格，同槽新代使用模板默认视觉。翻向只改变UV；显示尺寸由场景显式配置，帧裁剪不改变角色AABB。Auto自行按fixed tick切帧，不引入Host墙钟计时或隐式角色状态机。
+
+### 5.3 共同发布与寿命
+
+一个候选同时包含运动/对象/事件/相机/精灵；任一资源、输出、身份或GPU prepare错误保持整组last-good，不能出现位置新而帧旧。先验证再上传候选纹理；拒绝只释放新owner，合法外部pin可保留。纹理缓存键包括内容与device代次，正常暖帧换帧/翻向不重解码或重传图片；Pause不推进，Step中立输入一步，Stop撤销runtime owner且编辑preview可合法保留，fresh Run回到Auto初始化帧。关闭并释放最后pin后实际weak owner失效。
+
+### 规范增量
+
+| delta_id | add/modify/retire | docs/specs/... target（auto-lang知识仓） | before/after rule | rationale | acceptance IDs |
+|---|---|---|---|---|---|
+| SD-01 | add | docs/specs/auto-graphics/sprites-and-image-resources.md | 无公共图片/帧→有限PNG、取帧/翻向、事务与寿命 | M2 G2-08前置 | AC-01..04 |
+| SD-02 | modify | docs/specs/auto-graphics/scene-assets.md | glb-only closure→版本化图片共存/原额共享，旧静态域保持 | 编辑/离线完整 | AC-01/02/04 |
+| SD-03 | modify | docs/specs/auto-graphics/behavior-api.md | 新显式组合profile/价格/输出；旧profiles装配不变 | 真实Auto公开消费 | AC-03/05 |
+
+## 6. 测试设计
+
+新增测试/脚本由T-03..06建立，当前均未运行；命令示例须在work冻结实际可执行入口，0selected/跳过/错runner不能算绿。`cargo test --manifest-path experimental/autographics-auto-driver/Cargo.toml --test public_sprite_frames -- --test-threads=1`；AGP对应`--test sprite_resources`；`python experimental/autographics-auto-driver/tools/check_sprite_frames.py --controls`；`python experimental/autographics-auto-driver/tools/verify_plan004.py --controls`。GPU capture为无窗口真实内容；OS抢焦点/置顶/键鼠自动化暂停，不绕过暂停门。manual公共CLI路径验收由后续实施按用户环境安排，未验证明确pending。
+
+| V/补充case | AC/owner_stage/启用任务 | 路径/代表输入 | 可观察判据与区分错误 | 覆盖边界 |
+|---|---|---|---|---|
+| V-01/S-01 | AC-01/02 work T-03 | public import→Registry/Storage；非对称RGBA、2048边界、尺寸乘法溢出/伪PNG/APNG、SHA错/坏重开 | 有效输入可再读运行；非法先拒，decoder/allocation观察证明未越预算；残留不假clean | 本地磁盘PNG，不覆盖恶意并发换路径 |
+| V-02/S-02 | AC-03 work T-04 | 真实Auto固定帧序0→1→2与flip；字符移动/相机/触发组合 | 参考像素ROI从左红右蓝变翻向，帧背景/透明边缘正确；改源帧号则内容改变；碰撞轨迹不因UV变化 | 不承诺任意压缩/调色图 |
+| V-03/S-03 | AC-03/04 work T-04/05 | dynamic slot销毁重生；错Run/旧代/出界矩形/prepare失败 | 旧代拒绝，同槽新代默认帧；角色/相机/物品/精灵全旧或全新；有实际负控还原绿 | 不改变旧触发几何 |
+| V-04/S-04 | AC-04 work T-05 | 20轮Play/Stop/新局、暖换帧、合法外部pin/最终drop | 原始/解码/纹理weak owner与真实上传计数；暖换帧不重传，最后owner释放后弱引用失效 | 不以history长度代替释放，不测驱动内部缓存 |
+| V-05/S-05 | AC-05 work T-02/06 | fresh独立SDK consumer A→B、固定真实Auto组合、旧profile定向样本/旧装配hash | 预算实测、源变异敏感、离线运行/保存/重开、身份闭包一致；错误runner/部分报告拒绝 | 不跑全AG套件、不把引擎消费包当G09产品包 |
+
+实现者未指定；独立最终review按同一树顺序、独立上下文核AC/V/SD/遗漏/资源与源差异。无需为规划创建agent或另一棵review树。review pass必须标merge-owned冻结门pending；代码变化后复审受影响面。
+
+## 7. 验收标准
+
+| ID | owner_stage | 结果与证据 |
+|---|---|---|
+| AC-01 | work | 新图片准入/有限支持/预算分类明确，V-01正反例闭合，无静默解码/预算上调 |
+| AC-02 | work | 版本化场景、编辑绑定与完整离线保存/重开、坏件拒绝/修复恢复，V-01 |
+| AC-03 | work | 公开Auto帧/翻向，组合角色/相机/实例/触发，同tick/碰撞独立，V-02/03 |
+| AC-04 | work | 事务last-good、Pause/Step/新局/Stop、owner及暖上传，V-03/04 |
+| AC-05 | work | T-02整链可行与预算、fresh consumer、旧profile保持及V-05；实际CLI与资料一致 |
+| AC-06 | review | 独立核完整AC/V/SD、warnings/fmt与延期/私有业务绕过，无未处置finding；冻结门pending |
+| AC-07 | merge | 冻结提交定向门绿/有效复用才合auto-ui master，根crate零改不跑根档；全AG里程碑pending |
+| AC-08 | merge | Plan归档/SD知识与ledger沉淀、可恢复收据、guard clean后清唯一树；不宣称Gallery/完整M2交付 |
+
+## 8. 执行步骤
+
+| ID | owner_stage | 依赖 | 操作/产物 | AC | 状态 |
+|---|---|---|---|---|---|
+| T-01 | work | 用户启动、002实际交付 | 核baseline/owner/SDK两锁/策略，建唯一ui-004树，记录源码差异 | AC-01/05 | [ ] |
+| T-02 | work | T-01 | sprite-resource-contract先冻结；定长公开更新与整组合CPU/源/内存probe，失败回new | AC-01/03/05 | [ ] |
+| T-03 | work | T-02通过 | assets/document/storage图片/版本化closure/编辑接线、V-01 | AC-01/02 | [ ] |
+| T-04 | work | T-03 | 公共profile/Auto视觉输出与AGP真实绘制、V-02/03；新接口/测试入口创建 | AC-03/04 | [ ] |
+| T-05 | work | T-04 | Pause/Step/Stop/新局/owner/失败注入及V-04 | AC-04 | [ ] |
+| T-06 | work | T-05 | fresh consumer/预算/旧profile定向面/本代identity controls、fmt/warnings/提交、SD草案及交付说明 | AC-01..05 | [ ] |
+| T-07 | review | T-06 | 同树独立最终review，核所有V/S；merge冻结门pending | AC-06 | [ ] |
+| T-08 | merge | T-07 pass | 冻结提交受影响门/复用审计，通过才合本仓master | AC-07 | [ ] |
+| T-09 | merge | T-08 | 沉淀SD/ledger/索引、本仓Plan归档与真实交付SHA/API/包身份 | AC-08 | [ ] |
+| T-10 | merge | T-09 | wt-guard clean后移除本树/分支/空组，保必要本地恢复材料 | AC-08 | [ ] |
+
+## 9. 复审记录
+
+2026-10-29 new r1：`stage: new | plan_id: auto-ui/PLAN-004 | plan_revision: 1 | outcome: pass | next: 用户启动work T-01/T-02`。这是合同就绪，非实现/独立验收通过。本轮所有任务0/10，未建树、改实现或运行上述测试。ag-examples/001沿已交付002继续，不追004开发tip。
+
+2026-10-29 合同预检：三份Plan的0..10节、各10任务/8AC/5V、work/review/merge职责、依赖与SD引用检查通过；本批49个局部链接可解析，新增入口均标待建。此为文档预检，非实现测试或独立final review。
+
+## 10. 待澄清事项
+
+无需为既定M2表现方向重问授权。公开函数名/wire/schema编号、实际组合价格与内存布局由T-02冻结，属于有界实现决策；若必需整链不能在已有预算内运行，保留反例回new，不减AC/静默抬限。正式G09美术/产品包、声音/HUD与完整游戏留给后续各仓计划，尚未取号。

@@ -143,6 +143,9 @@ pub struct Frame {
     /// The admitted runtime object instances; objects, character and camera
     /// are one transaction. `None` outside the objects profiles.
     pub instances: Option<super::runtime_objects::RuntimeObjectsFrame>,
+    /// The admitted trigger events and restart marker; the whole candidate is
+    /// one transaction. `None` outside the triggers profiles.
+    pub rounds: Option<super::runtime_round::RuntimeRoundFrame>,
 }
 
 /// Per-tick camera output block sizes appended to the frame read layout.
@@ -157,6 +160,15 @@ struct Call {
     name: &'static str,
     args: Vec<Scalar>,
     kind: ResultKind,
+}
+impl Clone for Call {
+    fn clone(&self) -> Self {
+        Self {
+            name: self.name,
+            args: self.args.clone(),
+            kind: self.kind,
+        }
+    }
 }
 impl Call {
     fn unit(name: &'static str, args: Vec<Scalar>) -> Self {
@@ -180,6 +192,9 @@ pub struct Play {
     pub assets: assets::Registry,
     pub last: Option<Frame>,
     pub input: Input,
+    /// The actor binding this Run was admitted with; a round restart rebuilds
+    /// the Play from the same snapshot and the same actors.
+    pub actors: [Option<u64>; 2],
     pub compile_us: u128,
     pub spatial_configuration_calls: usize,
     pub spatial_configuration_us: u128,
@@ -213,6 +228,13 @@ pub struct Play {
     /// Per-slot generation high-water of every ADMITTED frame; a rebirth must
     /// exceed it, so a stale handle value can never re-enter through admission.
     objects_high_water: [i32; 8],
+    /// Finite trigger/round profile (8 explicit pairs) riding this Run.
+    rounds_dim: Option<super::runtime_objects::Dim>,
+    /// Per-pair contact state of the last ADMITTED frame; the enter/stay/exit
+    /// oracle carries it forward under an unchanged binding generation.
+    round_contact: [bool; super::runtime_round::PAIRS],
+    /// Per-pair binding-generation high-water of every ADMITTED frame.
+    round_bind_water: [i32; super::runtime_round::PAIRS],
 }
 impl Play {
     pub fn new(e: &Editor, actors: [Option<u64>; 2], source: &str) -> Result<Self, String> {
@@ -244,6 +266,8 @@ impl Play {
             && snapshot.version != super::behavior::CAMERA3_VERSION
             && snapshot.version != super::behavior::OBJECTS2_VERSION
             && snapshot.version != super::behavior::OBJECTS3_VERSION
+            && snapshot.version != super::behavior::TRIGGERS2_VERSION
+            && snapshot.version != super::behavior::TRIGGERS3_VERSION
         {
             return Err("spatial constructor API mismatch".into());
         }
@@ -305,19 +329,21 @@ impl Play {
             let character = match api {
                 super::behavior::Api::CharacterV1
                 | super::behavior::Api::Camera2V1
-                | super::behavior::Api::Objects2V1 => Some(CharProfile::TwoD),
+                | super::behavior::Api::Objects2V1
+                | super::behavior::Api::Triggers2V1 => Some(CharProfile::TwoD),
                 super::behavior::Api::Character3V1
                 | super::behavior::Api::Camera3V1
-                | super::behavior::Api::Objects3V1 => Some(CharProfile::ThreeD),
+                | super::behavior::Api::Objects3V1
+                | super::behavior::Api::Triggers3V1 => Some(CharProfile::ThreeD),
                 _ => None,
             };
             let camera_dim = match api {
-                super::behavior::Api::Camera2V1 | super::behavior::Api::Objects2V1 => {
-                    Some(CameraDim::TwoD)
-                }
-                super::behavior::Api::Camera3V1 | super::behavior::Api::Objects3V1 => {
-                    Some(CameraDim::ThreeD)
-                }
+                super::behavior::Api::Camera2V1
+                | super::behavior::Api::Objects2V1
+                | super::behavior::Api::Triggers2V1 => Some(CameraDim::TwoD),
+                super::behavior::Api::Camera3V1
+                | super::behavior::Api::Objects3V1
+                | super::behavior::Api::Triggers3V1 => Some(CameraDim::ThreeD),
                 _ => None,
             };
             let objects_dim = api.objects();
@@ -347,16 +373,34 @@ impl Play {
                     ));
                 }
             }
-            for (offset, call) in configuration.into_iter().enumerate() {
-                play.queue.insert(position + offset, call);
+            let rounds_dim = api.triggers();
+            if rounds_dim.is_some() {
+                if let Some(error) = super::runtime_round::pair_capacity_error(play.order.len()) {
+                    return Err(error);
+                }
+                // Every accepted node is addressable as a pair subject/source
+                // by its stable document id; eligibility re-checks on use.
+                for (index, node) in play.order.iter().enumerate() {
+                    let stable = i32::try_from(node.id)
+                        .map_err(|_| "trigger stable id exceeds 32-bit".to_string())?;
+                    configuration.push(Call::unit(
+                        "_ag_trg_map",
+                        vec![Scalar::Int(stable), Scalar::Int(index as i32)],
+                    ));
+                }
+            }
+            for (offset, call) in configuration.iter().enumerate() {
+                play.queue.insert(position + offset, call.clone());
             }
             play.spatial = Some(std::sync::Arc::new(descriptor));
             play.expected_profile = api.profile();
             play.character = character;
             play.camera_dim = camera_dim;
             play.objects_dim = objects_dim;
+            play.rounds_dim = rounds_dim;
             play.push_camera_queries();
             play.push_objects_queries();
+            play.push_round_queries();
         }
         Ok(play)
     }
@@ -467,6 +511,7 @@ impl Play {
             assets: e.assets.clone(),
             last: None,
             input: Input::default(),
+            actors,
             compile_us,
             spatial_configuration_calls: 0,
             spatial_configuration_us: 0,
@@ -497,6 +542,9 @@ impl Play {
             cam: CameraInput::default(),
             objects_dim: None,
             objects_high_water: [0; 8],
+            rounds_dim: None,
+            round_contact: [false; super::runtime_round::PAIRS],
+            round_bind_water: [0; super::runtime_round::PAIRS],
         };
         p.queries();
         Ok(p)
@@ -815,6 +863,7 @@ impl Play {
         }
         self.push_camera_queries();
         self.push_objects_queries();
+        self.push_round_queries();
     }
 
     /// The camera output block rides every camera-Run tick after the node
@@ -1035,7 +1084,16 @@ impl Play {
         } else {
             0
         };
-        if data.len() != 4 + 22 * self.order.len() + camera_block_len(self.camera_dim) + objects_len
+        let rounds_len = if self.rounds_dim.is_some() {
+            super::runtime_round::BLOCK_LEN
+        } else {
+            0
+        };
+        if data.len()
+            != 4 + 22 * self.order.len()
+                + camera_block_len(self.camera_dim)
+                + objects_len
+                + rounds_len
             || int(0)? != self.expected_profile
             || int(1)? != self.run_id
             || int(2)? != self.next_tick
@@ -1106,6 +1164,9 @@ impl Play {
                 },
             );
         }
+        // The rounds block is checked last: its geometry oracle reads the same
+        // derive worlds and the same candidate instance table the unit saw.
+        let rounds = self.admit_rounds(data, &expected, instances.as_ref())?;
         Ok(Frame {
             document: doc,
             objects,
@@ -1114,6 +1175,7 @@ impl Play {
             run_id: self.run_id,
             camera,
             instances,
+            rounds,
         })
     }
 
@@ -1315,6 +1377,125 @@ impl Play {
                     name,
                     args: vec![Scalar::Int(slot)],
                     kind,
+                });
+            }
+        }
+    }
+    /// Validate the trigger/round block that rides every triggers-Run tick
+    /// after the objects block. The independent geometry oracle recomputes
+    /// every pair from the derive worlds, the descriptor rows and the
+    /// candidate instances, so events must match enter/stay/exit exactly.
+    fn admit_rounds(
+        &mut self,
+        data: &[Scalar],
+        expected: &BTreeMap<u64, Derived>,
+        instances: Option<&super::runtime_objects::RuntimeObjectsFrame>,
+    ) -> Result<Option<super::runtime_round::RuntimeRoundFrame>, String> {
+        let Some(dim) = self.rounds_dim else {
+            return Ok(None);
+        };
+        let descriptor = self.spatial.as_ref().ok_or("rounds missing descriptor")?;
+        let base = 4
+            + 22 * self.order.len()
+            + camera_block_len(self.camera_dim)
+            + super::runtime_objects::BLOCK_LEN;
+        let mut block = Vec::with_capacity(super::runtime_round::BLOCK_LEN);
+        for i in 0..super::runtime_round::BLOCK_LEN {
+            match data.get(base + i) {
+                Some(v @ (Scalar::Int(_) | Scalar::Float(_))) => block.push(*v),
+                _ => return Err("rounds block output".into()),
+            }
+        }
+        let worlds: Vec<[f32; 3]> = self
+            .order
+            .iter()
+            .map(|n| expected[&n.id].translation)
+            .collect();
+        let rules = super::runtime_round::RoundRules {
+            order: &self.order,
+            rows: &descriptor.rows(),
+            worlds: &worlds,
+            dim,
+        };
+        let previous = self.last.as_ref().and_then(|f| f.rounds.as_ref()).cloned();
+        let mut contact = self.round_contact;
+        let mut bind_water = self.round_bind_water;
+        let frame = super::runtime_round::admit_round_block(
+            &block,
+            self.run_id,
+            self.next_tick,
+            &rules,
+            instances,
+            previous.as_ref(),
+            &mut contact,
+            &mut bind_water,
+        )?;
+        self.round_contact = contact;
+        self.round_bind_water = bind_water;
+        Ok(Some(frame))
+    }
+
+    /// The trigger/round block rides every triggers-Run tick after the objects
+    /// block: 8 header ints, 8 binding rows of 9 values and 8 event rows of 8
+    /// values, in pair order.
+    fn push_round_queries(&mut self) {
+        if self.rounds_dim.is_none() {
+            return;
+        }
+        for name in [
+            "_ag_trg_status",
+            "_ag_trg_run",
+            "_ag_trg_tick",
+            "_ag_trg_count_v",
+            "_ag_trg_req_v",
+            "_ag_trg_req_tick_v",
+            "_ag_trg_seq_v",
+            "_ag_trg_zero",
+        ] {
+            self.queue.push_back(Call {
+                name,
+                args: vec![],
+                kind: ResultKind::Int,
+            });
+        }
+        for pair in 0..super::runtime_round::PAIRS as i32 {
+            for name in [
+                "_ag_trg_b0",
+                "_ag_trg_b1",
+                "_ag_trg_b2",
+                "_ag_trg_b3",
+                "_ag_trg_b4",
+                "_ag_trg_b5",
+                "_ag_trg_b6",
+                "_ag_trg_b7",
+            ] {
+                self.queue.push_back(Call {
+                    name,
+                    args: vec![Scalar::Int(pair)],
+                    kind: ResultKind::Int,
+                });
+            }
+            self.queue.push_back(Call {
+                name: "_ag_trg_b8",
+                args: vec![Scalar::Int(pair)],
+                kind: ResultKind::Float,
+            });
+        }
+        for row in 0..super::runtime_round::PAIRS as i32 {
+            for name in [
+                "_ag_trg_e0",
+                "_ag_trg_e1",
+                "_ag_trg_e2",
+                "_ag_trg_e3",
+                "_ag_trg_e4",
+                "_ag_trg_e5",
+                "_ag_trg_e6",
+                "_ag_trg_e7",
+            ] {
+                self.queue.push_back(Call {
+                    name,
+                    args: vec![Scalar::Int(row)],
+                    kind: ResultKind::Int,
                 });
             }
         }
@@ -1662,5 +1843,123 @@ mod spatial_admission_tests {
         foreign.objects[0].scale[0] = 1.;
         let descriptor = Descriptor::build(&foreign, |_| None).unwrap();
         assert!(Play::new_user_spatial(&e, [Some(1), None], src(), descriptor).is_err());
+    }
+}
+
+#[cfg(test)]
+mod triggers_admission_tests {
+    use super::super::{
+        behavior::{Api, SourceSnapshot},
+        document::Kind,
+    };
+    use super::*;
+    use std::path::Path;
+
+    fn triggers_document() -> super::super::document::Document {
+        let mut d = super::super::document::Document::empty("triggers-admit".into());
+        let mut character = super::super::document::Object::new(1, Kind::Quad);
+        character.translation = [2.0, 1.0, 0.0];
+        character.scale = [0.8, 1.0, 1.0];
+        d.objects.push(character);
+        let mut coin = super::super::document::Object::new(3, Kind::Circle);
+        coin.translation = [6.0, 2.0, 0.0];
+        coin.scale = [0.6, 0.6, 1.0];
+        coin.visible = false;
+        d.objects.push(coin);
+        d.validate().unwrap();
+        d
+    }
+
+    fn triggers_source() -> String {
+        "var ok=0
+var h=0
+fn app_start() {
+ ag_set_local(0,1,0.5)
+ ok=ok+ag_char_bind(1)
+ ok=ok+ag_camera_follow_2d(1, 0.0, -4.0, 30.0, 12.0, 12.0, 8.0)
+ h=ag_object_spawn(0, 3, 6.0, 1.0, 0.0)
+ ok=ok+ag_trigger_bind(0, 1, 1, h, 0, 0.0)
+}
+fn app_update(dt float) {
+ ok=ok+ag_char_move(0.05,0.0,0.002)
+}
+"
+        .into()
+    }
+
+    fn ready_triggers_play(
+        mutant: impl FnOnce(&mut VecDeque<Call>),
+    ) -> (Play, Box<dyn Fn() -> bool>) {
+        let e = Editor::new(triggers_document()).unwrap();
+        let snap = SourceSnapshot::from_bytes_for(
+            Path::new("triggers-admit.at"),
+            triggers_source().into_bytes(),
+            Api::Triggers2V1,
+        )
+        .unwrap();
+        let descriptor = super::super::spatial::Descriptor::build(&e.document, |_| None).unwrap();
+        let mut p = Play::new_user_spatial(&e, [Some(1), None], snap, descriptor).unwrap();
+        let end = Instant::now() + Duration::from_secs(31);
+        while p.candidate().is_none() {
+            assert!(Instant::now() < end);
+            p.pump_until(Instant::now() + Duration::from_millis(8))
+                .unwrap();
+        }
+        p.accept().unwrap();
+        let owner = p.owner_probe().unwrap();
+        p.dispatch(Action::default()).unwrap();
+        mutant(&mut p.queue);
+        let end = Instant::now() + Duration::from_secs(31);
+        loop {
+            assert!(Instant::now() < end);
+            match p.pump_until(Instant::now() + Duration::from_millis(8)) {
+                Err(e) => {
+                    p.fail(e);
+                    break;
+                }
+                Ok(()) => {
+                    if p.candidate().is_some() {
+                        let error = p.accept().unwrap_err();
+                        p.fail(error);
+                        break;
+                    }
+                }
+            }
+        }
+        (p, owner)
+    }
+
+    #[test]
+    fn corrupted_rounds_blocks_fault_the_named_stage_and_close_the_vm() {
+        // A duplicated binding-row emitter breaks the frozen output layout.
+        let (p, owner) = ready_triggers_play(|queue| {
+            let index = queue
+                .iter()
+                .position(|c| c.name == "_ag_trg_b0")
+                .expect("rounds query present");
+            let duplicate = queue[index].clone();
+            queue.insert(index + 1, duplicate);
+        });
+        assert!(p
+            .error
+            .as_ref()
+            .expect("fault")
+            .contains("play profile/run/tick/count"));
+        assert_eq!(p.state, State::Faulted);
+        assert!(!owner());
+
+        // A shifted row argument misattributes the pair: the emitted binding
+        // row no longer matches the admitted frame identity.
+        let (p, owner) = ready_triggers_play(|queue| {
+            let index = queue
+                .iter()
+                .position(|c| c.name == "_ag_trg_b0")
+                .expect("rounds query present");
+            queue[index].args = vec![Scalar::Int(1)];
+        });
+        let error = p.error.as_ref().expect("fault").clone();
+        assert!(error.contains("rounds"), "{error}");
+        assert_eq!(p.state, State::Faulted);
+        assert!(!owner());
     }
 }
