@@ -30,10 +30,10 @@ phase唯一单位f32 seconds，必须有限且非负；由Auto在fixed dt推进�
 
 | 规则 | 实际路径/区分oracle | 当前状态 |
 |---|---|---|
-| V-01 原件与模式 | 原character全部4clip/44channel/337samples、层级；坏span/count/time/重复node/path、skin/morph/cubic与额度分类 | 核心test已建立，非生产assets入口 |
-| V-02 数学 | 120度旋转在1/4时间必须30度；独立point坐标区分slerp与nlerp；反号quat同pose、STEP边界、loop/one-shot/零duration | 核心test已建立；GPU画面待接入 |
+| V-01 原件与模式 | 原character全部4clip/44channel/337samples、层级；坏span/count/time/重复node/path、skin/morph/cubic与额度分类 | T-03生产准入29反例/精确额度/原件正控通过；资源union门前零key分配，见t03-admission-and-storage.md |
+| V-02 数学 | 120度旋转在1/4时间必须30度；独立point坐标区分slerp与nlerp；反号quat同pose、STEP边界、loop/one-shot/零duration | core5/5与T-02同帧GPU/去轨道负控通过；完整四clip ROI/数值及阴影仍T-04 |
 | V-03 朝向/物理 | Auto camera-relative movement+yaw；颜色/shadow相同矩阵；视觉开关同输入碰撞/支撑/触发结果相同 | 未关闭 |
-| V-04 事务/身份/owner | Host坏输出/prepare failure保留完整last-good；Pause/Step/新局/Stop；20轮Weak/上传/最终drop | producer坏clip/phase/loop/yaw/旧token入口已建立；Host及owner未关闭 |
+| V-04 事务/身份/owner | Host坏输出/prepare failure保留完整last-good；Pause/Step/新局/Stop；20轮Weak/上传/最终drop | producer/19wire负控与T-03资源/保存恢复通过；完整事务/owner仍T-05 |
 | V-05 预算/消费 | 真实Auto同callback运动（含垂直跳）、grounded、相机basis读取、触发event一次读取、视觉setter；固定原clip经GPU；fresh A→B离线保存重开 | producer组合test已建立，尚未把其结果当整链预算；consumer/identity待T-06 |
 
 最小整链当前结果：公开`import-animated`/“Import Animated GLB”保留原GLB+外图；schema6 closure新增`node_animation=true`并以新profile域计入closure id，旧false省略且旧identity保持。保存搬迁冷重开重建4clip，旧import拒动画，旧Play profile拒新动画payload，不能静默丢轨道。新Host验证wire并在共同Frame内sample；19项坏wire负控及最终矩阵非有限/奇异拒绝通过，颜色/shadow共用同一矩阵。固定位置/相机/yaw/mesh/texture只擦除node轨道的GPU负控使像素变化。单tick全链3.836ms，默认100000-step/120-resume/250ms callback与2s整tick均未触发；此为最小探针，非T-06完整性能/消费验收。

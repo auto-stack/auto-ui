@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-10-29
 updated_at: 2026-10-30
 plan_revision: 1
-current_step: 2
+current_step: 3
 total_steps: 10
 depends_on: [auto-ui/PLAN-005]
 supersedes_spec_components:
@@ -45,7 +45,7 @@ GLB原始层级/clip轨道→有界声明/数值/资源准入→不可变model+a
 
 2026-10-29 执行授权：用户 `/goal 完成AG计划006` 授予本计划 work→独立review→有界repair→merge/规范/归档/guard清理全链授权，后续阶段继承；目标、范围、验收与预算保持r1。005现已实际交付，前置核验与原件实读见[执行基线](attachments/006/work/source-preflight.md)。
 
-用户2026-10-29要求规划下一阶段；本轮仅合同/设计/引用，无实施、agent、窗口/GPU/Cargo门或发布。来源和指纹见[基线](attachments/004/planning/baseline.md)，资源与阶段边界见[设计](../design/autographics/m2-presentation-and-resources.md)。005/004尚未交付，不填写其未来SHA/接口价格。
+2026-10-29规划背景（历史，当前执行进度见§8/9）：用户要求规划下一阶段；规划轮仅合同/设计/引用，无实施、agent、窗口/GPU/Cargo门或发布。来源和指纹见[基线](attachments/004/planning/baseline.md)，资源与阶段边界见[设计](../design/autographics/m2-presentation-and-resources.md)。当时005/004尚未交付，未填写未来SHA/接口价格；实际前置现已由T-01核验。
 
 现有权威：[样本研究](../../../auto-lang/docs/specs/auto-graphics/m2-game-sample-research.md)、[游戏分母](../../../auto-lang/docs/design/autographics/m2-game-sample-matrix.md)、[运行角色](../../../auto-lang/docs/specs/auto-graphics/game-actions-and-character2d.md)、[触发新局](../../../auto-lang/docs/specs/auto-graphics/runtime-triggers-and-rounds.md)、[静态资源](../../../auto-lang/docs/specs/auto-graphics/scene-assets.md)。研究记character含static/idle/walk/jump、无skin；具体轨道interpolation/keys/时间/层级尚须读取固定原始字节，不能从“有动画”推断是骨骼或只需移动根。旧858源清单缺失风险由005 T-01先恢复，006再核该收据，不换来源。
 
@@ -81,7 +81,7 @@ phase由Auto显式提供的有限非负时间或等价整数tick表达，T-02选
 
 ## 6. 测试设计
 
-待T-03..06建立：`cargo test --manifest-path experimental/autographics-auto-driver/Cargo.toml --test public_node_animation -- --test-threads=1`、AGP `--test node_animation`；`python experimental/autographics-auto-driver/tools/check_node_animation.py --controls`、`python experimental/autographics-auto-driver/tools/verify_plan006.py --controls`。当前未运行，实际参数/所选case与新接口在T-02/T-03确认。只受影响面与可复现约1/10旧样本，新AC正反例不省；无窗口真实GPU单实例、OS抢焦点/置顶自动化暂停、全AG里程碑pending、根零改不跑根档。
+当前已建立并执行driver `--test public_node_animation` / `--test node_animation_resources`及AGP `--test node_animation`，`--locked --offline -- --test-threads=1`，实际结果/受影响范围见§9和T-02/T-03附件。driver正式运行工作目录为包目录以启用原32MiB主栈/16MiB worker配置。`python experimental/autographics-auto-driver/tools/check_node_animation.py --controls`与`verify_plan006.py --controls`仍由T-06待建，不提前称通过。只受影响面与可复现约1/10旧样本，新AC正反例不省；无窗口真实GPU单实例、OS抢焦点/置顶自动化暂停、全AG里程碑pending、根零改不跑根档。
 
 | V/补充case | AC/owner_stage/启用任务 | 输入→实际路径 | 区分性判据/关闭条件 | 覆盖边界 |
 |---|---|---|---|---|
@@ -97,7 +97,7 @@ phase由Auto显式提供的有限非负时间或等价整数tick表达，T-02选
 
 | ID | owner_stage | 结果与证据 |
 |---|---|---|
-| AC-01 | work | 固定四clip/层级/模式/数据/资源预检、原始身份与支持边界明确，V-01 |
+| AC-01 | work | 固定四clip/层级/模式/数据/资源预检、原始身份与支持边界明确，V-01；T-03生产准入/边界/计账证据通过，见t03-admission-and-storage.md |
 | AC-02 | work | 公开Auto切clip/phase，确定性loop/one-shot/双实例独立与真实动画，V-02 |
 | AC-03 | work | 公共视觉朝向、相机相对运动示范、碰撞/支撑独立、同pose色图/阴影，V-03 |
 | AC-04 | work | 同tick事务/身份/暂停单步/新局/Stop/owner/暖上传，V-04 |
@@ -112,7 +112,7 @@ phase由Auto显式提供的有限非负时间或等价整数tick表达，T-02选
 |---|---|---|---|---|---|
 | T-01 | work | 005实际交付、用户启动 | 核005/004/SDK/两锁/素材收据与owner，建唯一ui-006树 | AC-01/05 | [x] 11bc18b；source-preflight.md |
 | T-02 | work | T-01 | node-animation-contract：原clip/interpolation、phase/yaw/碰撞/价格/预算整链probe，失败回new | AC-01..05 | [x] 9354e9e；t02-integration.md，原件Auto→Host→GPU、19wire负控/搬迁重开 |
-| T-03 | work | T-02通过 | 有界节点/clip准入与持久化/资源计账，V-01 | AC-01/04 | [ ] |
+| T-03 | work | T-02通过 | 有界节点/clip准入与持久化/资源计账，V-01 | AC-01/04 | [x] 2739324；t03-admission-and-storage.md |
 | T-04 | work | T-03 | Auto公开视觉输出/Host采样/renderer色图与shadow，V-02/03 | AC-02/03 | [ ] |
 | T-05 | work | T-04 | 事务/实例代次/新局/暂停单步/owner与20轮V-04 | AC-04 | [ ] |
 | T-06 | work | T-05 | fresh消费/预算/兼容/identity controls、fmt/warnings/提交、SD与下游接口 | AC-01..05 | [ ] |
@@ -139,8 +139,12 @@ phase由Auto显式提供的有限非负时间或等价整数tick表达，T-02选
 
 2026-10-30 goal round 3：`stage: goal | plan_id: PLAN-006 | plan_revision: r1 | round: 3 | from: work | to: work | status: executing | outcome: pass (T-02 complete; work incomplete) | worktree: D:/autostack/.wt/ui-006/auto-ui | commit: 9354e9ef482f433257c3445a6472d37a027adb44 | next: work T-03`。前轮有效实现进展，本轮取得生产整链/真实像素/独立坏输出证据与提交，无用户待答问题；目标和预算未缩减。
 
+2026-10-30 work T-03完成：`stage: work | plan_id: auto-ui/PLAN-006 | plan_revision: 1 | outcome: pass (T-03 only; work incomplete) | worktree_path: D:/autostack/.wt/ui-006/auto-ui | branch: codex/plan-006-dev | base_commit: 80d9bbe | code_commit: 27393245118b0708b6f0b9c7ede66025d130598a | dependency_revisions: SDK/两锁/固定原件未变 | task_ids: T-03 | evidence: attachments/006/work/t03-admission-and-storage.md | blockers: none | next_responsible_role: work T-04`。生产准入23结构+6二进制反例正确分类且0关键帧分配/0图像geometry解码；原件恢复44channel真分配；8192/8193 samples、16clips、128nodes/channels、STEP/无纹理多层及保存冷重开通过。Animation精确预检与完整resident/依赖union门先于key/output载荷；64MiB满resident拒且0载荷分配、48MiB正控接受、暖Asset/Animation Arc共用。pose元数据/key/Arc/header/target/wire补齐：旧reserve21888B、实际headroom25501B、新reserve29112B，隐藏也拒；实际变异回旧公式该永久用例exit101，字节还原后exit0，加65536B余量正控绿。5保存故障/重试/pending损坏PNG verify/修复、暖PNG与GLB原字节身份及profile降级连id重算均真实拒绝，修复后冷开4clip。core5/5含预检字节/大有限LINEAR中点；Host受影响重放1/1，19wire/去轨道实际GPU负控、同帧与搬迁重开保持，tick3617us。driver测试在包目录以正式栈配置运行，PE头实读33554432B；worker配置16777216B；无warning新增，两包fmt/diff干净。日志均在`D:/autostack/plan-artifacts/auto-ui/plan-006/`：t03-resources-final.log（4/4，未变3case复用+storage后定向更新）SHA25627a90289b68091e24eff7569c7b517fd4193597e3a14214fef8cddc9261a5945；t03-core-final.log 49e1f4ca359a9ffb2a47def20435369bb114f38730d334d2da566880289cfbaf；t03-reservation-negative.log 0180f05b317aa6feb8233d5d6033148ef7cbc91c60eb820d6d0d9ab37a207092；t03-reservation-restored.log 3b28f6889c698c394ab8c8a9f2ac6c7f1fbe6c894a4b75f92b2f66ace21b71a5；t03-storage-final.log bbe6c03fd8bcdd65355508c5380f3252eedcd77a68e874691e279d1d9179b529；t03-host-replay.log 80bb38d9871d2adb7080fa080c1c60a023a8c4e16296ed6c7dc3a3e8ed91df95；t03-stack-profile.json d4429dba411d89a7ad82167bd55e92b1b32afc0e3783e692aa58e7b25d35b170。T-04..06/独立review/merge均pending，不把本准入成果冒充完整游戏画面/owner/发行通过。
+
+2026-10-30 goal round 4：`stage: goal | plan_id: PLAN-006 | plan_revision: r1 | round: 4 | from: work | to: work | status: executing | outcome: pass (T-03 complete; work incomplete) | worktree: D:/autostack/.wt/ui-006/auto-ui | commit: 27393245118b0708b6f0b9c7ede66025d130598a | next: work T-04`。前轮进展有效，本轮完成生产边界与预检/总账修正、实际负控与持久化证据；3/10，无用户待答/无范围变化。
+
 ## 10. 待澄清事项
 
-当前无用户待答问题。T-01输入与T-02最小整链已通过，phase/yaw/wire合同已冻结。继续T-03..06各自完整验收矩阵，不将T-02的最小probe当作后续AC完成。
+当前无用户待答问题。T-01输入、T-02最小整链与T-03准入/持久化/资源账已通过，phase/yaw/wire合同已冻结。继续T-04..06各自完整验收矩阵，不将最小probe或准入成果当作后续AC完成。
 
-005交付身份及原clip数据未实测，T-01/T-02认领；公开profile/签名/wire/价格/phase单位按本文有限语义冻结，不是再向用户索要相同方向授权。如必需clip需本期外插值或无法在既有预算内组合，应带原件与反例回new，显式提出合同/预算变化，不能丢动作或换成Bob动画。声音/HUD、G09/G10内容、完整两关与最终发行另立后继合同，跨端不插入桌面M2前置。
+原规划的005交付身份与原clip实读风险已关闭；如后续发现必需clip需本期外插值或无法在既有预算内组合，仍带原件与反例回new，显式提出合同/预算变化，不能丢动作或换成Bob动画。声音/HUD、G09/G10内容、完整两关与最终发行另立后继合同，跨端不插入桌面M2前置。
