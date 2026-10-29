@@ -94,6 +94,6 @@ def main():
   for kind in ["branches","core"]:
    m=copy.deepcopy(d);entry=next(e for e in m["evidence"]if e["kind"]==kind)
    raw=json.loads(pathlib.Path(entry["path"]).read_text());raw["rows"].pop()
-   path=control_dir/f"missing-{kind}-row.json";path.write_text(json.dumps(raw));entry.update(path=str(path),sha256=sha(path));rejected(m)
+   path=pathlib.Path(entry["path"]).with_name(f"control-missing-{kind}-row.json");path.write_text(json.dumps(raw));entry.update(path=str(path),sha256=sha(path));rejected(m)
  print(f"PASS honest bounded no-go decision; invalid reports rejected={n}")
 if __name__=="__main__":main()
