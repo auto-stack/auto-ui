@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-005
-status: execution_done
+status: reviewed
 feature_name: AutoGraphics有限纹理模型与UV资源闭包
 author: [Codex]
 created_at: 2026-10-29
 updated_at: 2026-10-29
 plan_revision: 3
-current_step: 6
+current_step: 7
 total_steps: 10
 depends_on: [auto-ui/PLAN-004]
 supersedes_spec_components:
@@ -116,7 +116,7 @@ T-03..06建立新入口：`cargo test --manifest-path experimental/autographics-
 | T-04 | work | T-03 | UV/材质/纹理shader与cache接线、V-03深度和变异 | AC-03 | [x] 6d67642：36采样组合/144实际GPU探针最大误差1；GLB变换4探针误差0/AABB与节点关联保持；深度/背面/阴影及真实负控通过，修复缩小时mag过滤误选；见pixels-and-lifetimes.md |
 | T-05 | work | T-04 | 候选故障/预算/20轮/owner/共享/静态暖上传V-04 | AC-04 | [x] 7437879补闭warm alias完整实际Host Play非Fault/Stop/Save流程，legacy GLB与PNG sprites同因路径亦实测；新consumer完整21+4含20轮事务/owner通过，既有普通状态证据仍有效；见repair-r2.md |
 | T-06 | work | T-05 | fresh consumer/兼容/identity controls、fmt/warnings/提交、SD与006交付说明 | AC-01..05 | [x] 7437879：identity1456/134b4f73…重新冻结/负控；新consumer-repair-r2冷SDK/独立target/21+4/12报告及全负控通过，sprite实际Auto2/旧profiles字节1抽样及fmt通过；诊断与closure见repair-r2.md |
-| T-07 | review | T-06 | 同树独立review并绑定实际revision；merge门pending | AC-06 | [ ] |
+| T-07 | review | T-06 | 同树独立review并绑定实际revision；merge门pending | AC-06 | [x] 独立R3 pass绑定r3/7437879；两finding完整闭合，诊断调整/全部六处绑定及真实后续状态验证通过，AC-01..06/V-01..05/SD均pass；见review-r3.md，冻结producer/merge门pending |
 | T-08 | merge | T-07 pass | 冻结提交定向门/有效复用，通过才合master | AC-07 | [ ] |
 | T-09 | merge | T-08 | Specs/ledger/索引与本地归档、delivery SHA/闭包/节点表示接口 | AC-08 | [ ] |
 | T-10 | merge | T-09 | wt-guard clean后清唯一树/分支/空组，保必要恢复收据 | AC-08 | [ ] |
@@ -165,6 +165,11 @@ R2独立重放：21准入反例/5正控通过，原different-name warm Open通�
 2026-10-29 work repair cycle2（r3，pass）：`stage: work | plan_id: auto-ui/PLAN-005 | plan_revision: 3 | outcome: pass | worktree_path: D:/autostack/.wt/ui-005/auto-ui | branch: codex/plan-005-dev | base_commit: 2b88bd69 | code_commit: 74378791b353cd285168fa43fb7fe4b27cd208fe | dependency_revisions: SDK/两锁/AGP/SD unchanged | task_ids: T-03,T-05,T-06 | evidence: attachments/005/work/repair-r2-diagnosis.md,repair-r2.md | blockers: none | next_responsible_role: independent affected final R3`。两失败诊断在修复前完成，shared same_content统一所有六处资源绑定准入，仅排除name；文档元数据Eq/源代码身份/字节hash不变。扩展永久case实跑纹理Host Open→非Fault Play/Stop→Save当前→SaveAs pending→坏图Verify拒绝/恢复→重开；新legacy+PNG sprites实际初始化/Stop/Save/重开及坏length拒绝全过。原R2实际反例重编译后所有操作Ok，原21准入/5正控、错边/缺损恢复仍绿；旧sprite实际Auto2项/旧profile字节1项通过。fresh consumer-repair-r2冷SDK与current1456 identity134b4f73…、21driver+4AGP/12case全报告controls通过，manifest SHA25601eaf90e08370b6ccfc81f6fb639a5cd77b27022686f86a4bb83b516495e2c25。fmt/最终source负控绿，冻结HEAD clean；停止实施写入，尚无独立pass或merge。未受影响GPU/固定源/两锁/SDK/SD与历史A搬B证据明确复用，当前consumer也实际全套资源/像素/项目路径运行，无已知work缺口。
 
 2026-10-29 goal round 9：`stage: goal | plan_id: PLAN-005 | plan_revision: r3 | round: 9 | from: work | to: review | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-005/auto-ui | commit: 74378791b353cd285168fa43fb7fe4b27cd208fe | next: review R3`。本轮完成强制诊断和共享规则/全后继状态验证调整，未缩减目标；6/10，待独立R3后再冻结merge门/知识沉淀/归档/清理。
+2026-10-29 independent affected review R3（final，PASS）：`stage: review | review_scope: final | reviewer_identity: /root/ui005_final_review，独立上下文，未参与实现 | plan_id: auto-ui/PLAN-005 | plan_revision: 3 | outcome: pass | worktree_path: D:/autostack/.wt/ui-005/auto-ui | branch: codex/plan-005-dev | reviewed_commit: 74378791b353cd285168fa43fb7fe4b27cd208fe | base_commit: 8809e54(repair),2b88bd69(original) | dependency_revisions: SDK7b987ca8/681、两锁/AGP/canonical四项hash同R1 | spec_inputs: SD SHA25614b5aa1a6a03751c1e7ffea3df07051c33e8b9aea3540de315795e3c81cf8a9a | acceptance_results: AC-01..06 pass,V-01..05/S-01..05 pass,SD-01/02 pass; F-005-R1-01/02完整closed | pending_closeout_gates: AC-07冻结producer定向21+4/12报告与兼容/fmt/source、实际合入；AC-08规范/ledger/索引/归档/guard清理 | evidence: attachments/005/work/review-r3.md；local report SHA2560ba7b15cb2cffdd485e31d4a697d4aec1e226a204f1e307f05358ef645c3ac13 | next: merge`。
+
+R3独立检查完整8文件修复diff与两失败诊断：全部六处同一same_content保留全绑定仅忽略name，Eq/文档名/字节hash/磁盘/entry/Verify完整性保持。重编译原R2完整流程反例全12操作Ok；21准入/5正控、cached三项定向（纹理Host全流程/pending损坏恢复、legacy GLB、真实非Fault PNG sprites、坏length/错边拒绝）通过；current source1456/SDK681/479/29、consumer21+4/12报告全controls重新验证通过；canonical四源hash与SD不变，冻结HEAD clean7437879。R1/R2未变GPU/owner等证据明确复用，改变的后续Save/Play状态全部新鲜验证，无未关闭finding或未检查受影响风险。独立review没有发布规范/ledger或合入，T-07完成7/10，merge自有门仍pending。
+
+2026-10-29 goal round 10：`stage: goal | plan_id: PLAN-005 | plan_revision: r3 | round: 10 | from: review | to: merge | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-005/auto-ui | commit: 74378791b353cd285168fa43fb7fe4b27cd208fe | next: merge`。本轮独立确认完整不变量与诊断调整闭合，取得绑定当前修订的final pass；7/10，按既有全链授权进入merge，003最终批回归不接管。
 ## 10. 待澄清事项
 
-Cycle2诊断与调整已完成并验证，冻结7437879，T-01..06完成6/10；F-005-R1-01已有独立closed，F-005-R1-02完整Open/Play/Save/Verify/重开及legacy/sprite同因状态已工作自验，等待独立R3确认。当前无已知work缺口/待用户决策；诊断/关闭行见repair-r2-diagnosis.md与repair-r2.md。merge/知识沉淀/归档清理pending，003批回归仍交BLOG-004。
+独立R3已pass，绑定r3/7437879，T-01..07完成7/10，两finding完整闭合且无未决用户决策/已知缺口。下一阶段merge负责冻结producer定向门、实际交付、SD/ledger/索引、归档与guard清理，完成前不声称delivered；003批回归仍交BLOG-004，全AG里程碑仍按原合同pending。
