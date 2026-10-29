@@ -685,6 +685,7 @@ dependencies = [
  "agp",
  "auto-lang-core",
  "auto-val",
+ "cpal",
  "glam 0.34.1",
  "gltf",
  "iced",
@@ -692,6 +693,7 @@ dependencies = [
  "kira",
  "serde",
  "serde_json",
+ "symphonia",
  "winit",
 ]
 

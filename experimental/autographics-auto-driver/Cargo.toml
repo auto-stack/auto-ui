@@ -20,6 +20,8 @@ winit = "0.30.13"
 iced = "0.14.0"
 iced_wgpu = "0.14.0"
 kira = { version = "0.9", features = ["ogg"] }
+cpal = "=0.15.3"
+symphonia = { version = "=0.5.5", default-features = false, features = ["ogg", "vorbis"] }
 
 
 [profile.dev]

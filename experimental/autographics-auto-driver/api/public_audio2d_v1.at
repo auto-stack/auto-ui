@@ -1,0 +1,28 @@
+// 2D action ids remain Left,Right,Jump,Restart; bit4/5 are zero.
+fn ag_actions_snapshot() int {
+ if _ag_cast_charge(1)==0 {return 0}
+ let h=_ag_char_held_l+2*_ag_char_held_r+4*_ag_char_held_j+8*_ag_char_held_n
+ var p=0
+ if _ag_tick_id()==_ag_char_ptick {
+  p=_ag_char_pressed_l+2*_ag_char_pressed_r+4*_ag_char_pressed_j+8*_ag_char_pressed_n
+  _ag_char_pressed_l=0;_ag_char_pressed_r=0;_ag_char_pressed_j=0;_ag_char_pressed_n=0
+ }
+ return h+64*p
+}
+fn ag_sprite_frame(id int, x int, y int, w int, h int, flip int) int {
+ if _ag_audio_touch(0,id)==0 {return 0}
+ return _ag_audio_sprite(id,x,y,w,h,flip)
+}
+fn ag_sprite_slot(token int, x int, y int, w int, h int, flip int) int {
+ if _ag_audio_touch(1,token)==0 {return 0}
+ return _ag_audio_slot(token,x,y,w,h,flip)
+}
+fn ag_present2d(kind int, entity int, x int, y int, w int, h int, flip int, n int, o0 int, c0 int, g0 float, o1 int, c1 int, g1 float, o2 int, c2 int, g2 float, o3 int, c3 int, g3 float) int {
+ if _ag_audio_begin(n,kind)==0 {return 0}
+ if kind>=0 {
+  if _ag_audio_touch(kind,entity)==0 {return 0}
+  if kind==0 {if _ag_audio_sprite(entity,x,y,w,h,flip)==0 {return 0}}
+  if kind==1 {if _ag_audio_slot(entity,x,y,w,h,flip)==0 {return 0}}
+ }
+ return _ag_audio_end(n,o0,c0,g0,o1,c1,g1,o2,c2,g2,o3,c3,g3)
+}

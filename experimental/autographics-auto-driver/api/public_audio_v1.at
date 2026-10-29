@@ -1,0 +1,93 @@
+// Finite public one-shots. Integers stay exact; no render-time side effects.
+var _ag_audio_frozen=0
+var _ag_audio_cues=0
+var _ag_audio_last=0
+var _ag_audio_ord=[]
+var _ag_audio_cue=[]
+var _ag_audio_gain=[]
+var _ag_audio_mode=0
+var _ag_audio_bundle=0
+var _ag_audio_inside=0
+var _ag_audio_vk=[]
+var _ag_audio_ve=[]
+fn _ag_audio_config(count int) {
+ if _ag_audio_frozen==1 {_ag_fail(49,-1,0);return}
+ if count<0 {_ag_fail(49,-1,count);return}
+ if count>8 {_ag_fail(49,-1,count);return}
+ _ag_audio_cues=count
+}
+fn _ag_audio_freeze() {_ag_audio_frozen=1}
+fn _ag_audio_tick_begin() {
+ _ag_audio_ord=[];_ag_audio_cue=[];_ag_audio_gain=[]
+ _ag_audio_mode=0;_ag_audio_bundle=0;_ag_audio_inside=0
+ _ag_audio_vk=[];_ag_audio_ve=[]
+}
+fn _ag_audio_visual_charge() int {
+ if _ag_audio_inside==1 {return 1}
+ return _ag_cast_charge(1)
+}
+fn _ag_audio_touch(kind int, entity int) int {
+ if _ag_audio_vk.len()>=32 {_ag_fail(50,entity,kind);return 0}
+ if _ag_audio_bundle==1 {if _ag_audio_inside==0 {_ag_fail(50,entity,kind);return 0}}
+ for i in 0.._ag_audio_vk.len() {
+  if _ag_audio_vk[i]==kind {if _ag_audio_ve[i]==entity {_ag_fail(50,entity,kind);return 0}}
+ }
+ _ag_audio_vk.push(kind);_ag_audio_ve.push(entity)
+ return 1
+}
+fn _ag_audio_put(ordinal int, cue int, gain float) int {
+ if _ag_error!=0 {return 0}
+ if _ag_audio_frozen==0 {_ag_fail(49,-1,0);return 0}
+ if _ag_audio_ord.len()>=4 {_ag_fail(51,-1,0);return 0}
+ if ordinal<=_ag_audio_last {_ag_fail(52,-1,ordinal);return 0}
+ if ordinal>2147483646 {_ag_fail(52,-1,ordinal);return 0}
+ if cue<0 {_ag_fail(53,-1,cue);return 0}
+ if cue>=_ag_audio_cues {_ag_fail(53,-1,cue);return 0}
+ if gain - gain!=0.0 {_ag_fail(54,-1,0);return 0}
+ if gain<0.0 {_ag_fail(54,-1,0);return 0}
+ if gain>1.0 {_ag_fail(54,-1,0);return 0}
+ _ag_audio_ord.push(ordinal);_ag_audio_cue.push(cue);_ag_audio_gain.push(gain)
+ _ag_audio_last=ordinal
+ return 1
+}
+fn ag_audio_emit(ordinal int, cue int, gain float) int {
+ if _ag_audio_mode==2 {_ag_fail(50,-1,0);return 0}
+ if _ag_cast_charge(1)==0 {return 0}
+ _ag_audio_mode=1
+ return _ag_audio_put(ordinal,cue,gain)
+}
+fn _ag_audio_begin(n int, kind int) int {
+ if _ag_audio_bundle!=0 {_ag_fail(50,-1,0);return 0}
+ if _ag_audio_mode==1 {_ag_fail(50,-1,0);return 0}
+ if _ag_audio_vk.len()!=0 {_ag_fail(50,-1,0);return 0}
+ if n<0 {_ag_fail(51,-1,n);return 0}
+ if n>4 {_ag_fail(51,-1,n);return 0}
+ if kind< -1 {_ag_fail(50,-1,kind);return 0}
+ if kind>1 {_ag_fail(50,-1,kind);return 0}
+ if _ag_cast_charge(1)==0 {return 0}
+ _ag_audio_bundle=1;_ag_audio_mode=2;_ag_audio_inside=1
+ return 1
+}
+fn _ag_audio_end(n int, o0 int, c0 int, g0 float, o1 int, c1 int, g1 float, o2 int, c2 int, g2 float, o3 int, c3 int, g3 float) int {
+ _ag_audio_inside=0
+ if n>0 {if _ag_audio_put(o0,c0,g0)==0 {return 0}}
+ if n>1 {if _ag_audio_put(o1,c1,g1)==0 {return 0}}
+ if n>2 {if _ag_audio_put(o2,c2,g2)==0 {return 0}}
+ if n>3 {if _ag_audio_put(o3,c3,g3)==0 {return 0}}
+ return 1
+}
+fn _ag_audio_count() int {return _ag_audio_ord.len()}
+fn _ag_audio_run() int {return _ag_run_id()}
+fn _ag_audio_tick() int {return _ag_tick_id()}
+fn _ag_audio_bundle_id() int {return _ag_audio_bundle}
+fn _ag_audio_i(i int, field int) int {
+ if i<0 {return 0}
+ if i>=_ag_audio_ord.len() {return 0}
+ if field==0 {return _ag_audio_ord[i]}
+ return _ag_audio_cue[i]
+}
+fn _ag_audio_g(i int) float {
+ if i<0 {return 0.0}
+ if i>=_ag_audio_gain.len() {return 0.0}
+ return _ag_audio_gain[i]
+}

@@ -1,0 +1,12 @@
+fn ag_visual_pose(kind int, entity int, clip int, phase float, looping int, yaw float) int {
+ if _ag_audio_touch(kind,entity)==0 {return 0}
+ return _ag_audio_pose(kind,entity,clip,phase,looping,yaw)
+}
+fn ag_present3d(kind int, entity int, clip int, phase float, looping int, yaw float, n int, o0 int, c0 int, g0 float, o1 int, c1 int, g1 float, o2 int, c2 int, g2 float, o3 int, c3 int, g3 float) int {
+ if _ag_audio_begin(n,kind)==0 {return 0}
+ if kind>=0 {
+  if _ag_audio_touch(kind,entity)==0 {return 0}
+  if _ag_audio_pose(kind,entity,clip,phase,looping,yaw)==0 {return 0}
+ }
+ return _ag_audio_end(n,o0,c0,g0,o1,c1,g1,o2,c2,g2,o3,c3,g3)
+}

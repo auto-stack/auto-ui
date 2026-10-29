@@ -49,6 +49,106 @@ pub(super) fn assemble(api: Api) -> Result<Units, String> {
     assemble_from(api, INPUTS)
 }
 fn assemble_from(api: Api, input: Inputs<'_>) -> Result<Units, String> {
+    if api.audio() {
+        let three = api == Api::Audio3V1;
+        let mut units = assemble_from(
+            if three {
+                Api::NodeAnimation3V1
+            } else {
+                Api::Sprites2V1
+            },
+            input,
+        )?;
+        units.entry = replace(
+            &units.entry,
+            if three {
+                "fn profile() int {return 21}"
+            } else {
+                "fn profile() int {return 20}"
+            },
+            if three {
+                "fn profile() int {return 23}"
+            } else {
+                "fn profile() int {return 22}"
+            },
+            1,
+        )?;
+        units.entry = replace(
+            &units.entry,
+            if three {
+                "fn _ag_version() int {return 110}"
+            } else {
+                "fn _ag_version() int {return 109}"
+            },
+            if three {
+                "fn _ag_version() int {return 112}"
+            } else {
+                "fn _ag_version() int {return 111}"
+            },
+            1,
+        )?;
+        units.entry = replace(
+            &units.entry,
+            "app_start();",
+            "_ag_audio_freeze(); app_start();",
+            1,
+        )?;
+        units.entry = replace(
+            &units.entry,
+            "app_update(dt);",
+            "_ag_audio_tick_begin(); app_update(dt);",
+            1,
+        )?;
+        // Internal visual setters are reachable only inside this trusted unit.
+        // Legacy profile units are never modified on disk or through this branch.
+        let names: &[(&str, &str)] = if three {
+            &[("ag_visual_pose", "_ag_audio_pose")]
+        } else {
+            &[
+                ("ag_sprite_frame", "_ag_audio_sprite"),
+                ("ag_sprite_slot", "_ag_audio_slot"),
+            ]
+        };
+        for (public, internal) in names {
+            units.api = replace(
+                &units.api,
+                &format!("fn {public}("),
+                &format!("fn {internal}("),
+                1,
+            )?;
+        }
+        let visual_charge = if three {
+            "fn _ag_audio_pose("
+        } else {
+            "fn _ag_spr_charge("
+        };
+        let start = units
+            .api
+            .find(visual_charge)
+            .ok_or("audio visual boundary")?;
+        let end = units.api[start + 3..]
+            .find("\nfn ")
+            .map_or(units.api.len(), |i| start + 3 + i);
+        let body = replace(
+            &units.api[start..end],
+            "_ag_cast_charge(1)",
+            "_ag_audio_visual_charge()",
+            1,
+        )?;
+        units.api.replace_range(start..end, &body);
+        let extension = if three {
+            include_str!("../../../api/public_audio3d_v1.at")
+        } else {
+            include_str!("../../../api/public_audio2d_v1.at")
+        };
+        units.api = format!("{}\n{}\n{}", units.api, super::AUDIO_API, extension);
+        units.api_region = if three {
+            "<public_audio3d_v1.at>"
+        } else {
+            "<public_audio2d_v1.at>"
+        };
+        return Ok(units);
+    }
     if api == Api::NodeAnimation3V1 {
         // Derive from the unchanged delivered triggers3d assembly. This branch
         // adds only a visual unit and hooks; every earlier profile keeps bytes.
@@ -212,12 +312,14 @@ fn assemble_from(api: Api, input: Inputs<'_>) -> Result<Units, String> {
         | Api::Triggers2V1
         | Api::Triggers3V1
         | Api::Sprites2V1
-        | Api::NodeAnimation3V1 => segment_transport(input.transport)?,
+        | Api::NodeAnimation3V1
+        | Api::Audio2V1
+        | Api::Audio3V1 => segment_transport(input.transport)?,
     };
     // The former v5 pre-namespace `_ag_derive` replacement never matched.
     // Preserve those emitted bytes; activating that guard would change behavior.
     let (api_text, api_region) = match api {
-        Api::NodeAnimation3V1 => unreachable!("derived above"),
+        Api::NodeAnimation3V1 | Api::Audio2V1 | Api::Audio3V1 => unreachable!("derived above"),
         Api::V1 => (input.base.to_owned(), "<behavior_v1.at>"),
         Api::SpatialV2 => (
             format!("{}\n{}", input.base, input.spatial),
@@ -434,7 +536,9 @@ fn entry(api: Api, source: &str) -> Result<String, String> {
         | Api::Triggers2V1
         | Api::Triggers3V1
         | Api::Sprites2V1
-        | Api::NodeAnimation3V1 => {
+        | Api::NodeAnimation3V1
+        | Api::Audio2V1
+        | Api::Audio3V1 => {
             let source = replace(
                 &source,
                 "_ag_spatial_begin();",
