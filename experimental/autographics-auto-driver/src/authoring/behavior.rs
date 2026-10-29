@@ -29,6 +29,9 @@ pub const CAMERA2_VERSION: &str = "autographics.runtime_camera2d/1";
 pub const CAMERA2_API: &str = include_str!("../../api/runtime_camera2d_v1.at");
 pub const CAMERA3_VERSION: &str = "autographics.runtime_camera3d/1";
 pub const CAMERA3_API: &str = include_str!("../../api/runtime_camera3d_v1.at");
+pub const OBJECTS2_VERSION: &str = "autographics.objects2d/1";
+pub const OBJECTS3_VERSION: &str = "autographics.objects3d/1";
+pub const OBJECTS_API: &str = include_str!("../../api/runtime_objects_v1.at");
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Api {
     V1,
@@ -40,6 +43,8 @@ pub enum Api {
     Character3V1,
     Camera2V1,
     Camera3V1,
+    Objects2V1,
+    Objects3V1,
 }
 impl Api {
     pub fn parse(value: &str) -> Result<Self, String> {
@@ -53,6 +58,8 @@ impl Api {
             CHARACTER3_VERSION => Ok(Self::Character3V1),
             CAMERA2_VERSION => Ok(Self::Camera2V1),
             CAMERA3_VERSION => Ok(Self::Camera3V1),
+            OBJECTS2_VERSION => Ok(Self::Objects2V1),
+            OBJECTS3_VERSION => Ok(Self::Objects3V1),
             _ => Err("unsupported behavior API".into()),
         }
     }
@@ -67,6 +74,8 @@ impl Api {
             Self::Character3V1 => CHARACTER3_VERSION,
             Self::Camera2V1 => CAMERA2_VERSION,
             Self::Camera3V1 => CAMERA3_VERSION,
+            Self::Objects2V1 => OBJECTS2_VERSION,
+            Self::Objects3V1 => OBJECTS3_VERSION,
         }
     }
     pub fn number(self) -> i32 {
@@ -80,6 +89,8 @@ impl Api {
             Self::Character3V1 => 102,
             Self::Camera2V1 => 103,
             Self::Camera3V1 => 104,
+            Self::Objects2V1 => 105,
+            Self::Objects3V1 => 106,
         }
     }
     pub fn profile(self) -> i32 {
@@ -93,6 +104,16 @@ impl Api {
             Self::Character3V1 => 13,
             Self::Camera2V1 => 14,
             Self::Camera3V1 => 15,
+            Self::Objects2V1 => 16,
+            Self::Objects3V1 => 17,
+        }
+    }
+    /// The finite run-object profiles: one dimension per Run, 8 reserved slots.
+    pub fn objects(self) -> Option<super::runtime_objects::Dim> {
+        match self {
+            Self::Objects2V1 => Some(super::runtime_objects::Dim::TwoD),
+            Self::Objects3V1 => Some(super::runtime_objects::Dim::ThreeD),
+            _ => None,
         }
     }
 }

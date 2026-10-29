@@ -140,6 +140,9 @@ pub struct Frame {
     /// The camera outputs admitted with this frame; frame and camera pass
     /// prepare/accept/publish as one transaction (contract section 5).
     pub camera: Option<RuntimeCameraFrame>,
+    /// The admitted runtime object instances; objects, character and camera
+    /// are one transaction. `None` outside the objects profiles.
+    pub instances: Option<super::runtime_objects::RuntimeObjectsFrame>,
 }
 
 /// Per-tick camera output block sizes appended to the frame read layout.
@@ -205,6 +208,11 @@ pub struct Play {
     camera_frame: Option<RuntimeCameraFrame>,
     cam_sent: Option<[f32; 3]>,
     cam: CameraInput,
+    /// Finite run-object profile (8 reserved slots) riding this Run.
+    objects_dim: Option<super::runtime_objects::Dim>,
+    /// Per-slot generation high-water of every ADMITTED frame; a rebirth must
+    /// exceed it, so a stale handle value can never re-enter through admission.
+    objects_high_water: [i32; 8],
 }
 impl Play {
     pub fn new(e: &Editor, actors: [Option<u64>; 2], source: &str) -> Result<Self, String> {
@@ -234,6 +242,8 @@ impl Play {
             && snapshot.version != super::behavior::CHARACTER3_VERSION
             && snapshot.version != super::behavior::CAMERA2_VERSION
             && snapshot.version != super::behavior::CAMERA3_VERSION
+            && snapshot.version != super::behavior::OBJECTS2_VERSION
+            && snapshot.version != super::behavior::OBJECTS3_VERSION
         {
             return Err("spatial constructor API mismatch".into());
         }
@@ -293,19 +303,39 @@ impl Play {
                 ));
             }
             let character = match api {
-                super::behavior::Api::CharacterV1 | super::behavior::Api::Camera2V1 => {
-                    Some(CharProfile::TwoD)
-                }
-                super::behavior::Api::Character3V1 | super::behavior::Api::Camera3V1 => {
-                    Some(CharProfile::ThreeD)
-                }
+                super::behavior::Api::CharacterV1
+                | super::behavior::Api::Camera2V1
+                | super::behavior::Api::Objects2V1 => Some(CharProfile::TwoD),
+                super::behavior::Api::Character3V1
+                | super::behavior::Api::Camera3V1
+                | super::behavior::Api::Objects3V1 => Some(CharProfile::ThreeD),
                 _ => None,
             };
             let camera_dim = match api {
-                super::behavior::Api::Camera2V1 => Some(CameraDim::TwoD),
-                super::behavior::Api::Camera3V1 => Some(CameraDim::ThreeD),
+                super::behavior::Api::Camera2V1 | super::behavior::Api::Objects2V1 => {
+                    Some(CameraDim::TwoD)
+                }
+                super::behavior::Api::Camera3V1 | super::behavior::Api::Objects3V1 => {
+                    Some(CameraDim::ThreeD)
+                }
                 _ => None,
             };
+            let objects_dim = api.objects();
+            if objects_dim.is_some() {
+                if let Some(error) = super::runtime_objects::slot_capacity_error(play.order.len()) {
+                    return Err(error);
+                }
+                // Every accepted node is addressable as a spawn template by its
+                // stable document id; eligibility re-checks happen on use.
+                for (index, node) in play.order.iter().enumerate() {
+                    let stable = i32::try_from(node.id)
+                        .map_err(|_| "object template id exceeds 32-bit".to_string())?;
+                    configuration.push(Call::unit(
+                        "_ag_obj_map",
+                        vec![Scalar::Int(stable), Scalar::Int(index as i32)],
+                    ));
+                }
+            }
             if let Some(profile) = character {
                 // Persistent document id -> run index table for user binds.
                 for (index, node) in play.order.iter().enumerate() {
@@ -324,7 +354,9 @@ impl Play {
             play.expected_profile = api.profile();
             play.character = character;
             play.camera_dim = camera_dim;
+            play.objects_dim = objects_dim;
             play.push_camera_queries();
+            play.push_objects_queries();
         }
         Ok(play)
     }
@@ -463,6 +495,8 @@ impl Play {
             camera_frame: None,
             cam_sent: None,
             cam: CameraInput::default(),
+            objects_dim: None,
+            objects_high_water: [0; 8],
         };
         p.queries();
         Ok(p)
@@ -780,6 +814,7 @@ impl Play {
             }
         }
         self.push_camera_queries();
+        self.push_objects_queries();
     }
 
     /// The camera output block rides every camera-Run tick after the node
@@ -927,9 +962,12 @@ impl Play {
         }
         Ok(())
     }
-    fn admit(&self) -> Result<Frame, String> {
-        let data = if let Some(snapshot) = &self.user_source {
-            match self.read.as_slice() {
+    fn admit(&mut self) -> Result<Frame, String> {
+        // Cloned so the objects admission can take &mut self for the
+        // generation high-water without aliasing the VM read buffer.
+        let read = self.read.clone();
+        let data: &[Scalar] = if let Some(snapshot) = &self.user_source {
+            match read.as_slice() {
                 [Scalar::Int(version), Scalar::Int(0), Scalar::Int(_), Scalar::Int(_), tail @ ..]
                     if *version == super::behavior::Api::parse(&snapshot.version)?.number() =>
                 {
@@ -982,7 +1020,7 @@ impl Play {
                 }
             }
         } else {
-            self.read.as_slice()
+            read.as_slice()
         };
         let int = |i: usize| match data.get(i) {
             Some(Scalar::Int(v)) => Ok(*v),
@@ -992,7 +1030,12 @@ impl Play {
             Some(Scalar::Float(v)) if v.is_finite() => Ok(*v),
             _ => Err("play float output".to_string()),
         };
-        if data.len() != 4 + 22 * self.order.len() + camera_block_len(self.camera_dim)
+        let objects_len = if self.objects_dim.is_some() {
+            super::runtime_objects::BLOCK_LEN
+        } else {
+            0
+        };
+        if data.len() != 4 + 22 * self.order.len() + camera_block_len(self.camera_dim) + objects_len
             || int(0)? != self.expected_profile
             || int(1)? != self.run_id
             || int(2)? != self.next_tick
@@ -1039,6 +1082,7 @@ impl Play {
         }
         doc.validate()?;
         let camera = self.admit_camera(&int, &float)?;
+        let instances = self.admit_objects(data)?;
         let expected = hierarchy::derive(&doc)?;
         let mut nodes = BTreeMap::new();
         let mut objects = doc.objects.clone();
@@ -1069,7 +1113,47 @@ impl Play {
             tick: self.next_tick,
             run_id: self.run_id,
             camera,
+            instances,
         })
+    }
+
+    /// Validate the runtime-object block that rides every objects-Run tick.
+    /// The fixed block, the template eligibility and the legitimate
+    /// birth/death/reuse generation sequence are all checked before a
+    /// candidate can be accepted; every rejection names its stage.
+    fn admit_objects(
+        &mut self,
+        data: &[Scalar],
+    ) -> Result<Option<super::runtime_objects::RuntimeObjectsFrame>, String> {
+        let Some(dim) = self.objects_dim else {
+            return Ok(None);
+        };
+        let base = 4 + 22 * self.order.len() + camera_block_len(self.camera_dim);
+        let mut block = Vec::with_capacity(super::runtime_objects::BLOCK_LEN);
+        for i in 0..super::runtime_objects::BLOCK_LEN {
+            match data.get(base + i) {
+                Some(v @ (Scalar::Int(_) | Scalar::Float(_))) => block.push(*v),
+                _ => return Err("objects block output".into()),
+            }
+        }
+        let order = &self.order;
+        let rules = super::runtime_objects::TemplateRules { order, dim };
+        let previous = self
+            .last
+            .as_ref()
+            .and_then(|f| f.instances.as_ref())
+            .cloned();
+        let mut high_water = self.objects_high_water;
+        let frame = super::runtime_objects::admit_block(
+            &block,
+            self.run_id,
+            self.next_tick,
+            &rules,
+            previous.as_ref(),
+            &mut high_water,
+        )?;
+        self.objects_high_water = high_water;
+        Ok(Some(frame))
     }
 
     /// Validate the camera output block that rides every camera-Run tick.
@@ -1199,6 +1283,41 @@ impl Play {
             }
         }
         Ok(Some(camera))
+    }
+    /// The runtime-object block rides every objects-Run tick after the camera
+    /// block: 4 header ints plus 8 canonical rows of 6 values, in slot order.
+    fn push_objects_queries(&mut self) {
+        if self.objects_dim.is_none() {
+            return;
+        }
+        for name in [
+            "_ag_obj_status",
+            "_ag_obj_count",
+            "_ag_obj_run",
+            "_ag_obj_tick",
+        ] {
+            self.queue.push_back(Call {
+                name,
+                args: vec![],
+                kind: ResultKind::Int,
+            });
+        }
+        for slot in 0..super::runtime_objects::SLOTS as i32 {
+            for (name, kind) in [
+                ("_ag_obj_gv", ResultKind::Int),
+                ("_ag_obj_tv", ResultKind::Int),
+                ("_ag_obj_xv", ResultKind::Float),
+                ("_ag_obj_yv", ResultKind::Float),
+                ("_ag_obj_zv", ResultKind::Float),
+                ("_ag_obj_vv", ResultKind::Int),
+            ] {
+                self.queue.push_back(Call {
+                    name,
+                    args: vec![Scalar::Int(slot)],
+                    kind,
+                });
+            }
+        }
     }
     pub fn accept(&mut self) -> Result<(), String> {
         let frame = self.candidate.take().ok_or("no complete play frame")?;

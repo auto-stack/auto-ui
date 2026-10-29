@@ -8,6 +8,7 @@ pub mod host;
 pub mod play;
 pub mod preview;
 pub mod runtime_camera;
+pub mod runtime_objects;
 pub mod session;
 pub mod storage;
 mod tagged;

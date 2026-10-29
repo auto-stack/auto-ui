@@ -1,0 +1,47 @@
+// auto-ui PLAN-001 objects3d/1 public sample: the user binds the character,
+// solids and the orbit camera, then spawns two runtime instances from the
+// accepted 3D templates (Crystal id 3, Beacon id 4). Every tick the crystal
+// sweeps along x while the beacon blinks; crossing to the +x side despawns
+// the crystal and respawns it on the other side through the SAME slot (new
+// generation). Editing `orbit` below (main-alt.at is that edited state)
+// changes the real trajectory: the public --open/--behavior/--behavior-api
+// root entry runs this file with --behavior-api objects3d.
+var orbit=1.6
+var px=3.0
+var dir=0.0 - 1.0
+var h_crystal=0
+var h_beacon=0
+var ok=0
+var vy=0.0
+var grounded=0
+fn app_start() {
+ ok=ok+ag_char3_bind(1)
+ ok=ok+ag_char3_solid(2)
+ ok=ok+ag_camera_orbit_3d(1, 8.0, 45.0, 0, 0.0)
+ h_crystal=ag_object_spawn(0, 3, 3.0, 1.0, -3.0)
+ h_beacon=ag_object_spawn(1, 4, -3.0, 1.5, -5.0)
+ ok=ok+ag_object_visible(h_beacon, 1)
+}
+fn app_update(dt float) {
+ let jp=ag_action_pressed(4)
+ if jp==1 {if grounded==1 {vy = 8.0}}
+ vy = vy - 20.0*dt
+ let hr=ag_action_held(1)
+ let dx=(hr*1.0)*3.0*dt
+ let q=ag_char3_move(dx,vy*dt,0.0,0.002)
+ grounded=ag_char3_grounded(q)
+ if grounded==1 {vy=0.0}
+ // the crystal sweeps along x; crossing +1.5 recycles the slot to -x
+ px=px+dir*orbit*dt
+ if px>1.5 {
+  ok=ok+ag_object_despawn(h_crystal)
+  px= -3.0
+  dir=1.0
+  h_crystal=ag_object_spawn(0, 3, px, 1.0, -3.0)
+ } else {
+  ok=ok+ag_object_move(h_crystal, px, 1.0, -3.0)
+ }
+ // the beacon blinks: visibility only, identity and geometry stay
+ let blink=ag_tick()%2
+ ok=ok+ag_object_visible(h_beacon, blink)
+}

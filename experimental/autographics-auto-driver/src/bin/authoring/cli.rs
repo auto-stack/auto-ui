@@ -13,7 +13,7 @@ pub(super) fn run() {
     if args.iter().any(|v| v == "--behavior-api")
         && value("--behavior-api").is_none_or(|v| v.starts_with("--"))
     {
-        eprintln!("--behavior-api requires v1 or v2 or v3 or v4 or v5 or character or character3d or camera2d or camera3d");
+        eprintln!("--behavior-api requires v1 or v2 or v3 or v4 or v5 or character or character3d or camera2d or camera3d or objects2d or objects3d");
         std::process::exit(2)
     }
     let behavior_api = match value("--behavior-api") {
@@ -33,9 +33,11 @@ pub(super) fn run() {
                 "character3d" => autographics_auto_driver::authoring::behavior::Api::Character3V1,
                 "camera2d" => autographics_auto_driver::authoring::behavior::Api::Camera2V1,
                 "camera3d" => autographics_auto_driver::authoring::behavior::Api::Camera3V1,
+                "objects2d" => autographics_auto_driver::authoring::behavior::Api::Objects2V1,
+                "objects3d" => autographics_auto_driver::authoring::behavior::Api::Objects3V1,
                 _ => {
                     eprintln!(
-                        "--behavior-api expects v1 or v2 or v3 or v4 or v5 or character or character3d or camera2d or camera3d"
+                        "--behavior-api expects v1 or v2 or v3 or v4 or v5 or character or character3d or camera2d or camera3d or objects2d or objects3d"
                     );
                     std::process::exit(2)
                 }

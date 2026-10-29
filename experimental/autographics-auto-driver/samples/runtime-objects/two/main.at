@@ -1,0 +1,38 @@
+// auto-ui PLAN-001 objects2d/1 public sample: the user spawns two runtime
+// items from the accepted templates (Coin id 3, Gem id 4), moves the Coin
+// toward the character every tick, despawns it on pickup and respawns it at
+// the far end through the SAME slot (new generation), and toggles the Gem's
+// visibility only. Editing `speed` below (main-alt.at is that edited state)
+// changes the real trajectory and the pickup tick: the public
+// --open/--behavior/--behavior-api root entry runs this file with
+// --behavior-api objects2d.
+var speed=2.0
+var coin_x=8.0
+var h_coin=0
+var h_gem=0
+var ok=0
+fn app_start() {
+ ok=ok+ag_char_bind(1)
+ ok=ok+ag_char_solid(2)
+ ok=ok+ag_camera_follow_2d(1, 0.0, -4.0, 30.0, 12.0, 12.0, 8.0)
+ h_coin=ag_object_spawn(0, 3, coin_x, 2.0, 0.0)
+ h_gem=ag_object_spawn(1, 4, 20.0, 2.5, 0.0)
+ ok=ok+ag_object_visible(h_gem, 1)
+}
+fn app_update(dt float) {
+ // walk right; the follow camera tracks the character
+ let hr=ag_action_held(1)
+ let dx=(hr*1.0)*3.0*dt
+ ok=ok+ag_char_move(dx,0.0,0.002)
+ // the coin drifts left toward the player; picking it up recycles the slot
+ coin_x=coin_x - speed*dt
+ ok=ok+ag_object_move(h_coin, coin_x, 2.0, 0.0)
+ if coin_x<0.0 {
+  ok=ok+ag_object_despawn(h_coin)
+  coin_x=26.0
+  h_coin=ag_object_spawn(0, 3, coin_x, 2.0, 0.0)
+ }
+ // the gem blinks: visibility only, identity and geometry stay
+ let blink=ag_tick()%2
+ ok=ok+ag_object_visible(h_gem, blink)
+}

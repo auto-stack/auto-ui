@@ -6,7 +6,13 @@ impl Host {
         &self,
         preview: &crate::authoring::preview::Preview,
     ) -> Result<Prepared, String> {
-        self.prepare_frame(preview.document(), &preview.objects, &preview.nodes, None)
+        self.prepare_frame(
+            preview.document(),
+            &preview.objects,
+            &preview.nodes,
+            None,
+            None,
+        )
     }
     pub(super) fn prepare_frame(
         &self,
@@ -14,6 +20,7 @@ impl Host {
         objects: &[Object],
         nodes: &std::collections::BTreeMap<u64, crate::authoring::hierarchy::Derived>,
         camera: Option<&crate::authoring::runtime_camera::RuntimeCameraFrame>,
+        instances: Option<&crate::authoring::runtime_objects::RuntimeObjectsFrame>,
     ) -> Result<Prepared, String> {
         if self.fail_resource {
             return Err("resource preparation rejected".into());
@@ -24,6 +31,14 @@ impl Host {
         let mut store = scene.store.staged();
         let assets = self.active_assets()?;
         crate::authoring::assets::check_registry(&assets)?;
+        let template = |id: u64| -> Result<Object, String> {
+            document
+                .objects
+                .iter()
+                .find(|o| o.id == id)
+                .cloned()
+                .ok_or_else(|| "objects template missing".into())
+        };
         let mut potential = 0;
         for o in objects.iter().filter(|o| !o.kind.is_2d()) {
             potential += self
@@ -31,6 +46,20 @@ impl Host {
                 .ok_or("missing resource payload")?
                 .meshes
                 .len();
+        }
+        // Hidden or inactive object slots never shrink the mesh denominator:
+        // every live instance pays its full template mesh count.
+        if let Some(instances) = instances {
+            for slot in instances.slots.iter().filter(|s| s.live()) {
+                let t = template(slot.template_id)?;
+                if !t.kind.is_2d() {
+                    potential += self
+                        .model(&t)
+                        .ok_or("missing object template model")?
+                        .meshes
+                        .len();
+                }
+            }
         }
         if potential > agp::render3d::pipeline::MAX_INSTANCES {
             return Err("resource limit: potential mesh instances 512".into());
@@ -194,6 +223,73 @@ impl Host {
                         mesh: (model.source_sha256.clone(), mesh.name.clone()),
                         model: transform,
                     });
+                }
+            }
+        }
+        // Runtime object instances render through the non-persistent adapter
+        // (id 0 can never alias a selectable document object): frozen template
+        // shape/material, admitted world position and visibility. They are
+        // non-solid presentation only; no selection, gesture or spatial state.
+        if let Some(instances) = instances {
+            for slot in instances.slots.iter().filter(|s| s.live()) {
+                let t = template(slot.template_id)?;
+                let o = crate::authoring::runtime_objects::instance_object(&t, slot)
+                    .ok_or("objects adapter slot")?;
+                if !o.visible {
+                    continue;
+                }
+                if o.kind.is_2d() {
+                    let (center, zoom) = match &runtime {
+                        Some((cam, follow, scale)) => (
+                            cam.screen_2d(
+                                glam::Vec2::new(o.translation[0], o.translation[1]),
+                                *follow,
+                            )
+                            .map(|s| s.to_array())
+                            .ok_or("2D camera projection exceeds finite range")?,
+                            *scale,
+                        ),
+                        None => (
+                            view.screen(glam::Vec2::new(o.translation[0], o.translation[1]))
+                                .map(|s| s.to_array())
+                                .ok_or("2D projection exceeds finite range")?,
+                            view.zoom,
+                        ),
+                    };
+                    p.draws.push(DrawCmd {
+                        center,
+                        size: [o.scale[0] * zoom, o.scale[1] * zoom],
+                        z: 0.0,
+                        color: Color::rgba(o.rgba[0], o.rgba[1], o.rgba[2], o.rgba[3]),
+                        shape: if o.kind == Kind::Circle {
+                            Shape::Circle
+                        } else {
+                            Shape::Rect
+                        },
+                    });
+                } else {
+                    let model = self.model(&o).ok_or("missing object template model")?;
+                    let transform = Mat4::from_translation(Vec3::from(o.translation))
+                        * Mat4::from_rotation_y(o.yaw)
+                        * Mat4::from_rotation_x(o.pitch)
+                        * Mat4::from_scale(Vec3::from(o.scale));
+                    for (mesh_index, mesh) in model.meshes.iter().enumerate() {
+                        // A hidden template never prepared its meshes in the
+                        // editing view; the first spawned instance uploads it
+                        // once and every later birth reuses the shared mesh.
+                        if p.store.get(&model.source_sha256, &mesh.name).is_none() {
+                            p.store
+                                .get_or_upload(self.rt.gpu(), model, mesh_index)
+                                .map_err(|e| format!("GPU preparation: {e:?}"))?;
+                        }
+                        if p.store.get(&model.source_sha256, &mesh.name).is_none() {
+                            return Err("fixed mesh missing".into());
+                        }
+                        p.instances.push(MeshInstance {
+                            mesh: (model.source_sha256.clone(), mesh.name.clone()),
+                            model: transform,
+                        });
+                    }
                 }
             }
         }

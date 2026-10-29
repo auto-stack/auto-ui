@@ -1,7 +1,7 @@
 //! One driver-local trusted assembler. No user input, IO, admission or caching.
 use super::{
     Api, API, CAMERA2_API, CAMERA3_API, CHARACTER3_API, CHARACTER_API, MOTION_API, MOTION_SCAN_API,
-    SEGMENT_API, SOURCE, SPATIAL_API, SWEEP_API,
+    OBJECTS_API, SEGMENT_API, SOURCE, SPATIAL_API, SWEEP_API,
 };
 
 pub(super) struct Units {
@@ -23,6 +23,7 @@ struct Inputs<'a> {
     character3: &'a str,
     camera2: &'a str,
     camera3: &'a str,
+    objects: &'a str,
     entry: &'a str,
 }
 const INPUTS: Inputs<'static> = Inputs {
@@ -37,6 +38,7 @@ const INPUTS: Inputs<'static> = Inputs {
     character3: CHARACTER3_API,
     camera2: CAMERA2_API,
     camera3: CAMERA3_API,
+    objects: OBJECTS_API,
     entry: ENTRY,
 };
 pub(super) fn assemble(api: Api) -> Result<Units, String> {
@@ -56,6 +58,8 @@ fn assemble_from(api: Api, input: Inputs<'_>) -> Result<Units, String> {
             | Api::Character3V1
             | Api::Camera2V1
             | Api::Camera3V1
+            | Api::Objects2V1
+            | Api::Objects3V1
     ) {
         require(input.segment, "fn ag_cast_segment(", 1)?;
     }
@@ -67,40 +71,54 @@ fn assemble_from(api: Api, input: Inputs<'_>) -> Result<Units, String> {
             | Api::Character3V1
             | Api::Camera2V1
             | Api::Camera3V1
+            | Api::Objects2V1
+            | Api::Objects3V1
     ) {
         require(input.sweep, "fn ag_sweep_aabb(", 1)?;
     }
     if matches!(
         api,
-        Api::MotionV5 | Api::CharacterV1 | Api::Character3V1 | Api::Camera2V1 | Api::Camera3V1
+        Api::MotionV5
+            | Api::CharacterV1
+            | Api::Character3V1
+            | Api::Camera2V1
+            | Api::Camera3V1
+            | Api::Objects2V1
+            | Api::Objects3V1
     ) {
         require(input.motion_scan, "fn _ag_motion_two(", 1)?;
         require(input.motion_scan, "fn _ag_motion_three(", 1)?;
         require(input.motion, "fn ag_move_and_slide(", 1)?;
         require(input.motion, "fn _ag_motion_set_leaf(", 1)?;
     }
-    if matches!(api, Api::CharacterV1 | Api::Camera2V1) {
+    if matches!(api, Api::CharacterV1 | Api::Camera2V1 | Api::Objects2V1) {
         require(input.character, "fn ag_char_move(", 1)?;
         require(input.character, "fn _ag_char_freeze(", 1)?;
         require(input.character, "fn _ag_char_tick_begin(", 1)?;
         require(input.character, "fn _ag_char_input(", 1)?;
     }
-    if matches!(api, Api::Character3V1 | Api::Camera3V1) {
+    if matches!(api, Api::Character3V1 | Api::Camera3V1 | Api::Objects3V1) {
         require(input.character3, "fn ag_char3_move(", 1)?;
         require(input.character3, "fn _ag_char3_freeze(", 1)?;
         require(input.character3, "fn _ag_char3_tick_begin(", 1)?;
         require(input.character3, "fn _ag_char3_input(", 1)?;
     }
-    if api == Api::Camera2V1 {
+    if matches!(api, Api::Camera2V1 | Api::Objects2V1) {
         require(input.camera2, "fn ag_camera_follow_2d(", 1)?;
         require(input.camera2, "fn _ag_cam2_freeze(", 1)?;
         require(input.camera2, "fn _ag_cam2_input(", 0)?;
     }
-    if api == Api::Camera3V1 {
+    if matches!(api, Api::Camera3V1 | Api::Objects3V1) {
         require(input.camera3, "fn ag_camera_orbit_3d(", 1)?;
         require(input.camera3, "fn _ag_cam3_freeze(", 1)?;
         require(input.camera3, "fn _ag_cam3_basis(", 1)?;
         require(input.camera3, "fn _ag_cam3_orbit(", 1)?;
+    }
+    if matches!(api, Api::Objects2V1 | Api::Objects3V1) {
+        require(input.objects, "fn ag_object_spawn(", 1)?;
+        require(input.objects, "fn _ag_obj_freeze(", 1)?;
+        require(input.objects, "fn _ag_obj_tick_begin(", 1)?;
+        require(input.objects, "var _ag_obj_dim=0", 1)?;
     }
 
     let transport = match api {
@@ -111,7 +129,9 @@ fn assemble_from(api: Api, input: Inputs<'_>) -> Result<Units, String> {
         | Api::CharacterV1
         | Api::Character3V1
         | Api::Camera2V1
-        | Api::Camera3V1 => segment_transport(input.transport)?,
+        | Api::Camera3V1
+        | Api::Objects2V1
+        | Api::Objects3V1 => segment_transport(input.transport)?,
     };
     // The former v5 pre-namespace `_ag_derive` replacement never matched.
     // Preserve those emitted bytes; activating that guard would change behavior.
@@ -150,6 +170,26 @@ fn assemble_from(api: Api, input: Inputs<'_>) -> Result<Units, String> {
             ))?,
             "<runtime_camera3d_v1.at>",
         ),
+        Api::Objects2V1 => (
+            segment_compact(&format!(
+                "{}\n{}\n{}\n{}",
+                motion_api(input)?,
+                input.character,
+                input.camera2,
+                objects_unit(input, 2)?
+            ))?,
+            "<runtime_objects_v1.at>",
+        ),
+        Api::Objects3V1 => (
+            segment_compact(&format!(
+                "{}\n{}\n{}\n{}",
+                motion_api(input)?,
+                input.character3,
+                input.camera3,
+                objects_unit(input, 3)?
+            ))?,
+            "<runtime_objects_v1.at>",
+        ),
     };
     Ok(Units {
         transport,
@@ -157,6 +197,14 @@ fn assemble_from(api: Api, input: Inputs<'_>) -> Result<Units, String> {
         entry: entry(api, input.entry)?,
         api_region,
     })
+}
+/// The objects unit is one file for both dimensions; the assembly freezes the
+/// Run dimension by replacing the declared literal (guarded by the require
+/// marker above), so no user or host call can flip it at runtime.
+fn objects_unit(input: Inputs<'_>, dim: i32) -> Result<String, String> {
+    Ok(input
+        .objects
+        .replace("var _ag_obj_dim=0", &format!("var _ag_obj_dim={dim}")))
 }
 fn motion_api(input: Inputs<'_>) -> Result<String, String> {
     let base = query_api(input, true)?;
@@ -235,7 +283,9 @@ fn entry(api: Api, source: &str) -> Result<String, String> {
         | Api::CharacterV1
         | Api::Character3V1
         | Api::Camera2V1
-        | Api::Camera3V1 => {
+        | Api::Camera3V1
+        | Api::Objects2V1
+        | Api::Objects3V1 => {
             let source = replace(
                 &source,
                 "_ag_spatial_begin();",
@@ -314,6 +364,49 @@ fn entry(api: Api, source: &str) -> Result<String, String> {
                         &source,
                         "app_update(dt); _ag_cast_token=0",
                         "_ag_char3_tick_begin(); app_update(dt); _ag_cast_token=0",
+                        1,
+                    )
+                }
+                Api::Objects2V1 => {
+                    // The table must exist before app_start can spawn into it,
+                    // so the object freeze precedes the first callback; the
+                    // camera/character freezes stay after it, as in 875.
+                    let source = replace(
+                        &source,
+                        "if _ag_error==0 { app_start();",
+                        "if _ag_error==0 { _ag_obj_freeze(); app_start();",
+                        1,
+                    )?;
+                    let source = replace(
+                        &source,
+                        "app_start(); _ag_cast_token=0",
+                        "app_start(); _ag_cast_token=0; _ag_char_freeze(); _ag_cam2_freeze()",
+                        1,
+                    )?;
+                    replace(
+                        &source,
+                        "app_update(dt); _ag_cast_token=0",
+                        "_ag_char_tick_begin(); _ag_obj_tick_begin(); app_update(dt); _ag_cast_token=0",
+                        1,
+                    )
+                }
+                Api::Objects3V1 => {
+                    let source = replace(
+                        &source,
+                        "if _ag_error==0 { app_start();",
+                        "if _ag_error==0 { _ag_obj_freeze(); app_start();",
+                        1,
+                    )?;
+                    let source = replace(
+                        &source,
+                        "app_start(); _ag_cast_token=0",
+                        "app_start(); _ag_cast_token=0; _ag_char3_freeze(); _ag_cam3_freeze()",
+                        1,
+                    )?;
+                    replace(
+                        &source,
+                        "app_update(dt); _ag_cast_token=0",
+                        "_ag_char3_tick_begin(); _ag_obj_tick_begin(); app_update(dt); _ag_cast_token=0",
                         1,
                     )
                 }
@@ -430,7 +523,7 @@ const ENTRY: &str = "\nfn main() {}\nfn profile() int {return 7}\nfn _ag_version
 #[cfg(test)]
 mod tests {
     use super::*;
-    const APIS: [Api; 9] = [
+    const APIS: [Api; 11] = [
         Api::V1,
         Api::SpatialV2,
         Api::SegmentV3,
@@ -440,6 +533,8 @@ mod tests {
         Api::Character3V1,
         Api::Camera2V1,
         Api::Camera3V1,
+        Api::Objects2V1,
+        Api::Objects3V1,
     ];
     #[test]
     fn trusted_boundary_mutations_reject_and_restored_units_match() {
@@ -534,6 +629,8 @@ mod tests {
                             | Api::Character3V1
                             | Api::Camera2V1
                             | Api::Camera3V1
+                            | Api::Objects2V1
+                            | Api::Objects3V1
                     ),
                     3 => matches!(
                         api,
@@ -543,6 +640,8 @@ mod tests {
                             | Api::Character3V1
                             | Api::Camera2V1
                             | Api::Camera3V1
+                            | Api::Objects2V1
+                            | Api::Objects3V1
                     ),
                     4 | 5 => matches!(
                         api,
@@ -551,11 +650,13 @@ mod tests {
                             | Api::Character3V1
                             | Api::Camera2V1
                             | Api::Camera3V1
+                            | Api::Objects2V1
+                            | Api::Objects3V1
                     ),
-                    6 => matches!(api, Api::CharacterV1 | Api::Camera2V1),
-                    7 => matches!(api, Api::Character3V1 | Api::Camera3V1),
-                    8 => api == Api::Camera2V1,
-                    9 => api == Api::Camera3V1,
+                    6 => matches!(api, Api::CharacterV1 | Api::Camera2V1 | Api::Objects2V1),
+                    7 => matches!(api, Api::Character3V1 | Api::Camera3V1 | Api::Objects3V1),
+                    8 => matches!(api, Api::Camera2V1 | Api::Objects2V1),
+                    9 => matches!(api, Api::Camera3V1 | Api::Objects3V1),
                     _ => false,
                 };
                 if !required {

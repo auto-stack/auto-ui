@@ -190,6 +190,40 @@ impl Host {
         };
         let mut play = if let Some(snapshot) = snapshot {
             if snapshot.version != crate::authoring::behavior::VERSION {
+                // Frozen construction envelope for the object profiles: every
+                // reserved slot pays its worst eligible template mesh count,
+                // hidden or not; the whole candidate is rejected before a Run
+                // exists (contract section 4; prepare re-checks per frame).
+                if let Ok(api) = crate::authoring::behavior::Api::parse(&snapshot.version) {
+                    if api.objects().is_some() {
+                        let mut base_potential = 0usize;
+                        let mut worst_template = 0usize;
+                        for o in &self.editor.document.objects {
+                            if o.kind.is_2d() {
+                                continue;
+                            }
+                            let meshes = self
+                                .model(o)
+                                .ok_or("missing resource payload")?
+                                .meshes
+                                .len();
+                            base_potential += meshes;
+                            if matches!(
+                                o.kind,
+                                Kind::Cylinder | Kind::Player | Kind::Mob | Kind::Model
+                            ) {
+                                worst_template = worst_template.max(meshes);
+                            }
+                        }
+                        let slots = crate::authoring::runtime_objects::SLOTS;
+                        let total = base_potential + worst_template * slots;
+                        if total > agp::render3d::pipeline::MAX_INSTANCES {
+                            return Err(format!(
+                                "objects mesh envelope: base {base_potential} + {slots} slots x worst template {worst_template} exceeds 512"
+                            ));
+                        }
+                    }
+                }
                 let descriptor =
                     crate::authoring::spatial::Descriptor::build(&self.editor.document, |o| {
                         self.model(o)
@@ -383,6 +417,7 @@ impl Host {
                         &frame.objects,
                         &frame.nodes,
                         frame.camera.as_ref(),
+                        frame.instances.as_ref(),
                     );
                     self.prepare_measurement.finish(measurement_start);
                     let prepared = prepared?;

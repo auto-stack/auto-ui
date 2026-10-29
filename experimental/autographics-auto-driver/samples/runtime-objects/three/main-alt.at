@@ -1,0 +1,41 @@
+// auto-ui PLAN-001 objects3d/1 second public configuration: the SAME scene
+// with a faster sweep and the recycle line moved to +0.5. The changed user
+// parameters alter the real trajectory and the respawn tick — this file is
+// the param-sensitivity twin of main.at.
+var orbit=3.0
+var px=3.0
+var dir=0.0 - 1.0
+var h_crystal=0
+var h_beacon=0
+var ok=0
+var vy=0.0
+var grounded=0
+fn app_start() {
+ ok=ok+ag_char3_bind(1)
+ ok=ok+ag_char3_solid(2)
+ ok=ok+ag_camera_orbit_3d(1, 8.0, 45.0, 0, 0.0)
+ h_crystal=ag_object_spawn(0, 3, 3.0, 1.0, -3.0)
+ h_beacon=ag_object_spawn(1, 4, -3.0, 1.5, -5.0)
+ ok=ok+ag_object_visible(h_beacon, 1)
+}
+fn app_update(dt float) {
+ let jp=ag_action_pressed(4)
+ if jp==1 {if grounded==1 {vy = 8.0}}
+ vy = vy - 20.0*dt
+ let hr=ag_action_held(1)
+ let dx=(hr*1.0)*3.0*dt
+ let q=ag_char3_move(dx,vy*dt,0.0,0.002)
+ grounded=ag_char3_grounded(q)
+ if grounded==1 {vy=0.0}
+ px=px+dir*orbit*dt
+ if px>0.5 {
+  ok=ok+ag_object_despawn(h_crystal)
+  px= -3.0
+  dir=1.0
+  h_crystal=ag_object_spawn(0, 3, px, 1.0, -3.0)
+ } else {
+  ok=ok+ag_object_move(h_crystal, px, 1.0, -3.0)
+ }
+ let blink=ag_tick()%2
+ ok=ok+ag_object_visible(h_beacon, blink)
+}

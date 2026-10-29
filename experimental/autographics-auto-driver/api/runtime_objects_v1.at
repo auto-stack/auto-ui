@@ -1,0 +1,212 @@
+// autographics.objects2d/1 and autographics.objects3d/1 trusted unit
+// (auto-ui PLAN-001). Appended after the character and runtime-camera units by
+// the objects assembly; public names are ag_object_*. The user drives a finite
+// per-Run instance table: at most 8 reserved slots, one dimension per Run, at
+// most 32 lifecycle writes per callback. Identity is the integer handle
+// run*524288 + slot*65536 + generation (generation starts at 1 and never
+// wraps; a stale or foreign-Run handle is a named sticky error, and only
+// ag_object_alive may answer absence with 0). Spawn copies the accepted base
+// template node (same dimension, non-group leaf, supported kind); the frozen
+// kind/scale/yaw/pitch/material/resource stay host-side derived from that
+// node, this unit only owns slot/generation/template-index/position/visibility.
+// The admitted output block rides every objects-Run tick after the camera
+// block as 4 header ints plus 8 canonical rows of (generation, template run
+// index, x, y, z, visible); free rows are all zeros. Instances are non-solid:
+// they never enter worlds/derive, solids, characters or camera targets, and
+// they never touch the Document, dirty tracking or Undo/Redo.
+var _ag_obj_dim=0
+var _ag_obj_frozen=0
+var _ag_obj_base=0
+var _ag_obj_ops=0
+var _ag_obj_ids=[]
+var _ag_obj_nodes=[]
+var _ag_obj_gen=[]
+var _ag_obj_live=[]
+var _ag_obj_tmpl=[]
+var _ag_obj_x=[]
+var _ag_obj_y=[]
+var _ag_obj_z=[]
+var _ag_obj_vis=[]
+fn _ag_obj_map(stable_id int, node int) {_ag_obj_ids.push(stable_id);_ag_obj_nodes.push(node)}
+fn _ag_obj_resolve(stable_id int) int {
+ for i in 0.._ag_obj_ids.len() {
+  if _ag_obj_ids[i]==stable_id {return _ag_obj_nodes[i]}
+ }
+ return -1
+}
+fn _ag_obj_freeze() {
+ if _ag_error!=0 {return}
+ if _ag_obj_frozen==1 {return}
+ if _ag_run_id()<1 {_ag_fail(38,-1,0);return}
+ if _ag_run_id()>4095 {_ag_fail(36,-1,_ag_run_id());return}
+ for i in 0..8 {
+  _ag_obj_gen.push(0);_ag_obj_live.push(0);_ag_obj_tmpl.push(0)
+  _ag_obj_x.push(0.0);_ag_obj_y.push(0.0);_ag_obj_z.push(0.0);_ag_obj_vis.push(0)
+ }
+ _ag_obj_base=_ag_run_id()*524288
+ _ag_obj_frozen=1
+}
+fn _ag_obj_tick_begin() {
+ if _ag_obj_frozen==0 {return}
+ _ag_obj_ops=0
+}
+// Handle -> live slot, or -1 with the named sticky error. A handle from an
+// older Run is negative here (the base grows with run ids), an overwritten
+// generation or a despawned slot fails identically from the caller view.
+fn _ag_obj_slot_of(token int) int {
+ let rel=token - _ag_obj_base
+ if rel<0 {_ag_fail(33,-1,token);return -1}
+ let slot=rel/65536
+ if slot>7 {_ag_fail(33,slot,token);return -1}
+ let gen=rel - slot*65536
+ if gen<1 {_ag_fail(33,slot,gen);return -1}
+ if _ag_obj_gen[slot]!=gen {_ag_fail(33,slot,gen);return -1}
+ if _ag_obj_live[slot]==0 {_ag_fail(33,slot,gen);return -1}
+ return slot
+}
+fn _ag_obj_coord(v float, axis int) int {
+ if v - v!=0.0 {_ag_fail(35,-1,axis);return 0}
+ if v>100000.0 {_ag_fail(35,-1,axis);return 0}
+ if v< -100000.0 {_ag_fail(35,-1,axis);return 0}
+ return 1
+}
+fn ag_object_spawn(slot int, template int, x float, y float, z float) int {
+ if _ag_error!=0 {return 0}
+ if _ag_obj_frozen==0 {_ag_fail(38,-1,0);return 0}
+ if slot<0 {_ag_fail(31,-1,slot);return 0}
+ if slot>7 {_ag_fail(31,-1,slot);return 0}
+ if _ag_obj_live[slot]==1 {_ag_fail(32,slot,_ag_obj_gen[slot]);return 0}
+ if _ag_obj_coord(x,0)==0 {return 0}
+ if _ag_obj_coord(y,1)==0 {return 0}
+ if _ag_obj_dim==2 {if z!=0.0 {_ag_fail(35,-1,2);return 0}}
+ if _ag_obj_coord(z,2)==0 {return 0}
+ let gen=_ag_obj_gen[slot]+1
+ if gen>65535 {_ag_fail(36,slot,gen);return 0}
+ _ag_obj_ops=_ag_obj_ops+1
+ if _ag_obj_ops>32 {_ag_fail(37,slot,0);return 0}
+ if _ag_cast_charge(1)==0 {return 0}
+ let node=_ag_obj_resolve(template)
+ if node<0 {_ag_fail(34,-1,template);return 0}
+ if node>=identities.len() {_ag_fail(34,node,template);return 0}
+ if kinds[node]==5 {_ag_fail(34,node,template);return 0}
+ if dimensions[node]!=_ag_obj_dim {_ag_fail(34,node,template);return 0}
+ if _ag_obj_dim==2 {if kinds[node]>1 {_ag_fail(34,node,template);return 0}}
+ if _ag_obj_dim==3 {
+  if kinds[node]<2 {_ag_fail(34,node,template);return 0}
+  if kinds[node]>6 {_ag_fail(34,node,template);return 0}
+  if kinds[node]==5 {_ag_fail(34,node,template);return 0}
+ }
+ _ag_obj_gen[slot]=gen
+ _ag_obj_live[slot]=1
+ _ag_obj_tmpl[slot]=node
+ _ag_obj_x[slot]=x
+ _ag_obj_y[slot]=y
+ _ag_obj_z[slot]=z
+ _ag_obj_vis[slot]=1
+ return _ag_obj_base+slot*65536+gen
+}
+fn ag_object_despawn(token int) int {
+ if _ag_error!=0 {return 0}
+ if _ag_obj_frozen==0 {_ag_fail(38,-1,0);return 0}
+ let s=_ag_obj_slot_of(token)
+ if s<0 {return 0}
+ _ag_obj_ops=_ag_obj_ops+1
+ if _ag_obj_ops>32 {_ag_fail(37,s,0);return 0}
+ if _ag_cast_charge(1)==0 {return 0}
+ _ag_obj_live[s]=0
+ return 1
+}
+fn ag_object_move(token int, x float, y float, z float) int {
+ if _ag_error!=0 {return 0}
+ if _ag_obj_frozen==0 {_ag_fail(38,-1,0);return 0}
+ if _ag_obj_coord(x,0)==0 {return 0}
+ if _ag_obj_coord(y,1)==0 {return 0}
+ if _ag_obj_dim==2 {if z!=0.0 {_ag_fail(35,-1,2);return 0}}
+ if _ag_obj_coord(z,2)==0 {return 0}
+ let s=_ag_obj_slot_of(token)
+ if s<0 {return 0}
+ _ag_obj_ops=_ag_obj_ops+1
+ if _ag_obj_ops>32 {_ag_fail(37,s,0);return 0}
+ if _ag_cast_charge(1)==0 {return 0}
+ _ag_obj_x[s]=x
+ _ag_obj_y[s]=y
+ _ag_obj_z[s]=z
+ return 1
+}
+// Visibility only flips presentation; identity, geometry and slot stay.
+fn ag_object_visible(token int, flag int) int {
+ if _ag_error!=0 {return 0}
+ if _ag_obj_frozen==0 {_ag_fail(38,-1,0);return 0}
+ if flag!=0 {if flag!=1 {_ag_fail(35,-1,flag);return 0}}
+ let s=_ag_obj_slot_of(token)
+ if s<0 {return 0}
+ _ag_obj_ops=_ag_obj_ops+1
+ if _ag_obj_ops>32 {_ag_fail(37,s,0);return 0}
+ if _ag_cast_charge(1)==0 {return 0}
+ _ag_obj_vis[s]=flag
+ return 1
+}
+// The legal absence check: a stale or foreign-Run handle answers 0 here
+// without a sticky error; every other consumer uses _ag_obj_slot_of.
+fn ag_object_alive(token int) int {
+ if _ag_error!=0 {return 0}
+ if _ag_obj_frozen==0 {return 0}
+ if _ag_cast_charge(1)==0 {return 0}
+ let rel=token - _ag_obj_base
+ if rel<0 {return 0}
+ let slot=rel/65536
+ if slot>7 {return 0}
+ let gen=rel - slot*65536
+ if gen<1 {return 0}
+ if _ag_obj_gen[slot]!=gen {return 0}
+ if _ag_obj_live[slot]==0 {return 0}
+ return 1
+}
+fn ag_object_x(token int) float {
+ if _ag_error!=0 {return 0.0}
+ if _ag_obj_frozen==0 {return 0.0}
+ if _ag_cast_charge(1)==0 {return 0.0}
+ let s=_ag_obj_slot_of(token)
+ if s<0 {return 0.0}
+ return _ag_obj_x[s]
+}
+fn ag_object_y(token int) float {
+ if _ag_error!=0 {return 0.0}
+ if _ag_obj_frozen==0 {return 0.0}
+ if _ag_cast_charge(1)==0 {return 0.0}
+ let s=_ag_obj_slot_of(token)
+ if s<0 {return 0.0}
+ return _ag_obj_y[s]
+}
+fn ag_object_z(token int) float {
+ if _ag_error!=0 {return 0.0}
+ if _ag_obj_frozen==0 {return 0.0}
+ if _ag_cast_charge(1)==0 {return 0.0}
+ let s=_ag_obj_slot_of(token)
+ if s<0 {return 0.0}
+ return _ag_obj_z[s]
+}
+// Admitted block emitters: fixed 8 canonical rows in slot order; a free row
+// is all zeros and a hidden live row keeps its identity and geometry.
+fn _ag_obj_status() int {if _ag_obj_frozen==1 {if _ag_error==0 {return 1}};return 0}
+fn _ag_obj_count() int {
+ if _ag_obj_frozen==0 {return 0}
+ var n=0
+ for i in 0..8 {
+  if _ag_obj_live[i]==1 {n=n+1}
+ }
+ return n
+}
+fn _ag_obj_run() int {return _ag_run_id()}
+fn _ag_obj_tick() int {return _ag_tick_id()}
+fn _ag_obj_gv(slot int) int {
+ if slot<0 {return 0}
+ if slot>7 {return 0}
+ if _ag_obj_live[slot]==0 {return 0}
+ return _ag_obj_gen[slot]
+}
+fn _ag_obj_tv(slot int) int {if _ag_obj_gv(slot)==0 {return 0};return _ag_obj_tmpl[slot]}
+fn _ag_obj_xv(slot int) float {if _ag_obj_gv(slot)==0 {return 0.0};return _ag_obj_x[slot]}
+fn _ag_obj_yv(slot int) float {if _ag_obj_gv(slot)==0 {return 0.0};return _ag_obj_y[slot]}
+fn _ag_obj_zv(slot int) float {if _ag_obj_gv(slot)==0 {return 0.0};return _ag_obj_z[slot]}
+fn _ag_obj_vv(slot int) int {if _ag_obj_gv(slot)==0 {return 0};return _ag_obj_vis[slot]}
