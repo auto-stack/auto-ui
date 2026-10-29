@@ -11,6 +11,7 @@ BASE_COMMIT = "80d9bbe3095892fcf5507dd1b9e26af523111fd4"
 PLAN_PIN = "351919c76b4ef1d940fc7b8120254e321c41cba2"
 FIX_PIN = "0261ae9dacf786beb6dceb630be6af267f242625"
 SDK_PIN = "7b987ca8b12f2eec3c076a1bfbf3ff4663aa8467"
+RAW_EXACT_RULES = ("autographics-auto-driver/sdk/frozen/**", "autographics-auto-driver/samples/**/scripts/*.at")
 LOCKS = {"autographics-auto-driver/Cargo.lock":"2b131d3dd33a968b43d53664cb8649d6c24225fa0f2c28c1add603be98a358db",
          "autographics-prototype/Cargo.lock":"c3df168e7234b8bfa876dfbab8afa71af8773d1d7241ac010ad5d8054930b3bf"}
 TEXT = (".rs", ".at", ".py", ".md", ".json", ".toml", ".lock", ".txt", ".agscene", ".gltf", ".gitignore", ".gitattributes")
@@ -52,7 +53,10 @@ REQUIRED = (
 
 def digest(p):
     b = p.read_bytes()
-    if p.suffix.lower() in TEXT or p.name.lower() in TEXT:
+    relative = p.relative_to(BASE).as_posix()
+    exact = relative.startswith("autographics-auto-driver/sdk/frozen/") or (
+        relative.startswith("autographics-auto-driver/samples/") and "/scripts/" in relative and p.suffix == ".at")
+    if not exact and (p.suffix.lower() in TEXT or p.name.lower() in TEXT):
         b = b.replace(b"\r\n", b"\n")
     return hashlib.sha256(b).hexdigest()
 

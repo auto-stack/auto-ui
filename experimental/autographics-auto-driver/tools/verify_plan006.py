@@ -15,6 +15,7 @@ def verify():
     assert identity["identity_fix_pin"] == p.FIX_PIN, "wrong 004 identity-fix pin"
     assert identity["sdk_pin"] == p.SDK_PIN, "wrong SDK pin"
     assert identity["text_suffixes"] == list(p.TEXT), "wrong text normalization policy"
+    assert identity["raw_exact_rules"] == list(p.RAW_EXACT_RULES), "wrong immutable byte policy"
     for relative in identity["files"]:
         p.safe_path(relative)
     actual, folders = p.collect()
@@ -81,6 +82,16 @@ def controls():
         IDENTITY.write_bytes(original)
     verify()
     print("PASS PLAN-006 identity controls: edited/deleted/unlisted/stable-scene/wrong-pins/escape/PID-pin rejected; volatile PID output ignored")
+    for path in (p.ROOT / "samples/node_animation/scripts").glob("*.at"):
+        original = path.read_bytes()
+        assert b"\r\n" not in original and b"\n" in original
+        try:
+            path.write_bytes(original.replace(b"\n", b"\r\n"))
+            rejected()
+        finally:
+            path.write_bytes(original)
+    verify()
+    print("PASS PLAN-006 exact-byte control: content-addressed Auto LF-to-CRLF mutation refused")
 
 
 if __name__ == "__main__":

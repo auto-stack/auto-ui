@@ -57,7 +57,7 @@ if __name__ == "__main__":
     for name,data in project().items():
         p=ROOT/name
         if check:
-            assert p.read_bytes().replace(b"\r\n",b"\n")==data if p.suffix in [".at",".agscene"] else p.read_bytes()==data,name
+            assert p.read_bytes().replace(b"\r\n",b"\n")==data if p.suffix == ".agscene" else p.read_bytes()==data,name
         else:
             p.parent.mkdir(parents=True,exist_ok=True)
             if p.exists(): assert p.read_bytes()==data,"refuse different existing output: "+name
