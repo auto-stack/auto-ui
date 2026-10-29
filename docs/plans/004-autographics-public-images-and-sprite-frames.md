@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-10-29
 updated_at: 2026-10-29
 plan_revision: 1
-current_step: 2
+current_step: 3
 total_steps: 10
 depends_on: [auto-ui/PLAN-002]
 supersedes_spec_components:
@@ -110,7 +110,7 @@ T-02先在本树形成`attachments/004/work/sprite-resource-contract.md`，并�
 |---|---|---|---|---|---|
 | T-01 | work | 用户启动、002实际交付 | 核baseline/owner/SDK两锁/策略，建唯一ui-004树，记录源码差异 | AC-01/05 | [x] |
 | T-02 | work | T-01 | sprite-resource-contract先冻结；定长公开更新与整组合CPU/源/内存probe，失败回new | AC-01/03/05 | [x] |
-| T-03 | work | T-02通过 | assets/document/storage图片/版本化closure/编辑接线、V-01 | AC-01/02 | [ ] |
+| T-03 | work | T-02通过 | assets/document/storage图片/版本化closure/编辑接线、V-01 | AC-01/02 | [x] |
 | T-04 | work | T-03 | 公共profile/Auto视觉输出与AGP真实绘制、V-02/03；新接口/测试入口创建 | AC-03/04 | [ ] |
 | T-05 | work | T-04 | Pause/Step/Stop/新局/owner/失败注入及V-04 | AC-04 | [ ] |
 | T-06 | work | T-05 | fresh consumer/预算/旧profile定向面/本代identity controls、fmt/warnings/提交、SD草案及交付说明 | AC-01..05 | [ ] |
@@ -138,3 +138,10 @@ T-02 证据（本地证据不入库）：合同 `docs/plans/attachments/004/work
 ## 10. 待澄清事项
 
 无需为既定M2表现方向重问授权。公开函数名/wire/schema编号、实际组合价格与内存布局由T-02冻结，属于有界实现决策；若必需整链不能在已有预算内运行，保留反例回new，不减AC/静默抬限。正式G09美术/产品包、声音/HUD与完整游戏留给后续各仓计划，尚未取号。
+2026-10-29 work T-03 checkpoint（r1）：`stage: work | plan_id: auto-ui/PLAN-004 | plan_revision: 1 | outcome: progress | worktree: D:/autostack/.wt/ui-004/auto-ui | branch: codex/plan-004-dev | base_commit: d3bd6b495dc8b690925e88deee9fbf2c42e7f991 | code_commit: a79ba040b209ff0fe13de0a3f49ed7af0b85530b | task_ids: T-03 | next_responsible_role: work (T-04)`。
+
+T-03 证据：图片载荷进入项目闭包与编辑事务。编辑：`Edit::SpriteObject` 新建/重绑/解绑，要求 2D 叶、无模型资源、绑定 SHA 与载荷一致、默认帧在图内；3D 叶、过期选择、错身份、越界帧、第 9 个绑定均为命名拒绝且文档不变。面板新增 PNG 路径 + Import PNG 及每图 Bind/Create/Detach，Host `import-sprite`/`sprite-bind`/`sprite-create`/`sprite-detach` 复用同一 begin→preview→commit 事务。存储：图片与模型同住 `assets/`（`<sha>.png`/`<sha>.glb`），共享 8 文件/32MiB（含残留与临时预留）；外来文件与篡改 blob 只报告不覆盖，缺失拒绝、恢复原字节后可重开，整目录 A→B 搬迁后从新位置重开并继续保存。`cargo test --locked --test public_sprite_frames -- --test-threads=1` 10 passed：新增 closure 正/反例、编辑器创建/重绑/解绑与四类命名拒绝、2048×2048 恰好 16MiB 接受而 2049 先拒且不触 decoder、四个 16MiB 恰好 64MiB 接受而第五个在分配前被拒、Host 公共命令导入/绑定/解绑/重复内容去重/坏 PNG 不改文档。相邻回归：lib 33、authoring_assets 17、authoring_host 7、authoring_hierarchy 10、authoring_document 1、authoring_session 4、authoring_storage 3 全绿。
+
+合同更新（本地 9045 字节，sha256 397a753e…）：§7 更正 T-02 计时为多次运行的区间（debug tick 中位 5.49–9.50ms、P95 7.78–8.55ms、max 9.42–10.54ms，共享机器负载相关；整 tick 仍受 2s 约束），并记录精灵块只占本 Run 约 390 次 Host 往返中的 74 次；§10 记录 T-03 交付事实。T-04 绘制、T-05 生命周期仍未开始，Plan 保持 executing。
+
+2026-10-29 goal round 2：`stage: goal | plan_id: PLAN-004 | plan_revision: r1 | round: 2 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-004/auto-ui | commit: a79ba04 | next: work`。

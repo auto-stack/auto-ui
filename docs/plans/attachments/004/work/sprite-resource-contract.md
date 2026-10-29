@@ -79,13 +79,13 @@ header:  status, bound_count, run_id, tick_id           (4)
 | 组装 managed/api/combined | 80367 / 76518 / 80418 字节 |
 | block_len（2 个绑定） | 74（上限 4+8*7+56=116） |
 | 编译器编译耗时 | ≈169–185ms（debug，单次） |
-| tick 中位/P95 | ≈5.56ms / 7.78ms（24 tick，含角色、相机、对象、触发、精灵块读取） |
+| tick 中位/P95 | 多次独立运行：中位 5.49–9.50ms、P95 7.78–8.55ms、max 9.42–10.54ms（24 tick，含角色、相机、对象、触发、精灵块读取；同代码同机器，debug 构建，受共享机器负载影响） |
 | 精灵块读取调用数 | 74（旧 triggers2d 为 316 总数，本 profile 为 390） |
 | VM owner 弱引用 | 存活（tick 结束仍在） |
 
 判据：24 tick 内真实 Auto 角色 x 单调前进；帧序列 0→1→2 随真实 phase 切换；左向输入只切换 flip 而不改变运动；实例槽在事件读取后从默认帧切到 Auto 写入的帧 2；PM 帧/矩形全部通过 Host 独立验证。上述均在 `tests/public_sprite_frames.rs` 中断言。
 
-价格结论：sprite 更新 1 credit 与既有 32 credit 预算兼容；整组合仍在一个 8ms pump 内可完成，但 debug 构建 P95 已接近预算上限（7.78ms），因此实现阶段不得再增加每 tick 的 Host 往返查询；GPU 准备/绘制成本在 T-04 单独测量，不并入本表。
+价格结论：sprite 更新 1 credit 与既有 32 credit 预算兼容。精灵块只增加 74 次（2 个绑定）Host 往返，占本 Run 全部约 390 次读取的 19%；但 debug 构建的整 tick 中位 5.5–9.5ms、尾部长到 ~10.5ms，已越过 8ms pump 轮次目标（整 tick 仍受 2s 上限约束，非正确性问题）。因此实现阶段不得再增加每 tick 的 Host 往返，且 T-06 需以 release/单实例复测并记录；GPU 准备/绘制成本在 T-04 单独测量，不并入本表。
 
 ## 8. 不在本计划内
 
@@ -93,7 +93,15 @@ header:  status, bound_count, run_id, tick_id           (4)
 
 ## 9. 待后续完成
 
-- T-03：编辑期导入/绑定/保存/重开与完整离线 closure（含磁盘 8 文件/32MiB 共享预算、重解析路径拒绝、坏图拒绝/修复恢复）。
+- T-03（已交付，见 §10）：编辑期导入/绑定/解绑、保存/重开/搬迁与离线 closure（磁盘 8 文件/32MiB 共享预算、外来/坏件保留、坏图拒绝/修复恢复）。
 - T-04：AGP 真实纹理绘制（nearest/clamp、预乘混合、翻向只改 UV）、像素 ROI oracle。
 - T-05：Pause/Step/Stop/新局、纹理 warm 复用与 owner 弱引用。
 - T-06：fresh consumer、旧 profile 定向面、identity controls、fmt/warnings、SD 草案与交付说明。
+
+## 10. T-03 交付事实（closure 与编辑接线）
+
+- 编辑器新增 `Edit::SpriteObject`：新建/重绑/解绑，要求 2D 叶、无模型资源、绑定 SHA 与载荷一致、默认帧在图内；3D 叶、过期选择、错身份、越界帧均为命名拒绝且文档不变。
+- 面板新增 “Local PNG path” + “Import PNG”，以及每个已接受图片的 “Bind to selected 2D / Create sprite leaf / Detach selected 2D”；Host 命令 `import-sprite`/`sprite-bind`/`sprite-create`/`sprite-detach` 复用同一 `Editor::begin` 事务（先预览后提交）。
+- 磁盘 closure：图片与模型同住 `assets/`，文件名 `<sha>.png` / `<sha>.glb`；目录 8 文件/32MiB 共享预算含残留与临时预留；外来文件与坏 blob 只报告、不覆盖；整目录 A→B 搬迁后从新位置重开并继续编辑保存。
+- 测试（`tests/public_sprite_frames.rs`，10 cases）：closure 保存/重开/搬迁、缺失/篡改/外来/超 8 文件拒绝与恢复、编辑器创建/重绑/解绑与四类命名拒绝、2048×2048 正好 16MiB 接受 + 2049 拒绝且不触 decoder、四个 16MiB 恰好 64MiB 接受而第五个在解码前被拒、Host 公共命令导入/绑定/解绑/重复内容去重/坏 PNG 不改文档。
+- 仍未交付：AGP 真实纹理绘制与像素 oracle（T-04）、Pause/Step/Stop/新局与 warm 纹理复用（T-05）。
