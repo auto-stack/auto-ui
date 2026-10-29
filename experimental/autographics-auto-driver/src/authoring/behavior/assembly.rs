@@ -1,7 +1,7 @@
 //! One driver-local trusted assembler. No user input, IO, admission or caching.
 use super::{
     Api, API, CAMERA2_API, CAMERA3_API, CHARACTER3_API, CHARACTER_API, MOTION_API, MOTION_SCAN_API,
-    OBJECTS_API, SEGMENT_API, SOURCE, SPATIAL_API, SWEEP_API, TRIGGERS_API,
+    OBJECTS_API, SEGMENT_API, SOURCE, SPATIAL_API, SPRITES_API, SWEEP_API, TRIGGERS_API,
 };
 
 pub(super) struct Units {
@@ -25,6 +25,7 @@ struct Inputs<'a> {
     camera3: &'a str,
     objects: &'a str,
     triggers: &'a str,
+    sprite: &'a str,
     entry: &'a str,
 }
 const INPUTS: Inputs<'static> = Inputs {
@@ -41,6 +42,7 @@ const INPUTS: Inputs<'static> = Inputs {
     camera3: CAMERA3_API,
     objects: OBJECTS_API,
     triggers: TRIGGERS_API,
+    sprite: SPRITES_API,
     entry: ENTRY,
 };
 pub(super) fn assemble(api: Api) -> Result<Units, String> {
@@ -64,6 +66,7 @@ fn assemble_from(api: Api, input: Inputs<'_>) -> Result<Units, String> {
             | Api::Objects3V1
             | Api::Triggers2V1
             | Api::Triggers3V1
+            | Api::Sprites2V1
     ) {
         require(input.segment, "fn ag_cast_segment(", 1)?;
     }
@@ -79,6 +82,7 @@ fn assemble_from(api: Api, input: Inputs<'_>) -> Result<Units, String> {
             | Api::Objects3V1
             | Api::Triggers2V1
             | Api::Triggers3V1
+            | Api::Sprites2V1
     ) {
         require(input.sweep, "fn ag_sweep_aabb(", 1)?;
     }
@@ -93,6 +97,7 @@ fn assemble_from(api: Api, input: Inputs<'_>) -> Result<Units, String> {
             | Api::Objects3V1
             | Api::Triggers2V1
             | Api::Triggers3V1
+            | Api::Sprites2V1
     ) {
         require(input.motion_scan, "fn _ag_motion_two(", 1)?;
         require(input.motion_scan, "fn _ag_motion_three(", 1)?;
@@ -101,7 +106,7 @@ fn assemble_from(api: Api, input: Inputs<'_>) -> Result<Units, String> {
     }
     if matches!(
         api,
-        Api::CharacterV1 | Api::Camera2V1 | Api::Objects2V1 | Api::Triggers2V1
+        Api::CharacterV1 | Api::Camera2V1 | Api::Objects2V1 | Api::Triggers2V1 | Api::Sprites2V1
     ) {
         require(input.character, "fn ag_char_move(", 1)?;
         require(input.character, "fn _ag_char_freeze(", 1)?;
@@ -117,7 +122,10 @@ fn assemble_from(api: Api, input: Inputs<'_>) -> Result<Units, String> {
         require(input.character3, "fn _ag_char3_tick_begin(", 1)?;
         require(input.character3, "fn _ag_char3_input(", 1)?;
     }
-    if matches!(api, Api::Camera2V1 | Api::Objects2V1 | Api::Triggers2V1) {
+    if matches!(
+        api,
+        Api::Camera2V1 | Api::Objects2V1 | Api::Triggers2V1 | Api::Sprites2V1
+    ) {
         require(input.camera2, "fn ag_camera_follow_2d(", 1)?;
         require(input.camera2, "fn _ag_cam2_freeze(", 1)?;
         require(input.camera2, "fn _ag_cam2_input(", 0)?;
@@ -130,20 +138,29 @@ fn assemble_from(api: Api, input: Inputs<'_>) -> Result<Units, String> {
     }
     if matches!(
         api,
-        Api::Objects2V1 | Api::Objects3V1 | Api::Triggers2V1 | Api::Triggers3V1
+        Api::Objects2V1 | Api::Objects3V1 | Api::Triggers2V1 | Api::Triggers3V1 | Api::Sprites2V1
     ) {
         require(input.objects, "fn ag_object_spawn(", 1)?;
         require(input.objects, "fn _ag_obj_freeze(", 1)?;
         require(input.objects, "fn _ag_obj_tick_begin(", 1)?;
         require(input.objects, "var _ag_obj_dim=0", 1)?;
     }
-    if matches!(api, Api::Triggers2V1 | Api::Triggers3V1) {
+    if matches!(api, Api::Triggers2V1 | Api::Triggers3V1 | Api::Sprites2V1) {
         require(input.triggers, "fn ag_trigger_bind(", 1)?;
         require(input.triggers, "fn ag_round_request(", 1)?;
         require(input.triggers, "fn _ag_trg_freeze(", 1)?;
         require(input.triggers, "fn _ag_trg_tick_begin(", 1)?;
         require(input.triggers, "fn _ag_trg_evaluate(", 1)?;
         require(input.triggers, "var _ag_trg_dim=0", 1)?;
+    }
+    // PLAN-004 sprite unit: only the explicit sprites2d profile composes it.
+    if api.sprites() {
+        require(input.sprite, "fn _ag_spr_freeze(", 1)?;
+        require(input.sprite, "fn _ag_spr_tick_begin(", 1)?;
+        require(input.sprite, "fn ag_sprite_frame(", 1)?;
+        require(input.sprite, "fn ag_sprite_slot(", 1)?;
+        require(input.sprite, "fn _ag_spr_pv(", 1)?;
+        require(input.sprite, "fn _ag_spr_qv(", 1)?;
     }
 
     let transport = match api {
@@ -158,7 +175,8 @@ fn assemble_from(api: Api, input: Inputs<'_>) -> Result<Units, String> {
         | Api::Objects2V1
         | Api::Objects3V1
         | Api::Triggers2V1
-        | Api::Triggers3V1 => segment_transport(input.transport)?,
+        | Api::Triggers3V1
+        | Api::Sprites2V1 => segment_transport(input.transport)?,
     };
     // The former v5 pre-namespace `_ag_derive` replacement never matched.
     // Preserve those emitted bytes; activating that guard would change behavior.
@@ -227,6 +245,18 @@ fn assemble_from(api: Api, input: Inputs<'_>) -> Result<Units, String> {
                 triggers_unit(input, 2)?
             ))?,
             "<runtime_triggers_v1.at>",
+        ),
+        Api::Sprites2V1 => (
+            segment_compact(&format!(
+                "{}\n{}\n{}\n{}\n{}\n{}",
+                motion_api(input)?,
+                locked_character(input.character, "fn ag_char_move(dx float, dy float, clearance float) int {\n if _ag_char_frozen==0 {_ag_fail(26,-1,0);return 0}\n")?,
+                input.camera2,
+                locked_objects(input, 2)?,
+                triggers_unit(input, 2)?,
+                input.sprite
+            ))?,
+            "<runtime_sprites_v1.at>",
         ),
         Api::Triggers3V1 => (
             segment_compact(&format!(
@@ -365,7 +395,8 @@ fn entry(api: Api, source: &str) -> Result<String, String> {
         | Api::Objects2V1
         | Api::Objects3V1
         | Api::Triggers2V1
-        | Api::Triggers3V1 => {
+        | Api::Triggers3V1
+        | Api::Sprites2V1 => {
             let source = replace(
                 &source,
                 "_ag_spatial_begin();",
@@ -510,6 +541,36 @@ fn entry(api: Api, source: &str) -> Result<String, String> {
                         &source,
                         "app_update(dt); _ag_cast_token=0",
                         "_ag_char_tick_begin(); _ag_obj_tick_begin(); _ag_trg_tick_begin(); app_update(dt); _ag_cast_token=0",
+                        1,
+                    )?;
+                    replace(
+                        &source,
+                        "_ag_dirty=0; toggled=0}",
+                        "_ag_dirty=0; _ag_trg_evaluate(); toggled=0}",
+                        1,
+                    )
+                }
+                Api::Sprites2V1 => {
+                    // The sprite table freezes after the trigger table and before
+                    // app_start, its per-callback write budget resets before the
+                    // callback, and the trigger evaluate stays the single
+                    // post-callback step. Every earlier profile keeps its bytes.
+                    let source = replace(
+                        &source,
+                        "if _ag_error==0 { app_start();",
+                        "if _ag_error==0 { _ag_obj_freeze(); _ag_trg_freeze(); _ag_spr_freeze(); app_start();",
+                        1,
+                    )?;
+                    let source = replace(
+                        &source,
+                        "app_start(); _ag_cast_token=0",
+                        "app_start(); _ag_cast_token=0; _ag_char_freeze(); _ag_cam2_freeze()",
+                        1,
+                    )?;
+                    let source = replace(
+                        &source,
+                        "app_update(dt); _ag_cast_token=0",
+                        "_ag_char_tick_begin(); _ag_obj_tick_begin(); _ag_trg_tick_begin(); _ag_spr_tick_begin(); app_update(dt); _ag_cast_token=0",
                         1,
                     )?;
                     replace(
@@ -913,6 +974,7 @@ mod managed_envelope {
             Api::Objects3V1,
             Api::Triggers2V1,
             Api::Triggers3V1,
+            Api::Sprites2V1,
         ] {
             let u = assemble(api).unwrap();
             let total = u.transport.len() + u.api.len() + u.entry.len();

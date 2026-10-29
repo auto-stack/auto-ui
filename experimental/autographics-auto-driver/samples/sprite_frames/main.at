@@ -1,0 +1,51 @@
+// PLAN-004 autographics.sprites2d/1 public engine fixture. The real Auto owns
+// the whole 2D composition: it binds the character, the solid floor, the
+// follow camera, three instances (coin, goal, hazard) and three trigger pairs,
+// then chooses the character frame sequence 0/1/2, the horizontal flip from the
+// real held direction and one instance frame. The sprite unit only carries
+// integer frame rectangles and the flip; the host re-validates the image
+// identity, the bounds, the run and the slot generation.
+var phase=0
+var dir=0
+var h0=0
+var h1=0
+var h2=0
+var ok=0
+var bag=0
+var state=0
+fn app_start() {
+ ok=ok+ag_char_bind(1)
+ ok=ok+ag_char_solid(5)
+ ok=ok+ag_camera_follow_2d(1, 0.0, -4.0, 30.0, 12.0, 12.0, 8.0)
+ h0=ag_object_spawn(0, 2, 3.2, 1.0, 0.0)
+ h1=ag_object_spawn(1, 3, 12.0, 1.0, 0.0)
+ h2=ag_object_spawn(2, 4, 8.0, 3.0, 0.0)
+ ok=ok+ag_trigger_bind(0, 1, 1, h0, 0, 0.0)
+ ok=ok+ag_trigger_bind(1, 1, 1, h1, 0, 0.0)
+ ok=ok+ag_trigger_bind(2, 1, 1, h2, 0, 0.0)
+ ok=ok+ag_sprite_frame(1, 0, 0, 32, 32, 0)
+ ok=ok+ag_sprite_slot(h0, 32, 0, 32, 32, 0)
+}
+fn app_update(dt float) {
+ if state==0 {
+  let right=ag_action_held(1)
+  let left=ag_action_held(0)
+  if right==1 {dir=0}
+  if left==1 {dir=1}
+  ok=ok+ag_char_move((right - left)*1.0*2.0*dt, 0.0, 0.002)
+  phase=phase+1
+  if phase>9 {phase=0}
+  var f=0
+  if phase>3 {f=1}
+  if phase>6 {f=2}
+  ok=ok+ag_sprite_frame(1, f*32, 0, 32, 32, dir)
+ }
+ let n=ag_event_next()
+ if n==1 {
+  let p=ag_event_pair()
+  if p==0 {
+   if bag==0 {bag=1; ok=ok+ag_sprite_slot(h0, 64, 0, 32, 32, 1)}
+  }
+  if p==1 {if bag==1 {state=1}}
+ }
+}

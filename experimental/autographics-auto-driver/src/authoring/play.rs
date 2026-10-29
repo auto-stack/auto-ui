@@ -146,6 +146,10 @@ pub struct Frame {
     /// The admitted trigger events and restart marker; the whole candidate is
     /// one transaction. `None` outside the triggers profiles.
     pub rounds: Option<super::runtime_round::RuntimeRoundFrame>,
+    /// PLAN-004 admitted sprite frames of every bound leaf and live slot. It
+    /// rides the same candidate, so a new position can never publish beside an
+    /// old frame.
+    pub sprites: Option<super::runtime_sprites::SpriteFrame>,
 }
 
 /// Per-tick camera output block sizes appended to the frame read layout.
@@ -235,6 +239,9 @@ pub struct Play {
     round_contact: [bool; super::runtime_round::PAIRS],
     /// Per-pair binding-generation high-water of every ADMITTED frame.
     round_bind_water: [i32; super::runtime_round::PAIRS],
+    /// PLAN-004 frozen bound-leaf table of this Run (None outside the sprite
+    /// profile). The admitted block is validated against exactly this table.
+    sprite_targets: Option<Vec<super::runtime_sprites::Target>>,
 }
 impl Play {
     pub fn new(e: &Editor, actors: [Option<u64>; 2], source: &str) -> Result<Self, String> {
@@ -250,7 +257,11 @@ impl Play {
         }
         Self::new_user_with_spatial(e, actors, snapshot, None)
     }
-    pub(crate) fn new_user_spatial(
+    /// The actual-resource constructor: the accepted document, its immutable
+    /// payloads and the frozen spatial descriptor are the only inputs. Public so
+    /// a fresh consumer (and the CPU probe) can drive the same path the Host
+    /// uses instead of a test-only copy.
+    pub fn new_user_spatial(
         e: &Editor,
         actors: [Option<u64>; 2],
         snapshot: super::behavior::SourceSnapshot,
@@ -268,6 +279,7 @@ impl Play {
             && snapshot.version != super::behavior::OBJECTS3_VERSION
             && snapshot.version != super::behavior::TRIGGERS2_VERSION
             && snapshot.version != super::behavior::TRIGGERS3_VERSION
+            && snapshot.version != super::behavior::SPRITES2_VERSION
         {
             return Err("spatial constructor API mismatch".into());
         }
@@ -330,7 +342,8 @@ impl Play {
                 super::behavior::Api::CharacterV1
                 | super::behavior::Api::Camera2V1
                 | super::behavior::Api::Objects2V1
-                | super::behavior::Api::Triggers2V1 => Some(CharProfile::TwoD),
+                | super::behavior::Api::Triggers2V1
+                | super::behavior::Api::Sprites2V1 => Some(CharProfile::TwoD),
                 super::behavior::Api::Character3V1
                 | super::behavior::Api::Camera3V1
                 | super::behavior::Api::Objects3V1
@@ -340,7 +353,8 @@ impl Play {
             let camera_dim = match api {
                 super::behavior::Api::Camera2V1
                 | super::behavior::Api::Objects2V1
-                | super::behavior::Api::Triggers2V1 => Some(CameraDim::TwoD),
+                | super::behavior::Api::Triggers2V1
+                | super::behavior::Api::Sprites2V1 => Some(CameraDim::TwoD),
                 super::behavior::Api::Camera3V1
                 | super::behavior::Api::Objects3V1
                 | super::behavior::Api::Triggers3V1 => Some(CameraDim::ThreeD),
@@ -401,6 +415,73 @@ impl Play {
             play.push_camera_queries();
             play.push_objects_queries();
             play.push_round_queries();
+            if api.sprites() {
+                // Every bound leaf must still resolve to the accepted payload:
+                // the persisted identity is the image SHA, and the frozen table
+                // is what the admitted block is checked against.
+                let targets = super::runtime_sprites::targets(&e.document, &play.order)?;
+                for t in &targets {
+                    let payload = e.assets.get(&t.asset).ok_or("missing sprite payload")?;
+                    let image = payload.image_data()?;
+                    if image.width != t.width || image.height != t.height {
+                        return Err("sprite payload dimensions".into());
+                    }
+                    if payload.identity != e.document.assets[t.asset_index as usize] {
+                        return Err("sprite payload identity".into());
+                    }
+                }
+                let position = play
+                    .queue
+                    .iter()
+                    .position(|c| c.name == "_ag_start")
+                    .ok_or("missing start boundary")?;
+                // The frozen target table is sent as four bounded calls per
+                // leaf (the host call profile admits at most four arguments):
+                // identity, image size, default origin/width, height/flip.
+                let mut sprite_calls = vec![];
+                for t in &targets {
+                    let stable = i32::try_from(t.node_id)
+                        .map_err(|_| "sprite stable id exceeds 32-bit".to_string())?;
+                    sprite_calls.push(Call::unit(
+                        "_ag_spr_map",
+                        vec![
+                            Scalar::Int(stable),
+                            Scalar::Int(t.node_index),
+                            Scalar::Int(t.asset_index),
+                        ],
+                    ));
+                    sprite_calls.push(Call::unit(
+                        "_ag_spr_img",
+                        vec![
+                            Scalar::Int(t.node_index),
+                            Scalar::Int(t.width as i32),
+                            Scalar::Int(t.height as i32),
+                        ],
+                    ));
+                    sprite_calls.push(Call::unit(
+                        "_ag_spr_def",
+                        vec![
+                            Scalar::Int(t.node_index),
+                            Scalar::Int(t.frame[0] as i32),
+                            Scalar::Int(t.frame[1] as i32),
+                            Scalar::Int(t.frame[2] as i32),
+                        ],
+                    ));
+                    sprite_calls.push(Call::unit(
+                        "_ag_spr_defh",
+                        vec![
+                            Scalar::Int(t.node_index),
+                            Scalar::Int(t.frame[3] as i32),
+                            Scalar::Int(i32::from(t.flip)),
+                        ],
+                    ));
+                }
+                for (offset, call) in sprite_calls.iter().enumerate() {
+                    play.queue.insert(position + offset, call.clone());
+                }
+                play.sprite_targets = Some(targets);
+                play.push_sprite_queries();
+            }
         }
         Ok(play)
     }
@@ -545,6 +626,7 @@ impl Play {
             rounds_dim: None,
             round_contact: [false; super::runtime_round::PAIRS],
             round_bind_water: [0; super::runtime_round::PAIRS],
+            sprite_targets: None,
         };
         p.queries();
         Ok(p)
@@ -864,6 +946,7 @@ impl Play {
         self.push_camera_queries();
         self.push_objects_queries();
         self.push_round_queries();
+        self.push_sprite_queries();
     }
 
     /// The camera output block rides every camera-Run tick after the node
@@ -1089,11 +1172,16 @@ impl Play {
         } else {
             0
         };
+        let sprite_len = self
+            .sprite_targets
+            .as_ref()
+            .map_or(0, |t| super::runtime_sprites::block_len(t.len()));
         if data.len()
             != 4 + 22 * self.order.len()
                 + camera_block_len(self.camera_dim)
                 + objects_len
                 + rounds_len
+                + sprite_len
             || int(0)? != self.expected_profile
             || int(1)? != self.run_id
             || int(2)? != self.next_tick
@@ -1167,6 +1255,7 @@ impl Play {
         // The rounds block is checked last: its geometry oracle reads the same
         // derive worlds and the same candidate instance table the unit saw.
         let rounds = self.admit_rounds(data, &expected, instances.as_ref())?;
+        let sprites = self.admit_sprites(data, instances.as_ref())?;
         Ok(Frame {
             document: doc,
             objects,
@@ -1176,6 +1265,7 @@ impl Play {
             camera,
             instances,
             rounds,
+            sprites,
         })
     }
 
@@ -1499,6 +1589,88 @@ impl Play {
                 });
             }
         }
+    }
+    /// The sprite block rides every sprite-Run tick after the rounds block: 4
+    /// header ints, then a fixed table of 8 bound rows and 8 slot rows of 7
+    /// values each, in frozen target and slot order. Rows without a bound leaf
+    /// are canonical zeros, so the layout never depends on the document again.
+    fn push_sprite_queries(&mut self) {
+        if self.sprite_targets.is_none() {
+            return;
+        }
+        for name in [
+            "_ag_spr_status",
+            "_ag_spr_count",
+            "_ag_spr_run",
+            "_ag_spr_tick",
+        ] {
+            self.queue.push_back(Call {
+                name,
+                args: vec![],
+                kind: ResultKind::Int,
+            });
+        }
+        let bound = self.sprite_targets.as_ref().map_or(0, Vec::len);
+        for row in 0..bound as i32 {
+            for f in 0..super::runtime_sprites::ROW_FIELDS as i32 {
+                self.queue.push_back(Call {
+                    name: "_ag_spr_pv",
+                    args: vec![Scalar::Int(row), Scalar::Int(f)],
+                    kind: ResultKind::Int,
+                });
+            }
+        }
+        for row in 0..super::runtime_objects::SLOTS as i32 {
+            for f in 0..super::runtime_sprites::ROW_FIELDS as i32 {
+                self.queue.push_back(Call {
+                    name: "_ag_spr_qv",
+                    args: vec![Scalar::Int(row), Scalar::Int(f)],
+                    kind: ResultKind::Int,
+                });
+            }
+        }
+    }
+    /// Validate the PLAN-004 sprite block that rides every sprite-Run tick
+    /// after the rounds block. Identity, frame bounds, run/tick and slot
+    /// generation are re-derived here from the frozen target table and the
+    /// accepted instance table, never from the output itself.
+    fn admit_sprites(
+        &mut self,
+        data: &[crate::Scalar],
+        instances: Option<&super::runtime_objects::RuntimeObjectsFrame>,
+    ) -> Result<Option<super::runtime_sprites::SpriteFrame>, String> {
+        let Some(targets) = self.sprite_targets.as_ref() else {
+            return Ok(None);
+        };
+        let base = 4
+            + 22 * self.order.len()
+            + camera_block_len(self.camera_dim)
+            + super::runtime_objects::BLOCK_LEN
+            + super::runtime_round::BLOCK_LEN;
+        let expected = super::runtime_sprites::block_len(targets.len());
+        let mut block = Vec::with_capacity(expected);
+        for i in 0..expected {
+            match data.get(base + i) {
+                Some(v @ (Scalar::Int(_) | Scalar::Float(_))) => block.push(*v),
+                _ => return Err("sprite block output".into()),
+            }
+        }
+        let assets = self.assets.clone();
+        let dims = |key: &str| -> Option<(u32, u32)> {
+            let asset = assets.get(key)?;
+            let image = asset.image.as_ref()?;
+            Some((image.width, image.height))
+        };
+        let targets = targets.clone();
+        super::runtime_sprites::admit_block(
+            &block,
+            self.run_id,
+            self.next_tick,
+            &targets,
+            &dims,
+            instances,
+        )
+        .map(Some)
     }
     pub fn accept(&mut self) -> Result<(), String> {
         let frame = self.candidate.take().ok_or("no complete play frame")?;

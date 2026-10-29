@@ -1,0 +1,227 @@
+// autographics.sprites2d/1 trusted unit (auto-ui PLAN-004). Appended after the
+// triggers unit by the sprites assembly. A bound visual is a 2D document leaf
+// whose accepted PNG payload the host configured before app_start; this unit
+// owns only the integer pixel frame rectangle and the horizontal flip of at
+// most 8 bound leaves and of the 8 reserved runtime slots. A frame rect is
+// integer pixels inside that image (w and h at least 1); flip only mirrors the
+// sample axis and never moves or resizes the visual. Every write costs one of
+// the shared 32 callback credits and at most 32 sprite writes are allowed per
+// callback. Image identity, frame bounds, run identity and slot generation are
+// independently re-validated by the host before a candidate is accepted, so a
+// wrong or stale value can never publish a frame.
+var _ag_spr_frozen=0
+var _ag_spr_ids=[]
+var _ag_spr_nodes=[]
+var _ag_spr_assets=[]
+var _ag_spr_aw=[]
+var _ag_spr_ah=[]
+var _ag_spr_dx=[]
+var _ag_spr_dy=[]
+var _ag_spr_dw=[]
+var _ag_spr_dh=[]
+var _ag_spr_df=[]
+var _ag_spr_seen=[]
+var _ag_spr_x=[]
+var _ag_spr_y=[]
+var _ag_spr_w=[]
+var _ag_spr_h=[]
+var _ag_spr_f=[]
+var _ag_spr_ops=0
+var _ag_spr_sgen=[]
+var _ag_spr_sa=[]
+var _ag_spr_sx=[]
+var _ag_spr_sy=[]
+var _ag_spr_sw=[]
+var _ag_spr_sh=[]
+var _ag_spr_sf=[]
+// Host configuration, four bounded calls per bound leaf and all before
+// app_start: declare the identity, then the image size, then the default frame
+// origin and width, then the height and flip. Negative or out-of-domain
+// arguments are configuration errors, never silent defaults.
+fn _ag_spr_map(id int, node int, asset int) {
+ if _ag_spr_frozen==1 {_ag_fail(11,-1,node); return}
+ if _ag_spr_nodes.len()>=8 {_ag_fail(41,node,0); return}
+ if id<1 {_ag_fail(41,node,id); return}
+ if node<0 {_ag_fail(41,node,0); return}
+ if node>=identities.len() {_ag_fail(41,node,0); return}
+ if kinds[node]==5 {_ag_fail(44,node,0); return}
+ if dimensions[node]!=2 {_ag_fail(44,node,0); return}
+ if asset<0 {_ag_fail(42,node,asset); return}
+ for i in 0.._ag_spr_nodes.len() {
+  if _ag_spr_ids[i]==id {_ag_fail(11,node,i); return}
+  if _ag_spr_nodes[i]==node {_ag_fail(11,node,i); return}
+ }
+ _ag_spr_ids.push(id); _ag_spr_nodes.push(node); _ag_spr_assets.push(asset)
+ _ag_spr_aw.push(0); _ag_spr_ah.push(0)
+ _ag_spr_dx.push(0); _ag_spr_dy.push(0); _ag_spr_dw.push(0); _ag_spr_dh.push(0); _ag_spr_df.push(0)
+ _ag_spr_seen.push(1)
+ _ag_spr_x.push(0); _ag_spr_y.push(0); _ag_spr_w.push(0); _ag_spr_h.push(0); _ag_spr_f.push(0)
+}
+fn _ag_spr_binding_node(node int) int {
+ for i in 0.._ag_spr_nodes.len() {
+  if _ag_spr_nodes[i]==node {return i}
+ }
+ return -1
+}
+fn _ag_spr_img(node int, width int, height int) {
+ if _ag_spr_frozen==1 {_ag_fail(11,node,0); return}
+ let b=_ag_spr_binding_node(node)
+ if b<0 {_ag_fail(41,node,0); return}
+ if width<1 {_ag_fail(42,node,width); return}
+ if height<1 {_ag_fail(42,node,height); return}
+ _ag_spr_aw[b]=width; _ag_spr_ah[b]=height
+ _ag_spr_seen[b]=_ag_spr_seen[b]+2
+}
+fn _ag_spr_def(node int, x int, y int, w int) {
+ if _ag_spr_frozen==1 {_ag_fail(11,node,0); return}
+ let b=_ag_spr_binding_node(node)
+ if b<0 {_ag_fail(41,node,0); return}
+ if x<0 {_ag_fail(42,node,x); return}
+ if y<0 {_ag_fail(42,node,y); return}
+ if w<1 {_ag_fail(42,node,w); return}
+ _ag_spr_dx[b]=x; _ag_spr_dy[b]=y; _ag_spr_dw[b]=w
+ _ag_spr_seen[b]=_ag_spr_seen[b]+4
+}
+fn _ag_spr_defh(node int, h int, flip int) {
+ if _ag_spr_frozen==1 {_ag_fail(11,node,0); return}
+ let b=_ag_spr_binding_node(node)
+ if b<0 {_ag_fail(41,node,0); return}
+ if h<1 {_ag_fail(42,node,h); return}
+ if flip!=0 {if flip!=1 {_ag_fail(42,node,flip); return}}
+ _ag_spr_dh[b]=h; _ag_spr_df[b]=flip
+ _ag_spr_seen[b]=_ag_spr_seen[b]+8
+}
+fn _ag_spr_binding(id int) int {
+ if _ag_spr_frozen==0 {return -1}
+ for i in 0.._ag_spr_ids.len() {
+  if _ag_spr_ids[i]==id {return i}
+ }
+ return -1
+}
+// Slot rows follow the admitted objects table: a slot row exists only while the
+// slot is live and its template leaf carries a binding. A new generation resets
+// the visual to that template default until the user writes it again.
+fn _ag_spr_slot_refresh(s int) int {
+ if _ag_obj_gen[s]==0 {_ag_spr_sgen[s]=0; return 0}
+ let b=_ag_spr_binding_node(_ag_obj_tmpl[s])
+ if b<0 {_ag_spr_sgen[s]=0; return 0}
+ if _ag_spr_sgen[s]!=_ag_obj_gen[s] {
+  _ag_spr_sgen[s]=_ag_obj_gen[s]
+  _ag_spr_sa[s]=_ag_spr_assets[b]
+  _ag_spr_sx[s]=_ag_spr_dx[b]; _ag_spr_sy[s]=_ag_spr_dy[b]
+  _ag_spr_sw[s]=_ag_spr_dw[b]; _ag_spr_sh[s]=_ag_spr_dh[b]
+  _ag_spr_sf[s]=_ag_spr_df[b]
+ }
+ return 1
+}
+// Freeze re-validates the complete table the host just configured: every
+// binding needs all four parts and a default frame inside its own image.
+fn _ag_spr_freeze() {
+ if _ag_error!=0 {return}
+ if _ag_spr_frozen==1 {return}
+ for i in 0.._ag_spr_nodes.len() {
+  if _ag_spr_seen[i]!=15 {_ag_fail(41,_ag_spr_nodes[i],_ag_spr_seen[i]); return}
+  if _ag_spr_dw[i]>_ag_spr_aw[i] {_ag_fail(42,_ag_spr_nodes[i],_ag_spr_dw[i]); return}
+  if _ag_spr_dh[i]>_ag_spr_ah[i] {_ag_fail(42,_ag_spr_nodes[i],_ag_spr_dh[i]); return}
+  if _ag_spr_dx[i]>_ag_spr_aw[i] - _ag_spr_dw[i] {_ag_fail(42,_ag_spr_nodes[i],_ag_spr_dx[i]); return}
+  if _ag_spr_dy[i]>_ag_spr_ah[i] - _ag_spr_dh[i] {_ag_fail(42,_ag_spr_nodes[i],_ag_spr_dy[i]); return}
+  _ag_spr_x[i]=_ag_spr_dx[i]; _ag_spr_y[i]=_ag_spr_dy[i]
+  _ag_spr_w[i]=_ag_spr_dw[i]; _ag_spr_h[i]=_ag_spr_dh[i]; _ag_spr_f[i]=_ag_spr_df[i]
+ }
+ for i in 0..8 {
+  _ag_spr_sgen.push(0); _ag_spr_sa.push(0)
+  _ag_spr_sx.push(0); _ag_spr_sy.push(0); _ag_spr_sw.push(0); _ag_spr_sh.push(0); _ag_spr_sf.push(0)
+ }
+ _ag_spr_frozen=1
+}
+fn _ag_spr_tick_begin() {
+ if _ag_spr_frozen==0 {return}
+ _ag_spr_ops=0
+}
+fn _ag_spr_rect(b int, node int, x int, y int, w int, h int) int {
+ if x<0 {_ag_fail(42,node,x); return 0}
+ if y<0 {_ag_fail(42,node,y); return 0}
+ if w<1 {_ag_fail(42,node,w); return 0}
+ if h<1 {_ag_fail(42,node,h); return 0}
+ if w>_ag_spr_aw[b] {_ag_fail(42,node,w); return 0}
+ if h>_ag_spr_ah[b] {_ag_fail(42,node,h); return 0}
+ if x>_ag_spr_aw[b] - w {_ag_fail(42,node,x); return 0}
+ if y>_ag_spr_ah[b] - h {_ag_fail(42,node,y); return 0}
+ return 1
+}
+fn _ag_spr_flip(flip int, node int) int {
+ if flip!=0 {if flip!=1 {_ag_fail(42,node,flip); return 0}}
+ return 1
+}
+fn _ag_spr_charge(node int) int {
+ _ag_spr_ops=_ag_spr_ops+1
+ if _ag_spr_ops>32 {_ag_fail(43,node,_ag_spr_ops); return 0}
+ if _ag_cast_charge(1)==0 {return 0}
+ return 1
+}
+// One write sets the frame rectangle and the flip of the same visual; there is
+// no half-applied variant. Unbound leaves are named so a typo cannot silently
+// paint the wrong visual.
+fn ag_sprite_frame(id int, x int, y int, w int, h int, flip int) int {
+ if _ag_error!=0 {return 0}
+ if _ag_spr_frozen==0 {_ag_fail(38,-1,0); return 0}
+ let b=_ag_spr_binding(id)
+ if b<0 {_ag_fail(41,id,0); return 0}
+ if _ag_spr_rect(b,id,x,y,w,h)==0 {return 0}
+ if _ag_spr_flip(flip,id)==0 {return 0}
+ if _ag_spr_charge(id)==0 {return 0}
+ _ag_spr_x[b]=x; _ag_spr_y[b]=y; _ag_spr_w[b]=w; _ag_spr_h[b]=h; _ag_spr_f[b]=flip
+ return 1
+}
+fn ag_sprite_slot(token int, x int, y int, w int, h int, flip int) int {
+ if _ag_error!=0 {return 0}
+ if _ag_spr_frozen==0 {_ag_fail(38,-1,0); return 0}
+ let s=_ag_obj_slot_of(token)
+ if s<0 {return 0}
+ let b=_ag_spr_binding_node(_ag_obj_tmpl[s])
+ if b<0 {_ag_fail(41,_ag_obj_tmpl[s],s); return 0}
+ if _ag_spr_rect(b,_ag_obj_tmpl[s],x,y,w,h)==0 {return 0}
+ if _ag_spr_flip(flip,_ag_obj_tmpl[s])==0 {return 0}
+ if _ag_spr_charge(_ag_obj_tmpl[s])==0 {return 0}
+ _ag_spr_sgen[s]=_ag_obj_gen[s]
+ _ag_spr_sa[s]=_ag_spr_assets[b]
+ _ag_spr_sx[s]=x; _ag_spr_sy[s]=y; _ag_spr_sw[s]=w; _ag_spr_sh[s]=h; _ag_spr_sf[s]=flip
+ return 1
+}
+// The legal absence check mirrors ag_object_alive: an unbound target answers 0
+// here without a sticky error.
+fn ag_sprite_bound(id int) int {
+ if _ag_error!=0 {return 0}
+ if _ag_spr_frozen==0 {return 0}
+ if _ag_spr_binding(id)<0 {return 0}
+ return 1
+}
+fn _ag_spr_status() int {if _ag_spr_frozen==1 {if _ag_error==0 {return 1}}; return 0}
+fn _ag_spr_count() int {if _ag_spr_frozen==0 {return 0}; return _ag_spr_nodes.len()}
+fn _ag_spr_run() int {return _ag_run_id()}
+fn _ag_spr_tick() int {return _ag_tick_id()}
+fn _ag_spr_pv(i int, f int) int {
+ if _ag_spr_frozen==0 {return 0}
+ if i<0 {return 0}
+ if i>=_ag_spr_nodes.len() {return 0}
+ if f==0 {return _ag_spr_nodes[i]}
+ if f==1 {return _ag_spr_assets[i]}
+ if f==2 {return _ag_spr_x[i]}
+ if f==3 {return _ag_spr_y[i]}
+ if f==4 {return _ag_spr_w[i]}
+ if f==5 {return _ag_spr_h[i]}
+ return _ag_spr_f[i]
+}
+fn _ag_spr_qv(i int, f int) int {
+ if _ag_spr_frozen==0 {return 0}
+ if i<0 {return 0}
+ if i>7 {return 0}
+ if _ag_spr_slot_refresh(i)==0 {return 0}
+ if f==0 {return _ag_spr_sgen[i]}
+ if f==1 {return _ag_spr_sa[i]}
+ if f==2 {return _ag_spr_sx[i]}
+ if f==3 {return _ag_spr_sy[i]}
+ if f==4 {return _ag_spr_sw[i]}
+ if f==5 {return _ag_spr_sh[i]}
+ return _ag_spr_sf[i]
+}

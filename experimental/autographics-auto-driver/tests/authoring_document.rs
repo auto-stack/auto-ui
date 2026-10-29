@@ -7,7 +7,7 @@ fn strict_codec_and_boundaries() {
     for s in [
         b.replacen("{", "{\"schema\":\"x\",", 1),
         b.replace("\"objects\":", "\"unknown\":0,\"objects\":"),
-        b.replace("autographics.scene/4", "autographics.scene/999"),
+        b.replace("autographics.scene/5", "autographics.scene/999"),
         b.replace("\"id\":2", "\"id\":1"),
         b.replace("\"circle\"", "\"bad\""),
         b.replace("\"visible\":true", "\"visible\":1"),

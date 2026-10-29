@@ -1,5 +1,9 @@
-//! Immutable GLB payloads. No decoder or GPU sees input before no-IO admission.
-use agp::assets::{load_glb_bytes, ModelData};
+//! Immutable GLB and static-PNG payloads. No decoder or GPU sees input before
+//! no-IO admission. PLAN-004 adds the finite PNG domain beside the unchanged
+//! model domain: identity is the complete original SHA/length/format, the
+//! resource name never identifies a payload, and decoded pixels join the same
+//! 8-identity / 32MiB raw / 64MiB CPU-and-GPU budget as model geometry.
+use agp::assets::{load_glb_bytes, ImageData, ModelData};
 use glam::{Mat3, Mat4, Vec3};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -15,6 +19,11 @@ pub const MAX_JSON: usize = 1024 * 1024;
 pub const MAX_ASSETS: usize = 8;
 pub const MAX_RAW_TOTAL: usize = 32 * 1024 * 1024;
 pub const MAX_GEOMETRY: usize = 64 * 1024 * 1024;
+/// Largest accepted PNG side and decoded RGBA payload (PLAN-004 5.1).
+pub const MAX_IMAGE_SIDE: u32 = 2048;
+pub const MAX_IMAGE_DECODED: usize = 16 * 1024 * 1024;
+pub const FORMAT_GLB: &str = "glb";
+pub const FORMAT_PNG: &str = "png";
 static DECODE_ATTEMPTS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 pub fn decode_attempts() -> u64 {
     DECODE_ATTEMPTS.load(std::sync::atomic::Ordering::Relaxed)
@@ -27,13 +36,22 @@ pub struct AssetRef {
     pub byte_length: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    /// PNG-only decoded dimensions: part of the persisted identity because the
+    /// frame domain of a bound visual is defined against them.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub width: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub height: Option<u32>,
 }
 impl AssetRef {
     pub fn key(&self) -> String {
         format!("sha256:{}", self.sha256)
     }
+    pub fn is_image(&self) -> bool {
+        self.format == FORMAT_PNG
+    }
     pub fn validate(&self) -> Result<(), String> {
-        if self.format != "glb"
+        if (self.format != FORMAT_GLB && self.format != FORMAT_PNG)
             || self.sha256.len() != 64
             || !self
                 .sha256
@@ -48,6 +66,23 @@ impl AssetRef {
         {
             return Err("resource limit: asset metadata".into());
         }
+        match (self.is_image(), self.width, self.height) {
+            (false, None, None) => {}
+            (true, Some(w), Some(h)) => {
+                if w == 0
+                    || h == 0
+                    || w > MAX_IMAGE_SIDE
+                    || h > MAX_IMAGE_SIDE
+                    || (w as usize)
+                        .checked_mul(h as usize)
+                        .and_then(|p| p.checked_mul(4))
+                        .is_none_or(|n| n > MAX_IMAGE_DECODED)
+                {
+                    return Err("resource limit: image dimensions".into());
+                }
+            }
+            _ => return Err("invalid: asset dimensions/format".into()),
+        }
         Ok(())
     }
 }
@@ -55,10 +90,31 @@ impl AssetRef {
 pub struct Asset {
     pub identity: AssetRef,
     pub bytes: Arc<[u8]>,
+    /// GLB payload. Empty for an image payload, which is never a model and is
+    /// never uploaded as geometry; `model_data` refuses it by identity.
     pub model: ModelData,
+    /// PNG payload (PLAN-004). `Some` exactly when the identity format is png.
+    pub image: Option<ImageData>,
+    /// Decoded CPU bytes: model geometry or RGBA pixels, one or the other.
     pub cpu_bytes: usize,
     pub gpu_bytes: usize,
     pub decode_us: u128,
+}
+impl Asset {
+    /// The model payload, or a named rejection for an image asset. Every
+    /// geometry/instance consumer goes through here so a PNG can never be
+    /// mistaken for a zero-mesh model.
+    pub fn model_data(&self) -> Result<&ModelData, String> {
+        if self.image.is_some() {
+            return Err("wrong asset kind: geometry required".into());
+        }
+        Ok(&self.model)
+    }
+    pub fn image_data(&self) -> Result<&ImageData, String> {
+        self.image
+            .as_ref()
+            .ok_or_else(|| "wrong asset kind: image required".to_string())
+    }
 }
 pub type Registry = BTreeMap<String, Arc<Asset>>;
 pub fn check_registry(r: &Registry) -> Result<(), String> {
@@ -134,7 +190,7 @@ pub fn read_blob(path: &Path) -> Result<Vec<u8>, String> {
         .read_to_end(&mut bytes)
         .map_err(|e| format!("io: {e}"))?;
     if bytes.len() > MAX_RAW {
-        return Err("resource limit: GLB 8MiB".into());
+        return Err("resource limit: asset 8MiB".into());
     }
     Ok(bytes)
 }
@@ -180,7 +236,7 @@ fn read_for_import(path: &Path, r: &Registry) -> Result<Input, String> {
         }
         let end = offset + n;
         if end > MAX_RAW {
-            return Err("resource limit: GLB 8MiB".into());
+            return Err("resource limit: asset 8MiB".into());
         }
         candidates.retain(|a| a.bytes.get(offset..end) == Some(&chunk[..n]));
         if capture && end <= remaining {
@@ -238,6 +294,21 @@ pub fn load_declared(path: &Path, a: &AssetRef, r: &Registry) -> Result<Arc<Asse
     };
     if bytes.len() != a.byte_length || agp::renderer::capture::sha256_hex(&bytes) != a.sha256 {
         return Err(format!("conflict: asset hash/length {}", path.display()));
+    }
+    decode_declared(bytes, a, r)
+}
+/// Decode an already identity-verified payload according to its declared
+/// format; an unknown format never reaches a decoder.
+fn decode_declared(bytes: Vec<u8>, a: &AssetRef, r: &Registry) -> Result<Arc<Asset>, String> {
+    if a.is_image() {
+        let asset = decode_png_in(bytes, a.name.clone(), r)?;
+        if asset.identity.width != a.width || asset.identity.height != a.height {
+            return Err("conflict: image dimensions".into());
+        }
+        return Ok(asset);
+    }
+    if a.width.is_some() || a.height.is_some() {
+        return Err("conflict: model dimensions".into());
     }
     decode_in(bytes, a.name.clone(), r)
 }
@@ -305,7 +376,7 @@ fn span(
 /// Predicted parts/CPU/GPU arrays and whether the sole scene needs selection.
 fn preflight(bytes: &[u8]) -> Result<(usize, usize, usize, bool), String> {
     if bytes.len() > MAX_RAW {
-        return Err("resource limit: GLB 8MiB".into());
+        return Err("resource limit: asset 8MiB".into());
     }
     if bytes.len() < 28
         || u32_at(bytes, 0)? != 0x46546c67
@@ -758,10 +829,12 @@ pub fn decode_in(
         return Err("resource limit: decoded geometry".into());
     }
     let identity = AssetRef {
-        format: "glb".into(),
+        format: FORMAT_GLB.into(),
         sha256: original_sha,
         byte_length: bytes.len(),
         name,
+        width: None,
+        height: None,
     };
     identity.validate()?;
     if model.source_sha256 != identity.sha256 {
@@ -771,8 +844,90 @@ pub fn decode_in(
         identity,
         bytes: bytes.into(),
         model,
+        image: None,
         cpu_bytes: cpu,
         gpu_bytes: gpu,
         decode_us: start.elapsed().as_micros(),
     }))
+}
+
+/// The PNG candidate/union budget is checked after the bounded preflight and
+/// before the decoder allocates pixels; the decoded payload then has to match
+/// the predicted size exactly.
+pub fn decode_png_in(
+    bytes: Vec<u8>,
+    name: Option<String>,
+    existing: &Registry,
+) -> Result<Arc<Asset>, String> {
+    let start = std::time::Instant::now();
+    if bytes.len() > MAX_RAW {
+        return Err("resource limit: image 8MiB".into());
+    }
+    let header = agp::assets::preflight_png(&bytes)?;
+    let decoded = (header.width as usize)
+        .checked_mul(header.height as usize)
+        .and_then(|p| p.checked_mul(4))
+        .ok_or("invalid: image dimension overflow")?;
+    if decoded > MAX_IMAGE_DECODED {
+        return Err("resource limit: decoded RGBA 16MiB".into());
+    }
+    if existing.len() >= MAX_ASSETS
+        || existing.values().map(|a| a.bytes.len()).sum::<usize>() + bytes.len() > MAX_RAW_TOTAL
+        || existing.values().map(|a| a.cpu_bytes).sum::<usize>() + decoded > MAX_GEOMETRY
+        || existing.values().map(|a| a.gpu_bytes).sum::<usize>() + decoded > MAX_GEOMETRY
+    {
+        return Err("resource limit: candidate/resident union before decode".into());
+    }
+    let sha = agp::renderer::capture::sha256_hex(&bytes);
+    DECODE_ATTEMPTS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let image = agp::assets::decode_png_bytes(&bytes, &sha)?;
+    if image.width != header.width
+        || image.height != header.height
+        || image.byte_length() != decoded
+        || image.source_sha256 != sha
+    {
+        return Err("invalid: decoded image identity".into());
+    }
+    let identity = AssetRef {
+        format: FORMAT_PNG.into(),
+        sha256: sha,
+        byte_length: bytes.len(),
+        name,
+        width: Some(image.width),
+        height: Some(image.height),
+    };
+    identity.validate()?;
+    Ok(Arc::new(Asset {
+        identity,
+        bytes: bytes.into(),
+        model: ModelData {
+            source_sha256: String::new(),
+            meshes: vec![],
+        },
+        image: Some(image),
+        cpu_bytes: decoded,
+        gpu_bytes: decoded,
+        decode_us: start.elapsed().as_micros(),
+    }))
+}
+
+/// Import one local static PNG under the same no-overwrite/cached-identity
+/// rules as model import. A duplicate payload is reused without re-decoding.
+pub fn import_png(path: &Path, existing: &Registry) -> Result<Arc<Asset>, String> {
+    let bytes = match read_for_import(path, existing)? {
+        Input::Cached(a) => {
+            if a.image.is_none() {
+                return Err("conflict: SHA identity bytes".into());
+            }
+            return Ok(a);
+        }
+        Input::Fresh(b) => b,
+    };
+    let name = path
+        .file_name()
+        .map(|s| s.to_string_lossy().chars().take(128).collect());
+    let asset = decode_png_in(bytes, name, existing)?;
+    let mut r = existing.clone();
+    insert(&mut r, asset.clone())?;
+    Ok(asset)
 }

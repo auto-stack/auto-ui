@@ -97,7 +97,7 @@ fn strict_v2_forest_and_explicit_v1_migration() {
     .is_err());
     let legacy = include_bytes!("../samples/authoring/example.agscene");
     let imported = Document::decode(legacy).unwrap();
-    assert_eq!(imported.schema, "autographics.scene/4");
+    assert_eq!(imported.schema, "autographics.scene/5");
     assert!(imported.groups.is_empty());
     assert!(imported.objects.iter().all(|o| o.parent.is_none()));
     let mut v: Value = serde_json::from_slice(legacy).unwrap();
@@ -143,6 +143,9 @@ fn shared_capacity_deep_chain_hidden_world_and_u64_max() {
     for o in v["objects"].as_array_mut().unwrap() {
         o.as_object_mut().unwrap().remove("parent");
         o.as_object_mut().unwrap().remove("resource");
+        // scene/1 predates the PNG visual binding (PLAN-004): a real v1 file
+        // never carries it and the reader rejects it instead of upgrading.
+        o.as_object_mut().unwrap().remove("sprite");
     }
     let imported = Document::decode(&serde_json::to_vec(&v).unwrap()).unwrap();
     assert_eq!(imported.objects.len(), 128);
@@ -429,7 +432,7 @@ fn v1_raw_bytes_conflict_v2_storage_and_new_process_reopen() {
     );
     assert!(String::from_utf8(std::fs::read(&path).unwrap())
         .unwrap()
-        .contains("autographics.scene/4"));
+        .contains("autographics.scene/5"));
     let mut h = Host::new(scene()).unwrap();
     h.frame(None).unwrap();
     h.storage.save(&mut h.editor, &path, Fault::None).unwrap();

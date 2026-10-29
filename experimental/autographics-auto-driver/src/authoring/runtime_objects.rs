@@ -277,6 +277,7 @@ pub fn instance_object(template: &Object, slot: &Slot) -> Option<Object> {
         visible: slot.visible,
         parent: None,
         resource: template.resource.clone(),
+        sprite: template.sprite.clone(),
     })
 }
 

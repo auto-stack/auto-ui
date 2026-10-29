@@ -43,6 +43,38 @@ pub struct Object {
     pub visible: bool,
     pub parent: Option<u64>,
     pub resource: Option<String>,
+    /// PLAN-004: the accepted PNG visual bound to this 2D leaf. Identity is
+    /// the image content hash; the frame is integer pixels inside that image
+    /// and the display size stays the object scale, so a frame never changes
+    /// the entity bounds.
+    pub sprite: Option<SpriteBinding>,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SpriteBinding {
+    pub asset: String,
+    pub frame: [u32; 4],
+    pub flip: bool,
+}
+impl SpriteBinding {
+    pub fn validate(&self, assets: &[super::assets::AssetRef]) -> Result<(), String> {
+        let asset = assets
+            .iter()
+            .find(|a| a.key() == self.asset)
+            .ok_or_else(|| "sprite asset reference".to_string())?;
+        if !asset.is_image() {
+            return Err("sprite requires an image resource".into());
+        }
+        let (width, height) = match (asset.width, asset.height) {
+            (Some(w), Some(h)) => (w, h),
+            _ => return Err("sprite image dimensions".into()),
+        };
+        let [x, y, w, h] = self.frame;
+        if w == 0 || h == 0 || w > width || h > height || x > width - w || y > height - h {
+            return Err("sprite frame bounds".into());
+        }
+        Ok(())
+    }
 }
 impl Object {
     pub fn new(id: u64, kind: Kind) -> Self {
@@ -62,6 +94,7 @@ impl Object {
             visible: true,
             parent: None,
             resource: None,
+            sprite: None,
         }
     }
 }
@@ -125,7 +158,7 @@ impl Group {
 impl Document {
     pub fn empty(id: String) -> Self {
         Self {
-            schema: "autographics.scene/4".into(),
+            schema: "autographics.scene/5".into(),
             behavior: None,
             document_id: id,
             resources: ["circle", "quad", "cylinder", "player", "mob"]
@@ -154,7 +187,7 @@ impl Document {
         d
     }
     pub fn validate(&self) -> Result<(), String> {
-        if self.schema != "autographics.scene/4" {
+        if self.schema != "autographics.scene/5" {
             return Err("unsupported schema".into());
         }
         if self.document_id.is_empty() || self.document_id.chars().count() > 128 {
@@ -179,13 +212,32 @@ impl Document {
         if assets.len() > super::assets::MAX_ASSETS || raw_bytes > super::assets::MAX_RAW_TOTAL {
             return Err("asset manifest budget".into());
         }
+        let mut bound = 0usize;
         for o in &self.objects {
             if o.kind == Kind::Model {
                 if !o.resource.as_ref().is_some_and(|k| assets.contains(k)) {
                     return Err("model resource reference".into());
                 }
+                let payload = self
+                    .assets
+                    .iter()
+                    .find(|a| Some(a.key()).as_ref() == o.resource.as_ref())
+                    .ok_or_else(|| "model resource reference".to_string())?;
+                if payload.is_image() {
+                    return Err("model requires a geometry resource".into());
+                }
             } else if o.resource.is_some() {
                 return Err("builtin resource mismatch".into());
+            }
+            if let Some(sprite) = &o.sprite {
+                if !o.kind.is_2d() {
+                    return Err("sprite binding on a 2D leaf only".into());
+                }
+                sprite.validate(&self.assets)?;
+                bound += 1;
+                if bound > super::runtime_sprites::MAX_TARGETS {
+                    return Err("sprite target budget".into());
+                }
             }
             if o.id == 0 || !ids.insert(o.id) {
                 return Err("duplicate/invalid object identity".into());
@@ -341,6 +393,38 @@ impl Document {
                     return Err("explicit behavior actors required".into());
                 }
             }
+        }
+        // PLAN-004 scene/5 adds the optional PNG visual binding. Older schemas
+        // keep their exact meaning: a legacy file carrying the new field or a
+        // non-model resource is rejected rather than silently upgraded.
+        if [
+            "autographics.scene/1",
+            "autographics.scene/2",
+            "autographics.scene/3",
+            "autographics.scene/4",
+        ]
+        .contains(&schema.as_str())
+        {
+            for a in v["assets"].as_array().ok_or("assets")? {
+                if a.get("format").and_then(Value::as_str) != Some("glb") {
+                    return Err("legacy unknown asset format".into());
+                }
+            }
+            for o in v["objects"].as_array_mut().ok_or("objects")? {
+                if o.get("sprite").is_some() {
+                    return Err("legacy unknown sprite".into());
+                }
+                o["sprite"] = Value::Null;
+            }
+            v["schema"] = Value::String("autographics.scene/5".into());
+        } else if schema == "autographics.scene/5" {
+            for o in v["objects"].as_array().ok_or("objects")? {
+                if o.get("sprite").is_none() {
+                    return Err("explicit sprite required".into());
+                }
+            }
+        } else {
+            return Err("unsupported schema".into());
         }
         let d: Self = serde_json::from_value(v).map_err(|e| e.to_string())?;
         d.validate()?;

@@ -35,6 +35,11 @@ pub const OBJECTS_API: &str = include_str!("../../api/runtime_objects_v1.at");
 pub const TRIGGERS2_VERSION: &str = "autographics.triggers2d/1";
 pub const TRIGGERS3_VERSION: &str = "autographics.triggers3d/1";
 pub const TRIGGERS_API: &str = include_str!("../../api/runtime_triggers_v1.at");
+/// PLAN-004: the finite 2D sprite profile layers the frame/flip unit on the
+/// unchanged triggers2d composition. It is an explicit new version; every
+/// earlier profile keeps its exact assembled bytes.
+pub const SPRITES2_VERSION: &str = "autographics.sprites2d/1";
+pub const SPRITES_API: &str = include_str!("../../api/sprite2d_v1.at");
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Api {
     V1,
@@ -50,6 +55,7 @@ pub enum Api {
     Objects3V1,
     Triggers2V1,
     Triggers3V1,
+    Sprites2V1,
 }
 impl Api {
     pub fn parse(value: &str) -> Result<Self, String> {
@@ -67,6 +73,7 @@ impl Api {
             OBJECTS3_VERSION => Ok(Self::Objects3V1),
             TRIGGERS2_VERSION => Ok(Self::Triggers2V1),
             TRIGGERS3_VERSION => Ok(Self::Triggers3V1),
+            SPRITES2_VERSION => Ok(Self::Sprites2V1),
             _ => Err("unsupported behavior API".into()),
         }
     }
@@ -85,6 +92,7 @@ impl Api {
             Self::Objects3V1 => OBJECTS3_VERSION,
             Self::Triggers2V1 => TRIGGERS2_VERSION,
             Self::Triggers3V1 => TRIGGERS3_VERSION,
+            Self::Sprites2V1 => SPRITES2_VERSION,
         }
     }
     pub fn number(self) -> i32 {
@@ -102,6 +110,7 @@ impl Api {
             Self::Objects3V1 => 106,
             Self::Triggers2V1 => 107,
             Self::Triggers3V1 => 108,
+            Self::Sprites2V1 => 109,
         }
     }
     pub fn profile(self) -> i32 {
@@ -119,13 +128,16 @@ impl Api {
             Self::Objects3V1 => 17,
             Self::Triggers2V1 => 18,
             Self::Triggers3V1 => 19,
+            Self::Sprites2V1 => 20,
         }
     }
     /// The finite run-object profiles including the trigger profiles that
     /// carry the objects unit: one dimension per Run, 8 reserved slots.
     pub fn objects(self) -> Option<super::runtime_objects::Dim> {
         match self {
-            Self::Objects2V1 | Self::Triggers2V1 => Some(super::runtime_objects::Dim::TwoD),
+            Self::Objects2V1 | Self::Triggers2V1 | Self::Sprites2V1 => {
+                Some(super::runtime_objects::Dim::TwoD)
+            }
             Self::Objects3V1 | Self::Triggers3V1 => Some(super::runtime_objects::Dim::ThreeD),
             _ => None,
         }
@@ -134,10 +146,15 @@ impl Api {
     /// audited restart request on top of the objects composition.
     pub fn triggers(self) -> Option<super::runtime_objects::Dim> {
         match self {
-            Self::Triggers2V1 => Some(super::runtime_objects::Dim::TwoD),
+            Self::Triggers2V1 | Self::Sprites2V1 => Some(super::runtime_objects::Dim::TwoD),
             Self::Triggers3V1 => Some(super::runtime_objects::Dim::ThreeD),
             _ => None,
         }
+    }
+    /// The PLAN-004 sprite profile: the bound-leaf frame/flip table and the
+    /// reserved-slot table riding the unchanged triggers2d composition.
+    pub fn sprites(self) -> bool {
+        matches!(self, Self::Sprites2V1)
     }
 }
 pub const API: &str = include_str!("../../api/behavior_v1.at");

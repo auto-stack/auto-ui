@@ -10,6 +10,7 @@ pub mod preview;
 pub mod runtime_camera;
 pub mod runtime_objects;
 pub mod runtime_round;
+pub mod runtime_sprites;
 pub mod session;
 pub mod storage;
 mod tagged;

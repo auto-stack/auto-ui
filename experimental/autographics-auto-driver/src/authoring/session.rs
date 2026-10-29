@@ -500,6 +500,8 @@ fn validate_assets(d: &Document, r: &super::assets::Registry) -> Result<(), Stri
         if loaded.identity.sha256 != a.sha256
             || loaded.identity.byte_length != a.byte_length
             || loaded.identity.format != a.format
+            || loaded.identity.width != a.width
+            || loaded.identity.height != a.height
         {
             return Err("asset content identity/length".into());
         }

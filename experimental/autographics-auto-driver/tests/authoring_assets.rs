@@ -746,7 +746,7 @@ fn schema3_strict_legacy_mapping_resource_identity_and_actual_auto() {
     ] {
         let old: Value = serde_json::from_slice(bytes).unwrap();
         let d = Document::decode(bytes).unwrap();
-        assert_eq!(d.schema, "autographics.scene/4");
+        assert_eq!(d.schema, "autographics.scene/5");
         assert!(d.assets.is_empty());
         assert_eq!(old["objects"].as_array().unwrap().len(), d.objects.len());
         assert!(d.objects.iter().all(|o| o.resource.is_none()));
