@@ -1790,3 +1790,96 @@ fn twenty_play_stop_rounds_reuse_one_texture_and_release_the_last_owner() {
         }),
     );
 }
+
+// ---------------------------------------------------------------------------
+// Review r1 repair: the public entry must select every shipped profile, and a
+// frame larger than its image is a named rejection at every boundary.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn every_profile_is_selectable_through_the_public_cli() {
+    // The usage list and the parser are derived from the same names, so a new
+    // profile cannot be added without also becoming selectable.
+    let usage = Api::cli_usage();
+    let listed: std::collections::BTreeSet<&str> = usage.split(" or ").collect();
+    let expected: std::collections::BTreeSet<&str> =
+        Api::all().iter().map(|api| api.cli_name()).collect();
+    assert_eq!(listed, expected, "the CLI list and the profiles disagree");
+    for api in Api::all() {
+        assert_eq!(Api::parse_cli(api.cli_name()), Some(api));
+        assert_eq!(Api::parse(api.version()).expect("version"), api);
+    }
+    let sprite = Api::parse_cli("sprites2d").expect("sprites2d must be selectable");
+    assert_eq!(sprite.version(), "autographics.sprites2d/1");
+    assert_eq!((sprite.profile(), sprite.number()), (20, 109));
+    assert_eq!(Api::parse_cli("sprites3d"), None);
+    assert_eq!(Api::parse_cli(""), None);
+    // The real process accepts the name: it reaches the next usage gate
+    // (`--behavior` required) instead of the unknown-value rejection.
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_autographics-authoring"))
+        .args(["--behavior-api", "sprites2d"])
+        .output()
+        .expect("run the authoring entry");
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("requires temporary --behavior"),
+        "the CLI did not accept sprites2d: {stderr}"
+    );
+    assert!(!stderr.contains("expects v1"), "{stderr}");
+}
+
+#[test]
+fn a_frame_larger_than_its_image_is_rejected_at_every_boundary() {
+    let dir = sample_dir();
+    let (doc, _) = sprite_document(&dir);
+    // Document binding.
+    let mut wide = doc.clone();
+    wide.objects[0].sprite = Some(SpriteBinding {
+        asset: doc.assets[0].key(),
+        frame: [0, 0, 97, 32],
+        flip: false,
+    });
+    assert!(
+        wide.validate().is_err(),
+        "width above the image must reject"
+    );
+    let mut tall = doc.clone();
+    tall.objects[0].sprite = Some(SpriteBinding {
+        asset: doc.assets[0].key(),
+        frame: [0, 0, 32, 33],
+        flip: false,
+    });
+    assert!(
+        tall.validate().is_err(),
+        "height above the image must reject"
+    );
+    // Admitted block (host-side oracle).
+    let order = hierarchy::ordered(&doc).expect("order");
+    let targets = runtime_sprites::targets(&doc, &order).expect("targets");
+    let mut data = vec![
+        Scalar::Int(1),
+        Scalar::Int(targets.len() as i32),
+        Scalar::Int(1),
+        Scalar::Int(0),
+    ];
+    for (i, target) in targets.iter().enumerate() {
+        data.extend([
+            Scalar::Int(target.node_index),
+            Scalar::Int(target.asset_index),
+            Scalar::Int(target.frame[0] as i32),
+            Scalar::Int(target.frame[1] as i32),
+            Scalar::Int(if i == 0 { 97 } else { target.frame[2] as i32 }),
+            Scalar::Int(target.frame[3] as i32),
+            Scalar::Int(i32::from(target.flip)),
+        ]);
+    }
+    data.extend([Scalar::Int(0); runtime_objects::SLOTS * runtime_sprites::ROW_FIELDS]);
+    let error = runtime_sprites::admit_block(&data, 1, 0, &targets, &dims, None)
+        .expect_err("oversized admitted row");
+    assert!(error.contains("frame bounds"), "{error}");
+    // The UV conversion itself, with no subtraction overflow.
+    assert!(agp::renderer::frame_uv([0, 0, 97, 32], 96, 32, false).is_err());
+    assert!(agp::renderer::frame_uv([0, 0, 32, 33], 96, 32, false).is_err());
+    assert!(agp::renderer::frame_uv([0, 0, u32::MAX, 32], 96, 32, false).is_err());
+}

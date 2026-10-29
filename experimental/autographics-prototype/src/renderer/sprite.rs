@@ -559,7 +559,13 @@ pub fn frame_uv(frame: [u32; 4], width: u32, height: u32, flip: bool) -> Result<
         return Err("sprite image has no extent".into());
     }
     let [x, y, w, h] = frame;
-    if w == 0 || h == 0 || x > width - w || y > height - h {
+    // Check the extents before any unsigned subtraction: a frame wider or taller
+    // than the image must be a named rejection, never a wrap (release) or a
+    // subtract-overflow panic (debug).
+    if w == 0 || h == 0 || w > width || h > height {
+        return Err("sprite frame outside image".into());
+    }
+    if x > width - w || y > height - h {
         return Err("sprite frame outside image".into());
     }
     let (x0, x1) = (

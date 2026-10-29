@@ -10,6 +10,8 @@
 !/research/source-lock.json
 !/research/code-identity.json
 /research/*.agscene
+# Transient native-probe reports: regenerated per run, never a source input.
+/research/probe-exit-*.json
 !/research/asset-probe/
 /research/asset-probe/*
 !/research/asset-probe/two-parts.glb

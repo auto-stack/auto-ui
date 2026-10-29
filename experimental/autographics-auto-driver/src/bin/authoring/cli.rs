@@ -10,10 +10,13 @@ pub(super) fn run() {
             .cloned()
     };
     // A supplied option without its value must not become the default API.
+    // The accepted value list is derived from Api::cli_name(), so a new profile
+    // cannot be added without also becoming selectable here.
+    let usage = autographics_auto_driver::authoring::behavior::Api::cli_usage();
     if args.iter().any(|v| v == "--behavior-api")
         && value("--behavior-api").is_none_or(|v| v.starts_with("--"))
     {
-        eprintln!("--behavior-api requires v1 or v2 or v3 or v4 or v5 or character or character3d or camera2d or camera3d or objects2d or objects3d or triggers2d or triggers3d");
+        eprintln!("--behavior-api requires {usage}");
         std::process::exit(2)
     }
     let behavior_api = match value("--behavior-api") {
@@ -23,27 +26,14 @@ pub(super) fn run() {
                 eprintln!("--behavior-api requires temporary --behavior");
                 std::process::exit(2)
             }
-            Some(match v.as_str() {
-                "v1" => autographics_auto_driver::authoring::behavior::Api::V1,
-                "v2" => autographics_auto_driver::authoring::behavior::Api::SpatialV2,
-                "v5" => autographics_auto_driver::authoring::behavior::Api::MotionV5,
-                "v4" => autographics_auto_driver::authoring::behavior::Api::SweepV4,
-                "v3" => autographics_auto_driver::authoring::behavior::Api::SegmentV3,
-                "character" => autographics_auto_driver::authoring::behavior::Api::CharacterV1,
-                "character3d" => autographics_auto_driver::authoring::behavior::Api::Character3V1,
-                "camera2d" => autographics_auto_driver::authoring::behavior::Api::Camera2V1,
-                "camera3d" => autographics_auto_driver::authoring::behavior::Api::Camera3V1,
-                "objects2d" => autographics_auto_driver::authoring::behavior::Api::Objects2V1,
-                "objects3d" => autographics_auto_driver::authoring::behavior::Api::Objects3V1,
-                "triggers2d" => autographics_auto_driver::authoring::behavior::Api::Triggers2V1,
-                "triggers3d" => autographics_auto_driver::authoring::behavior::Api::Triggers3V1,
-                _ => {
-                    eprintln!(
-                        "--behavior-api expects v1 or v2 or v3 or v4 or v5 or character or character3d or camera2d or camera3d or objects2d or objects3d or triggers2d or triggers3d"
-                    );
-                    std::process::exit(2)
-                }
-            })
+            Some(
+                autographics_auto_driver::authoring::behavior::Api::parse_cli(&v).unwrap_or_else(
+                    || {
+                        eprintln!("--behavior-api expects {usage}");
+                        std::process::exit(2)
+                    },
+                ),
+            )
         }
     };
     if args.iter().any(|v| {

@@ -15,6 +15,7 @@ validated (used by --controls, which restores every mutation).
 """
 import json
 import os
+import re
 import pathlib
 import shutil
 import subprocess
@@ -121,8 +122,11 @@ def run_suite():
     )
     output = result.stdout + result.stderr
     assert result.returncode == 0, output[-4000:]
-    assert "test result: ok. 15 passed" in output, output[-2000:]
-    assert "0 failed" in output, output[-2000:]
+    # The case reports below are the real coverage gate; the count only proves
+    # the binary ran its suites rather than a filtered subset.
+    match = re.search(r"test result: ok\. (\d+) passed; 0 failed", output)
+    assert match, output[-2000:]
+    assert int(match.group(1)) >= 17, f"only {match.group(1)} cases ran"
     return directory
 
 

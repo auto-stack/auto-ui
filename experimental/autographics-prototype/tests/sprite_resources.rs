@@ -245,6 +245,13 @@ fn frame_uv_and_capacity_are_bounded() {
     assert!(frame_uv([65, 0, 32, 32], 96, 32, false).is_err());
     assert!(frame_uv([0, 0, 0, 32], 96, 32, false).is_err());
     assert!(frame_uv([0, 0, 32, 32], 96, 0, false).is_err());
+    // PLAN-004 review F-02: an extent larger than the image is a named
+    // rejection, never a debug subtract-overflow panic or a release wrap.
+    assert!(frame_uv([0, 0, 97, 32], 96, 32, false).is_err());
+    assert!(frame_uv([0, 0, 32, 33], 96, 32, false).is_err());
+    assert!(frame_uv([0, 0, u32::MAX, 32], 96, 32, false).is_err());
+    assert!(frame_uv([95, 0, 1, 32], 96, 32, false).is_ok());
+    assert!(frame_uv([96, 0, 1, 32], 96, 32, false).is_err());
     assert!(agp::renderer::sprite::MAX_SPRITES >= 16);
     let _ = OffscreenTarget::FORMAT;
 }

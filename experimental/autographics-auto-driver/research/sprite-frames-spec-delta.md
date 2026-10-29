@@ -45,6 +45,7 @@
 - 组合预算沿用：managed 源 96KiB、用户源 256KiB、合并 352KiB；未上调。sprite 块使每 tick 增加 `4+targets*7+56` 次 Host 读取（本夹具 74 次，约全部 390 次的 19%）。
 - 价格与上限：sprite 写 1 credit；`ag_char_move` 等既有价格不变；每 callback 32 credit 与 32 次写预算不变。
 - 输出块在 rounds 块之后；Host 以冻结目标表、已接受实例表与 registry 身份独立验证，任一失败保持整组 last-good。
+- 公共入口：`autographics-authoring --open <scene> --behavior <main.at> --behavior-api sprites2d`。`--behavior-api` 的接受值列表由 `Api::cli_name()` 派生（`Api::cli_usage()` / `Api::parse_cli`），新增 profile 若无可选名字，其一致性测试会直接失败。
 
 ## 待 review/merge 处理
 

@@ -156,6 +156,58 @@ impl Api {
     pub fn sprites(self) -> bool {
         matches!(self, Self::Sprites2V1)
     }
+    /// Every shipped profile, in the order the command line lists them.
+    pub fn all() -> [Self; 14] {
+        [
+            Self::V1,
+            Self::SpatialV2,
+            Self::SegmentV3,
+            Self::SweepV4,
+            Self::MotionV5,
+            Self::CharacterV1,
+            Self::Character3V1,
+            Self::Camera2V1,
+            Self::Camera3V1,
+            Self::Objects2V1,
+            Self::Objects3V1,
+            Self::Triggers2V1,
+            Self::Triggers3V1,
+            Self::Sprites2V1,
+        ]
+    }
+    /// The command-line name of this profile. The public entry selects a Run by
+    /// this name, so every shipped profile must have one.
+    pub fn cli_name(self) -> &'static str {
+        match self {
+            Self::V1 => "v1",
+            Self::SpatialV2 => "v2",
+            Self::SegmentV3 => "v3",
+            Self::SweepV4 => "v4",
+            Self::MotionV5 => "v5",
+            Self::CharacterV1 => "character",
+            Self::Character3V1 => "character3d",
+            Self::Camera2V1 => "camera2d",
+            Self::Camera3V1 => "camera3d",
+            Self::Objects2V1 => "objects2d",
+            Self::Objects3V1 => "objects3d",
+            Self::Triggers2V1 => "triggers2d",
+            Self::Triggers3V1 => "triggers3d",
+            Self::Sprites2V1 => "sprites2d",
+        }
+    }
+    /// Parse one `--behavior-api` value; an unknown name is a usage error.
+    pub fn parse_cli(value: &str) -> Option<Self> {
+        Self::all().into_iter().find(|api| api.cli_name() == value)
+    }
+    /// The exact accepted value list, derived from the names above so a new
+    /// profile cannot be added without also being selectable.
+    pub fn cli_usage() -> String {
+        Self::all()
+            .iter()
+            .map(|api| api.cli_name())
+            .collect::<Vec<_>>()
+            .join(" or ")
+    }
 }
 pub const API: &str = include_str!("../../api/behavior_v1.at");
 /// The managed bridge envelope. r5 (PLAN-002): the triggers composition

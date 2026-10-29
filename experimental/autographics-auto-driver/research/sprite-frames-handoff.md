@@ -26,8 +26,9 @@
 | `cargo check --locked --all-targets`（driver 与 AGP） | 绿；改动文件 0 warning |
 | `cargo fmt -- --check`（两包） | 干净 |
 | `cargo test --locked --lib`（driver / AGP） | 33 / 30 passed |
-| `cargo test --locked --test public_sprite_frames -- --test-threads=1` | **15 passed**（连续 3 次 + 最终一次） |
+| `cargo test --locked --test public_sprite_frames -- --test-threads=1` | **17 passed**（review r1 修复后新增 2 例；修复前 15） |
 | `cargo test --locked --test sprite_resources -- --test-threads=1`（AGP） | 3 passed |
+| `autographics-authoring --open <scene> --behavior samples/sprite_frames/main.at --behavior-api sprites2d` | 公开入口选择 profile 20（review r1 F-01 修复后）；真实窗口交互按用户环境验证，仍 pending |
 | `cargo test --locked --test runtime_triggers_api` | 14 passed（旧 profile 定向面） |
 | `cargo test --locked --test authoring_assets/host/play_host` | 17 / 7 / 7 passed |
 | `cargo test --locked --test authoring_hierarchy/document/session/storage` | 10 / 1 / 4 / 3 passed |
