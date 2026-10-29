@@ -1,11 +1,14 @@
 """Check locked metadata's actual SDK dependency closure and pinned local inputs."""
 import json,pathlib,subprocess,sys,tomllib
 root=pathlib.Path(__file__).resolve().parents[1]
+current002=(root/'research/plan002-identity.json').exists()or(root/'tools/verify_plan002.py').exists()
+if current002 and '--sdk-only' not in sys.argv:
+ subprocess.run([sys.executable,str(root/'tools/verify_plan002.py')],check=True)
 current001=(root/'research/plan001-identity.json').exists()or(root/'tools/verify_plan001.py').exists()
-if current001 and '--sdk-only' not in sys.argv:
+if current001 and not current002 and '--sdk-only' not in sys.argv:
  subprocess.run([sys.executable,str(root/'tools/verify_plan001.py')],check=True)
 current879=(root/'research/plan879-identity.json').exists()or(root/'tools/verify_plan879.py').exists()
-if current879 and not current001 and '--sdk-only' not in sys.argv:
+if current879 and not current001 and not current002 and '--sdk-only' not in sys.argv:
  subprocess.run([sys.executable,str(root/'tools/verify_plan879.py')],check=True)
 current875=(root/'research/plan875-identity.json').exists()or(root/'tools/verify_plan875.py').exists()
 if current875 and not current879 and '--sdk-only' not in sys.argv:

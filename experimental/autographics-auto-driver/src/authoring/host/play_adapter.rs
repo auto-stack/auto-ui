@@ -400,6 +400,7 @@ impl Host {
             return;
         };
         let deadline = now + std::time::Duration::from_millis(8);
+        let mut round_requested = false;
         let result = (|| {
             if play.base_identity["stamp"]
                 != json!([self.editor.stamp.epoch, self.editor.stamp.revision])
@@ -428,6 +429,15 @@ impl Host {
                     self.presented = frame.objects.clone();
                     self.presented_nodes = frame.nodes.clone();
                     self.publish(prepared);
+                    // The restart marker is consumed only after the carrying
+                    // candidate was fully accepted, and only while Running:
+                    // Starting/Paused/step ticks never process a new round.
+                    if play.state == crate::authoring::play::State::Running
+                        && frame.rounds.as_ref().is_some_and(|r| r.restart_requested)
+                    {
+                        round_requested = true;
+                        break;
+                    }
                 }
                 if Instant::now() >= deadline || dispatched >= 4 || !play.dispatch_credit()? {
                     break;
@@ -440,7 +450,68 @@ impl Host {
             play.fail(error);
         }
         self.play = Some(play);
+        if round_requested
+            && self
+                .play
+                .as_ref()
+                .is_some_and(|p| p.state == crate::authoring::play::State::Running)
+        {
+            self.restart_round();
+        }
         self.sync_play_ui();
         bounded_time(&mut self.play_pump_us, now.elapsed().as_micros());
+    }
+
+    /// The audited round restart (PLAN-002 contract section 6): terminate the
+    /// old Run on the single scheduling stack, then rebuild a new Run/VM from
+    /// the same accepted source bytes, actors and configuration. The editing
+    /// `play_restore` and the last-good presentation stay untouched, so a
+    /// failed new round keeps the old complete presentation under a named
+    /// Fault and Stop still recovers the editing Prepared.
+    fn restart_round(&mut self) {
+        self.cancel_camera_drag();
+        let Some(mut old) = self.play.take() else {
+            return;
+        };
+        let built = (|| -> Result<crate::authoring::play::Play, String> {
+            let snapshot = old
+                .user_source
+                .clone()
+                .ok_or("round restart requires an accepted user snapshot")?;
+            let descriptor =
+                crate::authoring::spatial::Descriptor::build(&self.editor.document, |o| {
+                    self.model(o)
+                })?;
+            crate::authoring::play::Play::new_user_spatial(
+                &self.editor,
+                old.actors,
+                snapshot,
+                descriptor,
+            )
+        })();
+        match built {
+            Ok(mut fresh) => {
+                old.stop();
+                fresh
+                    .vm_output_measurement
+                    .enable(self.prepare_measurement.enabled);
+                fresh
+                    .admission_measurement
+                    .enable(self.prepare_measurement.enabled);
+                self.events.clear();
+                self.input.window_focus_lost();
+                self.rt.release_iced_focus(self.panel);
+                self.ui_mut().queue.clear();
+                self.ui_mut().error.clear();
+                self.play = Some(fresh);
+            }
+            Err(error) => {
+                old.stop();
+                old.fail(format!("round restart: {error}"));
+                // The old last-good frame stays published and installed; only
+                // the VM is gone and the state is the named Fault.
+                self.play = Some(old);
+            }
+        }
     }
 }

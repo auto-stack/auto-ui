@@ -1,0 +1,189 @@
+{
+ "schema": "autographics.scene/2",
+ "document_id": "runtime-triggers-two-layout-a",
+ "resources": [
+  "circle",
+  "quad",
+  "cylinder",
+  "player",
+  "mob"
+ ],
+ "objects": [
+  {
+   "id": 1,
+   "name": "Character",
+   "kind": "quad",
+   "translation": [
+    2.0,
+    1.0,
+    0.0
+   ],
+   "scale": [
+    0.8,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.2,
+    0.5,
+    0.9,
+    1.0
+   ],
+   "visible": true,
+   "parent": null
+  },
+  {
+   "id": 2,
+   "name": "Ground",
+   "kind": "quad",
+   "translation": [
+    15.0,
+    -1.5,
+    0.0
+   ],
+   "scale": [
+    40.0,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.3,
+    0.3,
+    0.35,
+    1.0
+   ],
+   "visible": true,
+   "parent": null
+  },
+  {
+   "id": 3,
+   "name": "CoinA",
+   "kind": "circle",
+   "translation": [
+    8.0,
+    2.0,
+    0.0
+   ],
+   "scale": [
+    0.6,
+    0.6,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.95,
+    0.8,
+    0.2,
+    1.0
+   ],
+   "visible": false,
+   "parent": null
+  },
+  {
+   "id": 4,
+   "name": "CoinB",
+   "kind": "quad",
+   "translation": [
+    10.0,
+    2.0,
+    0.0
+   ],
+   "scale": [
+    0.6,
+    0.6,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.95,
+    0.8,
+    0.2,
+    1.0
+   ],
+   "visible": false,
+   "parent": null
+  },
+  {
+   "id": 5,
+   "name": "CoinC",
+   "kind": "circle",
+   "translation": [
+    12.0,
+    2.0,
+    0.0
+   ],
+   "scale": [
+    0.6,
+    0.6,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.95,
+    0.8,
+    0.2,
+    1.0
+   ],
+   "visible": false,
+   "parent": null
+  },
+  {
+   "id": 6,
+   "name": "Hazard",
+   "kind": "quad",
+   "translation": [
+    9.0,
+    2.4,
+    0.0
+   ],
+   "scale": [
+    0.5,
+    0.5,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.2,
+    0.2,
+    1.0
+   ],
+   "visible": false,
+   "parent": null
+  },
+  {
+   "id": 7,
+   "name": "Goal",
+   "kind": "quad",
+   "translation": [
+    -20.0,
+    1.0,
+    0.0
+   ],
+   "scale": [
+    0.5,
+    1.2,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.3,
+    0.9,
+    0.5,
+    1.0
+   ],
+   "visible": false,
+   "parent": null
+  }
+ ],
+ "groups": []
+}
