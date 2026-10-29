@@ -1,6 +1,6 @@
 ---
 plan_id: PLAN-001
-status: drafting
+status: archived
 feature_name: AutoGraphics有限运行对象身份与生命周期
 author: [Codex]
 created_at: 2026-10-29
@@ -14,7 +14,7 @@ new_spec_components:
 touched_goals: [GOAL-008]
 affects: [auto-graphics]
 depends_on: [auto-lang/PLAN-879]
-current_step: 0
+current_step: 5
 total_steps: 10
 ---
 
@@ -143,16 +143,16 @@ work自查→独立上下文最终review→merge冻结受影响门，同一auto-
 
 | ID | owner_stage | 依赖 | 实际位置/操作与产出 | AC | 状态 |
 |---|---|---|---|---|---|
-| T-01 | work | 用户启动；879已交付 | auto-ui唯一树/owner/base、SDK/两锁/当前代际核对，880边界 | AC-01 | [ ] |
-| T-02 | work | T-01 | runtime-objects-contract/价格/身份/帧/支持集/整路径probe先冻结，失败回new | AC-02/05 | [ ] |
-| T-03 | work | T-02通过 | 新Auto单元/SourceSnapshot/Play/registry与准入/选择器、V-01/02 | AC-02/03 | [ ] |
-| T-04 | work | T-03 | Host/GPU对象适配/事务/owner、两维公共工程/真实反例、V-03/04 | AC-03/04/05 | [ ] |
-| T-05 | work | T-04 | fresh consumer/资源测量/current identity/checker/fmt/提交/SD摘要，V-05 | AC-01..05 | [ ] |
-| T-06 | review | T-05 | 同树独立最终review，绑定冻结提交；merge门pending | AC-06 | [ ] |
-| T-07 | merge | T-06 pass | 冻结受影响门/未变复用审计；不跑全AG/窗口自动化 | AC-07 | [ ] |
-| T-08 | merge | T-07 | auto-ui/master落地，记录实际源码SHA；不合旧autographics-dev | AC-08 | [ ] |
-| T-09 | merge | T-08 | auto-ui主检出更新本Plan/复审/归档与handoff；现有语言知识仓按SD同步Spec/ledger/索引 | AC-08 | [ ] |
-| T-10 | merge | T-09 | wt-guard clean后清树/分支/空组；保留必要exe/本地证据收据 | AC-08 | [ ] |
+| T-01 | work | 用户启动；879已交付 | auto-ui唯一树/owner/base、SDK/两锁/当前代际核对，880边界 | AC-01 | [x] 树`.wt/ui-001/auto-ui`@codex/plan-001-dev，base a9e8d70=pin代码；两锁blob与SDK 681/身份1387/源blob逐项核同；ag-examples零写入 |
+| T-02 | work | T-01 | runtime-objects-contract/价格/身份/帧/支持集/整路径probe先冻结，失败回new | AC-02/05 | [x] attachments/001/work/runtime-objects-contract.md随工作提交冻结；probe=runtime_objects_api 9通过（真实装配VM） |
+| T-03 | work | T-02通过 | 新Auto单元/SourceSnapshot/Play/registry与准入/选择器、V-01/02 | AC-02/03 | [x] api/runtime_objects_v1.at+runtime_objects.rs+Play准入+CLI选择器；V-01/02=api套件9通过含65535耗尽/32写帽/跨Run |
+| T-04 | work | T-03 | Host/GPU对象适配/事务/owner、两维公共工程/真实反例、V-03/04 | AC-03/04/05 | [x] prepare_frame实例渲染+非持久适配+包络门；V-03/04=host套件8通过（20轮churn/上传平坦/last-good/多mesh）+samples套件8通过（双布置/参数敏感/模板交换变异） |
+| T-05 | work | T-04 | fresh consumer/资源测量/current identity/checker/fmt/提交/SD摘要，V-05 | AC-01..05 | [x] plan001身份1401哈希+controls通过；checker通过（churn平坦+四形状p95<250ms/8实例）；fresh consumer离线锁定构建api 9+host/samples绿；fmt 0 diff；提交2fd9fe0 |
+| T-06 | review | T-05 | 同树独立最终review，绑定冻结提交；merge门pending | AC-06 | [x] 独立代理final：2fd9fe0 needs_fix（F-001/F-003）→修复c26484f→定向复审pass（AC-01..06全证据在c26484f，AC-07/08留merge）|
+| T-07 | merge | T-06 pass | 冻结受影响门/未变复用审计；不跑全AG/窗口自动化 | AC-07 | [x] 复审在冻结候选c26484f上重跑受影响门（fmt 0diff/driver零新warning/lib27/samples8/verify+identity链）；api9与旧套件65复用审计：修复diff=3文件（cfg(test)导入+注释+identity重冻结）不触语义与旧profile路径，复用正当；fresh consumer在交付闭包重导出（verify链+api9绿，AC-05绑定交付提交）|
+| T-08 | merge | T-07 | auto-ui/master落地，记录实际源码SHA；不合旧autographics-dev | AC-08 | [x] 分支rebase到master 7b64303（用户并发r4修订），range-diff全等，映射2fd9fe0→3f39f5b、c26484f→537122b；ff-only落地master tip=537122b09c025191355e260bc8e9880a4358cda2，无merge提交；未触碰autographics-dev |
+| T-09 | merge | T-08 | auto-ui主检出更新本Plan/复审/归档与handoff；现有语言知识仓按SD同步Spec/ledger/索引 | AC-08 | [x] auto-lang d9718cc6（sync-plan001-ag ff-only）：SD-01新增docs/specs/auto-graphics/runtime-objects.md、SD-02/03增量、identity代际升plan001；ledger守护离线投影v127→128（bak-p001-merge字节备份，6节schema/外科scope/读回一致守卫通过）：designs P001-OBJ+P833-AUTO-SOURCE/P839-PLAY更新、tests P001-T、reviews P001-R1、reports P001-M，全部带file+tags；本Plan归档至docs/plans/archived/；002 handoff交付SHA=537122b09c025191355e260bc8e9880a4358cda2 |
+| T-10 | merge | T-09 | wt-guard clean后清树/分支/空组；保留必要exe/本地证据收据 | AC-08 | [x] wt-guard双树clean后移除auto-ui/auto-lang两工作树与两分支，空组.wt/ui-001删除；plan-artifacts下target树与.pdb回收、.exe/报告/收据保留 |
 
 ## 9. 复审记录
 
@@ -169,6 +169,26 @@ work自查→独立上下文最终review→merge冻结受影响门，同一auto-
 2026-10-29 new r3：`stage: new | plan_id: PLAN-001 | plan_revision: 3 | outcome: pass | next: 用户启动work后T-01/T-02`。用户纠正本仓001起独立编号；旧auto-lang/PLAN-882仅作来源，新合同/工作树/分支/证据目录按auto-ui本仓号。未改变功能分母、预算、进度或历史验收，未创建实现树/执行测试。ag-examples旧880已归legacy历史，不占该仓本地号。
 
 2026-10-29 new r4（仅跨计划归属引用纠正）：用户批准auto-ui/002 r4只做引擎，非目标处G11引用改为[ag-examples/001](../../../ag-examples/docs/plans/001-autographics-gallery-runtime-objects.md)在002实际交付后交付G11。G11仍非本Plan工作，无任何AC/V/T、资源、实现设计或进度改变；只因合同引用文字修正递增revision，不重开任务、不接管ui-001实施树，既有执行授权保持。
+
+
+2026-10-29 work r1（本仓新号首执行）：`stage: work | plan_id: PLAN-001 | plan_revision: r3 | outcome: pass | worktree_path: D:/autostack/.wt/ui-001/auto-ui | branch: codex/plan-001-dev | base_commit: a9e8d70 | code_commit: 2fd9fe0 | dependency_revisions: SDK pin 7b987ca8（快照681文件，--from-snapshot PASS）、两AG锁blob不变（driver 47176cc/prototype bc7287b） | task_ids: T-01..T-05 | evidence: 见§8各行与attachments/001/work/runtime-objects-contract.md；会话套件9通过、host套件8通过（含churn/采样报告落盘并经checker通过）、samples套件8通过、lib 27通过、受影响现有套件58通过（camera2x/character2d/3d/authoring_play/output_admission，旧profile装配/输出不变）、fresh consumer离线锁定构建验证+测试绿、identity 1401哈希+--controls通过 | blockers: 无 | next_responsible_role: review（T-06，同树独立最终review）`。冻结要点：句柄=run*524288+slot*65536+gen（gen≤65535、run≤4095均具名36不回绕）；每次公开调用1 credit共享32/callback，写帽32先于扣费；对象块=4头+8×6定长行，free行全零，重生须超槽水位；主机渲染经id=0非持久适配，隐藏模板mesh首生上传；构造门 slot-capacity（121拒/120可）与 mesh-envelope 具名拒绝。880边界零接触。
+
+2026-10-29 goal r1：`stage: goal | plan_id: PLAN-001 | plan_revision: r3 | round: 1 | from: drafting | to: review | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-001/auto-ui | commit: 2fd9fe0 | next: review`。授权链：用户 /goal 完成计划001 一次授予 work/review/repair/merge 全程；本轮执行 work 阶段 T-01..T-05 并置 execution_done。
+
+2026-10-29 review r1（final，独立上下文）：`stage: review | review_scope: final | reviewer_identity: 独立通用代理（与实现会话隔离，未读执行摘要，全部结论自工件与自有重跑导出）| plan_id: PLAN-001 | plan_revision: r4 | outcome: needs_fix | worktree_path: D:/autostack/.wt/ui-001/auto-ui | branch: codex/plan-001-dev | reviewed_commit: 2fd9fe0 | base_commit: a9e8d70 | dependency_revisions: SDK 7b987ca8/两锁不变 | spec_inputs: §5 SD-01..03 表+合同md | acceptance_results: AC-01..05全部pass（独立重跑 fmt/lib27/api9/host8/samples8/verify+controls/checker/旧套件65）| pending_closeout_gates: AC-07/AC-08（merge拥有）| findings: F-001（low/AC-06：runtime_objects.rs 测试专用导入产生1条新warning，须cfg(test)限定）F-002（informational：合同§8记录的host probe数6为冻结时点，终态8）F-003（nit：two/main-alt.at头注释陈旧solid Gem表述）| evidence: 评审代理独立重跑全绿但AC-06门被F-001击穿 | next: work（修复F-001/F-003，同树）`。
+
+2026-10-29 goal r2：`stage: goal | plan_id: PLAN-001 | plan_revision: r4 | round: 2 | from: review | to: work | status: executing | outcome: needs_fix | worktree: D:/autostack/.wt/ui-001/auto-ui | commit: 2fd9fe0 | next: work`。r3→r4为用户并发修订（仅G11跨计划引用文字，r4收据明确不重开任务/不接管ui-001树/授权保持），work内容与r4无冲突，评审基线按r4。
+
+2026-10-29 work r2（F-001/F-003修复）：`stage: work | plan_id: PLAN-001 | plan_revision: r4 | outcome: pass | worktree_path: D:/autostack/.wt/ui-001/auto-ui | branch: codex/plan-001-dev | base_commit: a9e8d70 | code_commit: c26484f | task_ids: F-001,F-003 | evidence: runtime_objects.rs 测试专用导入限定cfg(test)（CameraDim保持实导入）；main-alt.at头注释修正；身份重冻结1401哈希+verify通过；受影响面重跑 lib 27通过+samples 8通过+fmt 0diff；无新增warnings | blockers: 无 | next_responsible_role: review（定向复审F-001/F-003闭合，代理进行中）`。F-002无需动作（评审已判informational）。修复范围=3文件，未触碰其余实现。
+
+2026-10-29 review r2（final，定向复审）：`stage: review | review_scope: final | reviewer_identity: 同一独立通用代理（修复定向复审）| plan_id: PLAN-001 | plan_revision: r4 | outcome: pass | worktree_path: D:/autostack/.wt/ui-001/auto-ui | branch: codex/plan-001-dev | reviewed_commit: c26484f5498fd1d197d735d13104c3d3232c22a3 | base_commit: a9e8d70 | dependency_revisions: SDK 7b987ca8/两锁不变 | spec_inputs: SD-01..03表（r4）+合同md | acceptance_results: AC-01..06 pass on c26484f（fmt 0diff、driver crate零新warning、lib 27、samples 8、verify_plan001 1401哈希、verify_source链、diff=3文件）；AC-01..05既有证据经3文件diff证明未受修复影响全部继承 | pending_closeout_gates: AC-07（merge冻结受影响门/未变复用审计）、AC-08（master落地/Spec同步/归档/清理）；fresh consumer离线构建为work收据证据（评审未独立重跑，已记录）| findings: 无新发现；F-001/F-003闭合确认 | evidence: c26484f | next: merge`。
+
+2026-10-29 goal r3：`stage: goal | plan_id: PLAN-001 | plan_revision: r4 | round: 3 | from: work | to: merge | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-001/auto-ui | commit: c26484f | next: merge`。
+
+
+2026-10-29 merge r1（PLAN-001:r4 沉淀收据）：`stage: merge | plan_id: PLAN-001 | plan_revision: r4 | outcome: pass | worktree_path: D:/autostack/.wt/ui-001/auto-ui | branch: codex/plan-001-dev | reviewed_commit: c26484f（→rebase 537122b，range-diff全等）| base_commit: a9e8d70 | delivery_commit: 537122b09c025191355e260bc8e9880a4358cda2（auto-ui master，ff-only无merge提交）| spec_inputs: SD-01/02/03（r4冻结表）| 副仓沉淀: auto-lang d9718cc63987e93e571eb045732fd2dab041ed0b（docs/specs/auto-graphics/{runtime-objects.md新,scene-play-session.md,auto-source-driver.md}+.autoos/specs.json v128，守护离线投影，channel=Regime B guarded offline projection，无store writer可达）| ledger_targets: designs P001-OBJ（新）/P833-AUTO-SOURCE/P839-PLAY（更新）、tests P001-T、reviews P001-R1、reports P001-M，均含file+tags | archived: docs/plans/archived/001-autographics-runtime-object-lifecycle.md（completion_kind: delivered）| production-artifacts观察: auto-ui工作区生产面（crates/*）不消费experimental/AG代码，无需重建/重启；auto-lang批量回归门为该仓规则，本次仅docs知识沉淀非auto-lang计划落地，观察记录在案不触发 | 清理: 见T-10行，随cleaned检查点确认 | next: done`。
+
+2026-10-29 goal r4：`stage: goal | plan_id: PLAN-001 | plan_revision: r4 | round: 4 | from: merge | to: done | status: archived | outcome: pass | worktree: 已清理 | commit: 537122b（auto-ui master交付）；d9718cc6（auto-lang知识沉淀）| next: done`。
 
 ## 10. 待澄清事项
 
