@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-004
-status: executing
+status: execution_done
 feature_name: AutoGraphics公共图片资源与2D精灵帧
 author: [Codex]
 created_at: 2026-10-29
 updated_at: 2026-10-29
 plan_revision: 1
-current_step: 5
+current_step: 6
 total_steps: 10
 depends_on: [auto-ui/PLAN-002]
 supersedes_spec_components:
@@ -113,7 +113,7 @@ T-02先在本树形成`attachments/004/work/sprite-resource-contract.md`，并�
 | T-03 | work | T-02通过 | assets/document/storage图片/版本化closure/编辑接线、V-01 | AC-01/02 | [x] |
 | T-04 | work | T-03 | 公共profile/Auto视觉输出与AGP真实绘制、V-02/03；新接口/测试入口创建 | AC-03/04 | [x] |
 | T-05 | work | T-04 | Pause/Step/Stop/新局/owner/失败注入及V-04 | AC-04 | [x] |
-| T-06 | work | T-05 | fresh consumer/预算/旧profile定向面/本代identity controls、fmt/warnings/提交、SD草案及交付说明 | AC-01..05 | [ ] |
+| T-06 | work | T-05 | fresh consumer/预算/旧profile定向面/本代identity controls、fmt/warnings/提交、SD草案及交付说明 | AC-01..05 | [x] |
 | T-07 | review | T-06 | 同树独立最终review，核所有V/S；merge冻结门pending | AC-06 | [ ] |
 | T-08 | merge | T-07 pass | 冻结提交受影响门/复用审计，通过才合本仓master | AC-07 | [ ] |
 | T-09 | merge | T-08 | 沉淀SD/ledger/索引、本仓Plan归档与真实交付SHA/API/包身份 | AC-08 | [ ] |
@@ -131,7 +131,7 @@ T-01 证据：主检出干净（仅 docs 差异）；baseline 六处源码 SHA-2
 
 T-02 证据（本地证据不入库）：合同 `docs/plans/attachments/004/work/sprite-resource-contract.md`（7301 字节，sha256 3ee7aae55aedd6befd13b2c3332cc580402d289d104388a1c8575cb8ad2ff482）冻结 `autographics.sprites2d/1`（profile 20 / number 109）、`ag_sprite_frame(id,x,y,w,h,flip)`、`ag_sprite_slot(token,…)`、`ag_sprite_bound(id)`、1 credit/32 每 callback、每 Run 定长块 `4+targets*7+56`、错误码 41/42/43/44 与 PNG 有限域（8bit RGB/RGBA、无交错、无 APNG、单边 1..2048、解码 16MiB、8 身份/32MiB raw/64MiB CPU+GPU 与模型共享）。`cargo test --locked --test public_sprite_frames -- --test-threads=1` 5 passed：13 个旧 profile 的 api/bridge/combined hash 与 pristine 基线逐字节相同；profile 20 managed 80367 字节（api 76518，96KiB 上限未抬）、块长 74；真实 Auto 24 tick（角色移动+相机+3 实例+3 触发对+精灵更新）中位 5.56ms/P95 7.78ms，帧 0→1→2 随真实 phase、左向只翻 UV 不改位移、实例槽在真实事件读取后切帧 2+flip，全部由 Host 独立验证；PNG 9 类非法输入先拒且 decoder 计数不变；scene/5 往返与旧 schema 拒收新字段成立。相邻回归：`cargo test --locked --lib` 33 passed；authoring_assets 17 / authoring_hierarchy 10 / authoring_document 1 / authoring_session 4 / authoring_storage 3 全绿（schema/4→5 的“当前写出版本”断言与 v1 夹具的 sprite 字段随版本化 scene 一并更新）。T-03 起的编辑接线/磁盘 closure 与 T-04 绘制仍未开始，故不设 execution_done，Plan 保持 executing。
 
-2026-10-29 goal round 1：`stage: goal | plan_id: PLAN-004 | plan_revision: r1 | round: 1 | from: drafting | to: executing | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-004/auto-ui | commit: 7552d01 | next: work`。本轮只完成 T-01/T-02（2/10），其余任务保持未完成；用户对整链 work→review→bounded repair→merge 的授权已记录于本节，后续阶段继承。
+2026-10-29 goal round 1：`stage: goal | plan_id: PLAN-004 | plan_revision: r1 | round: 1 | from: drafting | to: executing | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-004/auto-ui | commit: 7552d01 | next: work`。本轮只完成 T-01/T-02（2/10），其余任务保持未完成；用户对整链 work→review→bounded repair→merge 的授权已记录于本节，后续阶段继承。
 
 基线漂移（已知，不阻断）：本轮期间 master 由 `d3bd6b4` 前进到 `31e4bd2`（另一路线 `fix-synth-surface` 的 pre-landing sync），差异仅 `crates/auto-ui-runtime/src/ui/{handler_codegen,vm_bridge}.rs` +21 行，与本计划的 `experimental/autographics/**`、`docs/plans/004-*` 零重叠；本 worktree 仍基于 `d3bd6b4`，T-08 合并前须再与 master 同步并刷新受影响证据。§2 规划的树/分支 `D:/autostack/.wt/ui-004/auto-ui`、`codex/plan-004-dev` 与用户授权一致。
 
@@ -144,14 +144,19 @@ T-03 证据：图片载荷进入项目闭包与编辑事务。编辑：`Edit::Sp
 
 合同更新（本地 9045 字节，sha256 397a753e…）：§7 更正 T-02 计时为多次运行的区间（debug tick 中位 5.49–9.50ms、P95 7.78–8.55ms、max 9.42–10.54ms，共享机器负载相关；整 tick 仍受 2s 约束），并记录精灵块只占本 Run 约 390 次 Host 往返中的 74 次；§10 记录 T-03 交付事实。T-04 绘制、T-05 生命周期仍未开始，Plan 保持 executing。
 
-2026-10-29 goal round 2：`stage: goal | plan_id: PLAN-004 | plan_revision: r1 | round: 2 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-004/auto-ui | commit: a79ba04 | next: work`。
+2026-10-29 goal round 2：`stage: goal | plan_id: PLAN-004 | plan_revision: r1 | round: 2 | from: work | to: work | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-004/auto-ui | commit: a79ba04 | next: work`。
 2026-10-29 work T-04 checkpoint（r1）：`stage: work | plan_id: auto-ui/PLAN-004 | plan_revision: 1 | outcome: progress | worktree: D:/autostack/.wt/ui-004/auto-ui | branch: codex/plan-004-dev | base_commit: d3bd6b495dc8b690925e88deee9fbf2c42e7f991 | code_commit: ae6e3d9c8d4ae0e24de8f4550fb642b0f547bd1a | task_ids: T-04 | next_responsible_role: work (T-05)`。
 
 T-04 证据：AGP 新增 `renderer/sprite.rs`（内容 SHA 身份纹理、`Rgba8UnormSrgb`、nearest/clamp/无 mipmap、实例化四顶点、每命令一次 draw 保序、与平色管线同相机）+ `SpriteStore`（staged 候选、按内容复用、真实 `created`/`bytes_uploaded`、`device_owners`）。绑定叶与 001 实例改画 PNG：编辑预览用文档默认帧、Run 用真实 Auto 帧，tint 取中性白 × 对象 alpha（避免默认平色污染导入美术）；纹理在 accept 前准备，失败保持整组 last-good；渲染失败先 re-insert surface 再上抛，避免丢槽。`cargo test --locked --test sprite_resources`（AGP）3 passed：真实像素验证 nearest/夹取/翻向/裁剪、透明纹素露出 clear 色、暖帧三次换帧/翻向不新增纹理也不重传像素而实例仍重写、同内容异尺寸/异设备/缺纹理命名拒绝、最后一 owner 释放后弱引用失效、`frame_uv` 越界拒绝。`cargo test --locked --test public_sprite_frames` 12 passed：新增编辑预览像素判据（400±16 左红右蓝、±30 透明边框露画布、翻向只换 U）与真实 Auto 像素判据（frame 0 左红右蓝，左向输入后同矩形左蓝右红），两者都断言 `Descriptor::rows()` 逐值不变（碰撞与 UV 独立）；金币槽先写入帧 2+flip，重生后回到模板默认帧。相邻回归：AGP lib 30 / asset_resources 1 / surface_contract 29 / surface_review_r2 5；驱动 authoring_assets 17 / authoring_host 7 / authoring_play_host 7 全绿。V-03 的 prepare 失败注入与整组 last-good 归 T-05。
 
-2026-10-29 goal round 3：`stage: goal | plan_id: PLAN-004 | plan_revision: r1 | round: 3 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-004/auto-ui | commit: ae6e3d9 | next: work`。
+2026-10-29 goal round 3：`stage: goal | plan_id: PLAN-004 | plan_revision: r1 | round: 3 | from: work | to: work | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-004/auto-ui | commit: ae6e3d9 | next: work`。
 2026-10-29 work T-05 checkpoint（r1）：`stage: work | plan_id: auto-ui/PLAN-004 | plan_revision: 1 | outcome: progress | worktree: D:/autostack/.wt/ui-004/auto-ui | branch: codex/plan-004-dev | base_commit: d3bd6b495dc8b690925e88deee9fbf2c42e7f991 | code_commit: 0e421c310fbc0e7bb93b3778126174d3956ed23a | task_ids: T-05 | next_responsible_role: work (T-06)`。
 
 T-05 证据：Pause 不推 tick 且不改已发布视觉；Step 只推一个中立 tick 并按真实 phase 更新帧；Stop 撤销 runtime owner 并恢复编辑 preview（文档默认帧）；同一文档再次 Run 得到 tick 0/初始化帧。`fail_resource` 注入使 prepare 拒绝整个候选：tick 不前进、位置与已发布 UV/槽帧保持 last-good，Play 记录命名错误；清除注入后 Stop+重 Run 恢复。寿命：prune 仅在仍有 owner 持有载荷时保留纹理，并删除引用已释放纹理的已发布命令；20 轮 Play/Stop（含暖帧换帧）只创建 1 张纹理、只上传 12288 字节且 arc 身份不变，关闭项目后最后一 owner 释放、weak 失效且缓存清零。`cargo test --locked --test public_sprite_frames -- --test-threads=1` 15 passed（连续三次运行均绿），新增 3 个 case 覆盖上述生命周期/失败/owner；AGP `sprite_resources` 3 passed 控制；相邻 authoring_assets 17 / authoring_host 7 / authoring_play_host 7 全绿。
 
-2026-10-29 goal round 4：`stage: goal | plan_id: PLAN-004 | plan_revision: r1 | round: 4 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-004/auto-ui | commit: 0e421c3 | next: work`。
+2026-10-29 goal round 4：`stage: goal | plan_id: PLAN-004 | plan_revision: r1 | round: 4 | from: work | to: work | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-004/auto-ui | commit: 0e421c3 | next: work`。
+2026-10-29 work T-06（r1，work 收尾）：`stage: work | plan_id: auto-ui/PLAN-004 | plan_revision: 1 | outcome: pass | worktree: D:/autostack/.wt/ui-004/auto-ui | branch: codex/plan-004-dev | base_commit: d3bd6b495dc8b690925e88deee9fbf2c42e7f991 | code_commit: 7add28d | dependency_revisions: auto-ui base d3bd6b4、002 交付 0ee5ad0、SDK 681 files/479 包闭包未变 | task_ids: T-01..T-06 | blockers: 无 | next_responsible_role: review (T-07)`。
+
+T-06 证据：`tests/public_sprite_frames.rs` 在 `PLAN004_REPORT_DIR` 下为 5 个 case 落 bounded JSON 证据（profile20 帧序列/块长/装配 hash、真实像素 ROI 翻向前后、10 类准入反例、2048/16MiB/64MiB/8 预算、20 轮纹理复用与 owner 释放）；`python tools/check_sprite_frames.py --controls` 跑真实套件并严格校验，缺 case/外来 runner/篡改像素/抬升预算/暖帧重传全部拒绝后恢复通过。`tools/gen_plan004_identity.py` + `verify_plan004.py` 冻结两包完整闭包 1431 文件（含 681 个 frozen SDK）+ 002 交付与 base pin + 旧 profile 两个装配哈希，`--controls` 对编辑/删除/未列/错 pin 全部拒绝；`verify_source.py`/`package_consumer.py` 以 004 为当前身份（历史链保留）。`cargo fmt --check`（两包）干净、改动文件 0 warning；旧 profile 定向面 `runtime_triggers_api` 14 passed。fresh consumer：`package_consumer.py D:/autostack/.wt/ui-004/consumer-004`（2111 文件/41.4MiB，含 `.sdk-source` 与两锁、无 target），B 内独立 `verify_plan004.py` PASS（1431 hashes）、`cargo test --test public_sprite_frames` 15 passed、`check_sprite_frames.py` PASS。SD 草案 `research/sprite-frames-spec-delta.md`、交付说明 `research/sprite-frames-handoff.md` 已提交；merge 冻结门（全量 AG 套件/native/手动 CLI/release 复测）明确 pending，本收据不声称通过。
+
+2026-10-29 goal round 5：`stage: goal | plan_id: PLAN-004 | plan_revision: r1 | round: 5 | from: work | to: review | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-004/auto-ui | commit: 7add28d | next: review`。work 阶段 T-01..T-06 全部完成（6/10），进入独立 final review。
