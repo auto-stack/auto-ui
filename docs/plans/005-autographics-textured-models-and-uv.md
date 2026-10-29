@@ -5,8 +5,8 @@ feature_name: AutoGraphics有限纹理模型与UV资源闭包
 author: [Codex]
 created_at: 2026-10-29
 updated_at: 2026-10-29
-plan_revision: 2
-current_step: 1
+plan_revision: 3
+current_step: 2
 total_steps: 10
 depends_on: [auto-ui/PLAN-004]
 supersedes_spec_components:
@@ -53,6 +53,8 @@ touched_goals: [GOAL-008]
 T-01核004实际delivery/review/冻结门/Spec合同/两锁、SDK闭包与新增PNG/存储真实签名，冻结本计划输入；004只work/review完成或分支存在不够。T-02先写`attachments/005/work/textured-model-contract.md`，用固定源platform/coin/flag+色图走完整导入→保存→重开→真实GPU路径，冻结支持表/预算/缓存身份和后继动画节点关联。失败回new，不降为平色替代。
 
 新版本明确支持glTF2 GLB单内嵌geometry buffer、静态三角形、原有POSITION/NORMAL和受检TEXCOORD_0、opaque单面或双面、baseColorFactor×baseColorTexture。双面材质按front_facing校正背面法线并在颜色与阴影pass一致关闭剔除；旧平色profile仍保持单面限制。图像仅004已交付PNG支持域；可以来自有界GLB bufferView或受控相对PNG依赖，禁止data/network/绝对URI、query/fragment/百分号变体绕根、路径穿越/链接/reparse，不能将glTF URI直接传给通用加载器做IO。所有声明资源含未引用项均先检。只接受KHR_texture_transform作用于本期UV0的有限offset/rotation/scale与合法texCoord；其余required扩展/多UV/复杂材质具名unsupported，不能静默丢弃。重复JSON键、非有限UV/变换、越界accessor/错误image spans需invalid；超额独立resource_limit。
+
+r3有界实现澄清：固定三个模型另带TANGENT；本期对全部声明的未使用切线做FLOAT VEC4/非normalized/与POSITION同count、存储跨度、有限值及w=±1验证，仍不提供法线贴图。受检geometry-only scratch不将未使用切线传给旧平色decoder，原始GLB及其SHA完全保留；旧profile继续拒绝TANGENT。此为保持必需原件目标的等价局部分解，不增加材质通道或更改原额/AC。
 
 支持glTF nearest/linear、clamp/repeat/mirrored-repeat的有界采样组合；mipmap minFilter按无mipmap下等价基础采样明确归一并记录，实际需要多级才能等价的输入拒绝，不能宣称完整glTF采样器。颜色纹理按sRGB解码/线性乘色，原alpha必须opaque，原有透明sprite规则不推广到3D半透明。材质/UV正确性用非均匀色块/旋转偏移可判别夹具，而非单色colormap截图。
 
@@ -109,7 +111,7 @@ T-03..06建立新入口：`cargo test --manifest-path experimental/autographics-
 | ID | owner_stage | 依赖 | 操作/产物 | AC | 状态 |
 |---|---|---|---|---|---|
 | T-01 | work | 004实际交付、用户启动 | 核004/SDK/两锁/owner；恢复固定素材逐文件清单/许可/来源，建唯一ui-005树 | AC-01/05 | [x] base 2b88bd69、004与修复均已合入；SDK681冷准备通过；固定提交原件/许可/逐文件SHA恢复，见attachments/005/work/fixed-source.md |
-| T-02 | work | T-01 | textured-model-contract：支持表/身份/预算/节点关联、原件全链可行性，失败回new | AC-01/03/05 | [ ] |
+| T-02 | work | T-01 | textured-model-contract：支持表/身份/预算/节点关联、原件全链可行性，失败回new | AC-01/03/05 | [x] 9a0f722：固定三原件经public Host import→save→move→open→GPU capture全链通过；同根换PNG闭包及真实像素必变，切线准入澄清r3；两项测试通过，详见执行合同 |
 | T-03 | work | T-02通过 | 无任意IO的GLB/PNG闭包准入、持久化/编辑绑定、V-01/02 | AC-01/02 | [ ] |
 | T-04 | work | T-03 | UV/材质/纹理shader与cache接线、V-03深度和变异 | AC-03 | [ ] |
 | T-05 | work | T-04 | 候选故障/预算/20轮/owner/共享/静态暖上传V-04 | AC-04 | [ ] |
@@ -130,6 +132,10 @@ T-03..06建立新入口：`cargo test --manifest-path experimental/autographics-
 2026-10-29 合同预检：三份Plan的0..10节、各10任务/8AC/5V、work/review/merge职责、依赖与SD引用检查通过；本批49个局部链接可解析，新增入口均标待建。此为文档预检，非实现测试或独立final review。
 
 2026-10-29 goal round 1：`stage: goal | plan_id: PLAN-005 | plan_revision: r2 | round: 1 | from: work/new | to: work | status: executing | outcome: pass (T-01 only; work incomplete) | worktree: D:/autostack/.wt/ui-005/auto-ui | commit: 2b88bd69 (implementation base), 2c5e4cb (authorized contract/source receipt) | evidence: fixed-source.md、fixed-source-manifest.json SHA 74a88dbc…、prepare_sdk --from-snapshot exit0 | next: work T-02`。T-01已完成1/10；r2支持域及T-02待实现执行合同已记录于attachments/005/work/textured-model-contract.md；未改产品代码，未执行GPU/功能门，不声称work完成。独立review/merge/归档/清理均待后续。
+
+2026-10-29 bounded new r3 / work T-02：原件全链首次失败为`unsupported: vertex semantic Tangents`（t02-fixed-sources.log，合法原件而非损坏反例）；原GLB均带TANGENT，按§5.1补充对未使用切线的受检局部分解，不支持法线贴图、不删原件。修复后提交`9a0f7220f64dc563bc590be2222693a3d48b821c`，`cargo test --manifest-path experimental/autographics-auto-driver/Cargo.toml --locked --offline --test textured_model_resources -- --test-threads=1 --nocapture` exit0：2 passed；三个原件的保存搬迁GPU hash分别为platform `29de5143…`、coin `2386fe1a…`、flag `5e844027…`，原GLB不变且外图变异使真实像素变化；7种坏URI、9类声明负控拒绝，原件恢复绿。证据`D:/autostack/plan-artifacts/auto-ui/plan-005/t02-fixed-sources-r2.log`，SHA256 `6f39e221d24f66ecd1cf8b2d3e74033645974ccec334e6eb120e5239848ab6ac`。driver与AGP fmt已执行，当前构建无新增产品warning（SDK原有146 warnings）。本提交是T-02最小整链，不宣称T-03..06完成：全union预算/嵌入图/持久化故障/UV采样和深度/20轮owner/fresh consumer/identity尚待补齐与检验。
+
+2026-10-29 goal round 2：`stage: goal | plan_id: PLAN-005 | plan_revision: r3 | round: 2 | from: work | to: work | status: executing | outcome: pass (T-02 only; work incomplete) | worktree: D:/autostack/.wt/ui-005/auto-ui | commit: 9a0f7220f64dc563bc590be2222693a3d48b821c | next: work T-03`。前轮为有效进展，本轮已新增可执行全链与原件像素敏感证据；工作树保留，无并行writer/窗口抢焦点/其它Plan变更。
 
 ## 10. 待澄清事项
 
