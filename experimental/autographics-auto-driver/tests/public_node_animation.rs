@@ -412,6 +412,22 @@ fn visual_writes_really_share_the_spatial_credit_window() {
 }
 
 #[test]
+fn full_input_movement_trigger_and_visual_combination_exposes_scalar_read_budget_limit() {
+    // Permanent baseline counterexample for the T-02 design revision: all four
+    // direction keys + jump edge are five charged reads before the character
+    // sweep, grounded, one event read and the required atomic visual write.
+    let user=format!("{START}fn app_update(dt float){{let l=ag_action_held(0);let r=ag_action_held(1);let f=ag_action_held(2);let b=ag_action_held(3);let jump=ag_action_pressed(4);let q=ag_char3_move(0.01,0.01,0.01,0.002);let g=ag_char3_grounded(q);let e=ag_event_next();ok=ag_visual_pose(0,1,3,dt,1,0.0)}}\n");
+    let mut s = session(&user);
+    s.call("_ag_tick", &[Int(1), Float(1. / 60.)], ResultKind::Unit)
+        .unwrap();
+    assert_eq!(
+        s.int("_ag_status", &[]).unwrap(),
+        10,
+        "the frozen scalar input path really exceeds 32, rather than a hypothetical sum"
+    );
+}
+
+#[test]
 fn public_setter_rejects_stale_instance_and_invalid_clip_or_phase() {
     for expression in [
         "ag_visual_pose(0,1,4,0.0,1,0.0)",

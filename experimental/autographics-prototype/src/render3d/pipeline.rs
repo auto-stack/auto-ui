@@ -407,6 +407,16 @@ struct VsOut {
     @location(2) shadow_pos: vec4<f32>,
 };
 
+// Inverse transpose via cofactor columns; node clips can carry nonuniform
+// scale. The model is independently admitted as finite and invertible.
+fn transformed_normal(model: mat4x4<f32>, normal: vec3<f32>) -> vec3<f32> {
+    let a = model[0].xyz;
+    let b = model[1].xyz;
+    let c = model[2].xyz;
+    let determinant = dot(a, cross(b, c));
+    return normalize((cross(b, c) * normal.x + cross(c, a) * normal.y + cross(a, b) * normal.z) / determinant);
+}
+
 @vertex
 fn vs_main(
     @builtin(instance_index) ii: u32,
@@ -418,7 +428,7 @@ fn vs_main(
     let world = model * vec4<f32>(pos, 1.0);
     var out: VsOut;
     out.clip = camera.vp * world;
-    out.world_normal = normalize((model * vec4<f32>(normal, 0.0)).xyz);
+    out.world_normal = transformed_normal(model, normal);
     out.color = color;
     out.shadow_pos = light.shadow_vp * world;
     return out;
@@ -437,7 +447,7 @@ fn vs_shadow(
     let world = model * vec4<f32>(pos, 1.0);
     var out: VsOut;
     out.clip = light.shadow_vp * world;
-    out.world_normal = normalize((model * vec4<f32>(normal, 0.0)).xyz);
+    out.world_normal = transformed_normal(model, normal);
     out.color = color;
     out.shadow_pos = light.shadow_vp * world;
     return out;
