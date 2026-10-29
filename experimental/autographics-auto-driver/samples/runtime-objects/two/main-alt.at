@@ -1,7 +1,7 @@
 // auto-ui PLAN-001 objects2d/1 second public configuration: the SAME scene
-// with a faster coin, a different respawn end and a solid Gem. The changed
-// user parameters alter the real trajectory (pickup tick) and lifecycle —
-// this file is the param-sensitivity twin of main.at.
+// with a faster coin and an earlier respawn line. The changed user
+// parameters alter the real trajectory (pickup tick) and lifecycle — this
+// file is the param-sensitivity twin of main.at.
 var speed=4.0
 var coin_x=8.0
 var h_coin=0

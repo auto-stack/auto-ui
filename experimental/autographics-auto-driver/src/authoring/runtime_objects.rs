@@ -7,11 +7,10 @@
 //! keeps the last complete frame. Instances never enter the Document, the
 //! spatial worlds or the camera/character/solid state: the host renders them
 //! through a non-persistent adapter object derived from the accepted template.
-use super::{
-    document::{Dimension, Kind, Object},
-    hierarchy::Node,
-    runtime_camera::CameraDim,
-};
+use super::{document::Object, hierarchy::Node, runtime_camera::CameraDim};
+
+#[cfg(test)]
+use super::document::{Dimension, Kind};
 
 /// Frozen slot table shape (contract section 3): 8 reserved slots per Run.
 pub const SLOTS: usize = 8;
