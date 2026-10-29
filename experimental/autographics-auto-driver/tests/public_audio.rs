@@ -648,3 +648,50 @@ fn native_stream_contains_actual_decoded_span_waveform_once_after_common_accept(
         "transport replay must not submit another waveform"
     );
 }
+
+#[test]
+fn pause_freezes_sample_cursor_and_step_consumes_ordinals_without_backlog() {
+    use autographics_auto_driver::authoring::public_audio::mixer::{Accepted, Mixer};
+    let (cues, _asset) = decoded_wave_cues();
+    let mut s = session(
+        Api::Audio2V1,
+        &format!(
+            "var r=0\nfn app_start(){{}}\nfn app_update(dt float){{r={}}}\n",
+            bundle(Api::Audio2V1, "1")
+        ),
+    );
+    tick(&mut s, 1);
+    let first = packet(&mut s, 1);
+    let mut m = Mixer::default();
+    m.begin(1).unwrap();
+    m.accept(first.clone(), &cues, false, || Ok(())).unwrap();
+    let mut head = [[0.0; 2]; 2];
+    m.render(&mut head, 44100);
+    assert_eq!(head.as_slice(), &waveform(44100)[..2]);
+    m.pause(1, true).unwrap();
+    let mut silence = [[1.0; 2]; 4096];
+    m.render(&mut silence, 44100);
+    assert!(silence.iter().all(|f| *f == [0.0; 2]));
+    let mut step = first.clone();
+    step.tick = 2;
+    for r in &mut step.requests {
+        r.ordinal += 2;
+    }
+    assert_eq!(
+        m.accept(step.clone(), &cues, true, || Ok(())).unwrap(),
+        Accepted::SuppressedByStep
+    );
+    m.pause(1, false).unwrap();
+    let mut tail = [[0.0; 2]; 6];
+    m.render(&mut tail, 44100);
+    assert_eq!(tail.as_slice(), &waveform(44100)[2..]);
+    assert_eq!(m.voices(), 0);
+    step.tick = 3;
+    assert!(m
+        .accept(step, &cues, false, || panic!(
+            "step ordinal cannot be reused"
+        ))
+        .is_err());
+    m.render(&mut tail, 44100);
+    assert!(tail.iter().all(|f| *f == [0.0; 2]));
+}

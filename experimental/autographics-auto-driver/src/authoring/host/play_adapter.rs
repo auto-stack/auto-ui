@@ -2,6 +2,25 @@
 use super::*;
 
 impl Host {
+    fn begin_audio_run(&mut self, run: i32) -> Result<(), String> {
+        if self
+            .audio
+            .as_ref()
+            .is_none_or(|a| a.mixer.lock().unwrap().fault().is_some())
+        {
+            // Release a failed stream before opening its replacement: only one
+            // native manager is resident, including at round-restart boundaries.
+            self.audio = None;
+            self.audio = Some(crate::authoring::public_audio::native::Native::open()?);
+        }
+        self.audio
+            .as_ref()
+            .unwrap()
+            .mixer
+            .lock()
+            .unwrap()
+            .begin(run)
+    }
     pub(super) fn sync_play_ui(&mut self) {
         if self.play.is_none() {
             for (i, two) in [true, false].into_iter().enumerate() {
@@ -268,20 +287,10 @@ impl Host {
             }
         };
         if play.audio_cues.is_some() {
-            if self
-                .audio
-                .as_ref()
-                .is_none_or(|a| a.mixer.lock().unwrap().fault().is_some())
-            {
-                self.audio = Some(crate::authoring::public_audio::native::Native::open()?);
+            if let Err(error) = self.begin_audio_run(play.run_id()) {
+                self.install_3d(editing_view3d)?;
+                return Err(error);
             }
-            self.audio
-                .as_ref()
-                .unwrap()
-                .mixer
-                .lock()
-                .unwrap()
-                .begin(play.run_id())?;
         }
         self.play_restore = Some(restore);
         self.play = Some(play);
@@ -570,23 +579,20 @@ impl Host {
                 crate::authoring::spatial::Descriptor::build(&self.editor.document, |o| {
                     self.model(o)
                 })?;
-            crate::authoring::play::Play::new_user_spatial(
+            let fresh = crate::authoring::play::Play::new_user_spatial(
                 &self.editor,
                 old.actors,
                 snapshot,
                 descriptor,
-            )
+            )?;
+            if fresh.audio_cues.is_some() {
+                self.begin_audio_run(fresh.run_id())?;
+            }
+            Ok(fresh)
         })();
         match built {
             Ok(mut fresh) => {
                 old.stop();
-                if fresh.audio_cues.is_some() {
-                    if let Some(audio) = &self.audio {
-                        if let Err(error) = audio.mixer.lock().unwrap().begin(fresh.run_id()) {
-                            fresh.fail(error);
-                        }
-                    }
-                }
                 fresh
                     .vm_output_measurement
                     .enable(self.prepare_measurement.enabled);
@@ -608,5 +614,107 @@ impl Host {
                 self.play = Some(old);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod audio_restart_tests {
+    use super::*;
+    #[test]
+    fn preaccept_audio_start_failure_restores_editing_view_and_keeps_host_idle() {
+        use crate::authoring::behavior::{Api, SourceSnapshot};
+        let mut doc = Document::empty("audio-start-refusal".into());
+        doc.schema = "autographics.scene/7".into();
+        doc.cues = Some(vec![]);
+        let mut actor = Object::new(1, Kind::Quad);
+        actor.scale = [0.8, 1.0, 1.0];
+        doc.objects.push(actor);
+        let mut host = Host::with_assets(doc, Default::default()).unwrap();
+        let mut view = host.view3d;
+        view.sample_default = false;
+        view.yaw = 0.4;
+        host.set_view3d(view).unwrap();
+        let view = host.view3d;
+        let camera = host.camera();
+        host.audio = Some(crate::authoring::public_audio::native::Native::open().unwrap());
+        // Exercise the real admission error after runtime-view preparation,
+        // without disconnecting the user's device or substituting a fake sink.
+        host.audio
+            .as_ref()
+            .unwrap()
+            .mixer
+            .lock()
+            .unwrap()
+            .begin(i32::MAX)
+            .unwrap();
+        let source = SourceSnapshot::from_bytes_for(
+            Path::new("start-refusal.at"),
+            b"fn app_start(){}\nfn app_update(dt float){}\n".to_vec(),
+            Api::Audio2V1,
+        )
+        .unwrap();
+        let error = host.start_user_snapshot(source).unwrap_err();
+        assert!(error.contains("stale/exhausted Run"), "{error}");
+        assert_eq!(
+            host.view3d, view,
+            "preaccept failure restores editing camera"
+        );
+        assert_eq!(
+            host.camera(),
+            camera,
+            "installed GPU camera must match editing state"
+        );
+        assert!(host.play.is_none());
+        assert!(host.play_restore.is_none());
+    }
+    #[test]
+    fn round_restart_reopens_faulted_stream_and_invalidates_old_run_owner() {
+        use crate::authoring::behavior::{Api, SourceSnapshot};
+        let mut doc = Document::empty("restart-audio".into());
+        doc.schema = "autographics.scene/7".into();
+        doc.cues = Some(vec![]);
+        let mut actor = Object::new(1, Kind::Quad);
+        actor.scale = [0.8, 1.0, 1.0];
+        doc.objects.push(actor);
+        let mut host = Host::with_assets(doc, Default::default()).unwrap();
+        let source=b"var ok=0\nfn app_start(){ok=ag_char_bind(1);ok=ag_camera_follow_2d(1,-10.0,-10.0,10.0,10.0,4.0,4.0)}\nfn app_update(dt float){}\n";
+        let source =
+            SourceSnapshot::from_bytes_for(Path::new("restart.at"), source.to_vec(), Api::Audio2V1)
+                .unwrap();
+        host.start_user_snapshot(source).unwrap();
+        host.pause_play("");
+        let deadline = Instant::now() + std::time::Duration::from_secs(10);
+        while host.play.as_ref().unwrap().pending() {
+            assert!(Instant::now() < deadline);
+            host.frame(None).unwrap();
+        }
+        assert!(
+            host.play.as_ref().unwrap().error.is_none(),
+            "{:?}",
+            host.play.as_ref().unwrap().error
+        );
+        let run = host.play.as_ref().unwrap().run_id();
+        let owner = host.play.as_ref().unwrap().owner_probe().unwrap();
+        let old = std::sync::Arc::downgrade(&host.audio.as_ref().unwrap().mixer);
+        host.audio
+            .as_ref()
+            .unwrap()
+            .mixer
+            .lock()
+            .unwrap()
+            .output_fault("restart-boundary disconnect".into());
+        host.restart_round();
+        assert!(
+            old.upgrade().is_none(),
+            "failed stream must be dropped, not cleared by Mixer::begin"
+        );
+        assert!(!owner(), "old VM terminated at round boundary");
+        let fresh = host.play.as_ref().unwrap();
+        assert!(fresh.run_id() > run);
+        assert_ne!(fresh.state, crate::authoring::play::State::Faulted);
+        let mut m = host.audio.as_ref().unwrap().mixer.lock().unwrap();
+        assert_eq!(m.fault(), None);
+        assert_eq!(m.run(), fresh.run_id());
+        assert!(m.pause(run, false).is_err());
     }
 }

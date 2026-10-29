@@ -410,3 +410,235 @@ fn repeated_render_capture_and_multiple_portals_do_not_resubmit_accepted_sound()
         h.stop_play();
     }
 }
+
+// Finish the one candidate dispatched before Pause while the native cursor is
+// frozen; wall-clock speed cannot turn a capacity test into a voice-expiry test.
+fn frozen_tick(h: &mut Host, success: bool) {
+    let p = h.play.as_mut().unwrap();
+    p.resume().unwrap();
+    p.char_key(1, true, false);
+    p.dispatch(Action::default()).unwrap();
+    h.pause_play("");
+    pump(h, success);
+}
+fn next_silent_quantum(h: &Host) {
+    let audio = h.audio.as_ref().unwrap();
+    let before = audio.observation.lock().unwrap().callbacks;
+    let deadline = Instant::now() + Duration::from_secs(2);
+    loop {
+        let s = audio.observation.lock().unwrap();
+        if s.callbacks > before {
+            assert_eq!(s.last_run, 0);
+            assert_eq!(s.last_nonzero, 0);
+            break;
+        }
+        drop(s);
+        assert!(Instant::now() < deadline);
+        std::thread::sleep(Duration::from_millis(2));
+    }
+}
+#[test]
+fn ninth_voice_refuses_whole_candidate_without_stealing_or_partial_visual() {
+    for api in [Api::Audio2V1, Api::Audio3V1] {
+        let mut h = scene(api);
+        let user = controller(api, "")
+            .replace("0.5,2,step*2 - 1", "0.5,voices,step*2 - 1")
+            .replace("0,2,step*2 - 1", "0,voices,step*2 - 1")
+            .replace(
+                "let packed=",
+                "var voices=2;if step==5 {voices=1};let packed=",
+            );
+        // Unused wire rows must remain canonical when the ninth request is alone.
+        let user = user.replace("ok=ag_present", "if step==5 {choice=0};ok=ag_present");
+        // Present API canonicalizes slots beyond its count; only the first is used.
+        start(&mut h, api, &user);
+        for i in 1..=4 {
+            frozen_tick(&mut h, true);
+            assert_eq!(h.audio_snapshot()["voices"], i * 2);
+        }
+        let good = h.play.as_ref().unwrap().last.clone().unwrap();
+        let before = h.audio_snapshot()["nonzero"].clone();
+        h.frame(None).unwrap();
+        let surface = if api == Api::Audio2V1 { h.two } else { h.three };
+        let image = h.rt.capture(surface, "eight-voices").unwrap().0;
+        frozen_tick(&mut h, false);
+        let p = h.play.as_ref().unwrap();
+        assert_eq!(p.state, State::Faulted);
+        assert!(
+            p.error.as_ref().unwrap().contains("eight voices"),
+            "{:?}",
+            p.error
+        );
+        assert_eq!(p.last.as_ref().unwrap().tick, good.tick);
+        assert_eq!(p.last.as_ref().unwrap().nodes, good.nodes);
+        assert_eq!(
+            h.audio_snapshot()["voices"],
+            0,
+            "Fault cancels existing voices"
+        );
+        assert_eq!(
+            h.audio_snapshot()["nonzero"],
+            before,
+            "rejected voice never submitted"
+        );
+        assert_eq!(h.rt.capture(surface, "ninth-refused").unwrap().0, image);
+        next_silent_quantum(&h);
+        h.stop_play();
+    }
+}
+#[test]
+fn postaccept_native_error_preserves_visual_cancels_pcm_and_fresh_run_reopens_stream() {
+    for api in [Api::Audio2V1, Api::Audio3V1] {
+        let mut h = scene(api);
+        let source = controller(api, "");
+        start(&mut h, api, &source);
+        frozen_tick(&mut h, true);
+        let oldrun = h.play.as_ref().unwrap().run_id();
+        let oldowner = h.play.as_ref().unwrap().owner_probe().unwrap();
+        let oldmanager = std::sync::Arc::downgrade(&h.audio.as_ref().unwrap().mixer);
+        h.audio
+            .as_ref()
+            .unwrap()
+            .mixer
+            .lock()
+            .unwrap()
+            .pause(oldrun, false)
+            .unwrap();
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while h.audio_snapshot()["nonzero"].as_u64().unwrap() == 0 {
+            assert!(Instant::now() < deadline);
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        h.pause_play("");
+        h.frame(None).unwrap();
+        let frame = h.play.as_ref().unwrap().last.clone().unwrap();
+        let surface = if api == Api::Audio2V1 { h.two } else { h.three };
+        let image = h.rt.capture(surface, "postaccept").unwrap().0;
+        // This is the exact terminal method used by CPAL's output-error callback.
+        h.audio
+            .as_ref()
+            .unwrap()
+            .mixer
+            .lock()
+            .unwrap()
+            .output_fault("injected device disconnect".into());
+        let emitted = h.audio_snapshot()["nonzero"].clone();
+        for _ in 0..3 {
+            h.frame(None).unwrap();
+        }
+        let p = h.play.as_ref().unwrap();
+        assert_eq!(p.state, State::Faulted);
+        assert!(
+            p.error
+                .as_ref()
+                .unwrap()
+                .ends_with("audio_fault: injected device disconnect"),
+            "{:?}",
+            p.error
+        );
+        assert_eq!(p.last.as_ref().unwrap().tick, frame.tick);
+        assert_eq!(p.last.as_ref().unwrap().audio, frame.audio);
+        assert_eq!(
+            h.rt.capture(surface, "fault-keeps-accepted").unwrap().0,
+            image
+        );
+        assert!(!oldowner(), "Fault releases actual VM owner");
+        assert!(h.play.as_mut().unwrap().resume().is_err());
+        next_silent_quantum(&h);
+        assert_eq!(
+            h.audio_snapshot()["nonzero"],
+            emitted,
+            "no automatic retry or rollback"
+        );
+        h.stop_play();
+        let decodes = assets::decode_attempts();
+        start(&mut h, api, &source);
+        assert!(
+            oldmanager.upgrade().is_none(),
+            "faulted stream replaced, not reset"
+        );
+        assert!(h.play.as_ref().unwrap().run_id() > oldrun);
+        frozen_tick(&mut h, true);
+        assert_eq!(
+            h.play
+                .as_ref()
+                .unwrap()
+                .last
+                .as_ref()
+                .unwrap()
+                .audio
+                .as_ref()
+                .unwrap()
+                .requests[0]
+                .ordinal,
+            1
+        );
+        assert_eq!(assets::decode_attempts(), decodes);
+        h.stop_play();
+    }
+}
+#[test]
+fn twenty_runs_release_real_voice_vm_manager_and_pcm_owners_with_legitimate_external_pin() {
+    for api in [Api::Audio2V1, Api::Audio3V1] {
+        let mut h = scene(api);
+        let source = controller(api, "");
+        let cues = public_audio::resolve_cues(&h.editor.document, &h.editor.assets).unwrap();
+        let external = cues[0].pcm.clone();
+        let pcm0 = std::sync::Arc::downgrade(&cues[0].pcm);
+        let pcm1 = std::sync::Arc::downgrade(&cues[1].pcm);
+        drop(cues);
+        let decodes = assets::decode_attempts();
+        let mut manager = None;
+        let mut previous = 0;
+        let uploads = h.resource_snapshot()["mesh_uploads"].clone();
+        for cycle in 0..20 {
+            start(&mut h, api, &source);
+            let p = h.play.as_ref().unwrap();
+            let run = p.run_id();
+            assert!(run > previous);
+            let owner = p.owner_probe().unwrap();
+            let audio = h.audio.as_ref().unwrap();
+            if let Some(weak) = &manager {
+                assert!(std::sync::Weak::ptr_eq(
+                    weak,
+                    &std::sync::Arc::downgrade(&audio.mixer)
+                ));
+            } else {
+                manager = Some(std::sync::Arc::downgrade(&audio.mixer));
+            }
+            assert!(audio.mixer.lock().unwrap().pause(previous, false).is_err());
+            frozen_tick(&mut h, true);
+            let p = h.play.as_ref().unwrap();
+            assert_eq!(
+                p.last.as_ref().unwrap().audio.as_ref().unwrap().requests[0].ordinal,
+                1
+            );
+            assert_eq!(h.audio_snapshot()["voices"], 2);
+            h.stop_play();
+            assert!(!owner(), "{api:?} cycle{cycle}: VM actually released");
+            assert_eq!(h.audio_snapshot()["voices"], 0);
+            assert_eq!(h.audio_snapshot()["run"], 0);
+            assert!(
+                manager.as_ref().unwrap().upgrade().is_some(),
+                "Host retains healthy stream across Stop"
+            );
+            next_silent_quantum(&h);
+            assert_eq!(assets::decode_attempts(), decodes);
+            assert_eq!(h.resource_snapshot()["mesh_uploads"], uploads);
+            previous = run;
+        }
+        drop(h);
+        assert!(
+            manager.unwrap().upgrade().is_none(),
+            "final Host close releases real manager"
+        );
+        assert!(pcm1.upgrade().is_none(), "unpinned static PCM released");
+        assert!(
+            pcm0.upgrade().is_some(),
+            "legitimate external PCM pin retained"
+        );
+        drop(external);
+        assert!(pcm0.upgrade().is_none(), "last legitimate owner released");
+        println!("{api:?} 20Run cycles, zero warm decode/upload, actual VM/manager/PCM weak owners released");
+    }
+}
