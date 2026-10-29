@@ -1,0 +1,13 @@
+[workspace]
+[package]
+name = "autographics-g2-budget"
+version = "0.1.0"
+edition = "2021"
+[dependencies]
+autographics-auto-driver = { path = "D:/autostack/plan-artifacts/auto-ui/plan-011/consumer/experimental/autographics-auto-driver" }
+serde_json = "1"
+sha2 = "0.10"
+glam = "0.34"
+png = "0.17"
+[profile.dev]
+debug = 0

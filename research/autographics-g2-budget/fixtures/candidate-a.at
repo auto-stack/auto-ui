@@ -1,0 +1,88 @@
+// PLAN-011: every gameplay decision belongs to this Auto callback.
+var ok=0
+var grounded=0
+var vy=0.0
+var facing=0
+var phase=0
+var state=0
+var bag=0
+var ex=11.0
+var direction=1.0
+var c0=0
+var c1=0
+var c2=0
+var enemy=0
+var oldframe=0
+var oldflip=0
+var jump_intent=0
+var coin_intent=0
+var hud_intent=0
+fn app_start() {
+ ok=ag_char_bind(1)
+ ok=ok+ag_char_solid(2)
+ ok=ok+ag_char_solid(3)
+ ok=ok+ag_char_solid(4)
+ ok=ok+ag_char_solid(5)
+ ok=ok+ag_char_solid(6)
+ ok=ok+ag_char_solid(7)
+ ok=ok+ag_char_solid(8)
+ ok=ok+ag_camera_follow_2d(1,0.0,-4.0,30.0,12.0,12.0,8.0)
+ c0=ag_object_spawn(0,9,4.0,1.0,0.0)
+ c1=ag_object_spawn(1,9,13.0,2.25,0.0)
+ c2=ag_object_spawn(2,9,24.0,1.0,0.0)
+ enemy=ag_object_spawn(3,10,11.0,0.5,0.0)
+ ok=ok+ag_trigger_bind(0,1,1,c0,1,0.5)
+ ok=ok+ag_trigger_bind(1,1,1,c1,1,0.5)
+ ok=ok+ag_trigger_bind(2,1,1,c2,1,0.5)
+ ok=ok+ag_trigger_bind(3,1,1,enemy,1,0.5)
+ ok=ok+ag_trigger_bind(4,1,0,11,1,0.5)
+ ok=ok+ag_sprite_frame(1,0,0,32,32,0)
+ grounded=ag_char_grounded(0)
+}
+fn collect(p int) {
+ if p==0 {ok=ok+ag_object_despawn(c0);bag=bag+1;coin_intent=coin_intent+1}
+ if p==1 {ok=ok+ag_object_despawn(c1);bag=bag+1;coin_intent=coin_intent+1}
+ if p==2 {ok=ok+ag_object_despawn(c2);bag=bag+1;coin_intent=coin_intent+1}
+ if p==3 {state=2}
+ if p==4 && bag==3 && state==0 {state=1}
+ hud_intent=hud_intent+1
+}
+fn app_update(dt float) {
+ if state!=0 {
+  if ag_action_pressed(3)==1 {ok=ok+ag_round_request()}
+  return
+ }
+ let jump=ag_action_pressed(2)
+ let right=ag_action_held(1)
+ let left=ag_action_held(0)
+ if right==1 {facing=0}
+ if left==1 {facing=1}
+ if jump==1 && grounded==1 {vy=8.0;jump_intent=jump_intent+1}
+ let dx=(right - left)*4.0*dt
+ let dy=vy*dt
+ let q=ag_char_move(dx,dy,0.002)
+ grounded=ag_char_grounded(q)
+ var x=0
+ if grounded==1 {
+  if right==1 || left==1 {
+   phase=phase+1
+   if phase>1 {phase=0}
+   if phase==0 {x=32} else {x=64}
+  } else {phase=0}
+ } else {
+  if vy>0.0 {x=96} else {x=128}
+ }
+ // SPRITE_WRITE
+ ok=ok+ag_sprite_frame(1,x,0,32,32,facing)
+ if grounded==1 {vy=0.0} else {vy=vy - 20.0*dt}
+ ex=ex+direction*dt
+ if ex>=17.0 {ex=17.0;direction=0.0 - 1.0}
+ if ex<=11.0 {ex=11.0;direction=1.0}
+ ok=ok+ag_object_move(enemy,ex,0.5,0.0)
+ for i in 0..6 {
+  if ag_event_next()==0 {break}
+  let p=ag_event_pair()
+  if ag_event_phase()==1 {collect(p)}
+ }
+ if ag_world(0,1)<0.0 - 3.0 {state=2;hud_intent=hud_intent+1}
+}
