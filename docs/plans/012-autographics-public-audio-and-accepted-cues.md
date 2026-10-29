@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-10-30
 updated_at: 2026-10-30
 plan_revision: 1
-current_step: 2
+current_step: 5
 total_steps: 10
 depends_on: [auto-ui/PLAN-006]
 supersedes_spec_components: [docs/specs/auto-graphics/scene-assets.md, docs/specs/auto-graphics/behavior-api.md]
@@ -115,9 +115,9 @@ work自查后同树独立上下文review全部AC/V/S/SD、计价/codec/不可逆
 |---|---|---|---|---|---|
 | T-01 | work | 用户启动、006实际delivery | 核公开合同/SDK/锁/identity/设备条件与owner，建唯一ui-012树 | AC-01/05 | [x] f7c83c6基线；006独立R2/实际c681663/1477identity controls与SDK681/17包29边479metadata通过；native输出设备可用，执行合同含边界 |
 | T-02 | work | T-01 | public-audio-contract先冻结支持/计价/bundle/效果时序/PCM入口，两维整链可行性probe，不足回new | AC-01..05 | [x] ef438f9；14定向integration+1bank组合，15组独立PCM波形/长度交叉oracle；两维真实32/33、Host同帧/原声native、scene7保存搬迁/Step静音/last-good/旧15hash通过；完整AC后继门仍pending |
-| T-03 | work | T-02通过 | 有限codec/cue/asset闭包与存储版本化，V-01 | AC-01/02 | [ ] |
-| T-04 | work | T-03 | Auto/Host有界请求与mixer/native输出、接受幂等/32-33/错bundle，V-02/03 | AC-03 | [ ] |
-| T-05 | work | T-04 | 生命周期/设备故障/容量/20轮owner及完整账，V-03/04 | AC-04 | [ ] |
+| T-03 | work | T-02通过 | 有限codec/cue/asset闭包与存储版本化，V-01 | AC-01/02 | [x] 0bb1ce1；resources9/codec6通过，30schema/cue负控、8/32MiB/CPU实际并集、保存故障/损坏修复冷重开/ancestor junction拒；t03-t04-closure.md |
+| T-04 | work | T-03 | Auto/Host有界请求与mixer/native输出、接受幂等/32-33/错bundle，V-02/03 | AC-03 | [x] b10cc6a；两维各24实际VM输出破坏、精确大ordinal/4-5请求、整段PCM span/gain/tail/三rate及真实native/multimount重放通过；t03-t04-closure.md |
+| T-05 | work | T-04 | 生命周期/设备故障/容量/20轮owner及完整账，V-03/04 | AC-04 | [x] 4400661；两维真实8/第9拒整帧、postaccept Fault/下一quantum静音/新stream恢复、各20轮实际VM/manager/PCM弱owner及warm0；Pause非恒定波形cursor/Step无积压、restart故障负控及启动失败camera恢复；t05-lifecycle-closure.md |
 | T-06 | work | T-05 | fresh两维消费/预算/兼容/identity controls、fmt/提交、SD与G12a交付说明，V-05 | AC-01..05 | [ ] |
 | T-07 | review | T-06 | 同树独立final review，merge门pending | AC-06 | [ ] |
 | T-08 | merge | T-07 pass | 冻结定向门/有效复用后合master，不带Gallery内容 | AC-07 | [ ] |
@@ -144,6 +144,14 @@ work自查后同树独立上下文review全部AC/V/S/SD、计价/codec/不可逆
 
 2026-10-30 goal round2：`stage: goal | plan_id: PLAN-012 | plan_revision: r1 | round: 2 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-012/auto-ui | commit: ef438f9cff1d6313100ca0e1873079da31b7bd09 | next: work T-03`。前轮是基础实施进展，本轮解决真实作者Host/持久化接线、取得独立Vorbis格式反证并修正语义，再冻结完整组合/支持域/共享资源账，属实质进展；2/10，0failed final review/0repaircycle，无用户待答，目标未缩减。下一轮按T03关闭准入/保存损坏修复完整负控，后继AC/gates不提前打勾。
 
+2026-10-30 work T-03..05 closure：`stage: work | plan_id: auto-ui/PLAN-012 | plan_revision: 1 | outcome: pass (T-03/04/05 checkpoint; work_complete:false) | worktree_path: D:/autostack/.wt/ui-012/auto-ui | branch: codex/plan-012-dev | base_commit: f7c83c6fbe55b51b4c1e830a4175c94ec5c0d131 | code_commit: 4400661a04c456b710e757cfa697876bc98adcc9 | dependency_revisions: SDK681/two lock versions unchanged,no dependency code writes | task_ids: T-03,T-04,T-05 closed | evidence: attachments/012/work/t03-t04-closure.md,attachments/012/work/t05-lifecycle-closure.md | blockers: none | next_responsible_role: work T-06`。T03提交0bb1ce1，resources9/codec6实际schema/cue/采样参数/容器边界/保存损坏修复/冷重开及共享raw8/32MiB/CPU账负控通过。T04提交b10cc6a，两维各24实际VM输出破坏经普通Play→独立mixer prepare→共同accept，禁止部分状态/PCM；public_audio9case、native格式unit、multimount实际1case通过，完整独立波形span/gain/tail三rate及本stream真实提交波形/重放一次性通过；观察点修到设备channel mapping/量化之后，mono相消不能假非零。
+
+T05提交4400661，3Host定向case（两维各8/9voice、真实已发PCM后同CPAL错误终端路径注入、各20轮启停）+1非恒定waveform暂停cursor/Step+2启动/回合重启unit通过。warm实际0decode/0mesh上传，Stop实际VM owner死/Run0/voices0、下一服务quantum无旧PCM，Host最终drop才manager弱引用死；合法外部PCM pin保留并最后drop后弱owner死。postaccept Fault保最后Frame/GPU/已发计数，无重试补播，freshRun重建故障stream。统一begin先drop坏stream再open，避免清fault假恢复/瞬时双manager；回合重启同样恢复，失败保旧展示；初次音频启动准入失败重装真实editing GPU camera。控制变异复用坏stream确实在永久unit弱owner断言失败，finally恢复后通过。设备均真实打开成功；注入的是CPAL实际错误回调共用终端方法，不假称物理断开。硬件已缓冲样本不计可撤回边界。
+
+详细命令/exit/count/SHA在两份摘要；T05关键log：t05-owners SHA adfb9af16495645eb0200d348bc2d6d722a704c6defb0f7c90b3e7a2c7360308；t05-device-fault SHA728a17ae37a240da541789c720090dba441b99025bf8f0c1c92fb6f6421e34d8；t05-start-restart-final SHA1c2cc055bc33c67ee32e42fc689785ffb969ab4019bb38a2d5b06222b96d1ebb；均本地D:/autostack/plan-artifacts/auto-ui/plan-012。fmt/diff通过，SDK146既有warning保留，未见本期新增warning。变更后的成功路径与前期资源/codec/wire隔离，未重跑无关族/根Cargo/全AG；仅最终camera失败支路额外定向复验，冻结果门仍review/merge所有。当前5/10，未交review、未发布Spec/ledger/新identity；T06 fresh两维独立consumer/实际性能/012identity controls/SD与下游说明开放，T07..10仍pending。
+
+2026-10-30 goal round3：`stage: goal | plan_id: PLAN-012 | plan_revision: r1 | round: 3 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-012/auto-ui | commit: 4400661a04c456b710e757cfa697876bc98adcc9 | next: work T-06`。本轮关闭T03/04/05并以设备恢复反例修正同源边界，实质进展；5/10，0failed final review/0repaircycle，无用户待答。下一轮关闭两维fresh离线消费/完整预算/identity/规范增量后才交独立复审，不把本轮定向绿等同全部AC通过。
+
 ## 10. 待澄清事项
 
-当前无用户待答问题。T-01/02已完成，2/10；T-02支持域/版本/wire/效果时序与资源账冻结，作者Host两维完整accept/native/scene7闭包可行性已实测，旧15profile字节相同。round1 padded Vorbis帧数由本轮独立libsndfile oracle纠正，早期基础长度不作为当前cue/bank验收依据。下一步T-03完整codec/cue/identity/version/资源额度/存储故障与损坏修复负控；T-04完整请求PCM/native重放与wire负控、T-05容量8/9/设备故障/20轮owner、T-06 fresh consumer/identity/性能/SD及T-07..10均pending。若原合同不可行回new，不扩录音/空间音频或抬预算。011不自动升级，完整游戏G2-09/G3-08仍需真实消费者后继验证。
+当前无用户待答问题。T-01..05已完成，5/10；支持域/版本/wire/效果时序与资源账冻结，完整资源存储负控、请求/PCM/native幂等与生命周期8/9/设备Fault/各20轮实际owner已闭合。round1 padded Vorbis帧数早期基础长度已由独立libsndfile oracle纠正，不作为当前cue/bank验收依据。下一步T-06 fresh两维离线consumer/完整性能/012identity controls/SD与G12a说明；T-07独立review、T-08冻结定向合并门和T-09/10规范ledger归档清理均pending。若原合同不可行回new，不扩录音/空间音频或抬预算。011不自动升级，完整游戏G2-09/G3-08仍需真实消费者后继验证。
