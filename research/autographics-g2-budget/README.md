@@ -1,4 +1,4 @@
-# G2 full-loop budget research (auto-ui PLAN-011 r1)
+# G2 full-loop budget research (auto-ui PLAN-011 r2)
 
 This is a replayable negative feasibility study, not a game release. The original
 G2 geometry and complete public Auto controller run through the pinned source
@@ -112,3 +112,9 @@ All required G2-01..09 rows remain in the decision. Original core states after
 tick1 are not_established_budget_fault, even when an isolated control succeeds.
 Canonical knowledge changes are proposed in spec-delta.md and published only
 by merge after acceptance review.
+
+
+PLAN-011 r2 user ruling (2026-10-30): exact per-callback step/resume counters
+are accepted as unmeasured for this fixed consumer, with unchanged SDK limits
+and all other real evidence retained. This does not claim measured consumption
+or a margin below those limits and does not change game budgets or outcomes.

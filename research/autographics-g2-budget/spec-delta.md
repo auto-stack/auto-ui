@@ -1,4 +1,4 @@
-# Proposed canonical Spec delta — UI-011 r1
+# Proposed canonical Spec delta — UI-011 r2
 
 Knowledge owner: auto-lang; do not publish from work.
 
@@ -30,3 +30,9 @@ No current game, full M2, final art or release readiness is established here.
 Merge updates the canonical index and derived ledger by the existing workflow,
 records delivery/source revisions, archives the local Plan and guarded-cleans
 only ui-011 worktrees. Other active Plan WIP is unrelated.
+
+
+PLAN-011 r2 user ruling (2026-10-30): exact per-callback step/resume counters
+are accepted as unmeasured for this fixed consumer, with unchanged SDK limits
+and all other real evidence retained. This does not claim measured consumption
+or a margin below those limits and does not change game budgets or outcomes.
