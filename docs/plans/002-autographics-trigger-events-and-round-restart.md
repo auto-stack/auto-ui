@@ -1,75 +1,75 @@
 ---
 plan_id: PLAN-002
 status: drafting
-feature_name: AutoGraphics有限触发事件与新局隔离及Gallery G11
+feature_name: AutoGraphics有限触发事件与新局隔离（引擎）
 author: [Codex]
 created_at: 2026-10-29
 updated_at: 2026-10-29
-plan_revision: 3
+plan_revision: 4
 supersedes_spec_components:
   - docs/specs/auto-graphics/scene-play-session.md
   - docs/specs/auto-graphics/auto-source-driver.md
 new_spec_components:
   - docs/specs/auto-graphics/runtime-triggers-and-rounds.md
-  - docs/specs/auto-graphics/gallery-runtime-objects.md
 touched_goals: [GOAL-008]
-affects: [auto-graphics, ag-examples]
+affects: [auto-graphics]
 depends_on: [PLAN-001]
 current_step: 0
-total_steps: 11
+total_steps: 10
 ---
 
-# [PLAN-002] AutoGraphics有限触发事件与新局隔离及Gallery G11
+# [PLAN-002] AutoGraphics有限触发事件与新局隔离（引擎）
 
 
-> **本仓编号更正 r3（2026-10-29）**：唯一身份为`auto-ui/PLAN-002`，来源为旧`auto-lang/PLAN-883`。本仓计划从001独立取号，旧号只作来源映射，不作为本仓编号高水位。功能/AC/V及任务进度保持，仍drafting、未执行；实施树和分支改为本仓新号。既有auto-lang Specs/设计继续明确跨仓引用，未批量迁移知识。
+
+> **用户批准拆分 r4（2026-10-29）**：本计划只交付auto-ui引擎能力及必要测试夹具，不写ag-examples。G11的两维项目、目录/锁、验收与离线包整体移交[ag-examples/001](../../../ag-examples/docs/plans/001-autographics-gallery-runtime-objects.md)，该计划硬等本计划实际交付后启动。编号不变，原r1..r3记录保留，尚未实施。
 
 ## 0. 变更摘要
 
-消费[001对象生命周期](001-autographics-runtime-object-lifecycle.md)实际交付，建立有界几何触发/一次事件读取及受检新Run请求。两维公开小工程验证三物品收集、危险/终点与胜负后新局，玩法仍由用户Auto负责。承接Gallery G11的两维仓外示例；内容阶段等880交付，不接管其在途树。
+消费[auto-ui/001对象生命周期](001-autographics-runtime-object-lifecycle.md)实际交付，建立有界几何触发、一次事件读取及受检新Run请求。两维最小Auto工程作为引擎验收夹具，验证三物品收集、危险/终点与胜负后新局，玩法由用户Auto负责。只在auto-ui实现、测试、复审、合入与归档。
 
-本稿是有前置的语义合同：001尚未实施，不能预填其最终版本/计费/接口。T-01/02在实际交付基线上冻结本计划；语义变化递增revision。不是完整G2/G3游戏或HUD/声音交付。
+下游[ag-examples/001](../../../ag-examples/docs/plans/001-autographics-gallery-runtime-objects.md)独立消费本计划已合入的实际交付版本制作G11；其完成不再是本计划合入条件，不允许反向依赖造成循环。本稿仍有硬前置auto-ui/001，T-01/02在实际交付基线上冻结版本/签名/计费，不抢跑依赖或预填未来SHA。
 
 ## 1. 目标
 
-- 每Run最多8对显式触发，分别有enter/stay/exit、确定顺序和Run/tick/对象代次；同tick只评估一次，事件有界、读取不重发。
-- 三个不同物品各首次收集一次；危险/敌人或越界失败、集齐才可终点获胜由Auto状态机决定。销毁物品是真生命周期，旧代不因槽复用继续触发。
-- 用户Auto请求新局后进入新Run/VM，重置位置/物品/计数/输入与事件，拒绝旧Run迟到结果；新初始帧失败保完整last-good。
-- G11/2d、G11/3d在ag-examples作为独立公开项目/离线包，元数据与真实源/引擎/记录绑定。
+- 每Run最多8对显式触发，有enter/stay/exit、确定顺序和Run/tick/对象代次；同tick只评估一次，事件有界、读取不重发。
+- 真实用户Auto状态机区分不同物品/重复stay/危险/终点，销毁是真生命周期，同槽新代不继承旧触发。
+- Auto请求新局后进入新Run/VM，重置位置/物品/计数/输入/事件，拒绝旧Run迟到结果；新初始帧失败保完整last-good。
+- 交付可验证的公共接口、两维引擎夹具、源码/SDK/锁/独立consumer与测试证据，供下游冻结版本消费。
 
-非目标：完整两款游戏/最终关卡、动态solid/移动平台/刚体、无限碰撞世界/自动全对扫描、连续碰撞或高速穿越触发保证、动画/纹理/声音/HUD、通用事件总线/跨线程消息、任意多场景切换/存档/联网、880内容/工具重写、ACE/UI融合/跨端/发布。G11占位形状可表现身份变化，不认领最终美术。
+非目标：G11产品工程/目录/锁接线/离线ZIP/内容仓实现或合入（归ag-examples/001）、完整两款游戏/最终关卡、动态solid/移动平台/刚体、无限碰撞世界/自动全对扫描、连续碰撞/高速穿越触发保证、动画/纹理/声音/HUD、通用事件总线、任意多场景切换/存档/联网、ACE/UI融合/跨端/远端发布。
 
 ## 2. 架构方案
 
-受信Auto按本tick接受前的实际世界位置计算有限形状相交、比较前态、提供callback内有界事件结果；用户Auto负责计数、巡逻、胜负和请求restart。Rust只做配置/身份/几何来源准入、新Run调度与GPU事务，不识别金币/终点名称执行玩法。
+受信Auto按本tick实际世界位置计算有限形状相交、比较前态、提供callback内有界事件结果；用户Auto负责计数、巡逻、胜负和请求restart。Rust只做配置/身份/几何来源准入、新Run调度与GPU事务，不识别金币/终点名称执行玩法。
 
-复用一个Host/Play/Session调度栈；以新显式组合身份隔离001及所有旧profile。候选触发结果、实例生命周期、角色与相机共同准入/prepare/accept/publish；restart是候选中显式请求，在已接受边界启动全新Run，不在回调中递归建VM或复用旧globals。
+复用单Host/Play/Session调度栈，新显式组合身份隔离001及旧profile；触发结果、实例生命周期、角色与相机共同准入/prepare/accept/publish。restart作为已接受callback的显式请求，在接受边界创建新Run，不在回调中递归建VM或复用旧globals。
 
 ## 3. 技术栈
 
-auto-ui driver已有`src/authoring/{play.rs,behavior.rs,behavior/assembly.rs,game_input.rs,runtime_camera.rs,spatial.rs}`、`host/{play_adapter.rs,viewport.rs}`，001拟新增runtime_objects模块。当前实际路径与基线见[本批基线](attachments/001/planning/baseline.md)。无新增SDK/依赖。
+auto-ui driver已有`src/authoring/{play.rs,behavior.rs,behavior/assembly.rs,game_input.rs,runtime_camera.rs,spatial.rs}`、`host/{play_adapter.rs,viewport.rs}`；001将提供runtime_objects模块。当前源码事实见[原规划基线](attachments/001/planning/baseline.md)。无新增SDK/依赖。
 
-本计划新路径拟为`api/runtime_triggers_v1.at`、`src/authoring/runtime_round.rs`、`tests/{runtime_triggers_api,runtime_round_host,runtime_trigger_samples}.rs`、`samples/runtime-triggers/{two,three}/`、新identity/checker；ag-examples新增`examples/g11-runtime-objects/{2d,3d}/`与README/元数据/锁。具体命名/签名/内部编号在001交付后T-02冻结，不虚构已存在API。
+拟新增`api/runtime_triggers_v1.at`、`src/authoring/runtime_round.rs`、`tests/{runtime_triggers_api,runtime_round_host,runtime_trigger_samples}.rs`、`samples/runtime-triggers/{two,three}/`及本代identity/checker；局部命名/签名/编号由T-02冻结。samples是必要引擎测试/公共入口夹具，不是G11目录产品；本计划无ag-examples写入树。
 
 ## 4. 需求分析与背景调查
 
-授权：用户2026-10-29要求879迁仓后规划下一阶段，880已开始开发。本轮只规划，无实现/新树/agent/880修改/远端动作；执行等待后续work指令。001是引擎硬前置；Gallery所需880已交付（ag-examples c36c412）。T-05仍要复核880后的实际工具schema及owner，不接管后续在途改动。
+授权：用户2026-10-29明确批准“auto-ui/002只做引擎，G11另建ag-examples/001，依赖002实际交付，暂不实施”。本轮只修计划/引用，未建树/编译/运行OS或GPU/创建agent。T-01仍等auto-ui/001实际交付，已有其工作树不等于已交付；本次不修改其源码、进度或验收合同。
 
-权威输入：`docs/specs/overview.md`、`auto-graphics/{source-repository-and-sdk,behavior-api,scene-play-session,spatial-query-profile,game-actions-and-character2d,game-character3d,runtime-game-cameras,gallery-basic-six}.md`；[Design45§13](../../../auto-lang/docs/design/45-autographics-wgpu-engine-and-game-prototypes.md#13-m2运行对象触发与新局事务2026-10-29拟议合同)、[游戏分母](../../../auto-lang/docs/design/autographics/m2-game-sample-matrix.md)、[Gallery矩阵](../../../auto-lang/docs/design/autographics/m2-gallery-and-capability-matrix.md)及001/880合同。本轮不改canonical Specs。
+权威输入仍为auto-lang现有`docs/specs/overview.md`与`auto-graphics/{source-repository-and-sdk,behavior-api,scene-play-session,spatial-query-profile,game-actions-and-character2d,game-character3d,runtime-game-cameras}.md`，按[知识入口](../../../auto-lang/docs/specs/auto-graphics/overview.md)跨仓读取；[Design45§13](../../../auto-lang/docs/design/45-autographics-wgpu-engine-and-game-prototypes.md#13-m2运行对象触发与新局事务2026-10-29拟议合同)、[游戏分母](../../../auto-lang/docs/design/autographics/m2-game-sample-matrix.md)和auto-ui/001约束能力分母。SD路径暂以现有auto-lang知识仓为根；本轮不搬迁/修改canonical Specs。
 
-原r1只读auto-ui基线`4adf2d037a1804741adc9c5a012f08cfa566439d`（879），真实执行base必须换为001交付SHA并复核差异/SDK/锁/动态对象合同；AGSDK旧pin7b987ca8/681快照不变。ag-examples规划观察master6a223d9，880唯一树在lang-880；不能据drafting/clean断言其无owner或抢树。G11内容实际base必须为880交付，按其最终按项锁schema，不用本稿猜未来格式。
+原r1源码观察为879交付`4adf2d037a1804741adc9c5a012f08cfa566439d`；执行必须换为auto-ui/001实际交付SHA并核差异/对象代次/SDK/锁。旧SDK pin7b987ca8/681快照及原限额保持。当前旧v2只有闭区间单对overlap，无引擎事件流；Play有新Run建VM、Stop恢复编辑Prepared，但无公共restart保旧到新tick0边界，不能把命令已发送当新局完成。
 
-源码已核：旧v2 `ag_aabb_overlaps`是闭区间、单对查询，没有引擎事件队列；用户例子自己存前态。Play新Run会重建VM，Stop保编辑Prepared；缺少公开用户restart请求与保旧到新tick0的专用边界。已有游戏研究要求三个独立收集物、半径0.5触发区域、胜负后Enter新局、旧句柄不可影响新局。本Plan不能把触发AABB包围盒误当圆/球，或把Stop/Run命令发出算新局完成。
+旧混合r3曾包含G11内容和双仓合入；本次按用户授权拆分完整移交内容验收，而非删除分母。追溯：[拆分映射](../../../ag-examples/docs/plans/attachments/001/planning/split-contract.md)。下游可用接口/源码包/真实运行证据以本计划最终交付为准，不消费在途tip。
 
 ## 5. 详细设计
 
 ### 5.1 唯一树与前置冻结
 
-引擎唯一树`D:/autostack/.wt/ui-002/auto-ui`，分支`codex/plan-002-dev`，001实际交付后从该auto-ui源码SHA创建；源码只合auto-ui/master。G11唯一内容树`D:/autostack/.wt/ui-002/ag-examples`、同名分支，在880交付且其树退出共享工具写入后创建。auto-ui主检出持本Plan唯一簿记；语言仓只按既有知识归属同步SD/索引。每仓一树，同树顺序work/独立review/merge；无链接，清理先guard。
+唯一实现树`D:/autostack/.wt/ui-002/auto-ui`，分支`codex/plan-002-dev`，从auto-ui/001实际交付SHA创建，源码只合auto-ui/master；auto-ui主检出持本Plan/进度/复审/归档。旧知识按现有归属同步SD/索引，不在语言仓创建本Plan副本。每Plan每仓一树，同树顺序work/独立review/merge，无链接，清理先guard。
 
-T-01复核001实际接口/Run域/模板与活对象表、原SDK/两锁/current identity；T-02冻结`attachments/002/work/triggers-round-contract.md`：profile/签名、8对资源表、事件字段/顺序/读取/重绑规则、几何边界、restart状态图/失败路径、全部消费者和实际计费。
+T-01复核001实际接口/Run域/模板/活对象表、SDK/锁/current identity；T-02冻结`attachments/002/work/triggers-round-contract.md`：profile/签名、8对资源表、事件字段/顺序/读取/重绑、几何边界、restart状态图/失败路径、消费者与计费。
 
-先证明整路径：真实Auto单角色运动/跳/归一＋相机＋8对检测＋三物品同tick相交/消费/真实销毁＋结果输出。保持共享32credits、1000steps/slice、100000steps/callback、120resumes/250ms、256/64/320KiB、30s初始化/2s整tick/8ms目标。若需紧凑输入或有界批量几何，必须先冻结明确成本/正反例，不以回调拆分或免费无界扫描绕过限额；不足回new。第一次query成功不能替代该组合门。
+先证明整路径：真实Auto单角色运动/跳/归一＋相机＋8对检测＋三物品同tick相交/消费/真实销毁＋结果输出。共享32credits、1000steps/slice、100000steps/callback、120resumes/250ms、256/64/320KiB、30s初始化/2s整tick/8ms目标保持。紧凑输入/批量几何先冻结实际成本/正反例，不以拆callback或免费无界扫描绕限；不足回new。
 
 ### 5.2 有界触发与几何
 
@@ -99,66 +99,68 @@ Host沿原单一调度栈终止旧局：清held/pending/camera capture，关闭�
 
 20轮成功新局、失败初始化、Pause/Step/Stop/关闭检查最后VM/对象/事件owner和静态资源复用；保留旧画面所需合法Prepared引用与旧VM/事件owner区别记录。用户外部pin合法保留时只在最后释放后检查，不把计数清零当释放。
 
-### 5.5 两维公开工程与G11内容交付
+### 5.5 引擎夹具与下游交付接口
 
-引擎samples两维各最小试验场，含3个不同实例物品、一个危险/非solid巡逻物体和终点，角色使用已交付公共控制器/相机。Auto内状态机验证：未集齐不胜利、重复stay不加分、同tick三物品各一次、危险/越界失败、集齐触终点胜利、两种结束后Enter新Run。不是最终G2/G3关卡，不要求在此制作纹理/模型动画或音频HUD；可读状态由验收接口/已有形状表达，不能另造每游戏Rust宿主。
+引擎samples两维各最小试验场，含3个不同实例物品、一个危险/非solid巡逻物体和终点，消费已有公共角色/相机。Auto状态机必须验证未集齐不胜利、stay不重复计数、同tick三物品各一次、危险/越界失败、集齐触终点胜利、Won/Failed后Enter新Run。这些是引擎功能的必要代表性测试，保留原分母，不由Rust业务或Gallery验收代替。
 
-G11/2d、G11/3d两子入口消费同Plan冻结引擎候选；正常launch只公开CLI，无probe或checks依赖。G11 README、源码/资源、触发几何、生命周期/旧代拒绝/新局恢复、限制/平台与确切引擎锁齐备。Gallery工具按880交付schema做最小新API/锁接线，不改旧G01..08的固定pin/acceptance；总9项16入口（以880实际8项14入口交付为前提），G09/G10仍未交付，不占满12项。
+两维真实Auto与无窗口Host/GPU、参数/输入变异、独立own-SDK consumer、预算/身份/owner均由本计划闭合。无需为引擎夹具建设Gallery索引/产品README/下载ZIP，也不修改G01..08/内容工具。夹具不是最终游戏、美术或声音/HUD交付。
 
-G11单项ZIP包含两维、说明/许可/必要小资源/选中锁/通用工具，固定引擎独立取得；新目录A实际运行/保存，搬B重开，不访问生产者目录/链接/网络；篡改/缺件拒绝，修复同入口绿。内容树只在880交付后写，T-05前若880未完明确等待、不接管或暗自推迟G11到后继。两仓review绑定引擎/内容冻结commit；合入先auto-ui引擎后ag-examples内容，主语言知识最后沉淀，无远端发布。
+面向下游的交付收据必须绑定：auto-ui实际合入commit、最终公开API/profile/CLI、支持/拒绝与限额、SDK快照/两锁/构建栈、源码identity与导出/冷准备入口、真实测试/runner来源及已知限制。消费包应能离开生产者树离线准备SDK/锁定构建并运行两维夹具；registry缓存为显式前置。G11不得只凭review pass、代码提交或候选包开始实施；002 actual delivered后才由ag-examples/001冻结自己的consumer/runner/项目输入。
 
 ### 规范增量
 
 | delta_id | add/modify/retire | docs/specs/... target | before/after rule | rationale | acceptance IDs |
 |---|---|---|---|---|---|
-| SD-01 | add | docs/specs/auto-graphics/runtime-triggers-and-rounds.md | 手写overlap前态/无restart→有限事件、整数代次与新Run事务 | 公共运行服务 | AC-02/03/04 |
-| SD-02 | modify | docs/specs/auto-graphics/scene-play-session.md; docs/specs/auto-graphics/auto-source-driver.md | 对象候选→事件/新局同事务、公开选择/来源/consumer，旧保持 | 完整入口与恢复 | AC-01..05 |
-| SD-03 | add | docs/specs/auto-graphics/gallery-runtime-objects.md | G11候选→两维真实生命周期/触发/重开、单项包与固定来源 | 仓外消费知识 | AC-05 |
+| SD-01 | add | docs/specs/auto-graphics/runtime-triggers-and-rounds.md | 手写overlap前态/无restart→有限事件、整数代次、新Run事务与公共入口 | 引擎服务 | AC-02/03/04 |
+| SD-02 | modify | docs/specs/auto-graphics/scene-play-session.md; docs/specs/auto-graphics/auto-source-driver.md | 对象候选→事件/新局同事务、选择/来源/consumer，旧保持 | 完整入口与恢复 | AC-01..05 |
+
+原SD-03（Gallery知识）整项移交ag-examples/001 SD-01；本计划不宣称G11已交付。
 
 ## 6. 测试设计
 
-未指定模型/agent，work自查后同树独立最终review，pass后merge冻结受影响门。遵守变更相关∩约1/10可复现抽样，seed/全集/选择数记录；新AC下列直接正反例必须关闭，完整AG/全Gallery回归留里程碑。OS输入自动化暂停，不恢复抢焦点/置顶；用公开逻辑输入/无窗口Host/GPU和既有未变路由证据，历史证据不冒充新renderer/新项目实测。
+work自查→同一auto-ui树独立最终review→merge冻结受影响门，未指定模型/agent。变更相关∩约1/10可复现抽样，seed/全集/选择数在案；新AC的直接正反例必须关闭，完整AG留里程碑。OS输入/置顶/抢焦点自动化暂停，用公开逻辑输入与无窗口Host/GPU；历史未变路由证据不得冒新功能实测。
 
 | Case | AC/不变量 | 实际入口/代表输入 | 区别错误实现的oracle | work任务/边界 |
 |---|---|---|---|---|
-| V-01 | AC-02/03 几何/时序 | 新API：AABB闭接触、圆/球角外点/切线/±ULP、同tick双物体移动、8对/9对、重复evaluate | 独立几何oracle与真实Autoenter/stay/exit一致；包围盒替球/旧tick位置真实变异红；超限/阶段错拒绝 | T-02/03；离散采样、无连续穿越保证 |
-| V-02 | AC-03 一次/旧代 | 3物品同tick、反复stay/next/getter、销毁后复用同槽/显式重绑、旧eventtoken | 3个不同ID只各+1；老身份无新stay/exit，next不可重发；旧token错代拒绝，合法新代可enter | T-03/04；用户Auto计数非Host业务 |
-| V-03 | AC-04 新局/失败 | Won/Failed Enter、held Enter、Pause/Step、旧Run迟到、坏init/prepare/Stop取消 | 新Run/source快照/计数0/3新身份/角色camera初值一致；失败保完整旧呈现、闭新VM；不连续重启/不重读磁盘源 | T-04；无场景切换/存档 |
-| V-04 | AC-04 事务/owner | 事件+销毁+orbit同tick、错event身份/重复记录/坏序/超预算，20轮 | 全旧或全新，未接受事件不外泄；weak owner最后释放、静态上传有界；冻结reset/泄漏事件变异红还原绿 | T-04；合法外部pin区分 |
-| V-05 | AC-01/05 仓外/预算 | 两维源码对照/fresh SDK consumer、新身份controls、G11两入口包A→B/错锁/旧报告 | 实际Auto状态与GPU内容敏感、共享32credits和原限额；0selected/partial/错runner拒；原G01..08选锁不变、坏包修复可用 | T-02/05；880实际交付后 |
+| V-01 | AC-02/03 几何/时序 | AABB闭接触、圆/球角外/切线/±ULP、当步双移动、8/9对、重复evaluate | 独立几何与Auto enter/stay/exit一致；包围盒替球/旧tick变异红；超限/阶段错拒绝 | T-02/03；离散采样 |
+| V-02 | AC-03 一次/旧代 | 3物品同tick、stay/next/getter、销毁同槽/重绑、旧token | 3个ID各+1；老代无新stay/exit；next不重发；旧token拒绝、新代可enter | T-03/04；Auto计数 |
+| V-03 | AC-04 新局/失败 | Won/Failed Enter、held Enter、Pause/Step、旧Run迟到、坏init/prepare/Stop | 新Run/源快照/计数0/3新代/角色camera初值一致；失败保完整旧呈现闭新VM；不重读磁盘源 | T-04；无存档/切场景 |
+| V-04 | AC-04 事务/owner | 事件+销毁+orbit、错身份/重复/坏序/超预算，20轮 | 全旧或全新，未接受事件不外泄，最后weak owner/上传有界；冻结reset/泄漏事件变异红还原绿 | T-04；合法pin区分 |
+| V-05 | AC-01/05 消费/预算 | 两维引擎夹具参数对照、fresh SDK consumer A→B、本代identity controls、旧报告/错runner | 真Auto状态/实际内容敏感、32credits与原限额；0selected/partial/错身份拒绝；离线消费可运行 | T-02/05；非G11产品包 |
 
-拟命令（新入口由T-03/04建立）：driver `cargo check --locked`、`cargo fmt -- --check`、`cargo test --locked --test runtime_triggers_api --test runtime_round_host --test runtime_trigger_samples -- --test-threads=1`；受影响001对象/Play/相机命名case，current verifier/checker `--controls`及fresh own-SDK离线消费。G11工具命令沿880实际交付`gallery list/validate/launch/package`合同，定向Python结构测试与新两入口无窗口数值/内容/包验收，禁止默认重跑旧窗口probe。
+拟入口由T-03/04建立：driver `cargo check --locked`、`cargo fmt -- --check`、`cargo test --locked --test runtime_triggers_api --test runtime_round_host --test runtime_trigger_samples -- --test-threads=1`；受影响001对象/Play/相机命名case、本代verifier/checker `--controls`与own-SDK离线消费。实际命令/样本/runner在T-02冻结，help或旧report不算验收。
 
-根语言/默认UI零代码diff，不跑根cargo t/tf/tv/tu/docs_gen或完整UI/AG档。GPU按机器单实例；新局需实测真实接受后下一次读取/运行，不以request计数代替闭环。原始证据本地`D:/autostack/plan-artifacts/auto-ui/plan-002/`，attachments只md摘要/契约，记录命令/exit/计数/路径/hash；产品小预览与验收索引放内容仓，非原始大日志。两仓冻结commit/源/runner/资源hash绑定，复用证明代码/依赖/配置/输入未变。
+无ag-examples工具/打包/目录门，不运行全AG/全UI/根cargo t/tf/tv/tu/docs_gen。GPU机器单实例；原始证据本地`D:/autostack/plan-artifacts/auto-ui/plan-002/`，attachments仅md摘要/契约。新局必须验证接受后的下一次读取/实际运行，不能只数request。复用须证明代码/依赖/配置/输入未变。
 
 ## 7. 验收标准
 
 | ID | owner_stage | 可观察通过条件 |
 |---|---|---|
-| AC-01 | work | 001实际交付/唯一新源树/旧SDK锁及fresh包核实；内容T-05须880交付 |
-| AC-02 | work | 新profile/签名/几何/事件/新局/资源先冻结，完整组合预算成立，旧版本保持 |
+| AC-01 | work | 001实际交付/唯一auto-ui树/SDK锁及fresh消费闭包核实 |
+| AC-02 | work | profile/签名/几何/事件/新局/资源先冻结，整组合预算成立，旧保持 |
 | AC-03 | work | 两维有界触发/确定时序/一次读取/真销毁与代次绑定，V-01/02 |
-| AC-04 | work | 新Run完整复原/迟到隔离/失败last-good/20轮最后owner，V-03/04 |
-| AC-05 | work | 两维公开项目/G11两入口、真实Auto+内容+负控/消费/包/旧锁兼容闭合，V-05 |
-| AC-06 | review | 同两树独立核AC/V/SD/资源/遗漏/公开路径/fmt/warnings，merge门pending |
-| AC-07 | merge | 两冻结提交/输入身份、受影响抽样/必要新对照与复用审计通过 |
-| AC-08 | merge | auto-ui→ag-examples按序实际落地、本Plan在auto-ui归档、既有语言知识按SD同步索引、guard清理收据 |
+| AC-04 | work | 新Run复原/迟到隔离/失败last-good/20轮最后owner，V-03/04 |
+| AC-05 | work | 两维引擎夹具、真实Auto+内容+负控/消费/预算与下游可冻结交付接口闭合，V-05 |
+| AC-06 | review | 同一auto-ui树独立核AC/V/SD/资源/遗漏/公开路径/fmt/warnings，merge门pending |
+| AC-07 | merge | 冻结引擎提交/输入、受影响抽样/必要新对照与复用审计通过 |
+| AC-08 | merge | auto-ui源码/本Plan落地归档、SDK/接口/来源交付SHA、旧知识同步及guard清理收据 |
 
 ## 8. 执行步骤
 
 | ID | owner_stage | 依赖 | 实际位置/操作与产出 | AC | 状态 |
 |---|---|---|---|---|---|
-| T-01 | work | 001实际交付 | 唯一auto-ui树、实际SHA/签名/身份/价格/SDK/锁与closed/open核对 | AC-01 | [ ] |
-| T-02 | work | T-01 | triggers-round-contract先冻结几何/事件/Run状态图/价格与完整组合probe，不足回new | AC-02 | [ ] |
-| T-03 | work | T-02通过 | 新Auto/API/准入/触发时序与代次结果、V-01/02 | AC-02/03 | [ ] |
-| T-04 | work | T-03 | 同Host新Run事务/失败/owner、两维公开工程/真实GPU负控，V-03/04 | AC-03/04 | [ ] |
-| T-05 | work | T-04且880实际交付 | 唯一ag-examples树接G11两入口/锁/离线包；fresh consumer/资源/来源/fmt/两树提交/SD，V-05 | AC-01..05 | [ ] |
-| T-06 | review | T-05 | 同两树独立最终review绑定两commit；merge门pending | AC-06 | [ ] |
-| T-07 | merge | T-06 pass | 冻结受影响门/必要新对照与复用审计，失败回work复审 | AC-07 | [ ] |
-| T-08 | merge | T-07 | 先auto-ui/master引擎实际落地，固定源码与runner身份 | AC-08 | [ ] |
-| T-09 | merge | T-08 | 再ag-examples/master落G11，不动旧pin，无远端发布 | AC-08 | [ ] |
-| T-10 | merge | T-09 | auto-ui主检出更新本Plan/复审/归档；既有语言知识仓按SD沉淀Spec/ledger/索引 | AC-08 | [ ] |
-| T-11 | merge | T-10 | 两仓wt-guard clean后清树/分支/空组目录；保留必要本地产物收据 | AC-08 | [ ] |
+| T-01 | work | auto-ui/001实际交付 | 唯一auto-ui树、实际SHA/接口/身份/价格/SDK/锁核对 | AC-01 | [ ] |
+| T-02 | work | T-01 | triggers-round-contract先冻结几何/事件/Run图/价格与整组合probe，不足回new | AC-02 | [ ] |
+| T-03 | work | T-02通过 | 新Auto/API/准入/触发时序/代次，V-01/02 | AC-02/03 | [ ] |
+| T-04 | work | T-03 | 新Run事务/失败/owner、两维引擎夹具与GPU负控，V-03/04 | AC-03/04 | [ ] |
+| T-05 | work | T-04 | fresh consumer/预算/current identity/fmt/提交/SD与下游接口摘要，V-05 | AC-01..05 | [ ] |
+| T-06 | review | T-05 | 同一引擎树独立最终review绑定冻结commit；merge门pending | AC-06 | [ ] |
+| T-07 | merge | T-06 pass | 冻结引擎受影响门/新对照/复用审计，失败回work复审 | AC-07 | [ ] |
+| T-08 | merge | T-07 | 仅auto-ui/master引擎落地，记录实际源码与消费身份；无需等G11 | AC-08 | [ ] |
+| T-10 | merge | T-08 | 本仓Plan/复审/归档，现有知识按SD同步Spec/ledger/索引，给ag-examples/001实际SHA收据 | AC-08 | [ ] |
+| T-11 | merge | T-10 | 本仓wt-guard clean后清树/分支/空组，保必要本地产物收据 | AC-08 | [ ] |
+
+原T-09（内容仓合入）整项移交ag-examples/001 T-08；保留其他任务ID，不将移交项打勾或算本计划已完成步骤。
 
 ## 9. 复审记录
 
@@ -174,6 +176,11 @@ G11单项ZIP包含两维、说明/许可/必要小资源/选中锁/通用工具�
 
 2026-10-29 new r3：`stage: new | plan_id: PLAN-002 | plan_revision: 3 | outcome: blocked | next: 等auto-ui/PLAN-001实际交付后T-01/T-02`。用户纠正本仓001起独立编号；旧auto-lang/PLAN-883仅作来源，新合同/工作树/分支/证据目录按auto-ui本仓号。未改变功能分母、预算、进度或历史验收，未创建实现树/执行测试。ag-examples旧880已归legacy历史，不占该仓本地号。
 
+
+2026-10-29 new r4（用户批准按仓拆分）：`stage: new | plan_id: PLAN-002 | plan_revision: 4 | outcome: blocked | next: 等auto-ui/001实际交付后T-01/T-02`。功能/资源/引擎V-01..04不降级；T-05/V-05/AC-01/05..08收窄为引擎消费，原G11工程/锁/目录/包/旧项兼容与SD-03、T-09完整移交ag-examples/001。独立review/合入只绑定本引擎提交，G11不再反向阻塞002；分母映射见下游split-contract。仍drafting，所有任务未执行，本次未触代码/001在途树/构建/OS/GPU/agent。
+
+2026-10-29 文档预检：本Plan 0..10节、8个AC/5个V/10个当前T及stage映射完整，所有步骤未勾；本批管理/路线文档184个本地链接可解析。依赖无反向边，原002几何/事件/新局规则逐字保留，001原AC/V/T与进度字段未改。此为合同结构/拆分完整性检查，不是实现验收或独立final review。
+
 ## 10. 待澄清事项
 
-当前无新增产品决策。001交付后如触发/收集/新局组合在原限额不可行，或实际公开消费/880工具合同不能承接G11，带反例回new，不删同tick三物品/新局隔离/任一维或静默抬限。880已交付；T-05仍须复核内容仓owner/后续共享工具改动，冲突时明确等待，不建第二占用树、不在其WIP上接线。001/002仍不关闭动画/声音/HUD及完整M2分母。
+无未决产品决策，用户已明确批准拆分且暂不实施。001交付后若原限额下整组合不可行，带反例回new，不删任一维/同tick三物品/新局隔离或静默抬限。Gallery下游缺口由ag-examples/001按实际002交付反馈，不在本计划暗改内容仓，也不以其尚未实施认作002未完成。

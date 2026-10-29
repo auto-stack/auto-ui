@@ -6,8 +6,8 @@
 
 | 本仓号 | 计划 | 旧仓来源 | 状态 |
 |---|---|---|---|
-| 001 | [运行对象生命周期](001-autographics-runtime-object-lifecycle.md) | auto-lang/PLAN-882 | drafting r3，未执行 |
-| 002 | [触发、新局与G11](002-autographics-trigger-events-and-round-restart.md) | auto-lang/PLAN-883 | drafting r3，等本仓001交付 |
+| 001 | [运行对象生命周期](001-autographics-runtime-object-lifecycle.md) | auto-lang/PLAN-882 | r4仅修G11归属引用；执行进度以本Plan/owner记录为准 |
+| 002 | [触发与新局（引擎）](002-autographics-trigger-events-and-round-restart.md) | auto-lang/PLAN-883引擎部分 | drafting r4，等本仓001实际交付 |
 
 下一份新计划为003，之后004…；不能因导入历史号882/883而跳过本地001/002。
 
@@ -21,3 +21,5 @@
 - 旧Specs/设计的现有知识权威仍按Plan跨仓引用，本次没有批量复制历史知识。
 
 r2文档原貌保留于本仓提交`6c7bcdccb08b6320e5920e704990ab6eaa515e41`；r1保留于auto-lang提交`a5d8a4fa8`。编号更正不重写这些历史。
+
+用户批准按仓拆分（2026-10-29）：002仅auto-ui引擎/夹具/消费证据；[ag-examples/001](../../../ag-examples/docs/plans/001-autographics-gallery-runtime-objects.md)独立承接G11，硬等002实际交付。两份分别review/merge，无反向依赖。

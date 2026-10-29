@@ -5,7 +5,7 @@ feature_name: AutoGraphics有限运行对象身份与生命周期
 author: [Codex]
 created_at: 2026-10-29
 updated_at: 2026-10-29
-plan_revision: 3
+plan_revision: 4
 supersedes_spec_components:
   - docs/specs/auto-graphics/scene-play-session.md
   - docs/specs/auto-graphics/auto-source-driver.md
@@ -33,7 +33,7 @@ total_steps: 10
 - 一套公开Auto合同覆盖2D/3D，复用现有单Host/Play/SDK/资源/GPU；两维最小项目可仓外运行并有真实内容/来源/owner证据。
 - 保持角色、相机、整帧失败last-good、Stop/新Run与编辑隔离；预留002需要的几何/代次接缝。
 
-非目标：触发事件/新局服务（归002）、G11 Gallery（归002）、880 G07/G08、完整游戏、动态solid/移动平台/自由刚体、生成角色/相机目标、运行时导入资源、动态组/父子拓扑/任意prefab、缩放/旋转/材质writer、动画/声音/HUD、UI/ACE融合、WASM/迁仓/发布。实例是非solid叶，旧静态角色/solid合同不扩大。
+非目标：触发事件/新局服务（归002）、G11 Gallery（归ag-examples/001，依赖auto-ui/002实际交付）、880 G07/G08、完整游戏、动态solid/移动平台/自由刚体、生成角色/相机目标、运行时导入资源、动态组/父子拓扑/任意prefab、缩放/旋转/材质writer、动画/声音/HUD、UI/ACE融合、WASM/迁仓/发布。实例是非solid叶，旧静态角色/solid合同不扩大。
 
 ## 2. 架构方案
 
@@ -167,6 +167,8 @@ work自查→独立上下文最终review→merge冻结受影响门，同一auto-
 
 
 2026-10-29 new r3：`stage: new | plan_id: PLAN-001 | plan_revision: 3 | outcome: pass | next: 用户启动work后T-01/T-02`。用户纠正本仓001起独立编号；旧auto-lang/PLAN-882仅作来源，新合同/工作树/分支/证据目录按auto-ui本仓号。未改变功能分母、预算、进度或历史验收，未创建实现树/执行测试。ag-examples旧880已归legacy历史，不占该仓本地号。
+
+2026-10-29 new r4（仅跨计划归属引用纠正）：用户批准auto-ui/002 r4只做引擎，非目标处G11引用改为[ag-examples/001](../../../ag-examples/docs/plans/001-autographics-gallery-runtime-objects.md)在002实际交付后交付G11。G11仍非本Plan工作，无任何AC/V/T、资源、实现设计或进度改变；只因合同引用文字修正递增revision，不重开任务、不接管ui-001实施树，既有执行授权保持。
 
 ## 10. 待澄清事项
 
