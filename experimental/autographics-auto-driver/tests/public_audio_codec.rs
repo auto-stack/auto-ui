@@ -177,3 +177,149 @@ fn expansive_vorbis_setup_and_duration_reject_before_decoder_construction() {
     repair_crc(&mut control);
     assert!(codec::decode(Arc::from(control), 64 * 1024 * 1024).is_ok());
 }
+
+#[test]
+fn exact_ten_second_wav_bound_and_all_six_supported_sample_layouts() {
+    use autographics_auto_driver::authoring::assets::decode_attempts;
+    for rate in [22050, 44100, 48000] {
+        for channels in [1, 2] {
+            let good = wav(
+                channels,
+                rate,
+                &vec![1234; rate as usize * 10 * channels as usize],
+            );
+            let (pcm, header) = codec::decode(good.into(), 64 * 1024 * 1024).unwrap();
+            assert_eq!(header.frames, rate as usize * 10);
+            assert_eq!(pcm.frames.len(), header.frames);
+            assert!(pcm.frames.len() * 8 <= 16 * 1024 * 1024);
+            assert_eq!(pcm.frames.last().unwrap()[0], 1234.0 / 32768.0);
+            let bad = wav(
+                channels,
+                rate,
+                &vec![1234; (rate as usize * 10 + 1) * channels as usize],
+            );
+            let before = decode_attempts();
+            assert!(codec::decode(bad.into(), 64 * 1024 * 1024)
+                .unwrap_err()
+                .contains("resource_limit"));
+            assert_eq!(
+                decode_attempts(),
+                before,
+                "one extra sample rejects before decode"
+            );
+        }
+    }
+    let before = decode_attempts();
+    assert!(
+        codec::decode(vec![0; 8 * 1024 * 1024 + 1].into(), 64 * 1024 * 1024)
+            .unwrap_err()
+            .contains("raw size")
+    );
+    assert_eq!(decode_attempts(), before);
+}
+
+#[test]
+fn riff_malformed_spans_padding_duplicates_and_unsupported_formats_are_named_predecode() {
+    use autographics_auto_driver::authoring::assets::decode_attempts;
+    let good = wav(1, 22050, &[0, 1, -1, 16384]);
+    let mut cases = vec![];
+    for (offset, value, expected) in [
+        (20, 3, "unsupported"),
+        (22, 0, "unsupported"),
+        (22, 3, "unsupported"),
+        (34, 24, "unsupported"),
+        (32, 3, "invalid"),
+        (28, 0, "invalid"),
+    ] {
+        let mut bad = good.clone();
+        bad[offset] = value;
+        cases.push((bad, expected));
+    }
+    for offset in [16, 40] {
+        let mut bad = good.clone();
+        bad[offset..offset + 4].copy_from_slice(&u32::MAX.to_le_bytes());
+        cases.push((bad, "invalid"));
+    }
+    let mut duplicate = good.clone();
+    duplicate.extend_from_slice(&good[12..36]);
+    cases.push((duplicate, "invalid"));
+    let mut duplicate = good.clone();
+    duplicate.extend_from_slice(&good[36..]);
+    cases.push((duplicate, "invalid"));
+    let mut odd = good.clone();
+    odd.extend_from_slice(b"JUNK\x01\x00\x00\x00x");
+    cases.push((odd, "invalid"));
+    let mut missing = good.clone();
+    missing[36..40].copy_from_slice(b"JUNK");
+    cases.push((missing, "invalid"));
+    let mut missing = good.clone();
+    missing[12..16].copy_from_slice(b"JUNK");
+    cases.push((missing, "invalid"));
+    let mut partial = wav(2, 44100, &[1, 2, 3]);
+    cases.push((std::mem::take(&mut partial), "invalid"));
+    cases.push((wav(1, 22050, &[]), "invalid"));
+    for (i, (mut bytes, expected)) in cases.into_iter().enumerate() {
+        let n = bytes.len();
+        bytes[4..8].copy_from_slice(&(n as u32 - 8).to_le_bytes());
+        let before = decode_attempts();
+        let error = codec::decode(bytes.into(), 64 * 1024 * 1024).unwrap_err();
+        assert!(error.contains(expected), "case{i}: {error}");
+        assert_eq!(decode_attempts(), before, "case{i} should not decode");
+    }
+    // Unknown RIFF chunks with correct padding are legitimate and must survive.
+    let mut control = good;
+    control.extend_from_slice(b"JUNK\x01\x00\x00\x00x\x00");
+    let n = control.len();
+    control[4..8].copy_from_slice(&(n as u32 - 8).to_le_bytes());
+    assert!(codec::decode(control.into(), 64 * 1024 * 1024).is_ok());
+}
+
+#[test]
+fn ogg_container_identity_and_decoded_frame_prediction_have_distinct_failure_stages() {
+    use autographics_auto_driver::authoring::assets::decode_attempts;
+    let good = sound("jump.ogg");
+    let mut pages = vec![];
+    let mut at = 0;
+    while at < good.len() {
+        pages.push(at);
+        let count = good[at + 26] as usize;
+        at += 27
+            + count
+            + good[at + 27..at + 27 + count]
+                .iter()
+                .map(|b| *b as usize)
+                .sum::<usize>();
+    }
+    let last = *pages.last().unwrap();
+    for mutation in 0..5 {
+        let mut bad = good.clone();
+        match mutation {
+            0 => bad[last + 18] ^= 1,
+            1 => bad[last + 14] ^= 1,
+            2 => bad[last + 5] &= !4,
+            3 => bad[5] |= 1,
+            _ => bad[last + 26] = 255,
+        };
+        if mutation != 4 {
+            repair_crc(&mut bad)
+        }
+        let before = decode_attempts();
+        let error = codec::decode(bad.into(), 64 * 1024 * 1024).unwrap_err();
+        assert!(error.contains("invalid"), "mutation{mutation}: {error}");
+        assert_eq!(decode_attempts(), before);
+    }
+    let mut underreported = good;
+    underreported[last + 6..last + 14].copy_from_slice(&1u64.to_le_bytes());
+    repair_crc(&mut underreported);
+    let before = decode_attempts();
+    let error = codec::decode(underreported.into(), 64 * 1024 * 1024).unwrap_err();
+    assert!(
+        error.contains("decoded frames exceed") || error.contains("padding mismatch"),
+        "{error}"
+    );
+    assert_eq!(
+        decode_attempts(),
+        before + 1,
+        "actual decoded-block count is checked, not only trusted granule"
+    );
+}
