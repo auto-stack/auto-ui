@@ -129,6 +129,8 @@ T-03..06建立新入口：`cargo test --manifest-path experimental/autographics-
 
 2026-10-29 合同预检：三份Plan的0..10节、各10任务/8AC/5V、work/review/merge职责、依赖与SD引用检查通过；本批49个局部链接可解析，新增入口均标待建。此为文档预检，非实现测试或独立final review。
 
+2026-10-29 goal round 1：`stage: goal | plan_id: PLAN-005 | plan_revision: r2 | round: 1 | from: work/new | to: work | status: executing | outcome: pass (T-01 only; work incomplete) | worktree: D:/autostack/.wt/ui-005/auto-ui | commit: 2b88bd69 (implementation base), 2c5e4cb (authorized contract/source receipt) | evidence: fixed-source.md、fixed-source-manifest.json SHA 74a88dbc…、prepare_sdk --from-snapshot exit0 | next: work T-02`。T-01已完成1/10；r2支持域及T-02待实现执行合同已记录于attachments/005/work/textured-model-contract.md；未改产品代码，未执行GPU/功能门，不声称work完成。独立review/merge/归档/清理均待后续。
+
 ## 10. 待澄清事项
 
-004实际交付身份尚不存在，由T-01消费后冻结；原件逐项准入/材质/扩展明细须T-02验证。固定来源字节若不可达，只可追溯保留副本并验证身份/许可；无法建立身份则停止依赖该输入并回new，不能换当前上游或删必需纹理。超出支持域/已有预算不得静默接受。Gallery内容/完整character动画由后继独立Plan负责，未在此承诺已可用。
+004实际交付与固定来源恢复已由T-01核实，不再阻塞；原件双面材质支持已获用户授权并纳入r2。当前无待用户决策；T-02继续验证原件全链与预算，不把草拟合同当通过。超出支持域/已有预算不得静默接受。Gallery内容/完整character动画由后继独立Plan负责，未在此承诺已可用。
