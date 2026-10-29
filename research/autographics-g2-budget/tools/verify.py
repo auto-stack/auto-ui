@@ -2,6 +2,8 @@
 The program exits nonzero for incomplete evidence. It never fabricates a core pass.
 """
 import argparse,copy,hashlib,json,pathlib,subprocess,sys
+import evidence as bound
+import accounting
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 ENGINE=pathlib.Path("D:/autostack/plan-artifacts/auto-ui/plan-011/consumer/experimental")
 DEFAULT=pathlib.Path("D:/autostack/plan-artifacts/auto-ui/plan-011")
@@ -9,7 +11,7 @@ def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 def content_sha(p):
  b=p.read_bytes();b=b if p.suffix.lower()==".png"else b.replace(b"\r\n",b"\n");return hashlib.sha256(b).hexdigest()
 def receipts(d):
- by_kind={k:[]for k in ["core","branches","performance"]}
+ by_kind={k:[]for k in ["core","branches","performance","intents"]}
  for e in d["evidence"]:
   f=pathlib.Path(e["path"]);assert f.is_file() and sha(f)==e["sha256"]
   raw=json.loads(f.read_text())
@@ -19,11 +21,21 @@ def receipts(d):
     assert sha(source)==row["source_sha256"]
     assert content_sha(source)==content_sha(ROOT/f"fixtures/candidate-{row['candidate']}.at")
   by_kind[e["kind"]].append(raw)
+ assert len(by_kind["intents"])==2
+ expected={"jump-initial":[0,0,0],"jump-accepted":[1,0,0],"air-rejump-no-intent":[1,0,0],"single-N":[0,0,0],"single-Nplus1":[0,1,1],"single-no-duplicate":[0,1,1],"triple-N":[0,0,0],"triple-goal-Nplus1":[0,3,4],"ended-no-repeat":[0,3,4],"enter-reset-intents":[0,0,0],"duplicate-coin-intent-control":[0,6,4],"dropped-coin-intent-control":[0,0,4],"intent-source-restored":[0,3,4]}
+ for obs in by_kind["intents"]:
+  assert obs["schema"]=="ui011-intents/1" and obs["full_core_intents"]=="not_established_budget_fault"
+  assert len(obs["rows"])==len(expected)
+  assert {r["case"]:r["intent_totals"]for r in obs["rows"]}==expected
+  assert all(r["mutant_detected"]is True for r in obs["rows"]if r["case"].endswith("-control"))
  assert len(by_kind["core"])==3 and len(by_kind["branches"])==3 and len(by_kind["performance"])==5
  for core in by_kind["core"]:
   assert core["schema"]=="ui011-core/1" and {r["candidate"]for r in core["rows"]}=={"a","b"}
   for r in core["rows"]:
    assert r["source_sha256"]==d["candidates"][r["candidate"]]["source_sha256"]
+   summary=d["candidates"][r["candidate"]]
+   assert summary["first_fault_tick"]==r["trace"][-1]["logical_tick"]
+   assert summary["published_tick"]==r["trace"][-1]["frame"]["tick"]
    assert len(r["trace"])==1 and r["trace"][0]["logical_tick"]==1
    assert r["trace"][0]["frame"]["tick"]==0 and "QueryBudget"in r["trace"][0]["frame"]["error"]
    assert r["initial_capture_sha256"]==r["fault_capture_sha256"]
@@ -53,7 +65,7 @@ def receipts(d):
 
 def validate(d):
  assert d["schema"]=="ui011-decision/1"
- for relative,digest in d["source_inputs"].items():assert content_sha(ROOT/relative)==digest,relative
+ bound.verify_source_revision(d)
  receipts(d)
  assert set(d["denominator"])=={f"G2-{n:02d}" for n in range(1,10)}
  assert set(d["candidates"])=={"a","b"}
@@ -61,7 +73,10 @@ def validate(d):
  assert d["g2_09_public_services"]=="missing_public_capability"
  assert d["core_semantics"]=="not_established_budget_fault"
  assert d["hard_budgets"]=="fail" and d["decision"]=="no_go_current_profile"
- assert d["target_8ms"] in {"met_for_measured_prefix_only","missed"}
+ assert d["performance_windows"]==bound.performance_windows(d["evidence"]),"performance summary contradicts raw"
+ assert d["target_8ms"]==bound.target_status(d["performance_windows"]),"8ms classification contradicts raw"
+ ledger=d["callback_ledger"];p=pathlib.Path(ledger["path"]);assert sha(p)==ledger["sha256"]
+ assert json.loads(p.read_text())==accounting.build(d["evidence"]),"callback account contradicts source/raw"
  assert all(d["denominator"][f"G2-{n:02d}"]=="not_established_budget_fault" for n in range(1,9))
  assert d["denominator"]["G2-09"]=="missing_public_capability"
  for c in ["a","b"]:
@@ -95,5 +110,16 @@ def main():
    m=copy.deepcopy(d);entry=next(e for e in m["evidence"]if e["kind"]==kind)
    raw=json.loads(pathlib.Path(entry["path"]).read_text());raw["rows"].pop()
    path=pathlib.Path(entry["path"]).with_name(f"control-missing-{kind}-row.json");path.write_text(json.dumps(raw));entry.update(path=str(path),sha256=sha(path));rejected(m)
+ if a.controls:
+  for field,value in [("source_inputs",{}),("research_commit","0"*40),("performance_windows",[])]:
+   m=copy.deepcopy(d);m[field]=value;rejected(m)
+  m=copy.deepcopy(d);m["candidates"]["a"]["first_fault_tick"]=999;rejected(m)
+  m=copy.deepcopy(d);m["candidates"]["a"]["published_tick"]=999;rejected(m)
+  m=copy.deepcopy(d);m["performance_windows"][1]["max_host_whole_tick_us"]=999999999;rejected(m)
+  m=copy.deepcopy(d);entry=[e for e in m["evidence"]if e["kind"]=="performance"][1]
+  raw=json.loads(pathlib.Path(entry["path"]).read_text());raw["rows"][2]["host_whole_tick_us"][0]=9000000
+  path=a.report.parent/"decision-controls/measured-9s-performance.json";path.write_text(json.dumps(raw));entry.update(path=str(path),sha256=sha(path))
+  rejected(m)
+  m["performance_windows"]=bound.performance_windows(m["evidence"]);m["target_8ms"]="met_for_measured_prefix_only";rejected(m)
  print(f"PASS honest bounded no-go decision; invalid reports rejected={n}")
 if __name__=="__main__":main()

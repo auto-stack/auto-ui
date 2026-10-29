@@ -837,3 +837,150 @@ fn enemy_x(h: &Host) -> f32 {
         .unwrap()
         .translation[0]
 }
+
+// Additional observation-only isolation. Existing core and performance inputs above are unchanged.
+fn intent_scene(name: &str, xy: [f32; 2]) -> PathBuf {
+    let p = variant(name, xy);
+    let mut d: Value = serde_json::from_slice(&fs::read(&p).unwrap()).unwrap();
+    for id in [13, 14] {
+        let mut marker = d["objects"][11].clone();
+        marker["id"] = json!(id);
+        marker["name"] = json!(format!("intent-observer-{id}"));
+        marker["translation"] = json!([-10000., -10000., 0.]);
+        d["objects"].as_array_mut().unwrap().push(marker);
+    }
+    fs::write(&p, serde_json::to_vec(&d).unwrap()).unwrap();
+    p
+}
+fn intent_source(source: &str) -> String {
+    let body="fn g2_audit_intents() {\n ag_set_local(12,0, -10000.0 - jump_intent*1.0)\n ag_set_local(12,1, -10000.0 - coin_intent*1.0)\n ag_set_local(13,0, -10000.0 - hud_intent*1.0)\n}\n";
+    let s = source.replace("fn app_start()", &format!("{body}fn app_start()"));
+    let s = s.replacen(
+        " grounded=ag_char_grounded(0)\n}",
+        " grounded=ag_char_grounded(0)\n g2_audit_intents()\n}",
+        1,
+    );
+    let s = s.replace("  return\n", "  g2_audit_intents()\n  return\n");
+    s.replace(
+        " if ag_world(0,1)<0.0 - 3.0 {state=2;hud_intent=hud_intent+1}",
+        " if ag_world(0,1)<0.0 - 3.0 {state=2;hud_intent=hud_intent+1}\n g2_audit_intents()",
+    )
+}
+fn intents(h: &Host) -> [i32; 3] {
+    let f = h.play.as_ref().unwrap().last.as_ref().unwrap();
+    let j = f.nodes[&13].translation;
+    let hud = f.nodes[&14].translation;
+    [
+        (-10000. - j[0]).round() as i32,
+        (-10000. - j[1]).round() as i32,
+        (-10000. - hud[0]).round() as i32,
+    ]
+}
+fn intent_row(
+    rows: &mut Vec<Value>,
+    name: &str,
+    h: &Host,
+    source: &str,
+    held: &[usize],
+    mutant: bool,
+) {
+    rows.push(json!({"case":name,"frame":fact(h),"source_sha256":hash(source.as_bytes()),"held":held,"intent_totals":intents(h),"mutant_detected":mutant,"observation":"accepted Auto diagnostic leaves; no audio/HUD service"}));
+}
+#[test]
+fn accepted_intent_observations() {
+    let a = source_a();
+    let mut rows = Vec::new();
+    let scene = intent_scene("intent-jump", [2., 0.502]);
+    let source = intent_source(&character_only(&a));
+    let mut h = load(&scene);
+    start(&mut h, &source);
+    assert_eq!(intents(&h), [0, 0, 0]);
+    intent_row(&mut rows, "jump-initial", &h, &source, &[], false);
+    step(&mut h, &[]);
+    healthy(&h);
+    step(&mut h, &[2]);
+    healthy(&h);
+    assert!(pos(&h)[1] > 0.502);
+    assert_eq!(intents(&h), [1, 0, 0]);
+    intent_row(&mut rows, "jump-accepted", &h, &source, &[2], false);
+    step(&mut h, &[]);
+    step(&mut h, &[2]);
+    healthy(&h);
+    assert_eq!(intents(&h), [1, 0, 0]);
+    intent_row(&mut rows, "air-rejump-no-intent", &h, &source, &[2], false);
+    h.stop_play();
+    let scene = intent_scene("intent-single", [4., 1.]);
+    let events = event_only(&a);
+    let source = intent_source(&events);
+    let mut h = load(&scene);
+    start(&mut h, &source);
+    step(&mut h, &[]);
+    assert_eq!(intents(&h), [0, 0, 0]);
+    intent_row(&mut rows, "single-N", &h, &source, &[], false);
+    step(&mut h, &[]);
+    healthy(&h);
+    assert_eq!(intents(&h), [0, 1, 1]);
+    intent_row(&mut rows, "single-Nplus1", &h, &source, &[], false);
+    step(&mut h, &[]);
+    assert_eq!(intents(&h), [0, 1, 1]);
+    intent_row(&mut rows, "single-no-duplicate", &h, &source, &[], false);
+    h.stop_play();
+    let scene = intent_scene("intent-triple", [28., 1.]);
+    let triple = events
+        .replace("(0,9,4.0,1.0,0.0)", "(0,9,28.0,1.0,0.0)")
+        .replace("(1,9,13.0,2.25,0.0)", "(1,9,28.0,1.0,0.0)")
+        .replace("(2,9,24.0,1.0,0.0)", "(2,9,28.0,1.0,0.0)");
+    let source = intent_source(&triple);
+    let mut h = load(&scene);
+    start(&mut h, &source);
+    let run = h.play.as_ref().unwrap().run_id;
+    step(&mut h, &[]);
+    assert_eq!(intents(&h), [0, 0, 0]);
+    intent_row(&mut rows, "triple-N", &h, &source, &[], false);
+    step(&mut h, &[]);
+    healthy(&h);
+    assert_eq!(live(&h), 1);
+    assert_eq!(intents(&h), [0, 3, 4]);
+    intent_row(&mut rows, "triple-goal-Nplus1", &h, &source, &[], false);
+    step(&mut h, &[]);
+    assert_eq!(intents(&h), [0, 3, 4]);
+    intent_row(&mut rows, "ended-no-repeat", &h, &source, &[], false);
+    enter_restart(&mut h);
+    assert_ne!(run, h.play.as_ref().unwrap().run_id);
+    assert_eq!(intents(&h), [0, 0, 0]);
+    intent_row(&mut rows, "enter-reset-intents", &h, &source, &[3], false);
+    h.stop_play();
+    for (name, replacement, expected) in [
+        (
+            "duplicate-coin-intent-control",
+            "coin_intent=coin_intent+2",
+            6,
+        ),
+        (
+            "dropped-coin-intent-control",
+            "coin_intent=coin_intent+0",
+            0,
+        ),
+    ] {
+        let mutant = source.replace("coin_intent=coin_intent+1", replacement);
+        assert_ne!(mutant, source);
+        start(&mut h, &mutant);
+        step(&mut h, &[]);
+        step(&mut h, &[]);
+        healthy(&h);
+        assert_eq!(live(&h), 1);
+        assert_eq!(intents(&h)[1], expected);
+        let rejected = intents(&h)[1] != 3;
+        assert!(rejected);
+        intent_row(&mut rows, name, &h, &mutant, &[], rejected);
+        h.stop_play();
+    }
+    start(&mut h, &source);
+    step(&mut h, &[]);
+    step(&mut h, &[]);
+    healthy(&h);
+    assert_eq!(intents(&h), [0, 3, 4]);
+    intent_row(&mut rows, "intent-source-restored", &h, &source, &[], false);
+    h.stop_play();
+    fs::write(out().join("intents.json"),serde_json::to_vec_pretty(&json!({"schema":"ui011-intents/1","rows":rows,"full_core_intents":"not_established_budget_fault","g2_09_public_services":"missing_public_capability","hud_semantics":"Auto event-driven refresh requests, not rendered UI; triple3 coins+goal yields4 requests"})).unwrap()).unwrap();
+}

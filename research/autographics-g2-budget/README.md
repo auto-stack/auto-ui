@@ -49,11 +49,12 @@ changed in the generated Cargo.toml:
 python research/autographics-g2-budget/tools/replay.py --consumer-root D:/autostack/plan-artifacts/auto-ui/plan-011/fresh-consumer/experimental --out D:/autostack/plan-artifacts/auto-ui/plan-011/fresh-replay --target D:/autostack/plan-artifacts/auto-ui/plan-011/target
 ```
 
-Run GPU tests sequentially without windows or OS input automation. Three tests
+Run GPU tests sequentially without windows or OS input automation. Four tests
 are selected by the complete command: `full_loop_research` (A/B original route),
 `scoped_branches_and_controls` (50 case rows,20 short Run/Stop cycles) and
 `performance_prefix` (two original failing callbacks and60 legal isolated
-character ticks). Individual case failure makes Cargo fail. The performance
+character ticks) and `accepted_intent_observations` (13 accepted intent rows,
+including duplicate/dropped-counter controls). Individual case failure makes Cargo fail. The performance
 campaign is1 debug plus3 release windows: run the complete release suite once,
 then select only `performance_prefix` for repetitions2/3 with distinct
 G2_ARTIFACTS release-2/release-3. Fresh replay is an independent correctness
@@ -118,3 +119,19 @@ PLAN-011 r2 user ruling (2026-10-30): exact per-callback step/resume counters
 are accepted as unmeasured for this fixed consumer, with unchanged SDK limits
 and all other real evidence retained. This does not claim measured consumption
 or a margin below those limits and does not change game budgets or outcomes.
+
+
+R2 final-review closure: callback-ledger.json binds each original/isolated/CPU
+callback record to a source-derived public-call account, calibrated prices and
+32/33 controls. Conditional/early-return demands are explicit ranges; rejected
+callbacks report a refused33-credit boundary and budget-blocked suffix, never
+newly published diagnostics or a private meter reading. Paused/Stop/last-owner
+operations identify that no Auto callback ran. Initialization is separate.
+`intents.json` observes existing Auto counters on accepted diagnostic isolates
+via far-away hidden leaves; no core A/B file or original performance input is
+changed. Triple collection produces3 coin intents and4 HUD refresh requests
+(three coins+goal). These are event-driven requests, not rendered UI. They do
+not establish G2-09. Air rejump leaves jump intent1; duplicate/dropped coin
+intent source mutations produce6/0 instead of3 and are rejected, then exact
+source restoration returns3. Original/fresh targeted replay uses
+`--test-filter accepted_intent_observations` without repeating other families.
