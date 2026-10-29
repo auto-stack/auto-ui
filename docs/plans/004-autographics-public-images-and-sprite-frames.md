@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-10-29
 updated_at: 2026-10-29
 plan_revision: 1
-current_step: 3
+current_step: 4
 total_steps: 10
 depends_on: [auto-ui/PLAN-002]
 supersedes_spec_components:
@@ -111,7 +111,7 @@ T-02先在本树形成`attachments/004/work/sprite-resource-contract.md`，并�
 | T-01 | work | 用户启动、002实际交付 | 核baseline/owner/SDK两锁/策略，建唯一ui-004树，记录源码差异 | AC-01/05 | [x] |
 | T-02 | work | T-01 | sprite-resource-contract先冻结；定长公开更新与整组合CPU/源/内存probe，失败回new | AC-01/03/05 | [x] |
 | T-03 | work | T-02通过 | assets/document/storage图片/版本化closure/编辑接线、V-01 | AC-01/02 | [x] |
-| T-04 | work | T-03 | 公共profile/Auto视觉输出与AGP真实绘制、V-02/03；新接口/测试入口创建 | AC-03/04 | [ ] |
+| T-04 | work | T-03 | 公共profile/Auto视觉输出与AGP真实绘制、V-02/03；新接口/测试入口创建 | AC-03/04 | [x] |
 | T-05 | work | T-04 | Pause/Step/Stop/新局/owner/失败注入及V-04 | AC-04 | [ ] |
 | T-06 | work | T-05 | fresh consumer/预算/旧profile定向面/本代identity controls、fmt/warnings/提交、SD草案及交付说明 | AC-01..05 | [ ] |
 | T-07 | review | T-06 | 同树独立最终review，核所有V/S；merge冻结门pending | AC-06 | [ ] |
@@ -145,3 +145,8 @@ T-03 证据：图片载荷进入项目闭包与编辑事务。编辑：`Edit::Sp
 合同更新（本地 9045 字节，sha256 397a753e…）：§7 更正 T-02 计时为多次运行的区间（debug tick 中位 5.49–9.50ms、P95 7.78–8.55ms、max 9.42–10.54ms，共享机器负载相关；整 tick 仍受 2s 约束），并记录精灵块只占本 Run 约 390 次 Host 往返中的 74 次；§10 记录 T-03 交付事实。T-04 绘制、T-05 生命周期仍未开始，Plan 保持 executing。
 
 2026-10-29 goal round 2：`stage: goal | plan_id: PLAN-004 | plan_revision: r1 | round: 2 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-004/auto-ui | commit: a79ba04 | next: work`。
+2026-10-29 work T-04 checkpoint（r1）：`stage: work | plan_id: auto-ui/PLAN-004 | plan_revision: 1 | outcome: progress | worktree: D:/autostack/.wt/ui-004/auto-ui | branch: codex/plan-004-dev | base_commit: d3bd6b495dc8b690925e88deee9fbf2c42e7f991 | code_commit: ae6e3d9c8d4ae0e24de8f4550fb642b0f547bd1a | task_ids: T-04 | next_responsible_role: work (T-05)`。
+
+T-04 证据：AGP 新增 `renderer/sprite.rs`（内容 SHA 身份纹理、`Rgba8UnormSrgb`、nearest/clamp/无 mipmap、实例化四顶点、每命令一次 draw 保序、与平色管线同相机）+ `SpriteStore`（staged 候选、按内容复用、真实 `created`/`bytes_uploaded`、`device_owners`）。绑定叶与 001 实例改画 PNG：编辑预览用文档默认帧、Run 用真实 Auto 帧，tint 取中性白 × 对象 alpha（避免默认平色污染导入美术）；纹理在 accept 前准备，失败保持整组 last-good；渲染失败先 re-insert surface 再上抛，避免丢槽。`cargo test --locked --test sprite_resources`（AGP）3 passed：真实像素验证 nearest/夹取/翻向/裁剪、透明纹素露出 clear 色、暖帧三次换帧/翻向不新增纹理也不重传像素而实例仍重写、同内容异尺寸/异设备/缺纹理命名拒绝、最后一 owner 释放后弱引用失效、`frame_uv` 越界拒绝。`cargo test --locked --test public_sprite_frames` 12 passed：新增编辑预览像素判据（400±16 左红右蓝、±30 透明边框露画布、翻向只换 U）与真实 Auto 像素判据（frame 0 左红右蓝，左向输入后同矩形左蓝右红），两者都断言 `Descriptor::rows()` 逐值不变（碰撞与 UV 独立）；金币槽先写入帧 2+flip，重生后回到模板默认帧。相邻回归：AGP lib 30 / asset_resources 1 / surface_contract 29 / surface_review_r2 5；驱动 authoring_assets 17 / authoring_host 7 / authoring_play_host 7 全绿。V-03 的 prepare 失败注入与整组 last-good 归 T-05。
+
+2026-10-29 goal round 3：`stage: goal | plan_id: PLAN-004 | plan_revision: r1 | round: 3 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-004/auto-ui | commit: ae6e3d9 | next: work`。

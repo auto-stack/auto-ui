@@ -105,3 +105,13 @@ header:  status, bound_count, run_id, tick_id           (4)
 - 磁盘 closure：图片与模型同住 `assets/`，文件名 `<sha>.png` / `<sha>.glb`；目录 8 文件/32MiB 共享预算含残留与临时预留；外来文件与坏 blob 只报告、不覆盖；整目录 A→B 搬迁后从新位置重开并继续编辑保存。
 - 测试（`tests/public_sprite_frames.rs`，10 cases）：closure 保存/重开/搬迁、缺失/篡改/外来/超 8 文件拒绝与恢复、编辑器创建/重绑/解绑与四类命名拒绝、2048×2048 正好 16MiB 接受 + 2049 拒绝且不触 decoder、四个 16MiB 恰好 64MiB 接受而第五个在解码前被拒、Host 公共命令导入/绑定/解绑/重复内容去重/坏 PNG 不改文档。
 - 仍未交付：AGP 真实纹理绘制与像素 oracle（T-04）、Pause/Step/Stop/新局与 warm 纹理复用（T-05）。
+
+## 11. T-04 交付事实（AGP 真实绘制与像素判据）
+
+- AGP `renderer/sprite.rs`：`SpriteTexture`（内容 SHA 身份、`Rgba8UnormSrgb`、device ordinal）+ `SpriteStore`（`staged` 候选视图、按内容键复用、`created`/`bytes_uploaded` 真实计数、`device_owners`）+ `SpritePipeline`（实例化四顶点、每命令一次 draw 以保持命令顺序、nearest/min/mag/mipmap=Nearest、ClampToEdge、无 mipmap、`ALPHA_BLENDING` 直线 alpha、相机 uniform 与 2D 平色管线一致）。
+- UV 约定：`frame_uv(frame,w,h,flip)` 只产出归一化矩形；flip 只交换 U（`[x1,y0,x0,y1]`）。屏幕式 2D 相机下 V 直接由 corner 映射（图像第 0 行在四边形顶部），因此不引入第二次翻向。
+- 驱动展示：绑定叶（静态或 001 实例模板）改画 PNG 而不是平色形状；编辑 pre-view 用文档默认帧，Run 中用真实 Auto 帧。精灵以中性白色 tint × 对象 alpha 绘制（对象 rgba 仍是平色回退色，避免默认橙色污染导入美术）。纹理在任何 accept 之前准备，因此 prepare 失败保持整组 last-good。发布时只在缓存集合变化时失效 bind group。
+- 测试：
+  - AGP `tests/sprite_resources.rs` 3 cases：真实像素的 nearest/边界夹取/翻向/裁剪（2×2 图 64×64 四边形，四象限逐一验证）、透明纹素显示 clear 色、暖帧三次换帧/翻向不新增纹理也不重传像素（`created`=1、`bytes_uploaded`=16，实例缓冲仍有重写）、同内容异尺寸/异设备/缺失纹理命名拒绝、纹理 weak owner 在最后一个 owner 释放后失效、`frame_uv` 越界拒绝。
+  - 驱动 `tests/public_sprite_frames.rs` 新增 2 cases：编辑预览在 400±16/±30 处验证左红右蓝、透明边框露出画布、翻向只镜像 U；真实 Auto 在相机投影点上验证 frame 0 左红右蓝、左向输入后同矩形变左蓝右红；两者都断言 `Descriptor::rows()` 在换帧/翻向后逐值不变（碰撞与 UV 独立）。
+- 未在本任务完成（属 T-05）：Pause/Step/Stop/新局、prepare 失败注入与整组 last-good、纹理 owner 弱引用随关闭释放、暖帧换帧不重解码的端到端计数。
