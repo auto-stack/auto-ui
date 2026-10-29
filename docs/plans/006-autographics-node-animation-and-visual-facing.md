@@ -5,7 +5,7 @@ feature_name: AutoGraphics无蒙皮节点动画与视觉朝向
 author: [Codex]
 created_at: 2026-10-29
 updated_at: 2026-10-30
-plan_revision: 1
+plan_revision: 2
 current_step: 2
 total_steps: 10
 depends_on: [auto-ui/PLAN-005]
@@ -45,6 +45,8 @@ GLB原始层级/clip轨道→有界声明/数值/资源准入→不可变model+a
 
 2026-10-29 执行授权：用户 `/goal 完成AG计划006` 授予本计划 work→独立review→有界repair→merge/规范/归档/guard清理全链授权，后续阶段继承；目标、范围、验收与预算保持r1。005现已实际交付，前置核验与原件实读见[执行基线](attachments/006/work/source-preflight.md)。
 
+2026-10-30 r2有界修订：F-006-W1-INPUT-BUDGET实测证明r1逐键读取设计无法承载原完整组合。按原§5.1路由，仅调整尚未发布新profile的输入读取设计；目标、AC阈值、32credits、CPU/源/内存、旧接口兼容、仓库及动作范围均保持，继承上述授权。事实、Spec指纹、消费规则与下一执行入口见[输入预算修订](attachments/006/work/input-budget-revision-r2.md)；新getter尚未实现，不将设计和式当成实测通过。
+
 2026-10-29规划背景（历史，当前执行进度见§8/9）：用户要求规划下一阶段；规划轮仅合同/设计/引用，无实施、agent、窗口/GPU/Cargo门或发布。来源和指纹见[基线](attachments/004/planning/baseline.md)，资源与阶段边界见[设计](../design/autographics/m2-presentation-and-resources.md)。当时005/004尚未交付，未填写未来SHA/接口价格；实际前置现已由T-01核验。
 
 现有权威：[样本研究](../../../auto-lang/docs/specs/auto-graphics/m2-game-sample-research.md)、[游戏分母](../../../auto-lang/docs/design/autographics/m2-game-sample-matrix.md)、[运行角色](../../../auto-lang/docs/specs/auto-graphics/game-actions-and-character2d.md)、[触发新局](../../../auto-lang/docs/specs/auto-graphics/runtime-triggers-and-rounds.md)、[静态资源](../../../auto-lang/docs/specs/auto-graphics/scene-assets.md)。研究记character含static/idle/walk/jump、无skin；具体轨道interpolation/keys/时间/层级尚须读取固定原始字节，不能从“有动画”推断是骨骼或只需移动根。旧858源清单缺失风险由005 T-01先恢复，006再核该收据，不换来源。
@@ -57,13 +59,17 @@ T-01只接受005已合master、独立review与冻结门完成的实际delivery�
 
 保持32credits、原callback/step/时间与CPU目标、受管源96KiB/总352KiB、用户256KiB；不因006叠加再次抬限。应有单次有限setter设置clip/phase/yaw，输入实体绑定静态3D叶或合法001实例完整Run/slot/generation；旧身份拒绝，销毁撤销，复用槽从模板初始视觉重新开始。Auto计算角色状态、选择idle/walk/jump并由fixed tick推进phase；Host只执行明确的格式/采样，不按角色速度/grounded替Auto选动作。T-02证明真实组合预算不足则带反例回new，不能省相机/触发/原clip或转专用Rust业务。
 
+r2固定公开profile为`autographics.node_animation3d/1`（version110/profile21/CLI `node-animation3d`），视觉wire/phase/yaw和原`ag_visual_pose(kind,entity,clip,phase,looping,yaw)`成本1保持。只在该未发布profile的`api/node_animation3d_v1.at`新增成本1的`ag_actions_snapshot() int`（待T-02实现）：读取既有6held+6尚未消费pressed，返回`held + 64*pressed`（0..4095）；bit0..5为左/右/前/后/跳/重启。成功读取消费本tick所有未读pressed、保留held；重复和旧getter混读不得重放边沿，旧getter价格/旧14profile装配字节不改。app_start无运行输入为0，Pause/neutral Step/fresh Run沿原输入路由/clear规则，无跨tick或跨Run缓存，也不增Host wire或Rust玩法。
+
+修复目标是同一活动回调实测 `1 snapshot +26 move +1 grounded +1 event_next +1 pair +1 phase +1 visual =32`，四向/跳跃解码、相机相对运动、选择clip/phase/yaw均由Auto完成；必须有真实事件读取分支、真实输入敏感结果，并用额外1credit超额负控证明没有旁路。此为待执行的关闭条件，不是当前已通过结论。已有原逐键error10反例保留；完整S-06入口/消费组合/owner状态见修订附件。
+
 ### 5.2 支持表与确定性
 
 有限无skin/morph的节点translation/rotation/scale动画；首版支持LINEAR与STEP，quaternion线性轨道按glTF语义最短弧slerp并正规化，不能逐分量lerp后当等价。keys时间有限、非负严格递增，output计数/类型和维度匹配，单clip同node同path重复轨道拒绝，动画作用节点与原始层级唯一映射。CUBICSPLINE/weights/skin/其他目标在本期显式unsupported；T-02必须先确认冻结原clip不依赖这些模式，若确有必需模式则回new扩合同，不能丢该clip或用未批准转换代替原件。
 
 上限仍nodes128；新增有限域<=16 clips、<=128 channels/asset、全部channel累计<=8192 key samples；input时间/output TRS与必要索引/采样scratch按实际bytes计入既有CPU64MiB/GPU64MiB总额，不另给动画免费空间。005纹理/geometry/原始资源8身份32MiB、单raw8MiB/JSON1MiB、16 expanded primitives/512潜在mesh实例等上限全部保持。先按声明与span预检再分配；动画过程中不得制造超出已准入包络的资源。选定原件若越限只能回new，不临时松限。
 
-phase由Auto显式提供的有限非负时间或等价整数tick表达，T-02选一种并固定，不能同时存在两套不一致时钟；本期数学语义为seconds下loop以duration取模、one-shot夹到末端，精确末端按loop回0/one-shot保持最后key，duration0单pose保持；切clip立刻采样当次给定phase。Stop/fresh Run恢复Auto app_start初值；Pause不更新phase，Step仅一个fixed dt；不以render次数/wallclock漂移。静态无clip保持基础pose。
+phase固定为Auto显式给出的有限非负f32 seconds，不能同时存在两套不一致时钟；loop以duration取模、one-shot夹到末端，精确末端按loop回0/one-shot保持最后key，duration0单pose保持；切clip立刻采样当次给定phase。Stop/fresh Run恢复Auto app_start初值；Pause不更新phase，Step仅一个fixed dt；不以render次数/wallclock漂移。静态无clip保持基础pose。
 
 ### 5.3 视觉/碰撞/发布
 
@@ -76,7 +82,7 @@ phase由Auto显式提供的有限非负时间或等价整数tick表达，T-02选
 | delta_id | add/modify/retire | docs/specs/... target（auto-lang知识仓） | before/after rule | rationale | acceptance IDs |
 |---|---|---|---|---|---|
 | SD-01 | add | docs/specs/auto-graphics/node-animation-and-facing.md | 无公共clip→有限TRS/Auto phase/视觉yaw/碰撞独立/事务 | M2 G3-01/07前置 | AC-01..05 |
-| SD-02 | modify | docs/specs/auto-graphics/behavior-api.md | 新显式视觉组合profile/价格/身份；旧装配不变 | 公共Auto而非Bob专用路径 | AC-02/03/05 |
+| SD-02 | modify | docs/specs/auto-graphics/behavior-api.md | 新显式视觉组合profile/单visual setter与聚合6held+6pressed读取各1credit/身份与pressed混读规则；旧装配/逐键价不变 | 公共Auto而非Bob专用路径，真实完整组合保持32credits | AC-02/03/05 |
 | SD-03 | modify | docs/specs/auto-graphics/scene-assets.md | 新profile可声明受检动画；旧静态/纹理支持域继续显式分列 | 无静默忽略clip | AC-01/04 |
 
 ## 6. 测试设计
@@ -89,7 +95,8 @@ phase由Auto显式提供的有限非负时间或等价整数tick表达，T-02选
 | V-02/S-02 | AC-02 work T-04 | 真实Auto切idle/walk/jump/static、边界0/mid/end/loop、STEP/LINEAR旋转，两个共享asset实例不同phase | CPU独立矩阵/顶点期望与实际GPU轮廓/marker ROI同时敏感；改clip/phase应变图；去掉node轨道负控必红 | 不以tick/命令/hash变化代替动画画面 |
 | V-03/S-03 | AC-03 work T-04 | 相机yaw改变/前后左右移动/停、±pi边界、动画开关、墙地接触 | Auto提供yaw后的角色面向可见；动画/视觉yaw变化不改相同输入的角色位置/支撑/触发；颜色与shadow同pose | 无根运动/姿势碰撞，非通用刚体 |
 | V-04/S-04 | AC-04 work T-05 | 坏clip/phase/旧Run/旧slot代、prepare失败、Pause/Step、20轮新局/Stop/最终drop | 全旧或全新，neutral Step一次；新局初pose、暖mesh/texture零重传；真实weak owner/上传及预算账 | 合法外部pin最后drop后查，不测驱动内部保留 |
-| V-05/S-05 | AC-05 work T-02/06 | 完整真实Auto32credits组合、fresh SDK consumer A→B、004精灵/005纹理/旧profile定向 | CPU/步数/源/内存实测与既定额、公开入口离线保存/重开、identity controls/源变异敏感 | 不等于完整G3关卡或G10b内容交付 |
+| V-05/S-05 | AC-05 work T-02/06 | 完整真实Auto四向/跳跃输入+相机+move/grounded+event_next/pair/phase+visual的32credits组合、fresh SDK consumer A→B、004精灵/005纹理/旧profile定向 | CPU/步数/源/内存实测与既定额、公开入口离线保存/重开、identity controls/源变异敏感；原固定运动向量probe不能代替输入实测 | 不等于完整G3关卡或G10b内容交付 |
+| S-06（补充V-05） | AC-05 work T-02；输入状态影响T-04/05 | 原逐键反例；新聚合0/63/各bit、mixed/重复pressed；完整键控活动回调、额外1credit、Pause/neutral Step/fresh Run | 原逐键仍error10；新完整真实事件分支fault0、输入改变运动/clip/yaw且同tick；已消费pressed不重放、held保持；neutral/fresh无旧边沿；新source<=96KiB/旧14profile hash保持 | 新case待T-02新增，现未运行；20轮owner仍归T-05 |
 
 同一唯一树顺序实施和独立上下文最终review，未指定实现者/模型，不为规划创建agent；独立review逐AC/V/S/SD核遗漏、warnings/fmt/动画静默替代、CPU与owner。review pass标merge冻结门pending，修代码后重新绑定证据/复审受影响面。
 
@@ -111,9 +118,9 @@ phase由Auto显式提供的有限非负时间或等价整数tick表达，T-02选
 | ID | owner_stage | 依赖 | 操作/产物 | AC | 状态 |
 |---|---|---|---|---|---|
 | T-01 | work | 005实际交付、用户启动 | 核005/004/SDK/两锁/素材收据与owner，建唯一ui-006树 | AC-01/05 | [x] 11bc18b；source-preflight.md |
-| T-02 | work | T-01 | node-animation-contract：原clip/interpolation、phase/yaw/碰撞/价格/预算整链probe，失败回new | AC-01..05 | [ ] F-006-W1-INPUT-BUDGET重开：完整四向/跳跃输入error10，next new；原采样/GPU/存储证据保留 |
+| T-02 | work | T-01；r2设计已修订 | node-animation-contract：原clip/phase/yaw/wire保持，新增聚合input getter及S-06，真实完整32credits整链probe，失败回new | AC-01..05 | [ ] r2 work下一入口；原逐键反例保留，原采样/GPU/存储证据按不变输入复用 |
 | T-03 | work | T-02通过 | 有界节点/clip准入与持久化/资源计账，V-01 | AC-01/04 | [x] 2739324；t03-admission-and-storage.md |
-| T-04 | work | T-03 | Auto公开视觉输出/Host采样/renderer色图与shadow，V-02/03 | AC-02/03 | [ ] ccfe6d9：四clip/21状态/独立顶点和GPU轮廓通过；input预算回new，朝向/物理/阴影仍待 |
+| T-04 | work | T-02 r2恢复通过、T-03 | Auto公开视觉输出/Host采样/renderer色图与shadow，V-02/03；r2输入路径驱动朝向/物理 | AC-02/03 | [ ] ccfe6d9：四clip/21状态/独立顶点和GPU轮廓通过；聚合输入修复后继续朝向/物理/阴影 |
 | T-05 | work | T-04 | 事务/实例代次/新局/暂停单步/owner与20轮V-04 | AC-04 | [ ] |
 | T-06 | work | T-05 | fresh消费/预算/兼容/identity controls、fmt/warnings/提交、SD与下游接口 | AC-01..05 | [ ] |
 | T-07 | review | T-06 | 同树独立review全部V/S与遗漏，merge门pending | AC-06 | [ ] |
@@ -149,8 +156,14 @@ F-006-W1-INPUT-BUDGET：补入真实4向held+跳跃pressed后，即使不读even
 
 2026-10-30 goal round 5：`stage: goal | plan_id: PLAN-006 | plan_revision: r1 | round: 5 | from: work | to: new | status: executing | outcome: needs_replan | worktree: D:/autostack/.wt/ui-006/auto-ui | commit: ccfe6d9c0e80616af344ce8898a674a380903ffe | next: new (bounded input design revision)`。本轮有独立源数据/GPU证据、法线修复及改变下一动作的实际预算反例，属有效进展；并非用户等待或外部阻塞。T-04完整朝向/物理/阴影、T-05..10仍开放。
 
+2026-10-30 bounded new r2：`stage: new | plan_id: auto-ui/PLAN-006 | plan_revision: 2 | outcome: pass (contract ready, not implemented) | base_commit: ccfe6d9c0e80616af344ce8898a674a380903ffe | worktree: D:/autostack/.wt/ui-006/auto-ui | branch: codex/plan-006-dev | changed_design: new-profile-only bounded action snapshot, original32credits and all acceptance/scope preserved | affected_task_ids: T-02,T-04,T-05 input state,T-06 current identity; T-01/T-03 retained | evidence: attachments/006/work/input-budget-revision-r2.md | next: work T-02`。已核canonical三份Spec及实际GameInput.fold→Play输入调用→character3d私有held/pressed→旧1credit getter路径。新profile聚合一次有限输入读取，不改旧价格，不增Host玩法/wire；0..4095编码、混读/重复消费、neutral/fresh、完整键控/真实事件分支和额外1credit负控已在§5/6绑定S-06，源/CPU/内存上限不改。原预算pass作废，其余原件/准入/存储与采样/像素证据按相关算法、输入、依赖不变明确保留；新API/新组合尚未实施/运行，T-02不勾选，2/10。实施树HEAD clean ccfe6d9；本轮仅主Plan/执行合同文档，无代码/Spec/ledger/构建/GPU写入。
+
+2026-10-30 goal round 6：`stage: goal | plan_id: PLAN-006 | plan_revision: r2 | round: 6 | from: new | to: work | status: executing | outcome: pass (bounded contract revision; work incomplete) | worktree: D:/autostack/.wt/ui-006/auto-ui | commit: ccfe6d9c0e80616af344ce8898a674a380903ffe (frozen implementation baseline) | next: work T-02 then T-04..06`。前轮实测反例为有效进展，本轮完成其有界设计和可执行关闭合同；保持原授权/范围/预算，无用户待答问题，不将设计可行和式当作完成。
+
+2026-10-30 r2合同预检：现盘校验exit0：0..10节顺序、10个唯一T/8个唯一AC、2项已完成与current_step一致、S-06单一当前行、9个本地Markdown链接均可解析；实施树HEAD仍ccfe6d9且clean，源内尚无ag_actions_snapshot定义，符合“待work实现”。修订附件SHA256659e4c3bd353ec5c0a622496b6897eb59ccfcb4b4cc9c1f4261aa7019d2e6a66；本轮不改实施、canonical或ledger，不运行构建/测试来冒充新功能已过。共享主检出另有其它计划README文档WIP，定向diff检查只覆盖本Plan文件，保留其原有改动。
+
 ## 10. 待澄清事项
 
-当前无用户待答问题。下一责任为new按F-006-W1-INPUT-BUDGET作同目标/验收/预算/范围的有界设计修订，再work修复并验证真实完整输入组合；T-02已重开，T-01/T-03仍完成。独立画面证据保留，但T-04..06及review/merge不提前算完成。
+当前无用户待答问题。r2设计已修订，下一责任work在同树实现聚合输入getter并实测S-06完整组合，以证据关闭F-006-W1-INPUT-BUDGET；T-02仍重开，T-01/T-03仍完成。完成后继续T-04..06及review/merge，不提前算完成或调整原额度。
 
 原规划的005交付身份与原clip实读风险已关闭；如后续发现必需clip需本期外插值或无法在既有预算内组合，仍带原件与反例回new，显式提出合同/预算变化，不能丢动作或换成Bob动画。声音/HUD、G09/G10内容、完整两关与最终发行另立后继合同，跨端不插入桌面M2前置。
