@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-005
-status: executing
+status: execution_done
 feature_name: AutoGraphics有限纹理模型与UV资源闭包
 author: [Codex]
 created_at: 2026-10-29
 updated_at: 2026-10-29
 plan_revision: 3
-current_step: 3
+current_step: 6
 total_steps: 10
 depends_on: [auto-ui/PLAN-004]
 supersedes_spec_components:
@@ -112,10 +112,10 @@ T-03..06建立新入口：`cargo test --manifest-path experimental/autographics-
 |---|---|---|---|---|---|
 | T-01 | work | 004实际交付、用户启动 | 核004/SDK/两锁/owner；恢复固定素材逐文件清单/许可/来源，建唯一ui-005树 | AC-01/05 | [x] base 2b88bd69、004与修复均已合入；SDK681冷准备通过；固定提交原件/许可/逐文件SHA恢复，见attachments/005/work/fixed-source.md |
 | T-02 | work | T-01 | textured-model-contract：支持表/身份/预算/节点关联、原件全链可行性，失败回new | AC-01/03/05 | [x] 9a0f722：固定三原件经public Host import→save→move→open→GPU capture全链通过；同根换PNG闭包及真实像素必变，切线准入澄清r3；两项测试通过，详见执行合同 |
-| T-03 | work | T-02通过 | 无任意IO的GLB/PNG闭包准入、持久化/编辑绑定、V-01/02 | AC-01/02 | [ ] R2：F-005-R1-01已独立确认closed；F-005-R1-02仅warm Open闭合，后续Save/SaveAs仍snapshot asset identity，须统一内容绑定比较并补实际生命周期；见review-r2.md |
+| T-03 | work | T-02通过 | 无任意IO的GLB/PNG闭包准入、持久化/编辑绑定、V-01/02 | AC-01/02 | [x] 7437879：统一六处same_content内容绑定；纹理warm Open→Play/Stop→当前保存/另存→损坏Verify拒绝/恢复→重开通过，原21/5准入及错边/缺损拒绝保持；见repair-r2.md，待独立R3 |
 | T-04 | work | T-03 | UV/材质/纹理shader与cache接线、V-03深度和变异 | AC-03 | [x] 6d67642：36采样组合/144实际GPU探针最大误差1；GLB变换4探针误差0/AABB与节点关联保持；深度/背面/阴影及真实负控通过，修复缩小时mag过滤误选；见pixels-and-lifetimes.md |
-| T-05 | work | T-04 | 候选故障/预算/20轮/owner/共享/静态暖上传V-04 | AC-04 | [ ] R2重开warm alias状态：Host Play仍报play asset identity；621d2b9及R1普通状态20轮/事务/owner证据保持有效，须补同内容不同显示名Open→Play/Stop/Save闭合；见review-r2.md |
-| T-06 | work | T-05 | fresh consumer/兼容/identity controls、fmt/warnings/提交、SD与006交付说明 | AC-01..05 | [ ] R2依赖重开：8809e54/source1456/consumer20+4证据仅适用该baseline，warm alias工作流未完成；修复后重绑定当前源码/consumer与readiness |
+| T-05 | work | T-04 | 候选故障/预算/20轮/owner/共享/静态暖上传V-04 | AC-04 | [x] 7437879补闭warm alias完整实际Host Play非Fault/Stop/Save流程，legacy GLB与PNG sprites同因路径亦实测；新consumer完整21+4含20轮事务/owner通过，既有普通状态证据仍有效；见repair-r2.md |
+| T-06 | work | T-05 | fresh consumer/兼容/identity controls、fmt/warnings/提交、SD与006交付说明 | AC-01..05 | [x] 7437879：identity1456/134b4f73…重新冻结/负控；新consumer-repair-r2冷SDK/独立target/21+4/12报告及全负控通过，sprite实际Auto2/旧profiles字节1抽样及fmt通过；诊断与closure见repair-r2.md |
 | T-07 | review | T-06 | 同树独立review并绑定实际revision；merge门pending | AC-06 | [ ] |
 | T-08 | merge | T-07 pass | 冻结提交定向门/有效复用，通过才合master | AC-07 | [ ] |
 | T-09 | merge | T-08 | Specs/ledger/索引与本地归档、delivery SHA/闭包/节点表示接口 | AC-08 | [ ] |
@@ -161,6 +161,10 @@ F-005-R1-01：四种未支持贴图通道normal/occlusion/emissive/metallicRough
 R2独立重放：21准入反例/5正控通过，原different-name warm Open通过；延伸真实Host Open→Play返回play asset identity，Host Save/current及SaveAs返回snapshot asset identity，而cold Save+Play/same-name Save正控均通过。确认同因完整比较仍在storage.rs:268、play.rs:501和sprites分支:429；pending Verify仍完整校验snapshot/blob，但前置Save已拒。独立current source1456/SDK681/479/29及修复consumer20+4/12case全报告/实际zero-controls验证通过，不能代替漏掉的后续公共状态。HEAD仍clean8809e54，无实现改动。F-005-R1-02原样例闭合而完整不变量开放，不能凭旧绿再次交审。连续两次final失败触发诊断checkpoint，下一cycle2须在提交前记录调用方清单与共享内容绑定设计及更新oracle，并实际验证；T-03/05/06重开，保留T-01/02/04与未受影响普通生命周期证据，3/10。
 
 2026-10-29 goal round 8：`stage: goal | plan_id: PLAN-005 | plan_revision: r3 | round: 8 | from: review | to: work | status: executing | outcome: needs_fix | worktree: D:/autostack/.wt/ui-005/auto-ui | commit: 8809e545830a2d0ed6f587517e6d4d8a29a575ca | next: work cycle2 diagnosis`。本轮独立验证确认F-01闭合，并发现同因后继Save/Play路径未闭合；取得可重放实际生命周期红与冷/同名正控，属有效进展；尚未合入，目标不缩减。
+2026-10-29 cycle2诊断checkpoint（连续R1/R2 final失败，下一修复提交前）：详见attachments/005/work/repair-r2-diagnosis.md。根因是内容身份政策在多个调用方分别实现，cycle1永久用例只观察Open而遗漏下游Save/Play，普通20+4夹具的文档名与缓存名恰相同，不能覆盖新可达状态。全src/authoring调用方审计定位load/session/save_snapshot/new_program/sprites target六处，行为代码/快照hash身份另域不改。调整为AssetRef::same_content统一SHA/长度/格式/尺寸/完整closure，只排除display name，保留Eq的元数据含义与真实磁盘/entry/Verify检查。关闭oracle扩至纹理模型真实Host Open→Play初始化/Stop→Save当前→SaveAs待确认损坏/恢复Verify→冷/暖重开，以及旧GLB和PNG sprites真实profile初始化/Stop/Save/重开与坏length拒绝；R2原可执行反例已重编译全输出无Err，新增cached三项与既有sprite实际Auto2项/旧profile字节1项定向已绿。测试构造初次PNG误走GLB入口、随后未绑定必需character/camera及角色尺寸不合合同均已按正式PNG入口与sprites合同修正，错误日志保留，未改生产支持域或降低初始化断言。该调整已经真实执行验证，非再次重述finding；后续工作仍须current identity/consumer冻结及独立复审。
+2026-10-29 work repair cycle2（r3，pass）：`stage: work | plan_id: auto-ui/PLAN-005 | plan_revision: 3 | outcome: pass | worktree_path: D:/autostack/.wt/ui-005/auto-ui | branch: codex/plan-005-dev | base_commit: 2b88bd69 | code_commit: 74378791b353cd285168fa43fb7fe4b27cd208fe | dependency_revisions: SDK/两锁/AGP/SD unchanged | task_ids: T-03,T-05,T-06 | evidence: attachments/005/work/repair-r2-diagnosis.md,repair-r2.md | blockers: none | next_responsible_role: independent affected final R3`。两失败诊断在修复前完成，shared same_content统一所有六处资源绑定准入，仅排除name；文档元数据Eq/源代码身份/字节hash不变。扩展永久case实跑纹理Host Open→非Fault Play/Stop→Save当前→SaveAs pending→坏图Verify拒绝/恢复→重开；新legacy+PNG sprites实际初始化/Stop/Save/重开及坏length拒绝全过。原R2实际反例重编译后所有操作Ok，原21准入/5正控、错边/缺损恢复仍绿；旧sprite实际Auto2项/旧profile字节1项通过。fresh consumer-repair-r2冷SDK与current1456 identity134b4f73…、21driver+4AGP/12case全报告controls通过，manifest SHA25601eaf90e08370b6ccfc81f6fb639a5cd77b27022686f86a4bb83b516495e2c25。fmt/最终source负控绿，冻结HEAD clean；停止实施写入，尚无独立pass或merge。未受影响GPU/固定源/两锁/SDK/SD与历史A搬B证据明确复用，当前consumer也实际全套资源/像素/项目路径运行，无已知work缺口。
+
+2026-10-29 goal round 9：`stage: goal | plan_id: PLAN-005 | plan_revision: r3 | round: 9 | from: work | to: review | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-005/auto-ui | commit: 74378791b353cd285168fa43fb7fe4b27cd208fe | next: review R3`。本轮完成强制诊断和共享规则/全后继状态验证调整，未缩减目标；6/10，待独立R3后再冻结merge门/知识沉淀/归档/清理。
 ## 10. 待澄清事项
 
-独立R2 needs_fix：F-005-R1-01已closed，F-005-R1-02原warm Open样例已过但Save/Play调用方仍比较显示名，完整不变量未闭合。T-03/T-05/T-06重开，3/10。下一轮work cycle2须先完成连续两次final失败的诊断：完整AssetRef内容比较调用方清单、为何旧用例漏掉后继状态、统一绑定规则及Open→Play/Stop→Save/SaveAs→重开oracle，验证调整后再交审。无须用户扩大支持域/决策。merge/知识沉淀/归档清理pending；003批回归仍交BLOG-004。
+Cycle2诊断与调整已完成并验证，冻结7437879，T-01..06完成6/10；F-005-R1-01已有独立closed，F-005-R1-02完整Open/Play/Save/Verify/重开及legacy/sprite同因状态已工作自验，等待独立R3确认。当前无已知work缺口/待用户决策；诊断/关闭行见repair-r2-diagnosis.md与repair-r2.md。merge/知识沉淀/归档清理pending，003批回归仍交BLOG-004。
