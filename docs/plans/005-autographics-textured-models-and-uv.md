@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-10-29
 updated_at: 2026-10-29
 plan_revision: 3
-current_step: 3
+current_step: 5
 total_steps: 10
 depends_on: [auto-ui/PLAN-004]
 supersedes_spec_components:
@@ -113,8 +113,8 @@ T-03..06建立新入口：`cargo test --manifest-path experimental/autographics-
 | T-01 | work | 004实际交付、用户启动 | 核004/SDK/两锁/owner；恢复固定素材逐文件清单/许可/来源，建唯一ui-005树 | AC-01/05 | [x] base 2b88bd69、004与修复均已合入；SDK681冷准备通过；固定提交原件/许可/逐文件SHA恢复，见attachments/005/work/fixed-source.md |
 | T-02 | work | T-01 | textured-model-contract：支持表/身份/预算/节点关联、原件全链可行性，失败回new | AC-01/03/05 | [x] 9a0f722：固定三原件经public Host import→save→move→open→GPU capture全链通过；同根换PNG闭包及真实像素必变，切线准入澄清r3；两项测试通过，详见执行合同 |
 | T-03 | work | T-02通过 | 无任意IO的GLB/PNG闭包准入、持久化/编辑绑定、V-01/02 | AC-01/02 | [x] e158660：union先检/共享实际Arc/嵌入与外图/旧schema拒绝/错边缓存与保存故障恢复；12个新测试已有11+1执行证据，旧模型2/17抽样及PNG闭包2项定向通过；见attachments/005/work/admission-and-storage.md |
-| T-04 | work | T-03 | UV/材质/纹理shader与cache接线、V-03深度和变异 | AC-03 | [ ] |
-| T-05 | work | T-04 | 候选故障/预算/20轮/owner/共享/静态暖上传V-04 | AC-04 | [ ] |
+| T-04 | work | T-03 | UV/材质/纹理shader与cache接线、V-03深度和变异 | AC-03 | [x] 6d67642：36采样组合/144实际GPU探针最大误差1；GLB变换4探针误差0/AABB与节点关联保持；深度/背面/阴影及真实负控通过，修复缩小时mag过滤误选；见pixels-and-lifetimes.md |
+| T-05 | work | T-04 | 候选故障/预算/20轮/owner/共享/静态暖上传V-04 | AC-04 | [x] 621d2b9：driver3+AGP1通过，20轮真实Auto+相机/对象/Stop，warm上传/解码0、20VM释放、CPU1075810/GPU1080904与实际GPU相符；候选整帧/像素及实际Weak最后pin验证，修复关闭悬空实例和新key设备代次接缝；见pixels-and-lifetimes.md |
 | T-06 | work | T-05 | fresh consumer/兼容/identity controls、fmt/warnings/提交、SD与006交付说明 | AC-01..05 | [ ] |
 | T-07 | review | T-06 | 同树独立review并绑定实际revision；merge门pending | AC-06 | [ ] |
 | T-08 | merge | T-07 pass | 冻结提交定向门/有效复用，通过才合master | AC-07 | [ ] |
@@ -141,6 +141,10 @@ T-03..06建立新入口：`cargo test --manifest-path experimental/autographics-
 
 2026-10-29 goal round 3：`stage: goal | plan_id: PLAN-005 | plan_revision: r3 | round: 3 | from: work | to: work | status: executing | outcome: pass (T-03 only; work incomplete) | worktree: D:/autostack/.wt/ui-005/auto-ui | commit: e1586602e2d48e01b3d5c80047c9d75ba74db4f6 | next: work T-04`。前轮及本轮均为实现与已执行证据进展，非等待或同一失败重试。
 
+2026-10-29 work T-04/T-05：`stage: work | plan_id: auto-ui/PLAN-005 | plan_revision: 3 | outcome: pass (T-04,T-05 only) | worktree_path: D:/autostack/.wt/ui-005/auto-ui | branch: codex/plan-005-dev | base_commit: 2b88bd69 | code_commits: 6d6764227cf99dd9fe505fe70ea194d3bba5a835,621d2b98494631c79171cb9034599dc2194fb23e | task_ids: T-04,T-05 | evidence: attachments/005/work/pixels-and-lifetimes.md | blockers: none | next_responsible_role: work T-06`。独立数值像素oracle修复真实minification错误（36组144探针误差≤1）；深度/背面法线/双面阴影/禁用阴影变异与GLB变换/碰撞/节点恢复通过。候选前后失败保整帧/相机/像素，20轮真实Auto对象/相机/Stop静态上传与解码零增量、VM20次实际释放、最后Asset/raw/image/GPU pin均有Weak证据。阶段发现并修复关闭后悬空3D draw与新resource-key绕设备代次；错误重试画面oracle按合法选择/显隐观察新纹理，未降低验收。T-06、独立final review与merge全留pending。
+
+2026-10-29 goal round 4：`stage: goal | plan_id: PLAN-005 | plan_revision: r3 | round: 4 | from: work | to: work | status: executing | outcome: pass (T-04,T-05; work incomplete) | worktree: D:/autostack/.wt/ui-005/auto-ui | commit: 621d2b98494631c79171cb9034599dc2194fb23e | next: work T-06`。本轮完成两个工作任务及真实像素/资源释放证据；未启动独立review，当前无用户决策或外部阻塞。
+
 ## 10. 待澄清事项
 
-004实际交付与固定来源恢复已由T-01核实；原件双面材质支持已获用户授权并纳入r2，切线先检在r3澄清。T-02原件全链、T-03准入/持久化均已验证，当前无待用户决策；下一任务T-04独立像素/采样/深度/双面阴影oracle。超出支持域/已有预算不得静默接受。Gallery内容/完整character动画由后继独立Plan负责，未在此承诺已可用。
+T-01..T-05已完成，当前无待用户决策；下一任务T-06 fresh consumer、当前源码identity/checker负控、公开工程/交付说明与SD草案。独立review/merge/知识沉淀/归档清理尚未开始。超出支持域/已有预算不得静默接受。Gallery内容/完整character动画由后继独立Plan负责，未在此承诺已可用。
