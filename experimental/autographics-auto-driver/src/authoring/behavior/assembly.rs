@@ -49,6 +49,41 @@ pub(super) fn assemble(api: Api) -> Result<Units, String> {
     assemble_from(api, INPUTS)
 }
 fn assemble_from(api: Api, input: Inputs<'_>) -> Result<Units, String> {
+    if api == Api::NodeAnimation3V1 {
+        // Derive from the unchanged delivered triggers3d assembly. This branch
+        // adds only a visual unit and hooks; every earlier profile keeps bytes.
+        let mut units = assemble_from(Api::Triggers3V1, input)?;
+        let visual = super::NODE_ANIMATION_API;
+        require(visual, "fn ag_visual_pose(", 1)?;
+        require(visual, "fn _ag_vis_freeze(", 1)?;
+        units.api = format!("{}\n{}", units.api, visual);
+        units.api_region = "<node_animation3d_v1.at>";
+        units.entry = replace(
+            &units.entry,
+            "fn profile() int {return 19}",
+            "fn profile() int {return 21}",
+            1,
+        )?;
+        units.entry = replace(
+            &units.entry,
+            "fn _ag_version() int {return 108}",
+            "fn _ag_version() int {return 110}",
+            1,
+        )?;
+        units.entry = replace(
+            &units.entry,
+            "_ag_trg_freeze(); app_start();",
+            "_ag_trg_freeze(); _ag_vis_freeze(); app_start();",
+            1,
+        )?;
+        units.entry = replace(
+            &units.entry,
+            "_ag_trg_tick_begin(); app_update(dt);",
+            "_ag_trg_tick_begin(); _ag_vis_tick_begin(); app_update(dt);",
+            1,
+        )?;
+        return Ok(units);
+    }
     require(input.base, "fn ag_node_count(", 1)?;
     if api != Api::V1 {
         require(input.spatial, "fn _ag_spatial_begin(", 1)?;
@@ -176,11 +211,13 @@ fn assemble_from(api: Api, input: Inputs<'_>) -> Result<Units, String> {
         | Api::Objects3V1
         | Api::Triggers2V1
         | Api::Triggers3V1
-        | Api::Sprites2V1 => segment_transport(input.transport)?,
+        | Api::Sprites2V1
+        | Api::NodeAnimation3V1 => segment_transport(input.transport)?,
     };
     // The former v5 pre-namespace `_ag_derive` replacement never matched.
     // Preserve those emitted bytes; activating that guard would change behavior.
     let (api_text, api_region) = match api {
+        Api::NodeAnimation3V1 => unreachable!("derived above"),
         Api::V1 => (input.base.to_owned(), "<behavior_v1.at>"),
         Api::SpatialV2 => (
             format!("{}\n{}", input.base, input.spatial),
@@ -396,7 +433,8 @@ fn entry(api: Api, source: &str) -> Result<String, String> {
         | Api::Objects3V1
         | Api::Triggers2V1
         | Api::Triggers3V1
-        | Api::Sprites2V1 => {
+        | Api::Sprites2V1
+        | Api::NodeAnimation3V1 => {
             let source = replace(
                 &source,
                 "_ag_spatial_begin();",

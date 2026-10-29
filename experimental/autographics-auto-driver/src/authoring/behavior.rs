@@ -40,6 +40,8 @@ pub const TRIGGERS_API: &str = include_str!("../../api/runtime_triggers_v1.at");
 /// earlier profile keeps its exact assembled bytes.
 pub const SPRITES2_VERSION: &str = "autographics.sprites2d/1";
 pub const SPRITES_API: &str = include_str!("../../api/sprite2d_v1.at");
+pub const NODE_ANIMATION3_VERSION: &str = "autographics.node_animation3d/1";
+pub const NODE_ANIMATION_API: &str = include_str!("../../api/node_animation3d_v1.at");
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Api {
     V1,
@@ -56,6 +58,7 @@ pub enum Api {
     Triggers2V1,
     Triggers3V1,
     Sprites2V1,
+    NodeAnimation3V1,
 }
 impl Api {
     pub fn parse(value: &str) -> Result<Self, String> {
@@ -74,6 +77,7 @@ impl Api {
             TRIGGERS2_VERSION => Ok(Self::Triggers2V1),
             TRIGGERS3_VERSION => Ok(Self::Triggers3V1),
             SPRITES2_VERSION => Ok(Self::Sprites2V1),
+            NODE_ANIMATION3_VERSION => Ok(Self::NodeAnimation3V1),
             _ => Err("unsupported behavior API".into()),
         }
     }
@@ -93,6 +97,7 @@ impl Api {
             Self::Triggers2V1 => TRIGGERS2_VERSION,
             Self::Triggers3V1 => TRIGGERS3_VERSION,
             Self::Sprites2V1 => SPRITES2_VERSION,
+            Self::NodeAnimation3V1 => NODE_ANIMATION3_VERSION,
         }
     }
     pub fn number(self) -> i32 {
@@ -111,6 +116,7 @@ impl Api {
             Self::Triggers2V1 => 107,
             Self::Triggers3V1 => 108,
             Self::Sprites2V1 => 109,
+            Self::NodeAnimation3V1 => 110,
         }
     }
     pub fn profile(self) -> i32 {
@@ -129,6 +135,7 @@ impl Api {
             Self::Triggers2V1 => 18,
             Self::Triggers3V1 => 19,
             Self::Sprites2V1 => 20,
+            Self::NodeAnimation3V1 => 21,
         }
     }
     /// The finite run-object profiles including the trigger profiles that
@@ -138,7 +145,9 @@ impl Api {
             Self::Objects2V1 | Self::Triggers2V1 | Self::Sprites2V1 => {
                 Some(super::runtime_objects::Dim::TwoD)
             }
-            Self::Objects3V1 | Self::Triggers3V1 => Some(super::runtime_objects::Dim::ThreeD),
+            Self::Objects3V1 | Self::Triggers3V1 | Self::NodeAnimation3V1 => {
+                Some(super::runtime_objects::Dim::ThreeD)
+            }
             _ => None,
         }
     }
@@ -147,7 +156,7 @@ impl Api {
     pub fn triggers(self) -> Option<super::runtime_objects::Dim> {
         match self {
             Self::Triggers2V1 | Self::Sprites2V1 => Some(super::runtime_objects::Dim::TwoD),
-            Self::Triggers3V1 => Some(super::runtime_objects::Dim::ThreeD),
+            Self::Triggers3V1 | Self::NodeAnimation3V1 => Some(super::runtime_objects::Dim::ThreeD),
             _ => None,
         }
     }
@@ -157,7 +166,7 @@ impl Api {
         matches!(self, Self::Sprites2V1)
     }
     /// Every shipped profile, in the order the command line lists them.
-    pub fn all() -> [Self; 14] {
+    pub fn all() -> [Self; 15] {
         [
             Self::V1,
             Self::SpatialV2,
@@ -173,6 +182,7 @@ impl Api {
             Self::Triggers2V1,
             Self::Triggers3V1,
             Self::Sprites2V1,
+            Self::NodeAnimation3V1,
         ]
     }
     /// The command-line name of this profile. The public entry selects a Run by
@@ -193,6 +203,7 @@ impl Api {
             Self::Triggers2V1 => "triggers2d",
             Self::Triggers3V1 => "triggers3d",
             Self::Sprites2V1 => "sprites2d",
+            Self::NodeAnimation3V1 => "node-animation3d",
         }
     }
     /// Parse one `--behavior-api` value; an unknown name is a usage error.

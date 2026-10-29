@@ -5,6 +5,7 @@
 //! untrusted input before structural admission.
 
 pub mod glb;
+pub mod node_animation;
 pub mod png;
 pub mod textured;
 
