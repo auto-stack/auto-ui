@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-10-29
 updated_at: 2026-10-30
 plan_revision: 1
-current_step: 3
+current_step: 2
 total_steps: 10
 depends_on: [auto-ui/PLAN-005]
 supersedes_spec_components:
@@ -111,9 +111,9 @@ phase由Auto显式提供的有限非负时间或等价整数tick表达，T-02选
 | ID | owner_stage | 依赖 | 操作/产物 | AC | 状态 |
 |---|---|---|---|---|---|
 | T-01 | work | 005实际交付、用户启动 | 核005/004/SDK/两锁/素材收据与owner，建唯一ui-006树 | AC-01/05 | [x] 11bc18b；source-preflight.md |
-| T-02 | work | T-01 | node-animation-contract：原clip/interpolation、phase/yaw/碰撞/价格/预算整链probe，失败回new | AC-01..05 | [x] 9354e9e；t02-integration.md，原件Auto→Host→GPU、19wire负控/搬迁重开 |
+| T-02 | work | T-01 | node-animation-contract：原clip/interpolation、phase/yaw/碰撞/价格/预算整链probe，失败回new | AC-01..05 | [ ] F-006-W1-INPUT-BUDGET重开：完整四向/跳跃输入error10，next new；原采样/GPU/存储证据保留 |
 | T-03 | work | T-02通过 | 有界节点/clip准入与持久化/资源计账，V-01 | AC-01/04 | [x] 2739324；t03-admission-and-storage.md |
-| T-04 | work | T-03 | Auto公开视觉输出/Host采样/renderer色图与shadow，V-02/03 | AC-02/03 | [ ] |
+| T-04 | work | T-03 | Auto公开视觉输出/Host采样/renderer色图与shadow，V-02/03 | AC-02/03 | [ ] ccfe6d9：四clip/21状态/独立顶点和GPU轮廓通过；input预算回new，朝向/物理/阴影仍待 |
 | T-05 | work | T-04 | 事务/实例代次/新局/暂停单步/owner与20轮V-04 | AC-04 | [ ] |
 | T-06 | work | T-05 | fresh消费/预算/兼容/identity controls、fmt/warnings/提交、SD与下游接口 | AC-01..05 | [ ] |
 | T-07 | review | T-06 | 同树独立review全部V/S与遗漏，merge门pending | AC-06 | [ ] |
@@ -143,8 +143,14 @@ phase由Auto显式提供的有限非负时间或等价整数tick表达，T-02选
 
 2026-10-30 goal round 4：`stage: goal | plan_id: PLAN-006 | plan_revision: r1 | round: 4 | from: work | to: work | status: executing | outcome: pass (T-03 complete; work incomplete) | worktree: D:/autostack/.wt/ui-006/auto-ui | commit: 27393245118b0708b6f0b9c7ede66025d130598a | next: work T-04`。前轮进展有效，本轮完成生产边界与预检/总账修正、实际负控与持久化证据；3/10，无用户待答/无范围变化。
 
+2026-10-30 work T-04进展及needs_replan：`stage: work | plan_id: auto-ui/PLAN-006 | plan_revision: 1 | outcome: needs_replan | worktree_path: D:/autostack/.wt/ui-006/auto-ui | branch: codex/plan-006-dev | base_commit: 80d9bbe | code_commit: ccfe6d9c0e80616af344ce8898a674a380903ffe | dependency_revisions: SDK/两锁/固定原件未变 | task_ids: T-02 reopened,T-04 partial | evidence: attachments/006/work/t04-pixels-and-input-diagnosis.md | blockers: none (bounded design revision within existing scope) | next_responsible_role: new`。T-04已实际核原4clip的20时间状态+非零phase立即切换、共享asset独立实例：独立原JSON/BIN f64插值/层级，不复用生产sample；43596顶点误差max2.4978897e-7<2e-5；2074207稳定像素probe通过；去node轨道故障使idle/walk/jump的独立轮廓错644/1277/215像素，均拒，21PNG只本地保留。非均匀缩放法线独立GPU反例119≠预期163已用inverse transpose修复，最终163±2；旧005深度/双面4朝向/2顺序/1reveal定向绿max_error0。实际日志目录D:/autostack/plan-artifacts/auto-ui/plan-006/：t04-pixels-final.log SHA25600ef4c3bb76ece0017ecaa915c358fb1685ef7a7d1585fa7d03fdff53534f1b4（2/2）；t04-normal-red.log d327f84c5e7262e7b2a989bba125e84b83dc6d3a6d0a770df976389aab1fa253（预期红）；t04-legacy-normal.log 588e717dfa041d85dd17a665af848a15c6ff1bb3e622ccd87c11754b844e946a（1/1）。修复影响的旧T-02/T-03像素hash只作历史，不作当前颜色hash；几何/准入/存储/owner路径未改。
+
+F-006-W1-INPUT-BUDGET：补入真实4向held+跳跃pressed后，即使不读event pair/phase，更弱的move/grounded/event_next/visual组合已经实际error10；`public_node_animation::full_input_movement_trigger_and_visual_combination_exposes_scalar_read_budget_limit`在真实Auto Session运行exit0（断言预期error10），日志t04-scalar-input-budget-counterexample.log SHA256ac7ae59e56d0c733e8c35fdf8f655ccffb87cd1cd103d2d946aa9c5bf3b0e030。T-02旧probe读相机basis但用固定运动向量，漏算既有逐键1credit，故其“完整组合预算通过”结论失效，T-02重开；素材/采样/同帧/wire/保存证据保留，T-01/T-03仍完成，计2/10。按§5.1原定路由回new，不增加32credits、不省输入/相机/触发/原clip、不转Rust玩法。候选是在尚未发布的新profile追加成本1的6held+6pressed聚合读取（旧14profile/旧getter价格/输入语义保持），新完整组合可1+26+1+1+1+1+1=32；该候选尚未实施，须new有界修订合同并明确mixed/重复消费与neutral/fresh Run oracle后work。现有全链授权覆盖相同目标/验收/范围/预算的设计修订，不需用户重批。
+
+2026-10-30 goal round 5：`stage: goal | plan_id: PLAN-006 | plan_revision: r1 | round: 5 | from: work | to: new | status: executing | outcome: needs_replan | worktree: D:/autostack/.wt/ui-006/auto-ui | commit: ccfe6d9c0e80616af344ce8898a674a380903ffe | next: new (bounded input design revision)`。本轮有独立源数据/GPU证据、法线修复及改变下一动作的实际预算反例，属有效进展；并非用户等待或外部阻塞。T-04完整朝向/物理/阴影、T-05..10仍开放。
+
 ## 10. 待澄清事项
 
-当前无用户待答问题。T-01输入、T-02最小整链与T-03准入/持久化/资源账已通过，phase/yaw/wire合同已冻结。继续T-04..06各自完整验收矩阵，不将最小probe或准入成果当作后续AC完成。
+当前无用户待答问题。下一责任为new按F-006-W1-INPUT-BUDGET作同目标/验收/预算/范围的有界设计修订，再work修复并验证真实完整输入组合；T-02已重开，T-01/T-03仍完成。独立画面证据保留，但T-04..06及review/merge不提前算完成。
 
 原规划的005交付身份与原clip实读风险已关闭；如后续发现必需clip需本期外插值或无法在既有预算内组合，仍带原件与反例回new，显式提出合同/预算变化，不能丢动作或换成Bob动画。声音/HUD、G09/G10内容、完整两关与最终发行另立后继合同，跨端不插入桌面M2前置。

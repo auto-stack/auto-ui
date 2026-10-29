@@ -1,5 +1,7 @@
 # PLAN-006 T-02 执行合同（最小整链probe已通过）
 
+2026-10-30 当前修订入口：T-04补齐实际四向+跳跃键读取后实测error10，原T-02固定向量probe没有证明完整输入预算。T-02已重开，work outcome=needs_replan，下一阶段new按`t04-pixels-and-input-diagnosis.md`作有界设计修订；本文件原GPU/存储/采样证据保留，“完整组合预算已完成”不再作为当前结论。目标/32credits/旧价/CPU/范围不变；候选聚合input API尚未实施。
+
 基线 `80d9bbe`，输入及004/005/SDK/两锁身份见 `source-preflight.md`。本合同固定本期普通实现选择，不扩大r1的范围、AC、资源或CPU/时间门。原始纹理角色已经过Auto→Host→同帧真实GPU，含完整组合和预算/输出校验，T-02最小整链通过，见`t02-integration.md`；广泛准入/持久化矩阵、画面/物理/owner/fresh consumer仍分别属于T-03..06，不预称AC全部完成。
 
 ## 公共profile与视觉状态
