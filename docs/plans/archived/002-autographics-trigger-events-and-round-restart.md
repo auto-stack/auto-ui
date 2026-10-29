@@ -1,6 +1,6 @@
 ---
 plan_id: PLAN-002
-status: reviewed
+status: archived
 feature_name: AutoGraphics有限触发事件与新局隔离（引擎）
 author: [Codex]
 created_at: 2026-10-29
@@ -22,7 +22,7 @@ total_steps: 10
 
 
 
-> **用户批准拆分 r4（2026-10-29）**：本计划只交付auto-ui引擎能力及必要测试夹具，不写ag-examples。G11的两维项目、目录/锁、验收与离线包整体移交[ag-examples/001](../../../ag-examples/docs/plans/001-autographics-gallery-runtime-objects.md)，该计划硬等本计划实际交付后启动。编号不变，原r1..r3记录保留，尚未实施。
+> **用户批准拆分 r4（2026-10-29）**：本计划只交付auto-ui引擎能力及必要测试夹具，不写ag-examples。G11的两维项目、目录/锁、验收与离线包整体移交[ag-examples/001](../../../../ag-examples/docs/plans/001-autographics-gallery-runtime-objects.md)，该计划硬等本计划实际交付后启动。编号不变，原r1..r3记录保留，尚未实施。
 
 > **r5 受管桥接包络上调（2026-10-29，按§10预设路由）**：triggers组合在冻结的64KiB受管源包络下不可行——实测装配产物 Objects2V1 transport 2638+api 58621+entry 691=61950B（限额内），Triggers2V1 72141B、Triggers3V1 74050B 均>65536B；其中triggers单元压缩态10131B，而剩余预算仅3465B，无法容纳冻结的144值块布局+15个公开函数+评估器。按§10"带反例回new、不删功能、不静默抬限"执行：**显式**将`MAX_BRIDGE` 64KiB→96KiB、组合上限320KiB→352KiB（=256+96），功能分母/运行时预算（32credits、步数、时限、256KiB用户源）/AC/V/T/SD全部不变。反例探针固化为装配包络守卫测试。
 
@@ -30,7 +30,7 @@ total_steps: 10
 
 消费[auto-ui/001对象生命周期](001-autographics-runtime-object-lifecycle.md)实际交付，建立有界几何触发、一次事件读取及受检新Run请求。两维最小Auto工程作为引擎验收夹具，验证三物品收集、危险/终点与胜负后新局，玩法由用户Auto负责。只在auto-ui实现、测试、复审、合入与归档。
 
-下游[ag-examples/001](../../../ag-examples/docs/plans/001-autographics-gallery-runtime-objects.md)独立消费本计划已合入的实际交付版本制作G11；其完成不再是本计划合入条件，不允许反向依赖造成循环。本稿仍有硬前置auto-ui/001，T-01/02在实际交付基线上冻结版本/签名/计费，不抢跑依赖或预填未来SHA。
+下游[ag-examples/001](../../../../ag-examples/docs/plans/001-autographics-gallery-runtime-objects.md)独立消费本计划已合入的实际交付版本制作G11；其完成不再是本计划合入条件，不允许反向依赖造成循环。本稿仍有硬前置auto-ui/001，T-01/02在实际交付基线上冻结版本/签名/计费，不抢跑依赖或预填未来SHA。
 
 ## 1. 目标
 
@@ -49,7 +49,7 @@ total_steps: 10
 
 ## 3. 技术栈
 
-auto-ui driver已有`src/authoring/{play.rs,behavior.rs,behavior/assembly.rs,game_input.rs,runtime_camera.rs,spatial.rs}`、`host/{play_adapter.rs,viewport.rs}`；001将提供runtime_objects模块。当前源码事实见[原规划基线](attachments/001/planning/baseline.md)。无新增SDK/依赖。
+auto-ui driver已有`src/authoring/{play.rs,behavior.rs,behavior/assembly.rs,game_input.rs,runtime_camera.rs,spatial.rs}`、`host/{play_adapter.rs,viewport.rs}`；001将提供runtime_objects模块。当前源码事实见[原规划基线](../attachments/001/planning/baseline.md)。无新增SDK/依赖。
 
 拟新增`api/runtime_triggers_v1.at`、`src/authoring/runtime_round.rs`、`tests/{runtime_triggers_api,runtime_round_host,runtime_trigger_samples}.rs`、`samples/runtime-triggers/{two,three}/`及本代identity/checker；局部命名/签名/编号由T-02冻结。samples是必要引擎测试/公共入口夹具，不是G11目录产品；本计划无ag-examples写入树。
 
@@ -57,11 +57,11 @@ auto-ui driver已有`src/authoring/{play.rs,behavior.rs,behavior/assembly.rs,gam
 
 授权：用户2026-10-29明确批准“auto-ui/002只做引擎，G11另建ag-examples/001，依赖002实际交付，暂不实施”。本轮只修计划/引用，未建树/编译/运行OS或GPU/创建agent。T-01仍等auto-ui/001实际交付，已有其工作树不等于已交付；本次不修改其源码、进度或验收合同。
 
-权威输入仍为auto-lang现有`docs/specs/overview.md`与`auto-graphics/{source-repository-and-sdk,behavior-api,scene-play-session,spatial-query-profile,game-actions-and-character2d,game-character3d,runtime-game-cameras}.md`，按[知识入口](../../../auto-lang/docs/specs/auto-graphics/overview.md)跨仓读取；[Design45§13](../../../auto-lang/docs/design/45-autographics-wgpu-engine-and-game-prototypes.md#13-m2运行对象触发与新局事务2026-10-29拟议合同)、[游戏分母](../../../auto-lang/docs/design/autographics/m2-game-sample-matrix.md)和auto-ui/001约束能力分母。SD路径暂以现有auto-lang知识仓为根；本轮不搬迁/修改canonical Specs。
+权威输入仍为auto-lang现有`docs/specs/overview.md`与`auto-graphics/{source-repository-and-sdk,behavior-api,scene-play-session,spatial-query-profile,game-actions-and-character2d,game-character3d,runtime-game-cameras}.md`，按[知识入口](../../../../auto-lang/docs/specs/auto-graphics/overview.md)跨仓读取；[Design45§13](../../../../auto-lang/docs/design/45-autographics-wgpu-engine-and-game-prototypes.md#13-m2运行对象触发与新局事务2026-10-29拟议合同)、[游戏分母](../../../../auto-lang/docs/design/autographics/m2-game-sample-matrix.md)和auto-ui/001约束能力分母。SD路径暂以现有auto-lang知识仓为根；本轮不搬迁/修改canonical Specs。
 
 原r1源码观察为879交付`4adf2d037a1804741adc9c5a012f08cfa566439d`；执行必须换为auto-ui/001实际交付SHA并核差异/对象代次/SDK/锁。旧SDK pin7b987ca8/681快照及原限额保持。当前旧v2只有闭区间单对overlap，无引擎事件流；Play有新Run建VM、Stop恢复编辑Prepared，但无公共restart保旧到新tick0边界，不能把命令已发送当新局完成。
 
-旧混合r3曾包含G11内容和双仓合入；本次按用户授权拆分完整移交内容验收，而非删除分母。追溯：[拆分映射](../../../ag-examples/docs/plans/attachments/001/planning/split-contract.md)。下游可用接口/源码包/真实运行证据以本计划最终交付为准，不消费在途tip。
+旧混合r3曾包含G11内容和双仓合入；本次按用户授权拆分完整移交内容验收，而非删除分母。追溯：[拆分映射](../../../../ag-examples/docs/plans/attachments/001/planning/split-contract.md)。下游可用接口/源码包/真实运行证据以本计划最终交付为准，不消费在途tip。
 
 ## 5. 详细设计
 
@@ -156,10 +156,10 @@ work自查→同一auto-ui树独立最终review→merge冻结受影响门，未�
 | T-03 | work | T-02通过 | 新Auto/API/准入/触发时序/代次，V-01/02 | AC-02/03 | [x] api/runtime_triggers_v1.at+runtime_round.rs+装配/入口/锁；V-01/02 14/14绿（bfcc0c8） |
 | T-04 | work | T-03 | 新Run事务/失败/owner、两维引擎夹具与GPU负控，V-03/04 | AC-03/04 | [x] restart交换/失败last-good/20轮owner/Paused-Step门 5/5绿；准入变异单测；两维夹具 |
 | T-05 | work | T-04 | fresh consumer/预算/current identity/fmt/提交/SD与下游接口摘要，V-05 | AC-01..05 | [x] verify_plan002(+controls)/check_runtime_triggers全绿；fresh consumer离线--locked构建+14/14；身份链选plan002；提交bfcc0c8 |
-| T-06 | review | T-05 | 同一引擎树独立最终review绑定冻结commit；merge门pending | AC-06 | [ ] |
-| T-07 | merge | T-06 pass | 冻结引擎受影响门/新对照/复用审计，失败回work复审 | AC-07 | [ ] |
-| T-08 | merge | T-07 | 仅auto-ui/master引擎落地，记录实际源码与消费身份；无需等G11 | AC-08 | [ ] |
-| T-10 | merge | T-08 | 本仓Plan/复审/归档，现有知识按SD同步Spec/ledger/索引，给ag-examples/001实际SHA收据 | AC-08 | [ ] |
+| T-06 | review | T-05 | 同一引擎树独立最终review绑定冻结commit；merge门pending | AC-06 | [x] final review pass on bfcc0c8（AC-01..06 全 pass：14/5/3 新套件、9/8/8 回放、consumer-fresh-r2 离线、fmt 0 diff、002 零新 warning）；F-001 记录为 001 时代 GPU flake，非 002 回归 |
+| T-07 | merge | T-06 pass | 冻结引擎受影响门/新对照/复用审计，失败回work复审 | AC-07 | [x] 冻结基线重跑 check_runtime_triggers PASS（identity 1415；3 新套件 14/5/3；001 回放 9/8/8；lib 1/1/4）；bfcc0c8→0ee5ad0 代码子树零 diff，门证据绑定交付；F-001 按隔离运行处置 |
+| T-08 | merge | T-07 | 仅auto-ui/master引擎落地，记录实际源码与消费身份；无需等G11 | AC-08 | [x] rebase 到 master 9540150，range-diff bfcc0c8=0ee5ad0 全等；ff-only 落地 master tip=0ee5ad0（reflog "Fast-forward"，无 merge 提交）；未触 autographics-dev |
+| T-10 | merge | T-08 | 本仓Plan/复审/归档，现有知识按SD同步Spec/ledger/索引，给ag-examples/001实际SHA收据 | AC-08 | [x] auto-lang b73ec0712（SD-01 新 runtime-triggers-and-rounds.md + SD-02 增量 + identity plan002）+ ledger a74fea967 v129→130（守护离线投影；P002-M/TRG/T/R1 + P833/P839 tags；canonical sha256 与 tags 一致）；归档 archived/；handoff SHA=0ee5ad0 |
 | T-11 | merge | T-10 | 本仓wt-guard clean后清树/分支/空组，保必要本地产物收据 | AC-08 | [ ] |
 
 原T-09（内容仓合入）整项移交ag-examples/001 T-08；保留其他任务ID，不将移交项打勾或算本计划已完成步骤。
@@ -190,6 +190,8 @@ work自查→同一auto-ui树独立最终review→merge冻结受影响门，未�
 2026-10-29 goal r4：`stage: goal | plan_id: PLAN-002 | plan_revision: r5 | round: 4 | from: drafting | to: review | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-002/auto-ui | commit: bfcc0c8 | next: review`。授权链：用户 /goal 完成计划002 一次授予 work/review/repair/merge 全程。本轮执行 work 阶段 T-01..T-05（含 r5 有界修订）并置 execution_done；T-06 同树独立最终 review 待启动。
 
 2026-10-29 goal r5（final review pass）：`stage: review | review_scope: final | reviewer_identity: 同实现会话独立评审上下文（无独立最终评审者角色；结论从工件与新鲜运行重建，非执行摘要采信；此限制如实记录） | plan_id: PLAN-002 | plan_revision: 5 | outcome: pass | worktree: D:/autostack/.wt/ui-002/auto-ui | branch: codex/plan-002-dev | reviewed_commit: bfcc0c8f5da6d7086d2849828d22ff9123f90631 | base_commit: 78ee3b7 | dependency_revisions: 001=537122b（归档交付,计划档案 provenance 链保持）,SDK=932ad48 闭包（verify_source --sdk-only PASS:479包/17本地/29路径边/冻结AGP锁保留） | spec_inputs: Plan r5 §5 规范增量（SD-01 add runtime-triggers-and-rounds.md, SD-02 modify scene-play-session+auto-source-driver；规范发布归 merge,评审期未发布） | acceptance_results: AC-01 PASS（树/分支/001交付537122b/SDK锁/唯一树核实）；AC-02 PASS（合同冻结附件已提交;r5包络反例守卫;预算probe实测）;AC-03 PASS（V-01/02=14/14新鲜重跑）；AC-04 PASS（V-03/04=5/5新鲜重跑）；AC-05 PASS（样例3/3;verify_plan002+controls;consumer-fresh-r2 于 bfcc0c8 重打包:identity PASS+离线--locked构建+14/14）；AC-06 PASS（本评审:fmt 0 diff;002文件零新增警告;公开路径cli/--behavior-api/样例头部齐备;merge门pending） | pending_closeout_gates: T-07 统一回归/复用审计（merge-owned）;T-08/T-10/T-11（merge） | findings: F-001（环境敏感,001时代既有,非002回归,不阻塞）:runtime_objects_host 20轮churn的上传平坦性断言对GPU驱动 buffer_rewrites 计数敏感——同树同二进制（该测试及其输入相对78ee3b7 diff为空,二进制与001交付位相同）整文件跑一次失败(离群26/27 vs warm 18)一次通过8/8,单独跑恒过；处置:merge-owned统一回归门以隔离运行该套件或走 check_runtime_objects.py 的报告级churn门 | evidence: 评审新鲜运行 D:/autostack/plan-artifacts/auto-ui/plan-002/review_batch_gate.txt（3套件+lib门全绿;001回放中 F-001 如上）；consumer-fresh-r2 离线验证；restart交换/准入oracle/装配派生/Spec delta 逐 diff 巡检一致 | next: merge（T-07..T-11）`
+
+2026-10-29 merge r1（PLAN-002:r5 沉淀收据）：`stage: merge | plan_id: PLAN-002 | plan_revision: 5 | outcome: pass | prepared: reviewed_commit bfcc0c8f5da6d7086d2849828d22ff9123f90631（r5 final review pass，AC-01..06 pass）、delivery_commit 0ee5ad0747ec3bb67e1288401fcc31daf3901c6e、SD 冻结表 SD-01 新增 runtime-triggers-and-rounds.md / SD-02 增量 auto-source-driver.md+scene-play-session.md | worktree: D:/autostack/.wt/ui-002/auto-ui | branch: codex/plan-002-dev | landed: 分支 rebase 到 master 9540150，git range-diff 78ee3b7..bfcc0c8 78ee3b7..0ee5ad0 全等（bfcc0c8=0ee5ad0），git diff bfcc0c8 0ee5ad0 -- experimental/ 为空；主检出 git merge --ff-only codex/plan-002-dev 落地 master tip=0ee5ad0（reflog "Fast-forward"），无 merge 提交；旧→新映射 bfcc0c8→0ee5ad0 | gate: check_runtime_triggers PASS（identity 1415 哈希；runtime_triggers_api 14、runtime_round_host 5、runtime_trigger_samples 3；PLAN-001 回放 runtime_objects_api 9 / runtime_objects_host 8 / runtime_objects_samples 8；lib managed_source_envelope 1 / triggers_admission 1 / runtime_round 4；原始证据 D:/autostack/plan-artifacts/auto-ui/plan-002/batch_gate.txt），代码子树 reviewed→delivery 零 diff，门绑定交付基线；F-001（001 时代 churn 上传平坦性断言对 GPU 驱动状态敏感，同二进制时好时坏）按隔离运行/报告级 churn 门处置，非 002 回归 | ledger_refreshed: auto-lang a74fea967（父 b73ec0712），v129→130，channel=Regime B guarded offline projection（无 store writer 可达，仅 DSH GUI 4143 监听；字节备份 .autoos/specs.json.bak-p002-merge，外科 diff 113/3，六节 schema/唯一 ID/字段/tags 读回校验通过，提交 blob 与校验文件同哈希）；targets: designs P002-TRG（新；source-sha256:1d0e37f3…）、P833-AUTO-SOURCE/P839-PLAY（tags 追加；f0555a88…/648c93f9…）、tests P002-T、reviews P002-R1、reports P002-M，均带 file+tags | 副仓知识: auto-lang b73ec0712 新增 docs/specs/auto-graphics/runtime-triggers-and-rounds.md 并增量 auto-source-driver.md/scene-play-session.md，identity 升 plan002（1415 哈希）；三份 canonical docs 的 sha256 与 ledger tags 逐项一致 | archived: docs/plans/archived/002-autographics-trigger-events-and-round-restart.md（completion_kind: delivered；移动后相对链接深度按 archived/ 修正，README 索引同步）| handoff: ag-examples/001 交付 SHA=0ee5ad0747ec3bb67e1288401fcc31daf3901c6e | production-artifacts 观察: auto-ui 生产面为 crates/*（UI 壳）且不引用 autographics-auto-driver，无需重建/重启；auto-lang 本次仅知识/账本沉淀（非 auto-lang 计划落地），批量回归门 .last-batch-regression.json 覆盖 880/2026-10-28，非计划号%5 且<48h，不触发 | 清理: T-11，随 cleaned 检查点确认 | next: done`
 
 ## 10. 待澄清事项
 
