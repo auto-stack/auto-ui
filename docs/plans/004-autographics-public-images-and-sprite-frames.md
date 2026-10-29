@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-004
-status: drafting
+status: executing
 feature_name: AutoGraphics公共图片资源与2D精灵帧
 author: [Codex]
 created_at: 2026-10-29
 updated_at: 2026-10-29
 plan_revision: 1
-current_step: 0
+current_step: 2
 total_steps: 10
 depends_on: [auto-ui/PLAN-002]
 supersedes_spec_components:
@@ -108,8 +108,8 @@ T-02先在本树形成`attachments/004/work/sprite-resource-contract.md`，并�
 
 | ID | owner_stage | 依赖 | 操作/产物 | AC | 状态 |
 |---|---|---|---|---|---|
-| T-01 | work | 用户启动、002实际交付 | 核baseline/owner/SDK两锁/策略，建唯一ui-004树，记录源码差异 | AC-01/05 | [ ] |
-| T-02 | work | T-01 | sprite-resource-contract先冻结；定长公开更新与整组合CPU/源/内存probe，失败回new | AC-01/03/05 | [ ] |
+| T-01 | work | 用户启动、002实际交付 | 核baseline/owner/SDK两锁/策略，建唯一ui-004树，记录源码差异 | AC-01/05 | [x] |
+| T-02 | work | T-01 | sprite-resource-contract先冻结；定长公开更新与整组合CPU/源/内存probe，失败回new | AC-01/03/05 | [x] |
 | T-03 | work | T-02通过 | assets/document/storage图片/版本化closure/编辑接线、V-01 | AC-01/02 | [ ] |
 | T-04 | work | T-03 | 公共profile/Auto视觉输出与AGP真实绘制、V-02/03；新接口/测试入口创建 | AC-03/04 | [ ] |
 | T-05 | work | T-04 | Pause/Step/Stop/新局/owner/失败注入及V-04 | AC-04 | [ ] |
@@ -124,6 +124,16 @@ T-02先在本树形成`attachments/004/work/sprite-resource-contract.md`，并�
 2026-10-29 new r1：`stage: new | plan_id: auto-ui/PLAN-004 | plan_revision: 1 | outcome: pass | next: 用户启动work T-01/T-02`。这是合同就绪，非实现/独立验收通过。本轮所有任务0/10，未建树、改实现或运行上述测试。ag-examples/001沿已交付002继续，不追004开发tip。
 
 2026-10-29 合同预检：三份Plan的0..10节、各10任务/8AC/5V、work/review/merge职责、依赖与SD引用检查通过；本批49个局部链接可解析，新增入口均标待建。此为文档预检，非实现测试或独立final review。
+
+2026-10-29 work T-01+T-02 checkpoint（r1）：`stage: work | plan_id: auto-ui/PLAN-004 | plan_revision: 1 | outcome: progress | worktree: D:/autostack/.wt/ui-004/auto-ui | branch: codex/plan-004-dev | base_commit: d3bd6b495dc8b690925e88deee9fbf2c42e7f991 | code_commit: 7552d01d559a8737ff7663c386ef4d15334dbd36 | dependency_revisions: auto-ui master d3bd6b4, 根/驱动/AGP 三锁未改 | task_ids: T-01,T-02 | next_responsible_role: work (T-03)`。
+
+T-01 证据：主检出干净（仅 docs 差异）；baseline 六处源码 SHA-256 逐一相符（assets bf9b4b4f…、document 2068a187…、storage baf303bc…、viewport 096c253c…、assembly 669db066…、play b997b3aa…），三锁 SHA-256 亦相符（driver 2b131d3d…、AGP c3df168e…、root 813ba8e8…）；`D:/autostack/.wt/ui-004/auto-ui` 唯一注册为 `codex/plan-004-dev`，组目录 `D:/autostack/.wt/ui-004` 新建；`python tools/prepare_sdk.py --from-snapshot` PASS（681 files，17 local packages），SDK/target 均在本树内独立；`cargo check --locked --all-targets` exit 0。
+
+T-02 证据（本地证据不入库）：合同 `docs/plans/attachments/004/work/sprite-resource-contract.md`（7301 字节，sha256 3ee7aae55aedd6befd13b2c3332cc580402d289d104388a1c8575cb8ad2ff482）冻结 `autographics.sprites2d/1`（profile 20 / number 109）、`ag_sprite_frame(id,x,y,w,h,flip)`、`ag_sprite_slot(token,…)`、`ag_sprite_bound(id)`、1 credit/32 每 callback、每 Run 定长块 `4+targets*7+56`、错误码 41/42/43/44 与 PNG 有限域（8bit RGB/RGBA、无交错、无 APNG、单边 1..2048、解码 16MiB、8 身份/32MiB raw/64MiB CPU+GPU 与模型共享）。`cargo test --locked --test public_sprite_frames -- --test-threads=1` 5 passed：13 个旧 profile 的 api/bridge/combined hash 与 pristine 基线逐字节相同；profile 20 managed 80367 字节（api 76518，96KiB 上限未抬）、块长 74；真实 Auto 24 tick（角色移动+相机+3 实例+3 触发对+精灵更新）中位 5.56ms/P95 7.78ms，帧 0→1→2 随真实 phase、左向只翻 UV 不改位移、实例槽在真实事件读取后切帧 2+flip，全部由 Host 独立验证；PNG 9 类非法输入先拒且 decoder 计数不变；scene/5 往返与旧 schema 拒收新字段成立。相邻回归：`cargo test --locked --lib` 33 passed；authoring_assets 17 / authoring_hierarchy 10 / authoring_document 1 / authoring_session 4 / authoring_storage 3 全绿（schema/4→5 的“当前写出版本”断言与 v1 夹具的 sprite 字段随版本化 scene 一并更新）。T-03 起的编辑接线/磁盘 closure 与 T-04 绘制仍未开始，故不设 execution_done，Plan 保持 executing。
+
+2026-10-29 goal round 1：`stage: goal | plan_id: PLAN-004 | plan_revision: r1 | round: 1 | from: drafting | to: executing | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-004/auto-ui | commit: 7552d01 | next: work`。本轮只完成 T-01/T-02（2/10），其余任务保持未完成；用户对整链 work→review→bounded repair→merge 的授权已记录于本节，后续阶段继承。
+
+基线漂移（已知，不阻断）：本轮期间 master 由 `d3bd6b4` 前进到 `31e4bd2`（另一路线 `fix-synth-surface` 的 pre-landing sync），差异仅 `crates/auto-ui-runtime/src/ui/{handler_codegen,vm_bridge}.rs` +21 行，与本计划的 `experimental/autographics/**`、`docs/plans/004-*` 零重叠；本 worktree 仍基于 `d3bd6b4`，T-08 合并前须再与 master 同步并刷新受影响证据。§2 规划的树/分支 `D:/autostack/.wt/ui-004/auto-ui`、`codex/plan-004-dev` 与用户授权一致。
 
 ## 10. 待澄清事项
 
