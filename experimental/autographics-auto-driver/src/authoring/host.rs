@@ -491,8 +491,20 @@ impl Host {
                     .flat_map(|r| r.values().map(|a| a.model.source_sha256.clone())),
             )
             .collect();
+        let mut draws_removed = false;
         if let Some(SurfaceContent::Scene3d(c)) = self.rt.content_mut(self.three) {
             c.store.retain_models(|sha| keys.contains(sha));
+            let before = c.instances.len();
+            // A published draw cannot outlive its mesh, just as a sprite draw
+            // cannot outlive its image. Closing the editor may release the
+            // payload without constructing another candidate frame.
+            // Missing meshes of a retained owner still fail renderer validation;
+            // only draws whose payload ownership was revoked are retired here.
+            c.instances.retain(|i| keys.contains(&i.mesh.0));
+            draws_removed = c.instances.len() != before;
+        }
+        if draws_removed {
+            self.rt.graph.mark_content_dirty(self.three);
         }
         // PLAN-004: a textured visual may only outlive its accepted image while
         // some owner still holds that payload (accepted, candidate or retained

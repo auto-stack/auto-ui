@@ -1035,3 +1035,334 @@ fn gltf_mipmap_filters_have_explicit_base_filter_normalization() {
         );
     }
 }
+
+fn objects_scene() -> (Document, Registry) {
+    let mut registry = Registry::new();
+    let mut doc = Document::empty("ui005-objects".into());
+    doc.schema = "autographics.scene/6".into();
+    let mut actor = Object::new(1, Kind::Cylinder);
+    actor.translation = [0., 0.5, 0.];
+    actor.scale = [0.4, 0.5, 0.4];
+    doc.objects.push(actor);
+    let mut floor = Object::new(2, Kind::Cylinder);
+    floor.translation = [0., -0.5, 0.];
+    floor.scale = [10., 0.5, 10.];
+    doc.objects.push(floor);
+    for (i, name) in ["platform", "coin"].into_iter().enumerate() {
+        let asset =
+            assets::import(&samples().join(format!("models/{name}.glb")), &registry).unwrap();
+        let mut object = Object::new(i as u64 + 3, Kind::Model);
+        object.resource = Some(asset.identity.key());
+        object.translation = if i == 0 {
+            [3., 1., -3.]
+        } else {
+            [-3., 1.5, -5.]
+        };
+        doc.assets.push(asset.identity.clone());
+        doc.objects.push(object);
+        assets::insert(&mut registry, asset).unwrap();
+    }
+    (doc, registry)
+}
+fn source_snapshot() -> autographics_auto_driver::authoring::behavior::SourceSnapshot {
+    use autographics_auto_driver::authoring::behavior::{Api, SourceSnapshot};
+    SourceSnapshot::read_for(&samples().join("main.at"), Api::Objects3V1).unwrap()
+}
+fn settle_play(h: &mut Host) {
+    let end = std::time::Instant::now() + std::time::Duration::from_secs(30);
+    while h.play.as_ref().is_some_and(|p| p.pending()) {
+        assert!(std::time::Instant::now() < end);
+        h.frame(None).unwrap();
+    }
+}
+fn user_step(h: &mut Host) {
+    settle_play(h);
+    h.play
+        .as_mut()
+        .unwrap()
+        .dispatch(Default::default())
+        .unwrap();
+    settle_play(h);
+}
+fn mesh_store(h: &Host) -> &agp::render3d::MeshStore {
+    match h.rt.content(h.three).unwrap() {
+        agp::host::surface_runtime::SurfaceContent::Scene3d(c) => &c.store,
+        _ => panic!("3D surface"),
+    }
+}
+fn lifecycle_report(name: &str, value: Value) {
+    println!("UI005 {name}: {value}");
+    if let Some(root) = std::env::var_os("UI005_REPORT_DIR") {
+        let root = PathBuf::from(root);
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(
+            root.join(format!("{name}.json")),
+            serde_json::to_vec_pretty(&value).unwrap(),
+        )
+        .unwrap();
+    }
+}
+#[test]
+fn twenty_textured_object_camera_runs_keep_uploads_flat_and_release_actual_last_owners() {
+    let (doc, registry) = objects_scene();
+    let key = doc.assets[0].key();
+    let mut host = Host::with_assets(doc, registry).unwrap();
+    let external_asset = host.editor.assets[&key].clone();
+    let weak_asset = Arc::downgrade(&external_asset);
+    let weak_raw = Arc::downgrade(&external_asset.bytes);
+    let weak_image = Arc::downgrade(&external_asset.model_images[0]);
+    let external_mesh = mesh_store(&host)
+        .pin(&external_asset.model.source_sha256, "primitive-0")
+        .unwrap();
+    let weak_mesh = Arc::downgrade(&external_mesh);
+    let external_texture = external_mesh.texture.as_ref().unwrap().clone();
+    let weak_texture = Arc::downgrade(&external_texture);
+    let cold_buffers = mesh_store(&host).uploads.snapshot();
+    let cold_textures = mesh_store(&host).texture_upload_counters();
+    let decode = assets::decode_attempts();
+    let usage = textured_models::usage(&host.editor.assets);
+    let editor_state = host.editor.isolation_identity();
+    assert_eq!(
+        mesh_store(&host).texture_count(),
+        1,
+        "two original models share one real GPU texture"
+    );
+    let actual_mesh_bytes = host
+        .editor
+        .assets
+        .values()
+        .flat_map(|a| {
+            a.model
+                .meshes
+                .iter()
+                .map(move |m| (&a.model.source_sha256, &m.name))
+        })
+        .map(|(sha, name)| {
+            let m = mesh_store(&host).pin(sha, name).unwrap();
+            m.vertex_buf.size() + m.index_buf.size()
+        })
+        .sum::<u64>();
+    assert_eq!(
+        actual_mesh_bytes + mesh_store(&host).owned_texture_bytes(),
+        usage.3 as u64,
+        "GPU budget matches actual mesh/UV/index/texture allocations"
+    );
+    let snapshot = source_snapshot();
+    let mut vm_releases = 0;
+    for round in 0..20 {
+        host.start_user_snapshot(snapshot.clone()).unwrap();
+        host.pause_play("");
+        settle_play(&mut host);
+        let owner = host.play.as_ref().unwrap().owner_probe().unwrap();
+        assert!(owner());
+        host.play.as_mut().unwrap().resume().unwrap();
+        host.play.as_mut().unwrap().char_key(1, true, false);
+        for _ in 0..4 {
+            host.play.as_mut().unwrap().cam_drag(0.03, 0.01);
+            user_step(&mut host);
+        }
+        assert!(
+            host.play.as_ref().unwrap().error.is_none(),
+            "round {round}: {:?}",
+            host.play.as_ref().unwrap().error
+        );
+        assert!(host
+            .play
+            .as_ref()
+            .unwrap()
+            .last
+            .as_ref()
+            .unwrap()
+            .instances
+            .as_ref()
+            .unwrap()
+            .slots
+            .iter()
+            .any(|s| s.live()));
+        assert_eq!(
+            mesh_store(&host).uploads.snapshot().buffer_rewrites,
+            cold_buffers.buffer_rewrites
+        );
+        assert_eq!(
+            mesh_store(&host).texture_upload_counters().buffer_rewrites,
+            cold_textures.buffer_rewrites
+        );
+        assert_eq!(mesh_store(&host).texture_count(), 1);
+        assert_eq!(assets::decode_attempts(), decode);
+        host.stop_play();
+        assert!(!owner(), "round {round} released VM");
+        vm_releases += 1;
+        assert_eq!(
+            host.editor.isolation_identity(),
+            editor_state,
+            "Play never mutates editor state"
+        );
+        assert_eq!(textured_models::usage(&host.editor.assets), usage);
+    }
+    assert!(weak_mesh.upgrade().is_some() && weak_image.upgrade().is_some());
+    host.editor.close();
+    host.frame(None).unwrap();
+    assert_eq!(mesh_store(&host).texture_count(), 0);
+    assert!(
+        weak_asset.upgrade().is_some() && weak_mesh.upgrade().is_some(),
+        "legal external pins retain owners after project close"
+    );
+    drop(external_asset);
+    assert!(
+        weak_asset.upgrade().is_none()
+            && weak_raw.upgrade().is_none()
+            && weak_image.upgrade().is_none()
+    );
+    drop(external_mesh);
+    assert!(weak_mesh.upgrade().is_none() && weak_texture.upgrade().is_some());
+    drop(external_texture);
+    assert!(weak_texture.upgrade().is_none());
+    lifecycle_report(
+        "runtime-owners",
+        json!({"rounds":20,"vm_releases":vm_releases,"warm_mesh_uploads":0,"warm_texture_uploads":0,"warm_decodes":0,"shared_textures":1,"cpu_bytes":usage.2,"gpu_bytes":usage.3,"actual_gpu_bytes":actual_mesh_bytes+cold_textures.bytes_rewritten,"last_cpu_owner_released":true,"last_gpu_owner_released":true}),
+    );
+}
+
+#[test]
+fn textured_runtime_prepare_failures_preserve_the_complete_previous_frame_and_recover() {
+    for after_upload in [false, true] {
+        let (doc, registry) = objects_scene();
+        let mut host = Host::with_assets(doc, registry).unwrap();
+        host.start_user_snapshot(source_snapshot()).unwrap();
+        host.pause_play("");
+        settle_play(&mut host);
+        host.play.as_mut().unwrap().resume().unwrap();
+        user_step(&mut host);
+        host.pause_play("");
+        settle_play(&mut host);
+        let tick = host.play.as_ref().unwrap().tick();
+        let frame = format!("{:?}", host.play.as_ref().unwrap().last);
+        let pixels = host
+            .rt
+            .capture(host.three, "ui005-before-failure")
+            .unwrap()
+            .0;
+        let view = match host.rt.content(host.three).unwrap() {
+            agp::host::surface_runtime::SurfaceContent::Scene3d(c) => c.view_proj,
+            _ => unreachable!(),
+        };
+        host.play.as_mut().unwrap().resume().unwrap();
+        host.play.as_mut().unwrap().cam_drag(15., 5.);
+        host.play.as_mut().unwrap().char_key(1, true, false);
+        host.fail_resource = !after_upload;
+        host.fail_after_asset_upload = after_upload;
+        user_step(&mut host);
+        assert!(host.play.as_ref().unwrap().error.is_some());
+        assert_eq!(host.play.as_ref().unwrap().tick(), tick);
+        assert_eq!(format!("{:?}", host.play.as_ref().unwrap().last), frame);
+        let after = match host.rt.content(host.three).unwrap() {
+            agp::host::surface_runtime::SurfaceContent::Scene3d(c) => c.view_proj,
+            _ => unreachable!(),
+        };
+        assert_eq!(after, view);
+        assert_eq!(
+            host.rt
+                .capture(host.three, "ui005-after-failure")
+                .unwrap()
+                .0,
+            pixels
+        );
+        host.fail_resource = false;
+        host.fail_after_asset_upload = false;
+        host.stop_play();
+        host.start_user_snapshot(source_snapshot()).unwrap();
+        host.pause_play("");
+        settle_play(&mut host);
+        assert!(host.play.as_ref().unwrap().error.is_none());
+        host.stop_play();
+    }
+    lifecycle_report(
+        "runtime-transaction",
+        json!({"failure_stages":2,"full_frame_preserved":true,"camera_preserved":true,"pixels_preserved":true,"recovered":true}),
+    );
+}
+
+#[test]
+fn textured_import_failure_drops_candidates_and_leaves_published_pixels_unchanged() {
+    let root = temp();
+    let path = input_copy(&root);
+    let mut host = Host::new(Document::empty("ui005-candidate".into())).unwrap();
+    cmd(&mut host, "import", json!(path.to_str().unwrap())).unwrap();
+    host.frame(None).unwrap();
+    let before = host.editor.document.clone();
+    let history = host.editor.history();
+    let pixels = host
+        .rt
+        .capture(host.three, "ui005-import-before")
+        .unwrap()
+        .0;
+    let old = mesh_store(&host).texture_upload_counters();
+    let old_buffers = mesh_store(&host).uploads.snapshot();
+    let png = agp::assets::encode_png_rgba(1, 1, &[0, 255, 255, 255]).unwrap();
+    std::fs::write(root.join("Textures/colormap.png"), png).unwrap();
+    for after_upload in [false, true] {
+        host.fail_resource = !after_upload;
+        host.fail_after_asset_upload = after_upload;
+        host.dispatch(&json!({"epoch":host.editor.stamp.epoch,"revision":host.editor.stamp.revision,"action":"import","payload":path.to_str().unwrap(),"selection":host.editor.selection,"asset_generation":host.ui().asset_token}).to_string()).unwrap();
+        let candidate = host
+            .editor
+            .candidate_assets()
+            .values()
+            .find(|a| a.identity.key() != before.assets[0].key())
+            .unwrap();
+        let weak = Arc::downgrade(candidate);
+        let raw = Arc::downgrade(candidate.dependencies.values().next().unwrap());
+        let image = Arc::downgrade(&candidate.model_images[0]);
+        host.settle().unwrap();
+        assert!(weak.upgrade().is_none() && raw.upgrade().is_none() && image.upgrade().is_none());
+        assert_eq!(host.editor.document, before);
+        assert_eq!(host.editor.history(), history);
+        assert_eq!(
+            host.rt
+                .capture(host.three, "ui005-import-rejected")
+                .unwrap()
+                .0,
+            pixels
+        );
+        assert_eq!(mesh_store(&host).texture_count(), 1);
+        if after_upload {
+            assert_eq!(
+                mesh_store(&host).texture_upload_counters().buffer_rewrites,
+                old.buffer_rewrites + 1
+            );
+            assert_eq!(
+                mesh_store(&host).uploads.snapshot().buffer_rewrites,
+                old_buffers.buffer_rewrites + 2
+            );
+        } else {
+            assert_eq!(
+                mesh_store(&host).texture_upload_counters().buffer_rewrites,
+                old.buffer_rewrites
+            );
+            assert_eq!(
+                mesh_store(&host).uploads.snapshot().buffer_rewrites,
+                old_buffers.buffer_rewrites
+            );
+        }
+    }
+    host.fail_resource = false;
+    host.fail_after_asset_upload = false;
+    cmd(&mut host, "import", json!(path.to_str().unwrap())).unwrap();
+    host.frame(None).unwrap();
+    // Import creates another leaf. Equal-depth overlap deliberately preserves
+    // the first leaf, so hide it to observe the newly accepted texture.
+    cmd(&mut host, "select", json!(before.objects[0].id)).unwrap();
+    cmd(&mut host, "toggle-visible", json!(before.objects[0].id)).unwrap();
+    host.frame(None).unwrap();
+    assert_ne!(
+        host.rt
+            .capture(host.three, "ui005-import-recovered")
+            .unwrap()
+            .0,
+        pixels
+    );
+    lifecycle_report(
+        "import-transaction",
+        json!({"failure_stages":2,"new_upload_observed":true,"candidate_cpu_owners_released":true,"old_pixels_preserved":true,"successful_retry_changed_pixels":true}),
+    );
+}

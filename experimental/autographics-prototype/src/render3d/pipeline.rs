@@ -29,6 +29,7 @@ pub struct GpuMesh {
 /// Uploaded once per identity; never rebuilt for unchanged models.
 #[derive(Default)]
 pub struct MeshStore {
+    device_ordinal: Option<u64>,
     device: Option<wgpu::Device>,
     textures: crate::renderer::sprite::SpriteStore,
     meshes: HashMap<(String, String), std::sync::Arc<GpuMesh>>,
@@ -40,6 +41,7 @@ impl MeshStore {
     /// remain local. Attempts stay counted even when the candidate is discarded.
     pub fn staged(&self) -> Self {
         Self {
+            device_ordinal: self.device_ordinal,
             device: self.device.clone(),
             textures: self.textures.staged(),
             meshes: self.meshes.clone(),
@@ -63,6 +65,19 @@ impl MeshStore {
         model: &ModelData,
         mesh_index: usize,
     ) -> Result<(String, u32), RendererError> {
+        // Resource-key misses must not bypass the host generation check.
+        // Native handles from separate wgpu Instances can compare equal;
+        // the host token, rather than that comparison, is the public proof.
+        if self
+            .device_ordinal
+            .is_some_and(|old| old != gpu.token().ordinal)
+            || (self.device.is_some() && self.device_ordinal.is_none())
+        {
+            return Err(RendererError::ReportIo(
+                "mesh/texture device generation mismatch".into(),
+            ));
+        }
+        self.device_ordinal = Some(gpu.token().ordinal);
         let key = (
             model.source_sha256.clone(),
             model
@@ -124,6 +139,21 @@ impl MeshStore {
         }) {
             return Err(RendererError::ReportIo("invalid mesh UV".into()));
         }
+        if let Some(image) = visual.and_then(|v| v.image.as_ref()) {
+            if image.width == 0
+                || image.height == 0
+                || image.width > 2048
+                || image.height > 2048
+                || (image.width as usize)
+                    .checked_mul(image.height as usize)
+                    .and_then(|n| n.checked_mul(4))
+                    != Some(image.rgba.len())
+            {
+                return Err(RendererError::ReportIo(
+                    "invalid model image dimensions/payload".into(),
+                ));
+            }
+        }
         let mut verts: Vec<f32> =
             Vec::with_capacity(mesh.positions.len() * if textured { 12 } else { 10 });
         for (i, p) in mesh.positions.iter().enumerate() {
@@ -174,7 +204,7 @@ impl MeshStore {
                     queue,
                     &image.source_sha256,
                     image,
-                    None,
+                    self.device_ordinal,
                 )?)
             }
         } else {
@@ -271,6 +301,10 @@ impl MeshStore {
     }
     pub fn texture_uploads(&self) -> u64 {
         self.textures.created
+    }
+    /// Actual queue writes, shared with staged candidates even when rejected.
+    pub fn texture_upload_counters(&self) -> crate::renderer::UploadStats {
+        self.textures.uploads.snapshot()
     }
     pub fn owned_texture_bytes(&self) -> u64 {
         self.textures

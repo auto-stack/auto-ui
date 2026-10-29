@@ -548,3 +548,101 @@ fn double_sided_shadow_culling_and_shadow_disable_controls_use_the_same_geometry
         serde_json::json!({"culling_cases":3,"disable_control_rejected":true,"restore_control_passed":true,"shadow_pixel":dark_pixel,"lit_pixel":bright_pixel}),
     );
 }
+
+#[test]
+fn staged_texture_candidates_share_uploads_and_drop_failed_owners_on_the_same_device() {
+    let gpu = GpuDevice::new().unwrap();
+    let mut resident = MeshStore::default();
+    let image = solid([120, 80, 40]);
+    let a = quad(
+        "owner-a",
+        0.5,
+        image.clone(),
+        Sampling::default(),
+        [0., 0., 1., 1.],
+        false,
+        false,
+    );
+    let b = quad(
+        "owner-b",
+        0.5,
+        image.clone(),
+        Sampling::default(),
+        [0., 0., 1., 1.],
+        false,
+        false,
+    );
+    resident.get_or_upload(&gpu, &a, 0).unwrap();
+    resident.get_or_upload(&gpu, &b, 0).unwrap();
+    let pin = resident.pin(&a.source_sha256, "primitive-0").unwrap();
+    let other = resident.pin(&b.source_sha256, "primitive-0").unwrap();
+    assert!(Arc::ptr_eq(
+        pin.texture.as_ref().unwrap(),
+        other.texture.as_ref().unwrap()
+    ));
+    assert_eq!(resident.texture_count(), 1);
+    let attempts = resident.texture_upload_counters();
+    assert_eq!(attempts.buffer_rewrites, 1);
+    let mut candidate = resident.staged();
+    let new = quad(
+        "rejected-owner",
+        0.5,
+        solid([0, 255, 255]),
+        Sampling::default(),
+        [0., 0., 1., 1.],
+        true,
+        false,
+    );
+    candidate.get_or_upload(&gpu, &new, 0).unwrap();
+    let new_pin = candidate.pin(&new.source_sha256, "primitive-0").unwrap();
+    let weak_mesh = Arc::downgrade(&new_pin);
+    let weak_texture = Arc::downgrade(new_pin.texture.as_ref().unwrap());
+    drop(new_pin);
+    assert_eq!(candidate.texture_count(), 2);
+    assert_eq!(resident.texture_count(), 1);
+    drop(candidate);
+    assert!(weak_mesh.upgrade().is_none());
+    assert!(weak_texture.upgrade().is_none());
+    assert_eq!(resident.texture_count(), 1);
+    assert_eq!(
+        resident.texture_upload_counters().buffer_rewrites,
+        attempts.buffer_rewrites + 1,
+        "discarded real upload remains observable"
+    );
+    let before = resident.uploads.snapshot();
+    let mut bad = a.clone();
+    bad.source_sha256 = "bad-image-before-upload".into();
+    bad.meshes[0].visual.as_mut().unwrap().image = Some(Arc::new(ImageData {
+        width: 1,
+        height: 1,
+        rgba: vec![1, 2, 3],
+        source_sha256: "bad".into(),
+    }));
+    assert!(resident.get_or_upload(&gpu, &bad, 0).is_err());
+    assert_eq!(
+        resident.uploads.snapshot().buffer_rewrites,
+        before.buffer_rewrites
+    );
+    let foreign = GpuDevice::new().unwrap();
+    assert!(resident.get_or_upload(&foreign, &new, 0).is_err());
+    assert_eq!(
+        resident.uploads.snapshot().buffer_rewrites,
+        before.buffer_rewrites
+    );
+    let weak_original_mesh = Arc::downgrade(&pin);
+    let external = pin.texture.as_ref().unwrap().clone();
+    let weak_original_texture = Arc::downgrade(&external);
+    drop(other);
+    resident.retain_models(|_| false);
+    assert_eq!(resident.texture_count(), 0);
+    assert!(weak_original_mesh.upgrade().is_some());
+    drop(pin);
+    assert!(weak_original_mesh.upgrade().is_none());
+    assert!(weak_original_texture.upgrade().is_some());
+    drop(external);
+    assert!(weak_original_texture.upgrade().is_none());
+    report(
+        "gpu-owners",
+        serde_json::json!({"shared_textures":1,"failed_candidate_released":true,"failed_upload_counted":true,"malformed_before_upload":true,"foreign_device_refused":true,"last_external_pin_released":true}),
+    );
+}
