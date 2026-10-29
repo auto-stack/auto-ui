@@ -6,11 +6,19 @@ ROOT=pathlib.Path(__file__).resolve().parents[1]
 ENGINE=pathlib.Path("D:/autostack/plan-artifacts/auto-ui/plan-011/consumer/experimental")
 DEFAULT=pathlib.Path("D:/autostack/plan-artifacts/auto-ui/plan-011")
 def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+def content_sha(p):
+ b=p.read_bytes();b=b if p.suffix.lower()==".png"else b.replace(b"\r\n",b"\n");return hashlib.sha256(b).hexdigest()
 def receipts(d):
  by_kind={k:[]for k in ["core","branches","performance"]}
  for e in d["evidence"]:
   f=pathlib.Path(e["path"]);assert f.is_file() and sha(f)==e["sha256"]
-  by_kind[e["kind"]].append(json.loads(f.read_text()))
+  raw=json.loads(f.read_text())
+  if e["kind"]=="core":
+   for row in raw["rows"]:
+    source=f.parent/"sources"/f"{row['source_sha256']}.at"
+    assert sha(source)==row["source_sha256"]
+    assert content_sha(source)==content_sha(ROOT/f"fixtures/candidate-{row['candidate']}.at")
+  by_kind[e["kind"]].append(raw)
  assert len(by_kind["core"])==3 and len(by_kind["branches"])==3 and len(by_kind["performance"])==5
  for core in by_kind["core"]:
   assert core["schema"]=="ui011-core/1" and {r["candidate"]for r in core["rows"]}=={"a","b"}
@@ -45,6 +53,7 @@ def receipts(d):
 
 def validate(d):
  assert d["schema"]=="ui011-decision/1"
+ for relative,digest in d["source_inputs"].items():assert content_sha(ROOT/relative)==digest,relative
  receipts(d)
  assert set(d["denominator"])=={f"G2-{n:02d}" for n in range(1,10)}
  assert set(d["candidates"])=={"a","b"}
@@ -56,7 +65,7 @@ def validate(d):
  assert all(d["denominator"][f"G2-{n:02d}"]=="not_established_budget_fault" for n in range(1,9))
  assert d["denominator"]["G2-09"]=="missing_public_capability"
  for c in ["a","b"]:
-  assert d["candidates"][c]["source_sha256"]==sha(ROOT/f"fixtures/candidate-{c}.at")
+  assert d["candidates"][c]["source_content_sha256"]==content_sha(ROOT/f"fixtures/candidate-{c}.at")
   assert d["candidates"][c]["first_fault_tick"]>=1
  assert d["engine_commit"]=="0261ae9dacf786beb6dceb630be6af267f242625"
  assert d["research_limit"]=="two_candidates_current_profile_only"
