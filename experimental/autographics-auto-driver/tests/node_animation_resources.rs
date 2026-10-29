@@ -596,3 +596,237 @@ fn pose_metadata_wire_and_hidden_potential_slots_share_the_existing_cpu_union() 
     assert!(visual::targets(&d, &order, &r).is_ok());
     println!("CPU pose reservation={reserve}B; asset-only headroom={gap}B rejects including hidden; +65536B headroom accepts");
 }
+
+// R1 declared-but-unreferenced sampler regression. Appends a standalone input
+// and output; no geometry/image/valid original track byte is rewritten.
+fn extra_sampler(j: &mut Value, bin: &mut Vec<u8>, width: usize) -> (usize, usize, usize, usize) {
+    let vi = j["bufferViews"].as_array().unwrap().len();
+    let ai = j["accessors"].as_array().unwrap().len();
+    let time = bin.len();
+    for f in [0f32, 1.] {
+        bin.extend(f.to_le_bytes());
+    }
+    let output = bin.len();
+    for _ in 0..2 * width {
+        bin.extend(1f32.to_le_bytes());
+    }
+    j["bufferViews"].as_array_mut().unwrap().extend([
+        json!({"buffer":0,"byteOffset":time,"byteLength":8}),
+        json!({"buffer":0,"byteOffset":output,"byteLength":8*width}),
+    ]);
+    j["accessors"].as_array_mut().unwrap().extend([
+        json!({"bufferView":vi,"componentType":5126,"count":2,"type":"SCALAR","min":[0],"max":[1]}),
+        json!({"bufferView":vi+1,"componentType":5126,"count":2,"type":if width==3 {"VEC3"} else {"VEC4"}}),
+    ]);
+    let si = j["animations"][0]["samplers"].as_array().unwrap().len();
+    j["animations"][0]["samplers"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"input":ai,"output":ai+1,"interpolation":"LINEAR"}));
+    j["buffers"][0]["byteLength"] = json!(bin.len());
+    (si, ai, time, output)
+}
+
+#[test]
+fn every_declared_sampler_is_checked_without_allocating_unused_tracks_or_changing_channel_quota() {
+    let root = temp();
+    let mut negatives = 0;
+    for used in [false, true] {
+        for defect in [
+            "duplicate",
+            "negative",
+            "nan-time",
+            "nan-output",
+            "count",
+            "shape",
+            "input-type",
+            "normalized",
+            "span",
+            "index",
+            "cubic",
+        ] {
+            let (mut j, mut bin) = chunks();
+            let (si, ai, time, output) = extra_sampler(&mut j, &mut bin, 3);
+            if used {
+                j["animations"][0]["channels"][0]["sampler"] = json!(si);
+            }
+            let mut kind = "invalid:";
+            match defect {
+                "duplicate" => bin[time + 4..time + 8].copy_from_slice(&0f32.to_le_bytes()),
+                "negative" => bin[time..time + 4].copy_from_slice(&(-1f32).to_le_bytes()),
+                "nan-time" => bin[time + 4..time + 8].copy_from_slice(&f32::NAN.to_le_bytes()),
+                "nan-output" => {
+                    bin[output + 4..output + 8].copy_from_slice(&f32::NAN.to_le_bytes())
+                }
+                "count" => j["accessors"][ai + 1]["count"] = json!(1),
+                "shape" => j["accessors"][ai + 1]["type"] = json!("SCALAR"),
+                "input-type" => j["accessors"][ai]["type"] = json!("VEC3"),
+                "normalized" => j["accessors"][ai + 1]["normalized"] = json!(true),
+                "span" => {
+                    let vi = j["accessors"][ai + 1]["bufferView"].as_u64().unwrap() as usize;
+                    j["bufferViews"][vi]["byteLength"] = json!(4);
+                }
+                "index" => j["animations"][0]["samplers"][si]["input"] = json!(999999),
+                "cubic" => {
+                    kind = "unsupported:";
+                    j["animations"][0]["samplers"][si]["interpolation"] = json!("CUBICSPLINE");
+                }
+                _ => unreachable!(),
+            }
+            let allocations = channel_allocation_count();
+            for error in [
+                Animation::preflight(&j, &bin).unwrap_err(),
+                Animation::from_parts(&j, &bin).unwrap_err(),
+            ] {
+                assert!(error.starts_with(kind), "{used}/{defect}: {error}");
+            }
+            assert_eq!(
+                channel_allocation_count(),
+                allocations,
+                "{used}/{defect} retained tracks"
+            );
+            let decodes = assets::decode_attempts();
+            let path = put(&root, &j, &bin);
+            let error = assets::import_animated(&path, &Registry::new()).unwrap_err();
+            assert!(
+                error.starts_with(kind),
+                "production {used}/{defect}: {error}"
+            );
+            assert_eq!(
+                assets::decode_attempts(),
+                decodes,
+                "{used}/{defect} must refuse before decode"
+            );
+            assert_eq!(channel_allocation_count(), allocations);
+            negatives += 1;
+        }
+    }
+    let (base_j, base_bin) = chunks();
+    let base_bytes = Animation::preflight(&base_j, &base_bin).unwrap();
+    let base = Animation::from_parts(&base_j, &base_bin).unwrap();
+    for mode in ["LINEAR", "STEP"] {
+        for width in [3, 4] {
+            let (mut j, mut bin) = chunks();
+            let (si, _, _, output) = extra_sampler(&mut j, &mut bin, width);
+            j["animations"][0]["samplers"][si]["interpolation"] = json!(mode);
+            // No target => no invented positive-scale or unit-quaternion rule.
+            for i in 0..2 * width {
+                bin[output + i * 4..output + i * 4 + 4].copy_from_slice(&(-2f32).to_le_bytes());
+            }
+            let allocations = channel_allocation_count();
+            let bytes = Animation::preflight(&j, &bin).unwrap();
+            assert_eq!(bytes, base_bytes);
+            assert_eq!(channel_allocation_count(), allocations);
+            let a = Animation::from_parts(&j, &bin).unwrap();
+            assert_eq!(a.cpu_bytes, bytes);
+            assert_eq!(a.clips.len(), 4);
+            for clip in 0..4 {
+                assert_eq!(
+                    a.clips[clip].duration, base.clips[clip].duration,
+                    "unused keys do not extend duration"
+                );
+                assert_eq!(
+                    a.sample(Some(clip), 0.19, true).unwrap(),
+                    base.sample(Some(clip), 0.19, true).unwrap(),
+                    "unused output does not affect pose"
+                );
+            }
+            assert_eq!(
+                channel_allocation_count() - allocations,
+                44,
+                "unused sampler must allocate no retained channel"
+            );
+            let accepted =
+                assets::import_animated(&put(&root, &j, &bin), &Registry::new()).unwrap();
+            assert_eq!(accepted.animation.as_ref().unwrap().clips.len(), 4);
+            j["animations"][0]["channels"] = json!([{
+                "sampler":si,"target":{"node":1,"path":if width==4 {"rotation"} else {"scale"}}
+            }]);
+            let error = Animation::preflight(&j, &bin).unwrap_err();
+            assert!(
+                error.contains(if width == 4 {
+                    "unit quaternion"
+                } else {
+                    "positive scale"
+                }),
+                "{error}"
+            );
+        }
+    }
+    // One sampler can supply different nodes and both VEC3 target semantics.
+    for mode in ["LINEAR", "STEP"] {
+        let (mut j, mut bin) = chunks();
+        let (si, _, _, output) = extra_sampler(&mut j, &mut bin, 3);
+        j["animations"][0]["samplers"][si]["interpolation"] = json!(mode);
+        j["animations"][0]["channels"] = json!([
+            {"sampler":si,"target":{"node":1,"path":"translation"}},
+            {"sampler":si,"target":{"node":2,"path":"scale"}},
+        ]);
+        let bytes = Animation::preflight(&j, &bin).unwrap();
+        assert_eq!(Animation::from_parts(&j, &bin).unwrap().cpu_bytes, bytes);
+        assets::import_animated(&put(&root, &j, &bin), &Registry::new()).unwrap();
+        // The common finite checks do not replace target-specific scale checks.
+        bin[output..output + 4].copy_from_slice(&(-1f32).to_le_bytes());
+        assert!(Animation::preflight(&j, &bin)
+            .unwrap_err()
+            .contains("positive scale"));
+    }
+    // Exact 8192 channel samples remain accepted with additional unused keys.
+    let (mut j, mut bin) = chunks();
+    curve(&mut j, &mut bin, 8192);
+    extra_sampler(&mut j, &mut bin, 3);
+    let bytes = Animation::preflight(&j, &bin).unwrap();
+    assert_eq!(Animation::from_parts(&j, &bin).unwrap().cpu_bytes, bytes);
+    let a = assets::import_animated(&put(&root, &j, &bin), &Registry::new()).unwrap();
+    assert_eq!(
+        a.animation.as_ref().unwrap().clips[0].channels[0]
+            .times
+            .len(),
+        8192
+    );
+    println!("R1 declared samplers: {negatives} used/unused invalid controls reject pre-allocation/decode; 4 unused LINEAR/STEP VEC3/VEC4 controls allocate only original44 channels; shared translation/scale and exact8192 channel quota accepted");
+    if let Some(path) = std::env::var_os("UI006_R1_INPUT_DIR") {
+        let path = PathBuf::from(path);
+        for name in [
+            "unused-valid",
+            "unused-duplicate-time",
+            "unused-negative-time",
+            "unused-nan-time",
+            "unused-output-count",
+            "unused-output-nan",
+            "unused-output-shape",
+            "unused-output-span",
+            "unused-cubic",
+            "used-duplicate-time",
+            "used-output-count",
+            "used-output-nan",
+            "used-output-shape",
+            "used-output-span",
+        ] {
+            let decodes = assets::decode_attempts();
+            let allocations = channel_allocation_count();
+            let result =
+                assets::import_animated(&path.join(format!("{name}.glb")), &Registry::new());
+            if name == "unused-valid" {
+                assert_eq!(result.unwrap().animation.as_ref().unwrap().clips.len(), 4);
+            } else {
+                let error = result.unwrap_err();
+                assert!(
+                    error.starts_with(if name == "unused-cubic" {
+                        "unsupported:"
+                    } else {
+                        "invalid:"
+                    }),
+                    "R1 {name}: {error}"
+                );
+                assert_eq!(assets::decode_attempts(), decodes, "R1 {name} decode");
+                assert_eq!(
+                    channel_allocation_count(),
+                    allocations,
+                    "R1 {name} allocation"
+                );
+            }
+        }
+        println!("R1 original14 frozen review fixtures replayed through public import; 13 refuse before allocation/decode and unchanged valid original accepts");
+    }
+}

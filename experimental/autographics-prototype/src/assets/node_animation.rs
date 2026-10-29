@@ -124,6 +124,7 @@ fn positive(s: Vec3) -> Result<Vec3, String> {
     }
     Ok(s)
 }
+#[derive(Clone, Copy)]
 struct Access<'a> {
     bytes: &'a [u8],
     offset: usize,
@@ -208,12 +209,20 @@ struct Track<'a> {
     input: Access<'a>,
     output: Access<'a>,
 }
-fn key(t: &Track<'_>, i: usize, previous: f32) -> Result<(f32, Vec4), String> {
-    let time = t.input.row(i)?.x;
+fn sampler_key(
+    input: &Access<'_>,
+    output: &Access<'_>,
+    i: usize,
+    previous: f32,
+) -> Result<(f32, Vec4), String> {
+    let time = input.row(i)?.x;
     if time < 0. || time <= previous {
         return Err(invalid("strict nonnegative key times"));
     }
-    let mut value = t.output.row(i)?;
+    Ok((time, output.row(i)?))
+}
+fn key(t: &Track<'_>, i: usize, previous: f32) -> Result<(f32, Vec4), String> {
+    let (time, mut value) = sampler_key(&t.input, &t.output, i, previous)?;
     match t.path {
         Path::Rotation => {
             value = Vec4::from_array(unit(Quat::from_array(value.to_array()))?.to_array())
@@ -284,6 +293,9 @@ impl Animation {
             }
         }
         let mut plans = Vec::with_capacity(clips.len());
+        // Metadata views only: unused declarations must pass the same common
+        // admission, but are never retained as tracks or charged as channels.
+        let mut declared_samplers = Vec::new();
         let (mut total_channels, mut total_samples) = (0usize, 0usize);
         for clip in clips {
             let channels = array(clip, "channels")?;
@@ -304,10 +316,27 @@ impl Animation {
             if name.len() > 256 {
                 return Err(limit("clip name256"));
             }
-            let samplers = array(clip, "samplers")?;
-            for s in samplers {
-                interpolation(s)?;
-            }
+            let samplers = array(clip, "samplers")?
+                .iter()
+                .map(|s| {
+                    let mode = interpolation(s)?;
+                    let input = access(j, bin, &s["input"], "SCALAR", 1)?;
+                    let output_id = index(&s["output"])?;
+                    let output_decl = array(j, "accessors")?
+                        .get(output_id)
+                        .ok_or_else(|| invalid("accessor index"))?;
+                    let (ty, width) = match output_decl["type"].as_str() {
+                        Some("VEC3") => ("VEC3", 3),
+                        Some("VEC4") => ("VEC4", 4),
+                        _ => return Err(invalid("sampler TRS output type")),
+                    };
+                    let output = access(j, bin, &s["output"], ty, width)?;
+                    if input.count != output.count {
+                        return Err(invalid("input/output count"));
+                    }
+                    Ok((mode, input, output))
+                })
+                .collect::<Result<Vec<_>, String>>()?;
             let mut tracks = Vec::with_capacity(channels.len());
             let mut seen = BTreeSet::new();
             for c in channels {
@@ -318,23 +347,20 @@ impl Animation {
                 if declared[node].get("matrix").is_some() {
                     return Err(unsupported("animated matrix node"));
                 }
-                let (path, width, ty) = match c["target"]["path"].as_str() {
-                    Some("translation") => (Path::Translation, 3, "VEC3"),
-                    Some("rotation") => (Path::Rotation, 4, "VEC4"),
-                    Some("scale") => (Path::Scale, 3, "VEC3"),
+                let (path, width) = match c["target"]["path"].as_str() {
+                    Some("translation") => (Path::Translation, 3),
+                    Some("rotation") => (Path::Rotation, 4),
+                    Some("scale") => (Path::Scale, 3),
                     _ => return Err(unsupported("target path")),
                 };
                 if !seen.insert((node, c["target"]["path"].as_str().unwrap())) {
                     return Err(invalid("duplicate node/path"));
                 }
-                let s = samplers
+                let &(interpolation, input, output) = samplers
                     .get(index(&c["sampler"])?)
                     .ok_or_else(|| invalid("sampler index"))?;
-                let interpolation = interpolation(s)?;
-                let input = access(j, bin, &s["input"], "SCALAR", 1)?;
-                let output = access(j, bin, &s["output"], ty, width)?;
-                if input.count != output.count {
-                    return Err(invalid("input/output count"));
+                if output.width != width {
+                    return Err(invalid("target output dimension"));
                 }
                 total_samples = total_samples
                     .checked_add(input.count)
@@ -350,6 +376,7 @@ impl Animation {
                     output,
                 });
             }
+            declared_samplers.extend(samplers);
             plans.push((name, tracks));
         }
         let mut nodes = Vec::with_capacity(declared.len());
@@ -390,6 +417,15 @@ impl Animation {
                 .map(|(name, tracks)| name.len() + tracks.len() * std::mem::size_of::<Channel>())
                 .sum::<usize>()
             + total_samples * (4 + std::mem::size_of::<Vec4>());
+        // Validate every declared sampler before any key/output allocation,
+        // including unused samplers. Target-specific rotation/scale semantics
+        // belong to channels, not unreferenced VEC3/VEC4 declarations.
+        for (_, input, output) in &declared_samplers {
+            let mut previous = -1.;
+            for i in 0..input.count {
+                previous = sampler_key(input, output, i, previous)?.0;
+            }
+        }
         for (_, tracks) in &plans {
             for track in tracks {
                 let mut previous = -1.;

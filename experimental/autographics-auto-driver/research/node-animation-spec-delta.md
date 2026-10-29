@@ -30,6 +30,10 @@ Every declared animation sampler/channel is validated before retained key
 or output allocation and before image/geometry decode. Keys are finite,
 nonnegative and strictly increasing; counts, scalar time/TRS type, storage
 spans and values agree. Same-node/same-path duplicates within a clip refuse.
+Unused samplers receive the same common data checks but retain no track,
+change no clip duration or pose, and do not count as channel samples. Positive
+scale and unit-quaternion semantics follow an actual channel target path;
+an unreferenced finite VEC3/VEC4 does not acquire a fabricated target role.
 Hierarchy has unique parents and no cycles. Positive scales and finite,
 invertible composed transforms are required. LINEAR translations/scales use
 stable convex interpolation; rotations use normalized shortest-arc slerp,

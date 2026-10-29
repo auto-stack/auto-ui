@@ -21,7 +21,7 @@ SCHEMA = "autographics.plan006.report/1"
 # (package, test target, passed, filtered, exact optional selection)
 RUNNERS = {
     "public":(p.ROOT,"public_node_animation",8,0,None),
-    "resources":(p.ROOT,"node_animation_resources",5,0,None),
+    "resources":(p.ROOT,"node_animation_resources",6,0,None),
     "pixels":(p.ROOT,"node_animation_pixels",5,0,None),
     "lifecycle":(p.ROOT,"node_animation_lifecycle",5,0,None),
     "consumer":(p.ROOT,"node_animation_consumer",2,0,None),
@@ -170,4 +170,4 @@ if __name__=="__main__":
         run(directory)
     validate(directory)
     if args.controls: controls(directory)
-    print("PASS PLAN-006: new30 tests + 3 selected inherited cases; original clips, pixels, physical/transaction/owners, public consumer and unchanged CPU budgets")
+    print("PASS PLAN-006: new31 tests + 3 selected inherited cases; original clips, pixels, physical/transaction/owners, public consumer and unchanged CPU budgets")
