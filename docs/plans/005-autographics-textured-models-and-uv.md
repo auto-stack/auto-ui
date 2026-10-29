@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-005
-status: drafting
+status: executing
 feature_name: AutoGraphics有限纹理模型与UV资源闭包
 author: [Codex]
 created_at: 2026-10-29
 updated_at: 2026-10-29
-plan_revision: 1
-current_step: 0
+plan_revision: 2
+current_step: 1
 total_steps: 10
 depends_on: [auto-ui/PLAN-004]
 supersedes_spec_components:
@@ -42,7 +42,7 @@ touched_goals: [GOAL-008]
 
 ## 4. 需求分析与背景调查
 
-本轮授权仅规划，源于用户2026-10-29下一阶段要求；禁止本轮实现/新agent/窗口/GPU测试/远端发布。素材固定源/知识/当前代码指纹/观察见[基线](attachments/004/planning/baseline.md)；总设计见[表现与资源](../design/autographics/m2-presentation-and-resources.md)。004尚drafting，本计划暂时只引用规划基面7e56dc8，不伪填未来004交付SHA或runner。
+初始r1仅规划；2026-10-29用户在本会话授权完成UI-005全链，继承work/review/有界修复/merge/知识沉淀与清理授权。004实际交付e0fce138及身份修复0261ae9均已落地，当前实施base为2b88bd69；唯一树D:/autostack/.wt/ui-005/auto-ui，分支codex/plan-005-dev。用户另明确同意将有限材质域扩展至opaque双面，保留固定源原件，加入背面光照/阴影验证；其余范围/预算不变。原规划素材/知识指纹见[基线](attachments/004/planning/baseline.md)；总设计见[表现与资源](../design/autographics/m2-presentation-and-resources.md)。独立review在实现冻结后同树顺序执行，不并行写实现。
 
 现有权威：[静态GLB规则](../../../auto-lang/docs/specs/auto-graphics/scene-assets.md)、[M2素材研究](../../../auto-lang/docs/specs/auto-graphics/m2-game-sample-research.md)、[游戏资源分母](../../../auto-lang/docs/design/autographics/m2-game-sample-matrix.md)。原始静态profile拒images/textures/URI/animation。研究记录四GLB引用Textures/colormap.png并声明KHR_texture_transform，角色有static/idle/walk/jump且无skin；这些是历史研究结论，本轮未重新读取原件。旧文档所引858原始JSON在当前master及保留autographics-dev路径未找到；同号语言master的858附件是另一条ACE路线，禁止拿它替代。T-01须恢复固定来源字节并重建逐文件身份，不凭历史总字节数通过素材准入。
 
@@ -52,7 +52,7 @@ touched_goals: [GOAL-008]
 
 T-01核004实际delivery/review/冻结门/Spec合同/两锁、SDK闭包与新增PNG/存储真实签名，冻结本计划输入；004只work/review完成或分支存在不够。T-02先写`attachments/005/work/textured-model-contract.md`，用固定源platform/coin/flag+色图走完整导入→保存→重开→真实GPU路径，冻结支持表/预算/缓存身份和后继动画节点关联。失败回new，不降为平色替代。
 
-新版本明确支持glTF2 GLB单内嵌geometry buffer、静态三角形、原有POSITION/NORMAL和受检TEXCOORD_0、opaque/single-sided、baseColorFactor×baseColorTexture。图像仅004已交付PNG支持域；可以来自有界GLB bufferView或受控相对PNG依赖，禁止data/network/绝对URI、query/fragment/百分号变体绕根、路径穿越/链接/reparse，不能将glTF URI直接传给通用加载器做IO。所有声明资源含未引用项均先检。只接受KHR_texture_transform作用于本期UV0的有限offset/rotation/scale与合法texCoord；其余required扩展/多UV/复杂材质具名unsupported，不能静默丢弃。重复JSON键、非有限UV/变换、越界accessor/错误image spans需invalid；超额独立resource_limit。
+新版本明确支持glTF2 GLB单内嵌geometry buffer、静态三角形、原有POSITION/NORMAL和受检TEXCOORD_0、opaque单面或双面、baseColorFactor×baseColorTexture。双面材质按front_facing校正背面法线并在颜色与阴影pass一致关闭剔除；旧平色profile仍保持单面限制。图像仅004已交付PNG支持域；可以来自有界GLB bufferView或受控相对PNG依赖，禁止data/network/绝对URI、query/fragment/百分号变体绕根、路径穿越/链接/reparse，不能将glTF URI直接传给通用加载器做IO。所有声明资源含未引用项均先检。只接受KHR_texture_transform作用于本期UV0的有限offset/rotation/scale与合法texCoord；其余required扩展/多UV/复杂材质具名unsupported，不能静默丢弃。重复JSON键、非有限UV/变换、越界accessor/错误image spans需invalid；超额独立resource_limit。
 
 支持glTF nearest/linear、clamp/repeat/mirrored-repeat的有界采样组合；mipmap minFilter按无mipmap下等价基础采样明确归一并记录，实际需要多级才能等价的输入拒绝，不能宣称完整glTF采样器。颜色纹理按sRGB解码/线性乘色，原alpha必须opaque，原有透明sprite规则不推广到3D半透明。材质/UV正确性用非均匀色块/旋转偏移可判别夹具，而非单色colormap截图。
 
@@ -85,7 +85,7 @@ T-03..06建立新入口：`cargo test --manifest-path experimental/autographics-
 |---|---|---|---|---|
 | V-01/S-01 | AC-01 work T-02/03 | 固定原件platform/coin/flag与PNG、同根不同外图、嵌入图；坏URI/扩展/类型/跨度/尺寸bomb | 可接受原件实际准入；非法在IO/decoder/分配前阻断；不同closure内容不串用 | 不允许联网加载，不把动画character当静态正控 |
 | V-02/S-02 | AC-02 work T-03 | import→save A→move B→open→render；缺图/错边/SHA/alias/entry中断/恢复 | B无原路径仍真运行；错误具名且不假saved；修复后同入口重新读回成功 | 本地盘，无恶意并发路径替换承诺 |
-| V-03/S-03 | AC-03 work T-04 | 非对称UV色图、offset/rotation/scale、采样边界、depth遮挡/光照 | GPU ROI颜色/翻转/边界与独立CPU采样期望容差匹配；去掉UV/变换负控必红 | 仅支持表材质，不测完整PBR |
+| V-03/S-03 | AC-03 work T-04 | 非对称UV色图、offset/rotation/scale、采样边界、depth遮挡/光照、双面正背面与阴影 | GPU ROI颜色/翻转/边界与独立CPU采样期望容差匹配；去掉UV/变换负控必红；背面可见且法线/阴影与双面规则一致 | 仅支持表材质，不测完整PBR |
 | V-04/S-04 | AC-04 work T-05 | GPU prepare故障、20轮Play/Stop/关闭、两个模型共享图/外部pin | 整帧last-good、warm零静态资源重传；实际弱引用最后drop失效，CPU/GPU账不漏UV/纹理 | 不以引用数归零假定驱动缓存释放 |
 | V-05/S-05 | AC-05 work T-06 | fresh SDK consumer A→B、旧静态GLB/004sprite定向、identity controls | 离线编译/实际运行/保存重开；完整current源码/SDK/两锁/runner绑定，源变异敏感 | 不等于G10a单项产品ZIP或最终游戏 |
 
@@ -108,7 +108,7 @@ T-03..06建立新入口：`cargo test --manifest-path experimental/autographics-
 
 | ID | owner_stage | 依赖 | 操作/产物 | AC | 状态 |
 |---|---|---|---|---|---|
-| T-01 | work | 004实际交付、用户启动 | 核004/SDK/两锁/owner；恢复固定素材逐文件清单/许可/来源，建唯一ui-005树 | AC-01/05 | [ ] |
+| T-01 | work | 004实际交付、用户启动 | 核004/SDK/两锁/owner；恢复固定素材逐文件清单/许可/来源，建唯一ui-005树 | AC-01/05 | [x] base 2b88bd69、004与修复均已合入；SDK681冷准备通过；固定提交原件/许可/逐文件SHA恢复，见attachments/005/work/fixed-source.md |
 | T-02 | work | T-01 | textured-model-contract：支持表/身份/预算/节点关联、原件全链可行性，失败回new | AC-01/03/05 | [ ] |
 | T-03 | work | T-02通过 | 无任意IO的GLB/PNG闭包准入、持久化/编辑绑定、V-01/02 | AC-01/02 | [ ] |
 | T-04 | work | T-03 | UV/材质/纹理shader与cache接线、V-03深度和变异 | AC-03 | [ ] |
@@ -120,6 +120,10 @@ T-03..06建立新入口：`cargo test --manifest-path experimental/autographics-
 | T-10 | merge | T-09 | wt-guard clean后清唯一树/分支/空组，保必要恢复收据 | AC-08 | [ ] |
 
 ## 9. 复审记录
+
+2026-10-29 bounded new r2：固定提交3fa8a04b1c01ab23db43123d4ce814a34c3fc7f0原件platform/coin/flag均声明doubleSided:true，与r1单面域矛盾；用户明确选择“扩展支持双面材质（推荐，保留原件）”。仅扩大本期opaque材质面的支持并新增V-03背面光照/阴影oracle；保留所有AC、预算、原件身份、旧profile与006边界。全链授权继续有效，next: work T-01/T-02。
+
+2026-10-29 执行授权与入口核对：用户在本会话明确授权“完成计划UI-005”，覆盖work→独立review→有界修复→merge/Spec/ledger/归档/guard清理；003最终批回归按用户要求留给BLOG-004会话，本计划不接管。原new收据的004前置现已解除：交付e0fce138及身份修复0261ae9均为当前master 2b88bd69祖先，原路径verify_source.py exit 0（1431 hashes、SDK681、479 packages、29 path edges）。主检出仅有其它会话docs WIP，零生产代码WIP；保留原样。唯一实施树已创建：D:/autostack/.wt/ui-005/auto-ui，codex/plan-005-dev，base=2b88bd69b2a48172bf761615cc4e78a1df563b62；根/分支断言通过，无AGENTS.md。进入T-01恢复固定源与T-02可行性合同。
 
 2026-10-29 new r1：`stage: new | plan_id: auto-ui/PLAN-005 | plan_revision: 1 | outcome: blocked | next: 等004实际delivery后work T-01/T-02`。前置阻塞是执行顺序，不影响本合同可评审；0/10，未建树/实现/跑测试。源858附件缺失显式认领于T-01，不能以同号ACE材料替代。
 
