@@ -1,6 +1,6 @@
 ---
 plan_id: PLAN-004
-status: reviewed
+status: archived
 feature_name: AutoGraphics公共图片资源与2D精灵帧
 author: [Codex]
 created_at: 2026-10-29
@@ -43,9 +43,9 @@ PNG原始字节→有界无IO准入/解码→不可变Registry→版本化scene�
 
 授权：用户2026-10-29要求“ag-001在实施，规划AG下一阶段”。本轮只取auto-ui本地号、设计/合同/引用，不实施、建树、启动agent、跑窗口/GPU/Cargo或远端发布。功能沿已定桌面M2表现路线，不新增跨端前置。未授权自动续跑实施。
 
-已核基线与来源风险见[共用基线](attachments/004/planning/baseline.md)，架构见[表现与资源设计](../design/autographics/m2-presentation-and-resources.md)。当前UI HEAD `7e56dc8baa0b80f35ff7da757695e5e717047950`，002 delivery `0ee5ad0747ec3bb67e1288401fcc31daf3901c6e`，001 delivery `537122b09c025191355e260bc8e9880a4358cda2`。本仓003是Blog路线，不占AG实现范围。
+已核基线与来源风险见[共用基线](../attachments/004/planning/baseline.md)，架构见[表现与资源设计](../../design/autographics/m2-presentation-and-resources.md)。当前UI HEAD `7e56dc8baa0b80f35ff7da757695e5e717047950`，002 delivery `0ee5ad0747ec3bb67e1288401fcc31daf3901c6e`，001 delivery `537122b09c025191355e260bc8e9880a4358cda2`。本仓003是Blog路线，不占AG实现范围。
 
-知识权威目前仍在auto-lang：[overview](../../../auto-lang/docs/specs/auto-graphics/overview.md)、[静态资源](../../../auto-lang/docs/specs/auto-graphics/scene-assets.md)、[行为](../../../auto-lang/docs/specs/auto-graphics/behavior-api.md)、[触发/新局](../../../auto-lang/docs/specs/auto-graphics/runtime-triggers-and-rounds.md)、[样本研究](../../../auto-lang/docs/specs/auto-graphics/m2-game-sample-research.md)。本Plan SD路径以该既有知识仓为根，不代表本仓已有这些Specs；merge按SD跨仓沉淀，不批量迁史。
+知识权威目前仍在auto-lang：[overview](../../../../auto-lang/docs/specs/auto-graphics/overview.md)、[静态资源](../../../../auto-lang/docs/specs/auto-graphics/scene-assets.md)、[行为](../../../../auto-lang/docs/specs/auto-graphics/behavior-api.md)、[触发/新局](../../../../auto-lang/docs/specs/auto-graphics/runtime-triggers-and-rounds.md)、[样本研究](../../../../auto-lang/docs/specs/auto-graphics/m2-game-sample-research.md)。本Plan SD路径以该既有知识仓为根，不代表本仓已有这些Specs；merge按SD跨仓沉淀，不批量迁史。
 
 观察：Document仅Circle/Quad为2D且资源format仅glb；资产准入明确拒绝images/textures/animations，QuadPipeline只有平色/圆形。缓存有RGBA8槽不等于公共PNG精灵。现有Host prepare_frame统一相机/对象，不能另开一个未受检的贴图发布通道。
 
@@ -196,3 +196,11 @@ closing rows：
 合并前必须完成（merge-owned，本收据不声称已过）：冻结提交上的完整 driver/AGP 套件、native 窗口与手动 CLI 路径（本机仅以无窗口 GPU 与进程级入口验证）、release 性能复测、auto-lang 知识仓 SD-01/02/03 落地与 ledger 派生、本仓 Plan 归档、wt-guard clean 后移除唯一树/分支/空组。SD 草案与实现一致（profile 20/109、错误码 41-44、1 credit/32 写、块长 `4+targets*7+56`、2048/16MiB/64MiB/8、nearest+clamp、UV-only flip、scene/5 与旧 schema 拒绝、公共入口命令），本次修复未改变语义合同，`plan_revision` 保持 1。
 
 2026-10-29 goal round 8：`stage: goal | plan_id: PLAN-004 | plan_revision: r1 | round: 8 | from: review | to: merge | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-004/auto-ui | commit: 0e6e361 | next: merge`。
+2026-10-29 merge r1（PLAN-004:r1，delivered）：`stage: merge | plan_id: auto-ui/PLAN-004 | plan_revision: 1 | outcome: pass | checked: prepared, landed, ledger_refreshed, archived | delivery_commit: e0fce13810f9e1af28182950d62cfce8722aa30a | next: cleaned`。
+
+- **prepared**：reviewed 基线 `0e6e361`（final pass，两条 r1 finding 关闭）+ 冻结 SD delta（`research/sprite-frames-spec-delta.md`，sha256 0452ac61…）。canonical 目标：auto-lang `docs/specs/auto-graphics/sprites-and-image-resources.md`（新增）、`scene-assets.md`、`behavior-api.md`（修改）；ledger 目标：auto-lang `.autoos/specs.json` v133→v134。
+- **landed**：auto-ui 分支 `codex/plan-004-dev` 先 rebase 到 master `207e4bf`（7 个提交全部 `=`，`git range-diff d3bd6b4..0e6e361 207e4bf..e0fce13` 完全等价），`experimental/**` 树与 reviewed 逐字节相同（`git diff --name-only 0e6e361 e0fce13 -- experimental/` 为空）；主检出 `git merge --ff-only codex/plan-004-dev` 落地，master tip = `e0fce13`（无 merge commit）。同仓另一会话当时有 5 个未提交 docs 文件（design/README、.next-id、README、007 草案）；与本分支 42 个 `experimental/**` 文件零重叠，落地前后 dirty 集合不变（5→5，无差异），未提交、未丢弃。
+- **landed（auto-lang 知识仓）**：`D:/autostack/.wt/ui-004/auto-lang`（分支 `plan-004-sd`，base `635c84c94`）产生两个提交并在 auto-lang master `--ff-only` 落地：`b4c371678`（SD-01 新文件 + SD-02/03 增量，4 files/338 insertions）与 `dc2820437`（ledger v134）。auto-lang 主检出的 110 个既有未提交 design 文件原样保留（无重叠）。
+- **ledger_refreshed**：workspace `auto-lang`，`.autoos/specs.json` v133→v134，回归通道 **guarded offline projection（无 store writer 可达）**：先做 byte-exact backup（`D:/autostack/plan-artifacts/plan-004/ledger-specs-backup-v133.json`），脚本化 read-modify-write，仅 4 个新增 item（P004-SPRITES/P004-T/P004-R1/P004-M）+ 2 个既有 canonical item（P838-ASSETS、P840-BEHAVIOR-API）就地更新 + version+1；六段 schema 与 1417 个唯一 id 校验通过，read-back 证明未触碰 item 逐项相同，diff 为 116+/7-。所有新 item 都带 `file` 与 `tags`（PLAN-004/r1/reviewed/delivery/source-sha256/guarded-offline-projection）。
+- **archived**：本文件由 `docs/plans/` 移入 `docs/plans/archived/` 且 `status: archived`；相对链接按新位置改写（`../attachments/`、`../../design/`、`../../../../auto-lang/`），全部可解析；`docs/plans/README.md` 的 004 行改指归档路径与 delivered 状态。README 同时被另一会话未提交改动（007 行 + 下一号），本次仅以 HEAD 版本 + 本行变更提交，随后把该会话的未提交版本（含本行）还原到工作区，未吞并其 WIP。
+- **pending**：`cleaned`（wt-guard 后移除本树/分支/空组、回收 target/.pdb）、landing 后产物观察（后端/生成包是否需重建：本计划只改 experimental 实验包，不产生产物）、批回归 due 检查。
