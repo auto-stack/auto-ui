@@ -1,8 +1,6 @@
-# PLAN-006 T-02 执行合同（r2输入修订待实施）
+# PLAN-006 T-02 执行合同（r2已实测）
 
-2026-10-30 当前入口：new已完成r2有界修订，按`input-budget-revision-r2.md`回work实现/验证S-06。原T-02固定向量probe没有证明完整输入预算，故仍重开；原GPU/存储/采样证据按未变输入保留，“完整组合预算已完成”不作为当前结论。目标/32credits/旧价/CPU/范围不变；下述聚合input API已成为当前设计，但尚未实施/实测。
-
-原实施基线 `80d9bbe`，当前冻结代码基线`ccfe6d9`；输入及004/005/SDK/两锁身份见 `source-preflight.md`。r2只修订输入读取设计，不扩大r1范围、AC、资源或CPU/时间门。原始纹理角色已过Auto→Host→同帧真实GPU与输出校验（`t02-integration.md`），完整键控组合的预算待S-06补证。T-03已完成，T-04四clip数值/画面部分已有证据；其余物理/owner/fresh consumer及独立review/merge不预称完成。
+2026-10-30：r2聚合输入已实现，S-06完整真实事件分支32credits与额外1credit负控通过。T-02/T-04/T-05的当前关闭证据见 `r2-input-pixels-and-lifecycle.md`；T-06 fresh消费/current identity/SD及独立review/merge仍pending。SDK、两锁、原件身份与T-01相同，未更改原32credits/CPU/时间/源或资源额度。原固定向量probe的预算结论不单独复活，以本轮真实键控证据取代。
 
 ## 公共profile与视觉状态
 
@@ -18,7 +16,7 @@ phase唯一单位f32 seconds，必须有限且非负；由Auto在fixed dt推进�
 
 同一未发布profile追加`ag_actions_snapshot() int`，一次共享credit读取原Host送入的6held+6未消费pressed，返回`held + 64*pressed`（0..4095），bit0..5为Left/Right/Forward/Back/Jump/Restart。成功读取消费当前tick所有未读pressed，held保持；重复读取的pressed为0，和旧pressed getter混读不能重放已消费bit。app_start无输入为0，Pause/neutral Step/fresh Run沿原clear/路由；无跨tick或跨Run缓存、无新增Host wire、无Rust玩法。
 
-该helper仅属于node_animation3d/1受管单元，旧14profile与旧逐键1credit价格/字节不改。Auto自行解码、算相机相对方向/跳跃/clip/phase/yaw。完整活动回调要求真实实测 `1 snapshot +26 move +1 grounded +1 event_next +1 event_pair +1 event_phase +1 visual =32`；旧逐键反例仍error10，新组合必须在真实事件读取分支fault0、输入改变实际运动/clip/yaw，额外1credit必须error10。S-06全部关闭规则/命令/代表性bit与mixed状态见`input-budget-revision-r2.md`，当前不标绿。
+该helper仅属于node_animation3d/1受管单元，旧14profile与旧逐键1credit价格/字节不改。Auto自行解码、算相机相对方向/跳跃/clip/phase/yaw。完整活动回调要求真实实测 `1 snapshot +26 move +1 grounded +1 event_next +1 event_pair +1 event_phase +1 visual =32`；旧逐键反例仍error10，新组合必须在真实事件读取分支fault0、输入改变实际运动/clip/yaw，额外1credit必须error10。S-06全部关闭规则/命令/代表性bit与mixed状态见`input-budget-revision-r2.md`，S-06本轮已通过，见r2关闭记录。
 
 ## wire（已接入并验证）
 
@@ -39,9 +37,9 @@ phase唯一单位f32 seconds，必须有限且非负；由Auto在fixed dt推进�
 | 规则 | 实际路径/区分oracle | 当前状态 |
 |---|---|---|
 | V-01 原件与模式 | 原character全部4clip/44channel/337samples、层级；坏span/count/time/重复node/path、skin/morph/cubic与额度分类 | T-03生产准入29反例/精确额度/原件正控通过；资源union门前零key分配，见t03-admission-and-storage.md |
-| V-02 数学 | 120度旋转在1/4时间必须30度；独立point坐标区分slerp与nlerp；反号quat同pose、STEP边界、loop/one-shot/零duration | core5/5与原四clip21状态、43596独立源顶点/2074207稳定GPU probe通过；实际阴影及完整T-04仍待 |
-| V-03 朝向/物理 | Auto camera-relative movement+yaw；颜色/shadow相同矩阵；视觉开关同输入碰撞/支撑/触发结果相同 | 未关闭 |
-| V-04 事务/身份/owner | Host坏输出/prepare failure保留完整last-good；Pause/Step/新局/Stop；20轮Weak/上传/最终drop | producer/19wire负控与T-03资源/保存恢复通过；完整事务/owner仍T-05 |
-| V-05/S-06 预算/消费 | 真实完整键控Auto同callback输入/move/grounded/相机/event_next/pair/phase/visual；固定原clip经GPU；fresh A→B离线保存重开 | 原逐键输入反例error10，r2聚合读取与S-06待work；consumer/identity仍T-06 |
+| V-02 数学 | 120度旋转在1/4时间必须30度；独立point坐标区分slerp与nlerp；反号quat同pose、STEP边界、loop/one-shot/零duration | core5/5与原四clip21状态、43596独立源顶点/2074207稳定GPU probe通过；STEP/方向/同pose阴影亦通过，见r2关闭记录 |
+| V-03 朝向/物理 | Auto camera-relative movement+yaw；颜色/shadow相同矩阵；视觉开关同输入碰撞/支撑/触发结果相同 | T-04独立GPU朝向/阴影负控及240tick物理对照通过 |
+| V-04 事务/身份/owner | Host坏输出/prepare failure保留完整last-good；Pause/Step/新局/Stop；20轮Weak/上传/最终drop | producer/19wire负控与T-03资源/保存恢复通过；完整事务/20轮owner本轮T-05通过，见r2关闭记录 |
+| V-05/S-06 预算/消费 | 真实完整键控Auto同callback输入/move/grounded/相机/event_next/pair/phase/visual；固定原clip经GPU；fresh A→B离线保存重开 | 原逐键输入反例error10，r2聚合读取与S-06已通过；consumer/identity仍T-06 |
 
 最小整链当前结果：公开`import-animated`/“Import Animated GLB”保留原GLB+外图；schema6 closure新增`node_animation=true`并以新profile域计入closure id，旧false省略且旧identity保持。保存搬迁冷重开重建4clip，旧import拒动画，旧Play profile拒新动画payload，不能静默丢轨道。新Host验证wire并在共同Frame内sample；19项坏wire负控及最终矩阵非有限/奇异拒绝通过，颜色/shadow共用同一矩阵。固定位置/相机/yaw/mesh/texture只擦除node轨道的GPU负控使像素变化。单tick全链3.836ms，默认100000-step/120-resume/250ms callback与2s整tick均未触发；此为最小探针，非T-06完整性能/消费验收。

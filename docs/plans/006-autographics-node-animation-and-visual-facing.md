@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-10-29
 updated_at: 2026-10-30
 plan_revision: 2
-current_step: 2
+current_step: 5
 total_steps: 10
 depends_on: [auto-ui/PLAN-005]
 supersedes_spec_components:
@@ -96,7 +96,7 @@ phase固定为Auto显式给出的有限非负f32 seconds，不能同时存在两
 | V-03/S-03 | AC-03 work T-04 | 相机yaw改变/前后左右移动/停、±pi边界、动画开关、墙地接触 | Auto提供yaw后的角色面向可见；动画/视觉yaw变化不改相同输入的角色位置/支撑/触发；颜色与shadow同pose | 无根运动/姿势碰撞，非通用刚体 |
 | V-04/S-04 | AC-04 work T-05 | 坏clip/phase/旧Run/旧slot代、prepare失败、Pause/Step、20轮新局/Stop/最终drop | 全旧或全新，neutral Step一次；新局初pose、暖mesh/texture零重传；真实weak owner/上传及预算账 | 合法外部pin最后drop后查，不测驱动内部保留 |
 | V-05/S-05 | AC-05 work T-02/06 | 完整真实Auto四向/跳跃输入+相机+move/grounded+event_next/pair/phase+visual的32credits组合、fresh SDK consumer A→B、004精灵/005纹理/旧profile定向 | CPU/步数/源/内存实测与既定额、公开入口离线保存/重开、identity controls/源变异敏感；原固定运动向量probe不能代替输入实测 | 不等于完整G3关卡或G10b内容交付 |
-| S-06（补充V-05） | AC-05 work T-02；输入状态影响T-04/05 | 原逐键反例；新聚合0/63/各bit、mixed/重复pressed；完整键控活动回调、额外1credit、Pause/neutral Step/fresh Run | 原逐键仍error10；新完整真实事件分支fault0、输入改变运动/clip/yaw且同tick；已消费pressed不重放、held保持；neutral/fresh无旧边沿；新source<=96KiB/旧14profile hash保持 | 新case待T-02新增，现未运行；20轮owner仍归T-05 |
+| S-06（补充V-05） | AC-05 work T-02；输入状态影响T-04/05 | 原逐键反例；新聚合0/63/各bit、mixed/重复pressed；完整键控活动回调、额外1credit、Pause/neutral Step/fresh Run | 原逐键仍error10；新完整真实事件分支fault0、输入改变运动/clip/yaw且同tick；已消费pressed不重放、held保持；neutral/fresh无旧边沿；新source<=96KiB/旧14profile hash保持 | r2已通过，public8case/Host与20轮owner见r2-input-pixels-and-lifecycle.md |
 
 同一唯一树顺序实施和独立上下文最终review，未指定实现者/模型，不为规划创建agent；独立review逐AC/V/S/SD核遗漏、warnings/fmt/动画静默替代、CPU与owner。review pass标merge冻结门pending，修代码后重新绑定证据/复审受影响面。
 
@@ -105,9 +105,9 @@ phase固定为Auto显式给出的有限非负f32 seconds，不能同时存在两
 | ID | owner_stage | 结果与证据 |
 |---|---|---|
 | AC-01 | work | 固定四clip/层级/模式/数据/资源预检、原始身份与支持边界明确，V-01；T-03生产准入/边界/计账证据通过，见t03-admission-and-storage.md |
-| AC-02 | work | 公开Auto切clip/phase，确定性loop/one-shot/双实例独立与真实动画，V-02 |
-| AC-03 | work | 公共视觉朝向、相机相对运动示范、碰撞/支撑独立、同pose色图/阴影，V-03 |
-| AC-04 | work | 同tick事务/身份/暂停单步/新局/Stop/owner/暖上传，V-04 |
+| AC-02 | work | V-02已通过：原四clip21状态/双实例、独立源顶点/GPU、STEP旋转实际GPU与错误插值负控，见t04-pixels-and-input-diagnosis.md及r2-input-pixels-and-lifecycle.md |
+| AC-03 | work | V-03已通过：四向真实位移/可见朝向、stop/±pi、240tick动画开关物理/支撑/触发相同、独立同pose阴影ROI0误差及两负控，见r2-input-pixels-and-lifecycle.md |
+| AC-04 | work | V-04已通过：完整last-good/坏输出/prepare失败、Pause/neutral Step/fresh、20轮Play/restart/Stop真实weak/暖mesh与texture上传0增量/最终pin释放，见r2-input-pixels-and-lifecycle.md |
 | AC-05 | work | T-02整组合预算可行、仓外完整消费/重开与兼容/current identity，V-05；非Rust玩法 |
 | AC-06 | review | 独立核全部AC/V/SD、无未处置finding，冻结门pending |
 | AC-07 | merge | 新冻结提交定向门绿后合master，保留全AG里程碑pending |
@@ -118,10 +118,10 @@ phase固定为Auto显式给出的有限非负f32 seconds，不能同时存在两
 | ID | owner_stage | 依赖 | 操作/产物 | AC | 状态 |
 |---|---|---|---|---|---|
 | T-01 | work | 005实际交付、用户启动 | 核005/004/SDK/两锁/素材收据与owner，建唯一ui-006树 | AC-01/05 | [x] 11bc18b；source-preflight.md |
-| T-02 | work | T-01；r2设计已修订 | node-animation-contract：原clip/phase/yaw/wire保持，新增聚合input getter及S-06，真实完整32credits整链probe，失败回new | AC-01..05 | [ ] r2 work下一入口；原逐键反例保留，原采样/GPU/存储证据按不变输入复用 |
+| T-02 | work | T-01；r2设计已修订 | node-animation-contract：原clip/phase/yaw/wire保持，新增聚合input getter及S-06，真实完整32credits整链probe，失败回new | AC-01..05 | [x] 04042f8；r2-input-pixels-and-lifecycle.md；原逐键反例仍error10，新真实事件32成功/额外1失败 |
 | T-03 | work | T-02通过 | 有界节点/clip准入与持久化/资源计账，V-01 | AC-01/04 | [x] 2739324；t03-admission-and-storage.md |
-| T-04 | work | T-02 r2恢复通过、T-03 | Auto公开视觉输出/Host采样/renderer色图与shadow，V-02/03；r2输入路径驱动朝向/物理 | AC-02/03 | [ ] ccfe6d9：四clip/21状态/独立顶点和GPU轮廓通过；聚合输入修复后继续朝向/物理/阴影 |
-| T-05 | work | T-04 | 事务/实例代次/新局/暂停单步/owner与20轮V-04 | AC-04 | [ ] |
+| T-04 | work | T-02 r2恢复通过、T-03 | Auto公开视觉输出/Host采样/renderer色图与shadow，V-02/03；r2输入路径驱动朝向/物理 | AC-02/03 | [x] ccfe6d9+04042f8；原四clip/顶点/GPU+STEP/四向/±pi/240tick物理/同pose阴影ROI与负控 |
+| T-05 | work | T-04 | 事务/实例代次/新局/暂停单步/owner与20轮V-04 | AC-04 | [x] 04042f8；完整last-good/新槽初pose/Pause/Step/40VM与pose释放/暖mesh与texture0上传/预算账 |
 | T-06 | work | T-05 | fresh消费/预算/兼容/identity controls、fmt/warnings/提交、SD与下游接口 | AC-01..05 | [ ] |
 | T-07 | review | T-06 | 同树独立review全部V/S与遗漏，merge门pending | AC-06 | [ ] |
 | T-08 | merge | T-07 pass | 冻结提交定向门/有效复用，通过才合本仓master | AC-07 | [ ] |
@@ -162,8 +162,12 @@ F-006-W1-INPUT-BUDGET：补入真实4向held+跳跃pressed后，即使不读even
 
 2026-10-30 r2合同预检：现盘校验exit0：0..10节顺序、10个唯一T/8个唯一AC、2项已完成与current_step一致、S-06单一当前行、9个本地Markdown链接均可解析；实施树HEAD仍ccfe6d9且clean，源内尚无ag_actions_snapshot定义，符合“待work实现”。修订附件SHA256659e4c3bd353ec5c0a622496b6897eb59ccfcb4b4cc9c1f4261aa7019d2e6a66；本轮不改实施、canonical或ledger，不运行构建/测试来冒充新功能已过。共享主检出另有其它计划README文档WIP，定向diff检查只覆盖本Plan文件，保留其原有改动。
 
+2026-10-30 work r2 T-02/T-04/T-05完成：`stage: work | plan_id: auto-ui/PLAN-006 | plan_revision: 2 | outcome: pass (T-02,T-04,T-05 only; work incomplete) | worktree_path: D:/autostack/.wt/ui-006/auto-ui | branch: codex/plan-006-dev | base_commit: 80d9bbe | code_commit: 04042f827a1efd68b3e9d2188b97b2fa8f4e2100 | dependency_revisions: SDK/两锁/原件身份未变 | task_ids: T-02,T-04,T-05 | evidence: attachments/006/work/r2-input-pixels-and-lifecycle.md,node-animation-contract.md | blockers: none | next_responsible_role: work T-06`。F-006-W1-INPUT-BUDGET已闭：新profile独占1credit聚合读，旧14profile装配hash保留；原逐键反例仍10、新真实事件分支完整32成功、额外1失败且整组旧画面/位置/相机/事件/pose保留。managed80021B；真实tick4607us；raw2/97732B，CPU含animation1102359B+pose32240B=1134599B，GPU1101700B，原额度不变。public8/8；lifecycle当时4/4+独立新增四向位移1/1（未声称曾执行5/5整文件）；240tick开关动画对比floor/wall/platform与trigger完全相同；20轮Play/restart/Stop释放40VM/pose/descriptor，warm mesh/texture上传和decode均0增量，最终外部pin释放真实weak失效。四向/stop/±pi固定相机独立GPU轮廓<=2误差，错yaw负控1341/1380/1486/1458；STEP旋转GPU边界与持有通过，错插值608；原walk同pose shadow独立87196ROI/2171阴影内部错误0，冻结pose负控263/关闭shadow2171，已目视角色与阴影。日志命令与7个SHA256逐项见附件；日志/PNG本地D:/autostack/plan-artifacts/auto-ui/plan-006不入Git。原四clip21状态/43596源顶点/2074207ROI、T-01/T-03按未变算法/输入/依赖复用。fmt/diff exit0，无本轮新增warning（SDK146旧warning保留）。实施已提交且clean，共享主检出其它计划WIP保留；5/10，T-06完整消费/身份/SD与review/merge仍pending，不提前execution_done。
+
+2026-10-30 goal round 7：`stage: goal | plan_id: PLAN-006 | plan_revision: r2 | round: 7 | from: work | to: work | status: executing | outcome: pass (T-02,T-04,T-05 complete; work incomplete) | worktree: D:/autostack/.wt/ui-006/auto-ui | commit: 04042f827a1efd68b3e9d2188b97b2fa8f4e2100 | next: work T-06`。本轮有界输入修复与当前关闭反例、可见朝向/阴影、物理/所有权均取得实际新证据，非等待/无进展。AC-05的仓外fresh consumer/current identity及完整性能/SD尚待，不转交复审裁定未完成工作。
+
 ## 10. 待澄清事项
 
-当前无用户待答问题。r2设计已修订，下一责任work在同树实现聚合输入getter并实测S-06完整组合，以证据关闭F-006-W1-INPUT-BUDGET；T-02仍重开，T-01/T-03仍完成。完成后继续T-04..06及review/merge，不提前算完成或调整原额度。
+当前无用户待答问题。F-006-W1-INPUT-BUDGET已由04042f8及S-06真实预算正反例关闭；T-01..05完成，下一责任work在同树完成T-06 fresh SDK消费A→B保存/离线搬迁重开、current identity/源变异、完整性能/兼容及SD，再进入独立review/merge，不提前算完成或调整原额度。
 
 原规划的005交付身份与原clip实读风险已关闭；如后续发现必需clip需本期外插值或无法在既有预算内组合，仍带原件与反例回new，显式提出合同/预算变化，不能丢动作或换成Bob动画。声音/HUD、G09/G10内容、完整两关与最终发行另立后继合同，跨端不插入桌面M2前置。
