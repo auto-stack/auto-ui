@@ -201,7 +201,11 @@ impl MeshStore {
                 mag_filter: filter(sampling.mag),
                 min_filter: filter(sampling.min),
                 lod_min_clamp: 0.,
-                lod_max_clamp: 0.,
+                // Keep lambda available for min/mag selection. The image has
+                // exactly one mip level, so the texture still samples level0.
+                // Clamping sampler lambda itself to zero incorrectly selects
+                // mag_filter even when the footprint is minifying.
+                lod_max_clamp: 32.,
                 ..Default::default()
             });
             device.create_bind_group(&wgpu::BindGroupDescriptor {

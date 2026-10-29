@@ -802,3 +802,236 @@ fn raw_byte_union_refuses_over_32_mib_before_decoder_and_reuses_exact_large_dupl
     assert_eq!(assets::decode_attempts(), before);
     assert!(textured_models::usage(&r).1 < assets::MAX_RAW_TOTAL);
 }
+
+fn textured_quad_fixture(transform: bool, min_filter: u32) -> (Vec<u8>, Vec<u8>) {
+    let mut bin = vec![];
+    for p in [
+        [-1f32, -1., 0.5],
+        [1., -1., 0.5],
+        [1., 1., 0.5],
+        [-1., 1., 0.5],
+    ] {
+        for v in p {
+            bin.extend(v.to_le_bytes());
+        }
+    }
+    for _ in 0..4 {
+        for v in [0f32, 0., 1.] {
+            bin.extend(v.to_le_bytes());
+        }
+    }
+    for uv in [[0f32, 1.], [1., 1.], [1., 0.], [0., 0.]] {
+        for v in uv {
+            bin.extend(v.to_le_bytes());
+        }
+    }
+    for i in [0u16, 1, 2, 0, 2, 3] {
+        bin.extend(i.to_le_bytes());
+    }
+    let mut j = json!({"asset":{"version":"2.0"},"scene":0,"scenes":[{"nodes":[0]}],"nodes":[{"translation":[0.2,-0.1,0],"children":[1]},{"mesh":0}],
+        "buffers":[{"byteLength":bin.len()}],"bufferViews":[{"buffer":0,"byteOffset":0,"byteLength":48},{"buffer":0,"byteOffset":48,"byteLength":48},{"buffer":0,"byteOffset":96,"byteLength":32},{"buffer":0,"byteOffset":128,"byteLength":12}],
+        "accessors":[{"bufferView":0,"componentType":5126,"count":4,"type":"VEC3","min":[-1,-1,0.5],"max":[1,1,0.5]},{"bufferView":1,"componentType":5126,"count":4,"type":"VEC3"},{"bufferView":2,"componentType":5126,"count":4,"type":"VEC2"},{"bufferView":3,"componentType":5123,"count":6,"type":"SCALAR"}],
+        "meshes":[{"primitives":[{"attributes":{"POSITION":0,"NORMAL":1,"TEXCOORD_0":2},"indices":3,"material":0}]}],
+        "materials":[{"pbrMetallicRoughness":{"baseColorFactor":[0.35,0.65,0.8,1],"metallicFactor":0,"roughnessFactor":1,"baseColorTexture":{"index":0}}}],
+        "images":[{"uri":"colours.png"}],"textures":[{"source":0,"sampler":0}],"samplers":[{"magFilter":9728,"minFilter":min_filter,"wrapS":33071,"wrapT":33071}]});
+    if transform {
+        j["extensionsUsed"] = json!(["KHR_texture_transform"]);
+        j["materials"][0]["pbrMetallicRoughness"]["baseColorTexture"]["extensions"] = json!({"KHR_texture_transform":{"offset":[0.8,0.1],"rotation":std::f32::consts::FRAC_PI_2,"scale":[0.7,0.6],"texCoord":0}});
+    }
+    let mut rgba = vec![];
+    for y in 0..4 {
+        for x in 0..4 {
+            rgba.extend([
+                20 + x * 40 + y * 10,
+                15 + x * 15 + y * 45,
+                240 - x * 30 - y * 20,
+                255,
+            ]);
+        }
+    }
+    (
+        pack(&j, &bin),
+        agp::assets::encode_png_rgba(4, 4, &rgba).unwrap(),
+    )
+}
+fn linear_srgb(v: u8) -> f32 {
+    let x = v as f32 / 255.;
+    if x <= 0.04045 {
+        x / 12.92
+    } else {
+        ((x + 0.055) / 1.055).powf(2.4)
+    }
+}
+fn encode_srgb(x: f32) -> u8 {
+    let x = x.clamp(0., 1.);
+    (255.
+        * if x <= 0.0031308 {
+            x * 12.92
+        } else {
+            1.055 * x.powf(1. / 2.4) - 0.055
+        })
+    .round() as u8
+}
+#[test]
+fn gltf_uv_transform_changes_pixels_but_preserves_collision_bounds_and_node_associations() {
+    use agp::{
+        render3d::{LightDef, MeshInstance, MeshPipeline, MeshStore},
+        renderer::{capture::capture_png, target::OffscreenTarget, GpuDevice},
+    };
+    use glam::{Mat4, Vec3};
+    let root = temp();
+    let (raw, png) = textured_quad_fixture(true, 9728);
+    let (plain, _) = textured_quad_fixture(false, 9728);
+    let path = root.join("transformed.glb");
+    std::fs::write(&path, &raw).unwrap();
+    std::fs::write(root.join("colours.png"), png).unwrap();
+    let a = assets::import(&path, &Registry::new()).unwrap();
+    std::fs::write(root.join("plain.glb"), plain).unwrap();
+    let b = assets::import(&root.join("plain.glb"), &Registry::new()).unwrap();
+    let (doc, _) = scene_for(a.clone());
+    let (plain_doc, _) = scene_for(b.clone());
+    let before =
+        autographics_auto_driver::authoring::spatial::Descriptor::build(&doc, |_| Some(&a.model))
+            .unwrap();
+    let after = autographics_auto_driver::authoring::spatial::Descriptor::build(&plain_doc, |_| {
+        Some(&b.model)
+    })
+    .unwrap();
+    assert_eq!(
+        before.rows(),
+        after.rows(),
+        "visual transform cannot change collision AABB"
+    );
+    assert_eq!(a.bytes.as_ref(), raw);
+    let visual = a.model.meshes[0].visual.as_ref().unwrap();
+    assert_eq!(
+        (visual.node_index, visual.mesh_index, visual.primitive_index),
+        (1, 0, 0)
+    );
+    let local = Mat4::from_cols_array_2d(&visual.world)
+        .inverse()
+        .transform_point3(Vec3::from(a.model.meshes[0].positions[0]));
+    assert!(
+        (local - Vec3::new(-1., -1., 0.5)).length() < 1e-6,
+        "local geometry remains recoverable for 006"
+    );
+    let gpu = GpuDevice::new().unwrap();
+    let target = OffscreenTarget::new(&gpu, 64, 64).unwrap();
+    let mut pipeline = MeshPipeline::new(&gpu, OffscreenTarget::FORMAT).unwrap();
+    let mut store = MeshStore::default();
+    let light = LightDef {
+        dir_to_light: Vec3::Z,
+        color: [1.; 3],
+        energy: 0.5,
+        shadow_vp: Mat4::IDENTITY,
+        shadow_bias: 0.0005,
+    };
+    let vp = Mat4::from_translation(Vec3::new(-0.2, 0.1, 0.));
+    let draw =
+        |model: &agp::assets::ModelData, pipeline: &mut MeshPipeline, store: &mut MeshStore| {
+            store.get_or_upload(&gpu, model, 0).unwrap();
+            pipeline.render(
+                &gpu,
+                target.view(),
+                64,
+                64,
+                [0., 0., 0., 1.],
+                &vp,
+                &light,
+                store,
+                &[MeshInstance {
+                    mesh: (model.source_sha256.clone(), model.meshes[0].name.clone()),
+                    model: Mat4::IDENTITY,
+                }],
+                false,
+            );
+            capture_png(&gpu, &target).unwrap().1
+        };
+    let expected = |x: u32, y: u32| {
+        // Independently specialize a 90-degree KHR transform, rather than
+        // reusing the producer's sin/cos or already transformed vertex UVs.
+        let u = 0.8 - 0.6 * (y as f32 + 0.5) / 64.;
+        let v = 0.1 + 0.7 * (x as f32 + 0.5) / 64.;
+        let ix = (u * 4.).floor().clamp(0., 3.) as usize;
+        let iy = (v * 4.).floor().clamp(0., 3.) as usize;
+        // Reference colours come from the fixture definition, not the
+        // producer's decoded image or the GPU-bound material data.
+        let p = [
+            (20 + ix * 40 + iy * 10) as u8,
+            (15 + ix * 15 + iy * 45) as u8,
+            (240 - ix * 30 - iy * 20) as u8,
+        ];
+        let factor = [0.35, 0.65, 0.8];
+        std::array::from_fn::<u8, 3, _>(|i| encode_srgb(linear_srgb(p[i]) * factor[i] * 0.75))
+    };
+    let probes = [(5, 9), (17, 25), (42, 51), (60, 2)];
+    let pixels = draw(&a.model, &mut pipeline, &mut store);
+    let mut maximum = 0;
+    for (x, y) in probes {
+        let got = pixels.get_pixel(x, y).0;
+        let expect = expected(x, y);
+        let error = (0..3).map(|i| got[i].abs_diff(expect[i])).max().unwrap();
+        maximum = maximum.max(error);
+        assert!(error <= 2, "{x},{y}: GPU {got:?} CPU {expect:?}");
+    }
+    let mut frozen = a.model.clone();
+    frozen.source_sha256 = "frozen-uv-control".into();
+    frozen.meshes[0]
+        .visual
+        .as_mut()
+        .unwrap()
+        .uv
+        .fill([0.125; 2]);
+    let mut rejected = 0;
+    for wrong in [&b.model, &frozen] {
+        let pixels = draw(wrong, &mut pipeline, &mut store);
+        let mismatches = probes
+            .into_iter()
+            .filter(|&(x, y)| {
+                let p = pixels.get_pixel(x, y).0;
+                let e = expected(x, y);
+                (0..3).any(|i| p[i].abs_diff(e[i]) > 10)
+            })
+            .count();
+        assert!(
+            mismatches >= 3,
+            "missing KHR transform / frozen UV must fail the pixel oracle"
+        );
+        rejected += 1;
+    }
+    let report = json!({"probes":probes.len(),"max_error":maximum,"tolerance":2,"mutation_rejections":rejected,"collision_bounds_unchanged":true,"node_association_recoverable":true});
+    println!("UI005 gltf-transform: {report}");
+    if let Some(root) = std::env::var_os("UI005_REPORT_DIR") {
+        let root = PathBuf::from(root);
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(
+            root.join("gltf-transform.json"),
+            serde_json::to_vec_pretty(&report).unwrap(),
+        )
+        .unwrap();
+    }
+}
+
+#[test]
+fn gltf_mipmap_filters_have_explicit_base_filter_normalization() {
+    let root = temp();
+    let path = root.join("sampler.glb");
+    for (input, base) in [
+        (9728, 9728),
+        (9729, 9729),
+        (9984, 9728),
+        (9985, 9729),
+        (9986, 9728),
+        (9987, 9729),
+    ] {
+        let (bytes, png) = textured_quad_fixture(false, input);
+        std::fs::write(&path, bytes).unwrap();
+        std::fs::write(root.join("colours.png"), png).unwrap();
+        let a = assets::import(&path, &Registry::new()).unwrap();
+        assert_eq!(
+            a.model.meshes[0].visual.as_ref().unwrap().sampling.min,
+            base,
+            "{input}"
+        );
+    }
+}
