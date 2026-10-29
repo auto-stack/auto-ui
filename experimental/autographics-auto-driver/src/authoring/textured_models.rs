@@ -8,11 +8,89 @@ use agp::assets::{
 use glam::Mat4;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::io::Read;
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::Path,
     sync::Arc,
 };
+
+/// All original roots and external images share one raw-content pool. A full
+/// pool can still compare/reuse duplicates with only a bounded read buffer.
+pub(super) struct RawPool {
+    known: BTreeMap<String, Arc<[u8]>>,
+}
+impl RawPool {
+    pub(super) fn new(r: &Registry) -> Self {
+        let mut known = BTreeMap::new();
+        for a in r.values() {
+            known.insert(a.identity.sha256.clone(), a.bytes.clone());
+            for (k, b) in &a.dependencies {
+                known.insert(k.clone(), b.clone());
+            }
+        }
+        Self { known }
+    }
+    pub(super) fn read(&mut self, path: &Path) -> Result<Arc<[u8]>, String> {
+        assets::regular_path(path, false)?;
+        let file = std::fs::File::open(path).map_err(|e| format!("io: {}: {e}", path.display()))?;
+        let meta = file.metadata().map_err(|e| format!("io: {e}"))?;
+        if !meta.is_file() {
+            return Err("unsupported: regular asset file required".into());
+        }
+        let length = usize::try_from(meta.len()).map_err(|_| "resource limit: raw length")?;
+        if length > assets::MAX_RAW {
+            return Err("resource limit: asset 8MiB".into());
+        }
+        let remaining =
+            assets::MAX_RAW_TOTAL.saturating_sub(self.known.values().map(|b| b.len()).sum());
+        let capture = self.known.len() < assets::MAX_ASSETS && length <= remaining;
+        let mut candidates: Vec<_> = self
+            .known
+            .values()
+            .filter(|b| b.len() == length)
+            .cloned()
+            .collect();
+        if !capture && candidates.is_empty() {
+            return Err("resource limit: raw union before snapshot".into());
+        }
+        let mut bytes = if capture {
+            Vec::with_capacity(length)
+        } else {
+            Vec::new()
+        };
+        let mut file = file.take(assets::MAX_RAW as u64 + 1);
+        let mut at = 0;
+        let mut chunk = [0u8; 65536];
+        loop {
+            let n = file.read(&mut chunk).map_err(|e| format!("io: {e}"))?;
+            if n == 0 {
+                break;
+            }
+            let end = at + n;
+            if end > length {
+                return Err("conflict: raw file length changed".into());
+            }
+            candidates.retain(|b| b.get(at..end) == Some(&chunk[..n]));
+            if capture {
+                bytes.extend_from_slice(&chunk[..n]);
+            } else if candidates.is_empty() {
+                return Err("resource limit: unique raw union before snapshot".into());
+            }
+            at = end;
+        }
+        if at != length {
+            return Err("conflict: raw file truncated".into());
+        }
+        if let Some(b) = candidates.into_iter().next() {
+            return Ok(b);
+        }
+        let id = sha(&bytes);
+        let b: Arc<[u8]> = bytes.into();
+        self.known.insert(id, b.clone());
+        Ok(b)
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -50,6 +128,15 @@ pub fn validate_ref(a: &AssetRef) -> Result<(), String> {
             return Err("invalid: model closure identity".into());
         }
         for i in &c.images {
+            if let Some(u) = i.source.strip_prefix("uri:") {
+                uri(u)?;
+            } else if let Some(v) = i.source.strip_prefix("view:") {
+                if v.parse::<usize>().ok().is_none_or(|n| n.to_string() != v) {
+                    return Err("invalid: model image view edge".into());
+                }
+            } else {
+                return Err("invalid: model image source edge".into());
+            }
             if !valid_sha(&i.sha256)
                 || i.byte_length == 0
                 || i.byte_length > assets::MAX_RAW
@@ -60,6 +147,10 @@ pub fn validate_ref(a: &AssetRef) -> Result<(), String> {
             {
                 return Err("invalid: model image identity".into());
             }
+        }
+        let sources: BTreeSet<_> = c.images.iter().map(|i| i.source.as_str()).collect();
+        if sources.len() != c.images.len() {
+            return Err("invalid: duplicate model image edge".into());
         }
     }
     Ok(())
@@ -105,12 +196,27 @@ fn uri(s: &str) -> Result<(), String> {
         || s.len() > 256
         || !s.ends_with(".png")
         || !s.is_ascii()
-        || s.bytes()
-            .any(|b| b < 32 || matches!(b, b'\\' | b':' | b'%' | b'?' | b'#'))
+        || s.bytes().any(|b| {
+            b < 32
+                || matches!(
+                    b,
+                    b'\\' | b':' | b'%' | b'?' | b'#' | b'"' | b'<' | b'>' | b'|' | b'*'
+                )
+        })
         || s.split('/')
             .any(|p| p.is_empty() || p == "." || p == ".." || p.ends_with([' ', '.']))
     {
         return Err("unsupported: local relative PNG URI required".into());
+    }
+    for p in s.split('/') {
+        let stem = p.split('.').next().unwrap_or("").to_ascii_uppercase();
+        if ["CON", "AUX", "PRN", "NUL"].contains(&stem.as_str())
+            || (stem.len() == 4
+                && (stem.starts_with("COM") || stem.starts_with("LPT"))
+                && matches!(stem.as_bytes()[3], b'1'..=b'9'))
+        {
+            return Err("unsupported: device PNG URI".into());
+        }
     }
     Ok(())
 }
@@ -132,7 +238,14 @@ fn extensions(v: &Value, path: &str) -> Result<(), String> {
                     continue;
                 }
                 if k == "extensions" {
-                    if !path.ends_with("/pbrMetallicRoughness/baseColorTexture") {
+                    let parts: Vec<_> = path.split('/').collect();
+                    if !(parts.len() == 5
+                        && parts[0].is_empty()
+                        && parts[1] == "materials"
+                        && parts[2].parse::<usize>().is_ok()
+                        && parts[3] == "pbrMetallicRoughness"
+                        && parts[4] == "baseColorTexture")
+                    {
                         return Err("unsupported: extension location".into());
                     }
                     let m = v.as_object().ok_or("invalid: extensions object")?;
@@ -140,6 +253,9 @@ fn extensions(v: &Value, path: &str) -> Result<(), String> {
                         return Err("unsupported: texture extension".into());
                     }
                 } else if k == "extensionsUsed" || k == "extensionsRequired" {
+                    if !path.is_empty() {
+                        return Err("unsupported: extension declaration location".into());
+                    }
                     if v.as_array()
                         .is_none_or(|a| a.iter().any(|s| s != "KHR_texture_transform"))
                     {
@@ -249,6 +365,16 @@ fn pair(v: Option<&Value>, default: [f32; 2]) -> Result<[f32; 2], String> {
     };
     Ok([f(&a[0])?, f(&a[1])?])
 }
+fn transformed_uv(m: &Material, u: [f32; 2]) -> Result<[f32; 2], String> {
+    let (s, c) = m.rotation.sin_cos();
+    let x = u[0] * m.scale[0];
+    let y = u[1] * m.scale[1];
+    let out = [m.offset[0] + c * x - s * y, m.offset[1] + s * x + c * y];
+    if out.iter().any(|v| !v.is_finite()) {
+        return Err("invalid: transformed UV".into());
+    }
+    Ok(out)
+}
 fn sampling(v: &Value) -> Result<Sampling, String> {
     let enumv = |k: &str, d: u32| -> Result<u32, String> {
         v.get(k).map_or(Ok(d), |n| {
@@ -319,16 +445,30 @@ fn inspect(bytes: &[u8]) -> Result<Plan, String> {
     if images.is_empty() || images.len() > 8 {
         return Err("resource limit: declared images".into());
     }
+    let mut image_sources = BTreeSet::new();
     for i in images {
         match (i.get("uri"), i.get("bufferView")) {
             (Some(u), None) => {
                 uri(u.as_str().ok_or("invalid: image URI")?)?;
+                if !image_sources.insert(format!("uri:{}", u.as_str().unwrap())) {
+                    return Err("invalid: duplicate image source edge".into());
+                }
                 if i.get("mimeType").is_some_and(|v| v != "image/png") {
                     return Err("unsupported: PNG mime".into());
                 }
             }
             (None, Some(v)) => {
-                uint(v, "image bufferView")?;
+                let index = uint(v, "image bufferView")?;
+                if !image_sources.insert(format!("view:{index}")) {
+                    return Err("invalid: duplicate image source edge".into());
+                }
+                let view = g
+                    .views()
+                    .nth(index)
+                    .ok_or("invalid: image bufferView index")?;
+                if view.stride().is_some() || view.buffer().index() != 0 {
+                    return Err("invalid: image bufferView layout".into());
+                }
                 if i["mimeType"] != "image/png" {
                     return Err("unsupported: embedded PNG mime".into());
                 }
@@ -418,6 +558,23 @@ fn inspect(bytes: &[u8]) -> Result<Plan, String> {
         }
         materials.push(material);
     }
+    // This includes unused primitives: neither missing UV nor an overflowing
+    // effective transform may reach PNG IO/decoding or GPU preparation.
+    for mesh in g.meshes() {
+        for p in mesh.primitives() {
+            if let Some(m) = p.material().index().and_then(|i| materials.get(i)) {
+                if m.image.is_some() {
+                    let uv = p
+                        .reader(|_| Some(bin))
+                        .read_tex_coords(0)
+                        .ok_or("invalid: textured primitive requires UV0")?;
+                    for u in uv.into_f32() {
+                        transformed_uv(m, u)?;
+                    }
+                }
+            }
+        }
+    }
     Ok(Plan {
         j,
         scratch: clean,
@@ -430,7 +587,7 @@ type RawImages = (Vec<ImageRef>, Vec<Arc<[u8]>>, BTreeMap<String, Arc<[u8]>>);
 fn image_inputs(
     plan: &Plan,
     bytes: &[u8],
-    mut external: impl FnMut(&str) -> Result<Vec<u8>, String>,
+    mut external: impl FnMut(&str) -> Result<Arc<[u8]>, String>,
 ) -> Result<RawImages, String> {
     let g = gltf::Gltf::from_slice(bytes).map_err(|e| format!("invalid: glTF {e}"))?;
     let bin = g.blob.as_deref().ok_or("invalid: BIN")?;
@@ -439,7 +596,7 @@ fn image_inputs(
     let mut dependencies = BTreeMap::new();
     let mut sources = BTreeSet::new();
     for i in array(&plan.j, "images")? {
-        let (source, b): (String, Vec<u8>) = if let Some(u) = i.get("uri") {
+        let (source, b): (String, Arc<[u8]>) = if let Some(u) = i.get("uri") {
             let u = u.as_str().ok_or("invalid: image URI")?;
             uri(u)?;
             (format!("uri:{u}"), external(u)?)
@@ -460,7 +617,7 @@ fn image_inputs(
                 format!("view:{index}"),
                 bin.get(view.offset()..end)
                     .ok_or("invalid: image bufferView span")?
-                    .to_vec(),
+                    .into(),
             )
         };
         if !sources.insert(source.clone()) {
@@ -471,7 +628,6 @@ fn image_inputs(
         }
         let h = agp::assets::preflight_png(&b)?;
         let id = sha(&b);
-        let b: Arc<[u8]> = b.into();
         if source.starts_with("uri:") {
             dependencies.insert(id.clone(), b.clone());
         }
@@ -491,6 +647,8 @@ struct Usage {
     raw: BTreeMap<String, usize>,
     images: BTreeMap<String, usize>,
     geometry: BTreeMap<String, (usize, usize)>,
+    model_images: BTreeSet<String>,
+    sprite_images: BTreeSet<String>,
 }
 impl Usage {
     fn add(&mut self, a: &Asset) {
@@ -500,24 +658,36 @@ impl Usage {
         }
         if let Some(i) = &a.image {
             self.images.insert(i.source_sha256.clone(), i.rgba.len());
+            self.sprite_images.insert(i.source_sha256.clone());
         } else {
             self.geometry
                 .insert(a.identity.key(), (a.cpu_bytes, a.gpu_bytes));
         }
         for i in &a.model_images {
             self.images.insert(i.source_sha256.clone(), i.rgba.len());
+            self.model_images.insert(i.source_sha256.clone());
         }
+    }
+    fn cross_surface_pixels(&self) -> usize {
+        // These two surfaces own separate staged GPU stores, although their
+        // CPU PNG payload is shared. Reserve both physical textures.
+        self.model_images
+            .intersection(&self.sprite_images)
+            .map(|id| self.images[id])
+            .sum()
     }
     fn check(&self) -> Result<(), String> {
         let pixels = self.images.values().sum::<usize>();
         let cpu = self.geometry.values().map(|n| n.0).sum::<usize>() + pixels;
-        let gpu = self.geometry.values().map(|n| n.1).sum::<usize>() + pixels;
+        let gpu = self.geometry.values().map(|n| n.1).sum::<usize>()
+            + pixels
+            + self.cross_surface_pixels();
         if self.raw.len() > 8
             || self.raw.values().sum::<usize>() > assets::MAX_RAW_TOTAL
             || cpu > assets::MAX_GEOMETRY
             || gpu > assets::MAX_GEOMETRY
         {
-            return Err("resource limit: active asset/texture union".into());
+            return Err("resource limit: active asset union (including textures)".into());
         }
         Ok(())
     }
@@ -528,6 +698,46 @@ pub fn check_union(r: &Registry) -> Result<(), String> {
         u.add(a);
     }
     u.check()
+}
+
+/// The legacy model and sprite decoders use the same union, so importing a
+/// sprite cannot evade pixels already owned through a model closure.
+pub(super) fn candidate_budget(
+    r: &Registry,
+    id: &str,
+    len: usize,
+    cpu: usize,
+    gpu: usize,
+    image: bool,
+) -> Result<(), String> {
+    let mut u = Usage::default();
+    for a in r.values() {
+        u.add(a);
+    }
+    u.raw.insert(id.into(), len);
+    if image {
+        u.images.insert(id.into(), cpu);
+        u.sprite_images.insert(id.into());
+    } else {
+        u.geometry.insert(format!("sha256:{id}"), (cpu, gpu));
+    }
+    u.check()
+        .map_err(|_| "resource limit: candidate/resident union before decode".into())
+}
+
+/// Inspectable totals use exactly the same identity deduplication as admission.
+pub fn usage(r: &Registry) -> (usize, usize, usize, usize) {
+    let mut u = Usage::default();
+    for a in r.values() {
+        u.add(a);
+    }
+    let pixels = u.images.values().sum::<usize>();
+    (
+        u.raw.len(),
+        u.raw.values().sum(),
+        u.geometry.values().map(|n| n.0).sum::<usize>() + pixels,
+        u.geometry.values().map(|n| n.1).sum::<usize>() + pixels + u.cross_surface_pixels(),
+    )
 }
 
 pub struct Blob {
@@ -570,10 +780,10 @@ pub fn blobs(r: &Registry) -> Result<BTreeMap<String, Blob>, String> {
 }
 
 fn decode(
-    bytes: Vec<u8>,
+    bytes: Arc<[u8]>,
     name: Option<String>,
     existing: &Registry,
-    external: impl FnMut(&str) -> Result<Vec<u8>, String>,
+    external: impl FnMut(&str) -> Result<Arc<[u8]>, String>,
 ) -> Result<Arc<Asset>, String> {
     let start = std::time::Instant::now();
     let plan = inspect(&bytes)?;
@@ -596,7 +806,13 @@ fn decode(
                 .sum::<usize>()
         })
         .sum::<usize>();
-    let cpu = plan.cpu + extra;
+    // Conservative retained metadata charge includes edge strings, Arc/map
+    // entries and the per-primitive sampler/node associations (not scratch).
+    let metadata = refs
+        .iter()
+        .map(|i| 1024 + i.source.len() + i.sha256.len())
+        .sum::<usize>();
+    let cpu = plan.cpu + extra + metadata;
     let gpu = plan.gpu
         + g.nodes()
             .filter_map(|n| n.mesh())
@@ -618,6 +834,7 @@ fn decode(
         usage
             .images
             .insert(i.sha256.clone(), i.width as usize * i.height as usize * 4);
+        usage.model_images.insert(i.sha256.clone());
     }
     usage.geometry.insert(format!("closure:{id}"), (cpu, gpu));
     usage.check()?;
@@ -635,6 +852,7 @@ fn decode(
         let image = if let Some(i) = decoded.get(&r.sha256) {
             i.clone()
         } else {
+            assets::record_decode();
             let image = Arc::new(agp::assets::decode_png_bytes(b, &r.sha256)?);
             if image.rgba.chunks_exact(4).any(|p| p[3] != 255) {
                 return Err("unsupported: opaque model PNG required".into());
@@ -647,7 +865,10 @@ fn decode(
         }
         images.push(image);
     }
-    let mut model = assets::decode(plan.scratch.clone(), None)?.model.clone();
+    let decoded = assets::decode(plan.scratch.clone(), None)?;
+    let mut model = Arc::try_unwrap(decoded)
+        .map_err(|_| "invalid: private decoder owner")?
+        .model;
     let bin = g.blob.as_deref().ok_or("invalid: BIN")?;
     fn visit(
         node: gltf::Node<'_>,
@@ -674,14 +895,8 @@ fn decode(
                     if m.image.is_some() && p.get(&gltf::Semantic::TexCoords(0)).is_none() {
                         return Err("invalid: textured primitive requires UV0".into());
                     }
-                    let (s, c) = m.rotation.sin_cos();
                     for u in &mut uv {
-                        let x = u[0] * m.scale[0];
-                        let y = u[1] * m.scale[1];
-                        *u = [m.offset[0] + c * x - s * y, m.offset[1] + s * x + c * y];
-                        if u.iter().any(|v| !v.is_finite()) {
-                            return Err("invalid: transformed UV".into());
-                        }
+                        *u = transformed_uv(m, *u)?;
                     }
                 }
                 visuals.push(MeshVisual {
@@ -741,19 +956,23 @@ fn decode(
     assets::insert(&mut r, a.clone())?;
     Ok(a)
 }
-pub fn import(path: &Path, bytes: Vec<u8>, existing: &Registry) -> Result<Arc<Asset>, String> {
+pub fn import(path: &Path, bytes: Arc<[u8]>, existing: &Registry) -> Result<Arc<Asset>, String> {
     assets::regular_path(path, false)?;
     let root = path.parent().ok_or("invalid: model root")?;
+    let mut pool = RawPool::new(existing);
+    pool.known.insert(sha(&bytes), bytes.clone());
     decode(
         bytes,
-        path.file_name().map(|s| s.to_string_lossy().into_owned()),
+        path.file_name()
+            .map(|s| s.to_string_lossy().chars().take(128).collect()),
         existing,
-        |u| assets::read_blob(&root.join(u)),
+        |u| pool.read(&root.join(u)),
     )
 }
 pub fn load_declared(path: &Path, a: &AssetRef, existing: &Registry) -> Result<Arc<Asset>, String> {
     a.validate()?;
-    let bytes = assets::read_blob(path)?;
+    let mut pool = RawPool::new(existing);
+    let bytes = pool.read(path)?;
     if bytes.len() != a.byte_length || sha(&bytes) != a.sha256 {
         return Err("conflict: model root identity".into());
     }
@@ -766,7 +985,7 @@ pub fn load_declared(path: &Path, a: &AssetRef, existing: &Registry) -> Result<A
             .iter()
             .find(|i| i.source == edge)
             .ok_or("conflict: model dependency edge")?;
-        let b = assets::read_blob(&root.join(format!("{}.png", image.sha256)))?;
+        let b = pool.read(&root.join(format!("{}.png", image.sha256)))?;
         if b.len() != image.byte_length || sha(&b) != image.sha256 {
             return Err("conflict: model dependency identity".into());
         }

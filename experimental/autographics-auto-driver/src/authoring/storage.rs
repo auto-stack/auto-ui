@@ -226,13 +226,14 @@ impl Storage {
         }
         self.path = Some(path.clone());
         self.expected = Some(bytes);
+        let blobs = super::textured_models::blobs(&snapshot.assets)?;
         self.residuals.retain(|p| {
-            !snapshot.assets.values().any(|a| {
+            !blobs.values().any(|a| {
                 p == &path
                     .parent()
                     .unwrap()
                     .join("assets")
-                    .join(format!("{}.glb", a.identity.sha256))
+                    .join(blob_name(&a.identity).expect("validated blob format"))
             })
         });
         if let Some(c) = &snapshot.code {

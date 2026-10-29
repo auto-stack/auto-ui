@@ -28,6 +28,9 @@ static DECODE_ATTEMPTS: std::sync::atomic::AtomicU64 = std::sync::atomic::Atomic
 pub fn decode_attempts() -> u64 {
     DECODE_ATTEMPTS.load(std::sync::atomic::Ordering::Relaxed)
 }
+pub(super) fn record_decode() {
+    DECODE_ATTEMPTS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+}
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AssetRef {
@@ -197,14 +200,14 @@ pub fn read_blob(path: &Path) -> Result<Vec<u8>, String> {
     Ok(bytes)
 }
 pub fn import(path: &Path, existing: &Registry) -> Result<Arc<Asset>, String> {
-    let original = read_blob(path)?;
+    let original = super::textured_models::RawPool::new(existing).read(path)?;
     if super::textured_models::is_textured(&original)? {
         return super::textured_models::import(path, original, existing);
     }
-    let bytes = match read_for_import(path, existing)? {
-        Input::Cached(a) => return Ok(a),
-        Input::Fresh(b) => b,
-    };
+    if let Some(old) = existing.values().find(|a| a.bytes == original) {
+        return Ok(old.clone());
+    }
+    let bytes = original.to_vec();
     let name = path
         .file_name()
         .map(|s| s.to_string_lossy().chars().take(128).collect());
@@ -214,62 +217,39 @@ pub fn import(path: &Path, existing: &Registry) -> Result<Arc<Asset>, String> {
     Ok(asset)
 }
 enum Input {
-    Cached(Arc<Asset>),
+    Cached,
     Fresh(Vec<u8>),
 }
 /// One bounded read. When slots/raw bytes are exhausted, compare against cached
 /// immutable payloads while streaming; duplicate import still works without
 /// allocating a ninth payload or a second full copy beyond the raw budget.
 fn read_for_import(path: &Path, r: &Registry) -> Result<Input, String> {
-    regular_path(path, false)?;
-    let mut f = fs::File::open(path)
-        .map_err(|e| format!("io: {e}"))?
-        .take(MAX_RAW as u64 + 1);
-    let remaining = if r.len() < MAX_ASSETS {
-        MAX_RAW_TOTAL.saturating_sub(r.values().map(|a| a.bytes.len()).sum::<usize>())
+    let bytes = super::textured_models::RawPool::new(r).read(path)?;
+    if r.values().any(|a| a.bytes == bytes) {
+        Ok(Input::Cached)
     } else {
-        0
-    };
-    let mut candidates: Vec<_> = r.values().collect();
-    let mut bytes = Vec::new();
-    let mut capture = true;
-    let mut offset = 0;
-    let mut chunk = [0u8; 65536];
-    loop {
-        let n = f.read(&mut chunk).map_err(|e| format!("io: {e}"))?;
-        if n == 0 {
-            break;
-        }
-        let end = offset + n;
-        if end > MAX_RAW {
-            return Err("resource limit: asset 8MiB".into());
-        }
-        candidates.retain(|a| a.bytes.get(offset..end) == Some(&chunk[..n]));
-        if capture && end <= remaining {
-            bytes.extend_from_slice(&chunk[..n]);
-        } else {
-            capture = false;
-            bytes = Vec::new();
-            if candidates.is_empty() {
-                return Err(
-                    "resource limit: active raw bytes/unique assets before snapshot".into(),
-                );
-            }
-        }
-        offset = end;
-    }
-    if let Some(a) = candidates.into_iter().find(|a| a.bytes.len() == offset) {
-        return Ok(Input::Cached(a.clone()));
-    }
-    if capture {
-        Ok(Input::Fresh(bytes))
-    } else {
-        Err("resource limit: unique asset snapshot".into())
+        Ok(Input::Fresh(bytes.to_vec()))
     }
 }
 pub fn load_declared(path: &Path, a: &AssetRef, r: &Registry) -> Result<Arc<Asset>, String> {
+    a.validate()?;
     if a.closure.is_some() {
         return super::textured_models::load_declared(path, a, r);
+    }
+    if a.is_image() {
+        let bytes = super::textured_models::RawPool::new(r).read(path)?;
+        if bytes.len() != a.byte_length || agp::renderer::capture::sha256_hex(&bytes) != a.sha256 {
+            return Err("conflict: asset hash/length".into());
+        }
+        let loaded = import_png_raw(bytes, r, a.name.clone())?;
+        if loaded.identity.sha256 != a.sha256
+            || loaded.identity.byte_length != a.byte_length
+            || loaded.identity.width != a.width
+            || loaded.identity.height != a.height
+        {
+            return Err("conflict: image identity/dimensions".into());
+        }
+        return Ok(loaded);
     }
     regular_path(path, false)?;
     if fs::metadata(path).map_err(|e| format!("io: {e}"))?.len() != a.byte_length as u64 {
@@ -296,7 +276,7 @@ pub fn load_declared(path: &Path, a: &AssetRef, r: &Registry) -> Result<Arc<Asse
         return Ok(old.clone());
     }
     let bytes = match read_for_import(path, r)? {
-        Input::Cached(_) => {
+        Input::Cached => {
             return Err("conflict: declared asset SHA differs from actual cached content".into())
         }
         Input::Fresh(b) => b,
@@ -776,14 +756,15 @@ pub fn decode_in(
 ) -> Result<Arc<Asset>, String> {
     let start = std::time::Instant::now();
     let (predicted, cpu, gpu, implicit_scene) = preflight(&bytes)?; // no import_slice / external IO before this point
-    if existing.len() >= MAX_ASSETS
-        || existing.values().map(|a| a.bytes.len()).sum::<usize>() + bytes.len() > MAX_RAW_TOTAL
-        || existing.values().map(|a| a.cpu_bytes).sum::<usize>() + cpu > MAX_GEOMETRY
-        || existing.values().map(|a| a.gpu_bytes).sum::<usize>() + gpu > MAX_GEOMETRY
-    {
-        return Err("resource limit: candidate/resident union before decode".into());
-    }
     let original_sha = agp::renderer::capture::sha256_hex(&bytes);
+    super::textured_models::candidate_budget(
+        existing,
+        &original_sha,
+        bytes.len(),
+        cpu,
+        gpu,
+        false,
+    )?;
     let selected = if implicit_scene {
         Some(select_sole_scene(&bytes)?)
     } else {
@@ -883,16 +864,26 @@ pub fn decode_png_in(
     if decoded > MAX_IMAGE_DECODED {
         return Err("resource limit: decoded RGBA 16MiB".into());
     }
-    if existing.len() >= MAX_ASSETS
-        || existing.values().map(|a| a.bytes.len()).sum::<usize>() + bytes.len() > MAX_RAW_TOTAL
-        || existing.values().map(|a| a.cpu_bytes).sum::<usize>() + decoded > MAX_GEOMETRY
-        || existing.values().map(|a| a.gpu_bytes).sum::<usize>() + decoded > MAX_GEOMETRY
-    {
-        return Err("resource limit: candidate/resident union before decode".into());
-    }
     let sha = agp::renderer::capture::sha256_hex(&bytes);
-    DECODE_ATTEMPTS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    let image = agp::assets::decode_png_bytes(&bytes, &sha)?;
+    super::textured_models::candidate_budget(existing, &sha, bytes.len(), decoded, decoded, true)?;
+    let cached = existing.values().find_map(|a| {
+        a.image
+            .as_ref()
+            .filter(|i| i.source_sha256 == sha)
+            .cloned()
+            .or_else(|| {
+                a.model_images
+                    .iter()
+                    .find(|i| i.source_sha256 == sha)
+                    .cloned()
+            })
+    });
+    let image = if let Some(i) = cached {
+        i
+    } else {
+        record_decode();
+        Arc::new(agp::assets::decode_png_bytes(&bytes, &sha)?)
+    };
     if image.width != header.width
         || image.height != header.height
         || image.byte_length() != decoded
@@ -903,23 +894,30 @@ pub fn decode_png_in(
     let identity = AssetRef {
         closure: None,
         format: FORMAT_PNG.into(),
-        sha256: sha,
+        sha256: sha.clone(),
         byte_length: bytes.len(),
         name,
         width: Some(image.width),
         height: Some(image.height),
     };
     identity.validate()?;
+    let raw = existing.values().find_map(|a| {
+        if a.identity.sha256 == sha {
+            Some(a.bytes.clone())
+        } else {
+            a.dependencies.get(&sha).cloned()
+        }
+    });
     Ok(Arc::new(Asset {
         model_images: vec![],
         dependencies: BTreeMap::new(),
         identity,
-        bytes: bytes.into(),
+        bytes: raw.unwrap_or_else(|| bytes.into()),
         model: ModelData {
             source_sha256: String::new(),
             meshes: vec![],
         },
-        image: Some(Arc::new(image)),
+        image: Some(image),
         cpu_bytes: decoded,
         gpu_bytes: decoded,
         decode_us: start.elapsed().as_micros(),
@@ -929,19 +927,63 @@ pub fn decode_png_in(
 /// Import one local static PNG under the same no-overwrite/cached-identity
 /// rules as model import. A duplicate payload is reused without re-decoding.
 pub fn import_png(path: &Path, existing: &Registry) -> Result<Arc<Asset>, String> {
-    let bytes = match read_for_import(path, existing)? {
-        Input::Cached(a) => {
-            if a.image.is_none() {
-                return Err("conflict: SHA identity bytes".into());
-            }
-            return Ok(a);
-        }
-        Input::Fresh(b) => b,
-    };
     let name = path
         .file_name()
         .map(|s| s.to_string_lossy().chars().take(128).collect());
-    let asset = decode_png_in(bytes, name, existing)?;
+    import_png_named(path, existing, name)
+}
+fn import_png_named(
+    path: &Path,
+    existing: &Registry,
+    name: Option<String>,
+) -> Result<Arc<Asset>, String> {
+    let bytes = super::textured_models::RawPool::new(existing).read(path)?;
+    import_png_raw(bytes, existing, name)
+}
+fn import_png_raw(
+    bytes: Arc<[u8]>,
+    existing: &Registry,
+    name: Option<String>,
+) -> Result<Arc<Asset>, String> {
+    let hash = agp::renderer::capture::sha256_hex(&bytes);
+    if let Some(old) = existing.get(&format!("sha256:{hash}")) {
+        old.image_data()?;
+        return Ok(old.clone());
+    }
+    let shared = existing.values().find_map(|a| {
+        a.model_images
+            .iter()
+            .find(|i| i.source_sha256 == hash)
+            .cloned()
+    });
+    let asset = if let Some(image) = shared {
+        let n = image.rgba.len();
+        super::textured_models::candidate_budget(existing, &hash, bytes.len(), n, n, true)?;
+        Arc::new(Asset {
+            identity: AssetRef {
+                closure: None,
+                format: FORMAT_PNG.into(),
+                sha256: hash,
+                byte_length: bytes.len(),
+                name,
+                width: Some(image.width),
+                height: Some(image.height),
+            },
+            bytes,
+            model: ModelData {
+                source_sha256: String::new(),
+                meshes: vec![],
+            },
+            image: Some(image),
+            model_images: vec![],
+            dependencies: BTreeMap::new(),
+            cpu_bytes: n,
+            gpu_bytes: n,
+            decode_us: 0,
+        })
+    } else {
+        decode_png_in(bytes.to_vec(), name, existing)?
+    };
     let mut r = existing.clone();
     insert(&mut r, asset.clone())?;
     Ok(asset)

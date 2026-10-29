@@ -325,6 +325,13 @@ impl Document {
             .and_then(Value::as_str)
             .ok_or("schema required")?
             .to_owned();
+        if schema != "autographics.scene/6"
+            && v.get("assets")
+                .and_then(Value::as_array)
+                .is_some_and(|a| a.iter().any(|a| a.get("closure").is_some()))
+        {
+            return Err("legacy unknown model closure field".into());
+        }
         if schema == "autographics.scene/1" || schema == "autographics.scene/2" {
             if v.get("assets").is_some() {
                 return Err("legacy unknown assets".into());
