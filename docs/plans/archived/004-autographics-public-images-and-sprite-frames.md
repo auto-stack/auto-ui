@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-10-29
 updated_at: 2026-10-29
 plan_revision: 1
-current_step: 7
+current_step: 9
 total_steps: 10
 depends_on: [auto-ui/PLAN-002]
 supersedes_spec_components:
@@ -115,8 +115,8 @@ T-02先在本树形成`attachments/004/work/sprite-resource-contract.md`，并�
 | T-05 | work | T-04 | Pause/Step/Stop/新局/owner/失败注入及V-04 | AC-04 | [x] |
 | T-06 | work | T-05 | fresh consumer/预算/旧profile定向面/本代identity controls、fmt/warnings/提交、SD草案及交付说明 | AC-01..05 | [x] |
 | T-07 | review | T-06 | 同树独立最终review，核所有V/S；merge冻结门pending | AC-06 | [x] |
-| T-08 | merge | T-07 pass | 冻结提交受影响门/复用审计，通过才合本仓master | AC-07 | [ ] |
-| T-09 | merge | T-08 | 沉淀SD/ledger/索引、本仓Plan归档与真实交付SHA/API/包身份 | AC-08 | [ ] |
+| T-08 | merge | T-07 pass | 冻结提交受影响门/复用审计，通过才合本仓master | AC-07 | [x] |
+| T-09 | merge | T-08 | 沉淀SD/ledger/索引、本仓Plan归档与真实交付SHA/API/包身份 | AC-08 | [x] |
 | T-10 | merge | T-09 | wt-guard clean后移除本树/分支/空组，保必要本地恢复材料 | AC-08 | [ ] |
 
 ## 9. 复审记录
@@ -204,3 +204,4 @@ closing rows：
 - **ledger_refreshed**：workspace `auto-lang`，`.autoos/specs.json` v133→v134，回归通道 **guarded offline projection（无 store writer 可达）**：先做 byte-exact backup（`D:/autostack/plan-artifacts/plan-004/ledger-specs-backup-v133.json`），脚本化 read-modify-write，仅 4 个新增 item（P004-SPRITES/P004-T/P004-R1/P004-M）+ 2 个既有 canonical item（P838-ASSETS、P840-BEHAVIOR-API）就地更新 + version+1；六段 schema 与 1417 个唯一 id 校验通过，read-back 证明未触碰 item 逐项相同，diff 为 116+/7-。所有新 item 都带 `file` 与 `tags`（PLAN-004/r1/reviewed/delivery/source-sha256/guarded-offline-projection）。
 - **archived**：本文件由 `docs/plans/` 移入 `docs/plans/archived/` 且 `status: archived`；相对链接按新位置改写（`../attachments/`、`../../design/`、`../../../../auto-lang/`），全部可解析；`docs/plans/README.md` 的 004 行改指归档路径与 delivered 状态。README 同时被另一会话未提交改动（007 行 + 下一号），本次仅以 HEAD 版本 + 本行变更提交，随后把该会话的未提交版本（含本行）还原到工作区，未吞并其 WIP。
 - **pending**：`cleaned`（wt-guard 后移除本树/分支/空组、回收 target/.pdb）、landing 后产物观察（后端/生成包是否需重建：本计划只改 experimental 实验包，不产生产物）、批回归 due 检查。
+归档态校验（实际状态，非模拟）：`docs/plans/archived/004-autographics-public-images-and-sprite-frames.md` 存在且 `status: archived`；T-01..T-09 全部 `[x]`（T-10 清理待做）；相对链接从新父目录可解析（`../attachments/004/planning/baseline.md`、`../../design/autographics/m2-presentation-and-resources.md`、`../../../../auto-lang/docs/specs/auto-graphics/*.md`）；`docs/plans/README.md` 004 行指向 `archived/004-…md` 并标 archived；auto-lang 侧 canonical 三文件与 ledger v134 已在 master `dc2820437`，ledger item 的 `file` 指向 `docs/specs/…`、reviews item 指向本归档路径。
