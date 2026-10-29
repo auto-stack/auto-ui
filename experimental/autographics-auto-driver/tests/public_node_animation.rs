@@ -1,12 +1,312 @@
 //! T-02 producer probe. Host/GPU transaction coverage is added in T-02..05;
 //! this file currently proves real Auto source assembly, output and budget.
+use autographics_auto_driver::authoring::{
+    assets::{self, Registry},
+    document::Document,
+    host::Host,
+    play::{Action, State},
+};
 use autographics_auto_driver::{
     authoring::behavior::{Api, SourceSnapshot, MAX_BRIDGE},
     ResultKind,
     Scalar::{Float, Int},
     Session,
 };
+use serde_json::json;
 use std::path::Path;
+use std::time::{Duration, Instant};
+
+fn pump(h: &mut Host) {
+    let end = Instant::now() + Duration::from_secs(60);
+    while h.play.as_ref().is_some_and(|p| p.pending()) {
+        assert!(Instant::now() < end, "host deadline");
+        h.frame(None).unwrap();
+    }
+    assert!(
+        h.play.as_ref().unwrap().error.is_none(),
+        "{:?}",
+        h.play.as_ref().unwrap().error
+    );
+}
+fn step_host(h: &mut Host) {
+    pump(h);
+    h.play
+        .as_mut()
+        .unwrap()
+        .dispatch(Action::default())
+        .unwrap();
+    pump(h);
+}
+
+#[test]
+fn original_textured_character_auto_host_same_frame_pose_and_gpu_pixels() {
+    let path =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("samples/textured_models/models/character.glb");
+    assert!(assets::import(&path, &Registry::new())
+        .unwrap_err()
+        .contains("animations"));
+    let mut h = Host::new(Document::empty("node-probe".into())).unwrap();
+    h.dispatch(&json!({"epoch":h.editor.stamp.epoch,"revision":h.editor.stamp.revision,"action":"import-animated","payload":path.to_str().unwrap(),"selection":h.editor.selection,"asset_generation":h.ui().asset_token}).to_string()).unwrap();
+    h.settle().unwrap();
+    assert!(h.ui().error.is_empty(), "{}", h.ui().error);
+    let asset = h.editor.assets.values().next().unwrap().clone();
+    assert_eq!(asset.animation.as_ref().unwrap().clips.len(), 4);
+    assert!(asset.identity.closure.as_ref().unwrap().node_animation);
+    // The pre-existing character contract requires a frozen .8 x 1 x .8 AABB.
+    // Fixture scaling configures that collision shape without editing the GLB.
+    let (lo, hi) = autographics_auto_driver::authoring::interaction::bounds(&asset.model).unwrap();
+    let extent = hi - lo;
+    let mut doc = h.editor.document.clone();
+    doc.objects[0].scale = [0.8 / extent.x, 1.0 / extent.y, 0.8 / extent.z];
+    let registry = h.editor.assets.clone();
+    drop(h);
+    let mut h = Host::with_assets(doc, registry).unwrap();
+    // The explicit profile is part of the persisted content identity. Cold
+    // relocation must rebuild the animation from the same raw GLB and PNG.
+    let root = std::env::temp_dir().join(format!(
+        "ui006-storage-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(root.join("a")).unwrap();
+    let entry = root.join("a/scene.agscene");
+    assert_eq!(
+        h.storage
+            .save(
+                &mut h.editor,
+                &entry,
+                autographics_auto_driver::authoring::storage::Fault::None
+            )
+            .unwrap(),
+        autographics_auto_driver::authoring::storage::Saved::Confirmed
+    );
+    std::fs::rename(root.join("a"), root.join("b")).unwrap();
+    let (doc, registry, _) = autographics_auto_driver::authoring::storage::Storage::load_assets(
+        &root.join("b/scene.agscene"),
+        &Registry::new(),
+    )
+    .unwrap();
+    let reloaded = &registry[&asset.identity.key()];
+    assert_eq!(reloaded.identity, asset.identity);
+    assert_eq!(reloaded.animation.as_ref().unwrap().clips.len(), 4);
+    drop(h);
+    let mut h = Host::with_assets(doc, registry).unwrap();
+
+    let user="var ok=0\nvar phase=0.0\nvar obj=0\nvar mode=0\nfn app_start(){ok=ag_char3_bind(1);ok=ag_camera_orbit_3d(1,4.0,30.0,0,0.0);obj=ag_object_spawn(0,1,1.0,0.0,0.0);ok=ag_trigger_bind(0,1,1,obj,0,0.0);ok=ag_visual_pose(0,1,2,0.0,1,0.0)}\nfn app_update(dt float){phase=phase+dt*6.0;let fx=ag_cam3_forward_x();let fz=ag_cam3_forward_z();let q=ag_char3_move(fx*dt,0.01,fz*dt,0.002);let g=ag_char3_grounded(q);let e=ag_event_next();if e==1 {let p=ag_event_pair();ok=p};var clip=2;if g==0 {clip=3};ok=ag_visual_pose(0,1,clip,phase,1,0.5);ok=ag_visual_pose(1,obj,1,phase,1,0.0)}\n";
+    let snapshot = SourceSnapshot::from_bytes_for(
+        Path::new("original-character.at"),
+        user.as_bytes().to_vec(),
+        Api::NodeAnimation3V1,
+    )
+    .unwrap();
+    let legacy = SourceSnapshot::from_bytes_for(
+        Path::new("legacy.at"),
+        b"fn app_start(){}\nfn app_update(dt float){}\n".to_vec(),
+        Api::Triggers3V1,
+    )
+    .unwrap();
+    assert!(
+        h.start_user_snapshot(legacy)
+            .unwrap_err()
+            .contains("animated payload requires"),
+        "old profiles cannot silently drop admitted clips"
+    );
+    h.prepare_measurement.enable(true);
+    h.start_user_snapshot(snapshot).unwrap();
+    h.pause_play("");
+    pump(&mut h);
+    assert_eq!(h.play.as_ref().unwrap().state, State::Paused);
+    h.frame(None).unwrap();
+    let initial = h.rt.capture(h.three, "ui006-start").unwrap().0;
+    let first = h.play.as_ref().unwrap().last.as_ref().unwrap().clone();
+    assert_eq!(first.animations.as_ref().unwrap().targets[0].1.phase, 0.);
+    let warm = h.resource_snapshot()["mesh_uploads"].clone();
+    let decodes = assets::decode_attempts();
+    // dispatch is a fixed-tick producer call. Sampling is observed on the same
+    // accepted tick as the changed position and the echoed runtime camera.
+    step_host(&mut h);
+    let f = h.play.as_ref().unwrap().last.as_ref().unwrap().clone();
+    let v = f.animations.as_ref().unwrap().visual_for(1).unwrap();
+    assert!((v.phase - 0.1).abs() < 1e-6);
+    assert_eq!(v.clip, 3);
+    assert!((v.yaw - 0.5).abs() < 1e-6);
+    assert_eq!(f.animations.as_ref().unwrap().tick, f.tick);
+    assert_eq!(f.camera.as_ref().unwrap().tick, f.tick);
+    assert_ne!(f.nodes[&1].translation, first.nodes[&1].translation);
+    assert!(f.animations.as_ref().unwrap().slots[0].is_some());
+    assert_eq!(
+        h.resource_snapshot()["mesh_uploads"],
+        warm,
+        "pose must reuse mesh/UV uploads"
+    );
+    assert_eq!(
+        assets::decode_attempts(),
+        decodes,
+        "pose must not decode resources again"
+    );
+    let mesh = &asset.model.meshes[0];
+    assert!(
+        autographics_auto_driver::authoring::runtime_node_animation::mesh_matrix(
+            glam::Mat4::from_scale(glam::Vec3::splat(1e20)),
+            Some(v),
+            mesh
+        )
+        .is_err(),
+        "final composition overflow cannot reach either GPU pass"
+    );
+    println!(
+        "resource_usage={:?}",
+        autographics_auto_driver::authoring::textured_models::usage(&h.editor.assets)
+    );
+    // Rebuild the exact wire from the accepted real producer, then mutate one
+    // field at a time through the production independent Host validator.
+    use autographics_auto_driver::authoring::{hierarchy, runtime_node_animation as visual};
+    let targets = visual::targets(
+        &f.document,
+        &hierarchy::ordered(&f.document).unwrap(),
+        &h.editor.assets,
+    )
+    .unwrap();
+    let mut wire = vec![
+        Int(1),
+        Int(targets.len() as i32),
+        Int(f.run_id),
+        Int(f.tick),
+    ];
+    for t in &targets {
+        let v = f
+            .animations
+            .as_ref()
+            .unwrap()
+            .visual_for(t.node_id)
+            .unwrap();
+        wire.extend([
+            Int(t.node_index),
+            Int(t.asset_index),
+            Int(v.clip),
+            Int(v.looping as i32),
+            Float(v.phase),
+            Float(v.yaw),
+        ]);
+    }
+    for slot in &f.animations.as_ref().unwrap().slots {
+        if let Some(slot) = slot {
+            wire.extend([
+                Int(slot.generation),
+                Int(0),
+                Int(slot.visual.clip),
+                Int(slot.visual.looping as i32),
+                Float(slot.visual.phase),
+                Float(slot.visual.yaw),
+            ]);
+        } else {
+            wire.extend([Int(0), Int(0), Int(0), Int(0), Float(0.), Float(0.)]);
+        }
+    }
+    let admit = |wire: &[autographics_auto_driver::Scalar]| {
+        visual::admit_block(wire, f.run_id, f.tick, &targets, f.instances.as_ref())
+    };
+    assert_eq!(
+        admit(&wire).unwrap().visual_for(1).unwrap().worlds,
+        v.worlds
+    );
+    let mutants = [
+        (0, Int(0)),
+        (1, Int(0)),
+        (2, Int(f.run_id + 1)),
+        (3, Int(f.tick + 1)),
+        (4, Int(1)),
+        (5, Int(1)),
+        (6, Int(4)),
+        (6, Int(-2)),
+        (7, Int(2)),
+        (8, Float(-1.)),
+        (8, Float(f32::NAN)),
+        (8, Int(0)),
+        (9, Float(f32::INFINITY)),
+        (9, Float(7000.)),
+        (10, Int(2)),
+        (11, Int(1)),
+        (16, Int(1)),
+        (20, Float(1.)),
+    ];
+    for (at, value) in mutants {
+        let mut mutated = wire.clone();
+        mutated[at] = value;
+        assert!(admit(&mutated).is_err(), "wire field{at}");
+    }
+    assert!(admit(&wire[..wire.len() - 1]).is_err());
+    println!(
+        "Host_wire_controls={} prepare_samples={} vm_samples={} tick_us={}",
+        mutants.len() + 1,
+        h.prepare_measurement.samples_ns.len(),
+        h.play
+            .as_ref()
+            .unwrap()
+            .vm_output_measurement
+            .samples_ns
+            .len(),
+        h.play.as_ref().unwrap().reports.back().unwrap().elapsed_us
+    );
+    h.frame(None).unwrap();
+    let changed = h.rt.capture(h.three, "ui006-pose").unwrap().0;
+    assert_ne!(
+        initial, changed,
+        "actual GPU image must respond to Auto pose"
+    );
+    // Hold positions, camera, yaw, texture and actual meshes fixed; erase ONLY
+    // each source-node track delta in the real rendered instance matrices.
+    // This control cannot pass merely because the camera or actor moved.
+    if let Some(agp::host::surface_runtime::SurfaceContent::Scene3d(scene)) =
+        h.rt.content_mut(h.three)
+    {
+        for (i, instance) in scene.instances.iter_mut().enumerate() {
+            let mesh = asset
+                .model
+                .meshes
+                .iter()
+                .find(|m| m.name == instance.mesh.1)
+                .unwrap();
+            let meta = mesh.visual.as_ref().unwrap();
+            let visual = if i < asset.model.meshes.len() {
+                v
+            } else {
+                &f.animations.as_ref().unwrap().slots[0]
+                    .as_ref()
+                    .unwrap()
+                    .visual
+            };
+            let delta = visual.worlds[meta.node_index]
+                * glam::Mat4::from_cols_array_2d(&meta.world).inverse();
+            instance.model *= delta.inverse();
+        }
+    } else {
+        panic!("3D surface")
+    }
+    h.rt.graph.mark_content_dirty(h.three);
+    h.frame(None).unwrap();
+    let frozen =
+        h.rt.capture(h.three, "ui006-tracks-removed-control")
+            .unwrap()
+            .0;
+    assert_ne!(
+        changed, frozen,
+        "removing only node tracks must change actual GPU pixels"
+    );
+    println!(
+        "same_frame_tick={} meshes={} cpu_bytes={} original_sha={} pixels={} -> {}",
+        f.tick,
+        asset.model.meshes.len(),
+        asset.cpu_bytes,
+        asset.identity.sha256,
+        initial,
+        changed
+    );
+    h.stop_play();
+}
 
 fn session(user: &str) -> Session {
     let snap = SourceSnapshot::from_bytes_for(

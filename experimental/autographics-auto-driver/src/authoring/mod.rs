@@ -8,6 +8,7 @@ pub mod host;
 pub mod play;
 pub mod preview;
 pub mod runtime_camera;
+pub mod runtime_node_animation;
 pub mod runtime_objects;
 pub mod runtime_round;
 pub mod runtime_sprites;

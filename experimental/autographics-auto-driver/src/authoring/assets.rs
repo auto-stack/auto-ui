@@ -115,6 +115,7 @@ pub struct Asset {
     /// GLB payload. Empty for an image payload, which is never a model and is
     /// never uploaded as geometry; `model_data` refuses it by identity.
     pub model: ModelData,
+    pub animation: Option<Arc<agp::assets::node_animation::Animation>>,
     /// PNG payload (PLAN-004). `Some` exactly when the identity format is png.
     pub image: Option<Arc<ImageData>>,
     /// Decoded CPU bytes: model geometry or RGBA pixels, one or the other.
@@ -208,6 +209,11 @@ pub fn read_blob(path: &Path) -> Result<Vec<u8>, String> {
         return Err("resource limit: asset 8MiB".into());
     }
     Ok(bytes)
+}
+/// Explicit animated GLB admission; legacy import keeps rejecting clips.
+pub fn import_animated(path: &Path, existing: &Registry) -> Result<Arc<Asset>, String> {
+    let bytes = super::textured_models::RawPool::new(existing).read(path)?;
+    super::textured_models::import_animated(path, bytes, existing)
 }
 pub fn import(path: &Path, existing: &Registry) -> Result<Arc<Asset>, String> {
     let original = super::textured_models::RawPool::new(existing).read(path)?;
@@ -838,6 +844,7 @@ pub fn decode_in(
         return Err("invalid: decoder source identity".into());
     }
     Ok(Arc::new(Asset {
+        animation: None,
         model_images: vec![],
         dependencies: BTreeMap::new(),
         identity,
@@ -915,6 +922,7 @@ pub fn decode_png_in(
         }
     });
     Ok(Arc::new(Asset {
+        animation: None,
         model_images: vec![],
         dependencies: BTreeMap::new(),
         identity,
@@ -966,6 +974,7 @@ fn import_png_raw(
         let n = image.rgba.len();
         super::textured_models::candidate_budget(existing, &hash, bytes.len(), n, n, true)?;
         Arc::new(Asset {
+            animation: None,
             identity: AssetRef {
                 closure: None,
                 format: FORMAT_PNG.into(),

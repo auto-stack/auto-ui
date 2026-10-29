@@ -104,6 +104,8 @@ pub struct ImageRef {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Closure {
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub node_animation: bool,
     pub id: String,
     pub images: Vec<ImageRef>,
 }
@@ -115,15 +117,20 @@ fn valid_sha(s: &str) -> bool {
         && s.bytes()
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
-fn closure_id(root: &str, len: usize, images: &[ImageRef]) -> String {
-    sha(&serde_json::to_vec(&("autographics.textured/1", root, len, images)).unwrap())
+fn closure_id(root: &str, len: usize, images: &[ImageRef], animated: bool) -> String {
+    let profile = if animated {
+        "autographics.node_animation3d/1"
+    } else {
+        "autographics.textured/1"
+    };
+    sha(&serde_json::to_vec(&(profile, root, len, images)).unwrap())
 }
 pub fn validate_ref(a: &AssetRef) -> Result<(), String> {
     if let Some(c) = &a.closure {
         if a.format != "glb"
             || c.images.is_empty()
             || c.images.len() > 8
-            || c.id != closure_id(&a.sha256, a.byte_length, &c.images)
+            || c.id != closure_id(&a.sha256, a.byte_length, &c.images, c.node_animation)
         {
             return Err("invalid: model closure identity".into());
         }
@@ -299,6 +306,7 @@ fn scratch(j: &Value, bytes: &[u8], end: usize) -> Result<Vec<u8>, String> {
     let mut j = j.clone();
     strip_extensions(&mut j);
     let o = j.as_object_mut().ok_or("invalid: GLB JSON object")?;
+    o.remove("animations");
     o.remove("images");
     o.remove("textures");
     o.remove("samplers");
@@ -406,10 +414,24 @@ struct Plan {
     cpu: usize,
     gpu: usize,
     materials: Vec<Material>,
+    animation: Option<Arc<agp::assets::node_animation::Animation>>,
 }
-fn inspect(bytes: &[u8]) -> Result<Plan, String> {
+fn inspect(bytes: &[u8], animated: bool) -> Result<Plan, String> {
     let (j, end) = json(bytes)?;
     extensions(&j, "")?;
+    if !animated
+        && j.get("animations")
+            .is_some_and(|v| v.as_array().is_none_or(|a| !a.is_empty()))
+    {
+        return Err("unsupported: animations require explicit node animation profile".into());
+    }
+    let animation = if animated {
+        Some(Arc::new(
+            agp::assets::node_animation::Animation::from_parts(&j, &bytes[end + 8..])?,
+        ))
+    } else {
+        None
+    };
     // Validate original references before scratch removes image declarations.
     // Every material is admitted, including those unused by scene primitives.
     let g = gltf::Gltf::from_slice(bytes).map_err(|e| format!("invalid: glTF {e}"))?;
@@ -594,6 +616,7 @@ fn inspect(bytes: &[u8]) -> Result<Plan, String> {
         }
     }
     Ok(Plan {
+        animation,
         j,
         scratch: clean,
         cpu,
@@ -802,12 +825,13 @@ fn decode(
     name: Option<String>,
     existing: &Registry,
     external: impl FnMut(&str) -> Result<Arc<[u8]>, String>,
+    animated: bool,
 ) -> Result<Arc<Asset>, String> {
     let start = std::time::Instant::now();
-    let plan = inspect(&bytes)?;
+    let plan = inspect(&bytes, animated)?;
     let (refs, raws, dependencies) = image_inputs(&plan, &bytes, external)?;
     let root_sha = sha(&bytes);
-    let id = closure_id(&root_sha, bytes.len(), &refs);
+    let id = closure_id(&root_sha, bytes.len(), &refs, animated);
     if let Some(old) = existing.get(&format!("closure:{id}")) {
         return Ok(old.clone());
     }
@@ -830,7 +854,7 @@ fn decode(
         .iter()
         .map(|i| 1024 + i.source.len() + i.sha256.len())
         .sum::<usize>();
-    let cpu = plan.cpu + extra + metadata;
+    let cpu = plan.cpu + extra + metadata + plan.animation.as_ref().map_or(0, |a| a.cpu_bytes);
     let gpu = plan.gpu
         + g.nodes()
             .filter_map(|n| n.mesh())
@@ -950,7 +974,11 @@ fn decode(
     }
     model.source_sha256 = id.clone();
     let identity = AssetRef {
-        closure: Some(Closure { id, images: refs }),
+        closure: Some(Closure {
+            id,
+            images: refs,
+            node_animation: animated,
+        }),
         format: "glb".into(),
         sha256: root_sha,
         byte_length: bytes.len(),
@@ -960,6 +988,7 @@ fn decode(
     };
     identity.validate()?;
     let a = Arc::new(Asset {
+        animation: plan.animation,
         model_images: images,
         dependencies,
         identity,
@@ -985,6 +1014,25 @@ pub fn import(path: &Path, bytes: Arc<[u8]>, existing: &Registry) -> Result<Arc<
             .map(|s| s.to_string_lossy().chars().take(128).collect()),
         existing,
         |u| pool.read(&root.join(u)),
+        false,
+    )
+}
+pub fn import_animated(
+    path: &Path,
+    bytes: Arc<[u8]>,
+    existing: &Registry,
+) -> Result<Arc<Asset>, String> {
+    assets::regular_path(path, false)?;
+    let root = path.parent().ok_or("invalid: model root")?;
+    let mut pool = RawPool::new(existing);
+    pool.known.insert(sha(&bytes), bytes.clone());
+    decode(
+        bytes,
+        path.file_name()
+            .map(|s| s.to_string_lossy().chars().take(128).collect()),
+        existing,
+        |u| pool.read(&root.join(u)),
+        true,
     )
 }
 pub fn load_declared(path: &Path, a: &AssetRef, existing: &Registry) -> Result<Arc<Asset>, String> {
@@ -996,19 +1044,25 @@ pub fn load_declared(path: &Path, a: &AssetRef, existing: &Registry) -> Result<A
     }
     let closure = a.closure.as_ref().ok_or("invalid: model closure missing")?;
     let root = path.parent().ok_or("invalid: assets root")?;
-    let loaded = decode(bytes, a.name.clone(), existing, |u| {
-        let edge = format!("uri:{u}");
-        let image = closure
-            .images
-            .iter()
-            .find(|i| i.source == edge)
-            .ok_or("conflict: model dependency edge")?;
-        let b = pool.read(&root.join(format!("{}.png", image.sha256)))?;
-        if b.len() != image.byte_length || sha(&b) != image.sha256 {
-            return Err("conflict: model dependency identity".into());
-        }
-        Ok(b)
-    })?;
+    let loaded = decode(
+        bytes,
+        a.name.clone(),
+        existing,
+        |u| {
+            let edge = format!("uri:{u}");
+            let image = closure
+                .images
+                .iter()
+                .find(|i| i.source == edge)
+                .ok_or("conflict: model dependency edge")?;
+            let b = pool.read(&root.join(format!("{}.png", image.sha256)))?;
+            if b.len() != image.byte_length || sha(&b) != image.sha256 {
+                return Err("conflict: model dependency identity".into());
+            }
+            Ok(b)
+        },
+        closure.node_animation,
+    )?;
     if !loaded.identity.same_content(a) {
         return Err("conflict: model closure binding".into());
     }

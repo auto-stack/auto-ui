@@ -150,6 +150,7 @@ pub struct Frame {
     /// rides the same candidate, so a new position can never publish beside an
     /// old frame.
     pub sprites: Option<super::runtime_sprites::SpriteFrame>,
+    pub animations: Option<super::runtime_node_animation::AnimationFrame>,
 }
 
 /// Per-tick camera output block sizes appended to the frame read layout.
@@ -242,6 +243,7 @@ pub struct Play {
     /// PLAN-004 frozen bound-leaf table of this Run (None outside the sprite
     /// profile). The admitted block is validated against exactly this table.
     sprite_targets: Option<Vec<super::runtime_sprites::Target>>,
+    animation_targets: Option<Vec<super::runtime_node_animation::Target>>,
 }
 impl Play {
     pub fn new(e: &Editor, actors: [Option<u64>; 2], source: &str) -> Result<Self, String> {
@@ -280,6 +282,7 @@ impl Play {
             && snapshot.version != super::behavior::TRIGGERS2_VERSION
             && snapshot.version != super::behavior::TRIGGERS3_VERSION
             && snapshot.version != super::behavior::SPRITES2_VERSION
+            && snapshot.version != super::behavior::NODE_ANIMATION3_VERSION
         {
             return Err("spatial constructor API mismatch".into());
         }
@@ -347,7 +350,8 @@ impl Play {
                 super::behavior::Api::Character3V1
                 | super::behavior::Api::Camera3V1
                 | super::behavior::Api::Objects3V1
-                | super::behavior::Api::Triggers3V1 => Some(CharProfile::ThreeD),
+                | super::behavior::Api::Triggers3V1
+                | super::behavior::Api::NodeAnimation3V1 => Some(CharProfile::ThreeD),
                 _ => None,
             };
             let camera_dim = match api {
@@ -357,7 +361,8 @@ impl Play {
                 | super::behavior::Api::Sprites2V1 => Some(CameraDim::TwoD),
                 super::behavior::Api::Camera3V1
                 | super::behavior::Api::Objects3V1
-                | super::behavior::Api::Triggers3V1 => Some(CameraDim::ThreeD),
+                | super::behavior::Api::Triggers3V1
+                | super::behavior::Api::NodeAnimation3V1 => Some(CameraDim::ThreeD),
                 _ => None,
             };
             let objects_dim = api.objects();
@@ -415,6 +420,36 @@ impl Play {
             play.push_camera_queries();
             play.push_objects_queries();
             play.push_round_queries();
+            if api == super::behavior::Api::NodeAnimation3V1 {
+                let targets =
+                    super::runtime_node_animation::targets(&e.document, &play.order, &e.assets)?;
+                let position = play
+                    .queue
+                    .iter()
+                    .position(|c| c.name == "_ag_start")
+                    .ok_or("missing start boundary")?;
+                for (offset, t) in targets.iter().enumerate() {
+                    play.queue.insert(
+                        position + offset,
+                        Call::unit(
+                            "_ag_vis_map",
+                            vec![
+                                Scalar::Int(
+                                    i32::try_from(t.node_id)
+                                        .map_err(|_| "visual stable id exceeds 32-bit")?,
+                                ),
+                                Scalar::Int(t.node_index),
+                                Scalar::Int(t.asset_index),
+                                Scalar::Int(
+                                    t.asset.animation.as_ref().map_or(0, |a| a.clips.len()) as i32,
+                                ),
+                            ],
+                        ),
+                    );
+                }
+                play.animation_targets = Some(targets);
+                play.push_animation_queries();
+            }
             if api.sprites() {
                 // Every bound leaf must still resolve to the accepted payload:
                 // the persisted identity is the image SHA, and the frozen table
@@ -499,6 +534,13 @@ impl Play {
         }
         e.document.validate()?;
         assets::check_registry(&e.assets)?;
+        if e.assets.values().any(|a| a.animation.is_some())
+            && user_source
+                .as_ref()
+                .is_none_or(|s| s.version != super::behavior::NODE_ANIMATION3_VERSION)
+        {
+            return Err("unsupported: animated payload requires node_animation3d profile".into());
+        }
         for a in &e.document.assets {
             let payload = e.assets.get(&a.key()).ok_or("missing play asset")?;
             if !payload.identity.same_content(a) {
@@ -630,6 +672,7 @@ impl Play {
             round_contact: [false; super::runtime_round::PAIRS],
             round_bind_water: [0; super::runtime_round::PAIRS],
             sprite_targets: None,
+            animation_targets: None,
         };
         p.queries();
         Ok(p)
@@ -950,6 +993,7 @@ impl Play {
         self.push_objects_queries();
         self.push_round_queries();
         self.push_sprite_queries();
+        self.push_animation_queries();
     }
 
     /// The camera output block rides every camera-Run tick after the node
@@ -1185,6 +1229,10 @@ impl Play {
                 + objects_len
                 + rounds_len
                 + sprite_len
+                + self
+                    .animation_targets
+                    .as_ref()
+                    .map_or(0, |t| super::runtime_node_animation::block_len(t.len()))
             || int(0)? != self.expected_profile
             || int(1)? != self.run_id
             || int(2)? != self.next_tick
@@ -1259,6 +1307,7 @@ impl Play {
         // derive worlds and the same candidate instance table the unit saw.
         let rounds = self.admit_rounds(data, &expected, instances.as_ref())?;
         let sprites = self.admit_sprites(data, instances.as_ref())?;
+        let animations = self.admit_animations(data, instances.as_ref())?;
         Ok(Frame {
             document: doc,
             objects,
@@ -1269,6 +1318,7 @@ impl Play {
             instances,
             rounds,
             sprites,
+            animations,
         })
     }
 
@@ -1671,6 +1721,67 @@ impl Play {
             self.next_tick,
             &targets,
             &dims,
+            instances,
+        )
+        .map(Some)
+    }
+    fn push_animation_queries(&mut self) {
+        let Some(targets) = self.animation_targets.as_ref() else {
+            return;
+        };
+        let count = targets.len();
+        for name in [
+            "_ag_vis_status",
+            "_ag_vis_count",
+            "_ag_vis_run",
+            "_ag_vis_tick",
+        ] {
+            self.queue.push_back(Call {
+                name,
+                args: vec![],
+                kind: ResultKind::Int,
+            });
+        }
+        for (ints, floats, rows) in [
+            ("_ag_vis_pi", "_ag_vis_pf", count),
+            ("_ag_vis_qi", "_ag_vis_qf", 8),
+        ] {
+            for row in 0..rows as i32 {
+                for f in 0..4 {
+                    self.queue.push_back(Call {
+                        name: ints,
+                        args: vec![Scalar::Int(row), Scalar::Int(f)],
+                        kind: ResultKind::Int,
+                    });
+                }
+                for f in 0..2 {
+                    self.queue.push_back(Call {
+                        name: floats,
+                        args: vec![Scalar::Int(row), Scalar::Int(f)],
+                        kind: ResultKind::Float,
+                    });
+                }
+            }
+        }
+    }
+    fn admit_animations(
+        &self,
+        data: &[Scalar],
+        instances: Option<&super::runtime_objects::RuntimeObjectsFrame>,
+    ) -> Result<Option<super::runtime_node_animation::AnimationFrame>, String> {
+        let Some(targets) = self.animation_targets.as_ref() else {
+            return Ok(None);
+        };
+        let base = 4
+            + 22 * self.order.len()
+            + camera_block_len(self.camera_dim)
+            + super::runtime_objects::BLOCK_LEN
+            + super::runtime_round::BLOCK_LEN;
+        super::runtime_node_animation::admit_block(
+            data.get(base..).ok_or("visual block output")?,
+            self.run_id,
+            self.next_tick,
+            targets,
             instances,
         )
         .map(Some)

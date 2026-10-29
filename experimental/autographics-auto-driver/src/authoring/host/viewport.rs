@@ -13,6 +13,7 @@ impl Host {
             None,
             None,
             None,
+            None,
         )
     }
     pub(super) fn prepare_frame(
@@ -23,6 +24,7 @@ impl Host {
         camera: Option<&crate::authoring::runtime_camera::RuntimeCameraFrame>,
         instances: Option<&crate::authoring::runtime_objects::RuntimeObjectsFrame>,
         sprites: Option<&crate::authoring::runtime_sprites::SpriteFrame>,
+        animations: Option<&crate::authoring::runtime_node_animation::AnimationFrame>,
     ) -> Result<Prepared, String> {
         if self.fail_resource {
             return Err("resource preparation rejected".into());
@@ -246,7 +248,11 @@ impl Host {
                     }
                     p.instances.push(MeshInstance {
                         mesh: (model.source_sha256.clone(), mesh.name.clone()),
-                        model: transform,
+                        model: crate::authoring::runtime_node_animation::mesh_matrix(
+                            transform,
+                            animations.and_then(|f| f.visual_for(o.id)),
+                            mesh,
+                        )?,
                     });
                 }
             }
@@ -256,7 +262,7 @@ impl Host {
         // shape/material, admitted world position and visibility. They are
         // non-solid presentation only; no selection, gesture or spatial state.
         if let Some(instances) = instances {
-            for slot in instances.slots.iter().filter(|s| s.live()) {
+            for (slot_index, slot) in instances.slots.iter().enumerate().filter(|(_, s)| s.live()) {
                 let t = template(slot.template_id)?;
                 let o = crate::authoring::runtime_objects::instance_object(&t, slot)
                     .ok_or("objects adapter slot")?;
@@ -322,7 +328,13 @@ impl Host {
                         }
                         p.instances.push(MeshInstance {
                             mesh: (model.source_sha256.clone(), mesh.name.clone()),
-                            model: transform,
+                            model: crate::authoring::runtime_node_animation::mesh_matrix(
+                                transform,
+                                animations
+                                    .and_then(|f| f.slots[slot_index].as_ref())
+                                    .map(|s| &s.visual),
+                                mesh,
+                            )?,
                         });
                     }
                 }

@@ -420,6 +420,7 @@ impl Host {
                         frame.camera.as_ref(),
                         frame.instances.as_ref(),
                         frame.sprites.as_ref(),
+                        frame.animations.as_ref(),
                     );
                     self.prepare_measurement.finish(measurement_start);
                     let prepared = prepared?;

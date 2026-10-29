@@ -259,6 +259,11 @@ impl SurfaceUi for Panel {
                 self.bounds.clone(),
             ))
             .push(cmd("Import GLB", "import", json!(self.import_path)))
+            .push(cmd(
+                "Import Animated GLB",
+                "import-animated",
+                json!(self.import_path),
+            ))
             .push(crate::authoring::tagged::tag(
                 text_input("Local PNG path", &self.import_sprite_path)
                     .id("authoring-sprite-path")

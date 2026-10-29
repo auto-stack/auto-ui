@@ -195,7 +195,7 @@ impl Host {
                 self.project_pending =
                     self.editor.begin(stamp, Edit::Behavior { binding, code })?;
             }
-            "import" => {
+            "import" | "import-animated" => {
                 if v["asset_generation"].as_u64() != Some(self.asset_token) {
                     return Err("stale import generation".into());
                 }
@@ -206,10 +206,13 @@ impl Host {
                     .asset_token
                     .checked_add(1)
                     .ok_or("import token exhausted")?;
-                let asset = crate::authoring::assets::import(
-                    Path::new(p.as_str().ok_or("GLB path")?),
-                    &self.active_assets()?,
-                )?;
+                let path = Path::new(p.as_str().ok_or("GLB path")?);
+                let registry = self.active_assets()?;
+                let asset = if action == "import-animated" {
+                    crate::authoring::assets::import_animated(path, &registry)?
+                } else {
+                    crate::authoring::assets::import(path, &registry)?
+                };
                 let id = self.editor.next_id().ok_or("identity exhausted")?;
                 let mut o = Object::new(id, Kind::Model);
                 o.resource = Some(asset.identity.key());
