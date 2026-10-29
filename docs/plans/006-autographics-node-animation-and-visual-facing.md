@@ -4,9 +4,9 @@ status: executing
 feature_name: AutoGraphics无蒙皮节点动画与视觉朝向
 author: [Codex]
 created_at: 2026-10-29
-updated_at: 2026-10-29
+updated_at: 2026-10-30
 plan_revision: 1
-current_step: 1
+current_step: 2
 total_steps: 10
 depends_on: [auto-ui/PLAN-005]
 supersedes_spec_components:
@@ -111,7 +111,7 @@ phase由Auto显式提供的有限非负时间或等价整数tick表达，T-02选
 | ID | owner_stage | 依赖 | 操作/产物 | AC | 状态 |
 |---|---|---|---|---|---|
 | T-01 | work | 005实际交付、用户启动 | 核005/004/SDK/两锁/素材收据与owner，建唯一ui-006树 | AC-01/05 | [x] 11bc18b；source-preflight.md |
-| T-02 | work | T-01 | node-animation-contract：原clip/interpolation、phase/yaw/碰撞/价格/预算整链probe，失败回new | AC-01..05 | [ ] c7dceef：采样/Auto producer通过，Host/GPU整链待接入 |
+| T-02 | work | T-01 | node-animation-contract：原clip/interpolation、phase/yaw/碰撞/价格/预算整链probe，失败回new | AC-01..05 | [x] 9354e9e；t02-integration.md，原件Auto→Host→GPU、19wire负控/搬迁重开 |
 | T-03 | work | T-02通过 | 有界节点/clip准入与持久化/资源计账，V-01 | AC-01/04 | [ ] |
 | T-04 | work | T-03 | Auto公开视觉输出/Host采样/renderer色图与shadow，V-02/03 | AC-02/03 | [ ] |
 | T-05 | work | T-04 | 事务/实例代次/新局/暂停单步/owner与20轮V-04 | AC-04 | [ ] |
@@ -135,8 +135,12 @@ phase由Auto显式提供的有限非负时间或等价整数tick表达，T-02选
 
 2026-10-29 goal round 2：`stage: goal | plan_id: PLAN-006 | plan_revision: r1 | round: 2 | from: work | to: work | status: executing | outcome: pass (verified T-02 progress; work incomplete) | worktree: D:/autostack/.wt/ui-006/auto-ui | commit: c7dceef2f64a76589aad4eb2473dc3b904ddb2cd | next: work T-02 integration`。前轮有效进展，本轮新增实际实现与可区分已执行证据，非等待/无进展；保留1/10，不提前复审/合入。
 
+2026-10-30 work T-02完成：`stage: work | plan_id: auto-ui/PLAN-006 | plan_revision: 1 | outcome: pass (T-02 only; work incomplete) | worktree_path: D:/autostack/.wt/ui-006/auto-ui | branch: codex/plan-006-dev | base_commit: 80d9bbe | code_commit: 9354e9ef482f433257c3445a6472d37a027adb44 | dependency_revisions: SDK/两锁/原件身份与T-01相同 | task_ids: T-02 | evidence: attachments/006/work/t02-integration.md,node-animation-contract.md | blockers: none | next_responsible_role: work T-03`。最小整链实际交付：显式animated closure身份/公开import-animated/保存搬迁冷重开4clip→真实Auto运动/垂直位移/grounded/相机relative basis/触发一次读取/单visual setter→Host独立wire验证与采样→同tick Frame/Prepared→颜色/shadow共用矩阵。旧import/旧Play拒新动画payload，保留005旧identity。public_node_animation 4/4已过；最终Host case定向1/1：19坏wire+最终矩阵溢出拒、原GLB不变、共享节点payload静态/实例独立、去掉node delta且固定相机/位置/yaw/纹理的真实GPU负控必变图，mesh上传/解码零增量；单tick3836us，原运行限额未放宽；资源union raw2/97732B、CPU1102359B、GPU1101700B。最终日志`t02-final-profile.log` SHA256 2d0085e066ffe57fa7911091f422b19c5f9d1db5c4dd6ae2bb4254a0db37ffc4（目录D:/autostack/plan-artifacts/auto-ui/plan-006）；4/4历史`t02-closure-final.log` d560afc0456d28b3496f670bb5f4a1fd6b6ce7d0ddd2cc1db5e5aab90e21784f，其余3case producer代码/输入未变复用。005共享保存/identity定向1/1，日志`t02-legacy-closure.log` SHA2568c9d9823d8a6d00d72f6c253441b788c1f45f1773e199350f76c9994ea5cd3c8。初次测试碰撞AABB未按原character域配置及未dirty重绘的问题均按正式路径纠正，保留失败日志，不改验收。2/10；T-03..06完整准入/像素物理/owner/消费验收尚未关闭，未交review。
+
+2026-10-30 goal round 3：`stage: goal | plan_id: PLAN-006 | plan_revision: r1 | round: 3 | from: work | to: work | status: executing | outcome: pass (T-02 complete; work incomplete) | worktree: D:/autostack/.wt/ui-006/auto-ui | commit: 9354e9ef482f433257c3445a6472d37a027adb44 | next: work T-03`。前轮有效实现进展，本轮取得生产整链/真实像素/独立坏输出证据与提交，无用户待答问题；目标和预算未缩减。
+
 ## 10. 待澄清事项
 
-当前无用户待答问题。005交付身份与原clip数据已由T-01实测；T-02整路径预算、phase/yaw/wire合同仍待执行，不将T-01的素材检查计作其完成。
+当前无用户待答问题。T-01输入与T-02最小整链已通过，phase/yaw/wire合同已冻结。继续T-03..06各自完整验收矩阵，不将T-02的最小probe当作后续AC完成。
 
 005交付身份及原clip数据未实测，T-01/T-02认领；公开profile/签名/wire/价格/phase单位按本文有限语义冻结，不是再向用户索要相同方向授权。如必需clip需本期外插值或无法在既有预算内组合，应带原件与反例回new，显式提出合同/预算变化，不能丢动作或换成Bob动画。声音/HUD、G09/G10内容、完整两关与最终发行另立后继合同，跨端不插入桌面M2前置。

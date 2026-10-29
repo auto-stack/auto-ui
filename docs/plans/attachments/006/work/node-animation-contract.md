@@ -1,6 +1,6 @@
-# PLAN-006 T-02 当前执行合同（探针建设中，未通过整链门）
+# PLAN-006 T-02 执行合同（最小整链probe已通过）
 
-基线 `80d9bbe`，输入及004/005/SDK/两锁身份见 `source-preflight.md`。本合同固定本期普通实现选择，不扩大r1的范围、AC、资源或CPU/时间门。当前采样/Auto producer骨架在唯一ui-006树建设；直到原始纹理角色经过Auto→Host→同帧真实GPU且整组合预算实测通过，T-02保持未完成，不启动T-03广泛准入/持久化矩阵。
+基线 `80d9bbe`，输入及004/005/SDK/两锁身份见 `source-preflight.md`。本合同固定本期普通实现选择，不扩大r1的范围、AC、资源或CPU/时间门。原始纹理角色已经过Auto→Host→同帧真实GPU，含完整组合和预算/输出校验，T-02最小整链通过，见`t02-integration.md`；广泛准入/持久化矩阵、画面/物理/owner/fresh consumer仍分别属于T-03..06，不预称AC全部完成。
 
 ## 公共profile与视觉状态
 
@@ -12,7 +12,7 @@ phase唯一单位f32 seconds，必须有限且非负；由Auto在fixed dt推进�
 
 文档默认视觉为base/-1、phase0、loop0、yaw0；新槽generation从模板初始视觉重建而非继承模板上次运行态或槽旧代。销毁撤销视觉，旧Run/旧generation/无合法模型绑定受检拒绝。静态绑定数至多128，与原Run节点上限相同；槽仍8。Stop与fresh Run重建app_start状态，Pause不改phase，neutral Step只推进一fixed dt。
 
-## wire（待Host接入验证）
+## wire（已接入并验证）
 
 固定header四int：status=1、bound count、Run、tick。随后Run接受的稳定model target行（按Run顺序），最后8槽行。每行6值：四int+两float。static ints=`node ordinal,asset ordinal,clip,looping`，floats=`phase,yaw`；slot ints=`generation,asset ordinal,clip,looping`，floats同static。free/unbound槽六值均canonical0。Host独立检查实际model内容身份、类型/长度、clip域、finite phase/yaw、bool域、Run/tick、实例实际模板与generation、每个live bound模板有且仅有一行。用户可任意写视觉请求，Host只用此受检表产生候选pose。
 
@@ -36,4 +36,4 @@ phase唯一单位f32 seconds，必须有限且非负；由Auto在fixed dt推进�
 | V-04 事务/身份/owner | Host坏输出/prepare failure保留完整last-good；Pause/Step/新局/Stop；20轮Weak/上传/最终drop | producer坏clip/phase/loop/yaw/旧token入口已建立；Host及owner未关闭 |
 | V-05 预算/消费 | 真实Auto同callback运动（含垂直跳）、grounded、相机basis读取、触发event一次读取、视觉setter；固定原clip经GPU；fresh A→B离线保存重开 | producer组合test已建立，尚未把其结果当整链预算；consumer/identity待T-06 |
 
-T-02通过仍须完整实际生产路径/原纹理角色、矩阵与画面、预算/CPU/步数及所有wire校验真实执行；本附件不预称AC-01..05完成。
+最小整链当前结果：公开`import-animated`/“Import Animated GLB”保留原GLB+外图；schema6 closure新增`node_animation=true`并以新profile域计入closure id，旧false省略且旧identity保持。保存搬迁冷重开重建4clip，旧import拒动画，旧Play profile拒新动画payload，不能静默丢轨道。新Host验证wire并在共同Frame内sample；19项坏wire负控及最终矩阵非有限/奇异拒绝通过，颜色/shadow共用同一矩阵。固定位置/相机/yaw/mesh/texture只擦除node轨道的GPU负控使像素变化。单tick全链3.836ms，默认100000-step/120-resume/250ms callback与2s整tick均未触发；此为最小探针，非T-06完整性能/消费验收。
