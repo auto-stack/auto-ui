@@ -7,7 +7,7 @@
 | 计划 | 独立结果 | 硬前置与启动条件 |
 |---|---|---|
 | [004 公共图片与2D精灵帧](../../plans/archived/004-autographics-public-images-and-sprite-frames.md) | 安全PNG/透明采样、版本化场景/完整离线closure、真实Auto取帧/翻向与共同发布 | 002实际交付已满足，用户启动work后T-01/T-02 |
-| [005 3D纹理与UV](../../plans/005-autographics-textured-models-and-uv.md) | 固定静态素材色图/UV/变换、依赖闭包/身份、纹理绘制与寿命 | 004实际交付，先恢复固定源清单再验证素材整链 |
+| [005 3D纹理与UV](../../plans/archived/005-autographics-textured-models-and-uv.md) | 固定静态素材色图/UV/变换、依赖闭包/身份、纹理绘制与寿命 | 004实际交付，先恢复固定源清单再验证素材整链 |
 | [006 节点动画与视觉朝向](../../plans/006-autographics-node-animation-and-visual-facing.md) | 无skin节点TRS clip、Auto phase/yaw、碰撞独立与same-tick呈现 | 005实际交付，先核原clip与整组合预算 |
 
 三份改动同一资源/Frame/assembly/renderer合同，按004→005→006实际delivery串行；T-02均先冻结有限支持、准入资源和真实整链，失败回new，不用接口名字或一个小动画掩盖不可组合。004不声称3D动画已可用，005仍不接受含动画的character，006才闭合原character四clip。004给2D的帧由Auto自行选，Host不代玩法；006亦然。
@@ -39,8 +39,24 @@ CPU/GPU/磁盘/运行预算沿前序实际交付。新图片/UV/纹理/节点cli
 | owner合同 | 范围/前置 | 与主线的并行方式 |
 |---|---|---|
 | [auto-ui/011 2D完整玩法整链预算](../../plans/011-autographics-g2-full-loop-budget-feasibility.md) | 新drafting r1、0/10；固定004＋008公共profile，跑跳/敌人/三币/胜负/新Run/相机/精灵同程序与最坏callback；G2-09缺公共服务单列 | 不等005/006，不改其engine/API/身份/根Cargo，只写独立研究harness；负研究结论可交付，不静默抬限 |
-| [ag-examples/003 G10a](../../../../ag-examples/docs/plans/003-autographics-gallery-textured-models.md) | 新drafting r1、0/10；原件纹理/UV/闭包/许可/阶段目录/单项离线包，硬等005实际delivery | 现在仅规划；005交付后可与006并行实施内容，不消费005开发tip |
+| [ag-examples/003 G10a](../../../../ag-examples/docs/plans/archived/003-autographics-gallery-textured-models.md) | 新drafting r1、0/10；原件纹理/UV/闭包/许可/阶段目录/单项离线包，硬等005实际delivery | 现在仅规划；005交付后可与006并行实施内容，不消费005开发tip |
 
 011与003无相互完成依赖；T-02分别冻结自己的实验/素材与验收合同，不互相借准备目录/target。GPU和重型门仍机器单实例，OS抢焦点暂停，新增Plan只做受影响检查。声音/HUD未因记录事件意图而通过，完整游戏仍以后各自独立仓；G10a只新增g10/textures，当前inventory预期11逻辑项19入口，G10b动画/朝向仍pending，不能宣布G10/首12项已齐。
 
 本次仅规划两份，不实施/建树/agent/发布。预算Plan编号按本仓已归档010的最大本地号取011（当时.next-id落后为009，已在独占取号下推进012，不回填/重排009）；Gallery取本仓003，后续号各仓实时重核。
+
+## 6. 2026-10-30 G10b与公共声音/HUD后继（仅规划）
+
+本节替代前文尚未立声音/HUD和G10b计划的历史描述；005与Gallery003已实际交付。006仍在途，准确状态以其当前合同/owner收据为准。本轮只规划，不实施/建树/新agent。
+
+| 合同 | 交付/进入门 |
+|---|---|
+| [auto-ui/012](../../plans/012-autographics-public-audio-and-accepted-cues.md) | 公共有限音频/cue/接受后一次播放；硬等006实际delivery |
+| [auto-ui/013](../../plans/013-autographics-public-hud-and-presentation-state.md) | 公共有限文字HUD/字体/音画共同呈现；硬等012实际delivery |
+| [ag-examples/004](../../../../ag-examples/docs/plans/004-autographics-gallery-node-animation-and-facing.md) | G10b，硬等006；整个G10切006并重验textures，保005历史 |
+| [ag-examples/005](../../../../ag-examples/docs/plans/005-autographics-gallery-audio-actions.md) | G12a音效，硬等012与内容004；HUD仍pending |
+| [ag-examples/006](../../../../ag-examples/docs/plans/006-autographics-gallery-event-hud.md) | G12b事件HUD，硬等013与内容005；整个G12切013并重验audio，保012历史 |
+
+引擎006→012→013实施串行；内容004→005→006串行合入共享目录/工具，可分别与引擎012/013交错并行。011仍固定004＋008的旧基线，不因新API而自动变更实验/标go。新服务输入、资源/32credit、有限bundle、真实PCM/字形、前后接受失败边界见[正式设计](m2-public-audio-and-hud.md)。
+
+预计真实已交付inventory逐步11/19→11/20→12/21→12/22；未交付入口不标Ready，G10/G12齐备后仍不跳完整游戏/统一最终版本矩阵/发行与全AG里程碑。各Plan自有准备/target/证据目录，GPU/音频设备单实例、OS抢焦点暂停、原32和内存/源预算保持。
