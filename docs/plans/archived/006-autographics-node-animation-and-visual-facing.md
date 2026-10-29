@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-10-29
 updated_at: 2026-10-30
 plan_revision: 2
-current_step: 9
+current_step: 10
 total_steps: 10
 completion_kind: delivered
 delivered_commit: c681663e6ff392d70471abbec560e9d9daf12622
@@ -116,7 +116,7 @@ phase固定为Auto显式给出的有限非负f32 seconds，不能同时存在两
 | AC-05 | work | 已通过：T-02完整32/33真实预算、T-06仓外完整消费/冷重开/真实Auto源变异、继承兼容、1477文件current identity/controls与CPU包络，见t06-consumer-and-identity.md；非Rust玩法 |
 | AC-06 | review | R2 independent final pass，a85980c/e2994efa；R1唯一finding及共因/兄弟路径关闭，SD通过，无开放finding；T-07完成，新34case冻结merge门通过 |
 | AC-07 | merge | pass：新34case/controls exit0，源码等价rebase并ff-only合master，完整AG里程碑仍pending |
-| AC-08 | merge | SD/ledger/索引及归档交付已验证；清理见最终T10收据 |
+| AC-08 | merge | pass：规范/ledger/索引及归档提交完成，T10 guard与构建清理实盘验证 |
 
 ## 8. 执行步骤
 
@@ -131,7 +131,7 @@ phase固定为Auto显式给出的有限非负f32 seconds，不能同时存在两
 | T-07 | review | T-06 | 同树独立review全部V/S与遗漏，merge门pending | AC-06 | [x] a85980c上R2受影响独立final pass；原R1完整矩阵按不变路径复用，修复/SD/身份/消费关闭，review/r2.md |
 | T-08 | merge | T-07 pass | 冻结提交定向门/有效复用，通过才合本仓master | AC-07 | [x] verified merge receipt below |
 | T-09 | merge | T-08 | Spec/ledger/索引、本仓归档与真实delivery SHA/clip接口/消费包身份 | AC-08 | [x] verified merge receipt below |
-| T-10 | merge | T-09 | wt-guard clean后清唯一树/分支/空组与恢复收据 | AC-08 | [ ] |
+| T-10 | merge | T-09 | wt-guard clean后清唯一树/分支/空组与恢复收据 | AC-08 | [x] final guards and cleanup verified |
 
 ## 9. 复审记录
 
@@ -204,8 +204,16 @@ F-006-W1-INPUT-BUDGET：补入真实4向held+跳跃pressed后，即使不读even
 
 归档收据以本文件实际提交为准；工作树、分支与构建中间物清理完成后另记cleaned。生产backend/daemon/root UI未变，无需部署或重启；本期实验AG输出保留。语言批量回归按既有明确排除/延后不运行，不记为通过。
 
+2026-10-30 `stage: merge | PLAN-006:r2 | outcome: pass | archived: bc8d5c9 | cleaned: verified | delivery_commit: c681663e6ff392d70471abbec560e9d9daf12622 | knowledge_commit: 664145b791a3bb2576a13414e0c2929203c74e56 | pending_merge_owned_gates: none`。实际归档文件及所有本地Markdown链接回读通过，主干归档提交bc8d5c9含Plan移位、006索引与设计导航修复；其它所有者WIP未纳入提交。两树删除前再次核绝对路径、branch、clean、HEAD为master祖先和fresh wt-guard exit0，final-auto-ui-guard.log/final-auto-lang-guard.log记录无reparse；已移除D:/autostack/.wt/ui-006/{auto-ui,auto-lang}、codex/plan-006-dev/codex/ui-006-specs及空组目录，未清其它工作树。
+
+构建清理实际报告D:/autostack/plan-artifacts/auto-ui/plan-006/cleanup-report.json，SHA2567277706084a0897be049aa42909820a07dfc3f168adcb8358d3deb8dac79f035。确认两处Cargo CACHEDIR.TAG后移除target-agp、target-stack32（原缓存23918553302B），删除524份PDB；全部428个EXE/2903845888B逐个SHA256保留（缓存内者移至retained-exe/原相对路径，原→新映射在报告），9538份其它既存证据/源码/日志逐字节保持。当前9个merge-gate runner原EXE hash均与保留文件相等；历史manifest原路径不重写，由映射解析。实盘无Cargo缓存标记/PDB，工作树组不存在。
+
+最终并发回读：auto-lang另一所有者随后合入Plan863，master为2d5f3d842，ledger已自然演进144/SHA25664a3ba942f8af749bf6c72be52dc8032f1aac06ee984581f3ff95a923e8d15fd；本期664145仍为祖先，6个受影响条目的完整JSON与v143逐项完全相同，三个正式Spec与458276原字节相等，file/tags及归档引用均可解析。保留并发更新，不回退ledger到143。batch due现盘检查：上次覆盖887、2026-10-29T15:53:56Z，当前距其不足48h，未新增>887且五整除的已交付计划，本期006及同期863均非新五整除触发；不due；既有用户不再全量重跑的处置保留。生产backend release/daemon release/generated Vue bundle不消费本期实验AG变更，无本期重建/重启要求，实际本期AG EXE在retained-exe并有当前gate hash锚。
+
+2026-10-30 `stage: goal | plan_id: PLAN-006 | plan_revision: r2 | round: 12 | from: merge | to: done | status: archived | outcome: pass | worktree: removed after clean guards | commit: c681663e6ff392d70471abbec560e9d9daf12622 | next: done`。T01..10全部完成，10/10；AC01..08通过，无开放finding/待答问题/merge门。规范位于auto-lang/docs/specs/auto-graphics/{node-animation-and-facing,behavior-api,scene-assets}.md，derived ledger已验证，本Plan在auto-ui/docs/plans/archived归档；仅本目标范围完成，完整AG/Gallery/G3/G10b/正式游戏仍pending。
+
 ## 10. 待澄清事项
 
-当前无用户待答问题。T01..09已交付验证，9/10；仅T10安全清理与最终收据待完成。本计划只交付节点动画/视觉朝向引擎能力，后继产品里程碑保持开放。
+当前无用户待答问题。T01..10已全部完成，10/10；已交付、规范/台账沉淀、归档并清理。本计划只交付节点动画/视觉朝向引擎能力，后继产品里程碑保持开放。
 
 原规划的005交付身份与原clip实读风险已关闭；如后续发现必需clip需本期外插值或无法在既有预算内组合，仍带原件与反例回new，显式提出合同/预算变化，不能丢动作或换成Bob动画。声音/HUD、G09/G10内容、完整两关与最终发行另立后继合同，跨端不插入桌面M2前置。
