@@ -39,6 +39,9 @@ pub struct Session {
     pub compile_us: u128,
     pub calls: u64,
     pub yielded: u64,
+    /// Bounded scalar observations; retain no VM, task or payload owner.
+    pub max_call_steps: u64,
+    pub max_call_slices: usize,
 }
 impl Session {
     pub fn new(source: &str) -> Result<Self, String> {
@@ -87,6 +90,8 @@ impl Session {
             task: Some(AutoTask::new(1, 65536, 0)),
             pending: None,
             compile_us: now.elapsed().as_micros(),
+            max_call_steps: 0,
+            max_call_slices: 0,
             calls: 0,
             yielded: 0,
         })
@@ -175,6 +180,10 @@ impl Session {
         slices: usize,
         started: Instant,
     ) -> Result<Progress, String> {
+        self.max_call_steps = self
+            .max_call_steps
+            .max(self.task.as_ref().map_or(0, |t| t.cpu_steps_total as u64));
+        self.max_call_slices = self.max_call_slices.max(slices + 1);
         let result = match o {
             SegmentOutcome::Completed(Ok(())) => {
                 let t = self.task.as_mut().unwrap();

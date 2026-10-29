@@ -1,0 +1,59 @@
+// PLAN-006 engine fixture: original Kenney node clips, no skin or Rust gameplay.
+// Arrow/WASD action mapping and orbit input are supplied by the normal Host.
+var ok=0
+var grounded=1
+var vy=0.0
+var phase=0.0
+var yaw=0.0
+var last_event=0
+fn app_start() {
+ ok=ag_char3_bind(1)
+ ok=ag_char3_solid(2)
+ ok=ag_camera_orbit_3d(1,6.0,30.0,0,0.0)
+ ok=ag_trigger_bind(0,1,0,2,1,40.0)
+ ok=ag_visual_pose(0,1,1,0.0,1,0.0)
+}
+fn app_update(dt float) {
+ let packet=ag_actions_snapshot()
+ let held=packet%64
+ let pressed=packet/64
+ let left=held%2
+ let right=(held/2)%2
+ let forward=(held/4)%2
+ let back=(held/8)%2
+ let jump=(pressed/16)%2
+ if jump==1 {if grounded==1 {vy=8.0}}
+ vy=vy-20.0*dt
+ var mx=right - left
+ var mz=forward - back
+ var speed=4.0
+ if mx!=0 {if mz!=0 {speed=2.82842712}}
+ let fx=ag_cam3_forward_x();let fz=ag_cam3_forward_z()
+ let rx=ag_cam3_right_x();let rz=ag_cam3_right_z()
+ let q=ag_char3_move((mx*1.0*rx+mz*1.0*fx)*speed*dt,vy*dt,(mx*1.0*rz+mz*1.0*fz)*speed*dt,0.002)
+ grounded=ag_char3_grounded(q)
+ if grounded==1 {vy=0.0}
+ let event=ag_event_next()
+ if event==1 {let pair=ag_event_pair();let ep=ag_event_phase();last_event=pair*10+ep}
+ var clip=1
+ if mx!=0 || mz!=0 {
+  clip=2
+  yaw=ag_cam3_yaw()*0.01745329252
+  if mz>0 {
+   yaw=yaw+3.14159265359
+   if mx>0 {yaw=yaw-0.78539816339}
+   if mx<0 {yaw=yaw+0.78539816339}
+  } else {
+   if mz<0 {
+    if mx>0 {yaw=yaw+0.78539816339}
+    if mx<0 {yaw=yaw-0.78539816339}
+   } else {
+    if mx>0 {yaw=yaw+1.57079632679}
+    if mx<0 {yaw=yaw-1.57079632679}
+   }
+  }
+ }
+ if grounded==0 {clip=3}
+ phase=phase+dt
+ ok=ag_visual_pose(0,1,clip,phase,1,yaw)
+}

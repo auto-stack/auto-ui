@@ -686,6 +686,11 @@ impl Play {
             super::runtime_node_animation::pose_reservation(targets)
         })
     }
+    pub fn callback_high_water(&self) -> Option<(u64, usize)> {
+        self.vm
+            .as_ref()
+            .map(|s| (s.max_call_steps, s.max_call_slices))
+    }
     pub fn spatial_scans(&self) -> usize {
         self.spatial.as_ref().map_or(0, |d| d.local_scans)
     }

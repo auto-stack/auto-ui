@@ -1,0 +1,101 @@
+{
+  "schema": "autographics.scene/6",
+  "document_id": "plan006-node-animation",
+  "resources": [
+    "circle",
+    "quad",
+    "cylinder",
+    "player",
+    "mob"
+  ],
+  "objects": [
+    {
+      "id": 1,
+      "name": "Original animated character",
+      "kind": "model",
+      "translation": [
+        0,
+        0.0020000027093020076,
+        0
+      ],
+      "scale": [
+        0.6666666534211902,
+        0.9090908967759002,
+        1.2598424794780512
+      ],
+      "yaw": 0,
+      "pitch": 0,
+      "rgba": [
+        0.9,
+        0.3,
+        0.2,
+        1.0
+      ],
+      "visible": true,
+      "parent": null,
+      "resource": "closure:6da9227ee326d34b997e7d859abb0c3f9fc9af3f53659feaa5a48982472fbd9d",
+      "sprite": null
+    },
+    {
+      "id": 2,
+      "name": "Frozen collision floor",
+      "kind": "cylinder",
+      "translation": [
+        0,
+        -0.5,
+        0
+      ],
+      "scale": [
+        10,
+        0.5,
+        10
+      ],
+      "yaw": 0,
+      "pitch": 0,
+      "rgba": [
+        0.9,
+        0.3,
+        0.2,
+        1.0
+      ],
+      "visible": true,
+      "parent": null,
+      "resource": null,
+      "sprite": null
+    }
+  ],
+  "groups": [],
+  "assets": [
+    {
+      "closure": {
+        "node_animation": true,
+        "id": "6da9227ee326d34b997e7d859abb0c3f9fc9af3f53659feaa5a48982472fbd9d",
+        "images": [
+          {
+            "source": "uri:Textures/colormap.png",
+            "sha256": "106cf02e0d6dccded6d9f90c2ae6a51eb94c6301645fea159e834c44ed4708a3",
+            "byte_length": 10108,
+            "width": 512,
+            "height": 512
+          }
+        ]
+      },
+      "format": "glb",
+      "sha256": "7112f6a08400914f9da546f3e6029e947cc9eab2b4a6da5eb99776111289efb1",
+      "byte_length": 87624,
+      "name": "character.glb"
+    }
+  ],
+  "behavior": {
+    "api": "autographics.node_animation3d/1",
+    "source": {
+      "format": "auto-source",
+      "sha256": "f51a32bda7e5bfcc700eb35463349fee0079561110dc7d32076a29c9b2ddda96",
+      "byte_length": 1607
+    },
+    "actors": {
+      "two_d": null,
+      "three_d": 1
+    }
+  }
+}

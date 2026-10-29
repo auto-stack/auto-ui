@@ -666,3 +666,27 @@ as does AGP. package_consumer exports include it, so standalone consumer
 builds no longer need the manual `RUSTFLAGS`/`RUST_MIN_STACK` environment
 workaround described in the historical sections above; those sections are
 retained unchanged.
+
+## Finite animated GLB fixture (PLAN-006)
+
+The explicit `import-animated` action and `autographics.node_animation3d/1`
+(CLI `node-animation3d`, version110/profile21) add bounded no-skin node TRS
+clips and visual facing. Auto selects clip, seconds and yaw; the Host validates
+and samples them as part of the same frame as physics/camera/objects/events.
+The ordinary import and earlier behavior profiles keep their support domains.
+
+Open `samples/node_animation/scene.agscene` and Run its project-bound Auto
+source. It retains the original four Kenney clips and shared PNG, survives
+SaveAs/move/cold reopen, and uses normal character/orbit input. See the
+[sample](samples/node_animation/README.md) and the
+[finite API/limits](research/node-animation-spec-delta.md). This is an engine
+fixture, not a complete game or Gallery release. The new input snapshot and
+one visual setter each cost1; the full input/move/grounded/event/visual path
+fits the unchanged32 shared credits.
+
+`python tools/verify_plan006.py --controls` checks the complete current source
+closure; `python tools/check_node_animation.py --controls --reports <external-dir>`
+runs the bound new-family gate plus three selected inherited cases. Current
+identity is006; historical001..005 receipts are preserved. The source-only
+exporter chooses006, and its frozen SDK can be prepared with
+`python tools/prepare_sdk.py --from-snapshot` in the exported driver directory.
