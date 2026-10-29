@@ -80,3 +80,31 @@ language parser, acceptance threshold or production installation is changed.
 SD-01 remains proposed until final review and merge. The native single-page
 control and consumer profile are separately owned closing evidence; these
 fixture passes do not substitute for BLOG-004's pending native author task.
+
+## Work checkpoint after native single-page regression
+
+Implementation committed as `0e87054d254e4b01c96ae5b55dd41ecf20a212fc`.
+The same built tool passed the unmodified, Git-exported PLAN-003 single-page
+fixture through the real CLI with its generated Rust backend: visible owned
+window, MCP textarea input containing Chinese and a newline, MCP Save action,
+independent `GET /api/todos` exact text readback, and `q` exit 0. All captured
+owned PIDs exited; MCP/API ports have no live listeners (only OS TIME_WAIT).
+`native-single-space-recovered/report.json` SHA256
+`64739ef54c06c3a24677a917f6aa0b00e20b4041873f102b1b03618e38642638`.
+The first two attempts failed before a window because D: was full; those are
+not passes. Only this plan's disposable PDB files and two named completed
+incremental cache metadata files were removed; executables and evidence were
+preserved. A directory-level cache removal was rejected by the execution
+policy and was not performed. D: subsequently recovered over 32 GB and the
+fresh run completed successfully. Existing import/domain-validation controls
+also pass 2/2 (`import-regression.log` SHA256
+`18b72e40c15d5a3214832ee783e47b660b39ad4c5e8d8e8e10043ed4ae6fd6a8`).
+
+T-01/T-02 are complete. T-03 is blocked on the consumer harness: auto-blog
+`22045f0832d2cfa60f1ad9127094fd47ac9e73b5` still unconditionally includes
+`vm-ui.author_task` in PENDING_SCENARIOS (`tests/dual/verify_dual.py` lines
+366 and 395-404). A full native profile cannot exit 0 even with the UI repair.
+The user has been asked whether to authorize a Blog-only test-driver change
+in its own worktree, leaving `.at` sources unchanged, or wait for the consumer
+owner to supply that driver. No consumer threshold was weakened, no final
+review was claimed and no merge/production installation occurred.
