@@ -561,13 +561,7 @@ fn validate_assets(d: &Document, r: &super::assets::Registry) -> Result<(), Stri
     super::assets::check_registry(r)?;
     for a in &d.assets {
         let loaded = r.get(&a.key()).ok_or("missing asset payload")?;
-        if loaded.identity.sha256 != a.sha256
-            || loaded.identity.closure != a.closure
-            || loaded.identity.byte_length != a.byte_length
-            || loaded.identity.format != a.format
-            || loaded.identity.width != a.width
-            || loaded.identity.height != a.height
-        {
+        if !loaded.identity.same_content(a) {
             return Err("asset content identity/length".into());
         }
     }

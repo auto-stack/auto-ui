@@ -19,7 +19,7 @@ import tempfile
 import plan005_source_policy as p
 
 SCHEMA = "autographics.plan005.report/1"
-RUNNERS = {"driver": (p.ROOT, "textured_model_resources", 20),
+RUNNERS = {"driver": (p.ROOT, "textured_model_resources", 21),
            "agp": (p.BASE / "autographics-prototype", "textured_models", 4)}
 DRIVER_CASES = ["identity-budget", "decoded-budget", "raw-budget", "gltf-transform",
                 "runtime-owners", "runtime-transaction", "import-transaction", "public-project"]
@@ -248,4 +248,4 @@ if __name__ == "__main__":
     validate(directory)
     if args.controls:
         controls(directory)
-    print(f"PASS PLAN-005 textured models: 12 cases, driver20 + AGP4, 36/144 pixel sampling, portable bound project and 20-run owners; reports {directory}")
+    print(f"PASS PLAN-005 textured models: 12 cases, driver21 + AGP4, 36/144 pixel sampling, portable bound project and 20-run owners; reports {directory}")

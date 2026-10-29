@@ -426,7 +426,10 @@ impl Play {
                     if image.width != t.width || image.height != t.height {
                         return Err("sprite payload dimensions".into());
                     }
-                    if payload.identity != e.document.assets[t.asset_index as usize] {
+                    if !payload
+                        .identity
+                        .same_content(&e.document.assets[t.asset_index as usize])
+                    {
                         return Err("sprite payload identity".into());
                     }
                 }
@@ -498,7 +501,7 @@ impl Play {
         assets::check_registry(&e.assets)?;
         for a in &e.document.assets {
             let payload = e.assets.get(&a.key()).ok_or("missing play asset")?;
-            if payload.identity != *a {
+            if !payload.identity.same_content(a) {
                 return Err("play asset identity".into());
             }
         }

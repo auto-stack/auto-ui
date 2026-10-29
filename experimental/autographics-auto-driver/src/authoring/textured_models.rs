@@ -1009,16 +1009,7 @@ pub fn load_declared(path: &Path, a: &AssetRef, existing: &Registry) -> Result<A
         }
         Ok(b)
     })?;
-    // Display names describe the document's asset, not immutable content.
-    // A cached Arc may have been imported through another filename.
-    let identity = &loaded.identity;
-    if identity.sha256 != a.sha256
-        || identity.byte_length != a.byte_length
-        || identity.format != a.format
-        || identity.width != a.width
-        || identity.height != a.height
-        || identity.closure != a.closure
-    {
+    if !loaded.identity.same_content(a) {
         return Err("conflict: model closure binding".into());
     }
     Ok(loaded)

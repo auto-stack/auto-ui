@@ -572,6 +572,51 @@ fn cached_closure_open_ignores_display_name_but_preserves_content_binding() {
     host.settle().unwrap();
     assert_eq!(host.editor.document.assets[0].name, alias.identity.name);
     assert!(Arc::ptr_eq(&host.editor.assets[&old.identity.key()], &old));
+    host.start_play(autographics_auto_driver::authoring::play::SOURCE)
+        .unwrap();
+    host.pause_play("");
+    settle_play(&mut host);
+    assert!(host.play.is_some());
+    assert_ne!(
+        host.play.as_ref().unwrap().state,
+        autographics_auto_driver::authoring::play::State::Faulted
+    );
+    host.stop_play();
+    host.settle().unwrap();
+    assert_eq!(
+        host.storage
+            .save(&mut host.editor, &entry, Fault::None)
+            .unwrap(),
+        Saved::Confirmed
+    );
+    let save_as = root.join("resaved");
+    std::fs::create_dir(&save_as).unwrap();
+    let resaved = save_as.join("scene.agscene");
+    assert_eq!(
+        host.storage
+            .save(&mut host.editor, &resaved, Fault::ClosureAfterReplace)
+            .unwrap(),
+        Saved::VerificationPending
+    );
+    let image_ref = &alias.identity.closure.as_ref().unwrap().images[0];
+    let resaved_image = save_as.join(format!("assets/{}.png", image_ref.sha256));
+    let saved_image = std::fs::read(&resaved_image).unwrap();
+    std::fs::write(&resaved_image, b"corrupt pending dependency").unwrap();
+    assert!(host.storage.verify(&mut host.editor).is_err());
+    std::fs::write(&resaved_image, saved_image).unwrap();
+    assert!(host.storage.verify(&mut host.editor).unwrap());
+    let (again, again_assets, _) = Storage::load_assets(&resaved, &cache).unwrap();
+    assert_eq!(again.assets[0].name, alias.identity.name);
+    assert!(Arc::ptr_eq(&again_assets[&old.identity.key()], &old));
+    assert_eq!(
+        std::fs::read(save_as.join(format!("assets/{}.glb", old.identity.sha256))).unwrap(),
+        old.bytes.as_ref()
+    );
+    host.open(&resaved).unwrap();
+    host.settle().unwrap();
+    host.start_play(autographics_auto_driver::authoring::play::SOURCE)
+        .unwrap();
+    host.stop_play();
     // Name-only acceptance must not bypass re-reading dependencies with a cache hit.
     let image = &alias.identity.closure.as_ref().unwrap().images[0];
     let blob = root.join(format!("assets/{}.png", image.sha256));
@@ -580,6 +625,129 @@ fn cached_closure_open_ignores_display_name_but_preserves_content_binding() {
     assert!(Storage::load_assets(&entry, &cache).is_err());
     std::fs::write(&blob, bytes).unwrap();
     assert!(Storage::load_assets(&entry, &cache).is_ok());
+}
+
+#[test]
+fn legacy_model_and_sprite_cached_names_survive_save_reopen_and_actual_play() {
+    use autographics_auto_driver::authoring::{
+        behavior::{Api, SourceSnapshot},
+        document::SpriteBinding,
+    };
+    for image in [false, true] {
+        let root = temp();
+        let extension = if image { "png" } else { "glb" };
+        let path = root.join(format!("original.{extension}"));
+        let alias_path = root.join(format!("alias.{extension}"));
+        if image {
+            std::fs::write(
+                &path,
+                agp::assets::encode_png_rgba(2, 2, &[255; 16]).unwrap(),
+            )
+            .unwrap();
+        } else {
+            std::fs::write(
+                &path,
+                include_bytes!("../research/asset-probe/two-parts.glb"),
+            )
+            .unwrap();
+        }
+        std::fs::copy(&path, &alias_path).unwrap();
+        let import = |path: &Path| {
+            if image {
+                assets::import_png(path, &Registry::new())
+            } else {
+                assets::import(path, &Registry::new())
+            }
+        };
+        let old = import(&path).unwrap();
+        let alias = import(&alias_path).unwrap();
+        assert!(old.identity.same_content(&alias.identity));
+        assert_ne!(old.identity, alias.identity, "metadata Eq is still exact");
+        let mut doc = Document::empty("legacy-content-name".into());
+        doc.assets.push(alias.identity.clone());
+        let mut object = Object::new(1, if image { Kind::Quad } else { Kind::Model });
+        if image {
+            object.scale = [0.8, 1.0, 1.0];
+            object.sprite = Some(SpriteBinding {
+                asset: alias.identity.key(),
+                frame: [0, 0, 2, 2],
+                flip: false,
+            });
+        } else {
+            object.resource = Some(alias.identity.key());
+        }
+        doc.objects.push(object);
+        let mut alias_assets = Registry::new();
+        assets::insert(&mut alias_assets, alias.clone()).unwrap();
+        let mut editor = Editor::with_assets(doc.clone(), alias_assets).unwrap();
+        let entry = root.join("scene.agscene");
+        assert_eq!(
+            Storage::default()
+                .save(&mut editor, &entry, Fault::None)
+                .unwrap(),
+            Saved::Confirmed
+        );
+        let mut cache = Registry::new();
+        assets::insert(&mut cache, old.clone()).unwrap();
+        let mut original_doc = doc.clone();
+        original_doc.assets[0] = old.identity.clone();
+        let mut host = Host::with_assets(original_doc, cache.clone()).unwrap();
+        host.open(&entry).unwrap();
+        host.settle().unwrap();
+        assert!(Arc::ptr_eq(&host.editor.assets[&old.identity.key()], &old));
+        if image {
+            let snapshot = SourceSnapshot::from_bytes_for(
+                &root.join("main.at"),
+                b"var ok=0\nfn app_start() {\nok=ag_char_bind(1)\nok=ag_camera_follow_2d(1, 0.0, -4.0, 30.0, 12.0, 12.0, 8.0)\n}\nfn app_update(dt float) {}\n".to_vec(),
+                Api::Sprites2V1,
+            )
+            .unwrap();
+            host.start_user_snapshot(snapshot).unwrap();
+        } else {
+            host.start_play(autographics_auto_driver::authoring::play::SOURCE)
+                .unwrap();
+        }
+        host.pause_play("");
+        settle_play(&mut host);
+        assert!(host.play.is_some());
+        assert_ne!(
+            host.play.as_ref().unwrap().state,
+            autographics_auto_driver::authoring::play::State::Faulted,
+            "image={image}, error={:?}",
+            host.play.as_ref().unwrap().error
+        );
+        host.stop_play();
+        host.settle().unwrap();
+        assert_eq!(
+            host.storage
+                .save(&mut host.editor, &entry, Fault::None)
+                .unwrap(),
+            Saved::Confirmed
+        );
+        let saved_as = root.join("alias-resaved.agscene");
+        assert_eq!(
+            host.storage
+                .save(&mut host.editor, &saved_as, Fault::None)
+                .unwrap(),
+            Saved::Confirmed
+        );
+        let (reopened, reused, _) = Storage::load_assets(&saved_as, &cache).unwrap();
+        assert_eq!(reopened.assets[0].name, alias.identity.name);
+        assert!(Arc::ptr_eq(&reused[&old.identity.key()], &old));
+        // A real binding mismatch must still fail at snapshot and Play admission.
+        let mut bad = host.editor.document.clone();
+        bad.assets[0].byte_length += 1;
+        host.editor.document = bad;
+        assert!(host
+            .storage
+            .save(&mut host.editor, &saved_as, Fault::None)
+            .unwrap_err()
+            .contains("snapshot asset identity"));
+        assert!(host
+            .start_play(autographics_auto_driver::authoring::play::SOURCE)
+            .unwrap_err()
+            .contains("play asset identity"));
+    }
 }
 
 #[test]

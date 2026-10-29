@@ -265,7 +265,7 @@ impl Storage {
                 .assets
                 .get(&a.key())
                 .ok_or("missing declared snapshot asset")?;
-            if loaded.identity != *a {
+            if !loaded.identity.same_content(a) {
                 return Err("snapshot asset identity".into());
             }
         }

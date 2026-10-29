@@ -49,6 +49,16 @@ pub struct AssetRef {
     pub height: Option<u32>,
 }
 impl AssetRef {
+    /// Immutable payload binding. A document may display another name while
+    /// reusing the same accepted Arc; names still participate in document Eq.
+    pub fn same_content(&self, other: &Self) -> bool {
+        self.sha256 == other.sha256
+            && self.byte_length == other.byte_length
+            && self.format == other.format
+            && self.width == other.width
+            && self.height == other.height
+            && self.closure == other.closure
+    }
     pub fn key(&self) -> String {
         self.closure.as_ref().map_or_else(
             || format!("sha256:{}", self.sha256),
@@ -242,11 +252,7 @@ pub fn load_declared(path: &Path, a: &AssetRef, r: &Registry) -> Result<Arc<Asse
             return Err("conflict: asset hash/length".into());
         }
         let loaded = import_png_raw(bytes, r, a.name.clone())?;
-        if loaded.identity.sha256 != a.sha256
-            || loaded.identity.byte_length != a.byte_length
-            || loaded.identity.width != a.width
-            || loaded.identity.height != a.height
-        {
+        if !loaded.identity.same_content(a) {
             return Err("conflict: image identity/dimensions".into());
         }
         return Ok(loaded);
