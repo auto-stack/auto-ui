@@ -242,8 +242,23 @@ pub fn take_synth_failures() -> Vec<String> {
 }
 
 fn record_synth_failure(msg: String) {
+    // PLAN-886（reader N-r8-2）：合成期单 handler 失败按设计不中止整个组件
+    // （尽量编译其余 handler），但失败记录此前只进 log::warn——宿主 CLI 未
+    // 接 logger，运行期唯一可见现象是 "handler not found"，无因、无失败源，
+    // 排障只能靠外部二分（N-r8-2 即因此在多轮复审中不可见）。诊断面（Plan
+    // 492 M5 延续）恒向 stderr 泄流一行；结构化消费者仍走 take_synth_failures。
+    eprintln!("[SYNTH-FAIL] handler synthesis failed: {msg}");
     log::warn!("handler synthesis failed: {msg}");
     SYNTH_FAILURES.with(|f| f.borrow_mut().push(msg));
+}
+
+/// PLAN-886 诊断面：把本组件合成期累积的逐 handler 失败泄流到 stderr
+/// （组件名前缀）。两处 bridge 构造（AURA 树/decl 直读）共用，避免只覆盖
+/// 一条合成路径——N-r8-2 的静默正是"失败只进线程本地向量"造成的。
+pub(crate) fn drain_synth_failures(widget_name: &str) {
+    for f in crate::ui::handler_codegen::take_synth_failures() {
+        eprintln!("[SYNTH-FAIL] {widget_name}: {f}");
+    }
 }
 
 /// The synthesized receiver parameter name holding the widget-state heap id.

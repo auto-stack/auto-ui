@@ -694,6 +694,9 @@ impl VmBridge {
                 widget_name, e
             ))
         })?;
+        // PLAN-886 诊断面：合成期逐 handler 失败恒出 stderr（否则宿主 CLI 下
+        // 只剩 "handler not found"，无因可查——reader N-r8-2 的静默面）。
+        crate::ui::handler_codegen::drain_synth_failures(&widget_name);
         // PLAN-642 T-15: 合成同线程紧邻捕获视图侧 store 别名快照（线程级
         // 快照会被多组件工程的后续合成覆盖，须随 bridge 存档）。
         let store_alias_snapshot = crate::ui::handler_codegen::capture_view_store_alias_snapshot();
@@ -840,6 +843,9 @@ impl VmBridge {
                 widget_name, e
             ))
         })?;
+        // PLAN-886 诊断面：同 new_with_children——失败只进线程本地向量时
+        // 宿主 CLI 完全不可见（"handler not found" 无因），故恒出 stderr。
+        crate::ui::handler_codegen::drain_synth_failures(&widget_name);
         // PLAN-642 T-15: 同 new_with_children——快照随 bridge 存档
         // （线程级快照会被多组件工程的后续合成覆盖）。
         let store_alias_snapshot = crate::ui::handler_codegen::capture_view_store_alias_snapshot();
