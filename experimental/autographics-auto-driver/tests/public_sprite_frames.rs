@@ -1470,16 +1470,12 @@ fn real_auto_frame_and_flip_change_the_drawn_pixels() {
         right[2] > 150 && right[0] < 70,
         "frame 0 right blue {right:?}"
     );
-    // Hold left until the admitted flip reaches the pixels.
+    // Hold left until the admitted flip reaches the pixels. The wall clock may
+    // leave a tick in flight, so dispatch only through the guarded helper.
     host.play.as_mut().unwrap().char_key(0, true, false);
     let mut flipped = false;
     for _ in 0..10 {
-        host.play
-            .as_mut()
-            .unwrap()
-            .dispatch(Action::default())
-            .expect("dispatch");
-        host.frame(None).expect("frame");
+        step_once(&mut host);
         let admitted = host
             .play
             .as_ref()
