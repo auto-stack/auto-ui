@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-10-29
 updated_at: 2026-10-29
 plan_revision: 3
-current_step: 9
+current_step: 10
 total_steps: 10
 completion_kind: delivered
 depends_on: [auto-ui/PLAN-004]
@@ -120,7 +120,7 @@ T-03..06建立新入口：`cargo test --manifest-path experimental/autographics-
 | T-07 | review | T-06 | 同树独立review并绑定实际revision；merge门pending | AC-06 | [x] 独立R3 pass绑定r3/7437879；两finding完整闭合，诊断调整/全部六处绑定及真实后续状态验证通过，AC-01..06/V-01..05/SD均pass；见review-r3.md，冻结producer/merge门pending |
 | T-08 | merge | T-07 pass | 冻结提交定向门/有效复用，通过才合master | AC-07 | [x] 冻结producer21+4/12报告及负控、source/fmt通过；补丁全等rebase后ff-only交付351919c |
 | T-09 | merge | T-08 | Specs/ledger/索引与本地归档、delivery SHA/闭包/节点表示接口 | AC-08 | [x] SD01/02/索引与ledger v141在知识仓16555e450，代码交付351919c；本Plan实际归档，docs提交与清理验证见后续收据 |
-| T-10 | merge | T-09 | wt-guard clean后清唯一树/分支/空组，保必要恢复收据 | AC-08 | [ ] |
+| T-10 | merge | T-09 | wt-guard clean后清唯一树/分支/空组，保必要恢复收据 | AC-08 | [x] 双树clean/已落地祖先/新鲜guard后移除，两个临时分支与空组删除；984个exe逐SHA保留，6个consumer Cargo缓存及全部PDB回收，恢复清单见最终收据 |
 
 ## 9. 复审记录
 
@@ -177,6 +177,17 @@ R3独立检查完整8文件修复diff与两失败诊断：全部六处同一same
 
 本文件已实际移至archived/并修正相对链接，索引仅提交005行；其它会话README WIP不纳入本次提交。归档docs提交/读回和T10 guard清理尚待随后验证，本记录不提前宣称cleaned。
 
+2026-10-29 merge PLAN-005:r3（archived/cleaned，PASS）：归档提交f5e8063d621f20c3263313977309c7682cfce93e已在auto-ui/master，实际归档路径/链接/索引及9个已交付任务读回通过，README仅005行入库而其它会话WIP保留。清理前两树HEAD均为master祖先、status为空、新鲜wt-guard各clean；随后git worktree remove和合入分支删除完成，D:/autostack/.wt/ui-005空组已移除。清理脚本保留984个exe并逐原件/副本SHA校验，映射清单executable-recovery-manifest.json SHA256206681b33305ec913e464fdff8c7f32e4514f411b81a326053aa00ed2d7decbc；其中389个来自实施树，其余来自consumer缓存。6个artifact Cargo缓存原合计21,223,675,380B已回收，所有cache内PDB及另外10个残余PDB已删除；源码、日志、JSON报告、负控输入、Spec/ledger备份均保留。工作树targets随受保护的树移除；恢复映射保留所有hash绑定runner，可从清单解析原路径到保留exe。没有删除其它工作树或用户文件。
+
+交付身份说明：Git experimental子树从reviewed7437879到delivery351919c完全相同；rebase/checkout使身份JSON工作副本从LF变CRLF，raw摘要由134b4f73…变1e0aa531dd3ee2c966c4155059d4edd7858f495cc549bc3703879dc6c8f5efbb。实际读回证明JSON解析值和归一化字节完全相同，1456源码哈希内容与两锁/SDK保持；冻结producer报告绑定交付的1e0aa531…并全通过，之前consumer绑定原134b…各自记录，不混用raw摘要。清理后main verify_source.py仍通过1456/SDK681/479/29，公开工程确定性check通过。最终审计还核验保存后的producer/current consumer runner副本hash、日志hash、21+4/12报告/stacks、canonical与ledger读回和所有实际归档/清理状态。
+
+产物观察：本次交付diff仅experimental两包，auto-ui根crates/Cargo.toml/Cargo.lock零diff；知识仓仅canonical docs及派生ledger，无生产后端/依赖daemon/Vue bundle消费者需要重建或重启。两主检出的target/release与gen/front/vue/dist均不存在，未声称生产界面已升级；实验产物和精确执行证据已保留。本计划没有stale生产产物项。
+
+批回归due检查：AutoLang收据仍覆盖880/2026-10-28T18:55Z（当前2026-10-29T15:32Z，约20.6h），885在覆盖提交后已落地，故存在既有due。它正是用户明确“003最终回归暂时不做，等BLOG-004会话”的延期项，本会话不运行或重新认领，不把它写成绿；本期auto-lang仅知识沉淀，非新的语言实现计划。PLAN005合同的受影响定向门已全过；全AG里程碑仍按原合同pending。主检出自身交付范围clean，原有其它会话docs WIP在落地前后集合不变，未stash/提交/丢弃。
+
+spec-sync回写：SD01新增auto-lang docs/specs/auto-graphics/textured-model-resources.md，SD02增量scene-assets.md，overview/plans已回写、spec-index已再生无内容diff；GOAL-008仍有后续能力，不伪报整个目标完成。tracked ledger v141/16555e450已读回，四新item与一个既有item的file/tags/schema及未触条目字节守卫均通过；无当前知识仅落README/ledger而缺canonical的情况。
+
+2026-10-29 goal round 11：`stage: goal | plan_id: PLAN-005 | plan_revision: r3 | round: 11 | from: merge | to: done | status: archived | outcome: pass | worktree: removed and guarded | commit: 351919c76b4ef1d940fc7b8120254e321c41cba2 (auto-ui delivery),16555e450783bde1f9ad81ce494dc0e3c0e92988 (canonical/ledger) | next: done`。T01..10全部完成，完整目标未缩减；最终docs提交和完成审计读回后向host标记goal complete。
 ## 10. 待澄清事项
 
-T01..09已交付，9/10；归档docs读回与T10安全清理待验证，完成前不声称cleaned。无未决实现/review问题；003最终批回归仍由BLOG-004负责，全AG里程碑保持原合同pending。
+本计划T01..10全部完成10/10，代码/规范/账本/实际归档/清理均已验证，无未决本期问题。用户明确延期的003批回归仍由BLOG-004会话负责；全AG里程碑按原合同独立pending，不冒充本期已跑。
