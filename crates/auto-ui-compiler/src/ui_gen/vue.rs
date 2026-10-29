@@ -451,6 +451,11 @@ pub struct VueGenerator {
     /// Store dependencies from `use store:` (Plan 351)
     store_deps: Vec<String>,
 
+    /// PLAN-010: 项目级 store 暴露面（store 真名 → 暴露方法名集，取自各
+    /// store 的 handlers/msg）。多 store widget 的裸 `store.Method()` 依此
+    /// 做归属路由；空表 = 不路由（单 store 与旧调用方行为零变化）。
+    store_surface: std::collections::HashMap<String, std::collections::HashSet<String>>,
+
     /// Plan 446 批三 G1: store composable 导入路径前缀。默认 `@/stores`；
     /// 部署管线若把生成物迁至子目录（os-config regen 的 `src/stores/auto/`
     /// 布局），配 `@/stores/auto` 使 vue-tsc 的模块解析与实际落盘位置
@@ -924,6 +929,7 @@ impl VueGenerator {
             state_types: HashMap::new(),
             int_names: std::collections::HashSet::new(),
             store_deps: Vec::new(),
+            store_surface: Default::default(),
             store_import_prefix: "@/stores".to_string(),
             uses_autodown: false,
             last_validation_warnings: Vec::new(),
@@ -1068,6 +1074,18 @@ impl VueGenerator {
     /// Set store dependencies from `use store:` declarations (Plan 351).
     pub fn with_store_deps(mut self, deps: Vec<String>) -> Self {
         self.store_deps = deps;
+        self
+    }
+
+    /// PLAN-010: set the project-level store surface（store 真名 → 暴露方法名）。
+    pub fn with_store_surface(
+        mut self,
+        surface: std::collections::HashMap<String, Vec<String>>,
+    ) -> Self {
+        self.store_surface = surface
+            .into_iter()
+            .map(|(k, v)| (k, v.into_iter().collect()))
+            .collect();
         self
     }
 
@@ -5065,6 +5083,35 @@ onUnmounted(() => {{ if ({var} !== null) {{ clearInterval({var}); {var} = null }
                 extra.insert(dep.clone(), facade_var_for(dep));
             }
             ctx = ctx.with_store_facades(extra);
+            // PLAN-010: 多 store widget 的裸 `store.Method()` 归属路由。
+            // 仅当方法唯一归属 deps[1..] 中某 store 且首 store 未声明时才
+            // 路由；歧义/首 store 自有/未知保持 `store.`（现状）。surface
+            // 缺省或单 store 不建表（调用方行为零变化）。
+            if self.store_deps.len() > 1 && !self.store_surface.is_empty() {
+                let first = &self.store_deps[0];
+                let owns = |dep: &str, m: &str| {
+                    self.store_surface
+                        .get(dep)
+                        .map_or(false, |s| s.contains(m))
+                };
+                let mut routing = std::collections::HashMap::new();
+                for dep in self.store_deps.iter().skip(1) {
+                    if let Some(methods) = self.store_surface.get(dep.as_str()) {
+                        for m in methods {
+                            if owns(first, m)
+                                || routing.contains_key(m)
+                                || self.store_deps.iter().skip(1).any(|d| d != dep && owns(d, m))
+                            {
+                                continue;
+                            }
+                            routing.insert(m.clone(), facade_var_for(dep));
+                        }
+                    }
+                }
+                if !routing.is_empty() {
+                    ctx = ctx.with_bare_store_routing(routing);
+                }
+            }
         }
         ctx.with_typed_collections(arrays, strings)
             .with_typed_ints(self.int_names.iter().cloned().collect())
@@ -31924,6 +31971,96 @@ widget A1Probe {
             !sfc.contains("AuthStore.Init()"),
             "raw store name must not leak into TS:
 {sfc}"
+        );
+    }
+
+    /// PLAN-010: 多 store widget 裸 `store.Method()` 按归属路由——
+    /// LoadFeed 唯一归属 ArticleStore（首 store 为 AuthStore）→ emit
+    /// `articleStore.LoadFeed()`；Init 同理；Logout 首 store 自有 → 保持
+    /// `store.Logout()`。缺省（无 surface）不路由，发射与旧版一致。
+    #[test]
+    fn test_plan010_bare_store_method_routing() {
+        let src = r#"
+use auth_store: AuthStore
+use article_store: ArticleStore
+
+widget App {
+    msg { Init, Logout, GoDemo }
+    view {
+        col {
+            link (to: "/demo") { text "Demo" }
+        }
+    }
+    on {
+        .Init -> {
+            store.Init()
+            store.LoadFeed()
+        }
+        .Logout -> {
+            store.Logout()
+        }
+        .GoDemo -> { router.push("/demo") }
+    }
+}
+"#;
+        let ast = crate::parse_ui(src).expect("fixture must parse");
+        let decl = ast
+            .domain_stmts()
+            .find_map(|s| match s {
+                auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d),
+                _ => None,
+            })
+            .expect("widget decl");
+        let widget = crate::aura::extract_widget_from_decl(decl).expect("extract widget");
+
+        let mut surface = std::collections::HashMap::new();
+        surface.insert(
+            "AuthStore".to_string(),
+            vec!["Login".to_string(), "Register".to_string(), "Logout".to_string()],
+        );
+        surface.insert(
+            "ArticleStore".to_string(),
+            vec!["Init".to_string(), "LoadFeed".to_string(), "SetToken".to_string()],
+        );
+
+        let mut gen = VueGenerator::new()
+            .with_store_deps(vec!["AuthStore".to_string(), "ArticleStore".to_string()])
+            .with_store_surface(surface);
+        let sfc = gen.generate(&widget).expect("generate SFC");
+        assert!(
+            sfc.contains("articleStore.LoadFeed()"),
+            "LoadFeed 唯一归属 ArticleStore 必须路由到 facade:
+{sfc}"
+        );
+        assert!(
+            sfc.contains("articleStore.Init()"),
+            "Init 唯一归属 ArticleStore 必须路由到 facade:
+{sfc}"
+        );
+        assert!(
+            !sfc.contains("store.LoadFeed()"),
+            "路由后不得残留 `store.LoadFeed()`:
+{sfc}"
+        );
+        assert!(
+            sfc.contains("store.Logout()"),
+            "Logout 首 store 自有必须保持 `store.`:
+{sfc}"
+        );
+
+        // 回归守卫：无 surface（旧调用方/单 store 路径）不路由
+        let mut gen_plain = VueGenerator::new()
+            .with_store_deps(vec!["AuthStore".to_string(), "ArticleStore".to_string()]);
+        let sfc_plain = gen_plain.generate(&widget).expect("generate SFC (no surface)");
+        assert!(
+            sfc_plain.contains("store.LoadFeed()"),
+            "无 surface 时保持现状 `store.LoadFeed()`:
+{sfc_plain}"
+        );
+        assert!(
+            !sfc_plain.contains("articleStore.LoadFeed()"),
+            "无 surface 时不得出现路由:
+{sfc_plain}"
         );
     }
 

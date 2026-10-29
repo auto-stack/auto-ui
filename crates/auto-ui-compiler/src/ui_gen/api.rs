@@ -307,6 +307,10 @@ pub struct ComponentGenOptions {
     pub api_imports_override: Option<Vec<String>>,
     /// Override store dependencies. When `None`, auto-detected from `use store:`.
     pub store_deps_override: Option<Vec<String>>,
+    /// PLAN-010: 项目级 store 暴露面（store 真名 → 暴露方法名集，取自各
+    /// store 的 handlers/msg）。多 store widget 的裸 `store.Method()` 依此
+    /// 做归属路由；`None` = 不路由（行为与旧版一致）。由项目驱动聚合传入。
+    pub store_surface: Option<std::collections::HashMap<String, Vec<String>>>,
     /// Plan 446 批三 G1: store composable 导入路径前缀（默认 `@/stores`）。
     /// 部署管线把生成物迁至 `src/stores/auto/` 时配 `@/stores/auto`，
     /// 使 SFC 的 import 与实际落盘位置对齐（vue-tsc TS2307 规避）。
@@ -1052,6 +1056,7 @@ pub fn generate_component_from_file(
                 .with_default_classes(default_classes)
                 .with_store_deps(store_deps.clone())
                 .with_store_import_prefix(store_import_prefix.clone())
+                .with_store_surface(opts.store_surface.clone().unwrap_or_default())
                 .with_module_fns(module_fns.clone())
                 .with_use_module_fns(use_module_fns.clone(), use_imported_names.clone())
                 .with_sub_widgets(all_sub_widgets.clone())
@@ -1091,6 +1096,7 @@ pub fn generate_component_from_file(
             .with_default_classes(default_classes)
             .with_store_deps(store_deps.clone())
             .with_store_import_prefix(store_import_prefix.clone())
+            .with_store_surface(opts.store_surface.clone().unwrap_or_default())
             .with_module_fns(module_fns.clone())
             .with_use_module_fns(use_module_fns.clone(), use_imported_names.clone())
             .with_sub_widgets(all_sub_widgets.clone())

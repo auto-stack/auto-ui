@@ -3831,6 +3831,11 @@ export default router
             }
         }
 
+        // PLAN-010: 全工作区聚合 store 暴露面（store 真名 → 暴露方法名，
+        // 取各 store 的 handlers 键），经 opts 传实扫——多 store widget 的
+        // 裸 `store.Method()` 按归属路由（Blog app.at LoadFeed →
+        // ArticleStore）。解析失败静默跳过（surface 缺省=现状）。
+        let mut store_surface: HashMap<String, Vec<String>> = Default::default();
         // Plan 443 prescan — aggregate BOUND model channels across the whole
         // workspace BEFORE any real generation. For each .at file we run the
         // same `generate_component_from_file` pass it will really use (same
@@ -3866,6 +3871,28 @@ export default router
             }
             for (_dep_name, dep_front, _library_dep) in &dep_front_dirs {
                 Self::collect_at_files_recursive(dep_front, &mut prescan_files);
+            }
+        // PLAN-010: 全工作区聚合 store 暴露面（store 真名 → 暴露方法名，
+        // 取各 store 的 handlers 键），经 opts 传实扫——多 store widget 的
+        // 裸 `store.Method()` 按归属路由（Blog app.at LoadFeed →
+        // ArticleStore）。解析失败静默跳过（surface 缺省=现状）。
+            for path in &prescan_files {
+                if let Ok(text) = fs::read_to_string(path) {
+                    if let Ok(ast) = auto_ui_compiler::parse_ui(&text) {
+                        for stmt in ast.domain_stmts() {
+                            if let auto_ui_dialect::UiStmt::StoreDecl(decl) = stmt {
+                                if let Ok(store) = auto_ui_compiler::aura::extract::extract_store_from_decl(&decl) {
+                                    let entry = store_surface.entry(store.name.clone()).or_default();
+                                    for name in store.handlers.keys() {
+                                        if !entry.contains(name) {
+                                            entry.push(name.clone());
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
             for path in &prescan_files {
                 // app.at + front siblings see the cross-file channel map;
@@ -3910,6 +3937,7 @@ export default router
                 Some(default_classes),
                 Some(bound_model_channels.clone()),
                 Some(sub_widget_msgs.clone()),
+                Some(store_surface.clone()),
             ) {
                 Ok((vue_code, widgets, stores, named_view_codes)) => {
                     collect_ext_import_files(&widgets, &mut ext_file_set);
@@ -4031,6 +4059,7 @@ export default router
             all_routes: &mut Vec<AuraRoute>,
             ext_file_set: &mut std::collections::BTreeSet<String>,
             all_store_files: &mut Vec<(String, String)>,
+            store_surface: &std::collections::HashMap<String, Vec<String>>,
         ) -> Result<(), String> {
             for entry in
                 fs::read_dir(dir).map_err(|e| format!("Failed to read pages directory: {}", e))?
@@ -4051,6 +4080,7 @@ export default router
                         all_routes,
                         ext_file_set,
                         all_store_files,
+                        store_surface,
                     )?;
                 } else if path.extension().map(|e| e == "at").unwrap_or(false) {
                     let file_stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("page");
@@ -4072,6 +4102,7 @@ export default router
                         Some(shadcn),
                         Some(default_classes),
                         Some(bound_model_channels.clone()),
+                        Some(store_surface.clone()),
                     ) {
                         Ok(result) => {
                             let vue_code = result.vue_code.clone();
@@ -4158,6 +4189,7 @@ export default router
                 &mut all_routes,
                 &mut ext_file_set,
                 &mut all_store_files,
+                &store_surface,
             )
             .map_err(|e| format!("Failed to scan pages directory: {}", e))?;
         }

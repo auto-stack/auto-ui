@@ -83,7 +83,7 @@ pub fn ui_build_shadcn_all_widget_codes(
     shadcn: Option<bool>,
     default_classes: Option<bool>,
 ) -> AutoResult<GeneratedComponent> {
-    ui_build_shadcn_all_widget_codes_with_bound(path, root_dir, shadcn, default_classes, None)
+    ui_build_shadcn_all_widget_codes_with_bound(path, root_dir, shadcn, default_classes, None, None)
 }
 
 /// Plan 443: `ui_build_shadcn_all_widget_codes` + the workspace-aggregated
@@ -94,6 +94,7 @@ pub fn ui_build_shadcn_all_widget_codes_with_bound(
     shadcn: Option<bool>,
     default_classes: Option<bool>,
     bound_model_channels: Option<HashMap<String, Vec<String>>>,
+    store_surface: Option<HashMap<String, Vec<String>>>,
 ) -> AutoResult<GeneratedComponent> {
     let at_path = Path::new(path);
     let stream_endpoints = root_dir.map(resolve_stream_endpoints_for_project);
@@ -102,6 +103,7 @@ pub fn ui_build_shadcn_all_widget_codes_with_bound(
         shadcn,
         default_classes,
         bound_model_channels,
+        store_surface,
         ..Default::default()
     };
     let result = generate_component_from_file(at_path, opts).map_err(|e| format!("{}", e))?;
@@ -125,6 +127,7 @@ pub fn ui_build_shadcn_with_sub_widgets_and_stores_full(
     default_classes: Option<bool>,
     bound_model_channels: Option<HashMap<String, Vec<String>>>,
     sub_widget_msgs: Option<HashMap<String, Vec<String>>>,
+    store_surface: Option<HashMap<String, Vec<String>>>,
 ) -> AutoResult<(
     String,
     Vec<AuraWidget>,
@@ -141,6 +144,7 @@ pub fn ui_build_shadcn_with_sub_widgets_and_stores_full(
         shadcn,
         default_classes,
         sub_widget_msgs,
+        store_surface,
         ..Default::default()
     };
     let result = generate_component_from_file(at_path, opts).map_err(|e| format!("{}", e))?;

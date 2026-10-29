@@ -60,6 +60,12 @@ pub struct AuraTsContext {
     /// Widget-path facades are unaffected (heads listed here only appear in
     /// store files' own bodies).
     pub store_bare_heads: HashSet<String>,
+    /// PLAN-010: 多 store widget 裸 `store.Method()` 的方法归属路由
+    /// (method → facade 变量,如 "LoadFeed" → "articleStore")。由 vue 轨
+    /// handler_ts_ctx 依 store surface 构建:方法唯一归属 deps[1..] 中某
+    /// store 且首 store 未声明时才入表;歧义/未知/首 store 自有保持
+    /// `store.` 现状。空表 = 行为与旧版一致。
+    pub bare_store_routing: std::collections::HashMap<String, String>,
     /// Known API function names (need `await` prefix).
     api_functions: Vec<String>,
     /// Plan 012 Batch A (gap 19): state/prop names whose declared type is
@@ -128,6 +134,7 @@ impl AuraTsContext {
             store_facade_from: None,
             store_facades: Default::default(),
             store_bare_heads: Default::default(),
+            bare_store_routing: Default::default(),
             api_functions: DEFAULT_API_FUNCTIONS
                 .iter()
                 .map(|s| s.to_string())
@@ -257,6 +264,15 @@ impl AuraTsContext {
     /// Plan 559 W2: 注入裸发头(store 组合式自限定,vm A1 契约)。
     pub fn with_store_bare_heads(mut self, heads: HashSet<String>) -> Self {
         self.store_bare_heads = heads;
+        self
+    }
+
+    /// PLAN-010: 注入裸 `store.Method()` 的方法归属路由(见字段注)。
+    pub fn with_bare_store_routing(
+        mut self,
+        routing: std::collections::HashMap<String, String>,
+    ) -> Self {
+        self.bare_store_routing = routing;
         self
     }
 
@@ -1194,6 +1210,30 @@ fn transpile_expr(expr: &Expr, ctx: &AuraTsContext, out: &mut Vec<u8>) {
                             }
                             write!(out, ")").ok();
                             return;
+                        }
+                        // PLAN-010: 多 store widget 裸 `store.Method()` 按方法
+                        // 归属路由到对应 facade 变量（如 LoadFeed 唯一归属
+                        // ArticleStore → `articleStore.LoadFeed()`）。仅裸
+                        // `store` 头参与路由；限定头（`AuthStore.X`）是显式
+                        // 意图，不走路由。空表保持 `store.` 现状。
+                        if head.as_str() == "store" {
+                            if let Some(var) = ctx.bare_store_routing.get(method.as_str()) {
+                                write!(
+                                    out,
+                                    "{}.{}(",
+                                    var.as_str(),
+                                    sanitize_ident(method.as_str())
+                                )
+                                .ok();
+                                for (i, arg) in call.args.args.iter().enumerate() {
+                                    if i > 0 {
+                                        write!(out, ", ").ok();
+                                    }
+                                    transpile_expr(&arg.get_expr(), ctx, out);
+                                }
+                                write!(out, ")").ok();
+                                return;
+                            }
                         }
                     }
                     if try_transpile_builtin_call(object, method.as_str(), &call.args, ctx, out) {
