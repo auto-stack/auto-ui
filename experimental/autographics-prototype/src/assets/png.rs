@@ -142,8 +142,7 @@ pub fn preflight(bytes: &[u8]) -> Result<PngHeader, String> {
 }
 
 /// Decode an admitted PNG into RGBA8, re-checking the header facts.
-pub fn decode_png_bytes(bytes: &[u8], source_sha256: &str) -> Result<ImageData, String> {
-    let header = preflight(bytes)?;
+pub fn decode_png_bytes(bytes: &[u8], source_sha256: &str) -> Result<ImageData, String> {    let header = preflight(bytes)?;
     let image = image::load_from_memory_with_format(bytes, image::ImageFormat::Png)
         .map_err(|e| format!("invalid: PNG decoder {e}"))?;
     let rgba = image.to_rgba8();
@@ -164,4 +163,22 @@ pub fn decode_png_bytes(bytes: &[u8], source_sha256: &str) -> Result<ImageData, 
         rgba: raw,
         source_sha256: source_sha256.to_owned(),
     })
+}
+
+/// Encode one RGBA8 image as a static PNG. Fixture and test support only: the
+/// production path never writes an image, it only admits and decodes one.
+pub fn encode_png_rgba(width: u32, height: u32, rgba: &[u8]) -> Result<Vec<u8>, String> {
+    use image::{ExtendedColorType, ImageEncoder};
+    let expected = (width as usize)
+        .checked_mul(height as usize)
+        .and_then(|p| p.checked_mul(4))
+        .ok_or("invalid: encode dimensions")?;
+    if width == 0 || height == 0 || rgba.len() != expected {
+        return Err("invalid: encode payload length".into());
+    }
+    let mut out = Vec::new();
+    image::codecs::png::PngEncoder::new(&mut out)
+        .write_image(rgba, width, height, ExtendedColorType::Rgba8)
+        .map_err(|e| format!("invalid: PNG encode {e}"))?;
+    Ok(out)
 }

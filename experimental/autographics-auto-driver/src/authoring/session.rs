@@ -24,6 +24,13 @@ pub enum Edit {
         object: Object,
         create: bool,
     },
+    /// PLAN-004: create a 2D leaf carrying an accepted PNG visual, rebind the
+    /// selected 2D leaf to that payload, or detach it (asset and sprite None).
+    SpriteObject {
+        asset: Option<std::sync::Arc<super::assets::Asset>>,
+        object: Object,
+        create: bool,
+    },
     Replace(Object),
     Create(Object),
     Delete(u64),
@@ -220,6 +227,60 @@ impl Editor {
                             "resource replacement preserves 3D target/local/parent/properties"
                                 .into(),
                         );
+                    }
+                    *target = object;
+                }
+                Intent::Edit
+            }
+            Edit::SpriteObject {
+                asset,
+                object,
+                create,
+            } => {
+                // PLAN-004: the visual binding is an immutable image payload on
+                // a 2D leaf. A 3D leaf or a model resource is rejected, and the
+                // accepted payload is the one the binding names.
+                if !object.kind.is_2d() {
+                    return Err("sprite edit requires a 2D leaf".into());
+                }
+                if object.resource.is_some() {
+                    return Err("sprite edit forbids a model resource".into());
+                }
+                if let Some(asset) = asset {
+                    let key = asset.identity.key();
+                    if object.sprite.as_ref().is_none_or(|s| s.asset != key) {
+                        return Err("sprite binding identity".into());
+                    }
+                    if let Some(binding) = &object.sprite {
+                        binding.validate(std::slice::from_ref(&asset.identity))?;
+                    }
+                    if asset.image.is_none() {
+                        return Err("sprite edit requires an image payload".into());
+                    }
+                    super::assets::insert(&mut assets, asset.clone())?;
+                    if !doc.assets.iter().any(|a| a.sha256 == asset.identity.sha256) {
+                        doc.assets.push(asset.identity.clone());
+                    }
+                }
+                if create {
+                    if object.id <= self.high_water {
+                        return Err("created identity must exceed high-water".into());
+                    }
+                    doc.objects.push(object);
+                } else {
+                    if self.selection != Some(object.id) {
+                        return Err("stale selection".into());
+                    }
+                    let target = doc
+                        .objects
+                        .iter_mut()
+                        .find(|o| o.id == object.id)
+                        .ok_or("target missing")?;
+                    if !target.kind.is_2d() || target.kind != object.kind {
+                        return Err("sprite binding preserves the 2D target kind".into());
+                    }
+                    if target.translation != object.translation || target.parent != object.parent {
+                        return Err("sprite binding preserves target/local/parent".into());
                     }
                     *target = object;
                 }

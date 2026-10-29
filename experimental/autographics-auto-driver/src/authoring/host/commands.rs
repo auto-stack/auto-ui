@@ -288,6 +288,146 @@ impl Host {
                     },
                 )?;
             }
+            "import-sprite" => {
+                if v["asset_generation"].as_u64() != Some(self.asset_token) {
+                    return Err("stale import generation".into());
+                }
+                if v["selection"] != json!(self.editor.selection) {
+                    return Err("stale asset target selection".into());
+                }
+                let next_token = self
+                    .asset_token
+                    .checked_add(1)
+                    .ok_or("import token exhausted")?;
+                let asset = crate::authoring::assets::import_png(
+                    Path::new(p.as_str().ok_or("PNG path")?),
+                    &self.active_assets()?,
+                )?;
+                let (width, height) = match (asset.identity.width, asset.identity.height) {
+                    (Some(w), Some(h)) => (w, h),
+                    _ => return Err("PNG dimensions".into()),
+                };
+                let id = self.editor.next_id().ok_or("identity exhausted")?;
+                let mut o = Object::new(id, Kind::Quad);
+                // Display size is the scene's explicit configuration; the import
+                // default keeps the image aspect ratio at one world unit high.
+                let aspect = (width as f32 / height as f32).clamp(0.05, 20.0);
+                o.scale = [aspect, 1.0, 1.0];
+                o.sprite = Some(crate::authoring::document::SpriteBinding {
+                    asset: asset.identity.key(),
+                    frame: [0, 0, width, height],
+                    flip: false,
+                });
+                if let Some(g) = self.editor.document.groups.iter().find(|g| {
+                    Some(g.id) == self.editor.selection
+                        && g.dimension == crate::authoring::document::Dimension::Two
+                }) {
+                    o.parent = Some(g.id);
+                }
+                self.editor.begin_source(
+                    stamp,
+                    Edit::SpriteObject {
+                        asset: Some(asset),
+                        object: o,
+                        create: true,
+                    },
+                    self.asset_source_for_probe
+                        .as_deref()
+                        .unwrap_or(crate::authoring::preview::SOURCE),
+                )?;
+                self.asset_pending = true;
+                self.asset_token = next_token;
+            }
+            "sprite-bind" | "sprite-create" | "sprite-detach" => {
+                if v["selection"] != json!(self.editor.selection) {
+                    return Err("stale asset target selection".into());
+                }
+                let key = p.as_str().ok_or("image asset key")?;
+                let declared = self
+                    .editor
+                    .document
+                    .assets
+                    .iter()
+                    .find(|a| a.key() == key)
+                    .cloned()
+                    .ok_or("image asset not registered in document")?;
+                if !declared.is_image() {
+                    return Err("sprite binding requires a PNG asset".into());
+                }
+                let (width, height) = match (declared.width, declared.height) {
+                    (Some(w), Some(h)) => (w, h),
+                    _ => return Err("PNG dimensions".into()),
+                };
+                if action == "sprite-detach" {
+                    let id = self.editor.selection.ok_or("select a 2D leaf")?;
+                    let mut o = self
+                        .editor
+                        .document
+                        .local_target(id)
+                        .ok_or("target missing")?;
+                    if !o.kind.is_2d() || o.sprite.is_none() {
+                        return Err("select a bound 2D leaf".into());
+                    }
+                    o.sprite = None;
+                    self.editor.begin(
+                        stamp,
+                        Edit::SpriteObject {
+                            asset: None,
+                            object: o,
+                            create: false,
+                        },
+                    )?;
+                } else {
+                    let create = action == "sprite-create";
+                    let mut o = if create {
+                        let mut o = Object::new(
+                            self.editor.next_id().ok_or("identity exhausted")?,
+                            Kind::Quad,
+                        );
+                        let aspect = (width as f32 / height as f32).clamp(0.05, 20.0);
+                        o.scale = [aspect, 1.0, 1.0];
+                        if let Some(g) = self.editor.document.groups.iter().find(|g| {
+                            Some(g.id) == self.editor.selection
+                                && g.dimension == crate::authoring::document::Dimension::Two
+                        }) {
+                            o.parent = Some(g.id);
+                        }
+                        o
+                    } else {
+                        let id = self.editor.selection.ok_or("select a 2D leaf")?;
+                        let o = self
+                            .editor
+                            .document
+                            .local_target(id)
+                            .ok_or("target missing")?;
+                        if !o.kind.is_2d() {
+                            return Err("select a 2D leaf".into());
+                        }
+                        o
+                    };
+                    o.sprite = Some(crate::authoring::document::SpriteBinding {
+                        asset: declared.key(),
+                        frame: [0, 0, width, height],
+                        flip: false,
+                    });
+                    // The payload must already be the accepted one: an editor
+                    // command never re-reads the file or re-decodes an image.
+                    let accepted = self
+                        .editor
+                        .assets
+                        .get(&declared.key())
+                        .cloned()
+                        .ok_or("missing image payload")?;
+                    self.editor.begin(
+                        stamp,
+                        Edit::SpriteObject {
+                            asset: if create { Some(accepted.clone()) } else { None },
+                            object: o,
+                            create,
+                        },
+                    )?;
+                }
+            }
             "leave-cancel" => {
                 self.leave = None;
             }

@@ -62,6 +62,9 @@ pub struct Panel {
     pub asset_token: u64,
     pub asset_busy: bool,
     pub import_path: String,
+    /// PLAN-004: the PNG path typed in the panel; the import itself is one
+    /// bounded read and one accepted image payload.
+    pub import_sprite_path: String,
     pub document: Document,
     pub stamp: Stamp,
     pub selection: Option<u64>,
@@ -254,6 +257,7 @@ impl Host {
             asset_token: 0,
             asset_busy: false,
             import_path: String::new(),
+            import_sprite_path: String::new(),
             document: editor.document.clone(),
             stamp: editor.stamp,
             selection: None,

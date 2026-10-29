@@ -8,4 +8,6 @@ pub mod glb;
 pub mod png;
 
 pub use glb::{load_glb_bytes, load_glb_file, AssetError, MaterialDef, MeshData, ModelData};
-pub use png::{decode_png_bytes, preflight as preflight_png, ImageData, PngHeader};
+pub use png::{
+    decode_png_bytes, encode_png_rgba, preflight as preflight_png, ImageData, PngHeader,
+};

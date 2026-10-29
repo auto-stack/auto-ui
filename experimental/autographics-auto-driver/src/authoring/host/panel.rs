@@ -259,6 +259,18 @@ impl SurfaceUi for Panel {
                 self.bounds.clone(),
             ))
             .push(cmd("Import GLB", "import", json!(self.import_path)))
+            .push(crate::authoring::tagged::tag(
+                text_input("Local PNG path", &self.import_sprite_path)
+                    .id("authoring-sprite-path")
+                    .on_input(|v| format!("sprite-path:{v}")),
+                "sprite-path".into(),
+                self.bounds.clone(),
+            ))
+            .push(cmd(
+                "Import PNG",
+                "import-sprite",
+                json!(self.import_sprite_path),
+            ))
             .push(row![
                 cmd("+Circle", "create", json!("circle")),
                 cmd("+Quad", "create", json!("quad")),
@@ -273,7 +285,7 @@ impl SurfaceUi for Panel {
             cmd("+2D group", "create-group2", json!("2d")),
             cmd("+3D group", "create-group3", json!("3d"))
         ]);
-        for a in &self.document.assets {
+        for a in self.document.assets.iter().filter(|a| !a.is_image()) {
             let key = a.key();
             c = c
                 .push(text(format!(
@@ -284,6 +296,23 @@ impl SurfaceUi for Panel {
                 .push(row![
                     cmd("Create instance", "asset-create", json!(key)),
                     cmd("Use on selected 3D", "asset-replace", json!(key))
+                ]);
+        }
+        // PLAN-004: an accepted image is bound to a 2D leaf; the frame is the
+        // whole image until Auto (or the document) chooses a pixel rectangle.
+        for a in self.document.assets.iter().filter(|a| a.is_image()) {
+            let key = a.key();
+            c = c
+                .push(text(format!(
+                    "PNG {} {}x{}",
+                    &a.sha256[..8],
+                    a.width.unwrap_or(0),
+                    a.height.unwrap_or(0)
+                )))
+                .push(row![
+                    cmd("Bind to selected 2D", "sprite-bind", json!(key)),
+                    cmd("Create sprite leaf", "sprite-create", json!(key)),
+                    cmd("Detach selected 2D", "sprite-detach", json!(key))
                 ]);
         }
         if let Some(id) = self.delete_confirmation {
@@ -473,6 +502,10 @@ impl SurfaceUi for Panel {
         }
         if let Some(v) = m.strip_prefix("asset-path:") {
             self.import_path = v.into();
+            return;
+        }
+        if let Some(v) = m.strip_prefix("sprite-path:") {
+            self.import_sprite_path = v.into();
             return;
         }
         if m.starts_with("draft:") {

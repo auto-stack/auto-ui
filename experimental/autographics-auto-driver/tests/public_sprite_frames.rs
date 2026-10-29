@@ -4,6 +4,7 @@
 //! the driver's sprite host test and the AGP `sprite_resources` test.
 //!
 //! Run single-threaded: `cargo test --locked --test public_sprite_frames -- --test-threads=1`
+use agp::assets::encode_png_rgba;
 use autographics_auto_driver::authoring::{
     assets,
     behavior::{Api, SourceSnapshot},
@@ -12,8 +13,9 @@ use autographics_auto_driver::authoring::{
     play::{Action, Play},
     runtime_objects::{self, Dim, RuntimeObjectsFrame, Slot},
     runtime_sprites::{self, Target},
-    session::Editor,
+    session::{Edit, Editor},
     spatial::Descriptor,
+    storage::{Fault, Saved, Storage},
 };
 use autographics_auto_driver::Scalar;
 use std::path::{Path, PathBuf};
@@ -347,8 +349,10 @@ fn real_auto_drives_frames_flip_and_the_whole_2d_composition_in_one_tick() {
     ticks_us.sort_unstable();
     let median = ticks_us[ticks_us.len() / 2];
     let p95 = ticks_us[(ticks_us.len() * 95) / 100];
+    let min = *ticks_us.first().unwrap();
+    let max = *ticks_us.last().unwrap();
     println!(
-        "probe: compile_us={} tick_median_us={median} tick_p95_us={p95} ticks={} block_len={} managed_hash={} vm_owner={}",
+        "probe: compile_us={} tick_min_us={min} tick_median_us={median} tick_p95_us={p95} tick_max_us={max} ticks={} block_len={} managed_hash={} vm_owner={}",
         play.compile_us,
         ticks_us.len(),
         runtime_sprites::block_len(targets.len()),
@@ -747,4 +751,482 @@ fn scene_v5_persists_the_binding_and_legacy_schemas_never_accept_it_silently() {
     });
     kind.objects[1].kind = Kind::Cylinder;
     assert!(kind.validate().is_err(), "3D leaves cannot carry a sprite");
+}
+
+// ---------------------------------------------------------------------------
+// V-01: the finite PNG domain, the project closure and the editor binding.
+// ---------------------------------------------------------------------------
+
+fn temp_root(tag: &str) -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("ag-sprite-{tag}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).expect("temp root");
+    dir
+}
+
+fn settle_editor(e: &mut Editor) {
+    while !e.pump().expect("pump") {}
+    e.commit().expect("commit");
+}
+
+#[test]
+fn png_closure_saves_reopens_and_moves_with_the_project() {
+    let dir = sample_dir();
+    let (doc, registry) = sprite_document(&dir);
+    let mut editor = Editor::with_project(doc.clone(), registry, None).expect("editor");
+    let root = temp_root("closure");
+    let entry = root.join("scene.agscene");
+    let mut storage = Storage::default();
+    assert_eq!(
+        storage
+            .save(&mut editor, &entry, Fault::None)
+            .expect("save"),
+        Saved::Confirmed
+    );
+    let sha = doc.assets[0].sha256.clone();
+    let blob = root.join("assets").join(format!("{sha}.png"));
+    assert!(blob.is_file(), "the accepted PNG joins the project closure");
+    assert_eq!(
+        std::fs::read(&blob).unwrap(),
+        std::fs::read(dir.join("sheet.png")).unwrap(),
+        "the closure blob is the accepted original bytes, not a re-encode"
+    );
+    // Reopen: document, frame domain and decoded pixels all come from the
+    // project directory, never from the original import path.
+    let (reopened, assets_in, code, reopened_storage) =
+        Storage::load_project(&entry, &Default::default()).expect("reopen");
+    assert!(code.is_none());
+    assert!(!reopened_storage.unverified());
+    assert_eq!(reopened, editor.document);
+    let key = doc.assets[0].key();
+    let asset = assets_in.get(&key).expect("image payload");
+    let image = asset.image_data().expect("decoded image");
+    assert_eq!((image.width, image.height), (96, 32));
+    assert_eq!(
+        image.pixel(0, 1),
+        Some([255, 0, 0, 255]),
+        "real pixels survived"
+    );
+    assert_eq!(image.pixel(20, 1), Some([0, 0, 255, 255]));
+    // Move the whole directory A -> B and open from the new place.
+    let moved = temp_root("closure-moved");
+    std::fs::rename(&root, &moved).expect("move project");
+    let moved_entry = moved.join("scene.agscene");
+    let (again, assets_moved, _, _) =
+        Storage::load_project(&moved_entry, &Default::default()).expect("reopen moved");
+    assert_eq!(again, reopened);
+    assert_eq!(assets_moved.get(&key).unwrap().identity, doc.assets[0]);
+    // The moved project is still editable and saveable with the same payload.
+    let mut editor2 = Editor::with_project(again, assets_moved, None).expect("editor2");
+    let mut leaf = Object::new(editor2.next_id().unwrap(), Kind::Quad);
+    leaf.sprite = Some(SpriteBinding {
+        asset: key.clone(),
+        frame: [32, 0, 32, 32],
+        flip: true,
+    });
+    assert!(editor2
+        .begin(
+            editor2.stamp,
+            Edit::SpriteObject {
+                asset: None,
+                object: leaf,
+                create: true,
+            },
+        )
+        .unwrap());
+    settle_editor(&mut editor2);
+    assert_eq!(
+        Storage::default()
+            .save(&mut editor2, &moved_entry, Fault::None)
+            .expect("save moved"),
+        Saved::Confirmed
+    );
+    let _ = std::fs::remove_dir_all(&moved);
+}
+
+#[test]
+fn png_closure_rejects_missing_tampered_foreign_and_over_budget_blobs() {
+    let dir = sample_dir();
+    let (doc, registry) = sprite_document(&dir);
+    let mut editor = Editor::with_project(doc.clone(), registry, None).expect("editor");
+    let root = temp_root("closure-neg");
+    let entry = root.join("scene.agscene");
+    let mut storage = Storage::default();
+    storage
+        .save(&mut editor, &entry, Fault::None)
+        .expect("save");
+    let sha = doc.assets[0].sha256.clone();
+    let blob = root.join("assets").join(format!("{sha}.png"));
+    let original = std::fs::read(&blob).unwrap();
+    // Missing blob: the reopen rejects instead of fabricating the payload.
+    std::fs::remove_file(&blob).unwrap();
+    let error = match Storage::load_project(&entry, &Default::default()) {
+        Ok(_) => panic!("missing blob must reject"),
+        Err(e) => e,
+    };
+    assert!(error.contains("io") || error.contains("missing"), "{error}");
+    // Restoring the exact bytes recovers the project (repair, not rollback).
+    std::fs::write(&blob, &original).unwrap();
+    assert!(Storage::load_project(&entry, &Default::default()).is_ok());
+    // Tampered bytes under the accepted name are refused and preserved.
+    let mut tampered = original.clone();
+    tampered[40] ^= 0xff;
+    std::fs::write(&blob, &tampered).unwrap();
+    let error = match Storage::load_project(&entry, &Default::default()) {
+        Ok(_) => panic!("missing blob must reject"),
+        Err(e) => e,
+    };
+    assert!(error.contains("conflict"), "{error}");
+    assert_eq!(
+        std::fs::read(&blob).unwrap(),
+        tampered,
+        "a bad blob is never overwritten by the reader"
+    );
+    std::fs::write(&blob, &original).unwrap();
+    // A foreign file in assets/ is reported and left untouched by a save.
+    let foreign = root.join("assets").join("notes.txt");
+    std::fs::write(&foreign, b"keep").unwrap();
+    let error = Storage::default()
+        .save(&mut editor, &entry, Fault::None)
+        .unwrap_err();
+    assert!(
+        error.contains("foreign or incomplete asset path"),
+        "{error}"
+    );
+    assert_eq!(std::fs::read(&foreign).unwrap(), b"keep");
+    std::fs::remove_file(&foreign).unwrap();
+    // The shared 8-file budget counts every blob in the directory, not only
+    // the declared ones.
+    let mut extras = vec![];
+    for i in 0..8u8 {
+        let name = format!("{:02x}{}.png", i, "0".repeat(62));
+        let path = root.join("assets").join(name);
+        std::fs::write(&path, [i]).unwrap();
+        extras.push(path);
+    }
+    let error = Storage::default()
+        .save(&mut editor, &entry, Fault::None)
+        .unwrap_err();
+    assert!(error.contains("8"), "{error}");
+    for path in extras {
+        std::fs::remove_file(path).unwrap();
+    }
+    assert_eq!(
+        Storage::default()
+            .save(&mut editor, &entry, Fault::None)
+            .unwrap(),
+        Saved::Confirmed,
+        "removing the residuals restores a clean closure"
+    );
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+#[test]
+fn editor_sprite_commands_create_bind_detach_and_reject_wrong_targets() {
+    let dir = sample_dir();
+    let (doc, registry) = sprite_document(&dir);
+    let key = doc.assets[0].key();
+    let mut editor = Editor::with_project(doc.clone(), registry.clone(), None).expect("editor");
+    assert_eq!(editor.document.assets.len(), 1);
+    // Create a new sprite leaf from the accepted payload.
+    let id = editor.next_id().unwrap();
+    let mut leaf = Object::new(id, Kind::Quad);
+    leaf.scale = [3.0, 1.0, 1.0];
+    leaf.sprite = Some(SpriteBinding {
+        asset: key.clone(),
+        frame: [0, 0, 96, 32],
+        flip: false,
+    });
+    assert!(editor
+        .begin(
+            editor.stamp,
+            Edit::SpriteObject {
+                asset: Some(registry.get(&key).unwrap().clone()),
+                object: leaf,
+                create: true,
+            },
+        )
+        .unwrap());
+    settle_editor(&mut editor);
+    let stored = editor
+        .document
+        .objects
+        .iter()
+        .find(|o| o.id == id)
+        .expect("created leaf");
+    assert_eq!(stored.sprite.as_ref().unwrap().frame, [0, 0, 96, 32]);
+    // Rebind the selected 2D leaf while keeping its local/parent/properties.
+    editor.select(Some(5)).unwrap();
+    let mut target = editor.document.local_target(5).unwrap();
+    let before = target.clone();
+    target.sprite = Some(SpriteBinding {
+        asset: key.clone(),
+        frame: [32, 0, 32, 32],
+        flip: true,
+    });
+    assert!(editor
+        .begin(
+            editor.stamp,
+            Edit::SpriteObject {
+                asset: None,
+                object: target,
+                create: false,
+            },
+        )
+        .unwrap());
+    settle_editor(&mut editor);
+    let stored = editor
+        .document
+        .objects
+        .iter()
+        .find(|o| o.id == 5)
+        .unwrap()
+        .clone();
+    assert_eq!(stored.sprite.as_ref().unwrap().frame, [32, 0, 32, 32]);
+    assert!(stored.sprite.as_ref().unwrap().flip);
+    assert_eq!(stored.translation, before.translation);
+    // Detach clears only the binding.
+    let mut detached = stored.clone();
+    detached.sprite = None;
+    assert!(editor
+        .begin(
+            editor.stamp,
+            Edit::SpriteObject {
+                asset: None,
+                object: detached,
+                create: false,
+            },
+        )
+        .unwrap());
+    settle_editor(&mut editor);
+    assert!(editor
+        .document
+        .objects
+        .iter()
+        .find(|o| o.id == 5)
+        .unwrap()
+        .sprite
+        .is_none());
+    // Stale selection, wrong payload identity, an out-of-image frame and a 3D
+    // target are named rejections that leave the document unchanged.
+    let mut stale = editor.document.local_target(5).unwrap();
+    stale.sprite = Some(SpriteBinding {
+        asset: key.clone(),
+        frame: [0, 0, 32, 32],
+        flip: false,
+    });
+    editor.select(Some(1)).unwrap();
+    assert!(editor
+        .begin(
+            editor.stamp,
+            Edit::SpriteObject {
+                asset: None,
+                object: stale,
+                create: false,
+            },
+        )
+        .is_err());
+    editor.select(Some(5)).unwrap();
+    let kept = editor.document.clone();
+    let mut wrong = editor.document.local_target(5).unwrap();
+    wrong.sprite = Some(SpriteBinding {
+        asset: format!("sha256:{}", "0".repeat(64)),
+        frame: [0, 0, 32, 32],
+        flip: false,
+    });
+    let error = editor
+        .begin(
+            editor.stamp,
+            Edit::SpriteObject {
+                asset: None,
+                object: wrong,
+                create: false,
+            },
+        )
+        .unwrap_err();
+    assert!(error.contains("sprite asset reference"), "{error}");
+    let mut out = editor.document.local_target(5).unwrap();
+    out.sprite = Some(SpriteBinding {
+        asset: key.clone(),
+        frame: [80, 0, 32, 32],
+        flip: false,
+    });
+    let error = editor
+        .begin(
+            editor.stamp,
+            Edit::SpriteObject {
+                asset: None,
+                object: out,
+                create: false,
+            },
+        )
+        .unwrap_err();
+    assert!(error.contains("sprite frame bounds"), "{error}");
+    let mut three = Object::new(9, Kind::Cylinder);
+    three.sprite = Some(SpriteBinding {
+        asset: key.clone(),
+        frame: [0, 0, 32, 32],
+        flip: false,
+    });
+    let error = editor
+        .begin(
+            editor.stamp,
+            Edit::SpriteObject {
+                asset: None,
+                object: three,
+                create: true,
+            },
+        )
+        .unwrap_err();
+    assert!(error.contains("2D leaf"), "{error}");
+    assert_eq!(editor.document, kept);
+    // Nine bindings exceed the frozen target table.
+    let mut nine = Document::empty("nine".into());
+    nine.assets.push(doc.assets[0].clone());
+    for id in 1..=9u64 {
+        let mut o = Object::new(id, Kind::Quad);
+        o.sprite = Some(SpriteBinding {
+            asset: key.clone(),
+            frame: [0, 0, 1, 1],
+            flip: false,
+        });
+        nine.objects.push(o);
+    }
+    let error = nine.validate().unwrap_err();
+    assert!(error.contains("sprite target budget"), "{error}");
+}
+
+#[test]
+fn png_side_and_decoded_budget_are_checked_before_decoding() {
+    let base: assets::Registry = Default::default();
+    // A full 2048x2048 RGBA image is exactly the 16MiB decoded ceiling.
+    let bytes = encode_png_rgba(2048, 2048, &vec![0x7f; 2048 * 2048 * 4]).expect("encode");
+    let attempts = assets::decode_attempts();
+    let asset = assets::decode_png_in(bytes, None, &base).expect("2048 accepted");
+    assert_eq!(asset.cpu_bytes, 16 * 1024 * 1024);
+    assert_eq!(asset.gpu_bytes, 16 * 1024 * 1024);
+    assert_eq!(assets::decode_attempts(), attempts + 1);
+    // One pixel more per side is outside the finite domain and never decodes.
+    let wide = encode_png_rgba(2049, 1, &vec![0u8; 2049 * 4]).expect("encode");
+    let error = assets::decode_png_in(wide, None, &base).unwrap_err();
+    assert!(error.contains("resource limit: PNG side"), "{error}");
+    let tall = encode_png_rgba(1, 2049, &vec![0u8; 2049 * 4]).expect("encode");
+    assert!(assets::decode_png_in(tall, None, &base)
+        .unwrap_err()
+        .contains("PNG side"));
+    assert_eq!(
+        assets::decode_attempts(),
+        attempts + 1,
+        "rejected sides never reach the decoder"
+    );
+    // The union budget is shared with models: four 16MiB image payloads fit at
+    // the documented 64MiB ceiling, a fifth is refused before decoding, and no
+    // per-format quota is added.
+    let mut union = base.clone();
+    assets::insert(&mut union, asset.clone()).expect("first image");
+    for i in 1..4u8 {
+        let payload =
+            encode_png_rgba(2048, 2048, &vec![0x40 + i; 2048 * 2048 * 4]).expect("encode");
+        let image = assets::decode_png_in(payload, None, &union).expect("within 64MiB");
+        assets::insert(&mut union, image).expect("registry insert");
+    }
+    assert_eq!(union.len(), 4);
+    assert_eq!(
+        union.values().map(|a| a.cpu_bytes).sum::<usize>(),
+        64 * 1024 * 1024
+    );
+    let attempts = assets::decode_attempts();
+    let payload = encode_png_rgba(2048, 2048, &vec![0x55; 2048 * 2048 * 4]).expect("encode");
+    let error = assets::decode_png_in(payload, None, &union).unwrap_err();
+    assert!(
+        error.contains("candidate/resident union before decode"),
+        "{error}"
+    );
+    assert_eq!(
+        assets::decode_attempts(),
+        attempts,
+        "an over-budget candidate never allocates pixels"
+    );
+    assert_eq!(assets::MAX_GEOMETRY, 64 * 1024 * 1024);
+    assert_eq!(assets::MAX_ASSETS, 8);
+}
+
+#[test]
+fn host_imports_binds_and_detaches_a_png_visual() {
+    use autographics_auto_driver::authoring::host::Host;
+    use serde_json::json;
+    let dir = sample_dir();
+    let path = dir.join("sheet.png");
+    let mut host = Host::new(Document::empty("sprite-host".into())).expect("host");
+    let send = |host: &mut Host, action: &str, payload: serde_json::Value| {
+        let message = json!({
+            "epoch": host.editor.stamp.epoch,
+            "revision": host.editor.stamp.revision,
+            "action": action,
+            "payload": payload,
+            "selection": host.editor.selection,
+            "asset_generation": host.ui().asset_token,
+        })
+        .to_string();
+        host.dispatch(&message)?;
+        host.settle()?;
+        if !host.ui().error.is_empty() {
+            return Err(host.ui().error.clone());
+        }
+        Ok(())
+    };
+    // One public command imports the accepted PNG and creates a bound 2D leaf.
+    send(&mut host, "import-sprite", json!(path.to_str().unwrap())).expect("import");
+    let doc = host.editor.document.clone();
+    assert_eq!(doc.assets.len(), 1);
+    assert!(doc.assets[0].is_image());
+    assert_eq!(
+        (doc.assets[0].width, doc.assets[0].height),
+        (Some(96), Some(32))
+    );
+    let leaf = doc
+        .objects
+        .iter()
+        .find(|o| o.sprite.is_some())
+        .expect("bound leaf")
+        .clone();
+    assert!(leaf.kind.is_2d());
+    assert_eq!(leaf.sprite.as_ref().unwrap().frame, [0, 0, 96, 32]);
+    assert!(
+        (leaf.scale[0] / leaf.scale[1] - 3.0).abs() < 1e-6,
+        "aspect kept"
+    );
+    // The accepted document renders through the existing 2D canvas.
+    host.frame(None).expect("frame after import");
+    // Detach the binding from the selected leaf.
+    host.editor.select(Some(leaf.id)).expect("select");
+    send(&mut host, "sprite-detach", json!(doc.assets[0].key())).expect("detach");
+    assert!(host
+        .editor
+        .document
+        .objects
+        .iter()
+        .find(|o| o.id == leaf.id)
+        .unwrap()
+        .sprite
+        .is_none());
+    // Re-importing the same bytes reuses the single content identity.
+    send(&mut host, "import-sprite", json!(path.to_str().unwrap())).expect("reimport");
+    assert_eq!(host.editor.document.assets.len(), 1);
+    assert_eq!(
+        host.editor
+            .document
+            .objects
+            .iter()
+            .filter(|o| o.sprite.is_some())
+            .count(),
+        1
+    );
+    // An invalid PNG path is a named failure that leaves the document alone.
+    let before = host.editor.document.clone();
+    let bad = dir.join("not-a-png.png");
+    std::fs::write(&bad, b"not a png").unwrap();
+    assert!(send(&mut host, "import-sprite", json!(bad.to_str().unwrap())).is_err());
+    assert_eq!(host.editor.document, before);
+    std::fs::remove_file(bad).unwrap();
 }

@@ -142,7 +142,7 @@ impl Storage {
                 .parent()
                 .ok_or("project root")?
                 .join("assets")
-                .join(format!("{}.glb", a.sha256));
+                .join(&blob_name(a)?);
             let loaded = super::assets::load_declared(&blob, a, &assets)?;
             super::assets::insert(&mut assets, loaded)?;
         }
@@ -299,7 +299,8 @@ impl Storage {
                 .and_then(|s| s.to_str())
                 .is_some_and(|s| s.eq_ignore_ascii_case("assets"))
                 && name.len() == 68
-                && name.as_bytes()[64..].eq_ignore_ascii_case(b".glb")
+                && (name.as_bytes()[64..].eq_ignore_ascii_case(b".glb")
+                    || name.as_bytes()[64..].eq_ignore_ascii_case(b".png"))
                 && name.as_bytes()[..64].iter().all(|b| b.is_ascii_hexdigit()))
         {
             return Err(
@@ -475,7 +476,7 @@ fn disk_budget(dir: &Path, reserve: usize) -> Result<(), String> {
             .ok_or("disk length overflow")?;
         let name = item.file_name().to_string_lossy().into_owned();
         if name.len() != 68
-            || !name.ends_with(".glb")
+            || !(name.ends_with(".glb") || name.ends_with(".png"))
             || !name[..64]
                 .bytes()
                 .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
@@ -498,13 +499,23 @@ fn disk_budget(dir: &Path, reserve: usize) -> Result<(), String> {
     }
     Ok(())
 }
+/// PLAN-004: a project-owned blob is named by its content identity and its
+/// format extension. The image and model payloads live in the same assets
+/// directory and share one file/byte budget, so neither gains a separate quota.
+fn blob_name(a: &super::assets::AssetRef) -> Result<String, String> {
+    let extension = if a.is_image() { "png" } else { "glb" };
+    if a.format != extension {
+        return Err("invalid: closure blob format".into());
+    }
+    Ok(format!("{}.{}", a.sha256, extension))
+}
 fn verify_closure(entry: &Path, assets: &super::assets::Registry) -> Result<(), String> {
     for a in assets.values() {
         let path = entry
             .parent()
             .ok_or("root")?
             .join("assets")
-            .join(format!("{}.glb", a.identity.sha256));
+            .join(&blob_name(&a.identity)?);
         let bytes = super::assets::read_blob(&path)?;
         if bytes.as_slice() != a.bytes.as_ref()
             || bytes.len() != a.identity.byte_length
@@ -532,7 +543,7 @@ fn prepare_closure(
     }
     for asset in assets.values() {
         disk_budget(&dir, 0)?;
-        let target = dir.join(format!("{}.glb", asset.identity.sha256));
+        let target = dir.join(blob_name(&asset.identity)?);
         if target.exists() {
             let bytes = super::assets::read_blob(&target)?;
             if bytes.as_slice() != asset.bytes.as_ref() {
