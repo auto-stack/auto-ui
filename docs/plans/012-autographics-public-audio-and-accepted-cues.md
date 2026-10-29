@@ -164,8 +164,12 @@ SD01/02/03与ag-examples005/G12a下游说明冻结在research/public-audio-spec-
 
 2026-10-30 goal round5：`stage: goal | plan_id: PLAN-012 | plan_revision: r1 | round: 5 | from: review | to: review | status: execution_done | outcome: waiting | worktree: D:/autostack/.wt/ui-012/auto-ui | commit: 87414431b9a1dbda6eb54aad999af7f734a14516 | next: user review-context authorization then review`。前轮分类progress（已提交实现与实测证据），但末尾开始等待§10决定；本轮复读§9/10仍无用户答复，未运行阶段工作或任何检查、未启动agent/chat、未合并，代码冻结状态不变。相同工作流阻塞连续第2轮（round4/5），目标保留active；不以自动继续消息或经过时间代替人工授权。已有具体只读复审提议，继续等待同一答复，不重复提问、不修改验收或测试阈值。
 
+2026-10-30 goal round6：`stage: goal | plan_id: PLAN-012 | plan_revision: r1 | round: 6 | from: review | to: review | status: execution_done | outcome: blocked | worktree: D:/autostack/.wt/ui-012/auto-ui | commit: 87414431b9a1dbda6eb54aad999af7f734a14516 | next: user review-context authorization then review`。前轮分类no progress（仅等待/簿记，不是已验证的运行中进程等待）；本轮仅复读§9/10确认仍无人工答复，无阶段工作/测试/agent/chat/合并。相同阻塞已连续round4/5/6三轮，且缺少授权无法满足既定独立复审要求，没有不依赖答复的必要交付工作可继续，现将host goal标为blocked，保留完整目标与全部实现/证据/唯一树。解除动作：用户明确允许仅本计划的同树只读复审子代理，或安排既有独立上下文完成冻结87414431的T07复审。不是因难度/预算/耗时阻塞，不宣称完成或降低AC06；0failed final review/0repaircycle。
+
 ## 10. 待澄清事项
 
 待答：T01..06已完成，6/10，实施树87414431clean/冻结。§6同时规定“同树独立上下文review”与“不新建agent/chat”。auto-plan-review技能Entry还规定“Do not create another task or agent without the applicable authorization.” 仅实施会话变更角色不能声称独立；当前没有可用的既有独立复审上下文。已通过异步问题请求：是否允许一个只读复审子代理使用同一唯一树/冻结commit（不新建用户聊天、不复制代码、不修改实现），作为此项禁止新agent的明确例外？或用户保持限制并安排独立复审。未得到答复不启动agent、不把elapsed视为同意、不降低AC06。此为T07复审方式决策，无工作侧功能/证据缺口；全链merge授权仍有效，review pass前不得merge。首次waiting round4；目标仍active，未达到blocked阈值。
+
+round6现状：同一待答事项连续三轮未解决，host goal转blocked（Plan保持execution_done，6/10）。上述“目标仍active，未达到blocked阈值”为首次等待时记录，现已由round6收据更新。用户答复后恢复目标，按当前唯一树/冻结commit核对后进入T07；未经独立finalpass不得merge。
 
 参考约束：[本Plan§6](#6-测试设计)，[auto-plan-review技能](C:/Users/zhaop/.codex/skills/auto-plan-review/SKILL.md)。下一步答复后同树独立review全部AC/V/SD，T08冻结定向门与T09/10知识ledger/归档guard清理仍pending。完整游戏G2-09/G3-08、011/HUD/font/完整AG里程碑不自动升级。
