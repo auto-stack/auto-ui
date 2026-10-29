@@ -341,3 +341,72 @@ fn neutral_step_consumes_audio_ordinals_without_voice_or_resume_backlog() {
         }
     }
 }
+
+#[test]
+fn repeated_render_capture_and_multiple_portals_do_not_resubmit_accepted_sound() {
+    use agp::core::composition::{MountKind, Rect};
+    use autographics_auto_driver::authoring::public_audio::mixer::Accepted;
+    for api in [Api::Audio2V1, Api::Audio3V1] {
+        let mut h = scene(api);
+        start(&mut h, api, &controller(api, ""));
+        tick(&mut h, false, true);
+        let frame = h.play.as_ref().unwrap().last.as_ref().unwrap().clone();
+        let cues = h.play.as_ref().unwrap().audio_cues.clone().unwrap();
+        let mixer = h.audio.as_ref().unwrap().mixer.clone();
+        let observe = h.audio.as_ref().unwrap().observation.clone();
+        let voices = mixer.lock().unwrap().voices();
+        let nonzero = observe.lock().unwrap().nonzero;
+        let surface = if api == Api::Audio2V1 { h.two } else { h.three };
+        h.frame(None).unwrap();
+        let before = h.rt.capture(surface, "single-mount-audio").unwrap().0;
+        let view = h.rt.graph.surface(h.top).unwrap().views[0];
+        let mut portals = vec![];
+        for i in 0..2 {
+            portals.push(
+                h.rt.add_portal(
+                    view,
+                    surface,
+                    MountKind::Flat2d {
+                        offset: [20.0 + i as f32 * 100.0, 20.0],
+                        scale: [0.25, 0.25],
+                        clip: Rect::at(0.0, 0.0, 600.0, 600.0),
+                    },
+                    false,
+                )
+                .unwrap(),
+            );
+        }
+        for _ in 0..5 {
+            h.frame(None).unwrap();
+            assert_eq!(
+                h.rt.capture(surface, "multiple-mount-audio").unwrap().0,
+                before
+            );
+            assert_eq!(
+                h.play.as_ref().unwrap().last.as_ref().unwrap().tick,
+                frame.tick
+            );
+        }
+        assert_eq!(mixer.lock().unwrap().voices(), voices);
+        assert_eq!(
+            observe.lock().unwrap().nonzero,
+            nonzero,
+            "paused presentation/capture cannot create PCM"
+        );
+        assert_eq!(
+            mixer
+                .lock()
+                .unwrap()
+                .accept(frame.audio.unwrap(), &cues, false, || panic!(
+                    "accepted transport replay must not recommit visual"
+                ))
+                .unwrap(),
+            Accepted::Replay
+        );
+        assert_eq!(mixer.lock().unwrap().voices(), voices);
+        for portal in portals {
+            h.rt.remove_portal(portal).unwrap();
+        }
+        h.stop_play();
+    }
+}

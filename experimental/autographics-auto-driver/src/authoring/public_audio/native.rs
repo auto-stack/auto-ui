@@ -44,6 +44,8 @@ pub struct Native {
     pub observation: Arc<Mutex<Observation>>,
     pub device: String,
     pub rate: u32,
+    pub channels: u16,
+    pub sample_format: String,
 }
 impl Native {
     pub fn open() -> Result<Self, String> {
@@ -79,6 +81,8 @@ impl Native {
             observation,
             device: name,
             rate: config.sample_rate.0,
+            channels: config.channels,
+            sample_format: format!("{format:?}"),
         })
     }
     pub fn reserved_bytes() -> usize {
@@ -94,7 +98,10 @@ fn build<T: cpal::SizedSample + cpal::FromSample<f32>>(
     config: &cpal::StreamConfig,
     mixer: &Arc<Mutex<Mixer>>,
     observation: &Arc<Mutex<Observation>>,
-) -> Result<cpal::Stream, String> {
+) -> Result<cpal::Stream, String>
+where
+    f32: cpal::FromSample<T>,
+{
     let output = mixer.clone();
     let failed = mixer.clone();
     let observe = observation.clone();
@@ -117,21 +124,13 @@ fn build<T: cpal::SizedSample + cpal::FromSample<f32>>(
                     let len = chunk.len() / channels;
                     m.render(&mut scratch[..len], rate);
                     for (dst, src) in chunk.chunks_mut(channels).zip(&scratch[..len]) {
-                        for (ch, v) in dst.iter_mut().enumerate() {
-                            *v = T::from_sample(if channels == 1 {
-                                (src[0] + src[1]) * 0.5
-                            } else if ch < 2 {
-                                src[ch]
-                            } else {
-                                0.0
-                            });
-                        }
+                        let submitted = write_frame(dst, *src);
                         s.frames += 1;
-                        s.nonzero += u64::from(src[0] != 0.0 || src[1] != 0.0);
-                        s.last_nonzero += u64::from(src[0] != 0.0 || src[1] != 0.0);
-                        s.peak = s.peak.max(src[0].abs()).max(src[1].abs());
+                        s.nonzero += u64::from(submitted[0] != 0.0 || submitted[1] != 0.0);
+                        s.last_nonzero += u64::from(submitted[0] != 0.0 || submitted[1] != 0.0);
+                        s.peak = s.peak.max(submitted[0].abs()).max(submitted[1].abs());
                         let i = s.cursor;
-                        s.ring[i] = *src;
+                        s.ring[i] = submitted;
                         s.cursor = (i + 1) % TRACE_FRAMES;
                     }
                 }
@@ -147,4 +146,51 @@ fn build<T: cpal::SizedSample + cpal::FromSample<f32>>(
             None,
         )
         .map_err(|e| format!("audio_unavailable: output stream: {e}"))
+}
+/// Observe the exact samples written into THIS stream, after channel routing
+/// and device-format quantization. A mono cancellation must observe silence.
+fn write_frame<T: cpal::SizedSample + cpal::FromSample<f32>>(dst: &mut [T], src: Stereo) -> Stereo
+where
+    f32: cpal::FromSample<T>,
+{
+    let channels = dst.len();
+    let mut observed = [0.0; 2];
+    for (ch, value) in dst.iter_mut().enumerate() {
+        *value = T::from_sample(if channels == 1 {
+            (src[0] + src[1]) * 0.5
+        } else if ch < 2 {
+            src[ch]
+        } else {
+            0.0
+        });
+        if ch < 2 {
+            observed[ch] = cpal::Sample::from_sample(*value);
+        }
+    }
+    if channels == 1 {
+        observed[1] = observed[0];
+    }
+    observed
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn observed_native_pcm_is_after_mono_mapping_and_signed_unsigned_quantization() {
+        let mut mono = [9.0f32];
+        assert_eq!(write_frame(&mut mono, [0.75, -0.75]), [0.0; 2]);
+        assert_eq!(mono, [0.0]);
+        let mut stereo = [0i16; 2];
+        let observed = write_frame(&mut stereo, [0.25, -0.5]);
+        assert_eq!(stereo, [8192, -16384]);
+        assert_eq!(observed, [0.25, -0.5]);
+        let mut unsigned = [0u16; 2];
+        let observed = write_frame(&mut unsigned, [0.25, -0.5]);
+        assert_eq!(unsigned, [40960, 16384]);
+        assert_eq!(observed, [0.25, -0.5]);
+        let mut wider = [9.0f32; 4];
+        assert_eq!(write_frame(&mut wider, [0.25, -0.5]), [0.25, -0.5]);
+        assert_eq!(wider, [0.25, -0.5, 0.0, 0.0]);
+    }
 }

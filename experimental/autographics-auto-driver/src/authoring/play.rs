@@ -1,4 +1,7 @@
 //! Driver-local retained Auto world. Publication is explicit, after GPU preparation.
+#[cfg(test)]
+#[path = "play_audio_tests.rs"]
+mod audio_admission_tests;
 use super::{
     assets,
     document::{Document, Object},

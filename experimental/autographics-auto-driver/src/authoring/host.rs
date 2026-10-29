@@ -557,7 +557,7 @@ impl Host {
         };
         let m = audio.mixer.lock().unwrap();
         let s = audio.observation.lock().unwrap();
-        json!({"manager":true,"run":m.run(),"voices":m.voices(),"fault":m.fault(),"device":audio.device,"rate":audio.rate,"callbacks":s.callbacks,"frames":s.frames,"nonzero":s.nonzero,"peak":s.peak,"max_us":s.max_us,"deadline_misses":s.deadline_misses,"quantum_frames":s.last_quantum,"reserved_cpu_bytes":super::public_audio::native::Native::reserved_bytes()})
+        json!({"manager":true,"run":m.run(),"voices":m.voices(),"fault":m.fault(),"device":audio.device,"rate":audio.rate,"channels":audio.channels,"sample_format":audio.sample_format,"callbacks":s.callbacks,"frames":s.frames,"nonzero":s.nonzero,"peak":s.peak,"max_us":s.max_us,"deadline_misses":s.deadline_misses,"quantum_frames":s.last_quantum,"reserved_cpu_bytes":super::public_audio::native::Native::reserved_bytes()})
     }
     pub fn resource_snapshot(&self) -> serde_json::Value {
         let scene = match self.rt.content(self.three).unwrap() {

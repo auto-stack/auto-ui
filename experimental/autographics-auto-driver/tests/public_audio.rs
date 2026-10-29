@@ -378,3 +378,273 @@ fn packed_2d_actions_preserve_original_bit_order_and_consumption() {
         assert_eq!(s.int("old_pressed", &[]).unwrap(), 0);
     }
 }
+
+#[test]
+fn exact_integer_ordinals_four_request_bound_and_optional_bundle_conflicts() {
+    for api in [Api::Audio2V1, Api::Audio3V1] {
+        let user="var r=0\nvar step=0\nfn app_start(){}\nfn app_update(dt float){step=step+1;var o=16777217;if step==2 {o=2147483646};if step==3 {o=2147483647};r=ag_audio_emit(o,0,0.5)}\n";
+        let mut s = session(api, user);
+        for (t, ordinal) in [(1, 16777217), (2, 2147483646)] {
+            tick(&mut s, t);
+            assert_eq!(s.int("_ag_status", &[]).unwrap(), 0);
+            assert_eq!(s.int("_ag_audio_i", &[Int(0), Int(0)]).unwrap(), ordinal);
+        }
+        tick(&mut s, 3);
+        assert_eq!(
+            s.int("_ag_status", &[]).unwrap(),
+            52,
+            "ordinal exhaustion never wraps"
+        );
+        for n in [4, 5] {
+            let mut s=session(api,&format!("var r=0\nfn app_start(){{}}\nfn app_update(dt float){{for i in 0..{n} {{r=ag_audio_emit(i+1,i%2,0.5)}}}}\n"));
+            tick(&mut s, 1);
+            assert_eq!(
+                s.int("_ag_status", &[]).unwrap(),
+                if n == 4 { 0 } else { 51 }
+            );
+            if n == 4 {
+                assert_eq!(s.int("_ag_audio_count", &[]).unwrap(), 4);
+            }
+        }
+        let visual = if api == Api::Audio3V1 {
+            "ag_visual_pose(0,1,2,0.1,1,0.0)"
+        } else {
+            "ag_sprite_frame(1,0,0,4,4,0)"
+        };
+        let b = bundle(api, "1");
+        for body in [
+            format!("r={visual};r={visual}"),
+            format!("r={visual};r={b}"),
+            format!("r={b};r={visual}"),
+        ] {
+            let mut s = session(
+                api,
+                &format!("var r=0\nfn app_start(){{}}\nfn app_update(dt float){{{body}}}\n"),
+            );
+            tick(&mut s, 1);
+            assert_eq!(s.int("_ag_status", &[]).unwrap(), 50, "{body}");
+        }
+        let mut control=session(api,&format!("var r=0\nfn app_start(){{}}\nfn app_update(dt float){{r={visual};r=ag_audio_emit(1,0,0.5)}}\n"));
+        tick(&mut control, 1);
+        assert_eq!(
+            control.int("_ag_status", &[]).unwrap(),
+            0,
+            "standalone visual plus charged standalone audio is legitimate"
+        );
+        for n in [0, 4, 5] {
+            let present = if api == Api::Audio3V1 {
+                format!("ag_present3d(-1,0,-1,0.0,0,0.0,{n},1,0,0.1,2,1,0.2,3,0,0.3,4,1,0.4)")
+            } else {
+                format!("ag_present2d(-1,0,0,0,1,1,0,{n},1,0,0.1,2,1,0.2,3,0,0.3,4,1,0.4)")
+            };
+            let mut s = session(
+                api,
+                &format!("var r=0\nfn app_start(){{}}\nfn app_update(dt float){{r={present}}}\n"),
+            );
+            tick(&mut s, 1);
+            assert_eq!(
+                s.int("_ag_status", &[]).unwrap(),
+                if n <= 4 { 0 } else { 51 }
+            );
+            if n <= 4 {
+                assert_eq!(s.int("_ag_audio_count", &[]).unwrap(), n);
+            }
+        }
+    }
+}
+
+fn decoded_wave_cues() -> (
+    Vec<autographics_auto_driver::authoring::public_audio::mixer::Cue>,
+    std::sync::Arc<autographics_auto_driver::authoring::assets::Asset>,
+) {
+    use autographics_auto_driver::authoring::{
+        assets,
+        document::Document,
+        public_audio::{self, CueRef},
+    };
+    let mut raw = b"RIFF".to_vec();
+    raw.extend_from_slice(&116u32.to_le_bytes());
+    raw.extend_from_slice(b"WAVEfmt ");
+    raw.extend_from_slice(&16u32.to_le_bytes());
+    raw.extend_from_slice(&1u16.to_le_bytes());
+    raw.extend_from_slice(&2u16.to_le_bytes());
+    raw.extend_from_slice(&44100u32.to_le_bytes());
+    raw.extend_from_slice(&176400u32.to_le_bytes());
+    raw.extend_from_slice(&4u16.to_le_bytes());
+    raw.extend_from_slice(&16u16.to_le_bytes());
+    raw.extend_from_slice(b"data");
+    raw.extend_from_slice(&80u32.to_le_bytes());
+    for i in 1..=20i16 {
+        raw.extend_from_slice(&(i * 1000).to_le_bytes());
+        raw.extend_from_slice(&(-i * 500).to_le_bytes());
+    }
+    let mut registry = assets::Registry::new();
+    let asset = public_audio::import_raw(raw.into(), &registry, None).unwrap();
+    assets::insert(&mut registry, asset.clone()).unwrap();
+    let mut doc = Document::empty("wave-oracle".into());
+    doc.schema = "autographics.scene/7".into();
+    doc.assets.push(asset.identity.clone());
+    doc.cues = Some(vec![
+        CueRef {
+            name: "short".into(),
+            asset: asset.identity.key(),
+            start_frame: 4,
+            end_frame: 8,
+            gain: 0.5,
+        },
+        CueRef {
+            name: "long".into(),
+            asset: asset.identity.key(),
+            start_frame: 12,
+            end_frame: 18,
+            gain: 1.0,
+        },
+    ]);
+    (public_audio::resolve_cues(&doc, &registry).unwrap(), asset)
+}
+fn waveform(rate: u32) -> Vec<[f32; 2]> {
+    let n = (6.0 * rate as f64 / 44100.0).ceil() as usize + 2;
+    (0..n)
+        .map(|i| {
+            let t = i as f64 * 44100.0 / rate as f64;
+            let first = if t < 4.0 {
+                (5.0 + t.min(3.0)) * 1000.0 / 32768.0 * 0.125
+            } else {
+                0.0
+            };
+            let second = if t < 6.0 {
+                (13.0 + t.min(5.0)) * 1000.0 / 32768.0 * 0.5
+            } else {
+                0.0
+            };
+            [(first + second) as f32, (-(first + second) * 0.5) as f32]
+        })
+        .collect()
+}
+#[test]
+fn decoded_cue_ranges_gains_tails_and_transport_replays_match_independent_waveform() {
+    use autographics_auto_driver::authoring::public_audio::mixer::{Accepted, Mixer};
+    for api in [Api::Audio2V1, Api::Audio3V1] {
+        let (cues, _asset) = decoded_wave_cues();
+        for rate in [22050, 44100, 48000] {
+            let mut s = session(
+                api,
+                &format!(
+                    "var r=0\nfn app_start(){{}}\nfn app_update(dt float){{r={}}}\n",
+                    bundle(api, "1")
+                ),
+            );
+            tick(&mut s, 1);
+            let packet = packet(&mut s, 1);
+            let mut mixer = Mixer::default();
+            mixer.begin(1).unwrap();
+            mixer
+                .accept(packet.clone(), &cues, false, || Ok(()))
+                .unwrap();
+            let expected = waveform(rate);
+            let mut actual = vec![[0.0; 2]; expected.len()];
+            mixer.render(&mut actual, rate);
+            for (i, (a, e)) in actual.iter().zip(&expected).enumerate() {
+                for ch in 0..2 {
+                    assert!(
+                        (a[ch] - e[ch]).abs() < 0.000001,
+                        "{api:?} rate{rate} frame{i} ch{ch}: {a:?} != {e:?}"
+                    );
+                }
+            }
+            assert_eq!(mixer.voices(), 0, "voice ends at accepted half-open span");
+            assert_eq!(
+                mixer
+                    .accept(packet.clone(), &cues, false, || panic!(
+                        "same logical packet cannot accept twice"
+                    ))
+                    .unwrap(),
+                Accepted::Replay
+            );
+            mixer.render(&mut actual, rate);
+            assert!(
+                actual.iter().all(|f| *f == [0.0; 2]),
+                "finished voice cannot be replayed by transport"
+            );
+            let mut replaced = packet;
+            replaced.requests[0].gain = 0.5;
+            assert!(mixer
+                .accept(replaced, &cues, false, || panic!(
+                    "changed packet at accepted tick"
+                ))
+                .is_err());
+        }
+    }
+}
+#[test]
+fn native_stream_contains_actual_decoded_span_waveform_once_after_common_accept() {
+    use autographics_auto_driver::authoring::public_audio::native::{Native, TRACE_FRAMES};
+    let (cues, _asset) = decoded_wave_cues();
+    let mut s = session(
+        Api::Audio3V1,
+        &format!(
+            "var r=0\nfn app_start(){{}}\nfn app_update(dt float){{r={}}}\n",
+            bundle(Api::Audio3V1, "1")
+        ),
+    );
+    tick(&mut s, 1);
+    let packet = packet(&mut s, 1);
+    let native = Native::open().unwrap();
+    {
+        let mut mixer = native.mixer.lock().unwrap();
+        mixer.begin(1).unwrap();
+        mixer
+            .accept(packet.clone(), &cues, false, || Ok(()))
+            .unwrap();
+    }
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+    loop {
+        if native.observation.lock().unwrap().nonzero > 0 {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "native span PCM missing"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    }
+    let mut expected = waveform(native.rate);
+    if native.channels == 1 {
+        for p in &mut expected {
+            let mono = (p[0] + p[1]) * 0.5;
+            *p = [mono; 2];
+        }
+    }
+    let tolerance = if native.sample_format == "F32" {
+        0.000001
+    } else {
+        2.0 / 32768.0
+    };
+    {
+        let observation = native.observation.lock().unwrap();
+        assert!(
+            (0..TRACE_FRAMES).any(|start| expected.iter().enumerate().all(|(i, e)| (0..2).all(
+                |ch| (observation.ring[(start + i) % TRACE_FRAMES][ch] - e[ch]).abs() <= tolerance
+            ))),
+            "actual submitted PCM must contain complete expected positions/gains/tails"
+        );
+        println!("native span waveform device={} rate={} channels={} format={} submitted_frames={} max_us={} deadline_misses={}",native.device,native.rate,native.channels,native.sample_format,expected.len(),observation.max_us,observation.deadline_misses);
+    }
+    let before = native.observation.lock().unwrap().nonzero;
+    {
+        let mut m = native.mixer.lock().unwrap();
+        assert_eq!(
+            m.accept(packet, &cues, false, || panic!(
+                "native replay cannot recommit"
+            ))
+            .unwrap(),
+            autographics_auto_driver::authoring::public_audio::mixer::Accepted::Replay
+        );
+    }
+    std::thread::sleep(std::time::Duration::from_millis(30));
+    assert_eq!(
+        native.observation.lock().unwrap().nonzero,
+        before,
+        "transport replay must not submit another waveform"
+    );
+}
