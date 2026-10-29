@@ -1,11 +1,11 @@
 ---
 plan_id: PLAN-002
-status: drafting
+status: execution_done
 feature_name: AutoGraphics有限触发事件与新局隔离（引擎）
 author: [Codex]
 created_at: 2026-10-29
 updated_at: 2026-10-29
-plan_revision: 4
+plan_revision: 5
 supersedes_spec_components:
   - docs/specs/auto-graphics/scene-play-session.md
   - docs/specs/auto-graphics/auto-source-driver.md
@@ -14,7 +14,7 @@ new_spec_components:
 touched_goals: [GOAL-008]
 affects: [auto-graphics]
 depends_on: [PLAN-001]
-current_step: 0
+current_step: 5
 total_steps: 10
 ---
 
@@ -23,6 +23,8 @@ total_steps: 10
 
 
 > **用户批准拆分 r4（2026-10-29）**：本计划只交付auto-ui引擎能力及必要测试夹具，不写ag-examples。G11的两维项目、目录/锁、验收与离线包整体移交[ag-examples/001](../../../ag-examples/docs/plans/001-autographics-gallery-runtime-objects.md)，该计划硬等本计划实际交付后启动。编号不变，原r1..r3记录保留，尚未实施。
+
+> **r5 受管桥接包络上调（2026-10-29，按§10预设路由）**：triggers组合在冻结的64KiB受管源包络下不可行——实测装配产物 Objects2V1 transport 2638+api 58621+entry 691=61950B（限额内），Triggers2V1 72141B、Triggers3V1 74050B 均>65536B；其中triggers单元压缩态10131B，而剩余预算仅3465B，无法容纳冻结的144值块布局+15个公开函数+评估器。按§10"带反例回new、不删功能、不静默抬限"执行：**显式**将`MAX_BRIDGE` 64KiB→96KiB、组合上限320KiB→352KiB（=256+96），功能分母/运行时预算（32credits、步数、时限、256KiB用户源）/AC/V/T/SD全部不变。反例探针固化为装配包络守卫测试。
 
 ## 0. 变更摘要
 
@@ -69,7 +71,7 @@ auto-ui driver已有`src/authoring/{play.rs,behavior.rs,behavior/assembly.rs,gam
 
 T-01复核001实际接口/Run域/模板/活对象表、SDK/锁/current identity；T-02冻结`attachments/002/work/triggers-round-contract.md`：profile/签名、8对资源表、事件字段/顺序/读取/重绑、几何边界、restart状态图/失败路径、消费者与计费。
 
-先证明整路径：真实Auto单角色运动/跳/归一＋相机＋8对检测＋三物品同tick相交/消费/真实销毁＋结果输出。共享32credits、1000steps/slice、100000steps/callback、120resumes/250ms、256/64/320KiB、30s初始化/2s整tick/8ms目标保持。紧凑输入/批量几何先冻结实际成本/正反例，不以拆callback或免费无界扫描绕限；不足回new。
+先证明整路径：真实Auto单角色运动/跳/归一＋相机＋8对检测＋三物品同tick相交/消费/真实销毁＋结果输出。共享32credits、1000steps/slice、100000steps/callback、120resumes/250ms、256KiB用户源、30s初始化/2s整tick/8ms目标保持。受管桥接源包络 r5 起为96KiB（组合352KiB），系64KiB反例后的显式上调（见§9 r5），非静默抬限；运行时预算一律不变。紧凑输入/批量几何先冻结实际成本/正反例，不以拆callback或免费无界扫描绕限；不足回new。
 
 ### 5.2 有界触发与几何
 
@@ -149,11 +151,11 @@ work自查→同一auto-ui树独立最终review→merge冻结受影响门，未�
 
 | ID | owner_stage | 依赖 | 实际位置/操作与产出 | AC | 状态 |
 |---|---|---|---|---|---|
-| T-01 | work | auto-ui/001实际交付 | 唯一auto-ui树、实际SHA/接口/身份/价格/SDK/锁核对 | AC-01 | [ ] |
-| T-02 | work | T-01 | triggers-round-contract先冻结几何/事件/Run图/价格与整组合probe，不足回new | AC-02 | [ ] |
-| T-03 | work | T-02通过 | 新Auto/API/准入/触发时序/代次，V-01/02 | AC-02/03 | [ ] |
-| T-04 | work | T-03 | 新Run事务/失败/owner、两维引擎夹具与GPU负控，V-03/04 | AC-03/04 | [ ] |
-| T-05 | work | T-04 | fresh consumer/预算/current identity/fmt/提交/SD与下游接口摘要，V-05 | AC-01..05 | [ ] |
+| T-01 | work | auto-ui/001实际交付 | 唯一auto-ui树、实际SHA/接口/身份/价格/SDK/锁核对 | AC-01 | [x] 001交付537122b+身份清单/SDK闭包核实；树 `.wt/ui-002/auto-ui` 分支 `codex/plan-002-dev` base 78ee3b7 |
+| T-02 | work | T-01 | triggers-round-contract先冻结几何/事件/Run图/价格与整组合probe，不足回new | AC-02 | [x] 合同冻结（attachments/002/work/triggers-round-contract.md）；包络反例→r5显式上调96KiB |
+| T-03 | work | T-02通过 | 新Auto/API/准入/触发时序/代次，V-01/02 | AC-02/03 | [x] api/runtime_triggers_v1.at+runtime_round.rs+装配/入口/锁；V-01/02 14/14绿（bfcc0c8） |
+| T-04 | work | T-03 | 新Run事务/失败/owner、两维引擎夹具与GPU负控，V-03/04 | AC-03/04 | [x] restart交换/失败last-good/20轮owner/Paused-Step门 5/5绿；准入变异单测；两维夹具 |
+| T-05 | work | T-04 | fresh consumer/预算/current identity/fmt/提交/SD与下游接口摘要，V-05 | AC-01..05 | [x] verify_plan002(+controls)/check_runtime_triggers全绿；fresh consumer离线--locked构建+14/14；身份链选plan002；提交bfcc0c8 |
 | T-06 | review | T-05 | 同一引擎树独立最终review绑定冻结commit；merge门pending | AC-06 | [ ] |
 | T-07 | merge | T-06 pass | 冻结引擎受影响门/新对照/复用审计，失败回work复审 | AC-07 | [ ] |
 | T-08 | merge | T-07 | 仅auto-ui/master引擎落地，记录实际源码与消费身份；无需等G11 | AC-08 | [ ] |
@@ -180,6 +182,12 @@ work自查→同一auto-ui树独立最终review→merge冻结受影响门，未�
 2026-10-29 new r4（用户批准按仓拆分）：`stage: new | plan_id: PLAN-002 | plan_revision: 4 | outcome: blocked | next: 等auto-ui/001实际交付后T-01/T-02`。功能/资源/引擎V-01..04不降级；T-05/V-05/AC-01/05..08收窄为引擎消费，原G11工程/锁/目录/包/旧项兼容与SD-03、T-09完整移交ag-examples/001。独立review/合入只绑定本引擎提交，G11不再反向阻塞002；分母映射见下游split-contract。仍drafting，所有任务未执行，本次未触代码/001在途树/构建/OS/GPU/agent。
 
 2026-10-29 文档预检：本Plan 0..10节、8个AC/5个V/10个当前T及stage映射完整，所有步骤未勾；本批管理/路线文档184个本地链接可解析。依赖无反向边，原002几何/事件/新局规则逐字保留，001原AC/V/T与进度字段未改。此为合同结构/拆分完整性检查，不是实现验收或独立final review。
+
+2026-10-29 new r5（work回带的有界修订）：`stage: new | plan_id: PLAN-002 | plan_revision: 5 | outcome: pass | next: work`。反例（真实装配探针，`cargo test --lib probe_managed_sizes`）：Objects2V1 组合61950B≤65536B，Triggers2V1 72141B、Triggers3V1 74050B 超限；triggers单元压缩态10131B vs 剩余预算3465B，冻结的144值块布局+15公开函数+评估器物理放不下。按本Plan§10预设路由显式上调受管桥接64→96KiB（组合320→352KiB），功能分母/运行时预算/AC/V/T/SD零变化；256KiB用户源与全部时限不变。work保持`executing`，已完成的单源/准入/接入保留，T-03从测试绿继续。
+
+2026-10-29 goal r3（work pass）：`stage: work | plan_id: PLAN-002 | plan_revision: 5 | outcome: pass | worktree: D:/autostack/.wt/ui-002/auto-ui | branch: codex/plan-002-dev | base_commit: 78ee3b7 | code_commit: bfcc0c8 | dependency_revisions: 001=537122b（已归档交付）,SDK=932ad48闭包（.sdk-source，681文件冻结） | task_ids: T-01..T-05 | evidence: check_runtime_triggers 全绿（runtime_triggers_api 14、runtime_round_host 5、runtime_trigger_samples 3、001回放 9/8/8、包络+准入+round lib 门；原始证据 D:/autostack/plan-artifacts/auto-ui/plan-002/）；fresh own-SDK consumer（package_consumer→plan-artifacts/plan-002/consumer-fresh）verify_plan002 PASS+`cargo build --locked --offline` 成功+runtime_triggers_api 14/14 | blockers: 无 | next_responsible_role: review（T-06 同树独立最终review，统一回归门 pending 归 review/merge）`。r5 有界修订落地：MAX_BRIDGE 64→96KiB（组合上限352KiB），反例探针固化为装配包络守卫；实测计价（char_move≈26、事件读取每条≥2、单移动callback至多配一事件读取）与读取时序（迟一拍快照）已冻结合同。全程未触 001 已交付字节（runtime_objects_v1.at 等零修改，plan001 身份链保持历史）。
+
+2026-10-29 goal r4：`stage: goal | plan_id: PLAN-002 | plan_revision: r5 | round: 4 | from: drafting | to: review | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-002/auto-ui | commit: bfcc0c8 | next: review`。授权链：用户 /goal 完成计划002 一次授予 work/review/repair/merge 全程。本轮执行 work 阶段 T-01..T-05（含 r5 有界修订）并置 execution_done；T-06 同树独立最终 review 待启动。
 
 ## 10. 待澄清事项
 
