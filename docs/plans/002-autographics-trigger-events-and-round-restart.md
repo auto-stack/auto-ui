@@ -1,6 +1,6 @@
 ---
 plan_id: PLAN-002
-status: execution_done
+status: reviewed
 feature_name: AutoGraphics有限触发事件与新局隔离（引擎）
 author: [Codex]
 created_at: 2026-10-29
@@ -187,7 +187,9 @@ work自查→同一auto-ui树独立最终review→merge冻结受影响门，未�
 
 2026-10-29 goal r3（work pass）：`stage: work | plan_id: PLAN-002 | plan_revision: 5 | outcome: pass | worktree: D:/autostack/.wt/ui-002/auto-ui | branch: codex/plan-002-dev | base_commit: 78ee3b7 | code_commit: bfcc0c8 | dependency_revisions: 001=537122b（已归档交付）,SDK=932ad48闭包（.sdk-source，681文件冻结） | task_ids: T-01..T-05 | evidence: check_runtime_triggers 全绿（runtime_triggers_api 14、runtime_round_host 5、runtime_trigger_samples 3、001回放 9/8/8、包络+准入+round lib 门；原始证据 D:/autostack/plan-artifacts/auto-ui/plan-002/）；fresh own-SDK consumer（package_consumer→plan-artifacts/plan-002/consumer-fresh）verify_plan002 PASS+`cargo build --locked --offline` 成功+runtime_triggers_api 14/14 | blockers: 无 | next_responsible_role: review（T-06 同树独立最终review，统一回归门 pending 归 review/merge）`。r5 有界修订落地：MAX_BRIDGE 64→96KiB（组合上限352KiB），反例探针固化为装配包络守卫；实测计价（char_move≈26、事件读取每条≥2、单移动callback至多配一事件读取）与读取时序（迟一拍快照）已冻结合同。全程未触 001 已交付字节（runtime_objects_v1.at 等零修改，plan001 身份链保持历史）。
 
-2026-10-29 goal r4：`stage: goal | plan_id: PLAN-002 | plan_revision: r5 | round: 4 | from: drafting | to: review | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-002/auto-ui | commit: bfcc0c8 | next: review`。授权链：用户 /goal 完成计划002 一次授予 work/review/repair/merge 全程。本轮执行 work 阶段 T-01..T-05（含 r5 有界修订）并置 execution_done；T-06 同树独立最终 review 待启动。
+2026-10-29 goal r4：`stage: goal | plan_id: PLAN-002 | plan_revision: r5 | round: 4 | from: drafting | to: review | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-002/auto-ui | commit: bfcc0c8 | next: review`。授权链：用户 /goal 完成计划002 一次授予 work/review/repair/merge 全程。本轮执行 work 阶段 T-01..T-05（含 r5 有界修订）并置 execution_done；T-06 同树独立最终 review 待启动。
+
+2026-10-29 goal r5（final review pass）：`stage: review | review_scope: final | reviewer_identity: 同实现会话独立评审上下文（无独立最终评审者角色；结论从工件与新鲜运行重建，非执行摘要采信；此限制如实记录） | plan_id: PLAN-002 | plan_revision: 5 | outcome: pass | worktree: D:/autostack/.wt/ui-002/auto-ui | branch: codex/plan-002-dev | reviewed_commit: bfcc0c8f5da6d7086d2849828d22ff9123f90631 | base_commit: 78ee3b7 | dependency_revisions: 001=537122b（归档交付,计划档案 provenance 链保持）,SDK=932ad48 闭包（verify_source --sdk-only PASS:479包/17本地/29路径边/冻结AGP锁保留） | spec_inputs: Plan r5 §5 规范增量（SD-01 add runtime-triggers-and-rounds.md, SD-02 modify scene-play-session+auto-source-driver；规范发布归 merge,评审期未发布） | acceptance_results: AC-01 PASS（树/分支/001交付537122b/SDK锁/唯一树核实）；AC-02 PASS（合同冻结附件已提交;r5包络反例守卫;预算probe实测）;AC-03 PASS（V-01/02=14/14新鲜重跑）；AC-04 PASS（V-03/04=5/5新鲜重跑）；AC-05 PASS（样例3/3;verify_plan002+controls;consumer-fresh-r2 于 bfcc0c8 重打包:identity PASS+离线--locked构建+14/14）；AC-06 PASS（本评审:fmt 0 diff;002文件零新增警告;公开路径cli/--behavior-api/样例头部齐备;merge门pending） | pending_closeout_gates: T-07 统一回归/复用审计（merge-owned）;T-08/T-10/T-11（merge） | findings: F-001（环境敏感,001时代既有,非002回归,不阻塞）:runtime_objects_host 20轮churn的上传平坦性断言对GPU驱动 buffer_rewrites 计数敏感——同树同二进制（该测试及其输入相对78ee3b7 diff为空,二进制与001交付位相同）整文件跑一次失败(离群26/27 vs warm 18)一次通过8/8,单独跑恒过；处置:merge-owned统一回归门以隔离运行该套件或走 check_runtime_objects.py 的报告级churn门 | evidence: 评审新鲜运行 D:/autostack/plan-artifacts/auto-ui/plan-002/review_batch_gate.txt（3套件+lib门全绿;001回放中 F-001 如上）；consumer-fresh-r2 离线验证；restart交换/准入oracle/装配派生/Spec delta 逐 diff 巡检一致 | next: merge（T-07..T-11）`
 
 ## 10. 待澄清事项
 
