@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-10-30
 updated_at: 2026-10-30
 plan_revision: 1
-current_step: 1
+current_step: 2
 total_steps: 10
 depends_on: [auto-ui/PLAN-006]
 supersedes_spec_components: [docs/specs/auto-graphics/scene-assets.md, docs/specs/auto-graphics/behavior-api.md]
@@ -37,6 +37,8 @@ touched_goals: [GOAL-008]
 已核driver `src/host.rs`的私有Audio/enable_audio和`squash_host.rs`专用Music、AGP `src/render2d/text.rs`；两包kira0.9（ogg）已存在。公共owner应落driver `authoring/{assets,document,storage,behavior,play,host}.rs`、`behavior/assembly.rs`与`host/{viewport,play_adapter}.rs`，新音频模块/可信unit和工具由T-02冻结准确新路径，不复制专用游戏判断。
 
 拟新增`driver/tests/public_audio.rs`、`driver/tools/check_public_audio.py`、`verify_plan012.py`及两维Auto夹具（driver=experimental/autographics-auto-driver）。当前都不存在，命令/selector/wire/schema号不预造为已支持。
+
+2026-10-30 T-02现状：`authoring/public_audio/{mod,codec,mixer,native,bank}.rs`、`tests/public_audio{,_codec,_host,_compat}.rs`及`examples/audio_decode.rs`已建立并验证；显式audio2d/audio3d、scene/7及固定16scalar wire见执行合同当前关闭节。两个最终validator工具、正式两维bound样例与fresh consumer仍属T-06待建；上段“当前不存在”为规划时事实，不是已交付API声明。
 
 ## 4. 需求分析与背景调查
 
@@ -112,7 +114,7 @@ work自查后同树独立上下文review全部AC/V/S/SD、计价/codec/不可逆
 | ID | owner_stage | 依赖 | 操作/产物 | AC | 状态 |
 |---|---|---|---|---|---|
 | T-01 | work | 用户启动、006实际delivery | 核公开合同/SDK/锁/identity/设备条件与owner，建唯一ui-012树 | AC-01/05 | [x] f7c83c6基线；006独立R2/实际c681663/1477identity controls与SDK681/17包29边479metadata通过；native输出设备可用，执行合同含边界 |
-| T-02 | work | T-01 | public-audio-contract先冻结支持/计价/bundle/效果时序/PCM入口，两维整链可行性probe，不足回new | AC-01..05 | [ ] |
+| T-02 | work | T-01 | public-audio-contract先冻结支持/计价/bundle/效果时序/PCM入口，两维整链可行性probe，不足回new | AC-01..05 | [x] ef438f9；14定向integration+1bank组合，15组独立PCM波形/长度交叉oracle；两维真实32/33、Host同帧/原声native、scene7保存搬迁/Step静音/last-good/旧15hash通过；完整AC后继门仍pending |
 | T-03 | work | T-02通过 | 有限codec/cue/asset闭包与存储版本化，V-01 | AC-01/02 | [ ] |
 | T-04 | work | T-03 | Auto/Host有界请求与mixer/native输出、接受幂等/32-33/错bundle，V-02/03 | AC-03 | [ ] |
 | T-05 | work | T-04 | 生命周期/设备故障/容量/20轮owner及完整账，V-03/04 | AC-04 | [ ] |
@@ -132,6 +134,16 @@ work自查后同树独立上下文review全部AC/V/S/SD、计价/codec/不可逆
 
 2026-10-30 goal round1：`stage: goal | plan_id: PLAN-012 | plan_revision: r1 | round: 1 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-012/auto-ui | commit: fe59bc0 | next: work T-02`。本轮为实质实施/准入/真实输出可行性进展，不是work-complete verdict；1/10，0failed final review/0repaircycle，无用户待答。下一轮复读本Plan与唯一树，继续T-02 Host/计账/旧装配域，仍须先关闭T-02才开放后续正式交付任务。
 
+2026-10-30 work T-02 closure：`stage: work | plan_id: auto-ui/PLAN-012 | plan_revision: 1 | outcome: pass (T-02 checkpoint; work_complete:false) | worktree_path: D:/autostack/.wt/ui-012/auto-ui | branch: codex/plan-012-dev | base_commit: f7c83c6fbe55b51b4c1e830a4175c94ec5c0d131 | code_commit: ef438f9cff1d6313100ca0e1873079da31b7bd09 | dependency_revisions: SDK681/two lock package versions unchanged; no dependency code writes | task_ids: T-02 closed | evidence: attachments/012/work/public-audio-contract.md current closure | blockers: none | next_responsible_role: work T-03`。scene7资源采样元数据/cue、共享Registry/raw/CPU账、Editor stamped audio edit和作者Host普通Run默认native已接通；共16typed scalar wire随同visual/motion/camera/event候选，prepare/voice检查→共同accept后才提交一次。Pause单个在途候选沿原Play完成并在同锁保持新voice暂停；neutral Step标suppressed_by_step、消费ordinal无voice/Resume补播，Stop后manager保留但Run/voice清零、真实下一服务quantum观测Run0/nonzero0；旧begin/control受Run high-water拒。33rd调用或GPU prepare失败保last-good完整Frame/GPU图且Fault停止声音，后续pump不覆盖原因。原声native最后2D/3D各nonzero441frames、max83/78us、deadline_misses0；manager33504B，2D CPU249993B，3D含pose1381208B；VM/Host8ms目标仍unmeasured，T06负责完整性能与consumer门。warm新增tick零decode/mesh上传。保存复用已接受音频字节，ogg/wav根磁盘清单/配额/保留名/verify闭包接通，A→B冷重开并再Run通过。
+
+原round1 padded样本计数经独立soundfile0.13.1/libsndfile1.2.2确认非最终interval：修正pinned demux单个first+last音频page将tail误归start的边界，raw blocks后显式使用受限容器有效区间，保留意义样本、去声明padding；临时前后window先预测计账，保留PCM仍10s/16MiB。三原件正确7403/12643/2458frames、44100Hz；额外三rate×mono/stereo×单/多页12控制共15组完整PCM shape与波形对照通过，maxabs1.788139343e-7，非本解码器自我对照。原始完整PCM/生成源/外置oracle工具只本地，report SHA256f5b5a439dd8e82bad9729e6d3b748247defe23fe7d58c9f8207a4826cf5da476；小型独立预期样本/长度JSON是永久测试夹具，不以旧padding结果作新cue域。受限VQ/VLC/payload检查仍先于decode；pinned lookup1无法表达的整数运算具名unsupported，支持域已写合同，不宣称任意Vorbis配置。
+
+实际三cue bank22504frames/90060B/SHA b0b740dc49e51abefff9bb1af830080fe00f817b468614992040d438d6171c3d，量化误差<=1.525878906e-5、无重采样/超幅削波；公开三cue共用同一PCM Arc。真实4模型/共图5raw+bank1为6raw/236544B、CPU1448422B/GPU1145956B；同一生产candidate预算接受第7字体slot26828raw/保守4MiB CPU+GPU预留，字体准入渲染仍属013，未假称本期已实现。旧15profile实际装配combined/api/bridge/version/profile均与同树临时编译pristine f7assembler的基线相同，临时enum穷举兼容只覆盖从未选择的新variant，finally逐字节恢复当前实现，无第二检出/agent；永久旧hash基线与原capture收据可复验。
+
+当前14integration(6producer/3codec/1compat/4Host)0failed/0filtered，额外bank1selected/33unrelated filtered通过；Run watermark影响重放audio+Host10/10，去除未使用假decode字段后只重放受影响Host预算1/1和bank预算1/1，其余证据按未变路径保留。主要log：t02-integration-frozen SHA2d17ea34091cc47e10ddf85c1d1f5d938f69a116433917033fd4e9374d718268；t02-final-audio-host SHA f5a7d9bb65c309384b1520c97f70a1c3c34ab324d9b6f6b9412fcb8deb9199e1；最后metrics logs SHA c52523438c6d0b9e77b6406924f84dd67093adc356bf2ff59276cfb80195927e /364a06b36954c3b50d3efa15fb31fc43e2cc7c9be3b9e92b028dd3c28cbbbdc4；全在D:/autostack/plan-artifacts/auto-ui/plan-012。fmt/diff和SDK681通过，SDK146既有warning保留，无本期新增warning。新源已提交clean，未生成最终012identity、未把旧006验证器当当前新版验收，未运行root/全AG门、未发布Spec/ledger、未交复审或merge。T03..10保持开放，不把可行性等同完整AC交付。
+
+2026-10-30 goal round2：`stage: goal | plan_id: PLAN-012 | plan_revision: r1 | round: 2 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-012/auto-ui | commit: ef438f9cff1d6313100ca0e1873079da31b7bd09 | next: work T-03`。前轮是基础实施进展，本轮解决真实作者Host/持久化接线、取得独立Vorbis格式反证并修正语义，再冻结完整组合/支持域/共享资源账，属实质进展；2/10，0failed final review/0repaircycle，无用户待答，目标未缩减。下一轮按T03关闭准入/保存损坏修复完整负控，后继AC/gates不提前打勾。
+
 ## 10. 待澄清事项
 
-当前无用户待答问题。006实际交付已核验、唯一ui-012树已建立，T-01完成。T-02进行中：两维真实32/33credit事件分支、bounded codec基础/原始Ogg与WAV、Auto→typed packet→mixer→native stream探针通过；作者Host共同accept、完整资源/存储账、旧15profile字节核验及codec支持边界仍待关闭，不能先执行/宣告T-03..06完成。若原合同不可行回new，不扩录音/空间音频或抬预算。011不自动升级，完整游戏G2-09/G3-08仍需真实消费者后继验证。
+当前无用户待答问题。T-01/02已完成，2/10；T-02支持域/版本/wire/效果时序与资源账冻结，作者Host两维完整accept/native/scene7闭包可行性已实测，旧15profile字节相同。round1 padded Vorbis帧数由本轮独立libsndfile oracle纠正，早期基础长度不作为当前cue/bank验收依据。下一步T-03完整codec/cue/identity/version/资源额度/存储故障与损坏修复负控；T-04完整请求PCM/native重放与wire负控、T-05容量8/9/设备故障/20轮owner、T-06 fresh consumer/identity/性能/SD及T-07..10均pending。若原合同不可行回new，不扩录音/空间音频或抬预算。011不自动升级，完整游戏G2-09/G3-08仍需真实消费者后继验证。
