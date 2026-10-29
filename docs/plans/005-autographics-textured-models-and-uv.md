@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-10-29
 updated_at: 2026-10-29
 plan_revision: 3
-current_step: 2
+current_step: 3
 total_steps: 10
 depends_on: [auto-ui/PLAN-004]
 supersedes_spec_components:
@@ -112,7 +112,7 @@ T-03..06建立新入口：`cargo test --manifest-path experimental/autographics-
 |---|---|---|---|---|---|
 | T-01 | work | 004实际交付、用户启动 | 核004/SDK/两锁/owner；恢复固定素材逐文件清单/许可/来源，建唯一ui-005树 | AC-01/05 | [x] base 2b88bd69、004与修复均已合入；SDK681冷准备通过；固定提交原件/许可/逐文件SHA恢复，见attachments/005/work/fixed-source.md |
 | T-02 | work | T-01 | textured-model-contract：支持表/身份/预算/节点关联、原件全链可行性，失败回new | AC-01/03/05 | [x] 9a0f722：固定三原件经public Host import→save→move→open→GPU capture全链通过；同根换PNG闭包及真实像素必变，切线准入澄清r3；两项测试通过，详见执行合同 |
-| T-03 | work | T-02通过 | 无任意IO的GLB/PNG闭包准入、持久化/编辑绑定、V-01/02 | AC-01/02 | [ ] |
+| T-03 | work | T-02通过 | 无任意IO的GLB/PNG闭包准入、持久化/编辑绑定、V-01/02 | AC-01/02 | [x] e158660：union先检/共享实际Arc/嵌入与外图/旧schema拒绝/错边缓存与保存故障恢复；12个新测试已有11+1执行证据，旧模型2/17抽样及PNG闭包2项定向通过；见attachments/005/work/admission-and-storage.md |
 | T-04 | work | T-03 | UV/材质/纹理shader与cache接线、V-03深度和变异 | AC-03 | [ ] |
 | T-05 | work | T-04 | 候选故障/预算/20轮/owner/共享/静态暖上传V-04 | AC-04 | [ ] |
 | T-06 | work | T-05 | fresh consumer/兼容/identity controls、fmt/warnings/提交、SD与006交付说明 | AC-01..05 | [ ] |
@@ -137,6 +137,10 @@ T-03..06建立新入口：`cargo test --manifest-path experimental/autographics-
 
 2026-10-29 goal round 2：`stage: goal | plan_id: PLAN-005 | plan_revision: r3 | round: 2 | from: work | to: work | status: executing | outcome: pass (T-02 only; work incomplete) | worktree: D:/autostack/.wt/ui-005/auto-ui | commit: 9a0f7220f64dc563bc590be2222693a3d48b821c | next: work T-03`。前轮为有效进展，本轮已新增可执行全链与原件像素敏感证据；工作树保留，无并行writer/窗口抢焦点/其它Plan变更。
 
+2026-10-29 work T-03：`stage: work | plan_id: auto-ui/PLAN-005 | plan_revision: 3 | outcome: pass (T-03 only) | worktree_path: D:/autostack/.wt/ui-005/auto-ui | branch: codex/plan-005-dev | base_commit: 2b88bd69 | code_commit: e1586602e2d48e01b3d5c80047c9d75ba74db4f6 | task_ids: T-03 | evidence: attachments/005/work/admission-and-storage.md | blockers: none | next_responsible_role: work T-04`。V-01/02闭合：共享原始内容流式预算、未引用图预测、有效UV变换溢出前置拒绝、schema6完整绑定/实际owner复用、缓存重开检查全部依赖及失败修复再读。新增测试12项有11+1原始执行证据，旧模型2/17抽样及PNG闭包2项通过；初次两个兼容发现（错误前缀、PNG哈希校验顺序）均已修复定向复验。GPU采样/完整事务/20轮寿命/consumer与identity仍未关闭，不标work完成。
+
+2026-10-29 goal round 3：`stage: goal | plan_id: PLAN-005 | plan_revision: r3 | round: 3 | from: work | to: work | status: executing | outcome: pass (T-03 only; work incomplete) | worktree: D:/autostack/.wt/ui-005/auto-ui | commit: e1586602e2d48e01b3d5c80047c9d75ba74db4f6 | next: work T-04`。前轮及本轮均为实现与已执行证据进展，非等待或同一失败重试。
+
 ## 10. 待澄清事项
 
-004实际交付与固定来源恢复已由T-01核实，不再阻塞；原件双面材质支持已获用户授权并纳入r2。当前无待用户决策；T-02继续验证原件全链与预算，不把草拟合同当通过。超出支持域/已有预算不得静默接受。Gallery内容/完整character动画由后继独立Plan负责，未在此承诺已可用。
+004实际交付与固定来源恢复已由T-01核实；原件双面材质支持已获用户授权并纳入r2，切线先检在r3澄清。T-02原件全链、T-03准入/持久化均已验证，当前无待用户决策；下一任务T-04独立像素/采样/深度/双面阴影oracle。超出支持域/已有预算不得静默接受。Gallery内容/完整character动画由后继独立Plan负责，未在此承诺已可用。
