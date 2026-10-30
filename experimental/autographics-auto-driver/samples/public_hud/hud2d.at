@@ -1,0 +1,29 @@
+// PLAN-013 finite public HUD engine fixture.
+var ok=0
+var step=0
+var observed=0
+fn app_start(){
+ ok=ag_char_bind(1)
+ ok=ag_camera_follow_2d(1,-10.0,-10.0,10.0,10.0,4.0,4.0)
+ let obj=ag_object_spawn(0,3,0.0,0.0,0.0)
+ ok=ag_trigger_bind(0,1,1,obj,0,0.0)
+}
+fn app_update(dt float){
+ step=step+1
+ let packed=ag_actions_snapshot()
+ let held=packed%64;let pressed=packed/64
+ let right=(held/2)%2;let jump=(pressed/4)%2
+ var speed=1.0
+ let token=ag_char_move(right*speed*dt,jump*dt,0.002)
+ let grounded=ag_char_grounded(token)
+ let event=ag_event_next();let pair=ag_event_pair();let phase=ag_event_phase()
+ observed=event*100+pair*10+phase
+ var choice=0
+ if observed>=100 {choice=1}
+ var sounds=0
+ if step<=2 {sounds=2}
+ var state="Playing";var result="Won"
+ if step==2 {state="Won"}
+ if step>=3 {state="Failed";result="Failed"}
+ ok=ag_present2d(0,1,(step%2)*4,0,4,8,0,sounds,step*2 - 1,choice,0.25,step*2,2,0.5,0,0,0.0,0,0,0.0,1,f"$step",1,state,0,"",1,result)
+}

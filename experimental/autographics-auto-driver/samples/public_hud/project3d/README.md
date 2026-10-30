@@ -1,0 +1,1 @@
+PLAN-013 finite project3d public HUD fixture. scene.agscene binds Auto, visual, three-cue PCM bank and fixed Lilita One font. Font OFL/RFN is embedded in scene8 and retained separately in FONT-LICENSE.txt. Other art/sound provenance and upstream code license are separate. This is not a complete game or Gallery package.
