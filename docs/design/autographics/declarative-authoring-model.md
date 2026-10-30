@@ -8,6 +8,8 @@
 
 ## 1. 已确认目标与适用边界
 
+2026-10-30多屏续议：[多呈现变体与选择机制](multi-presentation-selection.md)明确每个出口从候选分支选择一个呈现，共享Node业务状态；编译期目标选择与运行时环境选择分层，保留if/#if区别。当前仅讨论默认UI、2D、3D、portrait、widget五类。具体采用view-*还是统一view内标签仍在讨论，本文早期view2d/view3d为现行草图拼写，不压过最新讨论；016不扩大到多呈现选择器。
+
 **用 AutoUI 式的声明、组件、绑定和事件模型表达图形应用。** UI、2D、3D 扩展共同的领域语言组织方式，保留各自的布局、坐标、资源和输入语义。普通 Auto 表达式、函数、类型、模块用于逻辑；组件允许内聚地组织声明、model 和 on，也允许将复杂部分拆为外部模块再导入。Godot/Bevy 是能力与样本参考，不决定 Auto 作者接口。
 
 依据：[Design45 §11](../../../../auto-lang/docs/design/45-autographics-wgpu-engine-and-game-prototypes.md)、[Design47 的状态/组件模型](../../../../auto-lang/docs/design/47-autoui-state-design-and-feature-architecture.md)、[CAP/CPC 长期机制](../../../../auto-lang/docs/design/46-context-profile-capability-cross-ecosystem.md)。完整 ACE/生产融合继续按原成熟度与另立实施合同推进；现在可以明确模型，不提前建设或声称完整 CPC 已可用。
