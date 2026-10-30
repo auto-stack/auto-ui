@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-10-30
 updated_at: 2026-10-30
 plan_revision: 2
-current_step: 4
+current_step: 5
 total_steps: 5
 depends_on: ["auto-ui/PLAN-003"]
 supersedes_spec_components: []
@@ -122,7 +122,7 @@ BLOG-004 原生腿新鲜证据：多页 VM 应用（auto-blog，app.at 声明 8 
 - [x] T-02（owner_stage=work；依赖T-01；AC-02/03）：按定界修复+具名错误化；V-02/V-03通过，6项永久定向测试、真实多页原生MCP、PLAN003原生单页输入/保存/HTTP读回通过。实现0e87054，证据补记e29ccab。
 - [x] T-03（owner_stage=work；依赖T-02；AC-04）：工具经AUTO_UI_TOOL_BIN精确发现，Blog驱动261413b；完整native-vm-rust 22/22 EXIT0、pending0，三次真实窗口覆盖正常q/强制结束及重开、HTTP/磁盘同稿核对，消费回执见r2 work。未改Blog.at；最终交付版本登记仍属T05。
 - [x] T-04（owner_stage=review；依赖T-03；AC-05）：r2 final R1 pass，UI59930ab/Blog261413b，报告attachments/015/review-r1.md；同实现上下文限制明确，无另一个独立会话。
-- [ ] T-05（owner_stage=merge；依赖T-04；AC-06）：门/SD-01 Spec/归档/worktree 清理/BLOG-004 登记。
+- [x] T-05（owner_stage=merge；依赖T-04；AC-06）：四门通过，两仓代码及ledger148已线性落地，Spec/索引/归档与BLOG-004精确版本登记完成；四树/三分支/空组已guard清理，exe/证据保全，安装工具清理后原生smoke通过。
 
 ## 9. 复审记录
 
@@ -167,6 +167,12 @@ stage: new | plan_id: PLAN-015 | plan_revision: 1 | outcome: blocked（计划就
 落地工具：主检出target/debug/auto-ui-tool.exe已从71503100旧版更新为最终gate重建的563afa4aa70d6a20e18885f0b607433b70cc3fadc73fcf593c3c3cbe777668d2；此前full22使用56d34609的等价源码构建，两hash分别记录不混淆。没有运行中的默认工具进程需中断；旧exe备份保留。使用主源码根与安装路径的真实native CLI/MCP smoke再次验证route/store Init、列表、Home/具名负控/返回Author及q退出0，report位于D:/autostack/plan-artifacts/plan-015/native-smoke/result。target/release/auto-ui-tool.exe与gen/front/vue/dist均不存在；Vue未改、语言/Man依赖仅记录或知识投影，没有这些产物待升级。原始gate日志SHA256：t c1f4a268b0d87b91b3c2acbb34b57224b4c6d2f417ac55f6b987d27092218fac；tu d5c8023b5f42a3bf83e345bcfc40587d4d7dae9c031712bc7bc876e8c9ca837a；ti a09dfc664df067bf9e9ea286edd4a5635ce2b80d41a64d2b180b48238a3bdf89；tn af817f5f3989ed17fd7c02cde5cdd66014e18e712e40585d46e6e013834a3430。
 
 证据与恢复：D:/autostack/plan-artifacts/plan-015已校验保全225个证据/输入/消费数据文件，work-evidence与consumer-evidence分别对应原两树attachments/015与attachments/004；native/single-fixture-inputs留存原始对照输入，UI与Blog提交源码tar保留。全部201个当前exe映射为107个唯一SHA产物（原路径总1244238848B），recovery-manifest.json SHA256 e7c866e35c894678632af354c811ae9ee22efd724b3805f77ef6b133246795a1；每份副本SHA逐个读回相同。未复制/提交Cargo缓存或PDB。此checkpoint只完成真实归档/索引/版本提交，T05仍未勾选、4/5，待新鲜guard与实际移除四树/三临时分支/空组后才记cleaned/pass。
+
+2026-10-30 merge cleaned（PASS，completion_kind: delivered）：归档提交06ca7f77fbece6b540813d47d5373df93d98a97b在UI/master，真实归档路径/索引/链接已核验并提交。四树在移除前逐个核对应分支或detached身份、tracked clean、HEAD已在各自主分支祖先、新鲜wt-guard clean；UI/Blog/lang三树及三临时分支先移除，清理脚本在down空分支输出比较处安全停止，读回证实仍为原detached c3464d0且无WIP后仅补清理该树，空ui-015组实际删除。没有创建链接，没有动其它组。cleanup-receipt.json SHA256 17ef99610fc3a37ae22e6ccf37009dbb7f1cdee87495ffa148fe10d13e684b3a，路径在D:/autostack/plan-artifacts/plan-015。Cargo缓存与PDB随权威树回收；保留201个exe原路径映射/107个唯一输出，225份证据/源输入/数据副本已在清理后再逐份SHA读回，artifact目录无PDB/Cargo CACHEDIR.TAG。清理后默认安装工具再次通过真实CLI/MCP路由/样式/store Init/列表/Home/具名错误/返回Author/q退出0，post-cleanup-2/report.json SHA256 6c6542852f35811d25a5406d524bfb4b807bd5a18741412b685005e47fe282b3；第一次搬迁本地探针因旧parents[5]位置假设在启动应用前报IndexError，保留其日志，另存只去掉位置猜测的探针并显式传主源码根后取得本次有效pass，未改生产代码或验收。
+
+最终实际状态：本Plan五任务全部完成，status=archived/current_step=5/total_steps=5；SD01/索引、ledger148四item、UI代码df39593、Blog驱动261413b与消费回执73f3594、归档提交06ca7f7均在相应默认分支且线性历史保持。主检出本计划范围无WIP，原有其它会话docs/design/计划/README/next-id等WIP完整保留，README只暂存015行与next016提示，未夹带其它计划行、不stash/丢弃他人内容。语言主仓批门收据覆盖887/2026-10-29T15:53:56Z，最终检查2026-10-30T02:35:38Z（客户端10:35，约10.7h），之后无大于887的language归档，故当前not due；不运行无关整库批门。final-audit.json记录全部读回，未残留merge-owned gates。
+
+2026-10-30 goal round 7：`stage: goal | plan_id: PLAN-015 | plan_revision: r2 | round: 7 | from: merge | to: done | status: archived | outcome: pass | worktree: removed/guarded,group removed | commit: UIdf39593,Blog261413b,consumer-receipt73f3594,ledger9b696678a,archive06ca7f7 | next: done`。5/5；完整目标达成，调用宿主目标complete；不将BLOG-004其它未完成任务算作本计划已交付。
 
 ## 10. 待澄清事项
 
