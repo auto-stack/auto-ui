@@ -49,3 +49,8 @@ and static/animated/load consumer with required service → forced constructor p
 exact three positive/negative pairs → pending measured results → final re-review.
 Two failed final reviews/firstrepair are retained; this is the second bounded
 repair cycle, within original r1scope and maximum3cycles. No user decision needed.
+
+Verified closure before resubmission:7e9802b removes Default, converts the orphaned
+forecast and passes all six exact static/animated/load controls with0bad/2good
+decode counts. Original budget and pose cases pass; fresh moved functional consumer
+and1536identity controls pass. See [r2-repair-closure.md](r2-repair-closure.md).
