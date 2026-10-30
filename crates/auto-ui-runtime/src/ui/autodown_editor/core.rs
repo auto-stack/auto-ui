@@ -1449,6 +1449,13 @@ impl AutodownEditorCore {
                 // 普通水平 motion 折叠跨块选区（shift+←/→ 跨块不做，
                 // T1 冻结登记）。
                 self.clear_doc_selection();
+                // A zero-distance drag can retain a block-local selection
+                // anchor. Cosmic motion extends it unless the non-shift path
+                // clears it; the next typed character would erase that range.
+                let mut blocks = self.blocks.lock().unwrap();
+                if let Some(block) = blocks.get_mut(bi) {
+                    block.editor.ed_mut().set_selection(Selection::None);
+                }
             }
             *self.nav_goal_x.lock().unwrap() = None;
             self.block_motion(font_system, bi, motion);

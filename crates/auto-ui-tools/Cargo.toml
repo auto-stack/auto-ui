@@ -21,7 +21,9 @@ auto-ui-dialect = { path = "../auto-ui-dialect" }
 # UI 运行域(iced renderer/back_proxy/back_provision/dynamic_build——vm 运行
 # 面与画廊 back-proxy 的依赖;default features 含 ui-iced,即 B 阶段组合
 # 实际 UI 后端的既定形态)。
-auto-ui-runtime = { path = "../auto-ui-runtime" }
+# The tool runs native autodown_editor widgets; default ui-iced alone falls
+# back to a plain text editor and cannot satisfy the document-engine contract.
+auto-ui-runtime = { path = "../auto-ui-runtime", features = ["autodown"] }
 # PLAN-815 T-05 R1（F01）：统一 owned 子进程执行设施（Job Object/进程组
 # 树终止+收尸+可停止 stdin 写）——man-ecosystem 纯设施层（ui→man-ecosystem
 # 与 auto-man-core/auto-api-gen 同向，ui-no-man-big-lib 不涉）。
