@@ -294,6 +294,25 @@ pub fn prepare_overlay(
     ),
     String,
 > {
+    prepare_overlay_with_clip(gpu, accepted, assets, document, frame, camera, three, None)
+}
+
+pub fn prepare_overlay_with_clip(
+    gpu: &agp::renderer::GpuDevice,
+    accepted: &AtlasCache,
+    assets: &super::assets::Registry,
+    document: &super::document::Document,
+    frame: Option<&Frame>,
+    camera: Option<&super::runtime_camera::RuntimeCameraFrame>,
+    three: bool,
+    clip_override: Option<[f32; 4]>,
+) -> Result<
+    (
+        Option<agp::host::surface_runtime::PublicHudOverlay>,
+        AtlasCache,
+    ),
+    String,
+> {
     use agp::host::surface_runtime::{PublicHudLayer, PublicHudOverlay};
     use std::sync::Arc;
     let Some(hud) = &document.hud else {
@@ -319,6 +338,7 @@ pub fn prepare_overlay(
         }
         _ => [0.0, 0.0, logical_size[0], logical_size[1]],
     };
+    let clip = clip_override.unwrap_or(clip);
     let font = assets.get(&hud.font).ok_or("hud_invalid: accepted font")?;
     if !font.identity.is_font() || font.bytes.len() != FONT_LEN {
         return Err("hud_invalid: accepted font identity".into());

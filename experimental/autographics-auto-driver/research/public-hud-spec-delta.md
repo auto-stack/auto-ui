@@ -57,7 +57,7 @@ backlog. Stop restores editing defaults; fresh Run starts from document defaults
 then `app_start`. Twenty-cycle owner/warm evidence distinguishes healthy Host
 reuse from VM/Run release and legitimate final external pins.
 
-Executable directed evidence: `public_hud`15, `public_audio`10,
+Executable directed evidence: `public_hud`17, `public_audio`10,
 `public_audio_codec`6, `public_audio_resources`9, `public_audio_host`12,
 `public_audio_compat`2, `public_hud_consumer`2 and5 selected audio units. Final
 `tools/check_public_hud.py --controls` binds source/runners, actual GPU/PCM,

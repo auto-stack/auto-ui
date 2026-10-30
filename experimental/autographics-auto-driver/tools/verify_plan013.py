@@ -29,7 +29,7 @@ def controls():
     verify()
     for relative in ['api/public_hud_v1.at','src/authoring/public_hud/mod.rs','tests/public_hud_consumer.rs',
         'samples/public_hud/project2d/scene.agscene','samples/public_hud/project3d/scene.agscene',
-        'samples/public_hud/fonts/lilita_one_regular.ttf','samples/public_hud/fonts/license.txt','research/plan013-legacy-profiles.json','Cargo.lock']:
+        'samples/public_hud/fonts/lilita_one_regular.ttf','samples/public_hud/fonts/license.txt','research/plan013-legacy-profiles.json','research/public-hud-gpu-golden.json','Cargo.lock']:
         path=p.ROOT/relative;raw=path.read_bytes()
         try:
             path.write_bytes(raw+b'\ncontrol\n');reject()

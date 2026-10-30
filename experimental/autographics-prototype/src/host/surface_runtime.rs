@@ -123,7 +123,7 @@ pub struct PublicHudOverlay {
 }
 
 impl PublicHudOverlay {
-    fn render(&self, gpu: &GpuDevice, view: &wgpu::TextureView, size: [u32; 2]) {
+    pub fn render(&self, gpu: &GpuDevice, view: &wgpu::TextureView, size: [u32; 2]) {
         let scale = [
             size[0] as f32 / self.logical_size[0],
             size[1] as f32 / self.logical_size[1],

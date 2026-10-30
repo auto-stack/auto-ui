@@ -456,7 +456,7 @@ fn host_real_gpu_hud_pcm_warm_atlas_letterbox_and_last_good() {
             "0"
         );
         for (step, state) in [(1, "Playing"), (2, "Won"), (3, "Failed")] {
-            host_tick(&mut h, true);
+            host_frozen_tick(&mut h, true);
             let frame = h.play.as_ref().unwrap().last.as_ref().unwrap();
             let hud = frame.hud.as_ref().unwrap();
             assert_eq!(hud.slots[0].text, step.to_string());
@@ -493,12 +493,27 @@ fn host_real_gpu_hud_pcm_warm_atlas_letterbox_and_last_good() {
             builds,
             "warm text changes cannot rebuild an atlas"
         );
-        let observation = h.audio.as_ref().unwrap().observation.lock().unwrap();
-        assert!(
-            observation.nonzero > 0,
-            "accepted cues must reach the native service PCM"
-        );
-        drop(observation);
+        h.audio
+            .as_ref()
+            .unwrap()
+            .mixer
+            .lock()
+            .unwrap()
+            .pause(h.play.as_ref().unwrap().run_id(), false)
+            .unwrap();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        loop {
+            let observation = h.audio.as_ref().unwrap().observation.lock().unwrap();
+            if observation.nonzero > 0 {
+                break;
+            }
+            drop(observation);
+            assert!(
+                std::time::Instant::now() < deadline,
+                "accepted cues must reach the native service PCM"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
         h.stop_play();
         assert!(h.hud_atlases.len() <= 4);
     }
@@ -1176,4 +1191,422 @@ fn twenty_runs_reuse_warm_atlas_and_release_vm_pcm_and_external_pin_owners() {
         assert!(pcm.upgrade().is_none());
         assert!(atlas.iter().all(|weak| weak.upgrade().is_none()));
     }
+}
+
+fn hud_clip(
+    h: &autographics_auto_driver::authoring::host::Host,
+    surface: agp::core::composition::SurfaceId,
+) -> [f32; 4] {
+    match h.rt.content(surface).unwrap() {
+        agp::host::surface_runtime::SurfaceContent::Game2d(content) => {
+            content.hud_overlay.as_ref().unwrap().clip
+        }
+        agp::host::surface_runtime::SurfaceContent::Scene3d(content) => {
+            content.hud_overlay.as_ref().unwrap().clip
+        }
+        _ => unreachable!(),
+    }
+}
+
+fn region_mask(
+    rt: &mut agp::host::surface_runtime::SurfaceRuntime,
+    surface: agp::core::composition::SurfaceId,
+    rect: [u32; 4],
+    color: [u8; 4],
+) -> std::collections::BTreeSet<(u32, u32)> {
+    let [x0, y0, width, height] = rect;
+    let mut points = vec![];
+    for y in y0..y0 + height {
+        for x in x0..x0 + width {
+            points.push([x as f32, y as f32]);
+        }
+    }
+    rt.probe_pixels(surface, &points)
+        .unwrap()
+        .into_iter()
+        .zip(points)
+        .filter(|(pixel, _)| *pixel == color)
+        .map(|(_, [x, y])| (x as u32, y as u32))
+        .collect()
+}
+
+fn state_mask(
+    h: &mut autographics_auto_driver::authoring::host::Host,
+    slot: usize,
+) -> std::collections::BTreeSet<(u32, u32)> {
+    let surface = if h
+        .play
+        .as_ref()
+        .unwrap()
+        .user_source
+        .as_ref()
+        .unwrap()
+        .version
+        == autographics_auto_driver::authoring::behavior::HUD3_VERSION
+    {
+        h.three
+    } else {
+        h.two
+    };
+    let clip = hud_clip(h, surface);
+    let rect = match slot {
+        0 | 2 => [clip[0] as u32, clip[1] as u32, 180, 56],
+        1 | 3 => [(clip[0] + clip[2] - 180.0) as u32, clip[1] as u32, 180, 56],
+        _ => unreachable!(),
+    };
+    let rect = if slot >= 2 {
+        [rect[0], (clip[1] + clip[3] - 56.0) as u32, rect[2], rect[3]]
+    } else {
+        rect
+    };
+    let color = match slot {
+        0 => [255, 255, 255, 255],
+        1 => [0, 255, 0, 255],
+        3 => [255, 0, 255, 255],
+        _ => [255, 255, 0, 255],
+    };
+    region_mask(&mut h.rt, surface, rect, color)
+}
+
+fn gpu_oracle(h: &mut autographics_auto_driver::authoring::host::Host) -> serde_json::Value {
+    serde_json::json!({
+        "slot0": state_mask(h, 0).into_iter().collect::<Vec<_>>(),
+        "slot1": state_mask(h, 1).into_iter().collect::<Vec<_>>(),
+        "slot3": state_mask(h, 3).into_iter().collect::<Vec<_>>(),
+    })
+}
+
+fn mask_distance(actual: &serde_json::Value, expected: &serde_json::Value) -> f64 {
+    let to_set = |value: &serde_json::Value| {
+        value
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|point| {
+                (
+                    point[0].as_u64().unwrap() as u32,
+                    point[1].as_u64().unwrap() as u32,
+                )
+            })
+            .collect::<std::collections::BTreeSet<_>>()
+    };
+    let actual = to_set(actual);
+    let expected = to_set(expected);
+    let union: std::collections::BTreeSet<_> = actual.union(&expected).collect();
+    if union.is_empty() {
+        return 1.0;
+    }
+    union
+        .iter()
+        .filter(|point| !actual.contains(point) || !expected.contains(point))
+        .count() as f64
+        / union.len() as f64
+}
+
+#[test]
+fn every_state_has_distinct_gpu_glyph_identity_and_wrong_stale_missing_controls() {
+    let golden: serde_json::Value =
+        serde_json::from_str(include_str!("../research/public-hud-gpu-golden.json")).unwrap();
+    for api in [Api::Hud2V1, Api::Hud3V1] {
+        let mut h = host_scene(api);
+        host_start(&mut h, api, &host_controller(api, ""));
+        for step in 0..=3 {
+            if step > 0 {
+                host_frozen_tick(&mut h, true);
+            }
+            let actual = gpu_oracle(&mut h);
+            if std::env::var_os("PLAN013_CAPTURE_GPU").is_some() {
+                println!("GPU_ORACLE {api:?} state={step} {actual}");
+                println!("CAPTURE_ONLY {api:?} state={step}");
+            } else {
+                for slot in ["slot0", "slot1", "slot3"] {
+                    let distance = mask_distance(
+                        &actual[slot],
+                        &golden[api.version()][step.to_string()][slot],
+                    );
+                    println!("GPU_DISTANCE {api:?} state={step} {slot} {distance}");
+                    assert!(
+                        distance <= 0.02,
+                        "actual per-slot glyph identity {api:?} {step} {slot}: {distance}"
+                    );
+                }
+                if step > 0 {
+                    let stale = mask_distance(
+                        &actual["slot0"],
+                        &golden[api.version()][(step - 1).to_string()]["slot0"],
+                    );
+                    assert!(stale > 0.02, "stale state text must be red: {stale}");
+                }
+            }
+        }
+        let surface = if three(api) { h.three } else { h.two };
+        let expected = if std::env::var_os("PLAN013_CAPTURE_GPU").is_some() {
+            gpu_oracle(&mut h)
+        } else {
+            golden[api.version()]["3"].clone()
+        };
+        let original = match h.rt.content_mut(surface).unwrap() {
+            agp::host::surface_runtime::SurfaceContent::Game2d(content) => {
+                let glyphs = &mut content.hud_overlay.as_mut().unwrap().layers[0].glyphs;
+                let original = glyphs.clone();
+                glyphs.truncate(glyphs.len() - 10);
+                original
+            }
+            agp::host::surface_runtime::SurfaceContent::Scene3d(content) => {
+                let glyphs = &mut content.hud_overlay.as_mut().unwrap().layers[0].glyphs;
+                let original = glyphs.clone();
+                glyphs.truncate(glyphs.len() - 10);
+                original
+            }
+            _ => unreachable!(),
+        };
+        h.rt.graph.mark_content_dirty(surface);
+        h.rt.frame(None, &Default::default()).unwrap();
+        assert_ne!(
+            gpu_oracle(&mut h),
+            expected,
+            "missing state text must be red"
+        );
+        match h.rt.content_mut(surface).unwrap() {
+            agp::host::surface_runtime::SurfaceContent::Game2d(content) => {
+                content.hud_overlay.as_mut().unwrap().layers[0].glyphs = original.clone()
+            }
+            agp::host::surface_runtime::SurfaceContent::Scene3d(content) => {
+                content.hud_overlay.as_mut().unwrap().layers[0].glyphs = original.clone()
+            }
+            _ => unreachable!(),
+        }
+        h.rt.graph.mark_content_dirty(surface);
+        h.rt.frame(None, &Default::default()).unwrap();
+        assert_eq!(
+            gpu_oracle(&mut h),
+            expected,
+            "restored glyph identity must be green"
+        );
+        match h.rt.content_mut(surface).unwrap() {
+            agp::host::surface_runtime::SurfaceContent::Game2d(content) => {
+                content.hud_overlay.as_mut().unwrap().layers[0].glyphs[0].uv_rect[0] += 0.01
+            }
+            agp::host::surface_runtime::SurfaceContent::Scene3d(content) => {
+                content.hud_overlay.as_mut().unwrap().layers[0].glyphs[0].uv_rect[0] += 0.01
+            }
+            _ => unreachable!(),
+        }
+        h.rt.graph.mark_content_dirty(surface);
+        h.rt.frame(None, &Default::default()).unwrap();
+        assert_ne!(gpu_oracle(&mut h), expected, "wrong glyph must be red");
+        match h.rt.content_mut(surface).unwrap() {
+            agp::host::surface_runtime::SurfaceContent::Game2d(content) => {
+                content.hud_overlay.as_mut().unwrap().layers[0].glyphs = original
+            }
+            agp::host::surface_runtime::SurfaceContent::Scene3d(content) => {
+                content.hud_overlay.as_mut().unwrap().layers[0].glyphs = original
+            }
+            _ => unreachable!(),
+        }
+        h.rt.graph.mark_content_dirty(surface);
+        h.rt.frame(None, &Default::default()).unwrap();
+        assert_eq!(gpu_oracle(&mut h), expected);
+        h.stop_play();
+    }
+}
+
+#[test]
+fn all_four_anchor_boundaries_clip_and_unclipped_control_leaks() {
+    for api in [Api::Hud2V1, Api::Hud3V1] {
+        let mut h = host_scene(api);
+        host_start(&mut h, api, &host_controller(api, ""));
+        let surface = if three(api) { h.three } else { h.two };
+        match h.rt.content_mut(surface).unwrap() {
+            agp::host::surface_runtime::SurfaceContent::Game2d(content) => {
+                content.hud_overlay = None
+            }
+            agp::host::surface_runtime::SurfaceContent::Scene3d(content) => {
+                content.hud_overlay = None
+            }
+            _ => unreachable!(),
+        }
+        h.rt.graph.mark_content_dirty(surface);
+        h.rt.frame(None, &Default::default()).unwrap();
+        let base = h.rt.capture(surface, "clip-base").unwrap().1;
+        let mut document = h.editor.document.clone();
+        for slot in &mut document.hud.as_mut().unwrap().slots {
+            slot.visible = true;
+            slot.text = "WWWW".into();
+            slot.offset = [-4.0, -4.0];
+        }
+        let (overlay, _) =
+            autographics_auto_driver::authoring::public_hud::prepare_overlay_with_clip(
+                h.rt.gpu(),
+                &Default::default(),
+                &h.editor.assets,
+                &document,
+                None,
+                h.play
+                    .as_ref()
+                    .and_then(|p| p.last.as_ref().and_then(|f| f.camera.as_ref())),
+                three(api),
+                Some(if three(api) {
+                    [100.0, 80.0, 400.0, 200.0]
+                } else {
+                    [210.0, 80.0, 380.0, 200.0]
+                }),
+            )
+            .unwrap();
+        let overlay = overlay.unwrap();
+        match h.rt.content_mut(surface).unwrap() {
+            agp::host::surface_runtime::SurfaceContent::Game2d(content) => {
+                content.hud_overlay = Some(overlay)
+            }
+            agp::host::surface_runtime::SurfaceContent::Scene3d(content) => {
+                content.hud_overlay = Some(overlay)
+            }
+            _ => unreachable!(),
+        }
+        let target = h.rt.target(surface).unwrap();
+        let size = [target.width, target.height];
+        match h.rt.content(surface).unwrap() {
+            agp::host::surface_runtime::SurfaceContent::Game2d(content) => content
+                .hud_overlay
+                .as_ref()
+                .unwrap()
+                .render(h.rt.gpu(), target.view(), size),
+            agp::host::surface_runtime::SurfaceContent::Scene3d(content) => content
+                .hud_overlay
+                .as_ref()
+                .unwrap()
+                .render(h.rt.gpu(), target.view(), size),
+            _ => unreachable!(),
+        }
+        let clipped = h.rt.capture(surface, "clipped").unwrap().1;
+        let regions: Vec<[u32; 4]> = if three(api) {
+            vec![
+                [0, 0, 800, 80],
+                [0, 280, 800, 120],
+                [0, 80, 100, 200],
+                [500, 80, 300, 200],
+            ]
+        } else {
+            vec![
+                [0, 0, 200, 380],
+                [600, 0, 200, 380],
+                [210, 0, 380, 80],
+                [210, 280, 380, 100],
+            ]
+        };
+        for region in &regions {
+            assert_eq!(
+                agp::renderer::capture::compare_png_region(&base, &clipped, *region)
+                    .unwrap()
+                    .0,
+                0.0,
+                "scissor leaked outside {region:?}"
+            );
+        }
+        let logical = match h.rt.content(surface).unwrap() {
+            agp::host::surface_runtime::SurfaceContent::Game2d(content) => {
+                content.hud_overlay.as_ref().unwrap().logical_size
+            }
+            agp::host::surface_runtime::SurfaceContent::Scene3d(content) => {
+                content.hud_overlay.as_ref().unwrap().logical_size
+            }
+            _ => unreachable!(),
+        };
+        let target = h.rt.target(surface).unwrap();
+        match h.rt.content(surface).unwrap() {
+            agp::host::surface_runtime::SurfaceContent::Game2d(content) => {
+                let layer = &content.hud_overlay.as_ref().unwrap().layers[0];
+                layer
+                    .renderer
+                    .set_ortho_camera(h.rt.gpu(), 0.0, logical[0], logical[1], 0.0);
+                layer
+                    .renderer
+                    .render(h.rt.gpu(), target.view(), &layer.glyphs);
+            }
+            agp::host::surface_runtime::SurfaceContent::Scene3d(content) => {
+                let layer = &content.hud_overlay.as_ref().unwrap().layers[0];
+                layer
+                    .renderer
+                    .set_ortho_camera(h.rt.gpu(), 0.0, logical[0], logical[1], 0.0);
+                layer
+                    .renderer
+                    .render(h.rt.gpu(), target.view(), &layer.glyphs);
+            }
+            _ => unreachable!(),
+        }
+        let unclipped = h.rt.capture(surface, "unclipped-control").unwrap().1;
+        let leak = if three(api) {
+            [90, 80, 20, 100]
+        } else {
+            [200, 0, 20, 100]
+        };
+        assert!(
+            agp::renderer::capture::compare_png_region(
+                &clipped,
+                &unclipped,
+                [
+                    0,
+                    0,
+                    clipped_dimensions(&h, surface)[0] as u32,
+                    clipped_dimensions(&h, surface)[1] as u32
+                ]
+            )
+            .unwrap()
+            .0 > 0.0,
+            "unclipped control must change actual pixels"
+        );
+        assert!(
+            agp::renderer::capture::compare_png_region(&base, &unclipped, leak)
+                .unwrap()
+                .0
+                > 0.0,
+            "unclipped control must actually leak"
+        );
+        h.frame(None).unwrap();
+        let overlay = match h.rt.content_mut(surface).unwrap() {
+            agp::host::surface_runtime::SurfaceContent::Game2d(content) => {
+                content.hud_overlay.take()
+            }
+            agp::host::surface_runtime::SurfaceContent::Scene3d(content) => {
+                content.hud_overlay.take()
+            }
+            _ => unreachable!(),
+        };
+        let size = clipped_dimensions(&h, surface);
+        h.rt.resize_surface(surface, [size[0] * 2.0, size[1] * 2.0])
+            .unwrap();
+        h.frame(None).unwrap();
+        let base_doubled = h.rt.capture(surface, "base-dpi2").unwrap().1;
+        match h.rt.content_mut(surface).unwrap() {
+            agp::host::surface_runtime::SurfaceContent::Game2d(content) => {
+                content.hud_overlay = overlay
+            }
+            agp::host::surface_runtime::SurfaceContent::Scene3d(content) => {
+                content.hud_overlay = overlay
+            }
+            _ => unreachable!(),
+        }
+        h.rt.graph.mark_content_dirty(surface);
+        h.rt.frame(None, &Default::default()).unwrap();
+        let doubled = h.rt.capture(surface, "clipped-dpi2").unwrap().1;
+        for region in regions {
+            let scaled = [region[0] * 2, region[1] * 2, region[2] * 2, region[3] * 2];
+            assert_eq!(
+                agp::renderer::capture::compare_png_region(&base_doubled, &doubled, scaled)
+                    .unwrap()
+                    .0,
+                0.0,
+                "DPI scissor leaked outside {scaled:?}"
+            );
+        }
+        h.stop_play();
+    }
+}
+
+fn clipped_dimensions(
+    h: &autographics_auto_driver::authoring::host::Host,
+    surface: agp::core::composition::SurfaceId,
+) -> [f32; 2] {
+    let target = h.rt.target(surface).unwrap();
+    [target.width as f32, target.height as f32]
 }

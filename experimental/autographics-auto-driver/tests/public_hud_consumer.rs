@@ -66,6 +66,87 @@ fn hud_text(h: &Host, slot: usize) -> String {
         .clone()
 }
 
+fn hud_clip(h: &Host, surface: agp::core::composition::SurfaceId) -> [f32; 4] {
+    match h.rt.content(surface).unwrap() {
+        agp::host::surface_runtime::SurfaceContent::Game2d(content) => {
+            content.hud_overlay.as_ref().unwrap().clip
+        }
+        agp::host::surface_runtime::SurfaceContent::Scene3d(content) => {
+            content.hud_overlay.as_ref().unwrap().clip
+        }
+        _ => unreachable!(),
+    }
+}
+
+fn region_mask(
+    rt: &mut agp::host::surface_runtime::SurfaceRuntime,
+    surface: agp::core::composition::SurfaceId,
+    rect: [u32; 4],
+    color: [u8; 4],
+) -> std::collections::BTreeSet<(u32, u32)> {
+    let [x0, y0, width, height] = rect;
+    let mut points = vec![];
+    for y in y0..y0 + height {
+        for x in x0..x0 + width {
+            points.push([x as f32, y as f32]);
+        }
+    }
+    rt.probe_pixels(surface, &points)
+        .unwrap()
+        .into_iter()
+        .zip(points)
+        .filter(|(pixel, _)| *pixel == color)
+        .map(|(_, [x, y])| (x as u32, y as u32))
+        .collect()
+}
+
+fn state_mask(h: &mut Host, slot: usize) -> std::collections::BTreeSet<(u32, u32)> {
+    let surface = if h
+        .play
+        .as_ref()
+        .unwrap()
+        .user_source
+        .as_ref()
+        .unwrap()
+        .version
+        == autographics_auto_driver::authoring::behavior::HUD3_VERSION
+    {
+        h.three
+    } else {
+        h.two
+    };
+    let clip = hud_clip(h, surface);
+    let rect = match slot {
+        0 | 2 => [clip[0] as u32, clip[1] as u32, 180, 56],
+        1 | 3 => [(clip[0] + clip[2] - 180.0) as u32, clip[1] as u32, 180, 56],
+        _ => unreachable!(),
+    };
+    let rect = if slot >= 2 {
+        [rect[0], (clip[1] + clip[3] - 56.0) as u32, rect[2], rect[3]]
+    } else {
+        rect
+    };
+    let rgba = h.editor.document.hud.as_ref().unwrap().slots[slot].rgba;
+    let color = rgba.map(|channel| {
+        assert!((0.0..=1.0).contains(&channel));
+        (channel * 255.0).round() as u8
+    });
+    let mask = region_mask(&mut h.rt, surface, rect, color);
+    assert!(
+        !mask.is_empty(),
+        "slot{slot} must contain real glyph pixels"
+    );
+    mask
+}
+
+fn gpu_oracle(h: &mut Host) -> Value {
+    json!({
+        "slot0": state_mask(h, 0).into_iter().collect::<Vec<_>>(),
+        "slot1": state_mask(h, 1).into_iter().collect::<Vec<_>>(),
+        "slot3": state_mask(h, 3).into_iter().collect::<Vec<_>>(),
+    })
+}
+
 fn report(name: &str, v: &Value) {
     println!("UI013 {name} {v}");
     if let Some(dir) = std::env::var_os("UI013_REPORT_DIR") {
@@ -147,6 +228,7 @@ fn bound_two_dimensional_projects_move_cold_reopen_and_source_changes_cue_gain_a
         let entry = root().join(name).join("scene.agscene");
         let mut h = open(&entry);
         start(&mut h);
+        let gpu0 = gpu_oracle(&mut h);
         let initial = h.play.as_ref().unwrap().last.as_ref().unwrap().nodes[&1].translation;
         input(&mut h);
         let packet = h
@@ -164,6 +246,7 @@ fn bound_two_dimensional_projects_move_cold_reopen_and_source_changes_cue_gain_a
         assert_ne!(normal, initial);
         assert_eq!(hud_text(&h, 0), "1");
         assert_eq!(hud_text(&h, 1), "Playing");
+        let gpu1 = gpu_oracle(&mut h);
         input(&mut h);
         let packet = h
             .play
@@ -178,6 +261,7 @@ fn bound_two_dimensional_projects_move_cold_reopen_and_source_changes_cue_gain_a
         assert_eq!(packet.requests[0].ordinal, 3);
         assert_eq!(hud_text(&h, 0), "2");
         assert_eq!(hud_text(&h, 1), "Won");
+        let gpu2 = gpu_oracle(&mut h);
         pcm_oracle(&h, packet, 1, 0.25); // real trigger event101 from previous tick
         let source = h.editor.code.as_ref().unwrap().bytes().to_vec();
         let accepted = h.editor.document.clone();
@@ -246,7 +330,7 @@ fn bound_two_dimensional_projects_move_cold_reopen_and_source_changes_cue_gain_a
         assert!((normal[0] - initial[0]).abs() > changed_x * 3.9);
         assert_eq!(hud_text(&h, 0), "1");
         h.stop_play();
-        results.push(json!({"profile":api.version(),"moved_project":true,"cold_reopen":true,"user_mutation_sensitive":true,"cue_gain_waveform_sensitive":true,"event_selects_cue1":true,"pcm_frames_compared":12645,"source_sha256":accepted.behavior.unwrap().source.sha256,"licenses_moved":true,"hud_dynamic":true}));
+        results.push(json!({"profile":api.version(),"moved_project":true,"cold_reopen":true,"user_mutation_sensitive":true,"cue_gain_waveform_sensitive":true,"event_selects_cue1":true,"pcm_frames_compared":12645,"source_sha256":accepted.behavior.unwrap().source.sha256,"licenses_moved":true,"hud_dynamic":true,"gpu_oracles":[gpu0,gpu1,gpu2]}));
     }
     report(
         "consumer",

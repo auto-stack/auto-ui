@@ -146,6 +146,7 @@ REQUIRED += (
     'autographics-auto-driver/samples/public_hud/fonts/lilita_one_regular.ttf',
     'autographics-auto-driver/samples/public_hud/fonts/license.txt',
     'autographics-auto-driver/research/plan013-legacy-profiles.json',
+    'autographics-auto-driver/research/public-hud-gpu-golden.json',
     'autographics-auto-driver/research/public-hud-spec-delta.md',
     'autographics-auto-driver/tools/plan013_source_policy.py',
     'autographics-auto-driver/tools/gen_plan013_identity.py',

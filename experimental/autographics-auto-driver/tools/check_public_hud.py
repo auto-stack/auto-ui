@@ -7,7 +7,7 @@ import argparse, copy, hashlib, json, os, pathlib, re, secrets, struct, subproce
 import plan013_source_policy as p
 SCHEMA='autographics.plan013.report/1'
 RUNNERS={
- 'public':('public_hud',15,0,None),
+ 'public':('public_hud',17,0,None),
  'codec':('public_audio_codec',6,0,None),
  'resources':('public_audio_resources',9,0,None),
  'host':('public_audio_host',12,0,None),
@@ -40,13 +40,27 @@ def guard():
     result=subprocess.run([sys.executable,str(p.ROOT/'tools/verify_source.py')],cwd=p.ROOT,env=env,capture_output=True,text=True)
     assert result.returncode==0,(result.stdout+result.stderr)[-5000:]
     return result.stdout+result.stderr
+def mask_distance(actual,expected):
+    def points(value):
+        assert isinstance(value,list) and value,'GPU glyph identity'
+        assert all(isinstance(p,list) and len(p)==2 and all(type(n) is int and n>=0 for n in p) for p in value),'GPU glyph identity'
+        result={tuple(p) for p in value};assert len(result)==len(value),'GPU glyph identity'
+        return result
+    actual,expected=points(actual),points(expected)
+    return len(actual^expected)/len(actual|expected)
 def data(directory,manifest_dir):
     c=json.loads((directory/'consumer.json').read_text());v=json.loads((directory/'performance.json').read_text())
     assert pathlib.Path(c['manifest_dir']).resolve()==manifest_dir and pathlib.Path(v['manifest_dir']).resolve()==manifest_dir,'foreign compiled consumer'
     assert [r['profile'] for r in c['projects']]==['autographics.hud2d/1','autographics.hud3d/1'],'partial dimension set'
+    golden=json.loads((p.ROOT/'research/public-hud-gpu-golden.json').read_text())
     for r in c['projects']:
         assert all(r[k] is True for k in ['moved_project','cold_reopen','user_mutation_sensitive','cue_gain_waveform_sensitive','event_selects_cue1','licenses_moved','hud_dynamic']),'public consumer oracle'
         assert r['pcm_frames_compared']==12645 and re.fullmatch('[0-9a-f]{64}',r['source_sha256']),'consumer PCM/source oracle'
+        assert len(r['gpu_oracles'])==3,'GPU glyph identity'
+        for i,actual in enumerate(r['gpu_oracles']):
+            expected=golden[r['profile']][str(i)]
+            assert set(actual)==set(expected)=={'slot0','slot1','slot3'},'GPU glyph identity'
+            assert all(mask_distance(actual[slot],expected[slot])<=0.02 for slot in expected),'GPU glyph identity'
     assert v['guards']==dict(credits=32,slice_steps=1000,callback_steps=100000,resumptions=120,callback_ms=250,init_ms=30000,tick_ms=2000,pump_target_us=8000),'guard changed'
     assert [r['project'] for r in v['projects']]==['project2d','project3d'],'partial performance set'
     for i,r in enumerate(v['projects']):
@@ -133,6 +147,7 @@ def controls(directory):
         return apply
     rejected(changed('consumer',lambda v:v['projects'][0].update(cue_gain_waveform_sensitive=False)),'consumer oracle')
     rejected(changed('consumer',lambda v:v['projects'][0].update(hud_dynamic=False)),'consumer oracle')
+    rejected(changed('consumer',lambda v:v['projects'][0]['gpu_oracles'][0].update(slot0='0'*64)),'GPU glyph identity')
     rejected(changed('performance',lambda v:v['guards'].update(credits=33)),'guard changed')
     rejected(changed('performance',lambda v:v['projects'][0].update(warm_decode_delta=1)),'warm resource')
     rejected(changed('performance',lambda v:v['projects'][0].update(warm_atlas_builds_delta=1)),'warm resource')
