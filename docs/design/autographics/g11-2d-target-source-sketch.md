@@ -1,12 +1,12 @@
 # G11/2d 目标源码示例：node / view2d / Life / msg
 
-2026-10-30，讨论稿 v2，取代同路径v1草图；v1保留在Git历史。依据[共同作者模型](declarative-authoring-model.md)和用户本轮命名决定。只写Markdown，不创建或运行产品源码，不分配Plan或更改在途合同。
+2026-10-30，讨论稿 v3，取代同路径v2草图；v1/v2保留在Git历史。依据[共同作者模型](declarative-authoring-model.md)和用户本轮命名决定。只写Markdown，不创建或运行产品源码，不分配Plan或更改在途合同。
 
 ## 1. 已确认写法与仍属提案的部分
 
 用户已选择：以node统一组件定义，widget经明确迁移后退役；view/view2d/view3d分别声明UI/2D/3D内容；view2d内不再套scene2d；model、呈现和on默认内聚同一Node；Life作为系统事件命名空间；msg { Collect(Key) }直接声明本Node事件；前导点引用当前实例成员。use用于复用真正的组件、资源与函数，不把关卡view另外拆成需重复映射全部model的MainScene。
 
-以下源码是**目标表示，当前不能直接编译运行**。资源构造器、节点名/refs/公开端口、输入服务、集合API、emit和key重建仍为语义占位。msg属性的类型化签名也尚待收敛。Life.Update是否按呈现帧、Life.FixedUpdate按固定逻辑步长的具体调度/顺序未最终冻结；本例用FixedUpdate明确运动时钟，不混入渲染回调。
+以下源码是**目标表示，当前不能直接编译运行**。资源构造器、节点名/refs/公开端口、输入服务、集合API、emit和key重建仍为语义占位。msg属性的类型化签名也尚待收敛。本轮已确定Life.Tick(dt)为固定步长逻辑更新，Life.Frame(dt)为呈现帧节奏更新；一帧可对应零次或多次Tick。本例只使用Tick，Frame留后继、不纳入016最小验证的实现或验收，也不增加Frame处理器。具体呈现调度后议，Frame不等于直接GPU绘制回调。
 
 规则参照[原G11/2d](../../../../ag-examples/examples/g11-runtime-objects/2d/main.at)：左右运动、三个不同外观物品一次收集、独立巡逻危险物、集齐才通过的终点、左侧界外失败、终局Enter按下沿重开。无跳跃/新增声音/HUD验收。去除原预算导致的漏处理/跳巡逻技巧，故不是原逐tick轨迹等价声明。
 
@@ -238,7 +238,7 @@ node Player(spawn: float2, speed: float, enabled: bool) {
         Life.Start -> {
             .move_axis = 0.0
         }
-        Life.FixedUpdate(dt) -> {
+        Life.Tick(dt) -> {
             .move_axis = 0.0
             if .enabled { .move_axis = input.axis(Left, Right) }
             refs.body.move_and_slide((.move_axis * .speed * dt, 0.0))
@@ -251,7 +251,7 @@ Life.*是系统事件，不在msg里声明、不经fixed_update/lifecycle辅助�
 
 initial_position只在新实例初始化生效，不把spawn持续写回运动位置；物理body保存真实位置，camera/trigger读取它。character与solid的默认碰撞匹配只是本例所需支持域，复杂层/掩码后议。refs/export仍是类型化公开actor端口的候选表示，不能访问任意子私有字段。
 
-Life.Start不同于Mounted：编辑器可已挂载但未进入Run。Start在必要引用/资源就绪后、首次FixedUpdate前一次；Pause不推进，Step只推进一次中性输入逻辑tick，多Portal不重复更新。动态创建、重挂载、HMR及Update/FixedUpdate的正式顺序须另冻，不凭命名假定已完成。
+Life.Start不同于Mounted：编辑器可已挂载但未进入Run。Start在必要引用/资源就绪后、首次Tick前一次；Pause不推进，Step只推进一次中性输入逻辑tick，多Portal不重复更新。动态创建、重挂载、HMR及Tick/Frame的正式顺序须另冻，不凭命名假定已完成。
 
 ## 6. Hazard与纯逻辑复用
 
@@ -287,7 +287,7 @@ node Hazard(x: float, base_y: float, target: ActorRef2D, on_hit: msg) {
     }
 
     on {
-        Life.FixedUpdate(dt) -> { .phase = (.phase + 3.0 * dt) % 0.8 }
+        Life.Tick(dt) -> { .phase = (.phase + 3.0 * dt) % 0.8 }
         .Touched(actor) -> {
             if actor == .target { emit .on_hit }
         }
@@ -321,7 +321,7 @@ node App {
     }
 
     on {
-        Life.FixedUpdate(dt) -> {
+        Life.Tick(dt) -> {
             if input.pressed(Enter) { emit .Restart }
         }
         .Finished(result) -> { .last_result = result }
@@ -345,7 +345,7 @@ input.pressed读取本tick一致的边沿事实，不因某个Node先读就吃�
 |---|---|---|
 | 匿名msg与前导点 | [declarations.rs](../../../crates/auto-ui-dialect/src/declarations.rs)的parse_msg_decl已接受msg { ... }，旧命名块为兼容；[widget.rs](../../../crates/auto-ui-dialect/src/grammar/widget.rs)已解析点前缀带参handler | 主要是复用/明确约定，不必当作全新功能 |
 | node与view域 | widget解析入口固定widget；[AST](../../../crates/auto-ui-dialect/src/ast.rs)为WidgetDecl、单view及named_views | node可先映射共同组件表示，补view域而非复制三套AST；named view不是view2d/3d，须区分。最终退役widget需另核旧读者/兼容 |
-| Life系统事件 | [Vue生成器](../../../crates/auto-ui-compiler/src/ui_gen/vue.rs)已有Init/Destroy到挂载钩子的接线；[VM桥](../../../crates/auto-ui-runtime/src/ui/vm_bridge.rs)有Init demand/代次/任务泵 | 可复用机制，但Life命名空间、Start/FixedUpdate调度、目标实例/代次不能只靠字符串改名；需区分系统事件与用户同名事件 |
+| Life系统事件 | [Vue生成器](../../../crates/auto-ui-compiler/src/ui_gen/vue.rs)已有Init/Destroy到挂载钩子的接线；[VM桥](../../../crates/auto-ui-runtime/src/ui/vm_bridge.rs)有Init demand/代次/任务泵 | 可复用机制，但Life命名空间、Start/Tick调度、目标实例/代次不能只靠字符串改名；需区分系统事件与用户同名事件 |
 | 实例状态与事件 | VM桥存在child实例支持，也有将子model字段合入root的merged兼容路径；[Design47](../../../../auto-lang/docs/design/47-autoui-state-design-and-feature-architecture.md)已明确目标差额 | 不能宣称所有组件已完全隔离；必须用两同类型实例验证receiver/model/订阅，不批量修无关UI |
 | 模块到AG执行 | [AG准入器](../../../experimental/autographics-auto-driver/src/authoring/behavior.rs)拒绝用户import；[Session](../../../experimental/autographics-auto-driver/src/lib.rs)直接编译组合源码并取root签名 | 不是删掉一条禁止即可：要接模块解析/依赖快照/命名空间、领域lowering与实例handler；当前AG固定SDK与生产UI编译链不同，不能盲接当前语言tip |
 | 图形运行 | 已有角色、对象/trigger、相机、资源/GPU、运行输入与寿命处理 | 大部分图形算法可复用；新增组件实例↔运行对象映射、条件差量、具名ref、事件绑定和新局子树管理。不能让bridge用Rust代替Auto玩法 |
@@ -366,6 +366,6 @@ input.pressed读取本tick一致的边沿事实，不因某个Node先读就吃�
 
 待决点：refs与公开端口语法、事件payload类型、emit复用现有分派的写法、输入动作配置、资源声明/准备边界、条件节点身份/key规则；多个view域是否允许同Node同时声明及跨域呈现接口，不在此示例中偷定。
 
-候选顺序：输入快照→FixedUpdate处理→位置/变换同步→触发产生与有序投递→model/on→声明增量与呈现准备。旧G11的N→N+1事件消费不被本文改变；同tickCollect/HitDanger/ReachGoal的顺序、终局优先级与故障策略须在实施合同明确，不能靠源码树遍历顺序暗定。Start前必要引用就绪、初始化依赖顺序和新局旧输入清除也需正反验证。
+候选顺序：输入快照→Tick处理→位置/变换同步→触发产生与有序投递→model/on→声明增量与呈现准备。旧G11的N→N+1事件消费不被本文改变；同tickCollect/HitDanger/ReachGoal的顺序、终局优先级与故障策略须在实施合同明确，不能靠源码树遍历顺序暗定。Start前必要引用就绪、初始化依赖顺序和新局旧输入清除也需正反验证。
 
 本轮只核对既有语法/源码触点、原G11规则意图、模块引用/命名一致、Markdown链接/围栏/限定diff。未运行编译、项目测试、GPU或窗口，未建立实现树、改变预算/SDK、现有示例/引擎锁或其他owner的在途合同。

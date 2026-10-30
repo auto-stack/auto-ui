@@ -1,8 +1,10 @@
 # AutoGraphics：AutoUI 式图形应用声明与组件模型
 
-2026-10-30；目标与要求回归 v1。本文承接用户本日对 AG-001 的走读和设计纠偏，恢复最初的作者模型；不是新增实施 Plan，也不声明语法、模块装配或 ACE 集成已实现。新设计归 auto-ui，Gallery 内容归 ag-examples；历史设计与现状 Specs 仍在 auto-lang。
+2026-10-30；目标与要求回归 v2。本文承接用户本日对 AG-001 的走读和设计纠偏，恢复最初的作者模型；不是新增实施 Plan，也不声明语法、模块装配或 ACE 集成已实现。新设计归 auto-ui，Gallery 内容归 ag-examples；历史设计与现状 Specs 仍在 auto-lang。
 
-2026-10-30命名与局部性续议：共同组件定义采用`node`，`widget`经明确兼容迁移后退役；`view`/`view2d`/`view3d`直接声明UI/2D/3D呈现，不再嵌套`view { scene2d { ... } }`；系统事件写`on { Life.Start -> ...; Life.FixedUpdate(dt) -> ... }`，不新增辅助lifecycle节点或要求msg重复声明。`msg { Collect(Key) }`声明当前Node事件，`.Collect`及`.remaining`均指当前实例成员。默认model、呈现与on内聚，普通use复用真正组件/资源/函数；独立view导入及作用域后议，不为同组件局部引用添加重复参数映射。更新后的[示例v2与实现分析](g11-2d-target-source-sketch.md)区分已确认命名和未定运行语义；尚未实施。
+2026-10-30命名与局部性续议：共同组件定义采用`node`，`widget`经明确兼容迁移后退役；`view`/`view2d`/`view3d`直接声明UI/2D/3D呈现，不再嵌套`view { scene2d { ... } }`；系统事件写`on { Life.Start -> ...; Life.Tick(dt) -> ... }`，不新增辅助lifecycle节点或要求msg重复声明。`msg { Collect(Key) }`声明当前Node事件，`.Collect`及`.remaining`均指当前实例成员。默认model、呈现与on内聚，普通use复用真正组件/资源/函数；独立view导入及作用域后议，不为同组件局部引用添加重复参数映射。更新后的[示例v3与实现分析](g11-2d-target-source-sketch.md)区分已确认命名和未定运行语义；尚未实施。
+
+2026-10-30时钟事件定名：`Life.Tick(dt)`为固定步长逻辑更新，`Life.Frame(dt)`为呈现帧节奏更新；不再使用含混的Update命名。一呈现帧可对应零次或多次Tick，多视图不重复推进同一实例。Frame仅记录为后继事件，不纳入auto-ui/016的实现、样例或验收；具体呈现调度后议，不能将Frame等同GPU直接绘制回调。本轮仍只修文档、暂不实施。
 
 ## 1. 已确认目标与适用边界
 
@@ -48,7 +50,7 @@ JSON 是当前原型便于保存/验证的选择，没有“可审计所以只�
 
 复杂且有真实复用边界的组件、纯数据、控制器/store和函数可单独导出，再普通use导入；不强迫场景与逻辑分成两个靠数字对接的工程。将同一个Node的呈现单独拆出是否需要作用域保持，暂不冻结机制；默认内聚局部引用，不能要求每次将model重新映射给MainScene。事件有实例接收者、payload和明确顺序，不默认所有逻辑进入全局app_update。运动由Life更新事件调度，不能以每帧重建整棵声明树代替。
 
-已确定node与Life命名；不另造scene专用组件类型。待讨论：外部片段确有需要时的导出/作用域、事件端口类型、Mounted/Start/Update/FixedUpdate的具体时序和实例寿命。本轮没有可运行新语法交付。
+已确定node与Life命名；不另造scene专用组件类型。待讨论：外部片段确有需要时的导出/作用域、事件端口类型、Mounted/Start/Tick/Frame的具体时序和实例寿命。本轮没有可运行新语法交付。
 
 ### 3.3 资源与节点引用
 
