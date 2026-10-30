@@ -96,6 +96,7 @@ impl ScreenOverlay {
 pub struct Scene3dContent {
     pub screen_overlay: Option<ScreenOverlay>,
     pub text_overlay: Option<TextOverlay>,
+    pub hud_overlay: Option<PublicHudOverlay>,
     pub mesh: crate::render3d::MeshPipeline,
     pub store: crate::render3d::MeshStore,
     pub instances: Vec<crate::render3d::MeshInstance>,
@@ -110,9 +111,61 @@ pub struct TextOverlay {
     pub glyphs: Vec<crate::render2d::GlyphQuad>,
 }
 
+pub struct PublicHudLayer {
+    pub renderer: std::sync::Arc<crate::render2d::TextRenderer>,
+    pub glyphs: Vec<crate::render2d::GlyphQuad>,
+}
+
+pub struct PublicHudOverlay {
+    pub layers: Vec<PublicHudLayer>,
+    pub logical_size: [f32; 2],
+    pub clip: [f32; 4],
+}
+
+impl PublicHudOverlay {
+    fn render(&self, gpu: &GpuDevice, view: &wgpu::TextureView, size: [u32; 2]) {
+        let scale = [
+            size[0] as f32 / self.logical_size[0],
+            size[1] as f32 / self.logical_size[1],
+        ];
+        let x0 = (self.clip[0] * scale[0])
+            .floor()
+            .max(0.0)
+            .min(size[0] as f32) as u32;
+        let y0 = (self.clip[1] * scale[1])
+            .floor()
+            .max(0.0)
+            .min(size[1] as f32) as u32;
+        let x1 = ((self.clip[0] + self.clip[2]) * scale[0])
+            .ceil()
+            .max(0.0)
+            .min(size[0] as f32) as u32;
+        let y1 = ((self.clip[1] + self.clip[3]) * scale[1])
+            .ceil()
+            .max(0.0)
+            .min(size[1] as f32) as u32;
+        if x0 == x1 || y0 == y1 {
+            return;
+        }
+        for layer in &self.layers {
+            layer.renderer.set_ortho_camera(
+                gpu,
+                0.0,
+                self.logical_size[0],
+                self.logical_size[1],
+                0.0,
+            );
+            layer
+                .renderer
+                .render_clipped(gpu, view, &layer.glyphs, [x0, y0, x1 - x0, y1 - y0]);
+        }
+    }
+}
+
 pub struct Game2dContent {
     /// Optional renderer-owned text data; contains no language or game state.
     pub text_overlay: Option<TextOverlay>,
+    pub hud_overlay: Option<PublicHudOverlay>,
     pub quad: QuadPipeline,
     /// PLAN-004 textured visual pass drawn over the flat quads, plus the
     /// persistent content-identified image cache it draws from.
@@ -127,6 +180,7 @@ impl Game2dContent {
     pub fn simple(gpu: &GpuDevice, clear: crate::core::scene::Color) -> Self {
         Game2dContent {
             text_overlay: None,
+            hud_overlay: None,
             quad: QuadPipeline::new(gpu, OffscreenTarget::FORMAT).expect("2d quad pipeline"),
             sprite: crate::renderer::sprite::SpritePipeline::new(gpu, OffscreenTarget::FORMAT)
                 .expect("2d sprite pipeline"),
@@ -1012,6 +1066,9 @@ impl SurfaceRuntime {
                         .set_ortho_camera(gpu, 0.0, w as f32, h as f32, 0.0);
                     text.renderer.render(gpu, slot.target.view(), &text.glyphs);
                 }
+                if let Some(hud) = &scene.hud_overlay {
+                    hud.render(gpu, slot.target.view(), [w, h]);
+                }
                 // A 3D surface renders every frame; consumers must refresh
                 // when its live state actually changed (review r2 F01).
                 let fingerprint = scene_fingerprint(scene);
@@ -1053,6 +1110,9 @@ impl SurfaceRuntime {
                         text.renderer
                             .set_ortho_camera(gpu, 0.0, w as f32, h as f32, 0.0);
                         text.renderer.render(gpu, slot.target.view(), &text.glyphs);
+                    }
+                    if let Some(hud) = &game.hud_overlay {
+                        hud.render(gpu, slot.target.view(), [w, h]);
                     }
                 }
             }
@@ -1422,6 +1482,18 @@ fn scene_fingerprint(scene: &Scene3dContent) -> u64 {
         for glyph in &text.glyphs {
             for v in glyph.dst.iter().chain(&glyph.uv_rect).chain(&glyph.color) {
                 v.to_bits().hash(&mut hasher);
+            }
+        }
+    }
+    if let Some(hud) = &scene.hud_overlay {
+        for v in hud.logical_size.iter().chain(&hud.clip) {
+            v.to_bits().hash(&mut hasher);
+        }
+        for layer in &hud.layers {
+            for glyph in &layer.glyphs {
+                for v in glyph.dst.iter().chain(&glyph.uv_rect).chain(&glyph.color) {
+                    v.to_bits().hash(&mut hasher);
+                }
             }
         }
     }

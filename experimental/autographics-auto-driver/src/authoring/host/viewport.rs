@@ -14,6 +14,7 @@ impl Host {
             None,
             None,
             None,
+            None,
         )
     }
     pub(super) fn prepare_frame(
@@ -25,6 +26,7 @@ impl Host {
         instances: Option<&crate::authoring::runtime_objects::RuntimeObjectsFrame>,
         sprites: Option<&crate::authoring::runtime_sprites::SpriteFrame>,
         animations: Option<&crate::authoring::runtime_node_animation::AnimationFrame>,
+        hud: Option<&crate::authoring::public_hud::Frame>,
     ) -> Result<Prepared, String> {
         if self.fail_resource {
             return Err("resource preparation rejected".into());
@@ -85,6 +87,24 @@ impl Host {
         if self.fail_after_asset_upload {
             return Err("GPU preparation: injected after asset upload".into());
         }
+        let (hud2d, hud_atlases) = crate::authoring::public_hud::prepare_overlay(
+            self.rt.gpu(),
+            &self.hud_atlases,
+            &assets,
+            document,
+            hud,
+            camera,
+            false,
+        )?;
+        let (hud3d, hud_atlases) = crate::authoring::public_hud::prepare_overlay(
+            self.rt.gpu(),
+            &hud_atlases,
+            &assets,
+            document,
+            hud,
+            camera,
+            true,
+        )?;
         let mut p = Prepared {
             store,
             draws: vec![],
@@ -93,6 +113,9 @@ impl Host {
             sprites: vec![],
             sprite_store: Default::default(),
             camera_vp: None,
+            hud2d,
+            hud3d,
+            hud_atlases,
         };
         // Runtime camera transaction: the accepted frame's camera rides the
         // same Prepared, so a preparation failure keeps the last-good pair.
@@ -527,10 +550,12 @@ impl Host {
             }
             g.sprites = p.sprites;
             g.sprite_store = p.sprite_store;
+            g.hud_overlay = p.hud2d;
         }
         if let Some(SurfaceContent::Scene3d(c)) = self.rt.content_mut(self.three) {
             c.store = p.store;
             c.instances = p.instances;
+            c.hud_overlay = p.hud3d;
             if let Some(vp) = p.camera_vp {
                 c.view_proj = vp;
             }
@@ -538,6 +563,7 @@ impl Host {
                 overlay.commands = p.highlight;
             }
         }
+        self.hud_atlases = p.hud_atlases;
         self.prune_resources();
         self.rt.graph.mark_content_dirty(self.two);
         self.rt.graph.mark_content_dirty(self.three);

@@ -139,6 +139,7 @@ impl SquashRuntime {
                     renderer: text,
                     glyphs: vec![],
                 }),
+                hud_overlay: None,
                 mesh: MeshPipeline::new(host.rt.gpu(), OffscreenTarget::FORMAT)
                     .map_err(|e| format!("mesh pipeline: {e:?}"))?,
                 store,

@@ -103,6 +103,9 @@ struct Prepared {
     /// Runtime-camera projection published with the same transaction; None
     /// keeps the installed editor/sample camera.
     camera_vp: Option<Mat4>,
+    hud2d: Option<agp::host::surface_runtime::PublicHudOverlay>,
+    hud3d: Option<agp::host::surface_runtime::PublicHudOverlay>,
+    hud_atlases: super::public_hud::AtlasCache,
 }
 fn bounded_time(v: &mut Vec<u128>, us: u128) {
     v.push(us);
@@ -134,6 +137,7 @@ pub struct Host {
     project_pending: bool,
     pub play: Option<super::play::Play>,
     pub audio: Option<super::public_audio::native::Native>,
+    pub hud_atlases: super::public_hud::AtlasCache,
     pub play_start_us: Vec<u128>,
     pub play_stop_us: Vec<u128>,
     pub play_pump_us: Vec<u128>,
@@ -228,6 +232,7 @@ impl Host {
                             .map_err(|e| format!("{e:?}"))?,
                     ),
                     text_overlay: None,
+                    hud_overlay: None,
                     mesh: MeshPipeline::new(rt.gpu(), OffscreenTarget::FORMAT)
                         .map_err(|e| format!("{e:?}"))?,
                     instances: vec![],
@@ -338,6 +343,7 @@ impl Host {
             play_pump_us: vec![],
             play: None,
             audio: None,
+            hud_atlases: Default::default(),
             play_restore: None,
             play_token: 0,
             actors,

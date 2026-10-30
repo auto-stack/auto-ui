@@ -303,7 +303,8 @@ impl Storage {
                 && (name.as_bytes()[64..].eq_ignore_ascii_case(b".glb")
                     || name.as_bytes()[64..].eq_ignore_ascii_case(b".png")
                     || name.as_bytes()[64..].eq_ignore_ascii_case(b".ogg")
-                    || name.as_bytes()[64..].eq_ignore_ascii_case(b".wav"))
+                    || name.as_bytes()[64..].eq_ignore_ascii_case(b".wav")
+                    || name.as_bytes()[64..].eq_ignore_ascii_case(b".ttf"))
                 && name.as_bytes()[..64].iter().all(|b| b.is_ascii_hexdigit()))
         {
             return Err(
@@ -482,7 +483,8 @@ fn disk_budget(dir: &Path, reserve: usize) -> Result<(), String> {
             || !(name.ends_with(".glb")
                 || name.ends_with(".png")
                 || name.ends_with(".ogg")
-                || name.ends_with(".wav"))
+                || name.ends_with(".wav")
+                || name.ends_with(".ttf"))
             || !name[..64]
                 .bytes()
                 .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
@@ -514,6 +516,7 @@ fn blob_name(a: &super::assets::AssetRef) -> Result<String, String> {
         "glb" => "glb",
         "ogg" => "ogg",
         "wav" => "wav",
+        "ttf" => "ttf",
         _ => return Err("invalid: closure blob format".into()),
     };
     if a.format != extension {

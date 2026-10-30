@@ -577,6 +577,7 @@ pub fn run(replay: &str, report_dir: &Path, mode: &str) -> i32 {
         let scene = crate::host::surface_runtime::Scene3dContent {
             screen_overlay: None,
             text_overlay: None,
+            hud_overlay: None,
             mesh: crate::render3d::MeshPipeline::new(
                 rt.gpu(),
                 crate::renderer::target::OffscreenTarget::FORMAT,
@@ -968,6 +969,7 @@ pub fn run(replay: &str, report_dir: &Path, mode: &str) -> i32 {
                 let foreign_scene = crate::host::surface_runtime::Scene3dContent {
                     screen_overlay: None,
                     text_overlay: None,
+                    hud_overlay: None,
                     mesh: crate::render3d::MeshPipeline::new(
                         &second,
                         crate::renderer::target::OffscreenTarget::FORMAT,
@@ -1000,6 +1002,7 @@ pub fn run(replay: &str, report_dir: &Path, mode: &str) -> i32 {
                         crate::host::surface_runtime::Scene3dContent {
                             screen_overlay: None,
                             text_overlay: None,
+                            hud_overlay: None,
                             mesh: raw_mesh,
                             store: Default::default(),
                             instances: vec![],
@@ -1021,6 +1024,7 @@ pub fn run(replay: &str, report_dir: &Path, mode: &str) -> i32 {
                         crate::host::surface_runtime::Scene3dContent {
                             screen_overlay: None,
                             text_overlay: None,
+                            hud_overlay: None,
                             mesh: crate::render3d::MeshPipeline::new(
                                 rt.gpu(),
                                 crate::renderer::target::OffscreenTarget::FORMAT,

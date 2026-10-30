@@ -157,7 +157,14 @@ impl TextRenderer {
             });
             shelf_x += w + 1;
         }
-        let atlas_h = atlas_h.next_power_of_two().min(2048);
+        let atlas_h = atlas_h.next_power_of_two();
+        if atlas_h > 1024
+            || atlas_w
+                .checked_mul(atlas_h)
+                .is_none_or(|n| n > 4 * 1024 * 1024)
+        {
+            return Err(RendererError::BadFont("atlas capacity".into()));
+        }
 
         // Rasterize into CPU atlas (single-channel), then upload as R8.
         let mut cpu = vec![0u8; atlas_w * atlas_h];
@@ -420,6 +427,33 @@ impl TextRenderer {
         w
     }
 
+    pub fn try_measure(&self, text: &str) -> Result<f32, String> {
+        let mut width = 0.0;
+        for c in text.chars() {
+            let info = self
+                .glyphs
+                .get(&c)
+                .ok_or_else(|| format!("missing glyph U+{:04X}", c as u32))?;
+            width += info.advance;
+        }
+        Ok(width)
+    }
+
+    pub fn try_layout(
+        &self,
+        text: &str,
+        x: f32,
+        y: f32,
+        color: Color,
+    ) -> Result<Vec<GlyphQuad>, String> {
+        for c in text.chars() {
+            if !self.glyphs.contains_key(&c) {
+                return Err(format!("missing glyph U+{:04X}", c as u32));
+            }
+        }
+        Ok(self.layout(text, x, y, color))
+    }
+
     /// CPU layout: text with pen at (x, y) = TOP-left of the line, in world
     /// units matching the camera. Unknown chars advance by space width.
     pub fn layout(&self, text: &str, x: f32, y: f32, color: Color) -> Vec<GlyphQuad> {
@@ -451,6 +485,26 @@ impl TextRenderer {
     /// Draw pre-laid-out glyph quads ON TOP of the current attachment
     /// contents (LoadOp::Load — text pass never clears).
     pub fn render(&self, gpu: &GpuDevice, view: &wgpu::TextureView, quads: &[GlyphQuad]) {
+        self.render_inner(gpu, view, quads, None);
+    }
+
+    pub fn render_clipped(
+        &self,
+        gpu: &GpuDevice,
+        view: &wgpu::TextureView,
+        quads: &[GlyphQuad],
+        clip: [u32; 4],
+    ) {
+        self.render_inner(gpu, view, quads, Some(clip));
+    }
+
+    fn render_inner(
+        &self,
+        gpu: &GpuDevice,
+        view: &wgpu::TextureView,
+        quads: &[GlyphQuad],
+        clip: Option<[u32; 4]>,
+    ) {
         if quads.is_empty() {
             return;
         }
@@ -490,6 +544,9 @@ impl TextRenderer {
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });
+            if let Some([x, y, width, height]) = clip {
+                pass.set_scissor_rect(x, y, width, height);
+            }
             pass.set_pipeline(&self.pipeline);
             pass.set_bind_group(0, &self.bind_group, &[]);
             pass.draw(0..4, 0..quads.len() as u32);

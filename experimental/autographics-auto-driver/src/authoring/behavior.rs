@@ -45,6 +45,9 @@ pub const NODE_ANIMATION_API: &str = include_str!("../../api/node_animation3d_v1
 pub const AUDIO2_VERSION: &str = "autographics.audio2d/1";
 pub const AUDIO3_VERSION: &str = "autographics.audio3d/1";
 pub const AUDIO_API: &str = include_str!("../../api/public_audio_v1.at");
+pub const HUD2_VERSION: &str = "autographics.hud2d/1";
+pub const HUD3_VERSION: &str = "autographics.hud3d/1";
+pub const HUD_API: &str = include_str!("../../api/public_hud_v1.at");
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Api {
     V1,
@@ -64,6 +67,8 @@ pub enum Api {
     NodeAnimation3V1,
     Audio2V1,
     Audio3V1,
+    Hud2V1,
+    Hud3V1,
 }
 impl Api {
     pub fn parse(value: &str) -> Result<Self, String> {
@@ -85,6 +90,8 @@ impl Api {
             AUDIO2_VERSION => Ok(Self::Audio2V1),
             AUDIO3_VERSION => Ok(Self::Audio3V1),
             NODE_ANIMATION3_VERSION => Ok(Self::NodeAnimation3V1),
+            HUD2_VERSION => Ok(Self::Hud2V1),
+            HUD3_VERSION => Ok(Self::Hud3V1),
             _ => Err("unsupported behavior API".into()),
         }
     }
@@ -107,6 +114,8 @@ impl Api {
             Self::NodeAnimation3V1 => NODE_ANIMATION3_VERSION,
             Self::Audio2V1 => AUDIO2_VERSION,
             Self::Audio3V1 => AUDIO3_VERSION,
+            Self::Hud2V1 => HUD2_VERSION,
+            Self::Hud3V1 => HUD3_VERSION,
         }
     }
     pub fn number(self) -> i32 {
@@ -128,6 +137,8 @@ impl Api {
             Self::NodeAnimation3V1 => 110,
             Self::Audio2V1 => 111,
             Self::Audio3V1 => 112,
+            Self::Hud2V1 => 113,
+            Self::Hud3V1 => 114,
         }
     }
     pub fn profile(self) -> i32 {
@@ -149,18 +160,24 @@ impl Api {
             Self::NodeAnimation3V1 => 21,
             Self::Audio2V1 => 22,
             Self::Audio3V1 => 23,
+            Self::Hud2V1 => 24,
+            Self::Hud3V1 => 25,
         }
     }
     /// The finite run-object profiles including the trigger profiles that
     /// carry the objects unit: one dimension per Run, 8 reserved slots.
     pub fn objects(self) -> Option<super::runtime_objects::Dim> {
         match self {
-            Self::Objects2V1 | Self::Triggers2V1 | Self::Sprites2V1 | Self::Audio2V1 => {
-                Some(super::runtime_objects::Dim::TwoD)
-            }
-            Self::Objects3V1 | Self::Triggers3V1 | Self::NodeAnimation3V1 | Self::Audio3V1 => {
-                Some(super::runtime_objects::Dim::ThreeD)
-            }
+            Self::Objects2V1
+            | Self::Triggers2V1
+            | Self::Sprites2V1
+            | Self::Audio2V1
+            | Self::Hud2V1 => Some(super::runtime_objects::Dim::TwoD),
+            Self::Objects3V1
+            | Self::Triggers3V1
+            | Self::NodeAnimation3V1
+            | Self::Audio3V1
+            | Self::Hud3V1 => Some(super::runtime_objects::Dim::ThreeD),
             _ => None,
         }
     }
@@ -168,10 +185,10 @@ impl Api {
     /// audited restart request on top of the objects composition.
     pub fn triggers(self) -> Option<super::runtime_objects::Dim> {
         match self {
-            Self::Triggers2V1 | Self::Sprites2V1 | Self::Audio2V1 => {
+            Self::Triggers2V1 | Self::Sprites2V1 | Self::Audio2V1 | Self::Hud2V1 => {
                 Some(super::runtime_objects::Dim::TwoD)
             }
-            Self::Triggers3V1 | Self::NodeAnimation3V1 | Self::Audio3V1 => {
+            Self::Triggers3V1 | Self::NodeAnimation3V1 | Self::Audio3V1 | Self::Hud3V1 => {
                 Some(super::runtime_objects::Dim::ThreeD)
             }
             _ => None,
@@ -180,16 +197,22 @@ impl Api {
     /// The PLAN-004 sprite profile: the bound-leaf frame/flip table and the
     /// reserved-slot table riding the unchanged triggers2d composition.
     pub fn sprites(self) -> bool {
-        matches!(self, Self::Sprites2V1 | Self::Audio2V1)
+        matches!(self, Self::Sprites2V1 | Self::Audio2V1 | Self::Hud2V1)
     }
     /// Every shipped profile, in the order the command line lists them.
     pub fn audio(self) -> bool {
-        matches!(self, Self::Audio2V1 | Self::Audio3V1)
+        matches!(
+            self,
+            Self::Audio2V1 | Self::Audio3V1 | Self::Hud2V1 | Self::Hud3V1
+        )
+    }
+    pub fn hud(self) -> bool {
+        matches!(self, Self::Hud2V1 | Self::Hud3V1)
     }
     pub fn node_animation(self) -> bool {
-        matches!(self, Self::NodeAnimation3V1 | Self::Audio3V1)
+        matches!(self, Self::NodeAnimation3V1 | Self::Audio3V1 | Self::Hud3V1)
     }
-    pub fn all() -> [Self; 17] {
+    pub fn all() -> [Self; 19] {
         [
             Self::V1,
             Self::SpatialV2,
@@ -208,6 +231,8 @@ impl Api {
             Self::NodeAnimation3V1,
             Self::Audio2V1,
             Self::Audio3V1,
+            Self::Hud2V1,
+            Self::Hud3V1,
         ]
     }
     /// The command-line name of this profile. The public entry selects a Run by
@@ -231,6 +256,8 @@ impl Api {
             Self::NodeAnimation3V1 => "node-animation3d",
             Self::Audio2V1 => "audio2d",
             Self::Audio3V1 => "audio3d",
+            Self::Hud2V1 => "hud2d",
+            Self::Hud3V1 => "hud3d",
         }
     }
     /// Parse one `--behavior-api` value; an unknown name is a usage error.

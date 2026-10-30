@@ -49,6 +49,76 @@ pub(super) fn assemble(api: Api) -> Result<Units, String> {
     assemble_from(api, INPUTS)
 }
 fn assemble_from(api: Api, input: Inputs<'_>) -> Result<Units, String> {
+    if api.hud() {
+        let three = api == Api::Hud3V1;
+        let mut units = assemble_from(if three { Api::Audio3V1 } else { Api::Audio2V1 }, input)?;
+        units.entry = replace(
+            &units.entry,
+            if three {
+                "fn profile() int {return 23}"
+            } else {
+                "fn profile() int {return 22}"
+            },
+            if three {
+                "fn profile() int {return 25}"
+            } else {
+                "fn profile() int {return 24}"
+            },
+            1,
+        )?;
+        units.entry = replace(
+            &units.entry,
+            if three {
+                "fn _ag_version() int {return 112}"
+            } else {
+                "fn _ag_version() int {return 111}"
+            },
+            if three {
+                "fn _ag_version() int {return 114}"
+            } else {
+                "fn _ag_version() int {return 113}"
+            },
+            1,
+        )?;
+        units.entry = replace(
+            &units.entry,
+            "_ag_audio_freeze(); app_start();",
+            "_ag_audio_freeze(); _ag_hud_freeze(); app_start();",
+            1,
+        )?;
+        units.entry = replace(
+            &units.entry,
+            "_ag_audio_tick_begin(); app_update(dt);",
+            "_ag_audio_tick_begin(); _ag_hud_tick_begin(); app_update(dt);",
+            1,
+        )?;
+        units.api = replace(
+            &units.api,
+            if three {
+                "fn ag_present3d("
+            } else {
+                "fn ag_present2d("
+            },
+            if three {
+                "fn _ag_hud_audio_present3d("
+            } else {
+                "fn _ag_hud_audio_present2d("
+            },
+            1,
+        )?;
+        let extension = if three {
+            include_str!("../../../api/public_hud3d_v1.at")
+        } else {
+            include_str!("../../../api/public_hud2d_v1.at")
+        };
+        units.api = format!("{}\n{}\n{}", units.api, super::HUD_API, extension);
+        units.api_region = if three {
+            "<public_hud3d_v1.at>"
+        } else {
+            "<public_hud2d_v1.at>"
+        };
+        return Ok(units);
+    }
     if api.audio() {
         let three = api == Api::Audio3V1;
         let mut units = assemble_from(
@@ -314,12 +384,14 @@ fn assemble_from(api: Api, input: Inputs<'_>) -> Result<Units, String> {
         | Api::Sprites2V1
         | Api::NodeAnimation3V1
         | Api::Audio2V1
-        | Api::Audio3V1 => segment_transport(input.transport)?,
+        | Api::Audio3V1
+        | Api::Hud2V1
+        | Api::Hud3V1 => segment_transport(input.transport)?,
     };
     // The former v5 pre-namespace `_ag_derive` replacement never matched.
     // Preserve those emitted bytes; activating that guard would change behavior.
     let (api_text, api_region) = match api {
-        Api::NodeAnimation3V1 | Api::Audio2V1 | Api::Audio3V1 => unreachable!("derived above"),
+        Api::NodeAnimation3V1 | Api::Audio2V1 | Api::Audio3V1 | Api::Hud2V1 | Api::Hud3V1 => unreachable!("derived above"),
         Api::V1 => (input.base.to_owned(), "<behavior_v1.at>"),
         Api::SpatialV2 => (
             format!("{}\n{}", input.base, input.spatial),
@@ -538,7 +610,9 @@ fn entry(api: Api, source: &str) -> Result<String, String> {
         | Api::Sprites2V1
         | Api::NodeAnimation3V1
         | Api::Audio2V1
-        | Api::Audio3V1 => {
+        | Api::Audio3V1
+        | Api::Hud2V1
+        | Api::Hud3V1 => {
             let source = replace(
                 &source,
                 "_ag_spatial_begin();",

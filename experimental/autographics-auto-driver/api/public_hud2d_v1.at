@@ -1,0 +1,8 @@
+fn ag_present2d(kind int, entity int, x int, y int, w int, h int, flip int, n int, o0 int, c0 int, g0 float, o1 int, c1 int, g1 float, o2 int, c2 int, g2 float, o3 int, c3 int, g3 float, v0 int, t0 str, v1 int, t1 str, v2 int, t2 str, v3 int, t3 str) int {
+ if _ag_hud_bundle_begin()==0 {return 0}
+ if _ag_hud_audio_present2d(kind,entity,x,y,w,h,flip,n,o0,c0,g0,o1,c1,g1,o2,c2,g2,o3,c3,g3)==0 {return 0}
+ if _ag_hud_put(0,v0,t0)==0 {return 0}
+ if _ag_hud_put(1,v1,t1)==0 {return 0}
+ if _ag_hud_put(2,v2,t2)==0 {return 0}
+ return _ag_hud_put(3,v3,t3)
+}

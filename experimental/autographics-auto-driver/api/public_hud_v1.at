@@ -1,0 +1,79 @@
+// Four complete Run-owned HUD slots. Strings become bounded ASCII integer rows.
+var _ag_hud_frozen=0
+var _ag_hud_vis=[0,0,0,0]
+var _ag_hud_chars=[[],[],[],[]]
+var _ag_hud_expected=[0,0,0,0]
+var _ag_hud_mode=0
+fn _ag_hud_config(slot int, visible int, count int) {
+ if slot<0 {_ag_fail(55,slot,0);return}
+ if slot>3 {_ag_fail(55,slot,0);return}
+ if visible<0 {_ag_fail(55,slot,visible);return}
+ if visible>1 {_ag_fail(55,slot,visible);return}
+ if count<0 {_ag_fail(56,slot,count);return}
+ if count>32 {_ag_fail(56,slot,count);return}
+ _ag_hud_vis[slot]=visible
+ _ag_hud_expected[slot]=count
+ _ag_hud_chars[slot]=[]
+}
+fn _ag_hud_config_code(slot int, code int) {
+ if slot<0 {_ag_fail(55,slot,0);return}
+ if slot>3 {_ag_fail(55,slot,0);return}
+ if _ag_hud_chars[slot].len()>=_ag_hud_expected[slot] {_ag_fail(56,slot,code);return}
+ if code<32 {_ag_fail(56,slot,code);return}
+ if code>126 {_ag_fail(56,slot,code);return}
+ _ag_hud_chars[slot].push(code)
+}
+fn _ag_hud_freeze() {
+ for slot in 0..4 {
+  if _ag_hud_chars[slot].len()!=_ag_hud_expected[slot] {_ag_fail(56,slot,_ag_hud_chars[slot].len());return}
+ }
+ _ag_hud_frozen=1
+}
+fn _ag_hud_tick_begin() {_ag_hud_mode=0}
+fn _ag_hud_put(slot int, visible int, text str) int {
+ if _ag_error!=0 {return 0}
+ if _ag_hud_frozen==0 {_ag_fail(55,slot,0);return 0}
+ if slot<0 {_ag_fail(55,slot,0);return 0}
+ if slot>3 {_ag_fail(55,slot,0);return 0}
+ if visible<0 {_ag_fail(55,slot,visible);return 0}
+ if visible>1 {_ag_fail(55,slot,visible);return 0}
+ if text.len()>32 {_ag_fail(56,slot,text.len());return 0}
+ var codes=[]
+ for i in 0..text.len() {
+  let code=text[i]
+  if code<32 {_ag_fail(56,slot,code);return 0}
+  if code>126 {_ag_fail(56,slot,code);return 0}
+  codes.push(code)
+ }
+ _ag_hud_vis[slot]=visible
+ _ag_hud_chars[slot]=codes
+ return 1
+}
+fn ag_hud_set(slot int, visible int, text str) int {
+ if _ag_hud_mode==2 {_ag_fail(57,slot,0);return 0}
+ if _ag_cast_charge(1)==0 {return 0}
+ _ag_hud_mode=1
+ return _ag_hud_put(slot,visible,text)
+}
+fn _ag_hud_bundle_begin() int {
+ if _ag_hud_mode==1 {_ag_fail(57,-1,0);return 0}
+ _ag_hud_mode=2
+ return 1
+}
+fn _ag_hud_visible(slot int) int {
+ if slot<0 {return 0}
+ if slot>3 {return 0}
+ return _ag_hud_vis[slot]
+}
+fn _ag_hud_length(slot int) int {
+ if slot<0 {return 0}
+ if slot>3 {return 0}
+ return _ag_hud_chars[slot].len()
+}
+fn _ag_hud_code(slot int, index int) int {
+ if slot<0 {return 0}
+ if slot>3 {return 0}
+ if index<0 {return 0}
+ if index>=_ag_hud_chars[slot].len() {return 0}
+ return _ag_hud_chars[slot][index]
+}

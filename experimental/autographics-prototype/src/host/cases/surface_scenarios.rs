@@ -329,6 +329,7 @@ fn scene3d(rt: &SurfaceRuntime, w: f32, h: f32) -> Scene3dContent {
     Scene3dContent {
         screen_overlay: None,
         text_overlay: None,
+        hud_overlay: None,
         mesh: crate::render3d::MeshPipeline::new(rt.gpu(), OffscreenTarget::FORMAT).expect("3d"),
         instances: vec![crate::render3d::MeshInstance {
             mesh: (
@@ -537,6 +538,7 @@ pub fn run(replay: &str, report_dir: &Path, mode: &str) -> i32 {
                 [GAME_W, GAME_H],
                 crate::host::surface_runtime::SurfaceContent::Game2d(Box::new(Game2dContent {
                     text_overlay: None,
+                    hud_overlay: None,
                     quad: QuadPipeline::new(rt.gpu(), OffscreenTarget::FORMAT).expect("quad"),
                     sprite: crate::renderer::sprite::SpritePipeline::new(
                         rt.gpu(),
@@ -848,6 +850,7 @@ pub fn run(replay: &str, report_dir: &Path, mode: &str) -> i32 {
                 crate::host::surface_runtime::SurfaceContent::Scene3d(Box::new(Scene3dContent {
                     screen_overlay: None,
                     text_overlay: None,
+                    hud_overlay: None,
                     mesh: crate::render3d::MeshPipeline::new(rt.gpu(), OffscreenTarget::FORMAT)
                         .expect("squash mesh"),
                     store,

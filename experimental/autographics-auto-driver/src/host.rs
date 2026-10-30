@@ -114,6 +114,7 @@ impl Host {
         let mesh = Scene3dContent {
             screen_overlay: None,
             text_overlay: None,
+            hud_overlay: None,
             mesh: MeshPipeline::new(rt.gpu(), OffscreenTarget::FORMAT)
                 .map_err(|e| format!("{e:?}"))?,
             store: MeshStore::default(),

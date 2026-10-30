@@ -227,6 +227,7 @@ fn scene3d(gpu: &GpuDevice, w: f32, h: f32) -> Scene3dContent {
     Scene3dContent {
         screen_overlay: None,
         text_overlay: None,
+        hud_overlay: None,
         mesh,
         store,
         instances,

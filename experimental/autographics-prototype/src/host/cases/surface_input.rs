@@ -201,6 +201,7 @@ fn build(rt: &mut SurfaceRuntime) -> Option<(SceneIds, CompositionInput)> {
     let scene = Scene3dContent {
         screen_overlay: None,
         text_overlay: None,
+        hud_overlay: None,
         mesh,
         instances: vec![crate::render3d::MeshInstance {
             mesh: (ground.source_sha256.clone(), ground.meshes[0].name.clone()),

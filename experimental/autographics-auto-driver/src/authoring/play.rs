@@ -156,6 +156,7 @@ pub struct Frame {
     pub animations: Option<super::runtime_node_animation::AnimationFrame>,
     pub audio: Option<super::public_audio::mixer::Packet>,
     pub audio_disposition: Option<super::public_audio::mixer::Accepted>,
+    pub hud: Option<super::public_hud::Frame>,
 }
 
 /// Per-tick camera output block sizes appended to the frame read layout.
@@ -250,6 +251,7 @@ pub struct Play {
     sprite_targets: Option<Vec<super::runtime_sprites::Target>>,
     animation_targets: Option<Vec<super::runtime_node_animation::Target>>,
     pub audio_cues: Option<Vec<super::public_audio::mixer::Cue>>,
+    pub hud_enabled: bool,
 }
 impl Play {
     pub fn new(e: &Editor, actors: [Option<u64>; 2], source: &str) -> Result<Self, String> {
@@ -291,6 +293,8 @@ impl Play {
             && snapshot.version != super::behavior::NODE_ANIMATION3_VERSION
             && snapshot.version != super::behavior::AUDIO2_VERSION
             && snapshot.version != super::behavior::AUDIO3_VERSION
+            && snapshot.version != super::behavior::HUD2_VERSION
+            && snapshot.version != super::behavior::HUD3_VERSION
         {
             return Err("spatial constructor API mismatch".into());
         }
@@ -355,13 +359,15 @@ impl Play {
                 | super::behavior::Api::Objects2V1
                 | super::behavior::Api::Triggers2V1
                 | super::behavior::Api::Sprites2V1
-                | super::behavior::Api::Audio2V1 => Some(CharProfile::TwoD),
+                | super::behavior::Api::Audio2V1
+                | super::behavior::Api::Hud2V1 => Some(CharProfile::TwoD),
                 super::behavior::Api::Character3V1
                 | super::behavior::Api::Camera3V1
                 | super::behavior::Api::Objects3V1
                 | super::behavior::Api::Triggers3V1
                 | super::behavior::Api::NodeAnimation3V1
-                | super::behavior::Api::Audio3V1 => Some(CharProfile::ThreeD),
+                | super::behavior::Api::Audio3V1
+                | super::behavior::Api::Hud3V1 => Some(CharProfile::ThreeD),
                 _ => None,
             };
             let camera_dim = match api {
@@ -369,12 +375,14 @@ impl Play {
                 | super::behavior::Api::Objects2V1
                 | super::behavior::Api::Triggers2V1
                 | super::behavior::Api::Sprites2V1
-                | super::behavior::Api::Audio2V1 => Some(CameraDim::TwoD),
+                | super::behavior::Api::Audio2V1
+                | super::behavior::Api::Hud2V1 => Some(CameraDim::TwoD),
                 super::behavior::Api::Camera3V1
                 | super::behavior::Api::Objects3V1
                 | super::behavior::Api::Triggers3V1
                 | super::behavior::Api::NodeAnimation3V1
-                | super::behavior::Api::Audio3V1 => Some(CameraDim::ThreeD),
+                | super::behavior::Api::Audio3V1
+                | super::behavior::Api::Hud3V1 => Some(CameraDim::ThreeD),
                 _ => None,
             };
             let objects_dim = api.objects();
@@ -549,6 +557,36 @@ impl Play {
             );
             play.push_audio_queries();
         }
+        if api.hud() {
+            play.hud_enabled = true;
+            let hud = e.document.hud.as_ref().ok_or("hud_invalid: document")?;
+            let mut calls = vec![];
+            for slot in &hud.slots {
+                calls.push(Call::unit(
+                    "_ag_hud_config",
+                    vec![
+                        Scalar::Int(slot.slot),
+                        Scalar::Int(i32::from(slot.visible)),
+                        Scalar::Int(slot.text.len() as i32),
+                    ],
+                ));
+                calls.extend(slot.text.bytes().map(|code| {
+                    Call::unit(
+                        "_ag_hud_config_code",
+                        vec![Scalar::Int(slot.slot), Scalar::Int(code as i32)],
+                    )
+                }));
+            }
+            let position = play
+                .queue
+                .iter()
+                .position(|c| c.name == "_ag_start")
+                .ok_or("missing start boundary")?;
+            for (offset, call) in calls.into_iter().enumerate() {
+                play.queue.insert(position + offset, call);
+            }
+            play.push_hud_queries();
+        }
         Ok(play)
     }
     fn new_program(
@@ -575,6 +613,13 @@ impl Play {
             })
         {
             return Err("audio_unsupported: audio payload requires explicit audio profile".into());
+        }
+        if (e.document.hud.is_some() || e.document.assets.iter().any(|a| a.is_font()))
+            && user_source
+                .as_ref()
+                .is_none_or(|s| !super::behavior::Api::parse(&s.version).is_ok_and(|api| api.hud()))
+        {
+            return Err("hud_unsupported: HUD payload requires explicit HUD profile".into());
         }
         for a in &e.document.assets {
             let payload = e.assets.get(&a.key()).ok_or("missing play asset")?;
@@ -709,6 +754,7 @@ impl Play {
             sprite_targets: None,
             animation_targets: None,
             audio_cues: None,
+            hud_enabled: false,
         };
         p.queries();
         Ok(p)
@@ -1051,6 +1097,7 @@ impl Play {
         self.push_sprite_queries();
         self.push_animation_queries();
         self.push_audio_queries();
+        self.push_hud_queries();
     }
 
     /// The camera output block rides every camera-Run tick after the node
@@ -1291,6 +1338,11 @@ impl Play {
                     .as_ref()
                     .map_or(0, |t| super::runtime_node_animation::block_len(t.len()))
                 + if self.audio_cues.is_some() { 16 } else { 0 }
+                + if self.hud_enabled {
+                    super::public_hud::BLOCK_LEN
+                } else {
+                    0
+                }
             || int(0)? != self.expected_profile
             || int(1)? != self.run_id
             || int(2)? != self.next_tick
@@ -1366,8 +1418,20 @@ impl Play {
         let rounds = self.admit_rounds(data, &expected, instances.as_ref())?;
         let sprites = self.admit_sprites(data, instances.as_ref())?;
         let animations = self.admit_animations(data, instances.as_ref())?;
+        let hud_len = if self.hud_enabled {
+            super::public_hud::BLOCK_LEN
+        } else {
+            0
+        };
+        let hud = if self.hud_enabled {
+            Some(super::public_hud::admit_block(
+                &data[data.len() - hud_len..],
+            )?)
+        } else {
+            None
+        };
         let audio = if self.audio_cues.is_some() {
-            let block = &data[data.len() - 16..];
+            let block = &data[data.len() - 16 - hud_len..data.len() - hud_len];
             let count = match block[3] {
                 Scalar::Int(v) if (0..=4).contains(&v) => v as usize,
                 _ => return Err("audio_invalid: count wire".into()),
@@ -1401,6 +1465,7 @@ impl Play {
             animations,
             audio,
             audio_disposition: None,
+            hud,
         })
     }
 
@@ -1898,6 +1963,27 @@ impl Play {
                 args: vec![Scalar::Int(i)],
                 kind: ResultKind::Float,
             });
+        }
+    }
+    fn push_hud_queries(&mut self) {
+        if !self.hud_enabled {
+            return;
+        }
+        for slot in 0..super::public_hud::SLOTS as i32 {
+            for name in ["_ag_hud_visible", "_ag_hud_length"] {
+                self.queue.push_back(Call {
+                    name,
+                    args: vec![Scalar::Int(slot)],
+                    kind: ResultKind::Int,
+                });
+            }
+            for index in 0..super::public_hud::MAX_TEXT as i32 {
+                self.queue.push_back(Call {
+                    name: "_ag_hud_code",
+                    args: vec![Scalar::Int(slot), Scalar::Int(index)],
+                    kind: ResultKind::Int,
+                });
+            }
         }
     }
     pub fn accept(&mut self) -> Result<(), String> {

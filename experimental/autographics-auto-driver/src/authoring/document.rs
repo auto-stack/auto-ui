@@ -110,6 +110,8 @@ pub struct Document {
     pub assets: Vec<super::assets::AssetRef>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cues: Option<Vec<super::public_audio::CueRef>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hud: Option<super::public_hud::DocumentHud>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -170,6 +172,7 @@ impl Document {
             groups: vec![],
             assets: vec![],
             cues: None,
+            hud: None,
         }
     }
     pub fn sample() -> Self {
@@ -194,15 +197,20 @@ impl Document {
             "autographics.scene/5",
             "autographics.scene/6",
             "autographics.scene/7",
+            "autographics.scene/8",
         ]
         .contains(&self.schema.as_str())
         {
             return Err("unsupported schema".into());
         }
-        if (self.schema == "autographics.scene/7") != self.cues.is_some() {
+        if !["autographics.scene/7", "autographics.scene/8"].contains(&self.schema.as_str())
+            && self.cues.is_some()
+            || ["autographics.scene/7", "autographics.scene/8"].contains(&self.schema.as_str())
+                && self.cues.is_none()
+        {
             return Err("audio_invalid: versioned cue field".into());
         }
-        if self.schema != "autographics.scene/7"
+        if !["autographics.scene/7", "autographics.scene/8"].contains(&self.schema.as_str())
             && self
                 .assets
                 .iter()
@@ -211,6 +219,7 @@ impl Document {
             return Err("legacy unknown audio format/metadata".into());
         }
         super::public_audio::validate_cues(self)?;
+        super::public_hud::validate_document(self)?;
         if self.document_id.is_empty() || self.document_id.chars().count() > 128 {
             return Err("document identity".into());
         }
@@ -228,7 +237,12 @@ impl Document {
             if !assets.insert(a.key()) {
                 return Err("duplicate asset identity".into());
             }
-            if !["autographics.scene/6", "autographics.scene/7"].contains(&self.schema.as_str())
+            if ![
+                "autographics.scene/6",
+                "autographics.scene/7",
+                "autographics.scene/8",
+            ]
+            .contains(&self.schema.as_str())
                 && a.closure.is_some()
             {
                 return Err("legacy unknown model closure".into());
@@ -258,7 +272,7 @@ impl Document {
                     .iter()
                     .find(|a| Some(a.key()).as_ref() == o.resource.as_ref())
                     .ok_or_else(|| "model resource reference".to_string())?;
-                if payload.is_image() || payload.is_audio() {
+                if payload.is_image() || payload.is_audio() || payload.is_font() {
                     return Err("model requires a geometry resource".into());
                 }
             } else if o.resource.is_some() {
@@ -348,7 +362,7 @@ impl Document {
             .and_then(Value::as_str)
             .ok_or("schema required")?
             .to_owned();
-        if schema != "autographics.scene/7"
+        if !["autographics.scene/7", "autographics.scene/8"].contains(&schema.as_str())
             && (v.get("cues").is_some()
                 || v.get("assets").and_then(Value::as_array).is_some_and(|a| {
                     a.iter().any(|a| {
@@ -362,10 +376,29 @@ impl Document {
         {
             return Err("legacy unknown audio fields/format".into());
         }
-        if schema == "autographics.scene/7" && !v.get("cues").is_some_and(Value::is_array) {
+        if ["autographics.scene/7", "autographics.scene/8"].contains(&schema.as_str())
+            && !v.get("cues").is_some_and(Value::is_array)
+        {
             return Err("explicit audio cues required".into());
         }
-        if !["autographics.scene/6", "autographics.scene/7"].contains(&schema.as_str())
+        if schema != "autographics.scene/8"
+            && (v.get("hud").is_some()
+                || v.get("assets").and_then(Value::as_array).is_some_and(|a| {
+                    a.iter()
+                        .any(|a| a.get("format").and_then(Value::as_str) == Some("ttf"))
+                }))
+        {
+            return Err("legacy unknown HUD fields/font".into());
+        }
+        if schema == "autographics.scene/8" && !v.get("hud").is_some_and(Value::is_object) {
+            return Err("explicit HUD required".into());
+        }
+        if ![
+            "autographics.scene/6",
+            "autographics.scene/7",
+            "autographics.scene/8",
+        ]
+        .contains(&schema.as_str())
             && v.get("assets")
                 .and_then(Value::as_array)
                 .is_some_and(|a| a.iter().any(|a| a.get("closure").is_some()))

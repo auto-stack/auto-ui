@@ -240,6 +240,7 @@ pub fn run(replay: &str, report_dir: &Path, mode: &str) -> i32 {
     let scene = Scene3dContent {
         screen_overlay: None,
         text_overlay: None,
+        hud_overlay: None,
         mesh: crate::render3d::MeshPipeline::new(rt.gpu(), OffscreenTarget::FORMAT).expect("3d"),
         instances: vec![crate::render3d::MeshInstance {
             mesh: (

@@ -74,9 +74,12 @@ impl AssetRef {
     pub fn is_image(&self) -> bool {
         self.format == FORMAT_PNG
     }
+    pub fn is_font(&self) -> bool {
+        self.format == "ttf"
+    }
     pub fn validate(&self) -> Result<(), String> {
         super::textured_models::validate_ref(self)?;
-        if (!matches!(self.format.as_str(), "glb" | "png" | "ogg" | "wav"))
+        if (!matches!(self.format.as_str(), "glb" | "png" | "ogg" | "wav" | "ttf"))
             || self.sha256.len() != 64
             || !self
                 .sha256
@@ -90,6 +93,12 @@ impl AssetRef {
             || self.name.as_ref().is_some_and(|s| s.chars().count() > 128)
         {
             return Err("resource limit: asset metadata".into());
+        }
+        if self.is_font()
+            && (self.sha256 != super::public_hud::FONT_SHA
+                || self.byte_length != super::public_hud::FONT_LEN)
+        {
+            return Err("hud_invalid: fixed font identity".into());
         }
         match (self.is_audio(), &self.audio) {
             (true, Some(m)) => m.validate()?,
@@ -140,7 +149,7 @@ impl Asset {
     /// geometry/instance consumer goes through here so a PNG can never be
     /// mistaken for a zero-mesh model.
     pub fn model_data(&self) -> Result<&ModelData, String> {
-        if self.image.is_some() || self.audio.is_some() {
+        if self.image.is_some() || self.audio.is_some() || self.identity.is_font() {
             return Err("wrong asset kind: geometry required".into());
         }
         Ok(&self.model)
@@ -321,6 +330,14 @@ pub fn load_declared(path: &Path, a: &AssetRef, r: &Registry) -> Result<Arc<Asse
     a.validate()?;
     if a.closure.is_some() {
         return super::textured_models::load_declared(path, a, r);
+    }
+    if a.is_font() {
+        let bytes = super::textured_models::RawPool::new(r).read(path)?;
+        let loaded = super::public_hud::import_raw(bytes, r, a.name.clone())?;
+        if !loaded.identity.same_content(a) {
+            return Err("hud_invalid: declared font identity".into());
+        }
+        return Ok(loaded);
     }
     if a.is_audio() {
         let bytes = super::textured_models::RawPool::new(r).read(path)?;
