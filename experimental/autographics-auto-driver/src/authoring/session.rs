@@ -19,6 +19,10 @@ pub enum Edit {
         asset: Option<std::sync::Arc<super::assets::Asset>>,
         cues: Vec<super::public_audio::CueRef>,
     },
+    Hud {
+        asset: std::sync::Arc<super::assets::Asset>,
+        hud: super::public_hud::DocumentHud,
+    },
     Behavior {
         binding: Option<super::behavior_project::Binding>,
         code: Option<super::behavior_project::Code>,
@@ -196,10 +200,31 @@ impl Editor {
                         doc.assets.push(asset.identity.clone());
                     }
                 }
-                doc.schema = "autographics.scene/7".into();
+                doc.schema = if doc.hud.is_some() {
+                    "autographics.scene/8"
+                } else {
+                    "autographics.scene/7"
+                }
+                .into();
                 doc.cues = Some(cues);
                 doc.validate()?;
                 super::public_audio::resolve_cues(&doc, &assets)?;
+                Intent::Edit
+            }
+            Edit::Hud { asset, hud } => {
+                if !asset.identity.is_font() {
+                    return Err("hud_invalid: fixed font payload required".into());
+                }
+                super::assets::insert(&mut assets, asset.clone())?;
+                if !doc.assets.iter().any(|a| a.key() == asset.identity.key()) {
+                    doc.assets.push(asset.identity.clone());
+                }
+                if doc.cues.is_none() {
+                    doc.cues = Some(vec![]);
+                }
+                doc.schema = "autographics.scene/8".into();
+                doc.hud = Some(hud);
+                doc.validate()?;
                 Intent::Edit
             }
             Edit::Behavior {
@@ -221,7 +246,10 @@ impl Editor {
                 }
                 if let Some(asset) = asset {
                     super::assets::insert(&mut assets, asset.clone())?;
-                    if asset.identity.closure.is_some() && doc.schema != "autographics.scene/7" {
+                    if asset.identity.closure.is_some()
+                        && !["autographics.scene/7", "autographics.scene/8"]
+                            .contains(&doc.schema.as_str())
+                    {
                         doc.schema = "autographics.scene/6".into();
                     }
                     if !doc.assets.iter().any(|a| a.key() == asset.identity.key()) {

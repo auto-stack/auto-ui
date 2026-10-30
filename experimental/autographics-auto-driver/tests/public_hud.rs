@@ -336,6 +336,7 @@ fn host_scene(api: Api) -> autographics_auto_driver::authoring::host::Host {
     .unwrap();
     doc.hud = Some(DocumentHud {
         font: font.identity.key(),
+        license: autographics_auto_driver::authoring::public_hud::LICENSE_TEXT.into(),
         slots: vec![
             Slot {
                 slot: 0,
@@ -592,4 +593,205 @@ fn scene8_font_closure_saves_relocates_rejects_corruption_and_recovers() {
         );
         h.stop_play();
     }
+}
+
+#[test]
+fn scene8_document_and_fixed_font_negative_controls_reject_before_effects() {
+    let h = host_scene(Api::Hud2V1);
+    let valid = h.editor.document.clone();
+    for (case, mutate) in [
+        (
+            "missing-slot",
+            (|d: &mut autographics_auto_driver::authoring::document::Document| {
+                d.hud.as_mut().unwrap().slots.pop();
+            }) as fn(&mut _),
+        ),
+        ("duplicate-slot", |d| {
+            d.hud.as_mut().unwrap().slots[1].slot = 0
+        }),
+        ("long-text", |d| {
+            d.hud.as_mut().unwrap().slots[0].text = "123456789012345678901234567890123".into()
+        }),
+        ("control-text", |d| {
+            d.hud.as_mut().unwrap().slots[0].text = "a\nb".into()
+        }),
+        ("unicode-text", |d| {
+            d.hud.as_mut().unwrap().slots[0].text = "é".into()
+        }),
+        ("anchor", |d| d.hud.as_mut().unwrap().slots[0].anchor = 4),
+        ("size-nan", |d| {
+            d.hud.as_mut().unwrap().slots[0].size = f32::NAN
+        }),
+        ("size-low", |d| d.hud.as_mut().unwrap().slots[0].size = 15.0),
+        ("offset-infinite", |d| {
+            d.hud.as_mut().unwrap().slots[0].offset[0] = f32::INFINITY
+        }),
+        ("rgba-nan", |d| {
+            d.hud.as_mut().unwrap().slots[0].rgba[0] = f32::NAN
+        }),
+        ("rgba-range", |d| {
+            d.hud.as_mut().unwrap().slots[0].rgba[0] = 1.1
+        }),
+        ("license", |d| d.hud.as_mut().unwrap().license.truncate(10)),
+        ("font-ref", |d| {
+            d.hud.as_mut().unwrap().font = "missing".into()
+        }),
+        ("font-sha", |d| {
+            d.assets.iter_mut().find(|a| a.is_font()).unwrap().sha256 = "0".repeat(64)
+        }),
+        ("cues-required", |d| d.cues = None),
+        ("hud-required", |d| d.hud = None),
+        ("legacy-hud", |d| d.schema = "autographics.scene/7".into()),
+    ] {
+        let mut changed = valid.clone();
+        mutate(&mut changed);
+        assert!(changed.validate().is_err(), "accepted invalid case {case}");
+    }
+    let mut legacy = serde_json::to_value(&valid).unwrap();
+    legacy["schema"] = serde_json::Value::String("autographics.scene/7".into());
+    assert!(
+        autographics_auto_driver::authoring::document::Document::decode(
+            &serde_json::to_vec(&legacy).unwrap()
+        )
+        .is_err()
+    );
+    let mut unknown = serde_json::to_value(&valid).unwrap();
+    unknown["hud"]["unknown"] = serde_json::Value::Bool(true);
+    assert!(
+        autographics_auto_driver::authoring::document::Document::decode(
+            &serde_json::to_vec(&unknown).unwrap()
+        )
+        .is_err()
+    );
+    let builds = autographics_auto_driver::authoring::public_hud::atlas_builds();
+    assert!(autographics_auto_driver::authoring::public_hud::import_raw(
+        b"not the audited font".as_slice().into(),
+        &Default::default(),
+        None,
+    )
+    .is_err());
+    assert_eq!(
+        autographics_auto_driver::authoring::public_hud::atlas_builds(),
+        builds
+    );
+    let duplicate = autographics_auto_driver::authoring::public_hud::import(
+        &root().join("samples/public_hud/fonts/lilita_one_regular.ttf"),
+        &h.editor.assets,
+    )
+    .unwrap();
+    assert!(std::sync::Arc::ptr_eq(
+        &duplicate,
+        h.editor
+            .assets
+            .values()
+            .find(|a| a.identity.is_font())
+            .unwrap()
+    ));
+}
+
+#[test]
+fn atlas_sharing_capacity_and_strict_glyph_controls_use_real_gpu() {
+    let h = host_scene(Api::Hud2V1);
+    assert_eq!(h.hud_atlases.len(), 1, "all equal sizes share one atlas");
+    let mut document = h.editor.document.clone();
+    for (slot, size) in document
+        .hud
+        .as_mut()
+        .unwrap()
+        .slots
+        .iter_mut()
+        .zip([16.0, 24.0, 32.0, 48.0])
+    {
+        slot.size = size;
+        slot.visible = true;
+        slot.text = format!("S{size}");
+    }
+    let (overlay, four) = autographics_auto_driver::authoring::public_hud::prepare_overlay(
+        h.rt.gpu(),
+        &h.hud_atlases,
+        &h.editor.assets,
+        &document,
+        None,
+        None,
+        false,
+    )
+    .unwrap();
+    assert_eq!(four.len(), 4);
+    assert_eq!(overlay.unwrap().layers.len(), 4);
+    document.hud.as_mut().unwrap().slots[0].size = 20.0;
+    assert!(
+        autographics_auto_driver::authoring::public_hud::prepare_overlay(
+            h.rt.gpu(),
+            &four,
+            &h.editor.assets,
+            &document,
+            None,
+            None,
+            false,
+        )
+        .is_err()
+    );
+    let bytes = include_bytes!("../samples/public_hud/fonts/lilita_one_regular.ttf");
+    assert!(agp::render2d::TextRenderer::new_checked(
+        h.rt.gpu(),
+        agp::renderer::target::OffscreenTarget::FORMAT,
+        bytes,
+        32.0,
+        "😀",
+    )
+    .is_err());
+    let ascii: String = (32u8..=126).map(char::from).collect();
+    agp::render2d::TextRenderer::new_checked(
+        h.rt.gpu(),
+        agp::renderer::target::OffscreenTarget::FORMAT,
+        bytes,
+        32.0,
+        &ascii,
+    )
+    .unwrap();
+}
+
+#[test]
+fn seven_identity_resource_union_and_public_import_command_close_scene8() {
+    use autographics_auto_driver::authoring::{
+        assets::{self, Registry},
+        document::Document,
+        host::Host,
+        public_hud,
+        storage::Storage,
+    };
+    let entry = root().join("samples/public_audio/project3d/scene.agscene");
+    let (mut document, mut registry, _, _) =
+        Storage::load_project(&entry, &Registry::new()).unwrap();
+    let font = public_hud::import(
+        &root().join("samples/public_hud/fonts/lilita_one_regular.ttf"),
+        &registry,
+    )
+    .unwrap();
+    document.schema = "autographics.scene/8".into();
+    document.hud = Some(public_hud::default_document(font.identity.key()));
+    document.assets.push(font.identity.clone());
+    assets::insert(&mut registry, font).unwrap();
+    document.validate().unwrap();
+    let (raw, bytes, cpu, gpu) =
+        autographics_auto_driver::authoring::textured_models::usage(&registry);
+    assert_eq!((raw, bytes), (7, 263372));
+    assert!(cpu <= assets::MAX_GEOMETRY && gpu <= assets::MAX_GEOMETRY);
+
+    let mut h = Host::new(Document::sample()).unwrap();
+    let message = serde_json::json!({
+        "epoch": h.editor.stamp.epoch,
+        "revision": h.editor.stamp.revision,
+        "action": "import-font",
+        "payload": root().join("samples/public_hud/fonts/lilita_one_regular.ttf").to_string_lossy(),
+        "asset_generation": 0,
+    });
+    h.dispatch(&message.to_string()).unwrap();
+    h.settle().unwrap();
+    assert_eq!(h.editor.document.schema, "autographics.scene/8");
+    assert_eq!(
+        h.editor.document.hud.as_ref().unwrap().license,
+        public_hud::LICENSE_TEXT
+    );
+    assert_eq!(h.editor.document.cues.as_ref().unwrap().len(), 0);
 }

@@ -102,6 +102,27 @@ impl TextRenderer {
         font_size_px: f32,
         chars: &str,
     ) -> Result<Self, RendererError> {
+        Self::new_inner(gpu, target_format, font_bytes, font_size_px, chars, false)
+    }
+
+    pub fn new_checked(
+        gpu: &GpuDevice,
+        target_format: wgpu::TextureFormat,
+        font_bytes: &[u8],
+        font_size_px: f32,
+        chars: &str,
+    ) -> Result<Self, RendererError> {
+        Self::new_inner(gpu, target_format, font_bytes, font_size_px, chars, true)
+    }
+
+    fn new_inner(
+        gpu: &GpuDevice,
+        target_format: wgpu::TextureFormat,
+        font_bytes: &[u8],
+        font_size_px: f32,
+        chars: &str,
+        strict_glyphs: bool,
+    ) -> Result<Self, RendererError> {
         let font = fontdue::Font::from_bytes(font_bytes, fontdue::FontSettings::default())
             .map_err(|e| RendererError::BadFont(format!("parse: {e:?}")))?;
 
@@ -132,6 +153,12 @@ impl TextRenderer {
         for c in chars.chars() {
             if glyphs.contains_key(&c) {
                 continue;
+            }
+            if strict_glyphs && font.lookup_glyph_index(c) == 0 {
+                return Err(RendererError::BadFont(format!(
+                    "missing glyph U+{:04X}",
+                    c as u32
+                )));
             }
             let (metrics, _bitmap) = font.rasterize(c, px as f32);
             let w = metrics.width.max(1);

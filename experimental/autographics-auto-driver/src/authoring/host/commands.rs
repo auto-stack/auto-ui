@@ -377,6 +377,23 @@ impl Host {
                 self.asset_pending = true;
                 self.asset_token = token;
             }
+            "import-font" => {
+                if v["asset_generation"].as_u64() != Some(self.asset_token) {
+                    return Err("stale import generation".into());
+                }
+                let token = self
+                    .asset_token
+                    .checked_add(1)
+                    .ok_or("import token exhausted")?;
+                let asset = crate::authoring::public_hud::import(
+                    Path::new(p.as_str().ok_or("font path")?),
+                    &self.active_assets()?,
+                )?;
+                let hud = crate::authoring::public_hud::default_document(asset.identity.key());
+                self.editor.begin(stamp, Edit::Hud { asset, hud })?;
+                self.asset_pending = true;
+                self.asset_token = token;
+            }
             "audio-cues" => {
                 let cues = serde_json::from_value(p.clone())
                     .map_err(|e| format!("audio_invalid: cue declarations: {e}"))?;

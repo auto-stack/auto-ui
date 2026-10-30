@@ -6,11 +6,15 @@ pub const ROW_LEN: usize = MAX_TEXT + 2;
 pub const BLOCK_LEN: usize = SLOTS * ROW_LEN;
 pub const FONT_SHA: &str = "4444c23631884f411aa7f2fee35061b1756a9927940c62d2a5572acf470b3ffa";
 pub const FONT_LEN: usize = 26828;
+pub const LICENSE_SHA: &str = "31d45880a38de46bc81835329c0c7d964609751e65add92769ea0095ad92c05b";
+pub const LICENSE_LEN: usize = 4391;
+pub const LICENSE_TEXT: &str = include_str!("../../../samples/public_hud/fonts/license.txt");
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DocumentHud {
     pub font: String,
+    pub license: String,
     pub slots: Vec<Slot>,
 }
 
@@ -63,6 +67,11 @@ pub fn validate_document(document: &super::document::Document) -> Result<(), Str
     if !font.is_font() {
         return Err("hud_invalid: font resource kind".into());
     }
+    if hud.license.len() != LICENSE_LEN
+        || agp::renderer::capture::sha256_hex(hud.license.as_bytes()) != LICENSE_SHA
+    {
+        return Err("hud_invalid: font license identity".into());
+    }
     if hud.slots.len() != SLOTS {
         return Err("hud_invalid: complete four slots required".into());
     }
@@ -90,6 +99,28 @@ pub fn validate_document(document: &super::document::Document) -> Result<(), Str
         return Err("hud_resource_limit: total text".into());
     }
     Ok(())
+}
+
+pub fn default_document(font: String) -> DocumentHud {
+    let slot = |slot, visible, text: &str, anchor| Slot {
+        slot,
+        visible,
+        text: text.into(),
+        anchor,
+        offset: [8.0, 8.0],
+        size: 32.0,
+        rgba: [1.0; 4],
+    };
+    DocumentHud {
+        font,
+        license: LICENSE_TEXT.into(),
+        slots: vec![
+            slot(0, true, "0", 0),
+            slot(1, true, "Playing", 1),
+            slot(2, false, "", 2),
+            slot(3, true, "Won", 3),
+        ],
+    }
 }
 
 pub fn initial_frame(document: &super::document::Document) -> Result<Option<Frame>, String> {
@@ -314,7 +345,7 @@ pub fn prepare_overlay(
                 return Err("hud_resource_limit: atlas key union".into());
             }
             let chars: String = (32u8..=126).map(char::from).collect();
-            let renderer = agp::render2d::TextRenderer::new(
+            let renderer = agp::render2d::TextRenderer::new_checked(
                 gpu,
                 agp::renderer::target::OffscreenTarget::FORMAT,
                 &font.bytes,

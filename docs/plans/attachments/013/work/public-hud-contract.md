@@ -53,7 +53,9 @@ Add `autographics.scene/8`, inheriting scene7's explicit `cues` and adding one
 required `hud` object. Older schemas reject `hud` and `ttf`; scene7 behavior and
 bytes stay unchanged. Scene8 has exactly one font binding and exactly four slot
 rows with unique explicit slot ids0..3. Unknown fields, missing/duplicate rows,
-bad references and noncanonical values reject.
+bad references and noncanonical values reject. The HUD object also persists the
+exact4391-byte OFL/RFN `license` string, so SaveAs/relocation carries the license
+inside the scene rather than depending on the source font directory.
 
 Each slot persists `visible`, `text`, `anchor` (0 top-left,1 top-right,
 2 bottom-left,3 bottom-right), logical-pixel `offset:[x,y]`, `size` in16..48,

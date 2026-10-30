@@ -252,7 +252,7 @@ impl SurfaceUi for Panel {
         }
         c = c
             .push(crate::authoring::tagged::tag(
-                text_input("Local asset path (GLB/Ogg/WAV)", &self.import_path)
+                text_input("Local asset path (GLB/Ogg/WAV/TTF)", &self.import_path)
                     .id("authoring-asset-path")
                     .on_input(|v| format!("asset-path:{v}")),
                 "asset-path".into(),
@@ -260,6 +260,7 @@ impl SurfaceUi for Panel {
             ))
             .push(cmd("Import GLB", "import", json!(self.import_path)))
             .push(cmd("Import Audio", "import-audio", json!(self.import_path)))
+            .push(cmd("Import Font", "import-font", json!(self.import_path)))
             .push(cmd(
                 "Import Animated GLB",
                 "import-animated",
