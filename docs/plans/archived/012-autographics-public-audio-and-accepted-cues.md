@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-10-30
 updated_at: 2026-10-30
 plan_revision: 1
-current_step: 9
+current_step: 10
 total_steps: 10
 depends_on: [auto-ui/PLAN-006]
 supersedes_spec_components: [docs/specs/auto-graphics/scene-assets.md, docs/specs/auto-graphics/behavior-api.md]
@@ -124,7 +124,7 @@ work自查后同树独立上下文review全部AC/V/S/SD、计价/codec/不可逆
 | T-07 | review | T-06 | 同树独立final review，merge门pending | AC-06 | [x] |
 | T-08 | merge | T-07 pass | 冻结定向门/有效复用后合master，不带Gallery内容 | AC-07 | [x] |
 | T-09 | merge | T-08 | 知识SD/ledger/索引、本仓归档与实际delivery | AC-08 | [x] |
-| T-10 | merge | T-09 | wt-guard clean后清唯一树/分支/空组，保必要本地恢复材料 | AC-08 | [ ] |
+| T-10 | merge | T-09 | wt-guard clean后清唯一树/分支/空组，保必要本地恢复材料 | AC-08 | [x] |
 
 ## 9. 复审记录
 
@@ -242,7 +242,19 @@ F01剩余共因是textured_models.rs908独立Usage::default只复制assets，丢
 
 实际发现2份缓存之外的原清单PDB仍在：review-r1/retained_manager.pdb、review-r2/textured_predecode.pdb。因此984PDB中实际推定已随缓存删除982，不能按用户描述宣称全无PDB。根会话在既有明确PDB授权内，仅用两个绝对LiteralPath做单文件删除；自动审批CreateProcess前仍返回blocked by policy，未执行。7缓存回收已完成，T10仅这2PDB待手动删除或外部策略改变，9/10；不扩大删除范围、不重新请求相同授权、不绕过拦截。当前cleanup-recovery-verification.json SHA c0c3c1d082d3beab15895d5d920e6e16161414ac0dc8d67652cec19cb1c364a2，本地证据不入Git。先前整目录pending记录为历史，剩余范围已收窄到两文件。
 
+2026-10-30 final cleanup recovery / merge pass：用户已手动删除最后review-r1/retained_manager.pdb与review-r2/textured_predecode.pdb。根会话再次独立完整复核：7个原缓存根路径均不存在，Plan产物根递归无CACHEDIR.TAG/PDB；全部795EXE/5288205747B逐个size/SHA与保留映射一致，12870other_files逐个SHA完全相同。当前7gate runners与freshconsumer实际保留EXE/日志hash锚均匹配历史冻结manifest。984份PDB均已移除（982随缓存、2在复审目录由用户补清）。删除操作者如实为用户，不声称工具曾执行此前被拒命令；所有拒绝与手动恢复记录保留，当前无待答/剩余清理项。
+
+cleanup-report.json SHA256 `834076a9b93d7fc607f7fc58780b2d9b62c97f6f6eca954a11cbc9bfab3e2b16`，本地路径 `D:/autostack/plan-artifacts/auto-ui/plan-012/cleanup-report.json`。报告保留全部原EXE→retained-exe映射，历史manifest原路径不改写；后续复核按映射取保留文件，源码/报告并未换身份。七缓存原逻辑33424943701B已清，非精确物理磁盘释放量（存在压缩/副本/并发写入）。工作树、两个分支及ui-012组再次确认不存在；code78632af与knowledge8c326a1a0仍在各master祖先。auto-lang当前v147六受影响条目与落地JSON一致，三个正式Spec与f0bd812ab内容一致。其它所有者WIP保留。
+
+收尾复核时间2026-10-30T01:57:46Z：batch收据仍覆盖887/2026-10-29T15:53:56Z，距其约10h04m，不满48h且无新增>887五整除实际交付，notdue，遵守既有用户不再全量重跑裁定。生产backend/daemon/rootVue未消费本实验AG改动，无本期重建/重启部署要求；本期实际AG可执行文件已保留并有门禁hash锚。无需重跑已冻结且输入未变的45case/完整fresh验证。
+
+`stage: merge | plan_id: auto-ui/PLAN-012 | plan_revision: 1 | completion_kind: delivered | outcome: pass | prepared: verified | landed: verified | ledger_refreshed: verified | archived: ffd4411 plus recovery receipts | cleaned: verified | delivery_commit: 78632af39de28881618f9219d07e20a9b7a5b56f | knowledge_commit: 8c326a1a04362d3ccdaa5b165888244c4071936d | pending_merge_owned_gates: none`。T01..10全部完成、10/10，AC01..08均已关闭；独立R3通过、45case/完整fresh与controls通过、canonical/ledger/index/归档/guard/产物清理完整，无开放finding/待答项。保留fresh3D pump8234us超8ms测量目标的真实记录，不伪称全部性能目标都met；全部硬门通过。
+
+2026-10-30 `stage: goal | plan_id: PLAN-012 | plan_revision: r1 | round: 12 | from: merge | to: done | status: archived | outcome: pass | commit: 78632af39de28881618f9219d07e20a9b7a5b56f | next: done`。本次为原round12被工具策略打断的清理恢复收尾，未新建目标或扩展cap，历史2failed finalreview/2boundedrepaircycles保留。仅本计划引擎公共音频范围完成，完整游戏/HUD/font/Gallery/fullAG里程碑按其后继合同继续，不自动升级。
+
 ## 10. 待澄清事项
+
+当前无待澄清或待操作事项。T01..10全部完成，10/10；代码/独立复审/45case与完整fresh/规范台账/归档/guard工作树清理及全部缓存PDB回收均已核验。以下此前等待与部分完成状态均为历史，由上述最终pass收据取代。
 
 当前7缓存已手动移除并独立核验，全部EXE/其它证据哈希完整。仅剩原清单中的review-r1/retained_manager.pdb和review-r2/textured_predecode.pdb，工具删除仍被自动审批拒绝、未执行，需要手动清理后核验。T10部分pending、9/10；以下此前整目录/授权等待状态均为历史。
 
