@@ -238,7 +238,13 @@ F01剩余共因是textured_models.rs908独立Usage::default只复制assets，丢
 
 2026-10-30 cleanup explicit-confirmation retry：用户已明确回答“确认，仅清理已核定缓存，保留 EXE 和证据”，原清理授权待答解除。根会话按cleanup-prepared.json准备同一PowerShell端到端绝对路径/七目标白名单/CACHEDIR.TAG/ancestor和fresh wt-guard/全部795EXE及12870其它证据hash前后核验的删除动作；执行工具在CreateProcess前再次拒绝，原因仍仅“blocked by policy”，未提供细分理由。该命令未执行，七缓存仍在、无cleanup-report.json、抽核保留EXE哈希仍符。不以另一个shell/隐藏脚本绕过，不再要求用户重复同一确认。代码/复审/45case/fresh/规范/台账/归档/工作树清理的已完成检查点保留，T10仅缓存回收pending，9/10；需要用户手动按清单清理或外部工具策略改变后再回读验证。cleanup-policy-rejection.json SHA b90c12ea7bc108cec370a1ba9cf7871b2d4139c8c302a7321394f467d7e115aa。本次为round12 merge清理恢复，不新建goal或扩展cap，不声称交付全链完成。
 
+2026-10-30 human cleanup verified：用户报告按清单手动删除7缓存并更新prepared stage。独立复核7根路径均不存在、无CACHEDIR.TAG残留；795EXE共5288205747B全部大小/SHA与保留映射一致，12870other_files全部SHA一致，当前7gate runner及fresh runner/日志哈希锚仍符；prepared除stage外全部字段重建原CRLF哈希fbd901e0一致。工作树/分支/组仍不存在，代码与知识提交仍为master祖先，auto-lang当前v147六受影响项与落地JSON相同，三个canonical Spec与规范提交逐字节一致（Git LF换行归一）。批量回归收据仍覆盖887/2026-10-29T15:53:56Z，未满48h、无新五整除已交付计划，notdue；生产backend/daemon/Vue不消费实验代码，无本期部署要求。
+
+实际发现2份缓存之外的原清单PDB仍在：review-r1/retained_manager.pdb、review-r2/textured_predecode.pdb。因此984PDB中实际推定已随缓存删除982，不能按用户描述宣称全无PDB。根会话在既有明确PDB授权内，仅用两个绝对LiteralPath做单文件删除；自动审批CreateProcess前仍返回blocked by policy，未执行。7缓存回收已完成，T10仅这2PDB待手动删除或外部策略改变，9/10；不扩大删除范围、不重新请求相同授权、不绕过拦截。当前cleanup-recovery-verification.json SHA c0c3c1d082d3beab15895d5d920e6e16161414ac0dc8d67652cec19cb1c364a2，本地证据不入Git。先前整目录pending记录为历史，剩余范围已收窄到两文件。
+
 ## 10. 待澄清事项
+
+当前7缓存已手动移除并独立核验，全部EXE/其它证据哈希完整。仅剩原清单中的review-r1/retained_manager.pdb和review-r2/textured_predecode.pdb，工具删除仍被自动审批拒绝、未执行，需要手动清理后核验。T10部分pending、9/10；以下此前整目录/授权等待状态均为历史。
 
 当前用户已明确确认清理，但自动审批仍在CreateProcess前以blocked by policy拒绝，未执行删除。需要手动清理已核定缓存或外部工具策略改变后复核；不再待重复确认。代码/规范/ledger/归档/工作树清理已完成，最终45case与完整fresh门通过，T10缓存部分pending、9/10。以下旧等待/复审/merge状态均为历史记录。
 
