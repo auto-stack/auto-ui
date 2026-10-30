@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-015
-status: executing
+status: reviewed
 feature_name: vm-route-page-dynamic-load
 author: [Codex]
 created_at: 2026-10-30
 updated_at: 2026-10-30
-plan_revision: 1
-current_step: 2
+plan_revision: 2
+current_step: 4
 total_steps: 5
 depends_on: ["auto-ui/PLAN-003"]
 supersedes_spec_components: []
@@ -24,7 +24,7 @@ BLOG-004 原生腿新鲜证据：多页 VM 应用（auto-blog，app.at 声明 8 
 
 多页 VM 应用中，任何已声明路由的页面要么完整加载（渲染并派发 Init），要么产生**具名诊断**（不再静默占位/吞错）；author 类页面（含 timer/多条件/列表模板特性）可正常加载。成功标准：auto-ui 侧多页路由 fixture 正控全绿 + 不可加载页负控具名报错；消费者侧 BLOG-004 `verify_dual.py --profile native-vm-rust` 全 profile EXIT=0（真实窗口 MCP 驱动作者任务 + 退出重开）。
 
-非目标：Vue 轨（PLAN-010 已交付）；Blog 仓 .at/源码变更；VM 渲染语义重设计；单页无路由应用（已正常）。
+非目标：Vue 轨（PLAN-010 已交付）；Blog 仓 .at 应用源码变更；VM 渲染语义重设计；单页无路由应用（已正常）。r2用户明确扩展仅允许Blog tests/dual原生验收驱动及消费回执，验收标准不变。
 
 ## 2. 架构方案
 
@@ -48,6 +48,8 @@ BLOG-004 原生腿新鲜证据：多页 VM 应用（auto-blog，app.at 声明 8 
 既有 auto-ui-runtime（VM 解释器/aura_view_builder）+ auto-ui-tools 测试夹具模式（PLAN-003 前例：fixture 目录 + `git archive` 导出 + `auto run -r vm` + MCP 驱动）。复用 BLOG-004 的 MCP 驱动模式（autoui_snapshot/autoui_action/autoui_type，已实证）。
 
 ## 4. 需求分析与背景调查
+
+**r2范围授权（2026-10-30）**：用户明确回复“允许补齐 Blog 原生验收驱动”，随后明确 `/goal resume`。允许同组唯一 `D:/autostack/.wt/ui-015/auto-blog`（`codex/ui-015-native-driver`，base `22045f0832d2cfa60f1ad9127094fd47ac9e73b5`）仅修改 tests/dual 驱动及消费回执，不改 `.at`/Vue代码/存储合同/验收阈值；T03补齐后仍按既有全链授权review/merge。宿主get_goal在显式resume后仍返回blocked，记录为宿主状态未同步；本会话已收到恢复指示，继续已授权工作，不创建第二目标、不要求重复恢复。
 
 **本轮全链授权（2026-10-30）**：用户 `/goal 完成UI的计划015` 授权 work/review/有界修复/merge/归档清理。开工前置经磁盘核验已满足：UI-005 归档 final PASS，交付351919c，工作树已清理；当前活跃UI-012属独立AG音频面。保留主检出已有文档WIP，禁止纳入本计划。`git worktree list` 无UI-015旧树，新建 `D:/autostack/.wt/ui-015/auto-ui`，分支 `codex/plan-015-dev`（服从当前宿主前缀），base `45b196e03ce5978a095cf6fd0af940240ca7dc56`。
 
@@ -79,6 +81,10 @@ BLOG-004 原生腿新鲜证据：多页 VM 应用（auto-blog，app.at 声明 8 
 
 - 静默失败具名化：页不可注册/构建失败不得回落 "not loaded" 占位了事——以具名诊断上浮（快照诊断文本携带原因 + 日志 error 行），保留占位仅为"路由未匹配"语义。
 - 根因修复：按 T-01 定界结果（H1 注册补全 / H2 构建路径错误传播与特性修复 / H3 别名解析）。
+
+### T-03 r2消费驱动范围
+
+修改auto-blog `tests/dual/verify_dual.py`并新增必要的原生MCP驱动；native profile经`auto run -r vm --server rust`启动，live snapshot发现控件→输入/创建/保存→HTTP与隔离数据目录独立核对→正常q退出及强制结束/重开持久性。移除pending须以实际执行的场景替代，禁止减场景或直接API写入冒充UI；关闭端口MCP负控和同工具live正控验证失败传播。源数据/生成物只在本组消费树，环境覆盖精确指向已验证UI工具及同组语言依赖；记录四仓commit与工具hash。原有API/Vue分支维持；统一回归属于最终review/merge。T01/T02实现与证据不因纯驱动范围修订失效，最终review绑定r2及两仓冻结commit。
 
 ### 规范增量
 
@@ -112,10 +118,10 @@ BLOG-004 原生腿新鲜证据：多页 VM 应用（auto-blog，app.at 声明 8 
 
 ## 8. 执行步骤
 
-- [x] T-01（owner_stage=work；依赖无；AC-01）：多页路由 fixture + 定界完成；[root-cause.md](attachments/015/root-cause.md)。原生旧工具失败/仅去样式导入全特性正控，源码绑定旧构建反例exit101。唯一根因=路由页缺样式预注册，解析Err被if-let吞掉。
+- [x] T-01（owner_stage=work；依赖无；AC-01）：多页路由 fixture + 定界完成；[root-cause.md](attachments/015/root-cause.md)。首层根因=路由页缺样式预注册且parse Err被吞；r2消费闭环进一步定界被首层遮蔽的`.store.Method()`接收者未归一化，永久夹具稳定复现两层失败。
 - [x] T-02（owner_stage=work；依赖T-01；AC-02/03）：按定界修复+具名错误化；V-02/V-03通过，6项永久定向测试、真实多页原生MCP、PLAN003原生单页输入/保存/HTTP读回通过。实现0e87054，证据补记e29ccab。
-- [ ] T-03（owner_stage=work；依赖T-02；AC-04）：重建交付二进制（auto-ui-tool 部署到消费发现路径），BLOG-004 native-vm-rust 全 profile 闭环（V-04）；提交消费回执。
-- [ ] T-04（owner_stage=review；依赖T-03；AC-05）：同树最终复审。
+- [x] T-03（owner_stage=work；依赖T-02；AC-04）：工具经AUTO_UI_TOOL_BIN精确发现，Blog驱动261413b；完整native-vm-rust 22/22 EXIT0、pending0，三次真实窗口覆盖正常q/强制结束及重开、HTTP/磁盘同稿核对，消费回执见r2 work。未改Blog.at；最终交付版本登记仍属T05。
+- [x] T-04（owner_stage=review；依赖T-03；AC-05）：r2 final R1 pass，UI59930ab/Blog261413b，报告attachments/015/review-r1.md；同实现上下文限制明确，无另一个独立会话。
 - [ ] T-05（owner_stage=merge；依赖T-04；AC-06）：门/SD-01 Spec/归档/worktree 清理/BLOG-004 登记。
 
 ## 9. 复审记录
@@ -132,8 +138,32 @@ stage: new | plan_id: PLAN-015 | plan_revision: 1 | outcome: blocked（计划就
 
 2026-10-30 goal round 1：`stage: goal | plan_id: PLAN-015 | plan_revision: r1 | round: 1 | from: work | to: user | status: executing | outcome: blocked | worktree: D:/autostack/.wt/ui-015/auto-ui | commit: e29ccabcf2436eb9db284da99792ca1e6aa65ac7 | next: user`。全链授权已记录，开工前置已解除；完成UI定界/修复/定向及原生回归，2/5。唯一待决=§10.3消费驱动仓库范围；收到决定后回work/T-03。目标未完成，宿主goal首个等待轮保持active（遵守三轮blocked门槛），不冒充已交付。
 
+2026-10-30 goal round 2（等待审计）：`stage: goal | plan_id: PLAN-015 | plan_revision: r1 | round: 2 | from: user | to: user | status: executing | outcome: waiting | worktree: D:/autostack/.wt/ui-015/auto-ui | commit: e29ccabcf2436eb9db284da99792ca1e6aa65ac7 (last verified implementation-tree checkpoint) | next: user`。上一轮属于progress（实际修复/提交/原生验收证据），但已触发§10.3范围决定阻点；本轮只读取宿主目标与当前主检出Plan，§10.3仍未收到用户答复，自动续跑消息不构成扩大Blog仓库范围的授权。本轮无stage执行、无测试/构建/实现或其他仓库检查；不是verified wait（没有存活作业句柄等待），亦不将状态复述记作工作进展。相同阻点连续第2个goal turn，尚未达到第3轮blocked门槛。保持2/5、executing；待决定后回work/T-03，不改AC04、不提前review/merge。
+
+2026-10-30 goal round 3（blocked audit）：`stage: goal | plan_id: PLAN-015 | plan_revision: r1 | round: 3 | from: user | to: user | status: executing | outcome: blocked | worktree: D:/autostack/.wt/ui-015/auto-ui | commit: e29ccabcf2436eb9db284da99792ca1e6aa65ac7 (last verified implementation-tree checkpoint) | next: user`。重读当前Plan与宿主目标，§10.3仍无用户决定；上一轮仅复述/记录等待，属于no progress，非verified wait。相同仓库范围阻点已连续3个goal turn，当前没有不依赖该决定的必要实施任务；不重复测试，不越界修改Blog，不削减AC04。本轮请求宿主goal标记blocked，Plan保持executing/2-of-5而非伪报交付。解除动作：用户明确允许在Blog专属树补齐tests/dual原生驱动且不改.at，或由消费方交付可执行的完整native profile驱动后恢复本目标；随后回work/T-03，完成消费闭环再final review/merge。
+
+2026-10-30 r2 revision handoff：`stage: new | plan_id: PLAN-015 | plan_revision: 2 | outcome: pass | reason: user-authorized Blog test-driver scope extension | next: work/T-03`。T01/T02保留完成；目标/AC01..06/SD01/支持域不变。用户明确授权并恢复，§10.3已解除，先前blocked/waiting仅为历史；恢复后重新计阻点审计，无当前待决项。
+
+2026-10-30 goal round 4（r2 revision）：`stage: goal | plan_id: PLAN-015 | plan_revision: r2 | round: 4 | from: new | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-015/auto-ui,auto-blog | commit: e29ccab,22045f0 (entry) | next: work`。用户已授权Blog驱动并明确恢复；宿主目标状态未同步，按无自动续跑载体在本turn顺序执行已授权各阶段，避免重复索要恢复。
+
+2026-10-30 work r2（PASS）：`stage: work | plan_id: PLAN-015 | plan_revision: 2 | outcome: pass | worktree_path: D:/autostack/.wt/ui-015/auto-ui + auto-blog | branch: codex/plan-015-dev + codex/ui-015-native-driver | base_commit: UI45b196e,Blog22045f0 | code_commit: UI59930ab9d767489911ff3b06fcce03c6bb41c4a8,Blog261413b3d24ed1491c8239b397b933584c25a01c | dependency_revisions: lang eb6ecc937ce25546b46f4da510e669396ab78463,down c3464d0a0d36e4f8a7988b0c0c26448fc52361b4,Man e6cc06f/exe da0558e7a979b7333fe6d3274c3700328582d68e043b4ddc56e2f366d9cea682 | task_ids: T01..03 complete | blockers: none | next_responsible_role: final review`。
+
+消费首轮揭示第二层错误`author_State.AutosaveTick`；在原冻结测试exe加真实路由store输入重现`Author_State.MarkReady` exit101（实施树attachments/015/red-leading-dot-store.log）。修复只将已注册store的前导点/self接收者归一化后进入既有store消歧，不改变普通对象方法或歧义拒绝；7项plan015定向测试exit0（leading-dot-green.log SHA256 efcadee4a6424443d70269b58494ee7b3d20b11241a321b3993221d7d922fcff）、4项既有plan446_a1 exit0（store-disambiguation-regression.log SHA256 547e967b7a7fc6fc8a6177ad4b29a21141f3914dbf0c952021e1a6a67ac1d4fc）。根因工件已补记。首层正/负控及PLAN003单页证据复用：新增归一化守卫仅触发前导点store方法，原单页夹具方法为bare store调用、原Home方法为本页状态，不受影响；样式与具名诊断实现未改。
+
+`python tests/dual/verify_dual.py --profile native-vm-rust`完整实际运行22/22 PASS、0失败/0pending、EXIT0；原始报告在消费树 `docs/plans/attachments/004/dual/native-vm-rust-20261030-100302/report.json`，SHA256 f26d93b0788512d5d1e464ea90db39328614e4b81600012dc838610035271ae5；native-lifecycle.json SHA256 2db13ebd11bd131b6b3fcaccd7654b70dbae2b46a5382ecc41a3923d63b34f8b。真实窗口句柄/所属进程三会话、中文引号多行输入/手动保存/3s自动保存/冲突保稿与KeepMine恢复/独立HTTP+current指针+rev正文/meta/.ok同身份核对、q退出0/硬终止/两次重开、关闭MCP真实连接拒绝且新会话同方法可用，全部有执行断言。前两轮分别为UI链接缺陷与驱动误将原始快照当JSON转义文本，均非pass；后者按原始快照纠正、未改期望数据/应用源。最终聚合器敏感性将真实22场景窗口结果翻假→EXIT1，再用原结果→EXIT0，空集→EXIT3（ui015/sensitivity.log SHA256 262db3f1ff6bff3d96ee3d117cbbfec1f1f166d7d22213492c7d1698b5d1ee6b）；这是结果聚合负控，未冒称又运行UI22次。
+
+工具SHA256 56d346091e36bb2e3a573ecccba54806a565dfc01c7cd6aeabaf6af0e7036bab；Blog驱动SHA256 78e844027d9b11e913659a573d78e893bde413545fe718932e2c97ec384cc6ae、入口SHA256 ef4d35599b56b390ce3b547e71805415b9f4b01424b3c413a2c6196039e1bb61均等于261413b提交内容（运行发生在该commit之前，报告源SHA绑定相同字节，不以旧Blog HEAD冒称驱动commit）。UI已在work顺序rebase到master d53f946，range-diff三提交全=：0e87054→1a8d726、e29ccab→15191a6、ab214c7→59930ab；root crates/锁/依赖输入未受main新增AG实验代码影响，既有证据有效。两树tracked clean，仅已知本地证据未跟踪；停止实现写入。AC01..04已满足，SD01草案在当前UIcommit（SHA256 9de289fddf1ef9e1925c78d098687e9d4abec1e8a18253d7703e639a238d34ae），无已知work缺口；T04最终review与T05统一门/合并/Spec-ledger/归档清理仍pending。merge自有门按UI003先例为cargo t/tu/ti/tn，未在work冒跑。
+
+2026-10-30 goal round 5：`stage: goal | plan_id: PLAN-015 | plan_revision: r2 | round: 5 | from: work | to: review | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-015/auto-ui,auto-blog | commit: UI59930ab,Blog261413b | next: review`。3/5；用户新增范围已完成，无待决项；接续最终review，不提前合并。
+
+2026-10-30 final review R1：`stage: review | review_scope: final | reviewer_identity/limitations: same Codex implementation context, artifact-based reconstruction; no independent-context claim | plan_id: PLAN-015 | plan_revision: 2 | outcome: pass | worktree_path: D:/autostack/.wt/ui-015/auto-ui + auto-blog | branch: codex/plan-015-dev + codex/ui-015-native-driver | reviewed_commit: UI59930ab9d767489911ff3b06fcce03c6bb41c4a8,Blog261413b3d24ed1491c8239b397b933584c25a01c | dependency_revisions: lang eb6ecc937,down c3464d0,Man e6cc06f/exe da0558e7 | spec_inputs: SD01 SHA256 9de289fddf1ef9e1925c78d098687e9d4abec1e8a18253d7703e639a238d34ae | acceptance_results: AC01..05 pass | pending_closeout_gates: T05/cargo t,tu,ti,tn; canonical/ledger; both linear landings; exact Blog receipt; archive/guard/recovery/cleanup/artifact check | findings: none | evidence: attachments/015/review-r1.md | next: merge`。复审重读完整两仓diff、原始22项report/三会话lifecycle/快照/Init日志/敏感性输入输出，重新执行7项plan015+4项既有store controls均exit0；未变单页证据有调用形式/源码守卫复用依据。所有提交与SD/依赖再次核对，无未提交实施改动、无尚未关闭work标准，不动实现或提前发布ledger。
+
+2026-10-30 goal round 6：`stage: goal | plan_id: PLAN-015 | plan_revision: r2 | round: 6 | from: review | to: merge | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-015/auto-ui,auto-blog | commit: UI59930ab,Blog261413b | next: merge`。4/5；按全链授权继续merge自有门与收尾，未提前声称交付。
+
+2026-10-30 merge prepared（r2）：冻结UI3de1485（59930ab的review摘要文档后继，Rust/依赖/SD不变）、Blog261413b。统一门全exit0：cargo t=2450通过/887跳过（既有档位排除），cargo tu=862通过/2忽略，cargo ti=28通过/15跳过，cargo tn=2通过/0忽略。日志与merge-gates.json位于实施树attachments/015，尚待保全/落地。canonical SD01及索引已在UI树冻结；沿UI003先例派生ledger目标为auto-lang/.autoos/specs.json。当前会话无spec工具，已检19999 /api/specs仅200 {}且owner为Python，未发现auto-musk/auto-ai store进程，故Regime B guarded offline projection。同组语言树切到知识分支前核实eb6..master的crates/Cargo/配置零diff（仅文档变化，不改变测试输入），权威树未复制；版本147→148，保留1471旧item字节并增UI015-ROUTES/UI015-T/UI015-R2-R1/UI015-M四条file/tags完整item，9处限定插入/标量更新且读回验证，备份SHA256 50b75c63b531f04ec05aced31523d88c828b96624c3082ad6bc8258c3f55f0f2，结果SHA256 700cf4ce6d39f009f6e8a8c7024a3693762680249df956f998a77466708853e6；准备提交8730cc47d。此处仅prepared，未提前记landed/archived/cleaned。语言仓纯ledger文档档按AGENTS不跑cargo/docs_gen。
+
 ## 10. 待澄清事项
 
 1. **已解除**：UI-005已归档，交付351919c，其组工作树已清理，足以确认不再在途；未向其他会话发消息。
 2. **已定界**：H2缺页样式预注册→parse失败被吞→H1未注册；H3页名无关，见T-01决策工件。
-3. **待用户决定仓库范围**：auto-blog@22045f0832d2cfa60f1ad9127094fd47ac9e73b5 的 `tests/dual/verify_dual.py:366,395-404` 仍将`vm-ui.author_task`无条件列为pending，完整native-vm-rust不可能exit0；本计划禁止改Blog源码/未授权该仓实现。已异步询问是否允许在Blog专属树仅补齐tests/dual原生驱动（不改.at），或等待消费方提供驱动；不擅自改阈值、不以独立fixture冒充AC-04。
+3. **已解除（r2）**：用户已允许补齐Blog原生验收驱动，并显式`/goal resume`；按§4、§5边界在同组消费树执行T03，不改.at/验收阈值。
