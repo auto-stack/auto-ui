@@ -529,3 +529,67 @@ fn invalid_auto_text_and_gpu_prepare_failure_preserve_complete_last_good_and_ins
         assert_eq!(h.audio.as_ref().unwrap().mixer.lock().unwrap().voices(), 0);
     }
 }
+
+#[test]
+fn scene8_font_closure_saves_relocates_rejects_corruption_and_recovers() {
+    use autographics_auto_driver::authoring::{
+        assets::Registry,
+        document::Document,
+        host::Host,
+        public_hud::FONT_SHA,
+        storage::{Fault, Saved, Storage},
+    };
+    for api in [Api::Hud2V1, Api::Hud3V1] {
+        let mut h = host_scene(api);
+        let directory = std::env::temp_dir().join(format!(
+            "ui013-closure-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(directory.join("a")).unwrap();
+        let entry = directory.join("a/scene.agscene");
+        assert_eq!(
+            h.storage.save(&mut h.editor, &entry, Fault::None).unwrap(),
+            Saved::Confirmed
+        );
+        assert_eq!(
+            Document::decode(&std::fs::read(&entry).unwrap()).unwrap(),
+            h.editor.document
+        );
+        let blob = entry
+            .parent()
+            .unwrap()
+            .join("assets")
+            .join(format!("{FONT_SHA}.ttf"));
+        let original = std::fs::read(&blob).unwrap();
+        std::fs::write(&blob, b"damaged font").unwrap();
+        assert!(Storage::load_assets(&entry, &Registry::new()).is_err());
+        std::fs::write(&blob, original).unwrap();
+        std::fs::rename(directory.join("a"), directory.join("b")).unwrap();
+        drop(h);
+        let (doc, registry, _) =
+            Storage::load_assets(&directory.join("b/scene.agscene"), &Registry::new()).unwrap();
+        assert!(doc.hud.is_some());
+        let mut h = Host::with_assets(doc, registry).unwrap();
+        host_start(&mut h, api, &host_controller(api, ""));
+        host_tick(&mut h, true);
+        assert_eq!(
+            h.play
+                .as_ref()
+                .unwrap()
+                .last
+                .as_ref()
+                .unwrap()
+                .hud
+                .as_ref()
+                .unwrap()
+                .slots[0]
+                .text,
+            "1"
+        );
+        h.stop_play();
+    }
+}

@@ -160,3 +160,32 @@ T-02 cannot close until all of these real probes pass:
 
 No root/full-AG suite, production UI, CJK/IME, arbitrary fonts, full game,
 Gallery implementation or new audio channel is included.
+
+## T-02 closure and stage-owner correction
+
+T-02 is closed at the real two-dimensional feasibility boundary in Plan task
+T-02. The earlier checklist above incorrectly folded detailed T-03/T-05/T-06
+acceptance into this entry gate. This is a stage-owner correction only, not a
+reduction or deferral outside the approved Plan: exhaustive slot/resource and
+nonfinite negatives remain T-03; postaccept device fault, resize/DPI, Pause/
+Step/Stop/newRun and20-cycle ownership remain T-05; source-only A-to-B fresh
+SDK/target consumption and final identity remain T-06. They are not checked off
+here.
+
+Passed evidence: `public_hud`6/6 and `public_audio_compat`2/2, zero filtered,
+plus the preceding `public_audio`10/`public_audio_host`12 legacy replay. Real
+2D/3D Auto executes the32-credit event branch and rejects33, produces dynamic
+HUD text and sound in one bundle, and fits the fixed-font scene8 resource union.
+Host independently admits complete HUD rows and publishes actual GPU glyphs and
+native PCM; letterbox pixels stay unchanged and warm text does not rebuild the
+atlas. Bad text/GPU candidates preserve last-good without a new voice. Scene8
+save, corruption refusal, repair and relocated cold reopen pass.
+
+All17 pre-HUD profile combined/API/bridge hashes equal a separately executed
+pristine `df39593` assembler captured in `research/plan013-legacy-profiles.json`.
+The baseline probe is local-only under `plan-artifacts/auto-ui/plan-013/legacy-baseline`;
+it is not a second implementation checkout. The document decode scene8 routing
+omission found by this probe was fixed and the complete test rerun passed.
+
+Final command log: `D:/autostack/plan-artifacts/auto-ui/plan-013/t02-closure.log`.
+No final gate, independent review, canonical Spec/ledger or merge is implied.

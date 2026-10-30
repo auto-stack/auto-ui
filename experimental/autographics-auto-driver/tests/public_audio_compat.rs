@@ -24,3 +24,31 @@ fn all_fifteen_delivered_profiles_keep_exact_assembled_bytes() {
     assert_eq!(Value::Object(profiles), baseline);
     println!("Verified15 legacy profiles against frozen exact-byte baseline");
 }
+
+#[test]
+fn all_seventeen_pre_hud_profiles_keep_exact_assembled_bytes() {
+    let mut profiles = serde_json::Map::new();
+    for api in Api::all().into_iter().filter(|a| !a.hud()) {
+        let snapshot = SourceSnapshot::from_bytes_for(
+            Path::new("legacy.at"),
+            b"fn app_start(){}\nfn app_update(dt float){}\n".to_vec(),
+            api,
+        )
+        .unwrap();
+        profiles.insert(
+            api.version().into(),
+            json!({
+                "combined": snapshot.combined_hash,
+                "api": snapshot.api_hash,
+                "bridge": snapshot.bridge_hash,
+                "version": api.number(),
+                "profile": api.profile(),
+            }),
+        );
+    }
+    assert_eq!(profiles.len(), 17);
+    let baseline: Value =
+        serde_json::from_str(include_str!("../research/plan013-legacy-profiles.json")).unwrap();
+    assert_eq!(Value::Object(profiles), baseline);
+    println!("Verified17 pre-HUD profiles against the pristine df39593 assembler");
+}

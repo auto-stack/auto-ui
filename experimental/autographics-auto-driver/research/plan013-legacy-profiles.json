@@ -1,0 +1,121 @@
+{
+  "autographics.behavior/1": {
+    "combined": "d50ef45fe25f336df7da02a79c2f81975b9952a6a3ca60cea078de1f9e7e5734",
+    "api": "343f34a27c62f58980ef9df34a009341b20ba47d5a1b38cbbde7a1c3d499939f",
+    "bridge": "c301a80f047d78866415147e5251af22018e1510548126a5f0352841d46ebc1d",
+    "version": 1,
+    "profile": 7
+  },
+  "autographics.behavior/2": {
+    "combined": "0deecb3f8a8298b257679c09cbbf5d5b8693ef3b83611f027966808e4c7b936b",
+    "api": "32c0412a2a662a920f3394ac5f176bfa66ac9a5b487b77c60014b9659f9ba63c",
+    "bridge": "79161a8e705cfd87abc0f45c158bc64ce070b1ffec63d5c266760aaac055801d",
+    "version": 2,
+    "profile": 8
+  },
+  "autographics.behavior/3": {
+    "combined": "c16d6298baf7f91d97afb8fcab651dbf2d66c2a3e41846a90fa89fab991d6ea9",
+    "api": "560e22eaa3da6998d747f6ec0372a40f975d9dd75fdaf24c9f24de59a1623c37",
+    "bridge": "a175f670601cb0feadfa9e252ae4f77010bc0f08c93155502397abae7b925e27",
+    "version": 3,
+    "profile": 9
+  },
+  "autographics.behavior/4": {
+    "combined": "4f3042d3d2124bb1be4c931353d2d7e59e1ce6d9031db7051fa8f59d32381ed8",
+    "api": "0e1e554f87302d15fb0295bed30f3a99dea4595edb1d67860703a4021d2fad7e",
+    "bridge": "b0b5e49fd8234506f119687535b98bcd7c4e687194b1104d9bdd9664aa8bdb3d",
+    "version": 4,
+    "profile": 10
+  },
+  "autographics.behavior/5": {
+    "combined": "aa30d4235897e44b3db309ff48632cecab96a40abdeea6b345d8d34b0920d7b4",
+    "api": "a0c4fce2e235cc6484914b25634e9c0b7d636a5a6991019262a812564de05b0d",
+    "bridge": "9c7c68e60ae815432ed14c85e0568fd977ad26f6faf57b46b5221e288ec6eaf6",
+    "version": 5,
+    "profile": 11
+  },
+  "autographics.character/1": {
+    "combined": "bb8294811717446976b674f85e646f9c2f42fdeb8e2942287e5dd0f5853991eb",
+    "api": "2b4631e371623dc51a0b9977cf0c7f59deb944408e4acde051599c36cfcc84ac",
+    "bridge": "320a9b90b24fad77b71720f88fc134624557ff26cfca96ff9ee58e340dc1cd97",
+    "version": 101,
+    "profile": 12
+  },
+  "autographics.character3d/1": {
+    "combined": "ce38298b3c91ef31dd27655094c200cfc403ab6adfa5033e3dffcef32094901f",
+    "api": "3ae0b1bad472bf0845bb167476f43adb7dfc77ac499f27b12939d76db5152a39",
+    "bridge": "09b9d215b237e1f77dc5c4a1628ffbd40995d39d0c6765602b6b303857900f22",
+    "version": 102,
+    "profile": 13
+  },
+  "autographics.runtime_camera2d/1": {
+    "combined": "379a85a5fd4f86f5dfb258eb3d6d97ab89f8945b5127b7d8392ec9cf95648597",
+    "api": "07765d0bd6ec533da2d4f4469112a767957f0bd4ca8174716fd8950c4f8e588c",
+    "bridge": "71dc7ab14f581ffa5f1b299728b8b9b8fa0484025f6a27225e54aa4a92843eba",
+    "version": 103,
+    "profile": 14
+  },
+  "autographics.runtime_camera3d/1": {
+    "combined": "f8c55339d8474f2009bbeff95993b83730f8adf09434fdc188e983cec0a1d42a",
+    "api": "2d92247f9146ee41188b8756d22d747fd8b51e698becb34a4afaab986c59d38f",
+    "bridge": "3a51fb037fb267c56808315645f6f5d7f59c928b2d62fc8e03c1c89a85869557",
+    "version": 104,
+    "profile": 15
+  },
+  "autographics.objects2d/1": {
+    "combined": "43f03f0cb1c777d261d3f4ef79e0443cff3aec2a803c5a73ef37f4f1f3bb3d64",
+    "api": "2846d0f3284e0fdb32b57309350eb47d2a3f64260f99b6a7bc89f228fd94b8fd",
+    "bridge": "18a0a3028e36d2f1f3862268c15a606cc42f044c19c651a7351ff7074cbacec5",
+    "version": 105,
+    "profile": 16
+  },
+  "autographics.objects3d/1": {
+    "combined": "f092122f6d23ed975a18ac999ef41dc645c88bbaadc5dc7019243c7cb074bc32",
+    "api": "920f0e9f0513e31db27bd1486e1aea6582dc3ea1c08f9f5b138e51bbf8d31148",
+    "bridge": "b5b55d72667a04ebc6bc0f0393093c12c76831467bd4d80e16d89d1e2dbb7261",
+    "version": 106,
+    "profile": 17
+  },
+  "autographics.triggers2d/1": {
+    "combined": "bfaf40fb50c7134b580f2796e03c6c7f2ecca0cc02bb0afefcc54cc973d12eb8",
+    "api": "4df4e49f2b11ee6f0ee71869e63954ad19664265284ff900a598f70904a1db46",
+    "bridge": "8441914f01cbc7fb3bdb1bfafe712dfdbb843863e05a33a0bf35af9cf205f6a4",
+    "version": 107,
+    "profile": 18
+  },
+  "autographics.triggers3d/1": {
+    "combined": "3c2a8cb4e7cfaa6a00cadd8d08a70e90a6c7b993a51d8f19609269cba1e0d402",
+    "api": "b0efdd00fb0803eecbbb35680feaf7be78a87fdc65f89dce4bc8c71c8028c757",
+    "bridge": "584713670eeeddcc767ac2b3550c7ab54e5705081d159b3ad6119b5cbc00204a",
+    "version": 108,
+    "profile": 19
+  },
+  "autographics.sprites2d/1": {
+    "combined": "e100da1a3249a350841a15841da0a657f73f24080072357c733c683a8d3a72ca",
+    "api": "667f9d176e63106b19dd8e81f3d1e946136dcddd32480fa50e3b72e12de4f797",
+    "bridge": "5d0e65886c1bcb97ca9d8efafe0b085da5422152c9476c88586c8af309394bad",
+    "version": 109,
+    "profile": 20
+  },
+  "autographics.node_animation3d/1": {
+    "combined": "757ea2fe6088d86b3c61bfba959a6699fe58f9ac50779122c3ed4776e75ec4e4",
+    "api": "86e61da44f5ebc3dc1c6c6027c7a32beb22b7ceecb6db8694c255922e4e95c27",
+    "bridge": "49517d143b31a97e5ad59086c80aade03781e0ad091c205d16309d9819a42ce2",
+    "version": 110,
+    "profile": 21
+  },
+  "autographics.audio2d/1": {
+    "combined": "92b7258ce122af0ec177a2b688aeb988e7e3da7f16cc2bc2fefde4121b90ff11",
+    "api": "4921658c5ec9a3bf6cd030d9a1be0f8f0a7d26b78b610b96fffb8d5dae0812d6",
+    "bridge": "29069096cbd19129c4fe3b1cc7adf57aa7a383601653ed315a5efe5cb02c2c79",
+    "version": 111,
+    "profile": 22
+  },
+  "autographics.audio3d/1": {
+    "combined": "ebfb7dad264fc3d1b85f22924c889193b681e17ec84c39d177fa119b0b964933",
+    "api": "8b61f591212cd05f7fab6c30e37b63061c08365c2500c155a3161f9d088f5247",
+    "bridge": "944b6a1ba8903665c6883f377af0ee472fc5b2c7e705ef9e209f1db213dfa832",
+    "version": 112,
+    "profile": 23
+  }
+}

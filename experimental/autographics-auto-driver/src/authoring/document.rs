@@ -513,6 +513,7 @@ impl Document {
             "autographics.scene/5",
             "autographics.scene/6",
             "autographics.scene/7",
+            "autographics.scene/8",
         ]
         .contains(&schema.as_str())
         {
