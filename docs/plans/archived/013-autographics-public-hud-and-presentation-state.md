@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-10-30
 updated_at: 2026-10-30
 plan_revision: 1
-current_step: 9
+current_step: 10
 total_steps: 10
 depends_on: [auto-ui/PLAN-012]
 supersedes_spec_components: [docs/specs/auto-graphics/scene-assets.md, docs/specs/auto-graphics/behavior-api.md]
@@ -122,7 +122,7 @@ Auto写0..3与Playing/Won/Failed，Host不从事件/score推导，字体布局�
 | T-07 | review | T-06 | 同树独立final review，merge门pending | AC-06 | [x] R2 agent-0 pass绑定52f370a；F-013-R1-01/02关闭，17+2/mask/source/fmt通过，无新增finding |
 | T-08 | merge | T-07 pass | 冻结定向门与复用审计后合master，不带Gallery实现 | AC-07 | [x] 交付tip 8b1e799完整门exit0（首跑一次瞬时音频抖动、单例与完整门复跑通过，见§9），identity1577/fmt通过，ff-only落地master |
 | T-09 | merge | T-08 | SD/ledger/索引、本仓归档与实际delivery | AC-08 | [x] 规范23ed93e6与台账v152(d910b869)已ff-only进auto-lang/master，索引62项目无结构变化；本仓归档见§9 |
-| T-10 | merge | T-09 | Git Bash wt-guard clean后清唯一树/分支/空组，保恢复材料 | AC-08 | [ ] |
+| T-10 | merge | T-09 | Git Bash wt-guard clean后清唯一树/分支/空组，保恢复材料 | AC-08 | [x] 双树fresh wt-guard clean后移除ui-013组两worktree与分支codex/plan-013-dev(8b1e799)/codex/ui-013-specs(d910b869)，空组删除，产物缓存/PDB回收、EXE与证据保留（见§9 cleaned收据） |
 
 ## 9. 复审记录
 
@@ -192,6 +192,8 @@ T-08冻结定向门在交付tip实测：首次完整门在scene8_font_closure保
 - Module overview/plans和GOAL-008关联更新；GOAL仍进行中，无新模块/全局结构变更，spec-index62项目/14既有warning。
 - 23ed93e6规范/d910b869台账已进入auto-lang/master；derived view不是第二份Spec，六项溯源及未受影响逐字节保护见前收据。
 - Actual auto-ui code delivery 8b1e799；未触碰Gallery实现，后继016与ag-examples/006(G12b)必须绑定实际交付后单独验收。
+
+2026-10-30 cleaned：`checkpoint: cleaned verified`（归档提交60e6d48，本文档所在master；`stage: merge | PLAN-013:r1 | completion_kind: delivered | outcome: pass | pending_merge_owned_gates: none`）。移除前双树status空且HEAD均为各自master祖先（auto-ui 8b1e799、auto-lang d910b8696）；紧邻删除前fresh `wt-guard.sh`分别报clean exit0（无junction/symlink）。已移除D:/autostack/.wt/ui-013/{auto-ui,auto-lang}及分支codex/plan-013-dev（was 8b1e799，已合并）、codex/ui-013-specs（was d910b8696，已合并），空组目录rmdir删除；两仓worktree list与.wt列表复核ui-013零残留。产物回收：`D:/autostack/plan-artifacts/auto-ui/plan-013/`定位2处cargo target缓存（legacy-baseline/target 6.4G、t06-fresh-2/b/experimental/autographics-auto-driver/target 4.1G，均含CACHEDIR.TAG证实为构建缓存），删除前251个EXE共844090368B逐个复制至retained-exe/原相对路径并SHA256校验，映射在cleanup-retained-exe.json；删除后复核0个PDB、0个非保留target缓存，251个保留EXE重读SHA零失配，其余日志/JSON/PNG/备份/投影脚本等证据逐项保留，目录11G→862M。Temp中ui013-closure-*临时场景目录为测试既定行为残留，非Plan产物根，不属回收范围。
 
 ## 10. 待澄清事项
 
