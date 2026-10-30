@@ -13,7 +13,7 @@
 | 005 | [3D纹理与UV](archived/005-autographics-textured-models-and-uv.md) | AG M2表现 | archived r3；交付351919c，独立R3通过，SD/ledger v141已同步 |
 | 006 | [节点动画与视觉朝向](archived/006-autographics-node-animation-and-visual-facing.md) | AG M2表现 | archived/r2；R2 pass；交付c681663，ledger143 |
 | 011 | [2D完整玩法整链预算验证](archived/011-autographics-g2-full-loop-budget-feasibility.md) | AG独立研究 | archived/r2；两候选no_go_current_profile（33/32），交付c4143af；知识/ledger v145，完整M2未证实 |
-| 012 | [公共音频与接受后一次播放](012-autographics-public-audio-and-accepted-cues.md) | AG公共服务 | drafting/r1；硬等006实际交付；G12a内容另仓 |
+| 012 | [公共音频与接受后一次播放](archived/012-autographics-public-audio-and-accepted-cues.md) | AG公共服务 | archived/r1；45case与完整fresh通过，公共音频交付；G12a内容另仓 |
 | 013 | [公共HUD与共同呈现](013-autographics-public-hud-and-presentation-state.md) | AG公共服务 | drafting/r1；硬等012实际交付；G12b内容另仓 |
 
 下一份本地新计划为014，以独占取号时`.next-id`与本地活动/归档最大号重核；不能因外仓号882/883跳号。003是Blog路线，004..006是AG表现路线，状态以各自交付收据为准；011预算研究已交付，完整游戏仍未证实。设计与并行/后继入口见[本仓设计](../design/autographics/m2-presentation-and-resources.md)。

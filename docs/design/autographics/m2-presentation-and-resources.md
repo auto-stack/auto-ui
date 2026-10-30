@@ -51,7 +51,7 @@ CPU/GPU/磁盘/运行预算沿前序实际交付。新图片/UV/纹理/节点cli
 
 | 合同 | 交付/进入门 |
 |---|---|
-| [auto-ui/012](../../plans/012-autographics-public-audio-and-accepted-cues.md) | 公共有限音频/cue/接受后一次播放；硬等006实际delivery |
+| [auto-ui/012](../../plans/archived/012-autographics-public-audio-and-accepted-cues.md) | 公共有限音频/cue/接受后一次播放；硬等006实际delivery |
 | [auto-ui/013](../../plans/013-autographics-public-hud-and-presentation-state.md) | 公共有限文字HUD/字体/音画共同呈现；硬等012实际delivery |
 | [ag-examples/004](../../../../ag-examples/docs/plans/004-autographics-gallery-node-animation-and-facing.md) | G10b，硬等006；整个G10切006并重验textures，保005历史 |
 | [ag-examples/005](../../../../ag-examples/docs/plans/005-autographics-gallery-audio-actions.md) | G12a音效，硬等012与内容004；HUD仍pending |
@@ -60,3 +60,5 @@ CPU/GPU/磁盘/运行预算沿前序实际交付。新图片/UV/纹理/节点cli
 引擎006→012→013实施串行；内容004→005→006串行合入共享目录/工具，可分别与引擎012/013交错并行。011仍固定004＋008的旧基线，不因新API而自动变更实验/标go。新服务输入、资源/32credit、有限bundle、真实PCM/字形、前后接受失败边界见[正式设计](m2-public-audio-and-hud.md)。
 
 预计真实已交付inventory逐步11/19→11/20→12/21→12/22；未交付入口不标Ready，G10/G12齐备后仍不跳完整游戏/统一最终版本矩阵/发行与全AG里程碑。各Plan自有准备/target/证据目录，GPU/音频设备单实例、OS抢焦点暂停、原32和内存/源预算保持。
+
+2026-10-30：引擎012公共音频已交付 `78632af`，正式规则见auto-lang/docs/specs/auto-graphics/public-audio.md；013/HUD与Gallery声音内容仍按各自Plan验收，历史规划约束保留。

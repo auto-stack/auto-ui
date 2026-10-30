@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-012
-status: reviewed
+status: archived
 feature_name: AutoGraphics公共音频资源与接受后一次播放
 author: [Codex]
 created_at: 2026-10-30
 updated_at: 2026-10-30
 plan_revision: 1
-current_step: 7
+current_step: 9
 total_steps: 10
 depends_on: [auto-ui/PLAN-006]
 supersedes_spec_components: [docs/specs/auto-graphics/scene-assets.md, docs/specs/auto-graphics/behavior-api.md]
@@ -28,7 +28,7 @@ touched_goals: [GOAL-008]
 
 ## 2. 架构方案
 
-音频raw/声明→先检预算/有界解码→不可变Registry/cue→Auto有限请求→Host验证/资源与voice容量prepare→共同accept→一次mixer提交。所有玩法决策仍在Auto。完整设计与边界见[公共声音/HUD设计](../design/autographics/m2-public-audio-and-hud.md)，本Plan §5..8为当前执行合同。
+音频raw/声明→先检预算/有界解码→不可变Registry/cue→Auto有限请求→Host验证/资源与voice容量prepare→共同accept→一次mixer提交。所有玩法决策仍在Auto。完整设计与边界见[公共声音/HUD设计](../../design/autographics/m2-public-audio-and-hud.md)，本Plan §5..8为当前执行合同。
 
 唯一实施/顺序复审树拟`D:/autostack/.wt/ui-012/auto-ui`，分支`codex/plan-012-dev`；等006实际delivery后核master创建。主检出仅簿记，SDK准备/target/报告自有；不写006在途树或Gallery，不创建链接，清理先Git Bash wt-guard clean。
 
@@ -44,13 +44,13 @@ touched_goals: [GOAL-008]
 
 2026-10-30 复审例外授权：用户对已具体化的只读复审问题明确回答“允许只读子代理独立复审”。这是§6“不新建agent/chat”的限定例外：仅同一唯一实施树/冻结commit的只读独立复审，不新建用户聊天、不复制代码、不修改实现；不改变功能、验收、阈值、仓库或merge前finalpass要求。根会话仍是共享Plan唯一写者。此前授权阻塞现已解除，可继续T07及原全链后续。
 
-2026-10-30 执行授权：用户 `/goal 完成UI的计划012` 授予既有合同的work→独立review→有界repair→merge/规范/台账/归档/guard清理全链。006已实际交付c681663并归档cleaned，master祖先与独立R2/冻结34case/SDK锁及current identity已经实读核验；历史“仅规划/006未交付”描述保留为当时背景。唯一ui-012树已由master f7c83c6创建，分支codex/plan-012-dev；主检出其他所有者文档WIP保留，未发现代码WIP。当前入口与T-02未关闭项见[执行合同](attachments/012/work/public-audio-contract.md)。
+2026-10-30 执行授权：用户 `/goal 完成UI的计划012` 授予既有合同的work→独立review→有界repair→merge/规范/台账/归档/guard清理全链。006已实际交付c681663并归档cleaned，master祖先与独立R2/冻结34case/SDK锁及current identity已经实读核验；历史“仅规划/006未交付”描述保留为当时背景。唯一ui-012树已由master f7c83c6创建，分支codex/plan-012-dev；主检出其他所有者文档WIP保留，未发现代码WIP。当前入口与T-02未关闭项见[执行合同](../attachments/012/work/public-audio-contract.md)。
 
 用户2026-10-30要求“规划G10b和公共声音/HUD后继计划，按引擎与Gallery分仓，暂不实施”。本轮只新Plan/设计/附件/引用/取号，不建树、改源、生成资源、编译、输出声音、GPU/OS/agent或远端发布；未授权自动实施。005已交付351919c；006仍executing r2、最新记录T-05进行/完成，实际delivery尚待核；本Plan不能追其tip或按某个勾选认定交付。
 
-知识权威仍在auto-lang：[overview](../../../auto-lang/docs/specs/auto-graphics/overview.md)、[音画旧专用边界](../../../auto-lang/docs/specs/auto-graphics/auto-source-driver.md)、[资产](../../../auto-lang/docs/specs/auto-graphics/scene-assets.md)、[事件/新Run](../../../auto-lang/docs/specs/auto-graphics/runtime-triggers-and-rounds.md)、[G2/G3分母](../../../auto-lang/docs/design/autographics/m2-game-sample-matrix.md)。006候选仅node-animation3d提供1credit输入快照，不能默认为旧sprites2d也有该函数。公共服务新profile必须显式定义2D有限输入快照/3D继承语义，旧profile字节与价格保持。
+知识权威仍在auto-lang：[overview](../../../../auto-lang/docs/specs/auto-graphics/overview.md)、[音画旧专用边界](../../../../auto-lang/docs/specs/auto-graphics/auto-source-driver.md)、[资产](../../../../auto-lang/docs/specs/auto-graphics/scene-assets.md)、[事件/新Run](../../../../auto-lang/docs/specs/auto-graphics/runtime-triggers-and-rounds.md)、[G2/G3分母](../../../../auto-lang/docs/design/autographics/m2-game-sample-matrix.md)。006候选仅node-animation3d提供1credit输入快照，不能默认为旧sprites2d也有该函数。公共服务新profile必须显式定义2D有限输入快照/3D继承语义，旧profile字节与价格保持。
 
-来源/当前代码指纹与Kenney声音/字体只读审计见[规划基线](attachments/012/planning/service-baseline.md)。SD路径以现有auto-lang知识仓为根，本轮不改canonical现状Spec。
+来源/当前代码指纹与Kenney声音/字体只读审计见[规划基线](../attachments/012/planning/service-baseline.md)。SD路径以现有auto-lang知识仓为根，本轮不改canonical现状Spec。
 
 ## 5. 详细设计
 
@@ -122,8 +122,8 @@ work自查后同树独立上下文review全部AC/V/S/SD、计价/codec/不可逆
 | T-05 | work | T-04 | 生命周期/设备故障/容量/20轮owner及完整账，V-03/04 | AC-04 | [x] 7e9802b原budget2/10filtered+combinedpose1/11filtered回放通过，New/Open/nearbound/firstaudio/duplicate/emptyRun与40轮证据保留 |
 | T-06 | work | T-05 | fresh两维消费/预算/兼容/identity controls、fmt/提交、SD与G12a交付说明，V-05 | AC-01..05 | [x] 7e9802b，1536新源/SDK/锁/identitycontrols与新A→B冷SDK/target离线functional1/1filtered通过；F02closed复用，最终45case门merge pending |
 | T-07 | review | T-06 | 同树独立final review，merge门pending | AC-06 | [x] |
-| T-08 | merge | T-07 pass | 冻结定向门/有效复用后合master，不带Gallery内容 | AC-07 | [ ] |
-| T-09 | merge | T-08 | 知识SD/ledger/索引、本仓归档与实际delivery | AC-08 | [ ] |
+| T-08 | merge | T-07 pass | 冻结定向门/有效复用后合master，不带Gallery内容 | AC-07 | [x] |
+| T-09 | merge | T-08 | 知识SD/ledger/索引、本仓归档与实际delivery | AC-08 | [x] |
 | T-10 | merge | T-09 | wt-guard clean后清唯一树/分支/空组，保必要本地恢复材料 | AC-08 | [ ] |
 
 ## 9. 复审记录
@@ -206,9 +206,28 @@ F01剩余共因是textured_models.rs908独立Usage::default只复制assets，丢
 
 2026-10-30 goal round11：`stage: goal | plan_id: PLAN-012 | plan_revision: r1 | round: 11 | from: review | to: merge | status: reviewed | outcome: pass | commit: 7e9802bb55961bf1d22be77892e568f15c9437bf | next: merge T08..10`。7/10，2failed final review/2repair cycles历史计数保留，全部work/review-owned标准已闭。逻辑round12在同一授权回合执行冻结45case门/完整fresh后才landing，再canonical/ledger/index/archive/guard-clean；cap12不扩展，host仍blocked无自动续轮不伪报active。
 
+2026-10-30 `stage: merge | PLAN-012:r1 | round: 12 | completion_kind: delivered | prepared: verified | landed: verified | ledger_refreshed: verified | archive: prepared; actual commit below | cleanup: pending`。独立R3冻结7e9802bb，SD634542205cffdb4808e2e7cb63f20aa5d470c4525d93a7185ecac90d18c17711。冻结45/45通过：public10/codec6/resources9/host12/compat1/consumer2/units5（仅units33filtered），完整source/SDK/runner/PE32MiB-worker16MiB/PCM/native/owner/budget负控及实际零选拒绝通过，exit0。source-only A→B在无SDK/target副本中独立准备681文件快照、locked/offline冷编译，完整consumer2/0filtered和当前完整性能通过。既有partial功能proof不作为本门证据；146个SDK旧warning保留，无新交付warning。
+
+本次producer Host pump最大2D4374us/3D5657us，均met8ms目标；fresh B最大4459us/met与8234us/missed（超234us），如实保留，不以2s硬限替代目标。两份完整观察warm decode/mesh/texture均0；native本服务quantum最大producer114/104us、B325/82us，deadline_misses均0；CPAL后端不暴露underrun，硬件延迟未测，设备为ToDesk虚拟扬声器。CPU含pose308844/1479646B、raw2/90202及6/236544，未抬预算。全部硬门通过，8ms为既有测量目标而非硬门。
+
+8实现提交rebase至主干e30b3bb后range-diff全部等价，experimental整树始终34df93aba84da528fb8728baf3f50cf8ac108765；旧→新fe59bc0→fe36023、ef438f9→7bfbac0、0bb1ce1→0c2723f、b10cc6a→a24a9f9、4400661→87d01a4、8741443→9578956、67ddbe2→05a060c、7e9802b→78632af。主干ff-only交付78632af39de28881618f9219d07e20a9b7a5b56f，pre-landing.bundle已verify可恢复。Git Bash wt-guard clean后landing；首次误用Windows WSL bash找不到路径exit127未作通过，随后显式Git Bash正确guard exit0。主干verify_source完整1536hash/SDK681/17包29边479metadata/two locks通过。
+
+同组auto-lang规范树按通过SD精确正文发布public-audio.md与scene-assets/behavior-api增量，overview/plans/GOAL-008关联更新；GOAL008仍进行中，full game/Gallery/HUD/font/productionI2/I3未升级。规范提交f0bd812ab，台账提交8c326a1a04362d3ccdaa5b165888244c4071936d已ff-only进入auto-lang/master。spec-index62项目/14既有未分组warning，无结构变动；auto-lang仅docs/ledger变更，依AGENTS CategoryA不运行rootCargo/docs_gen或全AG。batch last covered887/2026-10-29T15:53:56Z，当前未满48h且无新增>887五整除已交付计划，not due；保留既有用户不再全量重跑裁定，不记未执行为通过。生产backend/daemon/rootUI不消费本期实验源码，无重建重启部署要求。
+
+台账通道为guarded offline projection，无监听store且HTTP8080/specs与health均不可达，不伪称HTTP成功。byteexact备份version146 SHA291a2ed1ceccd004a4de79fe3e027b77af1498cec9aa391d406444c96d9202d1；version146→147仅+1。六段schema/SpecItem字段/ID/file/tags回读通过，1465无关条目及其它顶层/段元数据逐字节保留。复用P838-ASSETS/P840-BEHAVIOR-API，新建P012-PUBLIC-AUDIO/P012-T/P012-R3/P012-M，current项指向正式Spec、历史项指向本归档；review/report sourceSHA标明归档前reviewedPlan快照。ledgerSHA50b75c63b531f04ec05aced31523d88c828b96624c3082ad6bc8258c3f55f0f2。无覆盖其他所有者文档WIP。
+
+原始本地证据（不入Git）：
+- `D:/autostack/plan-artifacts/auto-ui/plan-012/merge-gate/manifest.json` SHA256 `b4ddb80857697b80f950fc0ed6e407143a5d0dc4b19ce9ef271eafdd1db03677`
+- `D:/autostack/plan-artifacts/auto-ui/plan-012/merge-gate.log` SHA256 `764f5cdde19d9f05af65c849e3be5a0fb93f52519e6bbb8cc680a8562c68fcf4`
+- `D:/autostack/plan-artifacts/auto-ui/plan-012/merge-gate-fresh/manifest.json` SHA256 `81380f95db702a0a43b75a88c46552950f38c0176f97ff7eaac1bf0c28eae82c`
+- `D:/autostack/plan-artifacts/auto-ui/plan-012/landing-range-diff.txt` SHA256 `ee0438f9994dcb81cd40466c9cd229ea15d9cb6456d988f233ca9eb902f77cdc`
+- `D:/autostack/plan-artifacts/auto-ui/plan-012/ledger-projection.json` SHA256 `df278e49701e7b890dda189472b56863037176486610a1fb8971de4befef09e6`
+
+归档实际状态/链接/提交及guard清理待最后核验；T01..09完成，T10pending，9/10。
+
 ## 10. 待澄清事项
 
-当前7e9802b已获独立R3 final pass，7/10、reviewed，F01/F02均closed，进入merge-owned最终验收与交付收尾。无用户待答，预算/r1范围/全链授权不变。最终45case冻结门/完整fresh与canonical/ledger/索引归档/guard清理仍待，先复审不得提前merge。以下旧待答/blocked/needs_fix为历史。
+当前代码/规范/台账均已交付，最终45case与完整fresh门通过，正在归档与guard清理，9/10、T10pending。无用户待答，预算/r1范围/全链授权不变。最终45case冻结门/完整fresh与canonical/ledger/索引归档/guard清理仍待，先复审不得提前merge。以下旧待答/blocked/needs_fix为历史。
 
 最新状态（2026-10-30）：用户已明确回答“允许只读子代理独立复审”，解除下列历史待答项。已核唯一树仍为87414431b9a1dbda6eb54aad999af7f734a14516且clean；只读独立上下文`/root/plan012_final_review`已开始T07，未新建用户聊天、源码副本或实施树。根会话暂停实现写入，reviewer只读源/允许最小定向检查，最终41case门仍merge-owned pending。host目标当前仍显示blocked（工具不提供恢复active接口），本次由用户明确答复继续授权任务，不创建第二目标；不声称host状态已恢复。无工作侧或复审方式待答事项。
 

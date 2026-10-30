@@ -5,4 +5,4 @@ AG实验代码与实现计划已归本仓；旧canonical Specs与历史设计继
 | 专题 | 范围/状态 |
 |---|---|
 | [AG M2表现与资源](autographics/m2-presentation-and-resources.md) | 规划v1；本仓004/005/006串行，Gallery内容另仓，均未实施 |
-| [AG公共声音与HUD](autographics/m2-public-audio-and-hud.md) | 规划v1；引擎012/013，Gallery004/005/006分仓，均未实施 |
+| [AG公共声音与HUD](autographics/m2-public-audio-and-hud.md) | 012公共音频已交付；013/HUD与Gallery005/006后继独立 |

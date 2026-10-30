@@ -6,7 +6,7 @@
 
 | 引擎/内容合同 | 本期结果 | 硬前置 |
 |---|---|---|
-| [auto-ui/012 公共声音](../../plans/012-autographics-public-audio-and-accepted-cues.md) | 有界音频资源/cue、真实Auto请求、接受后一次播放、生命周期与消费 | 006实际delivery |
+| [auto-ui/012 公共声音](../../plans/archived/012-autographics-public-audio-and-accepted-cues.md) | 有界音频资源/cue、真实Auto请求、接受后一次播放、生命周期与消费 | 006实际delivery |
 | [auto-ui/013 公共HUD](../../plans/013-autographics-public-hud-and-presentation-state.md) | 有限GPU文本HUD、Auto状态、画面/声音/HUD共同接受 | 012实际delivery |
 | [ag-examples/004 G10b](../../../../ag-examples/docs/plans/004-autographics-gallery-node-animation-and-facing.md) | 原character四clip/朝向、G10双入口和单项包 | 006实际delivery、内容003实际交付 |
 | [ag-examples/005 G12a](../../../../ag-examples/docs/plans/005-autographics-gallery-audio-actions.md) | 动作/有限cue声音示例与声音单项包 | 012实际delivery、内容004实际交付（共享目录串行） |
@@ -59,3 +59,5 @@ HUD用新鲜GPU像素/独立字形或固定样本文本oracle，0/1/2/3、Playin
 异步音频线程的解码/混音CPU与VM/Host/publish时间分别记账，记录每quantum样本数/耗时/实时deadline或underrun；不能把异步开销从性能报告里隐藏，8ms pump目标与音频deadline分列。
 
 新服务尚未实现，所有预计字节/价格/组合仅是合同约束；可行性先于依赖实现。任何必须格式/输入/预算或支持范围改变都带反例回new，不默改AC。Gallery只消费实际delivery，不修引擎、不复用上游绿报告当本项证据。最终G10/G12与首12项全部子入口Ready仍不替代完整游戏、统一引擎矩阵/发行与全AG里程碑。
+
+2026-10-30：引擎012公共音频已交付 `78632af`，正式规则见auto-lang/docs/specs/auto-graphics/public-audio.md；013/HUD与Gallery声音内容仍按各自Plan验收，历史规划约束保留。
