@@ -236,9 +236,11 @@ F01剩余共因是textured_models.rs908独立Usage::default只复制assets，丢
 - f0bd812ab规范/8c326a1a0派生ledger已进入auto-lang/master；derived view不是第二份Spec，六项溯源及未受影响逐字节保护见前收据。
 - Actual auto-ui code delivery78632af/归档ffd4411；未触碰Gallery实现，后继013与ag-examples005必须绑定实际交付后单独验收。
 
+2026-10-30 cleanup explicit-confirmation retry：用户已明确回答“确认，仅清理已核定缓存，保留 EXE 和证据”，原清理授权待答解除。根会话按cleanup-prepared.json准备同一PowerShell端到端绝对路径/七目标白名单/CACHEDIR.TAG/ancestor和fresh wt-guard/全部795EXE及12870其它证据hash前后核验的删除动作；执行工具在CreateProcess前再次拒绝，原因仍仅“blocked by policy”，未提供细分理由。该命令未执行，七缓存仍在、无cleanup-report.json、抽核保留EXE哈希仍符。不以另一个shell/隐藏脚本绕过，不再要求用户重复同一确认。代码/复审/45case/fresh/规范/台账/归档/工作树清理的已完成检查点保留，T10仅缓存回收pending，9/10；需要用户手动按清单清理或外部工具策略改变后再回读验证。cleanup-policy-rejection.json SHA b90c12ea7bc108cec370a1ba9cf7871b2d4139c8c302a7321394f467d7e115aa。本次为round12 merge清理恢复，不新建goal或扩展cap，不声称交付全链完成。
+
 ## 10. 待澄清事项
 
-当前仅等待缓存清理确认（前述自动审批拒绝后的明确确认），代码/规范/ledger/归档/工作树清理已完成，最终45case与完整fresh门通过，T10缓存部分pending、9/10。以下旧等待/复审/merge状态均为历史记录。
+当前用户已明确确认清理，但自动审批仍在CreateProcess前以blocked by policy拒绝，未执行删除。需要手动清理已核定缓存或外部工具策略改变后复核；不再待重复确认。代码/规范/ledger/归档/工作树清理已完成，最终45case与完整fresh门通过，T10缓存部分pending、9/10。以下旧等待/复审/merge状态均为历史记录。
 
 当前代码/规范/台账均已交付，最终45case与完整fresh门通过，正在归档与guard清理，9/10、T10pending。无用户待答，预算/r1范围/全链授权不变。最终45case冻结门/完整fresh与canonical/ledger/索引归档/guard清理仍待，先复审不得提前merge。以下旧待答/blocked/needs_fix为历史。
 
