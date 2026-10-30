@@ -12,6 +12,7 @@
 | 004 | [公共图片与2D精灵帧](archived/004-autographics-public-images-and-sprite-frames.md) | AG M2表现 | archived；交付 e0fce13（reviewed 0e6e361），SD/ledger 沉淀 auto-lang v134 |
 | 005 | [3D纹理与UV](archived/005-autographics-textured-models-and-uv.md) | AG M2表现 | archived r3；交付351919c，独立R3通过，SD/ledger v141已同步 |
 | 006 | [节点动画与视觉朝向](archived/006-autographics-node-animation-and-visual-facing.md) | AG M2表现 | archived/r2；R2 pass；交付c681663，ledger143 |
+| 008 | [PLAN-004交付身份清单修复](archived/008-plan004-identity-closure.md) | auto-ui/PLAN-004身份闭包 | archived/r1；delivered 0261ae9，原路径verify_source通过；ledger auto-lang v149；清理回执见计划 |
 | 011 | [2D完整玩法整链预算验证](archived/011-autographics-g2-full-loop-budget-feasibility.md) | AG独立研究 | archived/r2；两候选no_go_current_profile（33/32），交付c4143af；知识/ledger v145，完整M2未证实 |
 | 012 | [公共音频与接受后一次播放](archived/012-autographics-public-audio-and-accepted-cues.md) | AG公共服务 | archived/r1；45case与完整fresh通过，公共音频交付；G12a内容另仓 |
 | 013 | [公共HUD与共同呈现](013-autographics-public-hud-and-presentation-state.md) | AG公共服务 | drafting/r1；硬等012实际交付；G12b内容另仓 |
