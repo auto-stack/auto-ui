@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-012
-status: executing
+status: execution_done
 feature_name: AutoGraphics公共音频资源与接受后一次播放
 author: [Codex]
 created_at: 2026-10-30
 updated_at: 2026-10-30
 plan_revision: 1
-current_step: 2
+current_step: 6
 total_steps: 10
 depends_on: [auto-ui/PLAN-006]
 supersedes_spec_components: [docs/specs/auto-graphics/scene-assets.md, docs/specs/auto-graphics/behavior-api.md]
@@ -116,11 +116,11 @@ work自查后同树独立上下文review全部AC/V/S/SD、计价/codec/不可逆
 | ID | owner_stage | 依赖 | 操作/产物 | AC | 状态 |
 |---|---|---|---|---|---|
 | T-01 | work | 用户启动、006实际delivery | 核公开合同/SDK/锁/identity/设备条件与owner，建唯一ui-012树 | AC-01/05 | [x] f7c83c6基线；006独立R2/实际c681663/1477identity controls与SDK681/17包29边479metadata通过；native输出设备可用，执行合同含边界 |
-| T-02 | work | T-01 | public-audio-contract先冻结支持/计价/bundle/效果时序/PCM入口，两维整链可行性probe，不足回new | AC-01..05 | [ ] R1-F01重开Host服务独立owner预算账；ef438f9既有支持/计价/整链32-33/PCM/旧15证据保留，不重复未受影响族 |
-| T-03 | work | T-02通过 | 有限codec/cue/asset闭包与存储版本化，V-01 | AC-01/02 | [ ] R1-F01重开共享CPU服务所有权准入；0bb1ce1既有resources9/codec6及存储/codec证据保留，见review-r1.md |
+| T-02 | work | T-01 | public-audio-contract先冻结支持/计价/bundle/效果时序/PCM入口，两维整链可行性probe，不足回new | AC-01..05 | [x] 67ddbe2修正F01服务独立owner预算；原ef438f9支持/计价/整链32-33/PCM/旧15证据复用，现账/兄弟路径见r1-repair-closure.md |
+| T-03 | work | T-02通过 | 有限codec/cue/asset闭包与存储版本化，V-01 | AC-01/02 | [x] 67ddbe2，Registry预算上下文贯通共同Usage/解码前，资源9/9回归；codec及存储不改，原证据复用 |
 | T-04 | work | T-03 | Auto/Host有界请求与mixer/native输出、接受幂等/32-33/错bundle，V-02/03 | AC-03 | [x] b10cc6a；两维各24实际VM输出破坏、精确大ordinal/4-5请求、整段PCM span/gain/tail/三rate及真实native/multimount重放通过；t03-t04-closure.md |
-| T-05 | work | T-04 | 生命周期/设备故障/容量/20轮owner及完整账，V-03/04 | AC-04 | [ ] R1-F01重开New/Open后与空cue首次Run的manager预算；4400661既有生命周期/波形/容量/40轮实际owner证据保留 |
-| T-06 | work | T-05 | fresh两维消费/预算/兼容/identity controls、fmt/提交、SD与G12a交付说明，V-05 | AC-01..05 | [ ] R1-F01/F02重开预算相关消费/source identity及capture-only兼容证据准入；8741443既有实际消费/性能/变源证明保留为原基线，修复后受影响身份须刷新 |
+| T-05 | work | T-04 | 生命周期/设备故障/容量/20轮owner及完整账，V-03/04 | AC-04 | [x] 67ddbe2，New/Open/empty-cue/首次audio/duplicate/combined-pose及legacy64MiB控制3新case通过，start-restart2/postfault1通过；40轮未变证据复用 |
+| T-06 | work | T-05 | fresh两维消费/预算/兼容/identity controls、fmt/提交、SD与G12a交付说明，V-05 | AC-01..05 | [x] 67ddbe2，capture仍比15golden/错golden必败/拒旧capture-only；1534新identity及SD，source-only A→B coldSDK/target离线functional1/1filtered通过；完整44case门merge pending |
 | T-07 | review | T-06 | 同树独立final review，merge门pending | AC-06 | [ ] |
 | T-08 | merge | T-07 pass | 冻结定向门/有效复用后合master，不带Gallery内容 | AC-07 | [ ] |
 | T-09 | merge | T-08 | 知识SD/ledger/索引、本仓归档与实际delivery | AC-08 | [ ] |
@@ -176,9 +176,19 @@ F01实际正式路径Run→Stop→New后manager仍存33528B但资源CPU0；四�
 
 2026-10-30 goal round7：`stage: goal | plan_id: PLAN-012 | plan_revision: r1 | round: 7 | from: review | to: work | status: executing | outcome: needs_fix | worktree: D:/autostack/.wt/ui-012/auto-ui | commit: 87414431b9a1dbda6eb54aad999af7f734a14516 | next: work F012-R1-01/02 then affected independent review`。用户明确授权解决此前阻塞，本轮实际独立全矩阵审查取得改变下一动作的正式反例，属progress；第1次failed final review/第1个有界repair cycle，计数不重置。host仍blocked无自动续轮，按原全链授权在当前人工继续回合顺序执行后继逻辑round8work，不创建第二goal、不伪称active。修复不改目标/预算/支持域：将真实required/resident服务owner计入共同准入/解码前/报告，保持legacy64MiB无manager正控与Stop复用；兼容捕获不得绕过golden且validator拒capture-only。受影响consumer/source绑定刷新，未受影响GPU/PCM/40轮证据复用，最终统一门仍merge所有。
 
+2026-10-30 work R1 repair ready：`stage: work | plan_id: auto-ui/PLAN-012 | plan_revision: 1 | outcome: pass | worktree_path: D:/autostack/.wt/ui-012/auto-ui | branch: codex/plan-012-dev | base_commit: f7c83c6fbe55b51b4c1e830a4175c94ec5c0d131 | repair_base: 87414431b9a1dbda6eb54aad999af7f734a14516 | code_commit: 67ddbe2e61693773900af9630ef455d636d55108 | dependency_revisions: SDK/two locks unchanged | task_ids: T02,T03,T05,T06 closed | evidence: attachments/012/work/r1-repair-closure.md | blockers: none work-owned | next_responsible_role: same independent reviewer affected R2`。F01将Host required/live服务需求放入非持久Registry预算上下文，共同Usage在无audioAsset覆盖时计Native33528B，Asset保守service预留覆盖后不重复；上下文clone经import/峰值预测传递，新增服务在open前检查，Run/restart合并asset+service+poseCPU再准入。未造假asset/blob/cache、抬额或拒原合法legacy域。New/Open真manager0asset时CPU33528；三原PNG后第四全图/少4行图先于decode拒，少5行真第四图/duplicate/窄余额首次32frame音频接受且计一次服务。原R1四PNG逐字节成为84769B永久回归输入，非附件证据倾倒。另真实character+shared图+RGBA构造两个独立预算都fit但三者和越64M的组合，Audio3在Native创建前拒、同资产pose的无manager旧node-animation接受。原64MiB四图无manager仍成功。最终budget2/9filtered、pose1/10filtered、共同resources9/0filtered、start-restart2/36filtered/postfault1/10filtered通过。
+
+F02移除capture提前return，实际capture仍断言未改旧15golden并输出完成marker；gate清环境变量、要求marker且拒旧capture-only，永久控制从真实log移除marker并更新log hash应拒。实跑normal/capture各1/0filtered通过，capture+故意坏golden实际exit101/failed，finally原bytes恢复后normal通过，旧R1capture-log与failed-log被当前predicate拒。未改变旧profile源或期望baseline。1534新完整源SHAfbea61472b0e28ec113b93d4dd0d207d17a2c817ed1a7f39168df4997374c9b4，SDK681/17/29/479及两locks不变，identity controls/fmt/diff/Python compile通过；SD既有owner/组合pose与proof规则补充，SHA6b693eeadabbf68bf1d22f8cd28b913c1d0189b1507d99ad0a943a32fb24f8f2。R1原始外部报告SHAc961eb3f保留，持久Markdown GitLF摘要SHAd2dc3db85b84aa32c41b659187ce3b8334443b139599d2cd04cb60c2ac4123f5（文字等价，不伪称同原始字节）。
+
+受影响source-only新A→B在prepare前无SDK/target，在B自有snapshot准备/verify源及metadata后locked/offline重编译95s、functional真实1passed/1filtered/6.17s，两维变源cue/gain/运动及12645framePCM/保存搬迁冷开通过。实际B manifest_dir和PE32MiB/worker16MiB，exeSHAb6f359ad085fa149420050d5971855de7c08703a5a0406ce06d86f0a566c0dd7；B/producer identity逐字节相同，r1-functional-proof.json SHAe83c55aea93699acc1473dd9d2f83c33593dd8b84fde3cef2abdf0aec4eabfe7明确functional-only，不冒充完整44case门或给旧full报告改身份。未变Auto/wire/codec/Mixer/native转换/GPU视觉/40轮owner及旧性能原始证据按路径复用，完整current performance/fresh gate为merge-owned pending。所有局部命令/结果/LogSHA见closure；无本期新增warning，SDK146旧warning保留。
+
+初始cargo check在Windows依赖metadata遭D盘满而失败（非通过证据），随后定向编译补齐Registry map-array转换兼容后通过。自动审批拒绝两种缓存删除且均未执行；改以不删除的NTFS压缩过期首consumer target，8666files/885dirs，5093094599逻辑B→2618700258存储B，129EXE哈希前后相等/路径保留，无源码证据删除，磁盘恢复可用后完成检查。此环境处理不增加review失败次数、不作产品finding。
+
+2026-10-30 goal round8：`stage: goal | plan_id: PLAN-012 | plan_revision: r1 | round: 8 | from: work | to: review | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-012/auto-ui | commit: 67ddbe2e61693773900af9630ef455d636d55108 | next: same independent affected review R2`。第1个有界repair cycle完成两finding共因/兄弟路径/正反例与受影响消费。work-owned开放finding/覆盖缺口/合同决策为空，6/10；1failed finalreview计数保留，T07..10pending；无新Agent/chat或第二树，无规范/ledger/merge/归档。host无续轮（仍blocked）故继续按已授权全链顺序进入逻辑round9独立R2，不创建第二目标或伪报host active。
+
 ## 10. 待澄清事项
 
-当前独立R1已完成needs_fix，具体F012-R1-01/02见§9追加收据和attachments/012/review-r1.md。独立复审方式授权仍有效，无用户待答；进入原合同内第1次有界修复，完成后交同一独立上下文受影响复审。下列待答/blocked文字为历史，不是当前阻塞。
+当前两R1finding已在67ddbe2完成工作侧修复及局部验证/新消费，6/10、execution_done，等同一独立上下文R2。无用户待答，原独立只读例外和全链授权仍有效。T08新44case冻结门、T09知识ledger归档、T10guard清理仍pending。下列待答/blocked及needs_fix文字是历史；原始目标和所有失败证据保留，不缩范围或改变阈值。
 
 最新状态（2026-10-30）：用户已明确回答“允许只读子代理独立复审”，解除下列历史待答项。已核唯一树仍为87414431b9a1dbda6eb54aad999af7f734a14516且clean；只读独立上下文`/root/plan012_final_review`已开始T07，未新建用户聊天、源码副本或实施树。根会话暂停实现写入，reviewer只读源/允许最小定向检查，最终41case门仍merge-owned pending。host目标当前仍显示blocked（工具不提供恢复active接口），本次由用户明确答复继续授权任务，不创建第二目标；不声称host状态已恢复。无工作侧或复审方式待答事项。
 

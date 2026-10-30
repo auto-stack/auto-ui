@@ -302,3 +302,17 @@ repair closure. T-04 owns full request/admission/PCM/native replay controls,
 T-05 capacity8/9, postaccept device error, complete lifecycle20cycles/weak owners,
 T-06 fresh bound2D/3D consumer/identity/CPU/source sensitivity/SD delivery. All
 remain open until their own evidence; review/merge gates likewise pending.
+
+## R1 service-accounting correction (2026-10-30)
+
+The old per-audio-Asset reserve alone does not cover Host lifetime: retained
+manager after New/Open and empty-cue profiles own no audio Asset. Independent R1
+proved this at the actual64MiB image boundary. Repair67ddbe2 carries a transient
+Host service requirement through shared Registry/Usage/predecode admission and
+reports the uncovered Native reservation even with0assets. An existing audio
+Asset reserve covers it without double charge. Before opening/restarting Run,
+asset+service+animation-pose CPU is checked together. Manager-free old64MiB remains
+accepted. [R1 closure](r1-repair-closure.md) binds real New/Open/near-limit/duplicate/
+first-audio/empty-cue/combined-pose controls and current source/consumer evidence.
+Original support/pricing/PCM/codec/old-profile evidence above is retained by its
+own unchanged-input scope; the final44case gate remains merge-owned pending.
