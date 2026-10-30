@@ -30,10 +30,11 @@ use std::sync::Arc;
 
 use auto_lang_core::ast::Stmt;
 use auto_lang_core::vm::engine::AutoVM;
-use auto_lang_core::vm::ffi::http_server::{match_route, ApiArgBindError, ApiParamSig, HttpRoute};
+use auto_lang_core::vm::ffi::http_server::{ApiParamSig, HttpRoute};
 use auto_lang_core::vm::loader::Linker;
 use auto_lang_core::vm::task::AutoTask;
 use auto_lang_core::vm::virt_memory::VirtualFlash;
+use auto_web::http_server::{match_route, ApiArgBindError};
 
 /// Default listening port (`AUTO_GALLERY_PROXY_PORT` can override; binding conflicts fall back to
 /// +1..+10 mirroring the MCP 9247 precedent, then to an OS-assigned port when the whole range is
@@ -294,7 +295,10 @@ fn bind_with_fallback(want: u16) -> std::io::Result<(TcpListener, u16)> {
                     std::io::ErrorKind::AddrInUse | std::io::ErrorKind::PermissionDenied
                 ) =>
             {
-                log::warn!("[back-proxy] port {port} unavailable ({:?}), trying next", e.kind());
+                log::warn!(
+                    "[back-proxy] port {port} unavailable ({:?}), trying next",
+                    e.kind()
+                );
             }
             Err(e) => return Err(e),
         }
@@ -1801,8 +1805,7 @@ impl SessionRuntime {
                     .find(|(k, _)| k == "authorization")
                     .map(|(_, v)| v.clone())
                     .unwrap_or_default();
-                let meta_json =
-                    auto_lang_core::vm::ffi::http_server::build_meta_json(&cookie, &auth);
+                let meta_json = auto_web::http_server::build_meta_json(&cookie, &auth);
                 bound.push(serde_json::Value::String(meta_json.clone()));
                 arg_srcs.push(ArgSrc::TypedString(sig.clone(), meta_json));
                 continue;
@@ -1828,16 +1831,14 @@ impl SessionRuntime {
                             ApiArgBindError::Internal(format!("arg marshal failed: {e:?}"))
                         })
                 }
-                ArgSrc::TypedString(sig, s) => {
-                    auto_lang_core::vm::ffi::http_server::push_typed_string_arg(
-                        &self.vm,
-                        &mut task,
-                        sig,
-                        s,
-                        &req.method,
-                        &req.path,
-                    )
-                }
+                ArgSrc::TypedString(sig, s) => auto_web::http_server::push_typed_string_arg(
+                    &self.vm,
+                    &mut task,
+                    sig,
+                    s,
+                    &req.method,
+                    &req.path,
+                ),
             };
             if let Err(e) = pushed {
                 let (status, detail) = match e {

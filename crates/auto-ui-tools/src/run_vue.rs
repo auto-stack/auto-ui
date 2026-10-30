@@ -318,7 +318,7 @@ pub fn run_vue_flow(
         current_step, total_steps
     );
     // PLAN-734 T-06：Err 传播（错误不能只 warn 后继续启动旧产物）。
-    auto_api_gen::api_gen::generate_api(root_dir, "vue")?;
+    auto_web::generate_api(root_dir, "vue")?;
     if proc_host::cancelled() {
         return finish_cancelled();
     }

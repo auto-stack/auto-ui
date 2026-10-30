@@ -524,9 +524,11 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 name = "auto-api-gen"
 version = "0.1.0"
 dependencies = [
+ "auto-generation-core",
  "auto-lang-core",
  "auto-project-model",
  "auto-val",
+ "auto-web",
  "regex",
  "semver 1.0.28",
  "serde_json",
@@ -590,6 +592,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "auto-generation-core"
+version = "0.1.0"
+dependencies = [
+ "auto-lang-core",
+ "auto-project-model",
+ "auto-val",
+ "regex",
+ "semver 1.0.28",
+ "serde_json",
+ "sha2 0.10.9",
+ "toml",
+]
+
+[[package]]
 name = "auto-lang-core"
 version = "0.1.0"
 dependencies = [
@@ -607,7 +623,7 @@ dependencies = [
  "auto-terminal-core",
  "auto-text-core",
  "auto-val",
- "axum",
+ "auto-web-contract",
  "base64 0.22.1",
  "bincode",
  "blake3",
@@ -622,8 +638,6 @@ dependencies = [
  "futures",
  "hex",
  "hmac",
- "hyper",
- "hyper-util",
  "inventory",
  "lazy_static",
  "libloading",
@@ -644,7 +658,6 @@ dependencies = [
  "sha1 0.10.7",
  "sha2 0.10.9",
  "shim-metadata",
- "socket2 0.5.10",
  "stacker",
  "strum",
  "strum_macros",
@@ -789,6 +802,7 @@ dependencies = [
  "auto-ui-compiler",
  "auto-ui-dialect",
  "auto-val",
+ "auto-web",
  "autodown-core",
  "axum",
  "base64 0.22.1",
@@ -868,6 +882,7 @@ dependencies = [
  "auto-ui-dialect",
  "auto-ui-runtime",
  "auto-val",
+ "auto-web",
  "base64 0.22.1",
  "blake3",
  "colored",
@@ -892,6 +907,42 @@ dependencies = [
  "regex",
  "serde",
  "thiserror 2.0.21",
+]
+
+[[package]]
+name = "auto-web"
+version = "0.1.0"
+dependencies = [
+ "a2r-std",
+ "auto-generation-core",
+ "auto-lang-core",
+ "auto-media-core",
+ "auto-val",
+ "auto-web-contract",
+ "axum",
+ "base64 0.22.1",
+ "futures",
+ "hyper",
+ "hyper-util",
+ "lazy_static",
+ "mime_guess",
+ "regex",
+ "semver 1.0.28",
+ "serde",
+ "serde_json",
+ "sha1 0.10.7",
+ "sha2 0.10.9",
+ "socket2 0.5.10",
+ "tokio",
+ "toml",
+]
+
+[[package]]
+name = "auto-web-contract"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

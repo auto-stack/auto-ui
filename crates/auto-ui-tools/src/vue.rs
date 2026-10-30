@@ -5023,7 +5023,7 @@ export default router
         // Generate TypeScript API client if api.at exists.
         // PLAN-734 T-06：Err 传播（不再静默丢弃——生成失败不能以旧产物/无产物
         // 继续；AC-05）。
-        auto_api_gen::api_gen::generate_api(&self.root_dir, "vue")?;
+        auto_web::generate_api(&self.root_dir, "vue")?;
 
         // Write project files
         write_project_files(
@@ -6623,7 +6623,7 @@ fn prepare_vue_sources(
     println!();
     println!("▶ Generating API client...");
     // PLAN-734 T-06：Err 传播（无契约时 generate_api 返回 Ok——不受影响）。
-    auto_api_gen::api_gen::generate_api(root_dir, "vue")?;
+    auto_web::generate_api(root_dir, "vue")?;
 
     // Refresh API function names after generating (for next run)
     let api_fns_path = root_dir.join("dist").join(".api_functions");
@@ -9976,7 +9976,7 @@ fn resolve_demo_api_client_ts(apps_dir: &Path, demo_id: &str) -> Option<String> 
                 .ok()
                 .and_then(|content| auto_api_gen::api_gen::try_full_parse(&content))
                 .map(|module| {
-                    auto_lang_core::api::TypeScriptGenerator::new().generate_simple_client(&module)
+                    auto_web::api::TypeScriptGenerator::new().generate_simple_client(&module)
                 })
         }
     };

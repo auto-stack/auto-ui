@@ -83,6 +83,7 @@ native-dnd = ["dep:windows", "dep:windows-core", "dep:image"]
 test-native-dock = ["ui-iced", "native-dock"]
 
 [dependencies]
+auto-web = { version = "=0.1.0", path = "../../../auto-web/crates/auto-web" }
 auto-lang-core = { path = "../../../auto-lang/crates/auto-lang-core" }
 auto-ui-compiler = { path = "../auto-ui-compiler" }
 # PLAN-841 T-05: runtime consumes the UI-owned domain model (UiCode/UiStmt)

@@ -25,6 +25,8 @@ use crate::rust_ui::{probe_service_ready, start_api_server, stop_api_server, Pac
 /// T-05 R2（R2-01）：内部 VM 会话执行臂的入口（bin --internal-vm-exec
 /// 消费）；legacy CLI 与宿主钩子同走本口。
 pub fn run_entry_file(path: &str) -> auto_lang_core::AutoResult<String> {
+    auto_web::install_http_service_host_if_absent();
+    let launch = auto_lang_core::vm::host_capabilities::http_service::current_http_service_launch();
     let code = std::fs::read_to_string(path).map_err(|e| format!("Failed to read file: {}", e))?;
     if auto_ui_runtime::has_ui_keywords(&code) {
         return execute_vm_entry(&code, Some(path));
@@ -34,7 +36,11 @@ pub fn run_entry_file(path: &str) -> auto_lang_core::AutoResult<String> {
         .stack_size(auto_lang_core::vm_thread_stack_size())
         .name("auto-vm-exec".into())
         .spawn(move || {
-            let (result, stdout) = auto_lang_core::run_with_capture_and_path(&code, &path)?;
+            let (result, stdout) =
+                auto_lang_core::vm::host_capabilities::http_service::with_http_service_launch(
+                    launch,
+                    || auto_lang_core::run_with_capture_and_path(&code, &path),
+                )?;
             if !stdout.is_empty() {
                 println!("{stdout}");
             }
@@ -312,7 +318,7 @@ pub fn run_vm_ui_flow(
             // api.rs + types.rs from #[api] annotations (idempotent).
             // PLAN-734 T-06：Err 传播（split 生成失败不再 warn 后仍启动——
             // start_api_server 内的二次生成同错误也会硬传，此处提前终结）。
-            auto_api_gen::api_gen::generate_api(project_dir, "rust")
+            auto_web::generate_api(project_dir, "rust")
                 .map_err(|e| format!("Failed to generate Rust backend: {}", e))?;
             let child = match start_api_server(project_dir) {
                 Ok(child) => child,

@@ -32,7 +32,7 @@ pub use auto_api_gen::rust_workspace::{
     workspace_lock_identity, write_shared_cargo_config,
 };
 // PLAN-815 T-04: backend reuse freshness gate moved to auto-api-gen
-pub use auto_api_gen::api_gen::backend_generation_is_fresh;
+pub use auto_web::backend_generation_is_fresh;
 
 /// Generate Rust UI code from .at files in a project directory.
 ///
@@ -5823,7 +5823,7 @@ pub fn start_api_server(project_dir: &Path) -> Result<Option<std::process::Child
     let back_name = back_member_name(project_dir);
     let api_backend_dir = ws_dir.join(&back_name);
     // Generate or update the Rust backend from #[api] declarations (idempotent).
-    if let Err(e) = auto_api_gen::api_gen::generate_api(project_dir, "rust") {
+    if let Err(e) = auto_web::generate_api(project_dir, "rust") {
         return Err(format!("Failed to generate Rust backend: {}", e));
     }
     if !api_backend_dir.join("Cargo.toml").exists() {
@@ -6074,7 +6074,7 @@ fn build_rust_ui_inner(project_dir: &Path, source: &PacSource) -> AutoResult<()>
             "{}",
             "Refreshing Rust backend crate (idempotent)...".bright_cyan()
         );
-        auto_api_gen::api_gen::generate_api(project_dir, "rust")
+        auto_web::generate_api(project_dir, "rust")
             .map_err(|e| format!("Failed to generate Rust backend: {}", e))?;
     }
 
@@ -6709,7 +6709,7 @@ pub fn answer() int { return 42 }
         }
         let _restore = Restore(std::env::var_os("AUTO_RUST_WORKSPACE"));
         std::env::set_var("AUTO_RUST_WORKSPACE", &isolated_workspace);
-        auto_api_gen::api_gen::generate_api(&project, "rust").unwrap();
+        auto_web::generate_api(&project, "rust").unwrap();
         let ws = ensure_shared_workspace(&project);
         let receipt_path = ws.join(back_member_name(&project)).join("generation.json");
         let read_lock_field = || {
@@ -6831,7 +6831,7 @@ pub fn answer() int { return 42 }
         }
         let _restore = Restore(std::env::var_os("AUTO_RUST_WORKSPACE"));
         std::env::set_var("AUTO_RUST_WORKSPACE", &isolated_workspace);
-        auto_api_gen::api_gen::generate_api(&project, "rust").unwrap();
+        auto_web::generate_api(&project, "rust").unwrap();
         let ws = ensure_shared_workspace(&project);
         let receipt_path = ws.join(back_member_name(&project)).join("generation.json");
         let read_lock_field = || {
@@ -6864,7 +6864,7 @@ pub fn answer() int { return 42 }
         );
         // 3) R11 反例转正：同一空文件上再生成——收据仍记 811c9dc5（两端
         //    一致），业务与 lock 均未变，门必须新鲜。
-        auto_api_gen::api_gen::generate_api(&project, "rust").unwrap();
+        auto_web::generate_api(&project, "rust").unwrap();
         assert_eq!(
             read_lock_field(),
             format!("{:x}", auto_api_gen::api_gen::fnv1a(b"")),
