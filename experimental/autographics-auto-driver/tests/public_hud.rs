@@ -869,3 +869,311 @@ fn repeated_render_and_capture_do_not_replay_audio_or_rebuild_atlas() {
         h.stop_play();
     }
 }
+
+fn host_frozen_tick(h: &mut autographics_auto_driver::authoring::host::Host, success: bool) {
+    use autographics_auto_driver::authoring::play::Action;
+    let p = h.play.as_mut().unwrap();
+    p.resume().unwrap();
+    p.char_key(1, true, false);
+    p.dispatch(Action::default()).unwrap();
+    h.pause_play("");
+    host_pump(h, success);
+}
+
+fn host_silent_quantum(h: &autographics_auto_driver::authoring::host::Host) {
+    let audio = h.audio.as_ref().unwrap();
+    let before = audio.observation.lock().unwrap().callbacks;
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+    loop {
+        let observation = audio.observation.lock().unwrap();
+        if observation.callbacks > before {
+            assert_eq!(observation.last_run, 0);
+            assert_eq!(observation.last_nonzero, 0);
+            break;
+        }
+        drop(observation);
+        assert!(std::time::Instant::now() < deadline);
+        std::thread::sleep(std::time::Duration::from_millis(2));
+    }
+}
+
+#[test]
+fn pause_step_stop_and_fresh_run_reset_hud_audio_and_input() {
+    use autographics_auto_driver::authoring::public_audio::mixer::Accepted;
+    for api in [Api::Hud2V1, Api::Hud3V1] {
+        let mut h = host_scene(api);
+        host_start(&mut h, api, &host_controller(api, ""));
+        host_frozen_tick(&mut h, true);
+        let previous = h.play.as_ref().unwrap().tick();
+        let voices = h.audio_snapshot()["voices"].clone();
+        h.play.as_mut().unwrap().single_step().unwrap();
+        host_pump(&mut h, true);
+        let frame = h.play.as_ref().unwrap().last.as_ref().unwrap();
+        assert_eq!(frame.tick, previous + 1);
+        assert_eq!(frame.hud.as_ref().unwrap().slots[0].text, "2");
+        assert_eq!(frame.audio_disposition, Some(Accepted::SuppressedByStep));
+        assert_eq!(h.audio_snapshot()["voices"], voices);
+        h.play.as_mut().unwrap().resume().unwrap();
+        h.pause_play("");
+        assert_eq!(h.audio_snapshot()["voices"], voices);
+        h.stop_play();
+        host_start(&mut h, api, &host_controller(api, ""));
+        let fresh = h.play.as_ref().unwrap().last.as_ref().unwrap();
+        assert_eq!(fresh.hud.as_ref().unwrap().slots[0].text, "0");
+        assert_eq!(fresh.hud.as_ref().unwrap().slots[1].text, "Playing");
+        assert_eq!(fresh.audio.as_ref().unwrap().requests.len(), 0);
+        h.stop_play();
+    }
+}
+
+#[test]
+fn camera_independence_resize_dpi_and_device_identity_hold() {
+    for api in [Api::Hud2V1, Api::Hud3V1] {
+        let mut h = host_scene(api);
+        host_start(&mut h, api, &host_controller(api, ""));
+        let surface = if three(api) { h.three } else { h.two };
+        let initial_positions: Vec<[f32; 4]> = match h.rt.content(surface).unwrap() {
+            agp::host::surface_runtime::SurfaceContent::Game2d(content) => {
+                content.hud_overlay.as_ref().unwrap().layers[0]
+                    .glyphs
+                    .iter()
+                    .rev()
+                    .take(10)
+                    .map(|glyph| glyph.dst)
+                    .collect()
+            }
+            agp::host::surface_runtime::SurfaceContent::Scene3d(content) => {
+                content.hud_overlay.as_ref().unwrap().layers[0]
+                    .glyphs
+                    .iter()
+                    .rev()
+                    .take(10)
+                    .map(|glyph| glyph.dst)
+                    .collect()
+            }
+            _ => unreachable!(),
+        };
+        host_frozen_tick(&mut h, true);
+        let moved_positions: Vec<[f32; 4]> = match h.rt.content(surface).unwrap() {
+            agp::host::surface_runtime::SurfaceContent::Game2d(content) => {
+                content.hud_overlay.as_ref().unwrap().layers[0]
+                    .glyphs
+                    .iter()
+                    .rev()
+                    .take(10)
+                    .map(|glyph| glyph.dst)
+                    .collect()
+            }
+            agp::host::surface_runtime::SurfaceContent::Scene3d(content) => {
+                content.hud_overlay.as_ref().unwrap().layers[0]
+                    .glyphs
+                    .iter()
+                    .rev()
+                    .take(10)
+                    .map(|glyph| glyph.dst)
+                    .collect()
+            }
+            _ => unreachable!(),
+        };
+        assert_eq!(
+            initial_positions, moved_positions,
+            "fixed text HUD anchors follow the game viewport, not the world camera"
+        );
+        let before = h.rt.capture(surface, "before-dpi").unwrap();
+        let builds = autographics_auto_driver::authoring::public_hud::atlas_builds();
+        let original_size = [before.2, before.3];
+        h.rt.resize_surface(
+            surface,
+            [original_size[0] as f32 * 2.0, original_size[1] as f32 * 2.0],
+        )
+        .unwrap();
+        h.frame(None).unwrap();
+        let doubled = h.rt.capture(surface, "doubled").unwrap();
+        assert_eq!(
+            (doubled.2, doubled.3),
+            (original_size[0] * 2, original_size[1] * 2)
+        );
+        assert_eq!(
+            autographics_auto_driver::authoring::public_hud::atlas_builds(),
+            builds
+        );
+        h.rt.resize_surface(surface, [original_size[0] as f32, original_size[1] as f32])
+            .unwrap();
+        h.frame(None).unwrap();
+        assert_eq!(h.rt.capture(surface, "restored").unwrap().0, before.0);
+        let device = h.rt.gpu().token().ordinal;
+        let mut foreign = agp::render2d::TextRenderer::new_checked(
+            h.rt.gpu(),
+            agp::renderer::target::OffscreenTarget::FORMAT,
+            include_bytes!("../samples/public_hud/fonts/lilita_one_regular.ttf"),
+            32.0,
+            "A",
+        )
+        .unwrap();
+        foreign.device_ordinal = u64::MAX;
+        let foreign = std::sync::Arc::new(foreign);
+        match h.rt.content_mut(surface).unwrap() {
+            agp::host::surface_runtime::SurfaceContent::Game2d(content) => {
+                content.hud_overlay.as_mut().unwrap().layers[0].renderer = foreign.clone()
+            }
+            agp::host::surface_runtime::SurfaceContent::Scene3d(content) => {
+                content.hud_overlay.as_mut().unwrap().layers[0].renderer = foreign.clone()
+            }
+            _ => unreachable!(),
+        }
+        assert!(h
+            .rt
+            .content(surface)
+            .unwrap()
+            .validate_device(device)
+            .is_err());
+        h.stop_play();
+    }
+}
+
+#[test]
+fn postaccept_native_fault_preserves_hud_and_reopens_fresh_run() {
+    for api in [Api::Hud2V1, Api::Hud3V1] {
+        let mut h = host_scene(api);
+        let source = host_controller(api, "");
+        host_start(&mut h, api, &source);
+        host_frozen_tick(&mut h, true);
+        let oldrun = h.play.as_ref().unwrap().run_id();
+        let oldowner = h.play.as_ref().unwrap().owner_probe().unwrap();
+        let oldmanager = std::sync::Arc::downgrade(&h.audio.as_ref().unwrap().mixer);
+        h.audio
+            .as_ref()
+            .unwrap()
+            .mixer
+            .lock()
+            .unwrap()
+            .pause(oldrun, false)
+            .unwrap();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        while h.audio_snapshot()["nonzero"].as_u64().unwrap() == 0 {
+            assert!(std::time::Instant::now() < deadline);
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
+        h.pause_play("");
+        h.frame(None).unwrap();
+        let frame = h.play.as_ref().unwrap().last.clone().unwrap();
+        let surface = if three(api) { h.three } else { h.two };
+        let image = h.rt.capture(surface, "postaccept").unwrap().0;
+        h.audio
+            .as_ref()
+            .unwrap()
+            .mixer
+            .lock()
+            .unwrap()
+            .output_fault("injected device disconnect".into());
+        let emitted = h.audio_snapshot()["nonzero"].clone();
+        for _ in 0..3 {
+            h.frame(None).unwrap();
+        }
+        let play = h.play.as_ref().unwrap();
+        assert_eq!(
+            play.state,
+            autographics_auto_driver::authoring::play::State::Faulted
+        );
+        assert!(play
+            .error
+            .as_ref()
+            .unwrap()
+            .ends_with("audio_fault: injected device disconnect"));
+        assert_eq!(play.last.as_ref().unwrap().hud, frame.hud);
+        assert_eq!(h.rt.capture(surface, "fault-keeps-hud").unwrap().0, image);
+        assert!(!oldowner());
+        assert_eq!(
+            h.audio_snapshot()["nonzero"],
+            emitted,
+            "no retry or rollback of emitted samples"
+        );
+        h.stop_play();
+        host_start(&mut h, api, &source);
+        assert!(oldmanager.upgrade().is_none());
+        assert!(h.play.as_ref().unwrap().run_id() > oldrun);
+        assert_eq!(
+            h.play
+                .as_ref()
+                .unwrap()
+                .last
+                .as_ref()
+                .unwrap()
+                .hud
+                .as_ref()
+                .unwrap()
+                .slots[0]
+                .text,
+            "0"
+        );
+        h.stop_play();
+    }
+}
+
+#[test]
+fn twenty_runs_reuse_warm_atlas_and_release_vm_pcm_and_external_pin_owners() {
+    for api in [Api::Hud2V1, Api::Hud3V1] {
+        let mut h = host_scene(api);
+        let source = host_controller(api, "");
+        let cues = autographics_auto_driver::authoring::public_audio::resolve_cues(
+            &h.editor.document,
+            &h.editor.assets,
+        )
+        .unwrap();
+        let external_pcm = cues[0].pcm.clone();
+        let pcm = std::sync::Arc::downgrade(&cues[0].pcm);
+        drop(cues);
+        let external_atlas = match h.rt.content(h.two).unwrap() {
+            agp::host::surface_runtime::SurfaceContent::Game2d(content) => {
+                content.hud_overlay.as_ref().unwrap().layers[0]
+                    .renderer
+                    .clone()
+            }
+            _ => unreachable!(),
+        };
+        let atlas = h.hud_atlases.weak_owners();
+        let builds = autographics_auto_driver::authoring::public_hud::atlas_builds();
+        let decodes = autographics_auto_driver::authoring::assets::decode_attempts();
+        let mut manager = None;
+        let mut previous = 0;
+        for _ in 0..20 {
+            host_start(&mut h, api, &source);
+            let play = h.play.as_ref().unwrap();
+            let run = play.run_id();
+            assert!(run > previous);
+            let owner = play.owner_probe().unwrap();
+            let audio = h.audio.as_ref().unwrap();
+            if let Some(weak) = &manager {
+                assert!(std::sync::Weak::ptr_eq(
+                    weak,
+                    &std::sync::Arc::downgrade(&audio.mixer)
+                ));
+            } else {
+                manager = Some(std::sync::Arc::downgrade(&audio.mixer));
+            }
+            host_frozen_tick(&mut h, true);
+            assert_eq!(h.audio_snapshot()["voices"], 2);
+            h.stop_play();
+            assert!(!owner());
+            assert_eq!(h.audio_snapshot()["voices"], 0);
+            host_silent_quantum(&h);
+            assert_eq!(
+                autographics_auto_driver::authoring::public_hud::atlas_builds(),
+                builds
+            );
+            assert_eq!(
+                autographics_auto_driver::authoring::assets::decode_attempts(),
+                decodes
+            );
+            previous = run;
+        }
+        drop(h);
+        assert!(manager.unwrap().upgrade().is_none());
+        assert!(pcm.upgrade().is_some());
+        assert!(atlas.iter().all(|weak| weak.upgrade().is_some()));
+        drop(external_pcm);
+        drop(external_atlas);
+        assert!(pcm.upgrade().is_none());
+        assert!(atlas.iter().all(|weak| weak.upgrade().is_none()));
+    }
+}

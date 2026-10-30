@@ -217,6 +217,13 @@ impl SurfaceContent {
                         return None;
                     }
                 }
+                if g.hud_overlay.as_ref().is_some_and(|hud| {
+                    hud.layers
+                        .iter()
+                        .any(|layer| layer.renderer.device_ordinal != quad)
+                }) {
+                    return None;
+                }
                 if g.sprite.device_ordinal? != quad
                     || g.sprite_store.device_owners().any(|o| o != Some(quad))
                 {
@@ -233,6 +240,11 @@ impl SurfaceContent {
                     || s.screen_overlay
                         .as_ref()
                         .is_some_and(|o| o.quad.device_ordinal != Some(owner))
+                    || s.hud_overlay.as_ref().is_some_and(|hud| {
+                        hud.layers
+                            .iter()
+                            .any(|layer| layer.renderer.device_ordinal != owner)
+                    })
                 {
                     return None;
                 }
@@ -258,6 +270,11 @@ impl SurfaceContent {
                 }
                 if let Some(text) = &game.text_overlay {
                     check(Some(text.renderer.device_ordinal))?;
+                }
+                if let Some(hud) = &game.hud_overlay {
+                    for layer in &hud.layers {
+                        check(Some(layer.renderer.device_ordinal))?;
+                    }
                 }
                 Ok(())
             }
@@ -288,6 +305,11 @@ impl SurfaceContent {
                 if let Some(text) = &scene.text_overlay {
                     check(Some(text.renderer.device_ordinal))?;
                 }
+                if let Some(hud) = &scene.hud_overlay {
+                    for layer in &hud.layers {
+                        check(Some(layer.renderer.device_ordinal))?;
+                    }
+                }
                 Ok(())
             }
             _ => check(self.device_ordinal()),
@@ -302,6 +324,11 @@ impl SurfaceContent {
                 if let Some(text) = &game.text_overlay {
                     out.merge(&text.renderer.uploads.snapshot());
                 }
+                if let Some(hud) = &game.hud_overlay {
+                    for layer in &hud.layers {
+                        out.merge(&layer.renderer.uploads.snapshot());
+                    }
+                }
                 Some(out)
             }
             Self::Scene3d(scene) => {
@@ -313,6 +340,11 @@ impl SurfaceContent {
                 }
                 if let Some(text) = &scene.text_overlay {
                     out.merge(&text.renderer.uploads.snapshot());
+                }
+                if let Some(hud) = &scene.hud_overlay {
+                    for layer in &hud.layers {
+                        out.merge(&layer.renderer.uploads.snapshot());
+                    }
                 }
                 Some(out)
             }
