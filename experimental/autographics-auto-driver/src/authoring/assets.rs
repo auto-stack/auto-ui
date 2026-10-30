@@ -151,7 +151,65 @@ impl Asset {
             .ok_or_else(|| "wrong asset kind: image required".to_string())
     }
 }
-pub type Registry = BTreeMap<String, Arc<Asset>>;
+/// Resource identities plus transient admission context for a Host-owned service.
+/// The requirement is not an asset/blob, never consumes a raw identity and is
+/// not persisted. Cloning a budget view keeps its predecode reservation.
+#[derive(Clone, Debug, Default)]
+pub struct Registry {
+    items: BTreeMap<String, Arc<Asset>>,
+    pub(super) audio_manager_required: bool,
+}
+impl Registry {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+impl std::ops::Deref for Registry {
+    type Target = BTreeMap<String, Arc<Asset>>;
+    fn deref(&self) -> &Self::Target {
+        &self.items
+    }
+}
+impl std::ops::DerefMut for Registry {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.items
+    }
+}
+impl FromIterator<(String, Arc<Asset>)> for Registry {
+    fn from_iter<T: IntoIterator<Item = (String, Arc<Asset>)>>(items: T) -> Self {
+        Self {
+            items: items.into_iter().collect(),
+            audio_manager_required: false,
+        }
+    }
+}
+impl<const N: usize> From<[(String, Arc<Asset>); N]> for Registry {
+    fn from(items: [(String, Arc<Asset>); N]) -> Self {
+        items.into_iter().collect()
+    }
+}
+impl From<BTreeMap<String, Arc<Asset>>> for Registry {
+    fn from(items: BTreeMap<String, Arc<Asset>>) -> Self {
+        Self {
+            items,
+            audio_manager_required: false,
+        }
+    }
+}
+impl<'a> IntoIterator for &'a Registry {
+    type Item = (&'a String, &'a Arc<Asset>);
+    type IntoIter = std::collections::btree_map::Iter<'a, String, Arc<Asset>>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.items.iter()
+    }
+}
+impl IntoIterator for Registry {
+    type Item = (String, Arc<Asset>);
+    type IntoIter = std::collections::btree_map::IntoIter<String, Arc<Asset>>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.items.into_iter()
+    }
+}
 pub fn check_registry(r: &Registry) -> Result<(), String> {
     super::textured_models::check_union(r)
 }

@@ -67,7 +67,7 @@ outlive a Run; they do not retain a playable Run owner. Actual VM/voice/manager/
 weak probes, 20cycles per dimension and warm decode/upload0 distinguish lifetimes.
 
 Executable evidence: `public_audio`10, `public_audio_codec`6,
-`public_audio_resources`9, `public_audio_host`8, `public_audio_consumer`2,
+`public_audio_resources`9, `public_audio_host`11, `public_audio_consumer`2,
 `public_audio_compat`1 and5selected `--lib audio` units. The fixed source/runner
 gate is `tools/check_public_audio.py --controls` (final review/merge-owned), with
 `verify_plan012.py --controls` and an exported A→B cold SDK/target offline consumer.
@@ -93,6 +93,15 @@ cache. Multiple cues do not duplicate PCM. CPU pose reservation remains separate
 added to the same64MiB total. Unknown/foreign residues are preserved, not silently
 deleted. Damaged readback cannot confirm save; actual repaired cold reopen must
 succeed before claiming closure.
+
+Required/live Host service ownership is also charged when no audio Asset exists,
+including empty-cue Run and retained manager after Stop/New/Open. A transient
+Registry budget view carries this requirement through shared predecode admission;
+an audio Asset's conservative reserve covers it without a second charge. Run and
+restart check asset+service+animation-pose CPU together before opening the service.
+Manager-free legacy64MiB cases remain accepted. Compatibility capture may output
+snapshots but still compares all15profiles with the frozen baseline; the gate
+scrubs its ambient flag and rejects capture-only proof without a verified marker.
 
 The auditable derived bank is PCM16 stereo44100Hz,22504frames/90060bytes,
 SHA256 `b0b740dc49e51abefff9bb1af830080fe00f817b468614992040d438d6171c3d`.

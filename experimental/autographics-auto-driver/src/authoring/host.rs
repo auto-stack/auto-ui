@@ -473,6 +473,9 @@ impl Host {
     }
     fn active_assets(&self) -> Result<super::assets::Registry, String> {
         let mut assets = self.editor.assets.clone();
+        // Reconstruct the actual current Host requirement, not a stale budget
+        // view retained by an earlier import/load caller.
+        assets.audio_manager_required = false;
         for r in
             std::iter::once(self.editor.candidate_assets()).chain(self.storage.retained_assets())
         {
@@ -480,6 +483,7 @@ impl Host {
                 super::assets::insert(&mut assets, a.clone())?;
             }
         }
+        assets.audio_manager_required = self.audio.is_some();
         super::assets::check_registry(&assets)?;
         Ok(assets)
     }
@@ -574,11 +578,12 @@ impl Host {
         let asset_union = match self.active_assets() {
             Ok(assets) => {
                 let (count, raw, cpu, gpu) = super::textured_models::usage(&assets);
+                let service = super::textured_models::uncovered_audio_service_cpu(&assets);
                 let pose = self
                     .play
                     .as_ref()
                     .map_or(0, |p| p.animation_reserved_bytes());
-                json!({"count":count,"closure_count":assets.len(),"pose_reserved_cpu_bytes":pose,"cpu_total_with_pose_bytes":cpu+pose,"raw_bytes":raw,"cpu_geometry_bytes":cpu,"gpu_expected_bytes":gpu,"decode_attempts":super::assets::decode_attempts(),"decode_us":assets.values().map(|a|a.decode_us).collect::<Vec<_>>()})
+                json!({"count":count,"closure_count":assets.len(),"audio_manager_extra_cpu_bytes":service,"pose_reserved_cpu_bytes":pose,"cpu_total_with_pose_bytes":cpu+pose,"raw_bytes":raw,"cpu_geometry_bytes":cpu,"gpu_expected_bytes":gpu,"decode_attempts":super::assets::decode_attempts(),"decode_us":assets.values().map(|a|a.decode_us).collect::<Vec<_>>()})
             }
             Err(error) => json!({"error":error}),
         };

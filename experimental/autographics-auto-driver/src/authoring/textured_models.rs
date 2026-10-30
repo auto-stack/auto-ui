@@ -698,9 +698,29 @@ struct Usage {
     geometry: BTreeMap<String, (usize, usize)>,
     model_images: BTreeSet<String>,
     sprite_images: BTreeSet<String>,
+    manager_required: bool,
+    audio_asset_reserves_service: bool,
 }
 impl Usage {
+    fn from_registry(r: &Registry) -> Self {
+        let mut u = Self {
+            manager_required: r.audio_manager_required,
+            ..Self::default()
+        };
+        for a in r.values() {
+            u.add(a);
+        }
+        u
+    }
+    fn uncovered_service_cpu(&self) -> usize {
+        if self.manager_required && !self.audio_asset_reserves_service {
+            super::public_audio::native::Native::reserved_bytes()
+        } else {
+            0
+        }
+    }
     fn add(&mut self, a: &Asset) {
+        self.audio_asset_reserves_service |= a.audio.is_some();
         self.raw.insert(a.identity.sha256.clone(), a.bytes.len());
         for (k, b) in &a.dependencies {
             self.raw.insert(k.clone(), b.len());
@@ -727,7 +747,9 @@ impl Usage {
     }
     fn check(&self) -> Result<(), String> {
         let pixels = self.images.values().sum::<usize>();
-        let cpu = self.geometry.values().map(|n| n.0).sum::<usize>() + pixels;
+        let cpu = self.geometry.values().map(|n| n.0).sum::<usize>()
+            + pixels
+            + self.uncovered_service_cpu();
         let gpu = self.geometry.values().map(|n| n.1).sum::<usize>()
             + pixels
             + self.cross_surface_pixels();
@@ -742,10 +764,7 @@ impl Usage {
     }
 }
 pub fn check_union(r: &Registry) -> Result<(), String> {
-    let mut u = Usage::default();
-    for a in r.values() {
-        u.add(a);
-    }
+    let u = Usage::from_registry(r);
     u.check()
 }
 
@@ -759,10 +778,7 @@ pub(super) fn candidate_budget(
     gpu: usize,
     image: bool,
 ) -> Result<(), String> {
-    let mut u = Usage::default();
-    for a in r.values() {
-        u.add(a);
-    }
+    let mut u = Usage::from_registry(r);
     u.raw.insert(id.into(), len);
     if image {
         u.images.insert(id.into(), cpu);
@@ -774,17 +790,33 @@ pub(super) fn candidate_budget(
         .map_err(|_| "resource limit: candidate/resident union before decode".into())
 }
 
+/// Audio assets already include the conservative service reservation. A first
+/// audio candidate replaces, rather than duplicates, a Host-only reservation.
+pub(super) fn candidate_audio_budget(
+    r: &Registry,
+    id: &str,
+    len: usize,
+    cpu: usize,
+) -> Result<(), String> {
+    let mut u = Usage::from_registry(r);
+    u.audio_asset_reserves_service = true;
+    u.raw.insert(id.into(), len);
+    u.geometry.insert(format!("sha256:{id}"), (cpu, 0));
+    u.check()
+        .map_err(|_| "audio_resource_limit: candidate/resident service union before decode".into())
+}
+pub fn uncovered_audio_service_cpu(r: &Registry) -> usize {
+    Usage::from_registry(r).uncovered_service_cpu()
+}
+
 /// Inspectable totals use exactly the same identity deduplication as admission.
 pub fn usage(r: &Registry) -> (usize, usize, usize, usize) {
-    let mut u = Usage::default();
-    for a in r.values() {
-        u.add(a);
-    }
+    let u = Usage::from_registry(r);
     let pixels = u.images.values().sum::<usize>();
     (
         u.raw.len(),
         u.raw.values().sum(),
-        u.geometry.values().map(|n| n.0).sum::<usize>() + pixels,
+        u.geometry.values().map(|n| n.0).sum::<usize>() + pixels + u.uncovered_service_cpu(),
         u.geometry.values().map(|n| n.1).sum::<usize>() + pixels + u.cross_surface_pixels(),
     )
 }

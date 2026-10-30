@@ -17,10 +17,10 @@ fn all_fifteen_delivered_profiles_keep_exact_assembled_bytes() {
     assert_eq!(profiles.len(), 15);
     if let Ok(path) = std::env::var("PLAN012_CAPTURE_LEGACY") {
         std::fs::write(path, serde_json::to_vec_pretty(&profiles).unwrap()).unwrap();
-        println!("Captured15 legacy snapshots; capture mode is NOT verification");
-        return;
+        println!("Captured15 legacy snapshots; golden comparison still required");
     }
     let baseline: Value =
         serde_json::from_str(include_str!("../research/plan012-legacy-profiles.json")).unwrap();
     assert_eq!(Value::Object(profiles), baseline);
+    println!("Verified15 legacy profiles against frozen exact-byte baseline");
 }

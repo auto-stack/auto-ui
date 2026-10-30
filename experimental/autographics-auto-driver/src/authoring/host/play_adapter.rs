@@ -2,7 +2,22 @@
 use super::*;
 
 impl Host {
+    fn check_play_cpu_budget(&self, play: &crate::authoring::play::Play) -> Result<(), String> {
+        let mut assets = self.active_assets()?;
+        assets.audio_manager_required = self.audio.is_some() || play.audio_cues.is_some();
+        let cpu = crate::authoring::textured_models::usage(&assets).2;
+        if cpu
+            .checked_add(play.animation_reserved_bytes())
+            .is_none_or(|n| n > crate::authoring::assets::MAX_GEOMETRY)
+        {
+            return Err("resource limit: Host asset/service/pose CPU union".into());
+        }
+        Ok(())
+    }
     fn begin_audio_run(&mut self, run: i32) -> Result<(), String> {
+        let mut assets = self.active_assets()?;
+        assets.audio_manager_required = true;
+        crate::authoring::assets::check_registry(&assets)?;
         if self
             .audio
             .as_ref()
@@ -259,6 +274,7 @@ impl Host {
         } else {
             crate::authoring::play::Play::new(&self.editor, actors, source)?
         };
+        self.check_play_cpu_budget(&play)?;
         play.vm_output_measurement
             .enable(self.prepare_measurement.enabled);
         play.admission_measurement
@@ -585,6 +601,7 @@ impl Host {
                 snapshot,
                 descriptor,
             )?;
+            self.check_play_cpu_budget(&fresh)?;
             if fresh.audio_cues.is_some() {
                 self.begin_audio_run(fresh.run_id())?;
             }

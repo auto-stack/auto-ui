@@ -642,3 +642,261 @@ fn twenty_runs_release_real_voice_vm_manager_and_pcm_owners_with_legitimate_exte
         println!("{api:?} 20Run cycles, zero warm decode/upload, actual VM/manager/PCM weak owners released");
     }
 }
+
+fn editor_command(h: &mut Host, action: &str, payload: serde_json::Value) -> Result<(), String> {
+    h.dispatch(&json!({"epoch":h.editor.stamp.epoch,"revision":h.editor.stamp.revision,
+        "asset_generation":h.ui().asset_token,"selection":h.editor.selection,"action":action,"payload":payload}).to_string())
+}
+fn import_budget_image(h: &mut Host, index: usize) -> Result<(), String> {
+    editor_command(
+        h,
+        "import-sprite",
+        json!(root().join(format!(
+            "tests/fixtures/public_audio_budget/budget{index}.png"
+        ))),
+    )?;
+    h.settle()
+}
+fn fresh_directory() -> PathBuf {
+    let path = std::env::temp_dir().join(format!(
+        "ui012-owner-budget-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&path).unwrap();
+    path
+}
+fn thin_image(path: &Path, height: usize) {
+    let rgba = vec![97; 2048 * height * 4];
+    std::fs::write(
+        path,
+        agp::assets::encode_png_rgba(2048, height as u32, &rgba).unwrap(),
+    )
+    .unwrap();
+}
+#[test]
+fn retained_manager_budget_survives_new_open_and_refuses_boundary_image_before_decode() {
+    use autographics_auto_driver::authoring::{session::Editor, textured_models};
+    for (api, open) in [(Api::Audio2V1, false), (Api::Audio3V1, true)] {
+        let dir = fresh_directory();
+        let mut h = scene(api);
+        start(&mut h, api, &controller(api, ""));
+        h.stop_play();
+        let manager = std::sync::Arc::downgrade(&h.audio.as_ref().unwrap().mixer);
+        if open {
+            let mut editor = Editor::new(Document::empty("empty-open".into())).unwrap();
+            let path = dir.join("empty.agscene");
+            Storage::default()
+                .save(&mut editor, &path, Fault::None)
+                .unwrap();
+            editor_command(&mut h, "open", json!(path)).unwrap();
+        } else {
+            editor_command(&mut h, "new", json!(null)).unwrap();
+        }
+        h.settle().unwrap();
+        let reserve = h.audio_snapshot()["reserved_cpu_bytes"].as_u64().unwrap();
+        assert_eq!(
+            h.resource_snapshot()["asset_union"]["cpu_total_with_pose_bytes"],
+            reserve
+        );
+        assert_eq!(h.resource_snapshot()["asset_union"]["count"], 0);
+        for i in 0..3 {
+            import_budget_image(&mut h, i).unwrap();
+        }
+        let before = h.editor.document.clone();
+        let decoded = assets::decode_attempts();
+        let error = import_budget_image(&mut h, 3).unwrap_err();
+        assert!(error.contains("resource limit"), "{error}");
+        assert_eq!(
+            assets::decode_attempts(),
+            decoded,
+            "fourth image refused before allocation/decode"
+        );
+        assert_eq!(h.editor.document, before);
+        assert!(!h.editor.pending());
+        assert_eq!(
+            h.resource_snapshot()["asset_union"]["cpu_total_with_pose_bytes"],
+            3 * 16 * 1024 * 1024 + reserve
+        );
+        // Four fewer rows save32768B, insufficient for this33528B service.
+        let thin = dir.join("too-close.png");
+        thin_image(&thin, 2044);
+        assert!(editor_command(&mut h, "import-sprite", json!(thin))
+            .unwrap_err()
+            .contains("resource limit"));
+        assert_eq!(assets::decode_attempts(), decoded);
+        // Five fewer rows save40960B. This real fourth identity is legal.
+        let fits = dir.join("fits.png");
+        thin_image(&fits, 2043);
+        editor_command(&mut h, "import-sprite", json!(fits)).unwrap();
+        h.settle().unwrap();
+        let usage = h.resource_snapshot();
+        assert_eq!(
+            usage["asset_union"]["cpu_total_with_pose_bytes"],
+            64 * 1024 * 1024 - 40960 + reserve
+        );
+        assert!(
+            manager.upgrade().is_some(),
+            "New/Open must retain healthy Host manager"
+        );
+        let decoded = assets::decode_attempts();
+        import_budget_image(&mut h, 0).unwrap();
+        assert_eq!(
+            assets::decode_attempts(),
+            decoded,
+            "duplicate remains admissible at boundary"
+        );
+        // First tiny audio import replaces this manager-only reservation with
+        // the audio Asset's existing conservative reserve, rather than doubling.
+        let sound = dir.join("tiny.wav");
+        let mut wav = b"RIFF".to_vec();
+        wav.extend_from_slice(&100u32.to_le_bytes());
+        wav.extend_from_slice(b"WAVEfmt ");
+        wav.extend_from_slice(&16u32.to_le_bytes());
+        wav.extend_from_slice(&1u16.to_le_bytes());
+        wav.extend_from_slice(&1u16.to_le_bytes());
+        wav.extend_from_slice(&22050u32.to_le_bytes());
+        wav.extend_from_slice(&44100u32.to_le_bytes());
+        wav.extend_from_slice(&2u16.to_le_bytes());
+        wav.extend_from_slice(&16u16.to_le_bytes());
+        wav.extend_from_slice(b"data");
+        wav.extend_from_slice(&64u32.to_le_bytes());
+        for _ in 0..32 {
+            wav.extend_from_slice(&300i16.to_le_bytes());
+        }
+        std::fs::write(&sound, wav).unwrap();
+        editor_command(&mut h, "import-audio", json!(sound)).unwrap();
+        h.settle().unwrap();
+        assert_eq!(
+            h.resource_snapshot()["asset_union"]["audio_manager_extra_cpu_bytes"],
+            0
+        );
+        assert!(textured_models::usage(&h.editor.assets).2 <= 64 * 1024 * 1024);
+        let audio = h
+            .editor
+            .assets
+            .values()
+            .find(|a| a.audio.is_some())
+            .unwrap();
+        assert_eq!(
+            h.resource_snapshot()["asset_union"]["cpu_total_with_pose_bytes"]
+                .as_u64()
+                .unwrap(),
+            (64 * 1024 * 1024 - 40960 + audio.cpu_bytes) as u64
+        );
+    }
+}
+#[test]
+fn empty_cue_run_preflights_new_service_and_legacy_full_image_budget_stays_accepted() {
+    use autographics_auto_driver::authoring::document::Object;
+    let mut doc = Document::empty("legacy-full-images".into());
+    let mut actor = Object::new(1, Kind::Quad);
+    actor.scale = [0.8, 1.0, 1.0];
+    doc.objects.push(actor);
+    let mut h = Host::with_assets(doc, Registry::new()).unwrap();
+    for i in 0..4 {
+        import_budget_image(&mut h, i).unwrap();
+    }
+    assert_eq!(h.audio_snapshot()["manager"], false);
+    assert_eq!(
+        h.resource_snapshot()["asset_union"]["cpu_total_with_pose_bytes"],
+        64 * 1024 * 1024
+    );
+    // The very same pixels remain accepted in a scene7 with zero audio assets.
+    let mut doc = h.editor.document.clone();
+    doc.schema = "autographics.scene/7".into();
+    doc.cues = Some(vec![]);
+    let mut h = Host::with_assets(doc, h.editor.assets.clone()).unwrap();
+    let source=SourceSnapshot::from_bytes_for(Path::new("empty-cues.at"),b"var ok=0\nfn app_start(){ok=ag_char_bind(1);ok=ag_camera_follow_2d(1,-10.0,-10.0,10.0,10.0,4.0,4.0)}\nfn app_update(dt float){}\n".to_vec(),Api::Audio2V1).unwrap();
+    let before = h.editor.document.clone();
+    let camera = h.camera();
+    let error = h.start_user_snapshot(source).unwrap_err();
+    assert!(error.contains("resource limit"), "{error}");
+    assert!(
+        h.audio.is_none(),
+        "native allocation must follow service-budget admission"
+    );
+    assert!(h.play.is_none());
+    assert_eq!(h.editor.document, before);
+    assert_eq!(h.camera(), camera);
+}
+
+#[test]
+fn empty_audio_service_and_animation_pose_share_one_cpu_ceiling() {
+    use autographics_auto_driver::authoring::public_audio::native::Native;
+    use autographics_auto_driver::authoring::{hierarchy, runtime_node_animation, textured_models};
+    let mut r = Registry::new();
+    let model = assets::import_animated(
+        &root().join("samples/textured_models/models/character.glb"),
+        &r,
+    )
+    .unwrap();
+    let mut doc = Document::empty("pose-service-boundary".into());
+    doc.schema = "autographics.scene/7".into();
+    doc.cues = Some(vec![]);
+    let mut actor = Object::new(1, Kind::Model);
+    actor.resource = Some(model.identity.key());
+    let (lo, hi) = autographics_auto_driver::authoring::interaction::bounds(&model.model).unwrap();
+    let extent = hi - lo;
+    actor.scale = [0.8 / extent.x, 1.0 / extent.y, 0.8 / extent.z];
+    doc.objects.push(actor);
+    assets::insert(&mut r, model).unwrap();
+    for i in 0..3 {
+        let image = assets::import_png(
+            &root().join(format!("tests/fixtures/public_audio_budget/budget{i}.png")),
+            &r,
+        )
+        .unwrap();
+        assets::insert(&mut r, image).unwrap();
+    }
+    doc.assets = r.values().map(|a| a.identity.clone()).collect();
+    let targets =
+        runtime_node_animation::targets(&doc, &hierarchy::ordered(&doc).unwrap(), &r).unwrap();
+    let pose = runtime_node_animation::pose_reservation(&targets);
+    let manager = Native::reserved_bytes();
+    let cap = assets::MAX_GEOMETRY;
+    let margin = (pose + manager + pose.max(manager)) / 2;
+    let height = (cap - textured_models::usage(&r).2 - margin) / (2048 * 4);
+    let pixels = vec![113; 2048 * height * 4];
+    let image = assets::decode_png_in(
+        agp::assets::encode_png_rgba(2048, height as u32, &pixels).unwrap(),
+        None,
+        &r,
+    )
+    .unwrap();
+    assets::insert(&mut r, image).unwrap();
+    doc.assets = r.values().map(|a| a.identity.clone()).collect();
+    let cpu = textured_models::usage(&r).2;
+    assert!(
+        cpu + pose <= cap && cpu + manager <= cap && cpu + pose + manager > cap,
+        "distinguish combined owners, not either independent check"
+    );
+    let mut h = Host::with_assets(doc.clone(), r.clone()).unwrap();
+    let raw=b"var ok=0\nfn app_start(){ok=ag_char3_bind(1);ok=ag_camera_orbit_3d(1,8.0,45.0,0,0.0)}\nfn app_update(dt float){}\n";
+    let source =
+        SourceSnapshot::from_bytes_for(Path::new("pose-service.at"), raw.to_vec(), Api::Audio3V1)
+            .unwrap();
+    let error = h.start_user_snapshot(source).unwrap_err();
+    assert!(error.contains("asset/service/pose CPU union"), "{error}");
+    assert!(h.audio.is_none() && h.play.is_none());
+    drop(h);
+    // Identical resources/pose remain legal for the delivered legacy profile
+    // when it does not require or retain a native manager.
+    doc.schema = "autographics.scene/6".into();
+    doc.cues = None;
+    let mut h = Host::with_assets(doc, r).unwrap();
+    let source = SourceSnapshot::from_bytes_for(
+        Path::new("legacy-pose.at"),
+        raw.to_vec(),
+        Api::NodeAnimation3V1,
+    )
+    .unwrap();
+    h.start_user_snapshot(source).unwrap();
+    h.pause_play("");
+    pump(&mut h, true);
+    assert_eq!(h.audio_snapshot()["manager"], false);
+    h.stop_play();
+}

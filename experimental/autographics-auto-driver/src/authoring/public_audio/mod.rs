@@ -135,6 +135,7 @@ pub fn import_raw(
         return Ok(old.clone());
     }
     let (_, _, resident_cpu, _) = super::textured_models::usage(existing);
+    let resident_cpu = resident_cpu - super::textured_models::uncovered_audio_service_cpu(existing);
     // Manager, fixed observation ring, four requests, eight voices and cue
     // metadata join the same CPU envelope, including when imported before Run.
     let service = native::Native::reserved_bytes() + 8 * std::mem::size_of::<CueRef>() + 4096;
@@ -145,7 +146,7 @@ pub fn import_raw(
         + std::mem::size_of::<Asset>()
         + std::mem::size_of::<mixer::Pcm>()
         + service;
-    super::textured_models::candidate_budget(existing, &sha, bytes.len(), retained, 0, false)?;
+    super::textured_models::candidate_audio_budget(existing, &sha, bytes.len(), retained)?;
     let (pcm, header) = codec::decode(bytes.clone(), available)?;
     let identity = AssetRef {
         closure: None,

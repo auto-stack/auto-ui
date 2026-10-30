@@ -10,7 +10,7 @@ RUNNERS={
  'public':('public_audio',10,0,None),
  'codec':('public_audio_codec',6,0,None),
  'resources':('public_audio_resources',9,0,None),
- 'host':('public_audio_host',8,0,None),
+ 'host':('public_audio_host',11,0,None),
  'legacy':('public_audio_compat',1,0,None),
  'consumer':('public_audio_consumer',2,0,None),
  'units':(None,5,33,'audio'),
@@ -26,6 +26,8 @@ def counts(name,output):
     _,passed,filtered,_=RUNNERS[name]
     matches=re.findall(r'test result: ok\. (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; (\d+) filtered out',output)
     assert len(matches)==1 and tuple(map(int,matches[0]))==(passed,0,0,0,filtered),'partial/zero-selected runner '+name
+    if name=='legacy':
+        assert 'Verified15 legacy profiles against frozen exact-byte baseline' in output and 'capture mode is NOT verification' not in output,'legacy comparison missing/capture-only proof'
     if name=='units':
         for case in ['real_audio_wire_mutations_cannot_accept_partial_frame_or_insert_pcm',
           'observed_native_pcm_is_after_mono_mapping_and_signed_unsigned_quantization',
@@ -65,6 +67,7 @@ def run(directory,fresh_directory=None):
     proofs={}
     for name,(target,passed,filtered,selection) in RUNNERS.items():
         env=dict(os.environ,UI012_REPORT_DIR=str(directory),CARGO_TERM_COLOR='never',RUST_MIN_STACK='16777216');env.pop('RUSTC_WRAPPER',None)
+        env.pop('PLAN012_CAPTURE_LEGACY',None)
         command=['cargo','test','--locked','--offline']+(['--test',target] if target else ['--lib'])
         if selection:command.append(selection)
         command+=['--','--test-threads=1','--nocapture']
@@ -117,6 +120,13 @@ def controls(directory):
     rejected(lambda w,v:v['runners'].pop('host'),'partial runner')
     rejected(lambda w,v:v['runners']['public'].update(passed=0),'wrong runner/count')
     rejected(lambda w,v:v['runners']['host'].update(target='public_audio'),'wrong runner/count')
+    def capture_only(w,v):
+        f=w/'legacy.log';out=f.read_text(encoding='utf-8')
+        marker='Verified15 legacy profiles against frozen exact-byte baseline'
+        assert out.count(marker)==1,'legacy comparison marker not actually executed'
+        out=out.replace(marker,'Captured15 legacy snapshots; capture mode is NOT verification')
+        f.write_text(out,encoding='utf-8');v['runners']['legacy']['log_sha256']=digest(f)
+    rejected(capture_only,'legacy comparison')
     def changed(name,mutate):
         def apply(w,v):
             f=w/(name+'.json');data=json.loads(f.read_text());mutate(data);f.write_text(json.dumps(data),encoding='utf-8');v['data_sha256'][name]=digest(f)
