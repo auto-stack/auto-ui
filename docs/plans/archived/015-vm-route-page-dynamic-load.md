@@ -1,6 +1,6 @@
 ---
 plan_id: PLAN-015
-status: reviewed
+status: archived
 feature_name: vm-route-page-dynamic-load
 author: [Codex]
 created_at: 2026-10-30
@@ -118,7 +118,7 @@ BLOG-004 原生腿新鲜证据：多页 VM 应用（auto-blog，app.at 声明 8 
 
 ## 8. 执行步骤
 
-- [x] T-01（owner_stage=work；依赖无；AC-01）：多页路由 fixture + 定界完成；[root-cause.md](attachments/015/root-cause.md)。首层根因=路由页缺样式预注册且parse Err被吞；r2消费闭环进一步定界被首层遮蔽的`.store.Method()`接收者未归一化，永久夹具稳定复现两层失败。
+- [x] T-01（owner_stage=work；依赖无；AC-01）：多页路由 fixture + 定界完成；[root-cause.md](../attachments/015/root-cause.md)。首层根因=路由页缺样式预注册且parse Err被吞；r2消费闭环进一步定界被首层遮蔽的`.store.Method()`接收者未归一化，永久夹具稳定复现两层失败。
 - [x] T-02（owner_stage=work；依赖T-01；AC-02/03）：按定界修复+具名错误化；V-02/V-03通过，6项永久定向测试、真实多页原生MCP、PLAN003原生单页输入/保存/HTTP读回通过。实现0e87054，证据补记e29ccab。
 - [x] T-03（owner_stage=work；依赖T-02；AC-04）：工具经AUTO_UI_TOOL_BIN精确发现，Blog驱动261413b；完整native-vm-rust 22/22 EXIT0、pending0，三次真实窗口覆盖正常q/强制结束及重开、HTTP/磁盘同稿核对，消费回执见r2 work。未改Blog.at；最终交付版本登记仍属T05。
 - [x] T-04（owner_stage=review；依赖T-03；AC-05）：r2 final R1 pass，UI59930ab/Blog261413b，报告attachments/015/review-r1.md；同实现上下文限制明确，无另一个独立会话。
@@ -161,6 +161,12 @@ stage: new | plan_id: PLAN-015 | plan_revision: 1 | outcome: blocked（计划就
 2026-10-30 goal round 6：`stage: goal | plan_id: PLAN-015 | plan_revision: r2 | round: 6 | from: review | to: merge | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-015/auto-ui,auto-blog | commit: UI59930ab,Blog261413b | next: merge`。4/5；按全链授权继续merge自有门与收尾，未提前声称交付。
 
 2026-10-30 merge prepared（r2）：冻结UI3de1485（59930ab的review摘要文档后继，Rust/依赖/SD不变）、Blog261413b。统一门全exit0：cargo t=2450通过/887跳过（既有档位排除），cargo tu=862通过/2忽略，cargo ti=28通过/15跳过，cargo tn=2通过/0忽略。日志与merge-gates.json位于实施树attachments/015，尚待保全/落地。canonical SD01及索引已在UI树冻结；沿UI003先例派生ledger目标为auto-lang/.autoos/specs.json。当前会话无spec工具，已检19999 /api/specs仅200 {}且owner为Python，未发现auto-musk/auto-ai store进程，故Regime B guarded offline projection。同组语言树切到知识分支前核实eb6..master的crates/Cargo/配置零diff（仅文档变化，不改变测试输入），权威树未复制；版本147→148，保留1471旧item字节并增UI015-ROUTES/UI015-T/UI015-R2-R1/UI015-M四条file/tags完整item，9处限定插入/标量更新且读回验证，备份SHA256 50b75c63b531f04ec05aced31523d88c828b96624c3082ad6bc8258c3f55f0f2，结果SHA256 700cf4ce6d39f009f6e8a8c7024a3693762680249df956f998a77466708853e6；准备提交8730cc47d。此处仅prepared，未提前记landed/archived/cleaned。语言仓纯ledger文档档按AGENTS不跑cargo/docs_gen。
+
+2026-10-30 merge landed/ledger_refreshed/archive checkpoint（r2，cleanup pending）：UI默认分支经ff-only到df39593b53412fed10055d18c0aab90b0590bd27，工作树四提交range-diff全=（reviewed59930ab→9269579，review摘要后继3de1485→df39593）；源/锁/SD无冲突或漂移，故复审与2450/862/28/2统一门证据仍有效。Blog驱动ff-only至261413b3d24ed1491c8239b397b933584c25a01c，精确消费回执73f3594abcbcc229b4dd8e0a7f1190ad8e3ae9ac已在main，关闭其T03/T06而非整个BLOG004。语言知识提交9b696678adaa61cf4f6f1677e5e6cb42520aff3d已ff-only落地，ledger148四条完整item/source tags读回通过；prepared8730cc47d在最终delivery hash确定后仅校准尚未发布投影的tags，仍基于原v147备份生成单次v148，最终SHA256 be62d88190e5bf38615bd5aa1179f93b4db890f791fed05aecf3128140a79ddf。原1471条与其它top/section兼容字段保持，投影脚本/备份均保全。
+
+落地工具：主检出target/debug/auto-ui-tool.exe已从71503100旧版更新为最终gate重建的563afa4aa70d6a20e18885f0b607433b70cc3fadc73fcf593c3c3cbe777668d2；此前full22使用56d34609的等价源码构建，两hash分别记录不混淆。没有运行中的默认工具进程需中断；旧exe备份保留。使用主源码根与安装路径的真实native CLI/MCP smoke再次验证route/store Init、列表、Home/具名负控/返回Author及q退出0，report位于D:/autostack/plan-artifacts/plan-015/native-smoke/result。target/release/auto-ui-tool.exe与gen/front/vue/dist均不存在；Vue未改、语言/Man依赖仅记录或知识投影，没有这些产物待升级。原始gate日志SHA256：t c1f4a268b0d87b91b3c2acbb34b57224b4c6d2f417ac55f6b987d27092218fac；tu d5c8023b5f42a3bf83e345bcfc40587d4d7dae9c031712bc7bc876e8c9ca837a；ti a09dfc664df067bf9e9ea286edd4a5635ce2b80d41a64d2b180b48238a3bdf89；tn af817f5f3989ed17fd7c02cde5cdd66014e18e712e40585d46e6e013834a3430。
+
+证据与恢复：D:/autostack/plan-artifacts/plan-015已校验保全225个证据/输入/消费数据文件，work-evidence与consumer-evidence分别对应原两树attachments/015与attachments/004；native/single-fixture-inputs留存原始对照输入，UI与Blog提交源码tar保留。全部201个当前exe映射为107个唯一SHA产物（原路径总1244238848B），recovery-manifest.json SHA256 e7c866e35c894678632af354c811ae9ee22efd724b3805f77ef6b133246795a1；每份副本SHA逐个读回相同。未复制/提交Cargo缓存或PDB。此checkpoint只完成真实归档/索引/版本提交，T05仍未勾选、4/5，待新鲜guard与实际移除四树/三临时分支/空组后才记cleaned/pass。
 
 ## 10. 待澄清事项
 
