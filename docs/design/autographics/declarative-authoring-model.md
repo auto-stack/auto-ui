@@ -86,6 +86,8 @@ JSON 是当前原型便于保存/验证的选择，没有“可审计所以只�
 
 ## 5. 来源纠偏与本轮结果
 
+后续已规划[auto-ui/016最小真实执行验证](../../plans/016-autographics-node2d-minimal-validation.md)：一个Player、两个同定义独立Hazard和一个可销毁Coin，验证node/view2d/Life、use、实例状态与事件绑定；drafting、暂不实施，按合同先核013交付及有界接法，不代表整体G11迁移或ACE融合已开始。
+
 [840 §3/4.2/5.2](../../../../auto-lang/docs/plans/archive/840-autographics-public-behavior-api-and-user-scripts.md)将单文件定义为首版切片：SDK 有模块服务，消费者尚未验证其装配/诊断链，因此不读取未快照依赖；没有证明多模块不可验证。[854](../../../../auto-lang/docs/plans/archive/854-autographics-behavior-source-assembly.md)的“可审计”指内部受信装配的来源/顺序/错误可追查，不是新的产品定位，也不能倒推840的禁 use是长期要求。此前外部讨论纪要的“可审计 agent 代码运行时”解释不作为产品需求依据。
 
 本轮仅修订设计/要求/导航，不取 Plan 号，不建实施树、生成源码/资产或运行项目测试，不修改在途实现/合同、旧 profile 数学/预算/故障行为或交付状态。预算抽象单位、完整数值语义仍需在语言/执行合同专题继续收敛；不因本轮纠偏就宣称已解决或修改固定 SDK。
