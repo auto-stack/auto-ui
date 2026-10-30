@@ -1,0 +1,5 @@
+store RouteStore {
+    msg { MarkReady }
+    model { var marked bool = false }
+    on { .MarkReady -> { .marked = true } }
+}

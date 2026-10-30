@@ -2215,6 +2215,7 @@ mod plan015_route_loading_tests {
         for text in [
             "Route author loaded",
             "Route Init complete",
+            "Route store Init complete",
             "Timer ready",
             "entry first",
             "entry second",

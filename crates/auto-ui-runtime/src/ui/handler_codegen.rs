@@ -667,6 +667,20 @@ fn rewrite_expr_with_locals(
             }
         }
     }
+    // PLAN-015: `.store.Method()` and `.StoreName.Method()` have the same
+    // store receiver as their bare forms. Normalize only known store aliases;
+    // ordinary `.model_object.method()` must retain its instance receiver.
+    if let Expr::Call(call) = e {
+        if let Expr::Dot(receiver, _) = call.name.as_mut() {
+            if let Expr::Dot(owner, alias) = receiver.as_ref() {
+                if matches!(owner.as_ref(), Expr::Ident(n) if n.as_str() == "." || n.as_str() == "self")
+                    && STORE_WIDGET_NAMES.with(|names| names.borrow().contains_key(alias.as_str()))
+                {
+                    *receiver = Box::new(Expr::Ident(alias.clone()));
+                }
+            }
+        }
+    }
     // Plan 370 D-GAP-4 Phase 0 + VM multi-store fix: store.X rewriting.
     // store.Method(args) → handler_StoreName_Method(__state, args)
     //
@@ -2993,6 +3007,29 @@ mod tests {
         match stmt {
             Stmt::Expr(Expr::Call(c)) => format!("{}", c.name),
             other => panic!("expected Call after rewrite, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn plan015_leading_dot_store_calls_share_disambiguation() {
+        for (owner, alias, method, target) in [
+            (".", "store", "Pick", "handler_Collection_Pick"),
+            ("self", "store", "Select", "handler_Modules_Select"),
+            (".", "Collection", "Pick", "handler_Collection_Pick"),
+        ] {
+            two_store_context();
+            let mut stmt = store_call(alias, method);
+            if let Stmt::Expr(Expr::Call(call)) = &mut stmt {
+                if let Expr::Dot(receiver, _) = call.name.as_mut() {
+                    *receiver = Box::new(Expr::Dot(
+                        Box::new(Expr::Ident(Name::from(owner))),
+                        Name::from(alias),
+                    ));
+                }
+            }
+            rewrite_state_refs_stmts(std::slice::from_mut(&mut stmt), &HashSet::new());
+            clear_store_context();
+            assert!(rewritten_target(&stmt).contains(target), "{stmt:?}");
         }
     }
 

@@ -6,6 +6,9 @@ language repository's `docs/specs/auto-ui/project.md`.
 
 ## Runtime
 
+- [VM route-page loading](runtime/vm-route-page-loading.md) — page imports,
+  named diagnostics, store calls and lifecycle behavior for native multi-page apps.
+
 - [Native VM app validation](runtime/native-vm-app-validation.md) — evidence
   required to claim a native VM app was launched, interacted with, failed,
   closed, and reopened.

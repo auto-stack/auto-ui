@@ -108,3 +108,28 @@ The user has been asked whether to authorize a Blog-only test-driver change
 in its own worktree, leaving `.at` sources unchanged, or wait for the consumer
 owner to supply that driver. No consumer threshold was weakened, no final
 review was claimed and no merge/production installation occurred.
+
+## r2 consumer continuation: the second failed boundary
+
+The user authorized the Blog test-driver extension and explicitly resumed on
+2026-10-30. The first full native run reached page parsing after the recipe
+repair, then failed before creating a root window: `Undefined symbol:
+author_State.AutosaveTick`. Blog source was unchanged. Handlers used
+`.store.Method()` while VM store dispatch recognized only bare `store.Method()`;
+ordinary leading-dot field rewriting incorrectly turned this into a page-state
+method. This was hidden behind the earlier parse failure, so the earlier
+unique-cause conclusion applied to the isolated recipe failure, not the
+complete consumer pipeline.
+
+Adding an imported store plus `.store.MarkReady()` to the permanent route
+fixture reproduced `Author_State.MarkReady` on the previous frozen test binary
+(exit 101, `red-leading-dot-store.log`). The handler rewriter now normalizes
+leading-dot/self receivers only for registered store aliases and delegates to
+the existing bare-call dispatch. Multi-store uniqueness/errors and ordinary
+instance receivers retain their prior policy. The route fixture asserts the
+store Init effect; a focused rewriter case covers generic, self and qualified
+receivers. All 7 PLAN-015 cases pass; the 4 existing PLAN-446 store-disambiguation
+controls also pass. This is in the original VM supported-page scope, without
+changing Blog `.at`, Vue, store semantics or thresholds. Current tool SHA256 is
+`56d346091e36bb2e3a573ecccba54806a565dfc01c7cd6aeabaf6af0e7036bab`.
+Consumer acceptance remains pending the current full-profile run.

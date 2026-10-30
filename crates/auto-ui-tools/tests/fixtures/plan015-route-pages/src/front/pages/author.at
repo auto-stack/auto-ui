@@ -1,4 +1,5 @@
 use fields: route_field
+use route_store: RouteStore
 
 widget Author {
     msg { Init, Tick }
@@ -13,12 +14,13 @@ widget Author {
             text "Route author loaded"
             input { style: route_field }
             if .ready { text "Route Init complete" }
+            if .store.marked { text "Route store Init complete" }
             if .ticks == 0 { text "Timer ready" }
             for entry in .entries { text f"entry ${entry}" }
         }
     }
     on {
-        .Init -> { .ready = true }
+        .Init -> { .store.MarkReady(); .ready = true }
         .Tick -> { .ticks = .ticks + 1 }
     }
 }
