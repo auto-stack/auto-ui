@@ -92,6 +92,12 @@ Python身份生成/验证脚本、SHA-256清单；沿用现有PLAN-004检查，�
 - **archived**：本文件由 `docs/plans/` 移入 `docs/plans/archived/` 且 `status: archived`；全文无相对链接，无需改写；`docs/plans/README.md` 008 行改指归档路径与 delivered 状态（该 README 同时有他会话未提交 WIP：007/014 行与页脚改写——本次仅以 HEAD 版本+本行归档态提交，随后把其 WIP（含归档后的 008 行）还原到工作区，未吞并）。
 - **pending**：`cleaned`（wt-guard 后移除 ui-008 树/分支/空组、组内与 plan-artifacts 中间产物回收）、landing 产物观察、批回归 due 检查（均在清理收据记录）。
 
+2026-10-30 merge cleaned（PLAN-008:r1，最终收口）：`stage: merge | plan_id: auto-ui/PLAN-008 | plan_revision: 1 | completion_kind: delivered | outcome: pass | checked: prepared, landed, ledger_refreshed, archived, cleaned | delivery_commit: 0261ae9dacf786beb6dceb630be6af267f242625 | knowledge_commit: auto-lang 130caf7ff | archive_commit: auto-ui 1e3c983 | pending_merge_owned_gates: none`。
+
+- **cleaned**：移除前核实 ui-008 树 clean（`git status` 空）且 HEAD `0261ae9` 为 master 祖先；`bash wt-guard.sh D:/autostack/.wt/ui-008/auto-ui` 报 clean（exit 0，无 junction/symlink）；`git worktree remove` 后 `git branch -d codex/plan-008-dev`（was 0261ae9，已合并）；`git worktree list` 与分支表复核 ui-008 零残留。会话中临时建立的知识工作树 `…/ui-008/auto-lang`（分支 plan-008-ledger，was 69147a6b6→rebase 130caf7ff）已在 ff 落地验证后先行移除并删分支。空组目录 `D:/autostack/.wt/ui-008/` 已删（rmdir 仅空目录成功）。组内与 `D:/autostack/plan-artifacts/plan-008/`（目录不存在）经 find 复核均无 cargo target 树/.pdb 需回收（0 命中）。保留恢复材料：`D:/autostack/plan-artifacts/auto-ui/plan-008/`（v148 ledger 字节备份、project_ledger.py 投影脚本、inspect_boundaries.py、readme-wip-backup.md）。
+- **landing/产物观察**：交付提交仅 3 个文件且全部位于 `experimental/autographics-auto-driver/`（`research/plan004-identity.json` 重生成 + `tools/gen_plan004_identity.py` + `tools/verify_plan004.py`，`git show --stat 0261ae9` 核实）；根 crate、后端/daemon 与生成 web bundle 均不消费该实验包工具，无生产产物需重建/重启，无 stale-artifact 项。
+- **批回归 due 检查**：auto-lang `docs/plans/.last-batch-regression.json` 覆盖 887/2026-10-29T15:53:56Z，本收据时点约 11h（<48h）；auto-lang id 空间 887 之后无 id%5==0 落地（下一个 890 仍未落地，仅 WIP 树）。该步骤按 merge 技能定义是 auto-lang 计划的门，auto-ui/PLAN-008（id 8）不触发。如实记录观察项：ui/PLAN-015（id%5==0）于 2026-10-30T02:23:39Z 落地在收据之后，按 004 先例该触发的处置归属 auto-lang 后续循环（890 落地时）与 015 自身收尾（其合并时已在冻结基线跑完统一门：cargo t 2450/tu 862/ti 28/tn 2 全 exit 0，native 22/22）。
+
 ## 10. 待澄清事项
 
 无；不修改下游仓库，不更改必需源文件和预期产品哈希。
