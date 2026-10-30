@@ -900,3 +900,116 @@ fn empty_audio_service_and_animation_pose_share_one_cpu_ceiling() {
     assert_eq!(h.audio_snapshot()["manager"], false);
     h.stop_play();
 }
+
+#[test]
+fn retained_service_is_in_every_model_closure_predecode_forecast() {
+    use autographics_auto_driver::authoring::{session::Editor, textured_models};
+    for (model_name, animated, opening) in [
+        ("platform.glb", false, false),
+        ("character.glb", true, false),
+        ("platform.glb", false, true),
+    ] {
+        let model_path = root()
+            .join("samples/textured_models/models")
+            .join(model_name);
+        let mut r = Registry::new();
+        let model = if animated {
+            assets::import_animated(&model_path, &r)
+        } else {
+            assets::import(&model_path, &r)
+        }
+        .unwrap();
+        let identity = model.identity.clone();
+        assets::insert(&mut r, model).unwrap();
+        let model_cpu = textured_models::usage(&r).2;
+        let dir = fresh_directory();
+        let project = dir.join("scene.agscene");
+        if opening {
+            let mut doc = Document::empty("closure-load-control".into());
+            doc.schema = "autographics.scene/6".into();
+            doc.assets = r.values().map(|a| a.identity.clone()).collect();
+            let mut editor = Editor::with_assets(doc, r.clone()).unwrap();
+            Storage::default()
+                .save(&mut editor, &project, Fault::None)
+                .unwrap();
+            let hash = agp::renderer::capture::sha256_hex(&std::fs::read(&project).unwrap());
+            assert_eq!(
+                hash, "2fbf5eb26981188f62c8aea7af096e9ac37862345398567109acf7bf8d3cb0aa",
+                "exact R2declared closure input"
+            );
+        }
+        drop(r);
+        for manager in [false, true] {
+            let mut h = if manager {
+                let (d, r, c, _) = Storage::load_project(
+                    &root().join("samples/public_audio/project2d/scene.agscene"),
+                    &Registry::new(),
+                )
+                .unwrap();
+                let mut h = Host::with_project(d, r, c).unwrap();
+                h.start_selected_play().unwrap();
+                h.pause_play("");
+                pump(&mut h, true);
+                h.stop_play();
+                editor_command(&mut h, "new", json!(null)).unwrap();
+                h.settle().unwrap();
+                h
+            } else {
+                Host::with_assets(Document::empty("legacy-control".into()), Registry::new())
+                    .unwrap()
+            };
+            for i in 0..3 {
+                import_budget_image(&mut h, i).unwrap();
+            }
+            let boundary = root()
+                .join("tests/fixtures/public_audio_budget")
+                .join(if animated {
+                    "animated-boundary.png"
+                } else {
+                    "textured-boundary.png"
+                });
+            editor_command(&mut h, "import-sprite", json!(boundary)).unwrap();
+            h.settle().unwrap();
+            let images = textured_models::usage(&h.editor.assets).2;
+            let service =
+                autographics_auto_driver::authoring::public_audio::native::Native::reserved_bytes();
+            assert!(
+                images + model_cpu <= assets::MAX_GEOMETRY
+                    && images + model_cpu + service > assets::MAX_GEOMETRY
+            );
+            let before = h.editor.document.clone();
+            let decoded = assets::decode_attempts();
+            let result = if opening {
+                editor_command(&mut h, "open", json!(&project)).unwrap();
+                editor_command(&mut h, "leave-discard", json!(null))
+            } else {
+                editor_command(
+                    &mut h,
+                    if animated {
+                        "import-animated"
+                    } else {
+                        "import"
+                    },
+                    json!(&model_path),
+                )
+            };
+            let delta = assets::decode_attempts() - decoded;
+            if manager {
+                assert!(result.unwrap_err().contains("resource limit"));
+                assert_eq!(
+                    delta, 0,
+                    "{model_name} opening={opening}: full closure refused BEFORE allocation/decode"
+                );
+                assert_eq!(h.editor.document, before);
+                assert!(!h.editor.pending());
+            } else {
+                result.unwrap();
+                h.settle().unwrap();
+                assert_eq!(delta, 2, "actual positive image+geometry decode");
+                assert!(h.editor.assets.contains_key(&identity.key()));
+                assert_eq!(h.audio_snapshot()["manager"], false);
+            }
+            println!("closure forecast {model_name} opening={opening} manager={manager} decode_delta={delta}");
+        }
+    }
+}

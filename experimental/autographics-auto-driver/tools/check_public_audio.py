@@ -10,7 +10,7 @@ RUNNERS={
  'public':('public_audio',10,0,None),
  'codec':('public_audio_codec',6,0,None),
  'resources':('public_audio_resources',9,0,None),
- 'host':('public_audio_host',11,0,None),
+ 'host':('public_audio_host',12,0,None),
  'legacy':('public_audio_compat',1,0,None),
  'consumer':('public_audio_consumer',2,0,None),
  'units':(None,5,33,'audio'),

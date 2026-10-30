@@ -691,7 +691,6 @@ fn image_inputs(
     }
     Ok((refs, raws, dependencies))
 }
-#[derive(Default)]
 struct Usage {
     raw: BTreeMap<String, usize>,
     images: BTreeMap<String, usize>,
@@ -704,8 +703,13 @@ struct Usage {
 impl Usage {
     fn from_registry(r: &Registry) -> Self {
         let mut u = Self {
+            raw: BTreeMap::new(),
+            images: BTreeMap::new(),
+            geometry: BTreeMap::new(),
+            model_images: BTreeSet::new(),
+            sprite_images: BTreeSet::new(),
             manager_required: r.audio_manager_required,
-            ..Self::default()
+            audio_asset_reserves_service: false,
         };
         for a in r.values() {
             u.add(a);
@@ -905,10 +909,7 @@ fn decode(
                     .sum::<usize>()
             })
             .sum::<usize>();
-    let mut usage = Usage::default();
-    for a in existing.values() {
-        usage.add(a);
-    }
+    let mut usage = Usage::from_registry(existing);
     usage.raw.insert(root_sha.clone(), bytes.len());
     for (k, b) in &dependencies {
         usage.raw.insert(k.clone(), b.len());
