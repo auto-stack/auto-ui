@@ -225,7 +225,20 @@ F01剩余共因是textured_models.rs908独立Usage::default只复制assets，丢
 
 归档实际状态/链接/提交及guard清理待最后核验；T01..09完成，T10pending，9/10。
 
+2026-10-30 archive/cleanup recovery checkpoint：归档提交ffd4411已实核在auto-ui/master，9个已完成T与T10pending一致，原活跃Plan不存在、archived状态与位置一致，8个Markdown本地链接可解析；正式Spec/ledger六受影响项file/tags及当前/历史链接回读通过。两个树HEAD均为各自master祖先、clean，紧邻删除前显式Git Bash wt-guard exit0；已移除D:/autostack/.wt/ui-012/{auto-ui,auto-lang}、codex/plan-012-dev/codex/ui-012-specs及空组，无其它树改动。final-auto-ui-guard.log/final-auto-lang-guard.log保留。本仓其它所有者WIP仍在，索引仅提交本计划行，未合入其新计划/设计。
+
+剩余T10缓存清理：7处自有CACHEDIR.TAG缓存逻辑33424943701B，984PDB（部分在缓存内）。已将缓存内EXE复制到retained-exe/原相对路径，795个EXE共5288205747B逐个SHA验证，原→保留映射在cleanup-prepared.json；12870份其它既存证据逐项哈希保留。尚未删除这些缓存/PDB。此前自动审批两次拒绝删除（仅返回blocked by policy），不变换shell/隐藏脚本绕过，已将准确清单和安全保留结果具体化后请求用户明确确认。无产品/复审/gate/规范阻塞；用户答复前9/10、cleanup pending，不声明goal complete。cleanup-prepared.json SHA fbd901e04119aa4ae8c161e5724faf6c84323e84b6107ad89c0feb46fa9f89da。批准后仅执行清单内删除/回读全部输出和其它证据，最后补cleaned收据；若用户要求保留则按明确清理例外记录，不伪报已回收。
+
+### spec-sync 回写记录
+
+- Canonical auto-lang: public-audio.md（SD01新增）、scene-assets.md（SD02）、behavior-api.md（SD03）；正文逐段与独立R3通过的冻结提案精确比对，额外仅来源交付证明。
+- Module overview/plans和GOAL-008关联更新；GOAL仍进行中，无新模块/全局结构变更，spec-index62项目/14既有warning。
+- f0bd812ab规范/8c326a1a0派生ledger已进入auto-lang/master；derived view不是第二份Spec，六项溯源及未受影响逐字节保护见前收据。
+- Actual auto-ui code delivery78632af/归档ffd4411；未触碰Gallery实现，后继013与ag-examples005必须绑定实际交付后单独验收。
+
 ## 10. 待澄清事项
+
+当前仅等待缓存清理确认（前述自动审批拒绝后的明确确认），代码/规范/ledger/归档/工作树清理已完成，最终45case与完整fresh门通过，T10缓存部分pending、9/10。以下旧等待/复审/merge状态均为历史记录。
 
 当前代码/规范/台账均已交付，最终45case与完整fresh门通过，正在归档与guard清理，9/10、T10pending。无用户待答，预算/r1范围/全链授权不变。最终45case冻结门/完整fresh与canonical/ledger/索引归档/guard清理仍待，先复审不得提前merge。以下旧待答/blocked/needs_fix为历史。
 
