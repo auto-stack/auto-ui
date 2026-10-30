@@ -795,3 +795,77 @@ fn seven_identity_resource_union_and_public_import_command_close_scene8() {
     );
     assert_eq!(h.editor.document.cues.as_ref().unwrap().len(), 0);
 }
+
+#[test]
+fn complete_hud_wire_mutations_reject_and_legitimate_control_restores() {
+    let mut wire = vec![];
+    for slot in 0..4 {
+        wire.push(Int(i32::from(slot != 2)));
+        wire.push(Int(3));
+        for index in 0..32 {
+            wire.push(Int(if index < 3 { 65 + slot } else { 0 }));
+        }
+    }
+    let accepted = autographics_auto_driver::authoring::public_hud::admit_block(&wire).unwrap();
+    assert_eq!(accepted.slots[0].text, "AAA");
+    assert!(!accepted.slots[2].visible);
+    for slot in 0..4 {
+        let base = slot * 34;
+        for (index, value) in [
+            (base, Int(-1)),
+            (base, Int(2)),
+            (base, Float(1.0)),
+            (base + 1, Int(-1)),
+            (base + 1, Int(33)),
+            (base + 1, Float(3.0)),
+            (base + 2, Int(31)),
+            (base + 2, Int(127)),
+            (base + 2, Float(65.0)),
+            (base + 5, Int(1)),
+            (base + 5, Float(0.0)),
+        ] {
+            let original = wire[index].clone();
+            wire[index] = value;
+            assert!(
+                autographics_auto_driver::authoring::public_hud::admit_block(&wire).is_err(),
+                "slot {slot} index {index} accepted mutation"
+            );
+            wire[index] = original;
+            autographics_auto_driver::authoring::public_hud::admit_block(&wire).unwrap();
+        }
+    }
+    for changed in [wire[..wire.len() - 1].to_vec(), {
+        let mut changed = wire.clone();
+        changed.push(Int(0));
+        changed
+    }] {
+        assert!(autographics_auto_driver::authoring::public_hud::admit_block(&changed).is_err());
+    }
+}
+
+#[test]
+fn repeated_render_and_capture_do_not_replay_audio_or_rebuild_atlas() {
+    for api in [Api::Hud2V1, Api::Hud3V1] {
+        let mut h = host_scene(api);
+        host_start(&mut h, api, &host_controller(api, ""));
+        host_tick(&mut h, true);
+        let surface = if three(api) { h.three } else { h.two };
+        let voices = h.audio.as_ref().unwrap().mixer.lock().unwrap().voices();
+        assert_eq!(voices, 2);
+        let builds = autographics_auto_driver::authoring::public_hud::atlas_builds();
+        let image = h.rt.capture(surface, "first").unwrap().0;
+        for _ in 0..3 {
+            h.frame(None).unwrap();
+            assert_eq!(h.rt.capture(surface, "replay").unwrap().0, image);
+            assert_eq!(
+                h.audio.as_ref().unwrap().mixer.lock().unwrap().voices(),
+                voices
+            );
+        }
+        assert_eq!(
+            autographics_auto_driver::authoring::public_hud::atlas_builds(),
+            builds
+        );
+        h.stop_play();
+    }
+}
