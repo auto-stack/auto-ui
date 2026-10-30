@@ -102,6 +102,11 @@ pub struct AuraTsContext {
     /// locals don't do that). Reassignment with a non-int RHS removes the
     /// name (see the `Op::Asn` arm).
     int_locals: std::cell::RefCell<std::collections::HashSet<String>>,
+    // PLAN-890: local bindings must not be unwrapped as same-named Vue refs.
+    local_scopes: std::cell::RefCell<Vec<std::collections::HashMap<String, String>>>,
+    state_aliases: std::collections::HashMap<String, String>,
+    shadow_scopes: std::cell::RefCell<Vec<HashSet<String>>>,
+    used_state_aliases: std::cell::RefCell<HashSet<String>>,
     /// Plan 053 M5/P5-6: when Some(seq_var), this context is transpiling the
     /// body of a debounced complete-handler (wrapped in setTimeout). State-ref
     /// assignments (`.suggestions = x`) get guarded with
@@ -146,6 +151,10 @@ impl AuraTsContext {
             typed_ints: HashSet::new(),
             null_init_locals: std::cell::RefCell::new(Default::default()),
             int_locals: std::cell::RefCell::new(Default::default()),
+            local_scopes: std::cell::RefCell::new(Vec::new()),
+            state_aliases: Default::default(),
+            shadow_scopes: Default::default(),
+            used_state_aliases: Default::default(),
             debounce_seq_var: None,
             warnings: std::cell::RefCell::new(Vec::new()),
         }
@@ -154,6 +163,37 @@ impl AuraTsContext {
     pub fn with_props(mut self, prop_names: HashSet<String>) -> Self {
         self.prop_names = prop_names;
         self
+    }
+
+    /// Module-level aliases keep explicit store state reachable from handlers
+    /// that declare a same-named local, including delegated lambda captures.
+    pub(crate) fn with_state_aliases(
+        mut self,
+        aliases: std::collections::HashMap<String, String>,
+    ) -> Self {
+        self.state_aliases = aliases;
+        self
+    }
+
+    fn state_ident<'a>(&'a self, name: &'a str) -> &'a str {
+        if self
+            .shadow_scopes
+            .borrow()
+            .iter()
+            .any(|scope| scope.contains(name))
+        {
+            if let Some(alias) = self.state_aliases.get(name) {
+                self.used_state_aliases
+                    .borrow_mut()
+                    .insert(name.to_string());
+                return alias;
+            }
+        }
+        name
+    }
+
+    pub(crate) fn used_state_aliases(&self) -> HashSet<String> {
+        self.used_state_aliases.borrow().clone()
     }
 
     /// Plan 408 P10: set computed property names so the IIFE/multi-statement
@@ -233,13 +273,15 @@ impl AuraTsContext {
     /// Plan 015 P1#7: a handler local declared `let x = nil` (no type) —
     /// its methods pass through unchanged.
     fn is_null_init_local(&self, name: &str) -> bool {
-        self.null_init_locals.borrow().contains(name)
+        let name = self.local_ident(name).unwrap_or_else(|| name.to_string());
+        self.null_init_locals.borrow().contains(&name)
     }
 
     /// Plan 438 M1-fix②: a handler local proven int (declared with an int
     /// type annotation, or initialized from a proven-int expression).
     fn is_local_int(&self, name: &str) -> bool {
-        self.int_locals.borrow().contains(name)
+        let name = self.local_ident(name).unwrap_or_else(|| name.to_string());
+        self.int_locals.borrow().contains(&name)
     }
 
     /// Plan 012 Batch A (gap 19): declare facade/plain-object names (widget
@@ -310,6 +352,60 @@ impl AuraTsContext {
     fn is_api(&self, name: &str) -> bool {
         self.api_functions.iter().any(|f| f == name)
     }
+
+    fn local_scope(&self) -> LocalScope<'_> {
+        self.local_scopes.borrow_mut().push(Default::default());
+        self.shadow_scopes.borrow_mut().push(Default::default());
+        LocalScope(self)
+    }
+
+    fn local_scope_for(&self, stmts: &[Stmt]) -> LocalScope<'_> {
+        let scope = self.local_scope();
+        // Reserve before emitting initializers: `let count = .count` must
+        // read the module ref, not the JavaScript local's temporal dead zone.
+        for stmt in stmts {
+            if let Stmt::Store(store) = stmt {
+                self.reserve_local(store.name.as_str());
+            }
+        }
+        scope
+    }
+
+    fn reserve_local(&self, name: &str) {
+        self.shadow_scopes
+            .borrow_mut()
+            .last_mut()
+            .expect("local reservation requires an emission scope")
+            .insert(name.to_string());
+    }
+
+    fn local_ident(&self, name: &str) -> Option<String> {
+        self.local_scopes
+            .borrow()
+            .iter()
+            .rev()
+            .find_map(|scope| scope.get(name).cloned())
+    }
+
+    fn bind_local(&self, name: &str) -> String {
+        self.reserve_local(name);
+        let emitted = name.to_string();
+        self.local_scopes
+            .borrow_mut()
+            .last_mut()
+            .expect("local binding requires an emission scope")
+            .insert(name.to_string(), emitted.clone());
+        emitted
+    }
+}
+
+struct LocalScope<'a>(&'a AuraTsContext);
+
+impl Drop for LocalScope<'_> {
+    fn drop(&mut self) {
+        self.0.local_scopes.borrow_mut().pop();
+        self.0.shadow_scopes.borrow_mut().pop();
+    }
 }
 
 /// Plan 012 Batch A (gap 19): decide whether the legacy
@@ -374,6 +470,13 @@ fn method_map_decision(method: &str, object: &Expr, ctx: &AuraTsContext) -> Meth
     }
     match chain_root(object) {
         Some("store") => MethodMapDecision::PassWarn, // store facade chain
+        Some(root) if ctx.local_ident(root).is_some() => {
+            if ctx.is_null_init_local(root) {
+                MethodMapDecision::Pass
+            } else {
+                MethodMapDecision::Map
+            }
+        }
         Some(root) if ctx.is_ref(root) => MethodMapDecision::Pass,
         Some(root) if ctx.is_facade(root) => MethodMapDecision::PassWarn,
         Some(_) => {
@@ -430,7 +533,8 @@ fn expr_proven_int(expr: &Expr, ctx: &AuraTsContext) -> bool {
         | Expr::Byte(_)
         | Expr::Char(_) => true,
         Expr::Ident(n) | Expr::GenName(n) => {
-            ctx.is_typed_int(n.as_str()) || ctx.is_local_int(n.as_str())
+            ctx.is_local_int(n.as_str())
+                || (ctx.local_ident(n.as_str()).is_none() && ctx.is_typed_int(n.as_str()))
         }
         Expr::Dot(obj, field) => {
             matches!(obj.as_ref(), Expr::Ident(n) if n.as_str() == "self" || n.as_str() == ".")
@@ -531,6 +635,7 @@ fn transpile_receiver(expr: &Expr, ctx: &AuraTsContext, out: &mut Vec<u8>) {
 
 /// Transpile a list of AutoLang statements to TypeScript, with AURA rewrites.
 pub fn transpile_handler_body(stmts: &[Stmt], ctx: &AuraTsContext) -> String {
+    let _scope = ctx.local_scope_for(stmts);
     let mut out = Vec::new();
     for stmt in stmts.iter() {
         transpile_stmt(stmt, ctx, &mut out);
@@ -554,6 +659,7 @@ pub fn transpile_handler_body(stmts: &[Stmt], ctx: &AuraTsContext) -> String {
 /// (e.g. a trailing `if`) are left as-is — the IIFE then has no explicit return
 /// (undefined), matching a statement-expression block.
 pub fn transpile_body_as_return(stmts: &[Stmt], ctx: &AuraTsContext) -> String {
+    let _scope = ctx.local_scope_for(stmts);
     let mut out = Vec::new();
     let n = stmts.len();
     for (i, stmt) in stmts.iter().enumerate() {
@@ -590,13 +696,30 @@ fn transpile_stmt(stmt: &Stmt, ctx: &AuraTsContext, out: &mut Vec<u8>) {
     match stmt {
         // Variable declarations — AURA-aware value rewriting
         Stmt::Store(store) => {
+            // Evaluate the initializer against the enclosing bindings, then
+            // introduce this local. Explicit `.field` continues to name the
+            // module ref even when a local has the same Auto source name.
+            let mut value = Vec::new();
+            transpile_expr(&store.expr, ctx, &mut value);
+            let int_local = matches!(
+                store.ty,
+                Type::Int
+                    | Type::I64
+                    | Type::Uint
+                    | Type::U64
+                    | Type::USize
+                    | Type::Byte
+                    | Type::Char
+            ) || (!matches!(store.expr, Expr::Nil)
+                && expr_proven_int(&store.expr, ctx));
+            let local_name = ctx.bind_local(store.name.as_str());
             let kw = match store.kind {
                 StoreKind::Let => "let",
                 StoreKind::Var => "let",
                 StoreKind::Const => "const",
                 _ => "let", // Shared, CVar, Field — shouldn't appear in handlers
             };
-            write!(out, "{} {}", kw, store.name.as_str()).ok();
+            write!(out, "{} {}", kw, local_name).ok();
             // Plan 043 store-codegen: emit a type annotation when the parser
             // recorded a TS-builtin scalar/array type, so `var result []str = []`
             // becomes `let result: string[] = []` (valid under noImplicitAny).
@@ -610,9 +733,7 @@ fn transpile_stmt(stmt: &Stmt, ctx: &AuraTsContext, out: &mut Vec<u8>) {
             let nil_init = matches!(store.ty, auto_lang_core::ast::Type::Unknown)
                 && matches!(store.expr, auto_lang_core::ast::Expr::Nil);
             if nil_init {
-                ctx.null_init_locals
-                    .borrow_mut()
-                    .insert(store.name.as_str().to_string());
+                ctx.null_init_locals.borrow_mut().insert(local_name.clone());
             }
             // Plan 438 M1-fix②: register proven-int locals so their later
             // divisions lower to Math.trunc (parity with int-typed state).
@@ -620,24 +741,11 @@ fn transpile_stmt(stmt: &Stmt, ctx: &AuraTsContext, out: &mut Vec<u8>) {
             // proven-int initializer (`var m = .intState`). Unknown initializers
             // (record fields, dynamic calls) stay untracked — truncating an
             // actually-float value is a silent correctness bug (Plan 014 rule).
-            let int_local = matches!(
-                store.ty,
-                auto_lang_core::ast::Type::Int
-                    | auto_lang_core::ast::Type::I64
-                    | auto_lang_core::ast::Type::Uint
-                    | auto_lang_core::ast::Type::U64
-                    | auto_lang_core::ast::Type::USize
-                    | auto_lang_core::ast::Type::Byte
-                    | auto_lang_core::ast::Type::Char
-            ) || (!matches!(store.expr, auto_lang_core::ast::Expr::Nil)
-                && expr_proven_int(&store.expr, ctx));
             if int_local {
-                ctx.int_locals
-                    .borrow_mut()
-                    .insert(store.name.as_str().to_string());
+                ctx.int_locals.borrow_mut().insert(local_name);
             }
             write!(out, " = ").ok();
-            transpile_expr(&store.expr, ctx, out);
+            out.extend(value);
             writeln!(out, ";").ok();
         }
 
@@ -728,12 +836,15 @@ fn transpile_stmt(stmt: &Stmt, ctx: &AuraTsContext, out: &mut Vec<u8>) {
             write!(out, "try {{").ok();
             transpile_body(&t.body, ctx, out);
             write!(out, "}}").ok();
-            match &t.catch_param {
-                Some(p) => write!(out, " catch ({}) {{", p).ok(),
-                None => write!(out, " catch {{").ok(),
-            };
-            transpile_body(&t.catch_body, ctx, out);
-            write!(out, "}}").ok();
+            {
+                let _scope = ctx.local_scope();
+                match &t.catch_param {
+                    Some(p) => write!(out, " catch ({}) {{", ctx.bind_local(p.as_str())).ok(),
+                    None => write!(out, " catch {{").ok(),
+                };
+                transpile_body(&t.catch_body, ctx, out);
+                write!(out, "}}").ok();
+            }
             if let Some(finally_body) = &t.finally_body {
                 write!(out, " finally {{").ok();
                 transpile_body(finally_body, ctx, out);
@@ -771,6 +882,7 @@ fn sanitize_ident(s: &str) -> String {
 }
 
 fn transpile_body(body: &Body, ctx: &AuraTsContext, out: &mut Vec<u8>) {
+    let _scope = ctx.local_scope_for(&body.stmts);
     for stmt in &body.stmts {
         transpile_stmt(stmt, ctx, out);
     }
@@ -794,20 +906,27 @@ fn transpile_for(for_loop: &For, ctx: &AuraTsContext, out: &mut Vec<u8>) {
         }
         Iter::Named(iter_name) => {
             // for item in range { ... } → for (const item of range) { ... }
-            write!(out, "for (const {} of ", iter_name.as_str()).ok();
-            transpile_expr(&for_loop.range, ctx, out);
+            let _scope = ctx.local_scope();
+            ctx.reserve_local(iter_name.as_str());
+            let mut range = Vec::new();
+            transpile_expr(&for_loop.range, ctx, &mut range);
+            write!(out, "for (const {} of ", ctx.bind_local(iter_name.as_str())).ok();
+            out.extend(range);
             write!(out, ") {{").ok();
             transpile_body(&for_loop.body, ctx, out);
             writeln!(out, "}}").ok();
         }
         Iter::Indexed(index_name, iter_name) => {
             // for i, item in range { ... } → range.forEach((item, i) => { ... })
+            let _scope = ctx.local_scope();
+            ctx.reserve_local(iter_name.as_str());
+            ctx.reserve_local(index_name.as_str());
             transpile_expr(&for_loop.range, ctx, out);
             write!(
                 out,
                 ".forEach(({}, {}) => {{",
-                iter_name.as_str(),
-                index_name.as_str()
+                ctx.bind_local(iter_name.as_str()),
+                ctx.bind_local(index_name.as_str())
             )
             .ok();
             transpile_body(&for_loop.body, ctx, out);
@@ -841,14 +960,19 @@ fn transpile_for(for_loop: &For, ctx: &AuraTsContext, out: &mut Vec<u8>) {
         }
         Iter::Destructured(key, val) => {
             // for (k, v) in map -> for (const [k, v] of Object.entries(map))
+            let _scope = ctx.local_scope();
+            ctx.reserve_local(key.as_str());
+            ctx.reserve_local(val.as_str());
+            let mut range = Vec::new();
+            transpile_expr(&for_loop.range, ctx, &mut range);
             write!(
                 out,
                 "for (const [{}, {}] of Object.entries(",
-                key.as_str(),
-                val.as_str()
+                ctx.bind_local(key.as_str()),
+                ctx.bind_local(val.as_str())
             )
             .ok();
-            transpile_expr(&for_loop.range, ctx, out);
+            out.extend(range);
             write!(out, ")) {{").ok();
             transpile_body(&for_loop.body, ctx, out);
             writeln!(out, "}}").ok();
@@ -881,7 +1005,7 @@ fn transpile_expr(expr: &Expr, ctx: &AuraTsContext, out: &mut Vec<u8>) {
                         write!(out, "props.{}", field_name).ok();
                     } else if ctx.is_state(field_name) || ctx.is_computed(field_name) {
                         // State ref OR computed ref → unwrap `.value` (Vue).
-                        write!(out, "{}.value", field_name).ok();
+                        write!(out, "{}.value", ctx.state_ident(field_name)).ok();
                     } else if ctx.is_ref(field_name) {
                         // Template ref: `.menuEl` → `menuEl.value!` (the DOM
                         // element). Chained access (`.menuEl.scrollTop`,
@@ -910,7 +1034,13 @@ fn transpile_expr(expr: &Expr, ctx: &AuraTsContext, out: &mut Vec<u8>) {
                 if matches!(inner.as_ref(), Expr::Ident(n) if n.as_str() == "self" || n.as_str() == ".")
                 {
                     if ctx.is_state(base.as_str()) && ctx.is_typed_string(base.as_str()) {
-                        write!(out, "({}.value as any).{}", base.as_str(), field.as_str()).ok();
+                        write!(
+                            out,
+                            "({}.value as any).{}",
+                            ctx.state_ident(base.as_str()),
+                            field.as_str()
+                        )
+                        .ok();
                         return;
                     }
                 }
@@ -964,8 +1094,10 @@ fn transpile_expr(expr: &Expr, ctx: &AuraTsContext, out: &mut Vec<u8>) {
 
         // Identifier — check if it's a reactive state variable
         Expr::Ident(name) => {
-            if ctx.is_state(name.as_str()) || ctx.is_computed(name.as_str()) {
-                write!(out, "{}.value", name.as_str()).ok();
+            if let Some(local) = ctx.local_ident(name.as_str()) {
+                write!(out, "{}", local).ok();
+            } else if ctx.is_state(name.as_str()) || ctx.is_computed(name.as_str()) {
+                write!(out, "{}.value", ctx.state_ident(name.as_str())).ok();
             } else if ctx.store_facade_from.as_deref() == Some(name.as_str()) {
                 // A1 配套:`AuthStore` → facade `store`(见字段注)。
                 write!(out, "store").ok();
@@ -1799,7 +1931,9 @@ fn transpile_expr(expr: &Expr, ctx: &AuraTsContext, out: &mut Vec<u8>) {
                 Expr::Ident(name) => {
                     let func_name = name.as_str();
                     // API calls need `await`
-                    if ctx.is_api(func_name) {
+                    if let Some(local) = ctx.local_ident(func_name) {
+                        write!(out, "{}", local).ok();
+                    } else if ctx.is_api(func_name) {
                         write!(out, "await {}", func_name).ok();
                     } else if func_name == "print" {
                         // PLAN-701 供⑤b: `globalThis.console.log` 改道——
@@ -1848,10 +1982,9 @@ fn transpile_expr(expr: &Expr, ctx: &AuraTsContext, out: &mut Vec<u8>) {
                     // is no longer known-int, so later divisions must not
                     // lower to Math.trunc.
                     if let Expr::Ident(n) = lhs.as_ref() {
-                        if ctx.int_locals.borrow().contains(n.as_str())
-                            && !expr_proven_int(rhs, ctx)
-                        {
-                            ctx.int_locals.borrow_mut().remove(n.as_str());
+                        let local = ctx.local_ident(n.as_str()).unwrap_or_else(|| n.to_string());
+                        if ctx.int_locals.borrow().contains(&local) && !expr_proven_int(rhs, ctx) {
+                            ctx.int_locals.borrow_mut().remove(&local);
                         }
                     }
                     // PLAN-677 T-05b: api fn 在 wire 上返回 str(结构化负载是
@@ -2066,6 +2199,12 @@ fn transpile_expr(expr: &Expr, ctx: &AuraTsContext, out: &mut Vec<u8>) {
         // Must use transpile_expr (not delegate) so StateRef gets .value inside closures
         // Plan 367 P2-2: add ': any' type annotations for TS strict mode.
         Expr::Closure(closure) => {
+            let _scope = ctx.local_scope();
+            let params: Vec<_> = closure
+                .params
+                .iter()
+                .map(|param| ctx.bind_local(param.name.as_str()))
+                .collect();
             // PLAN-076: api calls emit `await <fn>` unconditionally, so a
             // closure whose (block) body contains one must be async —
             // otherwise the emitted arrow has an await in a non-async fn
@@ -2079,14 +2218,14 @@ fn transpile_expr(expr: &Expr, ctx: &AuraTsContext, out: &mut Vec<u8>) {
                 write!(out, "async ").ok();
             }
             if closure.params.len() == 1 {
-                write!(out, "({}: any)", closure.params[0].name).ok();
+                write!(out, "({}: any)", params[0]).ok();
             } else {
                 write!(out, "(").ok();
-                for (i, param) in closure.params.iter().enumerate() {
+                for (i, param) in params.iter().enumerate() {
                     if i > 0 {
                         write!(out, ", ").ok();
                     }
-                    write!(out, "{}: any", param.name).ok();
+                    write!(out, "{}: any", param).ok();
                 }
                 write!(out, ")").ok();
             }
@@ -2100,9 +2239,7 @@ fn transpile_expr(expr: &Expr, ctx: &AuraTsContext, out: &mut Vec<u8>) {
         // `state = x` instead of `state.value = x`.
         Expr::Block(block) => {
             write!(out, "{{ ").ok();
-            for stmt in &block.stmts {
-                transpile_stmt(stmt, ctx, out);
-            }
+            transpile_body(block, ctx, out);
             write!(out, " }}").ok();
         }
 
@@ -2151,7 +2288,7 @@ fn transpile_assign_target(expr: &Expr, ctx: &AuraTsContext, out: &mut Vec<u8>) 
                 if name.as_str() == "self" {
                     let field_name = field.as_str();
                     if ctx.is_state(field_name) {
-                        write!(out, "{}.value", field_name).ok();
+                        write!(out, "{}.value", ctx.state_ident(field_name)).ok();
                     } else if ctx.is_ref(field_name) {
                         // `.menuEl = el` assigns the element behind the ref
                         // (rare; `.menuEl.prop = v` takes the general path).
@@ -2173,8 +2310,10 @@ fn transpile_assign_target(expr: &Expr, ctx: &AuraTsContext, out: &mut Vec<u8>) 
             write!(out, "]").ok();
         }
         Expr::Ident(name) => {
-            if ctx.is_state(name.as_str()) {
-                write!(out, "{}.value", name.as_str()).ok();
+            if let Some(local) = ctx.local_ident(name.as_str()) {
+                write!(out, "{}", local).ok();
+            } else if ctx.is_state(name.as_str()) {
+                write!(out, "{}.value", ctx.state_ident(name.as_str())).ok();
             } else {
                 write!(out, "{}", name.as_str()).ok();
             }
@@ -2767,6 +2906,109 @@ pub fn stmts_have_router_nav(stmts: &[Stmt]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn collision_body(source: &str, ctx: &AuraTsContext) -> String {
+        let ast = crate::parse_ui(source).expect("collision fixture parses");
+        for stmt in ast.core_stmts() {
+            if let Stmt::Fn(function) = stmt {
+                let function = crate::aura::extract_module_fn(function).unwrap();
+                return transpile_handler_body(&function.body, ctx);
+            }
+        }
+        panic!("collision fixture has no function");
+    }
+
+    fn collision_context(names: &[&str]) -> AuraTsContext {
+        AuraTsContext::new(names.iter().map(|name| name.to_string()).collect()).with_state_aliases(
+            names
+                .iter()
+                .map(|name| (name.to_string(), format!("__auto_state${name}")))
+                .collect(),
+        )
+    }
+
+    #[test]
+    fn plan890_store_snapshots_keep_local_values_and_explicit_state() {
+        let ctx = collision_context(&["snap_body", "snap_rev", "editing_body", "revision"]);
+        let code = collision_body(
+            "fn save() { let snap_body str = .editing_body; let snap_rev int = .revision; capture(snap_body, snap_rev, .snap_body, .snap_rev); snap_rev = 4; capture(snap_rev) }",
+            &ctx,
+        );
+        assert!(
+            code.contains(
+                "capture(snap_body, snap_rev, __auto_state$snap_body.value, __auto_state$snap_rev.value)"
+            ),
+            "{code}"
+        );
+        assert!(
+            code.contains("snap_body: string = editing_body.value"),
+            "{code}"
+        );
+        assert!(code.contains("snap_rev = 4"), "{code}");
+        assert!(code.contains("capture(snap_rev)"), "{code}");
+        // Reusing a store context for another action must not retain locals.
+        let mut next = Vec::new();
+        transpile_expr_pub(&Expr::Ident("snap_body".into()), &ctx, &mut next);
+        assert_eq!(String::from_utf8(next).unwrap(), "snap_body.value");
+        assert!(crate::parse_ui("fn reserved() { let __auto_state$snap_body = 1 }").is_err());
+    }
+
+    #[test]
+    fn plan890_nested_local_scope_restores_outer_binding() {
+        let ctx = collision_context(&["snap_body"]);
+        let code = collision_body(
+            "fn scoped() { let snap_body str = \"outer\"; if true { let snap_body str = \"inner\"; capture(snap_body, .snap_body) }; capture(snap_body, .snap_body) }",
+            &ctx,
+        );
+        assert!(
+            code.matches("capture(snap_body, __auto_state$snap_body.value)")
+                .count()
+                == 2,
+            "{code}"
+        );
+    }
+
+    #[test]
+    fn plan890_loop_and_closure_bindings_do_not_capture_snapshot_local() {
+        let ctx = collision_context(&["snap_body"]);
+        let code = collision_body(
+            "fn scoped() { let snap_body str = \"outer\"; for snap_body in [\"inner\"] { capture(snap_body, .snap_body) }; consume((snap_body) => snap_body); capture(snap_body) }",
+            &ctx,
+        );
+        assert!(code.contains("for (const snap_body of"), "{code}");
+        assert!(
+            code.contains("capture(snap_body, __auto_state$snap_body.value)"),
+            "{code}"
+        );
+        assert!(code.contains("(snap_body: any) => snap_body"), "{code}");
+        assert!(code.contains("capture(snap_body)"), "{code}");
+    }
+
+    #[test]
+    fn plan890_same_name_initializer_and_delegated_capture_keep_bindings() {
+        let ctx = collision_context(&["snap_body"]);
+        let code = collision_body(
+            "fn snapshot() { let snap_body str = .snap_body; capture(snap_body) }",
+            &ctx,
+        );
+        assert!(
+            code.contains("snap_body: string = __auto_state$snap_body.value"),
+            "{code}"
+        );
+        let _scope = ctx.local_scope();
+        let declared = ctx.bind_local("snap_body");
+        let lambda = Expr::Lambda(Fn {
+            body: Body {
+                stmts: vec![Stmt::Return(Box::new(Expr::Ident("snap_body".into())))],
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+        let mut out = Vec::new();
+        transpile_expr_pub(&lambda, &ctx, &mut out);
+        let code = String::from_utf8(out).unwrap();
+        assert!(code.contains(&format!("return {declared};")), "{code}");
+    }
     use auto_val::Op;
 
     fn test_ctx() -> AuraTsContext {

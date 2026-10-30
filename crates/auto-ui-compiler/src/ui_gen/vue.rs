@@ -5090,9 +5090,7 @@ onUnmounted(() => {{ if ({var} !== null) {{ clearInterval({var}); {var} = null }
             if self.store_deps.len() > 1 && !self.store_surface.is_empty() {
                 let first = &self.store_deps[0];
                 let owns = |dep: &str, m: &str| {
-                    self.store_surface
-                        .get(dep)
-                        .map_or(false, |s| s.contains(m))
+                    self.store_surface.get(dep).map_or(false, |s| s.contains(m))
                 };
                 let mut routing = std::collections::HashMap::new();
                 for dep in self.store_deps.iter().skip(1) {
@@ -5103,7 +5101,11 @@ onUnmounted(() => {{ if ({var} !== null) {{ clearInterval({var}); {var} = null }
                             if m.is_empty()
                                 || owns(first, m)
                                 || routing.contains_key(m)
-                                || self.store_deps.iter().skip(1).any(|d| d != dep && owns(d, m))
+                                || self
+                                    .store_deps
+                                    .iter()
+                                    .skip(1)
+                                    .any(|d| d != dep && owns(d, m))
                             {
                                 continue;
                             }
@@ -19293,6 +19295,7 @@ export function cn(...inputs: ClassValue[]) {
             code.push_str(&format!("const {} = ref<{}>({})\n", sv.name, ty, init));
         }
         code.push('\n');
+        let state_alias_insert_at = code.len();
 
         // Build ctx for handler transpilation (state_names → .value emission).
         let state_names: std::collections::HashSet<String> =
@@ -19330,6 +19333,13 @@ export function cn(...inputs: ClassValue[]) {
         // 发射；否则 composable 内无 `store` 绑定落 TS2552。
         self_bare.insert("store".to_string());
         let ctx = AuraTsContext::new(state_names)
+            .with_state_aliases(
+                store
+                    .state_vars
+                    .iter()
+                    .map(|sv| (sv.name.clone(), format!("__auto_state${}", sv.name)))
+                    .collect(),
+            )
             .with_props(std::collections::HashSet::new())
             .with_api_functions(store.api_imports.clone())
             .with_store_bare_heads(self_bare)
@@ -19978,6 +19988,17 @@ export function cn(...inputs: ClassValue[]) {
             .collect();
         warnings.extend(pull_warnings);
 
+        // PLAN-890: only shadowed state actually referenced by handler bodies
+        // needs an alias. User locals (including delegated lambda captures)
+        // keep their names; ordinary store output and public getters stay put.
+        let used_aliases = ctx.used_state_aliases();
+        let mut aliases = String::new();
+        for sv in &store.state_vars {
+            if used_aliases.contains(&sv.name) {
+                aliases.push_str(&format!("const __auto_state${} = {}\n", sv.name, sv.name));
+            }
+        }
+        code.insert_str(state_alias_insert_at, &aliases);
         (code, warnings)
     }
 
@@ -32019,11 +32040,19 @@ widget App {
         let mut surface = std::collections::HashMap::new();
         surface.insert(
             "AuthStore".to_string(),
-            vec!["Login".to_string(), "Register".to_string(), "Logout".to_string()],
+            vec![
+                "Login".to_string(),
+                "Register".to_string(),
+                "Logout".to_string(),
+            ],
         );
         surface.insert(
             "ArticleStore".to_string(),
-            vec!["Init".to_string(), "LoadFeed".to_string(), "SetToken".to_string()],
+            vec![
+                "Init".to_string(),
+                "LoadFeed".to_string(),
+                "SetToken".to_string(),
+            ],
         );
 
         let mut gen = VueGenerator::new()
@@ -32054,7 +32083,9 @@ widget App {
         // 回归守卫：无 surface（旧调用方/单 store 路径）不路由
         let mut gen_plain = VueGenerator::new()
             .with_store_deps(vec!["AuthStore".to_string(), "ArticleStore".to_string()]);
-        let sfc_plain = gen_plain.generate(&widget).expect("generate SFC (no surface)");
+        let sfc_plain = gen_plain
+            .generate(&widget)
+            .expect("generate SFC (no surface)");
         assert!(
             sfc_plain.contains("store.LoadFeed()"),
             "无 surface 时保持现状 `store.LoadFeed()`:
