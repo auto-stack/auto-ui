@@ -5,7 +5,7 @@ feature_name: AutoGraphics Node2D最小真实执行验证
 author: [Codex]
 created_at: 2026-10-30
 updated_at: 2026-10-30
-plan_revision: 2
+plan_revision: 3
 current_step: 0
 total_steps: 10
 depends_on: [auto-ui/PLAN-013]
@@ -19,19 +19,19 @@ affects: [auto-ui-dialect, auto-ui-compiler, autographics-auto-driver, autograph
 
 ## 0. 变更摘要
 
-在auto-ui验证一个Player、两个同定义但状态独立的Hazard、一个可销毁Coin。真实跨文件use、node/model/view2d/on、Life系统事件、匿名msg/前导点、具名资源/节点引用，经过共同领域语义与真实Auto执行进入现有AG图形路径。成功必须包括实际运动、事件到正确实例、Coin真实销毁及GPU变化，不是parser或日志演示。
+在auto-ui验证一个Player、两个同定义但状态独立的Hazard、一个可销毁Coin。真实跨文件use、node/model/view-2d/on、Life系统事件、匿名msg/前导点、具名资源/节点引用，经过共同领域语义与真实Auto执行进入现有AG图形路径。成功必须包括实际运动、事件到正确实例、Coin真实销毁及GPU变化，不是parser或日志演示。
 
 本轮用户只授权规划，保持drafting/0 of 10，不建树、改实现、创建agent或启动构建。当前013正在唯一树实施；016实施硬等013实际交付，避免共享AG资产/Host/assembly写面竞争。这是本Plan的串行基线选择，不是HUD成为Node语言的架构前提。
 
 ## 1. 目标
 
-1. 一个公共研究入口读取普通模块工程，而非固定示例名或拼接成单文件绕过模块语义；model/view2d/on保持本实例局部引用。
+1. 一个公共研究入口读取普通模块工程，而非固定示例名或拼接成单文件绕过模块语义；model/view-2d/on保持本实例局部引用。
 2. Life.Start一次/新运行实例，Life.Tick(dt)按世界固定时钟；系统事件不要求msg声明，业务事件仍msg { Collect(Key) }和.Collect(key)。
 3. 两个Hazard同字段名、不同参数且同一世界运行，状态、handler receiver和订阅互不串线；可共享不可变资源。
 4. Player真实输入/碰撞移动；Coin触发发送有类型事件给父，父model改变条件声明，实体/trigger真实销毁、重复消息幂等；Stop/fresh Run恢复。
 5. 新语法仅显式研究入口启用，旧widget/旧AG profile不自动改写或升级；提供真实图形与实例状态的可区分证据，形成局部研究Spec。
 
-非目标：完整G11胜负/三Coin/危险伤害/终点/Enter新局，view3d实现、独立view文件导入、完整资源导入/编辑器往返、公共Node SDK/默认替换、全量widget退役、Vue/Iced组件迁移、ECS/并行多VM、完整CPC、ACE/AOT/HMR/新平台、预算/数值语义改造、Gallery内容或引擎锁升级。Hazard在本切片只验证独立运动和状态，不增加失败逻辑。
+非目标：完整G11胜负/三Coin/危险伤害/终点/Enter新局，view-3d实现、UI/2D/3D混合嵌套、多呈现选择器与view-portrait/view-widget、独立view文件导入、完整资源导入/编辑器往返、公共Node SDK/默认替换、全量widget退役、Vue/Iced组件迁移、ECS/并行多VM、完整CPC、ACE/AOT/HMR/新平台、预算/数值语义改造、Gallery内容或引擎锁升级。Hazard在本切片只验证独立运动和状态，不增加失败逻辑。
 
 ## 2. 架构方案
 
@@ -47,13 +47,13 @@ affects: [auto-ui-dialect, auto-ui-compiler, autographics-auto-driver, autograph
 
 拟新增（均未创建）：crates/auto-ui-dialect/tests/node2d_pilot.rs、crates/auto-ui-compiler/tests/node2d_pilot.rs；experimental/autographics-node2d-pilot/独立workspace（入口/实例adapter/fixtures）、experimental/autographics-auto-driver/tests/node2d_pilot.rs如实际consumer适合，或pilot自有tests/node2d_flow.rs；tools/verify_plan016.py及fixtures/minimal/{main,resources,types,player,hazard,coin,patrol}.at。T-02冻结精确包名/测试位置/命令，不制造两个相同运行入口。
 
-优先复用共同领域AST/模块解析而非新lexer/parser/解释器；node可映射共同组件表示，view2d增加明确域，不复制一套UI AST或把图形字段塞回Core AST。当前AG固定SDK和生产UI编译链不同，具体接法必须T-02整链证明；不能直接把SDK换成当前语言tip。
+优先复用共同领域AST/模块解析而非新lexer/parser/解释器；node可映射共同组件表示，view-2d增加明确域，不复制一套UI AST或把图形字段塞回Core AST。当前AG固定SDK和生产UI编译链不同，具体接法必须T-02整链证明；不能直接把SDK换成当前语言tip。
 
 ## 4. 需求分析与背景调查
 
-用户连续确认：node统一定义、view/view2d/view3d直接呈现、Life系统事件、匿名msg、.Collect与本实例成员；默认内聚model/呈现/on。最后直接授权“规划最小验证计划，一个Player、两个独立Hazard和可销毁Coin，放auto-ui，暂不实施”。没有实施、建树、agent/模型、性能预算提高或自动续跑授权。
+用户连续确认：node统一定义、view/view-2d/view-3d直接呈现、Life系统事件、匿名msg、.Collect与本实例成员；默认内聚model/呈现/on。最后直接授权“规划最小验证计划，一个Player、两个独立Hazard和可销毁Coin，放auto-ui，暂不实施”。没有实施、建树、agent/模型、性能预算提高或自动续跑授权。
 
-已读[共同作者要求](../design/autographics/declarative-authoring-model.md)、[G11目标草图v3](../design/autographics/g11-2d-target-source-sketch.md)、语言仓[AG overview](../../../auto-lang/docs/specs/auto-graphics/overview.md)、[行为profile](../../../auto-lang/docs/specs/auto-graphics/behavior-api.md)、[运行对象](../../../auto-lang/docs/specs/auto-graphics/runtime-objects.md)、[绑定工程](../../../auto-lang/docs/specs/auto-graphics/behavior-project.md)和[Design47](../../../auto-lang/docs/design/47-autoui-state-design-and-feature-architecture.md)。旧Spec描述实验现状，不声称本Plan能力已交付。新局key/三维/全事件生命周期只作为未来目标，不偷入本切片。
+已读[共同作者要求](../design/autographics/declarative-authoring-model.md)、[G11目标草图v4](../design/autographics/g11-2d-target-source-sketch.md)、语言仓[AG overview](../../../auto-lang/docs/specs/auto-graphics/overview.md)、[行为profile](../../../auto-lang/docs/specs/auto-graphics/behavior-api.md)、[运行对象](../../../auto-lang/docs/specs/auto-graphics/runtime-objects.md)、[绑定工程](../../../auto-lang/docs/specs/auto-graphics/behavior-project.md)和[Design47](../../../auto-lang/docs/design/47-autoui-state-design-and-feature-architecture.md)。旧Spec描述实验现状，不声称本Plan能力已交付。新局key/三维/全事件生命周期只作为未来目标，不偷入本切片。
 
 只读基面auto-ui 3e61d03（本轮文档前HEAD）；代码观察SHA256：
 
@@ -61,7 +61,7 @@ affects: [auto-ui-dialect, auto-ui-compiler, autographics-auto-driver, autograph
 |---|---|
 | dialect grammar/widget.rs | a08fa031f43455b367f72b20afbcdc920856ccef26941153ae918bc41e8ac2c6；widget入口/点前缀handler已有 |
 | dialect declarations.rs | e816dfb370bb5768673b388f0dbb1bc4017e662598d70385591132eb79b9ad67；匿名msg已支持，不是新语法发明 |
-| dialect ast.rs | 1e75439a5699057ac37e91f346b71c8080c9cbe1220b048f465e9fb0b145aed6；单view/named views不能冒充view2d |
+| dialect ast.rs | 1e75439a5699057ac37e91f346b71c8080c9cbe1220b048f465e9fb0b145aed6；单view/named views不能冒充view-2d |
 | compiler ui_ast.rs | 03f7dfd7f5888ef1e1724b06d86e0bd397242f62915f7255b38d698ceb7a510e；已有域解析与use定位 |
 | runtime vm_bridge.rs | 6c4c320e14cd8ae235d1d637594daa238b07564e986eedc6f20ad9826bfb8775；存在child状态与merged根字段兼容路径 |
 | AG authoring/behavior.rs | 96e3771e293c019c51e50e970ec4182e097c7bbbd46757f40a829875ea6a3306；当前import拒绝 |
@@ -81,13 +81,15 @@ T-02最多比较两种既有端口接法，必须均复用共同语法/Core解�
 
 ### 5.2 具体语义与最小输入
 
-- 根Node的model/条件view2d/on同作用域。普通use导入Player、Hazard、Coin、纯patrol函数及resources；缺模块、错导出/类型、重复局部绑定应有源码位置诊断。冻结闭包每文件字节与实际依赖关系，运行不偷读变化文件；不新增自动联网/插件加载。
+- 根Node的model/条件view-2d/on同作用域。普通use导入Player、Hazard、Coin、纯patrol函数及resources；缺模块、错导出/类型、重复局部绑定应有源码位置诊断。冻结闭包每文件字节与实际依赖关系，运行不偷读变化文件；不新增自动联网/插件加载。
 - 一个Player，静态ground，两个Hazard同类型不同props，一个Coin、一个camera。Player从(2,1)向右2单位/秒；Coin在行走线上约(4,1)。Hazard置于不碰Player的不同y层。Hazard字段同名phase/ticks/starts，初始相位和速度不同；另有根同名phase作为哨兵，不能字段展平共享。每实例结果须可从真实Auto状态读回并与渲染交叉核。
-- Life.Start/Tick是系统事件，msg { Collect(Key) }是本Node业务事件，.Collect绑定具体父实例。不按handler名字尾部混淆Life.Start和自定义.Start；一个补充夹具证明两者独立。Life.Frame定义为呈现帧节奏事件，仅留后继；Frame与view3d均不纳入本Plan实现、夹具或验收，不用空处理器冒充支持。
+- Life.Start/Tick是系统事件，msg { Collect(Key) }是本Node业务事件，.Collect绑定具体父实例。不按handler名字尾部混淆Life.Start和自定义.Start；一个补充夹具证明两者独立。Life.Frame定义为呈现帧节奏事件，仅留后继；Frame与view-3d均不纳入本Plan实现、夹具或验收，不用空处理器冒充支持。
 - Life.Tick采用1/60固定dt；每世界只采样一次输入；每存活实例每逻辑tick更新一次，与render次数/多视图无关。Start在必要引用/资源就绪后一次/新Run；Pause不更新，Step一个中性tick，Resume不重复Start；fresh Run回初态。Mounted等旧生命周期维持原入口，不在本Plan新做完整UI挂载体系。
 - 根coin_present是Coin存在的唯一玩法状态；Collect中由Auto检查/改false，绑定差量销毁真实对象/trigger并释放订阅。不能用visible=false、移动场外、Rust删除规则或只改日志代替。重复Collect对该局幂等；旧代事件在fresh Run不能修改新根，不能发给碰巧同名的新实例。
 - 有类型资源symbol和actor引用，不要求作者写数字对象/槽/资源ID。T-02冻结有限公开actor端口与refs表示，错误引用在进入执行前拒绝。资源用程序化小图元/单色材质，不加PNG/GLB导入和新数据格式；共享合法资源不等于共享model。
 - 候选tick顺序固定为输入→Tick→变换/运动结果→触发→有序业务事件→条件差量→呈现；T-02给出当前实现可达的准确顺序。此新研究入口的顺序不能偷偷改旧N→N+1 profile。若需换顺序影响AC，先修订合同。
+
+本轮命名修订：本切片统一写view-2d；view、view-3d、view-portrait、view-widget及内部混合嵌入的总体设计见[多呈现机制](../design/autographics/multi-presentation-selection.md)，不纳入本Plan实现或验收。Node直属呈现与内容树内嵌入按位置区分；本Plan只做前者。T-02须冻结view-2d领域标记的解析/lowering，不改变普通表达式减号语义，不复制一套词法/表达式解析器。
 
 ### 5.3 资源、预算、故障与所有权
 
@@ -113,7 +115,7 @@ T-02最多比较两种既有端口接法，必须均复用共同语法/Core解�
 
 | V/S ID | AC / work task | 输入→实际入口 | 区分oracle与关闭条件 | 边界 |
 |---|---|---|---|---|
-| V-01 / S-01 | AC-01/02 T-02/03 | 多文件node/view2d/Life/msg与导入helper；缺模块/错导出/资源错型/坏actor ref/重复绑定→真实解析/绑定/编译 | 合法真实运行；坏例执行前定位到模块/行/符号；改变patrol函数实际轨迹改变，改未用资源不改玩法；不能只测AST | 只所列Node2D有限子集，不承诺全部语言/模块循环形式 |
+| V-01 / S-01 | AC-01/02 T-02/03 | 多文件node/view-2d/Life/msg与导入helper；缺模块/错导出/资源错型/坏actor ref/重复绑定→真实解析/绑定/编译 | 合法真实运行；坏例执行前定位到模块/行/符号；改变patrol函数实际轨迹改变，改未用资源不改玩法；不能只测AST | 只所列Node2D有限子集，不承诺全部语言/模块循环形式 |
 | V-02 / S-02 | AC-03 T-04 | H1/H2同字段名、不同初值/速度、根phase哨兵；一固定输入跑120ticks | 每个starts=1、ticks=120，根哨兵不变；各phase/位置按独立f32计算匹配；中途只改H1合法参数/事件，H2不变，GPU两个ROI各按预期移动；共享状态/错receiver控制必须红 | 不以两个不同类型掩盖同类型实例问题 |
 | V-03 / S-03 | AC-04 T-04/05 | Player穿过Coin、重复Collect，事件投递到两个父实例的独立补充夹具 | 指定父coin_present=false，其他父保持true；Coin实例/trigger/订阅不存在，后续通过旧位置不再新触发；同位置放负控只有hidden仍判失败；GPU Coin ROI消失且地面/其他对象保持 | 一Coin主例；补充两父只验证receiver，不扩多场景产品 |
 | V-04 / S-04 | AC-03/05 T-04/05 | Start、Pause/Step/Resume、反复绘制、Stop/fresh Run、旧事件、Life.Start对自定义.Start | Start一次，暂停计数不变、Step恰+1中性输入，绘制无tick无状态推进；fresh初态与旧代隔离，系统/用户同名事件不混；20轮后实例/订阅/VM owner按约释放 | 实测窗口/设备限制如实记录，不做全HMR/多窗口 |
@@ -130,7 +132,7 @@ T-02最多比较两种既有端口接法，必须均复用共同语法/Core解�
 | ID | owner_stage | 可观察结果 |
 |---|---|---|
 | AC-01 | work | 013真实基线、唯一研究入口/模块→执行→GPU链及资源预算先以T-02冻结；无第二解释器/未批准语言仓写面；V-01/05 |
-| AC-02 | work | node/view2d/Life与匿名msg/前导点、use、资源/actor引用真实生效；正常/诊断和改helper敏感性，V-01 |
+| AC-02 | work | node/view-2d/Life与匿名msg/前导点、use、资源/actor引用真实生效；正常/诊断和改helper敏感性，V-01 |
 | AC-03 | work | H1/H2同定义不同实例状态/receiver/订阅隔离；Start/Tick实际调度与暂停绘制语义，V-02/04 |
 | AC-04 | work | Player真实运动/接触→正确父事件→条件差量真实销毁Coin；重复/错receiver/假隐藏负控，V-03 |
 | AC-05 | work | Stop/fresh/旧代、正常及失败owner终态20轮；合法共享资源寿命准确，V-04 |
@@ -164,13 +166,15 @@ T-02最多比较两种既有端口接法，必须均复用共同语法/Core解�
 
 2026-10-30 / stage: new / plan_id: auto-ui/PLAN-016 / plan_revision: 2 / outcome: blocked（原实施依赖/后续启动门保持） / next: 仍暂不实施，未来满足G-01并获启动后work T-01/T-02。依据用户明确命名选择，§1/5/7与草图中的固定更新统一为Life.Tick；Life.Frame仅为后继呈现帧事件，不纳入016实现/夹具/验收。T/AC/V/S/SD数量、预算、依赖与支持范围保持，匿名msg/前导点等方向不变；r1记录及命名历史保留于本节/Git，不将文档修改写成执行证据。
 
+2026-10-30 / stage: new / plan_id: auto-ui/PLAN-016 / plan_revision: 3 / outcome: blocked（原实施进入门保持） / next: 仍暂不实施。按用户确认，统一view-2d名称，草图v4；同名嵌入区域/多呈现变体只在总体设计说明，016只验证Node直属二维块。T/AC/V/S/SD数量、原预算/依赖保持，不纳入混合嵌套、view-3d/portrait/widget选择或Life.Frame。此前命名历史与r1/r2记录保留，尚无实现验证。
+
 ## 10. 待澄清事项
 
 | ID | 事项 | 关闭owner/下一步 |
 |---|---|---|
 | D-01 | 013仍executing；最终来源/owner窗口与UI014实际重叠未知 | T-01核delivery/冻结门与实际diff，不读开发tip作为稳定消费 |
 | D-02 | 共同领域/模块与固定AG SDK如何在本仓接通，是否无需外仓语义变更 | T-02最多两接法先证；不能成立则带反例修订，不先全面实施 |
-| D-03 | refs/类型化事件端口的精确语法、资源准备、tick/触发交接与原额可行性 | T-02在已定node/view2d/Life/msg/前导点内冻结常规细节；改变AC/额度/领域范围另修订 |
+| D-03 | refs/类型化事件端口的精确语法、资源准备、tick/触发交接与原额可行性 | T-02在已定node/view-2d/Life/msg/前导点内冻结常规细节；改变AC/额度/领域范围另修订 |
 | D-04 | 独立终审上下文及必需实际GPU环境 | T-06交接按后续用户安排或已授权资源核；没有证据保持pending，不伪称独立pass |
 
 无须本轮重新决定已确认作者方向；以上是未来执行的依赖/机制关闭项，用户本轮“暂不实施”持续有效。

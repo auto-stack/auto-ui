@@ -1,14 +1,14 @@
 # AutoGraphics：AutoUI 式图形应用声明与组件模型
 
-2026-10-30；目标与要求回归 v2。本文承接用户本日对 AG-001 的走读和设计纠偏，恢复最初的作者模型；不是新增实施 Plan，也不声明语法、模块装配或 ACE 集成已实现。新设计归 auto-ui，Gallery 内容归 ag-examples；历史设计与现状 Specs 仍在 auto-lang。
+2026-10-30；目标与要求回归 v3。本文承接用户本日对 AG-001 的走读和设计纠偏，恢复最初的作者模型；不是新增实施 Plan，也不声明语法、模块装配或 ACE 集成已实现。新设计归 auto-ui，Gallery 内容归 ag-examples；历史设计与现状 Specs 仍在 auto-lang。
 
-2026-10-30命名与局部性续议：共同组件定义采用`node`，`widget`经明确兼容迁移后退役；`view`/`view2d`/`view3d`直接声明UI/2D/3D呈现，不再嵌套`view { scene2d { ... } }`；系统事件写`on { Life.Start -> ...; Life.Tick(dt) -> ... }`，不新增辅助lifecycle节点或要求msg重复声明。`msg { Collect(Key) }`声明当前Node事件，`.Collect`及`.remaining`均指当前实例成员。默认model、呈现与on内聚，普通use复用真正组件/资源/函数；独立view导入及作用域后议，不为同组件局部引用添加重复参数映射。更新后的[示例v3与实现分析](g11-2d-target-source-sketch.md)区分已确认命名和未定运行语义；尚未实施。
+2026-10-30命名与局部性续议：共同组件定义采用`node`，`widget`经明确兼容迁移后退役；`view`/`view-2d`/`view-3d`直接声明UI/2D/3D呈现，纯二维/三维Node无需额外套一层view；系统事件写`on { Life.Start -> ...; Life.Tick(dt) -> ... }`，不新增辅助lifecycle节点或要求msg重复声明。`msg { Collect(Key) }`声明当前Node事件，`.Collect`及`.remaining`均指当前实例成员。默认model、呈现与on内聚，普通use复用真正组件/资源/函数；独立view导入及作用域后议，不为同组件局部引用添加重复参数映射。更新后的[示例v4与实现分析](g11-2d-target-source-sketch.md)区分已确认命名和未定运行语义；尚未实施。
 
 2026-10-30时钟事件定名：`Life.Tick(dt)`为固定步长逻辑更新，`Life.Frame(dt)`为呈现帧节奏更新；不再使用含混的Update命名。一呈现帧可对应零次或多次Tick，多视图不重复推进同一实例。Frame仅记录为后继事件，不纳入auto-ui/016的实现、样例或验收；具体呈现调度后议，不能将Frame等同GPU直接绘制回调。本轮仍只修文档、暂不实施。
 
 ## 1. 已确认目标与适用边界
 
-2026-10-30多屏续议：[多呈现变体与选择机制](multi-presentation-selection.md)区分Node呈现定义之间的选择与定义内部的内容组合。普通view保留正常UI内容树，可以同时包含scene2d/scene3d视口；不能把它改成选择标签表。每个出口从候选呈现定义选择一个，业务model共享；编译期/运行时选择分层，if/#if含义保持。当前只讨论默认UI、2D、3D、portrait、widget五类呈现定义，具体名称仍待定；本文view2d/view3d为016现行草图拼写，016不扩大到多呈现或混合视口验证。
+2026-10-30多屏定名：[多呈现变体与选择机制](multi-presentation-selection.md)采用`view`、`view-2d`、`view-3d`、`view-portrait`、`view-widget`五种名称。Node直属块声明呈现出口/变体；普通view内部可同时嵌入view-2d和view-3d区域，属于内容组合，不是选择分支，不另造场景包装名称。嵌入区域本身不新建业务model或重复Life.Tick；只有显式实例化子Node才创建相应实例。每个出口从匹配的直属呈现定义选一个，保持if/#if区别；具体跨域视口接口仍待实现。016仅等范围同步view-2d名称，不扩大到多呈现选择器、UI/3D混合嵌套或编译期裁剪。
 
 **用 AutoUI 式的声明、组件、绑定和事件模型表达图形应用。** UI、2D、3D 扩展共同的领域语言组织方式，保留各自的布局、坐标、资源和输入语义。普通 Auto 表达式、函数、类型、模块用于逻辑；组件允许内聚地组织声明、model 和 on，也允许将复杂部分拆为外部模块再导入。Godot/Bevy 是能力与样本参考，不决定 Auto 作者接口。
 
@@ -48,7 +48,7 @@ JSON 是当前原型便于保存/验证的选择，没有“可审计所以只�
 
 ### 3.2 场景与逻辑绑定
 
-图形Node沿用 model/view/on 的职责：view/view2d/view3d声明节点与子组件，model持有本Node状态，on处理事件；属性直接绑定本实例model/computed，子组件经props/事件或明确接口协作。跨组件状态不按同名字段自动合并。
+图形Node沿用 model/view/on 的职责：view/view-2d/view-3d声明节点与子组件，model持有本Node状态，on处理事件；属性直接绑定本实例model/computed，子组件经props/事件或明确接口协作。跨组件状态不按同名字段自动合并。
 
 复杂且有真实复用边界的组件、纯数据、控制器/store和函数可单独导出，再普通use导入；不强迫场景与逻辑分成两个靠数字对接的工程。将同一个Node的呈现单独拆出是否需要作用域保持，暂不冻结机制；默认内聚局部引用，不能要求每次将model重新映射给MainScene。事件有实例接收者、payload和明确顺序，不默认所有逻辑进入全局app_update。运动由Life更新事件调度，不能以每帧重建整棵声明树代替。
 
@@ -90,7 +90,7 @@ JSON 是当前原型便于保存/验证的选择，没有“可审计所以只�
 
 ## 5. 来源纠偏与本轮结果
 
-后续已规划[auto-ui/016最小真实执行验证](../../plans/016-autographics-node2d-minimal-validation.md)：一个Player、两个同定义独立Hazard和一个可销毁Coin，验证node/view2d/Life、use、实例状态与事件绑定；drafting、暂不实施，按合同先核013交付及有界接法，不代表整体G11迁移或ACE融合已开始。
+后续已规划[auto-ui/016最小真实执行验证](../../plans/016-autographics-node2d-minimal-validation.md)：一个Player、两个同定义独立Hazard和一个可销毁Coin，验证node/view-2d/Life、use、实例状态与事件绑定；drafting、暂不实施，按合同先核013交付及有界接法，不代表整体G11迁移或ACE融合已开始。
 
 [840 §3/4.2/5.2](../../../../auto-lang/docs/plans/archive/840-autographics-public-behavior-api-and-user-scripts.md)将单文件定义为首版切片：SDK 有模块服务，消费者尚未验证其装配/诊断链，因此不读取未快照依赖；没有证明多模块不可验证。[854](../../../../auto-lang/docs/plans/archive/854-autographics-behavior-source-assembly.md)的“可审计”指内部受信装配的来源/顺序/错误可追查，不是新的产品定位，也不能倒推840的禁 use是长期要求。此前外部讨论纪要的“可审计 agent 代码运行时”解释不作为产品需求依据。
 

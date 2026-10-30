@@ -1,10 +1,10 @@
-# G11/2d 目标源码示例：node / view2d / Life / msg
+# G11/2d 目标源码示例：node / view-2d / Life / msg
 
-2026-10-30，讨论稿 v3，取代同路径v2草图；v1/v2保留在Git历史。依据[共同作者模型](declarative-authoring-model.md)和用户本轮命名决定。只写Markdown，不创建或运行产品源码，不分配Plan或更改在途合同。
+2026-10-30，讨论稿 v4，取代同路径v3草图；v1/v2/v3保留在Git历史。依据[共同作者模型](declarative-authoring-model.md)和用户本轮命名决定。只写Markdown，不创建或运行产品源码，不分配Plan或更改在途合同。
 
 ## 1. 已确认写法与仍属提案的部分
 
-用户已选择：以node统一组件定义，widget经明确迁移后退役；view/view2d/view3d分别声明UI/2D/3D内容；view2d内不再套scene2d；model、呈现和on默认内聚同一Node；Life作为系统事件命名空间；msg { Collect(Key) }直接声明本Node事件；前导点引用当前实例成员。use用于复用真正的组件、资源与函数，不把关卡view另外拆成需重复映射全部model的MainScene。
+用户已选择：以node统一组件定义，widget经明确迁移后退役；view/view-2d/view-3d分别声明UI/2D/3D内容；纯二维声明直接使用view-2d，无需额外包装；model、呈现和on默认内聚同一Node；Life作为系统事件命名空间；msg { Collect(Key) }直接声明本Node事件；前导点引用当前实例成员。use用于复用真正的组件、资源与函数，不把关卡view另外拆成需重复映射全部model的MainScene。
 
 以下源码是**目标表示，当前不能直接编译运行**。资源构造器、节点名/refs/公开端口、输入服务、集合API、emit和key重建仍为语义占位。msg属性的类型化签名也尚待收敛。本轮已确定Life.Tick(dt)为固定步长逻辑更新，Life.Frame(dt)为呈现帧节奏更新；一帧可对应零次或多次Tick。本例只使用Tick，Frame留后继、不纳入016最小验证的实现或验收，也不增加Frame处理器。具体呈现调度后议，Frame不等于直接GPU绘制回调。
 
@@ -15,14 +15,16 @@ src/
   app.at                  应用/新局边界
   resources.at            不可变资源描述和具名symbol
   game_types.at           玩法类型
-  g11_round.at            一局：model + view2d + on
-  components/player.at    角色组件：model + view2d + on
+  g11_round.at            一局：model + view-2d + on
+  components/player.at    角色组件：model + view-2d + on
   components/coin.at      可复用拾取触发组件
   components/hazard.at    巡逻/失败触发组件
   logic/patrol.at         可复用纯函数
 ```
 
 文件数量只是示意；组件可合写或拆文件，语义不因文件布局改变。以下只列普通use，不引入use.ag。
+
+本轮统一命名为view、view-2d、view-3d、view-portrait、view-widget；Node直属定义与view内嵌入区域的语义见[多呈现设计](multi-presentation-selection.md)。本例只使用Node直属view-2d，不增加混合嵌套/变体选择验证；其他API仍是草图。
 
 ## 2. 资源与类型
 
@@ -81,7 +83,7 @@ node G11Round(on_finished: msg) {
 
     msg { Collect(Key), HitDanger, ReachGoal }
 
-    view2d {
+    view-2d {
         solid2d ground {
             position: (15.0, -0.6)
             mesh: resources.ground_mesh
@@ -178,7 +180,7 @@ node G11Round(on_finished: msg) {
 }
 ```
 
-model和view2d同属当前实例，.remaining/.result直接局部引用，不经MainScene参数再次转发。计数派生为3 - remaining.count()；条件分支消失对应真实销毁Coin的trigger/实体，不是隐藏。其他分支保持实例身份，不每tick全量重建。
+model和view-2d同属当前实例，.remaining/.result直接局部引用，不经MainScene参数再次转发。计数派生为3 - remaining.count()；条件分支消失对应真实销毁Coin的trigger/实体，不是隐藏。其他分支保持实例身份，不每tick全量重建。
 
 props/事件传递只出现在真实组件边界。on_collect绑定当前G11Round实例与Key；三枚Coin共享定义但不是同一个状态实例。on_finished: msg只是占位写法，正式端口须约束payload为Result。重复Collect因remaining守卫不重复计数；失败/胜利后请求忽略。
 
@@ -193,7 +195,7 @@ node Coin(position: float2, mesh: Mesh2D, material: Material2D,
           target: ActorRef2D, enabled: bool, on_collect: msg) {
     msg { Touched(ActorRef2D) }
 
-    view2d {
+    view-2d {
         trigger2d body {
             position: .position
             mesh: .mesh
@@ -226,7 +228,7 @@ node Player(spawn: float2, speed: float, enabled: bool) {
 
     export { actor: ActorRef2D = refs.body }
 
-    view2d {
+    view-2d {
         character2d body {
             initial_position: .spawn
             mesh: player_mesh
@@ -276,7 +278,7 @@ node Hazard(x: float, base_y: float, target: ActorRef2D, on_hit: msg) {
     model { var phase float = 0.0 }
     msg { Touched(ActorRef2D) }
 
-    view2d {
+    view-2d {
         trigger2d body {
             position: (.x, patrol_y(.base_y, .phase, 0.2))
             shape: circle(radius: 0.5)
@@ -299,7 +301,7 @@ node Hazard(x: float, base_y: float, target: ActorRef2D, on_hit: msg) {
 
 ## 7. App：新局重建实例子树
 
-`app.at`：为避免纯组合的跨领域包装，本例根也使用view2d；完整UI/2D/3D混合呈现端口另行定义。
+`app.at`：为避免纯组合的跨领域包装，本例根也使用view-2d；完整UI/2D/3D混合呈现端口另行定义。
 
 ```auto
 use game_types: Result
@@ -313,7 +315,7 @@ node App {
     }
     msg { Finished(Result), Restart }
 
-    view2d {
+    view-2d {
         G11Round current_round {
             key: .round_key
             on_finished: .Finished
@@ -344,7 +346,7 @@ input.pressed读取本tick一致的边沿事实，不因某个Node先读就吃�
 | 触面 | 现有证据 | 实施判断 |
 |---|---|---|
 | 匿名msg与前导点 | [declarations.rs](../../../crates/auto-ui-dialect/src/declarations.rs)的parse_msg_decl已接受msg { ... }，旧命名块为兼容；[widget.rs](../../../crates/auto-ui-dialect/src/grammar/widget.rs)已解析点前缀带参handler | 主要是复用/明确约定，不必当作全新功能 |
-| node与view域 | widget解析入口固定widget；[AST](../../../crates/auto-ui-dialect/src/ast.rs)为WidgetDecl、单view及named_views | node可先映射共同组件表示，补view域而非复制三套AST；named view不是view2d/3d，须区分。最终退役widget需另核旧读者/兼容 |
+| node与view域 | widget解析入口固定widget；[AST](../../../crates/auto-ui-dialect/src/ast.rs)为WidgetDecl、单view及named_views | node可先映射共同组件表示，补view域而非复制三套AST；named view不是view-2d/view-3d，须区分。最终退役widget需另核旧读者/兼容 |
 | Life系统事件 | [Vue生成器](../../../crates/auto-ui-compiler/src/ui_gen/vue.rs)已有Init/Destroy到挂载钩子的接线；[VM桥](../../../crates/auto-ui-runtime/src/ui/vm_bridge.rs)有Init demand/代次/任务泵 | 可复用机制，但Life命名空间、Start/Tick调度、目标实例/代次不能只靠字符串改名；需区分系统事件与用户同名事件 |
 | 实例状态与事件 | VM桥存在child实例支持，也有将子model字段合入root的merged兼容路径；[Design47](../../../../auto-lang/docs/design/47-autoui-state-design-and-feature-architecture.md)已明确目标差额 | 不能宣称所有组件已完全隔离；必须用两同类型实例验证receiver/model/订阅，不批量修无关UI |
 | 模块到AG执行 | [AG准入器](../../../experimental/autographics-auto-driver/src/authoring/behavior.rs)拒绝用户import；[Session](../../../experimental/autographics-auto-driver/src/lib.rs)直接编译组合源码并取root签名 | 不是删掉一条禁止即可：要接模块解析/依赖快照/命名空间、领域lowering与实例handler；当前AG固定SDK与生产UI编译链不同，不能盲接当前语言tip |
@@ -353,7 +355,7 @@ input.pressed读取本tick一致的边沿事实，不因某个Node先读就吃�
 
 建议实现路径（只是工作分解，不取编号或启动）：
 
-1. **语法与语义纵向探针**：node/view2d/Life/既有msg，模块导入、实例receiver和诊断；先一个Player、两个Coin/两个有状态Hazard，证明同定义不同实例不串状态。纯解析通过不算闭环。
+1. **语法与语义纵向探针**：node/view-2d/Life/既有msg，模块导入、实例receiver和诊断；先一个Player、两个Coin/两个有状态Hazard，证明同定义不同实例不串状态。纯解析通过不算闭环。
 2. **共同领域模型到AG adapter**：具名节点/ref和资源描述lowering到现有图形对象，接世界时钟/输入快照/触发到事件；事件、model、运动仍由Auto执行。使用生产共同模型端口，不把旧单文件代码拼接包装成正式模块。
 3. **条件实例与重开**：remaining变化只移除对应trigger，key变化重建一局；绑定/资源代次、Stop/Pause/Step/旧事件隔离有定向正反例。跨VM事务/全世界回滚不作为前置。
 4. **内容仓真实消费**：auto-ui能力实际交付后，ag-examples独立后继写真实.at/资源和新锁；保原玩法分母，显式说明新旧调度/轨迹差额，再决定旧入口何时退役。源码只变漂亮、暗中Rust补逻辑不算完成。

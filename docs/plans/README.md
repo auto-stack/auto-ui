@@ -17,7 +17,7 @@
 | 012 | [公共音频与接受后一次播放](archived/012-autographics-public-audio-and-accepted-cues.md) | AG公共服务 | archived/r1；45case与完整fresh通过，公共音频交付；G12a内容另仓 |
 | 013 | [公共HUD与共同呈现](013-autographics-public-hud-and-presentation-state.md) | AG公共服务 | drafting/r1；硬等012实际交付；G12b内容另仓 |
 | 015 | [VM路由页动态加载与原生Blog闭环](archived/015-vm-route-page-dynamic-load.md) | BLOG-004消费前置 | archived/r2；交付df39593；native22/22，规范/ledger148；清理回执见计划 |
-| 016 | [Node2D最小真实执行验证](016-autographics-node2d-minimal-validation.md) | AG共同作者模型最小切片 | drafting/r2，0/10；一个Player、两个独立Hazard、可销毁Coin；硬等013实际交付；仅规划 |
+| 016 | [Node2D最小真实执行验证](016-autographics-node2d-minimal-validation.md) | AG共同作者模型最小切片 | drafting/r3，0/10；一个Player、两个独立Hazard、可销毁Coin；硬等013实际交付；仅规划 |
 
 下一份本地新计划为017，以独占取号时`.next-id`与本地活动/归档最大号重核；不能因外仓号882/883跳号。003是Blog路线，004..006是AG表现路线，状态以各自交付收据为准；011预算研究已交付，完整游戏仍未证实。设计与并行/后继入口见[本仓设计](../design/autographics/m2-presentation-and-resources.md)。
 
