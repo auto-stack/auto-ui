@@ -4385,6 +4385,7 @@ fn delivery_lock_versions(lock_text: &str) -> Vec<(String, String)> {
 /// 名多槽包重复声明直依赖）。
 fn delivery_pins(
     producer_root: &Path,
+    ui_root: Option<&Path>,
     receipt: Option<&auto_api_gen::source_owner::InstalledSdkReceipt>,
 ) -> AutoResult<(Vec<(String, String)>, Vec<String>)> {
     // 根 Cargo.lock（本地实际输入——Cargo.lock 整体被 .gitignore 忽略、
@@ -4400,7 +4401,18 @@ fn delivery_pins(
     if let Some(receipt) = receipt {
         receipt.verify_bytes("Cargo.lock", lock_text.as_bytes())?;
     }
-    let versions = delivery_lock_versions(&lock_text);
+    let mut versions = delivery_lock_versions(&lock_text);
+    // PLAN-900 T-04：图形栈（iced/wgpu/windows 族）的闭包 owner 是
+    // auto-ui 仓——producer（auto-lang 仓）工作区去 UI 后其应用锁不再
+    // 携带这些版本。UI owner 锁（ui_root/Cargo.lock，交付 vendoring 的
+    // 同一检出）并入 pin 槽位来源：语言面锁无可读时语义不变；图形族
+    // 版本以 UI owner 锁为准与交付闭包一致。
+    if let Some(ui_root) = ui_root {
+        let ui_lock = ui_root.join("Cargo.lock");
+        if let Ok(ui_text) = fs::read_to_string(&ui_lock) {
+            versions.extend(delivery_lock_versions(&ui_text));
+        }
+    }
     let mut pins = Vec::new();
     let mut multi_slot = Vec::new();
     for fam in DELIVERY_PIN_FAMILY {
@@ -4418,7 +4430,7 @@ fn delivery_pins(
         }
     }
     if pins.is_empty() {
-        return Err("delivery: pin 家族在 producer 应用锁中零命中（锁可疑）".into());
+        return Err("delivery: pin 家族在 producer/UI owner 应用锁中零命中（锁可疑）".into());
     }
     Ok((pins, multi_slot))
 }
@@ -5575,7 +5587,13 @@ fn generate_rust_ui_delivery_inner(
     fs::write(&root_manifest_path, &root_manifest)
         .map_err(|e| format!("delivery: 写交付根 manifest 失败: {e}"))?;
 
-    let (pins, multi_slot) = delivery_pins(&producer_root, installed_receipt.as_ref())?;
+    // PLAN-900 T-04：UI owner 根前置（pin 族并锁来源 + git 身份共用）。
+    let ui_crate_source = delivery_crate_source(&producer_root, "auto-ui-compiler")?;
+    let ui_root = ui_crate_source
+        .parent()
+        .and_then(Path::parent)
+        .ok_or("delivery: producer UI owner 根无效")?;
+    let (pins, multi_slot) = delivery_pins(&producer_root, Some(ui_root), installed_receipt.as_ref())?;
 
     // 应用 member（main.rs 与开发模式同一编译相位产物）
     let app_dir = delivery_root.join("app");
@@ -5620,11 +5638,6 @@ fn generate_rust_ui_delivery_inner(
 
     // delivery-manifest.json（producer 身份/闭包规模/资源与 pin 清单）
     let (mut git_head, mut git_dirty) = delivery_git_identity(&producer_root);
-    let ui_crate_source = delivery_crate_source(&producer_root, "auto-ui-compiler")?;
-    let ui_root = ui_crate_source
-        .parent()
-        .and_then(Path::parent)
-        .ok_or("delivery: producer UI owner 根无效")?;
     let (mut ui_git_head, mut ui_git_dirty) = delivery_git_identity(ui_root);
     // Use the validated frozen receipt for installed content, including an
     // explicitly selected spelling of the same SDK. An external UI owner keeps
@@ -7980,7 +7993,7 @@ pub fn list_items() []str {
              [[package]]\nname = \"windows-core\"\nversion = \"0.62.2\"\n",
         )
         .unwrap();
-        let (pins, multi) = delivery_pins(dir.path(), None).unwrap();
+        let (pins, multi) = delivery_pins(dir.path(), None, None).unwrap();
         assert!(
             pins.contains(&("wgpu-hal".to_string(), "=27.0.4".to_string())),
             "单槽 wgpu-hal 精确钉扎：{pins:?}"
