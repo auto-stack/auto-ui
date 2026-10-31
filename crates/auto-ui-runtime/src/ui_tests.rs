@@ -122,3 +122,73 @@ mod plan019_vm_own_module_link_tests;
 mod plan042_scan_probe_tests;
 #[cfg(all(test, feature = "ui-iced"))]
 mod plan058_engine_gap_tests;
+
+// ---- PLAN-900 T-05：auto-lang src/tests UI 域 32 文件随依赖反转迁入 ----
+// （原 crates/auto-lang/src/tests/ 无条件 UI 符号文件；crate:: 路径已改写
+// 为 auto_ui_compiler/auto_lang_core/crate:: 本位；cfg 门与原 tests.rs 声明
+// 一致——plan814_v02_api_pin 原 ui-iced 门保留，其余默认编译（原 facade
+// default=ui-iced 下同语义）。
+#[cfg(all(test, feature = "ui-iced"))]
+mod plan814_v02_api_pin;
+#[cfg(test)]
+mod autodown_codegen_debts_tests;
+#[cfg(test)]
+mod back_proxy_tests;
+#[cfg(test)]
+mod error_spans_tests;
+#[cfg(test)]
+mod gallery_pages_compile_tests;
+#[cfg(test)]
+mod native_css_tests;
+#[cfg(test)]
+mod plan024_named_view_tests;
+#[cfg(test)]
+mod plan367_viewfn_tests;
+#[cfg(test)]
+mod plan408_tests;
+#[cfg(test)]
+mod plan492_m2_tests;
+#[cfg(test)]
+mod plan492_m3_tests;
+#[cfg(test)]
+mod plan502_diagram_tests;
+#[cfg(test)]
+mod plan503_tests;
+#[cfg(test)]
+mod plan627_qualified_api_tests;
+#[cfg(test)]
+mod plan634_block_tail_semi_tests;
+#[cfg(test)]
+mod plan639_bp_tests;
+#[cfg(test)]
+mod plan640_bp_tests;
+#[cfg(test)]
+mod plan643_chart_tag_tests;
+#[cfg(test)]
+mod plan645_bp_tests;
+#[cfg(test)]
+mod plan647_bp_version_tests;
+#[cfg(test)]
+mod plan649_bp_tests;
+#[cfg(test)]
+mod plan701_supply_probes;
+#[cfg(test)]
+mod plan711_cpu_slice_tests;
+#[cfg(test)]
+mod plan711_init_demand_tests;
+#[cfg(test)]
+mod plan716_supply_probes;
+#[cfg(test)]
+mod plan779_frame_provider;
+#[cfg(test)]
+mod plan785_clipboard_provider;
+#[cfg(test)]
+mod plan806_ui_declarations;
+#[cfg(test)]
+mod plan808_terminal_domain;
+#[cfg(test)]
+mod plan810_full_ui_grammar;
+#[cfg(test)]
+mod plan814_recipe_extraction_tests;
+#[cfg(test)]
+mod vm_json_float_read_tests;

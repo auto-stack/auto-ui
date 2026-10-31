@@ -1,0 +1,35 @@
+[package]
+name = "auto-lsp"
+version = "0.3.0"
+edition = "2021"
+description = "Language Server Protocol implementation for AutoLang"
+license = "MIT"
+
+[dependencies]
+tower-lsp-server = "0.23"
+lsp-types = "0.97"
+tokio = { version = "1", features = ["full"] }
+serde_json = { version = "1.0", features = ["preserve_order"] }
+serde = { version = "1.0", features = ["derive"] }
+miette = { version = "7.2", features = ["fancy"] }
+# PLAN-900：本 crate 自 auto-lang 迁 auto-ui 仓——语言基础走
+# auto-lang-core 直连（facade 零 UI 依赖后不再作为传递入口）。
+auto-lang-core = { path = "../../../auto-lang/crates/auto-lang-core" }
+auto-ui-compiler = { path = "../auto-ui-compiler" }
+auto-ast = { path = "../../../auto-lang/crates/auto-ast" }
+auto-diagnostics = { path = "../../../auto-lang/crates/auto-diagnostics" }
+auto-val = { path = "../../../auto-lang/crates/auto-val" }
+env_logger = "0.11"
+url = "2.5"
+
+[dev-dependencies]
+tower = "0.5"
+futures = "0.3"
+
+[lib]
+name = "auto_lsp"
+path = "src/lib.rs"
+
+[[bin]]
+name = "auto-lsp"
+path = "src/bin.rs"

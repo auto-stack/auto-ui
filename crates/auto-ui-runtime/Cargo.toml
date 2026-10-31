@@ -85,6 +85,8 @@ test-native-dock = ["ui-iced", "native-dock"]
 [dependencies]
 auto-web = { version = "=0.1.0", path = "../../../auto-web/crates/auto-web" }
 auto-lang-core = { path = "../../../auto-lang/crates/auto-lang-core" }
+# PLAN-900 T-03：UiCompatInstaller 进程期自注册（原 auto-lang facade 迁入）。
+inventory = "0.3"
 auto-ui-compiler = { path = "../auto-ui-compiler" }
 # PLAN-841 T-05: runtime consumes the UI-owned domain model (UiCode/UiStmt)
 auto-ui-dialect = { path = "../auto-ui-dialect" }
@@ -195,7 +197,141 @@ windows = { version = "0.58", optional = true, features = [
 ] }
 windows-core = { version = "0.58", optional = true }
 
+# PLAN-900 T-05：mpv 三集成测试随 auto-lang 迁入——必须保持集成目标形态
+#（lib --test 目标触发 rustc ICE，PLAN-617 T-16债务 P617-D1 原注释随迁）；
+# required-features 与 auto-lang 侧原声明逐位一致。
+[[test]]
+name = "mpv_engine"
+path = "tests/mpv_engine.rs"
+required-features = ["mpv-native"]
+
+[[test]]
+name = "mpv_channel"
+path = "tests/mpv_channel.rs"
+required-features = ["mpv-gpu"]
+
+[[test]]
+name = "mpv_contract"
+path = "tests/mpv_contract.rs"
+required-features = ["mpv-native"]
+
+# PLAN-900 T-06：UI examples 自 auto-lang 迁入（原 build-examples 门映射为
+# ui-iced——auto-ui 仓 default 即含；mpv_spike/p023_probe 保原专属门）。
+[[example]]
+name = "mpv_spike"
+required-features = ["mpv-spike"]
+
+[[example]]
+name = "native_pixels_counter"
+required-features = ["ui-iced"]
+
+[[example]]
+name = "p022_stack_click"
+required-features = ["ui-iced"]
+
+[[example]]
+name = "p023_probe"
+required-features = ["iced-layout-tests"]
+
+[[example]]
+name = "plan804_real_host"
+required-features = ["ui-iced"]
+
+[[example]]
+name = "regen_page"
+required-features = ["ui-iced"]
+
+[[example]]
+name = "ui_accordion"
+required-features = ["ui-iced"]
+
+[[example]]
+name = "ui_container"
+required-features = ["ui-iced"]
+
+[[example]]
+name = "ui_counter"
+required-features = ["ui-iced"]
+
+[[example]]
+name = "ui_dual_app"
+required-features = ["ui-iced"]
+
+[[example]]
+name = "ui_gallery"
+required-features = ["ui-iced"]
+
+[[example]]
+name = "ui_hello_loader"
+required-features = ["ui-iced"]
+
+[[example]]
+name = "ui_input"
+required-features = ["ui-iced"]
+
+[[example]]
+name = "ui_layout"
+required-features = ["ui-iced"]
+
+[[example]]
+name = "ui_list"
+required-features = ["ui-iced"]
+
+[[example]]
+name = "ui_navigation_rail"
+required-features = ["ui-iced"]
+
+[[example]]
+name = "ui_popover_probe"
+required-features = ["ui-iced"]
+
+[[example]]
+name = "ui_popover_probe2"
+required-features = ["ui-iced"]
+
+[[example]]
+name = "ui_progress"
+required-features = ["ui-iced"]
+
+[[example]]
+name = "ui_radio"
+required-features = ["ui-iced"]
+
+[[example]]
+name = "ui_scroll"
+required-features = ["ui-iced"]
+
+[[example]]
+name = "ui_select"
+required-features = ["ui-iced"]
+
+[[example]]
+name = "ui_sidebar"
+required-features = ["ui-iced"]
+
+[[example]]
+name = "ui_slider"
+required-features = ["ui-iced"]
+
+[[example]]
+name = "ui_table"
+required-features = ["ui-iced"]
+
+[[example]]
+name = "ui_tabs"
+required-features = ["ui-iced"]
+
+[[example]]
+name = "ui_todo"
+required-features = ["ui-iced"]
+
+[[example]]
+name = "ui_todos"
+required-features = ["ui-iced"]
+
 [dev-dependencies]
+# PLAN-900 T-05：ui_snapshots（insta 快照围栏）随 auto-lang 迁入。
+insta = { version = "1", features = ["filters"] }
 # PLAN-814 T-07：plan804_os_e2e（随 owner 迁入）的消费面。
 fastrand = "2.4.1"
 resvg = "0.45"

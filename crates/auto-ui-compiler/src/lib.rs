@@ -23,6 +23,9 @@ pub mod aura;
 pub mod route;
 pub mod ui_ast;
 pub mod ui_gen;
+// PLAN-900 T-03 预案 a：ui_build 组合层装配族自 auto-lang facade 迁入
+// （dialect 装配 + aura 提取 + design tokens/recipe + 后端生成组合点）。
+pub mod pipeline;
 
 pub use ui_ast::{
     find_store_decl_files, lower_ui, parse_ui, parse_validated_ui, resolve_use_module, LoweredUi,

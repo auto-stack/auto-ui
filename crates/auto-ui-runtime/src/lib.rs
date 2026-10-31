@@ -134,3 +134,18 @@ pub fn install_ui_host_capabilities() {
 /// 与钩子注册在旧兼容包侧完成，本 crate 无 UI 实现可装）。
 #[cfg(not(any(feature = "ui", feature = "ui-dialog")))]
 pub fn install_ui_host_capabilities() {}
+
+// ── PLAN-900 T-03：SDK 装配钩子自注册（原 auto-lang facade 迁入） ──
+//
+// 旧 facade 在 install_ui_host_capabilities 里注册
+// `auto_lang_core::set_ui_host_install_hook` 并 inventory-submit
+// UiCompatInstaller（plan814_sdk_hook_install / plan814_ui_compat_install）。
+// 依赖方向反转后（facade 零 auto-ui 依赖），装配扇入单点归本 crate：
+// SDK 旧公开入口（create_vm_from_source/abt、eval_config、execute 族等）
+// 经钩子回调至此，本 crate 被链接即经 inventory 生效，语义与旧 facade
+// 包装逐位一致（PLAN-779/785/790/794/802/804 装配合同保持）。
+fn plan900_register_sdk_hook() {
+    auto_lang_core::set_ui_host_install_hook(install_ui_host_capabilities);
+}
+
+inventory::submit!(auto_lang_core::UiCompatInstaller(plan900_register_sdk_hook));

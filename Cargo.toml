@@ -9,5 +9,19 @@
 # registry 依赖由受管 Cargo.lock 锁定（fresh/locked 可复现；重定位 A→B 同布局
 # 成立）。发布渠道/固定 rev 清单冻结归 T-07/T-09（SD-02/04）。
 [workspace]
-members = ["crates/*"]
+# PLAN-900：显式成员表（原 crates/* glob 因 auto-cosmic 父目录非包而不可用）；
+# auto-cosmic 整族 + auto-lsp 自 auto-lang 迁入（T-02/T-06）。
+members = [
+    "crates/auto-ui-compiler",
+    "crates/auto-ui-dialect",
+    "crates/auto-ui-runtime",
+    "crates/auto-ui-tools",
+    "crates/shell-pack",
+    "crates/auto-lsp",
+    "crates/auto-cosmic/ports",
+    "crates/auto-cosmic/ports-linux",
+    "crates/auto-cosmic/demo",
+    "crates/auto-cosmic/host-libcosmic",
+    "crates/auto-cosmic/host-smithay",
+]
 resolver = "2"
