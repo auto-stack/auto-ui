@@ -17,8 +17,11 @@
   image/resvg/tiny-skia/kamadak-exif/cosmic-text/syntect/ureq）。
   代码中基线九 feature 的 cfg 门已删除；`cfg(not(feature = "ui-iced"))`
   反向 stub 臂不存在（基线恒开使"无后端工程"不可构造）。
-- 证据口径：拍平前后 `cargo build -p auto-ui-runtime` 单元账本逐位一致
-  （214==214，包/目标/feature 零差）；检查警告 403==403 零新增。
+- 证据口径：拍平前后 `cargo build -p auto-ui-runtime --message-format=json`
+  账本逐位一致——657 条 compiler-artifact 消息两形态相等，按
+  （包, 目标组, features）三元组集合去重后 214 个不同单元相等
+  （657==657 消息级、214==214 单元级零差）；检查警告 403==403 零新增。
+  基线九 feature 的 cfg 门在全 crate（src/tests/examples）为零。
 
 ## 2. 真实可选产品能力（保 optional，语义不变）
 

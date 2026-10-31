@@ -94,13 +94,9 @@ fn main() -> auto_ui_runtime::ui::AppResult<()> {
     // Just change the feature flag in Cargo.toml or CLI:
     //   --features ui-iced   -> Iced backend
 
-    #[cfg(feature = "ui-iced")]
     {
         return auto_ui_runtime::ui::iced::run_app::<AccordionApp>();
     }
 
 
-    #[cfg(not(feature = "ui-iced"))]
-    {
-    }
 }

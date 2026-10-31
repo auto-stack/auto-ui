@@ -8,7 +8,6 @@
 //! 与 `image_surface_contract.rs` 同一套驱动（fixture 走真实文件解析 → VM bridge
 //! → builder），因此这里验的是**真实管线**，不是手搭的测试树。
 
-#![cfg(feature = "ui-iced")]
 
 use auto_ui_runtime::ui::aura_view_builder::AuraViewBuilder;
 use auto_ui_runtime::ui::view::View;

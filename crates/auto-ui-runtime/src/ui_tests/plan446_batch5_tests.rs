@@ -4,7 +4,7 @@
 //! 现场矩阵四链中 button class:/style: prop 与 text/label children 折叠
 //! 两链失效。corpus: test/ui/plan446_u7_loop_props/。
 
-#![cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 
 mod plan446_batch5_u7 {
     fn build() -> crate::ui::dynamic::DynamicComponent {

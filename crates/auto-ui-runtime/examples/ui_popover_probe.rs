@@ -80,14 +80,9 @@ impl Component for Probe {
 fn main() -> auto_ui_runtime::ui::AppResult<()> {
     auto_lang_core::set_ui_host_install_hook(auto_ui_runtime::install_ui_host_capabilities);
     auto_ui_runtime::install_ui_host_capabilities();
-    #[cfg(feature = "ui-iced")]
     {
         eprintln!("[probe] standalone popover probe starting");
         return auto_ui_runtime::ui::HostBackend::Iced.run::<Probe>();
     }
 
-    #[cfg(not(feature = "ui-iced"))]
-    {
-        Err("run with --features ui-iced".into())
-    }
 }

@@ -252,7 +252,6 @@ impl HelloLoaderApp {
 fn main() -> auto_ui_runtime::ui::AppResult<()> {
     auto_lang_core::set_ui_host_install_hook(auto_ui_runtime::install_ui_host_capabilities);
     auto_ui_runtime::install_ui_host_capabilities();
-    #[cfg(feature = "ui-iced")]
     {
         println!("🎨 Running with Iced backend");
         println!("📁 Loading from: scratch/hello.at");
@@ -260,13 +259,4 @@ fn main() -> auto_ui_runtime::ui::AppResult<()> {
     }
 
 
-    #[cfg(not(feature = "ui-iced"))]
-    {
-        Err(
-            "❌ No backend enabled!\n\n\
-             Please run with a backend feature:\n\
-             • cargo run --example ui_hello_loader --features ui-iced\n"
-                .into(),
-        )
-    }
 }

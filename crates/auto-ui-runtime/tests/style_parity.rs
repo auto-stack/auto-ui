@@ -15,7 +15,6 @@
 //!
 //! 诊断: `STYLE_AUDIT_DUMP=1 … audit_no_silent_drop --nocapture` 打印全量分类。
 
-#![cfg(feature = "ui-iced")]
 
 use std::collections::BTreeMap;
 

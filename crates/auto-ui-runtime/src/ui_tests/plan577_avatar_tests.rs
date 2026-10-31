@@ -3,7 +3,6 @@
 //! 断言：①avatar 有子件→avatar-image（图臂）与 avatar-fallback（文本臂）
 //! 进入视图树（fallback 文本可见）；②无子件→灰圆占位保持（回归面）。
 
-#![cfg(feature = "ui-iced")]
 
 use crate::ui::dynamic::DynamicComponent;
 

@@ -9,7 +9,6 @@
 //! 逐格写状态字段，Rust 侧直读断言真值（不依赖 .at 侧断言原语——观测面
 //! 本身可能是缺陷面）。
 
-#![cfg(feature = "ui-iced")]
 
 use std::path::PathBuf;
 

@@ -8,7 +8,6 @@
 //!   与 vue 轨（`generate_component_from_file` → SFC 发射面）断言关键文案。
 //!
 //! VM 轨断言依赖 `ui-iced`——与 plan639_bp_tests 同款门控。
-#![cfg(feature = "ui-iced")]
 
 use auto_ui_compiler::ui_gen::bp::BlueprintRegistry;
 use std::path::{Path, PathBuf};

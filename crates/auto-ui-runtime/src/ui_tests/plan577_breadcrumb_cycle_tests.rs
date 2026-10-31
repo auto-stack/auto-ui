@@ -7,7 +7,6 @@
 //! 页 100% 复现，P534 全站扫描确定性死亡的底层原因）。
 //! 守卫：`active_child_widgets` 进行中集合，命中环渲染 Empty 占位。
 
-#![cfg(feature = "ui-iced")]
 
 #[test]
 fn breadcrumb_page_tag_self_fold_cycle_does_not_overflow() {

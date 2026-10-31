@@ -1,4 +1,3 @@
-#![cfg(feature = "ui-iced")]
 
 use auto_ui_runtime::ui::image_pipeline::{
     MediaAssetKey, MediaAssetRegistry, MediaAssetState, MediaMetadata, RenditionSpec,

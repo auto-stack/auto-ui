@@ -2,7 +2,6 @@
 //!
 //! VM 轨断言依赖 `ui-iced`（build_dynamic_component/ui::view）——与
 //! tests/plan632_demo_bridge_tests.rs 同款门控；非 ui 特性编译零测试。
-#![cfg(feature = "ui-iced")]
 //!
 //! 语料 = `examples/capability-tests/046-bp-import`：pac.at 声明
 //! `dep bps { path: "../../../packages/blueprints" }`，app.at 经

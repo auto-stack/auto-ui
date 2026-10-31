@@ -9,7 +9,6 @@
 //!   + 全包 palette 零漂移不回归 + 047 dep 探测（635 声明门控链路）。
 //!
 //! VM 轨断言依赖 `ui-iced`——与 plan649 bp tests 同款门控。
-#![cfg(feature = "ui-iced")]
 
 use std::path::PathBuf;
 

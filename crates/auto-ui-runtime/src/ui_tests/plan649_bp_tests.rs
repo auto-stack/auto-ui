@@ -9,7 +9,6 @@
 //!   "全黑"对照转绿。
 //!
 //! VM 轨断言依赖 `ui-iced`——与 plan639/640 bp tests 同款门控。
-#![cfg(feature = "ui-iced")]
 
 use std::path::{Path, PathBuf};
 

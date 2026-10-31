@@ -10,7 +10,6 @@
 //!    搬运），测试用 scratch 目录拷贝物化（禁 symlink，worktree 红线）。
 //!
 //! 双轨断言依赖 `ui-iced`——与 plan640_bp_tests 同款门控。
-#![cfg(feature = "ui-iced")]
 
 use std::path::{Path, PathBuf};
 

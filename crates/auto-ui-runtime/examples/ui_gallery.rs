@@ -557,13 +557,9 @@ impl Default for GalleryApp {
 fn main() -> auto_ui_runtime::ui::AppResult<()> {
     auto_lang_core::set_ui_host_install_hook(auto_ui_runtime::install_ui_host_capabilities);
     auto_ui_runtime::install_ui_host_capabilities();
-    #[cfg(feature = "ui-iced")]
     {
         return auto_ui_runtime::ui::iced::run_app::<GalleryApp>();
     }
 
 
-    #[cfg(not(feature = "ui-iced"))]
-    {
-    }
 }

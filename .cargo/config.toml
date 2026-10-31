@@ -13,9 +13,8 @@ tu = "test -p auto-ui-compiler --lib ui_gen::"
 # lifecycle 三测自带 heavy/env ignore——证据跑须 `--ignored` 串行，t/ti 默认
 # 不触发。
 ti = "nextest run -p auto-ui-tools -p auto-ui-runtime --test legacy_build_semantics --test lifecycle --test resources_manifest --test tool_process --test osconfig_integration"
-# native 手工档（原门保持：native-dnd+test-native-dock 双 feature × windows、
-# 真光标交互——开发机/专用 CI 档，不进日常/集成档；feature 关闭时目标编译
-# 为空）
+# native 手工档（PLAN-018 T-03：test-native-dock 门退役——native-dnd 真
+# 能力门 × windows、真光标交互——开发机/专用 CI 档，不进日常/集成档）
 tn = "test -p auto-ui-runtime --features native-dnd --test native_dnd_e2e"
 
 # PLAN-831 T-09（F831-09-04，自语言仓 .cargo/config.toml 随迁）：深递归

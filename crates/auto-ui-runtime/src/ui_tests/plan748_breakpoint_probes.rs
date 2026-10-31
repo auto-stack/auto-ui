@@ -13,7 +13,7 @@
 //! 本文件是 T-00 定音探针（判定产物=定音报告，红格即复现证据）；T-01/T-02/
 //! T-03 修复时在本文件基础上固化红相矩阵（命名切 plan748_*_tests）。
 
-#![cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 
 use auto_lang_core::vm::engine::SegmentOutcome;
 use auto_lang_core::vm::task::AutoTask;

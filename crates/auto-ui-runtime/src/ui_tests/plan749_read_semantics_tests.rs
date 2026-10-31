@@ -15,7 +15,7 @@
 //! + raw NanoValue 位型 dump（不依赖 .at 侧断言原语——观测面本身可能是缺陷
 //! 面；plan733 同款纪律）。
 
-#![cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 
 use auto_lang_core::vm::engine::SegmentOutcome;
 use auto_lang_core::vm::task::AutoTask;

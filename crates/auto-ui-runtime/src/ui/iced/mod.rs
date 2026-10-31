@@ -23,7 +23,7 @@ pub mod hover_area;
 // 窗口根单包装,ButtonPressed 现场记账窗口逻辑坐标到会话级单槽,纯委托)。
 pub mod right_press_area;
 // PLAN-631 F-7: pointer placement headless 测试(iced_test 管线,
-// iced-layout-tests 门控)。
+// iced_test dev 依赖（PLAN-018 T-03） 门控)。
 #[cfg(test)]
 mod pointer_placement_tests;
 // PLAN-731 T-00: S5 分段根包装探针(layout/draw 括号计量,纯委托)。
@@ -80,7 +80,7 @@ pub mod managed_content;
 pub mod scroll_state_reader;
 
 // Plan 414 §8.2: headless layout testbench — `iced_test`-based bounds
-// assertions (feature `iced-layout-tests`; see layout_tests.rs header).
+// assertions (feature `iced_test dev 依赖（PLAN-018 T-03）`; see layout_tests.rs header).
 #[cfg(test)]
 mod layout_tests;
 // PLAN-010 T8: terminal 组件像素级 headless 自动化(同款 iced_test 管线)。

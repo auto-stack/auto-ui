@@ -13,7 +13,6 @@
 //! Run with:
 //!   cargo nextest run -p auto-lang --features ui-iced --test osconfig_integration
 
-#![cfg(feature = "ui-iced")]
 
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};

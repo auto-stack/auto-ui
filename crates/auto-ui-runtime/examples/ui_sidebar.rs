@@ -77,13 +77,9 @@ fn main() -> auto_ui_runtime::ui::AppResult<()> {
     auto_lang_core::set_ui_host_install_hook(auto_ui_runtime::install_ui_host_capabilities);
     auto_ui_runtime::install_ui_host_capabilities();
     // The same code works with both backends!
-    #[cfg(feature = "ui-iced")]
     {
         return auto_ui_runtime::ui::iced::run_app::<SidebarApp>();
     }
 
 
-    #[cfg(not(feature = "ui-iced"))]
-    {
-    }
 }

@@ -5,7 +5,6 @@
 //! the file driver also supplies the Vue output. This keeps all three checks
 //! tied to one source contract rather than three hand-built test trees.
 
-#![cfg(feature = "ui-iced")]
 
 use auto_ui_runtime::ui::aura_view_builder::AuraViewBuilder;
 use auto_ui_runtime::ui::view::View;

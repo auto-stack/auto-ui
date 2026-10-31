@@ -9,7 +9,7 @@
 //! headless 等价物：build + 首次视图渲染在带超时的线程内完成（wedge →
 //! 超时失败而非套件挂死），并断言按钮 onclick 携带物化后的字段值。
 
-#![cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 
 mod plan446_b1_store_loop {
     use crate::plan370_test_support::build_component_from_app;

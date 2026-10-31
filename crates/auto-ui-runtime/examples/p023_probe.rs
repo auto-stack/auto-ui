@@ -1,5 +1,5 @@
 // PLAN-023 T-01 划痕探针(未跟踪草稿,永不提交)——纯 iced 复现矩阵。
-// 运行:cargo run -p auto-lang --example p023_probe --features ui-iced,iced-layout-tests
+// 运行:cargo run -p auto-lang --example p023_probe --features ui-iced（iced_test 已转 dev 依赖，PLAN-018 T-03）
 //
 // 每变体一个 Simulator,交替点击 A(150,150)/B(450,150) 三轮;消息即计数
 // (A 发 1,B 发 2);6 连击期望消息序列 [1,2,1,2,1,2],缺失=该击死亡。

@@ -9,7 +9,6 @@
 //! （todos 恒 []），standalone 同源码种子可见。本测试把该链路锁进
 //! `cargo t`：绿 = 数据面修复的验收锚；红 = 白盒调试起点。
 
-#![cfg(feature = "ui-iced")]
 
 use std::path::PathBuf;
 

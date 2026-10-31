@@ -180,20 +180,10 @@ impl ListApp {
 fn main() -> auto_ui_runtime::ui::AppResult<()> {
     auto_lang_core::set_ui_host_install_hook(auto_ui_runtime::install_ui_host_capabilities);
     auto_ui_runtime::install_ui_host_capabilities();
-    #[cfg(feature = "ui-iced")]
     {
         println!("Running with Iced backend");
         return auto_ui_runtime::ui::iced::run_app::<ListApp>();
     }
 
 
-    #[cfg(not(feature = "ui-iced"))]
-    {
-        Err(
-            "No backend enabled!\n\n\
-             Please run with a backend feature:\n\
-             \u{2022} cargo run --features ui-iced\n"
-                .into(),
-        )
-    }
 }

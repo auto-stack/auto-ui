@@ -93,20 +93,10 @@ impl RadioApp {
 fn main() -> auto_ui_runtime::ui::AppResult<()> {
     auto_lang_core::set_ui_host_install_hook(auto_ui_runtime::install_ui_host_capabilities);
     auto_ui_runtime::install_ui_host_capabilities();
-    #[cfg(feature = "ui-iced")]
     {
         println!("🎨 Running with Iced backend");
         return auto_ui_runtime::ui::iced::run_app::<RadioApp>();
     }
 
 
-    #[cfg(not(feature = "ui-iced"))]
-    {
-        Err(
-            "❌ No backend enabled!\n\n\
-             Please run with a backend feature:\n\
-             • cargo run --example ui_radio --features ui-iced\n"
-                .into(),
-        )
-    }
 }
