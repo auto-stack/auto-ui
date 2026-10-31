@@ -3974,7 +3974,7 @@ pub fn generate_shell_pack_lib(output_dir: &Path) -> AutoResult<()> {
 
 /// 交付闭包内受管源码 crate（相对 crates/；含 auto-lang 全库——语言源码
 /// 尚未拆完，属如实披露的受管包含，非"纯 core/独立 UI 仓"）。
-pub const DELIVERY_CRATES: [&str; 25] = [
+pub const DELIVERY_CRATES: [&str; 28] = [
     "auto-lang",
     "auto-val",
     "auto-atom",
@@ -4039,6 +4039,17 @@ pub const DELIVERY_CRATES: [&str; 25] = [
     // 门转 auto-lang/auto-lang-core 常驻依赖，随包交付（其 vendored parser
     // 见 DELIVERY_VENDOR_TREES，非 crates/ 成员）。
     "auto-test-case",
+    // PLAN-901 r2/§5.5：交付闭包补全（890 谱系缺口修复）——auto-ui-tools/
+    // auto-api-gen/auto-lang/auto-lang-core 自 PLAN-890 起硬依赖 auto-web
+    // 家族（非 optional），auto-api-gen/auto-web 另依赖 auto-generation-core
+    // （共享生成/来源owner单源）；闭包缺位则交付根 fresh metadata 必红，
+    // staging 边界自检对 "../../../auto-web/..." 判"越出交付根"。web 两
+    // crate 源=组内兄弟 auto-web 仓（ui_crate_source web 类别），投影见
+    // PROJECTION_AUTO_API_GEN / PROJECTION_AUTO_WEB / AUTO_LANG(_CORE)
+    // 补充前缀。
+    "auto-generation-core",
+    "auto-web-contract",
+    "auto-web",
 ];
 
 /// PLAN-901：随包交付的 producer 仓根级树（源=语言仓相对路径 → 交付根
@@ -4093,12 +4104,19 @@ const PROJECTION_AUTO_LANG: DeliveryProjectionSpec = DeliveryProjectionSpec {
     feature_rewrites: &[],
     installed_rewrites: &[],
     // PLAN-831 T-06：auto-lang 对独立 UI 仓包组的跨仓 path → 交付根包内兄弟。
-    path_rewrites: &[("../../../auto-ui/crates/", "../")],
+    // PLAN-901 r2/§5.5：facade 对 web 仓 auto-web 的硬 path 依赖（890 谱系）
+    // → 交付根包内兄弟。
+    path_rewrites: &[
+        ("../../../auto-ui/crates/", "../"),
+        ("../../../auto-web/crates/", "../"),
+    ],
 };
 
 const PROJECTION_AUTO_UI_RUNTIME: DeliveryProjectionSpec = DeliveryProjectionSpec {
     // 814-T-04 随迁的跨仓 optional 依赖（原 auto-lang 位置），投影语义
     // 原样承接：剥 autodown-core 路径行，autodown 特征改写为无 dep: 形态。
+    // PLAN-901 r2/§5.5：runtime 对 web 仓 auto-web 的硬 path 依赖（890
+    // 谱系）→ 交付根包内兄弟。
     strip_deps: &[
         "autodown-core = { path = \"../../../auto-down/autodown/packages/engine/rust\", optional = true }",
     ],
@@ -4107,21 +4125,49 @@ const PROJECTION_AUTO_UI_RUNTIME: DeliveryProjectionSpec = DeliveryProjectionSpe
         "autodown = [\"ui-iced\"]",
     )],
     installed_rewrites: &[],
-    path_rewrites: &[("../../../auto-lang/crates/", "../")],
+    path_rewrites: &[
+        ("../../../auto-lang/crates/", "../"),
+        ("../../../auto-web/crates/", "../"),
+    ],
 };
 
 const PROJECTION_AUTO_LANG_CORE: DeliveryProjectionSpec = DeliveryProjectionSpec {
     // PLAN-901：Core 清单 test-cases feature 退出、auto-test-case 常驻——
-    // spec 收敛为恒等投影（与 PROJECTION_AUTO_LANG 同理，无跨仓 path 面）。
+    // spec 收敛为恒等投影（与 PROJECTION_AUTO_LANG 同理）。PLAN-901 r2/
+    // §5.5：Core 对 web 仓 auto-web-contract 的硬 path 依赖（890 谱系）
+    // → 交付根包内兄弟。
     strip_deps: &[],
     feature_rewrites: &[],
     installed_rewrites: &[],
-    path_rewrites: &[],
+    path_rewrites: &[("../../../auto-web/crates/", "../")],
 };
 
 /// PLAN-831 T-06 起 UI 仓侧受管 crate 的通用投影：跨仓语言基础 path 前缀
 /// 改写为交付根包内兄弟形态（runtime 另有 autodown 剥除 spec 覆盖）。
+/// PLAN-901 r2/§5.5：补 web 仓前缀（auto-ui-tools 硬依赖 auto-web）。
 const PROJECTION_AUTO_UI_CRATE: DeliveryProjectionSpec = DeliveryProjectionSpec {
+    strip_deps: &[],
+    feature_rewrites: &[],
+    installed_rewrites: &[],
+    path_rewrites: &[
+        ("../../../auto-lang/crates/", "../"),
+        ("../../../auto-web/crates/", "../"),
+    ],
+};
+
+/// PLAN-901 r2/§5.5：auto-api-gen 投影——语言基础 path 已是包内兄弟形
+/// （`../auto-generation-core` 等），仅 auto-web 跨仓前缀需改写。
+const PROJECTION_AUTO_API_GEN: DeliveryProjectionSpec = DeliveryProjectionSpec {
+    strip_deps: &[],
+    feature_rewrites: &[],
+    installed_rewrites: &[],
+    path_rewrites: &[("../../../auto-web/crates/", "../")],
+};
+
+/// PLAN-901 r2/§5.5：web 仓侧受管 crate 的通用投影：跨仓语言基础 path
+/// 前缀改写为交付根包内兄弟形态；`../auto-web-contract` 兄弟形在交付根
+/// 同构（web 仓与交付根 crates/ 布局一致），零改写。
+const PROJECTION_AUTO_WEB: DeliveryProjectionSpec = DeliveryProjectionSpec {
     strip_deps: &[],
     feature_rewrites: &[],
     installed_rewrites: &[],
@@ -4456,6 +4502,26 @@ fn generate_delivery_root_manifest(
     }
     let ws_deps = delivery_extract_toml_section(&root_manifest, "[workspace.dependencies]")?;
     let profile_dev = delivery_extract_toml_section(&root_manifest, "[profile.dev]")?;
+    // PLAN-901 r2/§5.5：交付闭包含 web owner crate（auto-web-contract/
+    // auto-web 以 version/edition/license.workspace 继承）——组内 web 根
+    // [workspace.package] 表字节副本随根发行；语言成员不继承、不受影响。
+    // fixture/独立 producer 无组内 web 根时省略（交付 E2E 须能解析 web 继承）。
+    let ws_package = std::path::Path::new(producer_root)
+        .parent()
+        .and_then(|parent| std::fs::read_to_string(parent.join("auto-web/Cargo.toml")).ok())
+        .and_then(|text| {
+            delivery_extract_toml_section(&text, "[workspace.package]")
+                .ok()
+                .filter(|section| !section.trim().is_empty())
+        })
+        .unwrap_or_default();
+    let ws_package_block = if ws_package.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "# web owner 包表（PLAN-901 r2/§5.5，web 根字节副本——交付闭包\n# web crate 继承解析面）。\n{ws_package}\n"
+        )
+    };
     let mut members: Vec<String> = Vec::new();
     members.push(format!("    \"app\""));
     for c in DELIVERY_CRATES {
@@ -4473,7 +4539,7 @@ members = [
 default-members = ["{app_member}"]
 resolver = "2"
 
-{ws_deps}
+{ws_package_block}{ws_deps}
 {profile_dev}
 # 顶层 patch（PLAN-043 走查 2026-09-25）：iced_widget 本地补丁随包发行——
 # patch 写在消费根，不写在依赖包内；删此段则 --locked 重放确定性红。
@@ -5472,6 +5538,8 @@ fn generate_rust_ui_delivery_inner(
                 | "auto-ui-tools"
                 | "shell-pack"
         );
+        // PLAN-901 r2/§5.5：交付闭包 web owner 类别（890 谱系缺口修复）。
+        let web = matches!(name, "auto-web-contract" | "auto-web");
         let selected_receipt = if ui {
             ui_receipt
         } else {
@@ -5479,7 +5547,17 @@ fn generate_rust_ui_delivery_inner(
         };
         if let Some(receipt) = selected_receipt {
             let rel = format!("crates/{name}");
-            receipt.require_package(name, if ui { "auto-ui" } else { "auto-lang" }, &rel)?;
+            receipt.require_package(
+                name,
+                if ui {
+                    "auto-ui"
+                } else if web {
+                    "auto-web"
+                } else {
+                    "auto-lang"
+                },
+                &rel,
+            )?;
             // Verify the actual staged bytes against the receipt frozen for
             // this particular owner, before any manifest projection.
             receipt.verify_tree(&rel, &dst)?;
@@ -5501,8 +5579,17 @@ fn generate_rust_ui_delivery_inner(
             name,
             "auto-ui-dialect" | "auto-ui-compiler" | "auto-ui-tools" | "shell-pack"
         ) {
-            // PLAN-831 T-06：UI 仓侧受管 crate——跨仓语言基础 path 前缀投影。
+            // PLAN-831 T-06：UI 仓侧受管 crate——跨仓语言基础 path 前缀投影
+            // （PLAN-901 r2：spec 内补 web 仓前缀改写）。
             edits = delivery_apply_projection(&dst.join("Cargo.toml"), &PROJECTION_AUTO_UI_CRATE)?;
+        } else if name == "auto-api-gen" {
+            // PLAN-901 r2/§5.5：api 生成主体——web 仓跨仓前缀投影（语言
+            // 基础 path 已是包内兄弟形）。
+            edits = delivery_apply_projection(&dst.join("Cargo.toml"), &PROJECTION_AUTO_API_GEN)?;
+        } else if name == "auto-web" {
+            // PLAN-901 r2/§5.5：web 仓侧受管 crate——跨仓语言基础前缀投影
+            // （auto-web-contract 无 path 依赖，恒等）。
+            edits = delivery_apply_projection(&dst.join("Cargo.toml"), &PROJECTION_AUTO_WEB)?;
         }
         let origin_repo = if matches!(
             name,
@@ -5513,6 +5600,8 @@ fn generate_rust_ui_delivery_inner(
                 | "shell-pack"
         ) {
             "auto-ui"
+        } else if web {
+            "auto-web"
         } else {
             "auto-lang"
         };
@@ -6623,12 +6712,20 @@ mod tests {
             .join("../../../auto-lang/crates")
             .canonicalize()
             .expect("兄弟 auto-lang/crates 在场（组布局）");
+        // PLAN-901 r2/§5.5：交付闭包 web owner crate（auto-web-contract/
+        // auto-web）自组内 auto-web 兄弟仓解析。
+        let web_crates = manifest_dir
+            .join("../../../auto-web/crates")
+            .canonicalize()
+            .expect("兄弟 auto-web/crates 在场（组布局）");
         for name in DELIVERY_CRATES {
             let local = ui_crates.join(name);
             let manifest_path = if local.join("Cargo.toml").is_file() {
                 local.join("Cargo.toml")
-            } else {
+            } else if lang_crates.join(name).join("Cargo.toml").is_file() {
                 lang_crates.join(name).join("Cargo.toml")
+            } else {
+                web_crates.join(name).join("Cargo.toml")
             };
             let manifest = std::fs::read_to_string(&manifest_path)
                 .unwrap_or_else(|e| panic!("{} manifest unreadable: {e}", name));
@@ -8511,6 +8608,40 @@ fn plan901_delivery_closure_pins_resident_test_case() {
         assert!(
             !vendored.contains("../../../auto-down"),
             "跨仓 path 引用零残留（重定位安全）"
+        );
+        // PLAN-901 r2/§5.5：交付闭包 web owner 成员随包（890 谱系缺口修复），
+        // 跨仓 path 投影为包内兄弟、根 manifest 携带 web 继承包表。
+        assert!(delivery.join("crates/auto-web/Cargo.toml").is_file());
+        assert!(
+            delivery
+                .join("crates/auto-web-contract/Cargo.toml")
+                .is_file()
+        );
+        let web_manifest =
+            std::fs::read_to_string(delivery.join("crates/auto-web/Cargo.toml")).unwrap();
+        assert!(
+            web_manifest
+                .lines()
+                .any(|l| l.contains("path = \"../auto-lang-core\"")),
+            "web 跨仓语言 path 投影为包内兄弟：{web_manifest}"
+        );
+        assert!(
+            !web_manifest.contains("../../../auto-lang"),
+            "web 跨仓 path 引用零残留（重定位安全）"
+        );
+        let apigen_manifest =
+            std::fs::read_to_string(delivery.join("crates/auto-api-gen/Cargo.toml")).unwrap();
+        assert!(
+            apigen_manifest.contains("path=\"../auto-web\""),
+            "api-gen web 依赖投影为包内兄弟：{apigen_manifest}"
+        );
+        assert!(
+            !apigen_manifest.contains("../../../auto-web"),
+            "api-gen 跨仓 path 引用零残留（重定位安全）"
+        );
+        assert!(
+            root_manifest.contains("[workspace.package]"),
+            "web 继承包表随交付根发行"
         );
         // 应用清单：自包含 path 依赖 + pin 块；无 workspace 继承
         let app_manifest = std::fs::read_to_string(delivery.join("app/Cargo.toml")).unwrap();
