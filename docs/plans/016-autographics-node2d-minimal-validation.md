@@ -1,6 +1,6 @@
 ---
 plan_id: PLAN-016
-status: executing
+status: reviewed
 feature_name: AutoGraphics Node2D最小真实执行验证
 author: [Codex]
 created_at: 2026-10-30
@@ -182,6 +182,8 @@ T-02最多比较两种既有端口接法，必须均复用共同语法/Core解�
 2026-10-31 goal round1（work 全阶段）：`stage: goal | plan_id: PLAN-016 | plan_revision: r3 | round: 1 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-016/auto-ui | commit: 803026d（T-06 内容提交 59ff619 为冻结代码提交） | next: review`。本轮 T-01..T-06 全闭合：G-01 核实、合同冻结、研究文法+模块绑定 12 例、降层生成器+冻结生成物、driver 6 例（CPU/GPU/预算/旧代/双父/生命周期/owner）、verify_plan016 --controls PASS、consumerB A→B 全量 6 passed（冷 SDK 681 files，t06-consumerB.log SHA 见 plan-artifacts）。执行 door：D-01/D-02/D-03 闭合，D-04 归 review。统一回归门 pending（owner=review/merge）。
 
 2026-10-31 independent final R1：`stage: review | review_scope: final | reviewer_identity: independent read-only subagent（同树只读，未参与实现） | plan_id: auto-ui/PLAN-016 | plan_revision: 3 | outcome: needs_fix | worktree_path: D:/autostack/.wt/ui-016/auto-ui | branch: codex/plan-016-dev | reviewed_commit: 59ff619 | base_commit: 69690dfb | dependency_revisions: SDK 7b987ca8、auto-lang 3fa75dd9、auto-down c3464d0 | spec_inputs: SD 候选 node2d-pilot.md | acceptance_results: AC-01/03/04/05/06 pass；AC-02 partial（F-01..F-04 诊断缺类）；AC-07 本报告 | pending_closeout_gates: 受影响修复复审、冻结定向门、canonical/archive/cleanup | findings: F-016-R1-01..11（错导出/坏引用/未知属性/重复绑定缺失、fmt、9 warnings、合同命令、预算算式 31→32、Life.Frame 死代码、Start 同名夹具缺、化妆项） | evidence: 审阅者自跑全电池（dialect 6+compiler 6+flow 6+verify PASS），报告见会话记录 | next: work 受影响修复后同员复审`。R1 确认执行核心真实可复现（生成物身份三重独立验证），四类文档承诺的诊断类未交付为实质 finding。
+
+2026-10-31 independent final R2（affected re-review，同一独立只读复审员）：`stage: review | review_scope: final affected re-review | reviewer_identity: independent read-only subagent agent_ec887a82（同 R1 员） | plan_id: auto-ui/PLAN-016 | plan_revision: 3 | outcome: pass | worktree_path: D:/autostack/.wt/ui-016/auto-ui | branch: codex/plan-016-dev | reviewed_commit: 9eb1d0e | base_commit: 69690dfb | dependency_revisions: SDK 7b987ca8、auto-lang 3fa75dd9 | spec_inputs: SD 候选 node2d-pilot.md（R1 修正后） | acceptance_results: AC-01..07 全 pass（AC-02 升级 pass：四类诊断已交付/定位/行为化测试） | pending_closeout_gates: 冻结定向门（merge 所有）、canonical/archive/cleanup、统一回归门 | findings: 无未处置；F-016-R1-01..11 全闭合且经复审员独立验证 | evidence: 复审员重放五探针全拒（带 file:line）、9/9 gates、flow 6/6 GPU、verify PASS、sha 不变、fmt 0 diff、触面 0 warning | next: merge`。R1 修复在 9eb1d0e；生成物字节不变（执行证据直通）。
 
 ## 10. 待澄清事项
 
