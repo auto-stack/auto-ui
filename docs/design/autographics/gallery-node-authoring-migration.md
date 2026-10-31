@@ -2,6 +2,8 @@
 
 2026-10-31，设计 v1，目标与分波合同；尚未实施。作者模型沿[总体设计](declarative-authoring-model.md)，当前交付能力沿[017 Spec](../../specs/auto-graphics/node2d-g11-authoring.md)。本文件归 auto-ui；Gallery 合同在各自仓管理。
 
+2026-11-01进展/规划补记：019引擎已实际交付c93adb7，AG008由用户报告在开发，仍固定019。下一轮[组件/查询/精灵设计](node-components-queries-and-sprites.md)拆为020共同组件基础→021查询、022精灵，三份仅规划；AG008不增加这些前置。019子组件目前仍限纯view，因此W1是有限作者形式迁移，不代表Player等局部model/on已经全部归位；后续内容局部性完善另按真实交付滚动，不在在途008中暗加验收。
+
 ## 目标与现场
 
 所有 Gallery 项目的作者源最终使用 Auto 的 node、model、view-2d/view-3d、on、Life、msg、绑定和普通 use。场景 JSON、句柄与单文件运行源可以继续作为生成产物，不要求它们消失，也不要求执行存储照搬声明树。资源、组件和纯函数应复用；不能为每个示例继续新增一个按示例名识别的专用编译器。
@@ -20,7 +22,7 @@ auto-ui 017的g11-2d模式仍要求恰一个character2d，solid/camera限根，�
 | g03/3d | JSON，父子group | W3；同维层级与旧3D规则，不承诺跨维parent或通用TRS写入 |
 | g04/2d | JSON，编辑器教程 | W6；Node为场景来源，原视口/选取/拖动/保存/重开仍是编辑器验收 |
 | g04/3d | JSON，编辑器教程 | W6；原34步相关能力不改名为公共脚本API；OS自动化准入另受既有政策 |
-| g05/2d | 旧v3 Auto+场景，segment/sweep | W2a；typed射线/扫掠结果、命中次序/法线/空间/源变体；不能只迁静态画面 |
+| g05/2d | 旧v3 Auto+场景，segment/sweep | W2a引擎021（依赖组件020）；typed射线/扫掠结果、命中次序/法线/空间/源变体；不能只迁静态画面 |
 | g05/3d | 旧v3 Auto+场景，segment/sweep | W4a；同上三维与parent空间，需先有3D基础 |
 | g06/layout-a | character Auto，台阶/跳跃 | W1；输入沿、重力/支撑/碰撞、速度4→5对照、布局A原几何 |
 | g06/layout-b | character Auto，坑道/跳跃 | W1；同输入与A产生原几何差异，保无双跳/无缓冲跳与Stop恢复 |
@@ -28,8 +30,8 @@ auto-ui 017的g11-2d模式仍要求恰一个character2d，solid/camera限根，�
 | g07/layout-b | character3d Auto，另一布局 | W3；第二布局与全部原源变体/验收 |
 | g08/2d | camera2d Auto，跟随/夹界/letterbox | W1；主alt相机配置、同tick角色与相机、实际条带和Pause |
 | g08/3d | camera3d Auto，环绕/缩放/相对运动 | W3；orbit/zoom、pointer清理、实际投影/运动，不仅生成静态相机 |
-| g09/atlas | sprites2d Auto+PNG atlas | W2b；资源symbol/导入、帧选择、UV、alpha、许可/变体/离线包 |
-| g09/character | sprites2d Auto，角色状态驱动帧 | W2b；真实走跳/状态与像素相符，保全部9项原oracle |
+| g09/atlas | sprites2d Auto+PNG atlas | W2b引擎022（依赖组件020）；资源symbol/导入、帧选择、UV、alpha、许可/变体/离线包 |
+| g09/character | sprites2d Auto，角色状态驱动帧 | W2b引擎022；真实走跳/状态与像素相符，保全部9项原oracle |
 | g10/textures | v1 Auto+GLB/PNG/UV | W4b；原件与UV夹具、遮挡/显隐/许可与完整资产闭包 |
 | g10/animation | animation3d Auto+clip/visual pose | W4b；原四clip、yaw/phase、颜色/阴影/物理隔离，不把动画公式放Rust |
 | g11/2d | Node源码，AG007/017 | 已交付；保51原项+新增负控，后续共同端口修改选真实受影响回归 |
@@ -41,7 +43,7 @@ W1是5个已交付入口；W2a/W2b共3个，W3共6个，W4a/W4b共3个，W5当�
 
 ## 第一轮可执行拆分
 
-- [auto-ui/019](../../plans/019-autographics-node2d-scenes-character-camera.md)：纯视觉叶子/二维group、零或一个角色、跳跃/支撑、可选跟随相机与完整主alt源变体；公共准备/来源消费能力。018已被UI构建配置路线占用，不能覆盖。
+- [auto-ui/019](../../plans/archived/019-autographics-node2d-scenes-character-camera.md)：已交付c93adb7；纯视觉叶子/二维group、零或一个角色、跳跃/支撑、可选跟随相机与完整主alt源变体；公共准备/来源消费能力。018已被UI构建配置路线占用，不能覆盖。
 - [ag-examples/008](../../../../ag-examples/docs/plans/008-autographics-gallery-node2d-first-wave.md)：固定消费019实际交付，只迁G01、G03/2d、G06两布局、G08/2d。每个入口的旧行为/素材/变体/验收在计划中逐项承接；原3D和其它项不跟升。
 
 先引擎交付、再内容；下一波引擎可与上一波固定消费的内容并行，读端不追开发tip。查询、二维图片、三维资源和声音的端口应复用共同领域表示，但共享文件要约定owner短窗，GPU/窗口/音频重型门单实例。当前018、语言901与UI014的真实写面由开工核对，不凭标题加全量串行前置。
