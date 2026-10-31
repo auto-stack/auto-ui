@@ -1,0 +1,77 @@
+// PLAN-017 g11-2d variant: radius geometry probes (original two-geometry at
+// authoring level). Static instances at the character-relative offsets used by
+// the original: AABB quad at the corner (2.9,1.4), circle r=0.5 at the corner
+// (silent: closest point 0.64 > 0.5), circle r=0.5 at the tangent (2.9,1.0)
+// (hits at exactly 0.5). dir0=0 keeps the circle probes static.
+use types: Key, Result
+use player: Player
+use hazard: Hazard
+use goal: Goal
+
+node MainGeometry {
+    model {
+        var box_hits = 0
+        var corner_hits = 0
+        var tangent_hits = 0
+        var result = 0
+        var starts = 0
+    }
+    msg { BoxHit, BoxLeft, CornerHit, TangentHit }
+    view-2d {
+        Player player {
+            spawn_x: 2.0
+            spawn_y: 0.5
+            speed: 2.0
+            enabled: 1
+        }
+        Goal corner_box {
+            x: 2.9
+            y: 1.4
+            mesh: resources.void_mesh
+            material: resources.dim
+            target: refs.player.actor
+            on_reach: .BoxHit
+            on_left: .BoxLeft
+        }
+        Hazard corner_circle {
+            x: 2.9
+            base_y: 1.4
+            dir0: 0.0
+            mesh: resources.hazard_mesh
+            material: resources.red
+            target: refs.player.actor
+            on_hit: .CornerHit
+        }
+        Hazard tangent_circle {
+            x: 2.9
+            base_y: 1.0
+            dir0: 0.0
+            mesh: resources.hazard_mesh
+            material: resources.red
+            target: refs.player.actor
+            on_hit: .TangentHit
+        }
+        camera2d camera {
+            target: refs.player.actor
+            bounds: (0.0, -4.0, 30.0, 12.0)
+            view_size: (12.0, 8.0)
+        }
+    }
+    on {
+        Life.Start -> {
+            .starts = 1
+        }
+        .BoxHit -> {
+            .box_hits = .box_hits + 1
+        }
+        .BoxLeft -> {
+            .box_hits = .box_hits + 10
+        }
+        .CornerHit -> {
+            .corner_hits = .corner_hits + 1
+        }
+        .TangentHit -> {
+            .tangent_hits = .tangent_hits + 1
+        }
+    }
+}

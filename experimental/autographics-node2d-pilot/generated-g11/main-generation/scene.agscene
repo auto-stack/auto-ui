@@ -1,0 +1,55 @@
+{
+ "behavior": {
+  "api": "autographics.triggers2d/1",
+  "source": {
+   "format": "auto-source",
+   "sha256": "8141d1142d86fb5393c0fcd9955b1120945f0f1bed79be7dbc1feb2f8c5b60d7",
+   "byte_length": 3607
+  },
+  "actors": {
+   "two_d": 1,
+   "three_d": null
+  }
+ },
+ "schema": "autographics.scene/6",
+ "document_id": "plan017-g11-2d-MainGeneration",
+ "resources": [
+  "circle",
+  "quad",
+  "cylinder",
+  "player",
+  "mob"
+ ],
+ "objects": [
+  {
+   "id": 1,
+   "name": "player",
+   "kind": "quad",
+   "translation": [2.0, 0.5, 0.0],
+   "scale": [0.8, 1.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.9, 0.5, 0.25, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 2,
+   "name": "respawn_template",
+   "kind": "circle",
+   "translation": [-30.0, 2.0, 0.0],
+   "scale": [0.6, 0.6, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.95, 0.8, 0.2, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  }
+ ],
+ "groups": [],
+ "assets": []
+}

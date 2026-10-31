@@ -1,0 +1,31 @@
+{
+ "generator": "autographics-node2d-pilot plan017 g11-2d",
+ "api": "autographics.triggers2d/1",
+ "user_source_sha256": "cc57c0f02e4ccfb5a2491bb89f207548f76b0f5340e43b381e0981046213deb4",
+ "user_source_bytes": 5733,
+  "module:goal": "5e731882f989f6221bfd0cb4d807bfe9bfe186043a1352237715ca0b805d33ed",
+  "module:hazard": "be44a4105821f5785f63a16e55136d120f979da7825e76d03c0f4244955ccb91",
+  "module:main-geometry": "06a90791d396440e63d68440abcc219eb24d40a457126bf4aae96a7cbdda7f31",
+  "module:patrol": "c7447a86d76cee7dd805dc7936443ea4b869be7819e8dfe411c4cd0ac2ad40e8",
+  "module:player": "b70396b4cf76bb5ffa90e19c423c123b6515a99e9a6722b09411e5904da87a4d",
+  "module:resources": "ac92fb354939f6a129b96c0cc2466f50dff73bb4694acc41f5478c687287d344",
+  "module:types": "8ebd898980bfca7fc8b3d68c45f4f79d4565d7232f908ca16dfcd6bfb0c3a486",
+ "closure": [
+  {"name": "goal", "sha256": "5e731882f989f6221bfd0cb4d807bfe9bfe186043a1352237715ca0b805d33ed", "bytes": 800},
+  {"name": "hazard", "sha256": "be44a4105821f5785f63a16e55136d120f979da7825e76d03c0f4244955ccb91", "bytes": 1142},
+  {"name": "main-geometry", "sha256": "06a90791d396440e63d68440abcc219eb24d40a457126bf4aae96a7cbdda7f31", "bytes": 2099},
+  {"name": "patrol", "sha256": "c7447a86d76cee7dd805dc7936443ea4b869be7819e8dfe411c4cd0ac2ad40e8", "bytes": 275},
+  {"name": "player", "sha256": "b70396b4cf76bb5ffa90e19c423c123b6515a99e9a6722b09411e5904da87a4d", "bytes": 1061},
+  {"name": "resources", "sha256": "ac92fb354939f6a129b96c0cc2466f50dff73bb4694acc41f5478c687287d344", "bytes": 913},
+  {"name": "types", "sha256": "8ebd898980bfca7fc8b3d68c45f4f79d4565d7232f908ca16dfcd6bfb0c3a486", "bytes": 220}
+ ],
+ "roles": {
+   "character": {"instance": "player", "template": 1},
+   "grounds": [],
+   "pairs": [
+    {"pair": 0, "instance": "corner_box", "template": 2},
+    {"pair": 1, "instance": "corner_circle", "template": 3},
+    {"pair": 2, "instance": "tangent_circle", "template": 4}
+   ]
+  }
+}

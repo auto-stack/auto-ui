@@ -1,0 +1,25 @@
+{
+ "generator": "autographics-node2d-pilot plan017 g11-2d",
+ "api": "autographics.triggers2d/1",
+ "user_source_sha256": "8141d1142d86fb5393c0fcd9955b1120945f0f1bed79be7dbc1feb2f8c5b60d7",
+ "user_source_bytes": 3607,
+  "module:coin": "554c7e14929e63412bf1451f088de9a3d20039596335f07e60e35875bbaa721f",
+  "module:main-generation": "5531764a0b4480155dbbe61c0cde26768bc4bb74af7a7270f0a10c41bb4afa39",
+  "module:player": "b70396b4cf76bb5ffa90e19c423c123b6515a99e9a6722b09411e5904da87a4d",
+  "module:resources": "ac92fb354939f6a129b96c0cc2466f50dff73bb4694acc41f5478c687287d344",
+  "module:types": "8ebd898980bfca7fc8b3d68c45f4f79d4565d7232f908ca16dfcd6bfb0c3a486",
+ "closure": [
+  {"name": "coin", "sha256": "554c7e14929e63412bf1451f088de9a3d20039596335f07e60e35875bbaa721f", "bytes": 758},
+  {"name": "main-generation", "sha256": "5531764a0b4480155dbbe61c0cde26768bc4bb74af7a7270f0a10c41bb4afa39", "bytes": 1470},
+  {"name": "player", "sha256": "b70396b4cf76bb5ffa90e19c423c123b6515a99e9a6722b09411e5904da87a4d", "bytes": 1061},
+  {"name": "resources", "sha256": "ac92fb354939f6a129b96c0cc2466f50dff73bb4694acc41f5478c687287d344", "bytes": 913},
+  {"name": "types", "sha256": "8ebd898980bfca7fc8b3d68c45f4f79d4565d7232f908ca16dfcd6bfb0c3a486", "bytes": 220}
+ ],
+ "roles": {
+   "character": {"instance": "player", "template": 1},
+   "grounds": [],
+   "pairs": [
+    {"pair": 0, "instance": "respawn", "template": 2}
+   ]
+  }
+}

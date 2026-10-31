@@ -1,0 +1,83 @@
+{
+ "behavior": {
+  "api": "autographics.triggers2d/1",
+  "source": {
+   "format": "auto-source",
+   "sha256": "cc57c0f02e4ccfb5a2491bb89f207548f76b0f5340e43b381e0981046213deb4",
+   "byte_length": 5733
+  },
+  "actors": {
+   "two_d": 1,
+   "three_d": null
+  }
+ },
+ "schema": "autographics.scene/6",
+ "document_id": "plan017-g11-2d-MainGeometry",
+ "resources": [
+  "circle",
+  "quad",
+  "cylinder",
+  "player",
+  "mob"
+ ],
+ "objects": [
+  {
+   "id": 1,
+   "name": "player",
+   "kind": "quad",
+   "translation": [2.0, 0.5, 0.0],
+   "scale": [0.8, 1.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.9, 0.5, 0.25, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 2,
+   "name": "corner_box_template",
+   "kind": "quad",
+   "translation": [-30.0, 2.0, 0.0],
+   "scale": [2.0, 3.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.1, 0.1, 0.12, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 3,
+   "name": "corner_circle_template",
+   "kind": "circle",
+   "translation": [-30.0, 2.0, 0.0],
+   "scale": [0.7, 0.7, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.9, 0.2, 0.2, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 4,
+   "name": "tangent_circle_template",
+   "kind": "circle",
+   "translation": [-30.0, 2.0, 0.0],
+   "scale": [0.7, 0.7, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.9, 0.2, 0.2, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  }
+ ],
+ "groups": [],
+ "assets": []
+}

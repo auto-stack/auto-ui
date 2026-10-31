@@ -1,0 +1,97 @@
+{
+ "behavior": {
+  "api": "autographics.triggers2d/1",
+  "source": {
+   "format": "auto-source",
+   "sha256": "3c6a74b3e1fe5523b0d52ef9e2bce7a58c49a255886f9fea6f9db1182a5d3151",
+   "byte_length": 6350
+  },
+  "actors": {
+   "two_d": 1,
+   "three_d": null
+  }
+ },
+ "schema": "autographics.scene/6",
+ "document_id": "plan017-g11-2d-MainStay",
+ "resources": [
+  "circle",
+  "quad",
+  "cylinder",
+  "player",
+  "mob"
+ ],
+ "objects": [
+  {
+   "id": 1,
+   "name": "player",
+   "kind": "quad",
+   "translation": [2.0, 0.5, 0.0],
+   "scale": [0.8, 1.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.9, 0.5, 0.25, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 2,
+   "name": "ground",
+   "kind": "quad",
+   "translation": [15.0, -0.6, 0.0],
+   "scale": [40.0, 1.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.55, 0.62, 0.7, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 3,
+   "name": "kept_template",
+   "kind": "circle",
+   "translation": [-30.0, 2.0, 0.0],
+   "scale": [0.6, 0.6, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.95, 0.8, 0.2, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 4,
+   "name": "hazard_template",
+   "kind": "circle",
+   "translation": [-30.0, 2.0, 0.0],
+   "scale": [0.7, 0.7, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.9, 0.2, 0.2, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 5,
+   "name": "goal_template",
+   "kind": "quad",
+   "translation": [-30.0, 2.0, 0.0],
+   "scale": [0.5, 1.2, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.3, 0.9, 0.5, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  }
+ ],
+ "groups": [],
+ "assets": []
+}

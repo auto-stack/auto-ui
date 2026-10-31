@@ -148,7 +148,7 @@ node Main {
                 }
             }
         }
-        .GoalLeft(actor) -> {
+        .GoalLeft -> {
             .goal_exits = .goal_exits + 1
         }
     }

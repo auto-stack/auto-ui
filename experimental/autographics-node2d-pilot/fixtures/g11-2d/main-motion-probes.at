@@ -1,0 +1,105 @@
+// PLAN-017 g11-2d variant: both-moved and away probes (original two-bothmove /
+// two-away at authoring level). MoverItem walks left along its own Life.Tick
+// while the character walks right - the enter must land on the tick whose
+// FINAL positions overlap. AwayItem teleports far every tick before the
+// evaluate - it must never enter (no previous-position geometry).
+use types: Key, Result
+use player: Player
+
+node MoverItem(x0: float, y: float, mesh: Mesh2D, material: Material2D, target: ActorRef2D, on_touch: msg) {
+    model {
+        var mx = x0
+        var t = 0
+    }
+    msg { Touched(ActorRef2D) }
+    view-2d {
+        trigger2d body {
+            position: (.mx, .y)
+            on_enter: .Touched
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            .t = .t + 1
+            .mx = 3.9 - .t * 0.02
+        }
+        .Touched(actor) -> {
+            if actor == .target {
+                emit .on_touch
+            }
+        }
+    }
+}
+
+node AwayItem(x0: float, y: float, mesh: Mesh2D, material: Material2D, target: ActorRef2D, on_touch: msg) {
+    model {
+        var mx = x0
+    }
+    msg { Touched(ActorRef2D) }
+    view-2d {
+        trigger2d body {
+            position: (.mx, .y)
+            on_enter: .Touched
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            .mx = 20.0
+        }
+        .Touched(actor) -> {
+            if actor == .target {
+                emit .on_touch
+            }
+        }
+    }
+}
+
+node MainMotion {
+    model {
+        var mover_hits = 0
+        var away_hits = 0
+        var result = 0
+        var starts = 0
+    }
+    msg { MoverTouch, AwayTouch }
+    view-2d {
+        Player player {
+            spawn_x: 2.0
+            spawn_y: 0.5
+            speed: 2.0
+            enabled: .result == Result.Playing
+        }
+        MoverItem slider {
+            x0: 3.0
+            y: 0.5
+            mesh: resources.azure_mesh
+            material: resources.cyan
+            target: refs.player.actor
+            on_touch: .MoverTouch
+        }
+        AwayItem ghost {
+            x0: 2.0
+            y: 0.5
+            mesh: resources.amber_mesh
+            material: resources.gold
+            target: refs.player.actor
+            on_touch: .AwayTouch
+        }
+        camera2d camera {
+            target: refs.player.actor
+            bounds: (0.0, -4.0, 30.0, 12.0)
+            view_size: (12.0, 8.0)
+        }
+    }
+    on {
+        Life.Start -> {
+            .starts = 1
+        }
+        .MoverTouch -> {
+            .mover_hits = .mover_hits + 1
+        }
+        .AwayTouch -> {
+            .away_hits = .away_hits + 1
+        }
+    }
+}

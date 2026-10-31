@@ -95,7 +95,7 @@ fn main_reach_goal() {
   }
  }
 }
-fn main_goal_left(actor int) {
+fn main_goal_left() {
  r_goal_exits = (r_goal_exits + 1)
 }
 fn coin_touched(i int, actor int) {
@@ -242,9 +242,7 @@ fn app_update(dt float) {
   if ph==1 { void_zone_touched(0, ag_actor(2)) }
   } }
  if _n2d_moved==0 {
-  if n==0 {
-   ok=ok+ag_object_move(hazard_handle[0], hazard_x[0], hazard_hy[0], 0.0)*1.0
-  } else {
+  if n==1 {
    let n1=ag_event_next()
    if n1==1 {
     let p1=ag_event_pair()
@@ -294,6 +292,9 @@ fn app_update(dt float) {
     }
    }
   }
+ }
+ if n==0 {
+  ok=ok+ag_object_move(hazard_handle[0], hazard_x[0], hazard_hy[0], 0.0)*1.0
  }
  if (r_amber == 1) {
   if coin_spawned[0]==0 {

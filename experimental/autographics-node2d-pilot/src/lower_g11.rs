@@ -571,6 +571,8 @@ fn validate_g11(project: &Project) -> Result<G11World, LowerError> {
 }
 
 pub fn lower_project_g112d(project: &Project) -> Result<LowerOutputG11, LowerError> {
+    let nl: &'static str = "
+";
     let world = validate_g11(project)?;
     let root_name = project.root.clone();
     let root = node_of(project, &root_name);
@@ -900,7 +902,8 @@ pub fn lower_project_g112d(project: &Project) -> Result<LowerOutputG11, LowerErr
         }
     }
 
-    // ---- 事件绑定表（每定义 × 事件端口参数 → 每实例常量列）----
+    // ---- 事件绑定表（每定义 × 事件端口参数 × 事件 → 每实例常量列；
+    // 同定义实例可绑定不同事件：不绑定该事件的实例列占位 0）----
     for def in &defs {
         let node = node_of(project, def);
         let prefix = &prefixes[def];
@@ -909,73 +912,70 @@ pub fn lower_project_g112d(project: &Project) -> Result<LowerOutputG11, LowerErr
             if param_kind(ty).map_err(unsupported)? != ParamKind::MsgEvent {
                 continue;
             }
-            // 全实例必须绑定同一事件；载荷常量按实例成列。
-            let mut event: Option<String> = None;
-            let mut columns: Vec<Vec<String>> = Vec::new();
+            // 收集每实例绑定（事件名 + 载荷常量）。
+            let mut bindings: Vec<(String, Vec<String>)> = Vec::new();
             for inst in &own {
                 let rprops = &resolved[&inst.gid];
-                let binding = match rprops.iter().find(|(n, _)| n == pname) {
-                    Some((_, ResolvedProp::EventBinding { event, args })) => (event, args),
-                    _ => return Err(unsupported(format!("instance '{}' port {pname} unbound", inst.name))),
-                };
-                match &event {
-                    Some(e) if e != binding.0 => {
+                match rprops.iter().find(|(n, _)| n.as_str() == pname.as_str()) {
+                    Some((_, ResolvedProp::EventBinding { event, args })) => {
+                        let mut consts = Vec::new();
+                        for a in args {
+                            consts.push(const_arg_text(project, a)?);
+                        }
+                        bindings.push((event.clone(), consts));
+                    }
+                    _ => {
                         return Err(unsupported(format!(
-                            "definition '{def}' port {pname} binds mixed events ({e} vs {})",
-                            binding.0
+                            "instance '{}' port {pname} unbound",
+                            inst.name
                         )))
                     }
-                    None => event = Some(binding.0.clone()),
-                    _ => {}
-                }
-                for (ai, a) in binding.1.iter().enumerate() {
-                    if columns.len() <= ai {
-                        columns.resize_with(ai + 1, Vec::new);
-                    }
-                    columns[ai].push(const_arg_text(project, a)?);
                 }
             }
-            let Some(event) = event else { continue };
-            // 载荷列数须全实例一致。
-            for inst in &own {
-                let rprops = &resolved[&inst.gid];
-                if let Some((_, ResolvedProp::EventBinding { args, .. })) =
-                    rprops.iter().find(|(n, _)| n == pname)
-                {
-                    if args.len() != columns.len() {
+            // 每个被绑定的事件一组列（实例序对齐，未绑定该事件的实例占位 0）。
+            let mut events: Vec<String> = Vec::new();
+            for (e, _) in &bindings {
+                if !events.contains(e) {
+                    events.push(e.clone());
+                }
+            }
+            for event in &events {
+                let arity = bindings
+                    .iter()
+                    .filter(|(e, _)| e == event)
+                    .map(|(_, a)| a.len())
+                    .next()
+                    .unwrap_or(0);
+                for (e, a) in bindings.iter() {
+                    if e == event && a.len() != arity {
                         return Err(unsupported(format!(
-                            "definition '{def}' port {pname}: mixed payload arity"
+                            "definition '{def}' port {pname}: mixed payload arity for .{event}"
                         )));
                     }
                 }
-            }
-            for (ai, col) in columns.iter().enumerate() {
-                src.push_str(&format!(
-                    "var {prefix}_bind_{}_{}=[{}]\n",
-                    snake(&event).to_uppercase(),
-                    ai,
-                    col.join(",")
-                ));
-            }
-            // 无载荷事件：路由仍需表（承载 owner 索引），列 -1。
-            if columns.is_empty() {
-                let owner_idx: Vec<String> = own
-                    .iter()
-                    .map(|i| match i.owner {
-                        Some(g) => instances
-                            .iter()
-                            .find(|o| o.gid == g)
-                            .expect("owner")
-                            .idx
-                            .to_string(),
-                        None => "0".to_string(),
-                    })
-                    .collect();
-                src.push_str(&format!(
-                    "var {prefix}_bind_{}=[{}]\n",
-                    snake(&event).to_uppercase(),
-                    owner_idx.join(",")
-                ));
+                for ai in 0..arity {
+                    let col: Vec<String> = bindings
+                        .iter()
+                        .map(|(e, a)| if e == event { a[ai].clone() } else { "0".to_string() })
+                        .collect();
+                    src.push_str(&format!(
+                        "var {prefix}_bind_{}_{}=[{}]\n",
+                        snake(event).to_uppercase(),
+                        ai,
+                        col.join(",")
+                    ));
+                }
+                if arity == 0 {
+                    let col: Vec<String> = bindings
+                        .iter()
+                        .map(|_| "0".to_string())
+                        .collect();
+                    src.push_str(&format!(
+                        "var {prefix}_bind_{}=[{}]\n",
+                        snake(event).to_uppercase(),
+                        col.join(",")
+                    ));
+                }
             }
         }
     }
@@ -1134,37 +1134,87 @@ pub fn lower_project_g112d(project: &Project) -> Result<LowerOutputG11, LowerErr
                     .find(|p| p.name.as_str() == pname.as_str())
                     .map(|p| resolve_prop_value(&p.value))
                     .transpose()?;
-                if let Some(ResolvedProp::EventBinding { event, args }) = binding {
-                    let owner_node = inst.owner.map(|g| {
-                        instances
+                if let Some(ResolvedProp::EventBinding { .. }) = binding {
+                    // 每实例的投递调用（同定义实例可绑定不同事件/载荷）。
+                    let mut calls: Vec<String> = Vec::new();
+                    for inst in instances.iter().filter(|i| i.node.as_str() == def.as_str()) {
+                        let rprops = &resolved[&inst.gid];
+                        let (event, args) = match rprops
                             .iter()
-                            .find(|o| o.gid == g)
-                            .expect("owner")
-                            .node
-                            .clone()
-                    });
-                    let call = match owner_node {
-                        None => {
-                            let obase = snake(&project.root);
-                            let prefix = &prefixes[def];
-                            let ev = snake(&event).to_uppercase();
-                            let arity = args.len();
-                            if arity == 0 {
-                                format!("{obase}_{}()", snake(&event))
-                            } else {
-                                let call_args = (0..arity)
-                                    .map(|ai| format!("{prefix}_bind_{ev}_{ai}[i]"))
-                                    .collect::<Vec<_>>()
-                                    .join(", ");
-                                format!("{obase}_{}({call_args})", snake(&event))
+                            .find(|(n, _)| n.as_str() == pname.as_str())
+                        {
+                            Some((_, ResolvedProp::EventBinding { event, args })) => (event, args),
+                            _ => unreachable!("checked above"),
+                        };
+                        // 接收方处理器形参数必须等于绑定载荷数（投递协议：
+                        // 参数全部来自绑定常量列；接收方无该形参的载荷即
+                        // 定位拒绝，不产生缺参调用）。
+                        let owner_def = inst
+                            .owner
+                            .map(|g| {
+                                instances
+                                    .iter()
+                                    .find(|o| o.gid == g)
+                                    .expect("owner")
+                                    .node
+                                    .clone()
+                            })
+                            .unwrap_or_else(|| project.root.clone());
+                        let owner_node = node_of(project, &owner_def);
+                        let recv_params = member_handler(owner_node, event.as_str())
+                            .map(|(_, n)| n)
+                            .unwrap_or(0);
+                        if recv_params != args.len() {
+                            return Err(unsupported(format!(
+                                "instance '{}' port {pname}: binding .{} carries {} payload(s) but the receiving handler on '{}' declares {recv_params} param(s)",
+                                inst.name,
+                                event,
+                                args.len(),
+                                owner_def
+                            )));
+                        }
+                        let owner_node = inst.owner.map(|g| {
+                            instances
+                                .iter()
+                                .find(|o| o.gid == g)
+                                .expect("owner")
+                                .node
+                                .clone()
+                        });
+                        let ev_u = snake(event.as_str()).to_uppercase();
+                        let call = match owner_node {
+                            None => {
+                                let obase = snake(&project.root);
+                                let prefix = &prefixes[def];
+                                let arity = args.len();
+                                if arity == 0 {
+                                    format!("{obase}_{}()", snake(event.as_str()))
+                                } else {
+                                    let call_args = (0..arity)
+                                        .map(|ai| format!("{prefix}_bind_{ev_u}_{ai}[i]"))
+                                        .collect::<Vec<_>>()
+                                        .join(", ");
+                                    format!("{obase}_{}({call_args})", snake(event.as_str()))
+                                }
                             }
+                            Some(owner) => {
+                                let obase = snake(&owner);
+                                let prefix = &prefixes[def];
+                                format!("{obase}_{}({prefix}_bind_{ev_u}[i])", snake(event.as_str()))
+                            }
+                        };
+                        calls.push(call);
+                    }
+                    let uniform = calls.iter().all(|c| c == &calls[0]);
+                    let call = if uniform {
+                        calls[0].clone()
+                    } else {
+                        let mut router = String::new();
+                        for (idx, c) in calls.iter().enumerate() {
+                            router.push_str(nl);
+                            router.push_str(&format!("  if i=={idx} {{ {c} }}"));
                         }
-                        Some(owner) => {
-                            let obase = snake(&owner);
-                            let prefix = &prefixes[def];
-                            let ev = snake(&event).to_uppercase();
-                            format!("{obase}_{}({prefix}_bind_{ev}[i])", snake(&event))
-                        }
+                        router
                     };
                     out.push((pname.clone(), call));
                 }
@@ -1218,7 +1268,9 @@ pub fn lower_project_g112d(project: &Project) -> Result<LowerOutputG11, LowerErr
 
     // ---- app_start ----
     src.push_str("fn app_start() {\n");
-    src.push_str(&format!(" {rbase}_lifestart()\n"));
+    if life_handler(root, "Start") {
+        src.push_str(&format!(" {rbase}_lifestart()\n"));
+    }
     for inst in &instances {
         if life_handler(node_of(project, &inst.node), "Start") {
             let base = snake(&inst.node);
@@ -1297,7 +1349,9 @@ pub fn lower_project_g112d(project: &Project) -> Result<LowerOutputG11, LowerErr
 
     // ---- app_update ----
     src.push_str("fn app_update(dt float) {\n");
-    src.push_str(&format!(" {rbase}_lifetick(dt)\n"));
+    if life_handler(root, "Tick") {
+        src.push_str(&format!(" {rbase}_lifetick(dt)\n"));
+    }
     for inst in &instances {
         if life_handler(node_of(project, &inst.node), "Tick") {
             let base = snake(&inst.node);
@@ -1343,26 +1397,7 @@ pub fn lower_project_g112d(project: &Project) -> Result<LowerOutputG11, LowerErr
     src.push_str(&dispatch("p", "ph")?);
     src.push_str(" }\n");
     src.push_str(" if _n2d_moved==0 {\n");
-    src.push_str("  if n==0 {\n");
-    // 动态位置图形同步（仅无事件 tick；原 001 等价策略）。
-    for gid in &trigger_instances {
-        let inst = instances.iter().find(|i| i.gid == *gid).unwrap();
-        let node = node_of(project, &inst.node);
-        let el = find_element(node, |e| matches!(e, View2dElement::Trigger { .. }))
-            .ok_or_else(|| unsupported("trigger element"))?;
-        let props = element_props(el).expect("props").clone();
-        if !position_is_dynamic(node, &props)? {
-            continue;
-        }
-        let prefix = &prefixes[&inst.node];
-        let hook = member_hook_for(project, &inst.node, &prefixes, &instances, &resolved);
-        let (sx, sy) = position_text(project, &inst.node, &props, &prefixes, &*hook, &inst.idx.to_string())?;
-        src.push_str(&format!(
-            "   ok=ok+ag_object_move({prefix}_handle[{}], {sx}, {sy}, 0.0)*1.0\n",
-            inst.idx
-        ));
-    }
-    src.push_str("  } else {\n");
+    src.push_str("  if n==1 {\n");
     src.push_str("   let n1=ag_event_next()\n");
     src.push_str("   if n1==1 {\n");
     src.push_str("    let p1=ag_event_pair()\n");
@@ -1376,6 +1411,27 @@ pub fn lower_project_g112d(project: &Project) -> Result<LowerOutputG11, LowerErr
     src.push_str("    }\n");
     src.push_str("   }\n");
     src.push_str("  }\n");
+    src.push_str(" }\n");
+    // 动态位置图形同步：首条 event_next==0 的 tick（无论是否移动）；
+    // 有事件 tick 跳过写、状态照常推进（原 001 等价策略，合同 §1/§4）。
+    src.push_str(" if n==0 {\n");
+    for gid in &trigger_instances {
+        let inst = instances.iter().find(|i| i.gid == *gid).unwrap();
+        let node = node_of(project, &inst.node);
+        let el = find_element(node, |e| matches!(e, View2dElement::Trigger { .. }))
+            .ok_or_else(|| unsupported("trigger element"))?;
+        let props = element_props(el).expect("props").clone();
+        if !position_is_dynamic(node, &props)? {
+            continue;
+        }
+        let prefix = &prefixes[&inst.node];
+        let hook = member_hook_for(project, &inst.node, &prefixes, &instances, &resolved);
+        let (sx, sy) = position_text(project, &inst.node, &props, &prefixes, &*hook, &inst.idx.to_string())?;
+        src.push_str(&format!(
+            "  ok=ok+ag_object_move({prefix}_handle[{}], {sx}, {sy}, 0.0)*1.0\n",
+            inst.idx
+        ));
+    }
     src.push_str(" }\n");
     // 条件差量执行器（真 spawn/despawn + 显式重绑）。
     for inst in &instances {

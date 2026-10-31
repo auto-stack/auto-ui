@@ -1,0 +1,25 @@
+// PLAN-017 g11-2d fixture: the goal trigger. AABB trigger (default shape);
+// enter routes to .Touched, exit (walk-away) routes to .GoalLeft — phase
+// classification on a kept-alive trigger through two distinct event ports.
+node Goal(x: float, y: float, mesh: Mesh2D, material: Material2D, target: ActorRef2D, on_reach: msg, on_left: msg) {
+    msg { Touched(ActorRef2D), GoalLeft(ActorRef2D) }
+    view-2d {
+        trigger2d body {
+            position: (.x, .y)
+            on_enter: .Touched
+            on_exit: .GoalLeft
+        }
+    }
+    on {
+        .Touched(actor) -> {
+            if actor == .target {
+                emit .on_reach
+            }
+        }
+        .GoalLeft(actor) -> {
+            if actor == .target {
+                emit .on_left
+            }
+        }
+    }
+}

@@ -1,0 +1,58 @@
+// PLAN-017 g11-2d variant: same-slot generations (original two-oldgen at
+// authoring level). The item sits on the spawn; a root counter clears its
+// visibility flag at tick 3 (despawn: the pair goes silent) and sets it at
+// tick 4 (respawn = explicit rebind; new generation enters again).
+use types: Key, Result
+use player: Player
+use coin: Coin
+
+node MainGeneration {
+    model {
+        var t = 0
+        var vis = 1
+        var grabs = 0
+        var result = 0
+        var starts = 0
+    }
+    msg { Collect(Key) }
+    view-2d {
+        Player player {
+            spawn_x: 2.0
+            spawn_y: 0.5
+            speed: 2.0
+            enabled: 1
+        }
+        if .vis == 1 {
+            Coin respawn {
+                position_x: 2.0
+                position_y: 0.5
+                mesh: resources.amber_mesh
+                material: resources.gold
+                target: refs.player.actor
+                on_collect: .Collect(Key.Amber)
+            }
+        }
+        camera2d camera {
+            target: refs.player.actor
+            bounds: (0.0, -4.0, 30.0, 12.0)
+            view_size: (12.0, 8.0)
+        }
+    }
+    on {
+        Life.Start -> {
+            .starts = 1
+        }
+        Life.Tick(dt) -> {
+            .t = .t + 1
+            if .t == 3 {
+                .vis = 0
+            }
+            if .t == 4 {
+                .vis = 1
+            }
+        }
+        .Collect(key) -> {
+            .grabs = .grabs + 1
+        }
+    }
+}

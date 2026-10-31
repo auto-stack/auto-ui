@@ -1,0 +1,6 @@
+// PLAN-017 g11-2d fixture: pooled pure function. The hazard's per-tick patrol
+// step is exact original-001 arithmetic (hy += dir); the pure fn is pooled by
+// verbatim source slice into the generated world.
+fn patrol_next(hy float, dir float) float {
+    return hy + dir
+}

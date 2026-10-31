@@ -1,0 +1,33 @@
+{
+ "generator": "autographics-node2d-pilot plan017 g11-2d",
+ "api": "autographics.triggers2d/1",
+ "user_source_sha256": "3c6a74b3e1fe5523b0d52ef9e2bce7a58c49a255886f9fea6f9db1182a5d3151",
+ "user_source_bytes": 6350,
+  "module:coin": "554c7e14929e63412bf1451f088de9a3d20039596335f07e60e35875bbaa721f",
+  "module:goal": "5e731882f989f6221bfd0cb4d807bfe9bfe186043a1352237715ca0b805d33ed",
+  "module:hazard": "be44a4105821f5785f63a16e55136d120f979da7825e76d03c0f4244955ccb91",
+  "module:main-stay": "cab9ef50fac9b98e2045378b47ca36c0679a17b2d1b2385196690fb3ed518626",
+  "module:patrol": "c7447a86d76cee7dd805dc7936443ea4b869be7819e8dfe411c4cd0ac2ad40e8",
+  "module:player": "b70396b4cf76bb5ffa90e19c423c123b6515a99e9a6722b09411e5904da87a4d",
+  "module:resources": "ac92fb354939f6a129b96c0cc2466f50dff73bb4694acc41f5478c687287d344",
+  "module:types": "8ebd898980bfca7fc8b3d68c45f4f79d4565d7232f908ca16dfcd6bfb0c3a486",
+ "closure": [
+  {"name": "coin", "sha256": "554c7e14929e63412bf1451f088de9a3d20039596335f07e60e35875bbaa721f", "bytes": 758},
+  {"name": "goal", "sha256": "5e731882f989f6221bfd0cb4d807bfe9bfe186043a1352237715ca0b805d33ed", "bytes": 800},
+  {"name": "hazard", "sha256": "be44a4105821f5785f63a16e55136d120f979da7825e76d03c0f4244955ccb91", "bytes": 1142},
+  {"name": "main-stay", "sha256": "cab9ef50fac9b98e2045378b47ca36c0679a17b2d1b2385196690fb3ed518626", "bytes": 3062},
+  {"name": "patrol", "sha256": "c7447a86d76cee7dd805dc7936443ea4b869be7819e8dfe411c4cd0ac2ad40e8", "bytes": 275},
+  {"name": "player", "sha256": "b70396b4cf76bb5ffa90e19c423c123b6515a99e9a6722b09411e5904da87a4d", "bytes": 1061},
+  {"name": "resources", "sha256": "ac92fb354939f6a129b96c0cc2466f50dff73bb4694acc41f5478c687287d344", "bytes": 913},
+  {"name": "types", "sha256": "8ebd898980bfca7fc8b3d68c45f4f79d4565d7232f908ca16dfcd6bfb0c3a486", "bytes": 220}
+ ],
+ "roles": {
+   "character": {"instance": "player", "template": 1},
+   "grounds": [2],
+   "pairs": [
+    {"pair": 0, "instance": "kept", "template": 3},
+    {"pair": 1, "instance": "hazard", "template": 4},
+    {"pair": 2, "instance": "goal", "template": 5}
+   ]
+  }
+}

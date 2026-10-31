@@ -1,0 +1,38 @@
+// PLAN-017 g11-2d fixture: the patrolling hazard. Patrol STATE advances every
+// tick (exact original-001 arithmetic: hy += dir, bounce beyond base±0.2 flips
+// dir to ∓0.05); the graphic position write is the orchestration's no-event
+// sync (event ticks skip it, original equivalence strategy). Circle trigger
+// radius 0.5 like the original bind.
+use resources
+use patrol: patrol_next
+
+node Hazard(x: float, base_y: float, dir0: float, mesh: Mesh2D, material: Material2D, target: ActorRef2D, on_hit: msg) {
+    model {
+        var hy = base_y
+        var hdir = dir0
+    }
+    msg { Touched(ActorRef2D) }
+    view-2d {
+        trigger2d body {
+            position: (.x, .hy)
+            shape: circle(radius: 0.5)
+            on_enter: .Touched
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            .hy = patrol_next(.hy, .hdir)
+            if .hy > .base_y + 0.2 {
+                .hdir = -0.05
+            }
+            if .hy < .base_y - 0.2 {
+                .hdir = 0.05
+            }
+        }
+        .Touched(actor) -> {
+            if actor == .target {
+                emit .on_hit
+            }
+        }
+    }
+}

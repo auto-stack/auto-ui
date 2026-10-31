@@ -1,0 +1,150 @@
+// PLAN-017 g11-2d variant: same world as main.at with all three items stacked
+// at the character spawn (2,0.5) - the same-tick-triple engine probe (original
+// two-triple variant expressed at the authoring-source level). One neutral
+// step's evaluate emits three enters; one stationary callback reads all three
+// and destroys each exactly once.
+use types: Key, Result
+use player: Player
+use coin: Coin
+use hazard: Hazard
+use goal: Goal
+use void_zone: VoidZone
+
+node MainTriple {
+    model {
+        var amber = 1
+        var azure = 1
+        var rose = 1
+        var bag = 0
+        var result = 0
+        var starts = 0
+    }
+    msg { Collect(Key), HitDanger, ReachGoal, GoalLeft }
+    view-2d {
+        solid2d ground {
+            position: (15.0, -0.6)
+            mesh: resources.ground_mesh
+            material: resources.ground_color
+        }
+        Player player {
+            spawn_x: 2.0
+            spawn_y: 0.5
+            speed: 2.0
+            enabled: .result == Result.Playing
+        }
+        if .amber == 1 {
+            Coin first {
+                position_x: 2.0
+                position_y: 0.5
+                mesh: resources.amber_mesh
+                material: resources.gold
+                target: refs.player.actor
+                on_collect: .Collect(Key.Amber)
+            }
+        }
+        if .azure == 1 {
+            Coin second {
+                position_x: 2.0
+                position_y: 0.5
+                mesh: resources.azure_mesh
+                material: resources.cyan
+                target: refs.player.actor
+                on_collect: .Collect(Key.Azure)
+            }
+        }
+        if .rose == 1 {
+            Coin third {
+                position_x: 2.0
+                position_y: 0.5
+                mesh: resources.rose_mesh
+                material: resources.pink
+                target: refs.player.actor
+                on_collect: .Collect(Key.Rose)
+            }
+        }
+        Hazard hazard {
+            x: 20.0
+            base_y: 2.4
+            dir0: 0.05
+            mesh: resources.hazard_mesh
+            material: resources.red
+            target: refs.player.actor
+            on_hit: .HitDanger
+        }
+        Goal goal {
+            x: 16.0
+            y: 1.0
+            mesh: resources.goal_mesh
+            material: resources.green
+            target: refs.player.actor
+            on_reach: .ReachGoal
+            on_left: .GoalLeft
+        }
+        VoidZone void_zone {
+            x: -1.0
+            y: 1.0
+            mesh: resources.void_mesh
+            material: resources.dim
+            target: refs.player.actor
+            on_hit: .HitDanger
+        }
+        camera2d camera {
+            target: refs.player.actor
+            bounds: (0.0, -4.0, 30.0, 12.0)
+            view_size: (12.0, 8.0)
+        }
+    }
+    on {
+        Life.Start -> {
+            .starts = 1
+        }
+        Life.Tick(dt) -> {
+            if .result != Result.Playing {
+                if input.pressed(Enter) == 1 {
+                    round.request()
+                }
+            }
+        }
+        .Collect(key) -> {
+            if .result == Result.Playing {
+                if key == Key.Amber {
+                    if .amber == 1 {
+                        .amber = 0
+                        .bag = .bag + 1
+                    }
+                }
+                if key == Key.Azure {
+                    if .azure == 1 {
+                        .azure = 0
+                        .bag = .bag + 1
+                    }
+                }
+                if key == Key.Rose {
+                    if .rose == 1 {
+                        .rose = 0
+                        .bag = .bag + 1
+                    }
+                }
+            }
+        }
+        .HitDanger -> {
+            if .result == Result.Playing {
+                .result = Result.Failed
+            }
+        }
+        .ReachGoal -> {
+            if .result == Result.Playing {
+                if .amber == 0 {
+                    if .azure == 0 {
+                        if .rose == 0 {
+                            .result = Result.Won
+                        }
+                    }
+                }
+            }
+        }
+        .GoalLeft -> {
+            .starts = .starts
+        }
+    }
+}

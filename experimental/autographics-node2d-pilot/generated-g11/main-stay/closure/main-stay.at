@@ -1,0 +1,110 @@
+// PLAN-017 g11-2d variant: stay semantics (original two-stay at authoring
+// level). Only the amber item exists, stacked on the spawn; its Collect
+// handler counts ONCE via a seen-guard and never clears the flag, so the item
+// is never destroyed and keeps emitting stay events while the goal can never
+// win (flags stay set). A stay-counting implementation would score many.
+use types: Key, Result
+use player: Player
+use coin: Coin
+use hazard: Hazard
+use goal: Goal
+
+node MainStay {
+    model {
+        var amber = 1
+        var azure = 1
+        var rose = 1
+        var seen = 0
+        var bag = 0
+        var result = 0
+        var starts = 0
+    }
+    msg { Collect(Key), HitDanger, ReachGoal, GoalLeft }
+    view-2d {
+        solid2d ground {
+            position: (15.0, -0.6)
+            mesh: resources.ground_mesh
+            material: resources.ground_color
+        }
+        Player player {
+            spawn_x: 2.0
+            spawn_y: 0.5
+            speed: 2.0
+            enabled: .result == Result.Playing
+        }
+        if .amber == 1 {
+            Coin kept {
+                position_x: 2.0
+                position_y: 0.5
+                mesh: resources.amber_mesh
+                material: resources.gold
+                target: refs.player.actor
+                on_collect: .Collect(Key.Amber)
+            }
+        }
+        Hazard hazard {
+            x: 20.0
+            base_y: 2.4
+            dir0: 0.05
+            mesh: resources.hazard_mesh
+            material: resources.red
+            target: refs.player.actor
+            on_hit: .HitDanger
+        }
+        Goal goal {
+            x: 16.0
+            y: 1.0
+            mesh: resources.goal_mesh
+            material: resources.green
+            target: refs.player.actor
+            on_reach: .ReachGoal
+            on_left: .GoalLeft
+        }
+        camera2d camera {
+            target: refs.player.actor
+            bounds: (0.0, -4.0, 30.0, 12.0)
+            view_size: (12.0, 8.0)
+        }
+    }
+    on {
+        Life.Start -> {
+            .starts = 1
+        }
+        Life.Tick(dt) -> {
+            if .result != Result.Playing {
+                if input.pressed(Enter) == 1 {
+                    round.request()
+                }
+            }
+        }
+        .Collect(key) -> {
+            if .result == Result.Playing {
+                if key == Key.Amber {
+                    if .seen == 0 {
+                        .seen = 1
+                        .bag = .bag + 1
+                    }
+                }
+            }
+        }
+        .HitDanger -> {
+            if .result == Result.Playing {
+                .result = Result.Failed
+            }
+        }
+        .ReachGoal -> {
+            if .result == Result.Playing {
+                if .amber == 0 {
+                    if .azure == 0 {
+                        if .rose == 0 {
+                            .result = Result.Won
+                        }
+                    }
+                }
+            }
+        }
+        .GoalLeft -> {
+            .starts = .starts
+        }
+    }
+}

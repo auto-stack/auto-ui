@@ -38,6 +38,31 @@ const DT: f32 = 1.0 / 60.0;
 const SPEED: f32 = 2.0;
 const SPAWN: [f32; 2] = [2.0, 0.5];
 const WALK_BUDGET: usize = 8000;
+const SCENE_TRIPLE: &str =
+    include_str!("../../autographics-node2d-pilot/generated-g11/main-triple/scene.agscene");
+const WORLD_TRIPLE: &str =
+    include_str!("../../autographics-node2d-pilot/generated-g11/main-triple/world.at");
+const SCENE_STAY: &str =
+    include_str!("../../autographics-node2d-pilot/generated-g11/main-stay/scene.agscene");
+const WORLD_STAY: &str =
+    include_str!("../../autographics-node2d-pilot/generated-g11/main-stay/world.at");
+const SCENE_BAG2: &str =
+    include_str!("../../autographics-node2d-pilot/generated-g11/main-bag2/scene.agscene");
+const WORLD_BAG2: &str =
+    include_str!("../../autographics-node2d-pilot/generated-g11/main-bag2/world.at");
+const SCENE_GEOMETRY: &str =
+    include_str!("../../autographics-node2d-pilot/generated-g11/main-geometry/scene.agscene");
+const WORLD_GEOMETRY: &str =
+    include_str!("../../autographics-node2d-pilot/generated-g11/main-geometry/world.at");
+const SCENE_GENERATION: &str =
+    include_str!("../../autographics-node2d-pilot/generated-g11/main-generation/scene.agscene");
+const WORLD_GENERATION: &str =
+    include_str!("../../autographics-node2d-pilot/generated-g11/main-generation/world.at");
+const SCENE_MOTION: &str =
+    include_str!("../../autographics-node2d-pilot/generated-g11/main-motion-probes/scene.agscene");
+const WORLD_MOTION: &str =
+    include_str!("../../autographics-node2d-pilot/generated-g11/main-motion-probes/world.at");
+
 
 // ---------------------------------------------------------------- harness --
 
@@ -555,4 +580,502 @@ fn g11_print_log() {
         println!("G11 {line}");
     }
     assert_eq!(State::Stopping, State::Stopping); // keeps the import honest
+}
+
+/// 1200x800 顶面网格扫描（probe_pixels 单次回读）→ (红, 橙, 金, 地面) 计数。
+/// 分类沿用 016 实测校准的相对通道规则（光照混合下）。
+fn scan_classes(h: &mut Host) -> (usize, usize, usize, usize) {
+    let mut points = Vec::new();
+    for gy in 0..80 {
+        for gx in 0..120 {
+            points.push([(gx * 10 + 5) as f32, (gy * 10 + 5) as f32]);
+        }
+    }
+    let px = h.rt.probe_pixels(h.top, &points).expect("probe");
+    let (mut red, mut orange, mut gold, mut ground) = (0usize, 0usize, 0usize, 0usize);
+    for p in px.iter() {
+        let (r, gg, b) = (p[0] as i32, p[1] as i32, p[2] as i32);
+        let is_red = r >= 220 && (r - gg) >= 80 && (r - gg) <= 140 && (gg - b).abs() <= 25;
+        let is_orange =
+            r >= 230 && (r - gg) >= 40 && (r - gg) <= 80 && (gg - b) >= 30 && (gg - b) <= 80;
+        let is_gold = r >= 240 && gg >= 210 && (gg - b) >= 90;
+        let is_ground = (r - gg).abs() <= 14 && (gg - b).abs() <= 25 && r >= 150 && r <= 210;
+        if is_red {
+            red += 1;
+        } else if is_orange {
+            orange += 1;
+        } else if is_gold {
+            gold += 1;
+        } else if is_ground {
+            ground += 1;
+        }
+    }
+    (red, orange, gold, ground)
+}
+
+#[test]
+fn g11_void_oob_left_axis_and_freeze() {
+    // 主世界左行：差值轴 Left 侧真实生效；越界 void 失败并冻结。
+    let mut h = start_main();
+    let mut seen: Vec<Ev> = Vec::new();
+    let mut oob = false;
+    for _ in 0..WALK_BUDGET {
+        seen.extend(events(&h));
+        if seen.iter().any(|e| e.pair == 5 && e.phase == 1) {
+            oob = true;
+            break;
+        }
+        step(&mut h, 1 << 0);
+    }
+    assert!(
+        oob && actor(&h)[0] < 0.5,
+        "void fails out of bounds x={:?}",
+        actor(&h)
+    );
+    for _ in 0..2 {
+        step(&mut h, 1 << 0);
+    }
+    let frozen = actor(&h);
+    for _ in 0..10 {
+        step(&mut h, 1 << 0);
+    }
+    assert_eq!(actor(&h), frozen, "oob freezes motion");
+    assert!(!seen.iter().any(|e| e.pair == 3), "hazard silent");
+    h.stop_play();
+}
+
+#[test]
+fn g11_same_tick_triple() {
+    let mut h = start_with(SCENE_TRIPLE, WORLD_TRIPLE, "triple");
+    assert!(play_error(&h).is_empty(), "{}", play_error(&h));
+    let t0 = frame_tick(&h);
+    h.play.as_mut().unwrap().single_step().expect("step");
+    settle(&mut h);
+    let ev = events(&h);
+    let enters: Vec<&Ev> = ev.iter().filter(|e| e.phase == 1).collect();
+    let pairs: Vec<i32> = enters.iter().map(|e| e.pair).collect();
+    assert!(
+        frame_tick(&h) == t0 + 1 && enters.len() >= 3,
+        "one step emits the geometry result: tick {}->{}, enters {}",
+        t0,
+        frame_tick(&h),
+        enters.len()
+    );
+    assert!(
+        enters.len() == 3 && pairs.contains(&0) && pairs.contains(&1) && pairs.contains(&2),
+        "same-tick three engine block: pairs {pairs:?}"
+    );
+    assert_eq!(
+        enters
+            .iter()
+            .map(|e| e.source_ref)
+            .collect::<std::collections::BTreeSet<i32>>()
+            .len(),
+        3,
+        "three distinct ids"
+    );
+    let before = live(&h);
+    step(&mut h, 0);
+    assert_eq!(before, 6, "six live before the reads");
+    assert_eq!(live(&h), 3, "three reads three destroys in one callback");
+    h.stop_play();
+}
+
+#[test]
+fn g11_stay_not_recounted() {
+    let mut h = start_with(SCENE_STAY, WORLD_STAY, "stay");
+    let mut seen: Vec<Ev> = Vec::new();
+    let mut goal = false;
+    let stay_run = run_id(&h);
+    for _ in 0..WALK_BUDGET {
+        let ev = events(&h);
+        goal |= ev.iter().any(|e| e.pair == 2 && e.phase == 1);
+        seen.extend(ev);
+        if goal {
+            break;
+        }
+        step(&mut h, 1 << 1);
+    }
+    let p0: Vec<i32> = seen.iter().filter(|e| e.pair == 0).map(|e| e.phase).collect();
+    assert!(
+        p0.first() == Some(&1)
+            && p0.iter().filter(|p| **p == 1).count() == 1
+            && p0.iter().filter(|p| **p == 2).count() >= 5,
+        "pair0 phases {p0:?} (one enter, many stays)"
+    );
+    assert!(
+        goal && run_id(&h) == stay_run && live(&h) == 3,
+        "goal reached but stays never scored: run {stay_run} live {}",
+        live(&h)
+    );
+    // Enter 在 Playing 状态不重开。
+    let before = run_id(&h);
+    restart_once(&mut h, 3);
+    for _ in 0..10 {
+        if run_id(&h) != before {
+            break;
+        }
+        step(&mut h, 0);
+    }
+    assert_eq!(run_id(&h), before, "playing state ignores Enter");
+    h.stop_play();
+}
+
+#[test]
+fn g11_bag2_goal_gate_and_exit() {
+    let mut h = start_with(SCENE_BAG2, WORLD_BAG2, "bag2");
+    let mut seen: Vec<Ev> = Vec::new();
+    let mut goal_enter = false;
+    let run2 = run_id(&h);
+    let mut won2 = false;
+    for _ in 0..WALK_BUDGET {
+        let ev = events(&h);
+        goal_enter |= ev.iter().any(|e| e.pair == 3 && e.phase == 1);
+        seen.extend(ev);
+        if run_id(&h) != run2 {
+            won2 = true;
+            break;
+        }
+        if seen.iter().filter(|e| e.pair == 3 && e.phase == 2).count() > 8 {
+            break;
+        }
+        step(&mut h, 1 << 1);
+    }
+    let stays = seen.iter().filter(|e| e.pair == 3 && e.phase == 2).count();
+    assert!(
+        goal_enter && stays > 0,
+        "goal enter={goal_enter} stays={stays}"
+    );
+    assert!(
+        !won2 && run_id(&h) == run2,
+        "bag2 never wins: run {}",
+        run_id(&h)
+    );
+    // 走出 goal：exit 事件在越过后出现。
+    let mut saw_exit = seen
+        .iter()
+        .any(|e| e.pair == 3 && e.phase == 3);
+    let mut guard = 0;
+    while !saw_exit && guard < WALK_BUDGET {
+        guard += 1;
+        step(&mut h, 1 << 1);
+        saw_exit = events(&h).iter().any(|e| e.pair == 3 && e.phase == 3);
+        assert!(run_id(&h) == run2, "bag2 walk cannot restart");
+        if actor(&h)[0] > 29.5 {
+            break;
+        }
+    }
+    assert!(saw_exit, "goal exit phase observed (walk-through)");
+    // Enter（Playing）不重开。
+    let before = run_id(&h);
+    restart_once(&mut h, 3);
+    for _ in 0..10 {
+        if run_id(&h) != before {
+            break;
+        }
+        step(&mut h, 0);
+    }
+    assert_eq!(run_id(&h), before, "bag2 enter does not open a round");
+    h.stop_play();
+}
+
+#[test]
+fn g11_geometry_probes() {
+    let mut h = start_with(SCENE_GEOMETRY, WORLD_GEOMETRY, "geometry");
+    assert!(play_error(&h).is_empty(), "{}", play_error(&h));
+    let mut seen: Vec<Ev> = Vec::new();
+    for _ in 0..6 {
+        seen.extend(events(&h));
+        step(&mut h, 0);
+    }
+    // pair0 = AABB@角（进入），pair1 = circle@角（0.64>0.5 静默），
+    // pair2 = circle@切点（恰 0.5 进入）。
+    assert!(
+        seen.iter().any(|e| e.pair == 0 && e.phase == 1),
+        "AABB corner instance enters"
+    );
+    assert!(
+        !seen.iter().any(|e| e.pair == 1),
+        "circle corner outside stays silent (AABB would hit)"
+    );
+    assert!(
+        seen.iter().any(|e| e.pair == 2 && e.phase == 1),
+        "circle tangent hits exactly at 0.5"
+    );
+    h.stop_play();
+}
+
+#[test]
+fn g11_generation_despawn_respawn_rebind() {
+    let mut h = start_with(SCENE_GENERATION, WORLD_GENERATION, "generation");
+    let mut enter_ticks: Vec<i32> = Vec::new();
+    let mut gens: Vec<i32> = Vec::new();
+    for _ in 0..12 {
+        for e in events(&h) {
+            if e.pair == 0 && e.phase == 1 {
+                enter_ticks.push(e.tick);
+            }
+        }
+        if let Some(s) = slot(&h, 0) {
+            gens.push(s.0);
+        }
+        step(&mut h, 0);
+    }
+    assert_eq!(enter_ticks.first(), Some(&1), "enters at tick 1 (spawn overlap)");
+    assert!(
+        !enter_ticks.iter().any(|t| *t > 1 && *t < 4),
+        "despawn window is silent: {enter_ticks:?}"
+    );
+    assert!(
+        enter_ticks.len() >= 2 && *enter_ticks.last().unwrap() >= 4,
+        "explicit respawn rebinds and re-enters the new generation: {enter_ticks:?}"
+    );
+    assert!(
+        gens.iter().any(|g| *g == 2),
+        "same slot reaches generation 2: {gens:?}"
+    );
+    h.stop_play();
+}
+
+#[test]
+fn g11_motion_probes_both_and_away() {
+    let mut h = start_with(SCENE_MOTION, WORLD_MOTION, "motion");
+    // slider（pair0，向左走）与 ghost（pair1，每 tick 远移）。
+    let mut enter_tick: Option<i32> = None;
+    let mut first_overlap: Option<i32> = None;
+    for _ in 0..80 {
+        let ev = events(&h);
+        if let Some(e) = ev.iter().find(|e| e.pair == 0 && e.phase == 1) {
+            enter_tick = Some(e.tick);
+        }
+        if first_overlap.is_none() {
+            if let Some(s) = slot(&h, 0) {
+                // 物件中心到角色盒（半宽 0.4/半高 0.5）的最近距离；
+                // ≤ 物件半宽 0.35 ⟺ 两个 AABB 相交（原 001 检测器语义）。
+                let c = actor(&h);
+                let char_half = [0.4f32, 0.5f32];
+                let mut d2 = 0.0f32;
+                for a in 0..2 {
+                    let lo = c[a] - char_half[a];
+                    let hi = c[a] + char_half[a];
+                    let d = if s.2[a] < lo {
+                        lo - s.2[a]
+                    } else if s.2[a] > hi {
+                        s.2[a] - hi
+                    } else {
+                        0.0
+                    };
+                    d2 += d * d;
+                }
+                if d2.sqrt() <= 0.35 {
+                    first_overlap = Some(frame_tick(&h));
+                }
+            }
+        }
+        if enter_tick.is_some() && first_overlap.is_some() {
+            break;
+        }
+        step(&mut h, 1 << 1);
+    }
+    assert!(
+        enter_tick.is_some() && enter_tick == first_overlap,
+        "both-moved enter tick {enter_tick:?} == first final-position overlap {first_overlap:?}"
+    );
+    // ghost：spawn 在角色上但每 tick 先远移 → 从不 enter（无旧位置几何）。
+    let mut away_enters = 0usize;
+    for _ in 0..6 {
+        away_enters += events(&h)
+            .iter()
+            .filter(|e| e.pair == 1 && e.phase == 1)
+            .count();
+        step(&mut h, 0);
+    }
+    assert_eq!(away_enters, 0, "away item never enters (no previous position)");
+    h.stop_play();
+}
+
+#[test]
+fn g11_pause_step_stop_harness() {
+    let mut h = start_main();
+    let p0 = actor(&h);
+    h.pause_play("");
+    {
+        let p = h.play.as_mut().unwrap();
+        let _ = p.dispatch(Action::default());
+    }
+    settle(&mut h);
+    assert_eq!(actor(&h), p0, "paused dispatch: no motion");
+    let t1 = frame_tick(&h);
+    h.play.as_mut().unwrap().single_step().expect("step");
+    settle(&mut h);
+    assert_eq!(frame_tick(&h), t1 + 1, "single step = exactly one tick");
+    assert!(play_error(&h).is_empty(), "{}", play_error(&h));
+    h.stop_play();
+    assert!(h.play.is_none(), "stop tears the play down");
+}
+
+#[test]
+fn g11_owner_20_rounds_and_stale_write() {
+    // 20 轮：Start-once + drop 后 owner 释放（weak 探针）。
+    for round in 0..20 {
+        let mut s = g11_session(WORLD_MAIN, "g11_owner.at", 1);
+        let probe = s.owner_probe();
+        assert!(probe(), "round {round}: open session owns state");
+        assert_eq!(int(&mut s, "get_r_starts"), 1, "round {round} starts once");
+        tick_cpu(&mut s, 1, true);
+        tick_cpu(&mut s, 2, true);
+        assert_eq!(status(&mut s), 0, "round {round} fault-free");
+        drop(s);
+        assert!(!probe(), "round {round}: owner released after drop");
+    }
+    // 旧代句柄写：完整世界 + 注入 stale_write；run-2 fresh 世界操作 run-1
+    // 句柄 → 命名外来句柄故障 33，新根不沾染。
+    let mut s1 = g11_session(WORLD_MAIN, "g11_gen1.at", 1);
+    let mut collected = 0;
+    for t in 0..400 {
+        tick_cpu(&mut s1, t + 1, true);
+        if int(&mut s1, "get_r_bag") > 0 {
+            collected = int(&mut s1, "get_amber_coin_handle");
+            break;
+        }
+    }
+    assert!(collected > 0, "collected a handle on run 1");
+    drop(s1);
+    let probe = format!(
+        "{WORLD_MAIN}\nfn stale_write(h int) int {{return ag_object_despawn(h)}}\n"
+    );
+    let mut p = g11_session(&probe, "g11_stale.at", 2);
+    assert_eq!(status(&mut p), 0, "fresh run-2 world starts clean");
+    let _ = p.call("stale_write", &[Int(collected)], ResultKind::Int);
+    assert_eq!(
+        status(&mut p),
+        33,
+        "stale handle is the named foreign-run fault"
+    );
+    assert_eq!(int(&mut p, "get_r_amber"), 1, "fresh root untouched");
+}
+
+#[test]
+fn g11_hidden_still_triggers_engine_fact() {
+    // engine-fact 探针（原始 Auto，非作者能力）：spawn 后 ag_object_visible
+    // 关闭可见性，触发资格不受影响（visibility never gates triggers）。
+    // 探针源以重写身份绑定到同场景工程（scene behavior sha/bytes = 探针源）。
+    let hidden = concat!(
+        "var ok=0.0
+", "var h0=0
+", "fn app_start() {
+", " ok=ok+ag_char_bind(1)
+",
+        " ok=ok+ag_char_solid(2)
+", " ok=ok+ag_camera_follow_2d(1, 0.0, -4.0, 30.0, 12.0, 12.0, 8.0)
+",
+        " h0=ag_object_spawn(0, 3, 2.0, 0.5, 0.0)
+", " ok=ok+ag_object_visible(h0, 0)
+",
+        " ok=ok+ag_trigger_bind(0, 1, 1, h0, 0, 0.0)
+", "}
+", "fn app_update(dt float) {
+",
+        " let n=ag_event_next()
+", " if n==1 {let p=ag_event_pair()}
+", "}
+",
+    );
+    let probe_sha = agp::renderer::capture::sha256_hex(hidden.as_bytes());
+    let old_sha = SCENE_MAIN
+        .split("\"sha256\": \"")
+        .nth(1)
+        .and_then(|r| r.split('"').next())
+        .expect("sha")
+        .to_string();
+    let old_bytes: usize = SCENE_MAIN
+        .split("\"byte_length\": ")
+        .nth(1)
+        .and_then(|r| {
+            let digits: String = r.chars().take_while(|c| c.is_ascii_digit()).collect();
+            digits.parse::<usize>().ok()
+        })
+        .expect("bytes");
+    let probe_scene = SCENE_MAIN
+        .replacen(&old_sha, &probe_sha, 1)
+        .replacen(&format!("\"byte_length\": {}", old_bytes), &format!("\"byte_length\": {}", hidden.len()), 1);
+    assert!(probe_scene.contains(&probe_sha), "scene rewritten for the probe source");
+    assert!(!probe_scene.contains(&old_sha), "old binding gone");
+    let mut h = start_with(&probe_scene, hidden, "hidden");
+    let mut enter = false;
+    let mut vis_at_enter: Option<bool> = None;
+    for _ in 0..6 {
+        let ev = events(&h);
+        if vis_at_enter.is_none() && ev.iter().any(|e| e.pair == 0 && e.phase == 1) {
+            vis_at_enter = slot_visible(&h, 0);
+        }
+        enter |= ev.iter().any(|e| e.pair == 0 && e.phase == 1);
+        if enter && vis_at_enter.is_some() {
+            break;
+        }
+        step(&mut h, 0);
+    }
+    assert!(
+        enter && vis_at_enter == Some(false),
+        "hidden instance still triggers (published visible={vis_at_enter:?})"
+    );
+    h.stop_play();
+}
+
+#[test]
+fn g11_gpu_won_pixels_and_windowless_png() {
+    // GPU：真实项目工程 → 离屏 GPU → 像素类三层证据 + won 后 capture。
+    let mut h = start_main();
+    let (red0, orange0, gold0, ground0) = scan_classes(&mut h);
+    assert!(red0 >= 6, "hazard pixels {red0}");
+    assert!(orange0 >= 4, "player pixels {orange0}");
+    assert!(gold0 >= 1, "gold pixels {gold0}");
+    assert!(ground0 >= 40, "ground pixels {ground0}");
+    // 收集：金币像素类消失 + 帧层槽死亡（真 despawn）。
+    let mut guard = 0;
+    while guard < 400 && live(&h) == 6 {
+        guard += 1;
+        step(&mut h, 1 << 1);
+    }
+    assert!(guard < 400, "collection happened");
+    let (_, _, gold1, _) = scan_classes(&mut h);
+    assert!(
+        gold1 < gold0,
+        "gold class disappears after despawn ({gold0}->{gold1})"
+    );
+    // 走到赢并冻结，然后 capture。
+    let mut won = false;
+    for _ in 0..WALK_BUDGET {
+        if live(&h) == 3 {
+            let ev = events(&h);
+            if ev.iter().any(|e| e.pair == 4 && e.phase == 1) {
+                won = true;
+                break;
+            }
+        }
+        step(&mut h, 1 << 1);
+    }
+    assert!(won, "reached the won state");
+    for _ in 0..2 {
+        step(&mut h, 1 << 1);
+    }
+    let won_x = actor(&h)[0];
+    for _ in 0..3 {
+        step(&mut h, 1 << 1);
+    }
+    assert!((actor(&h)[0] - won_x).abs() < 1e-6, "won freezes (GPU window)");
+    let cmds = match h.rt.content(h.two) {
+        Some(agp::host::surface_runtime::SurfaceContent::Game2d(g)) => g.commands.len(),
+        _ => 0,
+    };
+    let (_, png, w, ht) = h
+        .rt
+        .capture(h.two, "g11-2d-won")
+        .unwrap_or_else(|| panic!("capture"));
+    assert!(
+        w > 0 && ht > 0 && png.len() > 3_000 && cmds > 3,
+        "windowless png {w}x{ht} bytes={} cmds={cmds}",
+        png.len()
+    );
+    h.stop_play();
 }

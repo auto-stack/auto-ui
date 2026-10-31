@@ -1,0 +1,34 @@
+// PLAN-017 g11-2d fixture: the character component. character2d is the
+// declarative character port (maps the AG character service; identified by
+// element type, not by name). Full differential axis: Left=-1, Right=+1,
+// both/neither=0 (two charged held reads). Motion is the real swept
+// move_and_slide; the generated moved flag drives the event-read schedule.
+use resources
+
+node Player(spawn_x: float, spawn_y: float, speed: float, enabled: int) {
+    model {
+        var move_axis = 0.0
+        var starts = 0
+    }
+    view-2d {
+        character2d body {
+            position: (.spawn_x, .spawn_y)
+            mesh: resources.player_mesh
+            material: resources.orange
+        }
+    }
+    on {
+        Life.Start -> {
+            .starts = 1
+        }
+        Life.Tick(dt) -> {
+            .move_axis = 0.0
+            if .enabled {
+                .move_axis = input.axis(Left, Right)
+            }
+            if .move_axis != 0.0 {
+                refs.body.move_and_slide((.move_axis * .speed * dt, 0.0))
+            }
+        }
+    }
+}

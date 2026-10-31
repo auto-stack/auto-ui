@@ -1,0 +1,139 @@
+{
+ "behavior": {
+  "api": "autographics.triggers2d/1",
+  "source": {
+   "format": "auto-source",
+   "sha256": "cdb235b31c8b781746457435763ea26f3c4c819b74543b487a7efb18bea0ba57",
+   "byte_length": 9293
+  },
+  "actors": {
+   "two_d": 1,
+   "three_d": null
+  }
+ },
+ "schema": "autographics.scene/6",
+ "document_id": "plan017-g11-2d-MainTriple",
+ "resources": [
+  "circle",
+  "quad",
+  "cylinder",
+  "player",
+  "mob"
+ ],
+ "objects": [
+  {
+   "id": 1,
+   "name": "player",
+   "kind": "quad",
+   "translation": [2.0, 0.5, 0.0],
+   "scale": [0.8, 1.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.9, 0.5, 0.25, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 2,
+   "name": "ground",
+   "kind": "quad",
+   "translation": [15.0, -0.6, 0.0],
+   "scale": [40.0, 1.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.55, 0.62, 0.7, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 3,
+   "name": "first_template",
+   "kind": "circle",
+   "translation": [-30.0, 2.0, 0.0],
+   "scale": [0.6, 0.6, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.95, 0.8, 0.2, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 4,
+   "name": "second_template",
+   "kind": "quad",
+   "translation": [-30.0, 2.0, 0.0],
+   "scale": [0.7, 0.7, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.2, 0.8, 0.9, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 5,
+   "name": "third_template",
+   "kind": "circle",
+   "translation": [-30.0, 2.0, 0.0],
+   "scale": [0.9, 0.9, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.9, 0.35, 0.85, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 6,
+   "name": "hazard_template",
+   "kind": "circle",
+   "translation": [-30.0, 2.0, 0.0],
+   "scale": [0.7, 0.7, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.9, 0.2, 0.2, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 7,
+   "name": "goal_template",
+   "kind": "quad",
+   "translation": [-30.0, 2.0, 0.0],
+   "scale": [0.5, 1.2, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.3, 0.9, 0.5, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 8,
+   "name": "void_zone_template",
+   "kind": "quad",
+   "translation": [-30.0, 2.0, 0.0],
+   "scale": [2.0, 3.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.1, 0.1, 0.12, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  }
+ ],
+ "groups": [],
+ "assets": []
+}
