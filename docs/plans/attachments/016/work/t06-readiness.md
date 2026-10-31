@@ -46,7 +46,8 @@ dependency_revisions: SDK 7b987ca8（driver .sdk-source，source-lock 校验）�
    （6 passed 0 failed，driver 树）
 6. consumerB：git archive 新根 + auto-lang@3fa75dd9 + prepare_sdk 681 files
    → node2d-lower 再生 sha f66b1b92/4bd54fa3 与 A 逐字节等价 → driver
-   node2d_flow 全量通过（B 消费不借生产者构建状态）
+   node2d_flow 全量 6 passed exit0（B 消费不借生产者构建状态；日志
+   plan-artifacts/auto-ui/plan-016/t06-consumerB.log）
 
 ## 身份
 

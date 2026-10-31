@@ -179,6 +179,8 @@ T-02最多比较两种既有端口接法，必须均复用共同语法/Core解�
 
 2026-10-31 work final handoff：`stage: work | plan_id: auto-ui/PLAN-016 | plan_revision: 3 | outcome: pass | worktree_path: D:/autostack/.wt/ui-016/auto-ui | branch: codex/plan-016-dev | base_commit: 69690dfb8e0b691a9af8d9e1eacc240511d2e83e | code_commit: 59ff619 | dependency_revisions: SDK 7b987ca8/681；auto-lang 3fa75dd9（只读）；auto-down c3464d0（只读）；driver/生产 crate 源零改动（本计划 driver 侧仅新增 tests/） | task_ids: T-01..T-06 complete | evidence: attachments/016/work/t06-readiness.md | blockers: 无工作侧 finding；统一回归门 pending（owner=review/merge）；D-04 独立终审上下文归 review | next_responsible_role: 同树独立 final review on frozen 59ff619`。AC-01..06 工作侧全闭合映射见 readiness；verify_plan016 --controls PASS exit0（身份/再生等价/变异敏感/缺模块诊断/篡改检出）；consumerB A→B：git archive 新根+auto-lang@3fa75dd9+冷 SDK → 再生 sha f66b1b92/4bd54fa3 与 A 逐字节等价，driver node2d_flow 在 B 全量通过。fmt 已过；warning 面仅 sdk 既有 146 项（非本计划引入）。
 
+2026-10-31 goal round1（work 全阶段）：`stage: goal | plan_id: PLAN-016 | plan_revision: r3 | round: 1 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-016/auto-ui | commit: 803026d（T-06 内容提交 59ff619 为冻结代码提交） | next: review`。本轮 T-01..T-06 全闭合：G-01 核实、合同冻结、研究文法+模块绑定 12 例、降层生成器+冻结生成物、driver 6 例（CPU/GPU/预算/旧代/双父/生命周期/owner）、verify_plan016 --controls PASS、consumerB A→B 全量 6 passed（冷 SDK 681 files，t06-consumerB.log SHA 见 plan-artifacts）。执行 door：D-01/D-02/D-03 闭合，D-04 归 review。统一回归门 pending（owner=review/merge）。
+
 ## 10. 待澄清事项
 
 | ID | 事项 | 关闭owner/下一步 |
