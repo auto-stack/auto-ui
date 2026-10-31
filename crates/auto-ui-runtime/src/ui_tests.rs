@@ -192,3 +192,35 @@ mod plan810_full_ui_grammar;
 mod plan814_recipe_extraction_tests;
 #[cfg(test)]
 mod vm_json_float_read_tests;
+
+// PLAN-900 T-05 补充批：lib.rs #[path] 门控 mod 与 tests.rs 剩余 UI 引用文件。
+#[cfg(test)]
+mod plan449_style_parity_tests;
+#[cfg(test)]
+mod plan577_avatar_tests;
+#[cfg(test)]
+mod plan593_theme_registry_tests;
+#[cfg(test)]
+mod plan615_calc_prog_tests;
+#[cfg(all(test, feature = "ui-iced"))]
+mod plan632_demo_bridge_tests;
+#[cfg(all(test, feature = "ui-iced"))]
+mod plan633_fullstack_embed_tests;
+#[cfg(all(test, feature = "ui-iced"))]
+mod plan664_use_diag_tests;
+#[cfg(test)]
+mod plan728_bench;
+#[cfg(test)]
+mod plan733_fn_call_semantics_tests;
+#[cfg(test)]
+mod plan748_breakpoint_probes;
+#[cfg(test)]
+mod plan749_read_semantics_tests;
+#[cfg(test)]
+mod plan712_route_param_tests;
+#[cfg(all(test, feature = "ui-iced"))]
+mod plan499_engine_float_to_int_tests;
+#[cfg(all(test, feature = "ui-iced"))]
+mod plan712_back_prefix_route_fetch;
+#[cfg(test)]
+mod plan577_breadcrumb_cycle_tests;
