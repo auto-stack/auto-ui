@@ -26,7 +26,6 @@
 #![cfg(windows)]
 
 /// V-04：真模态文件对话框（cfg(ui-dialog)；windows 由外层 mod 门控）。
-#[cfg(feature = "ui-dialog")]
 mod dialog_e2e {
     use auto_lang_core::vm::host_capabilities::DialogHostProvider as _;
     use std::sync::mpsc;
@@ -647,7 +646,7 @@ mod dialog_e2e {
 }
 
 /// V-05：真 DoDragDrop 会话（cfg(native-dnd + ui)；windows crate 可用）。
-#[cfg(all(feature = "native-dnd", feature = "ui"))]
+#[cfg(feature = "native-dnd")]
 mod dnd_e2e {
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Mutex;
@@ -1302,7 +1301,6 @@ mod dnd_e2e {
         }
     }
 
-    #[cfg(feature = "ui-iced")]
     #[test]
     fn v05_real_host_dnd_finished_delivery() {
         if !env_gate() {

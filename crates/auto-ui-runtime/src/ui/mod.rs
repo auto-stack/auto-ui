@@ -30,7 +30,6 @@ pub mod sched_diag;
 
 // Plan 547: backend-neutral media runtime.  Concrete registries and worker
 // machinery are feature-gated so default language builds stay image-free.
-#[cfg(feature = "image-pipeline")]
 pub mod image_pipeline;
 
 // Plan 617 T-05: local media file service (recursive index + HTTP byte-range
@@ -43,7 +42,6 @@ pub mod media_service;
 // thumbnail rendering + original byte serving) for 029-photo-gallery.
 // Gated on `image-pipeline` — thumbnails need the `image`/`kamadak-exif`
 // decoders (media_service stays ungated because it never decodes pixels).
-#[cfg(feature = "image-pipeline")]
 pub mod photo_service;
 
 // PLAN-617 T-16: VM/iced 端原生播放引擎（libmpv DLL 运行时加载）。可选能力，
@@ -59,7 +57,6 @@ pub mod mem_guard;
 
 // Plan 413: cross-platform code editor widget (feature `code-editor`,
 // enabled by default under `ui-iced`).
-#[cfg(feature = "code-editor")]
 pub mod code_editor;
 // PLAN-009 P1: native `terminal` component (auto-term engine grid; core is
 // iced-free, `iced/` is the only iced point — code_editor layering).
@@ -72,18 +69,16 @@ pub mod terminal_provider;
 // iced/Vue adapter 在各自 backend 内，不在此处）。
 pub mod scroll;
 // Plan 418: OS clipboard bridge (arboard) behind `ui-clipboard`.
-#[cfg(feature = "ui-clipboard")]
 pub mod clipboard;
 // PLAN-785: clipboard text host provider adapter——委托 ui::clipboard 既有
 // 实现，经 vm::host_capabilities 显式装配（core shim 2925/2926 不再直引
 // ui；779 frame_provider 同构）。
-#[cfg(feature = "ui-clipboard")]
 pub mod clipboard_provider;
 // PLAN-790: clipboard media host provider adapter——委托 ui::clipboard_native
 // 既有实现（files/image 2934..2937；779/785 同构）。双门控 windows ×
 // native-clipboard 与被委托的 Win32 桥函数一致——非 Windows 无 adapter，
 // VM 缺席 provider → G3 值降级，不把 UI 默认伪造为可用 OS。
-#[cfg(all(windows, feature = "native-clipboard"))]
+#[cfg(windows)]
 pub mod clipboard_media_provider;
 // PLAN-794: scroll host provider adapter——委托 ui::scroll::controller 既有
 // 注册表/锚点状态机（9900..9905 + 9922/9923；779/785/790 同构）。单门控
@@ -95,13 +90,11 @@ pub mod scroll_host_provider;
 //（与被委托的 code_editor 模块一致）；cut/copy/paste 实现级第二门控
 // `ui-clipboard` 在方法体内（无此 feature 返 None = 组合特征 raise 臂）。
 // editor 注册表仍是单一真源，adapter 只做 core 值域转换。
-#[cfg(feature = "code-editor")]
 pub mod code_editor_provider;
 // PLAN-681: native open/save file dialogs — host of the `dialog_open`/
 // `dialog_save` VM builtins (natives 2927/2928) for a2r generated apps,
 // behind `ui-dialog` (enabled by `ui-iced`). PLAN-804 起为薄门面（单一
 // OS 实现在 host_adapters::dialog，本模块保 a2r unparented 策略）。
-#[cfg(feature = "ui-dialog")]
 pub mod dialog;
 // PLAN-804: dnd host provider adapter——委托 ui::native_dnd 既有载荷
 // parser 与 Win32 会话实现（2938；779/785/790/794 同构）。双门控
@@ -118,7 +111,6 @@ pub mod clipboard_native;
 pub use auto_ui_compiler::action_config;
 pub mod view;
 // PLAN-063 T-04d-2: 右栏块锚定坐标槽（iced 布局期记录 + 同步目标消费）。
-#[cfg(feature = "ui-iced")]
 pub mod anchor_slot;
 pub mod app;
 pub mod debug;
@@ -130,17 +122,13 @@ pub mod node_converter;
 // style_iced_adapter，不复制实现）；③适配器与再导出同上 ui-iced 门
 // （headless 构建零 iced 引用——203e2ce91 同款门）。
 pub mod style {
-    #[cfg(feature = "ui-iced")]
     pub use crate::ui::style_iced_adapter::IcedStyle;
     pub use auto_ui_compiler::style::*;
-    #[cfg(feature = "ui-iced")]
     pub mod iced_adapter {
         pub use crate::ui::style_iced_adapter::*;
     }
 }
-#[cfg(feature = "ui-iced")]
 pub mod style_iced_adapter;
-#[cfg(feature = "ui-iced")]
 pub use style_iced_adapter::IcedStyle;
 pub mod vnode;
 pub mod vnode_converter;
@@ -148,36 +136,30 @@ pub mod widget;
 // PLAN-646 Select Anything——框选语义纯函数 + 结果信封。依赖
 // mcp_server/vtree_atom（StyledNodeSnapshot/VTreeAtomBuilder），同门控。
 pub mod handler_codegen;
-#[cfg(feature = "ui-interpreter")]
 pub mod selection;
 // PLAN-814 R9-03：vm_bridge 类型面依赖 interpreter（dynamic/memo 字段族
 // 与 ui::dynamic 消费）——随 ui-interpreter 门（旧巨树 bare-ui 同为预存
 // 缺门，本批补齐声明面）。
-#[cfg(feature = "ui-interpreter")]
 pub mod vm_bridge;
 // PLAN-045：VM 渲染组件级 memo（菜单族四件 + sidebar nav 块；opt-in，
 // 缺省原始路径逐字节不变）。类型面依赖 interpreter 的 View/DynamicMessage，
 // 同门控。
-#[cfg(feature = "ui-interpreter")]
 pub mod memo_deps;
 // PLAN-051 C2：子→父 msg 参数回调通用路由表（handler_codegen 无 feature 门，
 // 故本模块同样不门控）。
 pub mod child_emit;
-#[cfg(feature = "ui-iced")]
 pub mod session;
 // PLAN-042 T-01：宿主系统日志环（三层采集归一：log trap / syslog! 双写宏 /
 // App log 动词）。纯 std + log，零 feature 门（headless 单测同轨可用）。
 pub mod syslog;
 // PLAN-037：桌面后端供给层（launch 决策树四臂 + 按需 proxy 装载 +
 // 前端 URL 内存态前缀化；658 谓词/前缀化函数迁入 auto-man 复用）。
-#[cfg(feature = "ui-iced")]
 pub mod back_provision;
 pub mod shell_projection;
 // PLAN-615 T-06: OS 系统主题读取（深/浅色个人化跟随地基；纯 std 全平台可编译）。
 pub mod system_theme;
 
 // Plan 463 T2：桌面布局引擎（free/grid/master-stack 纯函数 + snap 几何）。
-#[cfg(feature = "ui-iced")]
 pub mod layout;
 
 // Plan 463 T5：桌面 shell（特权 .at App 装配）。
@@ -201,7 +183,6 @@ pub mod desktop_config;
 
 // Plan 386 Stage 1：桌面协议（进程外 App 五通道）——loopback 同进程走通，
 // 施工图 Design 25 §7；Stage 2 换真 transport 时只替换其 loopback 层。
-#[cfg(feature = "ui-iced")]
 pub mod desktop_protocol;
 
 // Plan 473：原生窗口 dock（NativeSlot，假洞 Phase 1）。纯逻辑层零依赖全平台
@@ -218,25 +199,18 @@ pub mod native_dnd;
 // (adapter-chain loading + platform stubs).
 pub mod ext_stubs;
 
-#[cfg(feature = "ui-interpreter")]
 pub mod mcp_types;
 
-#[cfg(feature = "ui-interpreter")]
 pub mod snapshot_builder;
 
-#[cfg(feature = "ui-interpreter")]
 pub mod action_mapper;
 
-#[cfg(feature = "ui-interpreter")]
 pub mod mcp_server;
 
-#[cfg(feature = "ui-interpreter")]
 pub mod vtree_atom;
 
-#[cfg(feature = "ui-interpreter")]
 pub mod aura_snapshot_builder;
 
-#[cfg(feature = "ui-interpreter")]
 pub mod render_support;
 // Plan 019 批次七: autodown-core crate 消费（VM markdown/autodown 真渲染）。
 #[cfg(feature = "autodown")]
@@ -259,52 +233,40 @@ pub mod autodown_math;
 
 // Plan 019 Phase 3: autodown 文档编辑壳（cosmic-text 块缓冲 + 焦点导航）。
 // 双 feature 门控：块模型单源（autodown）× cosmic-text 栈（code-editor）。
-#[cfg(all(feature = "autodown", feature = "code-editor"))]
+#[cfg(feature = "autodown")]
 pub mod autodown_editor;
 
-#[cfg(feature = "ui-interpreter")]
 pub mod interpreter;
 
-#[cfg(feature = "ui-interpreter")]
 pub mod aura_view_builder;
 
-#[cfg(feature = "ui-interpreter")]
 pub mod debug_id_map;
 
-#[cfg(feature = "ui-interpreter")]
 pub mod event_router;
 
-#[cfg(feature = "ui-interpreter")]
 pub mod hot_reload;
 
-#[cfg(feature = "ui-interpreter")]
 pub mod dynamic;
 
-#[cfg(feature = "ui-interpreter")]
 pub mod widget_registry;
 
 // PLAN-066: 原生组件外部注册 SPI（NativeWidgetRegistry + View::Custom 派发
 // 通道）。跟随 ui-interpreter 门控——消费方（aura_view_builder 派发 /
 // iced renderer lowering）都在其内。
-#[cfg(feature = "ui-interpreter")]
 pub mod native_widget;
 
-#[cfg(feature = "ui-interpreter")]
 pub mod state_migration;
 
-#[cfg(feature = "ui-interpreter")]
 pub use auto_ui_compiler::i18n_lookup;
 
 #[cfg(feature = "ui-headless")]
 pub mod headless;
 
-#[cfg(feature = "ui-iced")]
 pub mod iced;
 
 // Plan 365 W1: Unified host backend interface (seam for W2/W3).
 // Available whenever the base `ui` feature is on; each variant is individually
 // cfg-gated inside the module.
-#[cfg(feature = "ui")]
 pub mod host;
 
 // Re-exports

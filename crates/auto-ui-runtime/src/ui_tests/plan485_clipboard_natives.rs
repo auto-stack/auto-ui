@@ -18,7 +18,7 @@ fn make_vm() -> AutoVM {
     let vm = AutoVM::new(VirtualFlash::new(1024), 1024);
     // PLAN-790：真实臂注入 OS adapter（缺席注入 = G3 值降级，OS 往返
     // 断言会走 headless guard 静默跳过——不算 OS 验收，见计划 V04）。
-    #[cfg(all(windows, feature = "native-clipboard"))]
+    #[cfg(windows)]
     vm.set_clipboard_media_provider(std::sync::Arc::new(
         crate::ui::clipboard_media_provider::NativeClipboardMediaProvider,
     ));
@@ -38,7 +38,7 @@ fn pop_heap_id(vm: &AutoVM, task: &mut AutoTask) -> u64 {
 fn clipboard_files_and_image_via_vm_shims() {
     // 跨进程命名互斥：与 ui::clipboard_native / ui::clipboard 的剪贴板
     // 集成测试互斥（nextest 多进程并行会互清剪贴板，见 T9 修复注）。
-    #[cfg(all(windows, feature = "native-clipboard"))]
+    #[cfg(windows)]
     let _global = match crate::ui::clipboard_native::GlobalClipboardTestLock::acquire() {
         Some(g) => g,
         None => return,

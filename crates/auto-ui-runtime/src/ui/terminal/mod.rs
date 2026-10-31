@@ -37,12 +37,10 @@ use std::sync::atomic::{AtomicI32, AtomicU64, Ordering};
 use std::sync::Mutex;
 
 // ② iced adapter — the only iced dependency point of the terminal.
-#[cfg(feature = "ui-iced")]
 pub mod iced;
 
 // Plan 583 T7: re-export 与模块声明同门——此前裸 pub use 在 ui 无 ui-iced
 // 组合下 E0432（仓外 a2r 后端 features=["ui",...] 必炸）。
-#[cfg(feature = "ui-iced")]
 pub use iced::{Terminal, TerminalState};
 
 // PLAN-808: the owned cell/color value contract lives in
@@ -994,7 +992,6 @@ pub fn terminal_window_row(core: &TerminalCore, id: i64) -> Option<WindowRow> {
 /// iced 档(ui-only back 生成体)编译炸,方法随特性门控(component.rs
 /// drain_bitmap_uploads 同款收口);消费面(bind 写臂)在 widget 侧
 /// 恒 ui-iced。
-#[cfg(feature = "ui-iced")]
 pub fn terminal_canvas_height(core: &TerminalCore) -> f32 {
     use crate::ui::terminal::iced::widget::{CELL_H, PAD};
     (core.rows as usize + core.history.load(Ordering::Relaxed)) as f32 * CELL_H + 2.0 * PAD

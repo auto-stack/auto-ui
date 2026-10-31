@@ -6,7 +6,6 @@
 
 #![cfg(all(test, feature = "ui-iced"))]
 
-#[cfg(feature = "ui-interpreter")]
 mod plan446_batch5_u7 {
     fn build() -> crate::ui::dynamic::DynamicComponent {
         let rel = "../../../auto-lang/crates/auto-lang/test/ui/plan446_u7_loop_props/src/front/app.at";
@@ -72,7 +71,6 @@ mod plan446_batch5_u7 {
     }
 }
 
-#[cfg(feature = "ui-interpreter")]
 mod plan446_batch5_u1 {
     fn build() -> crate::ui::dynamic::DynamicComponent {
         let rel = "../../../auto-lang/crates/auto-lang/test/ui/plan446_u1_event_freeze/src/front/app.at";
@@ -189,7 +187,6 @@ mod plan446_batch5_u1 {
     }
 }
 
-#[cfg(feature = "ui-iced")]
 mod plan446_batch5_u3_textarea_wedge {
     use crate::ui::iced::renderer::{oversized_textarea_preview, textarea_needs_preview};
 

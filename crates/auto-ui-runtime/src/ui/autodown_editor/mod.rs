@@ -25,14 +25,14 @@
 //   标记）；IME 候选窗组合实机验证受自动化通道限制（commit 形态已真窗
 //   验证，PLAN-048 T9 待澄清⑨）。
 
-#[cfg(all(feature = "autodown", feature = "code-editor"))]
+#[cfg(feature = "autodown")]
 pub mod core;
 
 // iced 下沉（autodown 隐含 ui-iced；code-editor 提供 cosmic-text 栈）。
-#[cfg(all(feature = "autodown", feature = "code-editor"))]
+#[cfg(feature = "autodown")]
 pub mod widget;
 
-#[cfg(all(feature = "autodown", feature = "code-editor"))]
+#[cfg(feature = "autodown")]
 pub use core::{
     autodown_editor, autodown_editor_dispose, autodown_editor_slash_state, autodown_editor_sync,
     autodown_editor_text, retheme_all_fence_buffers, split_wikilink_target, storage_key,

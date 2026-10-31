@@ -21,11 +21,11 @@
 use std::path::PathBuf;
 
 // ── Win32 clipboard format IDs（稳定 ABI 常量，免引 Win32_System_Ole）──
-#[cfg(all(windows, feature = "native-clipboard"))]
+#[cfg(windows)]
 const CF_DIB: u32 = 8;
-#[cfg(all(windows, feature = "native-clipboard"))]
+#[cfg(windows)]
 const CF_DIBV5: u32 = 17;
-#[cfg(all(windows, feature = "native-clipboard"))]
+#[cfg(windows)]
 const CF_HDROP: u32 = 15;
 
 /// DROPFILES header size: pFiles(u32) + POINT(2×i32) + fNC(i32) + fWide(i32).
@@ -268,22 +268,22 @@ fn rows_bytes_of(stride: usize, height: u32) -> u32 {
 // 以下每函数都遵守同一约定：任一步失败返回空值（G3 的 Windows 内延展——
 // 剪贴板被占用/无权限时同样静默降级，不 panic）。
 
-#[cfg(all(windows, feature = "native-clipboard"))]
+#[cfg(windows)]
 use windows::core::w;
-#[cfg(all(windows, feature = "native-clipboard"))]
+#[cfg(windows)]
 use windows::Win32::Foundation::{GlobalFree, HANDLE, HGLOBAL, WAIT_OBJECT_0};
-#[cfg(all(windows, feature = "native-clipboard"))]
+#[cfg(windows)]
 use windows::Win32::System::DataExchange::{
     CloseClipboard, EmptyClipboard, GetClipboardData, IsClipboardFormatAvailable, OpenClipboard,
     RegisterClipboardFormatW, SetClipboardData,
 };
-#[cfg(all(windows, feature = "native-clipboard"))]
+#[cfg(windows)]
 use windows::Win32::System::Memory::{
     GlobalAlloc, GlobalLock, GlobalSize, GlobalUnlock, GMEM_MOVEABLE,
 };
-#[cfg(all(windows, feature = "native-clipboard"))]
+#[cfg(windows)]
 use windows::Win32::System::Threading::{CreateMutexW, ReleaseMutex, WaitForSingleObject};
-#[cfg(all(windows, feature = "native-clipboard"))]
+#[cfg(windows)]
 use windows::Win32::UI::Shell::{DragQueryFileW, HDROP};
 
 /// 跨进程命名互斥（测试专用）：nextest 每测试一进程并行，剪贴板是机器级
@@ -291,10 +291,10 @@ use windows::Win32::UI::Shell::{DragQueryFileW, HDROP};
 /// set→get 窗口里的内容（Plan 485 T9 实测打红了 418 的 arboard 往返）。
 /// 同会话所有剪贴板集成测试（含 ui/clipboard.rs 的 418 用例）经
 /// [`Self::acquire`] 串行化；进程内 Mutex 不足以覆盖此形态。
-#[cfg(all(windows, feature = "native-clipboard"))]
+#[cfg(windows)]
 pub struct GlobalClipboardTestLock(HANDLE);
 
-#[cfg(all(windows, feature = "native-clipboard"))]
+#[cfg(windows)]
 impl GlobalClipboardTestLock {
     /// 同会话命名互斥；等待至多 30s（并行测试队头让行），拿不到返回 None
     /// （调用方按 headless 语义跳过）。
@@ -310,7 +310,7 @@ impl GlobalClipboardTestLock {
     }
 }
 
-#[cfg(all(windows, feature = "native-clipboard"))]
+#[cfg(windows)]
 impl Drop for GlobalClipboardTestLock {
     fn drop(&mut self) {
         unsafe {
@@ -321,10 +321,10 @@ impl Drop for GlobalClipboardTestLock {
 }
 
 /// RAII clipboard open guard（Drop 时 CloseClipboard）。
-#[cfg(all(windows, feature = "native-clipboard"))]
+#[cfg(windows)]
 struct ClipboardGuard;
 
-#[cfg(all(windows, feature = "native-clipboard"))]
+#[cfg(windows)]
 impl ClipboardGuard {
     fn open() -> Option<Self> {
         unsafe { OpenClipboard(None).ok()? };
@@ -332,7 +332,7 @@ impl ClipboardGuard {
     }
 }
 
-#[cfg(all(windows, feature = "native-clipboard"))]
+#[cfg(windows)]
 impl Drop for ClipboardGuard {
     fn drop(&mut self) {
         unsafe {
@@ -343,7 +343,7 @@ impl Drop for ClipboardGuard {
 
 /// Read the file list from the OS clipboard (CF_HDROP). Empty when the
 /// format is absent or any Win32 step fails.
-#[cfg(all(windows, feature = "native-clipboard"))]
+#[cfg(windows)]
 pub fn clipboard_files_get() -> Vec<String> {
     let _guard = match ClipboardGuard::open() {
         Some(g) => g,
@@ -372,7 +372,7 @@ pub fn clipboard_files_get() -> Vec<String> {
 
 /// Write a file list to the OS clipboard as CF_HDROP. `false` on empty
 /// input or any Win32 failure.
-#[cfg(all(windows, feature = "native-clipboard"))]
+#[cfg(windows)]
 pub fn clipboard_files_set(paths: &[PathBuf]) -> bool {
     if paths.is_empty() {
         return false;
@@ -396,7 +396,7 @@ pub fn clipboard_files_set(paths: &[PathBuf]) -> bool {
 
 /// GlobalAlloc→拷贝→SetClipboardData。成功后所有权归系统；失败自 free
 /// 返回 false。
-#[cfg(all(windows, feature = "native-clipboard"))]
+#[cfg(windows)]
 fn set_hglobal_data(format: u32, bytes: &[u8]) -> bool {
     unsafe {
         let hglobal = match GlobalAlloc(GMEM_MOVEABLE, bytes.len()) {
@@ -423,7 +423,7 @@ fn set_hglobal_data(format: u32, bytes: &[u8]) -> bool {
 /// Write an image file (PNG) to the OS clipboard as CF_DIBV5（32bpp
 /// BI_BITFIELDS BGRA）+ registered "PNG" 双挂（兼容只认 PNG 的接收方）。
 /// `false` on unreadable file / oversized (>64MP) / Win32 failure.
-#[cfg(all(windows, feature = "native-clipboard"))]
+#[cfg(windows)]
 pub fn clipboard_image_set(png_path: &std::path::Path) -> bool {
     let file_bytes = match std::fs::read(png_path) {
         Ok(b) => b,
@@ -472,7 +472,7 @@ pub struct TempImage {
 /// Read an image from the OS clipboard as a temp PNG file. Format
 /// priority: CF_DIBV5 → CF_DIB → registered "PNG". None when no image
 /// format is present or anything fails (含 64MP 防爆拒收).
-#[cfg(all(windows, feature = "native-clipboard"))]
+#[cfg(windows)]
 pub fn clipboard_image_get() -> Option<TempImage> {
     let _guard = ClipboardGuard::open()?;
     if let Ok(h) = unsafe { GetClipboardData(CF_DIBV5) } {
@@ -497,7 +497,7 @@ pub fn clipboard_image_get() -> Option<TempImage> {
 }
 
 /// HGLOBAL 内容拷出（GlobalSize 定长，GlobalLock 后整块复制）。
-#[cfg(all(windows, feature = "native-clipboard"))]
+#[cfg(windows)]
 fn hglobal_bytes(h: HANDLE) -> Option<Vec<u8>> {
     let hglobal = HGLOBAL(h.0);
     let size = unsafe { GlobalSize(hglobal) };
@@ -515,7 +515,7 @@ fn hglobal_bytes(h: HANDLE) -> Option<Vec<u8>> {
     Some(bytes)
 }
 
-#[cfg(all(windows, feature = "native-clipboard"))]
+#[cfg(windows)]
 fn dib_handle_to_png(h: HANDLE) -> Option<TempImage> {
     let bytes = hglobal_bytes(h)?;
     let info = parse_dib_header(&bytes)?;
@@ -529,7 +529,7 @@ fn dib_handle_to_png(h: HANDLE) -> Option<TempImage> {
     })
 }
 
-#[cfg(all(windows, feature = "native-clipboard"))]
+#[cfg(windows)]
 fn png_handle_to_file(h: HANDLE) -> Option<TempImage> {
     let bytes = hglobal_bytes(h)?;
     // 只读头部拿尺寸（不整图解码），过 64MP 防线后才落盘。
@@ -550,7 +550,7 @@ fn png_handle_to_file(h: HANDLE) -> Option<TempImage> {
     })
 }
 
-#[cfg(all(windows, feature = "native-clipboard"))]
+#[cfg(windows)]
 fn temp_png_path() -> PathBuf {
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -617,10 +617,10 @@ mod tests {
     // 无窗口站）时 clipboard_files_set 返回 false，测试静默跳过而非红。
     // 剪贴板是进程全局资源：cargo test 同进程并行时用互斥锁串行化
     // （nextest 每测试独立进程，锁为空转）。
-    #[cfg(all(windows, feature = "native-clipboard"))]
+    #[cfg(windows)]
     static CLIPBOARD_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
-    #[cfg(all(windows, feature = "native-clipboard"))]
+    #[cfg(windows)]
     #[test]
     fn clipboard_files_set_get_roundtrip() {
         let _global = match GlobalClipboardTestLock::acquire() {
@@ -724,7 +724,7 @@ mod tests {
 
     // ── T2: Win32 image 集成（windows × native-clipboard 档） ────────
 
-    #[cfg(all(windows, feature = "native-clipboard", feature = "ui-clipboard"))]
+    #[cfg(windows)]
     #[test]
     fn clipboard_image_get_none_without_image() {
         let _global = match GlobalClipboardTestLock::acquire() {
@@ -742,7 +742,7 @@ mod tests {
         assert!(clipboard_image_get().is_none());
     }
 
-    #[cfg(all(windows, feature = "native-clipboard"))]
+    #[cfg(windows)]
     #[test]
     fn clipboard_image_set_get_roundtrip() {
         let _global = match GlobalClipboardTestLock::acquire() {

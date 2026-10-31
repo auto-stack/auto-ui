@@ -79,7 +79,6 @@ widget detail {
 /// push("/book/7") 后 `__route_params` 应含 id="7"，页 Init 的
 /// `router.param("id")` 应取到 "7"。
 #[test]
-#[cfg(feature = "ui-iced")]
 fn route_param_survives_push_and_reaches_page_init() {
     let dir = tempfile::tempdir().expect("tempdir");
     let app_path = write_fixture(&dir);
@@ -126,7 +125,6 @@ fn route_param_survives_push_and_reaches_page_init() {
 /// 第一本。015 先例只覆盖裸循环变量实参（`k`），字段实参（`it.id`）在案
 /// 面未见。本测检查构建产物里两只按钮各自烘焙的实参。
 #[test]
-#[cfg(feature = "ui-iced")]
 fn loop_item_field_event_args_bake_per_instance() {
     let dir = tempfile::tempdir().expect("tempdir");
     let pages = dir.path().join("pages");
@@ -215,7 +213,6 @@ widget home {
 /// 状态滞留首次装载。语义应为「导航 = 新装载」：路由路径进身份，参数
 /// 变化 = 新代际 = Init 重跑（与书架回退重取数的既有行为一致）。
 #[test]
-#[cfg(feature = "ui-iced")]
 fn page_init_reruns_when_route_param_changes() {
     let dir = tempfile::tempdir().expect("tempdir");
     let app_path = write_fixture(&dir);

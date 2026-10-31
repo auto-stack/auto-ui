@@ -200,7 +200,6 @@ mod plan802_assembly {
 
 // ── 真实 adapter（V05 真注册表往返 + V04 寿命） ──────────────────────────
 
-#[cfg(feature = "code-editor")]
 mod plan802_real_adapter {
     use std::sync::Arc;
 
@@ -453,7 +452,6 @@ mod plan802_real_adapter {
 
 // ── 滚动投影链（V06） ────────────────────────────────────────────────────
 
-#[cfg(feature = "code-editor")]
 mod plan802_scroll {
     use crate::ui::code_editor_provider::CodeEditorRegistryProvider;
     use crate::ui::scroll::controller;
@@ -520,7 +518,6 @@ mod plan802_scroll {
 
 // ── OS 剪贴板（V06：真 arboard 桥往返） ─────────────────────────────────
 
-#[cfg(all(feature = "code-editor", feature = "ui-clipboard"))]
 mod plan802_clipboard {
     use crate::ui::code_editor_provider::CodeEditorRegistryProvider;
     use auto_lang_core::vm::host_capabilities::CodeEditorHostProvider;
@@ -532,7 +529,7 @@ mod plan802_clipboard {
     #[test]
     fn os_clipboard_cut_copy_paste_roundtrip() {
         // 跨进程命名互斥（nextest 多进程并行互清剪贴板——485 T9 形）。
-        #[cfg(all(windows, feature = "native-clipboard"))]
+        #[cfg(windows)]
         let _global = match crate::ui::clipboard_native::GlobalClipboardTestLock::acquire() {
             Some(g) => g,
             None => return, // 拿锁超时视同 headless 跳过

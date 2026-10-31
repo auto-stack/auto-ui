@@ -18,7 +18,6 @@ mod plan446_j1_repro {
         cand.filter(|p| p.exists())
     }
 
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     #[ignore = "historical UI repro; run explicitly against the tracked Plan 446 fixture"]
     fn b3_child_widget_expansion() {

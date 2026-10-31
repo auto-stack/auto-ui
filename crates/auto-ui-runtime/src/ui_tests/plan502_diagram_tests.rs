@@ -63,7 +63,6 @@ widget App {
 /// VM 轨:svgdoc 序列化含 `<text>` 元素(内容 = 位置参数文本,x/y 进属性),
 /// for 循环绑定下 record 字段(Dot)取值正确;overlay 动态 arbitrary 值
 /// 解析为 LeftOffset(对照轨完整)。
-#[cfg(feature = "ui-iced")]
 #[test]
 fn plan502_m1_vm_svgdoc_text_and_overlay() {
     let mut dc = crate::build_dynamic_component(PROBE_SRC, Some("plan502_m1_probe.at"))
@@ -198,7 +197,6 @@ widget W {
 /// 临时工程(组件源码取自 gallery components,消费页按方向参数生成),
 /// td/lr 各一跑,断言手算几何。算法值域由镜像对拍
 /// (plan502_m3_layout_core_parity)覆盖,两者互为漂移围栏。
-#[cfg(feature = "ui-iced")]
 #[test]
 fn plan502_m3_layout_geometry_e2e() {
     use std::path::PathBuf;
@@ -746,7 +744,6 @@ out
 /// Plan 502 M5:hover 交互行为(498 三段式)——HoverNode 写 hoverDg +
 /// tooltip 锚定(view 投影),NodeOut 复原哨兵;svg 兄弟层 mouse-area
 /// 命中层落树;节点/边标签 svg text 落 svgdoc(M1 定案机制)。
-#[cfg(feature = "ui-iced")]
 #[test]
 fn plan502_m5_hover_and_labels_e2e() {
     let root = std::env::temp_dir().join("plan502_m5_e2e");

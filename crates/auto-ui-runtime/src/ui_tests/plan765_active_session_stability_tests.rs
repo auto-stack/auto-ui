@@ -52,7 +52,6 @@ mod derive_event_name_contract {
 }
 
 /// F-4：回填 seq 门控派发（组件级契约，镜像 musk_vm_track soak 相 A/B 口径）。
-#[cfg(feature = "ui-interpreter")]
 mod backfill_seq_gate {
     fn locate_corpus() -> Option<std::path::PathBuf> {
         let rel = "../../../auto-lang/test/ui/plan062_memleak/src/front/app.at";

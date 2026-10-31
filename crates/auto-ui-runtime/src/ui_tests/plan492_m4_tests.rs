@@ -8,7 +8,7 @@
 //! 点前缀 `.curve` 直接形态与带参 msg 声明在两链均正常。
 //! M6 后组件回归直接写法——本模块以无补丁基线钉住三副本直接形态。
 
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod m4_pkg_compile_chain {
     use crate::ui_tests::plan492_tests::pkg_harness::{build_patched_gallery, render_dump};
 

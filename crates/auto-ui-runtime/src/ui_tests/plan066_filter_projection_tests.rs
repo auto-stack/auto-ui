@@ -73,7 +73,6 @@ mod plan066_filter_projection_tests {
     /// 值的 stake 接管（PLAN-062 T12 call_vm_fn takeover / T-05 shim 配平
     /// 的用户 fn 返回路径同族缺口）。落地后移除 `#[ignore]`，断言投影
     /// 命中 2/清空 3/miss 0。
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn plan066_pa_computed_filter_over_store_list() {
         let Some(manifest) = locate("src/front/app.at") else {
@@ -91,7 +90,6 @@ mod plan066_filter_projection_tests {
     // (PB) P536-D2: 跨模块调用帧内 SET_FIELD 达根态
     // ─────────────────────────────────────────────────────────────────────
 
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn plan066_pb_cross_module_setfield_reaches_root() {
         let Some(manifest) = locate("src/front/app.at") else {
@@ -121,7 +119,6 @@ mod plan066_filter_projection_tests {
     /// 携 `.msg.id`（obj prop 域读实参）；翻转后子件 computed
     /// `isOpen => .expanded == .msg.id` 经 SetProbe 回传。055-T13 现场
     /// 为「读侧子件 computed 与视图 if 求值恒假/恒真分歧」。
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn plan066_pc_think_block_read_side() {
         let Some(manifest) = locate("src/front/app.at") else {
@@ -171,7 +168,6 @@ mod plan066_filter_projection_tests {
     /// `Sse.open(url, .OnProbe)`——handler-as-value 实参须改写为 fn 引用
     /// （Sse no-op 弹弃），handler 不再因 GET_FIELD "OnProbe" Field not
     /// found 中止。KD-059-FU1 族（musk StartStream 现场）。
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn plan066_pd_handler_as_value_arg_tolerated() {
         let Some(manifest) = locate("src/front/app.at") else {

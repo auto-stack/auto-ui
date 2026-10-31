@@ -905,7 +905,7 @@ pub mod win32 {
     /// 我方多格式目标；幂等——HWND 不变时零开销直返）。宿主发现复用 473
     /// find_largest_own_window，故额外依赖 native-dock feature（ui-iced
     /// 隐含；native-dnd 独立档下拖入面缺失、拖出面不受影响）。
-    #[cfg(all(windows, feature = "native-dnd", feature = "native-dock"))]
+    #[cfg(all(windows, feature = "native-dnd"))]
     pub fn ensure_host_drop_target() {
         use std::sync::atomic::Ordering;
         let Some(h) = crate::ui::native_dock::win32::find_largest_own_window() else {

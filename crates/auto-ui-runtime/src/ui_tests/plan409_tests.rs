@@ -92,7 +92,6 @@ fn has_onclick_event(view: &View<DynamicMessage>, event: &str) -> bool {
 
 /// Build the real widgets-gallery app (like production does) and return the
 /// view tree. None when the example sources aren't present (graceful no-op).
-#[cfg(feature = "ui-iced")]
 fn build_gallery_view() -> Option<View<DynamicMessage>> {
     let comp: DynamicComponent =
         crate::plan370_test_support::build_example_component("widgets-gallery")?;
@@ -101,7 +100,6 @@ fn build_gallery_view() -> Option<View<DynamicMessage>> {
 }
 
 /// Build the gallery component (state + view) for §8 theme-color tests.
-#[cfg(feature = "ui-iced")]
 fn build_gallery_component() -> Option<DynamicComponent> {
     crate::plan370_test_support::build_example_component("widgets-gallery")
 }
@@ -109,7 +107,6 @@ fn build_gallery_component() -> Option<DynamicComponent> {
 /// Build a gallery page widget (e.g. "IndexPage") in isolation — the app
 /// component's outlet does not render route pages in the test harness, so
 /// page-specific assertions build the page file directly.
-#[cfg(feature = "ui-iced")]
 fn build_gallery_page(page_file: &str, widget_name: &str) -> Option<View<DynamicMessage>> {
     use crate::ui::aura_view_builder::AuraViewBuilder;
     use crate::ui::vm_bridge::VmBridge;
@@ -161,7 +158,6 @@ fn build_gallery_page(page_file: &str, widget_name: &str) -> Option<View<Dynamic
     None
 }
 
-#[cfg(feature = "ui-iced")]
 #[test]
 fn link_children_render_as_button_content() {
     let Some(view) = build_gallery_view() else {
@@ -201,7 +197,6 @@ fn link_children_render_as_button_content() {
     }
 }
 
-#[cfg(feature = "ui-iced")]
 #[test]
 fn plain_link_without_children_keeps_to_label() {
     let Some(view) = build_gallery_view() else {
@@ -234,7 +229,6 @@ fn plain_link_without_children_keeps_to_label() {
 // Plan 409 §8 — theme color support
 // ===========================================================================
 
-#[cfg(feature = "ui-iced")]
 #[test]
 fn theme_accent_color_state_and_handlers() {
     let Some(mut comp) = build_gallery_component() else {
@@ -263,7 +257,6 @@ fn theme_accent_color_state_and_handlers() {
     );
 }
 
-#[cfg(feature = "ui-iced")]
 #[test]
 fn theme_palette_ui_and_primary_rendering() {
     let Some(comp) = build_gallery_component() else {
@@ -322,7 +315,6 @@ fn theme_palette_ui_and_primary_rendering() {
 }
 
 /// Collect every Text node (content, style) in the view tree.
-#[cfg(feature = "ui-iced")]
 fn collect_texts<'a>(view: &'a View<DynamicMessage>, out: &mut Vec<(&'a str, &'a Option<Style>)>) {
     match view {
         View::Text { content, style, .. } => out.push((content.as_str(), style)),

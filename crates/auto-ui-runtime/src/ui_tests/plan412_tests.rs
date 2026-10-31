@@ -70,7 +70,6 @@ fn view_style(v: &View<DynamicMessage>) -> Option<&crate::ui::style::Style> {
 }
 
 /// Build a gallery page widget in isolation (same harness as plan409_tests).
-#[cfg(feature = "ui-iced")]
 fn build_gallery_page(page_file: &str, widget_name: &str) -> Option<View<DynamicMessage>> {
     use crate::ui::aura_view_builder::AuraViewBuilder;
     use crate::ui::vm_bridge::VmBridge;
@@ -122,7 +121,6 @@ fn build_gallery_page(page_file: &str, widget_name: &str) -> Option<View<Dynamic
     None
 }
 
-#[cfg(feature = "ui-iced")]
 #[test]
 fn plan412_all_layout_pages_build() {
     // 12 页(含重写的 /grid)全部解析 + 构建成功,根节点为 Column(页面骨架)。
@@ -159,7 +157,6 @@ fn plan412_all_layout_pages_build() {
     );
 }
 
-#[cfg(feature = "ui-iced")]
 #[test]
 fn plan412_grid_page_style_classes_rederive_to_grid() {
     // F1 验收:/grid 页 `col (style: "grid grid-cols-3 gap-4 w-full max-w-lg")`
@@ -192,7 +189,6 @@ fn plan412_grid_page_style_classes_rederive_to_grid() {
     );
 }
 
-#[cfg(feature = "ui-iced")]
 #[test]
 fn plan412_grid_span_page_carries_span_metadata() {
     // F2 验收:/grid-span 页 cell 的 col-span-N 落在 cell style 上,
@@ -226,7 +222,6 @@ fn plan412_grid_span_page_carries_span_metadata() {
     );
 }
 
-#[cfg(feature = "ui-iced")]
 #[test]
 fn plan412_layout_pages_generate_vue_sfc() {
     // 双端验收的 vue 通道:12 页走真实 parse → extract → VueGenerator 管线,
@@ -299,7 +294,6 @@ fn plan412_layout_pages_generate_vue_sfc() {
 }
 
 /// Build the VM view tree from a widget source string (real parse pipeline).
-#[cfg(feature = "ui-iced")]
 fn build_view_from_src(src: &str) -> View<DynamicMessage> {
     use crate::ui::aura_view_builder::AuraViewBuilder;
     use crate::ui::vm_bridge::VmBridge;
@@ -326,7 +320,6 @@ fn build_view_from_src(src: &str) -> View<DynamicMessage> {
     builder.build(&widget.view_tree)
 }
 
-#[cfg(feature = "ui-iced")]
 #[test]
 fn plan412_square_builds_centered_container() {
     // §4.3 占位块:VM 端 = Container center_x/center_y + 色块类;
@@ -391,7 +384,6 @@ widget Sq {
     }
 }
 
-#[cfg(feature = "ui-iced")]
 #[test]
 fn plan412_square_generates_vue_div() {
     // vue 端:square → div + flex 居中类 + text prop 内容(继承 text-{c}-600)。
@@ -455,7 +447,6 @@ widget Sq {
     }
 }
 
-#[cfg(feature = "ui-iced")]
 #[test]
 fn plan412_toast_call_rewrites_to_state_assign() {
     // Plan 412 续(toast VM 化):handler 里的 toast 调用重写为 __toast
@@ -545,7 +536,6 @@ fn plan412_toast_call_rewrites_to_state_assign() {
     assert_append_form(&stmts[1], "default");
 }
 
-#[cfg(feature = "ui-iced")]
 #[test]
 fn plan412_toast_page_builds_with_provider() {
     // toast-provider 在 VM 渲染为空挂载点(悬浮层由 renderer 顶层注入),
@@ -560,7 +550,6 @@ fn plan412_toast_page_builds_with_provider() {
     );
 }
 
-#[cfg(feature = "ui-iced")]
 #[test]
 fn plan412_routes_registered() {
     // app.at 的 routes 块含全部 12 条 Layout 路由(结构断言)。直接解析

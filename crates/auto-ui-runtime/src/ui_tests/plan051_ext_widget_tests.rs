@@ -13,7 +13,7 @@
 //!
 //! Corpus: `test/ui/plan051_ext_widget/`（mirrors musk ports 形态）。
 
-#[cfg(all(test, feature = "ui-interpreter"))]
+#[cfg(test)]
 mod plan051_ext_widget_tests {
     /// Corpus: src/front/app.at（含 use.web component Markdown + use.web.fn）。
     fn locate_corpus() -> Option<std::path::PathBuf> {
@@ -49,7 +49,6 @@ mod plan051_ext_widget_tests {
     /// （renderer.at → renderer.vm.at）注册进视图 registry——view 中的
     /// Markdown 节点以 **VM adapter** 的纯文本降级渲染（修复前 fallback
     /// 空白 / `<Markdown />` 占位文本）。
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn plan051_ext_widget_markdown_renders_from_vm_adapter() {
         let dc = match crate::plan370_test_support::build_component_from_app(

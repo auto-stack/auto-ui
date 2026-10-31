@@ -10,7 +10,7 @@
 //! 各测试红 = 缺陷在现行 master 复现（转介单 DEBTS 063）；绿 = 已修复，
 //! 本文件降级为回归锁（plan058_engine_gap_tests 同款口径）。
 
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan063_handler_float_arith {
     use auto_val::Value;
 
@@ -170,7 +170,7 @@ mod plan063_handler_float_arith {
 }
 
 /// PLAN-063 T-04d：锚块判定纯函数回归锁（需编辑器双 feature）。
-#[cfg(all(test, feature = "autodown", feature = "code-editor"))]
+#[cfg(all(test, feature = "autodown"))]
 mod plan063_anchor_picker {
     use crate::ui::code_editor::draw::Rect;
 

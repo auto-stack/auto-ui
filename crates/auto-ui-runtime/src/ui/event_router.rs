@@ -32,16 +32,9 @@ use std::sync::{Arc, RwLock};
 // 导入 VNodeId
 use super::vnode::VNodeId;
 
-// 导入 DynamicMessage（仅在 interpreter feature 启用时）
-#[cfg(feature = "ui-interpreter")]
+// PLAN-018：基线恒含解释器——DynamicMessage 恒自 interpreter 模块导入
+// （原 ui-interpreter 门与占位符枚举随拍平退出）。
 use super::interpreter::DynamicMessage;
-
-// 为非 interpreter 模式定义一个占位符类型
-#[cfg(not(feature = "ui-interpreter"))]
-#[derive(Debug, Clone)]
-pub enum DynamicMessage {
-    String(String),
-}
 
 /// 事件上下文 - 提供事件处理时的上下文信息
 #[derive(Debug, Clone)]

@@ -143,7 +143,7 @@ fn payload_encoding_roundtrips_through_decode_payload() {
 
 // ─── U-3 模拟器探针：两段式全链（.at 语料 → 发起段非阻塞 → 泵回填） ───────
 
-#[cfg(all(test, feature = "ui-interpreter"))]
+#[cfg(test)]
 mod two_phase_probe {
     use super::{poll_with_deadline, queue_test_lock, serve_once};
 

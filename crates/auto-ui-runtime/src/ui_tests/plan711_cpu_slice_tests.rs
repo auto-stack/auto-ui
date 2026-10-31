@@ -200,7 +200,6 @@ widget Pump {
 }
 "#;
 
-#[cfg(feature = "ui")]
 fn pump_bridge() -> crate::ui::vm_bridge::VmBridge {
     let session = auto_lang_core::session::CompilerSession::ui();
     let mut parser = auto_lang_core::parser::Parser::from(PUMP_WIDGET).with_session(session);
@@ -220,7 +219,6 @@ fn pump_bridge() -> crate::ui::vm_bridge::VmBridge {
 /// D-2 泵纪律：slice 派发让出后凭据 CpuRunnable——tick 泵
 /// （`resume_ready_parked`）**不拾取**（16ms tick 不驱动 CPU continuation），
 /// 有界泵（`resume_cpu_slices`）消费至终态，state 副作用与同步参考一致。
-#[cfg(feature = "ui")]
 #[test]
 fn plan711_cpu_runnable_invisible_to_tick_pump_progresses_via_cpu_pump() {
     let bridge = pump_bridge();
@@ -269,7 +267,6 @@ fn plan711_cpu_runnable_invisible_to_tick_pump_progresses_via_cpu_pump() {
 
 /// D-2 写队列：可覆盖输入同键合并（新值覆盖旧值、不增队深）；满队列
 /// 拒绝并给可观察 busy（`WriteQueueFull`，上限 128），不静默丢动作。
-#[cfg(feature = "ui")]
 #[test]
 fn plan711_write_queue_merges_overwritable_and_rejects_when_full() {
     use crate::ui::vm_bridge::{QueuedVmWrite, VmBridgeError};
@@ -325,7 +322,6 @@ fn plan711_write_queue_merges_overwritable_and_rejects_when_full() {
 /// D-2 片间消费：continuation 存活期间排队的写事件由有界泵在片间串行
 /// 落地（不与在途 continuation 交错；终态后队列清空）；两个副作用都
 /// 完整落地（Churn 的 20000 次递增 + 排队 SetN 的 m=7）。
-#[cfg(feature = "ui")]
 #[test]
 fn plan711_queued_write_drains_between_slices() {
     use crate::ui::vm_bridge::QueuedVmWrite;
@@ -376,7 +372,6 @@ fn plan711_queued_write_drains_between_slices() {
 /// D-2 公平性：一个 continuation 与一条排队写事件同轮都被驱动（无饥饿、
 /// 不因排队写独占轮次），本轮让出的 continuation 不被同轮重拾（快照纪律
 /// ——completed==0 证明单轮 512 步推不完 20000 迭代）。
-#[cfg(feature = "ui")]
 #[test]
 fn plan711_cpu_pump_drives_continuation_and_queued_write_same_round() {
     use crate::ui::vm_bridge::QueuedVmWrite;
@@ -421,7 +416,6 @@ fn plan711_cpu_pump_drives_continuation_and_queued_write_same_round() {
 
 /// T-04 (D-2): tick 泵订阅门收窄——CpuRunnable-only 注册表不吊 tick
 /// （`has_parked_io_tasks` 不计 CPU continuation）；I/O 凭据在册时门开。
-#[cfg(feature = "ui")]
 #[test]
 fn plan711_io_gate_ignores_cpu_runnable_registry() {
     let bridge = pump_bridge();

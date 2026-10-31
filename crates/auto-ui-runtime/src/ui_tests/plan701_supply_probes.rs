@@ -70,7 +70,6 @@ mod plan701_time_supply {
     }
 
     #[test]
-    #[cfg(feature = "ui-iced")]
     fn vm_time_now_ms_full_width_matches_a2r_std() {
         let bridge = build_probe_bridge(PROBE_SRC);
         let vm_ms = as_int_i64(bridge.call_vm_fn("probe_ms", &[]).expect("call probe_ms"));
@@ -92,7 +91,6 @@ mod plan701_time_supply {
     /// unified print 的 TAG_I64 臂在档，BENCH 标记行可直出毫秒值）。本
     /// 测试#[ignore]留档勘定，待平台 i64 算术面单独立件清偿后翻正。
     #[test]
-    #[cfg(feature = "ui-iced")]
     #[ignore = "预存缺口留档：.at 层 TAG_I64 算术（DIV）解码错位，平台级另件"]
     fn vm_time_now_ms_agrees_with_now_sec_at_level() {
         let src = format!(
@@ -111,7 +109,6 @@ mod plan701_time_supply {
     }
 
     #[test]
-    #[cfg(feature = "ui-iced")]
     fn a2r_std_time_agrees_with_vm_shim_clock() {
         // Host-side 对拍: the a2r leg's clock source vs the VM shim's (both
         // SystemTime epoch — same value class, GOAL-003).
@@ -129,7 +126,6 @@ mod plan701_time_supply {
     }
 
     #[test]
-    #[cfg(feature = "ui-iced")]
     fn vm_time_now_is_epoch_seconds_string() {
         let bridge = build_probe_bridge(PROBE_SRC);
         let s = match bridge.call_vm_fn("probe_now", &[]) {

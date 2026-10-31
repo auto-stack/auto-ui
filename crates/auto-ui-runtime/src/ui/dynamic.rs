@@ -2233,10 +2233,7 @@ impl Component for DynamicComponent {
         // 通道文本单次读面（两消费臂共用：绑定字段回写 + 单参注入）。
         // PLAN-814 R9-03：INPUT_TEXT 通道是 iced renderer 专属态——headless
         // 构建无通道（None 语义=无文本可读，与缺席臂一致）。
-        #[cfg(feature = "ui-iced")]
         let channel_text = crate::ui::iced::renderer::last_input_text();
-        #[cfg(not(feature = "ui-iced"))]
-        let channel_text: String = String::new();
 
         // PLAN-033 T-03①（D1=A）：input_state_map 绑定字段回写——native
         // 投影臂（INPUT_TEXT 通道代写后经 on() 派发）下零参内联闭包
@@ -4889,7 +4886,6 @@ mod tests {
     // 空转拍经 call_handler Ok → dirty=true 无条件置脏 → 整树重建 ×
     // retain 泄漏。本测钉死"零状态写的拍不得失效视图"。
 
-    #[cfg(feature = "ui-interpreter")]
     fn locate_plan062_corpus() -> Option<std::path::PathBuf> {
         let rel = "test/ui/plan062_memleak/src/front/app.at";
         [
@@ -4905,7 +4901,6 @@ mod tests {
     }
 
     /// PLAN-650 E-1：订阅层 when 门谓词。
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn plan650_timer_when_subscription_gate() {
         let Some(path) = locate_plan062_corpus() else {
@@ -4957,7 +4952,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn fire_timer_noop_does_not_dirty() {
         let Some(path) = locate_plan062_corpus() else {
@@ -4989,7 +4983,6 @@ mod tests {
 
     /// PLAN-062 T2: 突变计数器口径——纯读拍不 bump，状态写拍 bump
     /// （fire_timer 空转判定的地基：dispatch 机制本身不得虚增计数）。
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn mutation_seq_bumps_on_write_not_read() {
         let Some(path) = locate_plan062_corpus() else {

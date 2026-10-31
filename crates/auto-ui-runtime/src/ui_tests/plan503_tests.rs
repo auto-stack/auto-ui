@@ -6,7 +6,7 @@
 //! 均只认 `${.state}` 前导点形态。本文件钉死该能力 + 品牌色 8 位 hex
 //! arbitrary 类（bg-[#rrggbbaa]）解析。
 
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod loop_member_style_interp {
     /// 循环成员 style 插值（VM 轨）：`for r in .rows` 循环体内
     /// `style: "h-10 w-10 ${r.chip}"` 应解析为行对象字段值。
@@ -102,7 +102,7 @@ mod vue_loop_member_class {
 /// 此前只能实机才发现）+ ApplyFilter/PickCat 行为断言。
 /// PLAN-590（Stage B P-5）：028-launcher 迁 auto-os/apps/——语料经解析序
 /// 定位（os_paths 家族）；solo 检出 SKIP 不炸。
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod launcher_rewrite {
     fn build_launcher() -> Option<crate::ui::dynamic::DynamicComponent> {
         let sibling_base = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");

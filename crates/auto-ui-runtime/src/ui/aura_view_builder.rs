@@ -4270,7 +4270,6 @@ impl<'a> AuraViewBuilder<'a> {
         // 字符串字面量，剥前导点）。
         // PLAN-814 R9-03：anchor_slot 是 iced 布局期槽（ui-iced 门）——
         // headless 构建无同步目标（缺席=不注册）。
-        #[cfg(feature = "ui-iced")]
         if let Some(field) = self.extract_string_with(props, "sync_anchor_target", bindings) {
             eprintln!("[P063-SINK] registered");
             crate::ui::anchor_slot::set_target_sink(Some(
@@ -4295,7 +4294,7 @@ impl<'a> AuraViewBuilder<'a> {
             let handler = extract_handler_name(&ev.handler).to_string();
             let widget = self.widget_name.clone();
             crate::ui::view::ScrollCallback::new(move |m: crate::ui::view::ScrollMetrics| {
-                #[cfg(all(feature = "autodown", feature = "code-editor", feature = "ui-iced"))]
+                #[cfg(feature = "autodown")]
                 if let Some(sk) = &p063_sk {
                     if let Some(idx) = crate::ui::autodown_editor::core::set_anchor_from_scroll(
                         sk,
@@ -4306,7 +4305,7 @@ impl<'a> AuraViewBuilder<'a> {
                         crate::ui::anchor_slot::set_pending_anchor(idx);
                     }
                 }
-                #[cfg(not(all(feature = "autodown", feature = "code-editor")))]
+                #[cfg(not(feature = "autodown"))]
                 if let Some(_sk) = &p063_sk {
                     let _ = _sk;
                 }
@@ -4513,7 +4512,7 @@ impl<'a> AuraViewBuilder<'a> {
     /// sugar：内部仍产 View::AutodownEditor，快照 kind 与 vm-smoke 断言面
     /// 零改动）。门控同原臂；无 feature 时 global 注册 convert_textarea
     /// 降级（D-GAP-3 链保持）。
-    #[cfg(all(feature = "autodown", feature = "code-editor"))]
+    #[cfg(feature = "autodown")]
     pub(crate) fn convert_autodown_editor_native(
         &self,
         props: &HashMap<String, AuraPropValue>,
@@ -8505,7 +8504,6 @@ impl<'a> AuraViewBuilder<'a> {
         );
         // PLAN-814 R9-03：count_keyed_loops_free 在 ui-iced 门内——诊断
         // 输出随同门（headless 构建无 iced 布局诊断面）。
-        #[cfg(feature = "ui-iced")]
         if std::env::var("AUTO_MEMO_DIAG").ok().as_deref() == Some("1") {
             eprintln!(
                 "[MEMO-DIAG] child_widget={} keyed_loops={}",
@@ -16033,15 +16031,10 @@ fn pascal_to_kebab_icon(name: &str) -> String {
 /// 全数误判为 web-ecosystem 组件 → 占位卡，musk 图标子件整体消失
 /// （p054_t1/t4 两红，P733-R2 族）；AppViewport 等真网页组件 ∉ 名集，
 /// 占位卡路径（T-09(b) 意图）保持。
-#[cfg(feature = "ui-iced")]
 fn is_icon_component_tag(tag: &str) -> bool {
     tag.contains("icon") || crate::ui::iced::lucide_icon_known(&pascal_to_kebab_icon(tag))
 }
 
-#[cfg(not(feature = "ui-iced"))]
-fn is_icon_component_tag(tag: &str) -> bool {
-    tag.contains("icon")
-}
 
 /// PLAN-050 T9 (C7): 模板里的 `$t(KEY)` 标记 → i18n 查表替换（未命中回落
 /// key 本身）。提取侧对 `t("k")`/`i18n.t("k")` 文本产出该标记（见
@@ -18938,7 +18931,7 @@ mod tests {
     /// View::AutodownEditor.on_focus = FocusCallback（Typed 消息：
     /// args = [Int block, Float height]；失焦变体 (Int -1, 0.0)）。
     /// 普通臂与 tracked 臂同一装配（两镜像编辑臂对称）。
-    #[cfg(all(feature = "autodown", feature = "code-editor"))]
+    #[cfg(feature = "autodown")]
     #[test]
     fn test_autodown_editor_on_focus_message_channel() {
         use crate::ui::view::{FocusCallback, FocusMetrics};
@@ -19033,7 +19026,7 @@ mod tests {
     /// 形态）与属性简写 `onopenwikilink`）→ View::AutodownEditor.on_link =
     /// LinkCallback → Typed 消息 args = [Str target, Str anchor]（事件名 =
     /// handler 名）。缺省无事件 → on_link None（契约 C-06）。
-    #[cfg(all(feature = "autodown", feature = "code-editor"))]
+    #[cfg(feature = "autodown")]
     #[test]
     fn test_autodown_editor_on_link_message_channel() {
         use crate::ui::view::{LinkCallback, WikiLinkMetrics};
@@ -19331,7 +19324,7 @@ mod tests {
 
     /// Plan 019 批次九：`autodown_editor` 标签走可编辑变体臂
     /// （Phase 3 编辑壳；key/content/final/oninput 提取）。
-    #[cfg(all(feature = "autodown", feature = "code-editor"))]
+    #[cfg(feature = "autodown")]
     #[test]
     fn test_autodown_editor_widget_editable_arm() {
         let widget = make_test_widget("Test", vec![]);
@@ -21587,7 +21580,6 @@ mod tests {
 
     /// Plan 547 Task 21: ImageSurface props/events stay typed on the VM path
     /// and retain the path-derived vnode identity used by snapshots.
-    #[cfg(feature = "ui-iced")]
     #[test]
     fn image_surface_vm_builder() {
         let widget = make_test_widget("Viewer", vec![]);
@@ -24253,7 +24245,6 @@ mod plan080_rowclass_probe_tests {
     }
 }
 
-#[cfg(feature = "ui-iced")]
 fn count_keyed_loops_free(node: &AuraNode) -> usize {
     match node {
         AuraNode::ForLoop { key_expr, body, .. } => {

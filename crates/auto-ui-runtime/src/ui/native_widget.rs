@@ -164,7 +164,7 @@ pub fn global() -> &'static NativeWidgetRegistry {
 
 fn register_builtin_entries() -> NativeWidgetRegistry {
     let mut reg = NativeWidgetRegistry::new();
-    #[cfg(all(feature = "autodown", feature = "code-editor"))]
+    #[cfg(feature = "autodown")]
     {
         // PLAN-066 T2：autodown_editor 自硬编码臂迁出——案 a sugar（factory
         // 内部仍产 View::AutodownEditor，快照 kind 与断言面零改动）。
@@ -184,7 +184,7 @@ fn register_builtin_entries() -> NativeWidgetRegistry {
             )
         });
     }
-    #[cfg(not(all(feature = "autodown", feature = "code-editor")))]
+    #[cfg(not(feature = "autodown"))]
     {
         // 无 feature 降级链保持：原臂的 `#[cfg(not(...))] textarea` 分支迁经
         // 注册表（D-GAP-3 textarea 降级语义不变）。双拼写同上。
@@ -298,7 +298,7 @@ mod tests {
         );
     }
 
-    #[cfg(all(feature = "autodown", feature = "code-editor"))]
+    #[cfg(feature = "autodown")]
     #[test]
     fn global_registers_autodown_editor() {
         let g = global();

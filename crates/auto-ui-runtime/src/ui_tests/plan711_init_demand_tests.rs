@@ -77,7 +77,6 @@ widget Tick {
 "#;
 
 /// 从多 widget 源中提取指定 name 的 AuraWidget。
-#[cfg(feature = "ui")]
 fn extract_widget(source: &str, name: &str) -> auto_ui_compiler::aura::AuraWidget {
     let session = auto_lang_core::session::CompilerSession::ui();
     let mut parser = auto_lang_core::parser::Parser::from(source).with_session(session);
@@ -95,7 +94,6 @@ fn extract_widget(source: &str, name: &str) -> auto_ui_compiler::aura::AuraWidge
     panic!("widget {name} not found in source");
 }
 
-#[cfg(feature = "ui")]
 fn bridge_from(source: &str, root: &str) -> crate::ui::vm_bridge::VmBridge {
     let widget = extract_widget(source, root);
     crate::ui::vm_bridge::VmBridge::new(&widget).expect("bridge")
@@ -103,7 +101,6 @@ fn bridge_from(source: &str, root: &str) -> crate::ui::vm_bridge::VmBridge {
 
 /// 双 widget 桥（root=SlowInit 长 Init + child=Flow 短 Init，child 的
 /// handler 一并合成进导出表）——依赖序与渲染集成测试用。
-#[cfg(feature = "ui")]
 fn two_widget_bridge(
     root_src: &str,
     root_name: &str,
@@ -124,7 +121,6 @@ fn two_widget_bridge(
 
 /// AC-04：同代际重复登记只入队一次；派发完成后同身份登记不再重派
 /// （Init 挂载语义每代际一次，PLAN-536 保持）。
-#[cfg(feature = "ui")]
 #[test]
 fn plan711_init_demand_registers_once_per_generation() {
     let bridge = bridge_from(FLOW_WIDGET, "Flow");
@@ -156,7 +152,6 @@ fn plan711_init_demand_registers_once_per_generation() {
 
 /// 代际取消：在途（CPU park） demand 遇身份变化 → 旧段一次取消（出册/
 /// 清栈），新代际入队；A→B→A 的第二个 A 重跑 Init。
-#[cfg(feature = "ui")]
 #[test]
 fn plan711_init_demand_identity_change_supersedes_and_cancels() {
     let bridge = bridge_from(SLOW_WIDGET, "SlowInit");
@@ -221,7 +216,6 @@ fn plan711_init_demand_identity_change_supersedes_and_cancels() {
 /// 依赖序：页 demand 在途（park）时后继 child demand 不派发；页到终态后
 /// 后继继续消费（FIFO = 渲染登记序 = 页先 child 后）。页/child 用同一桥
 /// 内两个真 widget（root=SlowInit 长 Init，child=Flow 短 Init）。
-#[cfg(feature = "ui")]
 #[test]
 fn plan711_init_dependency_order_child_waits_for_parent() {
     let bridge = two_widget_bridge(SLOW_WIDGET, "SlowInit", TICK_WIDGET, "Tick");
@@ -271,7 +265,6 @@ fn plan711_init_dependency_order_child_waits_for_parent() {
 
 /// Missing 静默：声明了 lifecycle.Init 但导出缺失（登记了不存在的
 /// widget）→ 静默记 Done，不报错不重试。
-#[cfg(feature = "ui")]
 #[test]
 fn plan711_init_missing_handler_silently_done() {
     let bridge = bridge_from(FLOW_WIDGET, "Flow");
@@ -291,7 +284,6 @@ fn plan711_init_missing_handler_silently_done() {
 
 /// Failed 记账：派发即 VM 错误 → Failed 终态，错误上报；同身份登记不再
 /// 重派（不无限重试）。
-#[cfg(feature = "ui")]
 #[test]
 fn plan711_init_dispatch_failure_records_without_retry() {
     // Init 体内数组越界 → 运行时错误（确定性 VM error）。

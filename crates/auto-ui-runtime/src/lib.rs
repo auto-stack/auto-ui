@@ -15,7 +15,6 @@
 // ── 模块树（PLAN-814 T-04 自 auto-lang 整体随迁；cfg 门原名保持） ──
 
 // Plan 015: AutoUI Core (feature-gated)
-#[cfg(feature = "ui")]
 pub mod ui;
 
 // PLAN-804: 宿主 OS 能力适配层（vm core 与 ui renderer 门之外的第三
@@ -34,7 +33,7 @@ mod dynamic_build;
 // Plan 370 shared test support: builds the real 015-notes DynamicComponent.
 // Must precede the plan370_* test modules that depend on it（auto-lang 侧
 // 测试树经再导出消费）。
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 pub(crate) mod plan370_test_support;
 
 #[cfg(test)]
@@ -48,20 +47,17 @@ pub use auto_lang_core::{AutoResult, Parser};
 pub use auto_ui_compiler::ui_ast::{resolve_use_module, UseModuleResolution};
 
 // Re-export UI types when feature is enabled（与旧 auto-lang 根面同集）
-#[cfg(feature = "ui")]
 pub use ui::{
     view_to_vtree, App, AppResult, Component, Style, VNode, VNodeId, VNodeKind, VNodeProps, VTree,
     View, ViewBuilder,
 };
 
-#[cfg(feature = "ui-interpreter")]
 pub use ui::{
     event_router::{EventContext, EventRouter, EventType},
     hot_reload::{HotReloadComponent, UIWatcher},
     interpreter::{DynamicMessage, InterpreterBridge},
 };
 
-#[cfg(feature = "ui-iced")]
 pub use ui::iced::{ComponentIced, IntoIcedElement};
 
 // dynamic_build 管线公开面（原 auto-lang lib.rs 根项，cfg 门原样）。
@@ -71,14 +67,12 @@ pub use ui::iced::{ComponentIced, IntoIcedElement};
 // 根再导出删除（R5 cfg(test) 条件声明同款纪律）。
 pub(crate) use dynamic_build::collect_module_imports;
 // stmt_symbol_name 消费方（vm_bridge 测试 mod/plan339）均 test-gated。
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 pub(crate) use dynamic_build::load_ext_imports_for_vm;
-#[cfg(feature = "ui-iced")]
 pub use dynamic_build::run_file_dynamic_ui_with_scenario;
 #[cfg(test)]
 pub(crate) use dynamic_build::stmt_symbol_name;
 pub use dynamic_build::ui_module_parse_failures;
-#[cfg(feature = "ui-iced")]
 pub use dynamic_build::{build_dynamic_component, has_ui_keywords, run_file_dynamic_ui};
 
 // ── 宿主能力装配单点（原 auto-lang 实装随迁） ──
@@ -93,22 +87,18 @@ pub use dynamic_build::{build_dynamic_component, has_ui_keywords, run_file_dynam
 /// only（无 ui）构建恢复迁移前高层对话框路径**（不把 OS 实现藏在 ui
 /// renderer 门后）；dnd adapter 走 windows+native-dnd 双门控（模块本身
 /// 在 ui 门内=三分），缺席槽=false/VMError 同旧。
-#[cfg(any(feature = "ui", feature = "ui-dialog"))]
 pub fn install_ui_host_capabilities() {
     // PLAN-814: i18n lookup 钩子注册（原 shim_i18n_t 的 ui 直连边收口；
     // i18n_lookup 模块在 ui-interpreter 门——钩子注册随同门，R9-03 补齐）。
-    #[cfg(feature = "ui-interpreter")]
     auto_lang_core::set_i18n_lookup_hook(crate::ui::i18n_lookup::lookup);
-    #[cfg(feature = "ui")]
     {
         crate::ui::frame_provider::install_process_default();
         // PLAN-814 R3-04：autodown 文档引擎（feature 同 owner；SDK 侧
         // natives dispatch 槽未设时经宿主钩子回调至此注册）。
         #[cfg(feature = "autodown")]
         crate::ui::autodown_engine::install();
-        #[cfg(feature = "ui-clipboard")]
         crate::ui::clipboard_provider::install_process_default();
-        #[cfg(all(windows, feature = "native-clipboard"))]
+        #[cfg(windows)]
         crate::ui::clipboard_media_provider::install_process_default();
         crate::ui::scroll_host_provider::install_process_default();
         // PLAN-808: terminal 域 adapter（ui 单门控——引擎服务 + UI 输入/
@@ -116,7 +106,6 @@ pub fn install_ui_host_capabilities() {
         crate::ui::terminal_provider::install_process_default();
         // PLAN-802: code editor host adapter（code-editor 单门控——editor
         // 注册表接线恢复，22 native 全族）。
-        #[cfg(feature = "code-editor")]
         crate::ui::code_editor_provider::install_process_default();
         // PLAN-804: dnd adapter（委托 ui::native_dnd 既有
         // parse_payload_json + win32::start_drag；模块在 ui 门内，此处
@@ -126,14 +115,11 @@ pub fn install_ui_host_capabilities() {
     }
     // PLAN-804: dialog adapter（host_adapters 落点，ui-dialog 单门控——
     // 与 ui renderer 门无关，ui-dialog-only 形态同装）。
-    #[cfg(feature = "ui-dialog")]
     crate::host_adapters::dialog::install_process_default();
 }
 
 /// 无 renderer 构建形态：纯 no-op 安装器（旧 auto-lang 同形——文法装配
 /// 与钩子注册在旧兼容包侧完成，本 crate 无 UI 实现可装）。
-#[cfg(not(any(feature = "ui", feature = "ui-dialog")))]
-pub fn install_ui_host_capabilities() {}
 
 // ── PLAN-900 T-03：SDK 装配钩子自注册（原 auto-lang facade 迁入） ──
 //

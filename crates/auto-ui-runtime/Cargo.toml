@@ -13,32 +13,28 @@ keywords = ["ui", "runtime", "renderer", "desktop"]
 [features]
 default = ["ui-iced"]
 ui = ["auto-ui-compiler/ui"]
-ui-interpreter = ["ui", "dep:ureq"]
+# PLAN-018（Design52 D）：稳定UI基线（解释器/image-pipeline/code-editor/
+# 剪贴板/对话框/native-dock/clipboard + iced后端依赖）恒在——deps非optional、
+# 代码cfg门删除；ui-interpreter/ui-clipboard等收敛为组合别名（不挂 dep:）。
+ui-interpreter = ["ui"]
 ui-headless = ["ui", "ui-interpreter", "auto-ui-compiler/ui-headless"]
-image-pipeline = ["dep:image", "dep:kamadak-exif", "auto-media-core/image-codec"]
-# PLAN-041 T-14 unconditional-rendering 等 iced 门面注释随迁自 auto-lang
-# （完整依据见 ui/iced 模块头）。
+image-pipeline = ["auto-media-core/image-codec"]
+# PLAN-018：ui-iced 实现选择器退役——保留为兼容别名（仅转发基线子feature，
+# 不挂任何 dep:、不被任何cfg消费），default 经它保持字面兼容（生成模板/
+# 26 example required-features/Man 默认链零改）。
 ui-iced = [
     "ui",
-    "dep:iced",
-    "dep:iced_widget",
-    "dep:iced_futures",
-    "dep:iced_runtime",
-    "dep:iced_tiny_skia",
     "ui-interpreter",
     "image-pipeline",
-    "dep:arboard",
     "code-editor",
     "ui-clipboard",
     "ui-dialog",
     "native-dock",
     "native-clipboard",
-    "dep:resvg",
-    "dep:tiny-skia",
 ]
 # code-editor 双 owner 语义保持：SDK 侧 a2r diff 双轨（auto-lang-core/
 # code-editor）+ 本包 editor 注册表/provider（ui/code_editor）。
-code-editor = ["ui", "dep:cosmic-text", "dep:syntect", "auto-lang-core/code-editor"]
+code-editor = ["ui", "auto-lang-core/code-editor"]
 highlight-treesitter = [
     "code-editor",
     "dep:tree-sitter",
@@ -70,18 +66,18 @@ highlight-treesitter = [
 ]
 # PLAN-900：随迁的 http e2e 门（真 TCP 串行族；原 auto-lang test-http-e2e 同语义）。
 test-http-e2e = []
-ui-clipboard = ["dep:arboard"]
-ui-dialog = ["dep:rfd", "dep:raw-window-handle"]
+ui-clipboard = []
+ui-dialog = []
 iced-layout-tests = ["ui-iced", "dep:iced_test"]
 mpv-native = ["ui", "dep:libloading"]
 mpv-gpu = ["mpv-native", "dep:iced_wgpu"]
 mpv-widget = ["mpv-gpu", "ui-iced"]
 mpv-spike = ["mpv-gpu", "ui-iced"]
 # 跨仓 autodown-core（不进 SDK；解析序 env/组内/主检出——见 AGENTS）。
-autodown = ["ui-iced", "dep:autodown-core"]
-native-dock = ["dep:windows"]
-native-clipboard = ["dep:windows", "dep:image"]
-native-dnd = ["dep:windows", "dep:windows-core", "dep:image"]
+autodown = ["dep:autodown-core"]
+native-dock = []
+native-clipboard = []
+native-dnd = ["dep:windows-core"]
 test-native-dock = ["ui-iced", "native-dock"]
 
 [dependencies]
@@ -132,23 +128,23 @@ tokio-tungstenite = { version = "0.30.0", default-features = false, features = [
 reqwest = { version = "0.12", features = ["blocking", "json", "stream", "multipart", "cookies", "gzip", "brotli"] }
 
 # ── iced 后端（Plan 015/041/414/459/617/683 门面注释随迁自 auto-lang） ──
-iced = { version = "0.14.0", features = ["tokio", "image", "svg", "advanced", "canvas", "unconditional-rendering"], optional = true }
-iced_widget = { version = "0.14", optional = true }
-iced_futures = { version = "0.14", optional = true }
+iced = { version = "0.14.0", features = ["tokio", "image", "svg", "advanced", "canvas", "unconditional-rendering"] }
+iced_widget = { version = "0.14" }
+iced_futures = { version = "0.14" }
 iced_test = { version = "0.14", optional = true }
 iced_wgpu = { version = "0.14", optional = true }
 libloading = { version = "0.8", optional = true }
-iced_runtime = { version = "0.14", optional = true }
-iced_tiny_skia = { version = "0.14", optional = true }
-arboard = { version = "3", optional = true }
-rfd = { version = "0.15", optional = true }
-raw-window-handle = { version = "0.6", optional = true }
-image = { version = "0.25", optional = true }
-resvg = { version = "0.45", optional = true }
-tiny-skia = { version = "0.11", optional = true }
-kamadak-exif = { version = "0.6", optional = true }
-cosmic-text = { version = "0.15", optional = true, features = ["vi", "syntect"] }
-syntect = { version = "5", optional = true }
+iced_runtime = { version = "0.14" }
+iced_tiny_skia = { version = "0.14" }
+arboard = { version = "3" }
+rfd = { version = "0.15" }
+raw-window-handle = { version = "0.6" }
+image = { version = "0.25" }
+resvg = { version = "0.45" }
+tiny-skia = { version = "0.11" }
+kamadak-exif = { version = "0.6" }
+cosmic-text = { version = "0.15", features = ["vi", "syntect"] }
+syntect = { version = "5" }
 tree-sitter = { version = "0.27", optional = true }
 tree-sitter-highlight = { version = "0.27", optional = true }
 tree-sitter-rust = { version = "0.24", optional = true }
@@ -172,10 +168,10 @@ tree-sitter-xml = { version = "0.7", optional = true }
 tree-sitter-batch = { version = "0.11", optional = true }
 tree-sitter-powershell = { version = "0.26", optional = true }
 tree-sitter-ini = { version = "1.4", optional = true }
-ureq = { version = "2", features = ["json"], optional = true }
+ureq = { version = "2", features = ["json"] }
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.58", optional = true, features = [
+windows = { version = "0.58", features = [
     "Win32_Foundation",
     "Win32_Graphics_Dwm",
     "Win32_Graphics_Gdi",

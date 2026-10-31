@@ -69,7 +69,7 @@ mod plan536_t12_send_chain_probe_tests {
     /// .input,跨模块 store.Send/store.StartStream）→ store 推进到 Sse.open
     /// 抛点之前（seq=2）。一参帧对齐契约（aa92a821e 回归守卫的跨模块延伸）
     /// + PollStream 兜底链活性（streaming 置位先于抛点）双锁定。
-    #[cfg(all(test, feature = "ui-interpreter"))]
+    #[cfg(test)]
     #[test]
     fn p536_t12_send_route_survives_stream_open_arg_throw() {
         let mut dc = match build() {

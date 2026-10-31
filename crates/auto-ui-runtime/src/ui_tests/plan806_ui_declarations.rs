@@ -404,7 +404,6 @@ fn r3_probe_doc_comment_not_collected_and_plain_ident_idempotent() {
 /// `use child: Imported`），导入组件的 msg handler 实改 model 状态；
 /// 再实改被导入文件的注解，构造错误包含 Bad806 和子文件路径——证明真实
 /// 读取并经同一默认实现解析；错误登记表被消费，修复文件后再次构造成功。
-#[cfg(feature = "ui-iced")]
 #[test]
 fn r2_real_use_import_chain_uses_default_declarations() {
     let root = std::env::temp_dir().join(format!("plan806-import-{}", std::process::id()));

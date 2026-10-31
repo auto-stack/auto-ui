@@ -4,7 +4,6 @@
 //! 渲染半由本探针在复审中实证（2026-08-28 绿）并锁定。
 
 #![cfg(test)]
-#[cfg(feature = "ui-interpreter")]
 mod c1_popover {
     #[test]
     fn popover_form_builds_and_renders() {

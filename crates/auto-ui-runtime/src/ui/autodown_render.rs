@@ -289,7 +289,6 @@ pub fn render_document_streamed_with<M: Clone + std::fmt::Debug + 'static>(
 /// 只读 fence 视图实例键：`view_fence_<fnv1a(lang,code)>`（PLAN-041 T4）。
 /// 内容 hash 跨流式帧稳定——同一 fence 增量更新复用同一实例（core 差分
 /// 不重建），不同 fence 内容天然分键；前缀与编辑壳 VIEW_FENCE_PREFIX 对齐。
-#[cfg(feature = "code-editor")]
 fn fence_view_key(lang: &str, code: &str) -> String {
     use crate::ui::autodown_editor::VIEW_FENCE_PREFIX;
     let mut h: u64 = 0xcbf29ce484222325;
@@ -491,7 +490,6 @@ fn render_block<M: Clone + std::fmt::Debug + 'static>(
             // core（is_view_instance：不路由输入/不画 caret/不发射 chrome）。
             // code-editor 缺席时降级 lang-<token> View::Text（renderer syntect
             // 路径，Plan 442 A6 语义不变）。
-            #[cfg(feature = "code-editor")]
             let code_body: View<M> = {
                 // 围栏源重建（与编辑壳 emit_document 的 trim-尾换行口径一致，
                 // 保证 core 自回显差分稳定）。
@@ -505,19 +503,6 @@ fn render_block<M: Clone + std::fmt::Debug + 'static>(
                     on_link: None,
                     placeholder: None,
                     style: None,
-                }
-            };
-            #[cfg(not(feature = "code-editor"))]
-            let code_body: View<M> = {
-                let lang_class = if !lang.is_empty() && !lang.contains(char::is_whitespace) {
-                    format!(" lang-{lang}")
-                } else {
-                    String::new()
-                };
-                View::Text {
-                    content: code,
-                    style: Style::parse(&format!("{}{lang_class}", chrome.body_text)).ok(),
-                    selectable: false,
                 }
             };
             let code_area = View::Container {
@@ -1962,7 +1947,6 @@ mod tests {
     /// PLAN-041 T4：fence view/stream 正文 = 共享 buffer 绘制实例
     /// （View::AutodownEditor，view_fence_ 前缀 + 内容 hash 键，value 为
     /// 围栏源重建）；chrome（外框/header/p-4 正文区）仍由家族装配。
-    #[cfg(feature = "code-editor")]
     #[test]
     fn fence_view_body_uses_shared_buffer_instance() {
         let doc = render_document::<()>(

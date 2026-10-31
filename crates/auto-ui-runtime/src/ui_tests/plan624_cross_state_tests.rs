@@ -89,7 +89,6 @@ mod plan624_cross_state_tests {
     /// P1 in split mode — jade vm-smoke's configuration (the crashing one):
     /// live backend (local mock) so the interleaved #[api] call after the
     /// store reads succeeds, mirroring the jade OpenFile shape.
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn plan624_p1_split_mode_cross_state_read() {
         use std::io::{Read, Write};
@@ -155,7 +154,6 @@ mod plan624_cross_state_tests {
     }
 
     /// P1 matrix data point: merged mode (api_over_http = false).
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn plan624_p1_merged_mode_cross_state_read() {
         let Some(manifest) = locate("src/front/app.at") else {
@@ -171,7 +169,6 @@ mod plan624_cross_state_tests {
     // (P2) ?str store field read inside a map-literal argument
     // ─────────────────────────────────────────────────────────────────────
 
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn plan624_p2_opt_str_cross_state_read() {
         let Some(manifest) = locate("src/front/p2_app.at") else {
@@ -227,7 +224,6 @@ mod plan624_cross_state_tests {
     /// `fm && fm.title || "fallback"` resolves to the fallback STRING on a
     /// falsy map field instead of the boolean corruption (`true`) the old
     /// bool-normalizing emission produced.
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn plan624_p3_nonbool_chain_value_semantics() {
         let Some(manifest) = locate("src/front/p3_chain_app.at") else {
@@ -253,7 +249,6 @@ mod plan624_cross_state_tests {
     // (P4) find_index returns the first matching index
     // ─────────────────────────────────────────────────────────────────────
 
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn plan624_p4_find_index_returns_first_match() {
         let Some(manifest) = locate("src/front/p4_app.at") else {

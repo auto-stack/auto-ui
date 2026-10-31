@@ -291,7 +291,7 @@ mod musk_vm_track_p053_6_regex_static {
 
 /// P-053-6 widget 级：子组件 computed 调 Regex helper 渲染消息正文
 /// （UserMessage `html => render_mentions_default(.content)` 的最小同构）。
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod musk_vm_track_p053_6_widget_content {
     use auto_lang_core::parser::Parser;
 
@@ -537,7 +537,7 @@ mod musk_vm_track_p053_1_computed_helper_chain {
 /// P-053-1 widget 级:computed 链式 helper 调用 + `.store.` 扁平化实参
 /// (musk filteredMessages => chatSearchFilter(chatActivePath(.store.messages,
 /// .store.active_leaf), .chat_search) 的最小同构)。此前实机产出空列表。
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod musk_vm_track_p053_1_widget_computed {
     use auto_lang_core::parser::Parser;
 
@@ -735,7 +735,7 @@ mod musk_vm_track_p053_1_widget_computed {
 /// imports 扁平编译进模块（exports 在场）时守卫放行直调（分支②）；
 /// 仅实现体缺席（分支③）才发 3142 桩。旧测试名 emits_warn_opcode 双重
 /// 过时（D7 后 3142 是可定位 RuntimeError，非 warn no-op）。
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod musk_vm_track_p053_4_merged_api_call {
     use auto_lang_core::parser::Parser;
 
@@ -991,7 +991,7 @@ print(v)
 }
 
 /// P-053-7: Widget .Init 内 bare Sibling() 调用与 .Sibling() 均正确转译派发。
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod musk_vm_track_p053_7_sibling_handler_calls {
     use auto_lang_core::parser::Parser;
 
@@ -1097,7 +1097,7 @@ if guard {
 /// 现场：musk 会话侧栏 `button { title: .s.id ... }`——vue 轨 title 映射原生
 /// 属性，VM 轨此前静默丢弃（EE03 只有 toolbar 合成按钮在埋）。接线后
 /// renderer Button 臂剥 EE03 包 iced tooltip；snapshot 侧剥离为独立 title prop。
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod musk_vm_track_p053_b4_title_tooltip {
     use crate::ui::view::View;
     use auto_lang_core::parser::Parser;
@@ -1325,7 +1325,7 @@ mod musk_vm_track_p053_b4_title_tooltip {
 /// 拼进 label → leading Text("EE03+title") 常显（卡片首行 "Y<id>"、
 /// "Y新建会话"、"Y设置" 的根因）。修复后：内容子树用干净 label，
 /// EE03 只留在 Button.label 走 renderer tooltip 通道。
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod musk_vm_track_p054_t1_title_content_subtree {
     use crate::ui::view::View;
     use auto_lang_core::parser::Parser;
@@ -1530,7 +1530,7 @@ mod musk_vm_track_p054_t1_title_content_subtree {
 /// 且逐项确定：13e16… 两次点击均正确，8f20…（名"你好"）两次均漂移。
 /// 嫌疑：字符串池索引 u16 截断回绕（add_string 2026-08-22 注释登记的
 /// 引擎债）或 NV 负 i32 编码途经 i32 通道后的索引偏移。
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod musk_vm_track_p053_8_click_arg_drift {
     use auto_lang_core::parser::Parser;
 
@@ -1651,7 +1651,7 @@ mod musk_vm_track_p053_8_click_arg_drift {
 
 /// P-053-8 语料级复现：test/ui/plan053_p8_click_arg（生产路径构建，
 /// store 兄弟调用 + 扁平化同名状态 + 循环按钮带参 onclick 全保真）。
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod musk_vm_track_p053_8_corpus {
     fn build() -> Option<crate::ui::dynamic::DynamicComponent> {
         let rel = "../../../auto-lang/test/ui/plan053_p8_click_arg/src/front/app.at";
@@ -1810,7 +1810,7 @@ mod musk_vm_track_p053_8_phantom_freelist {
 /// 与 Text 内容——裁定图标丢失发生在注册面/视图面/渲染面哪一层。
 /// 运行：MUSK_APP_PATH=D:/autostack/auto-musk/src/front/app.at \
 ///   cargo nextest run -p auto-lang --lib --features ui-iced musk_runtime_icon -- --ignored --nocapture
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod musk_vm_track_p054_runtime_probe {
     #[test]
     #[ignore = "requires MUSK_APP_PATH pointing at real musk checkout"]
@@ -1917,7 +1917,7 @@ mod musk_vm_track_p054_runtime_probe {
 }
 
 /// PLAN-054 T3 (R3/R4): 文本插值 computed 形态求值 + i18n {'x'} 转义。
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod musk_vm_track_p054_t3_interp_i18n {
     use auto_lang_core::parser::Parser;
 
@@ -2059,7 +2059,7 @@ mod musk_vm_track_p054_t3_interp_i18n {
 /// 臂把 None 解析为 Int(0)（"unresolved ident 零占位"），子作用域 computed
 /// 链 `.current != None` 恒真 → `.current.path` 作用 Int(0) → None →
 /// workspace 行显示字面 "${currentName}/${currentTitle}"（A4）。
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod musk_vm_track_p054_t3_none_initial {
     use auto_lang_core::parser::Parser;
 
@@ -2112,7 +2112,7 @@ mod musk_vm_track_p054_t3_none_initial {
 /// 字面量，大写 None（musk 惯用）经 Ident/未解析臂落 Int(0)，沿
 /// `.current = ws_load_current()` 写进 state → `!= None` 恒真 →
 /// `.current.path` 作用 Int(0) → workspace 行显示字面 ${currentTitle}（A4）。
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod musk_vm_track_p054_t3_none_return {
     use auto_lang_core::parser::Parser;
 
@@ -2169,7 +2169,7 @@ mod musk_vm_track_p054_t3_none_return {
 /// PLAN-054 T3 (R3)：computed if 的兜底语义——then 体求值失败（如 x 为
 /// 零默认 Int(0) 时 `x.f` 解析 None）不得整链报废出 "${name}" 字面量，
 /// 必须落到 else 兜底（`if x != None { x.f } else { fallback }` 意图）。
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod musk_vm_track_p054_t3_if_fallback {
     use auto_lang_core::parser::Parser;
 
@@ -2251,7 +2251,7 @@ mod musk_vm_track_p054_t3_if_fallback {
 }
 
 /// PLAN-054 T4 (A9) 勘察：会话卡片样式链解析产物。
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod musk_vm_track_p054_t4_style_probe {
     #[test]
     #[ignore = "manual probe"]
@@ -2277,7 +2277,7 @@ mod musk_vm_track_p054_t4_style_probe {
 }
 
 /// PLAN-054 T4 (A6/A9/A11) 回归锁：会话卡片/消息行样式链。
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod musk_vm_track_p054_t4_styles {
     use crate::ui::style::{Style, StyleClass};
     use crate::ui::style_iced_adapter::IcedStyle;
@@ -2410,7 +2410,7 @@ mod musk_vm_track_p054_t4_styles {
 /// PLAN-054 T5 (A7)：Date.format 宿主桥端到端——musk forge_helpers.at 的
 /// msgTimeLabel 同款形态（epoch 秒 ×1000 → "HH:mm:ss"），此前 Date.format
 /// 未桥接返回垃圾（时间标签缺失现场）。宿主臂收口 KNOWN-DEBT 051。
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod musk_vm_track_p054_t5_date_format {
     use super::musk_vm_track_p054_t3_none_return::build_bridge;
 
@@ -2466,7 +2466,7 @@ mod musk_vm_track_p054_t5_date_format {
 }
 
 /// T5 勘察：Date.now 同形态对照。
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod musk_vm_track_p054_t5_date_probe {
     use super::musk_vm_track_p054_t3_none_return::build_bridge;
 
@@ -2510,7 +2510,7 @@ mod musk_vm_track_p054_t5_date_probe {
 /// dump 动态管线产出的 View 树 + 每节点样式类——定位用户气泡 self-end/
 /// bg-primary 丢失、会话卡 bg-primary/10、canvas gap-6 的断层在哪一层。
 /// 运行：cargo nextest run -p auto-lang --lib --features ui-iced p055_dump -- --ignored --nocapture
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod musk_vm_track_p055_dump {
     #[test]
     #[ignore = "manual probe"]
@@ -2646,7 +2646,7 @@ mod musk_vm_track_p055_dump {
 
 /// PLAN-055 勘察探针②：if 分支内 div{html:} 是否触发 else 兜底（musk
 /// 用户消息进 AI 分支的根因裁定）。
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod musk_vm_track_p055_dump2 {
     use super::musk_vm_track_p054_t3_none_return::build_bridge;
 
@@ -3080,7 +3080,7 @@ mod musk_vm_track_p055_dump2 {
 }
 
 /// PLAN-055 勘察探针③：if 分支兜底 bisect——条件求值 vs 分支体失败。
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod musk_vm_track_p055_dump3 {
     use crate::ui::view::View;
     use auto_lang_core::parser::Parser;
@@ -3243,7 +3243,7 @@ mod musk_vm_track_p055_dump3 {
 /// on_with_input_for 的 U2 替换（dynamic.rs Plan 446 批五）把 "$event" 前缀
 /// 实参换成输入文本。此前诊断（2026-09-01 musk 搜索框失效）怀疑 VM 侧断链；
 /// 复测现行 master：动态路径链路完整——本用例固化该行为防回退。
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod musk_vm_track_p055_input_event_text {
     #[test]
     fn input_event_arg_replaced_with_typed_text() {
@@ -3318,7 +3318,7 @@ mod musk_vm_track_p055_input_event_text {
 /// PLAN-055 T12（④）：pre/code 转换臂——此前落 unknown fallback 成
 /// style:None 的 Column（类串整体丢弃）。现进容器臂：think 展开区类串
 /// （py-[9px]/px-[12px]/my-0/border-t/max-h-[240px]）应完整解析进 View 样式。
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod musk_vm_track_p055_pre_code_arm {
     use crate::ui::view::View;
     use auto_lang_core::parser::Parser;
@@ -3420,7 +3420,7 @@ mod musk_vm_track_p055_pre_code_arm {
 /// resolve_expr_to_value 的 Eq 臂（state 字段 vs 字面量）。active=true 必须
 /// 把 nav_contract::ITEM_ACTIVE（bg-primary/10 text-primary font-medium）
 /// 拼进按钮类串。
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod musk_vm_track_p055_nav_active {
     use crate::ui::view::View;
     use auto_lang_core::parser::Parser;
@@ -4078,7 +4078,6 @@ mod musk_vm_track_p057_nested_stringify {
 /// （musk 空闲实测 0.85–2.2 MB/s，30–60 分钟达 4GB）。语料
 /// `test/ui/plan062_memleak`（BeatTick 恒写 + `items => build_items(20)`
 /// 表达式体 computed）同构 musk PollStream × filteredMessages 链。
-#[cfg(feature = "ui-interpreter")]
 mod musk_vm_track_p062_heap_soak {
     fn locate_corpus() -> Option<std::path::PathBuf> {
         let rel = "../../../auto-lang/test/ui/plan062_memleak/src/front/app.at";
@@ -4181,7 +4180,6 @@ mod musk_vm_track_p062_heap_soak {
 /// - StructTick：struct 字面量 ×100 → 本地 []Item → store 覆写（嫌疑路径）
 /// - ListTick/LitTick/IntPushTick/StrPushTick：单操作细分归因
 /// - NoneTick：零分配对照
-#[cfg(feature = "ui-interpreter")]
 mod probe_rc_leak_soak {
     fn locate_corpus() -> Option<std::path::PathBuf> {
         let rel = "../../../auto-lang/test/ui/probe_rc_leak/src/front/app.at";

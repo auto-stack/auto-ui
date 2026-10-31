@@ -3560,7 +3560,7 @@ mod plan732_wikilink_payload_tests {
     }
 }
 
-#[cfg(all(test, feature = "autodown", feature = "code-editor"))]
+#[cfg(all(test, feature = "autodown"))]
 mod plan737_mcp_link_dispatch_tests {
     use super::*;
     use crate::ui::autodown_editor as ade;
@@ -8923,13 +8923,13 @@ impl IcedMessage {
 /// 生命周期与编辑壳 core 注册表同键同域（同 key 覆写、无 dispose 面
 /// ——core 注册表同样无过期，两表一致）。`__mcp_click`（press-only
 /// ghost 语义）不受影响——门不闭合零激活（K-04 冻结负例锚）。
-#[cfg(all(feature = "autodown", feature = "code-editor"))]
+#[cfg(feature = "autodown")]
 static ADE_LINK_DISPATCH: std::sync::OnceLock<
     std::sync::Mutex<std::collections::HashMap<String, crate::ui::view::LinkCallback<IcedMessage>>>,
 > = std::sync::OnceLock::new();
 
 /// PLAN-737：合成通道派发注册（lowering 装配期；同 key 覆写）。
-#[cfg(all(feature = "autodown", feature = "code-editor"))]
+#[cfg(feature = "autodown")]
 pub(crate) fn ade_link_dispatch_register(sk: &str, cb: crate::ui::view::LinkCallback<IcedMessage>) {
     ADE_LINK_DISPATCH
         .get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
@@ -8942,7 +8942,7 @@ pub(crate) fn ade_link_dispatch_register(sk: &str, cb: crate::ui::view::LinkCall
 /// 构造 IcedMessage（`IcedMessage::from_dynamic` 同款 Send 边界封装在
 /// 装配闭包内）。None = 该 key 无装配（未挂载/泛型轨/缺回调——与既有
 /// keyed 通道语义一致，零派发）。
-#[cfg(all(feature = "autodown", feature = "code-editor"))]
+#[cfg(feature = "autodown")]
 pub(crate) fn ade_link_dispatch_message(
     sk: &str,
     act: &crate::ui::autodown_editor::LinkActivation,
@@ -9289,14 +9289,14 @@ fn convert_view_messages(view: AbstractView<DynamicMessage>) -> AbstractView<Ice
             // PLAN-737：装配期注册合成通道派发表（同 key 覆写）——
             // __mcp_drag_ade 完整点击门放行的激活经同款回调构造消息
             // （单源闭包；真实事件泵的 widget publish 路径零变化）。
-            #[cfg(all(feature = "autodown", feature = "code-editor"))]
+            #[cfg(feature = "autodown")]
             if let Some(cb) = &on_link {
                 ade_link_dispatch_register(
                     &crate::ui::autodown_editor::storage_key(&key),
                     cb.clone(),
                 );
             }
-            #[cfg(not(all(feature = "autodown", feature = "code-editor")))]
+            #[cfg(not(feature = "autodown"))]
             let _ = &on_link;
             AbstractView::AutodownEditor {
                 key,
@@ -12783,7 +12783,7 @@ fn sync_dash_dark_bit(state: &mut crate::ui::session::DesktopSession) {
 /// Win32 InvalidateRect+UpdateWindow 强制 WM_PAINT → winit
 /// RedrawRequested → 全管线重渲+present。1s 节流（分钟粒度状态一帧即
 /// 足）；输入活跃期 winit 自身 present 照常，本臂纯兜底。
-#[cfg(all(windows, feature = "native-dock"))]
+#[cfg(windows)]
 fn presentation_keepalive_tick() {
     static LAST: std::sync::Mutex<Option<std::time::Instant>> = std::sync::Mutex::new(None);
     let now = std::time::Instant::now();
@@ -15182,7 +15182,7 @@ fn execute_set_theme(state: &mut crate::ui::session::DesktopSession, dark: bool)
     // PLAN-551 门控补缺（合并取 master 字面门）：随 autodown_editor 模块
     // 同门控 all(autodown, code-editor)；autodown 隐含 ui-iced→code-editor,
     // ui-iced 单开时跳过——fence 重着色本就是 autodown 编辑壳的附加面。
-    #[cfg(all(feature = "autodown", feature = "code-editor"))]
+    #[cfg(feature = "autodown")]
     crate::ui::autodown_editor::retheme_all_fence_buffers();
     state.desktop.config.dark_theme = dark;
     // PLAN-615 T-06：用户显式切换即置 manual——终结 theme_source=system 的
@@ -16450,20 +16450,17 @@ fn inject_native_event(
 /// on_native_drop 的 text/files/image 域一致）。
 fn clipboard_paste_record_fields() -> Vec<(String, crate::ui::vm_bridge::RecordValue)> {
     use crate::ui::vm_bridge::RecordValue;
-    #[cfg(feature = "ui-clipboard")]
     let text = crate::ui::clipboard::clipboard_get();
-    #[cfg(not(feature = "ui-clipboard"))]
-    let text: Option<String> = None;
 
-    #[cfg(all(windows, feature = "native-clipboard"))]
+    #[cfg(windows)]
     let files = crate::ui::clipboard_native::clipboard_files_get();
-    #[cfg(not(all(windows, feature = "native-clipboard")))]
+    #[cfg(not(windows))]
     let files: Vec<String> = Vec::new();
 
-    #[cfg(all(windows, feature = "native-clipboard"))]
+    #[cfg(windows)]
     let image = crate::ui::clipboard_native::clipboard_image_get()
         .map(|t| (t.path.to_string_lossy().into_owned(), t.width, t.height));
-    #[cfg(not(all(windows, feature = "native-clipboard")))]
+    #[cfg(not(windows))]
     let image: Option<(String, u32, u32)> = None;
 
     vec![
@@ -19913,7 +19910,7 @@ fn run_session(
                     it.next().and_then(|s| s.parse::<f32>().ok()),
                     it.next().and_then(|s| s.parse::<f32>().ok()),
                 ) {
-                    #[cfg(all(feature = "autodown", feature = "code-editor"))]
+                    #[cfg(feature = "autodown")]
                     {
                         use crate::ui::autodown_editor as ade;
                         use crate::ui::autodown_editor::DocInput;
@@ -19947,7 +19944,7 @@ fn run_session(
                             return iced::Task::done(mcp_noop_with_ack(mcp_ack));
                         }
                     }
-                    #[cfg(not(all(feature = "autodown", feature = "code-editor")))]
+                    #[cfg(not(feature = "autodown"))]
                     let _ = (sk, x, y);
                     mcp_ack_apply(&state.desktop.mcp_shared, mcp_ack);
                     return iced::Task::none();
@@ -19971,7 +19968,7 @@ fn run_session(
             if let (Some(sk), Some(widget), Some(event), Some(keyspec)) =
                 (parts.next(), parts.next(), parts.next(), parts.next())
             {
-                #[cfg(all(feature = "autodown", feature = "code-editor"))]
+                #[cfg(feature = "autodown")]
                 {
                     use crate::ui::autodown_editor as ade;
                     use crate::ui::autodown_editor::DocInput;
@@ -20014,7 +20011,7 @@ fn run_session(
                         return iced::Task::batch(tasks);
                     }
                 }
-                #[cfg(not(all(feature = "autodown", feature = "code-editor")))]
+                #[cfg(not(feature = "autodown"))]
                 let _ = (sk, widget, event, keyspec);
                 mcp_ack_apply(&state.desktop.mcp_shared, mcp_ack);
                 return iced::Task::none();
@@ -20033,7 +20030,7 @@ fn run_session(
             if let (Some(sk), Some(widget), Some(event), Some(pts)) =
                 (parts.next(), parts.next(), parts.next(), parts.next())
             {
-                #[cfg(all(feature = "autodown", feature = "code-editor"))]
+                #[cfg(feature = "autodown")]
                 {
                     use crate::ui::autodown_editor as ade;
                     use crate::ui::autodown_editor::DocInput;
@@ -20122,7 +20119,7 @@ fn run_session(
                         return iced::Task::batch(tasks);
                     }
                 }
-                #[cfg(not(all(feature = "autodown", feature = "code-editor")))]
+                #[cfg(not(feature = "autodown"))]
                 let _ = (sk, widget, event, pts);
                 return iced::Task::none();
             }
@@ -21224,14 +21221,8 @@ fn run_session(
                     .map(|r| r.render(fmt));
                 let ok = match text {
                     Some(t) => {
-                        #[cfg(feature = "ui-clipboard")]
                         {
                             crate::ui::clipboard::clipboard_set(&t)
-                        }
-                        #[cfg(not(feature = "ui-clipboard"))]
-                        {
-                            let _ = t;
-                            false
                         }
                     }
                     None => false,
@@ -23284,7 +23275,7 @@ fn run_session(
                         }
                         // Plan 488 步骤 5：宿主窗打开即挂拖入目标（幂等，HWND
                         // 身份键控；winit 目标位移见 native_dnd spike 结论）。
-                        #[cfg(all(windows, feature = "native-dnd", feature = "native-dock"))]
+                        #[cfg(all(windows, feature = "native-dnd"))]
                         if state.is_desktop() {
                             crate::ui::native_dnd::win32::ensure_host_drop_target();
                         }
@@ -23368,7 +23359,7 @@ fn run_session(
                     DesktopEvent::ServiceTick => {
                         // Plan 488 步骤 5：宿主窗重建自愈——HWND 变化时重挂
                         // 拖入目标（幂等直返，400ms 节拍）。
-                        #[cfg(all(windows, feature = "native-dnd", feature = "native-dock"))]
+                        #[cfg(all(windows, feature = "native-dnd"))]
                         if state.is_desktop() {
                             crate::ui::native_dnd::win32::ensure_host_drop_target();
                         }
@@ -23381,7 +23372,7 @@ fn run_session(
                         // seq 门 + 500ms 攒批；全量快照下行）。
                         syslog_inject_tick(state);
                         // PLAN-041 T-14：空闲呈现保活（1s 节流，Win32 门控）。
-                        #[cfg(all(windows, feature = "native-dock"))]
+                        #[cfg(windows)]
                         presentation_keepalive_tick();
                         // PLAN-036 T-07（B3）：launcher attach 追赶——
                         /// spawn→attach 异步落差（launcher_open 挂起 +
@@ -26073,7 +26064,7 @@ fn dynamic_view_impl_inner(
                 // 落地成立）。
                 // PLAN-551：调用随 autodown_editor 模块同门控 all(autodown,
                 // code-editor)——ui-iced 单开时跳过。
-                #[cfg(all(feature = "autodown", feature = "code-editor"))]
+                #[cfg(feature = "autodown")]
                 crate::ui::autodown_editor::retheme_all_fence_buffers();
             }
             crate::ui::style_iced_adapter::set_dark_mode(is_dark);
@@ -29484,7 +29475,7 @@ fn build_autodown_editor_generic<M: Clone + Debug + 'static>(
     on_link: Option<crate::ui::view::LinkCallback<M>>,
     placeholder: Option<String>,
 ) -> iced::Element<'static, M> {
-    #[cfg(all(feature = "autodown", feature = "code-editor"))]
+    #[cfg(feature = "autodown")]
     {
         use crate::ui::autodown_editor as ade;
         let sk = ade::storage_key(key);
@@ -29516,7 +29507,7 @@ fn build_autodown_editor_generic<M: Clone + Debug + 'static>(
         }
         widget.into()
     }
-    #[cfg(not(all(feature = "autodown", feature = "code-editor")))]
+    #[cfg(not(feature = "autodown"))]
     {
         let _ = (key, is_final, on_focus, on_link);
         AbstractView::<M>::Text {
@@ -31155,7 +31146,7 @@ fn render_dynamic_view(
             style: _,
         } => {
             let use_ade = cfg!(all(feature = "autodown", feature = "code-editor"));
-            #[cfg(all(feature = "autodown", feature = "code-editor"))]
+            #[cfg(feature = "autodown")]
             {
                 let dbg_props = Vec::<(&str, String)>::new();
                 use crate::ui::autodown_editor as ade;
@@ -31216,7 +31207,7 @@ fn render_dynamic_view(
                 let _ = dbg_props;
                 el
             }
-            #[cfg(not(all(feature = "autodown", feature = "code-editor")))]
+            #[cfg(not(feature = "autodown"))]
             {
                 // 双 feature 缺一时退化只读文本（markdown 只读轨的兜底路径）。
                 let _ = (use_ade, on_focus, on_link);
@@ -34799,7 +34790,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "ui-iced")]
     fn plan050_content_align_justify_start_is_left() {
         let is = p050_style(vec![StyleClass::Flex, StyleClass::JustifyStart]);
         let (h, v) = plan050_content_align(Some(&is));
@@ -34808,7 +34798,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "ui-iced")]
     fn plan050_content_align_text_left_fallback() {
         let is = p050_style(vec![StyleClass::TextLeft]);
         let (h, _) = plan050_content_align(Some(&is));
@@ -34816,7 +34805,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "ui-iced")]
     fn plan050_content_align_items_start_is_top() {
         let is = p050_style(vec![StyleClass::ItemsStart]);
         let (_, v) = plan050_content_align(Some(&is));
@@ -34824,7 +34812,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "ui-iced")]
     fn plan050_side_border_flags_parse() {
         let is = p050_style(vec![StyleClass::BorderBottom, StyleClass::BorderRight]);
         assert!(is.border_bottom && is.border_right);
@@ -34835,7 +34822,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "ui-iced")]
     fn plan050_content_align_none_keeps_centered_default() {
         let is = p050_style(vec![]);
         let (h, v) = plan050_content_align(Some(&is));
@@ -34847,7 +34833,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "ui-iced")]
     fn plan414_height_branch_yields_to_explicit_align() {
         // nav-item(h-9 w-full text-left items-center):水平轴让位 text-left,
         // 高度臂不再无条件 center_x——否则内层 Fill 容器恒居中,外层 050
@@ -34867,7 +34852,6 @@ mod tests {
 
     // ---- PLAN-050 P2 #3: mt-auto → Column 弹性占位判定 ----
     #[test]
-    #[cfg(feature = "ui-iced")]
     fn plan050_mt_auto_child_gets_fill_spacer() {
         // 全链：mt-auto 经 master 通用 mt-<size> 解析为 MarginTop(SizeValue::Auto)，
         // 命中占位判定；定值 mt-4 与空类不命中。
@@ -34993,7 +34977,7 @@ mod tests {
     /// Plan 486 T1/T4：拖入高亮落位/清除（set_native_drag_over 经映射或
     /// headless 恒等——断言映射无关的存在性）+ 高亮元素构建冒烟。
     #[test]
-    #[cfg(all(windows, feature = "native-dock"))]
+    #[cfg(windows)]
     fn native_drag_over_overlay_sets_and_clears() {
         let mut ds = t3_session_with_shell();
         set_native_drag_over(
@@ -38020,7 +38004,7 @@ mod tests {
     /// 载荷字段。文本往返 + files/image 域形状（485 测试锁串行化，防
     /// nextest 并行进程互清剪贴板）。
     #[test]
-    #[cfg(all(windows, feature = "native-clipboard"))]
+    #[cfg(windows)]
     fn plan488_clipboard_paste_payload_reads_os_clipboard() {
         let _lock = crate::ui::clipboard_native::GlobalClipboardTestLock::acquire();
         crate::ui::clipboard::clipboard_set("paste-me");
@@ -39461,7 +39445,6 @@ mod tests {
     /// 覆盖 mock / hosted / visible 置位 / ApplyFilter 同步重算）。键流与
     /// 启动后隐匿半边走 ui_desktop 实机（T4 验收 §5.1）。
     #[test]
-    #[cfg(feature = "ui-iced")]
     fn summon_launcher_mounts_and_injects() {
         use crate::ui::app_registry::AppRegistryEntry;
 
@@ -39572,7 +39555,6 @@ mod tests {
     /// Plan 464 T4 探针：宿主 write_state_vec 注入 Obj 数组后，VM 侧
     /// `for a in .apps` + `a.title` 字段读（任务栏同型）是否保真。
     #[test]
-    #[cfg(feature = "ui-iced")]
     fn injected_obj_array_for_field_read() {
         let mut ds = crate::ui::session::DesktopSession::__test_session();
         ds.open_desktop(iced::window::Id::unique());

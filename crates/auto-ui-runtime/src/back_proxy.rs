@@ -60,7 +60,6 @@ pub struct SessionSpec {
 /// PLAN-658 T-03: 宿主原生 media 路由注册（生成器对全部后端无条件发射的
 /// `/api/media/scan` + `/api/media/stream/:id`，§5.7-3——不在 .at 语料，
 /// 由宿主 Rust 直答）。020 形态：无 session，仅原生路由。
-#[cfg(feature = "ui")]
 #[derive(Debug, Clone, PartialEq)]
 pub struct NativeMediaApp {
     pub app_id: String,
@@ -72,7 +71,6 @@ pub struct NativeMediaApp {
 /// `/api/photos/thumb/:id` + `/api/photos/full/:id`）。029 形态：无
 /// session，仅原生路由。 gated on `image-pipeline`——缩略图渲染需要
 /// `image`/`kamadak-exif` 解码器（media 臂无解码需求故只挂 ui）。
-#[cfg(feature = "image-pipeline")]
 #[derive(Debug, Clone, PartialEq)]
 pub struct NativePhotoApp {
     pub app_id: String,
@@ -97,11 +95,9 @@ pub struct BackProxyConfig {
     pub lazy_sessions: bool,
     /// 原生 media 路由（cfg ui；无 root 的 app 也注册——诚实空列表语义
     /// 与生成器一致）。
-    #[cfg(feature = "ui")]
     pub native_media: Vec<NativeMediaApp>,
     /// 原生 photo 路由（cfg image-pipeline；语义同 native_media——
     /// 无 root 也注册，诚实空图库）。
-    #[cfg(feature = "image-pipeline")]
     pub native_photos: Vec<NativePhotoApp>,
 }
 
@@ -132,16 +128,13 @@ struct ProxyShared {
     lazy: bool,
     /// PLAN-658 T-03: 宿主原生 media 路由状态（cfg ui）。PLAN-037 T-01:
     /// 同上 Mutex 化（add_native_media/remove_app 运行期写）。
-    #[cfg(feature = "ui")]
     native_media: std::sync::Mutex<HashMap<String, NativeMediaState>>,
     /// PLAN-043 Part 1: 宿主原生 photo 路由状态（cfg image-pipeline；
     /// 生命周期语义同 native_media）。
-    #[cfg(feature = "image-pipeline")]
     native_photos: std::sync::Mutex<HashMap<String, NativePhotoState>>,
 }
 
 /// PLAN-658 T-03: 一个 app 的原生 media 服务面（惰性索引 + 绝对 URL base）。
-#[cfg(feature = "ui")]
 struct NativeMediaState {
     app_id: String,
     /// 已解析根（None = 未配置 → 诚实空列表）。
@@ -156,7 +149,6 @@ struct NativeMediaState {
 /// PLAN-043 Part 1: 一个 app 的原生 photo 服务面（语义同 NativeMediaState：
 /// 绝对 URL base）。非递归浏览模型——scan 每次现列目录（无进程内索引；
 /// token→路径注册表在 photo_service 全局，按 root 分桶）。
-#[cfg(feature = "image-pipeline")]
 struct NativePhotoState {
     app_id: String,
     root: Option<std::path::PathBuf>,
@@ -183,7 +175,6 @@ enum ProxyReply {
         body: Vec<u8>,
     },
     /// 大体量字节流（media 文件窗口）——头 + 定长 reader，逐块写出不整读。
-    #[cfg(feature = "ui")]
     Stream {
         status: u16,
         content_type: String,
@@ -237,7 +228,6 @@ pub fn start(config: BackProxyConfig) -> std::io::Result<RunningProxy> {
         sessions: std::sync::Mutex::new(sessions),
         lazy: config.lazy_sessions,
         catalog: std::sync::Mutex::new(catalog),
-        #[cfg(feature = "ui")]
         native_media: std::sync::Mutex::new({
             let base = format!("http://127.0.0.1:{port}");
             let mut map = HashMap::new();
@@ -255,7 +245,6 @@ pub fn start(config: BackProxyConfig) -> std::io::Result<RunningProxy> {
             }
             map
         }),
-        #[cfg(feature = "image-pipeline")]
         native_photos: std::sync::Mutex::new({
             let base = format!("http://127.0.0.1:{port}");
             let mut map = HashMap::new();
@@ -398,7 +387,6 @@ impl RunningProxy {
     /// PLAN-037 T-01: 运行期注册宿主原生 media 路由（resolve_root 语义
     /// 同 start——None → env → 平台默认）。同 id 重复 add 覆盖旧态（索引
     /// 一并丢弃重建）。
-    #[cfg(feature = "ui")]
     pub fn add_native_media(&self, app: NativeMediaApp) {
         let base = format!("http://127.0.0.1:{}", self.port);
         let root = auto_media_core::media_service::resolve_root(app.media_root.as_deref());
@@ -416,7 +404,6 @@ impl RunningProxy {
 
     /// PLAN-043 Part 1: 运行期注册宿主原生 photo 路由（语义同
     /// add_native_media——同 id 重复 add 覆盖旧态，索引丢弃重建）。
-    #[cfg(feature = "image-pipeline")]
     pub fn add_native_photo(&self, app: NativePhotoApp) {
         let base = format!("http://127.0.0.1:{}", self.port);
         let root = crate::ui::photo_service::resolve_root(app.photo_root.as_deref());
@@ -443,9 +430,7 @@ impl RunningProxy {
             .unwrap()
             .remove(app_id)
             .and_then(|mut handle| handle.join.take());
-        #[cfg(feature = "ui")]
         self.shared.native_media.lock().unwrap().remove(app_id);
-        #[cfg(feature = "image-pipeline")]
         self.shared.native_photos.lock().unwrap().remove(app_id);
         join
     }
@@ -586,19 +571,16 @@ fn route_request(shared: &ProxyShared, req: &ParsedRequest) -> ProxyReply {
         }
     };
     // PLAN-658 T-03: 宿主原生 media 路由先于 session 分发（020 无 session）。
-    #[cfg(feature = "ui")]
     if let Some(reply) = shared.try_native_media(&app_id, &sub_path, req) {
         return reply;
     }
     // PLAN-043 Part 1: 宿主原生 photo 路由（029 无 session，同 media 序位）。
-    #[cfg(feature = "image-pipeline")]
     if let Some(reply) = shared.try_native_photos(&app_id, &sub_path, req) {
         return reply;
     }
     // PLAN-658 T-05: 031 族图片字节路由（image_pipeline 共享 registry 的
     // 不透明 `/api/__auto/media/{id}/{rev}` URI，session 内 auto.image 原生
     // 创建的条目同进程可读——字节保真 + ETag/304 语义直答）。
-    #[cfg(feature = "ui-iced")]
     if sub_path.starts_with("/api/__auto/media/") {
         let if_none = req
             .headers
@@ -705,7 +687,6 @@ fn write_response(stream: &mut TcpStream, reply: ProxyReply) -> std::io::Result<
             BodySource::Bytes(body),
         ),
         ProxyReply::Sse(_) => unreachable!("Sse handled in the outer match"),
-        #[cfg(feature = "ui")]
         ProxyReply::Stream {
             status,
             content_type,
@@ -784,7 +765,6 @@ fn error_json(msg: &str) -> String {
 // 宿主原生 media 路由（PLAN-658 T-03，cfg ui）
 // ---------------------------------------------------------------------------
 
-#[cfg(feature = "ui")]
 impl ProxyShared {
     /// `/api/media/scan` + `/api/media/stream/:id` 直答。未命中返回 None
     /// （回落 session 分发）。PLAN-037 T-01: 表已 Mutex 化——命中即持锁
@@ -953,7 +933,6 @@ impl ProxyShared {
 // 宿主原生 photo 路由（PLAN-043 Part 1，cfg image-pipeline）
 // ---------------------------------------------------------------------------
 
-#[cfg(feature = "image-pipeline")]
 impl ProxyShared {
     /// `/api/photos/scan` + `/api/photos/thumb/:id` + `/api/photos/full/:id`
     /// 直答（029 形态：无 session，仅原生路由）。未命中返回 None（回落

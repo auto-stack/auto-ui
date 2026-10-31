@@ -37,7 +37,6 @@ fn st(comp: &crate::ui::dynamic::DynamicComponent, field: &str) -> String {
 
 /// HEX: F F + 1 = → 0x100（pacc_hi=0, pacc_lo=256）。
 #[test]
-#[cfg(feature = "ui-iced")]
 fn calc_prog_hex_add() {
     let mut comp = calc_component();
     send(&mut comp, "SetMode", &[auto_val::Value::str("programmer")]);
@@ -55,7 +54,6 @@ fn calc_prog_hex_add() {
 
 /// 1 SHL 31 = 0x80000000（32 位边界肢：pacc_hi=32768）。
 #[test]
-#[cfg(feature = "ui-iced")]
 fn calc_prog_shl31_boundary() {
     let mut comp = calc_component();
     send(&mut comp, "SetMode", &[auto_val::Value::str("programmer")]);
@@ -70,7 +68,6 @@ fn calc_prog_shl31_boundary() {
 
 /// AND 位运算 + NOT + 非法键忽略（DEC 下按 F 不生效）。
 #[test]
-#[cfg(feature = "ui-iced")]
 fn calc_prog_and_not_invalid_digit() {
     let mut comp = calc_component();
     send(&mut comp, "SetMode", &[auto_val::Value::str("programmer")]);
@@ -95,7 +92,6 @@ fn calc_prog_and_not_invalid_digit() {
 
 /// 除零错误置位；Base 切换换算读出（HEX 值在 DEC 基显示）。
 #[test]
-#[cfg(feature = "ui-iced")]
 fn calc_prog_div_zero_and_base_switch() {
     let mut comp = calc_component();
     send(&mut comp, "SetMode", &[auto_val::Value::str("programmer")]);
@@ -118,7 +114,6 @@ fn calc_prog_div_zero_and_base_switch() {
 /// PLAN-615 T-08: 零参 Key 处理器模式路由——basic 域走 float 表达式串，
 /// programmer 域走肢乘加；HEX 字母在 DEC 基忽略。
 #[test]
-#[cfg(feature = "ui-iced")]
 fn calc_prog_key_routing_mode_aware() {
     let mut comp = calc_component();
     // basic 域：Key7 → float expr

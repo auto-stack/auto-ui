@@ -11,7 +11,6 @@
 
 #![cfg(all(test, feature = "ui-iced"))]
 
-#[cfg(feature = "ui-interpreter")]
 mod plan446_b1_store_loop {
     use crate::plan370_test_support::build_component_from_app;
 
@@ -95,7 +94,6 @@ mod plan446_b1_store_loop {
     /// handler 侧验收：点击实参经 payload 编码→decode→handler 分发后，
     /// handler 收到正确字符串。（现场 workaround 时代 handler 内读取静默
     /// 失效——"整只实参"形态。编码格式与 renderer.rs 的 encode_payload 同构。）
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn b1_pick_handler_receives_field_value() {
         let mut dc = match locate_corpus().and_then(|p| build_component_from_app(&p)) {

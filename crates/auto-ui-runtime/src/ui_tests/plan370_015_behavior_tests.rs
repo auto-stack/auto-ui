@@ -121,7 +121,6 @@ mod plan370_015_behavior_tests {
 
     // ── D1: Init loads seed data ────────────────────────────────────────────
 
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn d1_init_loads_seed_notes() {
         run_big_stack(|| {
@@ -148,7 +147,6 @@ mod plan370_015_behavior_tests {
     // Exercises the store method call chain: App.NewNote → store.NewNote()
     // → create_note() + notes = list_notes() + active_id = len-1.
 
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn d2_new_note_appends() {
         run_big_stack(|| {
@@ -182,7 +180,6 @@ mod plan370_015_behavior_tests {
 
     // ── D3: SelectNote(i) sets active_id (parameterized handler) ────────────
 
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn d3_select_note_sets_active_id() {
         run_big_stack(|| {
@@ -212,7 +209,6 @@ mod plan370_015_behavior_tests {
 
     // ── D4: View tabs switch active_folder ──────────────────────────────────
 
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn d4_view_tabs_switch_folder() {
         run_big_stack(|| {
@@ -238,7 +234,6 @@ mod plan370_015_behavior_tests {
 
     // ── D6: Tag filter sets/clears active_tag (parameterized handler) ───────
 
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn d6_tag_filter_sets_and_clears() {
         run_big_stack(|| {
@@ -267,7 +262,6 @@ mod plan370_015_behavior_tests {
     // store.active_id, which defaults to 0 = "Welcome", pinned:true).
     // store.TogglePin(idx): if idx < notes.len() { notes[idx].pinned = !... }
 
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn d7_toggle_pin_flips_flag() {
         run_big_stack(|| {
@@ -306,7 +300,6 @@ mod plan370_015_behavior_tests {
 
     // ── D8: ToggleDarkMode flips dark_mode ──────────────────────────────────
 
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn d8_toggle_dark_mode() {
         run_big_stack(|| {
@@ -338,7 +331,6 @@ mod plan370_015_behavior_tests {
     // "SetAccent", ...) routes to handler_NotesStore_SetAccent on root state.
     // This proves the store.SetAccent(name) method call works end-to-end.
 
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn d9_set_accent_color() {
         run_big_stack(|| {
@@ -366,7 +358,6 @@ mod plan370_015_behavior_tests {
     // （draft_title/draft_body），输入即置 dirty，SaveDraft 落库并清 dirty。
     // 本测驱动 EditorPanel 的 EditTitle/SaveDraft，经 store 方法链写 draft_*。
 
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn d10_edit_fills_draft_fields() {
         run_big_stack(|| {

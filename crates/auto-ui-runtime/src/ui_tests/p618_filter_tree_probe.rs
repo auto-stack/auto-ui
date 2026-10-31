@@ -116,7 +116,7 @@ fn setup_fixture() -> std::path::PathBuf {
     dir.join("app.at")
 }
 
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 #[test]
 fn p618_vm_filter_tree_recursion_probe() {
     let manifest = setup_fixture();

@@ -11,7 +11,6 @@
 //! dump 断言高亮/转折点/显隐样式落图(svgdoc 内联;Debug dump 引号转义
 //! 为 `\"`,故断言用原始字符串书写字面 `=\"…\"` 形态)。
 
-#[cfg(feature = "ui-iced")]
 mod plan498_m0 {
     /// M0:mouse-area onclick → View::MouseArea.on_click(VM 动态组件
     /// 全链;literal int 参数随行,legend Toggle(k) 消费同型)。
@@ -84,7 +83,6 @@ widget ClickZone {
     }
 }
 
-#[cfg(feature = "ui-iced")]
 mod plan498_charts {
     /// charts-gallery 整 app 构建(四类图同屏,数据由 app 注入;组件 props
     /// 不入 state,独立构建组件会缺 data 字段,故走消费方整包形态;路径

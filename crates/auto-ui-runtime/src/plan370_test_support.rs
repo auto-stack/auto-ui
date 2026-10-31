@@ -81,7 +81,6 @@ pub(crate) fn locate_example_app_at(example: &str) -> Option<PathBuf> {
 ///
 /// Returns None (so tests gracefully no-op) when the example sources aren't
 /// present (e.g. running the crate in isolation without the examples/ tree).
-#[cfg(feature = "ui-interpreter")]
 pub(crate) fn build_015_component() -> Option<DynamicComponent> {
     build_example_component("015-notes")
 }
@@ -91,7 +90,6 @@ pub(crate) fn build_015_component() -> Option<DynamicComponent> {
 /// child widgets + stores → module imports → build → fire_init.
 ///
 /// Returns None (graceful no-op) when the example sources aren't present.
-#[cfg(feature = "ui-interpreter")]
 pub(crate) fn build_example_component(example: &str) -> Option<DynamicComponent> {
     let manifest = locate_example_app_at(example)?;
     build_component_from_app(&manifest)
@@ -99,14 +97,12 @@ pub(crate) fn build_example_component(example: &str) -> Option<DynamicComponent>
 
 /// Path-based variant of `build_example_component` for fixtures outside
 /// examples/ (e.g. test/ui corpora).
-#[cfg(feature = "ui-interpreter")]
 pub(crate) fn build_component_from_app(manifest: &Path) -> Option<DynamicComponent> {
     build_component_from_app_mode(manifest, false)
 }
 
 /// PLAN-622: split-mode variant (`api_over_http = true`) so corpus tests can
 /// assert the Plan 340 rewrite through the full production-shaped build path.
-#[cfg(feature = "ui-interpreter")]
 pub(crate) fn build_component_from_app_mode(
     manifest: &Path,
     api_over_http: bool,

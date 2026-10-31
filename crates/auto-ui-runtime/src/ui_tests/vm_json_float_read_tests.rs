@@ -274,7 +274,7 @@ let obj = Json.to_value(js)
 /// 数学分发曾以 read_i32/push_i32/pop_i32 处理浮点 nv（位型当整数）。
 ///
 /// 门控与 plan370_*_tests 一致：widget 测试需要 `ui-iced` feature。
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod vm_json_float_widget_tests {
     use crate::ui::dynamic::DynamicComponent;
     use crate::ui::widget_registry::WidgetRegistry;

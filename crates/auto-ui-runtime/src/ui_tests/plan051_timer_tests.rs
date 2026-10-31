@@ -127,7 +127,6 @@ widget Clock {
     }
 
     /// 根 widget（corpus app.at）提取 → SFC：interval 建立/清理 + when 门控。
-    #[cfg(feature = "ui")]
     #[test]
     fn plan051_timer_vue_emits_interval_and_cleanup() {
         let path = locate_corpus("../../../auto-lang/test/ui/plan051_timer/src/front/app.at")
@@ -162,7 +161,6 @@ widget Clock {
     /// 形态)时,timers 臂与 tick_interval 臂同触——曾无守卫重推产出
     /// `import { …, onUnmounted, onUnmounted }`(vue/compiler-sfc 重复
     /// 声明,App.vue 编译炸)。断言导入行 onUnmounted 唯一。
-    #[cfg(feature = "ui")]
     #[test]
     fn vue_imports_dedupe_onunmounted_when_timer_and_tick_coexist() {
         let at = r#"
@@ -213,7 +211,6 @@ widget App {
 
     /// store（corpus ticker_store.at）提取 → composable：模块级 interval +
     /// when 门控。
-    #[cfg(feature = "ui")]
     #[test]
     fn plan051_timer_vue_store_composable_emits_interval() {
         let path =
@@ -246,7 +243,6 @@ widget App {
     // ── VM 轨：条目收集 + 派发 + 门控 ──────────────────────────────────────
 
     /// 组件构建后 timer_entries 收集（root widget + store-as-child 双源）。
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn plan051_timer_vm_collects_entries() {
         let corpus = locate_corpus("../../../auto-lang/test/ui/plan051_timer/pac.at")
@@ -275,7 +271,6 @@ widget App {
     }
 
     /// 派发：timer 事件经既有 handler 泉触发（root widget + store 各一）。
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn plan051_timer_vm_dispatch_fires_handlers() {
         let corpus = locate_corpus("../../../auto-lang/test/ui/plan051_timer/pac.at")
@@ -298,7 +293,6 @@ widget App {
     }
 
     /// 门控：when 条件假 → fire_timer 丢弃本拍（计数不动）；条件真 → 派发。
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn plan051_timer_vm_when_guard_blocks_and_passes() {
         let corpus = locate_corpus("../../../auto-lang/test/ui/plan051_timer/pac.at")

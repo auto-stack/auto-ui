@@ -98,13 +98,8 @@ impl AutodownEngine for AutodownCoreEngine {
 
     /// 编辑壳全文（code-editor 面缺席 → None=空串语义保持）。
     fn editor_text(&self, key: &str) -> Option<String> {
-        #[cfg(feature = "code-editor")]
         {
             crate::ui::autodown_editor::autodown_editor_text(key)
-        }
-        #[cfg(not(feature = "code-editor"))]
-        {
-            None
         }
     }
 }

@@ -25,7 +25,6 @@ pub fn enabled() -> bool {
 /// /MEMO-DIAG 行同轴对读）。
 // PLAN-814 R9-03：AppId 参数面属 session（ui-iced 门）——消费方全部在
 // renderer 侧，trace 随同门（enabled/record 等纯通道保持无门）。
-#[cfg(feature = "ui-iced")]
 pub fn trace(app: Option<crate::ui::session::AppId>, phase: &str, detail: &str) {
     if enabled() {
         let t0 = crate::ui::dynamic::sched_diag_t0();

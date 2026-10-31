@@ -72,7 +72,6 @@ mod plan536_t1_reactive_probe_tests {
 
     /// 环节 1+2（根 widget 计时器）：timer 写 state → dirty 置位（失效广播）
     /// → 重建视图文本更新（消费）。任一臂断即题 1 在该环节复现。
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn p536_t1_root_timer_write_reaches_rebuilt_view() {
         let corpus = match locate_corpus() {
@@ -115,7 +114,6 @@ mod plan536_t1_reactive_probe_tests {
 
     /// store 计时器（musk PollStream 同形）：store handler 写 store 字段 →
     /// 视图经 `.store.poll_count` 跨模块绑定消费。musk 题身的最近似面。
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn p536_t1_store_timer_write_reaches_rebuilt_view() {
         let corpus = match locate_corpus() {
@@ -150,7 +148,6 @@ mod plan536_t1_reactive_probe_tests {
     /// 待澄清 #1 定案：`when` 门是**派发前过滤**（fire_timer 内求值，假丢弃
     /// 本拍），订阅层消息（[UI_EVENT] 可见）无条件到达 update——即日志里
     /// when=false 仍见 UI_EVENT 与门语义不矛盾。
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn p536_t1_when_gate_is_pre_dispatch_filter() {
         let corpus = match locate_corpus() {
@@ -179,7 +176,6 @@ mod plan536_t1_reactive_probe_tests {
 
     /// 边界：handler 不存在/执行失败时 dirty 不得置位（防伪失效风暴）；
     /// 并验证连续多拍累积（musk 18 拍场景的累计口径）。
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn p536_t1_dirty_contract_under_repeated_ticks() {
         let corpus = match locate_corpus() {
@@ -232,7 +228,6 @@ mod plan536_t1_reactive_probe_tests {
     /// 是否同拍更新。题 4 的"prop 构建期快照、子件读侧恒旧"若在 builder
     /// 层成立，此探针的子件臂必红；若双臂同绿，则快照冻结只发生在
     /// iced Element 缓存层（画布未重建），题 4 的活性问题与题 1 同根。
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn p536_t1_store_timer_updates_child_prop_and_direct_binding() {
         let corpus = match locate_reactive_corpus() {
@@ -288,7 +283,6 @@ mod plan536_t1_reactive_probe_tests {
     /// T2 失效根修（题1 musk 根因定案）：handler **执行中崩**（副作用已落盘
     /// 后 RuntimeError，musk "Invalid object ID: 0" 同形状）时 dirty 也必须
     /// 置位——否则 store 已拿到数据而画布永冻（059-FU1 实录）。RED 先行。
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn p536_t2_handler_error_after_side_effects_still_invalidates() {
         let corpus = match locate_reactive_corpus() {
@@ -327,7 +321,6 @@ mod plan536_t1_reactive_probe_tests {
     /// 不随脏重建帧重放。RED：当前每渲染帧重放(437 v1 近似,债务在案),
     /// musk 单会话期子件 Init 1.6 万+次重放即此——副作用(ForgeStore.Init
     /// → LoadSessionList 打后端)随帧重入。
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn p536_t3_child_init_fires_once_not_per_rebuild() {
         let corpus = match locate_reactive_corpus() {
@@ -407,7 +400,6 @@ mod plan536_t1_reactive_probe_tests {
     /// T6①②: absolute + 偏移 + z 的悬浮元素在 **row 父容器**内也必须
     /// hoist 为 Overlay(锚=父 bounds),不再挤压兄弟流内布局(musk 会话卡 ×
     /// 的行内形状;此前仅 convert_column 有 hoist 臂)。
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn p536_t6_row_parent_hoists_absolute_child() {
         let corpus = match locate_absolute_corpus() {
@@ -459,7 +451,6 @@ mod plan536_t1_reactive_probe_tests {
 
     /// T6②: absolute 载体不止 col/row——button(× 删除钮)/container 一类
     /// 自带样式的叶子同样可 hoist。
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn p536_t6_button_carrier_hoists() {
         let corpus = match locate_absolute_corpus() {
@@ -503,7 +494,6 @@ mod plan536_t1_reactive_probe_tests {
     /// 实测:名称/× 全失,仅剩描边),hoist 臂已撤销。× 的悬浮由消费方
     /// 结构承接(musk:× 移出卡片 button,外层 col 的 col-arm hoist)。
     /// renderer 侧 Button{content:Overlay} 渲染根修后本测试可再翻转。
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn p536_t6_button_inner_absolute_hoists_in_card() {
         let corpus = match locate_absolute_corpus() {
@@ -542,7 +532,6 @@ mod plan536_t1_reactive_probe_tests {
 
     /// T6 语义定界(负面): absolute 无 z 的分层技巧(p051-min-ta textarea
     /// 叠加族)保留流内——不 hoist,防 inset-0 背景层翻到内容之上。
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn p536_t6_absolute_without_z_stays_in_flow() {
         let corpus = match locate_absolute_corpus() {
@@ -579,7 +568,6 @@ mod plan536_t1_reactive_probe_tests {
     /// T10①: col 内多个 absolute(z) 子件必须**全部**进浮层(嵌套 Overlay,
     /// 源序=栈序)。此前四处 hoist 臂只取 `.next()` 首个,其余 absolute
     /// 子件已被滤出流内却未进任何浮层,整体丢弃(D1 次生缺陷面)。
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn p536_t10_multiple_absolute_children_all_survive() {
         let corpus = match locate_absolute_corpus() {
@@ -614,7 +602,6 @@ mod plan536_t1_reactive_probe_tests {
     /// builder 不 hoist(T6 负面语义保持),但渲染器动态路径的 abs 分区
     /// 接盘且消费偏移(此前裸 Stack 落原点 = "× 落左上"根因);inset-0
     /// 零偏移(ghost 叠加族)判 None 保持落原点满铺语义。
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn p536_t10_noz_offset_floater_positioned_by_dynamic_path() {
         use crate::ui::iced::renderer::{column_layer_partition, dynamic_abs_layer_position};
@@ -751,7 +738,6 @@ mod plan536_t1_reactive_probe_tests {
     /// 勘误:此前误报"引擎缺陷"实为测试派发名错位（语料 msg=FlipRoot 而测试
     /// 派发 "Flip"→HandlerNotFound→写入不发生）;修正后本测试锁定 fallback
     /// 路径 open 绑定在带子件工程中依然成立。
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn p536_t8_unknown_tag_fallback_resolves_open_binding() {
         let corpus = match locate_modal_corpus() {
@@ -791,7 +777,6 @@ mod plan536_t1_reactive_probe_tests {
 
     /// T8(musk chats_view 同形)：alert-dialog 在**子件视图根部**,open 绑定
     /// 子件模型字段（统一根态播种）——翻转后 Modal(open=true) 须在树。
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn p536_t8_child_widget_root_alert_dialog_resolves_open() {
         let corpus = match locate_modal_corpus() {
@@ -881,7 +866,6 @@ mod plan534_side_panel_probe_tests {
 
     /// side/direction prop → Edge placement 解析（四向 sheet + 两向 drawer
     /// + hovercard Bottom）,初渲染全闭合。
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn plan534_side_props_resolve_to_edge_placements() {
         let dc = build();
@@ -919,7 +903,6 @@ mod plan534_side_panel_probe_tests {
 
     /// open 直驱（Flip* handler 翻转显式绑定）+ 铸造 toggle（drawer right
     /// 无显式 open → __dlg_open_1/__dlg_toggle_1）。
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn plan534_open_bindings_and_minted_toggle_drive_panels() {
         let mut dc = build();
@@ -963,7 +946,6 @@ mod plan534_side_panel_probe_tests {
 
     /// hovercard 铸造 hover 进/出：__dlg_enter_2 置 true / __dlg_leave_2
     /// 置 false（即时开合,渲染树 Bottom 面板同步开合）。
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn plan534_hover_enter_leave_flips_minted_open() {
         let mut dc = build();

@@ -5,7 +5,6 @@ use crate::{AutoResult, Parser};
 use auto_lang_core::{resolve_module_path, store_name_snake};
 use auto_ui_compiler::ui_ast::{resolve_use_module, UseModuleResolution};
 /// Used by CLI to decide whether to run on main thread for iced.
-#[cfg(feature = "ui-iced")]
 pub fn has_ui_keywords(code: &str) -> bool {
     for line in code.lines() {
         let trimmed = line.trim();
@@ -48,7 +47,6 @@ pub(crate) fn stmt_symbol_name(stmt: &auto_lang_core::ast::Stmt) -> Option<Strin
 /// pathological inputs). Single-element result for paths without underscore
 /// segments — callers loop and behave exactly as before in that case.
 #[allow(clippy::too_many_arguments)]
-#[cfg(feature = "ui")]
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn load_ext_imports_for_vm(
     base_dir: &std::path::Path,
@@ -733,7 +731,6 @@ pub(crate) fn collect_module_imports(
         // PLAN-733: 登记 store 源文件模块（file stem）——合成该
         // store 的 handler 时作 own-module 裸名绑定域（同文件模块级
         // fn 裸调用不再因跨模块同名歧义悬空）。
-        #[cfg(feature = "ui")]
         crate::ui::handler_codegen::register_store_source_module(
             &sd.name.to_string(),
             &module_name,
@@ -799,7 +796,6 @@ pub(crate) fn collect_module_imports(
 
 /// Run a .at file as dynamic UI with iced backend.
 /// MUST be called from the OS main thread (iced requirement).
-#[cfg(feature = "ui-iced")]
 pub fn run_file_dynamic_ui(code: &str, path: Option<&str>) -> AutoResult<String> {
     // PR-6: 默认 UI 场景（向后兼容）。调用方可通过 run_file_dynamic_ui_with_scenario 覆写。
     run_file_dynamic_ui_inner(code, path, None)
@@ -807,7 +803,6 @@ pub fn run_file_dynamic_ui(code: &str, path: Option<&str>) -> AutoResult<String>
 
 /// PR-6: 带场景覆写的 run_file_dynamic_ui。
 /// override_scenario 为 None 时默认 UI（向后兼容）。
-#[cfg(feature = "ui-iced")]
 pub fn run_file_dynamic_ui_with_scenario(
     code: &str,
     path: Option<&str>,
@@ -826,7 +821,6 @@ pub fn run_file_dynamic_ui_with_scenario(
 /// 此函数从 `module_path` 出发,扫它的 `use` 导入,把传递性 widget 注册进
 /// `registry`。用 `visited` 防循环(与 collect_module_imports 共享 visited)。
 /// 只注册 AuraWidget(孙组件),不重复处理 store(store 走 Plan 370 路径)。
-#[cfg(feature = "ui-iced")]
 fn register_transitive_widgets(
     module_path: &std::path::Path,
     registry: &mut crate::ui::widget_registry::WidgetRegistry,
@@ -841,7 +835,6 @@ fn register_transitive_widgets(
     )
 }
 
-#[cfg(feature = "ui-iced")]
 fn register_transitive_widgets_inner(
     module_path: &std::path::Path,
     registry: &mut crate::ui::widget_registry::WidgetRegistry,
@@ -937,7 +930,6 @@ fn register_transitive_widgets_inner(
     }
 }
 
-#[cfg(feature = "ui-iced")]
 fn build_dynamic_component_inner(
     code: &str,
     path: Option<&str>,
@@ -2044,7 +2036,6 @@ fn build_dynamic_component_inner(
 
 /// Plan 459：按 `auto run` 同一管线构造 DynamicComponent（不启动 iced 循环）。
 /// 双窗口 demo（examples/ui_dual_app）等宿主复用本入口装配多个 App。
-#[cfg(feature = "ui-iced")]
 pub fn build_dynamic_component(
     code: &str,
     path: Option<&str>,
@@ -2052,7 +2043,6 @@ pub fn build_dynamic_component(
     build_dynamic_component_inner(code, path, None)
 }
 
-#[cfg(feature = "ui-iced")]
 fn run_file_dynamic_ui_inner(
     code: &str,
     path: Option<&str>,
@@ -2068,11 +2058,10 @@ fn run_file_dynamic_ui_inner(
     // rqhost 客户端在 build 之后分岔，同样受益于此处注册）。
     crate::ui::frame_provider::install_process_default();
     // PLAN-785: clipboard text adapter 同点并入（if-absent 兼容默认）。
-    #[cfg(feature = "ui-clipboard")]
     crate::ui::clipboard_provider::install_process_default();
     // PLAN-790: clipboard media adapter 同点并入（if-absent 兼容默认；
     // windows+native-clipboard 双门控——非 Windows 不装配）。
-    #[cfg(all(windows, feature = "native-clipboard"))]
+    #[cfg(windows)]
     crate::ui::clipboard_media_provider::install_process_default();
     // PLAN-794: scroll host adapter 同点并入（if-absent 兼容默认；ui 单
     // 门控——controller 注册表接线恢复，9900..9905/9922/9923）。
@@ -2082,11 +2071,9 @@ fn run_file_dynamic_ui_inner(
     crate::ui::terminal_provider::install_process_default();
     // PLAN-802: code editor host adapter 同点并入（if-absent 兼容默认；
     // code-editor 单门控——editor 注册表接线恢复，22 native 全族）。
-    #[cfg(feature = "code-editor")]
     crate::ui::code_editor_provider::install_process_default();
     // PLAN-804: dialog adapter 同点并入（if-absent 兼容默认；ui-dialog
     // 单门控——host_adapters 落点，2927/2928 parented 策略接线恢复）。
-    #[cfg(feature = "ui-dialog")]
     crate::host_adapters::dialog::install_process_default();
     // PLAN-804: dnd adapter 同点并入（if-absent 兼容默认；windows+
     // native-dnd 双门控，本函数在 ui-iced 门内=有效三分，2938 接线恢复）。
@@ -2119,7 +2106,7 @@ fn is_non_fs_module_use(u: &auto_lang_core::use_scanner::UseStatement) -> bool {
     u.is_python_import || u.module.starts_with("auto.") || u.module.starts_with(".web")
 }
 
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan841_domain_validation_tests {
     #[test]
     fn dynamic_build_rejects_duplicate_widgets_and_accepts_valid_control() {
@@ -2195,7 +2182,7 @@ mod plan446_batch1_tests {
     }
 }
 
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan015_route_loading_tests {
     fn rendered(component: &mut crate::ui::dynamic::DynamicComponent, route: &str) -> String {
         component.set_route(route);

@@ -10,7 +10,7 @@
 //! - P2-②b: t("key", { k: expr }) 参数插值——此前 call_expr_t_key 只取首参，
 //!   模板里的 {k} 原样显示（"{count} 条"现场）。
 
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan051_p2_tests {
     /// 语料定位（test/ui/plan051_p2_modules/）。
     fn locate_corpus(rel: &str) -> Option<std::path::PathBuf> {
@@ -52,7 +52,6 @@ mod plan051_p2_tests {
 
     /// P2-①（红测）: 子模块顶层 use.web component 的图标在 VM 视图里以
     /// View::Image{lucide:kebab} 呈现（button 内容子树内 + 平铺位双形态）。
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn plan051_p2_module_level_useweb_component_registers_icons() {
         let corpus =

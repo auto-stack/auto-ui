@@ -68,7 +68,6 @@ mod plan622_store_facade_gap_tests {
     // (a) handler reads merged store field by bare name
     // ─────────────────────────────────────────────────────────────────────
 
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn plan622_a_handler_reads_store_field_bare() {
         let mut dc = match build_app("src/front/app.at") {
@@ -92,7 +91,6 @@ mod plan622_store_facade_gap_tests {
 
     /// (a-nested) widget handler reads a store array OBJECT field mutated
     /// through a retrieved reference (the jade tabs_store .Open shape).
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn plan622_a2_handler_reads_store_nested_field_after_reference_write() {
         let mut dc = match build_app("src/front/app.at") {
@@ -118,7 +116,6 @@ mod plan622_store_facade_gap_tests {
     /// `Tabs.Open({ path, title })` shape — msg payloads are single-typed
     /// maps). A silent dispatch failure leaves store state at model defaults,
     /// which is the observed downstream sentinel (0/"") family.
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn plan622_a3_store_msg_dispatch_with_map_arg() {
         let mut dc = match build_app("src/front/app.at") {
@@ -144,7 +141,6 @@ mod plan622_store_facade_gap_tests {
     // (b) view text bound to store field follows store-msg mutation
     // ─────────────────────────────────────────────────────────────────────
 
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn plan622_b_view_follows_store_field_update() {
         let mut dc = match build_app("src/front/app.at") {
@@ -193,7 +189,6 @@ mod plan622_store_facade_gap_tests {
     /// dispatch the widget msg that reaches the STORE module's #[api] call,
     /// and assert the HTTP request actually arrives. Env vars are read at
     /// codegen time inside the build, so the test serializes on a mutex.
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn plan622_c2_store_module_api_call_reaches_backend_runtime() {
         use std::io::{Read, Write};
@@ -304,7 +299,6 @@ mod plan622_store_facade_gap_tests {
     // (d) widget-model array splice writes back
     // ─────────────────────────────────────────────────────────────────────
 
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn plan622_d_widget_model_array_splice_writes_back() {
         let mut dc = match build_app("src/front/app.at") {
@@ -335,7 +329,6 @@ mod plan622_store_facade_gap_tests {
     // (e1) lambda captures a handler-local var
     // ─────────────────────────────────────────────────────────────────────
 
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn plan622_e1_lambda_captures_handler_local_var() {
         let mut dc = match build_app("src/front/lambda_app.at") {
@@ -361,7 +354,6 @@ mod plan622_store_facade_gap_tests {
     // (e2) lambda compares against a self field
     // ─────────────────────────────────────────────────────────────────────
 
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn plan622_e2_lambda_compares_self_field() {
         let mut dc = match build_app("src/front/lambda_app.at") {

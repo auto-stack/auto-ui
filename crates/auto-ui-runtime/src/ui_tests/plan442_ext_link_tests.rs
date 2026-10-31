@@ -51,7 +51,6 @@ mod plan442_ext_link_tests {
     /// REGRESSION: the whole component must build — before the fix,
     /// `.Init -> { platformInjectStyles(); … }` failed the link with
     /// "Undefined symbol: platformInjectStyles" and init never ran.
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn ext_link_builds_and_init_runs() {
         let dc = match build() {
@@ -71,7 +70,6 @@ mod plan442_ext_link_tests {
     /// the bare port file ("port"), proving the X.at → X.web.at gating.
     /// (Covered by the adapter assertion above; this test pins the export
     /// shape: the adapter fns exist as module exports.)
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn ext_link_adapter_fns_exported() {
         let dc = match build() {
@@ -97,7 +95,6 @@ mod plan442_ext_link_tests {
     /// (from composables.ts) and the adapter's nested `injectStyles` (from
     /// inject_styles.ts) must exist as stub exports so the Refresh handler
     /// (`let t = useT()`) and the adapter body link and run cleanly.
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn ext_link_ts_symbols_stubbed() {
         let mut dc = match build() {
@@ -127,7 +124,6 @@ mod plan442_ext_link_tests {
     /// 重放）此前把 void 哨兵 Int(0) 写进 `obj = None` 模型变量，
     /// `.current != None` 恒真而 `.current.name` 落空 → rail 底部渲染裸
     /// "${currentName}"。stub 改返 Nil 后 computed 应落 else 分支。
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn plan050_void_stub_reads_as_none_in_computed() {
         fn collect_texts(

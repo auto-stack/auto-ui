@@ -274,7 +274,6 @@ widget App {
 /// fix-tabs-merged-look：测试体消费 `crate::ui`，须挂 ui feature 门——
 /// 否则无 ui feature 的测试档编译失败（024 落地引入的基线破损，
 /// 此处机械修复解锁门禁）。
-#[cfg(feature = "ui")]
 #[test]
 fn dashboard_panel_classes_parse() {
     use crate::ui::style::Style;

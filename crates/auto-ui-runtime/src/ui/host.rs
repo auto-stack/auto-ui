@@ -31,7 +31,6 @@ pub enum HostBackend {
     Headless,
 
     /// Iced render backend (cross-platform GUI).
-    #[cfg(feature = "ui-iced")]
     Iced,
 }
 
@@ -57,7 +56,6 @@ impl HostBackend {
                 super::headless::run_headless::<C>();
                 Ok(())
             }
-            #[cfg(feature = "ui-iced")]
             HostBackend::Iced => super::iced::run_app::<C>(),
         }
     }
@@ -72,13 +70,9 @@ impl HostBackend {
         {
             return Ok(HostBackend::Headless);
         }
-        #[cfg(all(feature = "ui-iced", not(feature = "ui-headless")))]
+        #[cfg(not(feature = "ui-headless"))]
         {
             return Ok(HostBackend::Iced);
-        }
-        #[cfg(not(any(feature = "ui-headless", feature = "ui-iced")))]
-        {
-            return Err("No UI backend enabled. Enable one of: 'ui-headless', 'ui-iced'.".into());
         }
 
         // Unreachable, but Rust needs a fallback when the cfg-gated returns

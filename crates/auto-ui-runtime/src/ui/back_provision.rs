@@ -61,7 +61,6 @@ pub struct BackendPlan {
     pub native_media: Option<crate::back_proxy::NativeMediaApp>,
     /// ②' capability 臂：pac `photo_root:` 声明 → proxy 原生 photo 路由
     /// （PLAN-043 Part 1；media_root 平行件，029-photo-gallery 形态）。
-    #[cfg(feature = "image-pipeline")]
     pub native_photos: Option<crate::back_proxy::NativePhotoApp>,
     /// ③ session 臂：back api.at 特形谓词命中 → proxy VM session。
     pub session: Option<crate::back_proxy::SessionSpec>,
@@ -71,13 +70,8 @@ impl BackendPlan {
     pub fn is_empty(&self) -> bool {
         self.native_media.is_none()
             && {
-                #[cfg(feature = "image-pipeline")]
                 {
                     self.native_photos.is_none()
-                }
-                #[cfg(not(feature = "image-pipeline"))]
-                {
-                    true
                 }
             }
             && self.session.is_none()
@@ -109,7 +103,6 @@ pub fn plan_backend(spec: &crate::ui::session::LaunchSpec, app_key: &str) -> Bac
             media_root: spec.media_root.clone(),
         });
     }
-    #[cfg(feature = "image-pipeline")]
     if spec.photo_root.is_some() {
         plan.native_photos = Some(crate::back_proxy::NativePhotoApp {
             app_id: app_key.to_string(),
@@ -192,7 +185,6 @@ impl crate::ui::session::DesktopSession {
             if let Some(media) = plan.native_media {
                 proxy.add_native_media(media);
             }
-            #[cfg(feature = "image-pipeline")]
             if let Some(photos) = plan.native_photos {
                 proxy.add_native_photo(photos);
             }

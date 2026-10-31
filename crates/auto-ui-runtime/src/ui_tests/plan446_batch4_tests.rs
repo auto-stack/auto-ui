@@ -138,7 +138,7 @@ mod plan446_batch4_probes {
     }
 }
 
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan446_batch4_ui {
     use crate::plan370_test_support::build_component_from_app;
 
@@ -157,7 +157,6 @@ mod plan446_batch4_ui {
     /// D4(修复靶): `.find(闭包)` 在 store/App handler 语境——现场"静默不匹配"
     /// （同数据 for 循环正常）。复用 D2 corpus 的 store 数据面，经 Pick(name)
     /// 与 .Probe2(handler 内 find) 双路径对照。
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn d4_find_closure_in_handler_context() {
         let mut dc = match build_d2_corpus() {

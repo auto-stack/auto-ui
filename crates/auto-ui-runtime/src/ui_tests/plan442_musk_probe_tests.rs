@@ -33,7 +33,6 @@ mod plan442_musk_probe {
 
     /// B5 gate: the full musk frontend must pass parse + codegen + LINK.
     /// Any remaining "Undefined symbol" / language-semantics error fails here.
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     #[ignore = "requires sibling auto-musk checkout; manual Phase-B gate"]
     fn musk_full_front_end_links() {

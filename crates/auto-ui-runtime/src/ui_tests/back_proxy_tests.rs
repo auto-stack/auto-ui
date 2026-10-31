@@ -139,9 +139,7 @@ fn fixture_config(tag: &str, port: u16) -> (BackProxyConfig, PathBuf) {
             app_id: "fixture".to_string(),
             back_entry: dir.join("api.at"),
         }],
-        #[cfg(feature = "ui")]
         native_media: Vec::new(),
-        #[cfg(feature = "image-pipeline")]
         native_photos: Vec::new(),
     };
     (config, dir)
@@ -215,9 +213,7 @@ pub fn download(name str) FileResponse {
             app_id: "fixture".to_string(),
             back_entry: dir.join("api.at"),
         }],
-        #[cfg(feature = "ui")]
         native_media: Vec::new(),
-        #[cfg(feature = "image-pipeline")]
         native_photos: Vec::new(),
     };
     let proxy = start(config).expect("start back proxy");
@@ -257,9 +253,7 @@ pub fn upload(req UploadRequest) ~UploadReceipt {
             app_id: "fixture".to_string(),
             back_entry: dir.join("api.at"),
         }],
-        #[cfg(feature = "ui")]
         native_media: Vec::new(),
-        #[cfg(feature = "image-pipeline")]
         native_photos: Vec::new(),
     };
     let proxy = start(config).expect("start back proxy");
@@ -368,9 +362,7 @@ fn path_param_config(tag: &str, port: u16) -> (BackProxyConfig, PathBuf) {
             app_id: "p675".to_string(),
             back_entry: dir.join("api.at"),
         }],
-        #[cfg(feature = "ui")]
         native_media: Vec::new(),
-        #[cfg(feature = "image-pipeline")]
         native_photos: Vec::new(),
     };
     (config, dir)
@@ -487,9 +479,7 @@ pub fn echo(n int) int {
                 back_entry: baddir.join("api.at"),
             },
         ],
-        #[cfg(feature = "ui")]
         native_media: Vec::new(),
-        #[cfg(feature = "image-pipeline")]
         native_photos: Vec::new(),
     };
     let proxy = start(config).expect("lazy start");
@@ -570,9 +560,7 @@ fn http_e2e_back_proxy_real_routes_corpora_data_face() {
             spec("022-kanban"),
             spec("023-realworld"),
         ],
-        #[cfg(feature = "ui")]
         native_media: Vec::new(),
-        #[cfg(feature = "image-pipeline")]
         native_photos: Vec::new(),
     };
     let proxy = start(config).expect("start back proxy for routes corpora");
@@ -684,9 +672,7 @@ fn http_e2e_back_proxy_real_020_status_route() {
             app_id: "020-music-player".to_string(),
             back_entry: entry,
         }],
-        #[cfg(feature = "ui")]
         native_media: Vec::new(),
-        #[cfg(feature = "image-pipeline")]
         native_photos: Vec::new(),
     };
     let proxy = start(config).expect("start back proxy for 020");
@@ -705,7 +691,6 @@ fn http_e2e_back_proxy_real_020_status_route() {
 
 /// PLAN-658 T-03: 原生 media 路由——scan 绝对 URL + 字节保真 + Range 语义。
 /// （cfg ui：media_service 在 ui 门后；th 档已含 ui feature。）
-#[cfg(feature = "ui")]
 #[test]
 fn http_e2e_back_proxy_native_media_routes() {
     let dir = std::env::temp_dir().join(format!("p658-back-proxy-media-{}", std::process::id()));
@@ -722,7 +707,6 @@ fn http_e2e_back_proxy_native_media_routes() {
             app_id: "020-t".to_string(),
             media_root: Some(dir.to_string_lossy().into_owned()),
         }],
-        #[cfg(feature = "image-pipeline")]
         native_photos: Vec::new(),
     };
     let proxy = start(config).expect("start back proxy (media)");
@@ -789,7 +773,6 @@ fn http_e2e_back_proxy_native_media_routes() {
 
 /// PLAN-658 T-03: 未配置 media root 的 app——诚实空列表（与生成器
 /// auto_media_scan 三态语义一致），不是 500。
-#[cfg(feature = "ui")]
 #[test]
 fn http_e2e_back_proxy_native_media_no_root_honest_empty() {
     let config = BackProxyConfig {
@@ -800,7 +783,6 @@ fn http_e2e_back_proxy_native_media_no_root_honest_empty() {
             app_id: "no-root-t".to_string(),
             media_root: Some("Z:/definitely/not/a/real/dir".to_string()),
         }],
-        #[cfg(feature = "image-pipeline")]
         native_photos: Vec::new(),
     };
     let proxy = start(config).expect("start back proxy (no root)");
@@ -834,9 +816,7 @@ fn http_e2e_back_proxy_real_017_crud_probe() {
             app_id: "017-chat".to_string(),
             back_entry: entry,
         }],
-        #[cfg(feature = "ui")]
         native_media: Vec::new(),
-        #[cfg(feature = "image-pipeline")]
         native_photos: Vec::new(),
     };
     let proxy = start(config).expect("start proxy 017");
@@ -879,9 +859,7 @@ fn http_e2e_back_proxy_real_017_sse_stream() {
             app_id: "017-chat".to_string(),
             back_entry: entry,
         }],
-        #[cfg(feature = "ui")]
         native_media: Vec::new(),
-        #[cfg(feature = "image-pipeline")]
         native_photos: Vec::new(),
     };
     let proxy = start(config).expect("start proxy 017 sse");
@@ -956,7 +934,6 @@ fn http_e2e_back_proxy_real_017_sse_stream() {
 /// PLAN-658 T-05: 031-image-viewer 真实 back（use auto.image）装载进
 /// session——auto.image 原生经进程级注册表在 session 内可用，open/snapshot
 /// 走真实 image_pipeline（fixtures 目录）。
-#[cfg(feature = "ui-iced")]
 #[test]
 fn http_e2e_back_proxy_real_031_native_ns_session() {
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -978,7 +955,6 @@ fn http_e2e_back_proxy_real_031_native_ns_session() {
             back_entry: base.join("src/back/api.at"),
         }],
         native_media: Vec::new(),
-        #[cfg(feature = "image-pipeline")]
         native_photos: Vec::new(),
     };
     let proxy = start(config).expect("start proxy 031");
@@ -1026,7 +1002,6 @@ fn http_e2e_back_proxy_real_031_native_ns_session() {
 /// PLAN-658 T-05: `/api/__auto/media/{id}/{rev}` 字节保真——经 image_pipeline
 /// registry 直接发布资产，proxy 转发路由逐字节一致 + Content-Type 保真
 /// + ETag/304 语义（AC-03 字节级校验面）。
-#[cfg(feature = "ui-iced")]
 #[test]
 fn http_e2e_back_proxy_media_uri_byte_fidelity() {
     use crate::ui::image_pipeline::{
@@ -1064,7 +1039,6 @@ fn http_e2e_back_proxy_media_uri_byte_fidelity() {
         port: ephemeral_port(),
         sessions: Vec::new(),
         native_media: Vec::new(),
-        #[cfg(feature = "image-pipeline")]
         native_photos: Vec::new(),
     };
     let proxy = start(config).expect("start proxy (media uri)");
@@ -1159,9 +1133,7 @@ pub fn boom() str {
                 back_entry: healthy_dir.join("api.at"),
             },
         ],
-        #[cfg(feature = "ui")]
         native_media: Vec::new(),
-        #[cfg(feature = "image-pipeline")]
         native_photos: Vec::new(),
     };
     let proxy = start(config).expect("start proxy (panic isolation)");
@@ -1219,9 +1191,7 @@ fn http_e2e_back_proxy_runtime_add_remove_and_join_exit() {
         lazy_sessions: false,
         port: ephemeral_port(),
         sessions: Vec::new(),
-        #[cfg(feature = "ui")]
         native_media: Vec::new(),
-        #[cfg(feature = "image-pipeline")]
         native_photos: Vec::new(),
     };
     let proxy = start(config).expect("start idle proxy (lazy gate)");
@@ -1280,7 +1250,6 @@ fn http_e2e_back_proxy_runtime_add_remove_and_join_exit() {
 
 /// 运行期原生 media 增删：add_native_media 注册 → scan/stream 直答 →
 /// remove_app（无 session 形态返回 None）→ 路由 404。
-#[cfg(feature = "ui")]
 #[test]
 fn http_e2e_back_proxy_runtime_native_media_add_remove() {
     let dir = std::env::temp_dir().join(format!("p037-back-proxy-media-{}", std::process::id()));
@@ -1294,7 +1263,6 @@ fn http_e2e_back_proxy_runtime_native_media_add_remove() {
         port: ephemeral_port(),
         sessions: Vec::new(),
         native_media: Vec::new(),
-        #[cfg(feature = "image-pipeline")]
         native_photos: Vec::new(),
     };
     let proxy = start(config).expect("start idle proxy (media)");

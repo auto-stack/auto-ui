@@ -263,7 +263,6 @@ pub fn create_note(title str, body str) Note {
     /// This reproduces exactly what `run_file_dynamic_ui` does, minus the
     /// iced render loop. If Plan 339's qualified-name + alias scheme is broken,
     /// `synthesize_widget_module` returns an error here.
-    #[cfg(feature = "ui")]
     #[test]
     fn test_015_notes_app_compiles_with_namespace() {
         // Plan 364 Phase 8 F3: loading the real 015-notes sources and running
@@ -277,7 +276,6 @@ pub fn create_note(title str, body str) Note {
         child.join().expect("deep-stack test thread panicked");
     }
 
-    #[cfg(feature = "ui")]
     fn test_015_notes_app_compiles_with_namespace_inner() {
         // Tests run from the crate dir; the repo root is two levels up.
         let candidates = [
@@ -376,7 +374,6 @@ pub fn create_note(title str, body str) Note {
     /// Regression: 016-calendar uses `use calendar_util: build_month_grid, ...`
     /// (a sibling module, not nested under back/). Verify it still compiles
     /// under Plan 339's qualified-name scheme.
-    #[cfg(feature = "ui")]
     #[test]
     fn test_016_calendar_app_compiles_with_namespace() {
         let candidates = [

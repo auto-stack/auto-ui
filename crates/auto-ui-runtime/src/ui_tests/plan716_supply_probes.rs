@@ -346,7 +346,6 @@ widget App {{
     /// 由 AUTO_P716_CENSUS=1 显式驱动（每进程一次性成本，数字入 SD-C/
     /// 计划簿记——下游切换件的依据数字）。
     #[test]
-    #[cfg(feature = "code-editor")]
     fn diff_window_census() {
         let full_scale = std::env::var("AUTO_P716_CENSUS").ok().as_deref() == Some("1");
         // 散点对生成：每 40 行一处单行改（021 形态微缩/全尺寸按行数放大）。
@@ -415,7 +414,6 @@ widget App {{
     /// 下游 plan-022 挂死实测根因）。修复=补臂+改签 9921；本探针走完整
     /// 调用链（parse→codegen→VM→shim→envelope）锁真值形。
     #[test]
-    #[cfg(feature = "code-editor")]
     fn diff_files_window_vm_bare_name() {
         let fx = TempFixture::new("win");
         let pa = fx.write("a.txt", "alpha\nbeta\ngamma\n");

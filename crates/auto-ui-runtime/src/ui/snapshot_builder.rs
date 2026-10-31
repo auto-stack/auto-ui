@@ -343,7 +343,6 @@ impl SnapshotBuilder {
                     ("value".to_string(), value.clone()),
                     ("lang".to_string(), lang.clone()),
                 ];
-                #[cfg(feature = "code-editor")]
                 if let Some(text) = crate::ui::code_editor::code_editor_text(
                     &crate::ui::code_editor::storage_key(key),
                 ) {

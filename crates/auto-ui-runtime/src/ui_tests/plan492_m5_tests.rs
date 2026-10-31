@@ -77,7 +77,6 @@ widget GoodWidget {
     /// 合成/链接层: 包组件 Init 调用未定义函数 → 构建必须 FATAL 且错误带
     /// 模块名与符号名(响亮,不静默回落);synth 层诊断通道可取走(空=无
     /// per-handler 静默失败)。
-    #[cfg(feature = "ui-iced")]
     #[test]
     fn synth_and_link_layer_failures_are_loud_and_named() {
         let front = crate::plan370_test_support::locate_example_app_at("charts-gallery")

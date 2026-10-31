@@ -131,7 +131,6 @@ print(obj.title)
     // (These need the UI feature for synthesize_widget_module + VmBridge.)
     // ──────────────────────────────────────────────────────────────────────
 
-    #[cfg(feature = "ui")]
     #[test]
     fn test_codegen_rewrites_api_call_to_http_when_split() {
         use auto_lang_core::compile::CompileSession;
@@ -300,7 +299,6 @@ widget App {
     /// api 全空返回 → Tab 无标签/面板空白（vm-delegation-break.log 定因）。
     /// 断言面与 test_codegen_rewrites_api_call_to_http_when_split 同构：
     /// split = 无 CALL reloc（已改写 HTTP）；merge = 保留 CALL reloc。
-    #[cfg(feature = "ui")]
     #[test]
     fn test_codegen_rewrites_qualified_api_call_to_http_when_split() {
         use auto_lang_core::compile::CompileSession;
@@ -458,7 +456,6 @@ widget App {
     ///      （前缀/后缀分段拼接替代整段 URL 常量）；
     ///   2. POST `{id}` + 额外参数：路径参数不进 body（池内无 `"id":` 片段）、
     ///      其余参数进 body（池内有 `"profession_id":` 片段）。
-    #[cfg(feature = "ui")]
     #[test]
     fn test_codegen_brace_path_params_in_api_http_rewrite() {
         use auto_lang_core::compile::CompileSession;
@@ -626,7 +623,6 @@ widget App {
     /// the `{*path}` placeholder matched nothing: the URL kept the literal
     /// `{*path}` (404 on any backend) and the arg fell through to the body
     /// bucket (silently dropped for GET).
-    #[cfg(feature = "ui")]
     #[test]
     fn test_codegen_wildcard_path_param_in_api_http_rewrite() {
         use auto_lang_core::compile::CompileSession;
@@ -768,7 +764,6 @@ widget App {
     /// Before the fix non-path args were collected for the JSON body and
     /// then silently dropped for GET — `/api/search?q=x&limit=5` style
     /// endpoints were unreachable from the VM front.
-    #[cfg(feature = "ui")]
     #[test]
     fn test_codegen_get_query_params_in_api_http_rewrite() {
         use auto_lang_core::compile::CompileSession;
@@ -929,7 +924,6 @@ print(p)
     ///
     /// We scan the synthesized module's bytecode for a POP_N opcode (0x02
     /// followed by its count byte) and assert none appears.
-    #[cfg(feature = "ui")]
     #[test]
     fn test_api_http_call_scalar_return_uses_single_pop() {
         use auto_lang_core::compile::CompileSession;

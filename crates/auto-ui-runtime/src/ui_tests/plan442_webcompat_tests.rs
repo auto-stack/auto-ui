@@ -39,7 +39,6 @@ mod plan442_webcompat_tests {
 
     /// REGRESSION: localStorage round-trip with None-on-miss semantics —
     /// the exact shapes musk's AuthStore uses.
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn localstorage_bridge_roundtrip() {
         let mut dc = match build() {
@@ -69,7 +68,6 @@ mod plan442_webcompat_tests {
     /// REGRESSION: the bare JS global encodeURIComponent percent-encodes
     /// (musk's forge_store builds SSE URLs with it — an unresolved symbol
     /// here was the link-fatal blocker of the first musk VM probe).
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn encodeuricomponent_bridge() {
         let mut dc = match build() {

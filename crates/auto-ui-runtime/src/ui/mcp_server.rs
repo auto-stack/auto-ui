@@ -1445,7 +1445,7 @@ fn tool_editor_state(
             ))
         }
     };
-    #[cfg(all(feature = "autodown", feature = "code-editor"))]
+    #[cfg(feature = "autodown")]
     {
         let key = match resolve_editor_target(shared_handle, element_id, &element_id_str) {
             Ok((k, _, _)) => k,
@@ -1483,7 +1483,7 @@ fn tool_editor_state(
         });
         text_result(payload.to_string())
     }
-    #[cfg(not(all(feature = "autodown", feature = "code-editor")))]
+    #[cfg(not(feature = "autodown"))]
     {
         let _ = element_id;
         error_result("autoui_editor_state requires the autodown + code-editor features".to_string())
@@ -2156,9 +2156,9 @@ fn tool_action(shared_handle: &SharedStateHandle, args: serde_json::Value) -> se
             Some(auto_val::Value::Str(s)) => s.as_str().to_string(),
             _ => return error_result("Action 'key_press' requires a string 'value' = keyspec (left/right/up/down/home/end/pageup/pagedown/enter/backspace/delete/escape/tab or \"c:X\")"),
         };
-        #[cfg(all(feature = "autodown", feature = "code-editor"))]
+        #[cfg(feature = "autodown")]
         let key_ok = parse_editor_key_spec(&keyspec).is_some();
-        #[cfg(not(all(feature = "autodown", feature = "code-editor")))]
+        #[cfg(not(feature = "autodown"))]
         let key_ok = false;
         if !key_ok {
             return error_result(format!(
@@ -2579,7 +2579,7 @@ fn tool_screenshot(shared: &SharedStateHandle, args: serde_json::Value) -> serde
     // PLAN-526 T39：最小化窗护栏——最小化窗物理尺寸 0，window::screenshot
     // 触发 wgpu create_texture "Dimension X is zero" panic（exit 101 实录，
     // RUST_BACKTRACE 栈定 iced_wgpu::Renderer::screenshot）。前置拒绝。
-    #[cfg(all(windows, feature = "native-dock"))]
+    #[cfg(windows)]
     if crate::ui::native_dock::main_window_minimized(std::process::id()) {
         return error_result(
             "Screenshot skipped: desktop window is minimized (restore it and retry)".to_string(),
@@ -3013,17 +3013,11 @@ fn tool_desktop(_shared: &SharedStateHandle, args: serde_json::Value) -> serde_j
                     "Missing required parameter: verb (DesktopBus record, e.g. \"open_settings\")",
                 );
             };
-            #[cfg(feature = "ui-iced")]
             {
                 crate::ui::session::desktop_inject_push(crate::ui::session::DesktopInject::Bus(
                     verb.to_string(),
                 ));
                 text_result(format!("queued bus record: {verb}"))
-            }
-            #[cfg(not(feature = "ui-iced"))]
-            {
-                let _ = verb;
-                error_result("autoui_desktop requires the ui-iced desktop host")
             }
         }
         "handler" => {
@@ -3051,7 +3045,6 @@ fn tool_desktop(_shared: &SharedStateHandle, args: serde_json::Value) -> serde_j
                 // （AUTOUI_ACCEPTANCE 门在工具入口）；名字一次性 leak。
                 other => Box::leak(other.to_string().into_boxed_str()),
             };
-            #[cfg(feature = "ui-iced")]
             {
                 crate::ui::session::desktop_inject_push(
                     crate::ui::session::DesktopInject::Handler {
@@ -3063,17 +3056,11 @@ fn tool_desktop(_shared: &SharedStateHandle, args: serde_json::Value) -> serde_j
                 );
                 text_result(format!("queued {app_static} handler: {handler}"))
             }
-            #[cfg(not(feature = "ui-iced"))]
-            {
-                let _ = (app_static, handler, arg);
-                error_result("autoui_desktop requires the ui-iced desktop host")
-            }
         }
         // PLAN-029 T-03（D2 辅腿）：acceptance key verb——live 输入生产
         // 路由（route_live_input → broker_* → 焦点/命中 child，真桌面
         // update 循环内经 apply_desktop_injects 排空驱动）。
         "key" => {
-            #[cfg(feature = "ui-iced")]
             {
                 use crate::ui::session::LiveInput;
                 let kind = args.get("kind").and_then(|v| v.as_str()).unwrap_or("chars");
@@ -3119,11 +3106,6 @@ fn tool_desktop(_shared: &SharedStateHandle, args: serde_json::Value) -> serde_j
                     input,
                 ));
                 text_result(format!("queued live input: {kind}"))
-            }
-            #[cfg(not(feature = "ui-iced"))]
-            {
-                let _ = args;
-                error_result("autoui_desktop requires the ui-iced desktop host")
             }
         }
         _ => error_result(format!("Unknown action: '{action}' (bus|handler|key)")),
@@ -4046,7 +4028,7 @@ fn editor_synthesis_payload(sk: &str, widget: &str, event: &str, spec: &str) -> 
 /// （left/right/up/down/home/end/pageup/pagedown/enter/backspace/delete/
 /// escape/tab）+ "c:X" 单字符；修饰键组合不在 v1（VM 编辑壳无快捷键
 /// 消费场景，出现消费方再扩）。解析失败返回 None（调用方报错，不静默）。
-#[cfg(all(feature = "autodown", feature = "code-editor"))]
+#[cfg(feature = "autodown")]
 pub fn parse_editor_key_spec(spec: &str) -> Option<crate::ui::code_editor::core::EditorKey> {
     use crate::ui::code_editor::core::EditorKey;
     match spec {
@@ -6075,10 +6057,10 @@ mod tests_plan483_d4 {
 mod tests_plan057 {
     use super::*;
 
-    #[cfg(all(feature = "autodown", feature = "code-editor"))]
+    #[cfg(feature = "autodown")]
     use crate::ui::code_editor::core::EditorKey;
 
-    #[cfg(all(feature = "autodown", feature = "code-editor"))]
+    #[cfg(feature = "autodown")]
     #[test]
     fn plan057_keyspec_named_keys_full_vocabulary() {
         use EditorKey::*;
@@ -6107,7 +6089,7 @@ mod tests_plan057 {
         }
     }
 
-    #[cfg(all(feature = "autodown", feature = "code-editor"))]
+    #[cfg(feature = "autodown")]
     #[test]
     fn plan057_keyspec_single_char() {
         assert_eq!(parse_editor_key_spec("c:a"), Some(EditorKey::Char('a')));
@@ -6117,7 +6099,7 @@ mod tests_plan057 {
         assert_eq!(parse_editor_key_spec("c: "), Some(EditorKey::Char(' ')));
     }
 
-    #[cfg(all(feature = "autodown", feature = "code-editor"))]
+    #[cfg(feature = "autodown")]
     #[test]
     fn plan057_keyspec_rejects_invalid() {
         // 空串 / 裸前缀 / 多字符 / 修饰键组合（v1 不在词表）/ 大小写敏感 /

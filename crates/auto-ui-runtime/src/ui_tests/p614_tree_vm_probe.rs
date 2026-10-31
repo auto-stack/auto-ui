@@ -245,7 +245,7 @@ fn setup_fixture() -> std::path::PathBuf {
     dir.join("app.at")
 }
 
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 #[test]
 fn p614_vm_flatten_tree_probe() {
     let manifest = setup_fixture();

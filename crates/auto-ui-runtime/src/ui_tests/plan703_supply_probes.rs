@@ -85,7 +85,6 @@ mod plan703_diff_supply {
     }
 
     #[test]
-    #[cfg(feature = "ui-iced")]
     fn diff_files_envelope_fields_and_three_segment_marks() {
         let fx = TempFixture::new("files");
         let pa = fx.write("a.txt", "alpha\nbeta\ngamma\n");
@@ -133,7 +132,6 @@ mod plan703_diff_supply {
     }
 
     #[test]
-    #[cfg(feature = "ui-iced")]
     fn diff_files_cr_tolerance() {
         let fx = TempFixture::new("crlf");
         let pa = fx.write("a.txt", "one\r\ntwo\r\n");
@@ -153,7 +151,6 @@ mod plan703_diff_supply {
     }
 
     #[test]
-    #[cfg(feature = "ui-iced")]
     fn diff_files_missing_file_is_err_form_not_raise() {
         let fx = TempFixture::new("missing");
         let pa = fx.write("a.txt", "x\n");
@@ -177,7 +174,6 @@ mod plan703_diff_supply {
     }
 
     #[test]
-    #[cfg(feature = "ui-iced")]
     fn diff_dirs_envelope_states_and_counts() {
         let fx = TempFixture::new("dirs");
         std::fs::write(fx.0.join("mod.txt"), "old").unwrap();
@@ -236,7 +232,6 @@ mod plan703_diff_supply {
     }
 
     #[test]
-    #[cfg(feature = "ui-iced")]
     fn diff_dirs_missing_root_err_not_silent() {
         let fx = TempFixture::new("dirs_missing");
         let da = format!("{}/a", fx.dir());
@@ -251,7 +246,6 @@ mod plan703_diff_supply {
     }
 
     #[test]
-    #[cfg(feature = "ui-iced")]
     fn diff_snapshots_reads_buffer_registry() {
         // Two live editors with distinct contents; the native reads the
         // registry snapshots directly (zero full-text VM transit). Headless
@@ -301,7 +295,6 @@ mod plan703_diff_supply {
     }
 
     #[test]
-    #[cfg(feature = "ui-iced")]
     fn diff_snapshots_missing_key_err_form() {
         let bridge = probe_bridge_with(
             "fn probe_snap_missing() str {\n    return diff_snapshots(\"p703-nope-a\", \"p703-nope-b\")\n}\n",

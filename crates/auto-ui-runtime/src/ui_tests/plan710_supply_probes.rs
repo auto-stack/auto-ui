@@ -119,7 +119,6 @@ widget App {{
     // ---- G-A: envelope projection — VM track ----
 
     #[test]
-    #[cfg(feature = "ui-iced")]
     fn envelope_projection_vm_track() {
         // 注：VM 轨探针用单层成员链（.at 解析面）；嵌套形（v.a.b ?? d）
         // 的语义由 helper 单测（get_str_or 路径切片）与发射形单测覆盖。
@@ -190,7 +189,6 @@ widget App {{
     // ---- G-B: try/catch arms — VM track ----
 
     #[test]
-    #[cfg(feature = "ui-iced")]
     fn try_success_path_zero_disturbance_vm() {
         let bridge = probe_bridge_with(
             "fn probe_try_ok() str {\n    var r str = \"untouched\"\n    try {\n        r = \"touched\"\n    } catch {\n        r = \"caught\"\n    }\n    return r\n}\n",
@@ -199,8 +197,6 @@ widget App {{
     }
 
     #[test]
-    #[cfg(feature = "ui-iced")]
-    #[cfg(feature = "code-editor")]
     fn try_native_error_routes_to_catch_with_binding_vm() {
         let bridge = probe_bridge_with(
             "fn probe_try_err() str {\n    var r str = \"untouched\"\n    try {\n        let d = code_editor_delta(\"p710-no-such-editor\")\n        r = d\n    } catch (err) {\n        r = err\n    }\n    return r\n}\n",
@@ -219,8 +215,6 @@ widget App {{
     // ---- G-C: code_editor_delta — VM track vs core (envelope + error form) ----
 
     #[test]
-    #[cfg(feature = "ui-iced")]
-    #[cfg(feature = "code-editor")]
     fn vm_delta_registered_envelope_and_unregistered_error() {
         use crate::ui::code_editor::core::REGISTRY_TEST_LOCK;
         use crate::ui::code_editor::{
@@ -516,8 +510,6 @@ widget App {
     }
 
     #[test]
-    #[cfg(feature = "ui-iced")]
-    #[cfg(feature = "code-editor")]
     fn plan714_r4_registry_gate_accepts_runtime_tab_key() {
         // 注册键≡store 查找键的注册表层 E2E：按修复后发射形注册
         // （View::code_editor(t.key) → renderer storage_key("tab-N")），

@@ -12,7 +12,7 @@
 //! （原 19981 位）→ 脏重建（`view` + `patch_input_values`，原 23870 位）。
 //! 唯一不覆盖的是 iced OS 事件循环本身（同 plan732 六环边界）。
 
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan739_input_pin_tests {
     use crate::ui::interpreter::DynamicMessage;
     use crate::ui::view::View;

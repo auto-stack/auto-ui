@@ -2,7 +2,7 @@
 // actions (arboard). The iced widget path keeps its own EditorClipboard
 // adapter (iced clipboard handles from event context); this module serves
 // the handler-side natives, which run outside any iced event.
-#![cfg(feature = "ui-clipboard")]
+// PLAN-018：ui-clipboard 入稳定基线（恒开）——文件级cfg门随拍平退出。
 
 /// Read the OS clipboard text (None when empty or unavailable).
 pub fn clipboard_get() -> Option<String> {
@@ -29,7 +29,7 @@ mod tests {
         // 剪贴板集成测试（files/image 的 EmptyClipboard）会清掉本测试
         // set→get 窗口的内容。锁在本仓 native-clipboard 档下提供；其余
         // 档（无该 feature）保持原裸跑形态。
-        #[cfg(all(windows, feature = "native-clipboard"))]
+        #[cfg(windows)]
         let _global = match crate::ui::clipboard_native::GlobalClipboardTestLock::acquire() {
             Some(g) => g,
             None => return, // 拿锁超时视同 headless 跳过

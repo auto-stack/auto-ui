@@ -114,13 +114,12 @@ mod plan446_batch3_probes {
     }
 }
 
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan446_batch3_d2_ui {
     use crate::plan370_test_support::build_component_from_app;
 
     /// D2 现场矩阵里 handler 侧的循环变量字段读（"model 数组循环变量 m.id
     /// 失效(静默不匹配)"行）。corpus: test/ui/plan446_d2_handler_read/。
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn d2_handler_loop_var_field_read() {
         let rel = "../../../auto-lang/crates/auto-lang/test/ui/plan446_d2_handler_read/src/front/app.at";

@@ -152,7 +152,6 @@ fn plan814_v02_vm_public_surface_pins() {
 }
 
 /// feature 门控根再导出 + UI 动态管线入口签名 + 新旧类型身份同一 pin。
-#[cfg(feature = "ui-iced")]
 #[test]
 fn plan814_v02_root_reexports_and_type_identity_pins() {
     // 12 名门控根面存在性 use-pin（未消费即编译期锁名；消费面经

@@ -57,7 +57,6 @@ mod plan442_store_facade_tests {
     /// StoreDecl — its fields merge into root state, and the store's own
     /// Init handler runs (whoami seeded via the store file's `use auth_util`
     /// dep, proving dep collection through the facade path).
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn legacy_store_facade_loads_store_fields() {
         let dc = match build() {
@@ -87,7 +86,6 @@ mod plan442_store_facade_tests {
     /// App handler) and cross-widget field reads (`store.authenticated != true`)
     /// must work — before the fix these compiled to "Undefined variable:
     /// store" and the handlers silently no-op'd.
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn legacy_store_facade_cross_widget_calls_and_reads() {
         let mut dc = match build() {
@@ -121,7 +119,6 @@ mod plan442_store_facade_tests {
     /// REGRESSION: the view layer must see the store fields — the no-dot
     /// `store.authenticated` / `store.whoami` references (musk view form)
     /// read the merged root state, so the sign-in branch flips after Login.
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn legacy_store_facade_view_reads_store_state() {
         let mut dc = match build() {

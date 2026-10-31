@@ -60,7 +60,6 @@ mod plan019_vm_own_module_link_tests {
     /// the bare `bump(x)` call inside `db.get_val` left an unresolvable
     /// bare reloc ("Undefined symbol: bump in module App") and init never
     /// ran. After the fix it binds `db.bump` (own module) and computes 4.
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn own_module_bare_call_links_and_init_runs() {
         let dc = match build() {

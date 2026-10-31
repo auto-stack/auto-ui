@@ -25,65 +25,41 @@
 // 不变量（本 Stage 验收）：同一消息 encode→decode 恒等；状态机拒绝一切
 // 非法迁移；loopback demo 的 App 行为与直挂（in-process 直调）无差。
 
-#[cfg(feature = "ui-iced")]
 pub mod broker;
-#[cfg(feature = "ui-iced")]
 pub mod client_entry;
-#[cfg(feature = "ui-iced")]
 pub mod client_runtime;
-#[cfg(feature = "ui-iced")]
 pub mod codec;
-#[cfg(feature = "ui-iced")]
 pub mod coverage;
-#[cfg(feature = "ui-iced")]
 pub mod demo;
-#[cfg(feature = "ui-iced")]
 pub mod dual_mode;
-#[cfg(feature = "ui-iced")]
 pub mod editor_frame;
-#[cfg(feature = "ui-iced")]
 pub mod endpoint;
 /// PLAN-683（方案 2 远程 Renderer）：headless iced 宿主——iced 组件树照常
 /// 构建/布局/绘制，渲染原语经 tiny_skia 记录层截获降格为 DrawList 过线。
-#[cfg(feature = "ui-iced")]
 pub mod headless;
-#[cfg(feature = "ui-iced")]
 pub mod host;
-#[cfg(feature = "ui-iced")]
 pub mod loopback;
-#[cfg(feature = "ui-iced")]
 pub mod message;
-#[cfg(feature = "ui-iced")]
 pub mod native_projector;
-#[cfg(feature = "ui-iced")]
 pub mod pixels;
-#[cfg(feature = "ui-iced")]
 pub mod remote;
 /// PLAN-693 —— a2r exe 三模式 CLI（independent/rq/desktop 底座参数化 +
 /// 优先级链 CLI > env > pac > independent；F-3 关闭口径的解析单源）。
-#[cfg(feature = "ui-iced")]
 pub mod render_cli;
 /// PLAN-031 —— rqhost：共享合成器原生窗运行时（rendezvous 采纳 +
 /// 多窗 daemon + 输入路由；`auto run -q` 第四形态）。
-#[cfg(feature = "ui-iced")]
 pub mod rqhost;
 /// PLAN-029 T-03（D2）：Windows SendInput FFI（真机合成键入基建；内部
 /// 自带 `#![cfg(windows)]`，非 Windows 平台为空模块）。
-#[cfg(feature = "ui-iced")]
 pub mod sendinput;
 /// PLAN-030 T-03：壳 outproc 客户端装配（--autodesk-shell——双表面
 /// 协商 + 投影下行消费 + DesktopBus 上行 + queue 臂内联帧）。
-#[cfg(feature = "ui-iced")]
 pub mod shell_client;
-#[cfg(feature = "ui-iced")]
 pub mod shm;
-#[cfg(feature = "ui-iced")]
 pub mod stage3;
-#[cfg(feature = "ui-iced")]
 pub mod transport;
 /// PLAN-690 T-02 —— daemon 窗 IME 激活门控（Windows IMM 直写；内部
 /// 自带平台 cfg，非 Windows 宿主为 no-op 观测行）。
-#[cfg(feature = "ui-iced")]
 pub mod win_ime;
 
 /// 协议版本（信封头携带；不一致拒收——`CodecError::UnsupportedVersion`）。
@@ -105,7 +81,7 @@ pub use transport::{Transport, TransportError};
 /// `auto_exe()` 优先取现存二进制，陈旧产物会伪装成回归：mtime 对账
 /// `crates/` 树最新源文件，陈旧则 eprintln 警告（默认不阻断——警告即
 /// 留痕，"回归"结论前先看陈旧位）；`AUTO_FRESH_EXE=1` 强制重建。
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 pub(crate) mod e2e_exe {
     use std::path::{Path, PathBuf};
 
@@ -204,7 +180,7 @@ pub(crate) mod e2e_exe {
     }
 }
 
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod e2e_exe_tests {
     use super::e2e_exe::stale_against;
 

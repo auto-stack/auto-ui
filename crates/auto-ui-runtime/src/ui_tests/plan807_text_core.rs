@@ -39,7 +39,6 @@ mod plan807_core_cut {
 // ── 类型身份（旧门面路径在 code-editor 门内——关门形态下身份由独立
 //    consumer fixture 的 auto-text-core 单源消费钉住，不走 UI 门面） ────
 
-#[cfg(feature = "code-editor")]
 mod plan807_identity {
     /// V-01：旧路径门面与 auto-text-core 是**同一类型**（薄重导出，非包装）
     /// ——同一快照可跨新旧 API 传递。
@@ -69,7 +68,6 @@ mod plan807_identity {
 
 // ── 快照端口装配身份 + shim 语义（code-editor 门） ─────────────────────
 
-#[cfg(feature = "code-editor")]
 mod plan807_snapshot_port {
     use std::sync::Arc;
 
@@ -338,7 +336,6 @@ b
 
 // ── 真实编辑器路径（V-01：旧门面 envelope == provider+core 纯形） ───────
 
-#[cfg(all(feature = "ui-iced", feature = "code-editor"))]
 mod plan807_real_editor {
     /// 真注册表：旧门面 `diff_snapshots_envelope(key_a,key_b)` 与
     /// provider 端口 + core 纯形逐字节一致；编辑器读取期间替换不影响已取
@@ -390,7 +387,6 @@ mod plan807_real_editor {
 
 // ── 分页资源退出观测（V-03 旁证；crate 内永久主证见 file_backing 测试）──
 
-#[cfg(feature = "code-editor")]
 mod plan807_resource_release {
     use crate::ui::code_editor::core::rope::{PageConfig, Rope};
 

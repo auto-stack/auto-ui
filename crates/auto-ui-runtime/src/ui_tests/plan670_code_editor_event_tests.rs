@@ -218,7 +218,6 @@ fn code_editor_no_param_event_still_bakes() {
 /// DynamicMessage::Typed → VM handler）驱动 SrcChanged → .edits 自增 +
 /// tabs[0].dirty 置真——Str("") 时代 handler `.tabs[i].dirty = true` 在此
 /// IndexError 中断（auto-edit 矩阵 18 次的真身）。
-#[cfg(feature = "ui-iced")]
 #[test]
 fn corpus_041_code_editor_events_reach_handler() {
     use crate::ui::component::Component;

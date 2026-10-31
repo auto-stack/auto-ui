@@ -117,7 +117,6 @@ pub fn shell_source(name: &str) -> std::borrow::Cow<'static, str> {
 }
 
 /// 进程内编译装载 shell 组件（boot 期调用；失败由调用方降级为无任务栏桌面）。
-#[cfg(feature = "ui-iced")]
 pub fn build_shell_component(
 ) -> Result<crate::ui::dynamic::DynamicComponent, auto_lang_core::error::AutoError> {
     crate::build_dynamic_component(shell_source("shell.at").as_ref(), None)
@@ -128,7 +127,6 @@ pub fn build_shell_component(
 pub const SWITCHER_AT: &str = include_str!("../../assets/switcher.at");
 
 /// 进程内编译装载 switcher 组件（召唤期懒挂载调用；失败由调用方 toast 降级）。
-#[cfg(feature = "ui-iced")]
 pub fn build_switcher_component(
 ) -> Result<crate::ui::dynamic::DynamicComponent, auto_lang_core::error::AutoError> {
     crate::build_dynamic_component(shell_source("switcher.at").as_ref(), None)
@@ -140,7 +138,6 @@ pub const NOTIFICATION_CENTER_AT: &str = include_str!("../../assets/notification
 
 /// 进程内编译装载通知中心组件（notes_toggle 召唤期懒挂载调用；失败由调用方
 /// 通知降级）。
-#[cfg(feature = "ui-iced")]
 pub fn build_notification_center_component(
 ) -> Result<crate::ui::dynamic::DynamicComponent, auto_lang_core::error::AutoError> {
     crate::build_dynamic_component(shell_source("notification_center.at").as_ref(), None)
@@ -152,7 +149,6 @@ pub const DASHBOARD_AT: &str = include_str!("../../assets/dashboard.at");
 
 /// 进程内编译装载 dashboard 面板组件（dashboard_toggle 召唤期懒挂载调用；
 /// 失败由调用方 toast 降级）。
-#[cfg(feature = "ui-iced")]
 pub fn build_dashboard_component(
 ) -> Result<crate::ui::dynamic::DynamicComponent, auto_lang_core::error::AutoError> {
     crate::build_dynamic_component(shell_source("dashboard.at").as_ref(), None)
@@ -165,7 +161,6 @@ pub const DESKTOP_AT: &str = include_str!("../../assets/desktop.at");
 
 /// 进程内编译装载桌面本体面组件（boot 期常驻装载调用；失败由调用方降级为
 /// 无图标桌面——不阻断既有桌面）。
-#[cfg(feature = "ui-iced")]
 pub fn build_desktop_surface_component(
 ) -> Result<crate::ui::dynamic::DynamicComponent, auto_lang_core::error::AutoError> {
     crate::build_dynamic_component(shell_source("desktop.at").as_ref(), None)
@@ -175,7 +170,7 @@ pub fn build_desktop_surface_component(
 /// cargo check,语法回归此前只能实机 boot 才暴露(降级为无任务栏桌面)。
 /// 本测试走 build_dynamic_component 真管线(编译 + Init),守卫 pack 级
 /// 纯 .at 改动(shell/desktop/overlay 槽)。
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 /// Stage B P-7 加载器单测（默认档可跑——不依赖 ui-iced）。
 #[cfg(test)]
 mod p7_loader_tests {
@@ -240,7 +235,7 @@ mod p7_loader_tests {
     }
 }
 
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod pack_tests {
     #[test]
     fn shell_packs_compile() {
@@ -282,7 +277,6 @@ pub const LAUNCH_FALLBACK_AT: &str = r#"widget LaunchFallback {
 }"#;
 
 /// 进程内编译装载占位页组件（`app` 状态 = 目标 App 名，视图绑定展示）。
-#[cfg(feature = "ui-iced")]
 pub fn build_launch_fallback(
     app_name: &str,
 ) -> Result<crate::ui::dynamic::DynamicComponent, auto_lang_core::error::AutoError> {

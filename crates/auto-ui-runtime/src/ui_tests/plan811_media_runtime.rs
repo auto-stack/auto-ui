@@ -155,7 +155,6 @@ fn facade_types_are_core_types_with_one_shared_service() {
 
 // ── 17 shim 真实调用（V-01/V-02：票据句柄与会话语义） ───────────────────
 
-#[cfg(feature = "ui-iced")]
 mod shims {
     use super::*;
 
@@ -349,7 +348,6 @@ mod shims {
 }
 
 // shim_image_retain 的未知句柄臂在此内联（上表retain(unknown)=0 断言）。
-#[cfg(feature = "ui-iced")]
 #[test]
 fn retain_unknown_handle_returns_zero() {
     let (mut task, vm) = task_vm();

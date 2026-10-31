@@ -7,5 +7,4 @@
 //! 薄门面（`ui::dialog`）同层委托。ui 宿主专属的 adapter（如 dnd，需
 //! ui 输入线程/事件面）仍留 `ui::` 下，不入本层。
 
-#[cfg(feature = "ui-dialog")]
 pub mod dialog;

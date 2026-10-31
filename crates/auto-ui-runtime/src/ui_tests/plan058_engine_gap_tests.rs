@@ -144,7 +144,7 @@ mod plan058_nanbox_int_float {
 }
 
 /// ②-①/②-② use 导入子件语料探针（生产路径构建，p053_8 先例）。
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan058_child_emit_computed {
     fn build() -> Option<crate::ui::dynamic::DynamicComponent> {
         let rel = "../../../auto-lang/test/ui/plan058_child_emit_computed/src/front/app.at";

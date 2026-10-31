@@ -333,11 +333,9 @@ fn package_families_modeled() {
 /// load_package 的 full_widgets 注册进 WidgetRegistry(视图 + decl)。
 #[test]
 fn desktop_registry_bridges_package_components() {
-    #[cfg(feature = "ui-interpreter")]
     use auto_ui_runtime::ui::widget_registry::WidgetRegistry;
 
     // ① 折叠桥接(ui feature 门控:WidgetRegistry 在 iced 后端)
-    #[cfg(feature = "ui-interpreter")]
     {
         let mut reg_ui = WidgetRegistry::new();
         reg_ui.register(minimal_widget("CopyButton"));

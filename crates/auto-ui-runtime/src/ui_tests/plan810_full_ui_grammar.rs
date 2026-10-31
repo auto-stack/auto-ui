@@ -669,7 +669,6 @@ fn v03_shadow_and_error_paths() {
 /// V-04 导入再导入（F810-R1-03）：三层真实 use-import 链（app→child→
 /// grandchild）——每层经独立 with_session 默认装配解析，孙辈 widget 的
 /// model/msg 经传递注册可达（806 一层链的嵌套延伸，真实编译路径）。
-#[cfg(feature = "ui-iced")]
 #[test]
 fn v04_import_of_import_chain() {
     let root = std::env::temp_dir().join(format!("plan810-import-{}", std::process::id()));

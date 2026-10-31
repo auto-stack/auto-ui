@@ -2417,14 +2417,12 @@ impl CodeEditorCore {
         editor.set_selection(Selection::Normal(end));
     }
 
-    #[cfg(feature = "ui-clipboard")]
     fn do_copy(&self) {
         if let Some(selection) = self.editor_lock().copy_selection() {
             crate::ui::clipboard::clipboard_set(&selection);
         }
     }
 
-    #[cfg(feature = "ui-clipboard")]
     fn do_cut(&self, font_system: &mut FontSystem) {
         let old = self.edit_baseline();
         let mut editor = self.editor_lock();
@@ -2437,7 +2435,6 @@ impl CodeEditorCore {
         }
     }
 
-    #[cfg(feature = "ui-clipboard")]
     fn do_paste(&self) {
         if let Some(contents) = crate::ui::clipboard::clipboard_get() {
             let old = self.edit_baseline();
@@ -2801,7 +2798,6 @@ pub fn code_editor_select_all(key: &str) -> bool {
 /// Plan 418: menu-driven cut/copy/paste via the OS clipboard (arboard
 /// bridge — handler context has no iced clipboard handle). Cut needs the
 /// font system for the deletion action, same as the Ctrl+X arm.
-#[cfg(feature = "ui-clipboard")]
 pub fn code_editor_clipboard_op(key: &str, op: ClipboardOp) -> bool {
     let key = normalize_payload_key(key);
     let map = CODE_EDITORS.lock().unwrap();
@@ -2827,7 +2823,6 @@ pub fn code_editor_clipboard_op(key: &str, op: ClipboardOp) -> bool {
 }
 
 /// Which clipboard operation `code_editor_clipboard_op` performs.
-#[cfg(feature = "ui-clipboard")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ClipboardOp {
     Cut,

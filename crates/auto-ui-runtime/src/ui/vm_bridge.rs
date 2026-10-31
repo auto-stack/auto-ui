@@ -221,14 +221,12 @@ pub struct VmBridge {
     /// 缓存生命周期随桥（hot-reload 走新建桥 reload，缓存自然弃置）。
     /// RefCell 内可变理由同 parked_tasks（渲染期 `&self`）。类型面依赖
     /// interpreter，同 ui-interpreter 门控。
-    #[cfg(feature = "ui-interpreter")]
     memo_cache: std::cell::RefCell<crate::ui::memo_deps::MemoCache>,
 
     /// PLAN-047 T-01（档 C SD-08）: 依赖录制器宿主——memo 门/computed 信号
     /// 求值期经 [`VmBridge::dep_recording_guard`] 激活，桥读通道把状态读记
     /// 入当前 [`crate::ui::memo_deps::RecState`]；未激活 = `None`，读通道
     /// 零开销直落（非 memo 零行为零开销红线）。RefCell 理由同 memo_cache。
-    #[cfg(feature = "ui-interpreter")]
     dep_recorder: std::cell::RefCell<Option<crate::ui::memo_deps::RecState>>,
 
     /// PLAN-047 T-05: 求值通道探针计数（AC-02 零重解析断言的观测面——
@@ -238,7 +236,6 @@ pub struct VmBridge {
     /// PLAN-047 T-06（档 C SD-10）: computed 信号表宿主——(widget, prop)
     /// 键控的信号节点（值缓存 + 动态 dep 基线对）。生命周期随桥（hot-reload
     /// 新建桥自然弃置）。RefCell 理由同 memo_cache（渲染期 `&self`）。
-    #[cfg(feature = "ui-interpreter")]
     computed_signals: std::cell::RefCell<HashMap<(String, String), ComputedSignal>>,
 
     /// PLAN-047 T-06: 信号网命中/未命中计数（观测面——AC-04 断言用）。
@@ -249,14 +246,12 @@ pub struct VmBridge {
 /// PLAN-047 T-01: 依赖录制 guard。首选显式 [`DepRecGuard::finish`] 取走
 /// 本次录制集；未 finish 即 drop（`?` 早退/panic 展开）走同一恢复语义——
 /// 外层恢复与并集吸收不因退出路径缺失（正确性面不允许静默吞外层）。
-#[cfg(feature = "ui-interpreter")]
 pub struct DepRecGuard<'a> {
     bridge: &'a VmBridge,
     outer: Option<Box<crate::ui::memo_deps::RecState>>,
     done: bool,
 }
 
-#[cfg(feature = "ui-interpreter")]
 impl<'a> DepRecGuard<'a> {
     /// 结束录制：取走本次 [`crate::ui::memo_deps::RecState`]（含 overflow
     /// 旗标），恢复外层并集吸收。
@@ -287,7 +282,6 @@ impl<'a> DepRecGuard<'a> {
     }
 }
 
-#[cfg(feature = "ui-interpreter")]
 impl<'a> Drop for DepRecGuard<'a> {
     fn drop(&mut self) {
         if !self.done {
@@ -300,7 +294,6 @@ impl<'a> Drop for DepRecGuard<'a> {
 /// 体隐藏 VM fn 双通道共载。`deps` = 最近一次求值的动态依赖基线对；版本
 /// 全同 → 值缓存复用。脏传播 pull 式：写点定点 bump → 版本比对 miss →
 /// 重求值（不建主动订阅图——漏传播只落重算，不陈旧）。
-#[cfg(feature = "ui-interpreter")]
 pub struct ComputedSignal {
     pub cached: Value,
     pub deps: Vec<(crate::ui::memo_deps::DepKey, u64)>,
@@ -311,7 +304,6 @@ pub struct ComputedSignal {
 /// `ValueRef`；容器递归（Array/Obj/Pair/Some/Ok）；不可证净的复合变体
 /// （Node/Widget/View 等内嵌 prop 值）保守按携带处理。标量/字符串纯值
 /// （AutoStr 为自有拷贝，非池索引）放行。
-#[cfg(feature = "ui-interpreter")]
 fn value_carries_heap_identity(v: &Value) -> bool {
     match v {
         Value::VmRef(_) | Value::ValueRef(_) => true,
@@ -652,11 +644,10 @@ impl VmBridge {
         // 9918/9919 已不直引 frame_bench，UI 组件路径经此注入恢复同源供值。
         crate::ui::frame_provider::install_process_default();
         // PLAN-785: clipboard text adapter 同点并入（if-absent 兼容默认）。
-        #[cfg(feature = "ui-clipboard")]
         crate::ui::clipboard_provider::install_process_default();
         // PLAN-790: clipboard media adapter 同点并入（if-absent 兼容默认；
         // windows+native-clipboard 双门控——非 Windows 不装配）。
-        #[cfg(all(windows, feature = "native-clipboard"))]
+        #[cfg(windows)]
         crate::ui::clipboard_media_provider::install_process_default();
         // PLAN-794: scroll host adapter 同点并入（if-absent 兼容默认；
         // controller 注册表接线恢复，9900..9905/9922/9923）。
@@ -666,11 +657,9 @@ impl VmBridge {
         crate::ui::terminal_provider::install_process_default();
         // PLAN-802: code editor host adapter 同点并入（if-absent 兼容默认；
         // editor 注册表接线恢复，22 native 全族）。
-        #[cfg(feature = "code-editor")]
         crate::ui::code_editor_provider::install_process_default();
         // PLAN-804: dialog adapter 同点并入（if-absent 兼容默认；
         // ui-dialog 单门控，2927/2928 parented 策略接线恢复）。
-        #[cfg(feature = "ui-dialog")]
         crate::host_adapters::dialog::install_process_default();
         // PLAN-804: dnd adapter 同点并入（if-absent 兼容默认；
         // windows+native-dnd 双门控，本构造在 ui 门内=有效三分，2938）。
@@ -766,12 +755,9 @@ impl VmBridge {
             init_demand_records: std::cell::RefCell::new(std::collections::HashMap::new()),
             init_generation: std::cell::Cell::new(0),
             busy_flag_names: std::cell::RefCell::new(Vec::new()),
-            #[cfg(feature = "ui-interpreter")]
             memo_cache: std::cell::RefCell::new(crate::ui::memo_deps::MemoCache::new()),
-            #[cfg(feature = "ui-interpreter")]
             dep_recorder: std::cell::RefCell::new(None),
             resolve_probe_count: std::sync::atomic::AtomicU64::new(0),
-            #[cfg(feature = "ui-interpreter")]
             computed_signals: std::cell::RefCell::new(HashMap::new()),
             signal_hits: std::sync::atomic::AtomicU64::new(0),
             signal_misses: std::sync::atomic::AtomicU64::new(0),
@@ -804,11 +790,10 @@ impl VmBridge {
         // PLAN-779: 同 new_with_children——UI 宿主能力装配（frame provider）。
         crate::ui::frame_provider::install_process_default();
         // PLAN-785: clipboard text adapter 同点并入（if-absent 兼容默认）。
-        #[cfg(feature = "ui-clipboard")]
         crate::ui::clipboard_provider::install_process_default();
         // PLAN-790: clipboard media adapter 同点并入（if-absent 兼容默认；
         // windows+native-clipboard 双门控——非 Windows 不装配）。
-        #[cfg(all(windows, feature = "native-clipboard"))]
+        #[cfg(windows)]
         crate::ui::clipboard_media_provider::install_process_default();
         // PLAN-794: scroll host adapter 同点并入（if-absent 兼容默认；
         // 同 new_with_children）。
@@ -818,10 +803,8 @@ impl VmBridge {
         crate::ui::terminal_provider::install_process_default();
         // PLAN-802: code editor host adapter 同点并入（if-absent 兼容默认；
         // 同 new_with_children）。
-        #[cfg(feature = "code-editor")]
         crate::ui::code_editor_provider::install_process_default();
         // PLAN-804: dialog/dnd adapter 同点并入（同 new_with_children）。
-        #[cfg(feature = "ui-dialog")]
         crate::host_adapters::dialog::install_process_default();
         #[cfg(all(windows, feature = "native-dnd"))]
         crate::ui::dnd_host_provider::install_process_default();
@@ -1002,12 +985,9 @@ impl VmBridge {
             init_demand_records: std::cell::RefCell::new(std::collections::HashMap::new()),
             init_generation: std::cell::Cell::new(0),
             busy_flag_names: std::cell::RefCell::new(Vec::new()),
-            #[cfg(feature = "ui-interpreter")]
             memo_cache: std::cell::RefCell::new(crate::ui::memo_deps::MemoCache::new()),
-            #[cfg(feature = "ui-interpreter")]
             dep_recorder: std::cell::RefCell::new(None),
             resolve_probe_count: std::sync::atomic::AtomicU64::new(0),
-            #[cfg(feature = "ui-interpreter")]
             computed_signals: std::cell::RefCell::new(HashMap::new()),
             signal_hits: std::sync::atomic::AtomicU64::new(0),
             signal_misses: std::sync::atomic::AtomicU64::new(0),
@@ -2938,7 +2918,6 @@ impl VmBridge {
     }
 
     /// PLAN-045: memo 缓存快照口（渲染期 builder 走 `&self`，RefCell 内可变）。
-    #[cfg(feature = "ui-interpreter")]
     pub fn with_memo_cache<R>(
         &self,
         f: impl FnOnce(&mut crate::ui::memo_deps::MemoCache) -> R,
@@ -2957,7 +2936,6 @@ impl VmBridge {
     /// PLAN-047 T-04: 同时激活 AutoVM 录制槽——guard 作用域内的 VM fn
     /// 执行（block computed `call_computed_fn`/handler）读臂依赖由引擎
     /// 侧影子集承载，finish 时与桥侧集并集收编。
-    #[cfg(feature = "ui-interpreter")]
     pub fn dep_recording_guard(&self) -> DepRecGuard<'_> {
         let outer = self
             .dep_recorder
@@ -2976,13 +2954,11 @@ impl VmBridge {
     }
 
     /// 诊断/测试面：窥探当前录制状态快照（不改变激活态）。
-    #[cfg(feature = "ui-interpreter")]
     pub fn peek_dep_recorder(&self) -> Option<crate::ui::memo_deps::RecState> {
         self.dep_recorder.borrow().clone()
     }
 
     /// 读通道录制：具名字段读（未激活 = 零开销分支直落）。
-    #[cfg(feature = "ui-interpreter")]
     fn record_dep_read(&self, heap_id: u64, path: &str) {
         if let Some(rec) = self.dep_recorder.borrow_mut().as_mut() {
             rec.record(crate::ui::memo_deps::DepKey::field(heap_id, path));
@@ -2990,7 +2966,6 @@ impl VmBridge {
     }
 
     /// 读通道录制：容器/结构体整体展开（粗粒度 `DEP_PATH_ANY` 保守面）。
-    #[cfg(feature = "ui-interpreter")]
     fn record_dep_any(&self, heap_id: u64) {
         if let Some(rec) = self.dep_recorder.borrow_mut().as_mut() {
             rec.record(crate::ui::memo_deps::DepKey::any(heap_id));
@@ -2998,12 +2973,8 @@ impl VmBridge {
     }
 
     /// 非 ui-interpreter 构建的零伤 stub（vm_bridge 模块本身不门控）。
-    #[cfg(not(feature = "ui-interpreter"))]
-    fn record_dep_read(&self, _heap_id: u64, _path: &str) {}
 
     /// 非 ui-interpreter 构建的零伤 stub。
-    #[cfg(not(feature = "ui-interpreter"))]
-    fn record_dep_any(&self, _heap_id: u64) {}
 
     /// 诊断/测试面：flash 导出名在册查询（block computed 合成通道预检）。
     pub fn vm_flash_exports_contains(&self, fn_name: &str) -> bool {
@@ -3018,7 +2989,6 @@ impl VmBridge {
     /// 命中（fill 后任何归因写都会前进对应 path 版本——A 类 exact+wildcard
     /// 双 bump / B 类 wildcard，见 SD-09；C 类（字符串池/对象出世）不动既有
     /// 内容，version_fast 命中安全）。
-    #[cfg(feature = "ui-interpreter")]
     pub fn deps_unchanged(&self, pairs: &[(crate::ui::memo_deps::DepKey, u64)]) -> bool {
         pairs.iter().all(|(k, v0)| {
             // PLAN-706 r2 T-10: 死对象 dep 键 = 版本冻结键（path_versions
@@ -3033,7 +3003,6 @@ impl VmBridge {
     }
 
     /// 录制集 → (dep, 当前版本) 基线对（fill 入条目 / fp_slow 命中刷新）。
-    #[cfg(feature = "ui-interpreter")]
     pub fn dep_pairs(
         &self,
         deps: &std::collections::BTreeSet<crate::ui::memo_deps::DepKey>,
@@ -3048,7 +3017,6 @@ impl VmBridge {
 
     /// PLAN-047 T-05: 值承载的堆身份录制（keyed-for iterable 注入面——
     /// VmRef/Int≥4M → any 粗粒度；其余值无堆身份不录）。
-    #[cfg(feature = "ui-interpreter")]
     pub fn record_dep_value_heap(&self, v: &Value) {
         match v {
             Value::VmRef(r) => self.record_dep_any(r.id as u64),
@@ -3102,7 +3070,6 @@ impl VmBridge {
     /// vm_matrix [7 tab] 标脏弧 exit=101），release 无 canary 落 id 复用
     /// 静默错读（确认弹层滞留面）。不入网 = 退回每帧重算（pre-706 行为），
     /// 与空集/超预算退档同族。
-    #[cfg(feature = "ui-interpreter")]
     pub fn computed_signal_store(
         &self,
         widget: &str,
@@ -3964,7 +3931,6 @@ fn extract_handler_name(pattern: &str) -> &str {
 ///
 /// Retained for Plan 323 Task 5 (extracting HTTP shims into natives); currently
 /// unused after the AST interpreter removal.
-#[cfg(feature = "ui-interpreter")]
 #[allow(dead_code)]
 fn json_to_value(json: &serde_json::Value) -> Value {
     match json {
@@ -4873,7 +4839,6 @@ widget OpProbeOrig {
     }
 
     #[test]
-    #[cfg(feature = "ui-interpreter")]
     fn plan047_recorder_inactive_zero_record() {
         let bridge = VmBridge::new(&plan047_recorder_widget()).expect("bridge");
         bridge.read_state("count").expect("read");
@@ -4883,7 +4848,6 @@ widget OpProbeOrig {
     }
 
     #[test]
-    #[cfg(feature = "ui-interpreter")]
     fn plan047_recorder_read_state_records_field() {
         let bridge = VmBridge::new(&plan047_recorder_widget()).expect("bridge");
         let guard = bridge.dep_recording_guard();
@@ -4900,7 +4864,6 @@ widget OpProbeOrig {
     }
 
     #[test]
-    #[cfg(feature = "ui-interpreter")]
     fn plan047_recorder_container_read_records_any() {
         let bridge = VmBridge::new(&plan047_recorder_widget()).expect("bridge");
         let guard = bridge.dep_recording_guard();
@@ -4927,7 +4890,6 @@ widget OpProbeOrig {
     }
 
     #[test]
-    #[cfg(feature = "ui-interpreter")]
     fn plan047_recorder_materialize_and_nested_union() {
         let bridge = VmBridge::new(&plan047_recorder_widget()).expect("bridge");
         // 外层 guard 内嵌套内层 guard：内层读 + materialize 展开，
@@ -4967,7 +4929,6 @@ widget OpProbeOrig {
     }
 
     #[test]
-    #[cfg(feature = "ui-interpreter")]
     fn plan047_attribution_set_field_is_path_exact() {
         let mut widget = make_test_widget(
             "AttrRoot",
@@ -5003,7 +4964,6 @@ widget OpProbeOrig {
     }
 
     #[test]
-    #[cfg(feature = "ui-interpreter")]
     fn plan047_attribution_list_push_wildcard_only() {
         let mut widget = make_test_widget(
             "AttrList",
@@ -5034,7 +4994,6 @@ widget OpProbeOrig {
     }
 
     #[test]
-    #[cfg(feature = "ui-interpreter")]
     fn plan047_attribution_bridge_write_state_exact() {
         let widget = make_test_widget(
             "AttrBridge",
@@ -5053,7 +5012,6 @@ widget OpProbeOrig {
     }
 
     #[test]
-    #[cfg(feature = "ui-interpreter")]
     fn plan047_attribution_c_class_global_only() {
         let widget = make_test_widget("AttrC", vec![]);
         let bridge = VmBridge::new(&widget).expect("bridge");
@@ -5072,7 +5030,6 @@ widget OpProbeOrig {
     }
 
     #[test]
-    #[cfg(feature = "ui-interpreter")]
     fn plan047_attribution_hashmap_native_gap_closed() {
         // 普查发现闭合实证：auto.hashmap.set（shim_hashmap_insert_str）原
         // 无任何 seq bump——memo 全局快路径陈旧命中窗口。直调 shim 断言
@@ -5105,7 +5062,6 @@ widget OpProbeOrig {
     // ─────────────────────────────────────────────────────────────────
 
     #[test]
-    #[cfg(feature = "ui-interpreter")]
     fn plan047_engine_recorder_slot_semantics() {
         let widget = make_test_widget("RecSlot", vec![]);
         let bridge = VmBridge::new(&widget).expect("bridge");
@@ -5129,7 +5085,6 @@ widget OpProbeOrig {
     }
 
     #[test]
-    #[cfg(feature = "ui-interpreter")]
     fn plan047_engine_read_arm_intercepts_handler_reads() {
         // 端到端：录制激活期内 handler VM 执行（`.count` 读经 GET 系读臂
         // 编码）的依赖由引擎影子集承载——集含 (root,"count")。call_handler
@@ -5166,7 +5121,6 @@ widget OpProbeOrig {
     }
 
     #[test]
-    #[cfg(feature = "ui-interpreter")]
     fn plan047_recorder_drop_without_finish_restores() {
         let bridge = VmBridge::new(&plan047_recorder_widget()).expect("bridge");
         {
@@ -5842,7 +5796,6 @@ widget OpProbeOrig {
     /// Supersedes the pre-store-refactor harness that built a bare bridge
     /// from the widget alone — its Init handler calls `store.Init()`, which
     /// cannot compile without store context (064115a76 shape).
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn test_calendar_computed_grid_via_use_fns() {
         let mut dc = match crate::plan370_test_support::build_example_component("016-calendar") {
@@ -5946,7 +5899,6 @@ widget OpProbeOrig {
     /// 导入几何 helper(components/ 包通道)。VM 装载对包组件文件自身的
     /// use 依赖做收集 + 裸名别名(与根文件 use 同规则)——dc/ds 在 VM 内
     /// 可按裸名调用即证明该链路(437 §0.6.E-3 绕过点回正的 VM 半边)。
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn test_plan522_024_chart_geom_helpers_in_vm() {
         let dc = match crate::plan370_test_support::build_example_component("024-charts") {
@@ -6113,7 +6065,6 @@ widget Store {
     /// refactor and no longer compiles Init), then dispatch SelectDay with a
     /// date-string payload. Plan 522: `.days` left state for a widget
     /// computed, so the assertion set is the store fields the handler writes.
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn repro_selectday_panic() {
         let mut dc = match crate::plan370_test_support::build_example_component("016-calendar") {

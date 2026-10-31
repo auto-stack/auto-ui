@@ -97,7 +97,6 @@ mod plan066_native_widget_tests {
     /// 探针名经测试钩子进程内登记（native_widget::test_register_element，
     /// 首次 global() 前生效；生产源面与 schema 漂移围栏 P1 不见测试名）；
     /// props 经 resolve→display 明文透传，按键排序。
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn plan066_element_entry_produces_custom_view() {
         crate::ui::native_widget::test_register_element("plan066_element_probe");
@@ -127,7 +126,6 @@ mod plan066_native_widget_tests {
 
     /// 未知 tag 在注册表 miss → 沿既有链（WidgetRegistry → 折叠 → 兜底），
     /// 不得误产 View::Custom/AutodownEditor。
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn plan066_unknown_tag_bypasses_native_registry() {
         // 注册表面：确无此名。
@@ -183,7 +181,6 @@ mod plan066_native_widget_tests {
         }
     }
 
-    #[cfg(feature = "ui-interpreter")]
     fn find_custom(view: &View<DynamicMessage>) -> Option<(String, Vec<(String, String)>)> {
         match view {
             View::Custom { name, props, .. } => Some((name.clone(), props.clone())),

@@ -4247,7 +4247,7 @@ fn p748_j1_scroll_visual_classes_move_to_viewport() {
     );
 }
 
-#[cfg(all(feature = "autodown", feature = "code-editor"))]
+#[cfg(feature = "autodown")]
 /// 件四（PLAN-748 T-10）：autodown_editor wrapper padding 布局级断言——
 /// DocEditor 节点高 = 内容实测高 + 2×16（上下 padding，引擎 css :103
 /// `padding: 1rem 1.25rem` 等值内建）；哨兵文本 y 揭示节点高（列堆叠

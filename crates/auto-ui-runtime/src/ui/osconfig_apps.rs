@@ -56,14 +56,12 @@ pub fn read_app_theme_accent(app: &str) -> (Option<String>, Option<String>) {
 /// 的 state var（`dark_mode` bool / `accent_color` str / `mode` str）。
 /// 语义同 Plan 458 env 播种——只做初始值，运行时交互（点击切换）照旧优先；
 /// 未声明对应 var 的 App 静默跳过；坏值（未知 theme/accent 预设）跳过。
-#[cfg(feature = "ui-iced")]
 pub fn seed_app_config(component: &mut crate::ui::dynamic::DynamicComponent, app: &str) {
     seed_app_config_fields(component, &read_app_config(app));
 }
 
 /// 播种纯逻辑（字段表 → 已声明 var），文件 IO 之外的全部语义；
 /// 单测直接驱动本函数。
-#[cfg(feature = "ui-iced")]
 pub fn seed_app_config_fields(
     component: &mut crate::ui::dynamic::DynamicComponent,
     fields: &HashMap<String, String>,
@@ -117,7 +115,6 @@ mod tests {
 
     /// 播种：theme/accent/mode 写已声明 var；坏预设值跳过；未声明 var
     /// 静默跳过（不报错不改值）。
-    #[cfg(feature = "ui-iced")]
     #[test]
     fn seed_fields_writes_declared_vars_only() {
         let src = "widget P {\n    model {\n        var dark_mode bool = true\n        var accent_color str = \"indigo\"\n        var mode str = \"basic\"\n    }\n    view { text \"${.mode}\" }\n}\n";
@@ -151,7 +148,6 @@ mod tests {
     }
 
     /// 未声明对应 var 的 App：播种静默跳过（无 panic、无新 var）。
-    #[cfg(feature = "ui-iced")]
     #[test]
     fn seed_fields_skips_undeclared_vars() {
         let src = "widget Q {\n    model { var n int = 0 }\n    view { text \"${.n}\" }\n}\n";

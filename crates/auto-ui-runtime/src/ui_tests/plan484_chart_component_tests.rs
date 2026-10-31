@@ -5,7 +5,6 @@
 use auto_ui_dialect::UiCode;
 use auto_ui_dialect::UiStmt;
 
-#[cfg(feature = "ui-iced")]
 mod plan484_smoke {
     #[test]
     fn plan484_024_charts_component_smoke() {

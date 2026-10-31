@@ -49,7 +49,6 @@ mod plan442_sched_tests {
 
     /// REGRESSION: the event-form timer fires after its deadline and updates
     /// state through the normal handler dispatch path.
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn sched_event_timer_fires_via_poll() {
         let mut dc = match build() {
@@ -77,7 +76,6 @@ mod plan442_sched_tests {
 
     /// REGRESSION: the closure-form timer (SchedulerTimer parity) schedules
     /// and fires without error.
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn sched_closure_timer_fires() {
         let mut dc = match build() {
@@ -102,7 +100,6 @@ mod plan442_sched_tests {
 
     /// REGRESSION: clear_timeout cancels a pending timer — the SchedulerTimer
     /// contract's clearTimeout(handle).
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn sched_clear_timeout_cancels() {
         let mut dc = match build() {

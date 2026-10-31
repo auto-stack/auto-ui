@@ -134,7 +134,6 @@ impl CodeEditorHostProvider for CodeEditorRegistryProvider {
     }
 
     fn cut(&self, key: &str) -> Option<bool> {
-        #[cfg(feature = "ui-clipboard")]
         {
             Some(crate::ui::code_editor::code_editor_clipboard_op(
                 key,
@@ -143,40 +142,23 @@ impl CodeEditorHostProvider for CodeEditorRegistryProvider {
         }
         // 无 ui-clipboard：宿主无编辑器剪贴板面（shim raise 组合特征文案，
         // T-01 冻结——镜像迁移前 code-editor on + ui-clipboard off 行为）。
-        #[cfg(not(feature = "ui-clipboard"))]
-        {
-            let _ = key;
-            None
-        }
     }
 
     fn copy(&self, key: &str) -> Option<bool> {
-        #[cfg(feature = "ui-clipboard")]
         {
             Some(crate::ui::code_editor::code_editor_clipboard_op(
                 key,
                 crate::ui::code_editor::ClipboardOp::Copy,
             ))
         }
-        #[cfg(not(feature = "ui-clipboard"))]
-        {
-            let _ = key;
-            None
-        }
     }
 
     fn paste(&self, key: &str) -> Option<bool> {
-        #[cfg(feature = "ui-clipboard")]
         {
             Some(crate::ui::code_editor::code_editor_clipboard_op(
                 key,
                 crate::ui::code_editor::ClipboardOp::Paste,
             ))
-        }
-        #[cfg(not(feature = "ui-clipboard"))]
-        {
-            let _ = key;
-            None
         }
     }
 }

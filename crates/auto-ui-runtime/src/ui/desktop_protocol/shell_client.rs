@@ -900,7 +900,6 @@ impl ShellPump {
     }
 }
 
-#[cfg(feature = "ui-iced")]
 fn frame_ops(frame: &ProtocolMsg) -> usize {
     match frame {
         ProtocolMsg::Frame(FrameMsg::FrameReady { payload, .. }) => payload.ops.len(),

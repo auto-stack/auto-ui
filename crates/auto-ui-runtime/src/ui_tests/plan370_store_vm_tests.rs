@@ -27,7 +27,6 @@ mod plan370_store_vm_tests {
     ///
     /// Before the fix, root state held ONLY the App's own `search` field; the
     /// store's `notes`, `active_id`, `active_folder`, etc. were absent.
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn store_fields_merged_into_root_state() {
         let comp = match build_015_component() {
@@ -62,7 +61,6 @@ mod plan370_store_vm_tests {
     /// populated it. After the fix the VM handler chain
     /// (`store.Init` → `list_notes()` → `db.all_notes()`) executes and the
     /// `Value::VmRef` derefs to 6 elements.
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn notes_resolves_to_seed_data() {
         let comp = match build_015_component() {
@@ -92,7 +90,6 @@ mod plan370_store_vm_tests {
     /// (AuraSnapshotBuilder evaluates `.store.notes.len() > 0` and materializes
     /// the VmRef array). Before the fixes, `.store.notes.len() > 0` evaluated
     /// false and the snapshot rendered the "No notes yet" else-branch.
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn snapshot_does_not_show_empty_state() {
         let comp = match build_015_component() {
@@ -165,7 +162,6 @@ mod block_static_store_tests {
     use crate::plan370_test_support::build_example_component;
 
     /// Init handler pushes 2 items → read_state_as_vec("blocks").len() == 2.
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn store_list_push_persists_after_init() {
         let comp = match build_example_component("021-block-static") {
@@ -196,7 +192,6 @@ mod block_static_store_tests {
     }
 
     /// `blocks` field must be present in root state (not missing/Nil).
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn store_list_field_in_root_state() {
         let comp = match build_example_component("021-block-static") {

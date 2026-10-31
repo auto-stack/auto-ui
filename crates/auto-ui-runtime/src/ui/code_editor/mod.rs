@@ -14,7 +14,6 @@ pub mod diff;
 pub mod draw;
 pub mod theme;
 
-#[cfg(feature = "ui-iced")]
 pub mod iced;
 
 pub use core::{
@@ -27,7 +26,6 @@ pub use core::{
     EditorClipboard, EditorInput, EditorKey, EditorModifiers, NullClipboard, TextDelta,
 };
 // Plan 418: menu-driven clipboard ops (requires the arboard bridge).
-#[cfg(feature = "ui-clipboard")]
 pub use core::{code_editor_clipboard_op, ClipboardOp};
 pub use diff::{
     diff_lines, diff_lines_parallel, diff_lines_windowed, diff_snapshots, refine_inline, DiffOpts,
@@ -36,5 +34,4 @@ pub use diff::{
 pub use draw::EditorDrawList;
 pub use theme::{current_theme, set_theme_source, CodeEditorTheme, Rgba};
 
-#[cfg(feature = "ui-iced")]
 pub use iced::CodeEditor as IcedCodeEditor;

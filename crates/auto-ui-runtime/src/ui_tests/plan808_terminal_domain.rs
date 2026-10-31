@@ -1308,7 +1308,6 @@ mod plan808_real_dll {
     /// V-02/V-03: real UI adapter chain — directional input, per-pane rows,
     /// geometry, menu once-consumption, display_offset single source, and the
     /// window-store projection. Every session is reaped.
-    #[cfg(feature = "ui")]
     #[test]
     fn real_ui_adapter_directional_and_scroll_projection() {
         use crate::ui::terminal::{
@@ -1972,7 +1971,6 @@ mod plan808_real_dll {
 
 // ── F808-R1-02: production VmBridge constructors install the adapter ─────
 
-#[cfg(feature = "ui")]
 mod plan808_vm_bridge_assembly {
     use std::collections::HashMap;
     use std::sync::Arc;

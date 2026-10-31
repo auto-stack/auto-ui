@@ -311,7 +311,6 @@ pub struct DesktopCellEntry {
 // 留在解释轨/child 侧 apply）。载荷走 ControlMsg::ShellProjectionPush
 // {face, payload}；clock/cursor 独立变体字段直载（不入快照语义）。
 
-#[cfg(feature = "ui-iced")]
 pub mod wire {
     use super::*;
     use crate::ui::desktop_protocol::codec::{
@@ -1541,7 +1540,6 @@ mod tests {
     /// PLAN-030 T-02：wire 编解码 round-trip——全家族（叶面保形：bool
     /// 载体 bool、字符串载体 string）。overlay 三面 v1 不下行（D6 边界）
     /// 但编码在册（AC-01 五面载体）。
-    #[cfg(feature = "ui-iced")]
     #[test]
     /// PLAN-036 T-04（B1）：overlay 两载体写集 + 指纹 + 键盘事件扩档
     /// round-trip——键集与 renderer 召唤动词内联写集逐一对应（缺键 =

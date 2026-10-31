@@ -18,7 +18,6 @@ mod plan437_child_init {
     /// 子 Init 从 props 计算 path 字符串。镜像 plan370_test_support 的
     /// 生产构建路径(parse → extract → registry+child_decls →
     /// with_registry_and_imports_from_decls)。
-    #[cfg(feature = "ui-interpreter")]
     fn build_inline(src: &str) -> crate::ui::dynamic::DynamicComponent {
         use auto_lang_core::ast::Stmt;
         let session = auto_lang_core::session::CompilerSession::ui();
@@ -182,7 +181,6 @@ widget ChildSpin (spins: int = 0) {
     /// 放行断言；有界超时红并带 pending/CPU/I/O 诊断。循环内重建视图：
     /// 新落地状态可能登记下一批子件 demand（plan502 完成态驱动同
     /// precedent，PLAN-759 T-08）。
-    #[cfg(feature = "ui-interpreter")]
     fn drive_to_completion(
         dc: &mut crate::ui::dynamic::DynamicComponent,
         label: &str,
@@ -212,7 +210,6 @@ widget ChildSpin (spins: int = 0) {
     /// （续体在途即出循环）；完成态截止时间驱动仍可收敛且几何落地。
     /// 注：前半断言钉的是 helper 现行 `progressed` 判据（KNOWN-DEBT
     /// D-762-1）；若日后修复 helper 退出判据，本断言按新语义更新。
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn child_init_multi_slice_early_exit_and_completion_driving() {
         let mut dc = build_inline(SRC_SPIN);
@@ -244,7 +241,6 @@ widget ChildSpin (spins: int = 0) {
     // The shared fixture must complete the SAME deterministic multi-slice
     // workload that defeats a single production-helper call. Geometry is the
     // original hand-computed observable, not a new completion counter.
-    #[cfg(all(feature = "ui-interpreter", feature = "ui-iced"))]
     #[test]
     fn shared_completion_drives_multislice_geometry() {
         let mut dc = build_inline(SRC_SPIN);
@@ -257,7 +253,6 @@ widget ChildSpin (spins: int = 0) {
         assert!(format!("{view:?}").contains("M 250040 260"));
     }
 
-    #[cfg(all(feature = "ui-interpreter", feature = "ui-iced"))]
     #[test]
     fn shared_completion_deadline_rejects_pending_work() {
         let mut dc = build_inline(SRC_SPIN);
@@ -271,7 +266,6 @@ widget ChildSpin (spins: int = 0) {
         assert!(dc.has_pending_init_work() || dc.has_cpu_continuations());
     }
 
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn child_init_fires_during_render() {
         let mut dc = build_inline(SRC);
@@ -298,7 +292,6 @@ widget ChildSpin (spins: int = 0) {
     /// 端到端(生产构建路径):widgets-gallery 四条 chart 路由,每页消费
     /// 官方 Auto 组件(auto-*-chart),断言 Init 几何(M/L/A path 或
     /// 图例)进入渲染产物。缺 gallery 源(独立仓运行)时优雅跳过。
-    #[cfg(feature = "ui-interpreter")]
     #[test]
     fn gallery_chart_components_render_geometry() {
         let app = match crate::plan370_test_support::locate_example_app_at("widgets-gallery") {

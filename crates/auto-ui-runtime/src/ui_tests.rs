@@ -14,53 +14,52 @@ mod p618_filter_tree_probe;
 mod plan051_ext_widget_tests;
 mod plan051_p2_tests;
 mod plan051_timer_tests;
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan059_child_emit_probe_tests;
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan063_handler_float_tests;
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan066_filter_projection_tests;
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan066_native_widget_tests;
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan083_http_msg_bridge_tests;
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan089_mouse_area_press_tests;
 #[cfg(test)]
 mod plan339_tests;
 #[cfg(test)]
 mod plan340_tests;
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan370_015_behavior_tests;
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan370_store_vm_tests;
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan409_tests;
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan412_tests;
-#[cfg(feature = "code-editor")]
 mod plan413_code_editor_natives;
 #[cfg(test)]
 mod plan437_child_init_tests;
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan442_ext_link_tests;
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan442_musk_probe_tests;
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan442_sched_tests;
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan442_store_facade_tests;
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan442_webcompat_tests;
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan446_b1_tests;
 #[cfg(test)]
 mod plan446_batch3_tests;
 #[cfg(test)]
 mod plan446_batch4_tests;
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan446_batch5_tests;
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan446_c1_popover_tests;
 #[cfg(test)]
 mod plan446_j1_repro_tests;
@@ -76,39 +75,38 @@ mod plan492_tests;
 mod plan498_chart_interaction_tests;
 #[cfg(test)]
 mod plan499_pointer_stream_tests;
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan536_t12_send_chain_probe_tests;
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan536_t1_reactive_probe_tests;
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan606_gallery_tests;
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan622_store_facade_gap_tests;
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan624_cross_state_tests;
 mod plan656_scroll_controller_pipeline;
 #[cfg(test)]
 mod plan657_bp_admin_tests;
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan670_code_editor_event_tests;
 mod plan703_supply_probes;
 mod plan710_supply_probes;
 mod plan728_supply_probes;
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan739_input_pin_tests;
 mod plan765_active_session_stability_tests;
 mod plan794_scroll_host_provider;
 mod plan802_code_editor_provider;
 mod plan807_text_core;
 mod plan811_media_runtime;
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan814_app_registry_launch_tests;
 
 // PLAN-814 T-07：dev-deps 消费面随 owner 迁入（auto-lang 侧测试期
 // UI 依赖清零）。
-#[cfg(feature = "native-clipboard")]
 mod plan485_clipboard_natives;
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan732_wikilink_tests;
 mod plan804_dialog_dnd_provider;
 #[cfg(windows)]
@@ -116,11 +114,11 @@ mod plan804_os_e2e;
 
 // PLAN-814 T-07 勘误补挂：T-04 批三模块（plan019/042/058）文件已迁但挂载
 // 漏加（shell 短路事故），选择面验证器逐 ID 捕获——门与原 tests.rs 一致。
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan019_vm_own_module_link_tests;
 #[cfg(test)]
 mod plan042_scan_probe_tests;
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan058_engine_gap_tests;
 
 // ---- PLAN-900 T-05：auto-lang src/tests UI 域 32 文件随依赖反转迁入 ----
@@ -128,7 +126,7 @@ mod plan058_engine_gap_tests;
 // 为 auto_ui_compiler/auto_lang_core/crate:: 本位；cfg 门与原 tests.rs 声明
 // 一致——plan814_v02_api_pin 原 ui-iced 门保留，其余默认编译（原 facade
 // default=ui-iced 下同语义）。
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan814_v02_api_pin;
 #[cfg(test)]
 mod autodown_codegen_debts_tests;
@@ -202,11 +200,11 @@ mod plan577_avatar_tests;
 mod plan593_theme_registry_tests;
 #[cfg(test)]
 mod plan615_calc_prog_tests;
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan632_demo_bridge_tests;
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan633_fullstack_embed_tests;
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan664_use_diag_tests;
 #[cfg(test)]
 mod plan728_bench;
@@ -218,9 +216,9 @@ mod plan748_breakpoint_probes;
 mod plan749_read_semantics_tests;
 #[cfg(test)]
 mod plan712_route_param_tests;
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan499_engine_float_to_int_tests;
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod plan712_back_prefix_route_fetch;
 #[cfg(test)]
 mod plan577_breadcrumb_cycle_tests;

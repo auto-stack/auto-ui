@@ -4,7 +4,6 @@
 //! 全链把逻辑坐标送达组件状态(双 float 形参);coords 逻辑幅面随视图树
 //! 下发(iced PointerArea extent 消费)。
 
-#[cfg(feature = "ui-iced")]
 mod plan499_pipe {
     const SRC: &str = r#"
 widget Chart {
@@ -85,7 +84,6 @@ widget Chart {
     }
 }
 
-#[cfg(feature = "ui-iced")]
 mod plan499_axispointer {
     /// charts-gallery 整 app 构建(四类图同屏;line 卡 n=6 数据点,
     /// monthlyRevenue;left=40/right=550/step=102)。
@@ -208,7 +206,6 @@ mod plan499_axispointer {
     }
 }
 
-#[cfg(feature = "ui-iced")]
 mod plan499_donut_sector {
     fn build_gallery() -> Option<crate::ui::dynamic::DynamicComponent> {
         let app = crate::plan370_test_support::locate_example_app_at("charts-gallery")?;
@@ -293,7 +290,6 @@ mod plan499_donut_sector {
     }
 }
 
-#[cfg(feature = "ui-iced")]
 mod plan499_anim {
     fn build_gallery() -> Option<crate::ui::dynamic::DynamicComponent> {
         let app = crate::plan370_test_support::locate_example_app_at("charts-gallery")?;

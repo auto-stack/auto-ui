@@ -80,7 +80,6 @@ widget W {
     }
 
     /// VM 层锚: 同一 widget 源经 VM 编译链,style 类解析为 Width(Pixels)。
-    #[cfg(feature = "ui-iced")]
     #[test]
     fn view_prop_vm_style_width_lands() {
         let src = r##"
@@ -108,7 +107,6 @@ widget W {
     /// M1 复现(族 A2): 子组件(包组件同款单 VM 链)Init 内
     /// `f"w-[${slot}px] h-full"`——dollar-brace 插值 + 字面量方括号。
     /// 镜像 plan437_child_init 的内联夹具(同 with_registry_and_imports_from_decls 链)。
-    #[cfg(feature = "ui-interpreter")]
     mod child_fstr {
         fn build_inline(src: &str) -> crate::ui::dynamic::DynamicComponent {
             use auto_lang_core::ast::Stmt;
@@ -260,7 +258,7 @@ widget ChildGeo (data: List, field: str = "v") {
 /// 生产路径复现夹具: 拷贝 charts-gallery src/front 整树到临时目录,按
 /// (文件名, 旧串, 新串) 打补丁后经 build_dynamic_component 构建——真实
 /// load_package + child_decls 单 VM 编译链(M1 族 A2 / M4 族 C 消费)。
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 pub(crate) mod pkg_harness {
     use std::path::PathBuf;
 
@@ -345,7 +343,7 @@ pub(crate) mod pkg_harness {
 }
 
 /// M1 族 A2 vue 侧验证: 打补丁后的 bar_chart 经 vue SFC 生成。
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod m1_vue_fstr {
     #[test]
     fn vue_sfc_dollar_bracket_fstr_in_init() {
@@ -399,7 +397,7 @@ mod m1_vue_fstr {
 /// M1 族 A2 定案回归锚: dollar-brace + 字面量 [] 在生产包链必须全程存活。
 /// (484 记档的"整体失效"在 master 不可复现——金丝雀对照证明夹具可检出
 /// 真失败;判定误归因与族 C1 同现场,详见计划 M1 记录。)
-#[cfg(all(test, feature = "ui-iced"))]
+#[cfg(test)]
 mod m1_pkg_fstr {
     use super::pkg_harness::{build_patched_gallery, prepare_patched_gallery, render_dump};
     use crate::ui::vm_bridge::InitDemandPhase;

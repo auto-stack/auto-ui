@@ -2829,7 +2829,6 @@ pub struct DesktopSession {
     /// Plan 480 S3/S4：broker 孵化连接排队——`enable_broker` 的 serve 线程
     /// 生产（ProtocolHost 持 `&mut session` 不可跨线程，线程只搬运端点），
     /// `attach_pending_incubations` 在属主线程消费落 462 会话。
-    #[cfg(feature = "ui-iced")]
     pub(crate) broker_pending: Arc<
         Mutex<
             Vec<(
@@ -2842,20 +2841,16 @@ pub struct DesktopSession {
     /// Plan 480 S4：已落地的孵化连接表（per-app 管道名 → 连接状态）——
     /// 多 App 共享 host 的"每 App 一份"端点/表面驻留；ServiceTick 帧泵
     /// 周期 `pump_broker_clients` 驱动帧合成/回收。
-    #[cfg(feature = "ui-iced")]
     pub(crate) broker_clients: BTreeMap<String, crate::ui::desktop_protocol::stage3::BrokerClient>,
     /// Plan 480 S3：`enable_broker` serve 线程的停止旗标（boot 期进程级
     /// 常驻；持有以便将来显式停机）。
-    #[cfg(feature = "ui-iced")]
     pub(crate) broker_stop: Option<Arc<std::sync::atomic::AtomicBool>>,
     /// Plan 500 步骤 4：independent 臂像素桥（自带 iced 渲染宿主 + 隐藏窗
     /// 的 child 侧协议状态）。None = 非像素臂进程（既有路径零开销）。
-    #[cfg(feature = "ui-iced")]
     pub pixels: Option<crate::ui::desktop_protocol::pixels::PixelsChild>,
     /// Plan 505 B5（债 P480-R1）：broker 监听管道名（停机唤醒探测连接的
     /// 目标——serve_once 阻塞在管道 accept，一记"连上即关"使其返回见
     /// 旗标退出）。
-    #[cfg(feature = "ui-iced")]
     pub(crate) broker_pipe: Option<String>,
 }
 
@@ -3338,13 +3333,9 @@ impl DesktopSession {
             host: None,
             native_drag_watch: crate::ui::native_dock::DragWatch::new(),
             native_drag_over: None,
-            #[cfg(feature = "ui-iced")]
             broker_pending: Arc::new(Mutex::new(Vec::new())),
-            #[cfg(feature = "ui-iced")]
             broker_clients: BTreeMap::new(),
-            #[cfg(feature = "ui-iced")]
             broker_stop: None,
-            #[cfg(feature = "ui-iced")]
             pixels: None,
             broker_pipe: None,
         }
@@ -4230,7 +4221,6 @@ impl DesktopSession {
     /// 一记 probe 连接唤醒退出）。accepted 连接排队 [`Self::broker_pending`]；
     /// ProtocolHost 持 `&mut session` 不可跨线程，落会话由属主线程经
     /// [`Self::attach_pending_incubations`] 执行。
-    #[cfg(feature = "ui-iced")]
     pub fn enable_broker(&mut self, pipe_name: &str, stop: Arc<std::sync::atomic::AtomicBool>) {
         use crate::ui::desktop_protocol::broker::Broker;
         use std::sync::atomic::Ordering;
@@ -4265,7 +4255,6 @@ impl DesktopSession {
     /// serve_once（broker.rs 测试同款停机序）。桌面退出路径（Esc /
     /// exit 命令 / 全窗关闭 daemon 语义）统一调用；幂等（二次调用无旗标
     /// 即无操作）。serve 线程 v1"进程级常驻"语义就此收敛为随桌面停机。
-    #[cfg(feature = "ui-iced")]
     pub fn shutdown_broker(&mut self) {
         use std::sync::atomic::Ordering;
         let Some(stop) = self.broker_stop.take() else {
@@ -4301,7 +4290,6 @@ impl DesktopSession {
     /// Active（ProtocolHost ResolveAndAttach 同款动作臂，resolver = 桌面
     /// 既有 app registry）。**连接驻留** `broker_clients`（多 App 共享
     /// host：落地后持续泵帧/回收）。返回本次落地的虚拟窗列表。
-    #[cfg(feature = "ui-iced")]
     pub fn attach_pending_incubations(&mut self, budget_per_app_ms: u32) -> Vec<Wid> {
         use crate::ui::desktop_protocol::stage3::BrokerClient;
         let pending: Vec<_> = std::mem::take(&mut *self.broker_pending.lock().unwrap());
@@ -4343,7 +4331,6 @@ impl DesktopSession {
 
     /// 孵化 attach 单连接：端点泵到宿主 Active（预算收敛）。
     /// `self` 与 `client` 借用分离（map 已被 `mem::take` 取出）。
-    #[cfg(feature = "ui-iced")]
     fn broker_attach_one(
         session: &mut DesktopSession,
         client: &mut crate::ui::desktop_protocol::stage3::BrokerClient,
@@ -4376,7 +4363,6 @@ impl DesktopSession {
 
     /// PLAN-030 T-05：死亡检出后登记 respawn 意图（退避 1s/2s/5s 封顶；
     /// 预算 3 次/60s 窗——窗口起点随首登基线，耗尽 = 降级观测不炸）。
-    #[cfg(feature = "ui-iced")]
     fn schedule_shell_respawn(&mut self) {
         if self.desktop.shell_model != ShellModel::Outproc || self.desktop.shell_degraded {
             return;
@@ -4417,7 +4403,6 @@ impl DesktopSession {
 
     /// PLAN-030 T-05：看门兵一步（ServiceTick 消费——到期 respawn；full
     /// push 由 attach 侧指纹失效自动达成）。返回 true = 本次发起了 respawn。
-    #[cfg(feature = "ui-iced")]
     pub fn shell_watchdog_step(&mut self) -> bool {
         let Some(st) = self.desktop.shell_respawn else {
             return false;
@@ -4444,7 +4429,6 @@ impl DesktopSession {
 
     /// PLAN-030 T-04：壳 outproc 孵化（boot 序/看门兵共用——spawn + 句柄
     /// 驻留；attach 走 tick 泵 attach_pending_incubations）。
-    #[cfg(feature = "ui-iced")]
     pub fn launch_shell_outproc(&mut self) -> Result<(), String> {
         let geometry = self
             .desktop
@@ -4466,7 +4450,6 @@ impl DesktopSession {
 
     /// PLAN-030 T-04：向壳连接下行控制消息（投影/时钟/光标推送——update
     /// 线程直发，与泵同线程无竞态）。false = 壳不在场（inproc 轨走原路径）。
-    #[cfg(feature = "ui-iced")]
     pub fn push_shell_control(
         &mut self,
         msg: &crate::ui::desktop_protocol::message::ProtocolMsg,
@@ -4596,7 +4579,6 @@ impl DesktopSession {
 
     /// Plan 480 S4：多 client 日常泵——drain 全部在册连接（帧合成/Ack、
     /// 回收、上行）；断连/协议错的连接摘除。ServiceTick 帧泵周期调用。
-    #[cfg(feature = "ui-iced")]
     pub fn pump_broker_clients(&mut self) {
         if self.broker_clients.is_empty() {
             return;
@@ -4689,7 +4671,6 @@ impl DesktopSession {
 
     /// Plan 480 S4：桌面级指针按下路由——WM 命中 → 聚焦 → (Wid, event)
     /// 注入**命中窗所属 client** 的连接。返回是否路由成功。
-    #[cfg(feature = "ui-iced")]
     pub fn broker_pointer_down(
         &mut self,
         x: f32,
@@ -4735,7 +4716,6 @@ impl DesktopSession {
     /// PLAN-030 T-04：pointer release 生产路径（`broker_pointer_down` 的
     /// 收尾镜像——不聚焦不动 z；press→release 对成 click 的 child 侧
     /// 语义闭环）。
-    #[cfg(feature = "ui-iced")]
     pub fn broker_pointer_up(
         &mut self,
         x: f32,
@@ -4776,7 +4756,6 @@ impl DesktopSession {
     /// hit_test 命中窗），滚轮路由指针命中窗（hover 语义）。queued
     /// child 的 InputMsg 消费端（native/解释态投影器）同册受益。
     /// 桌面级键盘事件路由：焦点窗 → (Wid, KeyPressed) 注入。
-    #[cfg(feature = "ui-iced")]
     pub fn broker_key_event(&mut self, key: u32, modifiers: u8) -> bool {
         use crate::ui::desktop_protocol::message::{InputMsg, ProtocolMsg};
         let wid = {
@@ -4802,7 +4781,6 @@ impl DesktopSession {
     }
 
     /// 桌面级字符输入路由：焦点窗 → (Wid, CharTyped) 注入。
-    #[cfg(feature = "ui-iced")]
     pub fn broker_char(&mut self, ch: char) -> bool {
         use crate::ui::desktop_protocol::message::{InputMsg, ProtocolMsg};
         let wid = {
@@ -4826,7 +4804,6 @@ impl DesktopSession {
     /// 桌面级 IME 提交路由：焦点窗 → (Wid, ImeCommit) 注入
     /// （PLAN-026 T-05——broker_char 同型；宿主 iced IME 事件订阅缺口
     /// 并入 P025-D1 在册债，协议级注入为证据承载口径）。
-    #[cfg(feature = "ui-iced")]
     pub fn broker_ime_commit(&mut self, text: &str) -> bool {
         use crate::ui::desktop_protocol::message::{InputMsg, ProtocolMsg};
         let wid = {
@@ -4853,7 +4830,6 @@ impl DesktopSession {
     /// 桌面级 IME preedit 路由：焦点窗 → (Wid, ImePreedit) 注入
     /// （组合串 + 组合内选区——PLAN-690 T-03 起 wire 语义为字节区间；
     /// 候选窗定位矩形走下行 ImeRequest.cursor，不在此列）。
-    #[cfg(feature = "ui-iced")]
     pub fn broker_ime_preedit(&mut self, text: &str, selection: Option<(usize, usize)>) -> bool {
         use crate::ui::desktop_protocol::message::{InputMsg, ProtocolMsg};
         let wid = {
@@ -4879,7 +4855,6 @@ impl DesktopSession {
     }
 
     /// 桌面级 IME 取消路由：焦点窗 → (Wid, ImeCancelled) 注入。
-    #[cfg(feature = "ui-iced")]
     pub fn broker_ime_cancelled(&mut self) -> bool {
         use crate::ui::desktop_protocol::message::{InputMsg, ProtocolMsg};
         let wid = {
@@ -4902,7 +4877,6 @@ impl DesktopSession {
 
     /// 桌面级滚轮路由：指针命中窗（hit_test）→ (Wid, Scroll) 注入
     /// （窗内 Scrollable 定位在 child 投影器侧——wire Scroll 无坐标）。
-    #[cfg(feature = "ui-iced")]
     pub fn broker_scroll(&mut self, x: f32, y: f32, dx: f32, dy: f32) -> bool {
         use crate::ui::desktop_protocol::message::{InputMsg, ProtocolMsg};
         let wid = {
@@ -4926,7 +4900,6 @@ impl DesktopSession {
     /// PLAN-029 T-02（D1）：live 输入生产路由——`DesktopEvent::LiveInput`
     /// update 臂唯一入口；broker_* 六函数零改动直用（键盘/IME = 焦点窗、
     /// 滚轮 = last_cursor 命中窗）。返回是否路由成功（观测/e2e 断言用）。
-    #[cfg(feature = "ui-iced")]
     pub fn route_live_input(&mut self, input: &LiveInput) -> bool {
         match input {
             LiveInput::KeyPressed { key, modifiers } => self.broker_key_event(*key, *modifiers),
@@ -4955,7 +4928,6 @@ impl DesktopSession {
 
     /// 宿主动作落会话（与 `host::ProtocolHost::handle` 的动作臂同构；
     /// per-client 表面/shm/wid 映射挂在 [`stage3::BrokerClient`] 上）。
-    #[cfg(feature = "ui-iced")]
     fn broker_apply_actions(
         &mut self,
         client: &mut crate::ui::desktop_protocol::stage3::BrokerClient,
@@ -5429,7 +5401,6 @@ impl DesktopSession {
     }
 
     /// Plan 480 S4：测试/渲染断言口——wid → 该 client 当前合成面。
-    #[cfg(feature = "ui-iced")]
     pub fn broker_composed(
         &self,
         wid: Wid,
@@ -5441,7 +5412,6 @@ impl DesktopSession {
     }
 
     /// Plan 480 S3：测试口——排队中的孵化连接数。
-    #[cfg(feature = "ui-iced")]
     pub fn pending_incubations(&self) -> usize {
         self.broker_pending.lock().unwrap().len()
     }
