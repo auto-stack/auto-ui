@@ -2,6 +2,8 @@
 
 2026-10-30，讨论稿 v4，取代同路径v3草图；v1/v2/v3保留在Git历史。依据[共同作者模型](declarative-authoring-model.md)和用户本轮命名决定。只写Markdown，不创建或运行产品源码，不分配Plan或更改在途合同。
 
+2026-10-31状态补记：016已交付有限Node2D验证，本文完整源码仍不是已可编译的示例。后继[auto-ui/017](../../plans/017-autographics-g11-2d-node-authoring.md)与[ag-examples/007](../../../../ag-examples/docs/plans/007-autographics-gallery-g11-2d-node-migration.md)仅规划原G11/2d等价迁移，精确边界见[阶段设计](g11-2d-node-authoring-completion.md)：保原事件节奏/危险图形写策略/accepted新Run与51项检查；下文“去除预算技巧”、集合API、App/key局部重建等仍为目标提案，不作为这两份计划新增验收。
+
 ## 1. 已确认写法与仍属提案的部分
 
 用户已选择：以node统一组件定义，widget经明确迁移后退役；view/view-2d/view-3d分别声明UI/2D/3D内容；纯二维声明直接使用view-2d，无需额外包装；model、呈现和on默认内聚同一Node；Life作为系统事件命名空间；msg { Collect(Key) }直接声明本Node事件；前导点引用当前实例成员。use用于复用真正的组件、资源与函数，不把关卡view另外拆成需重复映射全部model的MainScene。

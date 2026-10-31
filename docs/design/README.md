@@ -5,5 +5,6 @@ AG实验代码与实现计划已归本仓；旧canonical Specs与历史设计继
 | 专题 | 范围/状态 |
 |---|---|
 | [AG声明与组件作者模型](autographics/declarative-authoring-model.md) | 2026-10-30总体目标回归；AutoUI式声明/组件/绑定/事件，AG-A01..09；六项细节为讨论建议，未实施 |
+| [G11/2d Node完整作者能力](autographics/g11-2d-node-authoring-completion.md) | 2026-10-31规划v1；016最小验证已交付；auto-ui/017补能力→ag-examples/007迁移原001二维，保51项/原额/旧三维；暂不实施 |
 | [AG M2表现与资源](autographics/m2-presentation-and-resources.md) | 规划v1；本仓004/005/006串行，Gallery内容另仓，均未实施 |
 | [AG公共声音与HUD](autographics/m2-public-audio-and-hud.md) | 012公共音频已交付；013/HUD与Gallery005/006后继独立 |
