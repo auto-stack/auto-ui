@@ -1,6 +1,6 @@
 ---
 plan_id: PLAN-016
-status: reviewed
+status: archived
 feature_name: AutoGraphics Node2D最小真实执行验证
 author: [Codex]
 created_at: 2026-10-30
@@ -137,7 +137,7 @@ T-02最多比较两种既有端口接法，必须均复用共同语法/Core解�
 | AC-04 | work | Player真实运动/接触→正确父事件→条件差量真实销毁Coin；重复/错receiver/假隐藏负控，V-03 |
 | AC-05 | work | Stop/fresh/旧代、正常及失败owner终态20轮；合法共享资源寿命准确，V-04 |
 | AC-06 | work | 120tick真实GPU、完整预算/守护负控、独立消费A→B与损坏恢复，旧profile/受影响UI路径保持；V-05 |
-| AC-07 | review | 独立重建AC/V/S/SD和模块/实例数据流、遗漏/延后/workaround/格式/warning检查，无未处置finding；merge门pending |
+| AC-07 | review | 独立重建AC/V/S/SD和模块/实例数据流、遗漏/延后/workaround/格式/warning检查，无未处置finding；merge门pending（R1 needs_fix 11项→修复→R2 pass，同员复审） |
 | AC-08 | merge | 冻结提交定向门与有效复用审核通过、真实合入本仓，SD新Spec准确沉淀且不发布未实现能力；全AG里程碑pending |
 | AC-09 | merge | 本Plan/来源导航归档，唯一树/分支/空组fresh guard clean后安全清理，EXE/原证据恢复映射与实际回读完整 |
 
@@ -195,3 +195,168 @@ T-02最多比较两种既有端口接法，必须均复用共同语法/Core解�
 | D-04 | 独立终审上下文及必需实际GPU环境 | T-06交接按后续用户安排或已授权资源核；没有证据保持pending，不伪称独立pass |
 
 无须本轮重新决定已确认作者方向；以上是未来执行的依赖/机制关闭项，用户本轮“暂不实施”持续有效。
+
+
+## 11. 执行合同（T-02 冻结版全文，自 attachments/016/work/node2d-contract.md 折叠并按 2026-10-31 裁定删除附件目录）
+
+# PLAN-016 Node2D 执行合同（T-02 冻结）
+
+status: frozen（T-02 go；原型整链已实测通过）
+plan: PLAN-016 r3 · auto-ui · tree `D:/autostack/.wt/ui-016/auto-ui` · branch `codex/plan-016-dev`
+work base_commit: 69690dfb8e0b691a9af8d9e1eacc240511d2e83e（master tip，含 PLAN-013 交付 `8b1e799`、归档 `60e6d48`）
+SDK pin: `7b987ca8`（`research/baseline.json.txt` sdk.repository_commit；`tools/prepare_sdk.py --from-snapshot` 681 files PASS，`.sdk-source` 本地 prepared，不入 Git）
+只读依赖: `D:/autostack/auto-lang` @ `3fa75dd9`（只读引用，无写面）；AGP 同仓 path dep。
+原型证据: `D:/autostack/plan-artifacts/auto-ui/plan-016/probe/t02-prototype.log` SHA256 `1e54b98f5cdf9a1dfbd9e172e30b51de4bc39246e329500efcaa20e628e72a19`（`cargo test --locked --offline --test plan016_probe -- --test-threads=1 --nocapture` exit 0，2 passed / 0 failed）。
+
+## 1. 接法比较（T-02 上限两种，实测裁定）
+
+**(a) 生产 UI 模块/编译服务执行有限 Node 实例 —— 结构性排除，不改生产代码。**
+证据（代码即设计，非缺陷）：VM merged 模式是"单一统一状态对象"，子件 model 字段按名合并、先到先得去重（`crates/auto-ui-runtime/src/ui/vm_bridge.rs:894-916`，Plan 370 D-GAP-4 注释原文）；`ensure_child_state` 把子 props 写进 ROOT 状态对象（`:1791-1839`）；状态实例唯一 `{Widget}_State`（`:972-975`）；handler 派发按 `handler_<Widget>_<Event>` 无实例 receiver（`:3517-3611`）。两个同定义实例的隔离状态需要生产运行时新增每实例状态机制 = 通用 UI 行为变更，违反本计划"显式 pilot 隔离路径/旧 profile 不改"边界（§5.2、§6），故不实施、不修生产面。
+
+**(b) 共同领域模型 → 局部研究 adapter → 固定 AG 运行服务 —— 选中，原型已实测通过。**
+全部复用既有面：dialect 解析器（共享 lexer/parser）、`resolve_use_module`/SDK `resolve_module_path` 模块定位、AG `Triggers2V1` 组合 profile（= triggers+objects+camera2+character2+motion+sweep+segment+spatial+base，`assembly.rs` 组合链）、`SourceSnapshot::admit` 准入、`Session` CPU 分片执行、Host/AGP 真 GPU 离屏。**驱动与本仓生产 crate 零改动**（原型的 driver tests/ 文件为 T-02 探针，T-04 被 `node2d_flow` 取代后删除）。
+
+## 2. 整链分段（file/symbol/owner/写面）
+
+| # | 段 | 输入→输出 | 位置/符号 | owner | 写面 |
+|---|---|---|---|---|---|
+| 1 | 模块工程 | `fixtures/minimal/{main,resources,types,player,hazard,coin,patrol}.at` | pilot workspace 内 fixture | work | 新增 |
+| 2 | 领域解析 | 源码文本→Node2D 研究 AST（node/params/model/msg/view-2d/on、Life.*、匿名 msg、前导点） | `auto-ui-dialect` 新增研究 dialect（不动 `UiDialect` 旧路径；旧 widget 解析字节不变） | work | 新增文件+测试 |
+| 3 | 模块绑定 | `use` → SDK `resolve_module_path`/`resolve_use_module` 定位、逐文件解析、定义表 | `auto-ui-compiler` `ui_ast.rs`（只消费），测试 `tests/node2d_pilot.rs` | work | 仅新增测试 |
+| 4 | 校验/诊断 | 缺模块/错导出/类型错/坏 actor ref/重复绑定 → 带行列位置拒绝（执行前） | pilot `validate`（消费 2/3 的 AST 与 span） | work | pilot |
+| 5 | 实例 lowering | 定义表+实例表 → 单文件 Auto 用户源（SoA 存储/逐实例 handler/事件绑定表/编排 app_start·app_update）+ 场景文档 | pilot `lower`；`SourceSnapshot::from_bytes_for(_, Api::Triggers2V1)` 准入 | work | pilot |
+| 6 | 执行 | `Session::new(combined)`、`_ag_reset/_ag_identity/_ag_append_field/_ag_spatial_config/_ag_*_map/_ag_start`、`_ag_tick(t, 1/60)`（`_ag_char_input` 宿主侧每 tick 一次采样） | driver `Session`（未改） | 复用 | 无 |
+| 7 | GPU 呈现 | pilot 场景文档工程 → `Host::with_project` → start → `h.frame(None)` 泵 → `rt.probe_pixels`/`capture` PNG | AGP `SurfaceRuntime/OffscreenTarget/capture`（未改）；模式同 `tests/public_hud_consumer.rs` | 复用 | 无 |
+| 8 | 观测/验收 | 纯 Auto 零消耗 getter（状态）+ `_ag_status/_ag_error_argument`（fault）+ GPU ROI/像素 + `verify_plan016.py --controls` | pilot tests + tools | work | pilot |
+
+## 3. Lowering 冻结规则（原型实测得出，违反即红）
+
+1. **存储**：每 node 定义一组 SoA 数组（`h_phase=[]` 等），实例索引寻址；定义→单 handler + 实例参数。根 node 用标量。根/实例同名字段不共享（哨兵 oracle）。
+2. **事件**：匿名 `msg` → 业务 handler fn；`emit`/前导点绑定 → 生成端绑定表（Auto 数组），投递为真实 Auto 调用，receiver 由表驱动；枚举载荷降为 int 常量（`Key.Amber=0`）；`ActorRef2D` → AG 运行时 handle int。系统事件不进 msg：`Life.Start` → `app_start` 内逐实例 starts=1 + 初始化；`Life.Tick(dt)` → `app_update` 内固定顺序逐实例调用。
+3. **tick 顺序**（每 `_ag_tick`，固定）：输入采样（宿主 `_ag_char_input` 一次）→ Player（`ag_action_held`→`ag_char_move` 扫掠）→ Hazard 逐实例 patrol（条件三角波）→（AG end-of-tick 触发 evaluate）→ 下一 tick 事件读取→守卫→`Collect`→条件差量（真 despawn，非 hidden）→ 呈现数据随 admitted block 走。
+4. **禁止**：float `%`（准入可过、VM 执行 sticky fault，用三角波条件式）；直接引用/调用保留名（`fields`/`_ag_*`，准入拒绝）；顶层非 const 初始化器；`use` 进入 AG 准入（模块已在 lowering 前解析）。声明先于使用（VM 源序编译）。
+5. **场景模板**：模板行必须停靠在玩法区外（原型：(-100,-100)），实例从模板 spawn；角色行在 `ag_char_bind` 前落位（原型 (2,1)），否则 born-overlap（motion status=4/3）永久锁死运动。
+6. **预算（实测形状）**：共享 32 credits/tick 池 = `_ag_cast_charge` 系（held 1 + move_and_slide 24 + scan 1）+ objects ops（spawn/move/despawn 各 1）+ trg 读（event_next/pair 各 1）。收集 tick 全分支 **恰 32**：held1+char_move26（24 sweep+2 scan，实测校准）+2×hazard move+event_next1+pair1+despawn1=32；第 33 个计费调用 → 命名 sticky fault 10（已测）；objects ops 超 32 → fault 37（objects 单元自带守护，AG 既有测试覆盖）。VM 分片 1000steps/2ms、100000steps/120resumes/250ms、30s init/2s tick/8ms pump 目标照旧（`Session`/`Play` 未改）。
+7. **读回**：验收读回必须走**纯 Auto getter**（读用户状态，零计费）。`ag_object_alive` 等计费读取每 tick 限次并在 tick 分支内预算；任何直接会话调用落在 tick 间会叠加上一 tick 余量（原型 get_c_alive 事故=合同依据）。声明返回类型与读取 `ResultKind` 必须一致；VM 层跨 fn 返回可能 float 化（camera 实测 2.0f），累加器一律用 float。
+8. **生命周期**：`Play`/Host 的 Start 一次/Pause 无 tick/Step 恰一中性 tick/Resume 不重 Start/Stop 回编辑态、8 槽对象/8 对触发/代次 handle（旧代跨 run fault 33/32）全部复用未改；pilot 20 轮短例只做观测（V-04）。
+
+## 4. 冻结入口与命令
+
+- dialect: `cargo test -p auto-ui-dialect --test node2d_pilot`（研究域解析+诊断，V-01）
+- compiler: `cargo test -p auto-ui-compiler --test node2d_pilot`（模块绑定/定位诊断，V-01）
+- pilot: `cargo test --manifest-path experimental/autographics-node2d-pilot/Cargo.toml --locked --offline --test node2d_lower_gates -- --test-threads=1`（降层负面门 9 例：错导出/坏引用/未知属性/重复绑定/Life.Frame 越界/Start 同名共存区分/合法对照；R1 修复新增）
+- driver: `cargo test --locked --offline --test node2d_flow -- --test-threads=1`（整链 V-02..05 六例；GPU 用例单实例串行）
+- 工具: `python experimental/autographics-node2d-pilot/tools/verify_plan016.py --controls`（源身份/负控；0selected 拒绝）
+- 准入面: `Api::Triggers2V1` 单一 profile；pilot 源闭包 ≤256KiB 用户/96KiB 桥/352KiB 合计；资源用场景文档程序化图元，不加新资源格式。
+- 消费 A→B（T-06）：A=本树构建；B=独立导出目录+冷 `.sdk-source`（`prepare_sdk.py --from-snapshot`）+独立 target，`--locked --offline` 同输入同结果。
+
+## 5. 已知边界（不冒称支持）
+
+view-3d/portrait/widget 与混合嵌套、Life.Frame、多呈现选择器、PNG/GLB 导入、完整 G11（三 Coin/伤害/终点/Enter 新局）、ECS/一Node一VM、生产 UI 融合——均非本合同交付。设计语法中的 `emit` 关键字与 refs/export 端口在研究入口内按上述第 2 条降实现，不声明为最终语言形态（SD 只写实测能力）。
+
+## 3a. T-04 实施修订（实测冻结，原 S3 条目增补/更正）
+
+1. **服务操作更名**：`refs.body.move(...)` 与 Core `move` 运算符冲突（解析为 Move 包装），研究服务名冻结为 `refs.body.move_to(x, y)`（AG `ag_object_move` 绝对置位语义）。
+2. **输入模型冻结**：`input.axis(Left, Right)` 映射为 `ag_action_held(1)` 单次计费（计划预算算式 "1snapshot" 的依据；完整差值轴为后继项，SD 如实记录）。
+3. **生成物架构**：pilot crate（tip 依赖树）只做 load/validate/lower，**不依赖 driver**（pinned-SDK 树与 tip 树不得同图，同包名冲突实测）；生成物 `generated/{world.at,scene.agscene,identity.json}` 提交为冻结数据，driver 侧 `tests/node2d_flow.rs` 以 include_str! 消费；`verify_plan016.py` 再生成并断言字节等价（再生控制）+ 身份校验。
+4. **Op 形态勘误**：auto-val `Op` 变体为 `Neq/Ge/Le`（不存在 NotEq/Gte/Lte）；Rust match 中未知变体名会静默成为绑定臂（曾致 `>` 译成 `!=`）——翻译面以真实变体冻结，警告必须清零。
+5. ** Int 字段初值**按 int 形态发射（getter 类型与读取期一致）；赋值语句不加括号；`emit` 目标事件名 snake 化。
+6. **观测面**：char 定义（冻结场景表 row 0）emit `get_player_node_x/y`（`ag_local` 纯读零计费）；全部读回走纯 Auto getter，任何计费读取每 tick 限次。
+7. **实测预算**（生成世界，Triggers2V1）：普通 tick ≈30 credits；收集 tick 恰 32（held 1 + char_move 26＝24 sweep+2 scan + 2×hazard move + event_next 1 + event_pair 1 + despawn 1；R1 修正算式，实测值 32 不变）；第 33 个计费调用 → sticky fault 10（flow 测试断言）。
+
+## 6. 阶段门
+
+- T-02 go：本合同+原型通过（已满足）。T-03 起按 §2 写面实施；改 §3 规则或预算先修订本合同再实施。
+- 原型探针文件 `experimental/autographics-auto-driver/tests/plan016_probe.rs`：T-02 原型工件，随 T-04 `node2d_flow` 落地删除（superseded），删除记录写 §9。
+
+
+## 12. work 移交 readiness（T-06/R1 修复后全文，自 attachments/016/work/t06-readiness.md 折叠）
+
+# PLAN-016 work 移交 readiness（T-06 完成时点）
+
+date: 2026-10-31 · tree: D:/autostack/.wt/ui-016/auto-ui · branch: codex/plan-016-dev
+base_commit: 69690dfb8e0b691a9af8d9e1eacc240511d2e83e（master，含 PLAN-013 交付 8b1e799）
+code_commit: 见 §9 最终移交收据（T-06 提交）
+dependency_revisions: SDK 7b987ca8（driver .sdk-source，source-lock 校验）；auto-lang 只读引用（生成器树 3fa75dd9、语言仓零写面）；auto-down 只读兄弟树（runtime dev-deps）
+合同: attachments/016/work/node2d-contract.md（含 §3a T-04 实测修订）
+
+## 工作侧 AC 结果（全部闭合，证据=当前提交上的命名测试断言）
+
+| AC | 结果 | 证据 |
+|---|---|---|
+| AC-01（013基线/唯一入口/预算先冻结） | pass | G-01：013 归档 60e6d48/交付 8b1e799 实读；合同 §1/§2 冻结（接法比较 (a) 结构性排除附代码行证据，(b) 原型整链 t02-prototype.log SHA 1e54b98f）；无第二解释器：生成物由 pinned SDK 真编译执行；语言仓写面 0 |
+| AC-02（node/view-2d/Life/msg/use 真实生效+诊断） | pass | auto-ui-dialect tests/node2d_pilot 6/6（真实夹具解析、6类定位拒绝、UiDialect opt-out）；auto-ui-compiler tests/node2d_pilot 6/6（模块定位/错导出/缺模块/跨模块 fn 池化）；改 helper 敏感性=verify_plan016 夹具变异控制（world 必变） |
+| AC-03（H1/H2 同定义独立状态/receiver/订阅；Start/Tick 调度） | pass | flow_minimal_world_instances_events：双 Hazard 相位/计数独立匹配独立 oracle、根 phase 哨兵不动、starts 各 1、ticks=收集 tick；receiver 隔离另见 flow_supplement |
+| AC-04（Player 真实运动→父事件→条件差量真销毁；负控） | pass | 同上：player node x 精确=2+2t/60（真扫掠）；真事件→main_collect→coin slot free（AG 帧层）+ GPU 金类消失；重复收集幂等；"只有 hidden" 负控=slot generation/存活断言（hidden 保持 live）；错 receiver=flow_supplement（b 未被投递） |
+| AC-05（Stop/fresh/旧代/owner 终态 20 轮） | pass | flow_host_pause_step_neutral_and_20_rounds（Pause 不推进/Step 恰一中性 tick/20 轮 stop-fresh tick 归零/币复活/终态健康）；flow_cpu_20_round_session_owner_release（20 轮 owner probe：开=持、释放后=无）；旧代=flow_budget（stale handle 故障 33、新根不沾染） |
+| AC-06（120tick GPU、预算/守护负控、A→B、旧触面保持） | pass | flow_gpu_project_pixels_and_real_despawn（120 tick 窗口内 GPU 像素三层证据）；预算=满池 33rd 调用故障 10 + verify_plan016；A→B=consumerB（git archive 新根 + auto-lang 3fa75dd9 只读 + 冷 .sdk-source 681 files）再生字节等价（f66b1b92/4bd54fa3）且 driver node2d_flow 在 B 上执行通过；旧触面=driver/生产 crate src 零 diff（本计划 driver 侧仅新增 tests/），legacy profile 字节无触 |
+
+## 开放 in-contract findings / 缺口 / 未决合同决定
+
+- 无工作侧未闭合 finding。合同 §10 D-04（独立终审上下文）归 review 阶段；
+  D-01/D-02/D-03 已由 T-01/T-02 闭合（013 已归档；接法 (b) 冻结；refs/msg/
+  预算细节已实测冻结入 §3/§3a）。
+
+## 受影响既有用例重放
+
+- driver 生产源零改动 → legacy profile 组合字节/行为无可影响面（复用既有
+  全绿证据，未重复全量回归；统一回归门按工作流归 review/merge 所有，保持
+  pending）。
+- 主仓 crates/ 触面：auto-ui-dialect（仅新增 node2d 模块与测试）与
+  auto-ui-compiler（仅新增测试）——两 crate 全量套件实跑全绿
+  （dialect 95+6+2，compiler 1123+9+6+1+3，0 failed）。
+- 阴性集：合同 §3 各禁止项均在测试或实测中闭合（float % 运行期拒绝、
+  保留名准入拒绝、声明先于使用、非 const 顶层初始化、重复根符号）。
+
+## 本次实跑的测试（当前提交）
+
+1. cargo test -p auto-ui-dialect --test node2d_pilot（6 passed）
+2. cargo test -p auto-ui-compiler --test node2d_pilot（6 passed）
+3. cargo test --manifest-path experimental/autographics-node2d-pilot/Cargo.toml
+   --locked --offline（生成器构建+verify 工具自检）
+4. python .../tools/verify_plan016.py --controls（PASS exit0，日志
+   plan-artifacts t06-verify.log SHA 139ff823）
+5. cargo test --locked --offline --test node2d_flow -- --test-threads=1
+   （6 passed 0 failed，driver 树）
+6. consumerB：git archive 新根 + auto-lang@3fa75dd9 + prepare_sdk 681 files
+   → node2d-lower 再生 sha f66b1b92/4bd54fa3 与 A 逐字节等价 → driver
+   node2d_flow 全量 6 passed exit0（B 消费不借生产者构建状态；日志
+   plan-artifacts/auto-ui/plan-016/t06-consumerB.log）
+
+## 身份
+
+- generated/world.at 4858B sha f66b1b927e50c52f96242600deaab84e9f10b2759a881c878d5cfc85048c0c41
+- generated/scene.agscene 绑定上 sha（triggers2d + byte_length 4858）
+- generated-supplement/world.at 3764B sha 4bd54fa364aa8fd136d7a18a820bf2a921e3e6d08fd3648f4460286c9e250b19
+- 夹具 14 文件 sha 见 verify_plan016 PASS 行（t06-verify.log）
+
+## R1 修复闭合（2026-10-31，独立终审 R1 needs_fix → 本轮 repair）
+
+| Finding | 关闭方式 | 证据 |
+|---|---|---|
+| F-01 错导出 | `validate_closure` 错导出定位拒绝 + `wrong_export_rejected` 负测 | pilot gates 9/9 |
+| F-02 坏 actor 引用 | `refs.<未知实例>` 定位拒绝 + `unknown_actor_ref_rejected` | 同上 |
+| F-03 未知实例属性 | 属性名不在参数表 → 定位拒绝 + `unknown_instance_property_rejected` | 同上 |
+| F-04 重复局部绑定 | 参数/model 字段重名定位拒绝 + 两个负测 | 同上 |
+| F-05 fmt | `rustfmt --edition 2021` 已应用到 driver 测试与全部触面 | fmt --check exit 0 |
+| F-06 warnings | dialect 2、dialect 测试 3、pilot 3、driver 1 全清（触面 0 warning） | 构建输出 |
+| F-07 合同命令 | 合同 §4 更正为 pilot `--test node2d_lower_gates` + driver `--test node2d_flow` | 合同 diff |
+| F-08 预算算式 | held1+char_move26(24+2)+2+1+1+1=32 修正入合同/SD（实测 32 不变） | 合同/SD diff |
+| F-09 Life.Frame | 解析层显式越界拒绝 + `life_frame_out_of_scope_rejected` | 同上 |
+| F-10 Start 同名区分 | `life_start_and_business_start_are_distinct`（lifestart vs start 两 fn、调用面分离） | gates 9/9 |
+| F-11 化妆项 | schema/6 注释、verify docstring、重复 node 声明带行号（node.span） | diff |
+
+修复后电池：dialect 6/6、compiler 6/6、pilot gates 9/9、driver flow 6/6、
+verify --controls PASS exit0（t06-verify-r2.log）；生成物 sha 不变
+（f66b1b92/4bd54fa3——拒绝面不触碰已冻结世界）；dialect 全量套件 0 failed。
+修复提交：9eb1d0e（见 §9）。
+
+## review/merge-owned 待办（不阻塞移交）
+
+- T-07 同树独立 final review（D-04 上下文按 §6 既有安排）；
+- T-08 冻结定向门（本计划命名用例 + 上述负控 + fmt/diff 检查）与合入；
+- T-09/T-10 归档与清理（merge 所有）。
+
+
+> 2026-10-31 归档折叠：以上两附录为 docs/plans/attachments/016/ 全部留存记录；
+> 附件目录已按证据合并裁定删除，原始本地副本随 plan-artifacts 保留窗口管理。
