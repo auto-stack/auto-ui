@@ -895,7 +895,8 @@ fn collect_basic(project: &Project, profile: BasicProfile) -> Result<Collected, 
             }
         }
     }
-    if out.nodes.len() + out.nodes.iter().filter(|n| n.is_group).count() > 128 {
+    // 层级服务上限：objects + groups 总和 ≤128（nodes 已含组，不再重复计）。
+    if out.nodes.len() > 128 {
         return Err(unsupported("basic2d scene exceeds 128 nodes"));
     }
     if let Some(cam) = &out.camera {

@@ -185,7 +185,6 @@ fn basic2d_character_walk_lands_and_walks_per_oracle() {
     let mut x = 0.0f32;
     let mut y = 1.0f32;
     let mut vy = 0.0f32;
-    let mut grounded = false;
     let ground_y = 0.0f32;
     for t in 1..=40 {
         step(&mut h, 1 << 1); // right held
@@ -205,16 +204,11 @@ fn basic2d_character_walk_lands_and_walks_per_oracle() {
         if new_y - 0.5 <= support + 0.002 {
             y = support + 0.5 + 0.002;
             vy = 0.0;
-            grounded = true;
         } else {
             y = new_y;
-            grounded = false;
         }
-        if grounded {
-            x += dx;
-        } else {
-            x += dx; // air control identical (original moves in air too)
-        }
+        // horizontal: the original moves on ground and in air alike.
+        x += dx;
         // wall x=14: stop.
         if x >= 14.0 - 0.4 {
             x = 14.0 - 0.4;
@@ -699,6 +693,20 @@ fn basic2d_scene_g01_alpha_rules_and_variants() {
     let p = pixel_classes(&mut pos);
     let pos_px: Vec<_> = p.iter().map(|(_, c)| *c).collect();
     assert_ne!(base_px, pos_px, "v-position capture differs from base");
+    // 原 B01-11 规则：蓝移开后重叠混合消失、蓝本身保留（blue class 保持
+    // 在网格采样容差内，red class 因不再被蓝覆盖而增加）。
+    let blue_pos = count_class(&p, "blue");
+    let blue_base = count_class(&b, "blue");
+    assert!(
+        blue_pos * 4 >= blue_base * 3,
+        "blue preserved in v-position: {blue_pos} vs {blue_base}"
+    );
+    assert!(
+        count_class(&p, "red") > count_class(&b, "red"),
+        "red uncovered in v-position: {} vs {}",
+        count_class(&p, "red"),
+        count_class(&b, "red")
+    );
     pos.stop_play();
 
     let mut color = start_with(SCENE_G01_COLOR, None, "g01-color");

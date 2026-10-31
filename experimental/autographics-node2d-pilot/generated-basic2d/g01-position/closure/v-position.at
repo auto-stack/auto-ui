@@ -1,20 +1,20 @@
-// PLAN-019 g01 v-position variant: the red disc instance moved onto the blue
-// quad (same sizes) — the overlap hides the a0.5 red under the later-drawn
-// blue; blue stays visible (B01-11). Pure instance param change.
+// PLAN-019 g01 v-position variant: the blue quad moved to x=40 — the original
+// B01-11 rule separates the two a0.5 objects so the red/blue overlap blend
+// disappears while blue itself stays visible at its new spot.
 use resources: red_alpha, blue_alpha, green_alpha, yellow_opaque
 use shapes: Disc
 
 node Main {
     view-2d {
         Disc red_disc {
-            x: 0.0
-            y: 0.0
+            x: -20.0
+            y: 10.0
             diameter: 30.0
             tint: resources.red_alpha
         }
         shape2d blue_quad {
             kind: quad
-            position: (0.0, 0.0)
+            position: (40.0, 0.0)
             size: (30.0, 30.0)
             material: resources.blue_alpha
         }

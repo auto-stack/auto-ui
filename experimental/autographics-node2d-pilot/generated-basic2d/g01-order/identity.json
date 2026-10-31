@@ -3,11 +3,11 @@
  "api": null,
  "user_source_sha256": null,
  "user_source_bytes": 0,
-  "module:resources": "6885b7f517fd9e2e08f725589085c8c1a96272fc4f7b68ffaee9eb5d72a5aac1",
+  "module:resources": "e0caad8df7fcfde39d4ea2e31f15f7540a0b19e2ef0ba781a53663efc3223cbc",
   "module:shapes": "a2c54d836b3a54f379aab5db7a38ba60e0b647ee2536a7c01dd8e8f2cccb9618",
   "module:v-order": "51db6e05b309fe145c4cb8c64f5f8a235454d7a516c8be7ee57ac64f16f301c3",
  "closure": [
-  {"name": "resources", "sha256": "6885b7f517fd9e2e08f725589085c8c1a96272fc4f7b68ffaee9eb5d72a5aac1", "bytes": 580},
+  {"name": "resources", "sha256": "e0caad8df7fcfde39d4ea2e31f15f7540a0b19e2ef0ba781a53663efc3223cbc", "bytes": 580},
   {"name": "shapes", "sha256": "a2c54d836b3a54f379aab5db7a38ba60e0b647ee2536a7c01dd8e8f2cccb9618", "bytes": 463},
   {"name": "v-order", "sha256": "51db6e05b309fe145c4cb8c64f5f8a235454d7a516c8be7ee57ac64f16f301c3", "bytes": 999}
  ],

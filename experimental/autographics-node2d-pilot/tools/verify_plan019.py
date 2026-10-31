@@ -257,6 +257,10 @@ def verify_build_record(record_path: pathlib.Path, generator: pathlib.Path) -> i
     assert record["generator"]["sha256"] == actual, (
         f"generator binary drifted: record {record['generator']['sha256'][:12]} vs {actual[:12]}"
     )
+    # 冻结合同：Cargo 锁是来源边界的一部分，漂移即拒绝。
+    assert record["workspace_lock"] == sha((ROOT / "Cargo.lock").read_bytes()), (
+        "workspace Cargo.lock drifted from the record"
+    )
     assert record["products"] == product_hashes(), "product hashes drifted from the record"
     print(f"PASS build record: generator {actual[:12]} + {len(record['products'])} products match")
     return 0

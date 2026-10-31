@@ -4,11 +4,11 @@
  "user_source_sha256": null,
  "user_source_bytes": 0,
   "module:main": "69940ee9e7a9d909b7735b0e6bc9cf4abd550c88b1961a9ee0db182d9127c02b",
-  "module:resources": "6885b7f517fd9e2e08f725589085c8c1a96272fc4f7b68ffaee9eb5d72a5aac1",
+  "module:resources": "e0caad8df7fcfde39d4ea2e31f15f7540a0b19e2ef0ba781a53663efc3223cbc",
   "module:shapes": "a2c54d836b3a54f379aab5db7a38ba60e0b647ee2536a7c01dd8e8f2cccb9618",
  "closure": [
   {"name": "main", "sha256": "69940ee9e7a9d909b7735b0e6bc9cf4abd550c88b1961a9ee0db182d9127c02b", "bytes": 1139},
-  {"name": "resources", "sha256": "6885b7f517fd9e2e08f725589085c8c1a96272fc4f7b68ffaee9eb5d72a5aac1", "bytes": 580},
+  {"name": "resources", "sha256": "e0caad8df7fcfde39d4ea2e31f15f7540a0b19e2ef0ba781a53663efc3223cbc", "bytes": 580},
   {"name": "shapes", "sha256": "a2c54d836b3a54f379aab5db7a38ba60e0b647ee2536a7c01dd8e8f2cccb9618", "bytes": 463}
  ],
  "roles": {
