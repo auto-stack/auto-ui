@@ -2840,7 +2840,9 @@ fn install_generated_ui_host() {{
 
 fn main() -> auto_ui_runtime::ui::AppResult<()> {{
     install_generated_ui_host();
-    #[cfg(feature = "ui-iced")]
+    // PLAN-018（Design52 D）：ui-iced 实现选择器退役——运行时稳定基线恒在，
+    // 生成工程 main 的 iced 臂无条件（原 cfg 门与 no-backend stub 臂一并
+    // 摘除：基线恒开使"无后端工程"不可构造，stub 成为死臂）。
     {{
 {env_inits}        // Plan 020 T-05：孵化参数在册 → native 协议 client 臂（返回即走）；
         // 无标记 → 独立窗（下行 iced_entry 现行行为零变化）。
@@ -2852,14 +2854,9 @@ fn main() -> auto_ui_runtime::ui::AppResult<()> {{
         {iced_entry}
     }}
     // PLAN-691 后随（2026-09-22 用户裁定 auto-lang 侧移除 ui-gpui 休眠
-    // feature）：本生成器残留 emission 令全新工程 cargo resolve 即败
-    //（`auto-lang does not have that feature`——[features] 表声明
-    // `auto-lang/ui-gpui` 被 cargo 惰性校验），GPUI 臂随 feature 一并
-    // 摘除，main 收敛为 iced 单底座。
-    #[cfg(not(feature = "ui-iced"))]
-    {{
-        Err("No backend enabled! Use --features ui-iced".into())
-    }}}}
+    // feature）：GPUI 臂已摘，main 收敛为 iced 单底座。PLAN-018：基线恒开
+    // 后无 no-backend 形态，原 cfg(not) stub 臂退役。
+}}
 "#,
         cleaned = cleaned.trim(),
         at_shims = AT_BUILTIN_METHOD_SHIMS,
@@ -4120,9 +4117,12 @@ const PROJECTION_AUTO_UI_RUNTIME: DeliveryProjectionSpec = DeliveryProjectionSpe
     strip_deps: &[
         "autodown-core = { path = \"../../../auto-down/autodown/packages/engine/rust\", optional = true }",
     ],
+    // PLAN-018 T-04：ui-iced 拍平后 runtime 的 autodown feature 定义为
+    // `["dep:autodown-core"]`（原 `["ui-iced", "dep:autodown-core"]`）——
+    // 剥除 autodown-core 路径行后转发引用须同步摘除（保留 feature 名）。
     feature_rewrites: &[(
-        "autodown = [\"ui-iced\", \"dep:autodown-core\"]",
-        "autodown = [\"ui-iced\"]",
+        "autodown = [\"dep:autodown-core\"]",
+        "autodown = []",
     )],
     installed_rewrites: &[],
     path_rewrites: &[
@@ -8255,10 +8255,13 @@ auto-test-case = { path = \"../auto-test-case\" }
     // rewrite (the shape moved over from auto-lang by 814-T-04), idempotent,
     // drift-red, each holding on its own.
     let rt = dir.path().join("runtime.toml");
+    // PLAN-018 T-04：ui-iced 拍平后 producer 的 autodown feature 为
+    // `["dep:autodown-core"]`——投影剥跨仓 dep 行并同步摘 dep: 转发
+    //（feature 名保留，空表体）。
     std::fs::write(
         &rt,
         "[features]
-autodown = [\"ui-iced\", \"dep:autodown-core\"]
+autodown = [\"dep:autodown-core\"]
 
 [dependencies]
 # comment
@@ -8274,8 +8277,8 @@ autodown-core = { path = \"../../../auto-down/autodown/packages/engine/rust\", o
         "cross-repo optional dep stripped"
     );
     assert!(
-        rt_text.contains("autodown = [\"ui-iced\"]"),
-        "feature name kept"
+        rt_text.contains("autodown = []"),
+        "feature name kept, dep forwarding dropped"
     );
     let rt_stripped = std::fs::read_to_string(&rt).unwrap();
     delivery_apply_projection(&rt, &PROJECTION_AUTO_UI_RUNTIME).unwrap();
