@@ -18,7 +18,7 @@
 | 013 | [公共HUD与共同呈现](archived/013-autographics-public-hud-and-presentation-state.md) | AG公共服务 | archived/r1；R2 pass；冻结定向门通过，交付8b1e799；SD/ledger auto-lang v152；清理回执见计划 |
 | 015 | [VM路由页动态加载与原生Blog闭环](archived/015-vm-route-page-dynamic-load.md) | BLOG-004消费前置 | archived/r2；交付df39593；native22/22，规范/ledger148；清理回执见计划 |
 | 016 | [Node2D最小真实执行验证](archived/016-autographics-node2d-minimal-validation.md) | AG共同作者模型最小切片 | archived/r3；R1 needs_fix 11项→修复→同员R2 pass；交付932bd5f（实现9eb1d0e），gate全绿；SD node2d-pilot.md 沉淀本仓；清理回执见计划 |
-| 017 | [完整G11/2d Node作者能力](017-autographics-g11-2d-node-authoring.md) | 016后继/原G11二维兼容 | drafting/r1，0/10；016实际交付前置已满足；先完整main/alt原额探针；内容迁移由ag-examples/007硬等本项交付，暂不实施 |
+| 017 | [完整G11/2d Node作者能力](archived/017-autographics-g11-2d-node-authoring.md) | 016后继/原G11二维兼容 | archived/r1；R1 needs_fix 4项→修复→同员R2 pass；交付9a8a5be（bf02061 rebase，range-diff全等），T-08门全绿；SD node2d-g11-authoring.md 沉淀本仓；清理回执见计划 |
 
 下一份本地新计划为018，以独占取号时`.next-id`与本地活动/归档最大号重核；不能因外仓号882/883跳号。003是Blog路线，004..006是AG表现路线，状态以各自交付收据为准；011预算研究已交付，完整游戏仍未证实。设计与并行/后继入口见[本仓设计](../design/autographics/m2-presentation-and-resources.md)。
 
