@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-016
-status: drafting
+status: executing
 feature_name: AutoGraphics Node2D最小真实执行验证
 author: [Codex]
 created_at: 2026-10-30
-updated_at: 2026-10-30
+updated_at: 2026-10-31
 plan_revision: 3
-current_step: 0
+current_step: 6
 total_steps: 10
 depends_on: [auto-ui/PLAN-013]
 supersedes_spec_components: []
@@ -145,12 +145,12 @@ T-02最多比较两种既有端口接法，必须均复用共同语法/Core解�
 
 | ID | owner_stage | 依赖 | 操作/产物与验证 | AC | 状态 |
 |---|---|---|---|---|---|
-| T-01 | work | 用户启动、G-01 | 核013实际SHA/SDK/来源、规约与写面/owner；建唯一ui-016树，记录本仓及只读依赖身份 | AC-01 | [ ] |
-| T-02 | work | T-01 | 最多两接法的真实whole-path探针、实例/事件/预算先证；node2d-contract冻结机制/精确入口和oracle，失败needs_replan | AC-01..06 | [ ] |
-| T-03 | work | T-02 go | 显式pilot域解析/共同模型/普通模块绑定与诊断；新增dialect/compiler命名tests，V-01 | AC-02 | [ ] |
-| T-04 | work | T-03 | Auto实例状态/receiver/Life固定时钟与input→Player/H1/H2→AG/GPU，独立状态与事件分类V-02/04 | AC-03 | [ ] |
-| T-05 | work | T-04 | Coin触发→父model→条件差量/真实despawn，Pause/Step/旧代/owner20轮及负控V-03/04 | AC-04/05 | [ ] |
-| T-06 | work | T-05 | 新fresh消费A→B/120tickGPU/预算/旧触面，工具正反控、fmt/warning/提交、SD候选及完整移交V-05 | AC-01..06 | [ ] |
+| T-01 | work | 用户启动、G-01 | 核013实际SHA/SDK/来源、规约与写面/owner；建唯一ui-016树，记录本仓及只读依赖身份 | AC-01 | [x] |
+| T-02 | work | T-01 | 最多两接法的真实whole-path探针、实例/事件/预算先证；node2d-contract冻结机制/精确入口和oracle，失败needs_replan | AC-01..06 | [x] |
+| T-03 | work | T-02 go | 显式pilot域解析/共同模型/普通模块绑定与诊断；新增dialect/compiler命名tests，V-01 | AC-02 | [x] |
+| T-04 | work | T-03 | Auto实例状态/receiver/Life固定时钟与input→Player/H1/H2→AG/GPU，独立状态与事件分类V-02/04 | AC-03 | [x] |
+| T-05 | work | T-04 | Coin触发→父model→条件差量/真实despawn，Pause/Step/旧代/owner20轮及负控V-03/04 | AC-04/05 | [x] |
+| T-06 | work | T-05 | 新fresh消费A→B/120tickGPU/预算/旧触面，工具正反控、fmt/warning/提交、SD候选及完整移交V-05 | AC-01..06 | [x] |
 | T-07 | review | T-06 | 同树独立final review逐AC/V/S/SD/遗漏，绑定提交；finding回原树work，pass标冻结门pending | AC-07 | [ ] |
 | T-08 | merge | T-07 pass | 冻结代码/依赖/输入，执行受影响门或严格有据复用后合本仓master | AC-08 | [ ] |
 | T-09 | merge | T-08 | 仅沉淀实际pilot Spec/来源导航，归档本合同；不手写派生账本/索引 | AC-08/09 | [ ] |
@@ -168,11 +168,22 @@ T-02最多比较两种既有端口接法，必须均复用共同语法/Core解�
 
 2026-10-30 / stage: new / plan_id: auto-ui/PLAN-016 / plan_revision: 3 / outcome: blocked（原实施进入门保持） / next: 仍暂不实施。按用户确认，统一view-2d名称，草图v4；同名嵌入区域/多呈现变体只在总体设计说明，016只验证Node直属二维块。T/AC/V/S/SD数量、原预算/依赖保持，不纳入混合嵌套、view-3d/portrait/widget选择或Life.Frame。此前命名历史与r1/r2记录保留，尚无实现验证。
 
+
+2026-10-31 work T-01/T-02 closure：`stage: work | plan_id: auto-ui/PLAN-016 | plan_revision: 3 | outcome: pass (T-02 checkpoint; work_complete:false) | worktree_path: D:/autostack/.wt/ui-016/auto-ui | branch: codex/plan-016-dev | base_commit: 69690dfb8e0b691a9af8d9e1eacc240511d2e83e | code_commit: 758f909 | dependency_revisions: SDK 7b987ca8（.sdk-source 681 files prepared）、auto-lang 3fa75dd9 只读兄弟树、auto-down c3464d0 只读兄弟树、语言仓零写面 | task_ids: T-01,T-02 | evidence: attachments/016/work/node2d-contract.md；原型 t02-prototype.log SHA 1e54b98f5cdf9a1dfbd9e172e30b51de4bc39246e329500efcaa20e628e72a19（2 passed/0 failed） | blockers: none | next_responsible_role: work T-03`。G-01 核实（013 归档 60e6d48、交付 8b1e799、canonical 23ed93e6/台账 d910b869 已入 auto-lang/master）。接法比较： (a) 生产 UI 服务结构性排除（merged-root 状态按名合并/无实例 receiver，vm_bridge.rs:894-916/1791/972/3517 代码证据），不改生产面； (b) 选中——原型 Start+一次Tick+两实例+一次真实事件+真 despawn+幂等+预算满池实测通过。主检出他者文档 WIP 保留未触。
+
+2026-10-31 work T-03 closure：`stage: work | plan_id: auto-ui/PLAN-016 | plan_revision: 3 | outcome: pass (T-03 checkpoint; work_complete:false) | worktree_path: D:/autostack/.wt/ui-016/auto-ui | branch: codex/plan-016-dev | base_commit: 69690dfb | code_commit: 475140a | dependency_revisions: 同上 | task_ids: T-03 | evidence: auto-ui-dialect tests/node2d_pilot 6 passed；auto-ui-compiler tests/node2d_pilot 6 passed；两 crate 全量套件 0 failed（dialect 95+6+2、compiler 1123+9+6+1+3） | blockers: none | next_responsible_role: work T-04`。新增 dialect node2d 研究 dialect（UiDialect 生产路径零变化）与 14 文件夹具；诊断带文件/行号；Core 形态实测发现（Life.* 模式 Core 不支持→研究域自有 on 解析；`view-2d` 词法=View+Sub+2；`msg` 参数端口非词法关键字）均冻结入合同 §3a。
+
+2026-10-31 work T-04 closure：`stage: work | plan_id: auto-ui/PLAN-016 | plan_revision: 3 | outcome: pass (T-04 checkpoint; work_complete:false) | worktree_path: D:/autostack/.wt/ui-016/auto-ui | branch: codex/plan-016-dev | base_commit: 69690dfb | code_commit: 50852bc | dependency_revisions: 同上 | task_ids: T-04 | evidence: 生成器（load/validate/lower/scene/translate）+ 冻结生成物 generated/{world.at 4858B sha f66b1b92…, scene.agscene, identity.json}；driver tests/node2d_flow CPU 电池 2/2 passed（合同 S6：探针 plan016_probe.rs 删除，superseded） | blockers: none | next_responsible_role: work T-04b/T-05`。依赖树实测约束：tip（生成器）与 pinned-SDK（driver）两树不得同图（同包名冲突），冻结为"生成器不依赖 driver、生成物为冻结数据、再生字节等价控制"。生成缺陷四项实测修正：Op::NotEq 为绑定臂误配（真变体 Neq/Ge/Le）、赋值括号、emit 目标 snake、int 字段初值形态。
+
+2026-10-31 work T-04b/T-05 closure：`stage: work | plan_id: auto-ui/PLAN-016 | plan_revision: 3 | outcome: pass (checkpoint; work_complete:false) | worktree_path: D:/autostack/.wt/ui-016/auto-ui | branch: codex/plan-016-dev | base_commit: 69690dfb | code_commit: d8fa903 | dependency_revisions: 同上 | task_ids: T-04b,T-05 | evidence: driver tests/node2d_flow 4/4 passed（GPU 像素类三层证据、Pause/Step 中性、20 轮 Stop/fresh、20 轮 CPU owner 释放、双父 receiver 隔离补充夹具） | blockers: none | next_responsible_role: work T-06`。GPU 校准：光照混合下相对通道类规则（红 237,124,124/橙 243,188,137/金 249,231,124/地面 179,179,188）；场景模板停靠防 born-overlap；scene/6（无 HUD/audio 负载）；嵌套实例（Collector→Coin）经绑定表投递实测隔离。
+
+2026-10-31 work final handoff：`stage: work | plan_id: auto-ui/PLAN-016 | plan_revision: 3 | outcome: pass | worktree_path: D:/autostack/.wt/ui-016/auto-ui | branch: codex/plan-016-dev | base_commit: 69690dfb8e0b691a9af8d9e1eacc240511d2e83e | code_commit: T06_COMMIT_PLACEHOLDER | dependency_revisions: SDK 7b987ca8/681；auto-lang 3fa75dd9（只读）；auto-down c3464d0（只读）；driver/生产 crate 源零改动（本计划 driver 侧仅新增 tests/） | task_ids: T-01..T-06 complete | evidence: attachments/016/work/t06-readiness.md | blockers: 无工作侧 finding；统一回归门 pending（owner=review/merge）；D-04 独立终审上下文归 review | next_responsible_role: 同树独立 final review on frozen T06_COMMIT_PLACEHOLDER`。AC-01..06 工作侧全闭合映射见 readiness；verify_plan016 --controls PASS exit0（身份/再生等价/变异敏感/缺模块诊断/篡改检出）；consumerB A→B：git archive 新根+auto-lang@3fa75dd9+冷 SDK → 再生 sha f66b1b92/4bd54fa3 与 A 逐字节等价，driver node2d_flow 在 B 全量通过。fmt 已过；warning 面仅 sdk 既有 146 项（非本计划引入）。
+
 ## 10. 待澄清事项
 
 | ID | 事项 | 关闭owner/下一步 |
 |---|---|---|
-| D-01 | 013仍executing；最终来源/owner窗口与UI014实际重叠未知 | T-01核delivery/冻结门与实际diff，不读开发tip作为稳定消费 |
+| D-01 | 已闭合（2026-10-31）：013 已实际归档（60e6d48/8b1e799），T-01 核实 | 关闭于 T-01 |
 | D-02 | 共同领域/模块与固定AG SDK如何在本仓接通，是否无需外仓语义变更 | T-02最多两接法先证；不能成立则带反例修订，不先全面实施 |
 | D-03 | refs/类型化事件端口的精确语法、资源准备、tick/触发交接与原额可行性 | T-02在已定node/view-2d/Life/msg/前导点内冻结常规细节；改变AC/额度/领域范围另修订 |
 | D-04 | 独立终审上下文及必需实际GPU环境 | T-06交接按后续用户安排或已授权资源核；没有证据保持pending，不伪称独立pass |
