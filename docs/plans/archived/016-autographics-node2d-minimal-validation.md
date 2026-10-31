@@ -197,6 +197,14 @@ T-02最多比较两种既有端口接法，必须均复用共同语法/Core解�
 无须本轮重新决定已确认作者方向；以上是未来执行的依赖/机制关闭项，用户本轮“暂不实施”持续有效。
 
 
+2026-10-31 merge prepared/landed：`stage: merge | plan_id: auto-ui/PLAN-016 | plan_revision: 3 | completion_kind: delivered | prepared: verified | landed: verified | delivery_commit: 932bd5fb0aca26586e3760bd070eb416ffe67418`。R2 pass 绑定实现 9eb1d0e；master 无漂移（base 69690df 即 master tip，rebase 空操作）；T-08 冻结定向门在交付 tip 932bd5f 全绿：dialect node2d_pilot 6/6、compiler 6/6、dialect 全量 95+6+2=103 0 failed、pilot gates 9/9、driver node2d_flow 6/6（GPU 22.16s）、verify_plan016 --controls PASS exit0、触面 rustfmt --check 0 diff、pilot src 0 warning；consumerB（修复后生成器重建）再生 f66b1b92/4bd54fa3 与 A 逐字节等价。主检出 ff-only 落地（无 merge commit），master tip==932bd5f；主检出 Cargo.lock 漂移经核为本地会话 cargo 触碰的同一 188 行刷新（与分支提交逐字节相同）后 checkout 还原，无损；他者 WIP（007/014/autoui 设计/012 r1 附件/docs/design README）保持未提交。主检出 verify_plan016 --controls 复跑 PASS（落地后主检出复核）。
+
+2026-10-31 canonical：`checkpoint: canonical_verified verified`。SD-01 落地本仓（PLAN-016 §5 "新Spec归本仓"）：docs/specs/auto-graphics/node2d-pilot.md（R2 修正版：诊断承诺与预算算式已按实际交付校准），master 9341ef0 内核对通过；auto-lang 知识根 Spec 只读引用未改写；无派生 specs.json/index.json 写入（PLAN-106）。
+
+2026-10-31 archive：`checkpoint: archived | completion_kind: delivered`。本 Plan 移入 docs/plans/archived/ 并置 status: archived（提交 9341ef0：折叠 contract/readiness 全文为 §11/§12 附录，docs/plans/attachments/016/ 按证据合并裁定删除）；README 016 行更新为 archived（仅本行选择性暂存——工作树含 007/014 他者行与 013 行的陈旧未提交改写，均保留未触）；T-01..T-09 收据关闭，T-10 随本轮清理关闭；任务计数 10/10。
+
+2026-10-31 cleaned：`checkpoint: cleaned verified`。移除前 wt-guard 三树 fresh clean（auto-ui/auto-lang/auto-down）；移除 D:/autostack/.wt/ui-016/{auto-ui,auto-lang,auto-down}、分支 codex/plan-016-dev（was 932bd5f，已合并）、空组目录 rmdir；worktree list 与 .wt 复核 ui-016 零残留。产物回收：consumerB 全工作副本（含两套 cargo target 构建缓存与 auto-lang 只读导出）9.8G 删除，plan-artifacts/auto-ui/plan-016 仅留证据日志（t02-prototype/t06-verify(+r2)/t06-consumerB/t08-gate-1/t08-verify.log 与 probe/）共 82K；无 EXE/PDB 保留需求（GPU 测试可由仓库源+冻结生成物随时重放）。批次回归到期未到（PLAN-016 非五整除；auto-lang 回执 covered 887 不触发）。落地≠部署观察：本计划触面为 experimental 研究引擎与 auto-ui-dialect 显式追加研究模块（生产 widget 路径 opt-out 实测），生产 backend/daemon/rootUI 不消费，无重建重启要求。
+
 ## 11. 执行合同（T-02 冻结版全文，自 attachments/016/work/node2d-contract.md 折叠并按 2026-10-31 裁定删除附件目录）
 
 # PLAN-016 Node2D 执行合同（T-02 冻结）
