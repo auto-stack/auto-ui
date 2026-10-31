@@ -1,0 +1,68 @@
+// PLAN-016 minimal pilot entry: one Player, two same-definition Hazards
+// with independent state, one destroyable Coin, static ground, camera.
+use types: Key
+use player: Player
+use hazard: Hazard
+use coin: Coin
+use patrol: patrol_y
+
+node Main {
+    model {
+        var coin_present = 1
+        var starts = 0
+        var ticks = 0
+        var phase = 0.5
+    }
+    msg { Collect(Key) }
+    view-2d {
+        solid2d ground {
+            position: (15.0, -0.5)
+            mesh: resources.ground_mesh
+            material: resources.ground_color
+        }
+        Player player {
+            spawn_x: 2.0
+            spawn_y: 1.0
+            speed: 2.0
+        }
+        Hazard h1 {
+            x: 12.0
+            base_y: 2.4
+            phase0: 0.1
+            speed: 0.5
+        }
+        Hazard h2 {
+            x: 16.0
+            base_y: 3.2
+            phase0: 0.45
+            speed: 0.9
+        }
+        if .coin_present == 1 {
+            Coin coin {
+                position_x: 4.0
+                position_y: 1.0
+                target: refs.player.actor
+                on_collect: .Collect(Key.Amber)
+            }
+        }
+        camera2d camera {
+            target: refs.player.actor
+            min: (-4.0, -4.0)
+            max: (30.0, 12.0)
+            view_size: (30.0, 12.0)
+        }
+    }
+    on {
+        Life.Start -> {
+            .starts = 1
+        }
+        Life.Tick(dt) -> {
+            .ticks = .ticks + 1
+        }
+        .Collect(key) -> {
+            if .coin_present == 1 {
+                .coin_present = 0
+            }
+        }
+    }
+}

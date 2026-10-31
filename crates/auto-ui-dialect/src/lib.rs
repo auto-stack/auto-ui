@@ -32,6 +32,7 @@ pub mod codec;
 pub mod declarations;
 pub mod grammar;
 pub mod model;
+pub mod node2d;
 pub mod route;
 pub mod validation;
 

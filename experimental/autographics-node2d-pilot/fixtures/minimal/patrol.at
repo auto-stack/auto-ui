@@ -1,0 +1,8 @@
+// PLAN-016 minimal pilot: reusable patrol wave as a pure function.
+// Frozen form (contract S3): phase in [0, 0.8), tri in [0, 0.4],
+// y = base + tri - extent. The independent oracle mirrors this exactly.
+fn patrol_y(base float, phase float, extent float) float {
+    var tri = phase
+    if phase > 0.4 { tri = 0.8 - phase }
+    return base + (tri - extent)
+}

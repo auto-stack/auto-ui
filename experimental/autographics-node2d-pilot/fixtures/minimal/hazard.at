@@ -1,0 +1,31 @@
+// PLAN-016 minimal pilot: the Hazard node. Two instances share this one
+// definition with different constructor arguments and fully independent
+// per-instance state (phase/ticks/starts) and receiver.
+use resources
+use patrol: patrol_y
+
+node Hazard(x: float, base_y: float, phase0: float, speed: float) {
+    model {
+        var phase = phase0
+        var ticks = 0
+        var starts = 0
+    }
+    view-2d {
+        trigger2d body {
+            position: (.x, patrol_y(.base_y, .phase, 0.4))
+            mesh: resources.hazard_mesh
+            material: resources.hazard_color
+        }
+    }
+    on {
+        Life.Start -> {
+            .starts = 1
+        }
+        Life.Tick(dt) -> {
+            .phase = .phase + .speed * dt
+            if .phase > 0.8 { .phase = .phase - 0.8 }
+            .ticks = .ticks + 1
+            refs.body.move(.x, patrol_y(.base_y, .phase, 0.4))
+        }
+    }
+}

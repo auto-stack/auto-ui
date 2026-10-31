@@ -1,0 +1,29 @@
+// PLAN-016 minimal pilot: the Player node. One instance; real input and
+// real swept motion through the AG character service.
+use resources
+use auto.graphics: input
+
+node Player(spawn_x: float, spawn_y: float, speed: float) {
+    model {
+        var axis = 0
+        var starts = 0
+        var ticks = 0
+    }
+    view-2d {
+        solid2d body {
+            position: (.spawn_x, .spawn_y)
+            mesh: resources.player_mesh
+            material: resources.player_color
+        }
+    }
+    on {
+        Life.Start -> {
+            .starts = 1
+        }
+        Life.Tick(dt) -> {
+            .axis = input.axis(Left, Right)
+            refs.body.move_and_slide((.axis * .speed * dt, 0.0))
+            .ticks = .ticks + 1
+        }
+    }
+}
