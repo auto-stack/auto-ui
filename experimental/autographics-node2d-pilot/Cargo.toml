@@ -1,0 +1,21 @@
+[package]
+name = "autographics-node2d-pilot"
+version = "0.1.0"
+edition = "2021"
+description = "PLAN-016 Node2D lowering generator: explicit research entry (node/view-2d/Life/msg modules) -> single-file AG user source + scene project. Consumed as frozen data by the driver's node2d_flow test; trees stay separate (tip lang crates vs pinned SDK)."
+
+[workspace]
+# Standalone research workspace (PLAN-016 contract S4); never a member of the
+# auto-ui root workspace. Deliberately NO dependency on the AG driver: the
+# driver tree resolves the pinned SDK (7b987ca8) while this generator resolves
+# the auto-lang tip; the two graphs must never name the same package.
+
+[dependencies]
+auto-ui-compiler = { path = "../../crates/auto-ui-compiler" }
+auto-ui-dialect = { path = "../../crates/auto-ui-dialect" }
+auto-lang-core = { path = "../../../auto-lang/crates/auto-lang-core" }
+auto-parser-api = { path = "../../../auto-lang/crates/auto-parser-api" }
+
+[[bin]]
+name = "node2d-lower"
+path = "src/main.rs"

@@ -52,6 +52,16 @@ SDK pin: `7b987ca8`（`research/baseline.json.txt` sdk.repository_commit；`tool
 
 view-3d/portrait/widget 与混合嵌套、Life.Frame、多呈现选择器、PNG/GLB 导入、完整 G11（三 Coin/伤害/终点/Enter 新局）、ECS/一Node一VM、生产 UI 融合——均非本合同交付。设计语法中的 `emit` 关键字与 refs/export 端口在研究入口内按上述第 2 条降实现，不声明为最终语言形态（SD 只写实测能力）。
 
+## 3a. T-04 实施修订（实测冻结，原 S3 条目增补/更正）
+
+1. **服务操作更名**：`refs.body.move(...)` 与 Core `move` 运算符冲突（解析为 Move 包装），研究服务名冻结为 `refs.body.move_to(x, y)`（AG `ag_object_move` 绝对置位语义）。
+2. **输入模型冻结**：`input.axis(Left, Right)` 映射为 `ag_action_held(1)` 单次计费（计划预算算式 "1snapshot" 的依据；完整差值轴为后继项，SD 如实记录）。
+3. **生成物架构**：pilot crate（tip 依赖树）只做 load/validate/lower，**不依赖 driver**（pinned-SDK 树与 tip 树不得同图，同包名冲突实测）；生成物 `generated/{world.at,scene.agscene,identity.json}` 提交为冻结数据，driver 侧 `tests/node2d_flow.rs` 以 include_str! 消费；`verify_plan016.py` 再生成并断言字节等价（再生控制）+ 身份校验。
+4. **Op 形态勘误**：auto-val `Op` 变体为 `Neq/Ge/Le`（不存在 NotEq/Gte/Lte）；Rust match 中未知变体名会静默成为绑定臂（曾致 `>` 译成 `!=`）——翻译面以真实变体冻结，警告必须清零。
+5. ** Int 字段初值**按 int 形态发射（getter 类型与读取期一致）；赋值语句不加括号；`emit` 目标事件名 snake 化。
+6. **观测面**：char 定义（冻结场景表 row 0）emit `get_player_node_x/y`（`ag_local` 纯读零计费）；全部读回走纯 Auto getter，任何计费读取每 tick 限次。
+7. **实测预算**（生成世界，Triggers2V1）：普通 tick ≈31 credits；收集 tick 恰 32（held 1 + sweep 24 + scan 1 + 2×hazard move + event_next + event_pair + despawn）；第 33 个计费调用 → sticky fault 10（flow 测试断言）。
+
 ## 6. 阶段门
 
 - T-02 go：本合同+原型通过（已满足）。T-03 起按 §2 写面实施；改 §3 规则或预算先修订本合同再实施。

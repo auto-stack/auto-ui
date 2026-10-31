@@ -1,0 +1,84 @@
+{
+ "behavior": {
+  "api": "autographics.triggers2d/1",
+  "source": {
+   "format": "auto-source",
+   "sha256": "f66b1b927e50c52f96242600deaab84e9f10b2759a881c878d5cfc85048c0c41",
+   "byte_length": 4858
+  },
+  "actors": {
+   "two_d": 1,
+   "three_d": null
+  }
+ },
+ "schema": "autographics.scene/8",
+ "document_id": "plan016-minimal-node2d",
+ "resources": [
+  "circle",
+  "quad",
+  "cylinder",
+  "player",
+  "mob"
+ ],
+ "objects": [
+  {
+   "id": 1,
+   "name": "player",
+   "kind": "quad",
+   "translation": [2.0, 1.0, 0.0],
+   "scale": [0.8, 1.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.9, 0.5, 0.25, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 2,
+   "name": "ground",
+   "kind": "quad",
+   "translation": [15.0, -0.5, 0.0],
+   "scale": [40.0, 1.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.45, 0.45, 0.5, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 3,
+   "name": "coin_template",
+   "kind": "circle",
+   "translation": [-100.0, -100.0, 0.0],
+   "scale": [0.3, 0.3, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.95, 0.8, 0.2, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 4,
+   "name": "hazard_template",
+   "kind": "quad",
+   "translation": [-100.0, -100.0, 0.0],
+   "scale": [1.0, 0.6, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.85, 0.2, 0.2, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  }
+ ],
+ "groups": [],
+ "assets": [],
+ "cues": []
+}

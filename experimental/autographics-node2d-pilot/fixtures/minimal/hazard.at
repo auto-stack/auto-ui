@@ -25,7 +25,7 @@ node Hazard(x: float, base_y: float, phase0: float, speed: float) {
             .phase = .phase + .speed * dt
             if .phase > 0.8 { .phase = .phase - 0.8 }
             .ticks = .ticks + 1
-            refs.body.move(.x, patrol_y(.base_y, .phase, 0.4))
+            refs.body.move_to(.x, patrol_y(.base_y, .phase, 0.4))
         }
     }
 }

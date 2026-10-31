@@ -1,0 +1,12 @@
+{
+ "user_source_sha256": "f66b1b927e50c52f96242600deaab84e9f10b2759a881c878d5cfc85048c0c41",
+ "user_source_bytes": 4858,
+ "module:coin": "6e9946de0177d8f3f7ef5cf362721db7bbf51d616f5eae7a07025fd709455a6e",
+ "module:hazard": "b31d04b8ccc582250d235748ad83c12c816bf3eb121842f0dd7e4f9646e65ce7",
+ "module:main": "58c305ae0a8c767dd5bfcb63979aa1b082a38aa475142793fa753d157c85947f",
+ "module:patrol": "bdbe0cbed7c18d0f7a0fb2e6005d37f4679ef2817269c8531ff5c1b708b8217d",
+ "module:player": "f537ae02f8fc3786c114440df6515154ea8e4c186bab765592e3dd035934255c",
+ "module:resources": "932f60e93c0894038419bf96cc488f236eb15acf1f2449820ea49f1a5d857e3d",
+ "module:types": "0e58a2182b3ded4bcfe686fa954eabc21b6c68c2c4e9397c5d01357b03faa0b9",
+ "pair_to_instance": [2,3,4]
+}
