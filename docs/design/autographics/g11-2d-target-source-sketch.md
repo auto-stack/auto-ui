@@ -2,7 +2,7 @@
 
 2026-10-30，讨论稿 v4，取代同路径v3草图；v1/v2/v3保留在Git历史。依据[共同作者模型](declarative-authoring-model.md)和用户本轮命名决定。只写Markdown，不创建或运行产品源码，不分配Plan或更改在途合同。
 
-2026-10-31状态补记：016已交付有限Node2D验证，本文完整源码仍不是已可编译的示例。后继[auto-ui/017](../../plans/017-autographics-g11-2d-node-authoring.md)与[ag-examples/007](../../../../ag-examples/docs/plans/007-autographics-gallery-g11-2d-node-migration.md)仅规划原G11/2d等价迁移，精确边界见[阶段设计](g11-2d-node-authoring-completion.md)：保原事件节奏/危险图形写策略/accepted新Run与51项检查；下文“去除预算技巧”、集合API、App/key局部重建等仍为目标提案，不作为这两份计划新增验收。
+2026-10-31状态补记：016、[auto-ui/017](../../plans/archived/017-autographics-g11-2d-node-authoring.md)与[ag-examples/007](../../../../ag-examples/docs/plans/archived/007-autographics-gallery-g11-2d-node-migration.md)现已交付有限Node2D与原G11/2d等价迁移，实际源码见[Gallery src/main.at](../../../../ag-examples/examples/g11-runtime-objects/2d/src/main.at)。本文完整草图仍非可原样编译的产品示例；保原事件节奏/危险图形写策略/accepted新Run与51项检查的实际边界见[阶段设计](g11-2d-node-authoring-completion.md)。下文“去除预算技巧”、集合API、App/key局部重建等仍为目标提案。其余入口后继见[全量迁移设计](gallery-node-authoring-migration.md)。
 
 ## 1. 已确认写法与仍属提案的部分
 

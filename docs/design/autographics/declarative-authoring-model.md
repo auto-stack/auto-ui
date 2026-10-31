@@ -92,7 +92,9 @@ JSON 是当前原型便于保存/验证的选择，没有“可审计所以只�
 
 截至2026-10-31，[auto-ui/016最小真实执行验证](../../plans/archived/016-autographics-node2d-minimal-validation.md)已实际交付932bd5f：一个Player、两个同定义独立Hazard和一个可销毁Coin，证明有限node/view-2d/Life、use、实例状态与事件绑定链；实际限制以[本仓pilot Spec](../../specs/auto-graphics/node2d-pilot.md)为准，不代表完整目标源码或ACE融合已实现。
 
-用户已授权下一轮仅规划：[完整G11/2d能力设计](g11-2d-node-authoring-completion.md)拆为[auto-ui/017引擎能力](../../plans/017-autographics-g11-2d-node-authoring.md)与[ag-examples/007内容迁移](../../../../ag-examples/docs/plans/007-autographics-gallery-g11-2d-node-migration.md)，后者硬等前者实际交付。保原二维玩法/51项验收与预算，三维维持旧源码/锁；均drafting、暂不实施，不把目标草图所有后继设想加入本轮。
+截至2026-10-31，[完整G11/2d能力设计](g11-2d-node-authoring-completion.md)对应的[auto-ui/017引擎能力](../../plans/archived/017-autographics-g11-2d-node-authoring.md)与[ag-examples/007内容迁移](../../../../ag-examples/docs/plans/archived/007-autographics-gallery-g11-2d-node-migration.md)已实际交付，保原二维玩法/51项验收与预算，三维仍旧源码/锁。其余目标草图提案不自动因此成为已实现能力。
+
+用户随后要求其余Gallery示例都迁入相同作者形式；[全量迁移设计](gallery-node-authoring-migration.md)列出21入口、剩余20入口及W1..W6能力波次。本轮先规划[auto-ui/019二维基础能力](../../plans/019-autographics-node2d-scenes-character-camera.md)→[ag-examples/008五入口迁移](../../../../ag-examples/docs/plans/008-autographics-gallery-node2d-first-wave.md)，后者等前者实际交付；纯场景允许无角色，编辑器教程保持编辑器验收，计划与源码/内容仍按仓管理。
 
 [840 §3/4.2/5.2](../../../../auto-lang/docs/plans/archive/840-autographics-public-behavior-api-and-user-scripts.md)将单文件定义为首版切片：SDK 有模块服务，消费者尚未验证其装配/诊断链，因此不读取未快照依赖；没有证明多模块不可验证。[854](../../../../auto-lang/docs/plans/archive/854-autographics-behavior-source-assembly.md)的“可审计”指内部受信装配的来源/顺序/错误可追查，不是新的产品定位，也不能倒推840的禁 use是长期要求。此前外部讨论纪要的“可审计 agent 代码运行时”解释不作为产品需求依据。
 

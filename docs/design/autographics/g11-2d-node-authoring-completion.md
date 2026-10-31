@@ -2,12 +2,14 @@
 
 2026-10-31，设计 v1；仅规划。依据[共同作者模型](declarative-authoring-model.md)、[目标草图](g11-2d-target-source-sketch.md)、[016 已交付 Spec](../../specs/auto-graphics/node2d-pilot.md)及原 G11 消费合同。
 
+交付状态补记：下列017与007现已归档交付；原设计要求保留作阶段来源，实际支持边界以本仓node2d-g11-authoring Spec与Gallery消费Spec为准。其余入口进入[全量迁移波次](gallery-node-authoring-migration.md)，不把G11完成写成全Gallery完成。
+
 ## 目标与分仓
 
 用普通 Auto 模块、`node/model/view-2d/on`、`Life.Start/Tick`、匿名 `msg` 与具名引用，表达原 G11/2d 的完整玩法。作者维护声明源码；场景 JSON、对象 ID、槽和生成单元由工具生成。生成后仍可复用既有运行服务，不要求一个模块对应一个 VM。
 
-- [auto-ui/017](../../plans/017-autographics-g11-2d-node-authoring.md)：补齐有限 Node2D 作者入口、声明驱动的资源/几何/绑定生成、完整左右输入、事件路由、原额调度及新 Run 接线；提供可搬迁生成器和固定运行器的消费契约。
-- [ag-examples/007](../../../../ag-examples/docs/plans/007-autographics-gallery-g11-2d-node-migration.md)：硬等 017 实际交付，改写 G11/2d 内容，承接原 51 项二维 oracle、目录、参数变体、公开启动与单项离线包。
+- [auto-ui/017](../../plans/archived/017-autographics-g11-2d-node-authoring.md)：已交付有限 Node2D 作者入口、声明驱动的资源/几何/绑定生成、完整左右输入、事件路由、原额调度及新 Run 接线。
+- [ag-examples/007](../../../../ag-examples/docs/plans/archived/007-autographics-gallery-g11-2d-node-migration.md)：已固定消费017改写G11/2d，承接原51项二维oracle、目录、参数变体、公开启动与单项离线包；旧3d runner供给仍有具名裁决项，不由本设计默示豁免。
 
 017 不写 Gallery，007 不在内容仓实现转译器或玩法服务。G11/3d 的源码、旧锁与 25 项历史验收保持；仅二维升级，因此 Gallery 必须按子入口选择锁与验收，不能把整个 G11 静默升引擎。
 

@@ -19,8 +19,9 @@
 | 015 | [VM路由页动态加载与原生Blog闭环](archived/015-vm-route-page-dynamic-load.md) | BLOG-004消费前置 | archived/r2；交付df39593；native22/22，规范/ledger148；清理回执见计划 |
 | 016 | [Node2D最小真实执行验证](archived/016-autographics-node2d-minimal-validation.md) | AG共同作者模型最小切片 | archived/r3；R1 needs_fix 11项→修复→同员R2 pass；交付932bd5f（实现9eb1d0e），gate全绿；SD node2d-pilot.md 沉淀本仓；清理回执见计划 |
 | 017 | [完整G11/2d Node作者能力](archived/017-autographics-g11-2d-node-authoring.md) | 016后继/原G11二维兼容 | archived/r1；R1 needs_fix 4项→修复→同员R2 pass；交付9a8a5be（bf02061 rebase，range-diff全等），T-08门全绿；SD node2d-g11-authoring.md 沉淀本仓；清理回执见计划 |
+| 019 | [Node2D场景层级与走跳相机](019-autographics-node2d-scenes-character-camera.md) | Gallery新作者形式首波引擎 | drafting/r1，0/10；017已交付，补纯视觉/group/走跳/可选相机与可核验消费；ag-examples/008硬等本项交付 |
 
-下一份本地新计划为018，以独占取号时`.next-id`与本地活动/归档最大号重核；不能因外仓号882/883跳号。003是Blog路线，004..006是AG表现路线，状态以各自交付收据为准；011预算研究已交付，完整游戏仍未证实。设计与并行/后继入口见[本仓设计](../design/autographics/m2-presentation-and-resources.md)。
+下一份本地新计划为020，以独占取号时`.next-id`与本地活动/归档最大号重核；不能因外仓号882/883跳号。003是Blog路线，004..006是AG表现路线，状态以各自交付收据为准；011预算研究已交付，完整游戏仍未证实。设计与并行/后继入口见[本仓设计](../design/autographics/m2-presentation-and-resources.md)。
 
 ## 债务/候选
 
@@ -28,6 +29,7 @@
 
 ## 管理规则
 
+- 2026-10-31新规：新计划不写attachments（含md）；临时材料统一plan-artifacts/plan-NNN/<repo>/，merge前将必要摘要折入Plan并清理自有scope/构建中间物；仅具名未解决问题持有，旧specs.json只读。
 - 本仓主检出`docs/plans/`持唯一活动合同、进度、复审和归档；归档目录以已交付001/002的实际约定为`archived/`（取号兼扫历史`archive/`，避免遗漏）。
 - 取号只扫描本仓活动/归档的本地Plan；外仓历史来源、附件、重定向不计高水位。独占核`.next-id`和本地最大号后创建，禁止覆盖。
 - 跨仓计划由主责任仓持一份合同，参与仓只留定位指引；旧auto-lang编号保留为来源，不再作为本地编号。
