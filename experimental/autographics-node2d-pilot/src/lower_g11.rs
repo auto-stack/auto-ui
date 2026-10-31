@@ -1303,7 +1303,7 @@ pub fn lower_project_g112d(project: &Project) -> Result<LowerOutputG11, LowerErr
             Some(cond) => {
                 let hook2 =
                     member_hook_for(project, &project.root, &prefixes, &instances, &resolved);
-                let mut ctx = base_ctx_g11(project, &project.root, &prefixes, &*hook2);
+                let ctx = base_ctx_g11(project, &project.root, &prefixes, &*hook2);
                 let mut buf = String::new();
                 translate_stmts(&[Stmt::Expr(cond.clone())], &ctx, &mut buf, 0)?;
                 Some(buf.trim().to_string())
@@ -1359,6 +1359,8 @@ pub fn lower_project_g112d(project: &Project) -> Result<LowerOutputG11, LowerErr
 
     // ---- app_update ----
     src.push_str("fn app_update(dt float) {\n");
+    // 移动标记每 tick 开头清零（合同 §4；置位只属于本 tick 的真实扫掠）。
+    src.push_str(" _n2d_moved=0\n");
     if life_handler(root, "Tick") {
         src.push_str(&format!(" {rbase}_lifetick(dt)\n"));
     }

@@ -1,8 +1,8 @@
 {
  "generator": "autographics-node2d-pilot plan017 g11-2d",
  "api": "autographics.triggers2d/1",
- "user_source_sha256": "ba9428a62e421d3b3bf42fbd5904906cbf1e9dca9e2aee807b33a00502bffd55",
- "user_source_bytes": 8309,
+ "user_source_sha256": "d04ef7d6c08c39ec8dc2d5d2179fd05c61ad2b560cd50004d0bd047e4fabd605",
+ "user_source_bytes": 8323,
   "module:coin": "554c7e14929e63412bf1451f088de9a3d20039596335f07e60e35875bbaa721f",
   "module:goal": "5e731882f989f6221bfd0cb4d807bfe9bfe186043a1352237715ca0b805d33ed",
   "module:hazard": "be44a4105821f5785f63a16e55136d120f979da7825e76d03c0f4244955ccb91",

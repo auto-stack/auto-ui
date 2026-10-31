@@ -985,7 +985,11 @@ fn g11_pause_step_stop_harness() {
     settle(&mut h);
     assert_eq!(frame_tick(&h), t1 + 1, "single step = exactly one tick");
     assert!(play_error(&h).is_empty(), "{}", play_error(&h));
+    // Stop 恢复编辑文档（原 001 oracle 35 的等价断言：文档 JSON 前后一致）。
+    let doc_before = serde_json::to_string(&h.editor.document).expect("document json");
     h.stop_play();
+    let doc_after = serde_json::to_string(&h.editor.document).expect("document json");
+    assert_eq!(doc_before, doc_after, "stop restores the editor document");
     assert!(h.play.is_none(), "stop tears the play down");
 }
 

@@ -213,6 +213,7 @@ fn app_start() {
  ok=ok+ag_camera_follow_2d(1, 0.0, (-4.0), 30.0, 12.0, 12.0, 8.0)*1.0
 }
 fn app_update(dt float) {
+ _n2d_moved=0
  main_triple_lifetick(dt)
  player_lifetick(0, dt)
  hazard_lifetick(0, dt)
