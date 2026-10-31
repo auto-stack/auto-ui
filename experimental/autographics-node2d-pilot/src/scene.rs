@@ -292,24 +292,18 @@ fn kind_geometry(
     project: &Project,
     resource: &str,
 ) -> Result<(String, f64, f64, (f64, f64, f64, f64)), crate::translate::LowerError> {
-    let module = project
-        .modules
-        .get("resources")
-        .ok_or_else(|| crate::translate::LowerError::Unsupported {
+    let module = project.modules.get("resources").ok_or_else(|| {
+        crate::translate::LowerError::Unsupported {
             what: "resources module missing".into(),
             line: 0,
-        })?;
+        }
+    })?;
     for r in &module.resources {
         if r.name == resource {
             return match &r.kind {
                 ResourceKind::Quad(w, h) => Ok(("quad".into(), *w, *h, (0.0, 0.0, 0.0, 0.0))),
                 ResourceKind::Circle(d) => Ok(("circle".into(), *d, *d, (0.0, 0.0, 0.0, 0.0))),
-                ResourceKind::Color(r, g, b, a) => Ok((
-                    "color".into(),
-                    0.0,
-                    0.0,
-                    (*r, *g, *b, *a),
-                )),
+                ResourceKind::Color(r, g, b, a) => Ok(("color".into(), 0.0, 0.0, (*r, *g, *b, *a))),
             };
         }
     }
@@ -332,10 +326,11 @@ fn position_component(
         // `.param`（self 成员）与裸参数名等价：查实例数值参数字面量。
         Expr::Dot(inner, p) => {
             if let Expr::Ident(_) = &**inner {
-                let props = inst_props.ok_or_else(|| crate::translate::LowerError::Unsupported {
-                    what: format!("position references '.{p}' without instance context"),
-                    line: 0,
-                })?;
+                let props =
+                    inst_props.ok_or_else(|| crate::translate::LowerError::Unsupported {
+                        what: format!("position references '.{p}' without instance context"),
+                        line: 0,
+                    })?;
                 match props.iter().find(|(n, _)| n == p.as_str()) {
                     Some((_, ResolvedProp::NumberLit(v))) => Ok(*v),
                     _ => Err(crate::translate::LowerError::Unsupported {
@@ -493,16 +488,7 @@ pub fn build_scene_json_g11(
             })?;
         let (tx, ty) = literal_position(&pos, iprops)?;
         assert_eq!(next_id, char_template, "char row must be id 1");
-        rows.push(obj_json(
-            next_id,
-            char_inst,
-            &kind,
-            tx,
-            ty,
-            w,
-            h,
-            rgba,
-        ));
+        rows.push(obj_json(next_id, char_inst, &kind, tx, ty, w, h, rgba));
         next_id += 1;
     }
 
@@ -535,13 +521,12 @@ pub fn build_scene_json_g11(
 
     // 触发实例模板行（停靠玩法区外，不可见；实例按声明位置 spawn）。
     for gid in trigger_instances {
-        let inst = instances
-            .iter()
-            .find(|i| i.gid == *gid)
-            .ok_or_else(|| crate::translate::LowerError::Unsupported {
+        let inst = instances.iter().find(|i| i.gid == *gid).ok_or_else(|| {
+            crate::translate::LowerError::Unsupported {
                 what: "trigger instance missing".into(),
                 line: 0,
-            })?;
+            }
+        })?;
         let node = crate::load::node_of(project, &inst.node);
         let el = node
             .view2d

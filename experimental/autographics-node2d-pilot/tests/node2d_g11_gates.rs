@@ -34,8 +34,8 @@ fn write_project(dir: &path::Path, main: &str) {
 fn lower(dir: &path::Path, entry: &str) -> Result<String, String> {
     let project = autographics_node2d_pilot::load_project(&dir.join(entry).join("..").join(entry))
         .map_err(|e| e.to_string())?;
-    let out = autographics_node2d_pilot::lower_project_g112d(&project)
-        .map_err(|e| e.to_string())?;
+    let out =
+        autographics_node2d_pilot::lower_project_g112d(&project).map_err(|e| e.to_string())?;
     Ok(out.user_source)
 }
 
@@ -44,7 +44,10 @@ use std::path;
 #[test]
 fn unbound_event_port_rejected() {
     let dir = path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("g11g-unbound");
-    let main = MAIN.replace("on_collect: .Collect(Key.Amber)", "on_collect: .Collect(Key.Amber)");
+    let main = MAIN.replace(
+        "on_collect: .Collect(Key.Amber)",
+        "on_collect: .Collect(Key.Amber)",
+    );
     //  coin 定义要求 on_collect 绑定：构造缺绑定的实例（去掉该 prop 行）。
     let broken = MAIN.replace("                on_collect: .Collect(Key.Amber)\n", "");
     write_project(&dir, &main);
@@ -56,7 +59,10 @@ fn unbound_event_port_rejected() {
         .ok()
         .and_then(|p| autographics_node2d_pilot::lower_project_g112d(&p).err());
     let err = project.expect("unbound event port must be rejected");
-    assert!(err.to_string().contains("missing prop 'on_collect'"), "{err}");
+    assert!(
+        err.to_string().contains("missing prop 'on_collect'"),
+        "{err}"
+    );
 }
 
 #[test]
@@ -69,10 +75,7 @@ fn receiver_arity_mismatch_rejected() {
         .ok()
         .and_then(|p| autographics_node2d_pilot::lower_project_g112d(&p).err());
     let err = project.expect("arity mismatch must be rejected");
-    assert!(
-        err.to_string().contains("declares 1 param"),
-        "{err}"
-    );
+    assert!(err.to_string().contains("declares 1 param"), "{err}");
 }
 
 #[test]
@@ -88,7 +91,8 @@ fn actor_ref_bound_to_event_rejected() {
         .and_then(|p| autographics_node2d_pilot::lower_project_g112d(&p).err());
     let err = err.expect("actor port bound to an event must be rejected");
     assert!(
-        err.to_string().contains("ActorRef2D ports take refs.<inst>.actor"),
+        err.to_string()
+            .contains("ActorRef2D ports take refs.<inst>.actor"),
         "{err}"
     );
 }
@@ -100,7 +104,10 @@ fn refs_unknown_instance_rejected() {
     write_project(&dir, &broken);
     let err = autographics_node2d_pilot::load_project(&dir.join("main.at")).err();
     let err = err.expect("refs to an unknown instance must be rejected");
-    assert!(err.to_string().contains("unknown root instance 'ghost'"), "{err}");
+    assert!(
+        err.to_string().contains("unknown root instance 'ghost'"),
+        "{err}"
+    );
 }
 
 #[test]
@@ -155,7 +162,8 @@ fn rename_and_reorder_keep_behavior_shape() {
     // 模板数）不变；pair 顺序跟随声明序（非名字）。
     let dir = path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("g11g-rename");
     let main2 = MAIN
-        .replace("Player player {", "Player walker {").replace("refs.player.actor", "refs.walker.actor")
+        .replace("Player player {", "Player walker {")
+        .replace("refs.player.actor", "refs.walker.actor")
         .replace("Coin amber_coin {", "Coin item_a {")
         .replace("Coin azure_coin {", "Coin item_b {")
         .replace("Coin rose_coin {", "Coin item_c {")
@@ -166,10 +174,17 @@ fn rename_and_reorder_keep_behavior_shape() {
     // 重排：把 hazard 实例移到 amber 之前（pair 顺序跟随声明序）。
     let hazard_block_start = main2.find("        Hazard saw {").expect("hazard block");
     let hazard_block_end = main2[hazard_block_start..]
-        .find("        }
-")
-        .map(|i| hazard_block_start + i + "        }
-".len())
+        .find(
+            "        }
+",
+        )
+        .map(|i| {
+            hazard_block_start
+                + i
+                + "        }
+"
+                .len()
+        })
         .expect("hazard block end");
     let hazard_block = main2[hazard_block_start..hazard_block_end].to_string();
     let head = main2[..hazard_block_start]
@@ -185,11 +200,12 @@ fn rename_and_reorder_keep_behavior_shape() {
     write_project(&dir, &reordered);
     let project = autographics_node2d_pilot::load_project(&dir.join("main.at"))
         .expect("renamed project loads");
-    let out = autographics_node2d_pilot::lower_project_g112d(&project)
-        .expect("renamed project lowers");
+    let out =
+        autographics_node2d_pilot::lower_project_g112d(&project).expect("renamed project lowers");
     assert!(out.user_source.contains("ag_trigger_bind(5,"), "six pairs");
     assert!(
-        out.roles_json.contains("{\"pair\": 0, \"instance\": \"saw\""),
+        out.roles_json
+            .contains("{\"pair\": 0, \"instance\": \"saw\""),
         "pair order follows declaration order: {}",
         out.roles_json
     );
@@ -204,8 +220,14 @@ fn resource_and_position_changes_move_outputs() {
     let project = autographics_node2d_pilot::load_project(&dir.join("main.at"))
         .expect("mutated project loads");
     let out = autographics_node2d_pilot::lower_project_g112d(&project).expect("lowers");
-    assert!(out.user_source.contains("coin_position_x=[9.5,"), "position moved");
-    assert!(!out.user_source.contains("coin_position_x=[8.0,"), "old value gone");
+    assert!(
+        out.user_source.contains("coin_position_x=[9.5,"),
+        "position moved"
+    );
+    assert!(
+        !out.user_source.contains("coin_position_x=[8.0,"),
+        "old value gone"
+    );
 
     let dir2 = path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("g11g-mutate2");
     let res2 = RESOURCES.replace(

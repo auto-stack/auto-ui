@@ -27,7 +27,8 @@ use autographics_auto_driver::{
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-const WORLD_MAIN: &str = include_str!("../../autographics-node2d-pilot/generated-g11/main/world.at");
+const WORLD_MAIN: &str =
+    include_str!("../../autographics-node2d-pilot/generated-g11/main/world.at");
 const WORLD_ALT: &str =
     include_str!("../../autographics-node2d-pilot/generated-g11/main-alt/world.at");
 const SCENE_MAIN: &str =
@@ -63,7 +64,6 @@ const SCENE_MOTION: &str =
 const WORLD_MOTION: &str =
     include_str!("../../autographics-node2d-pilot/generated-g11/main-motion-probes/world.at");
 
-
 // ---------------------------------------------------------------- harness --
 
 static G11_LOG: Mutex<Vec<String>> = Mutex::new(Vec::new());
@@ -72,7 +72,15 @@ fn g11log(line: String) {
     G11_LOG.lock().unwrap().push(line);
 }
 
-fn load_doc(scene_text: &str, world_src: &str, tag: &str) -> (autographics_auto_driver::authoring::document::Document, autographics_auto_driver::authoring::assets::Registry, Option<std::sync::Arc<CodePayload>>) {
+fn load_doc(
+    scene_text: &str,
+    world_src: &str,
+    tag: &str,
+) -> (
+    autographics_auto_driver::authoring::document::Document,
+    autographics_auto_driver::authoring::assets::Registry,
+    Option<std::sync::Arc<CodePayload>>,
+) {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("target/plan017-g11")
         .join(format!("{}-{tag}", std::process::id()));
@@ -91,11 +99,7 @@ fn load_doc(scene_text: &str, world_src: &str, tag: &str) -> (autographics_auto_
     (doc, registry, code)
 }
 
-fn start_with(
-    scene_text: &str,
-    world_src: &str,
-    tag: &str,
-) -> Host {
+fn start_with(scene_text: &str, world_src: &str, tag: &str) -> Host {
     let (doc, registry, code) = load_doc(scene_text, world_src, tag);
     assert!(code.is_some(), "behavior code loaded");
     let mut h = Host::with_project(doc, registry, code).expect("host");
@@ -195,12 +199,7 @@ fn actor(h: &Host) -> [f32; 3] {
 }
 
 fn play_error(h: &Host) -> String {
-    h.play
-        .as_ref()
-        .unwrap()
-        .error
-        .clone()
-        .unwrap_or_default()
+    h.play.as_ref().unwrap().error.clone().unwrap_or_default()
 }
 
 fn binding_count(h: &Host) -> usize {
@@ -235,7 +234,10 @@ fn slot(h: &Host, i: usize) -> Option<(i32, u64, [f32; 3])> {
 
 fn slot_visible(h: &Host, i: usize) -> Option<bool> {
     let f = h.play.as_ref().unwrap().last.as_ref()?;
-    f.instances.as_ref().and_then(|inst| inst.get(i)).map(|s| s.visible)
+    f.instances
+        .as_ref()
+        .and_then(|inst| inst.get(i))
+        .map(|s| s.visible)
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -289,14 +291,14 @@ struct Row(i32, i32, [f32; 3], [f32; 3]);
 /// g11 冻结场景表的 CPU 身份行（quad=1/circle=0，dim=2）。
 fn g11_rows() -> Vec<Row> {
     vec![
-        Row(1, 2, [-0.4, -0.5, 0.0], [0.4, 0.5, 0.0]),   // 1 char 0.8x1
+        Row(1, 2, [-0.4, -0.5, 0.0], [0.4, 0.5, 0.0]), // 1 char 0.8x1
         Row(1, 2, [-20.0, -1.1, 0.0], [20.0, -0.1, 0.0]), // 2 ground 40x1
-        Row(0, 2, [-0.3, -0.3, 0.0], [0.3, 0.3, 0.0]),   // 3 amber circle 0.6
+        Row(0, 2, [-0.3, -0.3, 0.0], [0.3, 0.3, 0.0]), // 3 amber circle 0.6
         Row(1, 2, [-0.35, -0.35, 0.0], [0.35, 0.35, 0.0]), // 4 azure quad 0.7
         Row(0, 2, [-0.45, -0.45, 0.0], [0.45, 0.45, 0.0]), // 5 rose circle 0.9
         Row(0, 2, [-0.35, -0.35, 0.0], [0.35, 0.35, 0.0]), // 6 hazard circle 0.7
         Row(1, 2, [-0.25, -0.6, 0.0], [0.25, 0.6, 0.0]), // 7 goal quad 0.5x1.2
-        Row(1, 2, [-1.0, -1.5, 0.0], [1.0, 1.5, 0.0]),   // 8 void quad 2x3
+        Row(1, 2, [-1.0, -1.5, 0.0], [1.0, 1.5, 0.0]), // 8 void quad 2x3
     ]
 }
 
@@ -329,7 +331,11 @@ fn g11_session(world: &str, name: &str, run: i32) -> Session {
             .unwrap();
         s.call("_ag_bind_resource", &[Int(0)], ResultKind::Unit)
             .unwrap();
-        let (tx, ty) = if n == 0 { (SPAWN[0], SPAWN[1]) } else { (-30.0, 2.0) };
+        let (tx, ty) = if n == 0 {
+            (SPAWN[0], SPAWN[1])
+        } else {
+            (-30.0, 2.0)
+        };
         for v in [tx, ty, 0., 1., 1., 1., 0., 0., 1., 1., 1., 0.] {
             s.call("_ag_append_field", &[Float(v)], ResultKind::Unit)
                 .unwrap();
@@ -386,7 +392,12 @@ fn tick_cpu(s: &mut Session, step: i32, held_right: bool) {
 fn g11_walk_collects_three_and_wins_then_restarts() {
     let mut h = start_main();
     assert!(play_error(&h).is_empty(), "fault: {}", play_error(&h));
-    g11log(format!("init: bindings={} live={} error={:?}", binding_count(&h), live(&h), play_error(&h)));
+    g11log(format!(
+        "init: bindings={} live={} error={:?}",
+        binding_count(&h),
+        live(&h),
+        play_error(&h)
+    ));
     assert_eq!(binding_count(&h), 6, "six pairs bound at tick0");
     assert_eq!(live(&h), 6, "six instances live at tick0");
     let tpl: Vec<Option<u64>> = (0..3).map(|i| slot(&h, i).map(|s| s.1)).collect();
@@ -407,18 +418,43 @@ fn g11_walk_collects_three_and_wins_then_restarts() {
         }
         step(&mut h, 1 << 1);
     }
-    assert!(won, "walk collects three then wins; events={seen:?} live={} x={:?} err={:?}", live(&h), actor(&h), play_error(&h));
+    assert!(
+        won,
+        "walk collects three then wins; events={seen:?} live={} x={:?} err={:?}",
+        live(&h),
+        actor(&h),
+        play_error(&h)
+    );
     let enters: Vec<&Ev> = seen.iter().filter(|e| e.pair < 3 && e.phase == 1).collect();
     let pairs: Vec<i32> = enters.iter().map(|e| e.pair).collect();
     assert_eq!(pairs.len(), 3, "three item enters");
-    assert!(pairs.contains(&0) && pairs.contains(&1) && pairs.contains(&2), "pairs {pairs:?}");
+    assert!(
+        pairs.contains(&0) && pairs.contains(&1) && pairs.contains(&2),
+        "pairs {pairs:?}"
+    );
     let ticks: Vec<i32> = enters.iter().map(|e| e.tick).collect();
-    assert!(ticks[0] < ticks[1] && ticks[1] < ticks[2], "ordered ticks {ticks:?}");
+    assert!(
+        ticks[0] < ticks[1] && ticks[1] < ticks[2],
+        "ordered ticks {ticks:?}"
+    );
     let post: Vec<&Ev> = seen.iter().filter(|e| e.pair < 3 && e.phase != 1).collect();
-    assert!(post.is_empty(), "destroyed items never emit stay/exit: {post:?}");
-    assert!(!seen.iter().any(|e| e.pair == 3), "hazard silent on the walk line");
-    assert!(run_id(&h) == first_run && !restart_seen, "win alone restarts nothing");
-    g11log(format!("win: enters ticks={ticks:?} x={:?} run={}", actor(&h), run_id(&h)));
+    assert!(
+        post.is_empty(),
+        "destroyed items never emit stay/exit: {post:?}"
+    );
+    assert!(
+        !seen.iter().any(|e| e.pair == 3),
+        "hazard silent on the walk line"
+    );
+    assert!(
+        run_id(&h) == first_run && !restart_seen,
+        "win alone restarts nothing"
+    );
+    g11log(format!(
+        "win: enters ticks={ticks:?} x={:?} run={}",
+        actor(&h),
+        run_id(&h)
+    ));
 
     // Won 冻结移动；fresh Enter 开新局。
     for _ in 0..2 {
@@ -440,13 +476,25 @@ fn g11_walk_collects_three_and_wins_then_restarts() {
     }
     settle(&mut h);
     settle(&mut h);
-    assert!(swapped && frame_tick(&h) == 0, "fresh Enter opens a new round");
+    assert!(
+        swapped && frame_tick(&h) == 0,
+        "fresh Enter opens a new round"
+    );
     assert_eq!(live(&h), 6, "items reborn after restart");
     let wgen: Vec<Option<i32>> = (0..3).map(|i| slot(&h, i).map(|s| s.0)).collect();
-    assert_eq!(wgen, vec![Some(1), Some(1), Some(1)], "new first generation");
+    assert_eq!(
+        wgen,
+        vec![Some(1), Some(1), Some(1)],
+        "new first generation"
+    );
     assert!((actor(&h)[0] - SPAWN[0]).abs() < 1e-3, "x restored");
     assert!(events(&h).is_empty(), "tick0 admits no events");
-    g11log(format!("restart: run {} -> {} tick {}", won_run, run_id(&h), frame_tick(&h)));
+    g11log(format!(
+        "restart: run {} -> {} tick {}",
+        won_run,
+        run_id(&h),
+        frame_tick(&h)
+    ));
     h.stop_play();
 }
 
@@ -469,7 +517,10 @@ fn g11_alt_fails_at_hazard_and_freezes() {
         "hazard enter at tick {hz_tick} x={hz_x} (walk line)"
     );
     let coin_before = seen.iter().filter(|e| e.pair < 3 && e.phase == 1).count();
-    assert!(coin_before < 3, "alt trajectory differs (collected {coin_before})");
+    assert!(
+        coin_before < 3,
+        "alt trajectory differs (collected {coin_before})"
+    );
     for _ in 0..2 {
         step(&mut h, 1 << 1);
     }
@@ -478,7 +529,9 @@ fn g11_alt_fails_at_hazard_and_freezes() {
         step(&mut h, 1 << 1);
     }
     assert_eq!(actor(&h), frozen, "failed freezes motion");
-    g11log(format!("alt: fail tick {hz_tick} x={hz_x} coins_before={coin_before}"));
+    g11log(format!(
+        "alt: fail tick {hz_tick} x={hz_x} coins_before={coin_before}"
+    ));
 
     // fresh Enter 重开到 tick0。
     let failed_run = run_id(&h);
@@ -495,7 +548,10 @@ fn g11_alt_fails_at_hazard_and_freezes() {
     assert!(swapped && frame_tick(&h) == 0, "restart opens tick0");
     let mut old_replay = 0usize;
     for _ in 0..6 {
-        old_replay += events(&h).iter().filter(|e| e.pair == 3 && e.phase == 1).count();
+        old_replay += events(&h)
+            .iter()
+            .filter(|e| e.pair == 3 && e.phase == 1)
+            .count();
         step(&mut h, 0);
     }
     assert_eq!(old_replay, 0, "old run events not replayed");
@@ -547,9 +603,17 @@ fn g11_cpu_budget_and_moving_collection_exactly_32() {
     for t in 0..=collected_tick {
         tick_cpu(&mut p, t + 1, true);
     }
-    assert_eq!(status(&mut p), 0, "probe world reaches the same collection tick");
+    assert_eq!(
+        status(&mut p),
+        0,
+        "probe world reaches the same collection tick"
+    );
     let _ = p.call("probe_extra", &[], ResultKind::Int);
-    assert_eq!(status(&mut p), 10, "33rd charged call faults on the collection tick");
+    assert_eq!(
+        status(&mut p),
+        10,
+        "33rd charged call faults on the collection tick"
+    );
     drop(s);
 
     // 静止三收集：同位三物品（用 triple 世界由 V-03 部分覆盖；这里验证
@@ -569,7 +633,9 @@ fn g11_cpu_budget_and_moving_collection_exactly_32() {
     tick_cpu(&mut f, 999, true);
     assert_eq!(status(&mut f), 0, "failed-state tick within budget");
     drop(f);
-    g11log(format!("budget: moving collection tick {collected_tick} = exactly 32 (33rd faults)"));
+    g11log(format!(
+        "budget: moving collection tick {collected_tick} = exactly 32 (33rd faults)"
+    ));
 }
 
 /// 输出日志（测试完成时可见）。
@@ -696,7 +762,11 @@ fn g11_stay_not_recounted() {
         }
         step(&mut h, 1 << 1);
     }
-    let p0: Vec<i32> = seen.iter().filter(|e| e.pair == 0).map(|e| e.phase).collect();
+    let p0: Vec<i32> = seen
+        .iter()
+        .filter(|e| e.pair == 0)
+        .map(|e| e.phase)
+        .collect();
     assert!(
         p0.first() == Some(&1)
             && p0.iter().filter(|p| **p == 1).count() == 1
@@ -752,9 +822,7 @@ fn g11_bag2_goal_gate_and_exit() {
         run_id(&h)
     );
     // 走出 goal：exit 事件在越过后出现。
-    let mut saw_exit = seen
-        .iter()
-        .any(|e| e.pair == 3 && e.phase == 3);
+    let mut saw_exit = seen.iter().any(|e| e.pair == 3 && e.phase == 3);
     let mut guard = 0;
     while !saw_exit && guard < WALK_BUDGET {
         guard += 1;
@@ -821,7 +889,11 @@ fn g11_generation_despawn_respawn_rebind() {
         }
         step(&mut h, 0);
     }
-    assert_eq!(enter_ticks.first(), Some(&1), "enters at tick 1 (spawn overlap)");
+    assert_eq!(
+        enter_ticks.first(),
+        Some(&1),
+        "enters at tick 1 (spawn overlap)"
+    );
     assert!(
         !enter_ticks.iter().any(|t| *t > 1 && *t < 4),
         "despawn window is silent: {enter_ticks:?}"
@@ -890,7 +962,10 @@ fn g11_motion_probes_both_and_away() {
             .count();
         step(&mut h, 0);
     }
-    assert_eq!(away_enters, 0, "away item never enters (no previous position)");
+    assert_eq!(
+        away_enters, 0,
+        "away item never enters (no previous position)"
+    );
     h.stop_play();
 }
 
@@ -941,9 +1016,8 @@ fn g11_owner_20_rounds_and_stale_write() {
     }
     assert!(collected > 0, "collected a handle on run 1");
     drop(s1);
-    let probe = format!(
-        "{WORLD_MAIN}\nfn stale_write(h int) int {{return ag_object_despawn(h)}}\n"
-    );
+    let probe =
+        format!("{WORLD_MAIN}\nfn stale_write(h int) int {{return ag_object_despawn(h)}}\n");
     let mut p = g11_session(&probe, "g11_stale.at", 2);
     assert_eq!(status(&mut p), 0, "fresh run-2 world starts clean");
     let _ = p.call("stale_write", &[Int(collected)], ResultKind::Int);
@@ -962,23 +1036,32 @@ fn g11_hidden_still_triggers_engine_fact() {
     // 探针源以重写身份绑定到同场景工程（scene behavior sha/bytes = 探针源）。
     let hidden = concat!(
         "var ok=0.0
-", "var h0=0
-", "fn app_start() {
-", " ok=ok+ag_char_bind(1)
+",
+        "var h0=0
+",
+        "fn app_start() {
+",
+        " ok=ok+ag_char_bind(1)
 ",
         " ok=ok+ag_char_solid(2)
-", " ok=ok+ag_camera_follow_2d(1, 0.0, -4.0, 30.0, 12.0, 12.0, 8.0)
+",
+        " ok=ok+ag_camera_follow_2d(1, 0.0, -4.0, 30.0, 12.0, 12.0, 8.0)
 ",
         " h0=ag_object_spawn(0, 3, 2.0, 0.5, 0.0)
-", " ok=ok+ag_object_visible(h0, 0)
+",
+        " ok=ok+ag_object_visible(h0, 0)
 ",
         " ok=ok+ag_trigger_bind(0, 1, 1, h0, 0, 0.0)
-", "}
-", "fn app_update(dt float) {
+",
+        "}
+",
+        "fn app_update(dt float) {
 ",
         " let n=ag_event_next()
-", " if n==1 {let p=ag_event_pair()}
-", "}
+",
+        " if n==1 {let p=ag_event_pair()}
+",
+        "}
 ",
     );
     let probe_sha = agp::renderer::capture::sha256_hex(hidden.as_bytes());
@@ -996,10 +1079,15 @@ fn g11_hidden_still_triggers_engine_fact() {
             digits.parse::<usize>().ok()
         })
         .expect("bytes");
-    let probe_scene = SCENE_MAIN
-        .replacen(&old_sha, &probe_sha, 1)
-        .replacen(&format!("\"byte_length\": {}", old_bytes), &format!("\"byte_length\": {}", hidden.len()), 1);
-    assert!(probe_scene.contains(&probe_sha), "scene rewritten for the probe source");
+    let probe_scene = SCENE_MAIN.replacen(&old_sha, &probe_sha, 1).replacen(
+        &format!("\"byte_length\": {}", old_bytes),
+        &format!("\"byte_length\": {}", hidden.len()),
+        1,
+    );
+    assert!(
+        probe_scene.contains(&probe_sha),
+        "scene rewritten for the probe source"
+    );
     assert!(!probe_scene.contains(&old_sha), "old binding gone");
     let mut h = start_with(&probe_scene, hidden, "hidden");
     let mut enter = false;
@@ -1063,15 +1151,17 @@ fn g11_gpu_won_pixels_and_windowless_png() {
     for _ in 0..3 {
         step(&mut h, 1 << 1);
     }
-    assert!((actor(&h)[0] - won_x).abs() < 1e-6, "won freezes (GPU window)");
+    assert!(
+        (actor(&h)[0] - won_x).abs() < 1e-6,
+        "won freezes (GPU window)"
+    );
     let cmds = match h.rt.content(h.two) {
         Some(agp::host::surface_runtime::SurfaceContent::Game2d(g)) => g.commands.len(),
         _ => 0,
     };
-    let (_, png, w, ht) = h
-        .rt
-        .capture(h.two, "g11-2d-won")
-        .unwrap_or_else(|| panic!("capture"));
+    let (_, png, w, ht) =
+        h.rt.capture(h.two, "g11-2d-won")
+            .unwrap_or_else(|| panic!("capture"));
     assert!(
         w > 0 && ht > 0 && png.len() > 3_000 && cmds > 3,
         "windowless png {w}x{ht} bytes={} cmds={cmds}",
