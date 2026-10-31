@@ -1,0 +1,197 @@
+{
+  "project": "auto-ui",
+  "version": 1,
+  "sections": [
+    {
+      "id": "goals",
+      "section_type": "Goals",
+      "title": "Goals",
+      "status": "empty",
+      "content": "",
+      "items": [],
+      "depends_on": [],
+      "last_modified": 1793405387,
+      "last_verified": null
+    },
+    {
+      "id": "architecture",
+      "section_type": "Architecture",
+      "title": "Architecture",
+      "status": "active",
+      "content": "",
+      "items": [
+        {
+          "id": "P890-BOUNDARY",
+          "depends_on": [],
+          "priority": null,
+          "assignee": null,
+          "test_file": null,
+          "milestone": null,
+          "created_at": 1793405387,
+          "title": "auto-ui Web边界",
+          "content": "Web领域canonical与各宿主消费边界，来源中央PLAN-890。",
+          "status": "verified",
+          "related": [
+            "PLAN-890"
+          ],
+          "file": "docs/web-integration.md",
+          "module": "auto-ui",
+          "tags": [
+            "PLAN-890",
+            "r6",
+            "channel:canonical-pointer"
+          ],
+          "modified_at": 1793405387,
+          "completed_at": 1793405387
+        }
+      ],
+      "depends_on": [],
+      "last_modified": 1793405387,
+      "last_verified": null
+    },
+    {
+      "id": "designs",
+      "section_type": "Designs",
+      "title": "Designs",
+      "status": "active",
+      "content": "",
+      "items": [
+        {
+          "id": "P890-COMPOSITION",
+          "depends_on": [],
+          "priority": null,
+          "assignee": null,
+          "test_file": null,
+          "milestone": null,
+          "created_at": 1793405387,
+          "title": "auto-ui 显式装配",
+          "content": "固定来源、typed launch和原CLI/资源/恢复义务保持。",
+          "status": "verified",
+          "related": [
+            "PLAN-890"
+          ],
+          "file": "docs/web-integration.md",
+          "module": "auto-ui",
+          "tags": [
+            "PLAN-890",
+            "r6",
+            "channel:canonical-pointer"
+          ],
+          "modified_at": 1793405387,
+          "completed_at": 1793405387
+        }
+      ],
+      "depends_on": [],
+      "last_modified": 1793405387,
+      "last_verified": null
+    },
+    {
+      "id": "tests",
+      "section_type": "Tests",
+      "title": "Tests",
+      "status": "active",
+      "content": "",
+      "items": [
+        {
+          "id": "P890-EXECUTION",
+          "depends_on": [],
+          "priority": null,
+          "assignee": null,
+          "test_file": null,
+          "milestone": null,
+          "created_at": 1793405387,
+          "title": "auto-ui 实际执行与原条件",
+          "content": "真实owner执行和原ID/floor/ignore守恒；完整门与定向证据分列。",
+          "status": "verified",
+          "related": [
+            "PLAN-890"
+          ],
+          "file": "docs/web-integration.md",
+          "module": "auto-ui",
+          "tags": [
+            "PLAN-890",
+            "r6",
+            "channel:canonical-pointer"
+          ],
+          "modified_at": 1793405387,
+          "completed_at": 1793405387
+        }
+      ],
+      "depends_on": [],
+      "last_modified": 1793405387,
+      "last_verified": null
+    },
+    {
+      "id": "reviews",
+      "section_type": "Reviews",
+      "title": "Reviews",
+      "status": "active",
+      "content": "",
+      "items": [
+        {
+          "id": "P890-REVIEW",
+          "depends_on": [],
+          "priority": null,
+          "assignee": null,
+          "test_file": null,
+          "milestone": null,
+          "created_at": 1793405387,
+          "title": "中央PLAN-890 r6独立终审",
+          "content": "第3次独立复审PASS；唯一计划在语言仓，不另取迁移号。",
+          "status": "verified",
+          "related": [
+            "PLAN-890"
+          ],
+          "file": "docs/web-integration.md",
+          "module": "auto-ui",
+          "tags": [
+            "PLAN-890",
+            "r6",
+            "channel:canonical-pointer"
+          ],
+          "modified_at": 1793405387,
+          "completed_at": 1793405387
+        }
+      ],
+      "depends_on": [],
+      "last_modified": 1793405387,
+      "last_verified": null
+    },
+    {
+      "id": "reports",
+      "section_type": "Reports",
+      "title": "Reports",
+      "status": "active",
+      "content": "",
+      "items": [
+        {
+          "id": "P890-DELIVERY",
+          "depends_on": [],
+          "priority": null,
+          "assignee": null,
+          "test_file": null,
+          "milestone": null,
+          "created_at": 1793405387,
+          "title": "中央PLAN-890交付收据指针",
+          "content": "实际最终门/landing/guard/归档仍pending，见中央收据，不提前认证。",
+          "status": "pending",
+          "related": [
+            "PLAN-890"
+          ],
+          "file": "docs/web-integration.md",
+          "module": "auto-ui",
+          "tags": [
+            "PLAN-890",
+            "r6",
+            "channel:canonical-pointer"
+          ],
+          "modified_at": 1793405387,
+          "completed_at": null
+        }
+      ],
+      "depends_on": [],
+      "last_modified": 1793405387,
+      "last_verified": null
+    }
+  ]
+}

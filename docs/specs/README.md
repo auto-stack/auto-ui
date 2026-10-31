@@ -12,3 +12,7 @@ language repository's `docs/specs/auto-ui/project.md`.
 - [Native VM app validation](runtime/native-vm-app-validation.md) — evidence
   required to claim a native VM app was launched, interacted with, failed,
   closed, and reopened.
+
+## Web consumer boundary (PLAN-890)
+
+[Integration guide](../web-integration.md); [Web canonical source](../../../auto-web/docs/specs/project.md); actual final cohort/gates in the central archived Plan.
