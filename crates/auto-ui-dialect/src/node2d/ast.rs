@@ -124,12 +124,6 @@ pub struct Handler {
 /// SourceSpan 类型，诊断构造时经 `pos_to_span` 还原。
 pub type LightSpan = (usize, usize);
 
-/// 供诊断与降层使用的 span 捕获。
-pub(crate) fn span_at(cx: &mut dyn auto_parser_api::DomainParseContext) -> LightSpan {
-    let s = pos_to_span(cx.cur_pos());
-    (s.offset(), s.len())
-}
-
 pub(crate) fn span_of(pos: Pos) -> LightSpan {
     let s = pos_to_span(pos);
     (s.offset(), s.len())

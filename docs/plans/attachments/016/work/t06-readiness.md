@@ -56,6 +56,27 @@ dependency_revisions: SDK 7b987ca8（driver .sdk-source，source-lock 校验）�
 - generated-supplement/world.at 3764B sha 4bd54fa364aa8fd136d7a18a820bf2a921e3e6d08fd3648f4460286c9e250b19
 - 夹具 14 文件 sha 见 verify_plan016 PASS 行（t06-verify.log）
 
+## R1 修复闭合（2026-10-31，独立终审 R1 needs_fix → 本轮 repair）
+
+| Finding | 关闭方式 | 证据 |
+|---|---|---|
+| F-01 错导出 | `validate_closure` 错导出定位拒绝 + `wrong_export_rejected` 负测 | pilot gates 9/9 |
+| F-02 坏 actor 引用 | `refs.<未知实例>` 定位拒绝 + `unknown_actor_ref_rejected` | 同上 |
+| F-03 未知实例属性 | 属性名不在参数表 → 定位拒绝 + `unknown_instance_property_rejected` | 同上 |
+| F-04 重复局部绑定 | 参数/model 字段重名定位拒绝 + 两个负测 | 同上 |
+| F-05 fmt | `rustfmt --edition 2021` 已应用到 driver 测试与全部触面 | fmt --check exit 0 |
+| F-06 warnings | dialect 2、dialect 测试 3、pilot 3、driver 1 全清（触面 0 warning） | 构建输出 |
+| F-07 合同命令 | 合同 §4 更正为 pilot `--test node2d_lower_gates` + driver `--test node2d_flow` | 合同 diff |
+| F-08 预算算式 | held1+char_move26(24+2)+2+1+1+1=32 修正入合同/SD（实测 32 不变） | 合同/SD diff |
+| F-09 Life.Frame | 解析层显式越界拒绝 + `life_frame_out_of_scope_rejected` | 同上 |
+| F-10 Start 同名区分 | `life_start_and_business_start_are_distinct`（lifestart vs start 两 fn、调用面分离） | gates 9/9 |
+| F-11 化妆项 | schema/6 注释、verify docstring、重复 node 声明带行号（node.span） | diff |
+
+修复后电池：dialect 6/6、compiler 6/6、pilot gates 9/9、driver flow 6/6、
+verify --controls PASS exit0（t06-verify-r2.log）；生成物 sha 不变
+（f66b1b92/4bd54fa3——拒绝面不触碰已冻结世界）；dialect 全量套件 0 failed。
+修复提交：R1_REPAIR_COMMIT（见 §9）。
+
 ## review/merge-owned 待办（不阻塞移交）
 
 - T-07 同树独立 final review（D-04 上下文按 §6 既有安排）；

@@ -204,7 +204,6 @@ fn translate_expr(e: &Expr, ctx: &Ctx, out: &mut String) -> Result<(), LowerErro
                     }
                 },
                 _ => Err(unsupported(format!("member path .{name} of {obj:?}"), e)),
-                _ => Err(unsupported(format!("member of {obj:?}"), e)),
             }
         }
         Expr::Call(call) => {

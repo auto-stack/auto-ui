@@ -896,24 +896,6 @@ fn emit_getters(
     }
     Ok(())
 }
-
-fn prop_pair(inst: &Instance, key: &str) -> Option<(f64, f64)> {
-    let v = inst
-        .props
-        .iter()
-        .find(|pr| pr.name == key)
-        .map(|pr| &pr.value)?;
-    let es = match v {
-        PropValue::Pair(es) => es.clone(),
-        PropValue::One(Expr::Tuple(es)) => es.clone(),
-        _ => return None,
-    };
-    if es.len() != 2 {
-        return None;
-    }
-    Some((numeric_lit(&es[0])?, numeric_lit(&es[1])?))
-}
-
 fn lit_f(e: &Expr) -> Result<f64, LowerError> {
     numeric_lit(e).ok_or_else(|| LowerError::Unsupported {
         what: format!("literal {e:?}"),

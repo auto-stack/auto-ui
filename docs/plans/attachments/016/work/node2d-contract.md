@@ -35,7 +35,7 @@ SDK pin: `7b987ca8`（`research/baseline.json.txt` sdk.repository_commit；`tool
 3. **tick 顺序**（每 `_ag_tick`，固定）：输入采样（宿主 `_ag_char_input` 一次）→ Player（`ag_action_held`→`ag_char_move` 扫掠）→ Hazard 逐实例 patrol（条件三角波）→（AG end-of-tick 触发 evaluate）→ 下一 tick 事件读取→守卫→`Collect`→条件差量（真 despawn，非 hidden）→ 呈现数据随 admitted block 走。
 4. **禁止**：float `%`（准入可过、VM 执行 sticky fault，用三角波条件式）；直接引用/调用保留名（`fields`/`_ag_*`，准入拒绝）；顶层非 const 初始化器；`use` 进入 AG 准入（模块已在 lowering 前解析）。声明先于使用（VM 源序编译）。
 5. **场景模板**：模板行必须停靠在玩法区外（原型：(-100,-100)），实例从模板 spawn；角色行在 `ag_char_bind` 前落位（原型 (2,1)），否则 born-overlap（motion status=4/3）永久锁死运动。
-6. **预算（实测形状）**：共享 32 credits/tick 池 = `_ag_cast_charge` 系（held 1 + move_and_slide 24 + scan 1）+ objects ops（spawn/move/despawn 各 1）+ trg 读（event_next/pair 各 1）。收集 tick 全分支 **恰 32**：held1+sweep24+scan1+2×hazard move+event_next1+pair1+despawn1=32；第 33 个计费调用 → 命名 sticky fault 10（已测）；objects ops 超 32 → fault 37（objects 单元自带守护，AG 既有测试覆盖）。VM 分片 1000steps/2ms、100000steps/120resumes/250ms、30s init/2s tick/8ms pump 目标照旧（`Session`/`Play` 未改）。
+6. **预算（实测形状）**：共享 32 credits/tick 池 = `_ag_cast_charge` 系（held 1 + move_and_slide 24 + scan 1）+ objects ops（spawn/move/despawn 各 1）+ trg 读（event_next/pair 各 1）。收集 tick 全分支 **恰 32**：held1+char_move26（24 sweep+2 scan，实测校准）+2×hazard move+event_next1+pair1+despawn1=32；第 33 个计费调用 → 命名 sticky fault 10（已测）；objects ops 超 32 → fault 37（objects 单元自带守护，AG 既有测试覆盖）。VM 分片 1000steps/2ms、100000steps/120resumes/250ms、30s init/2s tick/8ms pump 目标照旧（`Session`/`Play` 未改）。
 7. **读回**：验收读回必须走**纯 Auto getter**（读用户状态，零计费）。`ag_object_alive` 等计费读取每 tick 限次并在 tick 分支内预算；任何直接会话调用落在 tick 间会叠加上一 tick 余量（原型 get_c_alive 事故=合同依据）。声明返回类型与读取 `ResultKind` 必须一致；VM 层跨 fn 返回可能 float 化（camera 实测 2.0f），累加器一律用 float。
 8. **生命周期**：`Play`/Host 的 Start 一次/Pause 无 tick/Step 恰一中性 tick/Resume 不重 Start/Stop 回编辑态、8 槽对象/8 对触发/代次 handle（旧代跨 run fault 33/32）全部复用未改；pilot 20 轮短例只做观测（V-04）。
 
@@ -43,7 +43,8 @@ SDK pin: `7b987ca8`（`research/baseline.json.txt` sdk.repository_commit；`tool
 
 - dialect: `cargo test -p auto-ui-dialect --test node2d_pilot`（研究域解析+诊断，V-01）
 - compiler: `cargo test -p auto-ui-compiler --test node2d_pilot`（模块绑定/定位诊断，V-01）
-- pilot: `cargo test --manifest-path experimental/autographics-node2d-pilot/Cargo.toml --locked --offline --test node2d_flow -- --test-threads=1`（整链 V-02..05；GPU 用例单实例串行）
+- pilot: `cargo test --manifest-path experimental/autographics-node2d-pilot/Cargo.toml --locked --offline --test node2d_lower_gates -- --test-threads=1`（降层负面门 9 例：错导出/坏引用/未知属性/重复绑定/Life.Frame 越界/Start 同名共存区分/合法对照；R1 修复新增）
+- driver: `cargo test --locked --offline --test node2d_flow -- --test-threads=1`（整链 V-02..05 六例；GPU 用例单实例串行）
 - 工具: `python experimental/autographics-node2d-pilot/tools/verify_plan016.py --controls`（源身份/负控；0selected 拒绝）
 - 准入面: `Api::Triggers2V1` 单一 profile；pilot 源闭包 ≤256KiB 用户/96KiB 桥/352KiB 合计；资源用场景文档程序化图元，不加新资源格式。
 - 消费 A→B（T-06）：A=本树构建；B=独立导出目录+冷 `.sdk-source`（`prepare_sdk.py --from-snapshot`）+独立 target，`--locked --offline` 同输入同结果。
@@ -60,7 +61,7 @@ view-3d/portrait/widget 与混合嵌套、Life.Frame、多呈现选择器、PNG/
 4. **Op 形态勘误**：auto-val `Op` 变体为 `Neq/Ge/Le`（不存在 NotEq/Gte/Lte）；Rust match 中未知变体名会静默成为绑定臂（曾致 `>` 译成 `!=`）——翻译面以真实变体冻结，警告必须清零。
 5. ** Int 字段初值**按 int 形态发射（getter 类型与读取期一致）；赋值语句不加括号；`emit` 目标事件名 snake 化。
 6. **观测面**：char 定义（冻结场景表 row 0）emit `get_player_node_x/y`（`ag_local` 纯读零计费）；全部读回走纯 Auto getter，任何计费读取每 tick 限次。
-7. **实测预算**（生成世界，Triggers2V1）：普通 tick ≈31 credits；收集 tick 恰 32（held 1 + sweep 24 + scan 1 + 2×hazard move + event_next + event_pair + despawn）；第 33 个计费调用 → sticky fault 10（flow 测试断言）。
+7. **实测预算**（生成世界，Triggers2V1）：普通 tick ≈30 credits；收集 tick 恰 32（held 1 + char_move 26＝24 sweep+2 scan + 2×hazard move + event_next 1 + event_pair 1 + despawn 1；R1 修正算式，实测值 32 不变）；第 33 个计费调用 → sticky fault 10（flow 测试断言）。
 
 ## 6. 阶段门
 

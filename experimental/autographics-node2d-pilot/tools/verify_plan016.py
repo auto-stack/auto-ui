@@ -2,9 +2,9 @@
 
 Verifies, without executing the generator, that the frozen generated
 artifacts match the committed fixture identities, then --controls runs
-negative controls: fixture mutation rejection, generated-artifact
-mutation rejection, missing-fixture rejection, stale-identity rejection,
-and a zero-selected vacuous acceptance.
+negative controls: clean-regeneration byte-identity, fixture mutation
+sensitivity, missing-fixture rejection, generated-artifact tamper
+detection, and stale-scene-sha detection.
 
 Run from the repo root (or anywhere) with the worktree layout:
   python experimental/autographics-node2d-pilot/tools/verify_plan016.py --controls

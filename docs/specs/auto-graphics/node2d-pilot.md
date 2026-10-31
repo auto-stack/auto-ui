@@ -29,9 +29,10 @@ PNG/GLB 资源导入、生产 UI/ACE 融合、ECS 或一 Node 一 VM、`emit`/re
 - `on` 块为研究域自有解析：`Life.Start`/`Life.Tick(dt)` 系统事件（不在 msg
   声明）与前导点 `.Business` 业务事件（必须在匿名 `msg` 声明）混合；处理器体
   复用共享体文法（`emit .X`/前导点语句）。
-- 校验在执行前给带文件/行号的拒绝：缺模块、错导出（定位缺失）、未知实例
-  node/属性、重复 node 定义、非 UpperCamelCase node 名、未知 view 元素、
-  非法 on 模式。
+- 校验在执行前给带文件/行号的拒绝：缺模块、错导出（具名 use 项不在目标
+  模块导出面）、坏 actor 引用（`refs.<未知实例>`）、未知实例属性、重复
+  node 定义、参数/model 字段重复绑定、非 UpperCamelCase node 名、未知
+  view 元素、非法 on 模式、`Life.Frame` 越界显式拒绝。
 
 ## 2. 降层形状（真实 Auto 执行，无第二解释器）
 
@@ -57,9 +58,10 @@ PNG/GLB 资源导入、生产 UI/ACE 融合、ECS 或一 Node 一 VM、`emit`/re
 - tick 顺序固定：宿主输入采样（每 tick 一次 `_ag_char_input`）→ 根/Player/
   Hazard 逐实例 `Life.Tick` → AG end-of-tick 触发 evaluate → 下一 tick 事件
   读取与投递 → 条件差量 → 呈现随 admitted block。
-- 共享 32 credits/tick 池：普通 tick ≈31；收集 tick 恰 32（held 1 + sweep 24
-  + scan 1 + 2×hazard move + event_next 1 + event_pair 1 + despawn 1）；第 33
-  个计费调用为命名 sticky fault 10（同 tick 内直接计费读叠加同样拒绝）。VM
+- 共享 32 credits/tick 池：普通 tick ≈30；收集 tick 恰 32（held 1 +
+  char_move 26＝24 sweep+2 scan + 2×hazard move + event_next 1 + event_pair 1
+  + despawn 1）；第 33 个计费调用为命名 sticky fault 10（同 tick 内直接计费
+  读叠加同样拒绝）。VM
   分片 1000 steps/2ms、累计 100000 steps/120 resumes/250ms、30s init/2s tick、
   8ms pump 目标照旧未改。
 - 场景模板停靠玩法区外，实例从模板 spawn（born-overlap 会永久锁死扫掠运动，

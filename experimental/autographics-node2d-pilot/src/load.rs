@@ -6,7 +6,7 @@
 //! 未声明事件、重复定义。Rust 不实现任何玩法规则。
 
 use auto_lang_core::parser::Parser;
-use auto_lang_core::use_scanner::{scan_use_statements, UseStatement};
+use auto_lang_core::use_scanner::UseStatement;
 use auto_parser_api::ast::{Expr, Stmt};
 use auto_parser_api::{CompilerSession, DomainStmt, Scenario};
 use auto_ui_dialect::node2d::{Node2DStmt, NodeDecl, PropValue, View2dElement};
@@ -247,12 +247,7 @@ pub fn load_project(entry: &Path) -> Result<Project, ProjectError> {
                         .and_then(|s| s.to_str())
                         .unwrap_or_default()
                         .to_string();
-                    // 校验具名导入确为被导入模块的导出（错导出拒绝）。
-                    if !u.items.is_empty() {
-                        queue.push(target.clone());
-                    } else {
-                        queue.push(target);
-                    }
+                    queue.push(target);
                 }
                 _ => {
                     return Err(ProjectError {
@@ -322,13 +317,202 @@ pub fn load_project(entry: &Path) -> Result<Project, ProjectError> {
             {
                 return Err(ProjectError {
                     file: module.name.clone(),
-                    line: 0,
+                    line: line_of(&module.source, node.span.0),
                     message: format!("duplicate node declaration '{}'", node.name),
                 });
             }
         }
     }
+    // ---- 闭包后语义校验（合同 §2 段 4：执行前定位拒绝）----
+    validate_closure(&project)?;
     Ok(project)
+}
+
+/// 轻量实例元素引用（校验用）。
+struct InstanceRef<'a> {
+    node: &'a str,
+    name: &'a str,
+    props: &'a [auto_ui_dialect::node2d::Prop],
+}
+
+fn walk_view<'a>(
+    node_name: &'a str,
+    elements: &'a [View2dElement],
+    out: &mut Vec<InstanceRef<'a>>,
+) {
+    for el in elements {
+        match el {
+            View2dElement::Instance { node, name, props } => {
+                out.push(InstanceRef { node, name, props });
+            }
+            View2dElement::If { then, .. } => walk_view(node_name, then, out),
+            _ => {}
+        }
+    }
+}
+
+/// 闭包加载完成后的语义校验（执行前拒绝，带文件/行号）：
+/// 错导出、坏 actor 引用、未知实例属性、重复局部绑定。
+fn validate_closure(project: &Project) -> Result<(), ProjectError> {
+    // 1. 错导出：具名 use 项必须是目标模块的真实导出。
+    for module in project.modules.values() {
+        for u in &module.uses {
+            if u.items.is_empty() || u.module == SERVICES_NAMESPACE {
+                continue;
+            }
+            let Some(target) = project.modules.get(&u.module) else {
+                continue; // 缺模块已在闭包期拒绝
+            };
+            let mut exports: Vec<String> = Vec::new();
+            for f in &target.fns {
+                exports.push(f.0.clone());
+            }
+            for n in &target.nodes {
+                exports.push(n.name.clone());
+            }
+            for r in &target.resources {
+                exports.push(r.name.clone());
+            }
+            for e in target.enums.keys() {
+                exports.push(e.clone());
+            }
+            for item in &u.items {
+                if !exports.contains(item) {
+                    let line = line_of(
+                        &module.source,
+                        module
+                            .source
+                            .find(&format!("use {}", u.module))
+                            .unwrap_or(0),
+                    );
+                    return Err(ProjectError {
+                        file: module.name.clone(),
+                        line,
+                        message: format!(
+                            "module '{}' does not export '{}' (exports: {})",
+                            u.module,
+                            item,
+                            exports.join(", ")
+                        ),
+                    });
+                }
+            }
+        }
+    }
+
+    // 收集实例元素（全定义视图）与根 view 实例名（refs 引用面）。
+    let mut all_instances: Vec<(String, InstanceRef)> = Vec::new();
+    let mut root_names: Vec<String> = Vec::new();
+    for module in project.modules.values() {
+        for node in &module.nodes {
+            let Some(view) = &node.view2d else {
+                continue;
+            };
+            let mut out: Vec<InstanceRef> = Vec::new();
+            walk_view(&node.name, &view.elements, &mut out);
+            for inst in &out {
+                if node.name == project.root {
+                    root_names.push(inst.name.to_string());
+                }
+                all_instances.push((
+                    module.name.clone(),
+                    InstanceRef {
+                        node: inst.node,
+                        name: inst.name,
+                        props: inst.props,
+                    },
+                ));
+            }
+        }
+    }
+
+    // 2. 未知实例属性；3. 坏 actor 引用（refs.<name>.<field> 必须指向根
+    //    view 已声明的实例）。
+    for (module_name, inst) in &all_instances {
+        let module = &project.modules[module_name];
+        let node = node_of(project, inst.node);
+        for pr in inst.props {
+            let known = node.params.iter().any(|(n, _)| n.as_str() == pr.name);
+            if !known {
+                return Err(ProjectError {
+                    file: module.name.clone(),
+                    line: line_of(&module.source, pr.span.0),
+                    message: format!(
+                        "unknown property '{}' on instance '{}' of node '{}' (params: {})",
+                        pr.name,
+                        inst.name,
+                        inst.node,
+                        node.params
+                            .iter()
+                            .map(|(n, _)| n.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    ),
+                });
+            }
+            for e in pr.value.exprs() {
+                let mut cursor = e;
+                loop {
+                    match cursor {
+                        Expr::Dot(outer, field) => {
+                            if let Expr::Dot(inner, name) = &**outer {
+                                if let Expr::Ident(base) = &**inner {
+                                    if base.as_str() == "refs"
+                                        && !root_names.iter().any(|n| n == name.as_str())
+                                    {
+                                        return Err(ProjectError {
+                                            file: module.name.clone(),
+                                            line: line_of(&module.source, pr.span.0),
+                                            message: format!(
+                                                "refs.{} references unknown root instance '{}' (known: {})",
+                                                field, name, root_names.join(", ")
+                                            ),
+                                        });
+                                    }
+                                }
+                            }
+                            cursor = outer;
+                        }
+                        _ => break,
+                    }
+                }
+            }
+        }
+    }
+
+    // 4. 重复局部绑定：node 参数与 model 字段、model 字段互间不得重名。
+    for module in project.modules.values() {
+        for node in &module.nodes {
+            let mut seen: Vec<String> = Vec::new();
+            for (pname, _) in &node.params {
+                if seen.contains(pname) {
+                    return Err(ProjectError {
+                        file: module.name.clone(),
+                        line: line_of(&module.source, node.span.0),
+                        message: format!("duplicate parameter '{}' on node '{}'", pname, node.name),
+                    });
+                }
+                seen.push(pname.clone());
+            }
+            if let Some(model) = &node.model {
+                for f in &model.fields {
+                    let fname = f.name.to_string();
+                    if seen.contains(&fname) {
+                        return Err(ProjectError {
+                            file: module.name.clone(),
+                            line: line_of(&module.source, node.span.0),
+                            message: format!(
+                                "duplicate binding '{}' on node '{}' (param/model field)",
+                                fname, node.name
+                            ),
+                        });
+                    }
+                    seen.push(fname);
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 fn collect_instances(el: &View2dElement, out: &mut Vec<String>) {

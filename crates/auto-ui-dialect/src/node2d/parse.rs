@@ -13,7 +13,7 @@ use auto_parser_api::token::TokenKind;
 use auto_parser_api::{CompilerSession, DomainDialect, DomainParseContext, DomainStmt, Scenario};
 
 use super::ast::{
-    span_at, EventPattern, Handler, Node2DStmt, NodeDecl, OnBlock, Prop, PropValue, View2dBlock,
+    EventPattern, Handler, Node2DStmt, NodeDecl, OnBlock, Prop, PropValue, View2dBlock,
     View2dElement,
 };
 use crate::declarations::{parse_model_block, parse_msg_decl};
@@ -399,6 +399,25 @@ fn parse_handler(cx: &mut dyn DomainParseContext) -> AutoResult<Handler> {
             .into());
         }
         cx.advance();
+        // Life.Frame 是呈现帧节奏后继事件，不纳入 PLAN-016 实现/夹具/
+        // 验收（计划 §5.2）——显式越界拒绝，不用空处理器冒充支持。
+        if event == "Frame" {
+            return Err(SyntaxError::Generic {
+                message: "Life.Frame is out of PLAN-016 scope (presentation-frame successor event)"
+                    .to_string(),
+                span: pos_to_span(cx.cur_pos()),
+            }
+            .into());
+        }
+        if event != "Start" && event != "Tick" {
+            return Err(SyntaxError::Generic {
+                message: format!(
+                    "unknown Life event '{event}' (research surface: Life.Start/Life.Tick)"
+                ),
+                span: pos_to_span(cx.cur_pos()),
+            }
+            .into());
+        }
         EventPattern::Life {
             event,
             params: parse_handler_params(cx)?,

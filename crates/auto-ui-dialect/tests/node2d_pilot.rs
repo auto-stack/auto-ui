@@ -67,9 +67,7 @@ fn minimal_project_modules_parse_with_expected_surface() {
 fn main_node_structure_is_complete() {
     let src = read_fixture("main.at");
     let nodes = parse_node2d(&src).expect("main parses");
-    let Node2DStmt::Node(main) = &nodes[0] else {
-        panic!("node expected")
-    };
+    let auto_ui_dialect::node2d::Node2DStmt::Node(main) = &nodes[0];
     assert_eq!(main.name, "Main");
     let model = main.model.as_ref().expect("model block");
     let names: Vec<_> = model.fields.iter().map(|f| f.name.to_string()).collect();
@@ -113,9 +111,7 @@ fn main_node_structure_is_complete() {
 fn coin_handler_and_instance_bindings_parse() {
     let src = read_fixture("coin.at");
     let nodes = parse_node2d(&src).expect("coin parses");
-    let Node2DStmt::Node(coin) = &nodes[0] else {
-        panic!("node expected")
-    };
+    let Node2DStmt::Node(coin) = &nodes[0];
     // Constructor params: position floats, typed actor ref, msg port.
     let params: Vec<_> = coin.params.iter().map(|(n, _)| n.clone()).collect();
     assert_eq!(
@@ -147,9 +143,7 @@ fn coin_handler_and_instance_bindings_parse() {
 fn hazard_view2d_uses_leading_dot_members_and_call() {
     let src = read_fixture("hazard.at");
     let nodes = parse_node2d(&src).expect("hazard parses");
-    let Node2DStmt::Node(hazard) = &nodes[0] else {
-        panic!("node expected")
-    };
+    let Node2DStmt::Node(hazard) = &nodes[0];
     let view = hazard.view2d.as_ref().expect("view-2d");
     let Node2DElement::Trigger { props, .. } = &view.elements[0] else {
         panic!("trigger2d expected");

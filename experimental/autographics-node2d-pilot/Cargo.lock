@@ -494,6 +494,7 @@ dependencies = [
  "auto-parser-api",
  "auto-ui-compiler",
  "auto-ui-dialect",
+ "tempfile",
 ]
 
 [[package]]

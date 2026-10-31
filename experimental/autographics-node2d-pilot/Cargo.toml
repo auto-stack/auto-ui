@@ -19,3 +19,6 @@ auto-parser-api = { path = "../../../auto-lang/crates/auto-parser-api" }
 [[bin]]
 name = "node2d-lower"
 path = "src/main.rs"
+
+[dev-dependencies]
+tempfile = "3"

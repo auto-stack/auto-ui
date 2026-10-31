@@ -7,8 +7,9 @@
 //! pool with a 33rd-charged-call fault, and old-generation handle
 //! isolation. The consumed world.at/scene.agscene are frozen generator
 //! products (experimental/autographics-node2d-pilot/generated, byte-identity
-//! enforced by tools/verify_plan016.py). Scene schema: autographics.scene/7 (no HUD). Run single-threaded:
+//! enforced by tools/verify_plan016.py). Scene schema: autographics.scene/6 (no HUD/audio). Run single-threaded:
 //! cargo test --locked --offline --test node2d_flow -- --test-threads=1
+use autographics_auto_driver::authoring::assets::Registry;
 use autographics_auto_driver::{
     authoring::{
         behavior::{Api, SourceSnapshot},
@@ -20,7 +21,6 @@ use autographics_auto_driver::{
     Scalar::{Float, Int},
     Session,
 };
-use autographics_auto_driver::authoring::assets::Registry;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
@@ -70,7 +70,8 @@ fn session(world: &str, name: &str, run: i32) -> Session {
             ResultKind::Unit,
         )
         .unwrap();
-        s.call("_ag_visibility", &[Int(1)], ResultKind::Unit).unwrap();
+        s.call("_ag_visibility", &[Int(1)], ResultKind::Unit)
+            .unwrap();
         s.call("_ag_bind_resource", &[Int(0)], ResultKind::Unit)
             .unwrap();
         // 行 0 = player 模板，在位 (2,1)；其余模板停靠玩法区外。
@@ -173,7 +174,10 @@ fn flow_minimal_world_instances_events() {
         (h2 - wave_phase(0.45, 0.9, collect_tick)).abs() < 1e-4,
         "h2 phase {h2}"
     );
-    assert!((float(&mut s, "get_r_phase") - 0.5).abs() < 1e-6, "sentinel");
+    assert!(
+        (float(&mut s, "get_r_phase") - 0.5).abs() < 1e-6,
+        "sentinel"
+    );
     // 真实运动（V-02）：char 节点位置精确随扫掠推进。
     let px = float(&mut s, "get_player_node_x");
     assert!(
@@ -225,7 +229,8 @@ fn flow_budget_full_pool_and_stale_generation() {
     let probe = format!("{WORLD}\nfn stale_write(h int) int {{return ag_object_despawn(h)}}\n");
     let mut p = session(&probe, "node2d_flow_stale.at", 2);
     assert_eq!(status(&mut p), 0, "fresh run-2 world starts clean");
-    p.call("stale_write", &[Int(handle)], ResultKind::Int).unwrap();
+    p.call("stale_write", &[Int(handle)], ResultKind::Int)
+        .unwrap();
     assert_eq!(
         status(&mut p),
         33,
@@ -243,16 +248,7 @@ const SCENE: &str = include_str!("../../autographics-node2d-pilot/generated/scen
 
 /// 1200x800 顶面网格扫描（probe_pixels 单次回读）。
 /// 返回 (红, 橙, 金, 地面) 计数与橙/金质心 x。
-fn scan(
-    h: &mut Host,
-) -> (
-    usize,
-    usize,
-    usize,
-    usize,
-    (f32, usize),
-    (f32, usize),
-) {
+fn scan(h: &mut Host) -> (usize, usize, usize, usize, (f32, usize), (f32, usize)) {
     let mut points = Vec::new();
     for gy in 0..80 {
         for gx in 0..120 {
@@ -272,8 +268,7 @@ fn scan(
         let is_orange =
             r >= 230 && (r - gg) >= 40 && (r - gg) <= 80 && (gg - b) >= 30 && (gg - b) <= 80;
         let is_gold = r >= 240 && gg >= 210 && (gg - b) >= 90;
-        let is_ground =
-            (r - gg).abs() <= 14 && (gg - b).abs() <= 25 && r >= 150 && r <= 210;
+        let is_ground = (r - gg).abs() <= 14 && (gg - b).abs() <= 25 && r >= 150 && r <= 210;
         if is_red {
             red += 1;
         } else if is_orange {
@@ -317,7 +312,9 @@ fn host_tick(h: &mut Host) {
     );
 }
 
-fn admitted_instances(h: &mut Host) -> autographics_auto_driver::authoring::runtime_objects::RuntimeObjectsFrame {
+fn admitted_instances(
+    h: &mut Host,
+) -> autographics_auto_driver::authoring::runtime_objects::RuntimeObjectsFrame {
     h.play
         .as_ref()
         .unwrap()
@@ -387,7 +384,10 @@ fn flow_gpu_project_pixels_and_real_despawn() {
         host_tick(&mut h);
     }
     let (red_b, orange_b, gold_b, _ground_b, player_b, coin_b) = scan(&mut h);
-    assert!(red_b >= 6 && orange_b >= 4 && gold_b >= 1, "classes persist");
+    assert!(
+        red_b >= 6 && orange_b >= 4 && gold_b >= 1,
+        "classes persist"
+    );
     let expected_dx = 40.0 * SPEED * DT * 20.0;
     assert!(
         (player_b.0 - player_a.0 - expected_dx).abs() < 12.0,
@@ -435,7 +435,7 @@ const WORLD_SUP: &str =
 fn flow_supplement_two_parent_receiver_isolation() {
     // 冻结场景表（补充）：char 行 0（player, id 1）、ground 行 1（id 2）、
     // coin 模板行 2（id 3, 停靠）。两个 coin 实例 = pair 0/1，slot 0/1。
-    let mut s = session(WORLD_SUP, "node2d_flow_sup.at", 1);
+    let s = session(WORLD_SUP, "node2d_flow_sup.at", 1);
     // 行集与 minimal 不同（无 hazard 模板行）：重建场景行（3 行）。
     drop(s);
     let snap = SourceSnapshot::from_bytes_for(
@@ -451,9 +451,9 @@ fn flow_supplement_two_parent_receiver_isolation() {
     sup.call("_ag_spatial_reset", &[Int(3)], ResultKind::Unit)
         .unwrap();
     let scene: [(i32, [f32; 3], [f32; 3]); 3] = [
-        (1, [-0.4, -0.5, 0.0], [0.4, 0.5, 0.0]),   // char
-        (1, [-5.0, -1.0, 0.0], [35.0, 0.0, 0.0]),  // ground
-        (0, [-0.3, -0.3, 0.0], [0.3, 0.3, 0.0]),   // coin template
+        (1, [-0.4, -0.5, 0.0], [0.4, 0.5, 0.0]),  // char
+        (1, [-5.0, -1.0, 0.0], [35.0, 0.0, 0.0]), // ground
+        (0, [-0.3, -0.3, 0.0], [0.3, 0.3, 0.0]),  // coin template
     ];
     for (n, (kind, lo, hi)) in scene.iter().enumerate() {
         sup.call(
@@ -466,7 +466,11 @@ fn flow_supplement_two_parent_receiver_isolation() {
             .unwrap();
         sup.call("_ag_bind_resource", &[Int(0)], ResultKind::Unit)
             .unwrap();
-        let (tx, ty) = if n == 0 { (SPAWN_X, SPAWN_Y) } else { (-100.0, -100.0) };
+        let (tx, ty) = if n == 0 {
+            (SPAWN_X, SPAWN_Y)
+        } else {
+            (-100.0, -100.0)
+        };
         for v in [tx, ty, 0., 1., 1., 1., 0., 0., 1., 1., 1., 0.] {
             sup.call("_ag_append_field", &[Float(v)], ResultKind::Unit)
                 .unwrap();
@@ -550,13 +554,7 @@ fn start_paused(h: &mut Host) {
 }
 
 fn host_frame_tick(h: &mut Host) -> i32 {
-    h.play
-        .as_ref()
-        .unwrap()
-        .last
-        .as_ref()
-        .expect("frame")
-        .tick
+    h.play.as_ref().unwrap().last.as_ref().expect("frame").tick
 }
 
 fn pump_idle(h: &mut Host) {
@@ -582,8 +580,7 @@ fn flow_host_pause_step_neutral_and_20_rounds() {
     std::fs::write(dir.join("scene.agscene"), SCENE).expect("scene");
     std::fs::write(scripts.join(format!("{sha}.at")), WORLD).expect("script");
     let (doc, registry, code, _) =
-        Storage::load_project(&dir.join("scene.agscene"), &Registry::new())
-            .expect("load");
+        Storage::load_project(&dir.join("scene.agscene"), &Registry::new()).expect("load");
     let mut h = Host::with_project(doc, registry, code).expect("host");
 
     // Start → Paused：tick 0，中性输入。
