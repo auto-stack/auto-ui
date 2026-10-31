@@ -29489,13 +29489,14 @@ fn build_autodown_editor_generic<M: Clone + Debug + 'static>(
         use crate::ui::autodown_editor as ade;
         let sk = ade::storage_key(key);
         // 单向数据流：外部差分回写（与 code editor 同 §5.4 口径）。
-        ade::autodown_editor_sync(&sk, value, is_final);
         let fg = if crate::ui::style_iced_adapter::dark_mode() {
             ade_fg_dark()
         } else {
             ade_fg_light()
         };
         let mut widget = ade::widget::DocEditor::<M>::new(&sk, fg);
+        // PLAN-107: install the backend font source before first fence sync.
+        ade::autodown_editor_sync(&sk, value, is_final);
         // PLAN-048 T7（W4）：空态文案 lowering（content 空且非聚焦时
         // 编辑壳浅灰渲染）。
         if let Some(ph) = placeholder {
@@ -31159,13 +31160,14 @@ fn render_dynamic_view(
                 let dbg_props = Vec::<(&str, String)>::new();
                 use crate::ui::autodown_editor as ade;
                 let sk = ade::storage_key(&key);
-                ade::autodown_editor_sync(&sk, &value, is_final);
                 let fg = if crate::ui::style_iced_adapter::dark_mode() {
                     ade_fg_dark()
                 } else {
                     ade_fg_light()
                 };
                 let mut widget = ade::widget::DocEditor::<IcedMessage>::new(&sk, fg);
+                // PLAN-107: MCP may register the core before its first widget.
+                ade::autodown_editor_sync(&sk, &value, is_final);
                 // PLAN-048 T7（W4）：空态文案 lowering（VM 轨同 build_autodown_editor_generic）。
                 if let Some(ph) = placeholder {
                     widget = widget.placeholder(ph);
