@@ -33,3 +33,8 @@ landed cohort are read back in the central receipt; these pins are not relabeled
 as newer binary producers. Final gate/landing/recovery/cleanup status:
 [central PLAN-890](../../auto-lang/docs/plans/archive/890-auto-web-independent-repository-delivery.md).
 No remote publication or additional UI structural work is implied.
+
+Each proxy session retains canonical compiled return types separately from
+diagnostic Type Display strings. String-list replies use the language-owned
+typed converter and that session's declaration, preserving the existing VM list,
+iterator and reference-count ABI; integer and unknown returns retain numeric JSON.

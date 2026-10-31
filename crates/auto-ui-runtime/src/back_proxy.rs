@@ -1170,6 +1170,9 @@ struct SessionRuntime {
     /// ~Stream 判定（含 "Stream<"）与 POST 广播判别（void/typing/New<Type>）
     /// 都读它——镜像 api_gen broadcast_event_name 约定。
     fn_meta: HashMap<String, (String, String)>,
+    /// Canonical compiled return types for value marshalling, owned per session.
+    /// Type Display is diagnostic (e.g. a slice s-expression), not an ABI name.
+    fn_return_types: HashMap<String, String>,
     /// PLAN-658 T-04: session 事件总线——~Stream 端点订阅、POST 广播。
     bus: std::sync::Arc<SessionBus>,
 }
@@ -1498,6 +1501,7 @@ fn load_back_session(app_id: &str, back_entry: &std::path::Path) -> Result<Sessi
     let api_routes: Vec<(String, String, String)> = codegen.api_routes.clone();
     let mut fn_params: HashMap<String, Vec<ApiParamSig>> = HashMap::new();
     let mut fn_meta: HashMap<String, (String, String)> = HashMap::new();
+    let mut fn_return_types = HashMap::new();
     // PLAN-776 T-06：模块内用户类型名集（AST 直扫——back_proxy 跳过前端，
     // type_store 不含声明；stdlib HTTP 词汇不出现于用户 stmts，命中即遮蔽）。
     // PLAN-776 R1-F05/R2-07：直接声明名集（struct/enum）与 alias→target 表
@@ -1533,6 +1537,7 @@ fn load_back_session(app_id: &str, back_entry: &std::path::Path) -> Result<Sessi
     for stmt in &import_stmts {
         if let Stmt::Fn(f) = stmt {
             if f.api_attrs.is_some() {
+                fn_return_types.insert(f.name.to_string(), f.ret.unique_name().to_string());
                 fn_params.insert(
                     f.name.to_string(),
                     f.params
@@ -1629,6 +1634,7 @@ fn load_back_session(app_id: &str, back_entry: &std::path::Path) -> Result<Sessi
         routes: rt_routes,
         fn_params,
         fn_meta,
+        fn_return_types,
         bus: std::sync::Arc::new(SessionBus::new()),
     };
 
@@ -1865,8 +1871,24 @@ impl SessionRuntime {
         }
         let body_json_str = if task.ram.sp > pre_args_sp {
             let nv = task.ram.pop_nv();
-            auto_lang_core::vm::ffi::http_server::nv_to_json(&self.vm, nv, 6)
-                .unwrap_or_else(|| "null".to_string())
+            let declared = self
+                .fn_return_types
+                .get(&route_match.fn_name)
+                .map(String::as_str);
+            match auto_lang_core::vm::ffi::http_server::nv_to_typed_json(&self.vm, nv, declared, 6)
+            {
+                Some(json) => json,
+                None => {
+                    self.vm.rc_release_task_stack(&mut task);
+                    return ProxyReply::json(
+                        500,
+                        error_json(&format!(
+                            "back-proxy:{}: response serialization failed for `{}`",
+                            self.app_id, route_match.fn_name
+                        )),
+                    );
+                }
+            }
         } else {
             "null".to_string()
         };
