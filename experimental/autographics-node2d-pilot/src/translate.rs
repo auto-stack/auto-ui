@@ -5,6 +5,8 @@
 //! `Dot(Ident("self"), x)`；服务映射冻结：
 //! - `input.axis(Left, Right)` → `(ag_action_held(1) - ag_action_held(0))`
 //! - `refs.body.move_and_slide((dx, dy))` → `ag_char_move(dx, dy, 0.002)`
+//! - `refs.body.grounded(q)` / `refs.body.support(q)` → `ag_char_grounded/support(q)`
+//!   （PLAN-019 character-2d/camera-2d 服务拼写）
 //! - `refs.body.move(x, y)` → `ag_object_move(<实例 handle>, x, y, 0.0)`
 //! - `emit .Ev(args)` → 绑定表投递（lower 层注入目标调用文本）
 
@@ -252,7 +254,8 @@ fn translate_expr(e: &Expr, ctx: &Ctx, out: &mut String) -> Result<(), LowerErro
                         return Ok(());
                     }
                     // PLAN-017：input.pressed(Enter) → pressed 边沿（消耗性读取，
-                    // 计费 1）。仅 g11-2d profile 夹具使用。
+                    // 计费 1）。PLAN-019 扩展 Jump（G06 走跳沿），动作号沿
+                    // 受信 character 服务冻结表 0=Left/1=Right/2=Jump/3=Enter。
                     if base == "input" && m == "pressed" {
                         let names: Vec<String> = call
                             .args
@@ -263,10 +266,19 @@ fn translate_expr(e: &Expr, ctx: &Ctx, out: &mut String) -> Result<(), LowerErro
                                 _ => Err(unsupported("input.pressed args", e)),
                             })
                             .collect::<Result<Vec<_>, _>>()?;
-                        if names.len() != 1 || names[0] != "Enter" {
+                        if names.len() != 1 {
                             return Err(unsupported(format!("input.pressed({names:?})"), e));
                         }
-                        out.push_str("ag_action_pressed(3)");
+                        let action = match names[0].as_str() {
+                            "Enter" => 3,
+                            "Jump" => 2,
+                            other => {
+                                return Err(unsupported(format!(
+                                    "input.pressed({other}) (research surface: Enter/Jump)"
+                                ), e))
+                            }
+                        };
+                        out.push_str(&format!("ag_action_pressed({action})"));
                         return Ok(());
                     }
                     // PLAN-017：round.request() → ag_round_request()（计费 1，
@@ -409,6 +421,26 @@ fn translate_refs_body(
                 }
             }
             out.push_str(", 0.0)");
+            Ok(())
+        }
+        // PLAN-019 character-2d/camera-2d：move_and_slide 结果的支撑判定。
+        // `refs.<char>.grounded(q)` → `ag_char_grounded(q)`（计费 1，
+        // token==0 读冻结初值、旧 token fault 13 全部由受信服务承担）。
+        "grounded" | "support" => {
+            if call.args.args.len() != 1 {
+                return Err(unsupported(format!("{op} arity"), e));
+            }
+            let arg = match &call.args.args[0] {
+                Arg::Pos(x) => x,
+                other => return Err(unsupported(format!("{op} arg {other:?}"), e)),
+            };
+            out.push_str(if op == "grounded" {
+                "ag_char_grounded("
+            } else {
+                "ag_char_support("
+            });
+            translate_expr(arg, ctx, out)?;
+            out.push_str(")");
             Ok(())
         }
         other => Err(unsupported(format!("refs.body.{other}"), e)),

@@ -1,0 +1,35 @@
+// PLAN-019 g01 v-order variant: the two a0.5 objects swap declaration order
+// (blue quad drawn before red disc) — the blend top flips to red (B01-08).
+// Same geometry/colors as base; array order is the declaration order.
+use resources: red_alpha, blue_alpha, green_alpha, yellow_opaque
+use shapes: Disc
+
+node Main {
+    view-2d {
+        shape2d blue_quad {
+            kind: quad
+            position: (0.0, 0.0)
+            size: (30.0, 30.0)
+            material: resources.blue_alpha
+        }
+        Disc red_disc {
+            x: -20.0
+            y: 10.0
+            diameter: 30.0
+            tint: resources.red_alpha
+        }
+        Disc green_disc {
+            x: 25.0
+            y: -15.0
+            diameter: 24.0
+            tint: resources.green_alpha
+        }
+        shape2d yellow_quad {
+            kind: quad
+            position: (-45.0, -25.0)
+            size: (12.0, 12.0)
+            material: resources.yellow_opaque
+            visible: false
+        }
+    }
+}

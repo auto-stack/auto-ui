@@ -1,0 +1,3 @@
+// PLAN-019 basic2d g03 resources: exact original G03/2d colors (dbb4b75).
+let leaf_red = material2d.color(0.9, 0.2, 0.2, 1.0)
+let deep_blue = material2d.color(0.2, 0.3, 0.9, 1.0)

@@ -1,0 +1,34 @@
+// PLAN-019 g01 v-color variant: the blue quad rebinding to a different
+// material symbol — blue disappears, green coverage increases (B01-09/10).
+use resources: red_alpha, deep_green, green_alpha, yellow_opaque
+use shapes: Disc
+
+node Main {
+    view-2d {
+        Disc red_disc {
+            x: -20.0
+            y: 10.0
+            diameter: 30.0
+            tint: resources.red_alpha
+        }
+        shape2d blue_quad {
+            kind: quad
+            position: (0.0, 0.0)
+            size: (30.0, 30.0)
+            material: resources.deep_green
+        }
+        Disc green_disc {
+            x: 25.0
+            y: -15.0
+            diameter: 24.0
+            tint: resources.green_alpha
+        }
+        shape2d yellow_quad {
+            kind: quad
+            position: (-45.0, -25.0)
+            size: (12.0, 12.0)
+            material: resources.yellow_opaque
+            visible: false
+        }
+    }
+}

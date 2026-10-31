@@ -1,0 +1,16 @@
+// PLAN-019 basic2d g06 resources: exact original layout geometry/colors
+// (dbb4b75 layout-a/layout-b scenes). layout-a: Ground(6,-0.5) 20x1,
+// Wall(14.5,1.5) 1x3, Step(8,0.375) 2x0.75, Block(-4,0.5) 1x1.
+// layout-b (pit): Ground(2,-0.5) 8x1, Wall(21.5,2.0) 1x4, Step(11,0.875)
+// 2x1.75, Ground2(16,-0.5) 8x1 — a real pit between x=6..12.
+let char_orange = material2d.color(0.9, 0.5, 0.25, 1.0)
+let ground_color = material2d.color(0.55, 0.62, 0.7, 1.0)
+let wall_color = material2d.color(0.4, 0.45, 0.55, 1.0)
+let step_color = material2d.color(0.5, 0.55, 0.65, 1.0)
+let ground_mesh = mesh2d.quad(20.0, 1.0)
+let ground_short_mesh = mesh2d.quad(8.0, 1.0)
+let wall_mesh = mesh2d.quad(1.0, 3.0)
+let wall_tall_mesh = mesh2d.quad(1.0, 4.0)
+let step_mesh = mesh2d.quad(2.0, 0.75)
+let step_high_mesh = mesh2d.quad(2.0, 1.75)
+let block_mesh = mesh2d.quad(1.0, 1.0)

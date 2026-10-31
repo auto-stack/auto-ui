@@ -1,0 +1,59 @@
+{
+ "behavior": null,
+ "schema": "autographics.scene/6",
+ "document_id": "plan019-basic2d-main",
+ "resources": [
+  "circle",
+  "quad",
+  "cylinder",
+  "player",
+  "mob"
+ ],
+ "objects": [
+  {
+   "id": 3,
+   "name": "deep_quad",
+   "kind": "quad",
+   "translation": [5.0, 0.0, 0.0],
+   "scale": [10.0, 10.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.2, 0.3, 0.9, 1],
+   "visible": true,
+   "parent": 2,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 4,
+   "name": "leaf_circle",
+   "kind": "circle",
+   "translation": [0.0, 0.0, 0.0],
+   "scale": [12.0, 12.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.9, 0.2, 0.2, 1],
+   "visible": true,
+   "parent": 1,
+   "resource": null,
+   "sprite": null
+  }
+ ],
+ "groups": [  {
+   "id": 1,
+   "name": "root_2d",
+   "dimension": "2d",
+   "parent": null,
+   "translation": [20.0, 10.0, 0.0],
+   "visible": true
+  },
+  {
+   "id": 2,
+   "name": "child_2d",
+   "dimension": "2d",
+   "parent": 1,
+   "translation": [10.0, -5.0, 0.0],
+   "visible": true
+  }],
+ "assets": []
+}

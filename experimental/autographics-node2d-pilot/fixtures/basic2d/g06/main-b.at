@@ -1,0 +1,62 @@
+// PLAN-019 basic2d g06 layout-b entry: SAME Player component + same tick
+// logic as layout-a; only the static solid geometry differs (the original
+// pit layout: ground segments x[-2,6] and x[12,20], pit between, raised step
+// 2x1.75 at (11,0.875), wall 1x4 at (21.5,2.0)). Geometry contrast is real:
+// identical inputs produce different walk/jump outcomes per layout.
+use resources: char_orange, ground_color, ground_short_mesh, wall_color, wall_tall_mesh, step_color, step_high_mesh
+use walkjump: Player
+
+node Main {
+    model {
+        var speed = 4.0
+        var jump = 8.0
+        var gravity = 20.0
+        var vy = 0.0
+        var grounded = 0
+    }
+    view-2d {
+        Player body {
+            px: 0.0
+            py: 1.0
+            tint: resources.char_orange
+        }
+        solid2d ground {
+            position: (2.0, -0.5)
+            mesh: resources.ground_short_mesh
+            material: resources.ground_color
+        }
+        solid2d wall {
+            position: (21.5, 2.0)
+            mesh: resources.wall_tall_mesh
+            material: resources.wall_color
+        }
+        solid2d step {
+            position: (11.0, 0.875)
+            mesh: resources.step_high_mesh
+            material: resources.step_color
+        }
+        solid2d ground2 {
+            position: (16.0, -0.5)
+            mesh: resources.ground_short_mesh
+            material: resources.ground_color
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            let jp = input.pressed(Jump)
+            if jp == 1 {
+                if .grounded == 1 {
+                    .vy = .jump
+                }
+            }
+            .vy = .vy - .gravity * dt
+            let axis = input.axis(Left, Right)
+            let dx = axis * .speed * dt
+            let q = refs.body.move_and_slide((dx, .vy * dt))
+            .grounded = refs.body.grounded(q)
+            if .grounded == 1 {
+                .vy = 0.0
+            }
+        }
+    }
+}

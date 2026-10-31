@@ -1,0 +1,27 @@
+// PLAN-019 g03 v-hidden variant: root group visible=false; descendants keep
+// object identity but are invisible through the ancestor AND rule.
+use resources: leaf_red, deep_blue
+
+node Main {
+    view-2d {
+        group2d root_2d {
+            position: (20.0, 10.0)
+            visible: false
+            group2d child_2d {
+                position: (10.0, -5.0)
+                shape2d deep_quad {
+                    kind: quad
+                    position: (5.0, 0.0)
+                    size: (10.0, 10.0)
+                    material: resources.deep_blue
+                }
+            }
+            shape2d leaf_circle {
+                kind: circle
+                position: (0.0, 0.0)
+                size: (12.0, 12.0)
+                material: resources.leaf_red
+            }
+        }
+    }
+}

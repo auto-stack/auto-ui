@@ -1,0 +1,74 @@
+// PLAN-019 basic2d g08 main entry: the alt public configuration: rect x[4,26] y[-2,10], viewport 8x6 -> ~506.67x380 centered (bars ~146.67 logical px per side).
+// The character walks the x[0,30] floor; the declared camera2d pins the
+// Run-owned follow config exactly as the old ag_camera_follow_2d call
+// (bounds x[4,26] y[-2,10], viewport 8x6).. Character + camera co-publish
+// in the same tick; Pause/Step/Stop semantics are the host's.
+use resources: char_orange, ground_color, wall_color, ground_mesh, wall_mesh
+use walkjump: Player
+
+node Main {
+    model {
+        var speed = 5.0
+        var jump = 7.0
+        var gravity = 18.0
+        var vy = 0.0
+        var grounded = 0
+    }
+    view-2d {
+        Player body {
+            px: 2.0
+            py: 1.0
+            tint: resources.char_orange
+        }
+        solid2d ground {
+            position: (15.0, -0.5)
+            mesh: resources.ground_mesh
+            material: resources.ground_color
+        }
+        solid2d west_wall {
+            position: (-0.5, 1.5)
+            mesh: resources.wall_mesh
+            material: resources.wall_color
+        }
+        solid2d east_wall {
+            position: (30.5, 1.5)
+            mesh: resources.wall_mesh
+            material: resources.wall_color
+        }
+        shape2d landmark {
+            kind: quad
+            position: (15.0, 2.0)
+            size: (1.0, 4.0)
+            material: resources.landmark_blue
+        }
+        shape2d step {
+            kind: quad
+            position: (9.0, 0.375)
+            size: (2.0, 0.75)
+            material: resources.step_color
+        }
+        camera2d camera {
+            target: refs.body.actor
+            bounds: (4.0, -2.0, 26.0, 10.0)
+            view_size: (8.0, 6.0)
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            let jp = input.pressed(Jump)
+            if jp == 1 {
+                if .grounded == 1 {
+                    .vy = .jump
+                }
+            }
+            .vy = .vy - .gravity * dt
+            let axis = input.axis(Left, Right)
+            let dx = axis * .speed * dt
+            let q = refs.body.move_and_slide((dx, .vy * dt))
+            .grounded = refs.body.grounded(q)
+            if .grounded == 1 {
+                .vy = 0.0
+            }
+        }
+    }
+}

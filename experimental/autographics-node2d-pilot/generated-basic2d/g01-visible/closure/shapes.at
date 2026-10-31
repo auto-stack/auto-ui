@@ -1,0 +1,13 @@
+// PLAN-019 basic2d g01 component: one reusable circle leaf. The same
+// definition is instantiated twice in the base entry (red/green differ only
+// by position/size/material symbol params) — the multi-instance proof.
+node Disc(x: float, y: float, diameter: float, tint: Material2D) {
+    view-2d {
+        shape2d disc {
+            kind: circle
+            position: (x, y)
+            size: (diameter, diameter)
+            material: tint
+        }
+    }
+}

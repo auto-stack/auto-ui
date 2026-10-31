@@ -1,0 +1,12 @@
+// PLAN-019 basic2d g06 shared Player definition (consumed by BOTH layouts via
+// plain use — the "same Player definition" requirement). character2d is the
+// declarative character host (box pinned 0.8x1.0 by the character service);
+// all physics stays in the entry root's model/on, never in Rust.
+node Player(px: float, py: float, tint: Material2D) {
+    view-2d {
+        character2d body {
+            position: (px, py)
+            material: tint
+        }
+    }
+}

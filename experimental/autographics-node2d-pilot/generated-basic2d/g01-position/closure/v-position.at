@@ -1,0 +1,35 @@
+// PLAN-019 g01 v-position variant: the red disc instance moved onto the blue
+// quad (same sizes) — the overlap hides the a0.5 red under the later-drawn
+// blue; blue stays visible (B01-11). Pure instance param change.
+use resources: red_alpha, blue_alpha, green_alpha, yellow_opaque
+use shapes: Disc
+
+node Main {
+    view-2d {
+        Disc red_disc {
+            x: 0.0
+            y: 0.0
+            diameter: 30.0
+            tint: resources.red_alpha
+        }
+        shape2d blue_quad {
+            kind: quad
+            position: (0.0, 0.0)
+            size: (30.0, 30.0)
+            material: resources.blue_alpha
+        }
+        Disc green_disc {
+            x: 25.0
+            y: -15.0
+            diameter: 24.0
+            tint: resources.green_alpha
+        }
+        shape2d yellow_quad {
+            kind: quad
+            position: (-45.0, -25.0)
+            size: (12.0, 12.0)
+            material: resources.yellow_opaque
+            visible: false
+        }
+    }
+}

@@ -1,0 +1,18 @@
+{
+ "generator": "autographics-node2d-pilot plan019 scene-2d",
+ "api": null,
+ "user_source_sha256": null,
+ "user_source_bytes": 0,
+  "module:resources": "ec988a465294b8c6b550ed2200ba5f0c2bb7ccc00c8dc6859e04f8bca388c6ca",
+  "module:v-hidden": "3d555869dc4e1fe3013ff86e607cc1a0e93ce6705c6cfdd239f331c7c7563436",
+ "closure": [
+  {"name": "resources", "sha256": "ec988a465294b8c6b550ed2200ba5f0c2bb7ccc00c8dc6859e04f8bca388c6ca", "bytes": 180},
+  {"name": "v-hidden", "sha256": "3d555869dc4e1fe3013ff86e607cc1a0e93ce6705c6cfdd239f331c7c7563436", "bytes": 806}
+ ],
+ "roles": {
+ "character": null,
+ "solids": [],
+ "camera": null,
+ "scene_objects": {"deep_quad": 3, "leaf_circle": 4}
+}
+}

@@ -1,0 +1,9 @@
+// PLAN-019 basic2d g01 resources: exact original G01 colors (dbb4b75
+// g01-main/scene.agscene). Alpha ordering facts: yellow 1.0 opaque, green 0.6,
+// red/blue 0.5 (red drawn before blue in base array order -> blue is blend
+// top). Variants rebind materials/positions/order/visibility in their entries.
+let red_alpha = material2d.color(0.9, 0.3, 0.2, 0.5)
+let blue_alpha = material2d.color(0.2, 0.3, 0.9, 0.5)
+let green_alpha = material2d.color(0.2, 0.8, 0.3, 0.6)
+let yellow_opaque = material2d.color(0.95, 0.9, 0.1, 1.0)
+let deep_green = material2d.color(0.1, 0.9, 0.2, 0.6)

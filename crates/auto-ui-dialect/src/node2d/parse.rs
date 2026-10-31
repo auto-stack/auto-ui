@@ -98,6 +98,11 @@ pub fn parse_node_decl(cx: &mut dyn DomainParseContext) -> AutoResult<NodeDecl> 
     for action in ["Left", "Right", "Jump", "Enter"] {
         cx.bind_var(action, Type::Int);
     }
+    // PLAN-019：shape2d `kind` 的冻结几何符号（circle/quad）。与动作符号
+    // 同机制：解析作用域内的名义符号，值由 lowering 按名字映射。
+    for shape_kind in ["circle", "quad"] {
+        cx.bind_var(shape_kind, Type::Int);
+    }
 
     cx.expect(TokenKind::LBrace)?;
     let mut model = None;
@@ -188,7 +193,7 @@ pub fn parse_node_decl(cx: &mut dyn DomainParseContext) -> AutoResult<NodeDecl> 
     })
 }
 
-/// `view-2d { element* }`；元素：solid2d/trigger2d/camera2d/实例化/if。
+/// `view-2d { element* }`；元素：solid2d/trigger2d/camera2d/shape2d/group2d/实例化/if。
 fn parse_view2d_block(cx: &mut dyn DomainParseContext) -> AutoResult<View2dBlock> {
     let start = cx.cur_pos();
     cx.advance(); // View
@@ -243,6 +248,17 @@ fn parse_view2d_element(cx: &mut dyn DomainParseContext) -> AutoResult<View2dEle
         .into());
     }
     cx.advance();
+    // PLAN-019 基础二维：`group2d name { props/children 混合块 }`（同维
+    // 父组，仅平移/可见性继承）；子元素递归走同一文法。group2d 有自己的
+    // 块文法，先于通用 props 分派。
+    if head == "group2d" {
+        let (props, children) = parse_group_block(cx)?;
+        return Ok(View2dElement::Group {
+            name: elem_name,
+            props,
+            children,
+        });
+    }
     let props = parse_prop_block(cx)?;
     Ok(match head.as_str() {
         "solid2d" => View2dElement::Solid {
@@ -261,13 +277,17 @@ fn parse_view2d_element(cx: &mut dyn DomainParseContext) -> AutoResult<View2dEle
             name: elem_name,
             props,
         },
+        "shape2d" => View2dElement::Shape {
+            name: elem_name,
+            props,
+        },
         other => {
             // 约定：UpperCamelCase 头部 = 同定义实例化（组件实例语义）。
             let first = other.chars().next().unwrap();
             if !first.is_ascii_uppercase() {
                 return Err(SyntaxError::Generic {
                     message: format!(
-                        "unknown view-2d element '{other}' (expected solid2d/trigger2d/camera2d or a Node instance)"
+                        "unknown view-2d element '{other}' (expected solid2d/trigger2d/camera2d/shape2d/group2d or a Node instance)"
                     ),
                     span: pos_to_span(cx.cur_pos()),
                 }
@@ -297,13 +317,70 @@ fn parse_element_children(cx: &mut dyn DomainParseContext) -> AutoResult<Vec<Vie
     Ok(elements)
 }
 
-/// `{ name: value ... }` 属性行块；空行/逗号宽容。
+/// group2d 混合块：props（小写名行）与子元素（元素头/UpperCamel）按行
+/// 交错；先 prop 后子元素为推荐书写序，不强制。
+fn parse_group_block(
+    cx: &mut dyn DomainParseContext,
+) -> AutoResult<(Vec<Prop>, Vec<View2dElement>)> {
+    cx.expect(TokenKind::LBrace)?;
+    let mut props = Vec::new();
+    let mut children = Vec::new();
+    loop {
+        cx.skip_empty_lines();
+        if cx.is_kind(TokenKind::RBrace) || cx.is_kind(TokenKind::EOF) {
+            break;
+        }
+        let head = cx.cur_text();
+        if matches!(
+            head.as_str(),
+            "group2d" | "shape2d" | "solid2d" | "trigger2d" | "character2d" | "camera2d" | "if"
+        ) || head.chars().next().is_some_and(|c| c.is_ascii_uppercase())
+        {
+            children.push(parse_view2d_element(cx)?);
+            continue;
+        }
+        let start = cx.cur_pos();
+        let pname = cx.cur_text();
+        if pname.is_empty() {
+            return Err(SyntaxError::Generic {
+                message: "group2d property name expected".to_string(),
+                span: pos_to_span(cx.cur_pos()),
+            }
+            .into());
+        }
+        cx.advance();
+        cx.expect(TokenKind::Colon)?;
+        let value = parse_prop_value(cx)?;
+        props.push(Prop {
+            name: pname,
+            value,
+            span: super::ast::span_of(start),
+        });
+        if cx.is_kind(TokenKind::Comma) {
+            cx.advance();
+        }
+    }
+    cx.expect(TokenKind::RBrace)?;
+    Ok((props, children))
+}
+
+/// `{ name: value ... }` 属性行块；空行/逗号宽容。遇到下一个 view 元素头
+/// （group2d/shape2d 等冻结关键字或 UpperCamelCase 实例化）时停止 ——
+/// 仅 group2d 的 props 后会跟子元素；属性名一律小写，无误伤。
 fn parse_prop_block(cx: &mut dyn DomainParseContext) -> AutoResult<Vec<Prop>> {
     cx.expect(TokenKind::LBrace)?;
     let mut props = Vec::new();
     loop {
         cx.skip_empty_lines();
         if cx.is_kind(TokenKind::RBrace) || cx.is_kind(TokenKind::EOF) {
+            break;
+        }
+        let head = cx.cur_text();
+        if matches!(
+            head.as_str(),
+            "group2d" | "shape2d" | "solid2d" | "trigger2d" | "character2d" | "camera2d" | "if"
+        ) || head.chars().next().is_some_and(|c| c.is_ascii_uppercase())
+        {
             break;
         }
         let start = cx.cur_pos();

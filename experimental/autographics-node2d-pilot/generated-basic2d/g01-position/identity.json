@@ -1,0 +1,20 @@
+{
+ "generator": "autographics-node2d-pilot plan019 scene-2d",
+ "api": null,
+ "user_source_sha256": null,
+ "user_source_bytes": 0,
+  "module:resources": "6885b7f517fd9e2e08f725589085c8c1a96272fc4f7b68ffaee9eb5d72a5aac1",
+  "module:shapes": "a2c54d836b3a54f379aab5db7a38ba60e0b647ee2536a7c01dd8e8f2cccb9618",
+  "module:v-position": "4216ab5924c904f386642a793fc9d651acb8142d4fc188f03f13f08c70379b94",
+ "closure": [
+  {"name": "resources", "sha256": "6885b7f517fd9e2e08f725589085c8c1a96272fc4f7b68ffaee9eb5d72a5aac1", "bytes": 580},
+  {"name": "shapes", "sha256": "a2c54d836b3a54f379aab5db7a38ba60e0b647ee2536a7c01dd8e8f2cccb9618", "bytes": 463},
+  {"name": "v-position", "sha256": "4216ab5924c904f386642a793fc9d651acb8142d4fc188f03f13f08c70379b94", "bytes": 992}
+ ],
+ "roles": {
+ "character": null,
+ "solids": [],
+ "camera": null,
+ "scene_objects": {"red_disc.disc": 1, "blue_quad": 2, "green_disc.disc": 3, "yellow_quad": 4}
+}
+}

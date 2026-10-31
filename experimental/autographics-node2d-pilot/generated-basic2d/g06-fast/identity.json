@@ -1,0 +1,21 @@
+{
+ "generator": "autographics-node2d-pilot plan019 character-2d",
+ "api": "autographics.character/1",
+ "user_source_sha256": "3f913c6a4d664500d9ba270587c05e606b0ca628b806ee2c6dbc7e134e68802d",
+ "user_source_bytes": 787,
+  "module:main-fast": "5fa62f456958097610275947f66416307d1637d488a8a006abe6f3629dc5dd7a",
+  "module:resources": "44536a945c8ff16e6556b27e4881593111934d1073839299a49fcbe616864c76",
+  "module:walkjump": "56ad917587faff8925679dabda872ce884ea6d0e87f7574bc36e612e1f43c273",
+ "closure": [
+  {"name": "main-fast", "sha256": "5fa62f456958097610275947f66416307d1637d488a8a006abe6f3629dc5dd7a", "bytes": 1959},
+  {"name": "resources", "sha256": "44536a945c8ff16e6556b27e4881593111934d1073839299a49fcbe616864c76", "bytes": 861},
+  {"name": "walkjump", "sha256": "56ad917587faff8925679dabda872ce884ea6d0e87f7574bc36e612e1f43c273", "bytes": 472}
+ ],
+ "roles": {
+ "character": 1,
+ "character_name": "body.body",
+ "solids": [{"id": 2, "name": "ground"}, {"id": 3, "name": "wall"}, {"id": 4, "name": "step"}, {"id": 5, "name": "block"}],
+ "camera": null,
+ "scene_objects": {"body.body": 1, "ground": 2, "wall": 3, "step": 4, "block": 5}
+}
+}

@@ -11,6 +11,7 @@
 //! 保持 016 最小切片逐字节兼容（verify_plan016 再生控制），不被自动升级。
 pub mod load;
 pub mod lower;
+pub mod lower_basic2d;
 pub mod lower_g11;
 pub mod scene;
 pub mod translate;
@@ -22,8 +23,11 @@ pub enum Profile {
     Legacy,
     /// PLAN-017 完整 G11/2d 作者入口。
     G112D,
+    /// PLAN-019 基础二维：scene-2d/character-2d/camera-2d。
+    Basic2D(lower_basic2d::BasicProfile),
 }
 
 pub use load::{load_project, Project, ProjectError};
 pub use lower::{lower_project, LowerOutput};
+pub use lower_basic2d::{lower_project_basic, BasicProfile, LowerOutputBasic2D};
 pub use lower_g11::{lower_project_g112d, LowerOutputG11};

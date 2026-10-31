@@ -1,0 +1,97 @@
+{
+ "behavior": {
+  "api": "autographics.character/1",
+  "source": {
+   "format": "auto-source",
+   "sha256": "011517e1143a629522ae26fdc0666b985ad666d1686b941f0c38ae3df0e2c1ce",
+   "byte_length": 787
+  },
+  "actors": {
+   "two_d": 1,
+   "three_d": null
+  }
+ },
+ "schema": "autographics.scene/6",
+ "document_id": "plan019-basic2d-main",
+ "resources": [
+  "circle",
+  "quad",
+  "cylinder",
+  "player",
+  "mob"
+ ],
+ "objects": [
+  {
+   "id": 1,
+   "name": "body.body",
+   "kind": "quad",
+   "translation": [0.0, 1.0, 0.0],
+   "scale": [0.8, 1.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.9, 0.5, 0.25, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 2,
+   "name": "ground",
+   "kind": "quad",
+   "translation": [6.0, -0.5, 0.0],
+   "scale": [20.0, 1.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.55, 0.62, 0.7, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 3,
+   "name": "wall",
+   "kind": "quad",
+   "translation": [14.5, 1.5, 0.0],
+   "scale": [1.0, 3.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.4, 0.45, 0.55, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 4,
+   "name": "step",
+   "kind": "quad",
+   "translation": [8.0, 0.375, 0.0],
+   "scale": [2.0, 0.75, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.5, 0.55, 0.65, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 5,
+   "name": "block",
+   "kind": "quad",
+   "translation": [-4.0, 0.5, 0.0],
+   "scale": [1.0, 1.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.5, 0.55, 0.65, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  }
+ ],
+ "groups": [],
+ "assets": []
+}
