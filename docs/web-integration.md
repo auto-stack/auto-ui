@@ -38,3 +38,7 @@ Each proxy session retains canonical compiled return types separately from
 diagnostic Type Display strings. String-list replies use the language-owned
 typed converter and that session's declaration, preserving the existing VM list,
 iterator and reference-count ABI; integer and unknown returns retain numeric JSON.
+
+## 最终交付记录（2026-10-31）
+
+r7冻结四仓门与发行已通过，实际合入、主干rebase及用户免追加测试范围，统一见语言仓 `docs/plans/archive/890-auto-web-independent-repository-delivery.md`。历史producer pins只标识实际执行来源，不冒称后续主干更新已重测。

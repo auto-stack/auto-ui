@@ -174,7 +174,7 @@
           "created_at": 1793405387,
           "title": "中央PLAN-890交付收据指针",
           "content": "实际最终门/landing/guard/归档仍pending，见中央收据，不提前认证。",
-          "status": "pending",
+          "status": "verified",
           "related": [
             "PLAN-890"
           ],
