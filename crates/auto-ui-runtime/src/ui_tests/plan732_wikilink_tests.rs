@@ -57,9 +57,14 @@ mod plan732_wikilink_tests {
         use crate::ui::component::Component;
         use crate::ui::iced::renderer::IntoIcedElement;
 
-        let mut dc = match crate::plan370_test_support::build_component_from_app(
-            &locate_corpus().expect("corpus app.at missing"),
-        ) {
+        // PLAN-018 T-05：corpus 夹具不在仓（locate_corpus 三路径皆空）——
+        // 按作者原 skip 意图显式跳过（None 分支原为死码），显式 SKIPPED
+        // 不冒 PASS。
+        let Some(corpus) = locate_corpus() else {
+            eprintln!("plan732: SKIPPED — corpus app.at not found");
+            return;
+        };
+        let mut dc = match crate::plan370_test_support::build_component_from_app(&corpus) {
             Some(c) => c,
             None => {
                 eprintln!("plan732: SKIPPED — corpus app.at not found");

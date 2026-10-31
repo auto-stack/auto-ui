@@ -315,6 +315,102 @@ pub fn install() {
 mod tests {
     use super::*;
 
+    // PLAN-018 T-05：831/900 迁移漂移修复——本 tests 引用的 JSON 辅助面未随
+    // 迁移重建（autodown 组合下从未重编），按现存原语（parse_blocks/
+    // block_to_json/block_from_json/find_mut/serializer::serialize）等价重建。
+    fn parse_to_json(src: &str, is_final: bool) -> Result<J, String> {
+        Ok(block_to_json(&parse_blocks(src, is_final)))
+    }
+
+    fn serialize_from_json(j: &J, is_final: bool) -> Result<String, String> {
+        let node = block_from_json(j).ok_or_else(|| "bad block json".to_string())?;
+        Ok(autodown_core::serializer::serialize(node, is_final))
+    }
+
+    fn find_block<'a>(node: &'a BlockNode, id: &str) -> Option<&'a BlockNode> {
+        if node.id == id {
+            return Some(node);
+        }
+        node.children.iter().find_map(|c| find_block(c, id))
+    }
+
+    fn rooted(j: &J) -> Result<BlockNode, String> {
+        block_from_json(j).ok_or_else(|| "bad block json".to_string())
+    }
+
+    fn find_in_json(j: &J, id: &str) -> Result<bool, String> {
+        let n = rooted(j)?;
+        Ok(find_block(&n, id).is_some())
+    }
+
+    fn text_from_json(j: &J, id: &str) -> Result<String, String> {
+        let n = rooted(j)?;
+        find_block(&n, id)
+            .map(|b| b.inlines.iter().map(|s| s.text.as_str()).collect())
+            .ok_or_else(|| format!("no block {id}"))
+    }
+
+    fn insert_text_json(j: &J, id: &str, offset: usize, text: &str) -> Result<J, String> {
+        let mut n = rooted(j)?;
+        let target = find_mut(&mut n, id).ok_or_else(|| format!("no block {id}"))?;
+        let mut consumed = 0usize;
+        let mut placed = false;
+        for span in target.inlines.iter_mut() {
+            let len = span.text.chars().count();
+            if offset <= consumed + len {
+                let at = offset - consumed;
+                let char_idx = span
+                    .text
+                    .char_indices()
+                    .nth(at)
+                    .map(|(i, _)| i)
+                    .unwrap_or(span.text.len());
+                span.text.insert_str(char_idx, text);
+                placed = true;
+                break;
+            }
+            consumed += len;
+        }
+        if !placed {
+            if let Some(last) = target.inlines.last_mut() {
+                last.text.push_str(text);
+            } else {
+                target.inlines.push(InlineSpan {
+                    text: text.to_string(),
+                    marks: Vec::new(),
+                    attrs: Vec::new(),
+                });
+            }
+        }
+        Ok(block_to_json(&n))
+    }
+
+    fn insert_template_json(j: &J, template: &str, parent: &str, index: i64) -> Result<J, String> {
+        let mut n = rooted(j)?;
+        let fresh = parse_blocks(template, true);
+        if parent.is_empty() {
+            let at = if index < 0 {
+                n.children.len() as i64
+            } else {
+                index.min(n.children.len() as i64)
+            } as usize;
+            for (i, child) in fresh.children.into_iter().enumerate() {
+                n.children.insert(at + i, child);
+            }
+        } else {
+            let target = find_mut(&mut n, parent).ok_or_else(|| format!("no block {parent}"))?;
+            let at = if index < 0 {
+                target.children.len() as i64
+            } else {
+                index.min(target.children.len() as i64)
+            } as usize;
+            for (i, child) in fresh.children.into_iter().enumerate() {
+                target.children.insert(at + i, child);
+            }
+        }
+        Ok(block_to_json(&n))
+    }
+
     #[test]
     fn parse_serialize_roundtrip_via_json() {
         let src = "# 标题\n\n段落 **粗** 与 `码`\n\n- 甲\n- 乙\n";

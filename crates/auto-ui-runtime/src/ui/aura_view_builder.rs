@@ -19161,11 +19161,18 @@ mod tests {
             let builder = AuraViewBuilder::new(&bridge, "Test");
             match builder.build(&node) {
                 View::Column { children, .. } => {
+                    // PLAN-018 T-05：AnchorSlot 包装族加入后 children[0] 为
+                    // AnchorSlot——本 test 为 autodown 组合下首次可编（831/900
+                    // 迁移漂移），解包后再对 Table 断言。
+                    let inner = match &children[0] {
+                        View::AnchorSlot { child, .. } => child.as_ref(),
+                        v => v,
+                    };
                     let View::Table {
                         col_widths,
                         on_col_resize: Some(cb),
                         ..
-                    } = &children[0]
+                    } = inner
                     else {
                         panic!(
                             "expected View::Table with resize channel, got {:?}",
@@ -19215,11 +19222,15 @@ mod tests {
             let builder = AuraViewBuilder::new(&bridge, "Test");
             match builder.build(&node) {
                 View::Column { children, .. } => {
+                    let inner = match &children[0] {
+                        View::AnchorSlot { child, .. } => child.as_ref(),
+                        v => v,
+                    };
                     let View::Table {
                         col_widths,
                         on_col_resize: Some(_),
                         ..
-                    } = &children[0]
+                    } = inner
                     else {
                         panic!("expected View::Table")
                     };
@@ -19242,11 +19253,15 @@ mod tests {
             let builder = AuraViewBuilder::new(&bridge, "Test");
             match builder.build(&plain) {
                 View::Column { children, .. } => {
+                    let inner = match &children[0] {
+                        View::AnchorSlot { child, .. } => child.as_ref(),
+                        v => v,
+                    };
                     let View::Table {
                         col_widths,
                         on_col_resize,
                         ..
-                    } = &children[0]
+                    } = inner
                     else {
                         panic!("expected View::Table")
                     };
@@ -19284,6 +19299,9 @@ mod tests {
                     find_details_onclick(child)
                 }
                 View::Scrollable { child, .. } => find_details_onclick(child),
+                // PLAN-018 T-05：AnchorSlot 包装族——walker 需下钻（831/900
+                // 迁移漂移，本 test autodown 组合下首次可编）。
+                View::AnchorSlot { child, .. } => find_details_onclick(child),
                 _ => None,
             }
         }
