@@ -16,7 +16,7 @@ ti = "nextest run -p auto-ui-tools -p auto-ui-runtime --test legacy_build_semant
 # native 手工档（原门保持：native-dnd+test-native-dock 双 feature × windows、
 # 真光标交互——开发机/专用 CI 档，不进日常/集成档；feature 关闭时目标编译
 # 为空）
-tn = "test -p auto-ui-runtime --features native-dnd,test-native-dock --test native_dnd_e2e"
+tn = "test -p auto-ui-runtime --features native-dnd --test native_dnd_e2e"
 
 # PLAN-831 T-09（F831-09-04，自语言仓 .cargo/config.toml 随迁）：深递归
 # 解析/构建测试超过 libtest 默认 2MB 线程栈（STATUS_STACK_OVERFLOW 实证

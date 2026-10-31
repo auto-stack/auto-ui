@@ -24,7 +24,7 @@ pub mod hover_area;
 pub mod right_press_area;
 // PLAN-631 F-7: pointer placement headless 测试(iced_test 管线,
 // iced-layout-tests 门控)。
-#[cfg(all(test, feature = "iced-layout-tests"))]
+#[cfg(test)]
 mod pointer_placement_tests;
 // PLAN-731 T-00: S5 分段根包装探针(layout/draw 括号计量,纯委托)。
 pub mod frame_probe;
@@ -81,13 +81,13 @@ pub mod scroll_state_reader;
 
 // Plan 414 §8.2: headless layout testbench — `iced_test`-based bounds
 // assertions (feature `iced-layout-tests`; see layout_tests.rs header).
-#[cfg(all(test, feature = "iced-layout-tests"))]
+#[cfg(test)]
 mod layout_tests;
 // PLAN-010 T8: terminal 组件像素级 headless 自动化(同款 iced_test 管线)。
-#[cfg(all(test, feature = "iced-layout-tests"))]
+#[cfg(test)]
 mod terminal_pixel_tests;
 // 014 直键入:terminal 键盘捕获 → 键入队列 → on_input 消息的集成轨。
-#[cfg(all(test, feature = "iced-layout-tests"))]
+#[cfg(test)]
 mod p022_stack_click_tests;
 mod terminal_input_tests;
 

@@ -64,11 +64,11 @@ highlight-treesitter = [
     "dep:tree-sitter-powershell",
     "dep:tree-sitter-ini",
 ]
-# PLAN-900：随迁的 http e2e 门（真 TCP 串行族；原 auto-lang test-http-e2e 同语义）。
-test-http-e2e = []
+# PLAN-900：随迁的 http e2e 族（真 TCP 串行）——PLAN-018 T-03：Cargo feature
+# 选择门退役，族常驻 test 编译可见；运行由 nextest default-filter 排除出日常、
+# 显式 -E 过滤 + test-group 串行选择（见 .config/nextest.toml）。
 ui-clipboard = []
 ui-dialog = []
-iced-layout-tests = ["ui-iced", "dep:iced_test"]
 mpv-native = ["ui", "dep:libloading"]
 mpv-gpu = ["mpv-native", "dep:iced_wgpu"]
 mpv-widget = ["mpv-gpu", "ui-iced"]
@@ -78,7 +78,6 @@ autodown = ["dep:autodown-core"]
 native-dock = []
 native-clipboard = []
 native-dnd = ["dep:windows-core"]
-test-native-dock = ["ui-iced", "native-dock"]
 
 [dependencies]
 auto-web = { version = "=0.1.0", path = "../../../auto-web/crates/auto-web" }
@@ -131,7 +130,6 @@ reqwest = { version = "0.12", features = ["blocking", "json", "stream", "multipa
 iced = { version = "0.14.0", features = ["tokio", "image", "svg", "advanced", "canvas", "unconditional-rendering"] }
 iced_widget = { version = "0.14" }
 iced_futures = { version = "0.14" }
-iced_test = { version = "0.14", optional = true }
 iced_wgpu = { version = "0.14", optional = true }
 libloading = { version = "0.8", optional = true }
 iced_runtime = { version = "0.14" }
@@ -229,7 +227,6 @@ required-features = ["ui-iced"]
 
 [[example]]
 name = "p023_probe"
-required-features = ["iced-layout-tests"]
 
 [[example]]
 name = "plan804_real_host"
@@ -328,6 +325,9 @@ name = "ui_todos"
 required-features = ["ui-iced"]
 
 [dev-dependencies]
+# PLAN-018 T-03：iced_test 仅测试工具箱——自 optional+feature 门转 dev 依赖。
+iced_test = { version = "0.14" }
+
 # PLAN-900 T-05：ui_snapshots（insta 快照围栏）随 auto-lang 迁入。
 insta = { version = "1", features = ["filters"] }
 # PLAN-814 T-07：plan804_os_e2e（随 owner 迁入）的消费面。

@@ -8,7 +8,7 @@
 //!
 //! Run with:
 //! `cargo test -p auto-lang --features ui-iced,iced-layout-tests --lib pointer_placement`
-#![cfg(all(test, feature = "iced-layout-tests"))]
+#![cfg(test)]
 
 use crate::ui::iced::right_press_area::test_support::slot_lock;
 use crate::ui::iced::right_press_area::{

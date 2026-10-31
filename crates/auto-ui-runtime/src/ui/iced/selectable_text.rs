@@ -875,7 +875,6 @@ mod tests {
     /// T2 管线冒烟(iced_test simulator,feature `iced-layout-tests`):
     /// 真实 iced 事件流 press→move→release 全程无 panic 且事件被捕获
     /// (shell.capture_event → Status::Captured)。
-    #[cfg(feature = "iced-layout-tests")]
     #[test]
     fn text_selection_simulator_pipeline_smoke() {
         use iced_test::simulator;
@@ -905,7 +904,6 @@ mod tests {
     /// T3 管线链路(iced-layout-tests 档):真实 iced 事件流中 Ctrl+C 键盘
     /// 事件同样送达 widget update 并被捕获(无选区静默/有选区捕获——
     /// 运行时与单测同机制,实机剩余变量仅窗口焦点)。
-    #[cfg(feature = "iced-layout-tests")]
     #[test]
     fn text_selection_simulator_ctrl_c_captured() {
         use iced::keyboard::{self, key, Key};

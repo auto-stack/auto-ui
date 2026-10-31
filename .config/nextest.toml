@@ -14,8 +14,23 @@
 #   `cargo ti` 档；native_dnd_e2e 为手工 native 门（`cargo tn`，双 feature
 #   真光标交互，不进日常/集成档）——三者共同保证原选择面零丢失。
 [profile.default]
-default-filter = "not test(ui_gen::)"
+# PLAN-018 T-03：三UI测试选择feature退役后，原feature隐藏族转为 nextest
+# 静态边界——http e2e（真TCP串行）与 iced GPU/布局族（iced_test模拟器，
+# 117+19条）常驻编译可见但不进日常档；显式运行经 -E 名过滤（串行经
+# override 单线程，保持原条件）。零选择不PASS：显式过滤的枚举对账见
+# plan-artifacts/plan-018/t03_*。
+default-filter = "not test(ui_gen::) and not test(/http_e2e/) and not test(/^(ui::iced::(layout_tests|terminal_pixel_tests|p022_stack_click_tests|terminal_input_tests|pointer_placement_tests)|ui::terminal::iced::(p025_scroll_render_tests|widget::virtual_scroll_tests::(probe_publish_follows_available_width_and_stays_stable|shortcut_hit_captures_single_fire_across_stack)))/) and not test(/^ui::iced::selectable_text::tests::text_selection_simulator/) and not test(/^ui::iced::renderer::line_edit_tests::p(483|490|491)_/) and not test(/^ui::iced::renderer::plan080_uat_cjk_bubble_tests/) and not test(/^ui::native_dock::win32::(native_dock_events|native_dock_geometry)/)"
 
 [profile.default.slow-timeout]
 period = "60s"
 terminate-after = 2
+
+# PLAN-018 T-03：原 feature 门族的串行/资源条件保留——http e2e 真TCP与
+# iced_test 模拟器族显式运行时单线程（原 libtest 单进程形态等价）。
+[[profile.default.overrides]]
+filter = 'test(/http_e2e/)'
+threads-required = 1
+
+[[profile.default.overrides]]
+filter = 'test(/^(ui::iced::(layout_tests|terminal_pixel_tests|p022_stack_click_tests|terminal_input_tests|pointer_placement_tests)|ui::terminal::iced::(p025_scroll_render_tests|widget::virtual_scroll_tests::(probe_publish_follows_available_width_and_stays_stable|shortcut_hit_captures_single_fire_across_stack)))/) or test(/^ui::iced::selectable_text::tests::text_selection_simulator/) or test(/^ui::iced::renderer::line_edit_tests::p(483|490|491)_/) or test(/^ui::iced::renderer::plan080_uat_cjk_bubble_tests/) or test(/^ui::native_dock::win32::(native_dock_events|native_dock_geometry)/)'
+threads-required = 1

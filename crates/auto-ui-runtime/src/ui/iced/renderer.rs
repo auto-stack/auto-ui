@@ -37759,8 +37759,11 @@ mod tests {
     /// Plan 494 验收 3：Region 失败回退路径实测一次——stale hwnd 驱动
     /// `apply_hole_regions` Err → hole_mode 翻 off + 假洞 z 重申路径执行
     ///（无 slot 时重申空转，仅断言模式翻转与日志路径可达）。
-    #[cfg(all(windows, feature = "test-native-dock"))]
+    // PLAN-018 T-03：test-native-dock 门退役——真窗口 dock 族保持显式手动
+    // 准入（--ignored 运行），不进日常/集成档（原条件等价转写）。
+    #[cfg(all(windows, test))]
     #[test]
+    #[ignore = "PLAN-018: 真窗口 dock 交互族（原 test-native-dock 手动门），显式 --ignored 运行"]
     fn hole_region_fallback_flips_mode_off() {
         use crate::ui::native_dock::win32 as ndw;
         let mut ds = crate::ui::session::DesktopSession::__test_session();
@@ -40492,6 +40495,9 @@ mod tests {
 #[cfg(test)]
 mod line_edit_tests {
     use super::*;
+    // PLAN-018：layout 族修编——UiCode/UiStmt 自 dialect 域模型显式导入
+    //（841 迁移后测试门未重编，导入漂移在此补齐）。
+    use auto_ui_dialect::{UiCode, UiStmt};
 
     /// 每个测试独立的 key(避免 TEXTAREA_CONTENTS 全局残留)。
     fn setup(key: &str, text: &str) {
@@ -40709,8 +40715,7 @@ mod line_edit_tests {
 
     /// 双 input 列(VM 主路径同构输入)。on_change 挂 IcedMessage,
     /// widget/event 对齐 042 example 的 LoginChild/UserChanged|PassChanged。
-    #[cfg(feature = "iced-layout-tests")]
-    fn p483_two_input_view() -> AbstractView<IcedMessage> {
+        fn p483_two_input_view() -> AbstractView<IcedMessage> {
         let user = AbstractView::Input {
             placeholder: "Enter username".to_string(),
             value: String::new(),
@@ -40749,8 +40754,7 @@ mod line_edit_tests {
 
     /// derive_input_id 契约:主键唯一性 + 跨调用稳定性 + 三元组兜底。
     #[test]
-    #[cfg(feature = "iced-layout-tests")]
-    fn p483_derive_input_id_unique_and_stable() {
+        fn p483_derive_input_id_unique_and_stable() {
         let a = derive_input_id(
             Some(("LoginChild", "UserChanged")),
             "Enter username",
@@ -40791,8 +40795,7 @@ mod line_edit_tests {
     /// 键盘事件随之双投递(042 evidence r4/r5:username="adminadmin")。
     /// 现状(红):两 input 同为 "prompt_input"(13700 整体覆盖)。
     #[test]
-    #[cfg(feature = "iced-layout-tests")]
-    fn p483_vm_two_inputs_have_distinct_iced_ids() {
+        fn p483_vm_two_inputs_have_distinct_iced_ids() {
         use iced::Rectangle;
         use iced_test::selector::{Candidate, Selector};
 
@@ -40828,8 +40831,7 @@ mod line_edit_tests {
     /// view_with_debug_gated→render_dynamic_view VM 主路径)。镜像
     /// tests::plan437_child_init_tests::build_inline 的生产构建路径;子 widget
     /// 以 kebab tag 直接实例化(免 use 导入),根 widget 持 .authed 条件。
-    #[cfg(feature = "iced-layout-tests")]
-    fn p483_build_login_shape() -> crate::ui::dynamic::DynamicComponent {
+        fn p483_build_login_shape() -> crate::ui::dynamic::DynamicComponent {
         use auto_lang_core::ast::Stmt;
         let src = r##"
 widget App {
@@ -40906,7 +40908,7 @@ widget LoginChild {
                 if root_decl.is_none() {
                     root_decl = Some(decl.clone());
                     view_widget = Some(
-                        auto_ui_compiler::aura::extract_widget_from_decl(decl)
+                        auto_ui_compiler::aura::extract_widget_from_decl(&decl)
                             .map_err(|e| e.to_string())
                             .unwrap(),
                     );
@@ -40940,8 +40942,7 @@ widget LoginChild {
     /// 非零高——重叠则一次点击落双框(双双 is_focused=Some),静态树即
     /// 双投递;这也直接复现/排除「子 widget 拼接形态布局塌陷」。
     #[test]
-    #[cfg(feature = "iced-layout-tests")]
-    fn p483_login_shape_inputs_disjoint_and_delivery_single() {
+        fn p483_login_shape_inputs_disjoint_and_delivery_single() {
         use iced_test::selector::Bounded;
 
         let comp = p483_build_login_shape();
@@ -40984,8 +40985,7 @@ widget LoginChild {
     /// 断言:点击 password→键 a→重建(pass="a" 形态)→键 d,全程仅
     /// PassChanged 消息;若 UserChanged 混入=双投递在重建路径复现。
     #[test]
-    #[cfg(feature = "iced-layout-tests")]
-    fn p483_rebuild_between_keystrokes_keeps_single_delivery() {
+        fn p483_rebuild_between_keystrokes_keeps_single_delivery() {
         use iced_test::runtime::core::clipboard;
         use iced_test::runtime::core::renderer::Headless;
         use iced_test::runtime::core::{Event, Size};
@@ -41077,8 +41077,7 @@ widget LoginChild {
     /// UserChanged 与 PassChanged 齐发(= musk "adminadmin" 双投递)。
     /// 修复后(绿):各框唯一 Id → 聚焦首个 input 的 Id 仅命中一个框。
     #[test]
-    #[cfg(feature = "iced-layout-tests")]
-    fn p483_focus_op_then_typing_stays_single_delivery() {
+        fn p483_focus_op_then_typing_stays_single_delivery() {
         use iced_test::runtime::core::clipboard;
         use iced_test::runtime::core::renderer::Headless;
         use iced_test::runtime::core::{Event, Size};
@@ -41140,8 +41139,7 @@ widget LoginChild {
     /// 控制组(修复前后都须绿):静态树内点击第二个 input 后键入文本,
     /// 仅聚焦框的 on_change 触发——锁定正常单投递不回归。
     #[test]
-    #[cfg(feature = "iced-layout-tests")]
-    fn p483_click_and_type_delivers_to_focused_input_only() {
+        fn p483_click_and_type_delivers_to_focused_input_only() {
         let el = render_dynamic_view(p483_two_input_view(), None, &mut Vec::new());
         let mut ui = iced_test::simulator(el);
 
@@ -41169,8 +41167,7 @@ widget LoginChild {
 
     /// 未捕获 Tab/Shift+Tab 键盘事件(对齐产线订阅喂给
     /// keyboard_event_message 的形状;status 由调用方传 Ignored)。
-    #[cfg(feature = "iced-layout-tests")]
-    fn p491_tab_event(shift: bool) -> iced::Event {
+        fn p491_tab_event(shift: bool) -> iced::Event {
         iced::Event::Keyboard(iced::keyboard::Event::KeyPressed {
             key: iced::keyboard::Key::Named(iced::keyboard::key::Named::Tab),
             modified_key: iced::keyboard::Key::Named(iced::keyboard::key::Named::Tab),
@@ -41189,8 +41186,7 @@ widget LoginChild {
     }
 
     /// 042 双 input 形态的登记表快照(DFS 序 = 视觉树序:user 在前)。
-    #[cfg(feature = "iced-layout-tests")]
-    fn p491_registry() -> Vec<iced::widget::Id> {
+        fn p491_registry() -> Vec<iced::widget::Id> {
         let mut ids = Vec::new();
         collect_input_ids(&p483_two_input_view(), &mut ids);
         ids
@@ -41198,8 +41194,7 @@ widget LoginChild {
 
     /// 测试侧聚焦探针:读当前实际持焦 widget 的 Id(与产线
     /// FindFocusedInput 同逻辑;点击直聚的焦点同样可见)。
-    #[cfg(feature = "iced-layout-tests")]
-    fn p491_probe_focus(
+        fn p491_probe_focus(
         ui: &mut iced_test::runtime::user_interface::UserInterface<
             '_,
             IcedMessage,
@@ -41236,8 +41231,7 @@ widget LoginChild {
 
     /// 端到端遍历链复刻:探针读当前聚焦(含点击直聚)→ focus_traverse
     /// 按登记表求址 → 内建 focus operation 置焦;返回目标 Id。
-    #[cfg(feature = "iced-layout-tests")]
-    fn p491_apply_traversal(
+        fn p491_apply_traversal(
         ui: &mut iced_test::runtime::user_interface::UserInterface<
             '_,
             IcedMessage,
@@ -41259,8 +41253,7 @@ widget LoginChild {
     /// 建无头 UserInterface 并点击指定 placeholder 的 input(真实点击直聚)。
     /// `view` 以闭包供给(探针侧与主 UI 各建一份实例);返回 (ui, renderer),
     /// 键入消息由调用方收集。
-    #[cfg(feature = "iced-layout-tests")]
-    fn p491_ui_and_click(
+        fn p491_ui_and_click(
         view: impl Fn() -> AbstractView<IcedMessage>,
         placeholder: &str,
         msgs: &mut Vec<IcedMessage>,
@@ -41323,8 +41316,7 @@ widget LoginChild {
     /// 键入只进 PassChanged。旧状(红):分派为 `__focus_prompt` 且无
     /// focus_traverse。
     #[test]
-    #[cfg(feature = "iced-layout-tests")]
-    fn p491_tab_next() {
+        fn p491_tab_next() {
         use iced_test::runtime::core::clipboard;
         use iced_test::runtime::core::Event;
 
@@ -41407,8 +41399,7 @@ widget LoginChild {
     /// (旧:Named 臂不加修饰前缀,与 Tab 同臂当前进处理=bug);求址 pass →
     /// user;端到端:点击 pass → 反向遍历 → user 持焦。
     #[test]
-    #[cfg(feature = "iced-layout-tests")]
-    fn p491_shift_tab_prev() {
+        fn p491_shift_tab_prev() {
         use iced_test::runtime::core::clipboard;
         use iced_test::runtime::core::Event;
 
@@ -41481,8 +41472,7 @@ widget LoginChild {
     /// T1 红③(转绿于 T2):回环求址——Tab 尾→首,Shift+Tab 首→尾;端到端
     /// 双向实证(点击 pass → 前进回环 user;点击 user → 后退回环 pass)。
     #[test]
-    #[cfg(feature = "iced-layout-tests")]
-    fn p491_wrap() {
+        fn p491_wrap() {
         let ids = p491_registry();
         let user = derive_input_id(
             Some(("LoginChild", "UserChanged")),
@@ -41532,8 +41522,7 @@ widget LoginChild {
     /// 结构实证——UserInterface::operate 收 dyn Operation<()>,typed
     /// 产线探针不可直穿,以同逻辑孪生代验,产线侧由 T6 实机代验)。
     #[test]
-    #[cfg(feature = "iced-layout-tests")]
-    fn p491_find_focused_probe() {
+        fn p491_find_focused_probe() {
         // (a) 恒出值
         match iced::advanced::widget::Operation::finish(&FindFocusedInput::new()) {
             iced::advanced::widget::operation::Outcome::Some(None) => {}
@@ -41562,8 +41551,7 @@ widget LoginChild {
     /// 但无聚焦求址两者皆首项；端到端无点击直聚 → 遍历 → 首框持焦，
     /// 键入只进 UserChanged（兼锁 483 单投递）。
     #[test]
-    #[cfg(feature = "iced-layout-tests")]
-    fn p491_unfocused_fallback() {
+        fn p491_unfocused_fallback() {
         use iced_test::runtime::core::clipboard;
         use iced_test::runtime::core::renderer::Headless;
         use iced_test::runtime::core::{Event, Size};
@@ -41655,8 +41643,7 @@ widget LoginChild {
     }
 
     /// 单 input 视图(遍历环长度 1:自环即旧行为,防漂移)。
-    #[cfg(feature = "iced-layout-tests")]
-    fn p491_single_input_view() -> AbstractView<IcedMessage> {
+        fn p491_single_input_view() -> AbstractView<IcedMessage> {
         AbstractView::Input {
             placeholder: "Only box".to_string(),
             value: String::new(),
@@ -41675,8 +41662,7 @@ widget LoginChild {
     /// T4 边界锚:单 input 场景 next/prev 取模回环到自身——行为=旧
     /// fallback(聚焦不变),不失焦、不漂移;键入照常单投递。
     #[test]
-    #[cfg(feature = "iced-layout-tests")]
-    fn p491_single_input() {
+        fn p491_single_input() {
         use iced_test::runtime::core::clipboard;
         use iced_test::runtime::core::Event;
 
@@ -41732,8 +41718,7 @@ widget LoginChild {
     /// (onkeydown.tab)是 Captured 事件——根本到不了未捕获 fallback,
     /// Tab/Shift+Tab 遍历臂与 prompt 编辑器捕获路径零交集。
     #[test]
-    #[cfg(feature = "iced-layout-tests")]
-    fn p491_prompt_tab_captured_not_fallback() {
+        fn p491_prompt_tab_captured_not_fallback() {
         for shift in [false, true] {
             let msg = keyboard_event_message(
                 p491_tab_event(shift),
@@ -41757,8 +41742,7 @@ widget LoginChild {
 
     /// G4 测试载体：for-loop 行（launcher 形态）+ 无 onclick 锚行 + col/div
     /// 三形态。msg 声明/带参 handler/on 块全沿 028 真实形态。
-    #[cfg(feature = "iced-layout-tests")]
-    fn p490_build_click_shape() -> crate::ui::dynamic::DynamicComponent {
+        fn p490_build_click_shape() -> crate::ui::dynamic::DynamicComponent {
         use auto_lang_core::ast::Stmt;
         let src = r##"
 widget ClickApp {
@@ -41836,8 +41820,7 @@ widget ClickApp {
     }
 
     /// G4 构建并点击指定文本（点击落在其父布局件的矩形上）→ 收集消息。
-    #[cfg(feature = "iced-layout-tests")]
-    fn p490_click_collect(placeholder: &str) -> Vec<IcedMessage> {
+        fn p490_click_collect(placeholder: &str) -> Vec<IcedMessage> {
         let comp = p490_build_click_shape();
         let (view, _ids, _probe) = comp.view_with_debug_gated(false);
         let view = convert_view_messages(view);
@@ -41850,8 +41833,7 @@ widget ClickApp {
     /// T4 红①：row 挂 onclick（for-loop 形态，028 候选行同构）——
     /// 点击必须发射 .Pick(it) 消息。现状（红）：零消息。
     #[test]
-    #[cfg(feature = "iced-layout-tests")]
-    fn p490_row_onclick_fires() {
+        fn p490_row_onclick_fires() {
         let msgs = p490_click_collect("alpha");
         assert!(
             msgs.iter()
@@ -41862,8 +41844,7 @@ widget ClickApp {
 
     /// T4 红②：col 挂 onclick——点击发射 .Pick("col")。
     #[test]
-    #[cfg(feature = "iced-layout-tests")]
-    fn p490_col_onclick_fires() {
+        fn p490_col_onclick_fires() {
         let msgs = p490_click_collect("colbox");
         assert!(
             msgs.iter()
@@ -41875,8 +41856,7 @@ widget ClickApp {
     /// T4 红③：div（=Container）挂 onclick（musk specs 树形态）——
     /// 点击必须发射 .Pick("div")。
     #[test]
-    #[cfg(feature = "iced-layout-tests")]
-    fn p490_container_div_onclick_fires() {
+        fn p490_container_div_onclick_fires() {
         let msgs = p490_click_collect("divbox");
         assert!(
             msgs.iter()
@@ -41887,8 +41867,7 @@ widget ClickApp {
 
     /// T4 锚（绿）：无 onclick 的布局行点击零消息——不引入误触发。
     #[test]
-    #[cfg(feature = "iced-layout-tests")]
-    fn p490_layout_without_onclick_inert() {
+        fn p490_layout_without_onclick_inert() {
         let msgs = p490_click_collect("gamma");
         assert!(
             msgs.is_empty(),
@@ -41900,8 +41879,7 @@ widget ClickApp {
     /// .Launch(r.name)}，对象列表带参派发）——点击 Notes 行必须发射
     /// .Launch("notes")。
     #[test]
-    #[cfg(feature = "iced-layout-tests")]
-    fn p490_launcher_row_launches() {
+        fn p490_launcher_row_launches() {
         let msgs = p490_click_collect("Notes");
         assert!(
             msgs.iter()
@@ -41946,7 +41924,7 @@ fn ade_fg_light() -> crate::ui::code_editor::theme::Rgba {
 // 恒不可见（container 候选可见、text 候选缺失，operate traverse 修复无
 // 效）——MCP 快照对被包节点的文本上报缺口（§10-11 capped 盒伪影家族）
 // 待后续专项（候选通道：MaxWidthPct tag/state 委托引发的 Tree 错位）。
-#[cfg(all(test, feature = "iced-layout-tests"))]
+#[cfg(test)]
 mod plan080_uat_cjk_bubble_tests {
     use super::*;
 
@@ -41976,8 +41954,7 @@ mod plan080_uat_cjk_bubble_tests {
 
     /// F-UAT-2 探针：Rich 段落布局尺寸（容器包 Rich，dump 容器 bounds）。
     #[test]
-    #[cfg(feature = "iced-layout-tests")]
-    fn plan080_uat_fuat2_rich_layout_bounds() {
+        fn plan080_uat_fuat2_rich_layout_bounds() {
         for (label, spans) in [
             (
                 "latin-rich",
@@ -42040,8 +42017,7 @@ mod plan080_uat_cjk_bubble_tests {
     /// 读法用闭包收集器（不走 text 选择器——见模块头②）。    /// 回归钉：pct-hug 路径 CJK 测宽必须与 latin 同量级（全角 ≈ 2× 半角）。
     /// 读法用闭包收集器（不走 text 选择器——见模块头②）。
     #[test]
-    #[cfg(feature = "iced-layout-tests")]
-    fn plan080_uat_cjk_bubble_hug_width_not_collapsed() {
+        fn plan080_uat_cjk_bubble_hug_width_not_collapsed() {
         for (label, floor) in [("你好世界早上好", 100.0f32), ("hello world!", 50.0f32)] {
             let el = render_dynamic_view(bubble_view(label), None, &mut Vec::new());
             let mut ui = iced_test::simulator(el);
@@ -42079,7 +42055,7 @@ mod plan080_uat_cjk_bubble_tests {
     /// F-UAT-2 复现探针：autodown 文档（标题+段落+行内 marks）→
     /// simulator 布局，dump 全部候选 bounds——验证 Rich 段落是否零尺寸。
     #[test]
-    #[cfg(all(feature = "iced-layout-tests", feature = "autodown"))]
+    #[cfg(feature = "autodown")]
     fn plan080_uat_fuat2_rich_paragraph_geometry() {
         let doc = "# Heading
 
@@ -42214,8 +42190,7 @@ This is a **bold** and *italic* paragraph with `code` and [link](https://x).
     /// （cell 用 Text——autodown 链的 cell 是 Rich，iced_test 候选盲区，
     /// 见模块头②；本钉断言 lowering 层的几何）。
     #[test]
-    #[cfg(feature = "iced-layout-tests")]
-    fn plan082_table_columns_align_across_rows() {
+        fn plan082_table_columns_align_across_rows() {
         let cell = |s: &str| AbstractView::Text {
             content: s.to_string(),
             style: None,
@@ -42282,8 +42257,7 @@ This is a **bold** and *italic* paragraph with `code` and [link](https://x).
     /// 文档化（无断言）：MaxWidthPct 子树 text 节点对 Find 操作不可见、
     /// container 可见——见模块头②。
     #[test]
-    #[cfg(feature = "iced-layout-tests")]
-    fn plan080_uat_max_width_pct_operation_visibility_bisect() {
+        fn plan080_uat_max_width_pct_operation_visibility_bisect() {
         for (outer, expect_text) in [("flex flex-col", true), ("max-w-[70%]", false)] {
             let el = render_dynamic_view(
                 AbstractView::Column {

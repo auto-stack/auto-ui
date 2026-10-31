@@ -13,7 +13,7 @@
 //! 门控：`native-dnd` + `test-native-dock`（drag_sim 与 fixture 驱动基建）
 //! × windows；真实光标交互——开发机/专用 CI 档，不在日常 `cargo t` 内。
 
-#![cfg(all(windows, feature = "native-dnd", feature = "test-native-dock"))]
+#![cfg(all(windows, feature = "native-dnd"))]
 
 use std::io::{BufRead, BufReader};
 use std::process::{Child, Command, Stdio};

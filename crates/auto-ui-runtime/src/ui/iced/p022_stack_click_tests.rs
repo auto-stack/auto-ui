@@ -9,7 +9,7 @@
 //! into_iced 构建时执行一次)。
 //!
 //! Run: cargo test -p auto-lang --features ui-iced,iced-layout-tests --lib p022_stack
-#![cfg(all(test, feature = "iced-layout-tests"))]
+#![cfg(test)]
 
 use crate::ui::iced::renderer::IntoIcedElement;
 use crate::ui::view::View;

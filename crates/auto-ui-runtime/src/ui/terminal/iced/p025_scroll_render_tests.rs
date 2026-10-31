@@ -13,7 +13,7 @@
 //! 收敛到"新暴露行数"量级(AC-01 headless 门)。
 //!
 //! Run: cargo test -p auto-lang --features ui-iced,iced-layout-tests --lib p025 -- --nocapture
-#![cfg(all(test, feature = "iced-layout-tests"))]
+#![cfg(test)]
 
 use crate::ui::terminal::iced::widget::{
     refresh_row_cache, row_rebuilds_reset, VisibleRow, CELL_H,

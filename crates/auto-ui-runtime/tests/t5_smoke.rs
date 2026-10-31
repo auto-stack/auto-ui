@@ -12,7 +12,7 @@
 //!   cargo test -p auto-lang --features test-native-dock --test t5_smoke -- --ignored --nocapture
 //! ```
 
-#![cfg(all(windows, feature = "test-native-dock"))]
+#![cfg(all(windows, test))]
 
 use std::time::Duration;
 

@@ -9,8 +9,9 @@
 //!
 //! Run with:
 //! `cargo test -p auto-lang --features ui-iced,iced-layout-tests --lib layout_tests`
-#![cfg(all(test, feature = "iced-layout-tests"))]
+#![cfg(test)]
 
+use auto_ui_dialect::{UiCode, UiStmt};
 use crate::ui::iced::renderer::IntoIcedElement;
 use crate::ui::style::Style;
 use crate::ui::view::{PopoverAnchor, PopoverPlacement, View};
@@ -3117,7 +3118,7 @@ fn p642_t12_overflow_frame_scrolls_and_centers() {
                 if d.name == "Host" {
                     host_decl = Some(d.clone());
                 } else {
-                    let w = auto_ui_compiler::aura::extract::extract_widget_from_decl(d)
+                    let w = auto_ui_compiler::aura::extract::extract_widget_from_decl(&d)
                         .expect("child extract");
                     registry.register(w);
                 }

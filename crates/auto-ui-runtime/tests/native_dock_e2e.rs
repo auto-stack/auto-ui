@@ -15,7 +15,7 @@
 //! 门控：feature `test-native-dock` + `#[cfg(windows)]`；fixture 缺失时
 //! 首测自动 `cargo build`（独立项目，非 workspace 成员）。
 
-#![cfg(all(windows, feature = "test-native-dock"))]
+#![cfg(all(windows, test))]
 
 use std::io::{BufRead, BufReader};
 use std::process::{Child, Command, Stdio};

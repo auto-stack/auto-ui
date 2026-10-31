@@ -19,7 +19,7 @@
 //!
 //! Run with:
 //! `cargo test -p auto-lang --features ui-iced,iced-layout-tests --lib terminal_pixel`
-#![cfg(all(test, feature = "iced-layout-tests"))]
+#![cfg(test)]
 
 use crate::ui::iced::renderer::IntoIcedElement;
 use crate::ui::terminal::{

@@ -1007,7 +1007,9 @@ unsafe extern "system" fn winevent_proc(
 /// 手段定案（待澄清①执行期裁定）：SendInput 真实拖动标题栏——点击/移动/
 /// 释放走真实输入管线，目标窗口进入真 move-size 模态循环，产出真实的
 /// MOVESIZESTART/LOCATIONCHANGE/MOVESIZEEND WinEvent 序列。
-#[cfg(feature = "test-native-dock")]
+// PLAN-018 T-03：test-native-dock 门退役——拖拽模拟/测试辅助为 Windows
+// 常驻小面（集成 e2e 目标经 lib 消费，cfg(test) 不传播），无调用方即惰性。
+#[cfg(windows)]
 pub mod drag_sim {
     use super::{hwnd_of, NativeHwnd};
     use windows::Win32::Foundation::POINT;
@@ -1299,7 +1301,7 @@ pub mod drag_sim {
 // tests/native_dock_e2e.rs 充当"桌面替身"窗（Region 洞/z 序断言载体）。
 // ---------------------------------------------------------------------------
 
-#[cfg(all(windows, feature = "test-native-dock"))]
+#[cfg(windows)]
 pub mod test_support {
     use super::{hwnd_of, hwnd_value, NativeHwnd, Rect};
     use std::sync::OnceLock;
@@ -1419,7 +1421,7 @@ pub mod test_support {
 // T2：Win32 几何集成测试——全部针对本进程 scratch 窗口，无第三方依赖
 // ---------------------------------------------------------------------------
 
-#[cfg(all(test, windows, feature = "test-native-dock"))]
+#[cfg(all(test, windows))]
 mod native_dock_geometry {
     use super::*;
     use crate::ui::native_dock::Size;
@@ -1905,7 +1907,7 @@ fn load_blue_test_icon() -> windows::Win32::UI::WindowsAndMessaging::HICON {
     }
 }
 
-#[cfg(all(test, windows, feature = "test-native-dock"))]
+#[cfg(all(test, windows))]
 mod native_dock_events {
     use super::native_dock_geometry::{pump_one, scratch};
     use super::*;
