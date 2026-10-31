@@ -680,6 +680,7 @@ dependencies = [
  "auto-media-core",
  "auto-parser-api",
  "auto-terminal-core",
+ "auto-test-case",
  "auto-text-core",
  "auto-val",
  "auto-web-contract",
@@ -812,6 +813,13 @@ name = "auto-terminal-core"
 version = "0.1.0"
 dependencies = [
  "libloading",
+]
+
+[[package]]
+name = "auto-test-case"
+version = "0.1.0"
+dependencies = [
+ "autodown-test-parser",
 ]
 
 [[package]]
@@ -1035,6 +1043,10 @@ checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
 name = "autodown-core"
+version = "0.1.0"
+
+[[package]]
+name = "autodown-test-parser"
 version = "0.1.0"
 
 [[package]]

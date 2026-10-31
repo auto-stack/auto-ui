@@ -3974,7 +3974,7 @@ pub fn generate_shell_pack_lib(output_dir: &Path) -> AutoResult<()> {
 
 /// 交付闭包内受管源码 crate（相对 crates/；含 auto-lang 全库——语言源码
 /// 尚未拆完，属如实披露的受管包含，非"纯 core/独立 UI 仓"）。
-pub const DELIVERY_CRATES: [&str; 24] = [
+pub const DELIVERY_CRATES: [&str; 25] = [
     "auto-lang",
     "auto-val",
     "auto-atom",
@@ -4035,7 +4035,17 @@ pub const DELIVERY_CRATES: [&str; 24] = [
     "auto-tool-execution",
     "auto-api-gen",
     "auto-project-model",
+    // PLAN-901：语言仓测试 feature 拍平——auto-test-case 自 optional+feature
+    // 门转 auto-lang/auto-lang-core 常驻依赖，随包交付（其 vendored parser
+    // 见 DELIVERY_VENDOR_TREES，非 crates/ 成员）。
+    "auto-test-case",
 ];
+
+/// PLAN-901：随包交付的 producer 仓根级树（源=语言仓相对路径 → 交付根
+/// 同形路径；auto-test-case 的 ../../vendor/autodown-test-parser 依赖在
+/// 交付根 crates/auto-test-case 处自然解析到本拷贝，零 path 改写）。
+const DELIVERY_VENDOR_TREES: [(&str, &str); 1] =
+    [("vendor/autodown-test-parser", "vendor/autodown-test-parser")];
 
 /// 随包发行的本地 patch（相对 crates/patches/）。
 pub const DELIVERY_PATCHES: [&str; 1] = ["iced_widget"];
@@ -4073,19 +4083,15 @@ struct DeliveryProjectionSpec {
 }
 
 const PROJECTION_AUTO_LANG: DeliveryProjectionSpec = DeliveryProjectionSpec {
-    // PLAN-815 T-05 门禁附带修复（披露）：814-T-04 把跨仓 autodown-core
-    // optional path 依赖与 dep: 特征形态随迁 auto-ui-runtime——本 spec 的
-    // autodown 剥除/改写两项陈旧化（master 端到端即红），移除；runtime
-    // 清单的对应投影见 PROJECTION_AUTO_UI_RUNTIME。
-    strip_deps: &["auto-test-case = { path = \"../auto-test-case\", optional = true }"],
-    feature_rewrites: &[(
-        "test-cases = [\"dep:auto-test-case\", \"auto-lang-core/test-cases\"]",
-        "test-cases = []",
-    )],
-    installed_rewrites: &[(
-        "test-cases = [\"auto-lang-core/test-cases\"]",
-        "test-cases = []",
-    )],
+    // PLAN-901（Design 52 计划B）：语言仓七个测试 feature 拍平——
+    // auto-test-case 转常驻依赖并入 DELIVERY_CRATES 交付闭包，test-cases
+    // feature 行自 producer 清单消失。原 strip/rewrite/installed 三组条目
+    // 全部退役：本 spec 收敛为恒等投影（仅保留跨仓 path 改写）。旧
+    // installed 中间形态的 test-cases 转发行不再被投影改写——重交付以
+    // producer 新清单整树覆盖（receipt verify_tree 钉树身份）。
+    strip_deps: &[],
+    feature_rewrites: &[],
+    installed_rewrites: &[],
     // PLAN-831 T-06：auto-lang 对独立 UI 仓包组的跨仓 path → 交付根包内兄弟。
     path_rewrites: &[("../../../auto-ui/crates/", "../")],
 };
@@ -4105,8 +4111,10 @@ const PROJECTION_AUTO_UI_RUNTIME: DeliveryProjectionSpec = DeliveryProjectionSpe
 };
 
 const PROJECTION_AUTO_LANG_CORE: DeliveryProjectionSpec = DeliveryProjectionSpec {
-    strip_deps: &["auto-test-case = { path = \"../auto-test-case\", optional = true }"],
-    feature_rewrites: &[("test-cases = [\"dep:auto-test-case\"]", "test-cases = []")],
+    // PLAN-901：Core 清单 test-cases feature 退出、auto-test-case 常驻——
+    // spec 收敛为恒等投影（与 PROJECTION_AUTO_LANG 同理，无跨仓 path 面）。
+    strip_deps: &[],
+    feature_rewrites: &[],
     installed_rewrites: &[],
     path_rewrites: &[],
 };
@@ -5525,6 +5533,37 @@ fn generate_rust_ui_delivery_inner(
             &copied.digest[..12.min(copied.digest.len())]
         );
     }
+    // PLAN-901：producer 仓根级 vendor 树随包交付（auto-test-case 的冻结
+    // parser 快照——交付根同形路径，crates/auto-test-case 的相对依赖零改写）。
+    for (src_rel, dst_rel) in DELIVERY_VENDOR_TREES {
+        let src = producer_root.join(src_rel);
+        if !src.is_dir() {
+            return Err(format!(
+                "delivery: producer 缺受管 vendor 树（{src_rel}）——受管判红"
+            )
+            .into());
+        }
+        let dst = delivery_root.join(dst_rel);
+        let copied = delivery_copy_dir(&src, &dst, &DELIVERY_COPY_SKIP_DIRS)?;
+        total_files += copied.records.len() as u64;
+        total_bytes += copied.records.iter().map(|r| r.bytes).sum::<u64>();
+        crate_entries.push(serde_json::json!({
+            "name": dst_rel,
+            "kind": "vendor_tree",
+            "origin_repo": "auto-lang",
+            "origin_rel": src_rel,
+            "files": copied.records.len(),
+            "bytes": copied.records.iter().map(|r| r.bytes).sum::<u64>(),
+            "digest": copied.digest,
+            "projection_edits": Vec::<String>::new(),
+        }));
+        println!(
+            "  {} {dst_rel}（{} 文件，digest {}..）",
+            "Vendored".bright_green(),
+            copied.records.len(),
+            &copied.digest[..12.min(copied.digest.len())]
+        );
+    }
     for name in DELIVERY_PATCHES {
         let src = producer_root.join("crates").join("patches").join(name);
         if !src.is_dir() {
@@ -6641,6 +6680,14 @@ mod tests {
                         .any(|line| line.contains(&format!("{dep} = ")))
                     {
                         continue; // 投影 spec 已剥除该行
+                    }
+                    // PLAN-901：仓根 vendor 树（如 auto-test-case 的冻结
+                    // parser）按 DELIVERY_VENDOR_TREES 随包，非 crates/ 成员。
+                    if DELIVERY_VENDOR_TREES
+                        .iter()
+                        .any(|(_, dst)| *dst == target)
+                    {
+                        continue;
                     }
                     let target = target.split('/').next().unwrap_or(&target).to_string();
                     if target == name {
@@ -8002,7 +8049,7 @@ pub fn list_items() []str {
         assert!(!pins.iter().any(|(n, _)| n == "windows-core"));
 
         let missing = dir.path().join("absent");
-        assert!(delivery_pins(&missing, None).is_err(), "锁缺失受管判红");
+        assert!(delivery_pins(&missing, None, None).is_err(), "锁缺失受管判红");
     }
 
     /// PLAN-792：交付根 manifest 装配——[patch.crates-io] 在消费根（不写
@@ -8050,128 +8097,184 @@ pub fn list_items() []str {
         assert!(generate_delivery_root_manifest(&bare, "app", None).is_err());
     }
 
-    /// PLAN-792：投影修剪——剥闭包外 optional path 依赖 + feature 行改写保
-    /// 留 feature 名；幂等（二次运行零改动）；计数不足受管判红。
-    #[test]
-    fn delivery_projection_strip_and_idempotent() {
-        let dir = tempfile::tempdir().unwrap();
-        let m = dir.path().join("Cargo.toml");
-        // T-05 fact update: the auto-lang manifest no longer carries the cross-repo
-        // autodown-core optional dep (814-T-04 moved it to auto-ui-runtime), so this
-        // spec keeps only the test-protocol strip/rewrite; the runtime shape is
-        // verified by the runtime-spec arm below.
-        let original = "[features]\n\
-             test-cases = [\"dep:auto-test-case\", \"auto-lang-core/test-cases\"]\n\n\
-             [dependencies]\n# comment\n\
-             auto-test-case = { path = \"../auto-test-case\", optional = true }\n\
-             auto-val = { path = \"../auto-val\" }\n";
-        std::fs::write(&m, original).unwrap();
-        let edits = delivery_apply_projection(&m, &PROJECTION_AUTO_LANG).unwrap();
-        assert_eq!(edits.len(), 2, "1 strip + 1 rewrite");
-        let text = std::fs::read_to_string(&m).unwrap();
-        assert!(
-            !text.contains("auto-test-case"),
-            "test-protocol dep stripped"
-        );
-        assert!(text.contains("test-cases = []"), "feature name kept");
-        assert!(
-            text.contains("auto-val = { path = \"../auto-val\" }"),
-            "in-closure dependency untouched"
-        );
-        // Idempotent: a second pass over the trimmed manifest makes zero edits.
-        let stripped = std::fs::read_to_string(&m).unwrap();
-        delivery_apply_projection(&m, &PROJECTION_AUTO_LANG).unwrap();
-        assert_eq!(std::fs::read_to_string(&m).unwrap(), stripped);
-        // Under-count is red (a producer whose structure drifted).
-        let drift = dir.path().join("drift.toml");
-        std::fs::write(
-            &drift,
-            "[dependencies]\nauto-val = { path = \"../auto-val\" }\n",
-        )
-        .unwrap();
-        assert!(delivery_apply_projection(&drift, &PROJECTION_AUTO_LANG).is_err());
-        // PLAN-815 T-05: runtime spec — cross-repo autodown-core strip + feature
-        // rewrite (the shape moved over from auto-lang by 814-T-04), idempotent,
-        // drift-red, each holding on its own.
-        let rt = dir.path().join("runtime.toml");
-        std::fs::write(
-            &rt,
-            "[features]\nautodown = [\"ui-iced\", \"dep:autodown-core\"]\n\n[dependencies]\n# comment\nautodown-core = { path = \"../../../auto-down/autodown/packages/engine/rust\", optional = true }\n",
-        )
-        .unwrap();
-        let rt_edits = delivery_apply_projection(&rt, &PROJECTION_AUTO_UI_RUNTIME).unwrap();
-        assert_eq!(rt_edits.len(), 2, "1 strip + 1 rewrite");
-        let rt_text = std::fs::read_to_string(&rt).unwrap();
-        assert!(
-            !rt_text.contains("autodown-core"),
-            "cross-repo optional dep stripped"
-        );
-        assert!(
-            rt_text.contains("autodown = [\"ui-iced\"]"),
-            "feature name kept"
-        );
-        let rt_stripped = std::fs::read_to_string(&rt).unwrap();
-        delivery_apply_projection(&rt, &PROJECTION_AUTO_UI_RUNTIME).unwrap();
-        assert_eq!(std::fs::read_to_string(&rt).unwrap(), rt_stripped);
-        let rt_drift = dir.path().join("runtime-drift.toml");
-        std::fs::write(
-            &rt_drift,
-            "[dependencies]\nauto-val = { path = \"../auto-val\" }\n",
-        )
-        .unwrap();
-        assert!(delivery_apply_projection(&rt_drift, &PROJECTION_AUTO_UI_RUNTIME).is_err());
-        // PLAN-814 SD-08：SDK spec——旧形态 test-cases 行 + auto-test-case
-        // 剥除（2 编辑）、幂等、漂移判红各自成立。
-        let sdk = dir.path().join("sdk.toml");
-        std::fs::write(
-            &sdk,
-            "[features]\ntest-cases = [\"dep:auto-test-case\"]\n\n[dependencies]\nauto-test-case = { path = \"../auto-test-case\", optional = true }\n",
-        )
-        .unwrap();
-        let sdk_edits = delivery_apply_projection(&sdk, &PROJECTION_AUTO_LANG_CORE).unwrap();
-        assert_eq!(sdk_edits.len(), 2, "1 strip + 1 rewrite");
-        let sdk_text = std::fs::read_to_string(&sdk).unwrap();
-        assert!(
-            !sdk_text.contains("auto-test-case"),
-            "SDK 测试协议 dep 剥除"
-        );
-        assert!(sdk_text.contains("test-cases = []"), "feature 名保留");
-        delivery_apply_projection(&sdk, &PROJECTION_AUTO_LANG_CORE).unwrap();
-        assert_eq!(std::fs::read_to_string(&sdk).unwrap(), sdk_text, "SDK 幂等");
-        assert!(delivery_apply_projection(&drift, &PROJECTION_AUTO_LANG_CORE).is_err());
-    }
+    /// PLAN-792：投影修剪——恒等/幂等合同。PLAN-901（Design 52 计划B）：语言仓
+/// 测试 feature 拍平后 AUTO_LANG/CORE spec 收敛为恒等投影——新形态
+/// （常驻 auto-test-case 依赖、无 test-cases feature 行）零编辑、原文
+/// 保真、幂等；runtime 臂（autodown-core 剥除/改写）保持 PLAN-815 T-05
+/// 原语义：剥除+改写+幂等+漂移判红。
+#[test]
+fn delivery_projection_strip_and_idempotent() {
+    let dir = tempfile::tempdir().unwrap();
+    let m = dir.path().join("Cargo.toml");
+    // PLAN-901 新 producer 形态：TestCase 常驻依赖在清单，无测试 feature。
+    let original = "[features]
+             mem-profile = [\"auto-lang-core/mem-profile\"]
 
-    /// An installed Full SDK has already stripped the optional dependency but
-    /// still forwards to the installed SDK feature. Its producer shape is not
-    /// the same as a corrupt or ambiguously duplicated feature declaration.
-    #[test]
-    fn plan842_installed_projection_accepts_only_exact_supported_states() {
-        let dir = tempfile::tempdir().unwrap();
-        let manifest = dir.path().join("Cargo.toml");
-        let installed = "[features]\ntest-cases = [\"auto-lang-core/test-cases\"]\n\n[dependencies]\nauto-val = { path = \"../auto-val\" }\n";
-        std::fs::write(&manifest, installed).unwrap();
-        let edits = delivery_apply_projection(&manifest, &PROJECTION_AUTO_LANG).unwrap();
-        assert_eq!(edits.len(), 1);
-        let actual = std::fs::read_to_string(&manifest).unwrap();
-        assert!(actual.contains("test-cases = []"));
-        assert!(actual.contains("auto-val = { path = \"../auto-val\" }"));
-        assert!(!actual.contains("auto-lang-core/test-cases"));
-        assert!(delivery_apply_projection(&manifest, &PROJECTION_AUTO_LANG)
+             [dependencies]
+             auto-test-case = { path = \"../auto-test-case\" }
+             auto-val = { path = \"../auto-val\" }
+";
+    std::fs::write(&m, original).unwrap();
+    let edits = delivery_apply_projection(&m, &PROJECTION_AUTO_LANG).unwrap();
+    assert!(edits.is_empty(), "恒等投影零编辑（PLAN-901）: {edits:?}");
+    let text = std::fs::read_to_string(&m).unwrap();
+    assert_eq!(text, original, "原文逐字节保真");
+    assert!(
+        text.contains("auto-test-case = { path = \"../auto-test-case\" }"),
+        "常驻 TestCase 依赖随包保留"
+    );
+    assert!(!text.contains("test-cases"), "无测试 feature 面");
+    delivery_apply_projection(&m, &PROJECTION_AUTO_LANG).unwrap();
+    assert_eq!(std::fs::read_to_string(&m).unwrap(), original, "幂等");
+    // Core spec：同恒等语义。
+    let core = dir.path().join("core.toml");
+    let core_input = "[dependencies]
+auto-test-case = { path = \"../auto-test-case\" }
+";
+    std::fs::write(&core, core_input).unwrap();
+    assert!(
+        delivery_apply_projection(&core, &PROJECTION_AUTO_LANG_CORE)
             .unwrap()
-            .is_empty());
-        assert_eq!(std::fs::read_to_string(&manifest).unwrap(), actual);
-        for bad in [
-            "[features]\ntest-cases = [\"auto-lang-core/test-cases\"]\ntest-cases = []\n[dependencies]\n",
-            "[features]\ntest-cases = [\"auto-lang-core/test-cases\"]\n[dependencies]\nauto-test-case = { path = \"../auto-test-case\", optional = true }\n",
-            "[features]\ntest-cases = [\"auto-lang-core/test-cases\"]\n[dependencies]\nauto-test-case = { version = \"9\" }\n",
-            "[features]\ntest-cases = [\"unexpected\"]\n[dependencies]\n",
-            "[dependencies]\nauto-val = { path = \"../auto-val\" }\n",
-        ] {
-            std::fs::write(&manifest, bad).unwrap();
-            assert!(delivery_apply_projection(&manifest, &PROJECTION_AUTO_LANG).is_err(), "unexpectedly accepted {bad}");
-            assert_eq!(std::fs::read_to_string(&manifest).unwrap(), bad, "failed projection must not rewrite input");
-        }
+            .is_empty()
+    );
+    assert_eq!(std::fs::read_to_string(&core).unwrap(), core_input, "Core 恒等幂等");
+    // PLAN-815 T-05: runtime spec — cross-repo autodown-core strip + feature
+    // rewrite (the shape moved over from auto-lang by 814-T-04), idempotent,
+    // drift-red, each holding on its own.
+    let rt = dir.path().join("runtime.toml");
+    std::fs::write(
+        &rt,
+        "[features]
+autodown = [\"ui-iced\", \"dep:autodown-core\"]
+
+[dependencies]
+# comment
+autodown-core = { path = \"../../../auto-down/autodown/packages/engine/rust\", optional = true }
+",
+    )
+    .unwrap();
+    let rt_edits = delivery_apply_projection(&rt, &PROJECTION_AUTO_UI_RUNTIME).unwrap();
+    assert_eq!(rt_edits.len(), 2, "1 strip + 1 rewrite");
+    let rt_text = std::fs::read_to_string(&rt).unwrap();
+    assert!(
+        !rt_text.contains("autodown-core"),
+        "cross-repo optional dep stripped"
+    );
+    assert!(
+        rt_text.contains("autodown = [\"ui-iced\"]"),
+        "feature name kept"
+    );
+    let rt_stripped = std::fs::read_to_string(&rt).unwrap();
+    delivery_apply_projection(&rt, &PROJECTION_AUTO_UI_RUNTIME).unwrap();
+    assert_eq!(std::fs::read_to_string(&rt).unwrap(), rt_stripped);
+    let rt_drift = dir.path().join("runtime-drift.toml");
+    std::fs::write(
+        &rt_drift,
+        "[dependencies]
+auto-val = { path = \"../auto-val\" }
+",
+    )
+    .unwrap();
+    assert!(delivery_apply_projection(&rt_drift, &PROJECTION_AUTO_UI_RUNTIME).is_err());
+}
+
+    /// PLAN-901：恒等投影合同（原 plan842 installed 状态机退役）。语言仓
+/// 测试 feature 拍平后 AUTO_LANG/CORE spec 无 strip/rewrite 面：
+/// · 新 producer 形态与任意结构清单 → 恒等（零编辑、零改写）；
+/// · 旧 installed 中间形态的 test-cases 转发行不再被改写——重交付以
+///   producer 新清单整树覆盖（receipt verify_tree 钉树身份），受管
+///   消费根 fresh metadata 不再出现旧转发行；
+/// · 无关 metadata 键不受投影影响（保 PLAN-842 免疫语义）。
+#[test]
+fn plan842_installed_projection_accepts_only_exact_supported_states() {
+    let dir = tempfile::tempdir().unwrap();
+    let manifest = dir.path().join("Cargo.toml");
+    // 新 producer 形态：恒等。
+    let fresh = "[features]
+mem-profile = []
+
+[dependencies]
+auto-test-case = { path = \"../auto-test-case\" }
+";
+    std::fs::write(&manifest, fresh).unwrap();
+    assert!(delivery_apply_projection(&manifest, &PROJECTION_AUTO_LANG)
+        .unwrap()
+        .is_empty());
+    assert_eq!(std::fs::read_to_string(&manifest).unwrap(), fresh);
+    // 旧 installed 中间形态：恒等保留原文（不再改写；整树重覆盖负责收敛）。
+    let installed = "[features]
+test-cases = [\"auto-lang-core/test-cases\"]
+
+[dependencies]
+auto-val = { path = \"../auto-val\" }
+";
+    std::fs::write(&manifest, installed).unwrap();
+    assert!(delivery_apply_projection(&manifest, &PROJECTION_AUTO_LANG)
+        .unwrap()
+        .is_empty());
+    assert_eq!(std::fs::read_to_string(&manifest).unwrap(), installed);
+    // 任意其他结构：恒等，不判红、不改写（漂移防护移交 receipt verify_tree）。
+    for other in [
+        "[dependencies]
+auto-val = { path = \"../auto-val\" }
+",
+        "[features]
+mem-profile = []
+",
+    ] {
+        std::fs::write(&manifest, other).unwrap();
+        assert!(delivery_apply_projection(&manifest, &PROJECTION_AUTO_LANG).is_ok());
+        assert_eq!(std::fs::read_to_string(&manifest).unwrap(), other);
     }
+    // 非法 TOML（重复键等）仍判红——恒等投影不豁免解析失败。
+    std::fs::write(
+        &manifest,
+        "[features]
+test-cases = [\"auto-lang-core/test-cases\"]
+test-cases = []
+[dependencies]
+",
+    )
+    .unwrap();
+    assert!(delivery_apply_projection(&manifest, &PROJECTION_AUTO_LANG).is_err());
+}
+
+/// PLAN-901：常驻 TestCase 交付闭包钉——auto-test-case 入 DELIVERY_CRATES、
+/// 其 vendored parser 树经 DELIVERY_VENDOR_TREES 随包、语言仓新清单无
+/// test-cases feature 面。独立于 delivery_crates_path_closure_is_complete
+/// 的既存 auto-web 跨仓缺口（PLAN-890 谱系，另案跟踪）。
+#[test]
+fn plan901_delivery_closure_pins_resident_test_case() {
+    let root = test_producer_root();
+    // 1) 常驻成员在列。
+    assert!(DELIVERY_CRATES.contains(&"auto-test-case"));
+    // 2) producer 新清单：auto-test-case 为非 optional 依赖、无测试 feature。
+    for manifest in [
+        root.join("crates/auto-lang/Cargo.toml"),
+        root.join("crates/auto-lang-core/Cargo.toml"),
+    ] {
+        let text = std::fs::read_to_string(&manifest).unwrap();
+        assert!(
+            !text.lines().any(|l| l.starts_with("test-cases = ")),
+            "{} 无 test-cases feature 行",
+            manifest.display()
+        );
+        assert!(
+            text.contains("auto-test-case = { path = \"../auto-test-case\" }"),
+            "{} 常驻 auto-test-case 依赖（非 optional）",
+            manifest.display()
+        );
+    }
+    // 3) vendor 树源在场且登记，依赖路径在交付根自然解析。
+    let atc = std::fs::read_to_string(root.join("crates/auto-test-case/Cargo.toml")).unwrap();
+    assert!(atc.contains("autodown-test-parser"));
+    for (src_rel, dst_rel) in DELIVERY_VENDOR_TREES {
+        assert!(root.join(src_rel).join("Cargo.toml").is_file(), "vendor 源缺失 {src_rel}");
+        assert_eq!(src_rel, dst_rel, "同形镜像（零 path 改写前提）");
+    }
+    // 交付根解析模拟：crates/auto-test-case + ../../vendor/<tree> 均在场。
+    assert!(root.join("vendor/autodown-test-parser/src/lib.rs").is_file());
+}
 
     #[test]
     fn plan842_projection_ignores_unrelated_metadata_keys() {
@@ -8182,7 +8285,9 @@ pub fn list_items() []str {
         std::fs::write(&manifest, input).unwrap();
         delivery_apply_projection(&manifest, &PROJECTION_AUTO_LANG)
             .expect("unrelated metadata must not affect projection");
+        // PLAN-901：spec 无 feature 改写面——恒等投影，features 表原样保留。
         let output = std::fs::read_to_string(&manifest).unwrap();
+        assert_eq!(output, input, "恒等投影原文保真");
         let parsed: toml::Value = toml::from_str(&output).unwrap();
         assert_eq!(
             parsed["package"]["metadata"]["auto-test-case"].as_str(),
@@ -8192,10 +8297,10 @@ pub fn list_items() []str {
             parsed["package"]["metadata"]["test-cases"][0].as_str(),
             Some("unrelated")
         );
-        assert!(parsed["features"]["test-cases"]
-            .as_array()
-            .unwrap()
-            .is_empty());
+        assert_eq!(
+            parsed["features"]["test-cases"][0].as_str(),
+            Some("auto-lang-core/test-cases")
+        );
     }
 
     #[test]
@@ -8384,15 +8489,29 @@ pub fn list_items() []str {
             !vendored.lines().any(|l| l.contains("autodown-core = ")),
             "跨仓 optional dep 边剥除"
         );
+        // PLAN-901：TestCase 常驻依赖随包（不再剥除），测试 feature 行消失。
         assert!(
-            !vendored.lines().any(|l| l.contains("auto-test-case = ")),
-            "测试协议 dep 边剥除"
+            vendored
+                .lines()
+                .any(|l| l.contains("auto-test-case = { path = \"../auto-test-case\" }")),
+            "常驻 TestCase 依赖随包保留"
+        );
+        assert!(
+            !vendored.lines().any(|l| l.starts_with("test-cases = ")),
+            "测试 feature 行已随拍平消失"
+        );
+        // 常驻闭包新成员：crate 与 vendor 树实际拷入交付根。
+        assert!(delivery.join("crates/auto-test-case/Cargo.toml").is_file());
+        assert!(
+            delivery
+                .join("vendor/autodown-test-parser/Cargo.toml")
+                .is_file(),
+            "vendored parser 树随包（PLAN-901）"
         );
         assert!(
             !vendored.contains("../../../auto-down"),
             "跨仓 path 引用零残留（重定位安全）"
         );
-        assert!(vendored.contains("test-cases = []"));
         // 应用清单：自包含 path 依赖 + pin 块；无 workspace 继承
         let app_manifest = std::fs::read_to_string(delivery.join("app/Cargo.toml")).unwrap();
         assert!(!app_manifest.contains("auto-lang = { path = \"../crates/auto-lang\" }"));
