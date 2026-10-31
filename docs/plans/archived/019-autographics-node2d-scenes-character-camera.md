@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-019
-status: drafting
+status: archived
 feature_name: AutoGraphics Node2D场景层级与走跳相机
 author: [Codex]
 created_at: 2026-10-31
 updated_at: 2026-10-31
 plan_revision: 1
-current_step: 0
+current_step: 6
 total_steps: 10
 depends_on: [auto-ui/PLAN-017]
 supersedes_spec_components: []
@@ -21,7 +21,7 @@ affects: [auto-ui-dialect, auto-ui-compiler, autographics-node2d-pilot, autograp
 
 把已交付017的有限角色/触发作者入口扩展到首批普通二维项目：G01图元、G03二维层级、G06两角色布局、G08二维跟随相机所需能力。支持零角色纯场景、视觉叶子/group与组件组合、单角色跳跃/支撑、可选相机；普通use、node/model/view-2d/on、Life.Start/Tick、匿名msg/具名引用继续复用。
 
-内容迁移归[ag-examples/008](../../../ag-examples/docs/plans/008-autographics-gallery-node2d-first-wave.md)，硬等本计划实际交付。总体剩余20入口的波次见[迁移设计](../design/autographics/gallery-node-authoring-migration.md)。本轮仅规划drafting0/10，不实施、不建树/agent。
+内容迁移归[ag-examples/008](../../../../ag-examples/docs/plans/008-autographics-gallery-node2d-first-wave.md)，硬等本计划实际交付。总体剩余20入口的波次见[迁移设计](../../design/autographics/gallery-node-authoring-migration.md)。本轮仅规划drafting0/10，不实施、不建树/agent。
 
 ## 1. 目标
 
@@ -50,7 +50,7 @@ affects: [auto-ui-dialect, auto-ui-compiler, autographics-node2d-pilot, autograp
 
 本仓观察HEAD4e9acd52596c69f380447ef0608ef256439802e4，017实际delivery9a8a5be60b19d9a385f87fbf1828857389013c9d已入主线；内容仓dbb4b75（007交付939f20c），12项21入口仅g11/2d已迁新。当前018由UI构建配置路线先取号，本计划独占重核最大018/.next-id019后分配019，下一号020，不覆盖018；AG008独立编号。其他owner未提交文档保留。
 
-权威：[017实际Spec](../specs/auto-graphics/node2d-g11-authoring.md)、[语言仓AG overview](../../../auto-lang/docs/specs/auto-graphics/overview.md)、scene-hierarchy/game-actions-and-character2d/runtime-game-cameras/gallery-basic-six；本仓[作者目标](../design/autographics/declarative-authoring-model.md)及新迁移设计。历史Specs含过时仓归属段，不据其标题宣称旧单文件限制为最终要求，也不擅改已有数学/验收。
+权威：[017实际Spec](../../specs/auto-graphics/node2d-g11-authoring.md)、[语言仓AG overview](../../../../auto-lang/docs/specs/auto-graphics/overview.md)、scene-hierarchy/game-actions-and-character2d/runtime-game-cameras/gallery-basic-six；本仓[作者目标](../../design/autographics/declarative-authoring-model.md)及新迁移设计。历史Specs含过时仓归属段，不据其标题宣称旧单文件限制为最终要求，也不擅改已有数学/验收。
 
 raw SHA256：017 Spec a8b5b72403653521965c1b5024c826473699d178ed374c1d1b7bf3c17b06d958；lower_g11.rs 4f5106865d3b601a2e8d1d7b9e1fa3379dbb1ce9d9ce7d7c3864aa38b2f62ad4；load.rs 4837d29c0cfe863dc9db307b1ff160d05b84bc0213fe4c3278166d267405d3d9；node2d/ast.rs 5cf76769fa1ff4f4433191e522021f0854c3e4462d72be6a8d94004768a2a42a；parse.rs 9681e2be0eed5bdd20e9974fa01958462f9f32dd90fea82612e8c8c11aab561f。当前017要求恰一character、根solid/camera和程序化资源，角色移动服务未向作者暴露grounded/Jump完整语义，因此不能直接批量改Gallery。
 
@@ -140,12 +140,12 @@ G06原speed4/fast5、jump8、gravity20、dt1/60，台阶/坑道几何不改；�
 
 | ID | owner_stage | 依赖 | 操作/产物与验证 | AC | 状态 |
 |---|---|---|---|---|---|
-| T-01 | work | 后续用户启动，017实际交付 | 核当前Spec/源/SDK/依赖与018/901/014 owner，建唯一ui-019树；冻结五入口全部原变体/断言与数据 | AC-01 | [ ] |
-| T-02 | work | T-01 | 最多两接法三条完整链先证与成本/消费身份闭合，Plan§9冻结CLI/IR/typed服务/V-S精确集；不成立回规划 | AC-01..06 | [ ] |
-| T-03 | work | T-02 go | 纯视觉/层级/0角色模式、结构化lowering/引用诊断/多实例，V-01 | AC-02 | [ ] |
-| T-04 | work | T-03 | Auto走跳/grounded/输入、可选camera主alt、同tickGPU，V-02/03 | AC-03 | [ ] |
-| T-05 | work | T-04 | 生命周期/20轮owner/原额负控/旧兼容及真实消费者，记录backlog对照与性能边界，V-04/05 | AC-04/05 | [ ] |
-| T-06 | work | T-05 | source-build实际身份/公共消费/冷A→B/坏件恢复、必要格式/警告/SD候选与移交折入Plan，V-06 | AC-01..06 | [ ] |
+| T-01 | work | 后续用户启动，017实际交付 | 核当前Spec/源/SDK/依赖与018/901/014 owner，建唯一ui-019树；冻结五入口全部原变体/断言与数据 | AC-01 | [x] 2026-10-31：017 Spec a8b5b724/lower_g11 4f510686/load 4837d29c/ast 5cf76769/parse 9681e2be 与§4五hash逐一相符（主检出d85edbb）；018 drafting0/8、014 drafting0/11、语言901 executing（其auto-ui树lang-901有WIP crates/auto-ui-tools/src/rust_ui.rs，不接管）；SDK .sdk-source=681文件。ui-019组4树建成：auto-ui@d85edbb分支codex/plan-019-dev + 只读依赖auto-lang@98270a4f5/auto-web@f29c7d1/auto-down@c3464d0（detached）。五入口基线自ag-examples dbb4b75冻结至D:/autostack/plan-artifacts/plan-019/auto-ui/baseline/（21文件含4场景5变体2脚本对，G01 ff20607c/G03 b5ba7d62/G06main c2155ae3/G08main cf08e7d7与008§4指纹相符；layout-b与layout-a共用同一main.at c2155ae3，差异全在scene；verify_examples.py 00b29818相符）；B01×12/B03×6/B06×10义务源=verify_examples.py实读，B08×8义务源=008§5.3表+runtime_camera_host.rs/verify_plan875.py | AC-01 |
+| T-02 | work | T-01 | 最多两接法三条完整链先证与成本/消费身份闭合，Plan§9冻结CLI/IR/typed服务/V-S精确集；不成立回规划 | AC-01..06 | [x] 2026-10-31：两既有端口接法=（1）scene-embedded project play（character/1、runtime_camera2d/1、behavior=null三形态同路径）+（2）纯场景scene play（probe源，无VM）。三链全真机通过（commit bbfee0e）：G01五入口GPU像素类+变体敏感性、G03 derive world (35,5)/(55,5)+祖先AND、G06走/落地/跳沿/apex/无双跳/坑道对照/speed4→5、G08 clamp/letterbox115px/同tick/alt506.67×380、成本恰30（第33计费调用fault 10）、相机app_start零额外计费。CLI=node2d-lower --profile scene-2d|character-2d|camera-2d --entry --out（scene.agscene+identity.json+closure/，脚本profile另有world.at）；IR=既有共享translate（Root标量r_<field>）；typed服务拼写=input.axis(Left,Right)/input.pressed(Jump|Enter)/refs.<char>.move_and_slide((dx,dy))/refs.<char>.grounded(q)/refs.<char>.support(q)；消费身份=场景behavior.source绑world sha/bytes+closure/逐模块sha+roles具名映射 |
+| T-03 | work | T-02 go | 纯视觉/层级/0角色模式、结构化lowering/引用诊断/多实例，V-01 | AC-02 | [x] 2026-10-31：dialect+shape2d/group2d（混合块文法、circle/quad作用域符号）；lower_basic2d.rs组件参数含float/int/Material2D/Mesh2D四类typed端口；scene-2d拒绝character/solid/camera/trigger/model/msg/on/if，同view重名拒绝，circle非等尺寸拒绝，未知prop/资源定位拒绝；组件多实例+参数敏感性+改名不改几何（gates 9例全绿，bbfee0e+9096bd8） |
+| T-04 | work | T-03 | Auto走跳/grounded/输入、可选camera主alt、同tickGPU，V-02/03 | AC-03 | [x] 2026-10-31：driver node2d_basic_flow 13例全绿（9096bd8）：walk/land逐tick f32独立oracle（rest=face+半宽+clearance 0.002）、jump沿/apex离散界/空中沿弃用不缓冲、layout-b坑道真掉落vs layout-a台阶阻挡、fast位移差恰30·dt、G08主/alt投影+letterbox+同tick发布+Pause/Step/Stop、G01五变体GPU类、G03世界和/显隐/文档不变 |
+| T-05 | work | T-04 | 生命周期/20轮owner/原额负控/旧兼容及真实消费者，记录backlog对照与性能边界，V-04/05 | AC-04/05 | [x] 2026-10-31：20轮Run/Stop全fresh起点+第21轮正常（owners逐轮释放）；成本恰30负控（31/32过、33=fault 10）；旧链回归全绿：driver node2d_flow 6/6+node2d_g11_flow 15/15、verify_plan016 OK controls（016字节冻结保持）、verify_plan017 PASS、dialect/compiler node2d_pilot 6+6；backlog观察=旧017根因项（D-04），本plan生成源为同型triggers/character调用且未触及pump路径，无新写面回归证据；性能边界=离屏GPU用例内实测（13例17s内完成），桌面持续流畅不在本轮口径 |
+| T-06 | work | T-05 | source-build实际身份/公共消费/冷A→B/坏件恢复、必要格式/警告/SD候选与移交折入Plan，V-06 | AC-01..06 | [x] 2026-10-31：verify_plan019 --controls 19组PASS=13产品再生字节等价+身份绑定（场景sha/closure逐模块sha/fixture零漂移）+变异敏感性+character-2d拒相机诊断+cold A→B四组（B仅持closure/再生字节等价、篡改模块被manifest sha捕获、精确还原同入口复用）；--build-record/--verify-record绑定实际generator二进制sha（2c6041c415f1）+Cargo锁+rustc+13产品hash，漂移record负控拒绝；driver侧scene.source绑定篡改拒绝；cargo fmt全触面+全部gate复绿（9096bd8）；SD-01/SD-02候选定稿见规范增量表（与本§9冻结一致） |
 | T-07 | review | T-06 | 同树独立final逐AC/V/S/SD及旧断言审查，finding回work，pass列merge门pending | AC-07 | [ ] |
 | T-08 | merge | T-07 pass | 冻结源/依赖/输入、定向并集或严格有效复用后合master | AC-08 | [ ] |
 | T-09 | merge | T-08 | 两Spec/来源/归档/导航，折叠证据至Plan，不写派生JSON或外仓Spec | AC-08/09 | [ ] |
@@ -156,6 +156,35 @@ G06原speed4/fast5、jump8、gravity20、dt1/60，台阶/坑道几何不改；�
 2026-10-31 / stage: new / plan_id: auto-ui/PLAN-019 / plan_revision: 1 / outcome: pass（首波合同待审，T-02为后续实施内有界门） / next: 后续用户启动后T-01/T-02。首次尝试分配018时独占重核发现另一owner已取号，未创建冲突Plan；重核后分配019/下一020。仅设计/计划/导航/号源；无实现树、代码/资产、构建/GPU或agent。所有新命令/样本均未执行，不把历史回执和试玩当新能力证明。
 
 2026-10-31文档预检：0..10节、10任务/9AC/6组V-S/2SD、全部本地Markdown链接、跨仓依赖和owner/终审/合入分工、取号唯一与drafting0/10通过。总设计逐项覆盖当前21入口（1已迁+20待迁；HUD另列），首波检查义务12+6+10+8=36，计数与源工具控制流/回执交叉核；新profile和消费机制仍属T-02待实证假设，不写成通过结果。仅文档验证，不是实现或独立final review。
+
+stage: goal | plan_id: auto-ui/PLAN-019 | plan_revision: r1 | round: 1 | from: drafting | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-019/auto-ui | commit: d85edbb（树基，尚无代码提交） | next: work
+
+2026-10-31 / stage: work / plan_id: auto-ui/PLAN-019 / plan_revision: r1 / outcome: pass(T-01) / worktree: D:/autostack/.wt/ui-019/auto-ui / branch: codex/plan-019-dev / base_commit: d85edbb0988f1cb91e3ec6a7e21ba4d872bdfb02 / code_commit: 无（T-01为核验/建树/冻结，无代码改动） / dependency_revisions: auto-lang 98270a4f5、auto-web f29c7d1、auto-down c3464d0（均detached只读）、SDK .sdk-source 681文件 / task_ids: T-01 / evidence: D:/autostack/plan-artifacts/plan-019/auto-ui/baseline/（21文件+tools_verify_examples.py，hash见T-01行）；owner核=018 drafting0/8、014 drafting0/11、901 executing(lang-901树WIP rust_ui.rs不接管)；主检出仅docs/**簿记改动无代码WIP / blockers: 无 / next_responsible_role: work（T-02三链先证）。授权沿/goal整链授权（work/review/有界修复/merge）。
+
+2026-10-31 / stage: work / plan_id: auto-ui/PLAN-019 / plan_revision: r1 / outcome: pass(T-02..T-06 全work任务完成，execution_ready) / worktree: D:/autostack/.wt/ui-019/auto-ui / branch: codex/plan-019-dev / base_commit: d85edbb / code_commit: bbfee0e64194856aaa06a39cd09ec76f4f805b19 + 9096bd82425025821f4e8cbb6c3cbdde474a47bf / dependency_revisions: auto-lang 98270a4f5/auto-web f29c7d1/auto-down c3464d0只读、SDK .sdk-source 681（prepare_sdk --from-snapshot PASS）/ task_ids: T-02,T-03,T-04,T-05,T-06 / evidence: 见§8各任务行；测试计数=pilot gates 9+g11 gates 10+legacy 9、dialect 6、compiler 6、driver node2d_basic_flow 13（单线程，含真GPU）、driver node2d_flow 6+node2d_g11_flow 15（旧链回归）、verify_plan016 OK、verify_plan017 PASS、verify_plan019 --controls 19组、build-record roundtrip+漂移负控。
+
+T-02冻结合同（后续波次按此消费，修改须回本Plan）：
+- CLI：node2d-lower --profile legacy|g11-2d|scene-2d|character-2d|camera-2d --entry <dir>/main.at --out <dir>。输出：scene.agscene（schema/6，scene-2d behavior=null，character/camera分别绑autographics.character/1与autographics.runtime_camera2d/1及world sha/bytes）+identity.json（generator/api/module shas/closure清单/roles具名映射）+closure/<module>.at；脚本profile另有world.at。
+- 作者面：shape2d name{kind:circle|quad, position:(x,y), size:(w,h), material:resources.<color>, visible:bool?}（circle要求size.x==size.y）；group2d name{position?, visible?}{混合块children}（仅scene-2d）；character2d name{position, material}（恰一，盒0.8×1.0，root view或组件view）；solid2d name{position, mesh, material}（仅脚本profile root view，声明序绑定）；camera2d name{target:refs.<char>.actor, bounds:(min_x,min_y,max_x,max_y), view_size:(w,h)}（camera-2d恰一，root view）；组件节点=参数(float/int/Material2D/Mesh2D)+纯view；scene-2d拒绝model/msg/on/if/角色/solid/相机/trigger。
+- 服务拼写（共享translate映射）：input.axis(Left,Right)→(ag_action_held(1)-ag_action_held(0))（held计费2）；input.pressed(Jump)→ag_action_pressed(2)/Enter→3（计费1）；refs.<char>.move_and_slide((dx,dy))→ag_char_move(dx,dy,0.002)（26）；refs.<char>.grounded(q)→ag_char_grounded(q)/support→ag_char_support(q)（各1）。生成源根model为r_<field>标量；作者fn原文pooling（纯函数，不含服务调用）；Life.Start并人app_start（生成绑定先于作者体）、Life.Tick即app_update体。G06型完整tick成本=1+2+26+1=30（实测恰30，第33计费调用fault 10）；相机配置仅在app_start（零tick成本）；纯场景无VM。
+- 场景序：id 1起对象/组共享命名空间、声明序深度优先、对象数组=2D绘制序、渲染端alpha升序/等alpha原数组序/不透明先绘为既有渲染器行为（G01链实测保持）；group仅同维平移+可见性继承（derive逐层f32求和+祖先AND）。
+- 消费身份（SD-02 engine侧机制）：场景behavior.source绑生成源sha/bytes；closure/为输入闭包唯一消费物（B仅持closure再生字节等价，实测四组）；篡改由manifest sha捕获、精确还原即恢复；--build-record绑定实际generator二进制sha+Cargo锁+rustc+13产品hash，漂移拒绝。旧exact-binary锁不弱化，新模式不构成fallback。
+
+边界与移交：GPU像素类oracle为类级（相对通道规则+计数/差分），默认2D呈现约1px/unit未作逐像素位置断言（G03位置oracle=derive CPU准入、G08=host clamp/letterbox精确数学）；生成源块注记、identity/场景JSON形状为冻结面（再生等价控制）。未执行OS抢焦点路由（原边界保持）；试玩backlog=D-04既有债务不因本轮关闭。next_responsible_role: review（T-07同树独立final）。
+
+stage: goal | plan_id: auto-ui/PLAN-019 | plan_revision: r1 | round: 2 | from: work | to: review | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-019/auto-ui | commit: 9096bd82425025821f4e8cbb6c3cbdde474a47bf（bbfee0e+9096bd8两提交） | next: review
+
+stage: review | review_scope: final | reviewer_identity: 独立子代理上下文（同树 afb4ef5 前为 9096bd8；限制=同宿主会话派生的fresh上下文，非人工） | plan_id: auto-ui/PLAN-019 | plan_revision: r1 | outcome: needs_fix | worktree: D:/autostack/.wt/ui-019/auto-ui | branch: codex/plan-019-dev | reviewed_commit: 9096bd8 | base_commit: d85edbb | dependency_revisions: auto-lang 98270a4f5/auto-web f29c7d1/auto-down c3464d0只读均clean、SDK 681 | spec_inputs: SD-01/SD-02 delta文本（目标spec尚未发布，merge所有） | acceptance_results: AC-01..06 pass（独立复核：基线指纹重算、104点基线对比100/104、全部门禁亲自重跑全绿：pilot 9+10+9、driver 13、controls 19组、016 OK、017 PASS、dialect/compiler 6+6、driver旧链6/6+15/15）；AC-07=本轮；AC-08/09 merge pending未声称 | pending_closeout_gates: merge冻结定向门、Spec沉淀、归档/清理 | findings: F-R1-01(P1,v-position语义偏离原B01-11规则：原为蓝移(40,0)消除重叠而非红覆盖蓝)、F-R1-02(P2,v-color重着色值(0.1,0.9,0.2,0.6)≠原(0.1,0.8,0.2,0.5))、F-R1-03(P2,128上限将组重复计数)、F-R1-04(P2,walk oracle未读initial绑定告警)、F-R1-05(P2,--verify-record未核Cargo锁) | evidence: D:/autostack/plan-artifacts/plan-019/auto-ui/review-probe/（cmp_baseline.py等） | next: work修复F-R1-01..05
+
+stage: goal | plan_id: auto-ui/PLAN-019 | plan_revision: r1 | round: 3 | from: review | to: work | status: executing | outcome: needs_fix | worktree: D:/autostack/.wt/ui-019/auto-ui | commit: 9096bd8 | next: work
+
+2026-11-01 / stage: work / plan_id: auto-ui/PLAN-019 / plan_revision: r1 / outcome: pass(R1修复) / worktree: D:/autostack/.wt/ui-019/auto-ui / branch: codex/plan-019-dev / base_commit: d85edbb / code_commit: afb4ef5318846095ce74a1af197df352e726ec37（R1修复，含暂存目录勘误amend） / dependency_revisions: 不变 / task_ids: T-03,T-04（受影响面） / evidence: F-R1-01 v-position蓝移(40,0)按原B01-11规则重做+driver改为原oracle断言（blue保持容差内+red严格增加）；F-R1-02 deep_green=(0.1,0.8,0.2,0.5)原值；F-R1-03 节点上限改objects+groups单计；F-R1-04 未用绑定删除（告警消）；F-R1-05 --verify-record先核workspace_lock；全部五组g01产品再生（resources模块sha随资源值更新），g01-v-*误名目录已清理并amend。修复后门禁：pilot gates 9/9、driver node2d_basic_flow 13/13、verify_plan019 --controls 19组PASS、build-record roundtrip PASS（新generator sha 8fcf84d990b7绑定）、树clean@afb4ef5。受影响再复核已交原独立reviewer（范围=五finding+共享不变量），其余证据沿用。 / blockers: 无 / next_responsible_role: review（受影响再复核→final pass）
+
+stage: review | review_scope: final | reviewer_identity: 独立子代理上下文（同上轮限制） | plan_id: auto-ui/PLAN-019 | plan_revision: r1 | outcome: pass | worktree: D:/autostack/.wt/ui-019/auto-ui | branch: codex/plan-019-dev | reviewed_commit: afb4ef5318846095ce74a1af197df352e726ec37 | base_commit: d85edbb | dependency_revisions: 不变（只读三仓clean） | spec_inputs: SD-01/SD-02 delta（文本与实际行为一致、无越界声称；目标spec merge所有） | acceptance_results: AC-01..06 pass（沿用R1证据+受影响复核）、AC-07 pass（本审：触及集18文件与修复声明一致、101点基线对比0失败、节点上限公式=runtime公式、锁漂移负探针拒绝、五组g01 identity绑定新resources sha e0caad8d冻结==再生、受影响套件亲跑pilot 9+10+9/driver 13/controls 19/fmt clean零新告警）、AC-08/09 merge pending | pending_closeout_gates: merge冻结定向门/两Spec沉淀/归档导航/树清理与plan-artifacts删除 | findings: 无（F-R1-01..05全部关闭，无新问题） | evidence: D:/autostack/plan-artifacts/plan-019/auto-ui/review-probe/（复审探针） | next: merge
+
+stage: goal | plan_id: auto-ui/PLAN-019 | plan_revision: r1 | round: 4 | from: review | to: merge | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-019/auto-ui | commit: afb4ef5318846095ce74a1af197df352e726ec37 | next: merge
+
+2026-11-01 / stage: merge / plan_id: auto-ui/PLAN-019:r1 / outcome: pass(进行中→archived 前各检查点如下) / worktree: D:/autostack/.wt/ui-019/auto-ui / branch: codex/plan-019-dev / prepared: reviewed基线afb4ef5+SD-01/SD-02两Spec于worktree提交e37d1ec（docs-only descendant，实现/依赖零变化）；wt-guard clean / landed: master前进（901三提交b565675/bde25c0/e1fe4ca，仅触crates/auto-ui-tools，不在本Plan依赖图）；rebase后旧→新映射 bbfee0e→f765213、9096bd8→d5f0bc0、afb4ef5→8209713、e37d1ec→c93adb7，git range-diff 4/4全等（安全重写证明）；主检出 git merge --ff-only codex/plan-019-dev → master tip=c93adb77c25ec2278eb4aaad41c6e4fe25549c22（无merge commit） / canonical_verified: docs/specs/auto-graphics/node2d-basic-authoring.md sha256 0dc10c476f8739fabaf0b7f1b5e88679a775752733d53608944961f3e90a8498、docs/specs/auto-graphics/node-authoring-consumption.md sha256 f6689bf162eb992830dfa3a43f16168f2d1ca6b7470128ebbb51579df75667e3，均在landed commit c93adb7；main smoke：cargo check -p auto-ui-dialect PASS（对当前auto-lang master解析） / next: archived→cleaned
 
 ## 10. 待澄清事项
 
