@@ -36,14 +36,19 @@ fn lower(
     lower_project_basic(&project, profile).map_err(|e| e.to_string())
 }
 
-fn scene2d_tag(tag: &str, files: &[(&str, &str)]) -> Result<autographics_node2d_pilot::LowerOutputBasic2D, String> {
+fn scene2d_tag(
+    tag: &str,
+    files: &[(&str, &str)],
+) -> Result<autographics_node2d_pilot::LowerOutputBasic2D, String> {
     let dir = path::Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("b2g-{tag}"));
     let _ = fs::remove_dir_all(&dir);
     write(&dir, files);
     lower(&dir, "main.at", BasicProfile::Scene2D)
 }
 
-fn scene2d(files: &[(&str, &str)]) -> Result<autographics_node2d_pilot::LowerOutputBasic2D, String> {
+fn scene2d(
+    files: &[(&str, &str)],
+) -> Result<autographics_node2d_pilot::LowerOutputBasic2D, String> {
     use std::sync::atomic::{AtomicU32, Ordering};
     static N: AtomicU32 = AtomicU32::new(0);
     let n = N.fetch_add(1, Ordering::SeqCst);
@@ -53,7 +58,8 @@ fn scene2d(files: &[(&str, &str)]) -> Result<autographics_node2d_pilot::LowerOut
 fn character2d(
     files: &[(&str, &str)],
 ) -> Result<autographics_node2d_pilot::LowerOutputBasic2D, String> {
-    let dir = path::Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("b2c-{}", std::process::id()) + &format!("-{}", files.as_ptr() as usize));
+    let dir = path::Path::new(env!("CARGO_TARGET_TMPDIR"))
+        .join(format!("b2c-{}", std::process::id()) + &format!("-{}", files.as_ptr() as usize));
     let _ = fs::remove_dir_all(&dir);
     write(&dir, files);
     lower(&dir, "main.at", BasicProfile::Character2D)
@@ -62,14 +68,19 @@ fn character2d(
 fn camera2d(
     files: &[(&str, &str)],
 ) -> Result<autographics_node2d_pilot::LowerOutputBasic2D, String> {
-    let dir = path::Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("b2k-{}", files.as_ptr() as usize));
+    let dir = path::Path::new(env!("CARGO_TARGET_TMPDIR"))
+        .join(format!("b2k-{}", files.as_ptr() as usize));
     let _ = fs::remove_dir_all(&dir);
     write(&dir, files);
     lower(&dir, "main.at", BasicProfile::Camera2D)
 }
 
 fn g01() -> Vec<(&'static str, &'static str)> {
-    vec![("main", G01_MAIN), ("resources", G01_RES), ("shapes", G01_SHAPES)]
+    vec![
+        ("main", G01_MAIN),
+        ("resources", G01_RES),
+        ("shapes", G01_SHAPES),
+    ]
 }
 
 // ------------------------------------------------------- 正面：基线与再生 --
@@ -107,7 +118,9 @@ fn regeneration_is_byte_identical_and_ids_follow_declaration() {
     assert_eq!(c.scene_json, d.scene_json, "g06 scene regeneration");
     assert_eq!(c.user_source, d.user_source, "g06 source regeneration");
     // 声明序 = 场景 id 序（角色宿主声明第一 → id 1，solids 2..5）。
-    assert!(c.scene_json.contains("\"id\": 1,\n   \"name\": \"body.body\""));
+    assert!(c
+        .scene_json
+        .contains("\"id\": 1,\n   \"name\": \"body.body\""));
     assert!(c.scene_json.contains("\"id\": 2,\n   \"name\": \"ground\""));
     assert!(c.scene_json.contains("\"id\": 5,\n   \"name\": \"block\""));
 }
@@ -116,7 +129,9 @@ fn regeneration_is_byte_identical_and_ids_follow_declaration() {
 fn g03_groups_carry_parent_chain_and_visibility() {
     let out = scene2d(&[("main", G03_MAIN), ("resources", G03_RES)]).expect("g03");
     // root(20,10) > child(10,-5)；deep quad(5,0) 挂 child，leaf(0,0) 挂 root。
-    assert!(out.scene_json.contains("\"id\": 1,\n   \"name\": \"root_2d\""));
+    assert!(out
+        .scene_json
+        .contains("\"id\": 1,\n   \"name\": \"root_2d\""));
     // group JSON：parent 在 translation 前。
     assert!(out
         .scene_json
@@ -136,7 +151,10 @@ fn g03_groups_carry_parent_chain_and_visibility() {
 
 #[test]
 fn component_param_change_moves_expanded_object() {
-    let mut moved = G01_MAIN.replace("x: 25.0\n            y: -15.0", "x: 11.0\n            y: 4.0");
+    let mut moved = G01_MAIN.replace(
+        "x: 25.0\n            y: -15.0",
+        "x: 11.0\n            y: 4.0",
+    );
     moved = moved.replace("diameter: 24.0", "diameter: 10.0");
     let out = scene2d(&[
         ("main", moved.as_str()),
@@ -145,7 +163,46 @@ fn component_param_change_moves_expanded_object() {
     ])
     .expect("moved instance");
     let row = extract_object(&out.scene_json, "green_disc.disc");
-    assert_eq!((row.tx, row.ty, row.sx), (11.0, 4.0, 10.0), "param sensitivity");
+    assert_eq!(
+        (row.tx, row.ty, row.sx),
+        (11.0, 4.0, 10.0),
+        "param sensitivity"
+    );
+}
+
+#[test]
+fn rename_changes_identity_not_geometry() {
+    let renamed = G01_MAIN.replace("shape2d blue_quad {", "shape2d azure_quad {");
+    let out = scene2d(&[
+        ("main", renamed.as_str()),
+        ("resources", G01_RES),
+        ("shapes", G01_SHAPES),
+    ])
+    .expect("renamed entry");
+    assert!(
+        out.scene_json.contains("\"name\": \"azure_quad\""),
+        "new name in scene"
+    );
+    assert!(
+        !out.scene_json.contains("\"name\": \"blue_quad\""),
+        "old name gone"
+    );
+    let base = scene2d(&g01()).expect("base");
+    // geometry/alpha rows identical apart from the name lines.
+    let strip = |s: &str| {
+        s.lines()
+            .filter(|l| !l.contains("\"name\""))
+            .collect::<Vec<_>>()
+            .join(
+                "
+",
+            )
+    };
+    assert_eq!(
+        strip(&base.scene_json),
+        strip(&out.scene_json),
+        "rename keeps geometry"
+    );
 }
 
 fn g06_files() -> Vec<(&'static str, &'static str)> {
@@ -248,11 +305,13 @@ fn camera2d_requires_exactly_one_camera_with_valid_target() {
         "        camera2d camera {\n            target: refs.body.actor\n            bounds: (0.0, -4.0, 30.0, 12.0)\n            view_size: (12.0, 8.0)\n        }\n",
         "",
     );
-    let files = || vec![
-        ("main", nocam.as_str()),
-        ("resources", G08_RES),
-        ("walkjump", G08_WALK),
-    ];
+    let files = || {
+        vec![
+            ("main", nocam.as_str()),
+            ("resources", G08_RES),
+            ("walkjump", G08_WALK),
+        ]
+    };
     let err = camera2d(&files()).err().expect("camera-2d needs a camera");
     assert!(err.contains("exactly one camera2d"), "{err}");
     // 错目标。
@@ -263,13 +322,20 @@ fn camera2d_requires_exactly_one_camera_with_valid_target() {
         ("walkjump", G08_WALK),
     ];
     let err = camera2d(&files2).err().expect("bad target rejected");
-    assert!(err.contains("must reference") || err.contains("unknown"), "{err}");
+    assert!(
+        err.contains("must reference") || err.contains("unknown"),
+        "{err}"
+    );
 }
 
 #[test]
 fn shape_gates_reject_bad_kind_size_prop_and_resource() {
     fn files(main: &str) -> Vec<(&str, &str)> {
-        vec![("main", main), ("resources", G01_RES), ("shapes", G01_SHAPES)]
+        vec![
+            ("main", main),
+            ("resources", G01_RES),
+            ("shapes", G01_SHAPES),
+        ]
     }
     // 坏 kind。
     let bad = G01_MAIN.replace("kind: quad", "kind: triangle");
@@ -277,15 +343,21 @@ fn shape_gates_reject_bad_kind_size_prop_and_resource() {
     assert!(err.contains("triangle") || err.contains("kind"), "{err}");
     // circle 非等边（直声明 circle 用不等 size）。
     let uneven = "use resources: red_alpha\n\nnode Main {\n    view-2d {\n        shape2d odd_circle {\n            kind: circle\n            position: (0.0, 0.0)\n            size: (30.0, 12.0)\n            material: resources.red_alpha\n        }\n    }\n}";
-    let err = scene2d(&[("main", uneven), ("resources", G01_RES)]).err().expect("uneven circle");
+    let err = scene2d(&[("main", uneven), ("resources", G01_RES)])
+        .err()
+        .expect("uneven circle");
     assert!(err.contains("size.x==size.y"), "{err}");
     // 未知属性。
     let unknown = G01_MAIN.replace("visible: false", "visible: false\n            glow: true");
-    let err = scene2d(&files(unknown.as_str())).err().expect("unknown prop");
+    let err = scene2d(&files(unknown.as_str()))
+        .err()
+        .expect("unknown prop");
     assert!(err.contains("glow"), "{err}");
     // 未知资源。
     let nores = G01_MAIN.replace("resources.blue_alpha", "resources.ghost_pink");
-    let err = scene2d(&files(nores.as_str())).err().expect("unknown resource");
+    let err = scene2d(&files(nores.as_str()))
+        .err()
+        .expect("unknown resource");
     assert!(err.contains("ghost_pink"), "{err}");
     // 重复元素名。
     let dup = G01_MAIN.replace("shape2d yellow_quad {", "shape2d blue_quad {");
@@ -315,7 +387,9 @@ struct Row {
 /// 极简场景对象行解析（生成 JSON 形状冻结；不引入 JSON 依赖）。
 fn extract_object(scene: &str, name: &str) -> Row {
     let marker = format!("\"name\": \"{name}\"");
-    let pos = scene.find(&marker).unwrap_or_else(|| panic!("{name} in scene"));
+    let pos = scene
+        .find(&marker)
+        .unwrap_or_else(|| panic!("{name} in scene"));
     let seg = &scene[pos..];
     let num_after = |key: &str| -> f64 {
         let ki = seg.find(key).expect(key);

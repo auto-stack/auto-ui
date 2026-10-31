@@ -160,10 +160,7 @@ fn literal_or_param(e: &Expr, params: &[(String, ParamVal)]) -> Result<f64, Lowe
 }
 
 /// 资源 symbol 参数解引用：`material: <param>` → `resources.<name>`。
-fn resource_ref_of_param(
-    e: &Expr,
-    params: &[(String, ParamVal)],
-) -> Option<String> {
+fn resource_ref_of_param(e: &Expr, params: &[(String, ParamVal)]) -> Option<String> {
     if let Expr::Ident(p) = e {
         if let Some((_, ParamVal::Res(r))) = params.iter().find(|(n, _)| n == p.as_str()) {
             return Some(r.clone());
@@ -211,7 +208,10 @@ pub(crate) fn prop_of<'a>(props: &'a [Prop], name: &str) -> Option<&'a Prop> {
     props.iter().find(|p| p.name == name)
 }
 
-pub(crate) fn resource_color(project: &Project, name: &str) -> Result<(f64, f64, f64, f64), LowerError> {
+pub(crate) fn resource_color(
+    project: &Project,
+    name: &str,
+) -> Result<(f64, f64, f64, f64), LowerError> {
     let module = project
         .modules
         .get("resources")
@@ -239,9 +239,9 @@ fn resource_mesh(project: &Project, name: &str) -> Result<(String, f64, f64), Lo
             return match r.kind {
                 ResourceKind::Quad(w, h) => Ok(("quad".into(), w, h)),
                 ResourceKind::Circle(d) => Ok(("circle".into(), d, d)),
-                ResourceKind::Color(..) => {
-                    Err(unsupported(format!("resource '{name}' is not a mesh2d geometry")))
-                }
+                ResourceKind::Color(..) => Err(unsupported(format!(
+                    "resource '{name}' is not a mesh2d geometry"
+                ))),
             };
         }
     }
@@ -365,9 +365,14 @@ fn expand_elements(
             View2dElement::Shape { name, props } => {
                 let id = *next_id;
                 *next_id += 1;
-                out.nodes.push(shape_node(project, name, props, params, parent, id)?);
+                out.nodes
+                    .push(shape_node(project, name, props, params, parent, id)?);
             }
-            View2dElement::Group { name, props, children } => {
+            View2dElement::Group {
+                name,
+                props,
+                children,
+            } => {
                 let id = *next_id;
                 *next_id += 1;
                 let mut tx = 0.0;
@@ -402,7 +407,15 @@ fn expand_elements(
                     is_character: false,
                     is_solid: false,
                 });
-                expand_elements(project, children, params, Some(id), out, next_id, allow_character)?;
+                expand_elements(
+                    project,
+                    children,
+                    params,
+                    Some(id),
+                    out,
+                    next_id,
+                    allow_character,
+                )?;
             }
             View2dElement::Instance { node, name, props } => {
                 let iparams = instance_params(project, node, props)?;
@@ -464,7 +477,8 @@ fn expand_elements(
                 }
                 let id = *next_id;
                 *next_id += 1;
-                out.nodes.push(character_node(project, name, props, params, parent, id)?);
+                out.nodes
+                    .push(character_node(project, name, props, params, parent, id)?);
                 out.char_name = Some(name.clone());
             }
             View2dElement::Camera { name, .. } => {
@@ -536,8 +550,7 @@ fn shape_node(
             "shape2d circle requires size.x==size.y (diameter), got ({sx},{sy})"
         )));
     }
-    let m = material
-        .ok_or_else(|| unsupported("shape2d missing material"))?;
+    let m = material.ok_or_else(|| unsupported("shape2d missing material"))?;
     let rgba = resource_color(project, &m)?;
     Ok(SceneNode {
         is_group: false,
@@ -587,8 +600,7 @@ fn character_node(
         }
     }
     let (px, py) = pos.ok_or_else(|| unsupported("character2d missing position"))?;
-    let m = material
-        .ok_or_else(|| unsupported("character2d missing material"))?;
+    let m = material.ok_or_else(|| unsupported("character2d missing material"))?;
     let rgba = resource_color(project, &m)?;
     Ok(SceneNode {
         is_group: false,
@@ -674,11 +686,7 @@ fn camera_cfg(props: &[Prop]) -> Result<CameraCfg, LowerError> {
                                 ))
                             }
                         },
-                        _ => {
-                            return Err(unsupported(
-                                "camera2d target must be refs.<char>.actor",
-                            ))
-                        }
+                        _ => return Err(unsupported("camera2d target must be refs.<char>.actor")),
                     }
                 }
                 _ => return Err(unsupported("camera2d target must be refs.<char>.actor")),
@@ -733,7 +741,8 @@ fn expand_root_scripted(
                 }
                 let id = *next_id;
                 *next_id += 1;
-                out.nodes.push(character_node(project, name, props, &[], None, id)?);
+                out.nodes
+                    .push(character_node(project, name, props, &[], None, id)?);
                 out.char_name = Some(name.clone());
             }
             View2dElement::Solid { name, props } => {
@@ -753,7 +762,8 @@ fn expand_root_scripted(
             View2dElement::Shape { name, props } => {
                 let id = *next_id;
                 *next_id += 1;
-                out.nodes.push(shape_node(project, name, props, &[], None, id)?);
+                out.nodes
+                    .push(shape_node(project, name, props, &[], None, id)?);
             }
             View2dElement::Group { name, .. } => {
                 return Err(unsupported(format!(
@@ -808,10 +818,7 @@ fn expand_root_scripted(
 }
 
 /// profile 规则校验：非根节点限制与根 view 收集。
-fn collect_basic(
-    project: &Project,
-    profile: BasicProfile,
-) -> Result<Collected, LowerError> {
+fn collect_basic(project: &Project, profile: BasicProfile) -> Result<Collected, LowerError> {
     let root = node_of(project, &project.root);
     let scripted = profile != BasicProfile::Scene2D;
     if !scripted && (root.model.is_some() || root.msg.is_some() || root.on.is_some()) {
@@ -862,7 +869,15 @@ fn collect_basic(
     let mut next_id = 1usize;
     match profile {
         BasicProfile::Scene2D => {
-            expand_elements(project, &view.elements, &[], None, &mut out, &mut next_id, false)?;
+            expand_elements(
+                project,
+                &view.elements,
+                &[],
+                None,
+                &mut out,
+                &mut next_id,
+                false,
+            )?;
         }
         BasicProfile::Character2D | BasicProfile::Camera2D => {
             expand_root_scripted(project, &view.elements, &mut out, &mut next_id)?;
@@ -894,7 +909,9 @@ fn collect_basic(
             .char_name
             .as_ref()
             .is_some_and(|n| n == &cam.target_char_name)
-            || char_tail.as_ref().is_some_and(|t| t == &cam.target_char_name);
+            || char_tail
+                .as_ref()
+                .is_some_and(|t| t == &cam.target_char_name);
         if !matched {
             return Err(unsupported(format!(
                 "camera2d target '{}' must reference the root character2d '{}'",
@@ -1018,12 +1035,7 @@ fn roles_json_basic(collected: &Collected) -> String {
         .nodes
         .iter()
         .filter(|n| n.is_solid)
-        .map(|n| {
-            format!(
-                "{{\"id\": {}, \"name\": \"{}\"}}",
-                n.id, n.name
-            )
-        })
+        .map(|n| format!("{{\"id\": {}, \"name\": \"{}\"}}", n.id, n.name))
         .collect();
     parts.push(format!("\"solids\": [{}]", solids.join(", ")));
     parts.push(match &collected.camera {
@@ -1063,7 +1075,10 @@ fn enum_lookup(project: &Project, ename: &str, variant: &str) -> Option<String> 
     None
 }
 
-fn life_handler<'a>(node: &'a NodeDecl, event: &str) -> Option<&'a auto_ui_dialect::node2d::Handler> {
+fn life_handler<'a>(
+    node: &'a NodeDecl,
+    event: &str,
+) -> Option<&'a auto_ui_dialect::node2d::Handler> {
     let on = node.on.as_ref()?;
     on.handlers.iter().find(|h| {
         matches!(
@@ -1097,7 +1112,11 @@ fn gen_user_source(
             .map(|n| n.name.as_str())
             .collect::<Vec<_>>()
             .join(","),
-        collected.camera.as_ref().map(|_| "follow-2d").unwrap_or("-")
+        collected
+            .camera
+            .as_ref()
+            .map(|_| "follow-2d")
+            .unwrap_or("-")
     ));
     src.push_str("// Regeneration must be byte-identical (tools/verify_plan019.py).\n");
 
@@ -1235,4 +1254,3 @@ pub fn lower_project_basic(
         roles_json: roles,
     })
 }
-

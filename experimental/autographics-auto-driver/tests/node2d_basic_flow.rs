@@ -28,24 +28,42 @@ use autographics_auto_driver::{
 };
 use std::path::{Path, PathBuf};
 
-const SCENE_G01: &str = include_str!("../../autographics-node2d-pilot/generated-basic2d/g01-base/scene.agscene");
-const SCENE_G01_COLOR: &str = include_str!("../../autographics-node2d-pilot/generated-basic2d/g01-color/scene.agscene");
-const SCENE_G01_ORDER: &str = include_str!("../../autographics-node2d-pilot/generated-basic2d/g01-order/scene.agscene");
-const SCENE_G01_POSITION: &str = include_str!("../../autographics-node2d-pilot/generated-basic2d/g01-position/scene.agscene");
-const SCENE_G01_VISIBLE: &str = include_str!("../../autographics-node2d-pilot/generated-basic2d/g01-visible/scene.agscene");
-const SCENE_G03: &str = include_str!("../../autographics-node2d-pilot/generated-basic2d/g03-base/scene.agscene");
-const SCENE_G03_PARENT: &str = include_str!("../../autographics-node2d-pilot/generated-basic2d/g03-parent/scene.agscene");
-const SCENE_G03_HIDDEN: &str = include_str!("../../autographics-node2d-pilot/generated-basic2d/g03-hidden/scene.agscene");
-const SCENE_G06_A: &str = include_str!("../../autographics-node2d-pilot/generated-basic2d/g06-a/scene.agscene");
-const WORLD_G06_A: &str = include_str!("../../autographics-node2d-pilot/generated-basic2d/g06-a/world.at");
-const SCENE_G06_B: &str = include_str!("../../autographics-node2d-pilot/generated-basic2d/g06-b/scene.agscene");
-const WORLD_G06_B: &str = include_str!("../../autographics-node2d-pilot/generated-basic2d/g06-b/world.at");
-const SCENE_G06_FAST: &str = include_str!("../../autographics-node2d-pilot/generated-basic2d/g06-fast/scene.agscene");
-const WORLD_G06_FAST: &str = include_str!("../../autographics-node2d-pilot/generated-basic2d/g06-fast/world.at");
-const SCENE_G08: &str = include_str!("../../autographics-node2d-pilot/generated-basic2d/g08-main/scene.agscene");
-const WORLD_G08: &str = include_str!("../../autographics-node2d-pilot/generated-basic2d/g08-main/world.at");
-const SCENE_G08_ALT: &str = include_str!("../../autographics-node2d-pilot/generated-basic2d/g08-alt/scene.agscene");
-const WORLD_G08_ALT: &str = include_str!("../../autographics-node2d-pilot/generated-basic2d/g08-alt/world.at");
+const SCENE_G01: &str =
+    include_str!("../../autographics-node2d-pilot/generated-basic2d/g01-base/scene.agscene");
+const SCENE_G01_COLOR: &str =
+    include_str!("../../autographics-node2d-pilot/generated-basic2d/g01-color/scene.agscene");
+const SCENE_G01_ORDER: &str =
+    include_str!("../../autographics-node2d-pilot/generated-basic2d/g01-order/scene.agscene");
+const SCENE_G01_POSITION: &str =
+    include_str!("../../autographics-node2d-pilot/generated-basic2d/g01-position/scene.agscene");
+const SCENE_G01_VISIBLE: &str =
+    include_str!("../../autographics-node2d-pilot/generated-basic2d/g01-visible/scene.agscene");
+const SCENE_G03: &str =
+    include_str!("../../autographics-node2d-pilot/generated-basic2d/g03-base/scene.agscene");
+const SCENE_G03_PARENT: &str =
+    include_str!("../../autographics-node2d-pilot/generated-basic2d/g03-parent/scene.agscene");
+const SCENE_G03_HIDDEN: &str =
+    include_str!("../../autographics-node2d-pilot/generated-basic2d/g03-hidden/scene.agscene");
+const SCENE_G06_A: &str =
+    include_str!("../../autographics-node2d-pilot/generated-basic2d/g06-a/scene.agscene");
+const WORLD_G06_A: &str =
+    include_str!("../../autographics-node2d-pilot/generated-basic2d/g06-a/world.at");
+const SCENE_G06_B: &str =
+    include_str!("../../autographics-node2d-pilot/generated-basic2d/g06-b/scene.agscene");
+const WORLD_G06_B: &str =
+    include_str!("../../autographics-node2d-pilot/generated-basic2d/g06-b/world.at");
+const SCENE_G06_FAST: &str =
+    include_str!("../../autographics-node2d-pilot/generated-basic2d/g06-fast/scene.agscene");
+const WORLD_G06_FAST: &str =
+    include_str!("../../autographics-node2d-pilot/generated-basic2d/g06-fast/world.at");
+const SCENE_G08: &str =
+    include_str!("../../autographics-node2d-pilot/generated-basic2d/g08-main/scene.agscene");
+const WORLD_G08: &str =
+    include_str!("../../autographics-node2d-pilot/generated-basic2d/g08-main/world.at");
+const SCENE_G08_ALT: &str =
+    include_str!("../../autographics-node2d-pilot/generated-basic2d/g08-alt/scene.agscene");
+const WORLD_G08_ALT: &str =
+    include_str!("../../autographics-node2d-pilot/generated-basic2d/g08-alt/world.at");
 
 const DT: f32 = 1.0 / 60.0;
 
@@ -171,7 +189,7 @@ fn basic2d_character_walk_lands_and_walks_per_oracle() {
     let ground_y = 0.0f32;
     for t in 1..=40 {
         step(&mut h, 1 << 1); // right held
-        // oracle tick
+                              // oracle tick
         vy -= 20.0 * DT;
         let dy = vy * DT;
         let dx = 4.0 * DT;
@@ -225,11 +243,15 @@ fn basic2d_character_jump_edge_apex_and_no_double_jump() {
         step(&mut h, 0);
     }
     let a0 = actor(&h, 1);
-    assert!((a0[1] - 0.502).abs() < 1e-3, "landed at rest height: {:?}", a0);
+    assert!(
+        (a0[1] - 0.502).abs() < 1e-3,
+        "landed at rest height: {:?}",
+        a0
+    );
     press_once(&mut h, 2); // fresh Jump edge — this dispatch IS tick 1
-    // discrete oracle: vy=8 on the edge tick, gravity after, clip at 0.502.
-    // tick 1 already ran inside press_once; fold in its exact result:
-    // vy(1) = 8 - g*dt, y(1) = 0.502 + vy(1)*dt.
+                           // discrete oracle: vy=8 on the edge tick, gravity after, clip at 0.502.
+                           // tick 1 already ran inside press_once; fold in its exact result:
+                           // vy(1) = 8 - g*dt, y(1) = 0.502 + vy(1)*dt.
     let mut vy = 8.0 - 20.0 * DT;
     let mut y = 0.502f32 + vy * DT;
     let mut best = y;
@@ -284,7 +306,11 @@ fn basic2d_layout_b_pit_contrast_against_layout_a() {
     let aa = actor(&ha, 1);
     let ab = actor(&hb, 1);
     // layout-a: blocked by the step side (~x=6.598), still supported.
-    assert!((aa[0] - 6.598).abs() < 5e-3, "layout-a blocked at step: {:?}", aa);
+    assert!(
+        (aa[0] - 6.598).abs() < 5e-3,
+        "layout-a blocked at step: {:?}",
+        aa
+    );
     assert!((aa[1] - 0.502).abs() < 1e-3, "layout-a supported: {:?}", aa);
     // layout-b: walked past the ground edge (x=6.4) and fell into the pit.
     assert!(ab[0] > 6.4, "layout-b walked off the edge: {:?}", ab);
@@ -309,7 +335,11 @@ fn basic2d_fast_variant_displacement_contrast() {
         "speed 4->5 displacement differs: {d4} vs {d5}"
     );
     // exact delta = (5-4) * dt * moving ticks (grounded walk on flat ground).
-    assert!((d5 - d4 - 30.0 * DT).abs() < 1e-4, "exact 1 unit/s delta: {}", d5 - d4);
+    assert!(
+        (d5 - d4 - 30.0 * DT).abs() < 1e-4,
+        "exact 1 unit/s delta: {}",
+        d5 - d4
+    );
     h4.stop_play();
     h5.stop_play();
 }
@@ -351,10 +381,13 @@ fn basic2d_character_tick_cost_is_exactly_thirty() {
             ResultKind::Unit,
         )
         .unwrap();
-        s.call("_ag_visibility", &[Int(1)], ResultKind::Unit).unwrap();
-        s.call("_ag_bind_resource", &[Int(0)], ResultKind::Unit).unwrap();
+        s.call("_ag_visibility", &[Int(1)], ResultKind::Unit)
+            .unwrap();
+        s.call("_ag_bind_resource", &[Int(0)], ResultKind::Unit)
+            .unwrap();
         for v in [0., 0., 0., 1., 1., 1., 0., 0., 1., 1., 1., 0.] {
-            s.call("_ag_append_field", &[Float(v)], ResultKind::Unit).unwrap();
+            s.call("_ag_append_field", &[Float(v)], ResultKind::Unit)
+                .unwrap();
         }
         for (i, v) in [1.0, lo[0], lo[1], lo[2], hi[0], hi[1], hi[2]]
             .iter()
@@ -381,15 +414,15 @@ fn basic2d_character_tick_cost_is_exactly_thirty() {
     assert_eq!(status(&mut s), 0, "freeze ok");
     // walk tick (right held): 30 charged calls.
     let tick = |s: &mut Session, n: i32| {
-        s.call("_ag_char_input", &[Int(2), Int(0)], ResultKind::Unit).unwrap();
-        s.call("_ag_tick", &[Int(n), Float(DT)], ResultKind::Unit).unwrap();
+        s.call("_ag_char_input", &[Int(2), Int(0)], ResultKind::Unit)
+            .unwrap();
+        s.call("_ag_tick", &[Int(n), Float(DT)], ResultKind::Unit)
+            .unwrap();
     };
     tick(&mut s, 1);
     assert_eq!(status(&mut s), 0, "walk tick within budget");
     // probe extras: 31 and 32 pass; the 33rd charged call faults (10).
-    let probe = format!(
-        "{WORLD_G06_A}\nfn probe_extra() int {{return ag_action_held(1)}}\n"
-    );
+    let probe = format!("{WORLD_G06_A}\nfn probe_extra() int {{return ag_action_held(1)}}\n");
     let snap2 = SourceSnapshot::from_bytes_for(
         Path::new("basic2d-g06-probe.at"),
         probe.as_bytes().to_vec(),
@@ -400,25 +433,52 @@ fn basic2d_character_tick_cost_is_exactly_thirty() {
     p.call("main", &[], ResultKind::Unit).unwrap();
     p.call("_ag_reset", &[Int(1), Int(-1), Int(-1)], ResultKind::Unit)
         .unwrap();
-    p.call("_ag_spatial_reset", &[Int(rows.len() as i32)], ResultKind::Unit)
-        .unwrap();
+    p.call(
+        "_ag_spatial_reset",
+        &[Int(rows.len() as i32)],
+        ResultKind::Unit,
+    )
+    .unwrap();
     for (n, (kind, dim, lo, hi)) in rows.iter().enumerate() {
-        p.call("_ag_identity", &[Int(n as i32 + 1), Int(*kind), Int(*dim), Int(-1)], ResultKind::Unit).unwrap();
-        p.call("_ag_visibility", &[Int(1)], ResultKind::Unit).unwrap();
-        p.call("_ag_bind_resource", &[Int(0)], ResultKind::Unit).unwrap();
+        p.call(
+            "_ag_identity",
+            &[Int(n as i32 + 1), Int(*kind), Int(*dim), Int(-1)],
+            ResultKind::Unit,
+        )
+        .unwrap();
+        p.call("_ag_visibility", &[Int(1)], ResultKind::Unit)
+            .unwrap();
+        p.call("_ag_bind_resource", &[Int(0)], ResultKind::Unit)
+            .unwrap();
         for v in [0., 0., 0., 1., 1., 1., 0., 0., 1., 1., 1., 0.] {
-            p.call("_ag_append_field", &[Float(v)], ResultKind::Unit).unwrap();
+            p.call("_ag_append_field", &[Float(v)], ResultKind::Unit)
+                .unwrap();
         }
-        for (i, v) in [1.0, lo[0], lo[1], lo[2], hi[0], hi[1], hi[2]].iter().enumerate() {
-            p.call("_ag_spatial_config", &[Int((n * 7 + i) as i32), Float(*v)], ResultKind::Unit).unwrap();
+        for (i, v) in [1.0, lo[0], lo[1], lo[2], hi[0], hi[1], hi[2]]
+            .iter()
+            .enumerate()
+        {
+            p.call(
+                "_ag_spatial_config",
+                &[Int((n * 7 + i) as i32), Float(*v)],
+                ResultKind::Unit,
+            )
+            .unwrap();
         }
     }
     for (n, _) in rows.iter().enumerate() {
-        p.call("_ag_char_map", &[Int(n as i32 + 1), Int(n as i32)], ResultKind::Unit).unwrap();
+        p.call(
+            "_ag_char_map",
+            &[Int(n as i32 + 1), Int(n as i32)],
+            ResultKind::Unit,
+        )
+        .unwrap();
     }
     p.call("_ag_start", &[], ResultKind::Unit).unwrap();
-    p.call("_ag_char_input", &[Int(2), Int(0)], ResultKind::Unit).unwrap();
-    p.call("_ag_tick", &[Int(1), Float(DT)], ResultKind::Unit).unwrap();
+    p.call("_ag_char_input", &[Int(2), Int(0)], ResultKind::Unit)
+        .unwrap();
+    p.call("_ag_tick", &[Int(1), Float(DT)], ResultKind::Unit)
+        .unwrap();
     assert_eq!(status(&mut p), 0, "probe world walk tick ok");
     let _ = p.call("probe_extra", &[], ResultKind::Int);
     assert_eq!(status(&mut p), 0, "31st call ok");
@@ -432,10 +492,22 @@ fn basic2d_character_tick_cost_is_exactly_thirty() {
 
 fn camera_center(h: &Host) -> Option<[f32; 2]> {
     let f = h.play.as_ref().unwrap().last.as_ref().expect("frame");
-    f.camera.as_ref().map(|c| c.follow_center_2d(glam::Vec2::new(
-        f.objects.iter().find(|o| o.id == 1).expect("actor").translation[0],
-        f.objects.iter().find(|o| o.id == 1).expect("actor").translation[1],
-    )).unwrap().to_array())
+    f.camera.as_ref().map(|c| {
+        c.follow_center_2d(glam::Vec2::new(
+            f.objects
+                .iter()
+                .find(|o| o.id == 1)
+                .expect("actor")
+                .translation[0],
+            f.objects
+                .iter()
+                .find(|o| o.id == 1)
+                .expect("actor")
+                .translation[1],
+        ))
+        .unwrap()
+        .to_array()
+    })
 }
 
 #[test]
@@ -452,9 +524,7 @@ fn basic2d_camera_clamps_letterboxes_and_rides_same_tick() {
     assert_eq!(cam0.dim, CameraDim::TwoD);
     assert_eq!(cam0.rect, [0.0, -4.0, 30.0, 12.0], "declared bounds echoed");
     assert_eq!(cam0.view, [12.0, 8.0], "declared viewport echoed");
-    let center0 = cam0
-        .follow_center_2d(glam::Vec2::new(2.0, 1.0))
-        .unwrap();
+    let center0 = cam0.follow_center_2d(glam::Vec2::new(2.0, 1.0)).unwrap();
     // clamp((2,1), min+half=(6,0), max-half=(24,8)) -> (6,1).
     assert!((center0.x - 6.0).abs() < 1e-5 && (center0.y - 1.0).abs() < 1e-5);
     // letterbox: scale 47.5, bars 115 logical px (800x380 surface).
@@ -468,9 +538,7 @@ fn basic2d_camera_clamps_letterboxes_and_rides_same_tick() {
     let f = h.play.as_ref().unwrap().last.as_ref().unwrap().clone();
     let a = f.objects.iter().find(|o| o.id == 1).unwrap().translation;
     let cam = f.camera.clone().expect("camera rides the same tick");
-    let center = cam
-        .follow_center_2d(glam::Vec2::new(a[0], a[1]))
-        .unwrap();
+    let center = cam.follow_center_2d(glam::Vec2::new(a[0], a[1])).unwrap();
     let want = a[0].clamp(6.0, 24.0);
     assert!(
         (center.x - want).abs() < 1e-5,
@@ -498,12 +566,21 @@ fn basic2d_camera_alt_config_projection_differs() {
     assert_eq!(cam0.rect, [4.0, -2.0, 26.0, 10.0]);
     assert_eq!(cam0.view, [8.0, 6.0]);
     let (scale, content, bars) = cam0.letterbox_2d().unwrap();
-    assert!((content.x - 380.0 * 8.0 / 6.0).abs() < 1e-2, "content {content:?}");
-    assert!((bars.x - (800.0 - content.x) / 2.0).abs() < 1e-2, "bars {bars:?}");
+    assert!(
+        (content.x - 380.0 * 8.0 / 6.0).abs() < 1e-2,
+        "content {content:?}"
+    );
+    assert!(
+        (bars.x - (800.0 - content.x) / 2.0).abs() < 1e-2,
+        "bars {bars:?}"
+    );
     // tick0: actor (2,1) -> clamp into [8,22]x[1,7] -> (8, 1).
     let center = cam0.follow_center_2d(glam::Vec2::new(2.0, 1.0)).unwrap();
     assert!((center.x - 8.0).abs() < 1e-5 && (center.y - 1.0).abs() < 1e-5);
-    assert!((scale.x - 380.0 / 6.0).abs() < 1e-3, "alt scale min(surface/view)");
+    assert!(
+        (scale.x - 380.0 / 6.0).abs() < 1e-3,
+        "alt scale min(surface/view)"
+    );
     h.stop_play();
 }
 
@@ -549,7 +626,11 @@ fn pixel_classes(h: &mut Host) -> Vec<Px> {
         }
     }
     let px = h.rt.probe_pixels(h.top, &points).expect("probe");
-    points.iter().zip(px.iter()).map(|(p, c)| (*p, *c)).collect()
+    points
+        .iter()
+        .zip(px.iter())
+        .map(|(p, c)| (*p, *c))
+        .collect()
 }
 
 /// 相对通道类计数（016 校准的相对规则，光照混合下稳健）：blue = b 明显
@@ -557,7 +638,11 @@ fn pixel_classes(h: &mut Host) -> Vec<Px> {
 fn count_class(px: &[Px], class: &str) -> usize {
     px.iter()
         .filter(|(_, c)| {
-            let (r, g, b) = (c[0] as f32 / 255.0, c[1] as f32 / 255.0, c[2] as f32 / 255.0);
+            let (r, g, b) = (
+                c[0] as f32 / 255.0,
+                c[1] as f32 / 255.0,
+                c[2] as f32 / 255.0,
+            );
             match class {
                 "blue" => b - r.max(g) > 0.12,
                 "red" => r - g.max(b) > 0.12,
@@ -578,9 +663,21 @@ fn basic2d_scene_g01_alpha_rules_and_variants() {
     let b = pixel_classes(&mut base);
     // blue quad present, semi-red present, green present, yellow absent
     // (stride-4 grid: a 30-unit quad ≈ 7x7 ≈ 49 samples; d24 ≈ 36).
-    assert!(count_class(&b, "blue") > 20, "blue class present: {}", count_class(&b, "blue"));
-    assert!(count_class(&b, "red") > 10, "red class present: {}", count_class(&b, "red"));
-    assert!(count_class(&b, "green") > 8, "green class present: {}", count_class(&b, "green"));
+    assert!(
+        count_class(&b, "blue") > 20,
+        "blue class present: {}",
+        count_class(&b, "blue")
+    );
+    assert!(
+        count_class(&b, "red") > 10,
+        "red class present: {}",
+        count_class(&b, "red")
+    );
+    assert!(
+        count_class(&b, "green") > 8,
+        "green class present: {}",
+        count_class(&b, "green")
+    );
     assert_eq!(count_class(&b, "yellow"), 0, "yellow hidden in base");
     let base_px: Vec<_> = b.iter().map(|(_, c)| *c).collect();
     base.stop_play();
@@ -630,23 +727,46 @@ fn basic2d_scene_g03_world_sums_and_ancestor_visibility() {
         .find(|o| o.name == "deep_quad")
         .expect("deep quad");
     let w = worlds.get(&deep.id).expect("deep world");
-    assert!((w.translation[0] - 35.0).abs() < 1e-3, "deep world x: {}", w.translation[0]);
-    assert!((w.translation[1] - 5.0).abs() < 1e-3, "deep world y: {}", w.translation[1]);
+    assert!(
+        (w.translation[0] - 35.0).abs() < 1e-3,
+        "deep world x: {}",
+        w.translation[0]
+    );
+    assert!(
+        (w.translation[1] - 5.0).abs() < 1e-3,
+        "deep world y: {}",
+        w.translation[1]
+    );
     assert!(w.visible, "base deep visible");
     // v-parent: root x 20 -> 40 -> deep world (55,5).
     let (doc_p, _, _) = load_doc(SCENE_G03_PARENT, None, "g03-parent-doc");
     let worlds_p = hierarchy::derive(&doc_p).expect("derive parent");
-    let deep_p = doc_p.objects.iter().find(|o| o.name == "deep_quad").unwrap();
+    let deep_p = doc_p
+        .objects
+        .iter()
+        .find(|o| o.name == "deep_quad")
+        .unwrap();
     let wp = worlds_p.get(&deep_p.id).unwrap();
-    assert!((wp.translation[0] - 55.0).abs() < 1e-3, "moved world x: {}", wp.translation[0]);
+    assert!(
+        (wp.translation[0] - 55.0).abs() < 1e-3,
+        "moved world x: {}",
+        wp.translation[0]
+    );
     // v-hidden: root visible=false -> deep invisible via ancestor AND.
     let (doc_h, _, _) = load_doc(SCENE_G03_HIDDEN, None, "g03-hidden-doc");
     let worlds_h = hierarchy::derive(&doc_h).expect("derive hidden");
-    let deep_h = doc_h.objects.iter().find(|o| o.name == "deep_quad").unwrap();
+    let deep_h = doc_h
+        .objects
+        .iter()
+        .find(|o| o.name == "deep_quad")
+        .unwrap();
     let wh = worlds_h.get(&deep_h.id).unwrap();
     assert!(!wh.visible, "ancestor AND hides the deep leaf");
     // hidden leaf keeps identity (scene row present, visible=true locally).
-    assert!(deep_h.visible, "local visible flag unchanged (identity kept)");
+    assert!(
+        deep_h.visible,
+        "local visible flag unchanged (identity kept)"
+    );
 
     // GPU: base and hidden both run; captures differ.
     let mut hb = start_with(SCENE_G03, None, "g03-base");
@@ -685,6 +805,37 @@ fn basic2d_scene_source_binding_rejects_tampered_world() {
         }
         Err(_) => {}
     }
+}
+
+/// Twenty Run/Stop cycles on the character chain: every Run starts the
+/// character at its declared spawn, gameplay proceeds, and the 21st start
+/// still works (runtime owners released each cycle, no degradation).
+#[test]
+fn basic2d_character_twenty_run_stop_cycles_release_owners() {
+    for cycle in 0..20 {
+        let mut h = start_with(SCENE_G06_A, Some(WORLD_G06_A), &format!("g06-cycle{cycle}"));
+        for _ in 0..6 {
+            step(&mut h, 1 << 1);
+        }
+        let a = actor(&h, 1);
+        // fresh spawn each cycle: walk-line after 6 right ticks.
+        assert!(
+            (a[0] - 6.0 * 4.0 * DT).abs() < 1e-3,
+            "cycle {cycle} fresh start: {a:?}"
+        );
+        h.stop_play();
+    }
+    // the 21st cycle still runs normally.
+    let mut h = start_with(SCENE_G06_A, Some(WORLD_G06_A), "g06-cycle21");
+    for _ in 0..6 {
+        step(&mut h, 1 << 1);
+    }
+    let a = actor(&h, 1);
+    assert!(
+        (a[0] - 6.0 * 4.0 * DT).abs() < 1e-3,
+        "cycle 21 fresh: {a:?}"
+    );
+    h.stop_play();
 }
 
 /// The generated camera-2d project admits with the runtime_camera2d/1 API

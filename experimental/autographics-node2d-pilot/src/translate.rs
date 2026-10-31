@@ -273,9 +273,12 @@ fn translate_expr(e: &Expr, ctx: &Ctx, out: &mut String) -> Result<(), LowerErro
                             "Enter" => 3,
                             "Jump" => 2,
                             other => {
-                                return Err(unsupported(format!(
-                                    "input.pressed({other}) (research surface: Enter/Jump)"
-                                ), e))
+                                return Err(unsupported(
+                                    format!(
+                                        "input.pressed({other}) (research surface: Enter/Jump)"
+                                    ),
+                                    e,
+                                ))
                             }
                         };
                         out.push_str(&format!("ag_action_pressed({action})"));

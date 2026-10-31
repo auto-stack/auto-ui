@@ -108,7 +108,26 @@ def check_identity(name: str, out_dir: pathlib.Path, profile: str) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--controls", action="store_true")
+    ap.add_argument(
+        "--build-record",
+        metavar="OUT",
+        help="write a source-build record (generator binary sha, toolchain, product hashes)",
+    )
+    ap.add_argument(
+        "--verify-record",
+        metavar="JSON",
+        help="verify a recorded build against the current tree and generator binary",
+    )
+    ap.add_argument(
+        "--generator",
+        default=str(ROOT / "target" / "debug" / "node2d-lower.exe"),
+        help="generator binary the record binds (default: debug node2d-lower)",
+    )
     args = ap.parse_args()
+    if args.build_record:
+        return write_build_record(pathlib.Path(args.build_record), pathlib.Path(args.generator))
+    if args.verify_record:
+        return verify_build_record(pathlib.Path(args.verify_record), pathlib.Path(args.generator))
     if not args.controls:
         print(__doc__)
         return 2
@@ -165,7 +184,81 @@ def main() -> int:
         assert r.returncode != 0, "character-2d must reject camera2d"
         assert "camera2d" in (r.stderr + r.stdout), "diagnostic names the element"
         checks += 1
+        # 4. cold A->B: B receives ONLY the closure copies (no producer
+        #    fixtures) and reproduces every frozen product byte-identically;
+        #    a tampered closure module is caught by the manifest hashes and
+        #    the exact restore makes the same entry usable again.
+        for name in ("g06-a", "g08-main", "g01-base", "g03-base"):
+            profile, _, _ = PRODUCTS[name]
+            frozen = GENERATED / name
+            bdir = tmp / f"cold-{name}"
+            (bdir / "closure").parent.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(frozen / "closure", bdir / "closure")
+            entry_mod = sorted(pathlib.Path(PRODUCTS[name][1]).parts)[-1].removesuffix(".at")
+            out = tmp / f"coldout-{name}"
+            run_lower(bdir / "closure" / f"{entry_mod}.at", out, profile)
+            for f in ("scene.agscene", "identity.json"):
+                assert (frozen / f).read_bytes() == (out / f).read_bytes(), f"cold A->B {name}/{f}"
+            if profile != "scene-2d":
+                assert (frozen / "world.at").read_bytes() == (out / "world.at").read_bytes(), (
+                    f"cold A->B {name}/world.at"
+                )
+            # negative: tamper one closure module -> manifest hash mismatch.
+            ident = json.loads((frozen / "identity.json").read_text())
+            victim = ident["closure"][0]["name"]
+            vfile = bdir / "closure" / f"{victim}.at"
+            original = vfile.read_bytes()
+            vfile.write_bytes(original + b"\n// tampered\n")
+            got = sha(vfile.read_bytes())
+            assert got != ident["closure"][0]["sha256"], f"tamper undetected in {name}"
+            # recovery: exact restore -> the same entry regenerates again.
+            vfile.write_bytes(original)
+            out2 = tmp / f"coldrecover-{name}"
+            run_lower(bdir / "closure" / f"{entry_mod}.at", out2, profile)
+            assert (frozen / "scene.agscene").read_bytes() == (out2 / "scene.agscene").read_bytes(), (
+                f"recovery {name}"
+            )
+            checks += 1
     print(f"PASS verify_plan019 --controls: {checks} product/control groups")
+    return 0
+
+
+def product_hashes() -> dict:
+    out = {}
+    for name, (profile, _, _) in PRODUCTS.items():
+        d = GENERATED / name
+        rec = {"profile": profile, "scene_sha256": sha((d / "scene.agscene").read_bytes())}
+        if profile != "scene-2d":
+            rec["world_sha256"] = sha((d / "world.at").read_bytes())
+        rec["identity_sha256"] = sha((d / "identity.json").read_bytes())
+        out[name] = rec
+    return out
+
+
+def write_build_record(out: pathlib.Path, generator: pathlib.Path) -> int:
+    data = generator.read_bytes()
+    import subprocess as sp
+
+    rustc = sp.run(["rustc", "--version"], capture_output=True, text=True).stdout.strip()
+    record = {
+        "generator": {"path": str(generator), "sha256": sha(data), "bytes": len(data)},
+        "toolchain": {"rustc": rustc, "platform": sys.platform},
+        "workspace_lock": sha((ROOT / "Cargo.lock").read_bytes()),
+        "products": product_hashes(),
+    }
+    out.write_text(json.dumps(record, indent=1) + "\n", encoding="utf-8")
+    print(f"build record written: {out} (generator {record['generator']['sha256'][:12]})")
+    return 0
+
+
+def verify_build_record(record_path: pathlib.Path, generator: pathlib.Path) -> int:
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    actual = sha(generator.read_bytes())
+    assert record["generator"]["sha256"] == actual, (
+        f"generator binary drifted: record {record['generator']['sha256'][:12]} vs {actual[:12]}"
+    )
+    assert record["products"] == product_hashes(), "product hashes drifted from the record"
+    print(f"PASS build record: generator {actual[:12]} + {len(record['products'])} products match")
     return 0
 
 
