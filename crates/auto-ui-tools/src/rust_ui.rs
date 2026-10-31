@@ -4528,6 +4528,22 @@ fn generate_delivery_root_manifest(
         members.push(format!("    \"crates/{c}\""));
     }
     let members_toml = members.join(",\n");
+    // PLAN-901（T-04b 实际消费验证发现）：仓根级冻结快照树（如 vendor/
+    // autodown-test-parser）是独立 Cargo workspace 根——producer 根对其
+    // [workspace] exclude 同款排除，否则交付根 fresh 解析判
+    // "multiple workspace roots" 红。随 DELIVERY_VENDOR_TREES 派生。
+    let excludes: Vec<String> = DELIVERY_VENDOR_TREES
+        .iter()
+        .map(|(_, dst)| format!("    \"{dst}\""))
+        .collect();
+    let exclude_block = if excludes.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "# 仓根级冻结快照树随包但独立解析（producer 根同款 exclude——\n# 嵌套 workspace 根不得入本工作区，否则 fresh 解析红）。\nexclude = [\n{}\n]\n\n",
+            excludes.join(",\n")
+        )
+    };
     Ok(format!(
         r#"# PLAN-792 受管交付根（显式可搬动交付模式——生成物，勿手改）。
 # 镜像生产仓布局：members 含应用与受管源码闭包（[workspace.dependencies]
@@ -4539,7 +4555,7 @@ members = [
 default-members = ["{app_member}"]
 resolver = "2"
 
-{ws_package_block}{ws_deps}
+{exclude_block}{ws_package_block}{ws_deps}
 {profile_dev}
 # 顶层 patch（PLAN-043 走查 2026-09-25）：iced_widget 本地补丁随包发行——
 # patch 写在消费根，不写在依赖包内；删此段则 --locked 重放确定性红。
@@ -8642,6 +8658,11 @@ fn plan901_delivery_closure_pins_resident_test_case() {
         assert!(
             root_manifest.contains("[workspace.package]"),
             "web 继承包表随交付根发行"
+        );
+        assert!(
+            root_manifest.contains("exclude = [")
+                && root_manifest.contains("vendor/autodown-test-parser"),
+            "冻结快照树随包独立解析（producer 同款 exclude）"
         );
         // 应用清单：自包含 path 依赖 + pin 块；无 workspace 继承
         let app_manifest = std::fs::read_to_string(delivery.join("app/Cargo.toml")).unwrap();
