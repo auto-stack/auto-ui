@@ -1,0 +1,28 @@
+// PLAN-016 V-03 补充夹具：同定义双父实例，事件投递 receiver 隔离。
+// 每个 Collector 实例有自己的 Coin 子实例；币触碰只投递到所属父实例。
+use resources
+use coin: Coin
+
+node Collector(center_x: float, tag: float) {
+    model {
+        var grabbed = 0
+        var starts = 0
+    }
+    msg { Grab }
+    view-2d {
+        Coin c {
+            position_x: .center_x
+            position_y: 1.0
+            target: refs.player.actor
+            on_collect: .Grab
+        }
+    }
+    on {
+        Life.Start -> {
+            .starts = 1
+        }
+        .Grab -> {
+            .grabbed = 1
+        }
+    }
+}

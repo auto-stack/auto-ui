@@ -1,0 +1,26 @@
+// 同 minimal 的 Coin 定义（补充夹具复用）。
+use resources
+
+node Coin(position_x: float, position_y: float, target: ActorRef2D, on_collect: msg) {
+    model {
+        var enabled = 1
+    }
+    msg { Touched(ActorRef2D) }
+    view-2d {
+        trigger2d body {
+            position: (.position_x, .position_y)
+            mesh: resources.coin_mesh
+            material: resources.coin_color
+            on_enter: .Touched
+        }
+    }
+    on {
+        .Touched(actor) -> {
+            if .enabled == 1 {
+                if actor == .target {
+                    emit .on_collect
+                }
+            }
+        }
+    }
+}

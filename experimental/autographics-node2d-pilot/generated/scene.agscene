@@ -11,7 +11,7 @@
    "three_d": null
   }
  },
- "schema": "autographics.scene/8",
+ "schema": "autographics.scene/6",
  "document_id": "plan016-minimal-node2d",
  "resources": [
   "circle",
@@ -79,6 +79,5 @@
   }
  ],
  "groups": [],
- "assets": [],
- "cues": []
+ "assets": []
 }

@@ -1,6 +1,6 @@
 //! 场景文档生成与源身份（合同 §2 段 5/8）。
 //!
-//! autographics.scene/8 工程：player 模板在位（char 绑定），ground 静态，
+//! autographics.scene/6 工程（无音频/HUD 负载的最小玩法场景）：player 模板在位（char 绑定），ground 静态，
 //! coin/hazard 模板停靠在玩法区外（实例从模板 spawn，杜绝 born-overlap）。
 //! 行为绑定 = triggers2d + 生成源（sha256/byte_length 精确绑定）。
 
@@ -204,6 +204,12 @@ pub fn build_scene_json(
     source_sha256: &str,
     source_bytes: usize,
 ) -> String {
+    // 冻结模板表要求全部四定义在场（minimal 工程）；补充工程只消费
+    // world.at，不建场景。
+    if !project.node_modules.contains_key("Hazard") {
+        let _ = instances;
+        return String::new();
+    }
     // 模板几何/颜色来自定义 view（第一个 solid/trigger 元素）。
     let player_shape = shape_of(project, "Player", "body");
     let player_rgba = rgba_of(project, "Player", "body");
@@ -219,14 +225,50 @@ pub fn build_scene_json(
     let park = -100.0;
 
     let objects = [
-        obj_json(1, "player", &player_shape.0, 2.0, 1.0, player_shape.1, player_shape.2, player_rgba),
-        obj_json(2, "ground", &ground_shape.0, 15.0, -0.5, ground_shape.1, ground_shape.2, ground_rgba),
-        obj_json(3, "coin_template", &coin_shape.0, park, park, coin_shape.1, coin_shape.2, coin_rgba),
-        obj_json(4, "hazard_template", &hazard_shape.0, park, park, hazard_shape.1, hazard_shape.2, hazard_rgba),
+        obj_json(
+            1,
+            "player",
+            &player_shape.0,
+            2.0,
+            1.0,
+            player_shape.1,
+            player_shape.2,
+            player_rgba,
+        ),
+        obj_json(
+            2,
+            "ground",
+            &ground_shape.0,
+            15.0,
+            -0.5,
+            ground_shape.1,
+            ground_shape.2,
+            ground_rgba,
+        ),
+        obj_json(
+            3,
+            "coin_template",
+            &coin_shape.0,
+            park,
+            park,
+            coin_shape.1,
+            coin_shape.2,
+            coin_rgba,
+        ),
+        obj_json(
+            4,
+            "hazard_template",
+            &hazard_shape.0,
+            park,
+            park,
+            hazard_shape.1,
+            hazard_shape.2,
+            hazard_rgba,
+        ),
     ]
     .join(",\n");
 
     format!(
-        "{{\n \"behavior\": {{\n  \"api\": \"autographics.triggers2d/1\",\n  \"source\": {{\n   \"format\": \"auto-source\",\n   \"sha256\": \"{source_sha256}\",\n   \"byte_length\": {source_bytes}\n  }},\n  \"actors\": {{\n   \"two_d\": 1,\n   \"three_d\": null\n  }}\n }},\n \"schema\": \"autographics.scene/8\",\n \"document_id\": \"plan016-minimal-node2d\",\n \"resources\": [\n  \"circle\",\n  \"quad\",\n  \"cylinder\",\n  \"player\",\n  \"mob\"\n ],\n \"objects\": [\n{objects}\n ],\n \"groups\": [],\n \"assets\": [],\n \"cues\": []\n}}\n"
+        "{{\n \"behavior\": {{\n  \"api\": \"autographics.triggers2d/1\",\n  \"source\": {{\n   \"format\": \"auto-source\",\n   \"sha256\": \"{source_sha256}\",\n   \"byte_length\": {source_bytes}\n  }},\n  \"actors\": {{\n   \"two_d\": 1,\n   \"three_d\": null\n  }}\n }},\n \"schema\": \"autographics.scene/6\",\n \"document_id\": \"plan016-minimal-node2d\",\n \"resources\": [\n  \"circle\",\n  \"quad\",\n  \"cylinder\",\n  \"player\",\n  \"mob\"\n ],\n \"objects\": [\n{objects}\n ],\n \"groups\": [],\n \"assets\": []\n}}\n"
     )
 }

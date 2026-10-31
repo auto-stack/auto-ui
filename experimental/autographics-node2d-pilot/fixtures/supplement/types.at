@@ -1,0 +1,5 @@
+// PLAN-016 minimal pilot: shared game types (real module, real enum decls).
+enum Key {
+    Amber,
+    Azure,
+}

@@ -20,11 +20,10 @@ fn main() {
             eprintln!("node2d-lower: {e}");
             std::process::exit(2);
         });
-    let lowered = autographics_node2d_pilot::lower_project(&project)
-        .unwrap_or_else(|e| {
-            eprintln!("node2d-lower: {e}");
-            std::process::exit(3);
-        });
+    let lowered = autographics_node2d_pilot::lower_project(&project).unwrap_or_else(|e| {
+        eprintln!("node2d-lower: {e}");
+        std::process::exit(3);
+    });
     std::fs::create_dir_all(out).expect("out dir");
     std::fs::write(format!("{out}/world.at"), &lowered.user_source).expect("world.at");
     std::fs::write(format!("{out}/scene.agscene"), &lowered.scene_json).expect("scene.agscene");

@@ -5,10 +5,10 @@
 //! 执行前给出带文件/行号的拒绝：缺模块、错导出、未知实例/属性、
 //! 未声明事件、重复定义。Rust 不实现任何玩法规则。
 
-use auto_parser_api::ast::{Expr, Stmt};
-use auto_parser_api::{CompilerSession, DomainStmt, Scenario};
 use auto_lang_core::parser::Parser;
 use auto_lang_core::use_scanner::{scan_use_statements, UseStatement};
+use auto_parser_api::ast::{Expr, Stmt};
+use auto_parser_api::{CompilerSession, DomainStmt, Scenario};
 use auto_ui_dialect::node2d::{Node2DStmt, NodeDecl, PropValue, View2dElement};
 use auto_ui_dialect::{ModelBlock, MsgDecl};
 use std::collections::BTreeMap;
@@ -72,7 +72,11 @@ impl std::fmt::Display for ProjectError {
 }
 
 fn line_of(source: &str, offset: usize) -> usize {
-    source[..offset.min(source.len())].bytes().filter(|b| *b == b'\n').count() + 1
+    source[..offset.min(source.len())]
+        .bytes()
+        .filter(|b| *b == b'\n')
+        .count()
+        + 1
 }
 
 fn parse_module_text(file: &str, source: &str) -> Result<LoadedModule, ProjectError> {
@@ -352,10 +356,12 @@ pub fn resolve_instance_props(
     };
     let mut out = Vec::new();
     for (pname, pty) in &node.params {
-        let value = props
-            .iter()
-            .find(|(n, _)| n == pname)
-            .ok_or_else(|| err(format!("instance missing prop '{pname}' for node '{}'", node.name)))?;
+        let value = props.iter().find(|(n, _)| n == pname).ok_or_else(|| {
+            err(format!(
+                "instance missing prop '{pname}' for node '{}'",
+                node.name
+            ))
+        })?;
         let v = match &value.1 {
             PropValue::One(Expr::Float(v, _)) => *v,
             PropValue::One(Expr::Int(v)) => *v as f64,
@@ -383,9 +389,11 @@ pub fn resolve_instance_props(
 
 /// 供 scene/lower 读取的 node 查找。
 pub fn node_of<'a>(project: &'a Project, name: &str) -> &'a NodeDecl {
-    let module = &project.node_modules[name];
-    project
-        .modules[module]
+    let module = project
+        .node_modules
+        .get(name)
+        .unwrap_or_else(|| panic!("node '{}' not registered in module table", name));
+    project.modules[module]
         .nodes
         .iter()
         .find(|n| n.name == name)

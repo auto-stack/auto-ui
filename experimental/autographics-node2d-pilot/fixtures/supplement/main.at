@@ -1,0 +1,50 @@
+// PLAN-016 V-03 补充入口：一个 Player、两个同定义 Collector（各自持有
+// 一个 Coin 子实例）。玩家先后穿过两个币：投递必须只命中所属父实例。
+use types: Key
+use player: Player
+use collector: Collector
+use patrol: patrol_y
+
+node Main {
+    model {
+        var starts = 0
+        var ticks = 0
+        var phase = 0.5
+    }
+    msg { Collect(Key) }
+    view-2d {
+        solid2d ground {
+            position: (15.0, -0.5)
+            mesh: resources.ground_mesh
+            material: resources.ground_color
+        }
+        Player player {
+            spawn_x: 2.0
+            spawn_y: 1.0
+            speed: 2.0
+        }
+        Collector a {
+            center_x: 6.0
+            tag: 1.0
+        }
+        Collector b {
+            center_x: 12.0
+            tag: 2.0
+        }
+        camera2d camera {
+            target: refs.player.actor
+            min: (-4.0, -4.0)
+            max: (30.0, 12.0)
+            view_size: (30.0, 12.0)
+        }
+    }
+    on {
+        Life.Start -> {
+            .starts = 1
+        }
+        Life.Tick(dt) -> {
+            .ticks = .ticks + 1
+        }
+        .Collect(key) -> {}
+    }
+}

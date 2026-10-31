@@ -27,16 +27,74 @@ pub fn lower_project(project: &Project) -> Result<LowerOutput, LowerError> {
     let root_name = project.root.clone();
     let root = node_of(project, &root_name);
 
-    // ---- 实例表 ----
-    let root_view = root.view2d.as_ref().ok_or_else(|| LowerError::Unsupported {
-        what: "root node has no view-2d".into(),
-        line: 0,
-    })?;
+    // ---- 实例表（含嵌套实例树：非 root 定义的 view 也产生实例）----
+    let root_view = root
+        .view2d
+        .as_ref()
+        .ok_or_else(|| LowerError::Unsupported {
+            what: "root node has no view-2d".into(),
+            line: 0,
+        })?;
     let mut instances: Vec<Instance> = Vec::new();
     let mut per_def: BTreeMap<String, usize> = Default::default();
     let mut gid = 1usize;
     for el in &root_view.elements {
-        collect_instances(el, None, &mut instances, &mut gid, &mut per_def);
+        collect_instances(el, None, None, &mut instances, &mut gid, &mut per_def);
+    }
+    // 广度优先展开子实例：每个非 root 定义的 view 对其每个实例各展开
+    // 一遍（同定义实例的子树互不共享状态）。
+    loop {
+        let mut expanded = false;
+        let defs_with_children: Vec<String> = {
+            let mut ds: Vec<String> = Vec::new();
+            for inst in &instances {
+                if inst.owner.is_none() {
+                    let node = node_of(project, &inst.node);
+                    if let Some(view) = &node.view2d {
+                        if view.elements.iter().any(|e| {
+                            matches!(e, View2dElement::Instance { .. } | View2dElement::If { .. })
+                        }) && !ds.contains(&inst.node)
+                        {
+                            ds.push(inst.node.clone());
+                        }
+                    }
+                }
+            }
+            ds
+        };
+        for def in &defs_with_children {
+            let owners: Vec<Instance> = instances
+                .iter()
+                .filter(|i| &i.node == def)
+                .cloned()
+                .collect();
+            for owner in &owners {
+                // 防重复展开：该 owner 的子实例已存在则跳过。
+                if instances.iter().any(|i| i.owner == Some(owner.gid)) {
+                    continue;
+                }
+                let node = node_of(project, def);
+                if let Some(view) = &node.view2d {
+                    let before = instances.len();
+                    for el in &view.elements {
+                        collect_instances(
+                            el,
+                            None,
+                            Some(owner.gid),
+                            &mut instances,
+                            &mut gid,
+                            &mut per_def,
+                        );
+                    }
+                    if instances.len() > before {
+                        expanded = true;
+                    }
+                }
+            }
+        }
+        if !expanded {
+            break;
+        }
     }
 
     // ---- 前缀/定义表 ----
@@ -45,6 +103,26 @@ pub fn lower_project(project: &Project) -> Result<LowerOutput, LowerError> {
     let defs = defs_sorted(&instances);
     for def in &defs {
         prefixes.insert(def.clone(), def.to_lowercase());
+    }
+
+    // ---- 运行时初始化标记：属性为父成员引用的字段在 app_start 赋值 ----
+    for inst in instances.iter_mut() {
+        let node = node_of(project, &inst.node);
+        let mut runtime_fields = Vec::new();
+        for (pname, _pty) in &node.params {
+            if pname == "on_collect" || pname == "target" {
+                continue;
+            }
+            if let Some(pr) = inst.props.iter().find(|pr| &pr.name == pname) {
+                if !matches!(
+                    pr.value,
+                    PropValue::One(Expr::Float(..)) | PropValue::One(Expr::Int(..))
+                ) {
+                    runtime_fields.push(pname.clone());
+                }
+            }
+        }
+        inst.runtime_init = runtime_fields;
     }
 
     // ---- 触发标记与 slot/pair 分配（发射顺序）----
@@ -94,16 +172,12 @@ pub fn lower_project(project: &Project) -> Result<LowerOutput, LowerError> {
     // ---- 池化纯函数（verbatim 源切片：文本定位 + 花括号配平）----
     for module in project.modules.values() {
         for (fname, _span) in &module.fns {
-            let text = slice_fn_source(&module.source, fname).ok_or_else(|| {
-                LowerError::Unsupported {
+            let text =
+                slice_fn_source(&module.source, fname).ok_or_else(|| LowerError::Unsupported {
                     what: format!("fn {fname} source slice"),
                     line: 0,
-                }
-            })?;
-            src.push_str(&format!(
-                "// pooled fn {fname} from {}\n",
-                module.name
-            ));
+                })?;
+            src.push_str(&format!("// pooled fn {fname} from {}\n", module.name));
             src.push_str(text.trim_end());
             src.push('\n');
         }
@@ -132,12 +206,8 @@ pub fn lower_project(project: &Project) -> Result<LowerOutput, LowerError> {
 
     let source_bytes = src.len();
     let source_sha256 = crate::scene::sha256_hex(src.as_bytes());
-    let scene_json = crate::scene::build_scene_json(
-        project,
-        &instances,
-        &source_sha256,
-        source_bytes,
-    );
+    let scene_json =
+        crate::scene::build_scene_json(project, &instances, &source_sha256, source_bytes);
 
     Ok(LowerOutput {
         user_source: src,
@@ -160,11 +230,17 @@ pub struct Instance {
     pub trigger: bool,
     /// slot/pair（触发实例按发射顺序分配）。
     pub slot: Option<usize>,
+    /// 所属父实例 gid（嵌套实例树；根直属为 None）。
+    pub owner: Option<usize>,
+    /// 实例属性为父成员引用、需在 app_start 运行时初始化的字段。
+    pub runtime_init: Vec<String>,
 }
 
+#[allow(clippy::too_many_arguments)]
 fn collect_instances(
     el: &View2dElement,
     cond: Option<Expr>,
+    owner: Option<usize>,
     out: &mut Vec<Instance>,
     gid: &mut usize,
     per_def: &mut BTreeMap<String, usize>,
@@ -182,12 +258,14 @@ fn collect_instances(
                 conditional: cond,
                 trigger: false,
                 slot: None,
+                owner,
+                runtime_init: Vec::new(),
             });
             *gid += 1;
         }
         View2dElement::If { cond, then } => {
             for child in then {
-                collect_instances(child, Some(cond.clone()), out, gid, per_def);
+                collect_instances(child, Some(cond.clone()), owner, out, gid, per_def);
             }
         }
         _ => {}
@@ -235,10 +313,8 @@ fn def_fields(node: &NodeDecl) -> Vec<(String, bool)> {
     }
     if let Some(model) = &node.model {
         for f in &model.fields {
-            let is_int = matches!(
-                (&f.ty, &f.init),
-                (auto_parser_api::ast::Type::Int, _)
-            ) || matches!(f.init, Expr::Int(_));
+            let is_int = matches!((&f.ty, &f.init), (auto_parser_api::ast::Type::Int, _))
+                || matches!(f.init, Expr::Int(_));
             fields.push((f.name.to_string(), is_int));
         }
     }
@@ -271,16 +347,21 @@ fn emit_state(
     for def in defs_sorted(instances) {
         let node = node_of(project, &def);
         let prefix = &prefixes[&def];
-        let own: Vec<&Instance> = instances.iter().filter(|i| i.node.as_str() == def).collect();
+        let own: Vec<&Instance> = instances
+            .iter()
+            .filter(|i| i.node.as_str() == def)
+            .collect();
         for (field, _) in &def_fields(node) {
             let mut values = Vec::new();
             for inst in &own {
-                let v = if let Some(pv) = inst.props.iter().find(|p| &p.name == field).map(|p| &p.value) {
+                let v = if let Some(pv) = inst
+                    .props
+                    .iter()
+                    .find(|p| &p.name == field)
+                    .map(|p| &p.value)
+                {
                     match pv {
-                        PropValue::One(e) => numeric_lit(e).ok_or_else(|| LowerError::Unsupported {
-                            what: format!("instance {} prop {field} not numeric", inst.name),
-                            line: 0,
-                        })?,
+                        PropValue::One(e) => numeric_lit(e).unwrap_or(0.0), // 父成员引用字段：0 占位，app_start 运行时初始化
                         PropValue::Pair(_) => {
                             return Err(LowerError::Unsupported {
                                 what: format!("instance {} prop {field} pair", inst.name),
@@ -373,6 +454,61 @@ fn emit_state(
             src.push_str(&format!("var {prefix}_target=[{zeros}]\n"));
         }
     }
+    // 事件绑定表（非 root 父实例投递：每实例目标，按同定义实例序）。
+    for def in defs_sorted(instances) {
+        let inst = match instances.iter().find(|i| i.node.as_str() == def) {
+            Some(i) => i,
+            None => continue,
+        };
+        let Some(pr) = inst.props.iter().find(|pr| pr.name == "on_collect") else {
+            continue;
+        };
+        let any_non_root = instances
+            .iter()
+            .filter(|i| i.node.as_str() == def)
+            .any(|i| i.owner.is_some());
+        if !any_non_root {
+            continue;
+        }
+        let event = match &pr.value {
+            PropValue::One(Expr::Call(c)) => match &*c.name {
+                Expr::Dot(inner, ev) => {
+                    if matches!(&**inner, Expr::Ident(_)) {
+                        ev.clone()
+                    } else {
+                        continue;
+                    }
+                }
+                _ => continue,
+            },
+            // 裸 `.Ev` 绑定（无载荷）。
+            PropValue::One(Expr::Dot(inner, ev)) => {
+                if matches!(&**inner, Expr::Ident(_)) {
+                    ev.clone()
+                } else {
+                    continue;
+                }
+            }
+            _ => continue,
+        };
+        let prefix = &prefixes[def.as_str()];
+        let targets: Vec<String> = instances
+            .iter()
+            .filter(|i| i.node.as_str() == def)
+            .map(|i| {
+                let owner = i
+                    .owner
+                    .and_then(|gid| instances.iter().find(|o| o.gid == gid))
+                    .expect("owner");
+                owner.idx.to_string()
+            })
+            .collect();
+        src.push_str(&format!(
+            "var {prefix}_bind_{}=[{}]\n",
+            snake(&event).to_uppercase(),
+            targets.join(",")
+        ));
+    }
     Ok(())
 }
 
@@ -436,23 +572,35 @@ fn instance_emit_hook<'a>(
     instances: &'a [Instance],
     prefixes: &'a BTreeMap<String, String>,
 ) -> Result<Box<dyn Fn(&str) -> Result<String, LowerError> + 'a>, LowerError> {
-    let inst = instances.iter().find(|i| &i.node == def).ok_or_else(|| {
-        LowerError::Unsupported {
-            what: format!("handler for def {def} without instance"),
-            line: 0,
-        }
-    })?;
+    let inst =
+        instances
+            .iter()
+            .find(|i| &i.node == def)
+            .ok_or_else(|| LowerError::Unsupported {
+                what: format!("handler for def {def} without instance"),
+                line: 0,
+            })?;
     let binding = inst
         .props
         .iter()
         .find(|pr| pr.name == "on_collect")
         .map(|pr| pr.value.clone());
     let ctx = base_ctx(project, def, prefixes);
-    let call: Option<String> = match binding {
-        None => None,
+    // 绑定形态：`.Ev`（无载荷）或 `.Ev(arg...)`（Call）。
+    let (target, binding_args): (String, Vec<Expr>) = match &binding {
+        None => (String::new(), Vec::new()),
         Some(PropValue::One(Expr::Call(c))) => {
-            let target = match &*c.name {
-                Expr::Dot(inner, ev) => matches!(&**inner, Expr::Ident(_)).then(|| ev.clone()).unwrap_or_default(),
+            let t = match &*c.name {
+                Expr::Dot(inner, ev) => {
+                    if matches!(&**inner, Expr::Ident(_)) {
+                        ev.clone()
+                    } else {
+                        return Err(LowerError::Unsupported {
+                            what: format!("on_collect binding {c:?}"),
+                            line: 0,
+                        });
+                    }
+                }
                 other => {
                     return Err(LowerError::Unsupported {
                         what: format!("on_collect binding {other:?}"),
@@ -463,12 +611,7 @@ fn instance_emit_hook<'a>(
             let mut args = Vec::new();
             for a in &c.args.args {
                 match a {
-                    auto_parser_api::ast::Arg::Pos(e) => {
-                        let mut buf = String::new();
-                        translate_stmts(&[Stmt::Expr(e.clone())], &ctx, &mut buf, 0)?;
-                        let t = buf.trim().to_string();
-                        args.push(t);
-                    }
+                    auto_parser_api::ast::Arg::Pos(e) => args.push(e.clone()),
                     other => {
                         return Err(LowerError::Unsupported {
                             what: format!("binding arg {other:?}"),
@@ -477,8 +620,17 @@ fn instance_emit_hook<'a>(
                     }
                 }
             }
-            let base = snake(&project.root);
-            Some(format!("{base}_{}({})", snake(&target), args.join(", ")))
+            (t.to_string(), args)
+        }
+        Some(PropValue::One(Expr::Dot(inner, ev))) => {
+            if matches!(&**inner, Expr::Ident(_)) {
+                (ev.to_string(), Vec::new())
+            } else {
+                return Err(LowerError::Unsupported {
+                    what: format!("on_collect binding {binding:?}"),
+                    line: 0,
+                });
+            }
         }
         Some(other) => {
             return Err(LowerError::Unsupported {
@@ -487,7 +639,102 @@ fn instance_emit_hook<'a>(
             })
         }
     };
-    Ok(Box::new(move |event: &str| match &call {
+    let mut args = Vec::new();
+    for e in &binding_args {
+        let mut buf = String::new();
+        translate_stmts(&[Stmt::Expr(e.clone())], &ctx, &mut buf, 0)?;
+        args.push(buf.trim().to_string());
+    }
+    let call: Option<String> = if target.is_empty() {
+        None
+    } else {
+        let base = snake(&project.root);
+        Some(format!("{base}_{}({})", snake(&target), args.join(", ")))
+    };
+    // 非 root 父实例投递：绑定表按实例路由（collector_grab(coin_bind_GRAB[i])）。
+    let routed_call: Option<String> = {
+        let own: Vec<&Instance> = instances.iter().filter(|i| &i.node == def).collect();
+        let non_root: Vec<usize> = own.iter().filter_map(|i| i.owner).collect();
+        if non_root.is_empty() {
+            None
+        } else {
+            let inst = instances.iter().find(|i| &i.node == def).unwrap();
+            // 绑定形态：`.Ev`（无载荷）或 `.Ev(arg...)`。
+            let (target, _call_args): (String, Vec<Expr>) = match inst
+                .props
+                .iter()
+                .find(|pr| pr.name == "on_collect")
+                .map(|pr| &pr.value)
+            {
+                Some(PropValue::One(Expr::Call(c))) => {
+                    let t = match &*c.name {
+                        Expr::Dot(inner, ev) => {
+                            if matches!(&**inner, Expr::Ident(_)) {
+                                ev.to_string()
+                            } else {
+                                return Err(LowerError::Unsupported {
+                                    what: format!("routed binding {c:?}"),
+                                    line: 0,
+                                });
+                            }
+                        }
+                        other => {
+                            return Err(LowerError::Unsupported {
+                                what: format!("routed binding {other:?}"),
+                                line: 0,
+                            })
+                        }
+                    };
+                    (t, Vec::new())
+                }
+                Some(PropValue::One(Expr::Dot(inner, ev))) => {
+                    if matches!(&**inner, Expr::Ident(_)) {
+                        (ev.to_string(), Vec::new())
+                    } else {
+                        return Err(LowerError::Unsupported {
+                            what: "routed binding bare dot must be self member".into(),
+                            line: 0,
+                        });
+                    }
+                }
+                other => {
+                    return Err(LowerError::Unsupported {
+                        what: format!("routed binding {other:?}"),
+                        line: 0,
+                    })
+                }
+            };
+            // 所有非 root owner 必须同定义（fixture 约束）。
+            let mut owner_defs: Vec<String> = Vec::new();
+            for gid in &non_root {
+                let o = instances.iter().find(|i| i.gid == *gid).ok_or_else(|| {
+                    LowerError::Unsupported {
+                        what: "owner missing".into(),
+                        line: 0,
+                    }
+                })?;
+                if !owner_defs.contains(&o.node) {
+                    owner_defs.push(o.node.clone());
+                }
+            }
+            if owner_defs.len() != 1 {
+                return Err(LowerError::Unsupported {
+                    what: format!("mixed owner defs {owner_defs:?}"),
+                    line: 0,
+                });
+            }
+            let parent_base = snake(&owner_defs[0]);
+            let prefix = &prefixes[def];
+            let table = format!("{prefix}_bind_{}", snake(&target).to_uppercase());
+            let arg_text = String::new();
+            Some(format!(
+                "{parent_base}_{}({table}[i]{arg_text})",
+                snake(&target)
+            ))
+        }
+    };
+    let final_call = routed_call.or(call);
+    Ok(Box::new(move |event: &str| match &final_call {
         Some(c) => Ok(c.clone()),
         None => Err(LowerError::Unsupported {
             what: format!("emit .{event} without on_collect binding"),
@@ -510,7 +757,11 @@ fn emit_handlers(
             let (suffix, params): (String, String) = match &h.pattern {
                 EventPattern::Life { event, .. } => {
                     let e = event.to_lowercase();
-                    let ps = if e == "tick" { "dt float".into() } else { String::new() };
+                    let ps = if e == "tick" {
+                        "dt float".into()
+                    } else {
+                        String::new()
+                    };
                     (format!("life{e}"), ps)
                 }
                 EventPattern::Member { name, params } => {
@@ -585,13 +836,35 @@ fn emit_getters(
     for def in defs_sorted(instances) {
         let node = node_of(project, &def);
         let prefix = &prefixes[&def];
-        let own: Vec<&Instance> = instances.iter().filter(|i| i.node.as_str() == def).collect();
+        let own: Vec<&Instance> = instances
+            .iter()
+            .filter(|i| i.node.as_str() == def)
+            .collect();
+        // 同定义实例重名（如各自 view 内都叫 c）时用 def+idx 前缀，
+        // 避免 duplicate root symbol。
+        let mut names: Vec<String> = own.iter().map(|i| i.name.clone()).collect();
+        names.sort();
+        names.dedup();
+        let collision = names.len() != own.len()
+            || own.iter().any(|i| {
+                instances
+                    .iter()
+                    .any(|o| o.node.as_str() != def && o.name == i.name)
+            });
+        let getter = |inst: &Instance| -> String {
+            if collision {
+                format!("{}{}", def.to_lowercase(), inst.idx)
+            } else {
+                inst.name.clone()
+            }
+        };
         for (field, is_int) in &def_fields(node) {
             let ty = if *is_int { "int" } else { "float" };
             for inst in &own {
                 src.push_str(&format!(
                     "fn get_{}_{field}() {ty} {{return {prefix}_{field}[{}]}}\n",
-                    inst.name, inst.idx
+                    getter(inst),
+                    inst.idx
                 ));
             }
         }
@@ -599,7 +872,8 @@ fn emit_getters(
             for inst in &own {
                 src.push_str(&format!(
                     "fn get_{}_handle() int {{return {prefix}_handle[{}]}}\n",
-                    inst.name, inst.idx
+                    getter(inst),
+                    inst.idx
                 ));
             }
         }
@@ -607,7 +881,8 @@ fn emit_getters(
             for inst in &own {
                 src.push_str(&format!(
                     "fn get_{}_alive() int {{return {prefix}_alive[{}]}}\n",
-                    inst.name, inst.idx
+                    getter(inst),
+                    inst.idx
                 ));
             }
         }
@@ -623,7 +898,11 @@ fn emit_getters(
 }
 
 fn prop_pair(inst: &Instance, key: &str) -> Option<(f64, f64)> {
-    let v = inst.props.iter().find(|pr| pr.name == key).map(|pr| &pr.value)?;
+    let v = inst
+        .props
+        .iter()
+        .find(|pr| pr.name == key)
+        .map(|pr| &pr.value)?;
     let es = match v {
         PropValue::Pair(es) => es.clone(),
         PropValue::One(Expr::Tuple(es)) => es.clone(),
@@ -668,6 +947,48 @@ fn emit_orchestration(
         if node.params.iter().any(|(n, _)| n == "target") {
             let prefix = &prefixes[&inst.node];
             src.push_str(&format!(" {prefix}_target[{}]=ag_actor(2)\n", inst.idx));
+        }
+    }
+    // 父成员引用字段的运行时初始化（以所属父实例上下文翻译属性表达式）。
+    for inst in instances {
+        if inst.runtime_init.is_empty() {
+            continue;
+        }
+        let owner = inst
+            .owner
+            .and_then(|gid| instances.iter().find(|i| i.gid == gid))
+            .ok_or_else(|| LowerError::Unsupported {
+                what: format!("runtime-init field on root-d instance {}", inst.name),
+                line: 0,
+            })?;
+        let prefix = &prefixes[&inst.node];
+        for fname in &inst.runtime_init {
+            let pr = inst
+                .props
+                .iter()
+                .find(|pr| &pr.name == fname)
+                .ok_or_else(|| LowerError::Unsupported {
+                    what: format!("runtime field {fname} missing"),
+                    line: 0,
+                })?;
+            let mut ctx = base_ctx(project, &owner.node, prefixes);
+            ctx.target = Target::Instance {
+                prefix: prefixes[&owner.node].clone(),
+                index: owner.idx.to_string(),
+            };
+            let mut buf = String::new();
+            let ev = match &pr.value {
+                PropValue::One(e) => e.clone(),
+                PropValue::Pair(_) => {
+                    return Err(LowerError::Unsupported {
+                        what: "runtime-init pair".into(),
+                        line: 0,
+                    })
+                }
+            };
+            translate_stmts(&[Stmt::Expr(ev)], &ctx, &mut buf, 0)?;
+            let text = buf.trim().to_string();
+            src.push_str(&format!(" {prefix}_{fname}[{}]={text}\n", inst.idx));
         }
     }
     for (pair, gid) in pair_to_instance.iter().enumerate() {
@@ -741,34 +1062,33 @@ fn emit_orchestration(
     for (pair_idx, gid) in pair_to_instance.iter().enumerate() {
         let inst = instances.iter().find(|i| i.gid == *gid).unwrap();
         let node = node_of(project, &inst.node);
-        let handler_opt = node
-            .on
-            .as_ref()
-            .and_then(|on| {
-                on.handlers.iter().find_map(|h| match &h.pattern {
-                    EventPattern::Member { name, params } => Some((name.clone(), params.len())),
-                    _ => None,
-                })
-            });
+        let handler_opt = node.on.as_ref().and_then(|on| {
+            on.handlers.iter().find_map(|h| match &h.pattern {
+                EventPattern::Member { name, params } => Some((name.clone(), params.len())),
+                _ => None,
+            })
+        });
         // 无业务处理器的触发实例（016 Hazard：仅运动状态）：事件由游标
         // 推进消费，不投递。
         if let Some(handler) = handler_opt {
-        let base = snake(&inst.node);
-        let actor_arg = if handler.1 >= 1 { "ag_actor(2)" } else { "" };
-        let comma = if handler.1 >= 1 { ", " } else { "" };
-        src.push_str(&format!(
-            "  if p=={pair_idx} {{ {base}_{}({}{}{}) }}\n",
-            snake(&handler.0),
-            inst.idx,
-            comma,
-            actor_arg
-        ));
+            let base = snake(&inst.node);
+            let actor_arg = if handler.1 >= 1 { "ag_actor(2)" } else { "" };
+            let comma = if handler.1 >= 1 { ", " } else { "" };
+            src.push_str(&format!(
+                "  if p=={pair_idx} {{ {base}_{}({}{}{}) }}\n",
+                snake(&handler.0),
+                inst.idx,
+                comma,
+                actor_arg
+            ));
         }
     }
     src.push_str(" }\n");
     // 条件差量执行器（真 spawn/despawn，非 hidden）。
     for inst in instances {
-        let Some(cond) = &inst.conditional else { continue };
+        let Some(cond) = &inst.conditional else {
+            continue;
+        };
         let prefix = &prefixes[&inst.node];
         let has_trigger = inst.trigger;
         let mut cond_text = String::new();
@@ -818,9 +1138,9 @@ fn emit_orchestration(
 fn def_has_life(project: &Project, node_name: &str, event: &str) -> bool {
     let node = node_of(project, node_name);
     node.on.as_ref().is_some_and(|on| {
-        on.handlers.iter().any(|h| {
-            matches!(&h.pattern, EventPattern::Life { event: e, .. } if e == event)
-        })
+        on.handlers
+            .iter()
+            .any(|h| matches!(&h.pattern, EventPattern::Life { event: e, .. } if e == event))
     })
 }
 
@@ -828,14 +1148,11 @@ fn def_has_life(project: &Project, node_name: &str, event: &str) -> bool {
 pub fn mark_triggers(project: &Project, instances: &mut [Instance]) {
     for inst in instances.iter_mut() {
         let node = node_of(project, &inst.node);
-        inst.trigger = node
-            .view2d
-            .as_ref()
-            .is_some_and(|v| {
-                v.elements
-                    .iter()
-                    .any(|e| matches!(e, View2dElement::Trigger { .. }))
-            });
+        inst.trigger = node.view2d.as_ref().is_some_and(|v| {
+            v.elements
+                .iter()
+                .any(|e| matches!(e, View2dElement::Trigger { .. }))
+        });
     }
 }
 
@@ -867,10 +1184,13 @@ fn trigger_spawn_pos(
     prefixes: &BTreeMap<String, String>,
 ) -> Result<(String, String), LowerError> {
     let node = node_of(project, &inst.node);
-    let view = node.view2d.as_ref().ok_or_else(|| LowerError::Unsupported {
-        what: format!("node {} has no view-2d", inst.node),
-        line: 0,
-    })?;
+    let view = node
+        .view2d
+        .as_ref()
+        .ok_or_else(|| LowerError::Unsupported {
+            what: format!("node {} has no view-2d", inst.node),
+            line: 0,
+        })?;
     let pos = view
         .elements
         .iter()

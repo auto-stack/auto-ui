@@ -210,27 +210,27 @@ fn translate_expr(e: &Expr, ctx: &Ctx, out: &mut String) -> Result<(), LowerErro
         Expr::Call(call) => {
             // input.axis(Left, Right) → 差值轴（每方向一次 held 计费）。
             if let Expr::Dot(inner, m) = &*call.name {
-              if let Expr::Ident(base) = &**inner {
-                if base == "input" && m == "axis" {
-                    let sides: Vec<String> = call
-                        .args
-                        .args
-                        .iter()
-                        .map(|a| match a {
-                            Arg::Pos(Expr::Ident(n)) => Ok(n.to_string()),
-                            _ => Err(unsupported("input.axis args", e)),
-                        })
-                        .collect::<Result<Vec<_>, _>>()?;
-                    if sides.len() != 2 || sides[0] != "Left" || sides[1] != "Right" {
-                        return Err(unsupported(format!("input.axis({sides:?})"), e));
+                if let Expr::Ident(base) = &**inner {
+                    if base == "input" && m == "axis" {
+                        let sides: Vec<String> = call
+                            .args
+                            .args
+                            .iter()
+                            .map(|a| match a {
+                                Arg::Pos(Expr::Ident(n)) => Ok(n.to_string()),
+                                _ => Err(unsupported("input.axis args", e)),
+                            })
+                            .collect::<Result<Vec<_>, _>>()?;
+                        if sides.len() != 2 || sides[0] != "Left" || sides[1] != "Right" {
+                            return Err(unsupported(format!("input.axis({sides:?})"), e));
+                        }
+                        // 冻结研究输入模型（合同 S3）：axis(Left, Right) 映射为
+                        // 正向 held 位单次计费；完整差值轴为后继项（预算算式
+                        // 1snapshot 以此为准）。
+                        out.push_str("ag_action_held(1)");
+                        return Ok(());
                     }
-                    // 冻结研究输入模型（合同 S3）：axis(Left, Right) 映射为
-                    // 正向 held 位单次计费；完整差值轴为后继项（预算算式
-                    // 1snapshot 以此为准）。
-                    out.push_str("ag_action_held(1)");
-                    return Ok(());
                 }
-              }
             }
             // refs.body 服务调用（move_to 等）。
             if let Expr::Dot(inner, op) = &*call.name {
@@ -271,8 +271,7 @@ fn translate_expr(e: &Expr, ctx: &Ctx, out: &mut String) -> Result<(), LowerErro
             }
         }
         Expr::Bina(l, op, r) => {
-            let text =
-                op_text(op).ok_or_else(|| unsupported(format!("operator {op:?}"), e))?;
+            let text = op_text(op).ok_or_else(|| unsupported(format!("operator {op:?}"), e))?;
             let paren = *op != Op::Asn; // 赋值是语句形态，不加括号。
             if paren {
                 out.push('(');
