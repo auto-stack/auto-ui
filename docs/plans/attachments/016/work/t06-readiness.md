@@ -75,7 +75,7 @@ dependency_revisions: SDK 7b987ca8（driver .sdk-source，source-lock 校验）�
 修复后电池：dialect 6/6、compiler 6/6、pilot gates 9/9、driver flow 6/6、
 verify --controls PASS exit0（t06-verify-r2.log）；生成物 sha 不变
 （f66b1b92/4bd54fa3——拒绝面不触碰已冻结世界）；dialect 全量套件 0 failed。
-修复提交：R1_REPAIR_COMMIT（见 §9）。
+修复提交：9eb1d0e（见 §9）。
 
 ## review/merge-owned 待办（不阻塞移交）
 
