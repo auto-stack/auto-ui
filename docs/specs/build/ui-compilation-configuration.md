@@ -1,0 +1,45 @@
+# UI 编译配置（UI compilation configuration）
+
+> PLAN-018 新增合同（Design 52 计划D）。取代 `ui-iced` 实现选择器：runtime
+> 的稳定 UI 基线（ui/ui-interpreter/image-pipeline/code-editor/ui-clipboard/
+> ui-dialog/native-dock/native-clipboard + iced 后端与 arboard/resvg/
+> tiny-skia 依赖）恒在编译；`ui-iced` 保留为兼容别名。
+> 分类：build ｜ 状态：active ｜ 来源计划：docs/plans/018-ui-build-configuration-closure.md
+
+## 1. 稳定基线（恒开）
+
+- `auto-ui-runtime` 的 `default = ["ui-iced"]`；`ui-iced` 为**仅 feature 别名**
+  （转发基线子 feature，不挂任何 `dep:`、不被任何 cfg 消费）。生成模板
+  （`ui-iced = ["auto-ui-runtime/ui-iced"]` / `default = ["ui-iced"]`）、
+  26 个 example 的 required-features、Man 的默认链因此零改字面兼容。
+- 基线依赖非 optional（iced/iced_widget/iced_futures/iced_runtime/
+  iced_tiny_skia 目标域内 windows 随基线；arboard/rfd/raw-window-handle/
+  image/resvg/tiny-skia/kamadak-exif/cosmic-text/syntect/ureq）。
+  代码中基线九 feature 的 cfg 门已删除；`cfg(not(feature = "ui-iced"))`
+  反向 stub 臂不存在（基线恒开使"无后端工程"不可构造）。
+- 证据口径：拍平前后 `cargo build -p auto-ui-runtime` 单元账本逐位一致
+  （214==214，包/目标/feature 零差）；检查警告 403==403 零新增。
+
+## 2. 真实可选产品能力（保 optional，语义不变）
+
+`mpv-native/mpv-gpu/mpv-widget/mpv-spike`（mpv 族 + `iced_wgpu`）、
+`highlight-treesitter`（tree-sitter 15+ 包）、`autodown`
+（跨仓 autodown-core，不进 SDK）、`native-dnd`（windows-core）、
+`ui-headless`（cosmic 消费面）。交付投影中 `autodown` 的 `dep:` 转发随
+autodown-core 剥除同步摘除（feature 名保留）。
+
+## 3. 历史形态接收与来源
+
+- runtime 的 no-default 形态无生产读者（T-01 实证）；拍平后 no-default
+  = 基线本体减别名（行为等同默认），不再承诺"精简无窗形态"。
+- 生成工程 main 的 iced 臂无条件；原 no-backend stub 臂退役。
+- 来源：ui-iced 门面注释随迁自 auto-lang（Plan 015/041/414/459/617/683）；
+  本收口为 Design 52 计划D，B 面（语言测试 feature 拍平/常驻 TestCase）
+  见 auto-test-case/test-feature-flattening。
+
+## 4. 跨消费者
+
+- Man `auto` crate：optional auto-ui-runtime + `ui-extra`/`autodown`
+  转发链零改（别名兼容）；cosmic demo/host-libcosmic `ui-headless` 零改。
+- 轻包（compiler/dialect/LSP）零 runtime 反向边不回归（拍平闭包零 iced
+  单元）。
