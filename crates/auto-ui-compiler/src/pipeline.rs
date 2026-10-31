@@ -11,7 +11,6 @@
 use auto_lang_core::error::AutoResult;
 use auto_lang_core::parser::Parser;
 
-
 /// Build UI components from Auto files using AURA pipeline
 ///
 /// This is the main entry point for UI scenario compilation.
@@ -27,8 +26,8 @@ pub fn ui_build(
     backend: &str,
     output: Option<&str>,
 ) -> AutoResult<String> {
-    use auto_lang_core::session::CompilerSession;
     use crate::ui_gen::{BackendGenerator, JetGenerator, RustGenerator, VueGenerator};
+    use auto_lang_core::session::CompilerSession;
 
     // Parse scenario
     let session = match scenario {
@@ -167,8 +166,8 @@ pub fn ui_build(
 /// This is a convenience function for generating Vue components
 /// with shadcn-vue support enabled.
 pub fn ui_build_shadcn(path: &str, output: Option<&str>) -> AutoResult<String> {
-    use auto_lang_core::session::CompilerSession;
     use crate::ui_gen::{BackendGenerator, VueGenerator, VueMode};
+    use auto_lang_core::session::CompilerSession;
 
     // Read input file
     let code = std::fs::read_to_string(path).map_err(|e| format!("Failed to read file: {}", e))?;

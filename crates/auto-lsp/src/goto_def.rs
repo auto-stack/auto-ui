@@ -59,7 +59,10 @@ fn find_definition_impl(
 }
 
 /// Find the definition of a symbol using the compiler's Indexer + Database + TypeStore
-fn find_definition_in_ast(content: &str, name: &str) -> Option<auto_lang_core::symbols::SymbolLocation> {
+fn find_definition_in_ast(
+    content: &str,
+    name: &str,
+) -> Option<auto_lang_core::symbols::SymbolLocation> {
     use auto_lang_core::database::Database;
     use auto_lang_core::indexer::Indexer;
     use auto_val::AutoStr;
@@ -172,7 +175,10 @@ pub fn find_definition_workspace(
                     for method in &type_decl.methods {
                         if method.name.as_str() == member_name {
                             // Return location in current file (type is in current file)
-                            return create_location(uri, &auto_lang_core::symbols::SymbolLocation::new(0, 0, 0));
+                            return create_location(
+                                uri,
+                                &auto_lang_core::symbols::SymbolLocation::new(0, 0, 0),
+                            );
                         }
                     }
                 }
@@ -220,7 +226,10 @@ pub fn find_definition_workspace(
 }
 
 /// Create an LSP Location from a SymbolLocation
-fn create_location(uri: &str, loc: &auto_lang_core::symbols::SymbolLocation) -> Option<GotoDefinitionResponse> {
+fn create_location(
+    uri: &str,
+    loc: &auto_lang_core::symbols::SymbolLocation,
+) -> Option<GotoDefinitionResponse> {
     let uri_parsed: Uri = uri.parse().ok()?;
 
     // Adjust character position (subtract 1 to fix off-by-one issue)
