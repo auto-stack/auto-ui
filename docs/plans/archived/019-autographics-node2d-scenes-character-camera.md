@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-10-31
 updated_at: 2026-10-31
 plan_revision: 1
-current_step: 6
+current_step: 10
 total_steps: 10
 depends_on: [auto-ui/PLAN-017]
 supersedes_spec_components: []
@@ -149,7 +149,7 @@ G06原speed4/fast5、jump8、gravity20、dt1/60，台阶/坑道几何不改；�
 | T-07 | review | T-06 | 同树独立final逐AC/V/S/SD及旧断言审查，finding回work，pass列merge门pending | AC-07 | [ ] |
 | T-08 | merge | T-07 pass | 冻结源/依赖/输入、定向并集或严格有效复用后合master | AC-08 | [ ] |
 | T-09 | merge | T-08 | 两Spec/来源/归档/导航，折叠证据至Plan，不写派生JSON或外仓Spec | AC-08/09 | [ ] |
-| T-10 | merge | T-09 | fresh guard/clean/祖先核后清树分支空组，逐全部实际输出路径对账，删自有plan-artifacts并刷新登记/完成hash | AC-09 | [ ] |
+| T-10 | merge | T-09 | fresh guard/clean/祖先核后清树分支空组，逐全部实际输出路径对账，删自有plan-artifacts并刷新登记/完成hash | AC-09 | [x] 2026-11-01：fresh guard全4树clean（ui-019/auto-ui+三只读依赖）；git worktree remove×4+branch -d codex/plan-019-dev(was c93adb7已landed)+空组rmdir；plan-artifacts/plan-019/全删(67文件231K)并刷新.retention/policy.json（auto-ui/PLAN-019 cleaned，无具名持有，document指向归档文件存在）；主检出non-docs clean，其余docs WIP为其他owner保留。交付后观察：本仓为库/研究仓，无驻留生产二进制/daemon/web bundle交付面（017同例）；pilot/driver targets随worktree消亡即政策；gallery内容侧(008)消费本交付走其自身source-build记录。批量回归due核：auto-ui无.last-batch-regression.json（该due程序属auto-lang），019非5倍数，不适用。 |
 
 ## 9. 复审记录
 
