@@ -253,6 +253,10 @@ fn parse_view2d_element(cx: &mut dyn DomainParseContext) -> AutoResult<View2dEle
             name: elem_name,
             props,
         },
+        "character2d" => View2dElement::Character {
+            name: elem_name,
+            props,
+        },
         "camera2d" => View2dElement::Camera {
             name: elem_name,
             props,

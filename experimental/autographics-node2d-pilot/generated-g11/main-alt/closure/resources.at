@@ -1,0 +1,20 @@
+// PLAN-017 g11-2d fixture: programmatic resources (original 001 geometry and
+// colours, exact values from the read-only baseline). Resource symbols are
+// referenced by instances; no files, no new formats.
+let player_mesh = mesh2d.quad(0.8, 1.0)
+let ground_mesh = mesh2d.quad(40.0, 1.0)
+let amber_mesh = mesh2d.circle(0.6)
+let azure_mesh = mesh2d.quad(0.7, 0.7)
+let rose_mesh = mesh2d.circle(0.9)
+let hazard_mesh = mesh2d.circle(0.7)
+let goal_mesh = mesh2d.quad(0.5, 1.2)
+let void_mesh = mesh2d.quad(2.0, 3.0)
+
+let orange = material2d.color(0.9, 0.5, 0.25, 1.0)
+let ground_color = material2d.color(0.55, 0.62, 0.7, 1.0)
+let gold = material2d.color(0.95, 0.8, 0.2, 1.0)
+let cyan = material2d.color(0.2, 0.8, 0.9, 1.0)
+let pink = material2d.color(0.9, 0.35, 0.85, 1.0)
+let red = material2d.color(0.9, 0.2, 0.2, 1.0)
+let green = material2d.color(0.3, 0.9, 0.5, 1.0)
+let dim = material2d.color(0.1, 0.1, 0.12, 1.0)

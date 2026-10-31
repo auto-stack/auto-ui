@@ -45,6 +45,9 @@ pub enum View2dElement {
     Solid { name: String, props: Vec<Prop> },
     /// `trigger2d name { props }` —— 触发体。
     Trigger { name: String, props: Vec<Prop> },
+    /// `character2d name { props }` —— 角色宿主（PLAN-017 研究端口：
+    /// 声明式角色声明，映射 AG character 服务；按类型而非名字识别）。
+    Character { name: String, props: Vec<Prop> },
     /// `camera2d name { props }` —— 相机。
     Camera { name: String, props: Vec<Prop> },
     /// `NodeName instance_name { props }` —— 同定义多实例的实例化点。

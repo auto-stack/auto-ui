@@ -272,3 +272,322 @@ pub fn build_scene_json(
         "{{\n \"behavior\": {{\n  \"api\": \"autographics.triggers2d/1\",\n  \"source\": {{\n   \"format\": \"auto-source\",\n   \"sha256\": \"{source_sha256}\",\n   \"byte_length\": {source_bytes}\n  }},\n  \"actors\": {{\n   \"two_d\": 1,\n   \"three_d\": null\n  }}\n }},\n \"schema\": \"autographics.scene/6\",\n \"document_id\": \"plan016-minimal-node2d\",\n \"resources\": [\n  \"circle\",\n  \"quad\",\n  \"cylinder\",\n  \"player\",\n  \"mob\"\n ],\n \"objects\": [\n{objects}\n ],\n \"groups\": [],\n \"assets\": []\n}}\n"
     )
 }
+
+// ---- PLAN-017 g11-2d profile 场景构建（声明驱动模板表）----
+
+use crate::lower_g11::ResolvedProp;
+
+fn resource_ref_name(v: &auto_ui_dialect::node2d::PropValue) -> Option<String> {
+    if let auto_ui_dialect::node2d::PropValue::One(Expr::Dot(outer, m)) = v {
+        if let Expr::Ident(base) = &**outer {
+            if base == "resources" {
+                return Some(m.to_string());
+            }
+        }
+    }
+    None
+}
+
+fn kind_geometry(
+    project: &Project,
+    resource: &str,
+) -> Result<(String, f64, f64, (f64, f64, f64, f64)), crate::translate::LowerError> {
+    let module = project
+        .modules
+        .get("resources")
+        .ok_or_else(|| crate::translate::LowerError::Unsupported {
+            what: "resources module missing".into(),
+            line: 0,
+        })?;
+    for r in &module.resources {
+        if r.name == resource {
+            return match &r.kind {
+                ResourceKind::Quad(w, h) => Ok(("quad".into(), *w, *h, (0.0, 0.0, 0.0, 0.0))),
+                ResourceKind::Circle(d) => Ok(("circle".into(), *d, *d, (0.0, 0.0, 0.0, 0.0))),
+                ResourceKind::Color(r, g, b, a) => Ok((
+                    "color".into(),
+                    0.0,
+                    0.0,
+                    (*r, *g, *b, *a),
+                )),
+            };
+        }
+    }
+    Err(crate::translate::LowerError::Unsupported {
+        what: format!("resource '{resource}' not found"),
+        line: 0,
+    })
+}
+
+fn position_component(
+    e: &Expr,
+    inst_props: Option<&Vec<(String, ResolvedProp)>>,
+) -> Result<f64, crate::translate::LowerError> {
+    match e {
+        Expr::Float(x, _) => Ok(*x),
+        Expr::Int(x) => Ok(*x as f64),
+        Expr::Unary(auto_parser_api::ast::Op::Sub, inner) => {
+            Ok(-position_component(inner, inst_props)?)
+        }
+        // `.param`（self 成员）与裸参数名等价：查实例数值参数字面量。
+        Expr::Dot(inner, p) => {
+            if let Expr::Ident(_) = &**inner {
+                let props = inst_props.ok_or_else(|| crate::translate::LowerError::Unsupported {
+                    what: format!("position references '.{p}' without instance context"),
+                    line: 0,
+                })?;
+                match props.iter().find(|(n, _)| n == p.as_str()) {
+                    Some((_, ResolvedProp::NumberLit(v))) => Ok(*v),
+                    _ => Err(crate::translate::LowerError::Unsupported {
+                        what: format!("position member '.{p}' is not a numeric literal"),
+                        line: 0,
+                    }),
+                }
+            } else {
+                Err(crate::translate::LowerError::Unsupported {
+                    what: format!("position expr {e:?}"),
+                    line: 0,
+                })
+            }
+        }
+        Expr::Ident(p) => {
+            let props = inst_props.ok_or_else(|| crate::translate::LowerError::Unsupported {
+                what: format!("position references param '{p}' without instance context"),
+                line: 0,
+            })?;
+            match props.iter().find(|(n, _)| n == p.as_str()) {
+                Some((_, ResolvedProp::NumberLit(v))) => Ok(*v),
+                _ => Err(crate::translate::LowerError::Unsupported {
+                    what: format!("position param '{p}' is not a numeric literal"),
+                    line: 0,
+                }),
+            }
+        }
+        other => Err(crate::translate::LowerError::Unsupported {
+            what: format!("position expr {other:?}"),
+            line: 0,
+        }),
+    }
+}
+
+/// 位置字面量求值（字面量或实例数值参数引用）。
+fn literal_position(
+    v: &auto_ui_dialect::node2d::PropValue,
+    inst_props: Option<&Vec<(String, ResolvedProp)>>,
+) -> Result<(f64, f64), crate::translate::LowerError> {
+    let es = match v {
+        auto_ui_dialect::node2d::PropValue::Pair(es) => es.clone(),
+        auto_ui_dialect::node2d::PropValue::One(Expr::Tuple(es)) => es.clone(),
+        other => {
+            return Err(crate::translate::LowerError::Unsupported {
+                what: format!("position {other:?}"),
+                line: 0,
+            })
+        }
+    };
+    if es.len() != 2 {
+        return Err(crate::translate::LowerError::Unsupported {
+            what: "position arity".into(),
+            line: 0,
+        });
+    }
+    Ok((
+        position_component(&es[0], inst_props)?,
+        position_component(&es[1], inst_props)?,
+    ))
+}
+
+/// 元素（或实例覆盖）的 mesh/material 资源名。
+fn element_mesh_material(
+    props: &[auto_ui_dialect::node2d::Prop],
+    inst_props: Option<&Vec<(String, ResolvedProp)>>,
+) -> (Option<String>, Option<String>) {
+    let from_inst = |key: &str| {
+        inst_props.and_then(|ps| {
+            ps.iter().find_map(|(n, v)| match (n.as_str(), v) {
+                ("mesh", ResolvedProp::Resource(r)) if key == "mesh" => Some(r.clone()),
+                ("material", ResolvedProp::Resource(r)) if key == "material" => Some(r.clone()),
+                _ => None,
+            })
+        })
+    };
+    let from_elem = |key: &str| {
+        props
+            .iter()
+            .find(|p| p.name == key)
+            .and_then(|p| resource_ref_name(&p.value))
+    };
+    let mesh = from_inst("mesh").or_else(|| from_elem("mesh"));
+    let material = from_inst("material").or_else(|| from_elem("material"));
+    (mesh, material)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn build_scene_json_g11(
+    project: &Project,
+    instances: &[Instance],
+    resolved: &std::collections::BTreeMap<usize, Vec<(String, ResolvedProp)>>,
+    char_def: &str,
+    char_inst: &str,
+    grounds: &[(String, Vec<auto_ui_dialect::node2d::Prop>)],
+    camera: &Option<Vec<auto_ui_dialect::node2d::Prop>>,
+    char_template: usize,
+    ground_templates: &[usize],
+    inst_template: &std::collections::BTreeMap<usize, usize>,
+    trigger_instances: &[usize],
+    source_sha256: &str,
+    source_bytes: usize,
+    root_name: &str,
+) -> Result<String, crate::translate::LowerError> {
+    let _ = camera;
+    let park_x = -30.0f64;
+    let park_y = 2.0f64;
+    let mut rows: Vec<String> = Vec::new();
+    let mut next_id = 1usize;
+
+    // 角色行（id=1，在位可见）。
+    {
+        let host = instances
+            .iter()
+            .find(|i| i.name == char_inst)
+            .ok_or_else(|| crate::translate::LowerError::Unsupported {
+                what: "char host instance missing".into(),
+                line: 0,
+            })?;
+        let node = crate::load::node_of(project, char_def);
+        let el = node
+            .view2d
+            .as_ref()
+            .and_then(|v| {
+                v.elements
+                    .iter()
+                    .find(|e| matches!(e, View2dElement::Character { .. }))
+            })
+            .ok_or_else(|| crate::translate::LowerError::Unsupported {
+                what: "char element missing".into(),
+                line: 0,
+            })?;
+        let props = match el {
+            View2dElement::Character { props, .. } => props.clone(),
+            _ => unreachable!(),
+        };
+        let iprops = resolved.get(&host.gid);
+        let (mesh, material) = element_mesh_material(&props, iprops);
+        let mesh = mesh.ok_or_else(|| crate::translate::LowerError::Unsupported {
+            what: "character2d mesh missing".into(),
+            line: 0,
+        })?;
+        let material = material.ok_or_else(|| crate::translate::LowerError::Unsupported {
+            what: "character2d material missing".into(),
+            line: 0,
+        })?;
+        let (kind, w, h, _) = kind_geometry(project, &mesh)?;
+        let (_, _, _, rgba) = kind_geometry(project, &material)?;
+        let pos = props
+            .iter()
+            .find(|p| p.name == "position")
+            .map(|p| p.value.clone())
+            .ok_or_else(|| crate::translate::LowerError::Unsupported {
+                what: "character2d position missing".into(),
+                line: 0,
+            })?;
+        let (tx, ty) = literal_position(&pos, iprops)?;
+        assert_eq!(next_id, char_template, "char row must be id 1");
+        rows.push(obj_json(
+            next_id,
+            char_inst,
+            &kind,
+            tx,
+            ty,
+            w,
+            h,
+            rgba,
+        ));
+        next_id += 1;
+    }
+
+    // 地面行（根 solid2d，在位可见）。
+    for (i, (_, props)) in grounds.iter().enumerate() {
+        let (mesh, material) = element_mesh_material(props, None);
+        let mesh = mesh.ok_or_else(|| crate::translate::LowerError::Unsupported {
+            what: "solid2d mesh missing".into(),
+            line: 0,
+        })?;
+        let material = material.ok_or_else(|| crate::translate::LowerError::Unsupported {
+            what: "solid2d material missing".into(),
+            line: 0,
+        })?;
+        let (kind, w, h, _) = kind_geometry(project, &mesh)?;
+        let (_, _, _, rgba) = kind_geometry(project, &material)?;
+        let pos = props
+            .iter()
+            .find(|p| p.name == "position")
+            .map(|p| p.value.clone())
+            .ok_or_else(|| crate::translate::LowerError::Unsupported {
+                what: "solid2d position missing".into(),
+                line: 0,
+            })?;
+        let (tx, ty) = literal_position(&pos, None)?;
+        assert_eq!(next_id, ground_templates[i], "ground row id drift");
+        rows.push(obj_json(next_id, "ground", &kind, tx, ty, w, h, rgba));
+        next_id += 1;
+    }
+
+    // 触发实例模板行（停靠玩法区外，不可见；实例按声明位置 spawn）。
+    for gid in trigger_instances {
+        let inst = instances
+            .iter()
+            .find(|i| i.gid == *gid)
+            .ok_or_else(|| crate::translate::LowerError::Unsupported {
+                what: "trigger instance missing".into(),
+                line: 0,
+            })?;
+        let node = crate::load::node_of(project, &inst.node);
+        let el = node
+            .view2d
+            .as_ref()
+            .and_then(|v| {
+                v.elements
+                    .iter()
+                    .find(|e| matches!(e, View2dElement::Trigger { .. }))
+            })
+            .ok_or_else(|| crate::translate::LowerError::Unsupported {
+                what: "trigger element missing".into(),
+                line: 0,
+            })?;
+        let props = match el {
+            View2dElement::Trigger { props, .. } => props.clone(),
+            _ => unreachable!(),
+        };
+        let iprops = resolved.get(gid);
+        let (mesh, material) = element_mesh_material(&props, iprops);
+        let mesh = mesh.ok_or_else(|| crate::translate::LowerError::Unsupported {
+            what: format!("instance '{}' mesh missing", inst.name),
+            line: 0,
+        })?;
+        let material = material.ok_or_else(|| crate::translate::LowerError::Unsupported {
+            what: format!("instance '{}' material missing", inst.name),
+            line: 0,
+        })?;
+        let (kind, w, h, _) = kind_geometry(project, &mesh)?;
+        let (_, _, _, rgba) = kind_geometry(project, &material)?;
+        let tid = inst_template[gid];
+        assert_eq!(next_id, tid, "template id drift");
+        rows.push(obj_json(
+            next_id,
+            &format!("{}_template", inst.name),
+            &kind,
+            park_x,
+            park_y,
+            w,
+            h,
+            rgba,
+        ));
+        next_id += 1;
+    }
+
+    Ok(format!(
+        "{{\n \"behavior\": {{\n  \"api\": \"autographics.triggers2d/1\",\n  \"source\": {{\n   \"format\": \"auto-source\",\n   \"sha256\": \"{source_sha256}\",\n   \"byte_length\": {source_bytes}\n  }},\n  \"actors\": {{\n   \"two_d\": 1,\n   \"three_d\": null\n  }}\n }},\n \"schema\": \"autographics.scene/6\",\n \"document_id\": \"plan017-g11-2d-{root_name}\",\n \"resources\": [\n  \"circle\",\n  \"quad\",\n  \"cylinder\",\n  \"player\",\n  \"mob\"\n ],\n \"objects\": [\n{}\n ],\n \"groups\": [],\n \"assets\": []\n}}\n",
+        rows.join(",\n")
+    ))
+}

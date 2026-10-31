@@ -41,6 +41,18 @@ pub struct Ctx<'a> {
     pub emit_hook: Box<dyn Fn(&str) -> Result<String, LowerError> + 'a>,
     /// 枚举路径求值：`Key.Amber` → `KEY_AMBER`。
     pub enum_path: Box<dyn Fn(&str, &str) -> Option<String> + 'a>,
+    /// PLAN-017（g11-2d profile）：完整差值轴。false 保持 016 冻结映射
+    /// `ag_action_held(1)`（legacy 字节兼容）。
+    pub axis_differential: bool,
+    /// PLAN-017：参数成员覆盖（表达式绑定参数在 owner 上下文内联求值，
+    /// 如 `enabled`/actor 端口）。None 时回落 SoA 数组映射。
+    pub member_hook: Option<Box<dyn Fn(&str) -> Option<String> + 'a>>,
+    /// PLAN-017：移动标记全局变量名（`refs.<elem>.move_and_slide` 前置
+    /// 置位，事件段据此选择移动 1 条/静止 3 条读取）。legacy 为 None。
+    pub moved_flag: Option<String>,
+    /// PLAN-017：refs.<elem> 接受任意本定义 view 元素名（legacy 冻结
+    /// 仅 `body`）。
+    pub refs_any_elem: bool,
 }
 
 fn line_of(e: &Expr) -> usize {
@@ -75,11 +87,16 @@ fn op_text(op: &Op) -> Option<&'static str> {
     })
 }
 
-fn member_ref(field: &str, ctx: &Ctx) -> String {
-    match &ctx.target {
+fn member_ref(field: &str, ctx: &Ctx) -> Result<String, LowerError> {
+    if let Some(hook) = &ctx.member_hook {
+        if let Some(text) = hook(field) {
+            return Ok(text);
+        }
+    }
+    Ok(match &ctx.target {
         Target::Root => format!("r_{field}"),
         Target::Instance { prefix, index } => format!("{prefix}_{field}[{index}]"),
-    }
+    })
 }
 
 pub fn translate_stmts(
@@ -186,7 +203,7 @@ fn translate_expr(e: &Expr, ctx: &Ctx, out: &mut String) -> Result<(), LowerErro
             match &**obj {
                 Expr::Ident(base) => match base.as_str() {
                     "self" => {
-                        out.push_str(&member_ref(name, ctx));
+                        out.push_str(&member_ref(name, ctx)?);
                         Ok(())
                     }
                     "emit" => {
@@ -223,19 +240,53 @@ fn translate_expr(e: &Expr, ctx: &Ctx, out: &mut String) -> Result<(), LowerErro
                         if sides.len() != 2 || sides[0] != "Left" || sides[1] != "Right" {
                             return Err(unsupported(format!("input.axis({sides:?})"), e));
                         }
-                        // 冻结研究输入模型（合同 S3）：axis(Left, Right) 映射为
-                        // 正向 held 位单次计费；完整差值轴为后继项（预算算式
-                        // 1snapshot 以此为准）。
-                        out.push_str("ag_action_held(1)");
+                        if ctx.axis_differential {
+                            // PLAN-017 冻结映射：Left=-1、Right=+1、两者/都无=0；
+                            // 两次计费 held 读取（预算算式 held2）。
+                            out.push_str("(ag_action_held(1) - ag_action_held(0))");
+                        } else {
+                            // 016 冻结研究输入模型（合同 S3）：axis(Left, Right)
+                            // 映射为正向 held 位单次计费；legacy 字节不变。
+                            out.push_str("ag_action_held(1)");
+                        }
+                        return Ok(());
+                    }
+                    // PLAN-017：input.pressed(Enter) → pressed 边沿（消耗性读取，
+                    // 计费 1）。仅 g11-2d profile 夹具使用。
+                    if base == "input" && m == "pressed" {
+                        let names: Vec<String> = call
+                            .args
+                            .args
+                            .iter()
+                            .map(|a| match a {
+                                Arg::Pos(Expr::Ident(n)) => Ok(n.to_string()),
+                                _ => Err(unsupported("input.pressed args", e)),
+                            })
+                            .collect::<Result<Vec<_>, _>>()?;
+                        if names.len() != 1 || names[0] != "Enter" {
+                            return Err(unsupported(format!("input.pressed({names:?})"), e));
+                        }
+                        out.push_str("ag_action_pressed(3)");
+                        return Ok(());
+                    }
+                    // PLAN-017：round.request() → ag_round_request()（计费 1，
+                    // accepted 候选由宿主消费）。
+                    if base == "round" && m == "request" {
+                        if !call.args.args.is_empty() {
+                            return Err(unsupported("round.request arity", e));
+                        }
+                        out.push_str("ag_round_request()");
                         return Ok(());
                     }
                 }
             }
-            // refs.body 服务调用（move_to 等）。
+            // refs.<elem> 服务调用（move_and_slide 等）。
             if let Expr::Dot(inner, op) = &*call.name {
                 if let Expr::Dot(boxed_root, mid) = &**inner {
-                    if matches!(&**boxed_root, Expr::Ident(r) if r == "refs") && mid == "body" {
-                        return translate_refs_body(op, e, ctx, out);
+                    if matches!(&**boxed_root, Expr::Ident(r) if r == "refs")
+                        && (ctx.refs_any_elem || mid == "body")
+                    {
+                        return translate_refs_body(op, mid, e, ctx, out);
                     }
                 }
             }
@@ -302,12 +353,19 @@ fn translate_expr(e: &Expr, ctx: &Ctx, out: &mut String) -> Result<(), LowerErro
     }
 }
 
-/// `refs.body.<op>(args)`：`move_and_slide((dx,dy))` → char 扫掠；
-/// `move(x,y)` → 实例对象移动。其余拒绝。
-fn translate_refs_body(op: &str, e: &Expr, ctx: &Ctx, out: &mut String) -> Result<(), LowerError> {
+/// `refs.<elem>.<op>(args)`：`move_and_slide((dx,dy))` → char 扫掠；
+/// `move_to(x,y)` → 实例对象移动。其余拒绝。
+fn translate_refs_body(
+    op: &str,
+    elem: &str,
+    e: &Expr,
+    ctx: &Ctx,
+    out: &mut String,
+) -> Result<(), LowerError> {
+    let _ = elem;
     let call = match e {
         Expr::Call(c) => c,
-        _ => return Err(unsupported("refs.body non-call", e)),
+        _ => return Err(unsupported("refs.<elem> non-call", e)),
     };
     match op {
         "move_and_slide" => {
@@ -318,6 +376,14 @@ fn translate_refs_body(op: &str, e: &Expr, ctx: &Ctx, out: &mut String) -> Resul
                 Arg::Pos(Expr::Tuple(items)) if items.len() == 2 => items,
                 _ => return Err(unsupported("move_and_slide pair arg", e)),
             };
+            // PLAN-017：本 tick 真实扫掠标记（事件段读取条数选择的依据，
+            // 与原 001 的 moved 语义一致）。前置置位后紧邻扫掠调用。
+            if let Some(flag) = &ctx.moved_flag {
+                // 当前语句缩进 = translate_stmt 已写入 out 末尾的空格。
+                let spaces = out.len() - out.trim_end_matches(' ').len();
+                let indent: String = " ".repeat(spaces);
+                out.push_str(&format!("{flag} = 1\n{indent}"));
+            }
             out.push_str("ag_char_move(");
             translate_expr(&pair[0], ctx, out)?;
             out.push_str(", ");

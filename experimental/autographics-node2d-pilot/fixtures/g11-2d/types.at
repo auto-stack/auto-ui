@@ -1,0 +1,4 @@
+// PLAN-017 g11-2d fixture: gameplay types. Key only names which item; Result
+// only names the round outcome. Enums lower to int constants (0-based).
+enum Key { Amber, Azure, Rose }
+enum Result { Playing, Won, Failed }

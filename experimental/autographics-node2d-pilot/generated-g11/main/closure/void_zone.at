@@ -1,0 +1,18 @@
+// PLAN-017 g11-2d fixture: the out-of-bounds zone (left void). AABB trigger;
+// enter routes to .Touched; the parent maps it to the fail outcome.
+node VoidZone(x: float, y: float, mesh: Mesh2D, material: Material2D, target: ActorRef2D, on_hit: msg) {
+    msg { Touched(ActorRef2D) }
+    view-2d {
+        trigger2d body {
+            position: (.x, .y)
+            on_enter: .Touched
+        }
+    }
+    on {
+        .Touched(actor) -> {
+            if actor == .target {
+                emit .on_hit
+            }
+        }
+    }
+}

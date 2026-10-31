@@ -237,7 +237,7 @@ pub struct Instance {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn collect_instances(
+pub fn collect_instances(
     el: &View2dElement,
     cond: Option<Expr>,
     owner: Option<usize>,
@@ -283,7 +283,7 @@ fn defs_sorted(instances: &[Instance]) -> Vec<String> {
     defs
 }
 
-fn numeric_lit(e: &Expr) -> Option<f64> {
+pub fn numeric_lit(e: &Expr) -> Option<f64> {
     match e {
         Expr::Float(v, _) => Some(*v),
         Expr::Int(v) => Some(*v as f64),
@@ -294,7 +294,7 @@ fn numeric_lit(e: &Expr) -> Option<f64> {
     }
 }
 
-fn fmt_f(v: f64) -> String {
+pub fn fmt_f(v: f64) -> String {
     if v == v.trunc() && v.abs() < 1e15 {
         format!("{v:.1}")
     } else {
@@ -303,7 +303,7 @@ fn fmt_f(v: f64) -> String {
 }
 
 /// node 定义的状态字段：数值参数（序）+ model 字段，带 int 判定。
-fn def_fields(node: &NodeDecl) -> Vec<(String, bool)> {
+pub fn def_fields(node: &NodeDecl) -> Vec<(String, bool)> {
     let mut fields = Vec::new();
     for (pname, _ty) in &node.params {
         if pname == "on_collect" || pname == "target" {
@@ -547,10 +547,15 @@ fn base_ctx<'a>(
             }
             None
         }),
+        // PLAN-017：legacy 字节兼容默认（016 冻结映射不变）。
+        axis_differential: false,
+        member_hook: None,
+        moved_flag: None,
+        refs_any_elem: false,
     }
 }
 
-fn snake(name: &str) -> String {
+pub fn snake(name: &str) -> String {
     let mut out = String::new();
     for (i, c) in name.chars().enumerate() {
         if c.is_ascii_uppercase() {
@@ -1139,7 +1144,7 @@ pub fn mark_triggers(project: &Project, instances: &mut [Instance]) {
 }
 
 /// 在模块源里按文本定位 `fn name(` 并按花括号配平切出完整定义。
-fn slice_fn_source(source: &str, name: &str) -> Option<String> {
+pub fn slice_fn_source(source: &str, name: &str) -> Option<String> {
     let marker = format!("fn {name}(");
     let start = source.find(&marker)?;
     let open = source[start..].find('{')? + start;
