@@ -132,7 +132,7 @@ mod plan058_engine_gap_tests;
 mod plan814_v02_api_pin;
 #[cfg(test)]
 mod autodown_codegen_debts_tests;
-#[cfg(test)]
+#[cfg(all(test, feature = "test-http-e2e"))]
 mod back_proxy_tests;
 #[cfg(test)]
 mod error_spans_tests;

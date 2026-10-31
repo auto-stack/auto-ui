@@ -19,6 +19,7 @@ fn workspace_path(rel: &str) -> String {
     manifest_dir
         .join("..")
         .join("..")
+        .join("../auto-lang") // PLAN-900：015-notes 语料在 auto-lang 仓
         .join(rel)
         .to_string_lossy()
         .to_string()

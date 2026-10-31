@@ -223,7 +223,7 @@ fn test_plan635_example_fixture_vue_chain() {
     // production chain and assert the imported + derived recipes expand.
     let manifest = env!("CARGO_MANIFEST_DIR");
     let app = std::path::Path::new(manifest)
-        .join("../../examples/capability-tests/style-import/src/front/app.at");
+        .join("../../../auto-lang/examples/capability-tests/style-import/src/front/app.at");
     if !app.exists() {
         panic!("example fixture missing: {}", app.display());
     }

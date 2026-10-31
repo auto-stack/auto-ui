@@ -1,6 +1,6 @@
 ---
-source: crates/auto-lang/tests/ui_snapshots.rs
-assertion_line: 84
+source: crates/auto-ui-runtime/tests/ui_snapshots.rs
+assertion_line: 85
 expression: out
 ---
 File: examples/ui/015-notes/src/front/sidebar.at

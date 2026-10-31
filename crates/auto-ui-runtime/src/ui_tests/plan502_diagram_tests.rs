@@ -206,7 +206,7 @@ fn plan502_m3_layout_geometry_e2e() {
         // PLAN-590:画廊迁 auto-os 顶层——先解析序定位,旧仓内路径兜底。
         let p = locate_gallery_file("src/front/components/flow_diagram.at").unwrap_or_else(|| {
             PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("../../examples/widgets-gallery/src/front/components/flow_diagram.at")
+                .join("../../../auto-lang/examples/widgets-gallery/src/front/components/flow_diagram.at")
         });
         match std::fs::read_to_string(&p) {
             Ok(s) => s,
@@ -757,7 +757,7 @@ fn plan502_m5_hover_and_labels_e2e() {
         // PLAN-590:画廊迁 auto-os 顶层——先解析序定位,旧仓内路径兜底。
         let p = locate_gallery_file("src/front/components/flow_diagram.at").unwrap_or_else(|| {
             std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("../../examples/widgets-gallery/src/front/components/flow_diagram.at")
+                .join("../../../auto-lang/examples/widgets-gallery/src/front/components/flow_diagram.at")
         });
         match std::fs::read_to_string(&p) {
             Ok(s) => s,

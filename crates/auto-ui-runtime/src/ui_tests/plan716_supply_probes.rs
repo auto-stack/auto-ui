@@ -243,11 +243,11 @@ widget App {{
         // PLAN-814 T-05：发射 canonical 化（import_policy.rs 新旧映射表）——
         // ui::frame_bench 断言串随 auto_ui_runtime 前缀更新。
         assert!(
-            rs.contains("crate::ui::frame_bench::frame_begin_ms()"),
+            rs.contains("auto_ui_runtime::ui::frame_bench::frame_begin_ms()"),
             "handler 体 frame_begin_ms 直调臂缺失"
         );
         assert!(
-            rs.contains("crate::ui::frame_bench::frame_present_ms()"),
+            rs.contains("auto_ui_runtime::ui::frame_bench::frame_present_ms()"),
             "handler 体 frame_present_ms 直调臂缺失"
         );
     }
@@ -614,11 +614,11 @@ widget App {{
                 .join("\n")
         );
         assert!(
-            rs.contains("crate::ui::frame_bench::frame_begin_ms()"),
+            rs.contains("auto_ui_runtime::ui::frame_bench::frame_begin_ms()"),
             "handler 体 frame.begin_ms 直调臂缺失"
         );
         assert!(
-            rs.contains("crate::ui::frame_bench::frame_present_ms()"),
+            rs.contains("auto_ui_runtime::ui::frame_bench::frame_present_ms()"),
             "handler 体 frame.present_ms 直调臂缺失"
         );
     }

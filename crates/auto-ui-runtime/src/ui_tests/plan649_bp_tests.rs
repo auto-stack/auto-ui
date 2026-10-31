@@ -263,6 +263,8 @@ fn repo_root() -> PathBuf {
         .nth(2)
         .map(Path::to_path_buf)
         .expect("CARGO_MANIFEST_DIR has a repo-root ancestor")
+        // PLAN-900：blueprints 语料物理在 auto-lang 仓根。
+        .join("../auto-lang")
 }
 
 /// Runtime View 收集器：文本面（Text/Button/Input/容器）——与 plan639/640

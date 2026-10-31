@@ -20,6 +20,8 @@ fn repo_root() -> PathBuf {
         .nth(2)
         .map(Path::to_path_buf)
         .expect("CARGO_MANIFEST_DIR has a repo-root ancestor")
+        // PLAN-900：blueprints 语料物理在 auto-lang 仓根。
+        .join("../auto-lang")
 }
 
 /// 官方 chart 包源目录——用 charts-gallery 副本（本仓、master 干净可装载；

@@ -55,6 +55,8 @@ fn repo_root() -> PathBuf {
         .nth(2)
         .map(Path::to_path_buf)
         .expect("CARGO_MANIFEST_DIR has a repo-root ancestor")
+        // PLAN-900：blueprints 语料物理在 auto-lang 仓根。
+        .join("../auto-lang")
 }
 
 /// AC-01/AC-02: every Tier-0 package scans (name↔dir + variant files are

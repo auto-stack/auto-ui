@@ -75,7 +75,7 @@ fn report(line: String) {
     println!("[p728-bench] {line}");
     // CARGO_MANIFEST_DIR = <repo>/crates/auto-lang → repo/docs/reports.
     let mut p: PathBuf = env!("CARGO_MANIFEST_DIR").into();
-    p.push("../../docs/reports");
+    p.push("../../../auto-lang/docs/reports");
     let _ = std::fs::create_dir_all(&p);
     p.push("p728-bench.jsonl");
     if let Ok(mut f) = std::fs::OpenOptions::new()

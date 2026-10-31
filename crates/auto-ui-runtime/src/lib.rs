@@ -144,8 +144,12 @@ pub fn install_ui_host_capabilities() {}
 // SDK 旧公开入口（create_vm_from_source/abt、eval_config、execute 族等）
 // 经钩子回调至此，本 crate 被链接即经 inventory 生效，语义与旧 facade
 // 包装逐位一致（PLAN-779/785/790/794/802/804 装配合同保持）。
-fn plan900_register_sdk_hook() {
+fn plan900_ui_compat_install() {
+    // 与旧 facade plan814_ui_compat_install 逐位同语义：注册 SDK 钩子
+    //（幂等 OnceLock）并立即装配——inventory 收集点被 SDK
+    // install_ui_host_capabilities 迭代到时即生效，首轮直达调用不落空。
     auto_lang_core::set_ui_host_install_hook(install_ui_host_capabilities);
+    install_ui_host_capabilities();
 }
 
-inventory::submit!(auto_lang_core::UiCompatInstaller(plan900_register_sdk_hook));
+inventory::submit!(auto_lang_core::UiCompatInstaller(plan900_ui_compat_install));

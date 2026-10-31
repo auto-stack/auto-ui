@@ -11,7 +11,9 @@
 
 /// corpus fixture 的 front app.at 绝对路径（crate 目录三层上 + test/ui）。
 fn fixture_front_at() -> std::path::PathBuf {
+    // PLAN-900：corpus fixture 物理在 auto-lang 仓 crates/auto-lang/test/ui。
     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../auto-lang/crates/auto-lang")
         .join("test")
         .join("ui")
         .join("plan627_qualified_api")
@@ -126,7 +128,9 @@ widget App {
 
 /// 裸名符号形态对照组 fixture（金样基线，与模块形态 fixture 逐点同构）。
 fn fixture_bare_front_at() -> std::path::PathBuf {
+    // PLAN-900：corpus fixture 物理在 auto-lang 仓 crates/auto-lang/test/ui。
     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../auto-lang/crates/auto-lang")
         .join("test")
         .join("ui")
         .join("plan627_qualified_api_bare")

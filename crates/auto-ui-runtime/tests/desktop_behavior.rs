@@ -359,7 +359,7 @@ widget MultiState {
 fn plan488_dnd_bridge_app_handlers() {
     let path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../examples/capability-tests/dnd-bridge/src/front/app.at"
+        "/../../../auto-lang/examples/capability-tests/dnd-bridge/src/front/app.at"
     );
     let code = std::fs::read_to_string(path).expect("读 044 app.at");
     // PLAN-668 R-17：真实示例源先过 stylekit 预注册再裸 parse 装载——

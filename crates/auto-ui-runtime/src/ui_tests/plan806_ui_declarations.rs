@@ -113,7 +113,7 @@ fn component_and_store_paths_delegate() {
 fn import_created_parser_uses_default_declarations() {
     let path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../examples/ui/018-book-reader/src/front/components/treeview.at"
+        "/../../../auto-lang/examples/ui/018-book-reader/src/front/components/treeview.at"
     );
     let code = std::fs::read_to_string(path)
         .expect("real imported UI file exists (examples/ui/018-book-reader treeview)");

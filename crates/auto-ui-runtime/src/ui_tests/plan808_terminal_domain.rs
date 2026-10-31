@@ -2070,7 +2070,7 @@ mod plan808_vm_bridge_assembly {
         // VmBridge::new_from_decls (the decl-based production constructor).
         host::clear_process_default_terminal_host_provider();
         let at = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("test/ui/terminal_min/src/front/app.at");
+            .join("../../../auto-lang/crates/auto-lang/test/ui/terminal_min/src/front/app.at");
         let src = std::fs::read_to_string(&at).expect("read minimal terminal app");
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::parser::Parser::from(src.as_str()).with_session(session);

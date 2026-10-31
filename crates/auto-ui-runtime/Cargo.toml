@@ -68,6 +68,8 @@ highlight-treesitter = [
     "dep:tree-sitter-powershell",
     "dep:tree-sitter-ini",
 ]
+# PLAN-900：随迁的 http e2e 门（真 TCP 串行族；原 auto-lang test-http-e2e 同语义）。
+test-http-e2e = []
 ui-clipboard = ["dep:arboard"]
 ui-dialog = ["dep:rfd", "dep:raw-window-handle"]
 iced-layout-tests = ["ui-iced", "dep:iced_test"]
