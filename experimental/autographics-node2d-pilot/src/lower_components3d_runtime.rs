@@ -78,12 +78,17 @@ pub fn lower_project_components3d_runtime(
     let w3 = build_world_3d(project)?;
     let scene = collect_scene_3d(project, &w3)?;
     let runtime = collect_runtime_cfg(project, &w3, &scene)?;
-    // 装配身份：声明 camera3d -> runtime_camera3d/1（主机织入相机候选），
-    // 否则 character3d/1。驱动 start_selected_play 按该串选择受信装配。
+    // 装配身份：声明 camera3d -> runtime_camera3d/1（主机织入相机候选）；
+    // 声明 character3d -> character3d/1（entry 织入角色 freeze/tick 序）；
+    // 仅有为行为的其它场景 -> behavior/1（角色/相机单元不进入装配，避免
+    // 无 bind 的 freeze fault 25）。驱动 start_selected_play 按该串选择
+    // 受信装配。
     let behavior_api = if runtime.camera.is_some() {
         "autographics.runtime_camera3d/1"
-    } else {
+    } else if runtime.character_def.is_some() {
         "autographics.character3d/1"
+    } else {
+        "autographics.behavior/1"
     };
     lower_project_components3d_cfg(
         project,

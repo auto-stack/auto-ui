@@ -165,16 +165,22 @@ fn components3d_consumer(product: &str) -> &'static str {
 }
 
 fn runtime_behavior_api(project: &autographics_node2d_pilot::load::Project) -> &'static str {
-    // 与降层同规则：任一声明带 camera3d -> runtime_camera3d/1，否则
-    // character3d/1；无行为场景产品不读该串。
+    // 与降层同规则：camera3d -> runtime_camera3d/1；character3d ->
+    // character3d/1；其它行为场景 -> behavior/1（无行为场景产品不读该串）。
     let has_camera = project
         .modules
         .values()
         .any(|m| m.nodes.iter().any(|n| n.camera3d.is_some()));
+    let has_character = project
+        .modules
+        .values()
+        .any(|m| m.nodes.iter().any(|n| n.character3d.is_some()));
     if has_camera {
         "autographics.runtime_camera3d/1"
-    } else {
+    } else if has_character {
         "autographics.character3d/1"
+    } else {
+        "autographics.behavior/1"
     }
 }
 

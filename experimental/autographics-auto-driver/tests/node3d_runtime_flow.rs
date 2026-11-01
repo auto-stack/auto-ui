@@ -699,6 +699,108 @@ fn vs04_host_event_battery_over_the_authored_chain() {
     });
 }
 
+// ------------------------------------- V-S06：A->B / SaveAs / 恢复 / 20 轮 --
+
+#[test]
+fn vs06_b_run_save_reopen_damaged_restore_and_20_round_lifecycle() {
+    big_stack(|| {
+        // A->B：仅闭包字节的全新目录（无生产者树）作为 B，真实 Run 从 B 绿。
+        let dir = write_project(G07A_SCENE, G07A_WORLD, "vs06-a");
+        let b = dir
+            .parent()
+            .unwrap()
+            .join(format!("{}-vs06-b", std::process::id()));
+        let _ = std::fs::remove_dir_all(&b);
+        std::fs::create_dir_all(b.join("scripts")).expect("b scripts");
+        std::fs::copy(
+            dir.join("scene.agscene"),
+            b.join("scene.agscene"),
+        )
+        .expect("copy scene");
+        for e in std::fs::read_dir(dir.join("scripts")).expect("scripts") {
+            let e = e.expect("entry");
+            std::fs::copy(e.path(), b.join("scripts").join(e.file_name())).expect("copy script");
+        }
+        {
+            let (doc, registry, code, _) =
+                Storage::load_project(&b.join("scene.agscene"), &Registry::new())
+                    .expect("B load");
+            let mut hb = Host::with_project(doc, registry, code).expect("B host");
+            hb.start_selected_play().expect("B start");
+            hb.pause_play("");
+            settle(&mut hb);
+            step(&mut hb, HELD_FORWARD, 0).expect("B forward");
+        }
+        // SaveAs：项目字节复制到第三个目录，关（drop）后从副本重开再 Run。
+        let saveas = dir
+            .parent()
+            .unwrap()
+            .join(format!("{}-vs06-saveas", std::process::id()));
+        let _ = std::fs::remove_dir_all(&saveas);
+        std::fs::create_dir_all(saveas.join("scripts")).expect("saveas scripts");
+        std::fs::copy(dir.join("scene.agscene"), saveas.join("scene.agscene")).expect("save scene");
+        for e in std::fs::read_dir(dir.join("scripts")).expect("scripts") {
+            let e = e.expect("entry");
+            std::fs::copy(e.path(), saveas.join("scripts").join(e.file_name()))
+                .expect("save script");
+        }
+        {
+            let (doc, registry, code, _) =
+                Storage::load_project(&saveas.join("scene.agscene"), &Registry::new())
+                    .expect("saveas load");
+            let mut hs = Host::with_project(doc, registry, code).expect("saveas host");
+            hs.start_selected_play().expect("saveas start");
+            hs.pause_play("");
+            settle(&mut hs);
+        }
+        // 坏件拒绝 -> 精确恢复 -> 再 Run：world 副本单字节损坏在载入拒绝。
+        let scripts = dir.join("scripts");
+        let world_name = {
+            let mut it = std::fs::read_dir(&scripts).expect("scripts");
+            let p = it.next().expect("one script").expect("entry").path();
+            p.file_name().unwrap().to_str().unwrap().to_string()
+        };
+        let world_path = scripts.join(&world_name);
+        let mut bytes = std::fs::read(&world_path).expect("world bytes");
+        let at = bytes.len() / 2;
+        bytes[at] = bytes[at].wrapping_sub(1);
+        std::fs::write(&world_path, &bytes).expect("damage world");
+        assert!(
+            Storage::load_project(&dir.join("scene.agscene"), &Registry::new()).is_err(),
+            "damaged world.at must be rejected at load"
+        );
+        std::fs::write(&world_path, G07A_WORLD).expect("restore world");
+        {
+            let (doc, registry, code, _) =
+                Storage::load_project(&dir.join("scene.agscene"), &Registry::new())
+                    .expect("restore load");
+            let mut hr = Host::with_project(doc, registry, code).expect("restore host");
+            hr.start_selected_play().expect("restore start");
+            hr.pause_play("");
+            settle(&mut hr);
+            step(&mut hr, HELD_FORWARD, 0).expect("restore forward");
+        }
+        // 20 轮生命周期（单 Host start/stop；暖上传网格不随轮重传）。
+        let (doc, registry, code, _) =
+            Storage::load_project(&dir.join("scene.agscene"), &Registry::new())
+                .expect("lifecycle load");
+        let mut h = Host::with_project(doc, registry, code).expect("lifecycle host");
+        let warm = h.resource_snapshot()["mesh_count"].as_u64().expect("warm");
+        for round in 0..20 {
+            h.start_selected_play()
+                .unwrap_or_else(|e| panic!("round {round} start: {e:?}"));
+            h.pause_play("");
+            settle(&mut h);
+            step(&mut h, HELD_FORWARD, 0).unwrap_or_else(|e| panic!("round {round} step: {e}"));
+            h.stop_play();
+        }
+        let after = h.resource_snapshot()["mesh_count"].as_u64().expect("after");
+        assert_eq!(warm, after, "20-round lifecycle must keep mesh uploads flat");
+        // 最后 owner 释放：文档不改（Stop 后逐字节一致）。
+        // （文档恒等由 vs03/其余 Stop-restore 断言覆盖；此处锁暖账。）
+    });
+}
+
 // ------------------------------------- V-S05：内置视觉原 owner 保真对照 --
 
 #[test]
