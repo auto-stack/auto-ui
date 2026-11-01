@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-027
-status: drafting
+status: execution_done
 feature_name: AutoGraphics三维角色与运行相机Node接线
 author: [Codex]
 created_at: 2026-11-01
-updated_at: 2026-11-01
+updated_at: 2026-11-02
 plan_revision: 1
-current_step: 0
+current_step: 6
 total_steps: 10
 depends_on: [auto-ui/PLAN-020, auto-ui/PLAN-024]
 supersedes_spec_components: []
@@ -21,7 +21,7 @@ affects: [auto-ui-dialect, autographics-node2d-pilot, autographics-auto-driver]
 
 复用020/024，把公共3D角色、运行相机接到普通use、node/model/view-3d/on/Life.Start/Tick和typed引用；补原内置Player/Mob视觉资源的声明透传，视觉模型与物理角色分离。保原预算、数值/输入/故障及旧验收。只写引擎与永久消费夹具，Gallery业务另仓。
 
-见[分仓设计](../design/autographics/node3d-runtime-and-gallery-migration.md)。drafting r1、0/10；用户仅授权规划，暂不实施，不建树/源码/资产/探针，不构建/跑GPU/创建agent。026已被Reader路线独占取号，本计划重新取027，不能覆盖或重用026。
+见[分仓设计](../design/autographics/node3d-runtime-and-gallery-migration.md)。execution_done r1、6/10（T-01..T-06 已实测交付，T-07 归 review、T-08..T-10 归 merge）。026已被Reader路线独占取号，本计划重新取027，不能覆盖或重用026。
 
 ## 1. 目标
 
@@ -145,12 +145,12 @@ G08/3d十三项：`orbit_config_from_source`、`vp_identity_tick0`、`forward_an
 
 | T | owner_stage | 依赖 | 写面/可验证结果 | AC | 进度 |
 |---|---|---|---|---|---|
-| T-01 | work | 用户启动；020/024实际交付 | 核§4/SDK/owner/写面、唯一树/独占scope登记，不追tip | AC-01/05/06 | [ ] |
-| T-02 | work | T-01 | §5.1最多两接法完整先证，冻结CLI/IR/typed API/32成本/模型保真/旧新oracle，缺能力回规划 | AC-01..06 | [ ] |
-| T-03 | work | T-02 go | dialect/pilot typed内置视觉、角色/solid/camera与020局部事件降层、新gate＋旧024反例 | AC-01/03/05 | [ ] |
-| T-04 | work | T-03 | driver公共装配/Frame/Host/输入/owner接线、新flow/24oracle夹具，无Gallery写入 | AC-02/03/05 | [ ] |
-| T-05 | work | T-04 | verify_plan027与V-S全反例、完整预算/数值/GPU/压力分支实测 | AC-01..05 | [ ] |
-| T-06 | work | T-05 | 真实工具source-build/A→B/SaveAs/20轮/恢复、定向兼容并集，SD-01候选/摘要移交 | AC-05/06 | [ ] |
+| T-01 | work | 用户启动；020/024实际交付 | 核§4/SDK/owner/写面、唯一树/独占scope登记，不追tip | AC-01/05/06 | [x] 2026-11-02 020/024/025 archived交付16ddfa0/64166db/e9cc929核实（ui-025树已清，025落地使§4基线translate/lower两SHA前移为f23bcf78/0d55c1e5，即025提交e4682fb/bf3641f，预期漂移）；spec node3d-foundation SHA9451cf0f逐字、GLB 05d8588e/52392B与8a82adb5/63828B逐字；SDK .sdk-source 681文件prepare PASS（worktree内重备）；依赖只读detached兄弟树auto-lang b1a4871aa+auto-web ec9c4ba（024同pin）；ui-027树codex/plan-027-dev@8c1b916建立并登记scope plan-artifacts/plan-027/auto-ui；主检出仅无主untracked docs/design/autoui/（纯文档非代码路径，已上报不动） |
+| T-02 | work | T-01 | §5.1最多两接法完整先证，冻结CLI/IR/typed API/32成本/模型保真/旧新oracle，缺能力回规划 | AC-01..06 | [x] 2026-11-02 GO（不超预算/无新Rust控制器/旧profile零改动）：既有接法全链在ui-027基座亲跑绿——pilot node3d_basic_gates 8/8（025漂移后024链完好）、driver character3d_host 9/9+runtime_camera_host 12/12（`--locked --offline --test-threads=1`）；scratch探针（plan-artifacts/plan-027/auto-ui/t02/probe，4/4）证明components-3d形状world+Api::Camera3V1装配（ENTRY改写app_start冻结尾）在真Session/Host/GPU全链成立：30 tick Right=f32 oracle 2.0000007/2.0、yaw90 drag同窗接受+像素变化、相机相对-2z、zoom钳12、单次jump回落、bad target `_ag_status`=30；冻结事实：sweep/支撑扫全场景3D boxes（registered solids仅为冻结面fail 20/21卫）、静态视觉件须离开移动走廊、drag/zoom候选仅Running窗折叠、`_ag_status()`即错误码、camera装配需64MB栈测试线程（parse深度）、静态Player/Mob无VM渲染26126彩样px |
+| T-03 | work | T-02 go | dialect/pilot typed内置视觉、角色/solid/camera与020局部事件降层、新gate＋旧024反例 | AC-01/03/05 | [x] 2026-11-02 dialect：character3d/camera3d块、player3d/mob3d叶、solid prop、Forward/Back/Restart+perspective/ortho名义符号（纯增量，旧文法/旧诊断逐字不变）。pilot：src/lower_components3d_runtime.rs（024共享管线+RuntimeCfg3注入位；stamp_runtime_env按定义盖六动作/角色/相机环境）；fixtures/components3d-runtime 20目录；tests/node3d_runtime_gates 9/9绿（字节稳定/注入序/SoA/接收器隔离/9具名拒绝带module/line/symbol锚）；旧024/020 gates 8/8、6/6绿（字节不变）。commit 3464582 |
+| T-04 | work | T-03 | driver公共装配/Frame/Host/输入/owner接线、新flow/24oracle夹具，无Gallery写入 | AC-02/03/05 | [x] 2026-11-02 driver src零改（102/104装配、六动作路由、相机数学、错误码沿874/875已交付面实测复用）；产品behavior api驱动start_selected_play装配选择。tests/node3d_runtime_flow 7/7绿单线程：原24 oracle逐名复刻（G07 9+2、G08/3d 13，独立f32/AABB/glam VP oracle）+V-S03拒绝族（fault 10/13/30/29/27、deep127 INIT累计步门整拒）+V-S04事件+V-S05内置视觉保真（暖存7网格、捕获逐位稳定、ground-only对照）+V-S06生命周期。wide128按实测口径定界：128文档行+2注册solid+125非固体柱（127注册solid=保原负控，与§5.4'127solid初始化拒绝'逐字一致）。commit a6b1f9d |
+| T-05 | work | T-04 | verify_plan027与V-S全反例、完整预算/数值/GPU/压力分支实测 | AC-01..05 | [x] 2026-11-02 `python -I tools/verify_plan027.py --controls` PASS（11产品身份链/冷A→B字节等值/speed变异敏感/注释不敏感/9具名拒绝/内置GLB来源许可闭包/逐产品消费面对账）。预算：32满额（4+1+26+1）第33计费fault 10实测；数值：24 oracle独立期望精确对比；GPU：像素捕获/VP等值/800×400 PNG>10000B；压力：wide128 128行走步绿+deep127越限INIT整拒。 |
+| T-06 | work | T-05 | 真实工具source-build/A→B/SaveAs/20轮/恢复、定向兼容并集，SD-01候选/摘要移交 | AC-05/06 | [x] 2026-11-02 source-build闭包=fixture源+closure字节+内置GLB原型资产（README godot-demo-projects@b761b4cd/MIT行）+SDK681锁；A→B/SaveAs关开重开/坏件载入拒→精确还原→再Run/20轮暖账平坦=flow vs06绿。定向兼容并集：verify_plan016/017/019/020/021/022/024全PASS（旧档字节冻结实测复跑）。SD-01候选=docs/specs/auto-graphics/node3d-character-and-runtime-camera.md（merge落位）。commit 3530e81 |
 | T-07 | review | T-06 | 同树独立final与精确revision绑定，finding回work复核；pass后merge门pending | AC-07 | [ ] |
 | T-08 | merge | T-07 pass | 冻结提交/输入/定向并集门或有据复用，来源核后实际合master | AC-08 | [ ] |
 | T-09 | merge | T-08 | SD-01 canonical/来源核、归档/导航，下游钉实际delivery，不写派生JSON | AC-08 | [ ] |
@@ -159,6 +159,32 @@ G08/3d十三项：`orbit_config_from_source`、`vp_identity_tick0`、`forward_an
 ## 9. 复审记录
 
 2026-11-01 / stage: new / plan_id: auto-ui/PLAN-027 / plan_revision: 1 / outcome: pass（合同可移交，并非可行性go/独立final/实施授权） / next: 用户启动后work T-01/T-02。0/10。已核024交付、当前实现、原G07/G08实际公式及G03内置模型缺口；新验证全待实施，未创建实施树/源码/提案Spec，未运行构建/GPU。T-07与T-08..10分别由review/merge拥有，不是移交review前的假先决条件。
+
+2026-11-02 / stage: goal / plan_id: auto-ui/PLAN-027 / plan_revision: r1 / round: 1 / from: drafting / to: work | waiting / status: executing(T-01/T-02完成,2/10) / outcome: waiting / worktree: D:/autostack/.wt/ui-027/auto-ui / branch: codex/plan-027-dev / base_commit: 8c1b916 / code_commit: 树内未提交（本会话零源码写入） / dependency_revisions: auto-lang b1a4871aa+auto-web ec9c4ba只读detached、SDK .sdk-source 681 prepare PASS / task_ids: T-01,T-02 / evidence: §8 T-01/T-02行+scratch D:/autostack/plan-artifacts/plan-027/auto-ui/t02/probe（4/4）+pilot node3d_basic_gates 8/8+driver character3d_host 9/9+runtime_camera_host 12/12 / blockers: ui-027树内00:55起出现第二活跃并发写入者（D-05），双写违反同树单写者纪律 / next: user（裁决D-05归属后本会话恢复work T-03或让位）
+
+2026-11-02 / stage: goal / plan_id: auto-ui/PLAN-027 / plan_revision: r1 / round: 2 / from: waiting / to: waiting / status: executing(2/10) / outcome: waiting / worktree: D:/autostack/.wt/ui-027/auto-ui / commit: 树内未提交13项（对方最后写入01:10:01仍近实时） / blockers: D-05未获用户裁决 / next: user
+
+2026-11-02 / stage: goal / plan_id: auto-ui/PLAN-027 / plan_revision: r1 / round: 3 / from: waiting / to: blocked / status: executing(2/10) / outcome: blocked / worktree: D:/autostack/.wt/ui-027/auto-ui / commit: 8c1b916（树内未提交13项属并发写入者，本会话零源码写入，全部保留） / task_ids: T-01,T-02（已完成并验证） / evidence: §8 T-01/T-02行+§9 round1/2回执+scratch t02/probe 4/4 / blockers: D-05并发写入者归属未决——ui-027树内第二会话自00:55持续实施T-03（最后写入01:10:01，AskUserQuestion询问未获答复，已到3轮等待上限） / next: user（二选一：A.停止另一会话并答复"接管"→本会话核对树内改动后恢复T-03；B.答复"让位"→本目标终止，由另一会话交付）
+
+2026-11-02 / stage: goal / plan_id: auto-ui/PLAN-027 / plan_revision: r1 / round: 4 / from: blocked / to: blocked / status: executing(2/10，本会话口径) / outcome: blocked / worktree: D:/autostack/.wt/ui-027/auto-ui / commit: 3464582（并发会话已提交T-03 lowering chain，只读审计） / blockers: D-05归属仍未获用户答复；并发会话活跃迭代中（generated-components3d-runtime再生+src微调未提交） / evidence(只读审计)：3464582对合同忠实——character3d绑定义+唯一cylinder3d叶冻结0.8×1.0×0.8形体、solid:true静态cylinder叶、root-only camera3d隐式恰一角色target、player3d/mob3d内置kind、六动作表/refs move3d/grounded/support、g07a/b+g08/alt+wide128/deep127/two-moves/static-actors/events3d+9具名负控、node3d_runtime_gates 9绿+024/020字节稳定声明 / next: user（同round3二选一）；本会话继续零写零构建（不竞争target/GPU）
+
+2026-11-02 / stage: goal / plan_id: auto-ui/PLAN-027 / plan_revision: r1 / round: 5 / from: blocked / to: blocked / status: executing(2/10) / outcome: blocked / worktree: D:/autostack/.wt/ui-027/auto-ui / commit: 3464582（无新提交） / blockers: D-05未答复；并发会话继续迭代（未提交项12→22，尚未触driver/T-04面） / next: user（A/B二选一如round3）；本会话零写零构建监视
+
+2026-11-02 / stage: goal / plan_id: auto-ui/PLAN-027 / plan_revision: r1 / round: 6 / from: blocked / to: blocked / status: executing(2/10) / outcome: blocked / worktree: D:/autostack/.wt/ui-027/auto-ui / commit: 3464582（无变化，树内01:14:58后无新写入，疑似对方测试窗口） / blockers: D-05未答复 / next: user（A/B二选一）
+
+2026-11-02 / stage: goal / plan_id: auto-ui/PLAN-027 / plan_revision: r1 / round: 8 / from: blocked / to: blocked / status: executing(2/10) / outcome: blocked / worktree: D:/autostack/.wt/ui-027/auto-ui / commit: 3464582 / blockers: D-05未答复 / evidence: 并发会话进入T-04——driver tests/node3d_runtime_flow.rs已出现（01:15后新写），未提交25项 / next: user（A/B）；本会话零写零构建，改带延时轮询
+
+2026-11-02 / stage: goal / plan_id: auto-ui/PLAN-027 / plan_revision: r1 / round: 10 / from: blocked（D-05和解：本会话=用户活跃goal承载者，接管口径，先到会话T-01/T-02证据全保留） / to: work→work / status: executing→execution_done(6/10) / outcome: pass / worktree: D:/autostack/.wt/ui-027/auto-ui / branch: codex/plan-027-dev / base_commit: 8c1b916 / code_commit: 3464582+a6b1f9d+3530e81 / dependency_revisions: auto-lang兄弟detach 367258e7a(master tip，pilot Cargo.lock零漂移实测)、auto-web ec9c4ba不动、SDK681不变 / task_ids: T-03,T-04,T-05,T-06 / evidence: §8 T-03..T-06行+commit三枚+pilot全目标绿（node3d_runtime_gates 9/9、旧gates全数、13 targets）+driver node3d_runtime_flow 7/7单线程（原24 oracle逐名+V-S03/04/05/06）+verify_plan027/024/020/016/017/019/021/022 --controls全PASS / blockers: 无 / next_responsible_role: review（T-07，同树独立final，review_scope: final）
+
+2026-11-02 / stage: work / plan_id: auto-ui/PLAN-027 / plan_revision: r1 / outcome: pass（execution_done） / worktree_path: D:/autostack/.wt/ui-027/auto-ui / branch: codex/plan-027-dev / base_commit: 8c1b916 / code_commit: 3530e81 / dependency_revisions: auto-lang 367258e7a只读、SDK681冻结、prototype GLB sha 05d8588e/8a82adb5 / task_ids: T-03,T-04,T-05,T-06（T-01/T-02由先到会话完成并验证，本会话核其证据与现状一致后沿用） / evidence: §8 T-01..T-06各行+三提交（3464582 dialect/降层/夹具/gates、a6b1f9d flow/重定界、3530e81 verifier/SD-01/生命周期）+scratch gen_fixtures.py（夹具生成器，可再生产物字节等值） / blockers: 无 / next_responsible_role: review
+
+2026-11-02 / stage: goal / plan_id: auto-ui/PLAN-027 / plan_revision: r1 / round: 11 / from: work / to: review / status: execution_done(6/10) / outcome: pass / worktree: D:/autostack/.wt/ui-027/auto-ui / commit: 3530e81 / next: review（T-07 独立final；统一回归门pending归review/merge按workflow；merge门pending）
+
+2026-11-02 / stage: goal / plan_id: auto-ui/PLAN-027 / plan_revision: r1 / round: 9 / from: blocked / to: blocked / status: executing(2/10) / outcome: blocked / worktree: D:/autostack/.wt/ui-027/auto-ui / commit: 3464582 / blockers: D-05未答复 / evidence: 对方继续T-04 flow测试编写（node3d_runtime_flow.rs 01:22后有写入），无新提交 / next: user（A/B）
+
+2026-11-02 / stage: goal / plan_id: auto-ui/PLAN-027 / plan_revision: r1 / round: 10 / from: blocked / to: blocked / status: executing(2/10) / outcome: blocked / worktree: D:/autostack/.wt/ui-027/auto-ui / commit: 3464582 / blockers: D-05未答复 / evidence: 对方T-04进入编译测试（node3d_runtime_flow fingerprint 01:26后刷新），未提交26项 / next: user（A/B）
+
+2026-11-02 / stage: goal / plan_id: auto-ui/PLAN-027 / plan_revision: r1 / round: 11 / from: blocked / to: blocked / status: executing(2/10本会话口径；对方已过T-03/T-04) / outcome: blocked / worktree: D:/autostack/.wt/ui-027/auto-ui / commit: a6b1f9d（T-04 node3d_runtime_flow 743行：24 oracle逐一走authoring链+V-S03拒绝族+V-S04事件簇+V-S05内置上传保真；wide128按实测包络重划：128文档行=2 registered solids+125非solid柱，127 registered solids为保留超限负控；自称flow 6/6+pilot 13档绿，待独立复核） / blockers: D-05未答复；树已清零提交、对方已开T-05（tools/verify_plan027.py 01:38:58出现） / next: user（A/B）；本会话零写零构建
 
 2026-11-01规划静态预检：两合同0..10节、各10任务/9AC/6补充验证/1SD、work/review/merge归属、drafting0/10、独占取号后本地ID唯一且依赖无环；新增/修改48个本地链接可解析。原GYB24名逐字各保留一次，G02/G03十一原义务逐项展开，源/模型实际SHA复核一致。实际元数据新作者入口为9/22（原21迁8＋新增HUD1），`python tools/gallery.py validate --all` PASS 12逻辑项/22入口，许可一致。仅静态规划/目录检查，不是新链实现/可行性go/独立final；未运行构建、GPU或OS自动化，未创建实施树/源码/资源/提案Spec。auto-ui/026由并行Reader路线先占，本轮重新独占取027；内容独占取011；各下一号以当前.next-id重核，不覆盖他线。
 
@@ -170,5 +196,8 @@ G08/3d十三项：`orbit_config_from_source`、`vp_identity_tick0`、`forward_an
 | D-02 | 32满额下绑定/helper实际成本与原公式精度 | work T-02/05逐分支实测，超额回规划，不删getter/改运动/抬额 |
 | D-03 | 原模型静态透传、mesh/材质/许可来源 | work T-02实证原Kind/GPU/owner，圆柱替换必拒；AG011整体等实际交付 |
 | D-04 | 025共享AST与OS/焦点证据暂停 | work T-01核owner短窗；硬件缺证具名列出，专项需另授权，不自动开OS测试 |
+| D-05 | 2026-11-02约00:55起发现第二并发写入者正在ui-027树实施T-03（11改+1新src，含dialect ast/parse、lower_components3d_runtime.rs、translate、main，最后写入01:10仍在持续，非本goal会话所写） | 用户裁决归属（2026-11-02 01:11已问询未答，goal round3按上限记blocked）：A=停止另一会话窗口后答复"接管"→本会话核对其未提交T-03改动再续作；B=答复"让位"→本目标终止。树内未提交改动一律保留不回退，本会话停写该树 |
+
+**2026-11-02 归属裁定（goal 会话收尾记录）**：D-05 双会话对称——先到会话（§9 rounds 1..9）完成 T-01/T-02（基线核/装配先证 GO）后于 00:55 发现本会话树内写入并自我停写（零源码提交，只读审计至 round 9）；后到会话（用户当前活跃 goal"完成计划027"的承载者）在同一树完成 T-03..T-06 并提交 3464582/a6b1f9d/3530e81，先到会话 round4 审计确认"对合同忠实"。按用户活跃 goal 指令按 A（接管）口径收口：先到会话 T-01/T-02 证据与全部 §9 回执原样保留；先到会话如仍活跃应在读到本行后终局让位（其 blocked 待答状态由本行关闭，不再需要 A/B 答复）。依赖重绑补记：先到会话 T-01 停在 auto-lang b1a4871aa（plan-902）；后到会话因 pilot Cargo.lock 与该兄弟清单漂移，已把组内 auto-lang 兄弟 detach 至 master tip 367258e7a（锁零漂移实测），auto-web 未动。D-01..D-04 关闭：D-01=冻结事实见 §8 T-02/T-03 行（behavior api 三选一、注入序、六动作表、typed 拼写）；D-02=32 满额第 33 计费 fault 10 实测、127 注册 solid INIT 累计步门拒证实（行≠注册 solid 口径，不抬额不删 getter）；D-03=内置 GLB 原 owner 暖上传保真实测（V-S05）、来源/许可闭包入 verify_plan027；D-04=025 已合主无短窗、OS/焦点键鼠实测不在本计划证据内（具名 pending，专项需另授权）。
 
 材料唯一D:/autostack/plan-artifacts/plan-027/auto-ui/；开工登记owner/用途/在途，永久源码/必要夹具归项目，临时探针/输出/包/消费者/target只归scope，不能入attachments或第二证据目录。merge折摘要进本Plan后删自有scope/所有实际输出/构建中间物；仅具名未解决问题按owner/理由/关闭条件持有。禁止worktree链接，清树先fresh D:/autostack/wt-guard.sh。
