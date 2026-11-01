@@ -1,0 +1,106 @@
+// The walk/collect/fail/restart component: local model state, typed spawn/
+// bind in Life.Start, the frozen 32-credit event ladder in Life.Tick. Pair
+// dispatch is an explicit author if-chain (per event read), not compiler
+// policy: move ticks read one event, idle ticks read up to three, and an
+// event tick skips the Saw patrol move while local patrol state advances.
+node Character {
+    model {
+        var speed = 2.6
+        var hy = 0.9
+        var hdir = 0.08
+        var hbase = 0.9
+        var state = 0
+        var bag = 0
+        var moved = 0
+        var h0 = 0
+        var h1 = 0
+        var h2 = 0
+        var h3 = 0
+        var h4 = 0
+        var h5 = 0
+    }
+    view-3d {
+        cylinder3d body {
+            position: (3.0, 1.0, -3.0)
+            scale: (0.4, 0.5, 0.4)
+        }
+    }
+    character3d { }
+    on {
+        Life.Start -> {
+            refs.body.place(3.0, 0.5, -3.0)
+            .h0 = spawn("item_a", "ShardA", 8.0, 1.0, -3.0)
+            .h1 = spawn("item_b", "ShardB", 10.0, 1.0, -3.0)
+            .h2 = spawn("item_c", "ShardC", 12.0, 1.0, -3.0)
+            .h3 = spawn("saw", "Saw", 9.0, .hy, -3.0)
+            .h4 = spawn("beacon", "Beacon", 16.0, 1.0, -3.0)
+            .h5 = spawn("voidz", "VoidZone", 3.0, 1.0, -8.0)
+            bind("shard_a", refs.body, aabb, 0.0, .h0)
+            bind("shard_b", refs.body, aabb, 0.0, .h1)
+            bind("shard_c", refs.body, aabb, 0.0, .h2)
+            bind("hazard", refs.body, sphere, 0.5, .h3)
+            bind("goal", refs.body, aabb, 0.0, .h4)
+            bind("voidp", refs.body, aabb, 0.0, .h5)
+        }
+        Life.Tick(dt) -> {
+            .moved = 0
+            if .state == 0 {
+                let hr = input.held(Right)
+                if hr != 0 {
+                    refs.body.move3d(hr * camera3d.right_x() * .speed * dt, 0.0, hr * camera3d.right_z() * .speed * dt)
+                    .moved = 1
+                }
+            }
+            let n = event.next()
+            if n == 1 {
+                let p = event.pair()
+                if p == 0 { .bag = .bag + 1
+                            object.despawn(.h0) }
+                if p == 1 { .bag = .bag + 1
+                            object.despawn(.h1) }
+                if p == 2 { .bag = .bag + 1
+                            object.despawn(.h2) }
+                if p == 3 { .state = 2 }
+                if p == 4 { if .bag == 3 { .state = 1 } }
+                if p == 5 { .state = 2 }
+                if .moved == 0 {
+                    let n1 = event.next()
+                    if n1 == 1 {
+                        let p1 = event.pair()
+                        if p1 == 0 { .bag = .bag + 1
+                                    object.despawn(.h0) }
+                        if p1 == 1 { .bag = .bag + 1
+                                    object.despawn(.h1) }
+                        if p1 == 2 { .bag = .bag + 1
+                                    object.despawn(.h2) }
+                        if p1 == 3 { .state = 2 }
+                        if p1 == 4 { if .bag == 3 { .state = 1 } }
+                        if p1 == 5 { .state = 2 }
+                        let n2 = event.next()
+                        if n2 == 1 {
+                            let p2 = event.pair()
+                            if p2 == 0 { .bag = .bag + 1
+                                        object.despawn(.h0) }
+                            if p2 == 1 { .bag = .bag + 1
+                                        object.despawn(.h1) }
+                            if p2 == 2 { .bag = .bag + 1
+                                        object.despawn(.h2) }
+                            if p2 == 3 { .state = 2 }
+                            if p2 == 4 { if .bag == 3 { .state = 1 } }
+                            if p2 == 5 { .state = 2 }
+                        }
+                    }
+                }
+            }
+            if n == 0 { object.move(.h3, 9.0, .hy, -3.0) }
+            .hy = .hy + .hdir
+            if .hy > .hbase + 0.2 { .hdir = 0.0 - 0.05 }
+            if .hy < .hbase - 0.2 { .hdir = 0.05 }
+            if .state != 0 {
+                if input.pressed(Restart) == 1 {
+                    round.request()
+                }
+            }
+        }
+    }
+}

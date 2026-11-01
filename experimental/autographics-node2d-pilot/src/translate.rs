@@ -90,6 +90,10 @@ pub struct Ctx<'a> {
     /// PLAN-027：运行相机读取服务（`camera3d.forward_x()` 等；零空间
     /// 计费读取沿受信 camera3d 单元）。false 保持 unsupported（旧档不变）。
     pub cam3: bool,
+    /// PLAN-028（components-3d-events）：typed 对象/触发/事件服务环境。
+    /// None 保持旧档行为（spawn/bind/event.*/object.* 保持 unsupported，
+    /// 旧字节不变）。
+    pub events3d: Option<EventsEnv>,
 }
 
 /// PLAN-027：角色服务环境（标记面；`refs.<elem>` 元素有效性沿 space3.refs
@@ -109,6 +113,21 @@ fn handle_ref_of(ctx: &Ctx, e: &Expr) -> Result<String, LowerError> {
 /// PLAN-025：typed 声音请求环境。cue 表 = presentation2d 块声明序。
 pub struct SfxEnv<'a> {
     pub cues: &'a BTreeMap<String, usize>,
+}
+
+/// PLAN-028（components-3d-events）：typed 对象/触发/事件环境（全部为
+/// 下降期常量表；名字 → 槽/pair/模板文档 id，作者不写数字 ID）。
+#[derive(Clone)]
+pub struct EventsEnv {
+    /// objects3d 池：名字 → 运行槽位（声明序 0..8）。
+    pub slots: std::collections::BTreeMap<String, i64>,
+    /// triggers 池：名字 → pair（声明序 0..8）。
+    pub pairs: std::collections::BTreeMap<String, i64>,
+    /// 模板定义名 → 模板行 1-based 文档 id。
+    pub templates: std::collections::BTreeMap<String, i64>,
+    /// bind 主题：（定义前缀，元素名）→ 每实例 1-based 文档 id（def_idx
+    /// 序）；root 定义前缀为空串、单行。
+    pub subjects: std::collections::BTreeMap<(String, String), Vec<i64>>,
 }
 
 /// PLAN-024：view-3d 元素行句柄环境。refs：本定义 view-3d 元素名 →
@@ -709,6 +728,30 @@ fn translate_expr(e: &Expr, ctx: &Ctx, out: &mut String) -> Result<(), LowerErro
                 if let Expr::Ident(base) = &**inner {
                     if base == "render2d" && matches!(m.as_str(), "spawn" | "despawn") {
                         return translate_render_call(m, e, call, ctx, out);
+                    }
+                }
+            }
+            // PLAN-028（components-3d-events）：typed 对象/触发/事件端口
+            // （spawn/bind 裸调用；event.*/object.* 服务前缀）。环境缺席时
+            // 不进入本分支（旧档逐字路径不变）。
+            if ctx.events3d.is_some() {
+                if let Expr::Ident(base) = &*call.name {
+                    if matches!(base.as_str(), "spawn" | "bind") {
+                        return translate_events_call(base.as_str(), "", e, call, ctx, out);
+                    }
+                }
+                if let Expr::Dot(inner, m) = &*call.name {
+                    if let Expr::Ident(base) = &**inner {
+                        if base == "event" || base == "object" {
+                            return translate_events_call(base.as_str(), m, e, call, ctx, out);
+                        }
+                    }
+                }
+                // `move` 是语言关键字：object.move(...) 解析为
+                // Expr::Move(Ident("object")) 调用头（同一服务端口）。
+                if let Expr::Move(inner) = &*call.name {
+                    if matches!(&**inner, Expr::Ident(b) if b == "object") {
+                        return translate_events_call("object", "move", e, call, ctx, out);
                     }
                 }
             }
@@ -1772,6 +1815,269 @@ fn translate_render_call(
             Ok(())
         }
         other => Err(unsupported(format!("unknown render2d.{other}"), e)),
+    }
+}
+
+/// PLAN-028（components-3d-events）：typed 对象/触发/事件服务端口。全部
+/// 1:1 映射受信 units 的既有调用（零隐藏读取、零新单价）；数字身份由
+/// 下降期名字表解析，作者不写 slot/pair/scene ID。
+fn translate_events_call(
+    base: &str,
+    m: &str,
+    e: &Expr,
+    call: &auto_parser_api::ast::Call,
+    ctx: &Ctx,
+    out: &mut String,
+) -> Result<(), LowerError> {
+    let env = ctx
+        .events3d
+        .as_ref()
+        .expect("events env gates this dispatcher");
+    let label = if m.is_empty() {
+        base.to_string()
+    } else {
+        format!("{base}.{m}")
+    };
+    // bind 主题（refs.<elem> → 本定义上下文的文档 id 文本）。
+    fn subject_text(
+        ctx: &Ctx,
+        env: &EventsEnv,
+        elem: &str,
+        e: &Expr,
+    ) -> Result<String, LowerError> {
+        match &ctx.target {
+            Target::Root => {
+                let ids = env
+                    .subjects
+                    .get(&(String::new(), elem.to_string()))
+                    .ok_or_else(|| {
+                        unsupported(
+                            format!("trigger bind subject 'refs.{elem}' is not a root view element"),
+                            e,
+                        )
+                    })?;
+                Ok(ids
+                    .first()
+                    .copied()
+                    .expect("root subject table has one row per elem")
+                    .to_string())
+            }
+            Target::Instance { prefix, index } => {
+                if !env.subjects.contains_key(&(prefix.clone(), elem.to_string())) {
+                    return Err(unsupported(
+                        format!(
+                            "trigger bind subject 'refs.{elem}' is not an element of this definition (root elements bind from the root handler)"
+                        ),
+                        e,
+                    ));
+                }
+                Ok(format!("{prefix}_{elem}_subject_ids[{index}]"))
+            }
+        }
+    }
+    let name_arg = |i: usize, what: &str| -> Result<String, LowerError> {
+        match call.args.args.get(i) {
+            Some(Arg::Pos(Expr::Str(n))) => Ok(n.to_string()),
+            _ => Err(unsupported(format!("{label} {what} must be a string literal name"), e)),
+        }
+    };
+    match (base, m) {
+        // spawn(<slot>, <template>, x, y, z) → ag_object_spawn(slot, row, x, y, z)
+        ("spawn", "") => {
+            if call.args.args.len() != 5 {
+                return Err(unsupported(
+                    format!(
+                        "spawn arity {} (want <slot>, <template>, x, y, z)",
+                        call.args.args.len()
+                    ),
+                    e,
+                ));
+            }
+            let slot = name_arg(0, "slot")?;
+            let tmpl = name_arg(1, "template")?;
+            let slot_id = *env.slots.get(&slot).ok_or_else(|| {
+                unsupported(format!("unknown spawn slot '{slot}' (objects3d pool)"), e)
+            })?;
+            let tmpl_id = *env.templates.get(&tmpl).ok_or_else(|| {
+                unsupported(
+                    format!(
+                        "unknown spawn template '{tmpl}' (no object3d template def of that name)"
+                    ),
+                    e,
+                )
+            })?;
+            let mut parts = Vec::new();
+            for a in &call.args.args[2..5] {
+                match a {
+                    Arg::Pos(x) => {
+                        let mut buf = String::new();
+                        translate_expr(x, ctx, &mut buf)?;
+                        parts.push(buf);
+                    }
+                    other => return Err(unsupported(format!("spawn arg {other:?}"), e)),
+                }
+            }
+            out.push_str(&format!(
+                "ag_object_spawn({slot_id}, {tmpl_id}, {})",
+                parts.join(", ")
+            ));
+            Ok(())
+        }
+        // bind(<pair>, refs.<elem>, aabb|sphere, radius, <source>)
+        // → ag_trigger_bind(pair, subject_doc_id, source_kind, source_ref, shape, radius)
+        ("bind", "") => {
+            if call.args.args.len() != 5 {
+                return Err(unsupported(
+                    format!(
+                        "bind arity {} (want <pair>, refs.<elem>, aabb|sphere, radius, <source>)",
+                        call.args.args.len()
+                    ),
+                    e,
+                ));
+            }
+            let pair = name_arg(0, "pair")?;
+            let pair_id = *env.pairs.get(&pair).ok_or_else(|| {
+                unsupported(format!("unknown bind pair '{pair}' (triggers pool)"), e)
+            })?;
+            let subject = match &call.args.args[1] {
+                Arg::Pos(Expr::Dot(inner, elem)) => {
+                    if matches!(&**inner, Expr::Ident(r) if r == "refs") {
+                        subject_text(ctx, env, elem, e)?
+                    } else {
+                        return Err(unsupported(
+                            "bind subject must be refs.<elem> (a static same-dim leaf)",
+                            e,
+                        ));
+                    }
+                }
+                _ => {
+                    return Err(unsupported(
+                        "bind subject must be refs.<elem> (a static same-dim leaf)",
+                        e,
+                    ))
+                }
+            };
+            let shape = match &call.args.args[2] {
+                Arg::Pos(Expr::Ident(s)) if s == "aabb" => 0,
+                Arg::Pos(Expr::Ident(s)) if s == "sphere" => 1,
+                _ => {
+                    return Err(unsupported(
+                        "bind shape must be aabb or sphere (nominal symbols)",
+                        e,
+                    ))
+                }
+            };
+            let radius_v = match &call.args.args[3] {
+                Arg::Pos(x) => crate::lower::numeric_lit(x)
+                    .ok_or_else(|| unsupported("bind radius must be a numeric literal", e))?,
+                _ => return Err(unsupported("bind radius must be a numeric literal", e)),
+            };
+            if shape == 0 && radius_v != 0.0 {
+                return Err(unsupported(
+                    "aabb bind radius must be 0.0 (closed-interval AABB)",
+                    e,
+                ));
+            }
+            if shape == 1 && (!radius_v.is_finite() || radius_v <= 0.0 || radius_v > 100000.0) {
+                return Err(unsupported(
+                    "sphere bind radius must be finite within (0, 100000]",
+                    e,
+                ));
+            }
+            let (kind, src_text) = match &call.args.args[4] {
+                // 静态叶 refs.<elem>：source_kind 0（文档 id）。
+                Arg::Pos(Expr::Dot(inner, elem))
+                    if matches!(&**inner, Expr::Ident(r) if r == "refs") =>
+                {
+                    (0i64, subject_text(ctx, env, elem, e)?)
+                }
+                // 作者句柄（局部/成员变量）：source_kind 1（全代次 live 绑定）。
+                Arg::Pos(x) => {
+                    let mut buf = String::new();
+                    translate_expr(x, ctx, &mut buf)?;
+                    (1i64, buf)
+                }
+                _ => {
+                    return Err(unsupported(
+                        "bind source must be a handle variable or refs.<elem>",
+                        e,
+                    ))
+                }
+            };
+            let radius_t = crate::lower::fmt_f(radius_v);
+            out.push_str(&format!(
+                "ag_trigger_bind({pair_id}, {subject}, {kind}, {src_text}, {shape}, {radius_t})"
+            ));
+            Ok(())
+        }
+        // event.<getter>()：下一事件游标与冻结字段读取（各计 1）。
+        ("event", getter) => {
+            let f = match getter {
+                "next" => "ag_event_next",
+                "pair" => "ag_event_pair",
+                "phase" => "ag_event_phase",
+                "generation" => "ag_event_generation",
+                "source_kind" => "ag_event_source_kind",
+                "source" => "ag_event_source",
+                "geometry" => "ag_event_geometry",
+                other => {
+                    return Err(unsupported(
+                        format!(
+                            "unknown event.{other} (components-3d-events surface: next/pair/phase/generation/source_kind/source/geometry)"
+                        ),
+                        e,
+                    ))
+                }
+            };
+            if !call.args.args.is_empty() {
+                return Err(unsupported(format!("event.{getter} arity"), e));
+            }
+            out.push_str(&format!("{f}()"));
+            Ok(())
+        }
+        // object.<op>：typed 对象操作（1:1 runtime_objects_v1）。
+        ("object", op) => {
+            let (f, arity) = match op {
+                "move" => ("ag_object_move", 4usize),
+                "despawn" => ("ag_object_despawn", 1),
+                "alive" => ("ag_object_alive", 1),
+                "visible" => ("ag_object_visible", 2),
+                "x" => ("ag_object_x", 1),
+                "y" => ("ag_object_y", 1),
+                "z" => ("ag_object_z", 1),
+                other => {
+                    return Err(unsupported(
+                        format!(
+                            "unknown object.{other} (components-3d-events surface: move/despawn/alive/visible/x/y/z)"
+                        ),
+                        e,
+                    ))
+                }
+            };
+            if call.args.args.len() != arity {
+                return Err(unsupported(
+                    format!("object.{op} arity {} (want {arity})", call.args.args.len()),
+                    e,
+                ));
+            }
+            let mut parts = Vec::new();
+            for a in &call.args.args {
+                match a {
+                    Arg::Pos(x) => {
+                        let mut buf = String::new();
+                        translate_expr(x, ctx, &mut buf)?;
+                        parts.push(buf);
+                    }
+                    other => return Err(unsupported(format!("object.{op} arg {other:?}"), e)),
+                }
+            }
+            out.push_str(&format!("{f}({})", parts.join(", ")));
+            Ok(())
+        }
+        _ => Err(unsupported(
+            format!("unknown {label} (components-3d-events surface)"),
+            e,
+        )),
     }
 }
 

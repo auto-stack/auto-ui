@@ -14,6 +14,7 @@ pub mod lower;
 pub mod lower_basic2d;
 pub mod lower_components;
 pub mod lower_components3d;
+pub mod lower_components3d_events;
 pub mod lower_components3d_runtime;
 pub mod lower_components_game;
 pub mod lower_g11;
@@ -54,6 +55,10 @@ pub enum Profile {
     /// （character3d/solid/camera3d/player3d/mob3d 声明；六动作输入表；
     /// refs 角色服务；沿 024 共享管线 + 注入位）。
     Components3DRuntime,
+    /// PLAN-028 三维实例/触发事件/新局接线：components-3d-events（object3d
+    /// 模板/objects3d 槽池/triggers pair 池/spawn/bind/event.*/object.*
+    /// 调用端口；triggers3d/1 装配；沿 024 共享管线 + 注入位）。
+    Components3DEvents,
 }
 
 pub use load::{load_project, Project, ProjectError};
@@ -63,6 +68,7 @@ pub use lower_components::{
     lower_project_components, lower_project_queries, lower_project_sprites,
 };
 pub use lower_components3d::lower_project_components3d;
+pub use lower_components3d_events::lower_project_components3d_events;
 pub use lower_components3d_runtime::lower_project_components3d_runtime;
 pub use lower_components_game::{lower_project_components_game, LowerOutputGame};
 pub use lower_presentation::{lower_project_presentation, LowerOutputPresentation};

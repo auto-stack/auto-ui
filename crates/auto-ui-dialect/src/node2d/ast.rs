@@ -44,6 +44,15 @@ pub struct NodeDecl {
     /// PLAN-027：`camera3d { ... }` 块——运行相机一次性配置声明
     /// （仅 root；target 恒为本 Run 恰一角色）。
     pub camera3d: Option<Camera3dBlock>,
+    /// PLAN-028：`object3d { }` 块——本定义为 spawn 模板定义（仅
+    /// components-3d-events 档消费；解析面宽容，档归属由降层具名校验）。
+    pub object3d: Option<Object3dBlock>,
+    /// PLAN-028：`objects3d { a, b, ... }` 块——具名对象槽池声明（仅 root；
+    /// 名字 → 槽位 0..8 由降层按声明序分配）。
+    pub objects3d: Option<NameListBlock>,
+    /// PLAN-028：`triggers { a, b, ... }` 块——具名触发 pair 池声明（仅
+    /// root；名字 → pair 0..8 由降层按声明序分配）。
+    pub triggers: Option<NameListBlock>,
     pub span: LightSpan,
 }
 
@@ -51,6 +60,21 @@ pub struct NodeDecl {
 /// 元素静态 scale 与受信服务冻结规则决定）。
 #[derive(Debug, Clone)]
 pub struct Character3dBlock {
+    pub span: LightSpan,
+}
+
+/// PLAN-028：`object3d { }` —— spawn 模板定义标记（v1 无 props；模板
+/// 几何 = 本定义 view-3d 的唯一叶，静态 scale/yaw/pitch 即模板身份）。
+#[derive(Debug, Clone)]
+pub struct Object3dBlock {
+    pub span: LightSpan,
+}
+
+/// PLAN-028：`objects3d { a, b, ... }` / `triggers { a, b, ... }` —— 具名
+/// 池声明（裸标识符名字表；逗号/换行分隔均可，降层按声明序分配 0..8）。
+#[derive(Debug, Clone)]
+pub struct NameListBlock {
+    pub names: Vec<String>,
     pub span: LightSpan,
 }
 

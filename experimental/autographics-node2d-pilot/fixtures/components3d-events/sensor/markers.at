@@ -1,0 +1,20 @@
+// Two same-definition instances carry isolated ping counters and forward
+// their own tag upward (020 receiver isolation on the events profile).
+node Marker(x: float, tag: int) {
+    model {
+        var pings = 0
+    }
+    msg { Ping(int) }
+    view-3d {
+        cylinder3d marker {
+            position: (.x, 1.6, 0.0)
+            scale: (0.2, 0.2, 0.2)
+        }
+    }
+    on {
+        .Ping(n) -> {
+            .pings = .pings + 1
+            emit .Pinged(.tag)
+        }
+    }
+}

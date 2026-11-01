@@ -1,0 +1,8 @@
+use character: Character
+use props: Ghost
+node Main {
+    view-3d {
+        Character hero { }
+    }
+    objects3d { s1 }
+}

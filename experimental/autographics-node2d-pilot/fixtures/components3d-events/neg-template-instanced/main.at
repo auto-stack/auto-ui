@@ -1,0 +1,12 @@
+// A template definition must not also be instanced in any view: one parked
+// row per template, spawn-time instances are runtime objects (named reject).
+use character: Character
+use props: Ghost
+
+node Main {
+    view-3d {
+        Character hero { }
+        Ghost g { }
+    }
+    objects3d { s1 }
+}

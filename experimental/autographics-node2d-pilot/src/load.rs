@@ -543,9 +543,17 @@ pub fn load_project(entry: &Path) -> Result<Project, ProjectError> {
             });
         }
     }
+    // PLAN-028：object3d 模板定义不参与 root 判定（它们只作为 spawn
+    // 模板被引用；旧档夹具不携带 object3d，判定面不变）。
     let roots: Vec<String> = declared
         .iter()
-        .filter(|d| !instantiated.contains(d))
+        .filter(|d| {
+            !instantiated.contains(d)
+                && !project
+                    .modules
+                    .values()
+                    .any(|m| m.nodes.iter().any(|n| &n.name == *d && n.object3d.is_some()))
+        })
         .cloned()
         .collect();
     if roots.len() != 1 {

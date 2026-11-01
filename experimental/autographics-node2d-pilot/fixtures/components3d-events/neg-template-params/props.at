@@ -1,0 +1,6 @@
+node Ghost(scale: float) {
+    object3d { }
+    view-3d { mob3d shard { position: (-30.0, 1.0, -3.0)
+                            visible: false
+                            scale: (.scale, .scale, .scale) } }
+}

@@ -1,0 +1,39 @@
+// PLAN-028 g11-geometry: actor-relative corner/tangent probes at tick 1
+// (world-position reads of the character row, template VoidZone geometry).
+// Pair corner_aabb (AABB) must enter while corner_sphere (r=0.5, offset 0.9
+// diagonally) stays silent (corner outside the sphere); tangent_sphere at
+// +0.9/+0.5 sits at closest distance 0.5 and enters on exact tangency.
+node Character {
+    model {
+        var tick = 0
+        var h4 = 0
+        var h5 = 0
+    }
+    view-3d {
+        cylinder3d body {
+            position: (3.0, 1.0, -3.0)
+            scale: (0.4, 0.5, 0.4)
+        }
+    }
+    character3d { }
+    on {
+        Life.Start -> {
+            refs.body.place(3.0, 0.5, -3.0)
+        }
+        Life.Tick(dt) -> {
+            .tick = .tick + 1
+            if .tick == 1 {
+                let ax = refs.body.world(0)
+                let ay = refs.body.world(1)
+                let az = refs.body.world(2)
+                .h4 = spawn("corner", "VoidZone", ax + 0.9, ay + 0.9, az)
+                .h5 = spawn("tangent", "VoidZone", ax + 0.9, ay + 0.5, az)
+                bind("corner_aabb", refs.body, aabb, 0.0, .h4)
+                bind("corner_sphere", refs.body, sphere, 0.5, .h4)
+                bind("tangent_sphere", refs.body, sphere, 0.5, .h5)
+            }
+            let n = event.next()
+            if n == 1 { let p = event.pair() }
+        }
+    }
+}

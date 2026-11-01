@@ -563,6 +563,7 @@ fn base_ctx<'a>(
                         six_actions: false,
                         char3: None,
                         cam3: false,
+            events3d: None,
     }
 }
 

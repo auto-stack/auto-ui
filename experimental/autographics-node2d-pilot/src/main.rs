@@ -184,6 +184,23 @@ fn runtime_behavior_api(project: &autographics_node2d_pilot::load::Project) -> &
     }
 }
 
+fn components3d_events_consumer(product: &str) -> &'static str {
+    match product {
+        "g11-main" | "g11-alt" | "g11-triple" | "g11-geometry" | "g11-oldgen" | "g11-stale"
+        | "sensor" => {
+            "experimental/autographics-auto-driver/tests/node3d_events_flow.rs"
+        }
+        "neg-slot-nine" | "neg-pair-nine" | "neg-template-instanced" | "neg-template-params"
+        | "neg-template-model" | "neg-template-two-leaves" | "neg-template-solid"
+        | "neg-template-builtin-dyn" | "neg-pool-nonroot" | "neg-unknown-slot"
+        | "neg-unknown-template" | "neg-unknown-pair" | "neg-bind-non-const-subject"
+        | "neg-bind-shape" | "neg-bind-radius" => {
+            "experimental/autographics-node2d-pilot/tests/node3d_events_gates.rs (fixture-level; lowering rejection)"
+        }
+        _ => "unrecorded (this out dir has no registered flow consumer)",
+    }
+}
+
 fn components3d_runtime_consumer(product: &str) -> &'static str {
     match product {
         "g07a" | "g07a-fast" | "g07b" | "g08" | "g08-alt" | "static-actors" | "events3d"
@@ -217,6 +234,7 @@ fn main() {
                 Some("components-2d-game") => Profile::Components2DGame,
                 Some("components-3d") => Profile::Components3D,
                 Some("components-3d-runtime") => Profile::Components3DRuntime,
+                Some("components-3d-events") => Profile::Components3DEvents,
                 Some("presentation-2d") => Profile::Presentation2D,
                 _ => usage(),
             }
@@ -888,6 +906,22 @@ fn main() {
                 "autographics-node2d-pilot plan027 components-3d-runtime",
                 runtime_behavior_api(&project),
                 components3d_runtime_consumer,
+            );
+        }
+        Profile::Components3DEvents => {
+            let lowered = autographics_node2d_pilot::lower_project_components3d_events(&project)
+                .unwrap_or_else(|e| {
+                    eprintln!("node2d-lower: {e}");
+                    std::process::exit(3);
+                });
+            write_components3d_products(
+                &out,
+                &entry,
+                &project,
+                lowered,
+                "autographics-node2d-pilot plan028 components-3d-events",
+                "autographics.triggers3d/1",
+                components3d_events_consumer,
             );
         }
         Profile::Basic2D(basic) => {

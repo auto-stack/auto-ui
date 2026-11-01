@@ -1,0 +1,7 @@
+node Ghost {
+    object3d { }
+    view-3d { cylinder3d shard { position: (-30.0, 1.0, -3.0)
+                                 visible: false
+                                 scale: (0.5, 0.5, 0.5)
+                                 solid: true } }
+}

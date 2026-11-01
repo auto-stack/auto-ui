@@ -1,0 +1,33 @@
+// PLAN-028 g11-oldgen: same-slot respawn is a new generation that is never
+// auto-bound; an explicit rebind (tick 8) re-enters it with a fresh enter.
+// Faithful mechanics of the original three-oldgen variant on the typed
+// authoring surface (spawn item_a twice = same slot, new generation).
+node Character {
+    model {
+        var tick = 0
+        var h0 = 0
+        var h1 = 0
+    }
+    view-3d {
+        cylinder3d body {
+            position: (3.0, 1.0, -3.0)
+            scale: (0.4, 0.5, 0.4)
+        }
+    }
+    character3d { }
+    on {
+        Life.Start -> {
+            refs.body.place(3.0, 0.5, -3.0)
+            .h0 = spawn("item_a", "ShardA", 3.0, 1.0, -3.0)
+            bind("shard_a", refs.body, aabb, 0.0, .h0)
+        }
+        Life.Tick(dt) -> {
+            .tick = .tick + 1
+            if .tick == 3 { object.despawn(.h0) }
+            if .tick == 4 { .h1 = spawn("item_a", "ShardB", 3.0, 1.0, -3.0) }
+            if .tick == 8 { bind("shard_a", refs.body, aabb, 0.0, .h1) }
+            let n = event.next()
+            if n == 1 { let p = event.pair() }
+        }
+    }
+}

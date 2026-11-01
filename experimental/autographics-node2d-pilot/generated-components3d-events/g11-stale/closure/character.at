@@ -1,0 +1,31 @@
+// PLAN-028 g11-stale: operating the despawned (previous-generation) handle is
+// a named runtime rejection (ObjectNotAlive), the fault surfaces on play.error.
+node Character {
+    model {
+        var tick = 0
+        var h0 = 0
+        var h1 = 0
+    }
+    view-3d {
+        cylinder3d body {
+            position: (3.0, 1.0, -3.0)
+            scale: (0.4, 0.5, 0.4)
+        }
+    }
+    character3d { }
+    on {
+        Life.Start -> {
+            refs.body.place(3.0, 0.5, -3.0)
+            .h0 = spawn("item_a", "ShardA", 3.0, 1.0, -3.0)
+            bind("shard_a", refs.body, aabb, 0.0, .h0)
+        }
+        Life.Tick(dt) -> {
+            .tick = .tick + 1
+            if .tick == 3 { object.despawn(.h0) }
+            if .tick == 4 { .h1 = spawn("item_a", "ShardB", 3.0, 1.0, -3.0) }
+            if .tick == 5 { object.move(.h0, 5.0, 1.0, -3.0) }
+            let n = event.next()
+            if n == 1 { let p = event.pair() }
+        }
+    }
+}

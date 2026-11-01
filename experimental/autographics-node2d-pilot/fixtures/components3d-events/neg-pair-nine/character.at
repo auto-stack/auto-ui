@@ -1,0 +1,18 @@
+node Character {
+    model {
+        var h0 = 0
+    }
+    view-3d {
+        cylinder3d body {
+            position: (3.0, 1.0, -3.0)
+            scale: (0.4, 0.5, 0.4)
+        }
+    }
+    character3d { }
+    on {
+        Life.Start -> {
+            refs.body.place(3.0, 0.5, -3.0)
+            bind("p1", refs.body, aabb, 0.0, .h0)
+        }
+    }
+}

@@ -1,0 +1,77 @@
+// PLAN-028 sensor: a non-game sensing round on the components-3d-events
+// profile — no collect/score/win/fail business anywhere. A swept visitor
+// object (typed spawn into the named slot pool) crosses two stationary pads;
+// each pad is an AABB subject bound to the visitor handle (live-instance
+// source). Events route DOWN as child deliveries to two same-definition
+// Marker instances (isolated pings state/receivers) and back UP as .Pinged
+// msgs tallied per tag. The read policy is a second finite policy distinct
+// from the g11 ladder: up to two events per tick regardless of movement.
+use sentinel: Sentinel
+use markers: Marker
+use visitor_def: Visitor
+
+node Main {
+    model {
+        var vx = 2.0
+        var vdir = 1.0
+        var h = 0
+        var seen_a = 0
+        var seen_b = 0
+        var tally_a = 0
+        var tally_b = 0
+    }
+    msg { Pinged(int) }
+    view-3d {
+        cylinder3d pad_a {
+            position: (4.0, 0.5, 0.0)
+            scale: (1.0, 0.5, 1.0)
+        }
+        cylinder3d pad_b {
+            position: (8.0, 0.5, 0.0)
+            scale: (1.0, 0.5, 1.0)
+        }
+        Marker m_a { x: 4.0
+                     tag: 1 }
+        Marker m_b { x: 8.0
+                     tag: 2 }
+        Sentinel watch { }
+    }
+    camera3d { distance: 8.0
+              pitch: 45.0
+              projection: perspective }
+    objects3d { visitor }
+    triggers { sense_a, sense_b }
+    on {
+        Life.Start -> {
+            .h = spawn("visitor", "Visitor", 2.0, 0.5, 0.0)
+            bind("sense_a", refs.pad_a, aabb, 0.0, .h)
+            bind("sense_b", refs.pad_b, aabb, 0.0, .h)
+        }
+        Life.Tick(dt) -> {
+            if .seen_a * .seen_b == 0 {
+                object.move(.h, .vx, 0.5, 0.0)
+                .vx = .vx + .vdir * dt
+                let n = event.next()
+                if n == 1 {
+                    let p = event.pair()
+                    if p == 0 { .seen_a = 1
+                                m_a.Ping(0) }
+                    if p == 1 { .seen_b = 1
+                                m_b.Ping(0) }
+                    let n1 = event.next()
+                    if n1 == 1 {
+                        let p1 = event.pair()
+                        if p1 == 0 { .seen_a = 1
+                                    m_a.Ping(0) }
+                        if p1 == 1 { .seen_b = 1
+                                    m_b.Ping(0) }
+                    }
+                }
+            }
+        }
+        .Pinged(tag) -> {
+            if tag == 1 { .tally_a = .tally_a + 1 }
+            if tag == 2 { .tally_b = .tally_b + 1 }
+        }
+    }
+}

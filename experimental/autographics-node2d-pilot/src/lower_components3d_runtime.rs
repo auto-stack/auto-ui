@@ -94,6 +94,7 @@ pub fn lower_project_components3d_runtime(
         project,
         Cfg3 {
             runtime: Some(&runtime),
+            events: None,
             doc_prefix: "plan027-components-3d-runtime",
             gen_note: "PLAN-027 components-3d-runtime",
             regen_note: "tools/verify_plan027.py",
@@ -127,6 +128,15 @@ fn view_elems<'a>(w3: &'a World3d, def: &str) -> &'a [crate::lower_components3d:
         .get(def)
         .unwrap_or_else(|| panic!("def view missing: {def}"))
         .elems
+}
+
+/// events 档复用入口（027 收集逻辑原样；不复制第二份）。
+pub(crate) fn collect_runtime_cfg_pub(
+    project: &Project,
+    w3: &crate::lower_components3d::World3d,
+    scene: &crate::lower_components3d::SceneBuild3,
+) -> Result<crate::lower_components3d::RuntimeCfg3, LowerError> {
+    collect_runtime_cfg(project, w3, scene)
 }
 
 /// 恰一角色声明收集（(def name, def_idx)；root 为 None 哨兵时另行处理）。

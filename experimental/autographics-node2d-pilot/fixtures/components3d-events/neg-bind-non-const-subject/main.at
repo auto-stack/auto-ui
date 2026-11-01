@@ -1,0 +1,8 @@
+use character: Character
+
+node Main {
+    view-3d {
+        Character hero { }
+    }
+    triggers { p1 }
+}

@@ -121,6 +121,18 @@ pub(crate) fn build_def_3d(
     name: &str,
     is_root: bool,
 ) -> Result<(DefIR, View3dIR), LowerError> {
+    build_def_3d_with(project, name, is_root, false)
+}
+
+/// PLAN-028：`builtin_transform` 只在 components-3d-events 档为真（内置
+/// mob3d/player3d 叶允许静态 scale/yaw/pitch = 模板身份）；其余档保持
+/// 024 冻结拒绝面，旧字节不变。
+pub(crate) fn build_def_3d_with(
+    project: &Project,
+    name: &str,
+    is_root: bool,
+    builtin_transform: bool,
+) -> Result<(DefIR, View3dIR), LowerError> {
     let module = project.node_modules.get(name).cloned().ok_or_else(|| {
         at(
             "",
@@ -285,6 +297,7 @@ pub(crate) fn build_def_3d(
         Vec::new(),
         &mut seen,
         &mut v3,
+        builtin_transform,
     )?;
 
     let mut dyn_elems = Vec::new();
@@ -324,6 +337,7 @@ pub(crate) fn walk_view3d_elements(
     groups: Vec<String>,
     seen: &mut BTreeSet<String>,
     out: &mut View3dIR,
+    builtin_transform: bool,
 ) -> Result<(), LowerError> {
     let module_src = &project.modules[vctx.module].source;
     for el in elements {
@@ -480,7 +494,7 @@ pub(crate) fn walk_view3d_elements(
                 let scale = match prop_of(props, "scale") {
                     None => vec![CVal::Num(1.0), CVal::Num(1.0), CVal::Num(1.0)],
                     Some(pr) => {
-                        if is_builtin {
+                        if is_builtin && !builtin_transform {
                             return Err(at(
                                 vctx.module,
                                 line,
@@ -519,7 +533,7 @@ pub(crate) fn walk_view3d_elements(
                     let mut pv: Option<CVal> = None;
                     for (label, slot) in [("yaw", 0usize), ("pitch", 1usize)] {
                         if let Some(pr) = prop_of(props, label) {
-                            if is_builtin {
+                            if is_builtin && !builtin_transform {
                                 return Err(at(
                                     vctx.module,
                                     line,
@@ -578,7 +592,13 @@ pub(crate) fn walk_view3d_elements(
                     .unwrap_or(false);
                 for pr in props {
                     let known: &[&str] = if is_builtin {
-                        &["position", "visible", "solid"]
+                        // PLAN-028：events 档内置叶接受静态 scale/yaw/pitch
+                        // （模板身份）；solid 仍由专用检查具名拒绝。
+                        if builtin_transform {
+                            &["position", "scale", "yaw", "pitch", "visible"]
+                        } else {
+                            &["position", "visible", "solid"]
+                        }
                     } else if is_model {
                         &["position", "scale", "yaw", "pitch", "visible", "model"]
                     } else {
@@ -694,7 +714,7 @@ pub(crate) fn walk_view3d_elements(
                 });
                 let mut child_chain = groups.clone();
                 child_chain.push(name.clone());
-                walk_view3d_elements(project, vctx, children, child_chain, seen, out)?;
+                walk_view3d_elements(project, vctx, children, child_chain, seen, out, builtin_transform)?;
             }
             View3dElement::Instance { .. } => {}
         }
@@ -763,13 +783,21 @@ fn expr_binds_field(e: &Expr, vctx: &ViewCtx3) -> bool {
 // ------------------------------------------------------------- world build --
 
 pub(crate) fn build_world_3d(project: &Project) -> Result<World3d, LowerError> {
+    build_world_3d_with(project, false)
+}
+
+/// PLAN-028：`builtin_transform` 只在 components-3d-events 档为真。
+pub(crate) fn build_world_3d_with(
+    project: &Project,
+    builtin_transform: bool,
+) -> Result<World3d, LowerError> {
     let root_name = project.root.clone();
     let root_module = project
         .node_modules
         .get(&root_name)
         .cloned()
         .ok_or_else(|| at("", 0, &root_name, "root node module missing"))?;
-    let (root_def, root_view) = build_def_3d(project, &root_name, true)?;
+    let (root_def, root_view) = build_def_3d_with(project, &root_name, true, builtin_transform)?;
 
     let mut world = WorldIR {
         root: root_name.clone(),
@@ -829,6 +857,7 @@ pub(crate) fn build_world_3d(project: &Project) -> Result<World3d, LowerError> {
         in_module: &str,
         stack: &mut Vec<(String, String)>,
         depth: usize,
+        builtin_transform: bool,
     ) -> Result<(), LowerError> {
         if depth > 16 {
             return Err(at(
@@ -870,7 +899,7 @@ pub(crate) fn build_world_3d(project: &Project) -> Result<World3d, LowerError> {
             ));
         }
         if !w.defs.contains_key(node_name) {
-            let (def, view) = build_def_3d(project, node_name, false)?;
+            let (def, view) = build_def_3d_with(project, node_name, false, builtin_transform)?;
             views.insert(node_name.to_string(), view);
             w.defs.insert(node_name.to_string(), def);
         }
@@ -1060,6 +1089,7 @@ pub(crate) fn build_world_3d(project: &Project) -> Result<World3d, LowerError> {
             None,
             stack,
             depth + 1,
+            builtin_transform,
         )?;
         stack.pop();
         Ok(())
@@ -1076,6 +1106,7 @@ pub(crate) fn build_world_3d(project: &Project) -> Result<World3d, LowerError> {
         current_group: Option<String>,
         stack: &mut Vec<(String, String)>,
         depth: usize,
+        builtin_transform: bool,
     ) -> Result<(), LowerError> {
         for el in elements {
             match el {
@@ -1105,6 +1136,7 @@ pub(crate) fn build_world_3d(project: &Project) -> Result<World3d, LowerError> {
                         &owner_module,
                         stack,
                         depth,
+                        builtin_transform,
                     )?;
                 }
                 View3dElement::Group { name, children, .. } => {
@@ -1124,6 +1156,7 @@ pub(crate) fn build_world_3d(project: &Project) -> Result<World3d, LowerError> {
                         Some(group),
                         stack,
                         depth,
+                        builtin_transform,
                     )?;
                 }
                 _ => {}
@@ -1164,6 +1197,7 @@ pub(crate) fn build_world_3d(project: &Project) -> Result<World3d, LowerError> {
         None,
         &mut stack,
         0,
+        builtin_transform,
     )?;
 
     Ok(World3d { world, views })
@@ -1206,7 +1240,7 @@ struct PendingRow {
 }
 
 /// CVal → 初始化数值（数值/参数逐实例常量/`.field` 经 model init）。
-fn cval_init_value(
+pub(crate) fn cval_init_value(
     project: &Project,
     w3: &World3d,
     def: &DefIR,
@@ -1402,6 +1436,28 @@ fn resolve_model_3d(
 
 /// 收集三维场景：树先序行 + driver `ordered()` 同规则句柄。
 pub(crate) fn collect_scene_3d(project: &Project, w3: &World3d) -> Result<SceneBuild3, LowerError> {
+    collect_scene_3d_with(project, w3, &[])
+}
+
+/// PLAN-028：spawn 模板行输入（events 档；行名 = 模板定义名，值全部
+/// 为已求值常量）。模板行在 root/实例行之后按给定序追加。
+#[derive(Clone)]
+pub(crate) struct TemplateRowIn {
+    pub name: String,
+    pub kind: &'static str,
+    pub translation: [f64; 3],
+    pub scale: [f64; 3],
+    pub yaw: f64,
+    pub pitch: f64,
+    pub visible: bool,
+    pub resource: Option<String>,
+}
+
+pub(crate) fn collect_scene_3d_with(
+    project: &Project,
+    w3: &World3d,
+    templates: &[TemplateRowIn],
+) -> Result<SceneBuild3, LowerError> {
     let world = &w3.world;
     let mut pending: Vec<PendingRow> = Vec::new();
 
@@ -1495,6 +1551,26 @@ pub(crate) fn collect_scene_3d(project: &Project, w3: &World3d) -> Result<SceneB
             i.parent_group.clone(),
             &mut pending,
         )?;
+    }
+
+    // —— PLAN-028 spawn 模板行（声明序；parked 由作者声明携带）——
+    for t in templates {
+        pending.push(PendingRow {
+            key: t.name.clone(),
+            row: Row3 {
+                is_group: false,
+                name: t.name.clone(),
+                kind: t.kind,
+                translation: t.translation,
+                scale: t.scale,
+                yaw: t.yaw,
+                pitch: t.pitch,
+                visible: t.visible,
+                parent: None,
+                resource: t.resource.clone(),
+            },
+            parent_key: None,
+        });
     }
 
     // 名字唯一 + 128 包络。
@@ -1644,13 +1720,26 @@ pub(crate) struct RuntimeCfg3 {
 
 /// PLAN-027：runtime 环境盖章（六动作表 + 相机读取；角色定义另含角色
 /// 服务）。None（024 档）不触碰任何字段。
-fn stamp_runtime_env(ctx: &mut crate::translate::Ctx, def_name: &str, rt: Option<&RuntimeCfg3>) {
+fn stamp_runtime_env(
+    ctx: &mut crate::translate::Ctx,
+    def_name: &str,
+    rt: Option<&RuntimeCfg3>,
+    events: Option<&crate::lower_components3d_events::EventsCfg3>,
+) {
     if let Some(rt) = rt {
         ctx.six_actions = true;
         ctx.cam3 = true;
         if rt.character_def.as_deref() == Some(def_name) {
             ctx.char3 = Some(crate::translate::Char3Env);
         }
+    }
+    if let Some(ev) = events {
+        ctx.events3d = Some(crate::translate::EventsEnv {
+            slots: ev.slot_ids.clone(),
+            pairs: ev.pair_ids.clone(),
+            templates: ev.template_ids.clone(),
+            subjects: ev.subject_ids.clone(),
+        });
     }
 }
 
@@ -1660,6 +1749,7 @@ pub(crate) fn gen_user_source_3d(
     plan: &Plan,
     scene: &SceneBuild3,
     runtime: Option<&RuntimeCfg3>,
+    events: Option<&crate::lower_components3d_events::EventsCfg3>,
     gen_note: &str,
     regen_note: &str,
 ) -> Result<String, LowerError> {
@@ -1777,6 +1867,25 @@ pub(crate) fn gen_user_source_3d(
                 pname,
                 vals.join(",")
             ));
+        }
+        // PLAN-028：bind 主题文档 id 表（events 档；每元素每实例 1-based
+        // 文档 id，def_idx 序；bind 端口按 [i] 取本实例主题行 id）。
+        if let Some(ev) = events {
+            for e in &w3.views[&dname].elems {
+                let ids = ev
+                    .subject_ids
+                    .get(&(def.prefix().to_string(), e.elem.clone()))
+                    .expect("events subject table covers every def elem");
+                src.push_str(&format!(
+                    "var {}_{}_subject_ids=[{}]\n",
+                    def.prefix(),
+                    e.elem,
+                    ids.iter()
+                        .map(|v| v.to_string())
+                        .collect::<Vec<_>>()
+                        .join(",")
+                ));
+            }
         }
         for e in &w3.views[&dname].elems {
             if !def.dyn_elems.contains(&e.elem) {
@@ -1963,7 +2072,7 @@ pub(crate) fn gen_user_source_3d(
         self_row: root_primary.clone(),
     });
     // PLAN-027：runtime 环境盖章（None = 024 档不触碰，字节不变）。
-    stamp_runtime_env(&mut rctx, &world.root, runtime);
+    stamp_runtime_env(&mut rctx, &world.root, runtime, events);
     src.push_str("fn main_lifestart() {\n");
     if let Some(h) = life_handler(root_decl, "Start") {
         translate_handler(&h.body.stmts, &rctx, &mut src, 1)?;
@@ -1992,6 +2101,7 @@ pub(crate) fn gen_user_source_3d(
             &root_refs,
             root_primary.as_deref(),
             runtime,
+            events,
             &mut src,
         )?;
     }
@@ -2020,7 +2130,7 @@ pub(crate) fn gen_user_source_3d(
             refs: &inst_refs,
             self_row: inst_primary.clone(),
         });
-        stamp_runtime_env(&mut ictx, &dname, runtime);
+        stamp_runtime_env(&mut ictx, &dname, runtime, events);
         if def.life_tick {
             src.push_str(&format!("fn {prefix}_lifetick(i int, dt float) {{\n"));
             if let Some(h) = life_handler(decl, "Tick") {
@@ -2053,6 +2163,7 @@ pub(crate) fn gen_user_source_3d(
                 &inst_refs,
                 inst_primary.as_deref(),
                 runtime,
+                events,
                 &mut src,
             )?;
         }
@@ -2357,6 +2468,7 @@ fn gen_recv_fn_3d(
     refs: &BTreeMap<String, String>,
     self_row: Option<&str>,
     runtime: Option<&RuntimeCfg3>,
+    events: Option<&crate::lower_components3d_events::EventsCfg3>,
     src: &mut String,
 ) -> Result<(), LowerError> {
     let def = if recv_def_name.is_empty() {
@@ -2404,6 +2516,7 @@ fn gen_recv_fn_3d(
         &mut ctx,
         if recv_def_name.is_empty() { &world.root } else { recv_def_name },
         runtime,
+        events,
     );
     translate_handler(&h.body.stmts, &ctx, src, 1)?;
     src.push_str("}\n");
@@ -2516,6 +2629,7 @@ pub(crate) fn roles_json_3d(scene: &SceneBuild3) -> String {
 pub fn lower_project_components3d(project: &Project) -> Result<LowerOutputBasic2D, LowerError> {
     lower_project_components3d_cfg(project, Cfg3 {
         runtime: None,
+            events: None,
         doc_prefix: "plan024-components-3d",
         gen_note: "PLAN-024 components-3d",
         regen_note: "tools/verify_plan024.py",
@@ -2527,6 +2641,8 @@ pub fn lower_project_components3d(project: &Project) -> Result<LowerOutputBasic2
 pub(crate) struct Cfg3<'c> {
     /// runtime 注入配置（None = 024 路径，字节不变）。
     pub runtime: Option<&'c RuntimeCfg3>,
+    /// PLAN-028：components-3d-events 配置（None = 旧档，字节不变）。
+    pub events: Option<&'c crate::lower_components3d_events::EventsCfg3>,
     /// scene.agscene document_id 前缀。
     pub doc_prefix: &'static str,
     /// 生成头注释身份段。
@@ -2543,9 +2659,22 @@ pub(crate) fn lower_project_components3d_cfg(
     cfg: Cfg3<'_>,
 ) -> Result<LowerOutputBasic2D, LowerError> {
     let w3 = build_world_3d(project)?;
-    let plan = crate::lower_components::plan_dispatch(project, &w3.world, false, false, false)?;
-    let scene = collect_scene_3d(project, &w3)?;
-    let user_source = gen_user_source_3d(project, &w3, &plan, &scene, cfg.runtime, cfg.gen_note, cfg.regen_note)?;
+    let plan = crate::lower_components::plan_dispatch_events(
+        project,
+        &w3.world,
+        false,
+        false,
+        false,
+        cfg.events.is_some(),
+    )?;
+    // PLAN-028：events 档模板行随 cfg 进共享管线（旧档空切片，字节不变）。
+    let no_templates: Vec<TemplateRowIn> = Vec::new();
+    let templates: &[TemplateRowIn] = match cfg.events {
+        Some(ev) => &ev.template_rows,
+        None => &no_templates,
+    };
+    let scene = collect_scene_3d_with(project, &w3, templates)?;
+    let user_source = gen_user_source_3d(project, &w3, &plan, &scene, cfg.runtime, cfg.events, cfg.gen_note, cfg.regen_note)?;
     let sha = crate::scene::sha256_hex(user_source.as_bytes());
     let bytes = user_source.len();
     let has_behavior =

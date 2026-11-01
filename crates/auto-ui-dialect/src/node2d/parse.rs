@@ -13,8 +13,8 @@ use auto_parser_api::token::TokenKind;
 use auto_parser_api::{CompilerSession, DomainDialect, DomainParseContext, DomainStmt, Scenario};
 
 use super::ast::{
-    Camera3dBlock, Character3dBlock, EventPattern, Handler, Node2DStmt, NodeDecl, OnBlock, Prop,
-    PropValue, View2dBlock, View2dElement, View3dBlock, View3dElement,
+    Camera3dBlock, Character3dBlock, EventPattern, Handler, NameListBlock, Node2DStmt, NodeDecl,
+    Object3dBlock, OnBlock, Prop, PropValue, View2dBlock, View2dElement, View3dBlock, View3dElement,
 };
 use crate::declarations::{parse_model_block, parse_msg_decl};
 
@@ -115,6 +115,12 @@ pub fn parse_node_decl(cx: &mut dyn DomainParseContext) -> AutoResult<NodeDecl> 
     for projection in ["perspective", "ortho"] {
         cx.bind_var(projection, Type::Int);
     }
+    // PLAN-028：components-3d-events `bind` 形状名义符号（aabb/sphere，
+    // 值由 components-3d-events 降层映射 0/1）。旧档夹具不引用这些名字，
+    // 解析作用域扩展不改变旧字节。
+    for trigger_shape in ["aabb", "sphere"] {
+        cx.bind_var(trigger_shape, Type::Int);
+    }
 
     cx.expect(TokenKind::LBrace)?;
     let mut model = None;
@@ -126,6 +132,9 @@ pub fn parse_node_decl(cx: &mut dyn DomainParseContext) -> AutoResult<NodeDecl> 
     let mut presentation2d = None;
     let mut character3d = None;
     let mut camera3d = None;
+    let mut object3d = None;
+    let mut objects3d = None;
+    let mut triggers = None;
     loop {
         cx.skip_empty_lines();
         if cx.is_kind(TokenKind::RBrace) || cx.is_kind(TokenKind::EOF) {
@@ -257,10 +266,49 @@ pub fn parse_node_decl(cx: &mut dyn DomainParseContext) -> AutoResult<NodeDecl> 
                     camera3d = Some(parse_camera3d_block(cx)?);
                     continue;
                 }
+                // PLAN-028：`object3d { }` —— spawn 模板定义标记。任何 node
+                // 都可携带；档归属/模板形状由降层具名校验（解析面宽容）。
+                "object3d" => {
+                    if object3d.is_some() {
+                        return Err(SyntaxError::Generic {
+                            message: "duplicate object3d block in node".to_string(),
+                            span: pos_to_span(cx.cur_pos()),
+                        }
+                        .into());
+                    }
+                    object3d = Some(parse_object3d_block(cx)?);
+                    continue;
+                }
+                // PLAN-028：`objects3d { a, b, ... }` —— 具名对象槽池声明。
+                // 任何 node 都可携带；root-only/池包络由降层具名校验。
+                "objects3d" => {
+                    if objects3d.is_some() {
+                        return Err(SyntaxError::Generic {
+                            message: "duplicate objects3d block in node".to_string(),
+                            span: pos_to_span(cx.cur_pos()),
+                        }
+                        .into());
+                    }
+                    objects3d = Some(parse_name_list_block(cx)?);
+                    continue;
+                }
+                // PLAN-028：`triggers { a, b, ... }` —— 具名触发 pair 池
+                // 声明。任何 node 都可携带；root-only/池包络由降层具名校验。
+                "triggers" => {
+                    if triggers.is_some() {
+                        return Err(SyntaxError::Generic {
+                            message: "duplicate triggers block in node".to_string(),
+                            span: pos_to_span(cx.cur_pos()),
+                        }
+                        .into());
+                    }
+                    triggers = Some(parse_name_list_block(cx)?);
+                    continue;
+                }
                 _ => {
                     return Err(SyntaxError::Generic {
                         message: format!(
-                            "unsupported node block '{keyword}' (research surface: model/msg/view-2d/on/game2d/presentation2d/character3d/camera3d)"
+                            "unsupported node block '{keyword}' (research surface: model/msg/view-2d/on/game2d/presentation2d/character3d/camera3d/object3d/objects3d/triggers)"
                         ),
                         span: pos_to_span(cx.cur_pos()),
                     }
@@ -301,6 +349,9 @@ pub fn parse_node_decl(cx: &mut dyn DomainParseContext) -> AutoResult<NodeDecl> 
         presentation2d,
         character3d,
         camera3d,
+        object3d,
+        objects3d,
+        triggers,
         span: super::ast::span_of(start),
     })
 }
@@ -453,6 +504,63 @@ fn parse_character3d_block(cx: &mut dyn DomainParseContext) -> AutoResult<Charac
     }
     cx.expect(TokenKind::RBrace)?;
     Ok(Character3dBlock {
+        span: super::ast::span_of(start),
+    })
+}
+
+/// PLAN-028：`object3d { }` —— spawn 模板定义标记（v1 无 props；模板几何
+/// = 本定义 view-3d 唯一叶）。
+fn parse_object3d_block(cx: &mut dyn DomainParseContext) -> AutoResult<Object3dBlock> {
+    let start = cx.cur_pos();
+    cx.advance(); // object3d
+    cx.expect(TokenKind::LBrace)?;
+    cx.skip_empty_lines();
+    if !cx.is_kind(TokenKind::RBrace) {
+        return Err(SyntaxError::Generic {
+            message: "object3d block takes no properties (v1 research surface)".to_string(),
+            span: pos_to_span(cx.cur_pos()),
+        }
+        .into());
+    }
+    cx.expect(TokenKind::RBrace)?;
+    Ok(Object3dBlock {
+        span: super::ast::span_of(start),
+    })
+}
+
+/// PLAN-028：`objects3d { a, b, ... }` / `triggers { a, b, ... }` —— 具名
+/// 池声明。裸标识符名字表，逗号分隔可选（换行也可）；池包络/唯一性/
+/// root-only 由降层具名校验。
+fn parse_name_list_block(cx: &mut dyn DomainParseContext) -> AutoResult<NameListBlock> {
+    let start = cx.cur_pos();
+    let keyword = cx.cur_text().to_string();
+    cx.advance(); // objects3d / triggers
+    cx.expect(TokenKind::LBrace)?;
+    let mut names = Vec::new();
+    loop {
+        cx.skip_empty_lines();
+        if cx.is_kind(TokenKind::RBrace) || cx.is_kind(TokenKind::EOF) {
+            break;
+        }
+        if !(cx.cur_is_soft_ident() || cx.is_kind(TokenKind::Ident)) {
+            return Err(SyntaxError::Generic {
+                message: format!(
+                    "expected a name in {keyword} block (bare identifiers separated by commas)"
+                ),
+                span: pos_to_span(cx.cur_pos()),
+            }
+            .into());
+        }
+        names.push(cx.cur_text().to_string());
+        cx.advance();
+        cx.skip_empty_lines();
+        if cx.is_kind(TokenKind::Comma) {
+            cx.advance();
+        }
+    }
+    cx.expect(TokenKind::RBrace)?;
+    Ok(NameListBlock {
+        names,
         span: super::ast::span_of(start),
     })
 }

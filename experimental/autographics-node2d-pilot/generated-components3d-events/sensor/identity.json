@@ -1,0 +1,36 @@
+{
+ "generator": "autographics-node2d-pilot plan028 components-3d-events",
+ "api": "autographics.triggers3d/1",
+ "user_source_sha256": "98aa1b61088b9f2a3c7517d293a7bcca54ed29094f143b36b3a867e4e356890c",
+ "user_source_bytes": 2250,
+  "module:main": "412b9cf91f1a46ff85539ce3c96ce521699dd98add9047193a182eb01752b6aa",
+  "module:markers": "cd8a73e6340fefc05cf9d9c759b2d41647588ce0fccec4628e72867b5024feaf",
+  "module:sentinel": "ede066c3edc4a3388058984704ddccdea98bfbb24883384031222382dc45b3ae",
+  "module:visitor_def": "5400f2d68c1784f9fbfcd92d363f23d0db2fffe71396c33e0008a3b73945052b",
+ "closure": [
+  {"name": "main", "sha256": "412b9cf91f1a46ff85539ce3c96ce521699dd98add9047193a182eb01752b6aa", "bytes": 2600},
+  {"name": "markers", "sha256": "cd8a73e6340fefc05cf9d9c759b2d41647588ce0fccec4628e72867b5024feaf", "bytes": 484},
+  {"name": "sentinel", "sha256": "ede066c3edc4a3388058984704ddccdea98bfbb24883384031222382dc45b3ae", "bytes": 306},
+  {"name": "visitor_def", "sha256": "5400f2d68c1784f9fbfcd92d363f23d0db2fffe71396c33e0008a3b73945052b", "bytes": 273}
+ ],
+ "roles": {
+ "scene_rows": {
+  "Main/m_a/marker": 2,
+  "Main/m_b/marker": 3,
+  "Main/watch/body": 4,
+  "Visitor": 5,
+  "pad_a": 0,
+  "pad_b": 1
+ }
+},
+ "assets": [
+
+ ],
+ "provenance": {
+  "product": "sensor",
+  "consumer": "experimental/autographics-auto-driver/tests/node3d_events_flow.rs",
+  "consumption": "include_str! frozen scene.agscene + world.at + assets/<sha>.glb; the harness writes the project (scene + assets) under target and loads via Storage::load_project; variants feed scripts/<sha>.at where <sha> = scene.behavior.source.sha256",
+  "load_verification": "the load path hash-verifies the behavior source and every assets/<sha>.glb against the scene manifest; GLB geometry admission runs in the driver preflight decoder before allocation",
+  "world_sha256": "98aa1b61088b9f2a3c7517d293a7bcca54ed29094f143b36b3a867e4e356890c"
+ }
+}

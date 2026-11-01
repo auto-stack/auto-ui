@@ -1,0 +1,36 @@
+{
+ "generator": "autographics-node2d-pilot plan028 components-3d-events",
+ "api": "autographics.triggers3d/1",
+ "user_source_sha256": "9db14b5d483cbc544523808611b879b172cc4fc050d9118f4cfb8236f03298ed",
+ "user_source_bytes": 5913,
+  "module:character": "e2d457c3ec1ff4a752ae8903956fb01d76e52dede13236d300ae713484a8be29",
+  "module:main": "83cb428a1be6bfe7ce0615910eb642b033fbef8d2dba504fe70790f81399e410",
+  "module:props": "4f12cc7ce6c8dc17add6cd0bf0f840966845696dc90cbcddcba32cfcd85f342e",
+ "closure": [
+  {"name": "character", "sha256": "e2d457c3ec1ff4a752ae8903956fb01d76e52dede13236d300ae713484a8be29", "bytes": 4216},
+  {"name": "main", "sha256": "83cb428a1be6bfe7ce0615910eb642b033fbef8d2dba504fe70790f81399e410", "bytes": 1168},
+  {"name": "props", "sha256": "4f12cc7ce6c8dc17add6cd0bf0f840966845696dc90cbcddcba32cfcd85f342e", "bytes": 1475}
+ ],
+ "roles": {
+ "scene_rows": {
+  "Beacon": 6,
+  "Main/hero/body": 1,
+  "Saw": 5,
+  "ShardA": 2,
+  "ShardB": 3,
+  "ShardC": 4,
+  "VoidZone": 7,
+  "ground": 0
+ }
+},
+ "assets": [
+
+ ],
+ "provenance": {
+  "product": "g11-alt",
+  "consumer": "experimental/autographics-auto-driver/tests/node3d_events_flow.rs",
+  "consumption": "include_str! frozen scene.agscene + world.at + assets/<sha>.glb; the harness writes the project (scene + assets) under target and loads via Storage::load_project; variants feed scripts/<sha>.at where <sha> = scene.behavior.source.sha256",
+  "load_verification": "the load path hash-verifies the behavior source and every assets/<sha>.glb against the scene manifest; GLB geometry admission runs in the driver preflight decoder before allocation",
+  "world_sha256": "9db14b5d483cbc544523808611b879b172cc4fc050d9118f4cfb8236f03298ed"
+ }
+}

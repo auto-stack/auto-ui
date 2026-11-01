@@ -1804,6 +1804,19 @@ pub(crate) fn plan_dispatch(
     sprites: bool,
     pres: bool,
 ) -> Result<Plan, LowerError> {
+    plan_dispatch_events(project, world, queries, sprites, pres, false)
+}
+
+/// PLAN-028：`events` = components-3d-events 档（spawn/bind 裸调用是
+/// typed 服务端口，不是模块 helper fn；其余档保持旧拒绝面）。
+pub(crate) fn plan_dispatch_events(
+    project: &Project,
+    world: &WorldIR,
+    queries: bool,
+    sprites: bool,
+    pres: bool,
+    events: bool,
+) -> Result<Plan, LowerError> {
     let mut plan = Plan::default();
     let root_prefix = world.root.to_lowercase();
 
@@ -2129,8 +2142,11 @@ pub(crate) fn plan_dispatch(
                             ));
                         }
                     }
+                    // PLAN-028：具名行读/写校验属 queries-2d 面（refs.<inst>
+                    // = 实例路径）；components-3d 的 refs.<elem>.place/shift
+                    // 由 space3 行环境在 translate 期校验，这里不再拦截。
                     QEvent::RefRead { name, line } => {
-                        if !refs_names.contains_key(name) {
+                        if queries && !refs_names.contains_key(name) {
                             return Err(at(
                                 &def.module,
                                 *line,
@@ -2141,6 +2157,9 @@ pub(crate) fn plan_dispatch(
                     }
                     QEvent::RefWrite { name, line } => {
                         let Some(writable) = refs_names.get(name) else {
+                            if !queries {
+                                continue;
+                            }
                             return Err(at(
                                 &def.module,
                                 *line,
@@ -2244,6 +2263,9 @@ pub(crate) fn plan_dispatch(
                 }
             }
             for (f, fline) in &out.calls {
+                if events && (f == "spawn" || f == "bind") {
+                    continue;
+                }
                 let fmod = &project.modules[&def.module];
                 if !fmod.fns.iter().any(|(n, _)| n == f) {
                     return Err(at(
@@ -2256,6 +2278,12 @@ pub(crate) fn plan_dispatch(
             }
             // ---- 子投递 ----
             for (child, ev, argc, cline) in &out.child_emits {
+                // PLAN-028：event.*/object.*/round.* 是 typed 服务前缀，
+                // 不是子投递选择器（events 档跳过；其余档保持旧拒绝面；
+                // round.request() 的受信映射沿 025/027 既有面）。
+                if events && (child == "event" || child == "object" || child == "round") {
+                    continue;
+                }
                 let key = (edef.clone(), child.clone(), ev.clone());
                 if plan.child.contains_key(&key) {
                     continue;
@@ -3231,6 +3259,7 @@ pub(crate) fn collect_scene(
                         six_actions: false,
                         char3: None,
                         cam3: false,
+            events3d: None,
                     };
                     let pos = prop_of(props, "position").ok_or_else(|| {
                         at(
@@ -4580,6 +4609,7 @@ pub(crate) fn instance_ctx<'a>(
         six_actions: false,
         char3: None,
         cam3: false,
+            events3d: None,
     })
 }
 
@@ -4673,6 +4703,7 @@ pub(crate) fn root_ctx<'a>(
         six_actions: false,
         char3: None,
         cam3: false,
+            events3d: None,
     }
 }
 

@@ -1,0 +1,13 @@
+node Character {
+    objects3d { s1 }
+    model {
+        var h0 = 0
+    }
+    view-3d {
+        cylinder3d body {
+            position: (3.0, 1.0, -3.0)
+            scale: (0.4, 0.5, 0.4)
+        }
+    }
+    character3d { }
+}

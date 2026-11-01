@@ -1,0 +1,7 @@
+// The swept probe visual: a plain cylinder template (v1 kinds only).
+node Visitor {
+    object3d { }
+    view-3d { cylinder3d probe { position: (-30.0, 0.5, 0.0)
+                                 visible: false
+                                 scale: (0.3, 0.3, 0.3) } }
+}

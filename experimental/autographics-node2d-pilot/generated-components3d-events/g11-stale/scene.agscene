@@ -1,0 +1,247 @@
+{
+ "behavior": {
+  "api": "autographics.triggers3d/1",
+  "source": {
+   "format": "auto-source",
+   "sha256": "57d360b8ee500f993871b43acc7d46d617847b5fbc6e558f70a7d685effa1772",
+   "byte_length": 1671
+  },
+  "actors": {
+   "two_d": null,
+   "three_d": null
+  }
+ },
+ "schema": "autographics.scene/6",
+ "document_id": "plan028-components-3d-events-main",
+ "resources": [
+  "circle",
+  "quad",
+  "cylinder",
+  "player",
+  "mob"
+ ],
+ "groups": [
+
+ ],
+ "objects": [
+  {
+   "id": 1,
+   "name": "ground",
+   "kind": "cylinder",
+   "translation": [
+    15.0,
+    -1.1,
+    -3.0
+   ],
+   "scale": [
+    40.0,
+    1.0,
+    2.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 2,
+   "name": "Main/hero/body",
+   "kind": "cylinder",
+   "translation": [
+    3.0,
+    1.0,
+    -3.0
+   ],
+   "scale": [
+    0.4,
+    0.5,
+    0.4
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 3,
+   "name": "ShardA",
+   "kind": "mob",
+   "translation": [
+    -30.0,
+    1.0,
+    -3.0
+   ],
+   "scale": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": false,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 4,
+   "name": "ShardB",
+   "kind": "mob",
+   "translation": [
+    -30.0,
+    1.0,
+    -3.0
+   ],
+   "scale": [
+    0.6,
+    0.6,
+    0.6
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": false,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 5,
+   "name": "ShardC",
+   "kind": "mob",
+   "translation": [
+    -30.0,
+    1.0,
+    -3.0
+   ],
+   "scale": [
+    0.7,
+    0.7,
+    0.7
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": false,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 6,
+   "name": "Saw",
+   "kind": "cylinder",
+   "translation": [
+    -30.0,
+    2.4,
+    -3.0
+   ],
+   "scale": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": false,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 7,
+   "name": "Beacon",
+   "kind": "cylinder",
+   "translation": [
+    -30.0,
+    1.0,
+    -3.0
+   ],
+   "scale": [
+    0.5,
+    1.2,
+    0.5
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": false,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 8,
+   "name": "VoidZone",
+   "kind": "cylinder",
+   "translation": [
+    -30.0,
+    1.0,
+    -3.0
+   ],
+   "scale": [
+    1.0,
+    1.5,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": false,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  }
+ ],
+ "assets": [
+
+ ]
+}

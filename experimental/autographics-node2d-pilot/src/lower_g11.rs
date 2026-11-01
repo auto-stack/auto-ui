@@ -374,6 +374,7 @@ fn base_ctx_g11<'a>(
                         six_actions: false,
                         char3: None,
                         cam3: false,
+            events3d: None,
     }
 }
 
@@ -1055,6 +1056,7 @@ pub fn lower_project_g112d(project: &Project) -> Result<LowerOutputG11, LowerErr
                         six_actions: false,
                         char3: None,
                         cam3: false,
+            events3d: None,
                     };
                     let mut buf = String::new();
                     if translate_stmts(&[Stmt::Expr(e.clone())], &ctx, &mut buf, 0).is_ok() {
