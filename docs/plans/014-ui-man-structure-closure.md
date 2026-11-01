@@ -10,13 +10,13 @@ supersedes_spec_components: [docs/specs/README.md]
 new_spec_components: [docs/specs/ui/structure-closure.md, docs/specs/ui/structure-test-map.md]
 touched_goals: []
 affects: [auto-ui-compiler, auto-ui-runtime, auto-ui-tools, auto-man-cli, repository-boundaries]
-current_step: 3
+current_step: 7
 total_steps: 11
 ---
 
 # [auto-ui/PLAN-014] UI/Man内部结构收口
 
-> r2 / executing / 3/11（2026-11-01）。实施授权=2026-11-01用户goal：先推进T-01/T-02及Man CLI（T-03），再做Vue（T-04）；共享接口改动、renderer/GPU验证和最终合入安排短窗串行；不把020完整交付作为014全局前置。T-01/T-02冻结与T-03实施已完成：Man worktree提交5b310f0（基cbbe657），验证unit 24/24、tcore 24/24、plan816+plan890+cmd_ui 10/10（各1既有环境skip）；发现并修复901遗留consumer漂移（Man死转发feature `with-file-history`，master对lang b1a4871a本不可编译）。
+> r2 / executing / 7/11（2026-11-01）。实施授权=2026-11-01用户goal：先推进T-01/T-02及Man CLI（T-03），再做Vue（T-04）；共享接口改动、renderer/GPU验证和最终合入安排短窗串行；不把020完整交付作为014全局前置。T-03..T-06已交付（Man 5b310f0；UI组树7a183c6/90e0c44/fcece7a；901 consumer漂移随T-03修复）；T-07完成四面闭包核对+V-12守恒账（发现并修复T-05漏切的38个memo测试，修复后日常2196/2196、守恒172=172）+TrackCtx终局登记（7文件29签名，退出本Plan范围，登记007接续）。
 > 唯一主责auto-ui；Man参与CLI结构，语言/Web只接受稳定公开依赖及必要消费/规范指针。890、900、901、018均已有归档交付记录；本计划保留其实际支持边界，不重做迁移、feature拍平或发行闭包补全。
 > 设计：[UI/Man结构边界](../design/autoui/ui-man-structure-closure.md)。该设计r1的U890等待/旧feature与证据条款由本计划r2更新，四面目标保持；总路线v20仅历史，不覆盖本次实物核查。
 
@@ -201,6 +201,7 @@ work/review只做命名反例/模块/fixture及必要`cargo check -p auto-ui-com
 | [✅ T-04] | work / T-03 | UI compiler `ui_gen/vue.rs`→按template/script/style/import/library/store等具名主题模块（具体新路径T-02冻结）；移除旧正文/重复算法，保公开入口/单state/reset/010 | AC-03；V-04/05 |
 | [✅ T-05] | work / T-04 | runtime `ui/aura_view_builder.rs`及必要既有相邻模块按节点/绑定/构建/跟踪职责提取；单VmBridge/Bindings/slot/path与guard，旧实现退出 | AC-04；V-06及定向状态控制 |
 | [✅ T-06] | work / T-05 | runtime `ui/iced/renderer.rs`按已冻结消息/状态/资源owner整理更新/订阅/view、图标部件、纹理/快照与宿主边界；保实际调用、资源终态/帧/active | AC-05/06；V-07/08/10，真实GPU定向，不以只移动代码关闭 |
+| [✅ T-07] | work / T-06 | 四面API/依赖/feature/类型和源码发行清单核对，测试随owner迁移/外移并保旧新ID与原子义务；复用现有治理及必要小型结构回归，旧重复逻辑/未接线helper退出 | AC-07/08；V-11/12及对应V-05 |
 | T-04 | work / T-03 | UI compiler `ui_gen/vue.rs`→按template/script/style/import/library/store等具名主题模块（具体新路径T-02冻结）；移除旧正文/重复算法，保公开入口/单state/reset/010 | AC-03；V-04/05 |
 | T-05 | work / T-04 | runtime `ui/aura_view_builder.rs`及必要既有相邻模块按节点/绑定/构建/跟踪职责提取；单VmBridge/Bindings/slot/path与guard，旧实现退出 | AC-04；V-06及定向状态控制 |
 | T-06 | work / T-05 | runtime `ui/iced/renderer.rs`按已冻结消息/状态/资源owner整理更新/订阅/view、图标部件、纹理/快照与宿主边界；保实际调用、资源终态/帧/active | AC-05/06；V-07/08/10，真实GPU定向，不以只移动代码关闭 |
@@ -238,6 +239,16 @@ work/review只做命名反例/模块/fixture及必要`cargo check -p auto-ui-com
 - **T-04尾部修复（同提交）**：vue 9个子模块的提升方法pub(crate)→pub(super)，清零private_interfaces警告（VideoSpec/CanvasSpec/StyleBranch等vue私有payload类型）；node_to_html/node_to_auto_code按原pub(crate)保持。修复后compiler crate可达性警告=0。
 - **V-06 实测**：runtime日常档 `cargo nextest run -p auto-ui-runtime --lib` **2158/2158**（178 skip=018契约default-filter族+既有ignore，零新增）；builder族显式 `-E 'test(/aura_view_builder/)'` **126/126**（含plan045/046/047 memo族、plan055/571/534/080、build_with_debug捕获族）；mutation control：mention_segments提前返回→`plan493_mentions_literal_list` FAILED→还原→8/8；auto-ui-tools与Man auto check各0 error；拆分文件零新增警告（runtime余12条可达性警告均为session.rs既有）。
 
+### 8.5 执行记录（2026-11-01，work轮5：T-07）
+
+- **V-11 四面闭包核对**（全过）：①`cargo tree -p auto-ui-compiler --edges normal` 含 auto-ui-runtime 边数=0（compiler零反依赖）；runtime→compiler=1（合法方向）。②Man Core闭包：`cargo tree --manifest-path core/Cargo.toml` UI/VM-renderer边=0（+T-03 Core形状编译与tcore 24/24佐证）。③语言反向边=0：lang crates无auto-ui依赖（auto-api-gen→auto-web为890交付基线既有消费，非本Plan触面，如实登记）。④feature：四面Cargo.toml相对HEAD零diff（拆分零manifest改动）；`ui-iced`别名/真实optional能力未触（018合同保持）。⑤类型单source：VueGenerator/AuraViewBuilder/IcedMessage/DesktopSession定义各=1。⑥**发行清单/指纹**：compiler build.rs对`src/ui_gen`逐文件FNV哈希→生成器源指纹——拆分如实改变指纹=缓存身份变化→旧缓存失效重建（合同§5.3明文要求"不伪造旧fingerprint"），`ui_cache_schema`集成测试绿（V-05已证失效语义）。
+- **V-12 测试映射账与执行账**——**审计发现并修复一个真实缺陷**：
+  - 缺陷：#[test]守恒核对发现 aura 172→134——T-05拆分切片覆盖漏掉原文件25855-28054的 memo/keyed-for 测试族（plan045_memo_tests/plan046_for_memo_tests/plan046_memo_block_tests/plan047_{gate,signal,convergence}_tests，38测试）；T-05收据"builder族126/126"实为缺失后集合的测量。**修复=570c147**：38测试原样迁入route_memo.rs（impl#2 memo门owner）+映射注记；25506-25512节横幅归还tags_panels（impl#3前）。
+  - 修复后守恒：vue 329=329；aura 172=172；renderer 199=199；Man main 8=8（3111双`#[cfg(test)]`怪癖两侧一致保留）；Man集成目标（plan816/890/cmd_ui/smoke）零触碰。旧→新ID映射：全部mod名/测试名/断言零改；唯一位移=38个memo测试 族内位置 aura尾→route_memo.rs（owner迁移，T-07合同明文"测试随owner迁移"）。
+  - 执行账：compiler lib 1127/0；runtime日常 **2196/2196**（2158+38精确）；builder族 **164/164**；renderer+lucide 170/170；plan811 7/7；Man unit 24/24+tcore 24/24+真实进程10/10；mutation control×3（vue golden、aura mention、plan811源守卫）全过。
+- **TrackCtx三元组收敛窗口——终局登记（不做）**：实测三元组签名散布=**7个子文件29处**（tracked14/tags_panels6/slots4/route_memo3/child_widgets1/events1），T-02冻结"tracked.rs收编"的局域性前提与事实不符。收敛需跨文件签名手术+体内数百处`path/id_map/probe`标识符改写，行为收益为零、风险集中在最难观察的求值次序/挂载身份面。AC-04"跟踪职责明确"已由tracked.rs(3,856行)达成、AC-06"唯一owner与线程/作用域保持"已满足（三元组由build_with_debug_gated唯一创建、显式穿线）。处置：退出本Plan范围（合同AC不含此项），登记为UI-007接续矩阵的小步改进候选——不静默放弃、不夸大为已收敛。
+- **T-05收据勘误**（随本轮更正）：§8.3"builder族126/126"应为"164/164（修复后）"；§9 work轮3收据的builder族数字同此勘误；V-06"2158/2158"为缺失后口径，修复后真实日常基线=2196/2196。
+
 ### 8.4 执行记录（2026-11-01，work轮4：T-06）
 
 - **共享写面窗（短窗串行政策落点）**：开工重读master=6d7fc69（本Plan r3簿记，无他方漂移）；**020共享面核对**：`git diff master...codex/plan-020-dev --stat -- crates/auto-ui-runtime/src/ui/iced/` 为空——020触面在experimental/autographics-*，与renderer零重叠；020树（e660798，T-03/T-04进行中）未触碰。T-11合入窗仍按依赖序短窗串行。
@@ -272,6 +283,10 @@ stage: work | plan_id: auto-ui/PLAN-014 | plan_revision: 2 | outcome: pass | wor
 ### work轮3（2026-11-01，T-05）
 
 stage: work | plan_id: auto-ui/PLAN-014 | plan_revision: 2 | outcome: pass | worktree: D:/autostack/.wt/ui-014/auto-ui | branch: codex/plan-014-structure | base_commit: 7a183c6（master 10d04da祖先） | code_commit: 90e0c44 | dependency_revisions: lang b1a4871a / web ec9c4ba / down 7c4d5cb / man组树 5b310f0 | task_ids: T-05（含T-04警告修复） | evidence: §8.3执行记录 + 提交90e0c44（V-06 2158/2158，builder族126/126，mutation control过，拆分文件零新增警告） | blockers: 无（TrackCtx收敛缓期已登记§8.3） | next_responsible_role: work（T-06 renderer，开工按§4冻结细绑+重读master；与020共享面按短窗串行政策核对）
+### work轮5（2026-11-01，T-07）
+
+stage: work | plan_id: auto-ui/PLAN-014 | plan_revision: 2 | outcome: pass（含V-12审计缺陷修复） | worktree: D:/autostack/.wt/ui-014/auto-ui | branch: codex/plan-014-structure | base_commit: fcece7a（master 4f90851祖先） | code_commit: 570c147 | dependency_revisions: lang b1a4871a / web ec9c4ba / down 7c4d5cb / man组树 5b310f0 | task_ids: T-07 | evidence: §8.5执行记录 + 提交570c147（V-11闭包全过；V-12守恒账：缺陷修复后 vue 329=329/aura 172=172/renderer 199=199/Man 8=8，日常2196/2196，builder族164/164） | blockers: 无（TrackCtx终局登记为007接续候选，见§8.5） | next_responsible_role: work（T-08 真实消费窗口：V-09真实Vue/VM交互+owned关闭重开、V-10真实GPU定向帧）
+
 
 ### work轮4（2026-11-01，T-06）
 
