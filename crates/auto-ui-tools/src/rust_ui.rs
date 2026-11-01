@@ -37,8 +37,8 @@ pub use auto_web::backend_generation_is_fresh;
 // PLAN-910: generated-cargo build context, member identity, receipts,
 // publication — single source in auto-generation-core.
 use auto_api_gen::generated_build::{
-    claim_member_dir, file_sha256, publish_artifact, FrontReceipt, GeneratedBuildContext,
-    MemberRole,
+    claim_member_dir, file_sha256, hold_lease_for_process, publish_artifact, FrontReceipt,
+    GeneratedBuildContext, MemberRole, TargetLease,
 };
 
 /// Generate Rust UI code from .at files in a project directory.
@@ -407,6 +407,14 @@ fn regenerate_code_only(project_dir: &Path, rust_dir: &Path, src_: &PacSource) -
     at_files.extend(bps_widget_files);
     crate::util::validate_ui_files(&at_files)?;
     if at_files.is_empty() {
+        // PLAN-910: an empty input set for a member that already carries a
+        // generation is a named failure — never let the receipt claim an
+        // empty input set as the identity of the previous artifact.
+        if rust_dir.join("src").join("main.rs").exists() {
+            return Err(
+                "front 输入为空（无 .at 文件）但成员已有生成物；拒绝以空输入集重生成".into(),
+            );
+        }
         return Ok(());
     }
 
@@ -469,6 +477,15 @@ fn regenerate_code_only(project_dir: &Path, rust_dir: &Path, src_: &PacSource) -
     }
 
     if all_components.trim().is_empty() {
+        // PLAN-910: an empty input set for a member that already carries a
+        // generation is a named failure — never let the receipt claim an
+        // empty input set as the identity of the previous artifact.
+        if rust_dir.join("src").join("main.rs").exists() {
+            return Err(
+                "front 输入为空（无 .at 组件可编译）但成员已有生成物；拒绝以空输入集重生成"
+                    .into(),
+            );
+        }
         return Ok(());
     }
 
@@ -486,7 +503,7 @@ fn regenerate_code_only(project_dir: &Path, rust_dir: &Path, src_: &PacSource) -
 
     let full_code = wrap_example(&project_name, &all_components, project_dir, src_);
     let main_rs = rust_dir.join("src").join("main.rs");
-    fs::write(&main_rs, &full_code)
+    generated_write_if_changed(&main_rs, &full_code)
         .map_err(|e| format!("Failed to write {}: {}", main_rs.display(), e))?;
 
     // PLAN-013 T2: regen 只写 main.rs,侧车 mod 声明须重挂。014 修正:
@@ -495,7 +512,7 @@ fn regenerate_code_only(project_dir: &Path, rust_dir: &Path, src_: &PacSource) -
     // 踩中)。Cargo.toml 也按 pac 现值重写(exe_name 等 014 配置 regen
     // 即生效),随后 apply_sidecar_to_crate 重注依赖 + mod 声明。
     let cargo_toml = generate_cargo_toml(&project_name, project_dir, src_);
-    fs::write(rust_dir.join("Cargo.toml"), &cargo_toml).map_err(|e| {
+    generated_write_if_changed(&rust_dir.join("Cargo.toml"), &cargo_toml).map_err(|e| {
         format!(
             "Failed to write {}: {}",
             rust_dir.join("Cargo.toml").display(),
@@ -565,13 +582,13 @@ fn generate_rust_ui_inner(
     fs::create_dir_all(&src_dir).map_err(|e| format!("Failed to create src directory: {}", e))?;
 
     let main_rs = src_dir.join("main.rs");
-    fs::write(&main_rs, &full_code)
+    generated_write_if_changed(&main_rs, &full_code)
         .map_err(|e| format!("Failed to write {}: {}", main_rs.display(), e))?;
 
     // Generate Cargo.toml with workspace dependencies
     let cargo_toml = generate_cargo_toml(&project_name, project_dir, source);
     let cargo_path = output.join("Cargo.toml");
-    fs::write(&cargo_path, &cargo_toml)
+    generated_write_if_changed(&cargo_path, &cargo_toml)
         .map_err(|e| format!("Failed to write {}: {}", cargo_path.display(), e))?;
 
     // PLAN-013 T2: pac.at rust_sidecar 供给(用户 .rs 模块 + Cargo 依赖)。
@@ -3489,7 +3506,16 @@ pub(crate) fn generate_cargo_toml(
     // per-member publication, not by renaming user-facing binaries.
     let package =
         auto_api_gen::generated_build::package_name(&snake_name, project_dir, MemberRole::Front);
-    let bin_block = pac_bin_block(project_dir, src_, &snake_name);
+    // The cargo bin target is `<published>-<id8>`: Windows/MSVC cargo links
+    // bins without a metadata hash, so same-named bins in one target root
+    // overwrite each other at the link output (V-02 observed). The
+    // user-visible `<published>.exe` is restored at publication.
+    let bin_block = pac_bin_block(
+        project_dir,
+        src_,
+        &snake_name,
+        &auto_api_gen::generated_build::member_id8(project_dir),
+    );
 
     format!(
         r#"[package]
@@ -4618,11 +4644,14 @@ iced = {{ version = "{iced_ver}", features = ["tokio", "advanced"] }}
 }
 
 /// pac.at `exe_name` → 显式 `[[bin]]` 块（014；generate_cargo_toml 同源）。
-fn pac_bin_block(project_dir: &Path, src_: &PacSource, default_name: &str) -> String {
-    let name = src_
+fn pac_bin_block(project_dir: &Path, src_: &PacSource, default_name: &str, id8: &str) -> String {
+    let published = src_
         .exe_name(&project_dir.join("pac.at"))
         .unwrap_or_else(|| default_name.to_string());
-    format!("\n[[bin]]\nname = \"{name}\"\npath = \"src/main.rs\"\n")
+    // `# published = <name>` is informational; the receipt is authoritative.
+    format!(
+        "\n[[bin]]\n# published = \"{published}\"\nname = \"{published}-{id8}\"\npath = \"src/main.rs\"\n"
+    )
 }
 
 /// 投影修剪 vendored auto-lang/Cargo.toml：剥闭包外 optional path 依赖行
@@ -6025,6 +6054,12 @@ pub fn start_api_server(project_dir: &Path) -> Result<Option<std::process::Child
         .write_context_file()
         .map_err(|e| format!("context record write failed: {e}"))?;
     let context_env = context.cargo_env();
+    // The split backend runs from the target root for as long as this
+    // process lives: hold the lease for the process lifetime.
+    match TargetLease::acquire(&context.target_root, "api-server") {
+        Ok(lease) => hold_lease_for_process(lease),
+        Err(e) => return Err(format!("target lease failed: {e}")),
+    }
     println!("  cargo run --manifest-path {}", cargo_toml.display());
     // PLAN-815 T-05 hosted mode: the cargo api-server child is tracked
     // (piped stdout forwarded to the host log stream with URL sniffing;
@@ -6168,12 +6203,6 @@ pub(crate) struct ManagedFront {
 }
 
 impl ManagedFront {
-    /// The uplifted exe path cargo writes for this member under the context
-    /// target root.
-    pub(crate) fn uplifted_exe(&self, bin_name: &str, release: bool) -> PathBuf {
-        let file = exe_file_name(bin_name);
-        self.context.profile_dir(release).join(file)
-    }
 
     /// Published, member-owned exe (hard link/copy of the uplifted one) — the
     /// stable discovery target immune to same-basename uplift races.
@@ -6185,14 +6214,36 @@ impl ManagedFront {
             .join(file)
     }
 
-    /// The bin name recorded at generation: receipt first, member Cargo.toml
-    /// `[[bin]]` fallback (both written by generate_rust_ui_inner).
-    pub(crate) fn bin_name(&self) -> Option<String> {
-        if let Some(receipt) = FrontReceipt::read(&self.member_dir) {
-            if let Some(bin) = receipt.bin_name {
-                return Some(bin);
+    /// The member's cargo package name (unique per project identity).
+    pub(crate) fn package_name(&self) -> Option<String> {
+        let text = fs::read_to_string(self.member_dir.join("Cargo.toml")).ok()?;
+        let mut in_package = false;
+        for line in text.lines() {
+            let trimmed = line.trim();
+            if trimmed.starts_with('[') {
+                in_package = trimmed == "[package]";
+            } else if in_package {
+                if let Some(rest) = trimmed.strip_prefix("name = \"") {
+                    if let Some(name) = rest.strip_suffix('"') {
+                        return Some(name.to_string());
+                    }
+                }
             }
         }
+        None
+    }
+
+    /// The cargo `[[bin]]` target name (`<published>-<id8>`): the member
+    /// Cargo.toml is authoritative (it is what cargo builds); the receipt is
+    /// only a fallback (a stale receipt must never redirect artifact lookup).
+    pub(crate) fn cargo_bin_name(&self) -> Option<String> {
+        if let Some(from_manifest) = self.cargo_bin_from_manifest() {
+            return Some(from_manifest);
+        }
+        FrontReceipt::read(&self.member_dir).and_then(|receipt| receipt.cargo_bin)
+    }
+
+    fn cargo_bin_from_manifest(&self) -> Option<String> {
         let text = fs::read_to_string(self.member_dir.join("Cargo.toml")).ok()?;
         let mut in_bin = false;
         for line in text.lines() {
@@ -6211,6 +6262,41 @@ impl ManagedFront {
         }
         None
     }
+
+    /// The user-visible exe stem (pac exe_name else snake pac name): the
+    /// cargo bin name minus its `-<id8>` suffix (manifest-derived; receipt
+    /// fallback only when no manifest bin is declared).
+    pub(crate) fn bin_name(&self) -> Option<String> {
+        let cargo_bin = match self.cargo_bin_from_manifest() {
+            Some(bin) => bin,
+            None => {
+                return FrontReceipt::read(&self.member_dir).and_then(|receipt| receipt.bin_name)
+            }
+        };
+        let suffix = format!("-{}", self.member_id8());
+        Some(
+            cargo_bin
+                .strip_suffix(&suffix)
+                .unwrap_or(&cargo_bin)
+                .to_string(),
+        )
+    }
+
+    fn member_id8(&self) -> String {
+        self.member_dir
+            .file_name()
+            .and_then(|n| n.to_str())
+            .and_then(|n| n.rsplit('-').next())
+            .unwrap_or_default()
+            .to_string()
+    }
+}
+
+/// PLAN-910: generated front files are written only when their bytes change
+/// (an unconditional rewrite bumps mtimes on every generation and forces one
+/// pointless rebuild of the member crate).
+fn generated_write_if_changed(path: &Path, content: &str) -> std::io::Result<()> {
+    auto_api_gen::generated_build::write_if_changed(path, content.as_bytes()).map(|_| ())
 }
 
 fn exe_file_name(bin_name: &str) -> String {
@@ -6242,10 +6328,18 @@ pub(crate) fn resolve_managed_front(project_dir: &Path) -> AutoResult<ManagedFro
 
 /// Generator identity recorded in the front receipt: tool version + producer
 /// tree (SDK/source-root switches invalidate through the producer key).
+/// Generated front layout version: bump whenever the generator changes the
+/// SHAPE of what it emits for unchanged inputs (manifest/bin naming, member
+/// files). Content-level manifest drift is additionally caught by
+/// `front_needs_regeneration` recomputing the manifest text; main.rs-level
+/// generator changes without a bump are a recorded boundary.
+const FRONT_LAYOUT_VERSION: &str = "front-layout/v2";
+
 fn front_generator_identity(context: &GeneratedBuildContext) -> String {
     format!(
-        "auto-ui-tools@{} producer={}",
+        "auto-ui-tools@{} {} producer={}",
         env!("CARGO_PKG_VERSION"),
+        FRONT_LAYOUT_VERSION,
         auto_api_gen::generated_build::canonical_key(&context.producer_root)
     )
 }
@@ -6291,12 +6385,33 @@ fn write_front_receipt(
     source: &PacSource,
     artifact: Option<(&Path, &str)>,
 ) -> AutoResult<()> {
+    write_front_receipt_with_inputs(project_dir, managed, source, artifact, None)
+}
+
+/// Receipt writer with a generation-time input snapshot: when the caller
+/// froze the input hashes before generating (build/run paths), a concurrent
+/// source edit during generation/build withholds the receipt (stale inputs
+/// must never be recorded as the identity of fresh artifacts — same rule as
+/// the Web gate's "receipt withheld").
+fn write_front_receipt_with_inputs(
+    project_dir: &Path,
+    managed: &ManagedFront,
+    source: &PacSource,
+    artifact: Option<(&Path, &str)>,
+    generation_time_inputs: Option<std::collections::BTreeMap<String, String>>,
+) -> AutoResult<()> {
+    let current_inputs = front_input_hashes(project_dir, source);
+    if let Some(frozen) = &generation_time_inputs {
+        if frozen != &current_inputs {
+            return Err("front inputs changed during generation/build; receipt withheld".into());
+        }
+    }
     let workspace_lock = auto_api_gen::rust_workspace::workspace_lock_identity(fs::read(
         managed.ws_dir.join("Cargo.lock"),
     ))
     .map_err(|e| format!("workspace Cargo.lock unreadable: {e}"))?;
     let mut receipt = FrontReceipt {
-        inputs: front_input_hashes(project_dir, source),
+        inputs: current_inputs,
         generator: front_generator_identity(&managed.context),
         workspace_lock,
         lock_materialized: false,
@@ -6305,12 +6420,14 @@ fn write_front_receipt(
         exe: None,
         exe_sha256: None,
         bin_name: None,
+        cargo_bin: None,
         release: false,
     };
     if let Some((exe, bin)) = artifact {
         receipt.exe = Some(exe.to_string_lossy().to_string());
         receipt.exe_sha256 = file_sha256(exe).ok();
         receipt.bin_name = Some(bin.to_string());
+        receipt.cargo_bin = managed.cargo_bin_name();
         receipt.release = false;
     }
     receipt
@@ -6342,6 +6459,23 @@ fn front_needs_regeneration(
     let Some(receipt) = FrontReceipt::read(&managed.member_dir) else {
         return (true, true);
     };
+    // The member manifest is a pure function of (pac, identity): recompute
+    // and compare so a generator change to the manifest shape never leaves a
+    // stale member behind (V-02 re-run observed exactly that).
+    // (Sidecar deps are injected into the on-disk manifest after generation;
+    // such members rely on FRONT_LAYOUT_VERSION instead of a byte compare.)
+    if source.sidecar_spec(project_dir).deps.is_empty() {
+        let pac_path = project_dir.join("pac.at");
+        let project_name = if pac_path.exists() {
+            source.name(&pac_path)
+        } else {
+            "MyApp".to_string()
+        };
+        let expected = generate_cargo_toml(&project_name, project_dir, source);
+        if fs::read_to_string(&cargo_toml).ok().as_deref() != Some(expected.as_str()) {
+            return (true, true);
+        }
+    }
     let current = front_input_hashes(project_dir, source);
     if !receipt.inputs_match(project_dir, &current) {
         return (false, true);
@@ -6366,45 +6500,139 @@ fn front_needs_regeneration(
     (false, false)
 }
 
-/// Managed cargo spawn: build-context env pins (target root + flags) and a
-/// pinned cwd (the workspace dir). PLAN-910: the effective argv/env/config is
-/// identical no matter which directory the caller sits in.
-fn cargo_managed(
+/// Managed cargo BUILD with artifact capture: `--message-format=json-render-
+/// diagnostics` (JSON on stdout, diagnostics rendered on stderr as before).
+/// Returns the exit status plus the package-owned artifact path from
+/// `deps/<bin>-<metadata>.exe` — NOT the uplifted `target/<profile>/<bin>.exe`,
+/// which for fresh units cargo does NOT re-link (V-02: after A built, a fresh
+/// B build published A's exe from the shared uplifted slot — the same-basename
+/// hijack moved into the publish step). Fail closed when cargo reports no bin
+/// artifact for this member.
+fn verify_publishable_image(path: &Path) -> AutoResult<()> {
+    let mut header = [0u8; 2];
+    let read = std::fs::File::open(path)
+        .and_then(|mut file| std::io::Read::read_exact(&mut file, &mut header));
+    match read {
+        Ok(()) if cfg!(windows) && header == *b"MZ" => Ok(()),
+        Ok(()) if !cfg!(windows) && header[0] == 0x7f => Ok(()),
+        Ok(()) => Err(format!(
+            "cached artifact {} is not a publishable image (header {:02x?});              remove the unit fingerprint / managed root and rebuild",
+            path.display(),
+            header
+        )
+        .into()),
+        Err(e) => Err(format!("cannot read cached artifact {}: {e}", path.display()).into()),
+    }
+}
+
+fn cargo_managed_build(
     context: &GeneratedBuildContext,
-    args: &[String],
+    manifest: &Path,
+    package_name: &str,
+    bin_name: &str,
     label: &str,
-) -> AutoResult<std::process::ExitStatus> {
+) -> AutoResult<(std::process::ExitStatus, Option<PathBuf>)> {
+    let args = vec![
+        "build".to_string(),
+        "--manifest-path".to_string(),
+        manifest.to_string_lossy().to_string(),
+        "--message-format=json-render-diagnostics".to_string(),
+    ];
     let envs = context.cargo_env();
-    let env_refs: Vec<(&str, String)> = envs.iter().map(|(k, v)| (k.as_str(), v.clone())).collect();
-    let cwd = context
-        .target_root
-        .parent()
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|| context.target_root.clone());
-    // The context root's owning workspace dir is the cwd contract; fall back
-    // to the target root itself when no parent exists.
-    let cwd = find_ws_dir_for_cwd(&cwd).unwrap_or(cwd);
-    if crate::proc_host::current().is_some() {
-        let mut spec = crate::proc_host::TrackedSpawn::new("cargo", args.to_vec()).with_cwd(&cwd);
+    let env_refs: Vec<(&str, String)> =
+        envs.iter().map(|(k, v)| (k.as_str(), v.clone())).collect();
+    let cwd = {
+        let near = context
+            .target_root
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| context.target_root.clone());
+        find_ws_dir_for_cwd(&near).unwrap_or(near)
+    };
+    let _lease = TargetLease::acquire(&context.target_root, label)
+        .map_err(|e| format!("target lease failed: {e}"))?;
+    let mut artifact: Option<PathBuf> = None;
+    let exe_ext = if cfg!(windows) { ".exe" } else { "" };
+    let mut consider = |line: &str| {
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(line) else {
+            return;
+        };
+        if value.get("reason").and_then(|r| r.as_str()) != Some("compiler-artifact") {
+            return;
+        }
+        let target = value.get("target").cloned().unwrap_or_default();
+        let kinds = target
+            .get("kind")
+            .and_then(|k| k.as_array())
+            .map(|list| {
+                list.iter()
+                    .filter_map(|k| k.as_str().map(str::to_string))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        let name = target.get("name").and_then(|n| n.as_str()).unwrap_or("");
+        let package_id = value
+            .get("package_id")
+            .and_then(|p| p.as_str())
+            .unwrap_or("");
+        if name == bin_name && kinds.iter().any(|k| k == "bin") && package_id.contains(package_name)
+        {
+            if let Some(files) = value.get("filenames").and_then(|f| f.as_array()) {
+                for file in files {
+                    if let Some(text) = file.as_str() {
+                        if text.ends_with(exe_ext) {
+                            artifact = Some(PathBuf::from(text));
+                        }
+                    }
+                }
+            }
+        }
+    };
+    let status = if crate::proc_host::current().is_some() {
+        let mut spec =
+            crate::proc_host::TrackedSpawn::new("cargo", args).with_cwd(&cwd);
+        spec.capture_stdout = true;
         for (key, value) in &env_refs {
             spec = spec.with_env(key, value);
         }
         let tracked = crate::proc_host::spawn_tracked(spec, label)?;
+        if let Some(stdout) = tracked.take_captured_stdout() {
+            use std::io::BufRead;
+            for line in std::io::BufReader::new(stdout).lines().map_while(Result::ok) {
+                consider(&line);
+            }
+        }
         let status = crate::proc_host::wait_tracked(&tracked)?;
         if !status.success() && crate::proc_host::cancelled() {
             return Err(crate::proc_host::CANCELLED_ERR.into());
         }
-        return Ok(status);
-    }
-    let mut command = std::process::Command::new("cargo");
-    command.args(args).current_dir(&cwd);
-    for (key, value) in &env_refs {
-        command.env(key, value);
-    }
-    command
-        .status()
-        .map_err(|e| format!("cargo spawn failed: {e}").into())
+        status
+    } else {
+        let mut command = std::process::Command::new("cargo");
+        command
+            .args(&args)
+            .current_dir(&cwd)
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::inherit());
+        for (key, value) in &env_refs {
+            command.env(key, value);
+        }
+        let mut child = command
+            .spawn()
+            .map_err(|e| format!("cargo spawn failed: {e}"))?;
+        if let Some(stdout) = child.stdout.take() {
+            use std::io::BufRead;
+            for line in std::io::BufReader::new(stdout).lines().map_while(Result::ok) {
+                consider(&line);
+            }
+        }
+        child
+            .wait()
+            .map_err(|e| format!("cargo wait failed: {e}"))?
+    };
+    Ok((status, artifact))
 }
+
 
 /// The managed spawn cwd: the generated workspace that owns the members
 /// (identified by walking up from the target root's parent for a
@@ -6452,6 +6680,7 @@ fn build_rust_ui_inner(project_dir: &Path, source: &PacSource) -> AutoResult<()>
     // retired); cargo runs with pinned context env/cwd.
     let managed = resolve_managed_front(project_dir)?;
     let rust_dir = managed.member_dir.clone();
+    let frozen_inputs = front_input_hashes(project_dir, source);
     let (full, code) = front_needs_regeneration(project_dir, &managed, source);
 
     if full {
@@ -6492,17 +6721,9 @@ fn build_rust_ui_inner(project_dir: &Path, source: &PacSource) -> AutoResult<()>
         "{}",
         "Building Rust UI project (backend: rust-ui)".bright_cyan()
     );
-    let build_args = vec![
-        "build".to_string(),
-        "--manifest-path".to_string(),
-        cargo_toml.to_string_lossy().to_string(),
-    ];
-    let status = cargo_managed(&managed.context, &build_args, "rust-ui-build")?;
-
-    if !status.success() {
-        return Err(format!("Cargo build failed with status: {}", status).into());
-    }
-    publish_front_artifact(project_dir, &managed, source)?;
+    let _ = cargo_toml;
+    // Build + publish the package-owned artifact (cargo_managed_build).
+    publish_front_artifact(project_dir, &managed, source, Some(&frozen_inputs))?;
     Ok(())
 }
 
@@ -6513,21 +6734,55 @@ fn publish_front_artifact(
     project_dir: &Path,
     managed: &ManagedFront,
     source: &PacSource,
+    generation_time_inputs: Option<&std::collections::BTreeMap<String, String>>,
 ) -> AutoResult<()> {
     let Some(bin) = managed.bin_name() else {
         return Err("front member has no recorded bin name".into());
     };
-    let uplifted = managed.uplifted_exe(&bin, false);
+    let Some(cargo_bin) = managed.cargo_bin_name() else {
+        return Err("front member has no cargo bin target".into());
+    };
+    let package = managed
+        .package_name()
+        .unwrap_or_else(|| cargo_bin.clone());
+    let (status, artifact) = cargo_managed_build(
+        &managed.context,
+        &managed.member_dir.join("Cargo.toml"),
+        &package,
+        &cargo_bin,
+        "rust-ui-build",
+    )?;
+    if !status.success() {
+        return Err(format!("Cargo build failed with status: {}", status).into());
+    }
+    // Package-owned deps artifact — never the shared uplifted slot (fresh
+    // builds do not re-link it; see cargo_managed_build).
+    let uplifted = artifact.ok_or_else(|| {
+        format!(
+            "cargo reported success but no bin artifact for package {package} (bin {bin})"
+        )
+    })?;
     if !uplifted.is_file() {
         return Err(format!(
-            "cargo build succeeded but the uplifted exe is missing: {}",
+            "cargo-reported artifact is missing: {}",
             uplifted.display()
         )
         .into());
     }
-    let published = publish_artifact(&uplifted, &managed.member_dir, false)
+    // Sanity BEFORE publication: a truncated/corrupted cached image must
+    // fail here (named), never overwrite a previously published good copy or
+    // be recorded as a fresh artifact. Recovery is the unit/managed-root
+    // rebuild; cargo's fresh path does not detect arbitrary corruption.
+    verify_publishable_image(&uplifted)?;
+    let published = publish_artifact(&uplifted, &managed.member_dir, false, &exe_file_name(&bin))
         .map_err(|e| format!("publishing {} failed: {e}", uplifted.display()))?;
-    write_front_receipt(project_dir, managed, source, Some((&published, &bin)))?;
+    write_front_receipt_with_inputs(
+        project_dir,
+        managed,
+        source,
+        Some((&published, &bin)),
+        generation_time_inputs.cloned(),
+    )?;
     Ok(())
 }
 
@@ -6551,6 +6806,7 @@ fn run_rust_ui_inner(project_dir: &Path, args: Vec<String>, source: &PacSource) 
     // order) under its PLAN-910 identity dir; freshness is content-based.
     let managed = resolve_managed_front(project_dir)?;
     let rust_dir = managed.member_dir.clone();
+    let frozen_inputs = front_input_hashes(project_dir, source);
     let (full, code) = front_needs_regeneration(project_dir, &managed, source);
 
     if full {
@@ -6602,23 +6858,13 @@ fn run_rust_ui_inner(project_dir: &Path, args: Vec<String>, source: &PacSource) 
             e
         )
     })?;
-    let build_args = vec![
-        "build".to_string(),
-        "--manifest-path".to_string(),
-        cargo_toml.to_string_lossy().to_string(),
-    ];
-    let status = cargo_managed(&managed.context, &build_args, "rust-ui-run-build")?;
-    if !status.success() {
-        // F-815-T05-R1-05: a cancel-killed cargo tree is a cancellation,
-        // not a cargo failure — the sentinel keeps the final report honest.
-        if crate::proc_host::cancelled() {
-            stop_api_server(&mut _api_child);
-            return Err(crate::proc_host::CANCELLED_ERR.into());
-        }
+    let _ = cargo_toml;
+    // Build + publish the package-owned artifact; a cancel-killed cargo tree
+    // surfaces as CANCELLED_ERR from cargo_managed_build (F-815-T05-R1-05).
+    if let Err(e) = publish_front_artifact(project_dir, &managed, source, Some(&frozen_inputs)) {
         stop_api_server(&mut _api_child);
-        return Err(format!("Cargo build failed with status: {}", status).into());
+        return Err(e);
     }
-    publish_front_artifact(project_dir, &managed, source)?;
 
     let bin = managed
         .bin_name()
@@ -8374,8 +8620,9 @@ pub fn list_items() []str {
         // 命名（exe_name > snake(name)）以保 exe 文件名不变；展示字段
         // （title/title_zh）既不进清单也不成为 bin 名。
         assert!(
-            toml.contains("[[bin]]\nname = \"calc\"\npath = \"src/main.rs\""),
-            "[[bin]] 以 pac name 命名: [{}]",
+            toml.contains("# published = \"calc\"\nname = \"calc-")
+                && toml.contains("\npath = \"src/main.rs\""),
+            "[[bin]] = <pac name>-<id8>，发布名 calc: [{}]",
             toml
         );
         assert!(
@@ -8390,8 +8637,8 @@ pub fn list_items() []str {
         .unwrap();
         let toml = generate_cargo_toml("calc", &tmp, &PacSource::legacy());
         assert!(
-            toml.contains("[[bin]]\nname = \"auto-term\""),
-            "exe_name 显式臂不变: [{}]",
+            toml.contains("# published = \"auto-term\"\nname = \"auto-term-"),
+            "exe_name 显式臂：发布名 auto-term，cargo bin 带 id: [{}]",
             toml
         );
         let _ = std::fs::remove_dir_all(&tmp);
@@ -8647,60 +8894,65 @@ auto-val = { path = \"../auto-val\" }
         "[features]
 mem-profile = []
 ",
-    ] {
-        std::fs::write(&manifest, other).unwrap();
-        assert!(delivery_apply_projection(&manifest, &PROJECTION_AUTO_LANG).is_ok());
-        assert_eq!(std::fs::read_to_string(&manifest).unwrap(), other);
-    }
-    // 非法 TOML（重复键等）仍判红——恒等投影不豁免解析失败。
-    std::fs::write(
-        &manifest,
-        "[features]
+        ] {
+            std::fs::write(&manifest, other).unwrap();
+            assert!(delivery_apply_projection(&manifest, &PROJECTION_AUTO_LANG).is_ok());
+            assert_eq!(std::fs::read_to_string(&manifest).unwrap(), other);
+        }
+        // 非法 TOML（重复键等）仍判红——恒等投影不豁免解析失败。
+        std::fs::write(
+            &manifest,
+            "[features]
 test-cases = [\"auto-lang-core/test-cases\"]
 test-cases = []
 [dependencies]
 ",
-    )
-    .unwrap();
-    assert!(delivery_apply_projection(&manifest, &PROJECTION_AUTO_LANG).is_err());
-}
+        )
+        .unwrap();
+        assert!(delivery_apply_projection(&manifest, &PROJECTION_AUTO_LANG).is_err());
+    }
 
-/// PLAN-901：常驻 TestCase 交付闭包钉——auto-test-case 入 DELIVERY_CRATES、
-/// 其 vendored parser 树经 DELIVERY_VENDOR_TREES 随包、语言仓新清单无
-/// test-cases feature 面。独立于 delivery_crates_path_closure_is_complete
-/// 的既存 auto-web 跨仓缺口（PLAN-890 谱系，另案跟踪）。
-#[test]
-fn plan901_delivery_closure_pins_resident_test_case() {
-    let root = test_producer_root();
-    // 1) 常驻成员在列。
-    assert!(DELIVERY_CRATES.contains(&"auto-test-case"));
-    // 2) producer 新清单：auto-test-case 为非 optional 依赖、无测试 feature。
-    for manifest in [
-        root.join("crates/auto-lang/Cargo.toml"),
-        root.join("crates/auto-lang-core/Cargo.toml"),
-    ] {
-        let text = std::fs::read_to_string(&manifest).unwrap();
-        assert!(
-            !text.lines().any(|l| l.starts_with("test-cases = ")),
-            "{} 无 test-cases feature 行",
-            manifest.display()
-        );
-        assert!(
-            text.contains("auto-test-case = { path = \"../auto-test-case\" }"),
-            "{} 常驻 auto-test-case 依赖（非 optional）",
-            manifest.display()
-        );
+    /// PLAN-901：常驻 TestCase 交付闭包钉——auto-test-case 入 DELIVERY_CRATES、
+    /// 其 vendored parser 树经 DELIVERY_VENDOR_TREES 随包、语言仓新清单无
+    /// test-cases feature 面。独立于 delivery_crates_path_closure_is_complete
+    /// 的既存 auto-web 跨仓缺口（PLAN-890 谱系，另案跟踪）。
+    #[test]
+    fn plan901_delivery_closure_pins_resident_test_case() {
+        let root = test_producer_root();
+        // 1) 常驻成员在列。
+        assert!(DELIVERY_CRATES.contains(&"auto-test-case"));
+        // 2) producer 新清单：auto-test-case 为非 optional 依赖、无测试 feature。
+        for manifest in [
+            root.join("crates/auto-lang/Cargo.toml"),
+            root.join("crates/auto-lang-core/Cargo.toml"),
+        ] {
+            let text = std::fs::read_to_string(&manifest).unwrap();
+            assert!(
+                !text.lines().any(|l| l.starts_with("test-cases = ")),
+                "{} 无 test-cases feature 行",
+                manifest.display()
+            );
+            assert!(
+                text.contains("auto-test-case = { path = \"../auto-test-case\" }"),
+                "{} 常驻 auto-test-case 依赖（非 optional）",
+                manifest.display()
+            );
+        }
+        // 3) vendor 树源在场且登记，依赖路径在交付根自然解析。
+        let atc = std::fs::read_to_string(root.join("crates/auto-test-case/Cargo.toml")).unwrap();
+        assert!(atc.contains("autodown-test-parser"));
+        for (src_rel, dst_rel) in DELIVERY_VENDOR_TREES {
+            assert!(
+                root.join(src_rel).join("Cargo.toml").is_file(),
+                "vendor 源缺失 {src_rel}"
+            );
+            assert_eq!(src_rel, dst_rel, "同形镜像（零 path 改写前提）");
+        }
+        // 交付根解析模拟：crates/auto-test-case + ../../vendor/<tree> 均在场。
+        assert!(root
+            .join("vendor/autodown-test-parser/src/lib.rs")
+            .is_file());
     }
-    // 3) vendor 树源在场且登记，依赖路径在交付根自然解析。
-    let atc = std::fs::read_to_string(root.join("crates/auto-test-case/Cargo.toml")).unwrap();
-    assert!(atc.contains("autodown-test-parser"));
-    for (src_rel, dst_rel) in DELIVERY_VENDOR_TREES {
-        assert!(root.join(src_rel).join("Cargo.toml").is_file(), "vendor 源缺失 {src_rel}");
-        assert_eq!(src_rel, dst_rel, "同形镜像（零 path 改写前提）");
-    }
-    // 交付根解析模拟：crates/auto-test-case + ../../vendor/<tree> 均在场。
-    assert!(root.join("vendor/autodown-test-parser/src/lib.rs").is_file());
-}
 
     #[test]
     fn plan842_projection_ignores_unrelated_metadata_keys() {
