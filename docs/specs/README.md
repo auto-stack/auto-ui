@@ -23,6 +23,16 @@ language repository's `docs/specs/auto-ui/project.md`.
   Cargo features are retired; families are compile-visible and run-selected via
   the nextest static boundary with explicit serial/manual admission (PLAN-018).
 
+## Structure closure (PLAN-014)
+
+- [UI structure closure](ui/structure-closure.md) — the four-face module
+  layout, single state/resource owners, restored public paths and forbidden
+  edges after the PLAN-014 internal-structure closure.
+
+- [UI structure test map](ui/structure-test-map.md) — old-to-new test
+  placement mapping with #[test] conservation, directed execution anchors and
+  real-consumption evidence pointers (PLAN-014).
+
 ## Web consumer boundary (PLAN-890)
 
 [Integration guide](../web-integration.md); [Web canonical source](../../../auto-web/docs/specs/project.md); actual final cohort/gates in the central archived Plan.
