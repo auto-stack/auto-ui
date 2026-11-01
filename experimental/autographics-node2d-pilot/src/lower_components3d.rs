@@ -2345,7 +2345,7 @@ fn roles_json_3d(scene: &SceneBuild3) -> String {
 /// components-3d 降低入口：共享 IR 世界 → 投递计划 → 场景 → v1 用户源。
 pub fn lower_project_components3d(project: &Project) -> Result<LowerOutputBasic2D, LowerError> {
     let w3 = build_world_3d(project)?;
-    let plan = crate::lower_components::plan_dispatch(project, &w3.world, false, false)?;
+    let plan = crate::lower_components::plan_dispatch(project, &w3.world, false, false, false)?;
     let scene = collect_scene_3d(project, &w3)?;
     let user_source = gen_user_source_3d(project, &w3, &plan, &scene)?;
     let sha = crate::scene::sha256_hex(user_source.as_bytes());

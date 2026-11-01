@@ -559,6 +559,7 @@ fn base_ctx<'a>(
         sprites: None,
         space3: None,
                         sfx: None,
+                        handle_ref: None,
     }
 }
 

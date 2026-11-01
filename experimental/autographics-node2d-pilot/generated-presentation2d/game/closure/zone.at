@@ -1,0 +1,45 @@
+// PLAN-025 game Zone: the goal pad and the hazard share one definition with
+// different params. The handler relays the trigger phase upward — the ROOT
+// decides win/lose (pad: win only on the enter phase with every coin
+// collected; early arrival, stay and re-enter stay non-terminal and destroy
+// nothing; hazard: fail). No business enum exists anywhere in the engine.
+node Zone(kind: int, zx: float, zy: float, geo: Mesh2D, tint: Material2D) {
+    model {
+        var live = 1
+        var ticks = 0
+        var ph = 0
+    }
+    msg {
+        Hit(int)
+    }
+    view-2d {
+        shape2d area {
+            mesh: .geo
+            position: (.zx, .zy)
+            material: .tint
+            visible: .live
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            .ticks = .ticks + 1
+        }
+        .Hit(p) -> {
+            .ph = 0
+            if p == 1 {
+                .ph = 1
+            }
+            if p == 2 {
+                .ph = 2
+            }
+            if p == 3 {
+                .ph = 3
+            }
+            if .kind == 1 {
+                emit .GoalTry(.ph)
+            } else {
+                emit .Doomed(.ph)
+            }
+        }
+    }
+}

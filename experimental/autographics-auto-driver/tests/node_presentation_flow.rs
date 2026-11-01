@@ -44,6 +44,11 @@ const FOUR_SCENE: &str =
 const FOUR_WORLD: &str =
     include_str!("../../autographics-node2d-pilot/generated-presentation2d/four/world.at");
 const FOUR_WORLD_SHA: &str = "0a35a0d11a0a139f05e98aee40cc10ecf05e3c4f8a37d4e05c210471ddb12dc5";
+const GAME_SCENE: &str =
+    include_str!("../../autographics-node2d-pilot/generated-presentation2d/game/scene.agscene");
+const GAME_WORLD: &str =
+    include_str!("../../autographics-node2d-pilot/generated-presentation2d/game/world.at");
+const GAME_WORLD_SHA: &str = "a670a464678ae2ee15c344e038371997a6dd56e0207172d9ab46a625c3c643a3";
 const BANK_SHA: &str = "b0b740dc49e51abefff9bb1af830080fe00f817b468614992040d438d6171c3d";
 const FONT_SHA: &str = "4444c23631884f411aa7f2fee35061b1756a9927940c62d2a5572acf470b3ffa";
 const CLOSURE_ASSETS: &str = "../autographics-node2d-pilot/generated-presentation2d";
@@ -253,6 +258,150 @@ fn hud_text(s: &mut Session, slot: i32) -> String {
         .collect()
 }
 
+/// Character-mode session of the generated G12-equivalent product
+/// (autographics.hud2d/1 assembly; 7 scene rows, t04 geometry).
+fn game_session(name: &str, run: i32, px: f32, py: f32) -> Session {
+    game_session_world(GAME_WORLD, name, run, px, py)
+}
+
+fn game_session_world(
+    world_src: &str,
+    name: &str,
+    run: i32,
+    px: f32,
+    py: f32,
+) -> Session {
+    let snap = SourceSnapshot::from_bytes_for(
+        Path::new(name),
+        world_src.as_bytes().to_vec(),
+        Api::Hud2V1,
+    )
+    .unwrap_or_else(|e| panic!("{name} admission: {e}"));
+    let mut s = Session::new(&snap.source).unwrap_or_else(|e| panic!("{name} session: {e}"));
+    s.call("main", &[], ResultKind::Unit).unwrap();
+    s.call("_ag_reset", &[Int(run), Int(-1), Int(-1)], ResultKind::Unit)
+        .unwrap();
+    let scene = 7;
+    s.call("_ag_spatial_reset", &[Int(scene)], ResultKind::Unit).unwrap();
+    let rows: [(i32, i32, f32, f32, f32, f32); 7] = [
+        (1, 1, px, py, 0.8, 1.0),        // player.body (character)
+        (2, 1, 8.0, -0.5, 24.0, 1.0),    // ground
+        (3, 0, -30.0, -40.0, 0.5, 0.5),  // c1 template
+        (4, 0, -30.0, -42.0, 0.5, 0.5),  // c2 template
+        (5, 0, -30.0, -44.0, 0.5, 0.5),  // c3 template
+        (6, 1, -30.0, -40.0, 2.0, 1.0),  // pad template
+        (7, 1, -30.0, -42.0, 40.0, 2.0), // hazard template
+    ];
+    for (n, (id, kind, tx, ty, sx, sy)) in rows.iter().enumerate() {
+        s.call(
+            "_ag_identity",
+            &[Int(*id), Int(*kind), Int(2), Int(-1)],
+            ResultKind::Unit,
+        )
+        .unwrap();
+        s.call("_ag_visibility", &[Int(1)], ResultKind::Unit).unwrap();
+        s.call("_ag_bind_resource", &[Int(0)], ResultKind::Unit)
+            .unwrap();
+        for v in [*tx, *ty, 0., 1., 1., 1., 0., 0., 1., 1., 1., 0.] {
+            s.call("_ag_append_field", &[Float(v)], ResultKind::Unit)
+                .unwrap();
+        }
+        for (i, v) in [1.0, -sx / 2., -sy / 2., 0., sx / 2., sy / 2., 0.]
+            .iter()
+            .enumerate()
+        {
+            s.call(
+                "_ag_spatial_config",
+                &[Int((n * 7 + i) as i32), Float(*v)],
+                ResultKind::Unit,
+            )
+            .unwrap();
+        }
+    }
+    for n in 0..scene {
+        for name in ["_ag_char_map", "_ag_obj_map", "_ag_trg_map"] {
+            s.call(name, &[Int(n + 1), Int(n)], ResultKind::Unit).unwrap();
+        }
+    }
+    s.call("_ag_audio_config", &[Int(3)], ResultKind::Unit).unwrap();
+    // Slot configs from the generated scene: slot0 "3" (vis), slot1 "Playing",
+    // slots 2/3 hidden/empty.
+    for (slot, vis, text) in [(0, 1, "3"), (1, 1, "Playing"), (2, 0, ""), (3, 0, "")] {
+        s.call(
+            "_ag_hud_config",
+            &[Int(slot), Int(vis), Int(text.len() as i32)],
+            ResultKind::Unit,
+        )
+        .unwrap();
+        for b in text.bytes() {
+            s.call(
+                "_ag_hud_config_code",
+                &[Int(slot), Int(b as i32)],
+                ResultKind::Unit,
+            )
+            .unwrap();
+        }
+    }
+    s.call("_ag_start", &[], ResultKind::Unit).unwrap();
+    assert_eq!(
+        s.int("_ag_status", &[]).unwrap(),
+        0,
+        "{name} app_start fault {} arg {}",
+        s.int("_ag_error_node", &[]).unwrap(),
+        s.int("_ag_error_argument", &[]).unwrap()
+    );
+    s
+}
+
+/// Character tick: sample input (held/pressed bit masks), advance one tick,
+/// return the run status.
+fn char_tick(s: &mut Session, step: i32, held: i32) -> i32 {
+    char_tick_p(s, step, held, 0)
+}
+
+fn char_tick_p(s: &mut Session, step: i32, held: i32, pressed: i32) -> i32 {
+    s.call("_ag_char_input", &[Int(held), Int(pressed)], ResultKind::Unit)
+        .unwrap();
+    s.call("_ag_tick", &[Int(step), Float(DT)], ResultKind::Unit)
+        .unwrap();
+    s.int("_ag_status", &[]).unwrap()
+}
+
+/// Walk right from the settled start; capture every closeout bundle with its
+/// real tick identity; stop when status turns 1 (Won). Independent f32 walk
+/// oracle: every non-event tick advances x by 2.5*DT.
+fn walk_until_won(
+    s: &mut Session,
+    name: &str,
+) -> (i32, Vec<(i32, Vec<(i32, i32, f32)>)>) {
+    // Settle: fall from the spawn y to the ground.
+    let mut t0 = 0;
+    for t in 1..=300 {
+        t0 = t;
+        let st = char_tick(s, t, 0);
+        assert_eq!(st, 0, "{name} settle tick {t} status {st}");
+        if int(s, "get_player_grounded") == 1 {
+            break;
+        }
+    }
+    assert_eq!(int(s, "get_player_grounded"), 1, "{name} never settled");
+    let mut t = t0;
+    let mut captures = Vec::new();
+    while t < t0 + 4000 {
+        t += 1;
+        let st = char_tick(s, t, 2);
+        assert_eq!(st, 0, "{name} tick {t} over the pool (fault {st})");
+        let rows = audio_rows(s);
+        if !rows.is_empty() {
+            captures.push((t, rows));
+        }
+        if int(s, "get_r_status") == 1 {
+            return (t0, captures);
+        }
+    }
+    panic!("{name}: pad never won");
+}
+
 // ---------------------------------------------------------------- tests ----
 
 /// V-02 actor-free chain: real Auto execution of two same-definition Notify
@@ -413,4 +562,131 @@ fn t02_receiver_isolation_swap_negative() {
     // The hit landed on RIGHT's row: right.hits == 1, left untouched.
     assert_eq!(int(s, "get_right_hits"), 1, "swapped binding reaches the other row");
     assert_eq!(int(s, "get_left_hits"), 0, "left state untouched by the swap");
+}
+
+/// V-03 author G12-equivalent win path: continuous movement, one real pickup
+/// per coin, win only after the last coin on the pad enter phase; every tick
+/// inside the original 32-credit pool; ordinals strictly increase across the
+/// Run; HUD text follows the root's own business fields.
+#[test]
+fn t03_walk_collect_win_author_trajectory() {
+    let s = &mut game_session("t03-win.at", 1, 2.0, 1.0);
+    let (_t0, captures) = walk_until_won(s, "t03-win");
+    // Independent event oracle: coins at x=8/12/16 (r 0.9, char half-w 0.4)
+    // are picked when the walk oracle's x first reaches 6.7/10.7/14.7; each
+    // pickup costs one axis-skipped turn. Win on the pad enter (x >= 17.6).
+    let picks: Vec<(i32, i32, f32)> = captures
+        .iter()
+        .flat_map(|(_, rows)| rows.iter().cloned())
+        .collect();
+    let cues: Vec<i32> = picks.iter().map(|(_, c, _)| *c).collect();
+    assert_eq!(cues, vec![0, 0, 0, 1], "three coin cues then the win cue");
+    let ordinals: Vec<i32> = picks.iter().map(|(o, _, _)| *o).collect();
+    assert_eq!(
+        ordinals,
+        vec![1, 2, 3, 4],
+        "one shared strict ordinal sequence across the Run"
+    );
+    assert_eq!(int(s, "get_r_remaining"), 0, "all three picked");
+    assert_eq!(int(s, "get_r_status"), 1, "Won");
+    assert_eq!(hud_text(s, 0), "0", "remaining text via author helper");
+    assert_eq!(hud_text(s, 1), "Won", "status text via author helper");
+    // Exactly four bundles carried the four requests (one per callback).
+    assert_eq!(captures.len(), 4, "one closeout bundle per event callback");
+}
+
+/// V-03 early-arrival branch: standing on the pad with coins missing wins
+/// nothing, destroys nothing, and stays inside the pool (the goal handler
+/// reads the enter phase and the author's own remaining field).
+#[test]
+fn t03_early_pad_arrive_stay_no_win() {
+    let s = &mut game_session("t03-early.at", 1, 18.6, 1.0);
+    for t in 1..=120 {
+        let held = if t <= 30 { 0 } else if t <= 60 { 1 } else { 2 };
+        let st = char_tick(s, t, held);
+        assert_eq!(st, 0, "tick {t} status {st} (early arrival must be clean)");
+    }
+    assert_eq!(int(s, "get_r_status"), 0, "no win with coins missing");
+    assert_eq!(int(s, "get_r_remaining"), 3, "no destruction on early arrival");
+    assert!(audio_rows(s).is_empty(), "no requests on the early path");
+    assert_eq!(hud_text(s, 1), "Playing", "status text unchanged");
+}
+
+/// V-03 hazard branch: the author routes the hazard trigger to its own
+/// verdict (status 2 + fail cue), one bundle, no partial win.
+#[test]
+fn t03_hazard_fail_named_cue() {
+    let s = &mut game_session("t03-fail.at", 1, 8.0, -6.0);
+    // Tick 1 evaluates the trigger snapshot (enter phase); the poll prologue
+    // dispatches it at tick 2.
+    let st = char_tick(s, 1, 0);
+    assert_eq!(st, 0, "hazard evaluate tick inside the pool");
+    assert_eq!(int(s, "get_r_status"), 0);
+    let st = char_tick(s, 2, 0);
+    assert_eq!(st, 0, "hazard dispatch tick inside the pool");
+    assert_eq!(int(s, "get_r_status"), 2, "Failed via the author handler");
+    assert_eq!(audio_rows(s), vec![(1, 2, 1.0)], "fail cue, ordinal 1");
+    assert_eq!(hud_text(s, 1), "Failed", "status text via author helper");
+    for t in 2..=10 {
+        assert_eq!(char_tick(s, t, 0), 0, "tick {t}");
+    }
+    assert!(audio_rows(s).is_empty(), "fail fires exactly once (status guard)");
+}
+
+/// V-03 held Left+Right stands still; Jump leaves the ground with the frozen
+/// impulse and lands again (Jump/land overlap with continued input).
+#[test]
+fn t03_held_jump_land_branches() {
+    let s = &mut game_session("t03-jump.at", 1, 2.0, 1.0);
+    for t in 1..=300 {
+        assert_eq!(char_tick(s, t, 0), 0);
+        if int(s, "get_player_grounded") == 1 {
+            break;
+        }
+    }
+    // Left+Right: axis 0 -> no movement.
+    for t in 301..=310 {
+        assert_eq!(char_tick(s, t, 3), 0, "tick {t}");
+    }
+    // Jump with held Right: the pressed edge fires once; leaves the ground,
+    // returns (grounded 1 -> 0 -> 1).
+    let mut airborne = 0;
+    let mut landed_again = false;
+    for t in 311..=420 {
+        let pressed = if t == 311 { 4 } else { 0 };
+        assert_eq!(char_tick_p(s, t, 6, pressed), 0, "jump tick {t} over the pool");
+        let g = int(s, "get_player_grounded");
+        if g == 0 {
+            airborne += 1;
+        } else if airborne > 0 {
+            landed_again = true;
+            break;
+        }
+    }
+    assert!(airborne > 0, "jump left the ground");
+    assert!(landed_again, "landed again under continued input");
+}
+
+/// V-03/AC-05 budget boundary: the author program walk tick sits at the
+/// original pool edge — one additional held read is the named fault 10 at
+/// the first walk tick (derived in-memory world; committed product
+/// untouched).
+#[test]
+fn t03_budget_plus_one_named_fault10() {
+    let marker = "  axis = (ag_action_held(1) - ag_action_held(0))";
+    let idx = GAME_WORLD.find(marker).expect("axis read marker");
+    let variant = format!(
+        "{}  let _waste = ag_action_held(0);\n{}",
+        &GAME_WORLD[..idx],
+        &GAME_WORLD[idx..]
+    );
+    let mut s = game_session_world(&variant, "t03-plus1.at", 1, 2.0, 1.0);
+    // The very first tick already runs the full body (pressed + two held
+    // reads + move + grounded + poll prologue + closeout) at the exact
+    // 32-credit edge, so one extra held read faults immediately.
+    let st = char_tick(&mut s, 1, 0);
+    assert_eq!(
+        st, 10,
+        "one extra held read on the exact-edge walk tick must be the named          budget fault 10",
+    );
 }

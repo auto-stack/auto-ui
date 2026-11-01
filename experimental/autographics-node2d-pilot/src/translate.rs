@@ -76,6 +76,20 @@ pub struct Ctx<'a> {
     /// cue id；降层映射，作者不写数字 ID）。None 保持旧档行为（sfx.play
     /// 保持 unsupported，旧字节不变）。
     pub sfx: Option<SfxEnv<'a>>,
+    /// PLAN-025：`self.handle` 只读句柄（本定义恰一动态 shape2d 的生成
+    /// 对象槽句柄 `<prefix>_handle[i]`；F-8 保留名约定一致）。root/无动态
+    /// shape 为 None（`.handle` 具名拒绝）。
+    pub handle_ref: Option<String>,
+}
+
+/// PLAN-025：`.handle` 成员解析（实例上下文 + 恰一动态 shape2d）。
+fn handle_ref_of(ctx: &Ctx, e: &Expr) -> Result<String, LowerError> {
+    ctx.handle_ref.clone().ok_or_else(|| {
+        unsupported(
+            "self.handle is only available on instance handlers of a definition with exactly one dynamic shape2d (the generated object slot handle)",
+            e,
+        )
+    })
 }
 
 /// PLAN-025：typed 声音请求环境。cue 表 = presentation2d 块声明序。
@@ -205,6 +219,15 @@ fn member_ref(field: &str, ctx: &Ctx) -> Result<String, LowerError> {
         Target::Root => format!("r_{field}"),
         Target::Instance { prefix, index } => format!("{prefix}_{field}[{index}]"),
     })
+}
+
+/// PLAN-025：`.handle` 值位置的成员读取（走 member_ref 的 hook 面）。
+/// 经由 Ctx.handle_ref 注入；这里通过包装 hook 无法表达的错误路径。
+fn member_ref_or_handle(field: &str, ctx: &Ctx, e: &Expr) -> Result<String, LowerError> {
+    if field == "handle" {
+        return handle_ref_of(ctx, e);
+    }
+    member_ref(field, ctx)
 }
 
 pub fn translate_stmts(
@@ -361,7 +384,7 @@ fn translate_expr(e: &Expr, ctx: &Ctx, out: &mut String) -> Result<(), LowerErro
             match &**obj {
                 Expr::Ident(base) => match base.as_str() {
                     "self" => {
-                        out.push_str(&member_ref(name, ctx)?);
+                        out.push_str(&member_ref_or_handle(name, ctx, e)?);
                         Ok(())
                     }
                     "emit" => {
@@ -1514,6 +1537,23 @@ fn translate_render_call(
     ctx: &Ctx,
     out: &mut String,
 ) -> Result<(), LowerError> {
+    // PLAN-025：despawn 不依赖 sprites 环境（presentation 档作者销毁面；
+    // token 实参 = `.handle` 只读句柄）。plan 层已按档具名限定。
+    if m == "despawn" {
+        if call.args.args.len() != 1 {
+            return Err(unsupported(
+                format!("render2d.despawn arity {}", call.args.args.len()),
+                e,
+            ));
+        }
+        out.push_str("ag_object_despawn(");
+        match &call.args.args[0] {
+            Arg::Pos(x) => translate_expr(x, ctx, out)?,
+            other => return Err(unsupported(format!("despawn arg {other:?}"), e)),
+        }
+        out.push(')');
+        return Ok(());
+    }
     let Some(env) = &ctx.sprites else {
         return Err(unsupported(
             "render2d is only available in the sprites-2d profile",

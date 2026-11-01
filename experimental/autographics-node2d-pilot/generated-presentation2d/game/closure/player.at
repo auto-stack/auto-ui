@@ -1,0 +1,60 @@
+// PLAN-025 game Player: the author-written walk-jump body (local vy/grounded,
+// one pressed edge, ground-only jump gate, gravity integrate BEFORE the move,
+// differential axis, one move_and_slide with clearance 0.002, grounded read
+// from THAT move) with the G12a oracle constants (speed 2.5, jump 4.5,
+// gravity 12). The halt field is the author's own input rule: the root
+// dispatches Idle(1) on an event turn; that turn the two held reads
+// (input.axis -> ag_action_held x2, 2 credits) are skipped while pressed and
+// the gravity/move/grounded chain still run, so physics never diverges.
+node Player(px: float, py: float, tint: Material2D) {
+    model {
+        var vy = 0.0
+        var grounded = 0
+        var halt = 0
+    }
+    msg {
+        Idle(int)
+    }
+    view-2d {
+        character2d body {
+            position: (px, py)
+            material: tint
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            // Event turns (halt) skip BOTH input reads (pressed edge and the
+            // two held reads): the measured walk tick sits exactly at the
+            // original 32-credit pool edge, so the dispatch turn fits only
+            // without them. The author owns this tradeoff (a jump press on
+            // an event turn is consumed by the halt rule).
+            var jp = 0
+            var axis = 0
+            if .halt == 1 {
+                .halt = 0
+            } else {
+                jp = input.pressed(Jump)
+                axis = input.axis(Left, Right)
+            }
+            if jp == 1 {
+                if .grounded == 1 {
+                    .vy = 4.5
+                }
+            }
+            .vy = .vy - 12.0 * dt
+            let dx = axis * 2.5 * dt
+            let q = refs.body.move_and_slide((dx, .vy * dt))
+            .grounded = refs.body.grounded(q)
+            if .grounded == 1 {
+                .vy = 0.0
+            }
+        }
+        .Idle(n) -> {
+            if n == 1 {
+                .halt = 1
+            } else {
+                .halt = 0
+            }
+        }
+    }
+}

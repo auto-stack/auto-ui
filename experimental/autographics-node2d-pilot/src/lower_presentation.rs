@@ -218,31 +218,37 @@ fn prepare_pres(
                     "hud slot layout out of range (anchor 0..3, size 16..48, finite offset, rgba 0..1)",
                 ));
             }
-            // owner：恰一根视图组件实例；一实例至多一槽（单一明确 owner）。
-            let inst = world
-                .instances
-                .iter()
-                .find(|i| i.parent.is_none() && inst_name_of(&i.path) == s.owner)
-                .ok_or_else(|| {
-                    at(
-                        &root_module,
-                        sline,
-                        &s.owner,
-                        "hud slot owner must be a root-view component instance",
-                    )
-                })?;
-            if owners.contains(&s.owner) {
-                return Err(at(
-                    &root_module,
-                    sline,
-                    &s.owner,
-                    "duplicate hud slot owner (each instance owns at most one slot)",
-                ));
-            }
+            // owner：恰一根视图组件实例或根本身；一 owner 至多一槽
+            // （单一明确 owner）。根 owner 的字段走 r_<field> 寻址。
+            let root_owned = s.owner == world.root;
+            let inst = if root_owned {
+                None
+            } else {
+                Some(
+                    world
+                        .instances
+                        .iter()
+                        .find(|i| i.parent.is_none() && inst_name_of(&i.path) == s.owner)
+                        .ok_or_else(|| {
+                            at(
+                                &root_module,
+                                sline,
+                                &s.owner,
+                                "hud slot owner must be a root-view component instance or the root node",
+                            )
+                        })?,
+                )
+            };
             owners.push(s.owner.clone());
-            let def = &world.defs[&inst.def];
-            let prefix = def.prefix();
-            let idx = inst.def_idx;
+            let def = match &inst {
+                Some(i) => &world.defs[&i.def],
+                None => &world.defs[&world.root],
+            };
+            let prefix = match &inst {
+                Some(i) => def.prefix(),
+                None => "r".to_string(),
+            };
+            let idx = inst.as_ref().map(|i| i.def_idx).unwrap_or(usize::MAX);
             // 文字绑定：作者 helper（<module>_<fn>，(int) -> str）+ owner 的
             // int model 字段。
             let text = match (&s.text_fn, &s.text_field) {
@@ -292,7 +298,12 @@ fn prepare_pres(
                             ),
                         ));
                     }
-                    Some(format!("{fmodule}_{f}({prefix}_{field}[{idx}])"))
+                    let addr = if root_owned {
+                        format!("{prefix}_{field}")
+                    } else {
+                        format!("{prefix}_{field}[{idx}]")
+                    };
+                    Some(format!("{fmodule}_{f}({addr})"))
                 }
                 _ => None,
             };
@@ -310,7 +321,11 @@ fn prepare_pres(
                             ),
                         ));
                     }
-                    Some(format!("{prefix}_{field}[{idx}]"))
+                    Some(if root_owned {
+                        format!("{prefix}_{field}")
+                    } else {
+                        format!("{prefix}_{field}[{idx}]")
+                    })
                 }
                 None if text.is_some() => Some("1".to_string()),
                 None => None,
@@ -622,8 +637,13 @@ fn scene_json_presentation(
         })
         .collect::<Vec<_>>()
         .join(",\n");
+    let api = if has_char {
+        "autographics.hud2d/1"
+    } else {
+        "autographics.presentation2d/1"
+    };
     format!(
-        "{{\n \"behavior\": {{\n  \"api\": \"autographics.presentation2d/1\",\n  \"source\": {{\n   \"format\": \"auto-source\",\n   \"sha256\": \"{sha}\",\n   \"byte_length\": {bytes}\n  }},\n  \"actors\": {{\n   \"two_d\": {},\n   \"three_d\": null\n  }}\n }},\n \"schema\": \"autographics.scene/8\",\n \"document_id\": \"plan025-presentation-2d-{entry}\",\n \"resources\": [\n  \"circle\",\n  \"quad\",\n  \"cylinder\",\n  \"player\",\n  \"mob\"\n ],\n \"objects\": [\n{objects}\n ],\n \"groups\": [],\n \"assets\": [\n{}\n ],\n \"cues\": [\n{}\n ],\n \"hud\": {{\n  \"font\": \"sha256:{font_sha}\",\n  \"license\": \"{}\",\n  \"slots\": [\n{}\n  ]\n }}\n}}\n",
+        "{{\n \"behavior\": {{\n  \"api\": \"{api}\",\n  \"source\": {{\n   \"format\": \"auto-source\",\n   \"sha256\": \"{sha}\",\n   \"byte_length\": {bytes}\n  }},\n  \"actors\": {{\n   \"two_d\": {},\n   \"three_d\": null\n  }}\n }},\n \"schema\": \"autographics.scene/8\",\n \"document_id\": \"plan025-presentation-2d-{entry}\",\n \"resources\": [\n  \"circle\",\n  \"quad\",\n  \"cylinder\",\n  \"player\",\n  \"mob\"\n ],\n \"objects\": [\n{objects}\n ],\n \"groups\": [],\n \"assets\": [\n{}\n ],\n \"cues\": [\n{}\n ],\n \"hud\": {{\n  \"font\": \"sha256:{font_sha}\",\n  \"license\": \"{}\",\n  \"slots\": [\n{}\n  ]\n }}\n}}\n",
         if has_char { "1" } else { "null" },
         assets_json.join(",\n"),
         cues_json,
@@ -730,7 +750,7 @@ pub fn lower_project_presentation(
 ) -> Result<LowerOutputPresentation, LowerError> {
     let world = build_world(project, false, false)?;
     let block = pres2d_of(project, &world)?;
-    let mut plan = crate::lower_components::plan_dispatch(project, &world, false, false)?;
+    let mut plan = crate::lower_components::plan_dispatch(project, &world, false, false, true)?;
     complete_receivers(project, &world, &mut plan);
     let gen = prepare_pres(project, &world, &block)?;
     let root_src = project.modules[&world.root_module].source.clone();

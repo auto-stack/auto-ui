@@ -1800,6 +1800,7 @@ pub(crate) fn plan_dispatch(
     world: &WorldIR,
     queries: bool,
     sprites: bool,
+    pres: bool,
 ) -> Result<Plan, LowerError> {
     let mut plan = Plan::default();
     let root_prefix = world.root.to_lowercase();
@@ -1862,13 +1863,26 @@ pub(crate) fn plan_dispatch(
             // ---- PLAN-022: render2d surface validation (named
             // module/line/symbol diagnostics; slot budget checked below) ----
             for (op, target, argc, rline) in &out.render_calls {
-                if !sprites {
+                // PLAN-025：presentation 档仅开放 despawn（作者 on 决定销毁；
+                // token = self.handle 只读句柄），其余 render2d 面仍归 sprites。
+                if !sprites && !(pres && op == "despawn") {
                     return Err(at(
                         &def.module,
                         *rline,
                         "render2d",
-                        "render2d is only available in the sprites-2d profile",
+                        "render2d is only available in the sprites-2d profile (presentation-2d allows render2d.despawn only)",
                     ));
+                }
+                if !sprites && op == "despawn" {
+                    if *argc != 1 {
+                        return Err(at(
+                            &def.module,
+                            *rline,
+                            "render2d",
+                            &format!("render2d.despawn arity {argc} (want <handle>)"),
+                        ));
+                    }
+                    continue;
                 }
                 match op.as_str() {
                     "spawn" => {
@@ -2183,6 +2197,27 @@ pub(crate) fn plan_dispatch(
                 }
             }
             for m in &out.members {
+                // PLAN-025：`.handle` 是本定义恰一动态 shape2d 的生成只读
+                // 句柄（F-8 保留名；仅实例 handler，root 无槽）。
+                if m == "handle" {
+                    if !pres {
+                        return Err(at(
+                            &def.module,
+                            hline,
+                            m,
+                            "handler references unknown member '.handle' (the generated slot handle read is presentation-2d only)",
+                        ));
+                    }
+                    if def.dyn_elems.len() != 1 || is_root {
+                        return Err(at(
+                            &def.module,
+                            hline,
+                            m,
+                            "self.handle is only available on instance handlers of a definition with exactly one dynamic shape2d",
+                        ));
+                    }
+                    continue;
+                }
                 if !model_fields.contains(m) && !def.params.iter().any(|(n, _)| n == m) {
                     return Err(at(
                         &def.module,
@@ -3190,6 +3225,7 @@ pub(crate) fn collect_scene(
                         sprites: None,
                         space3: None,
                         sfx: None,
+                        handle_ref: None,
                     };
                     let pos = prop_of(props, "position").ok_or_else(|| {
                         at(
@@ -4531,6 +4567,11 @@ pub(crate) fn instance_ctx<'a>(
         }),
         space3: None,
         sfx: sfx.map(|e| crate::translate::SfxEnv { cues: e.cues }),
+        handle_ref: if def.dyn_elems.len() == 1 {
+            Some(format!("{prefix}_handle[{index}]"))
+        } else {
+            None
+        },
     })
 }
 
@@ -4620,6 +4661,7 @@ pub(crate) fn root_ctx<'a>(
         }),
         space3: None,
         sfx: sfx.map(|e| crate::translate::SfxEnv { cues: e.cues }),
+        handle_ref: None,
     }
 }
 
@@ -5819,6 +5861,18 @@ fn lower_components_mode(
     game: Option<&crate::lower_components_game::GameGen>,
     sprites: bool,
 ) -> Result<LowerOutputBasic2D, LowerError> {
+    lower_components_mode_ex(project, queries, game, sprites, false)
+}
+
+/// PLAN-025：pres 变体（presentation-2d 走 Some 注入的独立入口，不经此
+/// 分派；保留冻结档的签名形状）。
+fn lower_components_mode_ex(
+    project: &Project,
+    queries: bool,
+    game: Option<&crate::lower_components_game::GameGen>,
+    sprites: bool,
+    pres: bool,
+) -> Result<LowerOutputBasic2D, LowerError> {
     // PLAN-023：game2d 作者块只被 components-2d-game 消费；frozen 档拒绝
     // （不静默忽略）。
     if game.is_none() {
@@ -5837,7 +5891,7 @@ fn lower_components_mode(
         }
     }
     let world = build_world(project, sprites, true)?;
-    let plan = plan_dispatch(project, &world, queries, sprites)?;
+    let plan = plan_dispatch(project, &world, queries, sprites, pres)?;
     let scene = if sprites {
         collect_scene_sprites(project, &world, &plan)?
     } else {

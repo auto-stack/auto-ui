@@ -973,7 +973,7 @@ pub fn lower_project_components_game(
         }
     }
     // F-8.2（game 面）：先补全接收方，再走共享管线。
-    let mut plan = plan_dispatch(project, &world, false, false)?;
+    let mut plan = plan_dispatch(project, &world, false, false, false)?;
     complete_receivers(project, &world, &mut plan);
 
     let gen = prepare_game(project, &world, &game_block)?;

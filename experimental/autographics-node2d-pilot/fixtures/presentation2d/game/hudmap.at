@@ -1,0 +1,14 @@
+// PLAN-025 game HUD text helpers: the author owns HUD shaping (branch select
+// over the root's own business fields; ASCII literals only).
+fn remaining_text(n int) str {
+    if n == 0 {
+        return "0"
+    }
+    if n == 1 {
+        return "1"
+    }
+    if n == 2 {
+        return "2"
+    }
+    return "3"
+}

@@ -370,6 +370,7 @@ fn base_ctx_g11<'a>(
         sprites: None,
         space3: None,
                         sfx: None,
+                        handle_ref: None,
     }
 }
 
@@ -1047,6 +1048,7 @@ pub fn lower_project_g112d(project: &Project) -> Result<LowerOutputG11, LowerErr
                         sprites: None,
                         space3: None,
                         sfx: None,
+                        handle_ref: None,
                     };
                     let mut buf = String::new();
                     if translate_stmts(&[Stmt::Expr(e.clone())], &ctx, &mut buf, 0).is_ok() {

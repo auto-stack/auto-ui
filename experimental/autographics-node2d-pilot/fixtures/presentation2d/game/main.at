@@ -1,0 +1,187 @@
+// PLAN-025 T-02/T-05 game fixture (V-03, declared-character combination):
+// the complete G12-equivalent program written ENTIRELY by the author on the
+// presentation surface. No Collect/Goal/Fail engine enums, no root
+// count/state requirement — the author owns remaining/status/busy under
+// arbitrary names, decides despawn/count/win/lose/cue/gain in ordinary
+// handlers, and writes its own event-turn input rule (the halt dispatch is
+// author logic, never an engine auto-idle). Runs on the frozen
+// autographics.hud2d/1 assembly (character + camera admission unchanged).
+// G12a oracle constants: Right-only, speed 2.5, jump 4.5, gravity 12,
+// gravity-before-move, coin gain 1.0; branches: early pad arrival (no win,
+// no destruction), stay/leave/re-enter on the pad, held Left/Right and
+// Jump/land overlap.
+use resources: coin_mesh, coin_tint, char_orange, ground_color, ground_mesh, void_color, void_mesh, pad_color, pad_mesh
+use player: Player
+use coin: Coin
+use zone: Zone
+use hudmap: remaining_text
+use statusmap: status_text
+
+node Main {
+    model {
+        var remaining = 3
+        var status = 0
+        var busy = 0
+    }
+    msg {
+        Picked(int)
+        GoalTry(int)
+        Doomed(int)
+    }
+    presentation2d {
+        audio {
+            bank: "assets/b0b740dc49e51abefff9bb1af830080fe00f817b468614992040d438d6171c3d.wav"
+            font: "assets/lilita_one_regular.ttf"
+            license: "assets/license.txt"
+        }
+        cue coin {
+            span: (0, 7403)
+            gain: 1.0
+        }
+        cue win {
+            span: (7403, 20046)
+            gain: 1.0
+        }
+        cue fail {
+            span: (20046, 22504)
+            gain: 1.0
+        }
+        hud {
+            slot 0 {
+                owner: "Main"
+                anchor: 0
+                offset: (8.0, 8.0)
+                size: 32.0
+                rgba: (1.0, 1.0, 1.0, 1.0)
+                text_fn: "remaining_text"
+                text_field: "remaining"
+                init: "3"
+            }
+            slot 1 {
+                owner: "Main"
+                anchor: 1
+                offset: (8.0, 8.0)
+                size: 32.0
+                rgba: (1.0, 1.0, 1.0, 1.0)
+                text_fn: "status_text"
+                text_field: "status"
+                init: "Playing"
+            }
+        }
+        trigger c1 {
+            shape: circle
+            radius: 0.9
+            target: "c1"
+            event: "Hit"
+            guard: "alive"
+        }
+        trigger c2 {
+            shape: circle
+            radius: 0.9
+            target: "c2"
+            event: "Hit"
+            guard: "alive"
+        }
+        trigger c3 {
+            shape: circle
+            radius: 0.9
+            target: "c3"
+            event: "Hit"
+            guard: "alive"
+        }
+        trigger hazard_hit {
+            shape: box
+            target: "hazard"
+            event: "Hit"
+        }
+        trigger pad_enter {
+            shape: box
+            target: "pad"
+            event: "Hit"
+        }
+    }
+    view-2d {
+        Coin c1 {
+            cx: 8.0
+            cy: 1.2
+            geo: resources.coin_mesh
+            tint: resources.coin_tint
+        }
+        Coin c2 {
+            cx: 12.0
+            cy: 1.2
+            geo: resources.coin_mesh
+            tint: resources.coin_tint
+        }
+        Coin c3 {
+            cx: 16.0
+            cy: 1.2
+            geo: resources.coin_mesh
+            tint: resources.coin_tint
+        }
+        Player player {
+            px: 2.0
+            py: 1.0
+            tint: resources.char_orange
+        }
+        Zone pad {
+            kind: 1
+            zx: 19.0
+            zy: 0.5
+            geo: resources.pad_mesh
+            tint: resources.pad_color
+        }
+        Zone hazard {
+            kind: 2
+            zx: 8.0
+            zy: -6.0
+            geo: resources.void_mesh
+            tint: resources.void_color
+        }
+        solid2d ground {
+            position: (8.0, -0.5)
+            mesh: resources.ground_mesh
+            material: resources.ground_color
+        }
+        camera2d cam {
+            target: refs.player.actor
+            bounds: (0.0, -8.0, 24.0, 8.0)
+            view_size: (24.0, 16.0)
+        }
+    }
+    on {
+        .Picked(n) -> {
+            .busy = 1
+            .remaining = .remaining - 1
+            sfx.play("coin", 1.0)
+        }
+        .GoalTry(ph) -> {
+            .busy = 1
+            if .status == 0 {
+                if .remaining == 0 {
+                    if ph == 1 {
+                        .status = 1
+                        sfx.play("win", 1.0)
+                    }
+                }
+            }
+        }
+        .Doomed(ph) -> {
+            .busy = 1
+            if .status == 0 {
+                .status = 2
+                sfx.play("fail", 1.0)
+            }
+        }
+        Life.Tick(dt) -> {
+            // The author's own event-turn input rule: an event dispatch this
+            // turn marks busy; the root then dispatches Idle(1) to the player,
+            // whose handler skips its two held reads that turn. Ordinary Auto
+            // logic — never an engine auto-idle.
+            if .busy == 1 {
+                .busy = 0
+                player.Idle(1)
+            }
+        }
+    }
+}

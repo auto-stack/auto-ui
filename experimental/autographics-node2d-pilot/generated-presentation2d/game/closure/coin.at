@@ -1,0 +1,31 @@
+// PLAN-025 game Coin: one definition, three instances, arbitrary business
+// name (alive). The typed Hit event is the trigger forward (phase payload);
+// the handler is idempotent via the alive guard (a repeated delivery can
+// never double-collect). The author decides destruction (render2d.despawn of
+// its own read-only slot handle) and reports upward via the ordinary
+// ancestor emit — the root owns counting and the coin cue.
+node Coin(cx: float, cy: float, geo: Mesh2D, tint: Material2D) {
+    model {
+        var alive = 1
+    }
+    msg {
+        Hit(int)
+    }
+    view-2d {
+        shape2d disc {
+            mesh: .geo
+            position: (.cx, .cy)
+            material: .tint
+            visible: .alive
+        }
+    }
+    on {
+        .Hit(ph) -> {
+            if .alive == 1 {
+                .alive = 0
+                render2d.despawn(.handle)
+                emit .Picked(1)
+            }
+        }
+    }
+}

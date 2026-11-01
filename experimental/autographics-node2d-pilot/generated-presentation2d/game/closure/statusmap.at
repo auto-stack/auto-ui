@@ -1,0 +1,10 @@
+// PLAN-025 game status text helper (separate module, arbitrary module name).
+fn status_text(n int) str {
+    if n == 1 {
+        return "Won"
+    }
+    if n == 2 {
+        return "Failed"
+    }
+    return "Playing"
+}

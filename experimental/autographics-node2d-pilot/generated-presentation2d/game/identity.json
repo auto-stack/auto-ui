@@ -1,0 +1,38 @@
+{
+ "generator": "autographics-node2d-pilot plan025 presentation-2d",
+ "api": "autographics.hud2d/1",
+ "user_source_sha256": "a670a464678ae2ee15c344e038371997a6dd56e0207172d9ab46a625c3c643a3",
+ "user_source_bytes": 6959,
+  "module:coin": "763f51cb40b39d0a0d70971d45cc5d0b74fa49e1e1d4aa9134a46aa2be649107",
+  "module:hudmap": "58a05a733b4d72dcb99e650bdd5a9f5bbae392ae99b80ba0f3ab13bb0174115c",
+  "module:main": "26a9e7d7cb9e1489328b12769099bb571fbaeb0ad8a716c86dfb9129f2c0fe54",
+  "module:player": "f960a8606513f04d84bc1fa9db7414fa90c53d99753f337693160bc7cc901d9f",
+  "module:resources": "55005c4597f0d2ab6fc37eeca7645f2dd794e484c3268799221674ce0c51b5a4",
+  "module:statusmap": "8745cf3acb2e67048dc35ce289576a7f5b36bc0502a1e9b2925f798a230398e6",
+  "module:zone": "22ef3629c718ca68af06dea439b83797d66f0e6ca380b2ea21bb2eba194c1371",
+ "closure": [
+  {"name": "coin", "sha256": "763f51cb40b39d0a0d70971d45cc5d0b74fa49e1e1d4aa9134a46aa2be649107", "bytes": 963},
+  {"name": "hudmap", "sha256": "58a05a733b4d72dcb99e650bdd5a9f5bbae392ae99b80ba0f3ab13bb0174115c", "bytes": 325},
+  {"name": "main", "sha256": "26a9e7d7cb9e1489328b12769099bb571fbaeb0ad8a716c86dfb9129f2c0fe54", "bytes": 5278},
+  {"name": "player", "sha256": "f960a8606513f04d84bc1fa9db7414fa90c53d99753f337693160bc7cc901d9f", "bytes": 2107},
+  {"name": "resources", "sha256": "55005c4597f0d2ab6fc37eeca7645f2dd794e484c3268799221674ce0c51b5a4", "bytes": 654},
+  {"name": "statusmap", "sha256": "8745cf3acb2e67048dc35ce289576a7f5b36bc0502a1e9b2925f798a230398e6", "bytes": 218},
+  {"name": "zone", "sha256": "22ef3629c718ca68af06dea439b83797d66f0e6ca380b2ea21bb2eba194c1371", "bytes": 1230},
+  {"name": "asset:b0b740dc49e51abefff9bb1af830080fe00f817b468614992040d438d6171c3d.wav", "sha256": "b0b740dc49e51abefff9bb1af830080fe00f817b468614992040d438d6171c3d", "bytes": 90060},
+  {"name": "asset:lilita_one_regular.ttf", "sha256": "4444c23631884f411aa7f2fee35061b1756a9927940c62d2a5572acf470b3ffa", "bytes": 26828},
+  {"name": "asset:license.txt", "sha256": "31d45880a38de46bc81835329c0c7d964609751e65add92769ea0095ad92c05b", "bytes": 4391}
+ ],
+ "roles": {
+ "character": 1,
+ "character_name": "player.body",
+ "solids": [{"id": 2, "name": "ground"}],
+ "camera": 1,
+ "scene_objects": {"player.body": 1, "ground": 2, "c1_template": 3, "c2_template": 4, "c3_template": 5, "pad_template": 6, "hazard_template": 7}
+},
+ "provenance": {
+  "product": "game",
+  "consumer": "experimental/autographics-auto-driver/tests/node_presentation_flow.rs (V-03 author G12-equivalent branches)",
+  "consumption": "include_str! frozen scene.agscene + world.at; the harness writes world.at to scripts/<sha>.at where <sha> = scene.behavior.source.sha256",
+  "world_sha256": "a670a464678ae2ee15c344e038371997a6dd56e0207172d9ab46a625c3c643a3"
+ }
+}
