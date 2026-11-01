@@ -159,6 +159,10 @@ fn row_id(doc: &autographics_auto_driver::authoring::document::Document, name: &
 /// ordered node -> _ag_start) into a trusted Session built from the same
 /// frozen world.at through the real admission path.
 fn probe_session(scene_text: &str, world_src: &str, name: &str, run: i32) -> Session {
+    probe_session_src(scene_text, world_src, name, run)
+}
+
+fn probe_session_src(scene_text: &str, world_src: &str, name: &str, run: i32) -> Session {
     let snap =
         SourceSnapshot::from_bytes_for(Path::new(name), world_src.as_bytes().to_vec(), Api::V1)
             .expect("v1 admission");
@@ -166,6 +170,9 @@ fn probe_session(scene_text: &str, world_src: &str, name: &str, run: i32) -> Ses
     s.call("main", &[], ResultKind::Unit).unwrap();
     s.call("_ag_reset", &[Int(run), Int(-1), Int(-1)], ResultKind::Unit)
         .unwrap();
+    // 节点序来自冻结场景（载入层真实路径）；行为源直接用受检快照——
+    // 变异负控特意不匹配场景绑定哈希（生产载入路径对那种漂移的拒绝
+    // 由 v06 实测覆盖）。
     let (doc, _, _, _) = {
         let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/plan024-cpu");
         let _ = std::fs::remove_dir_all(&dir);
@@ -182,7 +189,9 @@ fn probe_session(scene_text: &str, world_src: &str, name: &str, run: i32) -> Ses
                 .expect("cpu scene binds sha")
                 .to_string();
             std::fs::create_dir_all(dir.join("scripts")).expect("cpu scripts");
-            std::fs::write(dir.join("scripts").join(format!("{sha}.at")), world_src)
+            // scripts/<sha>.at 持场景绑定的冻结源；TWIN_WORLD 与绑定一致，
+            // 变异源只进 VM 快照、不落该文件（保持载入层哈希合同）。
+            std::fs::write(dir.join("scripts").join(format!("{sha}.at")), TWIN_WORLD)
                 .expect("cpu world");
         }
         Storage::load_project(&dir.join("scene.agscene"), &Registry::new()).expect("cpu load")
@@ -346,6 +355,16 @@ fn v02_g03_hierarchy_world_parent_and_hidden() {
         .0;
     assert_ne!(cap_base, cap_hidden, "B03-05 hidden capture differs");
     hh.stop_play();
+    let (mut hp, _) = start_with(G03_PARENT_SCENE, None, G02_GLB, "g03-parent-run");
+    settle(&mut hp);
+    let cap_parent = hp
+        .rt
+        .capture(hp.top, "g03-parent")
+        .expect("capture parent")
+        .0;
+    assert_ne!(cap_base, cap_parent, "B03-02 moved-root capture differs");
+    assert_ne!(cap_hidden, cap_parent, "hidden vs moved renders differ");
+    hp.stop_play();
 
     // B03-06: a real run (pure-scene play) leaves the document unchanged and
     // Stop restores; the run frame carries the derived world positions.
@@ -495,6 +514,24 @@ fn v04_twin_cpu_lifecycle_counts() {
     assert_eq!(int(&mut fresh, "get_Main_left_ticks"), 0, "fresh rebuild");
     assert_eq!(int(&mut fresh, "get_r_lo"), 1, "fresh Start replay");
     fresh.close();
+
+    // 错误绑定负控（V-03）：投递路径必须承重——把生成源的投递实参从
+    // puck_p0[i]（每实例自己的初值）换成常量 9.0 后，两个实例都计进 hi
+    // （lo=0/hi=2），运行本身仍绿：接收计数来自真实投递，不是常量回声。
+    let mutant_world = TWIN_WORLD.replace("main_pinged(puck_p0[i])", "main_pinged(9.0)");
+    assert!(mutant_world != TWIN_WORLD, "mutation anchor present");
+    let mut bad = probe_session_src(TWIN_SCENE, &mutant_world, "twin-mut.at", 9);
+    assert_eq!(
+        int(&mut bad, "get_r_lo"),
+        0,
+        "mutated payload never lands in lo"
+    );
+    assert_eq!(
+        int(&mut bad, "get_r_hi"),
+        2,
+        "mutated payload lands in hi twice"
+    );
+    bad.close();
 }
 
 // ------------------------------------------------------------------ V-06 --

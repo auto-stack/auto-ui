@@ -1,0 +1,21 @@
+// PLAN-024 same-name-helpers fixture (module B): bump adds 2.0 per tick —
+// the same fn name must pool as helperb_bump and resolve in module scope.
+fn bump(v float) float {
+    return v + 2.0
+}
+
+node Beta(rate: float) {
+    model {
+        var acc = 0.0
+    }
+    view-3d {
+        cylinder3d leaf {
+            position: (0.0, .acc, 0.0)
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            .acc = bump(.acc + .rate * dt)
+        }
+    }
+}

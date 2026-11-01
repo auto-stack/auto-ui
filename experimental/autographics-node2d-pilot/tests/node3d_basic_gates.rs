@@ -43,6 +43,9 @@ const NUP_MAIN: &str = include_str!("../fixtures/node3d/neg-unknown-prop/main.at
 const NMU_MAIN: &str = include_str!("../fixtures/node3d/neg-missing-use/main.at");
 const NMM_MAIN: &str = include_str!("../fixtures/node3d/neg-msg-model/main.at");
 const NMARK_MAIN: &str = include_str!("../fixtures/node3d/neg-marker/main.at");
+const HELP_MAIN: &str = include_str!("../fixtures/node3d/helpers3d/main.at");
+const HELP_A: &str = include_str!("../fixtures/node3d/helpers3d/helpera.at");
+const HELP_B: &str = include_str!("../fixtures/node3d/helpers3d/helperb.at");
 const G02_GLB: &[u8] = include_bytes!("../fixtures/node3d/g02/assets/two-parts.glb");
 
 fn write_dir(dir: &path::Path, files: &[(&str, &str)], with_glb: bool) {
@@ -339,6 +342,50 @@ fn negatives_are_named_rejections() {
         &[("main", NMARK_MAIN)],
         false,
         "view domain marker must be view-",
+    );
+}
+
+#[test]
+fn same_name_helpers_across_modules_pool_prefixed_and_resolve_per_module() {
+    let files: &[(&str, &str)] = &[
+        ("main", HELP_MAIN),
+        ("helpera", HELP_A),
+        ("helperb", HELP_B),
+    ];
+    let a = case(files, false).expect("same-name helpers lower");
+    let b = case(files, false).expect("same-name helpers lower again");
+    let wa = a.user_source.as_ref().expect("world");
+    let wb = b.user_source.as_ref().expect("world");
+    assert_eq!(wa, wb, "helpers chain regeneration byte-identical");
+    // 两模块同名 fn 池化为模块前缀 fn（module A/B 各自解析各自的）。
+    assert!(
+        wa.contains("// pooled fn bump from helpera"),
+        "module A pooled"
+    );
+    assert!(
+        wa.contains("// pooled fn bump from helperb"),
+        "module B pooled"
+    );
+    assert!(wa.contains("fn helpera_bump(v float)"), "module A prefix");
+    assert!(wa.contains("fn helperb_bump(v float)"), "module B prefix");
+    // 调用点按所在模块解析：Alpha 用 helpera_bump，Beta 用 helperb_bump。
+    let tick_a = wa
+        .split("fn alpha_lifetick")
+        .nth(1)
+        .and_then(|t| t.split("}").next())
+        .expect("alpha lifetick body");
+    assert!(
+        tick_a.contains("helpera_bump(") && !tick_a.contains("helperb_bump("),
+        "alpha resolves module A helper: {tick_a}"
+    );
+    let tick_b = wa
+        .split("fn beta_lifetick")
+        .nth(1)
+        .and_then(|t| t.split("}").next())
+        .expect("beta lifetick body");
+    assert!(
+        tick_b.contains("helperb_bump(") && !tick_b.contains("helpera_bump("),
+        "beta resolves module B helper: {tick_b}"
     );
 }
 

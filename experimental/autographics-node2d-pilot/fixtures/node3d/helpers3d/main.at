@@ -1,0 +1,18 @@
+// PLAN-024 same-name-helpers chain: two modules each define bump(v) with
+// different bodies; both pool as <module>_bump and resolve per module scope.
+use helpera: Alpha
+use helperb: Beta
+
+node Main {
+    view-3d {
+        group3d arena {
+            position: (0.0, 0.0, 0.0)
+            Alpha a {
+                rate: 0.0
+            }
+            Beta b {
+                rate: 0.0
+            }
+        }
+    }
+}

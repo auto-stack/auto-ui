@@ -55,7 +55,7 @@ ORIGIN_GLB = {
 }
 ORIGIN_LICENSE = {
     "two-parts.LICENSE":
-        "88d8dd7fd0eb0b0c70d0d4c6011a3b661e96f8d33f8f3ff76ebdbf5a98f8ee75"
+        "fbcc886ee064764eba8b5b3d2b69fea01e623046bc5929e56e227d4b4a6d73fa"
 }
 
 
@@ -293,9 +293,12 @@ def control_provenance(results):
         results["glb/two-parts"] = f"{size} bytes, sha {name[:12]}"
     lic = os.path.join(FIXTURES, "licenses", "two-parts.LICENSE")
     assert os.path.isfile(lic), "license file missing: two-parts.LICENSE"
+    got = sha256_file(lic)
+    expect = ORIGIN_LICENSE["two-parts.LICENSE"]
+    assert got == expect, f"license file drifted: {got} != {expect}"
     head = open(lic, "r", encoding="utf-8").read().splitlines()
     assert any("license: MIT" in l for l in head), "GLB license must be recorded (MIT)"
-    results["license/two-parts"] = "MIT origin recorded"
+    results["license/two-parts"] = expect
 
     # provenance 消费面：identity.consumer 指向真实 include_str! 消费文件。
     consumer = "experimental/autographics-auto-driver/tests/node3d_basic_flow.rs"
