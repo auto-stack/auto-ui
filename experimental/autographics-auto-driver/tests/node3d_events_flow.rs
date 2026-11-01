@@ -412,6 +412,13 @@ fn g11_3d_oracles_on_the_typed_authoring_chain() {
                 && refs.len() == 3,
             "enters={enters:?}"
         );
+        // V-S03 补充（§6 另列）：despawn 撤销资格——被收集碎片不再产生
+        // stay/exit（销毁发生在 enter 后同一回调，资格随即消失）。
+        let shard_exits = all_events
+            .iter()
+            .filter(|e| e.pair < 3 && (e.phase == 2 || e.phase == 3))
+            .count();
+        assert_eq!(shard_exits, 0, "despawned shards must not emit stay/exit");
 
         // ---- windowless GPU capture of the won state (9) ----
         let (w, ht, png) = snap_png(&mut h, "g11-3d-events-won");
@@ -806,6 +813,48 @@ fn typed_budget_faults_are_named_on_the_new_chain() {
         // 该 fault 在 Start 回调内触发（回调失败即记录），无需再 step。
         let err = play_error(&h);
         assert!(err.contains("code=41"), "tick0 request must fault 41, got '{err}'");
+    });
+}
+
+#[test]
+fn hidden_instance_still_triggers_and_collects() {
+    big_stack(|| {
+        // V-S03 补充（§6 另列）：隐藏仍触发——Start 隐藏 Beacon（可见性写
+        // 不撤销触发资格），三收集 + 目标进入照常胜。
+        let mutated = MAIN_WORLD.replace(
+            " character_h4[i] = ag_object_spawn(4, 7, 16.0, 1.0, (-3.0))
+",
+            " character_h4[i] = ag_object_spawn(4, 7, 16.0, 1.0, (-3.0))
+ ag_object_visible(character_h4[i], 0)
+",
+        );
+        assert_ne!(mutated, MAIN_WORLD, "hide mutation must apply");
+        let dir = write_project(MAIN_SCENE, MAIN_WORLD, "hidden-run");
+        let (doc, registry, code, _) =
+            Storage::load_project(&dir.join("scene.agscene"), &Registry::new()).expect("doc");
+        let snapshot = SourceSnapshot::from_bytes_for(
+            Path::new("hidden-beacon.at"),
+            mutated.as_bytes().to_vec(),
+            autographics_auto_driver::authoring::behavior::Api::Triggers3V1,
+        )
+        .expect("admission");
+        let mut h = Host::with_project(doc, registry, code).expect("host");
+        h.start_user_snapshot(snapshot).expect("start");
+        h.pause_play("");
+        settle(&mut h);
+        let mut won = false;
+        for i in 0..WALK_BUDGET {
+            step(&mut h, 2, 0).unwrap_or_else(|e| panic!("hidden walk step {i}: {e}"));
+            let evs = events(&h);
+            if play_error(&h).is_empty()
+                && live(&h) == 3
+                && evs.iter().any(|e| e.pair == 4 && e.phase == 1)
+            {
+                won = true;
+                break;
+            }
+        }
+        assert!(won, "hidden beacon must still trigger (visible write keeps eligibility)");
     });
 }
 
