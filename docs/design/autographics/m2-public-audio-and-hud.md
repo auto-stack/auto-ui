@@ -1,16 +1,16 @@
 # AG M2公共声音与HUD（规划v1，2026-10-30）
 
-本设计定义拟新增公共服务的有限支持与接线边界。当前只有旧Breakout/Squash专用声音、字体与记分；没有本设计公开API/资源格式/验收已可用的声明。新Plans全为drafting，本轮不实施。旧canonical知识仍在auto-lang，新增实现与Plans归auto-ui；Gallery内容/Plans归ag-examples。
+本设计保留2026-10-30原公共服务规划的有限支持与接线边界；下文参数须按实际交付Spec读取，不把历史“拟新增/未实现”当当前状态。2026-11-01核验012音频78632af、013 HUD8b1e799、AG005音频内容5996d8f均已实际交付。Node作者入口尚缺声音/HUD接线，新路线为[UI023→AG006 r2](node-audio-hud-and-gallery-followups.md)，仅规划暂不实施；旧底层预算/素材/图声分母保留。实现/引擎计划归auto-ui，内容/计划归ag-examples。
 
 ## 1. 分仓与依赖
 
 | 引擎/内容合同 | 本期结果 | 硬前置 |
 |---|---|---|
 | [auto-ui/012 公共声音](../../plans/archived/012-autographics-public-audio-and-accepted-cues.md) | 有界音频资源/cue、真实Auto请求、接受后一次播放、生命周期与消费 | 006实际delivery |
-| [auto-ui/013 公共HUD](../../plans/013-autographics-public-hud-and-presentation-state.md) | 有限GPU文本HUD、Auto状态、画面/声音/HUD共同接受 | 012实际delivery |
-| [ag-examples/004 G10b](../../../../ag-examples/docs/plans/004-autographics-gallery-node-animation-and-facing.md) | 原character四clip/朝向、G10双入口和单项包 | 006实际delivery、内容003实际交付 |
-| [ag-examples/005 G12a](../../../../ag-examples/docs/plans/005-autographics-gallery-audio-actions.md) | 动作/有限cue声音示例与声音单项包 | 012实际delivery、内容004实际交付（共享目录串行） |
-| [ag-examples/006 G12b](../../../../ag-examples/docs/plans/006-autographics-gallery-event-hud.md) | 0..3/Playing/Won/Failed、事件音效与HUD、完整G12包 | 013实际delivery、内容005实际交付 |
+| [auto-ui/013 公共HUD](../../plans/archived/013-autographics-public-hud-and-presentation-state.md) | 有限GPU文本HUD、Auto状态、画面/声音/HUD共同接受 | 012实际delivery |
+| [ag-examples/004 G10b](../../../../ag-examples/docs/plans/archived/004-autographics-gallery-node-animation-and-facing.md) | 原character四clip/朝向、G10双入口和单项包 | 006实际delivery、内容003实际交付 |
+| [ag-examples/005 G12a](../../../../ag-examples/docs/plans/archived/005-autographics-gallery-audio-actions.md) | 动作/有限cue声音示例与声音单项包 | 012实际delivery、内容004实际交付（共享目录串行） |
+| [ag-examples/006 G12b](../../../../ag-examples/docs/plans/006-autographics-gallery-event-hud.md) | r2新Node作者形式：原三币/HUD义务＋旧audio一并迁移/原八项、完整G12包 | 新UI023实际delivery（其依赖020与已交付013）；内容005/008已交付 |
 
 引擎006→012→013共享资产/assembly/Frame/prepare协议，实施串行；Gallery004可与引擎012并行，Gallery005可与013并行，各自只消费已交付pin。Gallery共享catalog/gallery.py/package变更按004→005→006落地，素材/合同准备可独立，运行验收不追开发tip。011仍固定004＋008，不自动借006聚合输入或后继服务改写其研究结论；完整游戏整链在新能力交付后另约。
 

@@ -21,10 +21,11 @@
 | 017 | [完整G11/2d Node作者能力](archived/017-autographics-g11-2d-node-authoring.md) | 016后继/原G11二维兼容 | archived/r1；R1 needs_fix 4项→修复→同员R2 pass；交付9a8a5be（bf02061 rebase，range-diff全等），T-08门全绿；SD node2d-g11-authoring.md 沉淀本仓；清理回执见计划 |
 | 019 | [Node2D场景层级与走跳相机](archived/019-autographics-node2d-scenes-character-camera.md) | Gallery新作者形式首波引擎 | archived/r1，10/10；交付c93adb7，独立R2通过/冻结门/两Spec与清理收据齐；AG008已合并8a01a34并固定消费019，Gallery迁移6/21 |
 | 020 | [有状态Node组件与局部事件](020-autographics-stateful-node-components.md) | AG局部性共同基础 | drafting/r1，0/10；019已交付，补子model/msg/on、实例/绑定/Life/父事件；不接管AG008 |
-| 021 | [Node二维segment/sweep查询](021-autographics-node2d-queries.md) | W2a/G05-2d引擎 | drafting/r1，0/10；硬等020实际交付；保旧结果寿命/数值/原额/G05义务；Gallery后继另立 |
-| 022 | [Node精灵资源与帧动画](022-autographics-node2d-sprites-and-frame-animation.md) | W2b/G09双入口引擎 | drafting/r1，0/10；硬等020实际交付；保局部状态/两PNG/原18项/预算；不依赖021功能 |
+| 021 | [Node二维segment/sweep查询](021-autographics-node2d-queries.md) | W2a/G05-2d引擎 | drafting/r1，0/10；硬等020实际交付；保旧结果寿命/数值/原额/G05义务；内容[AG009](../../../ag-examples/docs/plans/009-autographics-gallery-node2d-queries.md)已规划并硬等本计划实际交付 |
+| 022 | [Node精灵资源与帧动画](022-autographics-node2d-sprites-and-frame-animation.md) | W2b/G09双入口引擎 | drafting/r1，0/10；硬等020实际交付；保局部状态/两PNG/原18项/预算；不依赖021功能；内容[AG010](../../../ag-examples/docs/plans/010-autographics-gallery-node2d-sprites-and-frame-animation.md)已规划并硬等本计划实际交付 |
+| 023 | [Node二维声音与公共HUD](023-autographics-node2d-audio-and-hud.md) | AG006 r2作者能力前置 | drafting/r1，0/10；硬等020，复用已交付013/012；补typed声音/font/HUD槽/ASCII/一次Auto收口，不硬等021/022 |
 
-下一份本地新计划为023，以独占取号时`.next-id`与本地活动/归档最大号重核；不能因外仓号882/883跳号。003是Blog路线，004..006是AG表现路线，状态以各自交付收据为准；011预算研究已交付，完整游戏仍未证实。设计与并行/后继入口见[本仓设计](../design/autographics/m2-presentation-and-resources.md)。
+本轮AG前置已分配023，当前号源024；下一份本地新计划为024，以独占取号时`.next-id`与本地活动/归档最大号重核；不能因外仓号882/883跳号。003是Blog路线，004..006是AG表现路线，状态以各自交付收据为准；011预算研究已交付，完整游戏仍未证实。设计与并行/后继入口见[本仓设计](../design/autographics/m2-presentation-and-resources.md)。
 
 ## 债务/候选
 

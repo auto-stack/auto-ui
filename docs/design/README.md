@@ -9,4 +9,5 @@ AG实验代码与实现计划已归本仓；旧canonical Specs与历史设计继
 | [Gallery全量Node作者迁移](autographics/gallery-node-authoring-migration.md) | 6/21入口已迁（涉及5个逻辑项），剩余15；AG007/008均已合并，008交付8a01a34并固定019；后继按能力分波，不预取编号 |
 | [Node局部组件、二维查询与精灵](autographics/node-components-queries-and-sprites.md) | 2026-11-01规划v1；020补子model/msg/on→021查询/022精灵；AG008已合并并固定019，与下一波能力合同独立 |
 | [AG M2表现与资源](autographics/m2-presentation-and-resources.md) | 规划v1；本仓004/005/006串行，Gallery内容另仓，均未实施 |
-| [AG公共声音与HUD](autographics/m2-public-audio-and-hud.md) | 012公共音频已交付；013/HUD与Gallery005/006后继独立 |
+| [AG公共声音与HUD](autographics/m2-public-audio-and-hud.md) | 012/013底层与AG005已交付；新作者前置023→AG006 r2，旧预算/素材/图声分母保持 |
+| [Node声音/HUD与下一轮Gallery](autographics/node-audio-hud-and-gallery-followups.md) | 仅规划；UI023→AG006 r2，UI021→AG009、UI022→AG010；当前迁移仍6/21 |

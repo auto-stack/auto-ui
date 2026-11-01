@@ -10,7 +10,7 @@
 | [021 二维查询](../../plans/021-autographics-node2d-queries.md) | G05/2d所需segment/sweep、具名节点引用和有寿命的typed结果、标记呈现、原数值/费用 | 020 |
 | [022 精灵与帧动画](../../plans/022-autographics-node2d-sprites-and-frame-animation.md) | G09 atlas/character所需PNG/帧资源、frame/flip绑定、局部角色/动画状态与同tick呈现 | 020 |
 
-三份均在auto-ui管理，状态以各自合同为准。AG-008已完成并合并8a01a34，归档/清理见[最终收据](../../../../ag-examples/docs/plans/archived/008-autographics-gallery-node2d-first-wave.md)；仍固定消费019，不追加020/021/022前置，也不追其开发tip。后续Gallery迁移另在ag-examples立合同，不提前给未交付内容取号。
+三份均在auto-ui管理，状态以各自合同为准。AG-008已完成并合并8a01a34，归档/清理见[最终收据](../../../../ag-examples/docs/plans/archived/008-autographics-gallery-node2d-first-wave.md)；仍固定消费019，不追加020/021/022前置，也不追其开发tip。2026-11-01已按用户后续授权建立[AG009查询](../../../../ag-examples/docs/plans/009-autographics-gallery-node2d-queries.md)与[AG010精灵双入口](../../../../ag-examples/docs/plans/010-autographics-gallery-node2d-sprites-and-frame-animation.md)，分别硬等021/022实际交付；另[UI023→AG006 r2](node-audio-hud-and-gallery-followups.md)补声音/HUD Node接线，023只依赖020与已交付013，不追加020范围。均为规划，当前迁移仍6/21。
 
 020先实际交付，021/022再以同一稳定组件合同实施。它们没有相互功能依赖，若各自新增lower/service模块且共享接线有owner短窗，可以并行；无法隔离共享文件则顺序落地。不能同树并发写，GPU/窗口/音频重型门仍机器单实例。与UI018构建配置的交集按实际diff核，不自动增设全量完成前置。
 

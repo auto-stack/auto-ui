@@ -22,7 +22,7 @@ auto-ui 017的g11-2d模式仍要求恰一个character2d，solid/camera限根，�
 | g03/3d | JSON，父子group | W3；同维层级与旧3D规则，不承诺跨维parent或通用TRS写入 |
 | g04/2d | JSON，编辑器教程 | W6；Node为场景来源，原视口/选取/拖动/保存/重开仍是编辑器验收 |
 | g04/3d | JSON，编辑器教程 | W6；原34步相关能力不改名为公共脚本API；OS自动化准入另受既有政策 |
-| g05/2d | 旧v3 Auto+场景，segment/sweep | W2a引擎021（依赖组件020）；typed射线/扫掠结果、命中次序/法线/空间/源变体；不能只迁静态画面 |
+| g05/2d | 旧v3 Auto+场景，segment/sweep | W2a引擎021→[AG009](../../../../ag-examples/docs/plans/009-autographics-gallery-node2d-queries.md)（依赖组件020，均待实际交付）；typed射线/扫掠结果、命中次序/法线/空间/源变体；不能只迁静态画面 |
 | g05/3d | 旧v3 Auto+场景，segment/sweep | W4a；同上三维与parent空间，需先有3D基础 |
 | g06/layout-a | Node源码，AG008/019；台阶/跳跃 | W1已交付；输入沿、重力/支撑/碰撞、速度4→5对照、布局A原几何 |
 | g06/layout-b | Node源码，AG008/019；坑道/跳跃 | W1已交付；同输入与A产生原几何差异，保无双跳/无缓冲跳与Stop恢复 |
@@ -30,14 +30,14 @@ auto-ui 017的g11-2d模式仍要求恰一个character2d，solid/camera限根，�
 | g07/layout-b | character3d Auto，另一布局 | W3；第二布局与全部原源变体/验收 |
 | g08/2d | Node源码，AG008/019；跟随/夹界/letterbox | W1已交付；主alt相机配置、同tick角色与相机、实际条带和Pause |
 | g08/3d | camera3d Auto，环绕/缩放/相对运动 | W3；orbit/zoom、pointer清理、实际投影/运动，不仅生成静态相机 |
-| g09/atlas | sprites2d Auto+PNG atlas | W2b引擎022（依赖组件020）；资源symbol/导入、帧选择、UV、alpha、许可/变体/离线包 |
-| g09/character | sprites2d Auto，角色状态驱动帧 | W2b引擎022；真实走跳/状态与像素相符，保全部9项原oracle |
+| g09/atlas | sprites2d Auto+PNG atlas | W2b引擎022→[AG010](../../../../ag-examples/docs/plans/010-autographics-gallery-node2d-sprites-and-frame-animation.md)（依赖组件020，均待实际交付）；资源symbol/导入、帧选择、UV、alpha、许可/变体/离线包 |
+| g09/character | sprites2d Auto，角色状态驱动帧 | W2b引擎022→AG010（仅规划）；真实走跳/状态与像素相符，保全部9项原oracle |
 | g10/textures | v1 Auto+GLB/PNG/UV | W4b；原件与UV夹具、遮挡/显隐/许可与完整资产闭包 |
 | g10/animation | animation3d Auto+clip/visual pose | W4b；原四clip、yaw/phase、颜色/阴影/物理隔离，不把动画公式放Rust |
 | g11/2d | Node源码，AG007/017 | 已交付；保51原项+新增负控，后续共同端口修改选真实受影响回归 |
 | g11/3d | triggers3d旧Auto | W3；三收集/危险/终点/越界/重开与原25项，不因旧runner丢失删检查 |
-| g12/audio | audio2d Auto+bank | W5；真实Auto ordinal、一次cue/PCM/原额度/许可/离线资源，不静默降成日志 |
-| g12/hud（未交付） | 既有AG006草案，尚不在21入口内 | W5后继接入；开工前明确修订AG006以消费新作者能力，保字形/PCM/共同接受原AC，不能另建重复HUD内容合同 |
+| g12/audio | audio2d Auto+bank | W5引擎023→AG006 r2（仅规划）；同项迁Node，保原两币玩法/八旧oracle/ordinal/PCM/原素材，不静默降成日志 |
+| g12/hud（未交付） | AG006已修订r2，尚不在21入口内 | W5引擎023→[AG006 r2](../../../../ag-examples/docs/plans/006-autographics-gallery-event-hud.md)；等实际Node声音/HUD交付，保原三币/字形/PCM/共同接受/包义务，净新增一个入口 |
 
 W1五入口已完成新作者形式迁移，加AG007已迁移的g11/2d共6/21；待迁移W2a/W2b共3个、W3共6个、W4a/W4b共3个、W5当前1个、W6共2个，合计剩余15个，总分母仍为21。HUD未来新增入口另按其合同记账，不算“迁移净增”。各波仍可按实际成本拆成中等Plan，不预领后面全部编号。
 
@@ -47,6 +47,8 @@ W1五入口已完成新作者形式迁移，加AG007已迁移的g11/2d共6/21；
 - [ag-examples/008](../../../../ag-examples/docs/plans/archived/008-autographics-gallery-node2d-first-wave.md)：已完成并合并8a01a34（archived/r1，10/10，归档/清理见合同最终收据）；固定消费019实际交付，已迁G01、G03/2d、G06两布局、G08/2d。每个入口的旧行为/素材/变体/验收在计划中逐项承接；原3D和其它项不跟升。
 
 先引擎交付、再内容；下一波引擎可与上一波固定消费的内容并行，读端不追开发tip。查询、二维图片、三维资源和声音的端口应复用共同领域表示，但共享文件要约定owner短窗，GPU/窗口/音频重型门单实例。当前018、语言901与UI014的真实写面由开工核对，不凭标题加全量串行前置。
+
+2026-11-01后继仅规划：[声音/HUD与内容拆分](node-audio-hud-and-gallery-followups.md)补UI023→AG006 r2，并建立UI021→AG009、UI022→AG010；三内容计划均等实际引擎交付。当前完成数仍6/21，后继草案不计入；不重开AG008或接管020。
 
 ## 不变的交付要求
 
