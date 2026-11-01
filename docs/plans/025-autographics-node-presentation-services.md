@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-025
-status: drafting
+status: execution_done
 feature_name: AutoGraphics声音与HUD通用Node接线收口
 author: [Codex]
 created_at: 2026-11-01
 updated_at: 2026-11-01
 plan_revision: 1
-current_step: 0
+current_step: 6
 total_steps: 10
 depends_on: [auto-ui/PLAN-020, auto-ui/PLAN-023]
 supersedes_spec_components: []
@@ -150,12 +150,12 @@ work自查→同一权威树独立上下文final review→merge冻结门，不�
 
 | ID | owner_stage | 依赖 | 操作/产物与验证 | AC | 状态 |
 |---|---|---|---|---|---|
-| T-01 | work | 后续实施启动 | 核020/023/SDK/两图依赖与022/024/AG006 owner，建唯一ui-025树/冻结旧档 | AC-01 | [ ] |
-| T-02 | work | T-01 | 最多两接法无角色/作者G12连续运动/四请求先证，§9冻结组合/语法/计量/旧项映射 | AC-01..06 | [ ] |
-| T-03 | work | T-02 go | generic资源/slot/服务IR及必要显式装配，严格准入/诊断，V-01 | AC-02 | [ ] |
-| T-04 | work | T-03 | 作者handler/typed事件/有界请求与一次Auto收口、无角色/游戏实链，V-02/03 | AC-03 | [ ] |
-| T-05 | work | T-04 | 四/五请求/原预算/连续运动/提前终点、旧生命周期/native/资源与负控，V-03..05 | AC-03..05 | [ ] |
-| T-06 | work | T-05 | 非游戏/游戏来源A→B/SaveAs/修复/旧023兼容、SD与移交折Plan，V-06 | AC-01..06 | [ ] |
+| T-01 | work | 后续实施启动 | 核020/023/SDK/两图依赖与022/024/AG006 owner，建唯一ui-025树/冻结旧档 | AC-01 | [x] 2026-11-01：020(16ddfa0)/023(32d7a81) master祖先核PASS；SDK681文件prepare_sdk --from-snapshot PASS(pin 7b987ca8)；ui-025组detached只读：auto-lang b1a4871aa/auto-web ec9c4ba/auto-down 7c4d5cb；022/024 archived、AG006已交付(4784d0c)无owner冲突；树D:/autostack/.wt/ui-025/auto-ui、codex/plan-025-dev、base 98cbcd2；根lock按组兄弟manifest重绑(906后rebind) |
+| T-02 | work | T-01 | 最多两接法无角色/作者G12连续运动/四请求先证，§9冻结组合/语法/计量/旧项映射 | AC-01..06 | [x] 2026-11-01：GO三先证真实编译执行：A无角色notify(两同定义Node/typed事件/独立状态/无角色无相机无触发)真实CPU会话+PCM逐位exact；B作者G12等价game(全业务在作者handler/含未齐到终点/站立/重入/持续按/Jump-land分支)walk tick恰32、+1=fault10钉界；C四请求单bundle四行精确(1,0,1.0)(2,1,0.25)(3,2,0.5)(4,3,0.75)、第五请求fault51无部分接受。§9冻结=D-01..03闭合(接法1=bundle closeout服务/接法2=standalone emit比较后弃用；拼写/组合/计量全冻结) |
+| T-03 | work | T-02 go | generic资源/slot/服务IR及必要显式装配，严格准入/诊断，V-01 | AC-02 | [x] 2026-11-01：presentation2d块(dialect node2d/presentation.rs)+src/presentation语义(lower_presentation.rs)+sfx.play typed翻译+self.handle只读句柄+render2d.despawn作者销毁面+严格具名诊断18组(node_presentation_gates全绿,含改名不变性/无业务枚举扫描/保留名/区域规则) |
+| T-04 | work | T-03 | 作者handler/typed事件/有界请求与一次Auto收口、无角色/游戏实链，V-02/03 | AC-03 | [x] 2026-11-01：作者handler/typed事件转发(phase作payload)/有界请求/一次Auto收口: notify无角色链+A→B冷再生真实运行+PCM bank直读逐位exact(含cue gain乘积)、GPU字形host门(two_d=null真实capture ROI变化) |
+| T-05 | work | T-04 | 四/五请求/原预算/连续运动/提前终点、旧生命周期/native/资源与负控，V-03..05 | AC-03..05 | [x] 2026-11-01：四/五请求边界+原预算(32edge/fault10)+fresh Run ordinal隔离+standalone/bundle fault50+ordinal重放fault52+负控(swap/mixed);V-03全分支真实通过;pause/step/20-round沿023共享机制证据复用(同结构closeout,单元未改),native路径无新代码、ToDesk虚拟设备gap具名保留 |
+| T-06 | work | T-05 | 非游戏/游戏来源A→B/SaveAs/修复/旧023兼容、SD与移交折Plan，V-06 | AC-01..06 | [x] 2026-11-01：verify_plan025 --controls全绿: 三产品identity/closure/provenance/media绑定+closure-only冷再生字节等价+坏件拒绝/精确恢复+旧023消费者verify_plan023全绿;pilot旧档verify_plan016/020/021/022/024全绿(byte稳定);SD-01提案文档docs/specs/auto-graphics/node-presentation-services.md(merge门canonical化) |
 | T-07 | review | T-06 | 同树独立final核全部分支/八旧项/原义务与无业务硬编码，finding回work | AC-07 | [ ] |
 | T-08 | merge | T-07 pass | 冻结提交/依赖/媒体/输入，定向门或有据复用后合master | AC-08 | [ ] |
 | T-09 | merge | T-08 | 新Spec/来源/归档导航与证据摘要，不改AG006依赖/完成数或派生JSON | AC-08/09 | [ ] |
@@ -166,6 +166,8 @@ work自查→同一权威树独立上下文final review→merge冻结门，不�
 2026-11-01 / stage: new / plan_id: auto-ui/PLAN-025 / plan_revision: 1 / outcome: pass（规划合同可审阅，020/023实际前置已交付；有无角色组合/原额可行性须T-02先证） / next: 后续用户明确启动后T-01/T-02。本轮暂不实施，drafting0/10；未创建新源码/夹具/资源/树或运行构建/GPU/音频/agent，本记录不是新模式可行性go/独立终审。
 
 2026-11-01规划预检：两合同各0..10节、10任务（work6/review1/merge3）、9AC/6组V-S/1SD与drafting0/10一致；新增合同/共同设计19个本地链接可解析。独占取号后复扫活动/archived/archive编号唯一、下一026；依赖无环，两计划无相互功能依赖。024十一旧义务按verify_g02四require＋tamper_negative一项＋verify_g03六require静态枚举；025保G12a原八名与G12b H01..12，原预算/旧023字节不变。均为文档静态检查，不是新产品验证/可行性go或独立终审；未创建实施树/提案Spec/源码/素材、构建/GPU/音频/agent。
+
+2026-11-01 / stage: work | plan_id: auto-ui/PLAN-025 | plan_revision: r1 | outcome: pass | worktree_path: D:/autostack/.wt/ui-025/auto-ui | branch: codex/plan-025-dev | base_commit: 98cbcd2 | code_commit: f70b4a2 | dependency_revisions: auto-lang b1a4871aa / auto-web ec9c4ba / auto-down 7c4d5cb（ui-025组detached只读clean）、SDK .sdk-source 681文件（prepare_sdk --from-snapshot PASS；pin 7b987ca8）、根Cargo.lock按组兄弟manifest重绑（906后rebind，两AG图blob随兄弟manifest） | task_ids: T-01..T-06 | evidence: 见§8各任务行+t02探针scratch D:/autostack/plan-artifacts/plan-025/auto-ui/；门禁亲跑计数=pilot node_presentation_gates 18/18、driver node_presentation_flow 14/14（单线程，含真实GPU字形host门与PCM bank直读逐位exact）、verify_plan025 --controls全绿（三产品identity/closure/A→B冷再生字节等价/坏件恢复/旧023消费者verify_plan023全绿）、pilot旧档verify_plan016/020/021/022/024全绿（全部冻结产品byte稳定） | blockers: 无 | next_responsible_role: review（T-07同树独立final）。D-01闭合：接法1=bundle closeout服务（采纳；比较过的接法2=standalone ag_audio_emit因每请求计费且无法承载四槽原子呈现弃用，保留为公开逃生口、混用fault 50）；无角色=autographics.presentation2d/1（profile 26/version 115，hud2d派生去相机单元+去角色/相机freeze+去输入采样，派生字节、旧档装配不变）、有角色受检组合=autographics.hud2d/1原装配。D-02闭合：presentation2d块（audio/cue/hud slot owner+text_fn+text_field+visible/trigger typed行无业务载荷）、sfx.play("<cue>",<gain>)字符串typed映射、.handle只读句柄、render2d.despawn作者销毁面（本profile仅despawn）、保留名ord/np/o0..o3/c0..c3/g0..g2+sfx_play/pres_events/pres_closeout。D-03闭合：GO——实测walk tick恰32、+1 credit=fault 10钉界、事件tick经作者自有halt规则（跳过压感+双held读，作者Auto逻辑非引擎自动Idle）恰32、未齐到终点/站立/重入全clean。D-04闭合：022/024/AG006均archived/delivered无在途树；AG006已交付（4784d0c）不新增前置；根lock重绑已记录。D-05闭合（本阶段）：native路径零新代码（同一Mixer/native单元blob不变，023 native证据复用）、ToDesk虚拟设备声学gap具名保留；独立终审时段归review/merge。AC-01..06全关；AC-07（review）/AC-08/09（merge）pending未声称。
 
 ## 10. 待澄清事项
 
