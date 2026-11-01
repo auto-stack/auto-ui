@@ -17,6 +17,167 @@ fn usage() -> ! {
     std::process::exit(2);
 }
 
+
+/// PLAN-024/027 共享 components-3d 产品落盘（world.at/scene.agscene/assets/
+/// identity.json/closure；身份串与消费者由 profile 注入，024 字节不变）。
+#[allow(clippy::too_many_arguments)]
+fn write_components3d_products(
+    out: &str,
+    entry: &str,
+    project: &autographics_node2d_pilot::load::Project,
+    lowered: autographics_node2d_pilot::LowerOutputBasic2D,
+    generator: &str,
+    consumer_for: fn(&str) -> &'static str,
+) {
+            if let Some(src) = &lowered.user_source {
+                std::fs::write(format!("{out}/world.at"), src).expect("world.at");
+            }
+            std::fs::write(format!("{out}/scene.agscene"), &lowered.scene_json)
+                .expect("scene.agscene");
+            // GLB 资产字节（完整闭包：身份 = 原始字节；字节等值复制）。
+            std::fs::create_dir_all(format!("{out}/assets")).expect("assets dir");
+            let mut copied: Vec<(String, String)> = Vec::new();
+            for module in project.modules.values() {
+                for r in &module.resources {
+                    if let autographics_node2d_pilot::load::ResourceKind::Model3D {
+                        file,
+                        sha256,
+                        byte_length,
+                    } = &r.kind
+                    {
+                        let bytes = std::fs::read(
+                            std::path::Path::new(entry)
+                                .parent()
+                                .expect("entry parent")
+                                .join(file),
+                        )
+                        .unwrap_or_else(|e| panic!("read model {file}: {e}"));
+                        assert_eq!(bytes.len(), *byte_length, "model byte drift: {file}");
+                        assert_eq!(
+                            autographics_node2d_pilot::scene::sha256_hex(&bytes),
+                            *sha256,
+                            "model sha drift: {file}"
+                        );
+                        let dest = format!("{out}/assets/{sha256}.glb");
+                        std::fs::write(&dest, &bytes).expect("asset copy");
+                        copied.push((sha256.clone(), file.clone()));
+                    }
+                }
+            }
+            copied.sort();
+            copied.dedup();
+            let mut names: Vec<_> = project.modules.keys().collect();
+            names.sort();
+            let mut modules = String::new();
+            let mut closure = String::new();
+            for name in &names {
+                let bytes = project.modules[*name].source.as_bytes();
+                modules.push_str(&format!(
+                    "  \"module:{}\": \"{}\",\n",
+                    name,
+                    autographics_node2d_pilot::scene::sha256_hex(bytes)
+                ));
+                closure.push_str(&format!(
+                    "  {{\"name\": \"{name}\", \"sha256\": \"{}\", \"bytes\": {}}},\n",
+                    autographics_node2d_pilot::scene::sha256_hex(bytes),
+                    bytes.len()
+                ));
+            }
+            let mut identity = String::from("{\n");
+            identity.push_str(&format!(" \"generator\": \"{generator}\",
+"));
+            identity.push_str(" \"api\": \"autographics.behavior/1\",\n");
+            identity.push_str(&format!(
+                " \"user_source_sha256\": {},\n \"user_source_bytes\": {},\n",
+                match &lowered.user_source {
+                    Some(_) => format!("\"{}\"", lowered.source_sha256),
+                    None => "null".to_string(),
+                },
+                lowered.source_bytes
+            ));
+            identity.push_str(&modules);
+            identity.push_str(" \"closure\": [\n");
+            identity.push_str(closure.trim_end_matches(",\n"));
+            identity.push_str("\n ],\n");
+            identity.push_str(&format!(" \"roles\": {},\n", lowered.roles_json));
+            identity.push_str(" \"assets\": [\n");
+            let asset_rows = copied
+                .iter()
+                .map(|(sha, declared)| {
+                    format!(
+                        "   {{\"sha256\": \"{sha}\", \"file\": \"{sha}.glb\", \"declared\": \"{declared}\"}}"
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+            identity.push_str(&asset_rows);
+            identity.push_str("\n ],\n");
+            let product = std::path::Path::new(out)
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("unrecorded")
+                .to_string();
+            let consumer = consumer_for(&product);
+            identity.push_str(" \"provenance\": {\n");
+            identity.push_str(&format!("  \"product\": \"{product}\",\n"));
+            identity.push_str(&format!("  \"consumer\": \"{consumer}\",\n"));
+            identity.push_str(
+                "  \"consumption\": \"include_str! frozen scene.agscene + world.at + assets/<sha>.glb; the harness writes the project (scene + assets) under target and loads via Storage::load_project; variants feed scripts/<sha>.at where <sha> = scene.behavior.source.sha256\",\n",
+            );
+            identity.push_str(
+                "  \"load_verification\": \"the load path hash-verifies the behavior source and every assets/<sha>.glb against the scene manifest; GLB geometry admission runs in the driver preflight decoder before allocation\",\n",
+            );
+            identity.push_str(&format!(
+                "  \"world_sha256\": \"{}\"\n",
+                lowered.source_sha256
+            ));
+            identity.push_str(" }\n}\n");
+            std::fs::write(format!("{out}/identity.json"), identity).expect("identity.json");
+            let closure_dir = format!("{out}/closure");
+            std::fs::create_dir_all(&closure_dir).expect("closure dir");
+            for name in &names {
+                let bytes = project.modules[*name].source.as_bytes();
+                std::fs::write(format!("{closure_dir}/{name}.at"), bytes).expect("closure file");
+            }
+            let source_note = match &lowered.user_source {
+                Some(_) => " + world.at",
+                None => "",
+            };
+            println!(
+                "node2d-lower[components-3d]: wrote scene.agscene{source_note} + closure/{} + assets/{} (source sha {})",
+                names.len(),
+                copied.len(),
+                lowered.source_sha256
+            );
+}
+
+fn components3d_consumer(product: &str) -> &'static str {
+    match product {
+        "g02" | "g03" | "g03-parent" | "g03-hidden" | "twin" | "envelope8" | "rows129"
+        | "rows129-ok" | "fault-nine" | "budget-full" | "lifecycle" | "model-param" => {
+            "experimental/autographics-auto-driver/tests/node3d_basic_flow.rs"
+        }
+        "neg-bad-props" | "neg-wrong-dim" | "neg-cycle" | "neg-param-write" => {
+            "experimental/autographics-node2d-pilot/tests/node3d_basic_gates.rs (fixture-level; lowering rejection)"
+        }
+        _ => "unrecorded (this out dir has no registered flow consumer)",
+    }
+}
+
+fn components3d_runtime_consumer(product: &str) -> &'static str {
+    match product {
+        "g07a" | "g07a-fast" | "g07b" | "g08" | "g08-alt" | "static-actors" | "wide128" => {
+            "experimental/autographics-auto-driver/tests/node3d_runtime_flow.rs"
+        }
+        "neg-two-characters" | "neg-camera-without-character" | "neg-camera-non-root"
+        | "neg-solid-dynamic" | "neg-solid-on-character" | "neg-character-shape"
+        | "neg-character-dyn" | "neg-solid-builtin" | "neg-camera-domain" => {
+            "experimental/autographics-node2d-pilot/tests/node3d_runtime_gates.rs (fixture-level; lowering rejection)"
+        }
+        _ => "unrecorded (this out dir has no registered flow consumer)",
+    }
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let profile = match args.iter().find(|a| a.as_str() == "--profile") {
@@ -34,6 +195,7 @@ fn main() {
                 Some("sprites-2d") => Profile::Sprites2D,
                 Some("components-2d-game") => Profile::Components2DGame,
                 Some("components-3d") => Profile::Components3D,
+                Some("components-3d-runtime") => Profile::Components3DRuntime,
                 Some("presentation-2d") => Profile::Presentation2D,
                 _ => usage(),
             }
@@ -681,134 +843,28 @@ fn main() {
                     eprintln!("node2d-lower: {e}");
                     std::process::exit(3);
                 });
-            if let Some(src) = &lowered.user_source {
-                std::fs::write(format!("{out}/world.at"), src).expect("world.at");
-            }
-            std::fs::write(format!("{out}/scene.agscene"), &lowered.scene_json)
-                .expect("scene.agscene");
-            // GLB 资产字节（完整闭包：身份 = 原始字节；字节等值复制）。
-            std::fs::create_dir_all(format!("{out}/assets")).expect("assets dir");
-            let mut copied: Vec<(String, String)> = Vec::new();
-            for module in project.modules.values() {
-                for r in &module.resources {
-                    if let autographics_node2d_pilot::load::ResourceKind::Model3D {
-                        file,
-                        sha256,
-                        byte_length,
-                    } = &r.kind
-                    {
-                        let bytes = std::fs::read(
-                            std::path::Path::new(entry)
-                                .parent()
-                                .expect("entry parent")
-                                .join(file),
-                        )
-                        .unwrap_or_else(|e| panic!("read model {file}: {e}"));
-                        assert_eq!(bytes.len(), *byte_length, "model byte drift: {file}");
-                        assert_eq!(
-                            autographics_node2d_pilot::scene::sha256_hex(&bytes),
-                            *sha256,
-                            "model sha drift: {file}"
-                        );
-                        let dest = format!("{out}/assets/{sha256}.glb");
-                        std::fs::write(&dest, &bytes).expect("asset copy");
-                        copied.push((sha256.clone(), file.clone()));
-                    }
-                }
-            }
-            copied.sort();
-            copied.dedup();
-            let mut names: Vec<_> = project.modules.keys().collect();
-            names.sort();
-            let mut modules = String::new();
-            let mut closure = String::new();
-            for name in &names {
-                let bytes = project.modules[*name].source.as_bytes();
-                modules.push_str(&format!(
-                    "  \"module:{}\": \"{}\",\n",
-                    name,
-                    autographics_node2d_pilot::scene::sha256_hex(bytes)
-                ));
-                closure.push_str(&format!(
-                    "  {{\"name\": \"{name}\", \"sha256\": \"{}\", \"bytes\": {}}},\n",
-                    autographics_node2d_pilot::scene::sha256_hex(bytes),
-                    bytes.len()
-                ));
-            }
-            let mut identity = String::from("{\n");
-            identity
-                .push_str(" \"generator\": \"autographics-node2d-pilot plan024 components-3d\",\n");
-            identity.push_str(" \"api\": \"autographics.behavior/1\",\n");
-            identity.push_str(&format!(
-                " \"user_source_sha256\": {},\n \"user_source_bytes\": {},\n",
-                match &lowered.user_source {
-                    Some(_) => format!("\"{}\"", lowered.source_sha256),
-                    None => "null".to_string(),
-                },
-                lowered.source_bytes
-            ));
-            identity.push_str(&modules);
-            identity.push_str(" \"closure\": [\n");
-            identity.push_str(closure.trim_end_matches(",\n"));
-            identity.push_str("\n ],\n");
-            identity.push_str(&format!(" \"roles\": {},\n", lowered.roles_json));
-            identity.push_str(" \"assets\": [\n");
-            let asset_rows = copied
-                .iter()
-                .map(|(sha, declared)| {
-                    format!(
-                        "   {{\"sha256\": \"{sha}\", \"file\": \"{sha}.glb\", \"declared\": \"{declared}\"}}"
-                    )
-                })
-                .collect::<Vec<_>>()
-                .join("\n");
-            identity.push_str(&asset_rows);
-            identity.push_str("\n ],\n");
-            let product = std::path::Path::new(out)
-                .file_name()
-                .and_then(|s| s.to_str())
-                .unwrap_or("unrecorded")
-                .to_string();
-            let consumer = match product.as_str() {
-                "g02" | "g03" | "g03-parent" | "g03-hidden" | "twin" | "envelope8" | "rows129"
-                | "rows129-ok" | "fault-nine" | "budget-full" | "lifecycle" | "model-param" => {
-                    "experimental/autographics-auto-driver/tests/node3d_basic_flow.rs"
-                }
-                "neg-bad-props" | "neg-wrong-dim" | "neg-cycle" | "neg-param-write" => {
-                    "experimental/autographics-node2d-pilot/tests/node3d_basic_gates.rs (fixture-level; lowering rejection)"
-                }
-                _ => "unrecorded (this out dir has no registered flow consumer)",
-            };
-            identity.push_str(" \"provenance\": {\n");
-            identity.push_str(&format!("  \"product\": \"{product}\",\n"));
-            identity.push_str(&format!("  \"consumer\": \"{consumer}\",\n"));
-            identity.push_str(
-                "  \"consumption\": \"include_str! frozen scene.agscene + world.at + assets/<sha>.glb; the harness writes the project (scene + assets) under target and loads via Storage::load_project; variants feed scripts/<sha>.at where <sha> = scene.behavior.source.sha256\",\n",
+            write_components3d_products(
+                &out,
+                &entry,
+                &project,
+                lowered,
+                "autographics-node2d-pilot plan024 components-3d",
+                components3d_consumer,
             );
-            identity.push_str(
-                "  \"load_verification\": \"the load path hash-verifies the behavior source and every assets/<sha>.glb against the scene manifest; GLB geometry admission runs in the driver preflight decoder before allocation\",\n",
-            );
-            identity.push_str(&format!(
-                "  \"world_sha256\": \"{}\"\n",
-                lowered.source_sha256
-            ));
-            identity.push_str(" }\n}\n");
-            std::fs::write(format!("{out}/identity.json"), identity).expect("identity.json");
-            let closure_dir = format!("{out}/closure");
-            std::fs::create_dir_all(&closure_dir).expect("closure dir");
-            for name in &names {
-                let bytes = project.modules[*name].source.as_bytes();
-                std::fs::write(format!("{closure_dir}/{name}.at"), bytes).expect("closure file");
-            }
-            let source_note = match &lowered.user_source {
-                Some(_) => " + world.at",
-                None => "",
-            };
-            println!(
-                "node2d-lower[components-3d]: wrote scene.agscene{source_note} + closure/{} + assets/{} (source sha {})",
-                names.len(),
-                copied.len(),
-                lowered.source_sha256
+        }
+        Profile::Components3DRuntime => {
+            let lowered = autographics_node2d_pilot::lower_project_components3d_runtime(&project)
+                .unwrap_or_else(|e| {
+                    eprintln!("node2d-lower: {e}");
+                    std::process::exit(3);
+                });
+            write_components3d_products(
+                &out,
+                &entry,
+                &project,
+                lowered,
+                "autographics-node2d-pilot plan027 components-3d-runtime",
+                components3d_runtime_consumer,
             );
         }
         Profile::Basic2D(basic) => {

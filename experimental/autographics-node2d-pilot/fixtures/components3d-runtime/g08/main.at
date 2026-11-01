@@ -1,0 +1,36 @@
+// PLAN-027 components-3d-runtime G08 3d: runtime orbit camera bound to the
+// Run character (distance 8, pitch 45, perspective) with the original
+// landmark scene (ids 1..5 = character/ground/wall/east/west). Camera-relative
+// motion keeps the original source order: mx/mz scaled by n first, basis
+// composed, then dx/dz scaled by n again.
+use character: Character
+
+node Main {
+    camera3d {
+        distance: 8.0
+        pitch: 45.0
+        projection: perspective
+    }
+    view-3d {
+        Character hero {
+        }
+        cylinder3d ground {
+            position: (0.0, -0.5, 0.0)
+            scale: (10.0, 0.5, 12.0)
+            solid: true
+        }
+        cylinder3d wall {
+            position: (6.0, 1.5, 0.0)
+            scale: (0.1, 1.5, 12.0)
+            solid: true
+        }
+        cylinder3d east {
+            position: (4.0, 1.0, -4.0)
+            scale: (0.5, 1.0, 0.5)
+        }
+        cylinder3d west {
+            position: (-4.0, 1.0, 4.0)
+            scale: (0.5, 1.0, 0.5)
+        }
+    }
+}

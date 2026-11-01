@@ -1,0 +1,166 @@
+{
+ "behavior": {
+  "api": "autographics.behavior/1",
+  "source": {
+   "format": "auto-source",
+   "sha256": "fc7ea37aa1e6b91f195f01fa15bda75efa6a07d2820067297142464c2f70f6a6",
+   "byte_length": 1134
+  },
+  "actors": {
+   "two_d": null,
+   "three_d": null
+  }
+ },
+ "schema": "autographics.scene/6",
+ "document_id": "plan027-components-3d-runtime-main",
+ "resources": [
+  "circle",
+  "quad",
+  "cylinder",
+  "player",
+  "mob"
+ ],
+ "groups": [
+
+ ],
+ "objects": [
+  {
+   "id": 1,
+   "name": "hero",
+   "kind": "player",
+   "translation": [
+    0.0,
+    0.5,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 2,
+   "name": "foe",
+   "kind": "mob",
+   "translation": [
+    2.5,
+    0.5,
+    -1.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 3,
+   "name": "ground",
+   "kind": "cylinder",
+   "translation": [
+    0.0,
+    -0.5,
+    0.0
+   ],
+   "scale": [
+    10.0,
+    0.5,
+    12.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 4,
+   "name": "Main/b0/dot",
+   "kind": "cylinder",
+   "translation": [
+    0.0,
+    1.5,
+    2.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 5,
+   "name": "Main/b1/dot",
+   "kind": "cylinder",
+   "translation": [
+    3.0,
+    1.5,
+    2.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  }
+ ],
+ "assets": [
+
+ ]
+}

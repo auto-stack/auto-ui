@@ -1,0 +1,25 @@
+// PLAN-027 components-3d-runtime two-moves: a second ag_char3_move inside
+// the same tick charges past the frozen 32-credit callback (4 held + 1
+// pressed + 26 move + 1 grounded = 32). The compiler maps declarations
+// verbatim; the trusted unit refuses the second move at Run time (V-S02).
+node Character() {
+    character3d {}
+    model {
+        var vy = 0.0
+        var grounded = 0
+    }
+    view-3d {
+        cylinder3d body {
+            position: (0.0, 0.5, 0.0)
+            scale: (0.4, 0.5, 0.4)
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            let q1 = refs.body.move3d(0.01, 0.0, 0.0)
+            .grounded = refs.body.grounded(q1)
+            let q2 = refs.body.move3d(0.01, 0.0, 0.0)
+            .grounded = refs.body.grounded(q2)
+        }
+    }
+}

@@ -1,0 +1,22 @@
+// PLAN-027 components-3d-runtime G07 layout-a speed-twin: platform scene (speed 5.0 for the 4->5 sensitivity oracle) (character +
+// ground + wall as static AABB solids; scene ids 1/2/3 mirror the original
+// G07 character3d layout-a document). No runtime camera: G07 keeps the fixed
+// basis and the author formula moves on mx/mz directly.
+use character: Character
+
+node Main {
+    view-3d {
+        Character hero {
+        }
+        cylinder3d ground {
+            position: (0.0, -0.5, 0.0)
+            scale: (10.0, 0.5, 12.0)
+            solid: true
+        }
+        cylinder3d wall {
+            position: (6.0, 1.5, 0.0)
+            scale: (0.1, 1.5, 12.0)
+            solid: true
+        }
+    }
+}

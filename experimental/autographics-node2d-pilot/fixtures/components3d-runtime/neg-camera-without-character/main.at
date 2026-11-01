@@ -1,0 +1,15 @@
+// PLAN-027 neg: camera3d without a character3d instance (target would be
+// unresolved; the API faults 30 at Run time, the compiler names it here).
+node Main {
+    camera3d {
+        distance: 8.0
+        pitch: 45.0
+        projection: perspective
+    }
+    view-3d {
+        cylinder3d ground {
+            position: (0.0, -0.5, 0.0)
+            scale: (10.0, 0.5, 12.0)
+        }
+    }
+}

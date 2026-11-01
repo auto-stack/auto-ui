@@ -1544,7 +1544,9 @@ pub(crate) fn walk_expr_q(e: &Expr, line: usize, out: &mut WalkOut, queries: boo
                         "emit" => out
                             .anc_emits
                             .push((ev.to_string(), c.args.args.len(), cline)),
-                        "input" | "refs" | "self" | "query2d" => {}
+                        // PLAN-027：camera3d 读站点（runtime 档；translator
+                        // 降层为受信 ag_cam3_* 读 getter，非子投递）。
+                        "input" | "refs" | "self" | "query2d" | "camera3d" => {}
                         // PLAN-025：typed 声音请求站点（pres 档；translator
                         // 降层为生成收集器调用，非子投递）。
                         "sfx" => {}
@@ -3226,6 +3228,9 @@ pub(crate) fn collect_scene(
                         space3: None,
                         sfx: None,
                         handle_ref: None,
+                        six_actions: false,
+                        char3: None,
+                        cam3: false,
                     };
                     let pos = prop_of(props, "position").ok_or_else(|| {
                         at(
@@ -4572,6 +4577,9 @@ pub(crate) fn instance_ctx<'a>(
         } else {
             None
         },
+        six_actions: false,
+        char3: None,
+        cam3: false,
     })
 }
 
@@ -4662,6 +4670,9 @@ pub(crate) fn root_ctx<'a>(
         space3: None,
         sfx: sfx.map(|e| crate::translate::SfxEnv { cues: e.cues }),
         handle_ref: None,
+        six_actions: false,
+        char3: None,
+        cam3: false,
     }
 }
 

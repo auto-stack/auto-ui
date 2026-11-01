@@ -1,0 +1,13 @@
+use character: Character
+
+node Main {
+    view-3d {
+        Character hero {
+        }
+        cylinder3d ground {
+            position: (0.0, -0.5, 0.0)
+            scale: (10.0, 0.5, 12.0)
+            solid: true
+        }
+    }
+}

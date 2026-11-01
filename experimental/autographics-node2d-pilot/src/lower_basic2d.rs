@@ -1223,6 +1223,9 @@ fn gen_user_source(
         space3: None,
                         sfx: None,
                         handle_ref: None,
+                        six_actions: false,
+                        char3: None,
+                        cam3: false,
     };
 
     // ---- app_start：生成绑定（声明序）+ 作者 Life.Start ----

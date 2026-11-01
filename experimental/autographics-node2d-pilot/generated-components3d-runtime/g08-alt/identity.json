@@ -1,0 +1,31 @@
+{
+ "generator": "autographics-node2d-pilot plan027 components-3d-runtime",
+ "api": "autographics.behavior/1",
+ "user_source_sha256": "fc815f9cdd5a2da0f9310fa8d15778b5b2984575fa3c4039ce904318a449018a",
+ "user_source_bytes": 2232,
+  "module:character": "07015523e2517fe7a47b1c7a50a0a505aad198100eeeb8be66cf873ab7f077ef",
+  "module:main": "092af1a76a36fbb9131fe5ddee3e8d50a80e2b66409d60b7780dfe61a2772ede",
+ "closure": [
+  {"name": "character", "sha256": "07015523e2517fe7a47b1c7a50a0a505aad198100eeeb8be66cf873ab7f077ef", "bytes": 1845},
+  {"name": "main", "sha256": "092af1a76a36fbb9131fe5ddee3e8d50a80e2b66409d60b7780dfe61a2772ede", "bytes": 905}
+ ],
+ "roles": {
+ "scene_rows": {
+  "Main/hero/body": 4,
+  "east": 2,
+  "ground": 0,
+  "wall": 1,
+  "west": 3
+ }
+},
+ "assets": [
+
+ ],
+ "provenance": {
+  "product": "g08-alt",
+  "consumer": "experimental/autographics-auto-driver/tests/node3d_runtime_flow.rs",
+  "consumption": "include_str! frozen scene.agscene + world.at + assets/<sha>.glb; the harness writes the project (scene + assets) under target and loads via Storage::load_project; variants feed scripts/<sha>.at where <sha> = scene.behavior.source.sha256",
+  "load_verification": "the load path hash-verifies the behavior source and every assets/<sha>.glb against the scene manifest; GLB geometry admission runs in the driver preflight decoder before allocation",
+  "world_sha256": "fc815f9cdd5a2da0f9310fa8d15778b5b2984575fa3c4039ce904318a449018a"
+ }
+}

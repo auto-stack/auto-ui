@@ -1,0 +1,53 @@
+// PLAN-027 components-3d-runtime G07 character definition: the author owns
+// the full controller formula (jp/grounded -> gravity -> four held -> mx/mz
+// -> diagonal normalize -> move3d -> grounded clears vy); the compiler only
+// maps the declared character3d binding, the six-action input table and the
+// refs.body character service. Layout-a physics constants: speed 4.
+node Character() {
+    character3d {}
+    model {
+        var speed = 4.0
+        var jump = 8.0
+        var gravity = 20.0
+        var vy = 0.0
+        var grounded = 0
+    }
+    view-3d {
+        cylinder3d body {
+            position: (0.0, 0.5, 0.0)
+            scale: (0.4, 0.5, 0.4)
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            let jp = input.pressed(Jump)
+            if jp == 1 {
+                if .grounded == 1 {
+                    .vy = .jump
+                }
+            }
+            .vy = .vy - .gravity * dt
+            let hr = input.held(Right)
+            let hl = input.held(Left)
+            let hf = input.held(Forward)
+            let hb = input.held(Back)
+            var mx = hr - hl
+            var mz = hb - hf
+            var n = 1.0
+            if mx != 0 {
+                if mz != 0 {
+                    n = 0.70710678
+                }
+            }
+            mx = mx * n
+            mz = mz * n
+            let dx = mx * .speed * dt
+            let dz = mz * .speed * dt
+            let q = refs.body.move3d(dx, .vy * dt, dz)
+            .grounded = refs.body.grounded(q)
+            if .grounded == 1 {
+                .vy = 0.0
+            }
+        }
+    }
+}

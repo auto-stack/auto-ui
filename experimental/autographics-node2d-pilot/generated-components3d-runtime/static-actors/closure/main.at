@@ -1,0 +1,19 @@
+// PLAN-027 components3d-runtime static-actors: named built-in visuals
+// (player3d/mob3d -> original Kind::Player/Mob meshes via the driver warm
+// upload; Kind is not character identity) in a pure static scene with NO
+// character/camera/user VM (behavior null). No stateful node, no msg, no on:
+// the scene alone must be consumable (V-S05/AC-03 static capability).
+node Main {
+    view-3d {
+        player3d hero {
+            position: (0.0, 0.5, 0.0)
+        }
+        mob3d foe {
+            position: (2.5, 0.5, -1.0)
+        }
+        cylinder3d ground {
+            position: (0.0, -0.5, 0.0)
+            scale: (10.0, 0.5, 12.0)
+        }
+    }
+}

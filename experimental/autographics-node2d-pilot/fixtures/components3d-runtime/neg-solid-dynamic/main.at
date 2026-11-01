@@ -1,0 +1,18 @@
+// PLAN-027 neg: solid leaf with a .field-bound position (the solid surface
+// is frozen at Life.Start; a moving solid would fault 20/21 at Run time).
+use character: Character
+
+node Main {
+    model {
+        var gx = 0.0
+    }
+    view-3d {
+        Character hero {
+        }
+        cylinder3d ground {
+            position: (.gx, -0.5, 0.0)
+            scale: (10.0, 0.5, 12.0)
+            solid: true
+        }
+    }
+}

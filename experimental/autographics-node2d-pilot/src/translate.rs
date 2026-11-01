@@ -80,7 +80,21 @@ pub struct Ctx<'a> {
     /// 对象槽句柄 `<prefix>_handle[i]`；F-8 保留名约定一致）。root/无动态
     /// shape 为 None（`.handle` 具名拒绝）。
     pub handle_ref: Option<String>,
+    /// PLAN-027（components-3d-runtime）：六动作输入表
+    /// Left/Right/Forward/Back/Jump/Restart=0..5。false 保持旧四动作表
+    /// （Left/Right/Jump/Enter=0..3，旧档字节不变）。
+    pub six_actions: bool,
+    /// PLAN-027：本定义是本 Run 恰一物理角色（`refs.<elem>.move3d/
+    /// grounded/support` 角色服务可用）。None 保持 unsupported（旧档不变）。
+    pub char3: Option<Char3Env>,
+    /// PLAN-027：运行相机读取服务（`camera3d.forward_x()` 等；零空间
+    /// 计费读取沿受信 camera3d 单元）。false 保持 unsupported（旧档不变）。
+    pub cam3: bool,
 }
+
+/// PLAN-027：角色服务环境（标记面；`refs.<elem>` 元素有效性沿 space3.refs
+/// 校验，本环境只授予角色服务拼写）。
+pub struct Char3Env;
 
 /// PLAN-025：`.handle` 成员解析（实例上下文 + 恰一动态 shape2d）。
 fn handle_ref_of(ctx: &Ctx, e: &Expr) -> Result<String, LowerError> {
@@ -458,21 +472,76 @@ fn translate_expr(e: &Expr, ctx: &Ctx, out: &mut String) -> Result<(), LowerErro
                         if names.len() != 1 {
                             return Err(unsupported(format!("input.held({names:?})"), e));
                         }
-                        let action = match names[0].as_str() {
-                            "Left" => 0,
-                            "Right" => 1,
-                            "Jump" => 2,
-                            "Enter" => 3,
+                        let action = if ctx.six_actions {
+                            // PLAN-027 冻结表：character3d/1 受信动作
+                            // Left/Right/Forward/Back/Jump/Restart=0..5。
+                            match names[0].as_str() {
+                                "Left" => 0,
+                                "Right" => 1,
+                                "Forward" => 2,
+                                "Back" => 3,
+                                "Jump" => 4,
+                                "Restart" => 5,
+                                other => {
+                                    return Err(unsupported(
+                                        format!(
+                                            "input.held({other}) (components-3d-runtime surface: Left/Right/Forward/Back/Jump/Restart)"
+                                        ),
+                                        e,
+                                    ))
+                                }
+                            }
+                        } else {
+                            match names[0].as_str() {
+                                "Left" => 0,
+                                "Right" => 1,
+                                "Jump" => 2,
+                                "Enter" => 3,
+                                other => {
+                                    return Err(unsupported(
+                                        format!(
+                                        "input.held({other}) (research surface: Left/Right/Jump/Enter)"
+                                    ),
+                                        e,
+                                    ))
+                                }
+                            }
+                        };
+                        out.push_str(&format!("ag_action_held({action})"));
+                        return Ok(());
+                    }
+                    // PLAN-027（components-3d-runtime）：运行相机读取服务
+                    // （camera3d.forward_x/forward_z/right_x/right_z/yaw/
+                    // pitch/distance → 受信 ag_cam3_* 读 getter；零空间
+                    // 计费，沿 runtime_camera3d/1 单元）。
+                    if base == "camera3d" {
+                        if !ctx.cam3 {
+                            return Err(unsupported(
+                                "camera3d reads are only available in the components-3d-runtime profile",
+                                e,
+                            ));
+                        }
+                        if !call.args.args.is_empty() {
+                            return Err(unsupported(format!("camera3d.{m} arity"), e));
+                        }
+                        let getter = match m.as_str() {
+                            "forward_x" => "ag_cam3_forward_x",
+                            "forward_z" => "ag_cam3_forward_z",
+                            "right_x" => "ag_cam3_right_x",
+                            "right_z" => "ag_cam3_right_z",
+                            "yaw" => "ag_cam3_yaw",
+                            "pitch" => "ag_cam3_pitch",
+                            "distance" => "ag_cam3_distance",
                             other => {
                                 return Err(unsupported(
                                     format!(
-                                    "input.held({other}) (research surface: Left/Right/Jump/Enter)"
-                                ),
+                                        "camera3d.{other} (components-3d-runtime surface: forward_x/forward_z/right_x/right_z/yaw/pitch/distance)"
+                                    ),
                                     e,
                                 ))
                             }
                         };
-                        out.push_str(&format!("ag_action_held({action})"));
+                        out.push_str(&format!("{getter}()"));
                         return Ok(());
                     }
                     // PLAN-017：input.pressed(Enter) → pressed 边沿（消耗性读取，
@@ -491,16 +560,35 @@ fn translate_expr(e: &Expr, ctx: &Ctx, out: &mut String) -> Result<(), LowerErro
                         if names.len() != 1 {
                             return Err(unsupported(format!("input.pressed({names:?})"), e));
                         }
-                        let action = match names[0].as_str() {
-                            "Enter" => 3,
-                            "Jump" => 2,
-                            other => {
-                                return Err(unsupported(
-                                    format!(
-                                        "input.pressed({other}) (research surface: Enter/Jump)"
-                                    ),
-                                    e,
-                                ))
+                        let action = if ctx.six_actions {
+                            match names[0].as_str() {
+                                "Left" => 0,
+                                "Right" => 1,
+                                "Forward" => 2,
+                                "Back" => 3,
+                                "Jump" => 4,
+                                "Restart" => 5,
+                                other => {
+                                    return Err(unsupported(
+                                        format!(
+                                            "input.pressed({other}) (components-3d-runtime surface: Left/Right/Forward/Back/Jump/Restart)"
+                                        ),
+                                        e,
+                                    ))
+                                }
+                            }
+                        } else {
+                            match names[0].as_str() {
+                                "Enter" => 3,
+                                "Jump" => 2,
+                                other => {
+                                    return Err(unsupported(
+                                        format!(
+                                            "input.pressed({other}) (research surface: Enter/Jump)"
+                                        ),
+                                        e,
+                                    ))
+                                }
                             }
                         };
                         out.push_str(&format!("ag_action_pressed({action})"));
@@ -630,6 +718,13 @@ fn translate_expr(e: &Expr, ctx: &Ctx, out: &mut String) -> Result<(), LowerErro
                     if matches!(&**boxed_root, Expr::Ident(r) if r == "refs")
                         && (ctx.refs_any_elem || mid == "body")
                     {
+                        // PLAN-027：角色服务（move3d/grounded/support）优先——
+                        // 拼写属 character3d/1 受信单元（非角色定义具名拒绝）。
+                        if ctx.char3.is_some()
+                            && matches!(op.as_str(), "move3d" | "grounded" | "support")
+                        {
+                            return translate_char3_call(op, mid, e, ctx, out);
+                        }
                         // PLAN-024：v1 空间服务优先（place/shift/show 值位置
                         // 具名拒绝；local/world/visible/row 读取）。
                         if ctx.space3.is_some() {
@@ -1061,6 +1156,70 @@ fn row_place_pair(e: &Expr, ctx: &Ctx) -> Result<Option<Vec<String>>, LowerError
         format!("ag_set_local({row}, 0, {})", parts[0]),
         format!("ag_set_local({row}, 1, {})", parts[1]),
     ]))
+}
+
+/// PLAN-027：角色服务调用（`refs.<elem>.move3d(dx, dy, dz)` →
+/// `ag_char3_move(dx, dy, dz, 0.002)`（clearance 沿 G07/G08 冻结拼写）；
+/// `.grounded(q)`/`.support(q)` → `ag_char3_grounded/support(q)`）。elem
+/// 必须命名本定义 view-3d 元素（行句柄校验沿 space3.refs）。
+fn translate_char3_call(
+    op: &str,
+    elem: &str,
+    e: &Expr,
+    ctx: &Ctx,
+    out: &mut String,
+) -> Result<(), LowerError> {
+    debug_assert!(ctx.char3.is_some(), "char3 dispatch requires the env");
+    let Some(env3) = &ctx.space3 else {
+        return Err(unsupported(
+            "character service requires the view-3d row environment",
+            e,
+        ));
+    };
+    if !env3.refs.contains_key(elem) {
+        return Err(unsupported(
+            format!("unknown view-3d element reference 'refs.{elem}'"),
+            e,
+        ));
+    }
+    let Expr::Call(c) = e else {
+        return Err(unsupported("character service call form", e));
+    };
+    let mut parts = Vec::new();
+    for a in &c.args.args {
+        match a {
+            Arg::Pos(x) => {
+                let mut t = String::new();
+                translate_expr(x, ctx, &mut t)?;
+                parts.push(t);
+            }
+            _ => return Err(unsupported(format!("{op} arg"), e)),
+        }
+    }
+    match op {
+        "move3d" => {
+            if parts.len() != 3 {
+                return Err(unsupported(format!("move3d arity {}", parts.len()), e));
+            }
+            out.push_str(&format!(
+                "ag_char3_move({}, {}, {}, 0.002)",
+                parts[0], parts[1], parts[2]
+            ));
+        }
+        "grounded" | "support" => {
+            if parts.len() != 1 {
+                return Err(unsupported(format!("{op} arity {}", parts.len()), e));
+            }
+            let name = if op == "grounded" {
+                "ag_char3_grounded"
+            } else {
+                "ag_char3_support"
+            };
+            out.push_str(&format!("{name}({})", parts[0]));
+        }
+        _ => unreachable!("char3 op dispatch"),
+    }
+    Ok(())
 }
 
 /// PLAN-024：v1 空间行句柄解析（refs.<elem> 或 self；space3 环境必需）。

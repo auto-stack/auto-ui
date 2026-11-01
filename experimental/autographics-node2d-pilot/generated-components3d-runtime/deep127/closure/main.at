@@ -1,0 +1,647 @@
+// PLAN-027 components-3d-runtime deep127: the documented over-limit counter
+// example. 127 solid tiles all overlap the moving character's footprint with
+// tops at the feet plane; the tick must be refused by the unchanged
+// cumulative step guard (no partial frame), never truncated.
+use character: Character
+
+node Main {
+    view-3d {
+        Character hero {
+        }
+        cylinder3d t0 {
+            position: (0.0, -0.5, -0.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t1 {
+            position: (0.0, -0.5, -0.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t2 {
+            position: (0.0, -0.5, -1.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t3 {
+            position: (0.0, -0.5, -1.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t4 {
+            position: (0.0, -0.5, -2.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t5 {
+            position: (0.0, -0.5, -2.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t6 {
+            position: (0.0, -0.5, -3.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t7 {
+            position: (0.0, -0.5, -3.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t8 {
+            position: (0.0, -0.5, -4.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t9 {
+            position: (0.0, -0.5, -4.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t10 {
+            position: (0.0, -0.5, -5.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t11 {
+            position: (0.0, -0.5, -5.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t12 {
+            position: (0.0, -0.5, -6.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t13 {
+            position: (0.0, -0.5, -6.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t14 {
+            position: (0.0, -0.5, -7.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t15 {
+            position: (0.0, -0.5, -7.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t16 {
+            position: (0.0, -0.5, -8.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t17 {
+            position: (0.0, -0.5, -8.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t18 {
+            position: (0.0, -0.5, -9.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t19 {
+            position: (0.0, -0.5, -9.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t20 {
+            position: (0.0, -0.5, -10.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t21 {
+            position: (0.0, -0.5, -10.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t22 {
+            position: (0.0, -0.5, -11.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t23 {
+            position: (0.0, -0.5, -11.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t24 {
+            position: (0.0, -0.5, -12.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t25 {
+            position: (0.0, -0.5, -12.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t26 {
+            position: (0.0, -0.5, -13.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t27 {
+            position: (0.0, -0.5, -13.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t28 {
+            position: (0.0, -0.5, -14.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t29 {
+            position: (0.0, -0.5, -14.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t30 {
+            position: (0.0, -0.5, -15.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t31 {
+            position: (0.0, -0.5, -15.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t32 {
+            position: (0.0, -0.5, -16.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t33 {
+            position: (0.0, -0.5, -16.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t34 {
+            position: (0.0, -0.5, -17.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t35 {
+            position: (0.0, -0.5, -17.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t36 {
+            position: (0.0, -0.5, -18.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t37 {
+            position: (0.0, -0.5, -18.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t38 {
+            position: (0.0, -0.5, -19.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t39 {
+            position: (0.0, -0.5, -19.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t40 {
+            position: (0.0, -0.5, -20.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t41 {
+            position: (0.0, -0.5, -20.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t42 {
+            position: (0.0, -0.5, -21.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t43 {
+            position: (0.0, -0.5, -21.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t44 {
+            position: (0.0, -0.5, -22.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t45 {
+            position: (0.0, -0.5, -22.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t46 {
+            position: (0.0, -0.5, -23.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t47 {
+            position: (0.0, -0.5, -23.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t48 {
+            position: (0.0, -0.5, -24.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t49 {
+            position: (0.0, -0.5, -24.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t50 {
+            position: (0.0, -0.5, -25.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t51 {
+            position: (0.0, -0.5, -25.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t52 {
+            position: (0.0, -0.5, -26.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t53 {
+            position: (0.0, -0.5, -26.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t54 {
+            position: (0.0, -0.5, -27.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t55 {
+            position: (0.0, -0.5, -27.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t56 {
+            position: (0.0, -0.5, -28.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t57 {
+            position: (0.0, -0.5, -28.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t58 {
+            position: (0.0, -0.5, -29.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t59 {
+            position: (0.0, -0.5, -29.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t60 {
+            position: (0.0, -0.5, -30.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t61 {
+            position: (0.0, -0.5, -30.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t62 {
+            position: (0.0, -0.5, -31.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t63 {
+            position: (0.0, -0.5, -31.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t64 {
+            position: (0.0, -0.5, -32.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t65 {
+            position: (0.0, -0.5, -32.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t66 {
+            position: (0.0, -0.5, -33.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t67 {
+            position: (0.0, -0.5, -33.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t68 {
+            position: (0.0, -0.5, -34.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t69 {
+            position: (0.0, -0.5, -34.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t70 {
+            position: (0.0, -0.5, -35.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t71 {
+            position: (0.0, -0.5, -35.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t72 {
+            position: (0.0, -0.5, -36.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t73 {
+            position: (0.0, -0.5, -36.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t74 {
+            position: (0.0, -0.5, -37.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t75 {
+            position: (0.0, -0.5, -37.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t76 {
+            position: (0.0, -0.5, -38.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t77 {
+            position: (0.0, -0.5, -38.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t78 {
+            position: (0.0, -0.5, -39.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t79 {
+            position: (0.0, -0.5, -39.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t80 {
+            position: (0.0, -0.5, -40.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t81 {
+            position: (0.0, -0.5, -40.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t82 {
+            position: (0.0, -0.5, -41.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t83 {
+            position: (0.0, -0.5, -41.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t84 {
+            position: (0.0, -0.5, -42.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t85 {
+            position: (0.0, -0.5, -42.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t86 {
+            position: (0.0, -0.5, -43.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t87 {
+            position: (0.0, -0.5, -43.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t88 {
+            position: (0.0, -0.5, -44.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t89 {
+            position: (0.0, -0.5, -44.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t90 {
+            position: (0.0, -0.5, -45.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t91 {
+            position: (0.0, -0.5, -45.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t92 {
+            position: (0.0, -0.5, -46.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t93 {
+            position: (0.0, -0.5, -46.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t94 {
+            position: (0.0, -0.5, -47.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t95 {
+            position: (0.0, -0.5, -47.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t96 {
+            position: (0.0, -0.5, -48.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t97 {
+            position: (0.0, -0.5, -48.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t98 {
+            position: (0.0, -0.5, -49.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t99 {
+            position: (0.0, -0.5, -49.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t100 {
+            position: (0.0, -0.5, -50.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t101 {
+            position: (0.0, -0.5, -50.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t102 {
+            position: (0.0, -0.5, -51.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t103 {
+            position: (0.0, -0.5, -51.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t104 {
+            position: (0.0, -0.5, -52.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t105 {
+            position: (0.0, -0.5, -52.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t106 {
+            position: (0.0, -0.5, -53.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t107 {
+            position: (0.0, -0.5, -53.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t108 {
+            position: (0.0, -0.5, -54.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t109 {
+            position: (0.0, -0.5, -54.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t110 {
+            position: (0.0, -0.5, -55.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t111 {
+            position: (0.0, -0.5, -55.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t112 {
+            position: (0.0, -0.5, -56.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t113 {
+            position: (0.0, -0.5, -56.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t114 {
+            position: (0.0, -0.5, -57.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t115 {
+            position: (0.0, -0.5, -57.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t116 {
+            position: (0.0, -0.5, -58.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t117 {
+            position: (0.0, -0.5, -58.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t118 {
+            position: (0.0, -0.5, -59.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t119 {
+            position: (0.0, -0.5, -59.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t120 {
+            position: (0.0, -0.5, -60.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t121 {
+            position: (0.0, -0.5, -60.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t122 {
+            position: (0.0, -0.5, -61.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t123 {
+            position: (0.0, -0.5, -61.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t124 {
+            position: (0.0, -0.5, -62.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t125 {
+            position: (0.0, -0.5, -62.75)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+        cylinder3d t126 {
+            position: (0.0, -0.5, -63.25)
+            scale: (1.0, 0.5, 0.25)
+            solid: true
+        }
+    }
+}

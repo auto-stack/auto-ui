@@ -1,0 +1,10 @@
+// PLAN-027 neg: solid marker on a built-in visual leaf (player3d/mob3d are
+// presentation-only; Kind is not character identity and never a solid).
+node Main {
+    view-3d {
+        player3d hero {
+            position: (0.0, 0.5, 0.0)
+            solid: true
+        }
+    }
+}

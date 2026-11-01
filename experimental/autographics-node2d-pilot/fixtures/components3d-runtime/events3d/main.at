@@ -1,0 +1,46 @@
+// PLAN-027 components-3d-runtime events3d: named built-in visuals
+// (player3d/mob3d -> original Kind::Player/Mob meshes via the driver warm
+// upload; Kind is not character identity) in a pure static scene with NO
+// character/camera/user VM (behavior null). Two same-definition Beeper
+// instances exercise the 020 local state/msg/event face under the runtime
+// profile: typed .Pinged payloads land in separate root counters per
+// instance (receiver isolation across same-def instances).
+use beeper: Beeper
+
+node Main {
+    model {
+        var lo = 0
+        var hi = 0
+    }
+    msg {
+        Pinged(float)
+    }
+    view-3d {
+        player3d hero {
+            position: (0.0, 0.5, 0.0)
+        }
+        mob3d foe {
+            position: (2.5, 0.5, -1.0)
+        }
+        cylinder3d ground {
+            position: (0.0, -0.5, 0.0)
+            scale: (10.0, 0.5, 12.0)
+        }
+        Beeper b0 {
+            p0: 0.0
+        }
+        Beeper b1 {
+            p0: 3.0
+        }
+    }
+    on {
+        Life.Start -> {}
+        .Pinged(v) -> {
+            if v > 2.0 {
+                .hi = .hi + 1
+            } else {
+                .lo = .lo + 1
+            }
+        }
+    }
+}

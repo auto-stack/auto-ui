@@ -39,81 +39,84 @@ const API: &str = "autographics.behavior/1";
 
 // ------------------------------------------------------------------ 3D IR --
 
+/// view-3d 内一个三维叶（cylinder3d/model3d/player3d/mob3d）的静态面。
+#[derive(Debug, Clone)]
+pub(crate) struct ElemIR3 {
+    pub(crate) elem: String,
+    /// "cylinder" | "model" | "player" | "mob"（Document kind 拼写）。
+    pub(crate) kind: &'static str,
+    /// model 引用（仅 model3d）。
+    pub(crate) model: Option<ModelRef>,
+    /// position 三元组（数值/参数/`.field` 引用）。
+    pub(crate) position: Vec<CVal>,
+    /// 静态 scale（数值/参数；缺省 [1,1,1]；内置视觉叶固定 [1,1,1]）。
+    pub(crate) scale: Vec<CVal>,
+    pub(crate) yaw: CVal,
+    pub(crate) pitch: CVal,
+    /// visible（静态数值/参数或 `.field` 引用）。
+    pub(crate) visible: CVal,
+    pub(crate) dyn_pos: bool,
+    pub(crate) dyn_vis: bool,
+    /// PLAN-027：`solid: true` —— 本叶标记为角色 solid（cylinder3d 限定，
+    /// 全静态；bind/solid/camera 配置调用由 runtime 降层注入 Life.Start）。
+    pub(crate) solid: bool,
+    /// 所在 group 链（外→内，组名）。
+    pub(crate) groups: Vec<String>,
+    pub(crate) line: usize,
+}
+
 /// 叶元素模型引用：`resources.<name>` 直连或 Model3D 参数。
 #[derive(Debug, Clone)]
-enum ModelRef {
+pub(crate) enum ModelRef {
     Direct(String),
     Param(String),
 }
 
-/// view-3d 内一个三维叶（cylinder3d/model3d）的静态面。
-#[derive(Debug, Clone)]
-struct ElemIR3 {
-    elem: String,
-    /// "cylinder" | "model"（Document kind 拼写）。
-    kind: &'static str,
-    /// model 引用（仅 model3d）。
-    model: Option<ModelRef>,
-    /// position 三元组（数值/参数/`.field` 引用）。
-    position: Vec<CVal>,
-    /// 静态 scale（数值/参数；缺省 [1,1,1]）。
-    scale: Vec<CVal>,
-    yaw: CVal,
-    pitch: CVal,
-    /// visible（静态数值/参数或 `.field` 引用）。
-    visible: CVal,
-    dyn_pos: bool,
-    dyn_vis: bool,
-    /// 所在 group 链（外→内，组名）。
-    groups: Vec<String>,
-    line: usize,
-}
-
 /// view-3d 内一个显式 group3d 的静态面（平移/可见静态，叶才绑 model）。
 #[derive(Debug, Clone)]
-struct GroupIR3 {
-    name: String,
+pub(crate) struct GroupIR3 {
+    pub(crate) name: String,
     /// 所在上级 group 链（外→内）。
-    parent_chain: Vec<String>,
-    position: Vec<CVal>,
-    visible: bool,
+    pub(crate) parent_chain: Vec<String>,
+    pub(crate) position: Vec<CVal>,
+    pub(crate) visible: bool,
     #[allow(dead_code)] // 诊断保留（行号随行进 identity/夹具定位）。
-    line: usize,
+    pub(crate) line: usize,
 }
 
 /// 一个定义的 view-3d 静态面（按定义名索引）。
 #[derive(Debug, Default)]
-struct View3dIR {
-    elems: Vec<ElemIR3>,
-    groups: Vec<GroupIR3>,
+pub(crate) struct View3dIR {
+    pub(crate) elems: Vec<ElemIR3>,
+    pub(crate) groups: Vec<GroupIR3>,
 }
 
 /// 3D 世界 IR：共享 WorldIR + 每定义 view-3d 面。
-struct World3d {
-    world: WorldIR,
-    views: BTreeMap<String, View3dIR>,
+pub(crate) struct World3d {
+    pub(crate) world: WorldIR,
+    pub(crate) views: BTreeMap<String, View3dIR>,
 }
 
 /// 视图静态解析上下文（DefIR 构造前的轻量面）。
-struct ViewCtx3<'a> {
-    module: &'a str,
-    def_line: usize,
-    params: &'a [(String, PType)],
-    model: &'a [(String, bool)],
+pub(crate) struct ViewCtx3<'a> {
+    pub(crate) module: &'a str,
+    pub(crate) def_line: usize,
+    pub(crate) params: &'a [(String, PType)],
+    pub(crate) model: &'a [(String, bool)],
 }
 
 impl<'a> ViewCtx3<'a> {
-    fn is_param(&self, name: &str) -> bool {
+    pub(crate) fn is_param(&self, name: &str) -> bool {
         self.params.iter().any(|(n, _)| n == name)
     }
-    fn is_field(&self, name: &str) -> bool {
+    pub(crate) fn is_field(&self, name: &str) -> bool {
         self.model.iter().any(|(n, _)| n == name)
     }
 }
 
 // -------------------------------------------------------------- def build --
 
-fn build_def_3d(
+pub(crate) fn build_def_3d(
     project: &Project,
     name: &str,
     is_root: bool,
@@ -257,10 +260,22 @@ fn build_def_3d(
         params: &params,
         model: &model,
     };
-    let view = decl
-        .view3d
-        .as_ref()
-        .ok_or_else(|| at(&module, line, name, "component definition has no view-3d"))?;
+    let empty_view;
+    let view = match decl.view3d.as_ref() {
+        Some(v) => v,
+        // PLAN-027：携带 character3d/camera3d 的定义可无 view-3d（如仅
+        // 相机配置的运行 root）；其余定义保持旧具名拒绝。
+        None if decl.character3d.is_some() || decl.camera3d.is_some() => {
+            empty_view = auto_ui_dialect::node2d::View3dBlock {
+                elements: Vec::new(),
+                span: decl.span,
+            };
+            &empty_view
+        }
+        None => {
+            return Err(at(&module, line, name, "component definition has no view-3d"));
+        }
+    };
     let mut v3 = View3dIR::default();
     let mut seen: BTreeSet<String> = BTreeSet::new();
     walk_view3d_elements(
@@ -302,7 +317,7 @@ fn build_def_3d(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn walk_view3d_elements(
+pub(crate) fn walk_view3d_elements(
     project: &Project,
     vctx: &ViewCtx3,
     elements: &[View3dElement],
@@ -313,7 +328,10 @@ fn walk_view3d_elements(
     let module_src = &project.modules[vctx.module].source;
     for el in elements {
         match el {
-            View3dElement::Primitive { name, props } | View3dElement::Model { name, props } => {
+            View3dElement::Primitive { name, props }
+            | View3dElement::Model { name, props }
+            | View3dElement::Player { name, props }
+            | View3dElement::Mob { name, props } => {
                 if !seen.insert(name.clone()) {
                     return Err(at(
                         vctx.module,
@@ -322,8 +340,24 @@ fn walk_view3d_elements(
                         "duplicate view-3d element name",
                     ));
                 }
-                let is_model = matches!(el, View3dElement::Model { .. });
-                let kind = if is_model { "model" } else { "cylinder" };
+                let (is_model, is_builtin) = match el {
+                    View3dElement::Model { .. } => (true, false),
+                    View3dElement::Player { .. } | View3dElement::Mob { .. } => (false, true),
+                    _ => (false, false),
+                };
+                let kind: &'static str = match el {
+                    View3dElement::Primitive { .. } => "cylinder",
+                    View3dElement::Model { .. } => "model",
+                    View3dElement::Player { .. } => "player",
+                    View3dElement::Mob { .. } => "mob",
+                    _ => unreachable!("leaf arm"),
+                };
+                let kind_label = match el {
+                    View3dElement::Primitive { .. } => "cylinder3d",
+                    View3dElement::Model { .. } => "model3d",
+                    View3dElement::Player { .. } => "player3d",
+                    _ => "mob3d",
+                };
                 let line = props
                     .first()
                     .map(|p| prop_line(module_src, p))
@@ -384,9 +418,43 @@ fn walk_view3d_elements(
                         vctx.module,
                         line,
                         name,
-                        "cylinder3d does not take a 'model' prop (use model3d)",
+                        &format!("{kind_label} does not take a 'model' prop (use model3d)"),
                     ));
                 }
+                // PLAN-027：solid 标记（v1 限 cylinder3d 叶；全静态 AABB）。
+                let solid = match prop_of(props, "solid") {
+                    None => false,
+                    Some(pr) => {
+                        if is_model || is_builtin {
+                            return Err(at(
+                                vctx.module,
+                                line,
+                                name,
+                                &format!("'solid' is a cylinder3d prop, not {kind_label}"),
+                            ));
+                        }
+                        let es = prop_exprs_3d(pr);
+                        match es.as_slice() {
+                            [Expr::Bool(true)] | [Expr::Int(1)] => true,
+                            [Expr::Bool(false)] | [Expr::Int(0)] => {
+                                return Err(at(
+                                    vctx.module,
+                                    line,
+                                    "solid",
+                                    "'solid' must be true (omit the prop for a non-solid leaf)",
+                                ));
+                            }
+                            other => {
+                                return Err(at(
+                                    vctx.module,
+                                    line,
+                                    "solid",
+                                    &format!("'solid' must be the literal true, got {other:?}"),
+                                ));
+                            }
+                        }
+                    }
+                };
                 let pos_pr = prop_of(props, "position").ok_or_else(|| {
                     at(
                         vctx.module,
@@ -412,6 +480,16 @@ fn walk_view3d_elements(
                 let scale = match prop_of(props, "scale") {
                     None => vec![CVal::Num(1.0), CVal::Num(1.0), CVal::Num(1.0)],
                     Some(pr) => {
+                        if is_builtin {
+                            return Err(at(
+                                vctx.module,
+                                line,
+                                name,
+                                &format!(
+                                    "{kind_label} has intrinsic built-in geometry and takes no 'scale' prop"
+                                ),
+                            ));
+                        }
                         let es = prop_exprs_3d(pr);
                         if es.len() != 3 {
                             return Err(at(
@@ -441,6 +519,16 @@ fn walk_view3d_elements(
                     let mut pv: Option<CVal> = None;
                     for (label, slot) in [("yaw", 0usize), ("pitch", 1usize)] {
                         if let Some(pr) = prop_of(props, label) {
+                            if is_builtin {
+                                return Err(at(
+                                    vctx.module,
+                                    line,
+                                    name,
+                                    &format!(
+                                        "{kind_label} has intrinsic built-in geometry and takes no '{label}' prop"
+                                    ),
+                                ));
+                            }
                             let es = prop_exprs_3d(pr);
                             if es.len() != 1 {
                                 return Err(at(
@@ -489,16 +577,21 @@ fn walk_view3d_elements(
                     .map(|pr| prop_exprs_3d(pr).iter().any(|e| expr_binds_field(e, vctx)))
                     .unwrap_or(false);
                 for pr in props {
-                    if !matches!(
-                        pr.name.as_str(),
-                        "position" | "scale" | "yaw" | "pitch" | "visible" | "model"
-                    ) {
+                    let known: &[&str] = if is_builtin {
+                        &["position", "visible", "solid"]
+                    } else if is_model {
+                        &["position", "scale", "yaw", "pitch", "visible", "model"]
+                    } else {
+                        &["position", "scale", "yaw", "pitch", "visible", "solid"]
+                    };
+                    if !known.contains(&pr.name.as_str()) {
                         return Err(at(
                             vctx.module,
                             line,
                             &pr.name,
                             &format!(
-                                "unknown prop on view-3d element '{name}' (known: position/scale/yaw/pitch/visible/model)"
+                                "unknown prop on view-3d element '{name}' (known: {})",
+                                known.join("/")
                             ),
                         ));
                     }
@@ -514,6 +607,7 @@ fn walk_view3d_elements(
                     visible,
                     dyn_pos,
                     dyn_vis,
+                    solid,
                     groups: groups.clone(),
                     line,
                 });
@@ -668,7 +762,7 @@ fn expr_binds_field(e: &Expr, vctx: &ViewCtx3) -> bool {
 
 // ------------------------------------------------------------- world build --
 
-fn build_world_3d(project: &Project) -> Result<World3d, LowerError> {
+pub(crate) fn build_world_3d(project: &Project) -> Result<World3d, LowerError> {
     let root_name = project.root.clone();
     let root_module = project
         .node_modules
@@ -1041,14 +1135,29 @@ fn build_world_3d(project: &Project) -> Result<World3d, LowerError> {
     let mut stack: Vec<(String, String)> = Vec::new();
     let root_name = world.root.clone();
     let root_decl = node_of(project, &root_name);
-    let root_view_decl = root_decl.view3d.as_ref().expect("root view-3d");
+    // PLAN-027：root 可无 view-3d（如仅携带 camera3d/on 的运行 root）；
+    // 旧档根必须有视图，缺视图的旧拒绝文本保持不变。
+    let root_view_elements: Vec<View3dElement> = match &root_decl.view3d {
+        Some(v) => v.elements.clone(),
+        None => {
+            if root_decl.character3d.is_none() && root_decl.camera3d.is_none() {
+                return Err(at(
+                    &root_module,
+                    world.defs[&root_name].line,
+                    &root_name,
+                    "root node must declare a view-3d (components-3d frozen surface)",
+                ));
+            }
+            Vec::new()
+        }
+    };
     // root 视图的直接实例 parent = None（root 不是实例）；实例点所在
     // caller group 记录到 InstanceIR.parent_group。
     expand_children_3d(
         project,
         &mut world,
         &mut views,
-        &root_view_decl.elements,
+        &root_view_elements,
         &root_name,
         &root_name,
         None,
@@ -1292,7 +1401,7 @@ fn resolve_model_3d(
 }
 
 /// 收集三维场景：树先序行 + driver `ordered()` 同规则句柄。
-fn collect_scene_3d(project: &Project, w3: &World3d) -> Result<SceneBuild3, LowerError> {
+pub(crate) fn collect_scene_3d(project: &Project, w3: &World3d) -> Result<SceneBuild3, LowerError> {
     let world = &w3.world;
     let mut pending: Vec<PendingRow> = Vec::new();
 
@@ -1520,11 +1629,39 @@ fn collect_scene_3d(project: &Project, w3: &World3d) -> Result<SceneBuild3, Lowe
 // ------------------------------------------------------------- generation --
 
 /// 生成用户源（world.at，v1 行为装配）。
-fn gen_user_source_3d(
+/// PLAN-027：runtime 档注入配置（None = 024 字节不变路径）。
+#[derive(Debug, Default)]
+pub(crate) struct RuntimeCfg3 {
+    /// 恰一角色定义名（ctx 角色服务授予）。
+    pub character_def: Option<String>,
+    /// 恰一角色：绑定声明 id（1-based 文档 id）。
+    pub character_bind_id: Option<i64>,
+    /// solid 叶：注入序（声明先序）的 `ag_char3_solid` 文档 id。
+    pub solid_ids: Vec<i64>,
+    /// 相机配置：`ag_camera_orbit_3d(角色 id, distance, pitch, projection, ortho_size)`。
+    pub camera: Option<(i64, f64, f64, i64, f64)>,
+}
+
+/// PLAN-027：runtime 环境盖章（六动作表 + 相机读取；角色定义另含角色
+/// 服务）。None（024 档）不触碰任何字段。
+fn stamp_runtime_env(ctx: &mut crate::translate::Ctx, def_name: &str, rt: Option<&RuntimeCfg3>) {
+    if let Some(rt) = rt {
+        ctx.six_actions = true;
+        ctx.cam3 = true;
+        if rt.character_def.as_deref() == Some(def_name) {
+            ctx.char3 = Some(crate::translate::Char3Env);
+        }
+    }
+}
+
+pub(crate) fn gen_user_source_3d(
     project: &Project,
     w3: &World3d,
     plan: &Plan,
     scene: &SceneBuild3,
+    runtime: Option<&RuntimeCfg3>,
+    gen_note: &str,
+    regen_note: &str,
 ) -> Result<String, LowerError> {
     let world = &w3.world;
     let mut src = String::new();
@@ -1532,7 +1669,7 @@ fn gen_user_source_3d(
     let root_decl = node_of(project, &world.root);
 
     src.push_str(&format!(
-        "// GENERATED by autographics-node2d-pilot (PLAN-024 components-3d, {API}).\n"
+        "// GENERATED by autographics-node2d-pilot ({gen_note}, {API}).\n"
     ));
     let inst_list = world
         .instances
@@ -1544,7 +1681,9 @@ fn gen_user_source_3d(
         "// Root: {}; instances (declaration pre-order): {}\n",
         world.root, inst_list
     ));
-    src.push_str("// Regeneration must be byte-identical (tools/verify_plan024.py).\n");
+    src.push_str(&format!(
+        "// Regeneration must be byte-identical ({regen_note}).\n"
+    ));
     src.push_str("var ok=0.0\n");
 
     // 枚举常量（019 约定，同 020）。
@@ -1823,6 +1962,8 @@ fn gen_user_source_3d(
         refs: &root_refs,
         self_row: root_primary.clone(),
     });
+    // PLAN-027：runtime 环境盖章（None = 024 档不触碰，字节不变）。
+    stamp_runtime_env(&mut rctx, &world.root, runtime);
     src.push_str("fn main_lifestart() {\n");
     if let Some(h) = life_handler(root_decl, "Start") {
         translate_handler(&h.body.stmts, &rctx, &mut src, 1)?;
@@ -1850,6 +1991,7 @@ fn gen_user_source_3d(
             ev,
             &root_refs,
             root_primary.as_deref(),
+            runtime,
             &mut src,
         )?;
     }
@@ -1878,6 +2020,7 @@ fn gen_user_source_3d(
             refs: &inst_refs,
             self_row: inst_primary.clone(),
         });
+        stamp_runtime_env(&mut ictx, &dname, runtime);
         if def.life_tick {
             src.push_str(&format!("fn {prefix}_lifetick(i int, dt float) {{\n"));
             if let Some(h) = life_handler(decl, "Tick") {
@@ -1909,6 +2052,7 @@ fn gen_user_source_3d(
                 ev,
                 &inst_refs,
                 inst_primary.as_deref(),
+                runtime,
                 &mut src,
             )?;
         }
@@ -1941,7 +2085,9 @@ fn gen_user_source_3d(
         }
     }
 
-    // app_start：Life.Start 们（根先、声明先序）。
+    // app_start：Life.Start 们（根先、声明先序），随后 runtime 档注入
+    // bind/solid/camera 配置（作者代码在前；主机在 app_start 之后织入
+    // _ag_char3_freeze/_ag_cam3_freeze，配置只需落在 app_start 内）。
     src.push_str("fn app_start() {\n");
     if root_def.life_start {
         src.push_str(" main_lifestart()\n");
@@ -1950,6 +2096,22 @@ fn gen_user_source_3d(
         let def = &world.defs[&inst.def];
         if def.life_start {
             src.push_str(&format!(" {}_lifestart({})\n", def.prefix(), inst.def_idx));
+        }
+    }
+    if let Some(rt) = runtime {
+        if let Some(bind) = rt.character_bind_id {
+            src.push_str(&format!(" ok=ok+ag_char3_bind({bind})\n"));
+        }
+        for solid in &rt.solid_ids {
+            src.push_str(&format!(" ok=ok+ag_char3_solid({solid})\n"));
+        }
+        if let Some((target, distance, pitch, projection, ortho_size)) = &rt.camera {
+            src.push_str(&format!(
+                " ok=ok+ag_camera_orbit_3d({target}, {}, {}, {projection}, {})\n",
+                fmt_f(*distance),
+                fmt_f(*pitch),
+                fmt_f(*ortho_size)
+            ));
         }
     }
     src.push_str("}\n");
@@ -2183,7 +2345,7 @@ fn elem_props_3d(project: &Project, def: &DefIR, elem: &str) -> Result<Vec<Prop>
         .ok_or_else(|| at(&def.module, def.line, elem, "view-3d props missing"))
 }
 
-/// 成员接收 fn（020 同型 + space3 环境）。
+/// 成员接收 fn（020 同型 + space3 环境 + PLAN-027 runtime 环境）。
 #[allow(clippy::too_many_arguments)]
 fn gen_recv_fn_3d(
     project: &Project,
@@ -2194,6 +2356,7 @@ fn gen_recv_fn_3d(
     ev: &str,
     refs: &BTreeMap<String, String>,
     self_row: Option<&str>,
+    runtime: Option<&RuntimeCfg3>,
     src: &mut String,
 ) -> Result<(), LowerError> {
     let def = if recv_def_name.is_empty() {
@@ -2237,6 +2400,11 @@ fn gen_recv_fn_3d(
         refs,
         self_row: self_row.map(|s| s.to_string()),
     });
+    stamp_runtime_env(
+        &mut ctx,
+        if recv_def_name.is_empty() { &world.root } else { recv_def_name },
+        runtime,
+    );
     translate_handler(&h.body.stmts, &ctx, src, 1)?;
     src.push_str("}\n");
     Ok(())
@@ -2287,7 +2455,8 @@ fn group_json_3d(r: &Row3, id: u64) -> String {
     )
 }
 
-fn scene_json_3d(
+pub(crate) fn scene_json_3d(
+    doc_prefix: &str,
     entry: &str,
     scene: &SceneBuild3,
     has_behavior: bool,
@@ -2328,11 +2497,11 @@ fn scene_json_3d(
         "null".to_string()
     };
     format!(
-        "{{\n \"behavior\": {behavior},\n \"schema\": \"autographics.scene/6\",\n \"document_id\": \"plan024-components-3d-{entry}\",\n \"resources\": [\n  \"circle\",\n  \"quad\",\n  \"cylinder\",\n  \"player\",\n  \"mob\"\n ],\n \"groups\": [\n{groups}\n ],\n \"objects\": [\n{objects}\n ],\n \"assets\": [\n{asset_rows}\n ]\n}}\n"
+        "{{\n \"behavior\": {behavior},\n \"schema\": \"autographics.scene/6\",\n \"document_id\": \"{doc_prefix}-{entry}\",\n \"resources\": [\n  \"circle\",\n  \"quad\",\n  \"cylinder\",\n  \"player\",\n  \"mob\"\n ],\n \"groups\": [\n{groups}\n ],\n \"objects\": [\n{objects}\n ],\n \"assets\": [\n{asset_rows}\n ]\n}}\n"
     )
 }
 
-fn roles_json_3d(scene: &SceneBuild3) -> String {
+pub(crate) fn roles_json_3d(scene: &SceneBuild3) -> String {
     let rows = scene
         .handles
         .iter()
@@ -2344,10 +2513,34 @@ fn roles_json_3d(scene: &SceneBuild3) -> String {
 
 /// components-3d 降低入口：共享 IR 世界 → 投递计划 → 场景 → v1 用户源。
 pub fn lower_project_components3d(project: &Project) -> Result<LowerOutputBasic2D, LowerError> {
+    lower_project_components3d_cfg(project, Cfg3 {
+        runtime: None,
+        doc_prefix: "plan024-components-3d",
+        gen_note: "PLAN-024 components-3d",
+        regen_note: "tools/verify_plan024.py",
+    })
+}
+
+/// PLAN-027：共享降低管线（024 唯一实现 + runtime 注入位）。
+pub(crate) struct Cfg3<'c> {
+    /// runtime 注入配置（None = 024 路径，字节不变）。
+    pub runtime: Option<&'c RuntimeCfg3>,
+    /// scene.agscene document_id 前缀。
+    pub doc_prefix: &'static str,
+    /// 生成头注释身份段。
+    pub gen_note: &'static str,
+    /// 生成头再生成门注释（verifier 脚本名）。
+    pub regen_note: &'static str,
+}
+
+pub(crate) fn lower_project_components3d_cfg(
+    project: &Project,
+    cfg: Cfg3<'_>,
+) -> Result<LowerOutputBasic2D, LowerError> {
     let w3 = build_world_3d(project)?;
     let plan = crate::lower_components::plan_dispatch(project, &w3.world, false, false, false)?;
     let scene = collect_scene_3d(project, &w3)?;
-    let user_source = gen_user_source_3d(project, &w3, &plan, &scene)?;
+    let user_source = gen_user_source_3d(project, &w3, &plan, &scene, cfg.runtime, cfg.gen_note, cfg.regen_note)?;
     let sha = crate::scene::sha256_hex(user_source.as_bytes());
     let bytes = user_source.len();
     let has_behavior =
@@ -2363,7 +2556,15 @@ pub fn lower_project_components3d(project: &Project) -> Result<LowerOutputBasic2
         .iter()
         .map(|(s, l, n)| (s.clone(), *l, n.as_str()))
         .collect();
-    let scene_json = scene_json_3d(&entry, &scene, has_behavior, &sha, bytes, &asset_refs);
+    let scene_json = scene_json_3d(
+        cfg.doc_prefix,
+        &entry,
+        &scene,
+        has_behavior,
+        &sha,
+        bytes,
+        &asset_refs,
+    );
     let roles_json = roles_json_3d(&scene);
     Ok(LowerOutputBasic2D {
         user_source: if has_behavior {

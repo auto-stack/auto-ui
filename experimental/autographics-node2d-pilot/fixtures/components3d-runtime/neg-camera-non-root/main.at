@@ -1,0 +1,10 @@
+// PLAN-027 neg: camera3d on a non-root definition (the Run camera is one
+// Run-owned object; root-only).
+use ground: Ground
+
+node Main {
+    view-3d {
+        Ground g {
+        }
+    }
+}

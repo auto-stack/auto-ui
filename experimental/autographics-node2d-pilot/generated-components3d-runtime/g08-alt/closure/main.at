@@ -1,0 +1,35 @@
+// PLAN-027 components-3d-runtime G08 alt: distance 6, pitch 30, ortho 16 AND
+// speed 5 / jump 7 / gravity 18 (the alt layout changes the controller
+// constants too; it never claims to be camera-only).
+use character: Character
+
+node Main {
+    camera3d {
+        distance: 6.0
+        pitch: 30.0
+        projection: ortho
+        ortho_size: 16.0
+    }
+    view-3d {
+        Character hero {
+        }
+        cylinder3d ground {
+            position: (0.0, -0.5, 0.0)
+            scale: (10.0, 0.5, 12.0)
+            solid: true
+        }
+        cylinder3d wall {
+            position: (6.0, 1.5, 0.0)
+            scale: (0.1, 1.5, 12.0)
+            solid: true
+        }
+        cylinder3d east {
+            position: (4.0, 1.0, -4.0)
+            scale: (0.5, 1.0, 0.5)
+        }
+        cylinder3d west {
+            position: (-4.0, 1.0, 4.0)
+            scale: (0.5, 1.0, 0.5)
+        }
+    }
+}

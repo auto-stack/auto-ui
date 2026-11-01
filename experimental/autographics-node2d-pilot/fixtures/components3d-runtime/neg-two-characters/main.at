@@ -1,0 +1,10 @@
+use character: Character
+
+node Main {
+    view-3d {
+        Character a {
+        }
+        Character b {
+        }
+    }
+}

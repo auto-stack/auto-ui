@@ -1,0 +1,3487 @@
+{
+ "behavior": {
+  "api": "autographics.behavior/1",
+  "source": {
+   "format": "auto-source",
+   "sha256": "2b9edc657c501b97be86aba760dbed6b7890a5a2961ce9d3569790f427faf7cd",
+   "byte_length": 5260
+  },
+  "actors": {
+   "two_d": null,
+   "three_d": null
+  }
+ },
+ "schema": "autographics.scene/6",
+ "document_id": "plan027-components-3d-runtime-main",
+ "resources": [
+  "circle",
+  "quad",
+  "cylinder",
+  "player",
+  "mob"
+ ],
+ "groups": [
+
+ ],
+ "objects": [
+  {
+   "id": 1,
+   "name": "p0",
+   "kind": "cylinder",
+   "translation": [
+    3.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 2,
+   "name": "p1",
+   "kind": "cylinder",
+   "translation": [
+    3.3,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 3,
+   "name": "p2",
+   "kind": "cylinder",
+   "translation": [
+    3.6,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 4,
+   "name": "p3",
+   "kind": "cylinder",
+   "translation": [
+    3.9,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 5,
+   "name": "p4",
+   "kind": "cylinder",
+   "translation": [
+    4.2,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 6,
+   "name": "p5",
+   "kind": "cylinder",
+   "translation": [
+    4.5,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 7,
+   "name": "p6",
+   "kind": "cylinder",
+   "translation": [
+    4.8,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 8,
+   "name": "p7",
+   "kind": "cylinder",
+   "translation": [
+    5.1,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 9,
+   "name": "p8",
+   "kind": "cylinder",
+   "translation": [
+    5.4,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 10,
+   "name": "p9",
+   "kind": "cylinder",
+   "translation": [
+    5.7,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 11,
+   "name": "p10",
+   "kind": "cylinder",
+   "translation": [
+    6.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 12,
+   "name": "p11",
+   "kind": "cylinder",
+   "translation": [
+    6.3,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 13,
+   "name": "p12",
+   "kind": "cylinder",
+   "translation": [
+    6.6,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 14,
+   "name": "p13",
+   "kind": "cylinder",
+   "translation": [
+    6.9,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 15,
+   "name": "p14",
+   "kind": "cylinder",
+   "translation": [
+    7.2,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 16,
+   "name": "p15",
+   "kind": "cylinder",
+   "translation": [
+    7.5,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 17,
+   "name": "p16",
+   "kind": "cylinder",
+   "translation": [
+    7.8,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 18,
+   "name": "p17",
+   "kind": "cylinder",
+   "translation": [
+    8.1,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 19,
+   "name": "p18",
+   "kind": "cylinder",
+   "translation": [
+    8.4,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 20,
+   "name": "p19",
+   "kind": "cylinder",
+   "translation": [
+    8.7,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 21,
+   "name": "p20",
+   "kind": "cylinder",
+   "translation": [
+    9.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 22,
+   "name": "p21",
+   "kind": "cylinder",
+   "translation": [
+    9.3,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 23,
+   "name": "p22",
+   "kind": "cylinder",
+   "translation": [
+    9.6,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 24,
+   "name": "p23",
+   "kind": "cylinder",
+   "translation": [
+    9.9,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 25,
+   "name": "p24",
+   "kind": "cylinder",
+   "translation": [
+    10.2,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 26,
+   "name": "p25",
+   "kind": "cylinder",
+   "translation": [
+    10.5,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 27,
+   "name": "p26",
+   "kind": "cylinder",
+   "translation": [
+    10.8,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 28,
+   "name": "p27",
+   "kind": "cylinder",
+   "translation": [
+    11.1,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 29,
+   "name": "p28",
+   "kind": "cylinder",
+   "translation": [
+    11.4,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 30,
+   "name": "p29",
+   "kind": "cylinder",
+   "translation": [
+    11.7,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 31,
+   "name": "p30",
+   "kind": "cylinder",
+   "translation": [
+    12.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 32,
+   "name": "p31",
+   "kind": "cylinder",
+   "translation": [
+    12.3,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 33,
+   "name": "p32",
+   "kind": "cylinder",
+   "translation": [
+    12.6,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 34,
+   "name": "p33",
+   "kind": "cylinder",
+   "translation": [
+    12.9,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 35,
+   "name": "p34",
+   "kind": "cylinder",
+   "translation": [
+    13.2,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 36,
+   "name": "p35",
+   "kind": "cylinder",
+   "translation": [
+    13.5,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 37,
+   "name": "p36",
+   "kind": "cylinder",
+   "translation": [
+    13.8,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 38,
+   "name": "p37",
+   "kind": "cylinder",
+   "translation": [
+    14.1,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 39,
+   "name": "p38",
+   "kind": "cylinder",
+   "translation": [
+    14.4,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 40,
+   "name": "p39",
+   "kind": "cylinder",
+   "translation": [
+    14.7,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 41,
+   "name": "p40",
+   "kind": "cylinder",
+   "translation": [
+    15.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 42,
+   "name": "p41",
+   "kind": "cylinder",
+   "translation": [
+    15.3,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 43,
+   "name": "p42",
+   "kind": "cylinder",
+   "translation": [
+    15.6,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 44,
+   "name": "p43",
+   "kind": "cylinder",
+   "translation": [
+    15.9,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 45,
+   "name": "p44",
+   "kind": "cylinder",
+   "translation": [
+    16.2,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 46,
+   "name": "p45",
+   "kind": "cylinder",
+   "translation": [
+    16.5,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 47,
+   "name": "p46",
+   "kind": "cylinder",
+   "translation": [
+    16.8,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 48,
+   "name": "p47",
+   "kind": "cylinder",
+   "translation": [
+    17.1,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 49,
+   "name": "p48",
+   "kind": "cylinder",
+   "translation": [
+    17.4,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 50,
+   "name": "p49",
+   "kind": "cylinder",
+   "translation": [
+    17.7,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 51,
+   "name": "p50",
+   "kind": "cylinder",
+   "translation": [
+    18.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 52,
+   "name": "p51",
+   "kind": "cylinder",
+   "translation": [
+    18.3,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 53,
+   "name": "p52",
+   "kind": "cylinder",
+   "translation": [
+    18.6,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 54,
+   "name": "p53",
+   "kind": "cylinder",
+   "translation": [
+    18.9,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 55,
+   "name": "p54",
+   "kind": "cylinder",
+   "translation": [
+    19.2,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 56,
+   "name": "p55",
+   "kind": "cylinder",
+   "translation": [
+    19.5,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 57,
+   "name": "p56",
+   "kind": "cylinder",
+   "translation": [
+    19.8,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 58,
+   "name": "p57",
+   "kind": "cylinder",
+   "translation": [
+    20.1,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 59,
+   "name": "p58",
+   "kind": "cylinder",
+   "translation": [
+    20.4,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 60,
+   "name": "p59",
+   "kind": "cylinder",
+   "translation": [
+    20.7,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 61,
+   "name": "p60",
+   "kind": "cylinder",
+   "translation": [
+    21.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 62,
+   "name": "p61",
+   "kind": "cylinder",
+   "translation": [
+    21.3,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 63,
+   "name": "p62",
+   "kind": "cylinder",
+   "translation": [
+    21.6,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 64,
+   "name": "p63",
+   "kind": "cylinder",
+   "translation": [
+    21.9,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 65,
+   "name": "p64",
+   "kind": "cylinder",
+   "translation": [
+    22.2,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 66,
+   "name": "p65",
+   "kind": "cylinder",
+   "translation": [
+    22.5,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 67,
+   "name": "p66",
+   "kind": "cylinder",
+   "translation": [
+    22.8,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 68,
+   "name": "p67",
+   "kind": "cylinder",
+   "translation": [
+    23.1,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 69,
+   "name": "p68",
+   "kind": "cylinder",
+   "translation": [
+    23.4,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 70,
+   "name": "p69",
+   "kind": "cylinder",
+   "translation": [
+    23.7,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 71,
+   "name": "p70",
+   "kind": "cylinder",
+   "translation": [
+    24.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 72,
+   "name": "p71",
+   "kind": "cylinder",
+   "translation": [
+    24.3,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 73,
+   "name": "p72",
+   "kind": "cylinder",
+   "translation": [
+    24.6,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 74,
+   "name": "p73",
+   "kind": "cylinder",
+   "translation": [
+    24.9,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 75,
+   "name": "p74",
+   "kind": "cylinder",
+   "translation": [
+    25.2,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 76,
+   "name": "p75",
+   "kind": "cylinder",
+   "translation": [
+    25.5,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 77,
+   "name": "p76",
+   "kind": "cylinder",
+   "translation": [
+    25.8,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 78,
+   "name": "p77",
+   "kind": "cylinder",
+   "translation": [
+    26.1,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 79,
+   "name": "p78",
+   "kind": "cylinder",
+   "translation": [
+    26.4,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 80,
+   "name": "p79",
+   "kind": "cylinder",
+   "translation": [
+    26.7,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 81,
+   "name": "p80",
+   "kind": "cylinder",
+   "translation": [
+    27.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 82,
+   "name": "p81",
+   "kind": "cylinder",
+   "translation": [
+    27.3,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 83,
+   "name": "p82",
+   "kind": "cylinder",
+   "translation": [
+    27.6,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 84,
+   "name": "p83",
+   "kind": "cylinder",
+   "translation": [
+    27.9,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 85,
+   "name": "p84",
+   "kind": "cylinder",
+   "translation": [
+    28.2,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 86,
+   "name": "p85",
+   "kind": "cylinder",
+   "translation": [
+    28.5,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 87,
+   "name": "p86",
+   "kind": "cylinder",
+   "translation": [
+    28.8,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 88,
+   "name": "p87",
+   "kind": "cylinder",
+   "translation": [
+    29.1,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 89,
+   "name": "p88",
+   "kind": "cylinder",
+   "translation": [
+    29.4,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 90,
+   "name": "p89",
+   "kind": "cylinder",
+   "translation": [
+    29.7,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 91,
+   "name": "p90",
+   "kind": "cylinder",
+   "translation": [
+    30.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 92,
+   "name": "p91",
+   "kind": "cylinder",
+   "translation": [
+    30.3,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 93,
+   "name": "p92",
+   "kind": "cylinder",
+   "translation": [
+    30.6,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 94,
+   "name": "p93",
+   "kind": "cylinder",
+   "translation": [
+    30.9,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 95,
+   "name": "p94",
+   "kind": "cylinder",
+   "translation": [
+    31.2,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 96,
+   "name": "p95",
+   "kind": "cylinder",
+   "translation": [
+    31.5,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 97,
+   "name": "p96",
+   "kind": "cylinder",
+   "translation": [
+    31.8,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 98,
+   "name": "p97",
+   "kind": "cylinder",
+   "translation": [
+    32.1,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 99,
+   "name": "p98",
+   "kind": "cylinder",
+   "translation": [
+    32.4,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 100,
+   "name": "p99",
+   "kind": "cylinder",
+   "translation": [
+    32.7,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 101,
+   "name": "p100",
+   "kind": "cylinder",
+   "translation": [
+    33.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 102,
+   "name": "p101",
+   "kind": "cylinder",
+   "translation": [
+    33.3,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 103,
+   "name": "p102",
+   "kind": "cylinder",
+   "translation": [
+    33.6,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 104,
+   "name": "p103",
+   "kind": "cylinder",
+   "translation": [
+    33.9,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 105,
+   "name": "p104",
+   "kind": "cylinder",
+   "translation": [
+    34.2,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 106,
+   "name": "p105",
+   "kind": "cylinder",
+   "translation": [
+    34.5,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 107,
+   "name": "p106",
+   "kind": "cylinder",
+   "translation": [
+    34.8,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 108,
+   "name": "p107",
+   "kind": "cylinder",
+   "translation": [
+    35.1,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 109,
+   "name": "p108",
+   "kind": "cylinder",
+   "translation": [
+    35.4,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 110,
+   "name": "p109",
+   "kind": "cylinder",
+   "translation": [
+    35.7,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 111,
+   "name": "p110",
+   "kind": "cylinder",
+   "translation": [
+    36.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 112,
+   "name": "p111",
+   "kind": "cylinder",
+   "translation": [
+    36.3,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 113,
+   "name": "p112",
+   "kind": "cylinder",
+   "translation": [
+    36.6,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 114,
+   "name": "p113",
+   "kind": "cylinder",
+   "translation": [
+    36.9,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 115,
+   "name": "p114",
+   "kind": "cylinder",
+   "translation": [
+    37.2,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 116,
+   "name": "p115",
+   "kind": "cylinder",
+   "translation": [
+    37.5,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 117,
+   "name": "p116",
+   "kind": "cylinder",
+   "translation": [
+    37.8,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 118,
+   "name": "p117",
+   "kind": "cylinder",
+   "translation": [
+    38.1,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 119,
+   "name": "p118",
+   "kind": "cylinder",
+   "translation": [
+    38.4,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 120,
+   "name": "p119",
+   "kind": "cylinder",
+   "translation": [
+    38.7,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 121,
+   "name": "p120",
+   "kind": "cylinder",
+   "translation": [
+    39.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 122,
+   "name": "p121",
+   "kind": "cylinder",
+   "translation": [
+    39.3,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 123,
+   "name": "p122",
+   "kind": "cylinder",
+   "translation": [
+    39.6,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 124,
+   "name": "p123",
+   "kind": "cylinder",
+   "translation": [
+    39.9,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 125,
+   "name": "p124",
+   "kind": "cylinder",
+   "translation": [
+    40.2,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 126,
+   "name": "p125",
+   "kind": "cylinder",
+   "translation": [
+    40.5,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 127,
+   "name": "p126",
+   "kind": "cylinder",
+   "translation": [
+    40.8,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.25,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 128,
+   "name": "Main/hero/body",
+   "kind": "cylinder",
+   "translation": [
+    0.0,
+    0.5,
+    0.0
+   ],
+   "scale": [
+    0.4,
+    0.5,
+    0.4
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  }
+ ],
+ "assets": [
+
+ ]
+}

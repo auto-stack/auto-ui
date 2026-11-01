@@ -560,6 +560,9 @@ fn base_ctx<'a>(
         space3: None,
                         sfx: None,
                         handle_ref: None,
+                        six_actions: false,
+                        char3: None,
+                        cam3: false,
     }
 }
 

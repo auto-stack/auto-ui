@@ -38,6 +38,28 @@ pub struct NodeDecl {
     /// PLAN-025：`presentation2d` 块（通用声音/HUD 接线，无业务枚举）；
     /// 仅 root node 携带、仅 presentation-2d profile 消费。
     pub presentation2d: Option<super::presentation::Presentation2dBlock>,
+    /// PLAN-027：`character3d { }` 块——本定义绑定为本 Run 物理角色
+    /// （恰一；bind/solid/camera 配置调用由降层注入 Life.Start）。
+    pub character3d: Option<Character3dBlock>,
+    /// PLAN-027：`camera3d { ... }` 块——运行相机一次性配置声明
+    /// （仅 root；target 恒为本 Run 恰一角色）。
+    pub camera3d: Option<Camera3dBlock>,
+    pub span: LightSpan,
+}
+
+/// PLAN-027：`character3d { }` —— 角色声明（v1 无 props；形状/支撑由
+/// 元素静态 scale 与受信服务冻结规则决定）。
+#[derive(Debug, Clone)]
+pub struct Character3dBlock {
+    pub span: LightSpan,
+}
+
+/// PLAN-027：`camera3d { distance: .. pitch: .. projection: .. ortho_size: .. }`
+/// —— 运行相机配置声明。distance/pitch/projection 必填（projection 取
+/// 名义符号 `perspective`/`ortho`），ortho 仅 `ortho` 投影必需。
+#[derive(Debug, Clone)]
+pub struct Camera3dBlock {
+    pub props: Vec<Prop>,
     pub span: LightSpan,
 }
 
@@ -100,6 +122,13 @@ pub enum View3dElement {
     /// `model3d name { props }` —— 静态平色 GLB 叶；`model:` 绑定
     /// `resources.<name>` 或 Model3D 参数（符号引用，名字不是 ID）。
     Model { name: String, props: Vec<Prop> },
+    /// `player3d name { props }`（PLAN-027）—— 具名内置视觉 Player：
+    /// 映射原 Kind::Player 与原 player.glb mesh/材质（原 owner 暖上传，
+    /// 不每实例重传）；Kind 不等于角色身份（静态呈现能力独立）。
+    Player { name: String, props: Vec<Prop> },
+    /// `mob3d name { props }`（PLAN-027）—— 具名内置视觉 Mob：映射
+    /// 原 Kind::Mob 与原 mob.glb mesh/材质。
+    Mob { name: String, props: Vec<Prop> },
     /// `group3d name { props children 混合块 }` —— 显式同维父组：
     /// 仅逐层 f32 平移与祖先可见性 AND，无组旋转/缩放；Node 组合本身
     /// 不隐式叠加 transform，parent 只由本元素决定。

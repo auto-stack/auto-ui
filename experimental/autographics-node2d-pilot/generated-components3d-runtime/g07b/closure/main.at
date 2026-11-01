@@ -1,0 +1,27 @@
+// PLAN-027 components-3d-runtime G07 layout-b: pit scene (ground near covers
+// z in [0,8]; a gap toward -z drops the character onto the pit floor at
+// y=-6). Identical source semantics to layout-a: the geometry alone must
+// produce the fall divergence.
+use character: Character
+
+node Main {
+    view-3d {
+        Character hero {
+        }
+        cylinder3d ground {
+            position: (0.0, -0.5, 4.0)
+            scale: (10.0, 0.5, 4.0)
+            solid: true
+        }
+        cylinder3d pit {
+            position: (0.0, -6.5, 0.0)
+            scale: (10.0, 0.5, 4.0)
+            solid: true
+        }
+        cylinder3d wall {
+            position: (6.0, 1.5, 4.0)
+            scale: (0.1, 1.5, 4.0)
+            solid: true
+        }
+    }
+}

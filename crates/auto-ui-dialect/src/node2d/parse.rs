@@ -13,8 +13,8 @@ use auto_parser_api::token::TokenKind;
 use auto_parser_api::{CompilerSession, DomainDialect, DomainParseContext, DomainStmt, Scenario};
 
 use super::ast::{
-    EventPattern, Handler, Node2DStmt, NodeDecl, OnBlock, Prop, PropValue, View2dBlock,
-    View2dElement, View3dBlock, View3dElement,
+    Camera3dBlock, Character3dBlock, EventPattern, Handler, Node2DStmt, NodeDecl, OnBlock, Prop,
+    PropValue, View2dBlock, View2dElement, View3dBlock, View3dElement,
 };
 use crate::declarations::{parse_model_block, parse_msg_decl};
 
@@ -98,11 +98,22 @@ pub fn parse_node_decl(cx: &mut dyn DomainParseContext) -> AutoResult<NodeDecl> 
     for action in ["Left", "Right", "Jump", "Enter"] {
         cx.bind_var(action, Type::Int);
     }
+    // PLAN-027：3D 运行六动作符号（Left/Right/Forward/Back/Jump/Restart
+    // =0..5，值由 components-3d-runtime 降层映射）。旧档夹具不引用这些
+    // 名字，解析作用域扩展不改变旧字节。
+    for action in ["Forward", "Back", "Restart"] {
+        cx.bind_var(action, Type::Int);
+    }
     // PLAN-019：shape2d `kind` 的冻结几何符号（circle/quad）。与动作符号
     // 同机制：解析作用域内的名义符号，值由 lowering 按名字映射。
     // PLAN-023：`box`（game2d 触发行的 AABB 形状名，同一名义符号族）。
     for shape_kind in ["circle", "quad", "box"] {
         cx.bind_var(shape_kind, Type::Int);
+    }
+    // PLAN-027：camera3d `projection` 的名义投影符号（perspective/ortho，
+    // 值由 components-3d-runtime 降层映射 0/1）。
+    for projection in ["perspective", "ortho"] {
+        cx.bind_var(projection, Type::Int);
     }
 
     cx.expect(TokenKind::LBrace)?;
@@ -113,6 +124,8 @@ pub fn parse_node_decl(cx: &mut dyn DomainParseContext) -> AutoResult<NodeDecl> 
     let mut on = None;
     let mut game2d = None;
     let mut presentation2d = None;
+    let mut character3d = None;
+    let mut camera3d = None;
     loop {
         cx.skip_empty_lines();
         if cx.is_kind(TokenKind::RBrace) || cx.is_kind(TokenKind::EOF) {
@@ -218,10 +231,36 @@ pub fn parse_node_decl(cx: &mut dyn DomainParseContext) -> AutoResult<NodeDecl> 
                     presentation2d = Some(super::presentation::parse_presentation2d_block(cx)?);
                     continue;
                 }
+                // PLAN-027：`character3d { }` —— 角色声明块。任何 node 都可
+                // 携带；恰一/profile 归属由降层具名校验（解析面保持宽容）。
+                "character3d" => {
+                    if character3d.is_some() {
+                        return Err(SyntaxError::Generic {
+                            message: "duplicate character3d block in node".to_string(),
+                            span: pos_to_span(cx.cur_pos()),
+                        }
+                        .into());
+                    }
+                    character3d = Some(parse_character3d_block(cx)?);
+                    continue;
+                }
+                // PLAN-027：`camera3d { ... }` —— 运行相机配置声明。任何
+                // node 都可携带；root-only/恰一/target 归属由降层具名校验。
+                "camera3d" => {
+                    if camera3d.is_some() {
+                        return Err(SyntaxError::Generic {
+                            message: "duplicate camera3d block in node".to_string(),
+                            span: pos_to_span(cx.cur_pos()),
+                        }
+                        .into());
+                    }
+                    camera3d = Some(parse_camera3d_block(cx)?);
+                    continue;
+                }
                 _ => {
                     return Err(SyntaxError::Generic {
                         message: format!(
-                            "unsupported node block '{keyword}' (research surface: model/msg/view-2d/on/game2d/presentation2d)"
+                            "unsupported node block '{keyword}' (research surface: model/msg/view-2d/on/game2d/presentation2d/character3d/camera3d)"
                         ),
                         span: pos_to_span(cx.cur_pos()),
                     }
@@ -260,6 +299,8 @@ pub fn parse_node_decl(cx: &mut dyn DomainParseContext) -> AutoResult<NodeDecl> 
         on,
         game2d,
         presentation2d,
+        character3d,
+        camera3d,
         span: super::ast::span_of(start),
     })
 }
@@ -364,13 +405,23 @@ fn parse_view3d_element(cx: &mut dyn DomainParseContext) -> AutoResult<View3dEle
             name: elem_name,
             props,
         },
+        // PLAN-027：具名内置视觉叶（原 Kind::Player/Mob；mesh/材质沿
+        // 原 owner 暖上传映射，声明只透传 kind/静态变换）。
+        "player3d" => View3dElement::Player {
+            name: elem_name,
+            props,
+        },
+        "mob3d" => View3dElement::Mob {
+            name: elem_name,
+            props,
+        },
         other => {
             // 约定：UpperCamelCase 头部 = 同定义实例化（组件实例语义）。
             let first = other.chars().next().unwrap();
             if !first.is_ascii_uppercase() {
                 return Err(SyntaxError::Generic {
                     message: format!(
-                        "unknown view-3d element '{other}' (expected cylinder3d/model3d/group3d or a Node instance)"
+                        "unknown view-3d element '{other}' (expected cylinder3d/model3d/player3d/mob3d/group3d or a Node instance)"
                     ),
                     span: pos_to_span(cx.cur_pos()),
                 }
@@ -382,6 +433,39 @@ fn parse_view3d_element(cx: &mut dyn DomainParseContext) -> AutoResult<View3dEle
                 props,
             }
         }
+    })
+}
+
+/// PLAN-027：`character3d { }` —— v1 无 props（形状/支撑/价格由受信
+/// 服务与元素静态 scale 决定）；props 出现即具名拒绝文本（降层校验），
+/// 这里只接受空块。
+fn parse_character3d_block(cx: &mut dyn DomainParseContext) -> AutoResult<Character3dBlock> {
+    let start = cx.cur_pos();
+    cx.advance(); // character3d
+    cx.expect(TokenKind::LBrace)?;
+    cx.skip_empty_lines();
+    if !cx.is_kind(TokenKind::RBrace) {
+        return Err(SyntaxError::Generic {
+            message: "character3d block takes no properties (v1 research surface)".to_string(),
+            span: pos_to_span(cx.cur_pos()),
+        }
+        .into());
+    }
+    cx.expect(TokenKind::RBrace)?;
+    Ok(Character3dBlock {
+        span: super::ast::span_of(start),
+    })
+}
+
+/// PLAN-027：`camera3d { distance: .. pitch: .. projection: .. ortho_size: .. }`
+/// —— 复用共享 prop 文法；值域/组合（ortho 必带 ortho_size）由降层具名校验。
+fn parse_camera3d_block(cx: &mut dyn DomainParseContext) -> AutoResult<Camera3dBlock> {
+    let start = cx.cur_pos();
+    cx.advance(); // camera3d
+    let props = parse_prop_block(cx)?;
+    Ok(Camera3dBlock {
+        props,
+        span: super::ast::span_of(start),
     })
 }
 
@@ -399,7 +483,7 @@ fn parse_group3d_block(
             break;
         }
         let head = cx.cur_text();
-        if matches!(head.as_str(), "group3d" | "cylinder3d" | "model3d")
+        if matches!(head.as_str(), "group3d" | "cylinder3d" | "model3d" | "player3d" | "mob3d")
             || head.chars().next().is_some_and(|c| c.is_ascii_uppercase())
         {
             children.push(parse_view3d_element(cx)?);
