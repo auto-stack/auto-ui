@@ -24,3 +24,7 @@ research/motion-evidence/** -text whitespace=cr-at-eol,-blank-at-eof
 # PLAN-879: frozen SDK source snapshot must round-trip byte-exactly against
 # research/source-lock.json (some SDK blobs contain CRLF); never normalize.
 sdk/frozen/** -text
+
+# PLAN-023 T-04: the T-02 hand-proven reference world must round-trip as
+# exact LF bytes (the equivalence oracle pins its sha).
+tests/fixtures/t04/t02-reference-world.at text eol=lf
