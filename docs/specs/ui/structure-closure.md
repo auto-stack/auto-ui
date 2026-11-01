@@ -8,9 +8,9 @@
 
 | 面 | 拆分后布局 | mod保留 | 行为合同 |
 |---|---|---|---|
-| U1 Vue | `auto-ui-compiler/src/ui_gen/vue/`：mod + nav_sidebar/script/template_media/expr/tags/style_helpers/shadcn_attrs/project_files/store/library | mod.rs=类型(VueGenerator/VueMode/payload/WidgetTemplate)+自由助手+BackendGenerator/Default+generate_sfc编排+测试 | 单 `VueGenerator` state（~75字段）唯一registry；`ui_gen::vue::VueGenerator` 路径不变；golden字节/模式/reset/010路由/fingerprint语义不变 |
+| U1 Vue | `auto-ui-compiler/src/ui_gen/vue/`：mod + nav_sidebar/script/template_media/expr/tags/style_helpers/shadcn_attrs/project_files/store/library | mod.rs=类型(VueGenerator/VueMode/payload/WidgetTemplate)+自由助手+BackendGenerator/Default+generate_sfc编排+测试 | 单 `VueGenerator` state（87字段）唯一registry；`ui_gen::vue::VueGenerator` 路径不变；golden字节/模式/reset/010路由/fingerprint语义不变 |
 | U2 Aura | `auto-ui-runtime/src/ui/aura_view_builder/`：mod + slots/eval/tracked/convert_element/nav_sidebar/child_widgets/tags_container/tags_panels/tags_controls/events/props/route_memo | mod.rs=类型(AuraViewBuilder/SlotFills/OutletInitIdentityGuard)+thread-locals+自由助手+build/build_with_debug入口+测试 | `&VmBridge` 仅借用（owner=dynamic.rs `DynamicComponent.bridge`）；求值次序/惰性/键/路由/挂载与调试身份/guard恢复零改 |
-| U3 Iced renderer | `auto-ui-runtime/src/ui/iced/renderer/`：mod + style_widgets/media/projection/host/subscriptions/shell_state/devtools | mod.rs=文件头助手与thread-locals/statics+IntoIcedElement trait+IcedMessage+convert_view_messages+测试 | 消息序/active判据（primary_app/app_of_window/focused_window）/last-owner exit（WindowClosed空→shutdown_broker+exit）/纹理与external pin寿命零改 |
+| U3 Iced renderer | `auto-ui-runtime/src/ui/iced/renderer/`：mod + style_widgets/media/projection/host/subscriptions/shell_state/devtools | mod.rs=文件头助手与thread-locals/statics+IcedMessage+convert_view_messages+测试；IntoIcedElement trait定义于style_widgets.rs并经mod.rs重导出（公开路径不变） | 消息序/active判据（primary_app/app_of_window/focused_window）/last-owner exit（WindowClosed空→shutdown_broker+exit）/纹理与external pin寿命零改 |
 | M1 Man CLI | auto-ui仓不含；见 auto-man `docs/specs/cli/structure-closure.md` | — | — |
 
 拆分为纯 impl/条目移动：切点在方法文档/属性边界逐一经字节映射核验；测试随文件保留
@@ -20,8 +20,8 @@
 
 - `VueGenerator` 字段即全部生成态；`reset()` 保 config 字段不清（既有语义）。
 - `AuraViewBuilder` 借用 `&VmBridge`；Bindings/tracked三元组（path/id_map/probe）
-  由 `build_with_debug_gated` 唯一创建、显式穿线（未收敛为struct——29签名散布
-  7子文件，收敛登记为UI-007接续候选）。
+  由 `build_with_debug_gated` 唯一创建、显式穿线（未收敛为struct——29签名散布6子文件+convert_element调用点
+  收敛登记为UI-007接续候选）。
 - `DesktopSession`（session.rs）拥有 windows/apps/host/Drop收子进程；renderer
   子模块只经 `&mut DesktopSession` 变更。纹理句柄缓存三处 OnceLock 语义原样。
 

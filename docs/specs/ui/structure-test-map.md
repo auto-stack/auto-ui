@@ -10,7 +10,7 @@
 |---|---|---|---|
 | U1 | ui_gen/vue.rs 329 | vue/mod.rs 329 | 329=329 |
 | U2 | aura_view_builder.rs 172 | mod.rs 134 + route_memo.rs 38（plan045/046/047 随impl#2 owner迁入） | 172=172 |
-| U3 | iced/renderer.rs 199 | renderer/mod.rs 199 | 199=199 |
+| U3 | iced/renderer.rs 199 | renderer/mod.rs 186 + style_widgets 6 + subscriptions 3 + shell_state 4（族合计199） | 199=199 |
 | M1 | auto/src/main.rs 8 | main.rs 8（含双侧保留的双 `#[cfg(test)]` 怪癖） | 8=8 |
 
 测试名/断言/mod名零改；唯一位移=U2尾族随owner。风格widget内嵌测试
