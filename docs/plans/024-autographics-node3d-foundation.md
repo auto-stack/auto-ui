@@ -1,6 +1,6 @@
 ---
 plan_id: PLAN-024
-status: drafting
+status: execution_done
 feature_name: AutoGraphics三维声明静态资源与有状态组件基础
 author: [Codex]
 created_at: 2026-11-01
@@ -162,6 +162,7 @@ T-02 冻结合同（唯一接法=v1文档节点直写；接法二objects3d未动
 
 2026-11-01 / stage: work | plan_id: auto-ui/PLAN-024 | plan_revision: 1 | round: 2 | outcome: pass（work完成，execution_done） | worktree: D:/autostack/.wt/ui-024/auto-ui | branch: codex/plan-024-dev | base_commit: 7dfab3c | code_commit: 00e96e6 | dependency_revisions: auto-lang b1a4871aa、auto-web ec9c4ba、auto-down 7c4d5cb、SDK681（不变） | task_ids: T-03,T-04,T-05,T-06 | evidence: §8各行+本记录；门禁亲跑计数= pilot 61/61（node3d_basic_gates 7、node_sprites_gates 10、node_components_gates 9、node_queries_gates 6、node_components_game_gates 3、basic 9、g11 10、016 gates 9等）＋ driver node3d_basic_flow 6/6单线程（真GPU）＋ 旧消费者node2d_basic_flow 13/node_components_flow 9/node_queries_flow 11/node_sprites_flow 4全绿 ＋ verify_plan024 --controls 29控制组PASS ＋ verify_plan016/017/019/020/021/022全PASS（旧入口字节冻结） ＋ dialect node2d_pilot 6/6 ＋ fmt（本期触碰文件全clean；master先在dirty集pilot 2文件/driver 6文件零变化，两图fmt-dirty集与master逐文件相同） | blockers: 无 | next_responsible_role: review（T-07同树独立final）。
 work完成声明：AC-01..06 work侧全闭合（映射见SD-01候选§7，plan-artifacts/plan-024/auto-ui/sd-01-candidate.md）；D-01闭合=T-02冻结（唯一接法v1，组静态/叶动态/句柄0-based/包络8与128）；D-02闭合=v1无32池、VM原额+变更计费门、回调内读写=即时VM数组+惰性derive（tick末entry derive，下tick读新值，GPU实测）；D-03闭合=022已合入master（2f45baa+c6aa63a），T-01在022落地后的master 7dfab3c上绑定，025未启动无共享写冲突；D-04闭合=独立review待T-07同树独立上下文（本goal授权链内，fresh subagent非人工，沿019/020 R1模式），GPU单实例串行已遵守。observation（非本期破坏，零diff）：driver tests/asset_feasibility.rs在master因PLAN-013 hud_overlay字段自013起失编译（E0063），其内含512上限单元级检查随之不可运行；512上限沿未触碰代码+包络上界128×2=256<512复用论证。遗留门：merge期冻结定向门（T-08）pending未声称；统一回归按test-scope规则由review/merge按受影响面决定。
+2026-11-01 / stage: goal | plan_id: auto-ui/PLAN-024 | plan_revision: 1 | round: 1 | from: work | to: review | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-024/auto-ui | commit: 00e96e6（树）/ 7b31251（本Plan簿记） | next: review（T-07 同树独立 final；授权沿 /goal 完成计划024 全链，review 后按裁定有界修复或 merge）。
 ## 10. 待澄清事项
 
 | ID | 事项 | owner/关闭动作 |
