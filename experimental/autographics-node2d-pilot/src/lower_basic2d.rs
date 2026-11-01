@@ -97,6 +97,19 @@ pub struct SceneNode {
     pub parent: Option<usize>,
     pub is_character: bool,
     pub is_solid: bool,
+    /// PLAN-022 sprites-2d：本行的场景 sprite 绑定（旧档恒 None）。
+    pub sprite: Option<SceneSprite>,
+}
+
+/// PLAN-022：场景对象 sprite 绑定（document SpriteBinding 的生成侧形态）。
+#[derive(Clone, Debug)]
+pub struct SceneSprite {
+    /// 图像完整原始 SHA256（不带 sha256: 前缀）。
+    pub asset: String,
+    /// 默认帧整数像素矩形 [x, y, w, h]。
+    pub frame: [u32; 4],
+    /// 默认水平翻向。
+    pub flip: bool,
 }
 
 pub struct CameraCfg {
@@ -245,6 +258,9 @@ pub(crate) fn resource_mesh(
                 ResourceKind::Color(..) => Err(unsupported(format!(
                     "resource '{name}' is not a mesh2d geometry"
                 ))),
+                ResourceKind::Image { .. } | ResourceKind::Frame { .. } => Err(unsupported(
+                    format!("resource '{name}' is not a mesh2d geometry"),
+                )),
             };
         }
     }
@@ -409,6 +425,7 @@ fn expand_elements(
                     parent,
                     is_character: false,
                     is_solid: false,
+                    sprite: None,
                 });
                 expand_elements(
                     project,
@@ -569,6 +586,7 @@ fn shape_node(
         parent,
         is_character: false,
         is_solid: false,
+        sprite: None,
     })
 }
 
@@ -619,6 +637,7 @@ fn character_node(
         parent,
         is_character: true,
         is_solid: false,
+        sprite: None,
     })
 }
 
@@ -664,6 +683,7 @@ fn solid_node(
         parent,
         is_character: false,
         is_solid: true,
+        sprite: None,
     })
 }
 
@@ -951,8 +971,17 @@ pub(crate) fn fmt_f(v: f64) -> String {
 }
 
 pub(crate) fn obj_json(n: &SceneNode) -> String {
+    // PLAN-022 sprites-2d：图像绑定行携带场景 sprite 字段（资产完整 SHA
+    // 身份 + 默认整数帧矩形 + flip）；旧档恒为 null，字节不变。
+    let sprite = match &n.sprite {
+        None => "null".to_string(),
+        Some(s) => format!(
+            "{{\"asset\": \"sha256:{}\", \"frame\": [{}, {}, {}, {}], \"flip\": {}}}",
+            s.asset, s.frame[0], s.frame[1], s.frame[2], s.frame[3], s.flip
+        ),
+    };
     format!(
-        "  {{\n   \"id\": {},\n   \"name\": \"{}\",\n   \"kind\": \"{}\",\n   \"translation\": [{}, {}, 0.0],\n   \"scale\": [{}, {}, 1.0],\n   \"yaw\": 0.0,\n   \"pitch\": 0.0,\n   \"rgba\": [{}, {}, {}, {}],\n   \"visible\": {},\n   \"parent\": {},\n   \"resource\": null,\n   \"sprite\": null\n  }}",
+        "  {{\n   \"id\": {},\n   \"name\": \"{}\",\n   \"kind\": \"{}\",\n   \"translation\": [{}, {}, 0.0],\n   \"scale\": [{}, {}, 1.0],\n   \"yaw\": 0.0,\n   \"pitch\": 0.0,\n   \"rgba\": [{}, {}, {}, {}],\n   \"visible\": {},\n   \"parent\": {},\n   \"resource\": null,\n   \"sprite\": {}\n  }}",
         n.id,
         n.name,
         n.kind,
@@ -968,7 +997,8 @@ pub(crate) fn obj_json(n: &SceneNode) -> String {
         match n.parent {
             Some(p) => p.to_string(),
             None => "null".into(),
-        }
+        },
+        sprite
     )
 }
 
@@ -1187,6 +1217,7 @@ fn gen_user_source(
         call_scope: None,
         child_emit: None,
         query: None,
+        sprites: None,
     };
 
     // ---- app_start：生成绑定（声明序）+ 作者 Life.Start ----

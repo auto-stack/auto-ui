@@ -1,0 +1,58 @@
+// PLAN-022 character budget control (32 credits): the original injected
+// ag_action_held(3) pad reads into the tick; here the same +1 held
+// read(s) ride the authoring surface. 32 total credits/tick (passes at the frozen 32-credit pool).
+use resources: char_img
+node PlayerBudget32(img: Image2D) {
+    model {
+        var vy = 0.0
+        var grounded = 0
+        var facing = 0
+        var phase = 0
+        var pose = 0
+    }
+    view-2d {
+        character2d body {
+            position: (2.0, 0.0)
+            size: (0.8, 1.0)
+            image: img
+            frame: .pose
+            flip: .facing
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            let jp = input.pressed(Jump)
+            let right = input.held(Right)
+            let left = input.held(Left)
+            let pad0 = input.held(Enter)
+            if right == 1 { .facing = 0 }
+            if left == 1 { .facing = 1 }
+            if jp == 1 {
+                if .grounded == 1 { .vy = 5.0 }
+            }
+            let dx = (right - left) * 2.0 * dt
+            let dy = .vy * dt
+            let q = refs.body.move_and_slide((dx, dy))
+            .grounded = refs.body.grounded(q)
+            .pose = 0
+            if .grounded == 1 {
+                if right == 1 {
+                    .phase = .phase + 1
+                    if .phase > 1 { .phase = 0 }
+                    if .phase == 0 { .pose = 1 } else { .pose = 2 }
+                } else {
+                    if left == 1 {
+                        .phase = .phase + 1
+                        if .phase > 1 { .phase = 0 }
+                        if .phase == 0 { .pose = 1 } else { .pose = 2 }
+                    } else {
+                        .phase = 0
+                    }
+                }
+            } else {
+                if .vy > 0.0 { .pose = 3 } else { .pose = 4 }
+            }
+            if .grounded == 1 { .vy = 0.0 } else { .vy = .vy - 9.0 * dt }
+        }
+    }
+}

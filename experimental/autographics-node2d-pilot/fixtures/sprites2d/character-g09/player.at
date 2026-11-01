@@ -1,0 +1,59 @@
+// PLAN-022 Player component: the original G09 character main.at logic owned
+// by the component itself (jump pressed edge, differential held axis, one
+// char move with clearance 0.002, grounded read from that move, five-pose
+// frame selection, gravity 9.0). Numbers are the original's (jump 5.0,
+// speed 2.0, gravity 9.0), not the 020 probe's.
+use resources: char_img
+node Player(img: Image2D) {
+    model {
+        var vy = 0.0
+        var grounded = 0
+        var facing = 0
+        var phase = 0
+        var pose = 0
+    }
+    view-2d {
+        character2d body {
+            position: (2.0, 0.0)
+            size: (0.8, 1.0)
+            image: img
+            frame: .pose
+            flip: .facing
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            let jp = input.pressed(Jump)
+            let right = input.held(Right)
+            let left = input.held(Left)
+            if right == 1 { .facing = 0 }
+            if left == 1 { .facing = 1 }
+            if jp == 1 {
+                if .grounded == 1 { .vy = 5.0 }
+            }
+            let dx = (right - left) * 2.0 * dt
+            let dy = .vy * dt
+            let q = refs.body.move_and_slide((dx, dy))
+            .grounded = refs.body.grounded(q)
+            .pose = 0
+            if .grounded == 1 {
+                if right == 1 {
+                    .phase = .phase + 1
+                    if .phase > 1 { .phase = 0 }
+                    if .phase == 0 { .pose = 1 } else { .pose = 2 }
+                } else {
+                    if left == 1 {
+                        .phase = .phase + 1
+                        if .phase > 1 { .phase = 0 }
+                        if .phase == 0 { .pose = 1 } else { .pose = 2 }
+                    } else {
+                        .phase = 0
+                    }
+                }
+            } else {
+                if .vy > 0.0 { .pose = 3 } else { .pose = 4 }
+            }
+            if .grounded == 1 { .vy = 0.0 } else { .vy = .vy - 9.0 * dt }
+        }
+    }
+}

@@ -1,0 +1,10 @@
+// PLAN-022 sprites-2d atlas resources: the fixed CC0 atlas (96x32, three
+// 32x32 frames) declared as a typed image + named frame table. Bytes are a
+// read-only copy of ag-examples G09 (sha fixed by verify_plan022).
+let atlas_img = image2d.png("assets/atlas.png")
+let f_ruby = frame2d.at(resources.atlas_img, 0, 0, 32, 32)
+let f_amber = frame2d.at(resources.atlas_img, 32, 0, 32, 32)
+let f_magenta = frame2d.at(resources.atlas_img, 64, 0, 32, 32)
+let underlay_color = material2d.color(0.0, 0.0, 0.0, 1.0)
+let ground_mesh = mesh2d.quad(40.0, 1.0)
+let ground_color = material2d.color(0.9, 0.3, 0.2, 1.0)

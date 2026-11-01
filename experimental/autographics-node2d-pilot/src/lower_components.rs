@@ -99,12 +99,15 @@ fn prop_line(module_src: &str, pr: &Prop) -> usize {
 
 // ------------------------------------------------------------------ IR ----
 
-/// 参数/载荷类型面（组件合同：int/float 数值 + Material2D/Mesh2D 资源端口）。
+/// 参数/载荷类型面（组件合同：int/float 数值 + Material2D/Mesh2D/Image2D
+/// 资源端口——Image2D 为 PLAN-022 sprites-2d 增补）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum PType {
     Int,
     Float,
     Res,
+    /// PLAN-022：Image2D（typed 图像端口；绑定必须是 image2d.png 资源）。
+    Img,
 }
 
 fn ptype_of(ty: &Type) -> Option<PType> {
@@ -112,6 +115,7 @@ fn ptype_of(ty: &Type) -> Option<PType> {
         Type::Int | Type::Byte => Some(PType::Int),
         Type::Float | Type::Double => Some(PType::Float),
         Type::User(d) if d.name == "Material2D" || d.name == "Mesh2D" => Some(PType::Res),
+        Type::User(d) if d.name == "Image2D" => Some(PType::Img),
         _ => None,
     }
 }
@@ -119,7 +123,7 @@ fn ptype_of(ty: &Type) -> Option<PType> {
 impl PType {
     fn text(self) -> &'static str {
         match self {
-            PType::Int | PType::Res => "int",
+            PType::Int | PType::Res | PType::Img => "int",
             PType::Float => "float",
         }
     }
@@ -147,6 +151,32 @@ impl ParamVal {
     }
 }
 
+/// PLAN-022：视图图像绑定上的 frame/flip 值形态（字面量序数/参数/model 引用）。
+#[derive(Debug, Clone)]
+enum FrameBind {
+    /// 字面量：frame = 帧表 ordinal；flip = 0/1。
+    Lit(u32),
+    /// 数值参数（逐实例下降期常量）。
+    Param(String),
+    /// `.field`（本定义 model 字段；运行期逐 tick 值）。
+    Field(String),
+}
+
+/// PLAN-022：一个图像绑定视图元素（shape2d 或 character2d）。
+#[derive(Debug, Clone)]
+struct SpriteElemIR {
+    elem: String,
+    /// character2d 行（帧写走 ag_sprite_frame(行 id)）还是 shape2d。
+    is_char: bool,
+    /// image2d.png 资源名（Direct 形态；Param 形态时为空）。
+    image: String,
+    /// Image2D 参数名（`image: <param>` 传参形态；逐实例解析）。
+    image_param: Option<String>,
+    frame: FrameBind,
+    flip: FrameBind,
+    line: usize,
+}
+
 /// 一个组件定义（root 或被实例化 node）的静态面。
 pub(crate) struct DefIR {
     pub(crate) name: String,
@@ -168,6 +198,8 @@ pub(crate) struct DefIR {
     pub(crate) static_elems: Vec<String>,
     /// character2d 元素（元素名, 行）。
     pub(crate) char_elem: Option<(String, usize)>,
+    /// PLAN-022（sprites-2d）：图像绑定元素（序保持；与 dyn/static 互斥）。
+    pub(crate) sprite_elems: Vec<SpriteElemIR>,
     /// 定义是否带状态面（model/msg/on）→ 实例计入 8 包络。
     pub(crate) stateful: bool,
 }
@@ -200,6 +232,10 @@ pub(crate) struct WorldIR {
     /// 根 view 的 solid2d（序保持）与 camera2d（≤1）。
     pub(crate) solids: Vec<String>,
     pub(crate) camera: Option<Vec<Prop>>,
+    /// PLAN-022：工程图像资源（声明序）：名字 → (sha256, byte_length, w, h)。
+    pub(crate) images: BTreeMap<String, (String, usize, u32, u32)>,
+    /// PLAN-022：帧表（图像名 → [(帧资源名, rect)]，声明序；ordinal 即序）。
+    pub(crate) frames: BTreeMap<String, Vec<(String, [u32; 4])>>,
 }
 
 pub(crate) fn inst_name_of(path: &str) -> &str {
@@ -307,7 +343,7 @@ fn param_int(
                 &format!("model init references unknown param '{pname}'"),
             )
         })?;
-    if pt == PType::Res {
+    if pt == PType::Res || pt == PType::Img {
         return Err(at(
             module,
             line,
@@ -318,8 +354,20 @@ fn param_int(
     Ok(pt == PType::Int)
 }
 
+/// PLAN-022：视图 image 绑定的引用形态（直连 resources.X 或 Image2D 参数）。
+#[derive(Debug, Clone)]
+enum ImageRef {
+    Direct(String),
+    Param(String),
+}
+
 /// 扫描一个定义的静态面（root 或被实例化 node）。
-fn build_def(project: &Project, name: &str, is_root: bool) -> Result<DefIR, LowerError> {
+fn build_def(
+    project: &Project,
+    name: &str,
+    is_root: bool,
+    sprites: bool,
+) -> Result<DefIR, LowerError> {
     let module = project.node_modules.get(name).cloned().ok_or_else(|| {
         at(
             "",
@@ -465,7 +513,44 @@ fn build_def(project: &Project, name: &str, is_root: bool) -> Result<DefIR, Lowe
         dyn_elems: Vec::new(),
         static_elems: Vec::new(),
         char_elem: None,
+        sprite_elems: Vec::new(),
         stateful: decl.model.is_some() || decl.msg.is_some() || decl.on.is_some(),
+    };
+
+    // PLAN-022：图像绑定 prop 解析（sprites-2d 档；旧档不走此路径）。
+    let parse_image_ref = |pr: &Prop| -> Result<ImageRef, LowerError> {
+        match &pr.value {
+            PropValue::One(Expr::Dot(outer, r)) if matches!(&**outer, Expr::Ident(b) if b == "resources") => {
+                Ok(ImageRef::Direct(r.to_string()))
+            }
+            PropValue::One(Expr::Dot(outer, p)) if matches!(&**outer, Expr::Ident(b) if b == "self") => {
+                Ok(ImageRef::Param(p.to_string()))
+            }
+            PropValue::One(Expr::Ident(p)) => Ok(ImageRef::Param(p.to_string())),
+            other => Err(at(
+                &module,
+                line,
+                &pr.name,
+                &format!("image prop must be resources.<name> or an Image2D param, got {other:?}"),
+            )),
+        }
+    };
+    let parse_frame_bind = |pr: &Prop| -> Result<FrameBind, LowerError> {
+        match &pr.value {
+            PropValue::One(Expr::Int(v)) => Ok(FrameBind::Lit(*v as u32)),
+            PropValue::One(Expr::Dot(outer, p)) if matches!(&**outer, Expr::Ident(b) if b == "self") => {
+                Ok(FrameBind::Field(p.to_string()))
+            }
+            PropValue::One(Expr::Ident(p)) => Ok(FrameBind::Param(p.to_string())),
+            other => Err(at(
+                &module,
+                line,
+                &pr.name,
+                &format!(
+                    "frame/flip must be an int literal, param or '.field' model ref, got {other:?}"
+                ),
+            )),
+        }
     };
 
     let view = decl
@@ -479,6 +564,78 @@ fn build_def(project: &Project, name: &str, is_root: bool) -> Result<DefIR, Lowe
             View2dElement::Shape { name, props } => {
                 if !seen.insert(name.clone()) {
                     return Err(at(&module, line, name, "duplicate view element name"));
+                }
+                // PLAN-022：image 绑定元素（sprites-2d 档）。
+                if sprites {
+                    if let Some(ip) = prop_of(props, "image") {
+                        let image = parse_image_ref(ip)?;
+                        let frame_pr = prop_of(props, "frame").ok_or_else(|| {
+                            at(&module, line, name, "image element missing 'frame'")
+                        })?;
+                        let flip_pr = prop_of(props, "flip").ok_or_else(|| {
+                            at(&module, line, name, "image element missing 'flip'")
+                        })?;
+                        let frame = parse_frame_bind(frame_pr)?;
+                        let flip = parse_frame_bind(flip_pr)?;
+                        if let FrameBind::Lit(v) = flip {
+                            if v > 1 {
+                                return Err(at(
+                                    &module,
+                                    line,
+                                    name,
+                                    &format!("literal flip must be 0/1, got {v}"),
+                                ));
+                            }
+                        }
+                        if prop_of(props, "position")
+                            .map(|p| prop_binds_model(p, &model_fields))
+                            .unwrap_or(false)
+                        {
+                            return Err(at(
+                                &module,
+                                line,
+                                name,
+                                "image element position must be static (move it through the character service or a dynamic non-image shape)",
+                            ));
+                        }
+                        let known = [
+                            "image", "frame", "flip", "position", "kind", "size", "visible",
+                            "material",
+                        ];
+                        for pr in props {
+                            if !known.contains(&pr.name.as_str()) {
+                                return Err(at(
+                                    &module,
+                                    line,
+                                    &pr.name,
+                                    &format!(
+                                        "unknown prop on image element '{name}' (known: {known:?})"
+                                    ),
+                                ));
+                            }
+                        }
+                        def.sprite_elems.push(match image {
+                            ImageRef::Direct(r) => SpriteElemIR {
+                                elem: name.clone(),
+                                is_char: false,
+                                image: r,
+                                image_param: None,
+                                frame,
+                                flip,
+                                line,
+                            },
+                            ImageRef::Param(p) => SpriteElemIR {
+                                elem: name.clone(),
+                                is_char: false,
+                                image: String::new(),
+                                image_param: Some(p),
+                                frame,
+                                flip,
+                                line,
+                            },
+                        });
+                        continue;
+                    }
                 }
                 if props.iter().any(|p| prop_binds_model(p, &model_fields)) {
                     def.dyn_elems.push(name.clone());
@@ -497,6 +654,53 @@ fn build_def(project: &Project, name: &str, is_root: bool) -> Result<DefIR, Lowe
                         name,
                         "duplicate character2d (exactly one)",
                     ));
+                }
+                // PLAN-022：character2d 携带 image 绑定（frame/flip 可绑定
+                // 本定义 model；position/size 仍静态）。
+                if sprites {
+                    if let Some(ip) = prop_of(props, "image") {
+                        let image = parse_image_ref(ip)?;
+                        let frame_pr = prop_of(props, "frame").ok_or_else(|| {
+                            at(&module, line, name, "image element missing 'frame'")
+                        })?;
+                        let flip_pr = prop_of(props, "flip").ok_or_else(|| {
+                            at(&module, line, name, "image element missing 'flip'")
+                        })?;
+                        let frame = parse_frame_bind(frame_pr)?;
+                        let flip = parse_frame_bind(flip_pr)?;
+                        if let FrameBind::Lit(v) = flip {
+                            if v > 1 {
+                                return Err(at(
+                                    &module,
+                                    line,
+                                    name,
+                                    &format!("literal flip must be 0/1, got {v}"),
+                                ));
+                            }
+                        }
+                        def.sprite_elems.push(match image {
+                            ImageRef::Direct(r) => SpriteElemIR {
+                                elem: name.clone(),
+                                is_char: true,
+                                image: r,
+                                image_param: None,
+                                frame,
+                                flip,
+                                line,
+                            },
+                            ImageRef::Param(p) => SpriteElemIR {
+                                elem: name.clone(),
+                                is_char: true,
+                                image: String::new(),
+                                image_param: Some(p),
+                                frame,
+                                flip,
+                                line,
+                            },
+                        });
+                        def.char_elem = Some((name.clone(), line));
+                        continue;
+                    }
                 }
                 if props.iter().any(|p| prop_binds_model(p, &model_fields)) {
                     return Err(at(
@@ -640,14 +844,14 @@ fn model_init_value(
 }
 
 /// 构建组件世界 IR：root + 声明先序实例展开（嵌套/同定义多实例/环/包络）。
-pub(crate) fn build_world(project: &Project) -> Result<WorldIR, LowerError> {
+pub(crate) fn build_world(project: &Project, sprites: bool) -> Result<WorldIR, LowerError> {
     let root_name = project.root.clone();
     let root_module = project
         .node_modules
         .get(&root_name)
         .cloned()
         .ok_or_else(|| at("", 0, &root_name, "root node module missing"))?;
-    let root_def = build_def(project, &root_name, true)?;
+    let root_def = build_def(project, &root_name, true, sprites)?;
 
     let mut world = WorldIR {
         root: root_name.clone(),
@@ -657,7 +861,79 @@ pub(crate) fn build_world(project: &Project) -> Result<WorldIR, LowerError> {
         stateful: 1, // root 计入
         solids: Vec::new(),
         camera: None,
+        images: BTreeMap::new(),
+        frames: BTreeMap::new(),
     };
+
+    // PLAN-022：图像/帧表资源装配（sprites-2d 档）——声明序跨 resources
+    // 模块收集；帧 rect 按图像 IHDR 尺寸边界具名校验（完整准入在 driver）。
+    if sprites {
+        let mut frame_names: BTreeSet<String> = BTreeSet::new();
+        for module in project.modules.values() {
+            for r in &module.resources {
+                match &r.kind {
+                    crate::load::ResourceKind::Image {
+                        file,
+                        sha256,
+                        byte_length,
+                        width,
+                        height,
+                    } => {
+                        if world.images.contains_key(&r.name) {
+                            return Err(at(
+                                &module.name,
+                                0,
+                                &r.name,
+                                "duplicate image resource name",
+                            ));
+                        }
+                        world.images.insert(
+                            r.name.clone(),
+                            (sha256.clone(), *byte_length, *width, *height),
+                        );
+                        let _ = file;
+                    }
+                    crate::load::ResourceKind::Frame { image, rect } => {
+                        if !frame_names.insert(r.name.clone()) {
+                            return Err(at(
+                                &module.name,
+                                0,
+                                &r.name,
+                                "duplicate frame resource name",
+                            ));
+                        }
+                        let entry = world.frames.entry(image.clone()).or_default();
+                        entry.push((r.name.clone(), *rect));
+                    }
+                    _ => {}
+                }
+            }
+        }
+        for (image, frames) in &world.frames {
+            let Some((_, _, w, h)) = world.images.get(image) else {
+                return Err(at(
+                    "",
+                    0,
+                    image,
+                    "frame table references unknown image resource",
+                ));
+            };
+            let (w, h) = (*w as i64, *h as i64);
+            for (fname, rect) in frames {
+                let [x, y, rw, rh] = rect.map(|v| v as i64);
+                if rw < 1 || rh < 1 || x < 0 || y < 0 || x + rw > w || y + rh > h {
+                    return Err(at(
+                        "",
+                        0,
+                        fname,
+                        &format!(
+                            "frame rect [{x}, {y}, {rw}, {rh}] exceeds image '{image}' ({w}x{h})"
+                        ),
+                    ));
+                }
+            }
+        }
+    }
     world.defs.insert(root_name.clone(), root_def);
 
     let root_decl = node_of(project, &world.root);
@@ -697,6 +973,7 @@ pub(crate) fn build_world(project: &Project) -> Result<WorldIR, LowerError> {
         in_module: &str,
         stack: &mut Vec<(String, String)>,
         depth: usize,
+        sprites: bool,
     ) -> Result<(), LowerError> {
         if depth > 16 {
             return Err(at(
@@ -738,7 +1015,7 @@ pub(crate) fn build_world(project: &Project) -> Result<WorldIR, LowerError> {
             ));
         }
         if !world.defs.contains_key(node_name) {
-            let def = build_def(project, node_name, false)?;
+            let def = build_def(project, node_name, false, sprites)?;
             world.defs.insert(node_name.to_string(), def);
         }
         let def_line = world.defs[node_name].line;
@@ -805,7 +1082,7 @@ pub(crate) fn build_world(project: &Project) -> Result<WorldIR, LowerError> {
                 PropValue::One(Expr::Dot(outer, m))
                     if matches!(&**outer, Expr::Ident(b) if b == "resources") =>
                 {
-                    if *pty != PType::Res {
+                    if !matches!(pty, PType::Res | PType::Img) {
                         return Err(at(
                             &def_module,
                             pline,
@@ -816,10 +1093,21 @@ pub(crate) fn build_world(project: &Project) -> Result<WorldIR, LowerError> {
                             ),
                         ));
                     }
+                    if *pty == PType::Img && !world.images.contains_key(m.as_str()) {
+                        return Err(at(
+                            &def_module,
+                            pline,
+                            pname,
+                            &format!(
+                                "instance '{path}' param '{pname}' binds 'resources.{}' which is not an image2d resource",
+                                m
+                            ),
+                        ));
+                    }
                     ParamVal::Res(m.to_string())
                 }
                 PropValue::One(e) => {
-                    if *pty == PType::Res {
+                    if matches!(pty, PType::Res | PType::Img) {
                         return Err(at(
                             &def_module,
                             pline,
@@ -929,6 +1217,7 @@ pub(crate) fn build_world(project: &Project) -> Result<WorldIR, LowerError> {
                     &def_module,
                     stack,
                     depth + 1,
+                    sprites,
                 )?;
             }
         }
@@ -956,7 +1245,67 @@ pub(crate) fn build_world(project: &Project) -> Result<WorldIR, LowerError> {
                 &root_module,
                 &mut stack,
                 0,
+                sprites,
             )?;
+        }
+    }
+
+    // PLAN-022：图像绑定面的具名校验（V-01）：直连 image 必须是 image2d
+    // 资源、必须有非空帧表；字面量 frame ordinal 必须落在帧表内；字面量
+    // flip 必须 0/1（Param 形态在实例解析处核，Field 形态运行期受信边界核）。
+    if sprites {
+        for (dname, d) in &world.defs {
+            for se in &d.sprite_elems {
+                if se.image_param.is_some() {
+                    continue;
+                }
+                let img = &se.image;
+                if !world.images.contains_key(img) {
+                    return Err(at(
+                        &d.module,
+                        se.line,
+                        &se.elem,
+                        &format!(
+                            "image element '{}' binds 'resources.{img}' which is not an image2d.png resource",
+                            se.elem
+                        ),
+                    ));
+                }
+                let frames = world.frames.get(img).ok_or_else(|| {
+                    at(
+                        &d.module,
+                        se.line,
+                        &se.elem,
+                        &format!(
+                            "image element '{}' binds image '{img}' which declares no frame table",
+                            se.elem
+                        ),
+                    )
+                })?;
+                if let FrameBind::Lit(v) = &se.frame {
+                    if *v as usize >= frames.len() {
+                        return Err(at(
+                            &d.module,
+                            se.line,
+                            &se.elem,
+                            &format!(
+                                "literal frame ordinal {v} exceeds the frame table of image '{img}' ({} frame(s))",
+                                frames.len()
+                            ),
+                        ));
+                    }
+                }
+                if let FrameBind::Lit(v) = &se.flip {
+                    if *v > 1 {
+                        return Err(at(
+                            &d.module,
+                            se.line,
+                            &se.elem,
+                            &format!("literal flip must be 0/1, got {v}"),
+                        ));
+                    }
+                }
+            }
         }
     }
 
@@ -1039,6 +1388,9 @@ pub(crate) struct Plan {
     pub(crate) anc: BTreeMap<(String, String), AncDispatch>,
     /// 接收 fn 名 → (接收定义（""=root）, 事件名)。
     pub(crate) recv_fns: BTreeMap<String, (String, String)>,
+    /// PLAN-022：render2d.spawn 站点（元素名, 行），声明先序；具体
+    /// (slot, row) 由 collect_scene 按同一顺序分配。
+    pub(crate) render_spawns: Vec<(String, usize)>,
 }
 
 /// 遍历处理器语句树，收集：裸函数调用、`.member` 引用、emit 站点。
@@ -1051,6 +1403,8 @@ struct WalkOut {
     anc_emits: Vec<(String, usize, usize)>,
     /// PLAN-021：queries-2d 事件序（绑定/读取/调用/引用/自身行）。
     query_events: Vec<QEvent>,
+    /// PLAN-022：render2d.<op> 调用（op, spawn 目标元素, 元数, 行）。
+    render_calls: Vec<(String, Option<String>, usize, usize)>,
 }
 
 /// PLAN-021：查询 handle 实参形态（plan 层验证引用存在/维度合法）。
@@ -1096,17 +1450,17 @@ enum QEvent {
     ResultAssign { name: String, line: usize },
 }
 
-fn walk_stmts(stmts: &[Stmt], line: usize, out: &mut WalkOut, queries: bool) {
+fn walk_stmts(stmts: &[Stmt], line: usize, out: &mut WalkOut, queries: bool, sprites: bool) {
     for s in stmts {
         match s {
-            Stmt::Expr(e) => walk_expr_q(e, line, out, queries),
+            Stmt::Expr(e) => walk_expr_q(e, line, out, queries, sprites),
             Stmt::If(if_) => {
                 for b in &if_.branches {
-                    walk_expr_q(&b.cond, line, out, queries);
-                    walk_stmts(&b.body.stmts, line, out, queries);
+                    walk_expr_q(&b.cond, line, out, queries, sprites);
+                    walk_stmts(&b.body.stmts, line, out, queries, sprites);
                 }
                 if let Some(e) = &if_.else_ {
-                    walk_stmts(&e.stmts, line, out, queries);
+                    walk_stmts(&e.stmts, line, out, queries, sprites);
                 }
             }
             Stmt::Store(v) => {
@@ -1125,9 +1479,9 @@ fn walk_stmts(stmts: &[Stmt], line: usize, out: &mut WalkOut, queries: bool) {
                         });
                     }
                 }
-                walk_expr_q(&v.expr, line, out, queries)
+                walk_expr_q(&v.expr, line, out, queries, sprites)
             }
-            Stmt::Return(e) => walk_expr_q(e, line, out, queries),
+            Stmt::Return(e) => walk_expr_q(e, line, out, queries, sprites),
             Stmt::EmptyLine(_) | Stmt::Comment(_) => {}
             _ => {}
         }
@@ -1142,7 +1496,7 @@ fn is_getter_method(m: &str) -> bool {
     )
 }
 
-fn walk_expr_q(e: &Expr, line: usize, out: &mut WalkOut, queries: bool) {
+fn walk_expr_q(e: &Expr, line: usize, out: &mut WalkOut, queries: bool, sprites: bool) {
     match e {
         Expr::Call(c) => {
             let cline = c.pos.as_ref().map(|p| p.line).unwrap_or(line);
@@ -1153,6 +1507,31 @@ fn walk_expr_q(e: &Expr, line: usize, out: &mut WalkOut, queries: bool) {
                             .anc_emits
                             .push((ev.to_string(), c.args.args.len(), cline)),
                         "input" | "refs" | "self" | "query2d" => {}
+                        // PLAN-022：render2d.<op> 站点（sprites 档记录）。
+                        "render2d" => {
+                            let target = match ev.as_str() {
+                                "spawn" => c.args.args.first().and_then(|a| match a {
+                                    auto_parser_api::ast::Arg::Pos(Expr::Str(n)) => {
+                                        Some(n.to_string())
+                                    }
+                                    _ => None,
+                                }),
+                                // frame：记录图像名（帧表生成面）。
+                                "frame" => c.args.args.get(1).and_then(|a| match a {
+                                    auto_parser_api::ast::Arg::Pos(Expr::Str(n)) => {
+                                        Some(n.to_string())
+                                    }
+                                    _ => None,
+                                }),
+                                _ => None,
+                            };
+                            out.render_calls.push((
+                                ev.to_string(),
+                                target,
+                                c.args.args.len(),
+                                cline,
+                            ));
+                        }
                         // PLAN-021：typed 结果 getter 事件（仅 queries 档；
                         // 其余保持子投递语义）。
                         child if queries && is_getter_method(ev) => {
@@ -1261,7 +1640,7 @@ fn walk_expr_q(e: &Expr, line: usize, out: &mut WalkOut, queries: bool) {
             }
             for a in &c.args.args {
                 if let auto_parser_api::ast::Arg::Pos(x) = a {
-                    walk_expr_q(x, line, out, queries);
+                    walk_expr_q(x, line, out, queries, sprites);
                 }
             }
         }
@@ -1279,7 +1658,7 @@ fn walk_expr_q(e: &Expr, line: usize, out: &mut WalkOut, queries: bool) {
                         return;
                     }
                 }
-                walk_expr_q(inner, line, out, queries);
+                walk_expr_q(inner, line, out, queries, sprites);
             }
         }
         Expr::Bina(l, op, r) => {
@@ -1304,13 +1683,13 @@ fn walk_expr_q(e: &Expr, line: usize, out: &mut WalkOut, queries: bool) {
                     }
                 }
             }
-            walk_expr_q(l, line, out, queries);
-            walk_expr_q(r, line, out, queries);
+            walk_expr_q(l, line, out, queries, sprites);
+            walk_expr_q(r, line, out, queries, sprites);
         }
-        Expr::Unary(_, i) => walk_expr_q(i, line, out, queries),
+        Expr::Unary(_, i) => walk_expr_q(i, line, out, queries, sprites),
         Expr::Tuple(items) => {
             for i in items {
-                walk_expr_q(i, line, out, queries);
+                walk_expr_q(i, line, out, queries, sprites);
             }
         }
         _ => {}
@@ -1346,7 +1725,12 @@ fn find_child_node(project: &Project, def_name: &str, child: &str) -> Option<Str
 
 /// 构建投递计划并验证全部 emit 站点（端口存在 + 元数一致）与 handler 面
 /// （未知成员 / 未知 helper fn）。
-pub(crate) fn plan_dispatch(project: &Project, world: &WorldIR, queries: bool) -> Result<Plan, LowerError> {
+pub(crate) fn plan_dispatch(
+    project: &Project,
+    world: &WorldIR,
+    queries: bool,
+    sprites: bool,
+) -> Result<Plan, LowerError> {
     let mut plan = Plan::default();
     let root_prefix = world.root.to_lowercase();
 
@@ -1401,8 +1785,127 @@ pub(crate) fn plan_dispatch(project: &Project, world: &WorldIR, queries: bool) -
                 child_emits: Vec::new(),
                 anc_emits: Vec::new(),
                 query_events: Vec::new(),
+                render_calls: Vec::new(),
             };
-            walk_stmts(&h.body.stmts, hline, &mut out, queries);
+            walk_stmts(&h.body.stmts, hline, &mut out, queries, sprites);
+
+            // ---- PLAN-022: render2d surface validation (named
+            // module/line/symbol diagnostics; slot budget checked below) ----
+            for (op, target, argc, rline) in &out.render_calls {
+                if !sprites {
+                    return Err(at(
+                        &def.module,
+                        *rline,
+                        "render2d",
+                        "render2d is only available in the sprites-2d profile",
+                    ));
+                }
+                match op.as_str() {
+                    "spawn" => {
+                        if *argc != 3 {
+                            return Err(at(
+                                &def.module,
+                                *rline,
+                                "render2d",
+                                &format!("render2d.spawn arity {argc} (want <elem>, x, y)"),
+                            ));
+                        }
+                        let Some(t) = target else {
+                            return Err(at(
+                                &def.module,
+                                *rline,
+                                "render2d",
+                                "render2d.spawn target must be a string literal element name",
+                            ));
+                        };
+                        let root_def = &world.defs[&world.root];
+                        let el = root_def
+                            .sprite_elems
+                            .iter()
+                            .find(|e| e.elem == *t && !e.is_char)
+                            .ok_or_else(|| {
+                                at(
+                                    &def.module,
+                                    *rline,
+                                    t,
+                                    &format!(
+                                        "unknown render2d.spawn target '{t}' (no bound image leaf of that name in the root view)"
+                                    ),
+                                )
+                            })?;
+                        if el.image_param.is_some() {
+                            return Err(at(
+                                &def.module,
+                                *rline,
+                                t,
+                                "render2d.spawn template must bind resources.<image> directly (the root has no params)",
+                            ));
+                        }
+                        if !matches!(el.frame, FrameBind::Lit(_))
+                            || !matches!(el.flip, FrameBind::Lit(_))
+                        {
+                            return Err(at(
+                                &def.module,
+                                *rline,
+                                t,
+                                &format!(
+                                    "render2d.spawn template '{t}' must declare literal frame/flip (spawned slots reset to the document default)"
+                                ),
+                            ));
+                        }
+                        plan.render_spawns.push((t.clone(), *rline));
+                    }
+                    "despawn" => {
+                        if *argc != 1 {
+                            return Err(at(
+                                &def.module,
+                                *rline,
+                                "render2d",
+                                &format!("render2d.despawn arity {argc} (want <token>)"),
+                            ));
+                        }
+                    }
+                    "frame" => {
+                        if *argc != 4 {
+                            return Err(at(
+                                &def.module,
+                                *rline,
+                                "render2d",
+                                &format!(
+                                    "render2d.frame arity {argc} (want <token>, <image>, <ordinal>, <flip>)"
+                                ),
+                            ));
+                        }
+                        if let Some(img) = target {
+                            if !world.frames.contains_key(img.as_str()) {
+                                return Err(at(
+                                    &def.module,
+                                    *rline,
+                                    &img,
+                                    &format!(
+                                        "render2d.frame image '{img}' is not an image2d resource with a frame table"
+                                    ),
+                                ));
+                            }
+                        } else {
+                            return Err(at(
+                                &def.module,
+                                *rline,
+                                "render2d",
+                                "render2d.frame image must be a string literal image resource name",
+                            ));
+                        }
+                    }
+                    other => {
+                        return Err(at(
+                            &def.module,
+                            *rline,
+                            "render2d",
+                            &format!("unknown render2d service '{other}' (spawn/despawn/frame)"),
+                        ));
+                    }
+                }
+            }
 
             // ---- PLAN-021: queries-2d surface validation (named
             // module/line/symbol diagnostics) ----
@@ -1875,6 +2378,41 @@ pub(crate) fn plan_dispatch(project: &Project, world: &WorldIR, queries: bool) -
             }
         }
     }
+
+    // PLAN-022：运行时对象槽预算（SLOTS=8 冻结合同）：app_start 声明先序
+    // spawn（每实例每动态/图像模板元素一个）+ render2d.spawn 站点 ≤ 8；
+    // 超出在降层具名拒绝（运行时第 9 槽 fault 31 不再可达）。
+    if sprites {
+        let mut slots = 0usize;
+        for inst in &world.instances {
+            let def = &world.defs[&inst.def];
+            let sprite_dyn = def
+                .sprite_elems
+                .iter()
+                .filter(|e| !e.is_char)
+                .filter(|e| {
+                    matches!(e.frame, FrameBind::Field(_)) || matches!(e.flip, FrameBind::Field(_))
+                })
+                .count();
+            slots += def.dyn_elems.len() + sprite_dyn;
+        }
+        slots += plan
+            .render_spawns
+            .iter()
+            .map(|(e, _)| e)
+            .collect::<std::collections::BTreeSet<_>>()
+            .len();
+        if slots > 8 {
+            return Err(at(
+                &world.root_module,
+                0,
+                &world.root,
+                &format!(
+                    "sprites-2d runtime object slots exceed the frozen 8-slot pool (dynamic instance templates + render2d.spawn sites = {slots})"
+                ),
+            ));
+        }
+    }
     Ok(plan)
 }
 
@@ -2156,6 +2694,12 @@ pub(crate) struct SceneBuild {
     /// PLAN-021：定义名 → [(def_idx, primary 静态行 ordinal)]（self 行
     /// 寻址数组 `{prefix}_qrow` 的来源；character 实例=0，无静态行=-1）。
     self_rows: BTreeMap<String, Vec<(usize, i64)>>,
+    /// PLAN-022：render2d.spawn 元素名 → (slot, 模板行 id)（旧档为空）。
+    spawn_sites: BTreeMap<String, (i64, i64)>,
+    /// PLAN-022：场景 assets JSON 条目（png 身份；旧档为空）。
+    assets_json: Vec<String>,
+    /// PLAN-022：被引用图像名（帧表数组生成面，声明序去重）。
+    used_images: Vec<String>,
 }
 
 /// 表达式 → 生成文本（共享 translate；ctx 决定 `.field`/emit/服务映射）。
@@ -2413,6 +2957,7 @@ pub(crate) fn collect_scene(
             parent: None,
             is_character: true,
             is_solid: false,
+            sprite: None,
         });
         char = Some((next_id, name));
         next_id += 1;
@@ -2468,6 +3013,7 @@ pub(crate) fn collect_scene(
             parent: None,
             is_character: false,
             is_solid: true,
+            sprite: None,
         });
         solid_ids.push(next_id);
         next_id += 1;
@@ -2522,6 +3068,7 @@ pub(crate) fn collect_scene(
             parent: None,
             is_character: false,
             is_solid: false,
+            sprite: None,
         });
         let template = *next_id;
         *next_id += 1;
@@ -2565,6 +3112,7 @@ pub(crate) fn collect_scene(
                         call_scope: None,
                         child_emit: None,
                         query: None,
+                        sprites: None,
                     };
                     let pos = prop_of(props, "position").ok_or_else(|| {
                         at(
@@ -2624,6 +3172,7 @@ pub(crate) fn collect_scene(
                         parent: None,
                         is_character: false,
                         is_solid: false,
+                        sprite: None,
                     });
                     next_id += 1;
                 }
@@ -2654,6 +3203,7 @@ pub(crate) fn collect_scene(
                             def,
                             &prefix,
                             &inst.def_idx.to_string(),
+                            None,
                             None,
                         )?;
                         let pos = prop_of(props, "position").ok_or_else(|| {
@@ -2717,6 +3267,7 @@ pub(crate) fn collect_scene(
                             parent: None,
                             is_character: false,
                             is_solid: false,
+                            sprite: None,
                         });
                         // PLAN-021：顶层实例 primary 静态行（首个静态
                         // shape；character 定义实例不在此分支）。
@@ -2760,6 +3311,9 @@ pub(crate) fn collect_scene(
         spawns,
         refs,
         self_rows,
+        spawn_sites: BTreeMap::new(),
+        assets_json: Vec::new(),
+        used_images: Vec::new(),
     })
 }
 
@@ -2773,6 +3327,1027 @@ pub struct QueryParts<'a> {
     pub binds: &'a std::cell::RefCell<Vec<(String, QueryKind)>>,
 }
 
+/// PLAN-022 sprites-2d 场景收集：声明序 = 文档序（作者显式层序），图像
+/// 绑定行携带场景 sprite 字段（默认 frame/flip 来自声明初值），动态图像
+/// 元素走模板+spawn+逐 tick slot 写，render2d.spawn 站点分配冻结槽预算
+/// 内的槽位。
+fn collect_scene_sprites(
+    project: &Project,
+    world: &WorldIR,
+    plan: &Plan,
+) -> Result<SceneBuild, LowerError> {
+    let mut rows: Vec<SceneNode> = Vec::new();
+    let mut next_id = 1usize;
+    let mut spawns: Vec<String> = Vec::new();
+    let mut slot: usize = 0;
+    let mut solid_ids: Vec<usize> = Vec::new();
+    let mut char: Option<(usize, String)> = None;
+    let mut camera: Option<CameraCfg> = None;
+    let mut leaf_rows: BTreeMap<String, usize> = BTreeMap::new();
+    let mut spawn_sites: BTreeMap<String, (i64, i64)> = BTreeMap::new();
+    let mut used_images: Vec<String> = Vec::new();
+    let mut used = |img: &str, used_images: &mut Vec<String>| {
+        if !used_images.iter().any(|i| i == img) {
+            used_images.push(img.to_string());
+        }
+    };
+
+    let root_def = &world.defs[&world.root];
+    let root_decl = node_of(project, &world.root);
+    let root_view = root_decl.view2d.as_ref().expect("root view");
+
+    // sprite 元素约束：每定义至多一个（char 或 shape）；root 直属 char 与
+    // 实例 char 的既有归属规则不变。
+    for (dname, d) in &world.defs {
+        if d.sprite_elems.len() > 1 {
+            return Err(at(
+                &d.module,
+                d.line,
+                &d.sprite_elems[1].elem,
+                &format!(
+                    "definition '{dname}' declares {} image elements (sprites-2d: exactly one per definition)",
+                    d.sprite_elems.len()
+                ),
+            ));
+        }
+        let dynamic_sprites = d
+            .sprite_elems
+            .iter()
+            .filter(|e| {
+                matches!(e.frame, FrameBind::Field(_)) || matches!(e.flip, FrameBind::Field(_))
+            })
+            .count();
+        if d.dyn_elems.len() + dynamic_sprites > 1 {
+            return Err(at(
+                &d.module,
+                d.line,
+                &d.name,
+                "definition mixes a dynamic shape with a dynamic image element (sprites-2d: one dynamic element per definition)",
+            ));
+        }
+    }
+
+    // 单实例展开（声明序：静态克隆行 / 静态图像行 / 动态图像模板+spawn）。
+    // 返回该实例的主静态行 id（refs/qrow 面；无静态行=None）。
+    fn emit_instance(
+        project: &Project,
+        world: &WorldIR,
+        rows: &mut Vec<SceneNode>,
+        next_id: &mut usize,
+        spawns: &mut Vec<String>,
+        slot: &mut usize,
+        solid_ids: &mut Vec<usize>,
+        used_images: &mut Vec<String>,
+        leaf_rows: &mut BTreeMap<String, usize>,
+        def_name: &str,
+        inst: Option<&InstanceIR>,
+        params: &[(String, ParamVal)],
+        def_idx_for_arrays: Option<usize>,
+        depth: usize,
+    ) -> Result<Option<usize>, LowerError> {
+        if depth > 16 {
+            return Err(at(
+                &world.root_module,
+                0,
+                def_name,
+                "component nesting deeper than 16",
+            ));
+        }
+        let def = &world.defs[def_name];
+        let decl = node_of(project, def_name);
+        let view = decl.view2d.as_ref().expect("view");
+        let mut primary: Option<usize> = None;
+        for el in &view.elements {
+            match el {
+                View2dElement::Shape { name, props } => {
+                    let sprite = def.sprite_elems.iter().find(|s| &s.elem == name);
+                    if let Some(se) = sprite {
+                        let image = if let Some(p) = &se.image_param {
+                            let inst = inst.ok_or_else(|| {
+                                at(
+                                    &def.module,
+                                    def.line,
+                                    p,
+                                    "image param outside an instance context",
+                                )
+                            })?;
+                            match inst.params.iter().find(|(n, _)| n == p).map(|(_, v)| v) {
+                                Some(ParamVal::Res(r)) => r.clone(),
+                                _ => {
+                                    return Err(at(
+                                        &def.module,
+                                        inst.line,
+                                        p,
+                                        "image param binding is not an image2d resource",
+                                    ))
+                                }
+                            }
+                        } else {
+                            se.image.clone()
+                        };
+                        let Some((sha, bytes_len, _, _)) = world.images.get(&image) else {
+                            return Err(at(
+                                &def.module,
+                                se.line,
+                                &se.elem,
+                                &format!("image element '{}' binds '{image}' which is not an image2d resource", se.elem),
+                            ));
+                        };
+                        let (sha, bytes_len) = (sha.clone(), *bytes_len);
+                        let frames = world.frames.get(&image).ok_or_else(|| {
+                            at(
+                                &def.module,
+                                se.line,
+                                &se.elem,
+                                &format!("image element '{}' binds image '{image}' which declares no frame table", se.elem),
+                            )
+                        })?;
+                        let dyn_bind = matches!(se.frame, FrameBind::Field(_))
+                            || matches!(se.flip, FrameBind::Field(_));
+                        let ordinal = default_ordinal_pub(project, world, def, &se.frame, inst)?;
+                        let flip = default_ordinal_pub(project, world, def, &se.flip, inst)? != 0;
+                        if ordinal as usize >= frames.len() {
+                            return Err(at(
+                                &def.module,
+                                se.line,
+                                &se.elem,
+                                &format!(
+                                    "default frame ordinal {ordinal} exceeds the frame table of image '{image}' ({} frame(s))",
+                                    frames.len()
+                                ),
+                            ));
+                        }
+                        let rect = frames[ordinal as usize].1;
+                        let pos = resolve_pos(def, props, params)?;
+                        let tx = cval_value_pub(project, world, def, &pos[0], inst)?;
+                        let ty = cval_value_pub(project, world, def, &pos[1], inst)?;
+                        let (sx, sy) = resolve_size_pub(project, world, def, props, params, inst)?;
+                        let visible = match prop_of(props, "visible") {
+                            None => true,
+                            Some(p) => {
+                                cval_value_pub(
+                                    project,
+                                    world,
+                                    def,
+                                    &resolve_visible(def, props, params)?,
+                                    inst,
+                                )? > 0.5
+                            }
+                        };
+                        let _ = visible;
+                        if !used_images.iter().any(|i| i == &image) {
+                            used_images.push(image.clone());
+                        }
+                        let name = match inst {
+                            Some(i) => format!("{}.{}", i.path.replace('/', "."), name),
+                            None => name.clone(),
+                        };
+                        if dyn_bind {
+                            // 模板行（停靠玩法区外，不可见；身份 = 默认绑定）。
+                            rows.push(SceneNode {
+                                is_group: false,
+                                id: *next_id,
+                                name: format!("{}_template", name.replace('.', "_")),
+                                kind: "quad".into(),
+                                tx: -30.0,
+                                ty: -40.0 - 2.0 * (*slot as f64),
+                                sx,
+                                sy,
+                                rgba: (0.9, 0.3, 0.2, 1.0),
+                                visible: false,
+                                parent: None,
+                                is_character: false,
+                                is_solid: false,
+                                sprite: Some(crate::lower_basic2d::SceneSprite {
+                                    asset: sha.clone(),
+                                    frame: rect,
+                                    flip,
+                                }),
+                            });
+                            let template = *next_id;
+                            *next_id += 1;
+                            let handle = format!("{}_handle", def.prefix());
+                            let lhs = match def_idx_for_arrays {
+                                Some(i) => format!("{handle}[{i}]"),
+                                None => handle,
+                            };
+                            spawns.push(format!(
+                                " {lhs}=ag_object_spawn({slot},{template},{},{},0.0)",
+                                crate::lower_basic2d::fmt_f(tx),
+                                crate::lower_basic2d::fmt_f(ty)
+                            ));
+                            *slot += 1;
+                        } else {
+                            rows.push(SceneNode {
+                                is_group: false,
+                                id: *next_id,
+                                name: name.clone(),
+                                kind: "quad".into(),
+                                tx,
+                                ty,
+                                sx,
+                                sy,
+                                rgba: (0.9, 0.3, 0.2, 1.0),
+                                visible: true,
+                                parent: None,
+                                is_character: false,
+                                is_solid: false,
+                                sprite: Some(crate::lower_basic2d::SceneSprite {
+                                    asset: sha,
+                                    frame: rect,
+                                    flip,
+                                }),
+                            });
+                            if def_idx_for_arrays.is_none() {
+                                leaf_rows.insert(se.elem.clone(), *next_id);
+                            }
+                            if primary.is_none() {
+                                primary = Some(*next_id);
+                            }
+                            *next_id += 1;
+                        }
+                    } else if def.dyn_elems.contains(name) {
+                        // 非 image 动态 shape：sprites 档拒绝（一个动态元素
+                        // 约束下未列支持面）。
+                        return Err(at(
+                            &def.module,
+                            def.line,
+                            name,
+                            "dynamic non-image shape2d is out of the sprites-2d scope (image elements drive the per-tick visual)",
+                        ));
+                    } else {
+                        let pos = resolve_pos(def, props, params)?;
+                        let tx = cval_value_pub(project, world, def, &pos[0], inst)?;
+                        let ty = cval_value_pub(project, world, def, &pos[1], inst)?;
+                        let (kind, sx, sy) =
+                            resolve_geom_pub(project, world, def, props, params, inst)?;
+                        let material = resolve_material(def, props, params)?;
+                        let rgba = resource_color(project, &material)?;
+                        let visible = cval_value_pub(
+                            project,
+                            world,
+                            def,
+                            &resolve_visible(def, props, params)?,
+                            inst,
+                        )? > 0.5;
+                        let name = match inst {
+                            Some(i) => format!("{}.{}", i.path.replace('/', "."), name),
+                            None => name.clone(),
+                        };
+                        rows.push(SceneNode {
+                            is_group: false,
+                            id: *next_id,
+                            name,
+                            kind,
+                            tx,
+                            ty,
+                            sx,
+                            sy,
+                            rgba,
+                            visible,
+                            parent: None,
+                            is_character: false,
+                            is_solid: false,
+                            sprite: None,
+                        });
+                        if primary.is_none() {
+                            primary = Some(*next_id);
+                        }
+                        *next_id += 1;
+                    }
+                }
+                View2dElement::Solid { name, props } => {
+                    let pos = resolve_pos(def, props, params)?;
+                    let tx = cval_value_pub(project, world, def, &pos[0], None)?;
+                    let ty = cval_value_pub(project, world, def, &pos[1], None)?;
+                    let (kind, sx, sy) =
+                        resolve_geom_pub(project, world, def, props, params, None)?;
+                    let material = resolve_material(def, props, params)?;
+                    let rgba = resource_color(project, &material)?;
+                    rows.push(SceneNode {
+                        is_group: false,
+                        id: *next_id,
+                        name: name.clone(),
+                        kind,
+                        tx,
+                        ty,
+                        sx,
+                        sy,
+                        rgba,
+                        visible: true,
+                        parent: None,
+                        is_character: false,
+                        is_solid: true,
+                        sprite: None,
+                    });
+                    solid_ids.push(*next_id);
+                    *next_id += 1;
+                }
+                View2dElement::Instance { node, name, .. } => {
+                    let child_inst = world
+                        .instances
+                        .iter()
+                        .find(|i| inst_name_of(&i.path) == name.as_str())
+                        .ok_or_else(|| {
+                            at(&def.module, def.line, name, "instance row missing in IR")
+                        })?;
+                    emit_instance(
+                        project,
+                        world,
+                        rows,
+                        next_id,
+                        spawns,
+                        slot,
+                        solid_ids,
+                        used_images,
+                        leaf_rows,
+                        node,
+                        Some(child_inst),
+                        &child_inst.params,
+                        Some(child_inst.def_idx),
+                        depth + 1,
+                    )?;
+                }
+                _ => {}
+            }
+        }
+        Ok(primary)
+    }
+
+    // ---- 根视图声明序发射 ----
+    // character 行（root 直属或恰一实例定义）在声明位置发射。
+    let char_host: Option<(String, String)> = if root_def.char_elem.is_some() {
+        Some((world.root.clone(), String::new()))
+    } else {
+        world
+            .defs
+            .iter()
+            .find(|(n, d)| d.char_elem.is_some() && *n != &world.root)
+            .map(|(n, _)| {
+                let inst = world
+                    .instances
+                    .iter()
+                    .find(|i| i.def == *n)
+                    .expect("single instance");
+                (n.clone(), inst.path.clone())
+            })
+    };
+
+    let mut emitted_char = false;
+    for el in &root_view.elements {
+        match el {
+            View2dElement::Character { name, props } => {
+                // root 直属 character2d（带/不带 image）。
+                let sprite = root_def
+                    .sprite_elems
+                    .iter()
+                    .find(|s| s.is_char && &s.elem == name);
+                let pos = resolve_pos(root_def, props, &[])?;
+                let tx = cval_value_pub(project, world, root_def, &pos[0], None)?;
+                let ty = cval_value_pub(project, world, root_def, &pos[1], None)?;
+                if let Some(se) = sprite {
+                    if se.image_param.is_some() {
+                        return Err(at(
+                            &root_def.module,
+                            se.line,
+                            &se.elem,
+                            "root view image elements must bind resources.<image> directly (the root has no params)",
+                        ));
+                    }
+                    let image = se.image.clone();
+                    let Some((sha, _, _, _)) = world.images.get(&image) else {
+                        return Err(at(
+                            &root_def.module,
+                            se.line,
+                            &se.elem,
+                            &format!("image element '{}' binds '{image}' which is not an image2d resource", se.elem),
+                        ));
+                    };
+                    let sha = sha.clone();
+                    let ordinal = default_ordinal_pub(project, world, root_def, &se.frame, None)?;
+                    let flip = default_flip_pub(project, world, root_def, &se.flip, None)?;
+                    let frames = world.frames.get(&image).ok_or_else(|| {
+                        at(
+                            &root_def.module,
+                            se.line,
+                            &se.elem,
+                            &format!("image element '{}' binds image '{image}' which declares no frame table", se.elem),
+                        )
+                    })?;
+                    if ordinal as usize >= frames.len() {
+                        return Err(at(
+                            &root_def.module,
+                            se.line,
+                            &se.elem,
+                            &format!(
+                                "default frame ordinal {ordinal} exceeds the frame table of image '{image}' ({} frame(s))",
+                                frames.len()
+                            ),
+                        ));
+                    }
+                    let rect = frames[ordinal as usize].1;
+                    if !used_images.iter().any(|i| i == &image) {
+                        used_images.push(image.clone());
+                    }
+                    let (sx, sy) = resolve_size_pub(project, world, root_def, props, &[], None)?;
+                    rows.push(SceneNode {
+                        is_group: false,
+                        id: next_id,
+                        name: name.clone(),
+                        kind: "quad".into(),
+                        tx,
+                        ty,
+                        sx,
+                        sy,
+                        rgba: (0.9, 0.3, 0.2, 1.0),
+                        visible: true,
+                        parent: None,
+                        is_character: true,
+                        is_solid: false,
+                        sprite: Some(crate::lower_basic2d::SceneSprite {
+                            asset: sha,
+                            frame: rect,
+                            flip,
+                        }),
+                    });
+                    char = Some((next_id, name.clone()));
+                    emitted_char = true;
+                    next_id += 1;
+                    continue;
+                }
+                let material = resolve_material(root_def, props, &[])?;
+                let rgba = resource_color(project, &material)?;
+                rows.push(SceneNode {
+                    is_group: false,
+                    id: next_id,
+                    name: name.clone(),
+                    kind: "quad".into(),
+                    tx,
+                    ty,
+                    sx: 0.8,
+                    sy: 1.0,
+                    rgba,
+                    visible: true,
+                    parent: None,
+                    is_character: true,
+                    is_solid: false,
+                    sprite: None,
+                });
+                char = Some((next_id, name.clone()));
+                emitted_char = true;
+                next_id += 1;
+            }
+            View2dElement::Instance { node, name, .. } => {
+                // 恰一实例定义的 character 宿主：其 char 行在实例展开内发射。
+                if let Some((host_def, _)) = &char_host {
+                    if host_def == node && !emitted_char {
+                        let def = &world.defs[host_def];
+                        let inst = world
+                            .instances
+                            .iter()
+                            .find(|i| i.def == *host_def)
+                            .expect("single instance");
+                        let se = def.sprite_elems.iter().find(|s| s.is_char);
+                        let decl = node_of(project, host_def);
+                        let view = decl.view2d.as_ref().expect("view");
+                        let celel = view.elements.iter().find_map(|e| match e {
+                            View2dElement::Character { name, props } => {
+                                Some((name.clone(), props.clone()))
+                            }
+                            _ => None,
+                        });
+                        let (cname, cprops) = celel.expect("char element");
+                        let _ = cname;
+                        let pos = resolve_pos(def, &cprops, &inst.params)?;
+                        let tx = cval_value_pub(project, world, def, &pos[0], Some(inst))?;
+                        let ty = cval_value_pub(project, world, def, &pos[1], Some(inst))?;
+                        if let Some(se) = se {
+                            let image = if let Some(p) = &se.image_param {
+                                match inst.params.iter().find(|(n, _)| n == p).map(|(_, v)| v) {
+                                    Some(ParamVal::Res(r)) => r.clone(),
+                                    _ => return Err(at(
+                                        &def.module,
+                                        se.line,
+                                        p,
+                                        "character image param binding is not an image2d resource",
+                                    )),
+                                }
+                            } else {
+                                se.image.clone()
+                            };
+                            let Some((sha, _, _, _)) = world.images.get(&image) else {
+                                return Err(at(
+                                    &def.module,
+                                    se.line,
+                                    &se.elem,
+                                    &format!(
+                                        "character image '{image}' is not an image2d resource"
+                                    ),
+                                ));
+                            };
+                            let sha = sha.clone();
+                            let ordinal =
+                                default_ordinal_pub(project, world, def, &se.frame, Some(inst))?;
+                            let flip = default_flip_pub(project, world, def, &se.flip, Some(inst))?;
+                            let frames = world.frames.get(&image).ok_or_else(|| {
+                                at(
+                                    &def.module,
+                                    se.line,
+                                    &se.elem,
+                                    &format!("character image '{image}' declares no frame table"),
+                                )
+                            })?;
+                            if ordinal as usize >= frames.len() {
+                                return Err(at(
+                                    &def.module,
+                                    se.line,
+                                    &se.elem,
+                                    &format!(
+                                        "default frame ordinal {ordinal} exceeds the frame table of image '{image}' ({} frame(s))",
+                                        frames.len()
+                                    ),
+                                ));
+                            }
+                            let rect = frames[ordinal as usize].1;
+                            if !used_images.iter().any(|i| i == &image) {
+                                used_images.push(image.clone());
+                            }
+                            let (sx, sy) = resolve_size_pub(
+                                project,
+                                world,
+                                def,
+                                &cprops,
+                                &inst.params,
+                                Some(inst),
+                            )?;
+                            rows.push(SceneNode {
+                                is_group: false,
+                                id: next_id,
+                                name: format!("{}.{}", inst.path.replace('/', "."), "body"),
+                                kind: "quad".into(),
+                                tx,
+                                ty,
+                                sx,
+                                sy,
+                                rgba: (0.9, 0.3, 0.2, 1.0),
+                                visible: true,
+                                parent: None,
+                                is_character: true,
+                                is_solid: false,
+                                sprite: Some(crate::lower_basic2d::SceneSprite {
+                                    asset: sha,
+                                    frame: rect,
+                                    flip,
+                                }),
+                            });
+                        } else {
+                            let material = resolve_material(def, &cprops, &inst.params)?;
+                            let rgba = resource_color(project, &material)?;
+                            rows.push(SceneNode {
+                                is_group: false,
+                                id: next_id,
+                                name: format!("{}.{}", inst.path.replace('/', "."), "body"),
+                                kind: "quad".into(),
+                                tx,
+                                ty,
+                                sx: 0.8,
+                                sy: 1.0,
+                                rgba,
+                                visible: true,
+                                parent: None,
+                                is_character: true,
+                                is_solid: false,
+                                sprite: None,
+                            });
+                        }
+                        char = Some((next_id, inst.path.replace('/', ".")));
+                        emitted_char = true;
+                        next_id += 1;
+                        // 继续实例展开（其余元素照常发射；Character 元素在
+                        // emit_instance 内为 no-op）。
+                    }
+                }
+                let inst = world
+                    .instances
+                    .iter()
+                    .find(|i| inst_name_of(&i.path) == name.as_str())
+                    .ok_or_else(|| {
+                        at(
+                            &root_def.module,
+                            root_def.line,
+                            name,
+                            "instance missing in IR",
+                        )
+                    })?;
+                emit_instance(
+                    project,
+                    world,
+                    &mut rows,
+                    &mut next_id,
+                    &mut spawns,
+                    &mut slot,
+                    &mut solid_ids,
+                    &mut used_images,
+                    &mut leaf_rows,
+                    node,
+                    Some(inst),
+                    &inst.params,
+                    Some(inst.def_idx),
+                    0,
+                )?;
+            }
+            View2dElement::Solid { name, props } => {
+                let pos = resolve_pos(root_def, props, &[])?;
+                let tx = cval_value_pub(project, world, root_def, &pos[0], None)?;
+                let ty = cval_value_pub(project, world, root_def, &pos[1], None)?;
+                let (kind, sx, sy) = resolve_geom_pub(project, world, root_def, props, &[], None)?;
+                let material = resolve_material(root_def, props, &[])?;
+                let rgba = resource_color(project, &material)?;
+                rows.push(SceneNode {
+                    is_group: false,
+                    id: next_id,
+                    name: name.clone(),
+                    kind,
+                    tx,
+                    ty,
+                    sx,
+                    sy,
+                    rgba,
+                    visible: true,
+                    parent: None,
+                    is_character: false,
+                    is_solid: true,
+                    sprite: None,
+                });
+                solid_ids.push(next_id);
+                next_id += 1;
+            }
+            View2dElement::Shape { name, props } => {
+                let sprite = root_def.sprite_elems.iter().find(|s| &s.elem == name);
+                if let Some(se) = sprite {
+                    if se.image_param.is_some() {
+                        return Err(at(
+                            &root_def.module,
+                            se.line,
+                            &se.elem,
+                            "root view image elements must bind resources.<image> directly (the root has no params)",
+                        ));
+                    }
+                    let image = se.image.clone();
+                    let Some((sha, _, _, _)) = world.images.get(&image) else {
+                        return Err(at(
+                            &root_def.module,
+                            se.line,
+                            &se.elem,
+                            &format!("image element '{}' binds '{image}' which is not an image2d resource", se.elem),
+                        ));
+                    };
+                    let sha = sha.clone();
+                    let ordinal = default_ordinal_pub(project, world, root_def, &se.frame, None)?;
+                    let flip = default_flip_pub(project, world, root_def, &se.flip, None)?;
+                    let frames = world.frames.get(&image).ok_or_else(|| {
+                        at(
+                            &root_def.module,
+                            se.line,
+                            &se.elem,
+                            &format!("image element '{}' binds image '{image}' which declares no frame table", se.elem),
+                        )
+                    })?;
+                    if ordinal as usize >= frames.len() {
+                        return Err(at(
+                            &root_def.module,
+                            se.line,
+                            &se.elem,
+                            &format!(
+                                "default frame ordinal {ordinal} exceeds the frame table of image '{image}' ({} frame(s))",
+                                frames.len()
+                            ),
+                        ));
+                    }
+                    let rect = frames[ordinal as usize].1;
+                    if !used_images.iter().any(|i| i == &image) {
+                        used_images.push(image.clone());
+                    }
+                    let pos = resolve_pos(root_def, props, &[])?;
+                    let tx = cval_value_pub(project, world, root_def, &pos[0], None)?;
+                    let ty = cval_value_pub(project, world, root_def, &pos[1], None)?;
+                    let (sx, sy) = resolve_size_pub(project, world, root_def, props, &[], None)?;
+                    let visible = cval_value_pub(
+                        project,
+                        world,
+                        root_def,
+                        &resolve_visible(root_def, props, &[])?,
+                        None,
+                    )? > 0.5;
+                    rows.push(SceneNode {
+                        is_group: false,
+                        id: next_id,
+                        name: name.clone(),
+                        kind: "quad".into(),
+                        tx,
+                        ty,
+                        sx,
+                        sy,
+                        rgba: (0.9, 0.3, 0.2, 1.0),
+                        visible,
+                        parent: None,
+                        is_character: false,
+                        is_solid: false,
+                        sprite: Some(crate::lower_basic2d::SceneSprite {
+                            asset: sha,
+                            frame: rect,
+                            flip,
+                        }),
+                    });
+                    leaf_rows.insert(se.elem.clone(), next_id);
+                    next_id += 1;
+                    continue;
+                }
+                if root_def.dyn_elems.contains(name) {
+                    return Err(at(
+                        &root_def.module,
+                        root_def.line,
+                        name,
+                        "dynamic non-image shape2d is out of the sprites-2d scope",
+                    ));
+                }
+                let pos = resolve_pos(root_def, props, &[])?;
+                let tx = cval_value_pub(project, world, root_def, &pos[0], None)?;
+                let ty = cval_value_pub(project, world, root_def, &pos[1], None)?;
+                let (kind, sx, sy) = resolve_geom_pub(project, world, root_def, props, &[], None)?;
+                let material = resolve_material(root_def, props, &[])?;
+                let rgba = resource_color(project, &material)?;
+                let visible = cval_value_pub(
+                    project,
+                    world,
+                    root_def,
+                    &resolve_visible(root_def, props, &[])?,
+                    None,
+                )? > 0.5;
+                rows.push(SceneNode {
+                    is_group: false,
+                    id: next_id,
+                    name: name.clone(),
+                    kind,
+                    tx,
+                    ty,
+                    sx,
+                    sy,
+                    rgba,
+                    visible,
+                    parent: None,
+                    is_character: false,
+                    is_solid: false,
+                    sprite: None,
+                });
+                next_id += 1;
+            }
+            View2dElement::Camera { props, .. } => {
+                let (_, cname) = char.clone().ok_or_else(|| {
+                    at(
+                        &root_def.module,
+                        root_def.line,
+                        "camera2d",
+                        "sprites-2d camera requires a declared character2d",
+                    )
+                })?;
+                camera = Some(camera_cfg_components(
+                    project, world, props, &cname, &cname,
+                )?);
+            }
+            _ => {}
+        }
+    }
+
+    if !emitted_char {
+        return Err(at(
+            &root_def.module,
+            root_def.line,
+            &world.root,
+            "sprites-2d requires a declared character2d (root view or a single-instance component)",
+        ));
+    }
+
+    // ---- render2d.spawn 站点（声明先序；槽预算已在 plan 层核过）----
+    let mut site_slots: BTreeMap<String, i64> = BTreeMap::new();
+    for (elem, rline) in &plan.render_spawns {
+        let Some(row) = leaf_rows.get(elem) else {
+            return Err(at(
+                &root_def.module,
+                *rline,
+                elem,
+                "render2d.spawn target row missing (not a static image leaf in the root view)",
+            ));
+        };
+        let slot_of = *site_slots.entry(elem.clone()).or_insert_with(|| {
+            let s = slot as i64;
+            slot += 1;
+            s
+        });
+        spawn_sites.insert(elem.clone(), (slot_of, *row as i64));
+    }
+
+    // ---- assets JSON（图像身份；名字序稳定）----
+    let mut assets_json: Vec<String> = Vec::new();
+    let mut img_names: Vec<&String> = world.images.keys().collect();
+    img_names.sort();
+    for name in img_names {
+        let (sha, bytes, w, h) = &world.images[name];
+        assets_json.push(format!(
+            "{{\"format\": \"png\", \"sha256\": \"{sha}\", \"byte_length\": {bytes}, \"name\": \"{sha}.png\", \"width\": {w}, \"height\": {h}}}"
+        ));
+    }
+
+    if rows.len() > 128 {
+        return Err(at(
+            &world.root_module,
+            0,
+            &world.root,
+            &format!("sprites-2d scene exceeds 128 nodes ({} rows)", rows.len()),
+        ));
+    }
+
+    Ok(SceneBuild {
+        rows,
+        char,
+        solid_ids,
+        camera,
+        spawns,
+        refs: BTreeMap::new(),
+        self_rows: BTreeMap::new(),
+        spawn_sites,
+        assets_json,
+        used_images,
+    })
+}
+
+/// model 字段初值（帧 ordinal/flip 默认的 Field 形态解析）。
+fn model_init_value_of_field(
+    project: &Project,
+    world: &WorldIR,
+    def: &DefIR,
+    field: &str,
+    inst: Option<&InstanceIR>,
+) -> Result<u32, LowerError> {
+    let v = match inst {
+        Some(i) => model_init_value(project, world, def, field, i)?,
+        None => {
+            // root：model 初值只允许数值字面量。
+            let decl = node_of(project, &def.name);
+            let model = decl.model.as_ref().ok_or_else(|| {
+                at(
+                    &def.module,
+                    def.line,
+                    field,
+                    "definition has no model block",
+                )
+            })?;
+            let f = model
+                .fields
+                .iter()
+                .find(|f| f.name.as_str() == field)
+                .ok_or_else(|| at(&def.module, def.line, field, "unknown model field"))?;
+            match &f.init {
+                Expr::Int(v) => *v as f64,
+                Expr::Float(v, _) => *v,
+                other => {
+                    return Err(at(
+                        &def.module,
+                        def.line,
+                        field,
+                        &format!("root model init must be a numeric literal, got {other:?}"),
+                    ))
+                }
+            }
+        }
+    };
+    if v < 0.0 {
+        return Err(at(
+            &def.module,
+            def.line,
+            field,
+            "frame ordinal model init must be >= 0",
+        ));
+    }
+    Ok(v as u32)
+}
+
+/// collect_scene_sprites 内部发射器使用的 pub 别名（同文件私有 fn 的重导出
+/// 形态，避免闭包借用冲突）。
+fn default_ordinal_pub(
+    project: &Project,
+    world: &WorldIR,
+    def: &DefIR,
+    bind: &FrameBind,
+    inst: Option<&InstanceIR>,
+) -> Result<u32, LowerError> {
+    match bind {
+        FrameBind::Lit(v) => Ok(*v),
+        FrameBind::Param(p) => {
+            let inst = inst.ok_or_else(|| {
+                at(
+                    &def.module,
+                    def.line,
+                    p,
+                    "frame/flip param outside an instance context",
+                )
+            })?;
+            match inst.params.iter().find(|(n, _)| n == p).map(|(_, v)| v) {
+                Some(ParamVal::Num(v)) => {
+                    if *v < 0.0 {
+                        return Err(at(&def.module, inst.line, p, "frame ordinal must be >= 0"));
+                    }
+                    Ok(*v as u32)
+                }
+                _ => Err(at(
+                    &def.module,
+                    inst.line,
+                    p,
+                    "frame ordinal param is not numeric",
+                )),
+            }
+        }
+        FrameBind::Field(f) => model_init_value_of_field(project, world, def, f, inst),
+    }
+}
+
+fn default_flip_pub(
+    project: &Project,
+    world: &WorldIR,
+    def: &DefIR,
+    bind: &FrameBind,
+    inst: Option<&InstanceIR>,
+) -> Result<bool, LowerError> {
+    Ok(default_ordinal_pub(project, world, def, bind, inst)? != 0)
+}
+
+fn cval_value_pub(
+    project: &Project,
+    world: &WorldIR,
+    def: &DefIR,
+    v: &CVal,
+    inst: Option<&InstanceIR>,
+) -> Result<f64, LowerError> {
+    cval_value(project, world, def, v, inst)
+}
+
+fn resolve_geom_pub(
+    project: &Project,
+    world: &WorldIR,
+    def: &DefIR,
+    props: &[Prop],
+    params: &[(String, ParamVal)],
+    inst: Option<&InstanceIR>,
+) -> Result<(String, f64, f64), LowerError> {
+    resolve_geom(project, world, def, props, params, inst)
+}
+
+/// PLAN-022：图像元素的显示尺寸（场景对象 scale；w,h > 0）。
+#[allow(clippy::type_complexity)]
+fn resolve_size_pub(
+    project: &Project,
+    world: &WorldIR,
+    def: &DefIR,
+    props: &[Prop],
+    params: &[(String, ParamVal)],
+    inst: Option<&InstanceIR>,
+) -> Result<(f64, f64), LowerError> {
+    let size = prop_of(props, "size")
+        .ok_or_else(|| at(&def.module, def.line, "size", "image element missing size"))?;
+    let es = prop_exprs(size);
+    if es.len() != 2 {
+        return Err(at(
+            &def.module,
+            def.line,
+            "size",
+            "'size' must have 2 components",
+        ));
+    }
+    let sx = cval_value(
+        project,
+        world,
+        def,
+        &resolve_cval(def, &es[0], params)?,
+        inst,
+    )?;
+    let sy = cval_value(
+        project,
+        world,
+        def,
+        &resolve_cval(def, &es[1], params)?,
+        inst,
+    )?;
+    if sx <= 0.0 || sy <= 0.0 {
+        return Err(at(
+            &def.module,
+            def.line,
+            "size",
+            &format!("image element size must be positive, got ({sx},{sy})"),
+        ));
+    }
+    Ok((sx, sy))
+}
+
 pub(crate) fn instance_ctx<'a>(
     project: &'a Project,
     plan: &'a Plan,
@@ -2780,6 +4355,7 @@ pub(crate) fn instance_ctx<'a>(
     prefix: &str,
     index: &str,
     query: Option<&'a QueryParts<'a>>,
+    sprites: Option<&crate::translate::SpriteEnv<'a>>,
 ) -> Result<Ctx<'a>, LowerError> {
     let edef = def.name.clone();
     let errmod = def.module.clone();
@@ -2867,6 +4443,10 @@ pub(crate) fn instance_ctx<'a>(
         call_scope: Some(call_scope),
         child_emit: Some(child_emit),
         query: qenv,
+        sprites: sprites.map(|e| crate::translate::SpriteEnv {
+            spawns: e.spawns,
+            frames: e.frames,
+        }),
     })
 }
 
@@ -2875,6 +4455,7 @@ pub(crate) fn root_ctx<'a>(
     world: &'a WorldIR,
     plan: &'a Plan,
     query: Option<&'a QueryParts<'a>>,
+    sprites: Option<&crate::translate::SpriteEnv<'a>>,
 ) -> Ctx<'a> {
     let root = world.root.clone();
     let errmod = world.root_module.clone();
@@ -2947,6 +4528,10 @@ pub(crate) fn root_ctx<'a>(
         call_scope: Some(call_scope),
         child_emit: Some(child_emit),
         query: qenv,
+        sprites: sprites.map(|e| crate::translate::SpriteEnv {
+            spawns: e.spawns,
+            frames: e.frames,
+        }),
     }
 }
 
@@ -2973,10 +4558,11 @@ fn def_runtime_members(project: &Project, def: &DefIR) -> BTreeSet<String> {
         child_emits: Vec::new(),
         anc_emits: Vec::new(),
         query_events: Vec::new(),
+        render_calls: Vec::new(),
     };
     if let Some(on) = &decl.on {
         for h in &on.handlers {
-            walk_stmts(&h.body.stmts, def.line, &mut out, false);
+            walk_stmts(&h.body.stmts, def.line, &mut out, false, false);
         }
     }
     if let Some(view) = &decl.view2d {
@@ -2985,7 +4571,7 @@ fn def_runtime_members(project: &Project, def: &DefIR) -> BTreeSet<String> {
                 if def.dyn_elems.contains(name) {
                     for pr in props {
                         for e in prop_exprs(pr) {
-                            walk_expr_q(&e, def.line, &mut out, false);
+                            walk_expr_q(&e, def.line, &mut out, false, false);
                         }
                     }
                 }
@@ -3190,6 +4776,7 @@ pub(crate) fn gen_user_source(
     scene: &SceneBuild,
     queries: bool,
     game: Option<&crate::lower_components_game::GameGen>,
+    sprites: bool,
 ) -> Result<String, LowerError> {
     let mut src = String::new();
     let root_def = &world.defs[&world.root];
@@ -3200,6 +4787,10 @@ pub(crate) fn gen_user_source(
     if queries {
         src.push_str(
             "// GENERATED by autographics-node2d-pilot (PLAN-021 queries-2d, T-03/T-04 contract).\n",
+        );
+    } else if sprites {
+        src.push_str(
+            "// GENERATED by autographics-node2d-pilot (PLAN-022 sprites-2d, T-02 contract).\n",
         );
     } else {
         src.push_str(
@@ -3216,7 +4807,11 @@ pub(crate) fn gen_user_source(
         "// Root: {}; instances (declaration pre-order): {}\n",
         world.root, inst_list
     ));
-    src.push_str("// Regeneration must be byte-identical (tools/verify_plan020.py).\n");
+    if sprites {
+        src.push_str("// Regeneration must be byte-identical (tools/verify_plan022.py).\n");
+    } else {
+        src.push_str("// Regeneration must be byte-identical (tools/verify_plan020.py).\n");
+    }
     src.push_str("var ok=0.0\n");
 
     // ---- 枚举常量（019 约定）----
@@ -3460,6 +5055,64 @@ pub(crate) fn gen_user_source(
         }
     }
 
+    // ---- PLAN-022：图像帧表全局数组 + 图像模板 handle 数组 ----
+    let mut frames_env: BTreeMap<String, crate::translate::FrameTable> = BTreeMap::new();
+    if sprites {
+        for img in &scene.used_images {
+            let frames = world
+                .frames
+                .get(img)
+                .ok_or_else(|| at(&world.root_module, 0, img, "used image has no frame table"))?;
+            let fx: Vec<String> = frames.iter().map(|(_, r)| r[0].to_string()).collect();
+            let fy: Vec<String> = frames.iter().map(|(_, r)| r[1].to_string()).collect();
+            let fw: Vec<String> = frames.iter().map(|(_, r)| r[2].to_string()).collect();
+            let fh: Vec<String> = frames.iter().map(|(_, r)| r[3].to_string()).collect();
+            src.push_str(&format!(
+                "var {img}_fx=[{}]
+var {img}_fy=[{}]
+var {img}_fw=[{}]
+var {img}_fh=[{}]
+",
+                fx.join(","),
+                fy.join(","),
+                fw.join(","),
+                fh.join(",")
+            ));
+            frames_env.insert(
+                img.clone(),
+                crate::translate::FrameTable {
+                    image: img.clone(),
+                    len: frames.len(),
+                },
+            );
+        }
+        // 图像模板 handle 数组（每实例一槽；app_start spawn 写入）。
+        for dname in def_order(world) {
+            let def = &world.defs[&dname];
+            let dyn_sprites = def
+                .sprite_elems
+                .iter()
+                .filter(|e| !e.is_char)
+                .filter(|e| {
+                    matches!(e.frame, FrameBind::Field(_)) || matches!(e.flip, FrameBind::Field(_))
+                })
+                .count();
+            if dyn_sprites == 0 {
+                continue;
+            }
+            let idxs = world.instances_of(&dname);
+            if idxs.is_empty() {
+                continue;
+            }
+            let zeros = vec!["0"; idxs.len()].join(",");
+            src.push_str(&format!(
+                "var {}_handle=[{zeros}]
+",
+                def.prefix()
+            ));
+        }
+    }
+
     // ---- root Life/成员/呈现 fns ----
     let root_query = queries.then(|| QueryParts {
         refs: &scene.refs,
@@ -3467,7 +5120,17 @@ pub(crate) fn gen_user_source(
         self_writable: false,
         binds: &qbinds,
     });
-    let rctx = root_ctx(project, world, plan, root_query.as_ref());
+    let sprite_env = sprites.then(|| crate::translate::SpriteEnv {
+        spawns: &scene.spawn_sites,
+        frames: &frames_env,
+    });
+    let rctx = root_ctx(
+        project,
+        world,
+        plan,
+        root_query.as_ref(),
+        sprite_env.as_ref(),
+    );
     src.push_str("fn main_lifestart() {\n");
     if let Some(h) = life_handler(root_decl, "Start") {
         translate_handler(&h.body.stmts, &rctx, &mut src, 1)?;
@@ -3499,12 +5162,30 @@ pub(crate) fn gen_user_source(
             "",
             ev,
             root_query.as_ref(),
+            sprite_env.as_ref(),
             &mut src,
         )?;
     }
-    // root 呈现 fn。
-    if root_def.life_tick && !root_def.dyn_elems.is_empty() {
-        gen_present_fn(project, world, plan, root_def, true, vis_suffix, &mut src)?;
+    // root 呈现 fn（含 PLAN-022 字符行帧写）。
+    if root_def.life_tick
+        && (!root_def.dyn_elems.is_empty()
+            || root_def.sprite_elems.iter().any(|e| {
+                e.is_char
+                    && (matches!(e.frame, FrameBind::Field(_))
+                        || matches!(e.flip, FrameBind::Field(_)))
+            }))
+    {
+        gen_present_fn(
+            project,
+            world,
+            plan,
+            root_def,
+            true,
+            vis_suffix,
+            sprite_env.as_ref(),
+            scene,
+            &mut src,
+        )?;
     }
 
     // ---- 每定义 fns（首个实例声明先序）----
@@ -3521,7 +5202,15 @@ pub(crate) fn gen_user_source(
             self_writable: def.char_elem.is_none(),
             binds: &qbinds,
         });
-        let ictx = instance_ctx(project, plan, def, &prefix, "i", inst_query.as_ref())?;
+        let ictx = instance_ctx(
+            project,
+            plan,
+            def,
+            &prefix,
+            "i",
+            inst_query.as_ref(),
+            sprite_env.as_ref(),
+        )?;
         if def.life_tick {
             src.push_str(&format!("fn {prefix}_lifetick(i int, dt float) {{\n"));
             if let Some(h) = life_handler(decl, "Tick") {
@@ -3559,11 +5248,25 @@ pub(crate) fn gen_user_source(
                 &dname,
                 ev,
                 recv_query.as_ref(),
+                sprite_env.as_ref(),
                 &mut src,
             )?;
         }
-        if def.life_tick && !def.dyn_elems.is_empty() {
-            gen_present_fn(project, world, plan, def, false, vis_suffix, &mut src)?;
+        let has_sprite_write = def.sprite_elems.iter().any(|e| {
+            matches!(e.frame, FrameBind::Field(_)) || matches!(e.flip, FrameBind::Field(_))
+        });
+        if def.life_tick && (!def.dyn_elems.is_empty() || has_sprite_write) {
+            gen_present_fn(
+                project,
+                world,
+                plan,
+                def,
+                false,
+                vis_suffix,
+                sprite_env.as_ref(),
+                scene,
+                &mut src,
+            )?;
         }
     }
 
@@ -3641,7 +5344,14 @@ pub(crate) fn gen_user_source(
     // ---- app_update（冻结序：根 → 声明先序 tick → present）----
     src.push_str("fn app_update(dt float) {\n");
     src.push_str(" main_lifetick(dt)\n");
-    if root_def.life_tick && !root_def.dyn_elems.is_empty() {
+    let root_presents = root_def.life_tick
+        && (!root_def.dyn_elems.is_empty()
+            || root_def.sprite_elems.iter().any(|e| {
+                e.is_char
+                    && (matches!(e.frame, FrameBind::Field(_))
+                        || matches!(e.flip, FrameBind::Field(_)))
+            }));
+    if root_presents {
         src.push_str(" main_present()\n");
     }
     for inst in &world.instances {
@@ -3653,7 +5363,12 @@ pub(crate) fn gen_user_source(
                 inst.def_idx
             ));
         }
-        if def.life_tick && !def.dyn_elems.is_empty() {
+        let presents = def.life_tick
+            && (!def.dyn_elems.is_empty()
+                || def.sprite_elems.iter().any(|e| {
+                    matches!(e.frame, FrameBind::Field(_)) || matches!(e.flip, FrameBind::Field(_))
+                }));
+        if presents {
             src.push_str(&format!(" {}_present({})\n", def.prefix(), inst.def_idx));
         }
     }
@@ -3679,6 +5394,7 @@ pub(crate) fn gen_recv_fn(
     recv_def_name: &str,
     ev: &str,
     query: Option<&QueryParts>,
+    sprites: Option<&crate::translate::SpriteEnv>,
     src: &mut String,
 ) -> Result<(), LowerError> {
     let def = if recv_def_name.is_empty() {
@@ -3714,9 +5430,9 @@ pub(crate) fn gen_recv_fn(
     }
     src.push_str(&format!("fn {fname}({sig}) {{\n"));
     let ctx = if index.is_empty() {
-        root_ctx(project, world, plan, query)
+        root_ctx(project, world, plan, query, sprites)
     } else {
-        instance_ctx(project, plan, def, &def.prefix(), "j", query)?
+        instance_ctx(project, plan, def, &def.prefix(), "j", query, sprites)?
     };
     translate_handler(&h.body.stmts, &ctx, src, 1)?;
     src.push_str("}\n");
@@ -3725,6 +5441,7 @@ pub(crate) fn gen_recv_fn(
 
 /// 呈现同步 fn：`fn <prefix>_present(i int)`（root 无索引）；位置/可见按
 /// 变更计费（缓存比较），预算与 T-02 探针一致（走跳 tick ≤32）。
+#[allow(clippy::too_many_arguments)]
 fn gen_present_fn(
     project: &Project,
     world: &WorldIR,
@@ -3732,6 +5449,8 @@ fn gen_present_fn(
     def: &DefIR,
     is_root: bool,
     vis_suffix: &str,
+    sprites: Option<&crate::translate::SpriteEnv>,
+    scene: &SceneBuild,
     src: &mut String,
 ) -> Result<(), LowerError> {
     let prefix = if is_root {
@@ -3749,9 +5468,9 @@ fn gen_present_fn(
     for arr in &arrays {
         let props = elem_props(project, def, &arr.elem)?;
         let ctx = if is_root {
-            root_ctx(project, world, plan, None)
+            root_ctx(project, world, plan, None, sprites)
         } else {
-            instance_ctx(project, plan, def, &prefix, index, None)?
+            instance_ctx(project, plan, def, &prefix, index, None, sprites)?
         };
         let pos = prop_of(&props, "position")
             .ok_or_else(|| at(&def.module, def.line, "position", "missing position"))?;
@@ -3793,6 +5512,137 @@ fn gen_present_fn(
             ));
         }
     }
+    // ---- PLAN-022：逐 tick 图像帧写（if-chain 帧表；越界具名 fault 42）----
+    if let Some(se) = def
+        .sprite_elems
+        .iter()
+        .find(|e| matches!(e.frame, FrameBind::Field(_)) || matches!(e.flip, FrameBind::Field(_)))
+    {
+        // 每定义恰一图像（多实例 Param 形态必须解析到同一 image2d 资源）。
+        let mut resolved: Option<String> = None;
+        if let Some(p) = &se.image_param {
+            for inst in world.instances.iter().filter(|i| i.def == def.name) {
+                let img = match inst.params.iter().find(|(n, _)| n == p).map(|(_, v)| v) {
+                    Some(ParamVal::Res(r)) => r.clone(),
+                    _ => {
+                        return Err(at(
+                            &def.module,
+                            se.line,
+                            p,
+                            "image param binding is not an image2d resource",
+                        ))
+                    }
+                };
+                match &resolved {
+                    None => resolved = Some(img),
+                    Some(prev) if *prev == img => {}
+                    Some(prev) => {
+                        return Err(at(
+                            &def.module,
+                            se.line,
+                            p,
+                            &format!(
+                                "instances of '{}' bind different images ('{prev}' vs '{img}'); a per-tick write needs one shared image per definition",
+                                def.name
+                            ),
+                        ));
+                    }
+                }
+            }
+            if resolved.is_none() {
+                return Err(at(
+                    &def.module,
+                    se.line,
+                    p,
+                    "image param has no instance to resolve",
+                ));
+            }
+        }
+        let image = resolved.unwrap_or_else(|| se.image.clone());
+        let frames = world.frames.get(&image).ok_or_else(|| {
+            at(
+                &def.module,
+                def.line,
+                &image,
+                "bound image has no frame table",
+            )
+        })?;
+        let n = frames.len();
+        let frame_ref = match &se.frame {
+            FrameBind::Field(f) => {
+                if is_root {
+                    format!("r_{f}")
+                } else {
+                    format!("{prefix}_{f}[{index}]")
+                }
+            }
+            _ => unreachable!("dynamic write requires a Field frame binding"),
+        };
+        let flip_text = match &se.flip {
+            FrameBind::Lit(v) => v.to_string(),
+            FrameBind::Param(p) => p.clone(),
+            FrameBind::Field(f) => {
+                if is_root {
+                    format!("r_{f}")
+                } else {
+                    format!("{prefix}_{f}[{index}]")
+                }
+            }
+        };
+        let mut chain = String::new();
+        for ordinal in 0..n {
+            let call_body = if se.is_char {
+                let Some((cid, _)) = scene.char else {
+                    return Err(at(
+                        &def.module,
+                        def.line,
+                        &se.elem,
+                        "character sprite write without a character row",
+                    ));
+                };
+                format!(
+                    "ag_sprite_frame({cid}, {image}_fx[{ordinal}], {image}_fy[{ordinal}], {image}_fw[{ordinal}], {image}_fh[{ordinal}], {flip_text})"
+                )
+            } else if is_root {
+                return Err(at(
+                    &def.module,
+                    def.line,
+                    &se.elem,
+                    "root view image shapes are static rows (no slot to write)",
+                ));
+            } else {
+                let handle_ref = format!("{prefix}_handle[{index}]");
+                format!(
+                    "ag_sprite_slot({handle_ref}, {image}_fx[{ordinal}], {image}_fy[{ordinal}], {image}_fw[{ordinal}], {image}_fh[{ordinal}], {flip_text})"
+                )
+            };
+            if ordinal == 0 {
+                chain.push_str(&format!(" if {frame_ref}=={ordinal} {{ {call_body} }}"));
+            } else {
+                chain.push_str(&format!(
+                    " else if {frame_ref}=={ordinal} {{ {call_body} }}"
+                ));
+            }
+        }
+        // 越界序数：写入退化矩形，由受信单元自身的矩形域检查具名拒绝
+        // （fault 42；用户源不可直呼保留传输 _ag_fail——admission 实测）。
+        let fallback = if se.is_char {
+            let (cid, _) = scene.char.clone().ok_or_else(|| {
+                at(
+                    &def.module,
+                    def.line,
+                    &se.elem,
+                    "character sprite write without a character row",
+                )
+            })?;
+            format!("ag_sprite_frame({cid}, 0, 0, 0, 0, 0)")
+        } else {
+            let handle_ref = format!("{prefix}_handle[{index}]");
+            format!("ag_sprite_slot({handle_ref}, 0, 0, 0, 0, 0)")
+        };
+        chain.push_str(&format!(" else {{ {fallback} }}\n"));
+        src.push_str(&chain);
+    }
     src.push_str("}\n");
     Ok(())
 }
@@ -3801,51 +5651,90 @@ fn gen_present_fn(
 
 /// PLAN-020 components-2d 公共入口：校验 → 场景/用户源 → identity 材料。
 pub fn lower_project_components(project: &Project) -> Result<LowerOutputBasic2D, LowerError> {
-    lower_components_mode(project, false, None)
+    lower_components_mode(project, false, None, false)
 }
 
 /// PLAN-021：queries-2d 显式作者档（components-2d 的超集 + typed 查询
 /// 面；api/运行时装配不变，identity generator 字符串区分）。
 pub fn lower_project_queries(project: &Project) -> Result<LowerOutputBasic2D, LowerError> {
-    lower_components_mode(project, true, None)
+    lower_components_mode(project, true, None, false)
+}
+
+/// PLAN-022：sprites-2d 作者档——typed 图像/帧表/组件局部帧翻转绑定 +
+/// render2d 渲染实例服务，装配 autographics.sprites2d/1。
+pub fn lower_project_sprites(project: &Project) -> Result<LowerOutputBasic2D, LowerError> {
+    lower_components_mode(project, false, None, true)
+}
+
+/// PLAN-022：场景 JSON（sprites2d/1 装配 + png 资产清单）。
+fn scene_json_sprites(
+    entry: &str,
+    rows: &[SceneNode],
+    has_char: bool,
+    sha: &str,
+    bytes: usize,
+    assets: &[String],
+) -> String {
+    let objects = rows.iter().map(obj_json).collect::<Vec<_>>().join(",\n");
+    let assets = assets.join(",\n  ");
+    format!(
+        "{{\n \"behavior\": {{\n  \"api\": \"autographics.sprites2d/1\",\n  \"source\": {{\n   \"format\": \"auto-source\",\n   \"sha256\": \"{sha}\",\n   \"byte_length\": {bytes}\n  }},\n  \"actors\": {{\n   \"two_d\": {},\n   \"three_d\": null\n  }}\n }},\n \"schema\": \"autographics.scene/6\",\n \"document_id\": \"plan022-sprites-2d-{entry}\",\n \"resources\": [\n  \"circle\",\n  \"quad\",\n  \"cylinder\",\n  \"player\",\n  \"mob\"\n ],\n \"objects\": [\n{objects}\n ],\n \"groups\": [],\n \"assets\": [\n  {assets}\n ]\n}}\n",
+        if has_char { 1 } else { 0 }
+    )
 }
 
 fn lower_components_mode(
     project: &Project,
     queries: bool,
     game: Option<&crate::lower_components_game::GameGen>,
+    sprites: bool,
 ) -> Result<LowerOutputBasic2D, LowerError> {
     // PLAN-023：game2d 作者块只被 components-2d-game 消费；frozen 档拒绝
     // （不静默忽略）。
     if game.is_none() {
-    for (mname, module) in &project.modules {
-        for n in &module.nodes {
-            if n.game2d.is_some() {
-                let line = line_at(&module.source, n.span.0);
-                return Err(at(
-                    mname,
-                    line,
-                    &n.name,
-                    "game2d block requires --profile components-2d-game (the frozen components-2d profile keeps its 020 lowering)",
-                ));
+        for (mname, module) in &project.modules {
+            for n in &module.nodes {
+                if n.game2d.is_some() {
+                    let line = line_at(&module.source, n.span.0);
+                    return Err(at(
+                        mname,
+                        line,
+                        &n.name,
+                        "game2d block requires --profile components-2d-game (the frozen components-2d profile keeps its 020 lowering)",
+                    ));
+                }
             }
         }
     }
-    }
-    let world = build_world(project)?;
-    let plan = plan_dispatch(project, &world, queries)?;
-    let scene = collect_scene(project, &world, &plan)?;
-    let src = gen_user_source(project, &world, &plan, &scene, queries, game)?;
+    let world = build_world(project, sprites)?;
+    let plan = plan_dispatch(project, &world, queries, sprites)?;
+    let scene = if sprites {
+        collect_scene_sprites(project, &world, &plan)?
+    } else {
+        collect_scene(project, &world, &plan)?
+    };
+    let src = gen_user_source(project, &world, &plan, &scene, queries, game, sprites)?;
     let source_bytes = src.len();
     let source_sha256 = sha256_hex(src.as_bytes());
     let entry = world.root_module.clone();
-    let scene_json = scene_json_components(
-        &entry,
-        &scene.rows,
-        scene.char.is_some(),
-        &source_sha256,
-        source_bytes,
-    );
+    let scene_json = if sprites {
+        scene_json_sprites(
+            &entry,
+            &scene.rows,
+            scene.char.is_some(),
+            &source_sha256,
+            source_bytes,
+            &scene.assets_json,
+        )
+    } else {
+        scene_json_components(
+            &entry,
+            &scene.rows,
+            scene.char.is_some(),
+            &source_sha256,
+            source_bytes,
+        )
+    };
     let collected = Collected {
         nodes: scene.rows,
         camera: scene.camera,

@@ -66,6 +66,25 @@ pub struct Ctx<'a> {
     /// PLAN-021（queries-2d）：typed 查询服务环境。None 保持旧档行为
     /// （query2d 构造在 plan 层具名拒绝，旧字节不变）。
     pub query: Option<QueryEnv<'a>>,
+    /// PLAN-022（sprites-2d）：typed 渲染服务环境。None 保持旧档行为
+    /// （render2d/input.held 保持 unsupported，旧字节不变）。
+    pub sprites: Option<SpriteEnv<'a>>,
+}
+
+/// PLAN-022：图像帧表（生成侧全局数组 `{image}_fx/fy/fw/fh`；序 = 帧资源
+/// 声明序，ordinal 即数组下标）。
+#[derive(Clone, Debug)]
+pub struct FrameTable {
+    pub image: String,
+    pub len: usize,
+}
+
+/// PLAN-022：render2d 服务解析面（下降期常量；plan 层已验证目标存在）。
+pub struct SpriteEnv<'a> {
+    /// `render2d.spawn(<elem>, x, y)`：根视图元素名 → (slot, 模板行 id)。
+    pub spawns: &'a BTreeMap<String, (i64, i64)>,
+    /// 本工程引用到的图像帧表（生成数组前缀 = 图像资源名）。
+    pub frames: &'a BTreeMap<String, FrameTable>,
 }
 
 /// PLAN-021：typed 查询结果种类（同一世界共享 latest slot，q 即 token）。
@@ -195,6 +214,16 @@ fn translate_stmt(s: &Stmt, ctx: &Ctx, out: &mut String, indent: usize) -> Resul
                 for t in texts {
                     pad(out, indent);
                     out.push_str(&t);
+                    out.push('\n');
+                }
+                return Ok(());
+            }
+            // PLAN-022：`render2d.frame(tok, img, ord, flip)` 是语句形态
+            // （帧表 if-chain + 具名 fault 42 兜底；值位置具名拒绝）。
+            if let Some(text) = render_frame_stmt(e, ctx)? {
+                for line in text {
+                    pad(out, indent);
+                    out.push_str(&line);
                     out.push('\n');
                 }
                 return Ok(());
@@ -360,6 +389,39 @@ fn translate_expr(e: &Expr, ctx: &Ctx, out: &mut String) -> Result<(), LowerErro
                         }
                         return Ok(());
                     }
+                    // PLAN-022（sprites-2d）：input.held(Action) → 受信输入
+                    // 服务的单次 held 读（计费 1；动作号沿受信冻结表
+                    // 0=Left/1=Right/2=Jump/3=Enter）。
+                    if base == "input" && m == "held" {
+                        let names: Vec<String> = call
+                            .args
+                            .args
+                            .iter()
+                            .map(|a| match a {
+                                Arg::Pos(Expr::Ident(n)) => Ok(n.to_string()),
+                                _ => Err(unsupported("input.held args", e)),
+                            })
+                            .collect::<Result<Vec<_>, _>>()?;
+                        if names.len() != 1 {
+                            return Err(unsupported(format!("input.held({names:?})"), e));
+                        }
+                        let action = match names[0].as_str() {
+                            "Left" => 0,
+                            "Right" => 1,
+                            "Jump" => 2,
+                            "Enter" => 3,
+                            other => {
+                                return Err(unsupported(
+                                    format!(
+                                    "input.held({other}) (research surface: Left/Right/Jump/Enter)"
+                                ),
+                                    e,
+                                ))
+                            }
+                        };
+                        out.push_str(&format!("ag_action_held({action})"));
+                        return Ok(());
+                    }
                     // PLAN-017：input.pressed(Enter) → pressed 边沿（消耗性读取，
                     // 计费 1）。PLAN-019 扩展 Jump（G06 走跳沿），动作号沿
                     // 受信 character 服务冻结表 0=Left/1=Right/2=Jump/3=Enter。
@@ -453,6 +515,15 @@ fn translate_expr(e: &Expr, ctx: &Ctx, out: &mut String) -> Result<(), LowerErro
                 if let Expr::Ident(base) = &**inner {
                     if base == "query2d" {
                         return translate_query_call(m, e, call, ctx, out);
+                    }
+                }
+            }
+            // PLAN-022（sprites-2d）：render2d.spawn/despawn（frame 是语句
+            // 形态，在 translate_stmt 展开；值位置具名拒绝）。
+            if let Expr::Dot(inner, m) = &*call.name {
+                if let Expr::Ident(base) = &**inner {
+                    if base == "render2d" && matches!(m.as_str(), "spawn" | "despawn") {
+                        return translate_render_call(m, e, call, ctx, out);
                     }
                 }
             }
@@ -1111,4 +1182,156 @@ fn translate_self_row_op(
         }
         _ => unreachable!("self row op dispatch"),
     }
+}
+
+/// PLAN-022：`render2d.spawn(<elem>, x, y)` → `ag_object_spawn(slot, row, x, y, 0.0)`
+/// （elem/ slot/行 id 为下降期常量，plan 层已验证目标与槽预算）；
+/// `render2d.despawn(t)` → `ag_object_despawn(t)`。
+fn translate_render_call(
+    m: &str,
+    e: &Expr,
+    call: &auto_parser_api::ast::Call,
+    ctx: &Ctx,
+    out: &mut String,
+) -> Result<(), LowerError> {
+    let Some(env) = &ctx.sprites else {
+        return Err(unsupported(
+            "render2d is only available in the sprites-2d profile",
+            e,
+        ));
+    };
+    match m {
+        "spawn" => {
+            if call.args.args.len() != 3 {
+                return Err(unsupported(
+                    format!(
+                        "render2d.spawn arity {} (want <elem>, x, y)",
+                        call.args.args.len()
+                    ),
+                    e,
+                ));
+            }
+            let elem = match &call.args.args[0] {
+                Arg::Pos(Expr::Str(n)) => n.to_string(),
+                _ => {
+                    return Err(unsupported(
+                        "render2d.spawn target must be a string literal element name",
+                        e,
+                    ))
+                }
+            };
+            let (slot, row) = env.spawns.get(&elem).copied().ok_or_else(|| {
+                unsupported(
+                    format!("unknown render2d.spawn target '{elem}' (no bound sprite leaf)"),
+                    e,
+                )
+            })?;
+            out.push_str(&format!("ag_object_spawn({slot}, {row}, "));
+            for a in &call.args.args[1..3] {
+                match a {
+                    Arg::Pos(x) => translate_expr(x, ctx, out)?,
+                    other => return Err(unsupported(format!("spawn arg {other:?}"), e)),
+                }
+                out.push_str(", ");
+            }
+            out.push_str("0.0)");
+            Ok(())
+        }
+        "despawn" => {
+            if call.args.args.len() != 1 {
+                return Err(unsupported(
+                    format!("render2d.despawn arity {}", call.args.args.len()),
+                    e,
+                ));
+            }
+            out.push_str("ag_object_despawn(");
+            match &call.args.args[0] {
+                Arg::Pos(x) => translate_expr(x, ctx, out)?,
+                other => return Err(unsupported(format!("despawn arg {other:?}"), e)),
+            }
+            out.push(')');
+            Ok(())
+        }
+        other => Err(unsupported(format!("unknown render2d.{other}"), e)),
+    }
+}
+
+/// PLAN-022：`render2d.frame(tok, img, ord, flip)` 语句形态 → 帧表 if-chain
+/// （每分支恰一次 `ag_sprite_slot` 写；序数越界走具名 `_ag_fail(42, 0, ord)`，
+/// 不取模不截断）。rect 一律来自命名图像的帧表；与槽模板图像不一致由旧受
+/// 检边界（资产序数/矩形域）具名拒绝。非 frame 调用返回 None。
+fn render_frame_stmt(e: &Expr, ctx: &Ctx) -> Result<Option<Vec<String>>, LowerError> {
+    let Expr::Call(c) = e else {
+        return Ok(None);
+    };
+    let Expr::Dot(inner, m) = &*c.name else {
+        return Ok(None);
+    };
+    if m != "frame" {
+        return Ok(None);
+    }
+    if !matches!(&**inner, Expr::Ident(b) if b == "render2d") {
+        return Ok(None);
+    }
+    let Some(env) = &ctx.sprites else {
+        return Err(unsupported(
+            "render2d is only available in the sprites-2d profile",
+            e,
+        ));
+    };
+    if c.args.args.len() != 4 {
+        return Err(unsupported(
+            format!(
+                "render2d.frame arity {} (want <token>, <image>, <ordinal>, <flip>)",
+                c.args.args.len()
+            ),
+            e,
+        ));
+    }
+    let image = match &c.args.args[1] {
+        Arg::Pos(Expr::Str(n)) => n.to_string(),
+        _ => {
+            return Err(unsupported(
+                "render2d.frame image must be a string literal image resource name",
+                e,
+            ))
+        }
+    };
+    let table = env.frames.get(&image).ok_or_else(|| {
+        unsupported(
+            format!("unknown render2d.frame image 'resources.{image}'"),
+            e,
+        )
+    })?;
+    let mut tok = String::new();
+    match &c.args.args[0] {
+        Arg::Pos(x) => translate_expr(x, ctx, &mut tok)?,
+        _ => return Err(unsupported("render2d.frame token arg", e)),
+    }
+    let mut ord = String::new();
+    match &c.args.args[2] {
+        Arg::Pos(x) => translate_expr(x, ctx, &mut ord)?,
+        _ => return Err(unsupported("render2d.frame ordinal arg", e)),
+    }
+    let mut flip = String::new();
+    match &c.args.args[3] {
+        Arg::Pos(x) => translate_expr(x, ctx, &mut flip)?,
+        _ => return Err(unsupported("render2d.frame flip arg", e)),
+    }
+    let img = &table.image;
+    let mut line = String::new();
+    for i in 0..table.len {
+        if i == 0 {
+            line.push_str(&format!(
+                "if {ord} == {i} {{ ag_sprite_slot({tok}, {img}_fx[{i}], {img}_fy[{i}], {img}_fw[{i}], {img}_fh[{i}], {flip}) }}"
+            ));
+        } else {
+            line.push_str(&format!(
+                " else if {ord} == {i} {{ ag_sprite_slot({tok}, {img}_fx[{i}], {img}_fy[{i}], {img}_fw[{i}], {img}_fh[{i}], {flip}) }}"
+            ));
+        }
+    }
+    // 越界序数：退化矩形写，由受信单元自身边界具名拒绝（fault 42）。
+    line.push_str(&format!(" else {{ ag_sprite_slot({tok}, 0, 0, 0, 0, 0) }}"));
+    Ok(Some(vec![line]))
 }

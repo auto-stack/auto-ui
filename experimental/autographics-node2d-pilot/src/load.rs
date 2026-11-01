@@ -25,6 +25,19 @@ pub enum ResourceKind {
     Circle(f64),
     /// material2d.color(r, g, b, a)
     Color(f64, f64, f64, f64),
+    /// PLAN-022 sprites-2d：image2d.png("file.png")——固定 PNG 资源。
+    /// 身份 = 完整原始字节 SHA256 + byte_length + png 格式 + IHDR 尺寸；
+    /// 严格准入仍在 driver 资源服务（生成器只读 IHDR 元数据，不解码）。
+    Image {
+        file: String,
+        sha256: String,
+        byte_length: usize,
+        width: u32,
+        height: u32,
+    },
+    /// PLAN-022 sprites-2d：frame2d.at(<image>, x, y, w, h)——具名帧表项。
+    /// 名字即资源符号；rect 是图像内的整数像素矩形（w,h>=1）。
+    Frame { image: String, rect: [u32; 4] },
 }
 
 #[derive(Debug, Clone)]
@@ -79,7 +92,7 @@ fn line_of(source: &str, offset: usize) -> usize {
         + 1
 }
 
-fn parse_module_text(file: &str, source: &str) -> Result<LoadedModule, ProjectError> {
+fn parse_module_text(file: &str, source: &str, base: &Path) -> Result<LoadedModule, ProjectError> {
     let err = |message: String, offset: usize| ProjectError {
         file: file.to_string(),
         line: line_of(source, offset),
@@ -145,11 +158,11 @@ fn parse_module_text(file: &str, source: &str) -> Result<LoadedModule, ProjectEr
                     module.enums.insert(e.name.to_string(), variants);
                 }
                 Stmt::Store(s) => {
-                    let def = resource_from_store(&s.name.to_string(), &s.expr)
+                    let def = resource_from_store(&s.name.to_string(), &s.expr, base)?
                         .ok_or_else(|| {
                             err(
                                 format!(
-                                    "unsupported resource initializer for '{}' (expected mesh2d.quad/circle or material2d.color)",
+                                    "unsupported resource initializer for '{}' (expected mesh2d.quad/circle, material2d.color, image2d.png or frame2d.at)",
                                     s.name
                                 ),
                                 0,
@@ -170,19 +183,39 @@ fn parse_module_text(file: &str, source: &str) -> Result<LoadedModule, ProjectEr
     Ok(module)
 }
 
-/// `let name = mesh2d.quad(w, h)` / `mesh2d.circle(d)` / `material2d.color(r,g,b,a)`。
-fn resource_from_store(name: &str, expr: &Expr) -> Option<ResourceDef> {
+/// `let name = mesh2d.quad(w, h)` / `mesh2d.circle(d)` / `material2d.color(r,g,b,a)`
+/// 以及 PLAN-022 sprites-2d：`image2d.png("file.png")` / `frame2d.at(<img>, x, y, w, h)`。
+fn resource_from_store(
+    name: &str,
+    expr: &Expr,
+    base: &Path,
+) -> Result<Option<ResourceDef>, ProjectError> {
     let call = match expr {
         Expr::Call(c) => c,
-        _ => return None,
+        _ => return Ok(None),
     };
     let ctor = match &*call.name {
         Expr::Dot(_, m) => m.to_string(),
-        _ => return None,
+        _ => return Ok(None),
     };
-    let args: Vec<f64> = call
-        .args
-        .args
+    // PLAN-022：图像/帧表构造器接受字符串/资源实参，先于数值实参收集。
+    // 读不到/坏签名的 PNG 具名拒绝（不静默回退到 generic unsupported）。
+    if ctor == "png" {
+        return resource_from_store_png(name, &call.args.args, base);
+    }
+    if ctor == "at" {
+        return Ok(resource_from_store_at(name, &call.args.args));
+    }
+    Ok(resource_from_store_legacy(name, &ctor, &call.args.args))
+}
+
+/// 旧三类数值构造器（quad/circle/color）。
+fn resource_from_store_legacy(
+    name: &str,
+    ctor: &str,
+    args: &[auto_parser_api::ast::Arg],
+) -> Option<ResourceDef> {
+    let nums: Vec<f64> = args
         .iter()
         .map(|a| match a {
             auto_parser_api::ast::Arg::Pos(Expr::Float(v, _)) => Some(*v),
@@ -190,10 +223,10 @@ fn resource_from_store(name: &str, expr: &Expr) -> Option<ResourceDef> {
             _ => None,
         })
         .collect::<Option<Vec<_>>>()?;
-    let kind = match ctor.as_str() {
-        "quad" if args.len() == 2 => ResourceKind::Quad(args[0], args[1]),
-        "circle" if args.len() == 1 => ResourceKind::Circle(args[0]),
-        "color" if args.len() == 4 => ResourceKind::Color(args[0], args[1], args[2], args[3]),
+    let kind = match ctor {
+        "quad" if nums.len() == 2 => ResourceKind::Quad(nums[0], nums[1]),
+        "circle" if nums.len() == 1 => ResourceKind::Circle(nums[0]),
+        "color" if nums.len() == 4 => ResourceKind::Color(nums[0], nums[1], nums[2], nums[3]),
         _ => return None,
     };
     Some(ResourceDef {
@@ -201,6 +234,156 @@ fn resource_from_store(name: &str, expr: &Expr) -> Option<ResourceDef> {
         kind,
         line: 0,
     })
+}
+
+/// PLAN-022：`image2d.png("file.png")` —— 缺文件/坏签名具名拒绝。
+fn resource_from_store_png(
+    name: &str,
+    args: &[auto_parser_api::ast::Arg],
+    base: &Path,
+) -> Result<Option<ResourceDef>, ProjectError> {
+    let err = |message: String| ProjectError {
+        file: "resources".to_string(),
+        line: 0,
+        message,
+    };
+    if args.len() != 1 {
+        return Ok(None);
+    }
+    let file = match &args[0] {
+        auto_parser_api::ast::Arg::Pos(Expr::Str(s)) => s.to_string(),
+        _ => return Ok(None),
+    };
+    let path = base.join(&file);
+    let bytes = std::fs::read(&path).map_err(|e| {
+        err(format!(
+            "image resource '{name}': cannot read '{}' ({e})",
+            path.display()
+        ))
+    })?;
+    let (width, height) = png_ihdr_dims(&bytes).ok_or_else(|| {
+        err(format!(
+            "image resource '{name}': '{}' is not a readable PNG (signature/IHDR)",
+            path.display()
+        ))
+    })?;
+    Ok(Some(ResourceDef {
+        name: name.to_string(),
+        kind: ResourceKind::Image {
+            file,
+            sha256: crate::scene::sha256_hex(&bytes),
+            byte_length: bytes.len(),
+            width,
+            height,
+        },
+        line: 0,
+    }))
+}
+
+/// PLAN-022：`frame2d.at(resources.<img>, x, y, w, h)`。
+fn resource_from_store_at(name: &str, args: &[auto_parser_api::ast::Arg]) -> Option<ResourceDef> {
+    if args.len() != 5 {
+        return None;
+    }
+    let image = match &args[0] {
+        auto_parser_api::ast::Arg::Pos(Expr::Dot(outer, m)) => {
+            if matches!(&**outer, Expr::Ident(b) if b == "resources") {
+                m.to_string()
+            } else {
+                return None;
+            }
+        }
+        _ => return None,
+    };
+    let nums: Vec<u32> = args[1..5]
+        .iter()
+        .map(|a| match a {
+            auto_parser_api::ast::Arg::Pos(Expr::Int(v)) if *v >= 0 => Some(*v as u32),
+            _ => None,
+        })
+        .collect::<Option<Vec<_>>>()?;
+    Some(ResourceDef {
+        name: name.to_string(),
+        kind: ResourceKind::Frame {
+            image,
+            rect: [nums[0], nums[1], nums[2], nums[3]],
+        },
+        line: 0,
+    })
+}
+
+/// PLAN-022：`image2d.png("file.png")` / `frame2d.at(resources.<img>, x, y, w, h)`。
+fn resource_from_store_sprites(
+    name: &str,
+    ctor: &str,
+    args: &[auto_parser_api::ast::Arg],
+    base: &Path,
+) -> Option<ResourceDef> {
+    let kind = match ctor {
+        // 身份 = 完整字节 SHA256 + byte_length + IHDR 尺寸（严格准入在
+        // driver 资源服务；生成器只读 IHDR 元数据）。
+        "png" if args.len() == 1 => {
+            let file = match &args[0] {
+                auto_parser_api::ast::Arg::Pos(Expr::Str(s)) => s.to_string(),
+                _ => return None,
+            };
+            let path = base.join(&file);
+            let bytes = std::fs::read(&path).ok()?;
+            let (width, height) = png_ihdr_dims(&bytes)?;
+            ResourceKind::Image {
+                file,
+                sha256: crate::scene::sha256_hex(&bytes),
+                byte_length: bytes.len(),
+                width,
+                height,
+            }
+        }
+        // 具名帧表项，rect 整数像素；边界关系在 lower 层按 IHDR 尺寸核。
+        "at" if args.len() == 5 => {
+            let image = match &args[0] {
+                auto_parser_api::ast::Arg::Pos(Expr::Dot(outer, m)) => {
+                    if matches!(&**outer, Expr::Ident(b) if b == "resources") {
+                        m.to_string()
+                    } else {
+                        return None;
+                    }
+                }
+                _ => return None,
+            };
+            let nums: Vec<u32> = args[1..5]
+                .iter()
+                .map(|a| match a {
+                    auto_parser_api::ast::Arg::Pos(Expr::Int(v)) if *v >= 0 => Some(*v as u32),
+                    _ => None,
+                })
+                .collect::<Option<Vec<_>>>()?;
+            ResourceKind::Frame {
+                image,
+                rect: [nums[0], nums[1], nums[2], nums[3]],
+            }
+        }
+        _ => return None,
+    };
+    Some(ResourceDef {
+        name: name.to_string(),
+        kind,
+        line: 0,
+    })
+}
+
+/// PNG IHDR 尺寸（仅元数据读：8 字节签名 + IHDR 块头 + 宽高 BE u32）。
+/// 签名/长度不符返回 None（载入层具名拒绝）；完整准入属 driver 资源服务。
+fn png_ihdr_dims(bytes: &[u8]) -> Option<(u32, u32)> {
+    const SIG: [u8; 8] = [0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A];
+    if bytes.len() < 24 || bytes[..8] != SIG {
+        return None;
+    }
+    if &bytes[12..16] != b"IHDR" {
+        return None;
+    }
+    let width = u32::from_be_bytes(bytes[16..20].try_into().ok()?);
+    let height = u32::from_be_bytes(bytes[20..24].try_into().ok()?);
+    Some((width, height))
 }
 
 /// 读入模块工程：`entry` 所在目录为根，`use` 闭包全部解析。
@@ -235,7 +418,7 @@ pub fn load_project(entry: &Path) -> Result<Project, ProjectError> {
             line: 0,
             message: "module not found".into(),
         })?;
-        let module = parse_module_text(&name, &source)?;
+        let module = parse_module_text(&name, &source, &base)?;
         for u in &module.uses {
             if u.module == SERVICES_NAMESPACE || u.module == "store" {
                 continue;

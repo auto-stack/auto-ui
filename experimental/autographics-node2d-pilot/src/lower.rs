@@ -556,6 +556,7 @@ fn base_ctx<'a>(
         call_scope: None,
         child_emit: None,
         query: None,
+        sprites: None,
     }
 }
 

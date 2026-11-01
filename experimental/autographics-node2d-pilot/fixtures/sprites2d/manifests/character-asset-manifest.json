@@ -1,0 +1,23 @@
+{
+  "schema": "ag-examples.asset-source/1",
+  "asset": {
+    "sha256": "8fde96f66bf875ec06cfe7058348cd572c469413381e8204b1cd5973058998df",
+    "path": "examples/g09-sprites-and-frames/character/assets/8fde96f66bf875ec06cfe7058348cd572c469413381e8204b1cd5973058998df.png",
+    "license": "licenses/8fde96f66bf875ec06cfe7058348cd572c469413381e8204b1cd5973058998df.LICENSE",
+    "creator": "OpenAI Codex",
+    "origin": "original procedural pixel art; no external image material",
+    "generator": "examples/g09-sprites-and-frames/source/generate_character.py",
+    "generator_sha256": "5d5b9fc60f9a9dbde928fc0b559da541e7d959756042944e37749fe45e0f785e",
+    "generator_helper": "examples/g09-sprites-and-frames/source/png_writer.py",
+    "generator_helper_sha256": "61581292ef6816b2673dbbb05b153b16a6d29337971febaa2825ade622141541",
+    "generator_runtime": "Python 3.14.2; standard library only",
+    "png": {"width": 160, "height": 32, "bit_depth": 8, "color_type": "RGBA", "interlace": false, "byte_length": 735, "decoded_rgba_bytes": 20480, "decoded_scanline_bytes": 20512},
+    "frames": [
+      {"name": "idle", "rect": [0, 0, 32, 32]},
+      {"name": "run-a", "rect": [32, 0, 32, 32]},
+      {"name": "run-b", "rect": [64, 0, 32, 32]},
+      {"name": "jump", "rect": [96, 0, 32, 32]},
+      {"name": "fall", "rect": [128, 0, 32, 32]}
+    ]
+  }
+}

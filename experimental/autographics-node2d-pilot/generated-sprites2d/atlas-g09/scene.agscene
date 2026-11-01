@@ -1,0 +1,71 @@
+{
+ "behavior": {
+  "api": "autographics.sprites2d/1",
+  "source": {
+   "format": "auto-source",
+   "sha256": "7145d97868abea634e8d52f03285b671dba0b413582c1d6c614fd62e60ee9724",
+   "byte_length": 2138
+  },
+  "actors": {
+   "two_d": 1,
+   "three_d": null
+  }
+ },
+ "schema": "autographics.scene/6",
+ "document_id": "plan022-sprites-2d-main",
+ "resources": [
+  "circle",
+  "quad",
+  "cylinder",
+  "player",
+  "mob"
+ ],
+ "objects": [
+  {
+   "id": 1,
+   "name": "underlay",
+   "kind": "quad",
+   "translation": [2.0, 0.0, 0.0],
+   "scale": [1.0, 1.2, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0, 0, 0, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 2,
+   "name": "hero.body",
+   "kind": "quad",
+   "translation": [2.0, 0.0, 0.0],
+   "scale": [0.8, 1.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.9, 0.3, 0.2, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": {"asset": "sha256:95a08525ebe48c2423f04ecb8105965109c5a1c6b55fb6d15c154f3338a5bbb1", "frame": [0, 0, 32, 32], "flip": false}
+  },
+  {
+   "id": 3,
+   "name": "floor",
+   "kind": "quad",
+   "translation": [15.0, -1.0, 0.0],
+   "scale": [40.0, 1.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.9, 0.3, 0.2, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  }
+ ],
+ "groups": [],
+ "assets": [
+  {"format": "png", "sha256": "95a08525ebe48c2423f04ecb8105965109c5a1c6b55fb6d15c154f3338a5bbb1", "byte_length": 258, "name": "95a08525ebe48c2423f04ecb8105965109c5a1c6b55fb6d15c154f3338a5bbb1.png", "width": 96, "height": 32}
+ ]
+}

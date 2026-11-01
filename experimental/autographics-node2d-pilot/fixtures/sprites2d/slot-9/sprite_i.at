@@ -1,0 +1,26 @@
+use resources: atlas_img
+node SpriteN(img: Image2D, px: float) {
+    model {
+        var phase = 0
+        var pose = 0
+        var flip = 0
+    }
+    view-2d {
+        shape2d sprite {
+            position: (px, 0.0)
+            size: (0.8, 1.0)
+            image: img
+            frame: .pose
+            flip: .flip
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            .phase = .phase + 1
+            if .phase > 5 { .phase = 0 }
+            .pose = 0
+            if .phase > 1 { .pose = 1 }
+            if .phase > 3 { .pose = 2 }
+        }
+    }
+}

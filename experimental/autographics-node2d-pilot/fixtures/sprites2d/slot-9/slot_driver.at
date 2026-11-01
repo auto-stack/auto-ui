@@ -1,0 +1,26 @@
+use resources: atlas_img
+node SlotDriver(img: Image2D) {
+    model {
+        var token = 0
+    }
+    view-2d {
+        shape2d anchor {
+            position: (-35.0, -40.0)
+            size: (0.1, 0.1)
+            mesh: resources.marker_mesh
+            material: resources.marker_color
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+                .token = render2d.spawn("spawn_template_1", 1.0, 0.0)
+                .token = render2d.spawn("spawn_template_2", 2.0, 0.0)
+                .token = render2d.spawn("spawn_template_3", 3.0, 0.0)
+                .token = render2d.spawn("spawn_template_4", 4.0, 0.0)
+                .token = render2d.spawn("spawn_template_5", 5.0, 0.0)
+                .token = render2d.spawn("spawn_template_6", 6.0, 0.0)
+                .token = render2d.spawn("spawn_template_7", 7.0, 0.0)
+                .token = render2d.spawn("spawn_template_8", 8.0, 0.0)
+        }
+    }
+}

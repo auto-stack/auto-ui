@@ -1,0 +1,6 @@
+let atlas_img = image2d.png("assets/atlas.png")
+let f_ruby = frame2d.at(resources.atlas_img, 0, 0, 32, 32)
+let f_amber = frame2d.at(resources.atlas_img, 32, 0, 32, 32)
+let f_oob = frame2d.at(resources.atlas_img, 90, 0, 32, 32)
+let marker_color = material2d.color(0.45, 0.45, 0.45, 1.0)
+let marker_mesh = mesh2d.quad(0.1, 0.1)

@@ -1,0 +1,39 @@
+// PLAN-022 typed render-instance driver (original atlas dynamic control):
+// phase 1 spawns a slot of the static atlas leaf and writes frame ordinal 2
+// (rect [64,0,32,32], flip); phase 2 despawns and respawns the same slot
+// (generation bump, default visual restored); phase 3 writes the STALE
+// handle (named fault 33; the host keeps the tick-2 last-good group).
+use resources: marker_mesh, marker_color
+use resources: atlas_img
+node SlotDriver(img: Image2D) {
+    model {
+        var old_token = 0
+        var token = 0
+        var phase = 0
+    }
+    view-2d {
+        shape2d anchor {
+            position: (-35.0, -40.0)
+            size: (0.1, 0.1)
+            mesh: resources.marker_mesh
+            material: resources.marker_color
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            .phase = .phase + 1
+            if .phase == 1 {
+                .old_token = render2d.spawn("spawn_template", 6.0, 0.0)
+                render2d.frame(.old_token, "atlas_img", 2, 1)
+            }
+            if .phase == 2 {
+                render2d.despawn(.old_token)
+                .old_token = 0
+                .token = render2d.spawn("spawn_template", 6.0, 0.0)
+            }
+            if .phase == 3 {
+                render2d.frame(.old_token, "atlas_img", 1, 0)
+            }
+        }
+    }
+}

@@ -46,8 +46,7 @@ use crate::lower_components::{
 use crate::scene::sha256_hex;
 use crate::translate::LowerError;
 use auto_ui_dialect::node2d::{
-    EventPattern, Game2dBlock, Game2dShape, Game2dTrigger,
-    Game2dTriggerKind,
+    EventPattern, Game2dBlock, Game2dShape, Game2dTrigger, Game2dTriggerKind,
 };
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -267,12 +266,7 @@ fn prepare_game(
                 ));
             }
             if seen.contains(&s.slot) {
-                return Err(at(
-                    &root_module,
-                    sline,
-                    &sym,
-                    "duplicate hud slot index",
-                ));
+                return Err(at(&root_module, sline, &sym, "duplicate hud slot index"));
             }
             seen.push(s.slot);
             if !(0..=3).contains(&s.anchor)
@@ -533,7 +527,10 @@ fn resolve_trigger(
         pair,
         prefix,
         def_idx: inst.def_idx,
-        recv: format!("{target_lower}_{ev_lower}", target_lower = t.target.to_lowercase()),
+        recv: format!(
+            "{target_lower}_{ev_lower}",
+            target_lower = t.target.to_lowercase()
+        ),
         guard: t.guard.clone(),
         circle,
         kind,
@@ -631,8 +628,7 @@ fn prepare_assets(
     })?;
     let read = |rel: &str, what: &str| -> Result<Vec<u8>, LowerError> {
         let p = entry_dir.join(rel);
-        std::fs::read(&p)
-            .map_err(|e| err(format!("game2d {what} '{rel}' unreadable: {e}")))
+        std::fs::read(&p).map_err(|e| err(format!("game2d {what} '{rel}' unreadable: {e}")))
     };
     if !game.cues.is_empty() {
         let bytes = read(&audio.bank, "bank")?;
@@ -804,7 +800,9 @@ fn at_lit(s: &str) -> String {
 /// T-02 手扩世界 world-game.at 逐形同构）。
 pub(crate) fn game_fns_src(gen: &GameGen) -> String {
     let mut s = String::new();
-    s.push_str("// ---- PLAN-023 components-2d-game generated closeout (T-02 frozen skeleton, F-3/F-6)\n");
+    s.push_str(
+        "// ---- PLAN-023 components-2d-game generated closeout (T-02 frozen skeleton, F-3/F-6)\n",
+    );
     // game_cue：单根序数（严格递增）+ ≤2 pending（F-3 冻结骨架）。
     s.push_str("fn game_cue(c int) {\n");
     s.push_str(" r_ord = r_ord + 1\n");
@@ -884,9 +882,7 @@ pub(crate) fn game_fns_src(gen: &GameGen) -> String {
     s.push_str("fn game_closeout() {\n");
     s.push_str(" var o0 = 0\n var c0 = 0\n var o1 = 0\n var c1 = 0\n");
     s.push_str(" if r_np == 1 {\n  o0 = r_ord\n  c0 = r_p0\n }\n");
-    s.push_str(
-        " if r_np == 2 {\n  o0 = r_ord - 1\n  c0 = r_p0\n  o1 = r_ord\n  c1 = r_p1\n }\n",
-    );
+    s.push_str(" if r_np == 2 {\n  o0 = r_ord - 1\n  c0 = r_p0\n  o1 = r_ord\n  c1 = r_p1\n }\n");
     s.push_str(&format!(
         " ok = ok + ag_present2d(-1, 0, 0, 0, 0, 0, 0, r_np, o0, c0, 0.5, o1, c1, 0.5, 0, 0, 0.0, 0, 0, 0.0, {}) * 1.0\n",
         slot_args.join(", ")
@@ -923,7 +919,11 @@ pub(crate) fn trigger_binds_src(gen: &GameGen, char_id: usize) -> String {
 /// F-8.2（game 面）：每个实例叶名的声明 handler 都有接收 fn（root 成员
 /// 无索引）。与 emit 站点命名一致（`<leaf>_<ev 小写>` / `<root>_<ev 小
 /// 写>`）；已有条目不覆盖（frozen 命名优先）。
-fn complete_receivers(project: &Project, world: &WorldIR, plan: &mut crate::lower_components::Plan) {
+fn complete_receivers(
+    project: &Project,
+    world: &WorldIR,
+    plan: &mut crate::lower_components::Plan,
+) {
     let root_prefix = world.root.to_lowercase();
     let root_decl = node_of(project, &world.root);
     if let Some(on) = &root_decl.on {
@@ -959,7 +959,7 @@ pub fn lower_project_components_game(
     project: &Project,
     entry_dir: &Path,
 ) -> Result<LowerOutputGame, LowerError> {
-    let mut world = build_world(project)?;
+    let mut world = build_world(project, false)?;
     let game_block = game2d_of(project, &world)?;
     // F-4：注入生成基础设施字段（gate/ord/np/p0/p1）到 root DefIR ——
     // 之后 `.gate` 翻译、getter 发射与 closeout 引用共享同一模型面。
@@ -973,7 +973,7 @@ pub fn lower_project_components_game(
         }
     }
     // F-8.2（game 面）：先补全接收方，再走共享管线。
-    let mut plan = plan_dispatch(project, &world, false)?;
+    let mut plan = plan_dispatch(project, &world, false, false)?;
     complete_receivers(project, &world, &mut plan);
 
     let gen = prepare_game(project, &world, &game_block)?;
@@ -1006,7 +1006,7 @@ pub fn lower_project_components_game(
     };
 
     let scene = collect_scene(project, &world, &plan)?;
-    let src = gen_user_source(project, &world, &plan, &scene, false, Some(&gen))?;
+    let src = gen_user_source(project, &world, &plan, &scene, false, Some(&gen), false)?;
     let source_bytes = src.len();
     let source_sha256 = sha256_hex(src.as_bytes());
     let entry = world.root_module.clone();

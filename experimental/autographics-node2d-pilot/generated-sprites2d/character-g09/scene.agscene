@@ -1,0 +1,85 @@
+{
+ "behavior": {
+  "api": "autographics.sprites2d/1",
+  "source": {
+   "format": "auto-source",
+   "sha256": "b9b0685674dc6c4c70340e4fba37972175580123b9103accafdd4c3f44f2ba34",
+   "byte_length": 3286
+  },
+  "actors": {
+   "two_d": 1,
+   "three_d": null
+  }
+ },
+ "schema": "autographics.scene/6",
+ "document_id": "plan022-sprites-2d-main",
+ "resources": [
+  "circle",
+  "quad",
+  "cylinder",
+  "player",
+  "mob"
+ ],
+ "objects": [
+  {
+   "id": 1,
+   "name": "floor",
+   "kind": "quad",
+   "translation": [15.0, -1.0, 0.0],
+   "scale": [40.0, 1.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.9, 0.3, 0.2, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 2,
+   "name": "east_wall",
+   "kind": "quad",
+   "translation": [10.0, 2.0, 0.0],
+   "scale": [0.6, 5.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.9, 0.3, 0.2, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 3,
+   "name": "low_platform",
+   "kind": "quad",
+   "translation": [5.4, 0.55, 0.0],
+   "scale": [3.0, 0.4, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.9, 0.3, 0.2, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 4,
+   "name": "player.body",
+   "kind": "quad",
+   "translation": [2.0, 0.0, 0.0],
+   "scale": [0.8, 1.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.9, 0.3, 0.2, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": {"asset": "sha256:8fde96f66bf875ec06cfe7058348cd572c469413381e8204b1cd5973058998df", "frame": [0, 0, 32, 32], "flip": false}
+  }
+ ],
+ "groups": [],
+ "assets": [
+  {"format": "png", "sha256": "8fde96f66bf875ec06cfe7058348cd572c469413381e8204b1cd5973058998df", "byte_length": 735, "name": "8fde96f66bf875ec06cfe7058348cd572c469413381e8204b1cd5973058998df.png", "width": 160, "height": 32}
+ ]
+}

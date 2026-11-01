@@ -1,0 +1,31 @@
+{
+ "generator": "autographics-node2d-pilot plan022 sprites-2d",
+ "api": "autographics.sprites2d/1",
+ "user_source_sha256": "b5a84793d7370815a9f1d3d8dba08775795d7a0255f333ab7c7445e507276c0e",
+ "user_source_bytes": 2238,
+  "module:atlas_sprite_flip0": "df73c8ad8231fffe9258339927b457edc979122fd7b2686a4a15085a2a195d6b",
+  "module:main": "648532c07454c920d1d84b46896e5654d9e175b9e108ae78f514e1d1ebc79264",
+  "module:resources": "ba349dc68c10e93e86bbb90a2a1559d126cf463012cf430ebaa522d2e6be8952",
+ "closure": [
+  {"name": "atlas_sprite_flip0", "sha256": "df73c8ad8231fffe9258339927b457edc979122fd7b2686a4a15085a2a195d6b", "bytes": 980},
+  {"name": "main", "sha256": "648532c07454c920d1d84b46896e5654d9e175b9e108ae78f514e1d1ebc79264", "bytes": 752},
+  {"name": "resources", "sha256": "ba349dc68c10e93e86bbb90a2a1559d126cf463012cf430ebaa522d2e6be8952", "bytes": 604}
+ ],
+ "roles": {
+ "character": 0,
+ "character_name": "hero",
+ "solids": [{"id": 3, "name": "floor"}],
+ "camera": 1,
+ "scene_objects": {"underlay": 1, "hero.body": 2, "floor": 3}
+},
+ "assets": [
+   {"sha256": "95a08525ebe48c2423f04ecb8105965109c5a1c6b55fb6d15c154f3338a5bbb1", "file": "95a08525ebe48c2423f04ecb8105965109c5a1c6b55fb6d15c154f3338a5bbb1.png", "declared": "assets/atlas.png"}
+ ],
+ "provenance": {
+  "product": "atlas-flip-control",
+  "consumer": "experimental/autographics-auto-driver/tests/node_sprites_flow.rs",
+  "consumption": "include_str! frozen scene.agscene + world.at; the harness writes the project (scene + assets/<sha>.png) under target and loads via Storage::load_project; variants feed scripts/<sha>.at",
+  "load_verification": "the load path hash-verifies behavior source and every assets/<sha>.png against the scene manifest; damaged copies are rejected at load",
+  "world_sha256": "b5a84793d7370815a9f1d3d8dba08775795d7a0255f333ab7c7445e507276c0e"
+ }
+}

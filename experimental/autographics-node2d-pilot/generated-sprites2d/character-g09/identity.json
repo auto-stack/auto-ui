@@ -1,0 +1,31 @@
+{
+ "generator": "autographics-node2d-pilot plan022 sprites-2d",
+ "api": "autographics.sprites2d/1",
+ "user_source_sha256": "b9b0685674dc6c4c70340e4fba37972175580123b9103accafdd4c3f44f2ba34",
+ "user_source_bytes": 3286,
+  "module:main": "8547e79a4d2281c3fc515ec8e5a3c63eacd0ac312b99cb2540560ee916c77f64",
+  "module:player": "50116422363b2d54cc7c2f6e269c4aad2a5f8ade400e21562c69dd9ee8e06066",
+  "module:resources": "111f1ba2dc30084380c0f7a015cec1030eb6f76a91cb8d7d8357b9558b7e0313",
+ "closure": [
+  {"name": "main", "sha256": "8547e79a4d2281c3fc515ec8e5a3c63eacd0ac312b99cb2540560ee916c77f64", "bytes": 932},
+  {"name": "player", "sha256": "50116422363b2d54cc7c2f6e269c4aad2a5f8ade400e21562c69dd9ee8e06066", "bytes": 1995},
+  {"name": "resources", "sha256": "111f1ba2dc30084380c0f7a015cec1030eb6f76a91cb8d7d8357b9558b7e0313", "bytes": 658}
+ ],
+ "roles": {
+ "character": 0,
+ "character_name": "player",
+ "solids": [{"id": 1, "name": "floor"}, {"id": 2, "name": "east_wall"}, {"id": 3, "name": "low_platform"}],
+ "camera": 1,
+ "scene_objects": {"floor": 1, "east_wall": 2, "low_platform": 3, "player.body": 4}
+},
+ "assets": [
+   {"sha256": "8fde96f66bf875ec06cfe7058348cd572c469413381e8204b1cd5973058998df", "file": "8fde96f66bf875ec06cfe7058348cd572c469413381e8204b1cd5973058998df.png", "declared": "assets/character.png"}
+ ],
+ "provenance": {
+  "product": "character-g09",
+  "consumer": "experimental/autographics-auto-driver/tests/node_sprites_flow.rs",
+  "consumption": "include_str! frozen scene.agscene + world.at; the harness writes the project (scene + assets/<sha>.png) under target and loads via Storage::load_project; variants feed scripts/<sha>.at",
+  "load_verification": "the load path hash-verifies behavior source and every assets/<sha>.png against the scene manifest; damaged copies are rejected at load",
+  "world_sha256": "b9b0685674dc6c4c70340e4fba37972175580123b9103accafdd4c3f44f2ba34"
+ }
+}

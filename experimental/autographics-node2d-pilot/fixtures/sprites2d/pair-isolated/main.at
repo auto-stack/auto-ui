@@ -1,0 +1,31 @@
+// PLAN-022 pair-isolated root: two AnimatedSprite instances (initial phases
+// 0 and 2) sharing one image; char + camera complete the entry contract.
+use resources: marker_mesh, marker_color
+use resources: atlas_img
+use animated_sprite: AnimatedSprite
+
+node Main {
+    view-2d {
+        AnimatedSprite a {
+            img: resources.atlas_img
+            ph0: 0
+            px: 4.0
+            py: 0.0
+        }
+        AnimatedSprite b {
+            img: resources.atlas_img
+            ph0: 2
+            px: 8.0
+            py: 0.0
+        }
+        character2d body {
+            position: (-40.0, -40.0)
+            material: resources.marker_color
+        }
+        camera2d cam {
+            target: refs.body.actor
+            bounds: (0.0, -4.0, 30.0, 12.0)
+            view_size: (12.0, 8.0)
+        }
+    }
+}

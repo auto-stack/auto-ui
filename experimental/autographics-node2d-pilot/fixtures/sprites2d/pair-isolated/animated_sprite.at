@@ -1,0 +1,31 @@
+// PLAN-022 AnimatedSprite: same-definition sprite components share the PNG +
+// frame table but keep independent phase/pose/flip SoA state (initial phase
+// from the typed ph0 param; b flips when its own phase passes 2).
+use resources: atlas_img
+use resources: marker_mesh, marker_color
+node AnimatedSprite(img: Image2D, ph0: int, px: float, py: float) {
+    model {
+        var phase = ph0
+        var pose = 0
+        var flip = 0
+    }
+    view-2d {
+        shape2d sprite {
+            position: (px, py)
+            size: (0.8, 1.0)
+            image: img
+            frame: .pose
+            flip: .flip
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            .phase = .phase + 1
+            if .phase > 5 { .phase = 0 }
+            .pose = 0
+            if .phase > 1 { .pose = 1 }
+            if .phase > 3 { .pose = 2 }
+            if .phase > 2 { .flip = 1 } else { .flip = 0 }
+        }
+    }
+}

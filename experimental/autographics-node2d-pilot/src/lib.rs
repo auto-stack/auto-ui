@@ -19,7 +19,7 @@ pub mod scene;
 pub mod translate;
 
 /// 降层 profile（PLAN-017 T-02 冻结；PLAN-020 增补 components-2d；
-/// PLAN-021 增补 queries-2d）。
+/// PLAN-021 增补 queries-2d；PLAN-022 增补 sprites-2d）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Profile {
     /// PLAN-016 最小切片：字节兼容，服务映射不变。
@@ -33,6 +33,9 @@ pub enum Profile {
     /// PLAN-021 typed 二维查询：queries-2d（components-2d 超集 + query2d
     /// 服务/具名行/typed 结果；api/运行时装配不变）。
     Queries2D,
+    /// PLAN-022 typed 精灵/帧动画：sprites-2d（组件局部 image/frame/flip
+    /// 绑定 + render2d 渲染实例服务；sprites2d/1 装配）。
+    Sprites2D,
     /// PLAN-023 components-2d-game：game2d 作者入口（T-02 冻结合同
     /// F-1..F-6 的生成器实现；frozen components-2d 字节不变）。
     Components2DGame,
@@ -41,6 +44,8 @@ pub enum Profile {
 pub use load::{load_project, Project, ProjectError};
 pub use lower::{lower_project, LowerOutput};
 pub use lower_basic2d::{lower_project_basic, BasicProfile, LowerOutputBasic2D};
-pub use lower_components::{lower_project_components, lower_project_queries};
+pub use lower_components::{
+    lower_project_components, lower_project_queries, lower_project_sprites,
+};
 pub use lower_components_game::{lower_project_components_game, LowerOutputGame};
 pub use lower_g11::{lower_project_g112d, LowerOutputG11};

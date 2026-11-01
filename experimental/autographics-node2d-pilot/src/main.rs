@@ -31,6 +31,7 @@ fn main() {
                 Some("camera-2d") => Profile::Basic2D(BasicProfile::Camera2D),
                 Some("components-2d") => Profile::Components2D,
                 Some("queries-2d") => Profile::Queries2D,
+                Some("sprites-2d") => Profile::Sprites2D,
                 Some("components-2d-game") => Profile::Components2DGame,
                 _ => usage(),
             }
@@ -145,6 +146,190 @@ fn main() {
                 lowered.source_bytes,
                 lowered.source_sha256,
                 names.len()
+            );
+        }
+        Profile::Sprites2D => {
+            let lowered = autographics_node2d_pilot::lower_project_sprites(&project)
+                .unwrap_or_else(|e| {
+                    eprintln!("node2d-lower: {e}");
+                    std::process::exit(3);
+                });
+            std::fs::write(
+                format!("{out}/world.at"),
+                lowered.user_source.expect("source"),
+            )
+            .expect("world.at");
+            std::fs::write(format!("{out}/scene.agscene"), &lowered.scene_json)
+                .expect("scene.agscene");
+            // 图像资产字节（完整闭包：身份 = 原始字节；字节等值复制）。
+            std::fs::create_dir_all(format!("{out}/assets")).expect("assets dir");
+            let mut copied: Vec<(String, String)> = Vec::new();
+            for module in project.modules.values() {
+                for r in &module.resources {
+                    if let autographics_node2d_pilot::load::ResourceKind::Image {
+                        file,
+                        sha256,
+                        byte_length,
+                        ..
+                    } = &r.kind
+                    {
+                        let bytes = std::fs::read(
+                            std::path::Path::new(entry)
+                                .parent()
+                                .expect("entry parent")
+                                .join(file),
+                        )
+                        .unwrap_or_else(|e| panic!("read image {file}: {e}"));
+                        assert_eq!(bytes.len(), *byte_length, "image byte drift: {file}");
+                        assert_eq!(
+                            autographics_node2d_pilot::scene::sha256_hex(&bytes),
+                            *sha256,
+                            "image sha drift: {file}"
+                        );
+                        let dest = format!("{out}/assets/{sha256}.png");
+                        std::fs::write(&dest, &bytes).expect("asset copy");
+                        copied.push((sha256.clone(), file.clone()));
+                    }
+                }
+            }
+            copied.sort();
+            copied.dedup();
+            let mut names: Vec<_> = project.modules.keys().collect();
+            names.sort();
+            let mut modules = String::new();
+            let mut closure = String::new();
+            for name in &names {
+                let bytes = project.modules[*name].source.as_bytes();
+                modules.push_str(&format!(
+                    "  \"module:{}\": \"{}\",
+",
+                    name,
+                    autographics_node2d_pilot::scene::sha256_hex(bytes)
+                ));
+                closure.push_str(&format!(
+                    "  {{\"name\": \"{name}\", \"sha256\": \"{}\", \"bytes\": {}}},
+",
+                    autographics_node2d_pilot::scene::sha256_hex(bytes),
+                    bytes.len()
+                ));
+            }
+            let mut identity = String::from(
+                "{
+",
+            );
+            identity.push_str(
+                " \"generator\": \"autographics-node2d-pilot plan022 sprites-2d\",
+",
+            );
+            identity.push_str(
+                " \"api\": \"autographics.sprites2d/1\",
+",
+            );
+            identity.push_str(&format!(
+                " \"user_source_sha256\": \"{}\",
+ \"user_source_bytes\": {},
+",
+                lowered.source_sha256, lowered.source_bytes
+            ));
+            identity.push_str(&modules);
+            identity.push_str(
+                " \"closure\": [
+",
+            );
+            identity.push_str(closure.trim_end_matches(
+                ",
+",
+            ));
+            identity.push_str(
+                "
+ ],
+",
+            );
+            identity.push_str(&format!(
+                " \"roles\": {},
+",
+                lowered.roles_json
+            ));
+            identity.push_str(
+                " \"assets\": [
+",
+            );
+            let asset_rows = copied
+                .iter()
+                .map(|(sha, declared)| {
+                    format!(
+                        "   {{\"sha256\": \"{sha}\", \"file\": \"{sha}.png\", \"declared\": \"{declared}\"}}"
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(
+                    "\n",
+                );
+            identity.push_str(&asset_rows);
+            identity.push_str(
+                "
+ ],
+",
+            );
+            let product = std::path::Path::new(out)
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("unrecorded")
+                .to_string();
+            let consumer = match product.as_str() {
+                "atlas-g09" | "atlas-alt" | "atlas-flip-control" | "atlas-alpha-control" | "runtime-oob"
+                | "atlas-slot" | "atlas-slot-control" | "character-g09" | "character-alt"
+                | "character-wrong-air" | "character-budget-plus" | "pair-isolated" => {
+                    "experimental/autographics-auto-driver/tests/node_sprites_flow.rs"
+                }
+                "slot-9" | "neg-unknown-spawn" | "neg-image-frame-oob" | "neg-image-type" => {
+                    "experimental/autographics-node2d-pilot/tests/node_sprites_gates.rs (fixture-level; lowering rejection)"
+                }
+                _ => "unrecorded (this out dir has no registered flow consumer)",
+            };
+            identity.push_str(
+                " \"provenance\": {
+",
+            );
+            identity.push_str(&format!(
+                "  \"product\": \"{product}\",
+"
+            ));
+            identity.push_str(&format!(
+                "  \"consumer\": \"{consumer}\",
+"
+            ));
+            identity.push_str(
+                "  \"consumption\": \"include_str! frozen scene.agscene + world.at; the harness writes the project (scene + assets/<sha>.png) under target and loads via Storage::load_project; variants feed scripts/<sha>.at\",
+",
+            );
+            identity.push_str(
+                "  \"load_verification\": \"the load path hash-verifies behavior source and every assets/<sha>.png against the scene manifest; damaged copies are rejected at load\",
+",
+            );
+            identity.push_str(&format!(
+                "  \"world_sha256\": \"{}\"
+",
+                lowered.source_sha256
+            ));
+            identity.push_str(
+                " }
+}
+",
+            );
+            std::fs::write(format!("{out}/identity.json"), identity).expect("identity.json");
+            let closure_dir = format!("{out}/closure");
+            std::fs::create_dir_all(&closure_dir).expect("closure dir");
+            for name in &names {
+                let bytes = project.modules[*name].source.as_bytes();
+                std::fs::write(format!("{closure_dir}/{name}.at"), bytes).expect("closure file");
+            }
+            println!(
+                "node2d-lower[sprites-2d]: wrote world.at ({} bytes, sha {}) + scene.agscene + closure/{} + assets/{}",
+                lowered.source_bytes,
+                lowered.source_sha256,
+                names.len(),
+                copied.len()
             );
         }
         Profile::Components2D | Profile::Queries2D => {
@@ -268,14 +453,12 @@ fn main() {
         Profile::Components2DGame => {
             let entry_path = std::path::Path::new(entry);
             let entry_dir = entry_path.parent().unwrap_or(entry_path);
-            let lowered = autographics_node2d_pilot::lower_project_components_game(
-                &project,
-                entry_dir,
-            )
-            .unwrap_or_else(|e| {
-                eprintln!("node2d-lower: {e}");
-                std::process::exit(3);
-            });
+            let lowered =
+                autographics_node2d_pilot::lower_project_components_game(&project, entry_dir)
+                    .unwrap_or_else(|e| {
+                        eprintln!("node2d-lower: {e}");
+                        std::process::exit(3);
+                    });
             std::fs::write(
                 format!("{out}/world.at"),
                 lowered.base.user_source.expect("source"),

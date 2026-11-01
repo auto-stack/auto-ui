@@ -1,0 +1,31 @@
+// PLAN-022 character-budget-33 root (same scene, budget control component).
+use resources: ground_color, ground_mesh, wall_mesh, platform_mesh
+use player_budget33: PlayerBudget33
+
+node Main {
+    view-2d {
+        solid2d floor {
+            position: (15.0, -1.0)
+            mesh: resources.ground_mesh
+            material: resources.ground_color
+        }
+        solid2d east_wall {
+            position: (10.0, 2.0)
+            mesh: resources.wall_mesh
+            material: resources.ground_color
+        }
+        solid2d low_platform {
+            position: (5.4, 0.55)
+            mesh: resources.platform_mesh
+            material: resources.ground_color
+        }
+        PlayerBudget33 player {
+            img: resources.char_img
+        }
+        camera2d cam {
+            target: refs.player.actor
+            bounds: (0.0, -4.0, 30.0, 12.0)
+            view_size: (12.0, 8.0)
+        }
+    }
+}

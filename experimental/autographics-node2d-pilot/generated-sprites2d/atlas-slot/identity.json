@@ -1,0 +1,31 @@
+{
+ "generator": "autographics-node2d-pilot plan022 sprites-2d",
+ "api": "autographics.sprites2d/1",
+ "user_source_sha256": "a4314ca3c48af2e1324b8b4c8c7fde2259d971a75e5feec981782d3f21f78d68",
+ "user_source_bytes": 2361,
+  "module:main": "f4c472ea3cc2b1947ba8b6ca74c0ba474622ad0c203bb2e55bd285e81219509d",
+  "module:resources": "d2e38de779e3b2a1d4f4129b8e2e2fc718d44e5c6007bdeb92c45d69454ef6ba",
+  "module:slot_driver": "fb98518ec69a74eebedfd5f3cab0ebfe495acadd1a1ba4769e5b3b83eaa6573a",
+ "closure": [
+  {"name": "main", "sha256": "f4c472ea3cc2b1947ba8b6ca74c0ba474622ad0c203bb2e55bd285e81219509d", "bytes": 906},
+  {"name": "resources", "sha256": "d2e38de779e3b2a1d4f4129b8e2e2fc718d44e5c6007bdeb92c45d69454ef6ba", "bytes": 548},
+  {"name": "slot_driver", "sha256": "fb98518ec69a74eebedfd5f3cab0ebfe495acadd1a1ba4769e5b3b83eaa6573a", "bytes": 1316}
+ ],
+ "roles": {
+ "character": 3,
+ "character_name": "body",
+ "solids": [],
+ "camera": 1,
+ "scene_objects": {"spawn_template": 1, "driver.anchor": 2, "body": 3}
+},
+ "assets": [
+   {"sha256": "95a08525ebe48c2423f04ecb8105965109c5a1c6b55fb6d15c154f3338a5bbb1", "file": "95a08525ebe48c2423f04ecb8105965109c5a1c6b55fb6d15c154f3338a5bbb1.png", "declared": "assets/atlas.png"}
+ ],
+ "provenance": {
+  "product": "atlas-slot",
+  "consumer": "experimental/autographics-auto-driver/tests/node_sprites_flow.rs",
+  "consumption": "include_str! frozen scene.agscene + world.at; the harness writes the project (scene + assets/<sha>.png) under target and loads via Storage::load_project; variants feed scripts/<sha>.at",
+  "load_verification": "the load path hash-verifies behavior source and every assets/<sha>.png against the scene manifest; damaged copies are rejected at load",
+  "world_sha256": "a4314ca3c48af2e1324b8b4c8c7fde2259d971a75e5feec981782d3f21f78d68"
+ }
+}

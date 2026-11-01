@@ -1,0 +1,34 @@
+// PLAN-022 atlas flip negative control: frame stays driven by .pose but flip
+// is the literal 0, so the accepted left/right color oracle must reverse.
+use resources: atlas_img
+node AtlasSpriteFlip0(img: Image2D) {
+    model {
+        var phase = 0
+        var facing = 0
+        var pose = 0
+    }
+    view-2d {
+        character2d body {
+            position: (2.0, 0.0)
+            size: (0.8, 1.0)
+            image: img
+            frame: .pose
+            flip: 0
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            let right = input.held(Right)
+            let left = input.held(Left)
+            if right == 1 { .facing = 0 }
+            if left == 1 { .facing = 1 }
+            let q = refs.body.move_and_slide((0.0, 0.0))
+            let g = refs.body.grounded(q)
+            .phase = .phase + 1
+            if .phase > 5 { .phase = 0 }
+            .pose = 0
+            if .phase > 1 { .pose = 1 }
+            if .phase > 3 { .pose = 2 }
+        }
+    }
+}

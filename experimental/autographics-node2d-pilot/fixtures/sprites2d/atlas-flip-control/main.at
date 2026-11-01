@@ -1,0 +1,27 @@
+// PLAN-022 atlas-flip-control root (same scene, control component).
+use resources: underlay_color, ground_mesh, ground_color
+use atlas_sprite_flip0: AtlasSpriteFlip0
+
+node Main {
+    view-2d {
+        shape2d underlay {
+            kind: quad
+            position: (2.0, 0.0)
+            size: (1.0, 1.2)
+            material: resources.underlay_color
+        }
+        AtlasSpriteFlip0 hero {
+            img: resources.atlas_img
+        }
+        solid2d floor {
+            position: (15.0, -1.0)
+            mesh: resources.ground_mesh
+            material: resources.ground_color
+        }
+        camera2d cam {
+            target: refs.hero.actor
+            bounds: (0.0, -4.0, 30.0, 12.0)
+            view_size: (12.0, 8.0)
+        }
+    }
+}

@@ -1,0 +1,31 @@
+// PLAN-022 atlas-slot root: the parked spawn_template is a static image leaf
+// (default frame ordinal 0); driver instance + char + camera complete the
+// frozen objects2d entry contract (camera + character required).
+use resources: marker_mesh, marker_color
+use resources: atlas_img
+use slot_driver: SlotDriver
+
+node Main {
+    view-2d {
+        shape2d spawn_template {
+            position: (-30.0, -40.0)
+            size: (0.8, 1.0)
+            image: resources.atlas_img
+            frame: 0
+            flip: 0
+            visible: false
+        }
+        SlotDriver driver {
+            img: resources.atlas_img
+        }
+        character2d body {
+            position: (-40.0, -40.0)
+            material: resources.marker_color
+        }
+        camera2d cam {
+            target: refs.body.actor
+            bounds: (0.0, -4.0, 30.0, 12.0)
+            view_size: (12.0, 8.0)
+        }
+    }
+}

@@ -1,0 +1,12 @@
+// PLAN-022 sprites-2d character resources: the fixed CC0 astronaut sheet
+// (160x32, five 32x32 poses: idle/run-a/run-b/jump/fall).
+let char_img = image2d.png("assets/character.png")
+let f_idle = frame2d.at(resources.char_img, 0, 0, 32, 32)
+let f_run_a = frame2d.at(resources.char_img, 32, 0, 32, 32)
+let f_run_b = frame2d.at(resources.char_img, 64, 0, 32, 32)
+let f_jump = frame2d.at(resources.char_img, 96, 0, 32, 32)
+let f_fall = frame2d.at(resources.char_img, 128, 0, 32, 32)
+let ground_color = material2d.color(0.9, 0.3, 0.2, 1.0)
+let ground_mesh = mesh2d.quad(40.0, 1.0)
+let wall_mesh = mesh2d.quad(0.6, 5.0)
+let platform_mesh = mesh2d.quad(3.0, 0.4)

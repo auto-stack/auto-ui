@@ -1,0 +1,20 @@
+use resources: marker_mesh, marker_color
+use resources: atlas_img
+node SlotDriver(img: Image2D) {
+    model {
+        var token = 0
+    }
+    view-2d {
+        shape2d anchor {
+            position: (-35.0, -40.0)
+            size: (0.1, 0.1)
+            mesh: resources.marker_mesh
+            material: resources.marker_color
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            .token = render2d.spawn("no_such_leaf", 0.0, 0.0)
+        }
+    }
+}
