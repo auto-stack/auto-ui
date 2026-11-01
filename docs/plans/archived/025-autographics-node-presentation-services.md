@@ -177,6 +177,8 @@ work自查→同一权威树独立上下文final review→merge冻结门，不�
 
 2026-11-01 / stage: merge | plan_id: auto-ui/PLAN-025:r1 | checkpoint: cleaned | worktree: D:/autostack/.wt/ui-025/auto-ui（fresh wt-guard clean后移除，branch codex/plan-025-dev@e9cc929已landed删除）、三detached兄弟（auto-lang/auto-web/auto-down）guard核后移除、组目录D:/autostack/.wt/ui-025已删 | plan_artifacts: D:/autostack/plan-artifacts/plan-025 全删（registry已刷新：auto-ui/PLAN-025 archived/delivered/无具名持有；删除前证据已全部折叠入本Plan §8/§9） | 最终计数: 10/10任务（work6+review1+merge3全[x]）、9AC全关、6组V-S全跑、1 SD canonical landed | landing checks: 本仓无生产部署消费面（experimental研究crate与冻结产品，无daemon/发布bundle）——显式观察：无需重建/重启的生产工件，main smoke即消费面验证（pilot gates 18/18+driver flow 14/14在54899e9亲跑绿） | batch regression: 本仓无.last-batch-regression.json约定（auto-lang规则），不适用 | cleaned: 2026-11-01
 
+2026-11-01 / stage: goal | plan_id: auto-ui/PLAN-025 | plan_revision: r1 | round: 2 | from: merge | to: done | status: archived | outcome: pass | worktree: 已移除（guard clean） | commit: delivery e9cc929 / canonical 54899e9 / archive cf28668+d971944 | next: done（done criteria全核：master ff-only线性、canonical spec在landed提交、归档含10/10标记、树/分支/兄弟/组/scope全清、main checkout clean、registry刷新、无生产消费面观察记录）
+
 ## 10. 待澄清事项
 
 | ID | 事项 | owner/关闭动作 |
