@@ -1,6 +1,6 @@
 ---
 plan_id: PLAN-028
-status: reviewed
+status: archived
 feature_name: AutoGraphics三维实例触发与新局Node接线
 author: [Codex]
 created_at: 2026-11-02
@@ -155,8 +155,8 @@ round.request沿accepted marker：Running且完整候选接受后才换fresh Run
 | T-06 | work | T-05 | source-build/A→B/SaveAs/恢复/20轮、受影响兼容并集，SD-01候选及摘要移交 | AC-05/06 | [x] 2026-11-02 commit afb35ad：A→B=verifier七产品closure-only再生字节相等+driver B目录in-process；SaveAs/关开=vs05同型在库；坏件拒绝→精确恢复→再Run=027 flow vs06同型（vs05含stop文档逐字节一致+20轮start/stop暖mesh账平坦）；受影响兼容并集=pilot 11组96测试+driver 027 flow 7/7全绿；SD-01候选=docs/specs/auto-graphics/node3d-instances-triggers-and-rounds.md（在树，merge落位）；OS键鼠自动化沿025/027暂停边界具名gap（非本计划验收项） |
 | T-07 | review | T-06 | 同权威树独立final/精确revision绑定，finding回work再复核；pass后merge门pending | AC-07 | [x] 2026-11-02 独立final（未参与实现的独立上下文，同权威树 codex/plan-028-dev @ afb35ad；报告=plan-artifacts/plan-028/auto-ui/final-review-report.md 17KB）：**pass**。AC-01..06全pass且证据全部为审查者自跑命令（pilot 96测试0失败、node3d_events_flow 8/8重跑54s、verify_plan028 33 checks PASS重跑、trusted单元14/14+5/5+9/9+7/7重跑、driver api/与authoring trusted单元diff为空、旧档024/027字节门重跑绿、业务名特判grep全量改码零命中）；独立反例自选（旧档mob3d scale具名拒绝rc3、sphere r=200000拒绝rc3、oldgen双spawn同slot0重生通道、event./object.前缀旧档仍拒绝、模板yaw逐字落行）；SD-01候选判"准确、建议merge采纳、无夸大"。发现5条均不阻塞：F-01[low]新档SaveAs/坏件由同型027 vs06+零运行时delta覆盖（收据诚实，可选后继补case）、F-02[low]refs行读/写校验门放宽至全部非queries档（拒绝移至translate期具名保留，探针证实仍拒；建议后继收紧为events档专属）、F-03[info]冻结文档twin产品行为陈现行（实际并入sensor）、F-04[info]模板yaw/pitch无正夹具（探针证实行为）、F-05[info]预编译二进制mtime先于commit（指纹/字节再生一致，merge重建）。AC-08/09记pending归merge |
 | T-08 | merge | T-07 pass | 冻结提交/输入/定向并集门或有据复用，来源核后实际合master | AC-08 | [x] 2026-11-02 prepared=reviewed afb35ad（r1 pass 绑定）/SD-01候选在树/目标 docs/specs/；rebase master（5216f72）无冲突，7b238fa→2bbbd50、55df76d→cb336f0、afb35ad→ebac1cd，git range-diff 全等（3=3，安全重写证明）；rebased tip 快门复验=pilot 全部 test result ok（11组）+verify_plan028 33 checks PASS，driver GPU 流测证据按 range-diff 全等+树同一复用（review 8/8 @afb35ad 补丁等价）；`git merge --ff-only codex/plan-028-dev`→master tip=ebac1cd（无 merge commit，线性）；canonical 核=docs/specs/auto-graphics/node3d-instances-triggers-and-rounds.md 落主，sha256 be4d9c152871c70c19d3…（与树内副本逐字节同）；主 checkout 冒烟=node3d_events_gates 7/7+node3d_runtime_gates 9/9 绿 |
-| T-09 | merge | T-08 | SD-01 canonical/来源核、归档/导航，不写派生JSON，G11内容仍后继未交付 | AC-08 | [ ] |
-| T-10 | merge | T-09 | fresh guard清树/分支/空组，全实际输出对账/删scope构建物/登记与最终收据 | AC-09 | [ ] |
+| T-09 | merge | T-08 | SD-01 canonical/来源核、归档/导航，不写派生JSON，G11内容仍后继未交付 | AC-08 | [x] 2026-11-02 canonical_verified：SD-01 canonical=docs/specs/auto-graphics/node3d-instances-triggers-and-rounds.md 在合主提交 ebac1cd 落位（sha256 be4d9c152871c70c19d3…，与reviewed树内副本逐字节同；无派生JSON/索引写入）；归档=本文件 git mv → docs/plans/archived/028-autographics-node3d-instances-triggers-and-rounds.md + status: archived（提交在案）；导航=canonical Spec指向本归档，G11/3d真实内容迁移保持后继未取号未交付（§0非目标不变） |
+| T-10 | merge | T-09 | fresh guard清树/分支/空组，全实际输出对账/删scope构建物/登记与最终收据 | AC-09 | [x] 2026-11-02 cleaned：fresh `bash D:/autostack/wt-guard.sh D:/autostack/.wt/ui-028/auto-ui` clean 后 remove worktree + 删分支 codex/plan-028-dev + 删空组目录 .wt/ui-028/；plan-artifacts/plan-028/ 全scope折叠后删除（无具名hold），registry 刷新（final archived/owner/完成时刻）；构建中间物随树消亡不回收；主 checkout 干净、线性历史段 867819b→…→ebac1cd→5b80efe→归档提交 连续 |
 
 ## 9. 复审记录
 
@@ -172,6 +172,10 @@ stage: goal | plan_id: PLAN-028 | plan_revision: r1 | round: 1 | from: work | to
 
 stage: goal | plan_id: PLAN-028 | plan_revision: r1 | round: 2 | from: review | to: merge | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-028/auto-ui | commit: afb35ad | next: merge
 
+2026-11-02 / stage: merge | plan_id: auto-ui/PLAN-028:r1 | outcome: pass | reviewed_commit: afb35ad | delivery_commit: ebac1cd（rebase 5216f72 后，range-diff 3=3 全等；rebased tip 快门复验 pilot 全组 ok + verifier 33 checks PASS；driver GPU 流测按补丁等价复用 review 8/8 证据） | landed: master tip=ebac1cd，`git merge --ff-only` 线性无 merge commit；冒烟=主 checkout node3d_events_gates 7/7 + node3d_runtime_gates 9/9 | canonical_verified: docs/specs/auto-graphics/node3d-instances-triggers-and-rounds.md @ ebac1cd，sha256 be4d9c152871c70c19d3…（与树内副本逐字节同；零派生JSON/索引/ledger写入） | archived: docs/plans/archived/028-autographics-node3d-instances-triggers-and-rounds.md，status: archived，completion_kind: delivered | cleaned: wt-guard clean → worktree/分支/空组删除，plan-artifacts/plan-028/ 折叠后整scope删除（无hold），registry 刷新 | 落地非部署：本仓为实验pilot/库仓，无运行中生产进程消费产物（后端release/web bundle约定属auto-musk，不适用）；观察项=无陈旧生产工件 | 后继未交付：G11/3d真实内容迁移（ag-examples侧）另立合同未取号；F-01..F-05 review备注为非阻塞 | next: done
+
+2026-11-02（merge 折叠记录，delete-at-merge 2026-10-31 ruling）：临时证据 scope D:/autostack/plan-artifacts/plan-028/ 整 scope 删除，无具名未解决 hold。删除前指纹（sha256 前16位）：T-02-freeze.md=902666903b73c7b6、final-review-report.md=d10f726b104df358、run-evidence.md=c9ef184b5711a190；持久摘要已全部折叠于本文件 §8/§9（冻结面/收据/25 oracle 清单/发现 F-01..F-05）。
+
 ## 10. 待澄清事项
 
 | ID | 事项 | owner/关闭动作 |
@@ -182,3 +186,5 @@ stage: goal | plan_id: PLAN-028 | plan_revision: r1 | round: 2 | from: review | 
 | D-04 | AG011/012的固定读027与共享接缝、真实OS证据暂停 | **已关闭（T-01，边界维持）**：ag-011 树 f3dea0d 在案未动（本计划不接管/不翻其状态）；OS 键鼠/焦点自动化沿 025/027 暂停边界，本计划 25 项 oracle 全为窗口式 GPU/状态面，无 OS 依赖项，缺证具名 gap 不影响 AC。 |
 
 材料唯一D:/autostack/plan-artifacts/plan-028/auto-ui/，开工登记owner/用途/在途；临时探针/日志/截图/包/消费者/外置target只归scope，永久产品/必要回归夹具归仓，禁止attachments/第二证据目录。merge摘要折Plan后全输出对账并删自有scope/构建中间物；仅具名未解决问题按owner/理由/关闭条件持有。禁止worktree链接，清树先fresh D:/autostack/wt-guard.sh；旧specs.json只读。
+
+stage: goal | plan_id: PLAN-028 | plan_revision: r1 | round: 3 | from: merge | to: done | status: archived | outcome: pass | delivery_commit: ebac1cd | archive: docs/plans/archived/028-autographics-node3d-instances-triggers-and-rounds.md | cleanup: worktree/branch/group removed after fresh wt-guard clean; plan-028 scratch scope deleted, registry refreshed | next: done
