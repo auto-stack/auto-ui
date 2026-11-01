@@ -56,8 +56,9 @@ components-2d-game 档与其冻结产物、价格、负控原样保留，不受�
 - `sfx.play` → 生成 `sfx_play(<cue_id>, <gain>)`：纯 Auto 计算（0 额外服
   务费；CPU 计入原 32/callback 池），向有界缓冲追加 (ordinal, cue, gain)。
   单 Run ordinal 由共享计数器严格递增（1..2147483646 由原 API 边界强
-  制）；缓冲恰 5 行——第 5 行只为把真实计数 n=5 送入 `_ag_audio_begin`
-  的具名 fault 51（包界），第 6+ 请求保持 n=5。
+  制）；缓冲存储恰 4 行并计数至 5——第 5 请求只递增计数，使收口以真实
+  计数 n=5 进入 `_ag_audio_begin` 的具名 fault 51（包界），第 6+ 请求保
+  持 n=5。
 - 每回调末恰一次 `ag_present2d(kind=-1, n, o0..o3, c0..c3, g0..g3, 四槽
   完整状态)`（bundle 整体 1 计费，沿原 API 价格）。四请求全部传输、精确
   ordinal/gain；五请求具名拒绝、无部分声音接受；n=0 空收口仍为一次合法
