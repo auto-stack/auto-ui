@@ -4,6 +4,8 @@
 
 阅读器跨仓探针：[auto-ui/PLAN-026](docs/plans/archived/026-reader-engine-embedding-and-locator-probe.md)已交付归档（r1、流程10/10）。[报告](docs/research/reader-engine-probe.md)记录Vue指定样本全链30/30；原生独立iced宿主嵌入/引擎/IPC已证，真实输入回传、IME/无障碍等仍有GAP，不能据归档称双端全门通过。下一阶段先收口原生输入链与必要接缝，再做完整EPUB产品化；本仓主导宿主，[AutoReader](https://github.com/auto-stack/auto-reader/blob/main/README.md)负责消费与数据验证。
 
+后续正式计划：[auto-ui/PLAN-029 原生输入链与必要接缝收口](docs/plans/029-reader-native-input-and-surface-closure.md)（drafting/r1、0/12，当前仅起草）。真实原生VM消费、独立复审与所有必需门均需通过，不能以GAP/有条件完成替代。Reader只留消费指针，不重复取号。
+
 ## 项目概述
 
 AutoUI 是一个使用 Auto 语言作为描述层，支持多种 UI 框架后端的跨平台 UI 库。
