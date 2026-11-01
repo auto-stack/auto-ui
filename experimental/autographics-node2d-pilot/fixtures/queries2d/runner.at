@@ -1,0 +1,11 @@
+use resources: lab_runner, lab_runner_mesh
+
+node Runner {
+    view-2d {
+        shape2d body {
+            mesh: resources.lab_runner_mesh
+            position: (6.0, 2.0)
+            material: resources.lab_runner
+        }
+    }
+}

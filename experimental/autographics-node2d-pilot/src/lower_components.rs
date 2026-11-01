@@ -37,7 +37,10 @@ use crate::lower_basic2d::{
     Collected, LowerOutputBasic2D, SceneNode,
 };
 use crate::scene::sha256_hex;
-use crate::translate::{translate_stmts, Ctx, LowerError, Target};
+use crate::translate::{
+    query_call_kind, translate_handler, translate_stmts, Ctx, LowerError, QueryEnv, QueryKind,
+    RefRow, Target,
+};
 use std::collections::{BTreeMap, BTreeSet};
 
 // ------------------------------------------------------------ diagnose ----
@@ -1021,30 +1024,87 @@ struct WalkOut {
     assign_targets: Vec<(String, usize)>,
     child_emits: Vec<(String, String, usize, usize)>,
     anc_emits: Vec<(String, usize, usize)>,
+    /// PLAN-021：queries-2d 事件序（绑定/读取/调用/引用/自身行）。
+    query_events: Vec<QEvent>,
 }
 
-fn walk_stmts(stmts: &[Stmt], line: usize, out: &mut WalkOut) {
+/// PLAN-021：查询 handle 实参形态（plan 层验证引用存在/维度合法）。
+#[derive(Debug, Clone)]
+enum QHandle {
+    Named(String),
+    SelfRow,
+    MinusOne,
+}
+
+/// PLAN-021：query2d 构造的有序事件（绑定模拟 + 具名验证的输入）。
+#[derive(Debug, Clone)]
+enum QEvent {
+    /// `let q = query2d.segment/sweep(...)`（在 QueryCall 之后）。
+    Bind { name: String, kind: QueryKind, line: usize },
+    /// `<结果变量>.<getter>(…)`。
+    Getter { base: String, method: String, line: usize },
+    /// `query2d.segment/sweep(...)`；handle 实参在 walk 层解析形态。
+    QueryCall {
+        name: String,
+        argc: usize,
+        handle: QHandle,
+        vo_ok: bool,
+        line: usize,
+    },
+    /// `refs.<inst>` 值读或只读行 op（world/local/show）。
+    RefRead { name: String, line: usize },
+    /// `refs.<inst>.shift/place`（位置写；character 行具名拒绝）。
+    RefWrite { name: String, line: usize },
+    /// `self.row()` / self 行写（root 无行）。
+    SelfRow { write: bool, line: usize },
+    /// `var q = query2d.…`（结果只允许 let 绑定）。
+    VarBind { name: String, line: usize },
+}
+
+fn walk_stmts(stmts: &[Stmt], line: usize, out: &mut WalkOut, queries: bool) {
     for s in stmts {
         match s {
-            Stmt::Expr(e) => walk_expr(e, line, out),
+            Stmt::Expr(e) => walk_expr_q(e, line, out, queries),
             Stmt::If(if_) => {
                 for b in &if_.branches {
-                    walk_expr(&b.cond, line, out);
-                    walk_stmts(&b.body.stmts, line, out);
+                    walk_expr_q(&b.cond, line, out, queries);
+                    walk_stmts(&b.body.stmts, line, out, queries);
                 }
                 if let Some(e) = &if_.else_ {
-                    walk_stmts(&e.stmts, line, out);
+                    walk_stmts(&e.stmts, line, out, queries);
                 }
             }
-            Stmt::Store(v) => walk_expr(&v.expr, line, out),
-            Stmt::Return(e) => walk_expr(e, line, out),
+            Stmt::Store(v) => {
+                // PLAN-021：let 查询绑定先于其后的 getter 读取。
+                if let Some(kind) = query_call_kind(&v.expr) {
+                    if matches!(v.kind, auto_parser_api::ast::StoreKind::Var) {
+                        out.query_events.push(QEvent::VarBind {
+                            name: v.name.to_string(),
+                            line,
+                        });
+                    } else {
+                        out.query_events.push(QEvent::Bind {
+                            name: v.name.to_string(),
+                            kind,
+                            line,
+                        });
+                    }
+                }
+                walk_expr_q(&v.expr, line, out, queries)
+            }
+            Stmt::Return(e) => walk_expr_q(e, line, out, queries),
             Stmt::EmptyLine(_) | Stmt::Comment(_) => {}
             _ => {}
         }
     }
 }
 
-fn walk_expr(e: &Expr, line: usize, out: &mut WalkOut) {
+/// PLAN-021：typed 结果 getter 方法名（cast5/sweep6 的并集）。
+fn is_getter_method(m: &str) -> bool {
+    matches!(m, "hit" | "node" | "t" | "point" | "normal" | "origin" | "start_overlap")
+}
+
+fn walk_expr_q(e: &Expr, line: usize, out: &mut WalkOut, queries: bool) {
     match e {
         Expr::Call(c) => {
             let cline = c.pos.as_ref().map(|p| p.line).unwrap_or(line);
@@ -1054,7 +1114,16 @@ fn walk_expr(e: &Expr, line: usize, out: &mut WalkOut) {
                         "emit" => out
                             .anc_emits
                             .push((ev.to_string(), c.args.args.len(), cline)),
-                        "input" | "refs" | "self" => {}
+                        "input" | "refs" | "self" | "query2d" => {}
+                        // PLAN-021：typed 结果 getter 事件（仅 queries 档；
+                        // 其余保持子投递语义）。
+                        child if queries && is_getter_method(ev) => out.query_events.push(
+                            QEvent::Getter {
+                                base: child.to_string(),
+                                method: ev.to_string(),
+                                line: cline,
+                            },
+                        ),
                         child => out.child_emits.push((
                             child.to_string(),
                             ev.to_string(),
@@ -1067,9 +1136,92 @@ fn walk_expr(e: &Expr, line: usize, out: &mut WalkOut) {
                 Expr::Ident(f) => out.calls.push((f.to_string(), cline)),
                 _ => {}
             }
+            // PLAN-021：query2d 调用事件（在实参递归前记录，序与文本序
+            // 一致；实参中的 refs 值读随后逐个入列）。
+            if let Expr::Dot(inner, m) = &*c.name {
+                if let Expr::Ident(base) = &**inner {
+                    if base == "query2d" && matches!(m.as_str(), "segment" | "sweep") {
+                        let handle = match c.args.args.first() {
+                            Some(auto_parser_api::ast::Arg::Pos(Expr::Int(v))) if *v == -1 => {
+                                QHandle::MinusOne
+                            }
+                            // `-1` 解析为一元负号字面量。
+                            Some(auto_parser_api::ast::Arg::Pos(Expr::Unary(
+                                auto_parser_api::ast::Op::Sub,
+                                inner,
+                            ))) if matches!(&**inner, Expr::Int(v) if *v == 1) => {
+                                QHandle::MinusOne
+                            }
+                            Some(auto_parser_api::ast::Arg::Pos(Expr::Dot(dn, dn2))) => {
+                                if matches!(&**dn, Expr::Ident(r) if r == "refs") {
+                                    QHandle::Named(dn2.to_string())
+                                } else {
+                                    QHandle::Named(String::new())
+                                }
+                            }
+                            Some(auto_parser_api::ast::Arg::Pos(Expr::Call(cc))) => {
+                                if matches!(
+                                    &*cc.name,
+                                    Expr::Dot(dn, dm)
+                                        if matches!(&**dn, Expr::Ident(b) if b == "self") && dm == "row"
+                                ) {
+                                    QHandle::SelfRow
+                                } else {
+                                    QHandle::Named(String::new())
+                                }
+                            }
+                            _ => QHandle::Named(String::new()),
+                        };
+                        let vo_ok = match c.args.args.get(1) {
+                            Some(auto_parser_api::ast::Arg::Pos(Expr::Int(v))) => *v == 0 || *v == 1,
+                            Some(auto_parser_api::ast::Arg::Pos(Expr::Bool(_))) => true,
+                            _ => false,
+                        };
+                        out.query_events.push(QEvent::QueryCall {
+                            name: m.to_string(),
+                            argc: c.args.args.len(),
+                            handle,
+                            vo_ok,
+                            line: cline,
+                        });
+                    }
+                }
+            }
+            // PLAN-021：refs.<inst>.<op> 行 op（读/写事件分流）。
+            if let Expr::Dot(op_node, op) = &*c.name {
+                if let Expr::Dot(root, inst) = &**op_node {
+                    if matches!(&**root, Expr::Ident(r) if r == "refs") {
+                        match op.as_str() {
+                            "shift" | "place" => out.query_events.push(QEvent::RefWrite {
+                                name: inst.to_string(),
+                                line: cline,
+                            }),
+                            "show" | "world" | "local" => out.query_events.push(QEvent::RefRead {
+                                name: inst.to_string(),
+                                line: cline,
+                            }),
+                            _ => {}
+                        }
+                    }
+                }
+            }
+            // PLAN-021：self 行 op。
+            if let Expr::Dot(inner, op) = &*c.name {
+                if matches!(&**inner, Expr::Ident(b) if b == "self") {
+                    match op.as_str() {
+                        "row" | "world" | "local" => out
+                            .query_events
+                            .push(QEvent::SelfRow { write: false, line: cline }),
+                        "shift" | "place" => out
+                            .query_events
+                            .push(QEvent::SelfRow { write: true, line: cline }),
+                        _ => {}
+                    }
+                }
+            }
             for a in &c.args.args {
                 if let auto_parser_api::ast::Arg::Pos(x) = a {
-                    walk_expr(x, line, out);
+                    walk_expr_q(x, line, out, queries);
                 }
             }
         }
@@ -1077,7 +1229,17 @@ fn walk_expr(e: &Expr, line: usize, out: &mut WalkOut) {
             if matches!(&**inner, Expr::Ident(b) if b == "self") {
                 out.members.insert(name.to_string());
             } else {
-                walk_expr(inner, line, out);
+                // PLAN-021：裸 `refs.<inst>` 值读。
+                if let Expr::Ident(b) = &**inner {
+                    if b == "refs" {
+                        out.query_events.push(QEvent::RefRead {
+                            name: name.to_string(),
+                            line,
+                        });
+                        return;
+                    }
+                }
+                walk_expr_q(inner, line, out, queries);
             }
         }
         Expr::Bina(l, op, r) => {
@@ -1092,13 +1254,13 @@ fn walk_expr(e: &Expr, line: usize, out: &mut WalkOut) {
                     }
                 }
             }
-            walk_expr(l, line, out);
-            walk_expr(r, line, out);
+            walk_expr_q(l, line, out, queries);
+            walk_expr_q(r, line, out, queries);
         }
-        Expr::Unary(_, i) => walk_expr(i, line, out),
+        Expr::Unary(_, i) => walk_expr_q(i, line, out, queries),
         Expr::Tuple(items) => {
             for i in items {
-                walk_expr(i, line, out);
+                walk_expr_q(i, line, out, queries);
             }
         }
         _ => {}
@@ -1134,9 +1296,28 @@ fn find_child_node(project: &Project, def_name: &str, child: &str) -> Option<Str
 
 /// 构建投递计划并验证全部 emit 站点（端口存在 + 元数一致）与 handler 面
 /// （未知成员 / 未知 helper fn）。
-fn plan_dispatch(project: &Project, world: &WorldIR) -> Result<Plan, LowerError> {
+fn plan_dispatch(
+    project: &Project,
+    world: &WorldIR,
+    queries: bool,
+) -> Result<Plan, LowerError> {
     let mut plan = Plan::default();
     let root_prefix = world.root.to_lowercase();
+
+    // PLAN-021: plan-time named-row name table (top-level instances; the
+    // character row is addressable but position-read-only). Ordinals are
+    // assigned by collect_scene under the same rule.
+    let mut refs_names: BTreeMap<String, bool> = BTreeMap::new();
+    for inst in &world.instances {
+        if inst.path.contains('/') {
+            continue;
+        }
+        let d = &world.defs[&inst.def];
+        let is_char = d.char_elem.is_some();
+        if is_char || !d.static_elems.is_empty() {
+            refs_names.insert(inst.path.clone(), !is_char);
+        }
+    }
 
     let mut emitters: Vec<String> = vec![world.root.clone()];
     for i in &world.instances {
@@ -1159,8 +1340,191 @@ fn plan_dispatch(project: &Project, world: &WorldIR) -> Result<Plan, LowerError>
                 assign_targets: Vec::new(),
                 child_emits: Vec::new(),
                 anc_emits: Vec::new(),
+                query_events: Vec::new(),
             };
-            walk_stmts(&h.body.stmts, hline, &mut out);
+            walk_stmts(&h.body.stmts, hline, &mut out, queries);
+
+            // ---- PLAN-021: queries-2d surface validation (named
+            // module/line/symbol diagnostics) ----
+            let mut q_binds: Vec<(String, QueryKind)> = Vec::new();
+            for qe in &out.query_events {
+                match qe {
+                    QEvent::QueryCall { name, argc, handle, vo_ok, line } => {
+                        if !queries {
+                            return Err(at(
+                                &def.module,
+                                *line,
+                                "query2d",
+                                "query2d is only available in the queries-2d profile",
+                            ));
+                        }
+                        if name != "segment" && name != "sweep" {
+                            return Err(at(
+                                &def.module,
+                                *line,
+                                name,
+                                "unknown query service (query2d.segment/sweep)",
+                            ));
+                        }
+                        let want = if name == "segment" { 6 } else { 4 };
+                        if *argc != want {
+                            return Err(at(
+                                &def.module,
+                                *line,
+                                name,
+                                &format!("query2d.{name} arity {argc} (want {want} args)"),
+                            ));
+                        }
+                        match handle {
+                            QHandle::Named(n) => {
+                                if !refs_names.contains_key(n) {
+                                    return Err(at(
+                                        &def.module,
+                                        *line,
+                                        n,
+                                        &format!("unknown query row reference 'refs.{n}'"),
+                                    ));
+                                }
+                            }
+                            QHandle::SelfRow => {
+                                if is_root {
+                                    return Err(at(
+                                        &def.module,
+                                        *line,
+                                        "self",
+                                        "self.row() has no instance row at the root",
+                                    ));
+                                }
+                            }
+                            QHandle::MinusOne => {
+                                if name == "sweep" {
+                                    return Err(at(
+                                        &def.module,
+                                        *line,
+                                        "sweep",
+                                        "sweep mover must be a named row (refs.<inst>) or self.row()",
+                                    ));
+                                }
+                            }
+                        }
+                        if !vo_ok {
+                            return Err(at(
+                                &def.module,
+                                *line,
+                                name,
+                                "visible_only must be the literal 0/1 (or true/false)",
+                            ));
+                        }
+                    }
+                    QEvent::Bind { name, kind, line } => {
+                        if q_binds.iter().any(|(n, _)| n == name) {
+                            return Err(at(
+                                &def.module,
+                                *line,
+                                name,
+                                &format!(
+                                    "query result '{name}' rebinds (one let per query result name)"
+                                ),
+                            ));
+                        }
+                        q_binds.push((name.clone(), *kind));
+                    }
+                    QEvent::Getter { base, method, line } => {
+                        if !queries {
+                            continue;
+                        }
+                        let found = q_binds.iter().find(|(n, _)| n == base);
+                        let Some((_, k)) = found else {
+                            return Err(at(
+                                &def.module,
+                                *line,
+                                base,
+                                &format!(
+                                    "unknown query result '{base}' (bind it with a let from query2d)"
+                                ),
+                            ));
+                        };
+                        let ok = match k {
+                            QueryKind::Cast => matches!(
+                                method.as_str(),
+                                "hit" | "node" | "t" | "point" | "normal"
+                            ),
+                            QueryKind::Sweep => matches!(
+                                method.as_str(),
+                                "hit" | "node" | "t" | "origin" | "normal" | "start_overlap"
+                            ),
+                        };
+                        if !ok {
+                            let this = if *k == QueryKind::Cast { "cast" } else { "sweep" };
+                            let other = if *k == QueryKind::Cast { "sweep" } else { "cast" };
+                            return Err(at(
+                                &def.module,
+                                *line,
+                                base,
+                                &format!(
+                                    "'.{method}()' is a {other} result getter; '{base}' is a {this} result"
+                                ),
+                            ));
+                        }
+                    }
+                    QEvent::RefRead { name, line } => {
+                        if !refs_names.contains_key(name) {
+                            return Err(at(
+                                &def.module,
+                                *line,
+                                name,
+                                &format!("unknown query row reference 'refs.{name}'"),
+                            ));
+                        }
+                    }
+                    QEvent::RefWrite { name, line } => {
+                        let Some(writable) = refs_names.get(name) else {
+                            return Err(at(
+                                &def.module,
+                                *line,
+                                name,
+                                &format!("unknown query row reference 'refs.{name}'"),
+                            ));
+                        };
+                        if !*writable {
+                            return Err(at(
+                                &def.module,
+                                *line,
+                                name,
+                                &format!(
+                                    "row 'refs.{name}' is the character row; its position is owned by the character service"
+                                ),
+                            ));
+                        }
+                    }
+                    QEvent::VarBind { name, line } => {
+                        return Err(at(
+                            &def.module,
+                            *line,
+                            name,
+                            "query results bind with 'let' only ('var' would claim mutable ownership of a shared latest-slot token)",
+                        ));
+                    }
+                    QEvent::SelfRow { write, line } => {
+                        if is_root {
+                            return Err(at(
+                                &def.module,
+                                *line,
+                                "self",
+                                "self.row() has no instance row at the root",
+                            ));
+                        }
+                        if *write && def.char_elem.is_some() {
+                            return Err(at(
+                                &def.module,
+                                *line,
+                                "self",
+                                "self row is the character row; its position is owned by the character service",
+                            ));
+                        }
+                    }
+                }
+            }
             for m in &out.members {
                 if !model_fields.contains(m) && !def.params.iter().any(|(n, _)| n == m) {
                     return Err(at(
@@ -1702,6 +2066,12 @@ struct SceneBuild {
     camera: Option<CameraCfg>,
     /// app_start spawn 行（声明先序）。
     spawns: Vec<String>,
+    /// PLAN-021：顶层实例名 → primary 静态行 ordinal（引用解析表；
+    /// character 行可寻址但位置只读）。
+    refs: BTreeMap<String, RefRow>,
+    /// PLAN-021：定义名 → [(def_idx, primary 静态行 ordinal)]（self 行
+    /// 寻址数组 `{prefix}_qrow` 的来源；character 实例=0，无静态行=-1）。
+    self_rows: BTreeMap<String, Vec<(usize, i64)>>,
 }
 
 /// 表达式 → 生成文本（共享 translate；ctx 决定 `.field`/emit/服务映射）。
@@ -1876,6 +2246,8 @@ fn collect_scene(
     let mut next_id = 1usize;
     let mut spawns: Vec<String> = Vec::new();
     let mut slot: usize = 0;
+    let mut refs: BTreeMap<String, RefRow> = BTreeMap::new();
+    let mut self_rows: BTreeMap<String, Vec<(usize, i64)>> = BTreeMap::new();
 
     let root_def = &world.defs[&world.root];
     let root_decl = node_of(project, &world.root);
@@ -1960,6 +2332,21 @@ fn collect_scene(
         });
         char = Some((next_id, name));
         next_id += 1;
+        if !host_path.is_empty() {
+            refs.insert(
+                host_path.clone(),
+                RefRow {
+                    row: 0,
+                    writable: false,
+                },
+            );
+            if let Some(inst) = world.instances.iter().find(|i| i.path == host_path) {
+                self_rows
+                    .entry(host_def_name.clone())
+                    .or_default()
+                    .push((inst.def_idx, 0));
+            }
+        }
     }
 
     // ---- root 静态 solid2d（碰撞 + 可见）----
@@ -2093,6 +2480,7 @@ fn collect_scene(
                         refs_any_elem: true,
                         call_scope: None,
                         child_emit: None,
+                        query: None,
                     };
                     let pos = prop_of(props, "position").ok_or_else(|| {
                         at(
@@ -2177,7 +2565,7 @@ fn collect_scene(
                         let material = resolve_material(def, props, &inst.params)?;
                         let rgba = resource_color(project, &material)?;
                         let ctx =
-                            instance_ctx(project, plan, def, &prefix, &inst.def_idx.to_string())?;
+                            instance_ctx(project, plan, def, &prefix, &inst.def_idx.to_string(), None)?;
                         let pos = prop_of(props, "position").ok_or_else(|| {
                             at(&def.module, def.line, "position", "missing position")
                         })?;
@@ -2240,6 +2628,20 @@ fn collect_scene(
                             is_character: false,
                             is_solid: false,
                         });
+                        // PLAN-021：顶层实例 primary 静态行（首个静态
+                        // shape；character 定义实例不在此分支）。
+                        if !inst.path.contains('/') {
+                            refs.entry(inst.path.clone()).or_insert(RefRow {
+                                row: (next_id - 1) as i64,
+                                writable: def.char_elem.is_none(),
+                            });
+                        }
+                        {
+                            let e = self_rows.entry(inst.def.clone()).or_default();
+                            if !e.iter().any(|(idx, _)| *idx == inst.def_idx) {
+                                e.push((inst.def_idx, (next_id - 1) as i64));
+                            }
+                        }
                         next_id += 1;
                     }
                 }
@@ -2266,16 +2668,28 @@ fn collect_scene(
         solid_ids,
         camera,
         spawns,
+        refs,
+        self_rows,
     })
 }
 
 /// 实例处理器/视图表达式的翻译上下文（SoA 索引 + 投递钩子）。
+/// PLAN-021：queries-2d 环境构造参数（None = 旧档行为）。
+pub struct QueryParts<'a> {
+    pub refs: &'a BTreeMap<String, RefRow>,
+    /// 本实例 self 行寻址表达式（`{prefix}_qrow[i]`；root=None）。
+    pub self_row: Option<String>,
+    pub self_writable: bool,
+    pub binds: &'a std::cell::RefCell<Vec<(String, QueryKind)>>,
+}
+
 fn instance_ctx<'a>(
     project: &'a Project,
     plan: &'a Plan,
     def: &'a DefIR,
     prefix: &str,
     index: &str,
+    query: Option<&'a QueryParts<'a>>,
 ) -> Result<Ctx<'a>, LowerError> {
     let edef = def.name.clone();
     let errmod = def.module.clone();
@@ -2343,6 +2757,12 @@ fn instance_ctx<'a>(
             None
         }
     });
+    let qenv = query.map(|q| QueryEnv {
+        refs: q.refs,
+        self_row: q.self_row.clone(),
+        self_writable: q.self_writable,
+        binds: q.binds,
+    });
     Ok(Ctx {
         target: Target::Instance {
             prefix: prefix.to_string(),
@@ -2356,10 +2776,16 @@ fn instance_ctx<'a>(
         refs_any_elem: true,
         call_scope: Some(call_scope),
         child_emit: Some(child_emit),
+        query: qenv,
     })
 }
 
-fn root_ctx<'a>(project: &'a Project, world: &'a WorldIR, plan: &'a Plan) -> Ctx<'a> {
+fn root_ctx<'a>(
+    project: &'a Project,
+    world: &'a WorldIR,
+    plan: &'a Plan,
+    query: Option<&'a QueryParts<'a>>,
+) -> Ctx<'a> {
     let root = world.root.clone();
     let errmod = world.root_module.clone();
     let emit_hook = Box::new(move |ev: &str| -> Result<String, LowerError> {
@@ -2414,6 +2840,12 @@ fn root_ctx<'a>(project: &'a Project, world: &'a WorldIR, plan: &'a Plan) -> Ctx
             None
         }
     });
+    let qenv = query.map(|q| QueryEnv {
+        refs: q.refs,
+        self_row: q.self_row.clone(),
+        self_writable: q.self_writable,
+        binds: q.binds,
+    });
     Ctx {
         target: Target::Root,
         emit_hook,
@@ -2424,6 +2856,7 @@ fn root_ctx<'a>(project: &'a Project, world: &'a WorldIR, plan: &'a Plan) -> Ctx
         refs_any_elem: true,
         call_scope: Some(call_scope),
         child_emit: Some(child_emit),
+        query: qenv,
     }
 }
 
@@ -2449,10 +2882,11 @@ fn def_runtime_members(project: &Project, def: &DefIR) -> BTreeSet<String> {
         assign_targets: Vec::new(),
         child_emits: Vec::new(),
         anc_emits: Vec::new(),
+        query_events: Vec::new(),
     };
     if let Some(on) = &decl.on {
         for h in &on.handlers {
-            walk_stmts(&h.body.stmts, def.line, &mut out);
+            walk_stmts(&h.body.stmts, def.line, &mut out, false);
         }
     }
     if let Some(view) = &decl.view2d {
@@ -2461,7 +2895,7 @@ fn def_runtime_members(project: &Project, def: &DefIR) -> BTreeSet<String> {
                 if def.dyn_elems.contains(name) {
                     for pr in props {
                         for e in prop_exprs(pr) {
-                            walk_expr(&e, def.line, &mut out);
+                            walk_expr_q(&e, def.line, &mut out, false);
                         }
                     }
                 }
@@ -2615,15 +3049,23 @@ fn gen_user_source(
     world: &WorldIR,
     plan: &Plan,
     scene: &SceneBuild,
+    queries: bool,
 ) -> Result<String, LowerError> {
     let mut src = String::new();
     let root_def = &world.defs[&world.root];
     let root_decl = node_of(project, &world.root);
+    let qbinds = std::cell::RefCell::<Vec<(String, QueryKind)>>::default();
 
     // ---- 头部 ----
-    src.push_str(
-        "// GENERATED by autographics-node2d-pilot (PLAN-020 components-2d, T-03/T-04 contract).\n",
-    );
+    if queries {
+        src.push_str(
+            "// GENERATED by autographics-node2d-pilot (PLAN-021 queries-2d, T-03/T-04 contract).\n",
+        );
+    } else {
+        src.push_str(
+            "// GENERATED by autographics-node2d-pilot (PLAN-020 components-2d, T-03/T-04 contract).\n",
+        );
+    }
     let inst_list = world
         .instances
         .iter()
@@ -2842,16 +3284,43 @@ fn gen_user_source(
         src.push('\n');
     }
 
+    // ---- PLAN-021：self 行寻址数组（定义序；无静态行实例=-1）----
+    if queries {
+        for dname in def_order(world) {
+            let Some(rows) = scene.self_rows.get(&dname) else {
+                continue;
+            };
+            if rows.is_empty() {
+                continue;
+            }
+            let prefix = world.defs[&dname].prefix();
+            let mut sorted = rows.clone();
+            sorted.sort_by_key(|(idx, _)| *idx);
+            let list = sorted
+                .iter()
+                .map(|(_, r)| r.to_string())
+                .collect::<Vec<_>>()
+                .join(",");
+            src.push_str(&format!("var {prefix}_qrow=[{list}]\n"));
+        }
+    }
+
     // ---- root Life/成员/呈现 fns ----
-    let rctx = root_ctx(project, world, plan);
+    let root_query = queries.then(|| QueryParts {
+        refs: &scene.refs,
+        self_row: None,
+        self_writable: false,
+        binds: &qbinds,
+    });
+    let rctx = root_ctx(project, world, plan, root_query.as_ref());
     src.push_str("fn main_lifestart() {\n");
     if let Some(h) = life_handler(root_decl, "Start") {
-        translate_stmts(&h.body.stmts, &rctx, &mut src, 1)?;
+        translate_handler(&h.body.stmts, &rctx, &mut src, 1)?;
     }
     src.push_str("}\n");
     src.push_str("fn main_lifetick(dt float) {\n");
     if let Some(h) = life_handler(root_decl, "Tick") {
-        translate_stmts(&h.body.stmts, &rctx, &mut src, 1)?;
+        translate_handler(&h.body.stmts, &rctx, &mut src, 1)?;
     }
     src.push_str("}\n");
     // root 成员接收 fn（直呼）。
@@ -2863,7 +3332,7 @@ fn gen_user_source(
         .collect();
     root_recvs.sort();
     for (fname, ev) in root_recvs {
-        gen_recv_fn(project, world, plan, fname, "", ev, &mut src)?;
+        gen_recv_fn(project, world, plan, fname, "", ev, root_query.as_ref(), &mut src)?;
     }
     // root 呈现 fn。
     if root_def.life_tick && !root_def.dyn_elems.is_empty() {
@@ -2878,18 +3347,24 @@ fn gen_user_source(
         if world.def_len(&dname) == 0 {
             continue;
         }
-        let ictx = instance_ctx(project, plan, def, &prefix, "i")?;
+        let inst_query = queries.then(|| QueryParts {
+            refs: &scene.refs,
+            self_row: Some(format!("{prefix}_qrow[i]")),
+            self_writable: def.char_elem.is_none(),
+            binds: &qbinds,
+        });
+        let ictx = instance_ctx(project, plan, def, &prefix, "i", inst_query.as_ref())?;
         if def.life_tick {
             src.push_str(&format!("fn {prefix}_lifetick(i int, dt float) {{\n"));
             if let Some(h) = life_handler(decl, "Tick") {
-                translate_stmts(&h.body.stmts, &ictx, &mut src, 1)?;
+                translate_handler(&h.body.stmts, &ictx, &mut src, 1)?;
             }
             src.push_str("}\n");
         }
         if def.life_start {
             src.push_str(&format!("fn {prefix}_lifestart(i int) {{\n"));
             if let Some(h) = life_handler(decl, "Start") {
-                translate_stmts(&h.body.stmts, &ictx, &mut src, 1)?;
+                translate_handler(&h.body.stmts, &ictx, &mut src, 1)?;
             }
             src.push_str("}\n");
         }
@@ -2901,8 +3376,14 @@ fn gen_user_source(
             .map(|(f, (_, e))| (f, e))
             .collect();
         mine.sort();
+        let recv_query = queries.then(|| QueryParts {
+            refs: &scene.refs,
+            self_row: Some(format!("{prefix}_qrow[j]")),
+            self_writable: def.char_elem.is_none(),
+            binds: &qbinds,
+        });
         for (fname, ev) in mine {
-            gen_recv_fn(project, world, plan, fname, &dname, ev, &mut src)?;
+            gen_recv_fn(project, world, plan, fname, &dname, ev, recv_query.as_ref(), &mut src)?;
         }
         if def.life_tick && !def.dyn_elems.is_empty() {
             gen_present_fn(project, world, plan, def, false, &mut src)?;
@@ -2998,6 +3479,7 @@ fn gen_recv_fn(
     fname: &str,
     recv_def_name: &str,
     ev: &str,
+    query: Option<&QueryParts>,
     src: &mut String,
 ) -> Result<(), LowerError> {
     let def = if recv_def_name.is_empty() {
@@ -3033,11 +3515,11 @@ fn gen_recv_fn(
     }
     src.push_str(&format!("fn {fname}({sig}) {{\n"));
     let ctx = if index.is_empty() {
-        root_ctx(project, world, plan)
+        root_ctx(project, world, plan, query)
     } else {
-        instance_ctx(project, plan, def, &def.prefix(), "j")?
+        instance_ctx(project, plan, def, &def.prefix(), "j", query)?
     };
-    translate_stmts(&h.body.stmts, &ctx, src, 1)?;
+    translate_handler(&h.body.stmts, &ctx, src, 1)?;
     src.push_str("}\n");
     Ok(())
 }
@@ -3067,9 +3549,9 @@ fn gen_present_fn(
     for arr in &arrays {
         let props = elem_props(project, def, &arr.elem)?;
         let ctx = if is_root {
-            root_ctx(project, world, plan)
+            root_ctx(project, world, plan, None)
         } else {
-            instance_ctx(project, plan, def, &prefix, index)?
+            instance_ctx(project, plan, def, &prefix, index, None)?
         };
         let pos = prop_of(&props, "position")
             .ok_or_else(|| at(&def.module, def.line, "position", "missing position"))?;
@@ -3119,10 +3601,23 @@ fn gen_present_fn(
 
 /// PLAN-020 components-2d 公共入口：校验 → 场景/用户源 → identity 材料。
 pub fn lower_project_components(project: &Project) -> Result<LowerOutputBasic2D, LowerError> {
+    lower_components_mode(project, false)
+}
+
+/// PLAN-021：queries-2d 显式作者档（components-2d 的超集 + typed 查询
+/// 面；api/运行时装配不变，identity generator 字符串区分）。
+pub fn lower_project_queries(project: &Project) -> Result<LowerOutputBasic2D, LowerError> {
+    lower_components_mode(project, true)
+}
+
+fn lower_components_mode(
+    project: &Project,
+    queries: bool,
+) -> Result<LowerOutputBasic2D, LowerError> {
     let world = build_world(project)?;
-    let plan = plan_dispatch(project, &world)?;
+    let plan = plan_dispatch(project, &world, queries)?;
     let scene = collect_scene(project, &world, &plan)?;
-    let src = gen_user_source(project, &world, &plan, &scene)?;
+    let src = gen_user_source(project, &world, &plan, &scene, queries)?;
     let source_bytes = src.len();
     let source_sha256 = sha256_hex(src.as_bytes());
     let entry = world.root_module.clone();

@@ -366,6 +366,7 @@ fn base_ctx_g11<'a>(
         // PLAN-020 钩子：g11-2d 档不用（017 字节不变）。
         call_scope: None,
         child_emit: None,
+        query: None,
     }
 }
 
@@ -1039,6 +1040,7 @@ pub fn lower_project_g112d(project: &Project) -> Result<LowerOutputG11, LowerErr
                         refs_any_elem: true,
                         call_scope: None,
                         child_emit: None,
+                        query: None,
                     };
                     let mut buf = String::new();
                     if translate_stmts(&[Stmt::Expr(e.clone())], &ctx, &mut buf, 0).is_ok() {

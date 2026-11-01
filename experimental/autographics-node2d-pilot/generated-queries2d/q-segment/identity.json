@@ -1,0 +1,40 @@
+{
+ "generator": "autographics-node2d-pilot plan021 queries-2d",
+ "api": "autographics.objects2d/1",
+ "user_source_sha256": "52a37119efd935d54e800cf399edd8d7ed58c94636be112a96f7cc8f4391d553",
+ "user_source_bytes": 1631,
+  "module:door": "f776b7bc8ef13bc1591e358b74d4143c0a9e0130644c9a763bee358311f7ead0",
+  "module:far": "b6392c468172eae887175861ec65d68b4d3bcd7a182874215cb03c1f63b5ba0c",
+  "module:marker": "5408c6fddd67c8083bfd262a5946a5c5ff2f605ccacc9d18c0f1a3d756ee8e54",
+  "module:point_marker": "f778cc578db0eeacab72bbb992a01f1f70f458a1a1f3469b73295e85de70fdf2",
+  "module:resources": "f1081c456addfea4f7e16bcf752bbefbf75c50d0298baae5a97aff43ebbd77a5",
+  "module:runner": "07548b4c95067d38c15174c1650d4b87ba61079a48e5f45ff26c41cbb632d3df",
+  "module:segment": "d0b387ee8955184175fdc06518fdba1d521a58d4bb1b5a999d69edf8aaf7be3c",
+  "module:spectator": "7b284e65c6df0c20cc3c8cf4d4df33600fd3f45fc267e58fa6036ea1761956d1",
+  "module:target": "fc48e4da649c7721f2e42cef39ab7853429538b40161bc23658e6d90ff456006",
+ "closure": [
+  {"name": "door", "sha256": "f776b7bc8ef13bc1591e358b74d4143c0a9e0130644c9a763bee358311f7ead0", "bytes": 243},
+  {"name": "far", "sha256": "b6392c468172eae887175861ec65d68b4d3bcd7a182874215cb03c1f63b5ba0c", "bytes": 225},
+  {"name": "marker", "sha256": "5408c6fddd67c8083bfd262a5946a5c5ff2f605ccacc9d18c0f1a3d756ee8e54", "bytes": 221},
+  {"name": "point_marker", "sha256": "f778cc578db0eeacab72bbb992a01f1f70f458a1a1f3469b73295e85de70fdf2", "bytes": 252},
+  {"name": "resources", "sha256": "f1081c456addfea4f7e16bcf752bbefbf75c50d0298baae5a97aff43ebbd77a5", "bytes": 867},
+  {"name": "runner", "sha256": "07548b4c95067d38c15174c1650d4b87ba61079a48e5f45ff26c41cbb632d3df", "bytes": 233},
+  {"name": "segment", "sha256": "d0b387ee8955184175fdc06518fdba1d521a58d4bb1b5a999d69edf8aaf7be3c", "bytes": 1639},
+  {"name": "spectator", "sha256": "7b284e65c6df0c20cc3c8cf4d4df33600fd3f45fc267e58fa6036ea1761956d1", "bytes": 361},
+  {"name": "target", "sha256": "fc48e4da649c7721f2e42cef39ab7853429538b40161bc23658e6d90ff456006", "bytes": 234}
+ ],
+ "roles": {
+ "character": 1,
+ "character_name": "spectator.body",
+ "solids": [],
+ "camera": 1,
+ "scene_objects": {"spectator.body": 1, "runner.body": 2, "target.body": 3, "marker.body": 4, "door.body": 5, "point_marker.body": 6, "far.body": 7}
+},
+ "provenance": {
+  "product": "q-segment",
+  "consumer": "experimental/autographics-auto-driver/tests/node_queries_flow.rs",
+  "consumption": "include_str! frozen scene.agscene + world.at; the harness writes world.at to scripts/<sha>.at where <sha> = scene.behavior.source.sha256",
+  "load_verification": "the load path hash-verifies the behavior source closure against the scene-bound sha and rejects a damaged world copy at load (observed: 'behavior source closure identity: <scripts/<sha>.at>')",
+  "world_sha256": "52a37119efd935d54e800cf399edd8d7ed58c94636be112a96f7cc8f4391d553"
+ }
+}

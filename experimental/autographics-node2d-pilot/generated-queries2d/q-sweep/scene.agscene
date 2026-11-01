@@ -1,0 +1,97 @@
+{
+ "behavior": {
+  "api": "autographics.objects2d/1",
+  "source": {
+   "format": "auto-source",
+   "sha256": "f7dc9f1987b375156b0f9067c51a11e93cff60d46818fcf2d4a76637c18f1b62",
+   "byte_length": 1800
+  },
+  "actors": {
+   "two_d": 1,
+   "three_d": null
+  }
+ },
+ "schema": "autographics.scene/6",
+ "document_id": "plan020-components-2d-sweep",
+ "resources": [
+  "circle",
+  "quad",
+  "cylinder",
+  "player",
+  "mob"
+ ],
+ "objects": [
+  {
+   "id": 1,
+   "name": "spectator.body",
+   "kind": "quad",
+   "translation": [-100.0, -100.0, 0.0],
+   "scale": [0.8, 1.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.5, 0.5, 0.55, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 2,
+   "name": "runner.body",
+   "kind": "quad",
+   "translation": [6.0, 2.0, 0.0],
+   "scale": [4.0, 4.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.95, 0.7, 0.2, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 3,
+   "name": "wall.body",
+   "kind": "quad",
+   "translation": [20.0, 2.0, 0.0],
+   "scale": [1.0, 8.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.4, 0.4, 0.45, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 4,
+   "name": "marker.body",
+   "kind": "quad",
+   "translation": [2.0, 7.0, 0.0],
+   "scale": [1.0, 1.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.95, 0.3, 0.3, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 5,
+   "name": "door.body",
+   "kind": "quad",
+   "translation": [37.0, 7.0, 0.0],
+   "scale": [1.0, 1.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.95, 0.95, 0.9, 1],
+   "visible": false,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  }
+ ],
+ "groups": [],
+ "assets": []
+}

@@ -1,0 +1,11 @@
+use resources: lab_target, lab_target_mesh
+
+node Target {
+    view-2d {
+        shape2d body {
+            mesh: resources.lab_target_mesh
+            position: (20.0, 2.0)
+            material: resources.lab_target
+        }
+    }
+}

@@ -1,0 +1,12 @@
+use resources: lab_point, lab_quad1
+
+node PointMarker {
+    view-2d {
+        shape2d body {
+            mesh: resources.lab_quad1
+            position: (1.0, -2.0)
+            material: resources.lab_point
+            visible: false
+        }
+    }
+}

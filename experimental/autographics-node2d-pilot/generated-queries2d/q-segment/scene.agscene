@@ -1,0 +1,125 @@
+{
+ "behavior": {
+  "api": "autographics.objects2d/1",
+  "source": {
+   "format": "auto-source",
+   "sha256": "52a37119efd935d54e800cf399edd8d7ed58c94636be112a96f7cc8f4391d553",
+   "byte_length": 1631
+  },
+  "actors": {
+   "two_d": 1,
+   "three_d": null
+  }
+ },
+ "schema": "autographics.scene/6",
+ "document_id": "plan020-components-2d-segment",
+ "resources": [
+  "circle",
+  "quad",
+  "cylinder",
+  "player",
+  "mob"
+ ],
+ "objects": [
+  {
+   "id": 1,
+   "name": "spectator.body",
+   "kind": "quad",
+   "translation": [-100.0, -100.0, 0.0],
+   "scale": [0.8, 1.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.5, 0.5, 0.55, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 2,
+   "name": "runner.body",
+   "kind": "quad",
+   "translation": [6.0, 2.0, 0.0],
+   "scale": [4.0, 4.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.95, 0.7, 0.2, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 3,
+   "name": "target.body",
+   "kind": "quad",
+   "translation": [20.0, 2.0, 0.0],
+   "scale": [8.0, 8.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.25, 0.45, 0.95, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 4,
+   "name": "marker.body",
+   "kind": "quad",
+   "translation": [2.0, 7.0, 0.0],
+   "scale": [1.0, 1.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.95, 0.3, 0.3, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 5,
+   "name": "door.body",
+   "kind": "quad",
+   "translation": [37.0, 7.0, 0.0],
+   "scale": [1.0, 1.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.95, 0.95, 0.9, 1],
+   "visible": false,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 6,
+   "name": "point_marker.body",
+   "kind": "quad",
+   "translation": [1.0, -2.0, 0.0],
+   "scale": [1.0, 1.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.2, 0.9, 0.9, 1],
+   "visible": false,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 7,
+   "name": "far.body",
+   "kind": "quad",
+   "translation": [34.0, 2.0, 0.0],
+   "scale": [4.0, 4.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.8, 0.8, 0.9, 0.4],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  }
+ ],
+ "groups": [],
+ "assets": []
+}

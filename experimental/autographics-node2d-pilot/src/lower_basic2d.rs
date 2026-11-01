@@ -1186,6 +1186,7 @@ fn gen_user_source(
         // PLAN-020 钩子：basic2d 档不用（019 字节不变）。
         call_scope: None,
         child_emit: None,
+        query: None,
     };
 
     // ---- app_start：生成绑定（声明序）+ 作者 Life.Start ----

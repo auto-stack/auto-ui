@@ -555,6 +555,7 @@ fn base_ctx<'a>(
         // PLAN-020 钩子：legacy 档不用（保持 016 冻结行为）。
         call_scope: None,
         child_emit: None,
+        query: None,
     }
 }
 

@@ -1,0 +1,11 @@
+use resources: lab_wall, lab_wall_mesh
+
+node Wall {
+    view-2d {
+        shape2d body {
+            mesh: resources.lab_wall_mesh
+            position: (20.0, 2.0)
+            material: resources.lab_wall
+        }
+    }
+}

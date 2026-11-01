@@ -1,0 +1,75 @@
+// PLAN-021 queries-2d T-02 sweep lab (wiring-1 root-scoped): swept AABB of
+// the runner row against a thin wall, explicit clearance stop written back by
+// Auto (speed 100, clearance 0.02, no dt on the requested displacement),
+// origin snapshot re-read invariance, start-overlap stop.
+use resources: lab_runner
+use runner: Runner
+use marker: Marker
+use door: Door
+use wall: Wall
+use spectator: Spectator
+
+node SweepLab {
+    model {
+        var speed = 100.0
+        var clearance = 0.02
+    }
+    view-2d {
+        Spectator spectator {
+        }
+        Runner runner {
+        }
+        Wall wall {
+        }
+        Marker marker {
+        }
+        Door door {
+        }
+        camera2d cam {
+            target: refs.spectator.actor
+            bounds: (0.0, -4.0, 40.0, 12.0)
+            view_size: (40.0, 12.0)
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            var dx = 0.0
+            if input.space() == 2 {
+                dx = input.x() * .speed
+            }
+            let q = query2d.sweep(refs.runner, 1, dx, 0.0)
+            let hit = q.hit()
+            let node = q.node()
+            let t = q.t()
+            let px = q.origin(0)
+            let nx = q.normal(0)
+            let overlap = q.start_overlap()
+            var move = dx
+            if hit == 1 {
+                move = 0.0
+                if overlap == 0 {
+                    var distance = dx
+                    if distance < 0.0 {
+                        distance = 0.0 - distance
+                    }
+                    distance = distance * t - .clearance
+                    if distance > 0.0 {
+                        move = distance
+                        if dx < 0.0 {
+                            move = 0.0 - distance
+                        }
+                    }
+                }
+            }
+            refs.runner.shift(move, 0.0)
+            let px2 = q.origin(0)
+            var snapshot_ok = 1
+            if px2 != px {
+                snapshot_ok = 0
+            }
+            refs.marker.place(2.0 + node * 2.5, 7.0 - t * 1.5)
+            refs.marker.show(snapshot_ok)
+            refs.door.show(hit)
+        }
+    }
+}

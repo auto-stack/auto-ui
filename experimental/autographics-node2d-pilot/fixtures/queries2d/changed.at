@@ -1,0 +1,57 @@
+// PLAN-021 queries-2d changed variant: source-only change of the segment lab reach (20.0 -> 10.0); scene and modules otherwise identical (G05 segment-changed obligation).
+// nearest-hit segment cast from a plain instance row, typed result mapped to
+// marker/door/point-marker static rows.
+use resources: lab_runner
+use runner: Runner
+use target: Target
+use marker: Marker
+use door: Door
+use point_marker: PointMarker
+use far: FarTarget
+use spectator: Spectator
+
+node SegmentLab {
+    model {
+        var reach = 10.0
+    }
+    view-2d {
+        Spectator spectator {
+        }
+        Runner runner {
+        }
+        Target target {
+        }
+        Marker marker {
+        }
+        Door door {
+        }
+        PointMarker point_marker {
+        }
+        FarTarget far {
+        }
+        camera2d cam {
+            target: refs.spectator.actor
+            bounds: (0.0, -4.0, 40.0, 12.0)
+            view_size: (40.0, 12.0)
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            if input.space() == 2 {
+                refs.runner.shift(input.x() * 60.0 * dt, input.y() * 60.0 * dt)
+            }
+            let ax = refs.runner.world(0)
+            let ay = refs.runner.world(1)
+            let q = query2d.segment(refs.runner, 1, ax, ay, ax + .reach, ay)
+            let hit = q.hit()
+            let node = q.node()
+            let fraction = q.t()
+            let px = q.point(0)
+            let nx = q.normal(0)
+            refs.marker.place(2.0 + node * 2.5, 7.0 - fraction * 1.5)
+            refs.point_marker.place(1.0 + px * 0.5, -2.0 + nx * 1.5)
+            refs.marker.show(1)
+            refs.door.show(hit)
+        }
+    }
+}

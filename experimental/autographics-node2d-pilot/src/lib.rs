@@ -17,7 +17,8 @@ pub mod lower_g11;
 pub mod scene;
 pub mod translate;
 
-/// 降层 profile（PLAN-017 T-02 冻结；PLAN-020 增补 components-2d）。
+/// 降层 profile（PLAN-017 T-02 冻结；PLAN-020 增补 components-2d；
+/// PLAN-021 增补 queries-2d）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Profile {
     /// PLAN-016 最小切片：字节兼容，服务映射不变。
@@ -28,10 +29,13 @@ pub enum Profile {
     Basic2D(lower_basic2d::BasicProfile),
     /// PLAN-020 有状态组件：components-2d（T-02 冻结的两套既有机制）。
     Components2D,
+    /// PLAN-021 typed 二维查询：queries-2d（components-2d 超集 + query2d
+    /// 服务/具名行/typed 结果；api/运行时装配不变）。
+    Queries2D,
 }
 
 pub use load::{load_project, Project, ProjectError};
 pub use lower::{lower_project, LowerOutput};
 pub use lower_basic2d::{lower_project_basic, BasicProfile, LowerOutputBasic2D};
-pub use lower_components::lower_project_components;
+pub use lower_components::{lower_project_components, lower_project_queries};
 pub use lower_g11::{lower_project_g112d, LowerOutputG11};

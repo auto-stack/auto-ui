@@ -1,0 +1,32 @@
+{
+ "generator": "autographics-node2d-pilot plan021 queries-2d",
+ "api": "autographics.objects2d/1",
+ "user_source_sha256": "eda9e765208f9b2666adfd21fe1b49c130ce4b12f4b2c22abd2e0441cd13cb46",
+ "user_source_bytes": 1945,
+  "module:crosslab": "618358d4a141c1faf59b1b3cee404f901a9dc6645e364f39ced3745857da8f77",
+  "module:far": "b6392c468172eae887175861ec65d68b4d3bcd7a182874215cb03c1f63b5ba0c",
+  "module:resources": "f1081c456addfea4f7e16bcf752bbefbf75c50d0298baae5a97aff43ebbd77a5",
+  "module:spectator": "7b284e65c6df0c20cc3c8cf4d4df33600fd3f45fc267e58fa6036ea1761956d1",
+  "module:target": "fc48e4da649c7721f2e42cef39ab7853429538b40161bc23658e6d90ff456006",
+ "closure": [
+  {"name": "crosslab", "sha256": "618358d4a141c1faf59b1b3cee404f901a9dc6645e364f39ced3745857da8f77", "bytes": 1764},
+  {"name": "far", "sha256": "b6392c468172eae887175861ec65d68b4d3bcd7a182874215cb03c1f63b5ba0c", "bytes": 225},
+  {"name": "resources", "sha256": "f1081c456addfea4f7e16bcf752bbefbf75c50d0298baae5a97aff43ebbd77a5", "bytes": 867},
+  {"name": "spectator", "sha256": "7b284e65c6df0c20cc3c8cf4d4df33600fd3f45fc267e58fa6036ea1761956d1", "bytes": 361},
+  {"name": "target", "sha256": "fc48e4da649c7721f2e42cef39ab7853429538b40161bc23658e6d90ff456006", "bytes": 234}
+ ],
+ "roles": {
+ "character": 1,
+ "character_name": "spectator.body",
+ "solids": [],
+ "camera": 1,
+ "scene_objects": {"spectator.body": 1, "target.body": 2, "far.body": 3, "qa.body": 4, "qb.body": 5}
+},
+ "provenance": {
+  "product": "q-cross",
+  "consumer": "experimental/autographics-auto-driver/tests/node_queries_flow.rs",
+  "consumption": "include_str! frozen scene.agscene + world.at; the harness writes world.at to scripts/<sha>.at where <sha> = scene.behavior.source.sha256",
+  "load_verification": "the load path hash-verifies the behavior source closure against the scene-bound sha and rejects a damaged world copy at load (observed: 'behavior source closure identity: <scripts/<sha>.at>')",
+  "world_sha256": "eda9e765208f9b2666adfd21fe1b49c130ce4b12f4b2c22abd2e0441cd13cb46"
+ }
+}

@@ -30,6 +30,7 @@ fn main() {
                 Some("character-2d") => Profile::Basic2D(BasicProfile::Character2D),
                 Some("camera-2d") => Profile::Basic2D(BasicProfile::Camera2D),
                 Some("components-2d") => Profile::Components2D,
+                Some("queries-2d") => Profile::Queries2D,
                 _ => usage(),
             }
         }
@@ -145,12 +146,20 @@ fn main() {
                 names.len()
             );
         }
-        Profile::Components2D => {
-            let lowered = autographics_node2d_pilot::lower_project_components(&project)
-                .unwrap_or_else(|e| {
+        Profile::Components2D | Profile::Queries2D => {
+            let queries = matches!(profile, Profile::Queries2D);
+            let lowered = if queries {
+                autographics_node2d_pilot::lower_project_queries(&project).unwrap_or_else(|e| {
                     eprintln!("node2d-lower: {e}");
                     std::process::exit(3);
-                });
+                })
+            } else {
+                autographics_node2d_pilot::lower_project_components(&project)
+                    .unwrap_or_else(|e| {
+                        eprintln!("node2d-lower: {e}");
+                        std::process::exit(3);
+                    })
+            };
             std::fs::write(
                 format!("{out}/world.at"),
                 lowered.user_source.expect("source"),
@@ -176,8 +185,13 @@ fn main() {
                 ));
             }
             let mut identity = String::from("{\n");
-            identity
-                .push_str(" \"generator\": \"autographics-node2d-pilot plan020 components-2d\",\n");
+            if queries {
+                identity
+                    .push_str(" \"generator\": \"autographics-node2d-pilot plan021 queries-2d\",\n");
+            } else {
+                identity
+                    .push_str(" \"generator\": \"autographics-node2d-pilot plan020 components-2d\",\n");
+            }
             identity.push_str(" \"api\": \"autographics.objects2d/1\",\n");
             identity.push_str(&format!(
                 " \"user_source_sha256\": \"{}\",\n \"user_source_bytes\": {},\n",
@@ -207,6 +221,13 @@ fn main() {
                 | "envelope" | "init-fault" => {
                     "experimental/autographics-auto-driver/tests/node_components_flow.rs"
                 }
+                "q-segment" | "q-sweep" | "q-cross" | "q-changed" | "q-g05seg" | "q-g05sweep"
+                | "q-g05changed" => {
+                    "experimental/autographics-auto-driver/tests/node_queries_flow.rs"
+                }
+                "q-helpers" => {
+                    "experimental/autographics-node2d-pilot/tests/node_queries_gates.rs (fixture-level; no driver flow consumer)"
+                }
                 _ => "unrecorded (this out dir has no registered flow consumer)",
             };
             identity.push_str(" \"provenance\": {\n");
@@ -231,7 +252,8 @@ fn main() {
                 std::fs::write(format!("{closure_dir}/{name}.at"), bytes).expect("closure file");
             }
             println!(
-                "node2d-lower[components-2d]: wrote world.at ({} bytes, sha {}) + scene.agscene + closure/{}",
+                "node2d-lower[{}]: wrote world.at ({} bytes, sha {}) + scene.agscene + closure/{}",
+                if queries { "queries-2d" } else { "components-2d" },
                 lowered.source_bytes, lowered.source_sha256,
                 names.len()
             );

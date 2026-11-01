@@ -1,0 +1,13 @@
+// PLAN-021 T-02 lab spectator: the components contract requires one camera
+// follow target (character instance); parked outside the corridor so it is
+// never a query candidate.
+use resources: lab_char
+
+node Spectator {
+    view-2d {
+        character2d body {
+            position: (-100.0, -100.0)
+            material: resources.lab_char
+        }
+    }
+}

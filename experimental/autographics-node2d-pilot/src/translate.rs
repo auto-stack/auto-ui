@@ -11,6 +11,7 @@
 //! - `emit .Ev(args)` → 绑定表投递（lower 层注入目标调用文本）
 
 use auto_parser_api::ast::{Arg, Expr, Op, Stmt};
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone)]
 pub enum LowerError {
@@ -62,6 +63,65 @@ pub struct Ctx<'a> {
     /// （含接收下标实参，未闭合；模板续接 `, args)`）。None 时该形态保持
     /// unsupported（旧档不变）。
     pub child_emit: Option<Box<dyn Fn(&str, &str, usize) -> Result<String, LowerError> + 'a>>,
+    /// PLAN-021（queries-2d）：typed 查询服务环境。None 保持旧档行为
+    /// （query2d 构造在 plan 层具名拒绝，旧字节不变）。
+    pub query: Option<QueryEnv<'a>>,
+}
+
+/// PLAN-021：typed 查询结果种类（同一世界共享 latest slot，q 即 token）。
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum QueryKind {
+    Cast,
+    Sweep,
+}
+
+/// PLAN-021：具名行引用目标。writable=false = character 行（位置由角色
+/// 服务拥有：shift/place 具名拒绝；show/world/local 仍合法）。
+#[derive(Clone, Copy, Debug)]
+pub struct RefRow {
+    pub row: i64,
+    pub writable: bool,
+}
+
+/// PLAN-021：queries-2d handler 翻译环境。binds 是本 handler 内
+/// `let q = query2d.…` 的有序绑定（作用域由 handler 边界的
+/// [`translate_handler`] 清理）。
+pub struct QueryEnv<'a> {
+    pub refs: &'a BTreeMap<String, RefRow>,
+    pub self_row: Option<String>,
+    pub self_writable: bool,
+    pub binds: &'a std::cell::RefCell<Vec<(String, QueryKind)>>,
+}
+
+/// handler 边界包装：清空 typed 结果绑定后翻译整个 handler 体。
+pub fn translate_handler(
+    stmts: &[Stmt],
+    ctx: &Ctx,
+    out: &mut String,
+    indent: usize,
+) -> Result<(), LowerError> {
+    if let Some(q) = &ctx.query {
+        q.binds.borrow_mut().clear();
+    }
+    translate_stmts(stmts, ctx, out, indent)
+}
+
+/// 语法识别：query2d.segment/sweep 调用（用于 let 绑定分类）。
+pub fn query_call_kind(e: &Expr) -> Option<QueryKind> {
+    if let Expr::Call(c) = e {
+        if let Expr::Dot(inner, m) = &*c.name {
+            if let Expr::Ident(base) = &**inner {
+                if base == "query2d" {
+                    return match m.as_str() {
+                        "segment" => Some(QueryKind::Cast),
+                        "sweep" => Some(QueryKind::Sweep),
+                        _ => None,
+                    };
+                }
+            }
+        }
+    }
+    None
 }
 
 fn line_of(e: &Expr) -> usize {
@@ -129,6 +189,16 @@ fn pad(out: &mut String, indent: usize) {
 fn translate_stmt(s: &Stmt, ctx: &Ctx, out: &mut String, indent: usize) -> Result<(), LowerError> {
     match s {
         Stmt::Expr(e) => {
+            // PLAN-021：`place(x, y)` 是语句形态（一次作者语句 → 两条
+            // ag_set_local）；值位置使用具名拒绝。
+            if let Some(texts) = row_place_pair(e, ctx)? {
+                for t in texts {
+                    pad(out, indent);
+                    out.push_str(&t);
+                    out.push('\n');
+                }
+                return Ok(());
+            }
             pad(out, indent);
             translate_expr(e, ctx, out)?;
             out.push('\n');
@@ -166,6 +236,26 @@ fn translate_stmt(s: &Stmt, ctx: &Ctx, out: &mut String, indent: usize) -> Resul
                 auto_parser_api::ast::StoreKind::Var => "var",
                 _ => "let",
             };
+            // PLAN-021：typed 查询结果只允许 `let q = query2d.…` 绑定；
+            // var 形态具名拒绝（结果不是可复制持有的普通 int）。
+            if let Some(kind) = query_call_kind(&v.expr) {
+                if matches!(v.kind, auto_parser_api::ast::StoreKind::Var) {
+                    return Err(unsupported(
+                        "query results bind with 'let' only ('var' would claim mutable ownership of a shared latest-slot token)",
+                        &v.expr,
+                    ));
+                }
+                out.push_str(kw);
+                out.push(' ');
+                out.push_str(&v.name.to_string());
+                out.push_str(" = ");
+                translate_expr(&v.expr, ctx, out)?;
+                out.push('\n');
+                if let Some(q) = &ctx.query {
+                    q.binds.borrow_mut().push((v.name.to_string(), kind));
+                }
+                return Ok(());
+            }
             out.push_str(kw);
             out.push(' ');
             out.push_str(&v.name.to_string());
@@ -221,6 +311,16 @@ fn translate_expr(e: &Expr, ctx: &Ctx, out: &mut String) -> Result<(), LowerErro
                         Ok(())
                     }
                     _ => {
+                        // PLAN-021：裸 `refs.<inst>` 值 = 具名行 handle
+                        // （行 ordinal 字面量；plan 层已验证名字与行存在）。
+                        if base == "refs" {
+                            if let Some(q) = &ctx.query {
+                                if let Some(row) = q.refs.get(name.as_str()) {
+                                    out.push_str(&row.row.to_string());
+                                    return Ok(());
+                                }
+                            }
+                        }
                         if let Some(text) = (ctx.enum_path)(base, name) {
                             out.push_str(&text);
                             Ok(())
@@ -299,6 +399,48 @@ fn translate_expr(e: &Expr, ctx: &Ctx, out: &mut String) -> Result<(), LowerErro
                         }
                         out.push_str("ag_round_request()");
                         return Ok(());
+                    }
+                    // PLAN-021（queries-2d）：空间输入沿 transport 全局
+                    // （`_ag_action(space,x,y,toggle)` 喂入；space==2 = 2D
+                    // 游戏面）。不占用 character action 位。
+                    if base == "input" && matches!(m.as_str(), "space" | "x" | "y") {
+                        if ctx.query.is_none() {
+                            return Err(unsupported(
+                                format!("input.{m}() is only available in the queries-2d profile"),
+                                e,
+                            ));
+                        }
+                        if !call.args.args.is_empty() {
+                            return Err(unsupported(format!("input.{m} arity"), e));
+                        }
+                        out.push_str(match m.as_str() {
+                            "space" => "ag_input_space()",
+                            "x" => "ag_input_x()",
+                            _ => "ag_input_y()",
+                        });
+                        return Ok(());
+                    }
+                    // PLAN-021（queries-2d）：self 行寻址（本实例 primary
+                    // 静态行）。root 无实例行；character 行只读（位置由
+                    // 角色服务拥有）。
+                    if base == "self" && matches!(m.as_str(), "row" | "world" | "local" | "place" | "shift" | "show") {
+                        return translate_self_row_op(m, e, call, ctx, out);
+                    }
+                    // PLAN-021（queries-2d）：typed 结果 getter（仅结果
+                    // 变量；kind 错配 plan 层已具名拒绝，这里按绑定种类
+                    // 机械映射原 API）。
+                    if let Some(q) = &ctx.query {
+                        if let Some(kind) = q.binds.borrow().iter().rev().find(|(n, _)| n == base.as_str()).map(|(_, k)| *k) {
+                            return translate_query_getter(base, m, e, call, ctx, out, kind);
+                        }
+                    }
+                }
+            }
+            // PLAN-021（queries-2d）：query2d.segment/sweep 查询调用。
+            if let Expr::Dot(inner, m) = &*call.name {
+                if let Expr::Ident(base) = &**inner {
+                    if base == "query2d" {
+                        return translate_query_call(m, e, call, ctx, out);
                     }
                 }
             }
@@ -379,6 +521,20 @@ fn translate_expr(e: &Expr, ctx: &Ctx, out: &mut String) -> Result<(), LowerErro
         }
         Expr::Bina(l, op, r) => {
             let text = op_text(op).ok_or_else(|| unsupported(format!("operator {op:?}"), e))?;
+            // PLAN-021：typed 结果变量不可再赋值（共享 latest slot 的
+            // token 不是可写状态）。
+            if *op == Op::Asn {
+                if let Expr::Ident(name) = &**l {
+                    if let Some(q) = &ctx.query {
+                        if q.binds.borrow().iter().any(|(n, _)| n == name) {
+                            return Err(unsupported(
+                                format!("query result '{name}' cannot be reassigned (read the values out instead)"),
+                                e,
+                            ));
+                        }
+                    }
+                }
+            }
             let paren = *op != Op::Asn; // 赋值是语句形态，不加括号。
             if paren {
                 out.push('(');
@@ -488,6 +644,449 @@ fn translate_refs_body(
             out.push_str(")");
             Ok(())
         }
+        // PLAN-021（queries-2d）：具名行 op（语句形态除 world/local 外
+        // 均为 bare unit 调用；character 行位置写具名拒绝）。
+        "place" => Err(unsupported(
+            "place is statement-only (it writes both row axes)",
+            e,
+        )),
+        "shift" => {
+            let row = query_row_of(elem, ctx, e)?;
+            if call.args.args.len() != 2 {
+                return Err(unsupported("shift arity", e));
+            }
+            if !row.writable {
+                return Err(unsupported(
+                    format!("row '{elem}' is the character row; its position is owned by the character service"),
+                    e,
+                ));
+            }
+            out.push_str(&format!("ag_move_local({}, ", row.row));
+            for (i, a) in call.args.args.iter().enumerate() {
+                if i > 0 {
+                    out.push_str(", ");
+                }
+                match a {
+                    Arg::Pos(x) => translate_expr(x, ctx, out)?,
+                    other => return Err(unsupported(format!("shift arg {other:?}"), e)),
+                }
+            }
+            out.push_str(", 0.0)");
+            Ok(())
+        }
+        "show" => {
+            let row = query_row_of(elem, ctx, e)?;
+            if call.args.args.len() != 1 {
+                return Err(unsupported("show arity", e));
+            }
+            out.push_str(&format!("ag_set_visible({}, ", row.row));
+            match &call.args.args[0] {
+                Arg::Pos(x) => translate_expr(x, ctx, out)?,
+                other => return Err(unsupported(format!("show arg {other:?}"), e)),
+            }
+            out.push(')');
+            Ok(())
+        }
+        "world" => {
+            let row = query_row_of(elem, ctx, e)?;
+            if call.args.args.len() != 1 {
+                return Err(unsupported("world arity", e));
+            }
+            out.push_str(&format!("ag_world({}, ", row.row));
+            match &call.args.args[0] {
+                Arg::Pos(x) => translate_expr(x, ctx, out)?,
+                other => return Err(unsupported(format!("world arg {other:?}"), e)),
+            }
+            out.push(')');
+            Ok(())
+        }
+        "local" => {
+            let row = query_row_of(elem, ctx, e)?;
+            if call.args.args.len() != 1 {
+                return Err(unsupported("local arity", e));
+            }
+            out.push_str(&format!("ag_local({}, ", row.row));
+            match &call.args.args[0] {
+                Arg::Pos(x) => translate_expr(x, ctx, out)?,
+                other => return Err(unsupported(format!("local arg {other:?}"), e)),
+            }
+            out.push(')');
+            Ok(())
+        }
         other => Err(unsupported(format!("refs.body.{other}"), e)),
+    }
+}
+
+/// PLAN-021：refs 具名行解析（queries-2d 环境；未知引用具名拒绝）。
+fn query_row_of(elem: &str, ctx: &Ctx, e: &Expr) -> Result<RefRow, LowerError> {
+    let Some(q) = &ctx.query else {
+        return Err(unsupported(
+            "named row ops are only available in the queries-2d profile",
+            e,
+        ));
+    };
+    q.refs.get(elem).copied().ok_or_else(|| {
+        unsupported(format!("unknown query row reference 'refs.{elem}'"), e)
+    })
+}
+
+/// PLAN-021：解析具名行实参（refs.<inst> | self.row() | -1 字面量）。
+fn query_handle_arg(
+    a: &Arg,
+    ctx: &Ctx,
+    allow_minus_one: bool,
+    e: &Expr,
+) -> Result<String, LowerError> {
+    match a {
+        Arg::Pos(Expr::Int(v)) => {
+            if allow_minus_one && *v == -1 {
+                return Ok("-1".to_string());
+            }
+            Err(unsupported(
+                "query handle argument must be a named row (refs.<inst> / self.row()) or -1",
+                e,
+            ))
+        }
+        Arg::Pos(Expr::Unary(Op::Sub, inner)) => {
+            if allow_minus_one {
+                if let Expr::Int(v) = &**inner {
+                    if *v == 1 {
+                        return Ok("-1".to_string());
+                    }
+                }
+            }
+            Err(unsupported(
+                "query handle argument must be a named row (refs.<inst> / self.row()) or -1",
+                e,
+            ))
+        }
+        Arg::Pos(Expr::Dot(inner, name)) => {
+            if let Expr::Ident(base) = &**inner {
+                if base == "refs" {
+                    if let Some(q) = &ctx.query {
+                        if let Some(row) = q.refs.get(name.as_str()) {
+                            return Ok(row.row.to_string());
+                        }
+                    }
+                }
+            }
+            Err(unsupported(
+                format!("unknown query row reference '{a:?}'"),
+                e,
+            ))
+        }
+        Arg::Pos(Expr::Call(c)) => {
+            if let Expr::Dot(inner, m) = &*c.name {
+                if let Expr::Ident(base) = &**inner {
+                    if base == "self" && m == "row" && c.args.args.is_empty() {
+                        if let Some(q) = &ctx.query {
+                            if let Some(row) = &q.self_row {
+                                return Ok(row.clone());
+                            }
+                        }
+                        return Err(unsupported(
+                            "self.row() has no instance row at the root",
+                            e,
+                        ));
+                    }
+                }
+            }
+            Err(unsupported("query handle argument form", e))
+        }
+        _ => Err(unsupported("query handle argument form", e)),
+    }
+}
+
+/// PLAN-021：语句位置识别 `place(x, y)`（refs.<inst> 或 self 形态）→
+/// 两条 `ag_set_local(row, axis, …)`。非 place 调用返回 None。
+fn row_place_pair(
+    e: &Expr,
+    ctx: &Ctx,
+) -> Result<Option<Vec<String>>, LowerError> {
+    let Expr::Call(c) = e else { return Ok(None) };
+    let Expr::Dot(inner, m) = &*c.name else { return Ok(None) };
+    if m != "place" {
+        return Ok(None);
+    }
+    let (row, writable, what): (String, bool, &str) = match &**inner {
+        Expr::Dot(boxed_root, name) => {
+            if !matches!(&**boxed_root, Expr::Ident(r) if r == "refs") {
+                return Ok(None);
+            }
+            let Some(q) = &ctx.query else {
+                return Err(unsupported(
+                    "row placement is only available in the queries-2d profile",
+                    e,
+                ));
+            };
+            let Some(rr) = q.refs.get(name.as_str()) else {
+                return Err(unsupported(
+                    format!("unknown query row reference 'refs.{name}'"),
+                    e,
+                ));
+            };
+            (rr.row.to_string(), rr.writable, "refs")
+        }
+        Expr::Ident(base) if base == "self" => {
+            let Some(q) = &ctx.query else {
+                return Err(unsupported(
+                    "row placement is only available in the queries-2d profile",
+                    e,
+                ));
+            };
+            let Some(row) = q.self_row.clone() else {
+                return Err(unsupported("self.place has no instance row at the root", e));
+            };
+            (row, q.self_writable, "self")
+        }
+        _ => return Ok(None),
+    };
+    if !writable {
+        return Err(unsupported(
+            "this row is the character row; its position is owned by the character service",
+            e,
+        ));
+    }
+    if c.args.args.len() != 2 {
+        return Err(unsupported(format!("{what}.place arity {}", c.args.args.len()), e));
+    }
+    let mut parts = Vec::new();
+    for a in &c.args.args {
+        match a {
+            Arg::Pos(x) => {
+                let mut t = String::new();
+                translate_expr(x, ctx, &mut t)?;
+                parts.push(t);
+            }
+            _ => return Err(unsupported("place arg", e)),
+        }
+    }
+    Ok(Some(vec![
+        format!("ag_set_local({row}, 0, {})", parts[0]),
+        format!("ag_set_local({row}, 1, {})", parts[1]),
+    ]))
+}
+
+/// PLAN-021：`query2d.segment(ignore, visible_only, ax, ay, bx, by)` /
+/// `query2d.sweep(mover, visible_only, dx, dy)` → 原 `ag_cast_segment(2,…)` /
+/// `ag_sweep_aabb(…, dx, dy, 0.0)`。2D 固定；z=0 隐含。plan 层已验证
+/// 元数/实参形态/引用存在（模块/行/符号诊断），此处为机械映射。
+fn translate_query_call(
+    m: &str,
+    e: &Expr,
+    call: &auto_parser_api::ast::Call,
+    ctx: &Ctx,
+    out: &mut String,
+) -> Result<(), LowerError> {
+    if ctx.query.is_none() {
+        return Err(unsupported(
+            "query2d is only available in the queries-2d profile",
+            e,
+        ));
+    }
+    match m {
+        "segment" => {
+            if call.args.args.len() != 6 {
+                return Err(unsupported(
+                    format!("query2d.segment arity {} (want ignore, visible_only, ax, ay, bx, by)", call.args.args.len()),
+                    e,
+                ));
+            }
+            let handle = query_handle_arg(&call.args.args[0], ctx, true, e)?;
+            let nums = query_numeric_args(&call.args.args[2..6], ctx, e)?;
+            out.push_str(&format!(
+                "ag_cast_segment(2, {handle}, {}, {}, {}, 0.0, {}, {}, 0.0)",
+                visible_only_text(&call.args.args[1], e)?,
+                nums[0], nums[1], nums[2], nums[3]
+            ));
+            Ok(())
+        }
+        "sweep" => {
+            if call.args.args.len() != 4 {
+                return Err(unsupported(
+                    format!("query2d.sweep arity {} (want mover, visible_only, dx, dy)", call.args.args.len()),
+                    e,
+                ));
+            }
+            let handle = query_handle_arg(&call.args.args[0], ctx, false, e)?;
+            let nums = query_numeric_args(&call.args.args[2..4], ctx, e)?;
+            out.push_str(&format!(
+                "ag_sweep_aabb({handle}, {}, {}, {}, 0.0)",
+                visible_only_text(&call.args.args[1], e)?,
+                nums[0], nums[1]
+            ));
+            Ok(())
+        }
+        other => Err(unsupported(
+            format!("unknown query service 'query2d.{other}' (segment/sweep)"),
+            e,
+        )),
+    }
+}
+
+fn visible_only_text(a: &Arg, e: &Expr) -> Result<String, LowerError> {
+    match a {
+        Arg::Pos(Expr::Int(v)) if *v == 0 || *v == 1 => Ok(v.to_string()),
+        Arg::Pos(Expr::Bool(b)) => Ok(if *b { "1".to_string() } else { "0".to_string() }),
+        _ => Err(unsupported(
+            "visible_only must be the literal 0/1 (or true/false)",
+            e,
+        )),
+    }
+}
+
+/// 位置数值实参 → 生成文本（机械映射；plan 层已验证元数）。
+fn query_numeric_args(
+    args: &[Arg],
+    ctx: &Ctx,
+    e: &Expr,
+) -> Result<Vec<String>, LowerError> {
+    let mut parts = Vec::new();
+    for a in args {
+        match a {
+            Arg::Pos(x) => {
+                let mut t = String::new();
+                translate_expr(x, ctx, &mut t)?;
+                parts.push(t);
+            }
+            _ => return Err(unsupported("query numeric arg", e)),
+        }
+    }
+    Ok(parts)
+}
+
+/// PLAN-021：typed 结果 getter（cast5/sweep6，计费 1 进原 API）。
+fn translate_query_getter(
+    base: &str,
+    m: &str,
+    e: &Expr,
+    call: &auto_parser_api::ast::Call,
+    ctx: &Ctx,
+    out: &mut String,
+    kind: QueryKind,
+) -> Result<(), LowerError> {
+    let axis_arg = |call: &auto_parser_api::ast::Call| -> Result<Option<String>, LowerError> {
+        match call.args.args.len() {
+            0 => Ok(None),
+            1 => match &call.args.args[0] {
+                Arg::Pos(x) => {
+                    let mut t = String::new();
+                    translate_expr(x, ctx, &mut t)?;
+                    Ok(Some(t))
+                }
+                _ => Err(unsupported("getter axis arg", e)),
+            },
+            n => Err(unsupported(format!("getter arity {n}"), e)),
+        }
+    };
+    let (fn_name, axis) = match (kind, m) {
+        (QueryKind::Cast, "hit") => ("ag_cast_hit", None),
+        (QueryKind::Cast, "node") => ("ag_cast_node", None),
+        (QueryKind::Cast, "t") => ("ag_cast_t", None),
+        (QueryKind::Cast, "point") => ("ag_cast_point", Some(axis_arg(call)?)),
+        (QueryKind::Cast, "normal") => ("ag_cast_normal", Some(axis_arg(call)?)),
+        (QueryKind::Sweep, "hit") => ("ag_sweep_hit", None),
+        (QueryKind::Sweep, "node") => ("ag_sweep_node", None),
+        (QueryKind::Sweep, "t") => ("ag_sweep_t", None),
+        (QueryKind::Sweep, "origin") => ("ag_sweep_origin", Some(axis_arg(call)?)),
+        (QueryKind::Sweep, "normal") => ("ag_sweep_normal", Some(axis_arg(call)?)),
+        (QueryKind::Sweep, "start_overlap") => ("ag_sweep_start_overlap", None),
+        (QueryKind::Cast, other) => {
+            return Err(unsupported(
+                format!("'.{other}()' is a sweep result getter; '{base}' is a cast result"),
+                e,
+            ));
+        }
+        (QueryKind::Sweep, other) => {
+            return Err(unsupported(
+                format!("'.{other}()' is a cast result getter; '{base}' is a sweep result"),
+                e,
+            ));
+        }
+    };
+    match axis {
+        None => out.push_str(&format!("{fn_name}({base})")),
+        Some(Some(axis)) => out.push_str(&format!("{fn_name}({base}, {axis})")),
+        Some(None) => {
+            return Err(unsupported(format!("{fn_name} needs an axis argument"), e));
+        }
+    }
+    Ok(())
+}
+
+/// PLAN-021：self 行 op（本实例 primary 静态行）。root 无实例行；
+/// character 行 shift/place 具名拒绝。
+fn translate_self_row_op(
+    m: &str,
+    e: &Expr,
+    call: &auto_parser_api::ast::Call,
+    ctx: &Ctx,
+    out: &mut String,
+) -> Result<(), LowerError> {
+    let Some(q) = &ctx.query else {
+        return Err(unsupported(
+            "self row ops are only available in the queries-2d profile",
+            e,
+        ));
+    };
+    let row = q.self_row.clone().ok_or_else(|| {
+        unsupported("self.row() has no instance row at the root", e)
+    })?;
+    let args = |n: usize| -> Result<Vec<String>, LowerError> {
+        if call.args.args.len() != n {
+            return Err(unsupported(format!("self.{m} arity {}", call.args.args.len()), e));
+        }
+        let mut t = String::new();
+        let mut parts = Vec::new();
+        for a in &call.args.args {
+            match a {
+                Arg::Pos(x) => {
+                    translate_expr(x, ctx, &mut t)?;
+                    parts.push(std::mem::take(&mut t));
+                }
+                _ => return Err(unsupported(format!("self.{m} arg"), e)),
+            }
+        }
+        Ok(parts)
+    };
+    match m {
+        "row" => {
+            if !call.args.args.is_empty() {
+                return Err(unsupported("self.row arity", e));
+            }
+            out.push_str(&row.to_string());
+            Ok(())
+        }
+        "world" => {
+            let a = args(1)?;
+            out.push_str(&format!("ag_world({row}, {})", a[0]));
+            Ok(())
+        }
+        "local" => {
+            let a = args(1)?;
+            out.push_str(&format!("ag_local({row}, {})", a[0]));
+            Ok(())
+        }
+        "place" => Err(unsupported(
+            "place is statement-only (it writes both row axes)",
+            e,
+        )),
+        "shift" => {
+            if !q.self_writable {
+                return Err(unsupported(
+                    "self row is the character row; its position is owned by the character service",
+                    e,
+                ));
+            }
+            let a = args(2)?;
+            out.push_str(&format!("ag_move_local({row}, {}, {}, 0.0)", a[0], a[1]));
+            Ok(())
+        }
+        "show" => {
+            let a = args(1)?;
+            out.push_str(&format!("ag_set_visible({row}, {})", a[0]));
+            Ok(())
+        }
+        _ => unreachable!("self row op dispatch"),
     }
 }

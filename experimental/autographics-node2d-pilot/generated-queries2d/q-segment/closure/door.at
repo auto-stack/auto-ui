@@ -1,0 +1,12 @@
+use resources: lab_door, lab_quad1
+
+node Door {
+    view-2d {
+        shape2d body {
+            mesh: resources.lab_quad1
+            position: (37.0, 7.0)
+            material: resources.lab_door
+            visible: false
+        }
+    }
+}

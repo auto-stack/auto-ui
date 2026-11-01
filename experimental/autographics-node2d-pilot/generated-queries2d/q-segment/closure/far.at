@@ -1,0 +1,11 @@
+use resources: lab_far, lab_far_mesh
+
+node FarTarget {
+    view-2d {
+        shape2d body {
+            mesh: resources.lab_far_mesh
+            position: (34.0, 2.0)
+            material: resources.lab_far
+        }
+    }
+}

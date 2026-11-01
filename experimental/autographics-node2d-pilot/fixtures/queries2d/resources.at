@@ -1,0 +1,16 @@
+// PLAN-021 queries-2d T-02 lab resources: G05-faithful display colors with
+// probe-visible geometry. Corridor y=2 inside the frozen camera view
+// (bounds 0,-4,40,12 / view 40x12 -> visible x[0,40] y[-2,10] static-centered).
+let lab_target = material2d.color(0.25, 0.45, 0.95, 1.0)
+let lab_far = material2d.color(0.8, 0.8, 0.9, 0.4)
+let lab_marker = material2d.color(0.95, 0.3, 0.3, 1.0)
+let lab_door = material2d.color(0.95, 0.95, 0.9, 1.0)
+let lab_point = material2d.color(0.2, 0.9, 0.9, 1.0)
+let lab_runner = material2d.color(0.95, 0.7, 0.2, 1.0)
+let lab_char = material2d.color(0.5, 0.5, 0.55, 1.0)
+let lab_wall = material2d.color(0.4, 0.4, 0.45, 1.0)
+let lab_quad1 = mesh2d.quad(1.0, 1.0)
+let lab_target_mesh = mesh2d.quad(8.0, 8.0)
+let lab_far_mesh = mesh2d.quad(4.0, 4.0)
+let lab_wall_mesh = mesh2d.quad(1.0, 8.0)
+let lab_runner_mesh = mesh2d.quad(4.0, 4.0)

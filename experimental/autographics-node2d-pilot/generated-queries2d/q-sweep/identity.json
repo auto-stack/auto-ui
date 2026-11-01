@@ -1,0 +1,36 @@
+{
+ "generator": "autographics-node2d-pilot plan021 queries-2d",
+ "api": "autographics.objects2d/1",
+ "user_source_sha256": "f7dc9f1987b375156b0f9067c51a11e93cff60d46818fcf2d4a76637c18f1b62",
+ "user_source_bytes": 1800,
+  "module:door": "f776b7bc8ef13bc1591e358b74d4143c0a9e0130644c9a763bee358311f7ead0",
+  "module:marker": "5408c6fddd67c8083bfd262a5946a5c5ff2f605ccacc9d18c0f1a3d756ee8e54",
+  "module:resources": "f1081c456addfea4f7e16bcf752bbefbf75c50d0298baae5a97aff43ebbd77a5",
+  "module:runner": "07548b4c95067d38c15174c1650d4b87ba61079a48e5f45ff26c41cbb632d3df",
+  "module:spectator": "7b284e65c6df0c20cc3c8cf4d4df33600fd3f45fc267e58fa6036ea1761956d1",
+  "module:sweep": "2b8c104c2da70004f6d769889317193bca5d19b8f500a2a5a78e840ff38843ba",
+  "module:wall": "7ba8cfb9810a8c11ef13192639b89edc761974481feefa34ff14c018abd400d4",
+ "closure": [
+  {"name": "door", "sha256": "f776b7bc8ef13bc1591e358b74d4143c0a9e0130644c9a763bee358311f7ead0", "bytes": 243},
+  {"name": "marker", "sha256": "5408c6fddd67c8083bfd262a5946a5c5ff2f605ccacc9d18c0f1a3d756ee8e54", "bytes": 221},
+  {"name": "resources", "sha256": "f1081c456addfea4f7e16bcf752bbefbf75c50d0298baae5a97aff43ebbd77a5", "bytes": 867},
+  {"name": "runner", "sha256": "07548b4c95067d38c15174c1650d4b87ba61079a48e5f45ff26c41cbb632d3df", "bytes": 233},
+  {"name": "spectator", "sha256": "7b284e65c6df0c20cc3c8cf4d4df33600fd3f45fc267e58fa6036ea1761956d1", "bytes": 361},
+  {"name": "sweep", "sha256": "2b8c104c2da70004f6d769889317193bca5d19b8f500a2a5a78e840ff38843ba", "bytes": 2150},
+  {"name": "wall", "sha256": "7ba8cfb9810a8c11ef13192639b89edc761974481feefa34ff14c018abd400d4", "bytes": 224}
+ ],
+ "roles": {
+ "character": 1,
+ "character_name": "spectator.body",
+ "solids": [],
+ "camera": 1,
+ "scene_objects": {"spectator.body": 1, "runner.body": 2, "wall.body": 3, "marker.body": 4, "door.body": 5}
+},
+ "provenance": {
+  "product": "q-sweep",
+  "consumer": "experimental/autographics-auto-driver/tests/node_queries_flow.rs",
+  "consumption": "include_str! frozen scene.agscene + world.at; the harness writes world.at to scripts/<sha>.at where <sha> = scene.behavior.source.sha256",
+  "load_verification": "the load path hash-verifies the behavior source closure against the scene-bound sha and rejects a damaged world copy at load (observed: 'behavior source closure identity: <scripts/<sha>.at>')",
+  "world_sha256": "f7dc9f1987b375156b0f9067c51a11e93cff60d46818fcf2d4a76637c18f1b62"
+ }
+}
