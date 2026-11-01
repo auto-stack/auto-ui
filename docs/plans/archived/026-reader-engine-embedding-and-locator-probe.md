@@ -244,10 +244,13 @@ AC-02～06 的成功语义是**路线go门**，不是允许跳过的产品验收
 
 ### 2026-11-02：merge（T-09，PLAN-026:r1）
 
-- stage: merge | plan_id: auto-ui/PLAN-026 | plan_revision: r1 | outcome: pass | delivery_commit: 68c36f0（master，ff-only 无 merge commit；rebase 后 range-diff 5/5 全等 = 安全重写证明；旧→新映射 99f69a5→(1)/85d1b2a→(2)/c5be104→(3)/ca45246→9de15ec/c08b6d3→8fc67d7）| canonical: docs/specs/runtime/document-surface-boundary.md（SHA256 444a970969667d92…，main 实测）+ docs/research/reader-engine-probe.md（fa24f54210be0715…，review F-1 已折叠 V-08/V-10 未执行补记）| archived: docs/plans/archived/026-reader-engine-embedding-and-locator-probe.md（本文件，status archived）| cleaned: 见后记
+- stage: merge | plan_id: auto-ui/PLAN-026 | plan_revision: r1 | outcome: pass | delivery_commit: 68c36f0（master，ff-only 无 merge commit；rebase 后 range-diff 5/5 全等 = 安全重写证明；旧→新映射 99f69a5→(1)/85d1b2a→(2)/c5be104→(3)/ca45246→9de15ec/c08b6d3→8fc67d7）| canonical: docs/specs/runtime/document-surface-boundary.md（SHA256 444a970969667d92…，main 实测）+ docs/research/reader-engine-probe.md（fa24f54210be0715…，review F-1 已折叠 V-08/V-10 未执行补记）| archived: docs/plans/archived/026-reader-engine-embedding-and-locator-probe.md（本文件，status archived）| cleaned: wt-guard fresh clean → worktree/branch(68c36f0)删除、组目录移除；plan-artifacts/plan-026 整删（证据摘要已折叠入本文件 §8/§9；引擎资产可经 reader tests/probe/engine_surface/prepare_engine_assets.py 重建，无 holds）；registry 刷新（auto-ui/PLAN-026 cleaned）
 - mergedelta 核对：交付对 reviewed 基线仅 +1 行文档（F-1 折叠），实现/依赖零变化 = 文档性后代准许的 delivery_commit；SD-01 无并发冲突（runtime 目录新文件）。
 - landing 检查：生产 members 零改动（experiments 独立 workspace + docs）→ auto-ui-tool.exe 等产物无需重建（显式观察项：产物日期早于本计划，但无消费面变化）；`auto build` 生成面未触碰；reader 侧为文档+测试新增，reader 产品构建面未触碰。
 - 计划内旧门 FAIL 归属保持可见：R-05（直连 api.at 入口路由 404，owner=工具链）与 R-06vm（原生像素判别负控 rc=0，owner=reader 后续计划）——非本计划引入，未修复未吞没。
+
+
+- **merge 后记（cleaned）**：worktree `.wt/ui-026/auto-ui`（guard clean）与分支 codex/plan-026-dev（tip 68c36f0）已删、组目录移除；plan-artifacts/plan-026 整删（review-vue 复跑 30/30、旧门日志、t00 契约等摘要均在 §8/§9 收据内）；引擎资产确定性重建脚本=reader tests/probe/engine_surface/prepare_engine_assets.py（adapter 固化于 assets/engine-adapter.js，reader aa54cb1）。旧门两处历史 FAIL（R-05 工具链 owner / R-06vm reader owner）保持可见。10/10：T-00..T-07 work、T-08 review pass、T-09 merge delivered。
 
 ## 10. 待澄清事项
 
