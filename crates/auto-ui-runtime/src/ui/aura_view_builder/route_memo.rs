@@ -1242,3 +1242,2209 @@ fn memo_diag(label: &str, reason: &str) {
         );
     }
 }
+
+// ============================================================================
+// PLAN-014 T-07/V-12 测试随owner迁移：原 aura_view_builder.rs 25855-28054 的
+// memo/keyed-for 测试族（plan045/plan046/plan047）原样迁入本文件（impl#2 所
+// 在owner）。测试标记守恒：38=38；原子义务/断言零改。
+// ============================================================================
+#[cfg(test)]
+mod plan045_memo_tests {
+    use super::*;
+    use auto_lang_core::ast::Type;
+    use auto_ui_compiler::aura::{AuraStateDef, AuraWidget};
+
+    /// MENUBAR_OPEN 是进程级全局——本模块 menubar 测试并发翻转会使
+    /// globals_fp 跨 build 漂移（slow 路径 gfp 门误 miss）。模块内互斥；
+    /// PLAN-046 episode 测试同锁（跨模块共享全局翻转面）。
+    pub(crate) static PLAN045_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    /// 本模块本地 widget 构造（tests::make_test_widget 私有不可达）。
+    fn make_memo_widget(name: &str, state_vars: Vec<AuraStateDef>) -> AuraWidget {
+        AuraWidget {
+            named_views: Vec::new(),
+            actions: None,
+            name: name.to_string(),
+            state_vars,
+            computed: vec![],
+            messages: vec![],
+            view_tree: AuraNode::element("col"),
+            handlers: std::collections::BTreeMap::new(),
+            props: vec![],
+            routes: None,
+            lifecycle: vec![],
+            tick_interval: None,
+            timers: Vec::new(),
+            handler_params: HashMap::new(),
+            span_map: HashMap::new(),
+            key_bindings: HashMap::new(),
+            api_imports: vec![],
+            style_css: None,
+            ext_imports: Vec::new(),
+            watchers: Vec::new(),
+            exposes: Vec::new(),
+            setup: None,
+        }
+    }
+
+    fn memo_widget() -> AuraWidget {
+        make_memo_widget(
+            "MemoApp",
+            vec![
+                AuraStateDef {
+                    name: "show_urls".to_string(),
+                    type_info: Type::Bool,
+                    initial: Expr::Bool(false),
+                    decorators: vec![],
+                },
+                AuraStateDef {
+                    name: "unrelated".to_string(),
+                    type_info: Type::Int,
+                    initial: Expr::Int(0),
+                    decorators: vec![],
+                },
+                AuraStateDef {
+                    name: "__current_route".to_string(),
+                    type_info: Type::StrSlice,
+                    initial: Expr::Str("/a".into()),
+                    decorators: vec![],
+                },
+            ],
+        )
+    }
+
+    /// 声明式 menubar：一项 `checked: .show_urls`（读槽），结构同 auto-jade。
+    fn menubar_node(memo: bool) -> AuraNode {
+        let item = AuraNode::element("menubar-checkbox-item")
+            .with_prop("title", Expr::Str("Show URLs".into()))
+            .with_prop("checked", Expr::Ident(".show_urls".into()));
+        let content = AuraNode::element("menubar-content").with_child(item);
+        let trigger =
+            AuraNode::element("menubar-trigger").with_prop("text", Expr::Str("File".into()));
+        let menu = AuraNode::element("menubar-menu")
+            .with_prop("value", Expr::Str("file".into()))
+            .with_child(trigger)
+            .with_child(content);
+        let mut mb = AuraNode::element("menubar");
+        if memo {
+            mb = mb.with_prop("memo", Expr::Bool(true));
+        }
+        mb.with_child(menu)
+    }
+
+    fn view_key(v: &View<DynamicMessage>) -> String {
+        format!("{v:?}")
+    }
+
+    /// menubar_open 是进程级全局（全量套件下其他 menubar 测试并发翻转）——
+    /// 跨 build 的产物断言仅在构建前后 open 态未翻转时可比（翻转窗口内
+    /// 产物差异来自全局而非被测行为，跳过断言避免假红）。
+    fn mb_open() -> Option<String> {
+        crate::ui::action_config::menubar_open()
+    }
+
+    fn build_stable(bridge: &VmBridge, node: &AuraNode) -> (String, bool) {
+        let o0 = mb_open();
+        let v = AuraViewBuilder::new(bridge, "MemoApp").build(node);
+        let o1 = mb_open();
+        (view_key(&v), o0 == o1)
+    }
+
+    fn s1_still_open() -> bool {
+        mb_open().is_some()
+    }
+
+    /// AC-02/AC-03：读集内写失效重建、读集外写快/慢路径命中（重求值不发生）。
+    #[test]
+    fn plan045_menubar_memo_hit_and_invalidation() {
+        let _guard = PLAN045_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        // items 仅在菜单开态渲染（PLAN-695）——开态下产物才反映 checked。
+        crate::ui::action_config::set_menubar_open(Some("file".to_string()));
+        let widget = memo_widget();
+        let mut bridge = VmBridge::new(&widget).unwrap();
+        let node = menubar_node(true);
+
+        let (k1, s1) = build_stable(&bridge, &node); // fill
+        bridge.with_memo_cache(|c| {
+            assert_eq!(c.hits, 0, "fill 不计 hit");
+            assert_eq!(c.len(), 1, "menubar 条目在册");
+        });
+
+        // 无状态写直接重建：seq 未动 → 快速路径全命中，产物一致。
+        let (k2, s2) = build_stable(&bridge, &node);
+        bridge.with_memo_cache(|c| assert_eq!(c.hits, 1, "快路径命中"));
+        if s1 && s2 {
+            assert_eq!(k1, k2, "快路径产物一致");
+        }
+
+        // 读集外写（unrelated）：seq 动 → 慢路径 → 读槽值指纹同 → 命中，
+        // 重求值不发生（AC-03）。
+        bridge
+            .write_state("unrelated", auto_val::Value::Int(7))
+            .unwrap();
+        let (k3, s3) = build_stable(&bridge, &node);
+        bridge.with_memo_cache(|c| {
+            assert_eq!(c.hits, 2, "读集外写经慢路径命中");
+            assert_eq!(c.misses, 0, "未失效");
+        });
+        if s1 && s3 {
+            assert_eq!(k1, k3, "读集外写产物一致");
+        }
+
+        // 读集内写（show_urls）：值指纹翻面 → 失效重求值，产物随之变化
+        //（AC-02）。
+        bridge
+            .write_state("show_urls", auto_val::Value::Bool(true))
+            .unwrap();
+        let (k4, s4) = build_stable(&bridge, &node);
+        bridge.with_memo_cache(|c| {
+            assert_eq!(c.misses, 1, "读集内写失效一次");
+        });
+        if s1 && s4 {
+            assert_ne!(k1, k4, "checked 翻转必须改变产物");
+        }
+
+        // 重写回 false：再次失效重建，产物回到 v1 形态。
+        bridge
+            .write_state("show_urls", auto_val::Value::Bool(false))
+            .unwrap();
+        let (k5, s5) = build_stable(&bridge, &node);
+        if s1 && s5 {
+            assert_eq!(k1, k5, "值回产物必须一致");
+        }
+    }
+
+    /// AC-01 前半：`memo` 缺省/false 时缓存完全惰性（零条目零计数）。
+    #[test]
+    fn plan045_memo_off_is_inert() {
+        let _guard = PLAN045_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        // items 仅在菜单开态渲染（PLAN-695）——开态下产物才反映 checked。
+        crate::ui::action_config::set_menubar_open(Some("file".to_string()));
+        let widget = memo_widget();
+        let mut bridge = VmBridge::new(&widget).unwrap();
+
+        let off_node = menubar_node(false);
+        let default_node = menubar_node(false).with_prop("memo", Expr::Bool(false));
+        for node in [off_node, default_node] {
+            bridge
+                .write_state("show_urls", auto_val::Value::Bool(false))
+                .unwrap();
+            let (k1, s1) = build_stable(&bridge, &node);
+            bridge
+                .write_state("show_urls", auto_val::Value::Bool(true))
+                .unwrap();
+            let (k2, s2) = build_stable(&bridge, &node);
+            if s1 && s2 && s1_still_open() {
+                assert_ne!(k1, k2, "非 memo 路径照常重求值");
+            }
+        }
+        bridge.with_memo_cache(|c| {
+            assert_eq!(c.len(), 0, "非 memo 不建条目");
+            assert_eq!((c.hits, c.misses, c.degraded), (0, 0, 0), "计数全零");
+        });
+    }
+
+    /// AC-04：静态不可证形态（插值文本/ForLoop）自动降级——不建条目、
+    /// 行为与非 memo 一致。
+    #[test]
+    fn plan045_dynamic_forms_degrade_to_raw() {
+        let _guard = PLAN045_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        // items 仅在菜单开态渲染（PLAN-695）——开态下产物才反映 checked。
+        crate::ui::action_config::set_menubar_open(Some("file".to_string()));
+        let widget = memo_widget();
+        let mut bridge = VmBridge::new(&widget).unwrap();
+
+        let interp_item = AuraNode::element("menubar-item")
+            .with_prop("title", Expr::Str("Dyn".into()))
+            .with_child(AuraNode::Text(
+                auto_ui_compiler::aura::AuraTextContent::Interpolated {
+                    template: "n=${.unrelated}".to_string(),
+                    bindings: vec!["unrelated".to_string()],
+                },
+            ));
+        let content = AuraNode::element("menubar-content").with_child(interp_item);
+        let trigger = AuraNode::element("menubar-trigger").with_prop("text", Expr::Str("F".into()));
+        let menu = AuraNode::element("menubar-menu")
+            .with_child(trigger)
+            .with_child(content);
+        let mb = AuraNode::element("menubar")
+            .with_prop("memo", Expr::Bool(true))
+            .with_child(menu);
+
+        let (k1, s1) = build_stable(&bridge, &mb);
+        bridge
+            .write_state("unrelated", auto_val::Value::Int(1))
+            .unwrap();
+        let (k2, s2) = build_stable(&bridge, &mb);
+        bridge.with_memo_cache(|c| {
+            assert_eq!(c.len(), 0, "降级形态不建条目");
+            assert!(c.degraded >= 1, "降级计数在册");
+        });
+        // 降级形态的动态面（插值子文本）不进 item 渲染——产物稳定恰证
+        // 走的是原始路径每次重算（缓存面为零由上方 len/degraded 断言承载）。
+        if s1 && s2 {
+            assert_eq!(k1, k2, "降级 = 原始重求值行为");
+        }
+    }
+
+    /// AC-06：memo 命中帧不吞 acceptance 事件索引——tracked build（probe
+    /// enabled）fill 后重 build（命中），新 probe 必须含 menubar 事件记录
+    /// （record! 路径重放）。
+    #[test]
+    fn plan045_menubar_probe_replay_on_hit() {
+        let _guard = PLAN045_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        crate::ui::action_config::set_menubar_open(Some("file".to_string()));
+        let widget = memo_widget();
+        let bridge = VmBridge::new(&widget).unwrap();
+        let node = menubar_node(true);
+
+        let empty_registry = crate::ui::widget_registry::WidgetRegistry::new();
+        let b = AuraViewBuilder::with_registry(&bridge, "MemoApp", &empty_registry);
+        // fill：probe enabled（build_with_debug 默认 enabled）。
+        let (_, _, probe1) = b.build_with_debug(&node);
+        assert!(!probe1.is_enabled() || true, "fill probe 在册");
+        bridge.with_memo_cache(|c| assert_eq!(c.len(), 1, "fill 条目在册"));
+
+        // 命中帧：全新 probe（同 enabled），产物来自缓存，probe 面须重放。
+        let (_, _, probe2) = b.build_with_debug(&node);
+        bridge.with_memo_cache(|c| assert_eq!(c.hits, 1, "回访命中"));
+        let mut replayed = 0;
+        for (path, entry) in probe2.snapshot_prefix(&[]) {
+            if !entry.events.is_empty() {
+                replayed += entry.events.len();
+            }
+            let _ = path;
+        }
+        assert!(replayed > 0, "命中帧 probe 事件索引不得为空（AC-06）");
+        std::env::remove_var("AUTO_OUTLET_MEMO");
+    }
+
+    /// PLAN-046 T-05：outlet 语料 prop 三态——prop=true（env 未设）→ 门开；
+    /// prop=false（env 未设）→ 原始惰性；prop=false（env=1）→ env 兼容层
+    /// 仍开门（并集语义：prop 载体优先，env 保留兼容）。
+    #[test]
+    fn plan046_outlet_prop_priority() {
+        let _guard = PLAN045_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        use crate::ui::widget_registry::WidgetRegistry;
+
+        let mut page_widget = make_memo_widget(
+            "RowPage",
+            vec![AuraStateDef {
+                name: "title".to_string(),
+                type_info: Type::StrSlice,
+                initial: Expr::Str("r0".into()),
+                decorators: vec![],
+            }],
+        );
+        page_widget.view_tree =
+            AuraNode::element("text").with_prop("text", Expr::Ident(".title".into()));
+        let mut registry = WidgetRegistry::new();
+        registry.register(page_widget);
+        registry.register_route_alias("row", "RowPage");
+
+        std::env::remove_var("AUTO_OUTLET_MEMO");
+        let host = make_memo_widget(
+            "MemoApp",
+            vec![AuraStateDef {
+                name: "__current_route".to_string(),
+                type_info: Type::StrSlice,
+                initial: Expr::Str("/row".into()),
+                decorators: vec![],
+            }],
+        );
+        let mut bridge = VmBridge::new(&host).unwrap();
+        let routes_static = [auto_ui_compiler::aura::AuraRoute {
+            path: "/row".to_string(),
+            module: "row".to_string(),
+            widget_name: "RowPage".to_string(),
+            params: Vec::new(),
+        }];
+        let builder_registry = &registry;
+        let build_once = |bridge: &VmBridge, memo: bool| {
+            let b = AuraViewBuilder::with_registry(bridge, "MemoApp", builder_registry)
+                .with_routes(&routes_static);
+            b.build(&AuraNode::Outlet { memo: Some(memo) })
+        };
+
+        // ① prop=false + env 未设 → 原始惰性（零条目零计数）。
+        let _ = build_once(&bridge, false);
+        let _ = build_once(&bridge, false);
+        bridge.with_memo_cache(|c| {
+            assert_eq!(
+                (c.len(), c.hits, c.misses),
+                (0, 0, 0),
+                "prop 缺省 = 原始路径（env 未设）"
+            );
+        });
+
+        // ② prop=true + env 未设 → 语料载体开门：fill + 回访命中。
+        let v1 = build_once(&bridge, true);
+        bridge.with_memo_cache(|c| assert_eq!(c.len(), 1, "prop 门 fill 条目在册"));
+        let v2 = build_once(&bridge, true);
+        bridge.with_memo_cache(|c| assert!(c.hits >= 1, "prop 门回访命中"));
+        assert_eq!(view_key(&v1), view_key(&v2), "命中产物一致");
+
+        // ③ prop=false + env=1 → env 兼容层照常开门。
+        bridge.with_memo_cache(|c| c.clear());
+        std::env::set_var("AUTO_OUTLET_MEMO", "1");
+        let _ = build_once(&bridge, false);
+        bridge.with_memo_cache(|c| assert_eq!(c.len(), 1, "env 门 fill 条目在册"));
+        let _ = build_once(&bridge, false);
+        bridge.with_memo_cache(|c| assert!(c.hits >= 1, "env 门回访命中"));
+        std::env::remove_var("AUTO_OUTLET_MEMO");
+    }
+
+    // ── PLAN-708 T-01（S-01）三态矩阵与失效面 ──────────────────────────
+
+    /// r2 §5 S-01 优先级冻结表：env ∈ {0, 1, 未设} × prop ∈
+    /// {None, Some(false), Some(true)} → resolve_outlet_memo 全 9 组合。
+    /// 纯函数级（env 门解析另测）——矩阵即契约。
+    #[test]
+    fn plan708_outlet_tristate_matrix() {
+        use MemoEnvGate as G;
+        let cases: &[(G, Option<bool>, bool, &str)] = &[
+            (G::ForceOff, None, false, "env=0 覆盖 prop 未设"),
+            (G::ForceOff, Some(false), false, "env=0 × 显式 false"),
+            (
+                G::ForceOff,
+                Some(true),
+                false,
+                "env=0 覆盖显式 true（诊断强制关）",
+            ),
+            (G::ForceOn, None, true, "env=1 强开 prop 未设"),
+            (
+                G::ForceOn,
+                Some(false),
+                true,
+                "env=1 覆盖显式 false（并集契约变化点）",
+            ),
+            (G::ForceOn, Some(true), true, "env=1 × 显式 true"),
+            (
+                G::Unset,
+                None,
+                true,
+                "未设 × 未设 → 缺省 on（r2 缺省面变更）",
+            ),
+            (G::Unset, Some(false), false, "未设 × 显式 false"),
+            (G::Unset, Some(true), true, "未设 × 显式 true"),
+        ];
+        for (env, prop, want, why) in cases {
+            assert_eq!(
+                AuraViewBuilder::resolve_outlet_memo(*env, *prop),
+                *want,
+                "{}",
+                why
+            );
+        }
+        // 菜单/nav 族：env 覆盖 + 字面量缺省关（045 语义保留）。
+        assert!(!AuraViewBuilder::resolve_site_memo(G::Unset, false));
+        assert!(AuraViewBuilder::resolve_site_memo(G::Unset, true));
+        assert!(
+            !AuraViewBuilder::resolve_site_memo(G::ForceOff, true),
+            "env=0 诊断强关覆盖字面量 true"
+        );
+        assert!(
+            AuraViewBuilder::resolve_site_memo(G::ForceOn, false),
+            "env=1 强开覆盖字面量 false"
+        );
+    }
+
+    /// env 门解析：`0`/`1`/未设/其他值四形态（诊断"其他值=未设"容错）。
+    #[test]
+    fn plan708_memo_env_gate_parsing() {
+        let _guard = PLAN045_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        std::env::remove_var("AUTO_OUTLET_MEMO");
+        assert!(matches!(
+            AuraViewBuilder::memo_env_gate(),
+            MemoEnvGate::Unset
+        ));
+        std::env::set_var("AUTO_OUTLET_MEMO", "0");
+        assert!(matches!(
+            AuraViewBuilder::memo_env_gate(),
+            MemoEnvGate::ForceOff
+        ));
+        std::env::set_var("AUTO_OUTLET_MEMO", "1");
+        assert!(matches!(
+            AuraViewBuilder::memo_env_gate(),
+            MemoEnvGate::ForceOn
+        ));
+        std::env::set_var("AUTO_OUTLET_MEMO", "garbage");
+        assert!(matches!(
+            AuraViewBuilder::memo_env_gate(),
+            MemoEnvGate::Unset
+        ));
+        std::env::remove_var("AUTO_OUTLET_MEMO");
+    }
+
+    /// builder 级缺省面变更：裸 outlet（prop 未设）× env 未设 → 门开
+    /// （fill + 回访 hit）。r2 G1"outlet 页 memo 缺省开启"的验收锚。
+    #[test]
+    fn plan708_outlet_bare_default_on() {
+        let _guard = PLAN045_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        use crate::ui::widget_registry::WidgetRegistry;
+
+        let mut page_widget = make_memo_widget(
+            "RowPage",
+            vec![AuraStateDef {
+                name: "title".to_string(),
+                type_info: Type::StrSlice,
+                initial: Expr::Str("r0".into()),
+                decorators: vec![],
+            }],
+        );
+        page_widget.view_tree =
+            AuraNode::element("text").with_prop("text", Expr::Ident(".title".into()));
+        let mut registry = WidgetRegistry::new();
+        registry.register(page_widget);
+        registry.register_route_alias("row", "RowPage");
+
+        std::env::remove_var("AUTO_OUTLET_MEMO");
+        let host = make_memo_widget(
+            "MemoApp",
+            vec![AuraStateDef {
+                name: "__current_route".to_string(),
+                type_info: Type::StrSlice,
+                initial: Expr::Str("/row".into()),
+                decorators: vec![],
+            }],
+        );
+        let mut bridge = VmBridge::new(&host).unwrap();
+        let routes_static = [auto_ui_compiler::aura::AuraRoute {
+            path: "/row".to_string(),
+            module: "row".to_string(),
+            widget_name: "RowPage".to_string(),
+            params: Vec::new(),
+        }];
+        let builder_registry = &registry;
+        let build_once = |bridge: &VmBridge| {
+            let b = AuraViewBuilder::with_registry(bridge, "MemoApp", builder_registry)
+                .with_routes(&routes_static);
+            // 裸 outlet：prop 未设（None）。
+            b.build(&AuraNode::Outlet { memo: None })
+        };
+        let _v1 = build_once(&bridge);
+        bridge.with_memo_cache(|c| assert_eq!(c.len(), 1, "裸 outlet 缺省开门：fill 条目在册"));
+        let _v2 = build_once(&bridge);
+        bridge.with_memo_cache(|c| assert!(c.hits >= 1, "裸 outlet 缺省开门：回访命中"));
+        std::env::remove_var("AUTO_OUTLET_MEMO");
+    }
+
+    /// builder 级 env=0 强制关：显式 `outlet (memo: true)` × env=0 → 零条目
+    /// （诊断逃生门覆盖语料显式开——AC-02 关键组合）。
+    #[test]
+    fn plan708_outlet_env0_overrides_prop_true() {
+        let _guard = PLAN045_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        use crate::ui::widget_registry::WidgetRegistry;
+
+        let mut page_widget = make_memo_widget(
+            "RowPage",
+            vec![AuraStateDef {
+                name: "title".to_string(),
+                type_info: Type::StrSlice,
+                initial: Expr::Str("r0".into()),
+                decorators: vec![],
+            }],
+        );
+        page_widget.view_tree =
+            AuraNode::element("text").with_prop("text", Expr::Ident(".title".into()));
+        let mut registry = WidgetRegistry::new();
+        registry.register(page_widget);
+        registry.register_route_alias("row", "RowPage");
+
+        std::env::set_var("AUTO_OUTLET_MEMO", "0");
+        let host = make_memo_widget(
+            "MemoApp",
+            vec![AuraStateDef {
+                name: "__current_route".to_string(),
+                type_info: Type::StrSlice,
+                initial: Expr::Str("/row".into()),
+                decorators: vec![],
+            }],
+        );
+        let mut bridge = VmBridge::new(&host).unwrap();
+        let routes_static = [auto_ui_compiler::aura::AuraRoute {
+            path: "/row".to_string(),
+            module: "row".to_string(),
+            widget_name: "RowPage".to_string(),
+            params: Vec::new(),
+        }];
+        let builder_registry = &registry;
+        let build_once = |bridge: &VmBridge| {
+            let b = AuraViewBuilder::with_registry(bridge, "MemoApp", builder_registry)
+                .with_routes(&routes_static);
+            b.build(&AuraNode::Outlet { memo: Some(true) })
+        };
+        let _v1 = build_once(&bridge);
+        let _v2 = build_once(&bridge);
+        bridge.with_memo_cache(|c| {
+            assert_eq!(
+                (c.len(), c.hits, c.misses),
+                (0, 0, 0),
+                "env=0 覆盖显式 true：零条目零计数（原始路径）"
+            );
+        });
+        std::env::remove_var("AUTO_OUTLET_MEMO");
+    }
+
+    /// T-01 失效面：ui_epoch bump 后旧 epoch 条目失配（保守整体失效）。
+    /// 组件局部态突变（preview toggle/tab、nav 局部态、ghost/列宽直写）
+    /// 走 epoch 通道——不 bump VM seq 也能废止在册产物。
+    #[test]
+    fn plan708_ui_epoch_invalidation() {
+        let _guard = PLAN045_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        use crate::ui::widget_registry::WidgetRegistry;
+
+        let mut page_widget = make_memo_widget(
+            "RowPage",
+            vec![AuraStateDef {
+                name: "title".to_string(),
+                type_info: Type::StrSlice,
+                initial: Expr::Str("r0".into()),
+                decorators: vec![],
+            }],
+        );
+        page_widget.view_tree =
+            AuraNode::element("text").with_prop("text", Expr::Ident(".title".into()));
+        let mut registry = WidgetRegistry::new();
+        registry.register(page_widget);
+        registry.register_route_alias("row", "RowPage");
+
+        std::env::remove_var("AUTO_OUTLET_MEMO");
+        let host = make_memo_widget(
+            "MemoApp",
+            vec![AuraStateDef {
+                name: "__current_route".to_string(),
+                type_info: Type::StrSlice,
+                initial: Expr::Str("/row".into()),
+                decorators: vec![],
+            }],
+        );
+        let mut bridge = VmBridge::new(&host).unwrap();
+        let routes_static = [auto_ui_compiler::aura::AuraRoute {
+            path: "/row".to_string(),
+            module: "row".to_string(),
+            widget_name: "RowPage".to_string(),
+            params: Vec::new(),
+        }];
+        let builder_registry = &registry;
+        let build_once = |bridge: &VmBridge| {
+            let b = AuraViewBuilder::with_registry(bridge, "MemoApp", builder_registry)
+                .with_routes(&routes_static);
+            b.build(&AuraNode::Outlet { memo: Some(true) })
+        };
+        let _v1 = build_once(&bridge); // fill（epoch E）
+        let _v2 = build_once(&bridge);
+        bridge.with_memo_cache(|c| assert!(c.hits >= 1, "同 epoch 回访命中"));
+
+        // 模拟组件局部态突变臂（preview/nav/ghost 同型）：bump epoch。
+        let before = crate::ui::memo_deps::ui_epoch();
+        let bumped = crate::ui::memo_deps::bump_ui_epoch();
+        assert!(bumped > before, "epoch 单调推进");
+
+        let h0 = bridge.with_memo_cache(|c| c.hits);
+        let _v3 = build_once(&bridge); // 旧 epoch 键失配 → fill 新条目
+        bridge.with_memo_cache(|c| {
+            assert_eq!(c.hits, h0, "bump 后不吞旧命中（保守失效）");
+            assert!(c.len() >= 2, "新 epoch 条目独立在册（旧条目待容量驱逐）");
+        });
+        let _v4 = build_once(&bridge);
+        bridge.with_memo_cache(|c| assert!(c.hits > h0, "新 epoch 内回访恢复命中"));
+        std::env::remove_var("AUTO_OUTLET_MEMO");
+    }
+
+    /// T-05b：outlet 页产物 memo——同页回访命中（重渲染不发生，build_ms
+    /// 级断言走 hit 计数），Init 身份门保持，组件模板读槽覆盖。
+    #[test]
+    fn plan045_outlet_page_memo() {
+        let _guard = PLAN045_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        use crate::ui::widget_registry::WidgetRegistry;
+
+        // 页 widget：静态模板 + 一处状态绑定 prop；Init 无。
+        let page_widget = {
+            let mut w = make_memo_widget(
+                "RowPage",
+                vec![AuraStateDef {
+                    name: "page_flag".to_string(),
+                    type_info: Type::Bool,
+                    initial: Expr::Bool(false),
+                    decorators: vec![],
+                }],
+            );
+            let node = AuraNode::element("col")
+                .with_child(AuraNode::element("h1").with_prop("text", Expr::Str("Row".into())))
+                .with_child(
+                    AuraNode::element("badge")
+                        .with_prop("visible", Expr::Ident(".page_flag".into())),
+                );
+            w.view_tree = node;
+            w
+        };
+        let mut registry = WidgetRegistry::new();
+        registry.register(page_widget);
+        registry.register_route_alias("row", "RowPage");
+
+        // T-05b opt-in 门（env 载体；测试内设置-移除）。
+        std::env::set_var("AUTO_OUTLET_MEMO", "1");
+        let host = make_memo_widget(
+            "MemoApp",
+            vec![AuraStateDef {
+                name: "__current_route".to_string(),
+                type_info: Type::StrSlice,
+                initial: Expr::Str("/row".into()),
+                decorators: vec![],
+            }],
+        );
+        let mut bridge = VmBridge::new(&host).unwrap();
+
+        // 宿主 widget：routes 声明 + registry 注入（builder.with_routes 面）。
+        let routes_static = [auto_ui_compiler::aura::AuraRoute {
+            path: "/row".to_string(),
+            module: "row".to_string(),
+            widget_name: "RowPage".to_string(),
+            params: Vec::new(),
+        }];
+        let builder_registry = &registry;
+
+        let build_once = |bridge: &VmBridge| {
+            let b = AuraViewBuilder::with_registry(bridge, "MemoApp", builder_registry)
+                .with_routes(&routes_static);
+            b.build(&AuraNode::Outlet { memo: Some(false) })
+        };
+
+        // 全量套件下其他 menubar 测试并发翻转 MENUBAR_OPEN → globals_fp 漂移
+        // 会把 fast 门打落 slow（hit 仍发生）或叠加 miss。守卫：构建前后全局
+        // 态未翻转才计数断言，否则重试构建（条目经慢路径自刷新）。
+        let mb = || crate::ui::action_config::menubar_open();
+        let mut v1 = build_once(&bridge); // fill
+        for _ in 0..8 {
+            let (hits, misses) = bridge.with_memo_cache(|c| (c.hits, c.misses));
+            if hits == 0 && misses == 0 {
+                break;
+            }
+            v1 = build_once(&bridge); // 全局面被翻转过 → 重建一轮垫稳
+        }
+        bridge.with_memo_cache(|c| {
+            assert_eq!((c.hits, c.misses), (0, 0), "fill 不计");
+        });
+
+        // 无状态写回访（同路由）：seq 未动 → 快速路径命中（全局漂移时落
+        // slow——同为命中，计数断言 ≥1）。
+        let mut v2 = build_once(&bridge);
+        for _ in 0..8 {
+            let o0 = mb();
+            v2 = build_once(&bridge);
+            let o1 = mb();
+            let hits = bridge.with_memo_cache(|c| c.hits);
+            if o0 == o1 {
+                assert!(hits >= 1, "同页回访命中");
+                assert_eq!(view_key(&v1), view_key(&v2));
+                break;
+            }
+        }
+
+        // 页内读槽字段写（badge.visible）：慢路径 miss → 重求值。
+        bridge
+            .write_state("page_flag", auto_val::Value::Bool(true))
+            .unwrap();
+        for _ in 0..8 {
+            let o0 = mb();
+            let _v3 = build_once(&bridge);
+            let o1 = mb();
+            let misses = bridge.with_memo_cache(|c| c.misses);
+            if o0 == o1 {
+                assert!(misses >= 1, "页内读槽写失效");
+                // 失效证据 = misses 计数（合成 badge 产物对该 prop 不敏感，
+                // 产物敏感性由 menubar checkbox 用例承载）。
+                break;
+            }
+        }
+
+        // 无关写：慢路径回命中。
+        bridge
+            .write_state("__current_route", auto_val::Value::str("/row"))
+            .unwrap();
+        for _ in 0..8 {
+            let o0 = mb();
+            let _v4 = build_once(&bridge);
+            let o1 = mb();
+            let hits = bridge.with_memo_cache(|c| c.hits);
+            if o0 == o1 {
+                assert!(hits >= 2, "无关写慢路径回命中");
+                break;
+            }
+        }
+        std::env::remove_var("AUTO_OUTLET_MEMO");
+    }
+
+    /// sidebar：`sidebar_provider (memo: true)` 武装 + nav 块派生值键——
+    /// 路由切换仅 active 翻转组失效，其余组全命中（AC-05 的机制面）；读集
+    /// 外写两组建全命中。
+    #[test]
+    fn plan045_sidebar_nav_group_memo() {
+        let _guard = PLAN045_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let widget = memo_widget();
+        let mut bridge = VmBridge::new(&widget).unwrap();
+        bridge
+            .write_state("__current_route", auto_val::Value::str("/a"))
+            .unwrap();
+
+        let mk_button = |to: &str, label: &str| {
+            AuraNode::element("sidebar_menu_button")
+                .with_prop("to", Expr::Str(to.into()))
+                .with_prop("text", Expr::Str(label.into()))
+        };
+        let group = |buttons: Vec<AuraNode>| {
+            let mut g = AuraNode::element("sidebar_group");
+            for btn in buttons {
+                g = g.with_child(btn);
+            }
+            g
+        };
+        let scroll = AuraNode::element("scroll")
+            .with_child(group(vec![
+                mk_button("/a", "Alpha"),
+                mk_button("/b", "Beta"),
+            ]))
+            .with_child(group(vec![mk_button("/c", "Gamma")]));
+        let provider = AuraNode::element("sidebar_provider")
+            .with_prop("memo", Expr::Bool(true))
+            .with_child(scroll.clone());
+
+        let v1 = AuraViewBuilder::new(&bridge, "MemoApp").build(&provider); // 两组建 fill
+        bridge.with_memo_cache(|c| assert_eq!(c.len(), 2, "两组条目在册"));
+
+        // 读集外写：两组全命中（慢路径，重求值不发生）。
+        bridge
+            .write_state("unrelated", auto_val::Value::Int(3))
+            .unwrap();
+        let v2 = AuraViewBuilder::new(&bridge, "MemoApp").build(&provider);
+        bridge.with_memo_cache(|c| {
+            assert_eq!(c.hits, 2, "两组全命中");
+            assert_eq!(c.misses, 0);
+        });
+        assert_eq!(view_key(&v1), view_key(&v2));
+
+        // 路由切换 /a→/b：含 active 翻转按钮的组 1 失效重建，组 2 全命中
+        //（§3 期望形态的机制面）。
+        bridge
+            .write_state("__current_route", auto_val::Value::str("/b"))
+            .unwrap();
+        let v3 = AuraViewBuilder::new(&bridge, "MemoApp").build(&provider);
+        bridge.with_memo_cache(|c| {
+            assert_eq!(c.misses, 1, "仅 active 翻转组失效");
+            assert_eq!(c.hits, 3, "组 2 命中");
+        });
+        assert_ne!(view_key(&v1), view_key(&v3), "active 高亮随路由迁移");
+
+        // 未武装 provider（无 memo prop）：nav 门完全不入。
+        let plain = AuraNode::element("sidebar_provider").with_child(scroll);
+        bridge
+            .write_state("__current_route", auto_val::Value::str("/a"))
+            .unwrap();
+        let before = bridge.with_memo_cache(|c| (c.hits, c.misses, c.len()));
+        let _ = AuraViewBuilder::new(&bridge, "MemoApp").build(&plain);
+        bridge.with_memo_cache(|c| {
+            let after = (c.hits, c.misses, c.len());
+            assert_eq!(before, after, "未武装 = nav 门惰性");
+        });
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// ── PLAN-046: keyed-for 项级 memo 单测（AC-02/AC-03）──
+#[cfg(test)]
+mod plan046_for_memo_tests {
+    use super::*;
+    use auto_lang_core::ast::Type;
+    use auto_ui_compiler::aura::{AuraStateDef, AuraWidget};
+
+    fn keyed_widget() -> AuraWidget {
+        AuraWidget {
+            named_views: Vec::new(),
+            actions: None,
+            name: "KeyedApp".to_string(),
+            state_vars: vec![
+                AuraStateDef {
+                    name: "rows".to_string(),
+                    type_info: Type::List(Box::new(Type::Int)),
+                    initial: Expr::Array(vec![]),
+                    decorators: vec![],
+                },
+                AuraStateDef {
+                    name: "outers".to_string(),
+                    type_info: Type::List(Box::new(Type::Int)),
+                    initial: Expr::Array(vec![]),
+                    decorators: vec![],
+                },
+            ],
+            computed: vec![],
+            messages: vec![],
+            view_tree: AuraNode::element("col"),
+            handlers: std::collections::BTreeMap::new(),
+            props: vec![],
+            routes: None,
+            lifecycle: vec![],
+            tick_interval: None,
+            timers: Vec::new(),
+            handler_params: HashMap::new(),
+            span_map: HashMap::new(),
+            key_bindings: HashMap::new(),
+            api_imports: vec![],
+            style_css: None,
+            ext_imports: Vec::new(),
+            watchers: Vec::new(),
+            exposes: Vec::new(),
+            setup: None,
+        }
+    }
+
+    fn row(id: i32, name: &str) -> Value {
+        let mut o = auto_val::Obj::new();
+        o.set("id", Value::Int(id));
+        o.set("name", Value::str(name));
+        Value::obj(o)
+    }
+
+    fn obj_rows(rows: &[Value]) -> Value {
+        Value::Array(auto_val::Array::from(rows.to_vec()))
+    }
+
+    /// `for r in .rows key: r.id { text (text: r.name) }`——稳定 key（id）+
+    /// 可变内容（name）的最小形态：单项内容修改走慢路径 miss 而非换键。
+    fn keyed_node(index: Option<&str>, key: Expr) -> AuraNode {
+        AuraNode::ForLoop {
+            var: "r".to_string(),
+            index: index.map(|s| s.to_string()),
+            iterable: ".rows".to_string(),
+            key_expr: Some(key),
+            body: vec![AuraNode::element("text").with_prop(
+                "text",
+                Expr::Dot(Box::new(Expr::Ident("r".into())), "name".into()),
+            )],
+            span: None,
+            debug_id: None,
+        }
+    }
+
+    fn unkeyed_node() -> AuraNode {
+        AuraNode::ForLoop {
+            var: "r".to_string(),
+            index: None,
+            iterable: ".rows".to_string(),
+            key_expr: None,
+            body: vec![AuraNode::element("text").with_prop(
+                "text",
+                Expr::Dot(Box::new(Expr::Ident("r".into())), "name".into()),
+            )],
+            span: None,
+            debug_id: None,
+        }
+    }
+
+    fn id_key() -> Expr {
+        Expr::Dot(Box::new(Expr::Ident("r".into())), "id".into())
+    }
+
+    fn tracked_build(bridge: &VmBridge, node: &AuraNode) -> String {
+        let (v, _idmap, _probe) = AuraViewBuilder::new(bridge, "KeyedApp").build_with_debug(node);
+        format!("{v:?}")
+    }
+
+    fn counts(bridge: &VmBridge) -> (u64, u64, u64, usize) {
+        bridge.with_memo_cache(|c| (c.hits, c.misses, c.degraded, c.len()))
+    }
+
+    /// fill 后无写重建 → 快速路径全命中、产物一致（AC-02 基础面）。
+    #[test]
+    fn plan046_keyed_fill_then_fast_hit() {
+        let _guard = super::plan045_memo_tests::PLAN045_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let widget = keyed_widget();
+        let mut bridge = VmBridge::new(&widget).unwrap();
+        bridge
+            .write_state(
+                "rows",
+                obj_rows(&[row(1, "aaa"), row(2, "bbb"), row(3, "ccc")]),
+            )
+            .unwrap();
+        let node = keyed_node(None, id_key());
+
+        let k1 = tracked_build(&bridge, &node); // fill
+        let (h0, m0, d0, n0) = counts(&bridge);
+        assert_eq!((h0, m0, d0), (0, 0, 0), "fill 不计 hit/miss/degraded");
+        assert_eq!(n0, 3, "三行三条目");
+
+        let k2 = tracked_build(&bridge, &node); // 无状态写 → 快速路径
+        let (h1, m1, d1, _) = counts(&bridge);
+        assert_eq!((h1 - h0, m1 - m0, d1 - d0), (3, 0, 0), "三行全命中");
+        assert_eq!(k1, k2, "快路径产物一致");
+    }
+
+    /// AC-02 重排：键集不变序变 → 全部命中；输出序恒随 iterable 当前序。
+    #[test]
+    fn plan046_keyed_reorder_all_hit_output_order() {
+        let _guard = super::plan045_memo_tests::PLAN045_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let widget = keyed_widget();
+        let mut bridge = VmBridge::new(&widget).unwrap();
+        bridge
+            .write_state(
+                "rows",
+                obj_rows(&[row(1, "aaa"), row(2, "bbb"), row(3, "ccc")]),
+            )
+            .unwrap();
+        let node = keyed_node(None, id_key());
+        let _ = tracked_build(&bridge, &node);
+        let (h0, m0, _, _) = counts(&bridge);
+
+        bridge
+            .write_state(
+                "rows",
+                obj_rows(&[row(3, "ccc"), row(1, "aaa"), row(2, "bbb")]),
+            )
+            .unwrap();
+        let k = tracked_build(&bridge, &node);
+        let (h1, m1, _, _) = counts(&bridge);
+        assert_eq!(h1 - h0, 3, "重排全命中（项产物按 key 复用）");
+        assert_eq!(m1 - m0, 0, "重排零 miss");
+        let (pc, pa, pb) = (
+            k.find("ccc").unwrap(),
+            k.find("aaa").unwrap(),
+            k.find("bbb").unwrap(),
+        );
+        assert!(pc < pa && pa < pb, "输出序=iterable 当前序 c,a,b：{}", k);
+    }
+
+    /// AC-02 单项内容修改（key 稳定）：仅该项慢路径 miss，其余命中。
+    #[test]
+    fn plan046_keyed_single_modify_only_item_misses() {
+        let _guard = super::plan045_memo_tests::PLAN045_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let widget = keyed_widget();
+        let mut bridge = VmBridge::new(&widget).unwrap();
+        bridge
+            .write_state(
+                "rows",
+                obj_rows(&[row(1, "aaa"), row(2, "bbb"), row(3, "ccc")]),
+            )
+            .unwrap();
+        let node = keyed_node(None, id_key());
+        let _ = tracked_build(&bridge, &node);
+        let (h0, m0, _, _) = counts(&bridge);
+
+        bridge
+            .write_state(
+                "rows",
+                obj_rows(&[row(1, "aaa"), row(2, "zzz"), row(3, "ccc")]),
+            )
+            .unwrap();
+        let k = tracked_build(&bridge, &node);
+        let (h1, m1, _, _) = counts(&bridge);
+        assert_eq!(h1 - h0, 2, "未变两项命中");
+        assert_eq!(m1 - m0, 1, "仅内容变化项 miss（key 同条目在册）");
+        assert!(
+            k.contains("zzz") && !k.contains("bbb"),
+            "产物反映新内容：{}",
+            k
+        );
+    }
+
+    /// AC-02 增删：新增项 fill（新键新条目）、删除项靠 LRU 闲置，存续全命中。
+    #[test]
+    fn plan046_keyed_add_remove_only_delta() {
+        let _guard = super::plan045_memo_tests::PLAN045_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let widget = keyed_widget();
+        let mut bridge = VmBridge::new(&widget).unwrap();
+        bridge
+            .write_state("rows", obj_rows(&[row(1, "aaa"), row(2, "bbb")]))
+            .unwrap();
+        let node = keyed_node(None, id_key());
+        let _ = tracked_build(&bridge, &node);
+        let (h0, m0, _, n0) = counts(&bridge);
+
+        bridge
+            .write_state(
+                "rows",
+                obj_rows(&[row(1, "aaa"), row(2, "bbb"), row(3, "ccc")]),
+            )
+            .unwrap();
+        let _ = tracked_build(&bridge, &node);
+        let (h1, m1, _, n1) = counts(&bridge);
+        assert_eq!(
+            (h1 - h0, m1 - m0),
+            (2, 0),
+            "新增仅 333 fill（新键），存续全命中"
+        );
+        assert_eq!(n1, n0 + 1);
+
+        bridge
+            .write_state("rows", obj_rows(&[row(1, "aaa")]))
+            .unwrap();
+        let _ = tracked_build(&bridge, &node);
+        let (h2, m2, _, _) = counts(&bridge);
+        assert_eq!((h2 - h1, m2 - m1), (1, 0), "删除后存续项命中，零 miss");
+    }
+
+    /// 声明 index 的保守面：迭代位入命中条件 → 重排必失效（T-01 D-4；
+    /// 产物依赖位置时正确性优先，宁可多重求值）。
+    #[test]
+    fn plan046_keyed_index_declared_reorder_misses() {
+        let _guard = super::plan045_memo_tests::PLAN045_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let widget = keyed_widget();
+        let mut bridge = VmBridge::new(&widget).unwrap();
+        bridge
+            .write_state(
+                "rows",
+                obj_rows(&[row(1, "aaa"), row(2, "bbb"), row(3, "ccc")]),
+            )
+            .unwrap();
+        let node = keyed_node(Some("i"), id_key());
+        let _ = tracked_build(&bridge, &node);
+        let (h0, m0, _, _) = counts(&bridge);
+
+        bridge
+            .write_state(
+                "rows",
+                obj_rows(&[row(3, "ccc"), row(1, "aaa"), row(2, "bbb")]),
+            )
+            .unwrap();
+        let k = tracked_build(&bridge, &node);
+        let (h1, m1, _, _) = counts(&bridge);
+        assert_eq!(
+            (h1 - h0, m1 - m0),
+            (0, 3),
+            "index 声明 → 重排全失效（保守）"
+        );
+        let (pc, pa, pb) = (
+            k.find("ccc").unwrap(),
+            k.find("aaa").unwrap(),
+            k.find("bbb").unwrap(),
+        );
+        assert!(pc < pa && pa < pb, "重求值下输出序仍正确：{}", k);
+    }
+
+    /// AC-03 重复 key：整体降级原始路径（绝不静默去重），产物与非 key 化一致。
+    #[test]
+    fn plan046_dup_key_degrades_to_raw() {
+        let _guard = super::plan045_memo_tests::PLAN045_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let widget = keyed_widget();
+        let mut bridge = VmBridge::new(&widget).unwrap();
+        bridge
+            .write_state("rows", obj_rows(&[row(1, "aaa"), row(1, "bbb")]))
+            .unwrap();
+        let keyed = keyed_node(None, id_key());
+        let plain = unkeyed_node();
+
+        let k_keyed = tracked_build(&bridge, &keyed);
+        let (h, m, d, n) = counts(&bridge);
+        assert_eq!((h, m), (0, 0), "降级帧零命中零 miss");
+        assert_eq!(d, 1, "重复 key 降级计数");
+        assert_eq!(n, 0, "降级不建条目");
+
+        let k_plain = tracked_build(&bridge, &plain);
+        assert_eq!(k_keyed, k_plain, "降级产物与非 key 化逐字节一致");
+    }
+
+    /// AC-03 key 求值失败（读缺失字段）：整体降级，行为与非 key 化一致。
+    #[test]
+    fn plan046_key_eval_fail_degrades_to_raw() {
+        let _guard = super::plan045_memo_tests::PLAN045_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let widget = keyed_widget();
+        let mut bridge = VmBridge::new(&widget).unwrap();
+        bridge
+            .write_state("rows", obj_rows(&[row(1, "aaa"), row(2, "bbb")]))
+            .unwrap();
+        let keyed = keyed_node(None, Expr::Ident(".missing".into()));
+        let plain = unkeyed_node();
+
+        let k_keyed = tracked_build(&bridge, &keyed);
+        let (_, _, d, n) = counts(&bridge);
+        assert_eq!((d, n), (1, 0), "key 求值失败降级且不建条目");
+        let k_plain = tracked_build(&bridge, &plain);
+        assert_eq!(k_keyed, k_plain);
+    }
+
+    /// AC-03 项值超指纹预算（4096 节点）：整体降级，key 可解析也不入缓存。
+    #[test]
+    fn plan046_item_fp_budget_degrades_to_raw() {
+        let _guard = super::plan045_memo_tests::PLAN045_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let widget = keyed_widget();
+        let mut bridge = VmBridge::new(&widget).unwrap();
+        let mut big = auto_val::Obj::new();
+        big.set("id", Value::Int(7));
+        big.set("name", Value::str("big"));
+        big.set(
+            "data",
+            Value::Array(auto_val::Array::from(
+                (0..5000).map(Value::Int).collect::<Vec<Value>>(),
+            )),
+        );
+        bridge
+            .write_state(
+                "rows",
+                Value::Array(auto_val::Array::from(vec![Value::obj(big)])),
+            )
+            .unwrap();
+        let keyed = keyed_node(None, id_key());
+        let plain = unkeyed_node();
+
+        let k_keyed = tracked_build(&bridge, &keyed);
+        let (_, _, d, n) = counts(&bridge);
+        assert_eq!((d, n), (1, 0), "超预算项值 → 整体降级不建条目");
+        let k_plain = tracked_build(&bridge, &plain);
+        assert_eq!(k_keyed, k_plain, "降级产物一致");
+    }
+
+    /// 嵌套 keyed-for：外层 keyless 循环体内外层绑定非空 → 内层整体降级
+    /// （T-01 D-4 保守裁定），渲染行为与原始一致。
+    #[test]
+    fn plan046_nested_keyed_for_degrades() {
+        let _guard = super::plan045_memo_tests::PLAN045_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let widget = keyed_widget();
+        let mut bridge = VmBridge::new(&widget).unwrap();
+        bridge
+            .write_state(
+                "outers",
+                Value::Array(auto_val::Array::from(vec![Value::Int(1)])),
+            )
+            .unwrap();
+        bridge
+            .write_state("rows", obj_rows(&[row(1, "aaa"), row(2, "bbb")]))
+            .unwrap();
+        let outer = AuraNode::ForLoop {
+            var: "o".to_string(),
+            index: None,
+            iterable: ".outers".to_string(),
+            key_expr: None,
+            body: vec![keyed_node(None, id_key())],
+            span: None,
+            debug_id: None,
+        };
+
+        let k = tracked_build(&bridge, &outer);
+        let (_, _, d, n) = counts(&bridge);
+        assert!(d >= 1, "内层嵌套绑定上下文降级计数");
+        assert_eq!(n, 0, "降级不建条目");
+        assert!(
+            k.contains("aaa") && k.contains("bbb"),
+            "内层原始渲染在册：{}",
+            k
+        );
+    }
+
+    /// probe/idmap 簿记重放：命中帧事件索引在册（fill 帧 probe 面 = 命中帧
+    /// probe 面——ForIter.index 补丁到当前迭代位）。
+    #[test]
+    fn plan046_keyed_hit_replays_probe_bookkeeping() {
+        let _guard = super::plan045_memo_tests::PLAN045_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let widget = keyed_widget();
+        let mut bridge = VmBridge::new(&widget).unwrap();
+        bridge
+            .write_state("rows", obj_rows(&[row(1, "aaa"), row(2, "bbb")]))
+            .unwrap();
+        let node = keyed_node(None, id_key());
+
+        let (_, _, probe_fill) = AuraViewBuilder::new(&bridge, "KeyedApp").build_with_debug(&node);
+        let fill_for: Vec<usize> = probe_fill
+            .snapshot()
+            .values()
+            .filter_map(|e| e.for_context.as_ref().map(|f| f.index.unwrap()))
+            .collect();
+        assert_eq!(fill_for.len(), 2, "fill 帧两条 record_for 在册");
+
+        bridge
+            .write_state("rows", obj_rows(&[row(2, "bbb"), row(1, "aaa")]))
+            .unwrap();
+        let (_, _, probe_hit) = AuraViewBuilder::new(&bridge, "KeyedApp").build_with_debug(&node);
+        let hit_for: Vec<usize> = probe_hit
+            .snapshot()
+            .values()
+            .filter_map(|e| e.for_context.as_ref().map(|f| f.index.unwrap()))
+            .collect();
+        assert_eq!(
+            hit_for.len(),
+            fill_for.len(),
+            "命中帧 probe 条目数与 fill 帧一致"
+        );
+        assert!(
+            hit_for.iter().all(|idx| matches!(idx, 0 | 1)),
+            "重排命中帧 ForIter.index 补丁在 [0,1] 内：{:?}",
+            hit_for
+        );
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// ── PLAN-046: 显式 memo 块单测（AC-04/AC-05）──
+#[cfg(test)]
+mod plan046_memo_block_tests {
+    use super::*;
+    use auto_lang_core::ast::Type;
+    use auto_ui_compiler::aura::{AuraStateDef, AuraWidget};
+
+    fn block_widget() -> AuraWidget {
+        AuraWidget {
+            named_views: Vec::new(),
+            actions: None,
+            name: "BlockApp".to_string(),
+            state_vars: vec![
+                AuraStateDef {
+                    name: "count".to_string(),
+                    type_info: Type::Int,
+                    initial: Expr::Int(0),
+                    decorators: vec![],
+                },
+                AuraStateDef {
+                    name: "other".to_string(),
+                    type_info: Type::Int,
+                    initial: Expr::Int(0),
+                    decorators: vec![],
+                },
+                AuraStateDef {
+                    name: "hidden".to_string(),
+                    type_info: Type::Int,
+                    initial: Expr::Int(0),
+                    decorators: vec![],
+                },
+                AuraStateDef {
+                    name: "data".to_string(),
+                    type_info: Type::List(Box::new(Type::Int)),
+                    initial: Expr::Array(vec![]),
+                    decorators: vec![],
+                },
+            ],
+            computed: vec![],
+            messages: vec![],
+            view_tree: AuraNode::element("col"),
+            handlers: std::collections::BTreeMap::new(),
+            props: vec![],
+            routes: None,
+            lifecycle: vec![],
+            tick_interval: None,
+            timers: Vec::new(),
+            handler_params: HashMap::new(),
+            span_map: HashMap::new(),
+            key_bindings: HashMap::new(),
+            api_imports: vec![],
+            style_css: None,
+            ext_imports: Vec::new(),
+            watchers: Vec::new(),
+            exposes: Vec::new(),
+            setup: None,
+        }
+    }
+
+    fn block_node(deps: Vec<Expr>, exact: bool, body: Vec<AuraNode>) -> AuraNode {
+        AuraNode::MemoBlock {
+            deps,
+            exact,
+            body,
+            span: None,
+            debug_id: None,
+        }
+    }
+
+    fn state_text(state: &str) -> AuraNode {
+        AuraNode::element("text").with_prop("text", Expr::Ident(format!(".{}", state).into()))
+    }
+
+    fn tracked_build(bridge: &VmBridge, node: &AuraNode) -> String {
+        let (v, _idmap, _probe) = AuraViewBuilder::new(bridge, "BlockApp").build_with_debug(node);
+        format!("{v:?}")
+    }
+
+    fn counts(bridge: &VmBridge) -> (u64, u64, u64, usize) {
+        bridge.with_memo_cache(|c| (c.hits, c.misses, c.degraded, c.len()))
+    }
+
+    /// AC-04 默认语义：deps 变化失效、块内读槽变化失效、无关写慢路径命中、
+    /// 无写快速路径命中。
+    #[test]
+    fn plan046_block_default_deps_and_slot_semantics() {
+        let _guard = super::plan045_memo_tests::PLAN045_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let widget = block_widget();
+        let mut bridge = VmBridge::new(&widget).unwrap();
+        // 块体读 .count（自动读槽）；deps 声明 .other。
+        let node = block_node(
+            vec![Expr::Ident(".other".into())],
+            false,
+            vec![state_text("count")],
+        );
+
+        let k0 = tracked_build(&bridge, &node); // fill
+        let (h0, m0, d0, n0) = counts(&bridge);
+        assert_eq!((h0, m0, d0), (0, 0, 0), "fill 不计数");
+        assert_eq!(n0, 1, "块条目在册");
+
+        // 无写重建 → 快速路径。
+        let k1 = tracked_build(&bridge, &node);
+        let (h1, _, _, _) = counts(&bridge);
+        assert_eq!(h1 - h0, 1, "无写快路径命中");
+        assert_eq!(k0, k1, "快路径产物一致");
+
+        // 块内读槽变化（.count）→ 失效重求值，产物更新（AC-04）。
+        bridge
+            .write_state("count", auto_val::Value::Int(7))
+            .unwrap();
+        let k2 = tracked_build(&bridge, &node);
+        let (_, m1, _, _) = counts(&bridge);
+        assert_eq!(m1 - m0, 1, "读槽变化失效一次");
+        assert!(k2.contains("7"), "产物反映新 count：{}", k2);
+
+        // deps 变化（.other）→ 失效重求值（AC-04）。
+        bridge
+            .write_state("other", auto_val::Value::Int(3))
+            .unwrap();
+        let _ = tracked_build(&bridge, &node);
+        let (_, m2, _, _) = counts(&bridge);
+        assert_eq!(m2 - m1, 1, "deps 变化失效一次");
+
+        // 无关写（.hidden）→ 慢路径命中（deps+读槽全同）。
+        bridge
+            .write_state("hidden", auto_val::Value::Int(9))
+            .unwrap();
+        let _ = tracked_build(&bridge, &node);
+        let (h2, _, _, _) = counts(&bridge);
+        assert!(h2 > h1, "无关写慢路径命中（deps∪读槽全同）");
+    }
+
+    /// AC-05 `exact: true` 纯 deps 判定：块内隐藏读变化**不失效**（语料
+    /// 签名担保的陈旧自担面）；deps 变化照常失效。
+    #[test]
+    fn plan046_block_exact_pure_deps_judgment() {
+        let _guard = super::plan045_memo_tests::PLAN045_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let widget = block_widget();
+        let mut bridge = VmBridge::new(&widget).unwrap();
+        let node = block_node(
+            vec![Expr::Ident(".other".into())],
+            true,                       // exact
+            vec![state_text("hidden")], // 隐藏读不在 deps——作者担保其不产陈旧
+        );
+
+        let _ = tracked_build(&bridge, &node); // fill
+        let (h0, m0, _, _) = counts(&bridge);
+
+        // 隐藏读变化 → 纯 deps 判定 → 命中（陈旧由语料自担——AC-05 契约）。
+        bridge
+            .write_state("hidden", auto_val::Value::Int(5))
+            .unwrap();
+        let _ = tracked_build(&bridge, &node);
+        let (h1, m1, _, _) = counts(&bridge);
+        assert_eq!(
+            (h1 - h0, m1 - m0),
+            (1, 0),
+            "exact 纯 deps：隐藏读变化仍命中"
+        );
+
+        // deps 变化 → 失效重求值。
+        bridge
+            .write_state("other", auto_val::Value::Int(2))
+            .unwrap();
+        let _ = tracked_build(&bridge, &node);
+        let (_, m2, _, _) = counts(&bridge);
+        assert_eq!(m2 - m1, 1, "exact 模式 deps 变化照常失效");
+    }
+
+    /// AC-04/05：默认语义下 Call 形态 prop（charts path 场景）不降级不入槽
+    /// ——deps 变化失效重建、无关写命中。
+    #[test]
+    fn plan046_block_call_prop_covered_by_deps() {
+        let _guard = super::plan045_memo_tests::PLAN045_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let widget = block_widget();
+        let mut bridge = VmBridge::new(&widget).unwrap();
+        // 模拟 charts path：`chart (path: compute(.data))`——Call 形态 prop。
+        let call = Expr::Call(auto_lang_core::ast::Call {
+            name: Box::new(Expr::Ident("compute".into())),
+            args: auto_lang_core::ast::Args {
+                args: vec![auto_lang_core::ast::Arg::Pos(Expr::Ident(".data".into()))],
+            },
+            ret: Type::Unknown,
+            type_args: Vec::new(),
+            generic_args: Vec::new(),
+            pos: None,
+        });
+        let node = block_node(
+            vec![Expr::Ident(".data".into())],
+            false,
+            vec![AuraNode::element("chart").with_prop("path", call)],
+        );
+
+        let _ = tracked_build(&bridge, &node); // fill（Call 不降级）
+        let (h0, m0, d0, n0) = counts(&bridge);
+        assert_eq!(
+            (h0, m0, d0),
+            (0, 0, 0),
+            "Call 形态由 deps 覆盖，fill 无降级"
+        );
+        assert_eq!(n0, 1, "块条目在册");
+
+        // deps（.data）变化 → 失效重建。
+        bridge
+            .write_state(
+                "data",
+                Value::Array(auto_val::Array::from(vec![Value::Int(1)])),
+            )
+            .unwrap();
+        let _ = tracked_build(&bridge, &node);
+        let (_, m1, _, _) = counts(&bridge);
+        assert_eq!(m1, 1, "deps 变化失效");
+
+        // 无关写 → 慢路径命中。
+        bridge
+            .write_state("hidden", auto_val::Value::Int(1))
+            .unwrap();
+        let _ = tracked_build(&bridge, &node);
+        let (h1, _, _, _) = counts(&bridge);
+        assert_eq!(h1, 1, "无关写慢路径命中");
+    }
+
+    /// Q-02 保守面：默认语义块内含 ForLoop → 整块降级原始路径；
+    /// `exact` 块内 ForLoop（deps 覆盖 iterable）→ 可缓存。
+    #[test]
+    fn plan046_block_nested_for_degrade_and_exact_override() {
+        let _guard = super::plan045_memo_tests::PLAN045_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let widget = block_widget();
+        let mut bridge = VmBridge::new(&widget).unwrap();
+        let inner = AuraNode::ForLoop {
+            var: "r".to_string(),
+            index: None,
+            iterable: ".data".to_string(),
+            key_expr: None,
+            body: vec![AuraNode::element("text").with_prop(
+                "text",
+                Expr::Dot(Box::new(Expr::Ident("r".into())), "x".into()),
+            )],
+            span: None,
+            debug_id: None,
+        };
+
+        // 默认语义：嵌套 for → 降级，不建条目。
+        let default_block = block_node(
+            vec![Expr::Ident(".data".into())],
+            false,
+            vec![inner.clone()],
+        );
+        let _ = tracked_build(&bridge, &default_block);
+        let (_, _, d0, n0) = counts(&bridge);
+        assert_eq!((d0, n0), (1, 0), "块内 ForLoop 默认降级");
+
+        // exact：作者担保（iterable ⊆ deps）→ 可缓存。
+        let exact_block = block_node(vec![Expr::Ident(".data".into())], true, vec![inner]);
+        let _ = tracked_build(&bridge, &exact_block);
+        let (h0, _, d1, n1) = counts(&bridge);
+        assert_eq!((d1 - d0, n1), (0, 1), "exact 块内 ForLoop 可缓存");
+
+        // 无写重建 → 快速命中。
+        let _ = tracked_build(&bridge, &exact_block);
+        let (h1, _, _, _) = counts(&bridge);
+        assert_eq!(h1 - h0, 1, "exact 块快路径命中");
+    }
+
+    /// untracked 路径（build/MCP sync）memo 块 = 子体直落原始渲染，缓存
+    /// 完全惰性（零条目零计数）。
+    #[test]
+    fn plan046_block_untracked_shared_gate() {
+        let _guard = super::plan045_memo_tests::PLAN045_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let widget = block_widget();
+        let bridge = VmBridge::new(&widget).unwrap();
+        let node = block_node(
+            vec![Expr::Ident(".other".into())],
+            false,
+            vec![state_text("count")],
+        );
+
+        // T-06 双轨修正：untracked 帧（桌面渲染轨）同走共享块门。
+        let builder = AuraViewBuilder::new(&bridge, "BlockApp");
+        let v1 = builder.build(&node);
+        let s = format!("{v1:?}");
+        assert!(s.contains("0"), "untracked 渲染在册（count 初值 0）：{}", s);
+        bridge.with_memo_cache(|c| assert_eq!(c.len(), 1, "untracked 块门 fill 条目在册"));
+        let v2 = builder.build(&node);
+        bridge.with_memo_cache(|c| assert!(c.hits >= 1, "untracked 块门回访命中"));
+        assert_eq!(format!("{v1:?}"), format!("{v2:?}"), "命中产物一致");
+    }
+
+    /// per-site 分解计数：memo 块门走 site_counts[MEMO_SITE_MEMO_BLOCK]。
+    #[test]
+    fn plan046_block_site_counts() {
+        let _guard = super::plan045_memo_tests::PLAN045_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let widget = block_widget();
+        let mut bridge = VmBridge::new(&widget).unwrap();
+        let node = block_node(
+            vec![Expr::Ident(".other".into())],
+            false,
+            vec![state_text("count")],
+        );
+
+        let _ = tracked_build(&bridge, &node); // fill
+        bridge
+            .write_state("count", auto_val::Value::Int(4))
+            .unwrap();
+        let _ = tracked_build(&bridge, &node); // miss
+        let _ = tracked_build(&bridge, &node); // fast hit
+        bridge.with_memo_cache(|c| {
+            let sc = &c.site_counts[&crate::ui::memo_deps::MEMO_SITE_MEMO_BLOCK];
+            assert_eq!((sc.hits, sc.misses), (1, 1), "per-site 分解在册");
+        });
+    }
+
+    /// AC-04 episode 翻转：menubar_open 翻面 → 慢路径 miss（互斥防并发翻转）。
+    #[test]
+    fn plan046_block_episode_flip_miss() {
+        let _guard = super::plan045_memo_tests::PLAN045_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let widget = block_widget();
+        let mut bridge = VmBridge::new(&widget).unwrap();
+        let node = block_node(
+            vec![Expr::Ident(".other".into())],
+            false,
+            vec![state_text("count")],
+        );
+
+        // menubar_open 是跨测试遗留全局——先归 None 再 fill，翻面才确定。
+        crate::ui::action_config::set_menubar_open(None);
+        let _ = tracked_build(&bridge, &node); // fill（open=None）
+        let (h0, m0, _, _) = counts(&bridge);
+        crate::ui::action_config::set_menubar_open(Some("file".to_string()));
+        let _ = tracked_build(&bridge, &node);
+        crate::ui::action_config::set_menubar_open(None);
+        let (h1, m1, _, _) = counts(&bridge);
+        assert_eq!((h1 - h0, m1 - m0), (0, 1), "episode 翻面失效一次");
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// PLAN-047 T-05: version_fast 三级判定单测（AC-02/AC-07 观测面）。
+// ─────────────────────────────────────────────────────────────────────
+mod plan047_gate_tests {
+    use super::*;
+    use auto_lang_core::ast::Type;
+    use auto_ui_compiler::aura::{AuraStateDef, AuraWidget};
+
+    fn vf_widget() -> AuraWidget {
+        AuraWidget {
+            named_views: Vec::new(),
+            actions: None,
+            name: "VfApp".to_string(),
+            state_vars: vec![
+                AuraStateDef {
+                    name: "rows".to_string(),
+                    type_info: Type::List(Box::new(Type::Int)),
+                    initial: Expr::Array(vec![]),
+                    decorators: vec![],
+                },
+                AuraStateDef {
+                    name: "other".to_string(),
+                    type_info: Type::Int,
+                    initial: Expr::Int(0),
+                    decorators: vec![],
+                },
+            ],
+            computed: vec![],
+            messages: vec![],
+            view_tree: AuraNode::element("col"),
+            handlers: std::collections::BTreeMap::new(),
+            props: vec![],
+            routes: None,
+            lifecycle: vec![],
+            tick_interval: None,
+            timers: Vec::new(),
+            handler_params: HashMap::new(),
+            span_map: HashMap::new(),
+            key_bindings: HashMap::new(),
+            api_imports: vec![],
+            style_css: None,
+            ext_imports: Vec::new(),
+            watchers: Vec::new(),
+            exposes: Vec::new(),
+            setup: None,
+        }
+    }
+
+    fn vf_row(id: i32, name: &str) -> Value {
+        let mut o = auto_val::Obj::new();
+        o.set("id", Value::Int(id));
+        o.set("name", Value::str(name));
+        Value::obj(o)
+    }
+
+    fn vf_rows(rows: &[Value]) -> Value {
+        Value::Array(auto_val::Array::from(rows.to_vec()))
+    }
+
+    fn vf_node() -> AuraNode {
+        AuraNode::ForLoop {
+            var: "r".to_string(),
+            index: None,
+            iterable: ".rows".to_string(),
+            key_expr: Some(Expr::Dot(Box::new(Expr::Ident("r".into())), "id".into())),
+            body: vec![AuraNode::element("text").with_prop(
+                "text",
+                Expr::Dot(Box::new(Expr::Ident("r".into())), "name".into()),
+            )],
+            span: None,
+            debug_id: None,
+        }
+    }
+
+    fn vf_build(bridge: &VmBridge, node: &AuraNode) -> String {
+        let (v, _idmap, _probe) = AuraViewBuilder::new(bridge, "VfApp").build_with_debug(node);
+        format!("{v:?}")
+    }
+
+    /// site=7 check-kind 分解读数。
+    fn vf_kinds(bridge: &VmBridge) -> (u64, u64, u64) {
+        bridge.with_memo_cache(|c| {
+            let sc = c.site_counts.get(&crate::ui::memo_deps::MEMO_SITE_FOR_ITEM);
+            (
+                sc.map(|s| s.seq_fast).unwrap_or(0),
+                sc.map(|s| s.version_fast).unwrap_or(0),
+                sc.map(|s| s.fp_slow).unwrap_or(0),
+            )
+        })
+    }
+
+    /// AC-02: 无关写帧 version_fast 零重解析命中——fp_slow 不动、产物一致、
+    /// resolve 探针零增量。
+    #[test]
+    fn plan047_version_fast_unrelated_write_zero_reeval() {
+        let _guard = super::plan045_memo_tests::PLAN045_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let widget = vf_widget();
+        let mut bridge = VmBridge::new(&widget).unwrap();
+        bridge
+            .write_state("rows", vf_rows(&[vf_row(1, "aaa"), vf_row(2, "bbb")]))
+            .unwrap();
+        let node = vf_node();
+
+        let k0 = vf_build(&bridge, &node); // fill
+        let probe0 = bridge
+            .resolve_probe_count
+            .load(std::sync::atomic::Ordering::Relaxed);
+        // 无写对照帧：seq_fast——探针增量 = pass-1 key 规划的合法求解
+        // （键集 diff 每帧现算；含 Dot→Ident 递归，2 项×2 次）。
+        let _ = vf_build(&bridge, &node);
+        let (sf0, vf0, fp0) = vf_kinds(&bridge);
+        let probe1 = bridge
+            .resolve_probe_count
+            .load(std::sync::atomic::Ordering::Relaxed);
+
+        // 无关写（.other）→ 全局 seq 动、动态 dep 面不动。
+        bridge
+            .write_state("other", auto_val::Value::Int(9))
+            .unwrap();
+        let k1 = vf_build(&bridge, &node);
+        let (sf1, vf1, fp1) = vf_kinds(&bridge);
+        let probe2 = bridge
+            .resolve_probe_count
+            .load(std::sync::atomic::Ordering::Relaxed);
+
+        assert_eq!(vf1 - vf0, 2, "version_fast 命中（两项条目各计一次）");
+        assert_eq!(fp1 - fp0, 0, "指纹慢路径零调用（零重解析）");
+        assert_eq!(sf1, sf0, "seq 快路径未走（seq 已动）");
+        // AC-02: version_fast 帧 == seq_fast 帧的求解增量（check 阶段零额外
+        // 重解析——fp_slow 的读槽重解析面零调用）。
+        assert_eq!(
+            probe2 - probe1,
+            probe1 - probe0,
+            "check 帧求解增量与快路径帧相同（无读槽重解析）"
+        );
+        assert_eq!(k0, k1, "产物一致");
+    }
+
+    /// dep 面写（同值）→ version_fast miss → fp_slow 命中并刷新基线 →
+    /// 下一无关写帧回到 version_fast（基线前移语义）。
+    #[test]
+    fn plan047_fp_slow_hit_refreshes_dep_baselines() {
+        let _guard = super::plan045_memo_tests::PLAN045_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let widget = vf_widget();
+        let mut bridge = VmBridge::new(&widget).unwrap();
+        bridge
+            .write_state("rows", vf_rows(&[vf_row(1, "aaa")]))
+            .unwrap();
+        let node = vf_node();
+
+        let _ = vf_build(&bridge, &node); // fill
+        let (_, vf0, fp0) = vf_kinds(&bridge);
+
+        // dep 面写：rows 字段整体重写**同值** → 版本前进、值指纹同。
+        bridge
+            .write_state("rows", vf_rows(&[vf_row(1, "aaa")]))
+            .unwrap();
+        let _ = vf_build(&bridge, &node);
+        let (_, vf1, fp1) = vf_kinds(&bridge);
+        assert_eq!(fp1 - fp0, 1, "版本动值同 → fp_slow 命中一次");
+        assert_eq!(vf1, vf0, "version_fast 未走（版本已动）");
+
+        // 基线已随 fp_slow 命中刷新 → 下一无关写帧回 version_fast。
+        bridge
+            .write_state("other", auto_val::Value::Int(3))
+            .unwrap();
+        let _ = vf_build(&bridge, &node);
+        let (_, vf2, fp2) = vf_kinds(&bridge);
+        assert_eq!(vf2 - vf1, 1, "基线刷新后 version_fast 恢复");
+        assert_eq!(fp2, fp1, "无新增慢路径");
+    }
+
+    /// 内容真变 → version_fast miss → fp_slow mismatch → 重求值，产物反映
+    /// 新值（AC-07 正确性下限：绝不陈旧）。
+    #[test]
+    fn plan047_content_change_refills_no_stale() {
+        let _guard = super::plan045_memo_tests::PLAN045_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let widget = vf_widget();
+        let mut bridge = VmBridge::new(&widget).unwrap();
+        bridge
+            .write_state("rows", vf_rows(&[vf_row(1, "aaa")]))
+            .unwrap();
+        let node = vf_node();
+
+        let k0 = vf_build(&bridge, &node); // fill
+        assert!(k0.contains("aaa"), "初值在册: {k0}");
+
+        bridge
+            .write_state("rows", vf_rows(&[vf_row(1, "zzz")]))
+            .unwrap();
+        let k1 = vf_build(&bridge, &node);
+        assert!(k1.contains("zzz"), "内容变更重求值落地: {k1}");
+        assert!(!k1.contains("aaa"), "无陈旧产物");
+    }
+
+    /// 判定序：无写重建走 seq_fast（version_fast 不消费）。
+    #[test]
+    fn plan047_seq_fast_precedes_version_fast() {
+        let _guard = super::plan045_memo_tests::PLAN045_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let widget = vf_widget();
+        let mut bridge = VmBridge::new(&widget).unwrap();
+        bridge
+            .write_state("rows", vf_rows(&[vf_row(1, "aaa")]))
+            .unwrap();
+        let node = vf_node();
+
+        let _ = vf_build(&bridge, &node); // fill
+        let (sf0, vf0, _) = vf_kinds(&bridge);
+        let _ = vf_build(&bridge, &node); // 无写重建
+        let (sf1, vf1, _) = vf_kinds(&bridge);
+        assert_eq!(sf1 - sf0, 1, "seq_fast 优先");
+        assert_eq!(vf1, vf0, "version_fast 未消费");
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// PLAN-047 T-06: computed 信号网单测（AC-04 观测面）。
+// ─────────────────────────────────────────────────────────────────────
+mod plan047_signal_tests {
+    use super::*;
+    use auto_lang_core::ast::Type;
+    use auto_ui_compiler::aura::{AuraComputed, AuraStateDef, AuraWidget};
+
+    fn sig_widget(computed: AuraComputed) -> AuraWidget {
+        AuraWidget {
+            named_views: Vec::new(),
+            actions: None,
+            name: "SigApp".to_string(),
+            state_vars: vec![
+                AuraStateDef {
+                    name: "count".to_string(),
+                    type_info: Type::Int,
+                    initial: Expr::Int(1),
+                    decorators: vec![],
+                },
+                AuraStateDef {
+                    name: "other".to_string(),
+                    type_info: Type::Int,
+                    initial: Expr::Int(0),
+                    decorators: vec![],
+                },
+            ],
+            computed: vec![computed],
+            messages: vec![],
+            view_tree: AuraNode::element("col"),
+            handlers: std::collections::BTreeMap::new(),
+            props: vec![],
+            routes: None,
+            lifecycle: vec![],
+            tick_interval: None,
+            timers: Vec::new(),
+            handler_params: HashMap::new(),
+            span_map: HashMap::new(),
+            key_bindings: HashMap::new(),
+            api_imports: vec![],
+            style_css: None,
+            ext_imports: Vec::new(),
+            watchers: Vec::new(),
+            exposes: Vec::new(),
+            setup: None,
+        }
+    }
+
+    /// inline computed：`mirror = .count`（镜像读面）。
+    fn inline_mirror() -> AuraComputed {
+        AuraComputed {
+            name: "mirror".to_string(),
+            expr: Expr::Dot(Box::new(Expr::Ident(".".into())), "count".into()),
+        }
+    }
+
+    /// block 体 computed：`mirror { .count }`（隐藏 VM fn 通道）。
+    fn block_mirror() -> AuraComputed {
+        AuraComputed {
+            name: "mirror".to_string(),
+            expr: Expr::Block(auto_lang_core::ast::Body {
+                stmts: vec![auto_lang_core::ast::Stmt::Expr(Expr::Dot(
+                    Box::new(Expr::Ident(".".into())),
+                    "count".into(),
+                ))],
+                has_new_line: false,
+                source_lines: Vec::new(),
+            }),
+        }
+    }
+
+    fn sig_view() -> AuraNode {
+        // 视图读 computed：`text (text: .mirror)`。
+        AuraNode::element("text").with_prop("text", Expr::Ident(".mirror".into()))
+    }
+
+    fn sig_build(bridge: &VmBridge, computed: &[AuraComputed], node: &AuraNode) -> String {
+        let (v, _idmap, _probe) = AuraViewBuilder::new(bridge, "SigApp")
+            .with_computed(computed)
+            .build_with_debug(node);
+        format!("{v:?}")
+    }
+
+    fn sig_counts(bridge: &VmBridge) -> (u64, u64) {
+        (
+            bridge
+                .signal_hits
+                .load(std::sync::atomic::Ordering::Relaxed),
+            bridge
+                .signal_misses
+                .load(std::sync::atomic::Ordering::Relaxed),
+        )
+    }
+
+    /// AC-04 inline 通道：无关写帧信号命中（零重求值）、deps 变化重算、
+    /// 产物保真（绝不陈旧）。
+    #[test]
+    fn plan047_signal_inline_hit_and_invalidation() {
+        let _guard = super::plan045_memo_tests::PLAN045_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let widget = sig_widget(inline_mirror());
+        let mut bridge = VmBridge::new(&widget).unwrap();
+        let node = sig_view();
+
+        let k0 = sig_build(&bridge, &widget.computed, &node); // fill（信号首求值入网）
+        assert!(k0.contains("1"), "初值 count=1: {k0}");
+        let (h0, m0) = sig_counts(&bridge);
+        assert_eq!((h0, m0), (0, 1), "首帧 miss 入网");
+
+        // 无关写 → 信号 deps 未动 → 命中复用（computed 零重算）。
+        bridge
+            .write_state("other", auto_val::Value::Int(9))
+            .unwrap();
+        let k1 = sig_build(&bridge, &widget.computed, &node);
+        let (h1, _) = sig_counts(&bridge);
+        assert_eq!(h1 - h0, 1, "无关写帧信号命中");
+        assert_eq!(k0, k1, "产物一致");
+
+        // deps 变化（.count）→ 信号重算 → 产物保真。
+        bridge
+            .write_state("count", auto_val::Value::Int(7))
+            .unwrap();
+        let k2 = sig_build(&bridge, &widget.computed, &node);
+        let (_, m2) = sig_counts(&bridge);
+        assert!(m2 > m0, "deps 变化信号重算");
+        assert!(k2.contains("7"), "新值落地（无陈旧）: {k2}");
+    }
+
+    /// AC-04 block 体通道（隐藏 VM fn）：信号命中/失效与 inline 同构；
+    /// 引擎读臂录制的 dep 面承载失效判定（T-04 端到端）。
+    #[test]
+    fn plan047_signal_block_channel() {
+        let _guard = super::plan045_memo_tests::PLAN045_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let widget = sig_widget(block_mirror());
+        let mut bridge = VmBridge::new(&widget).unwrap();
+        // 合成通道在册性预检：__computed_SigApp_mirror 必须已合成（缺失 =
+        // 旧构建路径降级 None，本测试前提不成立）。
+        let fn_name = crate::ui::handler_codegen::computed_fn_name("SigApp", "mirror");
+        assert!(
+            bridge.vm_flash_exports_contains(&fn_name),
+            "block computed 隐藏 fn 未合成: {fn_name}"
+        );
+        let node = sig_view();
+
+        let k0 = sig_build(&bridge, &widget.computed, &node);
+        assert!(k0.contains("1"), "block 通道初值: {k0}");
+        let (h0, m0) = sig_counts(&bridge);
+
+        bridge
+            .write_state("other", auto_val::Value::Int(9))
+            .unwrap();
+        let k1 = sig_build(&bridge, &widget.computed, &node);
+        let (h1, _) = sig_counts(&bridge);
+        assert_eq!(h1 - h0, 1, "block 通道无关写命中");
+        assert_eq!(k0, k1, "产物一致");
+
+        bridge
+            .write_state("count", auto_val::Value::Int(5))
+            .unwrap();
+        let k2 = sig_build(&bridge, &widget.computed, &node);
+        let (_, m2) = sig_counts(&bridge);
+        assert!(m2 > m0, "block 通道 deps 变化重算");
+        assert!(k2.contains("5"), "新值落地: {k2}");
+    }
+
+    /// 级联闭合：memo 条目收编信号的 dep 面——信号 deps 变 → 条目版本比对
+    /// 失效（即使条目自身不直读该状态）。
+    #[test]
+    fn plan047_signal_deps_absorbed_into_memo_entry() {
+        let _guard = super::plan045_memo_tests::PLAN045_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let widget = sig_widget(inline_mirror());
+        let mut bridge = VmBridge::new(&widget).unwrap();
+        // memo 块包 computed 读——块条目 deps 由录制收编（含 .mirror 的
+        // dep 面 (root,count)）。
+        let node = AuraNode::MemoBlock {
+            deps: vec![Expr::Ident(".other".into())],
+            exact: false,
+            body: vec![AuraNode::element("text").with_prop("text", Expr::Ident(".mirror".into()))],
+            span: None,
+            debug_id: None,
+        };
+
+        let _ = sig_build(&bridge, &widget.computed, &node); // fill（块条目 + 信号同帧入网）
+        let _ = sig_build(&bridge, &widget.computed, &node); // 无关重建（块快路径 + 信号命中）
+                                                             // 直写 count（信号 dep 面）——块条目必须经 version_fast miss 落重求
+                                                             // 值（条目收编了信号的 dep 键），产物保真。
+        bridge
+            .write_state("count", auto_val::Value::Int(3))
+            .unwrap();
+        let k = sig_build(&bridge, &widget.computed, &node);
+        assert!(k.contains("3"), "级联失效落地: {k}");
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// PLAN-047 T-07: 降级面收敛单测（AC-05——computed-exclusion 改判）。
+// ─────────────────────────────────────────────────────────────────────
+mod plan047_convergence_tests {
+    use super::*;
+    use auto_lang_core::ast::Type;
+    use auto_ui_compiler::aura::{AuraComputed, AuraStateDef, AuraWidget};
+
+    fn conv_widget() -> AuraWidget {
+        AuraWidget {
+            named_views: Vec::new(),
+            actions: None,
+            name: "ConvApp".to_string(),
+            state_vars: vec![
+                AuraStateDef {
+                    name: "show_urls".to_string(),
+                    type_info: Type::Bool,
+                    initial: Expr::Bool(false),
+                    decorators: vec![],
+                },
+                AuraStateDef {
+                    name: "other".to_string(),
+                    type_info: Type::Int,
+                    initial: Expr::Int(0),
+                    decorators: vec![],
+                },
+            ],
+            computed: vec![AuraComputed {
+                name: "mirror".to_string(),
+                expr: Expr::Dot(Box::new(Expr::Ident(".".into())), "show_urls".into()),
+            }],
+            messages: vec![],
+            view_tree: AuraNode::element("col"),
+            handlers: std::collections::BTreeMap::new(),
+            props: vec![],
+            routes: None,
+            lifecycle: vec![],
+            tick_interval: None,
+            timers: Vec::new(),
+            handler_params: HashMap::new(),
+            span_map: HashMap::new(),
+            key_bindings: HashMap::new(),
+            api_imports: vec![],
+            style_css: None,
+            ext_imports: Vec::new(),
+            watchers: Vec::new(),
+            exposes: Vec::new(),
+            setup: None,
+        }
+    }
+
+    /// menubar（memo 可开关）读 computed：`checked: .mirror`——T-01 时代
+    /// 此形态因 computed 声明整体不 memo，T-07 改判后入门。
+    fn conv_menubar(memo: bool) -> AuraNode {
+        let item = AuraNode::element("menubar-checkbox-item")
+            .with_prop("title", Expr::Str("Show URLs".into()))
+            .with_prop("checked", Expr::Ident(".mirror".into()));
+        let content = AuraNode::element("menubar-content").with_child(item);
+        // trigger text 读 computed——闭合态 popover 产物可见面（保真观察点）。
+        let trigger =
+            AuraNode::element("menubar-trigger").with_prop("text", Expr::Ident(".mirror".into()));
+        let menu = AuraNode::element("menubar-menu")
+            .with_prop("value", Expr::Str("file".into()))
+            .with_child(trigger)
+            .with_child(content);
+        let mut mb = AuraNode::element("menubar");
+        if memo {
+            mb = mb.with_prop("memo", Expr::Bool(true));
+        }
+        mb.with_child(menu)
+    }
+
+    fn conv_build(bridge: &VmBridge, computed: &[AuraComputed], node: &AuraNode) -> String {
+        let (v, _idmap, _probe) = AuraViewBuilder::new(bridge, "ConvApp")
+            .with_computed(computed)
+            .build_with_debug(node);
+        format!("{v:?}")
+    }
+
+    /// AC-05: 含 computed 的 widget 上下文 memo 化后渲染产物与原始路径
+    /// **逐字节一致**；门确证入册（非静默降级）；deps 变化经信号级联保真。
+    #[test]
+    fn plan047_computed_widget_memo_parity() {
+        let _guard = super::plan045_memo_tests::PLAN045_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let widget = conv_widget();
+        let mut bridge = VmBridge::new(&widget).unwrap();
+
+        // 原始路径基线（memo 关——不入册）。
+        let raw = conv_menubar(false);
+        let k_raw = conv_build(&bridge, &widget.computed, &raw);
+        let n0 = bridge.with_memo_cache(|c| c.len());
+        assert_eq!(n0, 0, "memo 关不入册");
+
+        // memo 开：T-07 改判后入门（T-01 时代此处整体降级）。
+        let armed = conv_menubar(true);
+        let k_memo = conv_build(&bridge, &widget.computed, &armed);
+        let n1 = bridge.with_memo_cache(|c| c.len());
+        assert_eq!(n1, 1, "computed 声明不再排除——条目在册");
+
+        // AC-05 对拍：产物逐字节一致。
+        assert_eq!(k_raw, k_memo, "memo 化产物与原始路径逐字节一致");
+
+        // 级联保真：computed deps（show_urls）变 → 信号重算 → 条目失效
+        // 重求值 → 产物反映新值。
+        bridge
+            .write_state("show_urls", auto_val::Value::Bool(true))
+            .unwrap();
+        let k2 = conv_build(&bridge, &widget.computed, &armed);
+        assert!(k2.contains("true"), "级联失效产物保真: {k2}");
+    }
+
+    /// F-781-D01 收口（T-19/W-01，2026-10-15）：scroll-pane 内层 col 的样式
+    /// 剥除——滚动轴尺寸类（Y 轴剥 Height 族 / X 轴剥 Width 族）不落内容，
+    /// 视觉类（padding/border/rounded）与跨轴宽度保留；hover 变体同步剥。
+    /// 反例锚：`h-32` 类 Fixed 高曾把 std pane 内容钳到 viewport 高（iced
+    /// 限高传导→溢出行零高、content==viewport→pane 永不可滚动，锚点行
+    /// zero_size 恒不可见）；vue 单元素映射无此面。
+    #[test]
+    fn plan781_scroll_content_style_strips_axis_sizing() {
+        use crate::ui::scroll::ScrollAxes;
+        use crate::ui::style::{Style, StyleClass};
+
+        let has = |s: &Style, f: &dyn Fn(&StyleClass) -> bool| {
+            s.classes.iter().any(|c| f(c)) || s.variant_classes.iter().any(|(_, c)| f(c))
+        };
+        let heightish = |c: &StyleClass| {
+            matches!(
+                c,
+                StyleClass::Height(_)
+                    | StyleClass::HeightPercent(_)
+                    | StyleClass::MinHeight(_)
+                    | StyleClass::MaxHeight(_)
+            )
+        };
+        let widthish = |c: &StyleClass| {
+            matches!(
+                c,
+                StyleClass::Width(_)
+                    | StyleClass::WidthPercent(_)
+                    | StyleClass::MinWidth(_)
+                    | StyleClass::MaxWidth(_)
+            )
+        };
+
+        // Y 轴（缺省）pane："border rounded h-32 px-2 w-full hover:h-64"——
+        // Height 族剥（含 hover 变体），border/rounded/px-2/w-full 保留。
+        let pane = Style::parse("border rounded h-32 px-2 w-full hover:h-64").unwrap();
+        let content = AuraViewBuilder::scroll_content_style(pane, ScrollAxes::Y);
+        assert!(!has(&content, &heightish), "Y 轴 pane：Height 族须剥除");
+        assert!(
+            has(&content, &|c| matches!(c, StyleClass::Border)),
+            "视觉类 border 保留"
+        );
+        assert!(
+            has(&content, &|c| matches!(c, StyleClass::Rounded)),
+            "视觉类 rounded 保留"
+        );
+        assert!(
+            has(&content, &|c| matches!(c, StyleClass::PaddingX(_))),
+            "padding 保留"
+        );
+        assert!(
+            has(&content, &widthish),
+            "Y 轴 pane：跨轴 Width（w-full 铺宽）保留"
+        );
+
+        // X 轴 pane："w-96 h-32"——Width 剥、Height 保留。
+        let pane = Style::parse("w-96 h-32").unwrap();
+        let content = AuraViewBuilder::scroll_content_style(pane, ScrollAxes::X);
+        assert!(!has(&content, &widthish), "X 轴 pane：Width 族须剥除");
+        assert!(has(&content, &heightish), "X 轴 pane：跨轴 Height 保留");
+
+        // 双轴：两族都剥。
+        let pane = Style::parse("h-[400px] max-h-[600px] w-1/2").unwrap();
+        let content = AuraViewBuilder::scroll_content_style(pane, ScrollAxes::BOTH);
+        assert!(
+            !has(&content, &heightish) && !has(&content, &widthish),
+            "双轴 pane：两族都剥"
+        );
+    }
+}

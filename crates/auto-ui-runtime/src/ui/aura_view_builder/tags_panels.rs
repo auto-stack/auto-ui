@@ -2355,6 +2355,13 @@ impl<'a> AuraViewBuilder<'a> {
 
 }
 
+
+// ─────────────────────────────────────────────────────────────────────
+// PLAN-045 T-04/T-05: memo 门包装层。原始转换体全部原样保留在 `*_raw`
+// （非 memo 路径 = 包装直落 raw，行为逐字节一致——用户硬性要求）；包装
+// 仅在 `memo: true`（provider 系为武装旗标）且扫描/上下文门通过时插缓存。
+// ─────────────────────────────────────────────────────────────────────
+
 impl<'a> AuraViewBuilder<'a> {
     /// menubar 声明式组件族门（`menubar { menubar-menu … }`）。
     pub(super) fn convert_menubar_component(
