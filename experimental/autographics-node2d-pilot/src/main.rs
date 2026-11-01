@@ -29,6 +29,7 @@ fn main() {
                 Some("scene-2d") => Profile::Basic2D(BasicProfile::Scene2D),
                 Some("character-2d") => Profile::Basic2D(BasicProfile::Character2D),
                 Some("camera-2d") => Profile::Basic2D(BasicProfile::Camera2D),
+                Some("components-2d") => Profile::Components2D,
                 _ => usage(),
             }
         }
@@ -141,6 +142,63 @@ fn main() {
                 "node2d-lower[g11-2d]: wrote world.at ({} bytes, sha {}) + scene.agscene + closure/{}",
                 lowered.source_bytes,
                 lowered.source_sha256,
+                names.len()
+            );
+        }
+        Profile::Components2D => {
+            let lowered = autographics_node2d_pilot::lower_project_components(&project)
+                .unwrap_or_else(|e| {
+                    eprintln!("node2d-lower: {e}");
+                    std::process::exit(3);
+                });
+            std::fs::write(
+                format!("{out}/world.at"),
+                lowered.user_source.expect("source"),
+            )
+            .expect("world.at");
+            std::fs::write(format!("{out}/scene.agscene"), &lowered.scene_json)
+                .expect("scene.agscene");
+            let mut names: Vec<_> = project.modules.keys().collect();
+            names.sort();
+            let mut modules = String::new();
+            let mut closure = String::new();
+            for name in &names {
+                let bytes = project.modules[*name].source.as_bytes();
+                modules.push_str(&format!(
+                    "  \"module:{}\": \"{}\",\n",
+                    name,
+                    autographics_node2d_pilot::scene::sha256_hex(bytes)
+                ));
+                closure.push_str(&format!(
+                    "  {{\"name\": \"{name}\", \"sha256\": \"{}\", \"bytes\": {}}},\n",
+                    autographics_node2d_pilot::scene::sha256_hex(bytes),
+                    bytes.len()
+                ));
+            }
+            let mut identity = String::from("{\n");
+            identity
+                .push_str(" \"generator\": \"autographics-node2d-pilot plan020 components-2d\",\n");
+            identity.push_str(" \"api\": \"autographics.objects2d/1\",\n");
+            identity.push_str(&format!(
+                " \"user_source_sha256\": \"{}\",\n \"user_source_bytes\": {},\n",
+                lowered.source_sha256, lowered.source_bytes
+            ));
+            identity.push_str(&modules);
+            identity.push_str(" \"closure\": [\n");
+            identity.push_str(closure.trim_end_matches(",\n"));
+            identity.push_str("\n ],\n");
+            identity.push_str(&format!(" \"roles\": {}\n", lowered.roles_json));
+            identity.push_str("}\n");
+            std::fs::write(format!("{out}/identity.json"), identity).expect("identity.json");
+            let closure_dir = format!("{out}/closure");
+            std::fs::create_dir_all(&closure_dir).expect("closure dir");
+            for name in &names {
+                let bytes = project.modules[*name].source.as_bytes();
+                std::fs::write(format!("{closure_dir}/{name}.at"), bytes).expect("closure file");
+            }
+            println!(
+                "node2d-lower[components-2d]: wrote world.at ({} bytes, sha {}) + scene.agscene + closure/{}",
+                lowered.source_bytes, lowered.source_sha256,
                 names.len()
             );
         }

@@ -1,0 +1,30 @@
+// PLAN-020 negative: emit to an undeclared port — Gauge declares only
+// `Add`, but Panel emits `meter.Bogus`. Must fail lowering with the named
+// unknown-port diagnostic (module/line/symbol).
+use gauge: Gauge
+
+node Panel(period: int, payload: int, phase0: float, speed: float, base_x: float, hide_at: int, geo: Mesh2D, tint: Material2D) {
+    model {
+        var acc = 0
+    }
+    view-2d {
+        Gauge meter {
+            phase0: .phase0
+            speed: .speed
+            base_x: .base_x
+            base_y: 3.0
+            hide_at: .hide_at
+            geo: .geo
+            tint: .tint
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            .acc = .acc + 1
+            if .acc == .period {
+                .acc = 0
+                meter.Bogus(.payload)
+            }
+        }
+    }
+}

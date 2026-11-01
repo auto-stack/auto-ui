@@ -1,0 +1,38 @@
+// PLAN-020 negative: root instantiates Panel WITHOUT `use panel: Panel` —
+// the module never enters the closure and the node is undeclared. Must fail
+// at load with a located diagnostic (never a panic).
+use resources: gauge_blue, gauge_green, char_orange, ground_color, ground_mesh, disc_mesh, dot_mesh
+use player: Player
+
+node Main {
+    model {
+        var vy = 999
+    }
+    view-2d {
+        Panel a {
+            period: 10
+            payload: 1
+            phase0: 0.0
+            speed: 1.0
+            base_x: 4.0
+            hide_at: 61
+            geo: resources.disc_mesh
+            tint: resources.gauge_blue
+        }
+        Player player {
+            px: 2.0
+            py: 1.0
+            tint: resources.char_orange
+        }
+        solid2d ground {
+            position: (6.0, -0.5)
+            mesh: resources.ground_mesh
+            material: resources.ground_color
+        }
+        camera2d cam {
+            target: refs.player.actor
+            bounds: (0.0, -4.0, 40.0, 12.0)
+            view_size: (40.0, 12.0)
+        }
+    }
+}

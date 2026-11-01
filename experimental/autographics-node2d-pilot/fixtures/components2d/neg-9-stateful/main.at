@@ -1,0 +1,25 @@
+// PLAN-020 negative: 9 stateful instances (root + eight Item instances) —
+// breaches the frozen 8-instance envelope (root included). Must fail with
+// the named envelope diagnostic naming the offending instance.
+use item: Item
+
+node Main {
+    view-2d {
+        Item i1 {
+        }
+        Item i2 {
+        }
+        Item i3 {
+        }
+        Item i4 {
+        }
+        Item i5 {
+        }
+        Item i6 {
+        }
+        Item i7 {
+        }
+        Item i8 {
+        }
+    }
+}

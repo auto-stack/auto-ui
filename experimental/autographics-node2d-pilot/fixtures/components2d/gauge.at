@@ -1,0 +1,48 @@
+// PLAN-020 components-2d Gauge definition: same fields (phase/ticks/count)
+// under every instance, different params (phase0 0/5, speed 1/6, base_x 4/-4,
+// hide_at 61/-1). The disc position is model-driven: draw_x recomputes on
+// even ticks only via the parity flip (integer compare — the VM's `/` is
+// real division, so a ticks/2*2 gate would run every tick and breach the
+// frozen 32-credit pool when the present() visible charge lands; probe-
+// observable parity is the even-tick formula). Visibility is model-driven
+// via the `visible: .show` binding (hide at ticks==hide_at; visible=false
+// keeps object identity). present() syncs both at tick end.
+node Gauge(phase0: float, speed: float, base_x: float, base_y: float, hide_at: int, geo: Mesh2D, tint: Material2D) {
+    model {
+        var phase = .phase0
+        var ticks = 0
+        var count = 0
+        var draw_x = .base_x
+        var show = 1
+        var parity = 1
+    }
+    msg {
+        Add(int)
+    }
+    view-2d {
+        shape2d disc {
+            mesh: .geo
+            position: (.draw_x, .base_y)
+            material: .tint
+            visible: .show
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            .ticks = .ticks + 1
+            .phase = .phase + .speed * dt
+            if .parity == 0 {
+                .draw_x = .base_x + .phase * 2.0 + .count * 0.2
+                .parity = 1
+            } else {
+                .parity = 0
+            }
+            if .ticks == .hide_at {
+                .show = 0
+            }
+        }
+        .Add(n) -> {
+            .count = .count + n
+        }
+    }
+}

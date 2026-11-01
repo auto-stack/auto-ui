@@ -83,7 +83,7 @@ pub(crate) fn unsupported(what: impl Into<String>) -> LowerError {
 }
 
 /// 展开后的 scene 节点（对象或组，共享 id 命名空间）。
-pub(crate) struct SceneNode {
+pub struct SceneNode {
     pub is_group: bool,
     pub id: usize,
     pub name: String,
@@ -99,7 +99,7 @@ pub(crate) struct SceneNode {
     pub is_solid: bool,
 }
 
-pub(crate) struct CameraCfg {
+pub struct CameraCfg {
     pub target_char_name: String,
     pub min_x: f64,
     pub min_y: f64,
@@ -109,7 +109,7 @@ pub(crate) struct CameraCfg {
     pub view_h: f64,
 }
 
-pub(crate) struct Collected {
+pub struct Collected {
     pub nodes: Vec<SceneNode>,
     pub camera: Option<CameraCfg>,
     pub char_name: Option<String>,
@@ -229,7 +229,10 @@ pub(crate) fn resource_color(
     Err(unsupported(format!("color resource '{name}' not found")))
 }
 
-fn resource_mesh(project: &Project, name: &str) -> Result<(String, f64, f64), LowerError> {
+pub(crate) fn resource_mesh(
+    project: &Project,
+    name: &str,
+) -> Result<(String, f64, f64), LowerError> {
     let module = project
         .modules
         .get("resources")
@@ -947,7 +950,7 @@ pub(crate) fn fmt_f(v: f64) -> String {
     }
 }
 
-fn obj_json(n: &SceneNode) -> String {
+pub(crate) fn obj_json(n: &SceneNode) -> String {
     format!(
         "  {{\n   \"id\": {},\n   \"name\": \"{}\",\n   \"kind\": \"{}\",\n   \"translation\": [{}, {}, 0.0],\n   \"scale\": [{}, {}, 1.0],\n   \"yaw\": 0.0,\n   \"pitch\": 0.0,\n   \"rgba\": [{}, {}, {}, {}],\n   \"visible\": {},\n   \"parent\": {},\n   \"resource\": null,\n   \"sprite\": null\n  }}",
         n.id,
@@ -1017,7 +1020,7 @@ fn scene_json_basic(
     )
 }
 
-fn roles_json_basic(collected: &Collected) -> String {
+pub(crate) fn roles_json_basic(collected: &Collected) -> String {
     let mut parts = Vec::new();
     match &collected.char_name {
         Some(name) => {
@@ -1076,7 +1079,7 @@ fn enum_lookup(project: &Project, ename: &str, variant: &str) -> Option<String> 
     None
 }
 
-fn life_handler<'a>(
+pub(crate) fn life_handler<'a>(
     node: &'a NodeDecl,
     event: &str,
 ) -> Option<&'a auto_ui_dialect::node2d::Handler> {
@@ -1180,6 +1183,9 @@ fn gen_user_source(
         member_hook: None,
         moved_flag: None,
         refs_any_elem: true,
+        // PLAN-020 钩子：basic2d 档不用（019 字节不变）。
+        call_scope: None,
+        child_emit: None,
     };
 
     // ---- app_start：生成绑定（声明序）+ 作者 Life.Start ----

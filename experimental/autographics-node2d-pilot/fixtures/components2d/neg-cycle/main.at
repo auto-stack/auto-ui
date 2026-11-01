@@ -1,0 +1,11 @@
+// PLAN-020 negative: instance cycle — root holds BoxA a; BoxA's view holds
+// BoxB b; BoxB's view holds BoxA inner. Must fail lowering with the named
+// cycle diagnostic via the definition path set (no panic / no overflow).
+use boxa: BoxA
+
+node Main {
+    view-2d {
+        BoxA a {
+        }
+    }
+}

@@ -1,0 +1,34 @@
+// PLAN-020 POSITIVE same-name-helpers fixture: two modules each define a
+// helper `bump` with a different body; a component in each module calls its
+// OWN bump. The generated world must pool module-prefixed fns
+// (helpera_bump / helperb_bump) and resolve call sites per module scope.
+use resources: char_orange, gauge_blue, gauge_green
+use helpera: Alpha
+use helperb: Beta
+
+node Actor {
+    view-2d {
+        character2d body {
+            position: (0.0, 1.0)
+            material: resources.char_orange
+        }
+    }
+}
+
+node Main {
+    view-2d {
+        Actor actor {
+        }
+        Alpha a {
+            rate: 1.0
+        }
+        Beta b {
+            rate: 2.0
+        }
+        camera2d cam {
+            target: refs.actor.actor
+            bounds: (-10.0, -4.0, 30.0, 12.0)
+            view_size: (12.0, 8.0)
+        }
+    }
+}

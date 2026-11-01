@@ -1,0 +1,9 @@
+// PLAN-020 negative (cycle chain part 1): BoxA instantiates BoxB.
+use boxb: BoxB
+
+node BoxA {
+    view-2d {
+        BoxB b {
+        }
+    }
+}

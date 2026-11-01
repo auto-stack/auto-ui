@@ -12,11 +12,12 @@
 pub mod load;
 pub mod lower;
 pub mod lower_basic2d;
+pub mod lower_components;
 pub mod lower_g11;
 pub mod scene;
 pub mod translate;
 
-/// 降层 profile（PLAN-017 T-02 冻结）。
+/// 降层 profile（PLAN-017 T-02 冻结；PLAN-020 增补 components-2d）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Profile {
     /// PLAN-016 最小切片：字节兼容，服务映射不变。
@@ -25,9 +26,12 @@ pub enum Profile {
     G112D,
     /// PLAN-019 基础二维：scene-2d/character-2d/camera-2d。
     Basic2D(lower_basic2d::BasicProfile),
+    /// PLAN-020 有状态组件：components-2d（T-02 冻结的两套既有机制）。
+    Components2D,
 }
 
 pub use load::{load_project, Project, ProjectError};
 pub use lower::{lower_project, LowerOutput};
 pub use lower_basic2d::{lower_project_basic, BasicProfile, LowerOutputBasic2D};
+pub use lower_components::{build_world, lower_project_components};
 pub use lower_g11::{lower_project_g112d, LowerOutputG11};

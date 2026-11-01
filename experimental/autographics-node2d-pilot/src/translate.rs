@@ -55,6 +55,13 @@ pub struct Ctx<'a> {
     /// PLAN-017：refs.<elem> 接受任意本定义 view 元素名（legacy 冻结
     /// 仅 `body`）。
     pub refs_any_elem: bool,
+    /// PLAN-020（components-2d）：裸纯函数调用的模块作用域解析。
+    /// Some(限定名) 按返回文本降层；None/未命中保持逐字（旧档字节不变）。
+    pub call_scope: Option<Box<dyn Fn(&str) -> Option<String> + 'a>>,
+    /// PLAN-020：子实例事件投递 `emit <child>.Ev(args)` → 调用头部文本
+    /// （含接收下标实参，未闭合；模板续接 `, args)`）。None 时该形态保持
+    /// unsupported（旧档不变）。
+    pub child_emit: Option<Box<dyn Fn(&str, &str, usize) -> Result<String, LowerError> + 'a>>,
 }
 
 fn line_of(e: &Expr) -> usize {
@@ -305,10 +312,45 @@ fn translate_expr(e: &Expr, ctx: &Ctx, out: &mut String) -> Result<(), LowerErro
                     }
                 }
             }
-            // 普通调用：池化纯函数（patrol_y）逐字参数翻译。
+            // PLAN-020：子实例事件投递（选择器形态 `<child>.Ev(args)`，含
+            // `emit .Ev(args)` 前导点形态 child=="emit"）。在 input/refs 之后
+            // 判定， hook 缺席时保持旧 unsupported 文本。
+            if let Expr::Dot(inner, ev) = &*call.name {
+                if let Expr::Ident(child) = &**inner {
+                    if let Some(hook) = &ctx.child_emit {
+                        let mut args = Vec::new();
+                        for a in &call.args.args {
+                            match a {
+                                Arg::Pos(x) => {
+                                    let mut buf = String::new();
+                                    translate_expr(x, ctx, &mut buf)?;
+                                    args.push(buf);
+                                }
+                                other => return Err(unsupported(format!("emit arg {other:?}"), e)),
+                            }
+                        }
+                        // 钩子返回调用头部（接收下标实参在内，未闭合）；
+                        // 模板续接实参并闭合。
+                        let call_text = (hook)(child, ev, args.len())?;
+                        out.push_str(&call_text);
+                        if !args.is_empty() {
+                            out.push_str(", ");
+                        }
+                        out.push_str(&args.join(", "));
+                        out.push(')');
+                        return Ok(());
+                    }
+                }
+            }
+            // 普通调用：池化纯函数（patrol_y）逐字参数翻译；PLAN-020 档先经
+            // 模块作用域解析 hook（未命中或 hook 缺席保持逐字）。
             match &*call.name {
                 Expr::Ident(fname) => {
-                    out.push_str(fname);
+                    let scoped = match &ctx.call_scope {
+                        Some(hook) => hook(fname).unwrap_or_else(|| fname.to_string()),
+                        None => fname.to_string(),
+                    };
+                    out.push_str(&scoped);
                     out.push('(');
                     for (i, a) in call.args.args.iter().enumerate() {
                         if i > 0 {
