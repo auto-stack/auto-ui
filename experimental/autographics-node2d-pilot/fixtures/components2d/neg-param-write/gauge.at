@@ -1,7 +1,9 @@
 // PLAN-020 negative: parameters are READ-ONLY (AC-02/06). The handler
-// assigns `.speed = 3.0` — `.speed` is a declared param, not a model field.
-// Must fail lowering with the named read-only diagnostic (module/line/
-// symbol); model-field assignment (.ticks/.phase/...) stays legal.
+// assigns `.speed = 3.0` in three forms — statement position AND the two
+// expression-nested bypasses (`let q = (.speed = 3.0)`,
+// `if (.speed = 3.0) == 3.0 {`). `.speed` is a declared param, not a model
+// field; all forms must fail lowering with the same named read-only
+// diagnostic (module/line/symbol); model-field assignment stays legal.
 node Gauge(phase0: float, speed: float, base_x: float, base_y: float, hide_at: int, parity0: int, geo: Mesh2D, tint: Material2D) {
     model {
         var phase = .phase0
@@ -26,6 +28,10 @@ node Gauge(phase0: float, speed: float, base_x: float, base_y: float, hide_at: i
         Life.Tick(dt) -> {
             .speed = 3.0
             .ticks = .ticks + 1
+            let q = (.speed = 3.0)
+            if (.speed = 3.0) == 3.0 {
+                .count = .count + 1
+            }
             .phase = .phase + .speed * dt
             if .parity == 0 {
                 .draw_x = .base_x + .phase * 2.0 + .count * 0.2

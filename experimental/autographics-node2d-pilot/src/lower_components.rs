@@ -1026,17 +1026,7 @@ struct WalkOut {
 fn walk_stmts(stmts: &[Stmt], line: usize, out: &mut WalkOut) {
     for s in stmts {
         match s {
-            Stmt::Expr(e) => {
-                // 赋值目标记录：`.member = ...`（成员写；参数只读合同）。
-                if let Expr::Bina(lhs, auto_parser_api::ast::Op::Asn, _) = e {
-                    if let Expr::Dot(inner, name) = &**lhs {
-                        if matches!(&**inner, Expr::Ident(b) if b == "self") {
-                            out.assign_targets.push((name.to_string(), line));
-                        }
-                    }
-                }
-                walk_expr(e, line, out);
-            }
+            Stmt::Expr(e) => walk_expr(e, line, out),
             Stmt::If(if_) => {
                 for b in &if_.branches {
                     walk_expr(&b.cond, line, out);
@@ -1090,7 +1080,19 @@ fn walk_expr(e: &Expr, line: usize, out: &mut WalkOut) {
                 walk_expr(inner, line, out);
             }
         }
-        Expr::Bina(l, _, r) => {
+        Expr::Bina(l, op, r) => {
+            // 赋值目标记录：`.member = ...`（成员写；参数只读合同）。检测
+            // 在 Bina 臂内，表达式嵌套形态（let x = (.p = v)、
+            // if (.p = v) == v {…}）同样命中同一具名拒绝。
+            if matches!(op, auto_parser_api::ast::Op::Asn) {
+                for side in [l, r] {
+                    if let Expr::Dot(inner, name) = &**side {
+                        if matches!(&**inner, Expr::Ident(b) if b == "self") {
+                            out.assign_targets.push((name.to_string(), line));
+                        }
+                    }
+                }
+            }
             walk_expr(l, line, out);
             walk_expr(r, line, out);
         }

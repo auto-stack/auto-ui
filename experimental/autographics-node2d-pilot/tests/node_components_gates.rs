@@ -33,6 +33,8 @@ const ENVELOPE_TICKER: &str = include_str!("../fixtures/components2d/envelope/ti
 const INIT_FAULT_MAIN: &str = include_str!("../fixtures/components2d/init-fault/main.at");
 const INIT_FAULT_CLUSTER: &str = include_str!("../fixtures/components2d/init-fault/cluster.at");
 const NEG_PARAM_WRITE: &str = include_str!("../fixtures/components2d/neg-param-write/gauge.at");
+const NEG_PARAM_WRITE_NESTED: &str =
+    include_str!("../fixtures/components2d/neg-param-write/gauge-nested.at");
 const HELP_MAIN: &str = include_str!("../fixtures/components2d/helpers/main.at");
 const HELP_A: &str = include_str!("../fixtures/components2d/helpers/helpera.at");
 const HELP_B: &str = include_str!("../fixtures/components2d/helpers/helperb.at");
@@ -315,22 +317,26 @@ fn negative_fixtures_fail_with_named_diagnostics_and_no_panic() {
     assert!(err.contains("camera2d"), "{err}");
     assert!(err.contains("requires"), "{err}");
 
-    // 参数只读：`.speed` 是声明参数，作为赋值目标具名拒绝；model 字段赋值
-    // 不受影响（全部正面链的 .ticks/.acc/.phase 写入即证）。
-    let err = components(&[
-        ("main", BUDGET_MAIN),
-        ("gauge", NEG_PARAM_WRITE),
-        ("player", PLAYER),
-        ("resources", RES),
-    ])
-    .err()
-    .expect("param write must fail");
-    assert!(err.contains("read-only"), "{err}");
-    assert!(err.contains("'speed'"), "{err}");
-    assert!(
-        err.contains("module gauge") && err.contains("line "),
-        "{err}"
-    );
+    // 参数只读：`.speed` 是声明参数，作为赋值目标具名拒绝——语句位置与两
+    // 个表达式嵌套旁路（let q = (.speed = 3.0)、if (.speed = 3.0) == 3.0）
+    // 全部命中同一拒绝；model 字段赋值不受影响（全部正面链的
+    // .ticks/.acc/.phase 写入即证）。
+    for gauge in [NEG_PARAM_WRITE, NEG_PARAM_WRITE_NESTED] {
+        let err = components(&[
+            ("main", BUDGET_MAIN),
+            ("gauge", gauge),
+            ("player", PLAYER),
+            ("resources", RES),
+        ])
+        .err()
+        .expect("param write must fail");
+        assert!(err.contains("read-only"), "{err}");
+        assert!(err.contains("'speed'"), "{err}");
+        assert!(
+            err.contains("module gauge") && err.contains("line "),
+            "{err}"
+        );
+    }
 }
 
 // --------------------------------------- T-05：预算/包络/初始化故障降层面 --
