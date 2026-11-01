@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-01
 updated_at: 2026-11-01
 plan_revision: 1
-current_step: 0
+current_step: 6
 total_steps: 10
 depends_on: [auto-ui/PLAN-020]
 supersedes_spec_components: []
@@ -139,12 +139,12 @@ work自查→同一权威树独立上下文final review→merge冻结门；未�
 
 | ID | owner_stage | 依赖 | 操作/产物与验证 | AC | 状态 |
 |---|---|---|---|---|---|
-| T-01 | work | 后续实施启动 | 核020/SDK/两图锁/022与025及跨路线owner，建唯一ui-024树/冻结源 | AC-01 | [ ] |
-| T-02 | work | T-01 | 最多两接法纯GLB/层级/双状态组件三链先证，§9冻结AST/模式/CLI/计量/原十一义务 | AC-01..06 | [ ] |
-| T-03 | work | T-02 go | 共用Node AST/实例表示扩view-3d/typed模型引用与资源准入，V-01 | AC-02 | [ ] |
-| T-04 | work | T-03 | 原GLB/层级及局部Auto状态/事件/三轴绑定真实接线，V-02/03 | AC-03/04 | [ ] |
-| T-05 | work | T-04 | 原预算/128-129/8-9/资源反例、生命周期/20轮owner与warm，V-04/05 | AC-04/05 | [ ] |
-| T-06 | work | T-05 | source-build/冷A→B/SaveAs/修复/旧消费者、SD与移交折Plan，V-06 | AC-01..06 | [ ] |
+| T-01 | work | 后续实施启动 | 核020/SDK/两图锁/022与025及跨路线owner，建唯一ui-024树/冻结源 | AC-01 | [x] 020/021/022/023交付16ddfa0/1bec52f/2f45baa+c6aa63a/32d7a81核实在册；025 drafting无树；AG006/009在途树未接管；SDK .sdk-source 681文件prepare PASS（pin 7b987ca8）；依赖树auto-lang b1a4871aa/auto-web ec9c4ba/auto-down 7c4d5cb只读detached；两图锁driver 5d6bb297…3147/pilot 05c67c2f…f5b7未动；ui-024树codex/plan-024-dev@7dfab3c；pilot/driver构建绿 |
+| T-02 | work | T-01 | 最多两接法纯GLB/层级/双状态组件三链先证，§9冻结AST/模式/CLI/计量/原十一义务 | AC-01..06 | [x] 接法一（v1文档节点直写）三链全部跑通即冻结，未动用接法二；冻结合同见§9 T-02行；十一义务经新链逐项复验（flow v02/v03） |
+| T-03 | work | T-02 go | 共用Node AST/实例表示扩view-3d/typed模型引用与资源准入，V-01 | AC-02 | [x] dialect view-3d AST/parse（4dcbae9）+ pilot lower_components3d（d1e88b3）；gates 7/7（含14具名负控）；verify_plan024负控14条全中 |
+| T-04 | work | T-03 | 原GLB/层级及局部Auto状态/事件/三轴绑定真实接线，V-02/03 | AC-03/04 | [x] flow v02_g02（B02-01..04原阈值）/v02_g03（B03-01..06）/v03_twin全绿（00e96e6）；行句柄0-based修正有CPU会话反证 |
+| T-05 | work | T-04 | 原预算/128-129/8-9/资源反例、生命周期/20轮owner与warm，V-04/05 | AC-04/05 | [x] envelope8/rows128 Ok、neg-9/129具名拒；Step恰一中性tick/render不推进；20轮fresh零GLB重上传；120 tick CPU墙钟avg 657µs/max 990µs（独立口径）；512上限沿未触碰代码复用（128×2=256<512，asset_feasibility失编译属master先在） |
+| T-06 | work | T-05 | source-build/冷A→B/SaveAs/修复/旧消费者、SD与移交折Plan，V-06 | AC-01..06 | [x] verify_plan024 --controls 29控制组PASS（冷A→B五产品字节等值/变异敏感/注释不敏感/14负控/许可/消费面）；坏world/GLB单字节拒→还原→再绿（v06）；旧消费者六verifier+四flow全绿复跑；fmt：本期触碰文件全clean，master先在dirty集（pilot 2/driver 6文件）零变化；SD-01候选折plan-artifacts/plan-024/auto-ui/sd-01-candidate.md |
 | T-07 | review | T-06 | 同树独立final逐AC/V/S/SD/原分母复审，finding回work，pass标merge门pending | AC-07 | [ ] |
 | T-08 | merge | T-07 pass | 冻结提交/依赖/资源/输入，定向门或有据复用后实际合master | AC-08 | [ ] |
 | T-09 | merge | T-08 | 沉淀Spec/来源/归档导航与证据摘要，不写派生JSON或改变Gallery完成数 | AC-08/09 | [ ] |
@@ -156,11 +156,17 @@ work自查→同一权威树独立上下文final review→merge冻结门；未�
 
 2026-11-01规划预检：两合同各0..10节、10任务（work6/review1/merge3）、9AC/6组V-S/1SD与drafting0/10一致；新增合同/共同设计19个本地链接可解析。独占取号后复扫活动/archived/archive编号唯一、下一026；依赖无环，两计划无相互功能依赖。024十一旧义务按verify_g02四require＋tamper_negative一项＋verify_g03六require静态枚举；025保G12a原八名与G12b H01..12，原预算/旧023字节不变。均为文档静态检查，不是新产品验证/可行性go或独立终审；未创建实施树/提案Spec/源码/素材、构建/GPU/音频/agent。
 
+
+2026-11-01 / stage: work | plan_id: auto-ui/PLAN-024 | plan_revision: 1 | round: 1 | outcome: pass（T-02 冻结合同 checkpoint） | worktree: D:/autostack/.wt/ui-024/auto-ui | branch: codex/plan-024-dev | base_commit: 7dfab3c | code_commit: 4dcbae9/d1e88b3/00e96e6 | dependency_revisions: auto-lang b1a4871aa、auto-web ec9c4ba、auto-down 7c4d5cb（ui-024组detached只读clean）、SDK .sdk-source 681文件（prepare_sdk --from-snapshot PASS；pin 7b987ca8） | task_ids: T-01,T-02 | evidence: 本行+plan-artifacts/plan-024/auto-ui/t02/；两图锁driver Cargo.lock sha256 5d6bb297826e8d70f90b2c7177b741488051155e9b895eda045de25876503147、pilot Cargo.lock 05c67c2f806ec922bdd1c927396a60f66e255fe9b5927f6e3ca28c5182f4f5b7、workspace Cargo.lock 81e5a6fd10929083491e0115a0092c1e22f55a7fad1526f6e5d51489e8f4f8ff（三者全程未动） | blockers: 无 | next_responsible_role: work T-03。
+T-02 冻结合同（唯一接法=v1文档节点直写；接法二objects3d未动用）：profile `components-3d`，CLI `node2d-lower --profile components-3d --entry <dir>/main.at --out <dir>`（exit 2解析/载入、3降层）；api `autographics.behavior/1`、schema `autographics.scene/6`、generator `autographics-node2d-pilot plan024 components-3d`、document_id前缀`plan024-components-3d-`。AST：`view-3d{}`（View+Sub+3标记），元素`cylinder3d`/`model3d`/`group3d`/UpperCamel实例；叶props position(3,可绑定.model)/scale(3,静态)/yaw/pitch(静态)/visible(可绑定)/model(仅model3d,resources.X或Model3D参数)；组props position(3,静态)/visible(字面量)；参数int/float/Model3D；单view出口、组绑定、scale/yaw/pitch绑定、参数写、错资源端口、非数值msg载具名拒绝。资源：`model3d.glb("path")`=原始字节SHA256+length身份，生成器不解析GLB；几何/域准入全在driver既有preflight（零改动）。句柄：v1行句柄=driver `hierarchy::ordered()`先序0-based（`fields[node*12+axis]`寻址、ag_valid含0），文档行id独立1-based；组/行名：root原名、实例`{path}/{elem|group}`，行名唯一。装配：app_start=Life.Start们（根先、声明先序）；app_update=根lifetick→[root present]→每实例lifetick→present（冻结序同020）；呈现写`ag_set_local(row,0/1/2)`/`ag_set_visible(row)`按变更计费门（平方差/int!=缓存）；空间服务`refs.<elem>|self .place(x,y,z)/.shift(dx,dy,dz)/.show(b)`语句形态+`.local/.world/.visible/.row`值形态（021二维place/shift/show行为不变）。包络：8有状态实例（root含model/msg/on才计入；纯场景0）、128场景行（组+对象）；v1无32计费池，VM原额（1000steps/slice、100k/120resumes/250ms、init30s/tick2s）+完整tick记账。三链先证：g02纯GLB场景、g03/3d层级（含parent/hidden变体）、twin双同定义有状态组件+typed父事件+三轴/显隐动态——均经真实driver GPU/CPU双面跑通（node3d_basic_flow），十一旧义务逐项复验不降阈值。实施中实测修正一处：v1行句柄为0-based（CPU会话证明1-based期望不成立，GPU帧读数修正）。
+
+2026-11-01 / stage: work | plan_id: auto-ui/PLAN-024 | plan_revision: 1 | round: 2 | outcome: pass（work完成，execution_done） | worktree: D:/autostack/.wt/ui-024/auto-ui | branch: codex/plan-024-dev | base_commit: 7dfab3c | code_commit: 00e96e6 | dependency_revisions: auto-lang b1a4871aa、auto-web ec9c4ba、auto-down 7c4d5cb、SDK681（不变） | task_ids: T-03,T-04,T-05,T-06 | evidence: §8各行+本记录；门禁亲跑计数= pilot 61/61（node3d_basic_gates 7、node_sprites_gates 10、node_components_gates 9、node_queries_gates 6、node_components_game_gates 3、basic 9、g11 10、016 gates 9等）＋ driver node3d_basic_flow 6/6单线程（真GPU）＋ 旧消费者node2d_basic_flow 13/node_components_flow 9/node_queries_flow 11/node_sprites_flow 4全绿 ＋ verify_plan024 --controls 29控制组PASS ＋ verify_plan016/017/019/020/021/022全PASS（旧入口字节冻结） ＋ dialect node2d_pilot 6/6 ＋ fmt（本期触碰文件全clean；master先在dirty集pilot 2文件/driver 6文件零变化，两图fmt-dirty集与master逐文件相同） | blockers: 无 | next_responsible_role: review（T-07同树独立final）。
+work完成声明：AC-01..06 work侧全闭合（映射见SD-01候选§7，plan-artifacts/plan-024/auto-ui/sd-01-candidate.md）；D-01闭合=T-02冻结（唯一接法v1，组静态/叶动态/句柄0-based/包络8与128）；D-02闭合=v1无32池、VM原额+变更计费门、回调内读写=即时VM数组+惰性derive（tick末entry derive，下tick读新值，GPU实测）；D-03闭合=022已合入master（2f45baa+c6aa63a），T-01在022落地后的master 7dfab3c上绑定，025未启动无共享写冲突；D-04闭合=独立review待T-07同树独立上下文（本goal授权链内，fresh subagent非人工，沿019/020 R1模式），GPU单实例串行已遵守。observation（非本期破坏，零diff）：driver tests/asset_feasibility.rs在master因PLAN-013 hud_overlay字段自013起失编译（E0063），其内含512上限单元级检查随之不可运行；512上限沿未触碰代码+包络上界128×2=256<512复用论证。遗留门：merge期冻结定向门（T-08）pending未声称；统一回归按test-scope规则由review/merge按受影响面决定。
 ## 10. 待澄清事项
 
 | ID | 事项 | owner/关闭动作 |
 |---|---|---|
-| D-01 | 共用Node AST/三维资源表示与无角色状态组件的准确装配 | T-02在旧v1/层级/资源合同内最多两接法冻结，不强迫角色或删局部状态 |
-| D-02 | model绑定/显式写/parent派生的准确时机和所选API计量 | T-02真链与独立f32 oracle，不能把v1与空间32池混称 |
-| D-03 | 022/025共享AST/load/translate接线与消费基线 | T-01核owner/实际已合入版本，功能上不等022/025，无法隔离共享写则顺序短窗 |
-| D-04 | 独立review/GPU时段与历史GLB/许可来源 | T-01/06核固定字节/实际授权；新证据未跑不计完成，旧SDK来源不替换 |
+| D-01 | 共用Node AST/三维资源表示与无角色状态组件的准确装配 | 已闭合（T-02冻结，§9）：v1文档节点直写唯一接法；cylinder3d/model3d/group3d装配；无角色纯场景behavior null |
+| D-02 | model绑定/显式写/parent派生的准确时机和所选API计量 | 已闭合（T-02/04实测）：v1原额（无32池）；写=VM fields即时+entry tick末derive；present变更计费门；GPU帧读数独立核 |
+| D-03 | 022/025共享AST/load/translate接线与消费基线 | 已闭合（T-01）：022已合master（2f45baa+c6aa63a），基线绑7dfab3c实态；025 drafting无树；共享写仅本树短窗；旧字节六verifier复跑零漂移 |
+| D-04 | 独立review/GPU时段与历史GLB/许可来源 | 部分闭合：GLB/许可已核（42c9da67 1528B MIT入fixtures+licenses）；GPU单实例串行已守；独立review留T-07（同树独立上下文，本goal链内授权） |
