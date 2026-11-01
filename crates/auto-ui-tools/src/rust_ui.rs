@@ -482,8 +482,7 @@ fn regenerate_code_only(project_dir: &Path, rust_dir: &Path, src_: &PacSource) -
         // empty input set as the identity of the previous artifact.
         if rust_dir.join("src").join("main.rs").exists() {
             return Err(
-                "front 输入为空（无 .at 组件可编译）但成员已有生成物；拒绝以空输入集重生成"
-                    .into(),
+                "front 输入为空（无 .at 组件可编译）但成员已有生成物；拒绝以空输入集重生成".into(),
             );
         }
         return Ok(());
@@ -6203,7 +6202,6 @@ pub(crate) struct ManagedFront {
 }
 
 impl ManagedFront {
-
     /// Published, member-owned exe (hard link/copy of the uplifted one) — the
     /// stable discovery target immune to same-basename uplift races.
     pub(crate) fn published_exe(&self, bin_name: &str, release: bool) -> PathBuf {
@@ -6539,8 +6537,7 @@ fn cargo_managed_build(
         "--message-format=json-render-diagnostics".to_string(),
     ];
     let envs = context.cargo_env();
-    let env_refs: Vec<(&str, String)> =
-        envs.iter().map(|(k, v)| (k.as_str(), v.clone())).collect();
+    let env_refs: Vec<(&str, String)> = envs.iter().map(|(k, v)| (k.as_str(), v.clone())).collect();
     let cwd = {
         let near = context
             .target_root
@@ -6589,8 +6586,7 @@ fn cargo_managed_build(
         }
     };
     let status = if crate::proc_host::current().is_some() {
-        let mut spec =
-            crate::proc_host::TrackedSpawn::new("cargo", args).with_cwd(&cwd);
+        let mut spec = crate::proc_host::TrackedSpawn::new("cargo", args).with_cwd(&cwd);
         spec.capture_stdout = true;
         for (key, value) in &env_refs {
             spec = spec.with_env(key, value);
@@ -6598,7 +6594,10 @@ fn cargo_managed_build(
         let tracked = crate::proc_host::spawn_tracked(spec, label)?;
         if let Some(stdout) = tracked.take_captured_stdout() {
             use std::io::BufRead;
-            for line in std::io::BufReader::new(stdout).lines().map_while(Result::ok) {
+            for line in std::io::BufReader::new(stdout)
+                .lines()
+                .map_while(Result::ok)
+            {
                 consider(&line);
             }
         }
@@ -6622,7 +6621,10 @@ fn cargo_managed_build(
             .map_err(|e| format!("cargo spawn failed: {e}"))?;
         if let Some(stdout) = child.stdout.take() {
             use std::io::BufRead;
-            for line in std::io::BufReader::new(stdout).lines().map_while(Result::ok) {
+            for line in std::io::BufReader::new(stdout)
+                .lines()
+                .map_while(Result::ok)
+            {
                 consider(&line);
             }
         }
@@ -6632,7 +6634,6 @@ fn cargo_managed_build(
     };
     Ok((status, artifact))
 }
-
 
 /// The managed spawn cwd: the generated workspace that owns the members
 /// (identified by walking up from the target root's parent for a
@@ -6742,9 +6743,7 @@ fn publish_front_artifact(
     let Some(cargo_bin) = managed.cargo_bin_name() else {
         return Err("front member has no cargo bin target".into());
     };
-    let package = managed
-        .package_name()
-        .unwrap_or_else(|| cargo_bin.clone());
+    let package = managed.package_name().unwrap_or_else(|| cargo_bin.clone());
     let (status, artifact) = cargo_managed_build(
         &managed.context,
         &managed.member_dir.join("Cargo.toml"),
@@ -6758,16 +6757,10 @@ fn publish_front_artifact(
     // Package-owned deps artifact — never the shared uplifted slot (fresh
     // builds do not re-link it; see cargo_managed_build).
     let uplifted = artifact.ok_or_else(|| {
-        format!(
-            "cargo reported success but no bin artifact for package {package} (bin {bin})"
-        )
+        format!("cargo reported success but no bin artifact for package {package} (bin {bin})")
     })?;
     if !uplifted.is_file() {
-        return Err(format!(
-            "cargo-reported artifact is missing: {}",
-            uplifted.display()
-        )
-        .into());
+        return Err(format!("cargo-reported artifact is missing: {}", uplifted.display()).into());
     }
     // Sanity BEFORE publication: a truncated/corrupted cached image must
     // fail here (named), never overwrite a previously published good copy or
@@ -8891,7 +8884,7 @@ auto-val = { path = \"../auto-val\" }
         "[dependencies]
 auto-val = { path = \"../auto-val\" }
 ",
-        "[features]
+            "[features]
 mem-profile = []
 ",
         ] {

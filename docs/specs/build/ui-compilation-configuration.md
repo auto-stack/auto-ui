@@ -46,3 +46,17 @@ autodown-core 剥除同步摘除（feature 名保留）。
   转发链零改（别名兼容）；cosmic demo/host-libcosmic `ui-headless` 零改。
 - 轻包（compiler/dialect/LSP）零 runtime 反向边不回归（拍平闭包零 iced
   单元）。
+
+## 附：生成 Rust UI 工程的受管构建上下文（PLAN-910 SD-04）
+
+- `auto build/run -r rust` 经 `auto-generation-core::generated_build` 单源解析
+  producer/缓存根/flags（见语言仓 generated-cargo-build-lifecycle）；本仓
+  `rust_ui.rs` 不再自推 target（`shared_cargo_target_dir` 仅作兼容导出）。
+- 成员包名 `<snake(pac name)>-<id8>`，cargo `[[bin]] name = "<published>-<id8>"`
+  （published = pac `exe_name` 否则 snake(pac name)）；发布件
+  `<member>/bin/<profile>/<published>.exe` 恢复用户可见名；`auto run` 直接运行
+  发布件。`default = ["ui-iced"]` 生成模板不变。
+- 前端新鲜度为内容收据（generation.json v1），mtime 退役；`FRONT_LAYOUT_VERSION`
+  随生成布局变更 bump。
+- 发现：`app_registry::published_native_exe`（收据优先）→ 约定路径回退；
+  runtime `launcher_compiled_exe` 同序。
