@@ -6500,12 +6500,12 @@ fn front_needs_regeneration(
 
 /// Managed cargo BUILD with artifact capture: `--message-format=json-render-
 /// diagnostics` (JSON on stdout, diagnostics rendered on stderr as before).
-/// Returns the exit status plus the package-owned artifact path from
-/// `deps/<bin>-<metadata>.exe` — NOT the uplifted `target/<profile>/<bin>.exe`,
-/// which for fresh units cargo does NOT re-link (V-02: after A built, a fresh
-/// B build published A's exe from the shared uplifted slot — the same-basename
-/// hijack moved into the publish step). Fail closed when cargo reports no bin
-/// artifact for this member.
+/// Returns the exit status plus the artifacts cargo reported for THIS member's
+/// bin target (`<profile>/<cargo_bin>.exe` + pdb). The cargo bin name carries
+/// the member id8 because Windows/MSVC cargo links bins without a metadata
+/// hash and does not re-link a fresh uplifted slot (V-02: a fresh B build
+/// once published A's image from the shared `counter.exe`). Fail closed when
+/// cargo reports no bin artifact for this member.
 fn verify_publishable_image(path: &Path) -> AutoResult<()> {
     let mut header = [0u8; 2];
     let read = std::fs::File::open(path)
@@ -6523,13 +6523,23 @@ fn verify_publishable_image(path: &Path) -> AutoResult<()> {
     }
 }
 
+/// Artifacts cargo reported for the member's bin target: the uplifted exe
+/// (`<profile>/<cargo_bin>.exe`) and, when present, its pdb (rustc names the
+/// pdb with underscores — `counter_72e31f46.pdb` — so it is taken from the
+/// same `filenames` list, never guessed from the exe name; F-910-R1-02).
+struct BuiltArtifacts {
+    exe: Option<PathBuf>,
+    pdb: Option<PathBuf>,
+}
+
 fn cargo_managed_build(
     context: &GeneratedBuildContext,
+    ws_dir: &Path,
     manifest: &Path,
     package_name: &str,
     bin_name: &str,
     label: &str,
-) -> AutoResult<(std::process::ExitStatus, Option<PathBuf>)> {
+) -> AutoResult<(std::process::ExitStatus, BuiltArtifacts)> {
     let args = vec![
         "build".to_string(),
         "--manifest-path".to_string(),
@@ -6538,17 +6548,18 @@ fn cargo_managed_build(
     ];
     let envs = context.cargo_env();
     let env_refs: Vec<(&str, String)> = envs.iter().map(|(k, v)| (k.as_str(), v.clone())).collect();
-    let cwd = {
-        let near = context
-            .target_root
-            .parent()
-            .map(Path::to_path_buf)
-            .unwrap_or_else(|| context.target_root.clone());
-        find_ws_dir_for_cwd(&near).unwrap_or(near)
-    };
+    // F-910-R1-01: cargo's cwd is the generated workspace itself — never a
+    // directory derived from the target root (that walked up to the producer
+    // checkout and let its `.cargo/config.toml` linker/jobs/[env] leak into
+    // generated units; an explicit root could even pick up an unrelated
+    // ancestor config). The ws config and the env pins are the whole contract.
+    let cwd = ws_dir.to_path_buf();
     let _lease = TargetLease::acquire(&context.target_root, label)
         .map_err(|e| format!("target lease failed: {e}"))?;
-    let mut artifact: Option<PathBuf> = None;
+    let mut artifact = BuiltArtifacts {
+        exe: None,
+        pdb: None,
+    };
     let exe_ext = if cfg!(windows) { ".exe" } else { "" };
     let mut consider = |line: &str| {
         let Ok(value) = serde_json::from_str::<serde_json::Value>(line) else {
@@ -6577,8 +6588,10 @@ fn cargo_managed_build(
             if let Some(files) = value.get("filenames").and_then(|f| f.as_array()) {
                 for file in files {
                     if let Some(text) = file.as_str() {
-                        if text.ends_with(exe_ext) {
-                            artifact = Some(PathBuf::from(text));
+                        if text.ends_with(".pdb") {
+                            artifact.pdb = Some(PathBuf::from(text));
+                        } else if text.ends_with(exe_ext) {
+                            artifact.exe = Some(PathBuf::from(text));
                         }
                     }
                 }
@@ -6633,22 +6646,6 @@ fn cargo_managed_build(
             .map_err(|e| format!("cargo wait failed: {e}"))?
     };
     Ok((status, artifact))
-}
-
-/// The managed spawn cwd: the generated workspace that owns the members
-/// (identified by walking up from the target root's parent for a
-/// `.generation.lock`-bearing ws); falls back to the given dir.
-fn find_ws_dir_for_cwd(near: &Path) -> Option<PathBuf> {
-    let mut dir = near.to_path_buf();
-    for _ in 0..4 {
-        if dir.join(".generation.lock").exists() || dir.join("Cargo.toml").is_file() {
-            return Some(dir);
-        }
-        if !dir.pop() {
-            return None;
-        }
-    }
-    None
 }
 
 /// Stop an API server child process (if running).
@@ -6746,6 +6743,7 @@ fn publish_front_artifact(
     let package = managed.package_name().unwrap_or_else(|| cargo_bin.clone());
     let (status, artifact) = cargo_managed_build(
         &managed.context,
+        &managed.ws_dir,
         &managed.member_dir.join("Cargo.toml"),
         &package,
         &cargo_bin,
@@ -6754,9 +6752,11 @@ fn publish_front_artifact(
     if !status.success() {
         return Err(format!("Cargo build failed with status: {}", status).into());
     }
-    // Package-owned deps artifact — never the shared uplifted slot (fresh
-    // builds do not re-link it; see cargo_managed_build).
-    let uplifted = artifact.ok_or_else(|| {
+    // The member-owned uplifted artifact `<profile>/<cargo_bin>.exe` as cargo
+    // reported it — unique per member because the cargo bin name carries the
+    // id8 (Windows cargo links bins without a metadata hash), so it can never
+    // be another member's image.
+    let uplifted = artifact.exe.ok_or_else(|| {
         format!("cargo reported success but no bin artifact for package {package} (bin {bin})")
     })?;
     if !uplifted.is_file() {
@@ -6767,8 +6767,14 @@ fn publish_front_artifact(
     // be recorded as a fresh artifact. Recovery is the unit/managed-root
     // rebuild; cargo's fresh path does not detect arbitrary corruption.
     verify_publishable_image(&uplifted)?;
-    let published = publish_artifact(&uplifted, &managed.member_dir, false, &exe_file_name(&bin))
-        .map_err(|e| format!("publishing {} failed: {e}", uplifted.display()))?;
+    let published = publish_artifact(
+        &uplifted,
+        artifact.pdb.as_deref(),
+        &managed.member_dir,
+        false,
+        &exe_file_name(&bin),
+    )
+    .map_err(|e| format!("publishing {} failed: {e}", uplifted.display()))?;
     write_front_receipt_with_inputs(
         project_dir,
         managed,
@@ -8874,14 +8880,14 @@ test-cases = [\"auto-lang-core/test-cases\"]
 [dependencies]
 auto-val = { path = \"../auto-val\" }
 ";
-    std::fs::write(&manifest, installed).unwrap();
-    assert!(delivery_apply_projection(&manifest, &PROJECTION_AUTO_LANG)
-        .unwrap()
-        .is_empty());
-    assert_eq!(std::fs::read_to_string(&manifest).unwrap(), installed);
-    // 任意其他结构：恒等，不判红、不改写（漂移防护移交 receipt verify_tree）。
-    for other in [
-        "[dependencies]
+        std::fs::write(&manifest, installed).unwrap();
+        assert!(delivery_apply_projection(&manifest, &PROJECTION_AUTO_LANG)
+            .unwrap()
+            .is_empty());
+        assert_eq!(std::fs::read_to_string(&manifest).unwrap(), installed);
+        // 任意其他结构：恒等，不判红、不改写（漂移防护移交 receipt verify_tree）。
+        for other in [
+            "[dependencies]
 auto-val = { path = \"../auto-val\" }
 ",
             "[features]
