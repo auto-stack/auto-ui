@@ -1,6 +1,6 @@
 ---
 plan_id: PLAN-026
-status: drafting
+status: reviewed
 feature_name: 阅读引擎嵌入与定位回传双端可行性探针
 author: [Codex]
 created_at: 2026-11-01
@@ -228,6 +228,18 @@ AC-02～06 的成功语义是**路线go门**，不是允许跳过的产品验收
 
 - stage: work | plan_id: auto-ui/PLAN-026 | plan_revision: r1 | outcome: pass（work-owned T-00..T-07 全闭合；T-08 review/T-09 merge 归 review/merge 所有，未声称）| worktree: D:/autostack/.wt/ui-026/auto-ui | branch: codex/plan-026-dev | base_commit: 8c1b916 | code_commit: c08b6d3（worktree：T-00缝隙85d1b2a→T-03 ca45246→报告/Spec c08b6d3）| dependency_revisions: auto-reader main@026结果指针提交（探针工程18af8f1→ac6a01e+roadmap指针）、readest v0.12.16@3cc39ad7+foliate-js@3d79419、工具auto.exe@plan-890(SHA256 390e664e…)、WebView2 156.0.4314.50、iced 0.14.0 | task_ids: T-00..T-07 | evidence: §8各任务行+plan-artifacts/plan-026/auto-reader/{vue-final4(30/30),vm-run14..16,reader/vm两旧门日志}+docs/research/reader-engine-probe.md | blockers: 无新增（原生输入边界为具名GAP已入报告/Spec，非阻塞）| next_responsible_role: review（T-08 同树独立复审：绑定本收据cohort，复验vue 30/30关键链与两旧门FAIL归属，判研究交付与路线结论）
 - work readiness：work-owned AC-01..08 对应证据齐（AC-03原生臂与AC-06两历史FAIL为具名归属缺口，研究交付语义按§5.4/AC-07判）；无未处置finding；统一回归面=零生产members改动（worktree仅experiments/+docs/），探针crate构建通过。
+
+
+### 2026-11-02：review（final，T-08）
+
+- stage: review | review_scope: final | reviewer_identity/limitations: 同会话复审（无独立 final reviewer 指定）——判定全部由工件重构：独立复跑而非采信执行摘要；plan_id: auto-ui/PLAN-026 | plan_revision: r1 | outcome: **pass**（研究交付，含具名限制）| worktree_path: D:/autostack/.wt/ui-026/auto-ui | branch: codex/plan-026-dev | reviewed_commit: c08b6d3（worktree）/reader f29f6c6（探针工程 ac6a01e+roadmap 指针）| base_commit: 8c1b916 | dependency_revisions: foliate-js@3d79419、readest v0.12.16@3cc39ad7、auto.exe SHA256 390e664e…（复算一致）、WebView2 156.0.4314.50、iced 0.14.0 | spec_inputs: docs/specs/runtime/document-surface-boundary.md（worktree 草稿，随 merge canonical 化）
+- 基线复核：两仓 HEAD 干净；§4 四项 auto-ui 钉定哈希+工具哈希逐字复算一致；reader `diff 9b0d513..f29f6c6 -- src/` 为空 = 旧门 FAIL 与探针工程无关成立。
+- **独立复跑**：verify_engine_surface --profile vue（全新实例/全新 out-dir）→ **30/30 PASS，exit 0**（107s，review-vue/results-vue.json）；T-03 spike native_host.exe 复跑 → PROBE_T03_PASS exit=0。
+- AC 证据图：AC-01 pass（钉定+契约冻结+双候选启动证据）；AC-02 pass（vue 引擎入页 + 原生引擎入 iced 宿主双表面装载实证，失败边界具名）；AC-03 **partial-具名**（V-02 vue 真拖选 PASS；V-04 IME、V-05 原生验证/无障碍=输入边界 GAP 在案，不冒充）；AC-04 pass（vue 全链+V-09+vm 臂实际结果与因果）；AC-05 pass（V-06/07/09 负控矩阵+零落盘+资源 404）；AC-06 partial-具名（旧门 27/28 与 25/27 真实跑毕、FAIL 归属实证、V-08 双实例与 V-10 探针驱动负控未单列执行——见 F-1）；AC-07 pass（有条件 go=vue 全链 go+原生嵌入已证+输入 GAP 非 no_go，owner/前置/局限全列）；AC-08 pass（SD-01 草稿与实际一致不超claim；roadmap 指针落地）。
+- findings：F-1（低，文档完备性）=报告 §6 局限未显式列 V-08/V-10 未单列执行——由 merge 在收尾折叠时补入报告/合同，不改研究结论；F-2（低，边界维持）=原生输入 GAP 的人工桌面验证留待后续（报告/Spec 已如实声明，非本合同内未完成项）。均不阻断研究交付 pass。
+- pending_closeout_gates：merge 拥有（canonical Spec 落地核对、报告 F-1 补行、材料折叠清理、landing 记录）。
+- evidence：plan-artifacts/plan-026/auto-reader/review-vue/ + 本文件记录的复跑命令与结果。
+- next: merge（T-09）。
 
 ## 10. 待澄清事项
 
