@@ -1188,7 +1188,7 @@ use shell_state::*;
 use style_widgets::*;
 use subscriptions::*;
 
-pub(crate) use devtools::{DebugElementInfo, DebugTreeNode};
+pub(crate) use devtools::{DebugElementInfo, DebugTreeNode, retain_input_values_after_handler, track_input_text};
 pub(crate) use style_widgets::{build_column, dynamic_abs_layer_position, layout_hover_flag, wrap_layout_events};
 pub(crate) use devtools::{column_layer_partition, patch_input_values};
 pub(crate) use shell_state::{
