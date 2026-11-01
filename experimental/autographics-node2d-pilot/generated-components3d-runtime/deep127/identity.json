@@ -1,6 +1,6 @@
 {
  "generator": "autographics-node2d-pilot plan027 components-3d-runtime",
- "api": "autographics.behavior/1",
+ "api": "autographics.character3d/1",
  "user_source_sha256": "2b9edc657c501b97be86aba760dbed6b7890a5a2961ce9d3569790f427faf7cd",
  "user_source_bytes": 5260,
   "module:character": "93cb4b4203ecd727e9686e0517f8dfed121c6f1763a265e902bf7e6dd82561a5",
@@ -146,7 +146,7 @@
  ],
  "provenance": {
   "product": "deep127",
-  "consumer": "unrecorded (this out dir has no registered flow consumer)",
+  "consumer": "experimental/autographics-auto-driver/tests/node3d_runtime_flow.rs",
   "consumption": "include_str! frozen scene.agscene + world.at + assets/<sha>.glb; the harness writes the project (scene + assets) under target and loads via Storage::load_project; variants feed scripts/<sha>.at where <sha> = scene.behavior.source.sha256",
   "load_verification": "the load path hash-verifies the behavior source and every assets/<sha>.glb against the scene manifest; GLB geometry admission runs in the driver preflight decoder before allocation",
   "world_sha256": "2b9edc657c501b97be86aba760dbed6b7890a5a2961ce9d3569790f427faf7cd"

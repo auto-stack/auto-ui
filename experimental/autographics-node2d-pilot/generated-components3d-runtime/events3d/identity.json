@@ -1,21 +1,19 @@
 {
  "generator": "autographics-node2d-pilot plan027 components-3d-runtime",
- "api": "autographics.behavior/1",
- "user_source_sha256": "fc7ea37aa1e6b91f195f01fa15bda75efa6a07d2820067297142464c2f70f6a6",
+ "api": "autographics.character3d/1",
+ "user_source_sha256": "a9e18a6a395c14196215d3a8c21e3608080d76b45e571e0744105341eecf69b0",
  "user_source_bytes": 1134,
   "module:beeper": "9c589a3548ffc7b42151522f5713d33728b811198871b78b2a6e8de2c32134d4",
-  "module:main": "e9736de17b912de7f39304a988c7ef69fb71fd6085ed474ebbe31843edf61893",
+  "module:main": "70464596e4987bebc452eb3975021bd5a930f5cbaa6438d9e3456649409a3d4b",
  "closure": [
   {"name": "beeper", "sha256": "9c589a3548ffc7b42151522f5713d33728b811198871b78b2a6e8de2c32134d4", "bytes": 502},
-  {"name": "main", "sha256": "e9736de17b912de7f39304a988c7ef69fb71fd6085ed474ebbe31843edf61893", "bytes": 1190}
+  {"name": "main", "sha256": "70464596e4987bebc452eb3975021bd5a930f5cbaa6438d9e3456649409a3d4b", "bytes": 829}
  ],
  "roles": {
  "scene_rows": {
-  "Main/b0/dot": 3,
-  "Main/b1/dot": 4,
-  "foe": 1,
-  "ground": 2,
-  "hero": 0
+  "Main/b0/dot": 1,
+  "Main/b1/dot": 2,
+  "pad": 0
  }
 },
  "assets": [
@@ -23,9 +21,9 @@
  ],
  "provenance": {
   "product": "events3d",
-  "consumer": "unrecorded (this out dir has no registered flow consumer)",
+  "consumer": "experimental/autographics-auto-driver/tests/node3d_runtime_flow.rs",
   "consumption": "include_str! frozen scene.agscene + world.at + assets/<sha>.glb; the harness writes the project (scene + assets) under target and loads via Storage::load_project; variants feed scripts/<sha>.at where <sha> = scene.behavior.source.sha256",
   "load_verification": "the load path hash-verifies the behavior source and every assets/<sha>.glb against the scene manifest; GLB geometry admission runs in the driver preflight decoder before allocation",
-  "world_sha256": "fc7ea37aa1e6b91f195f01fa15bda75efa6a07d2820067297142464c2f70f6a6"
+  "world_sha256": "a9e18a6a395c14196215d3a8c21e3608080d76b45e571e0744105341eecf69b0"
  }
 }

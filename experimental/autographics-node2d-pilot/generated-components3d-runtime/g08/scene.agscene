@@ -1,6 +1,6 @@
 {
  "behavior": {
-  "api": "autographics.behavior/1",
+  "api": "autographics.runtime_camera3d/1",
   "source": {
    "format": "auto-source",
    "sha256": "83888135d1993d59deb12b19e731cd90863f2425f1b4bdd345fb2c9811db3567",

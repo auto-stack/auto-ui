@@ -2456,6 +2456,7 @@ fn group_json_3d(r: &Row3, id: u64) -> String {
 }
 
 pub(crate) fn scene_json_3d(
+    behavior_api: &str,
     doc_prefix: &str,
     entry: &str,
     scene: &SceneBuild3,
@@ -2491,7 +2492,7 @@ pub(crate) fn scene_json_3d(
         .join(",\n");
     let behavior = if has_behavior {
         format!(
-            "{{\n  \"api\": \"{API}\",\n  \"source\": {{\n   \"format\": \"auto-source\",\n   \"sha256\": \"{sha}\",\n   \"byte_length\": {bytes}\n  }},\n  \"actors\": {{\n   \"two_d\": null,\n   \"three_d\": null\n  }}\n }}"
+            "{{\n  \"api\": \"{behavior_api}\",\n  \"source\": {{\n   \"format\": \"auto-source\",\n   \"sha256\": \"{sha}\",\n   \"byte_length\": {bytes}\n  }},\n  \"actors\": {{\n   \"two_d\": null,\n   \"three_d\": null\n  }}\n }}"
         )
     } else {
         "null".to_string()
@@ -2518,6 +2519,7 @@ pub fn lower_project_components3d(project: &Project) -> Result<LowerOutputBasic2
         doc_prefix: "plan024-components-3d",
         gen_note: "PLAN-024 components-3d",
         regen_note: "tools/verify_plan024.py",
+        behavior_api: API,
     })
 }
 
@@ -2531,6 +2533,9 @@ pub(crate) struct Cfg3<'c> {
     pub gen_note: &'static str,
     /// 生成头再生成门注释（verifier 脚本名）。
     pub regen_note: &'static str,
+    /// scene.agscene behavior.api（024 = autographics.behavior/1；runtime =
+    /// character3d/1 或 runtime_camera3d/1，驱动 start_selected_play 据此装配）。
+    pub behavior_api: &'static str,
 }
 
 pub(crate) fn lower_project_components3d_cfg(
@@ -2557,6 +2562,7 @@ pub(crate) fn lower_project_components3d_cfg(
         .map(|(s, l, n)| (s.clone(), *l, n.as_str()))
         .collect();
     let scene_json = scene_json_3d(
+        cfg.behavior_api,
         cfg.doc_prefix,
         &entry,
         &scene,

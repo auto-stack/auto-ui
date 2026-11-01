@@ -1,11 +1,11 @@
 {
  "generator": "autographics-node2d-pilot plan027 components-3d-runtime",
- "api": "autographics.behavior/1",
+ "api": "autographics.character3d/1",
  "user_source_sha256": null,
  "user_source_bytes": 350,
-  "module:main": "65820af9993786c6198909340c8b3e04712a8da9265d66d9ce51629e4f609fbb",
+  "module:main": "9b7d2ceec3421dc72d54f6cc8bf870e3b5c4a4a2b694d1c870a0a65c4e697889",
  "closure": [
-  {"name": "main", "sha256": "65820af9993786c6198909340c8b3e04712a8da9265d66d9ce51629e4f609fbb", "bytes": 658}
+  {"name": "main", "sha256": "9b7d2ceec3421dc72d54f6cc8bf870e3b5c4a4a2b694d1c870a0a65c4e697889", "bytes": 659}
  ],
  "roles": {
  "scene_rows": {

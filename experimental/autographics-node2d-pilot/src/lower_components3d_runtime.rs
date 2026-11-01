@@ -78,6 +78,13 @@ pub fn lower_project_components3d_runtime(
     let w3 = build_world_3d(project)?;
     let scene = collect_scene_3d(project, &w3)?;
     let runtime = collect_runtime_cfg(project, &w3, &scene)?;
+    // 装配身份：声明 camera3d -> runtime_camera3d/1（主机织入相机候选），
+    // 否则 character3d/1。驱动 start_selected_play 按该串选择受信装配。
+    let behavior_api = if runtime.camera.is_some() {
+        "autographics.runtime_camera3d/1"
+    } else {
+        "autographics.character3d/1"
+    };
     lower_project_components3d_cfg(
         project,
         Cfg3 {
@@ -85,6 +92,7 @@ pub fn lower_project_components3d_runtime(
             doc_prefix: "plan027-components-3d-runtime",
             gen_note: "PLAN-027 components-3d-runtime",
             regen_note: "tools/verify_plan027.py",
+            behavior_api,
         },
     )
 }

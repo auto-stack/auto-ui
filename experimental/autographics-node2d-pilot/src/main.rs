@@ -27,6 +27,7 @@ fn write_components3d_products(
     project: &autographics_node2d_pilot::load::Project,
     lowered: autographics_node2d_pilot::LowerOutputBasic2D,
     generator: &str,
+    behavior_api: &str,
     consumer_for: fn(&str) -> &'static str,
 ) {
             if let Some(src) = &lowered.user_source {
@@ -84,9 +85,8 @@ fn write_components3d_products(
                 ));
             }
             let mut identity = String::from("{\n");
-            identity.push_str(&format!(" \"generator\": \"{generator}\",
-"));
-            identity.push_str(" \"api\": \"autographics.behavior/1\",\n");
+            identity.push_str(&format!(" \"generator\": \"{generator}\",\n"));
+            identity.push_str(&format!(" \"api\": \"{behavior_api}\",\n"));
             identity.push_str(&format!(
                 " \"user_source_sha256\": {},\n \"user_source_bytes\": {},\n",
                 match &lowered.user_source {
@@ -164,9 +164,24 @@ fn components3d_consumer(product: &str) -> &'static str {
     }
 }
 
+fn runtime_behavior_api(project: &autographics_node2d_pilot::load::Project) -> &'static str {
+    // 与降层同规则：任一声明带 camera3d -> runtime_camera3d/1，否则
+    // character3d/1；无行为场景产品不读该串。
+    let has_camera = project
+        .modules
+        .values()
+        .any(|m| m.nodes.iter().any(|n| n.camera3d.is_some()));
+    if has_camera {
+        "autographics.runtime_camera3d/1"
+    } else {
+        "autographics.character3d/1"
+    }
+}
+
 fn components3d_runtime_consumer(product: &str) -> &'static str {
     match product {
-        "g07a" | "g07a-fast" | "g07b" | "g08" | "g08-alt" | "static-actors" | "wide128" => {
+        "g07a" | "g07a-fast" | "g07b" | "g08" | "g08-alt" | "static-actors" | "events3d"
+        | "wide128" | "deep127" | "two-moves" | "stale-token" => {
             "experimental/autographics-auto-driver/tests/node3d_runtime_flow.rs"
         }
         "neg-two-characters" | "neg-camera-without-character" | "neg-camera-non-root"
@@ -849,6 +864,7 @@ fn main() {
                 &project,
                 lowered,
                 "autographics-node2d-pilot plan024 components-3d",
+                "autographics.behavior/1",
                 components3d_consumer,
             );
         }
@@ -864,6 +880,7 @@ fn main() {
                 &project,
                 lowered,
                 "autographics-node2d-pilot plan027 components-3d-runtime",
+                runtime_behavior_api(&project),
                 components3d_runtime_consumer,
             );
         }

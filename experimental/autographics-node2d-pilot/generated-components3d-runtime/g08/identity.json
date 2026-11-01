@@ -1,6 +1,6 @@
 {
  "generator": "autographics-node2d-pilot plan027 components-3d-runtime",
- "api": "autographics.behavior/1",
+ "api": "autographics.runtime_camera3d/1",
  "user_source_sha256": "83888135d1993d59deb12b19e731cd90863f2425f1b4bdd345fb2c9811db3567",
  "user_source_bytes": 2231,
   "module:character": "1998e8abfd1d4c6f36c874868a24cde1c6b55e4c86c376a0d8098449c7e2054a",

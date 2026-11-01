@@ -223,17 +223,29 @@ fn events3d_keeps_the_020_receiver_isolation_face_on_the_runtime_profile() {
 
 #[test]
 fn wide128_boundary_and_deep127_counterexample_lower_ok() {
-    // 128 对象文档边界（角色 + 127 solids）接受；deep127 反例同样降层成功
-    // （拒绝发生在真实 Run 的累计步门，属 V-S02 流面，不在编译面）。
-    for (name, main) in [("wide128", WIDE128_MAIN), ("deep127", DEEP127_MAIN)] {
-        let out = case(&[("main", main), ("character", G07A_CHARACTER)])
-            .unwrap_or_else(|e| panic!("{name} must lower: {e}"));
+    // 128 行文档边界：wide128 = 角色 + 地面/墙两个注册 solid + 125 根非
+    // solid 稀疏柱（扫描包络过 128 identities）；deep127 = 127 根注册
+    // solid 重叠瓦片（文档上限内的越限反例，拒绝发生在真实 Run 的累计
+    // 步门，属 V-S02 流面，不在编译面）。
+    {
+        let out = case(&[("main", WIDE128_MAIN), ("character", G07A_CHARACTER)])
+            .expect("wide128 must lower");
         let world = out.user_source.as_ref().unwrap();
-        // root 自身元素先于实例：127 根柱 = 文档 id 1..127，角色实例 = 128。
+        // root 自身元素先于实例：ground=1、wall=2 注册 solid，柱 3..127，
+        // 角色实例 = 文档 id 128。
         assert!(world.contains(" ok=ok+ag_char3_bind(128)\n"), "{world}");
-        assert_eq!(world.matches("ag_char3_solid(").count(), 127, "{name}");
+        assert!(world.contains(" ok=ok+ag_char3_solid(1)\n"), "{world}");
+        assert!(world.contains(" ok=ok+ag_char3_solid(2)\n"), "{world}");
+        assert_eq!(world.matches("ag_char3_solid(").count(), 2, "{world}");
         let scene = &out.scene_json;
-        assert_eq!(scene.matches("\"kind\": \"cylinder\"").count(), 128, "{name}");
+        assert_eq!(scene.matches("\"kind\": \"cylinder\"").count(), 128, "wide128 rows");
+    }
+    {
+        let out = case(&[("main", DEEP127_MAIN), ("character", G07A_CHARACTER)])
+            .expect("deep127 must lower");
+        let world = out.user_source.as_ref().unwrap();
+        assert!(world.contains(" ok=ok+ag_char3_bind(128)\n"), "{world}");
+        assert_eq!(world.matches("ag_char3_solid(").count(), 127, "deep127 solids");
     }
 }
 

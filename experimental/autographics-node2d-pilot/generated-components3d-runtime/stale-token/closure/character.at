@@ -1,0 +1,29 @@
+// PLAN-027 components-3d-runtime stale-token: the second tick reads grounded
+// with the FIRST tick's MoveToken (charged 1; totals stay within the frozen
+// 32-credit callback), so the trusted unit must refuse it with fault 13 —
+// old tokens are unreadable, latest-only reads (V-S03).
+node Character() {
+    character3d {}
+    model {
+        var q = 0
+        var first = 1
+        var grounded = 0
+    }
+    view-3d {
+        cylinder3d body {
+            position: (0.0, 0.5, 0.0)
+            scale: (0.4, 0.5, 0.4)
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            if .first == 1 {
+                .q = refs.body.move3d(0.01, 0.0, 0.0)
+                .first = 0
+            } else {
+                let q2 = refs.body.move3d(0.0, 0.0, 0.0)
+                .grounded = refs.body.grounded(.q)
+            }
+        }
+    }
+}

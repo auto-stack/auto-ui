@@ -1,9 +1,9 @@
 {
  "behavior": {
-  "api": "autographics.behavior/1",
+  "api": "autographics.character3d/1",
   "source": {
    "format": "auto-source",
-   "sha256": "fc7ea37aa1e6b91f195f01fa15bda75efa6a07d2820067297142464c2f70f6a6",
+   "sha256": "a9e18a6a395c14196215d3a8c21e3608080d76b45e571e0744105341eecf69b0",
    "byte_length": 1134
   },
   "actors": {
@@ -26,61 +26,7 @@
  "objects": [
   {
    "id": 1,
-   "name": "hero",
-   "kind": "player",
-   "translation": [
-    0.0,
-    0.5,
-    0.0
-   ],
-   "scale": [
-    1.0,
-    1.0,
-    1.0
-   ],
-   "yaw": 0.0,
-   "pitch": 0.0,
-   "rgba": [
-    0.9,
-    0.3,
-    0.2,
-    1.0
-   ],
-   "visible": true,
-   "parent": null,
-   "resource": null,
-   "sprite": null
-  },
-  {
-   "id": 2,
-   "name": "foe",
-   "kind": "mob",
-   "translation": [
-    2.5,
-    0.5,
-    -1.0
-   ],
-   "scale": [
-    1.0,
-    1.0,
-    1.0
-   ],
-   "yaw": 0.0,
-   "pitch": 0.0,
-   "rgba": [
-    0.9,
-    0.3,
-    0.2,
-    1.0
-   ],
-   "visible": true,
-   "parent": null,
-   "resource": null,
-   "sprite": null
-  },
-  {
-   "id": 3,
-   "name": "ground",
+   "name": "pad",
    "kind": "cylinder",
    "translation": [
     0.0,
@@ -106,7 +52,7 @@
    "sprite": null
   },
   {
-   "id": 4,
+   "id": 2,
    "name": "Main/b0/dot",
    "kind": "cylinder",
    "translation": [
@@ -133,7 +79,7 @@
    "sprite": null
   },
   {
-   "id": 5,
+   "id": 3,
    "name": "Main/b1/dot",
    "kind": "cylinder",
    "translation": [

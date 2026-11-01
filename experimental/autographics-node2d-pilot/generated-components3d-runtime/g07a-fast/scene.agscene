@@ -1,6 +1,6 @@
 {
  "behavior": {
-  "api": "autographics.behavior/1",
+  "api": "autographics.character3d/1",
   "source": {
    "format": "auto-source",
    "sha256": "b41e043a9ad488fbbb24216be41562d74a2efa60cc3b31721d048d2a18c342dc",
