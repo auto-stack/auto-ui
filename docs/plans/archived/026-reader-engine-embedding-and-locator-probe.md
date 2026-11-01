@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-01
 updated_at: 2026-11-02
 plan_revision: 1
-current_step: 7
+current_step: 10
 total_steps: 10
 base_branch: master
 base_commit: 98cbcd2e79ebc61b0683886f24f0747b20d72617
@@ -21,9 +21,11 @@ touched_goals: []
 
 ## 0. 变更摘要
 
-承接 AutoReader 的 [coverage v3 路线](../../../auto-reader/docs/roadmap-v0.6.md)及已归档 READER-006，验证成熟 EPUB 引擎是否能进入 AutoUI 的 Vue 与原生 VM 表面，并让真实选区/定位经过应用 .at handler、持久化、冷重启恢复同一原文。主导仓为 **auto-ui**，AutoReader 为受管资产与纯 .at 消费验证方，Readest 固定源码仅为研究/引擎来源。
+承接 AutoReader 的 [路线](../../../../auto-reader/docs/roadmap-v0.6.md)及已归档 READER-006，验证成熟 EPUB 引擎是否能进入 AutoUI 的 Vue 与原生 VM 表面，并让真实选区/定位经过应用 .at handler、持久化、冷重启恢复同一原文。主导仓为 **auto-ui**，AutoReader 为受管资产与纯 .at 消费验证方，Readest 固定源码仅为研究/引擎来源。
 
-本轮用户明确“建立正式计划、核实已有能力、明确分工与双端验收，暂不实施”。当前仅 new，drafting/r1、0/10；不创建实施 worktree、不安装依赖、不写探针源码、不构建/启动应用、不实测、不改 canonical Spec。下述新文件、命令和预期均为未来任务，不是已完成证据。
+当前状态（2026-11-02 文档校正）：本计划已交付并归档，流程任务按 §9 merge/cleaned 回执记 **10/10**；头部原残留 7/10 已校正。这是流程计数，**不表示全部双端能力验收通过**。Vue 指定样本选区/保存/冷恢复 30/30；原生独立 iced 实验宿主的 WebView2 嵌入、引擎装载与 IPC 已证，真实输入→.at→保存/冷恢复尚未闭合，焦点/IME/系统无障碍未充分取证，V-08 与 V-10 未单列执行。报告“有条件 go”不得解释为原合同双端全门 go，详见[研究报告](../../research/reader-engine-probe.md)。
+
+起草时用户要求“暂不实施”，之后执行授权及过程见 §9；保留原目标、任务、验收与历史收据。此次只校正文档与链接，不补造执行结果、不重写 AC 标准、不声称重新复审。原复审记录注明同会话复跑，不能改称独立上下文复审。下一阶段先补原生输入与必要接缝的证据，再进入产品化。
 
 ## 1. 目标
 
@@ -252,9 +254,15 @@ AC-02～06 的成功语义是**路线go门**，不是允许跳过的产品验收
 
 - **merge 后记（cleaned）**：worktree `.wt/ui-026/auto-ui`（guard clean）与分支 codex/plan-026-dev（tip 68c36f0）已删、组目录移除；plan-artifacts/plan-026 整删（review-vue 复跑 30/30、旧门日志、t00 契约等摘要均在 §8/§9 收据内）；引擎资产确定性重建脚本=reader tests/probe/engine_surface/prepare_engine_assets.py（adapter 固化于 assets/engine-adapter.js，reader aa54cb1）。旧门两处历史 FAIL（R-05 工具链 owner / R-06vm reader owner）保持可见。10/10：T-00..T-07 work、T-08 review pass、T-09 merge delivered。
 
-## 10. 待澄清事项
+### 2026-11-02：归档状态与导航对账（仅文档）
 
-无阻塞本次正式起草的用户信息，已有“暂不实施”指令是本轮终点。下列由未来T-00及探针负责，不要求用户事先选技术答案：
+- 按已有merge/cleaned回执同步头部current_step=10/10，保持status=archived、plan_revision=1；修复归档后相对路径与两仓导航旧drafting/0/10。这是进度/链接校正，不改变原目标或AC，不是新增执行/复审证据。
+- 保留原review对AC-03/AC-06的partial、V-08/V-10未单列、原生输入GAP及旧Reader门失败；报告“有条件go”不能提升为双端全部通过。原review为同会话复跑的限制保持可见。
+- 后续顺序：原生输入链定责与必要接缝/隔离失败门收口→独立上下文复核→Locator v2/完整EPUB产品化。本轮未重开合同、未新取号、未运行实验或修改产品代码。
+
+## 10. 待澄清事项（起草时问题与归档后状态）
+
+以下保留起草时的问题清单；后续执行授权和实测已记录在§9。当前归档后的状态/局限以§0及merge/cleaned/对账记录为准，未闭合接缝交后续收口，不能将下列起草措辞理解为026尚未执行：
 
 1. 原生宿主可接入方式、引擎资产装载、桥字段/单位/预算与系统无障碍工具？T-00先冻结profile，T-02/03实证。
 2. UI 025/007对共享编译/宿主文件的写入时间窗、工具构建与实际source cohort？T-00按owner协调，一app一写入者，不切走他人工作。

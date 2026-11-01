@@ -2,7 +2,7 @@
 
 基于 Auto 语言的跨平台 UI 框架
 
-阅读器跨仓探针：[auto-ui/PLAN-026 阅读引擎嵌入与定位回传](docs/plans/026-reader-engine-embedding-and-locator-probe.md)（drafting/r1、0/10，仅规划、暂不实施）。本仓负责宿主表面/双端桥与资源生命周期，[AutoReader](https://github.com/auto-stack/auto-reader/blob/main/README.md)负责真实受管EPUB与纯.at消费验证；唯一正文在本仓，Reader不重复取号。已静态核对选择复制、Rich和RemoteFrame；其存在不代表原生WebView/CFI回传已可用。
+阅读器跨仓探针：[auto-ui/PLAN-026](docs/plans/archived/026-reader-engine-embedding-and-locator-probe.md)已交付归档（r1、流程10/10）。[报告](docs/research/reader-engine-probe.md)记录Vue指定样本全链30/30；原生独立iced宿主嵌入/引擎/IPC已证，真实输入回传、IME/无障碍等仍有GAP，不能据归档称双端全门通过。下一阶段先收口原生输入链与必要接缝，再做完整EPUB产品化；本仓主导宿主，[AutoReader](https://github.com/auto-stack/auto-reader/blob/main/README.md)负责消费与数据验证。
 
 ## 项目概述
 
