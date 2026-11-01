@@ -1,0 +1,36 @@
+// PLAN-023 T-02 gameplay Zone: one definition, two instances (goal pad,
+// hazard void). A Zone is a runtime instance (shape2d with a model-bound
+// visible field -> template row + spawn + per-tick change-gated present),
+// NOT a static scene leaf: the frozen character sweep collides with every
+// scene leaf, so a walking character can only ever overlap non-solid
+// runtime instances - the only shape a walk-through trigger region can
+// take. Local once-state (alive) with the same idempotent handler shape as
+// the Coin; vis0 lets the hazard spawn invisible.
+node Zone(zx: float, zy: float, vis0: int, geo: Mesh2D, tint: Material2D) {
+    model {
+        var alive = 1
+        var vis = .vis0
+        var ticks = 0
+    }
+    msg {
+        Enter(int)
+    }
+    view-2d {
+        shape2d box {
+            mesh: .geo
+            position: (.zx, .zy)
+            material: .tint
+            visible: .vis
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            .ticks = .ticks + 1
+        }
+        .Enter(n) -> {
+            if .alive == 1 {
+                .alive = 0
+            }
+        }
+    }
+}

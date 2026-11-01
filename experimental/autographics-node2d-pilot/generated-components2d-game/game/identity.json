@@ -1,0 +1,34 @@
+{
+ "generator": "autographics-node2d-pilot plan023 components-2d-game",
+ "api": "autographics.hud2d/1",
+ "user_source_sha256": "ed98b0b556d7e9c80e48355e7bacab7182f9aa9d0007c7441db36062bbb897d0",
+ "user_source_bytes": 6556,
+  "module:coin": "0bc4aea1cce52f389b3bcd0bc7735ca2c531358419e231d31ce80e4689ae475e",
+  "module:main": "480ba814a2baa890b572c6cf5fc86d781016ec7d692be13a322b3633bfa423ee",
+  "module:player": "ecc37f451951cce364e9487ae11430aa9f3df6989249f7237ae838df4ed036d5",
+  "module:resources": "73c62ded188aa1b075d5d9522ca899fca652126d6ec7a6b328d6e281e8ff4cb6",
+  "module:zone": "16b39b46494b2e297c0a96e2f43f985da2c9ea32d17d0645ff4c49a7b06701d2",
+ "closure": [
+  {"name": "coin", "sha256": "0bc4aea1cce52f389b3bcd0bc7735ca2c531358419e231d31ce80e4689ae475e", "bytes": 1038},
+  {"name": "main", "sha256": "480ba814a2baa890b572c6cf5fc86d781016ec7d692be13a322b3633bfa423ee", "bytes": 5172},
+  {"name": "player", "sha256": "ecc37f451951cce364e9487ae11430aa9f3df6989249f7237ae838df4ed036d5", "bytes": 1647},
+  {"name": "resources", "sha256": "73c62ded188aa1b075d5d9522ca899fca652126d6ec7a6b328d6e281e8ff4cb6", "bytes": 577},
+  {"name": "zone", "sha256": "16b39b46494b2e297c0a96e2f43f985da2c9ea32d17d0645ff4c49a7b06701d2", "bytes": 1114},
+  {"name": "asset:b0b740dc49e51abefff9bb1af830080fe00f817b468614992040d438d6171c3d.wav", "sha256": "b0b740dc49e51abefff9bb1af830080fe00f817b468614992040d438d6171c3d", "bytes": 90060},
+  {"name": "asset:lilita_one_regular.ttf", "sha256": "4444c23631884f411aa7f2fee35061b1756a9927940c62d2a5572acf470b3ffa", "bytes": 26828},
+  {"name": "asset:license.txt", "sha256": "31d45880a38de46bc81835329c0c7d964609751e65add92769ea0095ad92c05b", "bytes": 4391}
+ ],
+ "roles": {
+ "character": 1,
+ "character_name": "player.body",
+ "solids": [{"id": 2, "name": "ground"}],
+ "camera": 1,
+ "scene_objects": {"player.body": 1, "ground": 2, "c1_template": 3, "c2_template": 4, "c3_template": 5, "pad_template": 6, "hazard_template": 7}
+},
+ "provenance": {
+  "product": "game",
+  "consumer": "experimental/autographics-auto-driver/tests/t03_game_gates.rs (V-01 byte pin + V-02 Hud2V1 admission)",
+  "consumption": "include_str! frozen scene.agscene + world.at; the harness writes world.at to scripts/<sha>.at where <sha> = scene.behavior.source.sha256",
+  "world_sha256": "ed98b0b556d7e9c80e48355e7bacab7182f9aa9d0007c7441db36062bbb897d0"
+ }
+}

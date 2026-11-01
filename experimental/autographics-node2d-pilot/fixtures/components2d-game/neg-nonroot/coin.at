@@ -1,0 +1,33 @@
+// PLAN-023 T-02 gameplay Coin: one definition, three instances. Local
+// once-only state: alive (1 = waiting, 0 = collected). The typed Collect
+// event is the coin's own once-event; the handler is idempotent (the alive
+// guard), so a repeated delivery can never double-collect. The visible
+// model binding makes the shape a runtime object (template row + spawn +
+// per-tick present sync, change-gated writes); after collection the probe
+// wiring despawns the slot, and the alive gate in the generated present
+// call skips the now-dead token (a visible write to a despawned token is
+// named fault 33).
+node Coin(cx: float, cy: float, geo: Mesh2D, tint: Material2D) {
+    game2d {}
+    model {
+        var alive = 1
+    }
+    msg {
+        Collect(int)
+    }
+    view-2d {
+        shape2d disc {
+            mesh: .geo
+            position: (.cx, .cy)
+            material: .tint
+            visible: .alive
+        }
+    }
+    on {
+        .Collect(n) -> {
+            if .alive == 1 {
+                .alive = 0
+            }
+        }
+    }
+}

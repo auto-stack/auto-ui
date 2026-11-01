@@ -1,0 +1,11 @@
+// PLAN-023 T-02 gameplay probe resources: gold coins, orange character,
+// gray 24x1 ground, invisible hazard void (40x2), visible goal pad (2x1).
+let coin_mesh = mesh2d.circle(0.5)
+let coin_tint = material2d.color(0.95, 0.85, 0.2, 1.0)
+let char_orange = material2d.color(0.9, 0.5, 0.25, 1.0)
+let ground_color = material2d.color(0.45, 0.45, 0.45, 1.0)
+let ground_mesh = mesh2d.quad(24.0, 1.0)
+let void_color = material2d.color(0.1, 0.1, 0.1, 1.0)
+let void_mesh = mesh2d.quad(40.0, 2.0)
+let pad_color = material2d.color(0.9, 0.8, 0.3, 1.0)
+let pad_mesh = mesh2d.quad(2.0, 1.0)
