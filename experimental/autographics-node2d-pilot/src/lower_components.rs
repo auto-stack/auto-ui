@@ -1081,15 +1081,14 @@ fn walk_expr(e: &Expr, line: usize, out: &mut WalkOut) {
             }
         }
         Expr::Bina(l, op, r) => {
-            // 赋值目标记录：`.member = ...`（成员写；参数只读合同）。检测
-            // 在 Bina 臂内，表达式嵌套形态（let x = (.p = v)、
-            // if (.p = v) == v {…}）同样命中同一具名拒绝。
+            // 赋值目标记录：`.member = ...` 的左值（成员写；参数只读合
+            // 同）。仅检 Asn 左侧——右侧是读取（`.ticks = .phase0` 合法，
+            // .phase0 为参数）；嵌套写入（let x = (.p = v)、
+            // if (.p = v) == v {…}）由递归进入内层 Asn 同样命中。
             if matches!(op, auto_parser_api::ast::Op::Asn) {
-                for side in [l, r] {
-                    if let Expr::Dot(inner, name) = &**side {
-                        if matches!(&**inner, Expr::Ident(b) if b == "self") {
-                            out.assign_targets.push((name.to_string(), line));
-                        }
+                if let Expr::Dot(inner, name) = &**l {
+                    if matches!(&**inner, Expr::Ident(b) if b == "self") {
+                        out.assign_targets.push((name.to_string(), line));
                     }
                 }
             }

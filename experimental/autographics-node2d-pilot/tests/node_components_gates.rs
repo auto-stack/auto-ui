@@ -339,6 +339,73 @@ fn negative_fixtures_fail_with_named_diagnostics_and_no_panic() {
     }
 }
 
+/// F-R3-01 positive pin: an Asn RHS `.param` READ is legal — the read-only
+/// contract checks only the assignment TARGET (left side). `.draw_x =
+/// .phase0` / `.phase = .phase0` lower green with the runtime param array
+/// materialized.
+#[test]
+fn param_rhs_read_lowers_green_and_materializes_the_param_array() {
+    let gauge = "// PLAN-020 positive pin: param reads on assignment RHS are legal.
+node Gauge(phase0: float, speed: float, base_x: float, base_y: float, hide_at: int, parity0: int, geo: Mesh2D, tint: Material2D) {
+    model {
+        var phase = .phase0
+        var ticks = 0
+        var count = 0
+        var draw_x = .base_x
+        var show = 1
+        var parity = .parity0
+    }
+    msg {
+        Add(int)
+    }
+    view-2d {
+        shape2d disc {
+            mesh: .geo
+            position: (.draw_x, .base_y)
+            material: .tint
+            visible: .show
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            .draw_x = .phase0
+            .phase = .phase0
+            .ticks = .ticks + 1
+            if .parity == 0 {
+                .draw_x = .base_x + .phase * 2.0 + .count * 0.2
+                .parity = 1
+            } else {
+                .parity = 0
+            }
+        }
+        .Add(n) -> {
+            .count = .count + n
+        }
+    }
+}
+";
+    let out = components(&[
+        ("main", BUDGET_MAIN),
+        ("gauge", gauge),
+        ("player", PLAYER),
+        ("resources", RES),
+    ])
+    .expect("param RHS reads lower green");
+    let w = out.user_source.as_ref().expect("world.at");
+    assert!(
+        w.contains("var gauge_phase0=[0.0,5.0,2.0,7.0]"),
+        "runtime param array materialized"
+    );
+    assert!(
+        w.contains("gauge_draw_x[i] = gauge_phase0[i]"),
+        "RHS param read materialized"
+    );
+    assert!(
+        w.contains("gauge_phase[i] = gauge_phase0[i]"),
+        "second RHS param read materialized"
+    );
+}
+
 // --------------------------------------- T-05：预算/包络/初始化故障降层面 --
 
 #[test]
