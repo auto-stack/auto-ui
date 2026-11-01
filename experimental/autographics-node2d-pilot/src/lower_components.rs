@@ -27,6 +27,31 @@
 //! 具名拒绝（V-01）：每条诊断带 `module <m>, line <n>, symbol '<s>'`；
 //! 非法图（实例环/重复路径/缺 use/错参数元数/未知端口/未知 helper/第 9
 //! 有状态实例/缺相机）执行前拒绝，不 panic。
+//!
+//! PLAN-023 F-8 修复（T-02 实测缺陷）：
+//! - 呈现缓存改名 `<prefix>_visq`：020 以 `<prefix>_vis` 命名可见性缓存，
+//!   与作者 model 字段 `vis` 的 SoA 数组重名 → `var zone_vis=[..]` 声明
+//!   两次，admission 拒绝（T-02 探针手改 `zone_visq` 复现）。缓存统一
+//!   改为 `_visq`，并对与生成缓存符号撞名的 model 字段（`handle`/`px`/
+//!   `py`/`visq` 后缀）给出具名拒绝；020 冻结产物字节不受影响（绿色
+//!   夹具无一携带撞名字段——携带即 admission 致命，不可能为绿色）。
+//! - 区域规则（F-6 region rule）：goal/hazard 触发区必须是运行时实例
+//!   （带 model 绑定 shape 的组件 → 模板行 + ag_object_spawn），不能是
+//!   静态场景叶。实测依据：frozen 角色扫移（behavior_motion_v5.at 的
+//!   ag_move_and_slide）把每个场景叶当碰撞候选（仅跳过 self/group/其他
+//!   维度/隐藏），行走角色要么被叶挡住（status 3）要么停在 clearance
+//!   (0.002) 之上——闭区间触发对被触及的静态叶永不进入。运行时实例
+//!   非固体（合同），角色可自由重叠：触发区只能取实例形态。降层面：
+//!   触发目标实例的定义若无动态 shape（无 spawn/无 handle）→ 具名拒绝
+//!   "region rule: trigger regions must be runtime instances, not static
+//!   scene leaves"。
+//! - CPU 会话空间盒约定（F-8.3）：CPU 会话 `_ag_spatial_config` 按宿主
+//!   Descriptor 行（spatial.rs）同型供盒 —— **平移相对半边长**
+//!   (translation-relative half-extents: [-sx/2, -sy/2, -sz/2, +sx/2,
+//!   +sy/2, +sz/2])，平移由 `_ag_append_field` 的行载荷单独携带。绝对盒
+//!   （min/max 世界坐标）会把平移重复计入、静默平移每个触发/几何——
+//!   020 probe_session 曾以绝对盒供参（只影响 CPU 侧触发测试，GPU 门
+//!   不受影响）；T-02 探针与 PLAN-023 t03 门均按相对半边长供参。
 use auto_parser_api::ast::{Expr, Stmt, Type};
 use auto_ui_dialect::node2d::{EventPattern, NodeDecl, Prop, PropValue, View2dElement};
 
@@ -2989,7 +3014,13 @@ struct DynArr {
     vis: Option<String>,
 }
 
-fn def_dyn_arrays(project: &Project, def: &DefIR, prefix: &str) -> Result<Vec<DynArr>, LowerError> {
+fn def_dyn_arrays(
+    project: &Project,
+    def: &DefIR,
+    prefix: &str,
+    soa_prefix: &str,
+    vis_suffix: &str,
+) -> Result<Vec<DynArr>, LowerError> {
     let mut out = Vec::new();
     let single = def.dyn_elems.len() == 1;
     let decl = node_of(project, &def.name);
@@ -3029,12 +3060,46 @@ fn def_dyn_arrays(project: &Project, def: &DefIR, prefix: &str) -> Result<Vec<Dy
             } else {
                 None
             },
+            // PLAN-023 F-8.1：可见性缓存后缀按 profile 选择——game 为
+            // `_visq`（020 的 `_vis` 与作者 model 字段 `vis` 撞名 → 重复
+            // `var` 声明，admission 致命；T-02 探针实测后手改 visq，生成
+            // 侧与之逐字同形），frozen components-2d 保持 `_vis`（F-1
+            // 冻结字节）。与任一生成缓存符号撞名的 model 字段在本函数
+            // 尾部具名拒绝（handle/px/py/<vis 后缀>）。
             vis: if vis_model {
-                Some(format!("{base}_vis"))
+                Some(format!("{base}_{vis_suffix}"))
             } else {
                 None
             },
         });
+    }
+    // 缓存符号保留名检查：`{prefix}_{field}` 命中任一生成缓存数组名即
+    // 为重复根符号（重复 `var`，admission 拒绝），下降期提前具名定位。
+    let mut caches: Vec<String> = Vec::new();
+    for arr in &out {
+        caches.push(arr.handle.clone());
+        if let Some(px) = &arr.px {
+            caches.push(px.clone());
+        }
+        if let Some(py) = &arr.py {
+            caches.push(py.clone());
+        }
+        if let Some(vis) = &arr.vis {
+            caches.push(vis.clone());
+        }
+    }
+    for (fname, _) in &def.model {
+        let soa = format!("{soa_prefix}_{fname}");
+        if caches.contains(&soa) {
+            return Err(at(
+                &def.module,
+                def.line,
+                fname,
+                &format!(
+                    "model field '{fname}' collides with the generated present-cache symbol '{soa}' (cache names <prefix>_handle/_px/_py/_visq are reserved); rename the model field"
+                ),
+            ));
+        }
     }
     Ok(out)
 }
@@ -3236,7 +3301,7 @@ fn gen_user_source(
                 vals.join(",")
             ));
         }
-        for arr in def_dyn_arrays(project, def, &def.prefix())? {
+        for arr in def_dyn_arrays(project, def, &def.prefix(), &def.prefix(), "vis")? {
             let zeros = vec!["0"; idxs.len()].join(",");
             src.push_str(&format!("var {}=[{zeros}]\n", arr.handle));
             if let (Some(px), Some(py)) = (&arr.px, &arr.py) {
@@ -3269,7 +3334,7 @@ fn gen_user_source(
         }
     }
     // root 动态呈现标量。
-    for arr in def_dyn_arrays(project, root_def, "main")? {
+    for arr in def_dyn_arrays(project, root_def, "main", "r", "vis")? {
         src.push_str(&format!("var {}=0\n", arr.handle));
         if let (Some(px), Some(py)) = (&arr.px, &arr.py) {
             let props = elem_props(project, root_def, &arr.elem)?;
@@ -3410,7 +3475,7 @@ fn gen_user_source(
     }
     // root 呈现 fn。
     if root_def.life_tick && !root_def.dyn_elems.is_empty() {
-        gen_present_fn(project, world, plan, root_def, true, &mut src)?;
+        gen_present_fn(project, world, plan, root_def, true, "vis", &mut src)?;
     }
 
     // ---- 每定义 fns（首个实例声明先序）----
@@ -3469,7 +3534,7 @@ fn gen_user_source(
             )?;
         }
         if def.life_tick && !def.dyn_elems.is_empty() {
-            gen_present_fn(project, world, plan, def, false, &mut src)?;
+            gen_present_fn(project, world, plan, def, false, "vis", &mut src)?;
         }
     }
 
@@ -3615,6 +3680,7 @@ fn gen_present_fn(
     plan: &Plan,
     def: &DefIR,
     is_root: bool,
+    vis_suffix: &str,
     src: &mut String,
 ) -> Result<(), LowerError> {
     let prefix = if is_root {
@@ -3622,7 +3688,7 @@ fn gen_present_fn(
     } else {
         def.prefix()
     };
-    let arrays = def_dyn_arrays(project, def, &prefix)?;
+    let arrays = def_dyn_arrays(project, def, &prefix, &prefix, vis_suffix)?;
     if is_root {
         src.push_str("fn main_present() {\n");
     } else {

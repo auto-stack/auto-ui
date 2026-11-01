@@ -1,0 +1,36 @@
+// PLAN-023 F-8.1 negative fixture host: root + one Zone instance whose
+// definition carries the `vis` model field bound to shape visibility (the
+// T-02 measured collision shape). Lowering must reject with the named
+// present-cache diagnostic (module/line/symbol), not emit duplicate vars.
+use resources: pad_mesh, pad_color, char_orange, ground_color, ground_mesh
+use zone: Zone
+use player: Player
+
+node Main {
+    model {
+        var vy = 999
+    }
+    view-2d {
+        Zone pad {
+            zx: 4.0
+            zy: 1.0
+            geo: resources.pad_mesh
+            tint: resources.pad_color
+        }
+        Player player {
+            px: 2.0
+            py: 1.0
+            tint: resources.char_orange
+        }
+        solid2d ground {
+            position: (6.0, -0.5)
+            mesh: resources.ground_mesh
+            material: resources.ground_color
+        }
+        camera2d cam {
+            target: refs.player.actor
+            bounds: (0.0, -4.0, 24.0, 8.0)
+            view_size: (24.0, 8.0)
+        }
+    }
+}

@@ -35,6 +35,12 @@ const INIT_FAULT_CLUSTER: &str = include_str!("../fixtures/components2d/init-fau
 const NEG_PARAM_WRITE: &str = include_str!("../fixtures/components2d/neg-param-write/gauge.at");
 const NEG_PARAM_WRITE_NESTED: &str =
     include_str!("../fixtures/components2d/neg-param-write/gauge-nested.at");
+const NEG_VIS_CACHE_MAIN: &str = include_str!("../fixtures/components2d/neg-vis-cache/main.at");
+const NEG_VIS_CACHE_ZONE: &str = include_str!("../fixtures/components2d/neg-vis-cache/zone.at");
+const NEG_VIS_CACHE_PLAYER: &str =
+    include_str!("../fixtures/components2d/neg-vis-cache/player.at");
+const NEG_VIS_CACHE_RES: &str =
+    include_str!("../fixtures/components2d/neg-vis-cache/resources.at");
 const HELP_MAIN: &str = include_str!("../fixtures/components2d/helpers/main.at");
 const HELP_A: &str = include_str!("../fixtures/components2d/helpers/helpera.at");
 const HELP_B: &str = include_str!("../fixtures/components2d/helpers/helperb.at");
@@ -337,6 +343,22 @@ fn negative_fixtures_fail_with_named_diagnostics_and_no_panic() {
             "{err}"
         );
     }
+
+    // PLAN-023 F-8.1（frozen 档）：model 字段 `vis` 与呈现缓存
+    // `<prefix>_vis` 撞名（020 重复 `var` 根符号、admission 致命；T-02
+    // 实测）→ 降层具名拒绝（module/line/symbol），不再发出坏源。
+    let err = components(&[
+        ("main", NEG_VIS_CACHE_MAIN),
+        ("zone", NEG_VIS_CACHE_ZONE),
+        ("player", NEG_VIS_CACHE_PLAYER),
+        ("resources", NEG_VIS_CACHE_RES),
+    ])
+    .err()
+    .expect("vis cache collision must fail");
+    assert!(err.contains("present-cache symbol"), "{err}");
+    assert!(err.contains("'zone_vis'"), "{err}");
+    assert!(err.contains("'vis'"), "{err}");
+    assert!(err.contains("module zone") && err.contains("line "), "{err}");
 }
 
 /// F-R3-01 positive pin: an Asn RHS `.param` READ is legal — the read-only

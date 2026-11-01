@@ -1,0 +1,30 @@
+// PLAN-023 F-8.1 negative (frozen components-2d profile): a model field
+// named `vis` collides with the frozen present-cache symbol `<prefix>_vis`
+// (duplicate root `var zone_vis` — admission-fatal in 020, T-02 measured).
+// The lowering now names the collision (module/line/symbol) instead of
+// emitting duplicate declarations. The components-2d-game profile renames
+// its cache to `<prefix>_visq`, so the same field is legal there.
+node Zone(zx: float, zy: float, geo: Mesh2D, tint: Material2D) {
+    model {
+        var alive = 1
+        var vis = 1
+    }
+    msg {
+        Enter(int)
+    }
+    view-2d {
+        shape2d box {
+            mesh: .geo
+            position: (.zx, .zy)
+            material: .tint
+            visible: .vis
+        }
+    }
+    on {
+        .Enter(n) -> {
+            if .alive == 1 {
+                .alive = 0
+            }
+        }
+    }
+}
