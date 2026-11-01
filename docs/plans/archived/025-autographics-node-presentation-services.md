@@ -175,6 +175,8 @@ work自查→同一权威树独立上下文final review→merge冻结门，不�
 
 2026-11-01 / stage: merge | plan_id: auto-ui/PLAN-025:r1 | outcome: pass（checkpoint流水：prepared=reviewed f70b4a2+docs-only efb71e7、SD-01目标docs/specs/auto-graphics/有先例、冻结定向门全部绿可复用（review独立复跑+旧档五验证器）；landed=ff-only线性、master tip=d627369..e9cc929五提交、range-diff 1:1全等（e05172c→bf3641f、04b0f2c→e4682fb、5cb1c8a→62d8f5e、f70b4a2→d627369）+e9cc929（仅Spec措辞）；canonical_verified=docs/specs/auto-graphics/node-presentation-services.md在master（canonical状态行由merge改提案→canonical，54899e9）+pilot lock按main兄弟manifest重绑（54899e9）；main smoke=pilot gates 18/18+driver flow 14/14亲跑绿；archived=本文件git mv至docs/plans/archived/+status: archived | delivery_commit: e9cc929（canonical/lock后续=54899e9） | spec_paths: docs/specs/auto-graphics/node-presentation-services.md | cleanup: 见下一收据 | completion_kind: delivered）
 
+2026-11-01 / stage: merge | plan_id: auto-ui/PLAN-025:r1 | checkpoint: cleaned | worktree: D:/autostack/.wt/ui-025/auto-ui（fresh wt-guard clean后移除，branch codex/plan-025-dev@e9cc929已landed删除）、三detached兄弟（auto-lang/auto-web/auto-down）guard核后移除、组目录D:/autostack/.wt/ui-025已删 | plan_artifacts: D:/autostack/plan-artifacts/plan-025 全删（registry已刷新：auto-ui/PLAN-025 archived/delivered/无具名持有；删除前证据已全部折叠入本Plan §8/§9） | 最终计数: 10/10任务（work6+review1+merge3全[x]）、9AC全关、6组V-S全跑、1 SD canonical landed | landing checks: 本仓无生产部署消费面（experimental研究crate与冻结产品，无daemon/发布bundle）——显式观察：无需重建/重启的生产工件，main smoke即消费面验证（pilot gates 18/18+driver flow 14/14在54899e9亲跑绿） | batch regression: 本仓无.last-batch-regression.json约定（auto-lang规则），不适用 | cleaned: 2026-11-01
+
 ## 10. 待澄清事项
 
 | ID | 事项 | owner/关闭动作 |
