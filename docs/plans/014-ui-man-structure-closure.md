@@ -198,6 +198,7 @@ work/review只做命名反例/模块/fixture及必要`cargo check -p auto-ui-com
 | [✅ T-01] | work / G014 | 唯一ui-014组核各仓规约/HEAD及890/900/901/018实际交付和当前消费；冻结四面函数/消费者/状态/测试与X014，记录现有已完成职责和残项，禁止扩大到新架构 | AC-01；V-01，实际来源/依赖/窗口读回 |
 | [✅ T-02] | work / T-01 | 在同树对M1/U1/U2/U3有界最小全链验证，冻结模块/owner/状态与消息/资源图、测试/ID/支持矩阵及每V精确入口；临时图/映射统一`D:/autostack/plan-artifacts/plan-014/auto-ui/structure-and-oracles.md`（新材料，开工登记），永久规则入源码/Spec。公开语义/资源范围不可保先needs_replan | AC-01；V-01与V-02/04/06/07/08必要机制控制，不提前改架构或虚构API |
 | [✅ T-03] | work / T-02 | Man `auto/src/main.rs`及cmd_*/tool_ui_ops按冻结职责整理，复用现有owned/client/Web端点，主入口保组合/兼容，永久CLI反控 | AC-02/06；V-02/03 |
+| [✅ T-04] | work / T-03 | UI compiler `ui_gen/vue.rs`→按template/script/style/import/library/store等具名主题模块（具体新路径T-02冻结）；移除旧正文/重复算法，保公开入口/单state/reset/010 | AC-03；V-04/05 |
 | T-04 | work / T-03 | UI compiler `ui_gen/vue.rs`→按template/script/style/import/library/store等具名主题模块（具体新路径T-02冻结）；移除旧正文/重复算法，保公开入口/单state/reset/010 | AC-03；V-04/05 |
 | T-05 | work / T-04 | runtime `ui/aura_view_builder.rs`及必要既有相邻模块按节点/绑定/构建/跟踪职责提取；单VmBridge/Bindings/slot/path与guard，旧实现退出 | AC-04；V-06及定向状态控制 |
 | T-06 | work / T-05 | runtime `ui/iced/renderer.rs`按已冻结消息/状态/资源owner整理更新/订阅/view、图标部件、纹理/快照与宿主边界；保实际调用、资源终态/帧/active | AC-05/06；V-07/08/10，真实GPU定向，不以只移动代码关闭 |
@@ -219,6 +220,13 @@ work/review只做命名反例/模块/fixture及必要`cargo check -p auto-ui-com
 - **901 consumer漂移修复**（T-03前置，同等cbbe657类）：master auto-man对lang b1a4871a本不可解析——死转发feature `with-file-history`（901已从auto-lang-core退出）残留于crates/auto与crates/auto-core manifests；零代码引用（grep实证）。删除2行+刷新Cargo.lock/core/Cargo.lock，一并入5b310f0。
 - **V-02/V-03 实测**：`cargo check -p auto` exit 0（Full）；`cargo check --manifest-path core/Cargo.toml -p auto --no-default-features --features core` exit 0（Core形状）；unit `nextest -p auto --bin auto` 24/24；tcore 24/24（1既有skip）；`plan816_cli_driver+plan890_web_consumers+cmd_ui` 10/10（1既有skip；环境前置`te-child.exe`（lang）与`auto-ui-tool.exe`（ui组树）已补建）。负控：临时改名`cmd_build::run`→2个编译错→还原→0，分派接线为活。全部既有红/skip未新增。group兄弟构建产物（te-child/auto-ui-tool）留在各自worktree target，不入证据scope。
 
+### 8.2 执行记录（2026-11-01，work轮2：T-04）
+
+- **共享写面窗**：开工重读master=4aea5e6（基线上方仅b8fd0fb docs-only新提交，祖先关系保持，无代码漂移）；UI组树695ce0b零他方改动，窗口内单写。
+- **T-04 关闭**（AC-03；V-04/V-05）：UI worktree提交**7a183c6**（12文件+34709/−34615）：`ui_gen/vue.rs`(34,615行)→`ui_gen/vue/`目录——mod.rs保类型/助手/trait impl/generate_sfc编排/全部329测试；9个家族子模块纯impl移动：nav_sidebar/script/template_media/expr/tags/style_helpers/shadcn_attrs/project_files/store/library（切点逐一经doc/attr边界核验）。可见性提升经map账目核验：145个移method+5个library自由项+2个assoc const→pub(crate)（仅crate内面，公开API零改）；`ui_gen/mod.rs`零改动（`pub mod vue`路径不变）。冻结偏差登记（§2细化）：template_media吸收actions/previewcard(6821-7343,9505-10095)、expr吸收TS类型(11419起)、script吸收API提取/文本发射(12348-13673)、shadcn_attrs吸收registry发射(18806-18880)、style_helpers=extract_classes——均为原冻结家族间隙的归属细化，语义不变。
+- **V-04/V-05 实测**：按018合同 ui_gen族走**bare cargo test单进程**（nextest默认档排除ui_gen::属契约，`-E`不覆盖default-filter）：`cargo test -p auto-ui-compiler --lib ui_gen::vue` **327/327**；全lib单进程**1127 passed/0 failed/2 ignored**（2为既有#[ignore]）；`#[test]`守恒329=329；`ui_cache_schema`集成**1/1**（V-05指纹失效；A→B→A与全新A语料在327族内）；负控：golden串污染→`test_map_tag_native_html_passthrough` FAILED→还原→4/4，oracle为活；跨仓消费者check：auto-ui-tools与Man auto（ui-extra，经组兄弟树）各0 error。
+- 中间修复留痕：impl#1闭合`}`补插（原单impl块闭合位于20293）、store.rs多余`}`去除、`use library::{attribution_header,library_template,LIBRARY_UTILS_TS}`（mod.rs）与`use super::library::{emit_preset_dispatch,stream_guard_var}`（store.rs）两条拆分导入。
+
 ## 9. 复审记录
 
 ### r1历史记录（不作为当前启动指令）
@@ -236,6 +244,10 @@ stage: new（revision） / plan_id: auto-ui/PLAN-014 / plan_revision: 2 / outcom
 stage: work | plan_id: auto-ui/PLAN-014 | plan_revision: 2 | outcome: pass | worktree: D:/autostack/.wt/ui-014/auto-man（+组树 auto-ui@695ce0b, auto-lang@b1a4871a, auto-web@ec9c4ba, auto-down@7c4d5cb detached） | branch: codex/plan-014-structure | base_commit: cbbe657 | code_commit: 5b310f023a0ca1e60a356469e8d115d10e28f83e | dependency_revisions: lang b1a4871a / web ec9c4ba / down 7c4d5cb / UI组树 695ce0b | task_ids: T-01,T-02,T-03 | evidence: `plan-artifacts/plan-014/auto-ui/structure-and-oracles.md`（sha256前16 0ed07e8bef88a01d）+ §8.1执行记录 + 提交5b310f0（16文件+2691/−2293） | blockers: 无 | next_responsible_role: work（T-04 Vue，开工按§2冻结细绑并重读master）
 
 同轮 goal 收据：stage: goal | plan_id: PLAN-014 | plan_revision: r2 | round: 1 | from: drafting | to: executing | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-014/auto-man | commit: 5b310f0 | next: work
+
+### work轮2（2026-11-01，T-04）
+
+stage: work | plan_id: auto-ui/PLAN-014 | plan_revision: 2 | outcome: pass | worktree: D:/autostack/.wt/ui-014/auto-ui | branch: codex/plan-014-structure | base_commit: 695ce0b（master 4aea5e6祖先，docs-only漂移） | code_commit: 7a183c6 | dependency_revisions: lang b1a4871a / web ec9c4ba / down 7c4d5cb / man组树 5b310f0 | task_ids: T-04 | evidence: §8.2执行记录 + 提交7a183c6（12文件，#[test]守恒329=329，V-04 327/327单进程，全lib 1127/0，V-05 ui_cache_schema 1/1，负控+跨仓check全过） | blockers: 无 | next_responsible_role: work（T-05 Aura，开工按§3冻结细绑并重读master）
 
 ### 901 consumer漂移登记（2026-11-01，已在本Plan内修复）
 
