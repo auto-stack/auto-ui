@@ -4502,9 +4502,10 @@ fn generate_delivery_root_manifest(
     }
     let ws_deps = delivery_extract_toml_section(&root_manifest, "[workspace.dependencies]")?;
     let profile_dev = delivery_extract_toml_section(&root_manifest, "[profile.dev]")?;
-    // PLAN-901 r2/§5.5：交付闭包含 web owner crate（auto-web-contract/
-    // auto-web 以 version/edition/license.workspace 继承）——组内 web 根
-    // [workspace.package] 表字节副本随根发行；语言成员不继承、不受影响。
+    // PLAN-901 r2/§5.5：交付闭包含 web owner crate（PLAN-906 后仅
+    // auto-web 以 version/edition/license.workspace 继承；合同包已迁语言
+    // 仓、显式字段）——组内 web 根 [workspace.package] 表字节副本随根发行；
+    // 语言成员不继承、不受影响。
     // fixture/独立 producer 无组内 web 根时省略（交付 E2E 须能解析 web 继承）。
     let ws_package = std::path::Path::new(producer_root)
         .parent()
@@ -5555,7 +5556,9 @@ fn generate_rust_ui_delivery_inner(
                 | "shell-pack"
         );
         // PLAN-901 r2/§5.5：交付闭包 web owner 类别（890 谱系缺口修复）。
-        let web = matches!(name, "auto-web-contract" | "auto-web");
+        // PLAN-906：auto-web-contract 单源迁语言仓——lang 类别默认分支解析，
+        // receipt/origin owner=auto-lang；web 类别仅剩 auto-web 实现 crate。
+        let web = matches!(name, "auto-web");
         let selected_receipt = if ui {
             ui_receipt
         } else {
@@ -5604,7 +5607,8 @@ fn generate_rust_ui_delivery_inner(
             edits = delivery_apply_projection(&dst.join("Cargo.toml"), &PROJECTION_AUTO_API_GEN)?;
         } else if name == "auto-web" {
             // PLAN-901 r2/§5.5：web 仓侧受管 crate——跨仓语言基础前缀投影
-            // （auto-web-contract 无 path 依赖，恒等）。
+            // （PLAN-906：合同依赖翻转为 ../../../auto-lang/crates/ 前缀，
+            // 经下方 lang 前缀改写为交付根兄弟形 ../auto-web-contract）。
             edits = delivery_apply_projection(&dst.join("Cargo.toml"), &PROJECTION_AUTO_WEB)?;
         }
         let origin_repo = if matches!(
