@@ -6,6 +6,7 @@
 //! delivered v3/v4 contracts; nothing here relaxes them.
 //! Run single-threaded:
 //! cargo test --locked --offline --test node_queries_flow -- --test-threads=1
+use agp::renderer::capture::sha256_hex;
 use autographics_auto_driver::{
     authoring::{
         assets::Registry,
@@ -15,12 +16,10 @@ use autographics_auto_driver::{
         play::Action,
         storage::Storage,
     },
-    ResultKind,
-    Scalar,
+    ResultKind, Scalar,
     Scalar::{Float, Int},
     Session,
 };
-use agp::renderer::capture::sha256_hex;
 use std::path::{Path, PathBuf};
 
 const SCENE_SEG: &str =
@@ -183,7 +182,11 @@ fn scene_rows(scene_text: &str) -> Vec<(i32, [f32; 3], [f32; 3], [f32; 2], i32, 
             .find(|c: char| !(c.is_ascii_digit() || c == '.' || c == '-'))
             .unwrap_or(rests2.len());
         let sy: f64 = rests2[..ends].parse().expect("sy");
-        let visible = if chunk.contains("\"visible\": true") { 1 } else { 0 };
+        let visible = if chunk.contains("\"visible\": true") {
+            1
+        } else {
+            0
+        };
         rows.push((
             kind,
             [(tx - sx / 2.0) as f32, (ty - sy / 2.0) as f32, 0.0],
@@ -217,8 +220,12 @@ fn tick_cpu(s: &mut Session, step: i32) {
 }
 
 fn set_action(s: &mut Session, space: i32, x: i32, y: i32) {
-    s.call("_ag_action", &[Int(space), Int(x), Int(y), Int(0)], ResultKind::Unit)
-        .unwrap();
+    s.call(
+        "_ag_action",
+        &[Int(space), Int(x), Int(y), Int(0)],
+        ResultKind::Unit,
+    )
+    .unwrap();
 }
 
 fn credit(s: &mut Session) -> i32 {
@@ -421,7 +428,11 @@ fn v02_segment_chain_cpu_oracle_and_credits() {
         wall_sum += t0.elapsed().as_micros();
         wall_max = wall_max.max(t0.elapsed().as_micros());
         assert_eq!(status(&mut s), 0, "tick {tick} green");
-        assert_eq!(credit(&mut s), 13, "segment chain charges exactly 13 at tick {tick}");
+        assert_eq!(
+            credit(&mut s),
+            13,
+            "segment chain charges exactly 13 at tick {tick}"
+        );
     }
     println!(
         "v02 segment chain CPU tick wall: avg {}us / max {wall_max}us (8000us host cap, independent report)",
@@ -436,10 +447,26 @@ fn v02_segment_chain_cpu_oracle_and_credits() {
     assert!(approx(t, 0.5, 1e-6), "nearest entry t=0.5: {t}");
     assert!(approx(px, 16.0, 1e-3));
     assert!(approx(nx, -1.0, 0.0), "left-face normal -1");
-    assert!(approx(fcall(&mut s, "ag_local", &[Int(3), Int(0)]), 2.0 + node as f32 * 2.5, 1e-3));
-    assert!(approx(fcall(&mut s, "ag_local", &[Int(3), Int(1)]), 7.0 - t * 1.5, 1e-3));
-    assert!(approx(fcall(&mut s, "ag_local", &[Int(5), Int(0)]), 1.0 + px * 0.5, 1e-3));
-    assert_eq!(icall(&mut s, "ag_visible", &[Int(4)]), 1, "door visible on hit");
+    assert!(approx(
+        fcall(&mut s, "ag_local", &[Int(3), Int(0)]),
+        2.0 + node as f32 * 2.5,
+        1e-3
+    ));
+    assert!(approx(
+        fcall(&mut s, "ag_local", &[Int(3), Int(1)]),
+        7.0 - t * 1.5,
+        1e-3
+    ));
+    assert!(approx(
+        fcall(&mut s, "ag_local", &[Int(5), Int(0)]),
+        1.0 + px * 0.5,
+        1e-3
+    ));
+    assert_eq!(
+        icall(&mut s, "ag_visible", &[Int(4)]),
+        1,
+        "door visible on hit"
+    );
     assert_eq!(icall(&mut s, "ag_visible", &[Int(3)]), 1, "marker shown");
 
     // Walk right; oracle-check display rows at corridor checkpoints.
@@ -452,16 +479,32 @@ fn v02_segment_chain_cpu_oracle_and_credits() {
             let ax = fcall(&mut s, "ag_world", &[Int(1), Int(0)]);
             let (hit, node, t, px, _) = oracle_cast(&boxes, 1, ax, 2.0, ax + 20.0, 2.0);
             assert!(
-                approx(fcall(&mut s, "ag_local", &[Int(3), Int(0)]), 2.0 + node as f32 * 2.5, 1e-3),
+                approx(
+                    fcall(&mut s, "ag_local", &[Int(3), Int(0)]),
+                    2.0 + node as f32 * 2.5,
+                    1e-3
+                ),
                 "marker x at tick {tick} (runner {ax})"
             );
             assert!(
-                approx(fcall(&mut s, "ag_local", &[Int(3), Int(1)]), 7.0 - t * 1.5, 1e-3),
+                approx(
+                    fcall(&mut s, "ag_local", &[Int(3), Int(1)]),
+                    7.0 - t * 1.5,
+                    1e-3
+                ),
                 "marker y at tick {tick} (runner {ax})"
             );
-            assert_eq!(icall(&mut s, "ag_visible", &[Int(4)]), hit, "door==hit at tick {tick}");
+            assert_eq!(
+                icall(&mut s, "ag_visible", &[Int(4)]),
+                hit,
+                "door==hit at tick {tick}"
+            );
             assert!(
-                approx(fcall(&mut s, "ag_local", &[Int(5), Int(0)]), 1.0 + px * 0.5, 1e-3),
+                approx(
+                    fcall(&mut s, "ag_local", &[Int(5), Int(0)]),
+                    1.0 + px * 0.5,
+                    1e-3
+                ),
                 "point marker at tick {tick}"
             );
             println!("v02 checkpoint tick {tick}: runner {ax:.3} hit {hit} node {node} t {t:.4}");
@@ -496,7 +539,10 @@ fn v02_changed_reach_produces_real_result_difference() {
     let yb = fcall(&mut b, "ag_local", &[Int(3), Int(1)]);
     println!("v02 changed: marker y reach20={ya} reach10={yb}");
     assert!(approx(ya, 7.0 - 0.5 * 1.5, 1e-3), "reach20 t=0.5 marker y");
-    assert!(approx(yb, 7.0 - 1.0 * 1.5, 1e-3), "reach10 closed-boundary t=1.0 marker y");
+    assert!(
+        approx(yb, 7.0 - 1.0 * 1.5, 1e-3),
+        "reach10 closed-boundary t=1.0 marker y"
+    );
     assert!((ya - yb).abs() > 0.5, "actual display difference");
 
     set_action(&mut a, 2, 1, 0);
@@ -538,8 +584,15 @@ fn v03_sweep_chain_cpu_oracle_and_credits() {
     assert!(approx(px, 6.0, 1e-3), "miss origin = O+D");
     assert_eq!(overlap, 0);
     let _ = (nx, t);
-    assert_eq!(icall(&mut s, "ag_visible", &[Int(4)]), 0, "door hidden on miss");
-    assert!(approx(fcall(&mut s, "ag_world", &[Int(1), Int(0)]), 6.0, 1e-3), "no move");
+    assert_eq!(
+        icall(&mut s, "ag_visible", &[Int(4)]),
+        0,
+        "door hidden on miss"
+    );
+    assert!(
+        approx(fcall(&mut s, "ag_world", &[Int(1), Int(0)]), 6.0, 1e-3),
+        "no move"
+    );
 
     set_action(&mut s, 2, 1, 0);
     for tick in 2..=8i32 {
@@ -548,8 +601,7 @@ fn v03_sweep_chain_cpu_oracle_and_credits() {
         assert_eq!(status(&mut s), 0, "sweep tick {tick}");
         assert_eq!(credit(&mut s), 23, "credits stay 23 at tick {tick}");
         let x1 = fcall(&mut s, "ag_world", &[Int(1), Int(0)]);
-        let (hit, _, t, px, _, overlap) =
-            oracle_sweep_x(2.0, 2.0, 2.0, &boxes, 1, x0, 100.0);
+        let (hit, _, t, px, _, overlap) = oracle_sweep_x(2.0, 2.0, 2.0, &boxes, 1, x0, 100.0);
         let want = if hit == 1 && overlap == 0 {
             x0 + (100.0 * t - 0.02).max(0.0)
         } else if hit == 1 {
@@ -557,12 +609,25 @@ fn v03_sweep_chain_cpu_oracle_and_credits() {
         } else {
             x0 + 100.0
         };
-        assert!(approx(x1, want, 2e-3), "sweep position at tick {tick}: {x1} vs {want}");
-        assert!(approx(px, x0 + 100.0 * t, 2e-3), "origin snapshot at tick {tick}");
-        assert_eq!(icall(&mut s, "ag_visible", &[Int(4)]), 1, "door visible on contact");
+        assert!(
+            approx(x1, want, 2e-3),
+            "sweep position at tick {tick}: {x1} vs {want}"
+        );
+        assert!(
+            approx(px, x0 + 100.0 * t, 2e-3),
+            "origin snapshot at tick {tick}"
+        );
+        assert_eq!(
+            icall(&mut s, "ag_visible", &[Int(4)]),
+            1,
+            "door visible on contact"
+        );
     }
     let stopped = fcall(&mut s, "ag_world", &[Int(1), Int(0)]);
-    assert!(approx(stopped, 19.5 - 2.0 - 0.02, 2e-3), "converged stop {stopped}");
+    assert!(
+        approx(stopped, 19.5 - 2.0 - 0.02, 2e-3),
+        "converged stop {stopped}"
+    );
     for tick in 9..=12i32 {
         tick_cpu(&mut s, tick);
         assert_eq!(status(&mut s), 0);
@@ -607,7 +672,9 @@ fn v03_sweep_chain_cpu_oracle_and_credits() {
     );
 }
 
-fn seg_rows_boxes(rows: &[(i32, [f32; 3], [f32; 3], [f32; 2], i32, f32, f32)]) -> Vec<(usize, [f32; 2], [f32; 2])> {
+fn seg_rows_boxes(
+    rows: &[(i32, [f32; 3], [f32; 3], [f32; 2], i32, f32, f32)],
+) -> Vec<(usize, [f32; 2], [f32; 2])> {
     rows.iter()
         .enumerate()
         .map(|(n, (_, lo, hi, ..))| (n, [lo[0], lo[1]], [hi[0], hi[1]]))
@@ -634,8 +701,12 @@ fn probe_session_rows(
     s.call("main", &[], ResultKind::Unit).unwrap();
     s.call("_ag_reset", &[Int(run), Int(-1), Int(-1)], ResultKind::Unit)
         .unwrap();
-    s.call("_ag_spatial_reset", &[Int(rows.len() as i32)], ResultKind::Unit)
-        .unwrap();
+    s.call(
+        "_ag_spatial_reset",
+        &[Int(rows.len() as i32)],
+        ResultKind::Unit,
+    )
+    .unwrap();
     for (n, (kind, _, _, pos, visible, hx, hy)) in rows.iter().enumerate() {
         s.call(
             "_ag_identity",
@@ -682,14 +753,32 @@ fn v04_cross_component_queries_isolated_and_charged() {
     for tick in 1..=120i32 {
         tick_cpu(&mut s, tick);
         assert_eq!(status(&mut s), 0, "cross tick {tick}");
-        assert_eq!(credit(&mut s), 22, "2 casts + 6 getters = 22 at tick {tick}");
+        assert_eq!(
+            credit(&mut s),
+            22,
+            "2 casts + 6 getters = 22 at tick {tick}"
+        );
     }
     assert_eq!(icall(&mut s, "get_qa_hits", &[]), 120, "qa hit every tick");
     assert_eq!(icall(&mut s, "get_qb_hits", &[]), 120, "qb hit every tick");
-    assert_eq!(icall(&mut s, "get_qa_last_node", &[]), 1, "qa nearest = target ord");
-    assert_eq!(icall(&mut s, "get_qb_last_node", &[]), 2, "qb nearest = far ord");
-    assert!(approx(fcall(&mut s, "get_qa_last_t", &[]), 0.4, 1e-3), "qa t");
-    assert!(approx(fcall(&mut s, "get_qb_last_t", &[]), 0.1, 1e-3), "qb t");
+    assert_eq!(
+        icall(&mut s, "get_qa_last_node", &[]),
+        1,
+        "qa nearest = target ord"
+    );
+    assert_eq!(
+        icall(&mut s, "get_qb_last_node", &[]),
+        2,
+        "qb nearest = far ord"
+    );
+    assert!(
+        approx(fcall(&mut s, "get_qa_last_t", &[]), 0.4, 1e-3),
+        "qa t"
+    );
+    assert!(
+        approx(fcall(&mut s, "get_qb_last_t", &[]), 0.1, 1e-3),
+        "qb t"
+    );
     // VM guards at the original amounts (independent report).
     println!(
         "v04 cross VM: calls {} max_call_steps {} max_call_slices {}",
@@ -733,7 +822,14 @@ fn step_action(h: &mut Host, space: i32, x: i32, y: i32) {
     {
         let p = h.play.as_mut().unwrap();
         let _ = p.resume();
-        if p.dispatch(Action { space, x, y, toggle: false }).is_err() {
+        if p.dispatch(Action {
+            space,
+            x,
+            y,
+            toggle: false,
+        })
+        .is_err()
+        {
             return;
         }
     }
@@ -761,7 +857,11 @@ fn pixel_classes(h: &mut Host) -> Vec<Px> {
         }
     }
     let px = h.rt.probe_pixels(h.top, &points).expect("probe");
-    points.iter().zip(px.iter()).map(|(p, c)| (*p, *c)).collect()
+    points
+        .iter()
+        .zip(px.iter())
+        .map(|(p, c)| (*p, *c))
+        .collect()
 }
 
 fn class_hits(px: &[Px], class: &str) -> Vec<[f32; 2]> {
@@ -773,7 +873,9 @@ fn class_hits(px: &[Px], class: &str) -> Vec<[f32; 2]> {
                 "red" => r8 - g8 > 35 && r8 - b8 > 35,
                 "white" => r8.min(g8).min(b8) > 200 && r8 - b8 < 35,
                 "orange" => r8 > 200 && g8 > 180 && b8 < 160,
-                "wall" => (r8 - g8).abs() < 10 && b8 - r8 >= 5 && b8 - r8 < 25 && r8 > 140 && r8 < 200,
+                "wall" => {
+                    (r8 - g8).abs() < 10 && b8 - r8 >= 5 && b8 - r8 < 25 && r8 > 140 && r8 < 200
+                }
                 _ => false,
             }
         })
@@ -807,8 +909,14 @@ fn v02_gpu_segment_marker_chain_and_changed_pixels() {
     let dx_px = center(&red1, 0) - center(&red0, 0);
     let dy_px = center(&red1, 1) - center(&red0, 1);
     println!("v02 gpu marker shift px: {dx_px:.1}, {dy_px:.1} (want ~+100, ~+15)");
-    assert!((dx_px - 100.0).abs() < 24.0, "marker x +5 world * 20px: {dx_px}");
-    assert!((dy_px - 15.0).abs() < 24.0, "marker 0.75 world lower on screen: {dy_px}");
+    assert!(
+        (dx_px - 100.0).abs() < 24.0,
+        "marker x +5 world * 20px: {dx_px}"
+    );
+    assert!(
+        (dy_px - 15.0).abs() < 24.0,
+        "marker 0.75 world lower on screen: {dy_px}"
+    );
     let runner20 = actor(&h20, 2);
     h20.stop_play();
 
@@ -820,9 +928,15 @@ fn v02_gpu_segment_marker_chain_and_changed_pixels() {
     assert!(!red10.is_empty());
     let shift = center(&red10, 1) - center(&red1, 1);
     println!("v02 gpu changed marker y shift px: {shift:.1} (want ~+15)");
-    assert!((shift - 15.0).abs() < 24.0, "reach10 boundary t=1.0 sits 0.75 world lower");
+    assert!(
+        (shift - 15.0).abs() < 24.0,
+        "reach10 boundary t=1.0 sits 0.75 world lower"
+    );
     let runner10 = actor(&h10, 2);
-    assert!(approx(runner20[0], runner10[0], 1e-3), "same scene, same pose");
+    assert!(
+        approx(runner20[0], runner10[0], 1e-3),
+        "same scene, same pose"
+    );
     h10.stop_play();
 }
 
@@ -838,14 +952,24 @@ fn v03_gpu_sweep_stops_before_wall() {
     let runner = actor(&h, 2);
     let wall = actor(&h, 3);
     println!("v03 gpu sweep: runner {:?} wall {:?}", runner, wall);
-    assert!(approx(runner[0], 19.5 - 2.0 - 0.02, 2e-3), "stopped at clearance: {}", runner[0]);
+    assert!(
+        approx(runner[0], 19.5 - 2.0 - 0.02, 2e-3),
+        "stopped at clearance: {}",
+        runner[0]
+    );
     assert!(approx(wall[0], 20.0, 1e-3), "wall never moves");
-    assert!(runner[0] + 2.0 < wall[0] - 0.5, "visible gap before the wall face");
+    assert!(
+        runner[0] + 2.0 < wall[0] - 0.5,
+        "visible gap before the wall face"
+    );
     let px = pixel_classes(&mut h);
     let orange = class_hits(&px, "orange");
     let wall_px = class_hits(&px, "wall");
     assert!(!orange.is_empty() && !wall_px.is_empty());
-    assert!(center(&orange, 0) < center(&wall_px, 0), "runner left of wall on canvas");
+    assert!(
+        center(&orange, 0) < center(&wall_px, 0),
+        "runner left of wall on canvas"
+    );
     h.stop_play();
 }
 
@@ -856,7 +980,11 @@ fn v03_gpu_sweep_stops_before_wall() {
 fn v05_budget_plus_faults_at_the_33rd_charge() {
     let mut s = probe_session(SCENE_CROSS_PLUS, WORLD_CROSS_PLUS, "q-cross-plus.at", 1);
     tick_cpu(&mut s, 1);
-    assert_eq!(status(&mut s), 10, "named QueryBudget fault at the 33rd charge");
+    assert_eq!(
+        status(&mut s),
+        10,
+        "named QueryBudget fault at the 33rd charge"
+    );
     tick_cpu(&mut s, 2);
     assert_eq!(status(&mut s), 10, "sticky");
 }
@@ -917,25 +1045,45 @@ fn v04_gpu_pause_step_and_twenty_fresh_rounds_query_chain() {
         assert!(class_hits(&px, "white").is_empty(), "no tick during settle");
         // One input tick: runner walks 1 world unit, cast runs, door opens.
         step_action(&mut h, 2, 1, 0);
-        assert!(approx(actor(&h, 2)[0], 7.0, 1e-3), "one tick moved 60*dt: {}", actor(&h, 2)[0]);
+        assert!(
+            approx(actor(&h, 2)[0], 7.0, 1e-3),
+            "one tick moved 60*dt: {}",
+            actor(&h, 2)[0]
+        );
         let px = pixel_classes(&mut h);
-        assert!(!class_hits(&px, "white").is_empty(), "door visible after tick");
+        assert!(
+            !class_hits(&px, "white").is_empty(),
+            "door visible after tick"
+        );
         // Paused frames (settle inside step_action already paused; further
         // frames without resume must not advance the runner).
         for _ in 0..5 {
             settle(&mut h);
         }
-        assert!(approx(actor(&h, 2)[0], 7.0, 1e-3), "paused frames advance nothing");
+        assert!(
+            approx(actor(&h, 2)[0], 7.0, 1e-3),
+            "paused frames advance nothing"
+        );
         h.stop_play();
     }
     for round in 0..20 {
         let mut h = start_with(SCENE_SEG, WORLD_SEG, &format!("v04-fresh-{round}"));
-        assert!(play_error(&h).is_empty(), "round {round} fault: {}", play_error(&h));
+        assert!(
+            play_error(&h).is_empty(),
+            "round {round} fault: {}",
+            play_error(&h)
+        );
         step_action(&mut h, 2, 1, 0);
         let x = actor(&h, 2)[0];
-        assert!(approx(x, 7.0, 1e-3), "round {round}: fresh Run rebuilt at declared pose ({x})");
+        assert!(
+            approx(x, 7.0, 1e-3),
+            "round {round}: fresh Run rebuilt at declared pose ({x})"
+        );
         let px = pixel_classes(&mut h);
-        assert!(!class_hits(&px, "white").is_empty(), "round {round}: chain re-ran (door open)");
+        assert!(
+            !class_hits(&px, "white").is_empty(),
+            "round {round}: chain re-ran (door open)"
+        );
         h.stop_play();
     }
 }
@@ -971,7 +1119,11 @@ fn v06_damaged_queries_world_copy_rejected_then_recovery_green() {
     h.start_selected_play().expect("intact start");
     h.pause_play("");
     settle(&mut h);
-    assert!(play_error(&h).is_empty(), "intact run fault: {}", play_error(&h));
+    assert!(
+        play_error(&h).is_empty(),
+        "intact run fault: {}",
+        play_error(&h)
+    );
     h.stop_play();
 
     let mut damaged = WORLD_SEG.as_bytes().to_vec();
@@ -983,7 +1135,10 @@ fn v06_damaged_queries_world_copy_rejected_then_recovery_green() {
     assert!(damaged != WORLD_SEG.as_bytes());
     std::fs::write(&script, &damaged).expect("damaged world copy");
     let broken = Storage::load_project(&dir.join("scene.agscene"), &Registry::new());
-    assert!(broken.is_err(), "damaged world copy must be rejected at load");
+    assert!(
+        broken.is_err(),
+        "damaged world copy must be rejected at load"
+    );
     let msg = format!("{:?}", broken.err().unwrap());
     println!("V-06 damaged load rejected: {msg}");
     assert!(
@@ -1000,9 +1155,16 @@ fn v06_damaged_queries_world_copy_rejected_then_recovery_green() {
     h2.start_selected_play().expect("restored start");
     h2.pause_play("");
     settle(&mut h2);
-    assert!(play_error(&h2).is_empty(), "restored run fault: {}", play_error(&h2));
+    assert!(
+        play_error(&h2).is_empty(),
+        "restored run fault: {}",
+        play_error(&h2)
+    );
     step_action(&mut h2, 2, 1, 0);
     let a = actor(&h2, 2);
-    assert!((a[0] - 7.0).abs() < 1e-3, "restored chain advances with input: {a:?}");
+    assert!(
+        (a[0] - 7.0).abs() < 1e-3,
+        "restored chain advances with input: {a:?}"
+    );
     h2.stop_play();
 }

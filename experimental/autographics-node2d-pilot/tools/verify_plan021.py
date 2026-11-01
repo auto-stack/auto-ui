@@ -220,6 +220,15 @@ def main() -> int:
             ("visible-only-literal", [("segment.at",
                 "let q = query2d.segment(refs.runner, 1, ax, ay, ax + .reach, ay)",
                 "let vis = 1\n            let q = query2d.segment(refs.runner, vis, ax, ay, ax + .reach, ay)")]),
+            ("result-rebind", [("segment.at",
+                "let q = query2d.segment(refs.runner, 1, ax, ay, ax + .reach, ay)",
+                "let q = query2d.segment(refs.runner, 1, ax, ay, ax + .reach, ay)\n            let q = query2d.sweep(refs.runner, 1, 0.0, 0.0)")]),
+            ("result-reassign", [("segment.at",
+                "let hit = q.hit()",
+                "let hit = q.hit()\n            q = q")]),
+            ("multi-static-shape", [("marker.at",
+                "material: resources.lab_marker\n        }\n    }\n}",
+                "material: resources.lab_marker\n        }\n        shape2d extra {\n            mesh: resources.lab_quad1\n            position: (3.0, 3.0)\n            material: resources.lab_marker\n        }\n    }\n}")]),
         ]
         for neg, muts in negatives:
             d = compose(muts)

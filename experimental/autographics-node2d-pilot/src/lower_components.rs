@@ -1067,6 +1067,8 @@ enum QEvent {
     SelfRow { write: bool, line: usize },
     /// `var q = query2d.…`（结果只允许 let 绑定）。
     VarBind { name: String, line: usize },
+    /// `q = …`（typed 结果不可再赋值）。
+    ResultAssign { name: String, line: usize },
 }
 
 fn walk_stmts(stmts: &[Stmt], line: usize, out: &mut WalkOut, queries: bool) {
@@ -1266,6 +1268,16 @@ fn walk_expr_q(e: &Expr, line: usize, out: &mut WalkOut, queries: bool) {
                         out.assign_targets.push((name.to_string(), line));
                     }
                 }
+                // PLAN-021（F-R1-03）：typed 结果变量再赋值（plan 层具名
+                // module/line/symbol；translate 侧为 backstop）。
+                if queries {
+                    if let Expr::Ident(name) = &**l {
+                        out.query_events.push(QEvent::ResultAssign {
+                            name: name.to_string(),
+                            line,
+                        });
+                    }
+                }
             }
             walk_expr_q(l, line, out, queries);
             walk_expr_q(r, line, out, queries);
@@ -1323,6 +1335,20 @@ fn plan_dispatch(project: &Project, world: &WorldIR, queries: bool) -> Result<Pl
         }
         let d = &world.defs[&inst.def];
         let is_char = d.char_elem.is_some();
+        // F-R1-01（§9冻结合同）：具名行引用要求恰一静态 shape；多静态
+        // shape 实例具名拒绝（否则附加 shape 无声成为可查询几何行）。
+        if queries && !is_char && d.static_elems.len() > 1 {
+            return Err(at(
+                &d.module,
+                d.line,
+                &inst.path,
+                &format!(
+                    "instance '{}' has {} static shapes; a named row ref resolves exactly one (make the extra shapes dynamic or split the definition)",
+                    inst.path,
+                    d.static_elems.len()
+                ),
+            ));
+        }
         if is_char || !d.static_elems.is_empty() {
             refs_names.insert(inst.path.clone(), !is_char);
         }
@@ -1516,6 +1542,17 @@ fn plan_dispatch(project: &Project, world: &WorldIR, queries: bool) -> Result<Pl
                                 &format!(
                                     "row 'refs.{name}' is the character row; its position is owned by the character service"
                                 ),
+                            ));
+                        }
+                    }
+                    QEvent::ResultAssign { name, line } => {
+                        let bound = q_binds.iter().any(|(n, _)| n == name);
+                        if bound {
+                            return Err(at(
+                                &def.module,
+                                *line,
+                                name,
+                                "query result cannot be reassigned (read the values out instead)",
                             ));
                         }
                     }
