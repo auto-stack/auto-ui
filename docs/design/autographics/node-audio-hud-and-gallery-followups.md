@@ -4,7 +4,7 @@
 
 ## 本次补记：已交付能力与新规划
 
-当前020/021/022/023/024均实际交付；AG006交付e574b58、AG009交付062081d并归档清理，AG010 executing且唯一树在途。Gallery当前9/22（原21迁8＋新增HUD1），剩13。025通用服务在途，不自动重开006的023有限game内容。新增[UI027与AG011设计](node3d-runtime-and-gallery-migration.md)仅规划3D角色/运行相机/原内置模型透传和G02/G03-3d迁移，原预算/验收保持，不接管在途工作。下方首次拆分状态/计数仅为历史输入，不是当前现场。
+截至2026-11-02，020..025与027均实际交付，025/027交付e9cc929/f3dea0d且已归档清理；AG006/009/010已交付，010为8bfddca。当前源码/metadata为11/22（原21迁10＋HUD新增1），剩11；011用户告知在途、已核见唯一ag-011树，任务进度待owner同步，本轮不接管或改其状态。025通用服务交付不自动重开006固定023。新后继[UI028与AG012](node3d-instances-triggers-and-gallery-motion.md)只规划三维实例/触发/新局及角色相机三入口内容，保原预算/验收、暂不实施。下文首次拆分状态/计数保历史，不作当前现场。
 
 ## 首次规划时的现场与能力审计（历史快照）
 
@@ -28,7 +28,7 @@
 | [UI023](../../plans/archived/023-autographics-node2d-audio-and-hud.md) | 二维Node bank/cue/font/HUD槽、必要ASCII、快照/typed触发与一次呈现收口；复用012/013 | 020实际交付、013已交付 | drafting r1，0/10 |
 | [AG006 r2](../../../../ag-examples/docs/plans/archived/006-autographics-gallery-event-hud.md) | 原G12b三收集/胜败/音效/HUD，新作者形式；原audio同项迁移/保八旧oracle/完整双入口包 | UI023实际交付、AG005/008已交付 | drafting r2，0/10 |
 | [AG009](../../../../ag-examples/docs/plans/archived/009-autographics-gallery-node2d-queries.md) | G05/2d segment/sweep/changed、九旧义务/14阶段与完整混合维度包 | UI021实际交付、AG008已交付 | drafting r1，0/10 |
-| [AG010](../../../../ag-examples/docs/plans/010-autographics-gallery-node2d-sprites-and-frame-animation.md) | G09 atlas/character与main/alt、原图/局部状态/18旧oracle/完整包 | UI022实际交付、AG008已交付 | drafting r1，0/10 |
+| [AG010](../../../../ag-examples/docs/plans/archived/010-autographics-gallery-node2d-sprites-and-frame-animation.md) | G09 atlas/character与main/alt、原图/局部状态/18旧oracle/完整包 | UI022实际交付、AG008已交付 | drafting r1，0/10 |
 
 020交付后，021/022/023没有相互功能依赖；各自独立模块可并行，shared AST/load/translate/CLI接线必须owner短窗顺序进行，不能同树并发写。023当前只程序化图元＋无sprite的呈现(kind=-1)，G12原audio也无sprite/PNG，因此不强制等待022；将来需要sprite呈现写入另按真实022合同衔接，不能复制图像/帧实现。
 

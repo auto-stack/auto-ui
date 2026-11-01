@@ -28,12 +28,13 @@
 | 022 | [Node精灵资源与帧动画](archived/022-autographics-node2d-sprites-and-frame-animation.md) | W2b/G09双入口引擎 | archived/r1，10/10；R1 needs_fix 5项→修复→同评审者re-review pass；交付2f45baa+c6aa63a（rebase over 023交付/024-025规划，受影响验证rebased态全绿：七verifier/flow 22行receipt/pilot 54/旧consumer 9/9），SD node2d-sprites-and-frame-animation.md sha f997bae6 沉淀本仓；原G09 18项oracle逐字全绿于sprites-2d链；清理回执见计划 |
 | 023 | [Node二维声音与公共HUD](archived/023-autographics-node2d-audio-and-hud.md) | AG006 r2作者能力前置 | archived/r1，10/10；R1 needs_fix 3项P2（6新告警+SD计数笔误）→修复d125b6d→同评审者复核pass；交付32d7a81（13提交rebase重写，range-diff 13/13全等），统一门全绿（pilot 44/driver 45/旧flow 35/verifier 10组）；SD node2d-audio-and-hud.md 沉淀本仓；AG006 T-01硬门解除；清理回执见计划 |
 | 024 | [3D声明/静态资源/组件基础](archived/024-autographics-node3d-foundation.md) | W3基础/G02与G03-3d引擎 | archived/r1，10/10；R1 needs_fix 4项（LICENSE常量/同名helper覆盖/投递负控/v-parent像素）→修复→同评审者re-review pass；交付64166db（rebase后range-diff全等，ff-only零merge commit），门禁= pilot 62/gates 8/driver flow 6/旧consumer 13+9+11+4/verify_plan024 29控制组/六冻结verifier全绿；SD node3d-foundation.md sha 9451cf0f 沉淀本仓；原G02五+G03/3d六义务逐项复验于新链；清理回执见计划 |
-| 025 | [声音/HUD通用Node接线收口](025-autographics-node-presentation-services.md) | 023有限game档的通用服务后继 | drafting/r1，0/10；020/023已交付，已有ui-025唯一树在途，任务计数以owner合同为准；业务回作者on；无角色/连续输入/提前终点/四请求原额先证；旧023不变，不暗加AG006前置 |
+| 025 | [声音/HUD通用Node接线收口](archived/025-autographics-node-presentation-services.md) | 023有限game档的通用服务后继 | archived/r1，10/10；交付e9cc929、canonical/锁收口54899e9，独立final/落主smoke/归档清理齐；通用服务已交付，不自动重开AG006固定023内容 |
 | 026 | [阅读引擎嵌入与定位回传探针](archived/026-reader-engine-embedding-and-locator-probe.md) | auto-reader/READER-006、coverage v3 后继 | archived/r1、流程10/10；Vue指定样本30/30，原生嵌入/装载/IPC已证，真实输入/IME/无障碍等未闭合；V-08/V-10未单列。研究归档不等于双端全门go，下一阶段先收口原生接缝 |
-| 027 | [3D角色与运行相机Node接线](027-autographics-node3d-character-and-runtime-camera.md) | W3运行能力/G07与G08-3d引擎 | drafting/r1，0/10；020/024已交付，typed角色/相机＋原内置模型透传，保原32及24旧oracle，暂不实施 |
+| 027 | [3D角色与运行相机Node接线](archived/027-autographics-node3d-character-and-runtime-camera.md) | W3运行能力/G07与G08-3d引擎 | archived/r1，10/10；交付f3dea0d，独立final/冻结/归档清理齐；SD node3d-character-and-runtime-camera.md sha95a86660；原24oracle保持，AG011/012可固定消费，不把引擎绿当内容交付 |
+| 028 | [三维实例/触发/新局Node接线](028-autographics-node3d-instances-triggers-and-rounds.md) | W3后继/G11-3d引擎前置 | drafting/r1，0/10；027及公共001/002已交付，typed实例/局部事件/三种原Mob模板/accepted新Run，保原32与25旧oracle，暂不实施 |
 | 029 | [Reader原生输入链与必要接缝收口](029-reader-native-input-and-surface-closure.md) | 026原生GAP与coverage v4后继 | drafting/r1、0/12；真实AutoUI原生VM的选区→.at→保存/冷恢复，IME/几何/系统无障碍、双实例/清理、严格非零汇总与旧门；全部必需门通过后独立上下文review，仅起草、未实施 |
 
-024/025已分配，026为Reader路线，本轮AG新增027；并行新计划的当前号源以`.next-id`为准，下一份以独占取号时本地活动/归档最大号重核（018分配后已有并行019，勿回退号源）；不能因外仓号882/883跳号。003是Blog路线，004..006是AG表现阶段，007是主题/示例工作包，014是拆分路线结构收口包，018是UI编译配置收口，026是Reader阅读表面跨仓探针；这些合同分别管理。状态以各自合同为准。设计与并行/后继入口见[本仓设计索引](../design/README.md)。
+024/025/027已交付，026为Reader路线；本轮AG新增028；并行新计划的当前号源以`.next-id`为准，下一份以独占取号时本地活动/归档最大号重核（018分配后已有并行019，勿回退号源）；不能因外仓号882/883跳号。003是Blog路线，004..006是AG表现阶段，007是主题/示例工作包，014是拆分路线结构收口包，018是UI编译配置收口，026是Reader阅读表面跨仓探针；这些合同分别管理。状态以各自合同为准。设计与并行/后继入口见[本仓设计索引](../design/README.md)。
 
 ## 债务/候选
 

@@ -4,7 +4,7 @@
 
 ## 当前交付与后继补记
 
-024已交付64166db并归档，025唯一ui-025树在途，任务计数看owner合同；006交付e574b58、009交付062081d，010在途。当前Gallery9/22（原21迁8＋新增HUD1），剩13，不再沿用下方首次规划的6/21现场数。[新阶段设计](node3d-runtime-and-gallery-migration.md)与UI027/AG011承接3D运行接线和G02/G03内容迁移，暂不实施。原G03使用Player/Mob，024圆柱层级夹具不证明几何等价；027补静态内置视觉透传，011整体必须等实际交付，不能换模型/放宽GLB。
+截至2026-11-02，024已交付64166db，025交付e9cc929并完成canonical/锁54899e9与清理；027交付f3dea0d并归档清理。AG010亦已交付8bfddca，当前Gallery11/22（原21迁10＋新增HUD1），剩11；011用户告知在途，已核见唯一ag-011树，任务进度由owner更新，本轮不接管。下方原6/21与树在途状态只是首次规划快照。[新后继设计](node3d-instances-triggers-and-gallery-motion.md)建立UI028（三维实例/触发/新局）和AG012（G07/G08-3d内容）草案，保预算/验收、暂不实施。G03原Player/Mob透传已由027交付，011仍须独立内容验收，不以圆柱替代。
 
 ## 现场与两份合同（首次规划快照）
 
@@ -13,7 +13,7 @@
 | 引擎计划 | 本期交付边界 | 硬前置 | 内容边界 |
 |---|---|---|---|
 | [024 3D声明/静态资源/组件基础](../../plans/archived/024-autographics-node3d-foundation.md) | view-3d、有限三维图元/平色GLB、同维translation/visible层级、局部model/msg/on/use、纯场景和有状态模式 | 已交付020；复用现有3D渲染/资产/基础行为 | 为G02/G03/3d提供能力，不改项目/不分配内容号 |
-| [025 声音/HUD通用Node接线](../../plans/025-autographics-node-presentation-services.md) | 非游戏/游戏通用typed资源/槽/局部事件、四请求一次收口；业务全在作者Auto，无角色可用、连续移动/提前终点原额闭合 | 已交付020/023，底层012/013 | 不暗加AG006前置，不改其固定023；需要切版本由内容owner显式修订 |
+| [025 声音/HUD通用Node接线](../../plans/archived/025-autographics-node-presentation-services.md) | 非游戏/游戏通用typed资源/槽/局部事件、四请求一次收口；业务全在作者Auto，无角色可用、连续移动/提前终点原额闭合 | 已交付020/023，底层012/013 | 不暗加AG006前置，不改其固定023；需要切版本由内容owner显式修订 |
 
 两份均drafting r1、0/10，可独立规划/实施准备；实际实施另待用户启动。没有彼此或022功能依赖。共享Node AST、load/translate、CLI/assembly的写入按owner短窗顺序接线，不复制子系统、不在同树并发写；重型GPU/音频/窗口门机器单实例，OS键鼠/焦点自动化继续暂停。各自target/consumer/报告独占。
 
