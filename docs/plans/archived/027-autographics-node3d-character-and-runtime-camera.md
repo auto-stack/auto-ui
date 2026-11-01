@@ -151,10 +151,10 @@ G08/3d十三项：`orbit_config_from_source`、`vp_identity_tick0`、`forward_an
 | T-04 | work | T-03 | driver公共装配/Frame/Host/输入/owner接线、新flow/24oracle夹具，无Gallery写入 | AC-02/03/05 | [x] 2026-11-02 driver src零改（102/104装配、六动作路由、相机数学、错误码沿874/875已交付面实测复用）；产品behavior api驱动start_selected_play装配选择。tests/node3d_runtime_flow 7/7绿单线程：原24 oracle逐名复刻（G07 9+2、G08/3d 13，独立f32/AABB/glam VP oracle）+V-S03拒绝族（fault 10/13/30/29/27、deep127 INIT累计步门整拒）+V-S04事件+V-S05内置视觉保真（暖存7网格、捕获逐位稳定、ground-only对照）+V-S06生命周期。wide128按实测口径定界：128文档行+2注册solid+125非固体柱（127注册solid=保原负控，与§5.4'127solid初始化拒绝'逐字一致）。commit a6b1f9d |
 | T-05 | work | T-04 | verify_plan027与V-S全反例、完整预算/数值/GPU/压力分支实测 | AC-01..05 | [x] 2026-11-02 `python -I tools/verify_plan027.py --controls` PASS（11产品身份链/冷A→B字节等值/speed变异敏感/注释不敏感/9具名拒绝/内置GLB来源许可闭包/逐产品消费面对账）。预算：32满额（4+1+26+1）第33计费fault 10实测；数值：24 oracle独立期望精确对比；GPU：像素捕获/VP等值/800×400 PNG>10000B；压力：wide128 128行走步绿+deep127越限INIT整拒。 |
 | T-06 | work | T-05 | 真实工具source-build/A→B/SaveAs/20轮/恢复、定向兼容并集，SD-01候选/摘要移交 | AC-05/06 | [x] 2026-11-02 source-build闭包=fixture源+closure字节+内置GLB原型资产（README godot-demo-projects@b761b4cd/MIT行）+SDK681锁；A→B/SaveAs关开重开/坏件载入拒→精确还原→再Run/20轮暖账平坦=flow vs06绿。定向兼容并集：verify_plan016/017/019/020/021/022/024全PASS（旧档字节冻结实测复跑）。SD-01候选=docs/specs/auto-graphics/node3d-character-and-runtime-camera.md（merge落位）。commit 3530e81 |
-| T-07 | review | T-06 | 同树独立final与精确revision绑定，finding回work复核；pass后merge门pending | AC-07 | [ ] |
-| T-08 | merge | T-07 pass | 冻结提交/输入/定向并集门或有据复用，来源核后实际合master | AC-08 | [ ] |
-| T-09 | merge | T-08 | SD-01 canonical/来源核、归档/导航，下游钉实际delivery，不写派生JSON | AC-08 | [ ] |
-| T-10 | merge | T-09 | fresh guard清树/分支/空组，全部输出对账/删scope与构建物/登记关闭摘要 | AC-09 | [ ] |
+| T-07 | review | T-06 | 同树独立final与精确revision绑定，finding回work复核；pass后merge门pending | AC-07 | [x] 2026-11-02 独立通用代理 final R1（3530e81）：AC-01..07 全 pass，findings F-R1-01..06（2 low+4 nit，无阻断）；R1 修复 188c948→rebase 后 f3dea0d，复审 pass 绑定 188c948（补丁等值）；scratch review/ 日志 |
+| T-08 | merge | T-07 pass | 冻结提交/输入/定向并集门或有据复用，来源核后实际合master | AC-08 | [x] 2026-11-02 range-diff 四段全等 rebase（3464582→09fe0b2、a6b1f9d→bcb0f4e、3530e81→af99114、188c948→f3dea0d）+wt-guard clean+ff-only 合主，master tip=f3dea0d；定向兼容并集=T-06 已实测（verify 016..024 全 PASS） |
+| T-09 | merge | T-08 | SD-01 canonical/来源核、归档/导航，下游钉实际delivery，不写派生JSON | AC-08 | [x] 2026-11-02 SD-01 canonical 随 f3dea0d 落主（blob 95a86660dfa15a09）；landing smoke=主检出 gates 9/9+verify_plan027 PASS；F-R1-04 SHA 文字映射更正；归档至 docs/plans/archived/ + status archived；不写派生 JSON |
+| T-10 | merge | T-09 | fresh guard清树/分支/空组，全部输出对账/删scope与构建物/登记关闭摘要 | AC-09 | [x] 2026-11-02 fresh wt-guard clean 后移除 ui-027/auto-ui 树与 codex/plan-027-dev 分支，组内只读依赖兄弟树按注册解除后随组目录移除；plan-artifacts/plan-027 scope 折叠后整删、registry 刷新；关闭摘要=本归档 Plan §9 归并收据 |
 
 ## 9. 复审记录
 
