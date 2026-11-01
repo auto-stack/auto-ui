@@ -14,8 +14,15 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use iced::window;
 use iced::{Element, Subscription, Task};
 use wry::WebViewBuilder;
+use wry::raw_window_handle::HasWindowHandle;
 
 static DONE: AtomicBool = AtomicBool::new(false);
+
+// engine 模式：装载消费 app 引擎资产面（--url 传入），IPC 仅作状态回报，
+// 不自动退出（由驱动收尾 kill）；spike 模式（缺省）保留 20s 自动判定。
+fn engine_mode() -> bool {
+    std::env::var("PROBE_T03_MODE").as_deref() == Ok("engine")
+}
 
 const PROBE_HTML: &str = r#"<!doctype html>
 <html><head><meta charset="utf-8"><title>plan-026-t03</title></head>
@@ -58,10 +65,25 @@ fn update(app: &mut App, msg: Msg) -> Task<Msg> {
                 // &dyn Window 是未定尺寸类型——借具体 WindowHandle 包装。
                 eprintln!("PROBE_T03_RUN_CLOSURE entered");
                 let handle = win.window_handle().expect("iced window handle");
-                let built = WebViewBuilder::new()
-                    .with_html(PROBE_HTML)
+                let mut builder = WebViewBuilder::new();
+                builder = if engine_mode() {
+                    let url = std::env::var("PROBE_T03_URL")
+                        .unwrap_or_else(|_| "http://127.0.0.1:17827/api/probe/asset/native-host.html?doc=MISSING&session=MISSING&hash=MISSING".to_string());
+                    builder.with_url(&url)
+                } else {
+                    builder.with_html(PROBE_HTML)
+                };
+                let built = builder
                     .with_ipc_handler(|req| {
                         let body = req.body().to_string();
+                        if engine_mode() {
+                            // 引擎模式：状态回执直出（PASS/FAIL 判定由驱动做）。
+                            println!("IPC_RECEIVED {body}");
+                            if body.contains("t03-engine") {
+                                DONE.store(true, Ordering::SeqCst);
+                            }
+                            return;
+                        }
                         if body.contains("\"surface_alive\":true") {
                             DONE.store(true, Ordering::SeqCst);
                             println!("PROBE_T03_PASS iced-child-webview ipc round-trip ok :: {body}");
@@ -76,6 +98,35 @@ fn update(app: &mut App, msg: Msg) -> Task<Msg> {
                     .build_as_child(&handle);
                 match built {
                     Ok(wv) => {
+                        // 子表面默认 200x200（wry 缺省 bounds，2026-11-02 实测
+                        // WRY_WEBVIEW@0,0 200x200）——按宿主客户区物理尺寸撑满。
+                        if let wry::raw_window_handle::RawWindowHandle::Win32(h) =
+                            handle.as_raw()
+                        {
+                            #[repr(C)]
+                            struct RECT {
+                                left: i32,
+                                top: i32,
+                                right: i32,
+                                bottom: i32,
+                            }
+                            extern "system" {
+                                fn GetClientRect(hwnd: isize, rect: *mut RECT) -> i32;
+                            }
+                            let hwnd = h.hwnd.get() as isize;
+                            unsafe {
+                                let mut rect = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+                                if GetClientRect(hwnd, &mut rect) != 0 {
+                                    let w = (rect.right - rect.left).max(0) as u32;
+                                    let hh = (rect.bottom - rect.top).max(0) as u32;
+                                    let _ = wv.set_bounds(wry::Rect {
+                                        position: wry::dpi::PhysicalPosition::new(0, 0).into(),
+                                        size: wry::dpi::PhysicalSize::new(w, hh).into(),
+                                    });
+                                    println!("PROBE_T03_BOUNDS {w}x{hh}");
+                                }
+                            }
+                        }
                         WEBVIEW.with(|c| *c.borrow_mut() = Some(wv));
                         println!("PROBE_T03_WEBVIEW_MOUNTED as child of iced window");
                     }
@@ -110,9 +161,10 @@ fn boot() -> (App, Task<Msg>) {
 fn main() {
     // deadline 守护：20s 内未 PASS 则 FAIL 退出（1）。
     std::thread::spawn(|| {
-        std::thread::sleep(std::time::Duration::from_secs(20));
+        let budget = if engine_mode() { 120 } else { 20 };
+        std::thread::sleep(std::time::Duration::from_secs(budget));
         if !DONE.load(Ordering::SeqCst) {
-            eprintln!("PROBE_T03_FAIL deadline (20s) without ipc round-trip");
+            eprintln!("PROBE_T03_FAIL deadline ({budget}s) without ipc round-trip");
             std::process::exit(1);
         }
     });
