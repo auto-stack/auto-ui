@@ -1,0 +1,7 @@
+asset: two-parts.glb
+sha256: 42c9da673fc67ccb0c65d4b337608834efd28a499f7e460866dcfc5ff2a0c671
+byte_length: 1528
+author: AutoGraphics PLAN-838 authors (self-authored test geometry)
+license: MIT
+origin: autographics-dev commit 8b12632d7b5b1b0df72fbb4eef84297a054de31d, experimental/autographics-auto-driver/research/asset-probe/two-parts.glb (byte-identical copy; determinism check: research/asset-probe/generate.py --check)
+notes: red triangle at x=-1.5, green triangle at x=+1.5, y 0..1.5; no third-party model/texture/converter/network input.

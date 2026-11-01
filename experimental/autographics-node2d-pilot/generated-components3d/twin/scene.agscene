@@ -1,0 +1,128 @@
+{
+ "behavior": {
+  "api": "autographics.behavior/1",
+  "source": {
+   "format": "auto-source",
+   "sha256": "b7bedd5a9287956f4fefc85646202f5d339e5b378a1ca95e50fb0ec8e23ed52e",
+   "byte_length": 2385
+  },
+  "actors": {
+   "two_d": null,
+   "three_d": null
+  }
+ },
+ "schema": "autographics.scene/6",
+ "document_id": "plan024-components-3d-main",
+ "resources": [
+  "circle",
+  "quad",
+  "cylinder",
+  "player",
+  "mob"
+ ],
+ "groups": [
+  {
+   "id": 1,
+   "name": "arena",
+   "dimension": "3d",
+   "parent": null,
+   "translation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "visible": true
+  }
+ ],
+ "objects": [
+  {
+   "id": 2,
+   "name": "Main/left/puck",
+   "kind": "cylinder",
+   "translation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": 1,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 3,
+   "name": "Main/right/puck",
+   "kind": "cylinder",
+   "translation": [
+    3.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": 1,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 4,
+   "name": "sentinel",
+   "kind": "cylinder",
+   "translation": [
+    0.0,
+    2.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  }
+ ],
+ "assets": [
+  {
+   "format": "glb",
+   "sha256": "42c9da673fc67ccb0c65d4b337608834efd28a499f7e460866dcfc5ff2a0c671",
+   "byte_length": 1528,
+   "name": "g02_glb"
+  }
+ ]
+}

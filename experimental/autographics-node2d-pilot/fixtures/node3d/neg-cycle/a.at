@@ -1,0 +1,12 @@
+use b: B
+
+node A(p: float) {
+    view-3d {
+        cylinder3d leaf {
+            position: (0.0, 0.0, 0.0)
+        }
+        B two {
+            p: .p
+        }
+    }
+}

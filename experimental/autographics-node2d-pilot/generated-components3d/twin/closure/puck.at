@@ -1,0 +1,36 @@
+// PLAN-024 components-3d twin chain Puck definition: same definition, two
+// instances with different params (p0 0/3, hide_at 0/45). Local model
+// (phase/ticks/on) drives the leaf's 3-axis position and visible through
+// v1 ag_set_local/ag_set_visible writes at tick end (change-gated). The
+// anonymous .Pinged(float) business event emits upward at Life.Start with
+// the instance's own p0 payload.
+node Puck(p0: float, hide_at: int) {
+    model {
+        var phase = .p0
+        var ticks = 0
+        var on = 1
+    }
+    msg {
+        Pinged(float)
+    }
+    view-3d {
+        cylinder3d puck {
+            position: (.phase, 0.0, 0.0)
+            visible: .on
+        }
+    }
+    on {
+        Life.Start -> {
+            emit .Pinged(.p0)
+        }
+        Life.Tick(dt) -> {
+            .ticks = .ticks + 1
+            .phase = .phase + dt
+            if .hide_at > 0 {
+                if .ticks >= .hide_at {
+                    .on = 0
+                }
+            }
+        }
+    }
+}

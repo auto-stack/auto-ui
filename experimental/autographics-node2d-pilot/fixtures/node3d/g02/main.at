@@ -1,0 +1,17 @@
+// PLAN-024 components-3d g02 chain (author source): the original G02
+// obligation rebuilt through the view-3d author entry — one static flat-color
+// two-part GLB leaf, behavior null (pure scene: no model/msg/on anywhere),
+// no character/camera. Driver-side acceptance re-checks the five B02 rules
+// (run ok, red part pixels > 20, green part pixels > 20 on the 800-wide
+// capture at 2px sampling, inspect document == run document, single-byte
+// tamper rejected then restored).
+use resources: g02_glb
+
+node Main {
+    view-3d {
+        model3d badge {
+            model: resources.g02_glb
+            position: (0.0, 0.6, 0.0)
+        }
+    }
+}

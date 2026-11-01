@@ -1,0 +1,3 @@
+// g03 keeps a declared (unused) model resource to exercise unused-item
+// admission; the hierarchy chain itself uses cylinder leaves only.
+let g02_glb = model3d.glb("assets/two-parts.glb")

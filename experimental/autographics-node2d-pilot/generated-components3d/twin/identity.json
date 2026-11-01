@@ -1,0 +1,32 @@
+{
+ "generator": "autographics-node2d-pilot plan024 components-3d",
+ "api": "autographics.behavior/1",
+ "user_source_sha256": "b7bedd5a9287956f4fefc85646202f5d339e5b378a1ca95e50fb0ec8e23ed52e",
+ "user_source_bytes": 2385,
+  "module:main": "8da34d0be7000a011f3dab232f5cdc6d11da8224407e3d10b718c467f732f3dd",
+  "module:puck": "d5ab9d08b1c1f6fdf8fb335d29e5cd5f6e60e5caf19d5e92eae6634d9e284aeb",
+  "module:resources": "e5fc4ea430c93f6ec46eb09dbd37227da7c7a4606af97a215b0fc6b660cea197",
+ "closure": [
+  {"name": "main", "sha256": "8da34d0be7000a011f3dab232f5cdc6d11da8224407e3d10b718c467f732f3dd", "bytes": 1057},
+  {"name": "puck", "sha256": "d5ab9d08b1c1f6fdf8fb335d29e5cd5f6e60e5caf19d5e92eae6634d9e284aeb", "bytes": 995},
+  {"name": "resources", "sha256": "e5fc4ea430c93f6ec46eb09dbd37227da7c7a4606af97a215b0fc6b660cea197", "bytes": 162}
+ ],
+ "roles": {
+ "scene_rows": {
+  "Main/left/puck": 1,
+  "Main/right/puck": 2,
+  "arena": 0,
+  "sentinel": 3
+ }
+},
+ "assets": [
+   {"sha256": "42c9da673fc67ccb0c65d4b337608834efd28a499f7e460866dcfc5ff2a0c671", "file": "42c9da673fc67ccb0c65d4b337608834efd28a499f7e460866dcfc5ff2a0c671.glb", "declared": "assets/two-parts.glb"}
+ ],
+ "provenance": {
+  "product": "twin",
+  "consumer": "experimental/autographics-auto-driver/tests/node3d_basic_flow.rs",
+  "consumption": "include_str! frozen scene.agscene + world.at + assets/<sha>.glb; the harness writes the project (scene + assets) under target and loads via Storage::load_project; variants feed scripts/<sha>.at where <sha> = scene.behavior.source.sha256",
+  "load_verification": "the load path hash-verifies the behavior source and every assets/<sha>.glb against the scene manifest; GLB geometry admission runs in the driver preflight decoder before allocation",
+  "world_sha256": "b7bedd5a9287956f4fefc85646202f5d339e5b378a1ca95e50fb0ec8e23ed52e"
+ }
+}

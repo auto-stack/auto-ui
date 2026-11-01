@@ -1,0 +1,9 @@
+// Negative: unknown prop on a view-3d element (rgba is fixed for 3D).
+node Main {
+    view-3d {
+        cylinder3d leaf {
+            position: (0.0, 0.0, 0.0)
+            rgba: (1.0, 0.0, 0.0, 1.0)
+        }
+    }
+}

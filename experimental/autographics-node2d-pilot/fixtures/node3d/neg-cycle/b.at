@@ -1,0 +1,7 @@
+node B(p: float) {
+    view-3d {
+        A back {
+            p: .p
+        }
+    }
+}

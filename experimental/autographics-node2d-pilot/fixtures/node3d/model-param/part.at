@@ -1,0 +1,11 @@
+// PLAN-024 components-3d Model3D typed param: the leaf's model binding is a
+// Model3D port resolved per instance (GLB symbol reference, name is not an
+// integer ID).
+node Part(m: Model3D) {
+    view-3d {
+        model3d shell {
+            model: .m
+            position: (0.0, 0.0, 0.0)
+        }
+    }
+}

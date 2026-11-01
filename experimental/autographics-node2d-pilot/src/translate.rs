@@ -69,6 +69,17 @@ pub struct Ctx<'a> {
     /// PLAN-022（sprites-2d）：typed 渲染服务环境。None 保持旧档行为
     /// （render2d/input.held 保持 unsupported，旧字节不变）。
     pub sprites: Option<SpriteEnv<'a>>,
+    /// PLAN-024（components-3d）：v1 空间服务环境（refs/self 行句柄）。
+    /// None 保持旧档行为（place/shift/show 等保持 unsupported，旧字节不变）。
+    pub space3: Option<SpaceEnv<'a>>,
+}
+
+/// PLAN-024：view-3d 元素行句柄环境。refs：本定义 view-3d 元素名 →
+/// 行表达式（root = 1-based 序数字面量；实例 = `<prefix>_<elem>_rows[i]`）。
+/// 行句柄 = driver `hierarchy::ordered()` 先序 + 1（v1 节点 handle 基 1）。
+pub struct SpaceEnv<'a> {
+    pub refs: &'a BTreeMap<String, String>,
+    pub self_row: Option<String>,
 }
 
 /// PLAN-022：图像帧表（生成侧全局数组 `{image}_fx/fy/fw/fh`；序 = 帧资源
@@ -208,6 +219,16 @@ fn pad(out: &mut String, indent: usize) {
 fn translate_stmt(s: &Stmt, ctx: &Ctx, out: &mut String, indent: usize) -> Result<(), LowerError> {
     match s {
         Stmt::Expr(e) => {
+            // PLAN-024：v1 空间写语句（place/shift/show；refs.<elem>/self）。
+            // 值位置使用具名拒绝（place 展开三条 ag_set_local）。
+            if let Some(texts) = space3_stmt(e, ctx)? {
+                for t in texts {
+                    pad(out, indent);
+                    out.push_str(&t);
+                    out.push('\n');
+                }
+                return Ok(());
+            }
             // PLAN-021：`place(x, y)` 是语句形态（一次作者语句 → 两条
             // ag_set_local）；值位置使用具名拒绝。
             if let Some(texts) = row_place_pair(e, ctx)? {
@@ -533,7 +554,25 @@ fn translate_expr(e: &Expr, ctx: &Ctx, out: &mut String) -> Result<(), LowerErro
                     if matches!(&**boxed_root, Expr::Ident(r) if r == "refs")
                         && (ctx.refs_any_elem || mid == "body")
                     {
+                        // PLAN-024：v1 空间服务优先（place/shift/show 值位置
+                        // 具名拒绝；local/world/visible/row 读取）。
+                        if ctx.space3.is_some() {
+                            return translate_space3_call(op, mid, e, ctx, out);
+                        }
                         return translate_refs_body(op, mid, e, ctx, out);
+                    }
+                }
+            }
+            // PLAN-024：self 空间读取（self.local/self.world/self.visible/
+            // self.row；写形态已在语句层展开）。self 平移写属于 021 合同，
+            // 3D 档 self.shift 已在语句层展开，此处仅剩余读取形态。
+            if let Expr::Dot(inner, op) = &*call.name {
+                if let Expr::Ident(base) = &**inner {
+                    if base == "self"
+                        && ctx.space3.is_some()
+                        && matches!(op.as_str(), "local" | "world" | "visible" | "row")
+                    {
+                        return translate_space3_self(op, e, ctx, out);
                     }
                 }
             }
@@ -554,13 +593,11 @@ fn translate_expr(e: &Expr, ctx: &Ctx, out: &mut String) -> Result<(), LowerErro
                                 other => return Err(unsupported(format!("emit arg {other:?}"), e)),
                             }
                         }
-                        // 钩子返回调用头部（接收下标实参在内，未闭合）；
-                        // 模板续接实参并闭合。
+                        // 钩子返回调用头部（接收下标实参与分隔符在内，
+                        // 未闭合；PLAN-024 修复 root 直呼形态的括号缺失——
+                        // 旧实例投递字节不变）。模板续接实参并闭合。
                         let call_text = (hook)(child, ev, args.len())?;
                         out.push_str(&call_text);
-                        if !args.is_empty() {
-                            out.push_str(", ");
-                        }
                         out.push_str(&args.join(", "));
                         out.push(')');
                         return Ok(());
@@ -948,6 +985,236 @@ fn row_place_pair(e: &Expr, ctx: &Ctx) -> Result<Option<Vec<String>>, LowerError
         format!("ag_set_local({row}, 0, {})", parts[0]),
         format!("ag_set_local({row}, 1, {})", parts[1]),
     ]))
+}
+
+/// PLAN-024：v1 空间行句柄解析（refs.<elem> 或 self；space3 环境必需）。
+fn space3_row_of(inner: &Expr, e: &Expr, ctx: &Ctx) -> Result<String, LowerError> {
+    let Some(env) = &ctx.space3 else {
+        return Err(unsupported("view-3d row service outside components-3d", e));
+    };
+    match inner {
+        Expr::Dot(boxed_root, name) => {
+            if !matches!(&**boxed_root, Expr::Ident(r) if r == "refs") {
+                return Err(unsupported("view-3d row reference form", e));
+            }
+            env.refs.get(name.as_str()).cloned().ok_or_else(|| {
+                unsupported(
+                    format!("unknown view-3d element reference 'refs.{name}'"),
+                    e,
+                )
+            })
+        }
+        Expr::Ident(base) if base == "self" => env.self_row.clone().ok_or_else(|| {
+            unsupported(
+                "self has no view-3d row (definition has no view-3d element)",
+                e,
+            )
+        }),
+        _ => Err(unsupported("view-3d row reference form", e)),
+    }
+}
+
+/// PLAN-024：v1 空间写语句（place/shift/show）。place 展开三条
+/// `ag_set_local(row, axis, …)`；shift → `ag_move_local`；show →
+/// `ag_set_visible`。非目标形态返回 None（语句层继续分派）。
+fn space3_stmt(e: &Expr, ctx: &Ctx) -> Result<Option<Vec<String>>, LowerError> {
+    let Expr::Call(c) = e else {
+        return Ok(None);
+    };
+    let Expr::Dot(inner, m) = &*c.name else {
+        return Ok(None);
+    };
+    if !matches!(m.as_str(), "place" | "shift" | "show") {
+        return Ok(None);
+    }
+    // 仅 refs.<elem>/self 形态归本服务；其它基础（如 `refs.<q>.place` 在
+    // 021 档）由 ctx.space3 缺席回退旧路径。
+    let is_refs = matches!(&**inner, Expr::Dot(outer, _) if matches!(&**outer, Expr::Ident(r) if r == "refs"));
+    let is_self = matches!(&**inner, Expr::Ident(b) if b == "self");
+    if !is_refs && !is_self {
+        return Ok(None);
+    }
+    if ctx.space3.is_none() {
+        return Ok(None);
+    }
+    let row = space3_row_of(inner, e, ctx)?;
+    let mut parts = Vec::new();
+    for a in &c.args.args {
+        match a {
+            Arg::Pos(x) => {
+                let mut t = String::new();
+                translate_expr(x, ctx, &mut t)?;
+                parts.push(t);
+            }
+            _ => return Err(unsupported(format!("{m} arg"), e)),
+        }
+    }
+    match m.as_str() {
+        "place" => {
+            if parts.len() != 3 {
+                return Err(unsupported(format!("place arity {}", parts.len()), e));
+            }
+            Ok(Some(vec![
+                format!("ag_set_local({row}, 0, {})", parts[0]),
+                format!("ag_set_local({row}, 1, {})", parts[1]),
+                format!("ag_set_local({row}, 2, {})", parts[2]),
+            ]))
+        }
+        "shift" => {
+            if parts.len() != 3 {
+                return Err(unsupported(format!("shift arity {}", parts.len()), e));
+            }
+            Ok(Some(vec![format!(
+                "ag_move_local({row}, {}, {}, {})",
+                parts[0], parts[1], parts[2]
+            )]))
+        }
+        "show" => {
+            if parts.len() != 1 {
+                return Err(unsupported(format!("show arity {}", parts.len()), e));
+            }
+            Ok(Some(vec![format!("ag_set_visible({row}, {})", parts[0])]))
+        }
+        _ => unreachable!("space3 op dispatch"),
+    }
+}
+
+/// PLAN-024：v1 空间读取（值位置）：`refs.<elem>.local(axis)/world(axis)/
+/// visible()/row()`。写形态（place/shift/show）在语句层展开，这里具名拒绝。
+fn translate_space3_call(
+    op: &str,
+    elem: &str,
+    e: &Expr,
+    ctx: &Ctx,
+    out: &mut String,
+) -> Result<(), LowerError> {
+    let env = ctx
+        .space3
+        .as_ref()
+        .ok_or_else(|| unsupported("view-3d service outside components-3d", e))?;
+    let row = env.refs.get(elem).cloned().ok_or_else(|| {
+        unsupported(
+            format!("unknown view-3d element reference 'refs.{elem}'"),
+            e,
+        )
+    })?;
+    let call = match e {
+        Expr::Call(c) => c,
+        _ => return Err(unsupported("refs.<elem> non-call", e)),
+    };
+    let axis_arg = |call: &auto_parser_api::ast::Call| -> Result<String, LowerError> {
+        if call.args.args.len() != 1 {
+            return Err(unsupported(
+                format!("{op} arity {}", call.args.args.len()),
+                e,
+            ));
+        }
+        match &call.args.args[0] {
+            Arg::Pos(x) => {
+                let mut t = String::new();
+                translate_expr(x, ctx, &mut t)?;
+                Ok(t)
+            }
+            _ => Err(unsupported(format!("{op} axis arg"), e)),
+        }
+    };
+    match op {
+        "place" | "shift" | "show" => Err(unsupported(
+            format!("'{op}' is statement-only (it writes the row)"),
+            e,
+        )),
+        "local" => {
+            let axis = axis_arg(call)?;
+            out.push_str(&format!("ag_local({row}, {axis})"));
+            Ok(())
+        }
+        "world" => {
+            let axis = axis_arg(call)?;
+            out.push_str(&format!("ag_world({row}, {axis})"));
+            Ok(())
+        }
+        "visible" => {
+            if !call.args.args.is_empty() {
+                return Err(unsupported("visible arity", e));
+            }
+            out.push_str(&format!("ag_visible({row})"));
+            Ok(())
+        }
+        "row" => {
+            if !call.args.args.is_empty() {
+                return Err(unsupported("row arity", e));
+            }
+            out.push_str(&row);
+            Ok(())
+        }
+        _ => Err(unsupported(
+            format!(
+                "unknown view-3d service 'refs.{elem}.{op}' (place/shift/show/local/world/visible/row)"
+            ),
+            e,
+        )),
+    }
+}
+
+/// PLAN-024：self 空间读取（值位置）：`self.local/self.world/self.visible/
+/// self.row`。
+fn translate_space3_self(
+    op: &str,
+    e: &Expr,
+    ctx: &Ctx,
+    out: &mut String,
+) -> Result<(), LowerError> {
+    let env = ctx
+        .space3
+        .as_ref()
+        .ok_or_else(|| unsupported("view-3d service outside components-3d", e))?;
+    let row = env.self_row.clone().ok_or_else(|| {
+        unsupported(
+            "self has no view-3d row (definition has no view-3d element)",
+            e,
+        )
+    })?;
+    let call = match e {
+        Expr::Call(c) => c,
+        _ => return Err(unsupported("self non-call", e)),
+    };
+    match op {
+        "local" | "world" => {
+            if call.args.args.len() != 1 {
+                return Err(unsupported(
+                    format!("self.{op} arity {}", call.args.args.len()),
+                    e,
+                ));
+            }
+            let mut t = String::new();
+            match &call.args.args[0] {
+                Arg::Pos(x) => translate_expr(x, ctx, &mut t)?,
+                _ => return Err(unsupported(format!("self.{op} axis arg"), e)),
+            }
+            let f = if op == "local" {
+                "ag_local"
+            } else {
+                "ag_world"
+            };
+            out.push_str(&format!("{f}({row}, {t})"));
+            Ok(())
+        }
+        "visible" => {
+            if !call.args.args.is_empty() {
+                return Err(unsupported("self.visible arity", e));
+            }
+            out.push_str(&format!("ag_visible({row})"));
+            Ok(())
+        }
+        "row" => {
+            if !call.args.args.is_empty() {
+                return Err(unsupported("self.row arity", e));
+            }
+            out.push_str(&row);
+            Ok(())
+        }
+        _ => unreachable!("space3 self op dispatch"),
+    }
 }
 
 /// PLAN-021：`query2d.segment(ignore, visible_only, ax, ay, bx, by)` /

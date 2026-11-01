@@ -1,0 +1,14 @@
+// Negative: msg payload must be numeric (Model3D payload is named-rejected).
+node Main {
+    msg {
+        Carry(Model3D)
+    }
+    view-3d {
+        cylinder3d leaf {
+            position: (0.0, 0.0, 0.0)
+        }
+    }
+    on {
+        .Carry(m) -> {}
+    }
+}

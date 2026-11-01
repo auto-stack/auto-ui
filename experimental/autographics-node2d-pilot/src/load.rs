@@ -38,6 +38,15 @@ pub enum ResourceKind {
     /// PLAN-022 sprites-2d：frame2d.at(<image>, x, y, w, h)——具名帧表项。
     /// 名字即资源符号；rect 是图像内的整数像素矩形（w,h>=1）。
     Frame { image: String, rect: [u32; 4] },
+    /// PLAN-024 components-3d：model3d.glb("file.glb")——静态平色 GLB。
+    /// 身份 = 完整原始字节 SHA256 + byte_length + glb 格式（与 driver
+    /// AssetRef 键一致）；严格几何/域准入仍在 driver 受限 decoder
+    /// preflight（生成器只读原始字节哈希，不解析 GLB 结构）。
+    Model3D {
+        file: String,
+        sha256: String,
+        byte_length: usize,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -206,7 +215,61 @@ fn resource_from_store(
     if ctor == "at" {
         return Ok(resource_from_store_at(name, &call.args.args));
     }
+    // PLAN-024：model3d.glb("file.glb")——静态平色 GLB 资源（原始字节
+    // SHA 身份；几何准入在 driver preflight，缺文件具名拒绝）。
+    if ctor == "glb" {
+        return resource_from_store_glb(name, &call.args.args, base);
+    }
     Ok(resource_from_store_legacy(name, &ctor, &call.args.args))
+}
+
+/// PLAN-024：`model3d.glb("file.glb")` —— 缺文件具名拒绝；非 .glb 后缀
+/// 亦具名拒绝（不静默回退）。
+fn resource_from_store_glb(
+    name: &str,
+    args: &[auto_parser_api::ast::Arg],
+    base: &Path,
+) -> Result<Option<ResourceDef>, ProjectError> {
+    let err = |message: String| ProjectError {
+        file: "resources".to_string(),
+        line: 0,
+        message,
+    };
+    if args.len() != 1 {
+        return Ok(None);
+    }
+    let file = match &args[0] {
+        auto_parser_api::ast::Arg::Pos(Expr::Str(s)) => s.to_string(),
+        _ => return Ok(None),
+    };
+    if !file.to_ascii_lowercase().ends_with(".glb") {
+        return Err(err(format!(
+            "model resource '{name}': '{}' is not a .glb path",
+            file
+        )));
+    }
+    let path = base.join(&file);
+    let bytes = std::fs::read(&path).map_err(|e| {
+        err(format!(
+            "model resource '{name}': cannot read '{}' ({e})",
+            path.display()
+        ))
+    })?;
+    if bytes.len() < 12 || &bytes[0..4] != b"glTF" {
+        return Err(err(format!(
+            "model resource '{name}': '{}' is not a glTF-binary container",
+            path.display()
+        )));
+    }
+    Ok(Some(ResourceDef {
+        name: name.to_string(),
+        kind: ResourceKind::Model3D {
+            file,
+            sha256: crate::scene::sha256_hex(&bytes),
+            byte_length: bytes.len(),
+        },
+        line: 0,
+    }))
 }
 
 /// 旧三类数值构造器（quad/circle/color）。
@@ -460,6 +523,10 @@ pub fn load_project(entry: &Path) -> Result<Project, ProjectError> {
                     collect_instances(el, &mut instantiated);
                 }
             }
+            // PLAN-024：view-3d 实例同计入实例化面（root 判定一致）。
+            if let Some(view) = &node.view3d {
+                collect_instances3d(&view.elements, &mut instantiated);
+            }
         }
     }
     for name in &instantiated {
@@ -588,11 +655,14 @@ fn validate_closure(project: &Project) -> Result<(), ProjectError> {
     let mut root_names: Vec<String> = Vec::new();
     for module in project.modules.values() {
         for node in &module.nodes {
-            let Some(view) = &node.view2d else {
-                continue;
-            };
             let mut out: Vec<InstanceRef> = Vec::new();
-            walk_view(&node.name, &view.elements, &mut out);
+            if let Some(view) = &node.view2d {
+                walk_view(&node.name, &view.elements, &mut out);
+            }
+            // PLAN-024：view-3d 实例元素同走 prop/refs 校验。
+            if let Some(view) = &node.view3d {
+                walk_view3d(&view.elements, &mut out);
+            }
             for inst in &out {
                 if node.name == project.root {
                     root_names.push(inst.name.to_string());
@@ -707,6 +777,39 @@ fn collect_instances(el: &View2dElement, out: &mut Vec<String>) {
             }
         }
         _ => {}
+    }
+}
+
+/// PLAN-024：view-3d 实例名收集（group3d 子树递归）。
+fn collect_instances3d(elements: &[auto_ui_dialect::node2d::View3dElement], out: &mut Vec<String>) {
+    for el in elements {
+        match el {
+            auto_ui_dialect::node2d::View3dElement::Instance { node, .. } => {
+                out.push(node.clone());
+            }
+            auto_ui_dialect::node2d::View3dElement::Group { children, .. } => {
+                collect_instances3d(children, out);
+            }
+            _ => {}
+        }
+    }
+}
+
+/// PLAN-024：view-3d 实例元素引用收集（prop/refs 校验面与 view-2d 一致）。
+fn walk_view3d<'a>(
+    elements: &'a [auto_ui_dialect::node2d::View3dElement],
+    out: &mut Vec<InstanceRef<'a>>,
+) {
+    for el in elements {
+        match el {
+            auto_ui_dialect::node2d::View3dElement::Instance { node, name, props } => {
+                out.push(InstanceRef { node, name, props });
+            }
+            auto_ui_dialect::node2d::View3dElement::Group { children, .. } => {
+                walk_view3d(children, out);
+            }
+            _ => {}
+        }
     }
 }
 

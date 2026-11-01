@@ -1,0 +1,53 @@
+// PLAN-024 components-3d envelope: root stateful + 7 same-def Puck
+// instances = exactly 8 stateful instances (root included) — the frozen
+// envelope boundary holds (9th would be named-rejected).
+use puck: Puck
+
+node Main {
+    model {
+        var seen = 0
+    }
+    msg {
+        Pinged(float)
+    }
+    view-3d {
+        group3d arena {
+            position: (0.0, 0.0, 0.0)
+            Puck p0 {
+                p0: 0.0
+                hide_at: 0
+            }
+            Puck p1 {
+                p0: 1.0
+                hide_at: 0
+            }
+            Puck p2 {
+                p0: 2.0
+                hide_at: 0
+            }
+            Puck p3 {
+                p0: 3.0
+                hide_at: 0
+            }
+            Puck p4 {
+                p0: 4.0
+                hide_at: 0
+            }
+            Puck p5 {
+                p0: 5.0
+                hide_at: 0
+            }
+            Puck p6 {
+                p0: 6.0
+                hide_at: 0
+            }
+        }
+    }
+    on {
+        .Pinged(v) -> {
+            if v > 0.0 {
+                .seen = .seen + 1
+            }
+        }
+    }
+}

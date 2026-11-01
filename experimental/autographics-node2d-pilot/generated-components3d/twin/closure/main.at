@@ -1,0 +1,43 @@
+// PLAN-024 components-3d twin chain (author source): two same-def Puck
+// instances under one explicit group3d arena, each with independent local
+// phase/position/visibility, plus a root-stateful receiver that counts the
+// two typed .Pinged payloads separately (lo for left 0.0, hi for right 3.0).
+// A static root cylinder sentinel guards the root frame on GPU.
+use puck: Puck
+use resources: g02_glb
+
+node Main {
+    model {
+        var lo = 0
+        var hi = 0
+    }
+    msg {
+        Pinged(float)
+    }
+    view-3d {
+        group3d arena {
+            position: (0.0, 0.0, 0.0)
+            Puck left {
+                p0: 0.0
+                hide_at: 0
+            }
+            Puck right {
+                p0: 3.0
+                hide_at: 45
+            }
+        }
+        cylinder3d sentinel {
+            position: (0.0, 2.0, 0.0)
+        }
+    }
+    on {
+        Life.Start -> {}
+        .Pinged(v) -> {
+            if v > 2.0 {
+                .hi = .hi + 1
+            } else {
+                .lo = .lo + 1
+            }
+        }
+    }
+}

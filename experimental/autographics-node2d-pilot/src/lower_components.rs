@@ -77,7 +77,7 @@ pub(crate) fn at(module: &str, line: usize, symbol: &str, what: &str) -> LowerEr
     }
 }
 
-fn line_at(source: &str, offset: usize) -> usize {
+pub(crate) fn line_at(source: &str, offset: usize) -> usize {
     source[..offset.min(source.len())]
         .bytes()
         .filter(|b| *b == b'\n')
@@ -85,7 +85,7 @@ fn line_at(source: &str, offset: usize) -> usize {
         + 1
 }
 
-fn decl_line(project: &Project, module: &str, decl: &NodeDecl) -> usize {
+pub(crate) fn decl_line(project: &Project, module: &str, decl: &NodeDecl) -> usize {
     project
         .modules
         .get(module)
@@ -93,7 +93,7 @@ fn decl_line(project: &Project, module: &str, decl: &NodeDecl) -> usize {
         .unwrap_or(0)
 }
 
-fn prop_line(module_src: &str, pr: &Prop) -> usize {
+pub(crate) fn prop_line(module_src: &str, pr: &Prop) -> usize {
     line_at(module_src, pr.span.0)
 }
 
@@ -108,6 +108,9 @@ pub(crate) enum PType {
     Res,
     /// PLAN-022：Image2D（typed 图像端口；绑定必须是 image2d.png 资源）。
     Img,
+    /// PLAN-024：Model3D（typed 静态平色 GLB 端口；绑定必须是 model3d.glb
+    /// 资源）。仅 components-3d 构造；2D 档 ptype_of 不产生。
+    Model,
 }
 
 fn ptype_of(ty: &Type) -> Option<PType> {
@@ -120,10 +123,21 @@ fn ptype_of(ty: &Type) -> Option<PType> {
     }
 }
 
+/// PLAN-024：components-3d 参数类型面（int/float/Model3D；Material2D/
+/// Mesh2D/Image2D 端口具名拒绝）。
+pub(crate) fn ptype_of_3d(ty: &Type) -> Option<PType> {
+    match ty {
+        Type::Int | Type::Byte => Some(PType::Int),
+        Type::Float | Type::Double => Some(PType::Float),
+        Type::User(d) if d.name == "Model3D" => Some(PType::Model),
+        _ => None,
+    }
+}
+
 impl PType {
-    fn text(self) -> &'static str {
+    pub(crate) fn text(self) -> &'static str {
         match self {
-            PType::Int | PType::Res | PType::Img => "int",
+            PType::Int | PType::Res | PType::Img | PType::Model => "int",
             PType::Float => "float",
         }
     }
@@ -137,7 +151,7 @@ pub(crate) enum ParamVal {
 }
 
 impl ParamVal {
-    fn text(&self, is_int: bool) -> String {
+    pub(crate) fn text(&self, is_int: bool) -> String {
         match self {
             ParamVal::Num(v) => {
                 if is_int {
@@ -153,7 +167,7 @@ impl ParamVal {
 
 /// PLAN-022：视图图像绑定上的 frame/flip 值形态（字面量序数/参数/model 引用）。
 #[derive(Debug, Clone)]
-enum FrameBind {
+pub(crate) enum FrameBind {
     /// 字面量：frame = 帧表 ordinal；flip = 0/1。
     Lit(u32),
     /// 数值参数（逐实例下降期常量）。
@@ -164,17 +178,17 @@ enum FrameBind {
 
 /// PLAN-022：一个图像绑定视图元素（shape2d 或 character2d）。
 #[derive(Debug, Clone)]
-struct SpriteElemIR {
-    elem: String,
+pub(crate) struct SpriteElemIR {
+    pub(crate) elem: String,
     /// character2d 行（帧写走 ag_sprite_frame(行 id)）还是 shape2d。
-    is_char: bool,
+    pub(crate) is_char: bool,
     /// image2d.png 资源名（Direct 形态；Param 形态时为空）。
-    image: String,
+    pub(crate) image: String,
     /// Image2D 参数名（`image: <param>` 传参形态；逐实例解析）。
-    image_param: Option<String>,
-    frame: FrameBind,
-    flip: FrameBind,
-    line: usize,
+    pub(crate) image_param: Option<String>,
+    pub(crate) frame: FrameBind,
+    pub(crate) flip: FrameBind,
+    pub(crate) line: usize,
 }
 
 /// 一个组件定义（root 或被实例化 node）的静态面。
@@ -219,6 +233,9 @@ pub(crate) struct InstanceIR {
     /// 参数名 → 下降期常量（数值或资源 symbol）。
     pub(crate) params: Vec<(String, ParamVal)>,
     pub(crate) line: usize,
+    /// PLAN-024：实例化点所在的显式 group3d 名（caller 视图内；根层
+    /// 直接实例为 None）。2D 档恒 None。
+    pub(crate) parent_group: Option<String>,
 }
 
 /// 组件世界 IR（验证后的中间表示）。
@@ -236,6 +253,8 @@ pub(crate) struct WorldIR {
     pub(crate) images: BTreeMap<String, (String, usize, u32, u32)>,
     /// PLAN-022：帧表（图像名 → [(帧资源名, rect)]，声明序；ordinal 即序）。
     pub(crate) frames: BTreeMap<String, Vec<(String, [u32; 4])>>,
+    /// PLAN-024：工程 GLB 模型资源（声明序）：名字 → (sha256, byte_length)。
+    pub(crate) models: BTreeMap<String, (String, usize)>,
 }
 
 pub(crate) fn inst_name_of(path: &str) -> &str {
@@ -243,7 +262,7 @@ pub(crate) fn inst_name_of(path: &str) -> &str {
 }
 
 impl WorldIR {
-    fn instances_of(&self, def: &str) -> Vec<usize> {
+    pub(crate) fn instances_of(&self, def: &str) -> Vec<usize> {
         self.instances
             .iter()
             .enumerate()
@@ -252,7 +271,7 @@ impl WorldIR {
             .collect()
     }
 
-    fn def_len(&self, def: &str) -> usize {
+    pub(crate) fn def_len(&self, def: &str) -> usize {
         self.instances.iter().filter(|i| i.def == def).count()
     }
 
@@ -262,7 +281,12 @@ impl WorldIR {
             .position(|i| i.parent == Some(inst) && inst_name_of(&i.path) == name)
     }
 
-    fn param_value(&self, def: &DefIR, inst: &InstanceIR, pname: &str) -> Result<f64, LowerError> {
+    pub(crate) fn param_value(
+        &self,
+        def: &DefIR,
+        inst: &InstanceIR,
+        pname: &str,
+    ) -> Result<f64, LowerError> {
         let (_, val) = inst
             .params
             .iter()
@@ -289,7 +313,7 @@ impl WorldIR {
 
 // ------------------------------------------------------ def scanning ----
 
-fn model_field_is_int(
+pub(crate) fn model_field_is_int(
     project: &Project,
     module: &str,
     line: usize,
@@ -323,7 +347,7 @@ fn model_field_is_int(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn param_int(
+pub(crate) fn param_int(
     _project: &Project,
     module: &str,
     line: usize,
@@ -794,7 +818,7 @@ fn prop_binds_model(p: &Prop, model_fields: &BTreeSet<String>) -> bool {
 
 // ------------------------------------------------------ world build ----
 
-fn model_init_value(
+pub(crate) fn model_init_value(
     project: &Project,
     world: &WorldIR,
     def: &DefIR,
@@ -863,6 +887,7 @@ pub(crate) fn build_world(project: &Project, sprites: bool) -> Result<WorldIR, L
         camera: None,
         images: BTreeMap::new(),
         frames: BTreeMap::new(),
+        models: BTreeMap::new(),
     };
 
     // PLAN-022：图像/帧表资源装配（sprites-2d 档）——声明序跨 resources
@@ -1173,6 +1198,7 @@ pub(crate) fn build_world(project: &Project, sprites: bool) -> Result<WorldIR, L
             def_idx,
             params,
             line,
+            parent_group: None,
         });
         if stateful_inst {
             world.stateful += 1;
@@ -1361,24 +1387,24 @@ pub(crate) fn build_world(project: &Project, sprites: bool) -> Result<WorldIR, L
 /// 子投递：发射定义实例 i → 自名子实例的接收下标。
 #[derive(Debug, Clone)]
 pub(crate) struct ChildDispatch {
-    table: String,
-    fn_name: String,
+    pub(crate) table: String,
+    pub(crate) fn_name: String,
     #[allow(dead_code)] // 诊断/未来消费面保留（端口名）。
     ev: String,
-    /// 每发射实例的接收下标（root 发射方恰一项）。
-    entries: Vec<usize>,
+    // 每发射实例的接收下标（root 发射方恰一项）。
+    pub(crate) entries: Vec<usize>,
 }
 
 /// 祖先投递：发射定义实例 i → 最近声明 `on .Ev` 的祖先实例（或 root）。
 #[derive(Debug, Clone)]
 pub(crate) struct AncDispatch {
-    table: String,
-    fn_name: String,
-    to_root: bool,
+    pub(crate) table: String,
+    pub(crate) fn_name: String,
+    pub(crate) to_root: bool,
     #[allow(dead_code)] // 诊断/未来消费面保留（端口名）。
     ev: String,
-    /// 每发射实例的接收下标；None = root 接收（直呼）。
-    entries: Vec<Option<usize>>,
+    // 每发射实例的接收下标；None = root 接收（直呼）。
+    pub(crate) entries: Vec<Option<usize>>,
 }
 
 /// 下降期事件投递计划（V-03；全部在生成前解析，无宿主队列）。
@@ -1394,22 +1420,22 @@ pub(crate) struct Plan {
 }
 
 /// 遍历处理器语句树，收集：裸函数调用、`.member` 引用、emit 站点。
-struct WalkOut {
-    calls: Vec<(String, usize)>,
-    members: BTreeSet<String>,
+pub(crate) struct WalkOut {
+    pub(crate) calls: Vec<(String, usize)>,
+    pub(crate) members: BTreeSet<String>,
     /// `.member = ...` 赋值目标（参数只读合同的检测面）。
-    assign_targets: Vec<(String, usize)>,
-    child_emits: Vec<(String, String, usize, usize)>,
-    anc_emits: Vec<(String, usize, usize)>,
+    pub(crate) assign_targets: Vec<(String, usize)>,
+    pub(crate) child_emits: Vec<(String, String, usize, usize)>,
+    pub(crate) anc_emits: Vec<(String, usize, usize)>,
     /// PLAN-021：queries-2d 事件序（绑定/读取/调用/引用/自身行）。
-    query_events: Vec<QEvent>,
+    pub(crate) query_events: Vec<QEvent>,
     /// PLAN-022：render2d.<op> 调用（op, spawn 目标元素, 元数, 行）。
-    render_calls: Vec<(String, Option<String>, usize, usize)>,
+    pub(crate) render_calls: Vec<(String, Option<String>, usize, usize)>,
 }
 
 /// PLAN-021：查询 handle 实参形态（plan 层验证引用存在/维度合法）。
 #[derive(Debug, Clone)]
-enum QHandle {
+pub(crate) enum QHandle {
     Named(String),
     SelfRow,
     MinusOne,
@@ -1417,7 +1443,7 @@ enum QHandle {
 
 /// PLAN-021：query2d 构造的有序事件（绑定模拟 + 具名验证的输入）。
 #[derive(Debug, Clone)]
-enum QEvent {
+pub(crate) enum QEvent {
     /// `let q = query2d.segment/sweep(...)`（在 QueryCall 之后）。
     Bind {
         name: String,
@@ -1450,7 +1476,13 @@ enum QEvent {
     ResultAssign { name: String, line: usize },
 }
 
-fn walk_stmts(stmts: &[Stmt], line: usize, out: &mut WalkOut, queries: bool, sprites: bool) {
+pub(crate) fn walk_stmts(
+    stmts: &[Stmt],
+    line: usize,
+    out: &mut WalkOut,
+    queries: bool,
+    sprites: bool,
+) {
     for s in stmts {
         match s {
             Stmt::Expr(e) => walk_expr_q(e, line, out, queries, sprites),
@@ -1496,7 +1528,7 @@ fn is_getter_method(m: &str) -> bool {
     )
 }
 
-fn walk_expr_q(e: &Expr, line: usize, out: &mut WalkOut, queries: bool, sprites: bool) {
+pub(crate) fn walk_expr_q(e: &Expr, line: usize, out: &mut WalkOut, queries: bool, sprites: bool) {
     match e {
         Expr::Call(c) => {
             let cline = c.pos.as_ref().map(|p| p.line).unwrap_or(line);
@@ -1712,12 +1744,41 @@ fn root_member(project: &Project, world: &WorldIR, ev: &str) -> Option<(usize, u
 
 fn find_child_node(project: &Project, def_name: &str, child: &str) -> Option<String> {
     let decl = node_of(project, def_name);
-    let view = decl.view2d.as_ref()?;
-    for el in &view.elements {
-        if let View2dElement::Instance { node, name, .. } = el {
-            if name == child {
-                return Some(node.clone());
+    if let Some(view) = &decl.view2d {
+        for el in &view.elements {
+            if let View2dElement::Instance { node, name, .. } = el {
+                if name == child {
+                    return Some(node.clone());
+                }
             }
+        }
+    }
+    // PLAN-024：view-3d 子实例（group3d 子树递归；同一 node 只有一个
+    // view 块，两分支互斥）。
+    if let Some(view) = &decl.view3d {
+        return find_child_node3d(&view.elements, child);
+    }
+    None
+}
+
+/// PLAN-024：view-3d 子树内按实例名查子 node 定义。
+fn find_child_node3d(
+    elements: &[auto_ui_dialect::node2d::View3dElement],
+    child: &str,
+) -> Option<String> {
+    for el in elements {
+        match el {
+            auto_ui_dialect::node2d::View3dElement::Instance { node, name, .. } => {
+                if name == child {
+                    return Some(node.clone());
+                }
+            }
+            auto_ui_dialect::node2d::View3dElement::Group { children, .. } => {
+                if let Some(node) = find_child_node3d(children, child) {
+                    return Some(node);
+                }
+            }
+            _ => {}
         }
     }
     None
@@ -2419,12 +2480,17 @@ pub(crate) fn plan_dispatch(
 // ------------------------------------------------------ view values ----
 
 /// 位置/尺寸/可见分量求值：编译期数值或运行期 model 引用。
-enum CVal {
+#[derive(Debug, Clone)]
+pub(crate) enum CVal {
     Num(f64),
     Ref(String),
 }
 
-fn resolve_cval(def: &DefIR, e: &Expr, params: &[(String, ParamVal)]) -> Result<CVal, LowerError> {
+pub(crate) fn resolve_cval(
+    def: &DefIR,
+    e: &Expr,
+    params: &[(String, ParamVal)],
+) -> Result<CVal, LowerError> {
     if let Some(v) = numeric_lit(e) {
         return Ok(CVal::Num(v));
     }
@@ -2451,7 +2517,7 @@ fn resolve_cval(def: &DefIR, e: &Expr, params: &[(String, ParamVal)]) -> Result<
     ))
 }
 
-fn prop_exprs(pr: &Prop) -> Vec<Expr> {
+pub(crate) fn prop_exprs(pr: &Prop) -> Vec<Expr> {
     match &pr.value {
         PropValue::Pair(es) => es.clone(),
         PropValue::One(Expr::Tuple(es)) => es.clone(),
@@ -2459,7 +2525,7 @@ fn prop_exprs(pr: &Prop) -> Vec<Expr> {
     }
 }
 
-fn prop_of<'a>(props: &'a [Prop], key: &str) -> Option<&'a Prop> {
+pub(crate) fn prop_of<'a>(props: &'a [Prop], key: &str) -> Option<&'a Prop> {
     props.iter().find(|p| p.name == key)
 }
 
@@ -3113,6 +3179,7 @@ pub(crate) fn collect_scene(
                         child_emit: None,
                         query: None,
                         sprites: None,
+                        space3: None,
                     };
                     let pos = prop_of(props, "position").ok_or_else(|| {
                         at(
@@ -4381,7 +4448,10 @@ pub(crate) fn instance_ctx<'a>(
     let errmod = def.module.clone();
     let idx1 = index.to_string();
     let child_emit = Box::new(
-        move |child: &str, ev: &str, _argc: usize| -> Result<String, LowerError> {
+        move |child: &str, ev: &str, argc: usize| -> Result<String, LowerError> {
+            // 头部含分隔符：实参前缀（argc==0 时无尾随逗号；root 直呼带
+            // 左括号——PLAN-024 修复，实例投递字节不变）。
+            let sep = if argc == 0 { "" } else { ", " };
             if child == "emit" {
                 let d = plan
                     .anc
@@ -4395,16 +4465,16 @@ pub(crate) fn instance_ctx<'a>(
                         )
                     })?;
                 return Ok(if d.to_root {
-                    d.fn_name.clone()
+                    format!("{}(", d.fn_name)
                 } else {
-                    format!("{}({}[{}]", d.fn_name, d.table, idx1)
+                    format!("{}({}[{}]{sep}", d.fn_name, d.table, idx1)
                 });
             }
             match plan
                 .child
                 .get(&(edef.clone(), child.to_string(), ev.to_string()))
             {
-                Some(d) => Ok(format!("{}({}[{}]", d.fn_name, d.table, idx1)),
+                Some(d) => Ok(format!("{}({}[{}]{sep}", d.fn_name, d.table, idx1)),
                 None => Err(at(
                     &errmod,
                     0,
@@ -4447,6 +4517,7 @@ pub(crate) fn instance_ctx<'a>(
             spawns: e.spawns,
             frames: e.frames,
         }),
+        space3: None,
     })
 }
 
@@ -4473,7 +4544,8 @@ pub(crate) fn root_ctx<'a>(
     let root = world.root.clone();
     let errmod = world.root_module.clone();
     let child_emit = Box::new(
-        move |child: &str, ev: &str, _argc: usize| -> Result<String, LowerError> {
+        move |child: &str, ev: &str, argc: usize| -> Result<String, LowerError> {
+            let sep = if argc == 0 { "" } else { ", " };
             if child == "emit" {
                 let d = plan
                     .anc
@@ -4486,13 +4558,13 @@ pub(crate) fn root_ctx<'a>(
                             &format!("emit .{ev} has no lowering-time receiver"),
                         )
                     })?;
-                return Ok(d.fn_name.clone());
+                return Ok(format!("{}(", d.fn_name));
             }
             match plan
                 .child
                 .get(&(root.clone(), child.to_string(), ev.to_string()))
             {
-                Some(d) => Ok(format!("{}({}", d.fn_name, d.entries[0])),
+                Some(d) => Ok(format!("{}({}{sep}", d.fn_name, d.entries[0])),
                 None => Err(at(
                     &errmod,
                     0,
@@ -4532,6 +4604,7 @@ pub(crate) fn root_ctx<'a>(
             spawns: e.spawns,
             frames: e.frames,
         }),
+        space3: None,
     }
 }
 
@@ -4713,7 +4786,7 @@ fn expr_binds_model(def: &DefIR, e: &Expr) -> bool {
 }
 
 /// 词边界重命名：`fn` 名 → `{module}_{fn}`（池化纯函数的模块作用域）。
-fn rename_module_calls(text: &str, names: &[String], module: &str) -> String {
+pub(crate) fn rename_module_calls(text: &str, names: &[String], module: &str) -> String {
     let mut out = text.to_string();
     for n in names {
         let mut res = String::new();

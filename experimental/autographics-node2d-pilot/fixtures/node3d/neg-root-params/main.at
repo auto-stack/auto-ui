@@ -1,0 +1,8 @@
+// Negative: the root node declares params (root model init is a literal).
+node Main(a: int) {
+    view-3d {
+        cylinder3d leaf {
+            position: (0.0, 0.0, 0.0)
+        }
+    }
+}

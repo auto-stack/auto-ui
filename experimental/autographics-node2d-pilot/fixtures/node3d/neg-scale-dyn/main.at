@@ -1,0 +1,12 @@
+// Negative: scale bound to a model field — scale is static in PLAN-024.
+node Main {
+    model {
+        var s = 2.0
+    }
+    view-3d {
+        cylinder3d leaf {
+            position: (0.0, 0.0, 0.0)
+            scale: (.s, 1.0, 1.0)
+        }
+    }
+}

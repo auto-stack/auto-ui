@@ -1,0 +1,18 @@
+// PLAN-024 components-3d model-param chain: two same-def instances share one
+// GLB through a typed Model3D param (same-SHA CPU/GPU owner reuse).
+use part: Part
+use resources: g02_glb
+
+node Main {
+    view-3d {
+        group3d arena {
+            position: (0.0, 0.0, 0.0)
+            Part left {
+                m: resources.g02_glb
+            }
+            Part right {
+                m: resources.g02_glb
+            }
+        }
+    }
+}

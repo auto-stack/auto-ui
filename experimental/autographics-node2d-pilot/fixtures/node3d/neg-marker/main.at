@@ -1,0 +1,8 @@
+// Negative: unknown view domain marker (view-4d does not exist).
+node Main {
+    view-4d {
+        cylinder3d leaf {
+            position: (0.0, 0.0, 0.0)
+        }
+    }
+}

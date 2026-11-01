@@ -13,13 +13,15 @@ pub mod load;
 pub mod lower;
 pub mod lower_basic2d;
 pub mod lower_components;
+pub mod lower_components3d;
 pub mod lower_components_game;
 pub mod lower_g11;
 pub mod scene;
 pub mod translate;
 
 /// 降层 profile（PLAN-017 T-02 冻结；PLAN-020 增补 components-2d；
-/// PLAN-021 增补 queries-2d；PLAN-022 增补 sprites-2d）。
+/// PLAN-021 增补 queries-2d；PLAN-022 增补 sprites-2d；PLAN-024 增补
+/// components-3d）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Profile {
     /// PLAN-016 最小切片：字节兼容，服务映射不变。
@@ -39,6 +41,9 @@ pub enum Profile {
     /// PLAN-023 components-2d-game：game2d 作者入口（T-02 冻结合同
     /// F-1..F-6 的生成器实现；frozen components-2d 字节不变）。
     Components2DGame,
+    /// PLAN-024 三维组件：components-3d（view-3d/有限图元/静态平色 GLB/
+    /// 同维层级；behavior/1 装配；T-02 冻结的唯一接法）。
+    Components3D,
 }
 
 pub use load::{load_project, Project, ProjectError};
@@ -47,5 +52,6 @@ pub use lower_basic2d::{lower_project_basic, BasicProfile, LowerOutputBasic2D};
 pub use lower_components::{
     lower_project_components, lower_project_queries, lower_project_sprites,
 };
+pub use lower_components3d::lower_project_components3d;
 pub use lower_components_game::{lower_project_components_game, LowerOutputGame};
 pub use lower_g11::{lower_project_g112d, LowerOutputG11};

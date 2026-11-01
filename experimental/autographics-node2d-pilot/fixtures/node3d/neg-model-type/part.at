@@ -1,0 +1,8 @@
+node Part(m: Model3D) {
+    view-3d {
+        model3d shell {
+            model: .m
+            position: (0.0, 0.0, 0.0)
+        }
+    }
+}

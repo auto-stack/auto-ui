@@ -258,9 +258,11 @@ pub(crate) fn resource_mesh(
                 ResourceKind::Color(..) => Err(unsupported(format!(
                     "resource '{name}' is not a mesh2d geometry"
                 ))),
-                ResourceKind::Image { .. } | ResourceKind::Frame { .. } => Err(unsupported(
-                    format!("resource '{name}' is not a mesh2d geometry"),
-                )),
+                ResourceKind::Image { .. }
+                | ResourceKind::Frame { .. }
+                | ResourceKind::Model3D { .. } => Err(unsupported(format!(
+                    "resource '{name}' is not a mesh2d geometry"
+                ))),
             };
         }
     }
@@ -1218,6 +1220,7 @@ fn gen_user_source(
         child_emit: None,
         query: None,
         sprites: None,
+        space3: None,
     };
 
     // ---- app_start：生成绑定（声明序）+ 作者 Life.Start ----

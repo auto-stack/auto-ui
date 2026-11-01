@@ -1,0 +1,12 @@
+// Negative: a Model3D param bound to a non-model (material2d) resource is
+// named-rejected (wrong resource port).
+use part: Part
+use resources: marker
+
+node Main {
+    view-3d {
+        Part left {
+            m: resources.marker
+        }
+    }
+}

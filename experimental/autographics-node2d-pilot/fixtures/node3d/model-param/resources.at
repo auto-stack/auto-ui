@@ -1,0 +1,1 @@
+let g02_glb = model3d.glb("assets/two-parts.glb")

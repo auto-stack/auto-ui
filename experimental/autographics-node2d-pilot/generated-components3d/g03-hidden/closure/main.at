@@ -1,0 +1,21 @@
+// PLAN-024 components-3d g03 v-hidden variant: root group visible false —
+// every descendant loses effective visibility (AND) while keeping identity.
+use resources: g02_glb
+
+node Main {
+    view-3d {
+        group3d root3d {
+            position: (0.5, 0.0, 0.0)
+            visible: false
+            cylinder3d leaf {
+                position: (0.0, 0.0, 0.0)
+            }
+            group3d child3d {
+                position: (0.5, 1.0, 0.0)
+                cylinder3d deep {
+                    position: (0.8, 0.0, 0.0)
+                }
+            }
+        }
+    }
+}

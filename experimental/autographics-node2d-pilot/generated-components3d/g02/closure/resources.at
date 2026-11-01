@@ -1,0 +1,5 @@
+// PLAN-024 components-3d g02 resources: the original G02 two-parts GLB
+// (sha 42c9da67..., 1528 bytes, MIT, PLAN-838 self-authored) declared as a
+// typed model3d resource. Bytes are a read-only copy; license text at
+// fixtures/node3d/licenses/two-parts.LICENSE.
+let g02_glb = model3d.glb("assets/two-parts.glb")

@@ -1,0 +1,17 @@
+// Negative: duplicate instance path (two instances with the same name).
+use puck: Puck
+
+use puck: Puck
+
+node Main {
+    view-3d {
+        Puck left {
+            p0: 0.0
+            hide_at: 0
+        }
+        Puck left {
+            p0: 1.0
+            hide_at: 0
+        }
+    }
+}

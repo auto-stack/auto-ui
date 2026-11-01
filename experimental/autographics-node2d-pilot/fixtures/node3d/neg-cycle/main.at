@@ -1,0 +1,10 @@
+// Negative: instance cycle A -> B -> A is named-rejected.
+use a: A
+
+node Main {
+    view-3d {
+        A one {
+            p: 0.0
+        }
+    }
+}

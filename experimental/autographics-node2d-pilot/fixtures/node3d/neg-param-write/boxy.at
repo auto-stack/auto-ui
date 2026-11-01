@@ -1,0 +1,17 @@
+// Negative-only def: handler assigns a param — params are read-only.
+node Boxy(f: float) {
+    model {
+        var x = 0.0
+    }
+    view-3d {
+        cylinder3d leaf {
+            position: (.f, 0.0, 0.0)
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            .x = .x + dt
+            .f = 1.0
+        }
+    }
+}

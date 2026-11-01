@@ -1,0 +1,10 @@
+// Negative: assigning a param in a handler — params are read-only.
+use boxy: Boxy
+
+node Main {
+    view-3d {
+        Boxy b {
+            f: 0.0
+        }
+    }
+}

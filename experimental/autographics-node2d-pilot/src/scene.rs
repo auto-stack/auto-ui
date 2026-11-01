@@ -156,8 +156,10 @@ fn shape_of(project: &Project, node: &str, element: &str) -> (String, f64, f64) 
                             ResourceKind::Quad(w, h) => ("quad".into(), w, h),
                             ResourceKind::Circle(d) => ("circle".into(), d / 2.0, d / 2.0),
                             ResourceKind::Color(..) => panic!("mesh is a color"),
-                            ResourceKind::Image { .. } | ResourceKind::Frame { .. } => {
-                                panic!("mesh is an image/frame resource")
+                            ResourceKind::Image { .. }
+                            | ResourceKind::Frame { .. }
+                            | ResourceKind::Model3D { .. } => {
+                                panic!("mesh is an image/frame/model resource")
                             }
                         };
                     }
@@ -307,12 +309,12 @@ fn kind_geometry(
                 ResourceKind::Quad(w, h) => Ok(("quad".into(), *w, *h, (0.0, 0.0, 0.0, 0.0))),
                 ResourceKind::Circle(d) => Ok(("circle".into(), *d, *d, (0.0, 0.0, 0.0, 0.0))),
                 ResourceKind::Color(r, g, b, a) => Ok(("color".into(), 0.0, 0.0, (*r, *g, *b, *a))),
-                ResourceKind::Image { .. } | ResourceKind::Frame { .. } => {
-                    Err(crate::translate::LowerError::Unsupported {
-                        what: format!("resource '{resource}' is an image/frame, not geometry"),
-                        line: 0,
-                    })
-                }
+                ResourceKind::Image { .. }
+                | ResourceKind::Frame { .. }
+                | ResourceKind::Model3D { .. } => Err(crate::translate::LowerError::Unsupported {
+                    what: format!("resource '{resource}' is an image/frame/model, not geometry"),
+                    line: 0,
+                }),
             };
         }
     }

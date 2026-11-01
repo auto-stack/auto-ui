@@ -1,0 +1,15 @@
+// Negative: group3d translation bound to a model field is static-only —
+// named rejection (leaves bind model fields).
+node Main {
+    model {
+        var f = 1.0
+    }
+    view-3d {
+        group3d g {
+            position: (.f, 0.0, 0.0)
+            cylinder3d leaf {
+                position: (0.0, 0.0, 0.0)
+            }
+        }
+    }
+}

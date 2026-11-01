@@ -1,0 +1,3 @@
+// twin chain resources: the g02 GLB declared-but-unused (unused-item
+// admission), no other resources needed.
+let g02_glb = model3d.glb("assets/two-parts.glb")

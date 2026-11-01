@@ -1,0 +1,392 @@
+// PLAN-024 components-3d negative: 129 scene rows exceeds the 128-node limit and is named-rejected.
+node Main {
+    view-3d {
+        cylinder3d leaf0 {
+            position: (0.0, 0.0, 0.0)
+        }
+        cylinder3d leaf1 {
+            position: (1.0, 0.0, 0.0)
+        }
+        cylinder3d leaf2 {
+            position: (2.0, 0.0, 0.0)
+        }
+        cylinder3d leaf3 {
+            position: (3.0, 0.0, 0.0)
+        }
+        cylinder3d leaf4 {
+            position: (4.0, 0.0, 0.0)
+        }
+        cylinder3d leaf5 {
+            position: (5.0, 0.0, 0.0)
+        }
+        cylinder3d leaf6 {
+            position: (6.0, 0.0, 0.0)
+        }
+        cylinder3d leaf7 {
+            position: (7.0, 0.0, 0.0)
+        }
+        cylinder3d leaf8 {
+            position: (8.0, 0.0, 0.0)
+        }
+        cylinder3d leaf9 {
+            position: (9.0, 0.0, 0.0)
+        }
+        cylinder3d leaf10 {
+            position: (10.0, 0.0, 0.0)
+        }
+        cylinder3d leaf11 {
+            position: (11.0, 0.0, 0.0)
+        }
+        cylinder3d leaf12 {
+            position: (12.0, 0.0, 0.0)
+        }
+        cylinder3d leaf13 {
+            position: (13.0, 0.0, 0.0)
+        }
+        cylinder3d leaf14 {
+            position: (14.0, 0.0, 0.0)
+        }
+        cylinder3d leaf15 {
+            position: (15.0, 0.0, 0.0)
+        }
+        cylinder3d leaf16 {
+            position: (16.0, 0.0, 0.0)
+        }
+        cylinder3d leaf17 {
+            position: (17.0, 0.0, 0.0)
+        }
+        cylinder3d leaf18 {
+            position: (18.0, 0.0, 0.0)
+        }
+        cylinder3d leaf19 {
+            position: (19.0, 0.0, 0.0)
+        }
+        cylinder3d leaf20 {
+            position: (20.0, 0.0, 0.0)
+        }
+        cylinder3d leaf21 {
+            position: (21.0, 0.0, 0.0)
+        }
+        cylinder3d leaf22 {
+            position: (22.0, 0.0, 0.0)
+        }
+        cylinder3d leaf23 {
+            position: (23.0, 0.0, 0.0)
+        }
+        cylinder3d leaf24 {
+            position: (24.0, 0.0, 0.0)
+        }
+        cylinder3d leaf25 {
+            position: (25.0, 0.0, 0.0)
+        }
+        cylinder3d leaf26 {
+            position: (26.0, 0.0, 0.0)
+        }
+        cylinder3d leaf27 {
+            position: (27.0, 0.0, 0.0)
+        }
+        cylinder3d leaf28 {
+            position: (28.0, 0.0, 0.0)
+        }
+        cylinder3d leaf29 {
+            position: (29.0, 0.0, 0.0)
+        }
+        cylinder3d leaf30 {
+            position: (30.0, 0.0, 0.0)
+        }
+        cylinder3d leaf31 {
+            position: (31.0, 0.0, 0.0)
+        }
+        cylinder3d leaf32 {
+            position: (32.0, 0.0, 0.0)
+        }
+        cylinder3d leaf33 {
+            position: (33.0, 0.0, 0.0)
+        }
+        cylinder3d leaf34 {
+            position: (34.0, 0.0, 0.0)
+        }
+        cylinder3d leaf35 {
+            position: (35.0, 0.0, 0.0)
+        }
+        cylinder3d leaf36 {
+            position: (36.0, 0.0, 0.0)
+        }
+        cylinder3d leaf37 {
+            position: (37.0, 0.0, 0.0)
+        }
+        cylinder3d leaf38 {
+            position: (38.0, 0.0, 0.0)
+        }
+        cylinder3d leaf39 {
+            position: (39.0, 0.0, 0.0)
+        }
+        cylinder3d leaf40 {
+            position: (40.0, 0.0, 0.0)
+        }
+        cylinder3d leaf41 {
+            position: (41.0, 0.0, 0.0)
+        }
+        cylinder3d leaf42 {
+            position: (42.0, 0.0, 0.0)
+        }
+        cylinder3d leaf43 {
+            position: (43.0, 0.0, 0.0)
+        }
+        cylinder3d leaf44 {
+            position: (44.0, 0.0, 0.0)
+        }
+        cylinder3d leaf45 {
+            position: (45.0, 0.0, 0.0)
+        }
+        cylinder3d leaf46 {
+            position: (46.0, 0.0, 0.0)
+        }
+        cylinder3d leaf47 {
+            position: (47.0, 0.0, 0.0)
+        }
+        cylinder3d leaf48 {
+            position: (48.0, 0.0, 0.0)
+        }
+        cylinder3d leaf49 {
+            position: (49.0, 0.0, 0.0)
+        }
+        cylinder3d leaf50 {
+            position: (50.0, 0.0, 0.0)
+        }
+        cylinder3d leaf51 {
+            position: (51.0, 0.0, 0.0)
+        }
+        cylinder3d leaf52 {
+            position: (52.0, 0.0, 0.0)
+        }
+        cylinder3d leaf53 {
+            position: (53.0, 0.0, 0.0)
+        }
+        cylinder3d leaf54 {
+            position: (54.0, 0.0, 0.0)
+        }
+        cylinder3d leaf55 {
+            position: (55.0, 0.0, 0.0)
+        }
+        cylinder3d leaf56 {
+            position: (56.0, 0.0, 0.0)
+        }
+        cylinder3d leaf57 {
+            position: (57.0, 0.0, 0.0)
+        }
+        cylinder3d leaf58 {
+            position: (58.0, 0.0, 0.0)
+        }
+        cylinder3d leaf59 {
+            position: (59.0, 0.0, 0.0)
+        }
+        cylinder3d leaf60 {
+            position: (60.0, 0.0, 0.0)
+        }
+        cylinder3d leaf61 {
+            position: (61.0, 0.0, 0.0)
+        }
+        cylinder3d leaf62 {
+            position: (62.0, 0.0, 0.0)
+        }
+        cylinder3d leaf63 {
+            position: (63.0, 0.0, 0.0)
+        }
+        cylinder3d leaf64 {
+            position: (64.0, 0.0, 0.0)
+        }
+        cylinder3d leaf65 {
+            position: (65.0, 0.0, 0.0)
+        }
+        cylinder3d leaf66 {
+            position: (66.0, 0.0, 0.0)
+        }
+        cylinder3d leaf67 {
+            position: (67.0, 0.0, 0.0)
+        }
+        cylinder3d leaf68 {
+            position: (68.0, 0.0, 0.0)
+        }
+        cylinder3d leaf69 {
+            position: (69.0, 0.0, 0.0)
+        }
+        cylinder3d leaf70 {
+            position: (70.0, 0.0, 0.0)
+        }
+        cylinder3d leaf71 {
+            position: (71.0, 0.0, 0.0)
+        }
+        cylinder3d leaf72 {
+            position: (72.0, 0.0, 0.0)
+        }
+        cylinder3d leaf73 {
+            position: (73.0, 0.0, 0.0)
+        }
+        cylinder3d leaf74 {
+            position: (74.0, 0.0, 0.0)
+        }
+        cylinder3d leaf75 {
+            position: (75.0, 0.0, 0.0)
+        }
+        cylinder3d leaf76 {
+            position: (76.0, 0.0, 0.0)
+        }
+        cylinder3d leaf77 {
+            position: (77.0, 0.0, 0.0)
+        }
+        cylinder3d leaf78 {
+            position: (78.0, 0.0, 0.0)
+        }
+        cylinder3d leaf79 {
+            position: (79.0, 0.0, 0.0)
+        }
+        cylinder3d leaf80 {
+            position: (80.0, 0.0, 0.0)
+        }
+        cylinder3d leaf81 {
+            position: (81.0, 0.0, 0.0)
+        }
+        cylinder3d leaf82 {
+            position: (82.0, 0.0, 0.0)
+        }
+        cylinder3d leaf83 {
+            position: (83.0, 0.0, 0.0)
+        }
+        cylinder3d leaf84 {
+            position: (84.0, 0.0, 0.0)
+        }
+        cylinder3d leaf85 {
+            position: (85.0, 0.0, 0.0)
+        }
+        cylinder3d leaf86 {
+            position: (86.0, 0.0, 0.0)
+        }
+        cylinder3d leaf87 {
+            position: (87.0, 0.0, 0.0)
+        }
+        cylinder3d leaf88 {
+            position: (88.0, 0.0, 0.0)
+        }
+        cylinder3d leaf89 {
+            position: (89.0, 0.0, 0.0)
+        }
+        cylinder3d leaf90 {
+            position: (90.0, 0.0, 0.0)
+        }
+        cylinder3d leaf91 {
+            position: (91.0, 0.0, 0.0)
+        }
+        cylinder3d leaf92 {
+            position: (92.0, 0.0, 0.0)
+        }
+        cylinder3d leaf93 {
+            position: (93.0, 0.0, 0.0)
+        }
+        cylinder3d leaf94 {
+            position: (94.0, 0.0, 0.0)
+        }
+        cylinder3d leaf95 {
+            position: (95.0, 0.0, 0.0)
+        }
+        cylinder3d leaf96 {
+            position: (96.0, 0.0, 0.0)
+        }
+        cylinder3d leaf97 {
+            position: (97.0, 0.0, 0.0)
+        }
+        cylinder3d leaf98 {
+            position: (98.0, 0.0, 0.0)
+        }
+        cylinder3d leaf99 {
+            position: (99.0, 0.0, 0.0)
+        }
+        cylinder3d leaf100 {
+            position: (100.0, 0.0, 0.0)
+        }
+        cylinder3d leaf101 {
+            position: (101.0, 0.0, 0.0)
+        }
+        cylinder3d leaf102 {
+            position: (102.0, 0.0, 0.0)
+        }
+        cylinder3d leaf103 {
+            position: (103.0, 0.0, 0.0)
+        }
+        cylinder3d leaf104 {
+            position: (104.0, 0.0, 0.0)
+        }
+        cylinder3d leaf105 {
+            position: (105.0, 0.0, 0.0)
+        }
+        cylinder3d leaf106 {
+            position: (106.0, 0.0, 0.0)
+        }
+        cylinder3d leaf107 {
+            position: (107.0, 0.0, 0.0)
+        }
+        cylinder3d leaf108 {
+            position: (108.0, 0.0, 0.0)
+        }
+        cylinder3d leaf109 {
+            position: (109.0, 0.0, 0.0)
+        }
+        cylinder3d leaf110 {
+            position: (110.0, 0.0, 0.0)
+        }
+        cylinder3d leaf111 {
+            position: (111.0, 0.0, 0.0)
+        }
+        cylinder3d leaf112 {
+            position: (112.0, 0.0, 0.0)
+        }
+        cylinder3d leaf113 {
+            position: (113.0, 0.0, 0.0)
+        }
+        cylinder3d leaf114 {
+            position: (114.0, 0.0, 0.0)
+        }
+        cylinder3d leaf115 {
+            position: (115.0, 0.0, 0.0)
+        }
+        cylinder3d leaf116 {
+            position: (116.0, 0.0, 0.0)
+        }
+        cylinder3d leaf117 {
+            position: (117.0, 0.0, 0.0)
+        }
+        cylinder3d leaf118 {
+            position: (118.0, 0.0, 0.0)
+        }
+        cylinder3d leaf119 {
+            position: (119.0, 0.0, 0.0)
+        }
+        cylinder3d leaf120 {
+            position: (120.0, 0.0, 0.0)
+        }
+        cylinder3d leaf121 {
+            position: (121.0, 0.0, 0.0)
+        }
+        cylinder3d leaf122 {
+            position: (122.0, 0.0, 0.0)
+        }
+        cylinder3d leaf123 {
+            position: (123.0, 0.0, 0.0)
+        }
+        cylinder3d leaf124 {
+            position: (124.0, 0.0, 0.0)
+        }
+        cylinder3d leaf125 {
+            position: (125.0, 0.0, 0.0)
+        }
+        cylinder3d leaf126 {
+            position: (126.0, 0.0, 0.0)
+        }
+        cylinder3d leaf127 {
+            position: (127.0, 0.0, 0.0)
+        }
+        cylinder3d leaf128 {
+            position: (128.0, 0.0, 0.0)
+        }
+    }
+}

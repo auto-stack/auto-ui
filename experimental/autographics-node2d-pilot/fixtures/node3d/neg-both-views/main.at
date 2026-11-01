@@ -1,0 +1,14 @@
+// Negative: a node carrying both view-2d and view-3d — single view exit.
+node Main {
+    view-2d {
+        shape2d s {
+            kind: quad
+            position: (0.0, 0.0)
+        }
+    }
+    view-3d {
+        cylinder3d leaf {
+            position: (0.0, 0.0, 0.0)
+        }
+    }
+}

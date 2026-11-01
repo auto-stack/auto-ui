@@ -1,0 +1,52 @@
+{
+ "behavior": null,
+ "schema": "autographics.scene/6",
+ "document_id": "plan024-components-3d-main",
+ "resources": [
+  "circle",
+  "quad",
+  "cylinder",
+  "player",
+  "mob"
+ ],
+ "groups": [
+
+ ],
+ "objects": [
+  {
+   "id": 1,
+   "name": "badge",
+   "kind": "model",
+   "translation": [
+    0.0,
+    0.6,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": "sha256:42c9da673fc67ccb0c65d4b337608834efd28a499f7e460866dcfc5ff2a0c671",
+   "sprite": null
+  }
+ ],
+ "assets": [
+  {
+   "format": "glb",
+   "sha256": "42c9da673fc67ccb0c65d4b337608834efd28a499f7e460866dcfc5ff2a0c671",
+   "byte_length": 1528,
+   "name": "g02_glb"
+  }
+ ]
+}
