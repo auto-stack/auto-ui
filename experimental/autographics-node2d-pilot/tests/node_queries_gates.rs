@@ -129,7 +129,7 @@ fn q03_changed_variant_is_a_source_only_reach_change() {
 /// diagnostic; nothing panics.
 #[test]
 fn q04_negative_fixtures_fail_with_named_diagnostics() {
-    let cases: [(&str, fn(&str) -> String, &str, &str); 8] = [
+    let cases: [(&str, fn(&str) -> String, &str, &str); 10] = [
         (
             "unknown query row reference",
             |s| {
@@ -204,6 +204,23 @@ fn q04_negative_fixtures_fail_with_named_diagnostics() {
             "visible_only must be the literal 0/1",
             "true/false",
         ),
+        (
+            "query result rebind",
+            |s| {
+                s.replace(
+                    "let q = query2d.segment(refs.runner, 1, ax, ay, ax + .reach, ay)",
+                    "let q = query2d.segment(refs.runner, 1, ax, ay, ax + .reach, ay)\n            let q = query2d.sweep(refs.runner, 1, 0.0, 0.0)",
+                )
+            },
+            "query result 'q' rebinds",
+            "one let per query result name",
+        ),
+        (
+            "query result reassignment",
+            |s| s.replace("let hit = q.hit()", "let hit = q.hit()\n            q = q"),
+            "query result cannot be reassigned",
+            "read the values out instead",
+        ),
     ];
     for (name, mutate, needle1, needle2) in cases {
         let mutated =
@@ -260,4 +277,33 @@ fn q06_sweep_lab_lowes_clearance_contract_shape() {
     ] {
         assert!(src.contains(needle), "missing sweep shape: {needle}");
     }
+}
+
+/// Q-G4b (F-R1-01): a top-level instance with more than one static shape is
+/// named-rejected in queries-2d (the frozen contract: a named row ref
+/// resolves exactly one static row); components-2d keeps accepting it.
+#[test]
+fn q04b_multi_static_shape_instance_rejected_in_queries_mode() {
+    let dir = stage("q4b");
+    let path = dir.join("marker.at");
+    let s = std::fs::read_to_string(&path).expect("fixture");
+    let s2 = s.replace(
+        "material: resources.lab_marker\n        }\n    }\n}",
+        "material: resources.lab_marker\n        }\n        shape2d extra {\n            mesh: resources.lab_quad1\n            position: (3.0, 3.0)\n            material: resources.lab_marker\n        }\n    }\n}",
+    );
+    assert!(s2 != s, "mutation no-op");
+    std::fs::write(&path, s2).unwrap();
+    let project = load_project(&dir.join("segment.at")).expect("parse ok");
+    let err = lower_project_queries(&project).err().expect("rejected");
+    let msg = err.to_string();
+    assert!(msg.contains("has 2 static shapes"), "{msg}");
+    assert!(msg.contains("resolves exactly one"), "{msg}");
+    assert!(msg.contains("module marker, line "), "{msg}");
+    assert!(msg.contains("symbol 'marker'"), "{msg}");
+    // components-2d (no query surface) still accepts the same project.
+    let project2 = load_project(&dir.join("segment.at")).expect("parse ok");
+    assert!(
+        lower_project_components(&project2).is_err(),
+        "components-2d must still reject query2d for its own reason (profile boundary), not the static-shape count"
+    );
 }
