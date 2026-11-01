@@ -25,3 +25,13 @@ members = [
     "crates/auto-cosmic/host-smithay",
 ]
 resolver = "2"
+
+# iced_widget 本地补丁随 UI 栈迁入本仓（自 auto-lang crates/patches 同源复制；
+# P041-D1 竞态族根治，2026-09-25 实证）。PLAN-900 时 auto-lang 注明"auto-ui
+# 侧由其自身 [patch] 接管（计划 D）"——本次补上（缺失窗口内 tool host 走
+# crates.io 原版，container.rs:291 布局空窗 unwrap 曾致 VM 会话崩溃族，
+# DATABASE-002 原生门消费者门实证复现）。补丁语义=布局空窗良性降级，
+# 与上游 0.14.2 唯一差异面为 container.rs 五处；升级 iced 时按补丁 README
+# 重审。
+[patch.crates-io]
+iced_widget = { path = "crates/patches/iced_widget" }

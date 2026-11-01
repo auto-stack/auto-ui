@@ -141,11 +141,17 @@ where
         operation: &mut dyn widget::Operation,
     ) {
         operation.container(None, layout.bounds());
-        let content_layout = layout.children().next().expect("max-width pct child");
+        // 本 widget 的 layout() 是直通（返回 content 自身节点，无包装层），
+        // 与 update/draw/mouse_interaction/overlay 的转发一致——operate 也
+        // 必须把同一节点交给 content。此前解引用 children().next() 会把
+        // content 的第一个子节点当 content 的节点下传：内层为 Container 时
+        // 整树操作遍历逐层下移，遇叶子节点即触发 iced container.rs:291
+        // unwrap 崩溃（DATABASE-002 原生门 open/close 翻转后 MCP bounds
+        // 采集复现，backtrace: row → max_width → container → 崩）。
         operation.traverse(&mut |operation| {
             self.content.as_widget_mut().operate(
                 &mut tree.children[0],
-                content_layout,
+                layout,
                 renderer,
                 operation,
             );

@@ -7,6 +7,7 @@ name = "a2r-std"
 version = "0.1.0"
 dependencies = [
  "futures",
+ "getrandom 0.2.17",
  "redis",
  "reqwest",
  "rusqlite",
@@ -549,7 +550,6 @@ dependencies = [
  "auto-lang-core",
  "auto-project-model",
  "auto-val",
- "auto-web",
  "regex",
  "semver 1.0.28",
  "serde_json",
@@ -3376,8 +3376,6 @@ dependencies = [
 [[package]]
 name = "iced_widget"
 version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1596afa0d3109c2618e8bc12bae6c11d3064df8f95c42dfce570397dbe957ab"
 dependencies = [
  "iced_renderer",
  "log",
