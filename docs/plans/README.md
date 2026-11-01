@@ -26,7 +26,7 @@
 | 020 | [有状态Node组件与局部事件](archived/020-autographics-stateful-node-components.md) | AG局部性共同基础 | archived/r1，10/10；R1 needs_fix 4项→修复（含R2/R3各1项）→受影响复核pass；交付16ddfa0（7提交rebase重写，range-diff 7/7全等），verifier 18组/flow 9/9/旧消费者门全绿；SD stateful-node-components.md 沉淀本仓；021/022/023硬等解除；清理回执见计划 |
 | 021 | [Node二维segment/sweep查询](archived/021-autographics-node2d-queries.md) | W2a/G05-2d引擎 | archived/r1，10/10；R1 needs_fix 4项→修复→同评审者受影响复核pass（P3文本项R2闭环）；交付1bec52f（8提交rebase重写，range-diff 7/7全等），verify021 20组5产品/flow 11/11/verify020 18组全绿；SD node2d-queries.md 沉淀本仓；AG009可消费；清理回执见计划 |
 | 022 | [Node精灵资源与帧动画](022-autographics-node2d-sprites-and-frame-animation.md) | W2b/G09双入口引擎 | drafting/r1，0/10；硬等020实际交付；保局部状态/两PNG/原18项/预算；不依赖021功能；内容[AG010](../../../ag-examples/docs/plans/010-autographics-gallery-node2d-sprites-and-frame-animation.md)已规划并硬等本计划实际交付 |
-| 023 | [Node二维声音与公共HUD](023-autographics-node2d-audio-and-hud.md) | AG006 r2作者能力前置 | drafting/r1，0/10；硬等020，复用已交付013/012；补typed声音/font/HUD槽/ASCII/一次Auto收口，不硬等021/022 |
+| 023 | [Node二维声音与公共HUD](archived/023-autographics-node2d-audio-and-hud.md) | AG006 r2作者能力前置 | archived/r1，10/10；R1 needs_fix 3项P2（6新告警+SD计数笔误）→修复d125b6d→同评审者复核pass；交付32d7a81（13提交rebase重写，range-diff 13/13全等），统一门全绿（pilot 44/driver 45/旧flow 35/verifier 10组）；SD node2d-audio-and-hud.md 沉淀本仓；AG006 T-01硬门解除；清理回执见计划 |
 
 本轮AG前置已分配023，当前号源024；下一份本地新计划以独占取号时`.next-id`与本地活动/归档最大号重核（018分配后已有并行019，勿回退号源）；不能因外仓号882/883跳号。003是Blog路线，004..006是AG表现阶段，007是主题/示例工作包，014是拆分路线结构收口包，018是UI编译配置收口；这些合同分别管理。状态以各自合同为准。设计与并行/后继入口见[本仓设计索引](../design/README.md)。
 
