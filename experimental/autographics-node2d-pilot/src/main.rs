@@ -187,8 +187,42 @@ fn main() {
             identity.push_str(" \"closure\": [\n");
             identity.push_str(closure.trim_end_matches(",\n"));
             identity.push_str("\n ],\n");
-            identity.push_str(&format!(" \"roles\": {}\n", lowered.roles_json));
-            identity.push_str("}\n");
+            identity.push_str(&format!(" \"roles\": {},\n", lowered.roles_json));
+            // PLAN-020 T-06 runner provenance (factual, per product): the
+            // scene binds behavior.source to the world sha; the flow harness
+            // consumes the frozen files via include_str! and feeds world.at
+            // to scripts/<sha>.at; the load path hash-verifies every
+            // scripts/<64hex>.at against its file name, so a damaged world
+            // copy is rejected at load ("conflict: immutable source").
+            let product = std::path::Path::new(out)
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("unrecorded")
+                .to_string();
+            let consumer = match product.as_str() {
+                "helpers" => {
+                    "experimental/autographics-node2d-pilot/tests/node_components_gates.rs (fixture-level; no driver flow consumer)"
+                }
+                "probe" | "budget" | "budget-plus" | "lifecycle" | "lifecycle-doublepress"
+                | "envelope" | "init-fault" => {
+                    "experimental/autographics-auto-driver/tests/node_components_flow.rs"
+                }
+                _ => "unrecorded (this out dir has no registered flow consumer)",
+            };
+            identity.push_str(" \"provenance\": {\n");
+            identity.push_str(&format!("  \"product\": \"{product}\",\n"));
+            identity.push_str(&format!("  \"consumer\": \"{consumer}\",\n"));
+            identity.push_str(
+                "  \"consumption\": \"include_str! frozen scene.agscene + world.at; the harness writes world.at to scripts/<sha>.at where <sha> = scene.behavior.source.sha256\",\n",
+            );
+            identity.push_str(
+                "  \"load_verification\": \"the load path hash-verifies the behavior source closure against the scene-bound sha and rejects a damaged world copy at load (observed: 'behavior source closure identity: <scripts/<sha>.at>')\",\n",
+            );
+            identity.push_str(&format!(
+                "  \"world_sha256\": \"{}\"\n",
+                lowered.source_sha256
+            ));
+            identity.push_str(" }\n}\n");
             std::fs::write(format!("{out}/identity.json"), identity).expect("identity.json");
             let closure_dir = format!("{out}/closure");
             std::fs::create_dir_all(&closure_dir).expect("closure dir");

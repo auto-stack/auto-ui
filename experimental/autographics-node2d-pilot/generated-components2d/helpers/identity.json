@@ -19,5 +19,12 @@
  "solids": [],
  "camera": 1,
  "scene_objects": {"actor.body": 1, "a_template": 2, "b_template": 3}
-}
+},
+ "provenance": {
+  "product": "helpers",
+  "consumer": "experimental/autographics-node2d-pilot/tests/node_components_gates.rs (fixture-level; no driver flow consumer)",
+  "consumption": "include_str! frozen scene.agscene + world.at; the harness writes world.at to scripts/<sha>.at where <sha> = scene.behavior.source.sha256",
+  "load_verification": "the load path hash-verifies the behavior source closure against the scene-bound sha and rejects a damaged world copy at load (observed: 'behavior source closure identity: <scripts/<sha>.at>')",
+  "world_sha256": "8eee3d52ae05e9cc25c08493ec3b5430f45377eadbf582376bd822f1c3fc0c0a"
+ }
 }

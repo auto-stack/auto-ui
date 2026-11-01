@@ -21,5 +21,12 @@
  "solids": [{"id": 2, "name": "ground"}],
  "camera": 1,
  "scene_objects": {"player.body": 1, "ground": 2, "a_meter_template": 3, "b_meter_template": 4}
-}
+},
+ "provenance": {
+  "product": "probe",
+  "consumer": "experimental/autographics-auto-driver/tests/node_components_flow.rs",
+  "consumption": "include_str! frozen scene.agscene + world.at; the harness writes world.at to scripts/<sha>.at where <sha> = scene.behavior.source.sha256",
+  "load_verification": "the load path hash-verifies the behavior source closure against the scene-bound sha and rejects a damaged world copy at load (observed: 'behavior source closure identity: <scripts/<sha>.at>')",
+  "world_sha256": "9241d0132f469b605f5d488650ebb40e86af34e79798feb615fc47599d76060b"
+ }
 }

@@ -19,5 +19,12 @@
  "solids": [{"id": 2, "name": "ground"}],
  "camera": 1,
  "scene_objects": {"player.body": 1, "ground": 2, "c_d0_template": 3, "c_d1_template": 4, "c_d2_template": 5, "c_d3_template": 6, "c_d4_template": 7, "c_d5_template": 8, "c_d6_template": 9, "c_d7_template": 10, "c_d8_template": 11}
-}
+},
+ "provenance": {
+  "product": "init-fault",
+  "consumer": "experimental/autographics-auto-driver/tests/node_components_flow.rs",
+  "consumption": "include_str! frozen scene.agscene + world.at; the harness writes world.at to scripts/<sha>.at where <sha> = scene.behavior.source.sha256",
+  "load_verification": "the load path hash-verifies the behavior source closure against the scene-bound sha and rejects a damaged world copy at load (observed: 'behavior source closure identity: <scripts/<sha>.at>')",
+  "world_sha256": "a4af6335288e85511bc5f980e56710eea7cfb57af2ab73b29f727cd0e23b6b2b"
+ }
 }
