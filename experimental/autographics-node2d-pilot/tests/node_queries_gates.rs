@@ -25,7 +25,8 @@ const LAB_FILES: [&str; 13] = [
 ];
 
 fn stage(tag: &str) -> std::path::PathBuf {
-    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("nq-{}-{}", tag, std::process::id()));
+    let dir =
+        Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("nq-{}-{}", tag, std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     for name in LAB_FILES {
@@ -73,7 +74,10 @@ fn q01_segment_lab_lowers_to_frozen_shape_byte_stable() {
         assert!(a.contains(&needle), "missing generated shape: {needle}");
     }
     // No hand-written ordinals beyond the resolved refs; no raw query names.
-    assert!(!a.contains("query2d"), "query2d must not leak into user source");
+    assert!(
+        !a.contains("query2d"),
+        "query2d must not leak into user source"
+    );
 }
 
 /// Q-G2: instance-scoped wiring — self.row() resolves through the per-def
@@ -87,8 +91,14 @@ fn q02_cross_lab_qrow_and_isolation() {
         src.contains("let q = ag_cast_segment(2, querier_qrow[i], 1, ag_world(querier_qrow[i], 0), ag_world(querier_qrow[i], 1), 0.0, (ag_world(querier_qrow[i], 0) + querier_reach[i]), ag_world(querier_qrow[i], 1), 0.0)"),
         "self.row()/self.world() lower through qrow[i]"
     );
-    assert!(src.contains("fn get_qa_hits() int {return querier_hits[0]}"), "path alias getter");
-    assert!(src.contains("fn get_qb_hits() int {return querier_hits[1]}"), "second instance getter");
+    assert!(
+        src.contains("fn get_qa_hits() int {return querier_hits[0]}"),
+        "path alias getter"
+    );
+    assert!(
+        src.contains("fn get_qb_hits() int {return querier_hits[1]}"),
+        "second instance getter"
+    );
 }
 
 /// Q-G3: the changed variant differs from the segment lab only in the reach
@@ -97,7 +107,12 @@ fn q02_cross_lab_qrow_and_isolation() {
 fn q03_changed_variant_is_a_source_only_reach_change() {
     let seg = lower_queries("segment.at", "q3a").expect("lower");
     let chg = lower_queries("changed.at", "q3b").expect("lower");
-    assert!(seg.contains("var r_reach = 20.0") || seg.contains("var r_reach=20.0") || seg.contains("var r_reach = 20.0"), "segment reach");
+    assert!(
+        seg.contains("var r_reach = 20.0")
+            || seg.contains("var r_reach=20.0")
+            || seg.contains("var r_reach = 20.0"),
+        "segment reach"
+    );
     assert!(chg.contains("10.0"), "changed reach 10 present");
     assert!(!chg.contains("20.0"), "changed has no 20.0 reach");
     // Same structure otherwise: identical fn inventory.
@@ -115,26 +130,101 @@ fn q03_changed_variant_is_a_source_only_reach_change() {
 #[test]
 fn q04_negative_fixtures_fail_with_named_diagnostics() {
     let cases: [(&str, fn(&str) -> String, &str, &str); 8] = [
-        ("unknown query row reference", |s| s.replace("query2d.segment(refs.runner,", "query2d.segment(refs.ghost,"), "symbol 'ghost'", "refs.ghost"),
-        ("wrong-kind getter", |s| s.replace("let px = q.point(0)", "let px = q.origin(0)"), "'.origin()' is a sweep result getter", "cast result"),
-        ("unbound getter base", |s| s.replace("let hit = q.hit()", "let hit = qq.hit()"), "unknown query result 'qq'", "let"),
-        ("character-row position write", |s| s.replace("refs.runner.shift(input.x() * 60.0 * dt, input.y() * 60.0 * dt)", "refs.spectator.shift(input.x() * 60.0 * dt, input.y() * 60.0 * dt)"), "character row", "position is owned by the character service"),
-        ("sweep mover -1", |s| s.replace("let q = query2d.segment(refs.runner, 1, ax, ay, ax + .reach, ay)", "let q = query2d.sweep(-1, 1, ax, ay)"), "sweep mover must be a named row", "self.row()"),
-        ("var-bound query result", |s| s.replace("let q = query2d.segment", "var q = query2d.segment"), "query results bind with 'let' only", "shared latest-slot token"),
-        ("query arity", |s| s.replace("query2d.segment(refs.runner, 1, ax, ay, ax + .reach, ay)", "query2d.segment(refs.runner, 1, ax, ay, ax + .reach)"), "arity 5 (want 6 args)", "query2d.segment"),
-        ("visible_only literal", |s| s.replace("let q = query2d.segment(refs.runner, 1, ax, ay, ax + .reach, ay)", "let vis = 1
-            let q = query2d.segment(refs.runner, vis, ax, ay, ax + .reach, ay)"), "visible_only must be the literal 0/1", "true/false"),
+        (
+            "unknown query row reference",
+            |s| {
+                s.replace(
+                    "query2d.segment(refs.runner,",
+                    "query2d.segment(refs.ghost,",
+                )
+            },
+            "symbol 'ghost'",
+            "refs.ghost",
+        ),
+        (
+            "wrong-kind getter",
+            |s| s.replace("let px = q.point(0)", "let px = q.origin(0)"),
+            "'.origin()' is a sweep result getter",
+            "cast result",
+        ),
+        (
+            "unbound getter base",
+            |s| s.replace("let hit = q.hit()", "let hit = qq.hit()"),
+            "unknown query result 'qq'",
+            "let",
+        ),
+        (
+            "character-row position write",
+            |s| {
+                s.replace(
+                    "refs.runner.shift(input.x() * 60.0 * dt, input.y() * 60.0 * dt)",
+                    "refs.spectator.shift(input.x() * 60.0 * dt, input.y() * 60.0 * dt)",
+                )
+            },
+            "character row",
+            "position is owned by the character service",
+        ),
+        (
+            "sweep mover -1",
+            |s| {
+                s.replace(
+                    "let q = query2d.segment(refs.runner, 1, ax, ay, ax + .reach, ay)",
+                    "let q = query2d.sweep(-1, 1, ax, ay)",
+                )
+            },
+            "sweep mover must be a named row",
+            "self.row()",
+        ),
+        (
+            "var-bound query result",
+            |s| s.replace("let q = query2d.segment", "var q = query2d.segment"),
+            "query results bind with 'let' only",
+            "shared latest-slot token",
+        ),
+        (
+            "query arity",
+            |s| {
+                s.replace(
+                    "query2d.segment(refs.runner, 1, ax, ay, ax + .reach, ay)",
+                    "query2d.segment(refs.runner, 1, ax, ay, ax + .reach)",
+                )
+            },
+            "arity 5 (want 6 args)",
+            "query2d.segment",
+        ),
+        (
+            "visible_only literal",
+            |s| {
+                s.replace(
+                    "let q = query2d.segment(refs.runner, 1, ax, ay, ax + .reach, ay)",
+                    "let vis = 1
+            let q = query2d.segment(refs.runner, vis, ax, ay, ax + .reach, ay)",
+                )
+            },
+            "visible_only must be the literal 0/1",
+            "true/false",
+        ),
     ];
     for (name, mutate, needle1, needle2) in cases {
-        let mutated = mutate(&std::fs::read_to_string(Path::new(DIR).join("segment.at")).expect("fixture"));
+        let mutated =
+            mutate(&std::fs::read_to_string(Path::new(DIR).join("segment.at")).expect("fixture"));
         let dir = stage("q4");
         std::fs::write(dir.join("mutant.at"), mutated).unwrap();
         let project = load_project(&dir.join("mutant.at")).expect("parse ok");
         let err = lower_project_queries(&project).err().expect(name);
         let msg = err.to_string();
-        assert!(msg.contains(needle1), "{name}: missing '{needle1}' in {msg}");
-        assert!(msg.contains(needle2), "{name}: missing '{needle2}' in {msg}");
-        assert!(msg.contains("module mutant, line "), "{name}: module/line missing: {msg}");
+        assert!(
+            msg.contains(needle1),
+            "{name}: missing '{needle1}' in {msg}"
+        );
+        assert!(
+            msg.contains(needle2),
+            "{name}: missing '{needle2}' in {msg}"
+        );
+        assert!(
+            msg.contains("module mutant, line "),
+            "{name}: module/line missing: {msg}"
+        );
         assert!(msg.contains("symbol '"), "{name}: symbol missing: {msg}");
     }
 }
@@ -143,7 +233,9 @@ fn q04_negative_fixtures_fail_with_named_diagnostics() {
 /// old admission stays closed; no silent acceptance).
 #[test]
 fn q05_components_profile_rejects_query_constructs_named() {
-    let err = lower_components("segment.at", "q5").err().expect("rejected");
+    let err = lower_components("segment.at", "q5")
+        .err()
+        .expect("rejected");
     assert!(
         err.contains("query2d is only available in the queries-2d profile"),
         "{err}"

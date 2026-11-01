@@ -939,3 +939,70 @@ fn v04_gpu_pause_step_and_twenty_fresh_rounds_query_chain() {
         h.stop_play();
     }
 }
+
+/// V-06 damaged-consumption control on the frozen q-segment product: the
+/// intact product loads and runs green; corrupting ONE byte of the world
+/// copy under the scene-bound sha name is rejected at load with the closure
+/// identity naming the sha; the exact restore makes the same project load
+/// and run green again (the query chain advances with input).
+#[test]
+fn v06_damaged_queries_world_copy_rejected_then_recovery_green() {
+    let sha = SCENE_SEG
+        .split("\"sha256\": \"")
+        .nth(1)
+        .and_then(|r| r.split('"').next())
+        .expect("scene binds a source sha")
+        .to_string();
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("target/plan021-queries")
+        .join(format!("{}-v06-damaged", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let scripts = dir.join("scripts");
+    std::fs::create_dir_all(&scripts).expect("scripts dir");
+    std::fs::write(dir.join("scene.agscene"), SCENE_SEG).expect("scene");
+    let script = scripts.join(format!("{sha}.at"));
+    std::fs::write(&script, WORLD_SEG).expect("world copy");
+
+    let (doc, registry, code, _) =
+        Storage::load_project(&dir.join("scene.agscene"), &Registry::new())
+            .unwrap_or_else(|e| panic!("intact load: {e:?}"));
+    assert!(code.is_some(), "intact behavior admitted");
+    let mut h = Host::with_project(doc, registry, code).expect("host");
+    h.start_selected_play().expect("intact start");
+    h.pause_play("");
+    settle(&mut h);
+    assert!(play_error(&h).is_empty(), "intact run fault: {}", play_error(&h));
+    h.stop_play();
+
+    let mut damaged = WORLD_SEG.as_bytes().to_vec();
+    let at = damaged
+        .iter()
+        .position(|b| *b == b'2')
+        .expect("damage site");
+    damaged[at] = b'3';
+    assert!(damaged != WORLD_SEG.as_bytes());
+    std::fs::write(&script, &damaged).expect("damaged world copy");
+    let broken = Storage::load_project(&dir.join("scene.agscene"), &Registry::new());
+    assert!(broken.is_err(), "damaged world copy must be rejected at load");
+    let msg = format!("{:?}", broken.err().unwrap());
+    println!("V-06 damaged load rejected: {msg}");
+    assert!(
+        msg.contains("closure identity") && msg.contains(&sha),
+        "named rejection binding the sha, got: {msg}"
+    );
+
+    std::fs::write(&script, WORLD_SEG).expect("restored world copy");
+    let (doc2, registry2, code2, _) =
+        Storage::load_project(&dir.join("scene.agscene"), &Registry::new())
+            .unwrap_or_else(|e| panic!("restored load: {e:?}"));
+    assert!(code2.is_some(), "restored behavior admitted");
+    let mut h2 = Host::with_project(doc2, registry2, code2).expect("host2");
+    h2.start_selected_play().expect("restored start");
+    h2.pause_play("");
+    settle(&mut h2);
+    assert!(play_error(&h2).is_empty(), "restored run fault: {}", play_error(&h2));
+    step_action(&mut h2, 2, 1, 0);
+    let a = actor(&h2, 2);
+    assert!((a[0] - 7.0).abs() < 1e-3, "restored chain advances with input: {a:?}");
+    h2.stop_play();
+}

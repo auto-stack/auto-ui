@@ -1040,9 +1040,17 @@ enum QHandle {
 #[derive(Debug, Clone)]
 enum QEvent {
     /// `let q = query2d.segment/sweep(...)`（在 QueryCall 之后）。
-    Bind { name: String, kind: QueryKind, line: usize },
+    Bind {
+        name: String,
+        kind: QueryKind,
+        line: usize,
+    },
     /// `<结果变量>.<getter>(…)`。
-    Getter { base: String, method: String, line: usize },
+    Getter {
+        base: String,
+        method: String,
+        line: usize,
+    },
     /// `query2d.segment/sweep(...)`；handle 实参在 walk 层解析形态。
     QueryCall {
         name: String,
@@ -1101,7 +1109,10 @@ fn walk_stmts(stmts: &[Stmt], line: usize, out: &mut WalkOut, queries: bool) {
 
 /// PLAN-021：typed 结果 getter 方法名（cast5/sweep6 的并集）。
 fn is_getter_method(m: &str) -> bool {
-    matches!(m, "hit" | "node" | "t" | "point" | "normal" | "origin" | "start_overlap")
+    matches!(
+        m,
+        "hit" | "node" | "t" | "point" | "normal" | "origin" | "start_overlap"
+    )
 }
 
 fn walk_expr_q(e: &Expr, line: usize, out: &mut WalkOut, queries: bool) {
@@ -1117,13 +1128,13 @@ fn walk_expr_q(e: &Expr, line: usize, out: &mut WalkOut, queries: bool) {
                         "input" | "refs" | "self" | "query2d" => {}
                         // PLAN-021：typed 结果 getter 事件（仅 queries 档；
                         // 其余保持子投递语义）。
-                        child if queries && is_getter_method(ev) => out.query_events.push(
-                            QEvent::Getter {
+                        child if queries && is_getter_method(ev) => {
+                            out.query_events.push(QEvent::Getter {
                                 base: child.to_string(),
                                 method: ev.to_string(),
                                 line: cline,
-                            },
-                        ),
+                            })
+                        }
                         child => out.child_emits.push((
                             child.to_string(),
                             ev.to_string(),
@@ -1149,9 +1160,7 @@ fn walk_expr_q(e: &Expr, line: usize, out: &mut WalkOut, queries: bool) {
                             Some(auto_parser_api::ast::Arg::Pos(Expr::Unary(
                                 auto_parser_api::ast::Op::Sub,
                                 inner,
-                            ))) if matches!(&**inner, Expr::Int(v) if *v == 1) => {
-                                QHandle::MinusOne
-                            }
+                            ))) if matches!(&**inner, Expr::Int(v) if *v == 1) => QHandle::MinusOne,
                             Some(auto_parser_api::ast::Arg::Pos(Expr::Dot(dn, dn2))) => {
                                 if matches!(&**dn, Expr::Ident(r) if r == "refs") {
                                     QHandle::Named(dn2.to_string())
@@ -1173,7 +1182,9 @@ fn walk_expr_q(e: &Expr, line: usize, out: &mut WalkOut, queries: bool) {
                             _ => QHandle::Named(String::new()),
                         };
                         let vo_ok = match c.args.args.get(1) {
-                            Some(auto_parser_api::ast::Arg::Pos(Expr::Int(v))) => *v == 0 || *v == 1,
+                            Some(auto_parser_api::ast::Arg::Pos(Expr::Int(v))) => {
+                                *v == 0 || *v == 1
+                            }
                             Some(auto_parser_api::ast::Arg::Pos(Expr::Bool(_))) => true,
                             _ => false,
                         };
@@ -1209,12 +1220,14 @@ fn walk_expr_q(e: &Expr, line: usize, out: &mut WalkOut, queries: bool) {
             if let Expr::Dot(inner, op) = &*c.name {
                 if matches!(&**inner, Expr::Ident(b) if b == "self") {
                     match op.as_str() {
-                        "row" | "world" | "local" => out
-                            .query_events
-                            .push(QEvent::SelfRow { write: false, line: cline }),
-                        "shift" | "place" => out
-                            .query_events
-                            .push(QEvent::SelfRow { write: true, line: cline }),
+                        "row" | "world" | "local" => out.query_events.push(QEvent::SelfRow {
+                            write: false,
+                            line: cline,
+                        }),
+                        "shift" | "place" => out.query_events.push(QEvent::SelfRow {
+                            write: true,
+                            line: cline,
+                        }),
                         _ => {}
                     }
                 }
@@ -1296,11 +1309,7 @@ fn find_child_node(project: &Project, def_name: &str, child: &str) -> Option<Str
 
 /// 构建投递计划并验证全部 emit 站点（端口存在 + 元数一致）与 handler 面
 /// （未知成员 / 未知 helper fn）。
-fn plan_dispatch(
-    project: &Project,
-    world: &WorldIR,
-    queries: bool,
-) -> Result<Plan, LowerError> {
+fn plan_dispatch(project: &Project, world: &WorldIR, queries: bool) -> Result<Plan, LowerError> {
     let mut plan = Plan::default();
     let root_prefix = world.root.to_lowercase();
 
@@ -1349,7 +1358,13 @@ fn plan_dispatch(
             let mut q_binds: Vec<(String, QueryKind)> = Vec::new();
             for qe in &out.query_events {
                 match qe {
-                    QEvent::QueryCall { name, argc, handle, vo_ok, line } => {
+                    QEvent::QueryCall {
+                        name,
+                        argc,
+                        handle,
+                        vo_ok,
+                        line,
+                    } => {
                         if !queries {
                             return Err(at(
                                 &def.module,
@@ -1445,18 +1460,25 @@ fn plan_dispatch(
                             ));
                         };
                         let ok = match k {
-                            QueryKind::Cast => matches!(
-                                method.as_str(),
-                                "hit" | "node" | "t" | "point" | "normal"
-                            ),
+                            QueryKind::Cast => {
+                                matches!(method.as_str(), "hit" | "node" | "t" | "point" | "normal")
+                            }
                             QueryKind::Sweep => matches!(
                                 method.as_str(),
                                 "hit" | "node" | "t" | "origin" | "normal" | "start_overlap"
                             ),
                         };
                         if !ok {
-                            let this = if *k == QueryKind::Cast { "cast" } else { "sweep" };
-                            let other = if *k == QueryKind::Cast { "sweep" } else { "cast" };
+                            let this = if *k == QueryKind::Cast {
+                                "cast"
+                            } else {
+                                "sweep"
+                            };
+                            let other = if *k == QueryKind::Cast {
+                                "sweep"
+                            } else {
+                                "cast"
+                            };
                             return Err(at(
                                 &def.module,
                                 *line,
@@ -2564,8 +2586,14 @@ fn collect_scene(
                             resolve_geom(project, world, def, props, &inst.params, Some(inst))?;
                         let material = resolve_material(def, props, &inst.params)?;
                         let rgba = resource_color(project, &material)?;
-                        let ctx =
-                            instance_ctx(project, plan, def, &prefix, &inst.def_idx.to_string(), None)?;
+                        let ctx = instance_ctx(
+                            project,
+                            plan,
+                            def,
+                            &prefix,
+                            &inst.def_idx.to_string(),
+                            None,
+                        )?;
                         let pos = prop_of(props, "position").ok_or_else(|| {
                             at(&def.module, def.line, "position", "missing position")
                         })?;
@@ -3332,7 +3360,16 @@ fn gen_user_source(
         .collect();
     root_recvs.sort();
     for (fname, ev) in root_recvs {
-        gen_recv_fn(project, world, plan, fname, "", ev, root_query.as_ref(), &mut src)?;
+        gen_recv_fn(
+            project,
+            world,
+            plan,
+            fname,
+            "",
+            ev,
+            root_query.as_ref(),
+            &mut src,
+        )?;
     }
     // root 呈现 fn。
     if root_def.life_tick && !root_def.dyn_elems.is_empty() {
@@ -3383,7 +3420,16 @@ fn gen_user_source(
             binds: &qbinds,
         });
         for (fname, ev) in mine {
-            gen_recv_fn(project, world, plan, fname, &dname, ev, recv_query.as_ref(), &mut src)?;
+            gen_recv_fn(
+                project,
+                world,
+                plan,
+                fname,
+                &dname,
+                ev,
+                recv_query.as_ref(),
+                &mut src,
+            )?;
         }
         if def.life_tick && !def.dyn_elems.is_empty() {
             gen_present_fn(project, world, plan, def, false, &mut src)?;

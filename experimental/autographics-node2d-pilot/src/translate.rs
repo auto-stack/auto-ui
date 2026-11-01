@@ -423,14 +423,26 @@ fn translate_expr(e: &Expr, ctx: &Ctx, out: &mut String) -> Result<(), LowerErro
                     // PLAN-021（queries-2d）：self 行寻址（本实例 primary
                     // 静态行）。root 无实例行；character 行只读（位置由
                     // 角色服务拥有）。
-                    if base == "self" && matches!(m.as_str(), "row" | "world" | "local" | "place" | "shift" | "show") {
+                    if base == "self"
+                        && matches!(
+                            m.as_str(),
+                            "row" | "world" | "local" | "place" | "shift" | "show"
+                        )
+                    {
                         return translate_self_row_op(m, e, call, ctx, out);
                     }
                     // PLAN-021（queries-2d）：typed 结果 getter（仅结果
                     // 变量；kind 错配 plan 层已具名拒绝，这里按绑定种类
                     // 机械映射原 API）。
                     if let Some(q) = &ctx.query {
-                        if let Some(kind) = q.binds.borrow().iter().rev().find(|(n, _)| n == base.as_str()).map(|(_, k)| *k) {
+                        if let Some(kind) = q
+                            .binds
+                            .borrow()
+                            .iter()
+                            .rev()
+                            .find(|(n, _)| n == base.as_str())
+                            .map(|(_, k)| *k)
+                        {
                             return translate_query_getter(base, m, e, call, ctx, out, kind);
                         }
                     }
@@ -725,9 +737,10 @@ fn query_row_of(elem: &str, ctx: &Ctx, e: &Expr) -> Result<RefRow, LowerError> {
             e,
         ));
     };
-    q.refs.get(elem).copied().ok_or_else(|| {
-        unsupported(format!("unknown query row reference 'refs.{elem}'"), e)
-    })
+    q.refs
+        .get(elem)
+        .copied()
+        .ok_or_else(|| unsupported(format!("unknown query row reference 'refs.{elem}'"), e))
 }
 
 /// PLAN-021：解析具名行实参（refs.<inst> | self.row() | -1 字面量）。
@@ -784,10 +797,7 @@ fn query_handle_arg(
                                 return Ok(row.clone());
                             }
                         }
-                        return Err(unsupported(
-                            "self.row() has no instance row at the root",
-                            e,
-                        ));
+                        return Err(unsupported("self.row() has no instance row at the root", e));
                     }
                 }
             }
@@ -799,12 +809,11 @@ fn query_handle_arg(
 
 /// PLAN-021：语句位置识别 `place(x, y)`（refs.<inst> 或 self 形态）→
 /// 两条 `ag_set_local(row, axis, …)`。非 place 调用返回 None。
-fn row_place_pair(
-    e: &Expr,
-    ctx: &Ctx,
-) -> Result<Option<Vec<String>>, LowerError> {
+fn row_place_pair(e: &Expr, ctx: &Ctx) -> Result<Option<Vec<String>>, LowerError> {
     let Expr::Call(c) = e else { return Ok(None) };
-    let Expr::Dot(inner, m) = &*c.name else { return Ok(None) };
+    let Expr::Dot(inner, m) = &*c.name else {
+        return Ok(None);
+    };
     if m != "place" {
         return Ok(None);
     }
@@ -848,7 +857,10 @@ fn row_place_pair(
         ));
     }
     if c.args.args.len() != 2 {
-        return Err(unsupported(format!("{what}.place arity {}", c.args.args.len()), e));
+        return Err(unsupported(
+            format!("{what}.place arity {}", c.args.args.len()),
+            e,
+        ));
     }
     let mut parts = Vec::new();
     for a in &c.args.args {
@@ -888,7 +900,10 @@ fn translate_query_call(
         "segment" => {
             if call.args.args.len() != 6 {
                 return Err(unsupported(
-                    format!("query2d.segment arity {} (want ignore, visible_only, ax, ay, bx, by)", call.args.args.len()),
+                    format!(
+                        "query2d.segment arity {} (want ignore, visible_only, ax, ay, bx, by)",
+                        call.args.args.len()
+                    ),
                     e,
                 ));
             }
@@ -897,14 +912,20 @@ fn translate_query_call(
             out.push_str(&format!(
                 "ag_cast_segment(2, {handle}, {}, {}, {}, 0.0, {}, {}, 0.0)",
                 visible_only_text(&call.args.args[1], e)?,
-                nums[0], nums[1], nums[2], nums[3]
+                nums[0],
+                nums[1],
+                nums[2],
+                nums[3]
             ));
             Ok(())
         }
         "sweep" => {
             if call.args.args.len() != 4 {
                 return Err(unsupported(
-                    format!("query2d.sweep arity {} (want mover, visible_only, dx, dy)", call.args.args.len()),
+                    format!(
+                        "query2d.sweep arity {} (want mover, visible_only, dx, dy)",
+                        call.args.args.len()
+                    ),
                     e,
                 ));
             }
@@ -913,7 +934,8 @@ fn translate_query_call(
             out.push_str(&format!(
                 "ag_sweep_aabb({handle}, {}, {}, {}, 0.0)",
                 visible_only_text(&call.args.args[1], e)?,
-                nums[0], nums[1]
+                nums[0],
+                nums[1]
             ));
             Ok(())
         }
@@ -936,11 +958,7 @@ fn visible_only_text(a: &Arg, e: &Expr) -> Result<String, LowerError> {
 }
 
 /// 位置数值实参 → 生成文本（机械映射；plan 层已验证元数）。
-fn query_numeric_args(
-    args: &[Arg],
-    ctx: &Ctx,
-    e: &Expr,
-) -> Result<Vec<String>, LowerError> {
+fn query_numeric_args(args: &[Arg], ctx: &Ctx, e: &Expr) -> Result<Vec<String>, LowerError> {
     let mut parts = Vec::new();
     for a in args {
         match a {
@@ -1029,12 +1047,16 @@ fn translate_self_row_op(
             e,
         ));
     };
-    let row = q.self_row.clone().ok_or_else(|| {
-        unsupported("self.row() has no instance row at the root", e)
-    })?;
+    let row = q
+        .self_row
+        .clone()
+        .ok_or_else(|| unsupported("self.row() has no instance row at the root", e))?;
     let args = |n: usize| -> Result<Vec<String>, LowerError> {
         if call.args.args.len() != n {
-            return Err(unsupported(format!("self.{m} arity {}", call.args.args.len()), e));
+            return Err(unsupported(
+                format!("self.{m} arity {}", call.args.args.len()),
+                e,
+            ));
         }
         let mut t = String::new();
         let mut parts = Vec::new();

@@ -154,11 +154,10 @@ fn main() {
                     std::process::exit(3);
                 })
             } else {
-                autographics_node2d_pilot::lower_project_components(&project)
-                    .unwrap_or_else(|e| {
-                        eprintln!("node2d-lower: {e}");
-                        std::process::exit(3);
-                    })
+                autographics_node2d_pilot::lower_project_components(&project).unwrap_or_else(|e| {
+                    eprintln!("node2d-lower: {e}");
+                    std::process::exit(3);
+                })
             };
             std::fs::write(
                 format!("{out}/world.at"),
@@ -186,11 +185,13 @@ fn main() {
             }
             let mut identity = String::from("{\n");
             if queries {
-                identity
-                    .push_str(" \"generator\": \"autographics-node2d-pilot plan021 queries-2d\",\n");
+                identity.push_str(
+                    " \"generator\": \"autographics-node2d-pilot plan021 queries-2d\",\n",
+                );
             } else {
-                identity
-                    .push_str(" \"generator\": \"autographics-node2d-pilot plan020 components-2d\",\n");
+                identity.push_str(
+                    " \"generator\": \"autographics-node2d-pilot plan020 components-2d\",\n",
+                );
             }
             identity.push_str(" \"api\": \"autographics.objects2d/1\",\n");
             identity.push_str(&format!(
@@ -221,8 +222,8 @@ fn main() {
                 | "envelope" | "init-fault" => {
                     "experimental/autographics-auto-driver/tests/node_components_flow.rs"
                 }
-                "q-segment" | "q-sweep" | "q-cross" | "q-changed" | "q-g05seg" | "q-g05sweep"
-                | "q-g05changed" => {
+                "q-segment" | "q-sweep" | "q-cross" | "q-cross-plus" | "q-changed" | "q-g05seg"
+                | "q-g05sweep" | "q-g05changed" => {
                     "experimental/autographics-auto-driver/tests/node_queries_flow.rs"
                 }
                 "q-helpers" => {
@@ -253,8 +254,13 @@ fn main() {
             }
             println!(
                 "node2d-lower[{}]: wrote world.at ({} bytes, sha {}) + scene.agscene + closure/{}",
-                if queries { "queries-2d" } else { "components-2d" },
-                lowered.source_bytes, lowered.source_sha256,
+                if queries {
+                    "queries-2d"
+                } else {
+                    "components-2d"
+                },
+                lowered.source_bytes,
+                lowered.source_sha256,
                 names.len()
             );
         }

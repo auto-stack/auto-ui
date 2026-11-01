@@ -24,7 +24,7 @@
 },
  "provenance": {
   "product": "q-cross-plus",
-  "consumer": "unrecorded (this out dir has no registered flow consumer)",
+  "consumer": "experimental/autographics-auto-driver/tests/node_queries_flow.rs",
   "consumption": "include_str! frozen scene.agscene + world.at; the harness writes world.at to scripts/<sha>.at where <sha> = scene.behavior.source.sha256",
   "load_verification": "the load path hash-verifies the behavior source closure against the scene-bound sha and rejects a damaged world copy at load (observed: 'behavior source closure identity: <scripts/<sha>.at>')",
   "world_sha256": "a9b71b0a1714bc50687ef8bbf5353c7969e2cd8ef91f7ead25ff773ad529b66f"
