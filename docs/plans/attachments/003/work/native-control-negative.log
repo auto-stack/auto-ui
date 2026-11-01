@@ -1,0 +1,1 @@
+U03 PASS: autoui_snapshot on unused MCP port 4693 failed as connection refused in 2.052s; ConnectionRefusedError(10061, '由于目标计算机积极拒绝，无法连接。', None, 10061, None)

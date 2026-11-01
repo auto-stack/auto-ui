@@ -1,0 +1,195 @@
+START first-warmed: D:\autostack\.wt\ui-003\auto-ui\target\debug\auto-ui003.exe run -r vm -B 13230 -F 13330 MCP=13130
+READY first-warmed; snapshot follows
+AURA Snapshot v2 (rendered)
+widget: "App"
+
+tree:
+col #vnode_14695981039346656037 {
+  text #vnode_12642422519345821663 "Native VM Acceptance Control" {
+    style: "text-xl font-semibold"
+  }
+  textarea #vnode_12642404927159776812 {
+    style: "w-full min-h-[160px] border border-border rounded p-3"
+    value: ""
+    placeholder: "Enter multiline text"
+    oninput: .InputChanged($event)
+  }
+  button #vnode_12642457703717911365 "Save through API" {
+    style: "px-4 py-2 rounded bg-primary text-primary-foreground"
+    onclick: .Submit
+  }
+}
+
+SNAPSHOT_TOOL AURA Snapshot v2 (rendered)
+widget: "App"
+
+tree:
+col #vnode_14695981039346656037 {
+  text #vnode_12642422519345821663 "Native VM Acceptance Control" {
+    style: "text-xl font-semibold"
+  }
+  textarea #vnode_12642404927159776812 {
+    style: "w-full min-h-[160px] border border-border rounded p-3"
+    value: ""
+    placeholder: "Enter multiline text"
+    oninput: .InputChanged($event)
+  }
+  button #vnode_12642457703717911365 "Save through API" {
+    style: "px-4 py-2 rounded bg-primary text-primary-foreground"
+    onclick: .Submit
+  }
+}
+
+SCREENSHOT initial saved
+API initial todos=[{"id": 0, "text": "Learn Auto Language", "done": true}, {"id": 1, "text": "Build a TodoMVC app", "done": false}, {"id": 2, "text": "Master the a2r transpiler", "done": false}, {"id": 3, "text": "Write integration tests", "done": false}]
+FIND textarea 'Enter multiline text': Found 1 node(s):
+
+col vnode_14695981039346656037 {spacing: 0; padding: 0} {
+  textarea vnode_12642404927159776812 {placeholder: "Enter multiline text"; value: ""; events: {oninput: ".InputChanged($event)"}}
+}
+
+
+PRESS textarea: Error: Action 'press' not valid for component type 'Textarea'
+TYPE textarea: ActionResult
+  status: ok
+  element: #aura_0
+  action: type_text
+  handler: .App.InputChanged
+RENDERED first contains first=True; second=True
+AURA Snapshot v2 (rendered)
+widget: "App"
+
+tree:
+col #vnode_14695981039346656037 {
+  text #vnode_12642422519345821663 "Native VM Acceptance Control" {
+    style: "text-xl font-semibold"
+  }
+  textarea #vnode_12642404927159776812 {
+    style: "w-full min-h-[160px] border border-border rounded p-3"
+    value: "UI003原生窗口 20261029-200555
+第二行确认中文换行经真实API到达后端。"
+    placeholder: "Enter multiline text"
+    oninput: .InputChanged($event)
+  }
+  button #vnode_12642457703717911365 "Save through API" {
+    style: "px-4 py-2 rounded bg-primary text-primary-foreground"
+    onclick: .Submit
+  }
+}
+
+FIND button 'Save through API': Found 1 node(s):
+
+col vnode_14695981039346656037 {spacing: 0; padding: 0} {
+  button vnode_12642457703717911365 {label: "Save through API"; events: {onclick: ".Submit"}}
+}
+
+
+PRESS Save through API: ActionResult
+  status: ok
+  element: #aura_0
+  action: press
+  handler: .App.Submit
+  state_changes:
+    todos: [<vmref>, <vmref>, <vmref>, <vmref>] -> [<vmref>, <vmref>, <vmref>, <vmref>, <vmref>]
+API GET /api/todos matched={"id": 4, "text": "UI003原生窗口 20261029-200555\n第二行确认中文换行经真实API到达后端。", "done": false}
+SCREENSHOT edited saved
+SENT q first
+CLOSED first: exit=0
+NEGATIVE API after close refused in 2.010s: <urlopen error timed out>
+START reopen-warmed: D:\autostack\.wt\ui-003\auto-ui\target\debug\auto-ui003.exe run -r vm -B 13230 -F 13330 MCP=13131
+READY reopen-warmed; snapshot follows
+AURA Snapshot v2 (rendered)
+widget: "App"
+
+tree:
+col #vnode_14695981039346656037 {
+  text #vnode_12642422519345821663 "Native VM Acceptance Control" {
+    style: "text-xl font-semibold"
+  }
+  textarea #vnode_12642404927159776812 {
+    style: "w-full min-h-[160px] border border-border rounded p-3"
+    value: ""
+    placeholder: "Enter multiline text"
+    oninput: .InputChanged($event)
+  }
+  button #vnode_12642457703717911365 "Save through API" {
+    style: "px-4 py-2 rounded bg-primary text-primary-foreground"
+    onclick: .Submit
+  }
+}
+
+SNAPSHOT_TOOL AURA Snapshot v2 (rendered)
+widget: "App"
+
+tree:
+col #vnode_14695981039346656037 {
+  text #vnode_12642422519345821663 "Native VM Acceptance Control" {
+    style: "text-xl font-semibold"
+  }
+  textarea #vnode_12642404927159776812 {
+    style: "w-full min-h-[160px] border border-border rounded p-3"
+    value: ""
+    placeholder: "Enter multiline text"
+    oninput: .InputChanged($event)
+  }
+  button #vnode_12642457703717911365 "Save through API" {
+    style: "px-4 py-2 rounded bg-primary text-primary-foreground"
+    onclick: .Submit
+  }
+}
+
+SCREENSHOT reopen saved
+FIND textarea 'Enter multiline text': Found 1 node(s):
+
+col vnode_14695981039346656037 {spacing: 0; padding: 0} {
+  textarea vnode_12642404927159776812 {placeholder: "Enter multiline text"; value: ""; events: {oninput: ".InputChanged($event)"}}
+}
+
+
+PRESS textarea: Error: Action 'press' not valid for component type 'Textarea'
+TYPE textarea: ActionResult
+  status: ok
+  element: #aura_0
+  action: type_text
+  handler: .App.InputChanged
+RENDERED reopen contains first=True; second=True
+AURA Snapshot v2 (rendered)
+widget: "App"
+
+tree:
+col #vnode_14695981039346656037 {
+  text #vnode_12642422519345821663 "Native VM Acceptance Control" {
+    style: "text-xl font-semibold"
+  }
+  textarea #vnode_12642404927159776812 {
+    style: "w-full min-h-[160px] border border-border rounded p-3"
+    value: "UI003原生窗口 20261029-200555
+第二行确认中文换行经真实API到达后端。 重开"
+    placeholder: "Enter multiline text"
+    oninput: .InputChanged($event)
+  }
+  button #vnode_12642457703717911365 "Save through API" {
+    style: "px-4 py-2 rounded bg-primary text-primary-foreground"
+    onclick: .Submit
+  }
+}
+
+FIND button 'Save through API': Found 1 node(s):
+
+col vnode_14695981039346656037 {spacing: 0; padding: 0} {
+  button vnode_12642457703717911365 {label: "Save through API"; events: {onclick: ".Submit"}}
+}
+
+
+PRESS Save through API: ActionResult
+  status: ok
+  element: #aura_0
+  action: press
+  handler: .App.Submit
+  state_changes:
+    todos: [<vmref>, <vmref>, <vmref>, <vmref>] -> [<vmref>, <vmref>, <vmref>, <vmref>, <vmref>]
+API GET /api/todos matched={"id": 4, "text": "UI003原生窗口 20261029-200555\n第二行确认中文换行经真实API到达后端。 重开", "done": false}
+SENT q reopen
+CLOSED reopen: exit=0
+NEGATIVE MCP after close refused in 2.014s: <urlopen error timed out>
+RESULT PASS

@@ -1,0 +1,155 @@
+START first-final: D:\autostack\.wt\ui-003\auto-ui\target\debug\auto-ui003.exe run -r vm -B 13240 -F 13340 MCP=13140
+READY first-final; snapshot follows
+AURA Snapshot v2 (rendered)
+widget: "App"
+
+tree:
+col #vnode_14695981039346656037 {
+  text #vnode_12642422519345821663 "Native VM Acceptance Control" {
+    style: "text-xl font-semibold"
+  }
+  textarea #vnode_12642404927159776812 {
+    style: "w-full min-h-[160px] border border-border rounded p-3"
+    value: ""
+    placeholder: "Enter multiline text"
+    oninput: .InputChanged($event)
+  }
+  button #vnode_12642457703717911365 "Save through API" {
+    style: "px-4 py-2 rounded bg-primary text-primary-foreground"
+    onclick: .Submit
+  }
+}
+
+NATIVE_PROCESS_TREE [{"pid": 62556, "parentPid": 19508, "name": "auto-ui003.exe", "hwnd": "0x0", "title": "", "visible": false}, {"pid": 71328, "parentPid": 62556, "name": "auto-ui-tool.exe", "hwnd": "0x0", "title": "", "visible": false}, {"pid": 32804, "parentPid": 71328, "name": "cargo.exe", "hwnd": "0x0", "title": "", "visible": false}, {"pid": 61540, "parentPid": 32804, "name": "cargo.exe", "hwnd": "0x0", "title": "", "visible": false}, {"pid": 24780, "parentPid": 61540, "name": "ui003-native-control-back.exe", "hwnd": "0x0", "title": "", "visible": false}, {"pid": 71088, "parentPid": 71328, "name": "auto-ui-tool.exe", "hwnd": "0x2FE10B2", "title": "原生交互验收", "visible": true}]
+NATIVE_WINDOW [{"pid": 71088, "parentPid": 71328, "name": "auto-ui-tool.exe", "hwnd": "0x2FE10B2", "title": "原生交互验收", "visible": true}]
+SCREENSHOT_RESULT ui003-native-control-final-initial: Screenshot saved to: \\?\D:\autostack\.wt\ui-003\auto-ui\target\debug\ui003-native-control\src\front\tmp\autoui-screenshot-1793275940378.png
+SCREENSHOT_COPIED \\?\D:\autostack\.wt\ui-003\auto-ui\target\debug\ui003-native-control\src\front\tmp\autoui-screenshot-1793275940378.png -> D:\autostack\auto-ui\docs\plans\attachments\003\work\native-control-final-initial.png bytes=109647
+API initial todos=[{"id": 0, "text": "Learn Auto Language", "done": true}, {"id": 1, "text": "Build a TodoMVC app", "done": false}, {"id": 2, "text": "Master the a2r transpiler", "done": false}, {"id": 3, "text": "Write integration tests", "done": false}]
+FIND textarea 'Enter multiline text': Found 1 node(s):
+
+col vnode_14695981039346656037 {spacing: 0; padding: 0} {
+  textarea vnode_12642404927159776812 {placeholder: "Enter multiline text"; value: ""; events: {oninput: ".InputChanged($event)"}}
+}
+
+
+TYPE textarea: ActionResult
+  status: ok
+  element: #aura_0
+  action: type_text
+  handler: .App.InputChanged
+RENDERED first contains first=True; second=True
+AURA Snapshot v2 (rendered)
+widget: "App"
+
+tree:
+col #vnode_14695981039346656037 {
+  text #vnode_12642422519345821663 "Native VM Acceptance Control" {
+    style: "text-xl font-semibold"
+  }
+  textarea #vnode_12642404927159776812 {
+    style: "w-full min-h-[160px] border border-border rounded p-3"
+    value: "UI003原生窗口 20261029-201205
+第二行确认中文换行经真实API到达后端。"
+    placeholder: "Enter multiline text"
+    oninput: .InputChanged($event)
+  }
+  button #vnode_12642457703717911365 "Save through API" {
+    style: "px-4 py-2 rounded bg-primary text-primary-foreground"
+    onclick: .Submit
+  }
+}
+
+FIND button 'Save through API': Found 1 node(s):
+
+col vnode_14695981039346656037 {spacing: 0; padding: 0} {
+  button vnode_12642457703717911365 {label: "Save through API"; events: {onclick: ".Submit"}}
+}
+
+
+PRESS Save through API: ActionResult
+  status: ok
+  element: #aura_0
+  action: press
+  handler: .App.Submit
+  state_changes:
+    todos: [<vmref>, <vmref>, <vmref>, <vmref>] -> [<vmref>, <vmref>, <vmref>, <vmref>, <vmref>]
+API GET /api/todos matched={"id": 4, "text": "UI003原生窗口 20261029-201205\n第二行确认中文换行经真实API到达后端。", "done": false}
+SCREENSHOT_RESULT ui003-native-control-final-edited: Screenshot saved to: \\?\D:\autostack\.wt\ui-003\auto-ui\target\debug\ui003-native-control\src\front\tmp\autoui-screenshot-1793275941335.png
+SCREENSHOT_COPIED \\?\D:\autostack\.wt\ui-003\auto-ui\target\debug\ui003-native-control\src\front\tmp\autoui-screenshot-1793275941335.png -> D:\autostack\auto-ui\docs\plans\attachments\003\work\native-control-final-edited.png bytes=120637
+SENT q first
+CLOSED first: exit=0
+PROCESS_TREE_CLOSED first: pids=[62556, 71328, 32804, 61540, 24780, 71088]
+NEGATIVE API after close port was released in 0.000s; rebind succeeded
+NEGATIVE MCP after first close port was released in 0.000s; rebind succeeded
+START reopen-final: D:\autostack\.wt\ui-003\auto-ui\target\debug\auto-ui003.exe run -r vm -B 13240 -F 13340 MCP=13141
+READY reopen-final; snapshot follows
+AURA Snapshot v2 (rendered)
+widget: "App"
+
+tree:
+col #vnode_14695981039346656037 {
+  text #vnode_12642422519345821663 "Native VM Acceptance Control" {
+    style: "text-xl font-semibold"
+  }
+  textarea #vnode_12642404927159776812 {
+    style: "w-full min-h-[160px] border border-border rounded p-3"
+    value: ""
+    placeholder: "Enter multiline text"
+    oninput: .InputChanged($event)
+  }
+  button #vnode_12642457703717911365 "Save through API" {
+    style: "px-4 py-2 rounded bg-primary text-primary-foreground"
+    onclick: .Submit
+  }
+}
+
+NATIVE_PROCESS_TREE [{"pid": 12476, "parentPid": 19508, "name": "auto-ui003.exe", "hwnd": "0x0", "title": "", "visible": false}, {"pid": 6580, "parentPid": 12476, "name": "auto-ui-tool.exe", "hwnd": "0x0", "title": "", "visible": false}, {"pid": 10312, "parentPid": 6580, "name": "cargo.exe", "hwnd": "0x0", "title": "", "visible": false}, {"pid": 37224, "parentPid": 10312, "name": "cargo.exe", "hwnd": "0x0", "title": "", "visible": false}, {"pid": 48488, "parentPid": 37224, "name": "ui003-native-control-back.exe", "hwnd": "0x0", "title": "", "visible": false}, {"pid": 32856, "parentPid": 6580, "name": "auto-ui-tool.exe", "hwnd": "0xD70AE2", "title": "原生交互验收", "visible": true}]
+NATIVE_WINDOW [{"pid": 32856, "parentPid": 6580, "name": "auto-ui-tool.exe", "hwnd": "0xD70AE2", "title": "原生交互验收", "visible": true}]
+SCREENSHOT_RESULT ui003-native-control-final-reopened: Screenshot saved to: \\?\D:\autostack\.wt\ui-003\auto-ui\target\debug\ui003-native-control\src\front\tmp\autoui-screenshot-1793275962181.png
+SCREENSHOT_COPIED \\?\D:\autostack\.wt\ui-003\auto-ui\target\debug\ui003-native-control\src\front\tmp\autoui-screenshot-1793275962181.png -> D:\autostack\auto-ui\docs\plans\attachments\003\work\native-control-final-reopened.png bytes=109647
+FIND textarea 'Enter multiline text': Found 1 node(s):
+
+col vnode_14695981039346656037 {spacing: 0; padding: 0} {
+  textarea vnode_12642404927159776812 {placeholder: "Enter multiline text"; value: ""; events: {oninput: ".InputChanged($event)"}}
+}
+
+
+TYPE textarea: ActionResult
+  status: ok
+  element: #aura_0
+  action: type_text
+  handler: .App.InputChanged
+RENDERED reopen contains first=False; second=False
+AURA Snapshot v2 (rendered)
+widget: "App"
+
+tree:
+col #vnode_14695981039346656037 {
+  text #vnode_12642422519345821663 "Native VM Acceptance Control" {
+    style: "text-xl font-semibold"
+  }
+  textarea #vnode_12642404927159776812 {
+    style: "w-full min-h-[160px] border border-border rounded p-3"
+    value: ""
+    placeholder: "Enter multiline text"
+    oninput: .InputChanged($event)
+  }
+  button #vnode_12642457703717911365 "Save through API" {
+    style: "px-4 py-2 rounded bg-primary text-primary-foreground"
+    onclick: .Submit
+  }
+}
+
+SENT q reopen-finally
+CLOSED reopen-finally: exit=0
+PROCESS_TREE_CLOSED reopen-finally: pids=[12476, 6580, 10312, 37224, 48488, 32856]
+Traceback (most recent call last):
+  File "D:\autostack\.wt\ui-003\auto-ui\target\debug\native_control_acceptance_final.py", line 240, in <module>
+    main()
+    ~~~~^^
+  File "D:\autostack\.wt\ui-003\auto-ui\target\debug\native_control_acceptance_final.py", line 226, in main
+    submit(c2, api2, VALUE + " 重开", "reopen")
+    ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\autostack\.wt\ui-003\auto-ui\target\debug\native_control_acceptance_final.py", line 188, in submit
+    raise RuntimeError("the native textarea did not render both lines of the typed value")
+RuntimeError: the native textarea did not render both lines of the typed value

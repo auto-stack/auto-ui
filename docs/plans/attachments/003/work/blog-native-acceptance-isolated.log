@@ -1,0 +1,17 @@
+SOURCE_COMMIT 2a7c9586924a2d42e5d0a9360bcbe265ba90dcb0
+SOURCE_PATH D:\autostack\.wt\ui-003\auto-ui\target\debug\blog-app-2a7c9586
+AUTO_LANG_COMMIT 09bb414875d4e15050ecbbaf3959b1d72976d857
+AUTO_UI_COMMIT a226962eae3caf319ebe3e1a2b91ed380eab40cb
+AUTO_BLOG_DATA D:\autostack\auto-ui\docs\plans\attachments\003\work\blog-data-native-20261029-201821
+START first: D:\autostack\.wt\ui-003\auto-ui\target\debug\auto-ui003.exe run -r vm -B 13510 -F 13610 MCP=13410
+EXITED first: code=1; log=D:\autostack\auto-ui\docs\plans\attachments\003\work\blog-native-20261029-201821-first.log
+Traceback (most recent call last):
+  File "D:\autostack\.wt\ui-003\auto-ui\target\debug\blog_native_acceptance_isolated.py", line 301, in <module>
+    main()
+    ~~~~^^
+  File "D:\autostack\.wt\ui-003\auto-ui\target\debug\blog_native_acceptance_isolated.py", line 227, in main
+    proc1, c1, log1, path1, snap1, owned1 = start("first", mcp1, api1, front1)
+                                            ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\autostack\.wt\ui-003\auto-ui\target\debug\blog_native_acceptance_isolated.py", line 149, in start
+    raise RuntimeError(f"CLI exited before MCP ready ({proc.returncode})")
+RuntimeError: CLI exited before MCP ready (1)

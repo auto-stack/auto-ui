@@ -1,0 +1,12 @@
+START first-pinned: D:\autostack\.wt\ui-003\auto-ui\target\debug\auto-ui003.exe run -r vm -B 13217 -F 13317 MCP=13103
+EXITED first-pinned: code=1; log=D:\autostack\auto-ui\docs\plans\attachments\003\work\native-notes-first-pinned.log
+Traceback (most recent call last):
+  File "D:\autostack\.wt\ui-003\auto-ui\target\debug\notes_native_acceptance.py", line 228, in <module>
+    main()
+    ~~~~^^
+  File "D:\autostack\.wt\ui-003\auto-ui\target\debug\notes_native_acceptance.py", line 144, in main
+    proc1, c1, log1, log_path1, snap1 = start("first-pinned", mcp1, api1, front1)
+                                        ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\autostack\.wt\ui-003\auto-ui\target\debug\notes_native_acceptance.py", line 87, in start
+    raise RuntimeError(f"CLI exited before MCP ready ({proc.returncode})")
+RuntimeError: CLI exited before MCP ready (1)

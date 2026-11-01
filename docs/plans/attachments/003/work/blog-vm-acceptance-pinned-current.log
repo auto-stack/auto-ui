@@ -1,0 +1,12 @@
+START first-pinned-current: D:\autostack\.wt\ui-003\auto-ui\target\debug\auto-ui003.exe run -r vm -B 13217 -F 13317 MCP=13103 BACK=13217 FRONT=13317
+EXITED first-pinned-current: code=1; log=D:\autostack\auto-ui\docs\plans\attachments\003\work\blog-vm-first-pinned-current.log
+Traceback (most recent call last):
+  File "D:\autostack\.wt\ui-003\auto-ui\target\debug\blog_vm_acceptance_pinned_current.py", line 224, in <module>
+    main()
+    ~~~~^^
+  File "D:\autostack\.wt\ui-003\auto-ui\target\debug\blog_vm_acceptance_pinned_current.py", line 147, in main
+    proc1, c1, log1, path1, snap1, names1, back1, front1 = start(port1, "first-pinned-current")
+                                                           ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\autostack\.wt\ui-003\auto-ui\target\debug\blog_vm_acceptance_pinned_current.py", line 87, in start
+    raise RuntimeError(f"CLI exited before MCP ready ({proc.returncode})")
+RuntimeError: CLI exited before MCP ready (1)

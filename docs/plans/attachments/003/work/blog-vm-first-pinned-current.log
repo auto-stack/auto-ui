@@ -1,0 +1,1617 @@
+---------------------------
+AutoNexus / Auto CLI
+---------------------------
+Loading AmConfig from Some("C:\\Users\\zhaop\\.auto\\auto-man\\am.at")...
+AmConfig: AmConfig {
+  name: default
+  index: {
+    default: git@gitee.com:auto-stack/auto-index.git
+    soutek: git@codeup.aliyun.com:soutek/auto-stack/auto-index.git
+    boe: git@codeup.aliyun.com:soutek/boe/index.git
+  }
+}
+
+
+Loaded port: windows_ninja
+port NAME: windows_ninja
+all index: {"default": "git@gitee.com:auto-stack/auto-index.git", "soutek": "git@codeup.aliyun.com:soutek/auto-stack/auto-index.git", "boe": "git@codeup.aliyun.com:soutek/boe/index.git"}
+used index: ["default"]
+11:53:29 [INFO] loading index store from C:/Users/zhaop/.auto/auto-man/index/default
+setting port builder: windows_ninja ninja, at build
+11:53:29 [INFO] AutoCache initialized for project: realworld
+  → split mode: frontend vm ↔ backend rust over HTTP
+  Backend API server port: 13217 (from cli)
+  Frontend dev server port: 13317 (from cli)
+  VM window title: 博客 (from pac.at)
+11:53:29 [INFO] Running project ...
+
+------------ output ------------
+accepted request id=1 op=run_ui
+  ✓ Generated Rust server: auto-blog-back/
+  ✓ Generated Rust server: auto-blog-back/
+
+▶ Starting API backend server (Rust axum)...
+  cargo run --manifest-path D:\autostack\auto-blog\rust-workspace\auto-blog-back\Cargo.toml
+  ✓ API server starting (PID: 3148)...
+  Waiting for API server to be ready...
+    Blocking waiting for file lock on build directory
+warning: linker stdout: 正在创建库 D:\autostack\auto-blog\rust-workspace\target\debug\deps\auto_macros-27b00fc264208065.dll.lib 和对象 D:\autostack\auto-blog\rust-workspace\target\debug\deps\auto_macros-27b00fc264208065.dll.exp
+warning: `auto-macros` (lib) generated 1 warning
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\lib.rs:130:1: warning: unused doc comment: rustdoc does not generate documentation for macro invocations
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\lib.rs:148:1: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\http_service_observability.rs:12:29: warning: unused import: `Sender`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\trans\emit.rs:16:10: warning: unused import: `Args`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\trans\rust.rs:4282:5: warning: unused imports: `emit_http_verb_call` and `expr_root_is_http_request`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\abt\mod.rs:81:13: warning: unused import: `std::fmt::Write`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\codegen.rs:24:5: warning: unused imports: `NATIVE_PRINT_F64` and `NATIVE_PRINT_U64`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine.rs:1410:5: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine.rs:3132:9: warning: unused import: `crate::vm::ffi::VMConvertible`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine.rs:3133:9: warning: unused import: `crate::vm::task::AutoTask`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine\ops_collections.rs:1146:38: warning: unnecessary braces around method argument
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine\ops_collections.rs:1193:49: warning: unnecessary braces around method argument
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine\values.rs:87:13: warning: unused import: `std::sync::atomic::Ordering`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\rc.rs:20:5: warning: unused import: `dashmap::DashMap`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\rc.rs:21:36: warning: unused import: `AtomicU64`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\storage.rs:3:5: warning: unused import: `super::*`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\math.rs:13:5: warning: unused import: `super::*`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\strings_json.rs:888:1: warning: unused doc comment: rustdoc does not generate documentation for macro invocations
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\dep_methods.rs:2376:1: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_server.rs:3666:1: warning: unused doc comment: rustdoc does not generate documentation for macro invocations
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_server\server_scope.rs:141:5: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\tests_chart_geometry.rs:11:5: warning: unused import: `crate::run`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_server.rs:3324:9: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_stream.rs:208:13: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_transport.rs:366:10: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_transport.rs:852:25: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\parser\expressions.rs:456:13: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\parser\statements.rs:117:21: warning: unused variable: `w`: help: if this is intentional, prefix it with an underscore: `_w`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\parser\type_syntax.rs:292:14: warning: unused variable: `open`: help: if this is intentional, prefix it with an underscore: `_open`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\http_service_config.rs:497:13: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\http_service_config.rs:507:13: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\http_service_config.rs:613:13: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\http_service_config.rs:769:13: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\http_service_observability.rs:285:20: warning: irrefutable `if let` pattern
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\stdlib_assembly\host.rs:931:9: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\trans\rust\call_emit\call_module_methods.rs:1368:34: warning: unreachable pattern: no value can reach this
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\trans\rust\call_emit\call_module_methods.rs:1591:29: warning: unreachable pattern: no value can reach this
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\trans\rust\call_emit\call_module_methods.rs:1923:38: warning: unused variable: `i`: help: if this is intentional, prefix it with an underscore: `_i`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\trans\rust\project_fixups.rs:4127:25: warning: unused variable: `derive_attr`: help: if this is intentional, prefix it with an underscore: `_derive_attr`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\trans\rust\stmt_emit.rs:850:13: warning: unused variable: `name`: help: if this is intentional, prefix it with an underscore: `_name`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\trans\rust\stmt_emit.rs:1303:9: warning: unused variable: `name`: help: if this is intentional, prefix it with an underscore: `_name`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\trans\rust\ty.rs:50:31: warning: unused variable: `method`: help: if this is intentional, prefix it with an underscore: `_method`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\trans\s2s_rules.rs:90:21: warning: unused variable: `has_kw`: help: if this is intentional, prefix it with an underscore: `_has_kw`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\abt\asm.rs:296:11: warning: unreachable pattern: no value can reach this
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\abt\asm.rs:297:11: warning: unreachable pattern: no value can reach this
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\abt\disasm.rs:271:11: warning: unreachable pattern: no value can reach this
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\abt\disasm.rs:271:33: warning: unreachable pattern: no value can reach this
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\abt\mod.rs:87:13: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\codegen\expr_calls.rs:714:61: warning: unused variable: `enum_method`: help: if this is intentional, prefix it with an underscore: `_enum_method`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\codegen\stmt_emit.rs:1747:28: warning: unused variable: `spec_decl`: help: if this is intentional, prefix it with an underscore: `_spec_decl`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine\ops_arith.rs:1077:29: warning: unused variable: `handle`: help: if this is intentional, prefix it with an underscore: `_handle`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine\ops_arith.rs:2615:38: warning: unused variable: `other`: help: if this is intentional, prefix it with an underscore: `_other`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine\ops_calls.rs:833:25: warning: unused variable: `value`: help: if this is intentional, prefix it with an underscore: `_value`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine\ops_collections.rs:51:54: warning: value assigned to `old_field_ref` is never read: this value is reassigned later and never used
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine\tasks.rs:250:13: warning: unused variable: `saved_saved_closure_id`: help: if this is intentional, prefix it with an underscore: `_saved_saved_closure_id`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\rc.rs:374:22: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\rc.rs:769:25: warning: unused variable: `k`: help: if this is intentional, prefix it with an underscore: `_k`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43: warning: unused variable: `vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1737:43: warning: unused variable: `vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:3197:45: warning: unused variable: `vm`: help: if this is intentional, prefix it with an underscore: `_vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:6:49: warning: unused variable: `vm`: help: if this is intentional, prefix it with an underscore: `_vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:14:48: warning: unused variable: `vm`: help: if this is intentional, prefix it with an underscore: `_vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:22:49: warning: unused variable: `vm`: help: if this is intentional, prefix it with an underscore: `_vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:31:49: warning: unused variable: `vm`: help: if this is intentional, prefix it with an underscore: `_vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:39:49: warning: unused variable: `vm`: help: if this is intentional, prefix it with an underscore: `_vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:54:49: warning: unused variable: `vm`: help: if this is intentional, prefix it with an underscore: `_vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:69:49: warning: unused variable: `vm`: help: if this is intentional, prefix it with an underscore: `_vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:87:49: warning: unused variable: `vm`: help: if this is intentional, prefix it with an underscore: `_vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:95:49: warning: unused variable: `vm`: help: if this is intentional, prefix it with an underscore: `_vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:103:56: warning: unused variable: `vm`: help: if this is intentional, prefix it with an underscore: `_vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:110:59: warning: unused variable: `vm`: help: if this is intentional, prefix it with an underscore: `_vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:117:60: warning: unused variable: `vm`: help: if this is intentional, prefix it with an underscore: `_vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:124:52: warning: unused variable: `vm`: help: if this is intentional, prefix it with an underscore: `_vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:131:54: warning: unused variable: `vm`: help: if this is intentional, prefix it with an underscore: `_vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:147:54: warning: unused variable: `vm`: help: if this is intentional, prefix it with an underscore: `_vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:158:52: warning: unused variable: `vm`: help: if this is intentional, prefix it with an underscore: `_vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:172:53: warning: unused variable: `vm`: help: if this is intentional, prefix it with an underscore: `_vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:186:54: warning: unused variable: `vm`: help: if this is intentional, prefix it with an underscore: `_vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:207:45: warning: unused variable: `vm`: help: if this is intentional, prefix it with an underscore: `_vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_io.rs:45:48: warning: unused variable: `vm`: help: if this is intentional, prefix it with an underscore: `_vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_io.rs:484:44: warning: unused variable: `vm`: help: if this is intentional, prefix it with an underscore: `_vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_rand.rs:108:46: warning: unused variable: `vm`: help: if this is intentional, prefix it with an underscore: `_vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_rand.rs:143:45: warning: unused variable: `vm`: help: if this is intentional, prefix it with an underscore: `_vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_rand.rs:156:44: warning: unused variable: `vm`: help: if this is intentional, prefix it with an underscore: `_vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\http_client.rs:184:58: warning: unused variable: `vm`: help: if this is intentional, prefix it with an underscore: `_vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\http_client.rs:223:57: warning: unused variable: `vm`: help: if this is intentional, prefix it with an underscore: `_vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\http_client.rs:370:55: warning: unused variable: `vm`: help: if this is intentional, prefix it with an underscore: `_vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\http_client.rs:393:5: warning: unused variable: `vm`: help: if this is intentional, prefix it with an underscore: `_vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\http_client.rs:415:5: warning: unused variable: `vm`: help: if this is intentional, prefix it with an underscore: `_vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\http_client.rs:438:55: warning: unused variable: `vm`: help: if this is intentional, prefix it with an underscore: `_vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\http_client.rs:454:61: warning: unused variable: `vm`: help: if this is intentional, prefix it with an underscore: `_vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\http_client.rs:469:46: warning: unused variable: `vm`: help: if this is intentional, prefix it with an underscore: `_vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\http_client.rs:852:50: warning: unused variable: `vm`: help: if this is intentional, prefix it with an underscore: `_vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\http_client.rs:2371:51: warning: unused variable: `vm`: help: if this is intentional, prefix it with an underscore: `_vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\http_client.rs:2403:47: warning: unused variable: `vm`: help: if this is intentional, prefix it with an underscore: `_vm`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_server\server_dispatch.rs:599:17: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_stream.rs:394:5: warning: unused variable: `stream_id`: help: if this is intentional, prefix it with an underscore: `_stream_id`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\entry.rs:2492:54: warning: taking a mutable reference to a `const` item
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\http_service_config.rs:361:15: warning: constant `HEALTH_BUDGET` is never used
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\stdlib_assembly\host.rs:65:5: warning: variant `Standalone` is never constructed
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\trans\python.rs:2671:8: warning: function `test_a2p` is never used
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine.rs:100:4: warning: function `pop_str_idx` is never used
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine.rs:1059:8: warning: method `intern_string` is never used
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine.rs:3070:8: warning: function `vm_with` is never used
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine.rs:3074:8: warning: function `pop_str` is never used
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine.rs:3136:8: warning: function `vm_idle` is never used
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine.rs:3229:8: warning: function `vm_with` is never used
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine.rs:3233:8: warning: function `push_result_instance` is never used
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine\values.rs:7:8: warning: method `decode_tagged_value` is never used
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\http_async.rs:194:5: warning: field `req_id` is never read
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_server.rs:55:15: warning: function `fn_is_api_async` is never used
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_server.rs:4524:7: warning: constant `META_PARAM_NAMES` is never used
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_server\server_argbind.rs:323:4: warning: function `is_meta_param_name` is never used
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_server\server_route.rs:435:4: warning: function `http_status_reason` is never used
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_server\server_scope.rs:410:12: warning: field `0` is never read
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_stream.rs:311:15: warning: function `stream_remove` is never used
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_collections.rs:896:13: warning: variable `_stake__disc` should have a snake case name: help: convert the identifier to snake case: `_stake_disc`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_collections.rs:1272:9: warning: variable `_stake__closure_id` should have a snake case name: help: convert the identifier to snake case: `_stake_closure_id`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_collections.rs:2044:9: warning: variable `_stake__func_addr` should have a snake case name: help: convert the identifier to snake case: `_stake_func_addr`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_collections.rs:2106:9: warning: variable `_stake__func_addr` should have a snake case name: help: convert the identifier to snake case: `_stake_func_addr`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_collections.rs:3500:9: warning: variable `_stake__arr_id` should have a snake case name: help: convert the identifier to snake case: `_stake_arr_id`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_strings.rs:9:9: warning: variable `_stake__capacity` should have a snake case name: help: convert the identifier to snake case: `_stake_capacity`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_strings.rs:411:9: warning: variable `_stake__capacity` should have a snake case name: help: convert the identifier to snake case: `_stake_capacity`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_test.rs:109:9: warning: variable `_stake__inst_id` should have a snake case name: help: convert the identifier to snake case: `_stake_inst_id`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_test.rs:122:9: warning: variable `_stake__inst_id` should have a snake case name: help: convert the identifier to snake case: `_stake_inst_id`
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\exit_audit.rs:408:70: warning: direct cast of function item into an integer
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\exit_audit.rs:409:80: warning: direct cast of function item into an integer
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\rust_stdlib_dispatch.rs:823:13: warning: calls to `std::mem::drop` with a value that implements `Copy` does nothing
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\rust_stdlib_dispatch.rs:827:13: warning: calls to `std::mem::drop` with a value that implements `Copy` does nothing
+D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\musk_response_ctor.rs:874:16: warning: variable `_stake__cfg` should have a snake case name: help: convert the identifier to snake case: `_stake_cfg`
+warning: `auto-lang-core` (lib) generated 147 warnings (17 duplicates) (run `cargo fix --lib -p auto-lang-core` to apply 82 suggestions)
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\app_registry.rs:28:7: warning: unexpected `cfg` condition value: `ui-interpreter`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\app_registry.rs:139:15: warning: unexpected `cfg` condition value: `ui-interpreter`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\app_registry.rs:143:19: warning: unexpected `cfg` condition value: `ui-interpreter`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\style\mod.rs:41:29: warning: unused import: `AtomicBool`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\style\theme\mod.rs:178:1: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\aura\extract.rs:921:1: warning: unused doc comment: rustdoc does not generate documentation for macro invocations
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\bp\registry.rs:407:9: warning: unused import: `super::*`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\rust.rs:1295:9: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\rust.rs:8422:35: warning: unused imports: `Expr` and `Stmt`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\rust.rs:8423:13: warning: unused import: `auto_val::Op`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\rust.rs:9903:21: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\rust.rs:10114:17: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\rust.rs:13211:20: warning: unnecessary parentheses around `if` condition
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\api.rs:669:9: warning: unused import: `auto_lang_core::session::CompilerSession`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\aura\extract.rs:712:24: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\aura\schema.rs:323:21: warning: unused variable: `def`: help: if this is intentional, prefix it with an underscore: `_def`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\rust.rs:9518:21: warning: unused variable: `store_check`: help: if this is intentional, prefix it with an underscore: `_store_check`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\vue.rs:7524:34: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\vue.rs:10522:13: warning: unreachable pattern: no value can reach this
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\vue.rs:11280:17: warning: unreachable pattern: no value can reach this
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\api.rs:902:44: warning: value assigned to `sub_widgets_out` is never read: this value is reassigned later and never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\validators.rs:691:9: warning: unused variable: `count`: help: if this is intentional, prefix it with an underscore: `_count`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:458:13: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:463:13: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:685:13: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:1353:13: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:1420:13: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:1425:13: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:1431:13: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:1436:13: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:2224:13: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:2235:13: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:2279:13: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:2477:13: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\lucide_generated.rs:5534:18: warning: constant `LUCIDE_SOURCE_VERSION` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\bp\registry.rs:409:12: warning: struct `EnvGuard` is never constructed
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\bp\registry.rs:414:12: warning: associated function `set` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\vue.rs:205:8: warning: function `key_of` is never used
+warning: `auto-ui-compiler` (lib) generated 38 warnings (run `cargo fix --lib -p auto-ui-compiler` to apply 23 suggestions)
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\code_editor\core\highlight.rs:347:9: warning: unused import: `syntect::easy::HighlightLines`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\code_editor\core\highlight.rs:348:9: warning: unused import: `syntect::util::LinesWithEndings`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\code_editor\core\render.rs:14:41: warning: unused import: `Family`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\code_editor\core\mod.rs:28:39: warning: unused import: `Weak`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\code_editor\iced\gutter.rs:21:35: warning: unused import: `Family`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\code_editor\iced\widget.rs:13:5: warning: unused import: `iced::advanced::graphics::text::Renderer as RawTextRenderer`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\scroll\controller.rs:22:47: warning: unused import: `ScrollSource`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\scroll\host.rs:16:49: warning: unused import: `scroll_range`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\scroll\intent.rs:107:38: warning: unused import: `ScrollAxisState`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\anchor_slot.rs:9:29: warning: unused imports: `Point` and `Vector`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\vnode_converter.rs:35:7: warning: unexpected `cfg` condition value: `interpreter`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\vnode_converter.rs:38:7: warning: unexpected `cfg` condition value: `interpreter`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\vnode_converter.rs:1489:7: warning: unexpected `cfg` condition value: `interpreter`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\vnode_converter.rs:1505:7: warning: unexpected `cfg` condition value: `interpreter`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\vnode_converter.rs:1544:7: warning: unexpected `cfg` condition value: `interpreter`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\handler_codegen.rs:22:73: warning: unused import: `Try`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\selection\output.rs:16:38: warning: unused import: `VNode`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\session.rs:31:37: warning: unused import: `ReservedEdges`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\session.rs:4649:13: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\session.rs:5063:25: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\session.rs:5071:29: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\session.rs:5158:21: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\shell_projection.rs:1267:13: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\client_runtime.rs:13:5: warning: unused import: `std::collections::HashMap`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\client_runtime.rs:17:17: warning: unused imports: `DrawList`, `DrawOp`, `ImageFit`, `InputMsg`, `MouseButton`, and `WRect`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\client_runtime.rs:24:30: warning: unused imports: `AuraNode`, `AuraPropValue`, `AuraTextContent`, and `aura_events_get_base`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\coverage.rs:443:13: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\coverage.rs:987:9: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\dual_mode.rs:16:5: warning: unused import: `super::broker`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\dual_mode.rs:17:23: warning: unused imports: `AppEndpoint` and `AppState`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\dual_mode.rs:20:27: warning: unused imports: `FrameMsg` and `ProtocolMsg`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\dual_mode.rs:22:5: warning: unused import: `super::shm::SharedFrameBuffer`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\dual_mode.rs:23:24: warning: unused import: `self`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\dual_mode.rs:25:5: warning: unused import: `crate::ui::session::DesktopSession`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\native_projector.rs:35:17: warning: unused import: `DISABLED_ALPHA`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\native_projector.rs:347:5: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\native_projector.rs:1594:9: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\native_projector.rs:3351:9: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\native_projector.rs:3355:9: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\native_projector.rs:3384:9: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\rqhost.rs:27:35: warning: unused import: `HostEndpoint`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\rqhost.rs:28:5: warning: unused import: `super::host::SurfaceStore`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\shell_client.rs:357:13: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\shell_client.rs:763:21: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\shell_client.rs:801:25: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\transport.rs:161:24: warning: unused import: `NamedPipeClient`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\native_dock\win32.rs:672:27: warning: unused imports: `GetIconInfo` and `ICONINFO`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:3351:13: warning: unused import: `crate::ui::scroll::ScrollAxes`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:14297:22: warning: unnecessary trailing semicolon: help: remove this semicolon
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:137:1: warning: unused doc comment: rustdoc does not generate documentation for macro invocations
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:1048:1: warning: unused doc comment: rustdoc does not generate documentation for macro invocations
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:7991:1: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:10327:36: warning: unused import: `Fill`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:13031:5: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:13123:5: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:13304:5: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:13406:5: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:13750:5: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:14335:5: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:14352:5: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:14429:5: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:23387:25: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:23760:25: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:24085:29: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:24623:41: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:24896:17: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:25257:13: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:25293:17: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:25330:17: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\broker_surface.rs:418:49: warning: unused import: `Text`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\broker_surface.rs:579:5: warning: unused import: `BorderSpec`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\terminal\iced\widget.rs:1095:28: warning: falling back to `f32` as the trait bound `f32: From<f64>` is not satisfied: help: explicitly specify the type as `f32`: `0.0_f32`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\terminal\iced\widget.rs:1379:32: warning: falling back to `f32` as the trait bound `f32: From<f64>` is not satisfied: help: explicitly specify the type as `f32`: `1.0_f32`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\win_ime.rs:249:29: warning: unused import: `HasWindowHandle`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\code_editor\core\highlight.rs:351:14: warning: unused variable: `ext`: help: if this is intentional, prefix it with an underscore: `_ext`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\handler_codegen.rs:1197:9: warning: unused variable: `state_dot`: help: if this is intentional, prefix it with an underscore: `_state_dot`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\handler_codegen.rs:2096:5: warning: unused variable: `store_fields`: help: if this is intentional, prefix it with an underscore: `_store_fields`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\handler_codegen.rs:2097:5: warning: unused variable: `store_widget_names`: help: if this is intentional, prefix it with an underscore: `_store_widget_names`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\vm_bridge.rs:937:21: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\vm_bridge.rs:1428:25: warning: unused variable: `g`: help: if this is intentional, prefix it with an underscore: `_g`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\vm_bridge.rs:1695:14: warning: unused variable: `name`: help: if this is intentional, prefix it with an underscore: `_name`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\session.rs:4167:26: warning: unused variable: `app_root`: help: if this is intentional, prefix it with an underscore: `_app_root`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\client_entry.rs:198:17: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\client_runtime.rs:549:26: warning: unused variable: `e`: help: if this is intentional, prefix it with an underscore: `_e`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\coverage.rs:1016:9: warning: unreachable pattern: no value can reach this
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\coverage.rs:1084:5: warning: unused variable: `component`: help: if this is intentional, prefix it with an underscore: `_component`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\native_projector.rs:3319:9: warning: unreachable pattern: no value can reach this
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\render_cli.rs:96:13: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\rqhost.rs:739:5: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\shell_client.rs:300:13: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\shell_client.rs:301:13: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\native_dock\win32.rs:2086:30: warning: unused variable: `pid`: help: if this is intentional, prefix it with an underscore: `_pid`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\snapshot_builder.rs:402:21: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\mcp_server.rs:1430:5: warning: unused variable: `shared_handle`: help: if this is intentional, prefix it with an underscore: `_shared_handle`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\mcp_server.rs:4692:13: warning: unused variable: `ids`: help: if this is intentional, prefix it with an underscore: `_ids`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:959:21: warning: unused variable: `stripped`: help: if this is intentional, prefix it with an underscore: `_stripped`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:1425:9: warning: unused variable: `index`: help: if this is intentional, prefix it with an underscore: `_index`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:3157:19: warning: unused variable: `s`: help: if this is intentional, prefix it with an underscore: `_s`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:8663:19: warning: unused variable: `s`: help: if this is intentional, prefix it with an underscore: `_s`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:8923:13: warning: unused variable: `stripped`: help: if this is intentional, prefix it with an underscore: `_stripped`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:13871:13: warning: unreachable pattern: no value can reach this
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:14476:13: warning: unused variable: `cond`: help: if this is intentional, prefix it with an underscore: `_cond`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:5853:17: warning: unused variable: `keymap`: help: try ignoring the field: `keymap: _`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:11078:9: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:12633:14: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:13247:13: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:17632:9: warning: unused variable: `dragged_slot`: help: if this is intentional, prefix it with an underscore: `_dragged_slot`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:23939:36: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:23959:36: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:24008:32: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:26388:13: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:28767:15: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:29482:5: warning: unused variable: `on_change`: help: if this is intentional, prefix it with an underscore: `_on_change`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:29485:5: warning: unused variable: `placeholder`: help: if this is intentional, prefix it with an underscore: `_placeholder`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:29833:9: warning: unreachable pattern: no value can reach this
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:31147:13: warning: unused variable: `key`: help: try ignoring the field: `key: _`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:31149:13: warning: unused variable: `is_final`: help: try ignoring the field: `is_final: _`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:31150:13: warning: unused variable: `on_change`: help: try ignoring the field: `on_change: _`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:31153:13: warning: unused variable: `placeholder`: help: try ignoring the field: `placeholder: _`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:32940:19: warning: unused variable: `tick_msg`: help: if this is intentional, prefix it with an underscore: `_tick_msg`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:32941:9: warning: unused variable: `interval`: help: if this is intentional, prefix it with an underscore: `_interval`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\table_resize.rs:207:17: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\session.rs:49:5: warning: type `TodoItem` is more private than the item `ui::session::AppState::todos`: field `ui::session::AppState::todos` is reachable at visibility `pub`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\session.rs:150:5: warning: type `DebugElementInfo` is more private than the item `ui::session::DevToolsState::debug_element_styles`: field `ui::session::DevToolsState::debug_element_styles` is reachable at visibility `pub`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\session.rs:155:5: warning: type `InspectorSubTab` is more private than the item `ui::session::DevToolsState::inspector_subtab`: field `ui::session::DevToolsState::inspector_subtab` is reachable at visibility `pub`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\session.rs:156:5: warning: type `InspectorSections` is more private than the item `ui::session::DevToolsState::inspector_sections`: field `ui::session::DevToolsState::inspector_sections` is reachable at visibility `pub`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\session.rs:158:5: warning: type `DevToolsTab` is more private than the item `ui::session::DevToolsState::devtools_tab`: field `ui::session::DevToolsState::devtools_tab` is reachable at visibility `pub`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\session.rs:165:5: warning: type `DebugTreeNode` is more private than the item `ui::session::DevToolsState::component_tree`: field `ui::session::DevToolsState::component_tree` is reachable at visibility `pub`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\session.rs:301:5: warning: type `ToastReq` is more private than the item `DesktopState::toasts`: field `DesktopState::toasts` is reachable at visibility `pub`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\session.rs:316:5: warning: type `NotificationEntry` is more private than the item `DesktopState::notifications`: field `DesktopState::notifications` is reachable at visibility `pub`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\sendinput.rs:89:1: warning: type `sendinput::Input` is more private than the item `unicode_inputs`: function `unicode_inputs` is reachable at visibility `pub`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\sendinput.rs:100:1: warning: type `sendinput::Input` is more private than the item `vk_inputs`: function `vk_inputs` is reachable at visibility `pub`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\sendinput.rs:106:1: warning: type `sendinput::Input` is more private than the item `sendinput::send`: function `sendinput::send` is reachable at visibility `pub`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:397:5: warning: type `PreviewCardUiState` is more private than the item `aura_view_builder::AuraViewBuilder::<'a>::with_preview_states`: method `aura_view_builder::AuraViewBuilder::<'a>::with_preview_states` is reachable at visibility `pub`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\terminal\mod.rs:354:19: warning: method `take_scroll_bind_suppress` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\terminal\iced\widget.rs:102:7: warning: constant `DEFAULT_FG` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\terminal\iced\widget.rs:162:15: warning: function `row_rebuilds_reset` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\terminal\iced\widget.rs:433:19: warning: associated function `view_y_to_offset` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\handler_codegen.rs:378:4: warning: function `rewrite_stmt` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\handler_codegen.rs:1953:4: warning: function `synthesize_handler_fn_from_decl` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\vm_bridge.rs:2856:8: warning: method `retain_heap_result` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\memo_deps.rs:1008:4: warning: function `skeleton_children` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\client_runtime.rs:112:7: warning: constant `INPUT_H` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\client_runtime.rs:113:7: warning: constant `INPUT_PAD` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\client_runtime.rs:148:16: warning: field `font_italic` is never read
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\client_runtime.rs:228:4: warning: function `handler_token` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\client_runtime.rs:243:4: warning: function `fstr_template_and_bindings` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\client_runtime.rs:281:4: warning: function `interpolate` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\client_runtime.rs:295:4: warning: function `format_value` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\client_runtime.rs:472:8: warning: static `PUMP_T0` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\client_runtime.rs:474:4: warning: function `t0` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\dual_mode.rs:28:7: warning: constant `CHILD_ENV` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\dual_mode.rs:30:7: warning: constant `CHILD_MARKER` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\dual_mode.rs:33:7: warning: constant `COUNTER_SRC` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\dual_mode.rs:36:8: warning: struct `SpawnCounterSource` is never constructed
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\dual_mode.rs:43:8: warning: associated items `new` and `count` are never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\dual_mode.rs:114:4: warning: function `pump_host` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\stage3.rs:6984:4: warning: function `git_status_porcelain` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\stage3.rs:7005:8: warning: struct `RestoreFiles` is never constructed
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\stage3.rs:7008:8: warning: method `run` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\native_dock\win32.rs:1852:4: warning: function `load_blue_test_icon` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\mcp_server.rs:3871:4: warning: function `parse_aura_id` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\mcp_server.rs:4019:4: warning: function `view_kind_str` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\mcp_server.rs:5012:8: warning: method `area` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:4215:8: warning: multiple associated items are never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:10650:35: warning: constant `LEADING_EMPTY` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:23612:4: warning: function `svg_attr_literal` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:27448:8: warning: function `vf_widget` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:27488:8: warning: function `vf_row` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:27495:8: warning: function `vf_rows` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:27499:8: warning: function `vf_node` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:27514:8: warning: function `vf_build` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:27520:8: warning: function `vf_kinds` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:27671:8: warning: function `sig_widget` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:27712:8: warning: function `inline_mirror` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:27720:8: warning: function `block_mirror` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:27734:8: warning: function `sig_view` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:27739:8: warning: function `sig_build` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:27746:8: warning: function `sig_counts` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:27870:8: warning: function `conv_widget` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:27915:8: warning: function `conv_menubar` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:27934:8: warning: function `conv_build` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\dynamic.rs:3300:4: warning: function `onkeydown_suffix` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:182:5: warning: variants `Handler` and `Swallow` are never constructed
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:1668:4: warning: function `table_cell_container` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:1687:4: warning: function `col_fixed_width` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:1693:4: warning: function `table_row_rule` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:3419:4: warning: function `build_floating_layer` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:3428:4: warning: function `build_floating_layer_capture` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:8458:4: warning: function `lucide_svg` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:8824:4: warning: function `parse_drag_points` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:10022:4: warning: function `widget_tick` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:12591:5: warning: field `id` is never read
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:17458:4: warning: function `load_desktop_positions` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:17552:4: warning: function `target_slot_default` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:41938:4: warning: function `ade_fg_dark` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:41946:4: warning: function `ade_fg_light` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\remote_frame_registry.rs:151:8: warning: static `TEST_NS_ALLOC` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\back_proxy.rs:1197:8: warning: method `has_subscribers` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\vm_bridge.rs:538:15: warning: for loop over a `&Option`. This is more readably written as an `if let` statement
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\stage3.rs:172:13: warning: structure field `PageFaultCount` should have a snake case name: help: convert the identifier to snake case: `page_fault_count`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\stage3.rs:173:13: warning: structure field `PeakWorkingSetSize` should have a snake case name: help: convert the identifier to snake case: `peak_working_set_size`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\stage3.rs:174:13: warning: structure field `WorkingSetSize` should have a snake case name: help: convert the identifier to snake case: `working_set_size`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\stage3.rs:175:13: warning: structure field `QuotaPeakPagedPoolUsage` should have a snake case name: help: convert the identifier to snake case: `quota_peak_paged_pool_usage`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\stage3.rs:176:13: warning: structure field `QuotaPagedPoolUsage` should have a snake case name: help: convert the identifier to snake case: `quota_paged_pool_usage`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\stage3.rs:177:13: warning: structure field `QuotaPeakNonPagedPoolUsage` should have a snake case name: help: convert the identifier to snake case: `quota_peak_non_paged_pool_usage`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\stage3.rs:178:13: warning: structure field `QuotaNonPagedPoolUsage` should have a snake case name: help: convert the identifier to snake case: `quota_non_paged_pool_usage`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\stage3.rs:179:13: warning: structure field `PagefileUsage` should have a snake case name: help: convert the identifier to snake case: `pagefile_usage`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\stage3.rs:180:13: warning: structure field `PeakPagefileUsage` should have a snake case name: help: convert the identifier to snake case: `peak_pagefile_usage`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\stage3.rs:181:13: warning: structure field `PrivateUsage` should have a snake case name: help: convert the identifier to snake case: `private_usage`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\win_ime.rs:327:9: warning: unused `BOOL` that must be used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\win_ime.rs:143:26: warning: unused `BOOL` that must be used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\win_ime.rs:170:29: warning: direct cast of function item into an integer
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:16138:5: warning: calls to `std::mem::drop` with a reference instead of an owned value does nothing
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\stage3.rs:158:9: warning: `K32GetProcessMemoryInfo` redeclared with a different signature: this signature doesn't match the previous declaration
+warning: `auto-ui-runtime` (lib) generated 215 warnings (run `cargo fix --lib -p auto-ui-runtime` to apply 78 suggestions)
+   Compiling auto-blog-back v0.1.0 (D:\autostack\auto-blog\rust-workspace\auto-blog-back)
+error[E0433]: cannot find `time` in `a2r_std`
+   --> auto-blog-back\src\drafts.rs:422:45
+    |
+422 |     let now: i64 = auto_lang_core::a2r_std::time::now_sec();
+    |                                             ^^^^ could not find `time` in `a2r_std`
+
+error[E0433]: cannot find `time` in `a2r_std`
+   --> auto-blog-back\src\drafts.rs:447:45
+    |
+447 |     let now: i64 = auto_lang_core::a2r_std::time::now_sec();
+    |                                             ^^^^ could not find `time` in `a2r_std`
+
+error[E0433]: cannot find `time` in `a2r_std`
+   --> auto-blog-back\src\drafts.rs:508:96
+    |
+508 |     let bak: String = format!("{}{}", format!("{}{}", path, ".bak-"), auto_lang_core::a2r_std::time::now_ms().to_string());
+    |                                                                                                ^^^^ could not find `time` in `a2r_std`
+
+error[E0433]: cannot find `time` in `a2r_std`
+   --> auto-blog-back\src\drafts.rs:683:53
+    |
+683 |             let now: i64 = auto_lang_core::a2r_std::time::now_sec();
+    |                                                     ^^^^ could not find `time` in `a2r_std`
+
+error[E0433]: cannot find `time` in `a2r_std`
+   --> auto-blog-back\src\drafts.rs:706:45
+    |
+706 |     let now: i64 = auto_lang_core::a2r_std::time::now_sec();
+    |                                             ^^^^ could not find `time` in `a2r_std`
+
+error[E0433]: cannot find `time` in `a2r_std`
+  --> auto-blog-back\src\works.rs:33:44
+   |
+33 |     let ms: i64 = auto_lang_core::a2r_std::time::now_ms();
+   |                                            ^^^^ could not find `time` in `a2r_std`
+
+error[E0433]: cannot find `time` in `a2r_std`
+  --> auto-blog-back\src\works.rs:42:45
+   |
+42 |     let now: i64 = auto_lang_core::a2r_std::time::now_sec();
+   |                                             ^^^^ could not find `time` in `a2r_std`
+
+warning: unused imports: `Query` and `State`
+ --> auto-blog-back\src\api.rs:2:21
+  |
+2 |     extract::{Path, State, Json, Query},
+  |                     ^^^^^        ^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unnecessary parentheses around assigned value
+  --> auto-blog-back\src\db.rs:29:18
+   |
+29 |     let n: i64 = (*NEXTTOKENID.lock().unwrap());
+   |                  ^                            ^
+   |
+   = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+   |
+29 -     let n: i64 = (*NEXTTOKENID.lock().unwrap());
+29 +     let n: i64 = *NEXTTOKENID.lock().unwrap();
+   |
+
+warning: unnecessary parentheses around assigned value
+  --> auto-blog-back\src\db.rs:86:19
+   |
+86 |     let id: i64 = (*NEXTUSERID.lock().unwrap());
+   |                   ^                           ^
+   |
+help: remove these parentheses
+   |
+86 -     let id: i64 = (*NEXTUSERID.lock().unwrap());
+86 +     let id: i64 = *NEXTUSERID.lock().unwrap();
+   |
+
+warning: unnecessary parentheses around assigned value
+   --> auto-blog-back\src\db.rs:194:19
+    |
+194 |     let id: i64 = (*NEXTCOMMENTID.lock().unwrap());
+    |                   ^                              ^
+    |
+help: remove these parentheses
+    |
+194 -     let id: i64 = (*NEXTCOMMENTID.lock().unwrap());
+194 +     let id: i64 = *NEXTCOMMENTID.lock().unwrap();
+    |
+
+warning: unnecessary parentheses around assigned value
+   --> auto-blog-back\src\drafts.rs:362:18
+    |
+362 |     let n: i64 = (s.len() as i64);
+    |                  ^              ^
+    |
+help: remove these parentheses
+    |
+362 -     let n: i64 = (s.len() as i64);
+362 +     let n: i64 = s.len() as i64;
+    |
+
+warning: unnecessary parentheses around assigned value
+   --> auto-blog-back\src\drafts.rs:387:18
+    |
+387 |     let n: i64 = (ids.len() as i64);
+    |                  ^                ^
+    |
+help: remove these parentheses
+    |
+387 -     let n: i64 = (ids.len() as i64);
+387 +     let n: i64 = ids.len() as i64;
+    |
+
+warning: unnecessary parentheses around assigned value
+   --> auto-blog-back\src\drafts.rs:461:18
+    |
+461 |     let n: i64 = (ids.len() as i64);
+    |                  ^                ^
+    |
+help: remove these parentheses
+    |
+461 -     let n: i64 = (ids.len() as i64);
+461 +     let n: i64 = ids.len() as i64;
+    |
+
+warning: unnecessary parentheses around assigned value
+   --> auto-blog-back\src\drafts.rs:550:22
+    |
+550 |         let n: i64 = (obj.len() as i64);
+    |                      ^                ^
+    |
+help: remove these parentheses
+    |
+550 -         let n: i64 = (obj.len() as i64);
+550 +         let n: i64 = obj.len() as i64;
+    |
+
+warning: unnecessary parentheses around assigned value
+   --> auto-blog-back\src\drafts.rs:636:26
+    |
+636 |             let m: i64 = (rest.len() as i64);
+    |                          ^                 ^
+    |
+help: remove these parentheses
+    |
+636 -             let m: i64 = (rest.len() as i64);
+636 +             let m: i64 = rest.len() as i64;
+    |
+
+warning: unnecessary parentheses around assigned value
+   --> auto-blog-back\src\drafts.rs:731:18
+    |
+731 |     let n: i64 = (s.len() as i64);
+    |                  ^              ^
+    |
+help: remove these parentheses
+    |
+731 -     let n: i64 = (s.len() as i64);
+731 +     let n: i64 = s.len() as i64;
+    |
+
+warning: unnecessary parentheses around assigned value
+   --> auto-blog-back\src\drafts.rs:742:18
+    |
+742 |     let n: i64 = (s.len() as i64);
+    |                  ^              ^
+    |
+help: remove these parentheses
+    |
+742 -     let n: i64 = (s.len() as i64);
+742 +     let n: i64 = s.len() as i64;
+    |
+
+warning: unnecessary parentheses around assigned value
+   --> auto-blog-back\src\drafts.rs:762:18
+    |
+762 |     let n: i64 = (s.len() as i64);
+    |                  ^              ^
+    |
+help: remove these parentheses
+    |
+762 -     let n: i64 = (s.len() as i64);
+762 +     let n: i64 = s.len() as i64;
+    |
+
+warning: unnecessary parentheses around assigned value
+   --> auto-blog-back\src\drafts.rs:777:18
+    |
+777 |     let n: i64 = (s.len() as i64);
+    |                  ^              ^
+    |
+help: remove these parentheses
+    |
+777 -     let n: i64 = (s.len() as i64);
+777 +     let n: i64 = s.len() as i64;
+    |
+
+warning: unnecessary parentheses around assigned value
+   --> auto-blog-back\src\drafts.rs:811:18
+    |
+811 |     let n: i64 = (s.len() as i64);
+    |                  ^              ^
+    |
+help: remove these parentheses
+    |
+811 -     let n: i64 = (s.len() as i64);
+811 +     let n: i64 = s.len() as i64;
+    |
+
+warning: unnecessary parentheses around assigned value
+   --> auto-blog-back\src\drafts.rs:876:18
+    |
+876 |     let n: i64 = (s.len() as i64);
+    |                  ^              ^
+    |
+help: remove these parentheses
+    |
+876 -     let n: i64 = (s.len() as i64);
+876 +     let n: i64 = s.len() as i64;
+    |
+
+warning: unnecessary parentheses around assigned value
+    --> auto-blog-back\src\drafts.rs:1066:18
+     |
+1066 |     let n: i64 = (obj.len() as i64);
+     |                  ^                ^
+     |
+help: remove these parentheses
+     |
+1066 -     let n: i64 = (obj.len() as i64);
+1066 +     let n: i64 = obj.len() as i64;
+     |
+
+warning: unnecessary parentheses around assigned value
+    --> auto-blog-back\src\drafts.rs:1106:18
+     |
+1106 |     let n: i64 = (s.len() as i64);
+     |                  ^              ^
+     |
+help: remove these parentheses
+     |
+1106 -     let n: i64 = (s.len() as i64);
+1106 +     let n: i64 = s.len() as i64;
+     |
+
+warning: unnecessary parentheses around assigned value
+    --> auto-blog-back\src\drafts.rs:1160:18
+     |
+1160 |     let n: i64 = (s.len() as i64);
+     |                  ^              ^
+     |
+help: remove these parentheses
+     |
+1160 -     let n: i64 = (s.len() as i64);
+1160 +     let n: i64 = s.len() as i64;
+     |
+
+warning: unnecessary parentheses around assigned value
+  --> auto-blog-back\src\works.rs:31:18
+   |
+31 |     let n: i64 = (*NEXT_WORK_SEQ.lock().unwrap());
+   |                  ^                              ^
+   |
+help: remove these parentheses
+   |
+31 -     let n: i64 = (*NEXT_WORK_SEQ.lock().unwrap());
+31 +     let n: i64 = *NEXT_WORK_SEQ.lock().unwrap();
+   |
+
+warning: unnecessary parentheses around assigned value
+   --> auto-blog-back\src\works.rs:159:18
+    |
+159 |     let n: i64 = (s.len() as i64);
+    |                  ^              ^
+    |
+help: remove these parentheses
+    |
+159 -     let n: i64 = (s.len() as i64);
+159 +     let n: i64 = s.len() as i64;
+    |
+
+warning: unnecessary parentheses around assigned value
+   --> auto-blog-back\src\works.rs:250:18
+    |
+250 |     let n: i64 = (src.len() as i64);
+    |                  ^                ^
+    |
+help: remove these parentheses
+    |
+250 -     let n: i64 = (src.len() as i64);
+250 +     let n: i64 = src.len() as i64;
+    |
+
+warning: unnecessary parentheses around assigned value
+   --> auto-blog-back\src\works.rs:301:18
+    |
+301 |     let n: i64 = (src.len() as i64);
+    |                  ^                ^
+    |
+help: remove these parentheses
+    |
+301 -     let n: i64 = (src.len() as i64);
+301 +     let n: i64 = src.len() as i64;
+    |
+
+warning: unnecessary parentheses around assigned value
+   --> auto-blog-back\src\works.rs:383:19
+    |
+383 |     let al: i64 = (a.len() as i64);
+    |                   ^              ^
+    |
+help: remove these parentheses
+    |
+383 -     let al: i64 = (a.len() as i64);
+383 +     let al: i64 = a.len() as i64;
+    |
+
+error[E0308]: mismatched types
+   --> auto-blog-back\src\db.rs:291:12
+    |
+290 | pub fn create_draft(title: &str, body: &str) -> Work {
+    |                                                 ---- expected `types::Work` because of return type
+291 |     return drafts::create_draft(title, body);
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `types::Work`, found `works::Work`
+    |
+    = note: `works::Work` and `types::Work` have similar names, but are actually distinct types
+note: `works::Work` is defined in module `crate::works` of the current crate
+   --> auto-blog-back\src\works.rs:11:1
+    |
+ 11 | pub struct Work {
+    | ^^^^^^^^^^^^^^^
+note: `types::Work` is defined in module `crate::types` of the current crate
+   --> auto-blog-back\src\types.rs:48:1
+    |
+ 48 | pub struct Work {
+    | ^^^^^^^^^^^^^^^
+
+error[E0308]: mismatched types
+   --> auto-blog-back\src\db.rs:295:12
+    |
+294 | pub fn list_drafts() -> Vec<Work> {
+    |                         --------- expected `Vec<types::Work>` because of return type
+295 |     return drafts::list_drafts();
+    |            ^^^^^^^^^^^^^^^^^^^^^ expected `types::Work`, found `works::Work`
+    |
+    = note: `works::Work` and `types::Work` have similar names, but are actually distinct types
+note: `works::Work` is defined in module `crate::works` of the current crate
+   --> auto-blog-back\src\works.rs:11:1
+    |
+ 11 | pub struct Work {
+    | ^^^^^^^^^^^^^^^
+note: `types::Work` is defined in module `crate::types` of the current crate
+   --> auto-blog-back\src\types.rs:48:1
+    |
+ 48 | pub struct Work {
+    | ^^^^^^^^^^^^^^^
+
+error[E0308]: mismatched types
+   --> auto-blog-back\src\db.rs:299:12
+    |
+298 | pub fn open_draft(work_id: &str) -> Work {
+    |                                     ---- expected `types::Work` because of return type
+299 |     return drafts::open_draft(work_id);
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `types::Work`, found `works::Work`
+    |
+    = note: `works::Work` and `types::Work` have similar names, but are actually distinct types
+note: `works::Work` is defined in module `crate::works` of the current crate
+   --> auto-blog-back\src\works.rs:11:1
+    |
+ 11 | pub struct Work {
+    | ^^^^^^^^^^^^^^^
+note: `types::Work` is defined in module `crate::types` of the current crate
+   --> auto-blog-back\src\types.rs:48:1
+    |
+ 48 | pub struct Work {
+    | ^^^^^^^^^^^^^^^
+
+error[E0308]: mismatched types
+   --> auto-blog-back\src\db.rs:303:12
+    |
+302 | pub fn save_draft(work_id: &str, title: &str, summary: &str, body: &str, tags: &str, expected_rev: i64) -> SaveResult {
+    |                                                                                                            ---------- expected `types::SaveResult` because of return type
+303 |     return drafts::save_draft(work_id, title, summary, body, tags, expected_rev);
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `types::SaveResult`, found `drafts::SaveResult`
+    |
+    = note: `drafts::SaveResult` and `types::SaveResult` have similar names, but are actually distinct types
+note: `drafts::SaveResult` is defined in module `crate::drafts` of the current crate
+   --> auto-blog-back\src\drafts.rs:11:1
+    |
+ 11 | pub struct SaveResult {
+    | ^^^^^^^^^^^^^^^^^^^^^
+note: `types::SaveResult` is defined in module `crate::types` of the current crate
+   --> auto-blog-back\src\types.rs:66:1
+    |
+ 66 | pub struct SaveResult {
+    | ^^^^^^^^^^^^^^^^^^^^^
+
+error[E0308]: mismatched types
+   --> auto-blog-back\src\drafts.rs:26:26
+    |
+ 26 |         return join_path(auto_lang_core::a2r_std::env::get("HOME"), ".auto-blog/data");
+    |                --------- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `&str`, found `String`
+    |                |
+    |                arguments to this function are incorrect
+    |
+note: function defined here
+   --> auto-blog-back\src\works.rs:376:8
+    |
+376 | pub fn join_path(a: &str, b: &str) -> String {
+    |        ^^^^^^^^^ -------
+help: consider borrowing here
+    |
+ 26 |         return join_path(&auto_lang_core::a2r_std::env::get("HOME"), ".auto-blog/data");
+    |                          +
+
+error[E0308]: mismatched types
+   --> auto-blog-back\src\drafts.rs:100:18
+    |
+100 |     let v: i64 = auto_lang_core::a2r_std::fs::read_text(&p.as_str()).trim().to_string().parse::<i64>().ok();
+    |            ---   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `i64`, found `Option<i64>`
+    |            |
+    |            expected due to this
+    |
+    = note: expected type `i64`
+               found enum `std::option::Option<i64>`
+help: consider using `Option::expect` to unwrap the `std::option::Option<i64>` value, panicking if the value is an `Option::None`
+    |
+100 |     let v: i64 = auto_lang_core::a2r_std::fs::read_text(&p.as_str()).trim().to_string().parse::<i64>().ok().expect("REASON");
+    |                                                                                                            +++++++++++++++++
+
+error[E0599]: no method named `as_str` found for type `i64` in the current scope
+   --> auto-blog-back\src\drafts.rs:109:62
+    |
+109 |         write_confirmed(hw_path(root, work_id).as_str(), rev.as_str());
+    |                                                              ^^^^^^
+    |
+help: there is a method `as_` with a similar name
+    |
+109 -         write_confirmed(hw_path(root, work_id).as_str(), rev.as_str());
+109 +         write_confirmed(hw_path(root, work_id).as_str(), rev.as_());
+    |
+
+error[E0308]: mismatched types
+   --> auto-blog-back\src\drafts.rs:155:18
+    |
+155 |     let v: i64 = t.parse::<i64>().ok();
+    |            ---   ^^^^^^^^^^^^^^^^^^^^^ expected `i64`, found `Option<i64>`
+    |            |
+    |            expected due to this
+    |
+    = note: expected type `i64`
+               found enum `std::option::Option<i64>`
+help: consider using `Option::expect` to unwrap the `std::option::Option<i64>` value, panicking if the value is an `Option::None`
+    |
+155 |     let v: i64 = t.parse::<i64>().ok().expect("REASON");
+    |                                       +++++++++++++++++
+
+error[E0308]: mismatched types
+   --> auto-blog-back\src\drafts.rs:241:39
+    |
+241 |     if !(write_confirmed(rb.as_str(), w.body)) {
+    |          ---------------              ^^^^^^ expected `&str`, found `String`
+    |          |
+    |          arguments to this function are incorrect
+    |
+note: function defined here
+   --> auto-blog-back\src\drafts.rs:76:4
+    |
+ 76 | fn write_confirmed(path: &str, content: &str) -> bool {
+    |    ^^^^^^^^^^^^^^^             -------------
+help: consider borrowing here
+    |
+241 |     if !(write_confirmed(rb.as_str(), &w.body)) {
+    |                                       +
+
+error[E0599]: no method named `as_str` found for type `i64` in the current scope
+   --> auto-blog-back\src\drafts.rs:249:90
+    |
+249 |     if !(write_confirmed(current_ptr_path(root, w.work_id.as_str()).as_str(), w.revision.as_str())) {
+    |                                                                                          ^^^^^^
+    |
+help: there is a method `as_` with a similar name
+    |
+249 -     if !(write_confirmed(current_ptr_path(root, w.work_id.as_str()).as_str(), w.revision.as_str())) {
+249 +     if !(write_confirmed(current_ptr_path(root, w.work_id.as_str()).as_str(), w.revision.as_())) {
+    |
+
+error[E0308]: mismatched types
+   --> auto-blog-back\src\drafts.rs:253:67
+    |
+253 |     write_confirmed(body_path(root, w.work_id.as_str()).as_str(), w.body);
+    |     --------------- arguments to this function are incorrect      ^^^^^^ expected `&str`, found `String`
+    |
+note: function defined here
+   --> auto-blog-back\src\drafts.rs:76:4
+    |
+ 76 | fn write_confirmed(path: &str, content: &str) -> bool {
+    |    ^^^^^^^^^^^^^^^             -------------
+help: consider borrowing here
+    |
+253 |     write_confirmed(body_path(root, w.work_id.as_str()).as_str(), &w.body);
+    |                                                                   +
+
+error[E0061]: this function takes 3 arguments but 2 arguments were supplied
+   --> auto-blog-back\src\drafts.rs:407:12
+    |
+407 |     return auto_lang_core::a2r_std::str_find(ids, format!("{}{}", work_id, "\n").as_str()) >= 0;
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^---------------------------------------------- argument #3 of type `i32` is missing
+    |
+note: function defined here
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\a2r_std.rs:522:8
+    |
+522 | pub fn str_find<S: AsRef<str>>(s: S, needle: &str, start: i32) -> i32 {
+    |        ^^^^^^^^
+help: provide the argument
+    |
+407 |     return auto_lang_core::a2r_std::str_find(ids, format!("{}{}", work_id, "\n").as_str(), /* i32 */) >= 0;
+    |                                                                                          +++++++++++
+
+error[E0308]: mismatched types
+   --> auto-blog-back\src\drafts.rs:448:77
+    |
+448 |     let next: Work = make_work(work_id, p_title, p_summary, p_body, p_tags, cur.status, next_rev, cur.created_at, now);
+    |                      --------- arguments to this function are incorrect     ^^^^^^^^^^ expected `&str`, found `String`
+    |
+note: function defined here
+   --> auto-blog-back\src\works.rs:37:8
+    |
+ 37 | pub fn make_work(work_id: &str, p_title: &str, p_summary: &str, p_body: &str, p_tags: &str, p_status: &str, p_rev: i64, p_created: ...
+    |        ^^^^^^^^^                                                                            --------------
+help: consider borrowing here
+    |
+448 |     let next: Work = make_work(work_id, p_title, p_summary, p_body, p_tags, &cur.status, next_rev, cur.created_at, now);
+    |                                                                             +
+
+error[E0308]: mismatched types
+   --> auto-blog-back\src\drafts.rs:518:41
+    |
+518 |     return json_field_str(map.as_str(), json_escape(slug));
+    |            --------------               ^^^^^^^^^^^^^^^^^ expected `&str`, found `String`
+    |            |
+    |            arguments to this function are incorrect
+    |
+note: function defined here
+   --> auto-blog-back\src\works.rs:242:8
+    |
+242 | pub fn json_field_str(src: &str, key: &str) -> String {
+    |        ^^^^^^^^^^^^^^            ---------
+help: consider borrowing here
+    |
+518 |     return json_field_str(map.as_str(), &json_escape(slug));
+    |                                         +
+
+error[E0061]: this function takes 3 arguments but 2 arguments were supplied
+   --> auto-blog-back\src\drafts.rs:547:20
+    |
+547 |     let hit: i64 = auto_lang_core::a2r_std::str_find(obj, marker.as_str());
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^---------------------- argument #3 of type `i32` is missing
+    |
+note: function defined here
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\a2r_std.rs:522:8
+    |
+522 | pub fn str_find<S: AsRef<str>>(s: S, needle: &str, start: i32) -> i32 {
+    |        ^^^^^^^^
+help: provide the argument
+    |
+547 |     let hit: i64 = auto_lang_core::a2r_std::str_find(obj, marker.as_str(), /* i32 */);
+    |                                                                          +++++++++++
+
+error[E0308]: mismatched types
+   --> auto-blog-back\src\drafts.rs:547:20
+    |
+547 |     let hit: i64 = auto_lang_core::a2r_std::str_find(obj, marker.as_str());
+    |              ---   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `i64`, found `i32`
+    |              |
+    |              expected due to this
+    |
+help: you can convert an `i32` to an `i64`
+    |
+547 |     let hit: i64 = auto_lang_core::a2r_std::str_find(obj, marker.as_str()).into();
+    |                                                                           +++++++
+
+error[E0308]: mismatched types
+   --> auto-blog-back\src\drafts.rs:565:93
+    |
+565 | ...kip((0) as usize).collect::<String>() + json_escape(val) + obj.chars().take((n) as usize).skip((j) as usize).collect::<String>();
+    |                                            ^^^^^^^^^^^^^^^^ expected `&str`, found `String`
+    |
+help: consider borrowing here
+    |
+565 |         return obj.chars().take((vstart) as usize).skip((0) as usize).collect::<String>() + &json_escape(val) + obj.chars().take((n) as usize).skip((j) as usize).collect::<String>();
+    |                                                                                             +
+
+error[E0308]: mismatched types
+   --> auto-blog-back\src\drafts.rs:565:112
+    |
+565 | ...scape(val) + obj.chars().take((n) as usize).skip((j) as usize).collect::<String>();
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `&str`, found `String`
+    |
+help: consider borrowing here
+    |
+565 |         return obj.chars().take((vstart) as usize).skip((0) as usize).collect::<String>() + json_escape(val) + &obj.chars().take((n) as usize).skip((j) as usize).collect::<String>();
+    |                                                                                                                +
+
+error[E0061]: this function takes 3 arguments but 2 arguments were supplied
+   --> auto-blog-back\src\drafts.rs:606:8
+    |
+606 |     if auto_lang_core::a2r_std::str_find(src.as_str(), "::") >= 0 || auto_lang_core::a2r_std::str_find(slug, "::") >= 0 {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^-------------------- argument #3 of type `i32` is missing
+    |
+note: function defined here
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\a2r_std.rs:522:8
+    |
+522 | pub fn str_find<S: AsRef<str>>(s: S, needle: &str, start: i32) -> i32 {
+    |        ^^^^^^^^
+help: provide the argument
+    |
+606 |     if auto_lang_core::a2r_std::str_find(src.as_str(), "::", /* i32 */) >= 0 || auto_lang_core::a2r_std::str_find(slug, "::") >= 0 {
+    |                                                            +++++++++++
+
+error[E0061]: this function takes 3 arguments but 2 arguments were supplied
+   --> auto-blog-back\src\drafts.rs:606:70
+    |
+606 |     if auto_lang_core::a2r_std::str_find(src.as_str(), "::") >= 0 || auto_lang_core::a2r_std::str_find(slug, "::") >= 0 {
+    |                                                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^------------ argument #3 of type `i32` is missing
+    |
+note: function defined here
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\a2r_std.rs:522:8
+    |
+522 | pub fn str_find<S: AsRef<str>>(s: S, needle: &str, start: i32) -> i32 {
+    |        ^^^^^^^^
+help: provide the argument
+    |
+606 |     if auto_lang_core::a2r_std::str_find(src.as_str(), "::") >= 0 || auto_lang_core::a2r_std::str_find(slug, "::", /* i32 */) >= 0 {
+    |                                                                                                                  +++++++++++
+
+error[E0061]: this function takes 3 arguments but 2 arguments were supplied
+   --> auto-blog-back\src\drafts.rs:631:24
+    |
+631 |         let hit: i64 = auto_lang_core::a2r_std::str_find(rest.as_str(), needle.as_str());
+    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^-------------------------------- argument #3 of type `i32` is missing
+    |
+note: function defined here
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\a2r_std.rs:522:8
+    |
+522 | pub fn str_find<S: AsRef<str>>(s: S, needle: &str, start: i32) -> i32 {
+    |        ^^^^^^^^
+help: provide the argument
+    |
+631 |         let hit: i64 = auto_lang_core::a2r_std::str_find(rest.as_str(), needle.as_str(), /* i32 */);
+    |                                                                                        +++++++++++
+
+error[E0308]: mismatched types
+   --> auto-blog-back\src\drafts.rs:631:24
+    |
+631 |         let hit: i64 = auto_lang_core::a2r_std::str_find(rest.as_str(), needle.as_str());
+    |                  ---   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `i64`, found `i32`
+    |                  |
+    |                  expected due to this
+    |
+help: you can convert an `i32` to an `i64`
+    |
+631 |         let hit: i64 = auto_lang_core::a2r_std::str_find(rest.as_str(), needle.as_str()).into();
+    |                                                                                         +++++++
+
+error[E0308]: mismatched types
+   --> auto-blog-back\src\drafts.rs:666:62
+    |
+666 |     let mut existing: String = json_field_str(smap.as_str(), json_escape(mkey.as_str()));
+    |                                --------------                ^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `&str`, found `String`
+    |                                |
+    |                                arguments to this function are incorrect
+    |
+note: function defined here
+   --> auto-blog-back\src\works.rs:242:8
+    |
+242 | pub fn json_field_str(src: &str, key: &str) -> String {
+    |        ^^^^^^^^^^^^^^            ---------
+help: consider borrowing here
+    |
+666 |     let mut existing: String = json_field_str(smap.as_str(), &json_escape(mkey.as_str()));
+    |                                                              +
+
+error[E0308]: mismatched types
+   --> auto-blog-back\src\drafts.rs:670:50
+    |
+670 |         existing = json_field_str(smap.as_str(), json_escape(oldkey.as_str()));
+    |                    --------------                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `&str`, found `String`
+    |                    |
+    |                    arguments to this function are incorrect
+    |
+note: function defined here
+   --> auto-blog-back\src\works.rs:242:8
+    |
+242 | pub fn json_field_str(src: &str, key: &str) -> String {
+    |        ^^^^^^^^^^^^^^            ---------
+help: consider borrowing here
+    |
+670 |         existing = json_field_str(smap.as_str(), &json_escape(oldkey.as_str()));
+    |                                                  +
+
+error[E0308]: mismatched types
+   --> auto-blog-back\src\drafts.rs:678:42
+    |
+678 |         if json_field_str(lmap.as_str(), json_escape(slug)) != existing {
+    |            --------------                ^^^^^^^^^^^^^^^^^ expected `&str`, found `String`
+    |            |
+    |            arguments to this function are incorrect
+    |
+note: function defined here
+   --> auto-blog-back\src\works.rs:242:8
+    |
+242 | pub fn json_field_str(src: &str, key: &str) -> String {
+    |        ^^^^^^^^^^^^^^            ---------
+help: consider borrowing here
+    |
+678 |         if json_field_str(lmap.as_str(), &json_escape(slug)) != existing {
+    |                                          +
+
+error[E0308]: mismatched types
+   --> auto-blog-back\src\drafts.rs:690:64
+    |
+690 |     let mut work_id: String = json_field_str(pending.as_str(), json_escape(mkey.as_str()));
+    |                               --------------                   ^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `&str`, found `String`
+    |                               |
+    |                               arguments to this function are incorrect
+    |
+note: function defined here
+   --> auto-blog-back\src\works.rs:242:8
+    |
+242 | pub fn json_field_str(src: &str, key: &str) -> String {
+    |        ^^^^^^^^^^^^^^            ---------
+help: consider borrowing here
+    |
+690 |     let mut work_id: String = json_field_str(pending.as_str(), &json_escape(mkey.as_str()));
+    |                                                                +
+
+error[E0308]: mismatched types
+   --> auto-blog-back\src\drafts.rs:696:64
+    |
+696 |         let legacy_id: String = json_field_str(lmap0.as_str(), json_escape(slug));
+    |                                 --------------                 ^^^^^^^^^^^^^^^^^ expected `&str`, found `String`
+    |                                 |
+    |                                 arguments to this function are incorrect
+    |
+note: function defined here
+   --> auto-blog-back\src\works.rs:242:8
+    |
+242 | pub fn json_field_str(src: &str, key: &str) -> String {
+    |        ^^^^^^^^^^^^^^            ---------
+help: consider borrowing here
+    |
+696 |         let legacy_id: String = json_field_str(lmap0.as_str(), &json_escape(slug));
+    |                                                                +
+
+error[E0308]: mismatched types
+   --> auto-blog-back\src\drafts.rs:722:38
+    |
+722 |     if json_field_str(lmap.as_str(), json_escape(slug)) != work_id {
+    |        --------------                ^^^^^^^^^^^^^^^^^ expected `&str`, found `String`
+    |        |
+    |        arguments to this function are incorrect
+    |
+note: function defined here
+   --> auto-blog-back\src\works.rs:242:8
+    |
+242 | pub fn json_field_str(src: &str, key: &str) -> String {
+    |        ^^^^^^^^^^^^^^            ---------
+help: consider borrowing here
+    |
+722 |     if json_field_str(lmap.as_str(), &json_escape(slug)) != work_id {
+    |                                      +
+
+error[E0308]: mismatched types
+   --> auto-blog-back\src\drafts.rs:794:53
+    |
+794 | ...   if hex_val(s.chars().take((j + 3) as usize).skip((j + 2) as usize).collect::<String>()) < 0 || hex_val(s.chars().take((j + 4)...
+    |          ------- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `&str`, found `String`
+    |          |
+    |          arguments to this function are incorrect
+    |
+note: function defined here
+   --> auto-blog-back\src\works.rs:55:8
+    |
+ 55 | pub fn hex_val(c: &str) -> i64 {
+    |        ^^^^^^^ -------
+help: consider borrowing here
+    |
+794 |                     }                    if hex_val(&s.chars().take((j + 3) as usize).skip((j + 2) as usize).collect::<String>()) < 0 || hex_val(s.chars().take((j + 4) as usize).skip((j + 3) as usize).collect::<String>()) < 0 || hex_val(s.chars().take((j + 5) as usize).skip((j + 4) as usize).collect::<String>()) < 0 || hex_val(s.chars().take((j + 6) as usize).skip((j + 5) as usize).collect::<String>()) < 0 {
+    |                                                     +
+
+error[E0308]: mismatched types
+   --> auto-blog-back\src\drafts.rs:794:145
+    |
+794 | ... 0 || hex_val(s.chars().take((j + 4) as usize).skip((j + 3) as usize).collect::<String>()) < 0 || hex_val(s.chars().take((j + 5)...
+    |          ------- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `&str`, found `String`
+    |          |
+    |          arguments to this function are incorrect
+    |
+note: function defined here
+   --> auto-blog-back\src\works.rs:55:8
+    |
+ 55 | pub fn hex_val(c: &str) -> i64 {
+    |        ^^^^^^^ -------
+help: consider borrowing here
+    |
+794 |                     }                    if hex_val(s.chars().take((j + 3) as usize).skip((j + 2) as usize).collect::<String>()) < 0 || hex_val(&s.chars().take((j + 4) as usize).skip((j + 3) as usize).collect::<String>()) < 0 || hex_val(s.chars().take((j + 5) as usize).skip((j + 4) as usize).collect::<String>()) < 0 || hex_val(s.chars().take((j + 6) as usize).skip((j + 5) as usize).collect::<String>()) < 0 {
+    |                                                                                                                                                 +
+
+error[E0308]: mismatched types
+   --> auto-blog-back\src\drafts.rs:794:237
+    |
+794 | ... 0 || hex_val(s.chars().take((j + 5) as usize).skip((j + 4) as usize).collect::<String>()) < 0 || hex_val(s.chars().take((j + 6)...
+    |          ------- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `&str`, found `String`
+    |          |
+    |          arguments to this function are incorrect
+    |
+note: function defined here
+   --> auto-blog-back\src\works.rs:55:8
+    |
+ 55 | pub fn hex_val(c: &str) -> i64 {
+    |        ^^^^^^^ -------
+help: consider borrowing here
+    |
+794 |                     }                    if hex_val(s.chars().take((j + 3) as usize).skip((j + 2) as usize).collect::<String>()) < 0 || hex_val(s.chars().take((j + 4) as usize).skip((j + 3) as usize).collect::<String>()) < 0 || hex_val(&s.chars().take((j + 5) as usize).skip((j + 4) as usize).collect::<String>()) < 0 || hex_val(s.chars().take((j + 6) as usize).skip((j + 5) as usize).collect::<String>()) < 0 {
+    |                                                                                                                                                                                                                                             +
+
+error[E0308]: mismatched types
+   --> auto-blog-back\src\drafts.rs:794:329
+    |
+794 | ... 0 || hex_val(s.chars().take((j + 6) as usize).skip((j + 5) as usize).collect::<String>()) < 0 {
+    |          ------- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `&str`, found `String`
+    |          |
+    |          arguments to this function are incorrect
+    |
+note: function defined here
+   --> auto-blog-back\src\works.rs:55:8
+    |
+ 55 | pub fn hex_val(c: &str) -> i64 {
+    |        ^^^^^^^ -------
+help: consider borrowing here
+    |
+794 |                     }                    if hex_val(s.chars().take((j + 3) as usize).skip((j + 2) as usize).collect::<String>()) < 0 || hex_val(s.chars().take((j + 4) as usize).skip((j + 3) as usize).collect::<String>()) < 0 || hex_val(s.chars().take((j + 5) as usize).skip((j + 4) as usize).collect::<String>()) < 0 || hex_val(&s.chars().take((j + 6) as usize).skip((j + 5) as usize).collect::<String>()) < 0 {
+    |                                                                                                                                                                                                                                                                                                                                         +
+
+error[E0277]: can't compare `std::string::String` with `&str`
+   --> auto-blog-back\src\drafts.rs:819:14
+    |
+819 |         if c >= "0" && c <= "9" {
+    |              ^^ no implementation for `std::string::String < &str` and `std::string::String > &str`
+    |
+    = help: the trait `PartialOrd<&str>` is not implemented for `std::string::String`
+help: consider dereferencing both sides of the expression
+    |
+819 |         if *c >= *"0" && c <= "9" {
+    |            +     +
+
+error[E0277]: can't compare `std::string::String` with `&str`
+   --> auto-blog-back\src\drafts.rs:819:26
+    |
+819 |         if c >= "0" && c <= "9" {
+    |                          ^^ no implementation for `std::string::String < &str` and `std::string::String > &str`
+    |
+    = help: the trait `PartialOrd<&str>` is not implemented for `std::string::String`
+help: consider dereferencing both sides of the expression
+    |
+819 |         if c >= "0" && *c <= *"9" {
+    |                        +     +
+
+error[E0277]: can't compare `std::string::String` with `&str`
+   --> auto-blog-back\src\drafts.rs:835:18
+    |
+835 |             if c >= "0" && c <= "9" {
+    |                  ^^ no implementation for `std::string::String < &str` and `std::string::String > &str`
+    |
+    = help: the trait `PartialOrd<&str>` is not implemented for `std::string::String`
+help: consider dereferencing both sides of the expression
+    |
+835 |             if *c >= *"0" && c <= "9" {
+    |                +     +
+
+error[E0277]: can't compare `std::string::String` with `&str`
+   --> auto-blog-back\src\drafts.rs:835:30
+    |
+835 |             if c >= "0" && c <= "9" {
+    |                              ^^ no implementation for `std::string::String < &str` and `std::string::String > &str`
+    |
+    = help: the trait `PartialOrd<&str>` is not implemented for `std::string::String`
+help: consider dereferencing both sides of the expression
+    |
+835 |             if c >= "0" && *c <= *"9" {
+    |                            +     +
+
+error[E0277]: can't compare `std::string::String` with `&str`
+   --> auto-blog-back\src\drafts.rs:857:22
+    |
+857 |                 if c >= "0" && c <= "9" {
+    |                      ^^ no implementation for `std::string::String < &str` and `std::string::String > &str`
+    |
+    = help: the trait `PartialOrd<&str>` is not implemented for `std::string::String`
+help: consider dereferencing both sides of the expression
+    |
+857 |                 if *c >= *"0" && c <= "9" {
+    |                    +     +
+
+error[E0277]: can't compare `std::string::String` with `&str`
+   --> auto-blog-back\src\drafts.rs:857:34
+    |
+857 |                 if c >= "0" && c <= "9" {
+    |                                  ^^ no implementation for `std::string::String < &str` and `std::string::String > &str`
+    |
+    = help: the trait `PartialOrd<&str>` is not implemented for `std::string::String`
+help: consider dereferencing both sides of the expression
+    |
+857 |                 if c >= "0" && *c <= *"9" {
+    |                                +     +
+
+error[E0277]: can't compare `std::string::String` with `&str`
+   --> auto-blog-back\src\drafts.rs:925:34
+    |
+925 | ...                   if c >= "0" && c <= "9" || c == "-" {
+    |                            ^^ no implementation for `std::string::String < &str` and `std::string::String > &str`
+    |
+    = help: the trait `PartialOrd<&str>` is not implemented for `std::string::String`
+help: consider dereferencing both sides of the expression
+    |
+925 |                             if *c >= *"0" && c <= "9" || c == "-" {
+    |                                +     +
+
+error[E0277]: can't compare `std::string::String` with `&str`
+   --> auto-blog-back\src\drafts.rs:925:46
+    |
+925 | ...                   if c >= "0" && c <= "9" || c == "-" {
+    |                                        ^^ no implementation for `std::string::String < &str` and `std::string::String > &str`
+    |
+    = help: the trait `PartialOrd<&str>` is not implemented for `std::string::String`
+help: consider dereferencing both sides of the expression
+    |
+925 |                             if c >= "0" && *c <= *"9" || c == "-" {
+    |                                            +     +
+
+error[E0061]: this function takes 3 arguments but 2 arguments were supplied
+    --> auto-blog-back\src\drafts.rs:1061:22
+     |
+1061 |     let mut i: i64 = auto_lang_core::a2r_std::str_find(obj, key_tok.as_str());
+     |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^----------------------- argument #3 of type `i32` is missing
+     |
+note: function defined here
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\a2r_std.rs:522:8
+     |
+ 522 | pub fn str_find<S: AsRef<str>>(s: S, needle: &str, start: i32) -> i32 {
+     |        ^^^^^^^^
+help: provide the argument
+     |
+1061 |     let mut i: i64 = auto_lang_core::a2r_std::str_find(obj, key_tok.as_str(), /* i32 */);
+     |                                                                             +++++++++++
+
+error[E0308]: mismatched types
+    --> auto-blog-back\src\drafts.rs:1061:22
+     |
+1061 |     let mut i: i64 = auto_lang_core::a2r_std::str_find(obj, key_tok.as_str());
+     |                ---   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `i64`, found `i32`
+     |                |
+     |                expected due to this
+     |
+help: you can convert an `i32` to an `i64`
+     |
+1061 |     let mut i: i64 = auto_lang_core::a2r_std::str_find(obj, key_tok.as_str()).into();
+     |                                                                              +++++++
+
+error[E0308]: arguments to this function are incorrect
+    --> auto-blog-back\src\drafts.rs:1191:39
+     |
+1191 | ... = migrate_article(slug.as_str(), json_field_str(obj.as_str(), "title"), json_field_str(obj.as_str(), "description"), json_field_str(obj.as_str(), "body"), json_field_str(obj.as_str(), "tagList"), json_field_str(obj.as_str(), "author"));
+     |       ^^^^^^^^^^^^^^^                -------------------------------------  -------------------------------------------  ------------------------------------  ---------------------------------------  -------------------------------------- expected `&str`, found `String`
+     |                                      |                                      |                                            |                                     |
+     |                                      |                                      |                                            |                                     expected `&str`, found `String`
+     |                                      |                                      |                                            expected `&str`, found `String`
+     |                                      |                                      expected `&str`, found `String`
+     |                                      expected `&str`, found `String`
+     |
+note: function defined here
+    --> auto-blog-back\src\drafts.rs:658:8
+     |
+ 658 | pub fn migrate_article(slug: &str, p_title: &str, p_description: &str, p_body: &str, p_tagList: &str, p_author: &str) -> String {
+     |        ^^^^^^^^^^^^^^^             -------------  -------------------  ------------  ---------------  --------------
+help: consider borrowing here
+     |
+1191 |                     let wid: String = migrate_article(slug.as_str(), &json_field_str(obj.as_str(), "title"), json_field_str(obj.as_str(), "description"), json_field_str(obj.as_str(), "body"), json_field_str(obj.as_str(), "tagList"), json_field_str(obj.as_str(), "author"));
+     |                                                                      +
+help: consider borrowing here
+     |
+1191 |                     let wid: String = migrate_article(slug.as_str(), json_field_str(obj.as_str(), "title"), &json_field_str(obj.as_str(), "description"), json_field_str(obj.as_str(), "body"), json_field_str(obj.as_str(), "tagList"), json_field_str(obj.as_str(), "author"));
+     |                                                                                                             +
+help: consider borrowing here
+     |
+1191 |                     let wid: String = migrate_article(slug.as_str(), json_field_str(obj.as_str(), "title"), json_field_str(obj.as_str(), "description"), &json_field_str(obj.as_str(), "body"), json_field_str(obj.as_str(), "tagList"), json_field_str(obj.as_str(), "author"));
+     |                                                                                                                                                          +
+help: consider borrowing here
+     |
+1191 |                     let wid: String = migrate_article(slug.as_str(), json_field_str(obj.as_str(), "title"), json_field_str(obj.as_str(), "description"), json_field_str(obj.as_str(), "body"), &json_field_str(obj.as_str(), "tagList"), json_field_str(obj.as_str(), "author"));
+     |                                                                                                                                                                                                +
+help: consider borrowing here
+     |
+1191 |                     let wid: String = migrate_article(slug.as_str(), json_field_str(obj.as_str(), "title"), json_field_str(obj.as_str(), "description"), json_field_str(obj.as_str(), "body"), json_field_str(obj.as_str(), "tagList"), &json_field_str(obj.as_str(), "author"));
+     |                                                                                                                                                                                                                                         +
+
+error[E0061]: this function takes 3 arguments but 2 arguments were supplied
+   --> auto-blog-back\src\works.rs:162:23
+    |
+162 |         let bs: i64 = auto_lang_core::a2r_std::str_find(rest.as_str(), "\\");
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^--------------------- argument #3 of type `i32` is missing
+    |
+note: function defined here
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\a2r_std.rs:522:8
+    |
+522 | pub fn str_find<S: AsRef<str>>(s: S, needle: &str, start: i32) -> i32 {
+    |        ^^^^^^^^
+help: provide the argument
+    |
+162 |         let bs: i64 = auto_lang_core::a2r_std::str_find(rest.as_str(), "\\", /* i32 */);
+    |                                                                            +++++++++++
+
+error[E0308]: mismatched types
+   --> auto-blog-back\src\works.rs:162:23
+    |
+162 |         let bs: i64 = auto_lang_core::a2r_std::str_find(rest.as_str(), "\\");
+    |                 ---   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `i64`, found `i32`
+    |                 |
+    |                 expected due to this
+    |
+help: you can convert an `i32` to an `i64`
+    |
+162 |         let bs: i64 = auto_lang_core::a2r_std::str_find(rest.as_str(), "\\").into();
+    |                                                                             +++++++
+
+error[E0061]: this function takes 3 arguments but 2 arguments were supplied
+   --> auto-blog-back\src\works.rs:245:22
+    |
+245 |     let mut i: i64 = auto_lang_core::a2r_std::str_find(src, key_tok.as_str());
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^----------------------- argument #3 of type `i32` is missing
+    |
+note: function defined here
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\a2r_std.rs:522:8
+    |
+522 | pub fn str_find<S: AsRef<str>>(s: S, needle: &str, start: i32) -> i32 {
+    |        ^^^^^^^^
+help: provide the argument
+    |
+245 |     let mut i: i64 = auto_lang_core::a2r_std::str_find(src, key_tok.as_str(), /* i32 */);
+    |                                                                             +++++++++++
+
+error[E0308]: mismatched types
+   --> auto-blog-back\src\works.rs:245:22
+    |
+245 |     let mut i: i64 = auto_lang_core::a2r_std::str_find(src, key_tok.as_str());
+    |                ---   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `i64`, found `i32`
+    |                |
+    |                expected due to this
+    |
+help: you can convert an `i32` to an `i64`
+    |
+245 |     let mut i: i64 = auto_lang_core::a2r_std::str_find(src, key_tok.as_str()).into();
+    |                                                                              +++++++
+
+error[E0061]: this function takes 3 arguments but 2 arguments were supplied
+   --> auto-blog-back\src\works.rs:296:22
+    |
+296 |     let mut i: i64 = auto_lang_core::a2r_std::str_find(src, key_tok.as_str());
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^----------------------- argument #3 of type `i32` is missing
+    |
+note: function defined here
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\a2r_std.rs:522:8
+    |
+522 | pub fn str_find<S: AsRef<str>>(s: S, needle: &str, start: i32) -> i32 {
+    |        ^^^^^^^^
+help: provide the argument
+    |
+296 |     let mut i: i64 = auto_lang_core::a2r_std::str_find(src, key_tok.as_str(), /* i32 */);
+    |                                                                             +++++++++++
+
+error[E0308]: mismatched types
+   --> auto-blog-back\src\works.rs:296:22
+    |
+296 |     let mut i: i64 = auto_lang_core::a2r_std::str_find(src, key_tok.as_str());
+    |                ---   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `i64`, found `i32`
+    |                |
+    |                expected due to this
+    |
+help: you can convert an `i32` to an `i64`
+    |
+296 |     let mut i: i64 = auto_lang_core::a2r_std::str_find(src, key_tok.as_str()).into();
+    |                                                                              +++++++
+
+error[E0277]: can't compare `std::string::String` with `&str`
+   --> auto-blog-back\src\works.rs:330:14
+    |
+330 |         if c >= "0" && c <= "9" {
+    |              ^^ no implementation for `std::string::String < &str` and `std::string::String > &str`
+    |
+    = help: the trait `PartialOrd<&str>` is not implemented for `std::string::String`
+help: consider dereferencing both sides of the expression
+    |
+330 |         if *c >= *"0" && c <= "9" {
+    |            +     +
+
+error[E0277]: can't compare `std::string::String` with `&str`
+   --> auto-blog-back\src\works.rs:330:26
+    |
+330 |         if c >= "0" && c <= "9" {
+    |                          ^^ no implementation for `std::string::String < &str` and `std::string::String > &str`
+    |
+    = help: the trait `PartialOrd<&str>` is not implemented for `std::string::String`
+help: consider dereferencing both sides of the expression
+    |
+330 |         if c >= "0" && *c <= *"9" {
+    |                        +     +
+
+error[E0308]: mismatched types
+   --> auto-blog-back\src\works.rs:333:20
+    |
+294 | pub fn json_field_int(src: &str, key: &str) -> i64 {
+    |                                                --- expected `i64` because of return type
+...
+333 |             return src.chars().take((j) as usize).skip((start) as usize).collect::<String>().parse::<i64>().ok();
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `i64`, found `Option<i64>`
+    |
+    = note: expected type `i64`
+               found enum `std::option::Option<i64>`
+help: consider using `Option::expect` to unwrap the `std::option::Option<i64>` value, panicking if the value is an `Option::None`
+    |
+333 |             return src.chars().take((j) as usize).skip((start) as usize).collect::<String>().parse::<i64>().ok().expect("REASON");
+    |                                                                                                                 +++++++++++++++++
+
+warning: unused import: `auto_lang_core::a2r_std`
+ --> auto-blog-back\src\works.rs:6:5
+  |
+6 | use auto_lang_core::a2r_std::*;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `empty`
+  --> auto-blog-back\src\db.rs:57:9
+   |
+57 |     let empty: User = result.clone();
+   |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_empty`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+  --> auto-blog-back\src\db.rs:77:9
+   |
+77 |     let mut empty: User = User { id: 0, email: "".to_string(), username: "".to_string(), bio: "".to_string(), image: "".to_string(),...
+   |         ----^^^^^
+   |         |
+   |         help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> auto-blog-back\src\drafts.rs:116:32
+    |
+116 | fn ok_marker_valid(root: &str, mut work_id: &str, rev: i64) -> bool {
+    |                                ----^^^^^^^
+    |                                |
+    |                                help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> auto-blog-back\src\drafts.rs:211:33
+    |
+211 | fn self_heal_commit(root: &str, mut work_id: &str, rev: i64) {
+    |                                 ----^^^^^^^
+    |                                 |
+    |                                 help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> auto-blog-back\src\drafts.rs:329:33
+    |
+329 | fn write_work_files(root: &str, mut w: Work) -> bool {
+    |                                 ----^
+    |                                 |
+    |                                 help: remove this `mut`
+
+Some errors have detailed explanations: E0061, E0277, E0308, E0433, E0599.
+For more information about an error, try `rustc --explain E0061`.
+warning: `auto-blog-back` (bin "auto-blog-back") generated 29 warnings
+error: could not compile `auto-blog-back` (bin "auto-blog-back") due to 59 previous errors; 29 warnings emitted
+  [tool] run vm -> Failed
+[X9] main Err:   × API backend not ready within 120s (port 13217); aborting before UI init —
+  │ check backend build/run above
+
+Error:   × API backend not ready within 120s (port 13217); aborting before UI init —
+  │ check backend build/run above
+

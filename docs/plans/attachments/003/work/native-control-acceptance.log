@@ -1,0 +1,12 @@
+START first: D:\autostack\.wt\ui-003\auto-ui\target\debug\auto-ui003.exe run -r vm -B 13230 -F 13330 MCP=13130
+EXITED first: code=1; log=D:\autostack\auto-ui\docs\plans\attachments\003\work\native-control-first.log
+Traceback (most recent call last):
+  File "D:\autostack\.wt\ui-003\auto-ui\target\debug\native_control_acceptance.py", line 192, in <module>
+    main()
+    ~~~~^^
+  File "D:\autostack\.wt\ui-003\auto-ui\target\debug\native_control_acceptance.py", line 158, in main
+    proc1, c1, log1, path1, snap1 = start("first", mcp1, api1, front1)
+                                    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\autostack\.wt\ui-003\auto-ui\target\debug\native_control_acceptance.py", line 77, in start
+    raise RuntimeError(f"CLI exited before MCP ready ({proc.returncode})")
+RuntimeError: CLI exited before MCP ready (1)

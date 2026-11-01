@@ -1,0 +1,29 @@
+---------------------------
+AutoNexus / Auto CLI
+---------------------------
+Loading AmConfig from Some("C:\\Users\\zhaop\\.auto\\auto-man\\am.at")...
+AmConfig: AmConfig {
+  name: default
+  index: {
+    default: git@gitee.com:auto-stack/auto-index.git
+    boe: git@codeup.aliyun.com:soutek/boe/index.git
+    soutek: git@codeup.aliyun.com:soutek/auto-stack/auto-index.git
+  }
+}
+
+
+Loaded port: windows_ninja
+port NAME: windows_ninja
+all index: {"default": "git@gitee.com:auto-stack/auto-index.git", "boe": "git@codeup.aliyun.com:soutek/boe/index.git", "soutek": "git@codeup.aliyun.com:soutek/auto-stack/auto-index.git"}
+used index: ["default"]
+10:21:03 [INFO] loading index store from C:/Users/zhaop/.auto/auto-man/index/default
+setting port builder: windows_ninja ninja, at build
+10:21:03 [INFO] AutoCache initialized for project: realworld
+  → split mode: frontend vm ↔ backend rust over HTTP
+  Backend API server port: 17827 (from pac.at)
+  Frontend dev server port: 17826 (from pac.at)
+  VM window title: 博客 (from pac.at)
+10:21:03 [INFO] Running project ...
+
+------------ output ------------
+accepted request id=1 op=run_ui

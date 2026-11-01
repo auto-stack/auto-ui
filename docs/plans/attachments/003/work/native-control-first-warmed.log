@@ -1,0 +1,1970 @@
+---------------------------
+AutoNexus / Auto CLI
+---------------------------
+Loading AmConfig from Some("C:\\Users\\zhaop\\.auto\\auto-man\\am.at")...
+AmConfig: AmConfig {
+  name: default
+  index: {
+    default: git@gitee.com:auto-stack/auto-index.git
+    soutek: git@codeup.aliyun.com:soutek/auto-stack/auto-index.git
+    boe: git@codeup.aliyun.com:soutek/boe/index.git
+  }
+}
+
+
+Loaded port: windows_ninja
+port NAME: windows_ninja
+all index: {"default": "git@gitee.com:auto-stack/auto-index.git", "soutek": "git@codeup.aliyun.com:soutek/auto-stack/auto-index.git", "boe": "git@codeup.aliyun.com:soutek/boe/index.git"}
+used index: ["default"]
+12:05:55 [INFO] loading index store from C:/Users/zhaop/.auto/auto-man/index/default
+setting port builder: windows_ninja ninja, at build
+12:05:55 [INFO] AutoCache initialized for project: ui003-native-control
+  → split mode: frontend vm ↔ backend rust over HTTP
+  Backend API server port: 13230 (from cli)
+  Frontend dev server port: 13330 (from cli)
+  VM window title: 原生交互验收 (from pac.at)
+12:05:55 [INFO] Running project ...
+
+------------ output ------------
+accepted request id=1 op=run_ui
+  ✓ Generated Rust server: ui003-native-control-back/
+  ✓ Generated Rust server: ui003-native-control-back/
+
+▶ Starting API backend server (Rust axum)...
+  cargo run --manifest-path D:\autostack\.wt\ui-003\auto-ui\target\debug\ui003-native-control\rust-workspace\ui003-native-control-back\Cargo.toml
+  ✓ API server starting (PID: 22916)...
+  Waiting for API server to be ready...
+warning: linker stdout: 正在创建库 D:\autostack\.wt\ui-003\auto-ui\target\debug\deps\auto_macros-27b00fc264208065.dll.lib 和对象 D:\autostack\.wt\ui-003\auto-ui\target\debug\deps\auto_macros-27b00fc264208065.dll.exp
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `auto-macros` (lib) generated 1 warning
+warning: unused doc comment
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\lib.rs:130:1
+    |
+130 | /// extraction, taken by the wrapper on the same thread before join returns.
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ rustdoc does not generate documentation for macro invocations
+    |
+    = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+    = note: `#[warn(unused_doc_comments)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused doc comment
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\lib.rs:148:1
+    |
+148 | / /// Plan 346: Remap string pool indices in bytecode after merging string pools.
+149 | | /// Walks the bytecode one instruction at a time (using a per-opcode operand
+150 | | /// length table so operand bytes are never misread as opcodes) and remaps the
+151 | | /// u16 string-pool index operand of every string-indexed opcode.
+...   |
+186 | | ///
+187 | | /// **Plan 091**: Now uses CompileSession internally (no Universe dependency)
+    | |_----------------------------------------------------------------------------^
+    |   |
+    |   rustdoc does not generate documentation for macro invocations
+    |
+    = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+
+warning: unused import: `Sender`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\http_service_observability.rs:12:29
+   |
+12 | use std::sync::mpsc::{self, Sender, SyncSender, TrySendError};
+   |                             ^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `Args`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\trans\emit.rs:16:10
+   |
+16 |     Arg, Args, Body, Call, Code, Expr, Fn, For, If, Iter, Stmt, Store, StoreKind, Try, Use, UseKind,
+   |          ^^^^
+
+warning: unused imports: `emit_http_verb_call` and `expr_root_is_http_request`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\trans\rust.rs:4282:5
+     |
+4282 |     emit_http_verb_call, expr_root_is_builder_var, expr_root_is_http_request,
+     |     ^^^^^^^^^^^^^^^^^^^                            ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::fmt::Write`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\abt\mod.rs:81:13
+   |
+81 |         use std::fmt::Write;
+   |             ^^^^^^^^^^^^^^^
+
+warning: unused imports: `NATIVE_PRINT_F64` and `NATIVE_PRINT_U64`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\codegen.rs:24:5
+   |
+24 |     NATIVE_PRINT_F64, NATIVE_PRINT_I32, NATIVE_PRINT_STR, NATIVE_PRINT_U64, NATIVE_PRINT_UNIFIED,
+   |     ^^^^^^^^^^^^^^^^                                      ^^^^^^^^^^^^^^^^
+
+warning: unused doc comment
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine.rs:1410:5
+     |
+1410 | /     /// 累计一次忙等段(waits 次轮询,busy 时长)。
+1411 | |     /// PLAN-053 P-053-2: nil 家族判定 —— tag-null(encode_null，现行
+1412 | |     /// `None`/`null`/`nil` 字面量与 JSON null 的统一编码)或旧编码
+1413 | |     /// i32(-1)(历史 `null` 字面量/CREATE_NONE)或 i32(i32::MIN+1)
+...    |
+1418 | |     /// PLAN-026 T-03 配套: 宽整数值归一(i32/i64 tag → i64 按值;算术
+1419 | |     /// 兜底臂与序比较宽整臂共用)。
+     | |_____------------------------------^
+     |       |
+     |       rustdoc does not generate documentation for macro invocations
+     |
+     = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+
+warning: unused import: `crate::vm::ffi::VMConvertible`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine.rs:3132:9
+     |
+3132 |     use crate::vm::ffi::VMConvertible;
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::vm::task::AutoTask`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine.rs:3133:9
+     |
+3133 |     use crate::vm::task::AutoTask;
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unnecessary braces around method argument
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine\ops_collections.rs:1146:38
+     |
+1146 |                         obj.set(key, { self.decode_tagged_nv(value_nv) });
+     |                                      ^^                               ^^
+     |
+     = note: `#[warn(unused_braces)]` (part of `#[warn(unused)]`) on by default
+help: remove these braces
+     |
+1146 -                         obj.set(key, { self.decode_tagged_nv(value_nv) });
+1146 +                         obj.set(key, self.decode_tagged_nv(value_nv));
+     |
+
+warning: unnecessary braces around method argument
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine\ops_collections.rs:1193:49
+     |
+1193 | ...                   inst.set_field(idx, { self.decode_tagged_nv(value_nv) })
+     |                                           ^^                               ^^
+     |
+help: remove these braces
+     |
+1193 -                             inst.set_field(idx, { self.decode_tagged_nv(value_nv) })
+1193 +                             inst.set_field(idx, self.decode_tagged_nv(value_nv))
+     |
+
+warning: unused import: `std::sync::atomic::Ordering`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine\values.rs:87:13
+   |
+87 |         use std::sync::atomic::Ordering;
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `dashmap::DashMap`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\rc.rs:20:5
+   |
+20 | use dashmap::DashMap;
+   |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `AtomicU64`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\rc.rs:21:36
+   |
+21 | use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+   |                                    ^^^^^^^^^
+
+warning: unused import: `super::*`
+ --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\storage.rs:3:5
+  |
+3 | use super::*;
+  |     ^^^^^^^^
+
+warning: unused import: `super::*`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\math.rs:13:5
+   |
+13 | use super::*;
+   |     ^^^^^^^^
+
+warning: unused doc comment
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\strings_json.rs:888:1
+    |
+888 | /// 原始（inventory rust_fn）shim 的暂存表：wrapper 规整首参后委托原实现。
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ rustdoc does not generate documentation for macro invocations
+    |
+    = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+
+warning: unused doc comment
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\dep_methods.rs:2376:1
+     |
+2376 | / /// 同步调用期有效的回调帧(裸指针仅在 marshaller 调用窗口内解引用;
+2377 | | /// 单线程原型,深度 1)。Option 空即"不在回调窗口"。
+     | |_--------------------------------------------------^
+     |   |
+     |   rustdoc does not generate documentation for macro invocations
+     |
+     = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+
+warning: unused doc comment
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_server.rs:3666:1
+     |
+3666 | /// PLAN-730 T-07：legacy 落盘结果表（op_id → Option<Result>；None=Pending）。
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ rustdoc does not generate documentation for macro invocations
+     |
+     = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+
+warning: unused doc comment
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_server\server_scope.rs:141:5
+    |
+141 |       /// 释放未消费 body 能力 + 移除闲置收据）。
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+142 | /     let uploads: Vec<u64> = scope
+143 | |         .upload_resources
+144 | |         .lock()
+145 | |         .map(|mut r| std::mem::take(&mut *r))
+146 | |         .unwrap_or_default();
+    | |_____________________________- rustdoc does not generate documentation for statements
+    |
+    = help: use `//` for a plain comment
+
+warning: unused import: `crate::run`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\tests_chart_geometry.rs:11:5
+   |
+11 | use crate::run;
+   |     ^^^^^^^^^^
+
+warning: variable does not need to be mutable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_server.rs:3324:9
+     |
+3324 |     let mut loop_result = ();
+     |         ----^^^^^^^^^^^
+     |         |
+     |         help: remove this `mut`
+     |
+     = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_stream.rs:208:13
+    |
+208 |         let mut space_wait = handle.space.notified();
+    |             ----^^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_transport.rs:366:10
+    |
+366 |     let (mut parts, body) = request.into_parts();
+    |          ----^^^^^
+    |          |
+    |          help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_transport.rs:852:25
+    |
+852 |                     let mut resp = match outcome.reply.body {
+    |                         ----^^^^
+    |                         |
+    |                         help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\parser\expressions.rs:456:13
+    |
+456 |         let mut rollback = |slf: &mut Self| {
+    |             ----^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: unused variable: `w`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\parser\statements.rs:117:21
+    |
+117 |                 let w = "__w".to_string();
+    |                     ^ help: if this is intentional, prefix it with an underscore: `_w`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `open`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\parser\type_syntax.rs:292:14
+    |
+292 |         let (open, close, close_text) = if self.is_kind(TokenKind::Lt) {
+    |              ^^^^ help: if this is intentional, prefix it with an underscore: `_open`
+
+warning: variable does not need to be mutable
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\http_service_config.rs:497:13
+    |
+497 |         let mut take =
+    |             ----^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\http_service_config.rs:507:13
+    |
+507 |         let mut take_u64 =
+    |             ----^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\http_service_config.rs:613:13
+    |
+613 |         let mut take_list =
+    |             ----^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\http_service_config.rs:769:13
+    |
+769 |         let mut take = |field_end: &str, v: Option<bool>, dev: bool, svc: bool| -> bool {
+    |             ----^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: irrefutable `if let` pattern
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\http_service_observability.rs:285:20
+    |
+285 |                 if let SinkMsg::Line(l) = msg {
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: this pattern will always match, so the `if let` is useless
+    = help: consider replacing the `if let` with a `let`
+    = note: `#[warn(irrefutable_let_patterns)]` on by default
+
+warning: variable does not need to be mutable
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\stdlib_assembly\host.rs:931:9
+    |
+931 |     let mut returns = rule.public_return.to_string();
+    |         ----^^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: unreachable pattern
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\trans\rust\call_emit\call_module_methods.rs:1368:34
+     |
+1252 |                         "Json" => match method.as_str() {
+     |                         ------ matches all the relevant values
+...
+1368 |                         "json" | "Json" => match method.as_str() {
+     |                                  ^^^^^^ no value can reach this
+     |
+     = note: `#[warn(unreachable_patterns)]` (part of `#[warn(unused)]`) on by default
+
+warning: unreachable pattern
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\trans\rust\call_emit\call_module_methods.rs:1591:29
+     |
+1470 | ...                   "as_int" => {
+     |                       -------- matches all the relevant values
+...
+1591 | ...                   "as_int" => {
+     |                       ^^^^^^^^ no value can reach this
+
+warning: unused variable: `i`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\trans\rust\call_emit\call_module_methods.rs:1923:38
+     |
+1923 | ...                   for (i, arg) in call.args.args.iter().enumerate().skip(1) {
+     |                            ^ help: if this is intentional, prefix it with an underscore: `_i`
+
+warning: unused variable: `derive_attr`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\trans\rust\project_fixups.rs:4133:25
+     |
+4133 |                     let derive_attr = caps.get(1).unwrap().as_str();
+     |                         ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_derive_attr`
+
+warning: unused variable: `name`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\trans\rust\stmt_emit.rs:850:13
+    |
+850 |         let name = td.name.as_str();
+    |             ^^^^ help: if this is intentional, prefix it with an underscore: `_name`
+
+warning: unused variable: `name`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\trans\rust\stmt_emit.rs:1303:9
+     |
+1303 |         name: &str,
+     |         ^^^^ help: if this is intentional, prefix it with an underscore: `_name`
+
+warning: unused variable: `method`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\trans\rust\ty.rs:50:31
+   |
+50 |         if let Expr::Dot(obj, method) = call.name.as_ref() {
+   |                               ^^^^^^ help: if this is intentional, prefix it with an underscore: `_method`
+
+warning: unused variable: `has_kw`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\trans\s2s_rules.rs:90:21
+   |
+90 |                 let has_kw = c.args.args.iter().any(|a| matches!(a, Arg::Pair(_, _)));
+   |                     ^^^^^^ help: if this is intentional, prefix it with an underscore: `_has_kw`
+
+warning: unreachable pattern
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\abt\asm.rs:296:11
+    |
+260 |         | OpCode::LOAD_GLOBAL
+    |           ------------------- matches all the relevant values
+...
+296 |         | OpCode::LOAD_GLOBAL
+    |           ^^^^^^^^^^^^^^^^^^^ no value can reach this
+
+warning: unreachable pattern
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\abt\asm.rs:297:11
+    |
+261 |         | OpCode::STORE_GLOBAL => 1,
+    |           -------------------- matches all the relevant values
+...
+297 |         | OpCode::STORE_GLOBAL => 4,
+    |           ^^^^^^^^^^^^^^^^^^^^ no value can reach this
+
+warning: unreachable pattern
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\abt\disasm.rs:271:11
+    |
+247 |         | OpCode::LOAD_GLOBAL | OpCode::STORE_GLOBAL
+    |           ------------------- matches all the relevant values
+...
+271 |         | OpCode::LOAD_GLOBAL | OpCode::STORE_GLOBAL
+    |           ^^^^^^^^^^^^^^^^^^^ no value can reach this
+
+warning: unreachable pattern
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\abt\disasm.rs:271:33
+    |
+247 |         | OpCode::LOAD_GLOBAL | OpCode::STORE_GLOBAL
+    |                                 -------------------- matches all the relevant values
+...
+271 |         | OpCode::LOAD_GLOBAL | OpCode::STORE_GLOBAL
+    |                                 ^^^^^^^^^^^^^^^^^^^^ no value can reach this
+
+warning: variable does not need to be mutable
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\abt\mod.rs:87:13
+   |
+87 |         let mut emit_line = |s: &str,
+   |             ----^^^^^^^^^
+   |             |
+   |             help: remove this `mut`
+
+warning: unused variable: `enum_method`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\codegen\expr_calls.rs:714:61
+    |
+714 | ...                   let enum_method = format!(
+    |                           ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_enum_method`
+
+warning: unused variable: `spec_decl`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\codegen\stmt_emit.rs:1747:28
+     |
+1747 |             Stmt::SpecDecl(spec_decl) => {
+     |                            ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_spec_decl`
+
+warning: unused variable: `handle`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine\ops_arith.rs:1077:29
+     |
+1077 |                 if let Some(handle) = http_response_handle {
+     |                             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_handle`
+
+warning: unused variable: `other`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine\ops_arith.rs:2615:38
+     |
+2615 | ...                   Some(other) => {
+     |                            ^^^^^ help: if this is intentional, prefix it with an underscore: `_other`
+
+warning: unused variable: `value`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine\ops_calls.rs:833:25
+    |
+833 |                     let value = auto_val::decode_i32(value_nv);
+    |                         ^^^^^ help: if this is intentional, prefix it with an underscore: `_value`
+
+warning: value assigned to `old_field_ref` is never read
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine\ops_collections.rs:51:54
+   |
+51 |                   let mut old_field_ref: Option<u64> = None;
+   |                                                        ^^^^ this value is reassigned later and never used
+...
+65 | /                             old_field_ref =
+66 | |                                 instance.fields.get(field_index).and_then(|v| match v {
+67 | |                                     Value::VmRef(r) => Some(r.id as u64),
+68 | |                                     _ => None,
+69 | |                                 });
+   | |__________________________________- `old_field_ref` is overwritten here before the previous value is read
+   |
+   = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `saved_saved_closure_id`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine\tasks.rs:250:13
+    |
+250 |         let saved_saved_closure_id = task.saved_closure_id;
+    |             ^^^^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_saved_saved_closure_id`
+
+warning: variable does not need to be mutable
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\rc.rs:374:22
+    |
+374 |             let Some(mut e) = self.heap_rc.get_mut(&id) else {
+    |                      ----^
+    |                      |
+    |                      help: remove this `mut`
+
+warning: unused variable: `k`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\rc.rs:769:25
+    |
+769 |             if let Some(k) = &key {
+    |                         ^ help: if this is intentional, prefix it with an underscore: `_k`
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1746 | math_unary_shim!(shim_math_sin, sin);
+     | ------------------------------------ in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1746 | math_unary_shim!(shim_math_sin, sin);
+     | ------------------------------------ in this macro invocation
+     = note: this warning originates in the macro `math_unary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1747 | math_unary_shim!(shim_math_cos, cos);
+     | ------------------------------------ in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1747 | math_unary_shim!(shim_math_cos, cos);
+     | ------------------------------------ in this macro invocation
+     = note: this warning originates in the macro `math_unary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1748 | math_unary_shim!(shim_math_tan, tan);
+     | ------------------------------------ in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1748 | math_unary_shim!(shim_math_tan, tan);
+     | ------------------------------------ in this macro invocation
+     = note: this warning originates in the macro `math_unary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1751 | math_unary_shim!(shim_math_abs_f, abs);
+     | -------------------------------------- in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1751 | math_unary_shim!(shim_math_abs_f, abs);
+     | -------------------------------------- in this macro invocation
+     = note: this warning originates in the macro `math_unary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1752 | math_unary_shim!(shim_math_floor, floor);
+     | ---------------------------------------- in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1752 | math_unary_shim!(shim_math_floor, floor);
+     | ---------------------------------------- in this macro invocation
+     = note: this warning originates in the macro `math_unary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1753 | math_unary_shim!(shim_math_ceil, ceil);
+     | -------------------------------------- in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1753 | math_unary_shim!(shim_math_ceil, ceil);
+     | -------------------------------------- in this macro invocation
+     = note: this warning originates in the macro `math_unary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1754 | math_unary_shim!(shim_math_round, round);
+     | ---------------------------------------- in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1754 | math_unary_shim!(shim_math_round, round);
+     | ---------------------------------------- in this macro invocation
+     = note: this warning originates in the macro `math_unary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1755 | math_unary_shim!(shim_math_exp, exp);
+     | ------------------------------------ in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1755 | math_unary_shim!(shim_math_exp, exp);
+     | ------------------------------------ in this macro invocation
+     = note: this warning originates in the macro `math_unary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1756 | math_unary_shim!(shim_math_ln, ln);
+     | ---------------------------------- in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1756 | math_unary_shim!(shim_math_ln, ln);
+     | ---------------------------------- in this macro invocation
+     = note: this warning originates in the macro `math_unary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1757 | math_unary_shim!(shim_math_log2, log2);
+     | -------------------------------------- in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1757 | math_unary_shim!(shim_math_log2, log2);
+     | -------------------------------------- in this macro invocation
+     = note: this warning originates in the macro `math_unary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1758 | math_unary_shim!(shim_math_log10, log10);
+     | ---------------------------------------- in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1758 | math_unary_shim!(shim_math_log10, log10);
+     | ---------------------------------------- in this macro invocation
+     = note: this warning originates in the macro `math_unary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1759 | math_unary_shim!(shim_math_signum, signum);
+     | ------------------------------------------ in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1759 | math_unary_shim!(shim_math_signum, signum);
+     | ------------------------------------------ in this macro invocation
+     = note: this warning originates in the macro `math_unary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1760 | math_unary_shim!(shim_math_asin, asin);
+     | -------------------------------------- in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1760 | math_unary_shim!(shim_math_asin, asin);
+     | -------------------------------------- in this macro invocation
+     = note: this warning originates in the macro `math_unary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1761 | math_unary_shim!(shim_math_acos, acos);
+     | -------------------------------------- in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1761 | math_unary_shim!(shim_math_acos, acos);
+     | -------------------------------------- in this macro invocation
+     = note: this warning originates in the macro `math_unary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1762 | math_unary_shim!(shim_math_atan, atan);
+     | -------------------------------------- in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1762 | math_unary_shim!(shim_math_atan, atan);
+     | -------------------------------------- in this macro invocation
+     = note: this warning originates in the macro `math_unary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1763 | math_unary_shim!(shim_math_to_radians, to_radians);
+     | -------------------------------------------------- in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1763 | math_unary_shim!(shim_math_to_radians, to_radians);
+     | -------------------------------------------------- in this macro invocation
+     = note: this warning originates in the macro `math_unary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1764 | math_unary_shim!(shim_math_to_degrees, to_degrees);
+     | -------------------------------------------------- in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1764 | math_unary_shim!(shim_math_to_degrees, to_degrees);
+     | -------------------------------------------------- in this macro invocation
+     = note: this warning originates in the macro `math_unary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1737:43
+     |
+1737 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1765 | math_binary_shim!(shim_math_pow, powf);
+     | -------------------------------------- in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1737:43
+     |
+1737 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1765 | math_binary_shim!(shim_math_pow, powf);
+     | -------------------------------------- in this macro invocation
+     = note: this warning originates in the macro `math_binary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1737:43
+     |
+1737 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1766 | math_binary_shim!(shim_math_powf, powf);
+     | --------------------------------------- in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1737:43
+     |
+1737 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1766 | math_binary_shim!(shim_math_powf, powf);
+     | --------------------------------------- in this macro invocation
+     = note: this warning originates in the macro `math_binary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:3197:45
+     |
+3197 | pub fn shim_result_ok(_task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                             ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+ --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:6:49
+  |
+6 | pub(super) fn shim_int_and(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+  |                                                 ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:14:48
+   |
+14 | pub(super) fn shim_int_or(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+   |                                                ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:22:49
+   |
+22 | pub(super) fn shim_int_xor(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+   |                                                 ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:31:49
+   |
+31 | pub(super) fn shim_int_not(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+   |                                                 ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:39:49
+   |
+39 | pub(super) fn shim_int_shl(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+   |                                                 ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:54:49
+   |
+54 | pub(super) fn shim_int_shr(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+   |                                                 ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:69:49
+   |
+69 | pub(super) fn shim_int_sar(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+   |                                                 ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:87:49
+   |
+87 | pub(super) fn shim_int_rol(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+   |                                                 ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:95:49
+   |
+95 | pub(super) fn shim_int_ror(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+   |                                                 ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:103:56
+    |
+103 | pub(super) fn shim_int_count_ones(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                                        ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:110:59
+    |
+110 | pub(super) fn shim_int_leading_zeros(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                                           ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:117:60
+    |
+117 | pub(super) fn shim_int_trailing_zeros(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                                            ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:124:52
+    |
+124 | pub(super) fn shim_int_bitrev(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                                    ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:131:54
+    |
+131 | pub(super) fn shim_int_bit_read(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                                      ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:147:54
+    |
+147 | pub(super) fn shim_int_bit_test(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                                      ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:158:52
+    |
+158 | pub(super) fn shim_int_bit_on(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                                    ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:172:53
+    |
+172 | pub(super) fn shim_int_bit_off(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                                     ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:186:54
+    |
+186 | pub(super) fn shim_int_bit_flip(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                                      ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:207:45
+    |
+207 | pub fn shim_math_atan2(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                             ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_io.rs:45:48
+   |
+45 | pub fn shim_console_clear(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+   |                                                ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_io.rs:484:44
+    |
+484 | pub fn shim_log_noop(_task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                            ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_rand.rs:108:46
+    |
+108 | pub fn shim_rand_random(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                              ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_rand.rs:143:45
+    |
+143 | pub fn shim_rand_float(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                             ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_rand.rs:156:44
+    |
+156 | pub fn shim_rand_bool(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                            ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\http_client.rs:184:58
+    |
+184 | pub fn shim_net_tcp_listener_accept(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                                          ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\http_client.rs:223:57
+    |
+223 | pub fn shim_net_tcp_listener_close(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                                         ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\http_client.rs:370:55
+    |
+370 | pub fn shim_net_tcp_stream_close(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                                       ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\http_client.rs:393:5
+    |
+393 |     vm: &AutoVM,
+    |     ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\http_client.rs:415:5
+    |
+415 |     vm: &AutoVM,
+    |     ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\http_client.rs:438:55
+    |
+438 | pub fn shim_net_tcp_stream_flush(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                                       ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\http_client.rs:454:61
+    |
+454 | pub fn shim_net_tcp_stream_set_nodelay(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                                             ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\http_client.rs:469:46
+    |
+469 | pub fn shim_http_server(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                              ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\http_client.rs:852:50
+    |
+852 | pub fn shim_http_rate_limit(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                                  ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\http_client.rs:2371:51
+     |
+2371 | pub fn shim_http_last_status(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                                   ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\http_client.rs:2403:47
+     |
+2403 | pub fn shim_http_listen(_task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                               ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: variable does not need to be mutable
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_server\server_dispatch.rs:599:17
+    |
+599 |             let mut b = *boxed;
+    |                 ----^
+    |                 |
+    |                 help: remove this `mut`
+
+warning: unused variable: `stream_id`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_stream.rs:394:5
+    |
+394 |     stream_id: u64,
+    |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_stream_id`
+
+warning: taking a mutable reference to a `const` item
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\entry.rs:2492:54
+     |
+2492 |         scan_at_files(&src_root, &mut type_store, 0, &mut SCAN_MAX_FILES);
+     |                                                      ^^^^^^^^^^^^^^^^^^^
+     |
+     = note: each usage of a `const` item creates a new temporary
+     = note: the mutable reference will refer to this temporary, not the original `const` item
+note: `const` item defined here
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\entry.rs:2409:9
+     |
+2409 |         const SCAN_MAX_FILES: usize = 400;
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     = note: `#[warn(const_item_mutation)]` on by default
+
+warning: constant `HEALTH_BUDGET` is never used
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\http_service_config.rs:361:15
+    |
+361 |     pub const HEALTH_BUDGET: (usize, usize) = (1, 64);
+    |               ^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: variant `Standalone` is never constructed
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\stdlib_assembly\host.rs:65:5
+   |
+63 | enum RuntimeSpec {
+   |      ----------- variant in this enum
+64 |     Both,
+65 |     Standalone,
+   |     ^^^^^^^^^^
+
+warning: function `test_a2p` is never used
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\trans\python.rs:2671:8
+     |
+2671 |     fn test_a2p(case: &str) -> AutoResult<()> {
+     |        ^^^^^^^^
+
+warning: function `pop_str_idx` is never used
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine.rs:100:4
+    |
+100 | fn pop_str_idx(ram: &mut VirtualRAM) -> usize {
+    |    ^^^^^^^^^^^
+
+warning: method `intern_string` is never used
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine.rs:1059:8
+     |
+ 760 | impl AutoVM {
+     | ----------- method in this implementation
+...
+1059 |     fn intern_string(&mut self, bytes: &[u8]) -> usize {
+     |        ^^^^^^^^^^^^^
+
+warning: function `vm_with` is never used
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine.rs:3070:8
+     |
+3070 |     fn vm_with(code: Vec<u8>) -> AutoVM {
+     |        ^^^^^^^
+
+warning: function `pop_str` is never used
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine.rs:3074:8
+     |
+3074 |     fn pop_str(vm: &AutoVM, task: &mut AutoTask) -> String {
+     |        ^^^^^^^
+
+warning: function `vm_idle` is never used
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine.rs:3136:8
+     |
+3136 |     fn vm_idle() -> AutoVM {
+     |        ^^^^^^^
+
+warning: function `vm_with` is never used
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine.rs:3229:8
+     |
+3229 |     fn vm_with(code: Vec<u8>) -> AutoVM {
+     |        ^^^^^^^
+
+warning: function `push_result_instance` is never used
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine.rs:3233:8
+     |
+3233 |     fn push_result_instance(vm: &AutoVM, task: &mut AutoTask, kind: &str, field: auto_val::Value) {
+     |        ^^^^^^^^^^^^^^^^^^^^
+
+warning: method `decode_tagged_value` is never used
+ --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine\values.rs:7:8
+  |
+4 | impl AutoVM {
+  | ----------- method in this implementation
+...
+7 |     fn decode_tagged_value(&self, raw: i32) -> auto_val::Value {
+  |        ^^^^^^^^^^^^^^^^^^^
+
+warning: field `req_id` is never read
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\http_async.rs:194:5
+    |
+190 | struct HttpJsonJob {
+    |        ----------- field in this struct
+...
+194 |     req_id: u64,
+    |     ^^^^^^
+
+warning: function `fn_is_api_async` is never used
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_server.rs:55:15
+   |
+55 | pub(crate) fn fn_is_api_async(fn_name: &str) -> bool {
+   |               ^^^^^^^^^^^^^^^
+
+warning: constant `META_PARAM_NAMES` is never used
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_server.rs:4524:7
+     |
+4524 | const META_PARAM_NAMES: [&str; 4] = ["meta", "metadata", "req", "request"];
+     |       ^^^^^^^^^^^^^^^^
+
+warning: function `is_meta_param_name` is never used
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_server\server_argbind.rs:323:4
+    |
+323 | fn is_meta_param_name(name: &str) -> bool {
+    |    ^^^^^^^^^^^^^^^^^^
+
+warning: function `http_status_reason` is never used
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_server\server_route.rs:435:4
+    |
+435 | fn http_status_reason(code: u16) -> &'static str {
+    |    ^^^^^^^^^^^^^^^^^^
+
+warning: field `0` is never read
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_server\server_scope.rs:410:12
+    |
+410 |     Future(u32),
+    |     ------ ^^^
+    |     |
+    |     field in this variant
+    |
+help: consider changing the field to be of unit type to suppress this warning while preserving the field numbering, or remove the field
+    |
+410 -     Future(u32),
+410 +     Future(()),
+    |
+
+warning: function `stream_remove` is never used
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_stream.rs:311:15
+    |
+311 | pub(crate) fn stream_remove(stream_id: u64) {
+    |               ^^^^^^^^^^^^^
+
+warning: variable `_stake__disc` should have a snake case name
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_collections.rs:896:13
+    |
+896 |         let _stake__disc = crate::vm::native::StakeGuard::nv(vm, _disc);
+    |             ^^^^^^^^^^^^ help: convert the identifier to snake case: `_stake_disc`
+    |
+    = note: `#[warn(non_snake_case)]` (part of `#[warn(nonstandard_style)]`) on by default
+
+warning: variable `_stake__closure_id` should have a snake case name
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_collections.rs:1272:9
+     |
+1272 |     let _stake__closure_id = crate::vm::native::StakeGuard::new(vm, _closure_id as i64 as u64);
+     |         ^^^^^^^^^^^^^^^^^^ help: convert the identifier to snake case: `_stake_closure_id`
+
+warning: variable `_stake__func_addr` should have a snake case name
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_collections.rs:2044:9
+     |
+2044 |     let _stake__func_addr = crate::vm::native::StakeGuard::new(vm, _func_addr as i64 as u64); // Not used in MVP
+     |         ^^^^^^^^^^^^^^^^^ help: convert the identifier to snake case: `_stake_func_addr`
+
+warning: variable `_stake__func_addr` should have a snake case name
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_collections.rs:2106:9
+     |
+2106 |     let _stake__func_addr = crate::vm::native::StakeGuard::new(vm, _func_addr as i64 as u64); // Not used in MVP
+     |         ^^^^^^^^^^^^^^^^^ help: convert the identifier to snake case: `_stake_func_addr`
+
+warning: variable `_stake__arr_id` should have a snake case name
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_collections.rs:3500:9
+     |
+3500 |     let _stake__arr_id = crate::vm::native::StakeGuard::new(vm, _arr_id as i64 as u64);
+     |         ^^^^^^^^^^^^^^ help: convert the identifier to snake case: `_stake_arr_id`
+
+warning: variable `_stake__capacity` should have a snake case name
+ --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_strings.rs:9:9
+  |
+9 |     let _stake__capacity = crate::vm::native::StakeGuard::new(vm, _capacity as i64 as u64);
+  |         ^^^^^^^^^^^^^^^^ help: convert the identifier to snake case: `_stake_capacity`
+
+warning: variable `_stake__capacity` should have a snake case name
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_strings.rs:411:9
+    |
+411 |     let _stake__capacity = crate::vm::native::StakeGuard::new(vm, _capacity as i64 as u64);
+    |         ^^^^^^^^^^^^^^^^ help: convert the identifier to snake case: `_stake_capacity`
+
+warning: variable `_stake__inst_id` should have a snake case name
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_test.rs:109:9
+    |
+109 |     let _stake__inst_id = crate::vm::native::StakeGuard::new(vm, _inst_id as i64 as u64);
+    |         ^^^^^^^^^^^^^^^ help: convert the identifier to snake case: `_stake_inst_id`
+
+warning: variable `_stake__inst_id` should have a snake case name
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_test.rs:122:9
+    |
+122 |     let _stake__inst_id = crate::vm::native::StakeGuard::new(vm, _inst_id as i64 as u64);
+    |         ^^^^^^^^^^^^^^^ help: convert the identifier to snake case: `_stake_inst_id`
+
+warning: direct cast of function item into an integer
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\exit_audit.rs:408:70
+    |
+408 | ...                   "ExitProcess" => traced_exit_process as usize,
+    |                                                            ^^^^^^^^
+    |
+    = note: `#[warn(function_casts_as_integer)]` on by default
+help: first cast to a pointer `as *const ()`
+    |
+408 |                                 "ExitProcess" => traced_exit_process as *const () as usize,
+    |                                                                      ++++++++++++
+
+warning: direct cast of function item into an integer
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\exit_audit.rs:409:80
+    |
+409 | ...                   "TerminateProcess" => traced_terminate_process as usize,
+    |                                                                      ^^^^^^^^
+    |
+help: first cast to a pointer `as *const ()`
+    |
+409 |                                 "TerminateProcess" => traced_terminate_process as *const () as usize,
+    |                                                                                ++++++++++++
+
+warning: calls to `std::mem::drop` with a value that implements `Copy` does nothing
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\rust_stdlib_dispatch.rs:823:13
+    |
+823 |             drop(i64::pop_from_stack(task, vm).unwrap_or(0));
+    |             ^^^^^------------------------------------------^
+    |                  |
+    |                  argument has type `i64`
+    |
+    = note: `#[warn(dropping_copy_types)]` on by default
+help: use `let _ = ...` to ignore the expression or result
+    |
+823 -             drop(i64::pop_from_stack(task, vm).unwrap_or(0));
+823 +             let _ = i64::pop_from_stack(task, vm).unwrap_or(0);
+    |
+
+warning: calls to `std::mem::drop` with a value that implements `Copy` does nothing
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\rust_stdlib_dispatch.rs:827:13
+    |
+827 |             drop(i64::pop_from_stack(task, vm).unwrap_or(0));
+    |             ^^^^^------------------------------------------^
+    |                  |
+    |                  argument has type `i64`
+    |
+help: use `let _ = ...` to ignore the expression or result
+    |
+827 -             drop(i64::pop_from_stack(task, vm).unwrap_or(0));
+827 +             let _ = i64::pop_from_stack(task, vm).unwrap_or(0);
+    |
+
+warning: variable `_stake__cfg` should have a snake case name
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\musk_response_ctor.rs:874:16
+    |
+874 |     let (_cfg, _stake__cfg) = pop_value_staked(task, vm); // config Value (unused for the default)
+    |                ^^^^^^^^^^^ help: convert the identifier to snake case: `_stake_cfg`
+
+warning: `auto-lang-core` (lib) generated 147 warnings (run `cargo fix --lib -p auto-lang-core` to apply 82 suggestions)
+warning: unexpected `cfg` condition value: `ui-interpreter`
+  --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\app_registry.rs:28:7
+   |
+28 | #[cfg(feature = "ui-interpreter")]
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: expected values for `feature` are: `default`, `ui`, and `ui-headless`
+   = help: consider adding `ui-interpreter` as a feature in `Cargo.toml`
+   = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+   = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: unexpected `cfg` condition value: `ui-interpreter`
+   --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\app_registry.rs:139:15
+    |
+139 |         #[cfg(feature = "ui-interpreter")]
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `ui`, and `ui-headless`
+    = help: consider adding `ui-interpreter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `ui-interpreter`
+   --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\app_registry.rs:143:19
+    |
+143 |         #[cfg(not(feature = "ui-interpreter"))]
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `ui`, and `ui-headless`
+    = help: consider adding `ui-interpreter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unused import: `AtomicBool`
+  --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\style\mod.rs:41:29
+   |
+41 |     use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+   |                             ^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused doc comment
+   --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\style\theme\mod.rs:178:1
+    |
+178 | / /// PLAN-020 T-00b: 窗口高度(逻辑 px),与 window_width 同规约——renderer
+179 | | /// 在 view() 前设值。窗口尺寸面(分屏矩形投影 px 类几何的标定源)。
+    | |_-----------------------------------------------------------------^
+    |   |
+    |   rustdoc does not generate documentation for macro invocations
+    |
+    = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+    = note: `#[warn(unused_doc_comments)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused doc comment
+   --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\aura\extract.rs:921:1
+    |
+921 | /// Extract view node from parsed ViewNode
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ rustdoc does not generate documentation for macro invocations
+    |
+    = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+
+warning: unused import: `super::*`
+   --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\bp\registry.rs:407:9
+    |
+407 |     use super::*;
+    |         ^^^^^^^^
+    |
+help: if this is a test module, consider adding a `#[cfg(test)]` to the containing module
+   --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\bp\registry.rs:406:1
+    |
+406 | mod root_resolution_tests {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused doc comment
+    --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\rust.rs:1295:9
+     |
+1295 | /         /// action_config 全局面——与 VM 轨 renderer __menubar_toggle 同
+1296 | |         /// 机制非消费方补丁；族折叠契约镜像解释态
+1297 | |         /// convert_menubar_component）。枚举先于 view 树生成——变体在
+1298 | |         /// 此预扫描推送（scan_input_fields 同序先例）。
+     | |________________________________________________________^
+1299 | /         if self.view_tree_has_menubar(&widget.view_tree) {
+1300 | |             if !self
+1301 | |                 .message_variants
+1302 | |                 .iter()
+...    |
+1324 | |         }
+     | |_________- rustdoc does not generate documentation for expressions
+     |
+     = help: use `//` for a plain comment
+
+warning: unused imports: `Expr` and `Stmt`
+    --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\rust.rs:8422:35
+     |
+8422 |         use auto_lang_core::ast::{Expr, Stmt};
+     |                                   ^^^^  ^^^^
+
+warning: unused import: `auto_val::Op`
+    --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\rust.rs:8423:13
+     |
+8423 |         use auto_val::Op;
+     |             ^^^^^^^^^^^^
+
+warning: unused doc comment
+    --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\rust.rs:9903:21
+     |
+9903 |                       /// 显式拒绝非静默）。
+     |                       ^^^^^^^^^^^^^^^^^^^^^^
+9904 | /                     _ => {
+9905 | |                         let kind = self.tag_to_view_fn(tag);
+9906 | |                         let hit = crate::ui_gen::vocab::view_prop_vocab(kind)
+9907 | |                             .iter()
+...    |
+9944 | |                         format!("{{ std::compile_error!(\"{msg}\"); unreachable!() }}")
+9945 | |                     }
+     | |_____________________- rustdoc does not generate documentation for match arms
+     |
+     = help: use `//` for a plain comment
+
+warning: unused doc comment
+     --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\rust.rs:10114:17
+      |
+10114 |                 /// handler 闭包，Msg 槽发直消息（Option<M> 面无闭包包装）。
+      |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+10115 |                 let kind = self.tag_to_view_fn(tag);
+      |                 ------------------------------------ rustdoc does not generate documentation for statements
+      |
+      = help: use `//` for a plain comment
+
+warning: unnecessary parentheses around `if` condition
+     --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\rust.rs:13211:20
+      |
+13211 |                 if (fn_name.starts_with("store.") || fn_name.starts_with("self.store.")) {
+      |                    ^                                                                   ^
+      |
+      = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+      |
+13211 -                 if (fn_name.starts_with("store.") || fn_name.starts_with("self.store.")) {
+13211 +                 if fn_name.starts_with("store.") || fn_name.starts_with("self.store.") {
+      |
+
+warning: unused import: `auto_lang_core::session::CompilerSession`
+   --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\api.rs:669:9
+    |
+669 |     use auto_lang_core::session::CompilerSession;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: variable does not need to be mutable
+   --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\aura\extract.rs:712:24
+    |
+712 |     let (mut handlers, mut handler_params) = if let Some(on) = &decl.on {
+    |                        ----^^^^^^^^^^^^^^
+    |                        |
+    |                        help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `def`
+   --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\aura\schema.rs:323:21
+    |
+323 |         if let Some(def) = self.elements.get(tag) {
+    |                     ^^^ help: if this is intentional, prefix it with an underscore: `_def`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `store_check`
+    --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\rust.rs:9518:21
+     |
+9518 |                 let store_check = format!("{}.{}", first, part);
+     |                     ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_store_check`
+
+warning: variable does not need to be mutable
+    --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\vue.rs:7524:34
+     |
+7524 | ...                   let (mut static_classes, _dc, _ds) = self.extract_classes(tag, props);
+     |                            ----^^^^^^^^^^^^^^
+     |                            |
+     |                            help: remove this `mut`
+
+warning: unreachable pattern
+     --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\vue.rs:10522:13
+      |
+10490 |             "option" | "Option" => "option".to_string(),
+      |             ------------------- matches all the relevant values
+...
+10522 |             "option" | "Option" => "option".to_string(),
+      |             ^^^^^^^^^^^^^^^^^^^ no value can reach this
+      |
+      = note: `#[warn(unreachable_patterns)]` (part of `#[warn(unused)]`) on by default
+
+warning: unreachable pattern
+     --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\vue.rs:11280:17
+      |
+11280 |                 _ => {}
+      |                 ^ no value can reach this
+      |
+note: multiple earlier patterns match some of the same values
+     --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\vue.rs:11280:17
+      |
+11138 |                 AuraPropValue::StyleBinding(bindings) => {
+      |                 ------------------------------------- matches some of the same values
+...
+11158 |                 AuraPropValue::Expr(auto_lang_core::ast::Expr::Str(s)) => {
+      |                 ------------------------------------------------------ matches some of the same values
+...
+11193 |                 AuraPropValue::Expr(auto_lang_core::ast::Expr::If(if_stmt)) => {
+      |                 ----------------------------------------------------------- matches some of the same values
+...
+11206 |                 AuraPropValue::Expr(auto_lang_core::ast::Expr::Array(elems)) => {
+      |                 ------------------------------------------------------------ matches some of the same values
+...
+11280 |                 _ => {}
+      |                 ^ ...and 1 other patterns collectively make this unreachable
+
+warning: value assigned to `sub_widgets_out` is never read
+   --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\api.rs:902:44
+    |
+902 |     let mut sub_widgets_out: Vec<String> = Vec::new();
+    |                                            ^^^^^^^^^^ this value is reassigned later and never used
+...
+964 |         sub_widgets_out = package_names;
+    |         --------------- `sub_widgets_out` is overwritten here before the previous value is read
+    |
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `count`
+   --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\validators.rs:691:9
+    |
+691 |     let count = template.matches("AutoDownEditor").count();
+    |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_count`
+
+warning: variable does not need to be mutable
+   --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:458:13
+    |
+458 |         let mut scroll_scrollbar = WidgetSpec::new("ScrollAreaScrollbar", WidgetCategory::Layout)
+    |             ----^^^^^^^^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:463:13
+    |
+463 |         let mut scroll_thumb = WidgetSpec::new("ScrollAreaThumb", WidgetCategory::Layout)
+    |             ----^^^^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:685:13
+    |
+685 |         let mut select_value =
+    |             ----^^^^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:1353:13
+     |
+1353 |         let mut breadcrumb_sep = WidgetSpec::new("BreadcrumbSeparator", WidgetCategory::Navigation)
+     |             ----^^^^^^^^^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:1420:13
+     |
+1420 |         let mut pagination_link = WidgetSpec::new("PaginationLink", WidgetCategory::Navigation)
+     |             ----^^^^^^^^^^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:1425:13
+     |
+1425 |         let mut pagination_ellipsis =
+     |             ----^^^^^^^^^^^^^^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:1431:13
+     |
+1431 |         let mut pagination_next = WidgetSpec::new("PaginationNext", WidgetCategory::Navigation)
+     |             ----^^^^^^^^^^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:1436:13
+     |
+1436 |         let mut pagination_prev = WidgetSpec::new("PaginationPrevious", WidgetCategory::Navigation)
+     |             ----^^^^^^^^^^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:2224:13
+     |
+2224 |         let mut toast_viewport =
+     |             ----^^^^^^^^^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:2235:13
+     |
+2235 |         let mut toast_close =
+     |             ----^^^^^^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:2279:13
+     |
+2279 |         let mut sonner = WidgetSpec::new("Sonner", WidgetCategory::Feedback).with_alias("sonner");
+     |             ----^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:2477:13
+     |
+2477 |         let mut calendar_day =
+     |             ----^^^^^^^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: constant `LUCIDE_SOURCE_VERSION` is never used
+    --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\lucide_generated.rs:5534:18
+     |
+5534 | pub(super) const LUCIDE_SOURCE_VERSION: &str = "0.312.0";
+     |                  ^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: struct `EnvGuard` is never constructed
+   --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\bp\registry.rs:409:12
+    |
+409 |     struct EnvGuard {
+    |            ^^^^^^^^
+
+warning: associated function `set` is never used
+   --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\bp\registry.rs:414:12
+    |
+413 |     impl EnvGuard {
+    |     ------------- associated function in this implementation
+414 |         fn set(var: &'static str, value: &std::ffi::OsStr) -> Self {
+    |            ^^^
+
+warning: function `key_of` is never used
+   --> D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler\src\ui_gen\vue.rs:205:8
+    |
+205 |     fn key_of(node: &AuraNode) -> Option<String> {
+    |        ^^^^^^
+
+warning: `auto-ui-compiler` (lib) generated 38 warnings (run `cargo fix --lib -p auto-ui-compiler` to apply 23 suggestions)
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\code_editor\core\highlight.rs:347:9: warning: unused import: `syntect::easy::HighlightLines`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\code_editor\core\highlight.rs:348:9: warning: unused import: `syntect::util::LinesWithEndings`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\code_editor\core\render.rs:14:41: warning: unused import: `Family`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\code_editor\core\mod.rs:28:39: warning: unused import: `Weak`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\code_editor\iced\gutter.rs:21:35: warning: unused import: `Family`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\code_editor\iced\widget.rs:13:5: warning: unused import: `iced::advanced::graphics::text::Renderer as RawTextRenderer`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\scroll\controller.rs:22:47: warning: unused import: `ScrollSource`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\scroll\host.rs:16:49: warning: unused import: `scroll_range`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\scroll\intent.rs:107:38: warning: unused import: `ScrollAxisState`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\anchor_slot.rs:9:29: warning: unused imports: `Point` and `Vector`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\vnode_converter.rs:35:7: warning: unexpected `cfg` condition value: `interpreter`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\vnode_converter.rs:38:7: warning: unexpected `cfg` condition value: `interpreter`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\vnode_converter.rs:1489:7: warning: unexpected `cfg` condition value: `interpreter`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\vnode_converter.rs:1505:7: warning: unexpected `cfg` condition value: `interpreter`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\vnode_converter.rs:1544:7: warning: unexpected `cfg` condition value: `interpreter`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\handler_codegen.rs:22:73: warning: unused import: `Try`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\selection\output.rs:16:38: warning: unused import: `VNode`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\session.rs:31:37: warning: unused import: `ReservedEdges`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\session.rs:4649:13: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\session.rs:5063:25: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\session.rs:5071:29: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\session.rs:5158:21: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\shell_projection.rs:1267:13: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\client_runtime.rs:13:5: warning: unused import: `std::collections::HashMap`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\client_runtime.rs:17:17: warning: unused imports: `DrawList`, `DrawOp`, `ImageFit`, `InputMsg`, `MouseButton`, and `WRect`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\client_runtime.rs:24:30: warning: unused imports: `AuraNode`, `AuraPropValue`, `AuraTextContent`, and `aura_events_get_base`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\coverage.rs:443:13: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\coverage.rs:987:9: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\dual_mode.rs:16:5: warning: unused import: `super::broker`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\dual_mode.rs:17:23: warning: unused imports: `AppEndpoint` and `AppState`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\dual_mode.rs:20:27: warning: unused imports: `FrameMsg` and `ProtocolMsg`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\dual_mode.rs:22:5: warning: unused import: `super::shm::SharedFrameBuffer`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\dual_mode.rs:23:24: warning: unused import: `self`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\dual_mode.rs:25:5: warning: unused import: `crate::ui::session::DesktopSession`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\native_projector.rs:35:17: warning: unused import: `DISABLED_ALPHA`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\native_projector.rs:347:5: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\native_projector.rs:1594:9: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\native_projector.rs:3351:9: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\native_projector.rs:3355:9: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\native_projector.rs:3384:9: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\rqhost.rs:27:35: warning: unused import: `HostEndpoint`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\rqhost.rs:28:5: warning: unused import: `super::host::SurfaceStore`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\shell_client.rs:357:13: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\shell_client.rs:763:21: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\shell_client.rs:801:25: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\transport.rs:161:24: warning: unused import: `NamedPipeClient`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\native_dock\win32.rs:672:27: warning: unused imports: `GetIconInfo` and `ICONINFO`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:3351:13: warning: unused import: `crate::ui::scroll::ScrollAxes`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:14297:22: warning: unnecessary trailing semicolon: help: remove this semicolon
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:137:1: warning: unused doc comment: rustdoc does not generate documentation for macro invocations
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:1048:1: warning: unused doc comment: rustdoc does not generate documentation for macro invocations
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:7991:1: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:10327:36: warning: unused import: `Fill`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:13031:5: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:13123:5: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:13304:5: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:13406:5: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:13750:5: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:14335:5: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:14352:5: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:14429:5: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:23387:25: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:23760:25: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:24085:29: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:24623:41: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:24896:17: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:25257:13: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:25293:17: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:25330:17: warning: unused doc comment
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\broker_surface.rs:418:49: warning: unused import: `Text`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\broker_surface.rs:579:5: warning: unused import: `BorderSpec`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\terminal\iced\widget.rs:1095:28: warning: falling back to `f32` as the trait bound `f32: From<f64>` is not satisfied: help: explicitly specify the type as `f32`: `0.0_f32`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\terminal\iced\widget.rs:1379:32: warning: falling back to `f32` as the trait bound `f32: From<f64>` is not satisfied: help: explicitly specify the type as `f32`: `1.0_f32`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\win_ime.rs:249:29: warning: unused import: `HasWindowHandle`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\code_editor\core\highlight.rs:351:14: warning: unused variable: `ext`: help: if this is intentional, prefix it with an underscore: `_ext`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\handler_codegen.rs:1197:9: warning: unused variable: `state_dot`: help: if this is intentional, prefix it with an underscore: `_state_dot`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\handler_codegen.rs:2096:5: warning: unused variable: `store_fields`: help: if this is intentional, prefix it with an underscore: `_store_fields`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\handler_codegen.rs:2097:5: warning: unused variable: `store_widget_names`: help: if this is intentional, prefix it with an underscore: `_store_widget_names`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\vm_bridge.rs:937:21: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\vm_bridge.rs:1428:25: warning: unused variable: `g`: help: if this is intentional, prefix it with an underscore: `_g`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\vm_bridge.rs:1695:14: warning: unused variable: `name`: help: if this is intentional, prefix it with an underscore: `_name`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\session.rs:4167:26: warning: unused variable: `app_root`: help: if this is intentional, prefix it with an underscore: `_app_root`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\client_entry.rs:198:17: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\client_runtime.rs:549:26: warning: unused variable: `e`: help: if this is intentional, prefix it with an underscore: `_e`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\coverage.rs:1016:9: warning: unreachable pattern: no value can reach this
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\coverage.rs:1084:5: warning: unused variable: `component`: help: if this is intentional, prefix it with an underscore: `_component`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\native_projector.rs:3319:9: warning: unreachable pattern: no value can reach this
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\render_cli.rs:96:13: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\rqhost.rs:739:5: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\shell_client.rs:300:13: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\shell_client.rs:301:13: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\native_dock\win32.rs:2086:30: warning: unused variable: `pid`: help: if this is intentional, prefix it with an underscore: `_pid`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\snapshot_builder.rs:402:21: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\mcp_server.rs:1430:5: warning: unused variable: `shared_handle`: help: if this is intentional, prefix it with an underscore: `_shared_handle`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\mcp_server.rs:4692:13: warning: unused variable: `ids`: help: if this is intentional, prefix it with an underscore: `_ids`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:959:21: warning: unused variable: `stripped`: help: if this is intentional, prefix it with an underscore: `_stripped`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:1425:9: warning: unused variable: `index`: help: if this is intentional, prefix it with an underscore: `_index`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:3157:19: warning: unused variable: `s`: help: if this is intentional, prefix it with an underscore: `_s`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:8663:19: warning: unused variable: `s`: help: if this is intentional, prefix it with an underscore: `_s`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:8923:13: warning: unused variable: `stripped`: help: if this is intentional, prefix it with an underscore: `_stripped`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:13871:13: warning: unreachable pattern: no value can reach this
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:14476:13: warning: unused variable: `cond`: help: if this is intentional, prefix it with an underscore: `_cond`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:5853:17: warning: unused variable: `keymap`: help: try ignoring the field: `keymap: _`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:11078:9: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:12633:14: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:13247:13: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:17632:9: warning: unused variable: `dragged_slot`: help: if this is intentional, prefix it with an underscore: `_dragged_slot`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:23939:36: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:23959:36: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:24008:32: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:26388:13: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:28767:15: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:29482:5: warning: unused variable: `on_change`: help: if this is intentional, prefix it with an underscore: `_on_change`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:29485:5: warning: unused variable: `placeholder`: help: if this is intentional, prefix it with an underscore: `_placeholder`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:29833:9: warning: unreachable pattern: no value can reach this
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:31147:13: warning: unused variable: `key`: help: try ignoring the field: `key: _`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:31149:13: warning: unused variable: `is_final`: help: try ignoring the field: `is_final: _`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:31150:13: warning: unused variable: `on_change`: help: try ignoring the field: `on_change: _`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:31153:13: warning: unused variable: `placeholder`: help: try ignoring the field: `placeholder: _`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:32940:19: warning: unused variable: `tick_msg`: help: if this is intentional, prefix it with an underscore: `_tick_msg`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:32941:9: warning: unused variable: `interval`: help: if this is intentional, prefix it with an underscore: `_interval`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\table_resize.rs:207:17: warning: variable does not need to be mutable
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\session.rs:49:5: warning: type `TodoItem` is more private than the item `ui::session::AppState::todos`: field `ui::session::AppState::todos` is reachable at visibility `pub`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\session.rs:150:5: warning: type `DebugElementInfo` is more private than the item `ui::session::DevToolsState::debug_element_styles`: field `ui::session::DevToolsState::debug_element_styles` is reachable at visibility `pub`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\session.rs:155:5: warning: type `InspectorSubTab` is more private than the item `ui::session::DevToolsState::inspector_subtab`: field `ui::session::DevToolsState::inspector_subtab` is reachable at visibility `pub`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\session.rs:156:5: warning: type `InspectorSections` is more private than the item `ui::session::DevToolsState::inspector_sections`: field `ui::session::DevToolsState::inspector_sections` is reachable at visibility `pub`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\session.rs:158:5: warning: type `DevToolsTab` is more private than the item `ui::session::DevToolsState::devtools_tab`: field `ui::session::DevToolsState::devtools_tab` is reachable at visibility `pub`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\session.rs:165:5: warning: type `DebugTreeNode` is more private than the item `ui::session::DevToolsState::component_tree`: field `ui::session::DevToolsState::component_tree` is reachable at visibility `pub`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\session.rs:301:5: warning: type `ToastReq` is more private than the item `DesktopState::toasts`: field `DesktopState::toasts` is reachable at visibility `pub`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\session.rs:316:5: warning: type `NotificationEntry` is more private than the item `DesktopState::notifications`: field `DesktopState::notifications` is reachable at visibility `pub`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\sendinput.rs:89:1: warning: type `sendinput::Input` is more private than the item `unicode_inputs`: function `unicode_inputs` is reachable at visibility `pub`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\sendinput.rs:100:1: warning: type `sendinput::Input` is more private than the item `vk_inputs`: function `vk_inputs` is reachable at visibility `pub`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\sendinput.rs:106:1: warning: type `sendinput::Input` is more private than the item `sendinput::send`: function `sendinput::send` is reachable at visibility `pub`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:397:5: warning: type `PreviewCardUiState` is more private than the item `aura_view_builder::AuraViewBuilder::<'a>::with_preview_states`: method `aura_view_builder::AuraViewBuilder::<'a>::with_preview_states` is reachable at visibility `pub`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\terminal\mod.rs:354:19: warning: method `take_scroll_bind_suppress` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\terminal\iced\widget.rs:102:7: warning: constant `DEFAULT_FG` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\terminal\iced\widget.rs:162:15: warning: function `row_rebuilds_reset` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\terminal\iced\widget.rs:433:19: warning: associated function `view_y_to_offset` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\handler_codegen.rs:378:4: warning: function `rewrite_stmt` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\handler_codegen.rs:1953:4: warning: function `synthesize_handler_fn_from_decl` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\vm_bridge.rs:2856:8: warning: method `retain_heap_result` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\memo_deps.rs:1008:4: warning: function `skeleton_children` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\client_runtime.rs:112:7: warning: constant `INPUT_H` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\client_runtime.rs:113:7: warning: constant `INPUT_PAD` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\client_runtime.rs:148:16: warning: field `font_italic` is never read
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\client_runtime.rs:228:4: warning: function `handler_token` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\client_runtime.rs:243:4: warning: function `fstr_template_and_bindings` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\client_runtime.rs:281:4: warning: function `interpolate` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\client_runtime.rs:295:4: warning: function `format_value` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\client_runtime.rs:472:8: warning: static `PUMP_T0` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\client_runtime.rs:474:4: warning: function `t0` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\dual_mode.rs:28:7: warning: constant `CHILD_ENV` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\dual_mode.rs:30:7: warning: constant `CHILD_MARKER` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\dual_mode.rs:33:7: warning: constant `COUNTER_SRC` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\dual_mode.rs:36:8: warning: struct `SpawnCounterSource` is never constructed
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\dual_mode.rs:43:8: warning: associated items `new` and `count` are never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\dual_mode.rs:114:4: warning: function `pump_host` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\stage3.rs:6984:4: warning: function `git_status_porcelain` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\stage3.rs:7005:8: warning: struct `RestoreFiles` is never constructed
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\stage3.rs:7008:8: warning: method `run` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\native_dock\win32.rs:1852:4: warning: function `load_blue_test_icon` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\mcp_server.rs:3871:4: warning: function `parse_aura_id` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\mcp_server.rs:4019:4: warning: function `view_kind_str` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\mcp_server.rs:5012:8: warning: method `area` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:4215:8: warning: multiple associated items are never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:10650:35: warning: constant `LEADING_EMPTY` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:23612:4: warning: function `svg_attr_literal` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:27448:8: warning: function `vf_widget` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:27488:8: warning: function `vf_row` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:27495:8: warning: function `vf_rows` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:27499:8: warning: function `vf_node` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:27514:8: warning: function `vf_build` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:27520:8: warning: function `vf_kinds` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:27671:8: warning: function `sig_widget` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:27712:8: warning: function `inline_mirror` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:27720:8: warning: function `block_mirror` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:27734:8: warning: function `sig_view` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:27739:8: warning: function `sig_build` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:27746:8: warning: function `sig_counts` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:27870:8: warning: function `conv_widget` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:27915:8: warning: function `conv_menubar` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\aura_view_builder.rs:27934:8: warning: function `conv_build` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\dynamic.rs:3300:4: warning: function `onkeydown_suffix` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:182:5: warning: variants `Handler` and `Swallow` are never constructed
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:1668:4: warning: function `table_cell_container` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:1687:4: warning: function `col_fixed_width` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:1693:4: warning: function `table_row_rule` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:3419:4: warning: function `build_floating_layer` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:3428:4: warning: function `build_floating_layer_capture` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:8458:4: warning: function `lucide_svg` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:8824:4: warning: function `parse_drag_points` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:10022:4: warning: function `widget_tick` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:12591:5: warning: field `id` is never read
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:17458:4: warning: function `load_desktop_positions` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:17552:4: warning: function `target_slot_default` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:41938:4: warning: function `ade_fg_dark` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:41946:4: warning: function `ade_fg_light` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\remote_frame_registry.rs:151:8: warning: static `TEST_NS_ALLOC` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\back_proxy.rs:1197:8: warning: method `has_subscribers` is never used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\vm_bridge.rs:538:15: warning: for loop over a `&Option`. This is more readably written as an `if let` statement
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\stage3.rs:172:13: warning: structure field `PageFaultCount` should have a snake case name: help: convert the identifier to snake case: `page_fault_count`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\stage3.rs:173:13: warning: structure field `PeakWorkingSetSize` should have a snake case name: help: convert the identifier to snake case: `peak_working_set_size`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\stage3.rs:174:13: warning: structure field `WorkingSetSize` should have a snake case name: help: convert the identifier to snake case: `working_set_size`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\stage3.rs:175:13: warning: structure field `QuotaPeakPagedPoolUsage` should have a snake case name: help: convert the identifier to snake case: `quota_peak_paged_pool_usage`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\stage3.rs:176:13: warning: structure field `QuotaPagedPoolUsage` should have a snake case name: help: convert the identifier to snake case: `quota_paged_pool_usage`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\stage3.rs:177:13: warning: structure field `QuotaPeakNonPagedPoolUsage` should have a snake case name: help: convert the identifier to snake case: `quota_peak_non_paged_pool_usage`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\stage3.rs:178:13: warning: structure field `QuotaNonPagedPoolUsage` should have a snake case name: help: convert the identifier to snake case: `quota_non_paged_pool_usage`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\stage3.rs:179:13: warning: structure field `PagefileUsage` should have a snake case name: help: convert the identifier to snake case: `pagefile_usage`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\stage3.rs:180:13: warning: structure field `PeakPagefileUsage` should have a snake case name: help: convert the identifier to snake case: `peak_pagefile_usage`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\stage3.rs:181:13: warning: structure field `PrivateUsage` should have a snake case name: help: convert the identifier to snake case: `private_usage`
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\win_ime.rs:327:9: warning: unused `BOOL` that must be used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\win_ime.rs:143:26: warning: unused `BOOL` that must be used
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\win_ime.rs:170:29: warning: direct cast of function item into an integer
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\iced\renderer.rs:16138:5: warning: calls to `std::mem::drop` with a reference instead of an owned value does nothing
+D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-runtime\src\ui\desktop_protocol\stage3.rs:158:9: warning: `K32GetProcessMemoryInfo` redeclared with a different signature: this signature doesn't match the previous declaration
+warning: `auto-ui-runtime` (lib) generated 215 warnings (run `cargo fix --lib -p auto-ui-runtime` to apply 78 suggestions)
+   Compiling ui003-native-control-back v0.1.0 (D:\autostack\.wt\ui-003\auto-ui\target\debug\ui003-native-control\rust-workspace\ui003-native-control-back)
+warning: unused import: `State`
+ --> ui003-native-control-back\src\api.rs:2:21
+  |
+2 |     extract::{Path, State, Json, Query},
+  |                     ^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `done`
+  --> ui003-native-control-back\src\db.rs:54:25
+   |
+54 | pub fn remove_completed(done: bool) -> bool {
+   |                         ^^^^ help: if this is intentional, prefix it with an underscore: `_done`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: type alias `Db` is never used
+ --> ui003-native-control-back\src\api.rs:9:10
+  |
+9 | pub type Db = Arc<Mutex<Vec<Todo>>>;
+  |          ^^
+  |
+  = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: linker stdout: 正在创建库 D:\autostack\.wt\ui-003\auto-ui\target\debug\deps\ui003_native_control_back.lib 和对象 D:\autostack\.wt\ui-003\auto-ui\target\debug\deps\ui003_native_control_back.exp
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `ui003-native-control-back` (bin "ui003-native-control-back") generated 4 warnings (run `cargo fix --bin "ui003-native-control-back" -p ui003-native-control-back` to apply 2 suggestions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 14.65s
+     Running `D:\autostack\.wt\ui-003\auto-ui\target\debug\ui003-native-control-back.exe`
+Server running on http://127.0.0.1:13230 (CORS enabled for all origins)
+  ✓ API server is ready on http://127.0.0.1:13230
+Running VM interpreter UI (backend: rust, split over HTTP)
+[X9] entering vm interpreter
+[CALL_HANDLER] widget=App event_name=Init fn_name=handler_App_Init args=[]
+[VM-PARKED] handler_App_Init parked (event Init, wait HttpRequest(1)) — UI stays interactive
+AutoUI MCP: listening on http://127.0.0.1:13130
+AutoUI MCP: first state sync in view()
+[VM-PARKED] handler_App_Init resumed to completion (waited 1.1317214s)
+[VM-PARKED] handler_App_Submit parked (event Submit, wait HttpRequest(2)) — UI stays interactive
+[VM-PARKED] handler_App_Submit resumed to completion (waited 34.4635ms)
+accepted request id=1 op=input
+[session] host exit requested — closing the session (PLAN-815 T-05)
+[X9] vm interpreter returned ok=true
+  [tool] service launched at http://127.0.0.1:13130
+  [tool] run vm -> Completed
+------------- end --------------

@@ -1,0 +1,3774 @@
+   Compiling smallvec v1.16.3
+   Compiling log v0.4.34
+   Compiling windows-sys v0.61.2
+   Compiling num-traits v0.2.19
+   Compiling cc v1.2.67
+   Compiling syn v2.0.119
+   Compiling bytemuck v1.25.2
+   Compiling libm v0.2.16
+   Compiling windows-sys v0.52.0
+   Compiling syn v1.0.109
+   Compiling rgb v0.8.53
+   Compiling futures-executor v0.3.34
+   Compiling windows-sys v0.59.0
+   Compiling error-code v3.4.0
+   Compiling auto-lang-core v0.1.0 (D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core)
+   Compiling auto-ui-compiler v0.1.0 (D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-compiler)
+   Compiling tracing v0.1.44
+   Compiling tungstenite v0.30.0
+   Compiling shim-metadata v0.1.0 (D:\autostack\.wt\ui-003\auto-lang\crates\shim-metadata)
+   Compiling libsqlite3-sys v0.27.0
+   Compiling psm v0.1.32
+   Compiling blake3 v1.8.7
+   Compiling stacker v0.1.25
+   Compiling qoi v0.4.1
+   Compiling futures v0.3.34
+   Compiling clipboard-win v5.4.3
+   Compiling axum-core v0.5.6
+   Compiling parking_lot_core v0.9.12
+   Compiling icu_normalizer v2.4.0
+   Compiling icu_segmenter v2.4.0
+   Compiling nibble_vec v0.1.0
+   Compiling socket2 v0.5.10
+   Compiling fd-lock v4.0.4
+   Compiling zerocopy-derive v0.8.63
+   Compiling equator-macro v0.4.2
+   Compiling miette-derive v7.6.0
+   Compiling arg_enum_proc_macro v0.3.4
+   Compiling profiling-procmacros v1.0.18
+   Compiling strum_macros v0.26.4
+   Compiling windows-implement v0.57.0
+   Compiling num-derive v0.4.2
+   Compiling windows-interface v0.57.0
+   Compiling num-integer v0.1.47
+   Compiling num-complex v0.4.6
+   Compiling mio v1.2.4
+   Compiling socket2 v0.6.5
+   Compiling equator v0.4.2
+   Compiling parking_lot v0.12.5
+   Compiling terminal_size v0.4.4
+   Compiling num-bigint v0.4.8
+   Compiling schannel v0.1.30
+   Compiling idna_adapter v1.2.2
+   Compiling profiling v1.0.18
+   Compiling anstyle-wincon v3.0.11
+   Compiling anstyle-query v1.1.5
+   Compiling pulp v0.22.3
+   Compiling textwrap v0.16.4
+   Compiling winapi-util v0.1.11
+   Compiling dirs-sys v0.5.0
+   Compiling windows-core v0.57.0
+   Compiling moxcms v0.8.1
+   Compiling zerocopy v0.8.63
+   Compiling aligned-vec v0.6.4
+   Compiling thiserror-impl v1.0.69
+   Compiling home v0.5.12
+   Compiling tokio v1.54.1
+   Compiling native-tls v0.2.18
+   Compiling num-rational v0.4.2
+   Compiling trans-derive v0.4.0
+   Compiling anstream v1.0.0
+   Compiling same-file v1.0.6
+   Compiling chrono v0.4.45
+   Compiling dirs v6.0.0
+   Compiling idna v1.1.0
+   Compiling v_frame v0.3.9
+   Compiling radix_trie v0.2.1
+   Compiling clap_builder v4.6.7
+   Compiling colored v3.1.1
+   Compiling walkdir v2.5.0
+   Compiling miette v7.6.0
+   Compiling auto-macros v0.1.0 (D:\autostack\.wt\ui-003\auto-lang\crates\auto-macros)
+   Compiling tempfile v3.27.0
+   Compiling trans v0.4.0
+   Compiling av1-grain v0.2.5
+   Compiling av-scenechange v0.14.1
+   Compiling thiserror v1.0.69
+   Compiling serde_stacker v0.1.14
+   Compiling rustyline v14.0.0
+   Compiling notify v7.0.0
+   Compiling clap v4.6.7
+   Compiling url v2.5.8
+   Compiling publicsuffix v2.3.0
+warning: linker stdout: 正在创建库 D:\autostack\.wt\ui-003\auto-ui\target\debug\deps\auto_macros-3b1615d0285b3f12.dll.lib 和对象 D:\autostack\.wt\ui-003\auto-ui\target\debug\deps\auto_macros-3b1615d0285b3f12.dll.exp
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `auto-macros` (lib) generated 1 warning
+   Compiling auto-bindgen v0.1.0 (D:\autostack\.wt\ui-003\auto-lang\crates\auto-bindgen)
+   Compiling windows v0.57.0
+   Compiling rav1e v0.8.1
+   Compiling auto-lex v0.1.0 (D:\autostack\.wt\ui-003\auto-lang\crates\auto-lex)
+   Compiling cookie_store v0.22.1
+   Compiling redis v0.27.6
+   Compiling auto-diagnostics v0.1.0 (D:\autostack\.wt\ui-003\auto-lang\crates\auto-diagnostics)
+   Compiling auto-ast v0.1.0 (D:\autostack\.wt\ui-003\auto-lang\crates\auto-ast)
+   Compiling ahash v0.8.12
+   Compiling half v2.7.1
+   Compiling ppv-lite86 v0.2.21
+   Compiling hashbrown v0.14.5
+   Compiling rand_chacha v0.3.1
+   Compiling tiff v0.11.3
+   Compiling exr v1.74.2
+   Compiling rand v0.8.8
+   Compiling hashlink v0.8.4
+   Compiling dashmap v6.2.1
+   Compiling rusqlite v0.30.0
+   Compiling tungstenite v0.24.0
+   Compiling sysinfo v0.33.1
+   Compiling auto-cache v0.1.0 (D:\autostack\.wt\ui-003\auto-lang\crates\auto-cache)
+   Compiling auto-parser-api v0.1.0 (D:\autostack\.wt\ui-003\auto-lang\crates\auto-parser-api)
+   Compiling ravif v0.13.0
+   Compiling auto-ui-dialect v0.2.0 (D:\autostack\.wt\ui-003\auto-ui\crates\auto-ui-dialect)
+   Compiling tokio-util v0.7.20
+   Compiling tower v0.5.3
+   Compiling tokio-native-tls v0.3.1
+   Compiling async-compression v0.4.51
+   Compiling tokio-tungstenite v0.30.0
+   Compiling h2 v0.4.20
+   Compiling tower-http v0.6.11
+   Compiling image v0.25.10
+   Compiling hyper v1.12.0
+   Compiling hyper-util v0.1.21
+   Compiling hyper-tls v0.6.0
+   Compiling axum v0.8.9
+   Compiling reqwest v0.12.28
+   Compiling auto-media-core v0.1.0 (D:\autostack\.wt\ui-003\auto-lang\crates\auto-media-core)
+   Compiling a2r-std v0.1.0 (D:\autostack\.wt\ui-003\auto-lang\crates\a2r-std)
+warning: unused doc comment
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\lib.rs:130:1
+    |
+130 | /// extraction, taken by the wrapper on the same thread before join returns.
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ rustdoc does not generate documentation for macro invocations
+    |
+    = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+    = note: `#[warn(unused_doc_comments)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused doc comment
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\lib.rs:148:1
+    |
+148 | / /// Plan 346: Remap string pool indices in bytecode after merging string pools.
+149 | | /// Walks the bytecode one instruction at a time (using a per-opcode operand
+150 | | /// length table so operand bytes are never misread as opcodes) and remaps the
+151 | | /// u16 string-pool index operand of every string-indexed opcode.
+...   |
+186 | | ///
+187 | | /// **Plan 091**: Now uses CompileSession internally (no Universe dependency)
+    | |_----------------------------------------------------------------------------^
+    |   |
+    |   rustdoc does not generate documentation for macro invocations
+    |
+    = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+
+warning: unused import: `Sender`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\http_service_observability.rs:12:29
+   |
+12 | use std::sync::mpsc::{self, Sender, SyncSender, TrySendError};
+   |                             ^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `Args`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\trans\emit.rs:16:10
+   |
+16 |     Arg, Args, Body, Call, Code, Expr, Fn, For, If, Iter, Stmt, Store, StoreKind, Try, Use, UseKind,
+   |          ^^^^
+
+warning: unused imports: `emit_http_verb_call` and `expr_root_is_http_request`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\trans\rust.rs:4282:5
+     |
+4282 |     emit_http_verb_call, expr_root_is_builder_var, expr_root_is_http_request,
+     |     ^^^^^^^^^^^^^^^^^^^                            ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::fmt::Write`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\abt\mod.rs:81:13
+   |
+81 |         use std::fmt::Write;
+   |             ^^^^^^^^^^^^^^^
+
+warning: unused imports: `NATIVE_PRINT_F64` and `NATIVE_PRINT_U64`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\codegen.rs:24:5
+   |
+24 |     NATIVE_PRINT_F64, NATIVE_PRINT_I32, NATIVE_PRINT_STR, NATIVE_PRINT_U64, NATIVE_PRINT_UNIFIED,
+   |     ^^^^^^^^^^^^^^^^                                      ^^^^^^^^^^^^^^^^
+
+warning: unused doc comment
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine.rs:1410:5
+     |
+1410 | /     /// 累计一次忙等段(waits 次轮询,busy 时长)。
+1411 | |     /// PLAN-053 P-053-2: nil 家族判定 —— tag-null(encode_null，现行
+1412 | |     /// `None`/`null`/`nil` 字面量与 JSON null 的统一编码)或旧编码
+1413 | |     /// i32(-1)(历史 `null` 字面量/CREATE_NONE)或 i32(i32::MIN+1)
+...    |
+1418 | |     /// PLAN-026 T-03 配套: 宽整数值归一(i32/i64 tag → i64 按值;算术
+1419 | |     /// 兜底臂与序比较宽整臂共用)。
+     | |_____------------------------------^
+     |       |
+     |       rustdoc does not generate documentation for macro invocations
+     |
+     = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+
+warning: unused import: `crate::vm::ffi::VMConvertible`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine.rs:3132:9
+     |
+3132 |     use crate::vm::ffi::VMConvertible;
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::vm::task::AutoTask`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine.rs:3133:9
+     |
+3133 |     use crate::vm::task::AutoTask;
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unnecessary braces around method argument
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine\ops_collections.rs:1146:38
+     |
+1146 |                         obj.set(key, { self.decode_tagged_nv(value_nv) });
+     |                                      ^^                               ^^
+     |
+     = note: `#[warn(unused_braces)]` (part of `#[warn(unused)]`) on by default
+help: remove these braces
+     |
+1146 -                         obj.set(key, { self.decode_tagged_nv(value_nv) });
+1146 +                         obj.set(key, self.decode_tagged_nv(value_nv));
+     |
+
+warning: unnecessary braces around method argument
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine\ops_collections.rs:1193:49
+     |
+1193 | ...                   inst.set_field(idx, { self.decode_tagged_nv(value_nv) })
+     |                                           ^^                               ^^
+     |
+help: remove these braces
+     |
+1193 -                             inst.set_field(idx, { self.decode_tagged_nv(value_nv) })
+1193 +                             inst.set_field(idx, self.decode_tagged_nv(value_nv))
+     |
+
+warning: unused import: `std::sync::atomic::Ordering`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine\values.rs:87:13
+   |
+87 |         use std::sync::atomic::Ordering;
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `dashmap::DashMap`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\rc.rs:20:5
+   |
+20 | use dashmap::DashMap;
+   |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `AtomicU64`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\rc.rs:21:36
+   |
+21 | use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+   |                                    ^^^^^^^^^
+
+warning: unused import: `super::*`
+ --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\storage.rs:3:5
+  |
+3 | use super::*;
+  |     ^^^^^^^^
+
+warning: unused import: `super::*`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\math.rs:13:5
+   |
+13 | use super::*;
+   |     ^^^^^^^^
+
+warning: unused doc comment
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\strings_json.rs:888:1
+    |
+888 | /// 原始（inventory rust_fn）shim 的暂存表：wrapper 规整首参后委托原实现。
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ rustdoc does not generate documentation for macro invocations
+    |
+    = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+
+warning: unused doc comment
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\dep_methods.rs:2376:1
+     |
+2376 | / /// 同步调用期有效的回调帧(裸指针仅在 marshaller 调用窗口内解引用;
+2377 | | /// 单线程原型,深度 1)。Option 空即"不在回调窗口"。
+     | |_--------------------------------------------------^
+     |   |
+     |   rustdoc does not generate documentation for macro invocations
+     |
+     = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+
+warning: unused doc comment
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_server.rs:3666:1
+     |
+3666 | /// PLAN-730 T-07：legacy 落盘结果表（op_id → Option<Result>；None=Pending）。
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ rustdoc does not generate documentation for macro invocations
+     |
+     = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+
+warning: unused doc comment
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_server\server_scope.rs:141:5
+    |
+141 |       /// 释放未消费 body 能力 + 移除闲置收据）。
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+142 | /     let uploads: Vec<u64> = scope
+143 | |         .upload_resources
+144 | |         .lock()
+145 | |         .map(|mut r| std::mem::take(&mut *r))
+146 | |         .unwrap_or_default();
+    | |_____________________________- rustdoc does not generate documentation for statements
+    |
+    = help: use `//` for a plain comment
+
+warning: unused import: `crate::run`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\tests_chart_geometry.rs:11:5
+   |
+11 | use crate::run;
+   |     ^^^^^^^^^^
+
+warning: variable does not need to be mutable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_server.rs:3324:9
+     |
+3324 |     let mut loop_result = ();
+     |         ----^^^^^^^^^^^
+     |         |
+     |         help: remove this `mut`
+     |
+     = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_stream.rs:208:13
+    |
+208 |         let mut space_wait = handle.space.notified();
+    |             ----^^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_transport.rs:366:10
+    |
+366 |     let (mut parts, body) = request.into_parts();
+    |          ----^^^^^
+    |          |
+    |          help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_transport.rs:852:25
+    |
+852 |                     let mut resp = match outcome.reply.body {
+    |                         ----^^^^
+    |                         |
+    |                         help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\parser\expressions.rs:456:13
+    |
+456 |         let mut rollback = |slf: &mut Self| {
+    |             ----^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: unused variable: `w`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\parser\statements.rs:117:21
+    |
+117 |                 let w = "__w".to_string();
+    |                     ^ help: if this is intentional, prefix it with an underscore: `_w`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `open`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\parser\type_syntax.rs:292:14
+    |
+292 |         let (open, close, close_text) = if self.is_kind(TokenKind::Lt) {
+    |              ^^^^ help: if this is intentional, prefix it with an underscore: `_open`
+
+warning: variable does not need to be mutable
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\http_service_config.rs:497:13
+    |
+497 |         let mut take =
+    |             ----^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\http_service_config.rs:507:13
+    |
+507 |         let mut take_u64 =
+    |             ----^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\http_service_config.rs:613:13
+    |
+613 |         let mut take_list =
+    |             ----^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\http_service_config.rs:769:13
+    |
+769 |         let mut take = |field_end: &str, v: Option<bool>, dev: bool, svc: bool| -> bool {
+    |             ----^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: irrefutable `if let` pattern
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\http_service_observability.rs:285:20
+    |
+285 |                 if let SinkMsg::Line(l) = msg {
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: this pattern will always match, so the `if let` is useless
+    = help: consider replacing the `if let` with a `let`
+    = note: `#[warn(irrefutable_let_patterns)]` on by default
+
+warning: variable does not need to be mutable
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\stdlib_assembly\host.rs:931:9
+    |
+931 |     let mut returns = rule.public_return.to_string();
+    |         ----^^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: unreachable pattern
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\trans\rust\call_emit\call_module_methods.rs:1368:34
+     |
+1252 |                         "Json" => match method.as_str() {
+     |                         ------ matches all the relevant values
+...
+1368 |                         "json" | "Json" => match method.as_str() {
+     |                                  ^^^^^^ no value can reach this
+     |
+     = note: `#[warn(unreachable_patterns)]` (part of `#[warn(unused)]`) on by default
+
+warning: unreachable pattern
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\trans\rust\call_emit\call_module_methods.rs:1591:29
+     |
+1470 | ...                   "as_int" => {
+     |                       -------- matches all the relevant values
+...
+1591 | ...                   "as_int" => {
+     |                       ^^^^^^^^ no value can reach this
+
+warning: unused variable: `i`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\trans\rust\call_emit\call_module_methods.rs:1923:38
+     |
+1923 | ...                   for (i, arg) in call.args.args.iter().enumerate().skip(1) {
+     |                            ^ help: if this is intentional, prefix it with an underscore: `_i`
+
+warning: unused variable: `derive_attr`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\trans\rust\project_fixups.rs:4133:25
+     |
+4133 |                     let derive_attr = caps.get(1).unwrap().as_str();
+     |                         ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_derive_attr`
+
+warning: unused variable: `name`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\trans\rust\stmt_emit.rs:850:13
+    |
+850 |         let name = td.name.as_str();
+    |             ^^^^ help: if this is intentional, prefix it with an underscore: `_name`
+
+warning: unused variable: `name`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\trans\rust\stmt_emit.rs:1303:9
+     |
+1303 |         name: &str,
+     |         ^^^^ help: if this is intentional, prefix it with an underscore: `_name`
+
+warning: unused variable: `method`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\trans\rust\ty.rs:50:31
+   |
+50 |         if let Expr::Dot(obj, method) = call.name.as_ref() {
+   |                               ^^^^^^ help: if this is intentional, prefix it with an underscore: `_method`
+
+warning: unused variable: `has_kw`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\trans\s2s_rules.rs:90:21
+   |
+90 |                 let has_kw = c.args.args.iter().any(|a| matches!(a, Arg::Pair(_, _)));
+   |                     ^^^^^^ help: if this is intentional, prefix it with an underscore: `_has_kw`
+
+warning: unreachable pattern
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\abt\asm.rs:296:11
+    |
+260 |         | OpCode::LOAD_GLOBAL
+    |           ------------------- matches all the relevant values
+...
+296 |         | OpCode::LOAD_GLOBAL
+    |           ^^^^^^^^^^^^^^^^^^^ no value can reach this
+
+warning: unreachable pattern
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\abt\asm.rs:297:11
+    |
+261 |         | OpCode::STORE_GLOBAL => 1,
+    |           -------------------- matches all the relevant values
+...
+297 |         | OpCode::STORE_GLOBAL => 4,
+    |           ^^^^^^^^^^^^^^^^^^^^ no value can reach this
+
+warning: unreachable pattern
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\abt\disasm.rs:271:11
+    |
+247 |         | OpCode::LOAD_GLOBAL | OpCode::STORE_GLOBAL
+    |           ------------------- matches all the relevant values
+...
+271 |         | OpCode::LOAD_GLOBAL | OpCode::STORE_GLOBAL
+    |           ^^^^^^^^^^^^^^^^^^^ no value can reach this
+
+warning: unreachable pattern
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\abt\disasm.rs:271:33
+    |
+247 |         | OpCode::LOAD_GLOBAL | OpCode::STORE_GLOBAL
+    |                                 -------------------- matches all the relevant values
+...
+271 |         | OpCode::LOAD_GLOBAL | OpCode::STORE_GLOBAL
+    |                                 ^^^^^^^^^^^^^^^^^^^^ no value can reach this
+
+warning: variable does not need to be mutable
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\abt\mod.rs:87:13
+   |
+87 |         let mut emit_line = |s: &str,
+   |             ----^^^^^^^^^
+   |             |
+   |             help: remove this `mut`
+
+warning: unused variable: `enum_method`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\codegen\expr_calls.rs:714:61
+    |
+714 | ...                   let enum_method = format!(
+    |                           ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_enum_method`
+
+warning: unused variable: `spec_decl`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\codegen\stmt_emit.rs:1747:28
+     |
+1747 |             Stmt::SpecDecl(spec_decl) => {
+     |                            ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_spec_decl`
+
+warning: unused variable: `handle`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine\ops_arith.rs:1077:29
+     |
+1077 |                 if let Some(handle) = http_response_handle {
+     |                             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_handle`
+
+warning: unused variable: `other`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine\ops_arith.rs:2615:38
+     |
+2615 | ...                   Some(other) => {
+     |                            ^^^^^ help: if this is intentional, prefix it with an underscore: `_other`
+
+warning: unused variable: `value`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine\ops_calls.rs:833:25
+    |
+833 |                     let value = auto_val::decode_i32(value_nv);
+    |                         ^^^^^ help: if this is intentional, prefix it with an underscore: `_value`
+
+warning: value assigned to `old_field_ref` is never read
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine\ops_collections.rs:51:54
+   |
+51 |                   let mut old_field_ref: Option<u64> = None;
+   |                                                        ^^^^ this value is reassigned later and never used
+...
+65 | /                             old_field_ref =
+66 | |                                 instance.fields.get(field_index).and_then(|v| match v {
+67 | |                                     Value::VmRef(r) => Some(r.id as u64),
+68 | |                                     _ => None,
+69 | |                                 });
+   | |__________________________________- `old_field_ref` is overwritten here before the previous value is read
+   |
+   = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `saved_saved_closure_id`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine\tasks.rs:250:13
+    |
+250 |         let saved_saved_closure_id = task.saved_closure_id;
+    |             ^^^^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_saved_saved_closure_id`
+
+warning: variable does not need to be mutable
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\rc.rs:374:22
+    |
+374 |             let Some(mut e) = self.heap_rc.get_mut(&id) else {
+    |                      ----^
+    |                      |
+    |                      help: remove this `mut`
+
+warning: unused variable: `k`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\rc.rs:769:25
+    |
+769 |             if let Some(k) = &key {
+    |                         ^ help: if this is intentional, prefix it with an underscore: `_k`
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1746 | math_unary_shim!(shim_math_sin, sin);
+     | ------------------------------------ in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1746 | math_unary_shim!(shim_math_sin, sin);
+     | ------------------------------------ in this macro invocation
+     = note: this warning originates in the macro `math_unary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1747 | math_unary_shim!(shim_math_cos, cos);
+     | ------------------------------------ in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1747 | math_unary_shim!(shim_math_cos, cos);
+     | ------------------------------------ in this macro invocation
+     = note: this warning originates in the macro `math_unary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1748 | math_unary_shim!(shim_math_tan, tan);
+     | ------------------------------------ in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1748 | math_unary_shim!(shim_math_tan, tan);
+     | ------------------------------------ in this macro invocation
+     = note: this warning originates in the macro `math_unary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1751 | math_unary_shim!(shim_math_abs_f, abs);
+     | -------------------------------------- in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1751 | math_unary_shim!(shim_math_abs_f, abs);
+     | -------------------------------------- in this macro invocation
+     = note: this warning originates in the macro `math_unary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1752 | math_unary_shim!(shim_math_floor, floor);
+     | ---------------------------------------- in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1752 | math_unary_shim!(shim_math_floor, floor);
+     | ---------------------------------------- in this macro invocation
+     = note: this warning originates in the macro `math_unary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1753 | math_unary_shim!(shim_math_ceil, ceil);
+     | -------------------------------------- in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1753 | math_unary_shim!(shim_math_ceil, ceil);
+     | -------------------------------------- in this macro invocation
+     = note: this warning originates in the macro `math_unary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1754 | math_unary_shim!(shim_math_round, round);
+     | ---------------------------------------- in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1754 | math_unary_shim!(shim_math_round, round);
+     | ---------------------------------------- in this macro invocation
+     = note: this warning originates in the macro `math_unary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1755 | math_unary_shim!(shim_math_exp, exp);
+     | ------------------------------------ in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1755 | math_unary_shim!(shim_math_exp, exp);
+     | ------------------------------------ in this macro invocation
+     = note: this warning originates in the macro `math_unary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1756 | math_unary_shim!(shim_math_ln, ln);
+     | ---------------------------------- in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1756 | math_unary_shim!(shim_math_ln, ln);
+     | ---------------------------------- in this macro invocation
+     = note: this warning originates in the macro `math_unary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1757 | math_unary_shim!(shim_math_log2, log2);
+     | -------------------------------------- in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1757 | math_unary_shim!(shim_math_log2, log2);
+     | -------------------------------------- in this macro invocation
+     = note: this warning originates in the macro `math_unary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1758 | math_unary_shim!(shim_math_log10, log10);
+     | ---------------------------------------- in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1758 | math_unary_shim!(shim_math_log10, log10);
+     | ---------------------------------------- in this macro invocation
+     = note: this warning originates in the macro `math_unary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1759 | math_unary_shim!(shim_math_signum, signum);
+     | ------------------------------------------ in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1759 | math_unary_shim!(shim_math_signum, signum);
+     | ------------------------------------------ in this macro invocation
+     = note: this warning originates in the macro `math_unary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1760 | math_unary_shim!(shim_math_asin, asin);
+     | -------------------------------------- in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1760 | math_unary_shim!(shim_math_asin, asin);
+     | -------------------------------------- in this macro invocation
+     = note: this warning originates in the macro `math_unary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1761 | math_unary_shim!(shim_math_acos, acos);
+     | -------------------------------------- in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1761 | math_unary_shim!(shim_math_acos, acos);
+     | -------------------------------------- in this macro invocation
+     = note: this warning originates in the macro `math_unary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1762 | math_unary_shim!(shim_math_atan, atan);
+     | -------------------------------------- in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1762 | math_unary_shim!(shim_math_atan, atan);
+     | -------------------------------------- in this macro invocation
+     = note: this warning originates in the macro `math_unary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1763 | math_unary_shim!(shim_math_to_radians, to_radians);
+     | -------------------------------------------------- in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1763 | math_unary_shim!(shim_math_to_radians, to_radians);
+     | -------------------------------------------------- in this macro invocation
+     = note: this warning originates in the macro `math_unary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1764 | math_unary_shim!(shim_math_to_degrees, to_degrees);
+     | -------------------------------------------------- in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1727:43
+     |
+1727 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1764 | math_unary_shim!(shim_math_to_degrees, to_degrees);
+     | -------------------------------------------------- in this macro invocation
+     = note: this warning originates in the macro `math_unary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1737:43
+     |
+1737 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1765 | math_binary_shim!(shim_math_pow, powf);
+     | -------------------------------------- in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1737:43
+     |
+1737 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1765 | math_binary_shim!(shim_math_pow, powf);
+     | -------------------------------------- in this macro invocation
+     = note: this warning originates in the macro `math_binary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1737:43
+     |
+1737 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1766 | math_binary_shim!(shim_math_powf, powf);
+     | --------------------------------------- in this macro invocation
+     |
+help: `vm` is captured in macro and introduced a unused variable
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:1737:43
+     |
+1737 |         pub fn $name(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                           ^^
+...
+1766 | math_binary_shim!(shim_math_powf, powf);
+     | --------------------------------------- in this macro invocation
+     = note: this warning originates in the macro `math_binary_shim` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native.rs:3197:45
+     |
+3197 | pub fn shim_result_ok(_task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                             ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+ --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:6:49
+  |
+6 | pub(super) fn shim_int_and(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+  |                                                 ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:14:48
+   |
+14 | pub(super) fn shim_int_or(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+   |                                                ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:22:49
+   |
+22 | pub(super) fn shim_int_xor(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+   |                                                 ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:31:49
+   |
+31 | pub(super) fn shim_int_not(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+   |                                                 ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:39:49
+   |
+39 | pub(super) fn shim_int_shl(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+   |                                                 ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:54:49
+   |
+54 | pub(super) fn shim_int_shr(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+   |                                                 ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:69:49
+   |
+69 | pub(super) fn shim_int_sar(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+   |                                                 ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:87:49
+   |
+87 | pub(super) fn shim_int_rol(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+   |                                                 ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:95:49
+   |
+95 | pub(super) fn shim_int_ror(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+   |                                                 ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:103:56
+    |
+103 | pub(super) fn shim_int_count_ones(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                                        ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:110:59
+    |
+110 | pub(super) fn shim_int_leading_zeros(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                                           ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:117:60
+    |
+117 | pub(super) fn shim_int_trailing_zeros(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                                            ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:124:52
+    |
+124 | pub(super) fn shim_int_bitrev(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                                    ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:131:54
+    |
+131 | pub(super) fn shim_int_bit_read(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                                      ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:147:54
+    |
+147 | pub(super) fn shim_int_bit_test(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                                      ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:158:52
+    |
+158 | pub(super) fn shim_int_bit_on(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                                    ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:172:53
+    |
+172 | pub(super) fn shim_int_bit_off(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                                     ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:186:54
+    |
+186 | pub(super) fn shim_int_bit_flip(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                                      ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_int.rs:207:45
+    |
+207 | pub fn shim_math_atan2(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                             ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_io.rs:45:48
+   |
+45 | pub fn shim_console_clear(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+   |                                                ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_io.rs:484:44
+    |
+484 | pub fn shim_log_noop(_task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                            ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_rand.rs:108:46
+    |
+108 | pub fn shim_rand_random(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                              ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_rand.rs:143:45
+    |
+143 | pub fn shim_rand_float(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                             ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_rand.rs:156:44
+    |
+156 | pub fn shim_rand_bool(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                            ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\http_client.rs:184:58
+    |
+184 | pub fn shim_net_tcp_listener_accept(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                                          ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\http_client.rs:223:57
+    |
+223 | pub fn shim_net_tcp_listener_close(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                                         ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\http_client.rs:370:55
+    |
+370 | pub fn shim_net_tcp_stream_close(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                                       ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\http_client.rs:393:5
+    |
+393 |     vm: &AutoVM,
+    |     ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\http_client.rs:415:5
+    |
+415 |     vm: &AutoVM,
+    |     ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\http_client.rs:438:55
+    |
+438 | pub fn shim_net_tcp_stream_flush(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                                       ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\http_client.rs:454:61
+    |
+454 | pub fn shim_net_tcp_stream_set_nodelay(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                                             ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\http_client.rs:469:46
+    |
+469 | pub fn shim_http_server(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                              ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\http_client.rs:852:50
+    |
+852 | pub fn shim_http_rate_limit(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+    |                                                  ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\http_client.rs:2371:51
+     |
+2371 | pub fn shim_http_last_status(task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                                   ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: unused variable: `vm`
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\http_client.rs:2403:47
+     |
+2403 | pub fn shim_http_listen(_task: &mut AutoTask, vm: &AutoVM) -> Result<(), VMError> {
+     |                                               ^^ help: if this is intentional, prefix it with an underscore: `_vm`
+
+warning: variable does not need to be mutable
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_server\server_dispatch.rs:599:17
+    |
+599 |             let mut b = *boxed;
+    |                 ----^
+    |                 |
+    |                 help: remove this `mut`
+
+warning: unused variable: `stream_id`
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_stream.rs:394:5
+    |
+394 |     stream_id: u64,
+    |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_stream_id`
+
+warning: taking a mutable reference to a `const` item
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\entry.rs:2492:54
+     |
+2492 |         scan_at_files(&src_root, &mut type_store, 0, &mut SCAN_MAX_FILES);
+     |                                                      ^^^^^^^^^^^^^^^^^^^
+     |
+     = note: each usage of a `const` item creates a new temporary
+     = note: the mutable reference will refer to this temporary, not the original `const` item
+note: `const` item defined here
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\entry.rs:2409:9
+     |
+2409 |         const SCAN_MAX_FILES: usize = 400;
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     = note: `#[warn(const_item_mutation)]` on by default
+
+warning: constant `HEALTH_BUDGET` is never used
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\http_service_config.rs:361:15
+    |
+361 |     pub const HEALTH_BUDGET: (usize, usize) = (1, 64);
+    |               ^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: variant `Standalone` is never constructed
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\stdlib_assembly\host.rs:65:5
+   |
+63 | enum RuntimeSpec {
+   |      ----------- variant in this enum
+64 |     Both,
+65 |     Standalone,
+   |     ^^^^^^^^^^
+
+warning: function `test_a2p` is never used
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\trans\python.rs:2671:8
+     |
+2671 |     fn test_a2p(case: &str) -> AutoResult<()> {
+     |        ^^^^^^^^
+
+warning: function `pop_str_idx` is never used
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine.rs:100:4
+    |
+100 | fn pop_str_idx(ram: &mut VirtualRAM) -> usize {
+    |    ^^^^^^^^^^^
+
+warning: method `intern_string` is never used
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine.rs:1059:8
+     |
+ 760 | impl AutoVM {
+     | ----------- method in this implementation
+...
+1059 |     fn intern_string(&mut self, bytes: &[u8]) -> usize {
+     |        ^^^^^^^^^^^^^
+
+warning: function `vm_with` is never used
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine.rs:3070:8
+     |
+3070 |     fn vm_with(code: Vec<u8>) -> AutoVM {
+     |        ^^^^^^^
+
+warning: function `pop_str` is never used
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine.rs:3074:8
+     |
+3074 |     fn pop_str(vm: &AutoVM, task: &mut AutoTask) -> String {
+     |        ^^^^^^^
+
+warning: function `vm_idle` is never used
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine.rs:3136:8
+     |
+3136 |     fn vm_idle() -> AutoVM {
+     |        ^^^^^^^
+
+warning: function `vm_with` is never used
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine.rs:3229:8
+     |
+3229 |     fn vm_with(code: Vec<u8>) -> AutoVM {
+     |        ^^^^^^^
+
+warning: function `push_result_instance` is never used
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine.rs:3233:8
+     |
+3233 |     fn push_result_instance(vm: &AutoVM, task: &mut AutoTask, kind: &str, field: auto_val::Value) {
+     |        ^^^^^^^^^^^^^^^^^^^^
+
+warning: method `decode_tagged_value` is never used
+ --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\engine\values.rs:7:8
+  |
+4 | impl AutoVM {
+  | ----------- method in this implementation
+...
+7 |     fn decode_tagged_value(&self, raw: i32) -> auto_val::Value {
+  |        ^^^^^^^^^^^^^^^^^^^
+
+warning: field `req_id` is never read
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\http_async.rs:194:5
+    |
+190 | struct HttpJsonJob {
+    |        ----------- field in this struct
+...
+194 |     req_id: u64,
+    |     ^^^^^^
+
+warning: function `fn_is_api_async` is never used
+  --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_server.rs:55:15
+   |
+55 | pub(crate) fn fn_is_api_async(fn_name: &str) -> bool {
+   |               ^^^^^^^^^^^^^^^
+
+warning: constant `META_PARAM_NAMES` is never used
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_server.rs:4524:7
+     |
+4524 | const META_PARAM_NAMES: [&str; 4] = ["meta", "metadata", "req", "request"];
+     |       ^^^^^^^^^^^^^^^^
+
+warning: function `is_meta_param_name` is never used
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_server\server_argbind.rs:323:4
+    |
+323 | fn is_meta_param_name(name: &str) -> bool {
+    |    ^^^^^^^^^^^^^^^^^^
+
+warning: function `http_status_reason` is never used
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_server\server_route.rs:435:4
+    |
+435 | fn http_status_reason(code: u16) -> &'static str {
+    |    ^^^^^^^^^^^^^^^^^^
+
+warning: field `0` is never read
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_server\server_scope.rs:410:12
+    |
+410 |     Future(u32),
+    |     ------ ^^^
+    |     |
+    |     field in this variant
+    |
+help: consider changing the field to be of unit type to suppress this warning while preserving the field numbering, or remove the field
+    |
+410 -     Future(u32),
+410 +     Future(()),
+    |
+
+warning: function `stream_remove` is never used
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\http_stream.rs:311:15
+    |
+311 | pub(crate) fn stream_remove(stream_id: u64) {
+    |               ^^^^^^^^^^^^^
+
+warning: variable `_stake__disc` should have a snake case name
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_collections.rs:896:13
+    |
+896 |         let _stake__disc = crate::vm::native::StakeGuard::nv(vm, _disc);
+    |             ^^^^^^^^^^^^ help: convert the identifier to snake case: `_stake_disc`
+    |
+    = note: `#[warn(non_snake_case)]` (part of `#[warn(nonstandard_style)]`) on by default
+
+warning: variable `_stake__closure_id` should have a snake case name
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_collections.rs:1272:9
+     |
+1272 |     let _stake__closure_id = crate::vm::native::StakeGuard::new(vm, _closure_id as i64 as u64);
+     |         ^^^^^^^^^^^^^^^^^^ help: convert the identifier to snake case: `_stake_closure_id`
+
+warning: variable `_stake__func_addr` should have a snake case name
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_collections.rs:2044:9
+     |
+2044 |     let _stake__func_addr = crate::vm::native::StakeGuard::new(vm, _func_addr as i64 as u64); // Not used in MVP
+     |         ^^^^^^^^^^^^^^^^^ help: convert the identifier to snake case: `_stake_func_addr`
+
+warning: variable `_stake__func_addr` should have a snake case name
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_collections.rs:2106:9
+     |
+2106 |     let _stake__func_addr = crate::vm::native::StakeGuard::new(vm, _func_addr as i64 as u64); // Not used in MVP
+     |         ^^^^^^^^^^^^^^^^^ help: convert the identifier to snake case: `_stake_func_addr`
+
+warning: variable `_stake__arr_id` should have a snake case name
+    --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_collections.rs:3500:9
+     |
+3500 |     let _stake__arr_id = crate::vm::native::StakeGuard::new(vm, _arr_id as i64 as u64);
+     |         ^^^^^^^^^^^^^^ help: convert the identifier to snake case: `_stake_arr_id`
+
+warning: variable `_stake__capacity` should have a snake case name
+ --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_strings.rs:9:9
+  |
+9 |     let _stake__capacity = crate::vm::native::StakeGuard::new(vm, _capacity as i64 as u64);
+  |         ^^^^^^^^^^^^^^^^ help: convert the identifier to snake case: `_stake_capacity`
+
+warning: variable `_stake__capacity` should have a snake case name
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_strings.rs:411:9
+    |
+411 |     let _stake__capacity = crate::vm::native::StakeGuard::new(vm, _capacity as i64 as u64);
+    |         ^^^^^^^^^^^^^^^^ help: convert the identifier to snake case: `_stake_capacity`
+
+warning: variable `_stake__inst_id` should have a snake case name
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_test.rs:109:9
+    |
+109 |     let _stake__inst_id = crate::vm::native::StakeGuard::new(vm, _inst_id as i64 as u64);
+    |         ^^^^^^^^^^^^^^^ help: convert the identifier to snake case: `_stake_inst_id`
+
+warning: variable `_stake__inst_id` should have a snake case name
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\native\natives_test.rs:122:9
+    |
+122 |     let _stake__inst_id = crate::vm::native::StakeGuard::new(vm, _inst_id as i64 as u64);
+    |         ^^^^^^^^^^^^^^^ help: convert the identifier to snake case: `_stake_inst_id`
+
+warning: direct cast of function item into an integer
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\exit_audit.rs:408:70
+    |
+408 | ...                   "ExitProcess" => traced_exit_process as usize,
+    |                                                            ^^^^^^^^
+    |
+    = note: `#[warn(function_casts_as_integer)]` on by default
+help: first cast to a pointer `as *const ()`
+    |
+408 |                                 "ExitProcess" => traced_exit_process as *const () as usize,
+    |                                                                      ++++++++++++
+
+warning: direct cast of function item into an integer
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\exit_audit.rs:409:80
+    |
+409 | ...                   "TerminateProcess" => traced_terminate_process as usize,
+    |                                                                      ^^^^^^^^
+    |
+help: first cast to a pointer `as *const ()`
+    |
+409 |                                 "TerminateProcess" => traced_terminate_process as *const () as usize,
+    |                                                                                ++++++++++++
+
+warning: calls to `std::mem::drop` with a value that implements `Copy` does nothing
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\rust_stdlib_dispatch.rs:823:13
+    |
+823 |             drop(i64::pop_from_stack(task, vm).unwrap_or(0));
+    |             ^^^^^------------------------------------------^
+    |                  |
+    |                  argument has type `i64`
+    |
+    = note: `#[warn(dropping_copy_types)]` on by default
+help: use `let _ = ...` to ignore the expression or result
+    |
+823 -             drop(i64::pop_from_stack(task, vm).unwrap_or(0));
+823 +             let _ = i64::pop_from_stack(task, vm).unwrap_or(0);
+    |
+
+warning: calls to `std::mem::drop` with a value that implements `Copy` does nothing
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\stdlib\rust_stdlib_dispatch.rs:827:13
+    |
+827 |             drop(i64::pop_from_stack(task, vm).unwrap_or(0));
+    |             ^^^^^------------------------------------------^
+    |                  |
+    |                  argument has type `i64`
+    |
+help: use `let _ = ...` to ignore the expression or result
+    |
+827 -             drop(i64::pop_from_stack(task, vm).unwrap_or(0));
+827 +             let _ = i64::pop_from_stack(task, vm).unwrap_or(0);
+    |
+
+warning: variable `_stake__cfg` should have a snake case name
+   --> D:\autostack\.wt\ui-003\auto-lang\crates\auto-lang-core\src\vm\ffi\musk_response_ctor.rs:874:16
+    |
+874 |     let (_cfg, _stake__cfg) = pop_value_staked(task, vm); // config Value (unused for the default)
+    |                ^^^^^^^^^^^ help: convert the identifier to snake case: `_stake_cfg`
+
+warning: `auto-lang-core` (lib) generated 147 warnings (run `cargo fix --lib -p auto-lang-core` to apply 82 suggestions)
+warning: unexpected `cfg` condition value: `ui-interpreter`
+  --> crates\auto-ui-compiler\src\app_registry.rs:28:7
+   |
+28 | #[cfg(feature = "ui-interpreter")]
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: expected values for `feature` are: `default`, `ui`, and `ui-headless`
+   = help: consider adding `ui-interpreter` as a feature in `Cargo.toml`
+   = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+   = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: unexpected `cfg` condition value: `ui-interpreter`
+   --> crates\auto-ui-compiler\src\app_registry.rs:139:15
+    |
+139 |         #[cfg(feature = "ui-interpreter")]
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `ui`, and `ui-headless`
+    = help: consider adding `ui-interpreter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `ui-interpreter`
+   --> crates\auto-ui-compiler\src\app_registry.rs:143:19
+    |
+143 |         #[cfg(not(feature = "ui-interpreter"))]
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `ui`, and `ui-headless`
+    = help: consider adding `ui-interpreter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unused import: `super::*`
+    --> crates\auto-ui-compiler\src\design_tokens\recipe.rs:1016:9
+     |
+1016 |     use super::*;
+     |         ^^^^^^^^
+     |
+     = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `auto_lang_core::parser::Parser`
+    --> crates\auto-ui-compiler\src\design_tokens\recipe.rs:1017:9
+     |
+1017 |     use auto_lang_core::parser::Parser;
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `auto_lang_core::session::CompilerSession`
+    --> crates\auto-ui-compiler\src\design_tokens\recipe.rs:1018:9
+     |
+1018 |     use auto_lang_core::session::CompilerSession;
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `AtomicBool`
+  --> crates\auto-ui-compiler\src\style\mod.rs:41:29
+   |
+41 |     use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+   |                             ^^^^^^^^^^
+
+warning: unused doc comment
+   --> crates\auto-ui-compiler\src\style\theme\mod.rs:178:1
+    |
+178 | / /// PLAN-020 T-00b: 窗口高度(逻辑 px),与 window_width 同规约——renderer
+179 | | /// 在 view() 前设值。窗口尺寸面(分屏矩形投影 px 类几何的标定源)。
+    | |_-----------------------------------------------------------------^
+    |   |
+    |   rustdoc does not generate documentation for macro invocations
+    |
+    = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+    = note: `#[warn(unused_doc_comments)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused doc comment
+   --> crates\auto-ui-compiler\src\aura\extract.rs:921:1
+    |
+921 | /// Extract view node from parsed ViewNode
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ rustdoc does not generate documentation for macro invocations
+    |
+    = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+
+warning: unused doc comment
+    --> crates\auto-ui-compiler\src\ui_gen\rust.rs:1295:9
+     |
+1295 | /         /// action_config 全局面——与 VM 轨 renderer __menubar_toggle 同
+1296 | |         /// 机制非消费方补丁；族折叠契约镜像解释态
+1297 | |         /// convert_menubar_component）。枚举先于 view 树生成——变体在
+1298 | |         /// 此预扫描推送（scan_input_fields 同序先例）。
+     | |________________________________________________________^
+1299 | /         if self.view_tree_has_menubar(&widget.view_tree) {
+1300 | |             if !self
+1301 | |                 .message_variants
+1302 | |                 .iter()
+...    |
+1324 | |         }
+     | |_________- rustdoc does not generate documentation for expressions
+     |
+     = help: use `//` for a plain comment
+
+warning: unused imports: `Expr` and `Stmt`
+    --> crates\auto-ui-compiler\src\ui_gen\rust.rs:8422:35
+     |
+8422 |         use auto_lang_core::ast::{Expr, Stmt};
+     |                                   ^^^^  ^^^^
+
+warning: unused import: `auto_val::Op`
+    --> crates\auto-ui-compiler\src\ui_gen\rust.rs:8423:13
+     |
+8423 |         use auto_val::Op;
+     |             ^^^^^^^^^^^^
+
+warning: unused doc comment
+    --> crates\auto-ui-compiler\src\ui_gen\rust.rs:9903:21
+     |
+9903 |                       /// 显式拒绝非静默）。
+     |                       ^^^^^^^^^^^^^^^^^^^^^^
+9904 | /                     _ => {
+9905 | |                         let kind = self.tag_to_view_fn(tag);
+9906 | |                         let hit = crate::ui_gen::vocab::view_prop_vocab(kind)
+9907 | |                             .iter()
+...    |
+9944 | |                         format!("{{ std::compile_error!(\"{msg}\"); unreachable!() }}")
+9945 | |                     }
+     | |_____________________- rustdoc does not generate documentation for match arms
+     |
+     = help: use `//` for a plain comment
+
+warning: unused doc comment
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:10114:17
+      |
+10114 |                 /// handler 闭包，Msg 槽发直消息（Option<M> 面无闭包包装）。
+      |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+10115 |                 let kind = self.tag_to_view_fn(tag);
+      |                 ------------------------------------ rustdoc does not generate documentation for statements
+      |
+      = help: use `//` for a plain comment
+
+warning: unnecessary parentheses around `if` condition
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:13211:20
+      |
+13211 |                 if (fn_name.starts_with("store.") || fn_name.starts_with("self.store.")) {
+      |                    ^                                                                   ^
+      |
+      = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+      |
+13211 -                 if (fn_name.starts_with("store.") || fn_name.starts_with("self.store.")) {
+13211 +                 if fn_name.starts_with("store.") || fn_name.starts_with("self.store.") {
+      |
+
+warning: unused import: `auto_lang_core::ast::Stmt`
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:28926:13
+      |
+28926 |         use auto_lang_core::ast::Stmt;
+      |             ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `auto_lang_core::session::CompilerSession`
+   --> crates\auto-ui-compiler\src\ui_gen\api.rs:669:9
+    |
+669 |     use auto_lang_core::session::CompilerSession;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `super::*`
+    --> crates\auto-ui-compiler\src\ui_gen\validators.rs:1187:9
+     |
+1187 |     use super::*;
+     |         ^^^^^^^^
+
+warning: use of deprecated struct `ui_gen::jet::components::Material3Registry`: Use WidgetRegistry instead
+   --> crates\auto-ui-compiler\src\ui_gen\jet\components.rs:239:24
+    |
+239 |         let registry = Material3Registry::new();
+    |                        ^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated struct `ui_gen::jet::components::Material3Registry`: Use WidgetRegistry instead
+   --> crates\auto-ui-compiler\src\ui_gen\jet\components.rs:247:24
+    |
+247 |         let registry = Material3Registry::new();
+    |                        ^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated struct `ui_gen::jet::components::Material3Registry`: Use WidgetRegistry instead
+   --> crates\auto-ui-compiler\src\ui_gen\jet\components.rs:255:24
+    |
+255 |         let registry = Material3Registry::new();
+    |                        ^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated struct `ui_gen::jet::components::Material3Registry`: Use WidgetRegistry instead
+   --> crates\auto-ui-compiler\src\ui_gen\jet\components.rs:263:24
+    |
+263 |         let registry = Material3Registry::new();
+    |                        ^^^^^^^^^^^^^^^^^
+
+warning: unreachable expression
+    --> crates\auto-ui-compiler\src\ui_gen\vue.rs:1353:9
+     |
+1350 |               return "Circle".to_string();
+     |               --------------------------- any code following this expression is unreachable
+...
+1353 | /         {
+1354 | |             let _ = kebab;
+1355 | |             pascal
+1356 | |         }
+     | |_________^ unreachable expression
+     |
+     = note: `#[warn(unreachable_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `warnings`
+   --> crates\auto-ui-compiler\src\action_config.rs:852:19
+    |
+852 |         let (cfg, warnings) = UiActionConfig::parse(SAMPLE).unwrap();
+    |                   ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_warnings`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+    --> crates\auto-ui-compiler\src\style\mod.rs:1071:13
+     |
+1071 |         let mut p = Parser::from(code).with_session(CompilerSession::ui());
+     |             ----^
+     |             |
+     |             help: remove this `mut`
+     |
+     = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `p`
+    --> crates\auto-ui-compiler\src\style\mod.rs:1071:13
+     |
+1071 |         let mut p = Parser::from(code).with_session(CompilerSession::ui());
+     |             ^^^^^ help: if this is intentional, prefix it with an underscore: `_p`
+
+warning: unreachable pattern
+   --> crates\auto-ui-compiler\src\a2ui\schema.rs:484:13
+    |
+477 |             A2UIMessage::SurfaceUpdate(update) => match &update.components[0].body {
+    |             ---------------------------------- matches all the relevant values
+...
+484 |             _ => panic!("Expected SurfaceUpdate"),
+    |             ^ no value can reach this
+    |
+    = note: `#[warn(unreachable_patterns)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> crates\auto-ui-compiler\src\aura\extract.rs:712:24
+    |
+712 |     let (mut handlers, mut handler_params) = if let Some(on) = &decl.on {
+    |                        ----^^^^^^^^^^^^^^
+    |                        |
+    |                        help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> crates\auto-ui-compiler\src\aura\extract.rs:1988:13
+     |
+1988 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+     |             ----^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: unused variable: `parser`
+    --> crates\auto-ui-compiler\src\aura\extract.rs:1988:13
+     |
+1988 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+     |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+    --> crates\auto-ui-compiler\src\aura\extract.rs:2081:13
+     |
+2081 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+     |             ----^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: unused variable: `parser`
+    --> crates\auto-ui-compiler\src\aura\extract.rs:2081:13
+     |
+2081 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+     |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: unused variable: `def`
+   --> crates\auto-ui-compiler\src\aura\schema.rs:323:21
+    |
+323 |         if let Some(def) = self.elements.get(tag) {
+    |                     ^^^ help: if this is intentional, prefix it with an underscore: `_def`
+
+warning: unused variable: `store_check`
+    --> crates\auto-ui-compiler\src\ui_gen\rust.rs:9518:21
+     |
+9518 |                 let store_check = format!("{}.{}", first, part);
+     |                     ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_store_check`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:14407:13
+      |
+14407 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:14407:13
+      |
+14407 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:14682:13
+      |
+14682 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:14682:13
+      |
+14682 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:14726:13
+      |
+14726 |         let mut parser = auto_lang_core::Parser::from(src.as_str()).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:14726:13
+      |
+14726 |         let mut parser = auto_lang_core::Parser::from(src.as_str()).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:14800:13
+      |
+14800 |         let mut parser = auto_lang_core::Parser::from(src.as_str()).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:14800:13
+      |
+14800 |         let mut parser = auto_lang_core::Parser::from(src.as_str()).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:14920:13
+      |
+14920 |         let mut parser = auto_lang_core::Parser::from(src.as_str()).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:14920:13
+      |
+14920 |         let mut parser = auto_lang_core::Parser::from(src.as_str()).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:14975:13
+      |
+14975 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:14975:13
+      |
+14975 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:15033:13
+      |
+15033 |         let mut parser = auto_lang_core::Parser::from(src.as_str()).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:15033:13
+      |
+15033 |         let mut parser = auto_lang_core::Parser::from(src.as_str()).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:15092:13
+      |
+15092 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:15092:13
+      |
+15092 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:15187:13
+      |
+15187 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:15187:13
+      |
+15187 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:15253:13
+      |
+15253 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:15253:13
+      |
+15253 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:15320:13
+      |
+15320 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:15320:13
+      |
+15320 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:15378:13
+      |
+15378 |         let mut parser = auto_lang_core::Parser::from(prop_src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:15408:13
+      |
+15408 |         let mut parser = auto_lang_core::Parser::from(event_src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:15378:13
+      |
+15378 |         let mut parser = auto_lang_core::Parser::from(prop_src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:15408:13
+      |
+15408 |         let mut parser = auto_lang_core::Parser::from(event_src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:15591:17
+      |
+15591 |             let mut parser = auto_lang_core::Parser::from(src.as_str()).with_session(session);
+      |                 ----^^^^^^
+      |                 |
+      |                 help: remove this `mut`
+
+warning: unused variable: `known_tags`
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:15520:13
+      |
+15520 |         let known_tags: &[&str] = &[
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_known_tags`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:15591:17
+      |
+15591 |             let mut parser = auto_lang_core::Parser::from(src.as_str()).with_session(session);
+      |                 ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:15674:13
+      |
+15674 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:15674:13
+      |
+15674 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:15772:13
+      |
+15772 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:15772:13
+      |
+15772 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:15853:13
+      |
+15853 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:15853:13
+      |
+15853 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:15912:13
+      |
+15912 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:15912:13
+      |
+15912 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:16554:13
+      |
+16554 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:16554:13
+      |
+16554 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:16608:13
+      |
+16608 |         let mut parser = auto_lang_core::Parser::from(src.as_str()).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:16608:13
+      |
+16608 |         let mut parser = auto_lang_core::Parser::from(src.as_str()).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:16950:17
+      |
+16950 |             let mut parser = auto_lang_core::Parser::from(src.as_str()).with_session(session);
+      |                 ----^^^^^^
+      |                 |
+      |                 help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:16950:17
+      |
+16950 |             let mut parser = auto_lang_core::Parser::from(src.as_str()).with_session(session);
+      |                 ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:16996:13
+      |
+16996 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:16996:13
+      |
+16996 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:17049:13
+      |
+17049 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:17049:13
+      |
+17049 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:17108:17
+      |
+17108 |             let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |                 ----^^^^^^
+      |                 |
+      |                 help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:17108:17
+      |
+17108 |             let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |                 ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:17174:13
+      |
+17174 |         let mut parser = auto_lang_core::Parser::from(src.as_str()).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:17174:13
+      |
+17174 |         let mut parser = auto_lang_core::Parser::from(src.as_str()).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:17224:13
+      |
+17224 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:17224:13
+      |
+17224 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:17272:13
+      |
+17272 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:17272:13
+      |
+17272 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:17420:13
+      |
+17420 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:17420:13
+      |
+17420 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:18076:13
+      |
+18076 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:18076:13
+      |
+18076 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:18183:13
+      |
+18183 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\rust.rs:18183:13
+      |
+18183 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+    --> crates\auto-ui-compiler\src\ui_gen\ts_adapter.rs:3236:13
+     |
+3236 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+     |             ----^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: unused variable: `parser`
+    --> crates\auto-ui-compiler\src\ui_gen\ts_adapter.rs:3236:13
+     |
+3236 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+     |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+    --> crates\auto-ui-compiler\src\ui_gen\ts_adapter.rs:3270:13
+     |
+3270 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+     |             ----^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: unused variable: `parser`
+    --> crates\auto-ui-compiler\src\ui_gen\ts_adapter.rs:3270:13
+     |
+3270 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+     |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+    --> crates\auto-ui-compiler\src\ui_gen\ts_adapter.rs:3311:13
+     |
+3311 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+     |             ----^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: unused variable: `parser`
+    --> crates\auto-ui-compiler\src\ui_gen\ts_adapter.rs:3311:13
+     |
+3311 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+     |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+    --> crates\auto-ui-compiler\src\ui_gen\vue.rs:7524:34
+     |
+7524 | ...                   let (mut static_classes, _dc, _ds) = self.extract_classes(tag, props);
+     |                            ----^^^^^^^^^^^^^^
+     |                            |
+     |                            help: remove this `mut`
+
+warning: unreachable pattern
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:10522:13
+      |
+10490 |             "option" | "Option" => "option".to_string(),
+      |             ------------------- matches all the relevant values
+...
+10522 |             "option" | "Option" => "option".to_string(),
+      |             ^^^^^^^^^^^^^^^^^^^ no value can reach this
+
+warning: unreachable pattern
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:11280:17
+      |
+11280 |                 _ => {}
+      |                 ^ no value can reach this
+      |
+note: multiple earlier patterns match some of the same values
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:11280:17
+      |
+11138 |                 AuraPropValue::StyleBinding(bindings) => {
+      |                 ------------------------------------- matches some of the same values
+...
+11158 |                 AuraPropValue::Expr(auto_lang_core::ast::Expr::Str(s)) => {
+      |                 ------------------------------------------------------ matches some of the same values
+...
+11193 |                 AuraPropValue::Expr(auto_lang_core::ast::Expr::If(if_stmt)) => {
+      |                 ----------------------------------------------------------- matches some of the same values
+...
+11206 |                 AuraPropValue::Expr(auto_lang_core::ast::Expr::Array(elems)) => {
+      |                 ------------------------------------------------------------ matches some of the same values
+...
+11280 |                 _ => {}
+      |                 ^ ...and 1 other patterns collectively make this unreachable
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:21444:13
+      |
+21444 |         let mut parser = auto_lang_core::parser::Parser::from(src.as_str()).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:21444:13
+      |
+21444 |         let mut parser = auto_lang_core::parser::Parser::from(src.as_str()).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:21809:13
+      |
+21809 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:21809:13
+      |
+21809 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:21854:13
+      |
+21854 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:21854:13
+      |
+21854 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:21931:13
+      |
+21931 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:21931:13
+      |
+21931 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:22047:13
+      |
+22047 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:22047:13
+      |
+22047 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: unused variable: `attrs`
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:23552:14
+      |
+23552 |         let (attrs, _slot_content, slot_children) =
+      |              ^^^^^ help: if this is intentional, prefix it with an underscore: `_attrs`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:23638:13
+      |
+23638 |         let mut gen = VueGenerator::new();
+      |             ----^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `attrs`
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:24672:14
+      |
+24672 |         let (attrs, slot_content, _) = gen.generate_shadcn_attrs("tree_item", &props, &events);
+      |              ^^^^^ help: if this is intentional, prefix it with an underscore: `_attrs`
+
+warning: unused variable: `primary_component`
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:24685:13
+      |
+24685 |         let primary_component = |tag: &str| registry.get_primary_component("vue", tag);
+      |             ^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_primary_component`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:25037:13
+      |
+25037 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:25037:13
+      |
+25037 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:25519:13
+      |
+25519 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:25519:13
+      |
+25519 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:25845:13
+      |
+25845 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:25845:13
+      |
+25845 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:25864:13
+      |
+25864 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:25864:13
+      |
+25864 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:25994:13
+      |
+25994 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:25994:13
+      |
+25994 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:28173:13
+      |
+28173 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:28173:13
+      |
+28173 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:28829:17
+      |
+28829 |             let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |                 ----^^^^^^
+      |                 |
+      |                 help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:28829:17
+      |
+28829 |             let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |                 ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:28935:13
+      |
+28935 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:28935:13
+      |
+28935 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:28977:13
+      |
+28977 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:29008:13
+      |
+29008 |         let mut parser2 = auto_lang_core::parser::Parser::from(src2).with_session(session2);
+      |             ----^^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:28977:13
+      |
+28977 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: unused variable: `parser2`
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:29008:13
+      |
+29008 |         let mut parser2 = auto_lang_core::parser::Parser::from(src2).with_session(session2);
+      |             ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser2`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:29041:13
+      |
+29041 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:29041:13
+      |
+29041 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:30320:13
+      |
+30320 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:30320:13
+      |
+30320 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:30920:13
+      |
+30920 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:30920:13
+      |
+30920 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:31900:13
+      |
+31900 |         let mut parser =
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:31900:13
+      |
+31900 |         let mut parser =
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:31936:13
+      |
+31936 |         let mut parser =
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:31936:13
+      |
+31936 |         let mut parser =
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:32727:13
+      |
+32727 |         let mut parser =
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:32727:13
+      |
+32727 |         let mut parser =
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:32972:13
+      |
+32972 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:32972:13
+      |
+32972 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:33023:13
+      |
+33023 |         let mut parser = auto_lang_core::parser::Parser::from(src.as_str()).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:33023:13
+      |
+33023 |         let mut parser = auto_lang_core::parser::Parser::from(src.as_str()).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:33059:13
+      |
+33059 |         let mut parser = auto_lang_core::parser::Parser::from(src.as_str()).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:33059:13
+      |
+33059 |         let mut parser = auto_lang_core::parser::Parser::from(src.as_str()).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:33231:13
+      |
+33231 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:33231:13
+      |
+33231 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:33546:13
+      |
+33546 |         let mut gen = VueGenerator::new();
+      |             ----^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:33551:13
+      |
+33551 |         let mut gen_shadcn = VueGenerator::new_shadcn();
+      |             ----^^^^^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:33567:13
+      |
+33567 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:33567:13
+      |
+33567 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:33602:13
+      |
+33602 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:33602:13
+      |
+33602 |         let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:33646:13
+      |
+33646 |         let mut parser = auto_lang_core::parser::Parser::from(widget_src).with_session(session);
+      |             ----^^^^^^
+      |             |
+      |             help: remove this `mut`
+
+warning: unused variable: `parser`
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:33646:13
+      |
+33646 |         let mut parser = auto_lang_core::parser::Parser::from(widget_src).with_session(session);
+      |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: value assigned to `sub_widgets_out` is never read
+   --> crates\auto-ui-compiler\src\ui_gen\api.rs:902:44
+    |
+902 |     let mut sub_widgets_out: Vec<String> = Vec::new();
+    |                                            ^^^^^^^^^^ this value is reassigned later and never used
+...
+964 |         sub_widgets_out = package_names;
+    |         --------------- `sub_widgets_out` is overwritten here before the previous value is read
+    |
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+    --> crates\auto-ui-compiler\src\ui_gen\api.rs:1366:13
+     |
+1366 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+     |             ----^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: unused variable: `parser`
+    --> crates\auto-ui-compiler\src\ui_gen\api.rs:1366:13
+     |
+1366 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+     |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+    --> crates\auto-ui-compiler\src\ui_gen\ark\generator.rs:2432:13
+     |
+2432 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+     |             ----^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: unused variable: `parser`
+    --> crates\auto-ui-compiler\src\ui_gen\ark\generator.rs:2432:13
+     |
+2432 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+     |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: value assigned to `parser` is never read
+    --> crates\auto-ui-compiler\src\ui_gen\ark\generator.rs:3041:9
+     |
+3041 |         parser = parser.with_session(session);
+     |         ^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+
+warning: variable does not need to be mutable
+    --> crates\auto-ui-compiler\src\ui_gen\jet\generator.rs:2384:13
+     |
+2384 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+     |             ----^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: unused variable: `parser`
+    --> crates\auto-ui-compiler\src\ui_gen\jet\generator.rs:2384:13
+     |
+2384 |         let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+     |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+    --> crates\auto-ui-compiler\src\ui_gen\jet\generator.rs:3309:13
+     |
+3309 |         let mut gen = JetGenerator::new();
+     |             ----^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: unused variable: `gen`
+    --> crates\auto-ui-compiler\src\ui_gen\jet\generator.rs:3309:13
+     |
+3309 |         let mut gen = JetGenerator::new();
+     |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_gen`
+
+warning: value assigned to `parser` is never read
+    --> crates\auto-ui-compiler\src\ui_gen\jet\generator.rs:3577:9
+     |
+3577 |         parser = parser.with_session(session);
+     |         ^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+
+warning: value assigned to `parser` is never read
+    --> crates\auto-ui-compiler\src\ui_gen\jet\generator.rs:3851:5
+     |
+3851 |     parser = parser.with_session(session);
+     |     ^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+
+warning: variable does not need to be mutable
+   --> crates\auto-ui-compiler\src\ui_gen\jet\layout.rs:914:13
+    |
+914 |         let mut props = HashMap::new();
+    |             ----^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: unused variable: `count`
+   --> crates\auto-ui-compiler\src\ui_gen\validators.rs:691:9
+    |
+691 |     let count = template.matches("AutoDownEditor").count();
+    |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_count`
+
+warning: variable does not need to be mutable
+   --> crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:458:13
+    |
+458 |         let mut scroll_scrollbar = WidgetSpec::new("ScrollAreaScrollbar", WidgetCategory::Layout)
+    |             ----^^^^^^^^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:463:13
+    |
+463 |         let mut scroll_thumb = WidgetSpec::new("ScrollAreaThumb", WidgetCategory::Layout)
+    |             ----^^^^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:685:13
+    |
+685 |         let mut select_value =
+    |             ----^^^^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:1353:13
+     |
+1353 |         let mut breadcrumb_sep = WidgetSpec::new("BreadcrumbSeparator", WidgetCategory::Navigation)
+     |             ----^^^^^^^^^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:1420:13
+     |
+1420 |         let mut pagination_link = WidgetSpec::new("PaginationLink", WidgetCategory::Navigation)
+     |             ----^^^^^^^^^^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:1425:13
+     |
+1425 |         let mut pagination_ellipsis =
+     |             ----^^^^^^^^^^^^^^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:1431:13
+     |
+1431 |         let mut pagination_next = WidgetSpec::new("PaginationNext", WidgetCategory::Navigation)
+     |             ----^^^^^^^^^^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:1436:13
+     |
+1436 |         let mut pagination_prev = WidgetSpec::new("PaginationPrevious", WidgetCategory::Navigation)
+     |             ----^^^^^^^^^^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:2224:13
+     |
+2224 |         let mut toast_viewport =
+     |             ----^^^^^^^^^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:2235:13
+     |
+2235 |         let mut toast_close =
+     |             ----^^^^^^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:2279:13
+     |
+2279 |         let mut sonner = WidgetSpec::new("Sonner", WidgetCategory::Feedback).with_alias("sonner");
+     |             ----^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:2477:13
+     |
+2477 |         let mut calendar_day =
+     |             ----^^^^^^^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: unused variable: `key`
+    --> crates\auto-ui-compiler\src\ui_gen\widget\registry.rs:3077:13
+     |
+3077 |         let key = a
+     |             ^^^ help: if this is intentional, prefix it with an underscore: `_key`
+
+warning: function `key_of` is never used
+   --> crates\auto-ui-compiler\src\ui_gen\vue.rs:205:8
+    |
+205 |     fn key_of(node: &AuraNode) -> Option<String> {
+    |        ^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `test_pattern_to_handler_name` is never used
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:23145:8
+      |
+23145 |     fn test_pattern_to_handler_name() {
+      |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `test_actions_menubar_synthesis` is never used
+     --> crates\auto-ui-compiler\src\ui_gen\vue.rs:27540:8
+      |
+27540 |     fn test_actions_menubar_synthesis() {
+      |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `auto-ui-compiler` (lib test) generated 196 warnings (run `cargo fix --lib -p auto-ui-compiler --tests` to apply 173 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 49s
+     Running unittests src\lib.rs (target\debug\deps\auto_ui_compiler-4838703b5b224756.exe)
+
+running 863 tests
+test ui_gen::api::tests::test_plan522_024_donut_helpers_emitted ... ok
+test ui_gen::api::tests::test_resolve_stream_variants_defaults_when_absent ... ok
+test ui_gen::api::tests::test_to_snake_case_variants ... ok
+test ui_gen::api::tests::test_resolve_stream_variants_default_discriminator_without_tag_attr ... ok
+test ui_gen::api::tests::test_transpile_placeholder ... ok
+test ui_gen::api::tests::test_resolve_stream_variants_snake_case_tag ... ok
+test ui_gen::api::tests::test_store_declared_all_tags_placeholder_still_compiles ... ok
+test ui_gen::api::tests::test_store_with_notes_var_no_all_tags_injection ... ok
+test ui_gen::api::tests::test_multi_store_single_file_emission ... ok
+test ui_gen::api::tests::test_store_cross_store_calls_map_to_facades ... ok
+test ui_gen::ark::generator::tests::test_004_text ... ok
+test ui_gen::ark::generator::tests::test_003_box ... ok
+test ui_gen::ark::generator::tests::test_001_column ... ok
+test ui_gen::ark::generator::tests::test_002_row ... ok
+test ui_gen::ark::generator::tests::test_005_button ... ok
+test ui_gen::ark::generator::tests::test_006_input ... ok
+test ui_gen::ark::generator::tests::test_008_form_widgets ... ok
+test ui_gen::ark::generator::tests::test_007_image ... ok
+test ui_gen::ark::generator::tests::test_010_table ... ok
+test ui_gen::api::tests::test_shadcn_off_keeps_native_button ... ok
+test ui_gen::ark::generator::tests::test_012_dialog ... ok
+test ui_gen::ark::generator::tests::test_011_tabs ... ok
+test ui_gen::api::tests::test_shadcn_default_on_maps_button_component ... ok
+test ui_gen::ark::generator::tests::test_013_for_loop ... ok
+test ui_gen::api::tests::test_view_for_loop_ident_field_iterable ... ok
+test ui_gen::api::tests::test_view_for_loop_ident_field_chain_iterable ... ok
+test ui_gen::ark::generator::tests::test_017_decorators ... ok
+test ui_gen::ark::generator::tests::test_016_nav ... ok
+test ui_gen::api::tests::test_soft_keyword_in_if_condition ... ok
+test ui_gen::ark::generator::tests::test_014_array_objects ... ok
+test ui_gen::ark::generator::tests::test_018_card ... ok
+test ui_gen::ark::generator::tests::test_015_tabs ... ok
+test ui_gen::ark::generator::tests::test_app_widget_without_routes_is_entry_page ... ok
+test ui_gen::ark::generator::tests::test_app_widget_with_routes_has_entry ... ok
+test ui_gen::ark::generator::tests::test_child_page_with_navigation_has_consume ... ok
+test ui_gen::ark::generator::tests::test_020_msg_enum ... ok
+test ui_gen::ark::generator::tests::test_019_login ... ok
+test ui_gen::ark::generator::tests::test_dispatch_pattern_generation ... ok
+test ui_gen::ark::generator::tests::test_generated_file_has_imports ... ok
+test ui_gen::ark::generator::tests::test_custom_package ... ok
+test ui_gen::ark::generator::tests::test_generator_uses_widget_registry ... ok
+test ui_gen::ark::generator::tests::test_image_with_resource_reference ... ok
+test ui_gen::ark::generator::tests::test_image_with_url_source ... ok
+test ui_gen::ark::modifier::tests::test_align_center_modifier ... ok
+test ui_gen::ark::modifier::tests::test_align_start_modifier ... ok
+test ui_gen::ark::modifier::tests::test_ark_dsl_border_radius ... ok
+test ui_gen::ark::modifier::tests::test_ark_dsl_combined_classes ... ok
+test ui_gen::ark::modifier::tests::test_ark_dsl_convert_to_string ... ok
+test ui_gen::ark::modifier::tests::test_ark_dsl_colors ... ok
+test ui_gen::ark::modifier::tests::test_ark_dsl_padding ... ok
+test ui_gen::ark::generator::tests::test_generator_extension ... ok
+test ui_gen::ark::generator::tests::test_project_generation ... ok
+test ui_gen::ark::modifier::tests::test_ark_dsl_margin ... ok
+test ui_gen::ark::modifier::tests::test_arrange_between_modifier ... ok
+test ui_gen::ark::modifier::tests::test_ark_dsl_typography ... ok
+test ui_gen::ark::modifier::tests::test_arrange_center_modifier ... ok
+test ui_gen::ark::modifier::tests::test_font_family_modifier ... ok
+test ui_gen::ark::generator::tests::test_inline_lambda_event_ark_codegen ... ok
+test ui_gen::api::tests::test_dom_escape_hatch_plain_mode ... ok
+test ui_gen::ark::generator::tests::test_semantic_header_element ... ok
+test ui_gen::ark::modifier::tests::test_font_size_modifier ... ok
+test ui_gen::ark::modifier::tests::test_grid_col_gap ... ok
+test ui_gen::ark::modifier::tests::test_grid_row_gap ... ok
+test ui_gen::ark::modifier::tests::test_grid_default_scrollbar ... ok
+test ui_gen::ark::modifier::tests::test_grid_cols_template ... ok
+test ui_gen::ark::modifier::tests::test_grid_combined_modifiers ... ok
+test ui_gen::ark::modifier::tests::test_grid_default_height ... ok
+test ui_gen::ark::modifier::tests::test_grid_rows_template ... ok
+test ui_gen::api::tests::test_plan356_normal_loop_var_still_works ... ok
+test ui_gen::ark::modifier::tests::test_grid_scrollbar_modifiers ... ok
+test ui_gen::ark::modifier::tests::test_layout_weight_modifier ... ok
+test ui_gen::ark::modifier::tests::test_legacy_class_to_modifier ... ok
+test ui_gen::ark::modifier::tests::test_line_height_modifier ... ok
+test ui_gen::ark::modifier::tests::test_object_fit_modifier ... ok
+test ui_gen::ark::modifier::tests::test_swiper_animation_loop_not_confused ... ok
+test ui_gen::ark::modifier::tests::test_swiper_auto_play_modifier ... ok
+test ui_gen::ark::modifier::tests::test_swiper_combined_modifiers ... ok
+test ui_gen::ark::modifier::tests::test_swiper_indicator_modifier ... ok
+test ui_gen::ark::modifier::tests::test_swiper_loop_modifier ... ok
+test ui_gen::ark::modifier::tests::test_swiper_no_indicator_excluded ... ok
+test ui_gen::ark::modifier::tests::test_unknown_modifier_returns_none ... ok
+test ui_gen::ark::modifier::tests::test_width_modifier ... ok
+test ui_gen::ark::project::tests::test_app_json5_has_bundle_name ... ok
+test ui_gen::ark::project::tests::test_custom_package ... ok
+test ui_gen::ark::project::tests::test_main_pages_points_to_app ... ok
+test ui_gen::ark::project::tests::test_project_generator_creates_files ... ok
+test ui_gen::ark::state::tests::test_auto_type_to_arkts ... ok
+test ui_gen::ark::state::tests::test_extract_interface_from_array ... ok
+test ui_gen::ark::state::tests::test_generate_default_value ... ok
+test ui_gen::api::tests::test_dom_escape_hatch_shadcn_mode ... ok
+test ui_gen::ark::state::tests::test_generate_default_value_for_list ... ok
+test ui_gen::ark::state::tests::test_generate_interface_code ... ok
+test ui_gen::ark::state::tests::test_to_pascal_case ... ok
+test ui_gen::ark::state::tests::test_generate_msg_enum_produces_typescript_enum ... ok
+test ui_gen::ark_adapter::tests::test_assignment_state_ref ... ok
+test ui_gen::ark_adapter::tests::test_bare_non_state_ident ... ok
+test ui_gen::ark_adapter::tests::test_bare_state_ident ... ok
+test ui_gen::api::tests::test_plan356_oom_regression_loop_var_as_handler_arg ... ok
+test ui_gen::ark_adapter::tests::test_delegate_for_unknown_expr ... ok
+test ui_gen::ark_adapter::tests::test_for_cond_while ... ok
+test ui_gen::ark_adapter::tests::test_for_named ... ok
+test ui_gen::ark_adapter::tests::test_json_builtin ... ok
+test ui_gen::ark_adapter::tests::test_math_builtin ... ok
+test ui_gen::ark_adapter::tests::test_method_call_on_state_ref ... ok
+test ui_gen::ark_adapter::tests::test_no_await_on_call ... ok
+test ui_gen::ark_adapter::tests::test_print_becomes_console_log ... ok
+test ui_gen::ark_adapter::tests::test_return_nil ... ok
+test ui_gen::ark_adapter::tests::test_return_stmt ... ok
+test ui_gen::ark_adapter::tests::test_state_ref_dot_dot ... ok
+test ui_gen::ark_adapter::tests::test_state_ref_dot_self ... ok
+test ui_gen::ark_adapter::tests::test_storage_todo_comment ... ok
+test ui_gen::ark_adapter::tests::test_store_let ... ok
+test ui_gen::bp::registry::tests::empty_registry_when_root_missing ... ok
+test ui_gen::bp::spec::tests::rejects_missing_frontmatter ... ok
+test ui_gen::bp::spec::tests::rejects_missing_kind ... ok
+test ui_gen::import_policy::tests::plan814_t05_generated_imports_are_canonical_only ... ok
+test ui_gen::bp::spec::tests::rejects_frontmatter_version_key ... ok
+test ui_gen::jet::components::tests::test_registry_button_mapping ... ok
+test ui_gen::bp::spec::tests::parses_frontmatter ... ok
+test ui_gen::jet::components::tests::test_registry_col_mapping ... ok
+test ui_gen::jet::form::tests::test_checkbox_disabled ... ok
+test ui_gen::jet::form::tests::test_checkbox_without_state_ref ... ok
+test ui_gen::jet::components::tests::test_registry_input_mapping ... ok
+test ui_gen::jet::components::tests::test_registry_unsupported ... ok
+test ui_gen::jet::form::tests::test_chip_assist ... ok
+test ui_gen::jet::form::tests::test_chip_assist_with_icon ... ok
+test ui_gen::jet::form::tests::test_chip_default_is_assist ... ok
+test ui_gen::jet::form::tests::test_chip_disabled ... ok
+test ui_gen::jet::form::tests::test_chip_filter ... ok
+test ui_gen::jet::form::tests::test_chip_filter_not_selected ... ok
+test ui_gen::jet::form::tests::test_chip_icon_capitalization ... ok
+test ui_gen::api::tests::test_plan358_d1_for_style_if_msg_on_stress ... ok
+test ui_gen::bp::registry::root_resolution_tests::falls_back_to_compile_time_root_when_no_blueprints_upwards ... ok
+test ui_gen::jet::form::tests::test_chip_input ... ok
+test ui_gen::jet::form::tests::test_chip_suggestion ... ok
+test ui_gen::jet::form::tests::test_clear_imports ... ok
+test ui_gen::jet::form::tests::test_generate_checkbox_basic ... ok
+test ui_gen::jet::form::tests::test_generate_checkbox_with_label ... ok
+test ui_gen::jet::form::tests::test_generate_input_basic ... ok
+test ui_gen::jet::form::tests::test_generate_input_disabled ... ok
+test ui_gen::bp::registry::root_resolution_tests::env_override_wins_and_is_used_as_is ... ok
+test ui_gen::jet::form::tests::test_generate_input_password_type ... ok
+test ui_gen::jet::form::tests::test_generate_slider_basic ... ok
+test ui_gen::jet::form::tests::test_generate_input_with_placeholder ... ok
+test ui_gen::jet::form::tests::test_generate_slider_with_range ... ok
+test ui_gen::jet::form::tests::test_generate_input_with_label ... ok
+test ui_gen::jet::form::tests::test_generate_slider_with_step ... ok
+test ui_gen::jet::form::tests::test_generate_switch_basic ... ok
+test ui_gen::jet::form::tests::test_generate_switch_with_label ... ok
+test ui_gen::jet::form::tests::test_generate_textarea ... ok
+test ui_gen::jet::form::tests::test_import_deduplication ... ok
+test ui_gen::jet::form::tests::test_import_collection ... ok
+test ui_gen::jet::form::tests::test_input_email_type ... ok
+test ui_gen::jet::form::tests::test_input_number_type ... ok
+test ui_gen::jet::form::tests::test_input_without_value ... ok
+test ui_gen::jet::form::tests::test_slider_default_range ... ok
+test ui_gen::jet::form::tests::test_slider_without_state_ref ... ok
+test ui_gen::jet::form::tests::test_switch_disabled ... ok
+test ui_gen::jet::form::tests::test_switch_without_state_ref ... ok
+test ui_gen::jet::form::tests::test_textarea_disabled ... ok
+test ui_gen::jet::form::tests::test_textarea_without_value ... ok
+test ui_gen::jet::generator::test_image_tag_normalization ... ok
+test ui_gen::api::tests::test_plan522_use_module_fn_collected_from_filesystem ... ok
+test ui_gen::jet::generator::tests::test_all_form_elements_with_all_properties ... ok
+test ui_gen::jet::generator::tests::test_card_variant_e2e_default ... ok
+test ui_gen::jet::generator::tests::test_backend_generator_trait ... ok
+test ui_gen::jet::generator::tests::test_card_variant_e2e_elevated ... ok
+test ui_gen::jet::generator::test_text_with_flex_style ... ok
+test ui_gen::bp::registry::root_resolution_tests::with_defaults_follows_env_override ... ok
+test ui_gen::jet::generator::tests::test_card_variant_e2e_outlined ... ok
+test ui_gen::jet::generator::tests::test_expr_to_default_conversion ... ok
+test ui_gen::jet::generator::tests::test_component_registry_integration ... ok
+test ui_gen::jet::generator::tests::test_component_primary_components ... ok
+test ui_gen::jet::generator::tests::test_full_project_generation_workflow ... ok
+test ui_gen::jet::generator::tests::test_full_generation_no_state ... ok
+test ui_gen::jet::generator::tests::test_full_generation_with_multiple_states ... ok
+test ui_gen::jet::generator::tests::test_extension ... ok
+test ui_gen::jet::generator::tests::test_full_generation_workflow ... ok
+test ui_gen::jet::generator::tests::test_generate_preview ... ok
+test ui_gen::bp::registry::root_resolution_tests::walks_up_from_cwd_to_nearest_blueprints_dir ... ok
+test ui_gen::jet::generator::tests::test_import_sorting ... ok
+test ui_gen::jet::generator::tests::test_generate_simple_composable ... ok
+test ui_gen::jet::generator::tests::test_import_collection ... ok
+test ui_gen::jet::generator::tests::test_import_deduplication ... ok
+test ui_gen::jet::generator::tests::test_jet_generator_checkbox_integration ... ok
+test ui_gen::jet::generator::tests::test_inline_lambda_event_jet_codegen ... ok
+test ui_gen::jet::generator::tests::test_jet_generator_form_integration ... ok
+test ui_gen::jet::generator::tests::test_jet_generator_project_default ... ok
+test ui_gen::jet::generator::tests::test_jet_generator_project_with_package ... ok
+test ui_gen::jet::generator::tests::test_jet_generator_project_gradle_content ... ok
+test ui_gen::jet::generator::tests::test_jet_generator_project_structure ... ok
+test ui_gen::jet::generator::tests::test_jet_generator_slider_integration ... ok
+test ui_gen::jet::generator::tests::test_jet_generator_project_with_theme ... ok
+test ui_gen::jet::generator::tests::test_jet_generator_unknown_form_element ... ok
+test ui_gen::jet::generator::tests::test_jet_generator_toggle_alias ... ok
+test ui_gen::jet::generator::tests::test_jet_generator_switch_integration ... ok
+test ui_gen::jet::generator::tests::test_list_with_data_binding ... ok
+test ui_gen::jet::generator::tests::test_layout_with_modifier_chain ... ok
+test ui_gen::jet::generator::tests::test_modifier_dsl_integration ... ok
+test ui_gen::jet::generator::tests::test_navigation_full_workflow ... ok
+test ui_gen::jet::generator::tests::test_nested_card_variant_e2e ... ok
+test ui_gen::jet::generator::tests::test_project_generator_deterministic ... ok
+test ui_gen::jet::generator::tests::test_package_customization ... ok
+test ui_gen::jet::generator::tests::test_pascal_case_col_tag ... ok
+test ui_gen::jet::generator::tests::test_type_to_string_conversion ... ok
+test ui_gen::jet::layout::tests::test_card_variant_elevated ... ok
+test ui_gen::jet::generator::tests::test_package_declaration ... ok
+test ui_gen::jet::layout::tests::test_card_variant_elevated_with_style ... ok
+test ui_gen::jet::layout::tests::test_card_variant_filled_explicit ... ok
+test ui_gen::jet::layout::tests::test_card_variant_filled_default ... ok
+test ui_gen::jet::layout::tests::test_card_variant_outlined ... ok
+test ui_gen::jet::generator::tests::test_state_converter_integration ... ok
+test ui_gen::jet::layout::tests::test_clear_imports ... ok
+test ui_gen::jet::layout::tests::test_flow_row_arrangements ... ok
+test ui_gen::jet::layout::tests::test_flow_row_basic ... ok
+test ui_gen::jet::generator::tests::test_standard_imports ... ok
+test ui_gen::jet::layout::tests::test_class_to_modifier ... ok
+test ui_gen::jet::layout::tests::test_flow_row_imports ... ok
+test ui_gen::jet::layout::tests::test_flow_row_with_gap ... ok
+test ui_gen::jet::generator::tests::test_project_file_count ... ok
+test ui_gen::jet::generator::tests::test_theme_file_generation ... ok
+test ui_gen::jet::layout::tests::test_generate_box_basic ... ok
+test ui_gen::jet::layout::tests::test_generate_card_basic ... ok
+test ui_gen::jet::layout::tests::test_generate_column_basic ... ok
+test ui_gen::jet::layout::tests::test_generate_card_with_class ... ok
+test ui_gen::jet::layout::tests::test_generate_column_with_alignment ... ok
+test ui_gen::jet::layout::tests::test_flow_row_with_padding ... ok
+test ui_gen::jet::layout::tests::test_generate_column_with_gap ... ok
+test ui_gen::jet::layout::tests::test_generate_row_basic ... ok
+test ui_gen::jet::layout::tests::test_generate_row_with_justify ... ok
+test ui_gen::jet::generator::tests::test_with_package ... ok
+test ui_gen::jet::layout::tests::test_generate_scroll_basic ... ok
+test ui_gen::jet::layout::tests::test_import_collection ... ok
+test ui_gen::jet::list::tests::test_class_to_modifier ... ok
+test ui_gen::jet::layout::tests::test_tailwind_color_to_hex ... ok
+test ui_gen::jet::list::tests::test_clear_imports ... ok
+test ui_gen::jet::list::tests::test_content_type ... ok
+test ui_gen::jet::list::tests::test_generate_flow_column ... ok
+test ui_gen::jet::list::tests::test_generate_flow_row ... ok
+test ui_gen::jet::list::tests::test_generate_lazy_column_basic ... ok
+test ui_gen::jet::list::tests::test_generate_lazy_column_with_gap ... ok
+test ui_gen::jet::list::tests::test_generate_lazy_column_with_items ... ok
+test ui_gen::jet::list::tests::test_generate_lazy_grid_basic ... ok
+test ui_gen::jet::list::tests::test_generate_lazy_column_with_key ... ok
+test ui_gen::jet::list::tests::test_generate_lazy_row_with_gap ... ok
+test ui_gen::jet::list::tests::test_generate_lazy_grid_with_gap ... ok
+test ui_gen::jet::list::tests::test_generate_lazy_row_basic ... ok
+test ui_gen::jet::list::tests::test_import_collection ... ok
+test ui_gen::jet::list::tests::test_item_variable_customization ... ok
+test ui_gen::jet::list::tests::test_tailwind_color_to_hex ... ok
+test ui_gen::jet::modifier::tests::test_background_color ... ok
+test ui_gen::jet::modifier::tests::test_circle_shape ... ok
+test ui_gen::jet::modifier::tests::test_combined_modifiers ... ok
+test ui_gen::jet::modifier::tests::test_display_type_detection ... ok
+test ui_gen::jet::modifier::tests::test_fill_conversion ... ok
+test ui_gen::jet::modifier::tests::test_flex_direction_detection ... ok
+test ui_gen::jet::modifier::tests::test_gap_conversion ... ok
+test ui_gen::jet::modifier::tests::test_modifier_chain_generation ... ok
+test ui_gen::jet::modifier::tests::test_layout_weight_conversion ... ok
+test ui_gen::jet::modifier::tests::test_padding_conversion ... ok
+test ui_gen::jet::modifier::tests::test_rounded_conversion ... ok
+test ui_gen::jet::modifier::tests::test_shadow_conversion ... ok
+test ui_gen::jet::modifier::tests::test_table_cell_style ... ok
+test ui_gen::jet::navigation::tests::test_add_route_with_params ... ok
+test ui_gen::jet::navigation::tests::test_add_route ... ok
+test ui_gen::jet::navigation::tests::test_clear_imports ... ok
+test ui_gen::jet::navigation::tests::test_generate_clickable_navigate ... ok
+test ui_gen::jet::navigation::tests::test_clear_routes ... ok
+test ui_gen::bp::registry::scan_tests::login_has_three_references ... ok
+test ui_gen::jet::navigation::tests::test_generate_nav_host ... ok
+test ui_gen::jet::navigation::tests::test_generate_nav_imports ... ok
+test ui_gen::jet::navigation::tests::test_generate_app_with_nav ... ok
+test ui_gen::jet::navigation::tests::test_generate_navigate_call ... ok
+test ui_gen::jet::navigation::tests::test_generate_navigate_up ... ok
+test ui_gen::jet::navigation::tests::test_generate_navigate_with_arg ... ok
+test ui_gen::jet::navigation::tests::test_generate_tab_row ... ok
+test ui_gen::jet::navigation::tests::test_generate_pop_back_stack ... ok
+test ui_gen::jet::navigation::tests::test_generate_single_tab ... ok
+test ui_gen::jet::navigation::tests::test_generate_tabs_basic ... ok
+test ui_gen::jet::navigation::tests::test_generate_tabs_content_switching ... ok
+test ui_gen::jet::navigation::tests::test_generate_tabs_content ... ok
+test ui_gen::jet::navigation::tests::test_import_collection ... ok
+test ui_gen::jet::navigation::tests::test_generate_tabs_imports ... ok
+test ui_gen::jet::navigation::tests::test_generate_tabs_with_labels ... ok
+test ui_gen::jet::project::tests::test_generate_android_manifest ... ok
+test ui_gen::jet::project::tests::test_generate_app_build_gradle ... ok
+test ui_gen::jet::project::tests::test_generate_libs_versions_toml ... ok
+test ui_gen::jet::project::tests::test_generate_main_activity ... ok
+test ui_gen::jet::project::tests::test_generate_root_build_gradle ... ok
+test ui_gen::jet::project::tests::test_generate_theme_kt ... ok
+test ui_gen::jet::project::tests::test_hex_to_compose_color ... ok
+test ui_gen::jet::project::tests::test_jet_project_config_builder ... ok
+test ui_gen::jet::project::tests::test_jet_project_config_package_path ... ok
+test ui_gen::jet::project::tests::test_jet_project_config_default ... ok
+test ui_gen::jet::project::tests::test_jet_project_config_theme_name ... ok
+test ui_gen::jet::project::tests::test_lighten_hex ... ok
+test ui_gen::jet::project::tests::test_project_generator_new ... ok
+test ui_gen::jet::project::tests::test_project_generator_generate ... ok
+test ui_gen::jet::project::tests::test_project_with_custom_theme ... ok
+test ui_gen::jet::project::tests::test_theme_colors_default ... ok
+test ui_gen::jet::state::tests::test_float_state ... ok
+test ui_gen::jet::project::tests::test_theme_colors_new ... ok
+test ui_gen::jet::state::tests::test_bool_state ... ok
+test ui_gen::jet::state::tests::test_handler_generation ... ok
+test ui_gen::jet::project::tests::test_project_with_dependencies ... ok
+test ui_gen::jet::state::tests::test_int_state ... ok
+test ui_gen::jet::state::tests::test_string_state ... ok
+test ui_gen::jet::state::tests::test_handler_with_param ... ok
+test ui_gen::jet::state::tests::test_type_mapping ... ok
+test ui_gen::kotlin_adapter::tests::test_kotlin_array_literal ... ok
+test ui_gen::kotlin_adapter::tests::test_kotlin_bare_state_ident_stays_bare ... ok
+test ui_gen::kotlin_adapter::tests::test_kotlin_const_val ... ok
+test ui_gen::kotlin_adapter::tests::test_kotlin_for_ever_while_true ... ok
+test ui_gen::kotlin_adapter::tests::test_kotlin_len_to_size ... ok
+test ui_gen::kotlin_adapter::tests::test_kotlin_for_in ... ok
+test ui_gen::kotlin_adapter::tests::test_kotlin_let_var ... ok
+test ui_gen::kotlin_adapter::tests::test_kotlin_object_literal ... ok
+test ui_gen::kotlin_adapter::tests::test_kotlin_no_semicolons ... ok
+test ui_gen::kotlin_adapter::tests::test_kotlin_print ... ok
+test ui_gen::kotlin_adapter::tests::test_kotlin_state_ref_assign ... ok
+test ui_gen::kotlin_adapter::tests::test_kotlin_unknown_expr_todo ... ok
+test ui_gen::kotlin_adapter::tests::test_kotlin_state_ref_self ... ok
+test ui_gen::nav_contract::tests::nav_contract_hover_parses_into_hover_classes ... ok
+test ui_gen::nav_contract::tests::nav_contract_tokens_parse_on_vm ... ok
+test ui_gen::nav_contract::tests::nav_contract_matches_scaffold_assets ... ok
+test ui_gen::rust::plan039_a2r_gap_codegen_tests::button_ondblclick_mousearea_wrap ... ok
+test ui_gen::rust::plan039_a2r_gap_codegen_tests::icon_dynamic_class_runtime_eval ... ok
+test ui_gen::rust::plan039_a2r_gap_codegen_tests::drag_family_events_rejected_with_debt_pointer ... ok
+test ui_gen::rust::plan039_a2r_gap_codegen_tests::grid_dynamic_cols_runtime_eval ... ok
+test ui_gen::api::tests::test_plan356_real_sidebar_generates ... ok
+test ui_gen::rust::plan039_a2r_gap_codegen_tests::key_prop_silently_skipped ... ok
+test ui_gen::rust::plan039_a2r_gap_codegen_tests::outlet_multi_route_loud_reject ... ok
+test ui_gen::rust::plan039_a2r_gap_codegen_tests::non_button_ondblclick_stays_rejected ... ok
+test ui_gen::rust::plan039_a2r_gap_codegen_tests::outlet_single_route_folds_to_persistent_child ... ok
+test ui_gen::rust::plan039_a2r_gap_codegen_tests::p695_menubar_a2r_popover_tokens_and_dimmed ... ok
+test ui_gen::rust::plan039_a2r_gap_codegen_tests::menubar_family_lowers_to_popover_row ... ok
+test ui_gen::rust::plan039_a2r_gap_codegen_tests::p695_menubar_a2r_submenu_radio_label_shortcut ... ok
+test ui_gen::rust::plan039_a2r_gap_codegen_tests::record_shape_int_field_access ... ok
+test ui_gen::rust::plan039_a2r_gap_codegen_tests::string_literals_reescaped_on_emission ... ok
+test ui_gen::rust::plan039_a2r_gap_codegen_tests::textarea_dot_value_bindings ... ok
+test ui_gen::rust::plan039_a2r_gap_codegen_tests::vocab_gate_per_kind_prop_table ... ok
+test ui_gen::rust::plan039_a2r_gap_codegen_tests::vocab_gate_unknown_keeps_rejection_with_kind ... ok
+test ui_gen::bp::registry::scan_tests::palette_accepts_package_origin_tags_but_rejects_unknown ... ok
+test ui_gen::rust::tests::mouse_area_press_slot_emits_on_click ... ok
+test ui_gen::rust::tests::mouse_area_emits_events_and_logical_extent ... ok
+test ui_gen::rust::tests::row_direct_for_flattens_to_children_bulk_add ... ok
+test ui_gen::rust::tests::test_ast_expr_to_rust ... ok
+test ui_gen::rust::tests::test_auto_type_to_rust ... ok
+test ui_gen::rust::tests::test_autodown_panel_details_and_registry_slots_codegen ... ok
+test ui_gen::rust::tests::test_autodown_panel_heading_codegen ... ok
+test ui_gen::rust::tests::test_autodown_panel_quote_callout_codegen ... ok
+test ui_gen::rust::tests::test_bare_popover_point_anchor_codegen ... ok
+test ui_gen::rust::tests::test_bare_popover_widget_anchor_codegen ... ok
+test ui_gen::bp::registry::scan_tests::palette_has_no_drift ... ok
+test ui_gen::rust::plan039_a2r_gap_codegen_tests::declared_int_local_stays_out_of_value_union ... ok
+test ui_gen::rust::tests::test_code_editor_codegen_compiles ... ignored, e2e compile: minutes on a cold target dir
+test ui_gen::rust::plan039_a2r_gap_codegen_tests::builtin_method_table_receiver_kinds ... ok
+test ui_gen::rust::tests::test_codegen_rejects_unknown_prop_and_event ... ok
+test ui_gen::rust::plan039_a2r_gap_codegen_tests::user_type_constructor_literal_emits_struct_init ... ok
+test ui_gen::bp::registry::scan_tests::scans_default_packages ... ok
+test ui_gen::bp::registry::root_resolution_tests::blueprints_root_lock_survives_panicked_holder ... ok
+test ui_gen::rust::tests::terminal_onkeydown_emits_shortcuts_and_dynamic_key ... ok
+test ui_gen::rust::plan039_a2r_gap_codegen_tests::store_value_field_chain_demotion ... ok
+test ui_gen::rust::tests::test_extract_variant_name ... ok
+test ui_gen::rust::tests::terminal_scheme_and_scroll_fieldaccess_bindings_emit ... ok
+test ui_gen::rust::tests::test_display_family_codegen_arm_fixture ... ok
+test ui_gen::rust::tests::test_msg_multi_param_enum_output ... ok
+test ui_gen::rust::tests::test_host_synth_slot_codegen ... ok
+test ui_gen::rust::plan039_a2r_gap_codegen_tests::value_numeric_use_site_wrap ... ok
+test ui_gen::rust::tests::test_rust_generator_creation ... ok
+test ui_gen::rust::tests::test_setup_block_rejected_on_rust_target ... ok
+test ui_gen::rust::tests::test_simple_counter ... ok
+test ui_gen::rust::tests::test_state_snapshot_no_scalars_no_override ... ok
+test ui_gen::rust::tests::test_state_snapshot_recurses_into_store ... ok
+test ui_gen::rust::tests::test_bare_value_input_rust_codegen ... ok
+test ui_gen::rust::tests::test_code_editor_codegen ... ok
+test ui_gen::rust::tests::test_state_snapshot_scalar_override ... ok
+test ui_gen::rust::tests::test_tabs_codegen_046_compiles ... ignored, e2e compile: minutes on a cold target dir
+test ui_gen::rust::tests::test_svg_lowering_in_rust_view ... ok
+test ui_gen::rust::tests::test_tag_to_view_fn ... ok
+test ui_gen::rust::tests::test_tailwind_single_bg ... ok
+test ui_gen::rust::tests::test_tailwind_single_border ... ok
+test ui_gen::rust::tests::test_alert_dialog_codegen_emits_modal_popover ... ok
+test ui_gen::rust::tests::test_inline_lambda_event_rust_codegen ... ok
+test ui_gen::rust::tests::test_tailwind_single_border_radius ... ok
+test ui_gen::rust::tests::test_on_only_handlers_get_msg_variants_rust_track ... ok
+test ui_gen::rust::tests::terminal_onmenu_emits_on_menu_direct_msg ... ok
+test ui_gen::rust::tests::test_slider_codegen_arm_fixture ... ok
+test ui_gen::jet::generator::test_text_with_flex_style_e2e ... ok
+test ui_gen::rust::tests::test_tailwind_single_font_weight ... ok
+test ui_gen::rust::tests::test_tailwind_single_gap ... ok
+test ui_gen::rust::tests::test_tailwind_single_height ... ok
+test ui_gen::rust::tests::test_tailwind_single_layout ... ok
+test ui_gen::rust::tests::test_tailwind_single_margin ... ok
+test ui_gen::rust::tests::test_tailwind_single_padding ... ok
+test ui_gen::rust::tests::test_select_codegen_arm_fixture ... ok
+test ui_gen::rust::tests::test_tailwind_single_padding_xy ... ok
+test ui_gen::rust::tests::test_tailwind_single_text_color ... ok
+test ui_gen::rust::tests::test_dialog_family_codegen_modal_and_bare_trigger ... ok
+test ui_gen::rust::tests::test_tailwind_to_methods_unknown_classes_passthrough ... ok
+test ui_gen::rust::tests::test_text_element_with_text_prop ... ok
+test ui_gen::rust::tests::test_tailwind_single_width ... ok
+test ui_gen::rust::tests::test_tailwind_to_methods_chain ... ok
+test ui_gen::rust::tests::test_tailwind_to_methods_empty ... ok
+test ui_gen::shared::registry::tests::test_by_category ... ok
+test ui_gen::shared::state::tests::test_jet_state_generation ... ok
+test ui_gen::shared::state::tests::test_message_with_payload ... ok
+test ui_gen::shared::state::tests::test_vue_state_generation ... ok
+test ui_gen::shared::style::tests::test_resolved_style_merge ... ok
+test ui_gen::shared::registry::tests::test_registry_input ... ok
+test ui_gen::shared::registry::tests::test_registry_layout ... ok
+test ui_gen::shared::registry::tests::test_registry_button ... ok
+test ui_gen::rust::tests::test_tailwind_to_methods_complex ... ok
+test ui_gen::rust::tests::test_tabs_codegen_view_tabs_folding ... ok
+test ui_gen::shared::style::tests::test_tw_font_size ... ok
+test ui_gen::shared::style::tests::test_tw_radius ... ok
+test ui_gen::shared::style::tests::test_tw_spacing ... ok
+test ui_gen::shared::tailwind::tests::test_parse_corner_border_radius_bottom ... ok
+test ui_gen::shared::registry::tests::test_is_supported ... ok
+test ui_gen::shared::tailwind::tests::test_custom_classes ... ok
+test ui_gen::shared::tailwind::tests::test_parse_border ... ok
+test ui_gen::shared::tailwind::tests::test_parse_corner_border_radius_left ... ok
+test ui_gen::shared::tailwind::tests::test_parse_colors ... ok
+test ui_gen::shared::tailwind::tests::test_parse_combined_new_classes ... ok
+test ui_gen::shared::tailwind::tests::test_parse_corner_border_radius_right ... ok
+test ui_gen::shared::tailwind::tests::test_parse_layout_weight ... ok
+test ui_gen::shared::tailwind::tests::test_parse_corner_border_radius_single_corners ... ok
+test ui_gen::shared::tailwind::tests::test_parse_corner_border_radius_top ... ok
+test ui_gen::shared::tailwind::tests::test_parse_layout ... ok
+test ui_gen::shared::tailwind::tests::test_parse_line_height ... ok
+test ui_gen::shared::tailwind::tests::test_parse_object_fit ... ok
+test ui_gen::shared::tailwind::tests::test_parse_size ... ok
+test ui_gen::shared::tailwind::tests::test_parse_spacing ... ok
+test ui_gen::shared::tailwind::tests::test_parse_shadow ... ok
+test ui_gen::shared::tailwind::tests::test_parse_typography ... ok
+test ui_gen::shared::tests::test_merge_classes ... ok
+test ui_gen::shared::tests::test_parse_classes ... ok
+test ui_gen::sidebar_contract::tests::sidebar_contract_active_hover_parse ... ok
+test ui_gen::rust::tests::test_dropdown_menu_codegen_anchored_popover ... ok
+test ui_gen::style::tests::test_generate_scoped ... ok
+test ui_gen::style::tests::test_merge_classes ... ok
+test ui_gen::ts_adapter::tests::d3_self_method_call_is_standalone_statement ... ok
+test ui_gen::ts_adapter::tests::d2_array_plus_uses_concat ... ok
+test ui_gen::sidebar_contract::tests::sidebar_contract_tokens_parse_on_vm ... ok
+test ui_gen::rust::tests::test_shell_pack_codegen_vocabulary_gate ... ok
+test ui_gen::ts_adapter::tests::d4_container_new_transpiles_to_array_literal ... ok
+test ui_gen::sidebar_contract::tests::sidebar_contract_matches_scaffold_assets ... ok
+test ui_gen::ts_adapter::tests::env_get_literal_key_folds_to_host_snapshot ... ok
+test ui_gen::ts_adapter::tests::env_get_non_literal_key_stays_vm_only ... ok
+test ui_gen::style::tests::test_style_generator_creation ... ok
+test ui_gen::style::tests::test_tag_to_tailwind ... ok
+test ui_gen::ts_adapter::tests::block_bodied_closure_keeps_state_ref_unwrapping ... ok
+test ui_gen::ts_adapter::tests::date_format_ts_emission_is_balanced ... ok
+test ui_gen::ts_adapter::tests::document_window_passthrough ... ok
+test ui_gen::ts_adapter::tests::d4_store_array_gets_builtin_annotation ... ok
+test ui_gen::ts_adapter::tests::env_get_unset_literal_key_folds_to_empty ... ok
+test ui_gen::rust::tests::timer_block_rust_codegen_emits_named_tick_subscription ... ok
+test ui_gen::ts_adapter::tests::env_set_and_process_stay_vm_only ... ok
+test ui_gen::ts_adapter::tests::env_track_folds_to_vue_literal ... ok
+test ui_gen::rust::tests::test_gallery_alertdialog_page_codegen_contains_modal ... ok
+test ui_gen::ts_adapter::tests::p2_try_catch_finally_emitted_and_walked ... ok
+test ui_gen::ts_adapter::tests::storage_get_emits_null_coalescing ... ok
+test ui_gen::ts_adapter::tests::str_is_digit_maps_to_regex_test ... ok
+test ui_gen::ts_adapter::tests::template_ref_method_call ... ok
+test ui_gen::ts_adapter::tests::template_ref_property_write ... ok
+test ui_gen::ts_adapter::tests::let_type_annotation_not_shadowed_by_same_name_var ... ok
+test ui_gen::ts_adapter::tests::template_ref_property_read ... ok
+test ui_gen::validators::tests::format_warnings_produces_readable_output ... ok
+test ui_gen::api::tests::test_soft_keyword_as_condition_value ... ok
+test ui_gen::validators::tests::r003_info_when_autodown_used ... ok
+test ui_gen::validators::tests::r003_silent_without_autodown ... ok
+test ui_gen::validators::tests::r001_ignores_lowercase_html ... ok
+test ui_gen::ts_adapter::tests::t21_dynamic_regex_pattern_transpiles ... ok
+test ui_gen::ts_adapter::tests::time_module_bridges_to_date_now ... ok
+test ui_gen::validators::tests::r001_ignores_single_instance ... ok
+test ui_gen::validators::tests::r001_detects_duplicate_key ... ok
+test ui_gen::validators::tests::r001_ok_with_distinct_keys ... ok
+test ui_gen::validators::tests::r002_ignores_store_refs_inside_string_literals ... ok
+test ui_gen::validators::tests::r002_ignores_store_composable_definition ... ok
+test ui_gen::validators::tests::r002_ok_with_import ... ok
+test ui_gen::validators::tests::r004_ignores_inline_setter_assignment ... ok
+test ui_gen::jet::generator::tests::test_card_variant_full_e2e_from_source ... ok
+test ui_gen::validators::tests::r004_ignores_inline_toggle_assignment ... ok
+test ui_gen::validators::tests::r002_template_interpolation_conservatively_flagged ... ok
+test ui_gen::validators::tests::r002_detects_store_without_import ... ok
+test ui_gen::validators::tests::r007_detects_dual_editor ... ok
+test ui_gen::validators::tests::r007_ok_with_single_editor ... ok
+test ui_gen::validators::tests::r006_detects_missing_key ... ok
+test ui_gen::validators::tests::r004_detects_missing_handler ... ok
+test ui_gen::validators::tests::r002_still_fires_on_real_store_usage ... ok
+test ui_gen::validators::tests::r009_ignores_sfc_without_define_expose ... ok
+test ui_gen::validators::tests::r006_ok_with_key ... ok
+test ui_gen::validators::tests::r016_flags_link_without_to ... ok
+test ui_gen::validators::tests::r016_flags_task_element ... ok
+test ui_gen::validators::tests::r016_flags_view_element ... ok
+test ui_gen::validators::tests::r005_ok_when_all_declared ... ok
+test ui_gen::validators::tests::r016_ok_link_with_to ... ok
+test ui_gen::validators::tests::r016_ok_normal_elements ... ok
+test ui_gen::validators::tests::r009_ok_when_exposed_name_is_defined ... ok
+test ui_gen::validators::tests::r005_detects_undeclared_emit ... ok
+test ui_gen::validators::tests::r009_ok_when_exposed_name_is_imported ... ok
+test ui_gen::validators::tests::r004_ok_when_defined ... ok
+test ui_gen::rust::tests::test_time_and_storage_builtins_lowering ... ok
+test ui_gen::validators::tests::r009_detects_undefined_exposed_name ... ok
+test ui_gen::validators::tests::r004_trusts_generator_known_handlers ... ok
+test ui_gen::vue::tests::plan493_vue_mention_backdrop_class_derivation ... ok
+test ui_gen::vue::tests::p656_scroll_pane_vue_codegen ... ok
+test ui_gen::api::tests::test_top_level_actions_merge ... ok
+test ui_gen::rust::tests::test_side_panels_codegen_matches_interpreter_chrome ... ok
+test ui_gen::validators::tests::schema_validation_accepts_dyn_dynamic_component ... ok
+test ui_gen::validators::tests::schema_validation_catches_unknown_tag_and_prop ... ok
+test ui_gen::vue::tests::p692_command_family_shadcn_mapping ... ok
+test ui_gen::vue::tests::plan493_vue_textarea_without_mentions_unchanged ... ok
+test ui_gen::validators::tests::schema_validation_accepts_local_widgets_and_fold_aliases ... ok
+test ui_gen::vue::tests::p701_scroll_ctl_helpers_typed ... ok
+test ui_gen::vue::tests::plan493_vue_mentions_emits_backdrop_pair ... ok
+test ui_gen::validators::tests::validate_sfc_aggregates_all_rules ... ok
+test ui_gen::vue::tests::plan677_json_to_value_of_api_call_wraps_parse ... ok
+test ui_gen::vue::tests::image_surface_vue_codegen ... ok
+test ui_gen::vue::tests::plan018_iconfile_dual_theme_bitmap ... ok
+test ui_gen::vue::tests::plan621_icon_state_binding_ternary ... ok
+test ui_gen::vue::tests::plan563_canvas_element_sfc ... ok
+test ui_gen::vue::tests::plan621_icon_state_explicit_text_class_wins ... ok
+test ui_gen::vue::tests::plan781_vue_scroll_area_ownership_marker ... ok
+test ui_gen::vue::tests::p692_code_editor_literal_content ... ok
+test ui_gen::vue::tests::plan646_vue_emits_data_auto_markers ... ok
+test ui_gen::api::tests::test_plan356_soft_keyword_loop_var ... ok
+test ui_gen::vue::tests::plan619_icon_size_prop_emits_bound_size ... ok
+test ui_gen::vue::tests::plan781_vue_scroll_anchor_attrs_shadcn ... ok
+test ui_gen::vue::tests::plan781_vue_scroll_anchor_attrs_plain ... ok
+test ui_gen::vue::tests::p695_view_menubar_full_family ... ok
+test ui_gen::vue::tests::plan621_icon_state_undeclared_zero_diff_and_48px ... ok
+test ui_gen::vue::tests::p692_utility_scroll_ash_scroll_class ... ok
+test ui_gen::vue::tests::plan781_vue_scroll_pane_ownership_marker_and_helper ... ok
+test ui_gen::vue::tests::plan621_icon_state_literal_on_off ... ok
+test ui_gen::vue::tests::t22_value_on_prop_stays_one_way ... ok
+test ui_gen::vue::tests::test_a1_qualified_store_call_emits_facade ... ok
+test ui_gen::vue::tests::plan781_vue_anchor_helpers_typed ... ok
+test ui_gen::vue::tests::plan630_declarative_menubar_generates_shadcn_tree ... ok
+test ui_gen::vue::tests::test_a2vue_component_fn_style ... ok
+test ui_gen::vue::tests::test_a2vue_fn_call_prop ... ok
+test ui_gen::vue::tests::test_a2vue_neq_empty_safe ... ok
+test ui_gen::vue::tests::test_a2vue_markdown ... ok
+test ui_gen::vue::tests::test_a2vue_nested_if_style ... ok
+test ui_gen::vue::tests::schema_snake_case_overlay_tags_use_shadcn_components ... ok
+test ui_gen::vue::tests::parser_minted_modal_toggle_is_not_forwarded_to_vue_trigger ... ok
+test ui_gen::vue::tests::test_a2vue_icon_child ... ok
+test ui_gen::vue::tests::plan677_view_menubar_item_composition ... ok
+test ui_gen::vue::tests::test_a2vue_mouse_area_onclick ... ok
+test ui_gen::vue::tests::test_a2vue_icon_state ... ok
+test ui_gen::vue::tests::test_a2vue_shadcn_col_dynamic_class ... ok
+test ui_gen::vue::tests::test_as_cast_int_lowers_to_math_trunc ... ok
+test ui_gen::vue::tests::test_a2vue_counter ... ok
+test ui_gen::vue::tests::test_a2vue_text_fn_call ... ok
+test ui_gen::vue::tests::test_a2vue_remote_frame ... ok
+test ui_gen::vue::tests::test_a2vue_text_selectable ... ok
+test ui_gen::vue::tests::test_actions_placeholder_without_block_untouched ... ok
+test ui_gen::vue::tests::test_alertdialog_vmodel_open_real_dsl ... ok
+test ui_gen::vue::tests::test_a2vue_select_children ... ok
+test ui_gen::vue::tests::test_a2vue_virtual_window ... ok
+test ui_gen::vue::tests::test_autodown_theme_props_defaults ... ok
+test ui_gen::vue::tests::test_auto_sub_widget_import_without_ext_decl_unchanged ... ok
+test ui_gen::vue::tests::test_autodown_streaming_props_and_editor_placeholder ... ok
+test ui_gen::vue::tests::test_a2vue_window_thumbnail ... ok
+test ui_gen::vue::tests::test_bind_block_keydown_layer ... ok
+test ui_gen::vue::tests::test_autodown_theme_props_emit ... ok
+test ui_gen::vue::tests::test_a2vue_component_fn ... ok
+test ui_gen::vue::tests::test_a2vue_desktop_surface_asset ... ok
+test ui_gen::vue::tests::test_button_class_not_duplicated_shadcn ... ok
+test ui_gen::vue::tests::test_actions_condition_bare_expression_spelling ... ok
+test ui_gen::vue::tests::test_autodown_editor_rendering ... ok
+test ui_gen::vue::tests::test_card_forwards_dynamic_class_shadcn ... ok
+test ui_gen::vue::tests::test_autodown_editor_props_camelcase_and_events ... ok
+test ui_gen::vue::tests::test_col_gap_override_no_gap4 ... ok
+test ui_gen::vue::tests::test_button_with_text_full_widget ... ok
+test ui_gen::vue::tests::test_composable_with_args ... ok
+test ui_gen::vue::tests::test_computed_block_body_returns_tail ... ok
+test ui_gen::vue::tests::test_bare_value_input_folds_to_vmodel_without_mint_noise ... ok
+test ui_gen::vue::tests::test_actions_shortcut_keydown_layer ... ok
+test ui_gen::vue::tests::test_code_editor_rendering ... ok
+test ui_gen::vue::tests::test_actions_toolbar_synthesis ... ok
+test ui_gen::vue::tests::test_computed_parses_bare_ident_and_plain_call ... ok
+test ui_gen::vue::tests::test_covers_aura_tag_composite ... ok
+test ui_gen::vue::tests::test_computed_multiline_body_renders_js ... ok
+test ui_gen::vue::tests::test_computed_if_chain_transpiles_to_ternary ... ok
+test ui_gen::vue::tests::test_computed_prop_dot_ref_uses_props_not_self ... ok
+test ui_gen::vue::tests::test_component_template_ref ... ok
+test ui_gen::vue::tests::test_code_editor_events_no_params_plain_binding ... ok
+test ui_gen::vue::tests::test_computed_string_concat_infers_string ... ok
+test ui_gen::vue::tests::test_conditional_style_else_if_chain_nested_ternary ... ok
+test ui_gen::vue::tests::test_code_editor_events_payload_threading ... ok
+test ui_gen::vue::tests::test_conditional_style_prop ... ok
+test ui_gen::vue::tests::test_conditional_style_in_view_fn_with_loop_index ... ok
+test ui_gen::vue::tests::test_custom_type_import_in_define_props ... ok
+test ui_gen::vue::tests::test_dyn_component_is_prop_model_field ... ok
+test ui_gen::vue::tests::test_dialogtitle_forwards_class_shadcn ... ok
+test ui_gen::vue::tests::test_dialog_vmodel_open_real_dsl ... ok
+test ui_gen::vue::tests::test_expr_to_js ... ok
+test ui_gen::vue::tests::test_dyn_component_in_for_loop ... ok
+test ui_gen::vue::tests::test_controlled_video_audio_probe_chains_with_time ... ok
+test ui_gen::vue::tests::test_controlled_video_audio_probe_sfc ... ok
+test ui_gen::vue::tests::test_early_return_bare_newline_terminates_statement ... ok
+test ui_gen::vue::tests::test_element_custom_event_listener ... ok
+test ui_gen::vue::tests::test_else_if_chain_flattens_to_v_else_if ... ok
+test ui_gen::vue::tests::test_ext_use_block_parses ... ok
+test ui_gen::vue::tests::test_early_return_guarded_if ... ok
+test ui_gen::api::tests::test_strict_mode_escalation ... ok
+test ui_gen::vue::tests::test_find_guard_in_condition_string ... ok
+test ui_gen::vue::tests::test_find_lambda_store_composable_keeps_find ... ok
+test ui_gen::vue::tests::test_controlled_video_contract_sfc ... ok
+test ui_gen::vue::tests::test_event_modifiers_same_base_no_overwrite ... ok
+test ui_gen::vue::tests::test_fn_module_async_when_await ... ok
+test ui_gen::vue::tests::test_fn_module_dom_builtins ... ok
+test ui_gen::vue::tests::test_expose_single_imported_fn ... ok
+test ui_gen::vue::tests::test_event_arg_target_payload_narrowed ... ok
+test ui_gen::vue::tests::test_fn_module_pure_forwarding_port ... ok
+test ui_gen::vue::tests::test_expose_state_and_template_ref ... ok
+test ui_gen::vue::tests::test_ext_component_expresses_autodown_editor_case ... ok
+test ui_gen::vue::tests::test_fn_module_reexport_component_composable ... ok
+test ui_gen::vue::tests::test_expose_multiple_members_and_handler ... ok
+test ui_gen::vue::tests::test_ext_fn_name_collision_skips_auto_sub_widget_import ... ok
+test ui_gen::vue::tests::test_event_modifiers ... ok
+test ui_gen::vue::tests::test_find_lambda_computed_keeps_find ... ok
+test ui_gen::vue::tests::test_ext_component_shadows_auto_sub_widget_import ... ok
+test ui_gen::vue::tests::test_ext_component_npm_named_import ... ok
+test ui_gen::vue::tests::test_event_object_param ... ok
+test ui_gen::vue::tests::test_generate_project_files ... ok
+test ui_gen::vue::tests::test_find_lambda_handler_body_keeps_find ... ok
+test ui_gen::vue::tests::test_find_string_arg_still_maps_to_index_of ... ok
+test ui_gen::vue::tests::test_ext_fn_import_and_call_sites ... ok
+test ui_gen::vue::tests::test_ext_composable_setup_call ... ok
+test ui_gen::vue::tests::test_generate_shadcn_attrs_button ... ok
+test ui_gen::vue::tests::test_generate_shadcn_attrs_card ... ok
+test ui_gen::vue::tests::test_generate_shadcn_attrs_divider ... ok
+test ui_gen::vue::tests::test_gap20_dynamic_class_if_emits_ternary ... ok
+test ui_gen::vue::tests::test_generate_shadcn_attrs_divider_decorative ... ok
+test ui_gen::vue::tests::test_ext_component_local_vue ... ok
+test ui_gen::vue::tests::test_gap44_explicit_value_suffix_not_doubled ... ok
+test ui_gen::vue::tests::test_generate_shadcn_attrs_scroll ... ok
+test ui_gen::vue::tests::test_gap20_dynamic_class_ref_is_bound ... ok
+test ui_gen::vue::tests::test_generate_shadcn_attrs_radio ... ok
+test ui_gen::vue::tests::test_generate_shadcn_attrs_radio_disabled ... ok
+test ui_gen::vue::tests::test_gap47_null_checks_are_loose ... ok
+test ui_gen::vue::tests::test_generate_shadcn_attrs_spinner ... ok
+test ui_gen::vue::tests::test_generate_shadcn_attrs_table ... ok
+test ui_gen::vue::tests::test_generate_shadcn_attrs_table_cells ... ok
+test ui_gen::vue::tests::test_generate_shadcn_attrs_tabs ... ok
+test ui_gen::vue::tests::test_generate_shadcn_attrs_tooltip ... ok
+test ui_gen::vue::tests::test_generate_shadcn_attrs_tree ... ok
+test ui_gen::vue::tests::test_gap19_ext_composable_facade_remove_passes_through ... ok
+test ui_gen::vue::tests::test_gap30_stray_comma_warns_and_emits_nothing ... ok
+test ui_gen::vue::tests::test_generate_shadcn_attrs_tab ... ok
+test ui_gen::vue::tests::test_gap44_computed_ref_unwrapped_in_computed ... ok
+test ui_gen::vue::tests::test_generate_shadcn_attrs_tree_item ... ok
+test ui_gen::vue::tests::test_gap45_exposed_parameterized_handler_generated ... ok
+test ui_gen::vue::tests::test_gap19_store_facade_remove_passes_through ... ok
+test ui_gen::vue::tests::test_generate_shadcn_attrs_checkbox ... ok
+test ui_gen::vue::tests::test_generate_shadcn_attrs_modal ... ok
+test ui_gen::vue::tests::test_gap19_typed_string_contains_maps_to_includes ... ok
+test ui_gen::vue::tests::test_form_submit_wiring_emits_keyup_enter ... ok
+test ui_gen::vue::tests::test_gap19_typed_array_remove_keeps_splice ... ok
+test ui_gen::vue::tests::test_generate_shadcn_attrs_input ... ok
+test ui_gen::vue::tests::test_library_button_support_files ... ok
+test ui_gen::vue::tests::test_library_button_sfc_is_self_contained ... ok
+test ui_gen::vue::tests::test_library_all_widgets_self_contained ... ok
+test ui_gen::vue::tests::test_generate_shadcn_attrs_radiogroup ... ok
+test ui_gen::vue::tests::test_library_chat_message_sfc ... ok
+test ui_gen::vue::tests::test_library_composite_widget_support_files ... ok
+test ui_gen::vue::tests::test_library_index_reexports_all_vue_files ... ok
+test ui_gen::vue::tests::test_library_input_sfc_is_self_contained ... ok
+test ui_gen::vue::tests::test_generate_shadcn_attrs_tabs_with_model ... ok
+test ui_gen::vue::tests::test_library_reka_ui_backed_widgets ... ok
+test ui_gen::vue::tests::test_library_label_sfc_uses_reka_ui ... ok
+test ui_gen::vue::tests::test_library_widgets_exist_in_aura_registry ... ok
+test ui_gen::vue::tests::test_global_document_wheel_capture_prevent ... ok
+test ui_gen::vue::tests::test_library_unknown_widget_errors ... ok
+test ui_gen::vue::tests::test_library_sfc_has_attribution_header ... ok
+test ui_gen::vue::tests::test_library_mode_constructor ... ok
+test ui_gen::vue::tests::test_map_tag_native_html_passthrough ... ok
+test ui_gen::vue::tests::test_global_listener_map_arg_state_field_no_this ... ok
+test ui_gen::vue::tests::test_map_tag ... ok
+test ui_gen::vue::tests::test_map_tag_hyphenated ... ok
+test ui_gen::vue::tests::test_map_tag_svg_passthrough ... ok
+test ui_gen::vue::tests::test_grid_dynamic_cols_gap_inline_style ... ok
+test ui_gen::vue::tests::test_global_window_mouse_listeners ... ok
+test ui_gen::vue::tests::test_global_custom_event_listeners ... ok
+test ui_gen::vue::tests::test_label_keeps_static_class_shadcn ... ok
+test ui_gen::vue::tests::test_label_keeps_dynamic_class_shadcn ... ok
+test ui_gen::vue::tests::test_generic_dom_events ... ok
+test ui_gen::vue::tests::test_g1_store_import_prefix_configurable ... ok
+test ui_gen::vue::tests::test_icon_size_precedence ... ok
+test ui_gen::vue::tests::test_library_widgets_list_is_self_consistent ... ok
+test ui_gen::vue::tests::test_inline_lambda_event_generates_handler_without_emit ... ok
+test ui_gen::vue::tests::test_p013_catchall_vshow_is_hard_error ... ok
+test ui_gen::vue::tests::test_p013_catchall_vhtml_is_hard_error ... ok
+test ui_gen::vue::tests::test_nested_if_in_style_branch ... ok
+test ui_gen::vue::tests::test_mouse_area_onmousemove_logical_coords ... ok
+test ui_gen::vue::tests::test_no_widget_style_css_no_scoped_block ... ok
+test ui_gen::vue::tests::test_msg_prop_signature_and_custom_type_import ... ok
+test ui_gen::vue::tests::test_p013_catchall_class_expr_warns_r011 ... ok
+test ui_gen::vue::tests::test_no_expose_block_unchanged ... ok
+test ui_gen::vue::tests::test_onenter_ime_guard_wraps_handler ... ok
+test ui_gen::vue::tests::test_p013_catchall_style_binding_warns_r013 ... ok
+test ui_gen::vue::tests::test_loop_sub_widget_payload_event_forwards_dollar_event ... ok
+test ui_gen::vue::tests::test_nested_if_in_style_else_branch ... ok
+test ui_gen::vue::tests::test_nested_event_arg_state_field_no_this ... ok
+test ui_gen::vue::tests::test_map_literal_event_arg_state_field_no_this ... ok
+test ui_gen::vue::tests::test_input_text_arg_follows_declared_handler_arity ... ok
+test ui_gen::vue::tests::test_p013_catchall_style_obj_warns_r013 ... ok
+test ui_gen::vue::tests::test_nav_family_inline_sfc ... ok
+test ui_gen::vue::tests::test_model_channel_addressing_vmodel ... ok
+test ui_gen::vue::tests::test_p013_class_array_shadcn_choke_point ... ok
+test ui_gen::vue::tests::test_p013_class_array_ternary_no_null ... ok
+test ui_gen::vue::tests::test_nav_family_shadcn_sfc ... ok
+test ui_gen::vue::tests::test_p013_class_concat_no_null ... ok
+test ui_gen::vue::tests::test_p013_duplicate_class_props_merge ... ok
+test ui_gen::vue::tests::test_charts_gallery_compiles ... ok
+test ui_gen::vue::tests::test_p013_class_map_form_quotes_keys ... ok
+test ui_gen::vue::tests::test_plan426_setup_name_collision ... ok
+test ui_gen::vue::tests::test_plan426_setup_rejects_await ... ok
+test ui_gen::vue::tests::test_plan053_p53_view_expr_method_mapping ... ok
+test ui_gen::vue::tests::test_plan426_setup_rejects_state_reference ... ok
+test ui_gen::vue::tests::test_plan053_p56_non_complete_handler_not_debounced ... ok
+test ui_gen::vue::tests::test_plan522_016_corpus_helpers_emitted ... ok
+test ui_gen::vue::tests::test_plan053_p55_textarea_skips_default_classes ... ok
+test ui_gen::vue::tests::test_plan053_p56_complete_handler_is_debounced ... ok
+test ui_gen::vue::tests::test_plan053_string_mapping_computed_expr ... ok
+test ui_gen::vue::tests::test_plan053_p57_self_call_does_not_promote_non_handler ... ok
+test ui_gen::vue::tests::test_plan053_p56_debounce_guard_on_state_assign ... ok
+test ui_gen::vue::tests::test_plan053_p57_residual_self_called_handler_no_emit ... ok
+test ui_gen::vue::tests::test_pascalcase_fallback_element_on_prop_binds_pascal_emit_name ... ok
+test ui_gen::vue::tests::test_plan053_string_mapping_handler_body ... ok
+test ui_gen::vue::tests::test_plan426_setup_preamble_position_and_bindings ... ok
+test ui_gen::vue::tests::test_plan528_toggle_group_registry_mapping ... ok
+test ui_gen::vue::tests::test_plan053_p57_self_called_handler_is_emitted ... ok
+test ui_gen::vue::tests::test_plan008_loop_wrapper_hoists_child_key ... ok
+test ui_gen::vue::tests::test_plan522_use_fn_block_body_computed_calls_helper ... ok
+test ui_gen::vue::tests::test_plan522_use_fn_called_in_expr_computed_is_emitted ... ok
+test ui_gen::vue::tests::test_plan522_use_fn_closure_deps_pulled_to_fixpoint ... ok
+test ui_gen::vue::tests::test_router_generation ... ok
+test ui_gen::vue::tests::test_router_generation_empty ... ok
+test ui_gen::vue::tests::test_plan522_use_fn_not_imported_is_not_pulled ... ok
+test ui_gen::vue::tests::test_plan522_use_fn_pattern_match_body_warns_and_skips ... ok
+test ui_gen::vue::tests::test_shadcn_map_tag ... ok
+test ui_gen::vue::tests::test_plan426_setup_refs_annotation ... ok
+test ui_gen::vue::tests::test_shadcn_registry_phase3_components ... ok
+test ui_gen::vue::tests::test_shadcn_registry ... ok
+test ui_gen::vue::tests::test_plan425_widget_view_optional ... ok
+test ui_gen::vue::tests::test_shadcn_registry_phase4_components ... ok
+test ui_gen::vue::tests::test_shadcn_registry_phase5_components ... ok
+test ui_gen::vue::tests::test_shadcn_registry_phase6_components ... ok
+test ui_gen::vue::tests::test_shadcn_mode ... ok
+test ui_gen::vue::tests::test_plan522_use_fn_unreferenced_is_not_emitted ... ok
+test ui_gen::vue::tests::test_plan522_use_fn_trailing_expr_body_emits_return ... ok
+test ui_gen::vue::tests::test_plan522_use_fn_name_conflict_with_state_warns_and_skips ... ok
+test ui_gen::vue::tests::test_plan522_use_fn_dedup_across_computed_and_handler ... ok
+test ui_gen::vue::tests::test_plan522_use_fn_suppressed_by_ext_import_same_name ... ok
+test ui_gen::vue::tests::test_slot_children_warning ... ok
+test ui_gen::vue::tests::test_port_referenced_component_composable_caller_side ... ok
+test ui_gen::vue::tests::test_plan522_use_fn_called_in_handler_body_is_emitted ... ok
+test ui_gen::vue::tests::test_sidebar_menu_button_plain_mode_button_semantics ... ok
+test ui_gen::vue::tests::test_quoted_component_event_multi_arg_handler ... ok
+test ui_gen::vue::tests::test_simple_counter ... ok
+test ui_gen::vue::tests::test_store_composable_no_sse_without_stream_api ... ok
+test ui_gen::vue::tests::test_store_composable_sse_multi_endpoint ... ok
+test ui_gen::vue::tests::test_store_composable_sse_multi_variant_data_driven ... ok
+test ui_gen::vue::tests::test_slider_forwards_class_shadcn ... ok
+test ui_gen::vue::tests::test_store_composable_sse_type_driven ... ok
+test ui_gen::vue::tests::test_store_composable_wires_sse_stream ... ok
+test ui_gen::vue::tests::test_select_keeps_static_class_shadcn ... ok
+test ui_gen::vue::tests::test_store_composable_theme_runtime ... ok
+test ui_gen::vue::tests::test_store_handler_return_value ... ok
+test ui_gen::vue::tests::test_store_map_literal_init_preserved ... ok
+test ui_gen::vue::tests::test_plan677_single_if_loop_wraps_in_template_not_div ... ok
+test ui_gen::vue::tests::test_store_composable_no_notes_no_all_tags ... ok
+test ui_gen::vue::tests::test_sidebar_forwards_class_shadcn ... ok
+test ui_gen::vue::tests::test_store_watch_block_emits_module_watch ... ok
+test ui_gen::vue::tests::test_store_msg_multi_type_payload ... ok
+test ui_gen::vue::tests::test_sidebar_menu_button_to_active_shadcn ... ok
+test ui_gen::vue::tests::test_slot_default_children_unchanged ... ok
+test ui_gen::vue::tests::test_plan677_code_editor_emits_dynamic_editor_key ... ok
+test ui_gen::vue::tests::test_slot_named_template_parent_side ... ok
+test ui_gen::vue::tests::test_slot_outlet_default ... ok
+test ui_gen::vue::tests::test_tailwind_class_template_to_inline_style ... ok
+test ui_gen::vue::tests::test_spacer_generates_flex1 ... ok
+test ui_gen::vue::tests::test_sidebar_menu_button_route_autodetect_shadcn ... ok
+test ui_gen::vue::tests::test_slot_outlet_named ... ok
+test ui_gen::vue::tests::test_slot_style_class_string_becomes_real_inline_style ... ok
+test ui_gen::vue::tests::test_style_array_and_class_safe_concat ... ok
+test ui_gen::vue::tests::test_slider_native_range_attrs_and_payload ... ok
+test ui_gen::vue::tests::test_style_obj_inline_style_binding ... ok
+test ui_gen::vue::tests::test_try_catch_in_store_handler ... ok
+test ui_gen::vue::tests::test_svg_element_static_attributes ... ok
+test ui_gen::vue::tests::test_use_web_stmt_four_forms ... ok
+test ui_gen::vue::tests::test_style_class_binding_quotes_hyphenated_keys ... ok
+test ui_gen::vue::tests::test_sub_widget_omits_emitted_callback_prop_from_define_props ... ok
+test ui_gen::vue::tests::test_progress_onseek_wrapper ... ok
+test ui_gen::vue::tests::test_sub_widget_on_prop_binds_pascal_emit_name ... ok
+test ui_gen::vue::tests::test_teleport_nested_in_containers ... ok
+test ui_gen::vue::tests::test_template_ref_declaration ... ok
+test ui_gen::vue::tests::test_teleport_static_to ... ok
+test ui_gen::vue::tests::test_teleport_expr_to ... ok
+test ui_gen::vue::tests::test_text_selectable_emits_user_select ... ok
+test ui_gen::vue::tests::test_text_dynamic_style_concat_renders_style_binding ... ok
+test ui_gen::vue::tests::test_teleport_disabled_expr ... ok
+test ui_gen::vue::tests::test_teleport_missing_to_warns_r015 ... ok
+test ui_gen::vue::tests::test_uncontrolled_video_is_byte_identical ... ok
+test ui_gen::vue::tests::test_sidebar_provider_autowrap_shadcn ... ok
+test ui_gen::vue::tests::test_vhtml_conflicting_text_prop_warns_r014 ... ok
+test ui_gen::vue::tests::test_vhtml_plain_element_dynamic ... ok
+test ui_gen::vue::tests::test_vhtml_conflicting_children_warns_r014 ... ok
+test ui_gen::vue::tests::test_view_else_if_three_branch_loading_error_content ... ok
+test ui_gen::vue::tests::test_vfor_explicit_key_on_sub_widget ... ok
+test ui_gen::vue::tests::test_view_if_else_single_else ... ok
+test ui_gen::vue::tests::test_view_else_if_chain_composes_loop_and_props ... ok
+test ui_gen::vue::tests::test_vfor_auto_key_unchanged_without_explicit_key ... ok
+test ui_gen::vue::tests::test_try_catch_finally_in_widget_handler ... ok
+test ui_gen::vue::tests::test_vue_generator_creation ... ok
+test ui_gen::vue::tests::test_vhtml_dyn_passthrough_ext_component_pattern ... ok
+test ui_gen::vue::tests::test_vfor_explicit_key_on_plain_element ... ok
+test ui_gen::vue::tests::test_vfor_explicit_key_on_layout_widget_single_emission ... ok
+test ui_gen::widget::plan677_probe_tests::tests::menubar_family_tags_resolve_vue_components ... ok
+test ui_gen::widget::registry::tests::hover_card_schema_names_resolve_to_vue_components ... ok
+test ui_gen::widget::registry::tests::p692_schema_only_command_family_gets_vue_specs ... ok
+test ui_gen::vue::tests::test_vmodel_contract_parent_manual_wiring ... ok
+test ui_gen::vue::tests::test_vhtml_on_dyn_component ... ok
+test ui_gen::vue::tests::test_vmodel_contract_child_quoted_emit ... ok
+test ui_gen::vue::tests::test_plan425_legacy_on_event_spelling ... ok
+test ui_gen::vue::tests::test_vshow_on_dyn_component ... ok
+test ui_gen::vue::tests::test_vshow_plain_element_model_ref ... ok
+test ui_gen::vue::tests::test_vhtml_on_sub_widget_component ... ok
+test ui_gen::widget::registry::tests::image_surface_schema_is_registered_without_replacing_image ... ok
+test ui_gen::widget::registry::tests::p695_menubar_family_registry_complete ... ok
+test ui_gen::widget::registry::tests::test_all_form_widgets ... ok
+test ui_gen::widget::registry::tests::test_all_layout_widgets ... ok
+test ui_gen::widget::registry::tests::test_center_widget ... ok
+test ui_gen::widget::registry::tests::test_default_widgets_button ... ok
+test ui_gen::widget::registry::tests::plan708_with_defaults_cached_and_isolated ... ok
+test ui_gen::widget::registry::tests::test_autodown_entry_streaming_rebind ... ok
+test ui_gen::widget::registry::tests::test_autodown_editor_mobile_backends_stable ... ok
+test ui_gen::widget::registry::tests::test_case_insensitive_lookup ... ok
+test ui_gen::widget::registry::tests::test_registry_creation ... ok
+test ui_gen::widget::registry::tests::test_default_widgets_image ... ok
+test ui_gen::widget::registry::tests::test_default_widgets_text ... ok
+test ui_gen::widget::registry::tests::test_default_widgets_col ... ok
+test ui_gen::widget::registry::tests::test_document_panel_widgets_registered ... ok
+test ui_gen::widget::spec::tests::test_widget_spec_with_alias ... ok
+test ui_gen::vue::tests::test_vshow_plain_element_dynamic ... ok
+test ui_gen::widget::spec::tests::test_backend_mapping ... ok
+test ui_gen::widget::spec::tests::test_widget_spec_new ... ok
+test ui_gen::widget::spec::tests::test_widget_category_equality ... ok
+test ui_gen::widget::spec::tests::test_widget_spec_creation ... ok
+test ui_gen::widget::registry::tests::test_semantic_widgets_map_to_column ... ok
+test ui_gen::vue::tests::test_watch_prop_source_and_modifiers ... ok
+test ui_gen::vue::tests::test_watch_computed_source ... ok
+test ui_gen::vue::tests::test_vshow_on_sub_widget_component ... ok
+test ui_gen::vue::tests::test_widget_style_css_scoped_passthrough ... ok
+test ui_gen::vue::tests::zzz_probe_icon_size_in_button_child ... ok
+test ui_gen::vue::tests::test_vfor_indexed_loop_key_uses_index ... ok
+test ui_gen::vue::tests::test_widget_accent_color_injects_apply_accent ... ok
+test ui_gen::vue::tests::test_widget_theme_runtime_absent_without_accent ... ok
+test ui_gen::vue::tests::test_widget_theme_runtime_injected_with_accent ... ok
+test ui_gen::vue::tests::test_plan425_component_fn_widget_equivalence ... ok
+
+test result: ok. 861 passed; 0 failed; 2 ignored; 0 measured; 261 filtered out; finished in 1.22s
+
