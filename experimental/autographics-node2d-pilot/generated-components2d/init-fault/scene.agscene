@@ -1,0 +1,181 @@
+{
+ "behavior": {
+  "api": "autographics.objects2d/1",
+  "source": {
+   "format": "auto-source",
+   "sha256": "a4af6335288e85511bc5f980e56710eea7cfb57af2ab73b29f727cd0e23b6b2b",
+   "byte_length": 7135
+  },
+  "actors": {
+   "two_d": 1,
+   "three_d": null
+  }
+ },
+ "schema": "autographics.scene/6",
+ "document_id": "plan020-components-2d-main",
+ "resources": [
+  "circle",
+  "quad",
+  "cylinder",
+  "player",
+  "mob"
+ ],
+ "objects": [
+  {
+   "id": 1,
+   "name": "player.body",
+   "kind": "quad",
+   "translation": [2.0, 1.0, 0.0],
+   "scale": [0.8, 1.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.9, 0.5, 0.25, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 2,
+   "name": "ground",
+   "kind": "quad",
+   "translation": [6.0, -0.5, 0.0],
+   "scale": [20.0, 1.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.45, 0.45, 0.45, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 3,
+   "name": "c_d0_template",
+   "kind": "circle",
+   "translation": [-30.0, -40.0, 0.0],
+   "scale": [0.4, 0.4, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.2, 0.4, 0.95, 1],
+   "visible": false,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 4,
+   "name": "c_d1_template",
+   "kind": "circle",
+   "translation": [-30.0, -40.0, 0.0],
+   "scale": [0.4, 0.4, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.2, 0.4, 0.95, 1],
+   "visible": false,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 5,
+   "name": "c_d2_template",
+   "kind": "circle",
+   "translation": [-30.0, -40.0, 0.0],
+   "scale": [0.4, 0.4, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.2, 0.4, 0.95, 1],
+   "visible": false,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 6,
+   "name": "c_d3_template",
+   "kind": "circle",
+   "translation": [-30.0, -40.0, 0.0],
+   "scale": [0.4, 0.4, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.2, 0.4, 0.95, 1],
+   "visible": false,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 7,
+   "name": "c_d4_template",
+   "kind": "circle",
+   "translation": [-30.0, -40.0, 0.0],
+   "scale": [0.4, 0.4, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.2, 0.4, 0.95, 1],
+   "visible": false,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 8,
+   "name": "c_d5_template",
+   "kind": "circle",
+   "translation": [-30.0, -40.0, 0.0],
+   "scale": [0.4, 0.4, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.2, 0.4, 0.95, 1],
+   "visible": false,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 9,
+   "name": "c_d6_template",
+   "kind": "circle",
+   "translation": [-30.0, -40.0, 0.0],
+   "scale": [0.4, 0.4, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.2, 0.4, 0.95, 1],
+   "visible": false,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 10,
+   "name": "c_d7_template",
+   "kind": "circle",
+   "translation": [-30.0, -40.0, 0.0],
+   "scale": [0.4, 0.4, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.2, 0.4, 0.95, 1],
+   "visible": false,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 11,
+   "name": "c_d8_template",
+   "kind": "circle",
+   "translation": [-30.0, -40.0, 0.0],
+   "scale": [0.4, 0.4, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.2, 0.4, 0.95, 1],
+   "visible": false,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  }
+ ],
+ "groups": [],
+ "assets": []
+}

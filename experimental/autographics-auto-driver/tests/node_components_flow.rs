@@ -7,9 +7,19 @@
 //! identity kept), root vy sentinel untouched, exact typed-event delivery
 //! (12/8 at T=120) observed through generated getters on the CPU session,
 //! and the crossed-binding negative (receiver table mutated -> swapped
-//! counts, run itself stays green). The consumed scene.agscene/world.at are
-//! frozen generator products
-//! (experimental/autographics-node2d-pilot/generated-components2d/probe).
+//! counts, run itself stays green).
+//! T-05 (V-04/V-05) extends the same file: budget / budget-plus (pool
+//! exactly 32 vs the named 33rd-call fault 10 at the predicted tick),
+//! lifecycle counters on host and CPU (Start exactly once per Run, Resume
+//! never repeats Start, Tick exact with dispatches, paused dispatch /
+//! render-only frames advance nothing, single Step advances exactly one),
+//! 20 host-driven Stop/fresh rounds (model rebuilt, no old-Run leakage,
+//! document unchanged), the consumable pressed edge (double read), the
+//! 8-stateful-instance envelope green, and the runtime init fault (9th
+//! spawn out of the frozen 8-slot objects pool -> named fault 31) with the
+//! host retaining last-good. The consumed scene.agscene/world.at are frozen
+//! generator products
+//! (experimental/autographics-node2d-pilot/generated-components2d/*).
 //! Run single-threaded:
 //! cargo test --locked --offline --test node_components_flow -- --test-threads=1
 use autographics_auto_driver::{
@@ -31,6 +41,33 @@ const SCENE: &str =
     include_str!("../../autographics-node2d-pilot/generated-components2d/probe/scene.agscene");
 const WORLD: &str =
     include_str!("../../autographics-node2d-pilot/generated-components2d/probe/world.at");
+const SCENE_BUDGET: &str =
+    include_str!("../../autographics-node2d-pilot/generated-components2d/budget/scene.agscene");
+const WORLD_BUDGET: &str =
+    include_str!("../../autographics-node2d-pilot/generated-components2d/budget/world.at");
+const SCENE_BUDGET_PLUS: &str = include_str!(
+    "../../autographics-node2d-pilot/generated-components2d/budget-plus/scene.agscene"
+);
+const WORLD_BUDGET_PLUS: &str =
+    include_str!("../../autographics-node2d-pilot/generated-components2d/budget-plus/world.at");
+const SCENE_LIFECYCLE: &str =
+    include_str!("../../autographics-node2d-pilot/generated-components2d/lifecycle/scene.agscene");
+const WORLD_LIFECYCLE: &str =
+    include_str!("../../autographics-node2d-pilot/generated-components2d/lifecycle/world.at");
+const SCENE_DP: &str = include_str!(
+    "../../autographics-node2d-pilot/generated-components2d/lifecycle-doublepress/scene.agscene"
+);
+const WORLD_DP: &str = include_str!(
+    "../../autographics-node2d-pilot/generated-components2d/lifecycle-doublepress/world.at"
+);
+const SCENE_ENVELOPE: &str =
+    include_str!("../../autographics-node2d-pilot/generated-components2d/envelope/scene.agscene");
+const WORLD_ENVELOPE: &str =
+    include_str!("../../autographics-node2d-pilot/generated-components2d/envelope/world.at");
+const SCENE_INIT_FAULT: &str =
+    include_str!("../../autographics-node2d-pilot/generated-components2d/init-fault/scene.agscene");
+const WORLD_INIT_FAULT: &str =
+    include_str!("../../autographics-node2d-pilot/generated-components2d/init-fault/world.at");
 
 const DT: f32 = 1.0 / 60.0;
 
@@ -560,4 +597,456 @@ fn components_cpu_sentinel_counts_and_crossed_negative() {
         3,
         "crossed: a emits on b's meter"
     );
+}
+
+// =================================================== T-05 (V-04/V-05) ====
+
+/// Extra charged-call input variant: `_ag_char_input(held, pressed)` — the
+/// pressed mask carries one-tick edges (bit2 = Jump) consumed by the first
+/// `input.pressed` read.
+fn tick_cpu_input(s: &mut Session, step: i32, held: i32, pressed: i32) {
+    s.call(
+        "_ag_char_input",
+        &[Int(held), Int(pressed)],
+        ResultKind::Unit,
+    )
+    .unwrap();
+    s.call("_ag_tick", &[Int(step), Float(DT)], ResultKind::Unit)
+        .unwrap();
+}
+
+/// Lifecycle gauge slot x. The panel's Life.Start emits meter.Add(5), so
+/// count = 5 (+1 per period event at/behind the recompute tick); draw_x
+/// recomputes only on the gauge's parity side (a: odd ticks, b: even ticks).
+fn lifecycle_gauge_x(i: usize, n: i32) -> f64 {
+    let (base, phase0, speed, period, odd_side) = if i == 0 {
+        (4.0, 0.0, 1.0, 10, true)
+    } else {
+        (-4.0, 5.0, 6.0, 15, false)
+    };
+    let first_recompute = if odd_side { 1 } else { 2 };
+    let tr: i32 = if (n % 2 == 1) == odd_side { n } else { n - 1 };
+    if tr < first_recompute {
+        return base; // draw_x still at its model init
+    }
+    let count = 5 + tr / period;
+    base + 2.0 * (phase0 + speed * tr as f64 / 60.0) + 0.2 * count as f64
+}
+
+/// V-05: the budget chain charges EXACTLY 32 credits on every tick (player
+/// walk 30 + two staggered gauge writes) and runs status 0 through 120
+/// ticks; budget-plus adds ONE charged write (a fifth gauge on the even
+/// side) so the 33rd charged call raises the NAMED runtime fault 10 at the
+/// predicted first even tick, tick 2 (tick 1 stays green at 32).
+#[test]
+fn v05_budget_pool_exact_32_and_plus_faults_at_tick_2() {
+    let mut s = probe_session(SCENE_BUDGET, WORLD_BUDGET, "v05-budget.at", 1);
+    for tick in 1..=120 {
+        tick_cpu(&mut s, tick, false);
+        assert_eq!(status(&mut s), 0, "budget tick {tick} within the 32 pool");
+    }
+    // all four gauge models ran to completion (parity-staggered writes).
+    assert_eq!(int(&mut s, "get_g1_ticks"), 120);
+    assert_eq!(int(&mut s, "get_g2_ticks"), 120);
+    assert_eq!(int(&mut s, "get_g3_ticks"), 120);
+    assert_eq!(int(&mut s, "get_g4_ticks"), 120);
+    assert_eq!(int(&mut s, "get_player_grounded"), 1);
+    assert_eq!(int(&mut s, "get_r_vy"), 999, "root sentinel untouched");
+    println!(
+        "PLAN-020 T-05 budget CPU cost (32/tick): calls={} max_call_steps={} max_slices={}",
+        s.calls, s.max_call_steps, s.max_call_slices
+    );
+    assert!(s.max_call_steps < 100_000, "VM step guard headroom");
+    assert!(s.max_call_slices <= 120, "slice guard");
+
+    // budget-plus: the ONLY delta is the fifth gauge (one more charged write
+    // on even ticks). Tick 1 = 30 + 2 = 32 -> green; tick 2 = 30 + 3 = 33 ->
+    // the named fault 10, and the world freezes at tick 2.
+    let mut sp = probe_session(
+        SCENE_BUDGET_PLUS,
+        WORLD_BUDGET_PLUS,
+        "v05-budget-plus.at",
+        1,
+    );
+    tick_cpu(&mut sp, 1, false);
+    assert_eq!(
+        status(&mut sp),
+        0,
+        "budget-plus tick 1 is exactly at the pool"
+    );
+    tick_cpu(&mut sp, 2, false);
+    assert_eq!(status(&mut sp), 10, "33rd charged call faults 10 at tick 2");
+    assert_eq!(
+        int(&mut sp, "get_g1_ticks"),
+        2,
+        "model froze at the fault tick"
+    );
+    assert_eq!(int(&mut sp, "get_g5_ticks"), 2);
+    tick_cpu(&mut sp, 3, false);
+    assert_eq!(status(&mut sp), 10, "fault latches");
+    assert_eq!(
+        int(&mut sp, "get_g1_ticks"),
+        2,
+        "no further ticks after fault"
+    );
+    println!(
+        "PLAN-020 T-05 budget-plus CPU cost: calls={} max_call_steps={} max_slices={}",
+        sp.calls, sp.max_call_steps, sp.max_call_slices
+    );
+}
+
+/// V-04 (CPU): Start counters ran exactly once; Tick counters advance
+/// exactly with dispatched ticks; the Start-time meter.Add(5) delivery is
+/// visible in the gauge counts (17 = 12 period events + 5 Start, 13 = 8+5).
+#[test]
+fn v04_lifecycle_cpu_counters_exact() {
+    let mut s = probe_session(SCENE_LIFECYCLE, WORLD_LIFECYCLE, "v04-lifecycle.at", 1);
+    for tick in 1..=120 {
+        tick_cpu(&mut s, tick, false);
+        assert_eq!(status(&mut s), 0, "lifecycle tick {tick}");
+    }
+    assert_eq!(int(&mut s, "get_r_starts"), 1, "root Start exactly once");
+    assert_eq!(int(&mut s, "get_r_ticks"), 120, "root Tick exact");
+    assert_eq!(int(&mut s, "get_panel_starts_0"), 1);
+    assert_eq!(int(&mut s, "get_panel_starts_1"), 1);
+    assert_eq!(int(&mut s, "get_panel_ticks_0"), 120);
+    assert_eq!(int(&mut s, "get_panel_ticks_1"), 120);
+    assert_eq!(int(&mut s, "get_gauge_starts_0"), 1);
+    assert_eq!(int(&mut s, "get_gauge_starts_1"), 1);
+    assert_eq!(int(&mut s, "get_gauge_ticks_0"), 120);
+    assert_eq!(int(&mut s, "get_gauge_ticks_1"), 120);
+    assert_eq!(int(&mut s, "get_player_starts_0"), 1);
+    assert_eq!(int(&mut s, "get_player_ticks_0"), 120);
+    // Start-time event delivery: count = period events + 5 Start payload.
+    assert_eq!(
+        int(&mut s, "get_gauge_count_0"),
+        17,
+        "12 events + 5 from Start"
+    );
+    assert_eq!(
+        int(&mut s, "get_gauge_count_1"),
+        13,
+        "8 events + 5 from Start"
+    );
+    println!(
+        "PLAN-020 T-05 lifecycle CPU cost: calls={} max_call_steps={} max_slices={}",
+        s.calls, s.max_call_steps, s.max_call_slices
+    );
+}
+
+/// V-05: the consumable pressed edge. The Player reads input.pressed(Jump)
+/// twice per tick into p1/p2: the first read consumes the edge (1), the
+/// second reads 0 the same tick, and the jump fires exactly once.
+#[test]
+fn v05_doublepress_edge_consumed_jump_once() {
+    let mut s = probe_session(SCENE_DP, WORLD_DP, "v05-doublepress.at", 1);
+    // The reduced CPU spatial environment lands the char later than the GPU
+    // host trajectory, so settle on the STATE (grounded==1), not a fixed
+    // tick count (the probe CPU contract does the same at T=120).
+    let mut landed_at = 0;
+    for tick in 1..=300 {
+        tick_cpu_input(&mut s, tick, 0, 0);
+        assert_eq!(status(&mut s), 0, "settle tick {tick}");
+        if int(&mut s, "get_player_grounded") == 1 {
+            landed_at = tick;
+            break;
+        }
+    }
+    assert!(landed_at > 0, "char must settle in the CPU session");
+    // one Jump edge on the tick after landing: first read 1, second read 0,
+    // single jump.
+    let press_tick = landed_at + 1;
+    tick_cpu_input(&mut s, press_tick, 0, 4);
+    assert_eq!(status(&mut s), 0, "press tick within pool");
+    assert_eq!(
+        int(&mut s, "get_player_p1"),
+        1,
+        "first read consumed the edge"
+    );
+    assert_eq!(int(&mut s, "get_player_p2"), 0, "second read same tick = 0");
+    let vy1 = flt(&mut s, "get_player_vy");
+    assert!(
+        (vy1 - (8.0 - 20.0 * DT)).abs() < 1e-3,
+        "jump fired once: vy {vy1}"
+    );
+    // next tick without an edge: no re-trigger, plain gravity decay.
+    tick_cpu_input(&mut s, press_tick + 1, 0, 0);
+    assert_eq!(int(&mut s, "get_player_p1"), 0);
+    assert_eq!(int(&mut s, "get_player_p2"), 0);
+    let vy2 = flt(&mut s, "get_player_vy");
+    assert!((vy2 - (vy1 - 20.0 * DT)).abs() < 1e-3, "single decay {vy2}");
+    assert!(vy2 > 0.5, "still airborne (no second jump): {vy2}");
+}
+
+/// V-05: exactly EIGHT stateful instances (root + player + six tickers) run
+/// green at the envelope boundary with service-free tickers (player-only 30
+/// credits). The 9th stateful instance is lowering-rejected by the T-03
+/// negative fixture fixtures/components2d/neg-9-stateful/ (named envelope
+/// diagnostic, pilot gate negative_fixtures_fail_with_named_diagnostics).
+#[test]
+fn v05_envelope_exactly_8_stateful_runs_green() {
+    let mut s = probe_session(SCENE_ENVELOPE, WORLD_ENVELOPE, "v05-envelope.at", 1);
+    for tick in 1..=120 {
+        tick_cpu(&mut s, tick, false);
+        assert_eq!(status(&mut s), 0, "envelope tick {tick}");
+    }
+    for t in 1..=6 {
+        assert_eq!(int(&mut s, &format!("get_t{t}_acc")), 120, "ticker t{t}");
+        assert_eq!(int(&mut s, &format!("get_t{t}_starts")), 1, "ticker t{t}");
+    }
+    assert_eq!(int(&mut s, "get_player_grounded"), 1, "player settled");
+    assert_eq!(int(&mut s, "get_r_vy"), 999);
+    println!(
+        "PLAN-020 T-05 envelope CPU cost (30/tick): calls={} max_call_steps={} max_slices={}",
+        s.calls, s.max_call_steps, s.max_call_slices
+    );
+}
+
+/// V-04 negative: the init-fault chain lowers green but fails DURING
+/// initialization — the ninth ag_object_spawn targets slot 8, outside the
+/// frozen objects2d pool (slots 0..7), raising the named runtime fault 31.
+/// CPU: status 31 right after _ag_start. GPU host: the run surfaces the
+/// named fault, publishes no good frame, and the host retains last-good
+/// (document intact, stop/start cycle still works, a good project runs
+/// green right after — no cross-host damage).
+#[test]
+fn v04_init_fault_named_and_host_retains_last_good() {
+    // CPU: the init fault is deterministic at _ag_start.
+    let mut s = probe_session(SCENE_INIT_FAULT, WORLD_INIT_FAULT, "v04-init-fault.at", 1);
+    assert_eq!(status(&mut s), 31, "ninth spawn faults 31 at init");
+
+    // GPU host: the failed initialization must surface the named fault and
+    // leave the host at its last-good state.
+    let code = load_doc(SCENE_INIT_FAULT, WORLD_INIT_FAULT, "v04-init-fault-gpu");
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("target/plan020-components")
+        .join(format!("{}-v04-init-fault-gpu", std::process::id()));
+    let (doc, registry, code2, _) =
+        Storage::load_project(&dir.join("scene.agscene"), &Registry::new())
+            .unwrap_or_else(|e| panic!("reload: {e:?}"));
+    let _ = code;
+    assert!(
+        code2.is_some(),
+        "behavior code admitted (not a load rejection)"
+    );
+    let mut h = Host::with_project(doc, registry, code2).expect("host");
+    let started = h.start_selected_play();
+    if let Err(e) = &started {
+        println!("init fault surfaced at start: {e}");
+    }
+    h.pause_play("");
+    settle(&mut h);
+    let err = play_error(&h);
+    assert!(
+        !err.is_empty(),
+        "init fault must surface a named host error"
+    );
+    println!("DEBUG init-fault host error: {err}");
+    assert!(err.contains("31"), "named slot fault, got: {err}");
+    // last-good retention: no run frame with mutated world state was
+    // published as good (the fault hit during app_start; the player never
+    // ran a tick), and the host still stops cleanly.
+    if let Some(p) = h.play.as_ref() {
+        if let Some(f) = p.last.as_ref() {
+            for (id, d) in &f.nodes {
+                let t = d.translation;
+                assert!(
+                    id != &1 || (t[0] - 2.0).abs() < 1e-3,
+                    "player never advanced past spawn: node {id} at {t:?}"
+                );
+            }
+        }
+    }
+    h.stop_play();
+
+    // recovery: a good project starts and runs green immediately after the
+    // failed init (the host pipeline retains last-good; no global damage).
+    let mut hg = start_with(SCENE, WORLD, "v04-post-fault-good");
+    assert!(play_error(&hg).is_empty(), "good run after failed init");
+    for _ in 0..26 {
+        step(&mut hg, 0);
+    }
+    let a = actor(&hg, 1);
+    assert!((a[1] - 0.502).abs() < 1e-3, "good run settles: {a:?}");
+    hg.stop_play();
+}
+
+/// V-04 (GPU host): Start exactly once per Run (Resume never repeats it),
+/// Tick exact with dispatches, paused dispatch and render-only frames
+/// advance nothing, a single Step advances exactly one tick, and 20
+/// host-driven Stop/fresh rounds rebuild the model (counters reset, gauge
+/// params re-applied, Start-time count back at 5) with no old-Run leakage
+/// and the document unchanged. Shared legal resources stay alive across
+/// all rounds (same slot templates and rendered classes at the end — the
+/// honest observable the harness has for "not released early").
+#[test]
+fn v04_lifecycle_host_pause_step_render_20_fresh_rounds() {
+    let mut h = start_with(SCENE_LIFECYCLE, WORLD_LIFECYCLE, "v04-host");
+    assert!(play_error(&h).is_empty(), "fault: {}", play_error(&h));
+
+    // fresh start, zero dispatched ticks: gauge a sits at its model init
+    // (draw_x = base_x; the Start-time count only shows after the first
+    // recompute tick).
+    {
+        let (_, _, p0, _) = slot(&h, 0);
+        assert!((p0[0] - 4.0).abs() < 1e-3, "fresh init x: {}", p0[0]);
+    }
+    // three dispatched ticks: gauge a (odd side) recomputed at ticks 1 and 3.
+    for _ in 0..3 {
+        step(&mut h, 0);
+    }
+    {
+        let (_, _, p0, _) = slot(&h, 0);
+        assert!(
+            (p0[0] - lifecycle_gauge_x(0, 3) as f32).abs() < 1e-3,
+            "after 3 ticks: {} vs {}",
+            p0[0],
+            lifecycle_gauge_x(0, 3)
+        );
+    }
+    // Paused dispatch with neutral input (019 frozen pattern): the probe
+    // dispatch processes exactly one tick — tick 4 — but applies NO input
+    // edges (char edges do not accumulate while paused; the host/UI gate is
+    // the real pause). Tick 4 is gauge b's recompute side: a holds at its
+    // tick-3 value, b advances one tick.
+    {
+        let p = h.play.as_mut().unwrap();
+        let _ = p.dispatch(Action::default());
+    }
+    settle(&mut h);
+    {
+        let (_, _, p0, _) = slot(&h, 0);
+        let (_, _, p1, _) = slot(&h, 1);
+        assert!(
+            (p0[0] - lifecycle_gauge_x(0, 3) as f32).abs() < 1e-3,
+            "paused dispatch: odd-side gauge holds (tick 4): {}",
+            p0[0]
+        );
+        assert!(
+            (p1[0] - lifecycle_gauge_x(1, 4) as f32).abs() < 1e-3,
+            "paused dispatch: even-side gauge stepped one: {} vs {}",
+            p1[0],
+            lifecycle_gauge_x(1, 4)
+        );
+    }
+    // render-only frames advance nothing (both gauges hold).
+    for _ in 0..3 {
+        h.frame(None).expect("render-only frame");
+    }
+    {
+        let (_, _, p0, _) = slot(&h, 0);
+        let (_, _, p1, _) = slot(&h, 1);
+        assert!(
+            (p0[0] - lifecycle_gauge_x(0, 3) as f32).abs() < 1e-3
+                && (p1[0] - lifecycle_gauge_x(1, 4) as f32).abs() < 1e-3,
+            "render-only frames advanced nothing: {} / {}",
+            p0[0],
+            p1[0]
+        );
+    }
+    // One Step advances exactly one tick (tick 5): gauge a recomputes, b
+    // holds.
+    {
+        let p = h.play.as_mut().unwrap();
+        p.single_step().expect("single step");
+    }
+    settle(&mut h);
+    {
+        let (_, _, p0, _) = slot(&h, 0);
+        let (_, _, p1, _) = slot(&h, 1);
+        assert!(
+            (p0[0] - lifecycle_gauge_x(0, 5) as f32).abs() < 1e-3,
+            "step: odd-side gauge recomputed at tick 5: {} vs {}",
+            p0[0],
+            lifecycle_gauge_x(0, 5)
+        );
+        assert!(
+            (p1[0] - lifecycle_gauge_x(1, 4) as f32).abs() < 1e-3,
+            "step: even-side gauge holds: {}",
+            p1[0]
+        );
+    }
+    // Start ran exactly once across all those resumes: count still carries
+    // only the Start payload 5 (no period event before tick 10), so a's x
+    // is exactly the count-5 formula.
+    {
+        let (_, _, p0, _) = slot(&h, 0);
+        let expect = 4.0 + 2.0 * (5.0 / 60.0) + 0.2 * 5.0;
+        assert!(
+            (p0[0] - expect as f32).abs() < 1e-3,
+            "no repeated Start on Resume: {} vs {expect}",
+            p0[0]
+        );
+    }
+
+    // 20 host-driven Stop/fresh rounds. Round 0 mutates state (walk + 12
+    // ticks so gauge a's count grows past the Start payload); every fresh
+    // Run must rebuild the model (count back at 5, x at the rebuilt
+    // formula) with no old-Run leakage; the document (same frozen project
+    // replayed by the host) stays unchanged across runs, and the shared
+    // gauge resources keep rendering (honest observable for "legal shared
+    // resources are not released early").
+    let mut last_templates = (0u64, 0u64);
+    for round in 0..20i32 {
+        h.stop_play();
+        h.start_selected_play()
+            .unwrap_or_else(|e| panic!("round {round} start: {e:?}"));
+        h.pause_play("");
+        settle(&mut h);
+        // fresh rebuild: gauge a back at its init x; player back at spawn.
+        {
+            let (_, tp0, p0, _) = slot(&h, 0);
+            let a = actor(&h, 1);
+            assert_eq!(tp0, 3, "round {round} template identity");
+            assert!(
+                (p0[0] - 4.0).abs() < 1e-3,
+                "round {round} fresh x: {}",
+                p0[0]
+            );
+            assert!((a[0] - 2.0).abs() < 1e-3, "round {round} player respawned");
+            assert!(play_error(&h).is_empty(), "round {round} fault");
+        }
+        if round == 0 {
+            // mutate: walk right for 12 ticks (count a grows to 6 at tick 10).
+            for _ in 0..12 {
+                step(&mut h, 1 << 1);
+            }
+            let (_, _, p0, _) = slot(&h, 0);
+            assert!(
+                (p0[0] - lifecycle_gauge_x(0, 12) as f32).abs() < 1e-3,
+                "round 0 mutated: {} vs {}",
+                p0[0],
+                lifecycle_gauge_x(0, 12)
+            );
+            let a = actor(&h, 1);
+            assert!(a[0] > 2.1, "round 0 player walked: {}", a[0]);
+        } else {
+            // two neutral ticks: rebuilt model shows the fresh formula
+            // (count back at 5 — the old Run's mutated count is not visible;
+            // gauge a recomputes on the odd tick 1, holds on tick 2).
+            for _ in 0..2 {
+                step(&mut h, 0);
+            }
+            let (_, _, p0, _) = slot(&h, 0);
+            let expect = lifecycle_gauge_x(0, 2);
+            assert!(
+                (p0[0] - expect as f32).abs() < 1e-3,
+                "round {round} rebuilt: {} vs {expect}",
+                p0[0]
+            );
+        }
+        let (_, tp0, _, _) = slot(&h, 0);
+        let (_, tp1, _, _) = slot(&h, 1);
+        last_templates = (tp0, tp1);
+    }
+    assert_eq!(
+        last_templates,
+        (3, 4),
+        "shared gauge templates alive at the end"
+    );
+    // shared resources still render after 20 rounds (blue AND green classes).
+    let px = pixel_classes(&mut h);
+    assert!(count_class(&px, "blue") > 0, "blue gauge still rendered");
+    assert!(count_class(&px, "green") > 0, "green gauge still rendered");
+    h.stop_play();
 }

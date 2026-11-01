@@ -1,0 +1,40 @@
+// PLAN-020 T-05 lifecycle double-press Player (V-05): the walk-jump rules
+// with the Jump edge read TWICE per tick into two model fields. The frozen
+// consumable-edge semantics: the FIRST read consumes the pressed edge
+// (returns 1, charged 1), the SECOND read same tick returns 0 (charged 1
+// again) and the jump fires exactly once. Walk tick = pressed 2 + held 2 +
+// grounded 1 + move 26 = 31; with the staggered gauge pair (1 move/tick)
+// the pool stays at 32.
+node Player(px: float, py: float, tint: Material2D) {
+    model {
+        var vy = 0.0
+        var grounded = 0
+        var p1 = 0
+        var p2 = 0
+    }
+    view-2d {
+        character2d body {
+            position: (px, py)
+            material: tint
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            .p1 = input.pressed(Jump)
+            .p2 = input.pressed(Jump)
+            if .p1 == 1 {
+                if .grounded == 1 {
+                    .vy = 8.0
+                }
+            }
+            .vy = .vy - 20.0 * dt
+            let axis = input.axis(Left, Right)
+            let dx = axis * 4.0 * dt
+            let q = refs.body.move_and_slide((dx, .vy * dt))
+            .grounded = refs.body.grounded(q)
+            if .grounded == 1 {
+                .vy = 0.0
+            }
+        }
+    }
+}

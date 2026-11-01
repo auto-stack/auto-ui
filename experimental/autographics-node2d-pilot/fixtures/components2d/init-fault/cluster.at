@@ -1,0 +1,89 @@
+// PLAN-020 T-05 init-fault Cluster: ONE stateful component definition with
+// NINE model-driven shapes. Lowering accepts it (one instance, 9 dynamic
+// templates, 11 scene rows <= 128, 3 stateful instances <= 8) but at runtime
+// app_start spawns slot indices 0..8 and the frozen objects2d contract only
+// has slots 0..7: the NINTH ag_object_spawn raises the named runtime fault
+// 31 (slot out of range) during initialization — a real host-surfaced init
+// failure, not a lowering rejection.
+use resources: gauge_blue
+
+node Cluster {
+    model {
+        var draw_x = 0.0
+        var show = 1
+        var starts = 0
+    }
+    view-2d {
+        shape2d d0 {
+            kind: circle
+            position: (.draw_x, -2.0)
+            size: (0.4, 0.4)
+            material: resources.gauge_blue
+            visible: .show
+        }
+        shape2d d1 {
+            kind: circle
+            position: (.draw_x, -1.0)
+            size: (0.4, 0.4)
+            material: resources.gauge_blue
+            visible: .show
+        }
+        shape2d d2 {
+            kind: circle
+            position: (.draw_x, 0.0)
+            size: (0.4, 0.4)
+            material: resources.gauge_blue
+            visible: .show
+        }
+        shape2d d3 {
+            kind: circle
+            position: (.draw_x, 1.0)
+            size: (0.4, 0.4)
+            material: resources.gauge_blue
+            visible: .show
+        }
+        shape2d d4 {
+            kind: circle
+            position: (.draw_x, 2.0)
+            size: (0.4, 0.4)
+            material: resources.gauge_blue
+            visible: .show
+        }
+        shape2d d5 {
+            kind: circle
+            position: (.draw_x, 3.0)
+            size: (0.4, 0.4)
+            material: resources.gauge_blue
+            visible: .show
+        }
+        shape2d d6 {
+            kind: circle
+            position: (.draw_x, 4.0)
+            size: (0.4, 0.4)
+            material: resources.gauge_blue
+            visible: .show
+        }
+        shape2d d7 {
+            kind: circle
+            position: (.draw_x, 5.0)
+            size: (0.4, 0.4)
+            material: resources.gauge_blue
+            visible: .show
+        }
+        shape2d d8 {
+            kind: circle
+            position: (.draw_x, 6.0)
+            size: (0.4, 0.4)
+            material: resources.gauge_blue
+            visible: .show
+        }
+    }
+    on {
+        Life.Start -> {
+            .starts = .starts + 1
+        }
+        Life.Tick(dt) -> {
+            .draw_x = .draw_x + dt
+        }
+    }
+}

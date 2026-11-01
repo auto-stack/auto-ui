@@ -1,0 +1,29 @@
+// PLAN-020 T-05 envelope Ticker: minimal stateful component (model + Start
+// + Tick, STATIC view shape only — no dynamic shape, no spawn, no charged
+// services beyond model arithmetic). Six instances of this plus the root and
+// the Player make exactly 8 stateful instances (root included) — the frozen
+// envelope boundary, which must run green.
+use resources: gauge_blue
+
+node Ticker(period0: int) {
+    model {
+        var acc = 0
+        var starts = 0
+    }
+    view-2d {
+        shape2d dot {
+            kind: circle
+            position: (.period0, 0.0)
+            size: (0.5, 0.5)
+            material: resources.gauge_blue
+        }
+    }
+    on {
+        Life.Start -> {
+            .starts = .starts + 1
+        }
+        Life.Tick(dt) -> {
+            .acc = .acc + 1
+        }
+    }
+}

@@ -1,0 +1,139 @@
+{
+ "behavior": {
+  "api": "autographics.objects2d/1",
+  "source": {
+   "format": "auto-source",
+   "sha256": "a9cc07d653ab1304a1d553303747b9f16a0b0839c82a30d560d647ef00a3523d",
+   "byte_length": 3061
+  },
+  "actors": {
+   "two_d": 1,
+   "three_d": null
+  }
+ },
+ "schema": "autographics.scene/6",
+ "document_id": "plan020-components-2d-main",
+ "resources": [
+  "circle",
+  "quad",
+  "cylinder",
+  "player",
+  "mob"
+ ],
+ "objects": [
+  {
+   "id": 1,
+   "name": "player.body",
+   "kind": "quad",
+   "translation": [2.0, 1.0, 0.0],
+   "scale": [0.8, 1.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.9, 0.5, 0.25, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 2,
+   "name": "ground",
+   "kind": "quad",
+   "translation": [6.0, -0.5, 0.0],
+   "scale": [20.0, 1.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.45, 0.45, 0.45, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 3,
+   "name": "t1.dot",
+   "kind": "circle",
+   "translation": [1.0, 0.0, 0.0],
+   "scale": [0.5, 0.5, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.2, 0.4, 0.95, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 4,
+   "name": "t2.dot",
+   "kind": "circle",
+   "translation": [2.0, 0.0, 0.0],
+   "scale": [0.5, 0.5, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.2, 0.4, 0.95, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 5,
+   "name": "t3.dot",
+   "kind": "circle",
+   "translation": [3.0, 0.0, 0.0],
+   "scale": [0.5, 0.5, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.2, 0.4, 0.95, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 6,
+   "name": "t4.dot",
+   "kind": "circle",
+   "translation": [4.0, 0.0, 0.0],
+   "scale": [0.5, 0.5, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.2, 0.4, 0.95, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 7,
+   "name": "t5.dot",
+   "kind": "circle",
+   "translation": [5.0, 0.0, 0.0],
+   "scale": [0.5, 0.5, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.2, 0.4, 0.95, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 8,
+   "name": "t6.dot",
+   "kind": "circle",
+   "translation": [6.0, 0.0, 0.0],
+   "scale": [0.5, 0.5, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.2, 0.4, 0.95, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  }
+ ],
+ "groups": [],
+ "assets": []
+}

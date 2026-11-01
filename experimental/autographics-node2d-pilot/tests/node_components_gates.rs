@@ -25,6 +25,13 @@ const NEG_CYCLE_BOXB: &str = include_str!("../fixtures/components2d/neg-cycle/bo
 const NEG9_MAIN: &str = include_str!("../fixtures/components2d/neg-9-stateful/main.at");
 const NEG9_ITEM: &str = include_str!("../fixtures/components2d/neg-9-stateful/item.at");
 const NEG_NO_CAMERA: &str = include_str!("../fixtures/components2d/neg-no-camera/main.at");
+const BUDGET_MAIN: &str = include_str!("../fixtures/components2d/budget/main.at");
+const BUDGET_PLUS_MAIN: &str = include_str!("../fixtures/components2d/budget-plus/main.at");
+const BUDGET_GAUGE: &str = include_str!("../fixtures/components2d/budget/gauge.at");
+const ENVELOPE_MAIN: &str = include_str!("../fixtures/components2d/envelope/main.at");
+const ENVELOPE_TICKER: &str = include_str!("../fixtures/components2d/envelope/ticker.at");
+const INIT_FAULT_MAIN: &str = include_str!("../fixtures/components2d/init-fault/main.at");
+const INIT_FAULT_CLUSTER: &str = include_str!("../fixtures/components2d/init-fault/cluster.at");
 const HELP_MAIN: &str = include_str!("../fixtures/components2d/helpers/main.at");
 const HELP_A: &str = include_str!("../fixtures/components2d/helpers/helpera.at");
 const HELP_B: &str = include_str!("../fixtures/components2d/helpers/helperb.at");
@@ -306,6 +313,88 @@ fn negative_fixtures_fail_with_named_diagnostics_and_no_panic() {
     .expect("missing camera must fail");
     assert!(err.contains("camera2d"), "{err}");
     assert!(err.contains("requires"), "{err}");
+}
+
+// --------------------------------------- T-05：预算/包络/初始化故障降层面 --
+
+#[test]
+fn t05_budget_envelope_and_init_fault_lowering_shape() {
+    // budget: 4 staggered gauges -> exactly two spawn slots moving per tick
+    // side; the charged writes come only from the parity-gated presents.
+    let out = components(&[
+        ("main", BUDGET_MAIN),
+        ("gauge", BUDGET_GAUGE),
+        ("player", PLAYER),
+        ("resources", RES),
+    ])
+    .expect("budget lowers");
+    let w = out.user_source.as_ref().expect("world.at");
+    assert!(w.contains("var gauge_parity=[0,1,0,1]"), "staggered sides");
+    for slot in 0..4 {
+        assert!(
+            w.contains(&format!(
+                "gauge_handle[{slot}]=ag_object_spawn({slot},{}",
+                slot + 3
+            )),
+            "spawn slot {slot}"
+        );
+    }
+    assert_eq!(
+        w.matches("ag_object_move(gauge_handle[").count(),
+        1,
+        "one move site"
+    );
+    // budget-plus: the ONLY delta is the fifth gauge (fifth spawn, 8 env).
+    let plus = components(&[
+        ("main", BUDGET_PLUS_MAIN),
+        ("gauge", BUDGET_GAUGE),
+        ("player", PLAYER),
+        ("resources", RES),
+    ])
+    .expect("budget-plus lowers");
+    let wp = plus.user_source.as_ref().expect("world.at");
+    assert!(wp.contains("gauge_handle[4]=ag_object_spawn(4,7,"));
+    assert!(
+        wp.contains("var gauge_parity=[0,1,0,1,1]"),
+        "3 even-side writes"
+    );
+
+    // envelope: root + player + 6 tickers = exactly 8 stateful instances.
+    let env = components(&[
+        ("main", ENVELOPE_MAIN),
+        ("ticker", ENVELOPE_TICKER),
+        ("player", PLAYER),
+        ("resources", RES),
+    ])
+    .expect("envelope lowers");
+    let we = env.user_source.as_ref().expect("world.at");
+    assert!(we.contains("// Ticker SoA (instances t1=0, t2=1, t3=2, t4=3, t5=4, t6=5)"));
+    assert!(!we.contains("ag_object_spawn"), "tickers are service-free");
+    assert!(we.contains("// Player SoA (instance player=0)"));
+    // stateful count: root r_vy + player + 6 tickers = 8 (no 9th anywhere);
+    // lifetick FNS are per definition (SoA), the SoA comments carry the
+    // per-instance indexes.
+    assert_eq!(
+        we.matches("_lifetick(i int, dt float)").count(),
+        2,
+        "ticker + player lifetick defs"
+    );
+    assert!(we.contains("fn main_lifetick(dt float)"), "root lifetick");
+
+    // init-fault: NINE dynamic shapes lower GREEN (the failure is the
+    // runtime slot contract, not a lowering rejection): 9 spawn sites with
+    // slot indices 0..=8, scene rows still <= 128.
+    let fault = components(&[
+        ("main", INIT_FAULT_MAIN),
+        ("cluster", INIT_FAULT_CLUSTER),
+        ("player", PLAYER),
+        ("resources", RES),
+    ])
+    .expect("init-fault must LOWER (fault is runtime)");
+    let wf = fault.user_source.as_ref().expect("world.at");
+    assert!(wf.contains("ag_object_spawn(8,"), "ninth spawn present");
+    assert_eq!(wf.matches("ag_object_spawn(").count(), 9);
+    assert!(fault.scene_json.contains("\"name\": \"c_d8_template\""));
 }
 
 // ---------------------------------------------------------------- 工具 --

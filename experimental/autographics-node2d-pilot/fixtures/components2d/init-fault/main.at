@@ -1,0 +1,34 @@
+// PLAN-020 T-05 init-fault fixture (V-04 negative): the probe chain plus a
+// single Cluster instance owning NINE model-driven shapes. Lowering is
+// green by design; the run must fail DURING initialization with the named
+// runtime fault 31 (the frozen objects2d pool has slots 0..7; the ninth
+// spawn is out of range) and the host must retain its last-good state
+// (no partially-initialized run published as good).
+use resources: gauge_blue, char_orange, ground_color, ground_mesh
+use cluster: Cluster
+use player: Player
+
+node Main {
+    model {
+        var vy = 999
+    }
+    view-2d {
+        Cluster c {
+        }
+        Player player {
+            px: 2.0
+            py: 1.0
+            tint: resources.char_orange
+        }
+        solid2d ground {
+            position: (6.0, -0.5)
+            mesh: resources.ground_mesh
+            material: resources.ground_color
+        }
+        camera2d cam {
+            target: refs.player.actor
+            bounds: (0.0, -4.0, 40.0, 12.0)
+            view_size: (40.0, 12.0)
+        }
+    }
+}

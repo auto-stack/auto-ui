@@ -1,0 +1,45 @@
+// PLAN-020 T-05 budget Gauge: probe Gauge plus a parity0 param so each
+// instance can stagger its even-tick recompute side. Charged services per
+// instance per tick: exactly one ag_object_move on the recompute (parity)
+// side, nothing otherwise (hide_at -1 => show never flips => no visible
+// charges). Count/Add surface retained (no emitters in the budget chain —
+// the msg port is declared but unused there).
+node Gauge(phase0: float, speed: float, base_x: float, base_y: float, hide_at: int, parity0: int, geo: Mesh2D, tint: Material2D) {
+    model {
+        var phase = .phase0
+        var ticks = 0
+        var count = 0
+        var draw_x = .base_x
+        var show = 1
+        var parity = .parity0
+    }
+    msg {
+        Add(int)
+    }
+    view-2d {
+        shape2d disc {
+            mesh: .geo
+            position: (.draw_x, .base_y)
+            material: .tint
+            visible: .show
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            .ticks = .ticks + 1
+            .phase = .phase + .speed * dt
+            if .parity == 0 {
+                .draw_x = .base_x + .phase * 2.0 + .count * 0.2
+                .parity = 1
+            } else {
+                .parity = 0
+            }
+            if .ticks == .hide_at {
+                .show = 0
+            }
+        }
+        .Add(n) -> {
+            .count = .count + n
+        }
+    }
+}

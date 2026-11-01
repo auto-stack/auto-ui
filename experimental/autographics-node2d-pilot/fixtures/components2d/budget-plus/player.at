@@ -1,0 +1,36 @@
+// PLAN-020 components-2d shared Player definition: local vy/grounded model +
+// walk-jump rules identical to fixtures/basic2d/g06/main.at (one Jump pressed
+// edge per dispatch, ground-only jump gate, gravity integrate, differential
+// axis, one ag_char_move with clearance 0.002, grounded read from THAT move).
+// character2d is allowed inside a component only because this definition is
+// instantiated exactly once (the character service is one-per-Run).
+node Player(px: float, py: float, tint: Material2D) {
+    model {
+        var vy = 0.0
+        var grounded = 0
+    }
+    view-2d {
+        character2d body {
+            position: (px, py)
+            material: tint
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            let jp = input.pressed(Jump)
+            if jp == 1 {
+                if .grounded == 1 {
+                    .vy = 8.0
+                }
+            }
+            .vy = .vy - 20.0 * dt
+            let axis = input.axis(Left, Right)
+            let dx = axis * 4.0 * dt
+            let q = refs.body.move_and_slide((dx, .vy * dt))
+            .grounded = refs.body.grounded(q)
+            if .grounded == 1 {
+                .vy = 0.0
+            }
+        }
+    }
+}

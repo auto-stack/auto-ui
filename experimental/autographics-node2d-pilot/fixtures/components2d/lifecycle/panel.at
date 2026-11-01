@@ -1,0 +1,43 @@
+// PLAN-020 T-05 lifecycle Panel: probe Panel plus starts/ticks counters and
+// a Life.Start handler. Life.Start increments the per-instance Start counter
+// AND emits one typed meter.Add(5) — the Start-time delivery is observable
+// on the GPU through the gauge's count-driven position (+1.0 offset), so a
+// Resume that repeated Start would visibly re-emit (frozen contract: Resume
+// never repeats Start). Life.Tick counts ticks exactly with dispatches.
+// Gauges are parity-staggered (one charged move per tick) so the tick pool
+// stays at 31/32 including the hide tick.
+use gauge: Gauge
+
+node Panel(period: int, payload: int, phase0: float, speed: float, base_x: float, hide_at: int, parity0: int, geo: Mesh2D, tint: Material2D) {
+    model {
+        var acc = 0
+        var starts = 0
+        var ticks = 0
+    }
+    view-2d {
+        Gauge meter {
+            phase0: .phase0
+            speed: .speed
+            base_x: .base_x
+            base_y: 3.0
+            hide_at: .hide_at
+            parity0: .parity0
+            geo: .geo
+            tint: .tint
+        }
+    }
+    on {
+        Life.Start -> {
+            .starts = .starts + 1
+            meter.Add(5)
+        }
+        Life.Tick(dt) -> {
+            .ticks = .ticks + 1
+            .acc = .acc + 1
+            if .acc == .period {
+                .acc = 0
+                meter.Add(.payload)
+            }
+        }
+    }
+}

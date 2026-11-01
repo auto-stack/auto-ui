@@ -1,0 +1,50 @@
+// PLAN-020 T-05 envelope fixture (V-05): exactly EIGHT stateful instances
+// including the root — root Main + Player + six Tickers — the boundary of
+// the frozen 8-instance envelope, which must run green (the 9th is the
+// lowering-rejected negative fixtures/components2d/neg-9-stateful/ from
+// T-03). Tickers are service-free (static shapes, model arithmetic only):
+// the per-tick pool stays at the player's 30 charged credits.
+use resources: gauge_blue, char_orange, ground_color, ground_mesh
+use ticker: Ticker
+use player: Player
+
+node Main {
+    model {
+        var vy = 999
+    }
+    view-2d {
+        Ticker t1 {
+            period0: 1
+        }
+        Ticker t2 {
+            period0: 2
+        }
+        Ticker t3 {
+            period0: 3
+        }
+        Ticker t4 {
+            period0: 4
+        }
+        Ticker t5 {
+            period0: 5
+        }
+        Ticker t6 {
+            period0: 6
+        }
+        Player player {
+            px: 2.0
+            py: 1.0
+            tint: resources.char_orange
+        }
+        solid2d ground {
+            position: (6.0, -0.5)
+            mesh: resources.ground_mesh
+            material: resources.ground_color
+        }
+        camera2d cam {
+            target: refs.player.actor
+            bounds: (0.0, -4.0, 40.0, 12.0)
+            view_size: (40.0, 12.0)
+        }
+    }
+}

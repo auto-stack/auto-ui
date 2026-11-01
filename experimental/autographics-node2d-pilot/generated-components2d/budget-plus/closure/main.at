@@ -1,0 +1,81 @@
+// PLAN-020 T-05 budget-plus fixture (V-05 negative): IDENTICAL to budget/
+// except ONE more Gauge instance (g5, parity0 1) — one more charged object
+// write on even ticks. Even ticks then charge 30 + 3 = 33: the 33rd charged
+// call of the shared per-callback pool must raise the NAMED runtime fault 10
+// at the first even tick, tick 2 (tick 1 charges 30 + 2 = 32 and stays green).
+use resources: gauge_blue, gauge_green, char_orange, ground_color, ground_mesh, disc_mesh, dot_mesh
+use gauge: Gauge
+use player: Player
+
+node Main {
+    model {
+        var vy = 999
+    }
+    view-2d {
+        Gauge g1 {
+            phase0: 0.0
+            speed: 1.0
+            base_x: 4.0
+            base_y: 3.0
+            hide_at: -1
+            parity0: 0
+            geo: resources.disc_mesh
+            tint: resources.gauge_blue
+        }
+        Gauge g2 {
+            phase0: 5.0
+            speed: 6.0
+            base_x: -4.0
+            base_y: 3.0
+            hide_at: -1
+            parity0: 1
+            geo: resources.dot_mesh
+            tint: resources.gauge_green
+        }
+        Gauge g3 {
+            phase0: 2.0
+            speed: 2.0
+            base_x: 8.0
+            base_y: 3.5
+            hide_at: -1
+            parity0: 0
+            geo: resources.disc_mesh
+            tint: resources.gauge_blue
+        }
+        Gauge g4 {
+            phase0: 7.0
+            speed: 3.0
+            base_x: -8.0
+            base_y: 3.5
+            hide_at: -1
+            parity0: 1
+            geo: resources.dot_mesh
+            tint: resources.gauge_green
+        }
+        Gauge g5 {
+            phase0: 9.0
+            speed: 4.0
+            base_x: 12.0
+            base_y: 4.0
+            hide_at: -1
+            parity0: 1
+            geo: resources.disc_mesh
+            tint: resources.gauge_blue
+        }
+        Player player {
+            px: 2.0
+            py: 1.0
+            tint: resources.char_orange
+        }
+        solid2d ground {
+            position: (6.0, -0.5)
+            mesh: resources.ground_mesh
+            material: resources.ground_color
+        }
+        camera2d cam {
+            target: refs.player.actor
+            bounds: (0.0, -4.0, 40.0, 12.0)
+            view_size: (40.0, 12.0)
+        }
+    }
+}

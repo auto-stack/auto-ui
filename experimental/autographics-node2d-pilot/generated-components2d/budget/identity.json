@@ -1,0 +1,23 @@
+{
+ "generator": "autographics-node2d-pilot plan020 components-2d",
+ "api": "autographics.objects2d/1",
+ "user_source_sha256": "e80e4e31717904187cb634d72d65e5c4c55d6937f5674e6485316758b520b60a",
+ "user_source_bytes": 5427,
+  "module:gauge": "cbe33d58093adfa281bbc98e27995e6a38ede6775f04abf31a787831f6d6c7fd",
+  "module:main": "a5844a2d5d5e1f9c969c754199bca204fccafec998d04904087a1e17d0e664a6",
+  "module:player": "910272de582cb7e8a7f63900e5e8fb93c5f1c1ce91a0be633785df56396639e2",
+  "module:resources": "0a766d863477ec188ac92f2a652405be89cf7d83678edfacaf8fdf2a300a180c",
+ "closure": [
+  {"name": "gauge", "sha256": "cbe33d58093adfa281bbc98e27995e6a38ede6775f04abf31a787831f6d6c7fd", "bytes": 1377},
+  {"name": "main", "sha256": "a5844a2d5d5e1f9c969c754199bca204fccafec998d04904087a1e17d0e664a6", "bytes": 2204},
+  {"name": "player", "sha256": "910272de582cb7e8a7f63900e5e8fb93c5f1c1ce91a0be633785df56396639e2", "bytes": 1207},
+  {"name": "resources", "sha256": "0a766d863477ec188ac92f2a652405be89cf7d83678edfacaf8fdf2a300a180c", "bytes": 529}
+ ],
+ "roles": {
+ "character": 1,
+ "character_name": "player.body",
+ "solids": [{"id": 2, "name": "ground"}],
+ "camera": 1,
+ "scene_objects": {"player.body": 1, "ground": 2, "g1_template": 3, "g2_template": 4, "g3_template": 5, "g4_template": 6}
+}
+}

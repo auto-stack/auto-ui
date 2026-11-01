@@ -2088,6 +2088,13 @@ fn collect_scene(
                     let es = prop_exprs(pos);
                     let x_text = expr_text(&es[0], &ctx)?;
                     let y_text = expr_text(&es[1], &ctx)?;
+                    // 模板名 = 身份：单动态元素保持 {elem}_template 形态；
+                    // 多动态元素按元素消歧（唯一名）。
+                    let tmpl_name = if root_def.dyn_elems.len() == 1 {
+                        format!("{name}_template")
+                    } else {
+                        format!("main_{}_template", name.to_lowercase())
+                    };
                     spawn(
                         &mut rows,
                         &mut next_id,
@@ -2102,7 +2109,7 @@ fn collect_scene(
                         x_text,
                         y_text,
                         0,
-                        format!("{name}_template"),
+                        tmpl_name,
                     );
                 } else if !world.solids.contains(name) {
                     let pos = resolve_pos(root_def, props, &root_params)?;
@@ -2185,7 +2192,17 @@ fn collect_scene(
                             x_text,
                             y_text,
                             inst.def_idx,
-                            format!("{}_template", inst.path.replace('/', "_")),
+                            // 模板名 = 身份（唯一）：单动态元素保持探针冻结
+                            // 形态 {path}_template；多动态元素按元素消歧。
+                            if single_dyn {
+                                format!("{}_template", inst.path.replace('/', "_"))
+                            } else {
+                                format!(
+                                    "{}_{}_template",
+                                    inst.path.replace('/', "_"),
+                                    name.to_lowercase()
+                                )
+                            },
                         );
                     } else {
                         let pos = resolve_pos(def, props, &inst.params)?;
