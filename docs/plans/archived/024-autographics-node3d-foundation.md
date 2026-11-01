@@ -145,10 +145,10 @@ work自查→同一权威树独立上下文final review→merge冻结门；未�
 | T-04 | work | T-03 | 原GLB/层级及局部Auto状态/事件/三轴绑定真实接线，V-02/03 | AC-03/04 | [x] R1:F-R1-03/04已闭（投递变异负控+v-parent GPU capture） flow v02_g02（B02-01..04原阈值）/v02_g03（B03-01..06）/v03_twin全绿（00e96e6）；行句柄0-based修正有CPU会话反证 |
 | T-05 | work | T-04 | 原预算/128-129/8-9/资源反例、生命周期/20轮owner与warm，V-04/05 | AC-04/05 | [x] envelope8/rows128 Ok、neg-9/129具名拒；Step恰一中性tick/render不推进；20轮fresh零GLB重上传；120 tick CPU墙钟avg 657µs/max 990µs（独立口径）；512上限沿未触碰代码复用（128×2=256<512，asset_feasibility失编译属master先在） |
 | T-06 | work | T-05 | source-build/冷A→B/SaveAs/修复/旧消费者、SD与移交折Plan，V-06 | AC-01..06 | [x] R1:F-R1-01已闭（LICENSE实sha绑定断言） verify_plan024 --controls 29控制组PASS（冷A→B五产品字节等值/变异敏感/注释不敏感/14负控/许可/消费面）；坏world/GLB单字节拒→还原→再绿（v06）；旧消费者六verifier+四flow全绿复跑；fmt：本期触碰文件全clean，master先在dirty集（pilot 2/driver 6文件）零变化；SD-01候选折plan-artifacts/plan-024/auto-ui/sd-01-candidate.md |
-| T-07 | review | T-06 | 同树独立final逐AC/V/S/SD/原分母复审，finding回work，pass标merge门pending | AC-07 | [ ] |
-| T-08 | merge | T-07 pass | 冻结提交/依赖/资源/输入，定向门或有据复用后实际合master | AC-08 | [ ] |
-| T-09 | merge | T-08 | 沉淀Spec/来源/归档导航与证据摘要，不写派生JSON或改变Gallery完成数 | AC-08/09 | [ ] |
-| T-10 | merge | T-09 | fresh guard清树分支空组、所有输出全对账删scope/登记与完成计数/hash | AC-09 | [ ] |
+| T-07 | review | T-06 | 同树独立final逐AC/V/S/SD/原分母复审，finding回work，pass标merge门pending | AC-07 | [x] R1 needs_fix F-R1-01..04→R2受影响复核pass（§9两receipt） |
+| T-08 | merge | T-07 pass | 冻结提交/依赖/资源/输入，定向门或有据复用后实际合master | AC-08 | [x] delivery 64166db ff-only合master（range-diff全等；主检出重建+verify_plan024 PASS+gates 8/8 smoke） |
+| T-09 | merge | T-08 | 沉淀Spec/来源/归档导航与证据摘要，不写派生JSON或改变Gallery完成数 | AC-08/09 | [x] SD node3d-foundation.md 9451cf0f落位；归档+registry导航；派生JSON零写入、Gallery 6/21未动 |
+| T-10 | merge | T-09 | fresh guard清树分支空组、所有输出全对账删scope/登记与完成计数/hash | AC-09 | [x] fresh guard×2 clean后移除worktree/分支/依赖树/空组；plan-artifacts/plan-024整删；registry刷新；10/10计数hash见§9 closeout |
 
 ## 9. 复审记录
 
