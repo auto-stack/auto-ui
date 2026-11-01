@@ -1,0 +1,71 @@
+// PLAN-021 queries-2d budget-plus control: the cross lab with a third Querier
+// instance (qc at x=2) — 3 casts + 9 getters = 33 credits, so the 33rd charge
+// (qc third getter) is the named sticky fault 10.
+// two same-def Querier instances run one segment cast each per tick in
+// declaration order (A at x=8 hits the target t=0.4; B at x=30 hits the far
+// target t=0.1); each reads its own typed result into its own model.
+// self.row()/self.world() address the instance's own static row.
+use resources: lab_runner, lab_target
+use resources: lab_runner_mesh, lab_target_mesh
+use target: Target
+use far: FarTarget
+use spectator: Spectator
+
+node Querier(spot_x: float, reach: float, geo: Mesh2D, tint: Material2D) {
+    model {
+        var hits = 0
+        var last_node = -1
+        var last_t = 0.0
+    }
+    view-2d {
+        shape2d body {
+            mesh: .geo
+            position: (.spot_x, 2.0)
+            material: .tint
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            let q = query2d.segment(self.row(), 1, self.world(0), self.world(1), self.world(0) + .reach, self.world(1))
+            if q.hit() == 1 {
+                .hits = .hits + 1
+                .last_node = q.node()
+                .last_t = q.t()
+            }
+        }
+    }
+}
+
+node CrossLab {
+    view-2d {
+        Spectator spectator {
+        }
+        Target target {
+        }
+        FarTarget far {
+        }
+        Querier qa {
+            spot_x: 8.0
+            reach: 20.0
+            geo: resources.lab_runner_mesh
+            tint: resources.lab_runner
+        }
+        Querier qb {
+            spot_x: 30.0
+            reach: 20.0
+            geo: resources.lab_runner_mesh
+            tint: resources.lab_target
+        }
+        Querier qc {
+            spot_x: 2.0
+            reach: 20.0
+            geo: resources.lab_runner_mesh
+            tint: resources.lab_far
+        }
+        camera2d cam {
+            target: refs.spectator.actor
+            bounds: (0.0, -4.0, 40.0, 12.0)
+            view_size: (40.0, 12.0)
+        }
+    }
+}

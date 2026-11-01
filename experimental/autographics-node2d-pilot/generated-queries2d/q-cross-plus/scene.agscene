@@ -1,0 +1,111 @@
+{
+ "behavior": {
+  "api": "autographics.objects2d/1",
+  "source": {
+   "format": "auto-source",
+   "sha256": "a9b71b0a1714bc50687ef8bbf5353c7969e2cd8ef91f7ead25ff773ad529b66f",
+   "byte_length": 2331
+  },
+  "actors": {
+   "two_d": 1,
+   "three_d": null
+  }
+ },
+ "schema": "autographics.scene/6",
+ "document_id": "plan020-components-2d-crossplus",
+ "resources": [
+  "circle",
+  "quad",
+  "cylinder",
+  "player",
+  "mob"
+ ],
+ "objects": [
+  {
+   "id": 1,
+   "name": "spectator.body",
+   "kind": "quad",
+   "translation": [-100.0, -100.0, 0.0],
+   "scale": [0.8, 1.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.5, 0.5, 0.55, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 2,
+   "name": "target.body",
+   "kind": "quad",
+   "translation": [20.0, 2.0, 0.0],
+   "scale": [8.0, 8.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.25, 0.45, 0.95, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 3,
+   "name": "far.body",
+   "kind": "quad",
+   "translation": [34.0, 2.0, 0.0],
+   "scale": [4.0, 4.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.8, 0.8, 0.9, 0.4],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 4,
+   "name": "qa.body",
+   "kind": "quad",
+   "translation": [8.0, 2.0, 0.0],
+   "scale": [4.0, 4.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.95, 0.7, 0.2, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 5,
+   "name": "qb.body",
+   "kind": "quad",
+   "translation": [30.0, 2.0, 0.0],
+   "scale": [4.0, 4.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.25, 0.45, 0.95, 1],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 6,
+   "name": "qc.body",
+   "kind": "quad",
+   "translation": [2.0, 2.0, 0.0],
+   "scale": [4.0, 4.0, 1.0],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [0.8, 0.8, 0.9, 0.4],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  }
+ ],
+ "groups": [],
+ "assets": []
+}

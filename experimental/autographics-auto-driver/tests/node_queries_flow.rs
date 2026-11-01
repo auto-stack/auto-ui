@@ -39,6 +39,10 @@ const SCENE_CROSS: &str =
     include_str!("../../autographics-node2d-pilot/generated-queries2d/q-cross/scene.agscene");
 const WORLD_CROSS: &str =
     include_str!("../../autographics-node2d-pilot/generated-queries2d/q-cross/world.at");
+const SCENE_CROSS_PLUS: &str =
+    include_str!("../../autographics-node2d-pilot/generated-queries2d/q-cross-plus/scene.agscene");
+const WORLD_CROSS_PLUS: &str =
+    include_str!("../../autographics-node2d-pilot/generated-queries2d/q-cross-plus/world.at");
 
 const DT: f32 = 1.0 / 60.0;
 
@@ -470,6 +474,18 @@ fn v02_segment_chain_cpu_oracle_and_credits() {
 /// t=1.0 vs t=0.5, mid-walk 0.6 vs 0.3) and different display rows.
 #[test]
 fn v02_changed_reach_produces_real_result_difference() {
+    // Q8: the changed source binding really differs (identity), while the
+    // scene geometry stays the same.
+    assert_ne!(
+        sha256_hex(WORLD_SEG.as_bytes()),
+        sha256_hex(WORLD_CHG.as_bytes()),
+        "changed source hash differs"
+    );
+    assert_eq!(
+        scene_rows(SCENE_SEG).len(),
+        scene_rows(SCENE_CHG).len(),
+        "same scene geometry"
+    );
     let mut a = probe_session(SCENE_SEG, WORLD_SEG, "q-changed-a.at", 1);
     let mut b = probe_session(SCENE_CHG, WORLD_CHG, "q-changed-b.at", 2);
     tick_cpu(&mut a, 1);
@@ -674,6 +690,13 @@ fn v04_cross_component_queries_isolated_and_charged() {
     assert_eq!(icall(&mut s, "get_qb_last_node", &[]), 2, "qb nearest = far ord");
     assert!(approx(fcall(&mut s, "get_qa_last_t", &[]), 0.4, 1e-3), "qa t");
     assert!(approx(fcall(&mut s, "get_qb_last_t", &[]), 0.1, 1e-3), "qb t");
+    // VM guards at the original amounts (independent report).
+    println!(
+        "v04 cross VM: calls {} max_call_steps {} max_call_slices {}",
+        s.calls, s.max_call_steps, s.max_call_slices
+    );
+    assert!(s.max_call_steps < 100_000, "callback step guard");
+    assert!(s.max_call_slices <= 120, "resume/slice guard");
 }
 
 // --------------------------------------------------------- GPU sessions ----
@@ -824,4 +847,95 @@ fn v03_gpu_sweep_stops_before_wall() {
     assert!(!orange.is_empty() && !wall_px.is_empty());
     assert!(center(&orange, 0) < center(&wall_px, 0), "runner left of wall on canvas");
     h.stop_play();
+}
+
+/// V-05 (Q9 budget control) on the frozen q-cross-plus product: the third
+/// Querier instance makes the 33rd charged credit of the callback the named
+/// sticky fault 10 (3 casts + 9 getters = 33 > 32 shared pool).
+#[test]
+fn v05_budget_plus_faults_at_the_33rd_charge() {
+    let mut s = probe_session(SCENE_CROSS_PLUS, WORLD_CROSS_PLUS, "q-cross-plus.at", 1);
+    tick_cpu(&mut s, 1);
+    assert_eq!(status(&mut s), 10, "named QueryBudget fault at the 33rd charge");
+    tick_cpu(&mut s, 2);
+    assert_eq!(status(&mut s), 10, "sticky");
+}
+
+/// V-04 runtime control (frozen scene rows + minimal variant world): a
+/// second query in the same callback invalidates the prior typed token;
+/// reading the stale token is the named fault 13.
+#[test]
+fn v04_second_query_invalidates_prior_token_named_13() {
+    const WORLD_STALE: &str = r#"var ok=0.0
+var r_reach=20.0
+fn main_lifetick(dt float) {
+ let ax=ag_world(1,0); let ay=ag_world(1,1)
+ let q=ag_cast_segment(2,1,1,ax,ay,0.0,ax+r_reach,ay,0.0)
+ let hit=ag_cast_hit(q)
+ let q2=ag_cast_segment(2,1,1,ax,ay,0.0,ax+5.0,ay,0.0)
+ let stale=ag_cast_hit(q)
+}
+fn app_start() {ag_char_bind(1)*1.0; ag_camera_follow_2d(1,0.0,-4.0,40.0,12.0,40.0,12.0)*1.0}
+fn app_update(dt float) {main_lifetick(dt)}
+"#;
+    let mut s = probe_session_rows(&scene_rows(SCENE_SEG), WORLD_STALE, "stale.at", 1);
+    tick_cpu(&mut s, 1);
+    assert_eq!(status(&mut s), 13, "stale token named rejection");
+}
+
+/// V-04 runtime control: sweep getters on a cast token charge 1 then reject
+/// named 13 (kind guard in the sweep read).
+#[test]
+fn v04_wrong_kind_getter_named_13() {
+    const WORLD_KIND: &str = r#"var ok=0.0
+var r_reach=20.0
+fn main_lifetick(dt float) {
+ let ax=ag_world(1,0); let ay=ag_world(1,1)
+ let q=ag_cast_segment(2,1,1,ax,ay,0.0,ax+r_reach,ay,0.0)
+ let bad=ag_sweep_origin(q,0)
+}
+fn app_start() {ag_char_bind(1)*1.0; ag_camera_follow_2d(1,0.0,-4.0,40.0,12.0,40.0,12.0)*1.0}
+fn app_update(dt float) {main_lifetick(dt)}
+"#;
+    let mut s = probe_session_rows(&scene_rows(SCENE_SEG), WORLD_KIND, "kind.at", 1);
+    tick_cpu(&mut s, 1);
+    assert_eq!(status(&mut s), 13, "wrong-kind named rejection");
+}
+
+/// V-04 lifecycle on the query chain (GPU): the pre-tick settle renders
+/// without advancing any tick (declared marker/hidden door), each Step
+/// advances exactly one tick with input, paused frames never move the
+/// runner further, and 20 Stop/fresh rounds rebuild every Run from the
+/// declared scene (runner back at 6, door re-hidden, chain re-runs green).
+#[test]
+fn v04_gpu_pause_step_and_twenty_fresh_rounds_query_chain() {
+    {
+        let mut h = start_with(SCENE_SEG, WORLD_SEG, "v04-lifecycle");
+        assert!(play_error(&h).is_empty(), "fault: {}", play_error(&h));
+        // Render-only settle: no tick ran (door still hidden).
+        let px = pixel_classes(&mut h);
+        assert!(class_hits(&px, "white").is_empty(), "no tick during settle");
+        // One input tick: runner walks 1 world unit, cast runs, door opens.
+        step_action(&mut h, 2, 1, 0);
+        assert!(approx(actor(&h, 2)[0], 7.0, 1e-3), "one tick moved 60*dt: {}", actor(&h, 2)[0]);
+        let px = pixel_classes(&mut h);
+        assert!(!class_hits(&px, "white").is_empty(), "door visible after tick");
+        // Paused frames (settle inside step_action already paused; further
+        // frames without resume must not advance the runner).
+        for _ in 0..5 {
+            settle(&mut h);
+        }
+        assert!(approx(actor(&h, 2)[0], 7.0, 1e-3), "paused frames advance nothing");
+        h.stop_play();
+    }
+    for round in 0..20 {
+        let mut h = start_with(SCENE_SEG, WORLD_SEG, &format!("v04-fresh-{round}"));
+        assert!(play_error(&h).is_empty(), "round {round} fault: {}", play_error(&h));
+        step_action(&mut h, 2, 1, 0);
+        let x = actor(&h, 2)[0];
+        assert!(approx(x, 7.0, 1e-3), "round {round}: fresh Run rebuilt at declared pose ({x})");
+        let px = pixel_classes(&mut h);
+        assert!(!class_hits(&px, "white").is_empty(), "round {round}: chain re-ran (door open)");
+        h.stop_play();
+    }
 }

@@ -1,0 +1,32 @@
+{
+ "generator": "autographics-node2d-pilot plan021 queries-2d",
+ "api": "autographics.objects2d/1",
+ "user_source_sha256": "a9b71b0a1714bc50687ef8bbf5353c7969e2cd8ef91f7ead25ff773ad529b66f",
+ "user_source_bytes": 2331,
+  "module:crossplus": "712f9a12f7ff374f27c2a9ba211162c0d6778b03ba3c12ede35cfafd836c2f8b",
+  "module:far": "b6392c468172eae887175861ec65d68b4d3bcd7a182874215cb03c1f63b5ba0c",
+  "module:resources": "f1081c456addfea4f7e16bcf752bbefbf75c50d0298baae5a97aff43ebbd77a5",
+  "module:spectator": "7b284e65c6df0c20cc3c8cf4d4df33600fd3f45fc267e58fa6036ea1761956d1",
+  "module:target": "fc48e4da649c7721f2e42cef39ab7853429538b40161bc23658e6d90ff456006",
+ "closure": [
+  {"name": "crossplus", "sha256": "712f9a12f7ff374f27c2a9ba211162c0d6778b03ba3c12ede35cfafd836c2f8b", "bytes": 2057},
+  {"name": "far", "sha256": "b6392c468172eae887175861ec65d68b4d3bcd7a182874215cb03c1f63b5ba0c", "bytes": 225},
+  {"name": "resources", "sha256": "f1081c456addfea4f7e16bcf752bbefbf75c50d0298baae5a97aff43ebbd77a5", "bytes": 867},
+  {"name": "spectator", "sha256": "7b284e65c6df0c20cc3c8cf4d4df33600fd3f45fc267e58fa6036ea1761956d1", "bytes": 361},
+  {"name": "target", "sha256": "fc48e4da649c7721f2e42cef39ab7853429538b40161bc23658e6d90ff456006", "bytes": 234}
+ ],
+ "roles": {
+ "character": 1,
+ "character_name": "spectator.body",
+ "solids": [],
+ "camera": 1,
+ "scene_objects": {"spectator.body": 1, "target.body": 2, "far.body": 3, "qa.body": 4, "qb.body": 5, "qc.body": 6}
+},
+ "provenance": {
+  "product": "q-cross-plus",
+  "consumer": "unrecorded (this out dir has no registered flow consumer)",
+  "consumption": "include_str! frozen scene.agscene + world.at; the harness writes world.at to scripts/<sha>.at where <sha> = scene.behavior.source.sha256",
+  "load_verification": "the load path hash-verifies the behavior source closure against the scene-bound sha and rejects a damaged world copy at load (observed: 'behavior source closure identity: <scripts/<sha>.at>')",
+  "world_sha256": "a9b71b0a1714bc50687ef8bbf5353c7969e2cd8ef91f7ead25ff773ad529b66f"
+ }
+}
