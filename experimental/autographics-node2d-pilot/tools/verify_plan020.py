@@ -307,6 +307,16 @@ def main() -> int:
                 },
                 ["camera2d", "requires"],
             ),
+            (
+                "param-write",
+                {
+                    "main": FIXTURES / "budget/main.at",
+                    "gauge": FIXTURES / "neg-param-write/gauge.at",
+                    "player": FIXTURES / "budget/player.at",
+                    "resources": FIXTURES / "budget/resources.at",
+                },
+                ["read-only", "'speed'", "module gauge", "line "],
+            ),
         ]
         for neg_entry in negatives:
             neg, files, needles = neg_entry[0], neg_entry[1], neg_entry[2]

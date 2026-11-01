@@ -28,7 +28,7 @@ use autographics_auto_driver::{
         behavior::{Api, SourceSnapshot},
         behavior_project::CodePayload,
         host::Host,
-        play::{Action, State},
+        play::Action,
         storage::Storage,
     },
     ResultKind,
@@ -93,7 +93,7 @@ fn load_doc(scene_text: &str, world_src: &str, tag: &str) -> std::sync::Arc<Code
 }
 
 fn start_with(scene_text: &str, world_src: &str, tag: &str) -> Host {
-    let code = load_doc(scene_text, world_src, tag);
+    load_doc(scene_text, world_src, tag);
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("target/plan020-components")
         .join(format!("{}-{tag}", std::process::id()));
@@ -641,10 +641,21 @@ fn lifecycle_gauge_x(i: usize, n: i32) -> f64 {
 #[test]
 fn v05_budget_pool_exact_32_and_plus_faults_at_tick_2() {
     let mut s = probe_session(SCENE_BUDGET, WORLD_BUDGET, "v05-budget.at", 1);
+    let mut wall_total_us = 0u128;
+    let mut wall_max_us = 0u128;
     for tick in 1..=120 {
+        let t0 = std::time::Instant::now();
         tick_cpu(&mut s, tick, false);
+        let us = t0.elapsed().as_micros();
+        wall_total_us += us;
+        wall_max_us = wall_max_us.max(us);
         assert_eq!(status(&mut s), 0, "budget tick {tick} within the 32 pool");
     }
+    println!(
+        "PLAN-020 T-05/R1 budget full-tick wall time (CPU session, 120 ticks): avg {} us, max {} us (host frame cap 8 ms = 8000 us)",
+        wall_total_us / 120,
+        wall_max_us
+    );
     // all four gauge models ran to completion (parity-staggered writes).
     assert_eq!(int(&mut s, "get_g1_ticks"), 120);
     assert_eq!(int(&mut s, "get_g2_ticks"), 120);

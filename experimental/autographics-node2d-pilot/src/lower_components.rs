@@ -612,7 +612,7 @@ fn model_init_value(
 }
 
 /// 构建组件世界 IR：root + 声明先序实例展开（嵌套/同定义多实例/环/包络）。
-pub fn build_world(project: &Project) -> Result<WorldIR, LowerError> {
+fn build_world(project: &Project) -> Result<WorldIR, LowerError> {
     let root_name = project.root.clone();
     let root_module = project
         .node_modules
@@ -686,20 +686,16 @@ pub fn build_world(project: &Project) -> Result<WorldIR, LowerError> {
                 &format!("duplicate instance path '{path}'"),
             ));
         }
-        let module = project
-            .node_modules
-            .get(node_name)
-            .cloned()
-            .ok_or_else(|| {
-                at(
-                    in_module,
-                    line,
-                    node_name,
-                    &format!(
-                        "instance '{inst_name}' references unknown node '{node_name}' (missing use?)"
-                    ),
-                )
-            })?;
+        if !project.node_modules.contains_key(node_name) {
+            return Err(at(
+                in_module,
+                line,
+                node_name,
+                &format!(
+                    "instance '{inst_name}' references unknown node '{node_name}' (missing use?)"
+                ),
+            ));
+        }
         if stack.iter().any(|(d, _)| d == node_name) {
             let chain = stack
                 .iter()
@@ -990,10 +986,8 @@ pub fn build_world(project: &Project) -> Result<WorldIR, LowerError> {
 struct ChildDispatch {
     table: String,
     fn_name: String,
-    recv_def: String,
     #[allow(dead_code)] // 诊断/未来消费面保留（端口名）。
     ev: String,
-    payload: Vec<PType>,
     /// 每发射实例的接收下标（root 发射方恰一项）。
     entries: Vec<usize>,
 }
@@ -1006,7 +1000,6 @@ struct AncDispatch {
     to_root: bool,
     #[allow(dead_code)] // 诊断/未来消费面保留（端口名）。
     ev: String,
-    payload: Vec<PType>,
     /// 每发射实例的接收下标；None = root 接收（直呼）。
     entries: Vec<Option<usize>>,
 }
@@ -1024,6 +1017,8 @@ struct Plan {
 struct WalkOut {
     calls: Vec<(String, usize)>,
     members: BTreeSet<String>,
+    /// `.member = ...` 赋值目标（参数只读合同的检测面）。
+    assign_targets: Vec<(String, usize)>,
     child_emits: Vec<(String, String, usize, usize)>,
     anc_emits: Vec<(String, usize, usize)>,
 }
@@ -1031,7 +1026,17 @@ struct WalkOut {
 fn walk_stmts(stmts: &[Stmt], line: usize, out: &mut WalkOut) {
     for s in stmts {
         match s {
-            Stmt::Expr(e) => walk_expr(e, line, out),
+            Stmt::Expr(e) => {
+                // 赋值目标记录：`.member = ...`（成员写；参数只读合同）。
+                if let Expr::Bina(lhs, auto_parser_api::ast::Op::Asn, _) = e {
+                    if let Expr::Dot(inner, name) = &**lhs {
+                        if matches!(&**inner, Expr::Ident(b) if b == "self") {
+                            out.assign_targets.push((name.to_string(), line));
+                        }
+                    }
+                }
+                walk_expr(e, line, out);
+            }
             Stmt::If(if_) => {
                 for b in &if_.branches {
                     walk_expr(&b.cond, line, out);
@@ -1150,6 +1155,7 @@ fn plan_dispatch(project: &Project, world: &WorldIR) -> Result<Plan, LowerError>
             let mut out = WalkOut {
                 calls: Vec::new(),
                 members: BTreeSet::new(),
+                assign_targets: Vec::new(),
                 child_emits: Vec::new(),
                 anc_emits: Vec::new(),
             };
@@ -1161,6 +1167,20 @@ fn plan_dispatch(project: &Project, world: &WorldIR) -> Result<Plan, LowerError>
                         hline,
                         m,
                         &format!("handler references unknown member '.{m}'"),
+                    ));
+                }
+            }
+            // 参数只读（AC-02/06）：`.param` 作为赋值目标具名拒绝；model
+            // 字段赋值不受影响。
+            for (m, tline) in &out.assign_targets {
+                if def.params.iter().any(|(n, _)| n == m) {
+                    return Err(at(
+                        &def.module,
+                        *tline,
+                        m,
+                        &format!(
+                            "params are read-only: '.{m}' cannot be assigned (model fields are the mutable state)"
+                        ),
                     ));
                 }
             }
@@ -1267,9 +1287,7 @@ fn plan_dispatch(project: &Project, world: &WorldIR) -> Result<Plan, LowerError>
                     ChildDispatch {
                         table,
                         fn_name,
-                        recv_def: child_node,
                         ev: ev.clone(),
-                        payload: payload_types.clone(),
                         entries,
                     },
                 );
@@ -1312,7 +1330,6 @@ fn plan_dispatch(project: &Project, world: &WorldIR) -> Result<Plan, LowerError>
                             fn_name,
                             to_root: true,
                             ev: ev.clone(),
-                            payload,
                             entries: Vec::new(),
                         },
                     );
@@ -1403,7 +1420,6 @@ fn plan_dispatch(project: &Project, world: &WorldIR) -> Result<Plan, LowerError>
                         fn_name,
                         to_root: rdef.is_empty(),
                         ev: ev.clone(),
-                        payload,
                         entries,
                     },
                 );
@@ -2159,14 +2175,8 @@ fn collect_scene(
                             resolve_geom(project, world, def, props, &inst.params, Some(inst))?;
                         let material = resolve_material(def, props, &inst.params)?;
                         let rgba = resource_color(project, &material)?;
-                        let ctx = instance_ctx(
-                            project,
-                            world,
-                            plan,
-                            def,
-                            &prefix,
-                            &inst.def_idx.to_string(),
-                        )?;
+                        let ctx =
+                            instance_ctx(project, plan, def, &prefix, &inst.def_idx.to_string())?;
                         let pos = prop_of(props, "position").ok_or_else(|| {
                             at(&def.module, def.line, "position", "missing position")
                         })?;
@@ -2261,7 +2271,6 @@ fn collect_scene(
 /// 实例处理器/视图表达式的翻译上下文（SoA 索引 + 投递钩子）。
 fn instance_ctx<'a>(
     project: &'a Project,
-    world: &'a WorldIR,
     plan: &'a Plan,
     def: &'a DefIR,
     prefix: &str,
@@ -2436,6 +2445,7 @@ fn def_runtime_members(project: &Project, def: &DefIR) -> BTreeSet<String> {
     let mut out = WalkOut {
         calls: Vec::new(),
         members: BTreeSet::new(),
+        assign_targets: Vec::new(),
         child_emits: Vec::new(),
         anc_emits: Vec::new(),
     };
@@ -2867,7 +2877,7 @@ fn gen_user_source(
         if world.def_len(&dname) == 0 {
             continue;
         }
-        let ictx = instance_ctx(project, world, plan, def, &prefix, "i")?;
+        let ictx = instance_ctx(project, plan, def, &prefix, "i")?;
         if def.life_tick {
             src.push_str(&format!("fn {prefix}_lifetick(i int, dt float) {{\n"));
             if let Some(h) = life_handler(decl, "Tick") {
@@ -3024,7 +3034,7 @@ fn gen_recv_fn(
     let ctx = if index.is_empty() {
         root_ctx(project, world, plan)
     } else {
-        instance_ctx(project, world, plan, def, &def.prefix(), "j")?
+        instance_ctx(project, plan, def, &def.prefix(), "j")?
     };
     translate_stmts(&h.body.stmts, &ctx, src, 1)?;
     src.push_str("}\n");
@@ -3058,7 +3068,7 @@ fn gen_present_fn(
         let ctx = if is_root {
             root_ctx(project, world, plan)
         } else {
-            instance_ctx(project, world, plan, def, &prefix, index)?
+            instance_ctx(project, plan, def, &prefix, index)?
         };
         let pos = prop_of(&props, "position")
             .ok_or_else(|| at(&def.module, def.line, "position", "missing position"))?;

@@ -33,5 +33,5 @@ pub enum Profile {
 pub use load::{load_project, Project, ProjectError};
 pub use lower::{lower_project, LowerOutput};
 pub use lower_basic2d::{lower_project_basic, BasicProfile, LowerOutputBasic2D};
-pub use lower_components::{build_world, lower_project_components};
+pub use lower_components::lower_project_components;
 pub use lower_g11::{lower_project_g112d, LowerOutputG11};
