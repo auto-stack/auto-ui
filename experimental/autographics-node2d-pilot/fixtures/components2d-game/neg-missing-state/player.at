@@ -1,0 +1,54 @@
+// PLAN-023 T-02 gameplay Player: the PLAN-020 frozen walk-jump body (local
+// vy/grounded, one pressed edge, ground-only jump gate, gravity integrate,
+// differential axis, one move_and_slide with clearance 0.002, grounded read
+// from THAT move) plus the T-02 idle-turn gate: the root may dispatch
+// Idle(1) on an event tick (collection/win/fail); that turn the two held
+// reads (input.axis -> ag_action_held x2, 2 credits) are skipped so the
+// event tick stays inside the 32-credit pool. The pressed edge and the
+// gravity/move/grounded chain still run so physics never diverges.
+node Player(px: float, py: float, tint: Material2D) {
+    model {
+        var vy = 0.0
+        var grounded = 0
+        var halt = 0
+    }
+    msg {
+        Idle(int)
+    }
+    view-2d {
+        character2d body {
+            position: (px, py)
+            material: tint
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            let jp = input.pressed(Jump)
+            if jp == 1 {
+                if .grounded == 1 {
+                    .vy = 8.0
+                }
+            }
+            .vy = .vy - 20.0 * dt
+            var axis = 0
+            if .halt == 1 {
+                .halt = 0
+            } else {
+                axis = input.axis(Left, Right)
+            }
+            let dx = axis * 4.0 * dt
+            let q = refs.body.move_and_slide((dx, .vy * dt))
+            .grounded = refs.body.grounded(q)
+            if .grounded == 1 {
+                .vy = 0.0
+            }
+        }
+        .Idle(n) -> {
+            if n == 1 {
+                .halt = 1
+            } else {
+                .halt = 0
+            }
+        }
+    }
+}

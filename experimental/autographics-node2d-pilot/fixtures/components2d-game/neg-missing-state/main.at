@@ -1,0 +1,182 @@
+// PLAN-023 T-03 game fixture: the T-02 hand-proven collect-the-coins game
+// (scratch t02/gameplay/world-src/world-src game project) re-expressed in
+// the game2d authoring surface. The generator now owns everything the T-02
+// probe hand-wired: trigger binds, the game_events poll prologue + dispatch,
+// the idle-turn gate plumbing (gate field + player.Idle), the closeout
+// skeleton (game_cue / hud text helpers / one ag_present2d), receiver fns
+// for every declared handler (no forced dispatch site needed), the root
+// closeout scalars (gate/ord/np/p0/p1 generated; count/state author-owned),
+// and the Hud2V1 scene (schema 8: assets + cues + hud slots).
+// Author-owned root state (F-4): count (0..3 coins), state (0 Playing /
+// 1 Won / 2 Failed). The generated closeout reads r_count/r_state by the
+// frozen contract names.
+use resources: coin_mesh, coin_tint, char_orange, ground_color, ground_mesh, void_color, void_mesh, pad_color, pad_mesh
+use player: Player
+use coin: Coin
+use zone: Zone
+
+node Main {
+    model {
+        var count = 0
+    }
+    game2d {
+        audio {
+            bank: "assets/b0b740dc49e51abefff9bb1af830080fe00f817b468614992040d438d6171c3d.wav"
+            font: "assets/lilita_one_regular.ttf"
+            license: "assets/license.txt"
+        }
+        cue coin {
+            span: (0, 7403)
+            gain: 1.0
+        }
+        cue win {
+            span: (7403, 20046)
+            gain: 1.0
+        }
+        cue fail {
+            span: (20046, 22504)
+            gain: 1.0
+        }
+        hud {
+            slot 0 {
+                anchor: 0
+                offset: (8.0, 8.0)
+                size: 32.0
+                rgba: (1.0, 1.0, 1.0, 1.0)
+                text: "count"
+                init: "0"
+            }
+            slot 1 {
+                anchor: 1
+                offset: (8.0, 8.0)
+                size: 32.0
+                rgba: (1.0, 1.0, 1.0, 1.0)
+                text: "state"
+                init: "Playing"
+            }
+            text count {
+                0: "0"
+                1: "1"
+                2: "2"
+                default: "3"
+            }
+            text state {
+                1: "Won"
+                2: "Failed"
+                default: "Playing"
+            }
+        }
+        trigger c1_hit {
+            shape: circle
+            radius: 0.9
+            target: "c1"
+            event: "Collect"
+            on: "collect"
+            guard: "alive"
+            cue: "coin"
+            full_at: 3
+            full_cue: "win"
+        }
+        trigger c2_hit {
+            shape: circle
+            radius: 0.9
+            target: "c2"
+            event: "Collect"
+            on: "collect"
+            guard: "alive"
+            cue: "coin"
+            full_at: 3
+            full_cue: "win"
+        }
+        trigger c3_hit {
+            shape: circle
+            radius: 0.9
+            target: "c3"
+            event: "Collect"
+            on: "collect"
+            guard: "alive"
+            cue: "coin"
+            full_at: 3
+            full_cue: "win"
+        }
+        trigger hazard_hit {
+            shape: box
+            target: "hazard"
+            event: "Enter"
+            on: "fail"
+            value: 2
+            cue: "fail"
+        }
+        trigger pad_enter {
+            shape: box
+            target: "pad"
+            event: "Enter"
+            on: "goal"
+            when_count: 3
+            phase: 1
+            value: 1
+            cue: "win"
+        }
+    }
+    view-2d {
+        Coin c1 {
+            cx: 8.0
+            cy: 1.2
+            geo: resources.coin_mesh
+            tint: resources.coin_tint
+        }
+        Coin c2 {
+            cx: 12.0
+            cy: 1.2
+            geo: resources.coin_mesh
+            tint: resources.coin_tint
+        }
+        Coin c3 {
+            cx: 16.0
+            cy: 1.2
+            geo: resources.coin_mesh
+            tint: resources.coin_tint
+        }
+        Player player {
+            px: 2.0
+            py: 1.0
+            tint: resources.char_orange
+        }
+        Zone pad {
+            zx: 19.0
+            zy: 0.5
+            vis0: 1
+            geo: resources.pad_mesh
+            tint: resources.pad_color
+        }
+        Zone hazard {
+            zx: 8.0
+            zy: -6.0
+            vis0: 0
+            geo: resources.void_mesh
+            tint: resources.void_color
+        }
+        solid2d ground {
+            position: (8.0, -0.5)
+            mesh: resources.ground_mesh
+            material: resources.ground_color
+        }
+        camera2d cam {
+            target: refs.player.actor
+            bounds: (0.0, -8.0, 24.0, 8.0)
+            view_size: (24.0, 16.0)
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            // Idle-turn gate (F-6): the game_events poll sets r_gate=1 on a
+            // latch tick; that turn the root dispatches Idle(1) and the
+            // player's two held reads are skipped (pressed + move + grounded
+            // still run), keeping the event tick inside the 32-credit pool.
+            if .gate == 1 {
+                .gate = 0
+                player.Idle(1)
+            }
+        }
+    }
+}

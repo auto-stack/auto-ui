@@ -151,11 +151,16 @@ fn negative_game_fixtures_fail_with_named_diagnostics_and_no_panic() {
     assert!(err.contains("slot index must be 0..3"), "{err}");
     assert!(err.contains("line "), "{err}");
 
-    // 缺 count（作者所有字段必须声明；缺 state 同一诊断形态）。
+    // 缺 count / 缺 state（作者所有字段必须声明；同一诊断两个名字）。
     let err = lower_dir(&neg_dir("neg-missing-count"))
         .err()
         .expect("fails");
     assert!(err.contains("'count'"), "{err}");
+    assert!(err.contains("must declare int field"), "{err}");
+    let err = lower_dir(&neg_dir("neg-missing-state"))
+        .err()
+        .expect("fails");
+    assert!(err.contains("'state'"), "{err}");
     assert!(err.contains("must declare int field"), "{err}");
 
     // 生成基础设施字段被作者声明（生成器不发明游戏状态）。
