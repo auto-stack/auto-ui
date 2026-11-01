@@ -98,6 +98,8 @@ JSON 是当前原型便于保存/验证的选择，没有“可审计所以只�
 
 2026-11-01：019已实际交付（[归档合同](../../plans/archived/019-autographics-node2d-scenes-character-camera.md)），AG008已交付并固定消费019，不把019根逻辑/子纯view限制当最终模型。用户要求明确补齐局部性与下一波服务，[020/021/022设计](node-components-queries-and-sprites.md)规定Player等组件内model/msg/on、独立receiver、typed父事件及其上的查询/精灵；状态以各自合同为准，后两项等020实际交付，不重开已归档008或追加入其前置。
 
+2026-11-01新阶段规划：020局部组件、021二维查询、023有限game音画已经实际交付，但023的固定count/state及Collect/Goal/Fail生成模板不是最终作者模型。经用户授权，[024 3D基础](../../plans/024-autographics-node3d-foundation.md)从首版支持view-3d与局部model/msg/on/use；[025声音/HUD通用Node接线](../../plans/025-autographics-node-presentation-services.md)要求玩法/计分/胜败回归作者on，原预算下无角色/连续输入/提前终点/四请求真链先证。二者均仅规划，不改既有profile事实、在途内容合同或当前6/21计数；共享边界见[共同设计](node3d-foundation-and-generic-presentation.md)。
+
 [840 §3/4.2/5.2](../../../../auto-lang/docs/plans/archive/840-autographics-public-behavior-api-and-user-scripts.md)将单文件定义为首版切片：SDK 有模块服务，消费者尚未验证其装配/诊断链，因此不读取未快照依赖；没有证明多模块不可验证。[854](../../../../auto-lang/docs/plans/archive/854-autographics-behavior-source-assembly.md)的“可审计”指内部受信装配的来源/顺序/错误可追查，不是新的产品定位，也不能倒推840的禁 use是长期要求。此前外部讨论纪要的“可审计 agent 代码运行时”解释不作为产品需求依据。
 
 本轮仅修订设计/要求/导航，不取 Plan 号，不建实施树、生成源码/资产或运行项目测试，不修改在途实现/合同、旧 profile 数学/预算/故障行为或交付状态。预算抽象单位、完整数值语义仍需在语言/执行合同专题继续收敛；不因本轮纠偏就宣称已解决或修改固定 SDK。

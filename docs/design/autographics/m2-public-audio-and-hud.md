@@ -1,6 +1,6 @@
 # AG M2公共声音与HUD（规划v1，2026-10-30）
 
-本设计保留2026-10-30原公共服务规划的有限支持与接线边界；下文参数须按实际交付Spec读取，不把历史“拟新增/未实现”当当前状态。2026-11-01核验012音频78632af、013 HUD8b1e799、AG005音频内容5996d8f均已实际交付。Node作者入口尚缺声音/HUD接线，新路线为[UI023→AG006 r2](node-audio-hud-and-gallery-followups.md)，仅规划暂不实施；旧底层预算/素材/图声分母保留。实现/引擎计划归auto-ui，内容/计划归ag-examples。
+本设计保留2026-10-30原公共服务规划的有限支持与接线边界；下文参数须按实际交付Spec读取，不把历史“拟新增/未实现”当当前状态。2026-11-01核验012音频78632af、013 HUD8b1e799、AG005音频内容5996d8f均已实际交付。023有限game作者入口32d7a81已实际交付，AG006固定它在途；通用接线仍有业务模板/输入门/四请求限制，现另立[UI025通用Node服务](../../plans/025-autographics-node-presentation-services.md)，与[UI024 3D基础](../../plans/024-autographics-node3d-foundation.md)均只规划暂不实施，不暗改AG006前置。旧底层预算/素材/图声分母保留，边界见[共同设计](node3d-foundation-and-generic-presentation.md)。实现/引擎计划归auto-ui，内容/计划归ag-examples。
 
 ## 1. 分仓与依赖
 

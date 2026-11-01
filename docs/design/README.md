@@ -15,5 +15,6 @@ AG实验代码与实现计划已归本仓；旧canonical Specs与历史设计继
 | [Button树状主题](autoui/button-theme-atom.md) | 普通use、token引用、模式、widget局部设计；未实施 |
 | [主题迁移逐项清单](autoui/theme-migration-inventory.md) | 当前源目录与旧样式静态盘点，不是运行通过证明 |
 | [数据优先模型](autoui/design-data-model.md) | 当前方向；[抽象研究](autoui/design-system-abstractions.md)与[旧语言方案](autoui/button-design-syntax.md)为讨论依据 |
-| [AG公共声音与HUD](autographics/m2-public-audio-and-hud.md) | 012/013底层与AG005已交付；新作者前置023→AG006 r2，旧预算/素材/图声分母保持 |
-| [Node声音/HUD与下一轮Gallery](autographics/node-audio-hud-and-gallery-followups.md) | 仅规划；UI023→AG006 r2，UI021→AG009、UI022→AG010；当前迁移仍6/21 |
+| [AG公共声音与HUD](autographics/m2-public-audio-and-hud.md) | 012/013与023有限game已交付；AG006固定023在途，025通用服务仅规划；旧预算/素材/图声分母保持 |
+| [Node声音/HUD与下一轮Gallery](autographics/node-audio-hud-and-gallery-followups.md) | 020/021/023已交付，022及AG006/009按各自owner推进；025通用接线独立后继，当前迁移仍6/21 |
+| [3D Node基础与通用声音/HUD接线](autographics/node3d-foundation-and-generic-presentation.md) | 024/025仅规划、各0/10；保原预算/验收，共享接线短窗协调，不改在途内容依赖 |

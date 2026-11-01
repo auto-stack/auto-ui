@@ -1,8 +1,12 @@
 # Node声音/HUD能力与下一轮Gallery迁移
 
-2026-11-01，设计v1；本轮仅规划。承接[作者目标](declarative-authoring-model.md)、[组件/查询/精灵](node-components-queries-and-sprites.md)与[全量迁移路线](gallery-node-authoring-migration.md)。不修改当前引擎/示例/SDK或运行验证，不接管020/UI014在途树；本文件是设计依据，不是实施/独立复审证据。
+2026-11-01，设计v1；下文保留首次拆分时的历史审计/合同输入，当前状态见本次补记。承接[作者目标](declarative-authoring-model.md)、[组件/查询/精灵](node-components-queries-and-sprites.md)与[全量迁移路线](gallery-node-authoring-migration.md)。不修改当前引擎/示例/SDK或运行验证，不接管020/UI014在途树；本文件是设计依据，不是实施/独立复审证据。
 
-## 现场与能力审计
+## 本次补记：已交付能力与新规划
+
+截至024/025规划核验，020组件16ddfa0、021查询1bec52f、023有限game32d7a81均已实际交付；022按owner记录复审/合入，AG006固定023与AG009固定021在途，实际进度看各owner记录。当前仍6/21。023真实支持固定game2d收集例，不等于全部通用Node音画接口；[新阶段设计](node3d-foundation-and-generic-presentation.md)明确[024 3D基础](../../plans/024-autographics-node3d-foundation.md)与[025通用声音/HUD](../../plans/025-autographics-node-presentation-services.md)各drafting0/10，保原预算和验收，不改AG006依赖/接管其实施。
+
+## 首次规划时的现场与能力审计（历史快照）
 
 只读基线：auto-ui695ce0b、ag-examples d88243c；UI012音频78632af、013 HUD8b1e799、019基础Node c93adb7已实际交付；AG008五入口8a01a34已交付并清理。当前Gallery仍12逻辑项/21入口，6/21已迁、15待迁，规划不计完成。020已有独立实施树和T-01记录，实际交付尚未发生。
 
@@ -19,9 +23,9 @@
 
 ## 分仓合同与依赖
 
-| 仓/计划 | 范围 | 实施硬前置 | 本轮状态 |
+| 仓/计划 | 范围 | 实施硬前置 | 首次规划时状态 |
 |---|---|---|---|
-| [UI023](../../plans/023-autographics-node2d-audio-and-hud.md) | 二维Node bank/cue/font/HUD槽、必要ASCII、快照/typed触发与一次呈现收口；复用012/013 | 020实际交付、013已交付 | drafting r1，0/10 |
+| [UI023](../../plans/archived/023-autographics-node2d-audio-and-hud.md) | 二维Node bank/cue/font/HUD槽、必要ASCII、快照/typed触发与一次呈现收口；复用012/013 | 020实际交付、013已交付 | drafting r1，0/10 |
 | [AG006 r2](../../../../ag-examples/docs/plans/006-autographics-gallery-event-hud.md) | 原G12b三收集/胜败/音效/HUD，新作者形式；原audio同项迁移/保八旧oracle/完整双入口包 | UI023实际交付、AG005/008已交付 | drafting r2，0/10 |
 | [AG009](../../../../ag-examples/docs/plans/009-autographics-gallery-node2d-queries.md) | G05/2d segment/sweep/changed、九旧义务/14阶段与完整混合维度包 | UI021实际交付、AG008已交付 | drafting r1，0/10 |
 | [AG010](../../../../ag-examples/docs/plans/010-autographics-gallery-node2d-sprites-and-frame-animation.md) | G09 atlas/character与main/alt、原图/局部状态/18旧oracle/完整包 | UI022实际交付、AG008已交付 | drafting r1，0/10 |
@@ -44,4 +48,4 @@ AG006原AC-01..08/T-01..10保留，r1历史在Git d88243c；r2增加普通Node�
 
 AG009迁移现有一个入口，AG010迁移现有两个，均净增0。AG006迁移现有g12/audio并新增g12/hud一个；HUD原本不在21分母，不把新增混称旧入口迁移。每次实际合入再按现场更新原21项迁移账和当前库存；目前仍6/21，不能记作这些计划已完成。全部新计划均有单独SD，本轮不直接修改canonical Specs；新引擎Spec归auto-ui、新内容消费Spec归ag-examples，旧auto-lang知识只读引用，派生JSON不写。
 
-独占取号分别锁本仓.next-id并复扫活动/archived/archive后创建，不预领其它波次：UI023后当前024，AG009/010后当前011；下一次重新核查。每Plan每仓唯一权威树、同树不同上下文终审；无新agent/chat。临时材料唯一plan-artifacts/plan-NNN/<repo>/，合同/证据摘要折Plan，merge对账全部路径后删自有scope/构建物，仅具名未解决问题可登记持有；禁止attachments含md和跨仓同号覆盖。
+独占取号分别锁本仓.next-id并复扫活动/archived/archive后创建，不预领其它波次；本次仅在UI新增024/025，当前号源026，外仓号源独立重核且本轮未取Gallery号。每Plan每仓唯一权威树、同树不同上下文终审；无新agent/chat。临时材料唯一plan-artifacts/plan-NNN/<repo>/，合同/证据摘要折Plan，merge对账全部路径后删自有scope/构建物，仅具名未解决问题可登记持有；禁止attachments含md和跨仓同号覆盖。

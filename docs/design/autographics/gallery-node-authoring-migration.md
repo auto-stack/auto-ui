@@ -17,9 +17,9 @@ auto-ui 017的g11-2d模式仍要求恰一个character2d，solid/camera限根，�
 | 入口 | 当前作者形式/能力 | 迁移波次与必须保留的观察 |
 |---|---|---|
 | g01/main | Node源码，AG008/019；四图元/alpha/显隐/数组序变体 | W1已交付；base+color/position/order/visible，保原alpha排序和等alpha数组序，不改成任意图层能力 |
-| g02/main | JSON+静态GLB | W3基础3D/资源；真实多部件、颜色/遮挡/来源许可与离线资源闭包 |
+| g02/main | JSON+静态GLB | W3[UI024基础](../../plans/024-autographics-node3d-foundation.md)（仅规划）→内容后继另立；真实多部件、颜色/遮挡/来源许可与离线资源闭包 |
 | g03/2d | Node源码，AG008/019；父子group | W1已交付；父平移继承/祖先显隐/深层world坐标与Stop恢复 |
-| g03/3d | JSON，父子group | W3；同维层级与旧3D规则，不承诺跨维parent或通用TRS写入 |
+| g03/3d | JSON，父子group | W3 UI024（仅规划）→内容后继另立；同维层级与旧3D规则，不承诺跨维parent或通用TRS写入 |
 | g04/2d | JSON，编辑器教程 | W6；Node为场景来源，原视口/选取/拖动/保存/重开仍是编辑器验收 |
 | g04/3d | JSON，编辑器教程 | W6；原34步相关能力不改名为公共脚本API；OS自动化准入另受既有政策 |
 | g05/2d | 旧v3 Auto+场景，segment/sweep | W2a引擎021→[AG009](../../../../ag-examples/docs/plans/009-autographics-gallery-node2d-queries.md)（依赖组件020，均待实际交付）；typed射线/扫掠结果、命中次序/法线/空间/源变体；不能只迁静态画面 |
@@ -36,8 +36,8 @@ auto-ui 017的g11-2d模式仍要求恰一个character2d，solid/camera限根，�
 | g10/animation | animation3d Auto+clip/visual pose | W4b；原四clip、yaw/phase、颜色/阴影/物理隔离，不把动画公式放Rust |
 | g11/2d | Node源码，AG007/017 | 已交付；保51原项+新增负控，后续共同端口修改选真实受影响回归 |
 | g11/3d | triggers3d旧Auto | W3；三收集/危险/终点/越界/重开与原25项，不因旧runner丢失删检查 |
-| g12/audio | audio2d Auto+bank | W5引擎023→AG006 r2（仅规划）；同项迁Node，保原两币玩法/八旧oracle/ordinal/PCM/原素材，不静默降成日志 |
-| g12/hud（未交付） | AG006已修订r2，尚不在21入口内 | W5引擎023→[AG006 r2](../../../../ag-examples/docs/plans/006-autographics-gallery-event-hud.md)；等实际Node声音/HUD交付，保原三币/字形/PCM/共同接受/包义务，净新增一个入口 |
+| g12/audio | audio2d Auto+bank | W5 AG006固定已交付023在途；[025通用服务](../../plans/025-autographics-node-presentation-services.md)独立后继，不暗加前置；同项迁Node保原两币/八旧oracle/ordinal/PCM/素材 |
+| g12/hud（未交付） | AG006 r2在途，尚不在21入口内 | W5 [AG006 r2](../../../../ag-examples/docs/plans/006-autographics-gallery-event-hud.md)固定023先证；025若需切换由owner显式修订，不改原三币/字形/PCM/共同接受/包义务，净新增一个入口 |
 
 W1五入口已完成新作者形式迁移，加AG007已迁移的g11/2d共6/21；待迁移W2a/W2b共3个、W3共6个、W4a/W4b共3个、W5当前1个、W6共2个，合计剩余15个，总分母仍为21。HUD未来新增入口另按其合同记账，不算“迁移净增”。各波仍可按实际成本拆成中等Plan，不预领后面全部编号。
 
@@ -48,7 +48,7 @@ W1五入口已完成新作者形式迁移，加AG007已迁移的g11/2d共6/21；
 
 先引擎交付、再内容；下一波引擎可与上一波固定消费的内容并行，读端不追开发tip。查询、二维图片、三维资源和声音的端口应复用共同领域表示，但共享文件要约定owner短窗，GPU/窗口/音频重型门单实例。当前018、语言901与UI014的真实写面由开工核对，不凭标题加全量串行前置。
 
-2026-11-01后继仅规划：[声音/HUD与内容拆分](node-audio-hud-and-gallery-followups.md)补UI023→AG006 r2，并建立UI021→AG009、UI022→AG010；三内容计划均等实际引擎交付。当前完成数仍6/21，后继草案不计入；不重开AG008或接管020。
+2026-11-01本次规划核验：020/021/023已实际交付，022由其owner推进复审/合入，AG006/009在途，各按唯一owner推进。[新阶段设计](node3d-foundation-and-generic-presentation.md)建立024（3D声明/静态GLB/组件基础）与025（声音/HUD通用Node接线）两份草案，各0/10，暂无实施树；不暗加在途内容前置。下一步三维角色/相机→实例/触发，随后三维查询/纹理/节点动画、编辑器教程按真实接口另拆，不预取编号。当前完成数仍6/21，草案不计完成；不重开AG008。
 
 ## 不变的交付要求
 

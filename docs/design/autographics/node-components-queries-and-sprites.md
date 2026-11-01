@@ -2,6 +2,8 @@
 
 2026-11-01，设计 v1；仅规划。承接[全量迁移路线](gallery-node-authoring-migration.md)和已交付[019规范](../../specs/auto-graphics/node2d-basic-authoring.md)。本文件定义长期接口方向，不是执行证据。
 
+2026-11-01后续补记：020与021已实际交付，022由其唯一树完成独立复审/合入，进度以owner记录为准；新[024/025共同设计](node3d-foundation-and-generic-presentation.md)分别把组件机制扩到3D基础、把声音/HUD从固定game档收口为通用Node服务。两份仅规划、不暗加在途内容前置，原组件/查询/精灵合同不被本轮重写。
+
 ## 两个主题，三份合同
 
 | Plan | 责任 | 实际交付依赖 |
