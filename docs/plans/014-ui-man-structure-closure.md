@@ -200,6 +200,7 @@ work/review只做命名反例/模块/fixture及必要`cargo check -p auto-ui-com
 | [✅ T-03] | work / T-02 | Man `auto/src/main.rs`及cmd_*/tool_ui_ops按冻结职责整理，复用现有owned/client/Web端点，主入口保组合/兼容，永久CLI反控 | AC-02/06；V-02/03 |
 | [✅ T-04] | work / T-03 | UI compiler `ui_gen/vue.rs`→按template/script/style/import/library/store等具名主题模块（具体新路径T-02冻结）；移除旧正文/重复算法，保公开入口/单state/reset/010 | AC-03；V-04/05 |
 | [✅ T-05] | work / T-04 | runtime `ui/aura_view_builder.rs`及必要既有相邻模块按节点/绑定/构建/跟踪职责提取；单VmBridge/Bindings/slot/path与guard，旧实现退出 | AC-04；V-06及定向状态控制 |
+| [✅ T-06] | work / T-05 | runtime `ui/iced/renderer.rs`按已冻结消息/状态/资源owner整理更新/订阅/view、图标部件、纹理/快照与宿主边界；保实际调用、资源终态/帧/active | AC-05/06；V-07/08/10，真实GPU定向，不以只移动代码关闭 |
 | T-04 | work / T-03 | UI compiler `ui_gen/vue.rs`→按template/script/style/import/library/store等具名主题模块（具体新路径T-02冻结）；移除旧正文/重复算法，保公开入口/单state/reset/010 | AC-03；V-04/05 |
 | T-05 | work / T-04 | runtime `ui/aura_view_builder.rs`及必要既有相邻模块按节点/绑定/构建/跟踪职责提取；单VmBridge/Bindings/slot/path与guard，旧实现退出 | AC-04；V-06及定向状态控制 |
 | T-06 | work / T-05 | runtime `ui/iced/renderer.rs`按已冻结消息/状态/资源owner整理更新/订阅/view、图标部件、纹理/快照与宿主边界；保实际调用、资源终态/帧/active | AC-05/06；V-07/08/10，真实GPU定向，不以只移动代码关闭 |
@@ -237,6 +238,15 @@ work/review只做命名反例/模块/fixture及必要`cargo check -p auto-ui-com
 - **T-04尾部修复（同提交）**：vue 9个子模块的提升方法pub(crate)→pub(super)，清零private_interfaces警告（VideoSpec/CanvasSpec/StyleBranch等vue私有payload类型）；node_to_html/node_to_auto_code按原pub(crate)保持。修复后compiler crate可达性警告=0。
 - **V-06 实测**：runtime日常档 `cargo nextest run -p auto-ui-runtime --lib` **2158/2158**（178 skip=018契约default-filter族+既有ignore，零新增）；builder族显式 `-E 'test(/aura_view_builder/)'` **126/126**（含plan045/046/047 memo族、plan055/571/534/080、build_with_debug捕获族）；mutation control：mention_segments提前返回→`plan493_mentions_literal_list` FAILED→还原→8/8；auto-ui-tools与Man auto check各0 error；拆分文件零新增警告（runtime余12条可达性警告均为session.rs既有）。
 
+### 8.4 执行记录（2026-11-01，work轮4：T-06）
+
+- **共享写面窗（短窗串行政策落点）**：开工重读master=6d7fc69（本Plan r3簿记，无他方漂移）；**020共享面核对**：`git diff master...codex/plan-020-dev --stat -- crates/auto-ui-runtime/src/ui/iced/` 为空——020触面在experimental/autographics-*，与renderer零重叠；020树（e660798，T-03/T-04进行中）未触碰。T-11合入窗仍按依赖序短窗串行。
+- **T-06 关闭**（AC-05/06；V-07/V-08机制面；V-10真GPU归T-08）：UI worktree提交**fcece7a**（10文件+42416/−42296）：`iced/renderer.rs`(42,295行)→`iced/renderer/`目录——mod.rs保文件头助手与thread-locals/statics（INPUT_TEXT/INSPECT_CAPTURE/TEXTAREA_CONTENTS/P725_INPUT_BINDINGS/SpanHighlighter）、IntoIcedElement trait、IcedMessage+convert_view_messages、全部测试；7个家族子模块纯移动：style_widgets/media/projection(含into_iced巨impl+dynamic_view族)/host(含run_session/update闭包/exit机)/subscriptions/shell_state/devtools。消息序/active判据（primary_app/app_of_window/focused_window）/last-owner exit（WindowClosed空→shutdown_broker+exit）/纹理与external pin寿命零改。
+- **公开面恢复**：mod.rs重导出块——外部消费者`crate::ui::iced::renderer::X`路径逐名一致（session.rs/stage3.rs/broker_surface.rs/headless.rs/iced/mod.rs再导出链/ui_tests），pub面4组+pub(crate)面5组；`include_bytes!`资产路径`../assets/`；`lucide_generated`经`crate::ui::iced::`路径；**plan811源内容守卫随owner更新**（扫描全部8个家族文件，断言本体零改）。
+- **可见性收敛**：4轮错误账目（613→167→72→22→11→2→0）：跨sibling助手/类型提升pub(super)、外部消费项pub(crate)重导出、7处struct字段提升（ToastReq/InspectorSections/DashFace/DebugElementInfo/DebugRenderCtx/ShellStreamEvent/CanvasPainter/MarqueePainter等）、mod.rs子模块glob供测试裸名解析。**警告393==393（stash基线对账，零新增）**。
+- **冻结偏差登记**（§4细化）：焦点/网格族（3803-4369）与3个内联测试mod（plan732/737/plan095）随style_widgets；startup窗口配置（8616-8752）归host；热键测试随subscriptions——均为冻结区间间隙归属，语义不变。
+- **V-07/V-08 实测（机制面）**：日常档**2158/2158**（与T-05基线逐位平齐，178契约skip零新增）；renderer族+lucide显式 `-E 'test(/iced::renderer::/) or test(/lucide/)'` **170/170**（含消息/订阅/view边界、hotkey、line_edit非GPU子集、plan024/095/732/737、lucide coverage manifest、图像句柄）；mutation control：media.rs注入禁引串→`media_consumers_have_no_ui_path_references` FAILED→还原→7/7（顺带证明更新后守卫覆盖拆分文件）；auto-ui-tools与Man auto check各0 error。真GPU/真输入/owned关闭重开（V-09/V-10）按冻结归T-08窗口。
+
 ## 9. 复审记录
 
 ### r1历史记录（不作为当前启动指令）
@@ -262,6 +272,10 @@ stage: work | plan_id: auto-ui/PLAN-014 | plan_revision: 2 | outcome: pass | wor
 ### work轮3（2026-11-01，T-05）
 
 stage: work | plan_id: auto-ui/PLAN-014 | plan_revision: 2 | outcome: pass | worktree: D:/autostack/.wt/ui-014/auto-ui | branch: codex/plan-014-structure | base_commit: 7a183c6（master 10d04da祖先） | code_commit: 90e0c44 | dependency_revisions: lang b1a4871a / web ec9c4ba / down 7c4d5cb / man组树 5b310f0 | task_ids: T-05（含T-04警告修复） | evidence: §8.3执行记录 + 提交90e0c44（V-06 2158/2158，builder族126/126，mutation control过，拆分文件零新增警告） | blockers: 无（TrackCtx收敛缓期已登记§8.3） | next_responsible_role: work（T-06 renderer，开工按§4冻结细绑+重读master；与020共享面按短窗串行政策核对）
+
+### work轮4（2026-11-01，T-06）
+
+stage: work | plan_id: auto-ui/PLAN-014 | plan_revision: 2 | outcome: pass | worktree: D:/autostack/.wt/ui-014/auto-ui | branch: codex/plan-014-structure | base_commit: 90e0c44（master 6d7fc69祖先） | code_commit: fcece7a | dependency_revisions: lang b1a4871a / web ec9c4ba / down 7c4d5cb / man组树 5b310f0 | task_ids: T-06 | evidence: §8.4执行记录 + 提交fcece7a（V-07/V-08机制面：日常2158/2158平齐、renderer族170/170、mutation control过、393==393零新增警告、消费仓check 0 error） | blockers: 无（V-09/V-10真GPU/真输入/owned退出重开按冻结归T-08） | next_responsible_role: work（T-07 API/依赖/feature/类型闭包核对+测试随owner映射+TrackCtx收敛窗口）
 
 ### 901 consumer漂移登记（2026-11-01，已在本Plan内修复）
 
