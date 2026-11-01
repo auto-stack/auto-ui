@@ -767,6 +767,16 @@ pub fn lower_project_presentation(
             .map_err(|_| err0("presentation2d license must be UTF-8 text".to_string()))?
     };
     let scene = collect_scene(project, &world, &plan)?;
+    // 声明了角色的组合走 hud2d/1 原装配（入口含 _ag_cam2_freeze）——角色
+    // 必须带恰一相机（020 同规则）；无角色模式不要求相机。
+    if scene.char.is_some() && scene.camera.is_none() {
+        return Err(at(
+            &world.root_module,
+            world.defs[&world.root].line,
+            &world.root,
+            "presentation-2d with a character2d requires exactly one camera2d (the hud2d entry freezes camera state; absent camera faults 27); the actor-free mode needs neither",
+        ));
+    }
     let src = gen_user_source(project, &world, &plan, &scene, false, None, false, Some(&gen))?;
     let source_bytes = src.len();
     let source_sha256 = sha256_hex(src.as_bytes());

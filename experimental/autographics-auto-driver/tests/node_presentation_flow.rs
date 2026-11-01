@@ -690,3 +690,88 @@ fn t03_budget_plus_one_named_fault10() {
         "one extra held read on the exact-edge walk tick must be the named          budget fault 10",
     );
 }
+
+/// V-05 fresh-Run isolation: a second Run in the same session rebuilds the
+/// presentation infrastructure — the shared ordinal restarts at 1 and no
+/// old-Run request row leaks into the new closeout.
+#[test]
+fn t05_fresh_run_ordinal_isolation() {
+    let s = &mut session(NOTIFY_WORLD, "t05-fresh.at", 1, 3, 2);
+    for t in 1..=3 {
+        assert_eq!(tick(s, t), 0);
+    }
+    assert_eq!(audio_rows(s), vec![(1, 0, 1.0)], "run 1 first request");
+    for t in 4..=6 {
+        assert_eq!(tick(s, t), 0);
+    }
+    assert_eq!(audio_rows(s), vec![(2, 1, 0.5)]);
+    // Fresh Run: the host rebuilds the whole VM per Run (a fresh Session of
+    // the same world under a new run identity — the unit freeze/config state
+    // is Run-owned and cannot be re-configured in place).
+    let s = &mut session(NOTIFY_WORLD, "t05-fresh2.at", 2, 3, 2);
+    assert_eq!(s.int("_ag_status", &[]).unwrap(), 0, "fresh app_start clean");
+    for t in 1..=3 {
+        assert_eq!(tick(s, t), 0);
+    }
+    assert_eq!(
+        audio_rows(s),
+        vec![(1, 0, 1.0)],
+        "run 2 ordinal restarts at 1 (no old-Run carryover)"
+    );
+}
+
+/// V-05 mixed-write conflict: an author-side standalone ag_audio_emit in the
+/// same callback as the closeout bundle is the named fault 50 (mode
+/// conflict; the service path stays bundle-only, no partial acceptance).
+#[test]
+fn t05_standalone_emit_conflicts_with_bundle_fault50() {
+    // Derived world variant: the left handler ALSO fires a standalone emit.
+    let marker = "  sfx_play(0, 1.0)";
+    let idx = NOTIFY_WORLD.find(marker).expect("left sfx marker");
+    let variant = format!(
+        "{}  let _leak = ag_audio_emit(900, 0, 1.0);{}",
+        &NOTIFY_WORLD[..idx],
+        &NOTIFY_WORLD[idx + marker.len()..]
+    );
+    let s = &mut session(&variant, "t05-mixed.at", 1, 3, 2);
+    for t in 1..=2 {
+        assert_eq!(tick(s, t), 0);
+    }
+    let st = tick(s, 3);
+    assert_eq!(st, 50, "bundle after standalone emit is the named mode conflict");
+    // The standalone emit itself was the only accepted request; the bundle
+    // is refused whole (no partial bundle acceptance).
+    assert_eq!(audio_rows(s), vec![(900, 0, 1.0)], "only the standalone row");
+}
+
+/// V-05 ordinal replay across callbacks: the shared counter never resets
+/// within a Run, and a stale ordinal at the unit boundary stays the named
+/// fault 52 (the notify chain already asserts 1,2,3; this asserts the unit
+/// rejects a replayed ordinal directly).
+#[test]
+fn t05_ordinal_replay_named_fault52() {
+    // Derived world variant: the right handler replays ordinal 900/900 after
+    // the closeout already consumed it (emulate a stale emitter).
+    let marker = "  sfx_play(1, 0.5)";
+    // The receivers are per-leaf copies: target the SECOND occurrence (the
+    // right handler) so the stale emit fires on the tick-6 event.
+    let idx = NOTIFY_WORLD
+        .find(marker)
+        .map(|first| first + 1)
+        .and_then(|from| NOTIFY_WORLD[from..].find(marker).map(|m| from + m))
+        .expect("right sfx marker (second copy)");
+    let variant = format!(
+        "{}
+  let _stale = ag_audio_emit(1, 1, 1.0);{}",
+        &NOTIFY_WORLD[..idx + marker.len()],
+        &NOTIFY_WORLD[idx + marker.len()..]
+    );
+    let s = &mut session(&variant, "t05-replay.at", 1, 3, 2);
+    for t in 1..=5 {
+        assert_eq!(tick(s, t), 0, "tick {t}");
+    }
+    // Tick 6: the right handler runs; the stale standalone emit replays
+    // ordinal 1 (already consumed by the tick-3 closeout) -> fault 52.
+    let st = tick(s, 6);
+    assert_eq!(st, 52, "stale ordinal replay is the named fault 52");
+}
