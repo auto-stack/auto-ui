@@ -4,7 +4,7 @@
 
 ## 本次补记：已交付能力与新规划
 
-截至024/025规划核验，020组件16ddfa0、021查询1bec52f、023有限game32d7a81均已实际交付；022按owner记录复审/合入，AG006固定023与AG009固定021在途，实际进度看各owner记录。当前仍6/21。023真实支持固定game2d收集例，不等于全部通用Node音画接口；[新阶段设计](node3d-foundation-and-generic-presentation.md)明确[024 3D基础](../../plans/024-autographics-node3d-foundation.md)与[025通用声音/HUD](../../plans/025-autographics-node-presentation-services.md)各drafting0/10，保原预算和验收，不改AG006依赖/接管其实施。
+当前020/021/022/023/024均实际交付；AG006交付e574b58、AG009交付062081d并归档清理，AG010 executing且唯一树在途。Gallery当前9/22（原21迁8＋新增HUD1），剩13。025通用服务在途，不自动重开006的023有限game内容。新增[UI027与AG011设计](node3d-runtime-and-gallery-migration.md)仅规划3D角色/运行相机/原内置模型透传和G02/G03-3d迁移，原预算/验收保持，不接管在途工作。下方首次拆分状态/计数仅为历史输入，不是当前现场。
 
 ## 首次规划时的现场与能力审计（历史快照）
 
@@ -26,8 +26,8 @@
 | 仓/计划 | 范围 | 实施硬前置 | 首次规划时状态 |
 |---|---|---|---|
 | [UI023](../../plans/archived/023-autographics-node2d-audio-and-hud.md) | 二维Node bank/cue/font/HUD槽、必要ASCII、快照/typed触发与一次呈现收口；复用012/013 | 020实际交付、013已交付 | drafting r1，0/10 |
-| [AG006 r2](../../../../ag-examples/docs/plans/006-autographics-gallery-event-hud.md) | 原G12b三收集/胜败/音效/HUD，新作者形式；原audio同项迁移/保八旧oracle/完整双入口包 | UI023实际交付、AG005/008已交付 | drafting r2，0/10 |
-| [AG009](../../../../ag-examples/docs/plans/009-autographics-gallery-node2d-queries.md) | G05/2d segment/sweep/changed、九旧义务/14阶段与完整混合维度包 | UI021实际交付、AG008已交付 | drafting r1，0/10 |
+| [AG006 r2](../../../../ag-examples/docs/plans/archived/006-autographics-gallery-event-hud.md) | 原G12b三收集/胜败/音效/HUD，新作者形式；原audio同项迁移/保八旧oracle/完整双入口包 | UI023实际交付、AG005/008已交付 | drafting r2，0/10 |
+| [AG009](../../../../ag-examples/docs/plans/archived/009-autographics-gallery-node2d-queries.md) | G05/2d segment/sweep/changed、九旧义务/14阶段与完整混合维度包 | UI021实际交付、AG008已交付 | drafting r1，0/10 |
 | [AG010](../../../../ag-examples/docs/plans/010-autographics-gallery-node2d-sprites-and-frame-animation.md) | G09 atlas/character与main/alt、原图/局部状态/18旧oracle/完整包 | UI022实际交付、AG008已交付 | drafting r1，0/10 |
 
 020交付后，021/022/023没有相互功能依赖；各自独立模块可并行，shared AST/load/translate/CLI接线必须owner短窗顺序进行，不能同树并发写。023当前只程序化图元＋无sprite的呈现(kind=-1)，G12原audio也无sprite/PNG，因此不强制等待022；将来需要sprite呈现写入另按真实022合同衔接，不能复制图像/帧实现。
@@ -44,7 +44,7 @@ Player自己的model/on持输入/速度/grounded，Coin自己的状态控制一�
 
 AG006原AC-01..08/T-01..10保留，r1历史在Git d88243c；r2增加普通Node和旧audio迁移义务，原玩法/四槽/资源/预算/主alt/离线/坏件恢复不降。旧audio与G09文件/锁/回执保历史，新活源src与generated分离；新source-build只适用于明确新模式，不改旧exact-binary锁容纳任意exe。内容仓不写引擎，所有新接口和测试均尚未实现。
 
-## 迁移计数与知识归属
+## 迁移计数与知识归属（首次规划快照；当前数见补记）
 
 AG009迁移现有一个入口，AG010迁移现有两个，均净增0。AG006迁移现有g12/audio并新增g12/hud一个；HUD原本不在21分母，不把新增混称旧入口迁移。每次实际合入再按现场更新原21项迁移账和当前库存；目前仍6/21，不能记作这些计划已完成。全部新计划均有单独SD，本轮不直接修改canonical Specs；新引擎Spec归auto-ui、新内容消费Spec归ag-examples，旧auto-lang知识只读引用，派生JSON不写。
 

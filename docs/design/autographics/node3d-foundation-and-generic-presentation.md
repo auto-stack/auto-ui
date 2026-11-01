@@ -1,14 +1,18 @@
 # 3D Node基础与通用声音/HUD接线
 
-2026-11-01，设计v1；本轮仅规划，未实施。作者目标沿[声明与组件模型](declarative-authoring-model.md)，波次沿[Gallery迁移路线](gallery-node-authoring-migration.md)。本文件是正式架构/支持边界，不是临时探针或实现验收。
+2026-11-01，设计v1；保留024/025首次规划边界，当前状态以本次补记与各合同为准。作者目标沿[声明与组件模型](declarative-authoring-model.md)，波次沿[Gallery迁移路线](gallery-node-authoring-migration.md)。本文件是正式架构/支持边界，不是临时探针或实现验收。
 
-## 现场与两份合同
+## 当前交付与后继补记
+
+024已交付64166db并归档，025唯一ui-025树在途，任务计数看owner合同；006交付e574b58、009交付062081d，010在途。当前Gallery9/22（原21迁8＋新增HUD1），剩13，不再沿用下方首次规划的6/21现场数。[新阶段设计](node3d-runtime-and-gallery-migration.md)与UI027/AG011承接3D运行接线和G02/G03内容迁移，暂不实施。原G03使用Player/Mob，024圆柱层级夹具不证明几何等价；027补静态内置视觉透传，011整体必须等实际交付，不能换模型/放宽GLB。
+
+## 现场与两份合同（首次规划快照）
 
 本轮只读基线auto-ui0b6e74d；020组件16ddfa0、021查询1bec52f、023有限game32d7a81已经实际交付。022由其独立树完成复审/合入，进度以owner记录为准；AG006固定023、AG009固定021均已在途；不从旧导航drafting0/10推断未实施，也不接管它们。Gallery仍12逻辑项/21入口、已迁6/21，新合同不计完成。
 
 | 引擎计划 | 本期交付边界 | 硬前置 | 内容边界 |
 |---|---|---|---|
-| [024 3D声明/静态资源/组件基础](../../plans/024-autographics-node3d-foundation.md) | view-3d、有限三维图元/平色GLB、同维translation/visible层级、局部model/msg/on/use、纯场景和有状态模式 | 已交付020；复用现有3D渲染/资产/基础行为 | 为G02/G03/3d提供能力，不改项目/不分配内容号 |
+| [024 3D声明/静态资源/组件基础](../../plans/archived/024-autographics-node3d-foundation.md) | view-3d、有限三维图元/平色GLB、同维translation/visible层级、局部model/msg/on/use、纯场景和有状态模式 | 已交付020；复用现有3D渲染/资产/基础行为 | 为G02/G03/3d提供能力，不改项目/不分配内容号 |
 | [025 声音/HUD通用Node接线](../../plans/025-autographics-node-presentation-services.md) | 非游戏/游戏通用typed资源/槽/局部事件、四请求一次收口；业务全在作者Auto，无角色可用、连续移动/提前终点原额闭合 | 已交付020/023，底层012/013 | 不暗加AG006前置，不改其固定023；需要切版本由内容owner显式修订 |
 
 两份均drafting r1、0/10，可独立规划/实施准备；实际实施另待用户启动。没有彼此或022功能依赖。共享Node AST、load/translate、CLI/assembly的写入按owner短窗顺序接线，不复制子系统、不在同树并发写；重型GPU/音频/窗口门机器单实例，OS键鼠/焦点自动化继续暂停。各自target/consumer/报告独占。

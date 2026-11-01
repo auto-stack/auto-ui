@@ -22,16 +22,17 @@
 | 016 | [Node2D最小真实执行验证](archived/016-autographics-node2d-minimal-validation.md) | AG共同作者模型最小切片 | archived/r3；R1 needs_fix 11项→修复→同员R2 pass；交付932bd5f（实现9eb1d0e），gate全绿；SD node2d-pilot.md 沉淀本仓；清理回执见计划 |
 | 017 | [完整G11/2d Node作者能力](archived/017-autographics-g11-2d-node-authoring.md) | 016后继/原G11二维兼容 | archived/r1；R1 needs_fix 4项→修复→同员R2 pass；交付9a8a5be（bf02061 rebase，range-diff全等），T-08门全绿；SD node2d-g11-authoring.md 沉淀本仓；清理回执见计划 |
 | 018 | [Design52 D：UI编译配置收口](archived/018-ui-build-configuration-closure.md) | Design52 D；接受auto-lang/900与901交付 | archived/r1，8/8；R1 pass；交付968ac83（两轮rebase，range-diff 8处全等，ff-only零merge commit），canonical specs docs/specs/build/{ui-compilation-configuration,ui-test-selection}.md 在master；runtime语义等价+测试边界重构，无产品行为变更；014/007职责未并入；清理回执见计划 |
-| 019 | [Node2D场景层级与走跳相机](archived/019-autographics-node2d-scenes-character-camera.md) | Gallery新作者形式首波引擎 | archived/r1，10/10；交付c93adb7，独立R2通过/冻结门/两Spec与清理收据齐；AG008已合并8a01a34并固定消费019，Gallery迁移6/21 |
+| 019 | [Node2D场景层级与走跳相机](archived/019-autographics-node2d-scenes-character-camera.md) | Gallery新作者形式首波引擎 | archived/r1，10/10；交付c93adb7，独立R2通过/冻结门/两Spec与清理收据齐；AG008已合并8a01a34并固定消费019，Gallery交付时迁移6/21；当前总进度见设计路线 |
 | 020 | [有状态Node组件与局部事件](archived/020-autographics-stateful-node-components.md) | AG局部性共同基础 | archived/r1，10/10；R1 needs_fix 4项→修复（含R2/R3各1项）→受影响复核pass；交付16ddfa0（7提交rebase重写，range-diff 7/7全等），verifier 18组/flow 9/9/旧消费者门全绿；SD stateful-node-components.md 沉淀本仓；021/022/023硬等解除；清理回执见计划 |
 | 021 | [Node二维segment/sweep查询](archived/021-autographics-node2d-queries.md) | W2a/G05-2d引擎 | archived/r1，10/10；R1 needs_fix 4项→修复→同评审者受影响复核pass（P3文本项R2闭环）；交付1bec52f（8提交rebase重写，range-diff 7/7全等），verify021 20组5产品/flow 11/11/verify020 18组全绿；SD node2d-queries.md 沉淀本仓；AG009可消费；清理回执见计划 |
 | 022 | [Node精灵资源与帧动画](archived/022-autographics-node2d-sprites-and-frame-animation.md) | W2b/G09双入口引擎 | archived/r1，10/10；R1 needs_fix 5项→修复→同评审者re-review pass；交付2f45baa+c6aa63a（rebase over 023交付/024-025规划，受影响验证rebased态全绿：七verifier/flow 22行receipt/pilot 54/旧consumer 9/9），SD node2d-sprites-and-frame-animation.md sha f997bae6 沉淀本仓；原G09 18项oracle逐字全绿于sprites-2d链；清理回执见计划 |
 | 023 | [Node二维声音与公共HUD](archived/023-autographics-node2d-audio-and-hud.md) | AG006 r2作者能力前置 | archived/r1，10/10；R1 needs_fix 3项P2（6新告警+SD计数笔误）→修复d125b6d→同评审者复核pass；交付32d7a81（13提交rebase重写，range-diff 13/13全等），统一门全绿（pilot 44/driver 45/旧flow 35/verifier 10组）；SD node2d-audio-and-hud.md 沉淀本仓；AG006 T-01硬门解除；清理回执见计划 |
 | 024 | [3D声明/静态资源/组件基础](archived/024-autographics-node3d-foundation.md) | W3基础/G02与G03-3d引擎 | archived/r1，10/10；R1 needs_fix 4项（LICENSE常量/同名helper覆盖/投递负控/v-parent像素）→修复→同评审者re-review pass；交付64166db（rebase后range-diff全等，ff-only零merge commit），门禁= pilot 62/gates 8/driver flow 6/旧consumer 13+9+11+4/verify_plan024 29控制组/六冻结verifier全绿；SD node3d-foundation.md sha 9451cf0f 沉淀本仓；原G02五+G03/3d六义务逐项复验于新链；清理回执见计划 |
-| 025 | [声音/HUD通用Node接线收口](025-autographics-node-presentation-services.md) | 023有限game档的通用服务后继 | drafting/r1，0/10；020/023已交付，业务回作者on；无角色/连续输入/提前终点/四请求原额先证；旧023不变，不暗加AG006前置 |
+| 025 | [声音/HUD通用Node接线收口](025-autographics-node-presentation-services.md) | 023有限game档的通用服务后继 | drafting/r1，0/10；020/023已交付，已有ui-025唯一树在途，任务计数以owner合同为准；业务回作者on；无角色/连续输入/提前终点/四请求原额先证；旧023不变，不暗加AG006前置 |
 | 026 | [阅读引擎嵌入与定位回传探针](026-reader-engine-embedding-and-locator-probe.md) | auto-reader/READER-006、coverage v3 后继 | drafting/r1、0/10；本仓主导宿主/双端桥，Reader纯.at消费；现有选择/Rich/远程帧已静态核实，不等于DOM/CFI已可用；仅起草，暂不实施 |
+| 027 | [3D角色与运行相机Node接线](027-autographics-node3d-character-and-runtime-camera.md) | W3运行能力/G07与G08-3d引擎 | drafting/r1，0/10；020/024已交付，typed角色/相机＋原内置模型透传，保原32及24旧oracle，暂不实施 |
 
-024/025已分配，本次新增026；并行新计划的当前号源以`.next-id`为准，下一份以独占取号时本地活动/归档最大号重核（018分配后已有并行019，勿回退号源）；不能因外仓号882/883跳号。003是Blog路线，004..006是AG表现阶段，007是主题/示例工作包，014是拆分路线结构收口包，018是UI编译配置收口，026是Reader阅读表面跨仓探针；这些合同分别管理。状态以各自合同为准。设计与并行/后继入口见[本仓设计索引](../design/README.md)。
+024/025已分配，026为Reader路线，本轮AG新增027；并行新计划的当前号源以`.next-id`为准，下一份以独占取号时本地活动/归档最大号重核（018分配后已有并行019，勿回退号源）；不能因外仓号882/883跳号。003是Blog路线，004..006是AG表现阶段，007是主题/示例工作包，014是拆分路线结构收口包，018是UI编译配置收口，026是Reader阅读表面跨仓探针；这些合同分别管理。状态以各自合同为准。设计与并行/后继入口见[本仓设计索引](../design/README.md)。
 
 ## 债务/候选
 
