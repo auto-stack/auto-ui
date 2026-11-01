@@ -10,6 +10,7 @@ publish = false
 [workspace]
 
 [dependencies]
+iced = "=0.14.0"
 wry = "=0.57.0"
 tao = "=0.37.1"
 
