@@ -1,6 +1,6 @@
 ---
 plan_id: PLAN-027
-status: execution_done
+status: reviewed
 feature_name: AutoGraphics三维角色与运行相机Node接线
 author: [Codex]
 created_at: 2026-11-01
@@ -178,6 +178,10 @@ G08/3d十三项：`orbit_config_from_source`、`vp_identity_tick0`、`forward_an
 
 2026-11-02 / stage: work / plan_id: auto-ui/PLAN-027 / plan_revision: r1 / outcome: pass（execution_done） / worktree_path: D:/autostack/.wt/ui-027/auto-ui / branch: codex/plan-027-dev / base_commit: 8c1b916 / code_commit: 3530e81 / dependency_revisions: auto-lang 367258e7a只读、SDK681冻结、prototype GLB sha 05d8588e/8a82adb5 / task_ids: T-03,T-04,T-05,T-06（T-01/T-02由先到会话完成并验证，本会话核其证据与现状一致后沿用） / evidence: §8 T-01..T-06各行+三提交（3464582 dialect/降层/夹具/gates、a6b1f9d flow/重定界、3530e81 verifier/SD-01/生命周期）+scratch gen_fixtures.py（夹具生成器，可再生产物字节等值） / blockers: 无 / next_responsible_role: review
 
+2026-11-02 / stage: review / review_scope: final / reviewer_identity: 独立通用代理（与实现会话上下文隔离，未读执行摘要，全部结论自工件与自有重跑导出；scratch D:/autostack/plan-artifacts/plan-027/auto-ui/review/） / plan_id: auto-ui/PLAN-027 / plan_revision: r1 / outcome: needs_fix（F-R1-01..03，全低/nit）→ 修复后 R1 复审 pass / worktree_path: D:/autostack/.wt/ui-027/auto-ui / branch: codex/plan-027-dev / reviewed_commit: 3530e81 → 188c9486c41a15a3da563b5109acc796a6c84b49 / base_commit: 8c1b916 / dependency_revisions: auto-lang 367287e→367258e7a(master tip，锁零漂移)、SDK681 冻结、GLB 05d8588e/8a82adb5 复算一致 / spec_inputs: SD-01 候选 docs/specs/auto-graphics/node3d-character-and-runtime-camera.md（逐条量化主张复算通过，无需修正） / acceptance_results: AC-01 pass(gates 9/9+注入序/六动作/字节稳定断言核实)、AC-02 pass(flow 7/7 单线程，24 oracle 逐名+冻结数值)、AC-03 pass(9 具名拒绝锚点+CLI 复跑+形体/静态/root-only 域检)、AC-04 pass(fault 10/13/27/29/30 真实 Run、deep127 INIT 累计步门拒、wide128 128 行 2 solid 走步绿、Gallery 零触碰)、AC-05 pass(verify 024/020 PASS+pilot 13 targets 89 tests 0 fail)、AC-06 pass(verify_plan027 PASS 11 产品+冷A→B+变异+来源许可闭包)、AC-07 pass(本审：driver api/+src/ diff 为空=typed 语义零触碰、无新增 TODO/未实现、警告 F-R1-01..02 修复后归零、提交产物 CLI 再生字节等值) / pending_closeout_gates: AC-08/AC-09（merge 拥有）；统一回归门=定向兼容并集已由 T-06 实测（verify 016/017/019/020/021/022/024 全 PASS） / findings: F-R1-01(low/AC-07) pilot runtime 模块 unused NodeDecl import；F-R1-02(low/AC-07) driver flow 测试 unused import/const+4 needless mut；F-R1-03(nit/AC-06) verifier config_lines bind 硬编码 1→已改 len(binds)；F-R1-04(nit) §8 T-01 行 SHA 文字映射对调（translate.rs=0d55c1e5 / lower_components3d.rs=f23bcf78），merge 折叠时更正；F-R1-05(nit) 双会话回执轮号伪重复（D-05 历史，无需更正）；F-R1-06(nit/观察) 无"作者 Life.Start 非空+character3d"正向夹具（verifier 已钉 bind→solids→camera 序，非合同缺口，可选加固） / evidence: review/r1_gates_run.log+r1_flow_run.log+verifiers_run.log / next: work（R1 修复）→ 已完成：188c948 修复 F-R1-01..03（pilot 0 新警告、gates 9/9、flow 7/7、verify_plan027 PASS 复验），R1 复审 pass 绑定 188c948；status=reviewed，next merge（T-08）
+
+2026-11-02 / stage: goal / plan_id: auto-ui/PLAN-027 / plan_revision: r1 / round: 12 / from: review / to: merge / status: reviewed(6/10) / outcome: pass / worktree: D:/autostack/.wt/ui-027/auto-ui / commit: 188c948 / next: merge（T-08..T-10；F-R1-04 SHA 文字映射更正归 T-09 折叠）
+
 2026-11-02 / stage: goal / plan_id: auto-ui/PLAN-027 / plan_revision: r1 / round: 11 / from: work / to: review / status: execution_done(6/10) / outcome: pass / worktree: D:/autostack/.wt/ui-027/auto-ui / commit: 3530e81 / next: review（T-07 独立final；统一回归门pending归review/merge按workflow；merge门pending）
 
 2026-11-02 / stage: goal / plan_id: auto-ui/PLAN-027 / plan_revision: r1 / round: 9 / from: blocked / to: blocked / status: executing(2/10) / outcome: blocked / worktree: D:/autostack/.wt/ui-027/auto-ui / commit: 3464582 / blockers: D-05未答复 / evidence: 对方继续T-04 flow测试编写（node3d_runtime_flow.rs 01:22后有写入），无新提交 / next: user（A/B）
@@ -185,6 +189,10 @@ G08/3d十三项：`orbit_config_from_source`、`vp_identity_tick0`、`forward_an
 2026-11-02 / stage: goal / plan_id: auto-ui/PLAN-027 / plan_revision: r1 / round: 10 / from: blocked / to: blocked / status: executing(2/10) / outcome: blocked / worktree: D:/autostack/.wt/ui-027/auto-ui / commit: 3464582 / blockers: D-05未答复 / evidence: 对方T-04进入编译测试（node3d_runtime_flow fingerprint 01:26后刷新），未提交26项 / next: user（A/B）
 
 2026-11-02 / stage: goal / plan_id: auto-ui/PLAN-027 / plan_revision: r1 / round: 11 / from: blocked / to: blocked / status: executing(2/10本会话口径；对方已过T-03/T-04) / outcome: blocked / worktree: D:/autostack/.wt/ui-027/auto-ui / commit: a6b1f9d（T-04 node3d_runtime_flow 743行：24 oracle逐一走authoring链+V-S03拒绝族+V-S04事件簇+V-S05内置上传保真；wide128按实测包络重划：128文档行=2 registered solids+125非solid柱，127 registered solids为保留超限负控；自称flow 6/6+pilot 13档绿，待独立复核） / blockers: D-05未答复；树已清零提交、对方已开T-05（tools/verify_plan027.py 01:38:58出现） / next: user（A/B）；本会话零写零构建
+
+2026-11-02 / stage: goal / plan_id: auto-ui/PLAN-027 / plan_revision: r1 / round: 12 / from: blocked / to: monitoring-review / status: execution_done(6/10) / outcome: pass（D-05事实消解） / worktree: D:/autostack/.wt/ui-027/auto-ui / commit: 3530e81（T-05/T-06）+master e1bff5d（对方goal回执） / blockers: 无（对方work回执明示"T-01/T-02由先到会话完成并验证…沿用"，两会话无冲突分区成立） / evidence: §9 work回执execution_done+next_responsible_role=review；status字段=execution_done / next: review（T-07由对方循环同树顺序执行，本会话保持只读监视至merge/archived后核验完成条件）
+
+2026-11-02 / stage: goal / plan_id: auto-ui/PLAN-027 / plan_revision: r1 / round: 13 / from: monitoring-review / to: monitoring-review / status: execution_done(6/10，R1已回3 finding并修复) / outcome: monitoring / worktree: D:/autostack/.wt/ui-027/auto-ui / commit: 188c948（R1修复F-R1-01..03：diff引入告警清零、verifier bind计数诚实化） / blockers: 无（对方活跃，无停滞） / next: 对方R2复审→merge；本会话只读
 
 2026-11-01规划静态预检：两合同0..10节、各10任务/9AC/6补充验证/1SD、work/review/merge归属、drafting0/10、独占取号后本地ID唯一且依赖无环；新增/修改48个本地链接可解析。原GYB24名逐字各保留一次，G02/G03十一原义务逐项展开，源/模型实际SHA复核一致。实际元数据新作者入口为9/22（原21迁8＋新增HUD1），`python tools/gallery.py validate --all` PASS 12逻辑项/22入口，许可一致。仅静态规划/目录检查，不是新链实现/可行性go/独立final；未运行构建、GPU或OS自动化，未创建实施树/源码/资源/提案Spec。auto-ui/026由并行Reader路线先占，本轮重新独占取027；内容独占取011；各下一号以当前.next-id重核，不覆盖他线。
 
