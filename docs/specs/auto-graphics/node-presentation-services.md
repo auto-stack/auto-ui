@@ -1,6 +1,6 @@
 # node-presentation-services
 
-状态：提案（PLAN-025 SD-01 准备稿；canonical 化归 merge 门）。本文描述
+状态：canonical（PLAN-025 SD-01 交付；023 固定收集游戏档原样保留）。本文描述
 PLAN-025 交付后 auto-graphics 的通用二维 Node 声音/HUD 接线服务面，替代
 「023 固定收集游戏作者档」作为后续内容消费的唯一通用入口；023 的
 components-2d-game 档与其冻结产物、价格、负控原样保留，不受本服务影响。
