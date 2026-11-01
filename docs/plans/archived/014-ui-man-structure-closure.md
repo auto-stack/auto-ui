@@ -1,6 +1,6 @@
 ---
 plan_id: PLAN-014
-status: reviewed
+status: archived
 feature_name: UI/Man内部结构收口（保持行为与既有crate粒度）
 author: [Codex]
 created_at: 2026-10-30
@@ -10,13 +10,13 @@ supersedes_spec_components: [docs/specs/README.md]
 new_spec_components: [docs/specs/ui/structure-closure.md, docs/specs/ui/structure-test-map.md]
 touched_goals: []
 affects: [auto-ui-compiler, auto-ui-runtime, auto-ui-tools, auto-man-cli, repository-boundaries]
-current_step: 10
+current_step: 11
 total_steps: 11
 ---
 
 # [auto-ui/PLAN-014] UI/Man内部结构收口
 
-> r2 / reviewed / 10/11（2026-11-01）。实施授权=2026-11-01用户goal：先推进T-01/T-02及Man CLI（T-03），再做Vue（T-04）；共享接口改动、renderer/GPU验证和最终合入安排短窗串行；不把020完整交付作为014全局前置。T-03..T-06已交付（Man 5b310f0；UI组树7a183c6/90e0c44/fcece7a；901 consumer漂移随T-03修复）；T-07完成四面闭包核对+V-12守恒账（发现并修复T-05漏切的38个memo测试，修复后日常2196/2196、守恒172=172）+TrackCtx终局登记（7文件29签名，退出本Plan范围，登记007接续）。
+> r2 / archived / 11/11（2026-11-01）。实施授权=2026-11-01用户goal：先推进T-01/T-02及Man CLI（T-03），再做Vue（T-04）；共享接口改动、renderer/GPU验证和最终合入安排短窗串行；不把020完整交付作为014全局前置。T-03..T-06已交付（Man 5b310f0；UI组树7a183c6/90e0c44/fcece7a；901 consumer漂移随T-03修复）；T-07完成四面闭包核对+V-12守恒账（发现并修复T-05漏切的38个memo测试，修复后日常2196/2196、守恒172=172）+TrackCtx终局登记（7文件29签名，退出本Plan范围，登记007接续）。
 > 唯一主责auto-ui；Man参与CLI结构，语言/Web只接受稳定公开依赖及必要消费/规范指针。890、900、901、018均已有归档交付记录；本计划保留其实际支持边界，不重做迁移、feature拍平或发行闭包补全。
 > 设计：[UI/Man结构边界](../design/autoui/ui-man-structure-closure.md)。该设计r1的U890等待/旧feature与证据条款由本计划r2更新，四面目标保持；总路线v20仅历史，不覆盖本次实物核查。
 
@@ -205,6 +205,7 @@ work/review只做命名反例/模块/fixture及必要`cargo check -p auto-ui-com
 | [✅ T-08] | work / T-07 | 既有CLI/工具/公开package-runtime/生成发行consumer及固定legacy app，从新组合真实Vue/VM/GPU交互与owned退出重开；fresh/locked/A→B和失败恢复再消费 | AC-09；V-03/09/10/13，定位指纹/产物与实际工具来源 |
 | [✅ T-09] | work / T-08 | 四面/全部work AC与V自检、健康/遗漏/SD-01..06 proposal、X回交和UI007接续矩阵冻结；独立审查入口齐后execution_done9/11 | AC-10；V-14及AC-01..09证据读回；不提前合入/沉淀或跑最终整档 |
 | [✅ T-10] | review / T-09 | 同组冻结SHA独立final review所有work AC/V/SD与遗漏/延后/workaround；finding回同树work修复再审。pass后reviewed10/11，最终门仍pending | AC-11；auto-plan-review，独立来源重建 |
+| [✅ T-11] | merge / T-10 | 重新冻结各提交/依赖，按实际修改仓统一最终门、必要固定组合认证；按依赖顺序真实合入，UI主规范/Man CLI规范/语言指针canonical沉淀（不写specs.json、索引由应用派生）；主Plan归`archived/`，逐树fresh guard clean后安全移除，统一scope及全部实际输出路径核对/删除、最终读回与007交接 | AC-12；auto-plan-merge，实际来源/版本/规范/档位/归档guard；不假设跨Git原子合并 |
 | T-04 | work / T-03 | UI compiler `ui_gen/vue.rs`→按template/script/style/import/library/store等具名主题模块（具体新路径T-02冻结）；移除旧正文/重复算法，保公开入口/单state/reset/010 | AC-03；V-04/05 |
 | T-05 | work / T-04 | runtime `ui/aura_view_builder.rs`及必要既有相邻模块按节点/绑定/构建/跟踪职责提取；单VmBridge/Bindings/slot/path与guard，旧实现退出 | AC-04；V-06及定向状态控制 |
 | T-06 | work / T-05 | runtime `ui/iced/renderer.rs`按已冻结消息/状态/资源owner整理更新/订阅/view、图标部件、纹理/快照与宿主边界；保实际调用、资源终态/帧/active | AC-05/06；V-07/08/10，真实GPU定向，不以只移动代码关闭 |
@@ -342,6 +343,10 @@ stage: review | review_scope: final | reviewer_identity/limitations: 本会话�
 ### 901 consumer漂移登记（2026-11-01，已在本Plan内修复）
 
 master auto-man（cbbe657，clean）对 auto-lang b1a4871a 解析失败：`with-file-history = ["auto-lang-core/with-file-history"]` 死转发feature残留（901退出该feature时未清扫Man侧consumer），根workspace与core workspace均不可编译，主检出target/debug/auto.exe为旧产物。本轮在T-03提交5b310f0内删除两行别名并刷新双lock；主检出auto-man本仓文件未触碰（该修复仅入014 worktree，随本Plan合入回master）。
+
+### T-11 merge 收据（2026-11-01，archived 11/11）
+
+stage: merge | plan_id: auto-ui/PLAN-014:r2 | outcome: **pass（archived 11/11）** | 交付提交（rebase后）: auto-ui master **d66627a**（旧→新映射 7a183c6→71e8285/90e0c44→07871fb/fcece7a→5cd1cbc/570c147→18d8c5e/c3f5833→865f322/c9d9e3e→a0ff2f9/c514307→d66627a，range-diff全等×2轮）/ auto-man master **1eeac78**（5b310f0→21221a4含Cargo.toml冲突解决——保留本Plan删别名形态supersede fix-cli-stale-feat的不完整版（auto-core侧）、d77ffc0→54d9a9f/85217fc→1eeac78，2/3全等）/ auto-lang master **d5cfc79c1**（SD-05/06新增提交） | 统一最终门（rebase后冻结tip实测）: UI t **2960/2960**（+union树主检出复跑2960/2960）、tu **866/0**、ti **28/28**（15既有skip）；Man t **283/283**（4既有skip）、tcore **24/24**（1skip）、tc **254/254**（4skip）、ti **43/43**；语言仓零Rust改动→不触发根整档（合同§6） | 门期缺陷修复: c514307→d66627a devtools两helper显式重导出（workspace特一化后plan739经renderer::导入E0603；-p验证面未覆盖，受影响复审=编译+该ui_tests面） | canonical_verified: auto-ui d66627a docs/specs/ui/structure-closure.md=a5dba7bc48d44742…/structure-test-map.md=8c58b74bd71aa53c…+README注册；auto-man 1eeac78 docs/specs/cli/structure-closure.md=8fcf2e7659eb7911…；auto-lang d5cfc79c1 docs/specs/repository-boundaries/ui-man-structure-closure.md=90e5c3d744a88690…+四project.md指针 | 归档: docs/plans/archived/014-ui-man-structure-closure.md（git mv，status:archived，11/11） | landing-check观察（非部署授权）: 用户桌面运行中的auto/工具二进制与生成产物不在本Plan授权内升级——主检出target为构建中间产物随仓库现状；已装安装（若有）陈旧性由用户/后续会话按需重建重启 | 清理: 随后执行（wt-guard×5→树/分支/组目录→plan-artifacts/plan-014删除+registry刷新；无named holds——全部findings已修或登记为007接续候选） | 批回归due: plan 14非5倍数，另查receipt
 
 ## 10. 待澄清事项
 
