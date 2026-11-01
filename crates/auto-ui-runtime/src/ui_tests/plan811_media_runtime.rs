@@ -50,7 +50,16 @@ fn media_consumers_have_no_ui_path_references() {
             && !back_proxy_rs.contains("ui::image_pipeline"),
         "back_proxy.rs 不得再含 ui:: 媒体直引形态（PLAN-811 剪断）"
     );
-    let renderer_rs = include_str!("../ui/iced/renderer.rs");
+    // PLAN-014 T-06：renderer.rs 拆分为 renderer/ 目录后，源内容守卫随 owner 扫描全部家族文件；断言本体（禁止 crate::ui::image_pipeline 直引）零改。
+    let renderer_rs = include_str!("../ui/iced/renderer/mod.rs")
+        .to_string()
+        + include_str!("../ui/iced/renderer/style_widgets.rs")
+        + include_str!("../ui/iced/renderer/media.rs")
+        + include_str!("../ui/iced/renderer/projection.rs")
+        + include_str!("../ui/iced/renderer/host.rs")
+        + include_str!("../ui/iced/renderer/subscriptions.rs")
+        + include_str!("../ui/iced/renderer/shell_state.rs")
+        + include_str!("../ui/iced/renderer/devtools.rs");
     assert!(
         !renderer_rs.contains("crate::ui::image_pipeline"),
         "renderer 媒体钩子（纹理键/代次唤醒/notify 状态）直调 core；\
