@@ -1,0 +1,17 @@
+[package]
+name = "reader-engine-probe"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# PLAN-026 T-00 候选B（原生宿主）最小接缝证据：本机 WebView2 能否由 wry
+# 拉起并完成 JS→Rust IPC 回传。独立 workspace，不进生产 members；仅服务
+# 本计划的样本/协议验证，不是第二套生产 app。
+[workspace]
+
+[dependencies]
+wry = "=0.57.0"
+tao = "=0.37.1"
+
+[profile.release]
+debug = false
