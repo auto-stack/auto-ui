@@ -21,6 +21,10 @@ pub enum Node2DStmt {
 /// 一个 node 定义：同作用域的参数、model 实例状态、匿名 msg 事件、
 /// view-2d 呈现与 Life/业务事件处理。`game2d` 块（PLAN-023）仅 root
 /// node 携带、仅 components-2d-game profile 消费。
+///
+/// PLAN-024：`view3d` 是本片新增的单一三维出口（`view-3d { ... }`）；
+/// 同一 node 携带 view-2d 与 view-3d 属多呈现混合，解析面具名拒绝
+/// （"单一 view 出口"，嵌入/选择不在本片）。
 #[derive(Debug, Clone)]
 pub struct NodeDecl {
     pub name: String,
@@ -28,6 +32,7 @@ pub struct NodeDecl {
     pub model: Option<ModelBlock>,
     pub msg: Option<MsgDecl>,
     pub view2d: Option<View2dBlock>,
+    pub view3d: Option<View3dBlock>,
     pub on: Option<OnBlock>,
     pub game2d: Option<super::game::Game2dBlock>,
     pub span: LightSpan,
@@ -72,6 +77,40 @@ pub enum View2dElement {
     If {
         cond: Expr,
         then: Vec<View2dElement>,
+    },
+}
+
+/// `view-3d { ... }`（PLAN-024）：本 node 实例的直属三维呈现。单一出口；
+/// 图元/静态模型/同维 group 只映射现有 Document 能力，动态面仅限
+/// translation/visible（Run 内 scale/yaw/pitch/材质/模型绑定不可变）。
+#[derive(Debug, Clone)]
+pub struct View3dBlock {
+    pub elements: Vec<View3dElement>,
+    pub span: LightSpan,
+}
+
+#[derive(Debug, Clone)]
+pub enum View3dElement {
+    /// `cylinder3d name { props }` —— 有限三维图元（现有 Cylinder 占位色
+    /// 规则；不发明 cube，不扩 PBR/纹理）。
+    Primitive { name: String, props: Vec<Prop> },
+    /// `model3d name { props }` —— 静态平色 GLB 叶；`model:` 绑定
+    /// `resources.<name>` 或 Model3D 参数（符号引用，名字不是 ID）。
+    Model { name: String, props: Vec<Prop> },
+    /// `group3d name { props children 混合块 }` —— 显式同维父组：
+    /// 仅逐层 f32 平移与祖先可见性 AND，无组旋转/缩放；Node 组合本身
+    /// 不隐式叠加 transform，parent 只由本元素决定。
+    Group {
+        name: String,
+        props: Vec<Prop>,
+        children: Vec<View3dElement>,
+    },
+    /// `NodeName instance_name { props }` —— 同定义多实例的实例化点
+    /// （其实例的 view-3d 并入同维场景）。
+    Instance {
+        node: String,
+        name: String,
+        props: Vec<Prop>,
     },
 }
 

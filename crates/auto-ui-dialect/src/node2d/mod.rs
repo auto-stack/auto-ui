@@ -11,7 +11,7 @@ pub mod parse;
 
 pub use ast::{
     EventPattern, Handler, Node2DStmt, NodeDecl, OnBlock, Prop, PropValue, View2dBlock,
-    View2dElement,
+    View2dElement, View3dBlock, View3dElement,
 };
 pub use game::{Game2dAudio, Game2dBlock, Game2dCue, Game2dHud, Game2dShape, Game2dSlot,
     Game2dText, Game2dTrigger, Game2dTriggerKind};

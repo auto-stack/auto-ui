@@ -14,7 +14,7 @@ use auto_parser_api::{CompilerSession, DomainDialect, DomainParseContext, Domain
 
 use super::ast::{
     EventPattern, Handler, Node2DStmt, NodeDecl, OnBlock, Prop, PropValue, View2dBlock,
-    View2dElement,
+    View2dElement, View3dBlock, View3dElement,
 };
 use crate::declarations::{parse_model_block, parse_msg_decl};
 
@@ -109,6 +109,7 @@ pub fn parse_node_decl(cx: &mut dyn DomainParseContext) -> AutoResult<NodeDecl> 
     let mut model = None;
     let mut msg = None;
     let mut view2d = None;
+    let mut view3d = None;
     let mut on = None;
     let mut game2d = None;
     loop {
@@ -116,16 +117,40 @@ pub fn parse_node_decl(cx: &mut dyn DomainParseContext) -> AutoResult<NodeDecl> 
         if cx.is_kind(TokenKind::RBrace) || cx.is_kind(TokenKind::EOF) {
             break;
         }
-        // view-2d 域标记：View + Sub + 数字 2（词法面见模块文档）。
+        // view 域标记分派（PLAN-024）：View + Sub + 数字 2/3。'2' 走冻结
+        // view-2d 文法（旧路径与旧诊断逐字不变），'3' 走 view-3d；其它
+        // 标记保持 view-2d 的既有具名拒绝。投机窥探用 checkpoint/restore
+        // 回滚游标。
         if cx.is_kind(TokenKind::View) {
-            if view2d.is_some() {
-                return Err(SyntaxError::Generic {
-                    message: "duplicate view-2d block in node".to_string(),
-                    span: pos_to_span(cx.cur_pos()),
+            let marker = {
+                let cp = cx.checkpoint();
+                cx.advance();
+                let m = match cx.expect(TokenKind::Sub) {
+                    Ok(()) => cx.cur_text().to_string(),
+                    Err(_) => String::new(),
+                };
+                cx.restore(cp)?;
+                m
+            };
+            if marker.starts_with('3') {
+                if view3d.is_some() {
+                    return Err(SyntaxError::Generic {
+                        message: "duplicate view-3d block in node".to_string(),
+                        span: pos_to_span(cx.cur_pos()),
+                    }
+                    .into());
                 }
-                .into());
+                view3d = Some(parse_view3d_block(cx)?);
+            } else {
+                if view2d.is_some() {
+                    return Err(SyntaxError::Generic {
+                        message: "duplicate view-2d block in node".to_string(),
+                        span: pos_to_span(cx.cur_pos()),
+                    }
+                    .into());
+                }
+                view2d = Some(parse_view2d_block(cx)?);
             }
-            view2d = Some(parse_view2d_block(cx)?);
             continue;
         }
         if cx.is_kind(TokenKind::On) {
@@ -198,12 +223,25 @@ pub fn parse_node_decl(cx: &mut dyn DomainParseContext) -> AutoResult<NodeDecl> 
     cx.expect(TokenKind::RBrace)?;
     cx.exit_scope();
 
+    // PLAN-024：单一 view 出口——同一 node 同时携带 view-2d 与 view-3d
+    // 属多呈现混合，不在本片（具名拒绝）。
+    if view2d.is_some() && view3d.is_some() {
+        return Err(SyntaxError::Generic {
+            message: format!(
+                "node '{name}' declares both view-2d and view-3d (single view exit per node)"
+            ),
+            span: pos_to_span(cx.cur_pos()),
+        }
+        .into());
+    }
+
     Ok(NodeDecl {
         name,
         params,
         model,
         msg,
         view2d,
+        view3d,
         on,
         game2d,
         span: super::ast::span_of(start),
@@ -238,6 +276,142 @@ fn parse_view2d_block(cx: &mut dyn DomainParseContext) -> AutoResult<View2dBlock
         elements,
         span: super::ast::span_of(start),
     })
+}
+
+/// `view-3d { element* }`（PLAN-024）：元素：cylinder3d/model3d/group3d/
+/// UpperCamel 实例化。复用共享 Core 表达式/prop 文法，不新增解释器。
+fn parse_view3d_block(cx: &mut dyn DomainParseContext) -> AutoResult<View3dBlock> {
+    let start = cx.cur_pos();
+    cx.advance(); // View
+    cx.expect(TokenKind::Sub)?;
+    let marker = cx.cur_text();
+    if !marker.starts_with('3') {
+        return Err(SyntaxError::Generic {
+            message: format!("view domain marker must be view-3d, got 'view-{marker}'"),
+            span: pos_to_span(cx.cur_pos()),
+        }
+        .into());
+    }
+    cx.advance();
+    cx.expect(TokenKind::LBrace)?;
+    let mut elements = Vec::new();
+    loop {
+        cx.skip_empty_lines();
+        if cx.is_kind(TokenKind::RBrace) || cx.is_kind(TokenKind::EOF) {
+            break;
+        }
+        elements.push(parse_view3d_element(cx)?);
+    }
+    cx.expect(TokenKind::RBrace)?;
+    Ok(View3dBlock {
+        elements,
+        span: super::ast::span_of(start),
+    })
+}
+
+fn parse_view3d_element(cx: &mut dyn DomainParseContext) -> AutoResult<View3dElement> {
+    let head = cx.cur_text();
+    if head.is_empty() {
+        return Err(SyntaxError::Generic {
+            message: "view-3d element expected".to_string(),
+            span: pos_to_span(cx.cur_pos()),
+        }
+        .into());
+    }
+    cx.advance();
+    let elem_name = cx.cur_text();
+    if elem_name.is_empty() {
+        return Err(SyntaxError::Generic {
+            message: "view-3d element name expected".to_string(),
+            span: pos_to_span(cx.cur_pos()),
+        }
+        .into());
+    }
+    cx.advance();
+    // `group3d name { props/children 混合块 }`：显式同维父组，先于通用
+    // props 分派（子元素递归走同一文法）。
+    if head == "group3d" {
+        let (props, children) = parse_group3d_block(cx)?;
+        return Ok(View3dElement::Group {
+            name: elem_name,
+            props,
+            children,
+        });
+    }
+    let props = parse_prop_block(cx)?;
+    Ok(match head.as_str() {
+        "cylinder3d" => View3dElement::Primitive {
+            name: elem_name,
+            props,
+        },
+        "model3d" => View3dElement::Model {
+            name: elem_name,
+            props,
+        },
+        other => {
+            // 约定：UpperCamelCase 头部 = 同定义实例化（组件实例语义）。
+            let first = other.chars().next().unwrap();
+            if !first.is_ascii_uppercase() {
+                return Err(SyntaxError::Generic {
+                    message: format!(
+                        "unknown view-3d element '{other}' (expected cylinder3d/model3d/group3d or a Node instance)"
+                    ),
+                    span: pos_to_span(cx.cur_pos()),
+                }
+                .into());
+            }
+            View3dElement::Instance {
+                node: other.to_string(),
+                name: elem_name,
+                props,
+            }
+        }
+    })
+}
+
+/// group3d 混合块：props（小写名行）与子元素按行交错；先 prop 后子元素
+/// 为推荐书写序，不强制。子元素头 = cylinder3d/model3d/group3d/UpperCamel。
+fn parse_group3d_block(
+    cx: &mut dyn DomainParseContext,
+) -> AutoResult<(Vec<Prop>, Vec<View3dElement>)> {
+    cx.expect(TokenKind::LBrace)?;
+    let mut props = Vec::new();
+    let mut children = Vec::new();
+    loop {
+        cx.skip_empty_lines();
+        if cx.is_kind(TokenKind::RBrace) || cx.is_kind(TokenKind::EOF) {
+            break;
+        }
+        let head = cx.cur_text();
+        if matches!(head.as_str(), "group3d" | "cylinder3d" | "model3d")
+            || head.chars().next().is_some_and(|c| c.is_ascii_uppercase())
+        {
+            children.push(parse_view3d_element(cx)?);
+            continue;
+        }
+        let start = cx.cur_pos();
+        let pname = cx.cur_text();
+        if pname.is_empty() {
+            return Err(SyntaxError::Generic {
+                message: "group3d property name expected".to_string(),
+                span: pos_to_span(cx.cur_pos()),
+            }
+            .into());
+        }
+        cx.advance();
+        cx.expect(TokenKind::Colon)?;
+        let value = parse_prop_value(cx)?;
+        props.push(Prop {
+            name: pname,
+            value,
+            span: super::ast::span_of(start),
+        });
+        if cx.is_kind(TokenKind::Comma) {
+            cx.advance();
+        }
+    }
+    cx.expect(TokenKind::RBrace)?;
+    Ok((props, children))
 }
 
 fn parse_view2d_element(cx: &mut dyn DomainParseContext) -> AutoResult<View2dElement> {
