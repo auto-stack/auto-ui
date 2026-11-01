@@ -185,6 +185,8 @@ T-02 冻结（实测后冻结，全部经真实链先证）：
 
 2026-11-01 / stage: merge（续）/ plan_id: auto-ui/PLAN-022:r1 / outcome: pass（archived+cleaned全核）/ archived: docs/plans/archived/022-autographics-node2d-sprites-and-frame-animation.md status:archived（本文件，git mv保留历史）/ cleaned: 三树fresh guard clean（见T-10行）→worktree remove×3→worktree list 0项→branch -d（was c6aa63a landed祖先）→组目录rmdir→plan-artifacts/plan-022删除→registry刷新（无具名未解决问题持有）/ 10任务10/10完成 / 完成核对: ①merge pass（re-review RE-VERDICT pass @ff8cd23内容=c6aa63a重base同content）②交付commit c6aa63a在master默认分支、ff无merge commit、线性史③canonical spec在案④归档+导航（README 022行archived）⑤树/分支/组/plan-artifacts清零⑥主检出遗留WIP均他会话簿记（Cargo.lock/attachments/012/autoui/007/024-025规划README行），本Plan零代码WIP / 报告: PLAN-022 r1 merge pass；delivery 2f45baa+c6aa63a；SD sha f997bae6…；archive docs/plans/archived/022-autographics-node2d-sprites-and-frame-animation.md；cleanup 0残留。
 
+2026-11-01 / stage: goal | plan_id: PLAN-022 | plan_revision: r1 | round: 4 | from: merge | to: done | status: archived | outcome: pass | worktree: 无（主检出；ui-022三树/分支codex/plan-022-dev/组目录/plan-artifacts-022已清零，worktree list 0项） | commit: 0830e26（归档簿记；交付=c6aa63a master tip，ff-only线性史；映射 98d5edb→2f45baa、ff8cd23→c6aa63a） | next: done / Done五项核对：①merge pass（RE-VERDICT pass内容同基线）+交付c6aa63a在master默认分支、ff无merge commit②canonical spec docs/specs/auto-graphics/node2d-sprites-and-frame-animation.md sha f997bae6… @c6aa63a在案（应用索引自动派生，未手写）③归档文件status:archived已提交（0830e26，git mv保留历史）④三树/分支/组/plan-artifacts清零实证⑤主检出遗留WIP均他会话簿记（Cargo.lock a2r-std/attachments/012/README他会话行/untracked autoui与007设计稿），本Plan零代码WIP；交付后观察=库/研究仓无驻留生产二进制交付面；批量回归due=auto-ui无.last-batch-regression.json（程序属auto-lang），022不适用。遗留观察（非本Plan门，不接管）：README 023行外他会话行在working tree未提交（024/025规划会话所有）。
+
 ## 10. 待澄清事项
 
 | ID | 事项 | owner/关闭动作 |
