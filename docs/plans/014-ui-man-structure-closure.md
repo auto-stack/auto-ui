@@ -10,7 +10,7 @@ supersedes_spec_components: [docs/specs/README.md]
 new_spec_components: [docs/specs/ui/structure-closure.md, docs/specs/ui/structure-test-map.md]
 touched_goals: []
 affects: [auto-ui-compiler, auto-ui-runtime, auto-ui-tools, auto-man-cli, repository-boundaries]
-current_step: 7
+current_step: 8
 total_steps: 11
 ---
 
@@ -202,6 +202,7 @@ work/review只做命名反例/模块/fixture及必要`cargo check -p auto-ui-com
 | [✅ T-05] | work / T-04 | runtime `ui/aura_view_builder.rs`及必要既有相邻模块按节点/绑定/构建/跟踪职责提取；单VmBridge/Bindings/slot/path与guard，旧实现退出 | AC-04；V-06及定向状态控制 |
 | [✅ T-06] | work / T-05 | runtime `ui/iced/renderer.rs`按已冻结消息/状态/资源owner整理更新/订阅/view、图标部件、纹理/快照与宿主边界；保实际调用、资源终态/帧/active | AC-05/06；V-07/08/10，真实GPU定向，不以只移动代码关闭 |
 | [✅ T-07] | work / T-06 | 四面API/依赖/feature/类型和源码发行清单核对，测试随owner迁移/外移并保旧新ID与原子义务；复用现有治理及必要小型结构回归，旧重复逻辑/未接线helper退出 | AC-07/08；V-11/12及对应V-05 |
+| [✅ T-08] | work / T-07 | 既有CLI/工具/公开package-runtime/生成发行consumer及固定legacy app，从新组合真实Vue/VM/GPU交互与owned退出重开；fresh/locked/A→B和失败恢复再消费 | AC-09；V-03/09/10/13，定位指纹/产物与实际工具来源 |
 | T-04 | work / T-03 | UI compiler `ui_gen/vue.rs`→按template/script/style/import/library/store等具名主题模块（具体新路径T-02冻结）；移除旧正文/重复算法，保公开入口/单state/reset/010 | AC-03；V-04/05 |
 | T-05 | work / T-04 | runtime `ui/aura_view_builder.rs`及必要既有相邻模块按节点/绑定/构建/跟踪职责提取；单VmBridge/Bindings/slot/path与guard，旧实现退出 | AC-04；V-06及定向状态控制 |
 | T-06 | work / T-05 | runtime `ui/iced/renderer.rs`按已冻结消息/状态/资源owner整理更新/订阅/view、图标部件、纹理/快照与宿主边界；保实际调用、资源终态/帧/active | AC-05/06；V-07/08/10，真实GPU定向，不以只移动代码关闭 |
@@ -283,6 +284,19 @@ stage: work | plan_id: auto-ui/PLAN-014 | plan_revision: 2 | outcome: pass | wor
 ### work轮3（2026-11-01，T-05）
 
 stage: work | plan_id: auto-ui/PLAN-014 | plan_revision: 2 | outcome: pass | worktree: D:/autostack/.wt/ui-014/auto-ui | branch: codex/plan-014-structure | base_commit: 7a183c6（master 10d04da祖先） | code_commit: 90e0c44 | dependency_revisions: lang b1a4871a / web ec9c4ba / down 7c4d5cb / man组树 5b310f0 | task_ids: T-05（含T-04警告修复） | evidence: §8.3执行记录 + 提交90e0c44（V-06 2158/2158，builder族126/126，mutation control过，拆分文件零新增警告） | blockers: 无（TrackCtx收敛缓期已登记§8.3） | next_responsible_role: work（T-06 renderer，开工按§4冻结细绑+重读master；与020共享面按短窗串行政策核对）
+### 8.6 执行记录（2026-11-01，work轮6：T-08）
+
+- **真实消费窗口全绿**。构建：`auto.exe`（Full，auto-man组树，exit 0）链接拆分后UI组兄弟树；auto-ui-tool已在组树构建。fixture与驱动全部位于`plan-artifacts/plan-014/auto-ui/{v09-fixture,v09_driver.py,v10_shot.py,v13_run.sh,v09-evidence/}`（§5.5 scope，不入仓）；验证器复用`auto-lang/.agents/skills/autoui-verifier/scripts/test_vm_mcp.py`的AutoUiMcpClient（冻结§5.4"不重写框架"）。
+- **V-09（AC-04..06/09）全过**：固定legacy小型交互fixture（widget内联msg/model/on；input onchange `$event.target.value`→store、button onclick→Inc）；`auto run -r vm`真实进程+AUTOUI_MCP_PORT→MCP快照活树发现input/button vnode；`autoui_type`输入"structure14"→**视图可见**（snapshot `value: "structure14"`）且**store读回一致**（`autoui_state` `typed: "structure14" (str)`）；press×2→**计数2视图可见**（`text "2"`节点）且读回`count: 2 (int)`；owned terminate退出验证；**关闭后重开**第二次run→就绪→type→读回一致（重开功能保持）。
+- **V-10（AC-05/09机制面）全过**：真实GPU窗口首帧/交互后帧截图（97,473B/97,598B，sha be94d559…/f3753f90…，**字节不同**）；屏证据交叉：initial帧显示"structure14"+计数2，after帧同布局计数3（第3次press）——状态/属性与屏幕证据一致；非headless/非空树/非静态首帧。
+- **V-13（AC-07）实质全过**：`auto gen`（真实工具进程）fresh（生成App.vue含A-marker，od+sha256+python+grep四重读回一致）/locked（源不变→**H1==H2=5b6a0cec**字节稳定）/A→B（源改→重生成含B）/**生成中断恢复**（删除生成文件→regen→**H4==H3=d7383278**精确恢复且再次可消费）。**观察（记录非门）**：生成产物被外涂改+源不变→工具跳过写（不自愈）——真实工具合同边界，预存在行为，与四面拆分无关。
+- **证据采集限制（如实登记）**：v13_run.sh内联`grep -F -q/-cF`与函数内python检查在同一字节内容上间歇误报（od/sha256逐字节证明内容正确的同一时刻）——交互式重复同命令即过；harness工具怪癖（ugrep 7.8.4非交互上下文），非交付物缺陷；V-13判定以**静止后多重独立读回（od/sha/python直读）**为准。证据：v09-evidence/{v10_initial.png,v10_after.png,v13_final.log,v09_snapshot_initial.txt}。
+- **无仓内代码改动**：本轮全为真实消费验证，worktree零diff；§5.5 scope证据在plan-artifacts。
+
+### work轮6（2026-11-01，T-08）
+
+stage: work | plan_id: auto-ui/PLAN-014 | plan_revision: 2 | outcome: pass | worktree: D:/autostack/.wt/ui-014/auto-ui（零diff）+ auto-man（构建产物） | branch: codex/plan-014-structure | base_commit: 570c147（master 7ecee00祖先） | code_commit: 无仓内改动（纯验证轮；worktree头=570c147） | dependency_revisions: lang b1a4871a / web ec9c4ba / down 7c4d5cb | task_ids: T-08 | evidence: §8.6 + plan-artifacts/plan-014/auto-ui/v09-evidence/{v10_initial.png,v10_after.png,v13_final.log} | blockers: 无 | next_responsible_role: work（T-09 自检+SD-01..06 proposal+007回交矩阵）
+
 ### work轮5（2026-11-01，T-07）
 
 stage: work | plan_id: auto-ui/PLAN-014 | plan_revision: 2 | outcome: pass（含V-12审计缺陷修复） | worktree: D:/autostack/.wt/ui-014/auto-ui | branch: codex/plan-014-structure | base_commit: fcece7a（master 4f90851祖先） | code_commit: 570c147 | dependency_revisions: lang b1a4871a / web ec9c4ba / down 7c4d5cb / man组树 5b310f0 | task_ids: T-07 | evidence: §8.5执行记录 + 提交570c147（V-11闭包全过；V-12守恒账：缺陷修复后 vue 329=329/aura 172=172/renderer 199=199/Man 8=8，日常2196/2196，builder族164/164） | blockers: 无（TrackCtx终局登记为007接续候选，见§8.5） | next_responsible_role: work（T-08 真实消费窗口：V-09真实Vue/VM交互+owned关闭重开、V-10真实GPU定向帧）
