@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-023
-status: executing
+status: archived
 feature_name: AutoGraphics二维Node声音与公共HUD作者能力
 author: [Codex]
 created_at: 2026-11-01
 updated_at: 2026-11-01
 plan_revision: 1
-current_step: 6
+current_step: 9
 total_steps: 10
 depends_on: [auto-ui/PLAN-020, auto-ui/PLAN-013]
 supersedes_spec_components: []
@@ -137,8 +137,8 @@ work自查→同一权威树独立上下文final review→merge冻结门，模�
 | T-05 | work | T-04 | 真实最坏预算/故障/生命周期/native/owner/必要旧兼容，V-04/05 | AC-04/05 | [x] 2026-11-01：两提交 62a499d（V-05预算battery t05_game_budget.rs 5/5，生成世界上重钉F-7：walk恰30——120绿/+2池边绿/+3恰t=1 fault10；全通关每tick绿完成win（latch 85/146/207/251、ordinals 1..5）；收集tick恰32——+1恰t=85 fault10并latch；naive不门控34→恰85 fault10（idle-turn门承重证实）；goal latch恰32——+1恰win tick 251 fault；hazard恰31——+1仍latch绿/+2恰152 fault；**F-7勘误**：pad-stay(count<3)实测33→coin-bind剥离变体恰t=248 fault10（F-7原行32与其自身F-6构成和33矛盾；该形状关卡内不可达：coin3 t=207<pad进入t=248）——勘误归T-06文本收口；VM envelope steps=11747/slices=15独立报告）+4fbc1e4（V-04宿主GPU battery t05_game_host.rs 7/7：全场景GPU渲染精确位置（actor离散oracle (2.0,0.502)+T-04调色板窗+HUD锚点字形簇）；GPU行走+收集（双向精确4u/s步进、coins收集即despawn、rows(1,cue0,0.5)/(2,cue0,0.5) Played）；Pause/Step/Stop生命周期（~85次Resume零fault31+ordinal1收集证明Start恰一次、paused probe-dispatch恰一中性tick、render-only零推进、single_step SuppressedByStep、step不耗ordinal、生成cue表mixer抑制：cue-bearing step包被抑制/无声/ordinal已花/resume无重播）；20轮stop/fresh全重建（count 0、ordinals归1、coins回位、包Run身份逐轮、全Played、文档hash常量、资源存活）；preaccept=派生unknown-cue-3变体（scene sha重指target/下）→mixer接受前具名fault 53、last-good HUD \"0\"/\"Playing\"保持、无新voice、精确恢复绿；postaccept=经交付的Mixer::output_fault钩子（native error-callback路径，真实设备Fault不可安全 inducible已文档）→run具名audio_fault、Run voices停、其后静音（已出PCM不可撤、无重播）、替换流绿且ordinals归1；native=真实默认设备消费生成closeout包（tick85/ord1/cue0/gain0.5：非零970帧、ring head 970/970对coin切片×0.5内1e-6、peak 0.218918、0 miss）——ToDesk Virtual Audio虚拟设备警告逐字记录为D-04声学维度常驻gap。诚实注记：生成游戏neutral single_step永不发cue，故cue-bearing抑制以生成cue表经交付mixer机制证明）。协调者亲跑5/5（55.8s）+7/7（71.0s）；world sha ed98b0b5不变；树仅t02探针未跟踪。scratch t05/（evidence/measurements/commands）。遗留T-06：F-7 pad-stay勘误文本、V-06收口纪律battery、GPU fail分支像素（可选）、D-04声学gap保持 | AC-04/05 |
 | T-06 | work | T-05 | source-build A→B/保存重开/坏件恢复、SD与handoff折Plan，V-06 | AC-01..06 | [x] 2026-11-01：提交5fa912c（t06_game_closeout.rs 1117行10测 + tools/verify_plan023.py 328行，零Cargo改动沿020独立python工具例）。verify_plan023 --controls=10控制组/1产品全PASS（协调者亲跑；--skip-driver亦绿）：身份链（world sha==scene绑定==identity）、closure manifest==files==live fixtures、provenance（5消费测试文件+include_str!+scripts/<sha>.at机制）、scene媒体合同、A→B仅closure/冷再生字节等值（B shas==A：world ed98b0b5不变复验、scene 152950f9、identity e51e6feb）、B真实CPU Run（settle 13/coins 85/146/207/win 251、ordinals 1..5）+保存/重开两次绿、变异敏感（c1 cx 8→9→world+scene+identity实变）、V-06收口纪律7案、损坏副本拒→恢复→绿、六坏件类。V-06 F-9七案全绿：单bundle/tick正（双收口变体→具名50；4 carrying ticks rows(1,0)(2,0)(3,0)(4,1)(5,1)）、混用ag_hud_set→57双序、文本界32绿/33→56/非ASCII→56、ordinals严格递增+stale变体恰t=146→52、>4 puts→51、cue越界→53恰t=85、gain域0.0/1.0绿→2.0/负→54恰t=85；诚实边界：非有限gain到不了54守卫（world计算→VM trap DivisionByZero、harness注入→session call gate nonfinite argument，均具名断言）。六坏件类各自具名拒绝→精确恢复→绿：source=\"behavior source closure identity\"(load)、font=\"hud_invalid: fixed font bytes\"、bank=\"audio_invalid: declared hash/length\"、license=\"hud_invalid: font license identity\"、record=byte_length漂移同load+重指sha→缺scripts/<sha>.at具名、runner=V1 session编译Undefined symbol: ag_action_pressed（Audio2V1编译过但在收口运行时调用断，observed status=38；Hud2V1全绿）。SD-01候选scratch t06/sd-01-candidate.md（204行，020体例，含F-7 pad-stay勘误33不可达、D-04声学gap逐字、VM envelope独立报告）。协调者亲跑10/10（35.2s）+verifier 10组；world sha不变；树仅t02探针未跟踪。scratch t06/ | AC-01..06 |
 | T-07 | review | T-06 | 同树独立final逐项复审，finding回work，pass后merge门pending | AC-07 | [ ] |
-| T-08 | merge | T-07 pass | 冻结实际提交/依赖/输入，定向门或有据复用后合master | AC-08 | [ ] |
-| T-09 | merge | T-08 | 沉淀新Spec/来源、归档导航与证据摘要，不写派生JSON | AC-08/09 | [ ] |
+| T-08 | merge | T-07 pass | 冻结实际提交/依赖/输入，定向门或有据复用后合master | AC-08 | [x] 2026-11-01：prepared=reviewed d125b6d+SD-01候选逐字节落docs/specs/auto-graphics/node2d-audio-and-hud.md（sha 0eeb158a与评审重hash一致）于worktree提交b853e0d（docs-only后裔，实现/依赖零变化）；master并发前进含本计划docs簿记（aa47313..46466d2）与021交付（145d414），rebase 13提交→range-diff 13/13全等（8fd7d00→60f2731、7914204→9b9e0ab、b3610ca→14ba185、9995a76→02b4a81、0d61afd→82236e3、4175ce9→1ee16ee、c037312→ee2bbf5、2b1b99e→419f201、62a499d→3334226、4fbc1e4→8451261、5fa912c→6ebb0f8、d125b6d→5f1b80c、b853e0d→32d7a81）；统一定向门在交付tip 32d7a81亲跑全绿：pilot 44（9+10+9+3+6+7）、driver t03 4/t04play 7/t04media 2/t05budget 5/t05host 7/t06 10/旧flow g11 15+components 9+queries 11、verify_plan023 --controls 10组；主检出 git merge --ff-only codex/plan-023-dev → master tip=32d7a81（无merge commit），canonical spec@master sha 0eeb158a复验 | AC-08 |
+| T-09 | merge | T-08 | 沉淀新Spec/来源、归档导航与证据摘要，不写派生JSON | AC-08/09 | [x] 2026-11-01：SD-01 canonical落地于交付32d7a81（0eeb158a，逐字=评审绑定候选）；归档导航：docs/plans/README.md registry 023行→archived/r1 10/10+交付/门/勘误摘要；计划移docs/plans/archived/且status:archived；证据摘要已折§8/§9（scratch删除见T-10）；零派生JSON/零ledger写 | AC-08/09 |
 | T-10 | merge | T-09 | fresh guard清树分支空组、路径全对账/删scope/登记与最终计数 | AC-09 | [ ] |
 
 ## 9. 复审记录
