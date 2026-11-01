@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-01
 updated_at: 2026-11-02
 plan_revision: 1
-current_step: 2
+current_step: 3
 total_steps: 10
 base_branch: master
 base_commit: 98cbcd2e79ebc61b0683886f24f0747b20d72617
@@ -193,7 +193,7 @@ AC-02～06 的成功语义是**路线go门**，不是允许跳过的产品验收
 |---|---|---|---|---|---|
 | T-00 | work | 后续明确启动 | UI指定树+Reader独立clone核身份/WIP/007与025共享窗口；实查已有接口、固定工具/引擎，最多两接法比较，冻结消息/预算/deadline/测试选择于报告与合同 | 两仓git status/rev-parse、CLI/tool hash、源码入口与拟测试非零清单；不覆盖现有未跟踪设计，不建链接；依赖未知项先闭合 | AC-01；[x] 2026-11-02：树`.wt/ui-026/auto-ui`@codex/plan-026-dev(base 8c1b916=master头，含025落干)建；reader 9b0d513净(基线bf5d744+1指针)；readest v0.12.16@3cc39ad7+foliate-js@3d79419子模块逐字核；工具auto.exe hash 390e664e(plan-890面)；§4六项钉定哈希全复算一致；候选A启动证据=reader vue profile隔离数据真启动(17825后端books[]/17824前端200，实例已停)；候选B启动证据=experiments/reader-engine-probe wry0.57+WebView2 156真窗口JS→Rust IPC回传exit=0；契约冻结于plan-artifacts/plan-026/auto-ui/t00-report.md(消息schema v1/预算deadline/端口/测试选择/cohort)；主检未跟踪docs/design/autoui保留未纳入 |
 | T-01 | work | T-00 | 新增两本合成EPUB与独立原文/出现序oracle、跨书/畸形/超额/错锚反例；建立实验driver骨架和数据profile | 语料来源/指纹与预期第2处原句可独立重算；V-01～10输入/入口可复演，不把拟用例标已执行 | AC-01/05；[x] 2026-11-02：reader tests/probe/engine_surface/新增gen_corpus.py+corpus_oracle.py(独立重读EPUB重算)+corpus_profile.py(契约机器可读)+verify_engine_surface.py(T-01骨架)；语料alpha 4904B/beta 4693B(≤1MiB)+截断/2MiB超额负例；oracle自检9/9 PASS(重复句计数3/2/3、第2处=ch1 para7、跨书零命中、错字quote拒绝、occurrence越界拒绝、PNG角像素(178,60,20)/(30,60,200)、BadZipFile/超额识别)；oracle区分力实证=首跑抓出beta计数4真缺陷修复后3；V-01..10注册not_run，exit=3诚实未完成态；运行记录plan-artifacts/plan-026/auto-reader/t01-skel |
-| T-02 | work | T-01 | UI experiments/reader-engine-probe与最小必要compiler/tools接缝；Vue装载/资源/事件派发正向试验 | Vue真实表面与引擎身份、V-01/02运行；不改生成物，实际失败有最小对照和责任阶段 | AC-02/03 |
+| T-02 | work | T-01 | UI experiments/reader-engine-probe与最小必要compiler/tools接缝；Vue装载/资源/事件派发正向试验 | Vue真实表面与引擎身份、V-01/02运行；不改生成物，实际失败有最小对照和责任阶段 | AC-02/03；[x] 2026-11-02：引擎固定资产=foliate-js@3d79419受管副本(plan-artifacts/plan-026/engine-assets，vendor扁平化重写只读fork)；reader新增隔离消费app(tests/probe/engine_surface/app：.at消费handler+probe.at remote-frame接缝页，0e422f5/9622387)；vue全绿21/21：reader真实导入sha256身份→注册→生成Vue页[data-remote-frame]内挂foliate-view(176ms)→真图96x64→脚注可见→Playwright真实鼠标拖选→引擎CFI epubcfi(/6/2!/4/18,/1:34,/1:61)→.at accepted→oracle出现位次吻合(ch1 para7,occ=2,全书3)→sidecar HTTP+磁盘双读回；V-03冷重启goTo恢复PASS；V-06四负控+零落盘PASS；V-07未注册404/逃逸404 PASS；不改生成物(胶水同源动态import，零gen/改动)；失败均最小对照+修复(E5501门/file_size绑定移位/3操作数拼接截断/多字节find+1 panic/订阅时序缺口) |
 | T-03 | work | T-02接口、T-00原生接法 | UI runtime/iced最小原生宿主实验与事件接缝；焦点/IME/几何/系统无障碍试验 | 原生窗口/父子表面/布局关系与V-01/04/05实际结果；不能拿Vue通过代替原生 | AC-02/03 |
 | T-04 | work | T-02/03可消费边界 | Reader tests/probe/engine_surface纯.at消费、独立sidecar与verify_engine_surface.py；闭合选区→保存→重开；或记录阻断此链的已复现边界 | 两profile未来入口均可给实际结果与因果；V-02/03/09逐字/身份/出现序oracle；不写当前数据schema，失败不包装成功 | AC-04 |
 | T-05 | work | T-04结果 | 两仓运行V-01～10受影响路径、负控、生命周期与旧Reader门；记录不具备前置的未运行项 | `python tests/probe/verify_engine_surface.py --profile vue|vm ...`应由T-01/04建立；正常结果与负例退出码可区分、原生/资源/旧数据保护实证；本仓冻结cargo选择仅跑一次所需面 | AC-03～06 |
@@ -210,6 +210,12 @@ AC-02～06 的成功语义是**路线go门**，不是允许跳过的产品验收
 - 新增 T-00～09、AC-01～10、V-01～10、SD-01；current_step=0/10。已有能力核查为静态源码/规范观察，不是探针PASS/route go或独立review。
 - 计划号在本仓主检出独占锁下扫描活动与 archive/archived 分配；Reader仅加指针，不消耗007，不在语言仓/OS仓重复登记正文。
 - 本次设计输入为 auto-reader coverage v3 与 READER-006；不修改已归档研究、当前Spec、产品实现或原有UI未跟踪设计。
+
+
+### 2026-11-02：work 阶段进行中（goal round 1）
+
+- stage: work | plan_id: auto-ui/PLAN-026 | plan_revision: r1 | outcome: executing（T-00/01/02 完成，T-03 起未完成，不交 review）| worktree: D:/autostack/.wt/ui-026/auto-ui | branch: codex/plan-026-dev | base_commit: 8c1b916 | code_commit: 85d1b2a（worktree，T-00 缝隙）| dependency_revisions: auto-reader main@9622387（消费工程+语料+驱动，一写入者）、readest v0.12.16@3cc39ad7+foliate-js@3d79419（只读）、工具 auto.exe@plan-890(SHA256 390e664e…)、WebView2 156.0.4314.50 | task_ids: T-00,T-01,T-02 | evidence: §8 各任务行 + plan-artifacts/plan-026/{auto-ui/t00-report.md, auto-reader/vue-run2/results-vue.json(21/21)} | blockers: 无（T-03 起按表推进）| next_responsible_role: work（T-03 原生宿主实验 → T-04 已随消费链闭合大半 → T-05 双端门 → T-06/07 报告与规范）
+- 用户提供 /goal 完成计划026 = 全链授权（work/review/merge），继承 §0 授权约定；本轮 work 执行实录如上。
 
 ## 10. 待澄清事项
 
