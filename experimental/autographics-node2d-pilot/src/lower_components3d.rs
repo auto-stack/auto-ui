@@ -1889,6 +1889,24 @@ pub(crate) fn gen_user_source_3d(
         }
         for e in &w3.views[&dname].elems {
             if !def.dyn_elems.contains(&e.elem) {
+                // PLAN-028：events 档静态元素也发行表（Start place 与 bind
+                // 主题按行寻址；常量行表，其余档保持 dyn-only 字节不变）。
+                if let Some(ev) = events {
+                    let rows = scene
+                        .elem_rows
+                        .get(&dname)
+                        .and_then(|m| m.get(&e.elem))
+                        .expect("elem rows recorded");
+                    src.push_str(&format!(
+                        "var {}_{}_rows=[{}]\n",
+                        def.prefix(),
+                        e.elem,
+                        rows.iter()
+                            .map(|r| scene.handles[r].to_string())
+                            .collect::<Vec<_>>()
+                            .join(",")
+                    ));
+                }
                 continue;
             }
             // 行表（每实例 1-based 句柄；def_idx 序）。

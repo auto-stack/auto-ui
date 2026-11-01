@@ -14,8 +14,10 @@ var r_tally_b=0
 var marker_pings=[0,0]
 var marker_tag=[1,2]
 var marker_marker_subject_ids=[3,4]
+var marker_marker_rows=[2,3]
 // Sentinel SoA (instance Main/watch=0)
 var sentinel_body_subject_ids=[5]
+var sentinel_body_rows=[4]
 fn main_lifestart() {
  r_h = ag_object_spawn(0, 6, 2.0, 0.5, 0.0)
  ag_trigger_bind(0, 1, 1, r_h, 0, 0.0)

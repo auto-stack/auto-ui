@@ -3,8 +3,8 @@
   "api": "autographics.triggers3d/1",
   "source": {
    "format": "auto-source",
-   "sha256": "76bebdb0f6c8351a8c04f6555fcf66a18825efcd86caced09dfec6432d04e487",
-   "byte_length": 5913
+   "sha256": "4554b3e7483c1a3e755b54db05697d7a1b8261d7f43e6cab7c2d5dbf2fb23b82",
+   "byte_length": 5941
   },
   "actors": {
    "two_d": null,

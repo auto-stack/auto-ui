@@ -17,6 +17,7 @@ var character_h3=[0]
 var character_h4=[0]
 var character_h5=[0]
 var character_body_subject_ids=[2]
+var character_body_rows=[1]
 fn main_lifestart() {
 }
 fn main_lifetick(dt float) {
