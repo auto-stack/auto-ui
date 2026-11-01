@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-023
-status: drafting
+status: executing
 feature_name: AutoGraphics二维Node声音与公共HUD作者能力
 author: [Codex]
 created_at: 2026-11-01
 updated_at: 2026-11-01
 plan_revision: 1
-current_step: 0
+current_step: 1
 total_steps: 10
 depends_on: [auto-ui/PLAN-020, auto-ui/PLAN-013]
 supersedes_spec_components: []
@@ -130,7 +130,7 @@ work自查→同一权威树独立上下文final review→merge冻结门，模�
 
 | ID | owner_stage | 依赖 | 操作/产物与验证 | AC | 状态 |
 |---|---|---|---|---|---|
-| T-01 | work | 后续启动、020实际交付 | 核020/013/SDK/两图依赖/owner，建唯一ui-023树、冻结源与资源 | AC-01 | [ ] |
+| T-01 | work | 后续启动、020实际交付 | 核020/013/SDK/两图依赖/owner，建唯一ui-023树、冻结源与资源 | AC-01 | [x] 2026-11-01：授权=用户/goal续指令"先交付auto-ui/PLAN-023（work→review→merge链）后回到AG006 T-01"。020交付核验：archived 10/10、master交付16ddfa0在基9e347d3祖先链（merge-base实证）、canonical spec stateful-node-components.md sha256 5dd9e372@HEAD逐字节相符；013 archived（8b1e799）。owner核：.wt仅edit-029/lang-904/os-052，021/022仍drafting无树无分支→shared AST/load/translate/CLI窗口归023；ui-020组已清。ui-023组建成：auto-ui@9e347d3分支codex/plan-023-dev（无链接、状态clean）+只读依赖auto-lang@add1df088/auto-web@ec9c4ba（detached）；组内相对路径解析实测（pilot Cargo.lock重绑+1行=a2r-std getrandom，与主检出同一漂移，提交cf87440）。SDK：driver .sdk-source由tracked sdk/frozen prepare=681文件PASS（frozen tree 18c8f5eb自4adf2d03未变；source-lock lineage标签7b987ca8按specs）。源冻结：load.rs 4837d29c=§4、public_hud2d_v1.at 54f297a4=§4、lang specs public-audio 5a802e53/public-hud 4e787ed2=§4；translate.rs §4值894dd147→实测8210f297=020交付的call_scope/child_emit钩子（预期依赖交付漂移，按基线重冻）；新增观察public_audio2d_v1.at dab843e7。基线绿：pilot gates 9 basic+10 g11+9 lower+6 components全过（59s check）。主检出观察：搭建期间并发docs提交88c96ba（registry修复，docs-only不在依赖图）；根Cargo.lock 1行+docs WIP=他会话（020 merge收据载明保留不接管），零代码WIP。scratch登记D:/autostack/plan-artifacts/plan-023/auto-ui/README.md | AC-01 |
 | T-02 | work | T-01 | 最多两接法完整Player/三Coin/HUD/PCM先证，冻结§9语法/顺序/计量/命令 | AC-01..06 | [ ] |
 | T-03 | work | T-02 go | 共用IR新增typed bank/cue/font/slot、ASCII与公开准备，V-01 | AC-02 | [ ] |
 | T-04 | work | T-03 | 局部事件/输入/typed触发与一次Auto收口、字形/PCM，V-02/03 | AC-03 | [ ] |
@@ -151,7 +151,7 @@ work自查→同一权威树独立上下文final review→merge冻结门，模�
 
 | ID | 事项 | owner/关闭动作 |
 |---|---|---|
-| D-01 | 020共享IR与实例/属性/Life接口 | T-01核实际delivery，T-02冻结等价接法，不能追在途tip |
+| D-01 | 020共享IR与实例/属性/Life接口 | 2026-11-01 T-01闭合：020已实际交付（16ddfa0/master祖先、spec 5dd9e372在基、archived 10/10）；准确接口以020 landed spec与lower_components.rs为冻结输入，T-02冻结等价接法 |
 | D-02 | ASCII/输入快照/typed触发、一次收口准确拼写及实际费用 | T-02有界真链；超额/需新语言语义或外仓写面则needs_replan |
 | D-03 | 同tick多cue/事件最坏分支与旧G12注释差异 | T-02/05列完整账，不能借历史循环测试豁免；不足回规划 |
 | D-04 | native设备和独立review时段 | T-05/06按实际环境核，无设备不得宣称native通过；本轮不启动 |
