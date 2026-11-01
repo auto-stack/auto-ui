@@ -411,7 +411,13 @@ fn walk_until_won(
 /// visible latch flips off after the second hit on its OWN row.
 #[test]
 fn t02_actor_free_notify_chain_real_auto_hud_ordinals() {
-    let s = &mut session(NOTIFY_WORLD, "t02-notify.at", 1, 3, 2);
+    // verify_plan025's A->B control points PLAN025_B_WORLD at the cold
+    // B-regenerated world (byte-identical to the committed product), so this
+    // real CPU-session run exercises the regenerated copy.
+    let world_src = std::env::var("PLAN025_B_WORLD")
+        .map(|p| std::fs::read_to_string(&p).expect("PLAN025_B_WORLD readable"))
+        .unwrap_or_else(|_| NOTIFY_WORLD.to_string());
+    let s = &mut session(&world_src, "t02-notify.at", 1, 3, 2);
     // Tick 3: left.Ping(1) -> cue ping (id 0) at gain 1.0, ordinal 1.
     for t in 1..=2 {
         assert_eq!(tick(s, t), 0, "tick {t}");
@@ -774,4 +780,148 @@ fn t05_ordinal_replay_named_fault52() {
     // ordinal 1 (already consumed by the tick-3 closeout) -> fault 52.
     let st = tick(s, 6);
     assert_eq!(st, 52, "stale ordinal replay is the named fault 52");
+}
+
+/// V-02 GPU gate: the actor-free presentation composition renders REAL HUD
+/// glyphs on the host — a presentation2d/1 Run with no bound actor, one
+/// closeout bundle per callback, and the slot-0 glyph re-render observed as
+/// a real pixel change in the captured frame (public_hud host pattern).
+#[test]
+fn t02_host_real_gpu_actor_free_hud_glyphs() {
+    use autographics_auto_driver::authoring::{
+        assets::{self, Registry},
+        document::{Document, Kind, Object},
+        host::Host,
+        public_audio::{self, CueRef},
+        public_hud::{self, DocumentHud, Slot},
+        play::State,
+    };
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let mut registry = Registry::new();
+    let mut doc = Document::empty("plan025-presentation".into());
+    doc.schema = "autographics.scene/8".into();
+    doc.cues = Some(vec![]);
+    // One neutral quad object; NO actor binding (two_d stays null — the
+    // presentation Run binds no character and no camera).
+    let mut obj = Object::new(1, Kind::Quad);
+    obj.translation = [0.0, 0.0, 0.0];
+    obj.scale = [1.0, 1.0, 1.0];
+    doc.objects.push(obj);
+    for (i, name) in ["jump.ogg", "coin.ogg"].into_iter().enumerate() {
+        let asset = public_audio::import(
+            &root.join("samples/public_audio/sounds").join(name),
+            &registry,
+        )
+        .unwrap();
+        doc.cues.as_mut().unwrap().push(CueRef {
+            name: format!("s{i}"),
+            asset: asset.identity.key(),
+            start_frame: 0,
+            end_frame: asset.identity.audio.as_ref().unwrap().frames,
+            gain: 1.0,
+        });
+        doc.assets.push(asset.identity.clone());
+        assets::insert(&mut registry, asset).unwrap();
+    }
+    let font = public_hud::import(
+        &root.join("samples/public_hud/fonts/lilita_one_regular.ttf"),
+        &registry,
+    )
+    .unwrap();
+    doc.hud = Some(DocumentHud {
+        font: font.identity.key(),
+        license: public_hud::LICENSE_TEXT.into(),
+        slots: vec![
+            Slot { slot: 0, visible: true, text: "A".into(), anchor: 0, offset: [8.0, 8.0], size: 32.0, rgba: [1.0, 1.0, 1.0, 1.0] },
+            Slot { slot: 1, visible: true, text: "X".into(), anchor: 1, offset: [8.0, 8.0], size: 32.0, rgba: [0.0, 1.0, 0.0, 1.0] },
+            Slot { slot: 2, visible: false, text: "".into(), anchor: 2, offset: [8.0, 8.0], size: 32.0, rgba: [1.0, 1.0, 0.0, 1.0] },
+            Slot { slot: 3, visible: false, text: "".into(), anchor: 3, offset: [8.0, 8.0], size: 32.0, rgba: [1.0, 0.0, 1.0, 1.0] },
+        ],
+    });
+    doc.assets.push(font.identity.clone());
+    assets::insert(&mut registry, font).unwrap();
+    let mut h = Host::with_assets(doc, registry).unwrap();
+    // The actor-free closeout shape: one bundle per callback, slot-0 text
+    // changes after the first tick, one cue request per tick with strictly
+    // increasing ordinals.
+    let controller = "var ok=0
+var step=0
+fn app_start(){}
+fn app_update(dt float){step=step+1;var txt=\"A\";if step>=2 {txt=\"B\"};ok=ok+ag_present2d(-1,0,0,0,0,0,0,1,step,0,1.0,0,0,0.0,0,0,0.0,0,0,0.0,1,txt,1,\"X\",0,\"\",0,\"\")*1.0}
+";
+    let source = SourceSnapshot::from_bytes_for(
+        Path::new("plan025-gpu-controller.at"),
+        controller.as_bytes().to_vec(),
+        Api::Presentation2V1,
+    )
+    .unwrap();
+    h.start_user_snapshot(source).unwrap();
+    h.pause_play("");
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+    while h.play.as_ref().is_some_and(|pl| pl.pending()) {
+        assert!(std::time::Instant::now() < deadline, "pump deadline");
+        h.frame(None).unwrap();
+    }
+    assert_ne!(
+        h.play.as_ref().unwrap().state,
+        State::Faulted,
+        "{:?}",
+        h.play.as_ref().unwrap().error
+    );
+    assert!(
+        h.play.as_ref().unwrap().last.as_ref().unwrap().hud.is_some(),
+        "the actor-free Run publishes HUD state"
+    );
+    assert!(
+        h.play
+            .as_ref()
+            .unwrap()
+            .last
+            .as_ref()
+            .unwrap()
+            .camera
+            .is_none(),
+        "no runtime camera is configured for the actor-free Run"
+    );
+    let surface = h.two;
+    let initial = h.rt.capture(surface, "pres-initial").unwrap();
+    let mut previous = initial.1;
+    let mut changed = 0;
+    for _step in 0..3 {
+        // Resume for exactly one frozen tick, then pause.
+        {
+            let pl = h.play.as_mut().unwrap();
+            pl.resume().unwrap();
+            pl.char_key(1, true, false);
+            pl.dispatch(autographics_auto_driver::authoring::play::Action::default()).unwrap();
+        }
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+        while h.play.as_ref().is_some_and(|pl| pl.pending()) {
+            assert!(std::time::Instant::now() < deadline, "pump deadline");
+            h.frame(None).unwrap();
+        }
+        assert_ne!(
+            h.play.as_ref().unwrap().state,
+            State::Faulted,
+            "{:?}",
+            h.play.as_ref().unwrap().error
+        );
+        h.pause_play("");
+        let frame = h.play.as_ref().unwrap().last.as_ref().unwrap();
+        let hud = frame.hud.as_ref().unwrap();
+        assert!(!hud.slots[2].visible, "slot 2 stays hidden");
+        assert_eq!(hud.slots[1].text, "X", "slot 1 constant");
+        let capture = h.rt.capture(surface, "pres-tick").unwrap();
+        let (mean, _) = agp::renderer::capture::compare_png_region(
+            &previous,
+            &capture.1,
+            [0, 0, capture.2, 64],
+        )
+        .unwrap();
+        if mean > 0.0 {
+            changed += 1;
+        }
+        previous = capture.1;
+    }
+    assert!(changed >= 1, "the slot-0 glyph re-render must reach real pixels");
 }
