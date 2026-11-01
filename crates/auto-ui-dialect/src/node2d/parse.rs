@@ -100,7 +100,8 @@ pub fn parse_node_decl(cx: &mut dyn DomainParseContext) -> AutoResult<NodeDecl> 
     }
     // PLAN-019：shape2d `kind` 的冻结几何符号（circle/quad）。与动作符号
     // 同机制：解析作用域内的名义符号，值由 lowering 按名字映射。
-    for shape_kind in ["circle", "quad"] {
+    // PLAN-023：`box`（game2d 触发行的 AABB 形状名，同一名义符号族）。
+    for shape_kind in ["circle", "quad", "box"] {
         cx.bind_var(shape_kind, Type::Int);
     }
 
@@ -109,6 +110,7 @@ pub fn parse_node_decl(cx: &mut dyn DomainParseContext) -> AutoResult<NodeDecl> 
     let mut msg = None;
     let mut view2d = None;
     let mut on = None;
+    let mut game2d = None;
     loop {
         cx.skip_empty_lines();
         if cx.is_kind(TokenKind::RBrace) || cx.is_kind(TokenKind::EOF) {
@@ -162,10 +164,24 @@ pub fn parse_node_decl(cx: &mut dyn DomainParseContext) -> AutoResult<NodeDecl> 
                     msg = Some(parse_msg_decl(cx)?);
                     continue;
                 }
+                // PLAN-023：components-2d-game 作者入口块（触发表/cue 表/
+                // HUD 槽/音频资源）。任何 node 都可携带；root-only 与
+                // profile 归属由降层具名校验（解析面保持宽容）。
+                "game2d" => {
+                    if game2d.is_some() {
+                        return Err(SyntaxError::Generic {
+                            message: "duplicate game2d block in node".to_string(),
+                            span: pos_to_span(cx.cur_pos()),
+                        }
+                        .into());
+                    }
+                    game2d = Some(super::game::parse_game2d_block(cx)?);
+                    continue;
+                }
                 _ => {
                     return Err(SyntaxError::Generic {
                         message: format!(
-                            "unsupported node block '{keyword}' (research surface: model/msg/view-2d/on)"
+                            "unsupported node block '{keyword}' (research surface: model/msg/view-2d/on/game2d)"
                         ),
                         span: pos_to_span(cx.cur_pos()),
                     }
@@ -189,6 +205,7 @@ pub fn parse_node_decl(cx: &mut dyn DomainParseContext) -> AutoResult<NodeDecl> 
         msg,
         view2d,
         on,
+        game2d,
         span: super::ast::span_of(start),
     })
 }
@@ -367,7 +384,7 @@ fn parse_group_block(
 /// `{ name: value ... }` 属性行块；空行/逗号宽容。遇到下一个 view 元素头
 /// （group2d/shape2d 等冻结关键字或 UpperCamelCase 实例化）时停止 ——
 /// 仅 group2d 的 props 后会跟子元素；属性名一律小写，无误伤。
-fn parse_prop_block(cx: &mut dyn DomainParseContext) -> AutoResult<Vec<Prop>> {
+pub(super) fn parse_prop_block(cx: &mut dyn DomainParseContext) -> AutoResult<Vec<Prop>> {
     cx.expect(TokenKind::LBrace)?;
     let mut props = Vec::new();
     loop {

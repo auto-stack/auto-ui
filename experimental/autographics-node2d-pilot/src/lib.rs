@@ -13,6 +13,7 @@ pub mod load;
 pub mod lower;
 pub mod lower_basic2d;
 pub mod lower_components;
+pub mod lower_components_game;
 pub mod lower_g11;
 pub mod scene;
 pub mod translate;
@@ -32,10 +33,15 @@ pub enum Profile {
     /// PLAN-021 typed 二维查询：queries-2d（components-2d 超集 + query2d
     /// 服务/具名行/typed 结果；api/运行时装配不变）。
     Queries2D,
+    /// PLAN-023 components-2d-game：game2d 作者入口（T-02 冻结合同
+    /// F-1..F-6 的生成器实现；frozen components-2d 字节不变）。
+    Components2DGame,
 }
 
 pub use load::{load_project, Project, ProjectError};
 pub use lower::{lower_project, LowerOutput};
 pub use lower_basic2d::{lower_project_basic, BasicProfile, LowerOutputBasic2D};
 pub use lower_components::{lower_project_components, lower_project_queries};
+pub use lower_components::lower_project_components;
+pub use lower_components_game::{lower_project_components_game, LowerOutputGame};
 pub use lower_g11::{lower_project_g112d, LowerOutputG11};

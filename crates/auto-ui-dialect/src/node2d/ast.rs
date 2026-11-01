@@ -19,7 +19,8 @@ pub enum Node2DStmt {
 }
 
 /// 一个 node 定义：同作用域的参数、model 实例状态、匿名 msg 事件、
-/// view-2d 呈现与 Life/业务事件处理。
+/// view-2d 呈现与 Life/业务事件处理。`game2d` 块（PLAN-023）仅 root
+/// node 携带、仅 components-2d-game profile 消费。
 #[derive(Debug, Clone)]
 pub struct NodeDecl {
     pub name: String,
@@ -28,6 +29,7 @@ pub struct NodeDecl {
     pub msg: Option<MsgDecl>,
     pub view2d: Option<View2dBlock>,
     pub on: Option<OnBlock>,
+    pub game2d: Option<super::game::Game2dBlock>,
     pub span: LightSpan,
 }
 

@@ -70,7 +70,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 // ------------------------------------------------------------ diagnose ----
 
-fn at(module: &str, line: usize, symbol: &str, what: &str) -> LowerError {
+pub(crate) fn at(module: &str, line: usize, symbol: &str, what: &str) -> LowerError {
     LowerError::Unsupported {
         what: format!("{what} (module {module}, line {line}, symbol '{symbol}')"),
         line,
@@ -101,7 +101,7 @@ fn prop_line(module_src: &str, pr: &Prop) -> usize {
 
 /// 参数/载荷类型面（组件合同：int/float 数值 + Material2D/Mesh2D 资源端口）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum PType {
+pub(crate) enum PType {
     Int,
     Float,
     Res,
@@ -148,61 +148,61 @@ impl ParamVal {
 }
 
 /// 一个组件定义（root 或被实例化 node）的静态面。
-struct DefIR {
-    name: String,
-    module: String,
-    line: usize,
+pub(crate) struct DefIR {
+    pub(crate) name: String,
+    pub(crate) module: String,
+    pub(crate) line: usize,
     /// 声明参数（序保持）：名字 → 类型面。
-    params: Vec<(String, PType)>,
+    pub(crate) params: Vec<(String, PType)>,
     /// model 字段（序保持）：名字 → 是否 int。
-    model: Vec<(String, bool)>,
+    pub(crate) model: Vec<(String, bool)>,
     /// msg 事件：名字 → (payload 个数, payload 类型面)。
-    msgs: BTreeMap<String, (usize, Vec<PType>)>,
+    pub(crate) msgs: BTreeMap<String, (usize, Vec<PType>)>,
     /// `on .Ev` 成员处理器：事件名 → (形参个数, 行)。
-    members: BTreeMap<String, (usize, usize)>,
-    life_start: bool,
-    life_tick: bool,
+    pub(crate) members: BTreeMap<String, (usize, usize)>,
+    pub(crate) life_start: bool,
+    pub(crate) life_tick: bool,
     /// view 内绑定本定义 model 字段的 shape2d 元素（动态呈现，序保持）。
-    dyn_elems: Vec<String>,
+    pub(crate) dyn_elems: Vec<String>,
     /// 静态 shape2d/solid2d 元素名（序保持）。
-    static_elems: Vec<String>,
+    pub(crate) static_elems: Vec<String>,
     /// character2d 元素（元素名, 行）。
-    char_elem: Option<(String, usize)>,
+    pub(crate) char_elem: Option<(String, usize)>,
     /// 定义是否带状态面（model/msg/on）→ 实例计入 8 包络。
-    stateful: bool,
+    pub(crate) stateful: bool,
 }
 
 impl DefIR {
-    fn prefix(&self) -> String {
+    pub(crate) fn prefix(&self) -> String {
         self.name.to_lowercase()
     }
 }
 
 /// 一个实例（root 之外）：声明先序，def_idx 即其定义 SoA 下标。
-struct InstanceIR {
-    path: String,
-    def: String,
-    parent: Option<usize>,
-    def_idx: usize,
+pub(crate) struct InstanceIR {
+    pub(crate) path: String,
+    pub(crate) def: String,
+    pub(crate) parent: Option<usize>,
+    pub(crate) def_idx: usize,
     /// 参数名 → 下降期常量（数值或资源 symbol）。
-    params: Vec<(String, ParamVal)>,
-    line: usize,
+    pub(crate) params: Vec<(String, ParamVal)>,
+    pub(crate) line: usize,
 }
 
 /// 组件世界 IR（验证后的中间表示）。
-struct WorldIR {
-    root: String,
-    root_module: String,
-    defs: BTreeMap<String, DefIR>,
-    instances: Vec<InstanceIR>,
+pub(crate) struct WorldIR {
+    pub(crate) root: String,
+    pub(crate) root_module: String,
+    pub(crate) defs: BTreeMap<String, DefIR>,
+    pub(crate) instances: Vec<InstanceIR>,
     /// 有状态实例总数（含 root），≤8（016 有限实例包络的组件合同）。
-    stateful: usize,
+    pub(crate) stateful: usize,
     /// 根 view 的 solid2d（序保持）与 camera2d（≤1）。
-    solids: Vec<String>,
-    camera: Option<Vec<Prop>>,
+    pub(crate) solids: Vec<String>,
+    pub(crate) camera: Option<Vec<Prop>>,
 }
 
-fn inst_name_of(path: &str) -> &str {
+pub(crate) fn inst_name_of(path: &str) -> &str {
     path.rsplit('/').next().unwrap_or(path)
 }
 
@@ -640,7 +640,7 @@ fn model_init_value(
 }
 
 /// 构建组件世界 IR：root + 声明先序实例展开（嵌套/同定义多实例/环/包络）。
-fn build_world(project: &Project) -> Result<WorldIR, LowerError> {
+pub(crate) fn build_world(project: &Project) -> Result<WorldIR, LowerError> {
     let root_name = project.root.clone();
     let root_module = project
         .node_modules
@@ -1034,11 +1034,11 @@ struct AncDispatch {
 
 /// 下降期事件投递计划（V-03；全部在生成前解析，无宿主队列）。
 #[derive(Default)]
-struct Plan {
-    child: BTreeMap<(String, String, String), ChildDispatch>,
-    anc: BTreeMap<(String, String), AncDispatch>,
+pub(crate) struct Plan {
+    pub(crate) child: BTreeMap<(String, String, String), ChildDispatch>,
+    pub(crate) anc: BTreeMap<(String, String), AncDispatch>,
     /// 接收 fn 名 → (接收定义（""=root）, 事件名)。
-    recv_fns: BTreeMap<String, (String, String)>,
+    pub(crate) recv_fns: BTreeMap<String, (String, String)>,
 }
 
 /// 遍历处理器语句树，收集：裸函数调用、`.member` 引用、emit 站点。
@@ -1346,7 +1346,7 @@ fn find_child_node(project: &Project, def_name: &str, child: &str) -> Option<Str
 
 /// 构建投递计划并验证全部 emit 站点（端口存在 + 元数一致）与 handler 面
 /// （未知成员 / 未知 helper fn）。
-fn plan_dispatch(project: &Project, world: &WorldIR, queries: bool) -> Result<Plan, LowerError> {
+pub(crate) fn plan_dispatch(project: &Project, world: &WorldIR, queries: bool) -> Result<Plan, LowerError> {
     let mut plan = Plan::default();
     let root_prefix = world.root.to_lowercase();
 
@@ -2143,13 +2143,13 @@ fn resolve_visible(
 
 // ------------------------------------------------------ scene build ----
 
-struct SceneBuild {
-    rows: Vec<SceneNode>,
-    char: Option<(usize, String)>,
-    solid_ids: Vec<usize>,
-    camera: Option<CameraCfg>,
+pub(crate) struct SceneBuild {
+    pub(crate) rows: Vec<SceneNode>,
+    pub(crate) char: Option<(usize, String)>,
+    pub(crate) solid_ids: Vec<usize>,
+    pub(crate) camera: Option<CameraCfg>,
     /// app_start spawn 行（声明先序）。
-    spawns: Vec<String>,
+    pub(crate) spawns: Vec<String>,
     /// PLAN-021：顶层实例名 → primary 静态行 ordinal（引用解析表；
     /// character 行可寻址但位置只读）。
     refs: BTreeMap<String, RefRow>,
@@ -2320,7 +2320,7 @@ fn camera_cfg_components(
 }
 
 /// 收集场景行 + app_start spawn 行。角色行 id=1，其余按声明序。
-fn collect_scene(
+pub(crate) fn collect_scene(
     project: &Project,
     world: &WorldIR,
     plan: &Plan,
@@ -2773,7 +2773,7 @@ pub struct QueryParts<'a> {
     pub binds: &'a std::cell::RefCell<Vec<(String, QueryKind)>>,
 }
 
-fn instance_ctx<'a>(
+pub(crate) fn instance_ctx<'a>(
     project: &'a Project,
     plan: &'a Plan,
     def: &'a DefIR,
@@ -2870,7 +2870,7 @@ fn instance_ctx<'a>(
     })
 }
 
-fn root_ctx<'a>(
+pub(crate) fn root_ctx<'a>(
     project: &'a Project,
     world: &'a WorldIR,
     plan: &'a Plan,
@@ -2953,7 +2953,7 @@ fn root_ctx<'a>(
 // ------------------------------------------------------- generation ----
 
 /// 定义输出序：首个实例的声明先序（root 除外）。
-fn def_order(world: &WorldIR) -> Vec<String> {
+pub(crate) fn def_order(world: &WorldIR) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     for i in &world.instances {
         if !out.contains(&i.def) {
@@ -3006,15 +3006,15 @@ fn def_runtime_params(project: &Project, def: &DefIR) -> Vec<(String, PType)> {
 }
 
 /// 每定义动态呈现数组面（handle + 位置/可见缓存）。
-struct DynArr {
-    elem: String,
-    handle: String,
-    px: Option<String>,
-    py: Option<String>,
-    vis: Option<String>,
+pub(crate) struct DynArr {
+    pub(crate) elem: String,
+    pub(crate) handle: String,
+    pub(crate) px: Option<String>,
+    pub(crate) py: Option<String>,
+    pub(crate) vis: Option<String>,
 }
 
-fn def_dyn_arrays(
+pub(crate) fn def_dyn_arrays(
     project: &Project,
     def: &DefIR,
     prefix: &str,
@@ -3060,14 +3060,23 @@ fn def_dyn_arrays(
             } else {
                 None
             },
-            // PLAN-023 F-8.1：可见性缓存后缀按 profile 选择——game 为
-            // `_visq`（020 的 `_vis` 与作者 model 字段 `vis` 撞名 → 重复
-            // `var` 声明，admission 致命；T-02 探针实测后手改 visq，生成
-            // 侧与之逐字同形），frozen components-2d 保持 `_vis`（F-1
-            // 冻结字节）。与任一生成缓存符号撞名的 model 字段在本函数
-            // 尾部具名拒绝（handle/px/py/<vis 后缀>）。
+            // PLAN-023 F-8.1：可见性缓存名自适应——默认 `{base}_vis`
+            // （frozen components-2d 冻结字节，F-1）；仅当与作者 model
+            // 字段 SoA 名撞名（重复 `var`，admission 致命；T-02 实测
+            // `zone_vis`）时改名 `{base}_visq`（game 档，与 T-02 手扩
+            // 世界同形：coin_vis 不变、zone_vis→zone_visq）。与改名后
+            // 仍撞名的字段在本函数尾部具名拒绝。
             vis: if vis_model {
-                Some(format!("{base}_{vis_suffix}"))
+                let plain = format!("{base}_vis");
+                let collides = def
+                    .model
+                    .iter()
+                    .any(|(f, _)| format!("{prefix}_{f}") == plain);
+                Some(if collides {
+                    format!("{base}_{vis_suffix}")
+                } else {
+                    plain
+                })
             } else {
                 None
             },
@@ -3174,12 +3183,13 @@ fn elem_props(project: &Project, def: &DefIR, elem: &str) -> Result<Vec<Prop>, L
 }
 
 /// 生成用户源（world.at）。
-fn gen_user_source(
+pub(crate) fn gen_user_source(
     project: &Project,
     world: &WorldIR,
     plan: &Plan,
     scene: &SceneBuild,
     queries: bool,
+    game: Option<&crate::lower_components_game::GameGen>,
 ) -> Result<String, LowerError> {
     let mut src = String::new();
     let root_def = &world.defs[&world.root];
@@ -3243,6 +3253,21 @@ fn gen_user_source(
             }
         }
     }
+    // PLAN-023 F-4（game 面）：生成基础设施标量（gate/ord/np/p0/p1）。
+    // 作者只声明 count/state；生成器不发明游戏状态。
+    if let Some(g) = game {
+        src.push_str("// game closeout scalars (generated: gate/ord/np/p0/p1)\n");
+        for name in g.infra_field_names() {
+            src.push_str(&format!("var r_{name}=0\n"));
+        }
+    }
+
+    // PLAN-023 F-8.1（game 面）：呈现缓存后缀 visq（frozen 档保持 vis）。
+    let vis_suffix: &str = if game.is_some() {
+        crate::lower_components_game::GameGen::vis_suffix()
+    } else {
+        "vis"
+    };
 
     // ---- 每定义 SoA ----
     for dname in def_order(world) {
@@ -3301,7 +3326,7 @@ fn gen_user_source(
                 vals.join(",")
             ));
         }
-        for arr in def_dyn_arrays(project, def, &def.prefix(), &def.prefix(), "vis")? {
+        for arr in def_dyn_arrays(project, def, &def.prefix(), &def.prefix(), vis_suffix)? {
             let zeros = vec!["0"; idxs.len()].join(",");
             src.push_str(&format!("var {}=[{zeros}]\n", arr.handle));
             if let (Some(px), Some(py)) = (&arr.px, &arr.py) {
@@ -3334,7 +3359,7 @@ fn gen_user_source(
         }
     }
     // root 动态呈现标量。
-    for arr in def_dyn_arrays(project, root_def, "main", "r", "vis")? {
+    for arr in def_dyn_arrays(project, root_def, "main", "r", vis_suffix)? {
         src.push_str(&format!("var {}=0\n", arr.handle));
         if let (Some(px), Some(py)) = (&arr.px, &arr.py) {
             let props = elem_props(project, root_def, &arr.elem)?;
@@ -3449,6 +3474,10 @@ fn gen_user_source(
     }
     src.push_str("}\n");
     src.push_str("fn main_lifetick(dt float) {\n");
+    // PLAN-023 F-2c/F-6（game 面）：poll 前奏（每回调恰一次 next 首读）。
+    if game.is_some() {
+        src.push_str(" game_events()\n");
+    }
     if let Some(h) = life_handler(root_decl, "Tick") {
         translate_handler(&h.body.stmts, &rctx, &mut src, 1)?;
     }
@@ -3475,7 +3504,7 @@ fn gen_user_source(
     }
     // root 呈现 fn。
     if root_def.life_tick && !root_def.dyn_elems.is_empty() {
-        gen_present_fn(project, world, plan, root_def, true, "vis", &mut src)?;
+        gen_present_fn(project, world, plan, root_def, true, vis_suffix, &mut src)?;
     }
 
     // ---- 每定义 fns（首个实例声明先序）----
@@ -3534,7 +3563,7 @@ fn gen_user_source(
             )?;
         }
         if def.life_tick && !def.dyn_elems.is_empty() {
-            gen_present_fn(project, world, plan, def, false, "vis", &mut src)?;
+            gen_present_fn(project, world, plan, def, false, vis_suffix, &mut src)?;
         }
     }
 
@@ -3585,6 +3614,19 @@ fn gen_user_source(
         src.push_str(line);
         src.push('\n');
     }
+    // PLAN-023 F-2a（game 面）：每 authoring 触发行一条 ag_trigger_bind
+    // （pair = 行序，subject 恒为 character，source = 实例 handle）。
+    if let Some(g) = game {
+        let char_id = scene.char.clone().map(|(id, _)| id).ok_or_else(|| {
+            at(
+                &root_def.module,
+                root_def.line,
+                "trigger",
+                "game2d triggers require the components character2d subject",
+            )
+        })?;
+        src.push_str(&crate::lower_components_game::trigger_binds_src(g, char_id));
+    }
     if root_def.life_start {
         src.push_str(" main_lifestart()\n");
     }
@@ -3615,12 +3657,21 @@ fn gen_user_source(
             src.push_str(&format!(" {}_present({})\n", def.prefix(), inst.def_idx));
         }
     }
+    // PLAN-023 F-6（game 面）：每回调恰一次 closeout 收口。
+    if game.is_some() {
+        src.push_str(" game_closeout()\n");
+    }
     src.push_str("}\n");
+    // PLAN-023 F-3（game 面）：closeout 骨架（game_cue / game_events /
+    // hud_<field>_text / game_closeout）。
+    if let Some(g) = game {
+        src.push_str(&crate::lower_components_game::game_fns_src(g));
+    }
     Ok(src)
 }
 
 /// 成员接收 fn：`fn <name>_<ev>(j int, p..)` / root `fn main_<ev>(p..)`。
-fn gen_recv_fn(
+pub(crate) fn gen_recv_fn(
     project: &Project,
     world: &WorldIR,
     plan: &Plan,
@@ -3762,11 +3813,29 @@ pub fn lower_project_queries(project: &Project) -> Result<LowerOutputBasic2D, Lo
 fn lower_components_mode(
     project: &Project,
     queries: bool,
+    game: Option<&crate::lower_components_game::GameGen>,
 ) -> Result<LowerOutputBasic2D, LowerError> {
+    // PLAN-023：game2d 作者块只被 components-2d-game 消费；frozen 档拒绝
+    // （不静默忽略）。
+    if game.is_none() {
+    for (mname, module) in &project.modules {
+        for n in &module.nodes {
+            if n.game2d.is_some() {
+                let line = line_at(&module.source, n.span.0);
+                return Err(at(
+                    mname,
+                    line,
+                    &n.name,
+                    "game2d block requires --profile components-2d-game (the frozen components-2d profile keeps its 020 lowering)",
+                ));
+            }
+        }
+    }
+    }
     let world = build_world(project)?;
     let plan = plan_dispatch(project, &world, queries)?;
     let scene = collect_scene(project, &world, &plan)?;
-    let src = gen_user_source(project, &world, &plan, &scene, queries)?;
+    let src = gen_user_source(project, &world, &plan, &scene, queries, game)?;
     let source_bytes = src.len();
     let source_sha256 = sha256_hex(src.as_bytes());
     let entry = world.root_module.clone();

@@ -12,7 +12,7 @@ use autographics_node2d_pilot::{BasicProfile, Profile};
 
 fn usage() -> ! {
     eprintln!(
-        "usage: node2d-lower [--profile legacy|g11-2d|scene-2d|character-2d|camera-2d] --entry <dir>/main.at --out <dir>"
+        "usage: node2d-lower [--profile legacy|g11-2d|scene-2d|character-2d|camera-2d|components-2d|components-2d-game] --entry <dir>/main.at --out <dir>"
     );
     std::process::exit(2);
 }
@@ -31,6 +31,7 @@ fn main() {
                 Some("camera-2d") => Profile::Basic2D(BasicProfile::Camera2D),
                 Some("components-2d") => Profile::Components2D,
                 Some("queries-2d") => Profile::Queries2D,
+                Some("components-2d-game") => Profile::Components2DGame,
                 _ => usage(),
             }
         }
@@ -262,6 +263,104 @@ fn main() {
                 lowered.source_bytes,
                 lowered.source_sha256,
                 names.len()
+            );
+        }
+        Profile::Components2DGame => {
+            let entry_path = std::path::Path::new(entry);
+            let entry_dir = entry_path.parent().unwrap_or(entry_path);
+            let lowered = autographics_node2d_pilot::lower_project_components_game(
+                &project,
+                entry_dir,
+            )
+            .unwrap_or_else(|e| {
+                eprintln!("node2d-lower: {e}");
+                std::process::exit(3);
+            });
+            std::fs::write(
+                format!("{out}/world.at"),
+                lowered.base.user_source.expect("source"),
+            )
+            .expect("world.at");
+            std::fs::write(format!("{out}/scene.agscene"), &lowered.base.scene_json)
+                .expect("scene.agscene");
+            let mut names: Vec<_> = project.modules.keys().collect();
+            names.sort();
+            let mut modules = String::new();
+            let mut closure = String::new();
+            for name in &names {
+                let bytes = project.modules[*name].source.as_bytes();
+                modules.push_str(&format!(
+                    "  \"module:{}\": \"{}\",\n",
+                    name,
+                    autographics_node2d_pilot::scene::sha256_hex(bytes)
+                ));
+                closure.push_str(&format!(
+                    "  {{\"name\": \"{name}\", \"sha256\": \"{}\", \"bytes\": {}}},\n",
+                    autographics_node2d_pilot::scene::sha256_hex(bytes),
+                    bytes.len()
+                ));
+            }
+            // game 资产进 closure 清单与 closure/assets/（A→B 冷再生）。
+            let assets_dir = format!("{out}/closure/assets");
+            std::fs::create_dir_all(&assets_dir).expect("closure assets dir");
+            let mut asset_entries = String::new();
+            for a in &lowered.assets {
+                let bytes = std::fs::read(&a.src).expect("asset bytes");
+                std::fs::write(format!("{assets_dir}/{}", a.name), &bytes).expect("asset copy");
+                asset_entries.push_str(&format!(
+                    "  {{\"name\": \"asset:{}\", \"sha256\": \"{}\", \"bytes\": {}}},\n",
+                    a.name, a.sha256, a.bytes
+                ));
+            }
+            let mut identity = String::from("{\n");
+            identity.push_str(
+                " \"generator\": \"autographics-node2d-pilot plan023 components-2d-game\",\n",
+            );
+            identity.push_str(" \"api\": \"autographics.hud2d/1\",\n");
+            identity.push_str(&format!(
+                " \"user_source_sha256\": \"{}\",\n \"user_source_bytes\": {},\n",
+                lowered.base.source_sha256, lowered.base.source_bytes
+            ));
+            identity.push_str(&modules);
+            identity.push_str(" \"closure\": [\n");
+            let combined = format!("{closure}{asset_entries}");
+            identity.push_str(combined.trim_end_matches(",\n"));
+            identity.push_str("\n ],\n");
+            identity.push_str(&format!(" \"roles\": {},\n", lowered.base.roles_json));
+            let product = std::path::Path::new(out)
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("unrecorded")
+                .to_string();
+            let consumer = match product.as_str() {
+                "game" => {
+                    "experimental/autographics-auto-driver/tests/t03_game_gates.rs (V-01 byte pin + V-02 Hud2V1 admission)"
+                }
+                _ => "unrecorded (this out dir has no registered flow consumer)",
+            };
+            identity.push_str(" \"provenance\": {\n");
+            identity.push_str(&format!("  \"product\": \"{product}\",\n"));
+            identity.push_str(&format!("  \"consumer\": \"{consumer}\",\n"));
+            identity.push_str(
+                "  \"consumption\": \"include_str! frozen scene.agscene + world.at; the harness writes world.at to scripts/<sha>.at where <sha> = scene.behavior.source.sha256\",\n",
+            );
+            identity.push_str(&format!(
+                "  \"world_sha256\": \"{}\"\n",
+                lowered.base.source_sha256
+            ));
+            identity.push_str(" }\n}\n");
+            std::fs::write(format!("{out}/identity.json"), identity).expect("identity.json");
+            let closure_dir = format!("{out}/closure");
+            for name in &names {
+                let bytes = project.modules[*name].source.as_bytes();
+                std::fs::write(format!("{closure_dir}/{name}.at"), bytes).expect("closure file");
+            }
+            println!(
+                "node2d-lower[components-2d-game]: wrote world.at ({} bytes, sha {}) + scene.agscene + closure/{}+assets/{}",
+                lowered.base.source_bytes,
+                lowered.base.source_sha256,
+                names.len(),
+                lowered.assets.len()
             );
         }
         Profile::Basic2D(basic) => {

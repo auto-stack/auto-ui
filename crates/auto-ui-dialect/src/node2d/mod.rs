@@ -6,10 +6,13 @@
 //! 与降层合同见 `docs/plans/attachments/016/work/node2d-contract.md`。
 
 pub mod ast;
+pub mod game;
 pub mod parse;
 
 pub use ast::{
     EventPattern, Handler, Node2DStmt, NodeDecl, OnBlock, Prop, PropValue, View2dBlock,
     View2dElement,
 };
+pub use game::{Game2dAudio, Game2dBlock, Game2dCue, Game2dHud, Game2dShape, Game2dSlot,
+    Game2dText, Game2dTrigger, Game2dTriggerKind};
 pub use parse::Node2DDialect;
