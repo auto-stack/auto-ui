@@ -3801,13 +3801,13 @@ fn gen_present_fn(
 
 /// PLAN-020 components-2d 公共入口：校验 → 场景/用户源 → identity 材料。
 pub fn lower_project_components(project: &Project) -> Result<LowerOutputBasic2D, LowerError> {
-    lower_components_mode(project, false)
+    lower_components_mode(project, false, None)
 }
 
 /// PLAN-021：queries-2d 显式作者档（components-2d 的超集 + typed 查询
 /// 面；api/运行时装配不变，identity generator 字符串区分）。
 pub fn lower_project_queries(project: &Project) -> Result<LowerOutputBasic2D, LowerError> {
-    lower_components_mode(project, true)
+    lower_components_mode(project, true, None)
 }
 
 fn lower_components_mode(

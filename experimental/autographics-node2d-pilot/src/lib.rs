@@ -42,6 +42,5 @@ pub use load::{load_project, Project, ProjectError};
 pub use lower::{lower_project, LowerOutput};
 pub use lower_basic2d::{lower_project_basic, BasicProfile, LowerOutputBasic2D};
 pub use lower_components::{lower_project_components, lower_project_queries};
-pub use lower_components::lower_project_components;
 pub use lower_components_game::{lower_project_components_game, LowerOutputGame};
 pub use lower_g11::{lower_project_g112d, LowerOutputG11};
