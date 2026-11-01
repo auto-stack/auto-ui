@@ -72,6 +72,15 @@ pub struct Ctx<'a> {
     /// PLAN-024（components-3d）：v1 空间服务环境（refs/self 行句柄）。
     /// None 保持旧档行为（place/shift/show 等保持 unsupported，旧字节不变）。
     pub space3: Option<SpaceEnv<'a>>,
+    /// PLAN-025（presentation-2d）：typed 声音请求环境（cue 名 → scene
+    /// cue id；降层映射，作者不写数字 ID）。None 保持旧档行为（sfx.play
+    /// 保持 unsupported，旧字节不变）。
+    pub sfx: Option<SfxEnv<'a>>,
+}
+
+/// PLAN-025：typed 声音请求环境。cue 表 = presentation2d 块声明序。
+pub struct SfxEnv<'a> {
+    pub cues: &'a BTreeMap<String, usize>,
 }
 
 /// PLAN-024：view-3d 元素行句柄环境。refs：本定义 view-3d 元素名 →
@@ -481,6 +490,50 @@ fn translate_expr(e: &Expr, ctx: &Ctx, out: &mut String) -> Result<(), LowerErro
                             return Err(unsupported("round.request arity", e));
                         }
                         out.push_str("ag_round_request()");
+                        return Ok(());
+                    }
+                    // PLAN-025（presentation-2d）：typed 声音请求
+                    // sfx.play(<cue>, <gain>) → 生成收集器 sfx_play(<cue_id>,
+                    // <gain>)（ordinal/缓冲为生成基础设施，0 计费；cue 域/
+                    // 增益/容量界由原 API 运行时具名强制）。
+                    if base == "sfx" && m == "play" {
+                        let Some(env) = &ctx.sfx else {
+                            return Err(unsupported(
+                                "sfx.play is only available in the presentation-2d profile",
+                                e,
+                            ));
+                        };
+                        if call.args.args.len() != 2 {
+                            return Err(unsupported("sfx.play(<cue>, <gain>) arity", e));
+                        }
+                        // cue 名为字符串字面量（typed 引用：编译器映射为
+                        // scene cue id，作者不写数字 ID；跨模块可解析）。
+                        let cue = match &call.args.args[0] {
+                            Arg::Pos(Expr::Str(s)) => s.to_string(),
+                            other => {
+                                return Err(unsupported(
+                                    format!("sfx.play cue must be a string literal naming a presentation2d cue, got {other:?}"),
+                                    e,
+                                ))
+                            }
+                        };
+                        let Some(id) = env.cues.get(cue.as_str()).copied() else {
+                            return Err(unsupported(
+                                format!(
+                                    "unknown sfx cue '{cue}' (cue id = presentation2d cue declaration order; declared: {})",
+                                    env.cues.keys().cloned().collect::<Vec<_>>().join(", ")
+                                ),
+                                e,
+                            ));
+                        };
+                        let mut gain = String::new();
+                        match &call.args.args[1] {
+                            Arg::Pos(x) => translate_expr(x, ctx, &mut gain)?,
+                            other => {
+                                return Err(unsupported(format!("sfx.play gain {other:?}"), e))
+                            }
+                        }
+                        out.push_str(&format!("sfx_play({id}, {gain})"));
                         return Ok(());
                     }
                     // PLAN-021（queries-2d）：空间输入沿 transport 全局

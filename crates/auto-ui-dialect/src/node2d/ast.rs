@@ -35,6 +35,9 @@ pub struct NodeDecl {
     pub view3d: Option<View3dBlock>,
     pub on: Option<OnBlock>,
     pub game2d: Option<super::game::Game2dBlock>,
+    /// PLAN-025：`presentation2d` 块（通用声音/HUD 接线，无业务枚举）；
+    /// 仅 root node 携带、仅 presentation-2d profile 消费。
+    pub presentation2d: Option<super::presentation::Presentation2dBlock>,
     pub span: LightSpan,
 }
 

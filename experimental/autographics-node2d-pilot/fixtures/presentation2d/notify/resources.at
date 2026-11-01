@@ -1,0 +1,4 @@
+// PLAN-025 notify fixture resources: two discs + a neutral floor quad.
+let disc_mesh = mesh2d.circle(0.6)
+let teal = material2d.color(0.2, 0.7, 0.6, 1.0)
+let amber = material2d.color(0.9, 0.7, 0.2, 1.0)

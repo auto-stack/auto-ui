@@ -8,6 +8,7 @@
 pub mod ast;
 pub mod game;
 pub mod parse;
+pub mod presentation;
 
 pub use ast::{
     EventPattern, Handler, Node2DStmt, NodeDecl, OnBlock, Prop, PropValue, View2dBlock,
@@ -16,3 +17,4 @@ pub use ast::{
 pub use game::{Game2dAudio, Game2dBlock, Game2dCue, Game2dHud, Game2dShape, Game2dSlot,
     Game2dText, Game2dTrigger, Game2dTriggerKind};
 pub use parse::Node2DDialect;
+pub use presentation::{PresHud, PresSlot, PresTrigger, Presentation2dBlock};

@@ -1,0 +1,35 @@
+// PLAN-025 notify component: arbitrary business names (hits/live), local
+// once-only visible latch, and the typed sound request surface — the author
+// handler picks cue and gain; the compiler only maps the typed cue identity.
+node Notify(base: int, geo: Mesh2D, tint: Material2D) {
+    model {
+        var hits = 0
+        var live = 1
+    }
+    msg {
+        Ping(int)
+    }
+    view-2d {
+        shape2d disc {
+            mesh: .geo
+            position: (4.0 + .base * 8.0, 2.0)
+            material: .tint
+            visible: .live
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+        }
+        .Ping(kind) -> {
+            .hits = .hits + 1
+            if kind == 1 {
+                sfx.play("ping", 1.0)
+            } else {
+                sfx.play("pong", 0.5)
+            }
+            if .hits >= 2 {
+                .live = 0
+            }
+        }
+    }
+}

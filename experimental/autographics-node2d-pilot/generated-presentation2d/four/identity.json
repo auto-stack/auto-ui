@@ -1,0 +1,31 @@
+{
+ "generator": "autographics-node2d-pilot plan025 presentation-2d",
+ "api": "autographics.presentation2d/1",
+ "user_source_sha256": "0a35a0d11a0a139f05e98aee40cc10ecf05e3c4f8a37d4e05c210471ddb12dc5",
+ "user_source_bytes": 2210,
+  "module:bell": "309405b9f7564a7a22e21247692b7e42aa9f1577c011532bd90616def5f2dba5",
+  "module:bellmap": "a3616728cb67fee09f0f9ca85ffb77def85a0f1c90dfe2d0e8fbedf08a098561",
+  "module:main": "ec1066f68c01f98854c3237eb61d936b1cce0c69b6fd876119d2c5daa3cfbf06",
+  "module:resources": "326b578896127f715cb14e51fd5d225f71e721743c02f34ceffaf88e94b85fce",
+ "closure": [
+  {"name": "bell", "sha256": "309405b9f7564a7a22e21247692b7e42aa9f1577c011532bd90616def5f2dba5", "bytes": 838},
+  {"name": "bellmap", "sha256": "a3616728cb67fee09f0f9ca85ffb77def85a0f1c90dfe2d0e8fbedf08a098561", "bytes": 158},
+  {"name": "main", "sha256": "ec1066f68c01f98854c3237eb61d936b1cce0c69b6fd876119d2c5daa3cfbf06", "bytes": 2187},
+  {"name": "resources", "sha256": "326b578896127f715cb14e51fd5d225f71e721743c02f34ceffaf88e94b85fce", "bytes": 168},
+  {"name": "asset:b0b740dc49e51abefff9bb1af830080fe00f817b468614992040d438d6171c3d.wav", "sha256": "b0b740dc49e51abefff9bb1af830080fe00f817b468614992040d438d6171c3d", "bytes": 90060},
+  {"name": "asset:lilita_one_regular.ttf", "sha256": "4444c23631884f411aa7f2fee35061b1756a9927940c62d2a5572acf470b3ffa", "bytes": 26828},
+  {"name": "asset:license.txt", "sha256": "31d45880a38de46bc81835329c0c7d964609751e65add92769ea0095ad92c05b", "bytes": 4391}
+ ],
+ "roles": {
+ "character": null,
+ "solids": [],
+ "camera": null,
+ "scene_objects": {"alto.disc": 1, "tenor.disc": 2}
+},
+ "provenance": {
+  "product": "four",
+  "consumer": "experimental/autographics-auto-driver/tests/node_presentation_flow.rs (V-04 four-request bound + fifth named rejection)",
+  "consumption": "include_str! frozen scene.agscene + world.at; the harness writes world.at to scripts/<sha>.at where <sha> = scene.behavior.source.sha256",
+  "world_sha256": "0a35a0d11a0a139f05e98aee40cc10ecf05e3c4f8a37d4e05c210471ddb12dc5"
+ }
+}

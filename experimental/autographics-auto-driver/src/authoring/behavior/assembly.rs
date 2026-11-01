@@ -49,6 +49,39 @@ pub(super) fn assemble(api: Api) -> Result<Units, String> {
     assemble_from(api, INPUTS)
 }
 fn assemble_from(api: Api, input: Inputs<'_>) -> Result<Units, String> {
+    if api == Api::Presentation2V1 {
+        // PLAN-025 actor-free presentation composition: the full hud2d stack
+        // (objects + triggers + sprites + audio + hud over motion/character)
+        // with the camera2d unit omitted from the API and the character/camera
+        // freezes plus the per-tick character input sampling removed from the
+        // entry — a presentation Run binds no actor, so none can freeze, and
+        // no absent-actor freeze can fault. Derived bytes only; every earlier
+        // profile keeps its exact composition.
+        let mut units = assemble_from(Api::Hud2V1, input)?;
+        let camera_unit = segment_compact(input.camera2)?;
+        units.api = replace(&units.api, &format!("{camera_unit};"), "", 1)?;
+        units.entry = replace(
+            &units.entry,
+            "; _ag_char_freeze(); _ag_cam2_freeze()",
+            "",
+            1,
+        )?;
+        units.entry = replace(&units.entry, "_ag_char_tick_begin(); ", "", 1)?;
+        units.entry = replace(
+            &units.entry,
+            "fn profile() int {return 24}",
+            "fn profile() int {return 26}",
+            1,
+        )?;
+        units.entry = replace(
+            &units.entry,
+            "fn _ag_version() int {return 113}",
+            "fn _ag_version() int {return 115}",
+            1,
+        )?;
+        units.api_region = "<autographics.presentation2d/1>";
+        return Ok(units);
+    }
     if api.hud() {
         let three = api == Api::Hud3V1;
         let mut units = assemble_from(if three { Api::Audio3V1 } else { Api::Audio2V1 }, input)?;
@@ -386,12 +419,13 @@ fn assemble_from(api: Api, input: Inputs<'_>) -> Result<Units, String> {
         | Api::Audio2V1
         | Api::Audio3V1
         | Api::Hud2V1
-        | Api::Hud3V1 => segment_transport(input.transport)?,
+        | Api::Hud3V1
+        | Api::Presentation2V1 => segment_transport(input.transport)?,
     };
     // The former v5 pre-namespace `_ag_derive` replacement never matched.
     // Preserve those emitted bytes; activating that guard would change behavior.
     let (api_text, api_region) = match api {
-        Api::NodeAnimation3V1 | Api::Audio2V1 | Api::Audio3V1 | Api::Hud2V1 | Api::Hud3V1 => unreachable!("derived above"),
+        Api::NodeAnimation3V1 | Api::Audio2V1 | Api::Audio3V1 | Api::Hud2V1 | Api::Hud3V1 | Api::Presentation2V1 => unreachable!("derived above"),
         Api::V1 => (input.base.to_owned(), "<behavior_v1.at>"),
         Api::SpatialV2 => (
             format!("{}\n{}", input.base, input.spatial),
@@ -612,7 +646,8 @@ fn entry(api: Api, source: &str) -> Result<String, String> {
         | Api::Audio2V1
         | Api::Audio3V1
         | Api::Hud2V1
-        | Api::Hud3V1 => {
+        | Api::Hud3V1
+        | Api::Presentation2V1 => {
             let source = replace(
                 &source,
                 "_ag_spatial_begin();",

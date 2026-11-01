@@ -1818,7 +1818,7 @@ fn gen_user_source_3d(
         .map(|e| scene.handles[&scene.root_rows[&e.elem]].to_string());
 
     // root Life/成员/呈现 fns。
-    let mut rctx = root_ctx(project, world, plan, None, None);
+    let mut rctx = root_ctx(project, world, plan, None, None, None);
     rctx.space3 = Some(SpaceEnv {
         refs: &root_refs,
         self_row: root_primary.clone(),
@@ -1873,7 +1873,7 @@ fn gen_user_source_3d(
             .elems
             .first()
             .map(|e| format!("{prefix}_{}_rows[i]", e.elem));
-        let mut ictx = instance_ctx(project, plan, def, &prefix, "i", None, None)?;
+        let mut ictx = instance_ctx(project, plan, def, &prefix, "i", None, None, None)?;
         ictx.space3 = Some(SpaceEnv {
             refs: &inst_refs,
             self_row: inst_primary.clone(),
@@ -2229,9 +2229,9 @@ fn gen_recv_fn_3d(
     }
     src.push_str(&format!("fn {fname}({sig}) {{\n"));
     let mut ctx = if index.is_empty() {
-        root_ctx(project, world, plan, None, None)
+        root_ctx(project, world, plan, None, None, None)
     } else {
-        instance_ctx(project, plan, def, &def.prefix(), "j", None, None)?
+        instance_ctx(project, plan, def, &def.prefix(), "j", None, None, None)?
     };
     ctx.space3 = Some(SpaceEnv {
         refs,

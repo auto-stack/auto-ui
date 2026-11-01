@@ -1,0 +1,87 @@
+// PLAN-025 T-02/T-04 notify fixture (V-02, actor-free presentation): two
+// same-definition Notify instances with independent local state, driven by
+// root typed events (the 020 mechanism), each deciding its own sound cue,
+// gain and HUD text via ordinary author handlers. No character2d, no
+// camera2d, no trigger rows: the scene runs on the actor-free
+// autographics.presentation2d/1 composition with two_d: null. The closeout
+// transmits the bounded request rows plus the complete four-slot HUD state
+// exactly once per callback.
+use resources: disc_mesh, teal, amber
+use textmap: beat_text
+use notif: Notify
+
+node Main {
+    model {
+        var beat = 0
+    }
+    presentation2d {
+        audio {
+            bank: "assets/b0b740dc49e51abefff9bb1af830080fe00f817b468614992040d438d6171c3d.wav"
+            font: "assets/lilita_one_regular.ttf"
+            license: "assets/license.txt"
+        }
+        cue ping {
+            span: (0, 7403)
+            gain: 1.0
+        }
+        cue pong {
+            span: (7403, 20046)
+            gain: 0.5
+        }
+        hud {
+            slot 0 {
+                owner: "left"
+                anchor: 0
+                offset: (8.0, 8.0)
+                size: 32.0
+                rgba: (1.0, 1.0, 1.0, 1.0)
+                text_fn: "beat_text"
+                text_field: "hits"
+                init: "0"
+            }
+            slot 1 {
+                owner: "right"
+                anchor: 1
+                offset: (8.0, 8.0)
+                size: 32.0
+                rgba: (0.8, 0.9, 1.0, 1.0)
+                text_fn: "beat_text"
+                text_field: "hits"
+                visible: "live"
+                init: "0"
+            }
+        }
+    }
+    view-2d {
+        Notify left {
+            base: 0
+            geo: resources.disc_mesh
+            tint: resources.teal
+        }
+        Notify right {
+            base: 1
+            geo: resources.disc_mesh
+            tint: resources.amber
+        }
+        shape2d floor {
+            kind: quad
+            size: (24.0, 2.0)
+            position: (12.0, -1.0)
+            material: resources.teal
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            .beat = .beat + 1
+            if .beat == 3 {
+                left.Ping(1)
+            }
+            if .beat == 6 {
+                right.Ping(2)
+            }
+            if .beat >= 9 {
+                .beat = 0
+            }
+        }
+    }
+}

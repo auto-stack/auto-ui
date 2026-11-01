@@ -112,6 +112,7 @@ pub fn parse_node_decl(cx: &mut dyn DomainParseContext) -> AutoResult<NodeDecl> 
     let mut view3d = None;
     let mut on = None;
     let mut game2d = None;
+    let mut presentation2d = None;
     loop {
         cx.skip_empty_lines();
         if cx.is_kind(TokenKind::RBrace) || cx.is_kind(TokenKind::EOF) {
@@ -203,10 +204,24 @@ pub fn parse_node_decl(cx: &mut dyn DomainParseContext) -> AutoResult<NodeDecl> 
                     game2d = Some(super::game::parse_game2d_block(cx)?);
                     continue;
                 }
+                // PLAN-025：通用声音/HUD 接线入口块（typed 资源/槽 owner/
+                // generic 触发行；无业务枚举）。任何 node 都可携带；root-only
+                // 与 profile 归属由降层具名校验（解析面保持宽容）。
+                "presentation2d" => {
+                    if presentation2d.is_some() {
+                        return Err(SyntaxError::Generic {
+                            message: "duplicate presentation2d block in node".to_string(),
+                            span: pos_to_span(cx.cur_pos()),
+                        }
+                        .into());
+                    }
+                    presentation2d = Some(super::presentation::parse_presentation2d_block(cx)?);
+                    continue;
+                }
                 _ => {
                     return Err(SyntaxError::Generic {
                         message: format!(
-                            "unsupported node block '{keyword}' (research surface: model/msg/view-2d/on/game2d)"
+                            "unsupported node block '{keyword}' (research surface: model/msg/view-2d/on/game2d/presentation2d)"
                         ),
                         span: pos_to_span(cx.cur_pos()),
                     }
@@ -244,6 +259,7 @@ pub fn parse_node_decl(cx: &mut dyn DomainParseContext) -> AutoResult<NodeDecl> 
         view3d,
         on,
         game2d,
+        presentation2d,
         span: super::ast::span_of(start),
     })
 }

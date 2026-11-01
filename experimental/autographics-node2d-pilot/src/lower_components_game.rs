@@ -548,7 +548,7 @@ fn line_at_src(source: &str, offset: usize) -> usize {
 // ------------------------------------------------------------- assets ----
 
 /// 最小 RIFF/WAVE PCM16 解析（fmt + data）：格式/通道/采样率/帧数。
-fn parse_wav(bytes: &[u8]) -> Result<(i64, i64, i64), String> {
+pub(crate) fn parse_wav(bytes: &[u8]) -> Result<(i64, i64, i64), String> {
     let err = |m: &str| format!("game bank wav invalid: {m}");
     if bytes.len() < 12 || &bytes[0..4] != b"RIFF" || &bytes[8..12] != b"WAVE" {
         return Err(err("RIFF/WAVE header"));
@@ -919,7 +919,7 @@ pub(crate) fn trigger_binds_src(gen: &GameGen, char_id: usize) -> String {
 /// F-8.2（game 面）：每个实例叶名的声明 handler 都有接收 fn（root 成员
 /// 无索引）。与 emit 站点命名一致（`<leaf>_<ev 小写>` / `<root>_<ev 小
 /// 写>`）；已有条目不覆盖（frozen 命名优先）。
-fn complete_receivers(
+pub(crate) fn complete_receivers(
     project: &Project,
     world: &WorldIR,
     plan: &mut crate::lower_components::Plan,
@@ -959,7 +959,7 @@ pub fn lower_project_components_game(
     project: &Project,
     entry_dir: &Path,
 ) -> Result<LowerOutputGame, LowerError> {
-    let mut world = build_world(project, false)?;
+    let mut world = build_world(project, false, true)?;
     let game_block = game2d_of(project, &world)?;
     // F-4：注入生成基础设施字段（gate/ord/np/p0/p1）到 root DefIR ——
     // 之后 `.gate` 翻译、getter 发射与 closeout 引用共享同一模型面。
@@ -1006,7 +1006,7 @@ pub fn lower_project_components_game(
     };
 
     let scene = collect_scene(project, &world, &plan)?;
-    let src = gen_user_source(project, &world, &plan, &scene, false, Some(&gen), false)?;
+    let src = gen_user_source(project, &world, &plan, &scene, false, Some(&gen), false, None)?;
     let source_bytes = src.len();
     let source_sha256 = sha256_hex(src.as_bytes());
     let entry = world.root_module.clone();

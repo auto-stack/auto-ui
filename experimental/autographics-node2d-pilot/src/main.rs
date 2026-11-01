@@ -34,6 +34,7 @@ fn main() {
                 Some("sprites-2d") => Profile::Sprites2D,
                 Some("components-2d-game") => Profile::Components2DGame,
                 Some("components-3d") => Profile::Components3D,
+                Some("presentation-2d") => Profile::Presentation2D,
                 _ => usage(),
             }
         }
@@ -541,6 +542,133 @@ fn main() {
             }
             println!(
                 "node2d-lower[components-2d-game]: wrote world.at ({} bytes, sha {}) + scene.agscene + closure/{}+assets/{}",
+                lowered.base.source_bytes,
+                lowered.base.source_sha256,
+                names.len(),
+                lowered.assets.len()
+            );
+        }
+        Profile::Presentation2D => {
+            let entry_path = std::path::Path::new(entry);
+            let entry_dir = entry_path.parent().unwrap_or(entry_path);
+            let lowered =
+                autographics_node2d_pilot::lower_project_presentation(&project, entry_dir)
+                    .unwrap_or_else(|e| {
+                        eprintln!("node2d-lower: {e}");
+                        std::process::exit(3);
+                    });
+            std::fs::write(
+                format!("{out}/world.at"),
+                lowered.base.user_source.expect("source"),
+            )
+            .expect("world.at");
+            std::fs::write(format!("{out}/scene.agscene"), &lowered.base.scene_json)
+                .expect("scene.agscene");
+            let scene_api = if lowered.base.scene_json.contains("\"autographics.hud2d/1\"") {
+                "autographics.hud2d/1"
+            } else {
+                "autographics.presentation2d/1"
+            };
+            let mut names: Vec<_> = project.modules.keys().collect();
+            names.sort();
+            let mut modules = String::new();
+            let mut closure = String::new();
+            for name in &names {
+                let bytes = project.modules[*name].source.as_bytes();
+                modules.push_str(&format!(
+                    "  \"module:{}\": \"{}\",
+",
+                    name,
+                    autographics_node2d_pilot::scene::sha256_hex(bytes)
+                ));
+                closure.push_str(&format!(
+                    "  {{\"name\": \"{name}\", \"sha256\": \"{}\", \"bytes\": {}}},
+",
+                    autographics_node2d_pilot::scene::sha256_hex(bytes),
+                    bytes.len()
+                ));
+            }
+            // 资产进 closure 清单与 closure/assets/（A→B 冷再生）。
+            let assets_dir = format!("{out}/closure/assets");
+            std::fs::create_dir_all(&assets_dir).expect("closure assets dir");
+            let mut asset_entries = String::new();
+            for a in &lowered.assets {
+                let bytes = std::fs::read(&a.src).expect("asset bytes");
+                std::fs::write(format!("{assets_dir}/{}", a.name), &bytes).expect("asset copy");
+                asset_entries.push_str(&format!(
+                    "  {{\"name\": \"asset:{}\", \"sha256\": \"{}\", \"bytes\": {}}},
+",
+                    a.name, a.sha256, a.bytes
+                ));
+            }
+            let mut identity = String::from("{
+");
+            identity.push_str(
+                " \"generator\": \"autographics-node2d-pilot plan025 presentation-2d\",
+",
+            );
+            identity.push_str(&format!(" \"api\": \"{scene_api}\",
+"));
+            identity.push_str(&format!(
+                " \"user_source_sha256\": \"{}\",
+ \"user_source_bytes\": {},
+",
+                lowered.base.source_sha256, lowered.base.source_bytes
+            ));
+            identity.push_str(&modules);
+            identity.push_str(" \"closure\": [
+");
+            let combined = format!("{closure}{asset_entries}");
+            identity.push_str(combined.trim_end_matches(",
+"));
+            identity.push_str("
+ ],
+");
+            identity.push_str(&format!(" \"roles\": {},
+", lowered.base.roles_json));
+            let product = std::path::Path::new(out)
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("unrecorded")
+                .to_string();
+            let consumer = match product.as_str() {
+                "notify" => {
+                    "experimental/autographics-auto-driver/tests/node_presentation_flow.rs (V-02 actor-free Auto/GPU/PCM)"
+                }
+                "game" => {
+                    "experimental/autographics-auto-driver/tests/node_presentation_flow.rs (V-03 author G12-equivalent branches)"
+                }
+                "four" => {
+                    "experimental/autographics-auto-driver/tests/node_presentation_flow.rs (V-04 four-request bound + fifth named rejection)"
+                }
+                _ => "unrecorded (this out dir has no registered flow consumer)",
+            };
+            identity.push_str(" \"provenance\": {
+");
+            identity.push_str(&format!("  \"product\": \"{product}\",
+"));
+            identity.push_str(&format!("  \"consumer\": \"{consumer}\",
+"));
+            identity.push_str(
+                "  \"consumption\": \"include_str! frozen scene.agscene + world.at; the harness writes world.at to scripts/<sha>.at where <sha> = scene.behavior.source.sha256\",
+",
+            );
+            identity.push_str(&format!(
+                "  \"world_sha256\": \"{}\"
+",
+                lowered.base.source_sha256
+            ));
+            identity.push_str(" }
+}
+");
+            std::fs::write(format!("{out}/identity.json"), identity).expect("identity.json");
+            let closure_dir = format!("{out}/closure");
+            for name in &names {
+                let bytes = project.modules[*name].source.as_bytes();
+                std::fs::write(format!("{closure_dir}/{name}.at"), bytes).expect("closure file");
+            }
+            println!(
+                "node2d-lower[presentation-2d]: wrote world.at ({} bytes, sha {}) + scene.agscene + closure/{}+assets/{}",
                 lowered.base.source_bytes,
                 lowered.base.source_sha256,
                 names.len(),

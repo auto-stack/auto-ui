@@ -1,0 +1,31 @@
+{
+ "generator": "autographics-node2d-pilot plan025 presentation-2d",
+ "api": "autographics.presentation2d/1",
+ "user_source_sha256": "50a80d386f2c8f5ffe4a518ea083150e983a2025160bd1b97841eb51305aeab4",
+ "user_source_bytes": 3014,
+  "module:main": "207b136c21a6ccf2f57a067b345221c57c1e20031fccc6d9fb64cf523a17782b",
+  "module:notif": "9ecd8c05190879e6936228763ac6d4a2d8908df8e764c73203b7c077dc400451",
+  "module:resources": "cb3f5dd5ee78f5fe46486c0edb69734afb6989fa821d797b181a75dd9e44da0e",
+  "module:textmap": "fda4818c20ac1dbd0da911568f0c975a5948ef36c75336fcecf6f8518d0ea15b",
+ "closure": [
+  {"name": "main", "sha256": "207b136c21a6ccf2f57a067b345221c57c1e20031fccc6d9fb64cf523a17782b", "bytes": 2526},
+  {"name": "notif", "sha256": "9ecd8c05190879e6936228763ac6d4a2d8908df8e764c73203b7c077dc400451", "bytes": 919},
+  {"name": "resources", "sha256": "cb3f5dd5ee78f5fe46486c0edb69734afb6989fa821d797b181a75dd9e44da0e", "bytes": 204},
+  {"name": "textmap", "sha256": "fda4818c20ac1dbd0da911568f0c975a5948ef36c75336fcecf6f8518d0ea15b", "bytes": 261},
+  {"name": "asset:b0b740dc49e51abefff9bb1af830080fe00f817b468614992040d438d6171c3d.wav", "sha256": "b0b740dc49e51abefff9bb1af830080fe00f817b468614992040d438d6171c3d", "bytes": 90060},
+  {"name": "asset:lilita_one_regular.ttf", "sha256": "4444c23631884f411aa7f2fee35061b1756a9927940c62d2a5572acf470b3ffa", "bytes": 26828},
+  {"name": "asset:license.txt", "sha256": "31d45880a38de46bc81835329c0c7d964609751e65add92769ea0095ad92c05b", "bytes": 4391}
+ ],
+ "roles": {
+ "character": null,
+ "solids": [],
+ "camera": null,
+ "scene_objects": {"floor": 1, "left_template": 2, "right_template": 3}
+},
+ "provenance": {
+  "product": "notify",
+  "consumer": "experimental/autographics-auto-driver/tests/node_presentation_flow.rs (V-02 actor-free Auto/GPU/PCM)",
+  "consumption": "include_str! frozen scene.agscene + world.at; the harness writes world.at to scripts/<sha>.at where <sha> = scene.behavior.source.sha256",
+  "world_sha256": "50a80d386f2c8f5ffe4a518ea083150e983a2025160bd1b97841eb51305aeab4"
+ }
+}

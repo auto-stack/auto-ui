@@ -208,7 +208,7 @@ fn need_int(
 }
 
 /// 属性取数值字面量（int/float 皆可）。
-fn num_of(pr: &Prop) -> AutoResult<f64> {
+pub(super) fn num_of(pr: &Prop) -> AutoResult<f64> {
     let v = match &pr.value {
         PropValue::One(Expr::Int(v)) => *v as f64,
         PropValue::One(Expr::I64(v)) => *v as f64,
@@ -224,7 +224,7 @@ fn num_of(pr: &Prop) -> AutoResult<f64> {
     Ok(v)
 }
 
-fn int_of(pr: &Prop) -> AutoResult<i64> {
+pub(super) fn int_of(pr: &Prop) -> AutoResult<i64> {
     Ok(num_of(pr)? as i64)
 }
 
@@ -266,7 +266,7 @@ fn pair_of(pr: &Prop, n: usize) -> AutoResult<Vec<f64>> {
     Ok(out)
 }
 
-fn pair2(pr: &Prop) -> AutoResult<(f64, f64)> {
+pub(super) fn pair2(pr: &Prop) -> AutoResult<(f64, f64)> {
     let v = pair_of(pr, 2)?;
     Ok((v[0], v[1]))
 }
@@ -276,12 +276,12 @@ fn ipair2(pr: &Prop) -> AutoResult<(i64, i64)> {
     Ok((v[0] as i64, v[1] as i64))
 }
 
-fn pair4(pr: &Prop) -> AutoResult<(f64, f64, f64, f64)> {
+pub(super) fn pair4(pr: &Prop) -> AutoResult<(f64, f64, f64, f64)> {
     let v = pair_of(pr, 4)?;
     Ok((v[0], v[1], v[2], v[3]))
 }
 
-fn str_of(pr: &Prop) -> AutoResult<String> {
+pub(super) fn str_of(pr: &Prop) -> AutoResult<String> {
     match &pr.value {
         PropValue::One(Expr::Str(s)) => Ok(s.to_string()),
         PropValue::One(Expr::Ident(n)) => Ok(n.to_string()),
@@ -342,7 +342,7 @@ pub fn parse_game2d_block(cx: &mut dyn DomainParseContext) -> AutoResult<Game2dB
     })
 }
 
-fn parse_audio(cx: &mut dyn DomainParseContext) -> AutoResult<Game2dAudio> {
+pub(super) fn parse_audio(cx: &mut dyn DomainParseContext) -> AutoResult<Game2dAudio> {
     let start = cx.cur_pos();
     cx.advance(); // audio
     let props = parse_prop_block(cx)?;
@@ -382,7 +382,7 @@ fn parse_audio(cx: &mut dyn DomainParseContext) -> AutoResult<Game2dAudio> {
     })
 }
 
-fn parse_cue(cx: &mut dyn DomainParseContext) -> AutoResult<Game2dCue> {
+pub(super) fn parse_cue(cx: &mut dyn DomainParseContext) -> AutoResult<Game2dCue> {
     let start = cx.cur_pos();
     cx.advance(); // cue
     let name = cx.cur_text();

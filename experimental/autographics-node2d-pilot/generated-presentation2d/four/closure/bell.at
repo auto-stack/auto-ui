@@ -1,0 +1,32 @@
+// PLAN-025 four Bell component: one handler emits TWO typed requests; two
+// instances in the same callback fill the four bounded rows. Arbitrary
+// business names (ring), branch-selected cue and explicit gains.
+node Bell(px: float, geo: Mesh2D, tint: Material2D) {
+    model {
+        var ring = 0
+    }
+    msg {
+        Ring(int)
+    }
+    view-2d {
+        shape2d disc {
+            mesh: .geo
+            position: (.px, 2.0)
+            material: .tint
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+        }
+        .Ring(which) -> {
+            .ring = .ring + 1
+            if which == 1 {
+                sfx.play("q1", 1.0)
+                sfx.play("q2", 0.25)
+            } else {
+                sfx.play("q3", 0.5)
+                sfx.play("q4", 0.75)
+            }
+        }
+    }
+}

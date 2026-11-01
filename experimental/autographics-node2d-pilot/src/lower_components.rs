@@ -868,7 +868,11 @@ pub(crate) fn model_init_value(
 }
 
 /// 构建组件世界 IR：root + 声明先序实例展开（嵌套/同定义多实例/环/包络）。
-pub(crate) fn build_world(project: &Project, sprites: bool) -> Result<WorldIR, LowerError> {
+pub(crate) fn build_world(
+    project: &Project,
+    sprites: bool,
+    camera_required: bool,
+) -> Result<WorldIR, LowerError> {
     let root_name = project.root.clone();
     let root_module = project
         .node_modules
@@ -1370,7 +1374,9 @@ pub(crate) fn build_world(project: &Project, sprites: bool) -> Result<WorldIR, L
     }
 
     // 相机必须存在（Objects2V1 入口注入 _ag_cam2_freeze，缺相机 fault 27）。
-    if world.camera.is_none() {
+    // PLAN-025：presentation-2d 无角色组合装配不注入相机 freeze（actor-free
+    // 装配），相机可省；其余 profile 维持强制。
+    if world.camera.is_none() && camera_required {
         return Err(at(
             &world.root_module,
             0,
@@ -1539,6 +1545,9 @@ pub(crate) fn walk_expr_q(e: &Expr, line: usize, out: &mut WalkOut, queries: boo
                             .anc_emits
                             .push((ev.to_string(), c.args.args.len(), cline)),
                         "input" | "refs" | "self" | "query2d" => {}
+                        // PLAN-025：typed 声音请求站点（pres 档；translator
+                        // 降层为生成收集器调用，非子投递）。
+                        "sfx" => {}
                         // PLAN-022：render2d.<op> 站点（sprites 档记录）。
                         "render2d" => {
                             let target = match ev.as_str() {
@@ -3180,6 +3189,7 @@ pub(crate) fn collect_scene(
                         query: None,
                         sprites: None,
                         space3: None,
+                        sfx: None,
                     };
                     let pos = prop_of(props, "position").ok_or_else(|| {
                         at(
@@ -3270,6 +3280,7 @@ pub(crate) fn collect_scene(
                             def,
                             &prefix,
                             &inst.def_idx.to_string(),
+                            None,
                             None,
                             None,
                         )?;
@@ -4423,6 +4434,7 @@ pub(crate) fn instance_ctx<'a>(
     index: &str,
     query: Option<&'a QueryParts<'a>>,
     sprites: Option<&crate::translate::SpriteEnv<'a>>,
+    sfx: Option<&crate::translate::SfxEnv<'a>>,
 ) -> Result<Ctx<'a>, LowerError> {
     let edef = def.name.clone();
     let errmod = def.module.clone();
@@ -4518,6 +4530,7 @@ pub(crate) fn instance_ctx<'a>(
             frames: e.frames,
         }),
         space3: None,
+        sfx: sfx.map(|e| crate::translate::SfxEnv { cues: e.cues }),
     })
 }
 
@@ -4527,6 +4540,7 @@ pub(crate) fn root_ctx<'a>(
     plan: &'a Plan,
     query: Option<&'a QueryParts<'a>>,
     sprites: Option<&crate::translate::SpriteEnv<'a>>,
+    sfx: Option<&crate::translate::SfxEnv<'a>>,
 ) -> Ctx<'a> {
     let root = world.root.clone();
     let errmod = world.root_module.clone();
@@ -4605,6 +4619,7 @@ pub(crate) fn root_ctx<'a>(
             frames: e.frames,
         }),
         space3: None,
+        sfx: sfx.map(|e| crate::translate::SfxEnv { cues: e.cues }),
     }
 }
 
@@ -4850,6 +4865,7 @@ pub(crate) fn gen_user_source(
     queries: bool,
     game: Option<&crate::lower_components_game::GameGen>,
     sprites: bool,
+    pres: Option<&crate::lower_presentation::PresGen>,
 ) -> Result<String, LowerError> {
     let mut src = String::new();
     let root_def = &world.defs[&world.root];
@@ -4928,6 +4944,10 @@ pub(crate) fn gen_user_source(
         for name in g.infra_field_names() {
             src.push_str(&format!("var r_{name}=0\n"));
         }
+    }
+    // PLAN-025：presentation 基础设施标量（ord/np + 有界请求行）。
+    if pres.is_some() {
+        src.push_str(&crate::lower_presentation::pres_scalars_src());
     }
 
     // PLAN-023 F-8.1（game 面）：呈现缓存后缀 visq（frozen 档保持 vis）。
@@ -5197,12 +5217,14 @@ var {img}_fh=[{}]
         spawns: &scene.spawn_sites,
         frames: &frames_env,
     });
+    let pres_sfx = pres.map(|g| crate::translate::SfxEnv { cues: &g.cues });
     let rctx = root_ctx(
         project,
         world,
         plan,
         root_query.as_ref(),
         sprite_env.as_ref(),
+        pres_sfx.as_ref(),
     );
     src.push_str("fn main_lifestart() {\n");
     if let Some(h) = life_handler(root_decl, "Start") {
@@ -5213,6 +5235,12 @@ var {img}_fh=[{}]
     // PLAN-023 F-2c/F-6（game 面）：poll 前奏（每回调恰一次 next 首读）。
     if game.is_some() {
         src.push_str(" game_events()\n");
+    }
+    // PLAN-025（presentation 面）：触发存在时才有 poll 前奏。
+    if let Some(pg) = pres {
+        if !pg.triggers.is_empty() {
+            src.push_str(" pres_events()\n");
+        }
     }
     if let Some(h) = life_handler(root_decl, "Tick") {
         translate_handler(&h.body.stmts, &rctx, &mut src, 1)?;
@@ -5236,6 +5264,7 @@ var {img}_fh=[{}]
             ev,
             root_query.as_ref(),
             sprite_env.as_ref(),
+            pres_sfx.as_ref(),
             &mut src,
         )?;
     }
@@ -5256,6 +5285,7 @@ var {img}_fh=[{}]
             true,
             vis_suffix,
             sprite_env.as_ref(),
+            pres_sfx.as_ref(),
             scene,
             &mut src,
         )?;
@@ -5283,6 +5313,7 @@ var {img}_fh=[{}]
             "i",
             inst_query.as_ref(),
             sprite_env.as_ref(),
+            pres_sfx.as_ref(),
         )?;
         if def.life_tick {
             src.push_str(&format!("fn {prefix}_lifetick(i int, dt float) {{\n"));
@@ -5322,6 +5353,7 @@ var {img}_fh=[{}]
                 ev,
                 recv_query.as_ref(),
                 sprite_env.as_ref(),
+                pres_sfx.as_ref(),
                 &mut src,
             )?;
         }
@@ -5337,6 +5369,7 @@ var {img}_fh=[{}]
                 false,
                 vis_suffix,
                 sprite_env.as_ref(),
+                pres_sfx.as_ref(),
                 scene,
                 &mut src,
             )?;
@@ -5403,6 +5436,21 @@ var {img}_fh=[{}]
         })?;
         src.push_str(&crate::lower_components_game::trigger_binds_src(g, char_id));
     }
+    // PLAN-025（presentation 面）：每 authoring 触发行一条 ag_trigger_bind
+    // （pair = 声明序，subject 恒为 character；触发存在时要求恰一角色）。
+    if let Some(pg) = pres {
+        if !pg.triggers.is_empty() {
+            let char_id = scene.char.clone().map(|(id, _)| id).ok_or_else(|| {
+                at(
+                    &root_def.module,
+                    root_def.line,
+                    "trigger",
+                    "presentation2d triggers require the components character2d subject",
+                )
+            })?;
+            src.push_str(&crate::lower_presentation::pres_binds_src(pg, char_id));
+        }
+    }
     if root_def.life_start {
         src.push_str(" main_lifestart()\n");
     }
@@ -5449,11 +5497,18 @@ var {img}_fh=[{}]
     if game.is_some() {
         src.push_str(" game_closeout()\n");
     }
+    // PLAN-025（presentation 面）：每回调恰一次 closeout 收口。
+    if pres.is_some() {
+        src.push_str(" pres_closeout()\n");
+    }
     src.push_str("}\n");
     // PLAN-023 F-3（game 面）：closeout 骨架（game_cue / game_events /
     // hud_<field>_text / game_closeout）。
     if let Some(g) = game {
         src.push_str(&crate::lower_components_game::game_fns_src(g));
+    }
+    if let Some(pg) = pres {
+        src.push_str(&crate::lower_presentation::pres_fns_src(pg));
     }
     Ok(src)
 }
@@ -5468,6 +5523,7 @@ pub(crate) fn gen_recv_fn(
     ev: &str,
     query: Option<&QueryParts>,
     sprites: Option<&crate::translate::SpriteEnv>,
+    sfx: Option<&crate::translate::SfxEnv>,
     src: &mut String,
 ) -> Result<(), LowerError> {
     let def = if recv_def_name.is_empty() {
@@ -5503,9 +5559,9 @@ pub(crate) fn gen_recv_fn(
     }
     src.push_str(&format!("fn {fname}({sig}) {{\n"));
     let ctx = if index.is_empty() {
-        root_ctx(project, world, plan, query, sprites)
+        root_ctx(project, world, plan, query, sprites, sfx)
     } else {
-        instance_ctx(project, plan, def, &def.prefix(), "j", query, sprites)?
+        instance_ctx(project, plan, def, &def.prefix(), "j", query, sprites, sfx)?
     };
     translate_handler(&h.body.stmts, &ctx, src, 1)?;
     src.push_str("}\n");
@@ -5523,6 +5579,7 @@ fn gen_present_fn(
     is_root: bool,
     vis_suffix: &str,
     sprites: Option<&crate::translate::SpriteEnv>,
+    sfx: Option<&crate::translate::SfxEnv>,
     scene: &SceneBuild,
     src: &mut String,
 ) -> Result<(), LowerError> {
@@ -5541,9 +5598,9 @@ fn gen_present_fn(
     for arr in &arrays {
         let props = elem_props(project, def, &arr.elem)?;
         let ctx = if is_root {
-            root_ctx(project, world, plan, None, sprites)
+            root_ctx(project, world, plan, None, sprites, sfx)
         } else {
-            instance_ctx(project, plan, def, &prefix, index, None, sprites)?
+            instance_ctx(project, plan, def, &prefix, index, None, sprites, sfx)?
         };
         let pos = prop_of(&props, "position")
             .ok_or_else(|| at(&def.module, def.line, "position", "missing position"))?;
@@ -5779,14 +5836,14 @@ fn lower_components_mode(
             }
         }
     }
-    let world = build_world(project, sprites)?;
+    let world = build_world(project, sprites, true)?;
     let plan = plan_dispatch(project, &world, queries, sprites)?;
     let scene = if sprites {
         collect_scene_sprites(project, &world, &plan)?
     } else {
         collect_scene(project, &world, &plan)?
     };
-    let src = gen_user_source(project, &world, &plan, &scene, queries, game, sprites)?;
+    let src = gen_user_source(project, &world, &plan, &scene, queries, game, sprites, None)?;
     let source_bytes = src.len();
     let source_sha256 = sha256_hex(src.as_bytes());
     let entry = world.root_module.clone();

@@ -1221,6 +1221,7 @@ fn gen_user_source(
         query: None,
         sprites: None,
         space3: None,
+                        sfx: None,
     };
 
     // ---- app_start：生成绑定（声明序）+ 作者 Life.Start ----

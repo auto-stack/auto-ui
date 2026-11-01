@@ -1,0 +1,80 @@
+// PLAN-025 T-02/T-05 four fixture (V-04, actor-free): two same-definition
+// Bell instances deliver FOUR distinguishable cue requests in ONE callback
+// (two per handler), all four transmitted by the single closeout with exact
+// ordinals and gains; the fifth request is the named fault 51 (derived
+// in-memory world variant, never this committed product).
+use resources: disc_mesh, teal, amber
+use bellmap: bell_text
+use bell: Bell
+
+node Main {
+    model {
+        var beat = 0
+    }
+    presentation2d {
+        audio {
+            bank: "assets/b0b740dc49e51abefff9bb1af830080fe00f817b468614992040d438d6171c3d.wav"
+            font: "assets/lilita_one_regular.ttf"
+            license: "assets/license.txt"
+        }
+        cue q1 {
+            span: (0, 3000)
+            gain: 1.0
+        }
+        cue q2 {
+            span: (3000, 6000)
+            gain: 1.0
+        }
+        cue q3 {
+            span: (6000, 9000)
+            gain: 1.0
+        }
+        cue q4 {
+            span: (9000, 12000)
+            gain: 1.0
+        }
+        hud {
+            slot 0 {
+                owner: "alto"
+                anchor: 0
+                offset: (8.0, 8.0)
+                size: 32.0
+                rgba: (1.0, 1.0, 1.0, 1.0)
+                text_fn: "bell_text"
+                text_field: "ring"
+                init: "0"
+            }
+            slot 1 {
+                owner: "tenor"
+                anchor: 1
+                offset: (8.0, 8.0)
+                size: 32.0
+                rgba: (0.8, 0.9, 1.0, 1.0)
+                text_fn: "bell_text"
+                text_field: "ring"
+                init: "0"
+            }
+        }
+    }
+    view-2d {
+        Bell alto {
+            px: 4.0
+            geo: resources.disc_mesh
+            tint: resources.teal
+        }
+        Bell tenor {
+            px: 12.0
+            geo: resources.disc_mesh
+            tint: resources.amber
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            .beat = .beat + 1
+            if .beat == 2 {
+                alto.Ring(1)
+                tenor.Ring(2)
+            }
+        }
+    }
+}

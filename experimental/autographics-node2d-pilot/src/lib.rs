@@ -16,6 +16,7 @@ pub mod lower_components;
 pub mod lower_components3d;
 pub mod lower_components_game;
 pub mod lower_g11;
+pub mod lower_presentation;
 pub mod scene;
 pub mod translate;
 
@@ -44,6 +45,10 @@ pub enum Profile {
     /// PLAN-024 三维组件：components-3d（view-3d/有限图元/静态平色 GLB/
     /// 同维层级；behavior/1 装配；T-02 冻结的唯一接法）。
     Components3D,
+    /// PLAN-025 通用声音/HUD 接线：presentation-2d（presentation2d 作者块；
+    /// 无业务枚举；无角色 = autographics.presentation2d/1，有角色 =
+    /// autographics.hud2d/1 受检组合）。
+    Presentation2D,
 }
 
 pub use load::{load_project, Project, ProjectError};
@@ -54,4 +59,5 @@ pub use lower_components::{
 };
 pub use lower_components3d::lower_project_components3d;
 pub use lower_components_game::{lower_project_components_game, LowerOutputGame};
+pub use lower_presentation::{lower_project_presentation, LowerOutputPresentation};
 pub use lower_g11::{lower_project_g112d, LowerOutputG11};

@@ -558,6 +558,7 @@ fn base_ctx<'a>(
         query: None,
         sprites: None,
         space3: None,
+                        sfx: None,
     }
 }
 

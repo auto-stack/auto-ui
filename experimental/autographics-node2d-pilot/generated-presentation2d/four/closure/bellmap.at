@@ -1,0 +1,7 @@
+// PLAN-025 four text helper: branch select over the owner's local field.
+fn bell_text(n int) str {
+    if n == 0 {
+        return "0"
+    }
+    return "1"
+}
