@@ -10,7 +10,7 @@
 | [021 二维查询](../../plans/021-autographics-node2d-queries.md) | G05/2d所需segment/sweep、具名节点引用和有寿命的typed结果、标记呈现、原数值/费用 | 020 |
 | [022 精灵与帧动画](../../plans/022-autographics-node2d-sprites-and-frame-animation.md) | G09 atlas/character所需PNG/帧资源、frame/flip绑定、局部角色/动画状态与同tick呈现 | 020 |
 
-三份均在auto-ui管理，当前只起草。AG-008继续固定消费019，不等020/021/022，也不追其开发tip；本轮不修订其合同/进度或接管其owner。后续Gallery迁移另在ag-examples立合同，不提前给未交付内容取号。
+三份均在auto-ui管理，状态以各自合同为准。AG-008已完成并合并8a01a34，归档/清理见[最终收据](../../../../ag-examples/docs/plans/archived/008-autographics-gallery-node2d-first-wave.md)；仍固定消费019，不追加020/021/022前置，也不追其开发tip。后续Gallery迁移另在ag-examples立合同，不提前给未交付内容取号。
 
 020先实际交付，021/022再以同一稳定组件合同实施。它们没有相互功能依赖，若各自新增lower/service模块且共享接线有owner短窗，可以并行；无法隔离共享文件则顺序落地。不能同树并发写，GPU/窗口/音频重型门仍机器单实例。与UI018构建配置的交集按实际diff核，不自动增设全量完成前置。
 
@@ -50,4 +50,4 @@ G09原两张PNG及CC0许可/制作来源固定：atlas96×32（三帧），chara
 
 016/017/019原入口与生成字节保持历史兼容；新组件与服务模式显式选择，具体CLI/端口由各T-02有界整链冻结，不把未实现的语法草图写成Spec。各Plan提供受检输入闭包、依赖/工具/实际二进制身份与source-build消费契约；019记录当前只建立generator部分，runner/新资源身份必须实际闭合，不能自填hash或借旧绿报告。
 
-AG008迁移进度由其owner更新；本轮末核已登记唯一D:/autostack/.wt/ag-008/ag-examples、codex/plan-008-dev（观察HEAD912bd70），主检出执行记录仍待owner同步。本轮不重建/重复接管。所有新能力只跑实际触面及必要反例，OS抢焦点自动化继续暂停；临时材料只在plan-artifacts/plan-NNN/auto-ui，摘要折入Plan，合入清理自有scope。完整M2、ACE/AOT、CPC、3D、多呈现和Life.Frame不在本轮。
+2026-11-01核验AG008已合并并完成归档/清理（ag-examples c9c672c，交付8a01a34）；旧ag-008实施树/分支已由原owner清理，不再作为在途owner引用。连同AG007，迁移进度6/21：g11/2d及W1五入口，剩余15；本次仅同步簿记，不重建或接管其它实施树。所有新能力只跑实际触面及必要反例，OS抢焦点自动化继续暂停；临时材料只在plan-artifacts/plan-NNN/auto-ui，摘要折入Plan，合入清理自有scope。完整M2、ACE/AOT、CPC、3D、多呈现和Life.Frame不在本轮。

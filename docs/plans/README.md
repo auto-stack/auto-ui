@@ -19,7 +19,7 @@
 | 015 | [VM路由页动态加载与原生Blog闭环](archived/015-vm-route-page-dynamic-load.md) | BLOG-004消费前置 | archived/r2；交付df39593；native22/22，规范/ledger148；清理回执见计划 |
 | 016 | [Node2D最小真实执行验证](archived/016-autographics-node2d-minimal-validation.md) | AG共同作者模型最小切片 | archived/r3；R1 needs_fix 11项→修复→同员R2 pass；交付932bd5f（实现9eb1d0e），gate全绿；SD node2d-pilot.md 沉淀本仓；清理回执见计划 |
 | 017 | [完整G11/2d Node作者能力](archived/017-autographics-g11-2d-node-authoring.md) | 016后继/原G11二维兼容 | archived/r1；R1 needs_fix 4项→修复→同员R2 pass；交付9a8a5be（bf02061 rebase，range-diff全等），T-08门全绿；SD node2d-g11-authoring.md 沉淀本仓；清理回执见计划 |
-| 019 | [Node2D场景层级与走跳相机](archived/019-autographics-node2d-scenes-character-camera.md) | Gallery新作者形式首波引擎 | archived/r1，10/10；交付c93adb7，独立R2通过/冻结门/两Spec与清理收据齐；AG008固定消费 |
+| 019 | [Node2D场景层级与走跳相机](archived/019-autographics-node2d-scenes-character-camera.md) | Gallery新作者形式首波引擎 | archived/r1，10/10；交付c93adb7，独立R2通过/冻结门/两Spec与清理收据齐；AG008已合并8a01a34并固定消费019，Gallery迁移6/21 |
 | 020 | [有状态Node组件与局部事件](020-autographics-stateful-node-components.md) | AG局部性共同基础 | drafting/r1，0/10；019已交付，补子model/msg/on、实例/绑定/Life/父事件；不接管AG008 |
 | 021 | [Node二维segment/sweep查询](021-autographics-node2d-queries.md) | W2a/G05-2d引擎 | drafting/r1，0/10；硬等020实际交付；保旧结果寿命/数值/原额/G05义务；Gallery后继另立 |
 | 022 | [Node精灵资源与帧动画](022-autographics-node2d-sprites-and-frame-animation.md) | W2b/G09双入口引擎 | drafting/r1，0/10；硬等020实际交付；保局部状态/两PNG/原18项/预算；不依赖021功能 |

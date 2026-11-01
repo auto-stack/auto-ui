@@ -1,14 +1,14 @@
 # Gallery 全量迁入 Node 作者模型
 
-2026-10-31，设计 v1，目标与分波合同；尚未实施。作者模型沿[总体设计](declarative-authoring-model.md)，当前交付能力沿[017 Spec](../../specs/auto-graphics/node2d-g11-authoring.md)。本文件归 auto-ui；Gallery 合同在各自仓管理。
+2026-10-31，设计 v1；2026-11-01更新交付进度。作者模型沿[总体设计](declarative-authoring-model.md)，已迁移入口能力分别沿[017 Spec](../../specs/auto-graphics/node2d-g11-authoring.md)与[019 Spec](../../specs/auto-graphics/node2d-basic-authoring.md)。本文件归 auto-ui；Gallery 合同在各自仓管理。
 
-2026-11-01进展/规划补记：019引擎已实际交付c93adb7，AG008由用户报告在开发，仍固定019。下一轮[组件/查询/精灵设计](node-components-queries-and-sprites.md)拆为020共同组件基础→021查询、022精灵，三份仅规划；AG008不增加这些前置。019子组件目前仍限纯view，因此W1是有限作者形式迁移，不代表Player等局部model/on已经全部归位；后续内容局部性完善另按真实交付滚动，不在在途008中暗加验收。
+2026-11-01交付补记：019引擎已实际交付c93adb7；[AG008归档合同](../../../../ag-examples/docs/plans/archived/008-autographics-gallery-node2d-first-wave.md)确认已完成并合入master，交付8a01a34、归档248018a、收尾c9c672c，10/10；固定消费019，五入口迁移已交付。连同AG007的g11/2d，当前迁移进度为6/21。下一轮[组件/查询/精灵设计](node-components-queries-and-sprites.md)拆为020共同组件基础→021查询、022精灵，状态以各自合同为准；它们不追加入AG008前置。019子组件仍限纯view，因此W1是有限作者形式迁移，不代表Player等局部model/on已经全部归位；后续内容局部性完善另按真实交付滚动，不重开已归档008。
 
 ## 目标与现场
 
 所有 Gallery 项目的作者源最终使用 Auto 的 node、model、view-2d/view-3d、on、Life、msg、绑定和普通 use。场景 JSON、句柄与单文件运行源可以继续作为生成产物，不要求它们消失，也不要求执行存储照搬声明树。资源、组件和纯函数应复用；不能为每个示例继续新增一个按示例名识别的专用编译器。
 
-当前真实基线：ag-examples dbb4b75，12逻辑项/21入口；仅g11/2d经AG-007实际迁移，g11/3d及其余20入口尚未迁移。G01/G02/G03主要为JSON场景，不应称为已有“旧Auto脚本”；G04是编辑器教程。新模型须同时表达纯场景与有脚本项目，不强制每个项目都有角色、触发器、Tick或VM实例。
+当前核验基线：ag-examples c9c672c（实现交付8a01a34），12逻辑项/21入口；已迁移6/21入口、涉及5个逻辑项：g11/2d、g01/main、g03/2d、g06/layout-a、g06/layout-b、g08/2d；剩余15入口尚未迁移。G01/G02/G03迁移前主要为JSON场景，不应称为已有“旧Auto脚本”；G04是编辑器教程。新模型须同时表达纯场景与有脚本项目，不强制每个项目都有角色、触发器、Tick或VM实例。
 
 auto-ui 017的g11-2d模式仍要求恰一个character2d，solid/camera限根，资源仅程序化二维图元，不能冒称所有二维/三维/资源服务已支持。旧016/017、AG007收据保持历史，后继不重开归档Plan。
 
@@ -16,19 +16,19 @@ auto-ui 017的g11-2d模式仍要求恰一个character2d，solid/camera限根，�
 
 | 入口 | 当前作者形式/能力 | 迁移波次与必须保留的观察 |
 |---|---|---|
-| g01/main | JSON，四图元/alpha/显隐/数组序变体 | W1；base+color/position/order/visible，保原alpha排序和等alpha数组序，不改成任意图层能力 |
+| g01/main | Node源码，AG008/019；四图元/alpha/显隐/数组序变体 | W1已交付；base+color/position/order/visible，保原alpha排序和等alpha数组序，不改成任意图层能力 |
 | g02/main | JSON+静态GLB | W3基础3D/资源；真实多部件、颜色/遮挡/来源许可与离线资源闭包 |
-| g03/2d | JSON，父子group | W1；父平移继承/祖先显隐/深层world坐标与Stop恢复 |
+| g03/2d | Node源码，AG008/019；父子group | W1已交付；父平移继承/祖先显隐/深层world坐标与Stop恢复 |
 | g03/3d | JSON，父子group | W3；同维层级与旧3D规则，不承诺跨维parent或通用TRS写入 |
 | g04/2d | JSON，编辑器教程 | W6；Node为场景来源，原视口/选取/拖动/保存/重开仍是编辑器验收 |
 | g04/3d | JSON，编辑器教程 | W6；原34步相关能力不改名为公共脚本API；OS自动化准入另受既有政策 |
 | g05/2d | 旧v3 Auto+场景，segment/sweep | W2a引擎021（依赖组件020）；typed射线/扫掠结果、命中次序/法线/空间/源变体；不能只迁静态画面 |
 | g05/3d | 旧v3 Auto+场景，segment/sweep | W4a；同上三维与parent空间，需先有3D基础 |
-| g06/layout-a | character Auto，台阶/跳跃 | W1；输入沿、重力/支撑/碰撞、速度4→5对照、布局A原几何 |
-| g06/layout-b | character Auto，坑道/跳跃 | W1；同输入与A产生原几何差异，保无双跳/无缓冲跳与Stop恢复 |
+| g06/layout-a | Node源码，AG008/019；台阶/跳跃 | W1已交付；输入沿、重力/支撑/碰撞、速度4→5对照、布局A原几何 |
+| g06/layout-b | Node源码，AG008/019；坑道/跳跃 | W1已交付；同输入与A产生原几何差异，保无双跳/无缓冲跳与Stop恢复 |
 | g07/layout-a | character3d Auto，固定方向基 | W3；原六动作/归一/有限三维接触与支撑，不偷变相机相对运动 |
 | g07/layout-b | character3d Auto，另一布局 | W3；第二布局与全部原源变体/验收 |
-| g08/2d | camera2d Auto，跟随/夹界/letterbox | W1；主alt相机配置、同tick角色与相机、实际条带和Pause |
+| g08/2d | Node源码，AG008/019；跟随/夹界/letterbox | W1已交付；主alt相机配置、同tick角色与相机、实际条带和Pause |
 | g08/3d | camera3d Auto，环绕/缩放/相对运动 | W3；orbit/zoom、pointer清理、实际投影/运动，不仅生成静态相机 |
 | g09/atlas | sprites2d Auto+PNG atlas | W2b引擎022（依赖组件020）；资源symbol/导入、帧选择、UV、alpha、许可/变体/离线包 |
 | g09/character | sprites2d Auto，角色状态驱动帧 | W2b引擎022；真实走跳/状态与像素相符，保全部9项原oracle |
@@ -39,12 +39,12 @@ auto-ui 017的g11-2d模式仍要求恰一个character2d，solid/camera限根，�
 | g12/audio | audio2d Auto+bank | W5；真实Auto ordinal、一次cue/PCM/原额度/许可/离线资源，不静默降成日志 |
 | g12/hud（未交付） | 既有AG006草案，尚不在21入口内 | W5后继接入；开工前明确修订AG006以消费新作者能力，保字形/PCM/共同接受原AC，不能另建重复HUD内容合同 |
 
-W1是5个已交付入口；W2a/W2b共3个，W3共6个，W4a/W4b共3个，W5当前1个，W6共2个，加已迁移1个，正好21。HUD未来新增入口另按其合同记账，不算“迁移净增”。各波仍可按实际成本拆成中等Plan，不预领后面全部编号。
+W1五入口已完成新作者形式迁移，加AG007已迁移的g11/2d共6/21；待迁移W2a/W2b共3个、W3共6个、W4a/W4b共3个、W5当前1个、W6共2个，合计剩余15个，总分母仍为21。HUD未来新增入口另按其合同记账，不算“迁移净增”。各波仍可按实际成本拆成中等Plan，不预领后面全部编号。
 
-## 第一轮可执行拆分
+## 第一轮交付与后继边界
 
 - [auto-ui/019](../../plans/archived/019-autographics-node2d-scenes-character-camera.md)：已交付c93adb7；纯视觉叶子/二维group、零或一个角色、跳跃/支撑、可选跟随相机与完整主alt源变体；公共准备/来源消费能力。018已被UI构建配置路线占用，不能覆盖。
-- [ag-examples/008](../../../../ag-examples/docs/plans/008-autographics-gallery-node2d-first-wave.md)：固定消费019实际交付，只迁G01、G03/2d、G06两布局、G08/2d。每个入口的旧行为/素材/变体/验收在计划中逐项承接；原3D和其它项不跟升。
+- [ag-examples/008](../../../../ag-examples/docs/plans/archived/008-autographics-gallery-node2d-first-wave.md)：已完成并合并8a01a34（archived/r1，10/10，归档/清理见合同最终收据）；固定消费019实际交付，已迁G01、G03/2d、G06两布局、G08/2d。每个入口的旧行为/素材/变体/验收在计划中逐项承接；原3D和其它项不跟升。
 
 先引擎交付、再内容；下一波引擎可与上一波固定消费的内容并行，读端不追开发tip。查询、二维图片、三维资源和声音的端口应复用共同领域表示，但共享文件要约定owner短窗，GPU/窗口/音频重型门单实例。当前018、语言901与UI014的真实写面由开工核对，不凭标题加全量串行前置。
 
@@ -60,7 +60,7 @@ W1是5个已交付入口；W2a/W2b共3个，W3共6个，W4a/W4b共3个，W5当�
 
 当前清理政策删除计划临时二进制；PE受路径/构建环境影响，固定源码重建哈希可能不同。AG007新2d锁仍只接受历史6ceeb384…，用户试玩使用9a8a5be固定源码重建39a8e27b…，两者不能混称。后续迁移必须提供实际可用的消费/重建方案，不能靠把旧exe当证据永久保留、改写旧锁或静默跳过hash门。
 
-019/008的T-02共同冻结**仅适用于新迁移入口**的版本化来源消费合同：固定source/SDK681/依赖锁/工具链与构建参数；本地重建记录绑定实际二进制hash并验证真实消费者。它必须区别原已认证runner与本机重建，原锁模式继续严格拒绝不匹配。不得把任意自填JSON、当前tip或source字面SHA当已证明来源；若同源重建的闭合验证做不到，须带实际反例回规划，不让内容仓自行豁免。
+019/008已交付并冻结**仅适用于其新迁移入口**的版本化来源消费合同，内容消费规范见[AG008 Spec](../../../../ag-examples/docs/specs/auto-graphics/gallery-node2d-basics.md)：固定source/SDK681/依赖锁/工具链与构建参数；本地重建记录绑定实际二进制hash并验证真实消费者。它必须区别原已认证runner与本机重建，原锁模式继续严格拒绝不匹配。不得把任意自填JSON、当前tip或source字面SHA当已证明来源；若同源重建的闭合验证做不到，须带实际反例回规划，不让内容仓自行豁免。
 
 另有一次真实试玩观察：G11/2d在本机重建版到tick112出现`auto-Pause: tick backlog >4`。此为观察而非根因结论（窗口捕获/背景负载与执行路径尚未区分），不反推Node语法不行，也不能以51个离屏检查绿宣称桌面持续流畅。首轮整链验证需记录同机背景、完整Tick/pump与原码/新码对照，保暂停守护，改新路径引入的回归由其owner修复；无证据不调额度或删除暂停。
 
@@ -68,4 +68,4 @@ W1是5个已交付入口；W2a/W2b共3个，W3共6个，W4a/W4b共3个，W5当�
 
 本设计是长期路线和接口要求，不是临时探针/验收报告。临时材料只在plan-artifacts/plan-NNN/<repo>/，禁止新建attachments（包括md）；merge前摘要折叠进Plan，清理自有scope及构建中间物，具名未解决问题按新政策持有。永久产品源码、必要回归测试/夹具和canonical Spec按所属仓维护。
 
-本轮只提交设计、019/008草案与导航；未改任一示例/引擎实现、未新建实施树、未构建或运行GPU，也不接管上轮保留的试玩窗口。
+本次仅根据AG008实际合入/归档/清理收据更新路线与导航至6/21；不实施其它计划，不修改示例/引擎实现、旧锁或验收合同，不新建实施树、构建或运行GPU。
