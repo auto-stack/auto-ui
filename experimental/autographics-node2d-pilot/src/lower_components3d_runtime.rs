@@ -18,7 +18,7 @@
 //! 重复注册/预算等运行时拒绝仍由受信单元在真实 Run 内执行（V-S03）。
 
 use auto_parser_api::ast::Expr;
-use auto_ui_dialect::node2d::{Camera3dBlock, NodeDecl, PropValue};
+use auto_ui_dialect::node2d::{Camera3dBlock, PropValue};
 
 use crate::load::{node_of, Project};
 use crate::lower::numeric_lit;

@@ -12,7 +12,6 @@ use autographics_auto_driver::authoring::document::Document;
 use autographics_auto_driver::authoring::{
     assets::Registry,
     behavior::SourceSnapshot,
-    behavior_project::CodePayload,
     host::Host,
     play::{Action, CharProfile},
     storage::Storage,
@@ -69,7 +68,6 @@ const WIDE128_SCENE: &str = include_str!(
 const WIDE128_WORLD: &str =
     include_str!("../../autographics-node2d-pilot/generated-components3d-runtime/wide128/world.at");
 
-const DT: f32 = 1.0 / 60.0;
 const STEPS: usize = 60;
 
 // ---------------------------------------------------------------- harness --
@@ -575,7 +573,7 @@ fn vs03_runtime_rejections_fuel_the_named_faults() {
         {
             let bad = G08_WORLD.replace("ag_camera_orbit_3d(5,", "ag_camera_orbit_3d(1,");
             assert_ne!(bad, G08_WORLD, "target mutation applied");
-            let mut h = start_with_source(
+            let h = start_with_source(
                 G08_SCENE,
                 G08_WORLD,
                 &bad,
@@ -601,7 +599,7 @@ fn vs03_runtime_rejections_fuel_the_named_faults() {
             // 注入在 app_start 开头会先撞 fault 30 的 target 未绑定序）。
             let bad = G08_WORLD.replace(&line, &format!("{line}\n {line}"));
             assert_ne!(bad, G08_WORLD, "dup config mutation applied");
-            let mut h = start_with_source(
+            let h = start_with_source(
                 G08_SCENE,
                 G08_WORLD,
                 &bad,
@@ -619,7 +617,7 @@ fn vs03_runtime_rejections_fuel_the_named_faults() {
         {
             let bad = G08_WORLD.replace("ag_camera_orbit_3d(5, 8.0,", "ag_camera_orbit_3d(5, 99.0,");
             assert_ne!(bad, G08_WORLD, "domain mutation applied");
-            let mut h = start_with_source(
+            let h = start_with_source(
                 G08_SCENE,
                 G08_WORLD,
                 &bad,
@@ -654,7 +652,7 @@ fn vs03_runtime_rejections_fuel_the_named_faults() {
         // deep127：127 根注册 solid 全部与角色足迹重叠 —— 越限反例在 INIT
         // 即被原累计步门整帧拒绝（127solid初始化拒绝，保原负控）。
         {
-            let mut h = start(DEEP127_SCENE, DEEP127_WORLD, "deep127");
+            let h = start(DEEP127_SCENE, DEEP127_WORLD, "deep127");
             let p = h.play.as_ref().unwrap();
             assert!(
                 p.error

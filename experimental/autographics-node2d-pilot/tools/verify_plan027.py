@@ -149,7 +149,7 @@ def control_identity(results):
                 assert cams[0] > binds[0], f"{prod}: camera config follows the bind"
             if solids:
                 assert min(solids) > binds[0], f"{prod}: solids follow the bind"
-            results[f"{prod}/config_lines"] = {"bind": 1, "solids": len(solids), "camera": len(cams)}
+            results[f"{prod}/config_lines"] = {"bind": len(binds), "solids": len(solids), "camera": len(cams)}
         else:
             assert identity["user_source_sha256"] is None, f"{prod}: pure scene binds no source"
             assert not os.path.exists(os.path.join(pdir, "world.at")), (
