@@ -1,6 +1,6 @@
 ---
 plan_id: PLAN-014
-status: execution_done
+status: reviewed
 feature_name: UI/Man内部结构收口（保持行为与既有crate粒度）
 author: [Codex]
 created_at: 2026-10-30
@@ -10,13 +10,13 @@ supersedes_spec_components: [docs/specs/README.md]
 new_spec_components: [docs/specs/ui/structure-closure.md, docs/specs/ui/structure-test-map.md]
 touched_goals: []
 affects: [auto-ui-compiler, auto-ui-runtime, auto-ui-tools, auto-man-cli, repository-boundaries]
-current_step: 9
+current_step: 10
 total_steps: 11
 ---
 
 # [auto-ui/PLAN-014] UI/Man内部结构收口
 
-> r2 / execution_done / 9/11（2026-11-01）。实施授权=2026-11-01用户goal：先推进T-01/T-02及Man CLI（T-03），再做Vue（T-04）；共享接口改动、renderer/GPU验证和最终合入安排短窗串行；不把020完整交付作为014全局前置。T-03..T-06已交付（Man 5b310f0；UI组树7a183c6/90e0c44/fcece7a；901 consumer漂移随T-03修复）；T-07完成四面闭包核对+V-12守恒账（发现并修复T-05漏切的38个memo测试，修复后日常2196/2196、守恒172=172）+TrackCtx终局登记（7文件29签名，退出本Plan范围，登记007接续）。
+> r2 / reviewed / 10/11（2026-11-01）。实施授权=2026-11-01用户goal：先推进T-01/T-02及Man CLI（T-03），再做Vue（T-04）；共享接口改动、renderer/GPU验证和最终合入安排短窗串行；不把020完整交付作为014全局前置。T-03..T-06已交付（Man 5b310f0；UI组树7a183c6/90e0c44/fcece7a；901 consumer漂移随T-03修复）；T-07完成四面闭包核对+V-12守恒账（发现并修复T-05漏切的38个memo测试，修复后日常2196/2196、守恒172=172）+TrackCtx终局登记（7文件29签名，退出本Plan范围，登记007接续）。
 > 唯一主责auto-ui；Man参与CLI结构，语言/Web只接受稳定公开依赖及必要消费/规范指针。890、900、901、018均已有归档交付记录；本计划保留其实际支持边界，不重做迁移、feature拍平或发行闭包补全。
 > 设计：[UI/Man结构边界](../design/autoui/ui-man-structure-closure.md)。该设计r1的U890等待/旧feature与证据条款由本计划r2更新，四面目标保持；总路线v20仅历史，不覆盖本次实物核查。
 
@@ -204,6 +204,7 @@ work/review只做命名反例/模块/fixture及必要`cargo check -p auto-ui-com
 | [✅ T-07] | work / T-06 | 四面API/依赖/feature/类型和源码发行清单核对，测试随owner迁移/外移并保旧新ID与原子义务；复用现有治理及必要小型结构回归，旧重复逻辑/未接线helper退出 | AC-07/08；V-11/12及对应V-05 |
 | [✅ T-08] | work / T-07 | 既有CLI/工具/公开package-runtime/生成发行consumer及固定legacy app，从新组合真实Vue/VM/GPU交互与owned退出重开；fresh/locked/A→B和失败恢复再消费 | AC-09；V-03/09/10/13，定位指纹/产物与实际工具来源 |
 | [✅ T-09] | work / T-08 | 四面/全部work AC与V自检、健康/遗漏/SD-01..06 proposal、X回交和UI007接续矩阵冻结；独立审查入口齐后execution_done9/11 | AC-10；V-14及AC-01..09证据读回；不提前合入/沉淀或跑最终整档 |
+| [✅ T-10] | review / T-09 | 同组冻结SHA独立final review所有work AC/V/SD与遗漏/延后/workaround；finding回同树work修复再审。pass后reviewed10/11，最终门仍pending | AC-11；auto-plan-review，独立来源重建 |
 | T-04 | work / T-03 | UI compiler `ui_gen/vue.rs`→按template/script/style/import/library/store等具名主题模块（具体新路径T-02冻结）；移除旧正文/重复算法，保公开入口/单state/reset/010 | AC-03；V-04/05 |
 | T-05 | work / T-04 | runtime `ui/aura_view_builder.rs`及必要既有相邻模块按节点/绑定/构建/跟踪职责提取；单VmBridge/Bindings/slot/path与guard，旧实现退出 | AC-04；V-06及定向状态控制 |
 | T-06 | work / T-05 | runtime `ui/iced/renderer.rs`按已冻结消息/状态/资源owner整理更新/订阅/view、图标部件、纹理/快照与宿主边界；保实际调用、资源终态/帧/active | AC-05/06；V-07/08/10，真实GPU定向，不以只移动代码关闭 |
@@ -327,6 +328,16 @@ stage: work | plan_id: auto-ui/PLAN-014 | plan_revision: 2 | outcome: pass（含
 ### work轮4（2026-11-01，T-06）
 
 stage: work | plan_id: auto-ui/PLAN-014 | plan_revision: 2 | outcome: pass | worktree: D:/autostack/.wt/ui-014/auto-ui | branch: codex/plan-014-structure | base_commit: 90e0c44（master 6d7fc69祖先） | code_commit: fcece7a | dependency_revisions: lang b1a4871a / web ec9c4ba / down 7c4d5cb / man组树 5b310f0 | task_ids: T-06 | evidence: §8.4执行记录 + 提交fcece7a（V-07/V-08机制面：日常2158/2158平齐、renderer族170/170、mutation control过、393==393零新增警告、消费仓check 0 error） | blockers: 无（V-09/V-10真GPU/真输入/owned退出重开按冻结归T-08） | next_responsible_role: work（T-07 API/依赖/feature/类型闭包核对+测试随owner映射+TrackCtx收敛窗口）
+
+### T-10 独立final review（2026-11-01）
+
+stage: review | review_scope: final | reviewer_identity/limitations: 本会话编排+三个新建独立上下文subagent从源码重建验证（R1=UI三面/R2=Man CLI/R3=跨切面）；非独立会话整体，独立性限于重建上下文——如实记录 | plan_id: auto-ui/PLAN-014 | plan_revision: 2 | outcome: **pass（reviewed）** | worktree_path: D:/autostack/.wt/ui-014/auto-ui + auto-man | branch: codex/plan-014-structure | reviewed_commit: auto-ui c9d9e3e（代码=c3f5833=570c147+纯docs；doc修复c9d9e3e） / auto-man 85217fc（代码=5b310f0+doc修复） | base_commit: 695ce0b / cbbe657 | dependency_revisions: lang b1a4871a / web ec9c4ba / down 7c4d5cb | spec_inputs: docs/specs/ui/{structure-closure,structure-test-map}.md@c9d9e3e、auto-man docs/specs/cli/structure-closure.md@85217fc、README注册 | acceptance_results: AC-01..10全pass（三agent源码重建：纯移动multiset零漂移、覆盖零丢失（impl方法551/461/258与自由fn逐名守恒）、公开API逐名解析、单一source、零重加ui-iced门、Man 41变体43臂零丢失、CLI合同不变量、901修复、卫生零symlink）；reviewer侧新鲜运行 compiler 1127/0、builder+renderer族331/331、Man unit 24/24（复用同基线大账2196/2196等） | pending_closeout_gates: 统一最终门（UI t/tu/ti+Man t/tcore/tc/ti+语言受影响组）=T-11冻结提交执行；lang SD-05/06落盘=T-11依赖序合入；归档/清理=T-11 | findings: 全部doc精度级已当场修复（R1-1..4/R2-1..2/R3-1→c9d9e3e/85217fc）；R3-2=基线既有api-gen→auto-web边（非本Plan触面，记录）；R2-3/R2-4=行为等价适配（登记）；无in-contract缺陷 | evidence: 三agent重建报告要点折入本节+structure-and-oracles.md； reviewed Spec delta冻结副本=上述worktree提交 | next: merge（T-11）
+
+三agent独立重建结论摘要：
+- R1（UI三面）：纯移动完整性**穷举级**核验（全行multiset diff零body漂移；impl方法名multiset 551=551/461=461/258=258；自由fn 48/41/448守恒）；覆盖零丢失（行守恒+206/+111/+111=头与plumbing）；公开API（ui_gen/mod.rs与base逐字节同；iced/mod.rs 18名全解析；session.rs 8名全解析；双crate cargo check 0 error）；单一source×4；ui-iced门全仓0；TrackCtx诚实（无TrackCtx类型，29签名实测精确，创建点唯一）；plan811守卫扫8文件断言零改。
+- R2（Man CLI）：Build/Run/trans/Req臂字节级identical（dedent后）；41变体43臂零丢失（含注释臂与None臂逐一对账）；clap属性178行identical；exit_audit两点位保持；install先于parse；Command::new仅既有4处；Core共享面与901修复确认；测试文件与base零diff。
+- R3（跨切面）：三边0（含Core树0 auto-ui*/0 auto-vm）；五提交.toml零改动；指纹=FNV逐文件walk+schema组合（拆分必然换指纹=合同）；SD数字与树一致（329/134+38/186+6+3+4/8）；901修复零残留+metadata解析过；卫生：零symlink/junction、零attachments复活、零specs.json写入。
+- 文档精度findings（已修）：R1-1/R3-1 test-map U3单元格→族分布186+6+3+4；R1-2 IntoIcedElement定义位（style_widgets.rs:11定义+mod.rs:1178重导出）；R1-3 三元组散布=6子文件+convert_element调用点；R1-4 VueGenerator 87字段；R2-1 main.rs=1050行；R2-2 既有模块=9。
 
 ### 901 consumer漂移登记（2026-11-01，已在本Plan内修复）
 
