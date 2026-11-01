@@ -156,10 +156,10 @@ work自查→同一权威树独立上下文final review→merge冻结门，不�
 | T-04 | work | T-03 | 作者handler/typed事件/有界请求与一次Auto收口、无角色/游戏实链，V-02/03 | AC-03 | [x] 2026-11-01：作者handler/typed事件转发(phase作payload)/有界请求/一次Auto收口: notify无角色链+A→B冷再生真实运行+PCM bank直读逐位exact(含cue gain乘积)、GPU字形host门(two_d=null真实capture ROI变化) |
 | T-05 | work | T-04 | 四/五请求/原预算/连续运动/提前终点、旧生命周期/native/资源与负控，V-03..05 | AC-03..05 | [x] 2026-11-01：四/五请求边界+原预算(32edge/fault10)+fresh Run ordinal隔离+standalone/bundle fault50+ordinal重放fault52+负控(swap/mixed);V-03全分支真实通过;pause/step/20-round沿023共享机制证据复用(同结构closeout,单元未改),native路径无新代码、ToDesk虚拟设备gap具名保留 |
 | T-06 | work | T-05 | 非游戏/游戏来源A→B/SaveAs/修复/旧023兼容、SD与移交折Plan，V-06 | AC-01..06 | [x] 2026-11-01：verify_plan025 --controls全绿: 三产品identity/closure/provenance/media绑定+closure-only冷再生字节等价+坏件拒绝/精确恢复+旧023消费者verify_plan023全绿;pilot旧档verify_plan016/020/021/022/024全绿(byte稳定);SD-01提案文档docs/specs/auto-graphics/node-presentation-services.md(merge门canonical化) |
-| T-07 | review | T-06 | 同树独立final核全部分支/八旧项/原义务与无业务硬编码，finding回work | AC-07 | [ ] |
-| T-08 | merge | T-07 pass | 冻结提交/依赖/媒体/输入，定向门或有据复用后合master | AC-08 | [ ] |
-| T-09 | merge | T-08 | 新Spec/来源/归档导航与证据摘要，不改AG006依赖/完成数或派生JSON | AC-08/09 | [ ] |
-| T-10 | merge | T-09 | fresh guard清树分支空组、全部输出全对账删scope/登记与最终计数/hash | AC-09 | [ ] |
+| T-07 | review | T-06 | 同树独立final核全部分支/八旧项/原义务与无业务硬编码，finding回work | AC-07 | [x] 2026-11-01：final pass（§9 review收据：同工件重建+门禁独立复跑18/18+14/14+verify全绿；零未处置finding，两条语义边界记录在案） |
+| T-08 | merge | T-07 pass | 冻结提交/依赖/媒体/输入，定向门或有据复用后合master | AC-08 | [x] 2026-11-01：冻结提交/依赖/媒体/输入核毕（range-diff 1:1全等），定向门全部绿后合master（ff-only e9cc929，无merge commit） |
+| T-09 | merge | T-08 | 新Spec/来源/归档导航与证据摘要，不改AG006依赖/完成数或派生JSON | AC-08/09 | [x] 2026-11-01：SD-01 canonical landed（docs/specs/auto-graphics/node-presentation-services.md，merge改canonical 54899e9）+pilot lock按main兄弟manifest重绑+main smoke 18/18+14/14亲跑绿 |
+| T-10 | merge | T-09 | fresh guard清树分支空组、全部输出全对账删scope/登记与最终计数/hash | AC-09 | [x] 2026-11-01：fresh guard清树/分支/三兄弟/组目录全移除、plan-025 scope全删、registry刷新、全材料对账（§8/§9折叠），最终计数10/10 |
 
 ## 9. 复审记录
 
