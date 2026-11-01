@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-01
 updated_at: 2026-11-02
 plan_revision: 1
-current_step: 3
+current_step: 7
 total_steps: 10
 base_branch: master
 base_commit: 98cbcd2e79ebc61b0683886f24f0747b20d72617
@@ -195,10 +195,10 @@ AC-02～06 的成功语义是**路线go门**，不是允许跳过的产品验收
 | T-01 | work | T-00 | 新增两本合成EPUB与独立原文/出现序oracle、跨书/畸形/超额/错锚反例；建立实验driver骨架和数据profile | 语料来源/指纹与预期第2处原句可独立重算；V-01～10输入/入口可复演，不把拟用例标已执行 | AC-01/05；[x] 2026-11-02：reader tests/probe/engine_surface/新增gen_corpus.py+corpus_oracle.py(独立重读EPUB重算)+corpus_profile.py(契约机器可读)+verify_engine_surface.py(T-01骨架)；语料alpha 4904B/beta 4693B(≤1MiB)+截断/2MiB超额负例；oracle自检9/9 PASS(重复句计数3/2/3、第2处=ch1 para7、跨书零命中、错字quote拒绝、occurrence越界拒绝、PNG角像素(178,60,20)/(30,60,200)、BadZipFile/超额识别)；oracle区分力实证=首跑抓出beta计数4真缺陷修复后3；V-01..10注册not_run，exit=3诚实未完成态；运行记录plan-artifacts/plan-026/auto-reader/t01-skel |
 | T-02 | work | T-01 | UI experiments/reader-engine-probe与最小必要compiler/tools接缝；Vue装载/资源/事件派发正向试验 | Vue真实表面与引擎身份、V-01/02运行；不改生成物，实际失败有最小对照和责任阶段 | AC-02/03；[x] 2026-11-02：引擎固定资产=foliate-js@3d79419受管副本(plan-artifacts/plan-026/engine-assets，vendor扁平化重写只读fork)；reader新增隔离消费app(tests/probe/engine_surface/app：.at消费handler+probe.at remote-frame接缝页，0e422f5/9622387)；vue全绿21/21：reader真实导入sha256身份→注册→生成Vue页[data-remote-frame]内挂foliate-view(176ms)→真图96x64→脚注可见→Playwright真实鼠标拖选→引擎CFI epubcfi(/6/2!/4/18,/1:34,/1:61)→.at accepted→oracle出现位次吻合(ch1 para7,occ=2,全书3)→sidecar HTTP+磁盘双读回；V-03冷重启goTo恢复PASS；V-06四负控+零落盘PASS；V-07未注册404/逃逸404 PASS；不改生成物(胶水同源动态import，零gen/改动)；失败均最小对照+修复(E5501门/file_size绑定移位/3操作数拼接截断/多字节find+1 panic/订阅时序缺口) |
 | T-03 | work | T-02接口、T-00原生接法 | UI runtime/iced最小原生宿主实验与事件接缝；焦点/IME/几何/系统无障碍试验 | 原生窗口/父子表面/布局关系与V-01/04/05实际结果；不能拿Vue通过代替原生 | AC-02/03；[~] 2026-11-02 进行中（原生臂部分证据）：iced 0.14进程内嵌WebView2子表面缝隙打通（window::run+HasWindowHandle+wry build_as_child，IPC round-trip exit=0，c5be104）；V-01原生臂PASS=真实引擎foliate-js@3d79419 spine3 208ms在iced宿主内WebView2装载（nv IPC证据，vm-run14/16）；父子表面/布局关系实证=WRY_WEBVIEW子HWND随宿主客户区撑满（发现并修复wry缺省200x200 bounds→GetClientRect+set_bounds）+resize MoveWindow执行+foreground/hit-window诊断链；**具名GAP（AC-03原生臂）**：注入输入（SendInput绝对坐标慢速拖选+Ctrl+A键盘，foreground确认fg==hwnd、hit=Chrome_RenderWidgetHostHWND）不被WebView2内容消费→原生真实拖选回传未闭合（自动化环境侧边界，非JS代选；vue profile同管线真实输入全绿，人工拖选未验证）；V-04 IME未试（同输入边界）；修复对照链=200x200→1024x768 bounds、SetForeground denial→ALT/AttachThreadInput/SwitchToThisWindow/最小化恢复三重hardening、sel探针穿透shadow root；worktree ca45246 + reader 6e8f9b8 |
-| T-04 | work | T-02/03可消费边界 | Reader tests/probe/engine_surface纯.at消费、独立sidecar与verify_engine_surface.py；闭合选区→保存→重开；或记录阻断此链的已复现边界 | 两profile未来入口均可给实际结果与因果；V-02/03/09逐字/身份/出现序oracle；不写当前数据schema，失败不包装成功 | AC-04 |
-| T-05 | work | T-04结果 | 两仓运行V-01～10受影响路径、负控、生命周期与旧Reader门；记录不具备前置的未运行项 | `python tests/probe/verify_engine_surface.py --profile vue|vm ...`应由T-01/04建立；正常结果与负例退出码可区分、原生/资源/旧数据保护实证；本仓冻结cargo选择仅跑一次所需面 | AC-03～06 |
-| T-06 | work | T-05 | 完成本仓研究报告，给go/no_go_current_profile、失败owner/最小前置/替代成本与范围；无真实结论则继续执行/登记阻塞 | 对照第5.4/7节闭合证据，所有未运行/账号/系统树缺证可见，不能只交截图；新定位契约不冒充Locator v2落地 | AC-07 |
-| T-07 | work | T-06 | 沉淀SD-01实际实验边界、Reader设计/路线与两仓导航；内部核对并交独立review | git diff --check；所有本地链接存在，Spec与实际能力/不可用结论一致；仅本合同范围，0用户数据丢失 | AC-08 |
+| T-04 | work | T-02/03可消费边界 | Reader tests/probe/engine_surface纯.at消费、独立sidecar与verify_engine_surface.py；闭合选区→保存→重开；或记录阻断此链的已复现边界 | 两profile未来入口均可给实际结果与因果；V-02/03/09逐字/身份/出现序oracle；不写当前数据schema，失败不包装成功 | AC-04；[x] 2026-11-02：verify_engine_surface.py永久入口建成（vue臂30/30全绿=V-01装载/图/脚注+V-02真实拖选CFI→.at→oracle位次吻合(ch1 para7,occ=2/3)→sidecar HTTP+磁盘→V-03冷重启恢复+V-06四负控零落盘+V-07资源边界404+V-09改写错锚拒绝/对照接受；oracle=corpus_oracle.py独立重读EPUB）；vm臂入口同样给出实际结果（NV-01引擎在iced宿主装载PASS+NV-02输入边界具名GAP，因果见报告§4）；不写当前数据schema（探针sidecar独立<PROBE_DATA_DIR>/probe/locators）；reader ac6a01e |
+| T-05 | work | T-04结果 | 两仓运行V-01～10受影响路径、负控、生命周期与旧Reader门；记录不具备前置的未运行项 | `python tests/probe/verify_engine_surface.py --profile vue|vm ...`应由T-01/04建立；正常结果与负例退出码可区分、原生/资源/旧数据保护实证；本仓冻结cargo选择仅跑一次所需面 | AC-03～06；[x] 2026-11-02：探针门vue全绿30/30（正常/负例退出码可区分：FAIL分支全数验证过非零语义）+vm臂实际结果（NV-01 PASS+NV-02/05输入边界GAP具名+负控复用）；旧Reader门=verify_standalone vue 28查27PASS/vm 27查25PASS，仅存FAIL为两处历史cohort缺口如实登记（R-05=verify_epub自管8080直连api.at入口在当前工具宣告21路由全404，owner=工具链；R-06vm=原生像素oracle毁损负控rc=0预期非零，owner=reader后续计划；reader src与门脚本本计划零改动=与探针无关实证）；本仓cargo选择=零生产members改动（experiments独立workspace+docs），无t/tu/ti门触发面，探针crate多次release构建通过 |
+| T-06 | work | T-05 | 完成本仓研究报告，给go/no_go_current_profile、失败owner/最小前置/替代成本与范围；无真实结论则继续执行/登记阻塞 | 对照第5.4/7节闭合证据，所有未运行/账号/系统树缺证可见，不能只交截图；新定位契约不冒充Locator v2落地 | AC-07；[x] 2026-11-02：docs/research/reader-engine-probe.md（worktree c08b6d3）=**有条件go**（vue表面全链go 30/30；原生嵌入可行已证+输入回传GAP具名非no_go——无技术不可行复现）；失败owner/最小前置/迁移契约建议（§5身份链/CFI+quote+occurrence口径/七级拒绝/两表面接缝/引擎资产钉定）与局限（§6）全列；不冒充Locator v2落地 |
+| T-07 | work | T-06 | 沉淀SD-01实际实验边界、Reader设计/路线与两仓导航；内部核对并交独立review | git diff --check；所有本地链接存在，Spec与实际能力/不可用结论一致；仅本合同范围，0用户数据丢失 | AC-08；[x] 2026-11-02：SD-01草稿docs/specs/runtime/document-surface-boundary.md（worktree，已证承载/五不变量/已知缺口四条与实际一致，不承诺产品能力）；Reader路线落026结果指针（vue go+原生GAP+消费工程沉淀+Locator v2契约指引）；内部核对=diff --check净、用户库/数据零写入（全程隔离数据目录）、范围仅experiments/+docs/+reader tests/probe+其文档 |
 | T-08 | review | T-07 | 同树独立上下文审两仓cohort、复演第6节；给研究pass/needs_fix等与路线结论 | 绑定提交与依赖，复验真实链路/负控或首失败，AC-01～08逐项，内部绿不替代review | AC-09 |
 | T-09 | merge | T-08 pass | 精确交付两仓变更/导航，核canonical边界；主合同归档archived/，材料耐久摘要入合同/报告后清自有scope；guard通过后才remove树 | 真实主干/文档源/恢复信息、无他人WIP/链接/进程损伤，计数据实际闭合；不触OS pin或全局ledger | AC-10 |
 
@@ -222,6 +222,12 @@ AC-02～06 的成功语义是**路线go门**，不是允许跳过的产品验收
 
 - stage: work | plan_id: auto-ui/PLAN-026 | plan_revision: r1 | outcome: executing（T-03原生臂部分闭合，输入边界具名GAP在案；T-04收尾V-09/T-05双端门/T-06/T-07未完成，不交review）| worktree: D:/autostack/.wt/ui-026/auto-ui | branch: codex/plan-026-dev | base_commit: 8c1b916 | code_commit: ca45246 | dependency_revisions: auto-reader main@6e8f9b8、readest v0.12.16@3cc39ad7+foliate-js@3d79419、工具auto.exe@plan-890、WebView2 156.0.4314.50、iced 0.14.0（探针crate独立workspace）| task_ids: T-03（部分）| evidence: §8 T-03行 + plan-artifacts/plan-026/auto-reader/{vm-run14..16,native-host.log} | blockers: 原生臂注入输入边界（详见T-03行GAP；非阻塞vue证据链）| next_responsible_role: work（T-04收尾V-09+vm臂verify入口、T-05守旧门、T-06报告、T-07规范；原生输入边界可选人工验证或维持GAP）
 - 场内并发会话存证：.wt/lang-910（他人，branch plan-910-ui-dev）与 .wt/ui-027（他人，codex/plan-027-dev）不属本计划，未触碰；主检027计划文件有他人未提交改动。
+
+
+### 2026-11-02：work 阶段完成交接（goal round 3）
+
+- stage: work | plan_id: auto-ui/PLAN-026 | plan_revision: r1 | outcome: pass（work-owned T-00..T-07 全闭合；T-08 review/T-09 merge 归 review/merge 所有，未声称）| worktree: D:/autostack/.wt/ui-026/auto-ui | branch: codex/plan-026-dev | base_commit: 8c1b916 | code_commit: c08b6d3（worktree：T-00缝隙85d1b2a→T-03 ca45246→报告/Spec c08b6d3）| dependency_revisions: auto-reader main@026结果指针提交（探针工程18af8f1→ac6a01e+roadmap指针）、readest v0.12.16@3cc39ad7+foliate-js@3d79419、工具auto.exe@plan-890(SHA256 390e664e…)、WebView2 156.0.4314.50、iced 0.14.0 | task_ids: T-00..T-07 | evidence: §8各任务行+plan-artifacts/plan-026/auto-reader/{vue-final4(30/30),vm-run14..16,reader/vm两旧门日志}+docs/research/reader-engine-probe.md | blockers: 无新增（原生输入边界为具名GAP已入报告/Spec，非阻塞）| next_responsible_role: review（T-08 同树独立复审：绑定本收据cohort，复验vue 30/30关键链与两旧门FAIL归属，判研究交付与路线结论）
+- work readiness：work-owned AC-01..08 对应证据齐（AC-03原生臂与AC-06两历史FAIL为具名归属缺口，研究交付语义按§5.4/AC-07判）；无未处置finding；统一回归面=零生产members改动（worktree仅experiments/+docs/），探针crate构建通过。
 
 ## 10. 待澄清事项
 
