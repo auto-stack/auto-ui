@@ -4,7 +4,7 @@ use super::*;
 
 impl VueGenerator {
     /// Convert AuraExpr to Auto source code string
-    pub(crate) fn expr_to_auto_string(&self, expr: &auto_lang_core::ast::Expr) -> String {
+    pub(super) fn expr_to_auto_string(&self, expr: &auto_lang_core::ast::Expr) -> String {
         use auto_lang_core::ast::Expr;
         use auto_val::Op;
         match expr {
@@ -153,7 +153,7 @@ impl VueGenerator {
     /// convert_condition 的 find 守卫：逐处扫描 `.find (` / `.find(`，
     /// 参数段（到下一个 `)` 为止）含 `=>` 时是数组 find 谓词语义，
     /// 保持原样；否则映射为字符串语义的 `.indexOf(`。
-    pub(crate) fn map_find_in_condition(s: &str) -> String {
+    pub(super) fn map_find_in_condition(s: &str) -> String {
         let mut out = String::with_capacity(s.len());
         let mut rest = s;
         loop {
@@ -185,7 +185,7 @@ impl VueGenerator {
     /// Plan 051 C7: timer `when` 条件 → script 语境 JS 表达式。script 里
     /// 状态是 ref（需 `.value`）：`.field` → `field.value`；`.a.b` →
     /// `a.value.b`；非点前缀原样返回（调用侧约定简单布尔式）。
-    pub(crate) fn timer_condition_to_js(condition: &str) -> String {
+    pub(super) fn timer_condition_to_js(condition: &str) -> String {
         let c = condition.trim();
         if !c.starts_with('.') {
             return c.to_string();
@@ -204,7 +204,7 @@ impl VueGenerator {
         }
     }
 
-    pub(crate) fn convert_condition(&mut self, condition: &str) -> String {
+    pub(super) fn convert_condition(&mut self, condition: &str) -> String {
         // Convert .var to var, .len to .length, etc.
         let mut result = condition.trim().to_string();
 
@@ -327,7 +327,7 @@ impl VueGenerator {
 
 impl VueGenerator {
     /// Plan 100: Infer TypeScript type from AuraExpr
-    pub(crate) fn expr_to_ts_type(&self, expr: &auto_lang_core::ast::Expr) -> String {
+    pub(super) fn expr_to_ts_type(&self, expr: &auto_lang_core::ast::Expr) -> String {
         use auto_lang_core::ast::Expr;
         match expr {
             Expr::Int(_)
@@ -443,7 +443,7 @@ impl VueGenerator {
     }
 
     /// Check if LogicPayload contains NavCall (Plan 105)
-    pub(crate) fn payload_has_nav_call(payload: &LogicPayload) -> bool {
+    pub(super) fn payload_has_nav_call(payload: &LogicPayload) -> bool {
         match payload {
             LogicPayload::AstStmts(_) => false, // NavCall handled at view tree level
             LogicPayload::Bytecode(_) => false, // Can't analyze bytecode
@@ -451,7 +451,7 @@ impl VueGenerator {
     }
 
     /// Check if widget uses router features (Plan 105)
-    pub(crate) fn widget_needs_router(&self, widget: &AuraWidget) -> bool {
+    pub(super) fn widget_needs_router(&self, widget: &AuraWidget) -> bool {
         // Check handlers for NavCall
         for payload in widget.handlers.values() {
             if Self::payload_has_nav_call(payload) {
@@ -462,7 +462,7 @@ impl VueGenerator {
     }
 
     /// Check if LogicPayload contains route access (Plan 235)
-    pub(crate) fn payload_has_route_access(payload: &LogicPayload) -> bool {
+    pub(super) fn payload_has_route_access(payload: &LogicPayload) -> bool {
         match payload {
             LogicPayload::AstStmts(stmts) => {
                 crate::ui_gen::ts_adapter::stmts_have_route_access(stmts)
@@ -472,7 +472,7 @@ impl VueGenerator {
     }
 
     /// Check if widget uses route features (Plan 235)
-    pub(crate) fn widget_needs_route(widget: &AuraWidget) -> bool {
+    pub(super) fn widget_needs_route(widget: &AuraWidget) -> bool {
         for payload in widget.handlers.values() {
             if Self::payload_has_route_access(payload) {
                 return true;
@@ -482,7 +482,7 @@ impl VueGenerator {
     }
 
     /// Escape a string for use in JavaScript single-quoted string literals.
-    pub(crate) fn escape_js_string(s: &str) -> String {
+    pub(super) fn escape_js_string(s: &str) -> String {
         s.replace("\\", "\\\\")
             .replace("'", "\\'")
             .replace("\n", "\\n")
@@ -491,7 +491,7 @@ impl VueGenerator {
     }
 
     /// Plan 451 P2: escape for a double-quoted HTML attribute value.
-    pub(crate) fn escape_html_attr(s: &str) -> String {
+    pub(super) fn escape_html_attr(s: &str) -> String {
         s.replace('&', "&amp;")
             .replace('"', "&quot;")
             .replace('<', "&lt;")
@@ -499,7 +499,7 @@ impl VueGenerator {
     }
 
     /// Plan 451 P2: escape for HTML text content.
-    pub(crate) fn escape_html_text(s: &str) -> String {
+    pub(super) fn escape_html_text(s: &str) -> String {
         s.replace('&', "&amp;")
             .replace('<', "&lt;")
             .replace('>', "&gt;")
@@ -510,7 +510,7 @@ impl VueGenerator {
     /// ternary branch value. Returns None for multi-statement bodies (which
     /// need the IIFE block+return form) or when the expression fails to
     /// transpile (falls back to IIFE).
-    pub(crate) fn single_body_expr_js(&self, stmts: &[auto_lang_core::ast::Stmt]) -> Option<String> {
+    pub(super) fn single_body_expr_js(&self, stmts: &[auto_lang_core::ast::Stmt]) -> Option<String> {
         if stmts.len() == 1 {
             if let auto_lang_core::ast::Stmt::Expr(e) = &stmts[0] {
                 return self.expr_to_js(e).ok();
@@ -530,7 +530,7 @@ impl VueGenerator {
     /// `ts_adapter::transpile_expr` (handler body) carry the same table
     /// (P5-3: the view paths used to skip it, emitting invalid JS like
     /// `.to_float()`).
-    pub(crate) fn map_method_to_js(
+    pub(super) fn map_method_to_js(
         &self,
         method: &str,
         object_js: &str,
@@ -610,7 +610,7 @@ impl VueGenerator {
     }
 
     /// Convert AuraExpr to JS value string
-    pub(crate) fn expr_to_js(&self, expr: &auto_lang_core::ast::Expr) -> GenResult<String> {
+    pub(super) fn expr_to_js(&self, expr: &auto_lang_core::ast::Expr) -> GenResult<String> {
         use auto_lang_core::ast::Expr;
         use auto_val::Op;
         match expr {
@@ -1222,7 +1222,7 @@ impl VueGenerator {
     }
 
     /// Convert binary operator (auto_val::Op) to JS
-    pub(crate) fn op_to_js(op: &auto_val::Op) -> &'static str {
+    pub(super) fn op_to_js(op: &auto_val::Op) -> &'static str {
         match op {
             auto_val::Op::Add => "+",
             auto_val::Op::Sub => "-",

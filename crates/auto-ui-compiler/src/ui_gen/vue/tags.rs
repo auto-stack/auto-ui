@@ -5,7 +5,7 @@ use super::*;
 
 impl VueGenerator {
     /// Map AutoUI tag to HTML tag or shadcn-vue component
-    pub(crate) fn map_tag(&mut self, tag: &str, self_closing: bool) -> String {
+    pub(super) fn map_tag(&mut self, tag: &str, self_closing: bool) -> String {
         // Priority: known sub-widgets > external (widget `use`) components >
         // shadcn components > HTML fallback
         // If tag matches a known sub-widget, treat as custom component reference
@@ -271,7 +271,7 @@ impl VueGenerator {
     }
 
     /// Plan 442 A4: the native-SVG passthrough tag set (see `map_tag`).
-    pub(crate) fn is_svg_element(tag: &str) -> bool {
+    pub(super) fn is_svg_element(tag: &str) -> bool {
         matches!(
             tag,
             "svg"
@@ -296,7 +296,7 @@ impl VueGenerator {
     /// Plan 442 A4: literal expr → static SVG attribute value (strings
     /// raw-escaped, numbers/bools as-is). Anything dynamic returns None and
     /// keeps the v-bind path below.
-    pub(crate) fn svg_static_attr_value(expr: &auto_lang_core::ast::Expr) -> Option<String> {
+    pub(super) fn svg_static_attr_value(expr: &auto_lang_core::ast::Expr) -> Option<String> {
         use auto_lang_core::ast::Expr;
         match expr {
             Expr::Str(s) | Expr::CStr(s) => Some(s.to_string().replace('"', "&quot;")),
@@ -317,7 +317,7 @@ impl VueGenerator {
     /// Col/Column/CardHeader 等差异拼写)。**跨元素别名保形**:div(≡container)
     /// 与 hr(≡divider)是渲染层等价、类发射层历史区分的纯 HTML 直通拼写,
     /// 归一会让普通 div 吃到容器默认类 —— 跳过。未登记拼写原样返回(用户组件)。
-    pub(crate) fn normalize_tag(tag: &str) -> &str {
+    pub(super) fn normalize_tag(tag: &str) -> &str {
         const KEEP_AS_IS: &[&str] = &["div", "hr"];
         if KEEP_AS_IS.contains(&tag) {
             return tag;
@@ -330,7 +330,7 @@ impl VueGenerator {
     /// Render a key for a JS object literal: bare when it is a valid JS
     /// identifier, single-quoted otherwise (CSS props like `z-index`, class
     /// names like `line-through`).
-    pub(crate) fn js_obj_key(name: &str) -> String {
+    pub(super) fn js_obj_key(name: &str) -> String {
         let valid = !name.is_empty()
             && name
                 .chars()
@@ -352,7 +352,7 @@ impl VueGenerator {
     /// The `as any` cast keeps loosely-typed values (e.g. a plain `string`
     /// state var for `visibility`, whose CSS type is a literal union)
     /// assignable to Vue's `StyleValue`.
-    pub(crate) fn style_obj_to_vue(&self, bindings: &[AuraStyleBinding]) -> String {
+    pub(super) fn style_obj_to_vue(&self, bindings: &[AuraStyleBinding]) -> String {
         let parts: Vec<String> = bindings
             .iter()
             .map(|b| {
@@ -435,7 +435,7 @@ impl VueGenerator {
     /// 原样保留。识别集 = 本仓 app 惯用面:position 关键字、z-{n}、
     /// top/left/right/bottom/w/h/min-w/min-h/max-w/max-h/inset-[…]、
     /// bg-[…]。
-    pub(crate) fn tailwind_class_template_to_inline_style(expr: &str) -> Option<String> {
+    pub(super) fn tailwind_class_template_to_inline_style(expr: &str) -> Option<String> {
         let content = expr.trim();
         let (content, quote) = if let Some(inner) =
             content.strip_prefix('`').and_then(|c| c.strip_suffix('`'))
@@ -495,7 +495,7 @@ impl VueGenerator {
     }
 
     /// 单个 Tailwind token → CSS 声明。未知 token 返回 None(上层整体放弃)。
-    pub(crate) fn tailwind_token_to_css(token: &str) -> Option<String> {
+    pub(super) fn tailwind_token_to_css(token: &str) -> Option<String> {
         match token {
             "absolute" => return Some("position:absolute".to_string()),
             "relative" => return Some("position:relative".to_string()),

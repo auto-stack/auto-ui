@@ -5,7 +5,7 @@ use super::*;
 
 impl VueGenerator {
     /// Plan 482: `<nav-item>` → NavItem 组件（shadcn）或内联契约标记。
-    pub(crate) fn generate_nav_item_html(
+    pub(super) fn generate_nav_item_html(
         &mut self,
         props: &HashMap<String, AuraPropValue>,
         events: &HashMap<String, AuraEvent>,
@@ -341,7 +341,7 @@ impl VueGenerator {
     ///   自动探测(exact 或前缀段匹配)。$route 由 vue-router 全局注入,
     ///   模板内免 import。
     /// - variant/size/tooltip/text/class/onclick 与通用 shadcn 臂同规透传。
-    pub(crate) fn generate_sidebar_menu_button_html(
+    pub(super) fn generate_sidebar_menu_button_html(
         &mut self,
         tag: &str,
         props: &HashMap<String, AuraPropValue>,
@@ -474,7 +474,7 @@ impl VueGenerator {
     }
 
     /// Plan 482: `<nav-group>` → NavGroup 组件（shadcn）或内联折叠组。
-    pub(crate) fn generate_nav_group_html(
+    pub(super) fn generate_nav_group_html(
         &mut self,
         props: &HashMap<String, AuraPropValue>,
         events: &HashMap<String, AuraEvent>,
@@ -640,7 +640,7 @@ impl VueGenerator {
 
     /// Plan 482: `<nav (search: true, ...)>` 容器 —— 顶部集成搜索行 + 子节点。
     /// 仅 search 开启时拦截；普通 nav 走通用容器路径。
-    pub(crate) fn generate_nav_html(
+    pub(super) fn generate_nav_html(
         &mut self,
         props: &HashMap<String, AuraPropValue>,
         events: &HashMap<String, AuraEvent>,
@@ -724,7 +724,7 @@ impl VueGenerator {
         Ok(html)
     }
 
-    pub(crate) fn generate_category_section_html(
+    pub(super) fn generate_category_section_html(
         &mut self,
         props: &HashMap<String, AuraPropValue>,
         children: &[AuraNode],

@@ -5,7 +5,7 @@ use super::*;
 
 impl VueGenerator {
     /// Generate <script setup> content
-    pub(crate) fn generate_script(&mut self, widget: &AuraWidget) -> GenResult<String> {
+    pub(super) fn generate_script(&mut self, widget: &AuraWidget) -> GenResult<String> {
         let mut script = String::new();
 
         // Determine needed imports
@@ -2240,7 +2240,7 @@ onUnmounted(() => {{ if ({var} !== null) {{ clearInterval({var}); {var} = null }
     /// Build the AuraTsContext used for handler-body transpilation. Plan 053
     /// M5/P5-6 factored this out so the debounced variant can layer the
     /// seq-guard on top of the same base context without duplicating it.
-    pub(crate) fn handler_ts_ctx(&self) -> crate::ui_gen::ts_adapter::AuraTsContext {
+    pub(super) fn handler_ts_ctx(&self) -> crate::ui_gen::ts_adapter::AuraTsContext {
         let mut ctx = crate::ui_gen::ts_adapter::AuraTsContext::new(
             self.state_names.iter().cloned().collect(),
         )
@@ -2314,7 +2314,7 @@ onUnmounted(() => {{ if ({var} !== null) {{ clearInterval({var}); {var} = null }
     ///   → R013 警告 + 跳过发射(提示 ext_imports 兜底);
     /// - 转译边界:模式匹配/借用语义 fn 体不保证转译 → R013 警告 + 跳过
     ///   (回退现状,不阻塞生成)。
-    pub(crate) fn emit_use_module_fns(&self, widget: &AuraWidget, script: &mut String) {
+    pub(super) fn emit_use_module_fns(&self, widget: &AuraWidget, script: &mut String) {
         use std::collections::{HashMap, HashSet};
 
         if self.use_module_fns.is_empty() {
@@ -2441,7 +2441,7 @@ onUnmounted(() => {{ if ({var} !== null) {{ clearInterval({var}); {var} = null }
         }
     }
 
-    pub(crate) fn generate_handler_body(&self, payload: &LogicPayload) -> GenResult<String> {
+    pub(super) fn generate_handler_body(&self, payload: &LogicPayload) -> GenResult<String> {
         match payload {
             LogicPayload::AstStmts(stmts) => {
                 let ctx = self.handler_ts_ctx();
@@ -2462,7 +2462,7 @@ onUnmounted(() => {{ if ({var} !== null) {{ clearInterval({var}); {var} = null }
     /// in a setTimeout(80ms) debounce with a sequence counter. The handler
     /// function itself stays synchronous (is_async=false) — the
     /// `async`/`await` moves into the setTimeout callback.
-    pub(crate) fn generate_debounced_handler_body(&self, payload: &LogicPayload) -> GenResult<String> {
+    pub(super) fn generate_debounced_handler_body(&self, payload: &LogicPayload) -> GenResult<String> {
         match payload {
             LogicPayload::AstStmts(stmts) => {
                 let ctx = self
@@ -2486,7 +2486,7 @@ onUnmounted(() => {{ if ({var} !== null) {{ clearInterval({var}); {var} = null }
 
     /// Plan 012 Batch A (gap 19): split known state/prop names into proven
     /// array / string receivers for the ts_adapter method-mapping gate.
-    pub(crate) fn typed_collection_names(
+    pub(super) fn typed_collection_names(
         &self,
     ) -> (
         std::collections::HashSet<String>,
@@ -2508,7 +2508,7 @@ onUnmounted(() => {{ if ({var} !== null) {{ clearInterval({var}); {var} = null }
     /// Plan 014: is this Auto type int-ish? TS type maps collapse int and
     /// float to `number`, so division lowering needs the original `ast::Type`.
     /// Only proven-int operands get `Math.trunc` on `/` and `%`.
-    pub(crate) fn is_int_auto_type(ty: &auto_lang_core::ast::Type) -> bool {
+    pub(super) fn is_int_auto_type(ty: &auto_lang_core::ast::Type) -> bool {
         use auto_lang_core::ast::Type;
         matches!(
             ty,
@@ -2522,7 +2522,7 @@ onUnmounted(() => {{ if ({var} !== null) {{ clearInterval({var}); {var} = null }
 
     /// Plan 012 Batch A: forward ts_adapter passthrough notes into the
     /// unified codegen warning channel (R010, advisory).
-    pub(crate) fn drain_ctx_warnings(&self, ctx: &crate::ui_gen::ts_adapter::AuraTsContext) {
+    pub(super) fn drain_ctx_warnings(&self, ctx: &crate::ui_gen::ts_adapter::AuraTsContext) {
         for w in ctx.take_warnings() {
             self.warn("R010", crate::ui_gen::validators::Severity::Info, w);
         }
@@ -2532,7 +2532,7 @@ onUnmounted(() => {{ if ({var} !== null) {{ clearInterval({var}); {var} = null }
     /// for the `.contains → .includes` gate, mirroring
     /// `ts_adapter::method_map_decision` but driven by the generator's TS
     /// type maps (state_types/prop_types).
-    pub(crate) fn method_map_decision_for_expr(
+    pub(super) fn method_map_decision_for_expr(
         &self,
         object: &auto_lang_core::ast::Expr,
     ) -> crate::ui_gen::ts_adapter::MethodMapDecision {
@@ -2572,7 +2572,7 @@ onUnmounted(() => {{ if ({var} !== null) {{ clearInterval({var}); {var} = null }
     /// Plan 012 Batch A (gap 19): is `name` a `use { composable: ... }`
     /// local (a facade object, e.g. `recentFilesStore`)? Such receivers
     /// never get the `.remove → .splice` mapping.
-    pub(crate) fn is_ext_composable_local(&self, name: &str) -> bool {
+    pub(super) fn is_ext_composable_local(&self, name: &str) -> bool {
         self.ext_composables
             .iter()
             .any(|(local, _, _)| local == name)
@@ -2583,7 +2583,7 @@ onUnmounted(() => {{ if ({var} !== null) {{ clearInterval({var}); {var} = null }
     /// Plan 426: does a setup statement reference any forbidden name (state
     /// var / computed / prop)? Flags bare `x` identifiers and self/props-based
     /// field access (`.x` / `self.x` / `props.x`); returns the first hit.
-    pub(crate) fn stmt_references_any(
+    pub(super) fn stmt_references_any(
         stmt: &auto_lang_core::ast::Stmt,
         names: &std::collections::HashSet<&str>,
     ) -> Option<String> {
@@ -2624,7 +2624,7 @@ onUnmounted(() => {{ if ({var} !== null) {{ clearInterval({var}); {var} = null }
         }
     }
 
-    pub(crate) fn facade_local_names(&self) -> std::collections::HashSet<String> {
+    pub(super) fn facade_local_names(&self) -> std::collections::HashSet<String> {
         let mut names: std::collections::HashSet<String> = self
             .ext_composables
             .iter()
@@ -2637,7 +2637,7 @@ onUnmounted(() => {{ if ({var} !== null) {{ clearInterval({var}); {var} = null }
 
     /// Plan 408 P12 §10.4: ref 字段标注的 flat map（local name → field set），
     /// 传给 AuraTsContext 让 ts_adapter 在字段访问时注入 `.value`。
-    pub(crate) fn facade_ref_fields_map(
+    pub(super) fn facade_ref_fields_map(
         &self,
     ) -> std::collections::HashMap<String, std::collections::HashSet<String>> {
         let mut map = self.facade_ref_fields.clone();
@@ -2653,7 +2653,7 @@ onUnmounted(() => {{ if ({var} !== null) {{ clearInterval({var}); {var} = null }
 
 impl VueGenerator {
     /// Extract API function calls from a LogicPayload and track them
-    pub(crate) fn extract_api_calls_from_payload(&mut self, payload: &LogicPayload) {
+    pub(super) fn extract_api_calls_from_payload(&mut self, payload: &LogicPayload) {
         match payload {
             LogicPayload::AstStmts(stmts) => {
                 // Plan 132: Extract API calls from raw AST statements
@@ -2666,7 +2666,7 @@ impl VueGenerator {
     }
 
     /// Extract API function calls from raw AST statements (Plan 132)
-    pub(crate) fn extract_api_calls_from_ast_stmts(&mut self, stmts: &[auto_lang_core::ast::Stmt]) {
+    pub(super) fn extract_api_calls_from_ast_stmts(&mut self, stmts: &[auto_lang_core::ast::Stmt]) {
         use auto_lang_core::ast::{Expr, Stmt};
 
         fn walk_expr(expr: &Expr, api_fns: &[&str], used: &mut HashSet<String>) {
@@ -2793,7 +2793,7 @@ impl VueGenerator {
     /// matches the specific bare-call name `complete` (a `use back.api:
     /// complete` import), NOT the full api set — we don't want every
     /// API-calling handler debounced (e.g. run_command on Enter stays eager).
-    pub(crate) fn stmts_call_complete(stmts: &[auto_lang_core::ast::Stmt]) -> bool {
+    pub(super) fn stmts_call_complete(stmts: &[auto_lang_core::ast::Stmt]) -> bool {
         use auto_lang_core::ast::{Expr, Stmt};
         fn walk_expr(expr: &Expr) -> bool {
             match expr {
@@ -2841,7 +2841,7 @@ impl VueGenerator {
     /// native (`fs.*` / `File.*`)? Mirrors the ts_adapter rewrite so lifecycle
     /// bodies (transpiled AFTER the __vmOnly stub emission point) can flip
     /// `needs_vm_only_helper` ahead of time.
-    pub(crate) fn stmts_call_vm_only(stmts: &[auto_lang_core::ast::Stmt]) -> bool {
+    pub(super) fn stmts_call_vm_only(stmts: &[auto_lang_core::ast::Stmt]) -> bool {
         use auto_lang_core::ast::{Expr, Stmt};
         fn walk_expr(expr: &Expr) -> bool {
             match expr {
@@ -2902,7 +2902,7 @@ impl VueGenerator {
     /// Does this statement list call `toast(...)` (vue-sonner)? If so the
     /// generated <script setup> needs `import { toast } from 'vue-sonner'`.
     /// Same recursive walk as `stmts_call_complete`.
-    pub(crate) fn stmts_call_toast(stmts: &[auto_lang_core::ast::Stmt]) -> bool {
+    pub(super) fn stmts_call_toast(stmts: &[auto_lang_core::ast::Stmt]) -> bool {
         use auto_lang_core::ast::{Expr, Stmt};
         fn walk_expr(expr: &Expr) -> bool {
             match expr {
@@ -2953,7 +2953,7 @@ impl VueGenerator {
     }
 
     /// Check if a handler payload contains API calls
-    pub(crate) fn handler_has_api_calls(&self, payload: &LogicPayload) -> bool {
+    pub(super) fn handler_has_api_calls(&self, payload: &LogicPayload) -> bool {
         match payload {
             LogicPayload::AstStmts(stmts) => {
                 if self.project_api_functions.is_empty() {
@@ -2975,7 +2975,7 @@ impl VueGenerator {
     /// Caller MUST gate results against declared handler names — `.save()` /
     /// `.push()` / `.contains()` etc. share the self-call shape but are
     /// store/builtin calls, not handlers (`mark_self_called_handlers` gates).
-    pub(crate) fn collect_self_handler_calls(stmts: &[auto_lang_core::ast::Stmt]) -> Vec<String> {
+    pub(super) fn collect_self_handler_calls(stmts: &[auto_lang_core::ast::Stmt]) -> Vec<String> {
         use auto_lang_core::ast::{Expr, Stmt};
         fn is_self_receiver(object: &Expr) -> bool {
             matches!(object, Expr::Ident(name) if name.as_str() == "." || name.as_str() == "self")
@@ -3081,7 +3081,7 @@ impl VueGenerator {
     /// declared handlers in this widget are marked — this filters out
     /// store/builtin calls (`.save()`, `.push()`, `.new()`, ...) that share the
     /// self-call shape. Replaces the manual `expose { .X }` workaround.
-    pub(crate) fn mark_self_called_handlers(&mut self, widget: &AuraWidget) {
+    pub(super) fn mark_self_called_handlers(&mut self, widget: &AuraWidget) {
         use std::collections::{HashMap, HashSet};
         let mut calls_by_handler: HashMap<String, Vec<String>> = HashMap::new();
         let mut declared: HashSet<String> = HashSet::new();
@@ -3117,7 +3117,7 @@ impl VueGenerator {
     /// Convert prop value to HTML attribute value
     /// For static values: produces `"value"`
     /// For dynamic values (StateRef, FieldAccess): produces `"name"` (caller must prefix with `:`)
-    pub(crate) fn prop_to_attr_value(&self, value: &AuraPropValue) -> GenResult<String> {
+    pub(super) fn prop_to_attr_value(&self, value: &AuraPropValue) -> GenResult<String> {
         use auto_lang_core::ast::Expr;
         if let Some(state_ref) = self.extract_state_ref(value) {
             return Ok(format!("\"{}\"", state_ref));
@@ -3151,7 +3151,7 @@ impl VueGenerator {
     }
 
     /// Convert prop value to text content (for rendering inside element)
-    pub(crate) fn prop_to_text_content(&self, value: &AuraPropValue) -> GenResult<String> {
+    pub(super) fn prop_to_text_content(&self, value: &AuraPropValue) -> GenResult<String> {
         match value {
             AuraPropValue::Expr(expr) => self.expr_to_vue_text(expr),
             AuraPropValue::StyleBinding(_) => Ok("".to_string()),
@@ -3161,7 +3161,7 @@ impl VueGenerator {
     /// Convert AuraExpr to Vue template text (handles interpolation)
     /// Convert AuraExpr to raw Vue text (no {{ }} wrapping).
     /// Used internally by expr_to_vue_text for composing nested expressions.
-    pub(crate) fn expr_to_vue_text_raw(&self, expr: &auto_lang_core::ast::Expr) -> GenResult<String> {
+    pub(super) fn expr_to_vue_text_raw(&self, expr: &auto_lang_core::ast::Expr) -> GenResult<String> {
         use auto_lang_core::ast::Expr;
         match expr {
             Expr::Str(s) | Expr::CStr(s) => {
@@ -3362,7 +3362,7 @@ impl VueGenerator {
 
     /// Convert AuraExpr to Vue template text with {{ }} wrapping for display.
     /// Uses expr_to_vue_text_raw internally and wraps the final result.
-    pub(crate) fn expr_to_vue_text(&self, expr: &auto_lang_core::ast::Expr) -> GenResult<String> {
+    pub(super) fn expr_to_vue_text(&self, expr: &auto_lang_core::ast::Expr) -> GenResult<String> {
         use auto_lang_core::ast::Expr;
         // Plan 444 (ash-shell-057 ①c): a binary chain (`text "#" + j.id`) is
         // a JS expression — emit it through the bound-value path (string
@@ -3397,7 +3397,7 @@ impl VueGenerator {
     /// Convert AuraExpr to Vue bound attribute value (for :prop="..." bindings).
     /// Used for chart props and other complex bindings where we need JavaScript
     /// expressions in Vue templates (state refs are kept bare, no .value).
-    pub(crate) fn expr_to_vue_bound_value(&self, expr: &auto_lang_core::ast::Expr) -> GenResult<String> {
+    pub(super) fn expr_to_vue_bound_value(&self, expr: &auto_lang_core::ast::Expr) -> GenResult<String> {
         use auto_lang_core::ast::Expr;
         use auto_val::Op;
         match expr {
@@ -3630,7 +3630,7 @@ impl VueGenerator {
     /// expression form emit an R013 warning (with the expression's Debug
     /// shape and the calling context) and return the caller's fallback —
     /// the exact output the old silent `null` catch-all produced there.
-    pub(crate) fn bound_value_or_warn(
+    pub(super) fn bound_value_or_warn(
         &self,
         expr: &auto_lang_core::ast::Expr,
         context: &str,
@@ -3649,7 +3649,7 @@ impl VueGenerator {
         }
     }
     /// Convert template string with ${...} placeholders to Vue {{ ... }} interpolation
-    pub(crate) fn convert_template_to_vue(&self, template: &str) -> String {
+    pub(super) fn convert_template_to_vue(&self, template: &str) -> String {
         let mut result = String::new();
         let chars: Vec<char> = template.chars().collect();
         let mut i = 0;
@@ -3692,7 +3692,7 @@ impl VueGenerator {
     }
 
     /// Convert a template expression (inside ${...}) to Vue expression
-    pub(crate) fn convert_template_expr_to_vue(&self, expr: &str) -> String {
+    pub(super) fn convert_template_expr_to_vue(&self, expr: &str) -> String {
         let expr = expr.trim();
 
         // Handle state reference: .field -> field
@@ -3715,7 +3715,7 @@ impl VueGenerator {
     }
 
     /// Parse S-expression format from f-string parser to Vue expression
-    pub(crate) fn parse_s_expr_to_vue(&self, expr: &str) -> String {
+    pub(super) fn parse_s_expr_to_vue(&self, expr: &str) -> String {
         // Handle (dot (name user).field) -> user.field
         // Handle (dot (name user).id) -> user.id
         if let Some(inner) = expr.strip_prefix("(dot ") {
@@ -3770,7 +3770,7 @@ impl VueGenerator {
     ///（静态字面量 → 静态 attr；动态表达式（for 循环键等）→ `:data-scroll-
     /// anchor` v-bind 绑定）。空/类型不可解析 = R013 告警不发射——与 iced
     /// 侧 maybe_wrap_scroll_anchor 的 stderr 告警语义同形（不失效页面）。
-    pub(crate) fn push_scroll_anchor_attr(&self, attrs: &mut Vec<String>, value: &AuraPropValue, tag: &str) {
+    pub(super) fn push_scroll_anchor_attr(&self, attrs: &mut Vec<String>, value: &AuraPropValue, tag: &str) {
         let unresolvable = |this: &Self| {
             this.warn(
                 "R013",
@@ -3800,7 +3800,7 @@ impl VueGenerator {
         }
     }
 
-    pub(crate) fn push_passthrough_attrs(
+    pub(super) fn push_passthrough_attrs(
         &self,
         attrs: &mut Vec<String>,
         props: &HashMap<String, AuraPropValue>,
@@ -3861,7 +3861,7 @@ impl VueGenerator {
     /// 包裹 —— 原 prompt_bar.at 手写的 overlay 结构(相对定位容器 + 绝对定位
     /// spans 层 + text-transparent textarea)下沉为 codegen 职责。无新 props
     /// 或引用解析失败时返回 None(走通用发射路径)。
-    pub(crate) fn textarea_rich_overlay(
+    pub(super) fn textarea_rich_overlay(
         &mut self,
         tag: &str,
         props: &HashMap<String, AuraPropValue>,
@@ -3919,7 +3919,7 @@ impl VueGenerator {
     /// `__autoMentionHtml` helper 随 script 一次发射（escape + @\w+ 扫描 +
     /// span 包裹 + 尾随 \n，无 display 替换——对齐 VM 段计算契约）。
     /// 无 mentions，或 value/mentions 非裸 state ref → None（走通用发射）。
-    pub(crate) fn textarea_mentions_overlay(
+    pub(super) fn textarea_mentions_overlay(
         &mut self,
         tag: &str,
         props: &HashMap<String, AuraPropValue>,

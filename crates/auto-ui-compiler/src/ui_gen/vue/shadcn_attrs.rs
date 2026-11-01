@@ -4,7 +4,7 @@
 use super::*;
 
 impl VueGenerator {
-    pub(crate) fn generate_shadcn_attrs(
+    pub(super) fn generate_shadcn_attrs(
         &mut self,
         tag: &str,
         props: &HashMap<String, AuraPropValue>,
@@ -3529,7 +3529,7 @@ impl VueGenerator {
     /// `a ? 'x' : (b ? 'y' : 'z')`. Plan 043 M5 #tag-coloring: the previous
     /// implementation only read `branches.first()` + the final `else`, so
     /// else-if chains silently dropped every branch after the first.
-    pub(crate) fn if_expr_to_style_ternary(&self, if_stmt: &auto_lang_core::ast::If) -> String {
+    pub(super) fn if_expr_to_style_ternary(&self, if_stmt: &auto_lang_core::ast::If) -> String {
         let t = self.build_style_ternary(&if_stmt.branches, &if_stmt.else_);
         // Plan 054 M6: wrap the whole ternary in parens so it's safe inside
         // string concatenation (`'fw:' + (c ? a : b)`). Without the outer
@@ -3539,7 +3539,7 @@ impl VueGenerator {
         format!("({})", t)
     }
 
-    pub(crate) fn build_style_ternary(
+    pub(super) fn build_style_ternary(
         &self,
         branches: &[auto_lang_core::ast::Branch],
         else_: &Option<auto_lang_core::ast::Body>,
@@ -3587,7 +3587,7 @@ impl VueGenerator {
     /// - `{ if cond { x } else { y } }`    → `Nested("<ternary>")` (recursive)
     /// - anything else                     → `Leaf("")` (fallback, preserves
     ///   the old `style_branch_str` behavior of returning empty)
-    pub(crate) fn style_branch_value(&self, stmts: &[auto_lang_core::ast::Stmt]) -> StyleBranch {
+    pub(super) fn style_branch_value(&self, stmts: &[auto_lang_core::ast::Stmt]) -> StyleBranch {
         for st in stmts {
             match st {
                 // String leaf: `{ "cls" }` or `{ return "cls" }`
@@ -3630,7 +3630,7 @@ impl VueGenerator {
     /// because `"color: rgb(" + r + …` is indistinguishable from a class
     /// concat once refs are allowed. Use the array form
     /// `style: ["base", .dynClass]` for dynamic parts.
-    pub(crate) fn is_class_safe_concat(expr: &auto_lang_core::ast::Expr) -> bool {
+    pub(super) fn is_class_safe_concat(expr: &auto_lang_core::ast::Expr) -> bool {
         match expr {
             auto_lang_core::ast::Expr::Str(_) => true,
             auto_lang_core::ast::Expr::If(if_stmt) => {
@@ -3662,7 +3662,7 @@ impl VueGenerator {
     /// Translate one element of a `style: [...]` array into its JS fragment
     /// (quoted literal / style ternary / bound value). Shared by the
     /// plain-element and shadcn paths.
-    pub(crate) fn style_array_part_js(
+    pub(super) fn style_array_part_js(
         &self,
         e: &auto_lang_core::ast::Expr,
     ) -> crate::ui_gen::GenResult<String> {
@@ -3675,7 +3675,7 @@ impl VueGenerator {
         }
     }
 
-    pub(crate) fn push_style_class(&self, attrs: &mut Vec<String>, props: &HashMap<String, AuraPropValue>) {
+    pub(super) fn push_style_class(&self, attrs: &mut Vec<String>, props: &HashMap<String, AuraPropValue>) {
         if let Some(value) = self.get_style_class(props) {
             let is_explicit_class = props.contains_key("class") && !props.contains_key("style");
             match value {
@@ -3787,7 +3787,7 @@ impl VueGenerator {
     /// (`select`). Mirrors the plain-element path: static `class`, dynamic
     /// `:class` exprs (Batch A gap 20), conditional ternaries, and dynamic
     /// `:style` CSS-string expressions (independent channels, Plan 408 P12).
-    pub(crate) fn push_native_classes(
+    pub(super) fn push_native_classes(
         &self,
         attrs: &mut Vec<String>,
         tag: &str,
@@ -3807,7 +3807,7 @@ impl VueGenerator {
 
     /// IME guard for `@keyup.enter` handlers (LAUNCHER-001 R-02 / 452 spike).
     /// Composition confirm Enter must not fire onenter actions.
-    pub(crate) fn ime_guard_enter_handler(vue_event: &str, handler_fn: String) -> String {
+    pub(super) fn ime_guard_enter_handler(vue_event: &str, handler_fn: String) -> String {
         if vue_event.starts_with("@keyup.enter") {
             // handler_fn is either `Name` (0-arity) or `Name(...)` (call form).
             let invoke = if handler_fn.contains('(') {
@@ -3824,7 +3824,7 @@ impl VueGenerator {
     }
 
     /// Convert AutoUI event to Vue event for shadcn-vue components
-    pub(crate) fn shadcn_event_to_vue(&self, _tag: &str, event: &str) -> String {
+    pub(super) fn shadcn_event_to_vue(&self, _tag: &str, event: &str) -> String {
         let (base, modifiers) = Self::split_event_key(event);
         let mut vue = match base {
             "onclick" | "onClick" | "on_click" => "@click".to_string(),
@@ -3844,7 +3844,7 @@ impl VueGenerator {
     }
 
     /// Extract string value from AuraPropValue
-    pub(crate) fn extract_string_value<'a>(&self, value: &'a AuraPropValue) -> Option<&'a str> {
+    pub(super) fn extract_string_value<'a>(&self, value: &'a AuraPropValue) -> Option<&'a str> {
         match value {
             AuraPropValue::Expr(auto_lang_core::ast::Expr::Str(s)) => Some(s.as_str()),
             _ => None,
@@ -3852,7 +3852,7 @@ impl VueGenerator {
     }
 
     /// Extract boolean value from AuraPropValue
-    pub(crate) fn extract_bool_value(&self, value: &AuraPropValue) -> bool {
+    pub(super) fn extract_bool_value(&self, value: &AuraPropValue) -> bool {
         match value {
             AuraPropValue::Expr(auto_lang_core::ast::Expr::Bool(b)) => *b,
             AuraPropValue::Expr(auto_lang_core::ast::Expr::Str(s)) => s == "true",
@@ -3861,7 +3861,7 @@ impl VueGenerator {
     }
 
     /// Extract integer value from AuraPropValue
-    pub(crate) fn extract_int_value(&self, value: &AuraPropValue) -> Option<i64> {
+    pub(super) fn extract_int_value(&self, value: &AuraPropValue) -> Option<i64> {
         match value {
             AuraPropValue::Expr(auto_lang_core::ast::Expr::Int(n)) => Some(*n as i64),
             AuraPropValue::Expr(auto_lang_core::ast::Expr::Str(s)) => s.parse().ok(),
@@ -3870,7 +3870,7 @@ impl VueGenerator {
     }
 
     /// Extract float value from AuraPropValue
-    pub(crate) fn extract_float_value(&self, value: &AuraPropValue) -> Option<f64> {
+    pub(super) fn extract_float_value(&self, value: &AuraPropValue) -> Option<f64> {
         match value {
             AuraPropValue::Expr(auto_lang_core::ast::Expr::Float(n, _)) => Some(*n),
             AuraPropValue::Expr(auto_lang_core::ast::Expr::Int(n)) => Some(*n as f64),
@@ -3891,7 +3891,7 @@ impl VueGenerator {
     /// `store.field` where `store` is a store dep -> Some("store.field").
     /// Anything else (expression, prop, literal) -> None — the caller must
     /// raise the "model channel requires a writable state slot" error.
-    pub(crate) fn model_channel_slot(&self, expr: &auto_lang_core::ast::Expr) -> Option<String> {
+    pub(super) fn model_channel_slot(&self, expr: &auto_lang_core::ast::Expr) -> Option<String> {
         use auto_lang_core::ast::Expr;
         match expr {
             Expr::Dot(obj, field) => {
@@ -3915,7 +3915,7 @@ impl VueGenerator {
     /// `v-model:key="slot"`), or a hard error when the channel is fed a
     /// non-writable value. Returns None when `key` is not a channel (normal
     /// prop path continues).
-    pub(crate) fn try_model_channel_attr(
+    pub(super) fn try_model_channel_attr(
         &mut self,
         tag: &str,
         key: &str,
@@ -3955,7 +3955,7 @@ impl VueGenerator {
         }
     }
 
-    pub(crate) fn extract_state_ref(&self, value: &AuraPropValue) -> Option<String> {
+    pub(super) fn extract_state_ref(&self, value: &AuraPropValue) -> Option<String> {
         match value {
             AuraPropValue::Expr(auto_lang_core::ast::Expr::Ident(name)) => {
                 let stripped = name.as_str().strip_prefix('.').unwrap_or(name.as_str());
@@ -4004,7 +4004,7 @@ impl VueGenerator {
     /// Plan 028 F5: normalize an Index target to its bare state name —
     /// `.answers[k]` parses with the target as either Ident(".answers") or
     /// Dot(Ident("."), "answers"); both yield "answers".
-    pub(crate) fn index_target_name(target: &auto_lang_core::ast::Expr) -> Option<String> {
+    pub(super) fn index_target_name(target: &auto_lang_core::ast::Expr) -> Option<String> {
         match target {
             auto_lang_core::ast::Expr::Ident(name) => {
                 let stripped = name.as_str().strip_prefix('.').unwrap_or(name.as_str());
@@ -4028,7 +4028,7 @@ impl VueGenerator {
 
     /// Plan 028 F5: `value: .answers[q.id]` — Index-position state ref for a
     /// dynamic-key v-model. Returns `answers[q.id]` or None.
-    pub(crate) fn extract_state_index_ref(&self, value: &AuraPropValue) -> Option<String> {
+    pub(super) fn extract_state_index_ref(&self, value: &AuraPropValue) -> Option<String> {
         if let AuraPropValue::Expr(auto_lang_core::ast::Expr::Index(target, index)) = value {
             let t = Self::index_target_name(target)?;
             let idx = self.expr_to_vue_bound_value(index).ok()?;
@@ -4039,7 +4039,7 @@ impl VueGenerator {
 
     /// Get style or class prop value (style takes priority over class)
     /// This supports the transition from 'class' to 'style' prop naming
-    pub(crate) fn get_style_class<'a>(
+    pub(super) fn get_style_class<'a>(
         &self,
         props: &'a HashMap<String, AuraPropValue>,
     ) -> Option<&'a AuraPropValue> {
@@ -4053,7 +4053,7 @@ impl VueGenerator {
     /// `col { class: .rowClass }` 的动态绑定被静默丢弃。这里补齐：
     /// `Expr::If` → 三元；其他 `Expr` → `:class` 表达式。静态 `Expr::Str` 返回 None
     /// （由调用方按字符串追加到 classes）。
-    pub(crate) fn layout_dynamic_class_attr(&self, value: &AuraPropValue) -> Option<String> {
+    pub(super) fn layout_dynamic_class_attr(&self, value: &AuraPropValue) -> Option<String> {
         use auto_lang_core::ast::Expr;
         match value {
             AuraPropValue::Expr(Expr::If(if_stmt)) => Some(format!(
@@ -4075,7 +4075,7 @@ impl VueGenerator {
     /// 走 :class 会被当类名而失效)。之前 row/col 用 get_style_class(style 优先)
     /// 把 style prop 的动态值喂给 layout_dynamic_class_attr → 误产 :class →
     /// 表格 grid 列对齐失效(整个 Table 渲染虽不报错,但 grid 不生效)。
-    pub(crate) fn layout_dynamic_style_attr(&self, value: &AuraPropValue) -> Option<String> {
+    pub(super) fn layout_dynamic_style_attr(&self, value: &AuraPropValue) -> Option<String> {
         use auto_lang_core::ast::Expr;
         match value {
             // Plan 458: `style: if` branches carry Tailwind CLASS lists (the
@@ -4136,7 +4136,7 @@ impl VueGenerator {
     /// When present as another expression, emits the bound JS value. When
     /// absent, emits `default_val` so the consumer always gets a defined prop.
     /// (Plan 354 Phase C: used by AutoDownEditor's can_edit / show_actions.)
-    pub(crate) fn bool_prop_binding(
+    pub(super) fn bool_prop_binding(
         &self,
         props: &HashMap<String, AuraPropValue>,
         snake_key: &str,
@@ -4192,7 +4192,7 @@ impl VueGenerator {
     /// Quoted custom event names (`on"autodown:slash-open"`) may contain
     /// characters that are illegal in identifiers (':'/'-'); the base then
     /// runs to the closing quote and only what follows it is modifiers.
-    pub(crate) fn split_event_key(event: &str) -> (&str, Vec<&str>) {
+    pub(super) fn split_event_key(event: &str) -> (&str, Vec<&str>) {
         if let Some(rest) = event.strip_prefix("on\"") {
             if let Some(close) = rest.find('"') {
                 let end = 3 + close + 1; // just past the closing quote
@@ -4213,7 +4213,7 @@ impl VueGenerator {
     /// Covers the full common set: keyboard, mouse, wheel, focus, pointer,
     /// touch, drag, scroll. Unknown `onxxx` keys fall back to stripping `on`.
     /// Quoted custom names (`on"autodown:slash-open"`) map to the raw name.
-    pub(crate) fn base_event_to_dom(base: &str) -> String {
+    pub(super) fn base_event_to_dom(base: &str) -> String {
         if let Some(inner) = base.strip_prefix("on\"").and_then(|b| b.strip_suffix('"')) {
             return inner.to_string();
         }
@@ -4275,7 +4275,7 @@ impl VueGenerator {
 
     /// Normalize an event modifier for Vue templates.
     /// Auto names are mapped to Vue's modifier vocabulary where they differ.
-    pub(crate) fn vue_modifier(m: &str) -> &str {
+    pub(super) fn vue_modifier(m: &str) -> &str {
         match m {
             "escape" => "esc",
             "del" => "delete",
@@ -4292,7 +4292,7 @@ impl VueGenerator {
     /// child). Uses the same `on_pick` ↔ `Pick` convention as
     /// `prop_to_ts_type`. Non-`on_` events (e.g. DOM events forwarded to the
     /// child) keep the normal DOM mapping.
-    pub(crate) fn sub_widget_event_to_vue(&self, event: &str) -> String {
+    pub(super) fn sub_widget_event_to_vue(&self, event: &str) -> String {
         if let Some(base) = event.strip_prefix("on_") {
             return format!("@{}", Self::snake_to_pascal(base));
         }
@@ -4312,7 +4312,7 @@ impl VueGenerator {
     ///   empty-handler bridge — the ash-gui pass-through idiom) →
     ///   `@<handler>` so the listener matches what the child fires.
     /// - else keep the prop-derived name and warn (neither side fires it).
-    pub(crate) fn sub_widget_callback_event_to_vue(
+    pub(super) fn sub_widget_callback_event_to_vue(
         &self,
         tag: &str,
         event: &str,
@@ -4371,7 +4371,7 @@ impl VueGenerator {
     /// `.window` / `.document` modifiers are NOT handled here — they mark
     /// global listeners and are intercepted by `try_register_global_listener`
     /// before this function is called.
-    pub(crate) fn auto_event_to_vue(&self, event: &str) -> String {
+    pub(super) fn auto_event_to_vue(&self, event: &str) -> String {
         let (base, modifiers) = Self::split_event_key(event);
         // Existing shorthands keep their historical expansion.
         let mut vue = match base {
@@ -4392,7 +4392,7 @@ impl VueGenerator {
     /// Render the addEventListener/removeEventListener options argument
     /// (", { capture: true, passive: false }" or ""). For removal only the
     /// capture flag matters (per DOM spec), so passive is omitted there.
-    pub(crate) fn listener_options(gl: &GlobalListener, for_removal: bool) -> String {
+    pub(super) fn listener_options(gl: &GlobalListener, for_removal: bool) -> String {
         let mut opts: Vec<String> = Vec::new();
         if gl.capture {
             opts.push("capture: true".to_string());
@@ -4412,7 +4412,7 @@ impl VueGenerator {
     /// Make an arbitrary DOM event name safe for embedding in a JS identifier.
     /// Custom event names may contain ':'/'-' (e.g. "autodown:slash-open"),
     /// which would otherwise produce an invalid wrapper function name.
-    pub(crate) fn sanitize_ident(s: &str) -> String {
+    pub(super) fn sanitize_ident(s: &str) -> String {
         s.chars()
             .map(|c| {
                 if c.is_ascii_alphanumeric() || c == '_' {
@@ -4430,7 +4430,7 @@ impl VueGenerator {
     ///
     /// Declaration: `onmousemove.window: .DragMove($event)` or
     /// `onwheel.document.capture.prevent: .LockWheel($event)`.
-    pub(crate) fn try_register_global_listener(&mut self, event: &str, aura_event: &AuraEvent) -> bool {
+    pub(super) fn try_register_global_listener(&mut self, event: &str, aura_event: &AuraEvent) -> bool {
         let (base, modifiers) = Self::split_event_key(event);
         let target = modifiers
             .iter()
@@ -4524,7 +4524,7 @@ impl VueGenerator {
 
     /// Plan 367 P0-1: Convert PascalCase to snake_case for callback prop matching.
     /// e.g. "TogglePin" → "toggle_pin", "DeleteActive" → "delete_active"
-    pub(crate) fn pascal_to_snake(s: &str) -> String {
+    pub(super) fn pascal_to_snake(s: &str) -> String {
         let mut result = String::new();
         for (i, ch) in s.chars().enumerate() {
             if ch.is_uppercase() && i > 0 {
@@ -4538,7 +4538,7 @@ impl VueGenerator {
     /// Plan 367 P0-2: Indent every line of a body string by the given prefix.
     /// Used when wrapping transpiled handler bodies into function/onMounted.
     /// Ensures multi-line bodies have consistent indentation.
-    pub(crate) fn indent_body(body: &str, indent: &str) -> String {
+    pub(super) fn indent_body(body: &str, indent: &str) -> String {
         body.lines()
             .map(|line| {
                 if line.trim().is_empty() {
@@ -4553,7 +4553,7 @@ impl VueGenerator {
 
     /// Plan 367 P0-4/P1-1: Map an Auto type to its TypeScript equivalent.
     /// Used for emit payload types and prop types.
-    pub(crate) fn auto_type_to_ts_type(ty: &auto_lang_core::ast::Type) -> String {
+    pub(super) fn auto_type_to_ts_type(ty: &auto_lang_core::ast::Type) -> String {
         use auto_lang_core::ast::Type;
         match ty {
             Type::StrSlice | Type::StrOwned | Type::StrFixed(_) | Type::CStrLit => {
@@ -4606,7 +4606,7 @@ impl VueGenerator {
     /// the api.ts interface. This is a safe first step: `var input str` →
     /// `ref<string>`, `var next_id int` → `ref<number>`, while `var blocks
     /// List<Block>` stays `ref<any[]>` until imports land.
-    pub(crate) fn store_ref_ts_type(ty: &auto_lang_core::ast::Type) -> String {
+    pub(super) fn store_ref_ts_type(ty: &auto_lang_core::ast::Type) -> String {
         use auto_lang_core::ast::Type;
         match ty {
             Type::List(inner) => {
@@ -4631,7 +4631,7 @@ impl VueGenerator {
     /// Returns (name, ts_type) pairs; unmatched params fall back to `any`.
     /// Uses `store_ref_ts_type` so user-defined payload types stay `any`
     /// (avoiding "Cannot find name" until Phase E(e) imports land).
-    pub(crate) fn handler_param_types(store: &crate::aura::AuraStore, pattern: &str) -> Vec<(String, String)> {
+    pub(super) fn handler_param_types(store: &crate::aura::AuraStore, pattern: &str) -> Vec<(String, String)> {
         let after_dot = pattern.trim_start_matches('.');
         let action = after_dot.split('(').next().unwrap_or(after_dot);
         let names = match store.handler_params.get(pattern) {
@@ -4659,7 +4659,7 @@ impl VueGenerator {
     /// Plan 374 embeds param names in handler keys (".Scrolled(e)") so the
     /// Rust backend can recover them; the Vue backend matches handlers by
     /// base name (".Scrolled"), so normalize before lookup.
-    pub(crate) fn base_pattern(pattern: &str) -> &str {
+    pub(super) fn base_pattern(pattern: &str) -> &str {
         match pattern.find('(') {
             Some(i) if pattern.ends_with(')') => &pattern[..i],
             _ => pattern,
@@ -4673,7 +4673,7 @@ impl VueGenerator {
     /// the normal handler path (which would mangle it into `on<name>` and
     /// synthesize an empty stub). Returns None when the handler is not a
     /// callback prop.
-    pub(crate) fn try_callback_prop_attr(&self, aura_event: &AuraEvent, vue_event: &str) -> Option<String> {
+    pub(super) fn try_callback_prop_attr(&self, aura_event: &AuraEvent, vue_event: &str) -> Option<String> {
         let bare = Self::base_pattern(&aura_event.handler);
         if !bare.is_empty()
             && !bare.starts_with('.')
@@ -4693,7 +4693,7 @@ impl VueGenerator {
     /// `on_pick` ↔ `Pick` naming convention and type the callback from its
     /// payload: `Pick(str)` → `(arg0: string) => void`, `Stop` → `() => void`.
     /// Non-msg props fall through to the generic Auto→TS mapping.
-    pub(crate) fn prop_to_ts_type(prop: &AuraProp, widget: &AuraWidget) -> String {
+    pub(super) fn prop_to_ts_type(prop: &AuraProp, widget: &AuraWidget) -> String {
         use auto_lang_core::ast::Type;
         if let Type::User(decl) = &prop.type_info {
             if decl.name.as_str() == "msg" {
@@ -4740,7 +4740,7 @@ impl VueGenerator {
     /// `on_delete`). The child rewrites every `props.on_x()` / bare
     /// `on_x()` call to `emit('<Pascal>', ...)` (musk-022 / PLAN-037 T3),
     /// so the Pascal event is the one and only delivery channel.
-    pub(crate) fn prop_is_emitted_callback(prop: &AuraProp, widget: &AuraWidget) -> bool {
+    pub(super) fn prop_is_emitted_callback(prop: &AuraProp, widget: &AuraWidget) -> bool {
         use auto_lang_core::ast::Type;
         let _ = widget;
         if let Type::User(decl) = &prop.type_info {
@@ -4756,7 +4756,7 @@ impl VueGenerator {
     /// body calling these as `props.on_xxx(...)` must be rewritten to
     /// `emit('<Pascal>', ...)` so the parent's `@<Pascal>` binding fires — the
     /// prop is never passed as `:on_xxx` by the parent (it binds `@Pascal`).
-    pub(crate) fn real_callback_prop_snakes(widget: &AuraWidget) -> Vec<String> {
+    pub(super) fn real_callback_prop_snakes(widget: &AuraWidget) -> Vec<String> {
         widget
             .props
             .iter()
@@ -4778,7 +4778,7 @@ impl VueGenerator {
     /// variant exists). A handler body invoking these as `props.on_xxx(...)`
     /// must be rewritten to `emit('<Pascal>', ...)` — the prop does not exist
     /// at runtime, while the Pascal emit is declared via the msg variant.
-    pub(crate) fn emitted_callback_prop_snakes(widget: &AuraWidget) -> Vec<String> {
+    pub(super) fn emitted_callback_prop_snakes(widget: &AuraWidget) -> Vec<String> {
         widget
             .props
             .iter()
@@ -4799,7 +4799,7 @@ impl VueGenerator {
     /// `GenericInstance<T, …>`, …). Built-in/pseudo types (`msg`, `str`,
     /// `int`, `List`, `Array`, …) are excluded — they map to TS primitives
     /// or `() => void` and have no api.ts interface.
-    pub(crate) fn collect_custom_types(ty: &auto_lang_core::ast::Type, out: &mut Vec<String>) {
+    pub(super) fn collect_custom_types(ty: &auto_lang_core::ast::Type, out: &mut Vec<String>) {
         use auto_lang_core::ast::Type;
         match ty {
             Type::User(decl) => {
@@ -4851,7 +4851,7 @@ impl VueGenerator {
 
     /// Built-in / pseudo type names that have no api.ts interface (TS
     /// primitives, the `msg` callback pseudo-type, stdlib containers).
-    pub(crate) fn is_builtin_type_name(name: &str) -> bool {
+    pub(super) fn is_builtin_type_name(name: &str) -> bool {
         matches!(
             name,
             "msg" | "str" | "int" | "i64" | "uint" | "u64" | "usize" | "byte" | "char"
@@ -4870,7 +4870,7 @@ impl VueGenerator {
 
     /// Convert snake_case to PascalCase for msg-variant lookup
     /// (`on_open_path` → `OpenPath`).
-    pub(crate) fn snake_to_pascal(s: &str) -> String {
+    pub(super) fn snake_to_pascal(s: &str) -> String {
         let mut result = String::new();
         let mut cap = true;
         for ch in s.chars() {
@@ -4888,7 +4888,7 @@ impl VueGenerator {
 
     /// Look up on-block handler params by base pattern (".Name"), tolerant of
     /// Plan 374 parameterized keys (".Name(e)").
-    pub(crate) fn get_handler_params<'a>(
+    pub(super) fn get_handler_params<'a>(
         handler_params: &'a std::collections::HashMap<String, Vec<String>>,
         base_key: &str,
     ) -> Option<&'a Vec<String>> {
@@ -4910,7 +4910,7 @@ impl VueGenerator {
     /// multi-arg) always keep their bound arguments; handlers with no
     /// on-block entry (0-param synthesized stubs) only take the text via an
     /// explicit single-identifier binding.
-    pub(crate) fn input_text_handler_wants_text_arg(&self, aura_event: &AuraEvent) -> bool {
+    pub(super) fn input_text_handler_wants_text_arg(&self, aura_event: &AuraEvent) -> bool {
         // PLAN-055 T9(⑥): 实参为 `$event` 字面时同样按文本通道包
         // ($event.target as HTMLInputElement).value——此前 `$` 不属 bare 字符集，
         // `oninput: .OnSearchInput($event)` 生成 `@input="OnSearchInput($event)"`
@@ -4940,7 +4940,7 @@ impl VueGenerator {
     /// characters like ':' ("update:modelValue" v-model contracts), so the
     /// final name is sanitized (update:modelValue → update_modelValue). The
     /// verbatim emit name is recovered via the on-block pattern when needed.
-    pub(crate) fn pattern_to_handler_name(&self, pattern: &str) -> String {
+    pub(super) fn pattern_to_handler_name(&self, pattern: &str) -> String {
         let pattern = Self::base_pattern(pattern);
         let name = if pattern.starts_with('.') {
             // Dot-prefixed handlers map directly to function name (Vue convention)
@@ -4957,7 +4957,7 @@ impl VueGenerator {
     /// Convert handler reference to function call
     /// (same sanitization as pattern_to_handler_name — the two must agree so
     /// template references match the generated function definitions)
-    pub(crate) fn handler_to_function_call(&self, handler: &str) -> String {
+    pub(super) fn handler_to_function_call(&self, handler: &str) -> String {
         let handler = Self::base_pattern(handler);
         let name = if handler.starts_with('.') {
             // Dot-prefixed handlers map directly to function name (Vue convention)
@@ -4973,7 +4973,7 @@ impl VueGenerator {
 
     /// Find the state variable that likely represents the "active id" for a given handler.
     /// Heuristic: looks for state vars ending with "_id" (e.g., "active_id" for "SelectNote")
-    pub(crate) fn find_active_id_var(&self, _handler_name: &str) -> Option<String> {
+    pub(super) fn find_active_id_var(&self, _handler_name: &str) -> Option<String> {
         // Look for a state variable ending with "_id"
         for name in &self.state_names {
             if name.ends_with("_id") {
@@ -4984,7 +4984,7 @@ impl VueGenerator {
     }
 
     /// Convert handler to Vue function call with parameters
-    pub(crate) fn handler_to_function_call_with_params(&self, handler: &str, params: &[String]) -> String {
+    pub(super) fn handler_to_function_call_with_params(&self, handler: &str, params: &[String]) -> String {
         let func_name = self.handler_to_function_call(handler);
         if params.is_empty() {
             func_name
@@ -5012,7 +5012,7 @@ impl VueGenerator {
     /// Returns None when the binding is not a code_editor position event, the
     /// DSL already passes explicit args (they win), or the handler declares
     /// no params (nothing to forward — plain `@cursor="Handler"`).
-    pub(crate) fn code_editor_event_payload_call(
+    pub(super) fn code_editor_event_payload_call(
         &self,
         tag: &str,
         event: &str,
@@ -5066,7 +5066,7 @@ impl VueGenerator {
     ///
     /// A preceding identifier/`.` character guards against mangling member
     /// access like `obj.this`, and quoted string contents are left untouched.
-    pub(crate) fn vue_event_param(param: &str) -> String {
+    pub(super) fn vue_event_param(param: &str) -> String {
         let b = param.as_bytes();
         let mut out: Vec<u8> = Vec::with_capacity(b.len());
         let mut i = 0;
@@ -5136,7 +5136,7 @@ impl VueGenerator {
     // ========================================================================
 
     /// Register a shadcn-vue component as used
-    pub(crate) fn register_shadcn_component(&mut self, tag: &str) {
+    pub(super) fn register_shadcn_component(&mut self, tag: &str) {
         if self.is_shadcn() {
             if let Some(component_name) = self.shadcn_component_name(tag) {
                 self.shadcn_components_used.insert(component_name);
@@ -5145,7 +5145,7 @@ impl VueGenerator {
     }
 
     /// Generate shadcn-vue import statements using unified registry
-    pub(crate) fn generate_shadcn_imports(&self) -> String {
+    pub(super) fn generate_shadcn_imports(&self) -> String {
         if self.shadcn_components_used.is_empty() {
             return String::new();
         }
@@ -5195,7 +5195,7 @@ impl VueGenerator {
     }
 
     /// Get shadcn-vue component name for a tag
-    pub(crate) fn shadcn_component_name(&self, tag: &str) -> Option<String> {
+    pub(super) fn shadcn_component_name(&self, tag: &str) -> Option<String> {
         if self.is_shadcn() {
             self.widget_registry
                 .get_primary_component("vue", tag)

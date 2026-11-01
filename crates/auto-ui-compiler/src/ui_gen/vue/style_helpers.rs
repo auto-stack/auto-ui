@@ -4,7 +4,7 @@
 use super::*;
 
 impl VueGenerator {
-    pub(crate) fn extract_classes(
+    pub(super) fn extract_classes(
         &self,
         tag: &str,
         props: &HashMap<String, AuraPropValue>,

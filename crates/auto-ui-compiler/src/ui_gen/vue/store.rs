@@ -1037,7 +1037,7 @@ function getAccentNames(): string[] {
     /// 零 accent 面 app 维持零注入（零变化优先裁定）。storage 键为全局
     /// appearance 语义（与桌面端 appearance.theme 同型）：同源 app 间共享
     /// 用户主题偏好，属预期行为。
-    pub(crate) fn theme_runtime_js() -> String {
+    pub(super) fn theme_runtime_js() -> String {
         let palettes = crate::design_tokens::registry::render_theme_palettes_js();
         format!(
             r#"// PLAN-601 T-06: Named theme hot-switch runtime (applyAccent generalized
@@ -1098,7 +1098,7 @@ function applyTheme(name: string, isDark = document.documentElement.classList.co
     }
 
     /// Convert an initial-value AuraExpr to a JS literal (v1: simple cases).
-    pub(crate) fn store_init_to_js(expr: &auto_lang_core::ast::Expr) -> String {
+    pub(super) fn store_init_to_js(expr: &auto_lang_core::ast::Expr) -> String {
         use auto_lang_core::ast::Expr;
         match expr {
             Expr::Int(n) => n.to_string(),

@@ -5,7 +5,7 @@ use super::*;
 
 impl VueGenerator {
     /// Generate <template> content from view tree
-    pub(crate) fn generate_template(&mut self, root: &AuraNode) -> GenResult<String> {
+    pub(super) fn generate_template(&mut self, root: &AuraNode) -> GenResult<String> {
         let mut template = String::new();
 
         let root_html = self.node_to_html(root, 2)?;
@@ -91,7 +91,7 @@ impl VueGenerator {
     }
 
     /// Generate <style> content
-    pub(crate) fn generate_style(&self) -> String {
+    pub(super) fn generate_style(&self) -> String {
         let mut style = String::new();
 
         // Plan 106: Override Prism.js default margin on pre elements
@@ -130,7 +130,7 @@ impl VueGenerator {
     /// onMounted 初绘 + resize 重绘)与 pen 三包装(mousedown 内联;
     /// document mousemove/mouseup 挂载——出界即收笔,T1d 双端统一语义)
     /// 在 generate_script 消费时生成。
-    pub(crate) fn generate_canvas_html(
+    pub(super) fn generate_canvas_html(
         &mut self,
         props: &HashMap<String, AuraPropValue>,
         events: &HashMap<String, crate::aura::AuraEvent>,
@@ -265,7 +265,7 @@ impl VueGenerator {
     /// 调用方继续走通用原生元素路径。这条早退就是兼容性约束的落点：
     /// 019-video-app 之类「裸 `video { src: ... }`」的生成结果不会经过本函数
     /// 的任何一行。
-    pub(crate) fn try_generate_controlled_video_html(
+    pub(super) fn try_generate_controlled_video_html(
         &mut self,
         props: &HashMap<String, AuraPropValue>,
         events: &HashMap<String, crate::aura::AuraEvent>,
@@ -423,7 +423,7 @@ impl VueGenerator {
     ///    把最近一次的下行值缓存下来，`loadedmetadata` 时原样重推一遍即可；
     ///    这条也是「用户手势被浏览器 autoplay 策略拦下后，下一次交互能恢复」
     ///    的恢复路径。
-    pub(crate) fn video_script_block(&self, i: usize, spec: &VideoSpec) -> String {
+    pub(super) fn video_script_block(&self, i: usize, spec: &VideoSpec) -> String {
         let j = |v: &Option<String>| v.clone().unwrap_or_else(|| "null".to_string());
         let refn = &spec.ref_name;
         // 音轨探针（AC-16b）只在声明了 onaudiotrack 时发射声明/复位/包装，
@@ -601,7 +601,7 @@ onMounted(() => {{
     /// 既有 `progress` 输出逐字节不变）。契约：handler 收 **0..1 的横向比例**，
     /// 与 VM 侧 `View::ProgressBar.on_seek`（`seek_area.rs`）同尺——作者写
     /// `store.SeekTo(.duration * $0)` 即可，不需要知道像素或 max。
-    pub(crate) fn try_generate_seekable_progress_html(
+    pub(super) fn try_generate_seekable_progress_html(
         &mut self,
         props: &HashMap<String, AuraPropValue>,
         events: &HashMap<String, crate::aura::AuraEvent>,
@@ -665,7 +665,7 @@ onMounted(() => {{
     /// 按下即 seek（点哪跳哪）；**按住期间**的移动才继续 seek（悬停不 scrub
     /// ——与 VM 侧 `seek_area.rs` 的 `pressed` 门控同语义）；指针捕获让拖出
     /// 条外仍跟手。
-    pub(crate) fn progress_seek_script_block(&self, i: usize, handler: &str) -> String {
+    pub(super) fn progress_seek_script_block(&self, i: usize, handler: &str) -> String {
         let mut s = String::new();
         s.push_str("// PLAN-617: 可拖拽进度条（progress + onseek）。handler 收 0..1 比例。\n");
         s.push_str(&format!("let __seekDrag_{i} = false\n"));
@@ -691,7 +691,7 @@ onMounted(() => {{
     /// mousemove buttons&1 门控 + 33ms 时间闸 + 出界即收笔;document
     /// mouseup 收笔——与 iced PenArea 同语义)+ watch deep + onMounted/
     /// resize 初绘重绘。
-    pub(crate) fn canvas_script_block(&mut self, i: usize, spec: &CanvasSpec) -> String {
+    pub(super) fn canvas_script_block(&mut self, i: usize, spec: &CanvasSpec) -> String {
         let refn = &spec.ref_name;
         let prefix = &spec.prefix;
         let mut s = String::new();
@@ -1011,7 +1011,7 @@ onMounted(() => {{ nextTick(__canvasRedraw_{i}) }})
     /// field (`item.icon`), a model field, or a computed. Additional props
     /// are passed through as `:prop` bindings; `class` / `style_obj` and
     /// event listeners behave like on plain elements.
-    pub(crate) fn generate_dyn_component_html(
+    pub(super) fn generate_dyn_component_html(
         &mut self,
         props: &std::collections::HashMap<String, AuraPropValue>,
         events: &std::collections::HashMap<String, AuraEvent>,
@@ -1153,7 +1153,7 @@ onMounted(() => {{ nextTick(__canvasRedraw_{i}) }})
     /// Generate a slot outlet: `slot` → `<slot />`,
     /// `slot(name: "header")` → `<slot name="header" />`.
     /// Children (if any) become Vue slot fallback content.
-    pub(crate) fn generate_slot_outlet_html(
+    pub(super) fn generate_slot_outlet_html(
         &mut self,
         props: &HashMap<String, AuraPropValue>,
         children: &[AuraNode],
@@ -1183,7 +1183,7 @@ onMounted(() => {{ nextTick(__canvasRedraw_{i}) }})
     /// - `disabled:` bool literal → static `disabled`; expression →
     ///   `:disabled="expr"`.
     /// Children are emitted normally (recursed via node_to_html).
-    pub(crate) fn generate_teleport_html(
+    pub(super) fn generate_teleport_html(
         &mut self,
         props: &HashMap<String, AuraPropValue>,
         children: &[AuraNode],
@@ -1254,7 +1254,7 @@ onMounted(() => {{ nextTick(__canvasRedraw_{i}) }})
     /// child's named slot → `<template #x>...</template>`; a bare
     /// `slot { ... }` unwraps its children into the default slot.
     /// Anything else is emitted normally.
-    pub(crate) fn slot_child_to_html(&mut self, child: &AuraNode, indent: usize) -> GenResult<String> {
+    pub(super) fn slot_child_to_html(&mut self, child: &AuraNode, indent: usize) -> GenResult<String> {
         if let AuraNode::Element {
             tag,
             props,
@@ -1294,7 +1294,7 @@ onMounted(() => {{ nextTick(__canvasRedraw_{i}) }})
     ///
     /// `is_continuation` distinguishes the head (`v-if`) from arms deeper in
     /// the chain (`v-else-if`); a plain `else` arm closes the chain.
-    pub(crate) fn emit_conditional(
+    pub(super) fn emit_conditional(
         &mut self,
         node: &AuraNode,
         indent: usize,
@@ -1351,7 +1351,7 @@ onMounted(() => {{ nextTick(__canvasRedraw_{i}) }})
 
     /// Plan 451 P2: `menubar {}`/`toolbar {}` 占位标签可否从当前 widget 的
     /// `actions {}` 块合成（块存在且非空）。
-    pub(crate) fn actions_menubar_available(&self) -> bool {
+    pub(super) fn actions_menubar_available(&self) -> bool {
         self.current_actions
             .as_ref()
             .and_then(|a| a.menubar.as_ref())
@@ -1359,7 +1359,7 @@ onMounted(() => {{ nextTick(__canvasRedraw_{i}) }})
             .unwrap_or(false)
     }
 
-    pub(crate) fn actions_toolbar_available(&self) -> bool {
+    pub(super) fn actions_toolbar_available(&self) -> bool {
         self.current_actions
             .as_ref()
             .and_then(|a| a.toolbar.as_ref())
@@ -1369,7 +1369,7 @@ onMounted(() => {{ nextTick(__canvasRedraw_{i}) }})
 
     /// 用户在占位标签上给的 class/style 串（vm 侧 convert_menubar 同款
     /// 语义：class 或 style 均作为容器样式类）。
-    pub(crate) fn actions_placeholder_class(&self, props: &HashMap<String, AuraPropValue>) -> String {
+    pub(super) fn actions_placeholder_class(&self, props: &HashMap<String, AuraPropValue>) -> String {
         props
             .get("class")
             .or_else(|| props.get("style"))
@@ -1385,7 +1385,7 @@ onMounted(() => {{ nextTick(__canvasRedraw_{i}) }})
     /// 右对齐快捷键；enabled_if/checked_if 经 convert_condition 转译为
     /// 模板表达式（`.store.x > 0` → `store.x > 0`，与 view if 条件同一
     /// 翻译器）。分隔线用 MenubarSeparator（docs/schema/aura.at 的 vue 行）。
-    pub(crate) fn generate_actions_menubar_html(
+    pub(super) fn generate_actions_menubar_html(
         &mut self,
         props: &HashMap<String, AuraPropValue>,
         indent: usize,
@@ -1491,7 +1491,7 @@ onMounted(() => {{ nextTick(__canvasRedraw_{i}) }})
     /// checkbox 的 checked→:checked 单向绑定，视觉随 store 态刷新——
     /// 与 vm convert_menubar_component 语义同源）。
     /// 返回 None = 非 menubar 族 kind，调用方落回通用发射。
-    pub(crate) fn generate_menubar_view_node(
+    pub(super) fn generate_menubar_view_node(
         &mut self,
         kind: &str,
         props: &HashMap<String, AuraPropValue>,
@@ -1797,7 +1797,7 @@ onMounted(() => {{ nextTick(__canvasRedraw_{i}) }})
     /// Plan 451 P2: `toolbar {}` 占位标签 → 从声明合成的工具栏（镜像 vm
     /// convert_toolbar）：图标按钮（lucide 组件 + title 原生 tooltip，
     /// enabled_if → :disabled），无图标则文本按钮；sep 为细分隔线。
-    pub(crate) fn generate_actions_toolbar_html(
+    pub(super) fn generate_actions_toolbar_html(
         &mut self,
         props: &HashMap<String, AuraPropValue>,
         indent: usize,
@@ -1874,7 +1874,7 @@ onMounted(() => {{ nextTick(__canvasRedraw_{i}) }})
     /// rather than a generic registry component: the browser receives only a
     /// media URI and the template applies the interactive transform. File
     /// access, decoding, prefetching and caching remain backend concerns.
-    pub(crate) fn generate_image_surface_html(
+    pub(super) fn generate_image_surface_html(
         &mut self,
         props: &HashMap<String, AuraPropValue>,
         events: &HashMap<String, AuraEvent>,
@@ -4078,7 +4078,7 @@ onMounted(() => {{ nextTick(__canvasRedraw_{i}) }})
         (auto_code, vue_code)
     }
 
-    pub(crate) fn generate_previewcard_html(
+    pub(super) fn generate_previewcard_html(
         &mut self,
         props: &HashMap<String, AuraPropValue>,
         _events: &HashMap<String, AuraEvent>,
@@ -4254,7 +4254,7 @@ onMounted(() => {{ nextTick(__canvasRedraw_{i}) }})
     }
 
     /// Generate HTML for codeblock element with copy button
-    pub(crate) fn generate_codeblock_html(
+    pub(super) fn generate_codeblock_html(
         &mut self,
         props: &HashMap<String, AuraPropValue>,
         _events: &HashMap<String, AuraEvent>,
