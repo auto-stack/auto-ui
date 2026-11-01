@@ -46,7 +46,7 @@ use crate::lower_components::{
 use crate::scene::sha256_hex;
 use crate::translate::LowerError;
 use auto_ui_dialect::node2d::{
-    EventPattern, Game2dBlock, Game2dShape, Game2dSlot, Game2dText, Game2dTrigger,
+    EventPattern, Game2dBlock, Game2dShape, Game2dTrigger,
     Game2dTriggerKind,
 };
 use std::collections::BTreeMap;
@@ -58,8 +58,6 @@ use std::path::Path;
 pub(crate) struct GameTrigger {
     /// 触发对（= authoring 行序）。
     pub(crate) pair: usize,
-    /// 目标实例（root-view 声明名）。
-    pub(crate) target: String,
     /// 目标定义前缀（小写）与 SoA 下标。
     pub(crate) prefix: String,
     pub(crate) def_idx: usize,
@@ -533,7 +531,6 @@ fn resolve_trigger(
     };
     Ok(GameTrigger {
         pair,
-        target: t.target.clone(),
         prefix,
         def_idx: inst.def_idx,
         recv: format!("{target_lower}_{ev_lower}", target_lower = t.target.to_lowercase()),
@@ -940,7 +937,6 @@ fn complete_receivers(project: &Project, world: &WorldIR, plan: &mut crate::lowe
         }
     }
     for inst in &world.instances {
-        let def = &world.defs[&inst.def];
         let decl = node_of(project, &inst.def);
         let Some(on) = &decl.on else { continue };
         let leaf = inst_name_of(&inst.path).to_lowercase();

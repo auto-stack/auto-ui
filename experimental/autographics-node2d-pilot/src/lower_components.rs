@@ -127,7 +127,7 @@ impl PType {
 
 /// 实例参数绑定值：数值或资源 symbol（下降期常量）。
 #[derive(Debug, Clone)]
-enum ParamVal {
+pub(crate) enum ParamVal {
     Num(f64),
     Res(String),
 }
@@ -1011,7 +1011,7 @@ pub(crate) fn build_world(project: &Project) -> Result<WorldIR, LowerError> {
 
 /// 子投递：发射定义实例 i → 自名子实例的接收下标。
 #[derive(Debug, Clone)]
-struct ChildDispatch {
+pub(crate) struct ChildDispatch {
     table: String,
     fn_name: String,
     #[allow(dead_code)] // 诊断/未来消费面保留（端口名）。
@@ -1022,7 +1022,7 @@ struct ChildDispatch {
 
 /// 祖先投递：发射定义实例 i → 最近声明 `on .Ev` 的祖先实例（或 root）。
 #[derive(Debug, Clone)]
-struct AncDispatch {
+pub(crate) struct AncDispatch {
     table: String,
     fn_name: String,
     to_root: bool,
