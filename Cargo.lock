@@ -847,6 +847,7 @@ name = "auto-ui-compiler"
 version = "0.1.0"
 dependencies = [
  "auto-atom",
+ "auto-generation-core",
  "auto-lang-core",
  "auto-parser-api",
  "auto-ui-dialect",

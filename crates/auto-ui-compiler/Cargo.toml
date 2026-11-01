@@ -21,6 +21,8 @@ ui-headless = []
 # The compiler may use the SDK; it must NOT be depended on by the SDK.
 # UI owned AST 与显式领域文法组合（PLAN-841）。
 auto-lang-core = { path = "../../../auto-lang/crates/auto-lang-core" }
+# PLAN-910: generated front member receipt discovery (published exe path).
+auto-generation-core = { path = "../../../auto-lang/crates/auto-generation-core" }
 auto-ui-dialect = { path = "../auto-ui-dialect" }
 auto-parser-api = { path = "../../../auto-lang/crates/auto-parser-api" }
 # PLAN-814 T-03 Batch 1：action_config 解析消费的轻前端 crate（与 SDK 同源）。

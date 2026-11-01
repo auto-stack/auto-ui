@@ -4485,6 +4485,11 @@ impl DesktopSession {
         // entry = <app-root>/src/front/app.at → nth(3) = app root（pac.at
         // 与 rust-workspace 都在 app root 本层——无再上溯）。
         let root = entry.ancestors().nth(3)?;
+        // PLAN-910: receipt-first (published member exe); convention probing
+        // below stays as the legacy fallback.
+        if let Some(published) = crate::ui::app_registry::published_native_exe(root) {
+            return Some(published);
+        }
         let dir_name = root.file_name()?.to_string_lossy().to_string();
         let mut candidates: Vec<String> = Vec::new();
         if let Ok(text) = std::fs::read_to_string(root.join("pac.at")) {

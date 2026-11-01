@@ -181,6 +181,12 @@ pub(crate) fn framework_repo_root(from: &Path) -> Option<PathBuf> {
 /// name 蛇形 > pac name 原名（生成包名保 dash——hello-world.exe）> 目录名。
 /// 返回首个存在命中；全缺 = None。
 pub fn convention_native_exe(app_dir: &Path, name: Option<&str>) -> Option<PathBuf> {
+    // PLAN-910: receipt-first — the managed front member publishes its exe
+    // into its own bin dir and records the absolute path; the convention
+    // probes below remain the legacy fallback for pre-910 layouts.
+    if let Some(published) = published_native_exe(app_dir) {
+        return Some(published);
+    }
     let dir_name = app_dir.file_name()?.to_string_lossy().to_string();
     let mut candidates: Vec<String> = Vec::new();
     if let Some(name) = name {
@@ -234,6 +240,13 @@ pub fn convention_native_exe(app_dir: &Path, name: Option<&str>) -> Option<PathB
         }
     }
     None
+}
+
+/// PLAN-910: the published exe recorded by the generated front member's
+/// receipt (`<ws>/<member>/generation.json` → artifact.exe), verified to
+/// exist. None when the project has no 910-layout receipt yet.
+pub fn published_native_exe(app_dir: &Path) -> Option<PathBuf> {
+    auto_generation_core::generated_build::discover_front_exe(app_dir)
 }
 
 pub fn scan_apps(dir: &Path, opts: &ScanOptions) -> Vec<AppRegistryEntry> {

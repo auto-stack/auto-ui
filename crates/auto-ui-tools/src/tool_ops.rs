@@ -428,7 +428,10 @@ pub fn profile_output_dirs(root: &Path, profile: &str) -> Vec<PathBuf> {
         "rust" => {
             // rust_ui generates into the shared workspace member.
             let ws = crate::rust_ui::resolve_rust_workspace_dir(root);
-            vec![ws.join(crate::rust_ui::front_member_name(root))]
+            vec![ws.join(auto_api_gen::generated_build::member_dir_name(
+                root,
+                auto_api_gen::generated_build::MemberRole::Front,
+            ))]
         }
         _ => Vec::new(),
     }
