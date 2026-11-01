@@ -1,0 +1,28 @@
+// PLAN-022 runtime-oob control (F-R1-04): the FIELD-bound frame ordinal goes
+// out of the table at runtime (tick 2 writes .pose = 9 against a 3-frame
+// table). The generated present chain must take the degenerate-rect branch
+// and the frozen trusted unit must raise the NAMED fault 42; the host keeps
+// the tick-1 last-good visual.
+use resources: atlas_img
+node OobSprite(img: Image2D) {
+    model {
+        var phase = 0
+        var pose = 0
+    }
+    view-2d {
+        character2d body {
+            position: (2.0, 0.0)
+            size: (0.8, 1.0)
+            image: img
+            frame: .pose
+            flip: 0
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            .phase = .phase + 1
+            .pose = 0
+            if .phase == 2 { .pose = 9 }
+        }
+    }
+}

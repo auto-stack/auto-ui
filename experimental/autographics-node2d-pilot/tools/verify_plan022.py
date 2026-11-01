@@ -35,6 +35,7 @@ PRODUCTS = [
     "character-budget-32",
     "character-budget-33",
     "pair-isolated",
+    "runtime-oob",
 ]
 
 NEGATIVES = [
@@ -238,7 +239,38 @@ def control_mutation_sensitivity(results, workdir):
         assert mutant_world_sha != frozen_world_sha, (
             f"{prod}: mutated module must change the world identity"
         )
-        results[f"{prod}/mutation_sensitivity"] = "source byte change -> new world sha"
+        results[f"{prod}/mutation_sensitivity"] = "semantic source change -> new world sha"
+
+        # comment-only mutation must NOT change the generated world: the
+        # generator drops comments (byte-equal world, F-R1-03 control).
+        cm = os.path.join(workdir, f"{prod}-comment")
+        os.makedirs(cm, exist_ok=True)
+        for name in os.listdir(fdir):
+            src = os.path.join(fdir, name)
+            if os.path.isfile(src):
+                shutil.copyfile(src, os.path.join(cm, name))
+        os.makedirs(os.path.join(cm, "assets"), exist_ok=True)
+        for name in os.listdir(os.path.join(fdir, "assets")):
+            shutil.copyfile(
+                os.path.join(fdir, "assets", name), os.path.join(cm, "assets", name)
+            )
+        module = os.path.join(cm, "main.at")
+        text = read(module)
+        marker = text.find("//")
+        assert marker == 0, "main.at must start with a comment to mutate safely"
+        text = "// comment-only mutation probe (F-R1-03)\n" + text
+        with open(module, "w", encoding="utf-8", newline="\n") as f:
+            f.write(text)
+        r = lower(os.path.join(cm, "main.at"), os.path.join(workdir, f"{prod}-comment-out"))
+        assert r.returncode == 0, f"{prod}: comment mutant regen failed: {r.stderr}"
+        frozen_world = open(os.path.join(pdir, "world.at"), "rb").read()
+        comment_world = open(
+            os.path.join(workdir, f"{prod}-comment-out", "world.at"), "rb"
+        ).read()
+        assert frozen_world == comment_world, (
+            f"{prod}: comment-only mutation must leave the world byte-identical"
+        )
+        results[f"{prod}/comment_mutation_ignored"] = "comment-only edit -> byte-equal world"
 
 
 def control_negatives(results):

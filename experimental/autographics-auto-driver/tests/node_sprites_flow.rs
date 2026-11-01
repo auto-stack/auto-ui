@@ -62,6 +62,10 @@ const SCENE_BUDGET_32: &str = include_str!(
 const SCENE_BUDGET_33: &str = include_str!(
     "../../autographics-node2d-pilot/generated-sprites2d/character-budget-33/scene.agscene"
 );
+const SCENE_OOB: &str =
+    include_str!("../../autographics-node2d-pilot/generated-sprites2d/runtime-oob/scene.agscene");
+const WORLD_OOB: &str =
+    include_str!("../../autographics-node2d-pilot/generated-sprites2d/runtime-oob/world.at");
 const SCENE_PAIR: &str =
     include_str!("../../autographics-node2d-pilot/generated-sprites2d/pair-isolated/scene.agscene");
 
@@ -150,7 +154,7 @@ fn start_product(scene_text: &str, asset: &[u8], tag: &str) -> Result<Host, Stri
 
 /// 场景文本 → 同产品的 world.at 文本（顺序表；tag 仅用于错误信息）。
 fn world_of_scene(scene_text: &str, tag: &str) -> Result<&'static str, String> {
-    let pairs: [(&str, &str); 10] = [
+    let pairs: [(&str, &str); 11] = [
         (SCENE_ATLAS, WORLD_ATLAS),
         (SCENE_ATLAS_ALT, WORLD_ATLAS_ALT),
         (SCENE_ATLAS_FLIP0, WORLD_ATLAS_FLIP0),
@@ -161,6 +165,7 @@ fn world_of_scene(scene_text: &str, tag: &str) -> Result<&'static str, String> {
         (SCENE_BUDGET_32, WORLD_BUDGET_32),
         (SCENE_BUDGET_33, WORLD_BUDGET_33),
         (SCENE_PAIR, WORLD_PAIR),
+        (SCENE_OOB, WORLD_OOB),
     ];
     pairs
         .iter()
@@ -1166,6 +1171,45 @@ fn run_pair() -> Result<(), String> {
     Ok(())
 }
 
+/// F-R1-04 runtime control: a FIELD-bound frame ordinal that leaves the
+/// frame table at runtime must take the generated degenerate-rect branch and
+/// raise the frozen trusted unit's NAMED fault 42; the host keeps the
+/// tick-1 last-good visual (no half-applied or wrong-frame publication).
+#[test]
+fn runtime_out_of_range_ordinal_faults_42_named() {
+    let mut host = start_product(SCENE_OOB, ATLAS_PNG, "runtime-oob").expect("start");
+    let leaf = bound_leaf_id(&host).expect("leaf");
+    step(&mut host, &[]).expect("tick 1 must stay green");
+    assert_eq!(
+        visual(&host, leaf).expect("tick1 visual"),
+        ([0, 0, 32, 32], false)
+    );
+    step_raw(&mut host, &[]).expect("raw tick 2");
+    let stale = host_play_error(&host);
+    let accepted_tick = frame(&host).expect("frame").tick;
+    assert!(
+        stale.contains("42"),
+        "out-of-range ordinal must raise the named fault 42, got {stale:?}"
+    );
+    assert_eq!(
+        accepted_tick, 1,
+        "last accepted tick must stay 1 (last-good)"
+    );
+    assert_eq!(
+        visual(&host, leaf).expect("kept visual"),
+        ([0, 0, 32, 32], false),
+        "tick-1 visual must be kept unchanged"
+    );
+    host.stop_play();
+    record(
+        "plan022/runtime-oob",
+        "runtime_out_of_range_ordinal_faults_42_named",
+        true,
+        format!("tick2 pose=9 -> degenerate rect -> error={stale:?}; accepted tick={accepted_tick}; kept visual=[0,0,32,32]"),
+    );
+    write_receipt().expect("write PLAN-022 sprites receipt (runtime-oob)");
+}
+
 /// V-06 consumption control (mirrors node_components_flow's damaged-world
 /// recovery): a one-byte corruption of the frozen world copy is rejected at
 /// load by the closure-identity check; restoring the exact bytes recovers a
@@ -1238,6 +1282,7 @@ fn v06_damaged_copies_rejected_then_recovery_green() {
             "world+asset one-byte corruption rejected at load; exact restore recovered green runs"
         ),
     );
+    write_receipt().expect("write PLAN-022 sprites receipt (v06)");
 }
 
 /// V-04 owner control (020's 20-round pattern on the sprites chain): 20
@@ -1302,6 +1347,9 @@ fn v04_twenty_round_owner_fresh_runs() {
         true,
         "20 stop/fresh rounds: tick0 + empty slot + document default sprite each round; scene bindings byte-stable; shared PNG renders after respawn (generation 1, [64,0] flip)",
     );
+    // Receipt completeness (F-R1-02): ORACLES accumulates across this test
+    // binary; rewriting here lets the last-finishing test persist every row.
+    write_receipt().expect("write PLAN-022 sprites receipt (v04)");
 }
 
 fn write_receipt() -> Result<(), String> {

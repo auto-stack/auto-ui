@@ -89,11 +89,18 @@ components-2d/queries-2d 字节冻结（verify_plan016/017/019/020/021 再生
 
 ## 4. 诊断合同（V-01，module/line/symbol 具名）
 
-缺图像文件、坏 PNG 签名/IHDR、帧 rect 越图像、字面量 ordinal 越帧表、
-字面量 flip 域、image 绑非 image 资源、未知 render2d.spawn 目标、
-render2d arity、每定义多图像元素/多动态元素、第 9 槽、第 9 有状态实例
-——全部执行前具名拒绝（pilot node_sprites_gates 10 例 + verify_plan022
-负控复放，不 panic、无静默回退）。
+执行前具名拒绝面：缺图像文件、坏 PNG 签名/IHDR、帧 rect 越图像、字面量
+ordinal 越帧表、字面量 flip 域、image 绑非 image 资源、未知
+render2d.spawn 目标、第 9 运行时槽——其中 8 类由 pilot
+node_sprites_gates 具名复放（缺文件/坏PNG 为载入层控制），verify_plan022
+--controls 复放其中 6 类夹具负控。同合同的其余具名拒绝路径已实现但未
+单列夹具：render2d 各服务 arity、每定义多图像元素/多动态元素
+（lower_components 诊断）；第 9 有状态实例沿 020 套件覆盖
+（node_components_gates），022 未重复数。运行期面：帧 ordinal 越出帧表
+由生成退化矩形分支送受信单元矩形域检查具名 fault 42（runtime-oob 夹具
++ node_sprites_flow 实测：错误含 42、last-good 保持、不半应用）；用户源
+不可直呼保留传输 `_ag_fail`（admission 具名拒绝）。全面不 panic、无静
+默回退。
 
 ## 5. 原 G09 18 项映射（逐字保留，node_sprites_flow 实测全绿）
 
