@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-01
 updated_at: 2026-11-02
 plan_revision: 1
-current_step: 1
+current_step: 2
 total_steps: 10
 base_branch: master
 base_commit: 98cbcd2e79ebc61b0683886f24f0747b20d72617
@@ -192,7 +192,7 @@ AC-02～06 的成功语义是**路线go门**，不是允许跳过的产品验收
 | ID | owner_stage | 依赖 | 路径/动作与产物 | 验证/关闭条件 | AC |
 |---|---|---|---|---|---|
 | T-00 | work | 后续明确启动 | UI指定树+Reader独立clone核身份/WIP/007与025共享窗口；实查已有接口、固定工具/引擎，最多两接法比较，冻结消息/预算/deadline/测试选择于报告与合同 | 两仓git status/rev-parse、CLI/tool hash、源码入口与拟测试非零清单；不覆盖现有未跟踪设计，不建链接；依赖未知项先闭合 | AC-01；[x] 2026-11-02：树`.wt/ui-026/auto-ui`@codex/plan-026-dev(base 8c1b916=master头，含025落干)建；reader 9b0d513净(基线bf5d744+1指针)；readest v0.12.16@3cc39ad7+foliate-js@3d79419子模块逐字核；工具auto.exe hash 390e664e(plan-890面)；§4六项钉定哈希全复算一致；候选A启动证据=reader vue profile隔离数据真启动(17825后端books[]/17824前端200，实例已停)；候选B启动证据=experiments/reader-engine-probe wry0.57+WebView2 156真窗口JS→Rust IPC回传exit=0；契约冻结于plan-artifacts/plan-026/auto-ui/t00-report.md(消息schema v1/预算deadline/端口/测试选择/cohort)；主检未跟踪docs/design/autoui保留未纳入 |
-| T-01 | work | T-00 | 新增两本合成EPUB与独立原文/出现序oracle、跨书/畸形/超额/错锚反例；建立实验driver骨架和数据profile | 语料来源/指纹与预期第2处原句可独立重算；V-01～10输入/入口可复演，不把拟用例标已执行 | AC-01/05 |
+| T-01 | work | T-00 | 新增两本合成EPUB与独立原文/出现序oracle、跨书/畸形/超额/错锚反例；建立实验driver骨架和数据profile | 语料来源/指纹与预期第2处原句可独立重算；V-01～10输入/入口可复演，不把拟用例标已执行 | AC-01/05；[x] 2026-11-02：reader tests/probe/engine_surface/新增gen_corpus.py+corpus_oracle.py(独立重读EPUB重算)+corpus_profile.py(契约机器可读)+verify_engine_surface.py(T-01骨架)；语料alpha 4904B/beta 4693B(≤1MiB)+截断/2MiB超额负例；oracle自检9/9 PASS(重复句计数3/2/3、第2处=ch1 para7、跨书零命中、错字quote拒绝、occurrence越界拒绝、PNG角像素(178,60,20)/(30,60,200)、BadZipFile/超额识别)；oracle区分力实证=首跑抓出beta计数4真缺陷修复后3；V-01..10注册not_run，exit=3诚实未完成态；运行记录plan-artifacts/plan-026/auto-reader/t01-skel |
 | T-02 | work | T-01 | UI experiments/reader-engine-probe与最小必要compiler/tools接缝；Vue装载/资源/事件派发正向试验 | Vue真实表面与引擎身份、V-01/02运行；不改生成物，实际失败有最小对照和责任阶段 | AC-02/03 |
 | T-03 | work | T-02接口、T-00原生接法 | UI runtime/iced最小原生宿主实验与事件接缝；焦点/IME/几何/系统无障碍试验 | 原生窗口/父子表面/布局关系与V-01/04/05实际结果；不能拿Vue通过代替原生 | AC-02/03 |
 | T-04 | work | T-02/03可消费边界 | Reader tests/probe/engine_surface纯.at消费、独立sidecar与verify_engine_surface.py；闭合选区→保存→重开；或记录阻断此链的已复现边界 | 两profile未来入口均可给实际结果与因果；V-02/03/09逐字/身份/出现序oracle；不写当前数据schema，失败不包装成功 | AC-04 |
