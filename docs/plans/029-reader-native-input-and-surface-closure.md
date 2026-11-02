@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-02
 updated_at: 2026-11-02
 plan_revision: 1
-current_step: 7
+current_step: 8
 total_steps: 12
 base_branch: master
 base_commit: e344d2268f6bf40d1ed4f24ea957ce3fbd88313c
@@ -194,7 +194,7 @@ Reader旧门入口保持 `python tests/basic/verify_standalone.py --profile vue|
 | T-04 | work | T-03 | UI输入/焦点/组合事件最小修复与实际driver取证 | N-04真实IME组合/取消/提交、焦点返回与快捷键不误触，全通过 | AC-05 |
 | T-05 | work | T-03/04 | [x] UI布局/文档表面resize/DPI/遮挡/隐藏生命周期与系统无障碍接缝——弹出窗真隐藏修复（worktree 98633fd4）+ 驱动 N-05/06 全门（reader ac24c98，probe.at 断开按钮 + engine-adapter 键盘接缝）；N-05 字体重排/滚动重拖/遮挡像素取证/隐藏展示重拖选、N-06 UIA 系统树定位+UIA焦点+真实键盘翻页、N-05.dpi-change 交互门（144→192→144 track/redrag/restore 三段全过）——见 §9 2026-11-02 T-05 记录 | N-05/06目标原文/命中/系统树可操作均实测；不是records计数或纯ARIA | AC-06 |
 | T-06 | work | T-03～05 | [x] 双实例 A/B（-B/-F+AUTOUI_MCP_PORT 钉端口）、WM_CLOSE 真实关闭/迟到重放拒绝+零写入/崩溃无孤儿/取消隐藏、坏 tool 具名失败、占口不杀现有实例——见 §9 2026-11-02 T-06 记录（reader d3882ea，t06-vm7 全 PASS） | N-07/08/10正负对照；只收割自有树，10s清理，另一实例继续可用 | AC-07/08 |
-| T-07 | work | T-06 | 保原协议/资源安全，独立oracle与真实错锚/错身份变异，补适用负控回归 | N-09/11原拒绝零写、合法对照绿，变异红且聚合非零→还原绿；不得吞报错 | AC-03/07/08 |
+| T-07 | work | T-06 | [x] N-09 八类负控全部具名拒绝+逐例字节级零写+合法对照接受落盘（资产逃逸零泄漏/远程脚本零加载/本地资产仍用），href 不透明语义如实记录；N-11 变异→oracle 实红+恢复落点异位（位置指纹判据）→字节级还原绿——见 §9 2026-11-02 T-07 记录（reader cb9e1e5，t07-vm6） | N-09/11原拒绝零写、合法对照绿，变异红且聚合非零→还原绿；不得吞报错 | AC-03/07/08 |
 | T-08 | work | T-00可先诊断；最终依T-07 | 复现Reader R-05/R-06vm、分析实际owner；修本仓允许面或绑定他仓正式前置 | N-12原测试条件保留，404/像素负控失败机制真实闭合；外仓前置未到则保持未完成 | AC-09 |
 | T-09 | work | T-08全部通过 | 冻结cohort跑两个profile的完整新清单及旧Reader门、本仓定向cargo选择；写证据总结、SD-01/02与两仓路线/导航并内部检查 | 现有入口 `python tests/probe/engine_surface/verify_engine_surface.py --profile vue|vm --auto-bin ... --out-dir ...` 完整且exit0；新清单非旧30总数；git diff --check/链接/source绑定 | AC-01～10 |
 | T-10 | review | T-09 | 独立上下文在同树顺序复演规定路径与变异，检查source/Spec/范围，写final结论 | AC-01～10全部pass，无partial/GAP；否则needs_fix/needs_replan回原树，不能自评归档 | AC-11 |
@@ -216,9 +216,25 @@ Reader旧门入口保持 `python tests/basic/verify_standalone.py --profile vue|
 
 - stage: goal | plan_id: PLAN-029 | plan_revision: r1 | round: 2 | from: work | to: work | status: executing | outcome: pass(T-05) | worktree: D:/autostack/.wt/ui-029/auto-ui | commit: reader ac24c98 + ui 98633fd4 | next: work(T-06)。
 
+### 2026-11-02：work阶段——T-07 消费端负控与变异红→绿全绿（AC-03/07/08）
+
+- stage: work | plan_id: PLAN-029 | plan_revision: r1 | task: T-07 | outcome: pass（N-09 八类负控+资产/脚本面+合法对照、N-11 变异红→还原绿全 PASS；聚合 findings=1=已知 N-04.focus-roundtrip）| worktree: .wt/ui-029@98633fd4（无改）| reader: main@cb9e1e5 | next: T-08。
+- **N-09**（t07-vm6）：错 book/hash/session/schema/kind/quote/occurrence/oversize/stale-seq 逐一具名拒绝（rejected_bad_document/bad_session/bad_schema/bad_kind/bad_locator/oversize/stale_seq）+ **逐负例前后字节级快照零写入**（基线先经 _sidecar_stable 稳定等待——adapter 回传晚到 20-30s，单次预拍基线被击穿 t07-vm1 实测）；合法对照在全部负例后被接受并落盘（链路仍可用）。locator resource_href=不透明元数据（接受不解析不执行——执行面独立证明：资产路径逃逸零泄漏、surface 资源原点全部同源零外部脚本、本地 foliate-view.js 照常服务）。
+- **错 CFI 判据升级为位置指纹**（lastLocation cfi|fraction）：乙句第1/2处同文，文本可见性无法区分出现位次（t07-vm3/vm5 假绿/假红实测）——错 CFI/变异 CFI 的恢复落点必须 ≠ 真 CFI 落点：实测 wrong-cfi 落 `(/2,/12/1:105)` ≠ true `(/12/1:105,/20/1:34)`。
+- **N-11**：真实已存 locator 磁盘变异 → 原始 oracle 实红（quote_not_found）+ 恢复落点异位（先离开原位再投变异 CFI——原地不动假绿 t07-vm3 实测）→ 字节级还原 → oracle 绿+恢复命中。probe 隔离数据目录，用户数据零污染。
+- **观测（记 §10 候选）**：probe 后端 locator 校验（全书文本解析）期间**串行阻塞**数十秒——轮询改 _http_quiet 容错（t07-vm4 10060 崩溃实测）；该串行面属实验 profile 已知形态。
+- 证据：plan-artifacts/plan-029/t07-vm{1..6}-console.log + 各 out-dir。
+- 下一任务 T-08：R-05/R-06vm 旧门复现定责。
+
+### 2026-11-02：goal回合（T-06轮）
+
 ### 2026-11-02：goal回合（T-06轮）
 
 - stage: goal | plan_id: PLAN-029 | plan_revision: r1 | round: 3 | from: work | to: work | status: executing | outcome: pass(T-06) | worktree: D:/autostack/.wt/ui-029/auto-ui | commit: reader d3882ea | next: work(T-07)。
+
+### 2026-11-02：goal回合（T-07轮）
+
+- stage: goal | plan_id: PLAN-029 | plan_revision: r1 | round: 4 | from: work | to: work | status: executing | outcome: pass(T-07) | worktree: D:/autostack/.wt/ui-029/auto-ui | commit: reader cb9e1e5 | next: work(T-08)。
 
 ### 2026-11-02：work阶段——T-05 几何/无障碍/键盘/DPI 全门真实通过（AC-06）
 
