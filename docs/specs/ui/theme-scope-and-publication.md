@@ -73,8 +73,10 @@
   取 html 或容器任一为 dark。无容器/无主题 widget 保持 document 级 legacy。
 - 主题族变量的值对 Tailwind 必须是 `H S% L%` 三段式（`hsl(var(--x))`）；原始
   `#rrggbb` 代入会让声明 invalid-at-computed-value 并静默回落静态表。
-- App 声明了 `design { theme: .x }` 时，首帧必须应用**声明的默认族**（
-  `theme_name.value || getActiveTheme()`），不能只恢复 localStorage/scaffold。
+- App 声明了 `design { theme: .x }` 时，生成器把该表达式投影为组件内
+  `__designTheme`（`computed`），首帧与自动应用点优先读它；`theme_name` 作为
+  兼容别名在其后兜底，两者皆空才回落 localStorage/scaffold。投影支持面为字符串
+  字面量与单字段引用（prop → `props.X`，state → `X.value`），其余形态回落别名。
 
 ## 6. 生命周期、释放与边界（C-06）
 
@@ -87,10 +89,12 @@
     provider 结果验证。
   - 非 widget（store composable）路径仍为 document 级变量，未接声明族首帧。
   - VM 原生无键盘焦点模型：button 的 focus 环只在 Vue 端由原生 `focus-visible`
-    承担；input/textarea 的 disabled 目前只能以样式表达（`View` 无 disabled
-    字段），未扩 ABI。
-  - 多 App 同文档的真实双实例 Vue DOM 证据仍待补（当前为生成器合同 + 单 App
-    容器实测）。
+    承担（`View` 无 button focus 状态）。
+  - input/textarea 的 disabled 已是真实通道：`View` 带 `disabled` 字段，构造期
+    即不挂 `on_change`/`on_submit`（禁用不派发），渲染层另做降透明表面。
+  - 多 App/多实例同文档：每个带主题的 widget 模板根各自挂 `__autoThemeRoot` 与
+    `data-auto-theme-root`，容器变量按实例隔离；子根的 vars 不受父容器清理影响。
+    真实双实例 DOM 证据见 PLAN-031 的 V-03 腿（Auto/Solarized 各自持值、切换互不串写）。
 
 ## 7. 验收锚点
 

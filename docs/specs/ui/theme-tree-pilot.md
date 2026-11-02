@@ -88,4 +88,5 @@
 - Vue 轨 `theme_name`/`dark_mode` 为保留状态名约定（与 design 块绑定同
   源）；原生部件全量接入与旧 class 优先级清理属后继批次。
 - 平台边界：VM 原生无键盘焦点模型（button focus 环仅 Vue 端原生
-  `focus-visible`）；input/textarea 的 disabled 目前只能以样式表达。
+  `focus-visible`）；input/textarea 的 disabled 为真实通道（`View` 字段 +
+  构造期不挂 handler + 降透明表面）。

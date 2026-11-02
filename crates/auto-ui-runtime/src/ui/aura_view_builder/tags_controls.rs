@@ -646,11 +646,15 @@ impl<'a> AuraViewBuilder<'a> {
         if password {
             builder = builder.password();
         }
-        if let Some(msg) = on_change {
-            builder = builder.on_change(msg);
-        }
-        if let Some(msg) = on_submit {
-            builder = builder.on_submit(msg);
+        // PLAN-031 F-02（二次修复）：禁用态在**构造期**就不挂 handler——
+        // 不依赖某个渲染臂的额外门（VM 帧渲染走 render_dynamic_view，曾被漏掉）。
+        if !disabled {
+            if let Some(msg) = on_change {
+                builder = builder.on_change(msg);
+            }
+            if let Some(msg) = on_submit {
+                builder = builder.on_submit(msg);
+            }
         }
         if let Some(w) = width {
             builder = builder.width(w);
@@ -994,11 +998,14 @@ impl<'a> AuraViewBuilder<'a> {
         if disabled_ta {
             builder = builder.disabled(true);
         }
-        if let Some(msg) = on_change {
-            builder = builder.on_change(msg);
-        }
-        if let Some(msg) = on_submit {
-            builder = builder.on_submit(msg);
+        // PLAN-031 F-02（二次修复）：同 input——禁用态构造期不挂 handler。
+        if !disabled_ta {
+            if let Some(msg) = on_change {
+                builder = builder.on_change(msg);
+            }
+            if let Some(msg) = on_submit {
+                builder = builder.on_submit(msg);
+            }
         }
         if let Some(h) = height {
             builder = builder.height(h);

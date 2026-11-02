@@ -129,6 +129,8 @@ widget App {
 
             textarea (value: .note) {
                 placeholder: "note"
+                disabled: .blocked
+                oninput: () => { }
                 design: { placeholder: "#00ff00" }
                 style: "rounded-md border border-border bg-input text-foreground"
             }
@@ -340,12 +342,24 @@ fn input_and_textarea_states_use_scope_semantics() {
     let mut textarea_checked = false;
     for v in &views {
         match v {
-            View::Input { style, disabled, .. } => {
-                // PLAN-031 T-05（F-02）：`disabled: .blocked`（true）必须进 View，
-                // 渲染层据此丢弃 on_input/on_submit（不派发）。
+            View::Input {
+                style,
+                disabled,
+                on_change,
+                on_submit,
+                ..
+            } => {
+                // PLAN-031 F-02（二次修复）：`disabled: .blocked`（true）必须进
+                // View，且**构造期**就不挂 on_change/on_submit——判据不是渲染层
+                // 某个臂是否额外加了门（VM 帧渲染曾漏掉），而是 View 里没有
+                // handler 可派发。
                 assert!(
                     *disabled,
                     "input 的 disabled 必须由模型驱动进入 View（F-02）"
+                );
+                assert!(
+                    on_change.is_none() && on_submit.is_none(),
+                    "禁用 input 不得携带 on_change/on_submit（F-02 不派发）"
                 );
                 let s = style.as_ref().expect("input carries style");
                 assert!(
@@ -385,8 +399,20 @@ fn input_and_textarea_states_use_scope_semantics() {
                 );
                 input_checked = true;
             }
-            View::Textarea { style, .. } => {
+            View::Textarea {
+                style,
+                disabled,
+                on_change,
+                on_submit,
+                ..
+            } => {
                 let s = style.as_ref().expect("textarea carries style");
+                // PLAN-031 F-02（二次修复）：textarea 同 input——禁用即无 handler。
+                assert!(*disabled, "textarea 的 disabled 必须进入 View（F-02）");
+                assert!(
+                    on_change.is_none() && on_submit.is_none(),
+                    "禁用 textarea 不得携带 on_change/on_submit（F-02 不派发）"
+                );
                 assert!(
                     s.classes
                         .iter()

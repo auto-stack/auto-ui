@@ -2225,9 +2225,17 @@ onUnmounted(() => {{ if ({var} !== null) {{ clearInterval({var}); {var} = null }
                 script.push_str(&format!(
                     "const __designTheme = computed((): string => {ts})\n"
                 ));
-                script.push_str(
-                    "const __thName = (): string => __designTheme.value || (typeof theme_name !== \"undefined\" ? theme_name.value : \"\") || getActiveTheme()\n",
-                );
+                // N-06：只在该 widget 真有 theme_name 时才引用它（否则
+                // accent-only + design 的组件会引用未声明标识符，vue-tsc 报错）。
+                if self.has_theme_name {
+                    script.push_str(
+                        "const __thName = (): string => __designTheme.value || theme_name.value || getActiveTheme()\n",
+                    );
+                } else {
+                    script.push_str(
+                        "const __thName = (): string => __designTheme.value || getActiveTheme()\n",
+                    );
+                }
             } else if self.has_theme_name {
                 script.push_str(
                     "const __thName = (): string => theme_name.value || getActiveTheme()\n",

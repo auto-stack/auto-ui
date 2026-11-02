@@ -20,7 +20,13 @@ impl VueGenerator {
             && !self.theme_root_ref
             && root_html.contains("<div ")
         {
-            root_html = root_html.replacen("<div ", "<div ref=\"__autoThemeRoot\" ", 1);
+            // N-02：标记主题根，供清理逻辑跳过（父子都有主题时，父的清理
+        // 不得抹掉子根的 vars）。
+        root_html = root_html.replacen(
+            "<div ",
+            "<div ref=\"__autoThemeRoot\" data-auto-theme-root=\"1\" ",
+            1,
+        );
             self.theme_root_ref = true;
         }
 

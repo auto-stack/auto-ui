@@ -105,9 +105,10 @@ widget App {
     // PLAN-031 F-03：该 widget 声明了 design.theme，自动应用点改读 computed
     // 投影（`__designTheme`）；未声明 design 的 widget 仍走 `theme_name` 别名
     // 分支（见下方条件断言）。
+    // N-05：该 widget 声明 design.theme ⇒ 必须走投影；不接受"旧 emitter 文本"
+    // 这种可在未修复产物上通过的析取断言。
     assert!(
-        sfc.contains("__designTheme.value")
-            || sfc.contains("const __thName = (): string => theme_name.value || getActiveTheme()"),
+        sfc.contains("__designTheme.value"),
         "declared family must win on automatic application points:\n{sfc}"
     );
     // theme_name watch 同步容器。

@@ -1105,7 +1105,10 @@ function applyTheme(name: string, isDark = document.documentElement.classList.co
       // 能扫描/清理后代——实测它把已挂载子组件容器上的 vars 全抹掉（style 变空）。
       // root 自身保持不动（legacy 行为）。
       scope.querySelectorAll('.dark, [style*="--background"]').forEach(function (el) {{
-        if (el !== root) for (const k in pal!.light) (el as HTMLElement).style.removeProperty('--' + k)
+        // N-02：跳过嵌套主题根——父容器的清理不得抹掉子实例自己的 vars。
+        if (el !== root && !(el as HTMLElement).hasAttribute('data-auto-theme-root')) {{
+          for (const k in pal!.light) (el as HTMLElement).style.removeProperty('--' + k)
+        }}
       }})
     }}
   }}
