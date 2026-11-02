@@ -344,6 +344,20 @@ Reader旧门入口保持 `python tests/basic/verify_standalone.py --profile vue|
 - 证据：plan-artifacts/plan-029/t09-frozen-vue{,-console.log}/、t09-n04live{,2}/、t09-frozen-vm/、n04-pairing{,2,3,3b,4}-console.log、n04-pairing-receipt.json、n04-pairing-00*/。
 - 下一任务：work——phase② 静默窗口重跑（PROBE_N04_PAIRING+PROBE_DPI_INTERACTIVE=1，DPI双向及时切换）→ 证据总结/SD-01/02/导航/内部检查 → review交接。
 
+### 2026-11-03：work阶段——T-09 phase② 最终跑：92记录90绿，两项真实FAIL具名待修
+
+- stage: work | plan_id: PLAN-029 | plan_revision: r1 | task: T-09冻结跑（vm profile 最终轮）| outcome: partial（92 记录 90 绿；两项真实 FAIL 需专注轮）| worktree: .wt/ui-029@98633fd4（无改）| reader: main@7b42765（运行时代码）| next: work（两项 FAIL 诊断修复轮）。
+- **全绿面**：N-01/02/03/04（配对协议 PASS=CDP断言回执+在案目击组合）/N-05（resize/reflow/scroll/occlusion/hideshow/track/redrag 全 PASS）/N-06（UIA+键盘）/N-07（b-boot/b-window/b-real-selection oracle occ=2 PASS）/N-08/N-09/N-10/N-12（vue-chain 34记录全绿 + r05 22/22 + 两端旧门 28/28、27/27）。
+- **FAIL-1（N-05.dpi-change.restore）**：DPI 恢复方向弹窗未跟随重排——168→144 方向 track PASS（popup 1292≈期望1293，6px 容差内巧合），恢复 144→168 期望 w=1508 实测停 1292。真实产品发现：doc_surface 弹窗 WM_DPICHANGED 恢复方向重排缺失/失效（对照：t09-frozen-vm 的 192→168 方向曾跟踪成功）。owner=UI worktree（doc_surface.rs）。
+- **FAIL-2（N-07.b-continues）**：B 实例续跑拖选出了选区（🐙句前缀）且 **14 个 POST 全部 200 到达后端**，FAIL 出在驱动记录轮询判据与 sidecar 实态之间（occurrence/quote 匹配或基线比对）——发生时段紧随 DPI restore FAIL 之后，B 自身弹窗几何独立、级联可能性低，需查 consumer-b.log 的记录内容与驱动轮询条件分类（驱动判据 vs 产品问题）。owner=reader 诊断轮。
+- 两次尝试的中间数据：t09-final-vm（CDP 瞬断于 N-05 段，N-04 配对 PASS 已证）；t09-final2-vm（dpi GAP 用户未及切换 + N-07 崩溃已加固 e6d3d41）。
+- 证据：plan-artifacts/plan-029/t09-final3-vm{,-console.log}/（results-vm.json 92 记录完整）。
+- 下一任务：work——FAIL-1（doc_surface 恢复方向 DPI 重排，UI worktree）+ FAIL-2（b-continues 记录判据诊断）→ phase② 复跑 → 证据总结/SD-01/02/导航/内部检查 → review交接。
+
+### 2026-11-03：goal回合（T-09冻结跑轮）
+
+- stage: goal | plan_id: PLAN-029 | plan_revision: r1 | round: 11 | from: work | to: work | status: executing | outcome: partial(90/92绿，两FAIL具名) | worktree: D:/autostack/.wt/ui-029/auto-ui | commit: reader 7b42765+ | next: work。
+
 ### 2026-11-03：work阶段——N-05.reflow vue腿闭合（vue臂34/34全绿）+ T-09冻结两轮（dpi待用户时机）
 
 - stage: work | plan_id: PLAN-029 | plan_revision: r1 | task: T-09准备（reflow闭合/冻结跑）| outcome: partial（vue臂34/34全绿含重排腿；vm冻结跑全部就绪唯 dpi-change 两次未等到用户切换——播报节奏已修正）| worktree: .wt/ui-029@98633fd4（无改）| reader: main@28c765a | next: work（phase② 最终跑 + 收尾）。
