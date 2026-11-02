@@ -325,6 +325,20 @@ Reader旧门入口保持 `python tests/basic/verify_standalone.py --profile vue|
 - 证据：plan-artifacts/plan-029/t09-vueiso{2..10}{,-console.log}/、t09-vuediag{4..9}/（逐轮定位材料）。
 - 下一任务：work——适配器重订阅（连 vm 回归）→ N-04 收口 → T-09 冻结跑（空闲桌面 + DPI 协助）。
 
+### 2026-11-02：work阶段——适配器订阅硬化 + N-04实时bbox + vue重排腿GAP收口（vm回归27/27+28/28干净）
+
+- stage: work | plan_id: PLAN-029 | plan_revision: r1 | task: T-09准备（适配器硬化/N-04实时坐标/重排腿收口）| outcome: partial（vm 回归干净；N-04 实时 bbox 待下轮验证；reflow 腿 GAP 化）| worktree: .wt/ui-029@98633fd4（无改）| reader: main@276dc95 | next: work（N-04 live-bounds 验证 + T-09 冻结跑：需空闲桌面 + DPI 协助）。
+- **适配器订阅硬化（276dc95）**：subscribeSection + WeakSet 去重；mouseup 在 load 事件接线（旧代码只在挂载循环接，后载章节缺即时 mouseup 面）。vm 轨回归（t09-vmreg）：N-02..N-11 全 PASS（与硬化前一致），standalone-vue 28/28（R-01 vite 有界轮询生效）、standalone-vm 27/27（含 R-06vm 像素判别负控非零）——硬化无回归。
+- **N-04 再诊断**：input-focus 扫描点在运行间漂移（y=95/105 交替）——旧 click_input 固定坐标有错位风险。已改实时 bbox 优先（autoui_snapshot include_bounds 的 input 记录，解析失败回退+日志暴露快照形态）。roundtrip 本轮仍 FAIL（旧代码路径，fg/焦点/hit 证据链不变）。
+- **N-05.reflow vue 腿 GAP 化**：三触发通道（字号/gap/viewport）逐一实测不可用（证据链 t09-vuediag10、t09-vueiso5..14），记 GAP 并在 §10 0f 记录修复路径（probe.at 列宽响应式 regen 或分页器内容字号观察）；字号维度由 vm 轨覆盖。vue 臂终态 27 记录 1 GAP 余全绿（t09-vueiso15/16 双确认，含硬化后复跑）。
+- N-12.vue-chain 仍 FAIL（继承 reflow GAP——vue 臂最坏推导）；N-05.dpi-change not_run（交互腿待用户）。
+- 证据：plan-artifacts/plan-029/t09-vmreg{,-console.log}/、t09-vueiso11..16{,-console.log}/。
+- 下一任务：work——N-04 live-bounds 验证轮 + T-09 冻结全清单两 profile（需空闲桌面 1-2h + DPI 交互腿协助）。
+
+### 2026-11-02：goal回合（适配器硬化轮）
+
+- stage: goal | plan_id: PLAN-029 | plan_revision: r1 | round: 8 | from: work | to: work | status: executing | outcome: partial(vm回归干净，N-04待验证，reflow GAP化) | worktree: D:/autostack/.wt/ui-029/auto-ui | commit: reader 276dc95 | next: work。
+
 ### 2026-11-02：goal回合（Vue回归专轮）
 
 - stage: goal | plan_id: PLAN-029 | plan_revision: r1 | round: 7 | from: work | to: work | status: executing | outcome: partial(vue核心链全绿，reflow腿开放) | worktree: D:/autostack/.wt/ui-029/auto-ui | commit: reader 64c04db | next: work。
@@ -354,7 +368,8 @@ Reader旧门入口保持 `python tests/basic/verify_standalone.py --profile vue|
 
 0c. **N-04.focus-roundtrip（开放，诊断收敛）**：本轮把 OS 层证据链补齐——重排序后实测 fg=主窗、OS 焦点=主窗（AttachThreadInput+SetFocus 在最后一次表面点击之后）、WindowFromPoint(输入点)=winit 主窗类 "Window Class"、弹出窗矩形 (145,486,1696,840) 不覆盖输入点 (787,348)——即点击确实抵达 iced 主窗，但表面拖选发生后输入值恒不变；真实键盘 Tab（iced 默认无 Tab 焦点循环）亦无效。结论：iced 组件级焦点不随 OS 焦点恢复，且表面交互后真实点击不再聚焦输入 widget。剩余修法二选一：①UI 侧（worktree）对输入焦点路径插桩定位；②按本节第 1 条既定协议以「CDP 焦点断言 + 人工目击配对」补证。另：N-04 各真实输入腿在活桌面上有 run-to-run 抖动（dry3 ime-commit FAIL、相邻轮 PASS；dry2 表面点被 CASCADIA 终端瞬时遮盖）——真实输入门的度量需要空闲桌面窗口。
 0d. **Vue 既有链分页回归（已修复闭合，reader 64c04db）**：定位=分页器本身工作正常（next() 以 iframe 元素整页位移推进，每步 625px，t09-vuediag9 实测 x: 328→-297→-922），根因=巨列形态（ch1≈25列×625px）下第2处出现于第 ~20 列，旧驱动 12 轮翻页预算不可达，且「永不相交」时旧代码以负宽插值把拖选坐标算到视口外（elementFromPoint=null → 0 locator POST）。修复=共享 _vue_page_to_visible（48 轮预算 + 位移进度守卫 + 永不相交具名失败）+ 片段级行盒精化拖选 + RGB/RGBA PNG 解码 bpp 修正。iso10 实测：目标 20 轮真实翻页可达、真拖选 occ=2 → .at 后端 accepted → CFI → sidecar 落盘 → 冷恢复 → N-09 负控全绿 → N-11 变异红/指纹落点异位/还原绿（33/34）。
-0f. **N-05.reflow vue 腿（开放，具名）**：字体重排后（body 200%）拖选不产 locator 事件——分页器页表失真问题已绕过（render() 强制重排 + 段首锚定后翻页可达、拖选真实落在内容上），但适配器 listener 仅在挂载时接线一次，render()/重排重建 section 文档后旧订阅失效（iso10 全跑仅 4 个 POST = N-02/repage/occlusion/hideshow 各一，reflow 拖选零 POST）。修复需适配器增加重定位后重订阅（relocate/render 事件 → 重新接线 mouseup/pointerdown），属共享 engine-adapter.js（vm 轨同一文件），须连同 vm 轨回归一起专轮做。修复前该腿记 FAIL，vue profile 聚合保持非零，不冒充通过。
+0f. **N-05.reflow vue 腿（开放，具名 GAP）**：三个重排触发通道在 vue 轨当前形态下均不可用——a) body 字号注入：分页器不观察内容字号，页表失真 → 拖选落空（t09-vuediag10 sel=None 实测）；b) gap 属性：巨列形态 innerW 爆炸（t09-vueiso11）；c) viewport resize：生成页列盒宽固定（seam 627px 在 1280/1680/900 视口不变，t09-vueiso12..14 实测）。该腿如实记 GAP（机制不可用，非 oracle 失败），聚合保持非零。字号重排维度由 vm 轨 N-05.font-reflow 覆盖（T-05/dry2/t09-vmreg 全绿）。若未来要闭合此 GAP：改 probe.at 页列宽为 viewport 响应式并 regen 前端（牵动 vm 轨同页布局，需双轨回归），或适配器/分页器侧新增内容字号观察。适配器订阅硬化已随本轮落地（mouseup at load + WeakSet 去重，vm 回归干净），但其不解决重排触发本身。
+0g. **N-04.focus-roundtrip（诊断再进一步，修复待验证）**：输入框实时位置在运行间变化（input-focus 扫描 y=95 与 y=105 交替出现）——旧 click_input 固定扫描期坐标存在错位风险。已改 click_input 优先解析 autoui_snapshot include_bounds 的 input 实时 bbox（解析失败回退扫描点并在日志暴露快照形态）；待下一轮 vm 聚合验证。OS 层证据链（fg/焦点/hit=Window Class=winit 0.30.13 主窗类、弹窗矩形不覆盖输入点）维持不变。
 0e. **本轮随手闭合项**：N-03 旧记录基线改在 N-01 双通道之后重新静默冻结（合法增长曾被误判）；T-05 门单腿失败不再级联早退（dry3 N-06 曾被跳过成 missing）；N-12 门加 17825/17827 端口静默屏障（busy 回退链竞态实证）；verify_standalone 门内 verify_standalone 路径修正 + R-01 vite 单发探测改有界轮询（冷启动误判）。standalone-vm 旧门 27/27 全绿（含 R-05 与修复后 R-06vm）= T-08 修复在真实门内闭合。
 
 ### 2026-11-02（work 执行中登记）
