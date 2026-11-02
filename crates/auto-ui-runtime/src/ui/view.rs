@@ -721,6 +721,8 @@ pub enum View<M: Clone + Debug> {
         width: Option<u16>,   // Legacy field
         password: bool,
         style: Option<Style>, // ✅ NEW: Unified styling support
+        /// PLAN-031 T-05（F-02）：禁用态——不派发编辑/提交消息并以禁用表面呈现。
+        disabled: bool,
     },
 
     /// Multi-line text input with optional styling
@@ -731,6 +733,8 @@ pub enum View<M: Clone + Debug> {
         on_submit: Option<M>, // Fires on Enter key press (Plan 053 M4)
         height: Option<u16>,
         style: Option<Style>,
+        /// PLAN-031 T-05（F-02）：禁用态——不派发编辑/提交消息并以禁用表面呈现。
+        disabled: bool,
         /// Plan 057 续(富文本输入):语法着色段 — (text, kind) 连续覆盖 value。
         /// VM 端经原生 Highlighter 落为逐段颜色/字重;Vue 端生成叠加层。
         /// 空向量 = 无着色(存量行为)。
@@ -2075,6 +2079,7 @@ impl<M: Clone + Debug> View<M> {
             width: None,
             password: false,
             style: None, // ✅ NEW: style field
+            disabled: false,
         }
     }
 
@@ -2108,6 +2113,7 @@ impl<M: Clone + Debug> View<M> {
             on_submit: None,
             height: None,
             style: None,
+            disabled: false,
             highlight: Vec::new(),
             ghost: String::new(),
             keydown: std::collections::HashMap::new(),
@@ -2616,6 +2622,7 @@ impl<M: Clone + Debug> View<M> {
                 width,
                 password,
                 style,
+                disabled,
             } => View::Input {
                 placeholder,
                 value,
@@ -2624,6 +2631,7 @@ impl<M: Clone + Debug> View<M> {
                 width,
                 password,
                 style,
+                disabled,
             },
             View::Textarea {
                 placeholder,
@@ -2632,6 +2640,7 @@ impl<M: Clone + Debug> View<M> {
                 on_submit,
                 height,
                 style,
+                disabled,
                 highlight,
                 ghost,
                 keydown,
@@ -2643,6 +2652,7 @@ impl<M: Clone + Debug> View<M> {
                 on_submit: on_submit.map(|m| f(m)),
                 height,
                 style,
+                disabled,
                 highlight,
                 ghost,
                 keydown: keydown.into_iter().map(|(k, m)| (k, f(m))).collect(),
@@ -3246,6 +3256,8 @@ pub struct ViewInputBuilder<M: Clone + Debug> {
     width: Option<u16>,
     password: bool,
     style: Option<Style>, // ✅ NEW: Unified styling support
+    /// PLAN-031 T-05（F-02）：禁用态（不派发编辑/提交）。
+    disabled: bool,
 }
 
 impl<M: Clone + Debug> ViewInputBuilder<M> {
@@ -3270,6 +3282,12 @@ impl<M: Clone + Debug> ViewInputBuilder<M> {
     /// Enable password mode (hides input)
     pub fn password(mut self) -> Self {
         self.password = true;
+        self
+    }
+
+    /// PLAN-031 T-05（F-02）：禁用态（渲染层不派发编辑/提交）。
+    pub fn disabled(mut self, on: bool) -> Self {
+        self.disabled = on;
         self
     }
 
@@ -3348,6 +3366,7 @@ impl<M: Clone + Debug> ViewInputBuilder<M> {
             width: self.width,
             password: self.password,
             style: self.style,
+            disabled: self.disabled,
         }
     }
 }
@@ -3360,6 +3379,8 @@ pub struct ViewTextareaBuilder<M: Clone + Debug> {
     on_submit: Option<M>,
     height: Option<u16>,
     style: Option<Style>,
+    /// PLAN-031 T-05（F-02）：禁用态（不派发编辑/提交）。
+    disabled: bool,
     /// Plan 057 续(富文本输入):语法着色段 (text, kind)。
     highlight: Vec<(String, String)>,
     /// Plan 057 续(富文本输入):ghost 建议后缀。
@@ -3389,6 +3410,12 @@ impl<M: Clone + Debug> ViewTextareaBuilder<M> {
 
     pub fn height(mut self, height: u16) -> Self {
         self.height = Some(height);
+        self
+    }
+
+    /// PLAN-031 T-05（F-02）：禁用态（渲染层不派发编辑/提交）。
+    pub fn disabled(mut self, on: bool) -> Self {
+        self.disabled = on;
         self
     }
 
@@ -3487,6 +3514,7 @@ impl<M: Clone + Debug> ViewTextareaBuilder<M> {
             on_submit: self.on_submit,
             height: self.height,
             style: self.style,
+            disabled: self.disabled,
             highlight: self.highlight,
             ghost: self.ghost,
             keydown: self.keydown,

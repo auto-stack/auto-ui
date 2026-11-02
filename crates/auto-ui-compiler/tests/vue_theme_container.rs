@@ -96,10 +96,15 @@ widget App {
         sfc.contains("if (__th !== 'scaffold') applyTheme(__th, __isDark, getSavedAccent(), __rootEl)"),
         "theme restore must target the container:\n{sfc}"
     );
-    // 模式翻转 watch 同步容器。
+    // 模式翻转 watch 同步容器（PLAN-031 F-1：自动应用点统一经 `__thName()`，
+    // 声明族优先；容器的 dark 面由 applyTheme 内的 rootEl 分支写入）。
     assert!(
-        sfc.contains("applyTheme(getActiveTheme(), v, getSavedAccent(), __autoThemeRoot.value)"),
+        sfc.contains("applyTheme(__thName(), v, getSavedAccent(), __autoThemeRoot.value)"),
         "mode-flip watch must re-apply to the container:\n{sfc}"
+    );
+    assert!(
+        sfc.contains("const __thName = (): string => theme_name.value || getActiveTheme()"),
+        "declared family must win on automatic application points:\n{sfc}"
     );
     // theme_name watch 同步容器。
     assert!(

@@ -3415,6 +3415,7 @@ pub(super) fn render_dynamic_view(
             width,
             password,
             style,
+            disabled,
         } => {
             let dbg_props = debug_style_props(style.as_ref());
             // Plan 483: Id 主键在 on_change/on_submit 被 move 进闭包前取好
@@ -3433,6 +3434,7 @@ pub(super) fn render_dynamic_view(
                 width,
                 password,
                 style.as_ref(),
+                disabled,
             );
 
             // Wire on_change → on_input (captures typed text).
@@ -3498,6 +3500,7 @@ pub(super) fn render_dynamic_view(
             on_submit,
             height,
             style,
+            disabled,
             highlight,
             ghost,
             keydown,

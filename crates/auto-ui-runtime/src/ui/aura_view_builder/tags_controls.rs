@@ -633,7 +633,16 @@ impl<'a> AuraViewBuilder<'a> {
             .or_else(|| aura_events_get_base(events, "enter"))
             .map(|event| self.event_to_message_with(&event, bindings));
 
+        // PLAN-031 T-05（F-02）：`disabled` 与 Button 同口径（字面量/表达式）；
+        // 禁用时渲染层丢弃编辑/提交 handler（不派发）。
+        let disabled = self
+            .extract_string_with(props, "disabled", bindings)
+            .map(|v| v == "true" || v == "1")
+            .unwrap_or(false);
         let mut builder = View::<DynamicMessage>::input(placeholder).value(value);
+        if disabled {
+            builder = builder.disabled(true);
+        }
         if password {
             builder = builder.password();
         }
@@ -976,7 +985,15 @@ impl<'a> AuraViewBuilder<'a> {
             }
             None => self.resolve_highlight_spans(props, bindings),
         };
+        // PLAN-031 T-05（F-02）：textarea 同 input 的禁用口径。
+        let disabled_ta = self
+            .extract_string_with(props, "disabled", bindings)
+            .map(|v| v == "true" || v == "1")
+            .unwrap_or(false);
         let mut builder = View::<DynamicMessage>::textarea(placeholder).value(value);
+        if disabled_ta {
+            builder = builder.disabled(true);
+        }
         if let Some(msg) = on_change {
             builder = builder.on_change(msg);
         }

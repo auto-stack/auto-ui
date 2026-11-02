@@ -2142,6 +2142,8 @@ pub(super) fn build_input_shape<M: Clone + Debug + 'static>(
     width: Option<u16>,
     password: bool,
     style: Option<&Style>,
+    // PLAN-031 T-05（F-02）：禁用态表面（值/占位文字与边框降透明度）。
+    disabled: bool,
 ) -> iced::widget::TextInput<'static, M> {
     let mut input_widget = text_input(placeholder, value);
     // PLAN-050/483: 无显式 Id 的 text_input 在同视图多输入场景共享编辑器
@@ -2229,6 +2231,16 @@ pub(super) fn build_input_shape<M: Clone + Debug + 'static>(
                 .map(|(r, g, b)| iced::Color::from_rgb8(r, g, b))
                 .unwrap_or(iced::Color::from_rgba(0.6, 0.6, 0.6, 0.7))
         });
+        // F-02：禁用态整体降透明（值/占位/边框），与 Vue 原生 disabled 外观同向。
+        let dim = |c: iced::Color| iced::Color {
+            a: c.a * 0.45,
+            ..c
+        };
+        let (value_color, placeholder_color) = if disabled {
+            (dim(value_color), dim(placeholder_color))
+        } else {
+            (value_color, placeholder_color)
+        };
 
         let focus_border_color =
             crate::ui::style_iced_adapter::resolve_semantic_rgb(&crate::ui::style::Color::Primary)

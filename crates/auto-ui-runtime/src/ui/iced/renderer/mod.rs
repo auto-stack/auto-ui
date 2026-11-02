@@ -1654,6 +1654,7 @@ fn convert_view_messages(view: AbstractView<DynamicMessage>) -> AbstractView<Ice
             width,
             password,
             style,
+            disabled,
         } => AbstractView::Input {
             placeholder,
             value,
@@ -1662,6 +1663,7 @@ fn convert_view_messages(view: AbstractView<DynamicMessage>) -> AbstractView<Ice
             width,
             password,
             style,
+            disabled,
         },
 
         AbstractView::Textarea {
@@ -1671,6 +1673,7 @@ fn convert_view_messages(view: AbstractView<DynamicMessage>) -> AbstractView<Ice
             on_submit,
             height,
             style,
+            disabled,
             highlight,
             ghost,
             keydown,
@@ -1682,6 +1685,7 @@ fn convert_view_messages(view: AbstractView<DynamicMessage>) -> AbstractView<Ice
             on_submit: on_submit.map(|m| IcedMessage::from_dynamic(&m)),
             height,
             style,
+            disabled,
             highlight,
             ghost,
             keydown: keydown
@@ -8539,6 +8543,7 @@ mod tests {
                 width: None,
                 password: false,
                 style: None,
+                disabled: false,
             }],
             style: None,
         };
@@ -9129,6 +9134,7 @@ mod line_edit_tests {
             width: None,
             password: false,
             style: None,
+           disabled: false,
         };
         let pass = AbstractView::Input {
             placeholder: "Enter password".to_string(),
@@ -9142,6 +9148,7 @@ mod line_edit_tests {
             width: None,
             password: true,
             style: None,
+           disabled: false,
         };
         AbstractView::Column {
             children: vec![user, pass],
@@ -10057,6 +10064,7 @@ widget LoginChild {
             width: None,
             password: false,
             style: None,
+            disabled: false,
         }
     }
 

@@ -102,6 +102,7 @@ widget App {
             // PLAN-031 T-05：placeholder 槽由本元素 design 声明（§5.3 冻结面）。
             input (value: .name) {
                 placeholder: "name"
+                disabled: .blocked
                 design: { placeholder: "#ff0000" }
                 style: "rounded-md border border-destructive bg-background text-foreground"
             }
@@ -319,7 +320,13 @@ fn input_and_textarea_states_use_scope_semantics() {
     let mut textarea_checked = false;
     for v in &views {
         match v {
-            View::Input { style, .. } => {
+            View::Input { style, disabled, .. } => {
+                // PLAN-031 T-05（F-02）：`disabled: .blocked`（true）必须进 View，
+                // 渲染层据此丢弃 on_input/on_submit（不派发）。
+                assert!(
+                    *disabled,
+                    "input 的 disabled 必须由模型驱动进入 View（F-02）"
+                );
                 let s = style.as_ref().expect("input carries style");
                 assert!(
                     s.classes

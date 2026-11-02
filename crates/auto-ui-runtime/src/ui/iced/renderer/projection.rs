@@ -1278,21 +1278,26 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 width,
                 password,
                 style,
+                disabled,
             } => {
                 let mut input_widget =
-                    build_input_shape(&placeholder, &value, width, password, style.as_ref());
+                    build_input_shape(&placeholder, &value, width, password, style.as_ref(), disabled);
 
-                // Wire on_input for text change tracking
-                if let Some(msg) = on_change {
-                    input_widget = input_widget.on_input(move |text| {
-                        INPUT_TEXT.with(|t| *t.borrow_mut() = text.to_string());
-                        msg.clone()
-                    });
-                }
+                // PLAN-031 T-05（F-02）：禁用态不派发编辑/提交消息（输入被忽略），
+                // 表面由 style 的禁用呈现承担；与 Vue 侧原生 disabled 语义对齐。
+                if !disabled {
+                    // Wire on_input for text change tracking
+                    if let Some(msg) = on_change {
+                        input_widget = input_widget.on_input(move |text| {
+                            INPUT_TEXT.with(|t| *t.borrow_mut() = text.to_string());
+                            msg.clone()
+                        });
+                    }
 
-                // Wire on_submit for Enter key press
-                if let Some(msg) = on_submit {
-                    input_widget = input_widget.on_submit(msg);
+                    // Wire on_submit for Enter key press
+                    if let Some(msg) = on_submit {
+                        input_widget = input_widget.on_submit(msg);
+                    }
                 }
 
                 let el: iced::Element<'static, M> = input_widget.into();
@@ -1311,6 +1316,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 on_submit,
                 height,
                 style,
+                disabled,
                 keymap,
                 ..
             } => {

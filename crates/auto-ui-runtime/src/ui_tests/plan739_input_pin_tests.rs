@@ -172,6 +172,7 @@ mod plan739_input_pin_tests {
             width: None,
             password: false,
             style: None,
+            disabled: false,
         };
         patch_input_values(&mut input, &iv);
         match &input {

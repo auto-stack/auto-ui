@@ -1050,6 +1050,7 @@ mod tests {
             width: None,
             password: false,
             style: None,
+            disabled: false,
         };
 
         let tree = view_to_vtree(view);

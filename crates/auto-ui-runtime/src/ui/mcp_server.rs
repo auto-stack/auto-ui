@@ -5844,6 +5844,7 @@ mod tests_314 {
             width: None,
             password: false,
             style: None,
+            disabled: false,
         };
         let (msg, val) = enter_handler_in_view(&input).expect("onenter input 必须命中");
         assert_eq!(val, "hello");
@@ -5873,6 +5874,7 @@ mod tests_314 {
             ghost: String::new(),
             keydown,
             keymap: "emacs".into(),
+            disabled: false,
         };
         let (msg, val) = enter_handler_in_view(&ta).expect("keydown enter 必须命中");
         assert_eq!(val, "draft text");
@@ -5890,6 +5892,7 @@ mod tests_314 {
             width: None,
             password: false,
             style: None,
+            disabled: false,
         };
         assert!(
             enter_handler_in_view(&bare).is_none(),
@@ -5928,6 +5931,7 @@ mod tests_plan483_d4 {
             width: None,
             password: placeholder.contains("password"),
             style: None,
+            disabled: false,
         }
     }
 
