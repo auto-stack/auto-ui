@@ -23,6 +23,7 @@
 //! dependency.
 
 pub mod resources;
+pub mod theme_package;
 pub mod validate;
 
 // ---- PLAN-815 T-05: 托管执行闭包（协议循环/工作操作/进程托管/运行路径/
