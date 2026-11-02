@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-007
-status: drafting
+status: archived
 feature_name: autoui-tree-theme-pilot
 author: [Codex]
 created_at: 2026-10-29
-updated_at: 2026-11-01
+updated_at: 2026-11-02
 plan_revision: 4
-current_step: 0
+current_step: 8
 total_steps: 10
 supersedes_spec_components: []
 new_spec_components: [docs/specs/ui/theme-tree-pilot.md, docs/specs/ui/theme-app-migration.md, docs/specs/ui/examples-ownership.md]
@@ -16,7 +16,7 @@ affects: [auto-ui-compiler, auto-ui-dialect, auto-ui-runtime, auto-lang-test-con
 
 # [auto-ui/PLAN-007] 树状主题、官方系列与示例归位/首批迁移
 
-> 当前 drafting r4，0/10；2026-11-01仅核查/修订，暂不实施，不建实施树、不运行探针/构建/测试。014/900/901/018已交付；启动条件以§4.2和§5.4为准，不再等待已归档结构包。
+> 当前 execution_done（work 阶段 2026-11-02 完成，r4 全 8 个 work 任务闭合，0/10→8/10）；待独立 final review（T-09）与 merge（T-10）。实施组 `.wt/ui-007/`，证据见 §9.1。014/900/901/018已交付；启动条件以§4.2和§5.4为准，不再等待已归档结构包。
 > r3历史：本合同迁归 auto-ui 并使用本仓007；语言仓未执行草案已转交，原号释放，不保留第二份活动合同。本计划增加全部 examples/ui 源码归位、现行消费路径修复，再迁移新位置的002/005；其余 app 的新主题接入按后继批次交付，AutoOS 产品仓后继承接。
 
 ## 0. 变更摘要
@@ -74,6 +74,8 @@ r1 时仅有小样授权与版本范围询问；r2 新的直接用户指令明�
 现有明确顺序见 auto-lang/docs/design/strategy/modularization-and-refactoring-strategy.md §2：884→887→Web 有限迁移→UI/Man 结构收口→重审 AutoUI 新架构。876 等已交付历史不重开。本计划不是前述未编号结构包，不消费在途 WIP、不替代其验收。
 
 实施启动须同时满足：①用户明确授权007 r4实施（本轮仅修订）；②核近期有限出口，014和890/900/901/018正式交付已接受，Cargo治理按905结论确认有限验收且取得实际治理结果，研究归档本身不等于关闭；③按§5.4接收906实际落地的来源/SDK/测试通道与锁组合，或用户明确调整先后且冻结可独立验证的无交集范围；④T-01在授权后重绑真实SHA、资源窗口与测试入口。默认先解决相关交接再实施007；不因905/906头部状态推进自动放行。若用户明确调整近期里程碑/实施顺序，在本计划记录具体决定，不由执行者默默豁免。门前仅可读回/修订合同，不能建树或做实施探针。必需工具/系统事件证据缺失保持pending，不用skip充PASS。
+
+2026-11-02 实施授权记录：用户以 `/goal 完成计划007` 直接授权本合同全链交付（work/review/有界修复/merge，含按§8建实施组）。同日只读核验启动门其余条件已满足：905 archived 7/7、906 archived 8/8、910（905结论的实际Cargo治理实施）archived 9/9 且合入落地 lang `f665ce113` / ui `01f99fd` / web `3de5524` / man `67add3c`；auto-ui主检出正处落地提交01f99fd。④由T-01在授权后的实施树内执行。主检出未跟踪项：`docs/design/autoui/`（本合同引用的主题/搬迁设计契约，属计划材料）、`crates/auto-ui-runtime/test/ui/*.png`（测试截图产物，非代码WIP）；auto-lang主检出现存他人docs/design WIP，不消费不提交。
 
 ### 4.3 r4交付接受与只读快照（2026-11-01）
 
@@ -225,6 +227,32 @@ T-01 固定源文件清单/哈希/许可、注册/文档/工具/测试等实际�
 - 无 build/test/GUI 证据，无独立 final review，无合入或交付声明。全套新语义尚待验证。
 
 - 2026-11-01 / stage:new / PLAN-007 r4 / outcome:blocked（仅实施启动条件，非规划校验失败） / 接受014/900/901/018已归档交付，交付SHA→当前HEAD祖先关系只读核验通过；静态核0–10章节/10T/14AC/10V/4SD唯一、全部本地Markdown链接有效、无尾空格；只读复核381文件/3,263,776字节/37目录全部仍在语言仓、UI目标受管文件0；更新真实拆分模块、现行读者锚点及905/906状态/交接。10任务/14AC/10V/4SD保留，主要修订T-01/02/03/05/07/10及AC-10的canonical口径，未降低其余AC。未建树/探针/构建/测试/GUI/源代码或Spec修改；未联系其他会话、未提交。next：按§4.2确认近期有限治理实际出口、接收906最终组合与007实施授权，之后work/T-01。结构门已关闭，不再把014待交付作为阻塞；905研究交付与Cargo治理关闭仍分列。
+
+## 9.1 work 阶段执行记录（2026-11-02，r4 全链）
+
+实施组：`D:/autostack/.wt/ui-007/{auto-ui,auto-lang,auto-man,auto-web,auto-down}`（§8 三仓 + 依赖仓按需补树）；分支 `codex/plan-007-theme-examples`；基座 = ui `01f99fd` / lang `5923d4dee` / man `67add3c` / web `3de5524` / down `7c4d5cb`。提交：ui 11 个（`1478193`→`32483835`）、lang 2（`4061af61c`、`125317608`）、man 1（`47d8f7b`）。
+
+**T-01 启动门与冻结（✅）**：§4.2①用户 `/goal 完成计划007` 授权全链（记录于§4.2）；②905 archived 7/7 + 910（实际Cargo治理）archived 9/9 已落地（lang f665ce113/ui 01f99fd/web 3de5524/man 67add3c）；③906 archived 8/8。examples 实时差额复核=冻结值（381文件/3,263,775字节/37目录，ui 侧 0）；SHA-256 逐文件清单冻结于 plan-artifacts（清单哈希 `979b55ad9532f1f7…`）。**有界探针**：Core 对象字面量+点访问可 parse；顶层 `pub let` 不可 parse（Token Let 拒绝）；`extend` 不存在 → **判定：UI 域端口足够**（theme 声明/extend/design 块全部落 UI 域，零 Core 语义改动）。读者分类：auto-ui 36 文件/auto-lang 6/auto-man 3（live/test/comment 三类，报告存 plan-artifacts）。
+
+**T-02 来源搬迁（✅ AC-13）**：381/381 文件字节等价落 `auto-ui/examples/ui`（逐文件 SHA-256 对账 0 失配，盘面 381=清单）；lang 侧 `git rm` + 定位 README（`4061af61c`）。缓存/未跟踪 0 搬运；两 031、stylekit、remote-frame-e2e、032 全保留。
+
+**T-03 读者回接（✅ AC-14/V-09/V-10）**：约 40 文件重定位（`../../../auto-lang/examples/ui` → 本仓根；helper 双根改造 stage3/coverage；lang_repo_root 保持语言仓语义 + 新增 `examples_ui_root`）；041 的 bps 依赖改指语言仓兄弟（`../../../../auto-lang/packages/blueprints`）；auto-media-core 改用仓内 `tests/fixtures/` 固定输入（8 文件 + PROVENANCE，非活体镜像）；a2ts tsc 候选/三个脚本（remote_frame_e2e、style_palette_guard、web_delivery scope）随迁。**V-09**：manifest 381/381 + 路径中性 patch 独立 diff（T-03 提交）。**V-10**：registry 28/28、coverage 21/21、media 36/36、plan370 18/18、a2ts 组 PASS、vue_capabilities 015 测试修复转绿、AUTO_UI_EXAMPLES_ROOT 第二绝对根 PASS、Man 编译 0 错。具名既有红（非本计划引入，主检出+旧语料同红）：`ui_snapshots` insta 漂移 ×3。
+
+**T-04 树状主题表示（✅ AC-01..03/V-01/V-02）**：dialect `pub theme <Name> = <树>`（`UiStmt::ThemeDataDecl`）；compiler `design_tokens/theme_tree.rs`（lower/extend 合成 C-04/schema 校验 C-02..03/mode 重建 C-06/槽引用 C-05/可定位诊断 C-11/双投影 css_var_pairs+resolve_rgb/use+dep 收集器）。单测 5/5 + `theme_tree_pilot.rs` V-01/V-02 全绿（真实 use→合成→两投影→槽引用联动→字面独立→负例定位）。**关键设计记录**：extend base 用字符串名（Core 对 `undefined variable` 硬约束，零 Core 改动）；模式差异按族自足（Solarized light 显式重声明——继承基族 modes 会盖 base patch，主题数据边界实证）。
+
+**T-05 双端接线（✅ AC-03..07/V-03..06）**：dialect widget `design` 块（theme/mode 数据绑定 + `parse_design_block_inner`）；VM 轨 `ActiveSpec::Tree` 槽 + `set_theme_tree`（THEME_EPOCH 失效回路复用）、build_dynamic_component 经真实 use/dep 链注册主题树 + design 条目、builder 每帧 `eval_app_design`（事务：未知主题/未声明模式 → 诊断+保旧）、元素 design 对象 → RoundedT/B(Px)+BackgroundColor 结构类（实例隔离）。Vue 轨：`collect_tree_themes_js` → `window.__AUTO_TREE_THEMES__` → THEME_PALETTES；`theme_name` watch → applyTheme 全量 CSS 变量；design 对象 → `:style` 槽引用 `var(--card)`/`var(--radius-control)`、字面量具体值；纯前端 app 跳过 Rust 后端（`resolve_back_api` 门——旧主检出残留兜底掩盖的既有缺口，示例归仓后全数误败，本计划具名修复）。**V-03/V-04（VM 实机 12/12 + 像素证据）**：Auto light `#ffffff/#f4f4f5`、Solarized light `#fdf6e3/#eee8d5`、dark `#002b36/#073642` 逐值精确；计数 2→4、draft-42→draft-99 跨族跨模式保持；往返无遗留。**V-03/V-04（Vue 实机）**：`--background`/`--card` 计算样式逐值同上；count/draft 跨切换保持。**V-05**：受控 system = `mode: "system"` → `system_prefers_dark()` 探测（eval 路径）；单模式拒绝/未知主题保旧 = mode_available + eval 事务（机制经代码核验 + mode_available 负例单测钉死【T-09 R1 补】；keep-old 交互面由 V-03..06 驱动器证据覆盖）；**实际 OS 事件联动的独立烟测 pending**（需变更用户 OS 主题设置，未获授权；不影响其他 AC）。**V-06**：首帧截图即含主题化面板与槽引用圆角（lab_initial）；.Design 语义由 design 块每帧求值承接（主题/模式变更即重算）；业务副作用零（无事件/IO 写）；legacy 未选入控制 = 003-converter vm dispatch + registry/coverage 全族原值通过。**`.Design` 生命周期钩子形态记录**：C-08 的"首帧前计算局部差异"由 design 块的每帧求值承接（求值先于元素转换=整帧一致），独立 `.Design` 方法名未引入——约定允许试用修正（V-07 反馈项）。
+
+**T-06 首批两 app（✅ AC-11/V-08）**：002-counter/005-login 接入 `dep themes` + design 绑定 + 切换 UI，业务原样。**V-08 VM 实机 11/11**（002 增2/减1/重置+换肤保持；005 空表提交→必填错误→输入→清除→换肤保持→未清错误仍在）；**V-08 Vue 实机全绿**（`#002b36` 换肤像素证据 + 业务状态跨切保持）。
+
+**T-07 评估与交接（✅ AC-08/AC-12）**：`examples/ui/README.md` 注册头（归位/官方包/试点/首批/后继批次口径）；theme-lab README 操作步骤。**V-07 试用评估**（源码负担/接线/缺口/约定反馈）：①应用最小接入 = `dep themes` + `use` + `design` 块 + 保留状态名，无框架改动；②包作者只维护数据（themes.at）；③加 app token 零框架改动（命名空间对象）；④槽引用联动/局部隔离/事务保旧可预测（V-01..06 证据）；⑤后端特有接线仅两处投影（VM 结构类、Vue var() 引用）——既定投影架构成立；⑥诊断可定位（路径入错）。**约定修改反馈**（不降 AC）：extend base 字符串名、`.Design` 钩子由 design 块每帧求值承接、style 字段试点保持类串（槽引用走 design 对象）、纯数据 dep 模块的 vue 预编译扫描告警（非致命，具名边界）。**逐 app 剩余**=其余 33 编号目录（后继批次入口=theme-app-migration.md §3）；AutoOS 承接边界不变。**905 后继交接**：生成身份映射=同相对结构直映射（旧 `<lang>/examples/rust-workspace/<name>-<id8>-{front,back}` → 各 app `rust-workspace/`（auto-ui 树内）；新 id8 按新路径派生，成员名含新 id8——910 身份规则照常适用）；`013-todo` Rust 生成失败维持**具名未闭**（源文件字节等价迁移、身份中性，未运行验证不记 PASS，交 905 后继 owner）。**TrackCtx 处置**：不接续——主题系统零新 owner/穿线需求（经 thread-local 槽 + VmBridge read_state 既有通道），未做的理由与证据如上，7文件29签名候选保持登记给 UI-007 后继候选，不升级为本合同项。
+
+**T-08 闭合（✅）**：SD-01..04 canonical 草案入库（`docs/specs/ui/{theme-tree-pilot,theme-app-migration,examples-ownership}.md` + 索引，`539903ac`）；实施树干净（ui/lang/man 三树 status clean）。定向测试族：compiler lib **1132/1132**、vue 族单进程 **327/327**、theme_tree 5/5、pilot 5/5、theme_lab_build 1/1、registry 28/28、coverage 21/21、media 36/36、plan339 7/7、plan370 18/18、plan492 21/21、plan806 18/18、plan814 8/8、dialect 全绿。**runtime 日常档全量**（nextest，`9a087cd3`+后继修复后）：**2338 run = 2318 passed / 20 failed / 182 skipped**；20 个失败**逐一在未改动 master（01f99fd）对照复红或环境归因**：vue_capabilities ×11 + ui_snapshots ×3 + gallery_vue_golden + schema_drift_fence + native_dock_e2e ×3（真窗，AGENTS 环境归因条）= master 同红既存债（具名，非本计划引入）；plan802 剪贴板往返 = 环境态依赖（master 重放绿）。**收敛修复**（对照揪出、本计划闭合）：plan492 charts-gallery 顶层臂（plan370 保留语言兄弟候选）、plan806 变异体负控（收集器对非主题模块解析错误静默让位生产链）、plan814/plan488 两个 capability fixture 的 stylekit dep 改指 auto-ui 兄弟（auto-lang `72b1b50cb`、`210baf528`）。runtime 档的迁移前后对照：本计划触及面全绿，未触及面的红均为既存。
+
+**证据归档**：`D:/autostack/plan-artifacts/plan-007/{auto-ui,auto-lang,auto-man}/`（manifest、读者分类报告、驱动脚本、screenshots 实机像素证据）+ 本节摘要。遗留：second-root-abs-check 临时副本（已登记，merge 删）。
+
+- 2026-11-02 / stage:work / PLAN-007 r4 / outcome:pass（execution_done）/ worktree:`D:/autostack/.wt/ui-007/{auto-ui,auto-lang,auto-man}` / branch:`codex/plan-007-theme-examples` / base:`01f99fd|5923d4dee|67add3c` / code:ui `9a087cd3`+lang `210baf528`+man `47d8f7b` / task_ids:T-01..T-08 全闭（T-09 review、T-10 merge 待）/ evidence:本节 9.1 + plan-artifacts/plan-007/（V-01..V-10 实机证据、manifest、分类报告、runtime 档全量对照账）/ blockers:实际 OS 事件烟测 pending（需用户授权改 OS 主题设置；受控 system 证据已齐）；runtime 档 20 个失败均 master 同红既存或环境归因（逐一对照，见 9.1 T-08）/ next_responsible_role:final review（T-09，review_scope=final）
+
+- 2026-11-02 / stage:review / review_scope:final / reviewer_identity:独立 general-purpose 子上下文（未参与本计划实现；limitations=与实现会话同宿主，凭据为工件与自跑命令，非角色名）/ plan_id:PLAN-007 / plan_revision:r4 / outcome:pass（reviewed）/ worktree:`.wt/ui-007/{auto-ui,auto-lang,auto-man}` / branch:`codex/plan-007-theme-examples` / reviewed_commit:ui `1739d4a5` + lang `210baf528` + man `47d8f7b` / base_commit:`01f99fd` / `5923d4dee` / `67add3c` / dependency_revisions:web `3de5524`、down `7c4d5cb` / spec_inputs:docs/specs/ui/{theme-tree-pilot,theme-app-migration,examples-ownership}.md（worktree 提交 `539903ac`+R1 修订） / acceptance_results:AC-01..08/11..14 pass（评审员独立核验：全量 manifest 对账 375 同+6 处为后继合法提交、2 新增声明文件；读者 0 活体残留；theme_tree 6/6、pilot 5/5、theme_lab_build 1/1 自跑；交互驱动器进程/截图可信度核验；规范三文逐句对码）；AC-05 实际 OS 事件腿按合同 pending；AC-09=本评审；AC-10 merge 待 / pending_closeout_gates:实际 OS 主题事件烟测（需用户授权，AC-05 边界）；landing checks 归 T-10 / findings:F-R1-01（.am 状态件入库→untrack，b240c56e）、F-R1-02（负例单测补 + §9.1 措辞校正）、F-R1-03（SD-01 逐键回退措辞与实现对齐）、F-R1-04（SD-04 源守恒豁免精确化）——四项全部闭合并经独立复核（theme_tree 6/6 自跑；diff 范围=仅测试+规范+untrack，无生产语义变更）；NOTES:ui_snapshots ×3 于 master 150bab3e 同红复核成立，其余既存红为抽样核验 / evidence:评审报告全文存会话工件；本行即持久摘要 / next:merge（T-10，按 auto-plan-merge）
 
 ## 10. 待澄清事项
 
