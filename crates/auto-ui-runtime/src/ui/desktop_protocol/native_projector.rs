@@ -6615,7 +6615,7 @@ mod tests {
     fn p033_vm_input_writeback_zero_param() {
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../../auto-lang/examples/ui/003-converter/src/front/app.at"
+            "/../../examples/ui/003-converter/src/front/app.at"
         );
         let Ok(src) = std::fs::read_to_string(path) else {
             eprintln!("[p033] skip: 003-converter 载体缺席");

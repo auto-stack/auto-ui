@@ -2430,7 +2430,7 @@ widget App {
 fn zz_plan444_debug_015_app() {
     let tmp = std::env::temp_dir().join("p444dbg");
     std::fs::create_dir_all(&tmp).unwrap();
-    let src = std::fs::read_to_string("../../../auto-lang/crates/auto-lang/examples/ui/015-notes/src/front/app.at").unwrap();
+    let src = std::fs::read_to_string("../../examples/ui/015-notes/src/front/app.at").unwrap();
     let at = tmp.join("app.at");
     std::fs::write(&at, src).unwrap();
     let result = auto_ui_compiler::ui_gen::generate_component_from_file(

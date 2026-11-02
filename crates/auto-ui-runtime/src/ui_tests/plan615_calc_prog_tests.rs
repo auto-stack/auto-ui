@@ -10,7 +10,7 @@ use std::path::PathBuf;
 
 fn calc_component() -> crate::ui::dynamic::DynamicComponent {
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let path = manifest.join("../../../auto-lang/examples/ui/011-calculator/src/front/app.at");
+    let path = manifest.join("../../examples/ui/011-calculator/src/front/app.at");
     let src = std::fs::read_to_string(&path).expect("calc app.at exists");
     build_dynamic_component(&src, Some(path.to_str().unwrap())).expect("calc component builds")
 }

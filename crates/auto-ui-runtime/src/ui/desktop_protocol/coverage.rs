@@ -1140,7 +1140,7 @@ mod tests {
     fn scan_example(dir: &str) -> ViewScan {
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../../auto-lang/examples/ui/",
+            "/../../examples/ui/",
             "PLACEHOLDER/src/front/app.at"
         )
         .replace("PLACEHOLDER", dir);
@@ -1574,17 +1574,19 @@ mod tests {
         use crate::ui::aura_view_builder::AuraViewBuilder;
         use crate::ui::vm_bridge::VmBridge;
 
-        // 双根解析（stage3 example_source 同则）：046-tabs 等样板随
-        // fix-ui-track-reorg（2026-09-20）迁 capability-tests。
-        let front = ["examples/ui", "examples/capability-tests"]
-            .iter()
-            .map(|root| {
-                std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                    .join("../../../auto-lang/examples")
-                    .join(root.trim_start_matches("examples/"))
-                    .join(dir)
-                    .join("src/front")
-            })
+        // 双根解析（stage3 example_source 同则）：examples/ui 归 auto-ui
+        // 本仓（PLAN-007 T-03）；capability-tests 仍属语言仓（组内兄弟）。
+        // 046-tabs 等样板随 fix-ui-track-reorg（2026-09-20）迁 capability-tests。
+        let own_ui = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../examples/ui")
+            .join(dir)
+            .join("src/front");
+        let lang_ct = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../auto-lang/examples/capability-tests")
+            .join(dir)
+            .join("src/front");
+        let front = [own_ui, lang_ct]
+            .into_iter()
             .find(|p| p.is_dir())
             .unwrap_or_else(|| {
                 panic!("example {dir} not found under examples/ui or capability-tests")
@@ -1699,7 +1701,10 @@ mod tests {
     /// component.view()）即本口径。
     #[test]
     fn native_gate_runtime_views_of_six() {
-        let base = concat!(env!("CARGO_MANIFEST_DIR"), "/../../../auto-lang/");
+        // PLAN-007 T-03：examples/ui 归 auto-ui 本仓；capability-tests 仍属
+        // 语言仓（双根解析）。
+        let base_ui = concat!(env!("CARGO_MANIFEST_DIR"), "/../../");
+        let base_lang = concat!(env!("CARGO_MANIFEST_DIR"), "/../../../auto-lang/");
         // (例, 期望缺项——None = Covered)。tabs-variants 已迁
         // capability-tests（双根解析）。
         let expect: &[(&str, Option<&str>)] = &[
@@ -1718,11 +1723,13 @@ mod tests {
             ("codeeditor-rq", None),
         ];
         for (dir, missing) in expect {
-            let path = ["examples/ui", "examples/capability-tests"]
-                .iter()
-                .map(|root| format!("{base}{root}/{dir}/src/front/app.at"))
-                .find(|p| std::path::Path::new(p).is_file())
-                .unwrap_or_else(|| format!("{base}examples/ui/{dir}/src/front/app.at"));
+            let path = [
+                format!("{base_ui}examples/ui/{dir}/src/front/app.at"),
+                format!("{base_lang}examples/capability-tests/{dir}/src/front/app.at"),
+            ]
+            .into_iter()
+            .find(|p| std::path::Path::new(p).is_file())
+            .unwrap_or_else(|| format!("{base_ui}examples/ui/{dir}/src/front/app.at"));
             let src = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {path}: {e}"));
             let comp = crate::build_dynamic_component(&src, Some(&path))
                 .unwrap_or_else(|e| panic!("build {dir}: {e:?}"));
@@ -1754,7 +1761,7 @@ mod tests {
         use crate::ui::vm_bridge::VmBridge;
 
         let examples_dir =
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../auto-lang/examples/ui");
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/ui");
         // (name, covered, 缺项/失败原因)
         let mut rows: Vec<(String, bool, String)> = Vec::new();
         let mut dirs: Vec<std::path::PathBuf> = std::fs::read_dir(&examples_dir)
@@ -1897,14 +1904,16 @@ mod tests {
         use crate::ui::vm_bridge::VmBridge;
         use std::collections::BTreeMap;
 
-        let base =
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../auto-lang/examples");
+        // PLAN-007 T-03：ui 根归 auto-ui 本仓；capability-tests 仍属语言仓。
         let mut roots: Vec<(String, std::path::PathBuf)> = Vec::new();
-        for root in ["ui", "capability-tests"] {
-            let p = base.join(root);
-            if p.is_dir() {
-                roots.push((root.to_string(), p));
-            }
+        let ui_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/ui");
+        if ui_root.is_dir() {
+            roots.push(("ui".to_string(), ui_root));
+        }
+        let ct_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../auto-lang/examples/capability-tests");
+        if ct_root.is_dir() {
+            roots.push(("capability-tests".to_string(), ct_root));
         }
         assert!(!roots.is_empty(), "examples 根缺席");
         // kind/style/event 缺项 → (root, dir) 集（聚合视图）。

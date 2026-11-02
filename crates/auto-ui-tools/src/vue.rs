@@ -7954,24 +7954,22 @@ pub fn gallery_apps_dir(root_dir: &Path) -> AutoResult<PathBuf> {
     if default.is_dir() {
         return Ok(default);
     }
-    // PLAN-590(Stage B P-5):ui-gallery 物理迁 auto-os 顶层后,收割对象
-    //(框架示例 examples/ui)在 auto-lang——按解析序家族补兄弟探测
-    // `../auto-lang/examples/ui`(env 上面已覆盖;教学 demo 留架为画廊语料,
-    // Design 01 §1-B)。旧仓内两臂保留(向后兼容零变化)。
+    // PLAN-007 T-03(原 PLAN-590 Stage B P-5 探测臂随语料迁移换目标):
+    // 框架示例 examples/ui 自 2026-11 起 owner=auto-ui——兄弟探测臂改
+    // `../auto-ui/examples/ui`(env 上面已覆盖;教学 demo 留架为画廊语料,
+    // Design 01 §1-B)。不再探测 auto-lang 旧根（已无活体源，避免隐藏回退）。
     if let Some(parent) = root_dir.parent() {
-        let sibling_lang_ui = parent.join("auto-lang").join("examples").join("ui");
-        if sibling_lang_ui.is_dir() {
-            return Ok(sibling_lang_ui);
+        let sibling_ui_ui = parent.join("auto-ui").join("examples").join("ui");
+        if sibling_ui_ui.is_dir() {
+            return Ok(sibling_ui_ui);
         }
     }
-    // PLAN-662 T-01: 平铺主检出布局补探测——`D:/autostack/{auto-lang,
-    // auto-os}` 仓平铺为兄弟时,ui-gallery 的父级是 auto-os、祖父级才是
-    // auto-lang 的父目录(worktree 组布局 `.wt/lang-NNN/` 同形命中)。
-    // 658 验收仅覆盖组内布局+显式 env,主检出一键裸跑此前硬错。
+    // PLAN-662 T-01: 平铺主检出布局补探测——worktree 组布局/平铺主检出
+    // 中祖父级即 auto-ui 父目录时命中（`.wt/ui-NNN/` 同形）。
     if let Some(grandparent) = root_dir.parent().and_then(|p| p.parent()) {
-        let flat_lang_ui = grandparent.join("auto-lang").join("examples").join("ui");
-        if flat_lang_ui.is_dir() {
-            return Ok(flat_lang_ui);
+        let flat_ui = grandparent.join("auto-ui").join("examples").join("ui");
+        if flat_ui.is_dir() {
+            return Ok(flat_ui);
         }
     }
     Err(format!(

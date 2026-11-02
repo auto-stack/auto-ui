@@ -18,8 +18,7 @@ fn workspace_path(rel: &str) -> String {
     let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
     manifest_dir
         .join("..")
-        .join("..")
-        .join("../auto-lang") // PLAN-900：015-notes 语料在 auto-lang 仓
+        .join("..") // PLAN-007 T-03：语料归 auto-ui 本仓 examples/ui
         .join(rel)
         .to_string_lossy()
         .to_string()

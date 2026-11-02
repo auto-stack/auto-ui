@@ -345,14 +345,18 @@ mod tests {
     ];
 
     fn example_source(dir: &str) -> String {
-        // PLAN-552：构造语料双根——主根 examples/ui（001–005）优先，探针根
-        // examples/capability-tests 兜底（p507/p515 随探针清退迁出）。
-        let base = concat!(env!("CARGO_MANIFEST_DIR"), "/../../../auto-lang/");
-        let path = ["examples/ui", "examples/capability-tests"]
-            .iter()
-            .map(|root| format!("{base}{root}/{dir}/src/front/app.at"))
-            .find(|p| std::path::Path::new(p).is_file())
-            .unwrap_or_else(|| format!("{base}examples/ui/{dir}/src/front/app.at"));
+        // PLAN-552：构造语料双根——主根 examples/ui 归 auto-ui 本仓
+        // （PLAN-007 T-02/T-03）优先，探针根 examples/capability-tests 仍属
+        // 语言仓（组内兄弟解析；p507/p515 随探针清退迁出）。
+        let base_ui = concat!(env!("CARGO_MANIFEST_DIR"), "/../../");
+        let base_lang = concat!(env!("CARGO_MANIFEST_DIR"), "/../../../auto-lang/");
+        let path = [
+            format!("{base_ui}examples/ui/{dir}/src/front/app.at"),
+            format!("{base_lang}examples/capability-tests/{dir}/src/front/app.at"),
+        ]
+        .into_iter()
+        .find(|p| std::path::Path::new(p).is_file())
+        .unwrap_or_else(|| format!("{base_ui}examples/ui/{dir}/src/front/app.at"));
         std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {path}: {e}"))
     }
 
@@ -362,7 +366,7 @@ mod tests {
     fn example_source_all(dir: &str) -> String {
         let base = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../../auto-lang/examples/ui/"
+            "/../../examples/ui/"
         );
         let front = format!("{base}{dir}/src/front");
         let mut srcs: Vec<std::path::PathBuf> = std::fs::read_dir(&front)
@@ -602,7 +606,7 @@ mod tests {
             // loader 按 path 兄弟文件解析——018 book_store/021 页组件）。
             let base = concat!(
                 env!("CARGO_MANIFEST_DIR"),
-                "/../../../auto-lang/examples/ui/"
+                "/../../examples/ui/"
             );
             let path = format!("{base}{app}/src/front/app.at");
             let src = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {path}: {e}"));
@@ -4466,7 +4470,7 @@ mod tests {
         // 唯一差异 = broker 管道名测试隔离）。
         let exe = auto_exe();
         let app_root =
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../auto-lang/examples/ui");
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/ui");
         let pipe_for_spawn = broker_pipe.clone();
         session.desktop.outproc_spawner = Some(std::sync::Arc::new(move |child_name| {
             let mut cmd = std::process::Command::new(&exe);
@@ -4987,7 +4991,7 @@ mod tests {
             std::env::var("AUTO_694_NATIVE_APP_DIR").unwrap_or_else(|_| {
                 concat!(
                     env!("CARGO_MANIFEST_DIR"),
-                    "/../../../auto-lang/examples/ui/003-converter"
+                    "/../../examples/ui/003-converter"
                 )
                 .to_string()
             }),
@@ -5598,7 +5602,7 @@ mod tests {
         {
             let base = concat!(
                 env!("CARGO_MANIFEST_DIR"),
-                "/../../../auto-lang/examples/ui/"
+                "/../../examples/ui/"
             );
             for (name, want) in [
                 ("018-book-reader", "style:truncate"),
@@ -5967,7 +5971,7 @@ mod tests {
         if std::env::var("AUTO_DESKTOP_E2E").as_deref() != Ok("1") {
             return;
         }
-        let repo = crate::ui::desktop_protocol::e2e_exe::lang_repo_root();
+        let repo = crate::ui::desktop_protocol::e2e_exe::examples_ui_root();
         let dir_converter = repo.join("examples/ui/003-converter");
         let dir_hello = repo.join("examples/ui/001-helloworld");
         if !dir_converter.join("src/front/app.at").is_file()
@@ -6427,7 +6431,7 @@ child:
         if std::env::var("AUTO_DESKTOP_E2E").as_deref() != Ok("1") {
             return;
         }
-        let repo = crate::ui::desktop_protocol::e2e_exe::lang_repo_root();
+        let repo = crate::ui::desktop_protocol::e2e_exe::examples_ui_root();
         let dir_fm = repo.join("examples/ui/027-file-manager");
         let dir_conv = repo.join("examples/ui/003-converter");
         if !dir_fm.join("src/front/app.at").is_file()
@@ -6637,7 +6641,7 @@ child:
         if std::env::var("AUTO_DESKTOP_E2E").as_deref() != Ok("1") {
             return;
         }
-        let repo = crate::ui::desktop_protocol::e2e_exe::lang_repo_root();
+        let repo = crate::ui::desktop_protocol::e2e_exe::examples_ui_root();
         let dir_converter = repo.join("examples/ui/003-converter");
         if !dir_converter.join("src/front/app.at").is_file() {
             eprintln!("[p034] skip: 载体缺席");

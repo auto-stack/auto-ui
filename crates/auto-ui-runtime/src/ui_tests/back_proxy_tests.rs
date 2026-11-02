@@ -535,13 +535,11 @@ fn http_e2e_back_proxy_real_routes_corpora_data_face() {
         .nth(2)
         .expect("repo root")
         .to_path_buf();
-    // PLAN-900：五家语料（018/019/021/022/023）物理在 auto-lang 仓
-    // examples/ui/——跨仓兄弟相对定位；solo 检出缺席时本 e2e 整体 SKIP。
-    let ui = repo_root.join("../auto-lang").join("examples").join("ui");
+    // PLAN-007 T-03：五家语料（018/019/021/022/023）归 auto-ui 本仓
+    // examples/ui/（T-02 迁移后同仓定位；缺席即真实缺口，不回退旧根）。
+    let ui = repo_root.join("examples").join("ui");
     if !ui.join("018-book-reader").is_dir() {
-        eprintln!(
-            "back-proxy corpora: SKIPPED — auto-lang/examples/ui 未解析             (solo auto-ui 检出;并置 auto-lang 兄弟可启用)"
-        );
+        eprintln!("back-proxy corpora: SKIPPED — examples/ui 未解析（语料缺失）");
         return;
     }
     let spec = |id: &str| SessionSpec {

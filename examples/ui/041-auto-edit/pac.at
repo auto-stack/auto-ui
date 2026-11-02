@@ -14,6 +14,8 @@ dep stylekit {
 }
 
 // PLAN-070 T-01：共享 filetree bp 依赖（tree_util 支撑件跨包直用；L1 零副本）。
+# PLAN-007 T-03 path-neutral fix: corpus moved to auto-ui; blueprints stay a
+# language-repo asset (L1 zero-copy) — resolve the group/flat sibling.
 dep bps {
-    path: "../../../packages/blueprints"
+    path: "../../../../auto-lang/packages/blueprints"
 }

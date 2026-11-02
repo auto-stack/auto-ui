@@ -18,7 +18,7 @@ mod m4_pkg_compile_chain {
         let manifest = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_default();
         let mut out: Vec<std::path::PathBuf> = [
             "../../../auto-lang/examples/charts-gallery/src/front/components",
-            "../../../auto-lang/examples/ui/024-charts/src/front/components",
+            "../../examples/ui/024-charts/src/front/components",
         ]
         .iter()
         .map(|rel| {

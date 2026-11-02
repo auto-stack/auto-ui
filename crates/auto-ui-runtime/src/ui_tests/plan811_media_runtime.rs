@@ -25,7 +25,7 @@ use auto_lang_core::vm::virt_memory::VirtualFlash;
 
 fn fixtures_root() -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../auto-lang/examples/ui/031-image-viewer/tests/fixtures")
+        .join("../../examples/ui/031-image-viewer/tests/fixtures")
 }
 
 fn task_vm() -> (AutoTask, AutoVM) {

@@ -99,6 +99,17 @@ pub(crate) mod e2e_exe {
         PathBuf::from("D:/autostack/auto-lang")
     }
 
+    /// PLAN-007 T-03：examples/ui 教学语料单源 owner=auto-ui 本仓
+    /// （T-02 迁移后）。定位序：AUTO_UI_EXAMPLES_ROOT（第二根重定位验证）
+    /// → 本仓根 CARGO_MANIFEST_DIR/../..。capability-tests / `auto` CLI
+    /// 构建产物仍走 lang_repo_root（语言仓 owner）。
+    pub(crate) fn examples_ui_root() -> PathBuf {
+        if let Some(p) = std::env::var_os("AUTO_UI_EXAMPLES_ROOT") {
+            return p.into();
+        }
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/ui")
+    }
+
     /// `crates/` 树下最新 `.rs` 的 (mtime, 路径)（跳过 target/node_modules）。
     fn newest_source(root: &Path) -> Option<(std::time::SystemTime, PathBuf)> {
         fn walk(dir: &Path, best: &mut Option<(std::time::SystemTime, PathBuf)>) {

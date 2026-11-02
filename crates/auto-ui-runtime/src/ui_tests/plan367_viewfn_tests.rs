@@ -106,7 +106,7 @@ widget W(a: str) {
     fn real_sidebar_at_parses_with_navtree() {
         let path = [
             std::env::var("CARGO_MANIFEST_DIR").ok().map(|d| {
-                std::path::PathBuf::from(d).join("../../../auto-lang/examples/ui/015-notes/src/front/sidebar.at")
+                std::path::PathBuf::from(d).join("../../examples/ui/015-notes/src/front/sidebar.at")
             }),
             Some(std::path::PathBuf::from(
                 "examples/ui/015-notes/src/front/sidebar.at",

@@ -2729,7 +2729,7 @@ mod tests {
     fn boot_entry_matches_suffix_both_directions() {
         assert!(super::boot_entry_matches(
             "examples/ui/011-calculator/src/front/app.at",
-            "C:/autostack/auto-lang/examples/ui/011-calculator/src/front/app.at",
+            "C:/autostack/auto-ui/examples/ui/011-calculator/src/front/app.at",
         ));
         assert!(super::boot_entry_matches(
             "C:/repo/examples/ui/459-dual-app/app.at",
@@ -3308,9 +3308,9 @@ mod tests {
     /// boot 同构——launch 链 build + 504/540 播种可无头全跑）。
     fn t540_resolver_session() -> crate::ui::session::DesktopSession {
         let mut ds = t3_session_with_shell();
+        // PLAN-007 T-03：注册表语料扫本仓 examples/ui。
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../../auto-lang/examples")
-            .join("ui");
+            .join("../../examples/ui");
         let apps = std::sync::Arc::new(crate::ui::app_registry::scan_apps(
             &root,
             &crate::ui::app_registry::ScanOptions::default(),
@@ -6953,7 +6953,7 @@ mod tests {
         .iter()
         .map(|s| s.to_string())
         .collect();
-        if let Ok(entries) = std::fs::read_dir("../../../auto-lang/examples/ui") {
+        if let Ok(entries) = std::fs::read_dir("../../examples/ui") {
             for e in entries.flatten() {
                 let pac = e.path().join("pac.at");
                 if let Ok(content) = std::fs::read_to_string(&pac) {
