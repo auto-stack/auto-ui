@@ -14682,6 +14682,35 @@ widget ThemeApp {
     /// 首帧必须应用**声明的默认族**——mount 取 `theme_name.value` 优先于
     /// localStorage 的持久化选择；否则官方包（Auto/Solarized）的颜色在 Vue
     /// 侧永远不上身，只剩静态 scaffold 表。
+    /// N-34：theme_name 存在但没有 dark_mode 时，`watch(theme_name, …)` 仍会
+    /// 发射——`watch` 的 import 不能只按 has_dark_mode 门控，否则运行期
+    /// `ReferenceError: watch is not defined`。
+    #[test]
+    fn test_theme_name_without_dark_mode_imports_watch() {
+        let sfc = gen_sfc_from_widget_src(
+            r#"
+widget ThemeNameOnly {
+    model {
+        var theme_name str = "Auto"
+    }
+    view { col { text "probe" } }
+}
+"#,
+        );
+        assert!(
+            sfc.contains("watch(theme_name"),
+            "theme_name watcher must be emitted:\n{sfc}"
+        );
+        let import_line = sfc
+            .lines()
+            .find(|l| l.trim_start().starts_with("import {"))
+            .unwrap_or("");
+        assert!(
+            import_line.contains("watch"),
+            "watch must be imported for theme_name-only widgets, import line = {import_line:?}\n{sfc}"
+        );
+    }
+
     #[test]
     fn test_widget_mount_applies_declared_design_family() {
         let sfc = gen_sfc_from_widget_src(

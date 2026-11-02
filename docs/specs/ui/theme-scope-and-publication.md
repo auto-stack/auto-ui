@@ -96,8 +96,10 @@
     即不挂 `on_change`/`on_submit`（textarea 连 `onkeydown.*` 也不挂），
     **禁用不派发**。视觉上 Input 另做值/占位降透明；Textarea 目前只保证不派发，
     没有降透明表面（如实边界）。
-  - 多 App/多实例同文档：每个带主题的 widget 模板根各自挂 `__autoThemeRoot` 与
-    `data-auto-theme-root`，容器变量按实例隔离；子根的 vars 不受父容器清理影响。
+  - 多 App/多实例同文档：**模板根为元素（含 `<div`）**的带主题 widget 各自挂
+    `__autoThemeRoot` 与 `data-auto-theme-root`，容器变量按实例隔离，子根 vars
+    不受父容器清理/暗色覆盖；组件根/Fragment 无根元素时回落 document 级
+    （具名 legacy 边界）。
     真实双实例 DOM 证据见 PLAN-031 的 V-03 腿（Auto/Solarized 各自持值、切换互不串写）。
 
 ## 7. 验收锚点

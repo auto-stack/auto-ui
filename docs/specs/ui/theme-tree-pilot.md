@@ -70,7 +70,10 @@
   [正式主题包与外部消费](official-theme-package.md)），值必须是
   `H S% L%` 三段式；首帧应用 **design 投影**声明的默认族
   （`__designTheme.value || theme_name.value || getActiveTheme()`；未声明
-  design 时退回 `theme_name.value || getActiveTheme()`）。design 对象 →
+  design 时退回 `theme_name.value || getActiveTheme()`）。**发射门**：design 投影
+  随主题运行时一起注入，要求 widget 同时声明 `theme_name` 或 `accent_color`；
+  仅声明 design 的 widget 当前不发射运行时（详见
+  [主题作用域与发布](theme-scope-and-publication.md) §5）。design 对象 →
   `:style` 绑定，槽引用为 `var(--<css-var>)`
   （如 `tokens.colors.card` → `var(--card)`、`tokens.radius.control` →
   `var(--radius-control)`）。

@@ -118,9 +118,11 @@ widget App {
     );
     // N-11/N-23：主题根带独立标记，且作用域内的清理/dark pass 必须跳过它
     //（父容器不得覆盖嵌套实例的 vars）。
+    // N-32：断言带值属性本身——只搜 "data-auto-theme-root" 会被后面的
+    // hasAttribute 断言包含，删掉发射也不会失败（无效 oracle）。
     assert!(
-        sfc.contains("data-auto-theme-root"),
-        "theme root must carry the isolation marker:\n{sfc}"
+        sfc.contains("data-auto-theme-root=\""),
+        "theme root must carry the isolation marker attribute:\n{sfc}"
     );
     assert!(
         sfc.contains("hasAttribute('data-auto-theme-root')"),

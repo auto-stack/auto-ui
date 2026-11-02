@@ -142,7 +142,9 @@ impl VueGenerator {
         // Plan 458: theme flips must re-apply the accent (applyAccent writes
         // the .dark-scoped --primary too, which otherwise falls back to the
         // stylesheet's indigo).
-        if (self.has_accent_color || self.has_theme_name) && self.has_dark_mode && !imports.contains(&"watch") {
+        // N-34：theme_name 热切换 watch 与 accent 同步 watch 都无条件发射，
+        // 只有 dark_mode 时也需要 watch——import 不能仅按 has_dark_mode 门控。
+        if (self.has_accent_color || self.has_theme_name) && !imports.contains(&"watch") {
             imports.push("watch");
         }
         // Lifecycle: .Init → onMounted, .Destroy → onUnmounted
