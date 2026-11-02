@@ -506,11 +506,13 @@ impl<'a> AuraViewBuilder<'a> {
         (view, id_map, probe)
     }
 
-    /// PLAN-031 T-02（C-06/07/08 事务面；R-02 修复）：design 块每帧求值。
+    /// PLAN-031 T-02/T-03（C-06/07/08 事务面 + §5.2 优先级）：design 块每帧求值。
     ///
-    /// 先把全部 selector 求值成**完整候选**，再经
+    /// 先把全部输入求值成**完整候选**，再经
     /// [`publish_design_candidate`](auto_ui_compiler::style::theme::publish_design_candidate)
     /// 一次校验/发布：
+    /// - 宿主/受控输入优先（App override → 声明 follow 的宿主选择 → App design
+    ///   绑定默认）；非法高优先来源整帧拒绝，**不静默回落**（§5.2）。
     /// - `theme: <expr>` → 主题名 → 注册表 lookup，其次内置族；两者皆 miss →
     ///   整候选拒绝（诊断 + 保旧，C-11）。
     /// - `mode: <expr>` → "light"/"dark"/"system"（system 经受控 provider）；
@@ -521,15 +523,36 @@ impl<'a> AuraViewBuilder<'a> {
     ///   新 mode + 旧 family 的半套画面。
     fn eval_app_design(&self) {
         use auto_ui_compiler::design_tokens::registry;
-        use auto_ui_compiler::style::theme::{self, ThemeCandidate};
+        use auto_ui_compiler::style::theme::{
+            self, HostResolution, ModeInput, ThemeCandidate,
+        };
+        // 宿主/受控输入（优先级最高；Blocked = 整帧拒绝且不回落）。
+        let (host_family, host_mode) = match theme::host_theme_resolution() {
+            HostResolution::Blocked(reason) => {
+                eprintln!("[PLAN-031] {reason}——整帧保留旧设计（不回落）");
+                return;
+            }
+            HostResolution::Candidate { family, mode } => (family, mode),
+            HostResolution::None => (None, None),
+        };
+        let host_mode_str: Option<String> = host_mode.map(|m| match m {
+            ModeInput::Light => "light".to_string(),
+            ModeInput::Dark => "dark".to_string(),
+            ModeInput::System => "system".to_string(),
+            ModeInput::Unset | ModeInput::Invalid(_) => String::new(),
+        });
+        // 宿主同时给出 family+mode：完全接管，App design 不再参与。
+        let full_host = host_family.is_some() && host_mode_str.is_some();
+
         let entries = theme::app_design_entries();
-        if entries.is_empty() {
+        if !full_host && entries.is_empty() && host_family.is_none() && host_mode_str.is_none() {
             return;
         }
-        let bindings = Bindings::new();
-        let mut theme_name: Option<String> = None;
-        let mut mode_str: Option<String> = None;
-        let mut failed = false;
+        let mut theme_name: Option<String> = host_family.clone();
+        let mut mode_str: Option<String> = host_mode_str.clone();
+        if !full_host && !entries.is_empty() {
+            let bindings = Bindings::new();
+            let mut failed = false;
         for (key, expr) in &entries {
             let value = match self.resolve_expr_to_value(expr, &bindings) {
                 Some(v) => v,
@@ -568,6 +591,14 @@ impl<'a> AuraViewBuilder<'a> {
         if failed {
             // 整候选拒绝：不写 family、不写 mode、不增 revision（R-02）。
             return;
+        }
+            // 宿主字段覆盖 App 默认（未给字段仍用 design；full_host 已跳过本段）。
+            if host_family.is_some() {
+                theme_name = host_family.clone();
+            }
+            if host_mode_str.is_some() {
+                mode_str = host_mode_str.clone();
+            }
         }
 
         // mode 解析为受控输入（system 由 provider 给出真实/受控偏好结果；

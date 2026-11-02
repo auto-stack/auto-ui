@@ -562,6 +562,7 @@ impl<'a> AuraViewBuilder<'a> {
         let gfp = {
             let ep = GlobalEpisode {
                 theme_epoch: crate::ui::style::theme::theme_epoch(),
+                theme_scope: crate::ui::style::theme::theme_scope_identity(),
                 menubar_open: crate::ui::action_config::menubar_open(),
                 popover_open: crate::ui::action_config::popover_open(),
                 action_config_ptr: crate::ui::action_config::action_config()

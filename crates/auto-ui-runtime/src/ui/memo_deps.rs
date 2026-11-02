@@ -1174,6 +1174,9 @@ pub fn memo_block_site_fingerprint(
 #[derive(Debug, Clone)]
 pub struct GlobalEpisode {
     pub theme_epoch: u32,
+    /// PLAN-031 T-03：scope 身份（0 = legacy）——epoch 数值相同但 scope
+    /// 不同即不同主题，必须翻面（缓存键不能漏 scope 身份）。
+    pub theme_scope: u64,
     pub menubar_open: Option<String>,
     pub popover_open: Option<String>,
     /// `Arc::as_ptr` 身份——配置热重载换 Arc 即翻面。
@@ -1183,6 +1186,7 @@ pub struct GlobalEpisode {
 pub fn globals_fingerprint(ep: &GlobalEpisode) -> u64 {
     let mut h = std::collections::hash_map::DefaultHasher::new();
     ep.theme_epoch.hash(&mut h);
+    ep.theme_scope.hash(&mut h);
     ep.menubar_open.hash(&mut h);
     ep.popover_open.hash(&mut h);
     ep.action_config_ptr.hash(&mut h);
@@ -1619,6 +1623,7 @@ mod tests {
     fn globals_fingerprint_flips_on_any_component_change() {
         let base = GlobalEpisode {
             theme_epoch: 1,
+            theme_scope: 7,
             menubar_open: None,
             popover_open: None,
             action_config_ptr: 0x1000,
@@ -1630,6 +1635,10 @@ mod tests {
         let mut theme2 = base.clone();
         theme2.theme_epoch = 2;
         assert_ne!(f0, globals_fingerprint(&theme2));
+        // PLAN-031 T-03：epoch 相同但 scope 身份不同 → 不同主题，必须翻面。
+        let mut scope2 = base.clone();
+        scope2.theme_scope = 8;
+        assert_ne!(f0, globals_fingerprint(&scope2));
         let mut cfg2 = base.clone();
         cfg2.action_config_ptr = 0x2000;
         assert_ne!(f0, globals_fingerprint(&cfg2));

@@ -227,3 +227,83 @@ fn scope_install_is_nested_and_restores_on_drop() {
     assert_eq!(theme::theme_name(), "scaffold");
     assert_eq!(vm_background(), Some((255, 255, 255)));
 }
+
+/// T-03：宿主/受控输入优先级（App override → follow 宿主 → App 默认）、
+/// Unset/Invalid 分离、非法高优先来源不回落；preview 子 scope 独立身份与
+/// 发布隔离。
+#[test]
+fn host_input_priority_and_preview_scope_isolation() {
+    use theme::{HostResolution, HostThemeInputs, ModeInput, ThemeInput};
+    theme::set_dark_mode(false);
+    let a = theme::ThemeScope::capture();
+
+    assert_eq!(a.resolve_host_inputs(), HostResolution::None, "未设置 = 无高优先输入");
+
+    a.set_host_inputs(HostThemeInputs {
+        follow_host: false,
+        host_family: ThemeInput::Value("Ignored".into()),
+        ..Default::default()
+    });
+    assert_eq!(
+        a.resolve_host_inputs(),
+        HostResolution::None,
+        "未声明 follow 的 App 不吃宿主 family"
+    );
+
+    a.set_host_inputs(HostThemeInputs {
+        follow_host: true,
+        host_family: ThemeInput::Value("Followed".into()),
+        host_mode: ModeInput::Dark,
+        ..Default::default()
+    });
+    assert_eq!(
+        a.resolve_host_inputs(),
+        HostResolution::Candidate {
+            family: Some("Followed".into()),
+            mode: Some(ModeInput::Dark)
+        }
+    );
+
+    a.set_host_inputs(HostThemeInputs {
+        app_override: ThemeInput::Value("Override".into()),
+        follow_host: true,
+        host_family: ThemeInput::Value("Followed".into()),
+        ..Default::default()
+    });
+    assert_eq!(
+        a.resolve_host_inputs(),
+        HostResolution::Candidate {
+            family: Some("Override".into()),
+            mode: None
+        },
+        "App override 优先于宿主 follow"
+    );
+
+    a.set_host_inputs(HostThemeInputs {
+        app_override: ThemeInput::Invalid("bad source".into()),
+        follow_host: true,
+        host_family: ThemeInput::Value("Followed".into()),
+        ..Default::default()
+    });
+    match a.resolve_host_inputs() {
+        HostResolution::Blocked(msg) => assert!(msg.contains("bad source"), "{msg}"),
+        other => panic!("非法高优先来源必须 Blocked（不回落），得到 {other:?}"),
+    }
+
+    // preview 子 scope：独立身份、继承父选择、发布隔离。
+    let b = theme::ThemeScope::preview_child(&a);
+    assert_ne!(a.id(), b.id(), "preview 必须有独立身份");
+    assert_eq!(b.family_name(), a.family_name(), "preview 继承父选择");
+    let mut ma = BTreeMap::new();
+    ma.insert("Plan031Preview".to_string(), tree("Plan031Preview", "#010101"));
+    b.register_trees(ma);
+    {
+        let _guard = theme::install_theme_scope(b.clone());
+        let looked = theme::lookup_theme_tree("Plan031Preview").unwrap();
+        assert!(theme::set_theme_tree(looked));
+        assert_eq!(theme::theme_name(), "Plan031Preview");
+    }
+    assert_eq!(a.family_name(), "scaffold", "子发布不回流父");
+    assert_eq!(a.revision(), 0, "父 revision 不变");
+    assert_eq!(b.revision(), 1, "preview 自己 +1");
+}

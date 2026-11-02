@@ -161,6 +161,9 @@ pub struct StreamCache<M: Clone + std::fmt::Debug> {
     /// 不符即全量重建（PLAN-053 T12：fence 静态档随主题翻转，051-候选
     /// 首帧取档/翻转不重建双根因的失效机制）。
     theme_epoch: u32,
+    /// PLAN-031 T-03：构建时 scope 身份（0 = legacy）——同一 epoch 数值在
+    /// 两个 App scope 下不代表同一主题，缓存不得跨 scope 命中。
+    theme_scope: u64,
 }
 
 impl<M: Clone + std::fmt::Debug> Default for StreamCache<M> {
@@ -171,6 +174,7 @@ impl<M: Clone + std::fmt::Debug> Default for StreamCache<M> {
             gens: Vec::new(),
             last_final: None,
             theme_epoch: 0,
+            theme_scope: 0,
         }
     }
 }
@@ -231,7 +235,8 @@ pub fn render_document_streamed_with<M: Clone + std::fmt::Debug + 'static>(
     // 构建期读 theme::dark_mode，翻转/首帧 D-GAP 同步都会经 set_dark_mode
     // 值变化自增代数，缓存 clone 旧块的短路在此被击穿。
     let epoch = crate::ui::style::theme::theme_epoch();
-    let theme_flip = cache.theme_epoch != epoch;
+    let scope = crate::ui::style::theme::theme_scope_identity();
+    let theme_flip = cache.theme_epoch != epoch || cache.theme_scope != scope;
     crate::ui::anchor_slot::set_col_spacing(8.0);
     let n = root.children.len();
     let mut children: Vec<View<M>> = Vec::with_capacity(n);
@@ -276,6 +281,7 @@ pub fn render_document_streamed_with<M: Clone + std::fmt::Debug + 'static>(
     cache.keys = keys;
     cache.gens = gens;
     cache.theme_epoch = epoch;
+    cache.theme_scope = scope;
     View::Column {
         children,
         spacing: 8,
@@ -1149,6 +1155,39 @@ mod tests {
             vec![1, 1],
             "second frame reuses despite ghost wrap"
         );
+    }
+
+    /// PLAN-031 T-03：切换 App scope 但 revision 数值相同（都未发布）也必须
+    /// 重建——内容寻址缓存键并入了 scope 身份，不会跨 App 复用旧样式块。
+    #[test]
+    fn scope_identity_flip_invalidates_stream_cache() {
+        crate::ui::style::theme::set_dark_mode(false);
+        let src = "```js\nconst a = 1\n```\n\npara\n";
+        let mut cache = StreamCache::<()>::default();
+        let scope_a = crate::ui::style::theme::ThemeScope::capture();
+        let scope_b = crate::ui::style::theme::ThemeScope::capture();
+        {
+            let _guard = crate::ui::style::theme::install_theme_scope(scope_a);
+            let _v = render_document_streamed(&mut cache, src, true);
+            assert_eq!(cache.gens, vec![1, 1], "first build rebuilds both blocks");
+        }
+        // 两个 scope 的 revision 都是 0：只有身份不同 → 必须重建。
+        {
+            let _guard = crate::ui::style::theme::install_theme_scope(scope_b.clone());
+            let _v = render_document_streamed(&mut cache, src, true);
+            assert!(
+                cache.gens[0] > 1 && cache.gens[1] > 1,
+                "scope 身份变化必须重建缓存块, gens={:?}",
+                cache.gens
+            );
+        }
+        // 同一 scope 再渲染 → 复用零重建。
+        let gens = cache.gens.clone();
+        {
+            let _guard = crate::ui::style::theme::install_theme_scope(scope_b);
+            let _v = render_document_streamed(&mut cache, src, true);
+            assert_eq!(cache.gens, gens, "同一 scope 复用缓存");
+        }
     }
 
     /// PLAN-053 T12（051-候选修复，转介单①收回自修）：主题代数翻转必须

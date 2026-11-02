@@ -17,7 +17,10 @@ pub use crate::design_tokens::registry;
 // PLAN-031 T-03：App/组件主题作用域。builder 在一帧构建期安装 scope，
 // 旧读取函数沿 guard 读本帧快照；未安装时保 legacy 线程局部路径。
 mod scope;
-pub use scope::{install_theme_scope, InstalledThemeScope, ThemeScope};
+pub use scope::{
+    host_theme_resolution, install_theme_scope, theme_scope_identity, HostResolution,
+    HostThemeInputs, InstalledThemeScope, ModeInput, ThemeInput, ThemeScope,
+};
 use scope::current_scope;
 
 // PLAN-601 T-04/T-03：活动主题槽——命名主题（内置名或 theme{} 合成主题）

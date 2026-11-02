@@ -1560,6 +1560,38 @@ impl DynamicComponent {
             .map(auto_ui_compiler::style::theme::install_theme_scope)
     }
 
+    /// PLAN-031 T-03（§5.2 宿主端口）：设置受控主题输入（App override /
+    /// 声明 follow 后的宿主 family+mode）。无 scope 时先建立一个（capture
+    /// 当前宿主快照）。非法高优先来源由发布层整帧拒绝并保旧。
+    pub fn set_host_theme_inputs(
+        &mut self,
+        inputs: auto_ui_compiler::style::theme::HostThemeInputs,
+    ) {
+        if self.theme_scope.is_none() {
+            self.theme_scope = Some(auto_ui_compiler::style::theme::ThemeScope::capture());
+        }
+        if let Some(scope) = &self.theme_scope {
+            scope.set_host_inputs(inputs);
+        }
+        self.dirty = true;
+    }
+
+    /// 读回当前 scope 的宿主输入（未设置 = None）。
+    pub fn host_theme_inputs(
+        &self,
+    ) -> Option<auto_ui_compiler::style::theme::HostThemeInputs> {
+        self.theme_scope.as_ref().map(|s| s.host_inputs())
+    }
+
+    /// 显式 preview 子 scope：继承本组件当前选择/目录/设计/宿主输入，
+    /// 独立 revision 与身份；预览发布不污染 App 选择（§5.2）。
+    pub fn preview_theme_scope(
+        &self,
+    ) -> Option<std::rc::Rc<auto_ui_compiler::style::theme::ThemeScope>> {
+        let parent = self.theme_scope.as_ref()?;
+        Some(auto_ui_compiler::style::theme::ThemeScope::preview_child(parent))
+    }
+
     /// Plan 559 W7: dispatch a handler into a named sub-widget's handler
     /// context — the acceptance channel's (app, widget) targeting. Uses the
     /// namespaced `call_handler_for` pipeline (same as onclick). Plan 320
