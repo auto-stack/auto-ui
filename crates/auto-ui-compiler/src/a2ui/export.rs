@@ -535,6 +535,7 @@ mod tests {
         };
 
         AuraWidget {
+            design: Vec::new(),
             named_views: Vec::new(),
             actions: None,
             name: "Counter".to_string(),
@@ -615,6 +616,7 @@ mod tests {
         };
 
         let widget = AuraWidget {
+            design: Vec::new(),
             named_views: Vec::new(),
             actions: None,
             timers: Vec::new(),

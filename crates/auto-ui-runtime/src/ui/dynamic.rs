@@ -4174,6 +4174,7 @@ mod tests {
     /// Helper: create a minimal AuraWidget for testing.
     fn make_test_widget(name: &str, state_vars: Vec<AuraStateDef>) -> AuraWidget {
         AuraWidget {
+            design: Vec::new(),
             named_views: Vec::new(),
             actions: None,
             name: name.to_string(),
@@ -4363,6 +4364,7 @@ mod tests {
     #[test]
     fn test_view_with_state_binding() {
         let widget = AuraWidget {
+            design: Vec::new(),
             named_views: Vec::new(),
             actions: None,
             timers: Vec::new(),
@@ -4556,6 +4558,7 @@ mod tests {
     #[test]
     fn test_view_with_button_and_event() {
         let widget = AuraWidget {
+            design: Vec::new(),
             named_views: Vec::new(),
             actions: None,
             timers: Vec::new(),
@@ -4658,6 +4661,7 @@ mod tests {
     #[test]
     fn test_write_state_updates_view() {
         let widget = AuraWidget {
+            design: Vec::new(),
             named_views: Vec::new(),
             actions: None,
             timers: Vec::new(),
@@ -4868,6 +4872,7 @@ mod tests {
 
         // Reload with a different view template
         let new_widget = AuraWidget {
+            design: Vec::new(),
             named_views: Vec::new(),
             actions: None,
             timers: Vec::new(),

@@ -427,6 +427,10 @@ pub struct VueGenerator {
     /// Current widget name
     current_widget: Option<String>,
 
+    /// PLAN-031 F-03：本 widget 的 `design { … }` 条目（theme/mode 等），
+    /// 供生成器把 design 表达式投影为组件内 computed（此前只有保留名约定）。
+    design_entries: Vec<(String, auto_lang_core::ast::Expr)>,
+
     /// PLAN-031 T-03：widget 模板根是否已挂 `ref="__autoThemeRoot"`——
     /// 主题/强调色运行时据此把 CSS vars 写到本 App 容器子树（多 App 同
     /// 文档不共享 document 变量）；无根 `<div>` 的模板保持 document legacy。
@@ -930,6 +934,7 @@ enum StyleBranch {
 mod nav_sidebar;
 mod script;
 mod template_media;
+mod design_theme;
 mod expr;
 mod tags;
 mod style_helpers;
@@ -948,6 +953,7 @@ impl VueGenerator {
             select_markers: std::env::var("AUTOUI_SELECT_MARKERS").as_deref() == Ok("1"),
             source_stem: "app".to_string(),
             current_widget: None,
+            design_entries: Vec::new(),
             theme_root_ref: false,
             imports: Vec::new(),
             state_names: Vec::new(),
@@ -1659,6 +1665,9 @@ impl VueGenerator {
     pub fn generate_sfc(&mut self, widget: &AuraWidget) -> GenResult<String> {
         self.current_widget = Some(widget.name.clone());
         self.reset();
+        // PLAN-031 F-03：design 块随 widget 携带，投影前先落到生成器
+        //（reset 之后设置，避免被清空）。
+        self.design_entries = widget.design.clone();
         // PLAN-037 T5 (D1 rule 3): a prop and a model var of the same name
         // would compile to conflicting defineProps/defineModel entries.
         for prop in &widget.props {
@@ -3706,6 +3715,7 @@ widget Child(blocks: []Block, on_pick: msg, on_stop: msg) {
             })
         };
         let widget = AuraWidget {
+            design: Vec::new(),
             named_views: Vec::new(),
             actions: None,
             name: "Child".to_string(),
@@ -14687,9 +14697,16 @@ widget ThemeFamilyApp {
 }
 "#,
         );
+        // PLAN-031 F-03：声明了 design.theme 的 widget 走 computed 投影，
+        // `__thName` 优先读投影值（theme_name 作兼容别名兜底）。
         assert!(
-            sfc.contains("const __thName = (): string => theme_name.value || getActiveTheme()"),
-            "mount 首帧必须应用声明的默认族（F-1）：\n{}",
+            sfc.contains("const __designTheme = computed((): string =>"),
+            "design.theme 应投影为 computed（F-03）：\n{}",
+            sfc
+        );
+        assert!(
+            sfc.contains("__designTheme.value"),
+            "自动应用点必须优先读 design 投影（F-03）：\n{}",
             sfc
         );
         assert!(

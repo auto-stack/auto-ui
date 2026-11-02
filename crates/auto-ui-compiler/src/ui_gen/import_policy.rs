@@ -43,6 +43,7 @@ mod tests {
     #[test]
     fn plan814_t05_generated_imports_are_canonical_only() {
         let widget = AuraWidget {
+            design: Vec::new(),
             name: "PolicyPin".to_string(),
             state_vars: vec![AuraStateDef {
                 name: "count".to_string(),

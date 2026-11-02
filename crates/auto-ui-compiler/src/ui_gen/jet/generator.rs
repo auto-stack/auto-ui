@@ -2485,6 +2485,7 @@ mod tests {
 
         // Create a simple Counter widget
         let widget = AuraWidget {
+            design: Vec::new(),
             named_views: Vec::new(),
             actions: None,
             name: "Counter".to_string(),
@@ -2534,6 +2535,7 @@ mod tests {
 
         // Create a widget with multiple state variables
         let widget = AuraWidget {
+            design: Vec::new(),
             named_views: Vec::new(),
             actions: None,
             timers: Vec::new(),
@@ -2596,6 +2598,7 @@ mod tests {
 
         // Create a stateless widget
         let widget = AuraWidget {
+            design: Vec::new(),
             named_views: Vec::new(),
             actions: None,
             timers: Vec::new(),
@@ -2731,6 +2734,7 @@ mod tests {
         use crate::aura::{AuraNode, AuraWidget};
 
         let widget = AuraWidget {
+            design: Vec::new(),
             named_views: Vec::new(),
             actions: None,
             timers: Vec::new(),
@@ -2815,6 +2819,7 @@ mod tests {
         use crate::ui_gen::BackendGenerator;
 
         let widget = AuraWidget {
+            design: Vec::new(),
             named_views: Vec::new(),
             actions: None,
             timers: Vec::new(),
@@ -3367,6 +3372,7 @@ mod tests {
         };
 
         let widget = AuraWidget {
+            design: Vec::new(),
             named_views: Vec::new(),
             actions: None,
             timers: Vec::new(),
@@ -3434,6 +3440,7 @@ mod tests {
         };
 
         let widget = AuraWidget {
+            design: Vec::new(),
             named_views: Vec::new(),
             actions: None,
             timers: Vec::new(),
@@ -3494,6 +3501,7 @@ mod tests {
         };
 
         let widget = AuraWidget {
+            design: Vec::new(),
             named_views: Vec::new(),
             actions: None,
             timers: Vec::new(),
@@ -3696,6 +3704,7 @@ widget TestCardVariant {
         };
 
         let widget = AuraWidget {
+            design: Vec::new(),
             named_views: Vec::new(),
             actions: None,
             timers: Vec::new(),
@@ -3787,6 +3796,7 @@ fn test_text_with_flex_style() {
     };
 
     let widget = AuraWidget {
+        design: Vec::new(),
         named_views: Vec::new(),
         actions: None,
         timers: Vec::new(),

@@ -82,6 +82,11 @@ pub struct AuraWidget {
     /// ignore.
     pub named_views: Vec<(String, AuraNode)>,
 
+    /// PLAN-031 F-03：widget 级 `design { … }` 的原始条目（theme/mode 等）。
+    /// 此前只在 VM 侧经线程局部读取，Vue 生成器拿不到；随 widget 携带后，
+    /// 生成器可把 `design.theme`/`design.mode` 投影为组件内的 computed。
+    pub design: Vec<(String, auto_lang_core::ast::Expr)>,
+
     /// Event handlers: mapped by event pattern (e.g., "Msg::Inc")
     pub handlers: std::collections::BTreeMap<String, LogicPayload>,
 
@@ -1240,6 +1245,7 @@ mod tests {
     #[test]
     fn test_aura_widget() {
         let widget = AuraWidget {
+            design: Vec::new(),
             named_views: Vec::new(),
             actions: None,
             name: "Counter".to_string(),
@@ -1346,6 +1352,7 @@ mod tests {
     fn test_widget_logic_and_view_split() {
         // PR-3: 验证 logic()/view_data() 引用视图正确拆分 AuraWidget 的逻辑/视图两部分。
         let widget = AuraWidget {
+            design: Vec::new(),
             named_views: Vec::new(),
             actions: None,
             timers: Vec::new(),

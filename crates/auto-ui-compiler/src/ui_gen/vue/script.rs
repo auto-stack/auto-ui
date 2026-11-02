@@ -134,6 +134,11 @@ impl VueGenerator {
         if self.has_accent_color && !imports.contains(&"onMounted") {
             imports.push("onMounted");
         }
+        // PLAN-031 F-03：design.theme 投影需要 computed（与 ref/watch 同批收集，
+        // 不能等到 script 发射阶段——imports 已先行拼装）。
+        if self.has_design_theme() && !imports.contains(&"computed") {
+            imports.push("computed");
+        }
         // Plan 458: theme flips must re-apply the accent (applyAccent writes
         // the .dark-scoped --primary too, which otherwise falls back to the
         // stylesheet's indigo).
@@ -2213,7 +2218,17 @@ onUnmounted(() => {{ if ({var} !== null) {{ clearInterval({var}); {var} = null }
             // immediate watcher）统一走「声明族优先」——否则 setup 期 watcher
             // 先按 localStorage/scaffold 写一遍 html 级变量，覆盖 stylesheet 里
             // 已按包树生成的 :root/.dark，页面又回到静态表。
-            if self.has_theme_name {
+            // PLAN-031 F-03：widget 级 `design { theme: … }` 投影为 computed，
+            // 自动应用点优先读它（任意已声明字段，§5.2）；theme_name 保留为
+            // 兼容别名，二者皆空才回落持久化选择/scaffold。
+            if let Some(ts) = self.design_theme_ts() {
+                script.push_str(&format!(
+                    "const __designTheme = computed((): string => {ts})\n"
+                ));
+                script.push_str(
+                    "const __thName = (): string => __designTheme.value || (typeof theme_name !== \"undefined\" ? theme_name.value : \"\") || getActiveTheme()\n",
+                );
+            } else if self.has_theme_name {
                 script.push_str(
                     "const __thName = (): string => theme_name.value || getActiveTheme()\n",
                 );

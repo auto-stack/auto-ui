@@ -827,6 +827,18 @@ pub fn extract_widget_from_decl(decl: &WidgetDecl) -> ExtractResult<AuraWidget> 
         named_views.push((vname.as_str().to_string(), node));
     }
 
+    // PLAN-031 F-03：design 块随 widget 携带（theme/mode 等），供 Vue 生成器投影。
+    let design: Vec<(String, auto_lang_core::ast::Expr)> = decl
+        .design
+        .as_ref()
+        .map(|d| {
+            d.entries
+                .iter()
+                .map(|(n, e)| (n.as_str().to_string(), e.clone()))
+                .collect()
+        })
+        .unwrap_or_default();
+
     Ok(AuraWidget {
         name: decl.name.as_str().to_string(),
         state_vars,
@@ -834,6 +846,7 @@ pub fn extract_widget_from_decl(decl: &WidgetDecl) -> ExtractResult<AuraWidget> 
         messages,
         view_tree,
         named_views,
+        design,
         handlers,
         handler_params,
         props,

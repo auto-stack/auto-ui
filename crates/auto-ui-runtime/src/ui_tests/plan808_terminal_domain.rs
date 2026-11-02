@@ -1987,6 +1987,7 @@ mod plan808_vm_bridge_assembly {
     fn minimal_widget() -> auto_ui_compiler::aura::AuraWidget {
         use auto_ui_compiler::aura::{AuraNode, AuraWidget};
         AuraWidget {
+            design: Vec::new(),
             name: "Plan808Bridge".into(),
             named_views: vec![],
             actions: None,

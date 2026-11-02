@@ -68,6 +68,7 @@ fn import_surface_update(update: &super::A2UISurfaceUpdate) -> Result<AuraWidget
 
     Ok(AuraWidget {
         named_views: Vec::new(),
+        design: Vec::new(),
         name: update.surface_id.clone(),
         timers: Vec::new(),
         state_vars,

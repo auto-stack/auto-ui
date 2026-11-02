@@ -1263,6 +1263,7 @@ mod plan045_memo_tests {
     /// 本模块本地 widget 构造（tests::make_test_widget 私有不可达）。
     fn make_memo_widget(name: &str, state_vars: Vec<AuraStateDef>) -> AuraWidget {
         AuraWidget {
+            design: Vec::new(),
             named_views: Vec::new(),
             actions: None,
             name: name.to_string(),
@@ -2061,6 +2062,7 @@ mod plan046_for_memo_tests {
 
     fn keyed_widget() -> AuraWidget {
         AuraWidget {
+            design: Vec::new(),
             named_views: Vec::new(),
             actions: None,
             name: "KeyedApp".to_string(),
@@ -2502,6 +2504,7 @@ mod plan046_memo_block_tests {
 
     fn block_widget() -> AuraWidget {
         AuraWidget {
+            design: Vec::new(),
             named_views: Vec::new(),
             actions: None,
             name: "BlockApp".to_string(),
@@ -2854,6 +2857,7 @@ mod plan047_gate_tests {
 
     fn vf_widget() -> AuraWidget {
         AuraWidget {
+            design: Vec::new(),
             named_views: Vec::new(),
             actions: None,
             name: "VfApp".to_string(),
@@ -3077,6 +3081,7 @@ mod plan047_signal_tests {
 
     fn sig_widget(computed: AuraComputed) -> AuraWidget {
         AuraWidget {
+            design: Vec::new(),
             named_views: Vec::new(),
             actions: None,
             name: "SigApp".to_string(),
@@ -3276,6 +3281,7 @@ mod plan047_convergence_tests {
 
     fn conv_widget() -> AuraWidget {
         AuraWidget {
+            design: Vec::new(),
             named_views: Vec::new(),
             actions: None,
             name: "ConvApp".to_string(),

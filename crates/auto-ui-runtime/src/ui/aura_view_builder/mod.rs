@@ -1617,6 +1617,7 @@ mod tests {
 
     fn make_test_widget(name: &str, state_vars: Vec<AuraStateDef>) -> AuraWidget {
         AuraWidget {
+            design: Vec::new(),
             named_views: Vec::new(),
             actions: None,
             name: name.to_string(),
@@ -8519,6 +8520,7 @@ mod plan571_button_default_variant_tests {
 
     fn make_test_widget(name: &str) -> AuraWidget {
         AuraWidget {
+            design: Vec::new(),
             named_views: Vec::new(),
             actions: None,
             name: name.to_string(),
@@ -8998,6 +9000,7 @@ mod plan080_rowclass_probe_tests {
 
     fn widget() -> AuraWidget {
         AuraWidget {
+            design: Vec::new(),
             named_views: Vec::new(),
             actions: None,
             name: "Probe".to_string(),

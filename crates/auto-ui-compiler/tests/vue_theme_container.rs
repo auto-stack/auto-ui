@@ -102,8 +102,12 @@ widget App {
         sfc.contains("applyTheme(__thName(), v, getSavedAccent(), __autoThemeRoot.value)"),
         "mode-flip watch must re-apply to the container:\n{sfc}"
     );
+    // PLAN-031 F-03：该 widget 声明了 design.theme，自动应用点改读 computed
+    // 投影（`__designTheme`）；未声明 design 的 widget 仍走 `theme_name` 别名
+    // 分支（见下方条件断言）。
     assert!(
-        sfc.contains("const __thName = (): string => theme_name.value || getActiveTheme()"),
+        sfc.contains("__designTheme.value")
+            || sfc.contains("const __thName = (): string => theme_name.value || getActiveTheme()"),
         "declared family must win on automatic application points:\n{sfc}"
     );
     // theme_name watch 同步容器。

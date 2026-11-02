@@ -2495,6 +2495,7 @@ mod tests {
     fn test_dispatch_pattern_generation() {
         // Create a widget with messages and handlers
         let widget = AuraWidget {
+            design: Vec::new(),
             named_views: Vec::new(),
             actions: None,
             name: "Counter".to_string(),
@@ -2568,6 +2569,7 @@ mod tests {
     fn test_generated_file_has_imports() {
         // Create a simple widget without routes (child page - should have @Component only)
         let widget = AuraWidget {
+            design: Vec::new(),
             named_views: Vec::new(),
             actions: None,
             timers: Vec::new(),
@@ -2627,6 +2629,7 @@ mod tests {
     fn test_semantic_header_element() {
         // Test that semantic HTML elements like header are transpiled to Column
         let widget = AuraWidget {
+            design: Vec::new(),
             named_views: Vec::new(),
             actions: None,
             timers: Vec::new(),
@@ -2682,6 +2685,7 @@ mod tests {
         use crate::aura::{AuraRoute, AuraRoutes};
 
         let widget = AuraWidget {
+            design: Vec::new(),
             named_views: Vec::new(),
             actions: None,
             timers: Vec::new(),
@@ -2758,6 +2762,7 @@ mod tests {
     fn test_app_widget_without_routes_is_entry_page() {
         // Test that App widget without routes is a simple entry page (no Navigation)
         let widget = AuraWidget {
+            design: Vec::new(),
             named_views: Vec::new(),
             actions: None,
             timers: Vec::new(),
@@ -2829,6 +2834,7 @@ mod tests {
     fn test_child_page_with_navigation_has_consume() {
         // Test that child pages with navigation links have @Consume and are wrapped in NavDestination
         let widget = AuraWidget {
+            design: Vec::new(),
             named_views: Vec::new(),
             actions: None,
             timers: Vec::new(),
@@ -2904,6 +2910,7 @@ mod tests {
         );
 
         let widget = AuraWidget {
+            design: Vec::new(),
             named_views: Vec::new(),
             actions: None,
             timers: Vec::new(),
@@ -2963,6 +2970,7 @@ mod tests {
         );
 
         let widget = AuraWidget {
+            design: Vec::new(),
             named_views: Vec::new(),
             actions: None,
             timers: Vec::new(),
