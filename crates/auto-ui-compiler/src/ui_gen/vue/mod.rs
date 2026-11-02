@@ -14666,6 +14666,46 @@ widget ThemeApp {
         );
     }
 
+    /// PLAN-031 T-06（F-1）：声明 `design { theme: .theme_name }` 的 App，
+    /// 首帧必须应用**声明的默认族**——mount 取 `theme_name.value` 优先于
+    /// localStorage 的持久化选择；否则官方包（Auto/Solarized）的颜色在 Vue
+    /// 侧永远不上身，只剩静态 scaffold 表。
+    #[test]
+    fn test_widget_mount_applies_declared_design_family() {
+        let sfc = gen_sfc_from_widget_src(
+            r#"
+widget ThemeFamilyApp {
+    model {
+        var theme_name str = "Auto"
+        var dark_mode bool = false
+    }
+    design {
+        theme: .theme_name
+        mode: if .dark_mode { "dark" } else { "light" }
+    }
+    view { col { text "probe" } }
+}
+"#,
+        );
+        assert!(
+            sfc.contains("const __th = theme_name.value || getActiveTheme()"),
+            "mount 首帧必须应用声明的默认族（F-1）：\n{}",
+            sfc
+        );
+        assert!(
+            sfc.contains("watch(theme_name"),
+            "theme_name 热切换 watcher 必须保留：\n{}",
+            sfc
+        );
+        // F-1 续：多 App 同文档时 `.dark` 挂 <html>，作用域根是容器——
+        // dark 面必须直接写到容器根，否则子树停在 light 组（半暗半亮）。
+        assert!(
+            sfc.contains("if (rootEl || root.classList.contains('dark')) writeVars(root, pal!.dark)"),
+            "容器作用域的 dark 面必须写到 rootEl：\n{}",
+            sfc
+        );
+    }
+
     /// PLAN-601 T-06: no accent_color state → zero theme runtime injection
     /// (zero-change rule for apps outside the theme feature cohort).
     #[test]

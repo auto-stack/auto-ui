@@ -5312,7 +5312,10 @@ export default router
                     Ok(c) => c,
                     Err(_) => return "{}".to_string(),
                 };
-                let pairs = tt::css_var_pairs(&composed);
+                // PLAN-031 T-06（F-1）：Tailwind 以 `hsl(var(--x))` 消费，注入值
+                // 必须是 `H S% L%` 三段式；原值（hex）代入会让整条声明
+                // invalid-at-computed-value，落到静态表（官方包等于没生效）。
+                let pairs = tt::css_hsl_var_pairs(&composed);
                 let inner: Vec<String> = pairs
                     .iter()
                     .map(|(k, v)| format!("'{}': '{}'", esc(k), esc(v)))

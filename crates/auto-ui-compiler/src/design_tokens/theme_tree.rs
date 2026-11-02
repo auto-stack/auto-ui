@@ -655,8 +655,29 @@ pub fn css_var_pairs(tree: &Tree) -> Vec<(String, String)> {
     out
 }
 
-fn collect_namespace_colors(tree: &Tree, ns: &str, out: &mut Vec<(String, String)>) {
-    match tree {
+/// PLAN-031 T-06（F-1）：CSS 面投影的 **Tailwind 消费形**。
+///
+/// `css_var_pairs` 输出的是作者原值（多为 `#rrggbb`），而 Vue 脚手架的样式
+/// 以 `hsl(var(--token))` 消费（tailwind config + `@apply`），hex 代入后
+/// 整条声明 invalid-at-computed-value，实际回落静态表——表现为「Vue 侧
+/// 不吃官方包颜色」。本函数把**公共 31 键**的颜色值转成 `H S% L%` 三段式；
+/// 已是 HSL 串/非颜色值原样保留；radius 槽与 app 命名空间色不在此转换
+/// （命名空间色供 `var()` 直用，保持原值）。
+pub fn css_hsl_var_pairs(tree: &Tree) -> Vec<(String, String)> {
+    css_var_pairs(tree)
+        .into_iter()
+        .map(|(k, v)| {
+            if TokenName::from_css_var(&k).is_some() {
+                if let Some(rgb) = parse_color(&v) {
+                    return (k, registry::rgb_to_hsl_str(rgb));
+                }
+            }
+            (k, v)
+        })
+        .collect()
+}
+
+fn collect_namespace_colors(tree: &Tree, ns: &str, out: &mut Vec<(String, String)>) {    match tree {
         Tree::Object(pairs) => {
             for (k, v) in pairs {
                 match v {
@@ -864,8 +885,44 @@ mod tests {
         assert!(css.contains(&("primary".to_string(), "#8b5cf6".to_string())));
     }
 
-    fn parse_expr_help(src: &str) -> Expr {
-        // 借真实 UI 解析器取对象表达式（不手搓树）
+    /// PLAN-031 T-06（F-1）：Tailwind 消费形投影——公共键输出 HSL 三段式，
+    /// 命名空间色/radius 槽保持原值（`var()` 直用面不被改写）。
+    #[test]
+    fn css_hsl_pairs_convert_public_tokens_only() {
+        let tree = obj(vec![(
+            "tokens",
+            obj(vec![
+                (
+                    "colors",
+                    obj(vec![
+                        ("primary", s("#8b5cf6")),
+                        ("background", s("#09090b")),
+                        ("success", s("#22c55e")),
+                    ]),
+                ),
+                ("radius", obj(vec![("control", s("8dp"))])),
+            ]),
+        )]);
+        let pairs = css_hsl_var_pairs(&tree);
+        let get = |k: &str| {
+            pairs
+                .iter()
+                .find(|(name, _)| name == k)
+                .map(|(_, v)| v.clone())
+                .unwrap_or_else(|| panic!("{k} 缺失，实际 {pairs:?}"))
+        };
+        // #8b5cf6 → hsl(258, 90%, 66%)（与 registry::rgb_to_hsl_str 同源）
+        assert_eq!(get("primary"), "258 90% 66%");
+        assert_eq!(get("background"), "240 10% 4%");
+        assert_eq!(get("success"), "142 71% 45%");
+        // radius 槽不参与颜色转换
+        assert_eq!(get("radius-control"), "8px");
+        // 原值面（未转形）仍保留 hex，供 `var()` 直用消费者
+        let raw = css_var_pairs(&tree);
+        assert!(raw.contains(&("primary".to_string(), "#8b5cf6".to_string())));
+    }
+
+    fn parse_expr_help(src: &str) -> Expr {        // 借真实 UI 解析器取对象表达式（不手搓树）
         let ui = crate::ui_ast::parse_ui(&format!("pub theme T = {src}\n"))
             .expect("parse theme source");
         let decl = ui

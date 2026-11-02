@@ -1093,7 +1093,11 @@ function applyTheme(name: string, isDark = document.documentElement.classList.co
     const scope: ParentNode = rootEl ?? document
     if (isDark) {{
       // 容器根自身可能带 .dark（模板 :class 绑定）——querySelectorAll 不含自身。
-      if (root.classList.contains('dark')) writeVars(root, pal!.dark)
+      // PLAN-031 T-06（F-1）：多 App 同文档时 `.dark` 通常挂在 <html>，而作用域
+      // 根是本 App 容器——容器必须直接写 dark 面，否则整棵子树停在 light 组，
+      // 与 scope 的 dark 选择不一致（半暗半亮）。legacy（无容器）时 root 即
+      // documentElement，行为不变。
+      if (rootEl || root.classList.contains('dark')) writeVars(root, pal!.dark)
       scope.querySelectorAll('.dark').forEach(function (el) {{ writeVars(el as HTMLElement, pal!.dark) }})
     }} else {{
       // Any previous full write carries --background — use it as the marker

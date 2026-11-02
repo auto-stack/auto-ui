@@ -2213,14 +2213,25 @@ onUnmounted(() => {{ if ({var} !== null) {{ clearInterval({var}); {var} = null }
             script.push_str("onMounted(() => {\n");
             if self.theme_root_ref {
                 script.push_str("  const __rootEl = __autoThemeRoot.value\n");
+                // PLAN-031 T-06（F-1）：模式归属在 `<html>.dark`（模板 :class 绑定
+                // 未必落在容器根上）。只读容器类会把 dark 误判成 light，导致
+                // 容器整棵子树吃 light 组（半暗半亮）——两处任一为 dark 即 dark。
                 script.push_str(
-                    "  const __isDark = (__rootEl ?? document.documentElement).classList.contains('dark')\n",
+                    "  const __isDark = document.documentElement.classList.contains('dark') || (__rootEl ? __rootEl.classList.contains('dark') : false)\n",
                 );
             }
             // PLAN-601 T-06: restore the active theme on mount (localStorage
             // may carry a user choice or a generator-seeded declared theme).
             // Scaffold default needs no apply — the stylesheet already is it.
-            script.push_str("  const __th = getActiveTheme()\n");
+            // PLAN-031 T-06（F-1）：App 声明了 `design { theme: … }` 家族绑定时，
+            // 首帧必须应用**声明的默认族**（如 Auto），否则 mount 只恢复
+            // localStorage/scaffold，官方包的值永远不上身（Vue 侧表现为
+            // 静态 indigo 表）。theme_name 为空才回落持久化选择。
+            script.push_str(if self.has_theme_name {
+                "  const __th = theme_name.value || getActiveTheme()\n"
+            } else {
+                "  const __th = getActiveTheme()\n"
+            });
             if self.theme_root_ref {
                 script.push_str("  if (__th !== 'scaffold') applyTheme(__th, __isDark, getSavedAccent(), __rootEl)\n");
             } else {

@@ -15,6 +15,8 @@
 //   同样显示回执；FAQ 循环与 SetTheme/SetAccent 宿主传播通道保留。
 // - pac 显式 `theme: "dark"` 与本模型 `dark_mode = true` 的既有显式默认按新
 //   契约保留（不暗改成 Auto/light——那是未显式声明 App 的默认）。
+// - PLAN-031 T-06（F-1）：Vue 侧首帧按本 design 绑定的默认族应用（不再只恢复
+//   localStorage/scaffold），树主题注入值为 Tailwind 需要的 HSL 三段式。
 
 use themes.themes: Auto, Solarized
 
