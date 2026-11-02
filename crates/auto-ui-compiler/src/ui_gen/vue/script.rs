@@ -2342,14 +2342,26 @@ onUnmounted(() => {{ if ({var} !== null) {{ clearInterval({var}); {var} = null }
         // 事务保旧；theme/mode 同帧变更经两个 watch 同一 flush 批次应用，
         // C-07 同步事件原子发布）。
         if self.has_theme_name {
+                let dark_read = if self.has_dark_mode {
+                    let dark_var = self
+                        .dark_mode_var
+                        .clone()
+                        .unwrap_or_else(|| "dark_mode".to_string());
+                    format!("{dark_var}.value")
+                } else if self.theme_root_ref {
+                    "(__autoThemeRoot.value ?? document.documentElement)".to_string()
+                        + ".classList.contains('dark')"
+                } else {
+                    "document.documentElement".to_string() + ".classList.contains('dark')"
+                };
             if self.theme_root_ref {
-                script.push_str(
-                    "// PLAN-007 T-05: theme_name binds the active theme family (tree themes join THEME_PALETTES via __AUTO_TREE_THEMES__).\nwatch(theme_name, (n) => {\n  if (n) applyTheme(n, (__autoThemeRoot.value ?? document.documentElement).classList.contains('dark'), getSavedAccent(), __autoThemeRoot.value)\n})\n",
-                );
+                script.push_str(&format!(
+                    "// PLAN-007 T-05: theme_name binds the active theme family (tree themes join THEME_PALETTES via __AUTO_TREE_THEMES__).\nwatch(theme_name, (n) => {{\n  if (n) applyTheme(n, {dark_read}, getSavedAccent(), __autoThemeRoot.value)\n}})\n",
+                ));
             } else {
-                script.push_str(
-                    "// PLAN-007 T-05: theme_name binds the active theme family (tree themes join THEME_PALETTES via __AUTO_TREE_THEMES__).\nwatch(theme_name, (n) => {\n  if (n) applyTheme(n, document.documentElement.classList.contains('dark'))\n})\n",
-                );
+                script.push_str(&format!(
+                    "// PLAN-007 T-05: theme_name binds the active theme family (tree themes join THEME_PALETTES via __AUTO_TREE_THEMES__).\nwatch(theme_name, (n) => {{\n  if (n) applyTheme(n, {dark_read})\n}})\n",
+                ));
             }
         }
         Ok(script)
