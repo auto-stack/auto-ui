@@ -1,129 +1,195 @@
+# PLAN-033 T-04: 009-article-feed VM leg (theme migration acceptance).
+# Original business preserved: ReadArticle1/2/3 print feedback ("Reading
+# article N"), article/author/date/tag fields, emoji thumb placeholders
+# (original content assets — no remote images). Theme family/mode round-trip
+# via fixture channel.
 import os
-import sys
-import time
 import socket
 import subprocess
-import json
-import urllib.request
+import sys
+import time
+import shutil
 
-def pick_free_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(('127.0.0.1', 0))
-        return s.getsockname()[1]
 
-class AutoUiMcpClient:
-    def __init__(self, port: int):
-        self.url = f"http://127.0.0.1:{port}/mcp"
-        self._req_id = 1
+def pick_free_port():
+    for _ in range(64):
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            s.bind(('127.0.0.1', 0))
+            return s.getsockname()[1]
+        except OSError:
+            continue
+        finally:
+            s.close()
+    raise RuntimeError('no bindable port found')
 
-    def call(self, tool_name: str, args: dict = None) -> dict:
+
+class Mcp:
+    def __init__(self, port):
+        import json
+        import urllib.request
+        self.url = f'http://127.0.0.1:{port}/mcp'
+        self.req_id = 1
+        self.json = json
+        self.urllib = urllib.request
+
+    def call(self, tool, args=None):
         req = {
-            "jsonrpc": "2.0",
-            "id": self._req_id,
-            "method": "tools/call",
-            "params": {"name": tool_name, "arguments": args or {}}
+            'jsonrpc': '2.0', 'id': self.req_id, 'method': 'tools/call',
+            'params': {'name': tool, 'arguments': args or {}},
         }
-        self._req_id += 1
-        data = json.dumps(req).encode('utf-8')
-        http_req = urllib.request.Request(
-            self.url,
-            data=data,
-            headers={'Content-Type': 'application/json'}
-        )
-        with urllib.request.urlopen(http_req, timeout=10) as response:
-            res = json.loads(response.read().decode('utf-8'))
-            if "error" in res:
-                raise RuntimeError(f"MCP Tool '{tool_name}' error: {res['error']}")
-            return res.get("result", {})
+        self.req_id += 1
+        data = self.json.dumps(req).encode('utf-8')
+        http = self.urllib.Request(self.url, data=data,
+                                   headers={'Content-Type': 'application/json'})
+        with self.urllib.urlopen(http, timeout=10) as r:
+            res = self.json.loads(r.read().decode('utf-8'))
+            if 'error' in res:
+                raise RuntimeError(f"MCP {tool} error: {res['error']}")
+            return res.get('result', {})
 
-    def snapshot(self, mode: str = "rendered") -> str:
-        res = self.call("autoui_snapshot", {"mode": mode})
-        return res.get("content", [{}])[0].get("text", "")
+    def text(self, res):
+        return res.get('content', [{}])[0].get('text', '')
 
-    def press(self, element_id: str) -> str:
-        clean_id = element_id.lstrip("#")
-        res = self.call("autoui_action", {"element_id": clean_id, "action": "press"})
-        return res.get("content", [{}])[0].get("text", "")
 
-    def screenshot(self, name: str, baseline: bool = True, save_path: str = None) -> str:
-        args = {"name": name, "baseline": baseline}
-        if save_path:
-            args["save_path"] = save_path
-        res = self.call("autoui_screenshot", args)
-        return res.get("content", [{}])[0].get("text", "")
+def fixture(client, **state):
+    return client.call('autoui_fixture', {'schema_version': 1, 'state': state})
 
-def find_id_by_text(snapshot_str: str, text: str) -> str:
-    for line in snapshot_str.splitlines():
-        if text in line:
-            parts = line.split()
-            for part in parts:
-                if part.startswith("#"):
-                    return part.rstrip(":,{")
+
+def state_field(client, field):
+    txt = client.text(client.call('autoui_state', {}))
+    for line in txt.splitlines():
+        parts = line.strip().split(':', 1)
+        if len(parts) == 2 and parts[0].strip() == field:
+            return parts[1].split('(')[0].strip()
     return None
 
+
+def find_button(snapshot, label):
+    """Last-resort label lookup: the button line containing the label text."""
+    for line in snapshot.splitlines():
+        if 'button #' in line and label in line:
+            for p in line.split():
+                if p.startswith('#'):
+                    return p.rstrip(':,{')
+    return None
+
+
 def main():
-    root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../"))
-    auto_bin = os.path.join(root_dir, "target/debug/auto.exe")
-    app_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../"))
-    
+    root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../../'))
+    auto_bin = os.environ.get('AUTO_BIN') or os.path.join(root_dir, 'target/debug/auto.exe')
+    app_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
+    shot_dir = os.path.join(app_dir, 'tests', 'screenshots')
+    os.makedirs(shot_dir, exist_ok=True)
+
     port = pick_free_port()
-    env = dict(os.environ, AUTOUI_MCP_PORT=str(port))
+    env = dict(os.environ, AUTOUI_MCP_PORT=str(port), AUTOUI_TEST_FIXTURES='1')
+    print(f'[*] Starting VM for 009 on MCP port {port}...')
+    out_path = os.path.join(shot_dir, '009_vm_app_output.log')
+    out_file = open(out_path, 'w', encoding='utf-8')
+    proc = subprocess.Popen([auto_bin, 'run', '-r', 'vm'], cwd=app_dir, env=env,
+                            stdout=out_file, stderr=subprocess.STDOUT)
 
-    print(f"[*] Starting VM mode for 009 on MCP port {port}...")
-    proc = subprocess.Popen([auto_bin, "run", "-r", "vm"], cwd=app_dir, env=env)
-
+    failures = []
     try:
-        client = AutoUiMcpClient(port)
-        ready = False
-        start_time = time.time()
-        while time.time() - start_time < 15:
+        client = Mcp(port)
+        snap = ''
+        deadline = time.time() + 20
+        while time.time() < deadline:
             try:
-                snap = client.snapshot()
-                if snap and "tree:" in snap:
-                    ready = True
+                snap = client.text(client.call('autoui_snapshot', {}))
+                if 'tree:' in snap:
                     break
             except Exception:
                 pass
             time.sleep(0.3)
-
-        if not ready:
-            print("[-] Timeout waiting for AutoUI MCP server.", file=sys.stderr)
-            sys.exit(1)
-
-        print("[+] VM Ready! Capturing Initial Dark screenshot...")
-        client.screenshot("009_vm_dark_initial")
-
-        # Plan 506: in-app title bar / Settings removed (ExampleHeader retired —
-        # title/theme/accent moved to pac.at + os-config, host chrome carries them).
-        failures = []
-        snap = client.snapshot()
-        if "Settings" in snap or "ExampleHeader" in snap:
-            failures.append("in-app header/settings still present in snapshot")
-            print("[-] FAIL: snapshot still contains Settings/ExampleHeader")
         else:
-            print("[+] OK: no in-app Settings header (Plan 506)")
+            print('[-] VM did not become ready', file=sys.stderr)
+            sys.exit(1)
+        print('[+] VM ready')
 
-        # Content sanity: article cards still render (header removal must not
-        # have gutted the page).
-        for marker in ("Blog Posts", "Read more"):
+        # Original article content (three articles, fields, emoji thumbs).
+        for marker in ('Blog Posts', 'Read more', 'Getting Started with shadcn/ui Components',
+                       'Building Accessible Web Applications',
+                       'Modern Design Systems with Tailwind CSS',
+                       'Sarah Chen', 'Marcus Rodriguez', 'Emma Thompson',
+                       'Tutorial', 'Accessibility', 'Design Systems'):
             if marker not in snap:
-                failures.append(f"content marker missing: {marker}")
-                print(f"[-] FAIL: content marker missing: {marker}")
-            else:
-                print(f"[+] OK: content marker present: {marker}")
+                failures.append(f'content marker missing: {marker}')
+        for banned in ('Settings', 'ExampleHeader', 'Route', 'Fetch'):
+            if banned in snap:
+                failures.append(f'new business surface present: {banned}')
+        print('[+] content markers + no-new-business checked')
+
+        # ReadArticle1/2/3 original print feedback (three "Read more" buttons
+        # in document order -> articles 1/2/3).
+        read_ids = []
+        for line in snap.splitlines():
+            if 'button #' in line and '"Read more →"' in line:
+                for p in line.split():
+                    if p.startswith('#'):
+                        read_ids.append(p.rstrip(':,{'))
+        if len(read_ids) != 3:
+            failures.append(f'expected 3 Read more buttons, found {len(read_ids)}')
+        else:
+            expects = ['Reading article 1', 'Reading article 2', 'Reading article 3']
+            for i, (bid, expect) in enumerate(zip(read_ids, expects), 1):
+                res = client.text(client.call('autoui_action',
+                                              {'element_id': bid.lstrip('#'), 'action': 'press'}))
+                time.sleep(0.6)
+                printed = False
+                try:
+                    with open(out_path, encoding='utf-8', errors='replace') as f:
+                        printed = expect in f.read()
+                except OSError:
+                    pass
+                if 'ok' in res and printed:
+                    print(f'[+] ReadArticle{i} print feedback captured: {expect}')
+                else:
+                    failures.append(f'ReadArticle{i} feedback missing '
+                                    f'(press ok={"ok" in res}, printed={printed})')
+
+        # Theme round-trip with content preservation.
+        client.call('autoui_screenshot', {'name': '009_vm_auto_light'})
+        fixture(client, theme_name='Solarized', dark_mode=False)
+        time.sleep(1.0)
+        if state_field(client, 'theme_name') != '"Solarized"':
+            failures.append('family switch not applied')
+        client.call('autoui_screenshot', {'name': '009_vm_solarized_light'})
+        fixture(client, theme_name='Solarized', dark_mode=True)
+        time.sleep(1.0)
+        if state_field(client, 'dark_mode') != 'true':
+            failures.append('mode switch not applied')
+        client.call('autoui_screenshot', {'name': '009_vm_solarized_dark'})
+        fixture(client, theme_name='Auto', dark_mode=False)
+        time.sleep(1.0)
+        if state_field(client, 'theme_name') != '"Auto"' or state_field(client, 'dark_mode') != 'false':
+            failures.append('round trip back to Auto/light not applied')
+        client.call('autoui_screenshot', {'name': '009_vm_auto_light_back'})
+        snap_final = client.text(client.call('autoui_snapshot', {}))
+        for marker in ('Blog Posts', 'Sarah Chen', '📖'):
+            if marker not in snap_final:
+                failures.append(f'content not preserved across round-trip: {marker}')
+        print('[+] family/mode round-trip with content preservation')
+
+        shots = os.path.join(app_dir, 'src/front/tmp')
+        if os.path.isdir(shots):
+            for f in os.listdir(shots):
+                if f.endswith('.png'):
+                    shutil.copy2(os.path.join(shots, f), os.path.join(shot_dir, f))
 
         if failures:
-            print(f"[-] {len(failures)} assertion(s) failed: {failures}", file=sys.stderr)
+            print(f'[-] {len(failures)} assertion(s) failed: {failures}', file=sys.stderr)
             sys.exit(1)
-        print("[+] All VM assertions passed!")
-
+        print('[+] All VM assertions passed!')
     finally:
-        print("[*] Terminating VM process...")
+        out_file.close()
         proc.terminate()
         try:
-            proc.wait(timeout=3)
+            proc.wait(timeout=5)
         except subprocess.TimeoutExpired:
             proc.kill()
 
-if __name__ == "__main__":
+
+if __name__ == '__main__':
     main()
