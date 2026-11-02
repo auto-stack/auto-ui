@@ -40,18 +40,32 @@ pub(crate) fn locate_example_app_at(example: &str) -> Option<PathBuf> {
     // PLAN-007 T-03：examples/ui 单源 owner=auto-ui 本仓（crate 相对候选
     // 基点 = 仓根 ../../）；CWD 相对候选保留，顶层画廊臂仍走 auto-os 解析序。
     let rel = format!("examples/ui/{}/src/front/app.at", example);
-    let lang_examples = |sub: String| {
+    let own_examples = |sub: String| {
         std::env::var("CARGO_MANIFEST_DIR")
             .ok()
             .map(|d| PathBuf::from(d).join("../..").join(sub))
     };
+    // PLAN-007 T-03：examples/ui 单源 owner=auto-ui 本仓（own_examples）；
+    // 顶层画廊（charts-gallery 等，未随 ui 迁移）仍属语言仓——组内兄弟臂
+    // （组根/auto-lang，组布局与平铺主检出双形态可解析）。
+    let lang_top = |sub: String| {
+        std::env::var("CARGO_MANIFEST_DIR")
+            .ok()
+            .map(|d| {
+                PathBuf::from(d)
+                    .join("../../..")
+                    .join("auto-lang")
+                    .join(sub)
+            })
+    };
     let candidates = [
-        lang_examples(rel.clone()),
+        own_examples(rel.clone()),
         Some(PathBuf::from(&rel)),
         Some(PathBuf::from(format!("../../{}", rel))),
         // Plan 409 §8: top-level examples (widgets-gallery) live directly under
         // examples/, not examples/ui/.
-        lang_examples(format!("examples/{}/src/front/app.at", example)),
+        own_examples(format!("examples/{}/src/front/app.at", example)),
+        lang_top(format!("examples/{}/src/front/app.at", example)),
         Some(PathBuf::from(format!(
             "examples/{}/src/front/app.at",
             example

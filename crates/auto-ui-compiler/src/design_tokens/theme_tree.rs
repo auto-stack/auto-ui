@@ -542,8 +542,14 @@ pub fn collect_theme_trees(
                          module: Option<&str>,
                          known: &mut BTreeMap<String, Tree>|
      -> Result<(), ThemeError> {
-        let ui = crate::ui_ast::parse_ui(source)
-            .map_err(|e| ThemeError::at("", format!("解析主题模块失败：{e}")))?;
+        // 解析失败 = 该模块不是（合法的）主题数据模块——静默跳过，交给
+        // 生产解析链报告其自身诊断（plan806 变异体等负控依赖此序：主题
+        // 收集不得抢先吞掉/改写生产错误）。仅「解析成功但主题声明非法」
+        // 才是收集错误（C-11 只对真实主题数据生效）。
+        let ui = match crate::ui_ast::parse_ui(source) {
+            Ok(ui) => ui,
+            Err(_) => return Ok(()),
+        };
         for stmt in ui.domain_stmts() {
             let auto_ui_dialect::UiStmt::ThemeDataDecl(decl) = stmt else {
                 continue;
