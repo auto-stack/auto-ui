@@ -255,6 +255,11 @@ pub mod widget_registry;
 // iced renderer lowering）都在其内。
 pub mod native_widget;
 
+// PLAN-029 T-02：doc-surface 实验文档表面 leaf（wry WebView2 子表面挂进
+// 真实原生 VM 窗口的组件分配区域）。feature 门控，缺省不编译。
+#[cfg(all(windows, feature = "doc-surface"))]
+pub mod doc_surface;
+
 pub mod state_migration;
 
 pub use auto_ui_compiler::i18n_lookup;

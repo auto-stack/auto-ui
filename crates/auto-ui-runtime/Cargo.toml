@@ -78,6 +78,9 @@ autodown = ["dep:autodown-core"]
 native-dock = []
 native-clipboard = []
 native-dnd = ["dep:windows-core"]
+# PLAN-029 T-02：doc-surface 实验文档表面（真实 VM 窗口内 wry WebView2 子
+# 表面；probe-only，SD-02 记边界；非 windows 目标不开）。
+doc-surface = ["dep:wry"]
 
 [dependencies]
 auto-web = { version = "=0.1.0", path = "../../../auto-web/crates/auto-web" }
@@ -192,6 +195,11 @@ windows = { version = "0.58", features = [
     "implement",
 ] }
 windows-core = { version = "0.58", optional = true }
+
+# PLAN-029 T-02：doc-surface 实验文档表面——真实原生 VM 窗口内的 wry
+# WebView2 子表面（026 native_host 同缝 build_as_child）。实验能力：cargo
+# feature `doc-surface` 门控，缺省构建不含 wry；仅 windows 目标。
+wry = { version = "=0.57.0", optional = true }
 
 # PLAN-900 T-05：mpv 三集成测试随 auto-lang 迁入——必须保持集成目标形态
 #（lib --test 目标触发 rustc ICE，PLAN-617 T-16债务 P617-D1 原注释随迁）；

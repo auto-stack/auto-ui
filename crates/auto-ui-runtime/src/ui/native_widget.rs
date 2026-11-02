@@ -201,6 +201,12 @@ fn register_builtin_entries() -> NativeWidgetRegistry {
             )
         });
     }
+    #[cfg(all(windows, feature = "doc-surface"))]
+    {
+        // PLAN-029 T-02：doc-surface 实验文档表面（Element 通道派发——
+        // iced renderer 的 Custom 臂 cfg 同门消费；probe-only，SD-02 边界）。
+        reg.register_element("doc-surface");
+    }
     #[cfg(test)]
     for name in TEST_EXTRA_ELEMENTS
         .get_or_init(|| std::sync::Mutex::new(Vec::new()))
