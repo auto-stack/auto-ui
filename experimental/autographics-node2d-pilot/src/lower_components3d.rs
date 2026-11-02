@@ -121,17 +121,21 @@ pub(crate) fn build_def_3d(
     name: &str,
     is_root: bool,
 ) -> Result<(DefIR, View3dIR), LowerError> {
-    build_def_3d_with(project, name, is_root, false)
+    build_def_3d_with(project, name, is_root, false, false)
 }
 
 /// PLAN-028：`builtin_transform` 只在 components-3d-events 档为真（内置
 /// mob3d/player3d 叶允许静态 scale/yaw/pitch = 模板身份）；其余档保持
 /// 024 冻结拒绝面，旧字节不变。
+/// PLAN-030：`refs` 只在 components-3d-bindings 档为真（Slot/Template/
+/// Pair/Actor/msg 名义引用参数；无 view-3d 的纯逻辑 Node）。其余档保持
+/// 旧拒绝面，旧字节不变。
 pub(crate) fn build_def_3d_with(
     project: &Project,
     name: &str,
     is_root: bool,
     builtin_transform: bool,
+    refs: bool,
 ) -> Result<(DefIR, View3dIR), LowerError> {
     let module = project.node_modules.get(name).cloned().ok_or_else(|| {
         at(
@@ -147,14 +151,20 @@ pub(crate) fn build_def_3d_with(
 
     let mut params = Vec::new();
     for (pname, ty) in &decl.params {
-        let pt = ptype_of_3d(ty).ok_or_else(|| {
-            at(
-                &module,
-                line,
-                pname,
-                "param has unsupported type (components-3d: int/float/Model3D)",
-            )
-        })?;
+        // PLAN-030：refs 档接受名义引用参数（ABI 载体 int；名义类别由
+        // 装配按 decl 类型核，数值载体不进 PType 以免旧档类型面扩大）。
+        let pt = match ptype_of_3d(ty) {
+            Some(pt) => pt,
+            None if refs && crate::node3d_binding_refs::ref_kind_of(ty).is_some() => PType::Int,
+            None => {
+                return Err(at(
+                    &module,
+                    line,
+                    pname,
+                    "param has unsupported type (components-3d: int/float/Model3D)",
+                ))
+            }
+        };
         params.push((pname.clone(), pt));
     }
     if is_root && !params.is_empty() {
@@ -278,6 +288,15 @@ pub(crate) fn build_def_3d_with(
         // PLAN-027：携带 character3d/camera3d 的定义可无 view-3d（如仅
         // 相机配置的运行 root）；其余定义保持旧具名拒绝。
         None if decl.character3d.is_some() || decl.camera3d.is_some() => {
+            empty_view = auto_ui_dialect::node2d::View3dBlock {
+                elements: Vec::new(),
+                span: decl.span,
+            };
+            &empty_view
+        }
+        // PLAN-030：bindings 档纯逻辑 Node 可无 view-3d（局部状态/msg/on
+        // 组件不要求可见 leaf；§5.3）。
+        None if refs => {
             empty_view = auto_ui_dialect::node2d::View3dBlock {
                 elements: Vec::new(),
                 span: decl.span,
@@ -783,13 +802,14 @@ fn expr_binds_field(e: &Expr, vctx: &ViewCtx3) -> bool {
 // ------------------------------------------------------------- world build --
 
 pub(crate) fn build_world_3d(project: &Project) -> Result<World3d, LowerError> {
-    build_world_3d_with(project, false)
+    build_world_3d_with(project, false, false)
 }
 
 /// PLAN-028：`builtin_transform` 只在 components-3d-events 档为真。
 pub(crate) fn build_world_3d_with(
     project: &Project,
     builtin_transform: bool,
+    refs: bool,
 ) -> Result<World3d, LowerError> {
     let root_name = project.root.clone();
     let root_module = project
@@ -797,7 +817,8 @@ pub(crate) fn build_world_3d_with(
         .get(&root_name)
         .cloned()
         .ok_or_else(|| at("", 0, &root_name, "root node module missing"))?;
-    let (root_def, root_view) = build_def_3d_with(project, &root_name, true, builtin_transform)?;
+    let (root_def, root_view) =
+        build_def_3d_with(project, &root_name, true, builtin_transform, refs)?;
 
     let mut world = WorldIR {
         root: root_name.clone(),
@@ -858,6 +879,7 @@ pub(crate) fn build_world_3d_with(
         stack: &mut Vec<(String, String)>,
         depth: usize,
         builtin_transform: bool,
+        refs: bool,
     ) -> Result<(), LowerError> {
         if depth > 16 {
             return Err(at(
@@ -899,7 +921,8 @@ pub(crate) fn build_world_3d_with(
             ));
         }
         if !w.defs.contains_key(node_name) {
-            let (def, view) = build_def_3d_with(project, node_name, false, builtin_transform)?;
+            let (def, view) =
+                build_def_3d_with(project, node_name, false, builtin_transform, refs)?;
             views.insert(node_name.to_string(), view);
             w.defs.insert(node_name.to_string(), def);
         }
@@ -927,13 +950,187 @@ pub(crate) fn build_world_3d_with(
             })?;
             let module_src = &project.modules[&def_module].source;
             let pline = prop_line(module_src, pr);
+            // PLAN-030：本参数的名义引用类别（refs 档才有；旧档 None）。
+            let refk = if refs {
+                decl.params
+                    .iter()
+                    .find(|(n, _)| n.as_str() == pname.as_str())
+                    .and_then(|(_, ty)| crate::node3d_binding_refs::ref_kind_of(ty))
+            } else {
+                None
+            };
+            let parent_def: Option<String> = parent
+                .and_then(|p| w.instances.get(p))
+                .map(|i| i.def.clone());
             let val = match &pr.value {
+                // —— PLAN-030：名义引用参数绑定面 ——
+                // Slot/Pair/Template：根池/模板裸标识符，或同名同类别父参
+                // 转传。Actor：refs.<实例路径>，或同类别父参转传。
+                // msg：`.根事件`（零预绑实参），或父 msg 参数转传。
+                // 值以 Res 文本承载（名字/路径/`.事件`），数值 ABI 由装配
+                // 下降期解析；运行期身份不变（Run 池/行表冻结）。
+                _ if refs && refk.is_some() => {
+                    let rk = refk.expect("checked");
+                    use crate::node3d_binding_refs::RefKind;
+                    let forward =
+                        |m: &str| -> Result<ParamVal, crate::translate::LowerError> {
+                            let pd = parent_def.clone().ok_or_else(|| {
+                                at(
+                                    &def_module,
+                                    pline,
+                                    pname,
+                                    &format!(
+                                        "instance '{path}' param '{pname}' forwards '.{m}' but the definition is instanced at the root (no parent params)"
+                                    ),
+                                )
+                            })?;
+                            let pdecl = node_of(project, &pd);
+                            let pk = pdecl
+                                .params
+                                .iter()
+                                .find(|(n, _)| n.as_str() == m)
+                                .and_then(|(_, ty)| crate::node3d_binding_refs::ref_kind_of(ty));
+                            if pk != Some(rk) {
+                                return Err(at(
+                                    &def_module,
+                                    pline,
+                                    pname,
+                                    &format!(
+                                        "instance '{path}' param '{pname}' forwards '.{m}' with kind mismatch (want {})",
+                                        rk.spell()
+                                    ),
+                                ));
+                            }
+                            parent_params
+                                .iter()
+                                .find(|(n, _)| n.as_str() == m)
+                                .map(|(_, v)| v.clone())
+                                .ok_or_else(|| {
+                                    at(
+                                        &def_module,
+                                        pline,
+                                        pname,
+                                        &format!(
+                                            "instance '{path}' param '{pname}' references unknown parent member '.{m}'"
+                                        ),
+                                    )
+                                })
+                        };
+                    match (&pr.value, rk) {
+                        // 根池/模板点根符号（Slot: objects3d.<槽>；
+                        // Template: templates.<模板>；Pair: triggers.<pair>；
+                        // 类别错配的根由装配期池查表具名拒绝）。
+                        (PropValue::One(Expr::Dot(outer, n)), RefKind::Slot)
+                            if matches!(&**outer, Expr::Ident(b) if b == "objects3d") =>
+                        {
+                            ParamVal::Res(format!("objects3d.{n}"))
+                        }
+                        (PropValue::One(Expr::Dot(outer, n)), RefKind::Template)
+                            if matches!(&**outer, Expr::Ident(b) if b == "templates") =>
+                        {
+                            ParamVal::Res(format!("templates.{n}"))
+                        }
+                        (PropValue::One(Expr::Dot(outer, n)), RefKind::Pair)
+                            if matches!(&**outer, Expr::Ident(b) if b == "triggers") =>
+                        {
+                            ParamVal::Res(format!("triggers.{n}"))
+                        }
+                        // 类别错配的点根（如 slot: triggers.x / pair:
+                        // objects3d.y）——具名拒绝，不靠池查表假证。
+                        (PropValue::One(Expr::Dot(outer, _)), RefKind::Slot)
+                        | (PropValue::One(Expr::Dot(outer, _)), RefKind::Template)
+                        | (PropValue::One(Expr::Dot(outer, _)), RefKind::Pair)
+                            if matches!(&**outer, Expr::Ident(b)
+                                if b == "objects3d" || b == "triggers" || b == "templates") =>
+                        {
+                            return Err(at(
+                                &def_module,
+                                pline,
+                                pname,
+                                &format!(
+                                    "instance '{path}' param '{pname}' binds a {} port with the wrong symbol root (SlotRef3D takes objects3d.<name>, TemplateRef3D takes templates.<name>, PairRef3D takes triggers.<name>)",
+                                    rk.spell()
+                                ),
+                            ))
+                        }
+                        // 父 msg 参数转传（裸名形态；`.Ev` 是绑定形态）。
+                        (PropValue::One(Expr::Ident(n)), RefKind::MsgEvent) => {
+                            forward(n.as_str())?
+                        }
+                        (PropValue::One(Expr::Ident(n)), RefKind::Actor) => {
+                            return Err(at(
+                                &def_module,
+                                pline,
+                                pname,
+                                &format!(
+                                    "instance '{path}' param '{pname}' binds bare '{n}'; ActorRef3D takes refs.<instance path>"
+                                ),
+                            ));
+                        }
+                        // `.x`：msg 档 = `.根事件` 绑定；数值类别 = 父参转传。
+                        (PropValue::One(Expr::Dot(outer, m)), _)
+                            if matches!(&**outer, Expr::Ident(b) if b == "self") =>
+                        {
+                            match rk {
+                                RefKind::MsgEvent => ParamVal::Res(format!(".{m}")),
+                                _ => forward(m.as_str())?,
+                            }
+                        }
+                        // refs.<实例路径>（一段或两段；实例路径 = 声明先序
+                        // 实例名链）。
+                        (PropValue::One(Expr::Dot(outer, inst)), RefKind::Actor)
+                            if matches!(&**outer, Expr::Ident(b) if b == "refs") =>
+                        {
+                            ParamVal::Res(format!("refs.{inst}"))
+                        }
+                        (PropValue::One(Expr::Dot(outer, leaf)), RefKind::Actor)
+                            if matches!(&**outer, Expr::Dot(o2, _)
+                                if matches!(&**o2, Expr::Ident(b) if b == "refs")) =>
+                        {
+                            if let Expr::Dot(_, mid) = &**outer {
+                                ParamVal::Res(format!("refs.{mid}.{leaf}"))
+                            } else {
+                                unreachable!("matched above")
+                            }
+                        }
+                        // `.Ev()` 空括号形态 = `.Ev`；带实参 v1 具名拒绝。
+                        (PropValue::One(Expr::Call(c)), RefKind::MsgEvent) => {
+                            let is_self_ev = matches!(&*c.name, Expr::Dot(i, _)
+                                if matches!(&**i, Expr::Ident(b) if b == "self"));
+                            if !is_self_ev || !c.args.args.is_empty() {
+                                return Err(at(
+                                    &def_module,
+                                    pline,
+                                    pname,
+                                    &format!(
+                                        "instance '{path}' param '{pname}': msg port binding must be `.RootEvent` (zero pre-bound args in components-3d-bindings v1)"
+                                    ),
+                                ));
+                            }
+                            match &*c.name {
+                                Expr::Dot(_, ev) => ParamVal::Res(format!(".{ev}")),
+                                _ => unreachable!("checked above"),
+                            }
+                        }
+                        _ => {
+                            return Err(at(
+                                &def_module,
+                                pline,
+                                pname,
+                                &format!(
+                                    "instance '{path}' param '{pname}' must bind a {} symbol in the allowed form (pool/template bare symbol, refs.<instance path>, or .RootEvent)",
+                                    rk.spell()
+                                ),
+                            ))
+                        }
+                    }
+                }
                 PropValue::One(Expr::Dot(outer, m))
                     if matches!(&**outer, Expr::Ident(b) if b == "self") =>
                 {
                     parent_params
                         .iter()
-                        .find(|(n, _)| n == m.as_str())
+                        .find(|(n, _)| n.as_str() == m)
                         .map(|(_, v)| v.clone())
                         .ok_or_else(|| {
                             at(
@@ -1070,19 +1267,29 @@ pub(crate) fn build_world_3d_with(
             }
         }
         stack.push((node_name.to_string(), path.to_string()));
-        let decl_view = decl.view3d.as_ref().ok_or_else(|| {
-            at(
-                &def_module,
-                w.defs[node_name].line,
-                node_name,
-                "component definition has no view-3d",
-            )
-        })?;
+        // PLAN-030：refs 档纯逻辑 Node 可无 view-3d（空子树展开）；旧档
+        // 保持具名拒绝。
+        let no_view_elements: Vec<View3dElement>;
+        let decl_view_elements: &[View3dElement] = match decl.view3d.as_ref() {
+            Some(v) => &v.elements,
+            None if refs => {
+                no_view_elements = Vec::new();
+                &no_view_elements
+            }
+            None => {
+                return Err(at(
+                    &def_module,
+                    w.defs[node_name].line,
+                    node_name,
+                    "component definition has no view-3d",
+                ))
+            }
+        };
         expand_children_3d(
             project,
             w,
             views,
-            &decl_view.elements,
+            decl_view_elements,
             node_name,
             path,
             Some(index),
@@ -1090,6 +1297,7 @@ pub(crate) fn build_world_3d_with(
             stack,
             depth + 1,
             builtin_transform,
+            refs,
         )?;
         stack.pop();
         Ok(())
@@ -1107,6 +1315,7 @@ pub(crate) fn build_world_3d_with(
         stack: &mut Vec<(String, String)>,
         depth: usize,
         builtin_transform: bool,
+        refs: bool,
     ) -> Result<(), LowerError> {
         for el in elements {
             match el {
@@ -1137,6 +1346,7 @@ pub(crate) fn build_world_3d_with(
                         stack,
                         depth,
                         builtin_transform,
+                        refs,
                     )?;
                 }
                 View3dElement::Group { name, children, .. } => {
@@ -1157,6 +1367,7 @@ pub(crate) fn build_world_3d_with(
                         stack,
                         depth,
                         builtin_transform,
+                        refs,
                     )?;
                 }
                 _ => {}
@@ -1198,6 +1409,7 @@ pub(crate) fn build_world_3d_with(
         &mut stack,
         0,
         builtin_transform,
+        refs,
     )?;
 
     Ok(World3d { world, views })
@@ -1750,6 +1962,7 @@ pub(crate) fn gen_user_source_3d(
     scene: &SceneBuild3,
     runtime: Option<&RuntimeCfg3>,
     events: Option<&crate::lower_components3d_events::EventsCfg3>,
+    bindings: Option<&crate::lower_components3d_bindings::BindingsCfg3>,
     gen_note: &str,
     regen_note: &str,
 ) -> Result<String, LowerError> {
@@ -1844,6 +2057,12 @@ pub(crate) fn gen_user_source_3d(
             ));
         }
         for (pname, pt) in def_runtime_params_3d(project, def) {
+            // PLAN-030：引用参数列值 = 解析后的原数值 ABI（池/模板身份）。
+            let refk = node_of(project, &def.name)
+                .params
+                .iter()
+                .find(|(n, _)| n.as_str() == pname.as_str())
+                .and_then(|(_, ty)| crate::node3d_binding_refs::ref_kind_of(ty));
             let mut vals = Vec::new();
             for &k in &idxs {
                 let inst = &world.instances[k];
@@ -1859,6 +2078,41 @@ pub(crate) fn gen_user_source_3d(
                             "runtime param binding missing",
                         )
                     })?;
+                if let (
+                    crate::lower_components::ParamVal::Res(raw),
+                    Some(rk),
+                ) = (val, refk)
+                {
+                    use crate::node3d_binding_refs::RefKind;
+                    // 点根剥离（装配期已核存在性；此处按同表取数值身份）。
+                    let (rk_s, name): (&str, &str) = match rk {
+                        RefKind::Slot => ("objects3d.", raw.strip_prefix("objects3d.").unwrap_or(raw)),
+                        RefKind::Template => ("templates.", raw.strip_prefix("templates.").unwrap_or(raw)),
+                        RefKind::Pair => ("triggers.", raw.strip_prefix("triggers.").unwrap_or(raw)),
+                        _ => unreachable!("norun kinds filtered from SoA selection"),
+                    };
+                    let table = match rk {
+                        RefKind::Slot => events.map(|ev| &ev.slot_ids),
+                        RefKind::Template => events.map(|ev| &ev.template_ids),
+                        RefKind::Pair => events.map(|ev| &ev.pair_ids),
+                        _ => unreachable!("norun kinds filtered from SoA selection"),
+                    };
+                    let id = table
+                        .and_then(|t| t.get(name))
+                        .ok_or_else(|| {
+                            at(
+                                &def.module,
+                                inst.line,
+                                &pname,
+                                &format!(
+                                    "ref param '{pname}' binds unknown {} symbol '{name}'",
+                                    rk_s.trim_end_matches('.')
+                                ),
+                            )
+                        })?;
+                    vals.push(id.to_string());
+                    continue;
+                }
                 vals.push(val.text(pt == PType::Int));
             }
             src.push_str(&format!(
@@ -2091,6 +2345,16 @@ pub(crate) fn gen_user_source_3d(
     });
     // PLAN-027：runtime 环境盖章（None = 024 档不触碰，字节不变）。
     stamp_runtime_env(&mut rctx, &world.root, runtime, events);
+    // PLAN-030：引用参数环境盖章（None = 旧档不触碰，字节不变）。
+    apply_bindings_ctx(
+        &mut rctx,
+        &world.root,
+        &root_def.module,
+        project,
+        plan,
+        bindings,
+        "",
+    );
     src.push_str("fn main_lifestart() {\n");
     if let Some(h) = life_handler(root_decl, "Start") {
         translate_handler(&h.body.stmts, &rctx, &mut src, 1)?;
@@ -2120,6 +2384,7 @@ pub(crate) fn gen_user_source_3d(
             root_primary.as_deref(),
             runtime,
             events,
+            bindings,
             &mut src,
         )?;
     }
@@ -2149,6 +2414,8 @@ pub(crate) fn gen_user_source_3d(
             self_row: inst_primary.clone(),
         });
         stamp_runtime_env(&mut ictx, &dname, runtime, events);
+        // PLAN-030：引用参数环境盖章 + msg 参数投递覆盖（None = 旧档不变）。
+        apply_bindings_ctx(&mut ictx, &dname, &def.module, project, plan, bindings, "i");
         if def.life_tick {
             src.push_str(&format!("fn {prefix}_lifetick(i int, dt float) {{\n"));
             if let Some(h) = life_handler(decl, "Tick") {
@@ -2182,6 +2449,7 @@ pub(crate) fn gen_user_source_3d(
                 inst_primary.as_deref(),
                 runtime,
                 events,
+                bindings,
                 &mut src,
             )?;
         }
@@ -2285,9 +2553,28 @@ fn def_runtime_params_3d(project: &Project, def: &DefIR) -> Vec<(String, PType)>
             walk_stmts(&h.body.stmts, def.line, &mut out, false, false);
         }
     }
+    // PLAN-030：Actor/msg 引用参数无运行列（下降期内联解析/投递文本）；
+    // Slot/Template/Pair 参数保留 int SoA 列（handler `.参数` 读面）。
+    // 旧档定义不可能携带引用类型参数（ptypes 拒绝），过滤恒空集。
+    let ref_norun: BTreeSet<String> = decl
+        .params
+        .iter()
+        .filter(|(_, ty)| {
+            matches!(
+                crate::node3d_binding_refs::ref_kind_of(ty),
+                Some(crate::node3d_binding_refs::RefKind::Actor)
+                    | Some(crate::node3d_binding_refs::RefKind::MsgEvent)
+            )
+        })
+        .map(|(n, _)| n.clone())
+        .collect();
     def.params
         .iter()
-        .filter(|(n, pt)| !matches!(pt, PType::Model) && out.members.contains(n.as_str()))
+        .filter(|(n, pt)| {
+            !matches!(pt, PType::Model)
+                && out.members.contains(n.as_str())
+                && !ref_norun.contains(n.as_str())
+        })
         .cloned()
         .collect()
 }
@@ -2476,6 +2763,59 @@ fn elem_props_3d(project: &Project, def: &DefIR, elem: &str) -> Result<Vec<Prop>
 
 /// 成员接收 fn（020 同型 + space3 环境 + PLAN-027 runtime 环境）。
 #[allow(clippy::too_many_arguments)]
+/// PLAN-030：引用参数环境盖章 + msg 参数投递覆盖（life/recv ctx 共用；
+/// None = 旧档不触碰，字节不变）。
+pub(crate) fn apply_bindings_ctx<'a>(
+    ctx: &mut crate::translate::Ctx<'a>,
+    dname: &str,
+    def_module: &str,
+    project: &Project,
+    plan: &'a Plan,
+    bindings: Option<&'a crate::lower_components3d_bindings::BindingsCfg3>,
+    index: &'static str,
+) {
+    crate::lower_components3d_bindings::stamp_bindings_env(ctx, dname, project, bindings);
+    let Some(b) = bindings else { return };
+    let Some(pmap) = b.refs.get(dname) else { return };
+    let mtext: BTreeMap<String, String> = pmap
+        .iter()
+        .filter_map(|(p, rb)| match rb {
+            crate::lower_components3d_bindings::RefBinding::MsgEvent { call } => {
+                Some((p.clone(), format!("{call}()")))
+            }
+            _ => None,
+        })
+        .collect();
+    if mtext.is_empty() {
+        return;
+    }
+    // `emit .<msg参数>` → 绑定根事件 recv fn 直呼（017 血统）；其余祖先
+    // 投递沿原表（字节一致）。
+    let edef = dname.to_string();
+    let errmod = def_module.to_string();
+    let anc = &plan.anc;
+    ctx.emit_hook = Box::new(move |ev: &str| -> Result<String, LowerError> {
+        if let Some(t) = mtext.get(ev) {
+            return Ok(t.clone());
+        }
+        match anc.get(&(edef.clone(), ev.to_string())) {
+            Some(d) => {
+                if d.to_root {
+                    Ok(format!("{}()", d.fn_name))
+                } else {
+                    Ok(format!("{}({}[{}])", d.fn_name, d.table, index))
+                }
+            }
+            None => Err(at(
+                &errmod,
+                0,
+                ev,
+                &format!("emit .{ev} has no lowering-time receiver"),
+            )),
+        }
+    });
+}
+
 fn gen_recv_fn_3d(
     project: &Project,
     world: &WorldIR,
@@ -2487,6 +2827,7 @@ fn gen_recv_fn_3d(
     self_row: Option<&str>,
     runtime: Option<&RuntimeCfg3>,
     events: Option<&crate::lower_components3d_events::EventsCfg3>,
+    bindings: Option<&crate::lower_components3d_bindings::BindingsCfg3>,
     src: &mut String,
 ) -> Result<(), LowerError> {
     let def = if recv_def_name.is_empty() {
@@ -2535,6 +2876,15 @@ fn gen_recv_fn_3d(
         if recv_def_name.is_empty() { &world.root } else { recv_def_name },
         runtime,
         events,
+    );
+    apply_bindings_ctx(
+        &mut ctx,
+        if recv_def_name.is_empty() { &world.root } else { recv_def_name },
+        &def.module,
+        project,
+        plan,
+        bindings,
+        if index.is_empty() { "" } else { "j" },
     );
     translate_handler(&h.body.stmts, &ctx, src, 1)?;
     src.push_str("}\n");
@@ -2647,7 +2997,8 @@ pub(crate) fn roles_json_3d(scene: &SceneBuild3) -> String {
 pub fn lower_project_components3d(project: &Project) -> Result<LowerOutputBasic2D, LowerError> {
     lower_project_components3d_cfg(project, Cfg3 {
         runtime: None,
-            events: None,
+        events: None,
+        bindings: None,
         doc_prefix: "plan024-components-3d",
         gen_note: "PLAN-024 components-3d",
         regen_note: "tools/verify_plan024.py",
@@ -2661,6 +3012,9 @@ pub(crate) struct Cfg3<'c> {
     pub runtime: Option<&'c RuntimeCfg3>,
     /// PLAN-028：components-3d-events 配置（None = 旧档，字节不变）。
     pub events: Option<&'c crate::lower_components3d_events::EventsCfg3>,
+    /// PLAN-030：components-3d-bindings 引用参数配置（None = 旧档，字节
+    /// 不变；Some = 池常量/actor 主题/msg 投递/引用 SoA 列随档发行）。
+    pub bindings: Option<&'c crate::lower_components3d_bindings::BindingsCfg3>,
     /// scene.agscene document_id 前缀。
     pub doc_prefix: &'static str,
     /// 生成头注释身份段。
@@ -2676,7 +3030,17 @@ pub(crate) fn lower_project_components3d_cfg(
     project: &Project,
     cfg: Cfg3<'_>,
 ) -> Result<LowerOutputBasic2D, LowerError> {
-    let w3 = build_world_3d(project)?;
+    lower_project_components3d_cfg_with(project, cfg, false)
+}
+
+/// PLAN-030：refs 变体（bindings 档世界构建接受名义引用参数；旧档 false
+/// 字节不变）。
+pub(crate) fn lower_project_components3d_cfg_with(
+    project: &Project,
+    cfg: Cfg3<'_>,
+    refs: bool,
+) -> Result<LowerOutputBasic2D, LowerError> {
+    let w3 = build_world_3d_with(project, false, refs)?;
     let plan = crate::lower_components::plan_dispatch_events(
         project,
         &w3.world,
@@ -2684,6 +3048,7 @@ pub(crate) fn lower_project_components3d_cfg(
         false,
         false,
         cfg.events.is_some(),
+        cfg.bindings.is_some(),
     )?;
     // PLAN-028：events 档模板行随 cfg 进共享管线（旧档空切片，字节不变）。
     let no_templates: Vec<TemplateRowIn> = Vec::new();
@@ -2692,7 +3057,7 @@ pub(crate) fn lower_project_components3d_cfg(
         None => &no_templates,
     };
     let scene = collect_scene_3d_with(project, &w3, templates)?;
-    let user_source = gen_user_source_3d(project, &w3, &plan, &scene, cfg.runtime, cfg.events, cfg.gen_note, cfg.regen_note)?;
+    let user_source = gen_user_source_3d(project, &w3, &plan, &scene, cfg.runtime, cfg.events, cfg.bindings, cfg.gen_note, cfg.regen_note)?;
     let sha = crate::scene::sha256_hex(user_source.as_bytes());
     let bytes = user_source.len();
     let has_behavior =

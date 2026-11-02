@@ -14,7 +14,9 @@ pub mod lower;
 pub mod lower_basic2d;
 pub mod lower_components;
 pub mod lower_components3d;
+pub mod lower_components3d_bindings;
 pub mod lower_components3d_events;
+pub mod node3d_binding_refs;
 pub mod lower_components3d_runtime;
 pub mod lower_components_game;
 pub mod lower_g11;
@@ -59,6 +61,10 @@ pub enum Profile {
     /// 模板/objects3d 槽池/triggers pair 池/spawn/bind/event.*/object.*
     /// 调用端口；triggers3d/1 装配；沿 024 共享管线 + 注入位）。
     Components3DEvents,
+    /// PLAN-030 三维具名引用与跨组件接线：components-3d-bindings（028 全部
+    /// 面 + Slot/Template/Pair/Actor/msg 只读名义参数、纯逻辑 Node、根显式
+    /// 调度；triggers3d/1 装配；028 档字节不变）。
+    Components3DBindings,
 }
 
 pub use load::{load_project, Project, ProjectError};
@@ -68,6 +74,7 @@ pub use lower_components::{
     lower_project_components, lower_project_queries, lower_project_sprites,
 };
 pub use lower_components3d::lower_project_components3d;
+pub use lower_components3d_bindings::lower_project_components3d_bindings;
 pub use lower_components3d_events::lower_project_components3d_events;
 pub use lower_components3d_runtime::lower_project_components3d_runtime;
 pub use lower_components_game::{lower_project_components_game, LowerOutputGame};

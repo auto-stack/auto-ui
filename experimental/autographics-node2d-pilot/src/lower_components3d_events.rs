@@ -49,7 +49,7 @@ pub(crate) struct EventsCfg3 {
 pub fn lower_project_components3d_events(
     project: &Project,
 ) -> Result<LowerOutputBasic2D, LowerError> {
-    let w3 = build_world_3d_with(project, true)?;
+    let w3 = build_world_3d_with(project, true, false)?;
     let world = &w3.world;
     let root_name = world.root.clone();
     let root_decl = node_of(project, &root_name);
@@ -184,7 +184,7 @@ pub fn lower_project_components3d_events(
                     ),
                 ));
             }
-            let (def, view) = build_def_3d_with(project, name, false, true)?;
+            let (def, view) = build_def_3d_with(project, name, false, true, false)?;
             if !view.groups.is_empty() || view.elems.len() != 1 {
                 return Err(at(
                     &def.module,
@@ -326,6 +326,7 @@ pub fn lower_project_components3d_events(
         Cfg3 {
             runtime: Some(&runtime),
             events: Some(&events),
+            bindings: None,
             doc_prefix: "plan028-components-3d-events",
             gen_note: "PLAN-028 components-3d-events",
             regen_note: "tools/verify_plan028.py",

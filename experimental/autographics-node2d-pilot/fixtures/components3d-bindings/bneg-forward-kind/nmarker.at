@@ -1,0 +1,20 @@
+// A Marker variant whose tag forwarding target is a SlotRef3D param (the
+// parent forwards a PairRef3D — kind mismatch).
+node NMarker(x: float, tag: int, s: SlotRef3D) {
+    model {
+        var pings = 0
+    }
+    msg { Ping(int) }
+    view-3d {
+        cylinder3d marker {
+            position: (.x, 1.6, 0.0)
+            scale: (0.2, 0.2, 0.2)
+        }
+    }
+    on {
+        .Ping(n) -> {
+            .pings = .pings + 1
+            emit .Pinged(.tag)
+        }
+    }
+}

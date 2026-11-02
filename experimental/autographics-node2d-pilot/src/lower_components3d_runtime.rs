@@ -93,6 +93,7 @@ pub fn lower_project_components3d_runtime(
     lower_project_components3d_cfg(
         project,
         Cfg3 {
+            bindings: None,
             runtime: Some(&runtime),
             events: None,
             doc_prefix: "plan027-components-3d-runtime",

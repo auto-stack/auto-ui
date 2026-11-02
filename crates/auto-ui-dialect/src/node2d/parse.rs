@@ -121,6 +121,14 @@ pub fn parse_node_decl(cx: &mut dyn DomainParseContext) -> AutoResult<NodeDecl> 
     for trigger_shape in ["aabb", "sphere"] {
         cx.bind_var(trigger_shape, Type::Int);
     }
+    // PLAN-030：components-3d-bindings 名义引用根符号（点根形态：
+    // `objects3d.<槽>`、`triggers.<pair>`、`templates.<模板定义>`、
+    // `refs.<实例路径>`；数值/行身份由 bindings 档降层按名字解析）。与
+    // aabb/sphere 同机制：解析作用域内的名义符号；旧档夹具不引用这些
+    // 名字（旧值面全为字面量/resources./字符串字面量），字节不变。
+    for binding_root in ["objects3d", "triggers", "templates", "refs"] {
+        cx.bind_var(binding_root, Type::Int);
+    }
 
     cx.expect(TokenKind::LBrace)?;
     let mut model = None;
@@ -935,7 +943,19 @@ fn parse_handler(cx: &mut dyn DomainParseContext) -> AutoResult<Handler> {
         }
         .into());
     }
+    // PLAN-030：handler 参数进解析作用域（此前 `Life.Tick(dt)` 的 dt 仅在
+    // 二元链内经裸 Ident 豁免路径通过；裸实参形态（如 `hero.Move(dt)`）
+    // 撞 E0201）。旧夹具不依赖参数未定义行为，作用域收紧不改变旧字节。
+    let handler_params = match &pattern {
+        EventPattern::Life { params, .. } => params.clone(),
+        EventPattern::Member { params, .. } => params.clone(),
+    };
+    cx.enter_scope();
+    for p in &handler_params {
+        cx.bind_var(p, Type::Unknown);
+    }
     let body = cx.parse_body()?;
+    cx.exit_scope();
     Ok(Handler {
         pattern,
         body,

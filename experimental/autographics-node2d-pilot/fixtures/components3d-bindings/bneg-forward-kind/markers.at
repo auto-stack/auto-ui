@@ -1,0 +1,22 @@
+// Two same-definition receiver instances under each Pod parent carry
+// isolated ping counters (020 receiver isolation on the bindings profile);
+// the ping climbs the ancestor chain to the nearest `.Pinged` receiver (the
+// parent Pod), which relays it to the root tally.
+node Marker(x: float, tag: int) {
+    model {
+        var pings = 0
+    }
+    msg { Ping(int) }
+    view-3d {
+        cylinder3d marker {
+            position: (.x, 1.6, 0.0)
+            scale: (0.2, 0.2, 0.2)
+        }
+    }
+    on {
+        .Ping(n) -> {
+            .pings = .pings + 1
+            emit .Pinged(.tag)
+        }
+    }
+}

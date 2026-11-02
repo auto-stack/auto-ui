@@ -1,0 +1,31 @@
+// The Pod parent carrying a PairRef3D param forwarded into a child that
+// declares the forwarded param as SlotRef3D — the kind mismatch must be
+// rejected by the forwarding scope gate (never silently re-typed).
+node Pod(px: float, tag: int, pk: PairRef3D) {
+    model {
+        var relayed = 0
+    }
+    msg { Sweep(int)
+          Pinged(int) }
+    on {
+        .Sweep(which) -> {
+            if which == 1 { m1.Ping(0) }
+            if which == 2 { m2.Ping(0) }
+        }
+        .Pinged(tag_in) -> {
+            .relayed = .relayed + 1
+            emit .Pinged(tag_in)
+        }
+    }
+    view-3d {
+        NMarker m1 {
+            x: .px
+            tag: .tag
+            s: .pk
+        }
+        Marker m2 {
+            x: .px
+            tag: .tag
+        }
+    }
+}

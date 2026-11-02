@@ -564,6 +564,7 @@ fn base_ctx<'a>(
                         char3: None,
                         cam3: false,
             events3d: None,
+            bindings3d: None,
     }
 }
 

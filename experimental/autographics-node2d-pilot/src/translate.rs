@@ -94,6 +94,26 @@ pub struct Ctx<'a> {
     /// None 保持旧档行为（spawn/bind/event.*/object.* 保持 unsupported，
     /// 旧字节不变）。
     pub events3d: Option<EventsEnv>,
+    /// PLAN-030（components-3d-bindings）：具名引用参数环境（本定义视角；
+    /// 池/模板常量、actor 主题解析、msg 参数投递文本）。None 保持旧档
+    /// 行为（裸池名常量/`.actor参数.<元素>`/`.msg参数` 投递保持
+    /// unsupported，028 及更旧字节不变）。
+    pub bindings3d: Option<BindingsEnv>,
+}
+
+/// PLAN-030：本定义的具名引用环境（stamp 时已按当前定义过滤）。池/模板/
+/// 主题常量沿 events3d 环境复用；本环境只携带引用参数面。
+pub struct BindingsEnv {
+    /// 本定义引用参数（Slot/Template/Pair）：参数名 → 类别（spawn/bind
+    /// 实参解析与只读合同用；SoA 列由生成侧按解析值发行）。
+    pub ref_params: std::collections::BTreeMap<String, crate::node3d_binding_refs::RefKind>,
+    /// 本定义 Actor 参数：参数名 → (目标定义前缀，目标 def_idx)。
+    /// `.actor参数.<元素>` → `{目标前缀}_{元素}_subject_ids[{目标def_idx}]`；
+    /// 元素合法性沿 events3d.subjects 键集（仅静态 view-3d 叶）。
+    pub actors: std::collections::BTreeMap<String, (String, usize)>,
+    /// 本定义 msg 参数：参数名 → 完整投递调用文本（如 `main_collected()`；
+    /// 下降期已对绑定根事件校验并按 017 血统命名 recv fn）。
+    pub msg_params: std::collections::BTreeMap<String, String>,
 }
 
 /// PLAN-027：角色服务环境（标记面；`refs.<elem>` 元素有效性沿 space3.refs
@@ -413,6 +433,66 @@ fn translate_expr(e: &Expr, ctx: &Ctx, out: &mut String) -> Result<(), LowerErro
             Ok(())
         }
         Expr::Dot(obj, name) => {
+            // PLAN-030（bindings 档，仅 root）：根池/模板点根常量
+            // （`triggers.<pair>`/`objects3d.<槽>`/`templates.<模板>` →
+            // 声明序数值身份；作者不写 slot/pair/scene ID）。未命中为具名
+            // 错误（作用域门）；旧档 bindings3d=None 不进本分支。
+            if ctx.bindings3d.is_some() && matches!(ctx.target, Target::Root) {
+                if let Expr::Ident(base) = &**obj {
+                    if let Some(env) = &ctx.events3d {
+                        let hit = match base.as_str() {
+                            "triggers" => env.pairs.get(name.as_str()).copied(),
+                            "objects3d" => env.slots.get(name.as_str()).copied(),
+                            "templates" => env.templates.get(name.as_str()).copied(),
+                            _ => None,
+                        };
+                        if let Some(v) = hit {
+                            out.push_str(&v.to_string());
+                            return Ok(());
+                        }
+                        if matches!(
+                            base.as_str(),
+                            "triggers" | "objects3d" | "templates"
+                        ) {
+                            return Err(unsupported(
+                                format!(
+                                    "unknown {base} symbol '{name}' (root pool/template declaration order is the numeric identity)"
+                                ),
+                                e,
+                            ));
+                        }
+                    }
+                }
+            }
+            // PLAN-030：`<actor参数>.<元素>` → 目标实例静态叶行 id 文本
+            // （`{目标前缀}_{元素}_subject_ids[{目标def_idx}]`；常量索引
+            // 局部读，零服务费）。作用域/类别由下降期绑定表具名校验。
+            if let Expr::Dot(inner, p) = &**obj {
+                if matches!(&**inner, Expr::Ident(b) if b == "self") {
+                    if let Some(b) = &ctx.bindings3d {
+                        if let Some((tprefix, tidx)) = b.actors.get(p.as_str()) {
+                            let ok = ctx
+                                .events3d
+                                .as_ref()
+                                .map(|ev| {
+                                    ev.subjects
+                                        .contains_key(&(tprefix.clone(), name.to_string()))
+                                })
+                                .unwrap_or(false);
+                            if !ok {
+                                return Err(unsupported(
+                                    format!(
+                                        "'{p}.{name}' is not a static view-3d leaf of the bound actor (ActorRef3D subjects bind same-Run static leaves)"
+                                    ),
+                                    e,
+                                ));
+                            }
+                            out.push_str(&format!("{tprefix}_{name}_subject_ids[{tidx}]"));
+                            return Ok(());
+                        }
+                    }
+                }
+            }
             // `.field`（self 成员）、枚举路径、refs 服务、emit 标记。
             match &**obj {
                 Expr::Ident(base) => match base.as_str() {
@@ -1875,9 +1955,104 @@ fn translate_events_call(
             }
         }
     }
-    let name_arg = |i: usize, what: &str| -> Result<String, LowerError> {
+    let name_arg = |i: usize, what: &str| -> Result<(String, bool), LowerError> {
         match call.args.args.get(i) {
-            Some(Arg::Pos(Expr::Str(n))) => Ok(n.to_string()),
+            Some(Arg::Pos(Expr::Str(n))) => Ok((n.to_string(), false)),
+            // PLAN-030：root 点根形态（`objects3d.<槽>`/`templates.<模板>`/
+            // `triggers.<pair>`；root 无参数，直取池/模板常量）。
+            Some(Arg::Pos(Expr::Dot(outer, n)))
+                if matches!(&**outer, Expr::Ident(b)
+                    if b == "objects3d" || b == "templates" || b == "triggers") =>
+            {
+                let env_ok = ctx.bindings3d.is_some();
+                if !env_ok {
+                    return Err(unsupported(
+                        format!(
+                            "{label} dotted pool symbols are only available in the components-3d-bindings profile"
+                        ),
+                        e,
+                    ));
+                }
+                let want_root = match what {
+                    "slot" => "objects3d",
+                    "template" => "templates",
+                    "pair" => "triggers",
+                    _ => "",
+                };
+                let base = match &**outer {
+                    Expr::Ident(b) => b.as_str(),
+                    _ => unreachable!("matched above"),
+                };
+                if base != want_root {
+                    return Err(unsupported(
+                        format!(
+                            "{label} {what} port takes a {want_root}.<name> symbol, but got {base}.{n} (kind mismatch)"
+                        ),
+                        e,
+                    ));
+                }
+                let envt = ctx.events3d.as_ref().expect("bindings gates events3d");
+                let hit = match base {
+                    "objects3d" => envt.slots.get(n.as_str()).copied(),
+                    "templates" => envt.templates.get(n.as_str()).copied(),
+                    _ => envt.pairs.get(n.as_str()).copied(),
+                };
+                match hit {
+                    Some(v) => Ok((v.to_string(), true)),
+                    None => Err(unsupported(
+                        format!(
+                            "unknown {base} symbol '{n}' (root pool/template declaration order is the numeric identity)"
+                        ),
+                        e,
+                    )),
+                }
+            }
+            // PLAN-030：`.引用参数` 形态（Slot/Template/Pair 只读参数；
+            // 下降期 SoA 列 carries 该实例的解析值）。类别必须与端口一致
+            // （Slot 与 Pair 不能互传；Template 与运行 Instance 不能互传）。
+            Some(Arg::Pos(Expr::Dot(inner, pname)))
+                if matches!(&**inner, Expr::Ident(b) if b == "self") =>
+            {
+                let env_b = ctx.bindings3d.as_ref().ok_or_else(|| {
+                    unsupported(
+                        format!("{label} ref-param args are only available in the components-3d-bindings profile"),
+                        e,
+                    )
+                })?;
+                let kind = env_b.ref_params.get(pname.as_str()).ok_or_else(|| {
+                    unsupported(
+                        format!(
+                            "{label} {what} ref-arg '.{pname}' is not a declared SlotRef3D/TemplateRef3D/PairRef3D param of this definition"
+                        ),
+                        e,
+                    )
+                })?;
+                let want = match what {
+                    "slot" => crate::node3d_binding_refs::RefKind::Slot,
+                    "template" => crate::node3d_binding_refs::RefKind::Template,
+                    "pair" => crate::node3d_binding_refs::RefKind::Pair,
+                    _ => crate::node3d_binding_refs::RefKind::Slot,
+                };
+                if *kind != want {
+                    return Err(unsupported(
+                        format!(
+                            "{label} {what} port takes a {} symbol, but '.{pname}' is a {} (kind mismatch)",
+                            want.spell(),
+                            kind.spell()
+                        ),
+                        e,
+                    ));
+                }
+                Ok((
+                    match &ctx.target {
+                        Target::Root => format!("r_{pname}"),
+                        Target::Instance { prefix, index } => {
+                            format!("{prefix}_{pname}[{index}]")
+                        }
+                    },
+                    true,
+                ))
+            }
             _ => Err(unsupported(format!("{label} {what} must be a string literal name"), e)),
         }
     };
@@ -1893,19 +2068,29 @@ fn translate_events_call(
                     e,
                 ));
             }
-            let slot = name_arg(0, "slot")?;
-            let tmpl = name_arg(1, "template")?;
-            let slot_id = *env.slots.get(&slot).ok_or_else(|| {
-                unsupported(format!("unknown spawn slot '{slot}' (objects3d pool)"), e)
-            })?;
-            let tmpl_id = *env.templates.get(&tmpl).ok_or_else(|| {
-                unsupported(
-                    format!(
-                        "unknown spawn template '{tmpl}' (no object3d template def of that name)"
-                    ),
-                    e,
-                )
-            })?;
+            let (slot, slot_is_ref) = name_arg(0, "slot")?;
+            let (tmpl, tmpl_is_ref) = name_arg(1, "template")?;
+            let slot_id = if slot_is_ref {
+                slot
+            } else {
+                env.slots.get(&slot).copied().ok_or_else(|| {
+                    unsupported(format!("unknown spawn slot '{slot}' (objects3d pool)"), e)
+                })?
+                .to_string()
+            };
+            let tmpl_id = if tmpl_is_ref {
+                tmpl
+            } else {
+                env.templates.get(&tmpl).copied().ok_or_else(|| {
+                    unsupported(
+                        format!(
+                            "unknown spawn template '{tmpl}' (no object3d template def of that name)"
+                        ),
+                        e,
+                    )
+                })?
+                .to_string()
+            };
             let mut parts = Vec::new();
             for a in &call.args.args[2..5] {
                 match a {
@@ -1935,24 +2120,70 @@ fn translate_events_call(
                     e,
                 ));
             }
-            let pair = name_arg(0, "pair")?;
-            let pair_id = *env.pairs.get(&pair).ok_or_else(|| {
-                unsupported(format!("unknown bind pair '{pair}' (triggers pool)"), e)
-            })?;
+            let (pair, pair_is_ref) = name_arg(0, "pair")?;
+            let pair_id = if pair_is_ref {
+                pair
+            } else {
+                env.pairs.get(&pair).copied().ok_or_else(|| {
+                    unsupported(format!("unknown bind pair '{pair}' (triggers pool)"), e)
+                })?
+                .to_string()
+            };
             let subject = match &call.args.args[1] {
                 Arg::Pos(Expr::Dot(inner, elem)) => {
                     if matches!(&**inner, Expr::Ident(r) if r == "refs") {
                         subject_text(ctx, env, elem, e)?
+                    } else if let Expr::Dot(pinner, p) = &**inner {
+                        // PLAN-030：`<actor参数>.<元素>` —— 跨 Node 静态叶
+                        // 主题（目标实例行 id；类别/作用域下降期具名校验）。
+                        if matches!(&**pinner, Expr::Ident(b) if b == "self") {
+                            let env_b = ctx.bindings3d.as_ref().ok_or_else(|| {
+                                unsupported(
+                                    "bind actor subjects are only available in the components-3d-bindings profile",
+                                    e,
+                                )
+                            })?;
+                            let (tprefix, tidx) = env_b.actors.get(p.as_str()).ok_or_else(|| {
+                                unsupported(
+                                    format!(
+                                        "bind subject '.{p}.{elem}' base is not a declared ActorRef3D param of this definition"
+                                    ),
+                                    e,
+                                )
+                            })?;
+                            let subj_ok = ctx
+                                .events3d
+                                .as_ref()
+                                .map(|ev| {
+                                    ev.subjects
+                                        .contains_key(&(tprefix.clone(), elem.to_string()))
+                                })
+                                .unwrap_or(false);
+                            if !subj_ok {
+                                return Err(unsupported(
+                                    format!(
+                                        "bind subject '.{p}.{elem}' is not a static view-3d leaf of the bound actor"
+                                    ),
+                                    e,
+                                ));
+                            }
+                            format!("{tprefix}_{elem}_subject_ids[{tidx}]")
+                        } else {
+                            return Err(unsupported(
+                                "bind subject must be refs.<elem> or <actor param>.<elem> (a static same-dim leaf)",
+                                e,
+                            ));
+                        }
                     } else {
                         return Err(unsupported(
-                            "bind subject must be refs.<elem> (a static same-dim leaf)",
+                            "bind subject must be refs.<elem> or <actor param>.<elem> (a static same-dim leaf)",
                             e,
                         ));
                     }
                 }
                 _ => {
                     return Err(unsupported(
-                        "bind subject must be refs.<elem> (a static same-dim leaf)",
+                        "bind subject must be refs.<elem> or <actor param>.<elem> (a static same-dim leaf)",
                         e,
                     ))
                 }

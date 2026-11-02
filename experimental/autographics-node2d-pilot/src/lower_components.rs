@@ -1804,7 +1804,7 @@ pub(crate) fn plan_dispatch(
     sprites: bool,
     pres: bool,
 ) -> Result<Plan, LowerError> {
-    plan_dispatch_events(project, world, queries, sprites, pres, false)
+    plan_dispatch_events(project, world, queries, sprites, pres, false, false)
 }
 
 /// PLAN-028：`events` = components-3d-events 档（spawn/bind 裸调用是
@@ -1816,6 +1816,7 @@ pub(crate) fn plan_dispatch_events(
     sprites: bool,
     pres: bool,
     events: bool,
+    bindings: bool,
 ) -> Result<Plan, LowerError> {
     let mut plan = Plan::default();
     let root_prefix = world.root.to_lowercase();
@@ -2383,6 +2384,31 @@ pub(crate) fn plan_dispatch_events(
             for (ev, argc, cline) in &out.anc_emits {
                 let key = (edef.clone(), ev.clone());
                 if plan.anc.contains_key(&key) {
+                    continue;
+                }
+                // PLAN-030：`emit .<msg参数>` 经绑定表投递（下降期解析为
+                // 绑定根事件 recv fn 的直呼文本），不走祖先查表；绑定端口
+                // 存在性由 bindings 档装配核（根事件变体+handler+零载荷）。
+                if bindings
+                    && decl
+                        .params
+                        .iter()
+                        .any(|(n, ty)| {
+                            n.as_str() == ev.as_str()
+                                && crate::node3d_binding_refs::ref_kind_of(ty)
+                                    == Some(crate::node3d_binding_refs::RefKind::MsgEvent)
+                        })
+                {
+                    if *argc != 0 {
+                        return Err(at(
+                            &def.module,
+                            *cline,
+                            ev,
+                            &format!(
+                                "emit .{ev} carries {argc} arg(s); a msg param port forwards to its bound root event verbatim (zero-arg form)"
+                            ),
+                        ));
+                    }
                     continue;
                 }
                 if is_root {
@@ -3260,6 +3286,7 @@ pub(crate) fn collect_scene(
                         char3: None,
                         cam3: false,
             events3d: None,
+            bindings3d: None,
                     };
                     let pos = prop_of(props, "position").ok_or_else(|| {
                         at(
@@ -4610,6 +4637,7 @@ pub(crate) fn instance_ctx<'a>(
         char3: None,
         cam3: false,
             events3d: None,
+            bindings3d: None,
     })
 }
 
@@ -4704,6 +4732,7 @@ pub(crate) fn root_ctx<'a>(
         char3: None,
         cam3: false,
             events3d: None,
+            bindings3d: None,
     }
 }
 
@@ -4756,9 +4785,25 @@ fn def_runtime_members(project: &Project, def: &DefIR) -> BTreeSet<String> {
 /// 运行期参数数组（声明序；handler/动态视图引用到的数值参数）。
 fn def_runtime_params(project: &Project, def: &DefIR) -> Vec<(String, PType)> {
     let members = def_runtime_members(project, def);
+    // PLAN-030：Actor/msg 引用参数无运行列（下降期内联解析/投递文本）；
+    // Slot/Template/Pair 参数保留 int SoA 列（handler `.参数` 读面）。
+    // 旧档定义不可能携带引用类型参数（ptypes 拒绝），过滤恒空集。
+    let decl = node_of(project, &def.name);
+    let ref_norun: BTreeSet<String> = decl
+        .params
+        .iter()
+        .filter(|(_, ty)| {
+            matches!(
+                crate::node3d_binding_refs::ref_kind_of(ty),
+                Some(crate::node3d_binding_refs::RefKind::Actor)
+                    | Some(crate::node3d_binding_refs::RefKind::MsgEvent)
+            )
+        })
+        .map(|(n, _)| n.clone())
+        .collect();
     def.params
         .iter()
-        .filter(|(n, pt)| *pt != PType::Res && members.contains(n))
+        .filter(|(n, pt)| *pt != PType::Res && members.contains(n) && !ref_norun.contains(n))
         .cloned()
         .collect()
 }

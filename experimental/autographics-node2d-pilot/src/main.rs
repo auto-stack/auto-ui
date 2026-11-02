@@ -201,6 +201,22 @@ fn components3d_events_consumer(product: &str) -> &'static str {
     }
 }
 
+fn components3d_bindings_consumer(product: &str) -> &'static str {
+    match product {
+        "bg11-main" | "bg11-alt" | "bg11-geometry" | "bg11-oldgen" | "bg11-stale"
+        | "sensor2" => {
+            "experimental/autographics-auto-driver/tests/node3d_bindings_flow.rs"
+        }
+        "bneg-kind-mix" | "bneg-actor-bare" | "bneg-actor-unknown" | "bneg-actor-elem"
+        | "bneg-slot-unknown" | "bneg-pair-unknown" | "bneg-template-unknown"
+        | "bneg-ref-write" | "bneg-msg-payload" | "bneg-forward-kind"
+        | "bneg-pool-nonroot" | "bneg-actor-group" => {
+            "experimental/autographics-node2d-pilot/tests/node3d_bindings_gates.rs (fixture-level; lowering rejection)"
+        }
+        _ => "unrecorded (this out dir has no registered flow consumer)",
+    }
+}
+
 fn components3d_runtime_consumer(product: &str) -> &'static str {
     match product {
         "g07a" | "g07a-fast" | "g07b" | "g08" | "g08-alt" | "static-actors" | "events3d"
@@ -235,6 +251,7 @@ fn main() {
                 Some("components-3d") => Profile::Components3D,
                 Some("components-3d-runtime") => Profile::Components3DRuntime,
                 Some("components-3d-events") => Profile::Components3DEvents,
+                Some("components-3d-bindings") => Profile::Components3DBindings,
                 Some("presentation-2d") => Profile::Presentation2D,
                 _ => usage(),
             }
@@ -922,6 +939,22 @@ fn main() {
                 "autographics-node2d-pilot plan028 components-3d-events",
                 "autographics.triggers3d/1",
                 components3d_events_consumer,
+            );
+        }
+        Profile::Components3DBindings => {
+            let lowered = autographics_node2d_pilot::lower_project_components3d_bindings(&project)
+                .unwrap_or_else(|e| {
+                    eprintln!("node2d-lower: {e}");
+                    std::process::exit(3);
+                });
+            write_components3d_products(
+                &out,
+                &entry,
+                &project,
+                lowered,
+                "autographics-node2d-pilot plan030 components-3d-bindings",
+                "autographics.triggers3d/1",
+                components3d_bindings_consumer,
             );
         }
         Profile::Basic2D(basic) => {

@@ -304,6 +304,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "auto-generation-core"
+version = "0.1.0"
+dependencies = [
+ "auto-lang-core",
+ "auto-project-model",
+ "auto-val",
+ "regex",
+ "semver",
+ "serde_json",
+ "sha2",
+ "toml",
+]
+
+[[package]]
 name = "auto-lang-core"
 version = "0.1.0"
 dependencies = [
@@ -418,6 +432,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "auto-project-model"
+version = "0.1.0"
+dependencies = [
+ "auto-atom",
+ "auto-val",
+]
+
+[[package]]
 name = "auto-terminal-core"
 version = "0.1.0"
 dependencies = [
@@ -447,6 +469,7 @@ name = "auto-ui-compiler"
 version = "0.1.0"
 dependencies = [
  "auto-atom",
+ "auto-generation-core",
  "auto-lang-core",
  "auto-parser-api",
  "auto-ui-dialect",

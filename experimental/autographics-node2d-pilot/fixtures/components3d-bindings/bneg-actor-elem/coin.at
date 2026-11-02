@@ -1,0 +1,27 @@
+// The Coin: one definition, three instances, each with its own named
+// slot/template/pair binding and the shared Player actor reference. The
+// instance handle and one-shot collect state are local model fields; the
+// spawned shard comes from the instance's own TemplateRef3D symbol. No
+// view-3d: a logical state node needs no extra visible leaf. Collection is
+// dispatched by the root (named pair -> .Collect), the coin despawns its own
+// object and reports through the bound on_collected root event.
+node Coin(slot: SlotRef3D, template: TemplateRef3D, pair: PairRef3D, target: ActorRef3D, on_collected: msg, px: float, py: float, pz: float) {
+    model {
+        var h = 0
+        var taken = 0
+    }
+    msg { Collect }
+    on {
+        Life.Start -> {
+            .h = spawn(.slot, .template, .px, .py, .pz)
+            bind(.pair, .target.halo, aabb, 0.0, .h)
+        }
+        .Collect -> {
+            if .taken == 0 {
+                .taken = 1
+                object.despawn(.h)
+                emit .on_collected
+            }
+        }
+    }
+}
