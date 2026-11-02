@@ -1,27 +1,22 @@
 //! PLAN-029 T-02：doc-surface 实验文档表面 leaf（probe-only，PLAN-029 合同 §2）。
 //!
 //! 证明链：真实 AutoUI 原生 VM 窗口内，**组件布局分配的区域**上挂 wry
-//! WebView2 子表面（026 native_host 已证同缝：`build_as_child` + 客户区物理
-//! bounds）。与 026 独立宿主的差异：表面由 .at 页 `doc-surface (url: ...)`
-//! 声明，经 NativeWidgetRegistry Element 通道派发（`View::Custom`），iced
-//! canvas painter 在 draw 期把组件 bounds 同步给子表面——表面处于组件树/
-//! 布局/生命周期内，宿主 chrome（标题/按钮行/页边距）保持可见，不再盖满
-//! 整个客户区。工具链零改动：窗口进程 = auto-ui-tool.exe（发现序第一键
-//! `AUTO_UI_TOOL_BIN`，PLAN-816 T-04），本 crate 以 feature `doc-surface`
-//! 编入该 exe。
+//! WebView2 表面。表面宿主形态（T-04 视觉缺陷修复，用户桌面实测发现）：
+//! iced 窗口自身呈现层会把子 HWND（WRY_WEBVIEW）整体盖住——子表面存在、
+//! 收输入、CDP 可连，但像素永不出现在屏幕上（占位画布 #F6F7F9 直暴露，
+//! 用户截图逐像素证实 RGB(246,247,249)）。表面改挂**归属弹出窗**
+//! （WS_POPUP + owner=iced 窗 + TOOLWINDOW/NOACTIVATE）：真正进桌面 z 序，
+//! DWM 必合成；bounds 仍逐帧同步组件矩形——布局分配语义不变，实现形态
+//! 记入 SD-02。
 //!
-//! 纪律（计划 §5.3/SD-02 边界）：
-//! - 不得把 remote-frame 的 DisplayList 语义偷换成任意 DOM——本 leaf 是
-//!   独立注册名 `doc-surface`，不触碰 remote-frame 任何臂；
-//! - 子表面是 HWND 子层，z 序高于 iced 内容：bounds 严格取组件布局 rect
-//!   （逻辑 × 窗口 DPI → 物理）；url 空/draw 停止（滚出视口/隐藏）时同步
-//!   `set_visible(false)`，不遮邻接 chrome；多窗重叠布局不在本实验承诺内
-//!   （SD-02 记边界）；
-//! - webview 的 COM 初始化须在创建线程（winit 主线程；026 native_host
-//!   `window::run` 同缝实测成立，painter draw 即主线程渲染路径）；
-//! - 宿主窗定位：painter draw 在 winit 主线程——EnumThreadWindows(当前
-//!   线程) 可见顶层窗中，canvas 中心点（按候选窗 DPI 变换）落在其客户区
-//!   的第一窗即宿主（探针 profile 单窗；多窗属 SD-02 边界外）。
+//! 其余纪律同前：
+//! - 不触碰 remote-frame 任何臂（独立注册名 `doc-surface`）；
+//! - 弹出窗 rect 严格取组件布局 rect（逻辑 × 窗口 DPI → 客户区物理 →
+//!   ClientToScreen 屏幕物理）；url 空/滚出客户区时隐藏；
+//! - webview 的 COM 初始化须在创建线程（winit 主线程；026 同缝实测，
+//!   painter draw 即主线程渲染路径）；
+//! - 宿主窗定位：EnumThreadWindows(当前线程) 可见顶层窗中，canvas 中心点
+//!   （按候选窗 DPI 变换）落在其客户区的第一窗即宿主（探针单窗）。
 //!
 //! 诊断开关：`AUTO_DOC_SURFACE_DEBUG=1` 在 stderr 打每次同步（动作/bounds/
 //! hwnd/url 长度），供 T-04/T-05 取证。
@@ -55,6 +50,20 @@ struct POINT {
     y: i32,
 }
 
+#[repr(C)]
+struct WNDCLASSW {
+    style: u32,
+    lpfn_wnd_proc: isize,
+    cb_cls_extra: i32,
+    cb_wnd_extra: i32,
+    h_instance: isize,
+    h_icon: isize,
+    h_cursor: isize,
+    h_br_background: isize,
+    lpsz_menu_name: *const u16,
+    lpsz_class_name: *const u16,
+}
+
 extern "system" {
     fn EnumThreadWindows(dw_thread: u32, callback: isize, lparam: isize) -> i32;
     fn IsWindowVisible(hwnd: isize) -> i32;
@@ -62,6 +71,112 @@ extern "system" {
     fn ClientToScreen(hwnd: isize, pt: *mut POINT) -> i32;
     fn GetDpiForWindow(hwnd: isize) -> u32;
     fn GetCurrentThreadId() -> u32;
+    fn RegisterClassW(wc: *const WNDCLASSW) -> u16;
+    fn CreateWindowExW(
+        ex: u32, class: *const u16, title: *const u16, style: u32,
+        x: i32, y: i32, w: i32, h: i32, parent: isize, menu: isize,
+        inst: isize, param: isize,
+    ) -> isize;
+    fn DefWindowProcW(hwnd: isize, msg: u32, w: usize, l: isize) -> isize;
+    fn GetModuleHandleW(name: *const u16) -> isize;
+    fn GetLastError() -> u32;
+    fn SetWindowPos(
+        hwnd: isize, after: isize, x: i32, y: i32, cx: i32, cy: i32, flags: u32,
+    ) -> i32;
+}
+
+const WS_POPUP: u32 = 0x8000_0000;
+const WS_VISIBLE: u32 = 0x1000_0000;
+const WS_CLIPSIBLINGS: u32 = 0x0400_0000;
+const WS_EX_TOOLWINDOW: u32 = 0x0000_0080;
+const WS_EX_NOACTIVATE: u32 = 0x0800_0000;
+const WHITE_BRUSH: isize = 0;
+/// SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE
+const SWP_Z_ONLY: u32 = 0x0001 | 0x0002 | 0x0010;
+
+unsafe extern "system" fn popup_proc(
+    hwnd: isize, msg: u32, w: usize, l: isize,
+) -> isize {
+    // 最小 proc：弹出窗自身无消息语义，全部交 DefWindowProc。
+    DefWindowProcW(hwnd, msg, w, l)
+}
+
+/// 注册一次弹出窗窗口类，返回类名指针（进程生命周期有效）。
+fn popup_class() -> *const u16 {
+    static CLS: OnceLock<&'static [u16]> = OnceLock::new();
+    let name = CLS.get_or_init(|| {
+        &*Box::leak(
+            "AutoUIDocSurfacePopup\0"
+                .encode_utf16()
+                .collect::<Vec<u16>>()
+                .into_boxed_slice(),
+        )
+    });
+    static REGISTERED: OnceLock<()> = OnceLock::new();
+    REGISTERED.get_or_init(|| unsafe {
+        let hmod = GetModuleHandleW(std::ptr::null());
+        let wc = WNDCLASSW {
+            style: 0,
+            lpfn_wnd_proc: popup_proc as isize,
+            cb_cls_extra: 0,
+            cb_wnd_extra: 0,
+            h_instance: hmod,
+            h_icon: 0,
+            h_cursor: 0,
+            h_br_background: WHITE_BRUSH + 1,
+            lpsz_menu_name: std::ptr::null(),
+            lpsz_class_name: name.as_ptr(),
+        };
+        let atom = RegisterClassW(&wc);
+        if atom == 0 {
+            // 1410 = ERROR_CLASS_ALREADY_EXISTS：重复注册可复用；其余具名。
+            let err = GetLastError();
+            if err != 1410 {
+                eprintln!("[doc-surface] RegisterClassW failed err={err}");
+            }
+        }
+    });
+    name.as_ptr()
+}
+
+thread_local! {
+    /// 弹出窗句柄（主线程创建/复用；单表面探针 profile 一只）。
+    static POPUP: std::cell::Cell<Option<isize>> = const { std::cell::Cell::new(None) };
+    /// 宿主定位排除面：弹出窗与本线程同窗枚举会自命中（bounds 逐帧自收缩
+    /// ——vis5 实测 1696x840 塌缩成 822x246），定位时必须跳过。
+    static POPUP_EXCLUDE: std::cell::Cell<Option<isize>> = const { std::cell::Cell::new(None) };
+}
+
+/// 创建/复用归属弹出窗（owner=宿主 iced 窗，工具窗样式不进任务栏）。
+fn ensure_popup_hwnd(owner: isize, x: i32, y: i32, w: i32, h: i32) -> Option<isize> {
+    POPUP.with(|c| {
+        if let Some(h) = c.get() {
+            return Some(h);
+        }
+        unsafe {
+            let cls = popup_class();
+            let title: Vec<u16> = "AutoUI doc-surface\0".encode_utf16().collect();
+            let hmod = GetModuleHandleW(std::ptr::null());
+            let hwnd = CreateWindowExW(
+                WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
+                cls,
+                title.as_ptr(),
+                WS_POPUP | WS_VISIBLE | WS_CLIPSIBLINGS,
+                x, y, w.max(1), h.max(1),
+                owner, 0, hmod, 0,
+            );
+            if hwnd == 0 {
+                eprintln!(
+                    "[doc-surface] CreateWindowExW failed err={} owner={owner:#x}",
+                    GetLastError()
+                );
+                return None;
+            }
+            c.set(Some(hwnd));
+            POPUP_EXCLUDE.with(|e| e.set(Some(hwnd)));
+            Some(hwnd)
+        }
+    })
 }
 
 fn dpi_scale(hwnd: isize) -> f32 {
@@ -81,6 +196,11 @@ extern "system" fn enum_host_callback(hwnd: isize, _lparam: isize) -> i32 {
         let Some((cx, cy)) = CENTER.with(|c| c.get()) else { return 1 };
         if IsWindowVisible(hwnd) == 0 {
             return 1;
+        }
+        if let Some(p) = POPUP_EXCLUDE.with(|c| c.get()) {
+            if hwnd == p {
+                return 1; // 跳过弹出窗自身
+            }
         }
         let mut client = RECT { left: 0, top: 0, right: 0, bottom: 0 };
         if GetClientRect(hwnd, &mut client) == 0 {
@@ -113,7 +233,7 @@ fn locate_host(bounds: &Rectangle) -> Option<isize> {
     HIT.with(|c| c.get())
 }
 
-/// canvas 逻辑 bounds → 宿主客户区坐标系的物理 rect（子 HWND 定位口径）。
+/// canvas 逻辑 bounds → 宿主客户区坐标系的物理 rect。
 fn canvas_physical_rect(hwnd: isize, bounds: &Rectangle) -> Option<(i32, i32, u32, u32)> {
     unsafe {
         let mut client = RECT { left: 0, top: 0, right: 0, bottom: 0 };
@@ -125,7 +245,6 @@ fn canvas_physical_rect(hwnd: isize, bounds: &Rectangle) -> Option<(i32, i32, u3
         let y = (bounds.y * scale) as i32;
         let w = (bounds.width * scale) as i32;
         let h = (bounds.height * scale) as i32;
-        // 逻辑面可能超出客户区（负坐标/超界）——夹到客户区交集，全出界=None。
         let cl = x.max(0);
         let ct = y.max(0);
         let cr = (x + w).min(client.right - client.left);
@@ -138,12 +257,9 @@ fn canvas_physical_rect(hwnd: isize, bounds: &Rectangle) -> Option<(i32, i32, u3
 }
 
 // ---------------------------------------------------------------------------
-// 表面注册表：key → Surface（url/hwnd/webview/物理 bounds/可见性）。
+// 表面注册表：key → 元数据（webview 本体非 Send，留主线程 thread_local）。
 // ---------------------------------------------------------------------------
 
-/// 表面元数据（Send 静态注册表面）。webview 本体是 COM 对象（非 Send），
-/// 留在创建线程（winit 主线程）的 WEBVIEWS thread_local——sync/release 都
-/// 只从 painter draw（主线程渲染路径）进入，两侧状态严格同线程配对。
 #[derive(Default)]
 struct SurfaceMeta {
     url: String,
@@ -184,7 +300,7 @@ impl HasWindowHandle for RawHwndHost {
     }
 }
 
-/// painter draw 期同步：定位宿主、按需创建/导航/定位/显隐子表面。
+/// painter draw 期同步：定位宿主、屏幕坐标换算、按需创建/导航/移动/显隐。
 pub fn sync_surface(key: &str, url: &str, bounds: &Rectangle) {
     let seq = SYNC_SEQ.fetch_add(1, Ordering::Relaxed);
     let host = locate_host(bounds);
@@ -210,8 +326,8 @@ pub fn sync_surface(key: &str, url: &str, bounds: &Rectangle) {
         }
         return;
     }
-    let hwnd = host.unwrap();
-    let Some(phys) = canvas_physical_rect(hwnd, bounds) else {
+    let host = host.unwrap();
+    let Some(phys) = canvas_physical_rect(host, bounds) else {
         // 完全滚出客户区：隐藏。
         if let Some(s) = map.get_mut(key) {
             if s.visible {
@@ -225,26 +341,65 @@ pub fn sync_surface(key: &str, url: &str, bounds: &Rectangle) {
         }
         return;
     };
+    // 客户区 rect → 屏幕物理 rect（弹出窗坐标系）。
+    let mut origin = POINT { x: 0, y: 0 };
+    unsafe { ClientToScreen(host, &mut origin) };
+    let sx = origin.x + phys.0;
+    let sy = origin.y + phys.1;
+    let sw = phys.2 as i32;
+    let sh = phys.3 as i32;
+    let screen_phys = (sx, sy, sw as u32, sh as u32);
+
+    let Some(popup) = ensure_popup_hwnd(host, sx, sy, sw, sh) else {
+        eprintln!("[doc-surface] popup CreateWindowExW failed");
+        return;
+    };
+    // 弹出窗跟随组件矩形移动/缩放（屏幕坐标）；SWP_Z_ONLY 的 z 跟随在
+    // sync 尾部统一做。
+    static LAST_PHYS: OnceLock<Mutex<HashMap<String, (i32, i32, i32, i32)>>> =
+        OnceLock::new();
+    let last = LAST_PHYS.get_or_init(|| Mutex::new(HashMap::new()));
+    let moved = last
+        .lock()
+        .unwrap()
+        .get(key)
+        .map(|p| *p != (sx, sy, sw, sh))
+        .unwrap_or(true);
+    if moved {
+        unsafe {
+            // SWP_NOZORDER(0x4)|SWP_NOACTIVATE(0x10)
+            SetWindowPos(popup, 0, sx, sy, sw, sh, 0x0004 | 0x0010);
+        }
+        last.lock().unwrap().insert(key.to_string(), (sx, sy, sw, sh));
+    }
 
     if let std::collections::hash_map::Entry::Vacant(e) = map.entry(key.to_string()) {
-        // phys 以 (0,0,0,0) 哨兵插入——首帧 create 后必然走 set_bounds
-        //（wry 缺省 200x200 逻辑 bounds，否则子表面永远停在缺省矩形）。
-        e.insert(SurfaceMeta { url: String::new(), hwnd, phys: (0, 0, 0, 0), visible: false });
+        // phys 哨兵 (0,0,0,0)：首帧 create 后必然走 set_bounds。
+        e.insert(SurfaceMeta {
+            url: String::new(),
+            hwnd: popup,
+            phys: (0, 0, 0, 0),
+            visible: false,
+        });
     }
     let s = map.get_mut(key).unwrap();
     let mut action = "sync";
-    let has_webview =
-        WEBVIEWS.with(|w| w.borrow_mut().contains_key(key));
-    if !has_webview || s.hwnd != hwnd {
-        // 首建或宿主更换（会话子进程单窗；更换=异常重建路径）。
-        let host_handle = RawHwndHost(hwnd);
-        let built = wry::WebViewBuilder::new().with_url(url).build_as_child(&host_handle);
+    let has_webview = WEBVIEWS.with(|w| w.borrow_mut().contains_key(key));
+    if !has_webview || s.hwnd != popup {
+        let popup_handle = RawHwndHost(popup);
+        let built = wry::WebViewBuilder::new().with_url(url).build_as_child(&popup_handle);
         match built {
             Ok(wv) => {
+                // 弹出窗内部坐标：webview 填满弹出窗客户区 (0,0,sw,sh)——
+                // 误用屏幕坐标会把内容推到弹出窗外（用户实测灰/白/小字三层错位）。
+                let _ = wv.set_bounds(wry::Rect {
+                    position: wry::dpi::PhysicalPosition::new(0, 0).into(),
+                    size: wry::dpi::PhysicalSize::new(sw as u32, sh as u32).into(),
+                });
                 WEBVIEWS.with(|w| {
                     w.borrow_mut().insert(key.to_string(), wv);
                 });
-                s.hwnd = hwnd;
+                s.hwnd = popup;
                 action = "create";
             }
             Err(err) => {
@@ -264,12 +419,12 @@ pub fn sync_surface(key: &str, url: &str, bounds: &Rectangle) {
     WEBVIEWS.with(|w| {
         let mut ws = w.borrow_mut();
         if let Some(wv) = ws.get_mut(key) {
-            if s.phys != phys {
+            if s.phys != screen_phys {
                 let _ = wv.set_bounds(wry::Rect {
-                    position: wry::dpi::PhysicalPosition::new(phys.0, phys.1).into(),
-                    size: wry::dpi::PhysicalSize::new(phys.2, phys.3).into(),
+                    position: wry::dpi::PhysicalPosition::new(0, 0).into(),
+                    size: wry::dpi::PhysicalSize::new(sw as u32, sh as u32).into(),
                 });
-                s.phys = phys;
+                s.phys = screen_phys;
                 action = if action == "sync" { "move" } else { action };
             }
             if !s.visible {
@@ -279,14 +434,17 @@ pub fn sync_surface(key: &str, url: &str, bounds: &Rectangle) {
             }
         }
     });
+    // z 序跟随宿主：弹出窗始终贴在 owner 之上（owner 被别的窗盖住时弹出
+    // 窗同样被盖——与普通窗口语义一致，不做 topmost）。
+    unsafe { SetWindowPos(popup, host, 0, 0, 0, 0, SWP_Z_ONLY) };
     if debug_enabled() {
         eprintln!(
-            "[doc-surface #{seq}] {action} key={key} hwnd={:#x} phys={}x{}@{},{} url_len={}",
-            hwnd,
-            phys.2,
-            phys.3,
-            phys.0,
-            phys.1,
+            "[doc-surface #{seq}] {action} key={key} popup={:#x} phys={}x{}@{},{} url_len={}",
+            popup,
+            sw,
+            sh,
+            sx,
+            sy,
             url.len()
         );
     }
@@ -301,7 +459,7 @@ pub fn release_surface(key: &str) {
 }
 
 // ---------------------------------------------------------------------------
-// canvas painter：draw 同步 + 底色占位（挂载后被子表面覆盖）。
+// canvas painter：draw 同步 + 底色占位（挂载后弹出窗覆盖其上）。
 // ---------------------------------------------------------------------------
 
 pub struct DocSurfacePainter<M> {
