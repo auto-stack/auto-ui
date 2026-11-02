@@ -29,3 +29,41 @@ pub fn verify_official_theme_package(
         },
     )
 }
+
+/// 发行快照：校验源包后，只把**清单列出**的文件 + 清单本身复制到独立根
+/// （如消费根 `vendor/themes`），再对快照做一次同标准校验。源包不合法
+/// （错版/缺件/篡改）时整体拒绝且不写快照——发行物不可编辑、不是第二权威源。
+pub fn publish_theme_package_snapshot(
+    src: &std::path::Path,
+    dest: &std::path::Path,
+) -> Result<VerifiedThemePackage, ThemePackageError> {
+    // 先校验源包（失败零写入）。
+    verify_official_theme_package(src)?;
+    let manifest_src = src.join("theme-package.json");
+    let text = std::fs::read_to_string(&manifest_src)
+        .map_err(|_| ThemePackageError::MissingManifest(manifest_src.clone()))?;
+    let v: serde_json::Value = serde_json::from_str(&text)
+        .map_err(|e| ThemePackageError::BadManifest(format!("json: {e}")))?;
+    let files = v
+        .get("files")
+        .and_then(|x| x.as_array())
+        .ok_or_else(|| ThemePackageError::BadManifest("files 必须是非空数组".into()))?;
+
+    std::fs::create_dir_all(dest).map_err(|e| {
+        ThemePackageError::BadManifest(format!("快照目录创建失败 {}: {e}", dest.display()))
+    })?;
+    std::fs::copy(&manifest_src, dest.join("theme-package.json")).map_err(|e| {
+        ThemePackageError::BadManifest(format!("清单复制失败: {e}"))
+    })?;
+    for f in files {
+        let rel = f.get("path").and_then(|x| x.as_str()).unwrap_or("");
+        if rel.is_empty() || rel.contains("..") || rel.starts_with('/') || rel.contains('\\') {
+            return Err(ThemePackageError::PathEscape(rel.to_string()));
+        }
+        std::fs::copy(src.join(rel), dest.join(rel))
+            .map_err(|_| ThemePackageError::MissingFile(rel.to_string()))?;
+    }
+
+    // 快照必须是可独立校验的发行输入（不依赖源根）。
+    verify_official_theme_package(dest)
+}
