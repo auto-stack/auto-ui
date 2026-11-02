@@ -1099,9 +1099,11 @@ function applyTheme(name: string, isDark = document.documentElement.classList.co
       // documentElement，行为不变。
       if (rootEl || root.classList.contains('dark')) writeVars(root, pal!.dark)
       scope.querySelectorAll('.dark').forEach(function (el) {{ writeVars(el as HTMLElement, pal!.dark) }})
-    }} else {{
-      // Any previous full write carries --background — use it as the marker
-      // for stale inline overrides (the root keeps its own value).
+    }} else if (rootEl) {{
+      // PLAN-031 F-03：只有**容器作用域**才清理旧 dark/内联覆盖。rootEl 缺省
+      // 时（setup 期 immediate watcher，root=documentElement）的延迟 pass 绝不
+      // 能扫描/清理后代——实测它把已挂载子组件容器上的 vars 全抹掉（style 变空）。
+      // root 自身保持不动（legacy 行为）。
       scope.querySelectorAll('.dark, [style*="--background"]').forEach(function (el) {{
         if (el !== root) for (const k in pal!.light) (el as HTMLElement).style.removeProperty('--' + k)
       }})
