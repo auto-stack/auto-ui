@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-032
-status: drafting
+status: archived
 feature_name: AutoGraphics完整G2精灵对象音画组合与预算收口
 author: [Codex]
 created_at: 2026-11-02
 updated_at: 2026-11-02
 plan_revision: 2
-current_step: 0
+current_step: 6
 total_steps: 10
 depends_on: [auto-ui/PLAN-020, auto-ui/PLAN-022, auto-ui/PLAN-025]
 supersedes_spec_components: []
@@ -146,16 +146,16 @@ T-02冻结引擎接口文档并折Plan，供AG014独立游戏作者草稿准备�
 
 | T | owner_stage | 依赖 | 写面/可验证结果 | AC | 进度 |
 |---|---|---|---|---|---|
-| T-01 | work | 用户启动；020/022/025已交付 | 核§4/SDK/原G2/owner/写面，唯一树和scope登记 | AC-01/05/06 | [ ] |
-| T-02 | work | T-01 | A/B最多两候选完整先证，冻结公共域/价目/CLI/profile/协议/原G2与峰值、游戏接口文档；不足needs_replan不结案 | AC-01..06 | [ ] |
-| T-03 | work | T-02 go | 公共有限操作/版本/独立准入及API正负测试（选A无需新增则记实证）；旧API字节/价目不变 | AC-03/04/05 | [ ] |
-| T-04 | work | T-03 | generic Node组合降层/资源/receiver/present与gates/真实flow，原G2最小夹具，无正式游戏写面 | AC-01/02/03 | [ ] |
-| T-05 | work | T-04 | verify_plan032与完整G2/所有峰值、预算/协议/资源/音画/生命周期负控 | AC-01..05 | [ ] |
-| T-06 | work | T-05 | source-build/A→B/SaveAs/恢复/20轮、受影响兼容并集，SD候选与真实工具/接口移交 | AC-05/06 | [ ] |
-| T-07 | review | T-06 | 同树独立上下文final/精确revision，finding回work复核，pass后merge门pending | AC-07 | [ ] |
-| T-08 | merge | T-07 pass | 冻结提交/输入/定向门或有据复用，来源核后实际合master | AC-08 | [ ] |
-| T-09 | merge | T-08 | SD-01 canonical/来源核、归档/导航和可锁交付身份，不写派生JSON | AC-08 | [ ] |
-| T-10 | merge | T-09 | fresh guard清树/分支/空组，全输出对账/删scope构建物/登记最终收据 | AC-09 | [ ] |
+| T-01 | work | 用户启动；020/022/025已交付 | 核§4/SDK/原G2/owner/写面，唯一树和scope登记 | AC-01/05/06 | [x] 2026-11-02 base816b8801：§4七项SHA256全部字节相符（022/025 Spec、lower_presentation、4个.at）；sdk/frozen 681/681对source-lock.json零失配；G2矩阵与预算研究原文重读（32池/move26校准/原33拒绝/isolated账）；树D:/autostack/.wt/ui-032/auto-ui分支codex/plan-032-dev无链接；scope=D:/autostack/plan-artifacts/plan-032/auto-ui/SCOPE.md。观测：verify_plan879红为主上既有（879 identity 10-29冻结早于023在11-01改.gitattributes，两checkout字节一致且git-clean）；本计划门为verify_plan032，不改.gitattributes。主checkout WIP=031 owner在途（§4预declared），零接触 |
+| T-02 | work | T-01 | A/B最多两候选完整先证，冻结公共域/价目/CLI/profile/协议/原G2与峰值、游戏接口文档；不足needs_replan不结案 | AC-01..06 | [x] 2026-11-02 选B（A经真实路线证伪）。冻结：profile=autographics.components2d/1（number 116/profile 27/cli components2d，全hud2d栈+组合单元派生装配，旧profile字节不变）；新单元api/public_composition2d_v1.at：ag_events_snapshot()=1 credit物化0..8事件（pair/phase/绑定代/source身份/geometry+run/tick，第二次/混cursor具名58，字段读0 credit），ag_object_despawn_batch(n,h0..h7)=1 credit、0..8域、先全验证后修改、重复/第9项具名59、旧代/错Run沿用33、第33物理写37、空批合法不免费。B世界tests/fixtures/plan032/world-g2-components2d.at（sha dbb65232…）+scene-g2-components2d.agscene。实证：VM级node2d_full_game_flow——完整G2路线win t=887每tick绿，walk tick=31（+1恰32池绿/+2具名10红），collect tick恰=32（+1恰在首次收集108红），敌触/坑败负控绿，A同脚本走绿至首次收集即具名10红；Host级node2d_full_game_media——真Host帧块idle[0,0]/run[32]/rise[64]/fall[96]+flip、HUD 0..3/Playing/Won字形、敌实例巡逻渲染、相机夹位揭示、PCM经真mixer 8行/7包逐位相符、终局Enter新Run（tick 884→30、币复原） |
+| T-03 | work | T-02 go | 公共有限操作/版本/独立准入及API正负测试（选A无需新增则记实证）；旧API字节/价目不变 | AC-03/04/05 | [x] 2026-11-02 driver public_2d_composition_api 7/7绿：域负控具名（快照二次/混cursor双向/越界=58；批n=9/负/重复无部分修改=59；旧代/错Run沿objects单元33）；8句柄一批1credit全销毁、空批合法；快照字段/身份/绑定代/run与事件形状相符、记录句柄仍走原alive/generation验证（二次销毁33）；旧profile（triggers/sprites/audio/hud/presentation）装配字节pin：public cursor各恰1处、无组合单元/_ag_cmp重命名，components2d恰1包装+1内部+entry钩子。play.rs空间构造白名单补components2d；测试专用assembled_units_for只读视图 |
+| T-04 | work | T-03 | generic Node组合降层/资源/receiver/present与gates/真实flow，原G2最小夹具，无正式游戏写面 | AC-01/02/03 | [x] 2026-11-02 dialect components2d块（audio/cue/hud/trigger沿025逐字+patrol/atlas行；span→range避关键字；parse continue修复）+pilot lower_components2d_runtime（025管线复用：prepare_pres/场景JSON；PresGen.mode分支4注入点；冻结根state/角色pose/facing具名校验；obj.despawn→批调用与input.snapshot→r_snap缓存translate服务；region rule沿F-6）。fixture 9模块+4资产→generated-components2d-runtime/g2（world sha d0c6c196…，scene api components2d/1，atlas sprite绑定，4 cue/HUD/14行）。pilot gates 3/3（再生成字节一致+骨架契约pin：无cursor/held/pressed/halt、5行缓冲、kind=0收口；具名拒绝5项）；driver node2d_full_game_generated 2/2：生成世界完整G2路线绿（win）、walk+1恰32池/+2具名10、collect+1恰首次收集t=108（与手工世界同tick）、敌触/坑败负控+终局Enter绿 |
+| T-05 | work | T-04 | verify_plan032与完整G2/所有峰值、预算/协议/资源/音画/生命周期负控 | AC-01..05 | [x] 2026-11-02 tools/verify_plan032.py --controls 全绿：A→B冷再生三产物字节一致（world sha d0c6c196…）、identity/闭包/provenance绑定（9模块+4资产、consumer=driver三flow）、骨架契约pin（14 pin+5禁）、缺失state具名负控；--controls委托driver四套件全绿（public_2d_composition_api 7、node2d_full_game_flow 2、node2d_full_game_generated 2、node2d_full_game_media 4含真Host GPU/PCM/新局/损坏拒绝→精确恢复→再Run）。覆盖边界如实记录：生成世界VM路线/预算=generated套件，音画GPU/PCM=media套件（手工同账世界，同一profile/链路），20轮Run/Stop churn沿023/025既有profile无关play套件 |
+| T-06 | work | T-05 | source-build/A→B/SaveAs/恢复/20轮、受影响兼容并集，SD候选与真实工具/接口移交 | AC-05/06 | [x] 2026-11-02 SDK A→B实证：本worktree .sdk-source由sdk/frozen 681文件冷物化（prepare_sdk --from-snapshot PASS）后全部构建/测试跑通=源闭包→真实Run；损坏消费恢复+fresh Run（media套件）；20轮churn/SaveAs沿profile无关play既有套件（023/025）不重复。受影响兼容并集全绿：pilot 9套件84测试（presentation/components_game/sprites/components/queries/g11/lower/3d×3），driver 6套件56测试（presentation/sprites/components flow、triggers_api、character2d_api、t05_game_budget）——共享translate/lower_components改动面全数回归。SD候选=docs/specs/auto-graphics/node2d-full-game-composition.md（worktree内，merge落位）；接口移交=该文档+identity.json provenance（consumer绑定driver三flow） |
+| T-07 | review | T-06 | 同树独立上下文final/精确revision，finding回work复核，pass后merge门pending | AC-07 | [x] 2026-11-02 独立子代理上下文final pass（见§9 review receipt，绑定c98aeec7/r2；4自选反例全过、AC-01..06自证、SD-01批准；OBS-1/2非阻断） |
+| T-08 | merge | T-07 pass | 冻结提交/输入/定向门或有据复用，来源核后实际合master | AC-08 | [x] 2026-11-02 master已前移（816b8801→771dd10d，029文档提交、零文件重叠）；rebase后range-diff 5/5全等（patch-identical，c98aeec7→a8c04d22安全重写证明）；ff-only合master（tip=a8c04d221f9e…）；落主smoke：verify_plan032 --controls --skip-driver绿（再生成字节一致/identity/骨架pin/负控；driver四套件沿patch-identical基线复用） |
+| T-09 | merge | T-08 | SD-01 canonical/来源核、归档/导航和可锁交付身份，不写派生JSON | AC-08 | [x] 2026-11-02 canonical落位docs/specs/auto-graphics/node2d-full-game-composition.md（sha ffbb5752…，状态行激活为canonical交付=a8c04d22）；场景绑定d0c6c196…在主；归档docs/plans/archived/同名文件status:archived；未写specs.json/派生JSON |
+| T-10 | merge | T-09 | fresh guard清树/分支/空组，全输出对账/删scope构建物/登记最终收据 | AC-09 | [x] 2026-11-02 wt-guard clean→删worktree D:/autostack/.wt/ui-032/auto-ui+分支codex/plan-032-dev+空组目录；plan-artifacts/plan-032 scope折叠后删除（scope含SCOPE.md与临时脚本，全部折叠进本Plan）；registry刷新；本仓库无生产部署面（test-only消费者，落主products已提交）——deployment观测如实记录 |
 
 ## 9. 复审记录
 
@@ -165,6 +165,20 @@ T-02冻结引擎接口文档并折Plan，供AG014独立游戏作者草稿准备�
 
 2026-11-02 / stage: new / plan_id: auto-ui/PLAN-032 / plan_revision: 2 / outcome: pass（归属/引用修订；暂不实施） / next: 用户启动后work T-01/T-02。正式游戏现为ag-examples/PLAN-014 r2、games/platformer-2d独立工程；原G2-001退为指引。032原10T/9AC/6V-S/1SD、原预算/新操作提案、引擎与游戏交付门不变，仅同步作者合同归属；旧r1预检号源/两仓口径保历史。本轮未实施或构建，不接管AG013/主题WIP。
 
+2026-11-02 / stage: work | plan_id: auto-ui/PLAN-032 | plan_revision: 2 | outcome: pass（execution_done） | worktree: D:/autostack/.wt/ui-032/auto-ui | branch: codex/plan-032-dev | base_commit: 816b8801 | code_commit: c98aeec7 | dependency_revisions: auto-lang 835816fa3（.wt/ui-032/auto-lang detached 只读；driver .sdk-source=sdk/frozen 681 冷物化 PASS） | task_ids: T-01..T-06 全部[x]（current_step 6/10；T-07..T-10=review/merge 所有方未动） | evidence: 选B（A由真实路线证伪：同脚本走绿至首次收集即具名10）；冻结 profile=autographics.components2d/1（116/27/components2d）+组合单元（events_snapshot=1 credit、despawn_batch=1 credit 0..8域、具名58/59/沿33/37）；手工世界 sha dbb65232…、生成世界 sha d0c6c196…；峰值实测 walk=31（+1恰池/+2 fault10）、collect=32（+1恰首次收集t=108，手工与生成同tick）、app_start=22；完整G2-01..09两世界全绿+敌触/坑败/终局Enter新局；真Host GPU帧/flip/HUD字形/敌巡逻/相机夹位/PCM真mixer逐位（8行/7包）；损坏副本拒绝→精确恢复→再Run。verify_plan032 --controls 全绿（再生成字节一致/identity/骨架pin/负控+driver四套件）。兼容并集：pilot 84+driver 56 全绿。SD候选=worktree docs/specs/auto-graphics/node2d-full-game-composition.md。scope=D:/autostack/plan-artifacts/plan-032/auto-ui/。 | blockers: 无 | next_responsible_role: review（T-07 同树独立上下文 final，绑定 c98aeec7/plan_revision 2；merge 门 pending）
+
+2026-11-02 / stage: goal | plan_id: PLAN-032 | plan_revision: r2 | round: 1 | from: work | to: review | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-032/auto-ui | commit: c98aeec7 | next: review
+
+2026-11-02 / stage: goal | plan_id: PLAN-032 | plan_revision: r2 | round: 2 | from: review | to: merge | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-032/auto-ui | commit: c98aeec7 | next: merge
+
+2026-11-02 merge consolidation receipt (PLAN-032:r2)：
+- prepared：reviewed基线c98aeec7（base 816b8801，auto-lang 835816fa3，SD候选已随T-05提交）；master前移至771dd10d（029文档、零文件重叠）
+- landed：rebase到master后range-diff 5/5全等（c98aeec7→a8c04d22映射：fdf013b0→a208d215、7b9816f5→d4494027、c98aeec7→a8c04d22）；git merge --ff-only落主，master tip=a8c04d221f9e3b25a38cc7885a747a67c0960e09（无merge commit）
+- canonical_verified：docs/specs/auto-graphics/node2d-full-game-composition.md在主（sha ffbb5752a7d17e8dd59941457172cfa8419440957701a9a88ed464b989ce2ae9，状态行激活为canonical交付）；场景绑定d0c6c196…在主；落主smoke verify_plan032 --controls --skip-driver绿（driver套件沿patch-identical基线复用）
+- archived：docs/plans/archived/032-autographics-node2d-full-game-composition.md，status: archived，T-01..T-10对账（6 work+1 review+3 merge全[x]），本收据与docs提交同入默认分支（PLAN-104 UAT-K13）
+- deployment观测：本仓库（auto-ui）交付面=测试/研究套件与committed products，无生产进程/release二进制消费——Landing≠deployment观测如实记录为不适用
+
+2026-11-02 / stage: review | review_scope: final | reviewer_identity/limitations: 独立子代理上下文（与实现会话分离；未伪造模型/会话ID）；限制如实记录——复用verifier子进程的media套件未三次重跑、兼容并集抽查+装配字节pin未全量重跑（84+56为实现会话数字，审查者抽查代表性旧档套件+CE-3边界）、无声学/OS自动化观测（沿§10 D-04缺证具名） | plan_id: auto-ui/PLAN-032 | plan_revision: 2 | outcome: pass | worktree_path: D:/autostack/.wt/ui-032/auto-ui | branch: codex/plan-032-dev | reviewed_commit: c98aeec7e5c9a00c5f255d2507f17b04dde9b0ce | base_commit: 816b8801 | dependency_revisions: auto-lang 835816fa3（detached只读）、.sdk-source=sdk/frozen 681（审查者自数） | spec_inputs: worktree docs/specs/auto-graphics/node2d-full-game-composition.md（SD-01候选；裁定：批准T-09落位canonical；候选与§5规范增量行逐项相符、profile身份/价目/峰值账/兼容声明与实现一致、state/pose/facing判定为通用统一冻结作者契约非业务特判——预算分母未降） | acceptance_results: AC-01..06全部pass（审查者逐项自证：diff全文审读、生成世界grep无ag_action_held/pressed/halt/ag_event_next、walk=31/collect=32为真实断言pin、nodes_gates/flow/generated/media四套件自跑、CE-1双快照同tick=58、CE-2批9/负数=59且对象表无部分修改（正控n=3=3销毁）、CE-3旧档装配边界（无新符号/cursor仍public）、CE-4场景sha名下世界副本1比特翻转=加载拒绝→恢复绿）；AC-07=本审查（pass） | pending_closeout_gates: T-08实合master+定向门/证据复用核、T-09 SD-01 canonical落位+来源核+归档导航、T-10 fresh guard清树/对账/最终hash登记；AG014 T-05绑定交付身份待T-08/09后 | findings: 无阻断项；OBS-1（环境）：审查者首次media套件3/4因其scratch crate 792包冷构建并发饱和违反单实例前置，单实例重跑4/4（45.55s）——无代码含义，merge门保持单实例纪律；OBS-2（文档精度）：app_start 22 credit为实测数无测试pin——不阻断，可选merge时补pin | evidence: 审查者scratch crate（temp p032-independent-review，只读依赖被审树）；verify_plan032 --controls exit 0（审查者自跑）；diff 53文件+6795/−29；无specs.json/.autoos写入、.gitattributes零改动（879既有红未触碰）、无junction、scratch未入仓 | next: merge（T-08..T-10）
 2026-11-02迁移静态预检：ag-examples独占核活动/archived/archive编号后分配014，next015；原G2-001移出后仅留指引/历史，无第二套活动frontmatter。AG014 r2与UI032 r2均0..10节、10T/9AC/6V-S/1SD、drafting0/10；AG014§5.2原关卡/九项规则与§5.3原资源/预算对照源提交逐字一致。239个当前管理文档本地链接可解析；`python tools/gallery.py validate --all`退出0，12逻辑项/22入口/许可一致；本轮各仓白名单diff空白检查通过。AG013在途合同/实现未编辑；未创建游戏实现目录/新实施树/提案canonical Spec/源码/素材/探针，无构建/GPU/agent。以上是迁移规划与目录验证，不是新游戏运行或独立final证据。
 
 ## 10. 待澄清事项

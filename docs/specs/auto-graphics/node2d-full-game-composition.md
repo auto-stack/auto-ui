@@ -1,6 +1,6 @@
 # node2d-full-game-composition
 
-状态：canonical 候选（PLAN-032 SD-01；交付即 canonical）。本文描述 PLAN-032
+状态：canonical（PLAN-032 SD-01 交付；a8c04d22 落主）。本文描述 PLAN-032
 交付后的完整二维游戏组合服务面：普通 Node 作者链（use/node/model/view-2d/
 msg/on/Life.Tick）加上 `components2d` 作者块，表达角色/敌人/同定义收集物/
 目标/隐藏危险区与根关卡状态，在原 Callback32 池、原 VM/资源包络内以冻结
