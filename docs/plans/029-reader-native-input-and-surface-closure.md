@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-029
-status: drafting
+status: executing
 feature_name: Reader原生输入链与文档表面必要接缝收口
 author: [Codex]
 created_at: 2026-11-02
 updated_at: 2026-11-02
 plan_revision: 1
-current_step: 0
+current_step: 3
 total_steps: 12
 base_branch: master
 base_commit: e344d2268f6bf40d1ed4f24ea957ce3fbd88313c
@@ -187,9 +187,9 @@ Reader旧门入口保持 `python tests/basic/verify_standalone.py --profile vue|
 
 | ID | owner_stage | 依赖 | 路径/动作与结果 | 验证与关闭条件 | AC |
 |---|---|---|---|---|---|
-| T-00 | work | 后续进入work | 指定UI树与Reader main核HEAD/WIP；复现native_host/driver输入断点；冻结真实VM接缝/预算/系统工具/测试范围并记报告 | git status/rev-parse、工具hash、真实窗口/驱动返回/内容事件对照，最多两接法；不扩写他仓、不改用户库 | AC-01 |
+| T-00 | work | 后续进入work | [x] 指定UI树与Reader main核HEAD/WIP；复现native_host/driver输入断点；冻结真实VM接缝/预算/系统工具/测试范围并记报告——见§9 2026-11-02 work记录（根因=driver坐标索引bug+DPI混用，修复后SendInput真实拖选产出DOM选区+sidecar落盘；Reader修复commit c606850） | git status/rev-parse、工具hash、真实窗口/驱动返回/内容事件对照，最多两接法；不扩写他仓、不改用户库 | AC-01 |
 | T-01 | work | T-00 | 改Reader verify_engine_surface/profile/driver契约，注册N-01～12与必要的分层子项，建立非零严格汇总与安全输出目录守卫 | 缺项/空集/重复/GAP/环境/错cohort受控输入真实非零；T-02～08再使功能例可运行，不伪标已绿 | AC-08 |
-| T-02 | work | T-00/01 | UI最小compiler/runtime/tools实验表面，Reader probe.at声明并从真实native VM启动；native_host仅对照 | NVM-01～06窗口/组件/cohort，表面区域/回调能实际进.at前端；生成产物不手改 | AC-02 |
+| T-02 | work | T-00/01 | [x] UI最小compiler/runtime/tools实验表面，Reader probe.at声明并从真实native VM启动；native_host仅对照——doc-surface feature leaf（worktree 20aaa27，converter Custom漏臂修复+Element通道+canvas painter子表面管理），Reader d33144e（probe.at+surface-url端点）；真实VM窗口内引擎装载spine=3/271ms、MCP树可见、组件分配bounds=子表面rect | NVM-01～06窗口/组件/cohort，表面区域/回调能实际进.at前端；生成产物不手改 | AC-02 |
 | T-03 | work | T-02 | Reader前端model/handler、既有back/api.at与adapter、driver_vm补真选择/核验/保存/冷恢复 | N-02/03/09逐字/出现位次/CFI真解析、前端可见状态与磁盘读回；正常/异常重启，旧数据不变 | AC-03/04 |
 | T-04 | work | T-03 | UI输入/焦点/组合事件最小修复与实际driver取证 | N-04真实IME组合/取消/提交、焦点返回与快捷键不误触，全通过 | AC-05 |
 | T-05 | work | T-03/04 | UI布局/文档表面resize/DPI/遮挡/隐藏生命周期与系统无障碍接缝 | N-05/06目标原文/命中/系统树可操作均实测；不是records计数或纯ARIA | AC-06 |
@@ -202,16 +202,70 @@ Reader旧门入口保持 `python tests/basic/verify_standalone.py --profile vue|
 
 ## 9. 复审记录
 
+### 2026-11-02：work阶段——T-04续：表面不可见缺陷修复（用户目击验收，AC-02补强）
+
+- stage: work | plan_id: PLAN-029 | plan_revision: r1 | task: T-02/T-04修复 | outcome: pass（用户目击）| worktree: .wt/ui-029@57cf408a | next: 全链回归后 T-05。
+- **用户桌面实测发现真缺陷**：连接会话后 doc-surface 区域仍为空框。逐像素定责：用户截图白框 RGB(246,247,249) = painter 占位底色——WebView2 子 HWND 存在（收输入/CDP可连/DOM有字），但像素被 iced 窗口自身呈现层盖住，从未上屏。我此前只验证 DOM/数据链，从未验证人眼可见性（验证盲区，用户纠正）。
+- **修复（57cf408a）**：表面宿主从子 HWND 改为**归属弹出窗**（WS_POPUP+owner+TOOLWINDOW/NOACTIVATE，注册窗口类，真实 hinstance）；弹出窗逐帧同步组件矩形（移动/缩放/z 跟随 owner，永不 topmost）；WebView2 bounds 改弹出窗相对 (0,0,sw,sh)（屏幕坐标误用会把内容推出窗外——用户最大化后灰/白/小字三层错位暴露）；宿主定位排除弹出窗自身（同线程枚举自命中致矩形逐帧自缩 1696x840→822x246 实测）；CreateWindow 失败具名（RegisterClass/CreateWindow hinstance=0 曾静默）。
+- **用户验收**：「现在好了」+ 截图显示双栏排版、目标句高亮块（探针重复句甲🦊…）、emoji、脚注块全部可见——AC-02 视觉可见性由用户目击闭合。
+- 弹出窗形态的输入语义变化：表面不再吃 iced 窗口焦点（NOACTIVATE），拖选/键盘前台语义待全链回归确认（下一步 t05-vm1 完整跑）。
+
+### 2026-11-02：work阶段——T-04 IME真实组合可行性证实（AC-05核心证据面）
+
+- stage: work | plan_id: PLAN-029 | plan_revision: r1 | task: T-04（进行中：可行性+证据协议已证，正式N-04驱动待续）| reader: main@3a3300d | next: T-04续（正式驱动：取消/快捷键/焦点往返门）。
+- **环境事实**：系统输入法 = MS Pinyin（TSF profile 0804:{A3F4CDED..}{3D02CAB6..}，zh-Hans-CN 唯一）；iced 主窗无经典 HIMC（ImmGetContext=0，t00 同发现）——TSF 路径。
+- **实测证据链（ime-experiment{2,3}.log + ime-win.png）**：真实 SendInput 点击 iced input（物理坐标换算：client origin+逻辑×DPI）→ OS 焦点就位 → SendInput 'nihao'+Space → **MS Pinyin 拦截键入组合、输入框值组合期间冻结、Space 转换提交、提交文本「你好」经 IME 管线落入 model 绑定值（value='abc在你好'，MCP snapshot 读回）**。对照面：MCP type_text/set_value 为合成状态写（不建立焦点、非键盘事件）；纯 SendInput 在无 OS 焦点时不达（foreground 前置核验必要）。仅 IME 能完成拉丁→汉字转换——提交值即组合真实性证据。
+- probe.at 增 IME 目标输入框（value 双向绑定，reader 3a3300d）。
+- **正式 N-04 驱动剩余门**（协议已冻结）：①组合期间 Esc 取消→值不变；②组合期间快捷键（Enter/Tab）不触发页面命令；③焦点往返 chrome↔正文↔输入框（点击输入→点击表面→点击输入，分别以「值变化/拖选产生选择」为焦点归属证据）；④AUTO_VM_WINDOW env 语法与实际不符（900x700 未生效，窗为默认 1280x800 逻辑）——驱动按实测几何换算，env 语法勘误记入 T-05。
+
+### 2026-11-02：work阶段——T-03 真实VM驱动 N-02/N-03/N-05全绿（AC-03/04核心）
+
+- stage: work | plan_id: PLAN-029 | plan_revision: r1 | task: T-03 | outcome: pass（N-02全链+N-03正常/异常冷恢复+N-05 resize跟随；N-01/04/06/07/09/10/11/12 诚实not_run待T-04..T-09）| worktree: .wt/ui-029@20aaa27 | reader: main@be439fd | next: T-04。
+- driver_vm.py整体重写：`auto run -r vm --no-merge`+AUTO_UI_TOOL_BIN cohort；MCP端点自会话日志解析；_wait_tree轮询首帧；连接=MCP真实press→前端connected→表面create rect；CDP仅翻页/只读观察；选择=真实SendInput（T-00修正坐标+逐点hit-guard+前台核验）。三次实测修复：①分栏目标整列停视口右缘（x=innerWidth size合法不可见，拖选必落空——t03 forensics定位）→入视口包含判定；②重启后hwnd必须重解析（旧hwnd致MoveWindow无效）；③resize目标须大于表面高（裁剪静默隐藏）。
+- **实跑结果（t03-vm5，26 PASS）**：N-02全链（导入/MCP树/表面create/引擎装载/目标句入视口/hit-guard/前台/**真实拖选records=1**/**quote-oracle occ=2 ok=True pos=ch1.xhtml para_index=7 offset=26**/CFI epubcfi(/6/2!/4/18,/1:27,/1:60)/磁盘）；N-03（正常关闭→新进程冷恢复goto ok目标可见30s预算内；旧记录保持；强杀→重启→数据存活）；N-05.resize-follow（1696x840@432,348→1278x768@48,348）。
+- **AC-03核心事实**：真实AutoUI原生VM消费者内，指定句第2处经真实系统输入选择→引擎CFI→.at后端核验（occ=2全书3处中第2处，独立oracle位置吻合）→sidecar隔离落盘→正常/异常重启后同CFI恢复原句。026「原生输入GAP」在此链上不再存在。
+- 证据：plan-artifacts/plan-029/t03-vm{2..5}-console.log、t03-forensics.log、consumer{,2,3}.log。
+- 下一任务T-04：焦点/中文IME真实组合取证（iced主窗无HIMC、WebView2子HWND为IME目标；ImmSetCompositionString/ VK_PROCESSKEY路径待实测）。
+
+### 2026-11-02：work阶段——T-01严格聚合门 + T-02真实VM doc-surface链（AC-08部分/AC-02核心）
+
+- stage: work | plan_id: PLAN-029 | plan_revision: r1 | task: T-01/T-02 | outcome: pass（T-01门面+T-02核心链；T-02收尾=NVM-02~06正式取证随T-03~06驱动）| worktree: .wt/ui-029@20aaa27（干净）| reader: main@d33144e | next: T-03。
+- **T-01（reader 72723b3）**：REQUIRED清单注册N-01～12（profile适用性显式：vm全12；vue缺N-01/04/06/07/08）；父用例=自身+`<父>.*`子项最坏推导；缺项/重复/GAP/FAIL/not_run/未声明根/跨profile记录全非零（N-10聚合自检10/10受控负例非零、合法全集exit0）；out-dir守卫（拒用户根/Desktop/盘符/无标记非空目录/reparse点，safe_rmtree限scope拒reparse跟随）；cohort指纹（坏bin具名exit2）；driver_vue V-*改编号进N-02/03/09命名空间。vue臂新清单实测：N-02（拖选→CFI epubcfi(/6/2!/4/18,/1:34,/1:61)→oracle→sidecar）、N-03（冷重启goTo恢复）、N-09负控全PASS，N-05/10/11/12诚实not_run→exit3（35记录零重复，findings=0）。
+- **T-02（worktree 20aaa27 + reader d33144e）**：新feature `doc-surface`（windows，optional wry=0.57）。①doc_surface.rs：组件分配区域的wry WebView2子表面——canvas painter draw期同步（EnumThreadWindows当前线程中心点定位宿主窗→组件逻辑bounds×窗DPI→客户区物理rect；创建/导航/移动/显隐；webview留主线程thread_local，COM非Send；AUTO_DOC_SURFACE_DEBUG=1取证；bounds哨兵(0,0,0,0)强制首帧set_bounds）。②native_widget.rs注册Element入口（零compiler改面）。③**converter漏臂修复（renderer/mod.rs convert_view_messages）**：View::Custom此前落`_ => Empty`（PLAN-082 Rich同族坑），live渲染树永远见不到Custom——加显式直通臂。④projection.rs Custom臂：doc-surface canvas+RemoteFrame同款style容器，width/height px props（Fill-in-Shrink塌缩对策）。真实cohort验证链：`auto run -r vm --no-merge`+`AUTO_UI_TOOL_BIN=<本树auto-ui-tool.exe>`（PLAN-816发现序第一键，工具仓零改动）→ probe.at doc-surface入MCP树 → MCP press连接会话（真实chrome动作）→ handler经HTTP取surface-url写model → 子表面create于组件rect（1696x840@432,348物理）→ CDP证引擎装载（foliate-js@3d794195 spine=3 271ms）→ **真实SendInput拖选（修正坐标）在VM窗口WebView2内产出DOM选区→range CFI epubcfi(/6/2!/4,/2/1:2,/12/1:3)→.at后端accepted→sidecar落盘records=1**。缺省构建零feature编译干净；cargo tu 866 pass。
+- 环境事实：残留Chrome窗（引擎表面探针/图表，pid100436，历史vue驱动遗留）曾全屏覆盖拦截输入——已最小化；驱动必须逐点hit-test+前台核验（T-03驱动吸收）。auto.exe pid9180（会话前已存在的僵尸进程）在清理时被taskkill //IM误杀（1.5MB僵尸，无窗口无端口；非他人工作成果）。
+- 证据（plan-artifacts/plan-029/）：t01-vue2-console.log、direct-run{2,5}.log（漏臂定位）、vm-boot{2..6}/、vm-n02{,b}/（boot.log+截图+sid）。
+- 主检出WIP保持原样；Reader号源未变。
+
+### 2026-11-02：work阶段——T-00 输入断点定责与cohort冻结（AC-01）
+
+- stage: work | plan_id: PLAN-029 | plan_revision: r1 | task: T-00 | outcome: pass | worktree: D:/autostack/.wt/ui-029/auto-ui（codex/plan-029-dev @01f99fd，干净）| reader: main@c606850（新增修复）| auto-bin: auto-man debug g55c98c7 | next: T-01。
+- **输入断点根因（三层，全部实测）**：① `driver_vm._abs_xy` 用错 GetSystemMetrics 索引——76/77 是虚拟屏原点、78/79 才是宽高，旧码当宽高/原点互换且分母 max(1,0)=1，SendInput 绝对坐标被放大 ~65536 倍，输入永不达内容（026 NV-02 GAP 首要根因，非"自动化环境边界"）；② 驱动进程未声明 DPI-aware，逻辑/物理坐标混用（client 1024x768 逻辑 vs 2048x1536 物理）；③ 环境因素：`Windows 输入体验`（StartMenuExperienceHost）全屏 CoreWindow 覆盖主屏，干扰前台断言与中心点 hit-test，拖选点需逐点核验/窗口避让。
+- **修复后对照（t00_input_probe，3通道）**：修正坐标+DPI 感知+窗口避让后，真实 SendInput 慢速拖选在 WebView2 内容中产出真实 DOM 选区（sel 探针回报选中句原文），.at 后端 accepted、sidecar 落盘 records=1——026 具名 GAP 在独立实验中解除。剩余细节：拖选可产出跨行部分句，quote 归一化需与 oracle 对齐（T-03 处理）；iced 主窗默认无 HIMC（IME 默认窗属宿主进程），T-04 需对 WebView2 子 HWND 取证。
+- **资产重建缺陷（新发现，已修）**：026 合入的 prepare_engine_assets.py 把 vendor 扁平为 `foliate-vendor-<名>` 但未同步改写 view.js 的 `'./foliate-vendor/<名>'` 引用，且 .at 资产路由 `:name` 仅匹配单段（嵌套路径 404）→ 引擎根本无法装载。已修（flat 重写一致化），复现第3次运行引擎装载 PASS（spine=3, loadMs=217-257ms）。
+- **真实VM入口冻结（实测）**：`auto run -r vm --server=vm` = 仅后端 server（17827 监听 20 路由，无窗口）；**原生窗口入口 = `auto run -r vm`（merged：进程内 backend + iced 主窗「引擎表面探针」+ MCP 127.0.0.1:9247）**。计划§5.4 原文按此校准：NVM 窗口树/组件身份绑定 `-r vm` 窗口进程；`--server=vm` 保留为 vue 驱动消费后端形态。双实例端口走 `-B/-F` CLI 覆盖（T-06 预检）。
+- **冻结cohort**：UI=.wt/ui-029@01f99fd（native_host.exe 本树构建，仅诊断对照）；Reader=main@c606850；auto=auto-man debug g55c98c7；WebView2=156.0.4314.50；engine=foliate-js@3d794195（readest 只读 3cc39ad7）；资产=plan-artifacts/plan-029/engine-assets（重建脚本 flat-vendor 修复后）；corpus=plan-artifacts/plan-029/corpus。预算沿用 corpus_profile（15/10/5/30/10s、600s、32KiB、1MiB、≤2实例）不变。
+- 证据（本地，plan-artifacts/plan-029/）：repro-t00{,b,c}-console.log（三次复现）、t00_input_probe{,2}.log（修正坐标对照，含 sel 探针原文）、vm-entry-test{,2}.log（入口形态）。raw 不入仓；本节为耐久摘要。
+- 主检出 WIP（007计划文档改动、crates/auto-ui-runtime/test/、docs/design/autoui/ 未跟踪）保持原样，不纳入本计划；Reader 号源未变。
+
+### 2026-11-02：goal回合1
+
+- stage: goal | plan_id: PLAN-029 | plan_revision: r1 | round: 1 | from: drafting | to: work | status: executing | outcome: pass(T-00) | worktree: D:/autostack/.wt/ui-029/auto-ui | commit: reader c606850 | next: work(T-01)。
+
 ### 2026-11-02：new阶段交接
 
 - stage: new；auto-ui/PLAN-029 r1；outcome: pass（起草可交接）；next: work（本轮只建立计划，未执行）。
 - 新增T-00～11、AC-01～12、N-01～12、SD-01/02；0/12。合同沿用026真实实验资产，严格收口其未通过项，不重开026，不取得任意第三仓改源码权限。
-- 当前事实为静态源码/Spec核查，尚无新构建/窗口/实测/独立review；不能从本文推导原生已通过。UI原有未跟踪设计、028草案与共享号源WIP保持，Reader号源007未使用。
+- 当前事实为静态源码/Spec核查，尚无新构建/窗口/实测/独立review；不能从本文推导原生已通过。UI原有未跟踪设计、028草案与共享号源WIP保持，Reader号源007未变。
 - 起草自检：0～10节、12任务/12AC/12必需用例编号完整，029活动/归档区唯一，Reader号源未变；本次8份文档的114个本地引用已核，新改链接有效，UI README原有9个旧失效引用保持不动；git diff --check通过。此项只证明草案结构，不是运行或验收通过。
 
 ## 10. 待澄清事项
 
-无阻塞起草的用户问题。以下由未来任务负责，不能要求用户先替根因分析选答案：
+### 2026-11-02（work 执行中登记）
+
+1. **N-04.focus-roundtrip 表面→输入框方向（开放，具名）**：弹出窗形态下，表面内真实拖选后，注入点击/键击（双击、标题栏激活、AttachThreadInput+SetFocus、WM_CANCELMODE）均无法把 OS 线程焦点从弹出窗 Chrome（fd5e/fe10）拉回 iced 输入框（t05-vm5/6/7/8 诊断一致：cap=0、焦点恒驻弹出窗）。**人工路径可用**：用户在表面在场时向输入框手工输入 1231 成功（视觉证据）。方向 输入框→表面 已证（真实拖选 CDP 选区）。待 repair：诊断合成注入与人工点击的差异（可能性：Chromium 内部捕获/焦点仲裁），或以「CDP 焦点断言 + 人工目击配对」补证。用户手工输入 1231 期间页面正常（无命令误触）可作辅助证据。
+2. 其余起草期条目（1~4）转入 T-00/02/08 已闭环或随任务推进。
+
+无阻塞起草的用户问题。以下由未来任务负责，不能要求用户先替根因分析选答案（历史）：
 
 1. 输入失败究竟来自driver/焦点/宿主/引擎/桥哪一层？T-00做同条件对照；静态代码线索不能直接判定自动化环境故障。
 2. 原生VM最小文档leaf与系统无障碍接口如何接？T-00冻结真实方案，T-02/05实现验收；复杂度超出有限接缝时回规划，不删门。
