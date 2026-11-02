@@ -4,7 +4,9 @@
 
 阅读器跨仓探针：[auto-ui/PLAN-026](docs/plans/archived/026-reader-engine-embedding-and-locator-probe.md)已交付归档（r1、流程10/10）。[报告](docs/research/reader-engine-probe.md)记录Vue指定样本全链30/30；原生独立iced宿主嵌入/引擎/IPC已证，真实输入回传、IME/无障碍等仍有GAP，不能据归档称双端全门通过。下一阶段先收口原生输入链与必要接缝，再做完整EPUB产品化；本仓主导宿主，[AutoReader](https://github.com/auto-stack/auto-reader/blob/main/README.md)负责消费与数据验证。
 
-后续正式计划：[auto-ui/PLAN-029 原生输入链与必要接缝收口](docs/plans/029-reader-native-input-and-surface-closure.md)（drafting/r1、0/12，当前仅起草）。真实原生VM消费、独立复审与所有必需门均需通过，不能以GAP/有条件完成替代。Reader只留消费指针，不重复取号。
+后续正式计划：[auto-ui/PLAN-029 原生输入链与必要接缝收口](docs/plans/029-reader-native-input-and-surface-closure.md)（本次核查executing、9/12，最终交付待核）。真实原生VM消费、独立复审与所有必需门均需通过，不能以GAP/有条件完成替代。Reader只留消费指针，不重复取号。
+
+Reader正式产品化后继草案为 [READER-007](https://github.com/auto-stack/auto-reader/blob/main/docs/plans/007-epub-product-reader-and-locator-compatibility.md)（drafting/r1、0/13，主导仓auto-reader）。029所有必需门、独立review与固定版本交付是硬前置；本地029仍executing、9/12时仅可起草，不在此仓重复取号或提前声称产品化已放行。
 
 ## 项目概述
 
