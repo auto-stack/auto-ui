@@ -89,4 +89,4 @@
   源）；原生部件全量接入与旧 class 优先级清理属后继批次。
 - 平台边界：VM 原生无键盘焦点模型（button focus 环仅 Vue 端原生
   `focus-visible`）；input/textarea 的 disabled 为真实通道（`View` 字段 +
-  构造期不挂 handler + 降透明表面）。
+  构造期不挂 handler/textarea 不挂 keydown），Input 另有降透明表面、Textarea 暂无。

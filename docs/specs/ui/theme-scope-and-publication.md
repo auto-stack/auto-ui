@@ -77,6 +77,8 @@
   `__designTheme`（`computed`），首帧与自动应用点优先读它；`theme_name` 作为
   兼容别名在其后兜底，两者皆空才回落 localStorage/scaffold。投影支持面为字符串
   字面量与单字段引用（prop → `props.X`，state → `X.value`），其余形态回落别名。
+  发射门：该投影随主题运行时一起注入，要求 widget 同时声明 `theme_name` 或
+  `accent_color`；仅声明 design 的 widget 当前不发射运行时（见 §6 边界）。
 
 ## 6. 生命周期、释放与边界（C-06）
 
@@ -90,8 +92,10 @@
   - 非 widget（store composable）路径仍为 document 级变量，未接声明族首帧。
   - VM 原生无键盘焦点模型：button 的 focus 环只在 Vue 端由原生 `focus-visible`
     承担（`View` 无 button focus 状态）。
-  - input/textarea 的 disabled 已是真实通道：`View` 带 `disabled` 字段，构造期
-    即不挂 `on_change`/`on_submit`（禁用不派发），渲染层另做降透明表面。
+  - input/textarea 的 disabled 是真实通道：`View` 带 `disabled` 字段，构造期
+    即不挂 `on_change`/`on_submit`（textarea 连 `onkeydown.*` 也不挂），
+    **禁用不派发**。视觉上 Input 另做值/占位降透明；Textarea 目前只保证不派发，
+    没有降透明表面（如实边界）。
   - 多 App/多实例同文档：每个带主题的 widget 模板根各自挂 `__autoThemeRoot` 与
     `data-auto-theme-root`，容器变量按实例隔离；子根的 vars 不受父容器清理影响。
     真实双实例 DOM 证据见 PLAN-031 的 V-03 腿（Auto/Solarized 各自持值、切换互不串写）。

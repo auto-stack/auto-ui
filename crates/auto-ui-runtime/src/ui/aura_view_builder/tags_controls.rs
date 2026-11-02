@@ -1048,7 +1048,13 @@ impl<'a> AuraViewBuilder<'a> {
                 }
             }
         }
-        builder = builder.keydown(keydown);
+        // N-12：禁用态连 keydown.* 绑定也不挂——Binding::Custom 会在无
+        // on_change 时同样派发消息，与"禁用不派发"冲突。
+        builder = builder.keydown(if disabled_ta {
+            std::collections::HashMap::new()
+        } else {
+            keydown
+        });
 
         // Plan 057 续(行内编辑 keymap):`keymap: .edit_mode` 绑定或静态串,
         // 缺省 "emacs"。VM 端据此选渲染层行编辑键位表;Vue 端忽略

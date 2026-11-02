@@ -998,6 +998,8 @@ function applyAccent(name: string, isDark = false, rootEl?: HTMLElement | null):
       // 容器根自身可能带 .dark（模板 :class 绑定）——querySelectorAll 不含自身。
       if (root.classList.contains('dark')) root.style.setProperty('--primary', finalHsl)
       scope.querySelectorAll('.dark').forEach(function (el) {
+        // N-11：嵌套主题根是独立作用域，父的强调色 overlay 不得写入。
+        if ((el as HTMLElement).hasAttribute('data-auto-theme-root') || el === root) return
         ;(el as HTMLElement).style.setProperty('--primary', finalHsl)
       })
     } else {
@@ -1005,7 +1007,7 @@ function applyAccent(name: string, isDark = false, rootEl?: HTMLElement | null):
       // previously carried .dark. Skip the root itself (it holds the current
       // value). Scoped to the container subtree when rootEl is provided.
       scope.querySelectorAll('[style*="--primary"]').forEach(function (el) {
-        if (el !== root) {
+        if (el !== root && !(el as HTMLElement).hasAttribute('data-auto-theme-root')) {
           ;(el as HTMLElement).style.removeProperty('--primary')
         }
       })
@@ -1098,7 +1100,11 @@ function applyTheme(name: string, isDark = document.documentElement.classList.co
       // 与 scope 的 dark 选择不一致（半暗半亮）。legacy（无容器）时 root 即
       // documentElement，行为不变。
       if (rootEl || root.classList.contains('dark')) writeVars(root, pal!.dark)
-      scope.querySelectorAll('.dark').forEach(function (el) {{ writeVars(el as HTMLElement, pal!.dark) }})
+      scope.querySelectorAll('.dark').forEach(function (el) {{
+        // N-11：嵌套主题根自持一份快照——父的 dark 面不得覆盖它。
+        if ((el as HTMLElement).hasAttribute('data-auto-theme-root') || el === root) return
+        writeVars(el as HTMLElement, pal!.dark)
+      }})
     }} else if (rootEl) {{
       // PLAN-031 F-03：只有**容器作用域**才清理旧 dark/内联覆盖。rootEl 缺省
       // 时（setup 期 immediate watcher，root=documentElement）的延迟 pass 绝不
