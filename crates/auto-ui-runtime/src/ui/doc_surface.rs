@@ -20,6 +20,11 @@
 //!
 //! 诊断开关：`AUTO_DOC_SURFACE_DEBUG=1` 在 stderr 打每次同步（动作/bounds/
 //! hwnd/url 长度），供 T-04/T-05 取证。
+//!
+//! T-05（N-05 hide-show 门）：url 空/滚出客户区的隐藏路径必须把**弹出窗
+//! 本体**一并 SW_HIDE——修复前只隐 webview，弹出窗类底色矩形留在原位
+//! （N-05.hide-show.hidden 门红→修复后绿）；展示路径 SW_SHOWNA 还原
+//! （NOACTIVATE 语义保持，不抢前台）。
 
 use std::collections::HashMap;
 use std::num::NonZeroIsize;
@@ -83,7 +88,11 @@ extern "system" {
     fn SetWindowPos(
         hwnd: isize, after: isize, x: i32, y: i32, cx: i32, cy: i32, flags: u32,
     ) -> i32;
+    fn ShowWindow(hwnd: isize, cmd: i32) -> i32;
 }
+
+const SW_HIDE: i32 = 0;
+const SW_SHOWNA: i32 = 8;
 
 const WS_POPUP: u32 = 0x8000_0000;
 const WS_VISIBLE: u32 = 0x1000_0000;
@@ -266,6 +275,16 @@ struct SurfaceMeta {
     hwnd: isize,
     phys: (i32, i32, u32, u32),
     visible: bool,
+    /// 弹出窗自身可见性（N-05 隐藏门：url 空/滚出客户区时必须真隐藏，
+    /// 否则类底色矩形留在原位遮住 iced 内容——修复前实测灰框残留）。
+    popup_visible: bool,
+}
+
+/// 弹出窗显隐（SW_SHOWNA 不抢前台——NOACTIVATE 语义保持）。
+fn set_popup_visible(hwnd: isize, show: bool) {
+    unsafe {
+        ShowWindow(hwnd, if show { SW_SHOWNA } else { SW_HIDE });
+    }
 }
 
 static SURFACES: OnceLock<Mutex<HashMap<String, SurfaceMeta>>> = OnceLock::new();
@@ -306,7 +325,8 @@ pub fn sync_surface(key: &str, url: &str, bounds: &Rectangle) {
     let host = locate_host(bounds);
     let mut map = surfaces().lock().unwrap();
     if url.is_empty() || host.is_none() {
-        // 未就绪：已有表面保持隐藏（不遮 chrome）。
+        // 未就绪：已有表面保持隐藏（不遮 chrome）。弹出窗必须一并真隐藏——
+        // 只隐 webview 会留下类底色矩形（N-05 hide-show 门修复前实测）。
         if let Some(s) = map.get_mut(key) {
             if s.visible {
                 WEBVIEWS.with(|w| {
@@ -315,6 +335,12 @@ pub fn sync_surface(key: &str, url: &str, bounds: &Rectangle) {
                     }
                 });
                 s.visible = false;
+            }
+            if s.popup_visible {
+                if s.hwnd != 0 {
+                    set_popup_visible(s.hwnd, false);
+                }
+                s.popup_visible = false;
             }
         }
         if debug_enabled() {
@@ -328,7 +354,7 @@ pub fn sync_surface(key: &str, url: &str, bounds: &Rectangle) {
     }
     let host = host.unwrap();
     let Some(phys) = canvas_physical_rect(host, bounds) else {
-        // 完全滚出客户区：隐藏。
+        // 完全滚出客户区：webview 与弹出窗一并隐藏（同上，不留底色框）。
         if let Some(s) = map.get_mut(key) {
             if s.visible {
                 WEBVIEWS.with(|w| {
@@ -337,6 +363,12 @@ pub fn sync_surface(key: &str, url: &str, bounds: &Rectangle) {
                     }
                 });
                 s.visible = false;
+            }
+            if s.popup_visible {
+                if s.hwnd != 0 {
+                    set_popup_visible(s.hwnd, false);
+                }
+                s.popup_visible = false;
             }
         }
         return;
@@ -380,6 +412,7 @@ pub fn sync_surface(key: &str, url: &str, bounds: &Rectangle) {
             hwnd: popup,
             phys: (0, 0, 0, 0),
             visible: false,
+            popup_visible: false,
         });
     }
     let s = map.get_mut(key).unwrap();
@@ -426,6 +459,11 @@ pub fn sync_surface(key: &str, url: &str, bounds: &Rectangle) {
                 });
                 s.phys = screen_phys;
                 action = if action == "sync" { "move" } else { action };
+            }
+            if !s.popup_visible {
+                set_popup_visible(popup, true);
+                s.popup_visible = true;
+                action = if action == "sync" { "popup-show" } else { action };
             }
             if !s.visible {
                 let _ = wv.set_visible(true);
