@@ -60,3 +60,22 @@ autodown-core 剥除同步摘除（feature 名保留）。
   随生成布局变更 bump。
 - 发现：`app_registry::published_native_exe`（收据优先）→ 约定路径回退；
   runtime `launcher_compiled_exe` 同序。
+
+## 附：主题包作为受管生成输入（PLAN-031 SD-05）
+
+- 声明 `dep themes { path: … }` 的 App，其 UI 生成前必须通过主题包准入
+  （owner/包名/版本/schema/逐文件 sha256/族模式）；失败**具名中止**，不产
+  半成品、不静默回落别的同名来源。未声明该依赖的 App 零变化。
+- 生成输入 receipt：`<gen>/.theme-inputs.json`
+  （`{schema, package:{owner,name,version,digest}}`）。`digest` 是清单列出文件
+  按路径排序的内容 sha256，**与绝对根、mtime 无关**；内容变更（即使 mtime
+  不变）即视为输入变化，篡改（内容改而清单未同步）被准入拒绝。
+- 与 §附「前端新鲜度为内容收据（generation.json v1），mtime 退役」同口径：
+  主题包是**内容寻址的受管输入**，不是按路径/mtime 判断的附带资源。
+- Vue 生成产物（`src/assets/index.css` 的 `:root/.dark`、
+  `window.__AUTO_TREE_THEMES__`）由 App 导入的官方包驱动，值为 Tailwind
+  消费的 `H S% L%` 三段式；VM 侧由同一主题树解析语义色。包的单源/版本/
+  外部获取见 `docs/specs/ui/official-theme-package.md`。
+- 边界：语言侧 `generation.json`/target 结构本包未改（主题包摘要目前由
+  UI tools 记录）；若需并入语言生成缓存键，属跨仓最小通用受管输入扩展，
+  另立决策，不在本文件预称已覆盖。

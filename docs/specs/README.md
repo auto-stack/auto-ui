@@ -23,15 +23,24 @@ language repository's `docs/specs/auto-ui/project.md`.
   Cargo features are retired; families are compile-visible and run-selected via
   the nextest static boundary with explicit serial/manual admission (PLAN-018).
 
-## Theme pilot & examples ownership (PLAN-007)
+## Theme scope, publication & examples ownership (PLAN-007 / PLAN-031)
+
+- [Theme scope and publication](ui/theme-scope-and-publication.md) — App/session
+  and component-instance theme ownership, identity/revision rules, atomic candidate
+  publication with keep-old-on-failure, host/controlled-input priority, local design
+  scopes and the dual-end (VM/Iced ↔ Vue) projection boundaries (SD-01).
+
+- [Official theme package](ui/official-theme-package.md) — the single-source
+  `packages/themes` package, managed manifest with per-file hashes, named rejection,
+  external snapshot fetch and content-digest generation admission (SD-03).
 
 - [Theme tree pilot](ui/theme-tree-pilot.md) — tree-structured theme data
   (`pub theme`), extend composition, mode selection, typed slot references
   and widget-local design objects over the pilot support surface (SD-01/02).
 
 - [Theme app migration](ui/theme-app-migration.md) — the official single-source
-  theme families (`examples/ui/themes/`), app adoption form and the confirmed
-  per-app successor batches (SD-03).
+  theme families (`packages/themes/`), app adoption form, the delivered batches
+  (theme-lab/002/005, then 003/010) and the confirmed per-app successor list (SD-03/04).
 
 - [Examples ownership](ui/examples-ownership.md) — `examples/ui` relocated
   from auto-lang byte-identically; source mapping, dependency resolution and

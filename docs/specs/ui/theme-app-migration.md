@@ -1,36 +1,47 @@
 # 主题应用迁移（theme app migration）
 
-> PLAN-007 交付合同（SD-03）。官方主题单源、应用默认跟随/独立回退、首批
-> 两 demo 迁移与全量后继清单。分类：feature ｜ 状态：active ｜ 来源计划：
-> docs/plans/007-autoui-tree-theme-and-examples.md
+> PLAN-007 交付合同（SD-03），PLAN-031 修订（SD-04）。官方主题单源、应用接入
+> 形态、首批/第二批已迁 app 与全量后继清单。分类：feature ｜ 状态：active ｜
+> 来源计划：docs/plans/007-autoui-tree-theme-and-examples.md、
+> docs/plans/031-theme-scope-publication-and-package-closure.md
 
 ## 1. 官方主题单源（C-13）
 
-- 官方候选族维护在 `examples/ui/themes/`（`dep themes { path: "../themes" }`
-  + `use themes.themes: <Name>`）。首批两族，各含 light/dark 完整 31 公共键：
-  - **Auto** —— 默认设计（中性紫罗兰基调）；
-  - **Solarized** —— 风格示意（经典 Solarized 基色；非完整标准实现）。
-- 消费方经 `extend("Auto", ...)` 合成自己的主题；不得把整套颜色复制进
-  每个 app。名称与视觉值经首批（V-07）冻结。
-- 跨包数据模块（纯 `pub theme` 声明、无 widget/store）在 vue 轨 dep 预编
-  译扫描会告警 "No widget or store declarations"——非致命，属已登记边界。
+- 官方族维护在**本仓 `packages/themes/`**（`dep themes { path:
+  "../../../packages/themes" }` + `use themes.themes: <Name>`），首批两族各含
+  light/dark 完整 31 公共键：**Auto**（默认设计，中性紫罗兰基调）与
+  **Solarized**（风格示意，经典 Solarized 基色；非完整标准实现）。
+- 旧 `examples/ui/themes/` 已退役为迁移说明，不再是可编辑源；包身份/版本/
+  清单/校验/外部获取见
+  [正式主题包与外部消费](official-theme-package.md)。
+- 消费方经 `extend("Auto", ...)` 合成自己的主题；不得把整套颜色复制进每个
+  app。名称与视觉值经首批（V-07）冻结。
+- 跨包数据模块（纯 `pub theme` 声明、无 widget/store）在 vue 轨 dep 预编译
+  扫描会告警 "No widget or store declarations"——非致命，属已登记边界。
 
 ## 2. 应用接入形态（C-14）
 
 - 已迁移 app 的主题/模式选择 = design 块数据绑定（`theme: .theme_name`、
   `mode: if .dark_mode {...}`）；切换 = 普通事件改模型字段。不复制设置
   菜单、不固定 Auto/light 阻断统一切换。
-- 独立运行默认官方 Auto/light；宿主跟随与跨进程通知/持久化为 AutoOS
-  承接批次的显式任务（本计划未交付）。
+- 独立运行默认官方 Auto/light；显式 pac/CLI 默认（如 010 的 `theme: "dark"`）
+  按新契约保留，不暗改成未显式声明 App 的默认。
 - Vue 轨保留状态名约定：`theme_name`（str）与 `dark_mode`（bool）声明即
-  接通主题热切换（与 design 块绑定同源）。
+  接通主题热切换（与 design 块绑定同源）；首帧应用声明的默认族。
+- 宿主侧提供选择输入（follow/override）与结果读回端口；AutoOS 的通知/
+  持久化/重连与真实 OS 事件由 AutoOS 独立合同承接（本目录不交付）。
 
-## 3. 首批与后继清单（不降级、不冒称全量）
+## 3. 已交付批次与后继清单（不降级、不冒称全量）
 
-- 首批已交付：`002-counter`（增/减/重置保持）、`005-login`（输入/必填
-  校验保持）——双端（Vue + VM/Iced）换肤验收（V-08）。
-- 其余 33 个编号目录 + 公共库/夹具的主题接入 = **已确认后继批次**，逐
-  app 独立状态；不能以框架完成或首批完成冒称 examples 全量接入。
+- 首批（PLAN-007）：`002-counter`（增/减/重置保持）、`005-login`（输入/必填
+  校验保持）+ 试点面 `theme-lab`（两族 × 明暗、局部设计隔离、业务状态保持）。
+- 第二批（PLAN-031）：`003-converter`（两向换算；保留 `desktop_render:
+  "remote"` 声明与既有消费方向）、`010-contact-form`（无必填/格式校验、
+  Submit→submitted、FAQ 列表；回执走包内 `success` 语义槽）。
+- 其余 **30** 个编号目录（含 B1 余 001/004/006/007/008/009 六项 + B2 十二 +
+  B3 十二）的主题接入 = 已确认后继批次，逐 app 独立状态；不能以框架完成或
+  两批完成冒称 examples 全量接入。两个 031 身份（003/010）不并入后续批次
+  重复迁移。
 - 批次顺序按真实依赖：基础控件/表单 → 列表/卡片/导航 → 复杂业务/编辑/
   媒体；共享 `stylekit` 与验证夹具（`remote-frame-e2e`、032）按来源保持
   义务，不按业务 app 强套主题。
@@ -44,3 +55,5 @@
   `#002b36` 等基色逐值核对）。
 - 换肤保持业务：计数/输入/校验状态与组件实例身份跨主题+模式往返保持
   （V-04/V-08）；非法主题/模式组合保旧有效设计（V-05 事务面）。
+- 已知既有差异：003 的 VM 像素抓取只显示表面（迁移前基线同样如此，属
+  既有抓取/布局缺陷），其业务正确性以 MCP 快照与换算 oracle 判定。
