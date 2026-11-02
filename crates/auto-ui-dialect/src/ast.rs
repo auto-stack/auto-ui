@@ -112,6 +112,9 @@ pub struct WidgetDecl {
     /// Lifecycle methods (aboutToAppear, aboutToDisappear, etc.)
     pub lifecycle: Vec<LifecycleMethod>,
 
+    /// PLAN-007 T-05: `design { theme: ..., mode: ... }` 主题设计块（可缺省）。
+    pub design: Option<DesignBlock>,
+
     /// Raw native CSS from a widget-level `style { ... }` block, captured
     /// verbatim by the lexer (never tokenized/parsed). Emitted into the
     /// component's `<style scoped>` by the Vue backend.
@@ -238,6 +241,25 @@ pub struct ToolbarBlock {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TimerBlock {
     pub entries: Vec<TimerEntry>,
+}
+
+/// PLAN-007 T-05（C-06/07/08）：`design { ... }` 主题设计块。
+///
+/// ```auto
+/// widget App {
+///     design {
+///         theme: .theme_name
+///         mode: if .dark { "dark" } else { "light" }
+///     }
+/// }
+/// ```
+///
+/// 值是普通表达式（模型绑定/字面量）；theme/mode 选择由每帧对绑定求值
+/// 得出，非法组合在发布前校验（事务，C-07），失败保留旧有效设计（C-11）。
+/// 本块不写业务状态、不做 I/O（C-08）。
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct DesignBlock {
+    pub entries: Vec<(Name, Expr)>,
 }
 
 /// 单条计时器声明：`PollStream (every_ms: 500, when: .streaming)`。
@@ -997,6 +1019,7 @@ mod tests {
             actions: None,
             expose: Vec::new(),
             timer: None,
+            design: None,
         };
 
         assert_eq!(widget.name.as_str(), "Counter");

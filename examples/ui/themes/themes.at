@@ -1,0 +1,156 @@
+// AutoUI 官方主题候选包（PLAN-007 首批，C-13）。
+//
+// 两个候选族，各含 light/dark 完整 31 公共键（与 TokenName 封闭词表对账）：
+// - Auto      —— 默认设计（中性紫罗兰基调，兼容既有公共语义类消费面）
+// - Solarized —— 风格示意（经典 Solarized 基色；非完整标准实现）
+//
+// 单源消费：`dep themes { path: "../themes" }` + `use themes.themes: Auto, Solarized`；
+// 应用经 extend 合成自己的主题（C-04），不复制配色表。名称与视觉值经首批
+// 评估冻结（V-07）。
+
+pub theme Auto = {
+    tokens: {
+        colors: {
+            background: "#ffffff"
+            foreground: "#09090b"
+            card: "#ffffff"
+            card-foreground: "#09090b"
+            popover: "#ffffff"
+            popover-foreground: "#09090b"
+            primary: "#8b5cf6"
+            primary-foreground: "#ffffff"
+            secondary: "#f4f4f5"
+            secondary-foreground: "#18181b"
+            muted: "#f4f4f5"
+            muted-foreground: "#71717a"
+            accent: "#f4f4f5"
+            accent-foreground: "#18181b"
+            destructive: "#ef4444"
+            destructive-foreground: "#fafafa"
+            border: "#e4e4e7"
+            input: "#e4e4e7"
+            ring: "#8b5cf6"
+            sidebar-background: "#fafafa"
+            sidebar-foreground: "#71717a"
+            sidebar-primary: "#8b5cf6"
+            sidebar-primary-foreground: "#ffffff"
+            sidebar-accent: "#f0f0f2"
+            sidebar-accent-foreground: "#18181b"
+            sidebar-border: "#e4e4e7"
+            sidebar-ring: "#8b5cf6"
+            success: "#22c55e"
+            warning: "#eab308"
+            info: "#3b82f6"
+            error: "#ef4444"
+        }
+        radius: { control: "8dp" }
+    }
+    modes: {
+        light: { tokens: { colors: {
+            background: "#ffffff"
+            foreground: "#09090b"
+        } } }
+        dark: { tokens: { colors: {
+            background: "#09090b"
+            foreground: "#fafafa"
+            card: "#0f0f12"
+            card-foreground: "#fafafa"
+            popover: "#0f0f12"
+            popover-foreground: "#fafafa"
+            primary: "#a78bfa"
+            primary-foreground: "#1c1c21"
+            secondary: "#1f1f23"
+            secondary-foreground: "#fafafa"
+            muted: "#1f1f23"
+            muted-foreground: "#a1a1aa"
+            accent: "#26262b"
+            accent-foreground: "#fafafa"
+            border: "#27272a"
+            input: "#27272a"
+            ring: "#a78bfa"
+            sidebar-background: "#0c0c0e"
+            sidebar-foreground: "#a1a1aa"
+            sidebar-primary: "#a78bfa"
+            sidebar-primary-foreground: "#1c1c21"
+            sidebar-accent: "#1a1a1e"
+            sidebar-accent-foreground: "#fafafa"
+            sidebar-border: "#27272a"
+            sidebar-ring: "#a78bfa"
+            success: "#4ade80"
+            warning: "#facc15"
+            info: "#60a5fa"
+            error: "#f87171"
+        } } }
+    }
+}
+
+pub theme Solarized = extend("Auto", {
+    tokens: {
+        colors: {
+            background: "#fdf6e3"
+            foreground: "#657b83"
+            card: "#eee8d5"
+            card-foreground: "#586e75"
+            popover: "#eee8d5"
+            popover-foreground: "#586e75"
+            primary: "#268bd2"
+            primary-foreground: "#fdf6e3"
+            secondary: "#eee8d5"
+            secondary-foreground: "#586e75"
+            muted: "#eee8d5"
+            muted-foreground: "#93a1a1"
+            accent: "#eee8d5"
+            accent-foreground: "#586e75"
+            destructive: "#dc322f"
+            destructive-foreground: "#fdf6e3"
+            border: "#ddd6c1"
+            input: "#ddd6c1"
+            ring: "#268bd2"
+            sidebar-background: "#f3ecd9"
+            sidebar-foreground: "#93a1a1"
+            sidebar-primary: "#268bd2"
+            sidebar-primary-foreground: "#fdf6e3"
+            sidebar-accent: "#e8dfc9"
+            sidebar-accent-foreground: "#586e75"
+            sidebar-border: "#ddd6c1"
+            sidebar-ring: "#268bd2"
+            success: "#859900"
+            warning: "#b58900"
+            info: "#2aa198"
+            error: "#dc322f"
+        }
+    }
+    modes: {
+        dark: { tokens: { colors: {
+            background: "#002b36"
+            foreground: "#93a1a1"
+            card: "#073642"
+            card-foreground: "#93a1a1"
+            popover: "#073642"
+            popover-foreground: "#93a1a1"
+            primary: "#268bd2"
+            primary-foreground: "#fdf6e3"
+            secondary: "#073642"
+            secondary-foreground: "#93a1a1"
+            muted: "#073642"
+            muted-foreground: "#657b83"
+            accent: "#073642"
+            accent-foreground: "#93a1a1"
+            border: "#0a4552"
+            input: "#0a4552"
+            ring: "#268bd2"
+            sidebar-background: "#00212a"
+            sidebar-foreground: "#657b83"
+            sidebar-primary: "#268bd2"
+            sidebar-primary-foreground: "#fdf6e3"
+            sidebar-accent: "#073642"
+            sidebar-accent-foreground: "#93a1a1"
+            sidebar-border: "#0a4552"
+            sidebar-ring: "#268bd2"
+            success: "#859900"
+            warning: "#b58900"
+            info: "#2aa198"
+            error: "#dc322f"
+        } } }
+    }
+})

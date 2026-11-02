@@ -237,15 +237,17 @@ pub theme UnknownKey = extend("Auto", {
 #[test]
 fn official_theme_package_readable_from_examples_root() {
     let pkg = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/ui/themes");
-    if !pkg.is_dir() {
-        // T-06 前允许缺席；落点建立后此分支消失
-        return;
-    }
-    let src = std::fs::read_to_string(pkg.join("official.at")).unwrap();
-    let known =
-        collect_theme_trees(&pkg.join("official.at"), &src).unwrap();
+    let src_path = pkg.join("themes.at");
+    let src = std::fs::read_to_string(&src_path).expect("官方主题包 themes/themes.at 必须存在");
+    let known = collect_theme_trees(&src_path, &src).unwrap();
     assert!(known.contains_key("Auto"));
     assert!(known.contains_key("Solarized"));
+    // Solarized extend Auto：基座键继承 + 自身覆盖，两 modes 保留
+    let auto = known.get("Auto").unwrap();
+    let sol = known.get("Solarized").unwrap();
+    use auto_ui_compiler::design_tokens::registry::TokenName;
+    assert_eq!(resolve_rgb(auto, TokenName::Background), Some((255, 255, 255)));
+    assert_eq!(resolve_rgb(sol, TokenName::Primary), Some((38, 139, 210)));
 }
 
 mod token_alias {
@@ -254,3 +256,30 @@ mod token_alias {
 use token_alias::Token;
 
 
+
+#[test]
+fn probe_element_design_surface_forms() {
+    // (form, source) — which element-side local-diff forms parse today?
+    let cases: [(&str, &str); 5] = [
+        ("prop_dot_ref", "widget A { view { col { style: tokens.radius.control } } }"),
+        ("prop_object", "widget A { view { col { design: { radius: \"8dp\" } } } }"),
+        ("prop_dot_design", "widget A { view { col { design: panel_tokens } } }"),
+        ("block_design", "widget A { view { col { design { radius: \"8dp\" } } } }"),
+        ("widget_design_block", "widget A { design { theme: \"Auto\" } view { col { text \"x\" {} } } }"),
+    ];
+    for (label, src) in cases {
+        match parse_ui(src) {
+            Ok(_) => println!("DESIGN-PROBE {label}: OK"),
+            Err(e) => println!("DESIGN-PROBE {label}: ERR {e}"),
+        }
+    }
+}
+
+#[test]
+fn probe_theme_lab_source_parses() {
+    let src = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/theme-lab/src/front/app.at")).unwrap();
+    match parse_ui(&src) {
+        Ok(ui) => println!("THEME-LAB PARSE: OK ({} domain stmts)", ui.domain_stmts().count()),
+        Err(e) => println!("THEME-LAB PARSE: ERR {e}"),
+    }
+}

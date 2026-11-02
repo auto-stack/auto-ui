@@ -190,6 +190,7 @@ pub fn parse_component_fn_decl(cx: &mut dyn DomainParseContext) -> AutoResult<Ui
         expose: Vec::new(),
         actions: None,
         timer: None,
+            design: None,
     };
     mint_inline_event_handlers(&mut decl)?;
     Ok(UiStmt::WidgetDecl(decl))

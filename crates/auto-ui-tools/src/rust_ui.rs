@@ -909,6 +909,7 @@ fn compile_at_file(
                 setup: None,
                 actions: None,
                 timer: store.timer.clone(),
+                design: None,
             };
             match auto_ui_compiler::aura::extract_widget_from_decl(&fake_decl) {
                 Ok(aura_widget) => {

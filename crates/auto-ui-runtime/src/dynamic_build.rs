@@ -479,6 +479,7 @@ fn store_decl_as_widget_decl(
         setup: None,
         actions: None,
         timer: store_decl.timer.clone(),
+        design: None,
     }
 }
 
@@ -1313,6 +1314,7 @@ fn build_dynamic_component_inner(
                                     setup: None,
                                     actions: None,
                                     timer: store_decl.timer.clone(),
+                                    design: None,
                                 });
                             }
                         }
@@ -1525,6 +1527,7 @@ fn build_dynamic_component_inner(
                                     setup: None,
                                     actions: None,
                                     timer: store_decl.timer.clone(),
+                                    design: None,
                                 });
                             }
                         }
@@ -1592,6 +1595,7 @@ fn build_dynamic_component_inner(
                 setup: None,
                 actions: None,
                 timer: store_decl.timer.clone(),
+                design: None,
             };
             store_as_child_decls.push(fake_widget);
         }
@@ -1627,6 +1631,7 @@ fn build_dynamic_component_inner(
                     setup: None,
                     actions: None,
                     timer: store_decl.timer.clone(),
+                    design: None,
                 });
             }
         }

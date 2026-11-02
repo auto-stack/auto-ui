@@ -1,0 +1,9 @@
+name: "themes"
+version: "0.1.0"
+scene: "ui"
+render: "vue"
+title: "AutoUI Official Themes"
+title_zh: "AutoUI 官方主题包"
+# 官方主题单源包（PLAN-007，C-13）：AutoUI 提供公共库，demo 与 AutoOS
+# 消费同一约定和固定版本；不把整套颜色复制进每个 app。
+# 消费方式：`dep themes { path: "../themes" }` + `use themes.themes: Auto, Solarized`

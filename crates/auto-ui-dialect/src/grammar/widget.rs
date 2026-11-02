@@ -49,6 +49,8 @@ pub fn parse_widget_decl(cx: &mut dyn DomainParseContext) -> AutoResult<UiStmt> 
     let mut setup: Option<ui_ast::SetupBlock> = None;
     let mut actions: Option<ui_ast::ActionsBlock> = None;
     let mut timer: Option<ui_ast::TimerBlock> = None;
+    // PLAN-007 T-05：design 主题设计块（C-06/07/08）。
+    let mut design: Option<ui_ast::DesignBlock> = None;
 
     while !cx.is_kind(TokenKind::RBrace) {
         cx.skip_empty_lines();
@@ -164,6 +166,16 @@ pub fn parse_widget_decl(cx: &mut dyn DomainParseContext) -> AutoResult<UiStmt> 
                     .into());
                 }
             }
+            // PLAN-007 T-05：design 主题设计块（theme/mode 数据绑定）。
+            "design" => {
+                if design.replace(parse_design_block_inner(cx)?).is_some() {
+                    return Err(SyntaxError::Generic {
+                        message: "duplicate `design` block in widget".into(),
+                        span: pos_to_span(cx.cur_pos()),
+                    }
+                    .into());
+                }
+            }
             _ => {
                 // Plan 425: view 可选化——widget 体以元素开头(无 view 块)
                 // 时体即视图:首个非块关键字标识符按视图元素解析并自动
@@ -178,9 +190,9 @@ pub fn parse_widget_decl(cx: &mut dyn DomainParseContext) -> AutoResult<UiStmt> 
                 let next_is_brace = cx.is_kind(TokenKind::LBrace);
                 cx.raw_cursor_restore(cp)?;
                 if next_is_brace {
-                    const BLOCK_KEYWORDS: [&str; 13] = [
+                    const BLOCK_KEYWORDS: [&str; 14] = [
                         "msg", "model", "computed", "view", "on", "style", "use", "watch",
-                        "expose", "routes", "setup", "actions", "timer",
+                        "expose", "routes", "setup", "actions", "timer", "design",
                     ];
                     if let Some(kw) = BLOCK_KEYWORDS
                         .iter()
@@ -231,6 +243,7 @@ pub fn parse_widget_decl(cx: &mut dyn DomainParseContext) -> AutoResult<UiStmt> 
         expose,
         actions,
         timer,
+        design,
     };
     mint_inline_event_handlers(&mut decl)?;
     // Plan 051 C7: timer 条目头必须命中本 widget 的 msg{} 变体——
@@ -1482,4 +1495,39 @@ pub(crate) fn parse_bind_block(cx: &mut dyn DomainParseContext) -> AutoResult<Bi
 
     cx.expect(TokenKind::RBrace)?;
     Ok(BindBlock { bindings })
+}
+
+/// PLAN-007 T-05：design 块体——`name: expr` 条目序列（换行/逗号分隔，
+/// 值 = 普通表达式：模型绑定 / 字面量 / if 链）。重复键为解析错误。
+fn parse_design_block_inner(
+    cx: &mut dyn DomainParseContext,
+) -> AutoResult<ui_ast::DesignBlock> {
+    cx.expect_ident("design")?;
+    cx.expect(TokenKind::LBrace)?;
+    cx.skip_empty_lines();
+    let mut entries: Vec<(ast::Name, ast::Expr)> = Vec::new();
+    loop {
+        cx.skip_empty_lines();
+        if cx.is_kind(TokenKind::RBrace) {
+            cx.advance();
+            break;
+        }
+        let key = cx.cur_text();
+        cx.expect(TokenKind::Ident)?;
+        cx.expect(TokenKind::Colon)?;
+        let value = cx.parse_expr()?;
+        if entries.iter().any(|(k, _)| k.as_str() == key) {
+            return Err(SyntaxError::Generic {
+                message: format!("duplicate `design` entry `{key}`"),
+                span: pos_to_span(cx.cur_pos()),
+            }
+            .into());
+        }
+        entries.push((key.into(), value));
+        cx.skip_empty_lines();
+        if cx.is_kind(TokenKind::Comma) {
+            cx.advance();
+        }
+    }
+    Ok(ui_ast::DesignBlock { entries })
 }

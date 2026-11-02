@@ -152,7 +152,8 @@ mod tests {
             expose: vec![],
             actions: None,
             timer: None,
-        };
+                        design: None,
+};
         UiCode(DomainCode {
             items: vec![
                 DomainStmt::Domain(UiStmt::WidgetDecl(widget)),

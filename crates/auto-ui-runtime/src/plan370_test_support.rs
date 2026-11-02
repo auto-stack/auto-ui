@@ -241,7 +241,8 @@ pub(crate) fn build_component_from_app_mode(
                                 ext_imports: Vec::new(),
                                 watch: Vec::new(),
                                 expose: Vec::new(),
-                            });
+                                                            design: None,
+                                });
                         }
                     }
                 }
@@ -359,6 +360,7 @@ pub(crate) fn build_component_from_app_mode(
                 ext_imports: Vec::new(),
                 watch: Vec::new(),
                 expose: Vec::new(),
+                design: None,
             });
         }
     }
@@ -390,6 +392,7 @@ pub(crate) fn build_component_from_app_mode(
                     ext_imports: Vec::new(),
                     watch: Vec::new(),
                     expose: Vec::new(),
+                design: None,
                 });
             }
         }

@@ -1,0 +1,82 @@
+// Theme Lab —— PLAN-007 固定试用面（§5.1/C-08..12）。
+//
+// 一次运行观察：两官方族 × light/dark 切换、槽引用联动（V-02）、两个
+// CapsulePanel 实例隔离（V-04 父/兄弟不串色、子继承/子覆盖）、换肤后
+// 输入 draft-42 与计数 2 业务状态保持、首帧即局部圆角（V-06）。
+// theme/mode 是 design 块的数据绑定（业务状态派生）；切主题 = 改模型
+// 字段，无 I/O、无业务副作用（C-08）。
+use themes.themes: Auto, Solarized
+
+widget App {
+    msg { ToggleMode, UseAuto, UseSolarized }
+
+    model {
+        var count int = 2
+        var draft str = "draft-42"
+        var theme_name str = "Auto"
+        var dark bool = false
+    }
+
+    // 主题/模式选择器（数据绑定；C-06/07：同帧一起校验后发布）
+    design {
+        theme: .theme_name
+        mode: if .dark { "dark" } else { "light" }
+    }
+
+    view {
+        col {
+            text `Theme Lab — ${.theme_name} / ${if .dark { "dark" } else { "light" }}` {
+                style: "text-xl font-bold text-foreground"
+            }
+
+            row {
+                button "Auto" { onclick: .UseAuto, style: "px-3 py-1.5 rounded-lg bg-primary text-primary-foreground" }
+                button "Solarized" { onclick: .UseSolarized, style: "px-3 py-1.5 rounded-lg bg-secondary text-secondary-foreground" }
+                button "切换明暗" { onclick: .ToggleMode, style: "px-3 py-1.5 rounded-lg bg-accent text-accent-foreground" }
+            }
+
+            // 实例一：继承主题槽位（radius 跟随 tokens.radius.control）
+            panel {
+                design: { radius: tokens.radius.control }
+                col {
+                    text "CapsulePanel A（继承主题圆角）" { style: "text-sm text-foreground" }
+                    text `count = ${.count}` { style: "text-lg font-semibold text-primary" }
+                    row {
+                        button "+" { onclick: () => { .count += 1 }, style: "w-8 h-8 rounded-full bg-primary text-primary-foreground" }
+                        button "-" { onclick: () => { .count -= 1 }, style: "w-8 h-8 rounded-full bg-secondary text-secondary-foreground" }
+                        button "Reset" { onclick: () => { .count = 0 }, style: "px-3 h-8 rounded-full bg-muted text-muted-foreground" }
+                    }
+                }
+            }
+
+            // 实例二：局部覆盖（直接字面 radius —— 不随同槽变值联动，V-02）
+            panel {
+                design: { radius: "24dp", background: tokens.colors.card }
+                col {
+                    text "CapsulePanel B（局部 24dp 字面圆角）" { style: "text-sm text-foreground" }
+                    input (value: .draft) {
+                        oninput: () => {}
+                        placeholder: "type here"
+                        style: "px-3 py-2 border border-input rounded-lg text-foreground bg-background"
+                    }
+                    text `draft = ${.draft}` { style: "text-xs text-muted-foreground" }
+                    // 子级继承 + 子级再覆盖（C-09）
+                    panel {
+                        design: { background: tokens.colors.muted }
+                        col {
+                            text "ChildPanel（子覆盖 muted 底、继承 A 外圆角语义）" {
+                                style: "text-xs text-muted-foreground"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    on {
+        .UseAuto -> { .theme_name = "Auto" }
+        .UseSolarized -> { .theme_name = "Solarized" }
+        .ToggleMode -> { .dark = not .dark }
+    }
+}
