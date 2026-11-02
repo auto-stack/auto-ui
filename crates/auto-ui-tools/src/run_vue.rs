@@ -230,10 +230,12 @@ pub fn run_vue_flow(
             .map(|p| p.exists())
             .unwrap_or(false)
         {
+            let tree_themes_js = project.collect_tree_themes_js();
             let index_html = generate_index_html(
                 &project.name,
                 project.index_title.as_deref(),
                 project.theme.as_ref(),
+                tree_themes_js.as_deref(),
             );
             if let Err(e) = fs::write(&index_html_path, index_html) {
                 println!("  ⚠ index.html refresh skipped: {}", e);

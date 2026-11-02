@@ -2938,6 +2938,21 @@ onMounted(() => {{ nextTick(__canvasRedraw_{i}) }})
                             if key == "class" || key == "style" {
                                 continue; // Already handled in extract_classes
                             }
+                            // PLAN-007 T-05：元素 design 对象 → 内联 :style 绑定
+                            //（槽引用 tokens.* 点链 → var(--css-var) 随主题/模式
+                            // 联动；直接字面量 → 具体值不受主题影响。与 VM 轨
+                            // design 对象同语义、各自投影）。
+                            if key == "design" {
+                                if let AuraPropValue::Expr(expr) = value {
+                                    if let Some(binding) = design_obj_to_vue(expr) {
+                                        attrs.push(format!(
+                                            ":style=\"{}\"",
+                                            binding
+                                        ));
+                                    }
+                                }
+                                continue;
+                            }
                             // Inline style object: style_obj: { top: f"${.y}px", "z-index": 50 }
                             // → :style="{ top: `${y}px`, 'z-index': 50 }"
                             if key == "style_obj" {
@@ -4625,4 +4640,97 @@ onMounted(() => {{ nextTick(__canvasRedraw_{i}) }})
         }
     }
 
+}
+
+/// PLAN-007 T-05：design 对象 → Vue `:style` 绑定体。
+/// `radius` → borderRadius；`background` → backgroundColor；
+/// 槽引用（tokens.* 点链）→ `var(--<css-var>)`；字面量 → 具体值
+///（radius 值 dp→px）。未知槽跳过（试点支持面）。
+pub(crate) fn design_obj_to_vue(expr: &auto_parser_api::ast::Expr) -> Option<String> {
+    use auto_parser_api::ast::{Expr, Key};
+    let pairs = match expr {
+        Expr::Object(pairs) => pairs,
+        _ => return None,
+    };
+    let mut parts: Vec<String> = Vec::new();
+    for pair in pairs {
+        let key = match &pair.key {
+            Key::NamedKey(n) => n.to_string(),
+            Key::StrKey(s) => s.to_string(),
+            _ => continue,
+        };
+        let css_prop = match key.as_str() {
+            "radius" => "borderRadius",
+            "background" => "backgroundColor",
+            _ => continue,
+        };
+        let val_js: String = match &*pair.value {
+            Expr::Str(s) => format!("'{}'", design_literal(css_prop, s)),
+            Expr::Int(i) => format!("'{}px'", i),
+            Expr::Float(v, _) | Expr::Double(v, _) => format!("'{}px'", v),
+            Expr::Dot(_, _) | Expr::Ident(_) => {
+                let Some(segs) = flatten_design_ref(&*pair.value) else { continue };
+                let Some(var) = css_var_for_ref_path(&segs) else { continue };
+                format!("'var(--{})'", var)
+            }
+            _ => continue,
+        };
+        parts.push(format!("{}: {}", css_prop, val_js));
+    }
+    if parts.is_empty() {
+        None
+    } else {
+        Some(format!("{{ {} }}", parts.join(", ")))
+    }
+}
+
+fn design_literal(css_prop: &str, s: &str) -> String {
+    if css_prop == "borderRadius" {
+        // dp/px 长度 → px（CSS 侧 1dp=1px 与 VM 轨同刻度）
+        let n = s.trim_end_matches("dp").trim_end_matches("px").trim();
+        if let Ok(v) = n.parse::<f64>() {
+            return format!("{}px", v);
+        }
+    }
+    s.to_string()
+}
+
+fn flatten_design_ref(expr: &auto_parser_api::ast::Expr) -> Option<Vec<String>> {
+    use auto_parser_api::ast::Expr;
+    match expr {
+        Expr::Ident(n) => Some(vec![n.to_string()]),
+        Expr::Dot(root, field) => {
+            let mut segs = flatten_design_ref(root)?;
+            segs.push(field.to_string());
+            Some(segs)
+        }
+        _ => None,
+    }
+}
+
+/// `tokens.colors.<31键>` → `<31键>`；`tokens.radius.<k>` → `radius-<k>`；
+/// `tokens.colors.<ns>.<k>` → `<ns>-<k>`。非 tokens.* 路径 → None。
+fn css_var_for_ref_path(segs: &[String]) -> Option<String> {
+    if segs.first().map(|s| s.as_str()) != Some("tokens") {
+        return None;
+    }
+    match segs.get(1).map(|s| s.as_str()) {
+        Some("colors") => {
+            let rest = &segs[2..];
+            if rest.len() == 1 {
+                Some(rest[0].clone())
+            } else {
+                Some(rest.join("-"))
+            }
+        }
+        Some("radius") => {
+            let rest = &segs[2..];
+            if rest.len() == 1 {
+                Some(format!("radius-{}", rest[0]))
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
 }

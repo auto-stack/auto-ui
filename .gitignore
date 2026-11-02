@@ -40,3 +40,10 @@ book/
 
 # AutoOS 运行时账本目录：specs.json 已迁移 AutoDown（PLAN-107），本地保留只读副本作回滚依据
 .autoos/
+
+# Generated project artifacts under examples (PLAN-007: build/test evidence
+# lives in plan-artifacts; generated gen/rust-workspace/tool caches never land)
+examples/**/gen/
+examples/**/rust-workspace/
+examples/**/.auto/
+examples/**/.am/

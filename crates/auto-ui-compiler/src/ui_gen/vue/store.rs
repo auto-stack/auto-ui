@@ -1049,6 +1049,12 @@ if ((window as any).__AUTO_COMPOSED_THEME__) {{
   const ct = (window as any).__AUTO_COMPOSED_THEME__
   if (ct && ct.name && ct.light && ct.dark) THEME_PALETTES[ct.name] = ct
 }}
+// PLAN-007 T-05: 树状官方主题族（generator 注入 __AUTO_TREE_THEMES__：
+// name -> {{ light, dark }}，值含 app 命名空间扩展色）并入可选面。
+if ((window as any).__AUTO_TREE_THEMES__) {{
+  const tts = (window as any).__AUTO_TREE_THEMES__
+  for (const k in tts) if (tts[k] && tts[k].light && tts[k].dark) THEME_PALETTES[k] = tts[k]
+}}
 const THEME_STORAGE_KEY = 'auto-theme'
 
 /** Active theme: last applied choice persisted in localStorage, else the

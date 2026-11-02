@@ -573,6 +573,8 @@ pub struct VueGenerator {
 
     /// Whether the widget has an isDark state var (dark mode toggle)
     has_dark_mode: bool,
+    /// PLAN-007 T-05：模型声明 `theme_name` → 生成主题热切换 watch。
+    has_theme_name: bool,
     /// Name of the dark mode state variable (e.g. "isDark" or "dark_mode")
     dark_mode_var: Option<String>,
     /// Plan 458: true when the widget itself declares `dark_mode` in its
@@ -988,6 +990,7 @@ impl VueGenerator {
             },
             used_handlers: HashSet::new(),
             has_dark_mode: false,
+            has_theme_name: false,
             dark_mode_var: None,
             dark_mode_on_widget: false,
             has_accent_color: false,
@@ -1336,6 +1339,7 @@ impl VueGenerator {
         self.codegen_warnings.borrow_mut().clear();
         self.has_dark_mode = false;
         self.dark_mode_var = None;
+        self.has_theme_name = false;
         self.dark_mode_on_widget = false;
         self.has_accent_color = false;
         self.use_theme_toggle = false;
@@ -1778,6 +1782,9 @@ impl VueGenerator {
         // `accent_color` state (mirrors the store composable detection at
         // Plan 360; gallery App is a widget, not a store).
         self.has_accent_color = widget.state_vars.iter().any(|s| s.name == "accent_color");
+        // PLAN-007 T-05：theme_name 状态（design.theme 数据绑定的 Vue 面）——
+        // 声明即接通树状/命名主题热切换 watch。
+        self.has_theme_name = widget.state_vars.iter().any(|s| s.name == "theme_name");
         // Also check if ToggleDarkMode handler exists (D1 fix: removed
         // format!("{:?}", widget.view_tree) which caused OOM on large
         // view trees with Expr::If nodes — handler check is sufficient)

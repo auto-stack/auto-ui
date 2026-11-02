@@ -133,7 +133,7 @@ impl VueGenerator {
         // Plan 458: theme flips must re-apply the accent (applyAccent writes
         // the .dark-scoped --primary too, which otherwise falls back to the
         // stylesheet's indigo).
-        if self.has_accent_color && self.has_dark_mode && !imports.contains(&"watch") {
+        if (self.has_accent_color || self.has_theme_name) && self.has_dark_mode && !imports.contains(&"watch") {
             imports.push("watch");
         }
         // Lifecycle: .Init → onMounted, .Destroy → onUnmounted
@@ -2188,7 +2188,7 @@ onUnmounted(() => {{ if ({var} !== null) {{ clearInterval({var}); {var} = null }
         // helper used by the store composable path (Plan 360), plus an onMounted
         // bootstrap that restores the saved choice from localStorage. The
         // palette is aligned with auto-forge (indigo/coral/ocean/sage/amber).
-        if self.has_accent_color {
+        if self.has_accent_color || self.has_theme_name {
             script.push('\n');
             script.push_str(Self::ACCENT_PALETTE_JS);
             // PLAN-601 T-06: full named-theme runtime rides the same gate —
@@ -2196,22 +2196,26 @@ onUnmounted(() => {{ if ({var} !== null) {{ clearInterval({var}); {var} = null }
             // switching (applyTheme reuses applyAccent as its overlay).
             script.push('\n');
             script.push_str(&Self::theme_runtime_js());
-            script.push_str("\n// Restore saved accent on mount.\n");
+            script.push_str("\n// Restore saved theme (and accent when the widget owns one) on mount.\n");
             script.push_str("onMounted(() => {\n");
             // PLAN-601 T-06: restore the active theme on mount (localStorage
             // may carry a user choice or a generator-seeded declared theme).
             // Scaffold default needs no apply — the stylesheet already is it.
             script.push_str("  const __th = getActiveTheme()\n");
             script.push_str("  if (__th !== 'scaffold') applyTheme(__th, document.documentElement.classList.contains('dark'))\n");
-            script.push_str("  const saved = getSavedAccent()\n");
-            // Plan 458: only override the CLI/env-seeded ref when a real
-            // persisted choice exists (getSavedAccent returns '' otherwise).
-            script.push_str("  if (saved) {\n");
-            script.push_str("    accent_color.value = saved\n");
-            script.push_str(
-                "    applyAccent(saved, document.documentElement.classList.contains('dark'))\n",
-            );
-            script.push_str("  }\n");
+            // PLAN-007 T-05：accent 恢复仅在 widget 声明 accent_color 时发射
+            //（theme_name-only 应用无该 ref——PLAN-007 试点面）。
+            if self.has_accent_color {
+                script.push_str("  const saved = getSavedAccent()\n");
+                // Plan 458: only override the CLI/env-seeded ref when a real
+                // persisted choice exists (getSavedAccent returns '' otherwise).
+                script.push_str("  if (saved) {\n");
+                script.push_str("    accent_color.value = saved\n");
+                script.push_str(
+                    "    applyAccent(saved, document.documentElement.classList.contains('dark'))\n",
+                );
+                script.push_str("  }\n");
+            }
             script.push_str("})\n");
             // Plan 458: re-apply the accent when the theme flips at runtime —
             // applyAccent also writes the .dark-scoped --primary, which would
@@ -2225,14 +2229,33 @@ onUnmounted(() => {{ if ({var} !== null) {{ clearInterval({var}); {var} = null }
                     .dark_mode_var
                     .clone()
                     .unwrap_or_else(|| "dark_mode".to_string());
-                script.push_str(&format!(
-                    "// Plan 458: keep the accent and html dark class in sync across theme flips.\nwatch({}, (v) => {{\n  document.documentElement.classList.toggle('dark', v)\n  applyTheme(getActiveTheme(), v, accent_color.value)\n}}, {{ immediate: true }})\n",
-                    dark_var
-                ));
+                // PLAN-007 T-05：accent_color 是 watch 第三参的可选覆盖——
+                // 仅在 widget 声明它时传（theme_name-only 应用用默认
+                // getSavedAccent()）。
+                if self.has_accent_color {
+                    script.push_str(&format!(
+                        "// Plan 458: keep the accent and html dark class in sync across theme flips.\nwatch({}, (v) => {{\n  document.documentElement.classList.toggle('dark', v)\n  applyTheme(getActiveTheme(), v, accent_color.value)\n}}, {{ immediate: true }})\n",
+                        dark_var
+                    ));
+                } else {
+                    script.push_str(&format!(
+                        "// Plan 458: keep the html dark class in sync across theme flips.\nwatch({}, (v) => {{\n  document.documentElement.classList.toggle('dark', v)\n  applyTheme(getActiveTheme(), v)\n}}, {{ immediate: true }})\n",
+                        dark_var
+                    ));
+                }
             }
             script.push('\n');
         }
 
+
+        // PLAN-007 T-05：theme_name → 主题热切换（applyTheme 未知名零变化 =
+        // 事务保旧；theme/mode 同帧变更经两个 watch 同一 flush 批次应用，
+        // C-07 同步事件原子发布）。
+        if self.has_theme_name {
+            script.push_str(
+                "// PLAN-007 T-05: theme_name binds the active theme family (tree themes join THEME_PALETTES via __AUTO_TREE_THEMES__).\nwatch(theme_name, (n) => {\n  if (n) applyTheme(n, document.documentElement.classList.contains('dark'))\n})\n",
+            );
+        }
         Ok(script)
     }
 

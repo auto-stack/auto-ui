@@ -14,18 +14,18 @@ widget App {
         var count int = 2
         var draft str = "draft-42"
         var theme_name str = "Auto"
-        var dark bool = false
+        var dark_mode bool = false
     }
 
     // 主题/模式选择器（数据绑定；C-06/07：同帧一起校验后发布）
     design {
         theme: .theme_name
-        mode: if .dark { "dark" } else { "light" }
+        mode: if .dark_mode { "dark" } else { "light" }
     }
 
     view {
         col {
-            text `Theme Lab — ${.theme_name} / ${if .dark { "dark" } else { "light" }}` {
+            text `Theme Lab — ${.theme_name}` {
                 style: "text-xl font-bold text-foreground"
             }
 
@@ -77,6 +77,6 @@ widget App {
     on {
         .UseAuto -> { .theme_name = "Auto" }
         .UseSolarized -> { .theme_name = "Solarized" }
-        .ToggleMode -> { .dark = not .dark }
+        .ToggleMode -> { .dark_mode = !.dark_mode }
     }
 }

@@ -1234,6 +1234,9 @@ pub fn generate_index_html(
     name: &str,
     title: Option<&str>,
     composed_theme: Option<&auto_ui_compiler::design_tokens::decl::ComposedTheme>,
+    // PLAN-007 T-05: 树状官方主题族注入体（`{ Name: {light,dark} }` JSON；
+    // None = 无声明，零注入）。由调用方经 theme_tree 收集。
+    tree_themes_js: Option<&str>,
 ) -> String {
     // Plan 043 M5: the shadcn template ships fully-populated `.dark` tokens
     // in index.css; the handwritten ash-gui (and the shadcn default) render
@@ -1326,6 +1329,15 @@ pub fn generate_index_html(
         }
         None => String::new(),
     };
+    let tree_bootstrap = match tree_themes_js {
+        Some(js) => {
+            format!("    <script>
+    window.__AUTO_TREE_THEMES__ = {js};
+    </script>
+")
+        }
+        None => String::new(),
+    };
     format!(
         r#"<!DOCTYPE html>
 <html lang="en"{}>
@@ -1334,7 +1346,7 @@ pub fn generate_index_html(
     <link rel="icon" href="/favicon.ico">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{}</title>
-{}{}  </head>
+{}{}{}  </head>
   <body>
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
@@ -1344,7 +1356,8 @@ pub fn generate_index_html(
         dark_attr,
         title.unwrap_or(name),
         accent_bootstrap,
-        theme_bootstrap
+        theme_bootstrap,
+        tree_bootstrap
     )
 }
 
@@ -2492,7 +2505,7 @@ fn write_project_files(
         .map_err(|e| format!("Failed to write postcss.config.cjs: {}", e))?;
 
     // index.html
-    let index_html = generate_index_html(name, index_title, composed_theme);
+    let index_html = generate_index_html(name, index_title, composed_theme, None);
     fs::write(output_path.join("index.html"), index_html)
         .map_err(|e| format!("Failed to write index.html: {}", e))?;
 
@@ -5275,6 +5288,46 @@ export default router
 
     /// Regenerate only source files (App.vue, pages, components, router)
     /// This preserves node_modules, package.json, and installed shadcn components
+
+    /// PLAN-007 T-05：收集应用可用树状主题（真实 use/pac dep 解析链）并
+    /// 渲染为 `__AUTO_TREE_THEMES__` 注入体（`{ Name: {light,dark} }`，值 =
+    /// css_var_pairs 投影——applyTheme 同名写 CSS 变量）。无声明/收集为空
+    /// → None 零注入；收集/schema 失败 = 运行错误（C-11 不发半成品）。
+    pub(crate) fn collect_tree_themes_js(&self) -> Option<String> {
+        use auto_ui_compiler::design_tokens::theme_tree as tt;
+        let app_at = self.front_dir.join("app.at");
+        let code = std::fs::read_to_string(&app_at).ok()?;
+        let trees = match tt::collect_named_themes(&app_at, &code) {
+            Ok(trees) => trees,
+            Err(e) => panic!("树状主题收集/校验失败：{e}（首次挂载不发布半成品，C-11）"),
+        };
+        if trees.is_empty() {
+            return None;
+        }
+        let esc = |s: &str| s.replace('\\', "\\\\").replace('\'', "\\'");
+        let mut parts: Vec<String> = Vec::new();
+        for (name, tree) in &trees {
+            let mode_obj = |dark: bool| -> String {
+                let composed = match tt::compose_mode(tree, dark) {
+                    Ok(c) => c,
+                    Err(_) => return "{}".to_string(),
+                };
+                let pairs = tt::css_var_pairs(&composed);
+                let inner: Vec<String> = pairs
+                    .iter()
+                    .map(|(k, v)| format!("'{}': '{}'", esc(k), esc(v)))
+                    .collect();
+                format!("{{ {} }}", inner.join(", "))
+            };
+            parts.push(format!(
+                " {}: {{ light: {}, dark: {} }}",
+                esc(name),
+                mode_obj(false),
+                mode_obj(true)
+            ));
+        }
+        Some(format!("{{ {} }}", parts.join(", ")))
+    }
     pub fn regenerate_source_files(&self) -> AutoResult<()> {
         println!("{}", "Regenerating source files...".bright_cyan());
 
@@ -5394,8 +5447,13 @@ export default router
         // app renders light). Previously only written on the initial scaffold,
         // so a fresh index.html (or a generator fix) never took effect.
         let index_html_path = self.output_dir.join("index.html");
-        let index_html =
-            generate_index_html(&self.name, self.index_title.as_deref(), self.theme.as_ref());
+        let tree_themes_js = self.collect_tree_themes_js();
+        let index_html = generate_index_html(
+            &self.name,
+            self.index_title.as_deref(),
+            self.theme.as_ref(),
+            tree_themes_js.as_deref(),
+        );
         fs::write(&index_html_path, &index_html)
             .map_err(|e| format!("Failed to write index.html: {}", e))?;
         println!("{}", "  ✓ Regenerated index.html".bright_green());
@@ -10918,9 +10976,9 @@ title: \"Auto Musk\"
             ),
             None
         );
-        let html = generate_index_html("auto-musk", Some("Auto Musk"), None);
+        let html = generate_index_html("auto-musk", Some("Auto Musk"), None, None);
         assert!(html.contains("<title>Auto Musk</title>"));
-        let fallback = generate_index_html("auto-musk", None, None);
+        let fallback = generate_index_html("auto-musk", None, None, None);
         assert!(fallback.contains("<title>auto-musk</title>"));
     }
 

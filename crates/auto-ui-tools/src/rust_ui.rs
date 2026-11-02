@@ -5981,9 +5981,23 @@ pub fn start_api_server(project_dir: &Path) -> Result<Option<std::process::Child
             return Ok(None);
         }
     }
+    // PLAN-007 T-03/T-05：无 back 契约（src/back/api.at | back/ | pac
+    // `back: { project }` 均无）的纯前端 app 直接跳过服务端——此前靠
+    // 旧主检出预生成工作区成员兜底，新检出（示例归 auto-ui 后）纯前端
+    // app 全数误败。有契约的 app 走下方 ensure + generate 常规链。
+    if auto_lang_core::config::resolve_back_api(project_dir).is_none() {
+        eprintln!("[PLAN-007-DBG] no back contract under {} — skipping backend", project_dir.display());
+        return Ok(None);
+    }
+    eprintln!("[PLAN-007-DBG] back contract = {:?}", auto_lang_core::config::resolve_back_api(project_dir));
     // Backend lives in the resolved workspace ({name}-{id8}-back/ member;
     // Stage B P-2 landing + PLAN-910 collision-free identity).
-    let ws_dir = resolve_rust_workspace_dir(project_dir);
+    // 示例归 auto-ui 后新检出/组树不再有预生成 rust-workspace——服务成员
+    // 生成前先 ensure（沿 resolve_managed_front 同一入口）。
+    let ws_dir = match auto_api_gen::rust_workspace::try_ensure_shared_workspace(project_dir) {
+        Ok(ws) => ws,
+        Err(e) => return Err(format!("shared workspace ensure failed: {}", e)),
+    };
     let back_name = auto_api_gen::generated_build::member_dir_name(project_dir, MemberRole::Back);
     let api_backend_dir = ws_dir.join(&back_name);
     // Generate or update the Rust backend from #[api] declarations (idempotent).

@@ -623,6 +623,20 @@ pub fn css_var_pairs(tree: &Tree) -> Vec<(String, String)> {
             }
         }
     }
+    // PLAN-007 T-05：尺寸槽（tokens.radius.* → `radius-*`；dp→px 供 CSS
+    // var 消费——applyTheme 写 var，design 对象经 var() 引用随主题联动）。
+    if let Some(radius) = tree.get("tokens").and_then(|t| t.get("radius")) {
+        if let Tree::Object(pairs) = radius {
+            for (k, v) in pairs {
+                if let Tree::Str(s) = v {
+                    if let Some((n, unit)) = parse_length(s) {
+                        let px = if unit == "dp" { n } else { n };
+                        out.push((format!("radius-{k}"), format!("{px}px")));
+                    }
+                }
+            }
+        }
+    }
     // app 命名空间扩展色（顶层 `<ns>` 对象或 tokens.colors 下的 ns 子对象）
     if let Tree::Object(pairs) = tree {
         for (k, v) in pairs {
