@@ -1,5 +1,13 @@
 # examples/ui — AutoUI 应用示例（App 轨道）
 
+> **PLAN-007（2026-11-02）**：本目录整体自 `auto-lang/examples/ui` 归位本仓
+> （T-02，381 文件逐文件 SHA-256 字节等价迁移）。官方主题包 [`themes/`](themes/)
+> 与试点应用 [`../theme-lab/`](../theme-lab/) 同批落地；首批主题接入：
+> [`002-counter/`](002-counter/)、[`005-login/`](005-login/)（design 块 +
+> `dep themes`，业务保持，V-08 双端验收）。其余 33 个编号目录的逐 app
+> 主题迁移为已确认后继批次，逐目录状态见 `docs/plans/007-*` 归档。
+
+
 这里只放**应用性质**的示例：每个目录是一个可 `auto run` 起来的完整 UI 应用，
 以"完成一件事"为目标，而不是展示某个语言特性。
 
