@@ -427,6 +427,11 @@ pub struct VueGenerator {
     /// Current widget name
     current_widget: Option<String>,
 
+    /// PLAN-031 T-03：widget 模板根是否已挂 `ref="__autoThemeRoot"`——
+    /// 主题/强调色运行时据此把 CSS vars 写到本 App 容器子树（多 App 同
+    /// 文档不共享 document 变量）；无根 `<div>` 的模板保持 document legacy。
+    theme_root_ref: bool,
+
     /// Collected imports
     imports: Vec<String>,
 
@@ -943,6 +948,7 @@ impl VueGenerator {
             select_markers: std::env::var("AUTOUI_SELECT_MARKERS").as_deref() == Ok("1"),
             source_stem: "app".to_string(),
             current_widget: None,
+            theme_root_ref: false,
             imports: Vec::new(),
             state_names: Vec::new(),
             prop_names: Vec::new(),
@@ -14648,13 +14654,13 @@ widget ThemeApp {
             sfc
         );
         assert!(
-            sfc.contains("applyTheme(getActiveTheme(), v, accent_color.value)"),
+            sfc.contains("applyTheme(getActiveTheme(), v, accent_color.value"),
             "mode-flip watch must re-apply the whole active theme:\n{}",
             sfc
         );
         // Accent overlay stays cohesive inside applyTheme (last write wins).
         assert!(
-            sfc.contains("if (accentName) applyAccent(accentName, isDark)"),
+            sfc.contains("if (accentName) applyAccent(accentName, isDark"),
             "applyTheme must end with the accent overlay:\n{}",
             sfc
         );
@@ -14707,7 +14713,7 @@ store Shell {
             code
         );
         assert!(
-            code.contains("if (accentName) applyAccent(accentName, isDark)"),
+            code.contains("if (accentName) applyAccent(accentName, isDark"),
             "accent overlay must be cohesive in applyTheme:\n{}",
             code
         );

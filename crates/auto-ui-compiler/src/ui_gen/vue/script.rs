@@ -120,6 +120,10 @@ impl VueGenerator {
                 imports.push("watch");
             }
         }
+        // PLAN-031 T-03：容器主题根 ref（widget 路径）需要 `ref` 导入。
+        if self.theme_root_ref && !imports.contains(&"ref") {
+            imports.push("ref");
+        }
         // Dark mode: needs onMounted for system preference detection
         if self.has_dark_mode {
             if !imports.contains(&"onMounted") {
@@ -2196,13 +2200,32 @@ onUnmounted(() => {{ if ({var} !== null) {{ clearInterval({var}); {var} = null }
             // switching (applyTheme reuses applyAccent as its overlay).
             script.push('\n');
             script.push_str(&Self::theme_runtime_js());
+            // PLAN-031 T-03：容器主题根——vars 写本 App 容器子树而非
+            // document 根；无根 <div>（theme_root_ref=false）保持 legacy。
+            if self.theme_root_ref {
+                if self.use_typescript {
+                    script.push_str("const __autoThemeRoot = ref<HTMLElement | null>(null)\n");
+                } else {
+                    script.push_str("const __autoThemeRoot = ref(null)\n");
+                }
+            }
             script.push_str("\n// Restore saved theme (and accent when the widget owns one) on mount.\n");
             script.push_str("onMounted(() => {\n");
+            if self.theme_root_ref {
+                script.push_str("  const __rootEl = __autoThemeRoot.value\n");
+                script.push_str(
+                    "  const __isDark = (__rootEl ?? document.documentElement).classList.contains('dark')\n",
+                );
+            }
             // PLAN-601 T-06: restore the active theme on mount (localStorage
             // may carry a user choice or a generator-seeded declared theme).
             // Scaffold default needs no apply — the stylesheet already is it.
             script.push_str("  const __th = getActiveTheme()\n");
-            script.push_str("  if (__th !== 'scaffold') applyTheme(__th, document.documentElement.classList.contains('dark'))\n");
+            if self.theme_root_ref {
+                script.push_str("  if (__th !== 'scaffold') applyTheme(__th, __isDark, getSavedAccent(), __rootEl)\n");
+            } else {
+                script.push_str("  if (__th !== 'scaffold') applyTheme(__th, document.documentElement.classList.contains('dark'))\n");
+            }
             // PLAN-007 T-05：accent 恢复仅在 widget 声明 accent_color 时发射
             //（theme_name-only 应用无该 ref——PLAN-007 试点面）。
             if self.has_accent_color {
@@ -2211,9 +2234,13 @@ onUnmounted(() => {{ if ({var} !== null) {{ clearInterval({var}); {var} = null }
                 // persisted choice exists (getSavedAccent returns '' otherwise).
                 script.push_str("  if (saved) {\n");
                 script.push_str("    accent_color.value = saved\n");
-                script.push_str(
-                    "    applyAccent(saved, document.documentElement.classList.contains('dark'))\n",
-                );
+                if self.theme_root_ref {
+                    script.push_str("    applyAccent(saved, __isDark, __rootEl)\n");
+                } else {
+                    script.push_str(
+                        "    applyAccent(saved, document.documentElement.classList.contains('dark'))\n",
+                    );
+                }
                 script.push_str("  }\n");
             }
             script.push_str("})\n");
@@ -2233,15 +2260,29 @@ onUnmounted(() => {{ if ({var} !== null) {{ clearInterval({var}); {var} = null }
                 // 仅在 widget 声明它时传（theme_name-only 应用用默认
                 // getSavedAccent()）。
                 if self.has_accent_color {
-                    script.push_str(&format!(
-                        "// Plan 458: keep the accent and html dark class in sync across theme flips.\nwatch({}, (v) => {{\n  document.documentElement.classList.toggle('dark', v)\n  applyTheme(getActiveTheme(), v, accent_color.value)\n}}, {{ immediate: true }})\n",
-                        dark_var
-                    ));
+                    if self.theme_root_ref {
+                        script.push_str(&format!(
+                            "// Plan 458: keep the accent and html dark class in sync across theme flips.\nwatch({}, (v) => {{\n  document.documentElement.classList.toggle('dark', v)\n  applyTheme(getActiveTheme(), v, accent_color.value, __autoThemeRoot.value)\n}}, {{ immediate: true }})\n",
+                            dark_var
+                        ));
+                    } else {
+                        script.push_str(&format!(
+                            "// Plan 458: keep the accent and html dark class in sync across theme flips.\nwatch({}, (v) => {{\n  document.documentElement.classList.toggle('dark', v)\n  applyTheme(getActiveTheme(), v, accent_color.value)\n}}, {{ immediate: true }})\n",
+                            dark_var
+                        ));
+                    }
                 } else {
-                    script.push_str(&format!(
-                        "// Plan 458: keep the html dark class in sync across theme flips.\nwatch({}, (v) => {{\n  document.documentElement.classList.toggle('dark', v)\n  applyTheme(getActiveTheme(), v)\n}}, {{ immediate: true }})\n",
-                        dark_var
-                    ));
+                    if self.theme_root_ref {
+                        script.push_str(&format!(
+                            "// Plan 458: keep the html dark class in sync across theme flips.\nwatch({}, (v) => {{\n  document.documentElement.classList.toggle('dark', v)\n  applyTheme(getActiveTheme(), v, getSavedAccent(), __autoThemeRoot.value)\n}}, {{ immediate: true }})\n",
+                            dark_var
+                        ));
+                    } else {
+                        script.push_str(&format!(
+                            "// Plan 458: keep the html dark class in sync across theme flips.\nwatch({}, (v) => {{\n  document.documentElement.classList.toggle('dark', v)\n  applyTheme(getActiveTheme(), v)\n}}, {{ immediate: true }})\n",
+                            dark_var
+                        ));
+                    }
                 }
             }
             script.push('\n');
@@ -2252,9 +2293,15 @@ onUnmounted(() => {{ if ({var} !== null) {{ clearInterval({var}); {var} = null }
         // 事务保旧；theme/mode 同帧变更经两个 watch 同一 flush 批次应用，
         // C-07 同步事件原子发布）。
         if self.has_theme_name {
-            script.push_str(
-                "// PLAN-007 T-05: theme_name binds the active theme family (tree themes join THEME_PALETTES via __AUTO_TREE_THEMES__).\nwatch(theme_name, (n) => {\n  if (n) applyTheme(n, document.documentElement.classList.contains('dark'))\n})\n",
-            );
+            if self.theme_root_ref {
+                script.push_str(
+                    "// PLAN-007 T-05: theme_name binds the active theme family (tree themes join THEME_PALETTES via __AUTO_TREE_THEMES__).\nwatch(theme_name, (n) => {\n  if (n) applyTheme(n, (__autoThemeRoot.value ?? document.documentElement).classList.contains('dark'), getSavedAccent(), __autoThemeRoot.value)\n})\n",
+                );
+            } else {
+                script.push_str(
+                    "// PLAN-007 T-05: theme_name binds the active theme family (tree themes join THEME_PALETTES via __AUTO_TREE_THEMES__).\nwatch(theme_name, (n) => {\n  if (n) applyTheme(n, document.documentElement.classList.contains('dark'))\n})\n",
+                );
+            }
         }
         Ok(script)
     }

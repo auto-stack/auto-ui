@@ -7,8 +7,22 @@ impl VueGenerator {
     /// Generate <template> content from view tree
     pub(super) fn generate_template(&mut self, root: &AuraNode) -> GenResult<String> {
         let mut template = String::new();
+        // 每模板重置：ref 只属于本次生成的根元素（同一 generator 复用时
+        // 不把上一个 widget 的容器标记漏给下一个）。
+        self.theme_root_ref = false;
 
-        let root_html = self.node_to_html(root, 2)?;
+        let mut root_html = self.node_to_html(root, 2)?;
+
+        // PLAN-031 T-03：带主题/强调色运行时的 widget，根元素挂容器 ref；
+        // applyTheme/applyAccent 把 CSS vars 写到该容器子树（同文档多 App
+        // 各自独立），无根 <div> 的模板保持 document legacy（具名边界）。
+        if (self.has_theme_name || self.has_accent_color)
+            && !self.theme_root_ref
+            && root_html.contains("<div ")
+        {
+            root_html = root_html.replacen("<div ", "<div ref=\"__autoThemeRoot\" ", 1);
+            self.theme_root_ref = true;
+        }
 
         // Check for dark mode: either explicit state var, view tree reference,
         // or a ToggleDarkMode handler used in the template

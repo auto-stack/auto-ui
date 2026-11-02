@@ -967,7 +967,7 @@ const ACCENT_STORAGE_KEY = 'notes-accent-color'
  *  puts `.dark { --primary: ... }` on a root wrapper div, which would
  *  otherwise shadow the value inherited from <html>. We use a microtask
  *  (setTimeout 0) for the .dark pass so Vue has flushed the :class change. */
-function applyAccent(name: string, isDark = false): void {
+function applyAccent(name: string, isDark = false, rootEl?: HTMLElement | null): void {
   const hsl = ACCENT_PALETTES[name]
   if (!hsl) return
   let finalHsl = hsl
@@ -981,7 +981,9 @@ function applyAccent(name: string, isDark = false): void {
       finalHsl = match[1] + ' ' + boosted + '%'
     }
   }
-  const root = document.documentElement
+  // PLAN-031 T-03：传 rootEl 时写到该 App 容器（多 App 同文档不共享
+  // document 变量）；缺省 documentElement = legacy 单应用路径。
+  const root = rootEl ?? document.documentElement
   root.style.setProperty('--primary', finalHsl)
   // Also set on any .dark element so it overrides the .dark { --primary }
   // rule defined in index.css (which lives on a different element than <html>).
@@ -989,19 +991,21 @@ function applyAccent(name: string, isDark = false): void {
   // and dark just toggled — Vue flushes :class after this call returns).
   // CRITICAL: in light mode (no .dark elements) we must also REMOVE any
   // stale inline --primary left over from a previous dark-mode apply, otherwise
-  // the old value shadows the new <html>-level value via CSS inheritance.
+  // the old value shadows the new value via CSS inheritance.
   function applyToDark() {
+    const scope: ParentNode = rootEl ?? document
     if (isDark) {
-      document.querySelectorAll('.dark').forEach(function (el) {
+      // 容器根自身可能带 .dark（模板 :class 绑定）——querySelectorAll 不含自身。
+      if (root.classList.contains('dark')) root.style.setProperty('--primary', finalHsl)
+      scope.querySelectorAll('.dark').forEach(function (el) {
         ;(el as HTMLElement).style.setProperty('--primary', finalHsl)
       })
     } else {
       // Light mode: clear any stale inline --primary on elements that
-      // previously carried .dark (the wrapper still exists, just without .dark).
-      // IMPORTANT: skip documentElement (html) — that's where we just set the
-      // current value. Only clear child elements with a stale inline override.
-      document.querySelectorAll('[style*="--primary"]').forEach(function (el) {
-        if (el !== document.documentElement) {
+      // previously carried .dark. Skip the root itself (it holds the current
+      // value). Scoped to the container subtree when rootEl is provided.
+      scope.querySelectorAll('[style*="--primary"]').forEach(function (el) {
+        if (el !== root) {
           ;(el as HTMLElement).style.removeProperty('--primary')
         }
       })
@@ -1075,21 +1079,26 @@ function getActiveTheme(): string {{
  *  write. The accent overlay runs LAST so a named --primary rides on top of
  *  any theme (+10 dark boost inside applyAccent). Unknown names are ignored
  *  (closed vocabulary). */
-function applyTheme(name: string, isDark = document.documentElement.classList.contains('dark'), accentName = getSavedAccent()): void {{
+function applyTheme(name: string, isDark = document.documentElement.classList.contains('dark'), accentName = getSavedAccent(), rootEl?: HTMLElement | null): void {{
   const pal = THEME_PALETTES[name]
   if (!pal) return
-  const root = document.documentElement
+  // PLAN-031 T-03：rootEl = 本 App 容器（widget 模板根 ref）——vars 只写
+  // 该子树，多 App 同文档互不覆盖；缺省 documentElement = legacy 单应用。
+  const root = rootEl ?? document.documentElement
   function writeVars(el: HTMLElement, vars: Record<string, string>) {{
     for (const k in vars) el.style.setProperty('--' + k, vars[k])
   }}
   writeVars(root, pal.light)
   function applyDarkPass() {{
+    const scope: ParentNode = rootEl ?? document
     if (isDark) {{
-      document.querySelectorAll('.dark').forEach(function (el) {{ writeVars(el as HTMLElement, pal!.dark) }})
+      // 容器根自身可能带 .dark（模板 :class 绑定）——querySelectorAll 不含自身。
+      if (root.classList.contains('dark')) writeVars(root, pal!.dark)
+      scope.querySelectorAll('.dark').forEach(function (el) {{ writeVars(el as HTMLElement, pal!.dark) }})
     }} else {{
       // Any previous full write carries --background — use it as the marker
-      // for stale inline overrides (documentElement keeps its own value).
-      document.querySelectorAll('.dark, [style*="--background"]').forEach(function (el) {{
+      // for stale inline overrides (the root keeps its own value).
+      scope.querySelectorAll('.dark, [style*="--background"]').forEach(function (el) {{
         if (el !== root) for (const k in pal!.light) (el as HTMLElement).style.removeProperty('--' + k)
       }})
     }}
@@ -1097,7 +1106,7 @@ function applyTheme(name: string, isDark = document.documentElement.classList.co
   applyDarkPass()
   setTimeout(applyDarkPass, 0)
   try {{ localStorage.setItem(THEME_STORAGE_KEY, name) }} catch {{}}
-  if (accentName) applyAccent(accentName, isDark)
+  if (accentName) applyAccent(accentName, isDark, rootEl)
 }}
 "#
         )
