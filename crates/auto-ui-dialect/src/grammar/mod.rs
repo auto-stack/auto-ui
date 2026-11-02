@@ -3,6 +3,7 @@ use auto_parser_api::DomainParseContext;
 pub mod actions;
 pub mod helpers;
 pub mod store;
+pub mod theme;
 pub mod use_web;
 pub mod view;
 pub mod widget;
@@ -31,6 +32,7 @@ impl DomainDialect for UiDialect {
             "actions",
             "style",
             "store",
+            "theme",
         ]
     }
 
@@ -58,6 +60,10 @@ impl DomainDialect for UiDialect {
                 None => return Ok(None),
             },
             "store" => DomainStmt::Domain(store::parse_store_decl(cx)?),
+            "theme" => match theme::parse_theme_decl_stmt(cx)? {
+                Some(stmt) => DomainStmt::Domain(stmt),
+                None => return Ok(None),
+            },
             _ => return Ok(None),
         };
         Ok(Some(item))
@@ -87,6 +93,20 @@ impl DomainDialect for UiDialect {
         cx: &mut dyn DomainParseContext,
     ) -> AutoResult<Option<DomainStmt<UiStmt>>> {
         cx.advance();
+        if cx.cur_text() == "theme" {
+            let Some(stmt) = theme::parse_theme_decl_stmt(cx)? else {
+                return Ok(None);
+            };
+            let UiStmt::ThemeDataDecl(decl) = &stmt else {
+                unreachable!()
+            };
+            let _ = decl;
+            let mut stmt = stmt;
+            if let UiStmt::ThemeDataDecl(decl) = &mut stmt {
+                decl.is_pub = true;
+            }
+            return Ok(Some(DomainStmt::Domain(stmt)));
+        }
         if cx.cur_text() != "style" {
             return Ok(None);
         }

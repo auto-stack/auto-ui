@@ -14,6 +14,7 @@ pub enum UiStmt {
     ActionsDecl(ActionsBlock),
     ViewFragmentDecl(ViewFragmentDecl),
     StyleRecipeDecl(StyleRecipeDecl),
+    ThemeDataDecl(crate::ast::ThemeDataDecl),
     MsgDecl(MsgDecl),
     ModelBlock(ModelBlock),
     ViewBlock(ViewBlock),
@@ -67,6 +68,7 @@ impl fmt::Display for UiStmt {
             Self::ActionsDecl(_) => write!(f, "(actions)"),
             Self::ViewFragmentDecl(fragment) => write!(f, "(view fn {})", fragment.name),
             Self::StyleRecipeDecl(recipe) => write!(f, "(style-recipe {})", recipe.name),
+            Self::ThemeDataDecl(theme) => write!(f, "(theme {})", theme.name),
             Self::MsgDecl(msg) => write!(f, "(msg {} variants)", msg.variants.len()),
             Self::ModelBlock(model) => write!(f, "(model {} fields)", model.fields.len()),
             Self::ViewBlock(_) => write!(f, "(view)"),
@@ -102,6 +104,11 @@ impl ToNode for UiStmt {
             Self::StyleRecipeDecl(recipe) => {
                 let mut node = AutoNode::new("style-recipe");
                 node.add_arg(auto_val::Arg::Pos(Value::str(recipe.name.as_str())));
+                node
+            }
+            Self::ThemeDataDecl(theme) => {
+                let mut node = AutoNode::new("theme");
+                node.add_arg(auto_val::Arg::Pos(Value::str(theme.name.as_str())));
                 node
             }
             Self::MsgDecl(msg) => {

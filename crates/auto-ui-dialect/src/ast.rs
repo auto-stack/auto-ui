@@ -28,6 +28,30 @@ pub struct StyleRecipeDecl {
     pub doc: Option<AutoStr>,
 }
 
+/// PLAN-007 T-04 (C-01/03): `pub theme <Name> = <tree>` top-level data decl.
+///
+/// ```auto
+/// pub theme Auto = {
+///     tokens: { colors: { background: "#ffffff" }, radius: { control: "8dp" } }
+///     modes: { light: { tokens: { colors: { background: "#ffffff" } } }
+///              dark:  { tokens: { colors: { background: "#09090b" } } } }
+/// }
+/// pub theme MyApp = extend(themes.Auto, app_defaults, { ... })
+/// ```
+///
+/// The tree is an ordinary Auto object expression consumed by the
+/// compiler-side theme_tree module (schema validation, extend composition,
+/// mode selection, typed slot references). No new path DSL and no Core
+/// statement kind — this is a UI-domain data declaration.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ThemeDataDecl {
+    pub name: Name,
+    pub is_pub: bool,
+    /// Object literal tree or `extend(...)` composition expression.
+    pub tree: Expr,
+    pub doc: Option<AutoStr>,
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct StyleRecipeParam {
     pub name: Name,

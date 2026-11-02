@@ -14,3 +14,6 @@ pub mod decl;
 /// PLAN-607: style recipe 声明注册、语义校验、脱糖展开与 lint（Design 29 Phase 3）。
 pub mod recipe;
 pub use recipe::*;
+
+/// PLAN-007 T-04：树状主题表示/extend 合成/模式选择/槽引用（C-01..11）。
+pub mod theme_tree;
