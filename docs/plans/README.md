@@ -31,10 +31,11 @@
 | 025 | [声音/HUD通用Node接线收口](archived/025-autographics-node-presentation-services.md) | 023有限game档的通用服务后继 | archived/r1，10/10；交付e9cc929、canonical/锁收口54899e9，独立final/落主smoke/归档清理齐；通用服务已交付，不自动重开AG006固定023内容 |
 | 026 | [阅读引擎嵌入与定位回传探针](archived/026-reader-engine-embedding-and-locator-probe.md) | auto-reader/READER-006、coverage v3 后继 | archived/r1、流程10/10；Vue指定样本30/30，原生嵌入/装载/IPC已证，真实输入/IME/无障碍等未闭合；V-08/V-10未单列。研究归档不等于双端全门go，下一阶段先收口原生接缝 |
 | 027 | [3D角色与运行相机Node接线](archived/027-autographics-node3d-character-and-runtime-camera.md) | W3运行能力/G07与G08-3d引擎 | archived/r1，10/10；交付f3dea0d，独立final/冻结/归档清理齐；SD node3d-character-and-runtime-camera.md sha95a86660；原24oracle保持，AG011/012可固定消费，不把引擎绿当内容交付 |
-| 028 | [三维实例/触发/新局Node接线](028-autographics-node3d-instances-triggers-and-rounds.md) | W3后继/G11-3d引擎前置 | drafting/r1，0/10；027及公共001/002已交付，typed实例/局部事件/三种原Mob模板/accepted新Run，保原32与25旧oracle，暂不实施 |
+| 028 | [三维实例/触发/新局Node接线](archived/028-autographics-node3d-instances-triggers-and-rounds.md) | W3/G11-3d有限服务作者接线 | archived/r1，10/10；交付ebac1cd，独立final/冻结/归档清理齐；SD sha be4d9c15；25旧oracle保持，字符串/数值pair/本定义subject仍为有限边界，030补具名参数/跨组件接线 |
 | 029 | [Reader原生输入链与必要接缝收口](029-reader-native-input-and-surface-closure.md) | 026原生GAP与coverage v4后继 | drafting/r1、0/12；真实AutoUI原生VM的选区→.at→保存/冷恢复，IME/几何/系统无障碍、双实例/清理、严格非零汇总与旧门；全部必需门通过后独立上下文review，仅起草、未实施 |
+| 030 | [三维具名引用与跨组件接线收口](030-autographics-node3d-symbolic-component-bindings.md) | 028作者收口/G11-3d前置 | drafting/r1，0/10；slot/template/pair符号与跨Node Actor只读参数、三同定义Coin局部状态；保原25/八状态/32，暂不实施 |
 
-024/025/027已交付，026为Reader路线；本轮AG新增028；并行新计划的当前号源以`.next-id`为准，下一份以独占取号时本地活动/归档最大号重核（018分配后已有并行019，勿回退号源）；不能因外仓号882/883跳号。003是Blog路线，004..006是AG表现阶段，007是主题/示例工作包，014是拆分路线结构收口包，018是UI编译配置收口，026是Reader阅读表面跨仓探针；这些合同分别管理。状态以各自合同为准。设计与并行/后继入口见[本仓设计索引](../design/README.md)。
+024/025/027/028已交付，026/029为Reader路线；本轮AG新增030；并行新计划的当前号源以`.next-id`为准，下一份以独占取号时本地活动/归档最大号重核（018分配后已有并行019，勿回退号源）；不能因外仓号882/883跳号。003是Blog路线，004..006是AG表现阶段，007是主题/示例工作包，014是拆分路线结构收口包，018是UI编译配置收口，026是Reader阅读表面跨仓探针；这些合同分别管理。状态以各自合同为准。设计与并行/后继入口见[本仓设计索引](../design/README.md)。
 
 ## 债务/候选
 

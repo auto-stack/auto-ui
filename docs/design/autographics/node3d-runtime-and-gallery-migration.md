@@ -4,7 +4,7 @@
 
 ## 2026-11-02当前交付与后继
 
-027实际交付f3dea0d，Spec SHA95a86660dfa15a09206baac45d8901a9f515fbe871cbdc676a210afed14ff621、独立final/冻结/归档清理齐；025交付e9cc929并清理。AG010交付8bfddca，源码/metadata当前11/22（原21迁10＋新增HUD1），剩11。AG011用户告知开发中，已核见唯一ag-011树，合同任务进度待owner同步，本轮不接管或翻状态；下文首次规划的0/10/9/22和“等027交付”仅为历史拆分输入。后继见[UI028与AG012设计](node3d-instances-triggers-and-gallery-motion.md)：012固定已交付027迁G07/G08-3d，028补三维实例/触发/新局为G11-3d前置，各0/10、暂不实施。
+027交付f3dea0d，028交付ebac1cd，025已交付；AG011交付f35236dc，均有独立final/冻结/归档清理。当前Gallery13/22（原21迁12＋新增HUD1），剩9；AG012用户告知在途，本轮不接管或翻状态。原拆分快照的0/10、9/22与“等027交付”保历史，不作当前状态。新后继见[UI030与AG013](node3d-symbolic-bindings-and-g11-migration.md)：030补028有限入口的symbol参数/跨Node角色引用与局部组件，013完整G11/3d内容硬等030实际交付；各0/10、暂不实施。
 
 ## 已交付事实与本轮拆分（首次规划快照）
 
@@ -15,7 +15,7 @@ Gallery当前12逻辑项/22入口；原21入口已迁8个，另新增HUD一个�
 | 合同 | 所有权与交付 | 实施前置 |
 |---|---|---|
 | [auto-ui/027](../../plans/archived/027-autographics-node3d-character-and-runtime-camera.md) | 公共3D角色/运行相机Node接线；必要的原内置3D模型声明透传；只写引擎与永久消费夹具 | 已交付020/024；不等待025/AG010 |
-| [ag-examples/011](../../../../ag-examples/docs/plans/011-autographics-gallery-node3d-basics.md) | 仅G02/main、G03/3d迁移，普通use、资源symbol、组件及原主/父移/隐藏变体；保完整G02/G03包 | G02可先固定024先证；G03及整体交付硬等027内置模型支持实际交付 |
+| [ag-examples/011](../../../../ag-examples/docs/plans/archived/011-autographics-gallery-node3d-basics.md) | 仅G02/main、G03/3d迁移，普通use、资源symbol、组件及原主/父移/隐藏变体；保完整G02/G03包 | G02可先固定024先证；G03及整体交付硬等027内置模型支持实际交付 |
 
 两份均drafting r1、0/10。不得把“可以规划”写成“已授权开工”。025、027共享AST/load/translate/CLI，010、011共享Gallery工具/注册/包，只在各自独立树开发并按实际owner短窗串行接线。GPU/窗口/音频重型门同机单实例，OS键鼠/焦点自动化继续暂停。
 

@@ -2,7 +2,11 @@
 
 2026-11-02，设计v1；仅规划、暂不实施。承接[027/011设计](node3d-runtime-and-gallery-migration.md)、[作者模型](declarative-authoring-model.md)、[逐入口路线](gallery-node-authoring-migration.md)。设计/引擎计划归auto-ui，内容计划归ag-examples。
 
-## 当前证据与两份合同
+## 本轮后继补记
+
+028已实际交付ebac1cd，Spec SHAbe4d9c152871c70c19d3524237521f81e3cde0d3da956325e2bf7cf3119e540d；AG011交付f35236dc，均已归档/清理。当前metadata/src清单13/22，剩9；012用户告知开发中，进度以owner最新记录为准，不接管。下方旧11/22、028草案与011在途为首次规划快照。[030/013设计](node3d-symbolic-bindings-and-g11-migration.md)承接具名引用/跨Node参数/局部Coin组件及G11三维内容，013硬等030实际交付，暂不实施；028有限字符串/数值pair/本定义subject事实不被隐藏，不重开归档计划。
+
+## 当前证据与两份合同（首次规划快照）
 
 auto-ui主线867819bf，027实际交付f3dea0d并归档/清理，canonical node3d-character-and-runtime-camera.md SHA256 95a86660dfa15a09206baac45d8901a9f515fbe871cbdc676a210afed14ff621；025实际交付e9cc929、canonical/锁收口54899e9，均已归档/清理。不是仍在规划的能力。ag-examples主线2fcbaa72，010实际交付8bfddca，原18oracle与完整包/归档清理收据齐；其部分回执写9/22，当前example.json与src/generated清单实际为11/22（原21已迁10＋新增HUD1），剩11个。原回执作为历史保留，不据错计数减少验收。
 
@@ -11,7 +15,7 @@ AG011由用户告知正在开发；本轮初核主检出合同仍drafting0/10、
 | 合同 | 范围 | 进入/并行条件 |
 |---|---|---|
 | [ag-examples/012](../../../../ag-examples/docs/plans/012-autographics-gallery-node3d-character-and-cameras.md) | G07两布局与各main/main-fast、G08/3d主alt，普通模块/局部控制器/具名角色相机引用，三入口净增0 | 固定027实际交付f3dea0d；不等011/028，不追引擎开发tip；完整G08包仍包含固定019的2d |
-| [auto-ui/028](../../plans/028-autographics-node3d-instances-triggers-and-rounds.md) | 在020/024/027上接三维template/instance/trigger/round与局部事件，补G11原Mob模板静态缩放，给后续G11/3d内容提供前置 | 027与公共001/002已经实际交付；不等待AG011/012，不写Gallery内容 |
+| [auto-ui/028](../../plans/archived/028-autographics-node3d-instances-triggers-and-rounds.md) | 在020/024/027上接三维template/instance/trigger/round与局部事件，补G11原Mob模板静态缩放，给后续G11/3d内容提供前置 | 027与公共001/002已经实际交付；不等待AG011/012，不写Gallery内容 |
 
 两份均drafting r1、0/10，本轮不实施、不建树/源码/资产/探针、不构建/跑GPU、不创建agent。012与011只在各自权威树写内容，共享registry/gallery.py/包工具按owner短窗顺序接线；028只改引擎。各自target/报告/消费者独占，真实GPU/窗口/音频重型门同机单实例，OS键鼠/焦点自动化继续暂停。
 
