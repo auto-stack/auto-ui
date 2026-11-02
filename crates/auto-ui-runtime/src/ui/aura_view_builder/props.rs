@@ -259,9 +259,138 @@ impl<'a> AuraViewBuilder<'a> {
         props: &HashMap<String, AuraPropValue>,
         bindings: &Bindings,
     ) -> Option<Style> {
-        self.extract_string_with(props, "class", bindings)
+        let mut style = self
+            .extract_string_with(props, "class", bindings)
             .or_else(|| self.extract_string_with(props, "style", bindings))
             .and_then(|s| Style::parse(&s).ok())
-            .or_else(|| self.extract_style(props))
+            .or_else(|| self.extract_style(props));
+        // PLAN-007 T-05（C-08/09）：元素级 `design: { radius: ..., background: ... }`
+        // 局部差异——槽引用（tokens.* 点链）按当前主题+模式解析，直接字面值
+        // 原样生效。落点 = 本元素 Style 追加结构类；只影响本元素（实例隔离），
+        // 解析失败给诊断并跳过该槽（旧有效样式保留，C-11）。
+        if let Some(design_prop) = props.get("design") {
+            let extra = apply_design_object(design_prop, bindings);
+            if !extra.is_empty() {
+                let base = style.take().unwrap_or_else(|| Style {
+                    classes: Vec::new(),
+                    hover_classes: Vec::new(),
+                    variant_classes: Vec::new(),
+                });
+                style = Some(merge_design_classes(base, extra));
+            }
+        }
+        style
     }
+}
+
+/// PLAN-007 T-05：design 对象 → 结构类追加（radius/background 两槽，试点面）。
+fn apply_design_object(
+    value: &AuraPropValue,
+    bindings: &Bindings,
+) -> Vec<auto_ui_compiler::style::class::StyleClass> {
+    use auto_ui_compiler::style::class::{RoundedSize, StyleClass};
+    let expr = match value {
+        AuraPropValue::Expr(e) => e,
+        _ => return Vec::new(),
+    };
+    let pairs = match expr {
+        auto_lang_core::ast::Expr::Object(pairs) => pairs,
+        _ => return Vec::new(),
+    };
+    let mut out = Vec::new();
+    for pair in pairs {
+        let key = format!("{}", pair.key);
+        let resolved = resolve_design_value(&pair.value, bindings);
+        let Some(text) = resolved else {
+            eprintln!(
+                "[PLAN-007] design.{key} 槽引用解析失败——本槽跳过（旧有效样式保留）"
+            );
+            continue;
+        };
+        match key.as_str() {
+            "radius" => {
+                let n = text.trim_end_matches("dp").trim_end_matches("px").trim();
+                match n.parse::<f32>() {
+                    // 任意值四角同径 = RoundedT(Px) + RoundedB(Px) 对
+                    //（adapter：T 设上角对、B 设下角对）。
+                    Ok(v) => {
+                        out.push(StyleClass::RoundedT(Some(RoundedSize::Px(v))));
+                        out.push(StyleClass::RoundedB(Some(RoundedSize::Px(v))));
+                    }
+                    Err(_) => eprintln!("[PLAN-007] design.radius 值 `{text}` 非长度字面量"),
+                }
+            }
+            "background" => {
+                if let Some((r, g, b)) =
+                    auto_ui_compiler::design_tokens::theme_tree::parse_color(&text)
+                {
+                    out.push(StyleClass::BackgroundColor(
+                        auto_ui_compiler::style::color::Color::Rgba { r, g, b, a: 255 },
+                    ));
+                } else {
+                    eprintln!("[PLAN-007] design.background 值 `{text}` 非 #rrggbb");
+                }
+            }
+            other => {
+                eprintln!("[PLAN-007] design 槽 `{other}` 在试点支持面外（radius/background）")
+            }
+        }
+    }
+    out
+}
+
+/// design 值解析：点链/裸名 → 当前主题+模式的槽值；字面量 → 原样。
+fn resolve_design_value(
+    expr: &auto_lang_core::ast::Expr,
+    bindings: &Bindings,
+) -> Option<String> {
+    use auto_ui_compiler::design_tokens::theme_tree;
+    match expr {
+        auto_lang_core::ast::Expr::Str(s) => Some(s.to_string()),
+        auto_lang_core::ast::Expr::Int(i) => Some(i.to_string()),
+        auto_lang_core::ast::Expr::Float(v, _) | auto_lang_core::ast::Expr::Double(v, _) => {
+            Some(v.to_string())
+        }
+        auto_lang_core::ast::Expr::Dot(_, _) | auto_lang_core::ast::Expr::Ident(_) => {
+            let segs = flatten_ref_expr(expr)?;
+            let is_dark = auto_ui_compiler::style::theme::dark_mode();
+            let tree = auto_ui_compiler::style::theme::active_theme_tree(is_dark)?;
+            let path: Vec<String> = segs;
+            let value = theme_tree::resolve_slot(&tree, &path).ok()?;
+            value.as_str().map(|s| s.to_string())
+        }
+        _ => None,
+    }
+}
+
+fn flatten_ref_expr(expr: &auto_lang_core::ast::Expr) -> Option<Vec<String>> {
+    match expr {
+        auto_lang_core::ast::Expr::Ident(n) => Some(vec![n.to_string()]),
+        auto_lang_core::ast::Expr::Dot(root, field) => {
+            let mut segs = flatten_ref_expr(root)?;
+            segs.push(field.to_string());
+            Some(segs)
+        }
+        _ => None,
+    }
+}
+
+/// 结构类并入 Style（去重：同类后写胜——radius/background 各保最后一个）。
+fn merge_design_classes(
+    mut base: Style,
+    extra: Vec<auto_ui_compiler::style::class::StyleClass>,
+) -> Style {
+    for class in extra {
+        // 同族后写胜：radius 族（T/B 对）与 background 族各自保最后一组。
+        use auto_ui_compiler::style::class::StyleClass;
+        let radius_family = matches!(class, StyleClass::RoundedT(_) | StyleClass::RoundedB(_));
+        let bg_family = matches!(class, StyleClass::BackgroundColor(_));
+        base.classes.retain(|c| match c {
+            StyleClass::RoundedT(_) | StyleClass::RoundedB(_) => !radius_family,
+            StyleClass::BackgroundColor(_) => !bg_family,
+            _ => true,
+        });
+        base.classes.push(class);
+    }
+    base
 }

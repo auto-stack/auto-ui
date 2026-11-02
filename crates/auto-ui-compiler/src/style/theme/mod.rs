@@ -21,6 +21,9 @@ pub use crate::design_tokens::registry;
 pub enum ActiveSpec {
     Builtin(&'static registry::ThemeSpec),
     Composed(std::sync::Arc<crate::design_tokens::decl::ComposedTheme>),
+    /// PLAN-007 T-05：树状主题（theme_tree 合成体；extend/modes/槽引用）。
+    /// resolve 现场按模式重建（C-06：从原始公共数据选模式，不叠加）。
+    Tree(crate::design_tokens::theme_tree::ThemeTree),
 }
 
 impl ActiveSpec {
@@ -28,12 +31,18 @@ impl ActiveSpec {
         match self {
             ActiveSpec::Builtin(t) => t.name.to_string(),
             ActiveSpec::Composed(t) => t.name.clone(),
+            ActiveSpec::Tree(t) => t.name.clone(),
         }
     }
     fn resolve(&self, token: registry::TokenName, is_dark: bool) -> Option<(u8, u8, u8)> {
         match self {
             ActiveSpec::Builtin(t) => registry::resolve_rgb(t, token, is_dark),
             ActiveSpec::Composed(t) => t.resolve_rgb(token, is_dark),
+            ActiveSpec::Tree(tree) => {
+                let composed =
+                    crate::design_tokens::theme_tree::compose_mode(tree, is_dark).ok()?;
+                crate::design_tokens::theme_tree::resolve_rgb(&composed, token)
+            }
         }
     }
 }
@@ -68,7 +77,7 @@ pub fn active_theme_rgb(token: registry::TokenName, is_dark: bool) -> Option<(u8
 pub fn active_composed() -> Option<std::sync::Arc<crate::design_tokens::decl::ComposedTheme>> {
     ACTIVE_THEME.with(|t| match &*t.borrow() {
         ActiveSpec::Composed(c) => Some(c.clone()),
-        ActiveSpec::Builtin(_) => None,
+        ActiveSpec::Builtin(_) | ActiveSpec::Tree(_) => None,
     })
 }
 
@@ -79,6 +88,13 @@ pub fn set_theme(name: &str) -> bool {
         return false;
     };
     set_active(ActiveSpec::Builtin(spec))
+}
+
+/// PLAN-007 T-05：应用树状主题（theme_tree build/compose 产物）。
+/// 发布前已过 build 期 schema 校验；此处发布即事务点——求值失败不调用
+/// 本函数，旧有效主题保持（C-07/11）。
+pub fn set_theme_tree(tree: crate::design_tokens::theme_tree::ThemeTree) -> bool {
+    set_active(ActiveSpec::Tree(tree))
 }
 
 /// PLAN-601 T-03：应用 theme{} 合成主题（decl::compose 产物）。
@@ -105,11 +121,58 @@ fn set_active(spec: ActiveSpec) -> bool {
     changed
 }
 
+/// PLAN-007 T-05：已 build 树状主题注册表（进程级；`auto run` 单应用进程
+/// 模型下与 ACTIVE_THEME 同一状态面）。build_dynamic_component 在组件构建
+/// 时注册，视图构建经 [`lookup_theme_tree`] 按名取用（C-06 主题族选择）。
+thread_local! {
+    static THEME_TREES: std::cell::RefCell<
+        std::collections::BTreeMap<String, crate::design_tokens::theme_tree::ThemeTree>,
+    > = std::cell::RefCell::new(std::collections::BTreeMap::new());
+    /// 应用 design 块（根 widget）——theme/mode 数据绑定（C-06/07/08）。
+    static APP_DESIGN_ENTRIES: std::cell::RefCell<
+        Vec<(String, auto_parser_api::ast::Expr)>,
+    > = std::cell::RefCell::new(Vec::new());
+}
+
+/// 注册（合并语义：同名覆盖、异名保留）已 build 主题树。
+pub fn register_theme_trees(
+    trees: std::collections::BTreeMap<String, crate::design_tokens::theme_tree::ThemeTree>,
+) {
+    THEME_TREES.with(|r| r.borrow_mut().extend(trees));
+}
+
+pub fn lookup_theme_tree(
+    name: &str,
+) -> Option<crate::design_tokens::theme_tree::ThemeTree> {
+    THEME_TREES.with(|r| r.borrow().get(name).cloned())
+}
+
+/// 记录应用 design 块条目（theme/mode 绑定表达式；每帧在视图构建期求值）。
+pub fn set_app_design_entries(entries: Vec<(String, auto_parser_api::ast::Expr)>) {
+    APP_DESIGN_ENTRIES.with(|d| *d.borrow_mut() = entries);
+}
+
+pub fn app_design_entries() -> Vec<(String, auto_parser_api::ast::Expr)> {
+    APP_DESIGN_ENTRIES.with(|d| d.borrow().clone())
+}
+
+/// PLAN-007 T-05：当前树状主题按模式重建的合成树（槽引用解析消费）。
+/// 非树主题活动时返回 None（槽引用此时无源，调用方按 C-11 诊断跳槽）。
+pub fn active_theme_tree(is_dark: bool) -> Option<crate::design_tokens::theme_tree::Tree> {
+    ACTIVE_THEME.with(|t| match &*t.borrow() {
+        ActiveSpec::Tree(tree) => {
+            crate::design_tokens::theme_tree::compose_mode(tree, is_dark).ok()
+        }
+        _ => None,
+    })
+}
+
 /// 活动主题 spec（解析入口共用）。
 fn active_theme() -> ActiveSpec {
     ACTIVE_THEME.with(|t| match &*t.borrow() {
         ActiveSpec::Builtin(spec) => ActiveSpec::Builtin(spec),
         ActiveSpec::Composed(c) => ActiveSpec::Composed(c.clone()),
+        ActiveSpec::Tree(tree) => ActiveSpec::Tree(tree.clone()),
     })
 }
 

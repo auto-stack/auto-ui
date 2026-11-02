@@ -955,6 +955,23 @@ fn build_dynamic_component_inner(
         None => Vec::new(),
     };
 
+    // PLAN-007 T-05：注册应用树状主题 + design 块（真实 use/pac dep 解析
+    // 链，与 stylekit/bps 依赖同一解析面）。build 期完成 schema 校验——
+    // 校验失败即构建错误（首次挂载不发布半成品，C-11）。
+    if let Some(p) = path {
+        match auto_ui_compiler::design_tokens::theme_tree::collect_named_themes(
+            std::path::Path::new(p),
+            code,
+        ) {
+            Ok(trees) => {
+                if !trees.is_empty() {
+                    auto_ui_compiler::style::theme::register_theme_trees(trees);
+                }
+            }
+            Err(e) => return Err(auto_lang_core::error::AutoError::Msg(e.to_string())),
+        }
+    }
+
     // 1. Parse with UI scenario (or override if provided — PR-6)
     let session = override_scenario
         .cloned()
@@ -1007,6 +1024,18 @@ fn build_dynamic_component_inner(
 
     let widget = widget.ok_or("No widget declaration found")?;
     let root_decl = root_decl.ok_or("No widget declaration found")?;
+
+    // PLAN-007 T-05：根 widget design 块（theme/mode 数据绑定）登记——
+    // 每帧在视图构建期求值（C-06/07/08；评估失败保留旧有效设计）。
+    if let Some(design) = &root_decl.design {
+        auto_ui_compiler::style::theme::set_app_design_entries(
+            design
+                .entries
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.clone()))
+                .collect(),
+        );
+    }
 
     // PLAN-050 T9 (C7): VM 轨 t() 插值查表——front 根目录 i18n/{lang}.json
     // 存在则装载（默认 zh, AUTO_LOCALE 可覆）；缺席 = 空表静默。

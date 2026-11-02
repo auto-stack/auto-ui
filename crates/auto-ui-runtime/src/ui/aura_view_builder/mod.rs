@@ -476,6 +476,10 @@ impl<'a> AuraViewBuilder<'a> {
         node: &AuraNode,
         capture_probe: bool,
     ) -> (View<DynamicMessage>, DebugIdMap, BuildProbe) {
+        // PLAN-007 T-05：design 块 theme/mode 数据绑定每帧求值（C-06/07/08）。
+        // 先于任何元素转换——整帧一致使用新槽位；评估/校验失败保留旧有效
+        // 设计并给可定位诊断（C-11 事务发布）。
+        self.eval_app_design();
         let mut id_map = DebugIdMap::default();
         let mut probe = if capture_probe {
             BuildProbe::new()
@@ -491,6 +495,80 @@ impl<'a> AuraViewBuilder<'a> {
             &Bindings::new(),
         );
         (view, id_map, probe)
+    }
+
+    /// PLAN-007 T-05（C-06/07/08）：design 块每帧求值。
+    ///
+    /// - `theme: <expr>` → 主题名 → 注册表 lookup → [`set_theme_tree`]；
+    ///   未注册名尝试内置主题；两者皆 miss → 诊断 + 保旧（C-11）。
+    /// - `mode: <expr>` → "light"/"dark"/"system"（system 经 OS 探测）。
+    ///   显式请求树未声明模式 → 拒绝（保旧 + 诊断，C-07）。
+    /// - 求值失败（绑定缺失等）→ 该帧跳过发布（旧槽位自然保持）。
+    fn eval_app_design(&self) {
+        use auto_ui_compiler::design_tokens::theme_tree as tt;
+        let entries = auto_ui_compiler::style::theme::app_design_entries();
+        if entries.is_empty() {
+            return;
+        }
+        let bindings = Bindings::new();
+        let mut theme_name: Option<String> = None;
+        let mut mode_str: Option<String> = None;
+        for (key, expr) in &entries {
+            let value = match self.resolve_expr_to_value(expr, &bindings) {
+                Some(v) => v,
+                None => {
+                    eprintln!("[PLAN-007] design.{key} 求值失败——本帧保留旧设计");
+                    continue;
+                }
+            };
+            let text = match &value {
+                auto_val::Value::Str(s) => Some(s.as_str().to_string()),
+                auto_val::Value::Bool(b) => Some(b.to_string()),
+                auto_val::Value::Int(i) => Some(i.to_string()),
+                _ => None,
+            };
+            match key.as_str() {
+                "theme" => theme_name = text,
+                "mode" => mode_str = text,
+                other => {
+                    eprintln!("[PLAN-007] design 槽 `{other}` 在试点支持面外（theme/mode）")
+                }
+            }
+        }
+        // mode 先行（compose 需要知道目标模式）
+        if let Some(mode) = &mode_str {
+            let dark = match mode.as_str() {
+                "dark" => Some(true),
+                "light" => Some(false),
+                "system" => crate::ui::system_theme::system_prefers_dark(),
+                other => {
+                    eprintln!("[PLAN-007] design.mode `{other}` 非 light|dark|system——拒绝（C-07）");
+                    None
+                }
+            };
+            if let Some(d) = dark {
+                auto_ui_compiler::style::theme::set_dark_mode(d);
+            }
+        }
+        if let Some(name) = &theme_name {
+            let is_dark = auto_ui_compiler::style::theme::dark_mode();
+            if let Some(tree) = auto_ui_compiler::style::theme::lookup_theme_tree(name) {
+                if tt::mode_available(&tree, is_dark) {
+                    auto_ui_compiler::style::theme::set_theme_tree(tree);
+                } else {
+                    let want = if is_dark { "dark" } else { "light" };
+                    eprintln!(
+                        "[PLAN-007] 主题 `{name}` 未声明 {want} 模式——拒绝换肤，保留旧有效设计（C-07）"
+                    );
+                }
+            } else if auto_ui_compiler::style::theme::theme_name() != *name {
+                if !auto_ui_compiler::style::theme::set_theme(name) {
+                    eprintln!(
+                        "[PLAN-007] design.theme `{name}` 未注册且非内置主题——保留旧有效主题（C-11）"
+                    );
+                }
+            }
+        }
     }
 
     // ========================================================================

@@ -495,6 +495,15 @@ pub fn compose_mode(theme: &ThemeTree, dark: bool) -> Result<Tree, ThemeError> {
     Ok(out)
 }
 
+/// 模式可用性（C-07）：声明了 modes 却缺请求模式 → false（拒绝换肤）；
+/// 未声明 modes（单模式主题）→ 任意模式都落到基座（true）。
+pub fn mode_available(theme: &ThemeTree, dark: bool) -> bool {
+    let Some(modes) = theme.raw.get("modes") else {
+        return true;
+    };
+    modes.get(if dark { "dark" } else { "light" }).is_some()
+}
+
 /// 槽引用解析（C-05）：按路径逐段走对象；miss 给可定位诊断。
 pub fn resolve_slot<'a>(tree: &'a Tree, path: &[String]) -> Result<&'a Tree, ThemeError> {
     let mut cur = tree;
@@ -571,6 +580,28 @@ pub fn collect_theme_trees(
     }
     ingest_source(Some(at_path), code, None, &mut known)?;
     Ok(known)
+}
+
+/// 运行时注册形态：规范名（裸名）→ 已 build 的 [`ThemeTree`]。
+pub fn collect_named_themes(
+    at_path: &std::path::Path,
+    code: &str,
+) -> Result<BTreeMap<String, ThemeTree>, ThemeError> {
+    let known = collect_theme_trees(at_path, code)?;
+    // 从已知键表重建 ThemeTree：仅取裸名键（dotted 键是同一主题的别名）。
+    let mut out = BTreeMap::new();
+    for (name, tree) in known {
+        if !name.contains('.') {
+            out.insert(
+                name.clone(),
+                ThemeTree {
+                    name,
+                    raw: tree,
+                },
+            );
+        }
+    }
+    Ok(out)
 }
 
 // ── 投影（V-01 的两种投影：CSS 面 / VM RGB 面）────────────────────────

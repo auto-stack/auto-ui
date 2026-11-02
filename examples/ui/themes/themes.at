@@ -120,7 +120,43 @@ pub theme Solarized = extend("Auto", {
             error: "#dc322f"
         }
     }
+    // C-06：模式差异按族自足——Solarized 的 light 基即 base3 域，须显式
+    // 覆写继承自 Auto 的 light 差异（否则 compose 时 Auto 的 #ffffff 盖掉
+    // 本族 base 值）。
     modes: {
+        light: { tokens: { colors: {
+            background: "#fdf6e3"
+            foreground: "#657b83"
+            card: "#eee8d5"
+            card-foreground: "#586e75"
+            popover: "#eee8d5"
+            popover-foreground: "#586e75"
+            primary: "#268bd2"
+            primary-foreground: "#fdf6e3"
+            secondary: "#eee8d5"
+            secondary-foreground: "#586e75"
+            muted: "#eee8d5"
+            muted-foreground: "#93a1a1"
+            accent: "#eee8d5"
+            accent-foreground: "#586e75"
+            destructive: "#dc322f"
+            destructive-foreground: "#fdf6e3"
+            border: "#ddd6c1"
+            input: "#ddd6c1"
+            ring: "#268bd2"
+            sidebar-background: "#f3ecd9"
+            sidebar-foreground: "#93a1a1"
+            sidebar-primary: "#268bd2"
+            sidebar-primary-foreground: "#fdf6e3"
+            sidebar-accent: "#e8dfc9"
+            sidebar-accent-foreground: "#586e75"
+            sidebar-border: "#ddd6c1"
+            sidebar-ring: "#268bd2"
+            success: "#859900"
+            warning: "#b58900"
+            info: "#2aa198"
+            error: "#dc322f"
+        } } }
         dark: { tokens: { colors: {
             background: "#002b36"
             foreground: "#93a1a1"
