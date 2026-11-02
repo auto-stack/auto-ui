@@ -12,8 +12,8 @@
   `use themes.themes: Auto, Solarized`。
 - 内含族：`Auto`（默认设计）与 `Solarized`（风格示意），均声明 `light`/`dark`
   两种模式与 31 个公共色键 + `tokens.radius` 尺寸槽。
-- 旧 `examples/ui/themes/` 只保留迁移说明，不再承载可编辑 `.at`；旧引用在解析
-  时给出可定位迁移提示。
+- 旧 `examples/ui/themes/` 只保留迁移说明，不再承载可编辑 `.at`；指向旧路径的
+  引用会以缺失/校验失败的形式暴露（尚无专门的迁移提示诊断，见 §7 边界）。
 - app 命名空间扩展色（`tokens.colors` 之外的 ns 子树）随包数据进入 CSS 变量面，
   但**不扩**公共 31 键；某个 App 的成功色等语义应使用包内既有的
   `success`/`warning`/`info`/`error` 槽。
@@ -56,9 +56,9 @@
 
 ## 5. 生成准入与新鲜度（C-05）
 
-- 每次 Vue 生成/运行在 `<gen>/.theme-inputs.json` 写生成输入 receipt：
-  `{schema, package:{owner,name,version,digest}}`。它回答"这次产物消费了哪个
-  包内容"，是审计凭证，不是版本化清单。
+- 声明 `dep themes` 的 App，每次 Vue 生成/运行都会在 `<gen>/.theme-inputs.json`
+  写生成输入 receipt：`{schema, package:{owner,name,version,digest}}`。它回答
+  "这次产物消费了哪个包内容"，是审计凭证，不是版本化清单。
 - 新鲜度按**内容摘要**判定，不按 mtime、不按主题名：
   - 内容变更 + 清单 hash 同步更新（合法发布，`mtime` 可保持不变）→ 摘要变化，
     生成取得新值；

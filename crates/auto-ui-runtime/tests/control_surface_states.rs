@@ -40,6 +40,26 @@ pub theme Surf = {
     }
 }
 
+pub theme Surf2 = {
+    tokens: {
+        colors: {
+            background: "#202020"
+            foreground: "#dddddd"
+            primary: "#8888ff"
+            card: "#445566"
+            border: "#667788"
+            ring: "#00ff00"
+            destructive: "#cc0000"
+            input: "#223344"
+        }
+        radius: { control: "12dp" }
+    }
+    modes: {
+        light: { tokens: { colors: { background: "#202020" } } }
+        dark: { tokens: { colors: { background: "#020202" } } }
+    }
+}
+
 widget App {
     msg { Hit }
 
@@ -440,22 +460,30 @@ fn button_disabled_state_and_hover_variant() {
 #[test]
 fn design_slots_follow_theme_switch() {
     let dir = tempfile::tempdir().unwrap();
-    let comp = build_component(dir.path());
-    // Surf 的 light 只覆写 background，其余继承基值——切到 dark 后
-    // background 槽引用应变成 #010101。
+    let mut comp = build_component(dir.path());
+    comp.view_with_debug();
+    // F-07(b)：必须**真正切换**主题再断言槽值变化（此前只是同源码建两次，
+    // 只证明确定性，不能证槽引用随快照更新）。
     let before = surfaces(&comp);
     assert!(
-        before.iter().any(|s| s.bg == Some((17, 34, 51))),
-        "初始 card 槽应为 #112233"
+        before.iter().any(|s| s.radius == Some(10.0) && s.bg == Some((17, 34, 51))),
+        "初始应为 Surf：radius 10dp / card #112233，实际 {before:?}"
     );
 
-    // 直接以双主题对照：IsoR 式切换由 design_scope_inheritance 覆盖；
-    // 本用例只锁"槽值来自当前快照而非硬编码"。
-    let dir2 = tempfile::tempdir().unwrap();
-    let comp2 = build_component(dir2.path());
-    assert_eq!(
-        surfaces(&comp),
-        surfaces(&comp2),
-        "同一源码两次构建的表面必须一致（无进程级残留）"
+    comp.write_state("theme_name", Value::Str("Surf2".into()))
+        .unwrap();
+    comp.view_with_debug();
+    let after = surfaces(&comp);
+    assert!(
+        after.iter().any(|s| s.radius == Some(12.0)),
+        "切到 Surf2 后 radius 槽应变成 12dp，实际 {after:?}"
+    );
+    assert!(
+        after.iter().any(|s| s.bg == Some((68, 85, 102))),
+        "切到 Surf2 后 card 槽应变成 #445566，实际 {after:?}"
+    );
+    assert!(
+        !after.iter().any(|s| s.bg == Some((17, 34, 51))),
+        "旧族 card 值不得残留，实际 {after:?}"
     );
 }

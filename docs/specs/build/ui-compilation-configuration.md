@@ -70,8 +70,9 @@ autodown-core 剥除同步摘除（feature 名保留）。
   （`{schema, package:{owner,name,version,digest}}`）。`digest` 是清单列出文件
   按路径排序的内容 sha256，**与绝对根、mtime 无关**；内容变更（即使 mtime
   不变）即视为输入变化，篡改（内容改而清单未同步）被准入拒绝。
-- 与 §附「前端新鲜度为内容收据（generation.json v1），mtime 退役」同口径：
-  主题包是**内容寻址的受管输入**，不是按路径/mtime 判断的附带资源。
+- 与上文「生成 Rust UI 工程的受管构建上下文」中「前端新鲜度为内容收据
+  （generation.json v1），mtime 退役」同口径：主题包是**内容寻址的受管输入**，
+  不是按路径/mtime 判断的附带资源。
 - Vue 生成产物（`src/assets/index.css` 的 `:root/.dark`、
   `window.__AUTO_TREE_THEMES__`）由 App 导入的官方包驱动，值为 Tailwind
   消费的 `H S% L%` 三段式；VM 侧由同一主题树解析语义色。包的单源/版本/

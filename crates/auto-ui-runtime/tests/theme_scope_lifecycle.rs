@@ -175,7 +175,9 @@ fn r02_selector_eval_failure_rejects_whole_candidate() {
         &same_theme("Plan031Broken", "#777777"),
         ".missing_theme_field",
         "Plan031Broken",
-        true,
+        // F-07(a)：默认 light——若 mode 半边被单独发布，dark 会变 true，从而
+        // 让「同组件半发布」可被检出（默认 dark 会掩盖该差额）。
+        false,
     );
     let comp = build_app(dir.path(), "failing", &failing);
     comp.view_with_debug();
@@ -190,6 +192,19 @@ fn r02_selector_eval_failure_rejects_whole_candidate() {
         "另半个 selector 的成功结果不得单独发布（R-02 continue 差额）"
     );
     assert_eq!(observed_revision(&base), e0, "失败帧零 revision");
+    // F-07(a)：失败组件**自身**也不得半发布——坏 family 不得被写入自己的
+    // scope（此前只断言了另一个组件，无法检出本组件的半发布）。dark 值受
+    // 进程级 legacy 捕获影响，不单独作为判据。
+    assert_ne!(
+        observed_name(&comp),
+        "Plan031Broken",
+        "失败组件自身不得发布坏 family（R-02）"
+    );
+    assert_eq!(
+        observed_revision(&comp),
+        0,
+        "失败组件自身从未成功发布，revision 必须为 0"
+    );
 }
 
 /// R-02d：合法完整 pair 一次发布（恰好 +1 revision）；单独 theme 变化同样

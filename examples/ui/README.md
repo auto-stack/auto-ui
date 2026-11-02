@@ -1,11 +1,14 @@
 # examples/ui — AutoUI 应用示例（App 轨道）
 
 > **PLAN-007（2026-11-02）**：本目录整体自 `auto-lang/examples/ui` 归位本仓
-> （T-02，381 文件逐文件 SHA-256 字节等价迁移）。官方主题包 [`themes/`](themes/)
-> 与试点应用 [`../theme-lab/`](../theme-lab/) 同批落地；首批主题接入：
-> [`002-counter/`](002-counter/)、[`005-login/`](005-login/)（design 块 +
-> `dep themes`，业务保持，V-08 双端验收）。其余 33 个编号目录的逐 app
-> 主题迁移为已确认后继批次，逐目录状态见 `docs/plans/007-*` 归档。
+> （T-02，381 文件逐文件 SHA-256 字节等价迁移）。官方主题包已提升为本仓正式资产
+> [`packages/themes/`](../../packages/themes/)，旧 [`themes/`](themes/) 目录退役（仅留
+> 迁移说明）；试点应用 [`../theme-lab/`](../theme-lab/) 同批落地。已接入应用的批次：
+> 首批 [`002-counter/`](002-counter/)、[`005-login/`](005-login/)，第二批
+> [`003-converter/`](003-converter/)、[`010-contact-form/`](010-contact-form/)
+> （design 块 + `dep themes`，业务保持，V-08/V-06 双端验收）。其余 **30** 个编号目录
+> （B1 余 6 + B2 12 + B3 12）的逐 app 主题迁移为已确认后继批次，逐目录状态见
+> `docs/plans/031-*` 交接表。
 
 
 这里只放**应用性质**的示例：每个目录是一个可 `auto run` 起来的完整 UI 应用，

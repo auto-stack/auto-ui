@@ -12,8 +12,9 @@ auto run              # Vue 轨（浏览器，dev server）
 auto run -r vm        # VM/Iced 轨（原生窗口）
 ```
 
-依赖：同仓 `examples/ui/themes/`（pac `dep themes { path: "../ui/themes" }`），
+依赖：本仓正式主题包 `packages/themes/`（pac `dep themes { path: "../../packages/themes" }`），
 无需安装；`auto-ui-tool` 需在 PATH 或同组 target（`auto run` 自动发现）。
+（旧教学目录 `examples/ui/themes/` 已退役，只保留迁移说明。）
 
 ## 操作步骤（观察点）
 
