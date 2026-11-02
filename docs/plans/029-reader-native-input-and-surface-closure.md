@@ -202,6 +202,10 @@ Reader旧门入口保持 `python tests/basic/verify_standalone.py --profile vue|
 
 ## 9. 复审记录
 
+### 2026-11-02：goal回合（T-05轮）
+
+- stage: goal | plan_id: PLAN-029 | plan_revision: r1 | round: 2 | from: work | to: work | status: executing | outcome: pass(T-05) | worktree: D:/autostack/.wt/ui-029/auto-ui | commit: reader ac24c98 + ui 98633fd4 | next: work(T-06)。
+
 ### 2026-11-02：work阶段——T-05 几何/无障碍/键盘/DPI 全门真实通过（AC-06）
 
 - stage: work | plan_id: PLAN-029 | plan_revision: r1 | task: T-05 | outcome: pass（N-05/N-06 全子项 PASS；N-04.focus-roundtrip 保持 §10 具名开放、N-08 待 T-06）| worktree: .wt/ui-029@98633fd4 | reader: main@ac24c98 | next: T-06。
