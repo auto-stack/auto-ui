@@ -120,6 +120,22 @@ pub fn run_vue_flow(
         None => VueProject::from_workspace(root_dir)?,
     };
 
+    // PLAN-031 T-04/T-07（V-09）：生成准入——App 声明了官方主题包，必须先
+    // 校验 owner/版本/schema/文件 hash 才允许生成；非法（错版/缺件/篡改）
+    // 具名中止，不留半成品、不静默回落别的来源。
+    if let Some(app_dir) = project.app_dir() {
+        match crate::theme_package::verify_app_theme_inputs(&app_dir) {
+            Ok(_) => {}
+            Err(e) => {
+                return Err(format!(
+                    "主题包生成准入失败（{}）：{e}——修正 packages/themes 的清单/hash 后重试",
+                    app_dir.display()
+                )
+                .into());
+            }
+        }
+    }
+
     let mut current_step = 0u64;
 
     // Step 1: Generate project structure if not exists, or regenerate source files
@@ -260,6 +276,9 @@ pub fn run_vue_flow(
                 println!("  ⚠ index.css refresh skipped: {}", e);
             }
         }
+        // PLAN-031 T-07（V-09）：每次 run 刷新生成输入 receipt（官方包身份 +
+        // 内容摘要）——包内容变化即使 mtime 不变，也会让摘要变化并被记录。
+        project.write_theme_inputs_receipt();
         // Plan 672 条目 4: vite.config.ts 同律自愈——`/apps` back-proxy 条目
         // （env 运行时读取）只在生成器模板里，增量 run 不重写会让老项目
         // 永久缺失该路由（实测：proxy 起了但 vite 无 /apps 转发 → fullstack

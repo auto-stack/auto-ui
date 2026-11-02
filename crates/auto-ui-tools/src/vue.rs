@@ -5266,6 +5266,8 @@ export default router
             fs::write(&css_path, generate_index_css_with_tree(self.theme.as_ref(), self.tree_index_css().as_ref()))
                 .map_err(|e| format!("Failed to write src/assets/index.css: {}", e))?;
         }
+        // PLAN-031 T-07（V-09）：无论本次是否重写 CSS，都刷新生成输入 receipt。
+        self.write_theme_inputs_receipt();
 
         // Copy pac.at `styles:` CSS files (byte-for-byte) so main.ts can
         // import them.
@@ -5325,6 +5327,7 @@ export default router
         let index_css_content = generate_index_css_with_tree(self.theme.as_ref(), self.tree_index_css().as_ref());
         fs::write(assets_dir.join("index.css"), &index_css_content)
             .map_err(|e| format!("Failed to write src/assets/index.css: {}", e))?;
+        self.write_theme_inputs_receipt();
 
         // Write tsconfig.json
         let tsconfig = generate_tsconfig();
@@ -5355,6 +5358,38 @@ export default router
     /// css_var_pairs 投影——applyTheme 同名写 CSS 变量）。无声明/收集为空
     /// → None 零注入；收集/schema 失败 = 运行错误（C-11 不发半成品）。
     /// PLAN-031 T-06（F-1 续）：本 App 导入包树驱动的 index.css 四块。
+    /// PLAN-031 T-04/T-07（V-09）：把「本次生成消费的官方包内容摘要」写进
+    /// `<out>/.theme-inputs.json`；摘要变化（即使 mtime 不变）即视为生成输入
+    /// 变化并留观测量，供缓存/落地判定新鲜度。
+    pub(crate) fn write_theme_inputs_receipt(&self) {
+        let Some(app_dir) = self.app_dir() else { return };
+        let before = crate::theme_package::read_theme_inputs_receipt(&self.output_dir);
+        match crate::theme_package::write_theme_inputs_receipt(&self.output_dir, &app_dir) {
+            Ok(digest) => {
+                if before.as_deref() != Some(digest.as_str()) {
+                    println!(
+                        "  ✓ theme inputs receipt: {} (package content digest changed)",
+                        &digest[..12.min(digest.len())]
+                    );
+                }
+            }
+            Err(e) => println!("  ⚠ theme inputs receipt skipped: {e}"),
+        }
+    }
+
+    /// App 根：从 front_dir 向上找含 pac.at 的最近祖先（最多 4 级）。
+    pub(crate) fn app_dir(&self) -> Option<std::path::PathBuf> {
+        let mut cur = Some(self.front_dir.as_path());
+        for _ in 0..4 {
+            let dir = cur?;
+            if dir.join("pac.at").is_file() {
+                return Some(dir.to_path_buf());
+            }
+            cur = dir.parent();
+        }
+        None
+    }
+
     pub(crate) fn tree_index_css(&self) -> Option<TreeIndexCss> {
         tree_index_css_for_app(&self.front_dir.join("app.at"))
     }
@@ -5468,6 +5503,7 @@ export default router
         fs::write(&index_css_path, &index_css_content)
             .map_err(|e| format!("Failed to write src/assets/index.css: {}", e))?;
         println!("{}", "  ✓ Regenerated src/assets/index.css".bright_green());
+        self.write_theme_inputs_receipt();
 
         // PLAN-063 Phase B T22 (KD 061 D27 同族): 冷重生成自愈——增量路径
         // write-if-missing src/lib/utils.ts(常态靠粘性存在;冷删 src/ 后

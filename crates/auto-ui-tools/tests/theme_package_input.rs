@@ -4,6 +4,7 @@ use std::path::Path;
 
 use auto_ui_tools::theme_package::{
     publish_theme_package_snapshot, verify_official_theme_package, verify_theme_package, theme_package_content_digest,
+    read_theme_inputs_receipt, theme_file_sha256, verify_app_theme_inputs, write_theme_inputs_receipt,
     ThemePackageError, ThemePackageExpectation,
 };
 
@@ -94,4 +95,125 @@ fn content_digest_is_location_independent_and_content_sensitive() {
     changed[original.len() / 2] ^= 0x01;
     std::fs::write(&themes_at, changed).unwrap();
     assert_ne!(theme_package_content_digest(&copy).unwrap(), d1);
+}
+// ── PLAN-031 T-07（V-09）：生成准入 + 生成输入 receipt ──────────────────
+
+/// 保留 mtime（Windows 下用 std File::set_modified，不引额外依赖）。
+fn set_mtime(path: &Path, t: std::time::SystemTime) {
+    let f = std::fs::OpenOptions::new().write(true).open(path).unwrap();
+    f.set_modified(t).unwrap();
+}
+#[test]
+fn app_theme_inputs_admit_official_package_and_receipt_records_digest() {
+    let app = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../examples/ui/010-contact-form")
+        .canonicalize()
+        .expect("010 例程目录");
+    let root = verify_app_theme_inputs(&app)
+        .expect("声明官方包就必须校验通过")
+        .expect("应从 pac dep 解析出包根");
+    assert_eq!(root, pkg().canonicalize().unwrap());
+
+    let out = tempfile::tempdir().unwrap();
+    let d1 = write_theme_inputs_receipt(out.path(), &app).expect("receipt 可写");
+    assert_eq!(d1, theme_package_content_digest(&pkg()).unwrap());
+    assert_eq!(
+        read_theme_inputs_receipt(out.path()).as_deref(),
+        Some(d1.as_str()),
+        "receipt 读回必须等于写入摘要"
+    );
+}
+
+#[test]
+fn tampered_package_is_rejected_at_generation_admission() {
+    let dir = tempfile::tempdir().unwrap();
+    let pkg_dir = dir.path().join("themes");
+    publish_theme_package_snapshot(&pkg(), &pkg_dir).unwrap();
+    let app = dir.path().join("app");
+    std::fs::create_dir_all(app.join("src/front")).unwrap();
+    std::fs::write(
+        app.join("pac.at"),
+        "name: \"t\"\nversion: \"0.1.0\"\ndep themes {\n    path: \"../themes\"\n}\n",
+    )
+    .unwrap();
+
+    assert!(
+        verify_app_theme_inputs(&app).unwrap().is_some(),
+        "合法包应通过生成准入"
+    );
+
+    // 内容改但清单 hash 未更新 = 篡改 → 具名拒绝、不落半成品
+    let themes_at = pkg_dir.join("themes.at");
+    let mut bytes = std::fs::read(&themes_at).unwrap();
+    let mid = bytes.len() / 2;
+    bytes[mid] ^= 0x01;
+    std::fs::write(&themes_at, &bytes).unwrap();
+    let err = verify_app_theme_inputs(&app).expect_err("篡改必须拒绝");
+    assert!(
+        matches!(err, ThemePackageError::HashMismatch { .. }),
+        "应具名为 HashMismatch，得到 {err:?}"
+    );
+}
+
+/// V-09 核心：同名主题**内容变更且保留 mtime**（清单 hash 同步更新=合法发布）
+/// 也必须让生成输入摘要变化；内容不变时摘要稳定。
+#[test]
+fn receipt_follows_content_not_mtime() {
+    let dir = tempfile::tempdir().unwrap();
+    let pkg_dir = dir.path().join("themes");
+    publish_theme_package_snapshot(&pkg(), &pkg_dir).unwrap();
+    let app = dir.path().join("app");
+    std::fs::create_dir_all(app.join("src/front")).unwrap();
+    std::fs::write(
+        app.join("pac.at"),
+        "name: \"t\"\nversion: \"0.1.0\"\ndep themes {\n    path: \"../themes\"\n}\n",
+    )
+    .unwrap();
+    let out = tempfile::tempdir().unwrap();
+
+    let d1 = write_theme_inputs_receipt(out.path(), &app).unwrap();
+
+    // 未变：再写一次摘要稳定
+    let d_same = write_theme_inputs_receipt(out.path(), &app).unwrap();
+    assert_eq!(d1, d_same, "内容未变时生成输入摘要必须稳定");
+
+    // 合法内容变更：改色 + 同步清单 sha256 + 还原 mtime
+    let themes_at = pkg_dir.join("themes.at");
+    let manifest_path = pkg_dir.join("theme-package.json");
+    let mtime_themes = std::fs::metadata(&themes_at).unwrap().modified().unwrap();
+    let mtime_manifest = std::fs::metadata(&manifest_path).unwrap().modified().unwrap();
+
+    let src = std::fs::read_to_string(&themes_at).unwrap();
+    let new_src = src.replace("primary: \"#8b5cf6\"", "primary: \"#123456\"");
+    assert_ne!(src, new_src, "夹具必须真的改了内容");
+    std::fs::write(&themes_at, &new_src).unwrap();
+
+    let new_hash = theme_file_sha256(&themes_at).unwrap();
+    let manifest_text = std::fs::read_to_string(&manifest_path).unwrap();
+    let mut manifest: serde_json::Value = serde_json::from_str(&manifest_text).unwrap();
+    let files = manifest.get_mut("files").unwrap().as_array_mut().unwrap();
+    let mut patched = false;
+    for f in files.iter_mut() {
+        if f.get("path").and_then(|p| p.as_str()) == Some("themes.at") {
+            f["sha256"] = serde_json::Value::String(new_hash.clone());
+            patched = true;
+        }
+    }
+    assert!(patched, "清单必须列出 themes.at");
+    std::fs::write(&manifest_path, serde_json::to_string_pretty(&manifest).unwrap()).unwrap();
+
+    // 保留 mtime（证明新鲜度按内容而不是时间戳）
+    set_mtime(&themes_at, mtime_themes);
+    set_mtime(&manifest_path, mtime_manifest);
+    assert_eq!(
+        std::fs::metadata(&themes_at).unwrap().modified().unwrap(),
+        mtime_themes
+    );
+
+    let d2 = write_theme_inputs_receipt(out.path(), &app).unwrap();
+    assert_ne!(d1, d2, "内容变化（mtime 不变）必须让生成输入摘要变化");
+    assert_eq!(
+        read_theme_inputs_receipt(out.path()).as_deref(),
+        Some(d2.as_str())
+    );
 }
