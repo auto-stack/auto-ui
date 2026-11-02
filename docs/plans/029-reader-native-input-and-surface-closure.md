@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-02
 updated_at: 2026-11-02
 plan_revision: 1
-current_step: 6
+current_step: 7
 total_steps: 12
 base_branch: master
 base_commit: e344d2268f6bf40d1ed4f24ea957ce3fbd88313c
@@ -193,7 +193,7 @@ Reader旧门入口保持 `python tests/basic/verify_standalone.py --profile vue|
 | T-03 | work | T-02 | Reader前端model/handler、既有back/api.at与adapter、driver_vm补真选择/核验/保存/冷恢复 | N-02/03/09逐字/出现位次/CFI真解析、前端可见状态与磁盘读回；正常/异常重启，旧数据不变 | AC-03/04 |
 | T-04 | work | T-03 | UI输入/焦点/组合事件最小修复与实际driver取证 | N-04真实IME组合/取消/提交、焦点返回与快捷键不误触，全通过 | AC-05 |
 | T-05 | work | T-03/04 | [x] UI布局/文档表面resize/DPI/遮挡/隐藏生命周期与系统无障碍接缝——弹出窗真隐藏修复（worktree 98633fd4）+ 驱动 N-05/06 全门（reader ac24c98，probe.at 断开按钮 + engine-adapter 键盘接缝）；N-05 字体重排/滚动重拖/遮挡像素取证/隐藏展示重拖选、N-06 UIA 系统树定位+UIA焦点+真实键盘翻页、N-05.dpi-change 交互门（144→192→144 track/redrag/restore 三段全过）——见 §9 2026-11-02 T-05 记录 | N-05/06目标原文/命中/系统树可操作均实测；不是records计数或纯ARIA | AC-06 |
-| T-06 | work | T-03～05 | 两仓会话/实例配置与自有process管理，补双实例、关闭/迟到/端口/坏tool/占口专属门 | N-07/08/10正负对照；只收割自有树，10s清理，另一实例继续可用 | AC-07/08 |
+| T-06 | work | T-03～05 | [x] 双实例 A/B（-B/-F+AUTOUI_MCP_PORT 钉端口）、WM_CLOSE 真实关闭/迟到重放拒绝+零写入/崩溃无孤儿/取消隐藏、坏 tool 具名失败、占口不杀现有实例——见 §9 2026-11-02 T-06 记录（reader d3882ea，t06-vm7 全 PASS） | N-07/08/10正负对照；只收割自有树，10s清理，另一实例继续可用 | AC-07/08 |
 | T-07 | work | T-06 | 保原协议/资源安全，独立oracle与真实错锚/错身份变异，补适用负控回归 | N-09/11原拒绝零写、合法对照绿，变异红且聚合非零→还原绿；不得吞报错 | AC-03/07/08 |
 | T-08 | work | T-00可先诊断；最终依T-07 | 复现Reader R-05/R-06vm、分析实际owner；修本仓允许面或绑定他仓正式前置 | N-12原测试条件保留，404/像素负控失败机制真实闭合；外仓前置未到则保持未完成 | AC-09 |
 | T-09 | work | T-08全部通过 | 冻结cohort跑两个profile的完整新清单及旧Reader门、本仓定向cargo选择；写证据总结、SD-01/02与两仓路线/导航并内部检查 | 现有入口 `python tests/probe/engine_surface/verify_engine_surface.py --profile vue|vm --auto-bin ... --out-dir ...` 完整且exit0；新清单非旧30总数；git diff --check/链接/source绑定 | AC-01～10 |
@@ -202,9 +202,23 @@ Reader旧门入口保持 `python tests/basic/verify_standalone.py --profile vue|
 
 ## 9. 复审记录
 
+### 2026-11-02：work阶段——T-06 双实例/生命周期/专属负控门全绿（AC-07/08 部分）
+
+- stage: work | plan_id: PLAN-029 | plan_revision: r1 | task: T-06 | outcome: pass（N-07/08 全子项 + N-10 bad-tool/port-occupied 实况门全 PASS；聚合 findings=1=已知 N-04.focus-roundtrip 开放项）| worktree: .wt/ui-029@98633fd4（无改）| reader: main@d3882ea | next: T-07。
+- **N-07 双实例 A/B**（t06-vm7）：B 经 `-B 17837 -F 3017` + `AUTOUI_MCP_PORT` 钉端口（服务端有 busy 回退链，双实例必须钉）+ 独立 UDF/CDP/数据目录与 A 并存；B 真实拖选**乙句第2处**（oracle ch1 para6✓）；跨书隔离双向独立 oracle 核验（A 记录被 beta oracle 拒、B 记录被 alpha oracle 拒）；A 经 **WM_CLOSE 真实关窗**关闭→新进程重开（数据目录持久）→旧 sid3 事件重放被拒（`rejected_bad_document/book mismatch`）+ 旧会话文件字节级零写入；B 跨 A 全生命周期扰动继续真实选择成功。
+- **N-08 生命周期**：正常关闭=真实 WM_CLOSE 路径（进程/端口/弹出窗 10s 内释放，无 taskkill 补偿）；旧 MCP 目标再调用有界拒绝（URLError 10061）；取消腿=Disconnect 后弹出窗 10s 内隐藏（webview 对象进程内保留、窗口已释放——语义如实记录）；崩溃腿=强杀树后进程/端口 10s 内死亡、msedgewebview2 无孤儿增长（12→12）。
+- **N-10 实况负控**：坏 `AUTO_UI_TOOL_BIN`（不存在路径）→ 具名 "tool discovery: … missing path" 且 MCP 永不宣告（无静默回落）；占口（独占绑定哑 socket）→ 应用不服务、占口者不被杀。
+- **驱动硬化**（t06-vm1..7 实测驱动）：beta 书目身份用 import 返回 book_id（管理文件名统一 original.epub 不可按路径区分）；marker 参数贯穿 frame 筛选（REPEAT_B 被硬编码甲句遮蔽）；任意首行拖选在标题/TOC 行盒产生跨块拼接选区（' 跨章注与复'）→ B 拖选换 per-book 目标句机制；_drag_line 前台先行（A2 重启新窗覆盖 B 弹出窗直到 owner 提前台）；sidecar 轮询按实例 base_url；占口门禁用 SO_REUSEADDR（Windows 双绑定会假红）。
+- 证据：plan-artifacts/plan-029/t06-vm{1..7}-console.log + 各 out-dir。
+- 下一任务 T-07：消费端负控（N-09）与变异红→绿（N-11）。
+
 ### 2026-11-02：goal回合（T-05轮）
 
 - stage: goal | plan_id: PLAN-029 | plan_revision: r1 | round: 2 | from: work | to: work | status: executing | outcome: pass(T-05) | worktree: D:/autostack/.wt/ui-029/auto-ui | commit: reader ac24c98 + ui 98633fd4 | next: work(T-06)。
+
+### 2026-11-02：goal回合（T-06轮）
+
+- stage: goal | plan_id: PLAN-029 | plan_revision: r1 | round: 3 | from: work | to: work | status: executing | outcome: pass(T-06) | worktree: D:/autostack/.wt/ui-029/auto-ui | commit: reader d3882ea | next: work(T-07)。
 
 ### 2026-11-02：work阶段——T-05 几何/无障碍/键盘/DPI 全门真实通过（AC-06）
 
