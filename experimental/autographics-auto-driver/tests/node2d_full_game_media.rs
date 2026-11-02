@@ -886,3 +886,45 @@ fn g2_gpu_win_route_hud_and_fresh_run() {
     assert_eq!(inst.slots.iter().filter(|s| s.live()).count(), 6, "coins restored in the fresh run");
     println!("G2_GPU win route + fresh run observed (tick {tick_before} -> {})", f.tick);
 }
+
+/// Damaged-consumption recovery: a one-byte-corrupted world copy under the
+/// scene-bound sha name is rejected by the driver load path; the exact
+/// restore runs green and the real Host starts the run.
+#[test]
+fn g2_damaged_consumption_recovery() {
+    let dir = stage_game("damage");
+    let script = dir.join("scripts").join(format!("{WORLD_SHA}.at"));
+    let pristine = std::fs::read(&script).expect("staged world");
+    assert_eq!(sha256_hex(&pristine), WORLD_SHA, "staged copy binds the sha");
+    let mut damaged = pristine.clone();
+    let at = pristine.len() / 2;
+    damaged[at] ^= 0x01;
+    std::fs::write(&script, &damaged).expect("corrupt");
+    let err = Storage::load_project(&dir.join("scene.agscene"), &assets::Registry::new());
+    assert!(err.is_err(), "corrupted world must be rejected");
+    std::fs::write(&script, &pristine).expect("restore");
+    let (_d, doc, registry, code) = {
+        let (d, r, c, _) =
+            Storage::load_project(&dir.join("scene.agscene"), &assets::Registry::new())
+                .unwrap_or_else(|e| panic!("restored load: {e:?}"));
+        (dir.clone(), d, r, c.expect("code"))
+    };
+    let mut h = Host::with_project(doc, registry, Some(code)).expect("host");
+    h.start_selected_play()
+        .unwrap_or_else(|e| panic!("start run: {e:?}"));
+    h.pause_play("");
+    settle_host(&mut h);
+    assert!(h
+        .play
+        .as_ref()
+        .unwrap()
+        .error
+        .clone()
+        .unwrap_or_default()
+        .is_empty());
+}
+
+/// sha256 hex over bytes (the driver's own capture helper).
+fn sha256_hex(bytes: &[u8]) -> String {
+    autographics_auto_driver::authoring::behavior::sha256_hex_for_tests(bytes)
+}

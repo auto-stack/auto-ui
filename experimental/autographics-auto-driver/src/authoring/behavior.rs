@@ -366,6 +366,12 @@ pub fn assembled_units_for(api: Api) -> Result<(String, String), String> {
     let u = assembly::assemble(api)?;
     Ok((u.api, u.entry))
 }
+
+/// Test-only sha256 over bytes (the capture helper the trusted units use).
+#[doc(hidden)]
+pub fn sha256_hex_for_tests(bytes: &[u8]) -> String {
+    agp::renderer::capture::sha256_hex(bytes)
+}
 /// Shared complete transport units from Builtin6, never copies of its graph logic.
 pub fn bridge() -> String {
     assembly::bridge(SOURCE).expect("trusted transport assembly")
