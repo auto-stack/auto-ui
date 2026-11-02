@@ -3494,6 +3494,11 @@ pub(super) fn dynamic_view(
     state: crate::ui::session::SessionViewRef<'_>,
     sync_mcp: bool,
 ) -> iced::Element<'_, IcedMessage> {
+    // PLAN-033：投影期安装本组件主题 scope——语义色转换（style_iced_adapter
+    // convert_color）与 view 构建期（view_with_debug_gated guard）同读一份
+    // 快照。缺此安装时投影落 legacy 全局槽，design 绑定族不达像素（V-02
+    // 双端一致性的根因）。
+    let _theme_guard = state.component.theme_scope_guard();
     dynamic_view_impl(state, sync_mcp, false)
 }
 
@@ -3503,6 +3508,8 @@ pub(super) fn dynamic_view_vwin(
     state: crate::ui::session::SessionViewRef<'_>,
     sync_mcp: bool,
 ) -> iced::Element<'_, IcedMessage> {
+    // PLAN-033：同 dynamic_view——vwin 托管面投影亦在组件 scope 内转换。
+    let _theme_guard = state.component.theme_scope_guard();
     dynamic_view_impl(state, sync_mcp, true)
 }
 

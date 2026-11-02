@@ -1552,7 +1552,9 @@ impl DynamicComponent {
     }
 
     /// 帧构建入口用：安装本组件 scope；Drop 恢复（嵌套/失败均恢复）。
-    fn theme_scope_guard(
+    /// PLAN-033：窗口投影路（projection::dynamic_view）与 view* 构建路同需
+    /// 安装——投影期语义色转换同样读本 scope 快照（C-05 双端投影面）。
+    pub(crate) fn theme_scope_guard(
         &self,
     ) -> Option<auto_ui_compiler::style::theme::InstalledThemeScope> {
         self.theme_scope
