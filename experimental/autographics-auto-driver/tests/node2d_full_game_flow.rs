@@ -88,9 +88,9 @@ fn session(world_src: &str, name: &str, run: i32) -> Session {
     // four-frame atlas; the world passes the frame rect per bundle call.
     for (name, args) in [
         ("_ag_spr_map", vec![Int(1), Int(0), Int(0)]),
-        ("_ag_spr_img", vec![Int(0), Int(64), Int(16)]),
-        ("_ag_spr_def", vec![Int(0), Int(0), Int(0), Int(16)]),
-        ("_ag_spr_defh", vec![Int(0), Int(16), Int(1)]),
+        ("_ag_spr_img", vec![Int(0), Int(160), Int(32)]),
+        ("_ag_spr_def", vec![Int(0), Int(0), Int(0), Int(32)]),
+        ("_ag_spr_defh", vec![Int(0), Int(32), Int(1)]),
     ] {
         s.call(name, &args, ResultKind::Unit).unwrap();
     }

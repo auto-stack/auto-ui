@@ -296,6 +296,7 @@ impl Play {
             && snapshot.version != super::behavior::HUD2_VERSION
             && snapshot.version != super::behavior::HUD3_VERSION
             && snapshot.version != super::behavior::PRESENTATION2_VERSION
+            && snapshot.version != super::behavior::COMPONENTS2_VERSION
         {
             return Err("spatial constructor API mismatch".into());
         }

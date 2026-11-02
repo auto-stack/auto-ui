@@ -38,8 +38,8 @@ var e_dir=1
 // goal / hidden pit-zone handles
 var goal_h=0
 var pit_h=0
-// atlas frame x origins: 0 idle / 16 run / 32 rise / 48 fall
-var frame_x=[0,16,32,48]
+// atlas frame x origins (32x32 frames in the 160x32 atlas): 0 idle / 32 run / 64 rise / 96 fall
+var frame_x=[0,32,64,96]
 fn app_start() {
  ok=ok+ag_char_bind(1)*1.0
  ok=ok+ag_char_solid(2)*1.0
@@ -267,7 +267,7 @@ fn closeout() {
   o3 = r_ord
   c3 = r_p3
  }
- ok=ok+ag_present2d(0, 1, frame_x[p_frame], 0, 16, 16, face_flip(), r_np, o0, c0, 0.5, o1, c1, 0.5, o2, c2, 0.5, o3, c3, 0.5, 1, hud_count_text(r_count), 1, hud_state_text(r_state), 0, "", 0, "")*1.0
+ ok=ok+ag_present2d(0, 1, frame_x[p_frame], 0, 32, 32, face_flip(), r_np, o0, c0, 0.5, o1, c1, 0.5, o2, c2, 0.5, o3, c3, 0.5, 1, hud_count_text(r_count), 1, hud_state_text(r_state), 0, "", 0, "")*1.0
  r_np = 0
 }
 // observation getters (probes run between ticks; never inside the tick path)
