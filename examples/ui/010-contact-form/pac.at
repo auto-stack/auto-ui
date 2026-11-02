@@ -6,4 +6,10 @@ title: "Contact Form"
 title_zh: "联系表单"
 theme: "dark"
 accent: "indigo"
+# PLAN-031 T-06：官方主题单源包（不复制配色表进本 app，C-13）。
+# 显式 `theme: "dark"` 是该 App 既有的显式默认，按新契约精确保留
+# （不改为未显式声明 App 的 Auto/light 默认）。
+dep themes {
+    path: "../../../packages/themes"
+}
 

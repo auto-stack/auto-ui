@@ -9,3 +9,7 @@ title: "Converter"
 title_zh: "转换器"
 # Plan 506: 窗口随内容自然尺寸收缩（独立 VM 窗 / 虚拟桌面窗双路径）。
 window: "fit"
+# PLAN-031 T-06：官方主题单源包（不复制配色表进本 app，C-13）。
+dep themes {
+    path: "../../../packages/themes"
+}
