@@ -315,6 +315,20 @@ Reader旧门入口保持 `python tests/basic/verify_standalone.py --profile vue|
 - 证据：plan-artifacts/plan-029/t08-n04fix{,-console.log}、t09-dry{1,2,3}{,-console.log}/、t09-vueiso/、t09-vuediag{,2,3}/、t09-corpuscheck/（语料 sha 与 manifest 一致=d973dad8，排除语料漂移）。
 - 下一任务：work——vue 分页回归定位修复 → N-04 收口（UI 侧插桩或人工配对协议）→ T-09 冻结全清单两 profile + 旧门（需空闲桌面 + 用户协助 DPI 交互腿）。
 
+### 2026-11-02：work阶段——Vue分页回归专轮：核心拖选链恢复全绿 + N-05.vue腿大部分闭合（0f一项开放）
+
+- stage: work | plan_id: PLAN-029 | plan_revision: r1 | task: T-09准备（vue链回归修复）| outcome: partial（vue 核心链全绿 33/34；仅 N-05.reflow 腿因适配器订阅生命周期开放，见§10 0f）| worktree: .wt/ui-029@98633fd4（无改）| reader: main@64c04db | next: work（适配器重订阅专轮 + N-04 收口 + T-09 冻结跑）。
+- **定位（六轮诊断收敛）**：分页器本身正常（next() 以 iframe 元素整页位移推进每步 625px）；根因=巨列形态（ch1≈25 列）下目标句第2处在第 ~20 列，旧驱动 12 轮预算不可达 + 「永不相交」负宽插值把拖选打到视口外（elementFromPoint=null）。语料 sha 与 manifest 一致（排除漂移）；vendor 资产 mtime 自 T-00 未变（排除资产回归）；playwright chromium-1248 与 T-01 相同（排除浏览器回归）；生成前端 git diff 零变化（排除 regen 影响）。
+- **修复（reader 64c04db）**：共享 _vue_page_to_visible（48 轮翻页预算 + next() 位移进度守卫 + 永不相交具名失败，替换两处旧 12 轮循环）；拖选前片段级行盒精化（JS Range 量测取可视列内片段，防跨列 union 横跨列间隙落隙）；scan_png_pixels 按 ctype 取 bpp（Playwright 截图为 RGB/ctype2，旧固定 stride=4 越界）；N-11.vue 判别改 lastLocation 位置指纹（textContent 口径被邻 section 预渲染污染，假阴性实测）；N-02 图/脚注检查移到拖选链后按许可翻页到 ch2 再断言（不依赖邻章预渲染时序）；遮挡/隐藏腿先锚定再扰动；重排腿段首锚定 + render() 全量重排。
+- **iso10 实测（隔离全链）**：N-02 目标句 20 轮真实翻页可达 → 真拖选 occ=2 → .at 后端 accepted → CFI epubcfi(/6/2!/4/18,/1:8,/1:29) → sidecar HTTP+磁盘 → N-03 冷恢复 → N-09 负控矩阵全绿 → N-11 变异红/指纹落点异位（lastLocation wrong≠true）/字节还原绿 → N-05.vue repage/occlusion（像素 0→1152000→0）/hideshow 全绿——33/34。
+- **开放**：N-05.reflow 腿拖选零 POST（适配器 listener 仅挂载时接线，render() 重建 section 文档后订阅失效）——修复在共享 engine-adapter.js 加重定位重订阅，须连 vm 轨回归专轮做（§10 0f）；该腿如实记 FAIL，聚合保持非零。
+- 证据：plan-artifacts/plan-029/t09-vueiso{2..10}{,-console.log}/、t09-vuediag{4..9}/（逐轮定位材料）。
+- 下一任务：work——适配器重订阅（连 vm 回归）→ N-04 收口 → T-09 冻结跑（空闲桌面 + DPI 协助）。
+
+### 2026-11-02：goal回合（Vue回归专轮）
+
+- stage: goal | plan_id: PLAN-029 | plan_revision: r1 | round: 7 | from: work | to: work | status: executing | outcome: partial(vue核心链全绿，reflow腿开放) | worktree: D:/autostack/.wt/ui-029/auto-ui | commit: reader 64c04db | next: work。
+
 ### 2026-11-02：goal回合（T-08续轮）
 
 - stage: goal | plan_id: PLAN-029 | plan_revision: r1 | round: 6 | from: work | to: work | status: executing | outcome: partial(N-01全绿/N-12门建成/N-04与vue链开放) | worktree: D:/autostack/.wt/ui-029/auto-ui | commit: reader c962c86 | next: work。
@@ -339,7 +353,8 @@ Reader旧门入口保持 `python tests/basic/verify_standalone.py --profile vue|
 ### 2026-11-02（T-08续/T-09准备轮登记）
 
 0c. **N-04.focus-roundtrip（开放，诊断收敛）**：本轮把 OS 层证据链补齐——重排序后实测 fg=主窗、OS 焦点=主窗（AttachThreadInput+SetFocus 在最后一次表面点击之后）、WindowFromPoint(输入点)=winit 主窗类 "Window Class"、弹出窗矩形 (145,486,1696,840) 不覆盖输入点 (787,348)——即点击确实抵达 iced 主窗，但表面拖选发生后输入值恒不变；真实键盘 Tab（iced 默认无 Tab 焦点循环）亦无效。结论：iced 组件级焦点不随 OS 焦点恢复，且表面交互后真实点击不再聚焦输入 widget。剩余修法二选一：①UI 侧（worktree）对输入焦点路径插桩定位；②按本节第 1 条既定协议以「CDP 焦点断言 + 人工目击配对」补证。另：N-04 各真实输入腿在活桌面上有 run-to-run 抖动（dry3 ime-commit FAIL、相邻轮 PASS；dry2 表面点被 CASCADIA 终端瞬时遮盖）——真实输入门的度量需要空闲桌面窗口。
-0d. **Vue 既有链分页回归（新发现，阻塞 N-12.vue-chain）**：当前 regen 前端+资产下，vue 轨 ch1 以单一巨列渲染（iframe innerWidth=15625px），目标句第2处落 page-x≈12875（视口外，elementFromPoint=null），renderer.next() 不再移动可见列；驱动相交循环对「永不相交」的 box 不报错而是以负宽插值算出垃圾拖选坐标 → 0 locator POST（T-01 同代码同语料为真拖选+1 POST）。机制=分页 transform 位移行为变化 + 驱动相交守卫缺「永不相交」失败分支。owner=reader 探针驱动/前端组合，需专轮定位（vendored foliate 分页 vs regen 前端）后修；修复前 N-12.vue-chain 与 vue 轨 N-02 拖选腿不能记通过。
+0d. **Vue 既有链分页回归（已修复闭合，reader 64c04db）**：定位=分页器本身工作正常（next() 以 iframe 元素整页位移推进，每步 625px，t09-vuediag9 实测 x: 328→-297→-922），根因=巨列形态（ch1≈25列×625px）下第2处出现于第 ~20 列，旧驱动 12 轮翻页预算不可达，且「永不相交」时旧代码以负宽插值把拖选坐标算到视口外（elementFromPoint=null → 0 locator POST）。修复=共享 _vue_page_to_visible（48 轮预算 + 位移进度守卫 + 永不相交具名失败）+ 片段级行盒精化拖选 + RGB/RGBA PNG 解码 bpp 修正。iso10 实测：目标 20 轮真实翻页可达、真拖选 occ=2 → .at 后端 accepted → CFI → sidecar 落盘 → 冷恢复 → N-09 负控全绿 → N-11 变异红/指纹落点异位/还原绿（33/34）。
+0f. **N-05.reflow vue 腿（开放，具名）**：字体重排后（body 200%）拖选不产 locator 事件——分页器页表失真问题已绕过（render() 强制重排 + 段首锚定后翻页可达、拖选真实落在内容上），但适配器 listener 仅在挂载时接线一次，render()/重排重建 section 文档后旧订阅失效（iso10 全跑仅 4 个 POST = N-02/repage/occlusion/hideshow 各一，reflow 拖选零 POST）。修复需适配器增加重定位后重订阅（relocate/render 事件 → 重新接线 mouseup/pointerdown），属共享 engine-adapter.js（vm 轨同一文件），须连同 vm 轨回归一起专轮做。修复前该腿记 FAIL，vue profile 聚合保持非零，不冒充通过。
 0e. **本轮随手闭合项**：N-03 旧记录基线改在 N-01 双通道之后重新静默冻结（合法增长曾被误判）；T-05 门单腿失败不再级联早退（dry3 N-06 曾被跳过成 missing）；N-12 门加 17825/17827 端口静默屏障（busy 回退链竞态实证）；verify_standalone 门内 verify_standalone 路径修正 + R-01 vite 单发探测改有界轮询（冷启动误判）。standalone-vm 旧门 27/27 全绿（含 R-05 与修复后 R-06vm）= T-08 修复在真实门内闭合。
 
 ### 2026-11-02（work 执行中登记）
