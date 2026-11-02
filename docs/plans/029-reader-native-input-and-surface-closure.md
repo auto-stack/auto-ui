@@ -263,7 +263,8 @@ Reader旧门入口保持 `python tests/basic/verify_standalone.py --profile vue|
 ### 2026-11-02（work 执行中登记）
 
 1. **N-04.focus-roundtrip 表面→输入框方向（开放，具名）**：弹出窗形态下，表面内真实拖选后，注入点击/键击（双击、标题栏激活、AttachThreadInput+SetFocus、WM_CANCELMODE）均无法把 OS 线程焦点从弹出窗 Chrome（fd5e/fe10）拉回 iced 输入框（t05-vm5/6/7/8 诊断一致：cap=0、焦点恒驻弹出窗）。**人工路径可用**：用户在表面在场时向输入框手工输入 1231 成功（视觉证据）。方向 输入框→表面 已证（真实拖选 CDP 选区）。待 repair：诊断合成注入与人工点击的差异（可能性：Chromium 内部捕获/焦点仲裁），或以「CDP 焦点断言 + 人工目击配对」补证。用户手工输入 1231 期间页面正常（无命令误触）可作辅助证据。
-2. 其余起草期条目（1~4）转入 T-00/02/08 已闭环或随任务推进。
+2. **原生轨文本拖放入输入框（能力缺口，非本计划门）**：用户实测从文档拖文字到 IME 输入框不生效。定责：源端（WebView2/Chromium）支持拖出；目标端运行时有 Plan 488 `native_dnd`（IDropTarget/CF_UNICODETEXT，App 级 `on_native_drop` 事件）但 ① cohort 构建未启用 `native-dnd` feature，② 即使启用也只到应用级事件——iced text_input 无「拖放到光标处插入」接线。属原生轨框架新功能（Vue 轨浏览器原生支持故无此缺口），应由框架侧后续计划补，不阻塞本计划任何门。
+3. 其余起草期条目（1~4）转入 T-00/02/08 已闭环或随任务推进。
 
 无阻塞起草的用户问题。以下由未来任务负责，不能要求用户先替根因分析选答案（历史）：
 
