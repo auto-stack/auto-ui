@@ -33,9 +33,10 @@
 | 027 | [3D角色与运行相机Node接线](archived/027-autographics-node3d-character-and-runtime-camera.md) | W3运行能力/G07与G08-3d引擎 | archived/r1，10/10；交付f3dea0d，独立final/冻结/归档清理齐；SD node3d-character-and-runtime-camera.md sha95a86660；原24oracle保持，AG011/012可固定消费，不把引擎绿当内容交付 |
 | 028 | [三维实例/触发/新局Node接线](archived/028-autographics-node3d-instances-triggers-and-rounds.md) | W3/G11-3d有限服务作者接线 | archived/r1，10/10；交付ebac1cd，独立final/冻结/归档清理齐；SD sha be4d9c15；25旧oracle保持，字符串/数值pair/本定义subject仍为有限边界，030补具名参数/跨组件接线 |
 | 029 | [Reader原生输入链与必要接缝收口](029-reader-native-input-and-surface-closure.md) | 026原生GAP与coverage v4后继 | drafting/r1、0/12；真实AutoUI原生VM的选区→.at→保存/冷恢复，IME/几何/系统无障碍、双实例/清理、严格非零汇总与旧门；全部必需门通过后独立上下文review，仅起草、未实施 |
-| 030 | [三维具名引用与跨组件接线收口](archived/030-autographics-node3d-symbolic-component-bindings.md) | 028作者收口/G11-3d前置 | archived/r1，10/10；交付804d7303、Spec SHA6ed0bf07/冻结/清理有记录；review明确同实现会话重建、非独立会话，独立上下文final证据待补，AG013 T-02保留此门，不以归档代通过 |
+| 030 | [三维具名引用与跨组件接线收口](archived/030-autographics-node3d-symbolic-component-bindings.md) | 028作者收口/G11-3d前置 | archived/r1，10/10；交付804d7303、Spec SHA6ed0bf07/冻结/清理有记录；review原为同实现会话重建（非独立会话，历史记录保留）；2026-11-02经用户授权补录独立上下文final pass（独立reviewer绑定804d7303：range-diff两行全等/canonical 6ed0bf07三点等/verify --controls 32 checks复跑PASS/gates 5/5/flow 8/8/AC-01..06全pass/自选反例5条具名拒绝，收据在归档§9），AG013 T-02门已开启 |
 | 031 | [主题作用域、原子发布、正式主题包与基础控件收口](031-theme-scope-publication-and-package-closure.md) | 拆分后架构工作包A；接受007/910 | drafting/r1，0/11；R01/R02优先实证修复，App/子树scope与正式themes包、基础控件双端，第二批003/010；后继示例/AutoOS另约；暂不实施 |
 | 032 | [完整2D游戏组合与预算收口](032-autographics-node2d-full-game-composition.md) | M2游戏优先/引擎线 | drafting/r2，0/10；组合020/022/025与对象/触发/新局，原G2九项与最高分支原32内；新有限操作/价目是明确提案，暂不实施 |
+| 033 | [剩余六个基础示例正式主题迁移](033-basic-examples-theme-migration.md) | UI031后继B1六例 | drafting/r1，0/9；001/004/006/007/008/009逐例双端、原业务/资源/布局保持；硬等031正式交付，与OS053互不等待；暂不实施 |
 
 当前AG按[三线设计](../design/autographics/m2-game-first-three-lane-roadmap.md)推进：UI032引擎、ag-examples/AG014完整游戏（原G2-001）、AG013 r2 Demo；游戏T-01..04准备可并行，T-05等032实际交付。AG012已交付，Gallery实际16/22，不是M2百分比。3D表现/音画已分片设计，完整3D游戏在2D稳定闭环后交付。
 
