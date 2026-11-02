@@ -108,17 +108,91 @@ pub fn set_theme_composed(
 fn set_active(spec: ActiveSpec) -> bool {
     let changed = ACTIVE_THEME.with(|t| {
         let mut t = t.borrow_mut();
-        if t.name() != spec.name() {
+        if same_identity(&t, &spec) {
+            false
+        } else {
             *t = spec;
             true
-        } else {
-            false
         }
     });
     if changed {
         THEME_EPOCH.with(|e| e.set(e.get().wrapping_add(1)));
     }
     changed
+}
+
+/// PLAN-031 T-02（R-01）：主题身份 = 形态 + 名称 + 树内容，**不再只看名字**。
+///
+/// 同名但 token/半径/模式差异不同的树是新 revision：必须替换并推进 epoch，
+/// 否则消费端继续读旧值（§4.2 R-01 已定位差额）；同名且内容逐字段相等时
+/// 不发布、不增 revision（无变化不错误替换）。树与内置/合成族即使同名也是
+/// 不同来源，不算同一身份。
+fn same_identity(current: &ActiveSpec, next: &ActiveSpec) -> bool {
+    match (current, next) {
+        (ActiveSpec::Tree(a), ActiveSpec::Tree(b)) => a.name == b.name && a.raw == b.raw,
+        (ActiveSpec::Builtin(_), ActiveSpec::Builtin(_))
+        | (ActiveSpec::Composed(_), ActiveSpec::Composed(_)) => current.name() == next.name(),
+        _ => false,
+    }
+}
+
+/// PLAN-031 T-02（R-02）：design 块的完整主题候选（family + mode）。
+///
+/// 调用方（VM builder 与后续 Vue/宿主投影）先把 selector **全部**求值成
+/// 候选，再交给 [`publish_design_candidate`] 一次校验/发布。候选是纯数据，
+/// 校验前不写任何槽位。
+pub enum ThemeCandidate {
+    /// 已注册树状族（build 期已过 schema 校验）。
+    Tree(crate::design_tokens::theme_tree::ThemeTree),
+    /// 内置 legacy 族。
+    Builtin(&'static registry::ThemeSpec),
+}
+
+/// 完整候选一次校验、一次发布（PLAN-031 T-02，R-02）。
+///
+/// 语义（§5.3 事务发布）：
+/// - 非法组合（未声明请求模式的树、非法 mode 值由调用方先拒绝）整体拒绝，
+///   返回 `Err` 且**零写入**：旧 family/mode/revision 全部保持；
+/// - 合法候选在同一发布边界内提交 family+mode，并且只推进**一个**
+///   `THEME_EPOCH`——消费端看不到「新 mode + 旧 family」的半套画面。
+///
+/// 返回 `Ok(true)` = 产生了新 revision（family 或 mode 变化）。
+pub fn publish_design_candidate(
+    theme: Option<ThemeCandidate>,
+    dark: Option<bool>,
+) -> Result<bool, String> {
+    let next_dark = dark.unwrap_or_else(dark_mode);
+    // 1) 校验：只读旧快照，不写任何槽位。
+    let next_spec = match theme {
+        Some(ThemeCandidate::Tree(tree)) => {
+            if !crate::design_tokens::theme_tree::mode_available(&tree, next_dark) {
+                let want = if next_dark { "dark" } else { "light" };
+                return Err(format!(
+                    "主题 `{}` 未声明 {want} 模式——拒绝换肤，保留旧有效设计（C-07）",
+                    tree.name
+                ));
+            }
+            ActiveSpec::Tree(tree)
+        }
+        Some(ThemeCandidate::Builtin(spec)) => ActiveSpec::Builtin(spec),
+        None => active_theme(),
+    };
+    // 2) 提交：同步单线程内 family 与 mode 一起写入，epoch 在末尾只 +1。
+    let spec_changed = ACTIVE_THEME.with(|t| {
+        let mut t = t.borrow_mut();
+        if same_identity(&t, &next_spec) {
+            false
+        } else {
+            *t = next_spec;
+            true
+        }
+    });
+    let mode_changed = DARK_MODE.with(|d| d.replace(next_dark)) != next_dark;
+    let changed = spec_changed || mode_changed;
+    if changed {
+        THEME_EPOCH.with(|e| e.set(e.get().wrapping_add(1)));
+    }
+    Ok(changed)
 }
 
 /// PLAN-007 T-05：已 build 树状主题注册表（进程级；`auto run` 单应用进程

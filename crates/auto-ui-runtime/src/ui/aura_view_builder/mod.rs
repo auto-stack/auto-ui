@@ -497,27 +497,36 @@ impl<'a> AuraViewBuilder<'a> {
         (view, id_map, probe)
     }
 
-    /// PLAN-007 T-05（C-06/07/08）：design 块每帧求值。
+    /// PLAN-031 T-02（C-06/07/08 事务面；R-02 修复）：design 块每帧求值。
     ///
-    /// - `theme: <expr>` → 主题名 → 注册表 lookup → [`set_theme_tree`]；
-    ///   未注册名尝试内置主题；两者皆 miss → 诊断 + 保旧（C-11）。
-    /// - `mode: <expr>` → "light"/"dark"/"system"（system 经 OS 探测）。
-    ///   显式请求树未声明模式 → 拒绝（保旧 + 诊断，C-07）。
-    /// - 求值失败（绑定缺失等）→ 该帧跳过发布（旧槽位自然保持）。
+    /// 先把全部 selector 求值成**完整候选**，再经
+    /// [`publish_design_candidate`](auto_ui_compiler::style::theme::publish_design_candidate)
+    /// 一次校验/发布：
+    /// - `theme: <expr>` → 主题名 → 注册表 lookup，其次内置族；两者皆 miss →
+    ///   整候选拒绝（诊断 + 保旧，C-11）。
+    /// - `mode: <expr>` → "light"/"dark"/"system"（system 经受控 provider）；
+    ///   非法值/显式请求树未声明模式 → 整候选拒绝（保旧 + 诊断，C-07）。
+    /// - 任一 selector 求值失败（绑定缺失/非字符串）→ 整候选拒绝，另一
+    ///   selector 的成功结果**不得单独发布**（§4.2 R-02 continue 差额）。
+    /// - 合法候选一次提交 family+mode，只推进一个 revision；消费端不会看到
+    ///   新 mode + 旧 family 的半套画面。
     fn eval_app_design(&self) {
-        use auto_ui_compiler::design_tokens::theme_tree as tt;
-        let entries = auto_ui_compiler::style::theme::app_design_entries();
+        use auto_ui_compiler::design_tokens::registry;
+        use auto_ui_compiler::style::theme::{self, ThemeCandidate};
+        let entries = theme::app_design_entries();
         if entries.is_empty() {
             return;
         }
         let bindings = Bindings::new();
         let mut theme_name: Option<String> = None;
         let mut mode_str: Option<String> = None;
+        let mut failed = false;
         for (key, expr) in &entries {
             let value = match self.resolve_expr_to_value(expr, &bindings) {
                 Some(v) => v,
                 None => {
-                    eprintln!("[PLAN-007] design.{key} 求值失败——本帧保留旧设计");
+                    eprintln!("[PLAN-031] design.{key} 求值失败——整候选拒绝，本帧保留旧设计");
+                    failed = true;
                     continue;
                 }
             };
@@ -528,46 +537,68 @@ impl<'a> AuraViewBuilder<'a> {
                 _ => None,
             };
             match key.as_str() {
-                "theme" => theme_name = text,
-                "mode" => mode_str = text,
+                "theme" => match text {
+                    Some(t) => theme_name = Some(t),
+                    None => {
+                        eprintln!("[PLAN-031] design.theme 值不是字符串——整候选拒绝（C-07）");
+                        failed = true;
+                    }
+                },
+                "mode" => match text {
+                    Some(t) => mode_str = Some(t),
+                    None => {
+                        eprintln!("[PLAN-031] design.mode 值不是字符串——整候选拒绝（C-07）");
+                        failed = true;
+                    }
+                },
                 other => {
-                    eprintln!("[PLAN-007] design 槽 `{other}` 在试点支持面外（theme/mode）")
+                    eprintln!("[PLAN-031] design 槽 `{other}` 在试点支持面外（theme/mode）")
                 }
             }
         }
-        // mode 先行（compose 需要知道目标模式）
-        if let Some(mode) = &mode_str {
-            let dark = match mode.as_str() {
-                "dark" => Some(true),
-                "light" => Some(false),
-                "system" => crate::ui::system_theme::system_prefers_dark(),
-                other => {
-                    eprintln!("[PLAN-007] design.mode `{other}` 非 light|dark|system——拒绝（C-07）");
+        if failed {
+            // 整候选拒绝：不写 family、不写 mode、不增 revision（R-02）。
+            return;
+        }
+
+        // mode 解析为受控输入（system 由 provider 给出真实/受控偏好结果；
+        // provider 无结果时本帧不发布 mode——不伪称已获真实 OS 偏好）。
+        let dark = match mode_str.as_deref() {
+            None => None,
+            Some("dark") => Some(true),
+            Some("light") => Some(false),
+            Some("system") => match crate::ui::system_theme::system_prefers_dark() {
+                Some(d) => Some(d),
+                None => {
+                    eprintln!("[PLAN-031] design.mode `system` 未取得 provider 结果——本帧不发布 mode");
                     None
                 }
-            };
-            if let Some(d) = dark {
-                auto_ui_compiler::style::theme::set_dark_mode(d);
+            },
+            Some(other) => {
+                eprintln!("[PLAN-031] design.mode `{other}` 非 light|dark|system——整候选拒绝（C-07）");
+                return;
             }
-        }
-        if let Some(name) = &theme_name {
-            let is_dark = auto_ui_compiler::style::theme::dark_mode();
-            if let Some(tree) = auto_ui_compiler::style::theme::lookup_theme_tree(name) {
-                if tt::mode_available(&tree, is_dark) {
-                    auto_ui_compiler::style::theme::set_theme_tree(tree);
-                } else {
-                    let want = if is_dark { "dark" } else { "light" };
-                    eprintln!(
-                        "[PLAN-007] 主题 `{name}` 未声明 {want} 模式——拒绝换肤，保留旧有效设计（C-07）"
-                    );
-                }
-            } else if auto_ui_compiler::style::theme::theme_name() != *name {
-                if !auto_ui_compiler::style::theme::set_theme(name) {
-                    eprintln!(
-                        "[PLAN-007] design.theme `{name}` 未注册且非内置主题——保留旧有效主题（C-11）"
-                    );
-                }
-            }
+        };
+
+        // family：注册树优先，其次内置 legacy 族；未知名整候选拒绝。
+        let candidate = match theme_name.as_deref() {
+            None => None,
+            Some(name) => match theme::lookup_theme_tree(name) {
+                Some(tree) => Some(ThemeCandidate::Tree(tree)),
+                None => match registry::builtin(name) {
+                    Some(spec) => Some(ThemeCandidate::Builtin(spec)),
+                    None => {
+                        eprintln!(
+                            "[PLAN-031] design.theme `{name}` 未注册且非内置主题——整候选拒绝（C-11）"
+                        );
+                        return;
+                    }
+                },
+            },
+        };
+
+        if let Err(e) = theme::publish_design_candidate(candidate, dark) {
+            eprintln!("[PLAN-031] {e}");
         }
     }
 
