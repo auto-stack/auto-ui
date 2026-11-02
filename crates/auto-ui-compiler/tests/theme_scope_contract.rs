@@ -129,3 +129,101 @@ fn r01_same_name_different_source_kind_is_not_identity() {
         "切到内置族后不得继续读旧树内容"
     );
 }
+
+/// T-03：两个 App scope 的目录/选择/revision 互不覆盖；scoped 发布不写
+/// legacy 全局槽（单应用旧宿主保持原语义）；同一 scope 内同名内容变化
+/// 仍然按内容身份发布。
+#[test]
+fn scope_catalog_selection_and_revision_are_isolated() {
+    theme::set_dark_mode(false);
+    let _ = theme::set_theme("scaffold");
+    let legacy_name = theme::theme_name();
+    assert_eq!(vm_background(), Some((255, 255, 255)), "legacy scaffold light");
+
+    let a = theme::ThemeScope::capture();
+    let b = theme::ThemeScope::capture();
+
+    let mut ma = BTreeMap::new();
+    ma.insert("Plan031Scope".to_string(), tree("Plan031Scope", "#111111"));
+    a.register_trees(ma);
+    let mut mb = BTreeMap::new();
+    mb.insert("Plan031Scope".to_string(), tree("Plan031Scope", "#222222"));
+    b.register_trees(mb);
+
+    {
+        let _guard = theme::install_theme_scope(a.clone());
+        let looked = theme::lookup_theme_tree("Plan031Scope").expect("A 目录内有树");
+        assert!(theme::set_theme_tree(looked));
+        assert_eq!(theme::theme_name(), "Plan031Scope");
+        assert_eq!(vm_background(), Some((17, 17, 17)));
+        assert_eq!(theme::theme_epoch(), 1, "A 自己的 revision");
+    }
+    {
+        let _guard = theme::install_theme_scope(b.clone());
+        let looked = theme::lookup_theme_tree("Plan031Scope").expect("B 目录内有同名的另一棵树");
+        assert!(theme::set_theme_tree(looked));
+        assert_eq!(vm_background(), Some((34, 34, 34)));
+        assert_eq!(theme::theme_epoch(), 1, "B 的 revision 从自身起算");
+    }
+    // A 仍读自己的选择。
+    {
+        let _guard = theme::install_theme_scope(a.clone());
+        assert_eq!(theme::theme_name(), "Plan031Scope");
+        assert_eq!(vm_background(), Some((17, 17, 17)));
+        assert_eq!(theme::theme_epoch(), 1);
+    }
+    // 同名内容变化：同一 scope 内按内容身份发布并推进 revision。
+    {
+        let mut ma2 = BTreeMap::new();
+        ma2.insert("Plan031Scope".to_string(), tree("Plan031Scope", "#333333"));
+        a.register_trees(ma2);
+        let _guard = theme::install_theme_scope(a.clone());
+        let looked = theme::lookup_theme_tree("Plan031Scope").unwrap();
+        assert!(theme::set_theme_tree(looked));
+        assert_eq!(vm_background(), Some((51, 51, 51)));
+        assert_eq!(theme::theme_epoch(), 2);
+    }
+    // legacy 全局槽完全未被 scoped 发布改写。
+    assert_eq!(theme::theme_name(), legacy_name);
+    assert_eq!(vm_background(), Some((255, 255, 255)));
+}
+
+/// T-03：scope 安装严格入栈/退出恢复（嵌套构建不串，drop 后回上一层，
+/// 全部退出后回 legacy）。
+#[test]
+fn scope_install_is_nested_and_restores_on_drop() {
+    theme::set_dark_mode(false);
+    let _ = theme::set_theme("scaffold");
+
+    let a = theme::ThemeScope::capture();
+    let b = theme::ThemeScope::capture();
+    let mut ma = BTreeMap::new();
+    ma.insert("Plan031Nest".to_string(), tree("Plan031Nest", "#101010"));
+    a.register_trees(ma);
+    let mut mb = BTreeMap::new();
+    mb.insert("Plan031Nest".to_string(), tree("Plan031Nest", "#202020"));
+    b.register_trees(mb);
+
+    {
+        let _outer = theme::install_theme_scope(a.clone());
+        let looked = theme::lookup_theme_tree("Plan031Nest").unwrap();
+        assert!(theme::set_theme_tree(looked));
+        assert_eq!(vm_background(), Some((16, 16, 16)));
+
+        {
+            let _inner = theme::install_theme_scope(b.clone());
+            assert_eq!(theme::theme_name(), "scaffold", "B 尚未发布自己的选择");
+            let looked_b = theme::lookup_theme_tree("Plan031Nest").unwrap();
+            assert!(theme::set_theme_tree(looked_b));
+            assert_eq!(vm_background(), Some((32, 32, 32)), "内层 scope 生效");
+        }
+
+        // 内层 guard drop → 外层 A 的快照恢复（嵌套构建不串）。
+        assert_eq!(theme::theme_name(), "Plan031Nest");
+        assert_eq!(vm_background(), Some((16, 16, 16)));
+    }
+
+    // 全部退出 → legacy 槽位（scaffold/light）。
+    assert_eq!(theme::theme_name(), "scaffold");
+    assert_eq!(vm_background(), Some((255, 255, 255)));
+}

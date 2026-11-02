@@ -14,6 +14,12 @@ use super::Color;
 /// 见该模块头注）；此处 re-export 保持 `theme::registry` 路径稳定。
 pub use crate::design_tokens::registry;
 
+// PLAN-031 T-03：App/组件主题作用域。builder 在一帧构建期安装 scope，
+// 旧读取函数沿 guard 读本帧快照；未安装时保 legacy 线程局部路径。
+mod scope;
+pub use scope::{install_theme_scope, InstalledThemeScope, ThemeScope};
+use scope::current_scope;
+
 // PLAN-601 T-04/T-03：活动主题槽——命名主题（内置名或 theme{} 合成主题）
 // 热切换。epoch 失效回路与 dark_mode 共用（THEME_EPOCH）；mode 仍由
 // DARK_MODE 承载（主题对内 light/dark 选择器，`dark:` 门控经 dark_mode()
@@ -63,18 +69,27 @@ thread_local! {
 /// 当前活动主题名（内置名或合成主题名；缺省 "scaffold" = Vue 侧 scaffold
 /// 色板同源，见 ACTIVE_THEME 注）。
 pub fn theme_name() -> String {
+    if let Some(s) = current_scope() {
+        return s.family_name();
+    }
     ACTIVE_THEME.with(|t| t.borrow().name())
 }
 
 /// PLAN-601 T-10：按语义 token 查活动主题双面值（内置表/合成体统一入口）。
 /// code_editor 编辑器色域派生消费（bg/fg 从活动主题取，切主题即翻转）。
 pub fn active_theme_rgb(token: registry::TokenName, is_dark: bool) -> Option<(u8, u8, u8)> {
+    if let Some(s) = current_scope() {
+        return s.resolve_rgb(token, is_dark);
+    }
     active_theme().resolve(token, is_dark)
 }
 
 /// PLAN-601 T-10：活动合成主题（editor syntax 系统首次构建时把它烘焙进
 /// 主题集——合成主题 boot 后即固定，先于任何编辑器创建）。
 pub fn active_composed() -> Option<std::sync::Arc<crate::design_tokens::decl::ComposedTheme>> {
+    if let Some(s) = current_scope() {
+        return s.composed();
+    }
     ACTIVE_THEME.with(|t| match &*t.borrow() {
         ActiveSpec::Composed(c) => Some(c.clone()),
         ActiveSpec::Builtin(_) | ActiveSpec::Tree(_) => None,
@@ -83,25 +98,37 @@ pub fn active_composed() -> Option<std::sync::Arc<crate::design_tokens::decl::Co
 
 /// 切换活动主题为内置名（未知名返回 false 且零变化）。变化时
 /// THEME_EPOCH 自增——既有失效回路（view 重建→重解析）随之生效。
+/// PLAN-031 T-03：scope 安装期只改本 scope 的选择（App 隔离）。
 pub fn set_theme(name: &str) -> bool {
     let Some(spec) = registry::builtin(name) else {
         return false;
     };
+    if let Some(s) = current_scope() {
+        return s.set_family(ActiveSpec::Builtin(spec));
+    }
     set_active(ActiveSpec::Builtin(spec))
 }
 
 /// PLAN-007 T-05：应用树状主题（theme_tree build/compose 产物）。
 /// 发布前已过 build 期 schema 校验；此处发布即事务点——求值失败不调用
-/// 本函数，旧有效主题保持（C-07/11）。
+/// 本函数，旧有效主题保持（C-07/11）。PLAN-031 T-03：scope 安装期写入本
+/// scope。
 pub fn set_theme_tree(tree: crate::design_tokens::theme_tree::ThemeTree) -> bool {
+    if let Some(s) = current_scope() {
+        return s.set_family(ActiveSpec::Tree(tree));
+    }
     set_active(ActiveSpec::Tree(tree))
 }
 
 /// PLAN-601 T-03：应用 theme{} 合成主题（decl::compose 产物）。
-/// 返回是否发生变化（同名同值不触发 epoch）。
+/// 返回是否发生变化（同名同值不触发 epoch）。PLAN-031 T-03：scope 安装期
+/// 写入本 scope。
 pub fn set_theme_composed(
     theme: std::sync::Arc<crate::design_tokens::decl::ComposedTheme>,
 ) -> bool {
+    if let Some(s) = current_scope() {
+        return s.set_family(ActiveSpec::Composed(theme));
+    }
     set_active(ActiveSpec::Composed(theme))
 }
 
@@ -161,6 +188,11 @@ pub fn publish_design_candidate(
     theme: Option<ThemeCandidate>,
     dark: Option<bool>,
 ) -> Result<bool, String> {
+    // PLAN-031 T-03：scope 安装期发布到本 scope（App 隔离、本 scope revision）；
+    // legacy 路径（未安装 scope）语义与 T-02 一致。
+    if let Some(s) = current_scope() {
+        return s.publish(theme, dark);
+    }
     let next_dark = dark.unwrap_or_else(dark_mode);
     // 1) 校验：只读旧快照，不写任何槽位。
     let next_spec = match theme {
@@ -218,6 +250,9 @@ pub fn register_theme_trees(
 pub fn lookup_theme_tree(
     name: &str,
 ) -> Option<crate::design_tokens::theme_tree::ThemeTree> {
+    if let Some(s) = current_scope() {
+        return s.lookup_tree(name);
+    }
     THEME_TREES.with(|r| r.borrow().get(name).cloned())
 }
 
@@ -227,12 +262,18 @@ pub fn set_app_design_entries(entries: Vec<(String, auto_parser_api::ast::Expr)>
 }
 
 pub fn app_design_entries() -> Vec<(String, auto_parser_api::ast::Expr)> {
+    if let Some(s) = current_scope() {
+        return s.design_entries();
+    }
     APP_DESIGN_ENTRIES.with(|d| d.borrow().clone())
 }
 
 /// PLAN-007 T-05：当前树状主题按模式重建的合成树（槽引用解析消费）。
 /// 非树主题活动时返回 None（槽引用此时无源，调用方按 C-11 诊断跳槽）。
 pub fn active_theme_tree(is_dark: bool) -> Option<crate::design_tokens::theme_tree::Tree> {
+    if let Some(s) = current_scope() {
+        return s.active_tree(is_dark);
+    }
     ACTIVE_THEME.with(|t| match &*t.borrow() {
         ActiveSpec::Tree(tree) => {
             crate::design_tokens::theme_tree::compose_mode(tree, is_dark).ok()
@@ -268,7 +309,12 @@ thread_local! {
 }
 
 /// Set the global dark mode flag (called by renderer before rendering).
+/// PLAN-031 T-03：scope 安装期只写本 scope 的解析模式与 revision。
 pub fn set_dark_mode(dark: bool) {
+    if let Some(s) = current_scope() {
+        s.set_dark(dark);
+        return;
+    }
     let changed = DARK_MODE.with(|d| d.replace(dark)) != dark;
     if changed {
         THEME_EPOCH.with(|e| e.set(e.get().wrapping_add(1)));
@@ -277,13 +323,20 @@ pub fn set_dark_mode(dark: bool) {
 
 /// Read the global dark mode flag (Plan 413: code editor theme bridge).
 pub fn dark_mode() -> bool {
+    if let Some(s) = current_scope() {
+        return s.dark_mode();
+    }
     DARK_MODE.with(|d| d.get())
 }
 
 /// Current theme epoch: bump-on-change counter over `dark_mode` writes.
 /// Content-keyed view caches compare their build epoch against this to
-/// invalidate theme-dependent chrome (StreamCache 消费).
+/// invalidate theme-dependent chrome (StreamCache 消费)。
+/// PLAN-031 T-03：scope 安装期返回本 scope 的 revision（App 级失效基准）。
 pub fn theme_epoch() -> u32 {
+    if let Some(s) = current_scope() {
+        return s.revision();
+    }
     THEME_EPOCH.with(|e| e.get())
 }
 
@@ -518,7 +571,8 @@ fn color_token(color: &Color) -> Option<registry::TokenName> {
 /// Resolve a semantic color to RGB, considering dark mode and accent.
 /// PLAN-593 V2：静态语义色查 registry（stella 单源），零字面 RGB 臂。
 pub fn resolve_semantic_rgb(color: &Color) -> Option<(u8, u8, u8)> {
-    let is_dark = DARK_MODE.with(|d| d.get());
+    // PLAN-031 T-03：模式与 family 都从安装中的 scope 读（同一帧快照）。
+    let is_dark = dark_mode();
     if let Color::Primary = color {
         // Accent-driven: look up current accent name
         let name = ACCENT_NAME.with(|n| n.borrow().clone());
@@ -528,6 +582,9 @@ pub fn resolve_semantic_rgb(color: &Color) -> Option<(u8, u8, u8)> {
         return Some(hsl_to_rgb(h, s, l_adjusted));
     }
     let token = color_token(color)?;
+    if let Some(s) = current_scope() {
+        return s.resolve_rgb(token, is_dark);
+    }
     active_theme().resolve(token, is_dark)
 }
 
@@ -535,7 +592,12 @@ pub fn resolve_semantic_rgb(color: &Color) -> Option<(u8, u8, u8)> {
 /// PLAN-593 V2：值改查 registry（stella 表），零字面 RGB。
 /// （历史校准记录：Plan 518 暖灰 light #e3ddd1 / 蓝黑 dark #283146。）
 pub fn resolve_border_rgb() -> (u8, u8, u8) {
-    let is_dark = DARK_MODE.with(|d| d.get());
+    let is_dark = dark_mode();
+    if let Some(s) = current_scope() {
+        return s
+            .resolve_rgb(registry::TokenName::Border, is_dark)
+            .expect("活动主题 Border 槽：本 scope family 必须可解析 Border");
+    }
     active_theme()
         .resolve(registry::TokenName::Border, is_dark)
         .expect("活动主题 Border 槽：builtin 由 themes_core_complete 钉死；composed 含基座全表")

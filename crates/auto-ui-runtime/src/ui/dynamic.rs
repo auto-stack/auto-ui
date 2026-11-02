@@ -89,6 +89,11 @@ pub struct DynamicComponent {
     /// VM bridge for state management and handler execution.
     bridge: VmBridge,
 
+    /// PLAN-031 T-03：本组件（App/窗口）的主题作用域。`Some` 时 `view*`
+    /// 构建入口临时安装它（family/mode/目录/design 的 App 级隔离）；
+    /// `None` = 未绑定主题的 legacy 路径（仍走进程级槽位）。
+    theme_scope: Option<std::rc::Rc<auto_ui_compiler::style::theme::ThemeScope>>,
+
     /// The AuraNode view template (cloned from AuraWidget::view_tree).
     view_template: auto_ui_compiler::aura::AuraNode,
 
@@ -412,6 +417,7 @@ impl DynamicComponent {
 
         Ok(Self {
             bridge,
+            theme_scope: None,
             view_template,
             named_templates: widget
                 .named_views
@@ -531,6 +537,7 @@ impl DynamicComponent {
 
         Ok(Self {
             bridge,
+            theme_scope: None,
             view_template,
             named_templates: widget
                 .named_views
@@ -751,6 +758,7 @@ impl DynamicComponent {
 
         Ok(Self {
             bridge,
+            theme_scope: None,
             view_template,
             named_templates: view_widget
                 .named_views
@@ -806,6 +814,7 @@ impl DynamicComponent {
 
         Ok(Self {
             bridge,
+            theme_scope: None,
             view_template,
             named_templates: widget
                 .named_views
@@ -1492,6 +1501,65 @@ impl DynamicComponent {
         &mut self.bridge
     }
 
+    /// PLAN-031 T-03：本组件（App/窗口）的主题作用域；`None` = legacy 全局槽。
+    pub fn theme_scope(
+        &self,
+    ) -> Option<std::rc::Rc<auto_ui_compiler::style::theme::ThemeScope>> {
+        self.theme_scope.clone()
+    }
+
+    /// 接入共享 scope（同 App 多窗共享选择）或独立子 scope（显式 preview）。
+    /// 宿主适配端口的最小形态：scope 由调用方持有，UI 不按线程猜 owner。
+    pub fn attach_theme_scope(
+        &mut self,
+        scope: std::rc::Rc<auto_ui_compiler::style::theme::ThemeScope>,
+    ) {
+        self.theme_scope = Some(scope);
+    }
+
+    /// 由 build 期调用：以本应用的主题目录与 design 登记建立独立 scope。
+    ///
+    /// 没有 design 块（无 theme/mode 绑定）时保持 legacy 槽位——宿主运行期
+    /// `set_theme` 仍对所有未绑定组件生效（兼容边界）。
+    pub fn init_theme_scope(
+        &mut self,
+        trees: std::collections::BTreeMap<
+            String,
+            auto_ui_compiler::design_tokens::theme_tree::ThemeTree,
+        >,
+        design: Vec<(String, auto_parser_api::ast::Expr)>,
+    ) {
+        if design.is_empty() {
+            return;
+        }
+        let scope = auto_ui_compiler::style::theme::ThemeScope::capture();
+        if !trees.is_empty() {
+            scope.register_trees(trees);
+        }
+        scope.set_design_entries(design);
+        self.theme_scope = Some(scope);
+    }
+
+    /// 在本组件 scope 内执行闭包（结果读回/宿主端口；不泄漏到其他 App）。
+    pub fn with_theme_scope<R>(&self, f: impl FnOnce() -> R) -> R {
+        match &self.theme_scope {
+            Some(scope) => {
+                let _guard = auto_ui_compiler::style::theme::install_theme_scope(scope.clone());
+                f()
+            }
+            None => f(),
+        }
+    }
+
+    /// 帧构建入口用：安装本组件 scope；Drop 恢复（嵌套/失败均恢复）。
+    fn theme_scope_guard(
+        &self,
+    ) -> Option<auto_ui_compiler::style::theme::InstalledThemeScope> {
+        self.theme_scope
+            .clone()
+            .map(auto_ui_compiler::style::theme::install_theme_scope)
+    }
+
     /// Plan 559 W7: dispatch a handler into a named sub-widget's handler
     /// context — the acceptance channel's (app, widget) targeting. Uses the
     /// namespaced `call_handler_for` pipeline (same as onclick). Plan 320
@@ -1762,6 +1830,8 @@ impl DynamicComponent {
         DebugIdMap,
         crate::ui::debug::BuildProbe,
     ) {
+        // PLAN-031 T-03：本组件 scope 只在本帧构建期安装，Drop 恢复上一状态。
+        let _theme_guard = self.theme_scope_guard();
         let prev = self.view_mount_frame_prepare();
         let builder =
             AuraViewBuilder::with_registry(&self.bridge, &self.widget_name, &self.widget_registry)
@@ -1789,6 +1859,8 @@ impl DynamicComponent {
         DebugIdMap,
         crate::ui::debug::BuildProbe,
     ) {
+        // PLAN-031 T-03：本组件 scope 只在本帧构建期安装，Drop 恢复上一状态。
+        let _theme_guard = self.theme_scope_guard();
         // PLAN-045 T-07：帧构建计时打点（AUTO_MEMO_DIAG=1 门控）——主线程
         // 阻塞 = 本函数时长（VM 整树重解释在此），替代易受心跳污染的
         // stderr 静默窗口径。
@@ -1837,6 +1909,8 @@ impl DynamicComponent {
     /// not a screenshot). Returns None for an unknown name.
     pub fn view_named(&self, name: &str) -> Option<View<DynamicMessage>> {
         let template = self.named_templates.get(name)?;
+        // PLAN-031 T-03：命名视图与主视图共用同一 scope 快照。
+        let _theme_guard = self.theme_scope_guard();
         let builder =
             AuraViewBuilder::with_registry(&self.bridge, &self.widget_name, &self.widget_registry)
                 .with_routes(&self.routes)
@@ -2336,6 +2410,8 @@ impl Component for DynamicComponent {
     /// state references from the VmBridge at build time. After rendering, the
     /// dirty flag is cleared.
     fn view(&self) -> View<Self::Msg> {
+        // PLAN-031 T-03：渲染入口同 frame 快照（scope 隔离，Drop 恢复）。
+        let _theme_guard = self.theme_scope_guard();
         let prev = self.view_mount_frame_prepare();
         let builder =
             AuraViewBuilder::with_registry(&self.bridge, &self.widget_name, &self.widget_registry)

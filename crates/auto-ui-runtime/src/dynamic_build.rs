@@ -955,6 +955,14 @@ fn build_dynamic_component_inner(
         None => Vec::new(),
     };
 
+    // PLAN-031 T-03：本组件的主题作用域快照源（目录 + design 登记）。legacy
+    // 全局注册保持并行（单应用/旧宿主兼容），builder 构建期只读本 scope。
+    let mut scope_trees: std::collections::BTreeMap<
+        String,
+        auto_ui_compiler::design_tokens::theme_tree::ThemeTree,
+    > = std::collections::BTreeMap::new();
+    let mut scope_design: Vec<(String, auto_parser_api::ast::Expr)> = Vec::new();
+
     // PLAN-007 T-05：注册应用树状主题 + design 块（真实 use/pac dep 解析
     // 链，与 stylekit/bps 依赖同一解析面）。build 期完成 schema 校验——
     // 校验失败即构建错误（首次挂载不发布半成品，C-11）。
@@ -965,6 +973,7 @@ fn build_dynamic_component_inner(
         ) {
             Ok(trees) => {
                 if !trees.is_empty() {
+                    scope_trees = trees.clone();
                     auto_ui_compiler::style::theme::register_theme_trees(trees);
                 }
             }
@@ -1027,14 +1036,15 @@ fn build_dynamic_component_inner(
 
     // PLAN-007 T-05：根 widget design 块（theme/mode 数据绑定）登记——
     // 每帧在视图构建期求值（C-06/07/08；评估失败保留旧有效设计）。
+    // PLAN-031 T-03：同时登记到本组件 scope（App 级 design 隔离——另一 App
+    // 的构建不得覆盖本 App 的选择器）。
     if let Some(design) = &root_decl.design {
-        auto_ui_compiler::style::theme::set_app_design_entries(
-            design
-                .entries
-                .iter()
-                .map(|(k, v)| (k.to_string(), v.clone()))
-                .collect(),
-        );
+        scope_design = design
+            .entries
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.clone()))
+            .collect();
+        auto_ui_compiler::style::theme::set_app_design_entries(scope_design.clone());
     }
 
     // PLAN-050 T9 (C7): VM 轨 t() 插值查表——front 根目录 i18n/{lang}.json
@@ -2054,6 +2064,10 @@ fn build_dynamic_component_inner(
         api_over_http,
     )
     .map_err(|e| format!("DynamicComponent init failed: {}", e))?;
+
+    // PLAN-031 T-03：有 design 绑定时建立本 App/窗口的独立主题 scope；
+    // 无 design 的 legacy 组件保持全局槽位（宿主 set_theme 仍生效）。
+    comp.init_theme_scope(scope_trees, scope_design);
 
     // 3b. Set source path for hot-reload tracking
     if let Some(p) = path {
