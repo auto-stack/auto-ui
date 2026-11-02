@@ -23,6 +23,20 @@ language repository's `docs/specs/auto-ui/project.md`.
   Cargo features are retired; families are compile-visible and run-selected via
   the nextest static boundary with explicit serial/manual admission (PLAN-018).
 
+## Theme pilot & examples ownership (PLAN-007)
+
+- [Theme tree pilot](ui/theme-tree-pilot.md) — tree-structured theme data
+  (`pub theme`), extend composition, mode selection, typed slot references
+  and widget-local design objects over the pilot support surface (SD-01/02).
+
+- [Theme app migration](ui/theme-app-migration.md) — the official single-source
+  theme families (`examples/ui/themes/`), app adoption form and the confirmed
+  per-app successor batches (SD-03).
+
+- [Examples ownership](ui/examples-ownership.md) — `examples/ui` relocated
+  from auto-lang byte-identically; source mapping, dependency resolution and
+  preserved test obligations (SD-04).
+
 ## Structure closure (PLAN-014)
 
 - [UI structure closure](ui/structure-closure.md) — the four-face module
