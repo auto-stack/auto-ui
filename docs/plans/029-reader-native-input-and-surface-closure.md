@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-02
 updated_at: 2026-11-02
 plan_revision: 1
-current_step: 8
+current_step: 9
 total_steps: 12
 base_branch: master
 base_commit: e344d2268f6bf40d1ed4f24ea957ce3fbd88313c
@@ -195,7 +195,7 @@ Reader旧门入口保持 `python tests/basic/verify_standalone.py --profile vue|
 | T-05 | work | T-03/04 | [x] UI布局/文档表面resize/DPI/遮挡/隐藏生命周期与系统无障碍接缝——弹出窗真隐藏修复（worktree 98633fd4）+ 驱动 N-05/06 全门（reader ac24c98，probe.at 断开按钮 + engine-adapter 键盘接缝）；N-05 字体重排/滚动重拖/遮挡像素取证/隐藏展示重拖选、N-06 UIA 系统树定位+UIA焦点+真实键盘翻页、N-05.dpi-change 交互门（144→192→144 track/redrag/restore 三段全过）——见 §9 2026-11-02 T-05 记录 | N-05/06目标原文/命中/系统树可操作均实测；不是records计数或纯ARIA | AC-06 |
 | T-06 | work | T-03～05 | [x] 双实例 A/B（-B/-F+AUTOUI_MCP_PORT 钉端口）、WM_CLOSE 真实关闭/迟到重放拒绝+零写入/崩溃无孤儿/取消隐藏、坏 tool 具名失败、占口不杀现有实例——见 §9 2026-11-02 T-06 记录（reader d3882ea，t06-vm7 全 PASS） | N-07/08/10正负对照；只收割自有树，10s清理，另一实例继续可用 | AC-07/08 |
 | T-07 | work | T-06 | [x] N-09 八类负控全部具名拒绝+逐例字节级零写+合法对照接受落盘（资产逃逸零泄漏/远程脚本零加载/本地资产仍用），href 不透明语义如实记录；N-11 变异→oracle 实红+恢复落点异位（位置指纹判据）→字节级还原绿——见 §9 2026-11-02 T-07 记录（reader cb9e1e5，t07-vm6） | N-09/11原拒绝零写、合法对照绿，变异红且聚合非零→还原绿；不得吞报错 | AC-03/07/08 |
-| T-08 | work | T-00可先诊断；最终依T-07 | 复现Reader R-05/R-06vm、分析实际owner；修本仓允许面或绑定他仓正式前置 | N-12原测试条件保留，404/像素负控失败机制真实闭合；外仓前置未到则保持未完成 | AC-09 |
+| T-08 | work | T-00可先诊断；最终依T-07 | [x] 复现Reader R-05/R-06vm、分析实际owner；修本仓允许面或绑定他仓正式前置——R-05（直连api.at 404，026归因工具链）当前cohort不复现：同门命令 verify_epub --auto 22/22 exit0（reader src 自026基线零改动，闭合由cohort二进制 (55c98c7→47d8f7b] 区间工具链交付，确切commit未bisect=只读依赖纪律）；R-06vm复现rc=0并字节级定责：驱动main的generate_all(data_dir)以'w'无条件重写夹具，门先注入的毁损被静默还原（sha 2c00a65b→45b56233 pristine），变异从未抵达应用——owner=reader门脚本；修复（仅tests，6887ed0）：probe_books overwrite=False+驱动--no-regen+门变异腿传--no-regen；修复后变异腿exit1、NS-02 red_px=0/blue_px=0像素oracle真实失败、章节缓存res_*.png=64零字节（变异经导入→提取→服务→解码全链抵达），对照腿0 FAIL exit0；vue臂R-06（缓存毁损路径）不受影响——见§9 2026-11-02 T-08 记录 | N-12原测试条件保留，404/像素负控失败机制真实闭合；外仓前置未到则保持未完成 | AC-09 |
 | T-09 | work | T-08全部通过 | 冻结cohort跑两个profile的完整新清单及旧Reader门、本仓定向cargo选择；写证据总结、SD-01/02与两仓路线/导航并内部检查 | 现有入口 `python tests/probe/engine_surface/verify_engine_surface.py --profile vue|vm --auto-bin ... --out-dir ...` 完整且exit0；新清单非旧30总数；git diff --check/链接/source绑定 | AC-01～10 |
 | T-10 | review | T-09 | 独立上下文在同树顺序复演规定路径与变异，检查source/Spec/范围，写final结论 | AC-01～10全部pass，无partial/GAP；否则needs_fix/needs_replan回原树，不能自评归档 | AC-11 |
 | T-11 | merge | T-10 pass | 固定两仓提交/landing/canonical、归档archived/、修导航、材料摘要后清自有scope；fresh guard后移除树/分支 | 真实12/12与archive路径/cohort一致、恢复信息足够；不动他人WIP/OS pin/ledger，不把旧026回执改为新证据 | AC-12 |
@@ -303,6 +303,21 @@ Reader旧门入口保持 `python tests/basic/verify_standalone.py --profile vue|
 - 新增T-00～11、AC-01～12、N-01～12、SD-01/02；0/12。合同沿用026真实实验资产，严格收口其未通过项，不重开026，不取得任意第三仓改源码权限。
 - 当前事实为静态源码/Spec核查，尚无新构建/窗口/实测/独立review；不能从本文推导原生已通过。UI原有未跟踪设计、028草案与共享号源WIP保持，Reader号源007未变。
 - 起草自检：0～10节、12任务/12AC/12必需用例编号完整，029活动/归档区唯一，Reader号源未变；本次8份文档的114个本地引用已核，新改链接有效，UI README原有9个旧失效引用保持不动；git diff --check通过。此项只证明草案结构，不是运行或验收通过。
+
+### 2026-11-02：work阶段——T-08 R-05/R-06vm复现定责与修复（AC-09）
+
+- stage: work | plan_id: PLAN-029 | plan_revision: r1 | task: T-08 | outcome: pass（R-05当前cohort不复现=工具链已在cohort内交付修复；R-06vm复现→reader门修复→负控非零+对照绿）| worktree: .wt/ui-029@98633fd4（无改）| reader: main@6887ed0 | next: T-09。
+- **R-05（直连api.at入口404，026归因owner=工具链）当前cohort不复现**：同门命令 `python tests/epub/verify_epub.py --auto`（AUTO_EXE=auto-man target/debug/auto.exe，version 0.1.0+plan-890-verified-r7-t19-14-g47d8f7b）= PASS=22 FAIL=0 exit0。reader src/ 自026基线b6183e07零改动（git log实证），闭合完全由工具链侧交付——cohort二进制 (g55c98c7→g47d8f7b] 区间内（区间9 commits均为auto-man内部计划910/014/906/007；确切commit未bisect：只读依赖仓不做checkout回切）；N-12「404按实际owner修复后读到真实契约」成立：直连入口16路由真实返回library/import/toc/chapter/progress/media契约。
+- **R-06vm（坏图负控rc=0，026归因owner=reader后续计划）复现并字节级定责**：门r06_mutation_vm先毁损mut_dir2/probe-images.epub三PNG条目（64零字节；epub sha256 2c00a65b）→ 驱动启动后 main 第308行 `generate_all(data_dir)` 以'w'模式无条件重写夹具 → 毁损被静默还原（跑后sha256 45b56233=pristine RED 59edf555/BLUE 50dd60be）→ 应用导入干净图 → NS-02 red/blue PASS → 37/0 exit0（t08-r06vm/mutated-console.log）。根因=门与驱动的夹具契约缺口（变异从未抵达被测应用），owner=reader测试脚本（本计划允许修复面）。
+- **修复（reader 6887ed0，仅3个tests文件）**：probe_books.generate_all/probe_images/probe_links 增 `overwrite=False` 写缺席保护；驱动增 `--no-regen` 透传；verify_standalone.r06_mutation_vm 变异腿传 `--no-regen`（对照腿与vue臂保持原条件）。语义单测：no-regen保留毁损字节、默认重生成还原pristine。
+- **修复后双腿重跑（同cohort，fresh out-dirs）**：变异腿=驱动 **exit1**、FAIL恰为NS-02像素oracle对（red_px=0/blue_px=0）、章节缓存 res_*.png 三文件=64零字节 sha f5a5fd42（ALL-ZERO）——变异经导入→提取→媒体服务→widget解码全链真实抵达应用（t08-r06vm/mutated-fixed-console.log）；对照腿=0 FAIL exit0（control-fixed-console.log）。N-12原测试条件保留（同毁损方式/同像素oracle/对照腿不变，不删反例不改预期不用HTTP绕开）。
+- **cohort漂移事实（如实登记）**：T-00冻结的auto g55c98c7二进制已被auto-man后续构建覆盖（现=g47d8f7b，2026-11-02 12:18构建）；T-08按现二进制执行并记录，T-09冻结cohort以现二进制为准。
+- 证据：plan-artifacts/plan-029/t08-repro-verify_epub.log、t08-r06vm/{control,mutated,mutated-fixed,control-fixed}-console.log + native-mutated{,2,3}/ out-dirs（library.json章节缓存字节级取证）。
+- 下一任务T-09：冻结cohort全清单两profile完整跑+旧Reader门完整跑+证据总结SD-01/02与内部检查。
+
+### 2026-11-02：goal回合（T-08轮）
+
+- stage: goal | plan_id: PLAN-029 | plan_revision: r1 | round: 5 | from: work | to: work | status: executing | outcome: pass(T-08) | worktree: D:/autostack/.wt/ui-029/auto-ui | commit: reader 6887ed0 | next: work(T-09)。
 
 ## 10. 待澄清事项
 
