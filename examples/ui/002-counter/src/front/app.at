@@ -1,6 +1,22 @@
+// PLAN-007 T-06：002-counter 接入官方主题族（C-13/14）。
+// 业务保持：加/减/重置计数器（原 Plan 506 形态）；新增主题/模式切换，
+// theme/mode 经 design 块数据绑定（同帧校验发布）。语义类（bg-primary
+// 等）随官方树状主题双端联动；独立运行默认 Auto/light。
+use themes.themes: Auto, Solarized
+
 widget App {
+    msg { Inc, Dec, Reset, UseAuto, UseSolarized, ToggleMode }
+
     model {
         var count int = 0
+        var theme_name str = "Auto"
+        var dark_mode bool = false
+    }
+
+    // 主题/模式选择器（C-06/07：数据绑定，同帧校验发布）
+    design {
+        theme: .theme_name
+        mode: if .dark_mode { "dark" } else { "light" }
     }
 
     // Plan 506: 外壳改"内容即页面"（无 center 包裹，循 011 样板），配合
@@ -13,8 +29,22 @@ widget App {
                 button "Reset" { onclick: () => {.count = 0} }
                 button "+" { onclick: () => {.count += 1} }
             }
+            row {
+                button "Auto" { onclick: .UseAuto, style: "px-3 py-1.5 rounded-lg bg-primary text-primary-foreground" }
+                button "Solarized" { onclick: .UseSolarized, style: "px-3 py-1.5 rounded-lg bg-secondary text-secondary-foreground" }
+                button "切换明暗" { onclick: .ToggleMode, style: "px-3 py-1.5 rounded-lg bg-accent text-accent-foreground" }
+            }
             style: "items-center gap-4 p-6"
         }
+    }
+
+    on {
+        .Inc -> { .count += 1 }
+        .Dec -> { .count -= 1 }
+        .Reset -> { .count = 0 }
+        .UseAuto -> { .theme_name = "Auto" }
+        .UseSolarized -> { .theme_name = "Solarized" }
+        .ToggleMode -> { .dark_mode = !.dark_mode }
     }
 }
 

@@ -1,4 +1,10 @@
 
+// PLAN-007 T-06：005-login 接入官方主题族（C-13/14）。业务保持：输入、
+// 密码字段与必填校验（PLAN-637 配方形态）；新增主题/模式切换（design 块
+// 数据绑定）。语义类（bg-primary/bg-card/border-border 等）随官方树状
+// 主题双端联动；独立运行默认 Auto/light。
+use themes.themes: Auto, Solarized
+
 // ── PLAN-637 B1：本地配方（×2 重复串提取）─────────────────────────────
 // Phase A 提取 + Phase B token 定案合并过（W1 小面授权，映射见下注）。
 // input_login 与 stylekit input_field 形态不同（rounded-lg/mt-2，无 text-sm），
@@ -15,13 +21,21 @@ style error_text = "text-destructive text-xs mt-1"
 // text-blue-500→text-primary；bg-white/border-gray-200→bg-card/border-border。
 
 widget App {
-    msg { Submit }
+    msg { Submit, UseAuto, UseSolarized, ToggleMode }
 
     model {
         var email str = ""
         var password str = ""
         var email_error str = ""
         var password_error str = ""
+        var theme_name str = "Auto"
+        var dark_mode bool = false
+    }
+
+    // 主题/模式选择器（C-06/07：数据绑定，同帧校验发布）
+    design {
+        theme: .theme_name
+        mode: if .dark_mode { "dark" } else { "light" }
     }
 
     view {
@@ -29,6 +43,13 @@ widget App {
             col {
                 h2 "Sign In" {
                     style: "text-3xl font-extrabold text-foreground"
+                }
+
+                row {
+                    button "Auto" { onclick: .UseAuto, style: "px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-sm" }
+                    button "Solarized" { onclick: .UseSolarized, style: "px-3 py-1.5 rounded-lg bg-secondary text-secondary-foreground text-sm" }
+                    button "切换明暗" { onclick: .ToggleMode, style: "px-3 py-1.5 rounded-lg bg-accent text-accent-foreground text-sm" }
+                    style: "gap-2 mb-2"
                 }
 
                 text "Welcome back! Please enter your credentials." {
@@ -94,6 +115,9 @@ widget App {
     }
 
     on {
+        .UseAuto -> { .theme_name = "Auto" }
+        .UseSolarized -> { .theme_name = "Solarized" }
+        .ToggleMode -> { .dark_mode = !.dark_mode }
         .Submit -> {
             if .email == "" {
                 .email_error = "Email is required"
