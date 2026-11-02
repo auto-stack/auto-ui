@@ -38,6 +38,9 @@ pub struct NodeDecl {
     /// PLAN-025：`presentation2d` 块（通用声音/HUD 接线，无业务枚举）；
     /// 仅 root node 携带、仅 presentation-2d profile 消费。
     pub presentation2d: Option<super::presentation::Presentation2dBlock>,
+    /// PLAN-032：`components2d` 块（完整二维游戏组合，components-2d-runtime
+    /// profile；仅 root node 携带）。
+    pub components2d: Option<super::components2d::Components2dBlock>,
     /// PLAN-027：`character3d { }` 块——本定义绑定为本 Run 物理角色
     /// （恰一；bind/solid/camera 配置调用由降层注入 Life.Start）。
     pub character3d: Option<Character3dBlock>,

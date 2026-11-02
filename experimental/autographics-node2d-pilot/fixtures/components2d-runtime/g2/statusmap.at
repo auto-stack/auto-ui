@@ -1,0 +1,10 @@
+// PLAN-032 G2 HUD state text: branch select over the frozen root state.
+fn hud_state_text(s int) str {
+    if s == 1 {
+        return "Won"
+    }
+    if s == 2 {
+        return "Failed"
+    }
+    return "Playing"
+}

@@ -1,0 +1,66 @@
+// PLAN-032 G2 Player: the author-written body on the components2d surface.
+// input.snapshot() reads the generated r_snap (one ag_actions_snapshot per
+// callback, stored by the poll prelude); bit decode: held L/R in bits 0/1,
+// pressed Jump at bit 8 (64*4). No idle-turn gate anywhere: the frozen peak
+// (snapshot 1 + move 26 + grounded 1 + patrol 1 + events 1 + batch 1 + bundle
+// 1 = 32) fits without skipping any duty. pose/facing are the frozen model
+// fields the generated frame closeout reads.
+node Player(px: float, py: float, tint: Material2D) {
+    model {
+        var vy = 0.0
+        var grounded = 0
+        var pose = 0
+        var facing = 1
+    }
+    view-2d {
+        character2d body {
+            position: (px, py)
+            material: .tint
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            let snap = input.snapshot()
+            // bit decode by division chains (held L/R = bits 0/1, pressed
+            // Jump = bit 8 of the snapshot word)
+            let held = snap - ((snap / 64) * 64)
+            let pr = snap / 64
+            let jp = (pr / 4) - ((pr / 8) * 2)
+            let hl = held - ((held / 2) * 2)
+            let hr = (held / 2) - ((held / 4) * 2)
+            let axis = hr - hl
+            if jp == 1 {
+                if .grounded == 1 {
+                    .vy = 8.0
+                    sfx.play("jump", 1.0)
+                }
+            }
+            .vy = .vy - 20.0 * dt
+            let dx = axis * 4.0 * dt
+            let q = refs.body.move_and_slide((dx, .vy * dt))
+            .grounded = refs.body.grounded(q)
+            if .grounded == 1 {
+                .vy = 0.0
+            }
+            if axis > 0 {
+                .facing = 1
+            }
+            if axis < 0 {
+                .facing = -1
+            }
+            if .grounded == 1 {
+                if axis != 0 {
+                    .pose = 1
+                } else {
+                    .pose = 0
+                }
+            } else {
+                if .vy > 0.0 {
+                    .pose = 2
+                } else {
+                    .pose = 3
+                }
+            }
+        }
+    }
+}

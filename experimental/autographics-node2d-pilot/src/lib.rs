@@ -20,6 +20,7 @@ pub mod node3d_binding_refs;
 pub mod lower_components3d_runtime;
 pub mod lower_components_game;
 pub mod lower_g11;
+pub mod lower_components2d_runtime;
 pub mod lower_presentation;
 pub mod scene;
 pub mod translate;
@@ -53,6 +54,9 @@ pub enum Profile {
     /// 无业务枚举；无角色 = autographics.presentation2d/1，有角色 =
     /// autographics.hud2d/1 受检组合）。
     Presentation2D,
+    /// PLAN-032 完整二维游戏组合：components-2d-runtime（components2d 作者
+    /// 块；autographics.components2d/1 受检组合；T-02 冻结骨架）。
+    Components2DRuntime,
     /// PLAN-027 三维角色/运行相机/内置视觉声明接线：components-3d-runtime
     /// （character3d/solid/camera3d/player3d/mob3d 声明；六动作输入表；
     /// refs 角色服务；沿 024 共享管线 + 注入位）。
@@ -78,5 +82,8 @@ pub use lower_components3d_bindings::lower_project_components3d_bindings;
 pub use lower_components3d_events::lower_project_components3d_events;
 pub use lower_components3d_runtime::lower_project_components3d_runtime;
 pub use lower_components_game::{lower_project_components_game, LowerOutputGame};
+pub use lower_components2d_runtime::{
+    lower_project_components2d_runtime, LowerOutputComponents2dRuntime,
+};
 pub use lower_presentation::{lower_project_presentation, LowerOutputPresentation};
 pub use lower_g11::{lower_project_g112d, LowerOutputG11};

@@ -1,0 +1,29 @@
+// PLAN-032 G2 Coin: one definition, three instances, arbitrary business name
+// (alive). The Hit trigger forward is idempotent via the alive guard; the
+// destruction is the author's own obj.despawn (single-element despawn batch,
+// 1 credit, unchanged objects-identity validation).
+node Coin(cx: float, cy: float, geo: Mesh2D, tint: Material2D) {
+    model {
+        var alive = 1
+    }
+    msg {
+        Hit(int)
+    }
+    view-2d {
+        shape2d disc {
+            mesh: .geo
+            position: (.cx, .cy)
+            material: .tint
+            visible: .alive
+        }
+    }
+    on {
+        .Hit(ph) -> {
+            if .alive == 1 {
+                .alive = 0
+                obj.despawn(.handle)
+                emit .Picked(1)
+            }
+        }
+    }
+}

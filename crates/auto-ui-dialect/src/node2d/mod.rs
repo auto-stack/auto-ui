@@ -8,6 +8,7 @@
 pub mod ast;
 pub mod game;
 pub mod parse;
+pub mod components2d;
 pub mod presentation;
 
 pub use ast::{
@@ -17,4 +18,5 @@ pub use ast::{
 pub use game::{Game2dAudio, Game2dBlock, Game2dCue, Game2dHud, Game2dShape, Game2dSlot,
     Game2dText, Game2dTrigger, Game2dTriggerKind};
 pub use parse::Node2DDialect;
+pub use components2d::{CmpAtlas, CmpPatrol, CmpSpawn, Components2dBlock};
 pub use presentation::{PresHud, PresSlot, PresTrigger, Presentation2dBlock};

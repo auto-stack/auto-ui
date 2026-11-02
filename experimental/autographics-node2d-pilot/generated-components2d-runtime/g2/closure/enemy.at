@@ -1,0 +1,25 @@
+// PLAN-032 G2 Enemy: a distinct red patroller. The continuous patrol motion
+// is GENERATED from the components2d `patrol` row (Playing-state ticks move
+// this instance's handle once per callback); the handler only relays the
+// trigger upward - the root decides the fail.
+node Enemy(ex: float, ey: float, geo: Mesh2D, tint: Material2D) {
+    model {
+        var live = 1
+    }
+    msg {
+        Hit(int)
+    }
+    view-2d {
+        shape2d body {
+            mesh: .geo
+            position: (.ex, .ey)
+            material: .tint
+            visible: .live
+        }
+    }
+    on {
+        .Hit(ph) -> {
+            emit .Doomed(ph)
+        }
+    }
+}

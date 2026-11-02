@@ -1,0 +1,22 @@
+// PLAN-032 G2 Goal: the reach relay; the root owns the unmet-goal rule.
+node Goal(gx: float, gy: float, geo: Mesh2D, tint: Material2D) {
+    model {
+        var live = 1
+    }
+    msg {
+        Hit(int)
+    }
+    view-2d {
+        shape2d flag {
+            mesh: .geo
+            position: (.gx, .gy)
+            material: .tint
+            visible: .live
+        }
+    }
+    on {
+        .Hit(ph) -> {
+            emit .GoalTry(ph)
+        }
+    }
+}

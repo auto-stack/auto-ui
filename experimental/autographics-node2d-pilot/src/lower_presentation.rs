@@ -74,6 +74,18 @@ pub struct PresGen {
     pub triggers: Vec<PresTriggerOut>,
     /// 恰四槽（未声明槽补默认：隐藏/空文字）。
     pub slots: Vec<PresSlotOut>,
+    /// PLAN-032：生成骨架档位（缺省 presentation 原字节不变）。
+    pub mode: PresMode,
+    /// components-2d-runtime 附加材料（mode = Components2dRuntime 时恰 Some）。
+    pub cmp: Option<crate::lower_components2d_runtime::CmpGen>,
+}
+
+/// 骨架档位：Presentation 沿 025 原字节；Components2dRuntime 按 PLAN-032
+/// T-02 冻结合同（快照 poll / kind=0 帧收口 / 巡逻 / 终局 Enter）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PresMode {
+    Presentation,
+    Components2dRuntime,
 }
 
 /// 本 profile 的 scene 文档 + identity 材料。
@@ -96,7 +108,7 @@ const INFRA_FNS: [&str; 3] = ["sfx_play", "pres_events", "pres_closeout"];
 // ------------------------------------------------------------ validate ----
 
 /// presentation2d 块：root-only 定位 + 提取。
-fn pres2d_of(project: &Project, world: &WorldIR) -> Result<Presentation2dBlock, LowerError> {
+pub(crate) fn pres2d_of(project: &Project, world: &WorldIR) -> Result<Presentation2dBlock, LowerError> {
     for (mname, module) in &project.modules {
         for n in &module.nodes {
             let Some(p) = &n.presentation2d else { continue };
@@ -159,7 +171,7 @@ fn reject_reserved(project: &Project, world: &WorldIR) -> Result<(), LowerError>
 }
 
 /// 块校验 + 触发/槽解析（全部执行前具名拒绝）。
-fn prepare_pres(
+pub(crate) fn prepare_pres(
     project: &Project,
     world: &WorldIR,
     pres: &Presentation2dBlock,
@@ -453,6 +465,8 @@ fn prepare_pres(
         cues,
         triggers,
         slots,
+        mode: PresMode::Presentation,
+        cmp: None,
     })
 }
 
@@ -486,7 +500,7 @@ fn text_fn_signature_ok(src: &str, name: &str) -> bool {
 // ------------------------------------------------------------- assets ----
 
 /// 读入 + 校验 bank/font/license（沿 023 原媒体规则；cue span/gain 对界）。
-fn prepare_pres_assets(
+pub(crate) fn prepare_pres_assets(
     entry_dir: &Path,
     pres: &Presentation2dBlock,
     root_module: &str,
@@ -568,7 +582,7 @@ fn prepare_pres_assets(
 /// 的受检组合走 autographics.hud2d/1 原装配（相机/角色准入不变）；无角色
 /// 模式走 autographics.presentation2d/1（actor-free 组合，two_d=null）。
 #[allow(clippy::too_many_arguments)]
-fn scene_json_presentation(
+pub(crate) fn scene_json_presentation(
     entry: &str,
     rows: &[crate::lower_basic2d::SceneNode],
     has_char: bool,

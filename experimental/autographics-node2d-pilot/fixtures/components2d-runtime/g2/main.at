@@ -1,0 +1,230 @@
+// PLAN-032 T-04 G2 fixture: the complete frozen G2 game authored ENTIRELY on
+// the components2d surface. The root owns the level state under the frozen
+// `state` name (0=Playing/1=Won/2=Failed; the generated patrol gate and
+// end-state Enter read it) plus its own counter `taken`. The generated
+// skeleton owns: the per-callback input snapshot store, the whole-tick event
+// snapshot poll (pair -> receiver with the author guard), the enemy patrol,
+// the end-state Enter round request, and the kind=0 closing bundle (pose
+// frame + flip + <=4 sounds + the four HUD slots). No idle-turn gate exists
+// anywhere: the frozen 32-credit peak fits with every duty running.
+use resources: ground_mesh, ground_color, seg3_mesh, top_mesh, top_color, wall_mesh, wall_color, ceil_mesh, coin_mesh, coin_tint, char_mesh, char_orange, enemy_mesh, enemy_red, goal_mesh, goal_green, pit_mesh, pit_color
+use player: Player
+use coin: Coin
+use enemy: Enemy
+use goal: Goal
+use pit: Pit
+use hudmap: hud_count_text
+use statusmap: hud_state_text
+
+node Main {
+    model {
+        var state = 0
+        var taken = 0
+    }
+    msg {
+        Picked(int)
+        GoalTry(int)
+        Doomed(int)
+    }
+    components2d {
+        audio {
+            bank: "assets/b0b740dc49e51abefff9bb1af830080fe00f817b468614992040d438d6171c3d.wav"
+            font: "assets/lilita_one_regular.ttf"
+            license: "assets/license.txt"
+        }
+        cue coin {
+            span: (0, 7403)
+            gain: 1.0
+        }
+        cue win {
+            span: (7403, 20046)
+            gain: 1.0
+        }
+        cue fail {
+            span: (20046, 22504)
+            gain: 1.0
+        }
+        cue jump {
+            span: (0, 7403)
+            gain: 1.0
+        }
+        hud {
+            slot 0 {
+                owner: "Main"
+                anchor: 0
+                offset: (8.0, 8.0)
+                size: 32.0
+                rgba: (1.0, 1.0, 1.0, 1.0)
+                text_fn: "hud_count_text"
+                text_field: "taken"
+                init: "0"
+            }
+            slot 1 {
+                owner: "Main"
+                anchor: 1
+                offset: (8.0, 8.0)
+                size: 32.0
+                rgba: (1.0, 1.0, 1.0, 1.0)
+                text_fn: "hud_state_text"
+                text_field: "state"
+                init: "Playing"
+            }
+        }
+        trigger c1 {
+            shape: circle
+            radius: 0.5
+            target: "c1"
+            event: "Hit"
+            guard: "alive"
+        }
+        trigger c2 {
+            shape: circle
+            radius: 0.5
+            target: "c2"
+            event: "Hit"
+            guard: "alive"
+        }
+        trigger c3 {
+            shape: circle
+            radius: 0.5
+            target: "c3"
+            event: "Hit"
+            guard: "alive"
+        }
+        trigger enemy_hit {
+            shape: box
+            target: "enemy"
+            event: "Hit"
+        }
+        trigger goal_reach {
+            shape: circle
+            radius: 0.5
+            target: "goal"
+            event: "Hit"
+        }
+        trigger pit_fall {
+            shape: box
+            target: "pit"
+            event: "Hit"
+        }
+        patrol {
+            node: "enemy"
+            range: (11.0, 17.0)
+            at_y: 0.5
+            speed: 1.0
+        }
+        atlas {
+            asset: "assets/8fde96f66bf875ec06cfe7058348cd572c469413381e8204b1cd5973058998df.png"
+            frame_size: (32, 32)
+            idle: (0, 0)
+            run: (32, 0)
+            rise: (64, 0)
+            fall: (96, 0)
+        }
+    }
+    view-2d {
+        Coin c1 {
+            cx: 4.0
+            cy: 1.0
+            geo: resources.coin_mesh
+            tint: resources.coin_tint
+        }
+        Coin c2 {
+            cx: 13.0
+            cy: 2.25
+            geo: resources.coin_mesh
+            tint: resources.coin_tint
+        }
+        Coin c3 {
+            cx: 24.0
+            cy: 1.0
+            geo: resources.coin_mesh
+            tint: resources.coin_tint
+        }
+        Player player {
+            px: 2.0
+            py: 1.0
+            tint: resources.char_orange
+        }
+        Enemy enemy {
+            ex: 11.0
+            ey: 0.5
+            geo: resources.enemy_mesh
+            tint: resources.enemy_red
+        }
+        Goal goal {
+            gx: 28.0
+            gy: 1.0
+            geo: resources.goal_mesh
+            tint: resources.goal_green
+        }
+        Pit pit {
+            tx: 14.0
+            ty: -3.25
+            geo: resources.pit_mesh
+            tint: resources.pit_color
+        }
+        solid2d seg1 {
+            position: (4.0, -0.5)
+            mesh: resources.ground_mesh
+            material: resources.ground_color
+        }
+        solid2d seg2 {
+            position: (14.0, -0.5)
+            mesh: resources.ground_mesh
+            material: resources.ground_color
+        }
+        solid2d seg3 {
+            position: (25.0, -0.5)
+            mesh: resources.seg3_mesh
+            material: resources.ground_color
+        }
+        solid2d top {
+            position: (13.5, 1.125)
+            mesh: resources.top_mesh
+            material: resources.top_color
+        }
+        solid2d wallL {
+            position: (-0.2, 3.0)
+            mesh: resources.wall_mesh
+            material: resources.wall_color
+        }
+        solid2d wallR {
+            position: (30.2, 3.0)
+            mesh: resources.wall_mesh
+            material: resources.wall_color
+        }
+        solid2d ceil {
+            position: (15.0, 10.2)
+            mesh: resources.ceil_mesh
+            material: resources.wall_color
+        }
+        camera2d cam {
+            target: refs.player.actor
+            bounds: (0.0, -4.0, 30.0, 12.0)
+            view_size: (12.0, 8.0)
+        }
+    }
+    on {
+        .Picked(n) -> {
+            .taken = .taken + 1
+            sfx.play("coin", 1.0)
+        }
+        .GoalTry(ph) -> {
+            if .state == 0 {
+                if .taken == 3 {
+                    if ph == 1 {
+                        .state = 1
+                        sfx.play("win", 1.0)
+                    }
+                }
+            }
+        }
+        .Doomed(ph) -> {
+            if .state == 0 {
+                .state = 2
+                sfx.play("fail", 1.0)
+            }
+        }
+    }
+}

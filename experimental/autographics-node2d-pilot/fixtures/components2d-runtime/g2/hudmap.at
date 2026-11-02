@@ -1,0 +1,14 @@
+// PLAN-032 G2 HUD count text: the author owns HUD shaping (branch select;
+// ASCII literals only, <=32 visible chars).
+fn hud_count_text(n int) str {
+    if n == 0 {
+        return "0"
+    }
+    if n == 1 {
+        return "1"
+    }
+    if n == 2 {
+        return "2"
+    }
+    return "3"
+}

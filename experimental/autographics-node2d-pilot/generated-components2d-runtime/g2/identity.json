@@ -1,0 +1,43 @@
+{
+ "generator": "autographics-node2d-pilot plan032 components-2d-runtime",
+ "api": "autographics.components2d/1",
+ "user_source_sha256": "d0c6c196ea73d45bb7d66198aa1b614b09da1145a91608ef63919ceaea44a0ac",
+ "user_source_bytes": 7930,
+  "module:coin": "64dcc5a93d3b5b0ed69a0d14f24b89fa41ac09d8897a906beefda5bb89fadd79",
+  "module:enemy": "38f18e322cbccb5227e3130a5ecd712e147b856408e344ba045047473e4c2840",
+  "module:goal": "62b0d661f2a5a5b84dcfd4b65f536ab248de5629f0d1618ce2a9f87787f51baa",
+  "module:hudmap": "4fe1796ad5f541fd0ed9f6218594f3d0497d59eedaf78d054006b3abd9900a2f",
+  "module:main": "f39c9536afaba91c37e5926297307234bde04545e86d7a89fdc45c6c4c1e6d29",
+  "module:pit": "2ee4c750983c4519d5bafe9085aa3cd253b05a3e48c092f9b1d8fde539132562",
+  "module:player": "6ae7ef5622a5feb5ac6d750346439f7a6093fdc852bf2f162b6975e010441c17",
+  "module:resources": "9f27f4ea009a16d1d736772c45f5b24c259034b7b2cd1db46f2e5e7ed6fb7382",
+  "module:statusmap": "9b4aa641a19f230239846eb95b38a8c378de712af2acb03b4e6630144ee035c5",
+ "closure": [
+  {"name": "coin", "sha256": "64dcc5a93d3b5b0ed69a0d14f24b89fa41ac09d8897a906beefda5bb89fadd79", "bytes": 775},
+  {"name": "enemy", "sha256": "38f18e322cbccb5227e3130a5ecd712e147b856408e344ba045047473e4c2840", "bytes": 655},
+  {"name": "goal", "sha256": "62b0d661f2a5a5b84dcfd4b65f536ab248de5629f0d1618ce2a9f87787f51baa", "bytes": 453},
+  {"name": "hudmap", "sha256": "4fe1796ad5f541fd0ed9f6218594f3d0497d59eedaf78d054006b3abd9900a2f", "bytes": 291},
+  {"name": "main", "sha256": "f39c9536afaba91c37e5926297307234bde04545e86d7a89fdc45c6c4c1e6d29", "bytes": 6335},
+  {"name": "pit", "sha256": "2ee4c750983c4519d5bafe9085aa3cd253b05a3e48c092f9b1d8fde539132562", "bytes": 527},
+  {"name": "player", "sha256": "6ae7ef5622a5feb5ac6d750346439f7a6093fdc852bf2f162b6975e010441c17", "bytes": 2144},
+  {"name": "resources", "sha256": "9f27f4ea009a16d1d736772c45f5b24c259034b7b2cd1db46f2e5e7ed6fb7382", "bytes": 1035},
+  {"name": "statusmap", "sha256": "9b4aa641a19f230239846eb95b38a8c378de712af2acb03b4e6630144ee035c5", "bytes": 216},
+  {"name": "asset:b0b740dc49e51abefff9bb1af830080fe00f817b468614992040d438d6171c3d.wav", "sha256": "b0b740dc49e51abefff9bb1af830080fe00f817b468614992040d438d6171c3d", "bytes": 90060},
+  {"name": "asset:lilita_one_regular.ttf", "sha256": "4444c23631884f411aa7f2fee35061b1756a9927940c62d2a5572acf470b3ffa", "bytes": 26828},
+  {"name": "asset:license.txt", "sha256": "31d45880a38de46bc81835329c0c7d964609751e65add92769ea0095ad92c05b", "bytes": 4391},
+  {"name": "asset:8fde96f66bf875ec06cfe7058348cd572c469413381e8204b1cd5973058998df.png", "sha256": "8fde96f66bf875ec06cfe7058348cd572c469413381e8204b1cd5973058998df", "bytes": 735}
+ ],
+ "roles": {
+ "character": 1,
+ "character_name": "player.body",
+ "solids": [{"id": 2, "name": "seg1"}, {"id": 3, "name": "seg2"}, {"id": 4, "name": "seg3"}, {"id": 5, "name": "top"}, {"id": 6, "name": "wallL"}, {"id": 7, "name": "wallR"}, {"id": 8, "name": "ceil"}],
+ "camera": 1,
+ "scene_objects": {"player.body": 1, "seg1": 2, "seg2": 3, "seg3": 4, "top": 5, "wallL": 6, "wallR": 7, "ceil": 8, "c1_template": 9, "c2_template": 10, "c3_template": 11, "enemy_template": 12, "goal_template": 13, "pit_template": 14}
+},
+ "provenance": {
+  "product": "g2",
+  "consumer": "experimental/autographics-auto-driver/tests/node2d_full_game_flow.rs + node2d_full_game_media.rs (frozen G2 route/budget/GPU/PCM)",
+  "consumption": "include_str! frozen scene.agscene + world.at; the harness writes world.at to scripts/<sha>.at where <sha> = scene.behavior.source.sha256",
+  "world_sha256": "d0c6c196ea73d45bb7d66198aa1b614b09da1145a91608ef63919ceaea44a0ac"
+ }
+}

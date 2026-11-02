@@ -2282,7 +2282,7 @@ pub(crate) fn plan_dispatch_events(
                 // PLAN-028：event.*/object.*/round.* 是 typed 服务前缀，
                 // 不是子投递选择器（events 档跳过；其余档保持旧拒绝面；
                 // round.request() 的受信映射沿 025/027 既有面）。
-                if events && (child == "event" || child == "object" || child == "round") {
+                if (events && (child == "event" || child == "object" || child == "round")) || child == "obj" {
                     continue;
                 }
                 let key = (edef.clone(), child.clone(), ev.clone());
@@ -5147,8 +5147,13 @@ pub(crate) fn gen_user_source(
         }
     }
     // PLAN-025：presentation 基础设施标量（ord/np + 有界请求行）。
-    if pres.is_some() {
-        src.push_str(&crate::lower_presentation::pres_scalars_src());
+    // PLAN-032：components2d 档换用运行时标量（snap/巡逻/四行缓冲）。
+    if let Some(pg) = pres {
+        if pg.mode == crate::lower_presentation::PresMode::Components2dRuntime {
+            src.push_str(&crate::lower_components2d_runtime::cmp_scalars_src(pg));
+        } else {
+            src.push_str(&crate::lower_presentation::pres_scalars_src());
+        }
     }
 
     // PLAN-023 F-8.1（game 面）：呈现缓存后缀 visq（frozen 档保持 vis）。
@@ -5438,8 +5443,13 @@ var {img}_fh=[{}]
         src.push_str(" game_events()\n");
     }
     // PLAN-025（presentation 面）：触发存在时才有 poll 前奏。
+    // PLAN-032（components2d 面）：快照先存 r_snap，再 poll（作者
+    // input.snapshot() 读缓存；pressed 恰一次消费）。
     if let Some(pg) = pres {
-        if !pg.triggers.is_empty() {
+        if pg.mode == crate::lower_presentation::PresMode::Components2dRuntime {
+            src.push_str(" r_snap = ag_actions_snapshot()\n");
+            src.push_str(" cmp_events()\n");
+        } else if !pg.triggers.is_empty() {
             src.push_str(" pres_events()\n");
         }
     }
@@ -5699,8 +5709,17 @@ var {img}_fh=[{}]
         src.push_str(" game_closeout()\n");
     }
     // PLAN-025（presentation 面）：每回调恰一次 closeout 收口。
-    if pres.is_some() {
-        src.push_str(" pres_closeout()\n");
+    // PLAN-032（components2d 面）：巡逻 + 终局 Enter + kind=0 帧收口。
+    if let Some(pg) = pres {
+        if pg.mode == crate::lower_presentation::PresMode::Components2dRuntime {
+            if pg.cmp.as_ref().and_then(|c| c.patrol.as_ref()).is_some() {
+                src.push_str(" cmp_patrol(dt)\n");
+            }
+            src.push_str(" cmp_restart()\n");
+            src.push_str(" cmp_closeout()\n");
+        } else {
+            src.push_str(" pres_closeout()\n");
+        }
     }
     src.push_str("}\n");
     // PLAN-023 F-3（game 面）：closeout 骨架（game_cue / game_events /
@@ -5709,7 +5728,11 @@ var {img}_fh=[{}]
         src.push_str(&crate::lower_components_game::game_fns_src(g));
     }
     if let Some(pg) = pres {
-        src.push_str(&crate::lower_presentation::pres_fns_src(pg));
+        if pg.mode == crate::lower_presentation::PresMode::Components2dRuntime {
+            src.push_str(&crate::lower_components2d_runtime::cmp_fns_src(pg));
+        } else {
+            src.push_str(&crate::lower_presentation::pres_fns_src(pg));
+        }
     }
     Ok(src)
 }

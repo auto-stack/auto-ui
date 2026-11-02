@@ -1,0 +1,23 @@
+// PLAN-032 G2 Pit: the hidden lower-bound zone (y=-3 level rule). Hidden
+// shapes never cancel triggers; the relay is upward like every other row.
+node Pit(tx: float, ty: float, geo: Mesh2D, tint: Material2D) {
+    model {
+        var live = 0
+    }
+    msg {
+        Hit(int)
+    }
+    view-2d {
+        shape2d zone {
+            mesh: .geo
+            position: (.tx, .ty)
+            material: .tint
+            visible: .live
+        }
+    }
+    on {
+        .Hit(ph) -> {
+            emit .Doomed(ph)
+        }
+    }
+}

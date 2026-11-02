@@ -185,7 +185,7 @@ pub fn parse_presentation2d_block(
     })
 }
 
-fn parse_pres_hud(cx: &mut dyn DomainParseContext) -> AutoResult<PresHud> {
+pub(crate) fn parse_pres_hud(cx: &mut dyn DomainParseContext) -> AutoResult<PresHud> {
     let start = cx.cur_pos();
     cx.advance(); // hud
     cx.expect(TokenKind::LBrace)?;
@@ -308,7 +308,7 @@ fn parse_pres_slot(cx: &mut dyn DomainParseContext) -> AutoResult<PresSlot> {
     })
 }
 
-fn parse_pres_trigger(cx: &mut dyn DomainParseContext) -> AutoResult<PresTrigger> {
+pub(crate) fn parse_pres_trigger(cx: &mut dyn DomainParseContext) -> AutoResult<PresTrigger> {
     let start = cx.cur_pos();
     cx.advance(); // trigger
     let name = cx.cur_text();

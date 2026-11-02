@@ -528,6 +528,47 @@ fn translate_expr(e: &Expr, ctx: &Ctx, out: &mut String) -> Result<(), LowerErro
             }
         }
         Expr::Call(call) => {
+            // PLAN-032（components2d）：input.snapshot() → 读回调缓存快照
+            // r_snap（生成前奏恰一次 ag_actions_snapshot；0 额外计费）。
+            if let Expr::Dot(inner, m) = &*call.name {
+                if let Expr::Ident(base) = &**inner {
+                    if base == "input" && m == "snapshot" {
+                        if !call.args.args.is_empty() {
+                            return Err(unsupported("input.snapshot arity", e));
+                        }
+                        if ctx.sfx.is_none() {
+                            return Err(unsupported(
+                                "input.snapshot requires the components2d (audio) assembly",
+                                e,
+                            ));
+                        }
+                        out.push_str("r_snap");
+                        return Ok(());
+                    }
+                    // PLAN-032（components2d）：obj.despawn(h) → 单元素批销毁
+                    // （1 credit；沿 objects 单元原 alive/generation 验证）。
+                    if base == "obj" && m == "despawn" {
+                        if call.args.args.len() != 1 {
+                            return Err(unsupported("obj.despawn arity (want <handle>)", e));
+                        }
+                        if ctx.sfx.is_none() {
+                            return Err(unsupported(
+                                "obj.despawn requires the components2d (audio) assembly",
+                                e,
+                            ));
+                        }
+                        let Arg::Pos(a) = &call.args.args[0] else {
+                            return Err(unsupported("obj.despawn arg", e));
+                        };
+                        let mut buf = String::new();
+                        translate_expr(a, ctx, &mut buf)?;
+                        out.push_str(&format!(
+                            "ag_object_despawn_batch(1, {buf}, 0, 0, 0, 0, 0, 0, 0)"
+                        ));
+                        return Ok(());
+                    }
+                }
+            }
             // input.axis(Left, Right) → 差值轴（每方向一次 held 计费）。
             if let Expr::Dot(inner, m) = &*call.name {
                 if let Expr::Ident(base) = &**inner {

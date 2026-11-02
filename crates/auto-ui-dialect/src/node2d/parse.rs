@@ -138,6 +138,7 @@ pub fn parse_node_decl(cx: &mut dyn DomainParseContext) -> AutoResult<NodeDecl> 
     let mut on = None;
     let mut game2d = None;
     let mut presentation2d = None;
+    let mut components2d = None;
     let mut character3d = None;
     let mut camera3d = None;
     let mut object3d = None;
@@ -237,6 +238,17 @@ pub fn parse_node_decl(cx: &mut dyn DomainParseContext) -> AutoResult<NodeDecl> 
                 // PLAN-025：通用声音/HUD 接线入口块（typed 资源/槽 owner/
                 // generic 触发行；无业务枚举）。任何 node 都可携带；root-only
                 // 与 profile 归属由降层具名校验（解析面保持宽容）。
+                "components2d" => {
+                    if components2d.is_some() {
+                        return Err(SyntaxError::Generic {
+                            message: "duplicate components2d block in node".to_string(),
+                            span: pos_to_span(cx.cur_pos()),
+                        }
+                        .into());
+                    }
+                    components2d = Some(super::components2d::parse_components2d_block(cx)?);
+                    continue;
+                }
                 "presentation2d" => {
                     if presentation2d.is_some() {
                         return Err(SyntaxError::Generic {
@@ -355,6 +367,7 @@ pub fn parse_node_decl(cx: &mut dyn DomainParseContext) -> AutoResult<NodeDecl> 
         on,
         game2d,
         presentation2d,
+        components2d,
         character3d,
         camera3d,
         object3d,
@@ -817,7 +830,7 @@ pub(super) fn parse_prop_block(cx: &mut dyn DomainParseContext) -> AutoResult<Ve
 
 /// 属性值：`(a, b)` 字面量组（position/bounds/view_size）或单个共享
 /// Core 表达式（路径、前导点成员、调用、字面量）。
-fn parse_prop_value(cx: &mut dyn DomainParseContext) -> AutoResult<PropValue> {
+pub(super) fn parse_prop_value(cx: &mut dyn DomainParseContext) -> AutoResult<PropValue> {
     if cx.is_kind(TokenKind::LParen) {
         // 投机尝试字面量组 `(a, b)`；restore 回滚游标并截断投机诊断。
         let cp = cx.checkpoint();
