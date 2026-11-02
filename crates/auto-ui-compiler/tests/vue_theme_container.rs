@@ -116,6 +116,17 @@ widget App {
         sfc.contains("applyTheme(n, (__autoThemeRoot.value ?? document.documentElement)"),
         "theme_name watch must re-apply to the container:\n{sfc}"
     );
+    // N-11/N-23：主题根带独立标记，且作用域内的清理/dark pass 必须跳过它
+    //（父容器不得覆盖嵌套实例的 vars）。
+    assert!(
+        sfc.contains("data-auto-theme-root"),
+        "theme root must carry the isolation marker:\n{sfc}"
+    );
+    assert!(
+        sfc.contains("hasAttribute('data-auto-theme-root')"),
+        "cleanup/dark passes must skip nested theme roots:\n{sfc}"
+    );
+
     // 运行时本身：容器优先、document 回退。
     assert!(
         sfc.contains("const root = rootEl ?? document.documentElement"),

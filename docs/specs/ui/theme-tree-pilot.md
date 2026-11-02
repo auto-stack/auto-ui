@@ -68,8 +68,10 @@
   多 App 同文档互不覆盖；无容器时回落 `documentElement` 的 legacy 行为。
   生成期 `index.css` 的 `:root/.dark` 亦由 App 导入的官方包驱动（见
   [正式主题包与外部消费](official-theme-package.md)），值必须是
-  `H S% L%` 三段式；首帧应用 `theme_name.value || getActiveTheme()` 声明的
-  默认族。design 对象 → `:style` 绑定，槽引用为 `var(--<css-var>)`
+  `H S% L%` 三段式；首帧应用 **design 投影**声明的默认族
+  （`__designTheme.value || theme_name.value || getActiveTheme()`；未声明
+  design 时退回 `theme_name.value || getActiveTheme()`）。design 对象 →
+  `:style` 绑定，槽引用为 `var(--<css-var>)`
   （如 `tokens.colors.card` → `var(--card)`、`tokens.radius.control` →
   `var(--radius-control)`）。
 - 组件字段直接字面值解除该槽 token 引用（C-10）；不存在 token/theme 两套

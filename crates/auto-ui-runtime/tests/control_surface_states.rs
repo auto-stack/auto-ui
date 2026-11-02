@@ -131,6 +131,7 @@ widget App {
                 placeholder: "note"
                 disabled: .blocked
                 oninput: () => { }
+                onkeydown.enter: () => { }
                 design: { placeholder: "#00ff00" }
                 style: "rounded-md border border-border bg-input text-foreground"
             }
@@ -404,6 +405,7 @@ fn input_and_textarea_states_use_scope_semantics() {
                 disabled,
                 on_change,
                 on_submit,
+                keydown,
                 ..
             } => {
                 let s = style.as_ref().expect("textarea carries style");
@@ -412,6 +414,13 @@ fn input_and_textarea_states_use_scope_semantics() {
                 assert!(
                     on_change.is_none() && on_submit.is_none(),
                     "禁用 textarea 不得携带 on_change/on_submit（F-02 不派发）"
+                );
+                // N-12/N-23：onkeydown.* 绑定在禁用态也不得上车（Binding::Custom
+                // 会在无 on_change 时照样派发）。
+                assert!(
+                    keydown.is_empty(),
+                    "禁用 textarea 不得携带 onkeydown 绑定，实际 {:?}",
+                    keydown.keys().collect::<Vec<_>>()
                 );
                 assert!(
                     s.classes

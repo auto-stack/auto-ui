@@ -1428,10 +1428,16 @@ if ((window as any).__AUTO_UI_THEME__ === 'light' || (window as any).__AUTO_UI_T
             // isDark is resolved from the DOM (.dark class) rather than a state
             // var, since gallery apps hardcode `<html class="dark">`.
             if self.has_accent_color {
-                if handler_name == "SetAccent" {
-                    body.push_str("; applyAccent(accent_color.value, document.documentElement.classList.contains('dark'))");
-                } else if handler_name == "ToggleDarkMode" {
-                    body.push_str("; applyAccent(accent_color.value, document.documentElement.classList.contains('dark'))");
+                // N-22：容器作用域下 handler 驱动的强调色切换必须把容器根交给
+                // applyAccent，否则 N-11 的"跳过嵌套主题根"会把本实例自己根也
+                // 跳过，留下过期 --primary。无容器（legacy document 模式）保持原样。
+                let accent_call = if self.theme_root_ref {
+                    "; applyAccent(accent_color.value, __autoThemeRoot.value ? (__autoThemeRoot.value.classList.contains('dark') || document.documentElement.classList.contains('dark')) : document.documentElement.classList.contains('dark'), __autoThemeRoot.value)"
+                } else {
+                    "; applyAccent(accent_color.value, document.documentElement.classList.contains('dark'))"
+                };
+                if handler_name == "SetAccent" || handler_name == "ToggleDarkMode" {
+                    body.push_str(accent_call);
                 }
             }
             // Plan 132: Check if handler contains API calls (needs async).

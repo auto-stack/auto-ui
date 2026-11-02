@@ -14609,9 +14609,11 @@ widget ThemeApp {
             "widget path must restore saved accent on mount:\n{}",
             sfc
         );
+        // N-22：容器作用域 widget 的 handler 必须把容器根传给 applyAccent
+        //（否则 N-11 的嵌套根跳过会让本实例的 --primary 停留在旧值）。
         assert!(
-            sfc.contains("applyAccent(accent_color.value, document.documentElement.classList.contains('dark'))"),
-            "SetAccent handler must call applyAccent with the new accent:\n{}",
+            sfc.contains("applyAccent(accent_color.value, __autoThemeRoot.value ?"),
+            "SetAccent handler must pass the container ref to applyAccent:\n{}",
             sfc
         );
         assert!(
