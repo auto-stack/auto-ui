@@ -79,6 +79,12 @@ pub(crate) fn stamp_bindings_env(
             }
         }
     }
+    if std::env::var("PLAN030_DEBUG").is_ok() {
+        eprintln!("[plan030] stamp {def_name}: refs={:?} actors={:?} msg={:?}",
+            ref_params.keys().collect::<Vec<_>>(),
+            actors.keys().collect::<Vec<_>>(),
+            msg_params.keys().collect::<Vec<_>>());
+    }
     ctx.bindings3d = Some(BindingsEnv {
         ref_params,
         actors,
@@ -371,15 +377,6 @@ pub fn lower_project_components3d_bindings(
 
     // —— 引用参数解析（逐实例；数值 ABI = 原 pool/模板/实例路径身份）——
     let mut bindings_cfg = BindingsCfg3::default();
-    let mut plan = crate::lower_components::plan_dispatch_events(
-        project,
-        world,
-        false,
-        false,
-        false,
-        true,
-        true,
-    )?;
     // 实例参数查表：(def, param) → 每实例 Res 文本（世界构建期捕获）。
     let res_of = |dname: &str, pname: &str, def_idx: usize| -> Option<&String> {
         world
@@ -583,7 +580,10 @@ pub fn lower_project_components3d_bindings(
                                 ),
                             ));
                         }
-                        let call = format!("main_{}", ev.to_lowercase());
+                        // 017 血统命名：<root 前缀>_<ev>（root 载体；与
+                        // plan 侧注册同名——plan 派发在 cfg 重建时已注册，
+                        // 此处仅派生投递文本）。
+                        let call = format!("{}_{}", world.root.to_lowercase(), ev.to_lowercase());
                         match entry_of(&mut bindings_cfg, dname, pname)
                             .or_insert(RefBinding::MsgEvent { call: call.clone() })
                         {
@@ -608,8 +608,6 @@ pub fn lower_project_components3d_bindings(
                                 ))
                             }
                         }
-                        // 接收 fn 注册（017 血统命名 main_<ev>；root 载体）。
-                        plan.recv_fns.insert(call.clone(), (String::new(), ev.to_string()));
                     }
                 }
             }

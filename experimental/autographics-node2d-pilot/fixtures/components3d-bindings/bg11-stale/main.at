@@ -1,0 +1,48 @@
+// PLAN-030 bg11-stale: operating the despawned (previous-generation) handle is a named runtime rejection (ObjectNotAlive) surfaced on play.error. The spawn/despawn/rebind schedule is the
+// root's explicit author org; the OldgenCoin component holds its own
+// handles and rebinds through its named slot/pair/actor symbols.
+use player: Player
+use oldgen: OldgenCoin
+use props: ShardA, ShardB
+
+node Main {
+    msg { Moved }
+    model {
+        var tick = 0
+    }
+    view-3d {
+        cylinder3d ground {
+            position: (15.0, -1.1, -3.0)
+            scale: (40.0, 1.0, 2.0)
+            solid: true
+        }
+        Player hero {
+            speed: 2.0
+            moved_report: .Moved
+        }
+        OldgenCoin oc {
+            slot: objects3d.item_a
+            template: templates.ShardA
+            pair: triggers.shard_a
+            target: refs.hero
+            respawn_template: templates.ShardB
+        }
+    }
+    camera3d { distance: 8.0
+              pitch: 45.0
+              projection: perspective }
+    objects3d { item_a }
+    triggers { shard_a }
+    on {
+        Life.Tick(dt) -> {
+            .tick = .tick + 1
+            if .tick == 3 { oc.DespawnNow() }
+            if .tick == 4 { oc.Respawn() }
+            if .tick == 5 { oc.StaleNow() }
+            let n = event.next()
+            if n == 1 { let p = event.pair() }
+        }
+        .Moved -> {
+        }
+    }
+}

@@ -18,7 +18,7 @@ node Hazard(slot: SlotRef3D, template: TemplateRef3D, pair: PairRef3D, target: A
             bind(.pair, .target.body, sphere, 0.5, .h)
         }
         .Hit -> {
-            emit .on_hit
+            emit .on_hit()
         }
         .Advance -> {
             .hy = .hy + .hdir
@@ -49,7 +49,7 @@ node Goal(slot: SlotRef3D, template: TemplateRef3D, pair: PairRef3D, target: Act
         }
         .Reached(bag) -> {
             if bag == 3 {
-                emit .on_win
+                emit .on_win()
             }
         }
     }
@@ -67,7 +67,7 @@ node VoidTrap(slot: SlotRef3D, template: TemplateRef3D, pair: PairRef3D, target:
             bind(.pair, .target.body, aabb, 0.0, .h)
         }
         .Entered -> {
-            emit .on_hit
+            emit .on_hit()
         }
     }
 }

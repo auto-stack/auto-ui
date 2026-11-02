@@ -1,0 +1,73 @@
+// Patrol state lives here (hy/hdir advance every tick through .Advance,
+// regardless of events); the position write is the root schedule's no-event
+// sync (.Commit) — event ticks skip it, exactly the original equivalence
+// strategy. The hazard pair binds against the Player body leaf through the
+// ActorRef3D subject (sphere radius 0.5 like the original bind).
+node Hazard(slot: SlotRef3D, template: TemplateRef3D, pair: PairRef3D, target: ActorRef3D, on_hit: msg, base_y: float, dir0: float) {
+    model {
+        var h = 0
+        var hy = base_y
+        var hdir = dir0
+    }
+    msg { Hit
+          Advance
+          Commit }
+    on {
+        Life.Start -> {
+            .h = spawn(.slot, .template, 9.0, .base_y, -3.0)
+            bind(.pair, .target.body, sphere, 0.5, .h)
+        }
+        .Hit -> {
+            emit .on_hit()
+        }
+        .Advance -> {
+            .hy = .hy + .hdir
+            if .hy > .base_y + 0.2 {
+                .hdir = 0.0 - 0.05
+            }
+            if .hy < .base_y - 0.2 {
+                .hdir = 0.05
+            }
+        }
+        .Commit -> {
+            object.move(.h, 9.0, .hy, -3.0)
+        }
+    }
+}
+
+// The goal holds its own rule: reaching it only wins when the root-passed
+// bag count says all three shards are collected (original p==4 && bag==3).
+node Goal(slot: SlotRef3D, template: TemplateRef3D, pair: PairRef3D, target: ActorRef3D, on_win: msg) {
+    model {
+        var h = 0
+    }
+    msg { Reached(int) }
+    on {
+        Life.Start -> {
+            .h = spawn(.slot, .template, 16.0, 1.0, -3.0)
+            bind(.pair, .target.body, aabb, 0.0, .h)
+        }
+        .Reached(bag) -> {
+            if bag == 3 {
+                emit .on_win()
+            }
+        }
+    }
+}
+
+// The void zone holds its own rule: entering it always fails the round.
+node VoidTrap(slot: SlotRef3D, template: TemplateRef3D, pair: PairRef3D, target: ActorRef3D, on_hit: msg) {
+    model {
+        var h = 0
+    }
+    msg { Entered }
+    on {
+        Life.Start -> {
+            .h = spawn(.slot, .template, 3.0, 1.0, -8.0)
+            bind(.pair, .target.body, aabb, 0.0, .h)
+        }
+        .Entered -> {
+            emit .on_hit()
+        }
+    }
+}

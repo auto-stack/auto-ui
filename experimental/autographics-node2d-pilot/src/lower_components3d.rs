@@ -2781,7 +2781,7 @@ pub(crate) fn apply_bindings_ctx<'a>(
         .iter()
         .filter_map(|(p, rb)| match rb {
             crate::lower_components3d_bindings::RefBinding::MsgEvent { call } => {
-                Some((p.clone(), format!("{call}()")))
+                Some((p.clone(), call.clone()))
             }
             _ => None,
         })
@@ -2794,11 +2794,57 @@ pub(crate) fn apply_bindings_ctx<'a>(
     let edef = dname.to_string();
     let errmod = def_module.to_string();
     let anc = &plan.anc;
+    let mtext2 = mtext.clone();
+    let edef2 = edef.clone();
+    let errmod2 = errmod.clone();
+    let anc2 = anc;
+    let childtab = &plan.child;
+    // 语句形态 `emit .Ev()` 经 child_emit 钩子（调用头未闭合文本）；值
+    // 形态（无括号）经 emit_hook。两钩子同表：msg 参数优先，其余沿 anc。
+    ctx.child_emit = Some(Box::new(
+        move |child: &str, ev: &str, argc: usize| -> Result<String, LowerError> {
+            if child == "emit" {
+                if let Some(t) = mtext.get(ev) {
+                    return Ok(format!("{t}("));
+                }
+                match anc.get(&(edef.clone(), ev.to_string())) {
+                    Some(d) => {
+                        let sep = if argc == 0 { "" } else { ", " };
+                        return Ok(if d.to_root {
+                            format!("{}(", d.fn_name)
+                        } else {
+                            format!("{}({}[{}]{sep}", d.fn_name, d.table, index)
+                        });
+                    }
+                    None => {
+                        return Err(at(
+                            &errmod,
+                            0,
+                            ev,
+                            &format!("emit .{ev} has no lowering-time receiver"),
+                        ))
+                    }
+                }
+            }
+            match childtab.get(&(edef.clone(), child.to_string(), ev.to_string())) {
+                Some(d) => {
+                    let sep = if argc == 0 { "" } else { ", " };
+                    Ok(format!("{}({}[{}]{sep}", d.fn_name, d.table, index))
+                }
+                None => Err(at(
+                    &errmod,
+                    0,
+                    ev,
+                    &format!("emit {child}.{ev} has no lowering-time receiver"),
+                )),
+            }
+        },
+    ));
     ctx.emit_hook = Box::new(move |ev: &str| -> Result<String, LowerError> {
-        if let Some(t) = mtext.get(ev) {
-            return Ok(t.clone());
+        if let Some(t) = mtext2.get(ev) {
+            return Ok(format!("{t}()"));
         }
-        match anc.get(&(edef.clone(), ev.to_string())) {
+        match anc2.get(&(edef2.clone(), ev.to_string())) {
             Some(d) => {
                 if d.to_root {
                     Ok(format!("{}()", d.fn_name))
@@ -2807,7 +2853,7 @@ pub(crate) fn apply_bindings_ctx<'a>(
                 }
             }
             None => Err(at(
-                &errmod,
+                &errmod2,
                 0,
                 ev,
                 &format!("emit .{ev} has no lowering-time receiver"),

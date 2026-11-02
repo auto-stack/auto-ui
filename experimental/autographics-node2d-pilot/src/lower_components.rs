@@ -2387,8 +2387,9 @@ pub(crate) fn plan_dispatch_events(
                     continue;
                 }
                 // PLAN-030：`emit .<msg参数>` 经绑定表投递（下降期解析为
-                // 绑定根事件 recv fn 的直呼文本），不走祖先查表；绑定端口
-                // 存在性由 bindings 档装配核（根事件变体+handler+零载荷）。
+                // 绑定根事件 recv fn 的直呼文本），不走祖先查表。根事件
+                // 变体 + handler + 零载荷在此核验并注册 main 前缀接收 fn
+                // （cfg 档重建 plan 时注册随 plan 走，不丢失）。
                 if bindings
                     && decl
                         .params
@@ -2409,6 +2410,77 @@ pub(crate) fn plan_dispatch_events(
                             ),
                         ));
                     }
+                    // 绑定事件名 = 该参数的实例绑定 Res(".Ev")（uniformity
+                    // 由 bindings 装配核；此处取首实例绑定值）。
+                    let bound = world
+                        .instances
+                        .iter()
+                        .filter(|i| i.def == *edef)
+                        .find_map(|i| {
+                            i.params.iter().find(|(n, _)| n.as_str() == ev.as_str()).and_then(
+                                |(_, v)| match v {
+                                    crate::lower_components::ParamVal::Res(t) => {
+                                        t.strip_prefix('.').map(|e| e.to_string())
+                                    }
+                                    _ => None,
+                                },
+                            )
+                        })
+                        .ok_or_else(|| {
+                            at(
+                                &def.module,
+                                *cline,
+                                ev,
+                                &format!(
+                                    "emit .{ev} via a msg param has no symbol binding (bind it as `.RootEvent` at the instance)"
+                                ),
+                            )
+                        })?;
+                    let rdecl = node_of(project, &world.root);
+                    let variant = rdecl
+                        .msg
+                        .as_ref()
+                        .and_then(|m| m.variants.iter().find(|v| v.name.as_str() == bound))
+                        .ok_or_else(|| {
+                            at(
+                                &def.module,
+                                *cline,
+                                ev,
+                                &format!(
+                                    "emit .{ev} via a msg param binds '.{bound}' which is not a root msg variant"
+                                ),
+                            )
+                        })?;
+                    if !variant.payload.is_empty() {
+                        return Err(at(
+                            &def.module,
+                            *cline,
+                            ev,
+                            &format!(
+                                "emit .{ev} via a msg param binds '.{bound}' which carries a payload (zero-arg form only in components-3d-bindings v1)"
+                            ),
+                        ));
+                    }
+                    let has_handler = rdecl.on.as_ref().is_some_and(|on| {
+                        on.handlers.iter().any(|h| {
+                            matches!(&h.pattern,
+                                auto_ui_dialect::node2d::EventPattern::Member { name, .. }
+                                    if name.as_str() == bound)
+                        })
+                    });
+                    if !has_handler {
+                        return Err(at(
+                            &def.module,
+                            *cline,
+                            ev,
+                            &format!(
+                                "emit .{ev} via a msg param binds '.{bound}' which has no `on .{bound}` handler on the root"
+                            ),
+                        ));
+                    }
+                    let fn_name = format!("{root_prefix}_{}", bound.to_lowercase());
+                    plan.recv_fns
+                        .insert(fn_name.clone(), (String::new(), bound.clone()));
                     continue;
                 }
                 if is_root {

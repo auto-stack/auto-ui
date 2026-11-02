@@ -1,0 +1,8 @@
+// The swept visitor template: one parked visual row (declaration order =
+// template document id order), original sensor values.
+node Visitor {
+    object3d { }
+    view-3d { cylinder3d visitor { position: (-30.0, 0.5, 0.0)
+                                   visible: false
+                                   scale: (0.3, 0.3, 0.3) } }
+}

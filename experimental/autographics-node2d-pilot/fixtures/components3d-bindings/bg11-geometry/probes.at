@@ -1,0 +1,26 @@
+// The geometry probes: each holds its own spawned object and binds against
+// the Player body leaf through the ActorRef3D subject. Probe2 carries two
+// pairs (aabb + sphere) on one runtime object; Probe1 one sphere pair.
+node Probe2(slot: SlotRef3D, template: TemplateRef3D, pa: PairRef3D, pb: PairRef3D, target: ActorRef3D, px: float, py: float, pz: float) {
+    model {
+        var h = 0
+    }
+    on {
+        Life.Start -> {
+            .h = spawn(.slot, .template, .px, .py, .pz)
+            bind(.pa, .target.body, aabb, 0.0, .h)
+            bind(.pb, .target.body, sphere, 0.5, .h)
+        }
+    }
+}
+node Probe1(slot: SlotRef3D, template: TemplateRef3D, pair: PairRef3D, target: ActorRef3D, px: float, py: float, pz: float) {
+    model {
+        var h = 0
+    }
+    on {
+        Life.Start -> {
+            .h = spawn(.slot, .template, .px, .py, .pz)
+            bind(.pair, .target.body, sphere, 0.5, .h)
+        }
+    }
+}

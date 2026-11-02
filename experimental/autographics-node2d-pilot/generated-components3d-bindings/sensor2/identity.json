@@ -1,0 +1,40 @@
+{
+ "generator": "autographics-node2d-pilot plan030 components-3d-bindings",
+ "api": "autographics.triggers3d/1",
+ "user_source_sha256": "439ecf7a732bee725aaa839da57b1326c3f8ad43bcf3a0606137ab4f5f7e3be1",
+ "user_source_bytes": 3543,
+  "module:main": "b80a5c76db2fa4c195faeff6d369beb93a9b3bc1ae7e1d9b875e8ee27e70f28b",
+  "module:markers": "b2f7aa4e0008bc763e9079811fdcd5f1f2bdc445821f1932b3b851b467ec53ea",
+  "module:pods": "22f4b90410d90f59a96f36106599f505b07cbf15fd67153adeafe31205257d3f",
+  "module:sentinel": "b078a58c38a76f65a43953a46924389ad5de70f6d9b7d88e1685db86ab9c96e9",
+  "module:visitor": "2f62b4962386d6c40478a29bb4cc3de3d5e4968d15d3ecce5d5375f2de38c9ea",
+ "closure": [
+  {"name": "main", "sha256": "b80a5c76db2fa4c195faeff6d369beb93a9b3bc1ae7e1d9b875e8ee27e70f28b", "bytes": 2942},
+  {"name": "markers", "sha256": "b2f7aa4e0008bc763e9079811fdcd5f1f2bdc445821f1932b3b851b467ec53ea", "bytes": 612},
+  {"name": "pods", "sha256": "22f4b90410d90f59a96f36106599f505b07cbf15fd67153adeafe31205257d3f", "bytes": 970},
+  {"name": "sentinel", "sha256": "b078a58c38a76f65a43953a46924389ad5de70f6d9b7d88e1685db86ab9c96e9", "bytes": 329},
+  {"name": "visitor", "sha256": "2f62b4962386d6c40478a29bb4cc3de3d5e4968d15d3ecce5d5375f2de38c9ea", "bytes": 339}
+ ],
+ "roles": {
+ "scene_rows": {
+  "Main/pod_a/m1/marker": 2,
+  "Main/pod_a/m2/marker": 3,
+  "Main/pod_b/m1/marker": 4,
+  "Main/pod_b/m2/marker": 5,
+  "Main/watch/body": 6,
+  "Visitor": 7,
+  "pad_a": 0,
+  "pad_b": 1
+ }
+},
+ "assets": [
+
+ ],
+ "provenance": {
+  "product": "sensor2",
+  "consumer": "experimental/autographics-auto-driver/tests/node3d_bindings_flow.rs",
+  "consumption": "include_str! frozen scene.agscene + world.at + assets/<sha>.glb; the harness writes the project (scene + assets) under target and loads via Storage::load_project; variants feed scripts/<sha>.at where <sha> = scene.behavior.source.sha256",
+  "load_verification": "the load path hash-verifies the behavior source and every assets/<sha>.glb against the scene manifest; GLB geometry admission runs in the driver preflight decoder before allocation",
+  "world_sha256": "439ecf7a732bee725aaa839da57b1326c3f8ad43bcf3a0606137ab4f5f7e3be1"
+ }
+}

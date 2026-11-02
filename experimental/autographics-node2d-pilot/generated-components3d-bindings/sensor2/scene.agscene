@@ -1,0 +1,247 @@
+{
+ "behavior": {
+  "api": "autographics.triggers3d/1",
+  "source": {
+   "format": "auto-source",
+   "sha256": "439ecf7a732bee725aaa839da57b1326c3f8ad43bcf3a0606137ab4f5f7e3be1",
+   "byte_length": 3543
+  },
+  "actors": {
+   "two_d": null,
+   "three_d": null
+  }
+ },
+ "schema": "autographics.scene/6",
+ "document_id": "plan030-components-3d-bindings-main",
+ "resources": [
+  "circle",
+  "quad",
+  "cylinder",
+  "player",
+  "mob"
+ ],
+ "groups": [
+
+ ],
+ "objects": [
+  {
+   "id": 1,
+   "name": "pad_a",
+   "kind": "cylinder",
+   "translation": [
+    4.0,
+    0.5,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    0.5,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 2,
+   "name": "pad_b",
+   "kind": "cylinder",
+   "translation": [
+    8.0,
+    0.5,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    0.5,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 3,
+   "name": "Main/pod_a/m1/marker",
+   "kind": "cylinder",
+   "translation": [
+    4.0,
+    1.6,
+    0.0
+   ],
+   "scale": [
+    0.2,
+    0.2,
+    0.2
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 4,
+   "name": "Main/pod_a/m2/marker",
+   "kind": "cylinder",
+   "translation": [
+    4.0,
+    1.6,
+    0.0
+   ],
+   "scale": [
+    0.2,
+    0.2,
+    0.2
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 5,
+   "name": "Main/pod_b/m1/marker",
+   "kind": "cylinder",
+   "translation": [
+    8.0,
+    1.6,
+    0.0
+   ],
+   "scale": [
+    0.2,
+    0.2,
+    0.2
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 6,
+   "name": "Main/pod_b/m2/marker",
+   "kind": "cylinder",
+   "translation": [
+    8.0,
+    1.6,
+    0.0
+   ],
+   "scale": [
+    0.2,
+    0.2,
+    0.2
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 7,
+   "name": "Main/watch/body",
+   "kind": "cylinder",
+   "translation": [
+    0.0,
+    0.5,
+    -4.0
+   ],
+   "scale": [
+    0.4,
+    0.5,
+    0.4
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 8,
+   "name": "Visitor",
+   "kind": "cylinder",
+   "translation": [
+    -30.0,
+    0.5,
+    0.0
+   ],
+   "scale": [
+    0.3,
+    0.3,
+    0.3
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": false,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  }
+ ],
+ "assets": [
+
+ ]
+}

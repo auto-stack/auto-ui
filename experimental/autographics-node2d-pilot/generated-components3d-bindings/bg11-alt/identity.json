@@ -1,0 +1,40 @@
+{
+ "generator": "autographics-node2d-pilot plan030 components-3d-bindings",
+ "api": "autographics.triggers3d/1",
+ "user_source_sha256": "aedc572b745b29ec715cd82b155654a28c1ee9305841cb970f7625463b6d4df8",
+ "user_source_bytes": 6086,
+  "module:coin": "ee7fb754b925c4a72f8cc639ec73fd34b884345bc04d085ba1eabe39fd8faecf",
+  "module:extra": "79c847f4280ebdb90e4251187f614c767fb72d4142d0cbad580f2f031a077257",
+  "module:main": "43fa53b3f8f4bda60eb0da95bc4c52aef1bd91a6f90bf3ed412ba186b19df2e7",
+  "module:player": "bba19f54148e06c012e27df3093b0b2fc95c449e7e24cec5489cbb4b67e7dd09",
+  "module:props": "4f12cc7ce6c8dc17add6cd0bf0f840966845696dc90cbcddcba32cfcd85f342e",
+ "closure": [
+  {"name": "coin", "sha256": "ee7fb754b925c4a72f8cc639ec73fd34b884345bc04d085ba1eabe39fd8faecf", "bytes": 1063},
+  {"name": "extra", "sha256": "79c847f4280ebdb90e4251187f614c767fb72d4142d0cbad580f2f031a077257", "bytes": 2207},
+  {"name": "main", "sha256": "43fa53b3f8f4bda60eb0da95bc4c52aef1bd91a6f90bf3ed412ba186b19df2e7", "bytes": 5303},
+  {"name": "player", "sha256": "bba19f54148e06c012e27df3093b0b2fc95c449e7e24cec5489cbb4b67e7dd09", "bytes": 1046},
+  {"name": "props", "sha256": "4f12cc7ce6c8dc17add6cd0bf0f840966845696dc90cbcddcba32cfcd85f342e", "bytes": 1475}
+ ],
+ "roles": {
+ "scene_rows": {
+  "Beacon": 6,
+  "Main/hero/body": 1,
+  "Saw": 5,
+  "ShardA": 2,
+  "ShardB": 3,
+  "ShardC": 4,
+  "VoidZone": 7,
+  "ground": 0
+ }
+},
+ "assets": [
+
+ ],
+ "provenance": {
+  "product": "bg11-alt",
+  "consumer": "experimental/autographics-auto-driver/tests/node3d_bindings_flow.rs",
+  "consumption": "include_str! frozen scene.agscene + world.at + assets/<sha>.glb; the harness writes the project (scene + assets) under target and loads via Storage::load_project; variants feed scripts/<sha>.at where <sha> = scene.behavior.source.sha256",
+  "load_verification": "the load path hash-verifies the behavior source and every assets/<sha>.glb against the scene manifest; GLB geometry admission runs in the driver preflight decoder before allocation",
+  "world_sha256": "aedc572b745b29ec715cd82b155654a28c1ee9305841cb970f7625463b6d4df8"
+ }
+}

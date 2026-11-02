@@ -1,0 +1,85 @@
+// PLAN-030 sensor2: non-game second finite policy on components-3d-bindings.
+// No collect/score/win/fail business anywhere. Two same-definition Pod
+// parents each forward their own px/tag params down to two same-definition
+// Marker receiver children (nested parent forwarding on typed params); the
+// swept visitor object is spawned through the root's named slot/template
+// symbols and the pads bind through the root's named pair symbols with the
+// visitor handle as the live source. Marker pings climb the ancestor chain
+// (Marker -> Pod -> root) so both Pod parents relay through the same-def
+// receiver under each parent. The read policy is the second finite policy
+// distinct from the g11 ladder: up to two events per tick, no movement
+// coupling (the sweep continues while any pad is unseen).
+use pods: Pod
+use markers: Marker
+use visitor: Visitor
+use sentinel: Sentinel
+
+node Main {
+    model {
+        var vx = 2.0
+        var vdir = 1.0
+        var h = 0
+        var seen_a = 0
+        var seen_b = 0
+        var tally_a = 0
+        var tally_b = 0
+    }
+    msg { Pinged(int) }
+    view-3d {
+        cylinder3d pad_a {
+            position: (4.0, 0.5, 0.0)
+            scale: (1.0, 0.5, 1.0)
+        }
+        cylinder3d pad_b {
+            position: (8.0, 0.5, 0.0)
+            scale: (1.0, 0.5, 1.0)
+        }
+        Pod pod_a {
+            px: 4.0
+            tag: 1
+        }
+        Pod pod_b {
+            px: 8.0
+            tag: 2
+        }
+        Sentinel watch { }
+    }
+    camera3d { distance: 8.0
+              pitch: 45.0
+              projection: perspective }
+    objects3d { visitor }
+    triggers { sense_a, sense_b }
+    on {
+        Life.Start -> {
+            .h = spawn(objects3d.visitor, templates.Visitor, 2.0, 0.5, 0.0)
+            bind(triggers.sense_a, refs.pad_a, aabb, 0.0, .h)
+            bind(triggers.sense_b, refs.pad_b, aabb, 0.0, .h)
+        }
+        Life.Tick(dt) -> {
+            if .seen_a * .seen_b == 0 {
+                object.move(.h, .vx, 0.5, 0.0)
+                .vx = .vx + .vdir * dt
+                let n = event.next()
+                if n == 1 {
+                    let p = event.pair()
+                    if p == triggers.sense_a { .seen_a = 1
+                                pod_a.Sweep(1) }
+                    if p == triggers.sense_b { .seen_b = 1
+                                pod_b.Sweep(2) }
+                    let n1 = event.next()
+                    if n1 == 1 {
+                        let p1 = event.pair()
+                        if p1 == triggers.sense_a { .seen_a = 1
+                                    pod_a.Sweep(1) }
+                        if p1 == triggers.sense_b { .seen_b = 1
+                                    pod_b.Sweep(2) }
+                    }
+                }
+            }
+        }
+        .Pinged(tag) -> {
+            if tag == 1 { .tally_a = .tally_a + 1 }
+            if tag == 2 { .tally_b = .tally_b + 1 }
+        }
+    }
+}

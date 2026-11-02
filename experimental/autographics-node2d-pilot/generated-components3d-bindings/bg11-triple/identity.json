@@ -1,0 +1,40 @@
+{
+ "generator": "autographics-node2d-pilot plan030 components-3d-bindings",
+ "api": "autographics.triggers3d/1",
+ "user_source_sha256": "8556a5dde4812220a946617dfafd8cdc28e52c072256bf09b595f741b5e2cd9b",
+ "user_source_bytes": 6084,
+  "module:coin": "ee7fb754b925c4a72f8cc639ec73fd34b884345bc04d085ba1eabe39fd8faecf",
+  "module:extra": "79c847f4280ebdb90e4251187f614c767fb72d4142d0cbad580f2f031a077257",
+  "module:main": "fc36f3a7cfccb154c27b85716473522982c2177316417dd7b644b3cbd185e2f6",
+  "module:player": "bba19f54148e06c012e27df3093b0b2fc95c449e7e24cec5489cbb4b67e7dd09",
+  "module:props": "4f12cc7ce6c8dc17add6cd0bf0f840966845696dc90cbcddcba32cfcd85f342e",
+ "closure": [
+  {"name": "coin", "sha256": "ee7fb754b925c4a72f8cc639ec73fd34b884345bc04d085ba1eabe39fd8faecf", "bytes": 1063},
+  {"name": "extra", "sha256": "79c847f4280ebdb90e4251187f614c767fb72d4142d0cbad580f2f031a077257", "bytes": 2207},
+  {"name": "main", "sha256": "fc36f3a7cfccb154c27b85716473522982c2177316417dd7b644b3cbd185e2f6", "bytes": 5161},
+  {"name": "player", "sha256": "bba19f54148e06c012e27df3093b0b2fc95c449e7e24cec5489cbb4b67e7dd09", "bytes": 1046},
+  {"name": "props", "sha256": "4f12cc7ce6c8dc17add6cd0bf0f840966845696dc90cbcddcba32cfcd85f342e", "bytes": 1475}
+ ],
+ "roles": {
+ "scene_rows": {
+  "Beacon": 6,
+  "Main/hero/body": 1,
+  "Saw": 5,
+  "ShardA": 2,
+  "ShardB": 3,
+  "ShardC": 4,
+  "VoidZone": 7,
+  "ground": 0
+ }
+},
+ "assets": [
+
+ ],
+ "provenance": {
+  "product": "bg11-triple",
+  "consumer": "unrecorded (this out dir has no registered flow consumer)",
+  "consumption": "include_str! frozen scene.agscene + world.at + assets/<sha>.glb; the harness writes the project (scene + assets) under target and loads via Storage::load_project; variants feed scripts/<sha>.at where <sha> = scene.behavior.source.sha256",
+  "load_verification": "the load path hash-verifies the behavior source and every assets/<sha>.glb against the scene manifest; GLB geometry admission runs in the driver preflight decoder before allocation",
+  "world_sha256": "8556a5dde4812220a946617dfafd8cdc28e52c072256bf09b595f741b5e2cd9b"
+ }
+}

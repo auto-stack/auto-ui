@@ -1,0 +1,33 @@
+{
+ "generator": "autographics-node2d-pilot plan030 components-3d-bindings",
+ "api": "autographics.triggers3d/1",
+ "user_source_sha256": "783dff6f2afd94e3273827520f7dea2b45c382d499f16423167cdf5cb24892af",
+ "user_source_bytes": 2032,
+  "module:main": "4d3936b36813064675fb53ac35690f02531cbffe38c4b127f2ba6c6c079ab1e4",
+  "module:player": "bba19f54148e06c012e27df3093b0b2fc95c449e7e24cec5489cbb4b67e7dd09",
+  "module:probes": "0b3d98e03b8cc93eb17c7c24849d894f2f08b6510a9d35c48d0bdd042c6ce649",
+  "module:props": "c8bb7cd50b802838fe33c32cddcf2109d1a473c023c71de4773fd14a11542239",
+ "closure": [
+  {"name": "main", "sha256": "4d3936b36813064675fb53ac35690f02531cbffe38c4b127f2ba6c6c079ab1e4", "bytes": 1801},
+  {"name": "player", "sha256": "bba19f54148e06c012e27df3093b0b2fc95c449e7e24cec5489cbb4b67e7dd09", "bytes": 1046},
+  {"name": "probes", "sha256": "0b3d98e03b8cc93eb17c7c24849d894f2f08b6510a9d35c48d0bdd042c6ce649", "bytes": 933},
+  {"name": "props", "sha256": "c8bb7cd50b802838fe33c32cddcf2109d1a473c023c71de4773fd14a11542239", "bytes": 280}
+ ],
+ "roles": {
+ "scene_rows": {
+  "Main/hero/body": 1,
+  "VoidZone": 2,
+  "ground": 0
+ }
+},
+ "assets": [
+
+ ],
+ "provenance": {
+  "product": "bg11-geometry",
+  "consumer": "experimental/autographics-auto-driver/tests/node3d_bindings_flow.rs",
+  "consumption": "include_str! frozen scene.agscene + world.at + assets/<sha>.glb; the harness writes the project (scene + assets) under target and loads via Storage::load_project; variants feed scripts/<sha>.at where <sha> = scene.behavior.source.sha256",
+  "load_verification": "the load path hash-verifies the behavior source and every assets/<sha>.glb against the scene manifest; GLB geometry admission runs in the driver preflight decoder before allocation",
+  "world_sha256": "783dff6f2afd94e3273827520f7dea2b45c382d499f16423167cdf5cb24892af"
+ }
+}

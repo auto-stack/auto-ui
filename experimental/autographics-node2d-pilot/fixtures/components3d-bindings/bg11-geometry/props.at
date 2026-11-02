@@ -1,0 +1,7 @@
+// The probe template: parked VoidZone visual row (original geometry values).
+node VoidZone {
+    object3d { }
+    view-3d { cylinder3d void { position: (-30.0, 1.0, -3.0)
+                                visible: false
+                                scale: (1.0, 1.5, 1.0) } }
+}

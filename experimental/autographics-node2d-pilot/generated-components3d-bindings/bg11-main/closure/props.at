@@ -1,0 +1,40 @@
+// The six spawn templates: parked visual rows (declaration order = template
+// document id order). Static scale is the template identity (the three Shard
+// Mob templates are 0.5/0.6/0.7; the material is fixed) — the original G11/3d
+// scene values, including the Saw parked at its patrol baseline height.
+node ShardA {
+    object3d { }
+    view-3d { mob3d shard { position: (-30.0, 1.0, -3.0)
+                            visible: false
+                            scale: (0.5, 0.5, 0.5) } }
+}
+node ShardB {
+    object3d { }
+    view-3d { mob3d shard { position: (-30.0, 1.0, -3.0)
+                            visible: false
+                            scale: (0.6, 0.6, 0.6) } }
+}
+node ShardC {
+    object3d { }
+    view-3d { mob3d shard { position: (-30.0, 1.0, -3.0)
+                            visible: false
+                            scale: (0.7, 0.7, 0.7) } }
+}
+node Saw {
+    object3d { }
+    view-3d { cylinder3d saw { position: (-30.0, 2.4, -3.0)
+                               visible: false
+                               scale: (0.5, 0.5, 0.5) } }
+}
+node Beacon {
+    object3d { }
+    view-3d { cylinder3d beacon { position: (-30.0, 1.0, -3.0)
+                                  visible: false
+                                  scale: (0.5, 1.2, 0.5) } }
+}
+node VoidZone {
+    object3d { }
+    view-3d { cylinder3d void { position: (-30.0, 1.0, -3.0)
+                                visible: false
+                                scale: (1.0, 1.5, 1.0) } }
+}

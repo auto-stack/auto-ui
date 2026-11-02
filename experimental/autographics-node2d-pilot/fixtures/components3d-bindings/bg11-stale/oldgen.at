@@ -1,0 +1,32 @@
+// The oldgen coin: same-slot respawn is a new generation that is never
+// auto-bound; the explicit rebind re-enters it with a fresh enter, and a
+// stale handle operation is a named runtime rejection. Two TemplateRef3D
+// params (the respawn uses a different template into the same slot).
+node OldgenCoin(slot: SlotRef3D, template: TemplateRef3D, pair: PairRef3D, target: ActorRef3D, respawn_template: TemplateRef3D) {
+    model {
+        var h0 = 0
+        var h1 = 0
+    }
+    msg { DespawnNow
+          Respawn
+          RebindNow
+          StaleNow }
+    on {
+        Life.Start -> {
+            .h0 = spawn(.slot, .template, 3.0, 1.0, -3.0)
+            bind(.pair, .target.body, aabb, 0.0, .h0)
+        }
+        .DespawnNow -> {
+            object.despawn(.h0)
+        }
+        .Respawn -> {
+            .h1 = spawn(.slot, .respawn_template, 3.0, 1.0, -3.0)
+        }
+        .RebindNow -> {
+            bind(.pair, .target.body, aabb, 0.0, .h1)
+        }
+        .StaleNow -> {
+            object.move(.h0, 5.0, 1.0, -3.0)
+        }
+    }
+}

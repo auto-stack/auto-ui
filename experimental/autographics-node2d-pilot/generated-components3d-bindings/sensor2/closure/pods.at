@@ -1,0 +1,33 @@
+// The Pod parent: two same-definition instances, each forwarding its own
+// px/tag params down to its two Marker children (nested parent forwarding on
+// typed params — the child binds `.px`/`.tag` from the parent instance
+// scope). Sweep orders from the root ping the pod's own children; marker
+// pings climb the ancestor chain and the pod relays them upward after
+// counting locally (the pod's own relay is local state, not a re-entry).
+node Pod(px: float, tag: int) {
+    model {
+        var relayed = 0
+    }
+    msg { Sweep(int)
+          Pinged(int) }
+    on {
+        .Sweep(which) -> {
+            if which == 1 { m1.Ping(0) }
+            if which == 2 { m2.Ping(0) }
+        }
+        .Pinged(tag_in) -> {
+            .relayed = .relayed + 1
+            emit .Pinged(tag_in)
+        }
+    }
+    view-3d {
+        Marker m1 {
+            x: .px
+            tag: .tag
+        }
+        Marker m2 {
+            x: .px
+            tag: .tag
+        }
+    }
+}

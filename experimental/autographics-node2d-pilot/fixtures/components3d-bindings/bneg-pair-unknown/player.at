@@ -23,7 +23,7 @@ node Player(speed: float, moved_report: msg) {
             let hr = input.held(Right)
             if hr != 0 {
                 refs.body.move3d(hr * camera3d.right_x() * .speed * dt, 0.0, hr * camera3d.right_z() * .speed * dt)
-                emit .moved_report
+                emit .moved_report()
             }
         }
     }

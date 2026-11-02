@@ -1,0 +1,58 @@
+// PLAN-030 bg11-geometry: actor-relative corner/tangent probes on the
+// bindings surface. The character starts at (3.0, 0.5, -3.0) and does not
+// move before the probes arm, so the probe positions are the static
+// equivalents of the original tick-1 world-position reads: corner at
+// +0.9/+0.9 (AABB enters, sphere r=0.5 stays silent), tangent at +0.9/+0.5
+// (closest distance 0.5, enters on exact tangency). One Probe2 object
+// carries both corner pairs (aabb vs sphere on the same runtime object —
+// aabb_and_sphere_are_distinguishable), Probe1 carries the tangent pair.
+use player: Player
+use probes: Probe2, Probe1
+use props: VoidZone
+
+node Main {
+    msg { Moved }
+    view-3d {
+        cylinder3d ground {
+            position: (15.0, -1.1, -3.0)
+            scale: (40.0, 1.0, 2.0)
+            solid: true
+        }
+        Player hero {
+            speed: 2.0
+            moved_report: .Moved
+        }
+        Probe2 corner {
+            slot: objects3d.corner
+            template: templates.VoidZone
+            pa: triggers.corner_aabb
+            pb: triggers.corner_sphere
+            target: refs.hero
+            px: 3.9
+            py: 1.4
+            pz: -3.0
+        }
+        Probe1 tangent {
+            slot: objects3d.tangent
+            template: templates.VoidZone
+            pair: triggers.tangent_sphere
+            target: refs.hero
+            px: 3.9
+            py: 1.0
+            pz: -3.0
+        }
+    }
+    camera3d { distance: 8.0
+              pitch: 45.0
+              projection: perspective }
+    objects3d { corner, tangent }
+    triggers { corner_aabb, corner_sphere, tangent_sphere }
+    on {
+        Life.Tick(dt) -> {
+            let n = event.next()
+            if n == 1 { let p = event.pair() }
+        }
+        .Moved -> {
+        }
+    }
+}

@@ -21,7 +21,7 @@ node Coin(slot: SlotRef3D, template: TemplateRef3D, pair: PairRef3D, target: Act
             if .taken == 0 {
                 .taken = 1
                 object.despawn(.h)
-                emit .on_collected
+                emit .on_collected()
             }
         }
     }
