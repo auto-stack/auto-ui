@@ -357,6 +357,15 @@ fn hash(bytes: &[u8]) -> String {
     agp::renderer::capture::sha256_hex(bytes)
 }
 mod assembly;
+
+/// Test-only view of one profile's assembled trusted bytes (no user input,
+/// no caching). Returns (api_units, entry) so tests can pin composition
+/// boundaries without reaching into the private assembly module.
+#[doc(hidden)]
+pub fn assembled_units_for(api: Api) -> Result<(String, String), String> {
+    let u = assembly::assemble(api)?;
+    Ok((u.api, u.entry))
+}
 /// Shared complete transport units from Builtin6, never copies of its graph logic.
 pub fn bridge() -> String {
     assembly::bridge(SOURCE).expect("trusted transport assembly")
