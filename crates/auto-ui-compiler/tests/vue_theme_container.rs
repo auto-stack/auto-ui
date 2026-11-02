@@ -32,6 +32,40 @@ fn gen_sfc(src: &str) -> String {
     VueGenerator::new().generate(&widget).expect("generate SFC")
 }
 
+/// N-42 覆盖：模板没有任何 `<div`（根为 button）时，不挂 ref/marker，
+/// 运行期回落 document 级——这是 §6 声明的 legacy 分支。
+#[test]
+fn widget_without_div_falls_back_to_document_scope() {
+    let sfc = gen_sfc(
+        r#"
+widget NoDivApp {
+    model {
+        var theme_name str = "Auto"
+    }
+    view {
+        button "only" {
+            style: "px-3 py-1 rounded-lg bg-primary text-primary-foreground"
+        }
+    }
+}
+"#,
+    );
+    // 运行时脚本里始终有 hasAttribute('data-auto-theme-root') 的清理逻辑，
+    // 因此只断言**带值属性**不出现（模板侧未挂 marker）。
+    assert!(
+        !sfc.contains("data-auto-theme-root=\""),
+        "no-<div> template must not emit the container marker:\n{sfc}"
+    );
+    assert!(
+        !sfc.contains("ref=\"__autoThemeRoot\""),
+        "no-<div> template must not emit the container ref:\n{sfc}"
+    );
+    assert!(
+        sfc.contains("document.documentElement"),
+        "document fallback must remain:\n{sfc}"
+    );
+}
+
 fn gen_store(src: &str) -> String {
     let session = CompilerSession::ui();
     let mut parser = Parser::from(src).with_session(session);

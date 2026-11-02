@@ -64,7 +64,7 @@
   `panel`/`card` 是结构容器，携带 class/style 与局部 design。
 - **Vue**：树族经 `window.__AUTO_TREE_THEMES__` 并入 `THEME_PALETTES`；
   `theme_name` watch → `applyTheme` 全量 CSS 变量写（含 app 命名空间色与
-  `radius-*` 尺寸槽），写入目标是**本 App 容器子树**（widget 模板根 ref），
+  `radius-*` 尺寸槽），写入目标是**本 App 容器子树**（生成模板首个 `<div` 上的`__autoThemeRoot` ref；不要求是模板根），
   多 App 同文档互不覆盖；无容器时回落 `documentElement` 的 legacy 行为。
   生成期 `index.css` 的 `:root/.dark` 亦由 App 导入的官方包驱动（见
   [正式主题包与外部消费](official-theme-package.md)），值必须是

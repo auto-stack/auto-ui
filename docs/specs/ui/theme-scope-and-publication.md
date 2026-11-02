@@ -68,7 +68,7 @@
   都读该快照。控件（button/input/textarea/panel 等）与容器消费同一快照；
   `panel`/`card` 是结构容器（携带 class/style 与局部 design），不再落
   unknown fallback 丢样式。
-- **Vue**：vars 写到本 App 容器子树（widget 模板根的 `ref`），不是两个根共享
+- **Vue**：vars 写到本 App 的容器元素（生成模板中**首个 `<div`** 上的`__autoThemeRoot` ref——不要求它是模板根，见 §6），不是两个根共享
   `documentElement`；容器根自身在 dark 模式下也接收 dark 变量组，`__isDark`
   取 html 或容器任一为 dark。无容器/无主题 widget 保持 document 级 legacy。
 - 主题族变量的值对 Tailwind 必须是 `H S% L%` 三段式（`hsl(var(--x))`）；原始
