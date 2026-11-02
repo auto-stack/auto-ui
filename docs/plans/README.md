@@ -35,9 +35,9 @@
 | 029 | [Reader原生输入链与必要接缝收口](029-reader-native-input-and-surface-closure.md) | 026原生GAP与coverage v4后继 | drafting/r1、0/12；真实AutoUI原生VM的选区→.at→保存/冷恢复，IME/几何/系统无障碍、双实例/清理、严格非零汇总与旧门；全部必需门通过后独立上下文review，仅起草、未实施 |
 | 030 | [三维具名引用与跨组件接线收口](archived/030-autographics-node3d-symbolic-component-bindings.md) | 028作者收口/G11-3d前置 | archived/r1，10/10；交付804d7303、Spec SHA6ed0bf07/冻结/清理有记录；review明确同实现会话重建、非独立会话，独立上下文final证据待补，AG013 T-02保留此门，不以归档代通过 |
 | 031 | [主题作用域、原子发布、正式主题包与基础控件收口](031-theme-scope-publication-and-package-closure.md) | 拆分后架构工作包A；接受007/910 | drafting/r1，0/11；R01/R02优先实证修复，App/子树scope与正式themes包、基础控件双端，第二批003/010；后继示例/AutoOS另约；暂不实施 |
-| 032 | [完整2D游戏组合与预算收口](032-autographics-node2d-full-game-composition.md) | M2游戏优先/引擎线 | drafting/r1，0/10；组合020/022/025与对象/触发/新局，原G2九项与最高分支原32内；新有限操作/价目是明确提案，暂不实施 |
+| 032 | [完整2D游戏组合与预算收口](032-autographics-node2d-full-game-composition.md) | M2游戏优先/引擎线 | drafting/r2，0/10；组合020/022/025与对象/触发/新局，原G2九项与最高分支原32内；新有限操作/价目是明确提案，暂不实施 |
 
-当前AG按[三线设计](../design/autographics/m2-game-first-three-lane-roadmap.md)推进：UI032引擎、G2-001完整游戏、AG013 r2 Demo；游戏T-01..04准备可并行，T-05等032实际交付。AG012已交付，Gallery实际16/22，不是M2百分比。3D表现/音画已分片设计，完整3D游戏在2D稳定闭环后交付。
+当前AG按[三线设计](../design/autographics/m2-game-first-three-lane-roadmap.md)推进：UI032引擎、ag-examples/AG014完整游戏（原G2-001）、AG013 r2 Demo；游戏T-01..04准备可并行，T-05等032实际交付。AG012已交付，Gallery实际16/22，不是M2百分比。3D表现/音画已分片设计，完整3D游戏在2D稳定闭环后交付。
 
 024/025/027/028已交付，026/029为Reader路线；030已落主但独立review缺证如上；本轮AG新增032；并行新计划的当前号源以`.next-id`为准，下一份以独占取号时本地活动/归档最大号重核（018分配后已有并行019，勿回退号源）；不能因外仓号882/883跳号。003是Blog路线，004..006是AG表现阶段，007是主题/示例工作包，014是拆分路线结构收口包，018是UI编译配置收口，026是Reader阅读表面跨仓探针；这些合同分别管理。状态以各自合同为准。设计与并行/后继入口见[本仓设计索引](../design/README.md)。
 

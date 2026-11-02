@@ -4,7 +4,7 @@ AG实验代码与实现计划已归本仓；旧canonical Specs与历史设计继
 
 | 专题 | 范围/状态 |
 |---|---|
-| [M2游戏优先三线并行](autographics/m2-game-first-three-lane-roadmap.md) | 2026-11-02 v1；UI032＋独立G2-001＋AG013 r2每批三线；同步规划3D表现/音画，2D稳定闭环后交付完整3D；仅规划 |
+| [M2游戏优先三线并行](autographics/m2-game-first-three-lane-roadmap.md) | 2026-11-02 v2；UI032＋ag-examples/AG014完整游戏＋AG013 r2 Demo每批三线，游戏/Demo同仓分区；同步规划3D表现/音画，2D稳定闭环后交付完整3D；仅规划 |
 | [AG声明与组件作者模型](autographics/declarative-authoring-model.md) | 2026-10-30总体目标回归；AutoUI式声明/组件/绑定/事件，AG-A01..09；六项细节为讨论建议，未实施 |
 | [G11/2d Node完整作者能力](autographics/g11-2d-node-authoring-completion.md) | 017/AG007已实际交付；完整目标草图未全部实现，旧三维及runner裁决边界保留 |
 | [Gallery全量Node作者迁移](autographics/gallery-node-authoring-migration.md) | 当前16/22，剩6；AG012已交付05f1b498，AG013 r2并行准备/完整迁移核030独立review门 |
@@ -21,4 +21,4 @@ AG实验代码与实现计划已归本仓；旧canonical Specs与历史设计继
 | [3D Node基础与通用声音/HUD接线](autographics/node3d-foundation-and-generic-presentation.md) | 024/025/027/028及AG011/012已交付；030落主/独立review证据待补，AG013保原门 |
 | [3D角色/运行相机与Gallery三维迁移](autographics/node3d-runtime-and-gallery-migration.md) | 027已交付f3dea0d，原模型/角色/相机能力供011/012固定消费；原拆分快照保留 |
 | [三维实例/触发/新局与角色相机内容](autographics/node3d-instances-triggers-and-gallery-motion.md) | 028与AG012已实际交付，012固定027；原拆分快照保留，当前三线见新设计 |
-| [三维具名引用与G11迁移](autographics/node3d-symbolic-bindings-and-g11-migration.md) | UI030交付804d7303但独立review证据待补；AG013 r2准备与UI032/G2-001并行，保原25与完整双维包 |
+| [三维具名引用与G11迁移](autographics/node3d-symbolic-bindings-and-g11-migration.md) | UI030交付804d7303但独立review证据待补；AG013 r2准备与UI032/AG014并行，保原25与完整双维包 |

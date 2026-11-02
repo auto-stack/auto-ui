@@ -5,7 +5,7 @@ feature_name: AutoGraphics完整G2精灵对象音画组合与预算收口
 author: [Codex]
 created_at: 2026-11-02
 updated_at: 2026-11-02
-plan_revision: 1
+plan_revision: 2
 current_step: 0
 total_steps: 10
 depends_on: [auto-ui/PLAN-020, auto-ui/PLAN-022, auto-ui/PLAN-025]
@@ -19,9 +19,9 @@ affects: [auto-ui-dialect, autographics-node2d-pilot, autographics-auto-driver]
 
 ## 0. 变更摘要
 
-把020局部组件、022精灵、025通用声音/HUD和对象/触发/新局接入同一普通Node作者链，并证明冻结完整G2/G2-01..09在原32池、VM/资源包络内成立。引擎只做公共服务/作者接线和永久最小夹具，正式游戏在ag-platformer-2d；不再只交一份隔离no_go研究。
+把020局部组件、022精灵、025通用声音/HUD和对象/触发/新局接入同一普通Node作者链，并证明冻结完整G2/G2-01..09在原32池、VM/资源包络内成立。引擎只做公共服务/作者接线和永久最小夹具，正式游戏在ag-examples/games/platformer-2d；不再只交一份隔离no_go研究。
 
-见[三线设计](../design/autographics/m2-game-first-three-lane-roadmap.md)。drafting r1、0/10，暂不实施。本批与[G2-001](../../../ag-platformer-2d/docs/plans/001-autographics-complete-2d-platformer.md)、[AG013 r2](../../../ag-examples/docs/plans/013-autographics-gallery-g11-3d-node-migration.md)并行准备；游戏最终接线等本计划实际交付，不追开发tip。本轮不建实施树/探针/源码/资产、不构建/跑GPU/OS自动化、不创建agent。
+见[三线设计](../design/autographics/m2-game-first-three-lane-roadmap.md)。drafting r2、0/10，暂不实施。本批与[AG014（原G2-001）](../../../ag-examples/docs/plans/014-autographics-complete-2d-platformer.md)、[AG013 r2](../../../ag-examples/docs/plans/013-autographics-gallery-g11-3d-node-migration.md)并行准备；游戏最终接线等本计划实际交付，不追开发tip。本轮不建实施树/探针/源码/资产、不构建/跑GPU/OS自动化、不创建agent。
 
 ## 1. 目标
 
@@ -48,7 +48,7 @@ affects: [auto-ui-dialect, autographics-node2d-pilot, autographics-auto-driver]
 
 ## 4. 需求分析与背景调查
 
-用户2026-11-02批准游戏优先路线及引擎/完整游戏/Demo三线，每批可并行三计划；本轮授权更新设计/路线和规划，不是实施/发布授权。2D引擎、独立游戏与Gallery各持合同，正式游戏不放引擎/ag-examples；3D表现音画在共同设计明确后继支持域，本批不预占号。
+用户2026-11-02批准游戏优先路线及引擎/完整游戏/Demo三线，每批可并行三计划；本轮授权更新设计/路线和规划，不是实施/发布授权。2D引擎、独立游戏与Gallery各持合同，正式游戏放ag-examples/games/platformer-2d，不放引擎；3D表现音画在共同设计明确后继支持域，本批不预占号。用户随后批准游戏和Demo同仓分区，G2-001迁为ag-examples/014；本次r2仅同步归属/引用，引擎范围/预算/验收与任务保持。
 
 观测基线auto-ui ab3910de，规划期间030刚落主804d7303（归档/清理在案）；与2D无功能依赖，其同会话review记录另由AG013核独立门，不自动称独立final。031主题/Runtime有其它owner未提交实现，本轮不触碰。实际开工T-01重绑最新已交付源码/锁与真实owner，不按标题或status推就绪。
 
@@ -99,7 +99,7 @@ jump与每Coin一次声，四请求全部传递，五请求仍具名拒绝不截
 
 ### 5.5 正式游戏对接与交付
 
-T-02冻结引擎接口文档并折Plan，供G2-001独立作者草稿准备；不得传开发tip/未审二进制当固定consumer。T-08..09实际落主/Spec/来源闭合后，游戏T-05才绑定实际交付源/SDK/锁/toolchain/参数/generator/runner hash及模块/资产许可闭包。接口变更仅有新revision和影响清单，不覆盖其他仓实现。
+T-02冻结引擎接口文档并折Plan，供AG014独立游戏作者草稿准备；不得传开发tip/未审二进制当固定consumer。T-08..09实际落主/Spec/来源闭合后，游戏T-05才绑定实际交付源/SDK/锁/toolchain/参数/generator/runner hash及模块/资产许可闭包。接口变更仅有新revision和影响清单，不覆盖其他仓实现。
 
 新profile A→B仅闭包冷再生/真实Run、SaveAs关开、坏件拒绝→精确恢复→再Run、20轮newRun/Stop/churn/owner、同Tick相机/帧/PCM/HUD实测。旧档按真实受影响case验证，不能以保存旧exe冒充永久来源；新canonical只在review/merge后落位。
 
@@ -162,6 +162,10 @@ T-02冻结引擎接口文档并折Plan，供G2-001独立作者草稿准备；不
 2026-11-02 / stage: new / plan_id: auto-ui/PLAN-032 / plan_revision: 1 / outcome: pass（合同可审阅移交；A/B可行性、尤其新批操作价目是公开提案，不是已批准实现/独立final） / next: 用户启动后work T-01/T-02。0/10。三线授权仅规划；已有底层组合和022/025边界已核，旧no_go不外推，新G2未通过。本轮无实施树/源码/资产/探针/提案Spec/构建/GPU或agent。
 
 2026-11-02三线规划静态预检：三合同均0..10节、10T/9AC/6V-S/1SD，work6/review1/merge3、drafting0/10与阶段门一致；AG013原25名及顺序逐字保持，G2原九项/原几何与预算不减。241个当前管理文档本地链接经核（含历史归档定位修正）；本轮新增引用无断链。活动/归档编号唯一，UI next033（031为其他owner已保留号）、AG next014、游戏next002。metadata实际生成路径16/22，`python tools/gallery.py validate --all`退出0、12逻辑项/22入口/许可一致；022/025/030 canonical SHA与引用一致。未创建三计划实施树、提案canonical Spec、游戏源/素材/探针/构建/GPU/agent。以上仅规划/目录验证，不是实际新链可行性go、游戏运行验收或独立final。
+
+2026-11-02 / stage: new / plan_id: auto-ui/PLAN-032 / plan_revision: 2 / outcome: pass（归属/引用修订；暂不实施） / next: 用户启动后work T-01/T-02。正式游戏现为ag-examples/PLAN-014 r2、games/platformer-2d独立工程；原G2-001退为指引。032原10T/9AC/6V-S/1SD、原预算/新操作提案、引擎与游戏交付门不变，仅同步作者合同归属；旧r1预检号源/两仓口径保历史。本轮未实施或构建，不接管AG013/主题WIP。
+
+2026-11-02迁移静态预检：ag-examples独占核活动/archived/archive编号后分配014，next015；原G2-001移出后仅留指引/历史，无第二套活动frontmatter。AG014 r2与UI032 r2均0..10节、10T/9AC/6V-S/1SD、drafting0/10；AG014§5.2原关卡/九项规则与§5.3原资源/预算对照源提交逐字一致。239个当前管理文档本地链接可解析；`python tools/gallery.py validate --all`退出0，12逻辑项/22入口/许可一致；本轮各仓白名单diff空白检查通过。AG013在途合同/实现未编辑；未创建游戏实现目录/新实施树/提案canonical Spec/源码/素材/探针，无构建/GPU/agent。以上是迁移规划与目录验证，不是新游戏运行或独立final证据。
 
 ## 10. 待澄清事项
 
