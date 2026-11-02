@@ -171,6 +171,8 @@ T-02冻结引擎接口文档并折Plan，供AG014独立游戏作者草稿准备�
 
 2026-11-02 / stage: goal | plan_id: PLAN-032 | plan_revision: r2 | round: 2 | from: review | to: merge | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-032/auto-ui | commit: c98aeec7 | next: merge
 
+2026-11-02 / stage: goal | plan_id: PLAN-032 | plan_revision: r2 | round: 3 | from: merge | to: done | status: archived | outcome: pass | worktree: 已删（D:/autostack/.wt/ui-032/ 组清空） | commit: 交付 a8c04d22（master tip，线性史）；docs收尾 570c7738 | final: PLAN-032 r2 交付完成——canonical docs/specs/auto-graphics/node2d-full-game-composition.md（ffbb5752…）在主；归档 docs/plans/archived/ 同名文件（archived，10/10）；worktree/分支/依赖树/组目录/plan-artifacts scope 全部删除（registry: deleted-at-merge，无 holds）；无遗留 merge-owned 门
+
 2026-11-02 merge consolidation receipt (PLAN-032:r2)：
 - prepared：reviewed基线c98aeec7（base 816b8801，auto-lang 835816fa3，SD候选已随T-05提交）；master前移至771dd10d（029文档、零文件重叠）
 - landed：rebase到master后range-diff 5/5全等（c98aeec7→a8c04d22映射：fdf013b0→a208d215、7b9816f5→d4494027、c98aeec7→a8c04d22）；git merge --ff-only落主，master tip=a8c04d221f9e3b25a38cc7885a747a67c0960e09（无merge commit）
