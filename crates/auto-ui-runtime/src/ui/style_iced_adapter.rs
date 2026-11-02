@@ -91,6 +91,8 @@ pub struct IcedStyle {
     // Colors (L1)
     pub background_color: Option<iced::Color>,
     pub text_color: Option<iced::Color>,
+    /// PLAN-031 T-05：输入控件 placeholder 颜色（局部 design 槽产出）。
+    pub placeholder_color: Option<iced::Color>,
     pub gradient_dir: Option<crate::ui::style::class::GradientDir>,
     pub gradient_from: Option<iced::Color>,
     pub gradient_to: Option<iced::Color>,
@@ -386,6 +388,7 @@ impl IcedStyle {
             gap_y: None,
             background_color: None,
             text_color: None,
+            placeholder_color: None,
             gradient_dir: None,
             gradient_from: None,
             gradient_to: None,
@@ -741,6 +744,9 @@ impl IcedStyle {
             }
             StyleClass::TextColor(color) => {
                 self.text_color = Some(convert_color(color));
+            }
+            StyleClass::PlaceholderColor(color) => {
+                self.placeholder_color = Some(convert_color(color));
             }
             StyleClass::BgGradient(dir) => {
                 self.gradient_dir = Some(*dir);

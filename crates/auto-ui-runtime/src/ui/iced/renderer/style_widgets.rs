@@ -2222,11 +2222,13 @@ pub(super) fn build_input_shape<M: Clone + Debug + 'static>(
             .map(|(r, g, b)| iced::Color::from_rgb8(r, g, b))
             .unwrap_or(iced::Color::WHITE)
         });
-        let placeholder_color = crate::ui::style_iced_adapter::resolve_semantic_rgb(
-            &crate::ui::style::Color::OnSurface,
-        )
-        .map(|(r, g, b)| iced::Color::from_rgb8(r, g, b))
-        .unwrap_or(iced::Color::from_rgba(0.6, 0.6, 0.6, 0.7));
+        // PLAN-031 T-05：局部 `design { placeholder: … }` 直接给出 placeholder
+        // 颜色；未声明时沿用主题 OnSurface 语义（legacy 行为不变）。
+        let placeholder_color = iced_style.placeholder_color.unwrap_or_else(|| {
+            crate::ui::style_iced_adapter::resolve_semantic_rgb(&crate::ui::style::Color::OnSurface)
+                .map(|(r, g, b)| iced::Color::from_rgb8(r, g, b))
+                .unwrap_or(iced::Color::from_rgba(0.6, 0.6, 0.6, 0.7))
+        });
 
         let focus_border_color =
             crate::ui::style_iced_adapter::resolve_semantic_rgb(&crate::ui::style::Color::Primary)

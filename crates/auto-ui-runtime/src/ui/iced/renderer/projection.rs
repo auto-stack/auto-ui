@@ -1354,8 +1354,16 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                         if let Some(fs) = effective_font_size(&is) {
                             editor = editor.size(fs);
                         }
-                        if is.text_color.is_some() {
-                            let mut value_color = is.text_color.unwrap();
+                        // PLAN-031 T-05：placeholder 槽独立生效——只声明
+                        // placeholder（无 text 色）也要装样式闭包。
+                        if is.text_color.is_some() || is.placeholder_color.is_some() {
+                            let mut value_color = is.text_color.unwrap_or_else(|| {
+                                crate::ui::style::theme::resolve_semantic_rgb(
+                                    &crate::ui::style::Color::OnBackground,
+                                )
+                                .map(|(r, g, b)| iced::Color::from_rgb8(r, g, b))
+                                .unwrap_or(iced::Color::WHITE)
+                            });
                             // PLAN-051 P2: 全透明 value 色(如 musk composer 的
                             // text-transparent+backdrop 叠加技法)在 VM 侧回退为可见
                             // 前景——VM 无 backdrop 渲染层,透明即"输入成功但不可视"。
@@ -1368,11 +1376,14 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                                 .unwrap_or(iced::Color::WHITE);
                             }
                             let value_color = value_color;
+                            let placeholder_color = is
+                                .placeholder_color
+                                .unwrap_or(iced::Color::from_rgba(0.55, 0.58, 0.65, 0.7));
                             editor = editor.style(move |_theme, _status| {
                                 iced::widget::text_editor::Style {
                                     background: iced::Background::Color(iced::Color::TRANSPARENT),
                                     border: iced::Border::default(),
-                                    placeholder: iced::Color::from_rgba(0.55, 0.58, 0.65, 0.7),
+                                    placeholder: placeholder_color,
                                     value: value_color,
                                     selection: iced::Color::from_rgba(0.3, 0.5, 0.9, 0.35),
                                 }

@@ -341,24 +341,36 @@ impl<'a> AuraViewBuilder<'a> {
         // PLAN-031 T-03（V-04）：元素级 `design:` 局部作用域的**本元素**合成
         // 值（祖先未覆盖字段继承 + 本元素覆盖）；无 design 的元素不应用任何
         // 局部值。槽引用在消费时按当前 scope 主题+模式解析，字面量原样生效。
-        if let Some(frame) = self.current_design_frame() {
-            let extra = apply_design_values(&frame, bindings);
-            if !extra.is_empty() {
-                let base = style.take().unwrap_or_else(|| Style {
-                    classes: Vec::new(),
-                    hover_classes: Vec::new(),
-                    variant_classes: Vec::new(),
-                });
-                style = Some(merge_design_classes(base, extra));
-            }
+        self.merge_current_design(style, bindings)
+    }
+
+    /// 把**本元素**声明的 design 合成值并入已有样式（无声明原样返回）。
+    /// 供不走 `extract_style_with` 的控件臂（input/textarea 的 preset 路径）
+    /// 复用，保证 `design { placeholder/radius/... }` 在控件上同样生效。
+    pub(super) fn merge_current_design(
+        &self,
+        style: Option<Style>,
+        bindings: &Bindings,
+    ) -> Option<Style> {
+        let Some(frame) = self.current_design_frame() else {
+            return style;
+        };
+        let extra = apply_design_values(&frame, bindings);
+        if extra.is_empty() {
+            return style;
         }
-        style
+        let base = style.unwrap_or_else(|| Style {
+            classes: Vec::new(),
+            hover_classes: Vec::new(),
+            variant_classes: Vec::new(),
+        });
+        Some(merge_design_classes(base, extra))
     }
 }
 
 /// PLAN-031 T-03/T-05：design 合成 frame → 结构类。
 ///
-/// 支持面（§5.3 冻结）：`radius` 长度 + 颜色槽 `background`/`foreground`/
+/// 支持面（§5.3 冻结）：`radius` 长度 + 颜色槽 `background`/`foreground`/`placeholder`/
 /// `border`/`ring`（focus 环）。未在支持面内的槽只跳过该槽并给可定位诊断，
 /// 父级有效值保持（失败保旧有效子树）——不静默吞掉，也不擅自扩成通用
 /// 样式语言。
@@ -417,6 +429,11 @@ fn apply_design_values(
                     out.push(StyleClass::BorderColor(c));
                 }
             }
+            "placeholder" | "placeholder-color" => {
+                if let Some(c) = color("placeholder") {
+                    out.push(StyleClass::PlaceholderColor(c));
+                }
+            }
             "ring" | "focus-ring" | "focus_ring" => {
                 if let Some(c) = color("ring") {
                     out.push(StyleClass::RingColor(c));
@@ -427,7 +444,7 @@ fn apply_design_values(
             other => {
                 eprintln!(
                     "[PLAN-031] design 槽 `{other}` 在冻结支持面外（radius/background/\
-                     foreground/border/ring）"
+                     foreground/border/ring/placeholder）"
                 )
             }
         }
@@ -496,12 +513,16 @@ fn merge_design_classes(
     let has_ring = extra
         .iter()
         .any(|c| matches!(c, StyleClass::RingColor(_)));
+    let has_placeholder = extra
+        .iter()
+        .any(|c| matches!(c, StyleClass::PlaceholderColor(_)));
     base.classes.retain(|c| match c {
         StyleClass::RoundedT(_) | StyleClass::RoundedB(_) => !has_radius,
         StyleClass::BackgroundColor(_) => !has_bg,
         StyleClass::TextColor(_) => !has_fg,
         StyleClass::BorderColor(_) => !has_border,
         StyleClass::RingColor(_) => !has_ring,
+        StyleClass::PlaceholderColor(_) => !has_placeholder,
         _ => true,
     });
     base.classes.extend(extra);

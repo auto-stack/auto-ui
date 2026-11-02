@@ -99,13 +99,16 @@ widget App {
             }
 
             // 错误态用语义色（005 同款 text-destructive 家族的 border 版）。
+            // PLAN-031 T-05：placeholder 槽由本元素 design 声明（§5.3 冻结面）。
             input (value: .name) {
                 placeholder: "name"
+                design: { placeholder: "#ff0000" }
                 style: "rounded-md border border-destructive bg-background text-foreground"
             }
 
             textarea (value: .note) {
                 placeholder: "note"
+                design: { placeholder: "#00ff00" }
                 style: "rounded-md border border-border bg-input text-foreground"
             }
         }
@@ -331,6 +334,27 @@ fn input_and_textarea_states_use_scope_semantics() {
                         .any(|c| matches!(c, StyleClass::RoundedMd)),
                     "input 的 rounded-md 必须保留，实际 {:?}",
                     s.classes
+                );
+                // PLAN-031 T-05：本元素 design 的 placeholder 槽 → 样式类，
+                // 并经 IcedStyle 落到 text_input 的 placeholder 通道。
+                assert!(
+                    s.classes.iter().any(|c| matches!(
+                        c,
+                        StyleClass::PlaceholderColor(Color::Rgba {
+                            r: 255,
+                            g: 0,
+                            b: 0,
+                            ..
+                        })
+                    )),
+                    "input 的 design.placeholder 必须产出 PlaceholderColor，实际 {:?}",
+                    s.classes
+                );
+                let iced =
+                    auto_ui_runtime::ui::style::IcedStyle::from_style(s);
+                assert!(
+                    iced.placeholder_color.is_some(),
+                    "IcedStyle 必须消费 placeholder 颜色"
                 );
                 input_checked = true;
             }

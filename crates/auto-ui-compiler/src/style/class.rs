@@ -205,6 +205,12 @@ pub enum StyleClass {
     /// Text color: text-{color}
     TextColor(Color),
 
+    /// PLAN-031 T-05（§5.3/§5.4）：输入类控件的 placeholder 颜色。
+    /// 只由局部 `design { placeholder: … }` 槽产出（未引入 Tailwind
+    /// `placeholder:text-*` 第二种写法）；iced 侧经 text_input 的 placeholder
+    /// 通道消费，Vue 侧走同一 CSS 变量面。
+    PlaceholderColor(Color),
+
     // ========== Layout (L1 Core + L2) ==========
     /// Flex container
     Flex,

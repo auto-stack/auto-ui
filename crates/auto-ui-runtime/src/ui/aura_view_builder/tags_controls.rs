@@ -554,7 +554,8 @@ impl<'a> AuraViewBuilder<'a> {
             Some(c) => format!("{} {} {}", base, preset, c),
             None => format!("{} {}", base, preset),
         };
-        let style = Style::parse(&merged).ok();
+        // PLAN-031 T-05：本元素 design（placeholder/radius 等）并入控件 preset。
+        let style = self.merge_current_design(Style::parse(&merged).ok(), bindings);
         // 子元素 → Row(水平),对齐 vue Badge 的 inline-flex(items-center 居中)。
         // Plan 438 M2: badge (text: "…", variant: "…") 形态——text prop 是
         // gallery/应用的主流通法,此前只认 children,prop 形态渲染为空 Row。
@@ -612,7 +613,8 @@ impl<'a> AuraViewBuilder<'a> {
             None => default_preset.to_string(),
             Some(c) => format!("{} {}", default_preset, c),
         };
-        let style = Style::parse(&merged).ok();
+        // PLAN-031 T-05：本元素 design（placeholder/radius 等）并入控件 preset。
+        let style = self.merge_current_design(Style::parse(&merged).ok(), bindings);
         let width = self.extract_u16(props, "width");
         let password = self.extract_bool(props, "password").unwrap_or(false)
             || self.extract_string(props, "type").as_deref() == Some("password");
@@ -936,7 +938,7 @@ impl<'a> AuraViewBuilder<'a> {
             None => default_ta_preset.to_string(),
             Some(c) => format!("{} {}", default_ta_preset, c),
         };
-        let style = Style::parse(&merged_ta).ok();
+        let style = self.merge_current_design(Style::parse(&merged_ta).ok(), bindings);
         let height = self.extract_u16(props, "height");
 
         let on_change = aura_events_get_base(events, "onchange")
