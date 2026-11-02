@@ -77,8 +77,8 @@
   `__designTheme`（`computed`），首帧与自动应用点优先读它；`theme_name` 作为
   兼容别名在其后兜底，两者皆空才回落 localStorage/scaffold。投影支持面为字符串
   字面量与单字段引用（prop → `props.X`，state → `X.value`），其余形态回落别名。
-  发射门：该投影随主题运行时一起注入，要求 widget 同时声明 `theme_name` 或
-  `accent_color`；仅声明 design 的 widget 当前不发射运行时（见 §6 边界）。
+  发射门：该投影随主题运行时一起注入，要求 widget 声明 `theme_name` 或
+  `accent_color` 之一；仅声明 design 的 widget 当前不发射运行时（见 §6 边界）。
 
 ## 6. 生命周期、释放与边界（C-06）
 
@@ -96,10 +96,11 @@
     即不挂 `on_change`/`on_submit`（textarea 连 `onkeydown.*` 也不挂），
     **禁用不派发**。视觉上 Input 另做值/占位降透明；Textarea 目前只保证不派发，
     没有降透明表面（如实边界）。
-  - 多 App/多实例同文档：**模板根为元素（含 `<div`）**的带主题 widget 各自挂
-    `__autoThemeRoot` 与 `data-auto-theme-root`，容器变量按实例隔离，子根 vars
-    不受父容器清理/暗色覆盖；组件根/Fragment 无根元素时回落 document 级
-    （具名 legacy 边界）。
+  - 多 App/多实例同文档：生成模板中**含 `<div`** 时，**第一个 `<div`** 挂
+    `__autoThemeRoot` 与 `data-auto-theme-root`——不要求它是模板根；组件根渲染出
+    内层 div 时 marker 落在该后代 div 上。模板不含 `<div`（如根为 `<button>`/
+    `<span>`/纯文本）则回落 document 级（具名 legacy 边界）。容器变量据此按实例
+    隔离：子根 vars 不受父容器清理、dark pass 与 accent pass 影响。
     真实双实例 DOM 证据见 PLAN-031 的 V-03 腿（Auto/Solarized 各自持值、切换互不串写）。
 
 ## 7. 验收锚点
