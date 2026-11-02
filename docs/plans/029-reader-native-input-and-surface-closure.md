@@ -304,6 +304,21 @@ Reader旧门入口保持 `python tests/basic/verify_standalone.py --profile vue|
 - 当前事实为静态源码/Spec核查，尚无新构建/窗口/实测/独立review；不能从本文推导原生已通过。UI原有未跟踪设计、028草案与共享号源WIP保持，Reader号源007未变。
 - 起草自检：0～10节、12任务/12AC/12必需用例编号完整，029活动/归档区唯一，Reader号源未变；本次8份文档的114个本地引用已核，新改链接有效，UI README原有9个旧失效引用保持不动；git diff --check通过。此项只证明草案结构，不是运行或验收通过。
 
+### 2026-11-02：work阶段——T-08续/T-09准备：N-01门建成全绿 + N-12门建成 + N-04诊断收敛（开放项见§10）
+
+- stage: work | plan_id: PLAN-029 | plan_revision: r1 | task: T-04续/T-09准备 | outcome: partial（N-01 全绿、N-12 门面建成（vm旧门27/27含R-05/修复后R-06vm；vue-chain腿被§10 0d回归阻塞）、N-04 诊断收敛仍开放；多处门健壮性修复）| worktree: .wt/ui-029@98633fd4（无改）| reader: main@c962c86 | next: work（vue分页回归专轮 + N-04收口 + T-09冻结跑）。
+- **N-01 双通道输入对照门（新建成，dry3 全绿）**：CDP 输入管线（Input 域真实鼠标，非 JS 代选）与系统 SendInput 同文档同句各自完成目标句拖选——cdp-input PASS（sel='🦊：琥珀色的狐狸跃过懒狗'）、hit-guard PASS（有界重试抗活桌面瞬时遮盖：dry2 CASCADIA 终端曾盖住拖选点）、foreground PASS、sys-input PASS、pair PASS；自持 CDP 连接（复用 _cdp_engine_page@9333，修复了复用已关 playwright 的崩溃）。
+- **N-12 旧门聚合腿（新建成）**：vue profile=自身臂最坏推导镜像；vm profile=隔离 out-dir 重跑 driver_vue + R-05 直连入口具名快检（PASS=22 exit0）+ verify_standalone 两端完整跑。dry3 实测：**standalone-vm 27/27 全绿（含 R-05 与 --no-regen 修复后的 R-06vm——T-08 修复在真实门内闭合）**；standalone-vue 28 查 1 FAIL（R-01 vite 单发探测冷启动误判，已改 60s 有界轮询）。
+- **N-04 诊断收敛（仍开放）**：焦点归还重排序（捕获冲刷在 SetFocus 之前）后 OS 层全证实（fg/焦点/hit/弹窗矩形，见§10 0c），组件级焦点仍不回；Tab 恢复无效。dry3 另证真实输入腿有活桌面抖动（ime-commit 本轮 FAIL、相邻轮 PASS）。
+- **Vue 分页回归（新发现，§10 0d）**：三次隔离复现同签名（spine=3 挂载、巨列 15625px、目标句 page-x≈12875 视口外、0 locator POST）；机制=next() 列位移失效 + 驱动相交守卫缺失败分支。
+- **vue 轨 N-05/N-11 腿（新建成，随回归修复后验证）**：字体重排/翻页/遮挡（像素三段）/隐藏展示后真实拖选 + 磁盘变异红→落点异位→字节还原绿。
+- 证据：plan-artifacts/plan-029/t08-n04fix{,-console.log}、t09-dry{1,2,3}{,-console.log}/、t09-vueiso/、t09-vuediag{,2,3}/、t09-corpuscheck/（语料 sha 与 manifest 一致=d973dad8，排除语料漂移）。
+- 下一任务：work——vue 分页回归定位修复 → N-04 收口（UI 侧插桩或人工配对协议）→ T-09 冻结全清单两 profile + 旧门（需空闲桌面 + 用户协助 DPI 交互腿）。
+
+### 2026-11-02：goal回合（T-08续轮）
+
+- stage: goal | plan_id: PLAN-029 | plan_revision: r1 | round: 6 | from: work | to: work | status: executing | outcome: partial(N-01全绿/N-12门建成/N-04与vue链开放) | worktree: D:/autostack/.wt/ui-029/auto-ui | commit: reader c962c86 | next: work。
+
 ### 2026-11-02：work阶段——T-08 R-05/R-06vm复现定责与修复（AC-09）
 
 - stage: work | plan_id: PLAN-029 | plan_revision: r1 | task: T-08 | outcome: pass（R-05当前cohort不复现=工具链已在cohort内交付修复；R-06vm复现→reader门修复→负控非零+对照绿）| worktree: .wt/ui-029@98633fd4（无改）| reader: main@6887ed0 | next: T-09。
@@ -320,6 +335,12 @@ Reader旧门入口保持 `python tests/basic/verify_standalone.py --profile vue|
 - stage: goal | plan_id: PLAN-029 | plan_revision: r1 | round: 5 | from: work | to: work | status: executing | outcome: pass(T-08) | worktree: D:/autostack/.wt/ui-029/auto-ui | commit: reader 6887ed0 | next: work(T-09)。
 
 ## 10. 待澄清事项
+
+### 2026-11-02（T-08续/T-09准备轮登记）
+
+0c. **N-04.focus-roundtrip（开放，诊断收敛）**：本轮把 OS 层证据链补齐——重排序后实测 fg=主窗、OS 焦点=主窗（AttachThreadInput+SetFocus 在最后一次表面点击之后）、WindowFromPoint(输入点)=winit 主窗类 "Window Class"、弹出窗矩形 (145,486,1696,840) 不覆盖输入点 (787,348)——即点击确实抵达 iced 主窗，但表面拖选发生后输入值恒不变；真实键盘 Tab（iced 默认无 Tab 焦点循环）亦无效。结论：iced 组件级焦点不随 OS 焦点恢复，且表面交互后真实点击不再聚焦输入 widget。剩余修法二选一：①UI 侧（worktree）对输入焦点路径插桩定位；②按本节第 1 条既定协议以「CDP 焦点断言 + 人工目击配对」补证。另：N-04 各真实输入腿在活桌面上有 run-to-run 抖动（dry3 ime-commit FAIL、相邻轮 PASS；dry2 表面点被 CASCADIA 终端瞬时遮盖）——真实输入门的度量需要空闲桌面窗口。
+0d. **Vue 既有链分页回归（新发现，阻塞 N-12.vue-chain）**：当前 regen 前端+资产下，vue 轨 ch1 以单一巨列渲染（iframe innerWidth=15625px），目标句第2处落 page-x≈12875（视口外，elementFromPoint=null），renderer.next() 不再移动可见列；驱动相交循环对「永不相交」的 box 不报错而是以负宽插值算出垃圾拖选坐标 → 0 locator POST（T-01 同代码同语料为真拖选+1 POST）。机制=分页 transform 位移行为变化 + 驱动相交守卫缺「永不相交」失败分支。owner=reader 探针驱动/前端组合，需专轮定位（vendored foliate 分页 vs regen 前端）后修；修复前 N-12.vue-chain 与 vue 轨 N-02 拖选腿不能记通过。
+0e. **本轮随手闭合项**：N-03 旧记录基线改在 N-01 双通道之后重新静默冻结（合法增长曾被误判）；T-05 门单腿失败不再级联早退（dry3 N-06 曾被跳过成 missing）；N-12 门加 17825/17827 端口静默屏障（busy 回退链竞态实证）；verify_standalone 门内 verify_standalone 路径修正 + R-01 vite 单发探测改有界轮询（冷启动误判）。standalone-vm 旧门 27/27 全绿（含 R-05 与修复后 R-06vm）= T-08 修复在真实门内闭合。
 
 ### 2026-11-02（work 执行中登记）
 
