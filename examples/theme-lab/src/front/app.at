@@ -24,7 +24,12 @@ widget App {
     }
 
     view {
+        // PLAN-031 T-06：根容器自绘本 App 表面（与 010/003 同形）——多 App 同文档时
+        // html 级变量不归单个 App，页面背景必须由容器承担，否则 dark 模式下露白底。
         col {
+            // 本 App 表面（bg/前景）：多 App 同文档时 html 级变量不归单个 App，
+            // 容器自绘才能让 dark 模式与切换后的族色真正显示在页面上。
+            style: "w-full min-h-screen bg-background text-foreground p-2 gap-2"
             text `Theme Lab — ${.theme_name}` {
                 style: "text-xl font-bold text-foreground"
             }
