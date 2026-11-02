@@ -15,6 +15,9 @@ impl<'a> AuraViewBuilder<'a> {
         children: &[AuraNode],
         bindings: &Bindings,
     ) -> View<DynamicMessage> {
+        // PLAN-031 T-03（V-04）：进入本元素 design 作用域（子树转换期间生效，
+        // 返回时 Drop 恢复；兄弟/嵌套不串）。
+        let _design_scope = self.enter_element_design(props);
         let view = self.convert_element_inner(tag, props, events, children, bindings);
         self.maybe_wrap_scroll_anchor(view, props, bindings)
     }

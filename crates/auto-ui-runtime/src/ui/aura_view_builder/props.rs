@@ -3,6 +3,80 @@
 //! 纯 impl 代码移动；方法可见性按跨模块调用需要提升。
 use super::*;
 
+/// PLAN-031 T-03（V-04）：元素 design 帧 guard——Drop 弹出本元素 frame；
+/// 嵌套构建、转换失败与兄弟分支都恢复上一作用域。
+pub(super) struct DesignScopeGuard<'a> {
+    frames: &'a RefCell<
+        Vec<Option<std::collections::BTreeMap<String, auto_lang_core::ast::Expr>>>,
+    >,
+}
+
+impl Drop for DesignScopeGuard<'_> {
+    fn drop(&mut self) {
+        self.frames.borrow_mut().pop();
+    }
+}
+
+impl<'a> AuraViewBuilder<'a> {
+    /// 进入一个元素：带 `design:` 对象则合成（最近祖先 frame + 本元素同路径
+    /// 覆盖）并入栈；无 design 压入 None——祖先局部值不会绘制到未声明的子件，
+    /// 兄弟/另一实例各持自己的 frame（V-04）。
+    pub(super) fn enter_element_design(
+        &self,
+        props: &HashMap<String, AuraPropValue>,
+    ) -> DesignScopeGuard<'_> {
+        use auto_lang_core::ast::Expr;
+        let own: Option<Vec<(String, Expr)>> = match props.get("design") {
+            Some(AuraPropValue::Expr(Expr::Object(pairs))) => Some(
+                pairs
+                    .iter()
+                    .map(|p| (Self::design_key_text(&p.key), p.value.as_ref().clone()))
+                    .collect(),
+            ),
+            Some(_) => {
+                eprintln!("[PLAN-031] design 必须是对象字面量——本元素局部设计跳过");
+                None
+            }
+            None => None,
+        };
+        let frame = own.map(|pairs| {
+            let mut base: std::collections::BTreeMap<String, Expr> = self
+                .design_frames
+                .borrow()
+                .iter()
+                .rev()
+                .find_map(|f| f.clone())
+                .unwrap_or_default();
+            for (k, v) in pairs {
+                base.insert(k, v);
+            }
+            base
+        });
+        self.design_frames.borrow_mut().push(frame);
+        DesignScopeGuard {
+            frames: &self.design_frames,
+        }
+    }
+
+    /// design 对象键 → 槽名（AST Key 的 Display 带 `(name …)` 包装，不能直接用）。
+fn design_key_text(key: &auto_parser_api::ast::Key) -> String {
+    use auto_parser_api::ast::Key;
+    match key {
+        Key::NamedKey(name) => name.to_string(),
+        Key::StrKey(s) => s.to_string(),
+        Key::IntKey(i) => i.to_string(),
+        Key::BoolKey(b) => b.to_string(),
+    }
+}
+
+/// 本元素（且仅本元素声明了 design）的合成 frame；未声明返回 None。
+    pub(super) fn current_design_frame(
+        &self,
+    ) -> Option<std::collections::BTreeMap<String, auto_lang_core::ast::Expr>> {
+        self.design_frames.borrow().last().cloned().flatten()
+    }
+}
+
 impl<'a> AuraViewBuilder<'a> {
     pub(super) fn extract_string(&self, props: &HashMap<String, AuraPropValue>, key: &str) -> Option<String> {
         self.extract_string_with(props, key, &Bindings::new())
@@ -264,12 +338,11 @@ impl<'a> AuraViewBuilder<'a> {
             .or_else(|| self.extract_string_with(props, "style", bindings))
             .and_then(|s| Style::parse(&s).ok())
             .or_else(|| self.extract_style(props));
-        // PLAN-007 T-05（C-08/09）：元素级 `design: { radius: ..., background: ... }`
-        // 局部差异——槽引用（tokens.* 点链）按当前主题+模式解析，直接字面值
-        // 原样生效。落点 = 本元素 Style 追加结构类；只影响本元素（实例隔离），
-        // 解析失败给诊断并跳过该槽（旧有效样式保留，C-11）。
-        if let Some(design_prop) = props.get("design") {
-            let extra = apply_design_object(design_prop, bindings);
+        // PLAN-031 T-03（V-04）：元素级 `design:` 局部作用域的**本元素**合成
+        // 值（祖先未覆盖字段继承 + 本元素覆盖）；无 design 的元素不应用任何
+        // 局部值。槽引用在消费时按当前 scope 主题+模式解析，字面量原样生效。
+        if let Some(frame) = self.current_design_frame() {
+            let extra = apply_design_values(&frame, bindings);
             if !extra.is_empty() {
                 let base = style.take().unwrap_or_else(|| Style {
                     classes: Vec::new(),
@@ -283,28 +356,19 @@ impl<'a> AuraViewBuilder<'a> {
     }
 }
 
-/// PLAN-007 T-05：design 对象 → 结构类追加（radius/background 两槽，试点面）。
-fn apply_design_object(
-    value: &AuraPropValue,
+/// PLAN-031 T-03：design 合成 frame → 结构类（本包支持 radius/background 两槽；
+/// 其余槽由 T-05 控件表面阶段扩展）。非法/未知槽只跳过该槽并给可定位诊断，
+/// 父级有效值保持（失败保旧有效子树）。
+fn apply_design_values(
+    frame: &std::collections::BTreeMap<String, auto_lang_core::ast::Expr>,
     bindings: &Bindings,
 ) -> Vec<auto_ui_compiler::style::class::StyleClass> {
     use auto_ui_compiler::style::class::{RoundedSize, StyleClass};
-    let expr = match value {
-        AuraPropValue::Expr(e) => e,
-        _ => return Vec::new(),
-    };
-    let pairs = match expr {
-        auto_lang_core::ast::Expr::Object(pairs) => pairs,
-        _ => return Vec::new(),
-    };
     let mut out = Vec::new();
-    for pair in pairs {
-        let key = format!("{}", pair.key);
-        let resolved = resolve_design_value(&pair.value, bindings);
+    for (key, expr) in frame {
+        let resolved = resolve_design_value(expr, bindings);
         let Some(text) = resolved else {
-            eprintln!(
-                "[PLAN-007] design.{key} 槽引用解析失败——本槽跳过（旧有效样式保留）"
-            );
+            eprintln!("[PLAN-031] design.{key} 槽引用解析失败——本槽跳过（旧有效样式保留）");
             continue;
         };
         match key.as_str() {
@@ -317,7 +381,7 @@ fn apply_design_object(
                         out.push(StyleClass::RoundedT(Some(RoundedSize::Px(v))));
                         out.push(StyleClass::RoundedB(Some(RoundedSize::Px(v))));
                     }
-                    Err(_) => eprintln!("[PLAN-007] design.radius 值 `{text}` 非长度字面量"),
+                    Err(_) => eprintln!("[PLAN-031] design.radius 值 `{text}` 非长度字面量"),
                 }
             }
             "background" => {
@@ -328,11 +392,11 @@ fn apply_design_object(
                         auto_ui_compiler::style::color::Color::Rgba { r, g, b, a: 255 },
                     ));
                 } else {
-                    eprintln!("[PLAN-007] design.background 值 `{text}` 非 #rrggbb");
+                    eprintln!("[PLAN-031] design.background 值 `{text}` 非 #rrggbb");
                 }
             }
             other => {
-                eprintln!("[PLAN-007] design 槽 `{other}` 在试点支持面外（radius/background）")
+                eprintln!("[PLAN-031] design 槽 `{other}` 在试点支持面外（radius/background）")
             }
         }
     }
@@ -380,17 +444,22 @@ fn merge_design_classes(
     mut base: Style,
     extra: Vec<auto_ui_compiler::style::class::StyleClass>,
 ) -> Style {
-    for class in extra {
-        // 同族后写胜：radius 族（T/B 对）与 background 族各自保最后一组。
-        use auto_ui_compiler::style::class::StyleClass;
-        let radius_family = matches!(class, StyleClass::RoundedT(_) | StyleClass::RoundedB(_));
-        let bg_family = matches!(class, StyleClass::BackgroundColor(_));
-        base.classes.retain(|c| match c {
-            StyleClass::RoundedT(_) | StyleClass::RoundedB(_) => !radius_family,
-            StyleClass::BackgroundColor(_) => !bg_family,
-            _ => true,
-        });
-        base.classes.push(class);
-    }
+    use auto_ui_compiler::style::class::StyleClass;
+    // 同族后写胜：先摘掉 base 中与 extra 同族的旧值，再整体并入 extra。
+    // 注意 radius 族是 T/B 两个类组成的**一组**（四角同径），必须成对保留
+    // ——逐类 retain 会把刚压入的 RoundedT 在压入 RoundedB 时删掉（旧实现
+    // 只剩 RoundedB，半径读回为 None）。
+    let has_radius = extra
+        .iter()
+        .any(|c| matches!(c, StyleClass::RoundedT(_) | StyleClass::RoundedB(_)));
+    let has_bg = extra
+        .iter()
+        .any(|c| matches!(c, StyleClass::BackgroundColor(_)));
+    base.classes.retain(|c| match c {
+        StyleClass::RoundedT(_) | StyleClass::RoundedB(_) => !has_radius,
+        StyleClass::BackgroundColor(_) => !has_bg,
+        _ => true,
+    });
+    base.classes.extend(extra);
     base
 }

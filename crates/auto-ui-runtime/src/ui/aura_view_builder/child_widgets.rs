@@ -346,6 +346,8 @@ impl<'a> AuraViewBuilder<'a> {
             },
             mounted_sink: self.mounted_sink,
             mount_path_sink: self.mount_path_sink,
+            // PLAN-031 T-03：子组件实例借父作用域快照作为局部设计基线。
+            design_frames: RefCell::new(self.design_frames.borrow().clone()),
         };
 
         child_builder.build(&child_widget.view_tree)
@@ -457,6 +459,8 @@ impl<'a> AuraViewBuilder<'a> {
             },
             mounted_sink: self.mounted_sink,
             mount_path_sink: self.mount_path_sink,
+            // PLAN-031 T-03：子组件实例借父作用域快照作为局部设计基线。
+            design_frames: RefCell::new(self.design_frames.borrow().clone()),
         };
 
         child_builder.convert_node_tracked_ctx(

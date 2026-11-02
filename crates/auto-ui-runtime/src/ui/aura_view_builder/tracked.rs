@@ -1293,6 +1293,8 @@ impl<'a> AuraViewBuilder<'a> {
         probe: &mut BuildProbe,
         bindings: &Bindings,
     ) -> View<DynamicMessage> {
+        // PLAN-031 T-03（V-04）：tracked/untracked 同一 design 作用域语义。
+        let _design_scope = self.enter_element_design(props);
         let view = self.convert_element_tracked_ctx_inner(
             tag, props, events, children, path, id_map, probe, bindings,
         );

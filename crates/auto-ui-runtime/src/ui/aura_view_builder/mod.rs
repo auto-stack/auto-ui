@@ -189,6 +189,13 @@ pub struct AuraViewBuilder<'a> {
     /// 在其子树转换期间置位，`sidebar_group` 臂据此入 nav memo 门（键随
     /// group 骨架指纹，无需 path 通道）。builder 每帧新建，天然帧界。
     nav_memo_armed: std::cell::Cell<bool>,
+    /// PLAN-031 T-03（V-04）：元素级 design 局部作用域栈。每个元素入栈一个
+    /// `Option<frame>`：带 `design:` 对象 = 继承最近祖先 frame + 本元素覆盖
+    /// 后的合成 frame；无 design = None（避免祖先局部值绘制到未声明子件）。
+    /// builder 每帧新建，栈随帧销毁；Drop guard 严格恢复（兄弟/嵌套不串）。
+    design_frames: RefCell<
+        Vec<Option<std::collections::BTreeMap<String, auto_lang_core::ast::Expr>>>,
+    >,
 }
 
 /// Plan 476: widget 调用位的 slot 填充集。
@@ -329,6 +336,7 @@ impl<'a> AuraViewBuilder<'a> {
             active_child_widgets: RefCell::new(HashSet::new()),
             mounted_sink: None,
             mount_path_sink: None,
+            design_frames: RefCell::new(Vec::new()),
         }
     }
 
@@ -353,6 +361,7 @@ impl<'a> AuraViewBuilder<'a> {
             active_child_widgets: RefCell::new(HashSet::new()),
             mounted_sink: None,
             mount_path_sink: None,
+            design_frames: RefCell::new(Vec::new()),
         }
     }
 
