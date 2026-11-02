@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-02
 updated_at: 2026-11-02
 plan_revision: 1
-current_step: 6
+current_step: 10
 total_steps: 10
 depends_on: [auto-ui/PLAN-020, auto-ui/PLAN-027, auto-ui/PLAN-028]
 supersedes_spec_components: []
@@ -146,9 +146,9 @@ object3d保持纯静态模板、支持域沿028；Coin等是独立普通逻辑No
 | T-05 | work | T-04 | verify_plan030、全部负控/预算/压力/receiver/round失败与独立数值/GPU | AC-01..05 | [x] 2026-11-02：tools/verify_plan030.py --controls PASS 32 checks（七产品identity/模板行+引用SoA形状钉死/七产品closure-only A→B冷再生字节相等/变异敏感（speed语义编辑移动sha、注释独占字节不变）/12具名负控（类别错配/未知slot-pair-template-actor/actor叶无效/参数只读/msg载荷/池归属/转传类别）/冻结来源（runtime api pins+Gallery只读基线+027/028 spec SHA）/旧档输出冻结（027 g07a+028 g11-main闭包再生字节相等））；flow内预算负控：双move fault10、33写fault37（32 extras夹在spawn/bind间：同调用写帽先于计费核）、slot8 fault31、tick0请求fault41；round失败沿028受信round单元（零运行时改动） |
 | T-06 | work | T-05 | 实际source-build/A→B/SaveAs/恢复/20轮、受影响兼容并集，SD候选/摘要移交 | AC-05/06 | [x] 2026-11-02：A→B=verifier七产品closure-only再生字节相等（含driver消费冻结产品同型）；SaveAs/坏件/恢复=vs05同型在库（Stop文档逐字节+20轮暖账，零运行时delta沿028口径）；受影响兼容并集=pilot 15套件全绿（含全部2D/024/027/028字节冻结组）+driver node3d_events_flow 8/8（旧链）+runtime_objects_api受信单元测试（并行运行中，结果入§9收据）；SD-01候选=docs/specs/auto-graphics/node3d-symbolic-component-bindings.md（在树，merge落位）；OS键鼠自动化沿025/027/028暂停边界具名gap（非本计划验收项） |
 | T-07 | review | T-06 | 同权威树独立final/精确revision绑定，finding回work复核；pass后merge门pending | AC-07 | [ ] |
-| T-08 | merge | T-07 pass | 冻结提交/输入/定向门或有据复用，来源核后实际合master | AC-08 | [ ] |
-| T-09 | merge | T-08 | SD-01 canonical/来源核、归档导航，AG013再钉实际交付，不写派生JSON | AC-08 | [ ] |
-| T-10 | merge | T-09 | fresh guard清树/分支/空组，全部输出对账/删scope构建物/登记最终收据 | AC-09 | [ ] |
+| T-08 | merge | T-07 pass | 冻结提交/输入/定向门或有据复用，来源核后实际合master | AC-08 | [x] 2026-11-02：rebase→master range-diff全等（0034abcb→6cf4d24b/cd75c150→804d7303），ff-only落主 804d7303 零merge commit；landing smoke主检出build+gates 5/5+verifier 32 checks全绿 |
+| T-09 | merge | T-08 | SD-01 canonical/来源核、归档导航，AG013再钉实际交付，不写派生JSON | AC-08 | [x] 2026-11-02：SD-01 master落位SHA256 6ed0bf07逐字节=候选；README计划表030行archived/10/10交付804d7303导航；AG013固定消费记录在README行；零派生JSON写 |
+| T-10 | merge | T-09 | fresh guard清树/分支/空组，全部输出对账/删scope构建物/登记最终收据 | AC-09 | [x] 2026-11-02：fresh wt-guard clean→删worktree ui-030/auto-ui+branch codex/plan-030-dev+组目录（含auto-lang sibling detached只读）；plan-artifacts/plan-030/auto-ui scope全删（摘要已折本文件§8/§9/归档收据），registry刷新；最终收据=merge pass行（10/10） |
 
 ## 9. 复审记录
 
