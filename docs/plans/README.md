@@ -33,7 +33,8 @@
 | 027 | [3D角色与运行相机Node接线](archived/027-autographics-node3d-character-and-runtime-camera.md) | W3运行能力/G07与G08-3d引擎 | archived/r1，10/10；交付f3dea0d，独立final/冻结/归档清理齐；SD node3d-character-and-runtime-camera.md sha95a86660；原24oracle保持，AG011/012可固定消费，不把引擎绿当内容交付 |
 | 028 | [三维实例/触发/新局Node接线](archived/028-autographics-node3d-instances-triggers-and-rounds.md) | W3/G11-3d有限服务作者接线 | archived/r1，10/10；交付ebac1cd，独立final/冻结/归档清理齐；SD sha be4d9c15；25旧oracle保持，字符串/数值pair/本定义subject仍为有限边界，030补具名参数/跨组件接线 |
 | 029 | [Reader原生输入链与必要接缝收口](029-reader-native-input-and-surface-closure.md) | 026原生GAP与coverage v4后继 | drafting/r1、0/12；真实AutoUI原生VM的选区→.at→保存/冷恢复，IME/几何/系统无障碍、双实例/清理、严格非零汇总与旧门；全部必需门通过后独立上下文review，仅起草、未实施 |
-| 030 | [三维具名引用与跨组件接线收口](030-autographics-node3d-symbolic-component-bindings.md) | 028作者收口/G11-3d前置 | drafting/r1，0/10；slot/template/pair符号与跨Node Actor只读参数、三同定义Coin局部状态；保原25/八状态/32，暂不实施 |
+| 030 | [三维具名引用与跨组件接线收口](archived/030-autographics-node3d-symbolic-component-bindings.md) | 028作者收口/G11-3d前置 | archived/r1，10/10；交付804d7303，独立final pass（同树产物重建+自选反例）/冻结（028七夹具14产物逐字节）/归档清理齐；SD-01 canonical docs/specs/auto-graphics/node3d-symbolic-component-bindings.md SHA 6ed0bf07在master；components-3d-bindings档（Slot/Template/Pair/Actor/msg名义参数+八组件根调度+25 oracle 8/8+fault 10/37/31/41），AG013可固定消费 |
+| 031 | [主题作用域、原子发布、正式主题包与基础控件收口](031-theme-scope-publication-and-package-closure.md) | 拆分后架构工作包A；接受007/910 | drafting/r1，0/11；R01/R02优先实证修复，App/子树scope与正式themes包、基础控件双端，第二批003/010；后继示例/AutoOS另约；暂不实施 |
 
 024/025/027/028已交付，026/029为Reader路线；本轮AG新增030；并行新计划的当前号源以`.next-id`为准，下一份以独占取号时本地活动/归档最大号重核（018分配后已有并行019，勿回退号源）；不能因外仓号882/883跳号。003是Blog路线，004..006是AG表现阶段，007是主题/示例工作包，014是拆分路线结构收口包，018是UI编译配置收口，026是Reader阅读表面跨仓探针；这些合同分别管理。状态以各自合同为准。设计与并行/后继入口见[本仓设计索引](../design/README.md)。
 
