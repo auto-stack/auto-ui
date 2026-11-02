@@ -14276,6 +14276,8 @@ mod tests {
         };
         let widget = AuraWidget {
             named_views: Vec::new(),
+            // PLAN-033 merge gate repair: `design` field added to AuraWidget by af10c44e (Plan 031 F-03) without updating this test initializer.
+            design: Vec::new(),
             actions: None,
             timers: Vec::new(),
             name: "ImageViewer".to_string(),
