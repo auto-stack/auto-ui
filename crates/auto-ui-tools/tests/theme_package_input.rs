@@ -3,7 +3,7 @@
 use std::path::Path;
 
 use auto_ui_tools::theme_package::{
-    publish_theme_package_snapshot, verify_official_theme_package, verify_theme_package,
+    publish_theme_package_snapshot, verify_official_theme_package, verify_theme_package, theme_package_content_digest,
     ThemePackageError, ThemePackageExpectation,
 };
 
@@ -76,4 +76,22 @@ fn snapshot_publish_refuses_tampered_source_and_writes_nothing() {
         .expect_err("tampered source must be refused");
     assert!(matches!(err, ThemePackageError::HashMismatch { .. }), "{err:?}");
     assert!(!dest.exists(), "refusal must not create a snapshot dir");
+}
+#[test]
+fn content_digest_is_location_independent_and_content_sensitive() {
+    let d1 = theme_package_content_digest(&pkg()).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let copy = dir.path().join("vendor/themes");
+    publish_theme_package_snapshot(&pkg(), &copy).unwrap();
+    assert_eq!(
+        theme_package_content_digest(&copy).unwrap(),
+        d1,
+        "digest must not depend on the absolute root"
+    );
+    let themes_at = copy.join("themes.at");
+    let original = std::fs::read(&themes_at).unwrap();
+    let mut changed = original.clone();
+    changed[original.len() / 2] ^= 0x01;
+    std::fs::write(&themes_at, changed).unwrap();
+    assert_ne!(theme_package_content_digest(&copy).unwrap(), d1);
 }
