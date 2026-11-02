@@ -186,6 +186,8 @@ T-01冻结选例run命令/端口/driver/来源，正常`auto run`和`auto run -r
 
 `stage: goal | plan_id: PLAN-033 | plan_revision: r1 | round: 1 | from: drafting(blocked-on-gate) | to: work | status: executing | outcome: pass(T-01/T-02) | worktree: D:/autostack/.wt/ui-033/auto-ui | commit: 12446768+6ead145a | next: work(T-03..T-06)`
 
+`stage: goal | plan_id: PLAN-033 | plan_revision: r1 | round: 8 | from: done | to: done | status: archived | outcome: pass | delivery: d734f1fe | verification: 主检出审计——d734f1fe∈master(merge-base is-ancestor)、specs 干净=落地内容、归档件 committed dd91b27a、codex/plan-033-basic-themes 分支已删、.wt 无 ui-033、plan-artifacts/plan-033 已删、T-09 陈旧观察在案、主检出余留 WIP=§4.1 他方保留件 | next: done(goal complete)`
+
 ## 10. 待澄清事项
 
 1. 031当前在途，最终包/控件/接口及原控制证据必须正式接收，不能凭execution_done启动。本轮只立约，未授权本包执行。
