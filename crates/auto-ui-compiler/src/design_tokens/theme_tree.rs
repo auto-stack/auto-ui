@@ -815,6 +815,28 @@ mod tests {
         assert_eq!(e.path, "tokens.nope");
     }
 
+    /// C-07 事务面：单模式主题请求未声明模式 → mode_available=false
+    ///（eval 据此拒绝换肤并保旧；plan806 类负控不涉此路径）。
+    #[test]
+    fn mode_available_rejects_undeclared_mode() {
+        let light_only = ThemeTree {
+            name: "lightonly".into(),
+            raw: obj(vec![
+                ("tokens", obj(vec![("colors", obj(vec![("background", s("#ffffff"))]))])),
+                ("modes", obj(vec![("light", obj(vec![]))])),
+            ]),
+        };
+        assert!(mode_available(&light_only, false));
+        assert!(!mode_available(&light_only, true), "未声明 dark 必须拒绝");
+        // 无 modes 键的单模式主题：任意模式落到基座
+        let plain = ThemeTree {
+            name: "plain".into(),
+            raw: obj(vec![("tokens", obj(vec![("colors", obj(vec![("background", s("#ffffff"))]))]))]),
+        };
+        assert!(mode_available(&plain, true));
+        assert!(mode_available(&plain, false));
+    }
+
     /// build 期 extend 展开 + 投影（CSS 对 + VM RGB）。
     #[test]
     fn build_theme_expands_extend_and_projects() {

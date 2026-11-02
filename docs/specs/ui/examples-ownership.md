@@ -24,7 +24,9 @@
   不重写两仓历史。旧路径 → 新路径为同相对结构直映射
   `auto-lang/examples/ui/<rest>` → `auto-ui/examples/ui/<rest>`。
 - 本仓 `.gitignore` 增补：`examples/**/{gen,rust-workspace,.auto,.am}/`
-  生成产物不入库（证据入 plan-artifacts，merge 时折入 Plan）。
+  新生成产物不入库（证据入 plan-artifacts，merge 时折入 Plan）。源侧
+  既有 tracked 的 `015-notes/rust-workspace/*.toml` 等按来源守恒保留
+  （T-02 字节等价迁移的一部分），不因该规则追溯去跟踪。
 
 ## 3. 依赖定位（读者解析序）
 

@@ -48,8 +48,9 @@
 ## 4. 双端投影（复用既有消费面）
 
 - **VM/Iced**：主题树进入 `style::theme::ActiveSpec::Tree` 槽；
-  `resolve_semantic_rgb` 树优先、未覆盖键回退内置/合成主题（legacy 兼容，
-  C-12）。局部差异经 `RoundedT/B(Px)`、`BackgroundColor` 结构类注入。
+  `resolve_semantic_rgb` 对活动树缺席的公共键返回 None，消费方沿既有
+  字面量/内置主题路径取值（活动树不做逐键回退；官方族声明全部 31 键，
+  实践中即树值优先、树外键保持 legacy 既有外观，C-12）。局部差异经 `RoundedT/B(Px)`、`BackgroundColor` 结构类注入。
 - **Vue**：树族经 `window.__AUTO_TREE_THEMES__` 并入 `THEME_PALETTES`；
   `theme_name` watch → `applyTheme` 全量 CSS 变量写（含 app 命名空间色与
   `radius-*` 尺寸槽）；design 对象 → `:style` 绑定，槽引用为
