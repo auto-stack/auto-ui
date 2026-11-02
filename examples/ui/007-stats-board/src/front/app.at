@@ -1,4 +1,5 @@
 use stylekit.styles: caption_text, section_title
+use themes.themes: Auto, Solarized
 
 // PLAN-637 B2（Phase A 提取 + Phase B 映射，2026-09-17）：
 //   Phase B 映射：text-gray-900→text-foreground；text-gray-500→text-muted-foreground；
@@ -6,8 +7,16 @@ use stylekit.styles: caption_text, section_title
 //   stylekit 消费：hint_sm→caption_text（×12 位点）、stat_value→section_title(text-sm)
 //   （×21 位点；Phase B 归一后体序全等）。title_lg（×3）因源串词序（text-lg 在前）
 //   与 section_title 输出序不同，字节等价不可达，留本地（词序敏感性未验证不冒险）。
-//   豁免：四 stat 图标 chip（bg-{red,blue,green,purple}-100 + 同色 text-*-500）与
-//   三 avatar 底色（bg-{blue,green,purple}-100）＝类目装饰色，registry 无对应语义键。
+//   豁免（PLAN-033 复核维持，逐项理由见 §PLAN-033 映射表）：四 stat 图标 chip
+//   （bg-{red,blue,green,purple}-100 + 同色 text-*-500）与三 avatar 底色
+//   （bg-{blue,green,purple}-100）＝**分类身份色**（Campaign/System/Promo/Traffic
+//   四类目 + 成员 avatar 类目），不是语义状态：映射 success/error/info 会把类目
+//   误标成状态语义（"Promotional Offers"≠成功态），包内亦无 purple 类目角色——
+//   按"合法固定值"保留（PLAN-033 §5.2 口径），两模式下与原字面一致（原始 app
+//   明暗两臂本就同串），可读性证据见 V-02/V-04 双模式截图。
+
+// PLAN-033 T-02：接入官方主题包（family/mode 经 design 数据绑定；原布局/
+// 数字/标签/图文字段与 stylekit 消费保持；无新增筛选/刷新/网络交互）。
 style title_2xl = "text-2xl font-bold text-foreground"   // Phase B: gray-900 → foreground
 style title_lg = "text-lg font-semibold text-foreground"   // Phase B: gray-900 → foreground
 style stat_value = section_title(size: "text-sm")   // Phase B：归一后消费 stylekit（体 ≡ "font-semibold text-foreground text-sm"）
@@ -23,6 +32,10 @@ style row_avatar = "gap-3 items-center"
 
 widget App {
     model {
+        // PLAN-033：主题族/模式选择（默认 Auto/light = 原外观；非业务状态）
+        var theme_name str = "Auto"
+        var dark_mode bool = false
+
         // Header
         var dashboard_title str = "Dashboard"
         var dashboard_subtitle str = "Campaign Insights"
@@ -73,6 +86,12 @@ widget App {
         var member3_posts str = "215"
         var member3_followers str = "15.8k"
         var member3_engagement str = "5.3%"
+    }
+
+    // 主题/模式选择器（C-06/07：数据绑定，同帧校验发布）
+    design {
+        theme: .theme_name
+        mode: if .dark_mode { "dark" } else { "light" }
     }
 
     view {

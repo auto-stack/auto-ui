@@ -9,3 +9,7 @@ title: "Hello World"
 title_zh: "你好世界"
 # Plan 512: 窗口随内容自然尺寸收缩（fit 线，批二）。
 window: "fit"
+# PLAN-033 T-02：官方主题单源包（不复制配色表进本 app，C-13）。
+dep themes {
+    path: "../../../packages/themes"
+}

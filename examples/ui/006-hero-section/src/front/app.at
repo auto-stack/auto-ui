@@ -11,7 +11,12 @@
 
 // PLAN-637 B2 Phase B 映射（2026-09-17）：亮支 bg-gray-50/text-gray-900→
 // bg-background/text-foreground；暗支 text-white→text-primary-foreground（渐变
-// from-blue-500/to-purple-600 豁免保留，r2 口径）。
+// from-blue-500/to-purple-600 豁免保留，r2 口径；PLAN-033 维持豁免）。
+
+// PLAN-033 T-02：接入官方主题包。family 选择经 theme_name + design 绑定；
+// 模式仍由既有 dark_mode 承担（每帧值语义由 design 数据绑定取代，非每例
+// 新菜单）；GetStarted 原打印、SetTheme/SetAccent 宿主传播消息面保留。
+use themes.themes: Auto, Solarized
 
 widget App {
     msg { GetStarted, SetTheme(str), SetAccent(str) }
@@ -19,6 +24,14 @@ widget App {
     model {
         var dark_mode bool = true
         var accent_color str = "indigo"
+        // PLAN-033：主题族选择（默认 Auto；pac `theme: "dark"` 显式默认保留）
+        var theme_name str = "Auto"
+    }
+
+    // 主题/模式选择器（C-06/07：数据绑定，同帧校验发布）
+    design {
+        theme: .theme_name
+        mode: if .dark_mode { "dark" } else { "light" }
     }
 
     view {

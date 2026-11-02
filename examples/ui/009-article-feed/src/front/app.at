@@ -9,6 +9,11 @@
 // hover:border-zinc-700・gray-300→hover:border-foreground/20；页根→bg-background。
 // 明暗双臂收敛为同串（条件结构保留）。
 
+// PLAN-033 T-02：接入官方主题包（family/mode 经 design 数据绑定；文章/
+// 作者/日期/标签字段、emoji 缩略占位（原内容资产，无远程图片）与三按钮
+// ReadArticle 打印反馈保持；无新增路由或抓取）。
+use themes.themes: Auto, Solarized
+
 style art_tag = "text-xs font-semibold px-2.5 py-0.5 rounded-full bg-primary/10 text-primary"
 style read_more = "p-0 h-auto text-sm text-primary font-semibold mt-2 hover:underline cursor-pointer"
 style thumb_emoji = "text-3xl opacity-60"
@@ -24,6 +29,8 @@ widget App {
     model {
         var dark_mode bool = true
         var accent_color str = "indigo"   // declared for os-config/env seeding (Plan 504 idiom)
+        // PLAN-033：主题族选择（默认 Auto；pac `theme: "dark"` 显式默认保留）
+        var theme_name str = "Auto"
 
         // Header
         var header_title str = "Blog Posts"
@@ -49,6 +56,12 @@ widget App {
         var art3_date str = "1 Jan 2024"
         var art3_title str = "Modern Design Systems with Tailwind CSS"
         var art3_excerpt str = "Dive into creating scalable design systems using Tailwind CSS and shadcn/ui. Learn how to maintain consistency while building flexible and maintainable component libraries."
+    }
+
+    // 主题/模式选择器（C-06/07：数据绑定，同帧校验发布）
+    design {
+        theme: .theme_name
+        mode: if .dark_mode { "dark" } else { "light" }
     }
 
     view {

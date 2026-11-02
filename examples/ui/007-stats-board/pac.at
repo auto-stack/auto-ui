@@ -8,3 +8,8 @@ title_zh: "数据统计板"
 dep stylekit {
     path: "../stylekit"
 }
+
+// PLAN-033 T-02：官方主题单源包（不复制配色表进本 app，C-13）。
+dep themes {
+    path: "../../../packages/themes"
+}

@@ -6,3 +6,8 @@ title: "Pricing Table"
 title_zh: "价格表"
 theme: "dark"
 accent: "indigo"
+// PLAN-033 T-02：官方主题单源包（不复制配色表进本 app，C-13）。
+// 既有显式 pac `theme: "dark"` 默认按 031 契约保留（同 010 先例）。
+dep themes {
+    path: "../../../packages/themes"
+}

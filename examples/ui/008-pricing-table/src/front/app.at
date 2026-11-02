@@ -13,6 +13,11 @@
 // Default theme: Dark mode.
 // PLAN-637 B2 Phase A：重复 class 串提取为本地配方（体 ≡ 原字面量，
 // 展开后逐字节等价；单类短串（如 items-center）按不过度抽象口径豁免）。
+// PLAN-033 T-02：接入官方主题包（family/mode 经 design 数据绑定；方案名/
+// 价格/权益/推荐徽标/BuyPlan 反馈与等高 StretchLine 布局保持；无新增付款
+// 或订阅状态）。既有明暗双臂同串（Phase B 收敛）保留原条件结构。
+use themes.themes: Auto, Solarized
+
 style feat_check = "text-primary font-bold mr-2.5 text-sm"
 style feat_check_muted = "text-muted-foreground font-bold mr-2.5 text-sm"   // Phase B: zinc-400 → muted-foreground
 style feat_list = "gap-3.5 my-5 flex-1"
@@ -32,6 +37,8 @@ widget App {
     model {
         var dark_mode bool = true
         var accent_color str = "indigo"   // declared for os-config/env seeding (Plan 504 idiom)
+        // PLAN-033：主题族选择（默认 Auto；pac `theme: "dark"` 显式默认保留）
+        var theme_name str = "Auto"
 
         // Single Developer
         var plan1_name str = "Single Developer"
@@ -60,6 +67,12 @@ widget App {
         var feat3 str = "Lifetime Support"
         var feat4 str = "Unlimited Updates"
         var feat5 str = "Use on Unlimited Projects"
+    }
+
+    // 主题/模式选择器（C-06/07：数据绑定，同帧校验发布）
+    design {
+        theme: .theme_name
+        mode: if .dark_mode { "dark" } else { "light" }
     }
 
     view {

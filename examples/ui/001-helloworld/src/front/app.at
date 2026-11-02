@@ -1,4 +1,21 @@
+// PLAN-033 T-02：接入官方主题包（Auto/Solarized × light/dark）。
+// 主题/模式经 design 块数据绑定（C-14 形态，同 010/002 先例）：仅新增主题
+// 选择状态（theme_name/dark_mode——非业务模型），原问候文本/结构/可选文案
+// 面逐字节保持；无新增菜单或业务事件。独立运行默认 Auto/light（原外观）。
+use themes.themes: Auto, Solarized
+
 widget App {
+    model {
+        var theme_name str = "Auto"
+        var dark_mode bool = false
+    }
+
+    // 主题/模式选择器（C-06/07：数据绑定，同帧校验发布）
+    design {
+        theme: .theme_name
+        mode: if .dark_mode { "dark" } else { "light" }
+    }
+
     view {
         col {
             // Plan 481: selectable text —— 标题样式显式化(text-4xl 对齐 h1
@@ -9,7 +26,10 @@ widget App {
             }
             // Plan 512: fit 迁移——center 居中外壳退役（Fill 会把内容测量
             // 钉回窗口尺寸），根 col Shrink 包裹 + 内边距。
-            style: "p-8 items-center"
+            // PLAN-033 T-02：公共角色接入——根面 bg-background/text-foreground
+            // （包角色；family/mode 有效值可见面。text-primary 保持既有 accent
+            // 驱动语义——VM `Primary` 由运行时 accent 驱动是 031 交付契约）。
+            style: "p-8 items-center bg-background text-foreground"
         }
     }
 }
