@@ -14654,7 +14654,7 @@ widget ThemeApp {
             sfc
         );
         assert!(
-            sfc.contains("applyTheme(getActiveTheme(), v, accent_color.value"),
+            sfc.contains("applyTheme(__thName(), v, accent_color.value"),
             "mode-flip watch must re-apply the whole active theme:\n{}",
             sfc
         );
@@ -14688,7 +14688,7 @@ widget ThemeFamilyApp {
 "#,
         );
         assert!(
-            sfc.contains("const __th = theme_name.value || getActiveTheme()"),
+            sfc.contains("const __thName = (): string => theme_name.value || getActiveTheme()"),
             "mount 首帧必须应用声明的默认族（F-1）：\n{}",
             sfc
         );

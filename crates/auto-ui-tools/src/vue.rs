@@ -2187,18 +2187,68 @@ fn generate_app_vue(vue_code: &str) -> String {
 /// 原 CSS 继承语义）。sidebar 族块经 extra 槽拼接。
 /// PLAN-601 T-06：pac.at theme{} 声明合成体（Some）替换 scaffold 成双 mode
 /// 块值源——声明面消费点；None = scaffold 缺省（零变化）。
-pub fn generate_index_css(
+/// PLAN-031 T-06（F-1 续）：App 经 `use` 选定的官方树主题 → index.css 四个块
+/// （light core/sidebar、dark core/sidebar）。默认族优先取 `Auto`（官方默认），
+/// 否则按名称序首个。无树主题 = None（回落既有 composed/scaffold 行为）。
+pub(crate) struct TreeIndexCss {
+    pub light_core: String,
+    pub light_sidebar: String,
+    pub dark_core: String,
+    pub dark_sidebar: String,
+}
+
+pub(crate) fn tree_index_css_for_app(app_at: &std::path::Path) -> Option<TreeIndexCss> {
+    use auto_ui_compiler::design_tokens::theme_tree as tt;
+    use auto_ui_compiler::style::theme::registry;
+    let code = std::fs::read_to_string(app_at).ok()?;
+    let trees = match tt::collect_named_themes(app_at, &code) {
+        Ok(t) => t,
+        Err(e) => {
+            // 与 collect_tree_themes_js 同口径：收集/校验失败是运行错误，
+            // 不产出半套 static 面（C-11）。
+            panic!("树状主题收集/校验失败：{e}（index.css 不发布半成品）");
+        }
+    };
+    let tree = trees
+        .get("Auto")
+        .or_else(|| trees.values().next())?;
+    let light = tt::compose_mode(tree, false).ok()?;
+    let dark = tt::compose_mode(tree, true).ok()?;
+    let core = |t: &auto_ui_compiler::design_tokens::theme_tree::Tree| {
+        let mut s = tt::render_css_block(t, &registry::CORE_ORDER);
+        s.push_str(&tt::render_css_block(t, &registry::EXTENDED_ORDER));
+        s
+    };
+    Some(TreeIndexCss {
+        light_core: core(&light),
+        light_sidebar: tt::render_css_block(&light, &registry::SIDEBAR_ORDER),
+        dark_core: core(&dark),
+        dark_sidebar: tt::render_css_block(&dark, &registry::SIDEBAR_ORDER),
+    })
+}
+
+/// 无 pac `theme{}` 时用 App 导入的官方包驱动 `:root/.dark`（F-1 续）。
+pub(crate) fn generate_index_css_with_tree(
     composed: Option<&auto_ui_compiler::design_tokens::decl::ComposedTheme>,
+    tree: Option<&TreeIndexCss>,
 ) -> String {
     use auto_ui_compiler::style::theme::registry;
-    let (core_l, sb_l, core_d, sb_d) = match composed {
-        Some(t) => (
+    let (core_l, sb_l, core_d, sb_d) = match (composed, tree) {
+        (Some(t), _) => (
             t.render_core(false),
             t.render_sidebar(false),
             t.render_core(true),
             t.render_sidebar(true),
         ),
-        None => {
+        // PLAN-031：App 用 `use` 选了官方包但没写 pac theme{}——初始块取包值，
+        // 与运行时注入（__AUTO_TREE_THEMES__）同源，避免首帧/无容器回落静态表。
+        (None, Some(ti)) => (
+            ti.light_core.clone(),
+            ti.light_sidebar.clone(),
+            ti.dark_core.clone(),
+            ti.dark_sidebar.clone(),
+        ),
+        (None, None) => {
             let scaffold = registry::builtin("scaffold")
                 .expect("内置主题 scaffold 恒在（PLAN-601 registry 双面单源）");
             (
@@ -2313,6 +2363,13 @@ pub fn generate_index_css(
     css
 }
 
+/// 兼容入口：无树主题（= 既有 composed/scaffold 行为，测试与 legacy 调用面）。
+pub fn generate_index_css(
+    composed: Option<&auto_ui_compiler::design_tokens::decl::ComposedTheme>,
+) -> String {
+    generate_index_css_with_tree(composed, None)
+}
+
 fn generate_utils_ts() -> String {
     r#"import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
@@ -2425,6 +2482,8 @@ fn write_project_files(
     i18n: &I18nConfig,
     locale_files: &[String],
     composed_theme: Option<&auto_ui_compiler::design_tokens::decl::ComposedTheme>,
+    // PLAN-031 T-06（F-1 续）：App 导入包树驱动的 :root/.dark 初始块。
+    tree_index_css: Option<&TreeIndexCss>,
 ) -> Result<(), String> {
     // Plan 482: uses_autodown 的 main.ts 引 `@autodown/engine/style.css`，但
     // pac npm_deps 通常只链接 editor/core——engine 缺声明导致 vite 解析失败
@@ -2529,7 +2588,7 @@ fn write_project_files(
         .map_err(|e| format!("Failed to write src/App.vue: {}", e))?;
 
     // src/assets/index.css
-    let index_css = generate_index_css(composed_theme);
+    let index_css = generate_index_css_with_tree(composed_theme, tree_index_css);
     fs::write(output_path.join("src/assets/index.css"), index_css)
         .map_err(|e| format!("Failed to write src/assets/index.css: {}", e))?;
 
@@ -5051,6 +5110,7 @@ export default router
             &self.i18n,
             &locale_copies,
             self.theme.as_ref(),
+            self.tree_index_css().as_ref(),
         )?;
 
         // Generate router files if routes detected
@@ -5203,7 +5263,7 @@ export default router
         }
         let css_path = self.output_dir.join("src/assets/index.css");
         if !css_path.exists() {
-            fs::write(&css_path, generate_index_css(self.theme.as_ref()))
+            fs::write(&css_path, generate_index_css_with_tree(self.theme.as_ref(), self.tree_index_css().as_ref()))
                 .map_err(|e| format!("Failed to write src/assets/index.css: {}", e))?;
         }
 
@@ -5231,6 +5291,7 @@ export default router
             &self.i18n,
             &locale_copies,
             self.theme.as_ref(),
+            self.tree_index_css().as_ref(),
         )?;
 
         // Write App.vue (the root component)
@@ -5261,7 +5322,7 @@ export default router
             .map_err(|e| format!("Failed to write main.ts: {}", e))?;
 
         // Write index.css
-        let index_css_content = generate_index_css(self.theme.as_ref());
+        let index_css_content = generate_index_css_with_tree(self.theme.as_ref(), self.tree_index_css().as_ref());
         fs::write(assets_dir.join("index.css"), &index_css_content)
             .map_err(|e| format!("Failed to write src/assets/index.css: {}", e))?;
 
@@ -5293,6 +5354,11 @@ export default router
     /// 渲染为 `__AUTO_TREE_THEMES__` 注入体（`{ Name: {light,dark} }`，值 =
     /// css_var_pairs 投影——applyTheme 同名写 CSS 变量）。无声明/收集为空
     /// → None 零注入；收集/schema 失败 = 运行错误（C-11 不发半成品）。
+    /// PLAN-031 T-06（F-1 续）：本 App 导入包树驱动的 index.css 四块。
+    pub(crate) fn tree_index_css(&self) -> Option<TreeIndexCss> {
+        tree_index_css_for_app(&self.front_dir.join("app.at"))
+    }
+
     pub(crate) fn collect_tree_themes_js(&self) -> Option<String> {
         use auto_ui_compiler::design_tokens::theme_tree as tt;
         let app_at = self.front_dir.join("app.at");
@@ -5397,7 +5463,7 @@ export default router
         let assets_dir = src_dir.join("assets");
         fs::create_dir_all(&assets_dir)
             .map_err(|e| format!("Failed to create src/assets: {}", e))?;
-        let index_css_content = generate_index_css(self.theme.as_ref());
+        let index_css_content = generate_index_css_with_tree(self.theme.as_ref(), self.tree_index_css().as_ref());
         let index_css_path = assets_dir.join("index.css");
         fs::write(&index_css_path, &index_css_content)
             .map_err(|e| format!("Failed to write src/assets/index.css: {}", e))?;
@@ -13428,6 +13494,58 @@ fn test_plan_549_ui_gallery_registry_and_package_json() {
     );
 }
 
+// ── PLAN-031 T-06（F-1 续）：包树驱动的 index.css 初始块 ─────────────
+#[cfg(test)]
+mod plan031_tree_index_css_tests {
+    use std::path::PathBuf;
+
+    fn theme_lab_app() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../examples/theme-lab/src/front/app.at")
+            .canonicalize()
+            .expect("theme-lab app.at 在场")
+    }
+
+    /// App 用 `use themes.themes` 选官方包时，`:root/.dark` 必须取包值
+    /// （Auto light primary #8b5cf6 → 258 90% 66%；dark background #09090b →
+    /// 240 10% 4%），而不是静态 scaffold 表。
+    #[test]
+    fn index_css_uses_imported_tree_when_no_pac_theme() {
+        let app = theme_lab_app();
+        let tree = super::tree_index_css_for_app(&app).expect("theme-lab 导入官方包");
+        assert!(
+            tree.light_core.contains("    --primary: 258 90% 66%;"),
+            "light core 应含 Auto primary：{}",
+            tree.light_core
+        );
+        assert!(
+            tree.dark_core.contains("    --background: 240 10% 4%;"),
+            "dark core 应含 Auto background：{}",
+            tree.dark_core
+        );
+        assert!(
+            !tree.light_sidebar.is_empty(),
+            "sidebar 块应由同一树生成（含 sidebar-* 键）"
+        );
+
+        let css = super::generate_index_css_with_tree(None, Some(&tree));
+        assert!(
+            css.contains("    --primary: 258 90% 66%;"),
+            "index.css :root 应取包值"
+        );
+        assert!(
+            css.contains("    --background: 240 10% 4%;"),
+            "index.css .dark 应取包值"
+        );
+        // 无树主题时仍保持静态 scaffold（零变化）
+        let fallback = super::generate_index_css(None);
+        assert!(
+            !fallback.contains("    --primary: 258 90% 66%;"),
+            "无导入包时不得凭空出现包值"
+        );
+    }
+}
+
 // ── PLAN-571 T10: css 变量层 --secondary 分档互锁（防"第四源"回潮）────
 #[cfg(test)]
 mod plan571_css_secondary_interlock_tests {
@@ -13583,7 +13701,7 @@ mod plan601_theme_declaration_tests {
     fn index_html_theme_bootstrap() {
         let d = decl(Some("brand"), Some("zinc"), &[("primary", "#ef4444")]);
         let t = compose(&d, &BTreeMap::new()).unwrap();
-        let html = super::generate_index_html("demo", None, Some(&t));
+        let html = super::generate_index_html("demo", None, Some(&t), None);
         assert!(
             html.contains("window.__AUTO_COMPOSED_THEME__ = { name: 'brand',"),
             "{html}"
@@ -13598,7 +13716,7 @@ mod plan601_theme_declaration_tests {
             "种子携带合成值: {html}"
         );
 
-        let none = super::generate_index_html("demo", None, None);
+        let none = super::generate_index_html("demo", None, None, None);
         assert!(
             !none.contains("__AUTO_COMPOSED_THEME__"),
             "缺省零注入: {none}"

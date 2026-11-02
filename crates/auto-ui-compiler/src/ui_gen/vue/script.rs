@@ -2209,6 +2209,17 @@ onUnmounted(() => {{ if ({var} !== null) {{ clearInterval({var}); {var} = null }
                     script.push_str("const __autoThemeRoot = ref(null)\n");
                 }
             }
+            // PLAN-031 T-06（F-1）：所有自动应用点（首帧 mount / 模式 flip 的
+            // immediate watcher）统一走「声明族优先」——否则 setup 期 watcher
+            // 先按 localStorage/scaffold 写一遍 html 级变量，覆盖 stylesheet 里
+            // 已按包树生成的 :root/.dark，页面又回到静态表。
+            if self.has_theme_name {
+                script.push_str(
+                    "const __thName = (): string => theme_name.value || getActiveTheme()\n",
+                );
+            } else {
+                script.push_str("const __thName = (): string => getActiveTheme()\n");
+            }
             script.push_str("\n// Restore saved theme (and accent when the widget owns one) on mount.\n");
             script.push_str("onMounted(() => {\n");
             if self.theme_root_ref {
@@ -2227,11 +2238,7 @@ onUnmounted(() => {{ if ({var} !== null) {{ clearInterval({var}); {var} = null }
             // 首帧必须应用**声明的默认族**（如 Auto），否则 mount 只恢复
             // localStorage/scaffold，官方包的值永远不上身（Vue 侧表现为
             // 静态 indigo 表）。theme_name 为空才回落持久化选择。
-            script.push_str(if self.has_theme_name {
-                "  const __th = theme_name.value || getActiveTheme()\n"
-            } else {
-                "  const __th = getActiveTheme()\n"
-            });
+            script.push_str("  const __th = __thName()\n");
             if self.theme_root_ref {
                 script.push_str("  if (__th !== 'scaffold') applyTheme(__th, __isDark, getSavedAccent(), __rootEl)\n");
             } else {
@@ -2273,24 +2280,24 @@ onUnmounted(() => {{ if ({var} !== null) {{ clearInterval({var}); {var} = null }
                 if self.has_accent_color {
                     if self.theme_root_ref {
                         script.push_str(&format!(
-                            "// Plan 458: keep the accent and html dark class in sync across theme flips.\nwatch({}, (v) => {{\n  document.documentElement.classList.toggle('dark', v)\n  applyTheme(getActiveTheme(), v, accent_color.value, __autoThemeRoot.value)\n}}, {{ immediate: true }})\n",
+                            "// Plan 458: keep the accent and html dark class in sync across theme flips.\nwatch({}, (v) => {{\n  document.documentElement.classList.toggle('dark', v)\n  applyTheme(__thName(), v, accent_color.value, __autoThemeRoot.value)\n}}, {{ immediate: true }})\n",
                             dark_var
                         ));
                     } else {
                         script.push_str(&format!(
-                            "// Plan 458: keep the accent and html dark class in sync across theme flips.\nwatch({}, (v) => {{\n  document.documentElement.classList.toggle('dark', v)\n  applyTheme(getActiveTheme(), v, accent_color.value)\n}}, {{ immediate: true }})\n",
+                            "// Plan 458: keep the accent and html dark class in sync across theme flips.\nwatch({}, (v) => {{\n  document.documentElement.classList.toggle('dark', v)\n  applyTheme(__thName(), v, accent_color.value)\n}}, {{ immediate: true }})\n",
                             dark_var
                         ));
                     }
                 } else {
                     if self.theme_root_ref {
                         script.push_str(&format!(
-                            "// Plan 458: keep the html dark class in sync across theme flips.\nwatch({}, (v) => {{\n  document.documentElement.classList.toggle('dark', v)\n  applyTheme(getActiveTheme(), v, getSavedAccent(), __autoThemeRoot.value)\n}}, {{ immediate: true }})\n",
+                            "// Plan 458: keep the html dark class in sync across theme flips.\nwatch({}, (v) => {{\n  document.documentElement.classList.toggle('dark', v)\n  applyTheme(__thName(), v, getSavedAccent(), __autoThemeRoot.value)\n}}, {{ immediate: true }})\n",
                             dark_var
                         ));
                     } else {
                         script.push_str(&format!(
-                            "// Plan 458: keep the html dark class in sync across theme flips.\nwatch({}, (v) => {{\n  document.documentElement.classList.toggle('dark', v)\n  applyTheme(getActiveTheme(), v)\n}}, {{ immediate: true }})\n",
+                            "// Plan 458: keep the html dark class in sync across theme flips.\nwatch({}, (v) => {{\n  document.documentElement.classList.toggle('dark', v)\n  applyTheme(__thName(), v)\n}}, {{ immediate: true }})\n",
                             dark_var
                         ));
                     }

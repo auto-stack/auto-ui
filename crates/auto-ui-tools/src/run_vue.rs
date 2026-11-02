@@ -20,7 +20,7 @@ use auto_val::{AutoError, AutoResult};
 use crate::proc_host::{self, FlowEnd};
 // 生成主体（T-04 已迁）。
 use crate::vue::{
-    desktop_mode, gallery_apps_dir, gallery_mode, gallery_rows_via_cache, generate_index_css,
+    desktop_mode, gallery_apps_dir, gallery_mode, gallery_rows_via_cache, generate_index_css_with_tree,
     generate_index_html, generate_package_json, generate_select_overlay_ts,
     generate_tailwind_config, generate_vite_config, incremental_compile_changed, pac_media_root,
     package_json_deps_drifted, resolve_front_dir, set_gallery_proxy_root, write_auto_sources_ts,
@@ -256,7 +256,7 @@ pub fn run_vue_flow(
         }
         let index_css_path = project.output_dir.join("src/assets/index.css");
         if index_css_path.exists() {
-            if let Err(e) = fs::write(&index_css_path, generate_index_css(project.theme.as_ref())) {
+            if let Err(e) = fs::write(&index_css_path, generate_index_css_with_tree(project.theme.as_ref(), project.tree_index_css().as_ref())) {
                 println!("  ⚠ index.css refresh skipped: {}", e);
             }
         }

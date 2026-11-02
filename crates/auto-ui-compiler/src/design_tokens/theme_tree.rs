@@ -655,6 +655,23 @@ pub fn css_var_pairs(tree: &Tree) -> Vec<(String, String)> {
     out
 }
 
+/// PLAN-031 T-06（F-1 续）：把合成后的主题树渲染成 index.css 的变量块
+/// （`    --k: v;\n`，按 `order` 键序）——与 `registry::render_core`/
+/// `ComposedTheme::render_core` 同形，供生成器在「App 用 `use` 选了官方包、
+/// 但没有 pac `theme{}` 声明」时生成 `:root`/`.dark` 初始块，避免首帧/无容器
+/// 回落落到静态表。值取 `css_hsl_var_pairs`（HSL 三段式）。
+pub fn render_css_block(tree: &Tree, order: &[TokenName]) -> String {
+    use std::collections::BTreeMap;
+    let pairs: BTreeMap<String, String> = css_hsl_var_pairs(tree).into_iter().collect();
+    let mut out = String::new();
+    for t in order {
+        if let Some(v) = pairs.get(t.css_var()) {
+            out.push_str(&format!("    --{}: {};\n", t.css_var(), v));
+        }
+    }
+    out
+}
+
 /// PLAN-031 T-06（F-1）：CSS 面投影的 **Tailwind 消费形**。
 ///
 /// `css_var_pairs` 输出的是作者原值（多为 `#rrggbb`），而 Vue 脚手架的样式
@@ -920,6 +937,19 @@ mod tests {
         // 原值面（未转形）仍保留 hex，供 `var()` 直用消费者
         let raw = css_var_pairs(&tree);
         assert!(raw.contains(&("primary".to_string(), "#8b5cf6".to_string())));
+
+        // index.css 块渲染：按 CORE_ORDER 顺序 + HSL 值 + 4 空格缩进
+        let block = render_css_block(&tree, &registry::CORE_ORDER);
+        assert!(
+            block.contains("    --primary: 258 90% 66%;\n"),
+            "core 块应含 HSL primary：{block}"
+        );
+        let bg_pos = block.find("--background").expect("background 行");
+        let fg_pos = block.find("--foreground");
+        assert!(
+            fg_pos.is_none() || bg_pos < fg_pos.unwrap_or(usize::MAX),
+            "键序应遵循 CORE_ORDER（background 在 foreground 之前）：{block}"
+        );
     }
 
     fn parse_expr_help(src: &str) -> Expr {        // 借真实 UI 解析器取对象表达式（不手搓树）
