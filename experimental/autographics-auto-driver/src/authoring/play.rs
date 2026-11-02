@@ -361,7 +361,8 @@ impl Play {
                 | super::behavior::Api::Triggers2V1
                 | super::behavior::Api::Sprites2V1
                 | super::behavior::Api::Audio2V1
-                | super::behavior::Api::Hud2V1 => Some(CharProfile::TwoD),
+                | super::behavior::Api::Hud2V1
+                | super::behavior::Api::Components2V1 => Some(CharProfile::TwoD),
                 super::behavior::Api::Character3V1
                 | super::behavior::Api::Camera3V1
                 | super::behavior::Api::Objects3V1
@@ -377,7 +378,8 @@ impl Play {
                 | super::behavior::Api::Triggers2V1
                 | super::behavior::Api::Sprites2V1
                 | super::behavior::Api::Audio2V1
-                | super::behavior::Api::Hud2V1 => Some(CameraDim::TwoD),
+                | super::behavior::Api::Hud2V1
+                | super::behavior::Api::Components2V1 => Some(CameraDim::TwoD),
                 super::behavior::Api::Camera3V1
                 | super::behavior::Api::Objects3V1
                 | super::behavior::Api::Triggers3V1
