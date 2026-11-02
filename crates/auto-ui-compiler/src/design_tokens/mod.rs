@@ -17,3 +17,6 @@ pub use recipe::*;
 
 /// PLAN-007 T-04：树状主题表示/extend 合成/模式选择/槽引用（C-01..11）。
 pub mod theme_tree;
+
+/// PLAN-031 T-04：正式主题包受管来源校验（owner/version/schema/文件 hash/族模式）。
+pub mod theme_package;

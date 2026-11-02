@@ -16,6 +16,7 @@ ui = []
 ui-headless = []
 
 [dependencies]
+sha2 = "0.10"
 # PLAN-814 T-01/T-02 probe skeleton: the UI analysis/generator surface
 # (aura/ui_gen/design_tokens validators + widget registry) migrates in T-03.
 # The compiler may use the SDK; it must NOT be depended on by the SDK.
