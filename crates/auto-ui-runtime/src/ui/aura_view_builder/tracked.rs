@@ -1788,7 +1788,9 @@ impl<'a> AuraViewBuilder<'a> {
             "sidebar_menu_sub_button" | "sidebar-menu-sub-button" => {
                 self.convert_sidebar_menu_button(props, events, children, bindings, true)
             }
-            "aside" | "main" | "header" | "section" | "footer" | "article" => {
+            // PLAN-031 T-05：panel/card 与 untracked 层同名臂镜像（D-GAP 规则）
+            // ——结构容器保留 class/style 与 design 局部 frame。
+            "aside" | "main" | "header" | "section" | "footer" | "article" | "panel" | "card" => {
                 self.convert_container_tracked_ctx(props, children, path, id_map, probe, bindings)
             }
 

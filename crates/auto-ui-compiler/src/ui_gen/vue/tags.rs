@@ -113,6 +113,10 @@ impl VueGenerator {
             "square" | "Square" => "div".to_string(),
             "scroll" | "Scroll" | "scroll_test_content" => "div".to_string(),
             "container" | "Container" => "div".to_string(),
+            // PLAN-031 T-05：`panel` 是基础表面容器（§5.4）——Vue 侧与 VM
+            // 容器臂同名对齐，显式落 `<div>`。只收小写：PascalCase `Panel`
+            // 是子组件引用（slot 填充语义），不能坍缩成 div。
+            "panel" => "div".to_string(),
             "center" | "Center" => "div".to_string(),
 
             // Plan 041a①(musk 041 Phase 5 T19): 原生 HTML 语义元素直通。

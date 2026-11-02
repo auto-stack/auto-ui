@@ -69,7 +69,12 @@ impl<'a> AuraViewBuilder<'a> {
             "scroll_test_content" => self.managed_scroll_content_view(props, bindings),
             // Plan 482: nav 容器支持 search:true 集成搜索行，其余语义容器不变。
             "nav" => self.convert_nav_container(props, events, children, bindings),
-            "aside" | "main" | "header" | "section" | "footer" | "article" => {
+            // PLAN-031 T-05：`panel`/`card` 是结构容器（§5.4 Panel/文本标签：
+            // 容器底/边/radius、文字语义色与局部继承）。此前落 unknown fallback
+            // → 裸 Column：class/style 整体丢失，`design:` 局部 frame 也无消费
+            // 面（Theme Lab 的 CapsulePanel A/B 在 VM 拿不到圆角/底色）。
+            // Vue 轨这两个标签经 map_tag 落 `<div>`，此臂与其对齐。
+            "aside" | "main" | "header" | "section" | "footer" | "article" | "panel" | "card" => {
                 self.convert_container(props, children, bindings)
             }
             // Plan 442 A4: svg 元素子树 → 序列化 SVG 文档经 View::Image 渲染

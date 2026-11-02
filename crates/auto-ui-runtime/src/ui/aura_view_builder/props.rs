@@ -356,14 +356,18 @@ impl<'a> AuraViewBuilder<'a> {
     }
 }
 
-/// PLAN-031 T-03：design 合成 frame → 结构类（本包支持 radius/background 两槽；
-/// 其余槽由 T-05 控件表面阶段扩展）。非法/未知槽只跳过该槽并给可定位诊断，
-/// 父级有效值保持（失败保旧有效子树）。
+/// PLAN-031 T-03/T-05：design 合成 frame → 结构类。
+///
+/// 支持面（§5.3 冻结）：`radius` 长度 + 颜色槽 `background`/`foreground`/
+/// `border`/`ring`（focus 环）。未在支持面内的槽只跳过该槽并给可定位诊断，
+/// 父级有效值保持（失败保旧有效子树）——不静默吞掉，也不擅自扩成通用
+/// 样式语言。
 fn apply_design_values(
     frame: &std::collections::BTreeMap<String, auto_lang_core::ast::Expr>,
     bindings: &Bindings,
 ) -> Vec<auto_ui_compiler::style::class::StyleClass> {
     use auto_ui_compiler::style::class::{RoundedSize, StyleClass};
+    use auto_ui_compiler::style::color::Color;
     let mut out = Vec::new();
     for (key, expr) in frame {
         let resolved = resolve_design_value(expr, bindings);
@@ -371,32 +375,60 @@ fn apply_design_values(
             eprintln!("[PLAN-031] design.{key} 槽引用解析失败——本槽跳过（旧有效样式保留）");
             continue;
         };
+        // 颜色槽共用解析：`#rrggbb`/`#rgb`/具名/槽值 → Color::Rgba。
+        let color = |slot: &str| -> Option<Color> {
+            match auto_ui_compiler::design_tokens::theme_tree::parse_color(&text) {
+                Some((r, g, b)) => Some(Color::Rgba { r, g, b, a: 255 }),
+                None => {
+                    eprintln!(
+                        "[PLAN-031] design.{slot} 值 `{text}` 非颜色字面量——本槽跳过（旧有效样式保留）"
+                    );
+                    None
+                }
+            }
+        };
         match key.as_str() {
-            "radius" => {
+            "radius" | "corner-radius" | "rounded" => {
                 let n = text.trim_end_matches("dp").trim_end_matches("px").trim();
                 match n.parse::<f32>() {
                     // 任意值四角同径 = RoundedT(Px) + RoundedB(Px) 对
                     //（adapter：T 设上角对、B 设下角对）。
-                    Ok(v) => {
+                    Ok(v) if v >= 0.0 => {
                         out.push(StyleClass::RoundedT(Some(RoundedSize::Px(v))));
                         out.push(StyleClass::RoundedB(Some(RoundedSize::Px(v))));
                     }
-                    Err(_) => eprintln!("[PLAN-031] design.radius 值 `{text}` 非长度字面量"),
+                    _ => eprintln!(
+                        "[PLAN-031] design.radius 值 `{text}` 非非负长度字面量——本槽跳过（旧有效圆角保留）"
+                    ),
                 }
             }
-            "background" => {
-                if let Some((r, g, b)) =
-                    auto_ui_compiler::design_tokens::theme_tree::parse_color(&text)
-                {
-                    out.push(StyleClass::BackgroundColor(
-                        auto_ui_compiler::style::color::Color::Rgba { r, g, b, a: 255 },
-                    ));
-                } else {
-                    eprintln!("[PLAN-031] design.background 值 `{text}` 非 #rrggbb");
+            "background" | "bg" => {
+                if let Some(c) = color("background") {
+                    out.push(StyleClass::BackgroundColor(c));
+                }
+            }
+            "foreground" | "text" | "color" => {
+                if let Some(c) = color("foreground") {
+                    out.push(StyleClass::TextColor(c));
+                }
+            }
+            "border" => {
+                if let Some(c) = color("border") {
+                    out.push(StyleClass::BorderColor(c));
+                }
+            }
+            "ring" | "focus-ring" | "focus_ring" => {
+                if let Some(c) = color("ring") {
+                    out.push(StyleClass::RingColor(c));
+                    // 槽只给颜色；焦点环宽度按基础控件契约取 2px（不新增语法）。
+                    out.push(StyleClass::RingWidth(2.0));
                 }
             }
             other => {
-                eprintln!("[PLAN-031] design 槽 `{other}` 在试点支持面外（radius/background）")
+                eprintln!(
+                    "[PLAN-031] design 槽 `{other}` 在冻结支持面外（radius/background/\
+                     foreground/border/ring）"
+                )
             }
         }
     }
@@ -439,13 +471,15 @@ fn flatten_ref_expr(expr: &auto_lang_core::ast::Expr) -> Option<Vec<String>> {
     }
 }
 
-/// 结构类并入 Style（去重：同类后写胜——radius/background 各保最后一个）。
+/// 结构类并入 Style（去重：同类后写胜——每个字段族各保最后一个）。
 fn merge_design_classes(
     mut base: Style,
     extra: Vec<auto_ui_compiler::style::class::StyleClass>,
 ) -> Style {
     use auto_ui_compiler::style::class::StyleClass;
-    // 同族后写胜：先摘掉 base 中与 extra 同族的旧值，再整体并入 extra。
+    // 族判定按 extra 实际含有的类，逐族摘掉 base 同族旧值后整体并入——
+    // 这样"本元素 design 覆盖 class 里的同类声明"与 Tailwind 的
+    // 后写胜一致，同时不误删未涉及的族。
     // 注意 radius 族是 T/B 两个类组成的**一组**（四角同径），必须成对保留
     // ——逐类 retain 会把刚压入的 RoundedT 在压入 RoundedB 时删掉（旧实现
     // 只剩 RoundedB，半径读回为 None）。
@@ -455,9 +489,19 @@ fn merge_design_classes(
     let has_bg = extra
         .iter()
         .any(|c| matches!(c, StyleClass::BackgroundColor(_)));
+    let has_fg = extra.iter().any(|c| matches!(c, StyleClass::TextColor(_)));
+    let has_border = extra
+        .iter()
+        .any(|c| matches!(c, StyleClass::BorderColor(_)));
+    let has_ring = extra
+        .iter()
+        .any(|c| matches!(c, StyleClass::RingColor(_)));
     base.classes.retain(|c| match c {
         StyleClass::RoundedT(_) | StyleClass::RoundedB(_) => !has_radius,
         StyleClass::BackgroundColor(_) => !has_bg,
+        StyleClass::TextColor(_) => !has_fg,
+        StyleClass::BorderColor(_) => !has_border,
+        StyleClass::RingColor(_) => !has_ring,
         _ => true,
     });
     base.classes.extend(extra);
