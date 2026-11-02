@@ -44,3 +44,5 @@ tempfile = "3.14"
 # PLAN-814 T-03 Batch 1：lucide 表脚手架测试（node_modules 抽样核对）。
 walkdir = "2"
 serde_json = { version = "1.0", features = ["preserve_order"] }
+# PLAN-031 T-04：正式主题包受管清单 sha256 校验（theme_package_manifest）。
+sha2 = "0.10"

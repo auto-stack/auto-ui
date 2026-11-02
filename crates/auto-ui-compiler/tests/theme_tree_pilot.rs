@@ -232,13 +232,15 @@ pub theme UnknownKey = extend("Auto", {
     assert!(err.path.contains("colors.nope"), "{err:?}");
 }
 
-/// 官方主题数据包落点预演（T-06 前置）：examples/ui/themes/ 下的 .at 经
-/// 真实解析可被第三方消费者读取（V-08 三消费者同源的 compiler 侧前提）。
+/// 官方主题数据包落点（PLAN-031 T-04 起为正式包）：`packages/themes/` 下的
+/// .at 经真实解析可被第三方消费者读取（V-08 三消费者同源的 compiler 侧前提；
+/// 旧 `examples/ui/themes` 只留迁移 README）。
 #[test]
-fn official_theme_package_readable_from_examples_root() {
-    let pkg = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/ui/themes");
+fn official_theme_package_readable_from_packages_root() {
+    let pkg = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../packages/themes");
     let src_path = pkg.join("themes.at");
-    let src = std::fs::read_to_string(&src_path).expect("官方主题包 themes/themes.at 必须存在");
+    let src = std::fs::read_to_string(&src_path)
+        .expect("官方主题包 packages/themes/themes.at 必须存在");
     let known = collect_theme_trees(&src_path, &src).unwrap();
     assert!(known.contains_key("Auto"));
     assert!(known.contains_key("Solarized"));

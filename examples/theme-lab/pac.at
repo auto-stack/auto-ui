@@ -9,5 +9,5 @@ title_zh: "主题实验室"
 window: "fit"
 # 官方主题单源包（不复制配色表进本 app，C-13）。
 dep themes {
-    path: "../ui/themes"
+    path: "../../packages/themes"
 }

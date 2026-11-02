@@ -1,0 +1,11 @@
+name: "themes"
+version: "0.2.0"
+scene: "ui"
+render: "vue"
+title: "AutoUI Official Themes"
+title_zh: "AutoUI 官方主题包"
+# 正式官方主题包（PLAN-031 T-04；自 PLAN-007 试点 examples/ui/themes 迁移）。
+# 唯一可编辑源 = 本目录；受管清单 theme-package.json 记录 owner/版本/schema/
+# 文件 hash/族与模式能力。开发期消费者用显式 dep path 定位本目录：
+#   dep themes { path: "../../packages/themes" } + use themes.themes: Auto, Solarized
+# 外部消费者经 UI 受管 source/SDK/delivery 获得固定快照，不依赖本机检出。

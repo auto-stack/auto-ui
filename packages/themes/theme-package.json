@@ -1,0 +1,23 @@
+{
+  "owner": "auto-ui",
+  "package": "themes",
+  "version": "0.2.0",
+  "schema": 1,
+  "module": "themes",
+  "families": [
+    {
+      "name": "Auto",
+      "modes": ["light", "dark"],
+      "default": "light"
+    },
+    {
+      "name": "Solarized",
+      "modes": ["light", "dark"],
+      "default": "light"
+    }
+  ],
+  "files": [
+    { "path": "pac.at", "sha256": "2e66212b3e5fd1e9c9956e44421e2b7ad59c6f436fa845bae287b3c483d69c92" },
+    { "path": "themes.at", "sha256": "329c2d56d208811d87c577e2a9a1bba6021287c9e53fc224f10434da8f9baa49" }
+  ]
+}
