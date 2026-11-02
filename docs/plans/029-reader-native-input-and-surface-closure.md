@@ -344,6 +344,20 @@ Reader旧门入口保持 `python tests/basic/verify_standalone.py --profile vue|
 - 证据：plan-artifacts/plan-029/t09-frozen-vue{,-console.log}/、t09-n04live{,2}/、t09-frozen-vm/、n04-pairing{,2,3,3b,4}-console.log、n04-pairing-receipt.json、n04-pairing-00*/。
 - 下一任务：work——phase② 静默窗口重跑（PROBE_N04_PAIRING+PROBE_DPI_INTERACTIVE=1，DPI双向及时切换）→ 证据总结/SD-01/02/导航/内部检查 → review交接。
 
+### 2026-11-03：work阶段——N-05.reflow vue腿闭合（vue臂34/34全绿）+ T-09冻结两轮（dpi待用户时机）
+
+- stage: work | plan_id: PLAN-029 | plan_revision: r1 | task: T-09准备（reflow闭合/冻结跑）| outcome: partial（vue臂34/34全绿含重排腿；vm冻结跑全部就绪唯 dpi-change 两次未等到用户切换——播报节奏已修正）| worktree: .wt/ui-029@98633fd4（无改）| reader: main@28c765a | next: work（phase② 最终跑 + 收尾）。
+- **reflow 闭合复盘**：seam 627px 恒定=页面列 max-w-2xl(672px) 钳制——此前 1680/900/900×800 的 resize 全部未跌破 672，误判「触发不可用」记 GAP（诚实记录，后经 560 视口证伪并闭合）。viewport 560 实测：seam 627→512、colW 529→423（分页器 ResizeObserver 全量重排），重排后段首锚定 + 片段级拖选 occ=2 oracle 全绿。
+- **vue 臂终态（t09-vueiso17）**：34 记录 **零非绿**——N-02 全链（含图/脚注按许可翻页断言）/N-03/N-05（reflow+repage+occlusion+hideshow 全腿）/N-09 负控矩阵/N-11 变异指纹红→绿。
+- **vm 冻结两轮**：t09-final-vm（N-04 配对 PASS、N-05 除 dpi 全绿；CDP 瞬断早退——flake 家族）；t09-final2-vm（57 记录：N-04 配对 PASS、N-05 除 dpi 全绿、N-07 B-instance boot timeout（新现，伴随 600s dpi 等待的长寿命实例退化；N-07/08 异常防护已落地 e6d3d41）、N-12.vue-chain 继承 reflow GAP（本轮已闭合））。dpi 两轮均 GAP=播报节奏晚于提示（已修正：下轮 60-90s 密集轮询）。
+- 用户配合事实：DPI 第一次切换成功过（t09-frozen-vm 192→168 track+redrag PASS）；restore 超时与后续两轮未切均为提示到达时机问题，非用户不配合。
+- 证据：plan-artifacts/plan-029/t09-vueiso17{,-console.log}/、t09-final{,2}-vm{,-console.log}/、t09-vuediag11/。
+- 下一任务：work——phase② 最终跑（密集播报 DPI 时机）→ 证据总结/SD-01/02/导航/内部检查 → review交接。
+
+### 2026-11-03：goal回合（reflow闭合轮）
+
+- stage: goal | plan_id: PLAN-029 | plan_revision: r1 | round: 10 | from: work | to: work | status: executing | outcome: partial(reflow闭合，dpi待用户时机) | worktree: D:/autostack/.wt/ui-029/auto-ui | commit: reader 28c765a | next: work。
+
 ### 2026-11-03：goal回合（N-04配对轮）
 
 - stage: goal | plan_id: PLAN-029 | plan_revision: r1 | round: 9 | from: work | to: work | status: executing | outcome: partial(phase①完成，phase②待静默窗口) | worktree: D:/autostack/.wt/ui-029/auto-ui | commit: reader 7b42765 | next: work。
@@ -381,7 +395,7 @@ Reader旧门入口保持 `python tests/basic/verify_standalone.py --profile vue|
 
 0c. **N-04.focus-roundtrip（开放，诊断收敛）**：本轮把 OS 层证据链补齐——重排序后实测 fg=主窗、OS 焦点=主窗（AttachThreadInput+SetFocus 在最后一次表面点击之后）、WindowFromPoint(输入点)=winit 主窗类 "Window Class"、弹出窗矩形 (145,486,1696,840) 不覆盖输入点 (787,348)——即点击确实抵达 iced 主窗，但表面拖选发生后输入值恒不变；真实键盘 Tab（iced 默认无 Tab 焦点循环）亦无效。结论：iced 组件级焦点不随 OS 焦点恢复，且表面交互后真实点击不再聚焦输入 widget。剩余修法二选一：①UI 侧（worktree）对输入焦点路径插桩定位；②按本节第 1 条既定协议以「CDP 焦点断言 + 人工目击配对」补证。另：N-04 各真实输入腿在活桌面上有 run-to-run 抖动（dry3 ime-commit FAIL、相邻轮 PASS；dry2 表面点被 CASCADIA 终端瞬时遮盖）——真实输入门的度量需要空闲桌面窗口。
 0d. **Vue 既有链分页回归（已修复闭合，reader 64c04db）**：定位=分页器本身工作正常（next() 以 iframe 元素整页位移推进，每步 625px，t09-vuediag9 实测 x: 328→-297→-922），根因=巨列形态（ch1≈25列×625px）下第2处出现于第 ~20 列，旧驱动 12 轮翻页预算不可达，且「永不相交」时旧代码以负宽插值把拖选坐标算到视口外（elementFromPoint=null → 0 locator POST）。修复=共享 _vue_page_to_visible（48 轮预算 + 位移进度守卫 + 永不相交具名失败）+ 片段级行盒精化拖选 + RGB/RGBA PNG 解码 bpp 修正。iso10 实测：目标 20 轮真实翻页可达、真拖选 occ=2 → .at 后端 accepted → CFI → sidecar 落盘 → 冷恢复 → N-09 负控全绿 → N-11 变异红/指纹落点异位/还原绿（33/34）。
-0f. **N-05.reflow vue 腿（开放，具名 GAP）**：三个重排触发通道在 vue 轨当前形态下均不可用——a) body 字号注入：分页器不观察内容字号，页表失真 → 拖选落空（t09-vuediag10 sel=None 实测）；b) gap 属性：巨列形态 innerW 爆炸（t09-vueiso11）；c) viewport resize：生成页列盒宽固定（seam 627px 在 1280/1680/900 视口不变，t09-vueiso12..14 实测）。该腿如实记 GAP（机制不可用，非 oracle 失败），聚合保持非零。字号重排维度由 vm 轨 N-05.font-reflow 覆盖（T-05/dry2/t09-vmreg 全绿）。若未来要闭合此 GAP：改 probe.at 页列宽为 viewport 响应式并 regen 前端（牵动 vm 轨同页布局，需双轨回归），或适配器/分页器侧新增内容字号观察。适配器订阅硬化已随本轮落地（mouseup at load + WeakSet 去重，vm 回归干净），但其不解决重排触发本身。
+0f. **N-05.reflow vue 腿（已闭合，reader 28c765a）**：根因复盘——页面列 max-w-2xl(672px) 钳制使 seam 在 ≥672 视口恒 627px，此前向 1680/900 的 resize 均未破钳，被误判「触发不可用」；字号注入/gap 属性两通道仍不可用（分页器不观察内容字号、巨列下 innerW 爆炸，诊断记录保留）。闭合=**跌破钳制的 resize（viewport 560）**：seam 627→512、colW 529→423 真实重排（分页器 ResizeObserver 一级通道），重排后段首锚定 + 片段级拖选 occ=2 oracle 全绿（t09-vueiso17：34/34 零非绿）。
 0g. **N-04.focus-roundtrip（配对协议落地，门侧已实现）**：合成注入盲区实锤=CDP `document.hasFocus()` 在外部 SetFocus 归还 OS 焦点后**仍报 true**（Chromium 焦点信念不随 OS 焦点迁移，n04-pairing 各会话一致）——合成路径 click→组件焦点恢复失败的根因面。§10 第 1 条既定补证协议落地：配对回执（reader 7b42765）=自动 CDP 断言（真 SendInput 拖选后弹窗持焦=True ✓ + 显式 SetFocus 后 OS 焦点=主窗 ✓，n04-pairing-receipt.json run 005833）+ 在案人工目击（T-04 轮：用户表面在场时手工输入 1231 成功，视觉证据）组合判定。**另发现实验 profile 产品级缺陷**：IME 输入框 oninput 键入时 MCP 服务线程挂起（5 个配对会话一致复现，T-07 串行阻塞同族）——人证回读须走 UIA/产品修复，已具名。快照值/边界正则已修（聚焦态 bbox 嵌套、多行记录）。live-bounds 路线关闭：vnode 动态 id 不在 layout_bounds 测量集（快照无 bbox 字段实测）。
 0e. **本轮随手闭合项**：N-03 旧记录基线改在 N-01 双通道之后重新静默冻结（合法增长曾被误判）；T-05 门单腿失败不再级联早退（dry3 N-06 曾被跳过成 missing）；N-12 门加 17825/17827 端口静默屏障（busy 回退链竞态实证）；verify_standalone 门内 verify_standalone 路径修正 + R-01 vite 单发探测改有界轮询（冷启动误判）。standalone-vm 旧门 27/27 全绿（含 R-05 与修复后 R-06vm）= T-08 修复在真实门内闭合。
 
