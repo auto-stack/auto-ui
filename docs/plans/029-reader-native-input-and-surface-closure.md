@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-02
 updated_at: 2026-11-02
 plan_revision: 1
-current_step: 3
+current_step: 6
 total_steps: 12
 base_branch: master
 base_commit: e344d2268f6bf40d1ed4f24ea957ce3fbd88313c
@@ -192,7 +192,7 @@ Reader旧门入口保持 `python tests/basic/verify_standalone.py --profile vue|
 | T-02 | work | T-00/01 | [x] UI最小compiler/runtime/tools实验表面，Reader probe.at声明并从真实native VM启动；native_host仅对照——doc-surface feature leaf（worktree 20aaa27，converter Custom漏臂修复+Element通道+canvas painter子表面管理），Reader d33144e（probe.at+surface-url端点）；真实VM窗口内引擎装载spine=3/271ms、MCP树可见、组件分配bounds=子表面rect | NVM-01～06窗口/组件/cohort，表面区域/回调能实际进.at前端；生成产物不手改 | AC-02 |
 | T-03 | work | T-02 | Reader前端model/handler、既有back/api.at与adapter、driver_vm补真选择/核验/保存/冷恢复 | N-02/03/09逐字/出现位次/CFI真解析、前端可见状态与磁盘读回；正常/异常重启，旧数据不变 | AC-03/04 |
 | T-04 | work | T-03 | UI输入/焦点/组合事件最小修复与实际driver取证 | N-04真实IME组合/取消/提交、焦点返回与快捷键不误触，全通过 | AC-05 |
-| T-05 | work | T-03/04 | UI布局/文档表面resize/DPI/遮挡/隐藏生命周期与系统无障碍接缝 | N-05/06目标原文/命中/系统树可操作均实测；不是records计数或纯ARIA | AC-06 |
+| T-05 | work | T-03/04 | [x] UI布局/文档表面resize/DPI/遮挡/隐藏生命周期与系统无障碍接缝——弹出窗真隐藏修复（worktree 98633fd4）+ 驱动 N-05/06 全门（reader ac24c98，probe.at 断开按钮 + engine-adapter 键盘接缝）；N-05 字体重排/滚动重拖/遮挡像素取证/隐藏展示重拖选、N-06 UIA 系统树定位+UIA焦点+真实键盘翻页、N-05.dpi-change 交互门（144→192→144 track/redrag/restore 三段全过）——见 §9 2026-11-02 T-05 记录 | N-05/06目标原文/命中/系统树可操作均实测；不是records计数或纯ARIA | AC-06 |
 | T-06 | work | T-03～05 | 两仓会话/实例配置与自有process管理，补双实例、关闭/迟到/端口/坏tool/占口专属门 | N-07/08/10正负对照；只收割自有树，10s清理，另一实例继续可用 | AC-07/08 |
 | T-07 | work | T-06 | 保原协议/资源安全，独立oracle与真实错锚/错身份变异，补适用负控回归 | N-09/11原拒绝零写、合法对照绿，变异红且聚合非零→还原绿；不得吞报错 | AC-03/07/08 |
 | T-08 | work | T-00可先诊断；最终依T-07 | 复现Reader R-05/R-06vm、分析实际owner；修本仓允许面或绑定他仓正式前置 | N-12原测试条件保留，404/像素负控失败机制真实闭合；外仓前置未到则保持未完成 | AC-09 |
@@ -201,6 +201,18 @@ Reader旧门入口保持 `python tests/basic/verify_standalone.py --profile vue|
 | T-11 | merge | T-10 pass | 固定两仓提交/landing/canonical、归档archived/、修导航、材料摘要后清自有scope；fresh guard后移除树/分支 | 真实12/12与archive路径/cohort一致、恢复信息足够；不动他人WIP/OS pin/ledger，不把旧026回执改为新证据 | AC-12 |
 
 ## 9. 复审记录
+
+### 2026-11-02：work阶段——T-05 几何/无障碍/键盘/DPI 全门真实通过（AC-06）
+
+- stage: work | plan_id: PLAN-029 | plan_revision: r1 | task: T-05 | outcome: pass（N-05/N-06 全子项 PASS；N-04.focus-roundtrip 保持 §10 具名开放、N-08 待 T-06）| worktree: .wt/ui-029@98633fd4 | reader: main@ac24c98 | next: T-06。
+- **隐藏门红→绿**：红=red3（修复前构建）——probe.at 新增「断开表面」按钮置空 url 后弹出窗仍可见、中心像素灰 (200,200,200)；修复=doc_surface.rs 弹出窗真隐藏（SW_HIDE/SW_SHOWNA，SurfaceMeta.popup_visible；unmount 无钩子为 SD-02 记录边界）；绿=green11（hidden PASS popup_visible=False、同 rect 复现、重拖选 oracle 重命中）。
+- **N-05 几何门**（green11/dpi6 全部真实执行）：字体重排（章节 body 200%→行盒位移→新几何真实拖选 occ=2 oracle✓）；滚动重拖（CDP 翻页=许可口径，cfi 位移断言，新段 oracle ch1 para8✓）；遮挡（驱动自有 topmost 纯色遮挡窗，像素三段取证 before白/during红/after白，撤除后 ch3 预导航+真实拖选 oracle✓）；resize-follow 沿用。
+- **N-06 系统无障碍**（非 DOM ARIA）：`--force-renderer-accessibility`（屏读等效开关）+ PowerShell UIAutomationClient 从弹出窗 HWND 走**系统树**——目标句全文以 ControlType.Text 命中（链 Text←Document）；**键盘访问接缝**=engine-adapter.js 补 foliate-js 缺失的键处理（翻页是宿主职责；iframe 键事件不冒泡故 host 页+章节 doc 两级挂）——UIA SetFocus(Document)→GUI 线程焦点入弹出窗子树（IsChild✓）→真实 ArrowRight/Left 翻页往返（lastLocation.cfi 断言）全过。
+- **N-05.dpi-change 交互门**（用户协助，PROBE_DPI_INTERACTIVE=1）：OS 缩放 144→192→144 真实变化；track=弹出窗 959x576→1696x840 精确跟随（innerWidth×新scale 误差≤6px）；redrag=新几何下真实拖选 sel-exact 认领+oracle（ch1 para8 offset13）；restore=1272x630 精确回 1.5×。检测窗 600s=用户节奏语义修订（见 §10）。
+- **驱动硬化**（全部由 red2/red3/green1-11/dpi1-6 实测失败驱动）：GetPixel/CreateSolidBrush/DeleteObject 属 gdi32；MCP 安轮询（announce 先于 listener 的 10061 竞态）；禁双 sync_playwright（py3.14 event-loop 冲突）；同行逐字符拖选量测（整节点/跨行 box 塌缩成 1-3 字符选区）；sel-exact 记录认领（计数 delta 被乱序记录吸收）；坐标一律驱动侧实测（57cf408a 起日志行为屏幕绝对，旧 N-02 拖选数学含双重客户区原点偏移但 oracle 端到端仍真——已记坐标口径发现）。
+- 工具宿主曾于 green1 在 N-04 阶段静默退出（无 WER、无 panic 文本；同二进制 n04-repro 单独复现 30 次键击不崩、green2-11/dpi3-6 全部通过）——按瞬时环境 flake 记录，不做结论。
+- 证据：plan-artifacts/plan-029/t05-vm-red2|red3|green2..11|dpi..-console.log + 各 out-dir（consumer*.log/sidecar/n06-uia*.json/results-vm.json）。
+- 下一任务 T-06：双实例/关闭/迟到/端口/坏tool/占口门。
 
 ### 2026-11-02：work阶段——T-04续：表面不可见缺陷修复（用户目击验收，AC-02补强）
 
@@ -262,6 +274,8 @@ Reader旧门入口保持 `python tests/basic/verify_standalone.py --profile vue|
 
 ### 2026-11-02（work 执行中登记）
 
+0. **N-05.dpi-change 检测窗预算语义修订（T-05 已按此执行）**：交互门检测/恢复窗从起草隐含的短窗修订为 600s——首跑 150s 实测超时（用户切换动作晚于窗口，DPI 实际已生效）；交互门计时独立于 600s 自动链预算，属 §5.2「预算本身不适用时按语义修订说明原因」情形，不放宽任何自动门 deadline。
+0b. **坐标口径发现（T-05 登记）**：57cf408a 弹出窗形态起，doc-surface 日志行 phys 为屏幕绝对坐标；旧 N-02 拖选数学（ClientToScreen+该偏移）含双重客户区原点偏移，靠行宽容差+oracle 端到端仍真。T-05 起新门坐标一律驱动侧实测（EnumWindows 类名 AutoUIDocSurfacePopup + GetWindowRect），不依赖日志行。
 1. **N-04.focus-roundtrip 表面→输入框方向（开放，具名）**：弹出窗形态下，表面内真实拖选后，注入点击/键击（双击、标题栏激活、AttachThreadInput+SetFocus、WM_CANCELMODE）均无法把 OS 线程焦点从弹出窗 Chrome（fd5e/fe10）拉回 iced 输入框（t05-vm5/6/7/8 诊断一致：cap=0、焦点恒驻弹出窗）。**人工路径可用**：用户在表面在场时向输入框手工输入 1231 成功（视觉证据）。方向 输入框→表面 已证（真实拖选 CDP 选区）。待 repair：诊断合成注入与人工点击的差异（可能性：Chromium 内部捕获/焦点仲裁），或以「CDP 焦点断言 + 人工目击配对」补证。用户手工输入 1231 期间页面正常（无命令误触）可作辅助证据。
 2. **原生轨文本拖放入输入框（能力缺口，非本计划门）**：用户实测从文档拖文字到 IME 输入框不生效。定责：源端（WebView2/Chromium）支持拖出；目标端运行时有 Plan 488 `native_dnd`（IDropTarget/CF_UNICODETEXT，App 级 `on_native_drop` 事件）但 ① cohort 构建未启用 `native-dnd` feature，② 即使启用也只到应用级事件——iced text_input 无「拖放到光标处插入」接线。属原生轨框架新功能（Vue 轨浏览器原生支持故无此缺口），应由框架侧后续计划补，不阻塞本计划任何门。
 3. 其余起草期条目（1~4）转入 T-00/02/08 已闭环或随任务推进。
