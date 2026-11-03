@@ -1,5 +1,7 @@
 # 3D Node表现、声音/HUD与G10新作者迁移
 
+> 2026-11-03后续核验：UI034交付93eaa907、AG015交付80e0b65，当前19/22；UI035仍原owner实施3/10。034/015收据为同实现会话复核，独立上下文证据与相关持名hold不据归档自动推定已闭。下一批UI039/AG016/AG017见[查询与完整G3设计](node3d-queries-and-complete-game.md)。下文为本批立约时快照，原合同与预算不改。
+
 2026-11-03，设计v1。用户明确授权本批规划：auto-ui补3D表现与声音/HUD接线，ag-examples迁G10纹理/动画两个入口，原预算和验收不减；仅设计/合同/导航，不实施、建树/探针/素材、构建/GPU或创建agent。本设计承接[共同作者模型](declarative-authoring-model.md)和[M2游戏优先路线](m2-game-first-three-lane-roadmap.md)。
 
 ## 1. 实际基线与缺口
@@ -14,9 +16,9 @@ G10当前两入口固定006旧source/runner，共一个内容项/完整双入口
 
 | 合同/责任仓 | 范围 | 可并行准备 | 完整实施硬门 |
 |---|---|---|---|
-| [UI034](../../plans/034-autographics-node3d-materials-and-animation.md) / auto-ui | typed纹理/动画闭包、clip/目标、局部组件/原模型body、原G10十七项新生成链 | 005/006/030已实际交付；开工核owner/SDK/原件 | T-02最多两机制全链先证/冻结，不只parse |
+| [UI034](../../plans/archived/034-autographics-node3d-materials-and-animation.md) / auto-ui | typed纹理/动画闭包、clip/目标、局部组件/原模型body、原G10十七项新生成链 | 005/006/030已实际交付；开工核owner/SDK/原件 | T-02最多两机制全链先证/冻结，不只parse |
 | [UI035](../../plans/035-autographics-node3d-audio-hud-composition.md) / auto-ui | 具名cue/HUD通用服务、单视觉bundle、新显式三维有界组合及完整G3八项公共夹具 | T-01/02原资源/许可/oracle/接口/预算方案，不读034tip | T-03完整组合硬等034实际delivery/独立review/Spec/工具，再做最多两候选全链先证 |
-| [AG015](../../../../ag-examples/docs/plans/015-autographics-gallery-g10-node-migration.md) / ag-examples | G10纹理/动画两入口普通Node迁移，原17和全部内部控制、双入口包 | T-01原件/许可/原17/包准备 | T-02完整新链硬等034实际交付；**不依赖035**，不追加声音/HUD |
+| [AG015](../../../../ag-examples/docs/plans/archived/015-autographics-gallery-g10-node-migration.md) / ag-examples | G10纹理/动画两入口普通Node迁移，原17和全部内部控制、双入口包 | T-01原件/许可/原17/包准备 | T-02完整新链硬等034实际交付；**不依赖035**，不追加声音/HUD |
 
 三份均drafting/r1、0/10。先034实现、035与AG015准备；034实际交付后035完整接线与AG015完整迁移可并行，各自固定实际版本，不追tip。035/AG015彼此无完成依赖。完整3D游戏未来另立ag-examples/games/platformer-3d合同，不本轮取号或创建目录；2D继续保固定032，不因3D能力自动升级。
 
@@ -42,7 +44,7 @@ G10当前两入口固定006旧source/runner，共一个内容项/完整双入口
 
 ## 5. G10内容保真与验收分工
 
-[AG015 §5.2](../../../../ag-examples/docs/plans/015-autographics-gallery-g10-node-migration.md)列原9+8名，保各名内部阈值/轨迹/原66状态控制、8坏证明及2发布回滚等适用义务。纹理保原三Kenney模型+UV六面、非对称图/alt、原KHR/sampler/材质/深度、main幅度.8/alt1.6和tick2隐藏/tick3恢复；动画保原character87624B、static/idle/walk/jump四ordinal、8nodes/44LINEAR/337samples，初始位置/非均匀scale/地面/原相机距6-pitch30、动作/重力/触发及主phase+=dt/alt+=2dt。
+[AG015 §5.2](../../../../ag-examples/docs/plans/archived/015-autographics-gallery-g10-node-migration.md)列原9+8名，保各名内部阈值/轨迹/原66状态控制、8坏证明及2发布回滚等适用义务。纹理保原三Kenney模型+UV六面、非对称图/alt、原KHR/sampler/材质/深度、main幅度.8/alt1.6和tick2隐藏/tick3恢复；动画保原character87624B、static/idle/walk/jump四ordinal、8nodes/44LINEAR/337samples，初始位置/非均匀scale/地面/原相机距6-pitch30、动作/重力/触发及主phase+=dt/alt+=2dt。
 
 24UV ROI与独立CPU/f64 key/slerp/hierarchy/GPU silhouette-shadow等oracle保持；同输入240Tick visual开/关physics/camera/events除Run身份外相同。原normal7raw/150508B、含alt8raw/150787B和原六closure/poseCPU32592为内容保真基线；新生成层开销单独实测，不能为过预算删资源/轨道。
 

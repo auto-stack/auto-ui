@@ -37,15 +37,16 @@
 | 031 | [主题作用域、原子发布、正式主题包与基础控件收口](archived/031-theme-scope-publication-and-package-closure.md) | 拆分后架构工作包A；接受007/910 | archived/r1，11/11；已交付（评审 pass @ b6c26186，ff-only 落地）；SD-01..05 + packages/themes 生效，003/010 双端迁移完成，后继033已交付，B1累计10例，余24应用；发行/生成输入差额接036，宿主接OS053 |
 | 032 | [完整2D游戏组合与预算收口](archived/032-autographics-node2d-full-game-composition.md) | M2游戏优先/引擎线 | archived/r2；交付a8c04d22，独立final/落主/Spec/清理齐；原32内完整G2公共组合，AG014已固定消费并交付 |
 | 033 | [剩余六个基础示例正式主题迁移](archived/033-basic-examples-theme-migration.md) | UI031后继B1六例 | archived/r1，9/9；实际交付d734f1fe、Spec/归档清理齐；复审记录同实现会话重构的来源限制见归档，非AG新计划前置 |
-| 034 | [3D纹理资源与节点动画作者接线](034-autographics-node3d-materials-and-animation.md) | 005/006/030新作者收口 | drafting/r1，0/10；actor-free纹理＋原模型角色动画/局部组件/typed闭包与clip，原G10十七项/预算保持，暂不实施 |
-| 035 | [3D声音/HUD与完整G3组合接线](035-autographics-node3d-audio-hud-composition.md) | 034后继/公共三维音画 | drafting/r1，0/10；T-01/02可准备，T-03硬等034实际交付；原G3八项、原32与音画额度保持，不代正式游戏，暂不实施 |
+| 034 | [3D纹理资源与节点动画作者接线](archived/034-autographics-node3d-materials-and-animation.md) | 005/006/030新作者收口 | archived/r1，交付93eaa907、Spec gallery-node3d-textures-and-animation.md；AG015已消费。复审收据明确同实现会话复核，相关独立证据/持名hold不据归档视为已闭 |
+| 035 | [3D声音/HUD与完整G3组合接线](035-autographics-node3d-audio-hud-composition.md) | 034后继/公共三维音画 | 原owner实施中、任务3/10、metadata仍drafting/r1；ui-035树/codex/plan-035-dev可核，候选先证非交付；后继AG016完整接线等其实交付/独立证据 |
 | 036 | [正式主题包发行与生成输入收口](036-official-theme-distribution-and-input-closure.md) | 031 F-05及VM/Rust receipt差额，接受033 | drafting/r1，0/10；Full SDK/delivery、Vue/VM/Rust输入/复用与外部恢复；OS053/918互不整项等待，B2采用新渠道验收接U036；仅规划、暂不实施 |
 | 037 | [B2十二个业务示例主题迁移](037-business-examples-theme-migration.md) | 031/033后继B2，渠道接036 | drafting/r1，0/11；十二例业务/计时/store/路由保持、双端逐例/隔离/恢复；可先核path源码，渠道最终门等U036，暂不实施 |
 | 038 | [B3专用示例主题支持面核验](038-specialized-examples-theme-readiness.md) | 拆分路线B3有界研究 | drafting/r1，0/8；十二例盘点、六类真实链探针、go/blocked/no-go及后继分包；研究不等迁移，不等037整项，暂不实施 |
+| 039 | [3D查询、动态组与二维标记Node接线](039-autographics-node3d-queries-and-mixed-markers.md) | G05/3d新作者前置；021/024/030 | drafting/r1，0/10；不等035，T-02全链先证后实现；AG017固定消费其实交付，原九义务/三变体/预算不减；暂不实施 |
 
-当前AG按[三线总路线](../design/autographics/m2-game-first-three-lane-roadmap.md)推进；032引擎、AG014完整2D游戏、AG013 G11/3d均已实际交付。最新[3D表现/音画与G10设计](../design/autographics/node3d-presentation-audio-and-g10-migration.md)立UI034/035和ag-examples/015；后两者可独立准备、完整接线/迁移固定034实际交付，AG015不等035。当前Gallery17/22，不是M2百分比；完整3D游戏尚未立项，本轮只规划不实施。
+当前AG按[三线总路线](../design/autographics/m2-game-first-three-lane-roadmap.md)推进：UI032/AG014/AG013已交付，UI034交付93eaa907、AG015交付80e0b65，当前Gallery19/22；UI035原owner继续实施3/10。新批[查询与完整G3设计](../design/autographics/node3d-queries-and-complete-game.md)立本仓039＋AG016正式3D游戏＋AG017 G05/3d；游戏完整接线等035真实交付及相关独立证据，Demo完整迁移等039真实交付，各自可先准备。本轮只规划，不接管在途实现。
 
-024/025/027/028已交付，026/029为Reader路线；030已交付且独立review补齐；本轮AG新增034/035；并行新计划的当前号源以`.next-id`为准，下一份以独占取号时本地活动/归档最大号重核（018分配后已有并行019，勿回退号源）；不能因外仓号882/883跳号。003是Blog路线，004..006是AG表现阶段，007是主题/示例工作包，014是拆分路线结构收口包，018是UI编译配置收口，026是Reader阅读表面跨仓探针；这些合同分别管理。状态以各自合同为准。设计与并行/后继入口见[本仓设计索引](../design/README.md)。
+024/025/027/028/030/032/034已交付，独立review与持名问题以实际收据为准；026/029为Reader路线。AG下一能力为039，036..038属主题路线保持原owner；各仓号源独占重核，不以外仓历史号跳号。设计与后继见[本仓设计索引](../design/README.md)。
 
 ## 债务/候选
 
