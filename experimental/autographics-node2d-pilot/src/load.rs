@@ -119,12 +119,8 @@ fn line_of(source: &str, offset: usize) -> usize {
         + 1
 }
 
-fn parse_module_text(file: &str, source: &str, base: &Path) -> Result<LoadedModule, ProjectError> {
-    parse_module_text_dialect(file, source, base, false)
-}
-
 /// PLAN-039：queries-3d 组合 dialect（仅显式查询 profile 放行同 node 双
-/// view 解析；默认路径旧拒绝字节不变）。
+/// view 解析；`allow_dual_view=false` 即旧默认路径，拒绝字节不变）。
 fn parse_module_text_dialect(
     file: &str,
     source: &str,
