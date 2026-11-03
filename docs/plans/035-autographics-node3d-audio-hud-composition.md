@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-03
 updated_at: 2026-11-03
 plan_revision: 1
-current_step: 0
+current_step: 3
 total_steps: 10
 depends_on: [auto-ui/PLAN-012, auto-ui/PLAN-013, auto-ui/PLAN-025, auto-ui/PLAN-032, auto-ui/PLAN-034]
 supersedes_spec_components: []
@@ -46,7 +46,7 @@ affects: [auto-ui-dialect, autographics-node2d-pilot, autographics-auto-driver]
 
 ## 4. 需求分析与背景调查
 
-用户2026-11-03明确授权本批规划而非实施；引擎两片034→035、AG015内容分别管理，原G3/预算/验收不减。auto-ui基线cfe325d41e9c98b9d877fe071db04b42b687880c，012公共音频、013 HUD（8b1e799）、025通用二维（e9cc929/54899e9）、032组合（a8c04d22）及030三维引用（804d7303）均已交付；034当前只有drafting/r1，不能预填交付SHA或把其提案端口当现成能力。
+用户2026-11-03明确授权本批规划而非实施；同日用户再以`/goal 完成计划035`授权auto-plan-goal全链交付（work→review→有界修复→merge，含实施树创建/独立review/落主归档清理），后续阶段继承此授权不再重复请求；034已于56ed6ac3归档落主（交付93eaa907），T-03硬门前提已在主checkout可核；引擎两片034→035、AG015内容分别管理，原G3/预算/验收不减。auto-ui基线cfe325d41e9c98b9d877fe071db04b42b687880c，012公共音频、013 HUD（8b1e799）、025通用二维（e9cc929/54899e9）、032组合（a8c04d22）及030三维引用（804d7303）均已交付；034当前只有drafting/r1，不能预填交付SHA或把其提案端口当现成能力。
 
 权威：[公共音频](../../../auto-lang/docs/specs/auto-graphics/public-audio.md)、[HUD](../../../auto-lang/docs/specs/auto-graphics/public-hud.md)、[025 Spec](../specs/auto-graphics/node-presentation-services.md)、[032 Spec](../specs/auto-graphics/node2d-full-game-composition.md)、[034合同](034-autographics-node3d-materials-and-animation.md)、[原G3八项/关卡](../../../auto-lang/docs/design/autographics/m2-game-sample-matrix.md)。012/013事实不能推出新Node三维端口已接线；G12只二维、G10不含声音/HUD，不扩大其内容合同。
 
@@ -105,6 +105,38 @@ Pause冻结voice/phase，neutral Step视觉/HUD一Tick、声音suppressed无新v
 
 公开source-build/A→B仅闭包冷再生/真Run、源码编辑变异、保存关开/SaveAs/坏件拒绝→精确恢复→同入口再Run必需本新组合证据；不能只指旧profile无关套件顶替新资源/新链保存义务。真实generator/runner hash、两图依赖锁/toolchain/参数/SDK681及模块资产许可互绑，当前/候选Spec hash区分；无独立G3产品、无M2标签、无其他内容自动跟升。
 
+### 5.6 T-02接口准备与A/B两路径方案（2026-11-03，仅文档准备，不记完整先证go）
+
+**声音span权威绑定**：project2d scene.agscene权威cue表为jump=[0,7403)/coin=[7403,20046)/land=[20046,22504)（帧域，44100Hz/2ch/22504帧）；本计划§5.4"jump/land/coin"名称顺序为行文笔误，按权威表执行（coin为中段12643帧长音、land为尾段2458帧）。cue名字保持作者自由命名，span-事件对应由作者声明决定。
+
+**路径A（仅复用既有档，预期在收集步超32）**：装配=triggers3d/1＋034 node_animation3d/1（clip必需，G3-07）＋audio3d 112/23、hud3d 114/25既有bundle；事件走028单cursor（ag_event_next/pair/phase各1 credit，经composition包装或原名），销毁走ag_object_despawn逐个1 credit。收集Tick最坏账：move26＋grounded1＋input（无034快照时6次action读=6；有快照1）＋cursor最少(next+pair)2＋despawn1＋present3d1＋pose1 = 34..39 > 32，预期不可行；A仍按计划在T-03实测先证，不得凭和式直接判死，也不得减事件/表现凑过。
+
+**路径B（新显式三维组合档，预期恰32）**：新档名提案`autographics.components3d/1`（number/profile具体身份T-03核唯一后冻结，绝不冒用116/27），组装032同构有界机制但绑定三维trigger字段：ag_events_snapshot（1 credit，≤1/callback，0..8行完整字段）＋ag_object_despawn_batch（1 credit/批，0..8，59/37域不变）＋58混读拒绝，全部沿用032字节语义。收集Tick最坏账：ag_actions_snapshot1（034，pressed消费一次共享）＋move26＋grounded1＋pose1＋snapshot1＋batch despawn1＋present3d1 = 32/32，非收集Tick=30；零余量为实测结论预留，若实测超32→按计划needs_replan，不得静默扩域或减必要表现。pose每Tick推进phase（G3-07连续行走周期）故计入每Tick。
+
+**原G3运动oracle绑定**：脚本输入表=g3_route_a.at头r4冻结相位表（1-42=(1,1) 43-84=(1,-1) 85-309=(1,0) 310-351=(1,1) 352-355=(1,0) 356-402=(1,1)，jump{112,261}），spawn(2,1,2)（ag_set_local 0/1/2轴=2.0/1.0/2.0），对角k=2.8284271，clearance0.002；oracle三件套=①独立f32几何模拟器（Rust测试侧，60Hz、§5.3几何、固定步）②仓内committed g3_route_a.at探针同输入回放交叉核③夹具实测轨迹逐值对①（G3-01..03）。decision.json（go，sdk7b987ca8，A=27/step、B=26/step实测）为预算参照。
+
+**资源并集与夹具拷贝**：7身份/263372B从driver samples拷入两新夹具（character.glb 7112f6a0/87624四clip、platform 78c5ed4d/13352、coin a3fb8f77/22124、flag 0ba84ff4/13276、colormap 106cf02e/10108、bank b0b740dc/90060、font 4444c236/26828），随附CC0/MIT（Kenney 3fa8a04b）与OFL/RFN（31d45880/4391B）许可文件；占8身份/32MiB raw内。HUD四槽文本全部ASCII（n/3、Playing/Won/Failed类），font/atlas预算不变。
+
+**有界假设**：①034交付物（typed资源/clip/pose端口）按已落主Spec 93e9ae2a与verify_plan034钉死值消费，T-03实跑其--controls复验；②sdk/双Cargo.lock/toolchain按仓现值冻结，T-03登记精确hash；③32池含cast_charge全部服务读，camera basis/快照getter为0 credit Auto计算；④两路径产物生成器无计分/胜败/Idle特判（负控由V-S01改名/双实例证明）；⑤主地图三币同Tick压力由独立边界夹具承担，不改关卡。以上均文档准备，完整先证与go/no-go属T-03。
+
+### 5.7 T-03先证与冻结（2026-11-03）
+
+**034硬门在本树复验**：verify_plan034 --controls 7/7 PASS（cold_regen 10产品字节等、frozen_sources钉driver api/spec/G10原件）＋driver四GPU套件绿（node3d_presentation_flow 4/4、gates 4/4、oracles 4/4、oracles_anim 6/6，`--test-threads=1`）。034交付93eaa907/Spec 93e9ae2a可消费性成立。
+
+**源冻结**：auto-ui实施树=56ed6ac3+codex/plan-035-dev；pilot语言图=auto-lang 8717bd5d3（同组依赖树detached）；SDK681=driver sdk/frozen恰681文件（prepare_sdk --from-snapshot PASS）；toolchain=rustc 1.98.0/88d9e12ae；unit字节钉下表。
+
+**候选A实测死 verdict**：真Host/真VM下A形程序（hud3d/1全套+cursor next/pair/phase+逐个despawn+三币同Tick收集）在收集Tick第33次cast_charge处触发具名fault 10（探针tests/plan035_probe.rs::candidate_a实测，非和式推断）；与单元字节算术（cursor每次读各计1、next空探针也计费）一致。A不可行成立。
+
+**候选B冻结身份**：`autographics.components3d/1`＝number 117／profile 28／cli `components3d`（116/27保持2D专用；全仓无他占用，编译器穷尽match核过）。unit=`api/public_composition3d_v1.at`（sha256=f46fdb5aa2241a7beb10a2b622c8e453e7b0cad377dd8dba8ca26b5f7ab280b3提交前字节，提交后以git对象为准）：032同构有界机制绑定共享维度无关trigger/object状态（快照0..8行全字段1 credit≤1/callback、批销毁0..8全有全无1 credit/批、58混读、59长度域、37物理写、38未冻结），逐字节沿用032语义。装配=Hud3V1整栈派生：cursor七读改名为_ag_cmp_*、entry加_ag_cmp_tick_begin、profile 25→28/version 114→117、**char3/cam3冻结改为app_start绑定条件化**（唯一合法actor-free路径，D-02兑现）；旧profile装配字节零改（派生仅新增分支）。
+
+**Host接线冻结**：components3d＝ThreeD character/camera类（play.rs两match加臂）；behavior.actors.three_d=null时（且仅此profile）不注入bind表、不期待frozen相机块——actor-free服务Run合法发射kind=-1 present3d（1 credit/包、≤4声、四HUD槽全状态）。负控：同一actor-free源在hud3d/1下触发无绑定冻结fault 25（旧基底确无该合法路径）。synthetic输入注入、camera basis发送沿既有ThreeD路径不变。
+
+**收费实测**：B收集Tick=31/32（actions快照1+move26+grounded1+事件快照1+批销毁1+present3d包1）、边界变体恰32/32绿（+ag_char3_support）、稳态30。B在三币同Tick用例全收（批销毁3句柄一次全无）+HUD "3"/"Won"逐槽断言。具名拒绝3D装配下实测：58（快照后混cursor）、59（批n=9）。A/B两候选先证即此收口：A死B活，B为准。
+
+**CLI冻结**：driver `--behavior-api components3d`（parse_cli/cli_usage自动纳入）；pilot现有CLI零改，T-04新增生成profile名时在此登记。
+
+**环境记**：并行编译下rustc/sccache偶发STATUS_STACK_BUFFER_OVERRUN崩溃（arena grow，多单元复现），`-j 1`稳定；与代码无关（同lib此前cargo check绿）。
+
 ### 规范增量
 
 | delta_id | add/modify/retire | docs/specs/... target | before/after rule | rationale | acceptance IDs |
@@ -146,10 +178,10 @@ Pause冻结voice/phase，neutral Step视觉/HUD一Tick、声音suppressed无新v
 
 | T | owner_stage | 依赖 | 写面/可验证结果 | AC | 进度 |
 |---|---|---|---|---|---|
-| T-01 | work | 用户启动；012/013/025/030/032已交付；可独立准备 | 核原G3/素材/来源/SDK/owner，唯一树/scope登记，034仅读合同 | AC-01/05 | [ ] |
-| T-02 | work | T-01；不等034落主 | 文档接口/两路径/原G3与oracle/资源/预算A-B方案，列有界假设，不记完整先证go | AC-01/02/04 | [ ] |
-| T-03 | work | T-02；034实际交付/独立review/Spec/来源 | 锁实际工具/SDK/两图源，最多两候选完整G3/actor-free全链先证；冻结准确API/profile/域/价目/错误/CLI，不足needs_replan | AC-01..06 | [ ] |
-| T-04 | work | T-03 go | 公共有限操作/typed音画请求/受检收口与独立准入、新profile/gates/flow/原G3永久夹具 | AC-01..04 | [ ] |
+| T-01 | work | 用户启动；012/013/025/030/032已交付；可独立准备 | 核原G3/素材/来源/SDK/owner，唯一树/scope登记，034仅读合同 | AC-01/05 | [x] 2026-11-03树/scope登记：D:/autostack/.wt/ui-035/auto-ui@56ed6ac3+codex/plan-035-dev（无junction），同组依赖树auto-lang@8717bd5d3 detached（pilot路径依赖解析），材料scope=D:/autostack/plan-artifacts/plan-035/auto-ui（README登记owner/用途）。核验：原G3矩阵d47b7c1f@auto-lang工作树（八项/几何/输入与§5.3全符，clearance.002源自PLAN-860探针g3_route_a非矩阵）；原G3完整程序不存在（仅research/game-runtime/g3_route_a/b.at运动探针，跳点112/261，decision.json go@sdk7b987ca8）；素材7身份/263372B全符（character 7112f6a0/87624动画四clip、platform 78c5ed4d/13352、coin a3fb8f77/22124、flag 0ba84ff4/13276、colormap 106cf02e/10108、bank b0b740dc/90060、font 4444c236/26828+OFL 31d45880/4391）；SDK681=driver sdk/frozen恰681文件+source-lock.json；034合同仅读（archived@b4be4b27、交付93eaa907、Spec gallery-node3d=93e9ae2a）；hash核验audio 5a802e53/HUD 4e787ed2/hud3d.at 3b0e63cf/032 e693338b全符；025 Spec钉62090294为主checkout盘上CRLF字节、canonical LF blob=a16f8f4a同内容，T-03冻结用canonical |
+| T-02 | work | T-01；不等034落主 | 文档接口/两路径/原G3与oracle/资源/预算A-B方案，列有界假设，不记完整先证go | AC-01/02/04 | [x] 2026-11-03新增§5.6：权威span绑定（project2d权威表jump=[0,7403)/coin=[7403,20046)/land=[20046,22504)，§5.4名称顺序为笔误已记正）；A路径=triggers3d+034动画+audio3d/hud3d既有bundle+028 cursor+逐个despawn（收集步34..39>32预期不可行，T-03实测先证）；B路径=新档components3d/1（身份T-03冻结）复用032快照/批销毁机制（最坏32/32、非收集30，零余量实测定）；运动oracle三件套（独立f32模拟器+committed探针回放+夹具逐值，g3_route_a r4相位表/spawn/k/clearance绑定）；资源并集7身份/263372B拷贝与许可随附方案；五项有界假设列明；未记任何完整先证go |
+| T-03 | work | T-02；034实际交付/独立review/Spec/来源 | 锁实际工具/SDK/两图源，最多两候选完整G3/actor-free全链先证；冻结准确API/profile/域/价目/错误/CLI，不足needs_replan | AC-01..06 | [x] 2026-11-03详见§5.7：034硬门本树复验（controls 7/7+四GPU套件绿）；源冻结56ed6ac3/8717bd5d3/SDK681/rustc 1.98.0；候选A真Host实测死（收集Tick fault 10，探针非和式）；候选B冻结=components3d/1 number117/profile28/cli components3d（unit sha f46fdb5a…，032同构+条件化char3/cam3冻结唯一actor-free路径，旧profile字节零改）；收费实测31/32、边界32/32绿、稳态30，三币同Tick批销毁全收+HUD逐槽断言；58/59/25负控实测；CLI components3d登记；probe 6/6（tests/plan035_probe.rs+research/plan035/）；受影响回归（034controls/034flow/032controls全门）见§9工作收据 |
+| T-04 | work | T-03 go | 公共有限操作/typed音画请求/受检收口与独立准入、新profile/gates/flow/原G3永久夹具 | AC-01..04 | [~] 2026-11-03进行中（65f5ce47）：pilot新profile components-3d-audio-hud（presentation3d块 audio/cue/hud 025同文+trigger行具名拒；Cfg3.ahud None=旧档字节不变已验）；作者面 events.snapshot()/count/run/tick+0计费getter+objects.despawn_batch(1..8)+sfx.play+pose随bundle收口（actor-free kind=-1 pose具名拒）；scene/8发射（GLB closure+wav/ttf行+actors.three_d 1/null）；recv fn ahud门输入快照前奏（bg11直读字节不变已验）；永久夹具三件（actorfree/batch-tick恰32边界/g3-full-loop原G3几何8状态Node根协调直呼）+committed产品；driver flow 3/3（actorfree无角色绿、batch-tick三币同Tick一批销毁HUD 3/3、g3相机相对行走+单币恰一次收集+GPU捕获）；旧档字节安全（verify_plan034 7/7+presentation_gates 15/15+032 controls绿，regen_note/doc_prefix条件化修复一过性漂移）。余：pilot gates测试（字节冻结+具名拒绝矩阵）|
 | T-05 | work | T-04 | 原G3八项＋最高分支/V-S全链/真实PCM-native-GPU-HUD/资源/生命周期及负控，verify_plan035 | AC-01..05 | [ ] |
 | T-06 | work | T-05 | A→B/新链SaveAs/冷再生/恢复/20轮及旧档影响并集，SD候选和未来游戏实际来源移交 | AC-05/06 | [ ] |
 | T-07 | review | T-06 | 同树独立final/精确revision，finding回work复核，pass后merge门pending | AC-07 | [ ] |
@@ -160,6 +192,8 @@ Pause冻结voice/phase，neutral Step视觉/HUD一Tick、声音suppressed无新v
 ## 9. 复审记录
 
 2026-11-03 / stage: new / plan_id: auto-ui/PLAN-035 / plan_revision: 1 / outcome: pass（合同可审阅；用户启动后T-01/02可准备），blocked（T-03完整组合待034实际交付） / next: 用户启动后work T-01/T-02。0/10。原G3八项/原预算保持，新三维快照/批销毁为公开域/价目提案，未实现/未go；actor-free与完整G3为两项明确必需路径。无实施树/源码/资产/探针/提案Spec/构建/GPU/OS自动化/agent。
+
+2026-11-03 / stage: goal | plan_id: auto-ui/PLAN-035 | plan_revision: 1 | round: 1 | from: drafting | to: executing | status: executing | outcome: pass（本轮：T-01/T-02/T-03完成+T-04主体完成，树/worktree登记，034硬门本树复验，A死B活先证，components3d/1=117/28冻结，三夹具+flow 3/3，旧档字节安全） | worktree: D:/autostack/.wt/ui-035/auto-ui | commit: 56ed6ac3→65f5ce47（codex/plan-035-dev） | next: work（T-04余项pilot gates+T-05 verify_plan035/深oracle+T-06）
 
 2026-11-03本批规划静态预检：034/035/AG015均0..10节、10T/9AC/6V-S/1SD、work6/review1/merge3、drafting/r1/0-10及10任务未勾；依赖DAG无环，034实际交付为035 T-03及AG015 T-02硬门，独立准备和完整实施区分。AG015原纹理9/动画8逐名齐（按subentry保重复名，共17项），原内部66/8/2控制、原素材/四clip/几何/数值/预算均在合同；278个所涉管理文档本地链接可解析，白名单diff空白检查通过。两仓独占取号后活动/archived/archive唯一，UI next036、AG next016；当前metadata实际17/22不预加迁移。`python tools/gallery.py validate --all`退出0，12逻辑项/22入口/许可一致。新实施树、材料scope与三份拟canonical Spec均未创建；未改引擎/示例源码/资产、未构建/GPU/OS自动化、未创建agent。以上仅规划预检与现有目录验证，不是新链可行性go、实现验收或独立final。
 
