@@ -24,6 +24,7 @@ pub struct PresentationMeta3 {
 
 #[derive(Debug, Clone)]
 pub struct ResourceMeta3 {
+    pub kind: String,
     pub sha256: String,
     pub byte_length: usize,
     pub animated: bool,
@@ -72,6 +73,7 @@ struct MetaDoc {
 #[serde(deny_unknown_fields)]
 struct MetaEntryDoc {
     name: String,
+    kind: String,
     file: String,
     animated: bool,
     identity: IdentityDoc,
@@ -129,22 +131,30 @@ pub fn resources_request_json(project: &Project) -> String {
     names.sort();
     for name in &names {
         for r in &project.modules[*name].resources {
-            let (file, sha256, byte_length, animated) = match &r.kind {
+            // 平色声明也进请求：既有公开导入揭示其真实内容面，pass B 对
+            // "旧构造器携纹理/动画文件"具名拒绝（不静默升档）。
+            let (file, sha256, byte_length, animated, kind) = match &r.kind {
+                ResourceKind::Model3D {
+                    file,
+                    sha256,
+                    byte_length,
+                } => (file, sha256, byte_length, false, "model3d"),
                 ResourceKind::Model3DTextured {
                     file,
                     sha256,
                     byte_length,
-                } => (file, sha256, byte_length, false),
+                } => (file, sha256, byte_length, false, "textured3d"),
                 ResourceKind::Model3DAnimated {
                     file,
                     sha256,
                     byte_length,
-                } => (file, sha256, byte_length, true),
+                } => (file, sha256, byte_length, true, "animated3d"),
                 _ => continue,
             };
             rows.push_str(&format!(
-                "   {{\"name\": \"{}\", \"module\": \"{}\", \"file\": \"{}\", \"sha256\": \"{}\", \"byte_length\": {}, \"animated\": {}}},\n",
-                r.name, name, file, sha256, byte_length, animated
+                "   {{\"name\": \"{}\", \"module\": \"{}\", \"kind\": \"{}\", \"file\": \"{}\", \"sha256\": \"{}\", \"byte_length\": {}, \"animated\": {}}},
+",
+                r.name, name, kind, file, sha256, byte_length, animated
             ));
         }
     }
@@ -230,29 +240,55 @@ pub fn load_resources_meta(
             .values()
             .flat_map(|m| &m.resources)
             .find(|r| r.name == entry.name);
-        let (d_sha, d_len, d_animated) = match declared.map(|r| &r.kind) {
+        let (d_sha, d_len, d_animated, d_kind) = match declared.map(|r| &r.kind) {
+            Some(ResourceKind::Model3D {
+                sha256,
+                byte_length,
+                ..
+            }) => (sha256, *byte_length, false, "model3d"),
             Some(ResourceKind::Model3DTextured {
                 sha256,
                 byte_length,
                 ..
-            }) => (sha256, *byte_length, false),
+            }) => (sha256, *byte_length, false, "textured3d"),
             Some(ResourceKind::Model3DAnimated {
                 sha256,
                 byte_length,
                 ..
-            }) => (sha256, *byte_length, true),
+            }) => (sha256, *byte_length, true, "animated3d"),
             _ => {
                 return Err(at(
                     "resources",
                     0,
                     &entry.name,
                     format!(
-                        "metadata entry '{}' has no matching textured3d.glb/animated3d.glb declaration",
+                        "metadata entry '{}' has no matching model3d/textured3d/animated3d declaration",
                         entry.name
                     ),
                 ))
             }
         };
+        if entry.kind != d_kind {
+            return Err(at(
+                "resources",
+                0,
+                &entry.name,
+                format!(
+                    "metadata kind '{}' does not match declared constructor kind '{}'",
+                    entry.kind, d_kind
+                ),
+            ));
+        }
+        // 旧构造器不静默接受纹理/动画：平色声明的文件若被公共导入揭示为
+        // 携图像/动画内容，pass B 具名拒绝。
+        if d_kind == "model3d" && (entry.identity.closure.is_some() || !entry.clips.is_empty()) {
+            return Err(at(
+                "resources",
+                0,
+                &entry.name,
+                "plain model3d.glb declaration carries textured/animated content (the old constructor must not silently accept it; declare textured3d.glb/animated3d.glb)".to_string(),
+            ));
+        }
         if &entry.identity.sha256 != d_sha || entry.identity.byte_length != d_len {
             return Err(at(
                 "resources",
@@ -317,6 +353,7 @@ pub fn load_resources_meta(
         meta.resources.insert(
             entry.name.clone(),
             ResourceMeta3 {
+                kind: entry.kind.clone(),
                 sha256: entry.identity.sha256.clone(),
                 byte_length: entry.identity.byte_length,
                 animated,

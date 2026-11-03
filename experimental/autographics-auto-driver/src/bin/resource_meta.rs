@@ -26,6 +26,8 @@ struct RequestEntry {
     name: String,
     #[serde(default)]
     module: String,
+    #[serde(default)]
+    kind: String,
     file: String,
     sha256: String,
     byte_length: usize,
@@ -41,6 +43,7 @@ struct Meta {
 #[derive(Serialize)]
 struct MetaEntry {
     name: String,
+    kind: String,
     file: String,
     animated: bool,
     /// 既有公开导入产出的受检身份，pilot 原样嵌入 scene.agscene assets。
@@ -197,6 +200,7 @@ fn main() {
         let (bounds_min, bounds_max) = bounds_of(&loaded.model);
         entries.push(MetaEntry {
             name: r.name.clone(),
+            kind: r.kind.clone(),
             file: r.file.clone(),
             animated: r.animated,
             identity: loaded.identity.clone(),

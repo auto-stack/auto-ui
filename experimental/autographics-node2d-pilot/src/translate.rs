@@ -1535,9 +1535,9 @@ fn translate_vis_pose_call(
     // （数字形段 = 显式文件序；跨模型错配具名拒绝）；间接形（经局部 var
     // 的文件序 int）走一般表达式翻译，域由受信 fault 46 把守。
     let direct_clip = matches!(&c.args.args[0],
-        Arg::Pos(Expr::Dot(outer, seg))
-            if matches!(&**outer, Expr::Ident(r) if r == "clips")
-                || matches!(&**outer, Expr::Dot(_, p) if p == "clips")
+        Arg::Pos(Expr::Dot(outer, _))
+            if matches!(&**outer, Expr::Dot(base, _)
+                if matches!(&**base, Expr::Ident(r) if r == "clips"))
     );
     let clip_text: String = if !direct_clip {
         let mut t = String::new();
@@ -1573,36 +1573,40 @@ fn translate_vis_pose_call(
             // 段识别：`base` → -1；数字形段 = 显式文件序（关键字名/不可拼
             // 写名的显式选择；数字形段永不作名解析；越界具名拒绝）；其余按
             // 具名解析（未知名/重名歧义具名拒绝，重名在元数据侧已拒）。
-            if path.len() != 2 {
-                return Err(unsupported(
-                    "pose clip must be clips.<resource>.<name|base|ordinal>".to_string(),
-                    e,
-                ));
-            }
-            let res = &path[0];
+            // 直接形路径含 clips 根段：[clips, 资源, 名]。
+            let segs: Vec<&str> = match path.as_slice() {
+                [root, res, name] if root == "clips" => vec![res.as_str(), name.as_str()],
+                _ => {
+                    return Err(unsupported(
+                        "pose clip must be clips.<resource>.<name|base|ordinal>".to_string(),
+                        e,
+                    ))
+                }
+            };
+            let res = segs[0];
             if res != resource {
                 return Err(unsupported(
-                    format!("pose clip 'clips.{res}.{}' does not belong to element '{elem}' resource '{resource}'", path[1]),
+                    format!("pose clip 'clips.{res}.{}' does not belong to element '{elem}' resource '{resource}'", segs[1]),
                     e,
                 ));
             }
             let table = vis.clips.get(resource).expect("posable resource clip table");
-            if path[1] == "base" {
+            if segs[1] == "base" {
                 "-1".to_string()
-            } else if let Ok(ordinal) = path[1].parse::<i64>() {
+            } else if let Ok(ordinal) = segs[1].parse::<i64>() {
                 if ordinal < 0 || ordinal >= table.len() as i64 {
                     return Err(unsupported(
-                        format!("resource '{resource}' has no clip ordinal {} (clips: {})", path[1], table.len()),
+                        format!("resource '{resource}' has no clip ordinal {} (clips: {})", segs[1], table.len()),
                         e,
                     ));
                 }
                 format!("{ordinal}")
             } else {
-                match table.get(path[1].as_str()) {
+                match table.get(segs[1]) {
                     Some(ordinal) => format!("{ordinal}"),
                     None => {
                         return Err(unsupported(
-                            format!("resource '{resource}' has no clip named '{}' (explicit file ordinals are spelled clips.{resource}.<n>)", path[1]),
+                            format!("resource '{resource}' has no clip named '{}' (explicit file ordinals are spelled clips.{resource}.<n>)", segs[1]),
                             e,
                         ));
                     }

@@ -2001,9 +2001,10 @@ fn stamp_vis3d_env(
     def_name: &str,
     w3: &World3d,
     presentation: Option<&crate::lower_node3d_presentation::PresentationMeta3>,
-) {
-    let Some(p) = presentation else { return };
-    let Some(v3) = w3.views.get(def_name) else { return };
+) -> Result<(), LowerError> {
+    let Some(p) = presentation else { return Ok(()) };
+    let Some(v3) = w3.views.get(def_name) else { return Ok(()) };
+    let def = &w3.world.defs[def_name];
     let mut posable = std::collections::BTreeMap::new();
     let mut clips = std::collections::BTreeMap::new();
     for e in &v3.elems {
@@ -2019,7 +2020,16 @@ fn stamp_vis3d_env(
         }
         let mut table = std::collections::BTreeMap::new();
         for (ordinal, name) in &meta.clips {
-            table.insert(name.clone(), *ordinal as i64);
+            if table.insert(name.clone(), *ordinal as i64).is_some() {
+                return Err(at(
+                    &def.module,
+                    e.line,
+                    &e.elem,
+                    &format!(
+                        "resource '{res}' has duplicate clip name '{name}' (named clips must be unambiguous; explicit file ordinals are the only ambiguous-name channel)"
+                    ),
+                ));
+            }
         }
         clips.insert(res.clone(), table);
         posable.insert(e.elem.clone(), res);
@@ -2029,6 +2039,7 @@ fn stamp_vis3d_env(
         clips,
         input_snapshot: std::cell::Cell::new(false),
     });
+    Ok(())
 }
 
 pub(crate) fn gen_user_source_3d(
@@ -2423,7 +2434,7 @@ pub(crate) fn gen_user_source_3d(
     // PLAN-027：runtime 环境盖章（None = 024 档不触碰，字节不变）。
     stamp_runtime_env(&mut rctx, &world.root, runtime, events);
     // PLAN-034：视觉姿态环境盖章（None = 旧档不触碰，字节不变）。
-    stamp_vis3d_env(&mut rctx, &world.root, w3, presentation);
+    stamp_vis3d_env(&mut rctx, &world.root, w3, presentation)?;
     // PLAN-030：引用参数环境盖章（None = 旧档不触碰，字节不变）。
     apply_bindings_ctx(
         &mut rctx,
@@ -2511,7 +2522,7 @@ pub(crate) fn gen_user_source_3d(
         });
         stamp_runtime_env(&mut ictx, &dname, runtime, events);
         // PLAN-034：视觉姿态环境盖章（None = 旧档不触碰，字节不变）。
-        stamp_vis3d_env(&mut ictx, &dname, w3, presentation);
+        stamp_vis3d_env(&mut ictx, &dname, w3, presentation)?;
         // PLAN-030：引用参数环境盖章 + msg 参数投递覆盖（None = 旧档不变）。
         apply_bindings_ctx(&mut ictx, &dname, &def.module, project, plan, bindings, "i");
         if def.life_tick {
@@ -3046,7 +3057,7 @@ fn gen_recv_fn_3d(
         if recv_def_name.is_empty() { &world.root } else { recv_def_name },
         w3,
         presentation,
-    );
+    )?;
     apply_bindings_ctx(
         &mut ctx,
         if recv_def_name.is_empty() { &world.root } else { recv_def_name },
