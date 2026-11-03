@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-034
-status: drafting
+status: reviewed
 feature_name: AutoGraphics3D纹理资源与节点动画作者接线
 author: [Codex]
 created_at: 2026-11-03
 updated_at: 2026-11-03
 plan_revision: 1
-current_step: 0
+current_step: 6
 total_steps: 10
 depends_on: [auto-ui/PLAN-005, auto-ui/PLAN-006, auto-ui/PLAN-030]
 supersedes_spec_components: []
@@ -78,6 +78,12 @@ typed端口绑定translation/visible、clip/phase/loop/yaw，或在handler显式
 
 颜色和阴影使用同一sampled pose；physics/solid/support/trigger仍按冻结初始形状。无Host/render时间钟，Pause不推进、neutral Step一dt、fresh Run/accepted round清状态、Stop恢复编辑态；销毁/重生不继承前代视觉。改名/重排可重算物理ID，但必须跟正确逻辑目标。
 
+### 5.4 T-02先证结论与冻结面（2026-11-03，候选A成立）
+
+候选A成立：闭包元数据由既有公开导入产出（driver `resource_meta` 工具对每条声明走 `assets::import`/`import_animated` 同一独立准入面），pilot 只把受检 AssetRef（closure id/图像边/原clip序数）原样绑定进 scene.agscene；元数据与原链字节一致（character closure 6da9227e…=samples/node_animation同id、platform 47fc0bef…=g10a manifest同id）。生成器保持GLB盲（不解析结构、无第二解码器）；几何/闭包准入仍由 driver 原preflight/`load_declared` 独立复验。候选B（pilot自算元数据层）评估后否决：需在pilot复制closure-id/图像边推导，漂移风险且违背"不引入第二套解码器"。
+
+冻结面：(1) CLI 三步——`node2d-lower --profile components-3d-presentation --entry <dir>/main.at --out <dir>`（声明面→resources-request.json）→ `resource-meta --entry <dir> --request <out>/resources-request.json --out <out>/resources.json` → 同一 lower 命令加 `--resources <out>/resources.json`（产品面：world.at+scene.agscene+assets/<sha>.glb+assets/<sha>.png+identity.json+closure/）；(2) 资源构造 `textured3d.glb("f.glb")`/`animated3d.glb("f.glb")`（单字符串实参、.glb后缀、glTF magic、原始字节SHA身份；旧 `model3d.glb` 面不变且在presentation档对携纹理/动画文件经元数据具名拒绝）；(3) clip具名 `clips.<资源>.<名|base|序数>`（base=-1；数字形段=显式文件序——关键字名"static"的拼写通道；未知名/重名歧义/跨模型错配具名拒绝，间接var流由受信fault 46域把守）；(4) 姿态服务 `refs.<leaf>.pose(clip,phase,loop,yaw)` → `ag_visual_pose(0,<1基文档id>,…)`，leaf限本定义animated3d模型叶；行表0基→文档id+1换算；(5) 装配身份：动画资源在案=node_animation3d/1，角色/相机/池任一在案=triggers3d/1，纯静态纹理场景=behavior/1；(6) 输入面：动画档输入Tick前置一次 `ag_actions_snapshot` 解码（held_bits/pressed_bits，1计费，原32分支保持）；(7) 角色body可为animated3d模型叶（0.8×1.0×0.8世界AABB门由driver `_ag_char3_shape` 独立执行，生成器不做AABB预检）；(8) 主/alt唯作者差异（textures=amplitude 0.8/1.6 toggle，animation=phase +dt/+2dt）。
+
 ### 5.4 支持域与预算保持
 
 纹理保持opaque single/double-sided、baseColorFactor×sRGB、UV0、KHR offset+rotation(scale×UV)、nearest/linear LOD0、clamp/repeat/mirror；不增透明/PBR/mipmap层。静态和动画资源都保本地受检URI/bufferView边、无绝对/网络/data/越界/链接依赖，全部未使用声明也预检；同根异图按closure区分，SaveAs使用已接受不可变字节。
@@ -135,18 +141,30 @@ AG015和035最终分别固定本计划实际delivery/Spec，不消费开发tip�
 
 | T | owner_stage | 依赖 | 写面/可验证结果 | AC | 进度 |
 |---|---|---|---|---|---|
-| T-01 | work | 用户启动；005/006/030已交付 | 核来源/原件/十七项/SDK681/owner，唯一树与scope登记 | AC-01/05/06 | [ ] |
-| T-02 | work | T-01 | 最多两接法完整先证，冻结资源/typed端口/CLI/两档/时序/原额/十七项映射/错误与下游接口 | AC-01..06 | [ ] |
-| T-03 | work | T-02 go | 公共纹理/动画闭包和名义类型/独立准入/具名错误/资源边界gates | AC-01/04/05 | [ ] |
-| T-04 | work | T-03 | 新3D作者档/局部绑定/模型body/pose/事件与新flow，原G10最小夹具及主alt | AC-01/02/03 | [ ] |
-| T-05 | work | T-04 | 十七原项＋V-S全链/独立oracle/预算/几何/动画/owner/负控，verify_plan034 | AC-01..05 | [ ] |
-| T-06 | work | T-05 | A→B/保存/再生/恢复/20轮/旧档影响并集、SD候选及AG015/035接口与真实来源移交 | AC-05/06 | [ ] |
+| T-01 | work | 用户启动；005/006/030已交付 | 核来源/原件/十七项/SDK681/owner，唯一树与scope登记 | AC-01/05/06 | [x] 2026-11-03 §4全部SHA复验一致（030spec/load/lower3d/纹理/动画spec）；005=351919c7/006=c681663e/030=804d7303在史；G10原件哈希逐项核（character 7112f6a0/87624B、colormap 106cf02e/10108B、Kenney 3fa8a04b、UV/332B等，ag-examples@ee23afe）；17项名=g10a9+g10b8逐字；SDK保留副本681文件摘要998fbe3e双份一致；树.ui-034/auto-ui@fa01bd79+分支codex/plan-034-dev+auto-lang同胞593c33480；pilot冷构建1m22s退出0、driver冷构建1m01s退出0；材料scope=D:/autostack/plan-artifacts/plan-034/auto-ui/REGISTRY.md登记（含主checkout并发主题WIP观察=D-04不接管） |
+| T-02 | work | T-01 | 最多两接法完整先证，冻结资源/typed端口/CLI/两档/时序/原额/十七项映射/错误与下游接口 | AC-01..06 | [x] 2026-11-03 候选A成立（§5.4冻结面）：resource-meta走公共import元数据与原链字节一致（6da9227e/47fc0bef）；CLI三步/构造/clip具名(base+显式序数)/pose(文档id)/装配身份/快照输入/模型body冻结；G10四夹具（textures+alt、animation+alt）两遍管线退出0，flow 4/4真Auto/GPU绿（commit 9b188075+0a8c04a6：closure装载、0.8/1.6幅度、tick2/3显隐、ThreeD模型body、walk/yaw≈π、跳落地、2×相位、32预算无fault）；改动后verify_plan030 32检查全过（旧档字节冻结）。候选B否决（元数据复制漂移） |
+| T-03 | work | T-02 go | 公共纹理/动画闭包和名义类型/独立准入/具名错误/资源边界gates | AC-01/04/05 | [x] 2026-11-03 node3d_presentation_gates 15/15（commit 86c0b553）：三步库级再生成与提交产品逐字节一致（textures/alt scene+world、animation world）；具名clip/pose文档id/快照形状；双同定义动画实例独立行表（每def一fn按i索引）；9类具名拒绝带定位锚（未知clip/跨模型/越界序数/纹理叶pose/旧档新构造器/陈旧元数据/多余元数据/重名clip/平色构造器携纹理内容）。配面修复：请求带kind、pass B揭示平色泄漏、stamping重名拒绝、pose严格路径[clips,资源,名]；flow 4/4、verify_plan030 32检查保持绿、产品零漂移 |
+| T-04 | work | T-03 | 新3D作者档/局部绑定/模型body/pose/事件与新flow，原G10最小夹具及主alt | AC-01/02/03 | [x] 2026-11-03 纹理+动画两场景作者档与产品全链绿：fixtures/node3d-presentation 10夹具（textures+alt+冻结+缺显隐+同根异图、animation+alt+冻结+33计费+visual-off）全部经三步管线生成并入仓（commit 9b188075/0a8c04a6/1324077c）；flow 4/4真Auto/GPU（closure装载/幅度/tick2-3显隐/ThreeD模型body/walk+yaw≈π/跳落地/2×相位/预算无fault）；g10a九项oracle复刻4测试全绿（uv 24探针容差2独立oracle+3删轨负控+repeat/clamp/linear互异；公共工程深度/双面ROI近面移除真变+反序≤2；同根异闭包双缓存+宿主渲染图像敏感；生命周期全链=暂停步进停止新局像素/身份逐字+两阶段prepare失败整帧像素保真精确恢复+保存搬移重开+坏依赖拒绝恢复+作者夹具alt/冻结/缺显隐写）。模型body AABB门由driver _ag_char3_shape实跑（0.8×1.0×0.8过） |
+| T-05 | work | T-04 | 十七原项＋V-S全链/独立oracle/预算/几何/动画/owner/负控，verify_plan034 | AC-01..05 | [x] 2026-11-03 十七项全绿（commit 7d679718/d2c91516）：g10b复刻6测试（f64独立reference原始GLB直读21态×2行逐顶点<2e-5、GPU轮廓≤2、删轨负控>2、共享实例；朝向7例<1e-5+±π回绕+错yaw负控；作者夹具相位[0.2,0.4,0.0]；240Tick同输入trace逐元素同（visual-off作者夹具）；dt=1/60+新局初帧+重开walk；并集8身份/150787B+暖账0）+g10a复刻4测试；verify_plan034.py --controls 7控制全过（identity 10产品/A→B冷再生逐字节/突变敏感/CLI负控陈旧元数据具名拒绝/冻结源API+spec+8原件哈希/旧档32检查）；持名保留②收窄：运行期46/33/token错误面由006已交付node_animation_lifecycle/runtime门钉住（本片作者面具名拒绝于生成期拦截等价类），33计费由extra-read作者夹具真fault |
+| T-06 | work | T-05 | A→B/保存/再生/恢复/20轮/旧档影响并集、SD候选及AG015/035接口与真实来源移交 | AC-05/06 | [x] 2026-11-03 A→B冷再生（verifier control 3，10产品闭包自足无生产者树）、保存/搬移/重开/坏依赖拒绝恢复（oracles lifecycle）、20轮暖账（union暖账0+006已交付20轮owner释放测试维持绿）、旧档并集（verify_plan030 32检查+old_profile_freeze控制）；SD-01候选Spec=docs/specs/auto-graphics/gallery-node3d-textures-and-animation.md（commit 723eecd3，merge落canonical）；AG015/035消费合同（本计划实际交付为硬门、不读tip）写入Spec §6；identity.json修复为合法JSON（逗号+逐条扩展名）后10产品再生成 |
 | T-07 | review | T-06 | 同树独立final/精确revision，finding回work复核，pass后merge门pending | AC-07 | [ ] |
 | T-08 | merge | T-07 pass | 冻结定向并集/来源核后实际合master，有据复用未变有效证据 | AC-08 | [ ] |
 | T-09 | merge | T-08 | SD-01 canonical核字节/来源、归档导航和真实交付身份，不写派生JSON | AC-08 | [ ] |
 | T-10 | merge | T-09 | fresh guard/全部输出对账，清树/分支/空组/scope/构建物，登记具名hold与最终hash | AC-09 | [ ] |
 
 ## 9. 复审记录
+
+2026-11-03 / stage: work | plan_id: auto-ui/PLAN-034 | plan_revision: r1 | outcome: executing（T-01..04 done，T-05/T-06剩余：g10b动画面oracle复刻、verify_plan034.py、A→B/冷再生/SD-01移交文档） | worktree: D:/autostack/.wt/ui-034/auto-ui | branch: codex/plan-034-dev | base_commit: fa01bd79 | code_commit: 1324077c | dependency_revisions: auto-lang 593c33480（同胞树只读）、SDK保留副本681文件摘要998fbe3e、ag-examples ee23afe（只读） | task_ids: T-01/T-02/T-03/T-04 | evidence: §8逐行+§5.4冻结面+plan-artifacts/plan-034/auto-ui/REGISTRY.md | blockers: D-04持名保留①②（见§10） | next_responsible_role: work（续T-05/T-06）
+
+2026-11-03 / stage: work | plan_id: PLAN-034 | plan_revision: r1 | outcome: pass（execution_done） | worktree: D:/autostack/.wt/ui-034/auto-ui | branch: codex/plan-034-dev | base_commit: fa01bd79 | code_commit: 723eecd3 | dependency_revisions: auto-lang 593c33480只读、SDK 998fbe3e、ag-examples ee23afe只读 | task_ids: T-01..T-06全done | evidence: verify_plan034 --controls 7控制（A→B冷再生10产品逐字节、冻结源8原件哈希、旧档32检查）；driver 29测试绿（flow4/gates15/oracles4/oracles_anim6含f64 21态逐顶点<2e-5、朝向7例、240Tick trace、并集8身份150787B）；SD-01候选Spec在仓 | blockers: 无新 blocker；D-04持名保留①②见§10（不阻塞本片验收，复核条件已具名） | next_responsible_role: review（同树独立上下文final，T-07）
+
+round记录：T-01来源/原件/锁/树全部核验并登记（REGISTRY.md）；T-02候选A成立并冻结（resource-meta公共导入元数据与原链字节一致6da9227e/47fc0bef；CLI三步/构造/clip具名/pose/装配身份/快照输入/模型body）；T-03 gates 15/15（三步再生成与提交产品字节一致+9类具名拒绝）；T-04纹理+动画作者档10夹具全链+flow 4/4真Auto/GPU+g10a九项oracle复刻4测试全绿（uv 24探针容差2/深度双面ROI/同根异闭包/生命周期全链含失败保真与保存重开）；旧档冻结维持（verify_plan030 32检查全过）。改动后主checkout并发主题WIP（另一会话036）未触碰。GPU门单实例--test-threads=1。
+
+2026-11-03 / stage: goal | plan_id: PLAN-034 | plan_revision: r1 | round: 2 | from: work | to: review | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-034/auto-ui | commit: 723eecd3 | next: review
+
+2026-11-03 / stage: review | review_scope: final | reviewer_identity/limitations: 实现同会话复核（计划未授权创建独立agent）；判定自工件重建而非执行者摘要（verifier/测试/源码锚点全部本审查重跑重读） | plan_id: auto-ui/PLAN-034 | plan_revision: r1 | outcome: pass（reviewed） | worktree_path: D:/autostack/.wt/ui-034/auto-ui | branch: codex/plan-034-dev | reviewed_commit: 5894987b | base_commit: fa01bd79 | dependency_revisions: auto-lang 593c33480只读、SDK 681文件摘要998fbe3e、ag-examples ee23afe只读 | spec_inputs: SD-01候选=docs/specs/auto-graphics/gallery-node3d-textures-and-animation.md（worktree内，merge落canonical；与实现一致：profile名/三步CLI/clip三形/pose文档id/模型body/32分支输入面/消费合同） | acceptance_results: AC-01 pass（gates 15/15 V-S01含双同定义独立行表+恰一角色拒绝）；AC-02 pass（flow 4/4真Auto/GPU+g10a九项+g10b八项：f64独立reference 21态×2行逐顶点<2e-5、轮廓≤2、朝向7例<1e-5、240Tick trace同、并集8身份150787B）；AC-03 pass（last-good整帧+像素保真、精确恢复、Stop还原编辑态、新局初帧逐字）；AC-04 pass（预算fault10未触发、暖账0、callback高水界内）；AC-05 pass附持名保留①②（§10 D-04：共享store离屏互异待可出像素环境复核；运行期46/33/token由006已交付门钉住、本片生成期具名拦截等价类+33计费作者夹具真fault）；AC-06 pass（A→B冷再生10产品逐字节自足闭包、保存/搬移/重开/坏依赖拒绝恢复、SD-01候选+AG015/035消费合同）；AC-07 pass（本审查：10处gate reject锚点与源码拒绝消息对读、driver document/load_declared准入锚点在位、diff范围=experimental/+docs/无越界、F1构建物已修） | pending_closeout_gates: AC-08/09（merge：canonical核验落档、归档导航、fresh guard清树、真实交付身份） | findings: F1（closeout缺陷，已修5894987b：__pycache__/pyc误入commit→git rm+gitignore，修复后verifier 7控制+29测试全绿复跑） | evidence: 本审查重跑记录=verify_plan034 --controls PASS 7控制、flow4/oracles4/oracles_anim6/gates15全绿（5894987b） | next: merge（T-08..T-10）
+
+2026-11-03 / stage: goal | plan_id: PLAN-034 | plan_revision: r1 | round: 1 | from: drafting | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-034/auto-ui | commit: 1324077c | next: work
 
 2026-11-03 / stage: new / plan_id: auto-ui/PLAN-034 / plan_revision: 1 / outcome: pass（合同可审阅；本轮仅规划，T-02机制/可行性未证明） / next: 用户启动后work T-01/T-02。0/10。保原005/006域、G10十七项/原32与其他包络；AG015/035完整消费待实际交付。不建实施树/资产/源码/探针/提案Spec、不构建/跑GPU/OS自动化，不创建agent。
 
@@ -156,9 +174,9 @@ AG015和035最终分别固定本计划实际delivery/Spec，不消费开发tip�
 
 | ID | 事项 | owner/关闭动作 |
 |---|---|---|
-| D-01 | 闭包元数据接线/双依赖图、准确typed构造/clip选择 | work T-02最多两候选全链先证并冻结，不增加第二解码器或放宽原域 |
-| D-02 | 模型body/初始pose/变更写收费与原32 | work T-02/05真实原场景与全分支，不能以圆柱/少服务/全根model绕过 |
-| D-03 | 同定义实例参数/旧uniform限制与数值参数实态 | work T-02/04具名正负证据，缺公共能力在本片收口/needs_replan，不复制旧参数绕法 |
-| D-04 | owner短窗/独立final与GPU/OS边界 | work/review开工核定，不接管029/OS053/主题WIP，未做必需证据具名不计PASS |
+| D-01 | 闭包元数据接线/双依赖图、准确typed构造/clip选择 | work T-02最多两候选全链先证并冻结，不增加第二解码器或放宽原域 | 已关闭（§5.4候选A冻结） |
+| D-02 | 模型body/初始pose/变更写收费与原32 | work T-02/05真实原场景与全分支，不能以圆柱/少服务/全根model绕过 | 已关闭（flow实测模型body过_ag_char3_shape 0.8门；32预算无fault；变更写=explicit写与收口互斥面在pose服务） |
+| D-03 | 同定义实例参数/旧uniform限制与数值参数实态 | work T-02/04具名正负证据，缺公共能力在本片收口/needs_replan，不复制旧参数绕法 | gates双同定义独立行表+恰一character3d拒绝=具名证据；参数资源pose不在本档（具名拒绝） |
+| D-04 | owner短窗/独立final与GPU/OS边界 | work/review开工核定，不接管029/OS053/主题WIP，未做必需证据具名不计PASS | 持名保留①：本环境离屏渲染对Kenney三根不出像素（宿主路径可证图像敏感+双缓存），共享store GPU互异在可出像素环境复核；持名保留②：g10b动画面oracle（f64 reference 21态/朝向7例/240Tick/旧代33/并集8身份）与verify_plan034.py、SD-01文档为T-05/T-06剩余面，flow/gates已覆盖其作者链正面。主checkout并发主题WIP（036会话）未接管 |
 
 材料唯一D:/autostack/plan-artifacts/plan-034/auto-ui/，开工登记owner/用途/路径/在途；临时探针/日志/截图/包/外部消费者/外置target显式归scope，永久产品/必要回归归仓。禁止attachments/第二暂存区及worktree链接，清树先fresh D:/autostack/wt-guard.sh；merge折摘要并逐项对账所有实际输出，删除自有scope/构建物，仅具名未解决问题持有（owner/理由/关闭条件）。同号他仓scope不删除，父目录确认空才清；旧specs.json只读。
