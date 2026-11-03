@@ -83,6 +83,10 @@ class McpClient:
     def click(self, element_id: str) -> str:
         return self.call("autoui_action", element_id=element_id, action="press")
 
+    def fixture(self, **state) -> str:
+        # PLAN-037: theme family/mode state write (PLAN-623 fixture channel).
+        return self.call("autoui_fixture", schema_version=1, state=state)
+
 
 def wait_for_server(url: str, timeout: int = 45) -> bool:
     for _ in range(timeout):
@@ -174,6 +178,7 @@ def main() -> int:
 
     env = os.environ.copy()
     env["AUTOUI_MCP_PORT"] = str(port)
+    env["AUTOUI_TEST_FIXTURES"] = "1"  # PLAN-037: fixture channel for theme drive
     # Prefer clone worktree auto if present
     clone_auto = _REPO_CLONE / "target" / "debug" / "auto.exe"
     auto_bin = str(clone_auto if clone_auto.exists() else AUTO_BIN)
@@ -368,6 +373,89 @@ def main() -> int:
                 results.append(("theme toggle click", False))
                 print(f"  FAIL: theme {e}")
                 failed += 1
+
+        print("\n=== T6 PLAN-037 official theme package ===")
+        try:
+            st = mcp.state("theme_name", "dark_mode")
+            # 014 follows the host theme chain at VM boot (pac deliberately has
+            # no theme key; pre-migration HEAD behaves identically on this
+            # host — dark_mode=false). Default preserved = family Auto + bool
+            # mode resolved by the chain, not a hardcoded value.
+            def _bool_of(txt, field):
+                for line in txt.splitlines():
+                    if line.strip().startswith(field):
+                        return line.split(":", 1)[1].strip().split(" ")[0]
+                return None
+            ok_def = '"Auto"' in st and _bool_of(st, "dark_mode") in ("true", "false")
+            boot_dm = _bool_of(st, "dark_mode") == "true"
+            results.append(("p037 default family Auto, mode chain-driven (HEAD-parity)", ok_def))
+            print(f"  {'PASS' if ok_def else 'FAIL'}: default theme_name=Auto dark_mode={_bool_of(st, 'dark_mode')}")
+            if not ok_def:
+                failed += 1
+
+            mcp.fixture(theme_name="Solarized", dark_mode=False)
+            time.sleep(0.8)
+            st = mcp.state("theme_name", "dark_mode")
+            ok_sw = '"Solarized"' in st and "false" in st
+            results.append(("p037 fixture switch to Solarized/light", ok_sw))
+            print(f"  {'PASS' if ok_sw else 'FAIL'}: Solarized/light ({st[:120]})")
+            if not ok_sw:
+                failed += 1
+
+            # Business preserved across the switch: capture current business
+            # state before the switch and require equality after it.
+            st_before = mcp.state("city_id", "layout_mode", "forecast_tab")
+            mcp.fixture(theme_name="Solarized", dark_mode=False)
+            time.sleep(0.4)
+            mcp.fixture(theme_name="Solarized", dark_mode=True)
+            time.sleep(0.6)
+            st_after = mcp.state("city_id", "layout_mode", "forecast_tab")
+            ok_biz = st_before == st_after and 'city_id: "' in st_after
+            results.append(("p037 city/layout/forecast preserved", ok_biz))
+            print(f"  {'PASS' if ok_biz else 'FAIL'}: business state across switch "
+                  f"({st_before[:80]} -> {st_after[:80]})")
+            if not ok_biz:
+                failed += 1
+            mcp.fixture(theme_name="Solarized", dark_mode=False)
+            time.sleep(0.4)
+
+            snap = mcp.snapshot()
+            ok_marks = all(m in snap for m in ("北京", "24小时", "5日"))
+            results.append(("p037 weather content markers after switch", ok_marks))
+            print(f"  {'PASS' if ok_marks else 'FAIL'}: content markers after Solarized/light")
+            if not ok_marks:
+                failed += 1
+
+            # Existing ToggleTheme handler keeps driving dark_mode under the
+            # design binding (Solarized dark via in-app toggle).
+            tid = find_clickable_for_label(snap, "☀️") or find_clickable_for_label(snap, "🌙")
+            if tid:
+                mcp.click(tid)
+                time.sleep(0.5)
+                st = mcp.state("dark_mode")
+                ok_tg = "true" in st
+                results.append(("p037 ToggleTheme still flips dark_mode", ok_tg))
+                print(f"  {'PASS' if ok_tg else 'FAIL'}: toggle under design binding ({st[:120]})")
+                if not ok_tg:
+                    failed += 1
+
+            # 2x2 family/mode round-trip; restore the chain-resolved boot mode.
+            for fam in ("Solarized", "Auto"):
+                for dm in (True, False):
+                    mcp.fixture(theme_name=fam, dark_mode=dm)
+                    time.sleep(0.4)
+            mcp.fixture(theme_name="Auto", dark_mode=boot_dm)
+            time.sleep(0.5)
+            st = mcp.state("theme_name", "dark_mode")
+            ok_rt = '"Auto"' in st and (_bool_of(st, "dark_mode") == ("true" if boot_dm else "false"))
+            results.append(("p037 2x2 round-trip restored family+boot mode", ok_rt))
+            print(f"  {'PASS' if ok_rt else 'FAIL'}: round-trip final state (dark_mode={_bool_of(st, 'dark_mode')})")
+            if not ok_rt:
+                failed += 1
+        except Exception as e:
+            results.append(("p037 theme leg", False))
+            failed += 1
+            print(f"  FAIL: p037 theme leg {e}")
 
     finally:
         proc.terminate()

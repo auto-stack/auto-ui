@@ -10,3 +10,11 @@ window: "960x680"
 desktop: "true"
 # 不写死 theme/accent —— 跟随宿主/CLI；应用内 ToggleTheme 翻转 dark_mode。
 # r8：不声明 dep stylekit —— rust/a2r 轨不解析该导入；hint_text 内联。
+
+# PLAN-037 T-02：官方主题单源包（不复制配色表进本 app，C-13）。
+# 本 pac 维持不声明 theme 键（跟随主题链）；App 内既有 dark_mode = true
+# 显式默认精确保留，家族选择经 theme_name + design 数据绑定。天气条件
+# 渐变/AQI 类别色为内容/类目色字面豁免（B1 r2 口径），公共表面随族。
+dep themes {
+    path: "../../../packages/themes"
+}

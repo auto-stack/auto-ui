@@ -57,6 +57,19 @@ class AutoUiMcpClient:
         res = self.call("autoui_screenshot", args)
         return res.get("content", [{}])[0].get("text", "")
 
+    def fixture(self, **state) -> str:
+        res = self.call("autoui_fixture", {"schema_version": 1, "state": state})
+        return res.get("content", [{}])[0].get("text", "")
+
+    def state_field(self, field: str):
+        res = self.call("autoui_state", {})
+        txt = res.get("content", [{}])[0].get("text", "")
+        for line in txt.splitlines():
+            parts = line.strip().split(":", 1)
+            if len(parts) == 2 and parts[0].strip() == field:
+                return parts[1].split("(")[0].strip()
+        return None
+
 def main():
     root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../"))
     auto_bin = os.path.join(root_dir, "target/debug/auto.exe")
@@ -65,7 +78,9 @@ def main():
     os.makedirs(out_dir, exist_ok=True)
 
     port = pick_free_port()
-    env = dict(os.environ, AUTOUI_MCP_PORT=str(port))
+    # PLAN-037: AUTOUI_TEST_FIXTURES enables the autoui_fixture state-write
+    # channel (PLAN-623) used for theme family/mode driving below.
+    env = dict(os.environ, AUTOUI_MCP_PORT=str(port), AUTOUI_TEST_FIXTURES="1")
 
     print(f"[*] Starting VM mode for 011 on MCP port {port}...")
     proc = subprocess.Popen([auto_bin, "run", "-r", "vm"], cwd=app_dir, env=env)
@@ -129,6 +144,58 @@ def main():
         # Switch back to Basic
         client.press_sequence(["Basic", "C"])
         time.sleep(0.3)
+
+        # ── PLAN-037 T-02: official theme package — family/mode round-trip ──
+        # Business invariants: pending expression + mode survive theme
+        # switches (换肤保输入/运算/模式); model values come from the
+        # official package via theme_name/dark_mode design binding.
+        print("[*] PLAN-037: theme round-trip with business preservation...")
+        if client.state_field("theme_name") != '"Auto"':
+            failures.append(f"default theme_name not Auto: {client.state_field('theme_name')}")
+        else:
+            print("[+] OK: default family Auto (design binding present)")
+
+        # Pending expression 12 + → switch → complete → result must hold.
+        client.press_sequence(["1", "2", "+"])
+        time.sleep(0.2)
+        client.fixture(theme_name="Solarized", dark_mode=False)
+        time.sleep(0.8)
+        if client.state_field("theme_name") != '"Solarized"':
+            failures.append("family switch to Solarized not applied")
+        client.screenshot("011_vm_p037_solarized_light")
+        client.press_sequence(["3", "4", "="])
+        time.sleep(0.4)
+        snap = client.snapshot()
+        if "46" not in snap:
+            failures.append("pending expression 12+34 lost across theme switch (46 missing)")
+        else:
+            print("[+] OK: pending expression evaluated 12+34=46 after theme switch")
+
+        # Scientific mode must survive theme switches.
+        client.press_sequence(["Scientific", "C"])
+        time.sleep(0.3)
+        client.fixture(theme_name="Solarized", dark_mode=True)
+        time.sleep(0.8)
+        client.screenshot("011_vm_p037_solarized_dark")
+        snap = client.snapshot()
+        if "sin" not in snap:
+            failures.append("scientific mode lost after switch to Solarized/dark")
+        client.fixture(theme_name="Auto", dark_mode=True)
+        time.sleep(0.8)
+        client.screenshot("011_vm_p037_auto_dark")
+        client.fixture(theme_name="Auto", dark_mode=False)
+        time.sleep(0.8)
+        if client.state_field("theme_name") != '"Auto"' or client.state_field("dark_mode") != "false":
+            failures.append("round trip back to Auto/light not applied")
+        else:
+            print("[+] OK: 2x2 family/mode round-trip applied (Auto/light final)")
+
+        # Restore dark-first explicit default for repeatability.
+        client.fixture(dark_mode=True)
+        time.sleep(0.5)
+        client.press_sequence(["Basic", "C"])
+        time.sleep(0.3)
+        print("[+] PLAN-037 theme round-trip leg done")
 
         # Copy baseline screenshots to local out_dir
         tests_screenshots_dir = os.path.join(app_dir, "tests/screenshots")

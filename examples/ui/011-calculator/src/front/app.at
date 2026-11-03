@@ -21,6 +21,12 @@
 
 use prog_util: pdigit_val, pdigit_new_lo, pdigit_new_hi, pop_lo, pop_hi, pdiv, pcur_fmt, pline_calc
 
+// PLAN-037 T-02：接入官方主题包。family 选择经 theme_name + design 绑定；
+// 模式仍由既有 dark_mode 承担（每帧值语义由 design 数据绑定取代，同 006
+// 先例）；原 dark/light 双臂样式原样保留——design 绑定后即随主题实时切换
+// （暗支 = 原外观，亮支 = 原亮臂），业务 handler/模型零改动。
+use themes.themes: Auto, Solarized
+
 // PLAN-637 B5 Phase B 映射（2026-09-17）：数字键 zinc-800/gray-200→bg-secondary、配字
 // white/gray-900→white/secondary-foreground；功能键行 zinc-700/gray-300→bg-muted、配字
 // →white/secondary-foreground；显示器 text-red-400→text-primary；zinc-300/400→次级文字。
@@ -61,6 +67,8 @@ widget App {
     model {
         var dark_mode bool = true
         var accent_color str = "indigo"
+        // PLAN-037：主题族选择（默认 Auto；既有暗支外观默认保留）
+        var theme_name str = "Auto"
 
         // Expression engine: the full expression being built (e.g. "2*(3+4)").
         var expr str = ""
@@ -90,6 +98,12 @@ widget App {
         var pop str = ""
         // Programmer 错误信息（除零）；空 = OK。
         var perr str = ""
+    }
+
+    // 主题/模式选择器（C-14：数据绑定，同帧校验发布；PLAN-037）
+    design {
+        theme: .theme_name
+        mode: if .dark_mode { "dark" } else { "light" }
     }
 
     // PLAN-615 T-07: Programmer 派生显示全部走 computed（模块纯函数，双端

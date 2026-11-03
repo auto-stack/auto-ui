@@ -16,3 +16,11 @@ desktop: "true"
 dep stylekit {
     path: "../stylekit"
 }
+
+# PLAN-037 T-02：官方主题单源包（不复制配色表进本 app，C-13）。
+# 本 pac 不声明 theme 键（PLAN-615 T-04：跟随主题链）——独立默认按 031/033
+# 契约为官方 Auto/light；App 内既有 dark_mode = true（暗支外观优先）作为
+# 应用级显式默认精确保留，家族/模式选择经 theme_name + design 数据绑定。
+dep themes {
+    path: "../../../packages/themes"
+}

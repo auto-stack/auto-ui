@@ -24,6 +24,12 @@
 
 // r8：rust/a2r 轨不解析 stylekit 包导入（hint_text UndefinedVariable）。
 // 本地 recipe，与 stylekit.styles.hint_text 字节等价。
+//
+// PLAN-037 T-02：接入官方主题包。family 选择经 theme_name + design 绑定；
+// 模式仍由既有 dark_mode 承担（ToggleTheme/SetTheme/SetAccent 业务 handler
+// 原样保留——design 绑定后即真实切换主题）；Hero 条件渐变与 AQI 徽章为
+// 天气类目内容色字面豁免（不挪作语义面），其余公共表面已全是语义 role。
+use themes.themes: Auto, Solarized
 style hint_text = "text-[10px] text-muted-foreground"
 // r9：a2r 不把 `use weather_data: fn` 内联进 main.rs（E0425）。函数同文件
 // 放在 widget 之后；城市选择用中文名字符串键，避免 Obj id 被推成 i62。
@@ -67,6 +73,8 @@ widget App {
     model {
         var dark_mode bool = true
         var accent_color str = "indigo"
+        // PLAN-037：主题族选择（默认 Auto；既有暗支外观默认保留）
+        var theme_name str = "Auto"
         // landscape = 网页/桌面优先；portrait = 保留的手机版竖屏设计
         var layout_mode str = "landscape"
         // 预报区 Tab：hourly | daily（默认窗口不高，二者互斥显示）
@@ -105,6 +113,12 @@ widget App {
             { day: "周四", icon: "🌧️", cond: "小雨", tmin: "17°", tmax: "24°" },
             { day: "周五", icon: "⛅", cond: "多云", tmin: "19°", tmax: "27°" }
         ]
+    }
+
+    // 主题/模式选择器（C-14：数据绑定，同帧校验发布；PLAN-037）
+    design {
+        theme: .theme_name
+        mode: if .dark_mode { "dark" } else { "light" }
     }
 
     view {

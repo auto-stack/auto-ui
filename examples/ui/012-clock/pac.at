@@ -10,3 +10,10 @@ category: "tool"
 # Plan 506: 窗口随内容自然尺寸收缩（独立 VM 窗 / 虚拟桌面窗双路径）。
 window: "fit"
 desktop: "true"
+
+# PLAN-037 T-02：官方主题单源包（不复制配色表进本 app，C-13）。
+# 本例原无主题接线（无显式默认）——独立默认官方 Auto/light；模式经
+# theme_name/dark_mode + design 数据绑定接入，业务/计时/存储零改动。
+dep themes {
+    path: "../../../packages/themes"
+}

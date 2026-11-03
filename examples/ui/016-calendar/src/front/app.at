@@ -1,6 +1,11 @@
 use calendar_store: CalendarStore
 use calendar_util: build_month_grid, month_name
 
+// PLAN-037 T-02：接入官方主题包。family 选择经 theme_name + design 绑定；
+// 模式仍由既有 dark_mode（store 主权 → App 镜像）承担；今天/选中/其他月
+// 身份色与月份业务零改动（换肤不改变日期/选中/事件）。
+use themes.themes: Auto, Solarized
+
 use stylekit.styles: caption_text
 style nav_round_btn = "w-10 h-10 rounded-full hover:bg-accent text-foreground font-bold"
 style settings_label = "text-xs text-muted-foreground font-medium"
@@ -22,9 +27,17 @@ widget App {
     model {
         var dark_mode bool = false
         var accent_color str = "indigo"
+        // PLAN-037：主题族选择（默认 Auto；pac `theme: "light"` 显式默认保留）
+        var theme_name str = "Auto"
         // Plan 448 F: weekday header as a list + for (replacing seven
         // hand-unrolled grid-item lines).
         var weekday_labels = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]
+    }
+
+    // 主题/模式选择器（C-14：数据绑定，同帧校验发布；PLAN-037）
+    design {
+        theme: .theme_name
+        mode: if .dark_mode { "dark" } else { "light" }
     }
 
     // Plan 522: derived grid as computed — month_name / build_month_grid are

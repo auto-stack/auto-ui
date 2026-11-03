@@ -1,6 +1,12 @@
 // 012-clock — 现代全功能时钟应用（Plan 644 重塑）
 // 包含：时钟（传统手表 ⌚ SVG 表盘与数显）/ 世界时钟 / 闹钟 / 秒表 / 倒计时
 // 适配系统深浅主题与 AutoUI Design Tokens；桌面小组件 view mini 传统手表表盘支持。
+//
+// PLAN-037 T-02：接入官方主题包（原无主题接线、无显式默认 → 官方
+// Auto/light 独立默认）。family 经 theme_name + design 绑定；表盘 SVG 为
+// 内容插画（钟面绘制），hex 字面保持 B1 r2 豁免口径；Tick/闹钟/存储等
+// 业务零改动（换肤不重置计时、不重复订阅、闹钟不因换肤重复触发）。
+use themes.themes: Auto, Solarized
 
 style tab_active = "px-4 py-1.5 rounded-full bg-primary text-primary-foreground text-sm font-semibold shadow-sm"
 style tab_idle = "px-4 py-1.5 rounded-full text-muted-foreground text-sm hover:bg-accent font-medium"
@@ -34,6 +40,10 @@ widget App {
     }
 
     model {
+        // PLAN-037：主题族/模式选择态（主题选择，非业务状态）
+        var theme_name str = "Auto"
+        var dark_mode bool = false
+
         var tab str = "clock"
         var dial_mode str = "both"
 
@@ -95,6 +105,12 @@ widget App {
         var banner str = ""
         // Tick 周期（250ms）
         var interval int = 250
+    }
+
+    // 主题/模式选择器（C-14：数据绑定，同帧校验发布；PLAN-037）
+    design {
+        theme: .theme_name
+        mode: if .dark_mode { "dark" } else { "light" }
     }
 
     view {

@@ -15,3 +15,10 @@ desktop: "true"
 dep stylekit {
     path: "../stylekit"
 }
+
+# PLAN-037 T-02：官方主题单源包（不复制配色表进本 app，C-13）。
+# 既有显式 pac `theme: "light"` 默认按 031 契约保留（同 010 先例）；
+# 家族选择经 theme_name + design 数据绑定，store 主题主权链路原样。
+dep themes {
+    path: "../../../packages/themes"
+}

@@ -84,6 +84,10 @@ class Mcp:
     def type_into(self, element_id, text):
         self.call("autoui_type", {"element_id": element_id, "text": text, "clear_first": True})
 
+    def fixture(self, **state):
+        # PLAN-037: theme family/mode state write (PLAN-623 fixture channel).
+        return self.call("autoui_fixture", {"schema_version": 1, "state": state})
+
     def wait_ready(self, timeout=60):
         for _ in range(timeout):
             time.sleep(1)
@@ -114,6 +118,7 @@ def boot():
     env = dict(os.environ)
     env["AUTO_VM_STORAGE_FILE"] = STORAGE_FILE
     env["AUTOUI_MCP_PORT"] = str(PORT)
+    env["AUTOUI_TEST_FIXTURES"] = "1"  # PLAN-037: fixture channel for theme drive
     proc = subprocess.Popen([resolve_auto(), "run", "-r", "vm"], cwd=APP, env=env,
                             stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
     mcp = Mcp()
@@ -177,6 +182,44 @@ def main():
         time.sleep(0.5)
         s = mcp.state("banner")
         ck.ok("Dismiss 关闭", s.get("banner") == '""', s)
+
+        # ---- T2b PLAN-037 主题切换 × 计时守恒（V-04）----
+        # 活跃计时中换肤：Tick 连续（不复位、不倍速、无额外订阅），计时数据
+        # 与 tab 状态跨主题保持；家族/模式来自官方包 design 绑定。
+        print("T2b: PLAN-037 主题切换 × 计时守恒")
+        s = mcp.state("theme_name", "dark_mode")
+        ck.ok("默认官方族 Auto/light", s.get("theme_name") == '"Auto"'
+              and s.get("dark_mode") == "false", s)
+        mcp.press("秒表")
+        time.sleep(0.4)
+        mcp.press("开始")
+        time.sleep(1.2)
+        e1 = int(mcp.state("elapsed").get("elapsed", "0"))
+        mcp.fixture(theme_name="Solarized", dark_mode=True)
+        time.sleep(1.0)
+        s = mcp.state("elapsed", "sw_on", "theme_name", "dark_mode", "tab")
+        e2 = int(s.get("elapsed", "0"))
+        delta = e2 - e1
+        ck.ok("换肤后 theme_name=Solarized/dark", s.get("theme_name") == '"Solarized"'
+              and s.get("dark_mode") == "true", s)
+        ck.ok("换肤保 tab=秒表与运行态", s.get("tab") == '"stopwatch"'
+              and s.get("sw_on") == '"true"', s)
+        # 1.0s 实际间隔 → 250ms Tick 增量 ≈ 1000ms；<600 冻结/复位，>2200 倍速/重复订阅
+        ck.ok("Tick 连续（600≤Δ≤2200ms，无复位/倍速）", 600 <= delta <= 2200, f"Δ={delta}ms")
+        mcp.press("计圈")
+        mcp.press("停止")
+        time.sleep(0.4)
+        s = mcp.state("lap1", "sw_on")
+        ck.ok("Solarized/dark 下计圈+停止有效", ":" in s.get("lap1", "")
+              and s.get("sw_on") == '"false"', s)
+        mcp.press("复位")
+        time.sleep(0.3)
+        # 家族/模式 2x2 往返后回到默认
+        mcp.fixture(theme_name="Auto", dark_mode=False)
+        time.sleep(0.6)
+        s = mcp.state("theme_name", "dark_mode", "elapsed")
+        ck.ok("2x2 往返回 Auto/light 且秒表复位", s.get("theme_name") == '"Auto"'
+              and s.get("dark_mode") == "false" and s.get("elapsed") == "0", s)
 
         # ---- T3 世界时钟 ----
         print("T3: 世界时钟")
