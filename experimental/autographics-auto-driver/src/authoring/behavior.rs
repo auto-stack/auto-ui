@@ -65,6 +65,18 @@ pub const PRESENTATION2_VERSION: &str = "autographics.presentation2d/1";
 /// earlier profile keeps its exact assembled bytes.
 pub const COMPONENTS2_VERSION: &str = "autographics.components2d/1";
 pub const COMPONENTS2_API: &str = include_str!("../../api/public_composition2d_v1.at");
+/// PLAN-035: the complete 3D game composition profile. The full hud3d stack
+/// (objects3d + triggers3d + character3d + camera3d + node-animation3d +
+/// audio3d + hud3d) plus the bounded composition unit over the same
+/// dimension-generic trigger/object state: one whole-tick event snapshot and
+/// one whole-batch despawn per callback, so a complete G3 collection tick
+/// fits the frozen 32-credit pool with no duty skipped. The derived entry
+/// also makes the character/camera freezes conditional on an app_start bind:
+/// this is the only legal actor-free 3D path (a Run binding neither may still
+/// emit kind=-1 cue/HUD bundles), per the PLAN-035 contract. An explicit new
+/// version; every earlier profile keeps its exact assembled bytes.
+pub const COMPONENTS3_VERSION: &str = "autographics.components3d/1";
+pub const COMPONENTS3_API: &str = include_str!("../../api/public_composition3d_v1.at");
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Api {
     V1,
@@ -88,6 +100,7 @@ pub enum Api {
     Hud3V1,
     Presentation2V1,
     Components2V1,
+    Components3V1,
 }
 impl Api {
     pub fn parse(value: &str) -> Result<Self, String> {
@@ -113,6 +126,7 @@ impl Api {
             HUD3_VERSION => Ok(Self::Hud3V1),
             PRESENTATION2_VERSION => Ok(Self::Presentation2V1),
             COMPONENTS2_VERSION => Ok(Self::Components2V1),
+            COMPONENTS3_VERSION => Ok(Self::Components3V1),
             _ => Err("unsupported behavior API".into()),
         }
     }
@@ -139,6 +153,7 @@ impl Api {
             Self::Hud3V1 => HUD3_VERSION,
             Self::Presentation2V1 => PRESENTATION2_VERSION,
             Self::Components2V1 => COMPONENTS2_VERSION,
+            Self::Components3V1 => COMPONENTS3_VERSION,
         }
     }
     pub fn number(self) -> i32 {
@@ -164,6 +179,7 @@ impl Api {
             Self::Hud3V1 => 114,
             Self::Presentation2V1 => 115,
             Self::Components2V1 => 116,
+            Self::Components3V1 => 117,
         }
     }
     pub fn profile(self) -> i32 {
@@ -189,6 +205,7 @@ impl Api {
             Self::Hud3V1 => 25,
             Self::Presentation2V1 => 26,
             Self::Components2V1 => 27,
+            Self::Components3V1 => 28,
         }
     }
     /// The finite run-object profiles including the trigger profiles that
@@ -206,7 +223,8 @@ impl Api {
             | Self::Triggers3V1
             | Self::NodeAnimation3V1
             | Self::Audio3V1
-            | Self::Hud3V1 => Some(super::runtime_objects::Dim::ThreeD),
+            | Self::Hud3V1
+            | Self::Components3V1 => Some(super::runtime_objects::Dim::ThreeD),
             _ => None,
         }
     }
@@ -220,9 +238,11 @@ impl Api {
             | Self::Hud2V1
             | Self::Presentation2V1
             | Self::Components2V1 => Some(super::runtime_objects::Dim::TwoD),
-            Self::Triggers3V1 | Self::NodeAnimation3V1 | Self::Audio3V1 | Self::Hud3V1 => {
-                Some(super::runtime_objects::Dim::ThreeD)
-            }
+            Self::Triggers3V1
+            | Self::NodeAnimation3V1
+            | Self::Audio3V1
+            | Self::Hud3V1
+            | Self::Components3V1 => Some(super::runtime_objects::Dim::ThreeD),
             _ => None,
         }
     }
@@ -248,18 +268,26 @@ impl Api {
                 | Self::Hud3V1
                 | Self::Presentation2V1
                 | Self::Components2V1
+                | Self::Components3V1
         )
     }
     pub fn hud(self) -> bool {
         matches!(
             self,
-            Self::Hud2V1 | Self::Hud3V1 | Self::Presentation2V1 | Self::Components2V1
+            Self::Hud2V1
+                | Self::Hud3V1
+                | Self::Presentation2V1
+                | Self::Components2V1
+                | Self::Components3V1
         )
     }
     pub fn node_animation(self) -> bool {
-        matches!(self, Self::NodeAnimation3V1 | Self::Audio3V1 | Self::Hud3V1)
+        matches!(
+            self,
+            Self::NodeAnimation3V1 | Self::Audio3V1 | Self::Hud3V1 | Self::Components3V1
+        )
     }
-    pub fn all() -> [Self; 21] {
+    pub fn all() -> [Self; 22] {
         [
             Self::V1,
             Self::SpatialV2,
@@ -282,6 +310,7 @@ impl Api {
             Self::Hud3V1,
             Self::Presentation2V1,
             Self::Components2V1,
+            Self::Components3V1,
         ]
     }
     /// The command-line name of this profile. The public entry selects a Run by
@@ -309,6 +338,7 @@ impl Api {
             Self::Hud3V1 => "hud3d",
             Self::Presentation2V1 => "presentation2d",
             Self::Components2V1 => "components2d",
+            Self::Components3V1 => "components3d",
         }
     }
     /// Parse one `--behavior-api` value; an unknown name is a usage error.

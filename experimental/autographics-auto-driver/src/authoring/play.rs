@@ -297,6 +297,7 @@ impl Play {
             && snapshot.version != super::behavior::HUD3_VERSION
             && snapshot.version != super::behavior::PRESENTATION2_VERSION
             && snapshot.version != super::behavior::COMPONENTS2_VERSION
+            && snapshot.version != super::behavior::COMPONENTS3_VERSION
         {
             return Err("spatial constructor API mismatch".into());
         }
@@ -355,7 +356,7 @@ impl Play {
                     vec![Scalar::Int(index as i32), Scalar::Float(*value)],
                 ));
             }
-            let character = match api {
+            let mut character = match api {
                 super::behavior::Api::CharacterV1
                 | super::behavior::Api::Camera2V1
                 | super::behavior::Api::Objects2V1
@@ -370,10 +371,11 @@ impl Play {
                 | super::behavior::Api::Triggers3V1
                 | super::behavior::Api::NodeAnimation3V1
                 | super::behavior::Api::Audio3V1
-                | super::behavior::Api::Hud3V1 => Some(CharProfile::ThreeD),
+                | super::behavior::Api::Hud3V1
+                | super::behavior::Api::Components3V1 => Some(CharProfile::ThreeD),
                 _ => None,
             };
-            let camera_dim = match api {
+            let mut camera_dim = match api {
                 super::behavior::Api::Camera2V1
                 | super::behavior::Api::Objects2V1
                 | super::behavior::Api::Triggers2V1
@@ -386,9 +388,19 @@ impl Play {
                 | super::behavior::Api::Triggers3V1
                 | super::behavior::Api::NodeAnimation3V1
                 | super::behavior::Api::Audio3V1
-                | super::behavior::Api::Hud3V1 => Some(CameraDim::ThreeD),
+                | super::behavior::Api::Hud3V1
+                | super::behavior::Api::Components3V1 => Some(CameraDim::ThreeD),
                 _ => None,
             };
+            // PLAN-035: components3d is the only 3D profile with a legal
+            // actor-free path (the derived entry freezes character/camera only
+            // on an app_start bind); a Run whose scene declares no 3D actor
+            // gets no character/camera wiring, so the host neither injects the
+            // bind tables nor expects a frozen camera configuration block.
+            if api == super::behavior::Api::Components3V1 && actors[1].is_none() {
+                character = None;
+                camera_dim = None;
+            }
             let objects_dim = api.objects();
             if objects_dim.is_some() {
                 if let Some(error) = super::runtime_objects::slot_capacity_error(play.order.len()) {

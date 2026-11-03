@@ -1,0 +1,198 @@
+// autographics.components3d/1 trusted composition unit (auto-ui PLAN-035).
+// Appended after the hud3d stack by the components3d assembly; public names
+// are ag_events_* and ag_object_despawn_batch. Inside this assembly only, the
+// triggers unit's single-cursor event reads are renamed (every earlier
+// profile keeps its exact bytes) and re-exposed through the wrappers below,
+// which make the snapshot and the cursor mutually exclusive per callback
+// with the named fault 58. The mechanisms are the PLAN-032 bounded 3D
+// composition: the triggers/objects units are dimension-generic, so the
+// snapshot rows carry the full 3D trigger identity (pair order, phase,
+// binding generation, source kind/ref/template/generation, geometry) and the
+// batch despawn keeps the exact all-or-nothing whole-batch domain.
+//
+// This profile also carries the only legal actor-free 3D path: the derived
+// entry freezes the character/camera only when one was bound in app_start,
+// so a Run that binds neither may still emit cue/HUD requests through the
+// same contract (kind=-1 bundles, no forged actor). Every earlier 3D profile
+// keeps its unconditional freeze bytes and its exact assembled identity
+// (components3d is number 117 / profile 28; the 2D composition stays 116/27).
+//
+// ag_events_snapshot(): at most one call per callback, 1 credit. Materializes
+// the complete 0..8 evaluated events this callback inherited into fresh fixed
+// rows; empty is legal and returns 0. Unread events never queue across ticks:
+// the rows hold exactly the carrying evaluate's results and are replaced by
+// the next one. Getter reads on the snapshot are 0-credit Auto computation
+// (fully counted in VM/CPU steps); an out-of-range index is a named 58. The
+// snapshot is an independent immutable value, not a private live field:
+// handles read from it still pass through the unchanged alive/generation
+// validation of the objects unit, and a value from an older snapshot
+// authorizes no operation on a newer generation.
+//
+// ag_object_despawn_batch(n, h0..h7): explicit whole-batch destruction.
+// 1 credit per call; an empty batch is legal and still costs 1 (it is not a
+// free no-op). The length domain is 0..8; the 9th item (n>8) and a negative
+// n are the named fault 59. All n handles are validated first (alive, full
+// run/slot/generation identity, no duplicates) and only then does the batch
+// mutate: it either destroys all n or leaves the observable object table
+// untouched. Physical writes still add the actual n and the 33rd write
+// raises the named 37 before any mutation. No exit events are synthesized
+// and no rebinding happens, exactly like the single ag_object_despawn.
+var _ag_cmp_cursor_used=0
+var _ag_cmp_snap_used=0
+var _ag_cmp_run=0
+var _ag_cmp_tick=0
+var _ag_cmp_count=0
+var _ag_cmp_pair=[0,0,0,0,0,0,0,0]
+var _ag_cmp_phase=[0,0,0,0,0,0,0,0]
+var _ag_cmp_bg=[0,0,0,0,0,0,0,0]
+var _ag_cmp_sk=[0,0,0,0,0,0,0,0]
+var _ag_cmp_sr=[0,0,0,0,0,0,0,0]
+var _ag_cmp_st=[0,0,0,0,0,0,0,0]
+var _ag_cmp_sg=[0,0,0,0,0,0,0,0]
+var _ag_cmp_geo=[0,0,0,0,0,0,0,0]
+fn _ag_cmp_tick_begin() {
+ _ag_cmp_cursor_used=0
+ _ag_cmp_snap_used=0
+ _ag_cmp_count=0
+}
+fn ag_events_snapshot() int {
+ if _ag_error!=0 {return 0}
+ if _ag_cast_charge(1)==0 {return 0}
+ if _ag_cmp_snap_used==1 {_ag_fail(58,-1,_ag_tick_id());return 0}
+ if _ag_cmp_cursor_used==1 {_ag_fail(58,-1,_ag_tick_id());return 0}
+ _ag_cmp_snap_used=1
+ for i in 0..8 {
+  _ag_cmp_pair[i]=_ag_trg_e_pair[i]
+  _ag_cmp_phase[i]=_ag_trg_e_phase[i]
+  _ag_cmp_bg[i]=_ag_trg_e_bg[i]
+  _ag_cmp_sk[i]=_ag_trg_e_sk[i]
+  _ag_cmp_sr[i]=_ag_trg_e_sr[i]
+  _ag_cmp_st[i]=_ag_trg_e_st[i]
+  _ag_cmp_sg[i]=_ag_trg_e_sg[i]
+  _ag_cmp_geo[i]=_ag_trg_e_geo[i]
+ }
+ _ag_cmp_count=_ag_trg_count
+ _ag_cmp_run=_ag_run_id()
+ _ag_cmp_tick=_ag_tick_id()
+ return _ag_cmp_count
+}
+fn ag_event_snap_pair(i int) int {
+ if i<0 {if _ag_error==0 {_ag_fail(58,i,_ag_cmp_count)};return 0}
+ if i>=_ag_cmp_count {if _ag_error==0 {_ag_fail(58,i,_ag_cmp_count)};return 0}
+ return _ag_cmp_pair[i]
+}
+fn ag_event_snap_phase(i int) int {
+ if i<0 {if _ag_error==0 {_ag_fail(58,i,_ag_cmp_count)};return 0}
+ if i>=_ag_cmp_count {if _ag_error==0 {_ag_fail(58,i,_ag_cmp_count)};return 0}
+ return _ag_cmp_phase[i]
+}
+fn ag_event_snap_generation(i int) int {
+ if i<0 {if _ag_error==0 {_ag_fail(58,i,_ag_cmp_count)};return 0}
+ if i>=_ag_cmp_count {if _ag_error==0 {_ag_fail(58,i,_ag_cmp_count)};return 0}
+ return _ag_cmp_bg[i]
+}
+fn ag_event_snap_source_kind(i int) int {
+ if i<0 {if _ag_error==0 {_ag_fail(58,i,_ag_cmp_count)};return 0}
+ if i>=_ag_cmp_count {if _ag_error==0 {_ag_fail(58,i,_ag_cmp_count)};return 0}
+ return _ag_cmp_sk[i]
+}
+fn ag_event_snap_source(i int) int {
+ if i<0 {if _ag_error==0 {_ag_fail(58,i,_ag_cmp_count)};return 0}
+ if i>=_ag_cmp_count {if _ag_error==0 {_ag_fail(58,i,_ag_cmp_count)};return 0}
+ return _ag_cmp_sr[i]
+}
+fn ag_event_snap_template(i int) int {
+ if i<0 {if _ag_error==0 {_ag_fail(58,i,_ag_cmp_count)};return 0}
+ if i>=_ag_cmp_count {if _ag_error==0 {_ag_fail(58,i,_ag_cmp_count)};return 0}
+ return _ag_cmp_st[i]
+}
+fn ag_event_snap_source_generation(i int) int {
+ if i<0 {if _ag_error==0 {_ag_fail(58,i,_ag_cmp_count)};return 0}
+ if i>=_ag_cmp_count {if _ag_error==0 {_ag_fail(58,i,_ag_cmp_count)};return 0}
+ return _ag_cmp_sg[i]
+}
+fn ag_event_snap_geometry(i int) int {
+ if i<0 {if _ag_error==0 {_ag_fail(58,i,_ag_cmp_count)};return 0}
+ if i>=_ag_cmp_count {if _ag_error==0 {_ag_fail(58,i,_ag_cmp_count)};return 0}
+ return _ag_cmp_geo[i]
+}
+fn ag_events_run() int {return _ag_cmp_run}
+fn ag_events_tick() int {return _ag_cmp_tick}
+fn ag_events_count() int {return _ag_cmp_count}
+fn ag_event_next() int {
+ if _ag_error!=0 {return 0}
+ if _ag_cmp_snap_used==1 {_ag_fail(58,-1,_ag_tick_id());return 0}
+ _ag_cmp_cursor_used=1
+ return _ag_cmp_event_next()
+}
+fn ag_event_pair() int {
+ if _ag_error!=0 {return 0}
+ if _ag_cmp_snap_used==1 {_ag_fail(58,-1,_ag_tick_id());return 0}
+ return _ag_cmp_event_pair()
+}
+fn ag_event_phase() int {
+ if _ag_error!=0 {return 0}
+ if _ag_cmp_snap_used==1 {_ag_fail(58,-1,_ag_tick_id());return 0}
+ return _ag_cmp_event_phase()
+}
+fn ag_event_generation() int {
+ if _ag_error!=0 {return 0}
+ if _ag_cmp_snap_used==1 {_ag_fail(58,-1,_ag_tick_id());return 0}
+ return _ag_cmp_event_generation()
+}
+fn ag_event_source_kind() int {
+ if _ag_error!=0 {return 0}
+ if _ag_cmp_snap_used==1 {_ag_fail(58,-1,_ag_tick_id());return 0}
+ return _ag_cmp_event_source_kind()
+}
+fn ag_event_source() int {
+ if _ag_error!=0 {return 0}
+ if _ag_cmp_snap_used==1 {_ag_fail(58,-1,_ag_tick_id());return 0}
+ return _ag_cmp_event_source()
+}
+fn ag_event_geometry() int {
+ if _ag_error!=0 {return 0}
+ if _ag_cmp_snap_used==1 {_ag_fail(58,-1,_ag_tick_id());return 0}
+ return _ag_cmp_event_geometry()
+}
+fn ag_object_despawn_batch(n int, h0 int, h1 int, h2 int, h3 int, h4 int, h5 int, h6 int, h7 int) int {
+ if _ag_error!=0 {return 0}
+ if _ag_obj_frozen==0 {_ag_fail(38,-1,0);return 0}
+ if n<0 {_ag_fail(59,-1,n);return 0}
+ if n>8 {_ag_fail(59,-1,n);return 0}
+ var s0= -1
+ var s1= -1
+ var s2= -1
+ var s3= -1
+ var s4= -1
+ var s5= -1
+ var s6= -1
+ var s7= -1
+ if n>0 {s0=_ag_obj_slot_of(h0)}
+ if n>1 {s1=_ag_obj_slot_of(h1)}
+ if n>2 {s2=_ag_obj_slot_of(h2)}
+ if n>3 {s3=_ag_obj_slot_of(h3)}
+ if n>4 {s4=_ag_obj_slot_of(h4)}
+ if n>5 {s5=_ag_obj_slot_of(h5)}
+ if n>6 {s6=_ag_obj_slot_of(h6)}
+ if n>7 {s7=_ag_obj_slot_of(h7)}
+ if _ag_error!=0 {return 0}
+ if n>1 {if s1==s0 {_ag_fail(59,s1,h1);return 0}}
+ if n>2 {if s2==s0 {_ag_fail(59,s2,h2);return 0};if s2==s1 {_ag_fail(59,s2,h2);return 0}}
+ if n>3 {if s3==s0 {_ag_fail(59,s3,h3);return 0};if s3==s1 {_ag_fail(59,s3,h3);return 0};if s3==s2 {_ag_fail(59,s3,h3);return 0}}
+ if n>4 {if s4==s0 {_ag_fail(59,s4,h4);return 0};if s4==s1 {_ag_fail(59,s4,h4);return 0};if s4==s2 {_ag_fail(59,s4,h4);return 0};if s4==s3 {_ag_fail(59,s4,h4);return 0}}
+ if n>5 {if s5==s0 {_ag_fail(59,s5,h5);return 0};if s5==s1 {_ag_fail(59,s5,h5);return 0};if s5==s2 {_ag_fail(59,s5,h5);return 0};if s5==s3 {_ag_fail(59,s5,h5);return 0};if s5==s4 {_ag_fail(59,s5,h5);return 0}}
+ if n>6 {if s6==s0 {_ag_fail(59,s6,h6);return 0};if s6==s1 {_ag_fail(59,s6,h6);return 0};if s6==s2 {_ag_fail(59,s6,h6);return 0};if s6==s3 {_ag_fail(59,s6,h6);return 0};if s6==s4 {_ag_fail(59,s6,h6);return 0};if s6==s5 {_ag_fail(59,s6,h6);return 0}}
+ if n>7 {if s7==s0 {_ag_fail(59,s7,h7);return 0};if s7==s1 {_ag_fail(59,s7,h7);return 0};if s7==s2 {_ag_fail(59,s7,h7);return 0};if s7==s3 {_ag_fail(59,s7,h7);return 0};if s7==s4 {_ag_fail(59,s7,h7);return 0};if s7==s5 {_ag_fail(59,s7,h7);return 0};if s7==s6 {_ag_fail(59,s7,h7);return 0}}
+ if _ag_obj_ops+n>32 {_ag_fail(37,-1,n);return 0}
+ if _ag_cast_charge(1)==0 {return 0}
+ if n>0 {_ag_obj_ops=_ag_obj_ops+1;_ag_obj_live[s0]=0}
+ if n>1 {_ag_obj_ops=_ag_obj_ops+1;_ag_obj_live[s1]=0}
+ if n>2 {_ag_obj_ops=_ag_obj_ops+1;_ag_obj_live[s2]=0}
+ if n>3 {_ag_obj_ops=_ag_obj_ops+1;_ag_obj_live[s3]=0}
+ if n>4 {_ag_obj_ops=_ag_obj_ops+1;_ag_obj_live[s4]=0}
+ if n>5 {_ag_obj_ops=_ag_obj_ops+1;_ag_obj_live[s5]=0}
+ if n>6 {_ag_obj_ops=_ag_obj_ops+1;_ag_obj_live[s6]=0}
+ if n>7 {_ag_obj_ops=_ag_obj_ops+1;_ag_obj_live[s7]=0}
+ return n
+}

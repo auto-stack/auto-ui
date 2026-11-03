@@ -1,0 +1,58 @@
+// PLAN-035 T-03 candidate-B spike: the new components3d/1 stack (number 117 /
+// profile 28) with the bounded composition unit on the same three-coin
+// same-tick collection the candidate-A spike dies on. The spawns evaluate at
+// the end of tick1, so tick2 is the collection tick. Expected collection-tick
+// ledger: actions snapshot 1 + char3 fused move 26 + grounded 1 + events
+// snapshot 1 + one whole-batch despawn 1 (three handles, flat per callback) +
+// present3d bundle (pose + sounds + four HUD slots) 1 = 31 of 32.
+// Collection-state getters on the snapshot are 0-credit Auto computation.
+// Steady ticks are 30. This is the feasibility half of the PLAN-035 freeze
+// evidence; the exact original-G3 worst branches are measured by the
+// permanent fixture in T-05.
+var ok=0
+var stepn=0
+var coins=0
+var snd=0
+var c0=0
+var c1=0
+var c2=0
+fn app_start(){
+ ok=ag_char3_bind(1)
+ ok=ag_camera_orbit_3d(1,8.0,45.0,0,0.0)
+ c0=ag_object_spawn(0,4,0.2,0.0,-0.2)
+ c1=ag_object_spawn(1,5,-0.2,0.0,0.2)
+ c2=ag_object_spawn(2,6,0.3,0.0,0.3)
+ ok=ag_trigger_bind(0,1,1,c0,1,0.5)
+ ok=ag_trigger_bind(1,1,1,c1,1,0.5)
+ ok=ag_trigger_bind(2,1,1,c2,1,0.5)
+}
+fn app_update(dt float){
+ stepn=stepn+1
+ snd=0
+ let packed=ag_actions_snapshot()
+ let held=packed%64
+ let jump=(packed/64/16)%2
+ let token=ag_char3_move(1.0*dt,0.0,0.0,0.002)
+ let grounded=ag_char3_grounded(token)
+ let n=ag_events_snapshot()
+ var s0=0
+ var s1=0
+ var s2=0
+ var cnt=0
+ for i in 0..n {
+  let pair=ag_event_snap_pair(i)
+  let phase=ag_event_snap_phase(i)
+  if phase==1 {
+   if s0==0 {s0=ag_event_snap_source(i)} else {if s1==0 {s1=ag_event_snap_source(i)} else {s2=ag_event_snap_source(i)}}
+   coins=coins+1
+   snd=1
+   cnt=cnt+1
+  }
+ }
+ if cnt==1 {ok=ag_object_despawn_batch(1,s0,0,0,0,0,0,0,0)}
+ if cnt==2 {ok=ag_object_despawn_batch(2,s0,s1,0,0,0,0,0,0)}
+ if cnt==3 {ok=ag_object_despawn_batch(3,s0,s1,s2,0,0,0,0,0)}
+ var slot3=""
+ if coins==3 {slot3="Won"}
+ ok=ag_present3d(0,1,1,stepn*0.1,1,0.0,snd,stepn*4-3,1,1.0,stepn*4-2,0,1.0,stepn*4-1,2,1.0,0,0,0.0,1,f"$coins",1,"Playing",0,"",1,slot3)
+}

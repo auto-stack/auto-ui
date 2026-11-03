@@ -1,0 +1,20 @@
+// PLAN-035 T-03 named-rejection spike: after ag_events_snapshot in the same
+// callback, the cursor wrapper ag_event_next must refuse with the named
+// fault 58 (snapshot and cursor are mutually exclusive per callback in the
+// components3d assembly), never silently degrade to one access shape.
+var ok=0
+var stepn=0
+var c0=0
+fn app_start(){
+ ok=ag_char3_bind(1)
+ ok=ag_camera_orbit_3d(1,8.0,45.0,0,0.0)
+ c0=ag_object_spawn(0,4,0.2,0.0,-0.2)
+ ok=ag_trigger_bind(0,1,1,c0,1,0.5)
+}
+fn app_update(dt float){
+ stepn=stepn+1
+ let token=ag_char3_move(1.0*dt,0.0,0.0,0.002)
+ let grounded=ag_char3_grounded(token)
+ let n=ag_events_snapshot()
+ let ev=ag_event_next()
+}

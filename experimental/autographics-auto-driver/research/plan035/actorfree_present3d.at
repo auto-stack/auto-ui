@@ -1,0 +1,15 @@
+// PLAN-035 T-03 actor-free spike: under components3d/1 the derived entry
+// freezes the character/camera only when app_start bound one, so a service
+// Run that binds neither may emit the full cue/HUD contract with no forged
+// Player: kind=-1 present3d (no visual), one jump-cue request per tick with
+// strictly increasing per-Run ordinals, and the complete four-slot HUD state
+// every callback. Under every earlier 3D profile the unconditional entry
+// freeze turns exactly this source into the named character freeze fault 25.
+var ok=0
+var stepn=0
+fn app_start(){
+}
+fn app_update(dt float){
+ stepn=stepn+1
+ ok=ag_present3d(-1,0,0,0.0,0,0.0,1,stepn*4-3,0,1.0,0,0,0.0,0,0,0.0,0,0,0.0,1,f"$stepn",1,"Playing",0,"",0,"")
+}

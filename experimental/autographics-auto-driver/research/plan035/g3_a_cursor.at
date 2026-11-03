@@ -1,0 +1,51 @@
+// PLAN-035 T-03 candidate-A spike: the delivered hud3d/1 stack with cursor
+// event reads and per-object despawn on a three-coin same-tick collection.
+// The spawns evaluate at the end of tick1, so the collection consumption is
+// tick2. Expected collection-tick ledger: actions snapshot 1 + char3 fused
+// move (26 on the measured three-sweep shape) + grounded 1 + 4x
+// ag_event_next (3 events + 1 exhausted probe; every next call charges
+// before the emptiness check) + 3x(pair+phase) + 3x despawn + present3d
+// bundle 1 = far over the 32-charge pool: the tick dies with the named
+// credit fault 10 (sticky; the last accepted frame is kept). This is the
+// honest candidate-A verdict the PLAN-035 contract requires on real
+// assembled bytes before the components3d freeze; no duty is skipped or
+// thinned to dodge the pool.
+var ok=0
+var stepn=0
+var coins=0
+var c0=0
+var c1=0
+var c2=0
+fn app_start(){
+ ok=ag_char3_bind(1)
+ ok=ag_camera_orbit_3d(1,8.0,45.0,0,0.0)
+ c0=ag_object_spawn(0,4,0.2,0.0,-0.2)
+ c1=ag_object_spawn(1,5,-0.2,0.0,0.2)
+ c2=ag_object_spawn(2,6,0.3,0.0,0.3)
+ ok=ag_trigger_bind(0,1,1,c0,1,0.5)
+ ok=ag_trigger_bind(1,1,1,c1,1,0.5)
+ ok=ag_trigger_bind(2,1,1,c2,1,0.5)
+}
+fn app_update(dt float){
+ stepn=stepn+1
+ let packed=ag_actions_snapshot()
+ let held=packed%64
+ let jump=(packed/64/16)%2
+ let token=ag_char3_move(1.0*dt,0.0,0.0,0.002)
+ let grounded=ag_char3_grounded(token)
+ var snd=0
+ var slot3=""
+ for k in 0..3 {
+  let ev=ag_event_next()
+  if ev>0 {
+   let pair=ag_event_pair()
+   let phase=ag_event_phase()
+   if phase==1 {coins=coins+1;snd=1}
+   if pair==0 {ok=ag_object_despawn(c0)}
+   if pair==1 {ok=ag_object_despawn(c1)}
+   if pair==2 {ok=ag_object_despawn(c2)}
+  }
+ }
+ if coins==3 {slot3="Won"}
+ ok=ag_present3d(0,1,1,stepn*0.1,1,0.0,snd,stepn*4-3,1,1.0,stepn*4-2,0,1.0,stepn*4-1,2,1.0,0,0,0.0,1,f"$coins",1,"Playing",0,"",1,slot3)
+}

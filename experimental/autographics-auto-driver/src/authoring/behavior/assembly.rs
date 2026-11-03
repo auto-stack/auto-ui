@@ -1,8 +1,8 @@
 //! One driver-local trusted assembler. No user input, IO, admission or caching.
 use super::{
     Api, API, CAMERA2_API, CAMERA3_API, CHARACTER3_API, CHARACTER_API, COMPONENTS2_API,
-    MOTION_API, MOTION_SCAN_API, OBJECTS_API, SEGMENT_API, SOURCE, SPATIAL_API, SPRITES_API,
-    SWEEP_API, TRIGGERS_API,
+    COMPONENTS3_API, MOTION_API, MOTION_SCAN_API, OBJECTS_API, SEGMENT_API, SOURCE, SPATIAL_API,
+    SPRITES_API, SWEEP_API, TRIGGERS_API,
 };
 
 pub(super) struct Units {
@@ -129,6 +129,65 @@ fn assemble_from(api: Api, input: Inputs<'_>) -> Result<Units, String> {
         )?;
         units.api = format!("{}\n{}", units.api, COMPONENTS2_API);
         units.api_region = "<public_composition2d_v1.at>";
+        return Ok(units);
+    }
+    if api == Api::Components3V1 {
+        // PLAN-035 complete 3D game composition: the full hud3d stack (every
+        // unit, including the character3d and camera3d units) plus the bounded
+        // composition unit over the same dimension-generic trigger/object
+        // state. The triggers unit's single-cursor event reads are renamed
+        // inside this assembly's bytes only and re-exposed through the
+        // composition unit's wrappers, which make the whole-tick snapshot and
+        // the cursor mutually exclusive with the named fault 58. The derived
+        // entry additionally makes the character/camera freezes conditional on
+        // an app_start bind: a Run binding neither is the only legal actor-free
+        // 3D path (kind=-1 cue/HUD bundles with no forged Player), per the
+        // PLAN-035 contract; every earlier profile keeps its unconditional
+        // freeze bytes. Explicit new identity: profile 28 / version 117.
+        let mut units = assemble_from(Api::Hud3V1, input)?;
+        for public in [
+            "ag_event_next",
+            "ag_event_pair",
+            "ag_event_phase",
+            "ag_event_generation",
+            "ag_event_source_kind",
+            "ag_event_source",
+            "ag_event_geometry",
+        ] {
+            let internal = format!("_ag_cmp_{}", public.trim_start_matches("ag_"));
+            units.api = replace(
+                &units.api,
+                &format!("fn {public}("),
+                &format!("fn {internal}("),
+                1,
+            )?;
+        }
+        units.entry = replace(
+            &units.entry,
+            "app_start(); _ag_cast_token=0; _ag_char3_freeze(); _ag_cam3_freeze()",
+            "app_start(); _ag_cast_token=0; if _ag_char3_node>=0 {_ag_char3_freeze()}; if _ag_cam3_node>=0 {_ag_cam3_freeze()}",
+            1,
+        )?;
+        units.entry = replace(
+            &units.entry,
+            "_ag_hud_tick_begin(); app_update(dt);",
+            "_ag_hud_tick_begin(); _ag_cmp_tick_begin(); app_update(dt);",
+            1,
+        )?;
+        units.entry = replace(
+            &units.entry,
+            "fn profile() int {return 25}",
+            "fn profile() int {return 28}",
+            1,
+        )?;
+        units.entry = replace(
+            &units.entry,
+            "fn _ag_version() int {return 114}",
+            "fn _ag_version() int {return 117}",
+            1,
+        )?;
+        units.api = format!("{}\n{}", units.api, COMPONENTS3_API);
+        units.api_region = "<public_composition3d_v1.at>";
         return Ok(units);
     }
     if api.hud() {
@@ -470,12 +529,13 @@ fn assemble_from(api: Api, input: Inputs<'_>) -> Result<Units, String> {
         | Api::Hud2V1
         | Api::Hud3V1
         | Api::Presentation2V1
-        | Api::Components2V1 => segment_transport(input.transport)?,
+        | Api::Components2V1
+        | Api::Components3V1 => segment_transport(input.transport)?,
     };
     // The former v5 pre-namespace `_ag_derive` replacement never matched.
     // Preserve those emitted bytes; activating that guard would change behavior.
     let (api_text, api_region) = match api {
-        Api::NodeAnimation3V1 | Api::Audio2V1 | Api::Audio3V1 | Api::Hud2V1 | Api::Hud3V1 | Api::Presentation2V1 | Api::Components2V1 => unreachable!("derived above"),
+        Api::NodeAnimation3V1 | Api::Audio2V1 | Api::Audio3V1 | Api::Hud2V1 | Api::Hud3V1 | Api::Presentation2V1 | Api::Components2V1 | Api::Components3V1 => unreachable!("derived above"),
         Api::V1 => (input.base.to_owned(), "<behavior_v1.at>"),
         Api::SpatialV2 => (
             format!("{}\n{}", input.base, input.spatial),
@@ -698,7 +758,8 @@ fn entry(api: Api, source: &str) -> Result<String, String> {
         | Api::Hud2V1
         | Api::Hud3V1
         | Api::Presentation2V1
-        | Api::Components2V1 => {
+        | Api::Components2V1
+        | Api::Components3V1 => {
             let source = replace(
                 &source,
                 "_ag_spatial_begin();",

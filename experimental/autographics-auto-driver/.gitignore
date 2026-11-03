@@ -25,6 +25,12 @@ __pycache__/
 !/research/game-runtime/*.at
 !/research/game-runtime/decision.json
 !/research/plan860-identity.json
+# PLAN-035 T-03 spike worlds (load-bearing includes of tests/plan035_probe.rs):
+# candidate-A/B collection probes, the actor-free service probe and the two
+# named-rejection probes. Transient host artifacts under plan035/ stay ignored.
+!/research/plan035/
+/research/plan035/*
+!/research/plan035/*.at
 
 # PLAN-879: staging directory for prepare_sdk.py --from-snapshot; residue
 # from an interrupted preparation must never be committed or consumed.
