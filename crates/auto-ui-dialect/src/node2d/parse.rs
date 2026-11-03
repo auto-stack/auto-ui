@@ -22,6 +22,30 @@ use crate::declarations::{parse_model_block, parse_msg_decl};
 /// 显式组合；生产 UI 管线不引用此类型。
 pub struct Node2DDialect;
 
+impl Node2DDialect {
+    fn try_parse_stmt_impl(
+        &self,
+        cx: &mut dyn DomainParseContext,
+        keyword: &str,
+        allow_dual_view: bool,
+    ) -> AutoResult<Option<DomainStmt<Node2DStmt>>> {
+        if cx.in_on_body() || cx.in_fn_body() {
+            return Ok(None);
+        }
+        if keyword != "node" {
+            return Ok(None);
+        }
+        let decl = if allow_dual_view {
+            // PLAN-039：仅显式查询 profile 的组合 dialect 在解析期放行
+            // 同 node 双 view；有限组合仍由该 profile 降层准入裁决。
+            parse_node_decl_opts(cx, true)?
+        } else {
+            parse_node_decl(cx)?
+        };
+        Ok(Some(DomainStmt::Domain(Node2DStmt::Node(decl))))
+    }
+}
+
 impl DomainDialect for Node2DDialect {
     type Output = Node2DStmt;
 
@@ -38,19 +62,48 @@ impl DomainDialect for Node2DDialect {
         cx: &mut dyn DomainParseContext,
         keyword: &str,
     ) -> AutoResult<Option<DomainStmt<Node2DStmt>>> {
-        if cx.in_on_body() || cx.in_fn_body() {
-            return Ok(None);
-        }
-        if keyword != "node" {
-            return Ok(None);
-        }
-        let decl = parse_node_decl(cx)?;
-        Ok(Some(DomainStmt::Domain(Node2DStmt::Node(decl))))
+        self.try_parse_stmt_impl(cx, keyword, false)
+    }
+}
+
+/// PLAN-039 queries-3d 组合 dialect：与 [`Node2DDialect`] 完全同一文法，
+/// 唯一差异是解析期放行同 node `view-2d`＋`view-3d` 双出口（单 node
+/// 旧拒绝在默认 [`Node2DDialect`] 路径字节不变）；放行后的有限组合
+/// （仅根、共用 model/msg/on、子 Node 单维）由 pilot 的 queries-3d
+/// profile 降层准入具名裁决，不放宽任何旧 profile 行为。
+pub struct Node2DQueriesDialect;
+
+impl DomainDialect for Node2DQueriesDialect {
+    type Output = Node2DStmt;
+
+    fn matches(&self, session: &CompilerSession) -> bool {
+        session.scenario == Scenario::UI
+    }
+
+    fn keywords(&self) -> &'static [&'static str] {
+        &["node"]
+    }
+
+    fn try_parse_stmt(
+        &self,
+        cx: &mut dyn DomainParseContext,
+        keyword: &str,
+    ) -> AutoResult<Option<DomainStmt<Node2DStmt>>> {
+        Node2DDialect.try_parse_stmt_impl(cx, keyword, true)
     }
 }
 
 /// `node Name(param: Type, ...) { model? msg? view-2d? on? }`
 pub fn parse_node_decl(cx: &mut dyn DomainParseContext) -> AutoResult<NodeDecl> {
+    parse_node_decl_opts(cx, false)
+}
+
+/// PLAN-039：`allow_dual_view=true` 时不做单 view 出口解析拒绝；
+/// 有限组合（仅根双出口等）由调用方 profile 降层准入具名裁决。
+pub fn parse_node_decl_opts(
+    cx: &mut dyn DomainParseContext,
+    allow_dual_view: bool,
+) -> AutoResult<NodeDecl> {
     cx.expect_keyword("node")?;
     let start = cx.cur_pos();
     let name = cx.cur_text();
@@ -361,8 +414,10 @@ pub fn parse_node_decl(cx: &mut dyn DomainParseContext) -> AutoResult<NodeDecl> 
     cx.exit_scope();
 
     // PLAN-024：单一 view 出口——同一 node 同时携带 view-2d 与 view-3d
-    // 属多呈现混合，不在本片（具名拒绝）。
-    if view2d.is_some() && view3d.is_some() {
+    // 属多呈现混合，不在本片（具名拒绝）。PLAN-039：显式查询组合 dialect
+    // 经 `parse_node_decl_opts(_, true)` 放行解析，有限组合由其 profile
+    // 降层准入裁决；本默认路径的拒绝消息与行为字节不变。
+    if view2d.is_some() && view3d.is_some() && !allow_dual_view {
         return Err(SyntaxError::Generic {
             message: format!(
                 "node '{name}' declares both view-2d and view-3d (single view exit per node)"

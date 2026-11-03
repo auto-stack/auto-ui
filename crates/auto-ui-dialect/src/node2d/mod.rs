@@ -17,7 +17,7 @@ pub use ast::{
 };
 pub use game::{Game2dAudio, Game2dBlock, Game2dCue, Game2dHud, Game2dShape, Game2dSlot,
     Game2dText, Game2dTrigger, Game2dTriggerKind};
-pub use parse::Node2DDialect;
+pub use parse::{Node2DDialect, Node2DQueriesDialect};
 pub use components2d::{CmpAtlas, CmpPatrol, CmpSpawn, Components2dBlock};
 pub use presentation::{
     PresHud, PresSlot, PresTrigger, Presentation2dBlock, Presentation3dBlock,
