@@ -11,6 +11,11 @@ use composer: Composer
 use stylekit.styles: caption_text
 style main_shell = "flex-1 gap-3 min-h-0 overflow-hidden"
 
+// PLAN-037 T-03：接入官方主题包（原无主题接线、无显式默认 → 官方 Auto/light
+// 独立默认）。family 经 theme_name + design 绑定；timer/ClockTick、SSE、
+// 消息与 typing 业务零改动——换肤保会话与未发输入，header 计时不复位。
+use themes.themes: Auto, Solarized
+
 widget App {
     msg {
         Init,
@@ -24,6 +29,15 @@ widget App {
 
     model {
         var clock_secs int = 0
+        // PLAN-037：主题族/模式选择态（主题选择，非业务状态）
+        var theme_name str = "Auto"
+        var dark_mode bool = false
+    }
+
+    // 主题/模式选择器（C-14：数据绑定，同帧校验发布；PLAN-037）
+    design {
+        theme: .theme_name
+        mode: if .dark_mode { "dark" } else { "light" }
     }
 
     timer {

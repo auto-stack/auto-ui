@@ -639,6 +639,7 @@ pub(crate) fn collect_module_imports(
     // 模块生效（Core/back 模块无 style 配方）。本模块本地 `style` 声明走
     // parser 作用域 bind_var，不依赖注册表。失败容忍同 A-02（收集器自身对
     // 不可解析/解析失败的导入模块已降级为 warn）。
+ 47ccccd7 (feat(plan-037): T-03 — 013/015/017 adopt official themes package; 015 npm_deps corrected to surviving @autodown/engine link (ERR_PNPM_INVALID_DEPENDENCY_NAME blocker closed, pnpm install green); bounded runtime fix: collect_module_imports stylekit style-recipe preregistration (015/017 VM C1-fatal counterexample at base; regression test + mutation-verified oracle); gates: 013 vm 22ok/1skip + vue green, 015 smoke 13/13 + accent-dark 5/5 + autotest 19/19 + mcp 13ok/1skip, 017 vm PASS (D named Enter-routing skip, 013 D-GAP family) + vue 10 pass/4 base first-reds (json.from_value codegen transliteration, owner-dispatched))
     if parser_session.is_ui() {
         let _ = auto_ui_compiler::design_tokens::recipe::prepare_style_recipe_imports(
             module_path.parent().unwrap_or(std::path::Path::new(".")),

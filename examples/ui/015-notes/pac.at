@@ -9,10 +9,18 @@ title_zh: "备忘录"
 theme: "dark"
 accent: "indigo"
 api: "rust"
-npm_deps: ["@autodown/editor:link:D:/autostack/auto-down/autodown/packages/editor", "@autodown/core:link:D:/autostack/auto-down/autodown/packages/core", "@autodown/engine:link:D:/autostack/auto-down/autodown/packages/engine"]
+# PLAN-037 T-03: npm_deps 按上游现源修正（原 name:link:path 数组串不被
+# 结构化解析臂识别且 editor/core 包已退役，幸存渠道为 @autodown/engine）。
+npm_deps: { "@autodown/engine": "link:D:/autostack/auto-down/autodown/packages/engine" }
 
 dep stylekit {
     path: "../stylekit"
+}
+
+# PLAN-037 T-03：官方主题单源包（不复制配色表进本 app，C-13）。
+# 既有显式 pac `theme: "dark"` 默认按 031 契约精确保留（同 010 先例）。
+dep themes {
+    path: "../../../packages/themes"
 }
 
 desktop: "true"

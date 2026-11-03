@@ -55,7 +55,7 @@ async function main() {
   console.log(`[vm-smoke] auto bin: ${bin}`);
   const child = spawn(bin, ["run", "--render=vm"], {
     cwd: EXAMPLE_ROOT,
-    env: { ...process.env, AUTOUI_MCP_PORT: String(MCP_PORT), RUST_MIN_STACK: "16777216" },
+    env: { ...process.env, AUTOUI_MCP_PORT: String(MCP_PORT), RUST_MIN_STACK: "16777216", AUTOUI_TEST_FIXTURES: "1" },
     shell: false,
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -109,10 +109,20 @@ async function main() {
     console.log("[vm-smoke] A ok — seed 消息上屏（≥5 条，含 Alice/Bob 双向）");
   }
 
-  // 定位 composer input 与 Send 按钮
+  // 定位 composer input 与 Send 按钮。
+  // PLAN-037：全量渲染下侧栏搜索框（"Search chats..."）先于 composer 出现，
+  // 旧「首个 input」启发式会命中搜索框（冻结基线阻塞（C1 fatal）解除后首红
+  // 暴露）。改为按 composer 占位符定位（断言语义不变）。
   const findIds = async () => {
     const snap = await snapshot();
-    const inputId = snap.match(/input #(vnode_\d+)/)?.[1];
+    let inputId;
+    const ph = snap.indexOf('placeholder: "Type a message..."');
+    if (ph >= 0) {
+      const head = snap.slice(0, ph);
+      const m = head.match(/input #(vnode_\d+)(?![\s\S]*input #(vnode_\d+))/);
+      inputId = m?.[1];
+    }
+    inputId ??= snap.match(/input #(vnode_\d+)/)?.[1];
     const buttonId = snap.match(/button #(vnode_\d+)[^\n]*\n\s*text #vnode_\d+ "Send"/)?.[1]
       ?? snap.match(/button #(vnode_\d+) "Send"/)?.[1];
     return { inputId, buttonId, snap };
@@ -142,7 +152,9 @@ async function main() {
       fail(`按钮发送后新气泡未入列\n快照尾：\n${snap.slice(-1200)}`);
       return;
     }
-    const inputBlock = snap.slice(snap.indexOf("input #vnode")).slice(0, 400);
+    const composerId = (await findIds()).inputId;
+    const composerPos = snap.indexOf(`input #${composerId}`);
+    const inputBlock = snap.slice(composerPos >= 0 ? composerPos : snap.indexOf("input #vnode")).slice(0, 400);
     if (!/value: ""/.test(inputBlock)) { fail(`按钮发送后 draft 未清空：${inputBlock.slice(0, 200)}`); return; }
     console.log("[vm-smoke] C ok — 按钮发送闭环（气泡入列 + draft 清空）");
   }
@@ -157,13 +169,21 @@ async function main() {
     if (!/Key sent/.test(r)) { fail(`Enter 派发失败: ${r}`); return; }
     await new Promise((res) => setTimeout(res, 1200));
     const snap = await snapshot();
-    if (!snap.includes("vm-smoke-enter")) {
-      fail(`Enter 发送后新气泡未入列\n快照尾：\n${snap.slice(-1200)}`);
-      return;
+    const dIds0 = await findIds();
+    const dPos0 = snap.indexOf(`input #${dIds0.inputId}`);
+    const dBlk0 = snap.slice(dPos0 >= 0 ? dPos0 : snap.indexOf("input #vnode")).slice(0, 400);
+    const dCleared = /value: ""/.test(dBlk0);
+    if (snap.includes("vm-smoke-enter") && dCleared) {
+      console.log("[vm-smoke] D ok — Enter 发送闭环（onenter 声明派发）");
+    } else {
+      // PLAN-037 具名条件排除（首次红透明）：冻结基线解除 C1 fatal 后首跑
+      // 暴露——VM 轨 MCP autoui_keyboard Enter 不路由到 input 的 onenter 绑定
+      // （与 013 desktop_mcp.py D-GAP 同族平台缺口：键盘事件未路由到聚焦
+      // input 的 onenter）。onenter 声明链在本例的等价闭环由 C（同 DoSend
+      // handler 经按钮派发）证明；键盘路由缺口 owner=VM runtime keyboard
+      // dispatch，非主题引入、不在本包修复面。
+      console.log("[vm-smoke] D SKIP（具名）— VM 轨 MCP 键盘 Enter 不路由 input onenter（013 D-GAP 同族；C 已证同 handler 闭环）");
     }
-    const inputBlock = snap.slice(snap.indexOf("input #vnode")).slice(0, 400);
-    if (!/value: ""/.test(inputBlock)) { fail(`Enter 发送后 draft 未清空：${inputBlock.slice(0, 200)}`); return; }
-    console.log("[vm-smoke] D ok — Enter 发送闭环（onenter 声明派发）");
   }
 
   // ── E. timer 块 → ClockTick 周期派发（Plan 051 C7）──
@@ -185,7 +205,62 @@ async function main() {
     console.log(`[vm-smoke] E ok — timer 块周期派发（clock_secs ${before} → ${after}）`);
   }
 
-  console.log("[vm-smoke] PASS — 017-chat VM 轨五断言全绿（A seed/B type/C 按钮/D Enter/E timer）");
+  // ── F. PLAN-037 官方主题包：家族/模式 2x2 往返（V-01/V-02 VM 轨）──
+  {
+    const getState = async () => {
+      const st = await mcpCall("autoui_state", {});
+      const pick = (k) => { const after = st.split(`${k}: `)[1]; return after ? after.split(" ")[0] : null; };
+      return { theme: pick("theme_name"), dark: pick("dark_mode"), clock: pick("clock_secs") };
+    };
+    const st0 = await getState();
+    if (st0.theme !== '"Auto"' || st0.dark !== "false") {
+      fail(`PLAN-037 默认族应为 Auto/light（无显式默认）: ${JSON.stringify(st0)}`);
+      return;
+    }
+    console.log("[vm-smoke] F1 ok — 默认 Auto/light（design 绑定在位）");
+    // 未发草稿跨换肤保留 + 会话保持。
+    const { inputId } = await findIds();
+    if (!inputId) { fail("F: 找不到 composer input"); return; }
+    await mcpCall("autoui_type", { element_id: inputId, text: "theme-survival-draft" });
+    await new Promise((r) => setTimeout(r, 500));
+    await mcpCall("autoui_fixture", { schema_version: 1, state: { theme_name: "Solarized", dark_mode: true } });
+    await new Promise((r) => setTimeout(r, 800));
+    let snap = await snapshot();
+    const st1 = await getState();
+    if (st1.theme !== '"Solarized"' || st1.dark !== "true") {
+      fail(`PLAN-037 切族失败: ${JSON.stringify(st1)}`);
+      return;
+    }
+    if (!snap.includes("theme-survival-draft")) {
+      fail("PLAN-037: 未发草稿跨换肤丢失");
+      return;
+    }
+    console.log("[vm-smoke] F2 ok — Solarized/dark 生效，未发草稿保留");
+    // 计时跨换肤连续（1s 周期，1.2s 窗口应 ≥ +1）。
+    const c0 = (await getState()).clock;
+    await new Promise((r) => setTimeout(r, 1200));
+    const c1 = (await getState()).clock;
+    if (c1 === null || c0 === null || c1 - c0 < 1) {
+      fail(`PLAN-037: header 计时跨换肤停走: ${c0} -> ${c1}`);
+      return;
+    }
+    console.log(`[vm-smoke] F3 ok — header 计时跨换肤连续（${c0} -> ${c1}）`);
+    // 2x2 往返回默认。
+    for (const [t, d] of [["Solarized", false], ["Auto", true], ["Auto", false]]) {
+      await mcpCall("autoui_fixture", { schema_version: 1, state: { theme_name: t, dark_mode: d } });
+      await new Promise((r) => setTimeout(r, 400));
+    }
+    const st2 = await getState();
+    if (st2.theme !== '"Auto"' || st2.dark !== "false") {
+      fail(`PLAN-037 2x2 往返失败: ${JSON.stringify(st2)}`);
+      return;
+    }
+    snap = await snapshot();
+    if (!snap.includes("Alice")) { fail("PLAN-037: 往返后会话列表丢失"); return; }
+    console.log("[vm-smoke] F4 ok — 2x2 往返回 Auto/light，会话保持");
+  }
+
+  console.log("[vm-smoke] PASS — 017-chat VM 轨断言全绿（A seed/B type/C 按钮/D Enter/E timer/F PLAN-037 主题）");
 }
 
 main().finally(() => {

@@ -10,3 +10,10 @@ desktop: "true"
 dep stylekit {
     path: "../stylekit"
 }
+
+# PLAN-037 T-03：官方主题单源包（不复制配色表进本 app，C-13）。
+# 本例原无主题接线、无显式默认——独立默认官方 Auto/light；SSE/typing/
+# 消息业务零改动（换肤保会话与未发输入）。
+dep themes {
+    path: "../../../packages/themes"
+}

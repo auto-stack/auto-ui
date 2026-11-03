@@ -7,3 +7,10 @@ title: "Todo"
 title_zh: "待办清单"
 api: "rust"
 desktop: "true"
+
+# PLAN-037 T-03：官方主题单源包（不复制配色表进本 app，C-13）。
+# 本例原无主题接线、无显式默认——独立默认官方 Auto/light；API/store 业务
+# 零改动（换肤不丢列表/编辑输入，后端不改静态种子）。
+dep themes {
+    path: "../../../packages/themes"
+}

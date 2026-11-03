@@ -10,6 +10,11 @@ use todo_list: TodoList
 // 标题 text-red-400→text-primary（TodoMVC 传承红按设计退休，角色=品牌强调）；卡面
 // bg-white→bg-card；输入行 border-gray-200→border-border；页脚提示 text-gray-400→
 // text-muted-foreground。todo_list.at 侧映射见其文件头注。
+//
+// PLAN-037 T-03：接入官方主题包（原无主题接线、无显式默认 → 官方 Auto/light
+// 独立默认）。family 经 theme_name + design 绑定；store/API/业务 handler 零改动
+// ——换肤不丢列表/编辑输入，不把 API 变静态种子。
+use themes.themes: Auto, Solarized
 
 widget App {
     msg {
@@ -18,6 +23,15 @@ widget App {
 
     model {
         var input str = ""
+        // PLAN-037：主题族/模式选择态（主题选择，非业务状态）
+        var theme_name str = "Auto"
+        var dark_mode bool = false
+    }
+
+    // 主题/模式选择器（C-14：数据绑定，同帧校验发布；PLAN-037）
+    design {
+        theme: .theme_name
+        mode: if .dark_mode { "dark" } else { "light" }
     }
 
     view {

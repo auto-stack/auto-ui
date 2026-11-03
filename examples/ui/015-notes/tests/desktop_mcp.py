@@ -200,7 +200,10 @@ def run_tests_015(mcp_url):
     result.check("Snapshot has element IDs", "aura_" in snap or "vnode_" in snap,
                  "No aura_/vnode_ IDs found (v2 snapshot)")
     result.check("Snapshot shows Notes header", '"Notes"' in snap, "Notes header missing")
-    result.check("Snapshot shows New button label", '"New"' in snap, "New button missing")
+    # PLAN-037: PLAN-616 renamed the primary button label New -> "New note";
+    # the old exact-token check could never match the current label (first red
+    # on frozen base 3c46104b, see plan evidence). Assert current label.
+    result.check("Snapshot shows New button label", '"New note"' in snap, "New button missing")
 
     # T2: Initial state — seed notes loaded (D-GAP-4 data layer)
     print("\nT2: Initial State (seed notes)")

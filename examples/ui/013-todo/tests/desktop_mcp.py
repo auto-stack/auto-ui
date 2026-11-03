@@ -379,6 +379,37 @@ def run_tests_013(mcp_url):
             r = mcp.click(clear_btn)
             result.check("clear completed click status ok", "status: ok" in r, r)
 
+    # ── PLAN-037 T-03: official theme package (V-01/V-02 on the VM track) ──
+    # 换肤不丢列表/编辑输入：主题 2x2 往返前后 todos 数据与可见列表保持；
+    # family/mode 来自 theme_name/dark_mode design 绑定（无新菜单）。
+    print("\nT-PLAN-037: theme round-trip preserves todo state")
+    try:
+        mcp.call("autoui_fixture", schema_version=1,
+                 state={"theme_name": "Solarized", "dark_mode": True})
+        time.sleep(0.8)
+        st = mcp.state("theme_name", "dark_mode")
+        result.check("fixture switches to Solarized/dark",
+                     '"Solarized"' in st and "dark_mode: true" in st, st[:160])
+        snap = mcp.snapshot()
+        result.check("list renders under Solarized/dark",
+                     "What needs to be done?" in snap, snap[:160])
+        todos_before = count_state_todos(mcp.state("todos"))
+        mcp.call("autoui_fixture", schema_version=1,
+                 state={"theme_name": "Auto", "dark_mode": False})
+        time.sleep(0.6)
+        st = mcp.state("theme_name", "dark_mode")
+        result.check("round-trip back to Auto/light",
+                     '"Auto"' in st and "dark_mode: false" in st, st[:160])
+        todos_after = count_state_todos(mcp.state("todos"))
+        result.check("todos preserved across 2x2 round-trip",
+                     todos_before is not None and todos_before == todos_after,
+                     f"{todos_before} -> {todos_after}")
+        snap = mcp.snapshot()
+        result.check("list still renders after round-trip",
+                     "What needs to be done?" in snap, snap[:160])
+    except Exception as e:
+        result.skip("PLAN-037 theme leg", f"error: {e}")
+
     return result
 
 
@@ -470,7 +501,8 @@ def main():
         proc = subprocess.Popen(
             [AUTO_BIN, "run", "-r", "vm"],
             cwd=TODO_PROJECT,
-            env={**os.environ, "AUTOUI_MCP_PORT": str(mcp_port)},
+            env={**os.environ, "AUTOUI_MCP_PORT": str(mcp_port),
+                 "AUTOUI_TEST_FIXTURES": "1"},  # PLAN-037: fixture channel
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )

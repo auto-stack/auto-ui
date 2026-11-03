@@ -174,3 +174,42 @@ test('T8: 控制台无实质错误', async ({ page }) => {
   const real = errors.filter((e) => !e.includes('EventSource') && !e.includes('net::ERR'))
   expect(real, `实质错误: ${real.join('; ')}`).toHaveLength(0)
 })
+
+// PLAN-037 T-03: 官方主题包 —— 家族/模式 2x2 往返（setupState 模型驱动，
+// 生效包值 oracle；换肤保会话与未发草稿）。
+test('T-P037: 主题族/模式 2x2 往返 — 换肤保会话与未发草稿', async ({ page }) => {
+  await waitForApp(page)
+  const themeRoot = () => page.evaluate(() =>
+    getComputedStyle(document.querySelector('[data-auto-theme-root]')).getPropertyValue('--background').trim())
+  const drive = (t: string, d: boolean) => page.evaluate(([t, d]) => {
+    const st = (document.querySelector('#app') as any).__vue_app__._instance.setupState
+    st.theme_name = t
+    st.dark_mode = d
+  }, [t, d] as any)
+
+  // 默认 Auto/light（本例原无显式默认）。
+  expect(await themeRoot()).toBe('0 0% 100%')
+
+  // 未发草稿跨换肤保留。
+  const input = composerInput(page)
+  await input.fill('theme-draft-survival')
+  await drive('Solarized', true)
+  await page.waitForTimeout(400)
+  expect(await themeRoot()).toBe('192 100% 11%')
+  expect(await input.inputValue()).toBe('theme-draft-survival')
+  await page.screenshot({ path: 'test-results/p037_solarized_dark.png', fullPage: true })
+
+  await drive('Solarized', false)
+  await page.waitForTimeout(350)
+  expect(await themeRoot()).toBe('44 87% 94%')
+  await drive('Auto', true)
+  await page.waitForTimeout(350)
+  expect(await themeRoot()).toBe('240 10% 4%')
+  await drive('Auto', false)
+  await page.waitForTimeout(350)
+  expect(await themeRoot()).toBe('0 0% 100%')
+  expect(await input.inputValue()).toBe('theme-draft-survival')
+  // 会话内容保持。
+  await expect(page.locator('body')).toContainText('Alice')
+  await expect(page.locator('body')).toContainText('Morning everyone!')
+})

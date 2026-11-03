@@ -7,6 +7,11 @@
 // dark_mode / accent_color），但 Vue 生成器把根元素的 `:class="{ dark: X }"`
 // 绑到 **widget 本地** 的 dark_mode（vue.rs `dark_mode_on_widget` 分支），
 // 所以 App 保留同名镜像，并在切换 handler 里与 store 同步。
+//
+// PLAN-037 T-03：接入官方主题包。既有显式 pac `theme: "dark"` + store
+// dark_mode=true 显式默认精确保留（store 主权/applyAccent/T12-DARK 契约
+// 不动）；家族选择经新增 theme_name + design 数据绑定（主题选择态，非
+// 业务状态，无新菜单/新业务 handler）。
 
 use notes_store: NotesStore
 use sidebar: NavTree
@@ -18,12 +23,22 @@ use editor: EditorPanel
 style icon_btn = "h-8 w-8 border-0 flex items-center justify-center rounded-md bg-transparent text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
 style primary_btn = "h-9 w-auto border-0 flex items-center gap-1.5 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium shadow-sm hover:bg-primary/90 transition-colors"
 
+use themes.themes: Auto, Solarized
+
 widget App {
     msg { Init, NewNote, ToggleDarkMode, SetMode(str), SetAccent(str), ToggleSettings }
 
     model {
         var dark_mode bool = true
         var accent_color str = "indigo"
+        // PLAN-037：主题族选择（默认 Auto；pac `theme: "dark"` 显式默认保留）
+        var theme_name str = "Auto"
+    }
+
+    // 主题/模式选择器（C-14：数据绑定，同帧校验发布；PLAN-037）
+    design {
+        theme: .theme_name
+        mode: if .dark_mode { "dark" } else { "light" }
     }
 
     view {
