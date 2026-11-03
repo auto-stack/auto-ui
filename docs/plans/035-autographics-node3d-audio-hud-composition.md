@@ -1,0 +1,175 @@
+---
+plan_id: PLAN-035
+status: drafting
+feature_name: AutoGraphics3D声音HUD与完整G3组合接线
+author: [Codex]
+created_at: 2026-11-03
+updated_at: 2026-11-03
+plan_revision: 1
+current_step: 0
+total_steps: 10
+depends_on: [auto-ui/PLAN-012, auto-ui/PLAN-013, auto-ui/PLAN-025, auto-ui/PLAN-032, auto-ui/PLAN-034]
+supersedes_spec_components: []
+new_spec_components: [docs/specs/auto-graphics/node3d-audio-hud-composition.md]
+touched_goals: [GOAL-008]
+affects: [auto-ui-dialect, autographics-node2d-pilot, autographics-auto-driver]
+---
+
+# PLAN-035：3D声音/HUD通用Node与完整G3组合接线
+
+## 0. 变更摘要
+
+复用公共audio3d/hud3d和034具名表现，在普通Node/use/局部model-msg-on中接通声音、HUD、视觉bundle及对象/触发/相机/accepted新局，证明原完整G3-01..08/合法峰值在原32池与资源/VM包络内。正式G3游戏仍归ag-examples/games/platformer-3d未来独立合同；本期仅公共引擎与永久最小整链夹具，不冒称完整游戏交付。
+
+[共同设计](../design/autographics/node3d-presentation-audio-and-g10-migration.md)。drafting r1、0/10，暂不实施。T-01/T-02可独立做原G3/素材/许可/协议/oracle及文档接口准备，T-03完整组合先证硬等034实际交付/独立review/Spec与来源；不读034开发tip。AG015固定034，不依赖本计划。本轮不建实施树/源码/素材/探针/提案Spec，不构建/GPU/OS自动化或创建agent。
+
+## 1. 目标
+
+1. 任意业务名字的Node/普通use/局部model/msg/on可请求具名cue、gain、四槽HUD及视觉clip/phase/yaw；支持034的模型/引用/局部组件，真实Auto持玩法和cue/文字选择，生成器没有计分/胜败/Idle特判。
+2. actor-free 3D音画服务小夹具与含唯一character/camera/三Coin/危险/目标/越界/重开的完整G3夹具成立；无视觉请求可只提交声音/HUD，不为服务制造假Player。
+3. 完整G3八项同一程序逐项/峰值实测，不停移动/漏事件/删必要表现声音来过32；如需有界组合操作，显式新profile/API域/价目/错误和独立准入，旧档及价目不变。
+4. 实际Auto/Host/GPU/PCM/native/HUD/owner、冷消费/保存迁移/故障恢复与034/旧2D兼容闭合，交付未来游戏可固定消费的公共组合；无正式游戏或整M2认领。
+
+非目标：另写mixer/font/物理/动画解码器、G10内容或完整G3游戏、声音空间化/音乐/混音总线/任意字体/CJK/富文本/生产UI overlay、多视觉无界bundle、多个可控角色、动态拓扑/跨场景、ACE/AOT/ECS/CPC/跨端、抬原32或资源/VM上限。032保留字段/自动巡逻约定不扩成3D业务协议，030/034有限端口限制如需改变必须在本计划明确证明。
+
+## 2. 架构方案
+
+普通Auto组件资源/声明/绑定/handler→034具名纹理/动画＋025通用cue/HUD请求及035显式三维收口→固定scene8/受检用户Auto→原3D角色/相机/对象/触发/动画/audio/HUD组合→Host共同逻辑accept→GPU与有界native服务。音频设备真正采样和GPU呈现分别计时，不许诺物理扬声器与显示硬件原子同步。
+
+拟唯一实施与同树独立review树D:/autostack/.wt/ui-035/auto-ui，codex/plan-035-dev。T-01可为独立准备登记本树/scope，034实现只读；T-03绑定其实际落主后固定来源，pilot当前语言依赖图与SDK681 driver图始终分开。不得用兄弟开发树/未审SDK或共享target越门；公共AST/load/translate/assembly owner短窗、GPU/窗口/音频重型门机器单实例。
+
+## 3. 技术栈
+
+已核api/public_audio3d_v1.at、public_hud3d_v1.at（ag_present3d一个视觉/四声/四HUD，kind=-1无视觉）、public_audio_v1.at、public_hud_v1.at及authoring/public_audio/{bank,codec,mixer,native}.rs、public_hud/mod.rs；pilot lower_presentation.rs和translate.rs::SfxEnv仅二维，034新typed资源/clip尚未交付。032 public_composition2d_v1.at已有0..8事件快照/显式批销毁，但不代表其profile可直接用于3D。
+
+拟新增lower_presentation3d.rs、node3d_audio_hud_gates/flow、必要public_3d_composition_api与verify_plan035.py、fixtures/node3d-presentation-services/及g3-full-loop/；均提案路径，T-02列支持边界、T-03冻结实际CLI/协议，T-04..06建立执行。只新增公共服务/最小夹具，不把关卡业务算法放Rust或私有Host测试命令。
+
+## 4. 需求分析与背景调查
+
+用户2026-11-03明确授权本批规划而非实施；引擎两片034→035、AG015内容分别管理，原G3/预算/验收不减。auto-ui基线cfe325d41e9c98b9d877fe071db04b42b687880c，012公共音频、013 HUD（8b1e799）、025通用二维（e9cc929/54899e9）、032组合（a8c04d22）及030三维引用（804d7303）均已交付；034当前只有drafting/r1，不能预填交付SHA或把其提案端口当现成能力。
+
+权威：[公共音频](../../../auto-lang/docs/specs/auto-graphics/public-audio.md)、[HUD](../../../auto-lang/docs/specs/auto-graphics/public-hud.md)、[025 Spec](../specs/auto-graphics/node-presentation-services.md)、[032 Spec](../specs/auto-graphics/node2d-full-game-composition.md)、[034合同](034-autographics-node3d-materials-and-animation.md)、[原G3八项/关卡](../../../auto-lang/docs/design/autographics/m2-game-sample-matrix.md)。012/013事实不能推出新Node三维端口已接线；G12只二维、G10不含声音/HUD，不扩大其内容合同。
+
+SHA256：audio Spec=5a802e532a63bd2ad1d9999d3ce8cf6acc8f054280c6f0c7bb47cf514eebacb5；HUD Spec=4e787ed23872e682f79069e0d6bdcd00f364ab4e5c3cb58dade0c0df1fb2f6a9；025=62090294bcbdb83affc2194a0e93e0d284290578e28d162f1ce6f7748528d610；032当前canonical=e693338b0a88a7e6e7313ba1dc7572f354d99b19cf786ef8a9a8cebc01fb76fb（旧收据ffbb5752为候选；实际差异仅激活状态行，不能在新锁填旧hash）；public_hud3d_v1.at=3b0e63cf3b97c9a87c9e69af94af49f53c62ac0125de6b0285b575355c3636eb。SDK固定7b987ca8b12f2eec3c076a1bfbf3ff4663aa8467/681内容锁，历史对象不可达按受检副本处理，不改当前SDK。
+
+## 5. 详细设计
+
+### 5.1 分阶段进入与有界决策
+
+T-01核现有3D服务、原G3/资源/独立oracle、034合同与source/SDK/owner，登记唯一树/scope。T-02准备完整资源并集/原轨迹/事件cue映射/预算单位、actor-free与完整G3两路径接口，最多A/B两候选：A只复用原hud3d单条事件/对象操作；B在新显式三维组合档复用032有界机制。只据文档revision准备，不运行依赖未交付端口的完整新链。
+
+T-03硬门：034实际review/落主/Spec/来源和冻结工具可用后，固定其delivery、pilot语言来源与SDK681/two-lock/toolchain/runner/generator hash，再做最多两候选完整全链先证。冻结准确新profile/API number/marker/Frame/typed端口/错误/价目/支持域、G3轨迹/峰值与受影响命名case；不能把2D协议号116冒用3D。不成立保持功能未完成/needs_replan，不能交no_go研究后算功能交付。
+
+### 5.2 普通组件、资源与音画服务
+
+034资源/ClipRef、actor/对象引用、普通局部事件与025 cue/gain/HUD绑定复用。根、Player、三同定义Coin、Hazard、Goal、Boundary共八有状态Node；局部状态/句柄/一次收集/receiver隔离，根只显式协调计数/结果与顺序。纯模板/平台/服务声明不浪费状态配额；数字scene/slot/pair/cue ID由生成器表解析，业务不依赖生成序。
+
+作者字段/枚举自由命名，通过typed属性/显式公共调用绑定；所有运动、clip、phase、yaw、jump/land/coin cue、ordinal消费、HUD文本、胜败和fresh Restart由真实Auto handler决定。新档不得要求root叫state、角色叫pose/facing，不凭Coin/Playing/Idle名字自动生成业务。参数经局部model/helper/子msg可用，uniform限制与支持域须具名先证，不让所有状态重回root规避组件。
+
+声明音频、≤8cue以及四HUD槽/字体许可；每callback恰一次受检收口，支持一个视觉（无视觉kind=-1）、≤4请求、四槽完整状态。请求来自各组件，ordinal精确int同Run严格递增、无重复/溢出回绕，拒绝时不消费为已播放；neutral Step按原语义消费ordinal且suppressed，无Resume积压。直接HUD/视觉/音频写与bundle混用/重复bundle必须按原规则拒绝，不靠降层顺序隐藏冲突。actor-free服务使用相同cue/HUD合同，不伪造角色/相机；若旧基底不支持空actor，则只在新档明确补该合法路径。
+
+### 5.3 原G3完整夹具与验收分母
+
+固定60Hz、x/z水平/y上；spawn(2,1,2)、half宽深.4/高.5，三个平台[0,8]/[10,18]/[20,28]×y[-1,0]×z[0,8]；下界y=-4，危险区[14,16]×[0,1]×[3,5]。三币(4,1,4)/(12,1,2)/(24,1,4)，goal(26,1,6)，触发半径.5；speed4/gravity20/jump8/clearance.002，相机初距8/夹[4,12]/pitch[15°,75°]，鼠标左拖/滚轮，WASD或方向键/空格，终局fresh Enter新Run。原完整轨迹T-02/03逐值绑定，不改几何避峰值。
+
+| 原ID | 同一个真实G3程序必须成立 | 反例/可观察证据 |
+|---|---|---|
+| G3-01 | 相机相对四向/对角归一，朝向运动、停步保yaw | 环绕仍世界轴/对角加速/反yaw必须失败，独立轨迹+像素 |
+| G3-02 | 接地一次跳、空中无二跳、重力落地 | pressed/held/边沿/着地，独立f32支撑轨迹 |
+| G3-03 | 固定立体地墙顶/危险区/越界 | 穿透/错shape/未失败变异真失败；模型视觉不能改physics |
+| G3-04 | 三物首次各+1真销毁，未齐目标不胜 | 重复/旧代/早目标/合法同时事件顺序，计数与身份 |
+| G3-05 | 危险/越界失败、齐物目标胜、终局冻结、Enter新局 | 20轮计数/位置/物品/相机/局部状态/旧Run隔离 |
+| G3-06 | 相机跟随/环绕/缩放及距离俯仰约束，同Tick更新 | camera basis与角色/VP/像素、界外/非法值拒绝 |
+| G3-07 | 原低多边形角色/平台/物品/目标可辨，idle/walk/jump正确 | 保原character四clip/texture，错帧/冻结shadow/动画侵入物理负控 |
+| G3-08 | jump/land/coin边沿一次声音，n/3与胜败HUD | cue/ordinal/PCM/native/字形ROI与Auto状态共同观察，漏/重/错HUD失败 |
+
+正常路线、危险与坑失败、未齐目标、获胜/失败新局、失焦/Pause/Step/Stop、旧Run和槽代隔离都必须执行。原地图不可达的三币同Tick/多请求容量用明确公共边界夹具证明支持/拒绝，不伪称主地图能达到或调整关卡冒充预算余量。G3-01..08是本期整链公共夹具的分母，未来游戏仍独立验正式内容，不能照搬引擎绿当产品交付。
+
+### 5.4 原预算及新有界操作提案
+
+保全Callback32 credits、32物理lifecycle写、第33收费fault10/第33物理写fault37，8状态Node/8slot/8pair、120base+8reserved128、deep/contact64base、mesh512、raw8身份/32MiB/单件8MiB、CPU/GPU各64MiB及034动画元数据/pose/clip16/channel128/samples8192。原managed96/user256/combined352KiB、1000steps/2ms slice、100000steps/120resumes/250ms callback、init30s/tick2s/8ms pump目标不变；绑定/纯函数零额外服务费不等于VM免费。
+
+A保持原价目。B提案新autographics.components3d/1（仅名称提案，具体身份T-03核唯一）：完整0..8上一Tick事件快照，每callback一次1credit，固定ordered rows/count/精确int Run/tick/pair/phase/完整source/generation/geometry；字段读取为本地Auto计算，VM/CPU计量；第二次快照/与单cursor混读/越界具名拒绝58。显式despawn_batch 0..8同Run不同完整live句柄，1credit/批（空批仍计），先全验证后写、重复/错代/错Run/第9项具名拒绝59或原33，物理写仍按n计/第33仍37，不自动rebind/exit。复用代码须核3D事件字段与独立Host准入，旧2D/3D装配字节/收费不变。
+
+候选B收集分支账：input snapshot1+char3_move26+grounded1+events snapshot1+batch despawn1+present3d1=31，余1不是承诺免费空间；任何额外服务读取/配置都计。最强运动/跳落/收集/危险目标竞争/终局新局、初始化及真实执行VM数据分别实测，不能凭和式/go或失败前缀报完整余量，不停输入/隔帧事件/少读身份/静音/挪物凑预算。若确需扩one-visual域，须明确有界公共协议/价目/新身份或needs_replan，不静默扩成无限列表。
+
+原声音≤4请求/callback、8voice/Run、≤8cue、signed int ordinal1..2147483646；四HUD槽每槽0..32ASCII32..126、总128，LilitaOne font26828B sha4444c23631884f411aa7f2fee35061b1756a9927940c62d2a5572acf470b3ffa和OFL/RFN4391B sha31d45880a38de46bc81835329c0c7d964609751e65add92769ea0095ad92c05b，4atlas/1024边/每atlas4MiB/16..48逻辑px全保持。jump/land/coin bank可复用固定Kenney派生b0b740dc…/90060B，44100Hz/2ch/22504frames，片段[0,7403)/[7403,20046)/[20046,22504)；普通声明可支持原音频格式域，不硬编码这三个cue名字。
+
+原素材版本3fa8a04b1c01ab23db43123d4ce814a34c3fc7f0/CC0及字体OFL固定。原character/platform/coin/flag+colormap+bank+font合计7身份/263372raw字节是候选输入算术，不是实际GPU/内存证明；T-03/05核实际输入/许可及资源图全部保原总额，不给声音/HUD另开64MiB池。
+
+### 5.5 接受、故障、生命周期与来源
+
+同一逻辑候选含节点/物理/相机/对象/事件/pose/PCM请求/HUD，完整准入/资源prepare后common accept；preaccept错值/超额/资源或prepare失败保原完整last-good且不插新voice。只在accept后插一次，transport重放不重复；旧Run/ordinal/代次拒绝。postaccept native错误沿audio_fault清Run voices/queue、保最后视觉/HUD，已播PCM不回滚，不自动重播；无设备/不可用配置必须audio_unavailable，不能虚拟静音冒充设备正常。
+
+Pause冻结voice/phase，neutral Step视觉/HUD一Tick、声音suppressed无新voice，Stop/Fault/newRun下一quantum无旧Run PCM。20轮accepted restart/Stop/churn真实VM/voice/PCM/font/atlas/mesh/manager owner及弱引用、warmdecode/upload0与最后外部pin释放；不要清计数伪装释放。HUD贴游戏surface逻辑坐标，camera不动锚点、DPI/resize沿原布局/scissor，无3D深度采样UI承诺。
+
+公开source-build/A→B仅闭包冷再生/真Run、源码编辑变异、保存关开/SaveAs/坏件拒绝→精确恢复→同入口再Run必需本新组合证据；不能只指旧profile无关套件顶替新资源/新链保存义务。真实generator/runner hash、两图依赖锁/toolchain/参数/SDK681及模块资产许可互绑，当前/候选Spec hash区分；无独立G3产品、无M2标签、无其他内容自动跟升。
+
+### 规范增量
+
+| delta_id | add/modify/retire | docs/specs/... target | before/after rule | rationale | acceptance IDs |
+|---|---|---|---|---|---|
+| SD-01 | add | docs/specs/auto-graphics/node3d-audio-hud-composition.md | 仅底层audio3d/hud3d与二维Node接线→显式通用3D资源/请求/四槽收口和原额完整G3新链，必要有限操作公开域/价目/身份，旧档保持 | 为正式G3游戏提供实际可消费公共组合 | AC-01..06/08 |
+
+## 6. 测试设计
+
+新工具/夹具由T-04..06建立执行，未通过。无指定实现/内部/final人选；同一权威树顺序、final不同独立上下文，不能以实现会话内重跑代替，未授权创建agent。真实GPU/窗口/native重型门单实例；OS键鼠/焦点自动化暂停，真实人工走查、PCM路由/虚拟设备和物理声学证据分别记，必需缺项具名不能计PASS。
+
+| ID/AC/owner_stage | 不变量/合法及非法输入/状态 | 实际入口/区分oracle/边界 |
+|---|---|---|
+| V-S01 / AC-01/02 / work | actor-free服务/八Node完整G3、普通use/任意字段名/局部状态/具名cue-clip-target/参数/receiver | 新node3d_audio_hud_gates→公开生成→真实Auto，改名/双实例/错误kind/只读/未知绑定/串状态负控，不靠特殊字段和Rust玩法 |
+| V-S02 / AC-02/03 / work | 原G3八项/完整正常与失败/胜败新局、同Tick相机-姿态-字形-声音 | 新node3d_audio_hud_flow＋独立f32几何/Auto轨迹/f64 pose/GPU silhouette-shadow/字形ROI/PCM逐位/实际native输出；冻结/错yaw/漏cue/重复cue/坏HUD真失败 |
+| V-S03 / AC-03/04 / work | A/B真实最高分支及容量，32/33、8/9批/重复/错Run旧代、int边界 | public_3d_composition_api与新flow：新批完整/无半写、第二快照/混读58、9项59、旧代33、写37、旧profiles API字节/价目不变；主地图不可达压力独立标注 |
+| V-S04 / AC-03/04 / work | 四/五请求、八/九voice、超ordinal、错gain/字体/字形、bundle混写/重复/重放/prepare/native故障 | 真Host/GPU/mixer/native + typed包恶意变异，旧last-good/无额外voice、明确audio_unavailable/audio_fault；不同设备虚拟流不冒物理声学 |
+| V-S05 / AC-03/05 / work | Pause/neutralStep/Stop/20轮新Run/旧事件句柄/atlas与最后owner，034及2D025/032兼容 | 新lifecycle/受影响旧命名case，Run/voice/PCM/manager/pose/font/atlas真实weak及warm账、原Document/Undo/物理不变；正式SDK源控制保持 |
+| V-S06 / AC-05/06 / work | source-build/工具/模块/资产许可/Frame/identity，A→B/SaveAs/冷再生/坏件恢复 | 新verify_plan035 --controls与consumer，B无生产者/网络，新组合真实保存/重开/Run，假SHA/partial/零case拒绝、恢复后同入口绿 |
+
+拟命令`cargo test --manifest-path experimental/autographics-node2d-pilot/Cargo.toml --test node3d_audio_hud_gates -- --test-threads=1`、driver node3d_audio_hud_flow/public_3d_composition_api、`python experimental/autographics-node2d-pilot/tools/verify_plan035.py --controls`；新路径T-04..06建立，T-03冻结准确CLI/输出参数。仅真实影响面/必要公共消费者，冻结commit与输入并集、有据复用未变证据；不日常全AG/根crate。准备/冷编译/实际执行/清理/整命令时长、运行/条件排除/未执行分列，未实际计量不假报steps或余量。
+
+共享AST/方言结构若有实际修改，T-02/03必须列真实受影响的UI/语言消费者命名case与原profile验证；根crate零改才省根门，不以pilot解析或依赖编译替代消费者验证。数值保持原f32语义和触发阈值，phase/yaw参数与原非均匀scale/初始位变不能因格式化截断改变；旧profile格式/字节不跟改。
+
+## 7. 验收标准
+
+| AC | owner_stage | 可观察关闭条件 | 验证 |
+|---|---|---|---|
+| AC-01 | work | 普通Node/use/局部model-msg-on与typed cue/HUD/pose/目标，actor-free与八状态内组件正确，无业务保留字段/Rust玩法 | V-S01 |
+| AC-02 | work | 原G3-01..08同一个真实新链程序/原关卡、两类终局重开/相机/三币/必要表现音画逐项通过 | V-S01/02 |
+| AC-03 | work | 同Tick状态/相机/pose/字形/PCM真实一致、一次播放与错误last-good、输入/Life/旧Run及20轮释放保持 | V-S02..05 |
+| AC-04 | work | 原32/物理写/节点/槽/资源/VM/请求/voice/HUD域及全部最高分支实测，新有界操作若采用则公开版本/域/价目/独立拒绝 | V-S03/04 |
+| AC-05 | work | 034实际来源/SDK681/两图锁与工具严核，旧2D/3D合法和负控保持、真实owner无泄漏、错来源拒绝 | V-S05/06 |
+| AC-06 | work | 新组合A→B/公开Run/编辑变化/保存关开/SaveAs/冷再生/恢复齐，SD候选及未来游戏消费交接文档完整 | V-S06 |
+| AC-07 | review | 同树独立上下文final逐AC/diff/SD/遗漏延期workaround/告警审查、finding回work同员复核，绑定revision/输入 | T-07 |
+| AC-08 | merge | 冻结定向门/来源核后实际落主，SD-01 canonical核字节/来源、归档导航及可锁交付身份 | T-08/09 |
+| AC-09 | merge | fresh guard清自有树/分支/空组，全输出对账/摘要折Plan/删scope构建物，具名hold及最终hash登记 | T-10 |
+
+## 8. 执行步骤
+
+| T | owner_stage | 依赖 | 写面/可验证结果 | AC | 进度 |
+|---|---|---|---|---|---|
+| T-01 | work | 用户启动；012/013/025/030/032已交付；可独立准备 | 核原G3/素材/来源/SDK/owner，唯一树/scope登记，034仅读合同 | AC-01/05 | [ ] |
+| T-02 | work | T-01；不等034落主 | 文档接口/两路径/原G3与oracle/资源/预算A-B方案，列有界假设，不记完整先证go | AC-01/02/04 | [ ] |
+| T-03 | work | T-02；034实际交付/独立review/Spec/来源 | 锁实际工具/SDK/两图源，最多两候选完整G3/actor-free全链先证；冻结准确API/profile/域/价目/错误/CLI，不足needs_replan | AC-01..06 | [ ] |
+| T-04 | work | T-03 go | 公共有限操作/typed音画请求/受检收口与独立准入、新profile/gates/flow/原G3永久夹具 | AC-01..04 | [ ] |
+| T-05 | work | T-04 | 原G3八项＋最高分支/V-S全链/真实PCM-native-GPU-HUD/资源/生命周期及负控，verify_plan035 | AC-01..05 | [ ] |
+| T-06 | work | T-05 | A→B/新链SaveAs/冷再生/恢复/20轮及旧档影响并集，SD候选和未来游戏实际来源移交 | AC-05/06 | [ ] |
+| T-07 | review | T-06 | 同树独立final/精确revision，finding回work复核，pass后merge门pending | AC-07 | [ ] |
+| T-08 | merge | T-07 pass | 冻结定向门/来源核后实际合master，有据复用未变有效证据 | AC-08 | [ ] |
+| T-09 | merge | T-08 | SD-01 canonical核字节/来源、归档导航及真实交付身份，不写派生JSON | AC-08 | [ ] |
+| T-10 | merge | T-09 | fresh guard/全输出对账，清树/分支/空组/scope/构建物，登记具名hold和最终hash | AC-09 | [ ] |
+
+## 9. 复审记录
+
+2026-11-03 / stage: new / plan_id: auto-ui/PLAN-035 / plan_revision: 1 / outcome: pass（合同可审阅；用户启动后T-01/02可准备），blocked（T-03完整组合待034实际交付） / next: 用户启动后work T-01/T-02。0/10。原G3八项/原预算保持，新三维快照/批销毁为公开域/价目提案，未实现/未go；actor-free与完整G3为两项明确必需路径。无实施树/源码/资产/探针/提案Spec/构建/GPU/OS自动化/agent。
+
+2026-11-03本批规划静态预检：034/035/AG015均0..10节、10T/9AC/6V-S/1SD、work6/review1/merge3、drafting/r1/0-10及10任务未勾；依赖DAG无环，034实际交付为035 T-03及AG015 T-02硬门，独立准备和完整实施区分。AG015原纹理9/动画8逐名齐（按subentry保重复名，共17项），原内部66/8/2控制、原素材/四clip/几何/数值/预算均在合同；278个所涉管理文档本地链接可解析，白名单diff空白检查通过。两仓独占取号后活动/archived/archive唯一，UI next036、AG next016；当前metadata实际17/22不预加迁移。`python tools/gallery.py validate --all`退出0，12逻辑项/22入口/许可一致。新实施树、材料scope与三份拟canonical Spec均未创建；未改引擎/示例源码/资产、未构建/GPU/OS自动化、未创建agent。以上仅规划预检与现有目录验证，不是新链可行性go、实现验收或独立final。
+
+## 10. 待澄清事项
+
+| ID | 事项 | owner/关闭动作 |
+|---|---|---|
+| D-01 | 034准确typed资源/clip/目标/模型body与实际交付 | work T-02文档revision准备，T-03硬核delivery/独立review/Spec/工具，不读tip |
+| D-02 | 完整G3/actor-free和原额A/B机制 | work T-03最多两全链候选冻结，不能用no_go代功能或少事件/必要音画；必要新协议清楚版本化 |
+| D-03 | 固定素材/声音字体许可、最大同Tick请求与路径可达 | work T-02/03/05按实际可达与独立边界分列，缺许可/高峰不靠换源/改关卡/丢声规避 |
+| D-04 | 独立final/owner短窗/真实设备与OS声学缺证 | work/review明确实际身份/路径和必需证据，不把同会话重跑或虚拟设备冒充独立/物理通过 |
+
+材料唯一D:/autostack/plan-artifacts/plan-035/auto-ui/，开工登记owner/用途/在途；所有临时探针/日志/截图/包/外部消费者/外置target显式归scope，永久产品/回归归仓。禁止attachments/第二暂存区及worktree链接，清树先fresh D:/autostack/wt-guard.sh；merge必要摘要折Plan后逐项对账全部实际输出并删自有scope/构建物，仅具名未解决问题持有owner/理由/关闭条件。同号他仓scope不动，父目录确认空才清；旧specs.json只读。

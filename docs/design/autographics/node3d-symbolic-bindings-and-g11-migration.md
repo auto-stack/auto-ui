@@ -1,6 +1,6 @@
 # 三维组件具名引用收口与G11/3d迁移
 
-> 2026-11-02后续核验：030已交付804d7303、canonical Spec SHA6ed0bf07，但归档review注明同实现会话重建，独立上下文证据待补；AG013现修订r2，T-01可并行准备、T-02完整迁移核此门。AG012已交付05f1b498，当前迁移16/22。最新优先级/三线合同见[M2游戏优先路线](m2-game-first-three-lane-roadmap.md)；下文为首次拆分时快照，不作为当前状态。
+> 2026-11-03后续核验：030已交付804d7303、独立上下文final证据已补齐；AG013已交付b48b304，当前迁移17/22。最新UI034/035与AG015见[3D表现/音画/G10设计](node3d-presentation-audio-and-g10-migration.md)及[M2路线](m2-game-first-three-lane-roadmap.md)。下文保首次拆分历史，不作为当前状态。
 
 2026-11-02，设计v1；仅规划、暂不实施。承接[作者目标](declarative-authoring-model.md)、[028/012设计](node3d-instances-triggers-and-gallery-motion.md)、[逐入口迁移路线](gallery-node-authoring-migration.md)。引擎/设计计划归auto-ui，内容计划归ag-examples。
 
@@ -13,7 +13,7 @@ AG012由用户告知开发中；本轮初核合同/树尚未更新，随后已�
 | 合同 | 范围 | 前置与并行 |
 |---|---|---|
 | [UI030](../../plans/archived/030-autographics-node3d-symbolic-component-bindings.md) | 在028之上补Slot/Template/Pair具名引用、跨Node只读ActorRef3D及局部组件接线；不改运行时/原预算 | 020/027/028均已实际交付，可与固定消费027的AG012并行 |
-| [AG013](../../../../ag-examples/docs/plans/013-autographics-gallery-g11-3d-node-migration.md) | G11/3d主alt与专项变体迁新作者源；保原25项/玩法/模板/完整G11双维包，净增0 | 028已交付；完整新组件作者形式硬等030实际交付，不把028有限夹具直接计为内容完成 |
+| [AG013](../../../../ag-examples/docs/plans/archived/013-autographics-gallery-g11-3d-node-migration.md) | G11/3d主alt与专项变体迁新作者源；保原25项/玩法/模板/完整G11双维包，净增0 | 028已交付；完整新组件作者形式硬等030实际交付，不把028有限夹具直接计为内容完成 |
 
 两份均drafting r1、0/10，不创建实施树/探针/产品源码/资产、不构建/跑GPU或OS自动键鼠、不创建agent。AG012/013共享Gallery工具/注册/包按owner短窗串行；UI030与其他引擎路线的AST/load/translate改面开工核实际owner。target/报告/消费者独占，GPU/窗口/音频重型门同机单实例。
 

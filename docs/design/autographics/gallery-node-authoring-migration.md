@@ -1,16 +1,16 @@
 # Gallery 全量迁入 Node 作者模型
 
-2026-10-31，设计 v1；2026-11-02更新交付进度。作者模型沿[总体设计](declarative-authoring-model.md)，已迁移入口能力分别沿[017 Spec](../../specs/auto-graphics/node2d-g11-authoring.md)与[019 Spec](../../specs/auto-graphics/node2d-basic-authoring.md)。本文件归 auto-ui；Gallery 合同在各自仓管理。
+2026-10-31，设计 v1；2026-11-03更新交付进度。作者模型沿[总体设计](declarative-authoring-model.md)，已迁移入口能力分别沿[017 Spec](../../specs/auto-graphics/node2d-g11-authoring.md)与[019 Spec](../../specs/auto-graphics/node2d-basic-authoring.md)。本文件归 auto-ui；Gallery 合同在各自仓管理。
 
-2026-11-02最新核验：AG012交付05f1b498并归档清理；当前metadata/src/generated新作者入口16/22，剩6。旧13/22、14/22是不同轮次/基线的历史回执，不改写；当前逐入口计数包含G12 audio/hud两个已迁入口。030已落主804d7303、Spec SHA6ed0bf07，但其review记录明确同会话自审，独立上下文证据待补；AG013 r2可独立准备，T-02完整迁移先核此门。
+2026-11-03最新核验：AG013已实际交付b48b304/独立final/Spec/归档清理齐，030独立review证据已补齐；当前metadata/src/generated新作者入口17/22，剩G04两维、G05/3d、G10两入口。旧13/14/16等计数保历史，当前按实际源逐项核。UI032完整二维组合及AG014正式2D游戏均已交付。
 
-优先级改为[M2游戏优先三线路线](m2-game-first-three-lane-roadmap.md)：UI032完整2D组合＋AG014完整2D游戏＋AG013 Demo并行准备；游戏完整接线等032实际交付，Demo不等游戏/032。同步设计3D表现/音画切片，2D闭环稳定后交付完整3D游戏；不要求Gallery全迁完才做游戏。当前仅规划，不启动任何实现。
+优先级见[M2总路线](m2-game-first-three-lane-roadmap.md)和[本批3D设计](node3d-presentation-audio-and-g10-migration.md)：UI034表现资源、UI035三维音画、AG015 G10双入口仅规划；035/AG015可先准备，完整接线/迁移硬等034实际交付，AG015不等035。不将Gallery全迁完作完整游戏启动前置，完整3D游戏另立合同。
 
 ## 目标与现场
 
 所有 Gallery 项目的作者源最终使用 Auto 的 node、model、view-2d/view-3d、on、Life、msg、绑定和普通 use。场景 JSON、句柄与单文件运行源可以继续作为生成产物，不要求它们消失，也不要求执行存储照搬声明树。资源、组件和纯函数应复用；不能为每个示例继续新增一个按示例名识别的专用编译器。
 
-当前核验基线：ag-examples dc1ee53、UI030实际交付804d7303；12逻辑项/22入口，16个新作者入口为g01/main、g02/main、g03双维、g05/2d、g06两布局、g07两布局、g08双维、g09双入口、g11/2d、g12/audio与hud。未迁六入口是g04两维、g05/3d、g10/textures与animation、g11/3d；013未交付不预加。纯场景无需角色/触发/Tick/用户VM。
+当前核验基线：ag-examples391d0122、auto-ui cfe325d4；12逻辑项/22入口，新作者17项为g01/main、g02/main、g03双维、g05/2d、g06双布局、g07双布局、g08双维、g09两入口、g11双维、g12/audio与hud。未迁五入口g04两维/g05-3d/g10两入口；AG015未交付不预加。纯场景无需角色/触发/Tick/用户VM。
 
 auto-ui 017的g11-2d模式仍要求恰一个character2d，solid/camera限根，资源仅程序化二维图元，不能冒称所有二维/三维/资源服务已支持。旧016/017、AG007收据保持历史，后继不重开归档Plan。
 
@@ -34,14 +34,14 @@ auto-ui 017的g11-2d模式仍要求恰一个character2d，solid/camera限根，�
 | g08/3d | Node源码，固定027，AG012已交付 | W3 AG012；保二次n/主alt物理参数/同tick/投影，完整G08包保持固定019二维 |
 | g09/atlas | Node源码，固定022 | W2b [AG010](../../../../ag-examples/docs/plans/archived/010-autographics-gallery-node2d-sprites-and-frame-animation.md)已交付8bfddca；原PNG/UV/alpha/九oracle与完整包保持 |
 | g09/character | Node源码，固定022 | W2b AG010已交付；真实走跳/状态/帧像素/原九oracle与完整包，不跟升027/028 |
-| g10/textures | v1 Auto+GLB/PNG/UV | W4b；原件与UV夹具、遮挡/显隐/许可与完整资产闭包 |
-| g10/animation | animation3d Auto+clip/visual pose | W4b；原四clip、yaw/phase、颜色/阴影/物理隔离，不把动画公式放Rust |
+| g10/textures | v1 Auto+原GLB/PNG/UV，固定006 | W4b [AG015](../../../../ag-examples/docs/plans/015-autographics-gallery-g10-node-migration.md)仅规划；完整迁移等034实际交付，原九项/六面UV/遮挡/图像变体/许可与完整包保持 |
+| g10/animation | 旧node-animation3d Auto，固定006 | W4b AG015同计划；原四clip/主alt相位/朝向/颜色阴影/物理隔离与八项不减，不等待035/追加声音HUD |
 | g11/2d | Node源码，AG007/017 | 已交付；保51原项+新增负控，后续共同端口修改选真实受影响回归 |
-| g11/3d | 旧triggers3d Auto | W3 [AG013 r2](../../../../ag-examples/docs/plans/013-autographics-gallery-g11-3d-node-migration.md)准备线；030已交付804d7303但独立review证据待补，T-02完整迁移核门，保原25与完整双维包 |
+| g11/3d | Node源码，固定030，AG013已交付 | W3 [AG013](../../../../ag-examples/docs/plans/archived/013-autographics-gallery-g11-3d-node-migration.md)交付b48b304；具名引用/三同定义Coin局部状态、原25和完整双维包保持 |
 | g12/audio | Node源码，固定023有限game档 | W5 AG006已交付e574b58；原两币/八oracle/ordinal/PCM/素材保持，025通用服务亦已交付，不自动重开006 |
 | g12/hud | Node源码，新增入口、固定023有限game档 | W5 [AG006](../../../../ag-examples/docs/plans/archived/006-autographics-gallery-event-hud.md)已交付；三币/字形/PCM/共同接受/完整包，声学等具名gap保留，新增1而非旧项迁移 |
 
-已完成W1五入口、AG007一入口、W2a一入口、W2b两入口、W5原audio一入口、AG011两入口、AG012三入口，共原21中的15个；HUD新增1，当前16/22。待迁W3一（013）、W4a/W4b三、W6二，共六。AG012原收据14/22未计此前G12两入口，保原收据并按当前实际清单对账，不按计划数推M2进度。
+已完成原21中的16个、HUD新增1，当前17/22。待迁W4a/W4b三、W6二，共五；AG015规划迁G10两项，净增0，交付后预计19/22仍须真实重算，不能提前计入。原归档收据计数保历史，不按Plan数估M2进度。
 
 ## 第一轮交付与后继边界
 
@@ -50,7 +50,7 @@ auto-ui 017的g11-2d模式仍要求恰一个character2d，solid/camera限根，�
 
 先引擎交付、再内容；下一波引擎可与上一波固定消费的内容并行，读端不追开发tip。查询、二维图片、三维资源和声音的端口应复用共同领域表示，但共享文件要约定owner短窗，GPU/窗口/音频重型门单实例。当前018、语言901与UI014的真实写面由开工核对，不凭标题加全量串行前置。
 
-2026-11-02下一轮以三线新路线为准。028有限字符串/序号边界、030具名引用真实交付与独立review缺证分别记账；013保持实际来源与不同上下文review门。032补完整二维组合，AG014在ag-examples/games独立工程制作正式游戏，AG013复用原号继续Demo；三维查询/纹理/动画/编辑器后继滚动取号。完整两游戏/整链预算/同一最终版本/发行仍pending。
+2026-11-03下一轮：UI034补005/006资源与动画新作者接线，UI035补声音/HUD和原完整G3整链，AG015独立迁G10两入口/完整包。035/AG015完整工作固定034实际交付、彼此不等；正式G3游戏/G05查询/G04教程后继滚动取号。032与AG014已经交付，完整M2两游戏/统一版本/发行仍pending。
 
 ## 不变的交付要求
 
@@ -72,4 +72,4 @@ auto-ui 017的g11-2d模式仍要求恰一个character2d，solid/camera限根，�
 
 本设计是长期路线和接口要求，不是临时探针/验收报告。临时材料只在plan-artifacts/plan-NNN/<repo>/，禁止新建attachments（包括md）；merge前摘要折叠进Plan，清理自有scope及构建中间物，具名未解决问题按新政策持有。永久产品源码、必要回归测试/夹具和canonical Spec按所属仓维护。
 
-本次按AG012/030实际交付与当前逐入口源更新到16/22，并新增三线设计/UI032/AG014、修订AG013 r2；只改合同与设计导航，不实施示例/引擎，不建实施树、不构建/跑GPU。
+本次按实际已交付源更新到17/22并规划034/035/AG015；只改合同/设计/导航，不实施或建树/探针/素材，不构建/跑GPU。游戏已交付不改变Gallery入口分母。
