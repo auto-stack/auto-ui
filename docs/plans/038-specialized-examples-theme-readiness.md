@@ -1,10 +1,10 @@
 ---
 plan_id: PLAN-038
-status: drafting
+status: reviewed
 feature_name: B3十二个专用示例的主题迁移支持面核验
 author: [Codex]
 created_at: 2026-11-03
-updated_at: 2026-11-03
+updated_at: 2026-11-04
 plan_revision: 1
 current_step: 5
 total_steps: 8
@@ -177,6 +177,8 @@ drafting r1、0/8。2026-11-03用户授权调研立项；本轮只静态读取/�
 材料唯一`D:/autostack/plan-artifacts/plan-038/auto-ui/`，按repo身份/用途/owner登记。所有探针/外部工程/生成/小媒体/数据库/图像/日志截图/target显式该scope；普通构建在唯一树。不得依脚本默认写项目内证据、其他盘或用户临时根。merge将可复核命令/退出码/关键值/源hash/节选折Plan后删本scope与树产物；仅具名未闭持有owner/理由/关闭条件，后继可用最新源重测，不为等待新计划永久存原exe。未知/他方/活动目录不盲删。
 
 ## 9. 复审记录
+
+stage: review | review_scope: final | reviewer_identity/limitations: 本会话即实现会话（无独立 reviewer 角色可用）——按 skill 要求自证据重建结论而非采信执行摘要；重建手段=冻结基线复核（worktree ui-038 @fe1c8a6d 树净、diff 恰 5 文件：2 测试修定+3 SD）、代表证据独立重跑（031-paint 原门 31/31 fresh 进程复现、029 探针全绿复现且 luma 28.3/231.2/Δ202.9 与 work 记录逐位一致、F-1 codegen 7 错逐字复现 E0428/E0432/E0106/E0422/E0425）、其余例原始日志对读（041 50/50、025 7/11、024 12/19、026 0/8、018 5/10、030 vm-smoke ALL PASS+assert-style PASS） | plan_id: PLAN-038 | plan_revision: r1 | outcome: pass | worktree_path: D:/autostack/.wt/ui-038/auto-ui | branch: codex/plan-038-theme-readiness | reviewed_commit: fe1c8a6d（fc610dc7 + SD-02/03 spec delta；全 delta 在 reviewed 提交内，037 同型） | base_commit: f83fd06f | dependency_revisions: auto-lang@2f558fc93 auto-man@2bbd954 auto-web@3de5524 auto-down@7c4d5cb | spec_inputs: docs/specs/ui/specialized-theme-migration-readiness.md（SD-01 新建 @fe1c8a6d，与 §5.4 矩阵逐行一致、不把 target 写已实现）、docs/specs/ui/theme-app-migration.md（SD-02 B3 行按实测改写）、docs/specs/ui/theme-scope-and-publication.md（SD-03 VM 轨输入解析边界=实测口径澄清非新承诺） | acceptance_results: AC-01 pass（94.at 守恒+十二行对账冻结 hash）/ AC-02 pass（六类代表真实链正控；负控=027 坏路径守恒、030 死流+空库分列+mock 词、031iv corrupt 具名 blocked、026 错误预设随套件陈旧具名）/ AC-03 pass（内容哨兵全绿跨肤恒守；用户根零访问——020/030/029 全 env/CLI 覆盖；kill 未执行；进程/临时物回收+树净复核）/ AC-04 pass（判定不超证据：9 有界 go+030 壳面 go+031iv blocked；11 具名发现+三分包不取号；B3 仍未迁）/ AC-05 pass（本记录：重建+反控抽验）/ AC-06、AC-07 = merge-owned pending（V-08：canonical 落地读回、全输出对账+归档清理） | pending_closeout_gates: AC-06/AC-07（merge T-07/T-08） | findings: R1（非阻断，路由记录）031-paint 原套件 pick_free_port 同 041 旧缺陷（connect_ex 探测穿 Windows 保留段——本次 review 实测保留段已漂移至 9188–9487 使 9253/9553 族不可 bind；套件 default 参数在 def 时绑定致 monkeypatch 覆盖无效，review 以 9500 重跑取证）——owner=031p tests，后继测试修定波同 041 方案；不阻断本研究判定（work 证据取得时段口可用+review 已复现） | evidence: D:/autostack/plan-artifacts/plan-038/auto-ui/（review_031p_boot.log=9253 保留段 bind FATAL 实证、031p 31/31 review 重跑、029 review 重跑输出、review_031iv_boot.log=F-1 复现、fe1c8a6d diff 面普查仅 5 文件） | next: merge（T-07/T-08）
 
 stage: goal | plan_id: PLAN-038 | plan_revision: r1 | round: 1 | from: drafting | to: execution_done | status: execution_done(5/8) | outcome: pass | worktree: D:/autostack/.wt/ui-038/auto-ui | commit: fc610dc7 | next: review
 
