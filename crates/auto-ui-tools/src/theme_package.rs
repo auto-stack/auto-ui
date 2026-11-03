@@ -6,7 +6,8 @@
 //! 的 pac/manifest 同步。
 
 pub use auto_ui_compiler::design_tokens::theme_package::{
-    verify_theme_package, ThemePackageError, ThemePackageExpectation, VerifiedThemePackage,
+    theme_package_identity, verify_theme_package, ThemePackageError, ThemePackageExpectation,
+    VerifiedThemePackage,
 };
 
 /// 官方主题包身份（工具链固定期望）。
@@ -52,6 +53,17 @@ pub fn publish_theme_package_snapshot(
     std::fs::create_dir_all(dest).map_err(|e| {
         ThemePackageError::BadManifest(format!("快照目录创建失败 {}: {e}", dest.display()))
     })?;
+    // PLAN-036 T-02（V-07）：快照目标必须为空——非空目录可能属于未知来源或
+    // 活动负载，绝不静默合并/覆盖（发布原语不得破坏已有合法目标；换装由
+    // 调用方以独立 staging+swap 完成）。
+    if let Ok(mut entries) = std::fs::read_dir(dest) {
+        if entries.next().is_some() {
+            return Err(ThemePackageError::BadManifest(format!(
+                "快照目标目录非空，拒绝覆盖未知内容（清空或换独立 staging 目录后重试）：{}",
+                dest.display()
+            )));
+        }
+    }
     std::fs::copy(&manifest_src, dest.join("theme-package.json")).map_err(|e| {
         ThemePackageError::BadManifest(format!("清单复制失败: {e}"))
     })?;
@@ -79,6 +91,9 @@ pub fn theme_package_content_digest(
 }
 /// PLAN-031 T-04/T-07（V-09）：解析 pac `dep themes { path: … }` 的**原始**路径
 /// （未校验）。None = 该 App 未声明官方包依赖。
+/// PLAN-036 T-02（V-01）：dep 名必须**恰为** `themes`——`mythemes`/`themes-extra`
+/// 等近似名、`deploy:` 等前缀词、其他 dep 块内出现的 `themes` 字样均不误命中；
+/// 近似名声明官方包目录时按「未声明」处理（零 UI 资产，旧行为）。
 pub fn app_theme_dep_path(app_dir: &std::path::Path) -> Option<std::path::PathBuf> {
     let pac = std::fs::read_to_string(app_dir.join("pac.at")).ok()?;
     let mut in_dep = false;
@@ -90,7 +105,17 @@ pub fn app_theme_dep_path(app_dir: &std::path::Path) -> Option<std::path::PathBu
             continue;
         }
         if !in_dep {
-            if line.starts_with("dep") && line.contains("themes") {
+            let is_official_dep = line
+                .strip_prefix("dep")
+                .map(|rest| {
+                    let rest = rest.trim_start();
+                    rest == "themes"
+                        || rest.strip_prefix("themes").is_some_and(|tail| {
+                            tail.starts_with('{') || tail.starts_with(char::is_whitespace)
+                        })
+                })
+                .unwrap_or(false);
+            if is_official_dep {
                 in_dep = true;
                 depth = line.matches('{').count() as i32 - line.matches('}').count() as i32;
             }
@@ -122,33 +147,81 @@ pub fn official_theme_package_root_for_app(
     verify_official_theme_package(&root).ok().map(|_| root)
 }
 
-/// PLAN-031 T-04/T-07（V-09）：把官方包的**身份 + 内容摘要**写成生成输入
-/// receipt（`<out>/.theme-inputs.json`）。该文件是「本次生成消费了哪个包内容」
-/// 的可审计凭证：内容变化（即使 mtime 不变）会让摘要变化，缓存/落地方可据此
-/// 判定新鲜度，而不是靠 mtime 或主题名。
+/// PLAN-036 T-02：统一已验证主题输入身份——所有消费轨（Vue/VM/Rust/delivery）
+/// 共用的「本次消费了哪个包」描述。`content_digest` 为冻结算法（OS053 兼容）；
+/// `identity_digest` 额外纳入清单身份/能力元数据（见 compiler
+/// [`theme_package_identity`]），能力变化即使同版本同内容也必然失效。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ThemePackageInputIdentity {
+    pub owner: String,
+    pub name: String,
+    pub version: String,
+    pub schema: u64,
+    pub content_digest: String,
+    pub identity_digest: String,
+}
+
+/// 校验包并给出统一输入身份（verify + 内容摘要 + 语义身份，三者必须同根）。
+pub fn verified_theme_input_identity(
+    root: &std::path::Path,
+) -> Result<ThemePackageInputIdentity, ThemePackageError> {
+    let verified = verify_official_theme_package(root)?;
+    let content_digest = theme_package_content_digest(root)?;
+    let identity_digest = theme_package_identity(root)?;
+    Ok(ThemePackageInputIdentity {
+        owner: verified.owner,
+        name: verified.package,
+        version: verified.version,
+        schema: verified.schema,
+        content_digest,
+        identity_digest,
+    })
+}
+
+/// PLAN-031 T-04/T-07（V-09）+ PLAN-036 T-02：把官方包的**统一输入身份**写成
+/// 生成输入 receipt（`<out>/.theme-inputs.json`，含内容摘要与语义身份）。
+/// 返回 `None` = App 未声明官方包（零 UI 资产、旧行为，不写文件）；
+/// `Err` = 声明了但非法（错版/缺件/篡改，具名错误）或 receipt 写入失败
+/// （消费失败，调用方必须中止，不得警告后继续）。
 pub fn write_theme_inputs_receipt(
     out_dir: &std::path::Path,
     app_dir: &std::path::Path,
-) -> Result<String, ThemePackageError> {
-    let root = official_theme_package_root_for_app(app_dir)
-        .ok_or_else(|| ThemePackageError::MissingManifest(out_dir.join("theme-package.json")))?;
-    let digest = theme_package_content_digest(&root)?;
+) -> Result<Option<ThemePackageInputIdentity>, ThemePackageError> {
+    let Some(root) = verify_app_theme_inputs(app_dir)? else {
+        return Ok(None);
+    };
+    let identity = verified_theme_input_identity(&root)?;
     let body = format!(
-        "{{\n  \"schema\": 1,\n  \"package\": {{\n    \"owner\": \"{}\",\n    \"name\": \"{}\",\n    \"version\": \"{}\",\n    \"digest\": \"{}\"\n  }}\n}}\n",
-        OFFICIAL_THEME_PACKAGE_OWNER, OFFICIAL_THEME_PACKAGE_NAME, OFFICIAL_THEME_PACKAGE_VERSION, digest
+        "{{\n  \"schema\": 1,\n  \"package\": {{\n    \"owner\": \"{}\",\n    \"name\": \"{}\",\n    \"version\": \"{}\",\n    \"digest\": \"{}\",\n    \"identity\": \"{}\"\n  }}\n}}\n",
+        identity.owner,
+        identity.name,
+        identity.version,
+        identity.content_digest,
+        identity.identity_digest
     );
     let path = out_dir.join(".theme-inputs.json");
     std::fs::write(&path, body)
         .map_err(|_| ThemePackageError::MissingFile(".theme-inputs.json".into()))?;
-    Ok(digest)
+    Ok(Some(identity))
 }
 
-/// 读回生成输入 receipt 的摘要（无 receipt = None）。
+/// 读回生成输入 receipt 的内容摘要（无 receipt = None）。
 pub fn read_theme_inputs_receipt(out_dir: &std::path::Path) -> Option<String> {
     let text = std::fs::read_to_string(out_dir.join(".theme-inputs.json")).ok()?;
     let v: serde_json::Value = serde_json::from_str(&text).ok()?;
     v.get("package")?
         .get("digest")?
+        .as_str()
+        .map(|s| s.to_string())
+}
+
+/// PLAN-036 T-02：读回 receipt 的语义身份摘要（旧 receipt 无此字段 = None，
+/// 调用方必须按不新鲜处理并安全重验，绝不当 fresh）。
+pub fn read_theme_inputs_identity(out_dir: &std::path::Path) -> Option<String> {
+    let text = std::fs::read_to_string(out_dir.join(".theme-inputs.json")).ok()?;
+    let v: serde_json::Value = serde_json::from_str(&text).ok()?;
+    v.get("package")?
+        .get("identity")?
         .as_str()
         .map(|s| s.to_string())
 }

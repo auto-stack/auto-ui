@@ -278,7 +278,8 @@ pub fn run_vue_flow(
         }
         // PLAN-031 T-07（V-09）：每次 run 刷新生成输入 receipt（官方包身份 +
         // 内容摘要）——包内容变化即使 mtime 不变，也会让摘要变化并被记录。
-        project.write_theme_inputs_receipt();
+        // PLAN-036 T-02（V-06）：写失败 = 消费失败，中止而非警告后继续。
+        project.write_theme_inputs_receipt()?;
         // Plan 672 条目 4: vite.config.ts 同律自愈——`/apps` back-proxy 条目
         // （env 运行时读取）只在生成器模板里，增量 run 不重写会让老项目
         // 永久缺失该路由（实测：proxy 起了但 vite 无 /apps 转发 → fullstack

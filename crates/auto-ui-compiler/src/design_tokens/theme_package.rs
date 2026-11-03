@@ -246,3 +246,62 @@ pub fn theme_package_content_digest(dir: &Path) -> Result<String, ThemePackageEr
     }
     Ok(format!("{:x}", hasher.finalize()))
 }
+
+/// PLAN-036 T-02：主题包**语义身份**摘要——在 [`theme_package_content_digest`]
+/// （只覆盖清单列出文件字节；算法冻结，OS053 固定快照与宿主 `theme_family_digest`
+/// 策略绑定现值）之上，纳入清单的**身份与能力元数据**：owner/package/version/
+/// schema/module/families（每族 name+modes+default）。同版本下的能力/默认值/
+/// 文件集合语义变化必使身份摘要变化，即使内容摘要不变；清单字段顺序、空白、
+/// families/modes 排列等非语义差异规范化后不变化。生成 receipt 以
+/// 「内容摘要 + 身份摘要」合判新鲜度；旧 receipt 缺身份字段一律按不新鲜处理
+/// （安全重验），绝不当 fresh。与内容摘要同址单源实现（runtime 目录注入同样
+/// 可消费，不反向依赖 tools）。
+pub fn theme_package_identity(dir: &Path) -> Result<String, ThemePackageError> {
+    let manifest = dir.join("theme-package.json");
+    let text = std::fs::read_to_string(&manifest)
+        .map_err(|_| ThemePackageError::MissingManifest(manifest.clone()))?;
+    let v: serde_json::Value = serde_json::from_str(&text)
+        .map_err(|e| ThemePackageError::BadManifest(format!("json: {e}")))?;
+
+    // 语义子集规范化为确定序列：身份字段 + 排序后的 families（集合语义，
+    // modes 内部同样排序；default 保留）。手工拼接，不依赖 serde Map 键序。
+    let mut families: BTreeMap<String, String> = BTreeMap::new();
+    if let Some(list) = v.get("families").and_then(|x| x.as_array()) {
+        for fam in list {
+            let name = field(fam, "name").to_string();
+            let mut modes: Vec<String> = fam
+                .get("modes")
+                .and_then(|m| m.as_array())
+                .map(|a| a.iter().filter_map(|m| m.as_str().map(str::to_string)).collect())
+                .unwrap_or_default();
+            modes.sort();
+            let default = fam.get("default").map(|d| match d {
+                serde_json::Value::String(s) => s.clone(),
+                other => other.to_string(),
+            });
+            families.insert(
+                name,
+                format!(
+                    "modes={}|default={}",
+                    modes.join(","),
+                    default.unwrap_or_default()
+                ),
+            );
+        }
+    }
+    let mut material = String::new();
+    material.push_str("owner="); material.push_str(field(&v, "owner"));
+    material.push_str("\u{1f}package="); material.push_str(field(&v, "package"));
+    material.push_str("\u{1f}version="); material.push_str(field(&v, "version"));
+    material.push_str(&format!("\u{1f}schema={}", v.get("schema").and_then(|x| x.as_u64()).unwrap_or(0)));
+    material.push_str("\u{1f}module="); material.push_str(field(&v, "module"));
+    for (name, desc) in &families {
+        material.push_str(&format!("\u{1e}family={name}:{desc}"));
+    }
+    let content = theme_package_content_digest(dir)?;
+    let mut hasher = Sha256::new();
+    hasher.update(material.as_bytes());
+    hasher.update([0u8]);
+    hasher.update(content.as_bytes());
+    Ok(format!("{:x}", hasher.finalize()))
+}

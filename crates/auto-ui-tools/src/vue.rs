@@ -5267,7 +5267,7 @@ export default router
                 .map_err(|e| format!("Failed to write src/assets/index.css: {}", e))?;
         }
         // PLAN-031 T-07（V-09）：无论本次是否重写 CSS，都刷新生成输入 receipt。
-        self.write_theme_inputs_receipt();
+        self.write_theme_inputs_receipt()?;
 
         // Copy pac.at `styles:` CSS files (byte-for-byte) so main.ts can
         // import them.
@@ -5327,7 +5327,7 @@ export default router
         let index_css_content = generate_index_css_with_tree(self.theme.as_ref(), self.tree_index_css().as_ref());
         fs::write(assets_dir.join("index.css"), &index_css_content)
             .map_err(|e| format!("Failed to write src/assets/index.css: {}", e))?;
-        self.write_theme_inputs_receipt();
+        self.write_theme_inputs_receipt()?;
 
         // Write tsconfig.json
         let tsconfig = generate_tsconfig();
@@ -5361,19 +5361,26 @@ export default router
     /// PLAN-031 T-04/T-07（V-09）：把「本次生成消费的官方包内容摘要」写进
     /// `<out>/.theme-inputs.json`；摘要变化（即使 mtime 不变）即视为生成输入
     /// 变化并留观测量，供缓存/落地判定新鲜度。
-    pub(crate) fn write_theme_inputs_receipt(&self) {
-        let Some(app_dir) = self.app_dir() else { return };
+    /// PLAN-036 T-02（V-06）：receipt 写失败 = 消费失败（具名错误中止生成，
+    /// 不再警告后继续）；未声明官方包 = Ok(()) 旧行为（零 UI 资产）。
+    pub(crate) fn write_theme_inputs_receipt(&self) -> AutoResult<()> {
+        let Some(app_dir) = self.app_dir() else { return Ok(()) };
         let before = crate::theme_package::read_theme_inputs_receipt(&self.output_dir);
         match crate::theme_package::write_theme_inputs_receipt(&self.output_dir, &app_dir) {
-            Ok(digest) => {
-                if before.as_deref() != Some(digest.as_str()) {
+            Ok(Some(identity)) => {
+                if before.as_deref() != Some(identity.content_digest.as_str()) {
                     println!(
                         "  ✓ theme inputs receipt: {} (package content digest changed)",
-                        &digest[..12.min(digest.len())]
+                        &identity.content_digest[..12.min(identity.content_digest.len())]
                     );
                 }
+                Ok(())
             }
-            Err(e) => println!("  ⚠ theme inputs receipt skipped: {e}"),
+            Ok(None) => Ok(()),
+            Err(e) => Err(format!(
+                "主题包生成输入 receipt 写失败（声明包必须有可审计凭证）：{e}"
+            )
+            .into()),
         }
     }
 
@@ -5503,7 +5510,7 @@ export default router
         fs::write(&index_css_path, &index_css_content)
             .map_err(|e| format!("Failed to write src/assets/index.css: {}", e))?;
         println!("{}", "  ✓ Regenerated src/assets/index.css".bright_green());
-        self.write_theme_inputs_receipt();
+        self.write_theme_inputs_receipt()?;
 
         // PLAN-063 Phase B T22 (KD 061 D27 同族): 冷重生成自愈——增量路径
         // write-if-missing src/lib/utils.ts(常态靠粘性存在;冷删 src/ 后
