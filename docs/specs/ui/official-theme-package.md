@@ -40,7 +40,7 @@
   `PathEscape` / `MissingFile` / `HashMismatch` / `BadThemeData` / `ModeMismatch`。
   任一失败即拒绝该包，不静默回落到另一个同名来源。
 - 生成准入（`auto_ui_tools::theme_package::verify_app_theme_inputs`）：
-  - App 未声明 `dep themes` → `Ok(None)`（零变化）；
+  - App 未声明官方包（判定名无关：无任何 dep 解析目录含 `theme-package.json`）→ `Ok(None)`（零变化）；
   - 声明但校验失败 → 具名 `Err`，调用方**中止生成**，不产半成品。
 
 ## 4. 外部获取与内容摘要（C-04）
@@ -68,7 +68,7 @@
 
 ## 5. 生成准入与新鲜度（C-05）
 
-- 声明 `dep themes` 的 App，每次 Vue 生成/运行都会在 `<gen>/.theme-inputs.json`
+- 声明官方包的 App（判定名无关，见本节「声明判定」），每次 Vue 生成/运行都会在 `<gen>/.theme-inputs.json`
   写生成输入 receipt：`{schema, package:{owner,name,version,digest,identity}}`
   （PLAN-036 起含语义身份；旧 receipt 缺 `identity` 字段一律按不新鲜处理，
   首次安全重验/重建，绝不当 fresh）。它回答
@@ -126,8 +126,8 @@
 ## 8. 验收锚点
 
 - `theme_package_manifest`（compiler）、`theme_package_verify`（compiler）、
-  `theme_package_input`（tools，含 receipt/篡改/内容变更/语义身份/解析精度/
-  非空拒绝/旧 receipt 容错用例，PLAN-036 扩至 12 测）。
+  `theme_package_input`（tools，含 receipt/篡改/内容变更/语义身份/声明判定
+  （解析面、名无关）/非空拒绝/旧 receipt 容错用例，PLAN-036 扩至 13 测）。
 - 真实生成：010 的 `index.css` 与运行时变量逐值为 Auto/Solarized 包值；
   `v09-e2e` 脚本演示"合法改色→摘要变化+产物更新""篡改→准入拒绝"。
 - 渠道与输入收口（PLAN-036）：Full/real 安装 `man-install.py install|verify

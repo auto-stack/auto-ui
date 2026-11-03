@@ -12,7 +12,7 @@
 | 唯一编辑源 | auto-ui `packages/themes/` | UI（人工/计划） | compiler `verify_theme_package`（8 具名错误） |
 | Full 安装 SDK | `<install>/sdk/packages/themes/` | Man 安装事务（full profile 专属） | staging 内 python 自描述清单核验（身份常量 + 逐文件 sha256 + 路径逃逸）；坏包 = 事务保旧回滚；安装后多件/篡改由 `verify()` 全树 hash 对账具名拒绝；Core 恒零主题（`sdk/packages/themes` 进 Core 具名 forbidden） |
 | 交付根 | `<delivery>/packages/themes/` | UI delivery（`auto gen --delivery-root`） | 发布原语复制+复验；`delivery-manifest.json` 新增 `theme_package` 节（owner/name/version/schema + content/identity 双摘要）；随包 `verify.py` 重算逐文件 sha256 + content digest + 身份对账 + 未登记文件 |
-| App 消费 | pac `dep themes { path: <受管快照> }` | App（外部 fixture/产品） | dep 名恰为 `themes`；指向已安装/已交付快照即可，不手工拷贝、不依赖兄弟检出或绝对开发根 |
+| App 消费 | pac dep 指向受管快照（推荐形式 `dep themes { path: <受管快照> }`） | App（外部 fixture/产品） | 声明判定**名无关**（§2：任何 dep 解析目录含 `theme-package.json` 即为声明，按§2校验——通过→消费、非法→具名拒绝；不依赖 dep 名）；指向已安装/已交付快照即可，不手工拷贝、不依赖兄弟检出或绝对开发根 |
 
 - 内容摘要算法**冻结**（OS053 固定快照与宿主策略绑定 `9fa07742…`）；身份扩展
   走加法字段（receipt `identity`、front inputs `theme/content`+`theme/identity`），
@@ -62,7 +62,7 @@
 
 ## 5. 验收锚点
 
-- UI：`cargo test -p auto-ui-tools --test theme_package_input`（12 测）、
+- UI：`cargo test -p auto-ui-tools --test theme_package_input`（13 测）、
   `cargo test -p auto-ui-compiler --test theme_package_verify --test
   theme_package_manifest`；`cargo test -p auto-ui-tools --lib`（主题闭包/fresh
   receipt 单测；6 个既有红与本合同无关，见 Plan §9 归因）。
