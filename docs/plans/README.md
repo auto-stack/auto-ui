@@ -38,15 +38,15 @@
 | 032 | [完整2D游戏组合与预算收口](archived/032-autographics-node2d-full-game-composition.md) | M2游戏优先/引擎线 | archived/r2；交付a8c04d22，独立final/落主/Spec/清理齐；原32内完整G2公共组合，AG014已固定消费并交付 |
 | 033 | [剩余六个基础示例正式主题迁移](archived/033-basic-examples-theme-migration.md) | UI031后继B1六例 | archived/r1，9/9；实际交付d734f1fe、Spec/归档清理齐；复审记录同实现会话重构的来源限制见归档，非AG新计划前置 |
 | 034 | [3D纹理资源与节点动画作者接线](archived/034-autographics-node3d-materials-and-animation.md) | 005/006/030新作者收口 | archived/r1，交付93eaa907、Spec gallery-node3d-textures-and-animation.md；AG015已消费。复审收据明确同实现会话复核，相关独立证据/持名hold不据归档视为已闭 |
-| 035 | [3D声音/HUD与完整G3组合接线](035-autographics-node3d-audio-hud-composition.md) | 034后继/公共三维音画 | 原owner实施中、任务3/10、metadata仍drafting/r1；ui-035树/codex/plan-035-dev可核，候选先证非交付；后继AG016完整接线等其实交付/独立证据 |
+| 035 | [3D声音/HUD与完整G3组合接线](archived/035-autographics-node3d-audio-hud-composition.md) | 034后继/公共三维音画 | archived/r1，交付5903839e（ff-only落主、7补丁range-diff等价、主smoke 26/26）；SD-01 canonical node3d-audio-hud-composition.md字节核d7272516。复审收据如实记录同实现会话final（判定从工件重建、五门独立重跑），同034先例不称独立上下文pass；D-04声学/走查hold随归档保留，D-05批量回归被阻具名移交（他会话主checkout WIP+缺批量门定义），不阻塞下游消费。AG016完整接线引擎前置实质解除，034相关证据核验仍归AG016计划内 |
 | 036 | [正式主题包发行与生成输入收口](036-official-theme-distribution-and-input-closure.md) | 031 F-05及VM/Rust receipt差额，接受033 | drafting/r1，0/10；Full SDK/delivery、Vue/VM/Rust输入/复用与外部恢复；OS053/918互不整项等待，B2采用新渠道验收接U036；仅规划、暂不实施 |
 | 037 | [B2十二个业务示例主题迁移](037-business-examples-theme-migration.md) | 031/033后继B2，渠道接036 | drafting/r1，0/11；十二例业务/计时/store/路由保持、双端逐例/隔离/恢复；可先核path源码，渠道最终门等U036，暂不实施 |
 | 038 | [B3专用示例主题支持面核验](038-specialized-examples-theme-readiness.md) | 拆分路线B3有界研究 | drafting/r1，0/8；十二例盘点、六类真实链探针、go/blocked/no-go及后继分包；研究不等迁移，不等037整项，暂不实施 |
-| 039 | [3D查询、动态组与二维标记Node接线](039-autographics-node3d-queries-and-mixed-markers.md) | G05/3d新作者前置；021/024/030 | drafting/r1，0/10；不等035，T-02全链先证后实现；AG017固定消费其实交付，原九义务/三变体/预算不减；暂不实施 |
+| 039 | [3D查询、动态组与二维标记Node接线](archived/039-autographics-node3d-queries-and-mixed-markers.md) | G05/3d新作者前置；021/024/030 | archived/r1，交付8f577a34（含复审finding R-1修复ff5d267d）；SD-01 canonical node3d-queries-and-mixed-markers.md已落。final收据如实记录同实现会话（判定从工件重建、pilot152/dialect103/gates7/flow8/verifier独立重跑全绿）；D-03 OS phase-14探针沿AG009持有、G05逐字OS迁移归AG017。AG017固定消费其实际交付，前置实质解除 |
 
-当前AG按[三线总路线](../design/autographics/m2-game-first-three-lane-roadmap.md)推进：UI032/AG014/AG013已交付，UI034交付93eaa907、AG015交付80e0b65，当前Gallery19/22；UI035原owner继续实施3/10。新批[查询与完整G3设计](../design/autographics/node3d-queries-and-complete-game.md)立本仓039＋AG016正式3D游戏＋AG017 G05/3d；游戏完整接线等035真实交付及相关独立证据，Demo完整迁移等039真实交付，各自可先准备。本轮只规划，不接管在途实现。
+当前AG按[三线总路线](../design/autographics/m2-game-first-three-lane-roadmap.md)推进：UI032/AG014/AG013已交付，UI034交付93eaa907、UI035交付5903839e、UI039交付8f577a34，AG015交付80e0b65，当前Gallery19/22。[查询与完整G3设计](../design/autographics/node3d-queries-and-complete-game.md)所立039已交付；AG016正式3D游戏与AG017 G05/3d迁移的引擎前置（035/039实际交付+SD-01 canonical）均已实质解除，两份ag-examples计划仍drafting/r1/0-10待实施；035/039同会话final限制按034先例如实持有，AG016计划内的034证据核验义务不变。本轮仅刷新登记，不实施。
 
-024/025/027/028/030/032/034已交付，独立review与持名问题以实际收据为准；026/029为Reader路线。AG下一能力为039，036..038属主题路线保持原owner；各仓号源独占重核，不以外仓历史号跳号。设计与后继见[本仓设计索引](../design/README.md)。
+024/025/027/028/030/032/034/035/039已交付，独立review与持名问题以实际收据为准（034/035/039复审同会话限制如实记录，不称独立上下文pass）；026/029为Reader路线。AG下一能力已由039交付提供，036..038属主题路线保持原owner；各仓号源独占重核，不以外仓历史号跳号。设计与后继见[本仓设计索引](../design/README.md)。
 
 ## 债务/候选
 
