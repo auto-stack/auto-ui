@@ -61,9 +61,18 @@
   条件排除/首红具名（017 Vue 发送/SSE 族、023 Vue 鉴权发文族、028
   focus 清位、028 间歇崩溃——均 owner 已名，不以本包完成冒称关闭）。
 - 剩余 **12** 个 B3 目录（018/019/020/024/025/026/027/029/030/
-  031-image-viewer/031-paint/041）主题接入 = 后继批次，归 UI038 有界
-  支持面核验后再分包；共享 stylekit、remote-frame-e2e、032 验证例按
-  来源保持义务，不按业务 app 强套主题。
+  031-image-viewer/031-paint/041）主题接入 = 后继批次。UI038 已交付
+  **有界支持面实测**（真实链探针，非静态盘点）：9 例有界 go（其中 018
+  阅读链半通、030 仅壳/静态门——media 数据面与播放腿 blocked 具名）、
+  031-image-viewer blocked（a2r codegen 7 错 + `--server vm` boot 挂起，
+  均具名 owner）。实测支持表/具名前置/三后继分包（媒体播放/门户、图像
+  与文件、阅读编辑数据专用绘制，不取号）见
+  [专用示例主题迁移支持面](specialized-theme-migration-readiness.md)。
+  **B3 十二例仍未迁**；实测"无主题面"四例（031-paint/024/026/041，未
+  声明 theme 状态/design 绑定，壳不随族/模式输入改变）的补声明 = 后继
+  第一步工作项；四处原测试陈旧（024/025/026/027）与 018 五红具名 owner。
+  共享 stylekit、remote-frame-e2e、032 验证例按来源保持义务，不按业务
+  app 强套主题；038-minesweeper 属 UI037 谱系不随 B3。
 - **渠道与支持面（PLAN-036 交接，不扩历史交付）**：B1 十例的既有交付
   不变；新渠道（Full SDK `sdk/packages/themes/`、交付根 `packages/themes/`、
   全入口准入与统一输入身份）自本计划起对后继批次可用，采用新渠道的后继

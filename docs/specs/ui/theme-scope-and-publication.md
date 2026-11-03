@@ -48,6 +48,13 @@
   follow 门控。
 - 该通道只承载 UI 可调用的选择输入与结果读回；不实现 AutoOS 消息、持久化或
   真实 OS 事件（见 §6）。
+- **VM 轨输入解析边界（UI038 实测口径，真实支持澄清非新承诺）**：CLI
+  `--theme`/`--accent` 覆盖 pac `theme:`/`accent:`；直接预设 `AUTO_UI_THEME`
+  环境变量会被 CLI 按 pac 解析结果重写——覆盖 pac 默认必须走 CLI。启动播种
+  （Plan 458）只写**已声明**的 `dark_mode`/`accent_color` 状态且仅首帧生效；
+  未声明即无主题面（壳不随族/模式输入改变，UI038 在 031-paint/024/026/041
+  实测 luma/类指纹恒定），补声明是迁移工作项而非运行时缺陷。VM 独立窗
+  toast 反馈不入快照树/像素——失败可见性以 state/oracle 为准（具名观察）。
 
 ## 4. 局部设计（design 作用域）（C-04）
 
