@@ -167,6 +167,8 @@ stage: merge | plan_id: PLAN-037:r1 | outcome: pass（完成收据） | prepared
 
 stage: merge | plan_id: PLAN-037:r1 | outcome: pass | checkpoint: **cleaned** ✅（2026-11-03）——wt-guard.sh clean 复验后 `git worktree remove --force`（残余=测试产物 screenshots/dist/node_modules/.am，随树销毁）+ 分支 codex/plan-037-business-themes 删除（was 0f90ec1b）+ 组内兄弟树 4 个移除（auto-lang/auto-man/auto-web/auto-down detached）+ 组目录 D:/autostack/.wt/ui-037 删除（空）；plan-artifacts/plan-037 scope 全删（原始日志 t01-baseline.md/各例门日志/基线对照/ext-root receipt/临时脚本——命令/退出码/关键数均已折入本文件 §8/§9，原始证据不再需要）；registry 刷新同批提交。**清理后验证**：worktree list 0 个 ui-037、组目录不存在、master @3a736f18（archive 提交）delivery 提交 0f90ec1b 在 ancestry。**交付计数**：T-01..T-11 11/11，9 AC 全 pass（AC-08/09 本收据闭）；具名未闭持有（非本地 scope，owner 链在 SD-01 C-07）：017 codegen json.from_value+SSE、023 codegen meta-in-body、028 focus 清位 shadow-write、028 palette 间歇崩溃（基线族）、U036 vue-render 新渠道门（Man 发行）、npm_deps_from_value 解析缺陷（codegen）、p625_uigallery_sidebar 基线红（runtime）、028 __focus_input 与主题帧路径交互（runtime）。**落地非部署**：release 制品（release bin/daemon/web dist）非本计划部署面，重建归 runtime owner 后继窗口（PLAN-092 教训显式记观察）
 
+**批量回归到期检查（fix-test-tiering 2026-09-30）**：`docs/plans/.last-batch-regression.json` 缺失 → 按规 due；但主检出仍载他方活跃 WIP（docs/design/README、archived/029、039 删除 + 未跟踪 038 计划——037 合并全程未触碰），批量门需主检出单实例干净；且本仓批量门定义缺（同 PLAN-035 D-05 命名）。到期执行交接 regress owner：待主检出路由干净后按 regress skill 跑批（含本计划 @0f90ec1b），红转 fix-forward，不回退本合并。
+
 ## 10. 待澄清事项
 
 1. ~~实施尚未授权~~ → **已授权**（2026-11-03 用户 /goal 全链授权，T-01 执行）。015 阻点已真复现并按现源修定（npm_deps 对象语法+幸存 engine 链接），生成器解析缺陷本体具名交 owner（npm_deps_from_value scoped/:link: 解析），未为通过删轨。
