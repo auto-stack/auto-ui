@@ -530,6 +530,11 @@ impl<'a> AuraViewBuilder<'a> {
         let (host_family, host_mode) = match theme::host_theme_resolution() {
             HostResolution::Blocked(reason) => {
                 eprintln!("[PLAN-031] {reason}——整帧保留旧设计（不回落）");
+                crate::ui::theme_policy::note_scope_eval(
+                    theme::theme_scope_identity(),
+                    false,
+                    &reason,
+                );
                 return;
             }
             HostResolution::Candidate { family, mode } => (family, mode),
@@ -590,6 +595,11 @@ impl<'a> AuraViewBuilder<'a> {
         }
         if failed {
             // 整候选拒绝：不写 family、不写 mode、不增 revision（R-02）。
+            crate::ui::theme_policy::note_scope_eval(
+                theme::theme_scope_identity(),
+                false,
+                "design 求值失败——整候选拒绝",
+            );
             return;
         }
             // 宿主字段覆盖 App 默认（未给字段仍用 design；full_host 已跳过本段）。
@@ -611,11 +621,21 @@ impl<'a> AuraViewBuilder<'a> {
                 Some(d) => Some(d),
                 None => {
                     eprintln!("[PLAN-031] design.mode `system` 未取得 provider 结果——本帧不发布 mode");
+                    crate::ui::theme_policy::note_scope_eval(
+                        theme::theme_scope_identity(),
+                        false,
+                        "mode system 无 provider 结果（本帧跳过）",
+                    );
                     None
                 }
             },
             Some(other) => {
                 eprintln!("[PLAN-031] design.mode `{other}` 非 light|dark|system——整候选拒绝（C-07）");
+                crate::ui::theme_policy::note_scope_eval(
+                    theme::theme_scope_identity(),
+                    false,
+                    &format!("mode {other:?} 非 light|dark|system"),
+                );
                 return;
             }
         };
@@ -631,6 +651,11 @@ impl<'a> AuraViewBuilder<'a> {
                         eprintln!(
                             "[PLAN-031] design.theme `{name}` 未注册且非内置主题——整候选拒绝（C-11）"
                         );
+                        crate::ui::theme_policy::note_scope_eval(
+                            theme::theme_scope_identity(),
+                            false,
+                            &format!("family {name:?} 未注册且非内置主题"),
+                        );
                         return;
                     }
                 },
@@ -639,6 +664,14 @@ impl<'a> AuraViewBuilder<'a> {
 
         if let Err(e) = theme::publish_design_candidate(candidate, dark) {
             eprintln!("[PLAN-031] {e}");
+            crate::ui::theme_policy::note_scope_eval(
+                theme::theme_scope_identity(),
+                false,
+                &e.to_string(),
+            );
+        } else {
+            // PLAN-053：整帧提交成功读回面（宿主状态表 applied 判定的记录点）。
+            crate::ui::theme_policy::note_scope_eval(theme::theme_scope_identity(), true, "");
         }
     }
 

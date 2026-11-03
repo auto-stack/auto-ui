@@ -799,6 +799,53 @@ impl<S: FrameSource> ClientPump<S> {
                 }
                 None // 等 BufferRelease 落地（dispatch 通用臂）转 Detached。
             }
+            // PLAN-053 T-03：宿主主题策略完整快照——喂 031 scope 端口 →
+            // 产帧评估 → 读回 applied/rejected（具名）→ 结果帧上行。
+            ProtocolMsg::Control(ControlMsg::ThemePolicyPush { revision, record }) => {
+                let outcome = {
+                    let app = self.endpoint.as_mut()?;
+                    match crate::ui::theme_policy::PolicySnapshot::parse_record(&record) {
+                        Some(snap) => app.session.on_theme_policy(&snap),
+                        None => Err(format!("策略帧 record 解析失败（rev {revision}）")),
+                    }
+                };
+                match outcome {
+                    Ok(()) => {
+                        // 产帧评估（publish/eval 注册表记录）后再读回状态。
+                        let active = self
+                            .endpoint
+                            .as_ref()
+                            .map(|a| a.state == AppState::Active)
+                            .unwrap_or(false);
+                        if active {
+                            self.push_frame();
+                        }
+                        let readback = {
+                            let app = self.endpoint.as_mut()?;
+                            app.session.theme_policy_status()
+                        };
+                        let (status, reason) =
+                            readback.unwrap_or(("pending".to_string(), String::new()));
+                        let _ = self.app_end.send(&ProtocolMsg::Control(
+                            ControlMsg::ThemePolicyResult {
+                                revision,
+                                status,
+                                reason,
+                            },
+                        ));
+                    }
+                    Err(reason) => {
+                        let _ = self.app_end.send(&ProtocolMsg::Control(
+                            ControlMsg::ThemePolicyResult {
+                                revision,
+                                status: "unsupported".to_string(),
+                                reason,
+                            },
+                        ));
+                    }
+                }
+                None
+            }
             other => {
                 let app = self.endpoint.as_mut()?;
                 let result = app.on_message(other);

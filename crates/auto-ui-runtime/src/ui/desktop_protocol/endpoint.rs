@@ -152,6 +152,28 @@ pub trait FrameSource {
     fn drain_window_controls(&mut self) -> Vec<ControlMsg> {
         Vec::new()
     }
+
+    /// PLAN-053 T-03：主题策略采纳能力（转发组件面 `Component::
+    /// theme_capable`）。缺省 false——非 AutoUI 源（计数器/压测桩）恒
+    /// legacy，宿主不推送。
+    fn theme_capable(&self) -> bool {
+        false
+    }
+
+    /// PLAN-053 T-03：宿主主题策略快照应用。缺省 = 具名不支持（legacy
+    /// 支持面走旧 dark/light 词，宿主按 unsupported 分列）。
+    fn on_theme_policy(
+        &mut self,
+        _snap: &crate::ui::theme_policy::PolicySnapshot,
+    ) -> Result<(), String> {
+        Err("unsupported: FrameSource 无主题作用域".to_string())
+    }
+
+    /// PLAN-053 T-03：策略推送 + 产帧后的读回 `(status, reason)`。缺省
+    /// None（宿主保持 pending 列示，不伪称成功）。
+    fn theme_policy_status(&self) -> Option<(String, String)> {
+        None
+    }
 }
 
 /// app 侧端点。泛型 [`FrameSource`] 是会话的最小接缝。
@@ -252,6 +274,13 @@ impl<S: FrameSource> AppEndpoint<S> {
             height: self.height,
             fonts: self.fonts.clone(),
             surfaces: self.surfaces.clone(),
+            // PLAN-053：主题策略能力尾段（031 scope 在场的会话声明
+            // `theme-policy/1`；空 = 旧端线字节等价）。
+            theme_caps: if self.session.theme_capable() {
+                vec!["theme-policy/1".to_string()]
+            } else {
+                Vec::new()
+            },
         }))
     }
 
@@ -590,6 +619,8 @@ pub enum HostAction {
         height: f32,
         fonts: Vec<super::message::FontBlob>,
         surfaces: Vec<super::message::SurfaceDecl>,
+        /// PLAN-053：Hello 尾段的主题策略能力声明（空 = 旧端/不支持）。
+        theme_caps: Vec<String>,
     },
     /// 帧合成：写入 surface 的 slot（双缓冲翻面）；适配层随合成回 FrameAck
     /// （frame_id 原样回带）。
@@ -651,6 +682,13 @@ pub enum HostAction {
     /// wid → registry_id。此前在端点丢弃臂中无声消失（desktop.* wire 化
     /// 缺口，PLAN-030 D4 清偿）。
     DesktopBus { wid: u64, record: String },
+    /// PLAN-053 T-03：主题策略结果上行（app→host 适配层落点 = 会话状态面
+    /// + shell 推送；stale 判定锚在 BrokerClient.theme_pushed_rev）。
+    ThemePolicyResult {
+        revision: u64,
+        status: String,
+        reason: String,
+    },
     /// app→host IME 请求下行（PLAN-690 T-02，remote 模式）：daemon 对
     /// wid 窗执行 IME enable/disable + 候选窗定位（Windows IMM——
     /// `window::run` → HWND 路径；非 Windows 观测行降级）。
@@ -718,6 +756,7 @@ impl HostEndpoint {
                     height,
                     fonts,
                     surfaces,
+                    theme_caps,
                 }),
             ) => {
                 if version != super::PROTOCOL_VERSION {
@@ -737,6 +776,7 @@ impl HostEndpoint {
                     height,
                     fonts,
                     surfaces,
+                    theme_caps,
                 }])
             }
             // --- Active：帧/输入确认/控制/观测 ---
@@ -893,6 +933,20 @@ impl HostEndpoint {
             (HostState::Active, ProtocolMsg::Control(ControlMsg::DesktopBus { wid, record })) => {
                 Ok(vec![HostAction::DesktopBus { wid, record }])
             }
+            // PLAN-053 T-03：主题策略结果上行（连接级寻址——端点只路由，
+            // stale/归因落点在会话适配层）。
+            (
+                HostState::Active,
+                ProtocolMsg::Control(ControlMsg::ThemePolicyResult {
+                    revision,
+                    status,
+                    reason,
+                }),
+            ) => Ok(vec![HostAction::ThemePolicyResult {
+                revision,
+                status,
+                reason,
+            }]),
             // PLAN-690 T-02/T-05（remote 模式）：App 派生窗口控制下行——
             // 端点只路由（wid 原样），落点在适配层（rqhost daemon IMM /
             // view 态）。wid = 0 哨兵（连接级寻址——headless 装配期不知
@@ -1071,6 +1125,8 @@ fn msg_name(msg: &ProtocolMsg) -> &'static str {
             ControlMsg::ShellCursorMove { .. } => "Control::ShellCursorMove",
             ControlMsg::ImeRequest { .. } => "Control::ImeRequest",
             ControlMsg::SetCursor { .. } => "Control::SetCursor",
+            ControlMsg::ThemePolicyPush { .. } => "Control::ThemePolicyPush",
+            ControlMsg::ThemePolicyResult { .. } => "Control::ThemePolicyResult",
         },
         ProtocolMsg::Observe(m) => match m {
             ObserveMsg::Attach { .. } => "Observe::Attach",
@@ -1490,6 +1546,8 @@ mod tests {
             height: 10.0,
             fonts: vec![],
             surfaces: Vec::new(),
+                theme_caps: Vec::new(),
+
         }));
         assert_eq!(mismatch, Err(ProtocolError::VersionMismatch(99)));
     }
@@ -1557,6 +1615,7 @@ mod tests {
                     height: 48.0,
                 },
             ],
+            theme_caps: Vec::new(),
         });
         let actions = host.on_message(hello).unwrap();
         match &actions[0] {
@@ -1643,6 +1702,7 @@ mod tests {
             height: 10.0,
             fonts: vec![],
             surfaces: Vec::new(),
+            theme_caps: Vec::new(),
         });
         match host2.on_message(legacy).unwrap()[0] {
             HostAction::ResolveAndAttach { ref surfaces, .. } => assert!(surfaces.is_empty()),

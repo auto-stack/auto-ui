@@ -57,6 +57,12 @@ pub struct BrokerClient {
     pub wid: Option<Wid>,
     /// 孵化上报的 app 名（ResolveAndAttach 落地时回填；压测按名寻窗）。
     pub app_name: Option<String>,
+    /// PLAN-053 T-03：Hello 尾段声明的主题策略能力（空 = 旧端/legacy——
+    /// 宿主不推送；`theme-policy/1` = 可推）。
+    pub theme_caps: Vec<String>,
+    /// PLAN-053 T-03：本连接已推送的宿主 revision（结果帧 stale 判定锚：
+    /// 低于此值的结果 = 乱序/重复，可读分列不覆盖新状态）。
+    pub theme_pushed_rev: u64,
 }
 
 impl BrokerClient {
@@ -74,6 +80,8 @@ impl BrokerClient {
             app_id: None,
             wid: None,
             app_name: None,
+            theme_caps: Vec::new(),
+            theme_pushed_rev: 0,
         }
     }
 

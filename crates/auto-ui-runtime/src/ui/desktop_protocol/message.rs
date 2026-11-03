@@ -938,7 +938,9 @@ impl WelcomeSurface {
 pub enum HandshakeMsg {
     /// app→host。spawn/反向连接后的第一跳：上报身份 + 初始尺寸 + 字体。
     /// `surfaces`（v1.11 尾部追加）：多表面声明（壳双表面）；空 = 单
-    /// window 表面（旧端线等价）。
+    /// window 表面（旧端线等价）。`theme_caps`（PLAN-053 尾部追加）：主题
+    /// 策略能力声明（如 `"theme-policy/1"`）——空 = 不声明（旧端线字节
+    /// 等价；宿主据此门控策略推送，旧客户端永不收未知帧）。
     Hello {
         version: u16,
         app_name: String,
@@ -948,6 +950,7 @@ pub enum HandshakeMsg {
         height: f32,
         fonts: Vec<FontBlob>,
         surfaces: Vec<SurfaceDecl>,
+        theme_caps: Vec<String>,
     },
     /// host→app。分配结果：AppId + 虚拟窗 Wid + surface 句柄 + 初始矩形。
     /// `frame_mode`（v1.3 尾部追加）：该表面的帧载荷解释位——旧端载荷
@@ -981,6 +984,7 @@ impl HandshakeMsg {
                 height,
                 fonts,
                 surfaces,
+                theme_caps,
             } => {
                 put_u8(out, Self::HELLO);
                 put_u16(out, *version);
@@ -1006,6 +1010,13 @@ impl HandshakeMsg {
                     put_u32(out, surfaces.len() as u32);
                     for s in surfaces {
                         s.encode(out);
+                    }
+                }
+                // PLAN-053 尾部追加：主题策略能力（空则不写——字节等价旧线）。
+                if !theme_caps.is_empty() {
+                    put_u32(out, theme_caps.len() as u32);
+                    for c in theme_caps {
+                        put_string(out, c);
                     }
                 }
             }
@@ -1063,6 +1074,17 @@ impl HandshakeMsg {
                 } else {
                     Vec::new()
                 };
+                // PLAN-053 尾部追加：主题策略能力（旧端线无此段 = 不声明）。
+                let theme_caps = if r.remaining() > 0 {
+                    let n = r.u32()? as usize;
+                    let mut caps = Vec::with_capacity(n.min(8));
+                    for _ in 0..n {
+                        caps.push(r.string()?);
+                    }
+                    caps
+                } else {
+                    Vec::new()
+                };
                 Self::Hello {
                     version,
                     app_name,
@@ -1072,6 +1094,7 @@ impl HandshakeMsg {
                     height,
                     fonts,
                     surfaces,
+                    theme_caps,
                 }
             }
             Self::WELCOME => {
@@ -1994,6 +2017,19 @@ pub enum ControlMsg {
     ///（mouse_area interaction）应用——iced_winit 每帧 update_mouse
     /// 以自身 UI 的 interaction 刷 OS 光标，Win32 直设会被覆盖。
     SetCursor { wid: u64, kind: u8 },
+    /// host→app（PLAN-053 T-03）。宿主主题策略完整快照推送（连接级寻址，
+    /// `wid()` = 0）——attach/重连/策略变更三路同帧；App 端喂 031 scope
+    /// 端口后回 [`ControlMsg::ThemePolicyResult`]。仅向 Hello 声明
+    /// `theme-policy/1` 能力的会话发送（旧客户端零未知帧）。
+    ThemePolicyPush { revision: u64, record: String },
+    /// app→host（PLAN-053 T-03）。策略推送处理结果：`revision` = 所 ack
+    /// 的宿主 revision；`status` ∈ `applied`|`rejected`|`unsupported`|
+    /// `stale`；`reason` = 具名 detail（rejected/unsupported 非空）。
+    ThemePolicyResult {
+        revision: u64,
+        status: String,
+        reason: String,
+    },
 }
 
 /// `ControlMsg::ImeRequest` 的 Enabled 载荷（PLAN-690 T-02）。
@@ -2023,10 +2059,13 @@ impl ControlMsg {
             | Self::StateSnapshot { wid, .. }
             | Self::ImeRequest { wid, .. }
             | Self::SetCursor { wid, .. } => *wid,
-            // v1.11 壳投影族：连接级寻址（非窗口）——0 哨兵。
+            // v1.11 壳投影族 + PLAN-053 主题策略族：连接级寻址（非窗口）
+            // ——0 哨兵。
             Self::ShellProjectionPush { .. }
             | Self::ShellClockTick { .. }
-            | Self::ShellCursorMove { .. } => 0,
+            | Self::ShellCursorMove { .. }
+            | Self::ThemePolicyPush { .. }
+            | Self::ThemePolicyResult { .. } => 0,
         }
     }
 
@@ -2049,7 +2088,9 @@ impl ControlMsg {
             | Self::SetCursor { wid: w, .. } => *w = wid,
             Self::ShellProjectionPush { .. }
             | Self::ShellClockTick { .. }
-            | Self::ShellCursorMove { .. } => {}
+            | Self::ShellCursorMove { .. }
+            | Self::ThemePolicyPush { .. }
+            | Self::ThemePolicyResult { .. } => {}
         }
     }
 
@@ -2141,6 +2182,23 @@ impl ControlMsg {
                 put_u64(out, *wid);
                 put_u8(out, *kind);
             }
+            // PLAN-053 T-03：主题策略推送/结果（record = PolicySnapshot 的
+            // tab 分隔串——`rev\x1ffamily\x1fversion\x1fdigest\x1fmode`）。
+            Self::ThemePolicyPush { revision, record } => {
+                put_u8(out, 17);
+                put_u64(out, *revision);
+                put_string(out, record);
+            }
+            Self::ThemePolicyResult {
+                revision,
+                status,
+                reason,
+            } => {
+                put_u8(out, 18);
+                put_u64(out, *revision);
+                put_string(out, status);
+                put_string(out, reason);
+            }
         }
     }
 
@@ -2215,6 +2273,15 @@ impl ControlMsg {
             16 => Self::SetCursor {
                 wid: r.u64()?,
                 kind: r.u8()?,
+            },
+            17 => Self::ThemePolicyPush {
+                revision: r.u64()?,
+                record: r.string()?,
+            },
+            18 => Self::ThemePolicyResult {
+                revision: r.u64()?,
+                status: r.string()?,
+                reason: r.string()?,
             },
             tag => return Err(CodecError::UnknownTag(tag)),
         })
@@ -2417,6 +2484,8 @@ mod tests {
                     data: Vec::new(),
                 },
             ],
+            theme_caps: Vec::new(),
+
             surfaces: Vec::new(),
         }));
         round_trip(ProtocolMsg::Handshake(HandshakeMsg::Hello {
@@ -2440,6 +2509,7 @@ mod tests {
                     height: 48.0,
                 },
             ],
+            theme_caps: Vec::new(),
         }));
         round_trip(ProtocolMsg::Handshake(HandshakeMsg::Welcome {
             app_id: 1,
@@ -2941,6 +3011,21 @@ mod tests {
                 face: shell_face::DESKTOP_SURFACE,
                 x: 128.5,
                 y: 300.0,
+            },
+            // PLAN-053 T-03：主题策略推送/结果（连接级寻址族 + roundtrip）。
+            ControlMsg::ThemePolicyPush {
+                revision: 7,
+                record: "7\u{1F}Auto\u{1F}0.2.0\u{1F}abcd\u{1F}dark".into(),
+            },
+            ControlMsg::ThemePolicyResult {
+                revision: 7,
+                status: "applied".into(),
+                reason: String::new(),
+            },
+            ControlMsg::ThemePolicyResult {
+                revision: 7,
+                status: "rejected".into(),
+                reason: "mode 未被 family 声明".into(),
             },
         ];
         for m in shell_msgs {

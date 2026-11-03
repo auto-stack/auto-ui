@@ -472,6 +472,9 @@ fn apply_actions(
     let mut events = Vec::new();
     for action in actions {
         match action {
+            // PLAN-053 T-03：结果落点在桌面会话状态面（broker 臂）；rqhost
+            // daemon 侧无主题消费面（no-op 收尾）。
+            HostAction::ThemePolicyResult { .. } => {}
             HostAction::ResolveAndAttach {
                 app_name,
                 title,
@@ -1754,6 +1757,8 @@ mod tests {
             height: 320.0,
             fonts: vec![],
             surfaces: Vec::new(),
+            theme_caps: Vec::new(),
+
         })
     }
 

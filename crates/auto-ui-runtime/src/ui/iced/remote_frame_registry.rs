@@ -128,6 +128,7 @@ impl Client {
                 width: 0.0,
                 height: 0.0,
                 fonts: vec![],
+                theme_caps: Vec::new(),
                 surfaces: vec![],
             });
             let _ = end.send(&hello);

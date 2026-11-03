@@ -2457,6 +2457,43 @@ impl Component for DynamicComponent {
 
         view
     }
+
+    /// PLAN-053 T-03：主题策略采纳能力 = 031 scope 在场（themes dep 采纳者；
+    /// legacy 组件不加 cap——宿主不推送，旧 dark/light 词继续承载）。
+    fn theme_capable(&self) -> bool {
+        self.theme_scope.is_some()
+    }
+
+    /// PLAN-053 T-03：宿主策略快照喂入（031 `set_host_theme_inputs` 端口；
+    /// 失败保旧由 publish 层整帧拒绝保证）。置脏 → 泵随后产帧评估并读回。
+    fn on_theme_policy(
+        &mut self,
+        snap: &crate::ui::theme_policy::PolicySnapshot,
+    ) -> Result<(), String> {
+        self.set_host_theme_inputs(snap.host_inputs());
+        Ok(())
+    }
+
+    /// PLAN-053 T-03：帧后读回 `(status, reason)`——scope 已生效 family 与
+    /// 推送 family 一致 + eval 注册表整帧提交 = applied；eval 具名拒绝 =
+    /// rejected；未评估 = pending。
+    fn theme_policy_status(&self) -> Option<(String, String)> {
+        use auto_ui_compiler::style::theme::ThemeInput;
+        let scope = self.theme_scope.as_ref()?;
+        let family = match scope.host_inputs().host_family {
+            ThemeInput::Value(f) => f,
+            _ => return Some(("unsupported".to_string(), "无宿主 family 输入".to_string())),
+        };
+        let (committed, reason) = crate::ui::theme_policy::last_scope_eval(scope.id())
+            .unwrap_or((false, "pending".to_string()));
+        if scope.family_name() == family && committed {
+            Some(("applied".to_string(), String::new()))
+        } else if reason == "pending" {
+            Some(("pending".to_string(), String::new()))
+        } else {
+            Some(("rejected".to_string(), reason))
+        }
+    }
 }
 
 impl DynamicComponent {

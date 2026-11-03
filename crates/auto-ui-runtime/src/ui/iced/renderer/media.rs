@@ -231,8 +231,10 @@ pub(super) fn render_video<M: Clone + Debug + 'static>(
 
         // 稳定运行时键：`key:` 声明 + 当前会话域合成（域缺席 = ns 0——
         // 面板/桌面 chrome 等非 app 视图构建，键只落 key 串本身）。
+        // PLAN-053 基线修复：改经 projection 只读访问器（本模块裸引私有
+        // static 在 mpv-widget 下 E0425，master cfe325d4 实况）。
         let runtime_key = media_key.map(|k| {
-            let ns = MEDIA_VIEW_SCOPE.with(|c| c.get()).unwrap_or(0);
+            let ns = crate::ui::iced::renderer::projection::current_media_view_scope().unwrap_or(0);
             crate::ui::mpv::widget::stable_runtime_key(ns, &k)
         });
 

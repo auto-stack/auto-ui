@@ -717,6 +717,8 @@ impl ShellPump {
             height: geometry_ref.viewport_h,
             fonts: Vec::new(),
             surfaces,
+            // 壳投影连接不承载 App 主题采纳（shell 自身走宿主 chrome 档）。
+            theme_caps: Vec::new(),
         });
         let mut end = end;
         end.send(&hello)

@@ -581,6 +581,23 @@ impl<C: Component> FrameSource for RqProjector<C> {
         ups
     }
 
+    /// PLAN-053 T-03：主题策略面 = 组件转发（Component trait 缺省不支持，
+    /// DynamicComponent 覆写 031 端口喂入/读回）。
+    fn theme_capable(&self) -> bool {
+        self.component.theme_capable()
+    }
+
+    fn on_theme_policy(
+        &mut self,
+        snap: &crate::ui::theme_policy::PolicySnapshot,
+    ) -> Result<(), String> {
+        self.component.on_theme_policy(snap)
+    }
+
+    fn theme_policy_status(&self) -> Option<(String, String)> {
+        self.component.theme_policy_status()
+    }
+
     fn render_frame(&mut self) -> DrawList {
         let view = self.component.view();
         let mut ctx = NativeCtx {

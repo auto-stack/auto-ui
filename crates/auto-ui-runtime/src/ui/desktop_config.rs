@@ -90,6 +90,18 @@ pub struct DesktopConfig {
     /// 虚拟窗底色透明度三档：`off` | `low` | `high`（518 G6；坏值回退 off）。
     pub transparency: String,
     pub notes_enabled: bool,
+    /// PLAN-053 T-02：宿主主题策略（family 链）。`None` = 未选（legacy
+    /// dark/theme_name 链原样，行为与升级前逐字节一致）。
+    /// `family` = 官方包 family 标识；`version`+`digest` 锁内容（与宿主
+    /// 目录快照比对，任一不符整候选拒绝）；`mode` = `light`|`dark`|`system`
+    /// （运行派生值不落盘——load 后按 system 派生，不回写）；`theme_rev`
+    /// = 宿主分配的单调 revision（提交一次 +1；外部写方不手改——校验以
+    /// 内存 last 语义为准，盘值仅恢复用）。
+    pub theme_family: Option<String>,
+    pub theme_family_version: Option<String>,
+    pub theme_family_digest: Option<String>,
+    pub theme_mode: Option<String>,
+    pub theme_rev: u64,
 }
 
 impl Default for DesktopConfig {
@@ -109,6 +121,12 @@ impl Default for DesktopConfig {
             theme_name: Some("stella".to_string()),
             transparency: "off".to_string(),
             notes_enabled: true,
+            // PLAN-053 T-02：family 链缺省未选（存量/无包环境零行为差）。
+            theme_family: None,
+            theme_family_version: None,
+            theme_family_digest: None,
+            theme_mode: None,
+            theme_rev: 0,
         }
     }
 }
@@ -201,6 +219,37 @@ pub fn parse_config(src: &str) -> DesktopConfig {
     }
     if let Some(v) = f.get("notes_enabled").and_then(|v| parse_bool(v)) {
         cfg.notes_enabled = v;
+    }
+    // PLAN-053 T-02：family 策略键（family/version/digest 非空串即收——
+    // 与宿主目录的符合性校验在策略核心 validate 层做并具名拒绝，解析层
+    // 不猜；mode 窄值域 light/dark/system，坏值不入内存 = 该候选校验必拒
+    // 并诊断，盘上坏值保留到宿主下一次策略提交改写）。
+    if let Some(v) = f.get("theme_family") {
+        let t = v.trim();
+        if !t.is_empty() {
+            cfg.theme_family = Some(t.to_string());
+        }
+    }
+    if let Some(v) = f.get("theme_family_version") {
+        let t = v.trim();
+        if !t.is_empty() {
+            cfg.theme_family_version = Some(t.to_string());
+        }
+    }
+    if let Some(v) = f.get("theme_family_digest") {
+        let t = v.trim();
+        if !t.is_empty() {
+            cfg.theme_family_digest = Some(t.to_string());
+        }
+    }
+    if let Some(v) = f.get("theme_mode") {
+        let t = v.trim();
+        if t == "light" || t == "dark" || t == "system" {
+            cfg.theme_mode = Some(t.to_string());
+        }
+    }
+    if let Some(v) = f.get("theme_rev").and_then(|v| v.trim().parse::<u64>().ok()) {
+        cfg.theme_rev = v;
     }
     cfg
 }
@@ -309,6 +358,27 @@ pub fn serialize_config(cfg: &DesktopConfig) -> String {
         "    notes_enabled : {}\n",
         if cfg.notes_enabled { "true" } else { "false" }
     ));
+    // PLAN-053 T-02：family 策略键——链未选（family None）整组不落盘，
+    // 文件面与升级前一致；选定后全组恒写（通用编辑器展示全字段约定）。
+    if cfg.theme_family.is_some() {
+        out.push_str(&format!(
+            "    theme_family : \"{}\"\n",
+            cfg.theme_family.clone().unwrap_or_default()
+        ));
+        out.push_str(&format!(
+            "    theme_family_version : \"{}\"\n",
+            cfg.theme_family_version.clone().unwrap_or_default()
+        ));
+        out.push_str(&format!(
+            "    theme_family_digest : \"{}\"\n",
+            cfg.theme_family_digest.clone().unwrap_or_default()
+        ));
+        out.push_str(&format!(
+            "    theme_mode : \"{}\"\n",
+            cfg.theme_mode.clone().unwrap_or_default()
+        ));
+        out.push_str(&format!("    theme_rev : {}\n", cfg.theme_rev));
+    }
     out.push_str("}\n");
     out
 }
@@ -514,6 +584,23 @@ fn changed_fields(a: &DesktopConfig, b: &DesktopConfig) -> Vec<&'static str> {
     if a.notes_enabled != b.notes_enabled {
         out.push("notes_enabled");
     }
+    // PLAN-053 T-02：family 策略整组参与字段级合并（外部写方改候选不被
+    // 陈旧快照冲掉；组内任一字段变化整组采纳——半截候选由策略核心校验拒绝）。
+    if a.theme_family != b.theme_family {
+        out.push("theme_family");
+    }
+    if a.theme_family_version != b.theme_family_version {
+        out.push("theme_family_version");
+    }
+    if a.theme_family_digest != b.theme_family_digest {
+        out.push("theme_family_digest");
+    }
+    if a.theme_mode != b.theme_mode {
+        out.push("theme_mode");
+    }
+    if a.theme_rev != b.theme_rev {
+        out.push("theme_rev");
+    }
     out
 }
 
@@ -535,6 +622,12 @@ fn apply_field(cfg: &mut DesktopConfig, name: &str, from: &DesktopConfig) {
         "theme_name" => cfg.theme_name = from.theme_name.clone(),
         "transparency" => cfg.transparency = from.transparency.clone(),
         "notes_enabled" => cfg.notes_enabled = from.notes_enabled,
+        // PLAN-053 T-02：策略组字段级抄写（changed_fields 对偶臂）。
+        "theme_family" => cfg.theme_family = from.theme_family.clone(),
+        "theme_family_version" => cfg.theme_family_version = from.theme_family_version.clone(),
+        "theme_family_digest" => cfg.theme_family_digest = from.theme_family_digest.clone(),
+        "theme_mode" => cfg.theme_mode = from.theme_mode.clone(),
+        "theme_rev" => cfg.theme_rev = from.theme_rev,
         _ => {}
     }
 }
@@ -596,6 +689,13 @@ pub fn save_to(path: &std::path::Path, cfg: &DesktopConfig) -> std::io::Result<(
 
 #[cfg(test)]
 mod tests {
+
+    /// 进程级 env/快照状态（`AUTOOS_DESKTOP_CONFIG` + `LAST_SNAPSHOT`）的
+    /// 用例互斥锁——触碰方全程持有。
+    fn env_test_lock() -> std::sync::MutexGuard<'static, ()> {
+        static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        LOCK.lock().unwrap_or_else(|e| e.into_inner())
+    }
 
     /// PLAN-601 T-05：theme_name 序列化/解析往返（None 不落盘稳定面）。
     /// PLAN-619 T-03：缺省改为 `Some("stella")`——轨缺省主题已是 scaffold，
@@ -684,8 +784,13 @@ mod tests {
 
     /// PLAN-044 T-03：save 字段级合并——daemon 在轮询间隙外写的字段不被
     /// 宿主陈旧快照冲掉；宿主真正改过的字段照常落盘。
+    ///
+    /// PLAN-053 注：本用例与 712 用例同抢 `AUTOOS_DESKTOP_CONFIG` env +
+    /// `LAST_SNAPSHOT` 进程级状态，须互斥（2026-11-03 实测并行调度下本就
+    /// 存在的窗口被新用例的线程时序 expose）。
     #[test]
     fn save_merges_external_field_changes() {
+        let _g = env_test_lock();
         let dir = std::env::temp_dir().join(format!("auto-t03-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
@@ -732,6 +837,7 @@ mod tests {
     /// 覆盖，步骤 4 会把 transparency 冲回 high——本测钉死该通道。
     #[test]
     fn save_after_external_edit_preserves_fields() {
+        let _g = env_test_lock();
         let dir = std::env::temp_dir().join(format!("auto-712-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
@@ -844,6 +950,12 @@ mod tests {
             theme_name: Some("stella".to_string()),
             transparency: "high".to_string(),
             notes_enabled: false,
+            // PLAN-053 T-02：策略组参与往返（family 选定态全字段 + rev）。
+            theme_family: Some("Auto".to_string()),
+            theme_family_version: Some("0.2.0".to_string()),
+            theme_family_digest: Some("d".repeat(64)),
+            theme_mode: Some("dark".to_string()),
+            theme_rev: 7,
         };
         assert_eq!(parse_config(&serialize_config(&cfg)), cfg);
     }

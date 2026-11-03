@@ -1898,6 +1898,13 @@ pub enum DesktopCommand {
     /// 持久化 + 全 App 视图标脏；与 SetTheme(bool)（mode）正交。未知名
     /// 解析期拒绝（窄值跳过，同 set_dock_* 门）。
     SetThemeName(String),
+    /// PLAN-053 T-02：宿主主题策略选择（`set_theme_policy	<family>	<mode>`，
+    /// mode ∈ light|dark|system）。执行臂 = 策略核心
+    /// （theme_policy::stage_candidate 校验→config 落盘→publish_staged 发布
+    /// revision）单点；version/digest 由宿主从官方包目录补全（shell 不持
+    /// digest）。校验拒绝具名回写 shell 状态面并保旧 policy；与 legacy
+    /// SetTheme/SetThemeName 并存（§5.2 兼容规则）。
+    SetThemePolicy(String, String),
     /// PLAN-526 T8：窗口最小化（dock 右键菜单 `win_min\t<wid>`；落
     /// `WmCommand::Minimize` 同款状态机——窗隐藏、任务栏保留）。
     MinWindow(Wid),
@@ -2166,6 +2173,17 @@ impl DesktopCommand {
             // roundtrip 全量对拍捕获（AC-03 门的设计意图实证）。
             DesktopCommand::SetThemeName(name) => {
                 format!("set_theme{}{}", Self::FIELD_SEP, name)
+            }
+            // PLAN-053 T-02：策略选择 encode（两参同族——FIELD_SEP 分隔，
+            // 与 parse 臂的 split 迭代对偶）。
+            DesktopCommand::SetThemePolicy(family, mode) => {
+                format!(
+                    "set_theme_policy{}{}{}{}",
+                    Self::FIELD_SEP,
+                    family,
+                    Self::FIELD_SEP,
+                    mode
+                )
             }
             // Plan 540 T3：配置写动词族（值域窄——transparency 三档、
             // notes 1/0、pinned csv、wallpapers_dir 直传）。
@@ -2548,6 +2566,26 @@ impl DesktopCommand {
                         }
                         _ => None,
                     },
+                    // PLAN-053 T-02：策略选择（family+mode 两参；mode 窄值域，
+                    // family 非空即收——目录符合性在执行臂策略核心具名校验）。
+                    "set_theme_policy" => {
+                        let mut it = arg.split([Self::FIELD_SEP, '\t']);
+                        let (Some(family), Some(mode), None) =
+                            (it.next(), it.next(), it.next())
+                        else {
+                            return None;
+                        };
+                        if family.is_empty() {
+                            return None;
+                        }
+                        match mode {
+                            "light" | "dark" | "system" => Some(DesktopCommand::SetThemePolicy(
+                                family.to_string(),
+                                mode.to_string(),
+                            )),
+                            _ => None,
+                        }
+                    }
                     // PLAN-526 T8/T14：win_min / set_wallpaper（arg 直传）。
                     "win_min" => arg
                         .parse::<u64>()
@@ -2802,6 +2840,28 @@ impl Drop for DesktopSession {
     }
 }
 
+/// PLAN-053 T-03：为具备 `theme-policy/1` 能力且策略已激活的连接构造策略
+/// 推送帧（attach 即时推送用；广播走 [`DesktopSession::broadcast_theme_policy`]）。
+fn theme_policy_push_for(
+    client: &crate::ui::desktop_protocol::stage3::BrokerClient,
+) -> Option<(u64, crate::ui::desktop_protocol::message::ProtocolMsg)> {
+    if !client.theme_caps.iter().any(|c| c == "theme-policy/1") {
+        return None;
+    }
+    let policy = crate::ui::theme_policy::current()?;
+    let snap = policy.snapshot();
+    let rev = snap.revision;
+    Some((
+        rev,
+        crate::ui::desktop_protocol::message::ProtocolMsg::Control(
+            crate::ui::desktop_protocol::message::ControlMsg::ThemePolicyPush {
+                revision: snap.revision,
+                record: snap.encode_record(),
+            },
+        ),
+    ))
+}
+
 /// 桌面会话——进程唯一。R3：单 App 即"无 chrome 的退化桌面"；
 /// 459：多 App 多 OS 窗口（iced::daemon，每窗口渲染各自 AppSession）。
 pub struct DesktopSession {
@@ -2852,6 +2912,14 @@ pub struct DesktopSession {
     /// 目标——serve_once 阻塞在管道 accept，一记"连上即关"使其返回见
     /// 旗标退出）。
     pub(crate) broker_pipe: Option<String>,
+    /// PLAN-053 T-03：outproc App 主题策略结果面（app 名, 状态, 具名
+    /// detail）——协议结果帧回填；in-proc App 状态由 shell 状态推送时从
+    /// scope/eval 注册表现算，不落此表。
+    pub theme_outproc_status: RefCell<Vec<(String, String, String)>>,
+    /// PLAN-053 T-03：待推送主题策略帧队列（pipe → 帧）——策略提交臂入队，
+    /// `pump_broker_clients` 按连接排水（attach 即时推送直接走
+    /// broker_apply_actions 返回面，不入队）。
+    pub theme_push_queue: RefCell<Vec<(String, crate::ui::desktop_protocol::message::ProtocolMsg)>>,
 }
 
 /// 统一消息扇出形状。454 的 VirtualWindow 复用同一封装。
@@ -3320,6 +3388,37 @@ impl AppSession {
 }
 
 impl DesktopSession {
+    /// PLAN-053 T-03：向全部已声明 `theme-policy/1` 能力的 outproc 连接
+    /// 广播当前策略完整快照（策略提交臂调用；attach 即时推送另走
+    /// `theme_policy_push_for`）。stale 判定锚（theme_pushed_rev）同布更新。
+    pub fn broadcast_theme_policy(&mut self) {
+        let Some(policy) = crate::ui::theme_policy::current() else {
+            return;
+        };
+        let snap = policy.snapshot();
+        let rev = snap.revision;
+        let msg = crate::ui::desktop_protocol::message::ProtocolMsg::Control(
+            crate::ui::desktop_protocol::message::ControlMsg::ThemePolicyPush {
+                revision: rev,
+                record: snap.encode_record(),
+            },
+        );
+        let mut targets: Vec<String> = Vec::new();
+        for (_pipe, client) in self.broker_clients.iter_mut() {
+            if client.theme_caps.iter().any(|c| c == "theme-policy/1") {
+                client.theme_pushed_rev = rev;
+                targets.push(client.pipe.clone());
+            }
+        }
+        if targets.is_empty() {
+            return;
+        }
+        let mut q = self.theme_push_queue.borrow_mut();
+        for pipe in targets {
+            q.push((pipe, msg.clone()));
+        }
+    }
+
     /// 459：空会话（boot 逐 App `allocate_app` + 开窗登记）。单 App 形态 =
     /// allocate 一次（R3 退化桌面语义不变）。
     pub fn empty(mcp_shared: Option<crate::ui::mcp_server::SharedStateHandle>) -> Self {
@@ -3338,6 +3437,8 @@ impl DesktopSession {
             broker_stop: None,
             pixels: None,
             broker_pipe: None,
+            theme_outproc_status: RefCell::new(Vec::new()),
+            theme_push_queue: RefCell::new(Vec::new()),
         }
     }
 
@@ -4617,6 +4718,20 @@ impl DesktopSession {
                     }
                 }
             }
+            // PLAN-053 T-03：主题策略推送排水（提交臂入队 → 此处按连接发出）。
+            if alive {
+                let pending: Vec<crate::ui::desktop_protocol::message::ProtocolMsg> = {
+                    let mut q = self.theme_push_queue.borrow_mut();
+                    let (mine, rest): (Vec<_>, Vec<_>) = q
+                        .drain(..)
+                        .partition(|(p, _)| p == pipe);
+                    *q = rest;
+                    mine.into_iter().map(|(_, m)| m).collect()
+                };
+                for m in pending {
+                    let _ = client.end.send(&m);
+                }
+            }
             if !alive {
                 dead.push(pipe.clone());
             }
@@ -4969,6 +5084,7 @@ impl DesktopSession {
                     width,
                     height,
                     surfaces,
+                    theme_caps,
                     ..
                 } => {
                     if app_name == "shell" && !surfaces.is_empty() {
@@ -5243,9 +5359,44 @@ impl DesktopSession {
                             }));
                             client.app_id = Some(app_id);
                             client.wid = Some(wid);
+                            // PLAN-053 T-03：attach 即最新完整快照（重连/新开窗
+                            // 同路——Hello 重走本臂）。仅向声明能力且策略已激活
+                            // 的会话推送（旧客户端零未知帧）。
+                            client.theme_caps = theme_caps;
+                            if let Some(push) = theme_policy_push_for(client) {
+                                client.theme_pushed_rev = push.0;
+                                to_app.push(push.1);
+                            }
                         }
                         Err(_) => continue,
                     }
+                }
+                // PLAN-053 T-03：策略结果上行——stale/重复（低于本连接已推
+                // revision）可读分列不覆盖新状态；归因 = client.app_name。
+                HostAction::ThemePolicyResult {
+                    revision,
+                    status,
+                    reason,
+                } => {
+                    let name = client
+                        .app_name
+                        .clone()
+                        .unwrap_or_else(|| format!("pipe-{}", client.pipe));
+                    let (status, reason) = if revision < client.theme_pushed_rev {
+                        ("stale".to_string(), format!("ack rev {revision} < 推送 rev {}", client.theme_pushed_rev))
+                    } else {
+                        (status, reason)
+                    };
+                    {
+                        let mut rows = self.theme_outproc_status.borrow_mut();
+                        rows.retain(|(n, _, _)| n != &name);
+                        rows.push((name.clone(), status.clone(), reason.clone()));
+                    }
+                    eprintln!(
+                        "[PLAN-053] outproc 主题策略结果 app={name} rev={revision} status={status} reason={reason}"
+                    );
+                    // shell 状态面刷新走 ServiceTick 脏位（session 无 iced 依赖）。
+                    crate::ui::theme_policy::mark_shell_dirty();
                 }
                 HostAction::ComposeFrame {
                     surface,
@@ -5562,6 +5713,13 @@ impl DesktopSession {
         if self.host.is_some() && component.read_state("dark_mode").is_ok() {
             let dark = crate::ui::style::theme::dark_mode();
             let _ = component.write_state("dark_mode", auto_val::Value::Bool(dark));
+        }
+        // PLAN-053 T-02：策略已激活时新挂载 App 即刻获得宿主完整快照
+        // （themes dep 采纳者喂 031 端口；legacy 组件走上面的 dark 档回写）。
+        if let Some(policy) = crate::ui::theme_policy::current() {
+            if component.theme_scope().is_some() {
+                component.set_host_theme_inputs(policy.snapshot().host_inputs());
+            }
         }
         self.next_app += 1;
         let id = AppId(self.next_app);
@@ -7084,6 +7242,10 @@ mod tests {
             C::DashboardUnpin("020-music-player".into()),
             C::DashboardSpan("020-music-player".into(), 2),
             C::DashboardLaunch("013-todo".into()),
+            // PLAN-053 T-02：策略选择两参动词（family+mode 全值域 + 坏值跳过）。
+            C::SetThemePolicy("Auto".into(), "dark".into()),
+            C::SetThemePolicy("Solarized".into(), "light".into()),
+            C::SetThemePolicy("Auto".into(), "system".into()),
         ];
         assert!(
             samples.len() >= 46,
@@ -7094,6 +7256,16 @@ mod tests {
             let parsed = DesktopCommand::parse_records(&rec);
             assert_eq!(parsed.len(), 1, "{rec:?} 应解析为单记录（词表缺臂？）");
             assert_eq!(parsed[0], cmd, "roundtrip 失败：{rec:?}");
+        }
+        // PLAN-053：策略动词窄值域负例（坏 mode/坏参形态/空 family = 跳过）。
+        for bad in [
+            "set_theme_policy\tAuto\tsepia",
+            "set_theme_policy\tAuto",
+            "set_theme_policy\t\tdark",
+            "set_theme_policy\tAuto\tdark\textra",
+        ] {
+            let parsed = DesktopCommand::parse_records(bad);
+            assert!(parsed.is_empty(), "{bad:?} 应被窄门跳过");
         }
         // DesktopBusHandle：send_record 与直发同队列语义（SendCmd 锚契约）。
         let mut q = DesktopBusQueue::new();

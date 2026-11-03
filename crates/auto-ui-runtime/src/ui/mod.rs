@@ -181,6 +181,10 @@ pub mod osconfig_apps;
 // boot 读 + 设置窗经宿主臂写 + os-config 通用编辑器同文件）。
 pub mod desktop_config;
 
+// PLAN-053 T-02：宿主主题策略核心（family/mode/revision 的校验-提交-通知
+// 单点；bus 动词与 config 外写轮询共用同一入口——双路径等价的策略层）。
+pub mod theme_policy;
+
 // Plan 386 Stage 1：桌面协议（进程外 App 五通道）——loopback 同进程走通，
 // 施工图 Design 25 §7；Stage 2 换真 transport 时只替换其 loopback 层。
 pub mod desktop_protocol;

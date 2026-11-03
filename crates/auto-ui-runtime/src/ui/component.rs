@@ -102,6 +102,30 @@ pub trait Component: Sized + Debug {
         Vec::new()
     }
 
+    /// PLAN-053 T-03：是否具备主题策略采纳能力（031 scope 在场 = 官方包
+    /// `dep themes` 采纳者）。缺省 false——宿主据此决定是否向该会话推送
+    /// 策略（Hello caps 门 + 旧客户端零推免未知帧）。
+    fn theme_capable(&self) -> bool {
+        false
+    }
+
+    /// PLAN-053 T-03：宿主主题策略快照应用（031 `set_host_theme_inputs`
+    /// 端口；失败保旧由 publish 层保证）。`Err` = 具名不支持/拒绝原因
+    /// （无 scope 组件恒不支持——legacy 支持面走旧 dark/light 词）。
+    fn on_theme_policy(
+        &mut self,
+        _snap: &crate::ui::theme_policy::PolicySnapshot,
+    ) -> Result<(), String> {
+        Err("unsupported: 组件无主题作用域（legacy 支持面）".to_string())
+    }
+
+    /// PLAN-053 T-03：策略推送后的帧内读回 `(status, reason)`——applied/
+    /// rejected 由 eval 注册表 + scope 状态判定（宿主不把发送成功当渲染
+    /// 成功）。`None` = 无可读回结果。
+    fn theme_policy_status(&self) -> Option<(String, String)> {
+        None
+    }
+
     /// PLAN-033 T-04：L3 v2a 快照注入（融合态 → child 状态迁移落点）——
     /// 逐字段写回 + 续接快照 revision。返回 false = 组件无状态写回路径
     ///（a2r typed 结构体缺省；消费端维持 not-yet 留痕）。

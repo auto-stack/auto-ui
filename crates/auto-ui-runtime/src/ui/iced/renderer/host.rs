@@ -4665,6 +4665,13 @@ fn run_session(
                         update_shell_clock(state);
                         // PLAN-041 T-15：面板暗色注入位单点同步（值变才写）。
                         sync_dash_dark_bit(state);
+                        // PLAN-053 T-03：主题策略状态面刷新脏位消费（outproc
+                        // 结果帧/策略变化置位；同值零写——变更检测在 sync 内）。
+                        if crate::ui::theme_policy::take_shell_dirty() {
+                            crate::ui::iced::renderer::shell_state::sync_theme_shell_state(
+                                state, None,
+                            );
+                        }
                         // PLAN-042 T-06：syslog 查看窗注入泵（窗在才扫描；
                         // seq 门 + 500ms 攒批；全量快照下行）。
                         syslog_inject_tick(state);

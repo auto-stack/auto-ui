@@ -3473,6 +3473,13 @@ thread_local! {
     static MEDIA_VIEW_SCOPE: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
 }
 
+/// 当前媒体会话域读值（mpv 稳定键合成的模块外只读口；缺席 = None）。
+/// PLAN-053 基线修复：master `cfe325d4` 的 media.rs 在 mpv-widget 下裸引
+/// 本模块私有 static（E0425）——以访问器形态修复，不改原 thread_local 可见性。
+pub(crate) fn current_media_view_scope() -> Option<u64> {
+    MEDIA_VIEW_SCOPE.with(|c| c.get())
+}
+
 /// 会话域内执行一次视图构建（作用域守卫：嵌套/异常路径都恢复前值）。
 pub(crate) fn with_media_view_scope<R>(ns: u64, f: impl FnOnce() -> R) -> R {
     MEDIA_VIEW_SCOPE.with(|c| {

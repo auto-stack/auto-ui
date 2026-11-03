@@ -2615,6 +2615,10 @@ pub(super) fn execute_desktop_commands(
             DC::SetTheme(dark) => execute_set_theme(state, dark),
             // PLAN-601 T-05：命名主题热切换（set_theme 未知名解析期已拒）。
             DC::SetThemeName(name) => execute_set_theme_name(state, &name.clone()),
+            // PLAN-053 T-02：宿主主题策略选择（策略核心单点执行臂）。
+            DC::SetThemePolicy(family, mode) => {
+                execute_set_theme_policy(state, &family, &mode)
+            }
         }
     }
     (false, tasks)
@@ -2637,6 +2641,210 @@ fn execute_set_theme_name(state: &mut crate::ui::session::DesktopSession, name: 
     crate::ui::iced::snapshot::invalidate_all();
     for app in state.apps.values_mut() {
         *app.state.view_dirty.borrow_mut() = true;
+    }
+}
+
+/// PLAN-053 T-02：宿主主题策略选择执行臂——策略核心 stage（校验 + 候选
+/// 改写）→ config 落盘（失败 = 零内存变更 + 具名状态面）→ publish_staged
+/// （revision 发布）→ 全场生效（legacy 档位 + 全场快照撤 + 全 App
+/// view_dirty + legacy dark_mode 回写 + 031 scoped 端口喂宿主输入）→
+/// shell 状态面回写。校验拒绝：具名原因进 shell 状态面，policy/config
+/// 零变更（保旧）；全等候选：Unchanged 零落盘（杀外写/重复写回环）。
+fn execute_set_theme_policy(
+    state: &mut crate::ui::session::DesktopSession,
+    family: &str,
+    mode: &str,
+) {
+    // 候选 = 活配置副本；shell 只给 family/mode，version/digest 由宿主目录补全
+    // （shell 不持 digest——目录真源在宿主 boot 注入的 catalog）。
+    let mut candidate = state.desktop.config.clone();
+    match crate::ui::theme_policy::catalog() {
+        Some(cat) => {
+            candidate.theme_family = Some(family.to_string());
+            candidate.theme_mode = Some(mode.to_string());
+            candidate.theme_family_version = Some(cat.version.clone());
+            candidate.theme_family_digest = Some(cat.digest.clone());
+        }
+        None => {
+            // 目录缺席：不构造候选，直接具名拒绝（零落盘）。
+            sync_theme_shell_state(
+                state,
+                Some(&format!(
+                    "rejected: 主题包目录不可用（包缺席或校验失败）——family {family:?} 候选拒绝"
+                )),
+            );
+            return;
+        }
+    }
+    match crate::ui::theme_policy::stage_candidate(&mut candidate) {
+        crate::ui::theme_policy::PolicyOutcome::Staged(staged) => {
+            if crate::ui::desktop_config::save(&candidate).is_err() {
+                // 写失败不发布内存 revision（§5.2 提交序）；stage 只动了
+                // 候选副本，活配置未变 = 内存 policy 自动保旧。
+                sync_theme_shell_state(state, Some("save-failed: 策略落盘失败——保旧 policy"));
+                return;
+            }
+            let rev = crate::ui::theme_policy::publish_staged(staged);
+            apply_theme_policy_effect(state, mode, rev);
+            // outproc 能力会话广播（完整快照推送；pump 排水发出）。
+            state.broadcast_theme_policy();
+            sync_theme_shell_state(state, None);
+        }
+        crate::ui::theme_policy::PolicyOutcome::Rejected(reason) => {
+            sync_theme_shell_state(state, Some(&format!("rejected: {reason}")));
+        }
+        crate::ui::theme_policy::PolicyOutcome::Unchanged => {
+            // 与已提交策略全等：零落盘零重推，仅刷新状态面。
+            sync_theme_shell_state(state, None);
+        }
+    }
+}
+
+/// PLAN-053 T-02：策略生效面（与 execute_set_theme 同款全场语义 + 031
+/// scoped 端口差异面）：legacy 组件/shell chrome 走 adapter dark 档与
+/// `dark_mode` 状态回写；有主题 scope 的 App（themes dep 采纳者）经
+/// `set_host_theme_inputs` 喂宿主完整快照（失败保旧由 031 publish 层保证，
+/// 本臂不逐 App 试错）。全场快照撤 + view_dirty 双路径共用（P041 等价）。
+fn apply_theme_policy_effect(
+    state: &mut crate::ui::session::DesktopSession,
+    mode: &str,
+    rev: u64,
+) {
+    let _ = rev;
+    let resolved = crate::ui::theme_policy::resolved_dark(mode);
+    if let Some(dark) = resolved {
+        crate::ui::style_iced_adapter::set_dark_mode(dark);
+        #[cfg(feature = "autodown")]
+        crate::ui::autodown_editor::retheme_all_fence_buffers();
+    }
+    crate::ui::iced::snapshot::invalidate_all();
+    let inputs = crate::ui::theme_policy::current().map(|p| p.snapshot().host_inputs());
+    for app in state.apps.values_mut() {
+        if let Some(inputs) = inputs.as_ref() {
+            if app.component.theme_scope().is_some() {
+                app.component.set_host_theme_inputs(inputs.clone());
+                *app.state.view_dirty.borrow_mut() = true;
+                continue;
+            }
+        }
+        // legacy 链：adapter 档已全局生效，这里回写 App 级 dark_mode 状态变量
+        // （458 语义：运行时变量每帧回写全局，不同步则被旧值翻回）。
+        if let Some(dark) = resolved {
+            if app.component.read_state("dark_mode").is_ok() {
+                let _ = app
+                    .component
+                    .write_state("dark_mode", auto_val::Value::Bool(dark));
+            }
+        }
+        *app.state.view_dirty.borrow_mut() = true;
+    }
+}
+
+/// PLAN-053 T-02：shell 主题状态面推送（`__theme_*` 模型变量，desktop.at
+/// 消费）——family/mode/rev + 每应用状态行（in-proc 现算 + outproc 结果表）。
+/// `error: Option<&str>` 非空 = 具名拒绝/落盘失败诊断（进 `__theme_error`）。
+/// host.rs ServiceTick 经脏位消费同一入口（同值零写，变更检测内置）。
+pub(crate) fn sync_theme_shell_state(
+    state: &mut crate::ui::session::DesktopSession,
+    error: Option<&str>,
+) {
+    let policy = crate::ui::theme_policy::current();
+    let (family, mode, rev) = match &policy {
+        Some(p) => (p.family.clone(), p.mode.clone(), p.rev),
+        None => (String::new(), String::new(), 0),
+    };
+    // in-proc App 状态：scope 在场（采纳者）→ 与已提交策略比对 + eval 注册
+    // 表读回；legacy → 随 adapter 档（applied 语义 = 全局档生效）。
+    let mut rows: Vec<String> = Vec::new();
+    let registry_names: std::collections::HashMap<u64, String> = state
+        .host
+        .as_ref()
+        .map(|h| {
+            h.wm
+                .wins
+                .iter()
+                .filter_map(|(_wid, w)| w.registry_id.clone().map(|id| (w.app.0, id)))
+                .collect()
+        })
+        .unwrap_or_default();
+    for (id, app) in state.apps.iter() {
+        let name = registry_names
+            .get(&id.0)
+            .cloned()
+            .unwrap_or_else(|| format!("app-{}", id.0));
+        match app.component.theme_scope() {
+            Some(scope) => {
+                let status = match (&policy, crate::ui::theme_policy::last_scope_eval(scope.id()))
+                {
+                    (Some(p), _) if scope.family_name() == p.family => "applied".to_string(),
+                    (Some(_), Some((false, reason))) => format!("rejected: {reason}"),
+                    (Some(_), _) => "pending".to_string(),
+                    (None, _) => "idle".to_string(),
+                };
+                rows.push(format!("{name}={status}"));
+            }
+            None => rows.push(format!("{name}=legacy")),
+        }
+    }
+    for (name, status, detail) in state.theme_outproc_status.borrow().iter() {
+        if detail.is_empty() {
+            rows.push(format!("{name}={status}"));
+        } else {
+            rows.push(format!("{name}={status}: {detail}"));
+        }
+    }
+    rows.sort();
+    rows.dedup();
+    // 摘要头（family@mode rev=N）+ 每应用状态行；未激活 = 仅行集（恒空串）。
+    let status = if policy.is_some() {
+        format!(
+            "{}@{} rev{}; {}",
+            family,
+            mode,
+            rev,
+            rows.join(", ")
+        )
+    } else {
+        rows.join(", ")
+    };
+    if let Some(panel) = state.desktop.desktop_app {
+        if let Some(app) = state.apps.get_mut(&panel) {
+            // 变更检测写（ServiceTick 周期调用——同值零写零标脏，防逐帧重建）。
+            let reads = (
+                app.component.read_state("__theme_family").ok(),
+                app.component.read_state("__theme_mode").ok(),
+                app.component.read_state("__theme_rev").ok(),
+                app.component.read_state("__theme_status").ok(),
+                app.component.read_state("__theme_error").ok(),
+            );
+            let want = (
+                Some(auto_val::Value::str(&family)),
+                Some(auto_val::Value::str(&mode)),
+                Some(auto_val::Value::Int(rev as i32)),
+                Some(auto_val::Value::str(&status)),
+                Some(auto_val::Value::str(error.unwrap_or(""))),
+            );
+            if reads == want {
+                return;
+            }
+            let _ = app
+                .component
+                .write_state("__theme_family", auto_val::Value::str(&family));
+            let _ = app
+                .component
+                .write_state("__theme_mode", auto_val::Value::str(&mode));
+            let _ = app
+                .component
+                .write_state("__theme_rev", auto_val::Value::Int(rev as i32));
+            let _ = app
+                .component
+                .write_state("__theme_status", auto_val::Value::str(&status));
+            let _ = app.component.write_state(
+                "__theme_error",
+                auto_val::Value::str(error.unwrap_or("")),
+            );
+            *app.state.view_dirty.borrow_mut() = true;
+        }
     }
 }
 
@@ -3051,6 +3259,52 @@ pub(super) fn apply_external_config_diff(
     cfg: &crate::ui::desktop_config::DesktopConfig,
 ) {
     let old = state.desktop.config.clone();
+    // PLAN-053 T-02：策略组差异 → 与 bus 动词**同一**策略核心入口（§5.2
+    // 双路径等价：外写 = 候选来源不同，校验/提交/发布序完全一致）。外写方
+    // 通常不持 version/digest——由宿主目录补全后参与校验；stage 全等判
+    // Unchanged（杀外写回环）、拒绝具名状态面、提交改写候选字段并落盘
+    // （补全值 + rev 是宿主权威事实；落盘后 mtime 变化一次，下轮 poll
+    // 内容相等早退收敛）。
+    let policy_diff = cfg.theme_family != old.theme_family
+        || cfg.theme_mode != old.theme_mode
+        || cfg.theme_family_version != old.theme_family_version
+        || cfg.theme_family_digest != old.theme_family_digest;
+    if policy_diff {
+        let mut candidate = cfg.clone();
+        match crate::ui::theme_policy::catalog() {
+            Some(cat) => {
+                candidate.theme_family_version = Some(cat.version.clone());
+                candidate.theme_family_digest = Some(cat.digest.clone());
+            }
+            None => {
+                candidate.theme_family_version = None;
+                candidate.theme_family_digest = None;
+            }
+        }
+        match crate::ui::theme_policy::stage_candidate(&mut candidate) {
+            crate::ui::theme_policy::PolicyOutcome::Staged(staged) => {
+                state.desktop.config = candidate.clone();
+                if crate::ui::desktop_config::save(&state.desktop.config).is_ok() {
+                    let mode = candidate.theme_mode.clone().unwrap_or_default();
+                    let rev = crate::ui::theme_policy::publish_staged(staged);
+                    apply_theme_policy_effect(state, &mode, rev);
+                    state.broadcast_theme_policy();
+                    sync_theme_shell_state(state, None);
+                } else {
+                    sync_theme_shell_state(
+                        state,
+                        Some("save-failed: 外写策略落盘失败——保旧 policy"),
+                    );
+                }
+            }
+            crate::ui::theme_policy::PolicyOutcome::Rejected(reason) => {
+                sync_theme_shell_state(state, Some(&format!("rejected: {reason}")));
+            }
+            crate::ui::theme_policy::PolicyOutcome::Unchanged => {
+                // 盘面与已提交策略语义全等：内存镜像保持权威，无需动作。
+            }
+        }
+    }
     if cfg.dock_position != old.dock_position || cfg.dock_enabled != old.dock_enabled {
         state.desktop.config.dock_position = cfg.dock_position.clone();
         state.desktop.config.dock_enabled = cfg.dock_enabled;

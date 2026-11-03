@@ -186,11 +186,15 @@ impl<'a> ProtocolHost<'a> {
         let actions = self.endpoint.on_message(msg.clone())?;
         for action in actions {
             match action {
+                // PLAN-053 T-03：结果落点在桌面会话状态面（broker 臂）；
+                // legacy 单客户端 host 无主题状态面（no-op 收尾）。
+                HostAction::ThemePolicyResult { .. } => {}
                 HostAction::ResolveAndAttach {
                     app_name,
                     title,
                     width,
                     height,
+                    theme_caps,
                     ..
                 } => {
                     // ① 编译装载（独立模式下这一步 = spawn exe，Stage 2）。
@@ -247,6 +251,19 @@ impl<'a> ProtocolHost<'a> {
                         shm: Some(shm_name),
                         bm,
                     }));
+                    // PLAN-053 T-03：attach 即最新完整快照（能力门 + 策略激活）。
+                    if theme_caps.iter().any(|c| c == "theme-policy/1") {
+                        if let Some(policy) = crate::ui::theme_policy::current() {
+                            let snap = policy.snapshot();
+                            let rev = snap.revision;
+                            self.to_app.push(ProtocolMsg::Control(
+                                super::message::ControlMsg::ThemePolicyPush {
+                                    revision: rev,
+                                    record: snap.encode_record(),
+                                },
+                            ));
+                        }
+                    }
                 }
                 HostAction::ComposeFrame {
                     surface,
@@ -688,6 +705,8 @@ mod tests {
             height: 320.0,
             fonts: vec![],
             surfaces: Vec::new(),
+                theme_caps: Vec::new(),
+
         });
         host.handle(&hello).unwrap();
         assert_eq!(
