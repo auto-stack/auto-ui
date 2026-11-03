@@ -1,6 +1,6 @@
 ---
 plan_id: PLAN-034
-status: reviewed
+status: archived
 feature_name: AutoGraphics3D纹理资源与节点动画作者接线
 author: [Codex]
 created_at: 2026-11-03
@@ -161,6 +161,8 @@ AG015和035最终分别固定本计划实际delivery/Spec，不消费开发tip�
 round记录：T-01来源/原件/锁/树全部核验并登记（REGISTRY.md）；T-02候选A成立并冻结（resource-meta公共导入元数据与原链字节一致6da9227e/47fc0bef；CLI三步/构造/clip具名/pose/装配身份/快照输入/模型body）；T-03 gates 15/15（三步再生成与提交产品字节一致+9类具名拒绝）；T-04纹理+动画作者档10夹具全链+flow 4/4真Auto/GPU+g10a九项oracle复刻4测试全绿（uv 24探针容差2/深度双面ROI/同根异闭包/生命周期全链含失败保真与保存重开）；旧档冻结维持（verify_plan030 32检查全过）。改动后主checkout并发主题WIP（另一会话036）未触碰。GPU门单实例--test-threads=1。
 
 2026-11-03 / stage: goal | plan_id: PLAN-034 | plan_revision: r1 | round: 2 | from: work | to: review | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-034/auto-ui | commit: 723eecd3 | next: review
+
+2026-11-03 / stage: merge | PLAN-034:r1 | outcome: pass | checkpoints: prepared（SD-01候选=worktree 723eecd3/f77d26c0）、landed（rebase master 6f4bcfae后ff-only；old→new映射9b188075→2c2fe2e0/0a8c04a6→a085d3c6/86c0b553→9f9bbcde/1324077c→105568d4/7d679718→a2dfe2b3/d2c91516→a26f105e/723eecd3→f77d26c0/5894987b→93eaa907；range-diff 8/8全等=安全改写证明；master新提交PLAN-053（crates/auto-ui-runtime+host-theme docs）不在pilot/driver依赖图内→绿证据输入不变沿用）、canonical_verified（docs/specs/auto-graphics/gallery-node3d-textures-and-animation.md落主sha256前16=93e9ae2a191fed64，与worktree逐字节同；主checkout冒烟=pilot+driver构建绿+verify_plan034 --controls 7控制PASS@93eaa907）、archived（本文件，completion_kind: delivered）、cleaned（见尾收据） | delivery_commit: 93eaa907 | canonical: docs/specs/auto-graphics/gallery-node3d-textures-and-animation.md | 旧档并集：verify_plan030 32检查（old_profile_freeze控制）维持
 
 2026-11-03 / stage: review | review_scope: final | reviewer_identity/limitations: 实现同会话复核（计划未授权创建独立agent）；判定自工件重建而非执行者摘要（verifier/测试/源码锚点全部本审查重跑重读） | plan_id: auto-ui/PLAN-034 | plan_revision: r1 | outcome: pass（reviewed） | worktree_path: D:/autostack/.wt/ui-034/auto-ui | branch: codex/plan-034-dev | reviewed_commit: 5894987b | base_commit: fa01bd79 | dependency_revisions: auto-lang 593c33480只读、SDK 681文件摘要998fbe3e、ag-examples ee23afe只读 | spec_inputs: SD-01候选=docs/specs/auto-graphics/gallery-node3d-textures-and-animation.md（worktree内，merge落canonical；与实现一致：profile名/三步CLI/clip三形/pose文档id/模型body/32分支输入面/消费合同） | acceptance_results: AC-01 pass（gates 15/15 V-S01含双同定义独立行表+恰一角色拒绝）；AC-02 pass（flow 4/4真Auto/GPU+g10a九项+g10b八项：f64独立reference 21态×2行逐顶点<2e-5、轮廓≤2、朝向7例<1e-5、240Tick trace同、并集8身份150787B）；AC-03 pass（last-good整帧+像素保真、精确恢复、Stop还原编辑态、新局初帧逐字）；AC-04 pass（预算fault10未触发、暖账0、callback高水界内）；AC-05 pass附持名保留①②（§10 D-04：共享store离屏互异待可出像素环境复核；运行期46/33/token由006已交付门钉住、本片生成期具名拦截等价类+33计费作者夹具真fault）；AC-06 pass（A→B冷再生10产品逐字节自足闭包、保存/搬移/重开/坏依赖拒绝恢复、SD-01候选+AG015/035消费合同）；AC-07 pass（本审查：10处gate reject锚点与源码拒绝消息对读、driver document/load_declared准入锚点在位、diff范围=experimental/+docs/无越界、F1构建物已修） | pending_closeout_gates: AC-08/09（merge：canonical核验落档、归档导航、fresh guard清树、真实交付身份） | findings: F1（closeout缺陷，已修5894987b：__pycache__/pyc误入commit→git rm+gitignore，修复后verifier 7控制+29测试全绿复跑） | evidence: 本审查重跑记录=verify_plan034 --controls PASS 7控制、flow4/oracles4/oracles_anim6/gates15全绿（5894987b） | next: merge（T-08..T-10）
 
