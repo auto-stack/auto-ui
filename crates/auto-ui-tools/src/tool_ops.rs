@@ -179,6 +179,15 @@ fn generate_profile(
                     ),
                 ));
             }
+            // PLAN-036 T-04（AC-01/V-01）：generate_ui vue 工具链入口与
+            // run/build 同律前置准入——声明官方包非法即具名拒绝。
+            let gate_project = crate::vue::VueProject::from_workspace_with_request(root, request)
+                .map_err(|e| ToolError::internal(format!("project context failed: {e}")))?;
+            if let Some(app_dir) = gate_project.app_dir() {
+                crate::theme_package::admit_generation_theme_inputs(&app_dir)
+                    .map_err(ToolError::internal)?;
+            }
+            drop(gate_project);
             crate::vue::incremental_compile_changed(root, Some(request))
                 .map_err(|e| ToolError::internal(format!("incremental compile failed: {e}")))?;
             let project = crate::vue::VueProject::from_workspace_with_request(root, request)
@@ -194,6 +203,11 @@ fn generate_profile(
                 project
                     .ensure_code_editor_component()
                     .map_err(|e| ToolError::internal(format!("self-heal failed: {e}")))?;
+                // PLAN-036 T-04（AC-03/V-04）：既有工程自愈路径补生成输入 receipt
+                // （与 run/regen 同律；写失败=消费失败）。
+                project
+                    .write_theme_inputs_receipt()
+                    .map_err(|e| ToolError::internal(format!("theme receipt failed: {e}")))?;
             }
         }
         "rust" => {

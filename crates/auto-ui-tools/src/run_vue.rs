@@ -123,17 +123,9 @@ pub fn run_vue_flow(
     // PLAN-031 T-04/T-07（V-09）：生成准入——App 声明了官方主题包，必须先
     // 校验 owner/版本/schema/文件 hash 才允许生成；非法（错版/缺件/篡改）
     // 具名中止，不留半成品、不静默回落别的来源。
+    // PLAN-036 T-04：准入消息收敛到共享 helper（run/build/gen 三轨同律）。
     if let Some(app_dir) = project.app_dir() {
-        match crate::theme_package::verify_app_theme_inputs(&app_dir) {
-            Ok(_) => {}
-            Err(e) => {
-                return Err(format!(
-                    "主题包生成准入失败（{}）：{e}——修正 packages/themes 的清单/hash 后重试",
-                    app_dir.display()
-                )
-                .into());
-            }
-        }
+        crate::theme_package::admit_generation_theme_inputs(&app_dir)?;
     }
 
     let mut current_step = 0u64;

@@ -5185,6 +5185,10 @@ export default router
 
         println!("{}", "✓ Generated project files".bright_green());
 
+        // PLAN-036 T-04（V-01/AC-03）：fresh 生成路径同样落生成输入 receipt——
+        // 修复此前只有 run/增量/regen 路径写 receipt 的缺口；未声明=Ok(()) 旧行为。
+        self.write_theme_inputs_receipt()?;
+
         Ok(())
     }
 
@@ -6758,6 +6762,12 @@ fn prepare_vue_sources(
         Some(r) => VueProject::from_workspace_with_request(root_dir, r)?,
         None => VueProject::from_workspace(root_dir)?,
     };
+
+    // PLAN-036 T-04（AC-01/V-01）：build/gen 生成路径与 run 路径同律前置准入——
+    // 声明官方包就必须校验通过，非法具名中止（不发半成品）。
+    if let Some(app_dir) = project.app_dir() {
+        crate::theme_package::admit_generation_theme_inputs(&app_dir)?;
+    }
 
     // Plan 351: drain stashed store composable files and write them
     for (filename, content) in auto_lang_core::drain_store_extra_files() {
@@ -14804,5 +14814,103 @@ mod plan842_retired_palette_controls {
         fn index_css_secondary_is_differentiated_from_muted() {
             super::verify_palette_and_active_scaffold("tauri", false);
         }
+    }
+}
+
+/// PLAN-036 T-04（V-01/AC-03）：fresh generate() 路径同样写生成输入 receipt；
+/// 声明包篡改时 generate 失败（消费失败而非警告成功）；未声明零 receipt。
+#[cfg(test)]
+mod plan036_fresh_generate_receipt_tests {
+    use super::*;
+
+    fn pkg_source() -> std::path::PathBuf {
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../packages/themes")
+    }
+
+    fn app_with_dep(root: &std::path::Path) -> std::path::PathBuf {
+        let pkg_dir = root.join("vendor/themes");
+        crate::theme_package::publish_theme_package_snapshot(&pkg_source(), &pkg_dir)
+            .expect("snapshot publish");
+        fs::write(
+            root.join("pac.at"),
+            "name: \"t36\"
+version: \"0.1.0\"
+dep themes {
+    path: \"vendor/themes\"
+}
+",
+        )
+        .unwrap();
+        let front = root.join("src").join("front");
+        fs::create_dir_all(&front).unwrap();
+        fs::write(
+            front.join("app.at"),
+            "widget App {
+    view { text \"hi\" }
+}
+",
+        )
+        .unwrap();
+        pkg_dir
+    }
+
+    #[test]
+    fn fresh_generate_writes_theme_receipt_with_identity() {
+        let tmp = tempfile::tempdir().unwrap();
+        let pkg_dir = app_with_dep(tmp.path());
+        let project = VueProject::from_workspace(tmp.path()).expect("load");
+        let out = project.output_dir.clone();
+        project.generate().expect("fresh generate");
+        let receipt = out.join(".theme-inputs.json");
+        assert!(receipt.exists(), "fresh generate 必须写生成输入 receipt");
+        assert!(
+            crate::theme_package::read_theme_inputs_identity(&out).is_some(),
+            "receipt 必须携带语义身份"
+        );
+        drop(pkg_dir);
+    }
+
+    #[test]
+    fn fresh_generate_fails_named_when_package_tampered_after_load() {
+        let tmp = tempfile::tempdir().unwrap();
+        let pkg_dir = app_with_dep(tmp.path());
+        let project = VueProject::from_workspace(tmp.path()).expect("load against valid package");
+        let bytes = fs::read(pkg_dir.join("themes.at")).unwrap();
+        let mut bad = bytes.clone();
+        bad[bytes.len() / 2] ^= 0x01;
+        fs::write(pkg_dir.join("themes.at"), &bad).unwrap();
+        let err = project
+            .generate()
+            .expect_err("篡改包必须让 generate 具名失败（消费失败，不警告后成功）");
+        assert!(
+            format!("{err}").contains("主题包"),
+            "应具名主题包错误: {err}"
+        );
+    }
+
+    #[test]
+    fn undeclared_app_generate_has_no_receipt() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        fs::write(root.join("pac.at"), "name: \"u\"
+version: \"0.1.0\"
+").unwrap();
+        let front = root.join("src").join("front");
+        fs::create_dir_all(&front).unwrap();
+        fs::write(
+            front.join("app.at"),
+            "widget App {
+    view { text \"hi\" }
+}
+",
+        )
+        .unwrap();
+        let project = VueProject::from_workspace(root).expect("load");
+        let out = project.output_dir.clone();
+        project.generate().expect("undeclared generate keeps legacy behavior");
+        assert!(
+            !out.join(".theme-inputs.json").exists(),
+            "未声明官方包 = 零 receipt 文件（旧行为）"
+        );
     }
 }

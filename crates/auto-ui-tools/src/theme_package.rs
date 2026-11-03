@@ -249,3 +249,18 @@ pub fn theme_file_sha256(path: &std::path::Path) -> Result<String, ThemePackageE
     h.update(&bytes);
     Ok(format!("{:x}", h.finalize()))
 }
+
+/// PLAN-036 T-04（AC-01/V-01）：全部 Vue 生成/构建/run 入口共用的准入消息——
+/// 声明官方包就必须校验通过；非法具名中止（不发半成品，C-11）。
+pub(crate) fn admit_generation_theme_inputs(
+    app_dir: &std::path::Path,
+) -> Result<(), String> {
+    verify_app_theme_inputs(app_dir)
+        .map(|_| ())
+        .map_err(|e| {
+            format!(
+                "主题包生成准入失败（{}）：{e}——修正 packages/themes 的清单/hash 后重试",
+                app_dir.display()
+            )
+        })
+}

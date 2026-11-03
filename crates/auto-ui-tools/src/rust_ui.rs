@@ -6484,10 +6484,15 @@ fn front_generator_identity(context: &GeneratedBuildContext) -> String {
 
 /// Declared front input set (content identity, never mtime): pac.at + the
 /// .at set under the front dir + rust_sidecar module sources.
+/// PLAN-036 T-04（AC-03/V-04/V-06）：声明了官方主题包的 App 额外登记统一输入
+/// 身份（`theme/content` + `theme/identity`，见 [`theme_input_entries`]）——
+/// 包内容/能力变化必使输入集变化（同 mtime 同样生效），旧 receipt 缺键 =
+/// inputs_match 不成立 = 安全重建；必需主题输入读/验失败 = 具名错误中止，
+/// 绝不静默跳过后签发 reduced 身份。未声明 = 无键（旧行为）。
 fn front_input_hashes(
     project_dir: &Path,
     source: &PacSource,
-) -> std::collections::BTreeMap<String, String> {
+) -> AutoResult<std::collections::BTreeMap<String, String>> {
     use std::collections::BTreeMap;
     let mut inputs = BTreeMap::new();
     let mut record = |abs: &Path| {
@@ -6511,7 +6516,27 @@ fn front_input_hashes(
     for (_, rel) in &sidecar.modules {
         record(&project_dir.join(rel));
     }
-    inputs
+    for (key, digest) in theme_input_entries(project_dir)? {
+        inputs.insert(key, digest);
+    }
+    Ok(inputs)
+}
+
+/// PLAN-036 T-04：外部官方主题包闭包——统一输入身份作为必需生成输入。
+/// 未声明 = Ok(空)；声明了但校验/读失败 = 具名 Err（必需输入，不跳过）。
+fn theme_input_entries(
+    project_dir: &Path,
+) -> AutoResult<std::collections::BTreeMap<String, String>> {
+    let mut entries = std::collections::BTreeMap::new();
+    if let Some(root) = crate::theme_package::verify_app_theme_inputs(project_dir)
+        .map_err(|e| format!("主题包生成输入解析失败（{}）：{e}", project_dir.display()))?
+    {
+        let identity = crate::theme_package::verified_theme_input_identity(&root)
+            .map_err(|e| format!("主题包生成输入身份失败（{}）：{e}", root.display()))?;
+        entries.insert("theme/content".to_string(), identity.content_digest);
+        entries.insert("theme/identity".to_string(), identity.identity_digest);
+    }
+    Ok(entries)
 }
 
 /// Write (or refresh) the front member's content-identity receipt. Called at
@@ -6538,7 +6563,7 @@ fn write_front_receipt_with_inputs(
     artifact: Option<(&Path, &str)>,
     generation_time_inputs: Option<std::collections::BTreeMap<String, String>>,
 ) -> AutoResult<()> {
-    let current_inputs = front_input_hashes(project_dir, source);
+    let current_inputs = front_input_hashes(project_dir, source)?;
     if let Some(frozen) = &generation_time_inputs {
         if frozen != &current_inputs {
             return Err("front inputs changed during generation/build; receipt withheld".into());
@@ -6583,19 +6608,19 @@ fn front_needs_regeneration(
     project_dir: &Path,
     managed: &ManagedFront,
     source: &PacSource,
-) -> (bool, bool) {
+) -> AutoResult<(bool, bool)> {
     let cargo_toml = managed.member_dir.join("Cargo.toml");
     let main_rs = managed.member_dir.join("src").join("main.rs");
     if !cargo_toml.exists() || !main_rs.exists() {
-        return (true, true);
+        return Ok((true, true));
     }
     if let Ok(content) = fs::read_to_string(&cargo_toml) {
         if !content.contains("default = [\"ui-iced\"]") {
-            return (true, true);
+            return Ok((true, true));
         }
     }
     let Some(receipt) = FrontReceipt::read(&managed.member_dir) else {
-        return (true, true);
+        return Ok((true, true));
     };
     // The member manifest is a pure function of (pac, identity): recompute
     // and compare so a generator change to the manifest shape never leaves a
@@ -6611,17 +6636,17 @@ fn front_needs_regeneration(
         };
         let expected = generate_cargo_toml(&project_name, project_dir, source);
         if fs::read_to_string(&cargo_toml).ok().as_deref() != Some(expected.as_str()) {
-            return (true, true);
+            return Ok((true, true));
         }
     }
-    let current = front_input_hashes(project_dir, source);
+    let current = front_input_hashes(project_dir, source)?;
     if !receipt.inputs_match(project_dir, &current) {
-        return (false, true);
+        return Ok((false, true));
     }
     if receipt.generator != front_generator_identity(&managed.context)
         || receipt.context_id != managed.context.context_id
     {
-        return (false, true);
+        return Ok((false, true));
     }
     // Workspace lock three-state freshness (same rule family as the Web
     // gate; a materialized lock change invalidates reuse).
@@ -6633,9 +6658,9 @@ fn front_needs_regeneration(
     match (receipt.workspace_lock.as_deref(), current_lock.as_deref()) {
         (Some(recorded), Some(current_value)) if recorded == current_value => {}
         (None, None) => {}
-        _ => return (false, true),
+        _ => return Ok((false, true)),
     }
-    (false, false)
+    Ok((false, false))
 }
 
 /// Managed cargo BUILD with artifact capture: `--message-format=json-render-
@@ -6818,8 +6843,8 @@ fn build_rust_ui_inner(project_dir: &Path, source: &PacSource) -> AutoResult<()>
     // retired); cargo runs with pinned context env/cwd.
     let managed = resolve_managed_front(project_dir)?;
     let rust_dir = managed.member_dir.clone();
-    let frozen_inputs = front_input_hashes(project_dir, source);
-    let (full, code) = front_needs_regeneration(project_dir, &managed, source);
+    let frozen_inputs = front_input_hashes(project_dir, source)?;
+    let (full, code) = front_needs_regeneration(project_dir, &managed, source)?;
 
     if full {
         println!("{}", "Generating Rust UI project...".bright_cyan());
@@ -6945,8 +6970,8 @@ fn run_rust_ui_inner(project_dir: &Path, args: Vec<String>, source: &PacSource) 
     // order) under its PLAN-910 identity dir; freshness is content-based.
     let managed = resolve_managed_front(project_dir)?;
     let rust_dir = managed.member_dir.clone();
-    let frozen_inputs = front_input_hashes(project_dir, source);
-    let (full, code) = front_needs_regeneration(project_dir, &managed, source);
+    let frozen_inputs = front_input_hashes(project_dir, source)?;
+    let (full, code) = front_needs_regeneration(project_dir, &managed, source)?;
 
     if full {
         println!("{}", "Generating Rust UI project...".bright_cyan());
@@ -10099,6 +10124,62 @@ test-cases = []
         assert!(
             delivery_cargo.contains("auto-lang-core = { path = \"../crates/auto-lang-core\" }"),
             "交付 app 直依赖 canonical SDK: {delivery_cargo}"
+        );
+    }
+}
+
+/// PLAN-036 T-04（V-04/V-06）：外部主题包闭包进 front inputs 的单测——
+/// 声明=content/identity 双键；未声明=空；篡改=具名 Err（不签 reduced 身份）。
+#[cfg(test)]
+mod plan036_theme_input_tests {
+    use super::*;
+
+    fn pkg_source() -> std::path::PathBuf {
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../packages/themes")
+    }
+
+    fn write_app(root: &std::path::Path, dep: bool) {
+        let pac = if dep {
+            "name: \"t\"\nversion: \"0.1.0\"\ndep themes {\n    path: \"vendor/themes\"\n}\n"
+        } else {
+            "name: \"u\"\nversion: \"0.1.0\"\n"
+        };
+        std::fs::write(root.join("pac.at"), pac).unwrap();
+    }
+
+    #[test]
+    fn theme_input_entries_follow_identity_and_reject_tamper() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        let pkg = root.join("vendor/themes");
+        crate::theme_package::publish_theme_package_snapshot(&pkg_source(), &pkg).unwrap();
+        write_app(root, true);
+
+        let entries = theme_input_entries(root).expect("declared package resolves");
+        assert_eq!(entries.len(), 2, "content+identity 双键");
+        let id = crate::theme_package::verified_theme_input_identity(&pkg).unwrap();
+        assert_eq!(entries.get("theme/content"), Some(&id.content_digest));
+        assert_eq!(entries.get("theme/identity"), Some(&id.identity_digest));
+
+        // 未声明 = 空（旧行为，零主题键）。
+        let tmp2 = tempfile::tempdir().unwrap();
+        write_app(tmp2.path(), false);
+        assert!(theme_input_entries(tmp2.path()).unwrap().is_empty());
+
+        // 篡改（等长字节翻转）= 具名 Err——必需输入失败不静默跳过、不签 reduced 身份。
+        let bytes = std::fs::read(pkg.join("themes.at")).unwrap();
+        let mut bad = bytes.clone();
+        bad[bytes.len() / 2] ^= 0x01;
+        std::fs::write(pkg.join("themes.at"), &bad).unwrap();
+        let err = theme_input_entries(root).expect_err("tamper must abort");
+        assert!(format!("{err}").contains("主题包"), "{err}");
+
+        // 恢复合法后可再次真实消费（AC-04 恢复语义）。
+        std::fs::write(pkg.join("themes.at"), &bytes).unwrap();
+        assert_eq!(
+            theme_input_entries(root).unwrap(),
+            entries,
+            "恢复后身份与篡改前一致"
         );
     }
 }
