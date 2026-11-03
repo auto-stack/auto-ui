@@ -47,6 +47,19 @@
 - 其余 **24** 个编号目录（B2 十二 + B3 十二）的主题接入 = 已确认后继
   批次，逐 app 独立状态；不能以框架完成或前几批完成冒称 examples 全量
   接入。既有身份（002/005/003/010 与本批六）不并入后续批次重复迁移。
+- **渠道与支持面（PLAN-036 交接，不扩历史交付）**：B1 十例的既有交付
+  不变；新渠道（Full SDK `sdk/packages/themes/`、交付根 `packages/themes/`、
+  全入口准入与统一输入身份）自本计划起对后继批次可用，采用新渠道的后继
+  验收以后继计划 own 合同为准。交接对象与状态：**OS053** 已归档交付
+  （calc `vendor/themes` 固定快照 digest `9fa07742…` 与本源逐位一致——
+  本包冻结内容摘要算法，宿主策略值不受影响；升级 = UI 发新快照 +
+  calc 重验）；**语言 918** 已归档（其 canonical
+  `delivery-admission-and-boundary-policy.md` 生效：本包主题输入为 UI
+  owner 加法字段、无新 cargo 依赖边；本包落地后 modularity audit baseline
+  按其 §3 由变更 owner 重采样）；**B2** 尚未立约——可用入口/限制：单包
+  声明（`dep themes` 恰名）、`vendor/themes` 或已安装快照 path、生成输入
+  receipt 与移根/升级验收模板见
+  [正式主题包发行渠道与生成输入收口](../build/official-theme-delivery-and-inputs.md)。
 - 批次顺序按真实依赖：基础控件/表单 → 列表/卡片/导航 → 复杂业务/编辑/
   媒体；共享 `stylekit` 与验证夹具（`remote-frame-e2e`、032）按来源保持
   义务，不按业务 app 强套主题。

@@ -48,23 +48,47 @@
 - 发行快照（`publish_theme_package_snapshot(src, dest)`）：先按官方身份校验源包，
   失败零写入；只复制清单 + 清单列出的文件到独立根（如 `vendor/themes`），再对
   快照做同标准校验——快照可脱离源根独立使用，不含 README 等非发行件。
+  **目标目录非空即具名拒绝**（未知内容零合并、零覆盖；换装由调用方以独立
+  staging+swap 完成）。
 - 内容摘要（`theme_package_content_digest`）：清单列出文件按路径排序后聚合
   sha256。**与绝对根无关**（同包搬根不变）、**与 mtime 无关**（内容不变即不变）。
-- 开发期用显式 dep path 指向本仓包；外部消费者**规划**经受管 source/SDK/
-  delivery 渠道取得固定版本快照——目前只交付了可调用的快照发布/校验/摘要
-  原语与第二根真实构建验证，渠道接线本身尚未落地（见 §7）。该快照不是第二套可编辑权威源，也不需要新 registry 或网络
-  发布。
+  **算法冻结**：OS053 固定快照（auto-calc `vendor/themes`，digest
+  `9fa07742…bef838e`）与宿主 `theme_family_digest` 策略绑定现值。
+- 语义身份（`theme_package_identity`，PLAN-036）：在内容摘要之上纳入清单身份
+  与能力元数据（owner/package/version/schema/module/families 含 default）。
+  字段顺序/空白/families 排列规范化后不变；能力、身份或文件集合变化必使身份
+  变化，即使同版本同内容摘要。
+- 发行渠道（PLAN-036 接线）：Man Full 安装 SDK 携带 `sdk/packages/themes/`
+  （安装事务 staging 内先按自描述清单核验身份与逐文件 sha256，坏包保旧回滚；
+  Core 恒零主题且 verify 具名拒绝）；`auto gen --delivery-root` 交付根携带
+  `packages/themes/` 快照并在 `delivery-manifest.json` 的 `theme_package` 节
+  记录身份/双摘要，随包 `verify.py` 重算校验。外部消费者以 dep path 指向
+  **已安装/已交付**的受管快照即可，不手工拷贝、不依赖兄弟检出或绝对开发根。
+  该快照不是第二套可编辑权威源，也不需要新 registry 或网络发布。
 
 ## 5. 生成准入与新鲜度（C-05）
 
 - 声明 `dep themes` 的 App，每次 Vue 生成/运行都会在 `<gen>/.theme-inputs.json`
-  写生成输入 receipt：`{schema, package:{owner,name,version,digest}}`。它回答
+  写生成输入 receipt：`{schema, package:{owner,name,version,digest,identity}}`
+  （PLAN-036 起含语义身份；旧 receipt 缺 `identity` 字段一律按不新鲜处理，
+  首次安全重验/重建，绝不当 fresh）。它回答
   "这次产物消费了哪个包内容"，是审计凭证，不是版本化清单。
-- 新鲜度按**内容摘要**判定，不按 mtime、不按主题名：
-  - 内容变更 + 清单 hash 同步更新（合法发布，`mtime` 可保持不变）→ 摘要变化，
-    生成取得新值；
+  **receipt 写失败 = 消费失败**（生成具名中止，不警告后成功）；未声明官方包
+  的 App 保持旧行为（零 receipt 文件）。
+- 生成准入覆盖**全部生成入口**（PLAN-036）：Vue run/build/gen-only/
+  generate_ui 工具链、VM 源码运行、Rust 生成/构建/复用——声明官方包就必须
+  先校验通过（错版/缺件/篡改具名中止，不发半成品）；dep 名必须恰为
+  `themes`（近似名/前缀词/其他 dep 块内的 `themes` 字样不误命中）。
+- 新鲜度按**内容摘要 + 语义身份**合判，不按 mtime、不按主题名：
+  - 内容变更 + 清单 hash 同步更新（合法发布，`mtime` 可保持不变）→ 内容与
+    语义身份变化，生成取得新值；
+  - 能力/身份元数据变化（同版本同内容）→ 语义身份变化 → 复用失效；
   - 内容变更但清单未更新（篡改）→ 准入具名拒绝；
-  - 内容未变 → 摘要稳定，不做无谓重写。
+  - 内容未变且身份未变 → 摘要稳定，不做无谓重写。
+- Rust 生成轨（PLAN-036）：统一输入身份作为**必需 front input** 键入
+  `FrontReceipt.inputs`（`theme/content` + `theme/identity`）；读/验失败 =
+  具名错误（不静默跳过后签发 reduced 身份）；生成期间输入漂移 → receipt
+  置扣（frozen-vs-current 规则沿用 910）；旧 receipt 缺键 = 不新鲜 = 安全重建。
 - 双端消费同一源：VM 由主题树解析语义色；Vue 由 `index.css` 的 `:root/.dark`
   与运行时 `THEME_PALETTES`/`__AUTO_TREE_THEMES__` 消费，值均为
   `H S% L%` 三段式，且首帧应用声明的默认族。
@@ -80,18 +104,31 @@
 ## 7. 边界（不冒充完成）
 
 - 不做远端 registry 发布、不做包签名体系；`registry`/`network` 不在本合同。
-- 语言侧 910 的 receipt/target 结构未改：本包把"包身份 + 内容摘要"做成 UI tools
-  的生成输入 receipt；是否并入语言生成缓存键属跨仓最小扩展，另立决策。
-- VM/Rust 生成轨（`auto build`）尚未接同一 receipt，仍按源码解析包内容。
-- 受管 source/SDK/delivery **发行渠道尚未接线**：当前交付的是快照发布
-  （`publish_theme_package_snapshot`）、校验与内容摘要原语，以及第二绝对根的
-  真实构建验证；由 SDK/安装器自动取得快照的通道属后继接线。
+- 语言侧 910 的 receipt **schema 未改**（PLAN-036 落地形态）：`FrontReceipt`
+  仍为 `generated-front-receipt/v1`，主题输入以**加法键**（`theme/content` +
+  `theme/identity`）进入既有 `inputs` 映射；旧 receipt 容错语义（缺键 = 不
+  新鲜）由语言侧既有防读规则承载，无迁移门。
+- VM/Rust 生成轨已接统一准入与输入身份（PLAN-036）；VM 源码运行不强造
+  Cargo 产物 receipt，以运行前准入校验证明本次所读包与输入一致。
+- 受管 source/SDK/delivery 发行渠道已接线（PLAN-036）：Full SDK
+  `sdk/packages/themes/` + delivery `packages/themes/` + 清单身份节。已具名
+  边界：**已安装 Full SDK 当前不含 `crates/auto-web`**（安装闭包按
+  workspace metadata 决定），从已安装工具链直接 `--delivery-root` 生成会被
+  producer 预检具名拒绝——发行交付的生成入口仍为工作树/driver 路径（792
+  验收面）；SDK 闭包扩展归 Man 发行 owner（816/832 谱系）后继决策。
 - 包内 `success/warning/info/error` 等语义槽的颜色仍由包数据决定；下游 App
   不得复制调色板，也不得把语义槽改成错误色。
 
 ## 8. 验收锚点
 
 - `theme_package_manifest`（compiler）、`theme_package_verify`（compiler）、
-  `theme_package_input`（tools，含 receipt/篡改/内容变更用例）。
+  `theme_package_input`（tools，含 receipt/篡改/内容变更/语义身份/解析精度/
+  非空拒绝/旧 receipt 容错用例，PLAN-036 扩至 12 测）。
 - 真实生成：010 的 `index.css` 与运行时变量逐值为 Auto/Solarized 包值；
   `v09-e2e` 脚本演示"合法改色→摘要变化+产物更新""篡改→准入拒绝"。
+- 渠道与输入收口（PLAN-036）：Full/real 安装 `man-install.py install|verify
+  --profile full`（含 `sdk/packages/themes` 必需件与 Core 具名反控，
+  `test_install_transaction.py` 9 测）；交付驱动 `generated-ui-consumer/
+  driver.py` V06 腿（vendor 快照→交付生成→清单身份节→verify.py→B 根
+  locked 构建→篡改具名红）；OS053 固定快照 digest 与 canonical 逐位一致
+  （`9fa07742…`）。
