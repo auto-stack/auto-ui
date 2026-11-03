@@ -1,0 +1,12 @@
+// PLAN-035 T-05 capacity spike: five buffered sound rows in one closeout is
+// outside the frozen <=4-request/callback audio domain; the bundle port must
+// refuse with the named fault 51 before any voice is created. The generated
+// sfx_play collector buffers exactly five rows so n=5 can reach this port.
+var ok=0
+var stepn=0
+fn app_start(){
+}
+fn app_update(dt float){
+ stepn=stepn+1
+ ok=ag_present3d(-1,0,0,0.0,0,0.0,5,stepn*5-4,0,1.0,stepn*5-3,0,1.0,stepn*5-2,0,1.0,stepn*5-1,0,1.0,1,"a",1,"b",1,"c",1,"d")
+}

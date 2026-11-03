@@ -1,0 +1,11 @@
+// PLAN-035 T-05 domain spike: a bundle sound row with gain 1.5 leaves the
+// frozen [0,1] gain domain; the audio put must refuse with the named
+// fault 54 and keep the last-good frame (no partial voice).
+var ok=0
+var stepn=0
+fn app_start(){
+}
+fn app_update(dt float){
+ stepn=stepn+1
+ ok=ag_present3d(-1,0,0,0.0,0,0.0,1,stepn,0,1.5,0,0,0.0,0,0,0.0,0,0,0.0,1,"a",1,"b",1,"c",1,"d")
+}

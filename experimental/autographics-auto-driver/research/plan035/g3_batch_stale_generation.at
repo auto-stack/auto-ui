@@ -1,0 +1,26 @@
+// PLAN-035 T-05 whole-batch spike on the proven candidate-B spawn pattern:
+// the three spawned coins are destroyed by one whole-batch despawn on tick 1
+// (green — all-or-nothing, no half-write); re-despawning the same handles on
+// tick 2 hits the stale generation and must refuse with the named fault —
+// no resurrection, no double destroy.
+var ok=0
+var stepn=0
+var c0=0
+var c1=0
+var c2=0
+fn app_start(){
+ ok=ag_char3_bind(1)
+ ok=ag_camera_orbit_3d(1,8.0,45.0,0,0.0)
+ c0=ag_object_spawn(0,4,0.2,0.0,-0.2)
+ c1=ag_object_spawn(1,5,-0.2,0.0,0.2)
+ c2=ag_object_spawn(2,6,0.3,0.0,0.3)
+}
+fn app_update(dt float){
+ stepn=stepn+1
+ if stepn==1 {
+  ok=ag_object_despawn_batch(3,c0,c1,c2,0,0,0,0,0)
+ }
+ if stepn==2 {
+  ok=ag_object_despawn_batch(3,c0,c1,c2,0,0,0,0,0)
+ }
+}

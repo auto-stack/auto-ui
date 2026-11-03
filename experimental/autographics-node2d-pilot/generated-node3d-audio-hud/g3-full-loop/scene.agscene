@@ -3,8 +3,8 @@
   "api": "autographics.components3d/1",
   "source": {
    "format": "auto-source",
-   "sha256": "8b614b618f3fae8c1c2a9aed1c610e8289a9afaec6ab785744f7bd872d763710",
-   "byte_length": 10270
+   "sha256": "e2429f334c8306acb4e6f9579ea5b4acb40bfa7cf0f851b7fc3eed002740895b",
+   "byte_length": 11081
   },
   "actors": {
    "two_d": null,
@@ -61,9 +61,9 @@
     4.0
    ],
    "scale": [
-    8.0,
+    4.0,
     1.0,
-    8.0
+    4.0
    ],
    "yaw": 0.0,
    "pitch": 0.0,
@@ -88,9 +88,9 @@
     4.0
    ],
    "scale": [
-    8.0,
+    4.0,
     1.0,
-    8.0
+    4.0
    ],
    "yaw": 0.0,
    "pitch": 0.0,
@@ -115,9 +115,9 @@
     4.0
    ],
    "scale": [
-    8.0,
+    4.0,
     1.0,
-    8.0
+    4.0
    ],
    "yaw": 0.0,
    "pitch": 0.0,
@@ -134,33 +134,6 @@
   },
   {
    "id": 5,
-   "name": "Main/hazard/zone",
-   "kind": "cylinder",
-   "translation": [
-    15.0,
-    0.5,
-    4.0
-   ],
-   "scale": [
-    2.0,
-    1.0,
-    2.0
-   ],
-   "yaw": 0.0,
-   "pitch": 0.0,
-   "rgba": [
-    0.9,
-    0.3,
-    0.2,
-    1.0
-   ],
-   "visible": false,
-   "parent": null,
-   "resource": null,
-   "sprite": null
-  },
-  {
-   "id": 6,
    "name": "Main/goal/banner",
    "kind": "model",
    "translation": [
@@ -187,7 +160,7 @@
    "sprite": null
   },
   {
-   "id": 7,
+   "id": 6,
    "name": "Main/voidz/pit",
    "kind": "cylinder",
    "translation": [
@@ -196,9 +169,9 @@
     4.0
    ],
    "scale": [
-    32.0,
+    16.0,
     1.0,
-    12.0
+    6.0
    ],
    "yaw": 0.0,
    "pitch": 0.0,
@@ -214,7 +187,7 @@
    "sprite": null
   },
   {
-   "id": 8,
+   "id": 7,
    "name": "Shard",
    "kind": "cylinder",
    "translation": [

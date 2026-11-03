@@ -45,20 +45,24 @@ var platform_deck_rows=[1,2,3]
 var coin_h=[0,0,0]
 var coin_alive=[1,1,1]
 var coin_slot=[0,1,2]
-var coin_template=[8,8,8]
+var coin_template=[7,7,7]
 var coin_pair=[0,1,2]
 var coin_px=[4.0,12.0,24.0]
 var coin_py=[1.0,1.0,1.0]
 var coin_pz=[4.0,2.0,4.0]
 // Hazard SoA (instance Main/hazard=0)
-var hazard_zone_subject_ids=[5]
-var hazard_zone_rows=[4]
+var hazard_h=[0]
+var hazard_slot=[3]
+var hazard_template=[7]
 // Goal SoA (instance Main/goal=0)
-var goal_banner_subject_ids=[6]
-var goal_banner_rows=[5]
+var goal_banner_subject_ids=[5]
+var goal_banner_rows=[4]
 // Void SoA (instance Main/voidz=0)
-var void_pit_subject_ids=[7]
-var void_pit_rows=[6]
+var void_p1=[0]
+var void_slot=[4]
+var void_template=[7]
+var void_pit_subject_ids=[6]
+var void_pit_rows=[5]
 // pooled fn count_text from hudmap
 fn hudmap_count_text(n int) str {
     if n == 0 {
@@ -91,6 +95,9 @@ fn main_lifetick(dt float) {
  }
  let n = ag_events_snapshot()
  r_bn = 0
+ r_b1 = 0
+ r_b2 = 0
+ r_b3 = 0
  if (0 < n) {
   let ph = ag_event_snap_phase(0)
   if (ph == 1) {
@@ -215,10 +222,28 @@ fn main_lifetick(dt float) {
   }
  }
  if (r_bn == 1) {
-  ag_object_despawn_batch(1, r_b1, 0, 0, 0, 0, 0, 0, 0)
+  if (r_b1 != 0) {
+   ag_object_despawn_batch(1, r_b1, 0, 0, 0, 0, 0, 0, 0)
+  }
+  if (r_b2 != 0) {
+   ag_object_despawn_batch(1, r_b2, 0, 0, 0, 0, 0, 0, 0)
+  }
+  if (r_b3 != 0) {
+   ag_object_despawn_batch(1, r_b3, 0, 0, 0, 0, 0, 0, 0)
+  }
  }
  if (r_bn == 2) {
-  ag_object_despawn_batch(2, r_b1, r_b2, 0, 0, 0, 0, 0, 0)
+  if (r_b1 != 0) {
+   if (r_b2 != 0) {
+    ag_object_despawn_batch(2, r_b1, r_b2, 0, 0, 0, 0, 0, 0)
+   }
+   if (r_b2 == 0) {
+    ag_object_despawn_batch(2, r_b1, r_b3, 0, 0, 0, 0, 0, 0)
+   }
+  }
+  if (r_b1 == 0) {
+   ag_object_despawn_batch(2, r_b2, r_b3, 0, 0, 0, 0, 0, 0)
+  }
  }
  if (r_bn == 3) {
   ag_object_despawn_batch(3, r_b1, r_b2, r_b3, 0, 0, 0, 0, 0)
@@ -322,13 +347,15 @@ fn coin_lifestart(i int) {
  ag_trigger_bind(coin_pair[i], player_body_subject_ids[0], 1, coin_h[i], 1, 0.55)
 }
 fn hazard_lifestart(i int) {
- ag_trigger_bind(3, player_body_subject_ids[0], 0, hazard_zone_subject_ids[i], 0, 0.0)
+ hazard_h[i] = ag_object_spawn(hazard_slot[i], hazard_template[i], 15.0, 0.5, 4.0)
+ ag_trigger_bind(3, player_body_subject_ids[0], 1, hazard_h[i], 1, 1.2)
 }
 fn goal_lifestart(i int) {
- ag_trigger_bind(4, player_body_subject_ids[0], 0, goal_banner_subject_ids[i], 1, 0.5)
+ ag_trigger_bind(4, player_body_subject_ids[0], 0, goal_banner_subject_ids[i], 1, 1.8)
 }
 fn void_lifestart(i int) {
- ag_trigger_bind(5, player_body_subject_ids[0], 0, void_pit_subject_ids[i], 0, 0.0)
+ void_p1[i] = ag_object_spawn(void_slot[i], void_template[i], 9.2, (-2.2), 2.0)
+ ag_trigger_bind(5, player_body_subject_ids[0], 1, void_p1[i], 1, 1.2)
 }
 fn get_r_taken() int {return r_taken}
 fn get_r_status() int {return r_status}
@@ -362,6 +389,10 @@ fn get_coin_h_2() int {return coin_h[2]}
 fn get_Main_cc_h() int {return coin_h[2]}
 fn get_coin_alive_2() int {return coin_alive[2]}
 fn get_Main_cc_alive() int {return coin_alive[2]}
+fn get_hazard_h_0() int {return hazard_h[0]}
+fn get_Main_hazard_h() int {return hazard_h[0]}
+fn get_void_p1_0() int {return void_p1[0]}
+fn get_Main_voidz_p1() int {return void_p1[0]}
 fn app_start() {
  coin_lifestart(0)
  coin_lifestart(1)

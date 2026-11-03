@@ -4,9 +4,18 @@
 // stateful nodes; all motion/clips/cue selection/count/win-fail/fresh
 // restart are author-owned (no business enums, no root state requirement
 // beyond the author's own names). Spawn (2,1,2) half 0.4/0.5/0.4; platforms
-// [0,8]/[10,18]/[20,28] x y[-1,0] x z[0,8]; lower void y[-4,-3]; hazard
-// [14,16]x[0,1]x[3,5]; coins (4,1,4)/(12,1,2)/(24,1,4); goal (26,1,6)
-// sphere 0.5; speed 4, gravity 20, jump 8, clearance 0.002 (the frozen
+// [0,8]/[10,18]/[20,28] x y[-1,0] x z[0,8]; lower void y[-4,-3] (aabb bind
+// margin 1.0 fires mid-fall, before the pit body top); hazard volume =
+// spawned invisible marker at (15,0.5,4) + sphere bind 1.2 — the proven coin
+// mechanism: on the 035 chain every scene cylinder is a physical sweep box
+// for the character (visible or not), so the static volume cylinder walled
+// the pinned z=2 crossing lane (distance to the marker on the lane is 1.5,
+// outside the 1.2 fire radius); coins
+// (4,1,4)/(12,1,2)/(24,1,4); goal (26,1,6)
+// sphere 1.8 (the banner is a physical box on this chain, so the matrix 0.5
+// fire radius is unreachable behind the wall; 1.8 keeps the coin-3 point
+// outside the ball — box distance 2.06 — while the 3/3 +x lane enters at
+// ~1.63); speed 4, gravity 20, jump 8, clearance 0.002 (the frozen
 // move3d clearance); camera initial distance 8 / pitch 30, drag orbit and
 // wheel zoom ride the host orbit admission [4,12]x[15,75].
 use resources: hero_glb, flag_glb
@@ -16,7 +25,7 @@ node Platform(cx: float, cz: float) {
     view-3d {
         cylinder3d deck {
             position: (.cx, -0.5, .cz)
-            scale: (8.0, 1.0, 8.0)
+            scale: (4.0, 1.0, 4.0)
             solid: true
         }
     }
@@ -46,17 +55,19 @@ node Coin(slot: SlotRef3D, template: TemplateRef3D, pair: PairRef3D, target: Act
     }
 }
 
-node Hazard(target: ActorRef3D) {
-    view-3d {
-        cylinder3d zone {
-            position: (15.0, 0.5, 4.0)
-            scale: (2.0, 1.0, 2.0)
-            visible: false
-        }
+// The hazard volume is a spawned invisible marker + a sphere bind, the same
+// proven coin mechanism: on the 035 chain every scene cylinder is a physical
+// sweep box for the character (visible or not), so a static volume cylinder
+// walled the pinned z=2 crossing lane; the tiny marker box (z-min 3.825)
+// stays clear of the lane while sphere 1.2 fires the fail on entry.
+node Hazard(slot: SlotRef3D, template: TemplateRef3D, target: ActorRef3D) {
+    model {
+        var h = 0
     }
     on {
         Life.Start -> {
-            bind(triggers.hazard_hit, .target.body, aabb, 0.0, refs.zone)
+            .h = spawn(.slot, .template, 15.0, 0.5, 4.0)
+            bind(triggers.hazard_hit, .target.body, sphere, 1.2, .h)
         }
     }
 }
@@ -71,22 +82,30 @@ node Goal(target: ActorRef3D) {
     }
     on {
         Life.Start -> {
-            bind(triggers.goal_hit, .target.body, sphere, 0.5, refs.banner)
+            bind(triggers.goal_hit, .target.body, sphere, 1.8, refs.banner)
         }
     }
 }
 
-node Void(target: ActorRef3D) {
+// The void kill rides the same marker mechanism: the faller into the gap-1
+// z=2 lane lands on the invisible marker at (9.2,-2.2,2) and the sphere 1.2
+// bind fires (a contact aabb can never fire — the 0.002 move clearance keeps
+// every resting box strictly off every surface).
+node Void(slot: SlotRef3D, template: TemplateRef3D, target: ActorRef3D) {
+    model {
+        var p1 = 0
+    }
     view-3d {
         cylinder3d pit {
             position: (14.0, -3.5, 4.0)
-            scale: (32.0, 1.0, 12.0)
+            scale: (16.0, 1.0, 6.0)
             visible: false
         }
     }
     on {
         Life.Start -> {
-            bind(triggers.void_hit, .target.body, aabb, 0.0, refs.pit)
+            .p1 = spawn(.slot, .template, 9.2, -2.2, 2.0)
+            bind(triggers.void_hit, .target.body, sphere, 1.2, .p1)
         }
     }
 }
@@ -224,11 +243,11 @@ node Main {
         Coin ca { slot: objects3d.ca, template: templates.Shard, pair: triggers.ca_hit, target: refs.hero, px: 4.0, py: 1.0, pz: 4.0 }
         Coin cb { slot: objects3d.cb, template: templates.Shard, pair: triggers.cb_hit, target: refs.hero, px: 12.0, py: 1.0, pz: 2.0 }
         Coin cc { slot: objects3d.cc, template: templates.Shard, pair: triggers.cc_hit, target: refs.hero, px: 24.0, py: 1.0, pz: 4.0 }
-        Hazard hazard { target: refs.hero }
+        Hazard hazard { slot: objects3d.haz, template: templates.Shard, target: refs.hero }
         Goal goal { target: refs.hero }
-        Void voidz { target: refs.hero }
+        Void voidz { slot: objects3d.v1, template: templates.Shard, target: refs.hero }
     }
-    objects3d { ca, cb, cc }
+    objects3d { ca, cb, cc, haz, v1 }
     triggers { ca_hit, cb_hit, cc_hit, hazard_hit, goal_hit, void_hit }
     presentation3d {
         audio {
@@ -290,6 +309,9 @@ node Main {
             }
             let n = events.snapshot()
             .bn = 0
+            .b1 = 0
+            .b2 = 0
+            .b3 = 0
             if 0 < n {
                 let ph = events.phase(0)
                 if ph == 1 {
@@ -414,10 +436,28 @@ node Main {
                 }
             }
             if .bn == 1 {
-                objects.despawn_batch(.b1)
+                if .b1 != 0 {
+                    objects.despawn_batch(.b1)
+                }
+                if .b2 != 0 {
+                    objects.despawn_batch(.b2)
+                }
+                if .b3 != 0 {
+                    objects.despawn_batch(.b3)
+                }
             }
             if .bn == 2 {
-                objects.despawn_batch(.b1, .b2)
+                if .b1 != 0 {
+                    if .b2 != 0 {
+                        objects.despawn_batch(.b1, .b2)
+                    }
+                    if .b2 == 0 {
+                        objects.despawn_batch(.b1, .b3)
+                    }
+                }
+                if .b1 == 0 {
+                    objects.despawn_batch(.b2, .b3)
+                }
             }
             if .bn == 3 {
                 objects.despawn_batch(.b1, .b2, .b3)
