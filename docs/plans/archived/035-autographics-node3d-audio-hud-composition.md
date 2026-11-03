@@ -216,3 +216,5 @@ Pause冻结voice/phase，neutral Step视觉/HUD一Tick、声音suppressed无新v
 | D-05 | 批量回归到期被阻：035落主触发（%5==0且.last-batch-regression.json缺失）但主checkout带他会话未文档化WIP（crates/auto-ui-runtime/dynamic_build.rs、ui_tests.rs、未跟踪stylekit_module_import_parse_tests.rs与test/、docs/design/autoui/）且auto-ui无既定批量门定义（无scripts/test-groups.toml） | owner=该WIP会话/仓维护者：①路由WIP入worktree或文档化；②定义auto-ui批量门命令后运行/auto-plan:regress并在收据补记 |
 
 材料唯一D:/autostack/plan-artifacts/plan-035/auto-ui/，开工登记owner/用途/在途；所有临时探针/日志/截图/包/外部消费者/外置target显式归scope，永久产品/回归归仓。禁止attachments/第二暂存区及worktree链接，清树先fresh D:/autostack/wt-guard.sh；merge必要摘要折Plan后逐项对账全部实际输出并删自有scope/构建物，仅具名未解决问题持有owner/理由/关闭条件。同号他仓scope不动，父目录确认空才清；旧specs.json只读。
+
+2026-11-03 / stage: goal | plan_id: auto-ui/PLAN-035 | plan_revision: 1 | round: 3 | from: reviewed | to: archived | status: archived | outcome: pass（merge全检查点：rebase 7补丁range-diff全等→ff-only落主5903839e→canonical字节核d7272516a359f56e→归档4b9eb66a→cleaned两树guard/分支/兄弟/组目录/scope 103文件全清+registry刷新；主smoke 26/26） | worktree: 已移除 | commit: 落主5903839e，收据0ce02e21、5c6291f8 | next: done（D-05批量回归被阻具名移交：他会话WIP+缺批量门定义）
