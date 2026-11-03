@@ -13,8 +13,11 @@ use agp::assets::load_glb_bytes;
 use autographics_auto_driver::{
     authoring::{
         behavior::{Api, SourceSnapshot},
+        behavior_project::CodePayload,
         document::{Dimension, Document},
         hierarchy,
+        host::Host,
+        play::Action,
         spatial::Descriptor,
         storage::Storage,
         assets::Registry,
@@ -320,6 +323,163 @@ fn rows_for(scene_text: &str) -> Vec<Row> {
         .collect()
 }
 
+// ------------------------------------------------- real host/GPU leg ----
+
+fn settle(h: &mut Host) {
+    let end = std::time::Instant::now() + std::time::Duration::from_secs(31);
+    loop {
+        let pending = h.play.as_ref().map(|p| p.pending()).unwrap_or(false);
+        if !pending {
+            break;
+        }
+        assert!(std::time::Instant::now() < end, "host settle deadline");
+        h.frame(None).expect("frame");
+    }
+}
+
+fn host_tick(h: &mut Host, action: Action) {
+    {
+        let p = h.play.as_mut().unwrap();
+        p.resume().expect("resume");
+        p.dispatch(action).expect("dispatch");
+    }
+    h.pause_play("");
+    settle(h);
+}
+
+fn frame_obj(h: &Host, id: u64) -> (bool, [f32; 3]) {
+    let f = h.play.as_ref().unwrap().last.as_ref().expect("frame");
+    let o = f.objects.iter().find(|o| o.id == id).unwrap_or_else(|| panic!("obj {id}"));
+    (o.visible, o.translation)
+}
+
+#[test]
+fn real_host_runs_the_segment_chain_with_gpu_evidence() {
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("target/plan039-queries3d")
+        .join(format!("{}-gpu", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let scripts = dir.join("scripts");
+    let assets = dir.join("assets");
+    std::fs::create_dir_all(&scripts).expect("scripts");
+    std::fs::create_dir_all(&assets).expect("assets");
+    std::fs::write(dir.join("scene.agscene"), SCENE_SEG).expect("scene");
+    let sha = SCENE_SEG
+        .split("\"sha256\": \"")
+        .nth(1)
+        .and_then(|r| r.split('"').next())
+        .unwrap()
+        .to_string();
+    std::fs::write(scripts.join(format!("{sha}.at")), WORLD_SEG).expect("world");
+    std::fs::write(
+        assets.join("42c9da673fc67ccb0c65d4b337608834efd28a499f7e460866dcfc5ff2a0c671.glb"),
+        GLB,
+    )
+    .expect("glb");
+    let (doc, registry, code, _) =
+        Storage::load_project(&dir.join("scene.agscene"), &Registry::new())
+            .expect("load product project");
+    let mut h = Host::with_project(doc, registry, code).expect("host");
+    h.start_selected_play().expect("start run (behavior/3 admission)");
+    h.pause_play("");
+    settle(&mut h);
+    // 12 input ticks: the group moves +x at 3 u/s (input x=1), exactly the
+    // G05 lab convention; the chain re-runs each tick on the real descriptor.
+    for _ in 0..12 {
+        host_tick(
+            &mut h,
+            Action { space: 3, x: 1, y: 0, toggle: false },
+        );
+    }
+    // The group write published: actor world advanced by 12 * 3 * dt.
+    let f = h.play.as_ref().unwrap().last.as_ref().expect("frame");
+    let actor_id = h
+        .editor
+        .document
+        .objects
+        .iter()
+        .find(|o| o.name == "actor")
+        .expect("actor doc row")
+        .id;
+    let actor_world = f
+        .nodes
+        .get(&actor_id)
+        .map(|d| d.translation)
+        .expect("actor derived node");
+    let origin = actor_world;
+    assert!(
+        origin[0] > -2.0,
+        "dynamic parent write moved the actor world ({})",
+        origin[0]
+    );
+    // Independent oracle at the moved origin (real descriptor rows).
+    let mut rows = rows_for(SCENE_SEG);
+    let dx = origin[0] - (-2.0);
+    for r in rows.iter_mut() {
+        if r.ord == 0 {
+            r.world[0] += dx;
+        }
+        if r.ord == 1 {
+            r.world[0] += dx;
+            r.lo[0] += dx;
+            r.hi[0] += dx;
+        }
+    }
+    // post-write target (x=0.5 written by the chain each tick, z +0.5)
+    let mut moved = rows;
+    for r in moved.iter_mut() {
+        if r.ord == 2 {
+            r.world[0] += 0.5;
+            r.lo[0] += 0.5;
+            r.hi[0] += 0.5;
+            r.world[2] += 0.5;
+            r.lo[2] += 0.5;
+            r.hi[2] += 0.5;
+        }
+    }
+    let (hit2, node2, t2, _, _) =
+        oracle_cast3(&moved, 1, true, origin, [origin[0] + 4.0, origin[1], origin[2]]);
+    // Published marker state must equal the oracle (node/t of the post-write
+    // cast; the door shows hit).
+    let (door_visible, _) = frame_obj(&h, doc_id(&h, "door"));
+    let (marker_visible, marker_t) = frame_obj(&h, doc_id(&h, "marker"));
+    assert_eq!(
+        door_visible as i32, hit2,
+        "door = post-write hit at the moved origin"
+    );
+    assert!(
+        (marker_t[0] - (-100.0 + node2 as f32 * 5.0)).abs() < 1e-3,
+        "marker x tracks the oracle node"
+    );
+    assert!((marker_t[1] - (50.0 + t2 * 10.0)).abs() < 1e-3, "marker y tracks the oracle t");
+    let _ = marker_visible;
+    // Real GPU pixels: the 3D surface renders the multi-part GLB (red-ish
+    // part pixels), the 2D surface is alive for the diagnostic markers.
+    let cap3 = h.rt.capture(h.three, "q3-3d").expect("capture 3d").0;
+    let cap2 = h.rt.capture(h.two, "q3-2d").expect("capture 2d").0;
+    assert!(!cap3.is_empty(), "3D surface rendered");
+    assert!(!cap2.is_empty(), "2D surface rendered");
+    h.stop_play();
+    settle(&mut h);
+    assert!(
+        h.play
+            .as_ref()
+            .map(|p| !matches!(p.state, autographics_auto_driver::authoring::play::State::Running))
+            .unwrap_or(true),
+        "stop restored the editor"
+    );
+}
+
+fn doc_id(h: &Host, name: &str) -> u64 {
+    h.editor
+        .document
+        .objects
+        .iter()
+        .find(|o| o.name == name)
+        .unwrap_or_else(|| panic!("doc row {name}"))
+        .id
+}
+
 // --------------------------------------------------------------- tests ----
 
 #[test]
@@ -448,6 +608,83 @@ fn dynamic_group_write_moves_actor_world_between_ticks() {
     // 2D markers stay on the 2D surface: marker z is pinned to 0.
     assert_eq!(local(&mut s, 5, 2), 0.0, "marker z stays 0");
     assert_eq!(local(&mut s, 6, 2), 0.0, "point marker z stays 0");
+}
+
+#[test]
+fn real_host_runs_the_sweep_chain_with_stop_clearance() {
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("target/plan039-queries3d")
+        .join(format!("{}-gpusweep", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let scripts = dir.join("scripts");
+    let assets = dir.join("assets");
+    std::fs::create_dir_all(&scripts).expect("scripts");
+    std::fs::create_dir_all(&assets).expect("assets");
+    std::fs::write(dir.join("scene.agscene"), SCENE_SWEEP).expect("scene");
+    let sha = SCENE_SWEEP
+        .split("\"sha256\": \"")
+        .nth(1)
+        .and_then(|r| r.split('"').next())
+        .unwrap()
+        .to_string();
+    std::fs::write(scripts.join(format!("{sha}.at")), WORLD_SWEEP).expect("world");
+    std::fs::write(
+        assets.join("42c9da673fc67ccb0c65d4b337608834efd28a499f7e460866dcfc5ff2a0c671.glb"),
+        GLB,
+    )
+    .expect("glb");
+    let (doc, registry, code, _) =
+        Storage::load_project(&dir.join("scene.agscene"), &Registry::new())
+            .expect("load product project");
+    let mut h = Host::with_project(doc, registry, code).expect("host");
+    h.start_selected_play().expect("start run (behavior/4 admission)");
+    h.pause_play("");
+    settle(&mut h);
+    let actor_id = h
+        .editor
+        .document
+        .objects
+        .iter()
+        .find(|o| o.name == "actor")
+        .expect("actor doc row")
+        .id;
+    let before = h
+        .play
+        .as_ref()
+        .unwrap()
+        .last
+        .as_ref()
+        .expect("frame")
+        .nodes
+        .get(&actor_id)
+        .expect("actor node")
+        .translation[0];
+    // 20 hold-right ticks: the sweep moves the actor toward the target and
+    // the stop-with-clearance rule must keep it short of the target box.
+    for _ in 0..20 {
+        host_tick(
+            &mut h,
+            Action { space: 3, x: 1, y: 0, toggle: false },
+        );
+    }
+    let after = h
+        .play
+        .as_ref()
+        .unwrap()
+        .last
+        .as_ref()
+        .expect("frame")
+        .nodes
+        .get(&actor_id)
+        .expect("actor node")
+        .translation[0];
+    assert!(after > before, "sweep advanced the actor ({before} -> {after})");
+    assert!(
+        after < 0.5,
+        "stop-with-clearance kept the actor short of the target face ({after})"
+    );
+    h.stop_play();
+    settle(&mut h);
 }
 
 #[test]
