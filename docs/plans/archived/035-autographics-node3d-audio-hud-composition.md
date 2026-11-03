@@ -213,5 +213,6 @@ Pause冻结voice/phase，neutral Step视觉/HUD一Tick、声音suppressed无新v
 | D-02 | 完整G3/actor-free和原额A/B机制 | work T-03最多两全链候选冻结，不能用no_go代功能或少事件/必要音画；必要新协议清楚版本化 |
 | D-03 | 固定素材/声音字体许可、最大同Tick请求与路径可达 | work T-02/03/05按实际可达与独立边界分列，缺许可/高峰不靠换源/改关卡/丢声规避 |
 | D-04 | 独立final/owner短窗/真实设备与OS声学缺证 | work/review明确实际身份/路径和必需证据，不把同会话重跑或虚拟设备冒充独立/物理通过 |
+| D-05 | 批量回归到期被阻：035落主触发（%5==0且.last-batch-regression.json缺失）但主checkout带他会话未文档化WIP（crates/auto-ui-runtime/dynamic_build.rs、ui_tests.rs、未跟踪stylekit_module_import_parse_tests.rs与test/、docs/design/autoui/）且auto-ui无既定批量门定义（无scripts/test-groups.toml） | owner=该WIP会话/仓维护者：①路由WIP入worktree或文档化；②定义auto-ui批量门命令后运行/auto-plan:regress并在收据补记 |
 
 材料唯一D:/autostack/plan-artifacts/plan-035/auto-ui/，开工登记owner/用途/在途；所有临时探针/日志/截图/包/外部消费者/外置target显式归scope，永久产品/回归归仓。禁止attachments/第二暂存区及worktree链接，清树先fresh D:/autostack/wt-guard.sh；merge必要摘要折Plan后逐项对账全部实际输出并删自有scope/构建物，仅具名未解决问题持有owner/理由/关闭条件。同号他仓scope不动，父目录确认空才清；旧specs.json只读。
