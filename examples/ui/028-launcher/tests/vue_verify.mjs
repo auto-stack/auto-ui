@@ -141,6 +141,38 @@ async function main() {
   await page.waitForSelector('input', { state: 'visible' });
   console.log('  ok: Ctrl+Space 召唤');
 
+  // ---- 6. PLAN-037 官方主题包：家族/模式 2x2 往返（V-01/V-02 vue 轨）----
+  console.log('[6] PLAN-037 theme 2x2 round-trip preserves query');
+  const themeRoot = () => page.evaluate(() =>
+    getComputedStyle(document.querySelector('[data-auto-theme-root]')).getPropertyValue('--background').trim());
+  const drive = (t, d) => page.evaluate(([t, d]) => {
+    const st = document.querySelector('#app').__vue_app__._instance.setupState;
+    st.theme_name = t;
+    st.dark_mode = d;
+  }, [t, d]);
+  assert.strictEqual(await themeRoot(), '0 0% 100%', 'boot 应为 Auto/light（无显式默认）');
+  await input().fill('to');
+  await page.waitForTimeout(300);
+  const nresBefore = await page.evaluate(() => {
+    const st = document.querySelector('#app').__vue_app__._instance.setupState;
+    return String(st.nres);
+  });
+  await drive('Solarized', true);
+  await page.waitForTimeout(400);
+  assert.strictEqual(await themeRoot(), '192 100% 11%', 'Solarized/dark bg 应为 192 100% 11%');
+  const nresAfter = await page.evaluate(() => {
+    const st = document.querySelector('#app').__vue_app__._instance.setupState;
+    return String(st.nres);
+  });
+  assert.strictEqual(nresAfter, nresBefore, `换肤后查询结果数应保持（${nresBefore}），实际 ${nresAfter}`);
+  await shot('t6-p037-solarized-dark.png');
+  for (const [t, d] of [['Solarized', false], ['Auto', true], ['Auto', false]]) {
+    await drive(t, d);
+    await page.waitForTimeout(300);
+  }
+  assert.strictEqual(await themeRoot(), '0 0% 100%', '往返后应回 Auto/light');
+  console.log('  ok: 主题 2x2 往返 + 查询保持');
+
   await browser.close();
   console.log('\nALL PASS (028-launcher vue 验收)');
 }

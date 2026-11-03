@@ -16,6 +16,11 @@
 // 字符串比较一律针对预小写字段（ln/lt，mock 字面量给出、宿主注入时由宿主
 // 预小写）：排序权重全整数，规避浮点/字符宽度双端差（SPEC §排序）。
 
+// PLAN-037 T-05：接入官方主题包（原无主题接线、无显式默认 → 官方
+// Auto/light 独立默认）。family 经 theme_name + design 绑定；键盘流/
+// recent 存储/宿主接缝零改动——换肤不丢查询/选中/recent。
+use themes.themes: Auto, Solarized
+
 widget App {
     msg {
         Init, SetQ(str), ApplyFilter, MoveUp, MoveDown, MoveLeft, MoveRight,
@@ -23,6 +28,9 @@ widget App {
     }
 
     model {
+        // PLAN-037：主题族/模式选择态（主题选择，非业务状态）
+        var theme_name str = "Auto"
+        var dark_mode bool = false
         // ---- 接缝状态（desktop 宿主注入；独立模式恒默认值）----
         var visible str = "0"       // overlay 门控：宿主 SummonLauncher 置 "1"
         var hosted str = "0"        // 宿主挂载时写 "1"：隐藏独立模式的开门按钮
@@ -93,6 +101,12 @@ widget App {
         ]
         var recent = []             // 启动名记录，最近在前，上限 5（storage 持久化）
         var last str = ""           // 最近一次启动（演示/断言锚）
+    }
+
+    // 主题/模式选择器（C-14：数据绑定，同帧校验发布；PLAN-037）
+    design {
+        theme: .theme_name
+        mode: if .dark_mode { "dark" } else { "light" }
     }
 
     view {

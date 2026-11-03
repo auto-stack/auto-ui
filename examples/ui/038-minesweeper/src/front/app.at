@@ -1,5 +1,10 @@
 use minesweeper_store: MinesweeperStore
 
+// PLAN-037 T-05：接入官方主题包（原无主题接线、无显式默认 → 官方 Auto/light
+// 独立默认）。雷盘壳面已逐字段映射公共 role；数字/雷/旗/LCD 身份色维持
+// 字面豁免——换肤不改雷盘数据/计时/难度，确定性首击(4,4)展开不变。
+use themes.themes: Auto, Solarized
+
 widget App {
     msg {
         Reveal(int, int),
@@ -13,6 +18,15 @@ widget App {
     model {
         var interval int = 1000
         var mounted int = 0
+        // PLAN-037：主题族/模式选择态（主题选择，非业务状态）
+        var theme_name str = "Auto"
+        var dark_mode bool = false
+    }
+
+    // 主题/模式选择器（C-14：数据绑定，同帧校验发布；PLAN-037）
+    design {
+        theme: .theme_name
+        mode: if .dark_mode { "dark" } else { "light" }
     }
 
     // Plan 506 & Plan 017: 外壳"内容即页面"，配合 pac `window: "fit"` 窗口随内容收缩。
@@ -26,13 +40,13 @@ widget App {
                     text .store.mines_label {
                         style: "text-base font-bold font-mono text-rose-400"
                     }
-                    style: "bg-zinc-950 border border-zinc-800 px-3 py-1.5 rounded-xl items-center shadow-inner"
+                    style: "bg-background border border-border px-3 py-1.5 rounded-xl items-center shadow-inner"
                 }
 
                 // 表情重开按钮
                 button .store.face_icon {
                     onclick: .Reset,
-                    style: "text-2xl px-3.5 py-1 bg-zinc-800 hover:bg-zinc-700 active:scale-95 rounded-xl border border-zinc-700 shadow-md"
+                    style: "text-2xl px-3.5 py-1 bg-muted hover:bg-secondary active:scale-95 rounded-xl border border-input shadow-md"
                 }
 
                 // 计时器 LCD 盒
@@ -40,7 +54,7 @@ widget App {
                     text .store.timer_label {
                         style: "text-base font-bold font-mono text-amber-400"
                     }
-                    style: "bg-zinc-950 border border-zinc-800 px-3 py-1.5 rounded-xl items-center shadow-inner"
+                    style: "bg-background border border-border px-3 py-1.5 rounded-xl items-center shadow-inner"
                 }
                 style: "w-full items-center justify-between"
             }
@@ -59,7 +73,7 @@ widget App {
                     onclick: .SetDifficulty("expert"),
                     class: .store.expert_class
                 }
-                style: "bg-zinc-900 border border-zinc-800 p-1 rounded-xl gap-1 items-center"
+                style: "bg-card border border-border p-1 rounded-xl gap-1 items-center"
             }
 
             // —— 棋盘网格 ——
@@ -78,7 +92,7 @@ widget App {
                     cols: .store.cols
                     gap: 0
                 }
-                style: "p-1.5 bg-zinc-950/80 border border-zinc-800 rounded-xl shadow-2xl items-center"
+                style: "p-1.5 bg-background/80 border border-border rounded-xl shadow-2xl items-center"
             }
 
             // —— 游戏状态提示 ——
@@ -93,7 +107,7 @@ widget App {
                 }
             }
 
-            style: "max-w-fit p-4 items-center gap-3.5 bg-zinc-900/40 rounded-2xl border border-zinc-800/60"
+            style: "max-w-fit p-4 items-center gap-3.5 bg-card/40 rounded-2xl border border-border/60"
         }
     }
 

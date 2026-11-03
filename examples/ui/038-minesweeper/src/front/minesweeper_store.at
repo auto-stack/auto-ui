@@ -72,24 +72,24 @@ store MinesweeperStore {
             for x < .rows {
                 var y int = 0
                 for y < .cols {
-                    .board.push({ x: x, y: y, mine: false, revealed: false, flagged: false, adjacent: 0, number_class: "", cell_class: "w-8 h-8 flex items-center justify-center select-none bg-zinc-700 hover:bg-zinc-600 active:bg-zinc-800 border border-zinc-600 rounded-none text-zinc-100", display: "　" })
+                    .board.push({ x: x, y: y, mine: false, revealed: false, flagged: false, adjacent: 0, number_class: "", cell_class: "w-8 h-8 flex items-center justify-center select-none bg-secondary hover:bg-secondary/80 active:bg-muted border border-border rounded-none text-foreground", display: "　" })
                     y = y + 1
                 }
                 x = x + 1
             }
             .mines_label = "💣 " + .mine_count.to_string()
             .timer_label = "⏱ 0s"
-            .beginner_class = "px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
-            .intermediate_class = "px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
-            .expert_class = "px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
+            .beginner_class = "px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted"
+            .intermediate_class = "px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted"
+            .expert_class = "px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted"
             if .difficulty == "beginner" {
-                .beginner_class = "px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-700 text-white shadow-sm border border-zinc-600/50"
+                .beginner_class = "px-3 py-1.5 rounded-lg text-xs font-medium bg-secondary text-white shadow-sm border border-border/50"
             }
             if .difficulty == "intermediate" {
-                .intermediate_class = "px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-700 text-white shadow-sm border border-zinc-600/50"
+                .intermediate_class = "px-3 py-1.5 rounded-lg text-xs font-medium bg-secondary text-white shadow-sm border border-border/50"
             }
             if .difficulty == "expert" {
-                .expert_class = "px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-700 text-white shadow-sm border border-zinc-600/50"
+                .expert_class = "px-3 py-1.5 rounded-lg text-xs font-medium bg-secondary text-white shadow-sm border border-border/50"
             }
         }
 
@@ -231,7 +231,7 @@ store MinesweeperStore {
                             for k < .board.len() {
                                 if .board[k].mine {
                                     var ck = .board[k]
-                                    var c_class str = "w-8 h-8 flex items-center justify-center select-none bg-zinc-900 border border-zinc-800 rounded-none text-base"
+                                    var c_class str = "w-8 h-8 flex items-center justify-center select-none bg-card border border-border rounded-none text-base"
                                     if ck.x == x && ck.y == y {
                                         c_class = "w-8 h-8 flex items-center justify-center select-none bg-rose-950 border-2 border-rose-500 rounded-none text-base"
                                     }
@@ -272,38 +272,38 @@ store MinesweeperStore {
                                 var fc = .board[fidx]
                                 if fc.revealed == false && fc.flagged == false {
                                     var nclass str = "color:#60a5fa;font-weight:700;font-size:1.125rem"
-                                    var cclass str = "w-8 h-8 flex items-center justify-center select-none bg-zinc-900 border border-zinc-800/80 rounded-none font-bold text-base"
+                                    var cclass str = "w-8 h-8 flex items-center justify-center select-none bg-card border border-border/80 rounded-none font-bold text-base"
                                     if fc.adjacent == 1 {
                                         nclass = "color:#60a5fa;font-weight:700;font-size:1.125rem"
-                                        cclass = "w-8 h-8 flex items-center justify-center select-none bg-zinc-900 border border-zinc-800/80 rounded-none text-blue-400 font-bold text-base"
+                                        cclass = "w-8 h-8 flex items-center justify-center select-none bg-card border border-border/80 rounded-none text-blue-400 font-bold text-base"
                                     }
                                     if fc.adjacent == 2 {
                                         nclass = "color:#34d399;font-weight:700;font-size:1.125rem"
-                                        cclass = "w-8 h-8 flex items-center justify-center select-none bg-zinc-900 border border-zinc-800/80 rounded-none text-emerald-400 font-bold text-base"
+                                        cclass = "w-8 h-8 flex items-center justify-center select-none bg-card border border-border/80 rounded-none text-emerald-400 font-bold text-base"
                                     }
                                     if fc.adjacent == 3 {
                                         nclass = "color:#f87171;font-weight:700;font-size:1.125rem"
-                                        cclass = "w-8 h-8 flex items-center justify-center select-none bg-zinc-900 border border-zinc-800/80 rounded-none text-rose-400 font-bold text-base"
+                                        cclass = "w-8 h-8 flex items-center justify-center select-none bg-card border border-border/80 rounded-none text-rose-400 font-bold text-base"
                                     }
                                     if fc.adjacent == 4 {
                                         nclass = "color:#c084fc;font-weight:700;font-size:1.125rem"
-                                        cclass = "w-8 h-8 flex items-center justify-center select-none bg-zinc-900 border border-zinc-800/80 rounded-none text-purple-400 font-bold text-base"
+                                        cclass = "w-8 h-8 flex items-center justify-center select-none bg-card border border-border/80 rounded-none text-purple-400 font-bold text-base"
                                     }
                                     if fc.adjacent == 5 {
                                         nclass = "color:#fbbf24;font-weight:700;font-size:1.125rem"
-                                        cclass = "w-8 h-8 flex items-center justify-center select-none bg-zinc-900 border border-zinc-800/80 rounded-none text-amber-400 font-bold text-base"
+                                        cclass = "w-8 h-8 flex items-center justify-center select-none bg-card border border-border/80 rounded-none text-amber-400 font-bold text-base"
                                     }
                                     if fc.adjacent == 6 {
                                         nclass = "color:#22d3ee;font-weight:700;font-size:1.125rem"
-                                        cclass = "w-8 h-8 flex items-center justify-center select-none bg-zinc-900 border border-zinc-800/80 rounded-none text-cyan-400 font-bold text-base"
+                                        cclass = "w-8 h-8 flex items-center justify-center select-none bg-card border border-border/80 rounded-none text-cyan-400 font-bold text-base"
                                     }
                                     if fc.adjacent == 7 {
                                         nclass = "color:#e4e4e7;font-weight:700;font-size:1.125rem"
-                                        cclass = "w-8 h-8 flex items-center justify-center select-none bg-zinc-900 border border-zinc-800/80 rounded-none text-zinc-200 font-bold text-base"
+                                        cclass = "w-8 h-8 flex items-center justify-center select-none bg-card border border-border/80 rounded-none text-foreground font-bold text-base"
                                     }
                                     if fc.adjacent >= 8 {
                                         nclass = "color:#f472b6;font-weight:700;font-size:1.125rem"
-                                        cclass = "w-8 h-8 flex items-center justify-center select-none bg-zinc-900 border border-zinc-800/80 rounded-none text-pink-400 font-bold text-base"
+                                        cclass = "w-8 h-8 flex items-center justify-center select-none bg-card border border-border/80 rounded-none text-pink-400 font-bold text-base"
                                     }
                                     var dpy str = " "
                                     if fc.adjacent > 0 {
@@ -352,7 +352,7 @@ store MinesweeperStore {
                 for k < .board.len() {
                     if .board[k].mine {
                         var ck = .board[k]
-                        var c_class str = "w-8 h-8 flex items-center justify-center select-none bg-zinc-900 border border-zinc-800 rounded-none text-base"
+                        var c_class str = "w-8 h-8 flex items-center justify-center select-none bg-card border border-border rounded-none text-base"
                         if ck.x == x && ck.y == y {
                             c_class = "w-8 h-8 flex items-center justify-center select-none bg-rose-950 border-2 border-rose-500 rounded-none text-base"
                         }
@@ -378,38 +378,38 @@ store MinesweeperStore {
                     if fc.revealed == false && fc.flagged == false {
                         // Reveal it with its number color class.
                         var nclass str = "color:#60a5fa;font-weight:700;font-size:1.125rem"
-                        var cclass str = "w-8 h-8 flex items-center justify-center select-none bg-zinc-900 border border-zinc-800/80 rounded-none font-bold text-base"
+                        var cclass str = "w-8 h-8 flex items-center justify-center select-none bg-card border border-border/80 rounded-none font-bold text-base"
                         if fc.adjacent == 1 {
                             nclass = "color:#60a5fa;font-weight:700;font-size:1.125rem"
-                            cclass = "w-8 h-8 flex items-center justify-center select-none bg-zinc-900 border border-zinc-800/80 rounded-none text-blue-400 font-bold text-base"
+                            cclass = "w-8 h-8 flex items-center justify-center select-none bg-card border border-border/80 rounded-none text-blue-400 font-bold text-base"
                         }
                         if fc.adjacent == 2 {
                             nclass = "color:#34d399;font-weight:700;font-size:1.125rem"
-                            cclass = "w-8 h-8 flex items-center justify-center select-none bg-zinc-900 border border-zinc-800/80 rounded-none text-emerald-400 font-bold text-base"
+                            cclass = "w-8 h-8 flex items-center justify-center select-none bg-card border border-border/80 rounded-none text-emerald-400 font-bold text-base"
                         }
                         if fc.adjacent == 3 {
                             nclass = "color:#f87171;font-weight:700;font-size:1.125rem"
-                            cclass = "w-8 h-8 flex items-center justify-center select-none bg-zinc-900 border border-zinc-800/80 rounded-none text-rose-400 font-bold text-base"
+                            cclass = "w-8 h-8 flex items-center justify-center select-none bg-card border border-border/80 rounded-none text-rose-400 font-bold text-base"
                         }
                         if fc.adjacent == 4 {
                             nclass = "color:#c084fc;font-weight:700;font-size:1.125rem"
-                            cclass = "w-8 h-8 flex items-center justify-center select-none bg-zinc-900 border border-zinc-800/80 rounded-none text-purple-400 font-bold text-base"
+                            cclass = "w-8 h-8 flex items-center justify-center select-none bg-card border border-border/80 rounded-none text-purple-400 font-bold text-base"
                         }
                         if fc.adjacent == 5 {
                             nclass = "color:#fbbf24;font-weight:700;font-size:1.125rem"
-                            cclass = "w-8 h-8 flex items-center justify-center select-none bg-zinc-900 border border-zinc-800/80 rounded-none text-amber-400 font-bold text-base"
+                            cclass = "w-8 h-8 flex items-center justify-center select-none bg-card border border-border/80 rounded-none text-amber-400 font-bold text-base"
                         }
                         if fc.adjacent == 6 {
                             nclass = "color:#22d3ee;font-weight:700;font-size:1.125rem"
-                            cclass = "w-8 h-8 flex items-center justify-center select-none bg-zinc-900 border border-zinc-800/80 rounded-none text-cyan-400 font-bold text-base"
+                            cclass = "w-8 h-8 flex items-center justify-center select-none bg-card border border-border/80 rounded-none text-cyan-400 font-bold text-base"
                         }
                         if fc.adjacent == 7 {
                             nclass = "color:#e4e4e7;font-weight:700;font-size:1.125rem"
-                            cclass = "w-8 h-8 flex items-center justify-center select-none bg-zinc-900 border border-zinc-800/80 rounded-none text-zinc-200 font-bold text-base"
+                            cclass = "w-8 h-8 flex items-center justify-center select-none bg-card border border-border/80 rounded-none text-foreground font-bold text-base"
                         }
                         if fc.adjacent >= 8 {
                             nclass = "color:#f472b6;font-weight:700;font-size:1.125rem"
-                            cclass = "w-8 h-8 flex items-center justify-center select-none bg-zinc-900 border border-zinc-800/80 rounded-none text-pink-400 font-bold text-base"
+                            cclass = "w-8 h-8 flex items-center justify-center select-none bg-card border border-border/80 rounded-none text-pink-400 font-bold text-base"
                         }
                         var dpy str = " "
                         if fc.adjacent > 0 {
@@ -464,10 +464,10 @@ store MinesweeperStore {
             if fc.revealed == false {
                 var new_flag bool = fc.flagged == false
                 var new_dpy str = "　"
-                var new_class str = "w-8 h-8 flex items-center justify-center select-none bg-zinc-700 hover:bg-zinc-600 active:bg-zinc-800 border border-zinc-600 rounded-none text-zinc-100"
+                var new_class str = "w-8 h-8 flex items-center justify-center select-none bg-secondary hover:bg-secondary/80 active:bg-muted border border-border rounded-none text-foreground"
                 if new_flag {
                     new_dpy = "🚩"
-                    new_class = "w-8 h-8 flex items-center justify-center select-none bg-zinc-700 hover:bg-zinc-600 active:bg-zinc-800 border border-zinc-600 rounded-none text-rose-400 text-base"
+                    new_class = "w-8 h-8 flex items-center justify-center select-none bg-secondary hover:bg-secondary/80 active:bg-muted border border-border rounded-none text-rose-400 text-base"
                 }
                 .board[fidx] = { x: fc.x, y: fc.y, mine: fc.mine, revealed: fc.revealed, flagged: new_flag, adjacent: fc.adjacent, number_class: fc.number_class, cell_class: new_class, display: new_dpy }
                 if new_flag {

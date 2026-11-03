@@ -18,5 +18,12 @@ front_port: 4028
 icon: "search"
 title: "Launcher"
 title_zh: "启动器"
+
+# PLAN-037 T-05：官方主题单源包（不复制配色表进本 app，C-13）。
+# 本例原无主题接线、无显式默认——独立默认官方 Auto/light；palette/grid
+# 公共表面随族，品牌色 hex（宿主注入/mock 数据）维持内容色字面豁免。
+dep themes {
+    path: "../../../packages/themes"
+}
 category: "system"
 desktop: "true"

@@ -3,6 +3,13 @@ version: "1.0.0"
 scene: "ui"
 render: "vue"
 icon: "bomb"
+
+# PLAN-037 T-05：官方主题单源包（不复制配色表进本 app，C-13）。
+# 雷盘锌灰壳逐字段映射公共 role（background/card/muted/secondary/border）；
+# LCD 计数/计时、雷/旗、数字 1-8 身份色维持内容色字面豁免（不归并语义槽）。
+dep themes {
+    path: "../../../packages/themes"
+}
 title: "Minesweeper"
 title_zh: "扫雷"
 front_port: 4038

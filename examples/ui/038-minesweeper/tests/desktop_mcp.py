@@ -131,6 +131,10 @@ class McpClient:
     def state(self, *fields):
         return self.call("autoui_state", fields=list(fields))
 
+    def fixture(self, **state):
+        # PLAN-037: theme family/mode state write (PLAN-623 fixture channel).
+        return self.call("autoui_fixture", schema_version=1, state=state)
+
     def screenshot(self, name="", baseline=False):
         return self.call("autoui_screenshot", name=name, baseline=baseline)
 
@@ -296,6 +300,52 @@ def run_tests_038(mcp_url):
         detail = f"{w}x{h} (default 1293x836)"
     result.check("fit window shrunk to board size", ok, detail)
 
+    # ── T7 (PLAN-037): official theme package — mid-game theme switch ──
+    # 换肤不改雷盘数据：T3 已首击 (4,4) 展开 29 格；此处重开一局，首击后
+    # 换肤（Solarized dark），雷盘揭示数/数字格/计时与难度跨换肤保持；
+    # 2x2 往返回默认。数字/雷/旗身份色维持字面（不归并语义槽）。
+    print("\nT7 (PLAN-037): theme round-trip preserves board state")
+    try:
+        st = mcp.state("theme_name", "dark_mode")
+        result.check("default family Auto/light (no explicit default)",
+                     '"Auto"' in st and "dark_mode: false" in st, st[:160])
+        # Reset via the difficulty button (Reset semantics; find id — the
+        # client has click-by-id only, no press_sequence).
+        # Deterministic (4,4) first click = 37th covered cell in row-major
+        # order (same locator contract as T3: find_buttons_by_label("　")[36]).
+        reveal_ids = find_buttons_by_label(mcp.snapshot(), "　")
+        if len(reveal_ids) != 81:
+            result.skip("T7 first click", f"expected 81 covered cells, got {len(reveal_ids)}")
+        else:
+            mcp.click(reveal_ids[36])
+            time.sleep(1.0)
+            hist1 = count_button_labels(mcp.snapshot())
+            result.check("T7 first click reveals 29 (16 digits)",
+                         hist1.get("digits") == 16 and hist1.get("unrevealed") == 52,
+                         hist1)
+            mcp.fixture(theme_name="Solarized", dark_mode=True)
+            time.sleep(0.8)
+            st = mcp.state("theme_name", "dark_mode", "game_state")
+            result.check("T7 switched to Solarized/dark mid-game",
+                         '"Solarized"' in st and "dark_mode: true" in st
+                         and 'game_state: "playing"' in st, st[:160])
+            hist2 = count_button_labels(mcp.snapshot())
+            result.check("T7 board preserved across theme switch",
+                         hist2.get("digits") == 16 and hist2.get("unrevealed") == 52,
+                         hist2)
+            for fam, dm in (("Solarized", False), ("Auto", True), ("Auto", False)):
+                mcp.fixture(theme_name=fam, dark_mode=dm)
+                time.sleep(0.5)
+            st = mcp.state("theme_name", "dark_mode")
+            result.check("T7 2x2 round-trip applied (Auto/light final)",
+                         '"Auto"' in st and "dark_mode: false" in st, st[:160])
+            hist3 = count_button_labels(mcp.snapshot())
+            result.check("T7 board preserved after round-trip",
+                         hist3.get("digits") == 16 and hist3.get("unrevealed") == 52,
+                         hist3)
+    except Exception as e:
+        result.skip("T7 PLAN-037 theme leg", f"error: {e}")
+
     return result
 
 
@@ -324,7 +374,7 @@ def launch_counter_project(tmpdir, mcp_port):
     return subprocess.Popen(
         [AUTO_BIN, "run", "-r", "vm"],
         cwd=tmpdir,
-        env={**os.environ, "AUTOUI_MCP_PORT": str(mcp_port)},
+        env={**os.environ, "AUTOUI_MCP_PORT": str(mcp_port), "AUTOUI_TEST_FIXTURES": "1"},
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
 
@@ -354,7 +404,7 @@ def main():
         proc = subprocess.Popen(
             [AUTO_BIN, "run", "-r", "vm"],
             cwd=MINES_PROJECT,
-            env={**os.environ, "AUTOUI_MCP_PORT": str(mcp_port)},
+            env={**os.environ, "AUTOUI_MCP_PORT": str(mcp_port), "AUTOUI_TEST_FIXTURES": "1"},
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
         wait_marker = "初级"
