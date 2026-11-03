@@ -2282,7 +2282,14 @@ pub(crate) fn plan_dispatch_events(
                 // PLAN-028：event.*/object.*/round.* 是 typed 服务前缀，
                 // 不是子投递选择器（events 档跳过；其余档保持旧拒绝面；
                 // round.request() 的受信映射沿 025/027 既有面）。
-                if (events && (child == "event" || child == "object" || child == "round")) || child == "obj" {
+                // PLAN-035：events.*/objects.* 是 components3d 组合档的
+                // typed 服务前缀（有界快照/批销毁），不是子投递选择器；
+                // 旧档在 translate 侧保持 unsupported 拒绝面。
+                if (events && (child == "event" || child == "object" || child == "round"))
+                    || child == "obj"
+                    || child == "events"
+                    || child == "objects"
+                {
                     continue;
                 }
                 let key = (edef.clone(), child.clone(), ev.clone());
@@ -3334,6 +3341,7 @@ pub(crate) fn collect_scene(
                     let rgba = resource_color(project, &material)?;
                     let ctx = Ctx {
                         target: Target::Root,
+                        ahud3: None,
                         emit_hook: Box::new(|ev: &str| {
                             Err(at(
                                 &root_def.module,
@@ -4686,6 +4694,7 @@ pub(crate) fn instance_ctx<'a>(
             prefix: prefix.to_string(),
             index: index.to_string(),
         },
+        ahud3: None,
         emit_hook,
         enum_path: Box::new(|e: &str, v: &str| enum_lookup(project, e, v)),
         axis_differential: true,
@@ -4785,6 +4794,7 @@ pub(crate) fn root_ctx<'a>(
         binds: q.binds,
     });
     Ctx {
+        ahud3: None,
         target: Target::Root,
         emit_hook,
         enum_path: Box::new(|e: &str, v: &str| enum_lookup(project, e, v)),

@@ -473,7 +473,7 @@ pub(crate) fn prepare_pres(
 /// 作者 helper 头签名检查：`fn <name>(<one param: int>) str` 形（Auto
 /// 返回类型为空格后缀，无箭头）。load 层 fn 表只有名字；对切片头部做
 /// 保守文本检查。
-fn text_fn_signature_ok(src: &str, name: &str) -> bool {
+pub(crate) fn text_fn_signature_ok(src: &str, name: &str) -> bool {
     let Some(rest) = src.trim_start().strip_prefix("fn ") else {
         return false;
     };

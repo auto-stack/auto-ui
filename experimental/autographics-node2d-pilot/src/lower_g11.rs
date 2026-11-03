@@ -347,6 +347,7 @@ fn base_ctx_g11<'a>(
 ) -> Ctx<'a> {
     let is_root = node_name == project.root;
     Ctx {
+        ahud3: None,
         target: if is_root {
             Target::Root
         } else {
@@ -1042,6 +1043,7 @@ pub fn lower_project_g112d(project: &Project) -> Result<LowerOutputG11, LowerErr
                                 index: "oi".to_string(),
                             }
                         },
+                        ahud3: None,
                         emit_hook: Box::new(|_| unreachable!()),
                         enum_path: Box::new(|a, b| enum_lookup(project, a, b)),
                         axis_differential: true,

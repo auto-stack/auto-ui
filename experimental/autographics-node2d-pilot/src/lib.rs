@@ -16,6 +16,7 @@ pub mod lower_components;
 pub mod lower_components3d;
 pub mod lower_components3d_bindings;
 pub mod lower_components3d_events;
+pub mod lower_components3d_audio_hud;
 pub mod node3d_binding_refs;
 pub mod lower_components3d_runtime;
 pub mod lower_components_game;
@@ -75,6 +76,11 @@ pub enum Profile {
     /// 服务、animated3d 模型叶角色 body；bindings 载体 + 既有公开导入产出的
     /// 受检闭包元数据；动画档 node_animation3d/1 装配）。
     Components3DPresentation,
+    /// PLAN-035 三维声音/HUD/姿态组合：components-3d-audio-hud（presentation3d
+    /// 作者块 audio/cue/hud + 024..034 全部三维作者构造；有界事件快照/批
+    /// 销毁作者面；角色姿态随 bundle 收口；actor-free kind=-1；components3d/1
+    /// 装配，T-03 冻结 117/28）。
+    Components3DAudioHud,
 }
 
 pub use load::{load_project, Project, ProjectError};
@@ -90,6 +96,7 @@ pub use lower_components3d_bindings::{
 pub use lower_node3d_presentation::{
     load_resources_meta, lower_project_components3d_presentation, resources_request_json,
 };
+pub use lower_components3d_audio_hud::lower_project_components3d_audio_hud;
 pub use lower_components3d_events::lower_project_components3d_events;
 pub use lower_components3d_runtime::lower_project_components3d_runtime;
 pub use lower_components_game::{lower_project_components_game, LowerOutputGame};

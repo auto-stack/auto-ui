@@ -519,6 +519,7 @@ fn base_ctx<'a>(
 ) -> Ctx<'a> {
     let is_root = node_name == project.root;
     Ctx {
+        ahud3: None,
         target: if is_root {
             Target::Root
         } else {

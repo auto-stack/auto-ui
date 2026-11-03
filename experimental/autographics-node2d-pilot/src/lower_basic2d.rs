@@ -1208,6 +1208,7 @@ fn gen_user_source(
     // ---- 处理器翻译上下文（共享 translate；basic2d 无 emit/实例成员）----
     let ctx = Ctx {
         target: Target::Root,
+        ahud3: None,
         emit_hook: Box::new(|event: &str| {
             Err(unsupported(format!(
                 "emit .{event} without binding (basic2d: no msg events)"

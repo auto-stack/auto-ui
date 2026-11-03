@@ -1,0 +1,5 @@
+{
+ "schema": "autographics.resources-request/1",
+ "resources": [
+   {"name": "hero_glb", "module": "resources", "kind": "animated3d", "file": "assets/character.glb", "sha256": "7112f6a08400914f9da546f3e6029e947cc9eab2b4a6da5eb99776111289efb1", "byte_length": 87624, "animated": true} ]
+}

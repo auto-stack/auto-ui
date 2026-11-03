@@ -103,6 +103,9 @@ pub struct Ctx<'a> {
     /// 可 pose 的动画模型叶 + 各资源原 clip 表）。None 保持旧档行为
     /// （`refs.<elem>.pose`/`clips.*` 保持 unsupported，旧字节不变）。
     pub vis3d: Option<Vis3dEnv>,
+    /// PLAN-035（components-3d-audio-hud）：components3d/1 组合环境（有界
+    /// 事件快照面/批销毁/bundle 姿态收口的具名门）。None 保持旧档行为。
+    pub ahud3: Option<crate::lower_components3d_audio_hud::AhudEnv3>,
 }
 
 /// PLAN-034：具名视觉姿态环境（stamp 时已按当前定义过滤；作者面只有
@@ -641,6 +644,94 @@ fn translate_expr(e: &Expr, ctx: &Ctx, out: &mut String) -> Result<(), LowerErro
                         translate_expr(a, ctx, &mut buf)?;
                         out.push_str(&format!(
                             "ag_object_despawn_batch(1, {buf}, 0, 0, 0, 0, 0, 0, 0)"
+                        ));
+                        return Ok(());
+                    }
+                    // PLAN-035（components3d）：有界事件快照面。快照 1 计费
+                    // ≤1/回调，getter 0 计费（Auto 计算，VM/CPU 计量）；
+                    // 快照与 cursor 互斥由组合单元自身具名强制（58）。
+                    if base == "events" && ctx.ahud3.is_some() {
+                        if m == "snapshot" {
+                            if !call.args.args.is_empty() {
+                                return Err(unsupported("events.snapshot arity", e));
+                            }
+                            out.push_str("ag_events_snapshot()");
+                            return Ok(());
+                        }
+                        if m == "count" {
+                            if !call.args.args.is_empty() {
+                                return Err(unsupported("events.count arity", e));
+                            }
+                            out.push_str("ag_events_count()");
+                            return Ok(());
+                        }
+                        if m == "run" {
+                            if !call.args.args.is_empty() {
+                                return Err(unsupported("events.run arity", e));
+                            }
+                            out.push_str("ag_events_run()");
+                            return Ok(());
+                        }
+                        if m == "tick" {
+                            if !call.args.args.is_empty() {
+                                return Err(unsupported("events.tick arity", e));
+                            }
+                            out.push_str("ag_events_tick()");
+                            return Ok(());
+                        }
+                        let getter = match m.as_str() {
+                            "pair" => Some("ag_event_snap_pair"),
+                            "phase" => Some("ag_event_snap_phase"),
+                            "source" => Some("ag_event_snap_source"),
+                            "generation" => Some("ag_event_snap_generation"),
+                            "source_kind" => Some("ag_event_snap_source_kind"),
+                            "template" => Some("ag_event_snap_template"),
+                            "source_generation" => Some("ag_event_snap_source_generation"),
+                            "geometry" => Some("ag_event_snap_geometry"),
+                            _ => None,
+                        };
+                        if let Some(getter) = getter {
+                            if call.args.args.len() != 1 {
+                                return Err(unsupported(
+                                    format!("events.{m} arity (want <row index>)"),
+                                    e,
+                                ));
+                            }
+                            let Arg::Pos(a) = &call.args.args[0] else {
+                                return Err(unsupported("events getter arg", e));
+                            };
+                            let mut buf = String::new();
+                            translate_expr(a, ctx, &mut buf)?;
+                            out.push_str(&format!("{getter}({buf})"));
+                            return Ok(());
+                        }
+                    }
+                    // PLAN-035（components3d）：显式批销毁面（1..8 句柄一次
+                    // 全有全无；1 计费/批，域/重复/代次由组合单元具名强制）。
+                    if base == "objects" && m == "despawn_batch" && ctx.ahud3.is_some() {
+                        let n = call.args.args.len();
+                        if !(1..=8).contains(&n) {
+                            return Err(unsupported(
+                                format!("objects.despawn_batch arity {n} (want 1..8 handles)"),
+                                e,
+                            ));
+                        }
+                        let mut parts = Vec::new();
+                        for a in &call.args.args {
+                            let Arg::Pos(x) = a else {
+                                return Err(unsupported("objects.despawn_batch arg", e));
+                            };
+                            let mut t = String::new();
+                            translate_expr(x, ctx, &mut t)?;
+                            parts.push(t);
+                        }
+                        while parts.len() < 8 {
+                            parts.push("0".to_string());
+                        }
+                        out.push_str(&format!(
+                            "ag_object_despawn_batch({}, {})",
+                            n,
+                            parts.join(", ")
                         ));
                         return Ok(());
                     }
@@ -1631,6 +1722,23 @@ fn translate_vis_pose_call(
             }
             _ => return Err(unsupported("pose arg", e)),
         }
+    }
+    // PLAN-035（components3d）：角色姿态随组合 bundle 收口——pose() 降层
+    // 为生成基础设施写（0 额外计费），独立 ag_visual_pose 不再发出
+    // （bundle 的 kind/clip/phase/loop/yaw 即本角色姿态）；actor-free
+    // 组合无视觉，pose 具名拒绝。
+    if let Some(ahud) = &ctx.ahud3 {
+        if !ahud.has_character {
+            return Err(unsupported(
+                "actor-free components3d bundle carries no visual pose (declare a character3d definition to pose)",
+                e,
+            ));
+        }
+        out.push_str(&format!(
+            "ah_pose({clip_text}, {}, {}, {})",
+            parts[0], parts[1], parts[2]
+        ));
+        return Ok(());
     }
     // 行表是 0 基运行寻址（ag_set_local 面）；visual pose kind-0 是稳定
     // 文档 id（1 基，与 _ag_vis_map/char3_bind 同面）——按 +1 换算。

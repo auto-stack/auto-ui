@@ -41,6 +41,11 @@ pub struct NodeDecl {
     /// PLAN-032：`components2d` 块（完整二维游戏组合，components-2d-runtime
     /// profile；仅 root node 携带）。
     pub components2d: Option<super::components2d::Components2dBlock>,
+    /// PLAN-035：`presentation3d` 块（三维通用声音/HUD 接线；audio/cue/hud
+    /// 声明面与 presentation2d 同文。无 trigger 行：三维触发归属 030 池/
+    /// bind 与作者 `events.snapshot()` 消费，块内 trigger 行具名拒绝）。
+    /// 仅 root node 携带、仅 components-3d-audio-hud profile 消费。
+    pub presentation3d: Option<super::presentation::Presentation3dBlock>,
     /// PLAN-027：`character3d { }` 块——本定义绑定为本 Run 物理角色
     /// （恰一；bind/solid/camera 配置调用由降层注入 Life.Start）。
     pub character3d: Option<Character3dBlock>,

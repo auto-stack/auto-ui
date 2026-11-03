@@ -139,6 +139,7 @@ pub fn parse_node_decl(cx: &mut dyn DomainParseContext) -> AutoResult<NodeDecl> 
     let mut game2d = None;
     let mut presentation2d = None;
     let mut components2d = None;
+    let mut presentation3d = None;
     let mut character3d = None;
     let mut camera3d = None;
     let mut object3d = None;
@@ -260,6 +261,20 @@ pub fn parse_node_decl(cx: &mut dyn DomainParseContext) -> AutoResult<NodeDecl> 
                     presentation2d = Some(super::presentation::parse_presentation2d_block(cx)?);
                     continue;
                 }
+                // PLAN-035：`presentation3d { ... }` —— 三维通用声音/HUD
+                // 接线块。任何 node 都可携带；root-only 与 profile 归属由
+                // 降层具名校验（解析面保持宽容）。
+                "presentation3d" => {
+                    if presentation3d.is_some() {
+                        return Err(SyntaxError::Generic {
+                            message: "duplicate presentation3d block in node".to_string(),
+                            span: pos_to_span(cx.cur_pos()),
+                        }
+                        .into());
+                    }
+                    presentation3d = Some(super::presentation::parse_presentation3d_block(cx)?);
+                    continue;
+                }
                 // PLAN-027：`character3d { }` —— 角色声明块。任何 node 都可
                 // 携带；恰一/profile 归属由降层具名校验（解析面保持宽容）。
                 "character3d" => {
@@ -368,6 +383,7 @@ pub fn parse_node_decl(cx: &mut dyn DomainParseContext) -> AutoResult<NodeDecl> 
         game2d,
         presentation2d,
         components2d,
+        presentation3d,
         character3d,
         camera3d,
         object3d,

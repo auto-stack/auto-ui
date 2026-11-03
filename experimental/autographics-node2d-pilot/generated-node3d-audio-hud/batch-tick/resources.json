@@ -1,0 +1,68 @@
+{
+  "schema": "autographics.resources-meta/1",
+  "entries": [
+    {
+      "name": "hero_glb",
+      "kind": "animated3d",
+      "file": "assets/character.glb",
+      "animated": true,
+      "identity": {
+        "closure": {
+          "node_animation": true,
+          "id": "6da9227ee326d34b997e7d859abb0c3f9fc9af3f53659feaa5a48982472fbd9d",
+          "images": [
+            {
+              "source": "uri:Textures/colormap.png",
+              "sha256": "106cf02e0d6dccded6d9f90c2ae6a51eb94c6301645fea159e834c44ed4708a3",
+              "byte_length": 10108,
+              "width": 512,
+              "height": 512
+            }
+          ]
+        },
+        "format": "glb",
+        "sha256": "7112f6a08400914f9da546f3e6029e947cc9eab2b4a6da5eb99776111289efb1",
+        "byte_length": 87624,
+        "name": "character.glb"
+      },
+      "clips": [
+        {
+          "ordinal": 0,
+          "name": "static"
+        },
+        {
+          "ordinal": 1,
+          "name": "idle"
+        },
+        {
+          "ordinal": 2,
+          "name": "walk"
+        },
+        {
+          "ordinal": 3,
+          "name": "jump"
+        }
+      ],
+      "images": [
+        {
+          "source": "uri:Textures/colormap.png",
+          "sha256": "106cf02e0d6dccded6d9f90c2ae6a51eb94c6301645fea159e834c44ed4708a3",
+          "byte_length": 10108,
+          "width": 512,
+          "height": 512,
+          "path": "assets/Textures/colormap.png"
+        }
+      ],
+      "bounds_min": [
+        -0.6000000238418579,
+        -1.4901161193847656e-8,
+        -0.32375001907348633
+      ],
+      "bounds_max": [
+        0.6000000238418579,
+        1.100000023841858,
+        0.3112500011920929
+      ]
+    }
+  ]
+}

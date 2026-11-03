@@ -1,0 +1,47 @@
+// PLAN-035 actor-free services fixture (V-S01 gate): a components-3d-audio-hud
+// Run that binds no character and no camera — the scene carries one static
+// pad and the root emits the full cue/HUD contract through the kind=-1
+// bundle. No forged Player: the driver-side conditional freeze (T-03) is the
+// only legal actor-free 3D path, and the same source faults 25 under hud3d/1.
+use hudmap: tick_text
+
+node Main {
+    model {
+        var n = 0
+    }
+    presentation3d {
+        audio {
+            bank: "assets/b0b740dc49e51abefff9bb1af830080fe00f817b468614992040d438d6171c3d.wav"
+            font: "assets/4444c23631884f411aa7f2fee35061b1756a9927940c62d2a5572acf470b3ffa.ttf"
+            license: "assets/license.txt"
+        }
+        cue tick {
+            span: (0, 7403)
+            gain: 0.5
+        }
+        hud {
+            slot 0 {
+                owner: "Main"
+                anchor: 0
+                offset: (8.0, 8.0)
+                size: 32.0
+                rgba: (1.0, 1.0, 1.0, 1.0)
+                text_fn: "tick_text"
+                text_field: "n"
+                init: "0"
+            }
+        }
+    }
+    view-3d {
+        cylinder3d pad {
+            position: (0.0, -0.5, 0.0)
+            scale: (4.0, 0.5, 4.0)
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            .n = .n + 1
+            sfx.play("tick", 0.5)
+        }
+    }
+}

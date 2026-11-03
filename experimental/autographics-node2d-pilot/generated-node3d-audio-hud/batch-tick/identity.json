@@ -1,0 +1,32 @@
+{
+ "generator": "autographics-node2d-pilot plan035 components-3d-audio-hud",
+ "api": "autographics.components3d/1",
+ "user_source_sha256": "b020447be431c836ac685e6f5ac97e346676f63d9b46d73cba7b722c96cb7069",
+ "user_source_bytes": 5493,
+  "module:hudmap": "afce2e370b5f08243d4e06af7264567857c74da495ed93169b7a85d5f0db90c3",
+  "module:main": "4157236e6a2aeb407418b35d6290780f544050807a89cf3ad545f23258e7b0b3",
+  "module:resources": "87c771a1a2a3ae6fbc09f50c76327af05f7539adf158553cd81b9b391db4330d",
+ "closure": [
+  {"name": "hudmap", "sha256": "afce2e370b5f08243d4e06af7264567857c74da495ed93169b7a85d5f0db90c3", "bytes": 234},
+  {"name": "main", "sha256": "4157236e6a2aeb407418b35d6290780f544050807a89cf3ad545f23258e7b0b3", "bytes": 6115},
+  {"name": "resources", "sha256": "87c771a1a2a3ae6fbc09f50c76327af05f7539adf158553cd81b9b391db4330d", "bytes": 54}
+ ],
+ "roles": {
+ "scene_rows": {
+  "Main/ground/floor": 1,
+  "Main/hero/body": 0,
+  "Shard": 2
+ }
+},
+ "assets": [
+   {"sha256": "106cf02e0d6dccded6d9f90c2ae6a51eb94c6301645fea159e834c44ed4708a3", "file": "106cf02e0d6dccded6d9f90c2ae6a51eb94c6301645fea159e834c44ed4708a3.png", "declared": "assets/Textures/colormap.png"},
+   {"sha256": "7112f6a08400914f9da546f3e6029e947cc9eab2b4a6da5eb99776111289efb1", "file": "7112f6a08400914f9da546f3e6029e947cc9eab2b4a6da5eb99776111289efb1.glb", "declared": "assets/character.glb"}
+ ],
+ "provenance": {
+  "product": "batch-tick",
+  "consumer": "experimental/autographics-auto-driver/tests/node3d_audio_hud_flow.rs",
+  "consumption": "include_str! frozen scene.agscene + world.at + assets/<sha>.glb; the harness writes the project (scene + assets) under target and loads via Storage::load_project; variants feed scripts/<sha>.at where <sha> = scene.behavior.source.sha256",
+  "load_verification": "the load path hash-verifies the behavior source and every assets/<sha>.glb against the scene manifest; GLB geometry admission runs in the driver preflight decoder before allocation",
+  "world_sha256": "b020447be431c836ac685e6f5ac97e346676f63d9b46d73cba7b722c96cb7069"
+ }
+}

@@ -120,6 +120,17 @@ pub fn lower_project_components3d_presentation_entry(
     project: &Project,
     presentation: Option<&crate::lower_node3d_presentation::PresentationMeta3>,
 ) -> Result<LowerOutputBasic2D, LowerError> {
+    lower_project_components3d_presentation_entry_ahud(project, presentation, None)
+}
+
+/// PLAN-035：组合档变体——`presentation3d` 配置随档发行；装配身份恒
+/// components3d/1（T-03 冻结；动画/池/相机的旧档身份选择不适用）。scene/8
+/// 音频面（license 文本/资产行）由组合入口预先受检并随 AhudCfg3 携带。
+pub fn lower_project_components3d_presentation_entry_ahud(
+    project: &Project,
+    presentation: Option<&crate::lower_node3d_presentation::PresentationMeta3>,
+    ahud: Option<&crate::lower_components3d_audio_hud::AhudCfg3>,
+) -> Result<LowerOutputBasic2D, LowerError> {
     let w3 = build_world_3d_with(project, true, true, presentation)?;
     let world = &w3.world;
     let root_name = world.root.clone();
@@ -638,7 +649,38 @@ pub fn lower_project_components3d_presentation_entry(
     // 受信面）。无动画时：角色/相机/池任一在案 → bindings 载体身份
     // triggers3d/1；纯静态纹理场景（无角色纹理档）→ behavior/1（原 api v1
     // 面；triggers3d 档恒定 3D 角色装载，纯场景不该被装配成角色 Run）。
-    let behavior_api = match presentation {
+    let behavior_api = if ahud.is_some() {
+        // PLAN-035：组合档恒定身份（T-03 冻结 117/28）。
+        "autographics.components3d/1"
+    } else {
+        behavior_api_select(project, presentation, &events, &world)
+    };
+
+    lower_project_components3d_cfg_cfg(
+        project,
+        Cfg3 {
+            runtime: Some(&runtime),
+            events: Some(&events),
+            bindings: Some(&bindings_cfg),
+            presentation,
+            doc_prefix: "plan035-components-3d-audio-hud",
+            gen_note: "PLAN-030 components-3d-bindings",
+            regen_note: "tools/verify_plan035.py",
+            behavior_api,
+            ahud,
+        },
+    )
+}
+
+/// 旧档身份选择（动画资源 → node_animation3d/1；池/角色/相机 →
+/// triggers3d/1；纯静态纹理场景 → behavior/1）。字节与 034 冻结一致。
+fn behavior_api_select(
+    project: &Project,
+    presentation: Option<&crate::lower_node3d_presentation::PresentationMeta3>,
+    events: &crate::lower_components3d_events::EventsCfg3,
+    world: &crate::lower_components::WorldIR,
+) -> &'static str {
+    match presentation {
         Some(_) if crate::lower_node3d_presentation::has_animated_resource(project) => {
             "autographics.node_animation3d/1"
         }
@@ -657,21 +699,7 @@ pub fn lower_project_components3d_presentation_entry(
             }
         }
         _ => BINDINGS_API,
-    };
-
-    lower_project_components3d_cfg_cfg(
-        project,
-        Cfg3 {
-            runtime: Some(&runtime),
-            events: Some(&events),
-            bindings: Some(&bindings_cfg),
-            presentation,
-            doc_prefix: "plan030-components-3d-bindings",
-            gen_note: "PLAN-030 components-3d-bindings",
-            regen_note: "tools/verify_plan030.py",
-            behavior_api,
-        },
-    )
+    }
 }
 
 /// 实例路径 → 作者名字链（去 root 段；嵌套段以'.'连接，如

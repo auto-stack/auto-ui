@@ -294,6 +294,18 @@ fn components3d_runtime_consumer(product: &str) -> &'static str {
     }
 }
 
+fn components3d_audio_hud_consumer(product: &str) -> &'static str {
+    match product {
+        "actorfree" | "batch-tick" | "g3-full-loop" => {
+            "experimental/autographics-auto-driver/tests/node3d_audio_hud_flow.rs"
+        }
+        "neg-*" => {
+            "experimental/autographics-node2d-pilot/tests/node3d_audio_hud_gates.rs (fixture-level; lowering rejection)"
+        }
+        _ => "unrecorded (this out dir has no registered flow consumer)",
+    }
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let profile = match args.iter().find(|a| a.as_str() == "--profile") {
@@ -315,6 +327,7 @@ fn main() {
                 Some("components-3d-events") => Profile::Components3DEvents,
                 Some("components-3d-bindings") => Profile::Components3DBindings,
                 Some("components-3d-presentation") => Profile::Components3DPresentation,
+                Some("components-3d-audio-hud") => Profile::Components3DAudioHud,
                 Some("presentation-2d") => Profile::Presentation2D,
                 Some("components-2d-runtime") => Profile::Components2DRuntime,
                 _ => usage(),
@@ -1192,6 +1205,64 @@ fn main() {
                         components3d_presentation_consumer,
                         Some(&meta),
                     );
+                }
+            }
+        }
+        Profile::Components3DAudioHud => {
+            match resources_arg {
+                None => {
+                    // pass A（声明面）：GLB 闭包元数据请求（034 同一面）。
+                    let request =
+                        autographics_node2d_pilot::resources_request_json(&project);
+                    std::fs::write(
+                        format!("{out}/resources-request.json"),
+                        &request,
+                    )
+                    .expect("resources-request.json");
+                    let n = request.matches("\"animated\"").count();
+                    println!(
+                        "node2d-lower[components-3d-audio-hud]: declared {n} texture/animation resources -> resources-request.json; run resource-meta, then rerun with --resources <resources.json>"
+                    );
+                }
+                Some(meta_path) => {
+                    // pass B（产品面）：受检元数据对账 + 组合块 + 全量产品。
+                    let meta = autographics_node2d_pilot::load_resources_meta(
+                        std::path::Path::new(meta_path),
+                        &project,
+                    )
+                    .unwrap_or_else(|e| {
+                        eprintln!("node2d-lower: {e}");
+                        std::process::exit(3);
+                    });
+                    let entry_dir = std::path::Path::new(&entry)
+                        .parent()
+                        .expect("entry parent")
+                        .to_path_buf();
+                    let lowered = autographics_node2d_pilot::
+                        lower_project_components3d_audio_hud(&project, &entry_dir, &meta)
+                        .unwrap_or_else(|e| {
+                            eprintln!("node2d-lower: {e}");
+                            std::process::exit(3);
+                        });
+                    write_components3d_products(
+                        &out,
+                        &entry,
+                        &project,
+                        lowered.base,
+                        "autographics-node2d-pilot plan035 components-3d-audio-hud",
+                        &lowered.api,
+                        components3d_audio_hud_consumer,
+                        Some(&meta),
+                    );
+                    for a in &lowered.audio {
+                        if !a.in_scene {
+                            continue;
+                        }
+                        let bytes = autographics_node2d_pilot::
+                            lower_components3d_audio_hud::verify_audio_asset(a);
+                        std::fs::write(format!("{out}/assets/{}", a.name), &bytes)
+                            .expect("audio asset copy");
+                    }
                 }
             }
         }

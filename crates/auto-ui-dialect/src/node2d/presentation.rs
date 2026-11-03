@@ -414,3 +414,73 @@ pub(crate) fn parse_pres_trigger(cx: &mut dyn DomainParseContext) -> AutoResult<
         span: super::ast::span_of(start),
     })
 }
+
+/// `presentation3d { ... }` 完整块（PLAN-035）。
+#[derive(Debug, Clone)]
+pub struct Presentation3dBlock {
+    pub audio: Option<Game2dAudio>,
+    pub cues: Vec<Game2dCue>,
+    pub hud: Option<PresHud>,
+    pub span: LightSpan,
+}
+
+/// `presentation3d { ... }` 块解析（node 块循环按关键字 `presentation3d`
+/// 分派进入）。声明面与 presentation2d 同文（audio/cue/hud），差别：
+/// 本块无 trigger 行——三维触发 pair 归属 030 `triggers { }` 池与作者
+/// `bind()`，事件消费走作者 `events.snapshot()`/`events.<get>(i)` 有界
+/// 快照面（components3d/1 组合档），块内 trigger 行具名拒绝。
+pub fn parse_presentation3d_block(
+    cx: &mut dyn DomainParseContext,
+) -> AutoResult<Presentation3dBlock> {
+    let start = cx.cur_pos();
+    cx.advance(); // presentation3d
+    cx.expect(TokenKind::LBrace)?;
+    let mut audio: Option<Game2dAudio> = None;
+    let mut cues: Vec<Game2dCue> = Vec::new();
+    let mut hud: Option<PresHud> = None;
+    loop {
+        cx.skip_empty_lines();
+        if cx.is_kind(TokenKind::RBrace) || cx.is_kind(TokenKind::EOF) {
+            break;
+        }
+        let head = cx.cur_text();
+        match head.as_str() {
+            "audio" => {
+                if audio.is_some() {
+                    return cursor_err(cx, "duplicate audio block in presentation3d".to_string());
+                }
+                audio = Some(parse_audio(cx)?);
+            }
+            "cue" => cues.push(parse_cue(cx)?),
+            "hud" => {
+                if hud.is_some() {
+                    return cursor_err(cx, "duplicate hud block in presentation3d".to_string());
+                }
+                hud = Some(parse_pres_hud(cx)?);
+            }
+            // 三维触发不由本块声明（030 池/bind + 有界快照消费是唯一路径；
+            // 双机制回流具名拒绝）。
+            "trigger" => {
+                return cursor_err(
+                    cx,
+                    "presentation3d has no trigger rows (declare triggers { } pools, bind them with bind(), and consume events with events.snapshot()/events.pair(i); the 025-style auto-forward rows are not part of this profile)".to_string(),
+                );
+            }
+            other => {
+                return cursor_err(
+                    cx,
+                    format!(
+                        "unsupported presentation3d entry '{other}' (surface: audio/cue/hud; business trigger payloads are game2d-only)"
+                    ),
+                );
+            }
+        }
+    }
+    cx.expect(TokenKind::RBrace)?;
+    Ok(Presentation3dBlock {
+        audio,
+        cues,
+        hud,
+        span: super::ast::span_of(start),
+    })
+}

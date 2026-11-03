@@ -2051,6 +2051,7 @@ pub(crate) fn gen_user_source_3d(
     events: Option<&crate::lower_components3d_events::EventsCfg3>,
     bindings: Option<&crate::lower_components3d_bindings::BindingsCfg3>,
     presentation: Option<&crate::lower_node3d_presentation::PresentationMeta3>,
+    ahud: Option<&crate::lower_components3d_audio_hud::AhudCfg3>,
     gen_note: &str,
     regen_note: &str,
 ) -> Result<String, LowerError> {
@@ -2445,6 +2446,12 @@ pub(crate) fn gen_user_source_3d(
         bindings,
         "",
     );
+    if let Some(ahud) = ahud {
+        rctx.sfx = Some(crate::translate::SfxEnv { cues: &ahud.cues });
+        rctx.ahud3 = Some(crate::lower_components3d_audio_hud::AhudEnv3 {
+            has_character: ahud.has_character,
+        });
+    }
     src.push_str("fn main_lifestart() {\n");
     if let Some(h) = life_handler(root_decl, "Start") {
         translate_handler(&h.body.stmts, &rctx, &mut src, 1)?;
@@ -2492,6 +2499,7 @@ pub(crate) fn gen_user_source_3d(
             bindings,
             w3,
             presentation,
+            ahud,
             &mut src,
         )?;
     }
@@ -2525,6 +2533,12 @@ pub(crate) fn gen_user_source_3d(
         stamp_vis3d_env(&mut ictx, &dname, w3, presentation)?;
         // PLAN-030：引用参数环境盖章 + msg 参数投递覆盖（None = 旧档不变）。
         apply_bindings_ctx(&mut ictx, &dname, &def.module, project, plan, bindings, "i");
+        if let Some(ahud) = ahud {
+            ictx.sfx = Some(crate::translate::SfxEnv { cues: &ahud.cues });
+            ictx.ahud3 = Some(crate::lower_components3d_audio_hud::AhudEnv3 {
+                has_character: ahud.has_character,
+            });
+        }
         if def.life_tick {
             src.push_str(&format!("fn {prefix}_lifetick(i int, dt float) {{\n"));
             if let Some(h) = life_handler(decl, "Tick") {
@@ -2577,6 +2591,7 @@ pub(crate) fn gen_user_source_3d(
                 bindings,
                 w3,
                 presentation,
+                ahud,
                 &mut src,
             )?;
         }
@@ -2660,8 +2675,19 @@ pub(crate) fn gen_user_source_3d(
         }
     }
     src.push_str("}\n");
-    Ok(src)
-}
+    // PLAN-035：每回调末恰一次组合收口（bundle 整体 1 计费；四 HUD 槽
+    // 完整状态 + 角色姿态 + ≤4 声音请求），基础设施 fns 末尾随档发行。
+    if let Some(ahud) = ahud {
+        let kind = if ahud.has_character { 0 } else { -1 };
+        let entity = runtime.and_then(|rt| rt.character_bind_id).unwrap_or(0);
+        src.push_str(&format!(
+            " {}
+",
+            crate::lower_components3d_audio_hud::ahud_closeout_call(ahud, kind, entity)
+        ));
+        src.push_str(&crate::lower_components3d_audio_hud::ahud_fns_src(ahud, kind, entity));
+    }
+    Ok(src)}
 
 /// 运行期参数数组（handler 引用到的数值参数；视图静态引用逐实例内联）。
 fn def_runtime_params_3d(project: &Project, def: &DefIR) -> Vec<(String, PType)> {
@@ -3003,6 +3029,7 @@ fn gen_recv_fn_3d(
     bindings: Option<&crate::lower_components3d_bindings::BindingsCfg3>,
     w3: &World3d,
     presentation: Option<&crate::lower_node3d_presentation::PresentationMeta3>,
+    ahud: Option<&crate::lower_components3d_audio_hud::AhudCfg3>,
     src: &mut String,
 ) -> Result<(), LowerError> {
     let def = if recv_def_name.is_empty() {
@@ -3067,6 +3094,12 @@ fn gen_recv_fn_3d(
         bindings,
         if index.is_empty() { "" } else { "j" },
     );
+    if let Some(ahud) = ahud {
+        ctx.sfx = Some(crate::translate::SfxEnv { cues: &ahud.cues });
+        ctx.ahud3 = Some(crate::lower_components3d_audio_hud::AhudEnv3 {
+            has_character: ahud.has_character,
+        });
+    }
     translate_handler(&h.body.stmts, &ctx, src, 1)?;
     src.push_str("}\n");
     Ok(())
@@ -3174,6 +3207,7 @@ pub fn lower_project_components3d(project: &Project) -> Result<LowerOutputBasic2
         bindings: None,
         presentation: None,
         doc_prefix: "plan024-components-3d",
+        ahud: None,
         gen_note: "PLAN-024 components-3d",
         regen_note: "tools/verify_plan024.py",
         behavior_api: API,
@@ -3201,6 +3235,9 @@ pub(crate) struct Cfg3<'c> {
     /// scene.agscene behavior.api（024 = autographics.behavior/1；runtime =
     /// character3d/1 或 runtime_camera3d/1，驱动 start_selected_play 据此装配）。
     pub behavior_api: &'static str,
+    /// PLAN-035：components-3d-audio-hud 组合配置（None = 旧档，字节不变；
+    /// Some = 声音/HUD/姿态 bundle 收口 + 有界快照/批销毁作者面随档发行）。
+    pub ahud: Option<&'c crate::lower_components3d_audio_hud::AhudCfg3>,
 }
 
 pub(crate) fn lower_project_components3d_cfg(
@@ -3234,7 +3271,7 @@ pub(crate) fn lower_project_components3d_cfg_with(
         None => &no_templates,
     };
     let scene = collect_scene_3d_with(project, &w3, templates, cfg.presentation)?;
-    let user_source = gen_user_source_3d(project, &w3, &plan, &scene, cfg.runtime, cfg.events, cfg.bindings, cfg.presentation, cfg.gen_note, cfg.regen_note)?;
+    let user_source = gen_user_source_3d(project, &w3, &plan, &scene, cfg.runtime, cfg.events, cfg.bindings, cfg.presentation, cfg.ahud, cfg.gen_note, cfg.regen_note)?;
     let sha = crate::scene::sha256_hex(user_source.as_bytes());
     let bytes = user_source.len();
     let has_behavior =
@@ -3256,16 +3293,62 @@ pub(crate) fn lower_project_components3d_cfg_with(
             crate::lower_node3d_presentation::asset_ref_row(s, *l, n, meta)
         })
         .collect();
-    let scene_json = scene_json_3d(
-        cfg.behavior_api,
-        cfg.doc_prefix,
-        &entry,
-        &scene,
-        has_behavior,
-        &sha,
-        bytes,
-        &asset_rows,
-    );
+    let scene_json = if let Some(ahud) = cfg.ahud {
+        // PLAN-035：scene/8（音频/HUD/cue 面 + 3D 行/资产闭包），actors
+        // three_d = 1（角色）或 null（actor-free 唯一合法路径）。
+        let objects = scene
+            .rows
+            .iter()
+            .enumerate()
+            .filter(|(_, r)| !r.is_group)
+            .map(|(i, r)| obj_json_3d(r, i as u64 + 1))
+            .collect::<Vec<_>>()
+            .join(",
+");
+        let groups = scene
+            .rows
+            .iter()
+            .enumerate()
+            .filter(|(_, r)| r.is_group)
+            .map(|(i, r)| group_json_3d(r, i as u64 + 1))
+            .collect::<Vec<_>>()
+            .join(",
+");
+        let glb_rows = if asset_rows.is_empty() {
+            String::new()
+        } else {
+            format!("{}
+", asset_rows.join(",
+"))
+        };
+        crate::lower_components3d_audio_hud::scene_json_3d_ahud(
+            cfg.behavior_api,
+            cfg.doc_prefix,
+            &entry,
+            &objects,
+            &groups,
+            &glb_rows,
+            &ahud.audio_rows,
+            has_behavior,
+            &sha,
+            bytes,
+            ahud,
+            &ahud.bank_sha,
+            &ahud.font_sha,
+            &ahud.license_text,
+        )
+    } else {
+        scene_json_3d(
+            cfg.behavior_api,
+            cfg.doc_prefix,
+            &entry,
+            &scene,
+            has_behavior,
+            &sha,
+            bytes,
+            &asset_rows,
+        )
+    };
     let roles_json = roles_json_3d(&scene);
     Ok(LowerOutputBasic2D {
         user_source: if has_behavior {

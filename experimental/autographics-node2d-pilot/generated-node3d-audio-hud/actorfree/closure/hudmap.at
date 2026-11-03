@@ -1,0 +1,13 @@
+// PLAN-035 actor-free HUD helper: the author owns HUD shaping entirely.
+fn tick_text(n int) str {
+    if n == 0 {
+        return "0"
+    }
+    if n == 1 {
+        return "1"
+    }
+    if n == 2 {
+        return "2"
+    }
+    return "3+"
+}

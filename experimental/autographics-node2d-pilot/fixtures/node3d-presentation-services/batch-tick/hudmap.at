@@ -1,0 +1,13 @@
+// PLAN-035 batch-tick HUD helper: the author owns the count text.
+fn count_text(n int) str {
+    if n == 0 {
+        return "0"
+    }
+    if n == 1 {
+        return "1"
+    }
+    if n == 2 {
+        return "2"
+    }
+    return "3"
+}

@@ -1,0 +1,27 @@
+{
+ "generator": "autographics-node2d-pilot plan035 components-3d-audio-hud",
+ "api": "autographics.components3d/1",
+ "user_source_sha256": "871b1eaa1e10d03da57818e52fa5f397cc8a89a2de4e29bd869d95eb2bc76d5d",
+ "user_source_bytes": 1435,
+  "module:hudmap": "078ca804c8d0eef6758732b3730b411fa3f833063936ead2d744408f4425b46e",
+  "module:main": "f9a29ddcd51a816c8ed8b293b131d858cec1157d8369deb0e20a7f9b7a4b8ae5",
+ "closure": [
+  {"name": "hudmap", "sha256": "078ca804c8d0eef6758732b3730b411fa3f833063936ead2d744408f4425b46e", "bytes": 240},
+  {"name": "main", "sha256": "f9a29ddcd51a816c8ed8b293b131d858cec1157d8369deb0e20a7f9b7a4b8ae5", "bytes": 1380}
+ ],
+ "roles": {
+ "scene_rows": {
+  "pad": 0
+ }
+},
+ "assets": [
+
+ ],
+ "provenance": {
+  "product": "actorfree",
+  "consumer": "experimental/autographics-auto-driver/tests/node3d_audio_hud_flow.rs",
+  "consumption": "include_str! frozen scene.agscene + world.at + assets/<sha>.glb; the harness writes the project (scene + assets) under target and loads via Storage::load_project; variants feed scripts/<sha>.at where <sha> = scene.behavior.source.sha256",
+  "load_verification": "the load path hash-verifies the behavior source and every assets/<sha>.glb against the scene manifest; GLB geometry admission runs in the driver preflight decoder before allocation",
+  "world_sha256": "871b1eaa1e10d03da57818e52fa5f397cc8a89a2de4e29bd869d95eb2bc76d5d"
+ }
+}

@@ -1,0 +1,200 @@
+// PLAN-035 batch-tick boundary fixture (V-S03): three coins enter in the same
+// evaluate; the root consumes the bounded snapshot once and destroys all three
+// handles with one whole-batch despawn. Collection-tick ledger: input snapshot
+// 1 + char3 fused move 26 + grounded 1 + support 1 + events snapshot 1 + batch
+// despawn 1 + present3d bundle (pose + sounds + four slots) 1 = 32 of 32 —
+// the exact frozen pool boundary, live on the authoring chain.
+use resources: hero_glb
+use hudmap: count_text
+
+node Ground {
+    view-3d {
+        cylinder3d floor {
+            position: (0.0, -0.5, 0.0)
+            scale: (6.0, 0.5, 6.0)
+            solid: true
+        }
+    }
+}
+
+node Shard {
+    object3d { }
+    view-3d {
+        cylinder3d shard {
+            position: (-30.0, 1.0, -30.0)
+            visible: false
+            scale: (0.35, 0.08, 0.35)
+        }
+    }
+}
+
+node Coin(slot: SlotRef3D, template: TemplateRef3D, pair: PairRef3D, target: ActorRef3D, px: float, py: float, pz: float) {
+    model {
+        var h = 0
+    }
+    on {
+        Life.Start -> {
+            .h = spawn(.slot, .template, .px, .py, .pz)
+            bind(.pair, .target.body, sphere, 0.8, .h)
+        }
+    }
+}
+
+node Player {
+    model {
+        var grounded = 1
+        var vy = 0.0
+        var phase = 0.0
+        var yaw = 0.0
+    }
+    view-3d {
+        model3d body {
+            model: resources.hero_glb
+            position: (0.0, 0.0020000027093020076, 0.0)
+            scale: (0.6666666534211902, 0.9090908967759002, 1.2598424794780512)
+        }
+    }
+    character3d { }
+    on {
+        Life.Tick(dt) -> {
+            .vy = .vy - 20.0 * dt
+            var mx = input.held(Right) - input.held(Left)
+            var mz = input.held(Forward) - input.held(Back)
+            let fx = camera3d.forward_x()
+            let fz = camera3d.forward_z()
+            let rx = camera3d.right_x()
+            let rz = camera3d.right_z()
+            let q = refs.body.move3d((mx * rx + mz * fx) * 1.0 * dt, .vy * dt, (mx * rz + mz * fz) * 1.0 * dt)
+            .grounded = refs.body.grounded(q)
+            let sup = refs.body.support(q)
+            if .grounded == 1 {
+                .vy = 0.0
+            }
+            .phase = .phase + dt
+            refs.body.pose(clips.hero_glb.idle, .phase, 1, .yaw)
+        }
+    }
+}
+
+node Main {
+    model {
+        var taken = 0
+        var h1 = 0
+        var h2 = 0
+        var h3 = 0
+    }
+    msg {
+        Pinged(int)
+    }
+    view-3d {
+        Player hero { }
+        Ground ground { }
+        Coin ca { slot: objects3d.ca, template: templates.Shard, pair: triggers.ca_hit, target: refs.hero, px: 0.3, py: 0.5, pz: -0.2 }
+        Coin cb { slot: objects3d.cb, template: templates.Shard, pair: triggers.cb_hit, target: refs.hero, px: -0.3, py: 0.5, pz: 0.2 }
+        Coin cc { slot: objects3d.cc, template: templates.Shard, pair: triggers.cc_hit, target: refs.hero, px: 0.3, py: 0.5, pz: 0.3 }
+    }
+    objects3d { ca, cb, cc }
+    triggers { ca_hit, cb_hit, cc_hit }
+    presentation3d {
+        audio {
+            bank: "assets/b0b740dc49e51abefff9bb1af830080fe00f817b468614992040d438d6171c3d.wav"
+            font: "assets/4444c23631884f411aa7f2fee35061b1756a9927940c62d2a5572acf470b3ffa.ttf"
+            license: "assets/license.txt"
+        }
+        cue coin {
+            span: (7403, 20046)
+            gain: 1.0
+        }
+        hud {
+            slot 0 {
+                owner: "Main"
+                anchor: 0
+                offset: (8.0, 8.0)
+                size: 32.0
+                rgba: (1.0, 1.0, 1.0, 1.0)
+                text_fn: "count_text"
+                text_field: "taken"
+                init: "0"
+            }
+        }
+    }
+    camera3d { distance: 8.0
+              pitch: 30.0
+              projection: perspective }
+    on {
+        Life.Tick(dt) -> {
+            let n = events.snapshot()
+            var b1 = 0
+            var b2 = 0
+            var b3 = 0
+            var bn = 0
+            if 0 < n {
+                let ph = events.phase(0)
+                if ph == 1 {
+                    let p = events.pair(0)
+                    if p == 0 {
+                        b1 = events.source(0)
+                        bn = bn + 1
+                    }
+                    if p == 1 {
+                        b2 = events.source(0)
+                        bn = bn + 1
+                    }
+                    if p == 2 {
+                        b3 = events.source(0)
+                        bn = bn + 1
+                    }
+                    sfx.play("coin", 1.0)
+                }
+            }
+            if 1 < n {
+                let ph = events.phase(1)
+                if ph == 1 {
+                    let p = events.pair(1)
+                    if p == 0 {
+                        b1 = events.source(1)
+                        bn = bn + 1
+                    }
+                    if p == 1 {
+                        b2 = events.source(1)
+                        bn = bn + 1
+                    }
+                    if p == 2 {
+                        b3 = events.source(1)
+                        bn = bn + 1
+                    }
+                    sfx.play("coin", 1.0)
+                }
+            }
+            if 2 < n {
+                let ph = events.phase(2)
+                if ph == 1 {
+                    let p = events.pair(2)
+                    if p == 0 {
+                        b1 = events.source(2)
+                        bn = bn + 1
+                    }
+                    if p == 1 {
+                        b2 = events.source(2)
+                        bn = bn + 1
+                    }
+                    if p == 2 {
+                        b3 = events.source(2)
+                        bn = bn + 1
+                    }
+                    sfx.play("coin", 1.0)
+                }
+            }
+            if bn == 1 {
+                objects.despawn_batch(b1)
+            }
+            if bn == 2 {
+                objects.despawn_batch(b1, b2)
+            }
+            if bn == 3 {
+                objects.despawn_batch(b1, b2, b3)
+            }
+            .taken = .taken + bn
+        }
+    }
+}

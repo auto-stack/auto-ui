@@ -100,6 +100,7 @@ pub fn lower_project_components3d_runtime(
             gen_note: "PLAN-027 components-3d-runtime",
             regen_note: "tools/verify_plan027.py",
             presentation: None,
+            ahud: None,
             behavior_api,
         },
     )

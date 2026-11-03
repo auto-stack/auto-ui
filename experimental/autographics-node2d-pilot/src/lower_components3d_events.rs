@@ -331,6 +331,7 @@ pub fn lower_project_components3d_events(
             gen_note: "PLAN-028 components-3d-events",
             regen_note: "tools/verify_plan028.py",
             presentation: None,
+            ahud: None,
             behavior_api: EVENTS_API,
         },
     )
