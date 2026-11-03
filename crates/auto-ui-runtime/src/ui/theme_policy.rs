@@ -374,10 +374,10 @@ pub fn take_shell_dirty() -> bool {
 
 // ---------------------------------------------------------------------------
 // 目录发现装载（宿主 boot 与 standalone 跟随武装共用单一实现——解析序
-// env `AUTOOS_THEME_PACKAGE_DIR` → env `AUTO_UI_ROOT/packages/themes` →
-// 兄弟 `<组根>/auto-ui/packages/themes`（编译期锚 ancestors，组树/主检出
-// 双形态命中）；全缺席 = None 注入（family 链具名拒绝降级，legacy 链
-// 不受影响）。校验/digest 全走 compiler 包权威模块，无镜像实现。
+// env `AUTOOS_THEME_PACKAGE_DIR` → env `AUTO_UI_ROOT/packages/themes`；
+// 全缺席/全校验失败 = None 注入（family 链具名拒绝降级，legacy 链不受
+// 影响）。无主检出 fallback（V-08：managed channel 缺席 = 降级，不静默
+// 换源）。校验/digest 全走 compiler 包权威模块，无镜像实现。
 // ---------------------------------------------------------------------------
 
 /// 目录发现 + 校验 + 目录注入。返回人类可读诊断行（启动日志用）；包缺席
@@ -402,15 +402,9 @@ pub fn init_catalog_from_discovery() -> String {
             candidates.push(std::path::PathBuf::from(root).join("packages").join("themes"));
         }
     }
-    // 组兄弟（编译期锚 ancestors 第 4 层 = 组根——crates/<crate> → crates →
-    // <repo> → <组根>；worktree/主检出同律，PLAN-002 shell pack 同族先例）。
-    if let Some(group) = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .ancestors()
-        .nth(3)
-        .map(|p| p.to_path_buf())
-    {
-        candidates.push(group.join("auto-ui").join("packages").join("themes"));
-    }
+    // PLAN-053/V-08：**无主检出 fallback**——managed channel 缺席 = 降级
+    // （family 链具名拒绝），不静默换源到编译期锚定的检出目录（用户机上
+    // 该锚 = 主检出，合同明令禁止的隐式来源）。
     for dir in candidates {
         let expect = ThemePackageExpectation {
             owner: OWNER,

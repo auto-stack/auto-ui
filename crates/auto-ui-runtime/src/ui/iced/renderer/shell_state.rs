@@ -2844,6 +2844,11 @@ pub(crate) fn sync_theme_shell_state(
                 auto_val::Value::str(error.unwrap_or("")),
             );
             *app.state.view_dirty.borrow_mut() = true;
+            // PLAN-053 T-05：pending 行自续拍（eval 落定在帧构建路径——
+            // 晚于本 sync；有待定行 = 下拍再查，落定即停，稳态零成本）。
+            if status.contains("=pending") {
+                crate::ui::theme_policy::mark_shell_dirty();
+            }
         }
     }
 }

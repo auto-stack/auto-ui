@@ -5755,6 +5755,9 @@ impl DesktopSession {
                         let _ = component.write_state("dark_mode", auto_val::Value::Bool(dark));
                     }
                 }
+                // shell 状态面行刷新（新采纳者 pending→applied 可读不迟于
+                // 下一拍——不依赖下一次策略事件）。
+                crate::ui::theme_policy::mark_shell_dirty();
             }
         }
         self.next_app += 1;
