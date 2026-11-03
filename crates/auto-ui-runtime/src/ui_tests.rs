@@ -195,7 +195,7 @@ mod stylekit_module_import_parse_tests;
 // PLAN-037 有界修复回归：collect_module_imports 路径的 stylekit 共享配方
 // 预注册（015-notes VM 引导 plan-446 C1 fatal 反例钉住）。
 #[cfg(test)]
-mod plan037_stylekit_import_parse_tests; 47ccccd7 (feat(plan-037): T-03 — 013/015/017 adopt official themes package; 015 npm_deps corrected to surviving @autodown/engine link (ERR_PNPM_INVALID_DEPENDENCY_NAME blocker closed, pnpm install green); bounded runtime fix: collect_module_imports stylekit style-recipe preregistration (015/017 VM C1-fatal counterexample at base; regression test + mutation-verified oracle); gates: 013 vm 22ok/1skip + vue green, 015 smoke 13/13 + accent-dark 5/5 + autotest 19/19 + mcp 13ok/1skip, 017 vm PASS (D named Enter-routing skip, 013 D-GAP family) + vue 10 pass/4 base first-reds (json.from_value codegen transliteration, owner-dispatched))
+mod plan037_stylekit_import_parse_tests;
 #[cfg(test)]
 mod vm_json_float_read_tests;
 
