@@ -88,7 +88,7 @@ def main():
     port = free_port()
     env = dict(os.environ)
     env["AUTOUI_MCP_PORT"] = str(port)
-    proc = subprocess.Popen([AUTO_BIN, "run", "-r", "vm"], cwd=PROJECT,
+    proc = subprocess.Popen([AUTO_BIN, "run", "-r", "vm", "--server", "vm"], cwd=PROJECT,
                             stdout=subprocess.DEVNULL,
                             stderr=subprocess.DEVNULL, env=env)
     mcp = Mcp(f"http://127.0.0.1:{port}/mcp")

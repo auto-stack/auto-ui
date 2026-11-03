@@ -44,11 +44,16 @@ MCP_PORT_DEFAULT = 9247
 
 
 def pick_free_port(start=MCP_PORT_DEFAULT):
+    """PLAN-038 测试定位修定：bind 探测（connect_ex 把 Windows 保留段
+    误报为空闲——vm_matrix 同修；保留段上应用 MCP bind 失败即拒连）。"""
     import socket
     for port in range(start, start + 100):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            if s.connect_ex(("127.0.0.1", port)) != 0:
+            try:
+                s.bind(("127.0.0.1", port))
                 return port
+            except OSError:
+                continue
     raise RuntimeError(f"No free port in [{start}, {start + 100})")
 
 
@@ -492,7 +497,7 @@ def run_tests(mcp_url, proc):
             env={**os.environ, "AUTOUI_MCP_PORT": str(t9_port)},
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         t9_url = f"http://127.0.0.1:{t9_port}/mcp"
-        if wait_for_server(t9_url, 30):
+        if wait_for_server(t9_url, 60):  # PLAN-038: 30s 在负载下不够（主臂 60s 同因）
             mcp = McpClient(t9_url)
             snap_cache = [""]
             for _ in range(15):
@@ -618,7 +623,7 @@ def run_tests(mcp_url, proc):
         config_backup = open(config_file, encoding="utf-8", newline="").read()
         try:
             t10_url = f"http://127.0.0.1:{t10_port}/mcp"
-            assert wait_for_server(t10_url, 30), "T10 server never up"
+            assert wait_for_server(t10_url, 60), "T10 server never up"  # PLAN-038: 30s 在负载下不够
             mcp10 = McpClient(t10_url)
             snap10 = ""
             for _ in range(15):
