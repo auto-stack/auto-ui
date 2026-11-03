@@ -2256,6 +2256,21 @@ fn convert_view_messages(view: AbstractView<DynamicMessage>) -> AbstractView<Ice
         // 载荷需要转换，原样透传即可。
         AbstractView::Rich { spans, style } => AbstractView::Rich { spans, style },
 
+        // PLAN-029 T-02：Custom（NativeWidgetRegistry Element 通道，View::
+        // Custom）显式直通——此前漏臂落 `_ => Empty`（PLAN-082 Rich 同族
+        // 坑），doc-surface 等外部原生组件在 VM 动态路径整体不可见（永远
+        // 到不了 into_iced）。events 消息经 IcedMessage::from_dynamic 转换
+        // （Button onclick 同式）。
+        AbstractView::Custom { name, props, events, style } => AbstractView::Custom {
+            name,
+            props,
+            events: events
+                .into_iter()
+                .map(|(k, m)| (k, IcedMessage::from_dynamic(&m)))
+                .collect(),
+            style,
+        },
+
         // Select, Slider, Accordion, Sidebar, NavigationRail use
         // callback types (SelectCallback, fn pointers, Arc<...>) that
         // cannot be trivially converted. Map them to Empty as fallback.

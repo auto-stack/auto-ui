@@ -16,10 +16,75 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
             // 的 iced Element factory 表。本计划未注册任何 factory（首个后端
             // 原生件落地时建表消费，提案 066 §3.2），零高 Space 防御臂与
             // Empty 同款（不占布局位）。
-            AbstractView::Custom { .. } => iced::widget::Space::new()
-                .width(iced::Length::Shrink)
-                .height(iced::Length::Fixed(0.0))
-                .into(),
+            AbstractView::Custom { name, props, events, style } => {
+                // PLAN-029 T-02：doc-surface 实验文档表面——组件 bounds 处挂
+                // wry WebView2 子表面（feature 同门，缺省保持零高 Space 防御
+                // 臂与 Empty 同款）。key/url 取已解析 props（派发期 Element
+                // 通道 resolve 产物）；style chrome（边框/圆角/底色）走容器
+                // 包装（RemoteFrame 同款纪律）。events 暂无消费（表面输入由
+                // WebView2 内容自身处理），保字段防未来事件接缝。
+                #[cfg(all(windows, feature = "doc-surface"))]
+                if name == "doc-surface" {
+                    let _ = &events;
+                    if std::env::var("AUTO_DOC_SURFACE_DEBUG").as_deref() == Ok("1") {
+                        eprintln!("[doc-surface] into_iced arm reached props={:?}", props);
+                    }
+
+                    let get = |k: &str| {
+                        props
+                            .iter()
+                            .find(|(n, _)| n == k)
+                            .map(|(_, v)| v.clone())
+                            .unwrap_or_default()
+                    };
+                    let painter = crate::ui::doc_surface::DocSurfacePainter::<M>::new(
+                        get("key"),
+                        get("url"),
+                    );
+                    // 尺寸 props（px 数字；缺省 Fill——Fill 在 Shrink 父容器内
+                    // 会塌缩为 0，探针页必须给显式 height）。
+                    let size_hint = |k: &str| -> Option<iced::Length> {
+                        get(k)
+                            .trim()
+                            .parse::<f32>()
+                            .ok()
+                            .filter(|v| *v > 0.0)
+                            .map(iced::Length::Fixed)
+                    };
+                    let width_hint = size_hint("width").unwrap_or(iced::Length::Fill);
+                    let height_hint = size_hint("height").unwrap_or(iced::Length::Fill);
+                    let canvas_el: iced::Element<'static, M> =
+                        iced::widget::canvas(painter)
+                            .width(width_hint)
+                            .height(height_hint)
+                            .into();
+                    let is = style.as_ref().map(IcedStyle::from_style);
+                    let mut surface = iced::widget::container(canvas_el);
+                    if let Some(ref is) = is {
+                        let background =
+                            is.background_color.map(iced::Background::Color);
+                        let border_color =
+                            is.border_color.unwrap_or(iced::Color::TRANSPARENT);
+                        let border_width = is.border_width.unwrap_or(0.0);
+                        let border_radius = is.border_radius.unwrap_or(0.0);
+                        surface = surface
+                            .style(move |_theme| iced::widget::container::Style {
+                                background,
+                                border: iced::Border::default()
+                                    .rounded(border_radius.min(9999.0))
+                                    .width(border_width)
+                                    .color(border_color),
+                                ..Default::default()
+                            });
+                    }
+                    return surface.into();
+                }
+                let _ = (&name, &props, &events, &style);
+                iced::widget::Space::new()
+                    .width(iced::Length::Shrink)
+                    .height(iced::Length::Fixed(0.0))
+                    .into()
+            }
             // PLAN-063 T-04d-2: 锚槽 → 记录布局坐标的委托 wrapper。
             AbstractView::AnchorSlot { index, child } => {
                 let el = child.into_iced();
