@@ -70,37 +70,12 @@ pub fn publish_theme_package_snapshot(
 
 /// 主题包内容摘要：清单列出文件（按路径排序）的 sha256，供生成/缓存 receipt
 /// 失效使用。摘要与绝对根无关（同一包移动后不变），文件内容变化即变化。
+/// PLAN-053 T-04：算法唯一实现点迁至 compiler（包身份语义同址——runtime
+/// 侧目录注入也消费，不能反向依赖 tools）；本函数保留 re-export 形态。
 pub fn theme_package_content_digest(
     dir: &std::path::Path,
 ) -> Result<String, ThemePackageError> {
-    use sha2::{Digest, Sha256};
-    let manifest = dir.join("theme-package.json");
-    let text = std::fs::read_to_string(&manifest)
-        .map_err(|_| ThemePackageError::MissingManifest(manifest.clone()))?;
-    let v: serde_json::Value = serde_json::from_str(&text)
-        .map_err(|e| ThemePackageError::BadManifest(format!("json: {e}")))?;
-    let files = v
-        .get("files")
-        .and_then(|x| x.as_array())
-        .ok_or_else(|| ThemePackageError::BadManifest("files 必须是非空数组".into()))?;
-    let mut entries: Vec<(String, Vec<u8>)> = Vec::new();
-    for f in files {
-        let rel = f.get("path").and_then(|x| x.as_str()).unwrap_or("");
-        if rel.is_empty() || rel.contains("..") || rel.starts_with('/') || rel.contains('\\') {
-            return Err(ThemePackageError::PathEscape(rel.to_string()));
-        }
-        let bytes = std::fs::read(dir.join(rel))
-            .map_err(|_| ThemePackageError::MissingFile(rel.to_string()))?;
-        entries.push((rel.to_string(), bytes));
-    }
-    entries.sort_by(|a, b| a.0.cmp(&b.0));
-    let mut hasher = Sha256::new();
-    for (path, bytes) in entries {
-        hasher.update(path.as_bytes());
-        hasher.update([0u8]);
-        hasher.update(&bytes);
-    }
-    Ok(format!("{:x}", hasher.finalize()))
+    auto_ui_compiler::design_tokens::theme_package::theme_package_content_digest(dir)
 }
 /// PLAN-031 T-04/T-07（V-09）：解析 pac `dep themes { path: … }` 的**原始**路径
 /// （未校验）。None = 该 App 未声明官方包依赖。

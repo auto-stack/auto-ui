@@ -4726,6 +4726,10 @@ fn run_session(
                         }
                         // Plan 551 T6:外写热应用轮询(os-config 经 daemon 改
                         // config.at → 宿主 400ms 节拍感知 → 差异应用)。
+                        // PLAN-053 T-04：standalone armed 时同拍生效——
+                        // 策略组差异臂（apply_external_config_diff）与宿主
+                        // bus 动词同一 stage/commit 入口喂 031 端口；订阅门
+                        // 在 armed 位拉起（unarmed 零拍）。
                         poll_external_config(state);
                         // PLAN-526 T18：热键切换的切换预览面板倒计时收起
                         // （~1.6s；触发 icon 手动开合不经此——无倒计时）。
@@ -6984,8 +6988,14 @@ fn run_session(
                 // 都挂在 400ms 拍；url 退场租约清空 → 订阅自动回落。
                 let remote_frame_tick =
                     !state.is_desktop() && crate::ui::iced::remote_frame_registry::has_live_urls();
+                // PLAN-053 T-04：standalone 跟随腿——`AUTOOS_DESKTOP_CONFIG`
+                // 武装（run_file_dynamic_ui_inner 置位）时拉 400ms 拍，独立
+                // 进程经外写轮询差异臂（与宿主同入口）跟随宿主策略。
+                let standalone_follow_tick =
+                    !state.is_desktop() && crate::ui::theme_policy::standalone_follow_armed();
                 if fit_remeasure_tick
                     || remote_frame_tick
+                    || standalone_follow_tick
                     || (state.is_desktop()
                         && std::env::var("AUTOUI_MCP_DISABLE").map_or(true, |v| v != "1"))
                 {

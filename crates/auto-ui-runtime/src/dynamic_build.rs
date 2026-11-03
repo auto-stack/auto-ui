@@ -2137,6 +2137,12 @@ fn run_file_dynamic_ui_inner(
         return crate::ui::desktop_protocol::rqhost::run_vm_rqhost_client(comp, &pipe)
             .map_err(auto_lang_core::error::AutoError::Msg);
     }
+    // PLAN-053 T-04：standalone 跟随腿武装（`AUTOOS_DESKTOP_CONFIG` 在场 =
+    // 显式跟随宿主桌面配置——目录发现装载 + 落盘策略恢复 + 400ms tick 订阅
+    // 拉起；env 缺席零开销零行为差）。armed 后 tick 内 poll_external_config
+    // 的策略组差异臂（与宿主 bus 动词同一 stage/commit 入口）喂本进程
+    // 组件的 031 端口（§5.1 冻结裁定：独立进程复用 config 轮询通道）。
+    crate::ui::theme_policy::arm_standalone_follow();
     // 4. Run iced (blocks until all windows close; plan-459 daemon semantics)
     run_dynamic_iced(comp).map_err(|e| auto_lang_core::error::AutoError::Msg(format!("{}", e)))
 }

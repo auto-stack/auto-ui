@@ -373,6 +373,138 @@ pub fn take_shell_dirty() -> bool {
 }
 
 // ---------------------------------------------------------------------------
+// 目录发现装载（宿主 boot 与 standalone 跟随武装共用单一实现——解析序
+// env `AUTOOS_THEME_PACKAGE_DIR` → env `AUTO_UI_ROOT/packages/themes` →
+// 兄弟 `<组根>/auto-ui/packages/themes`（编译期锚 ancestors，组树/主检出
+// 双形态命中）；全缺席 = None 注入（family 链具名拒绝降级，legacy 链
+// 不受影响）。校验/digest 全走 compiler 包权威模块，无镜像实现。
+// ---------------------------------------------------------------------------
+
+/// 目录发现 + 校验 + 目录注入。返回人类可读诊断行（启动日志用）；包缺席
+/// 时注入 None 并返回降级诊断。
+pub fn init_catalog_from_discovery() -> String {
+    use auto_ui_compiler::design_tokens::theme_package::{
+        theme_package_content_digest, verify_theme_package, ThemePackageExpectation,
+    };
+    const OWNER: &str = "auto-ui";
+    const PACKAGE: &str = "themes";
+    const VERSION: &str = "0.2.0";
+    const SCHEMA: u64 = 1;
+
+    let mut candidates: Vec<std::path::PathBuf> = Vec::new();
+    if let Ok(dir) = std::env::var("AUTOOS_THEME_PACKAGE_DIR") {
+        if !dir.trim().is_empty() {
+            candidates.push(std::path::PathBuf::from(dir));
+        }
+    }
+    if let Ok(root) = std::env::var("AUTO_UI_ROOT") {
+        if !root.trim().is_empty() {
+            candidates.push(std::path::PathBuf::from(root).join("packages").join("themes"));
+        }
+    }
+    // 组兄弟（编译期锚 ancestors 第 4 层 = 组根——crates/<crate> → crates →
+    // <repo> → <组根>；worktree/主检出同律，PLAN-002 shell pack 同族先例）。
+    if let Some(group) = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .nth(3)
+        .map(|p| p.to_path_buf())
+    {
+        candidates.push(group.join("auto-ui").join("packages").join("themes"));
+    }
+    for dir in candidates {
+        let expect = ThemePackageExpectation {
+            owner: OWNER,
+            package: PACKAGE,
+            version: VERSION,
+            schema: SCHEMA,
+        };
+        let (verified, digest) = match (
+            verify_theme_package(&dir, &expect),
+            theme_package_content_digest(&dir),
+        ) {
+            (Ok(v), Ok(d)) => (v, d),
+            _ => continue,
+        };
+        // family 缺省 mode 从 manifest 读（校验后的能力表只带 modes）。
+        let manifest_families = std::fs::read_to_string(dir.join("theme-package.json"))
+            .ok()
+            .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+            .and_then(|v| v.get("families").and_then(|f| f.as_array()).cloned())
+            .unwrap_or_default();
+        let families: Vec<ThemeFamilyInfo> = manifest_families
+            .iter()
+            .filter_map(|f| {
+                let name = f.get("name")?.as_str()?.to_string();
+                let modes = verified.families.get(&name)?;
+                Some(ThemeFamilyInfo {
+                    name,
+                    modes: modes.clone(),
+                    default: f
+                        .get("default")
+                        .and_then(|d| d.as_str())
+                        .unwrap_or("light")
+                        .to_string(),
+                })
+            })
+            .collect();
+        let diag = format!(
+            "theme package: {} v{} families={} digest={}..{} root={}",
+            verified.package,
+            verified.version,
+            families.len(),
+            &digest[..8],
+            &digest[digest.len() - 8..],
+            dir.display()
+        );
+        init_catalog(Some(ThemePackageCatalog {
+            owner: verified.owner,
+            package: verified.package,
+            version: verified.version,
+            digest,
+            families,
+        }));
+        return diag;
+    }
+    init_catalog(None);
+    "theme package 未找到/校验失败（AUTOOS_THEME_PACKAGE_DIR/AUTO_UI_ROOT/兄弟 auto-ui 均未命中）——family 链降级"
+        .to_string()
+}
+
+// ---------------------------------------------------------------------------
+// standalone（`auto run -r vm`）跟随腿（PLAN-053 T-04；§5.1 冻结裁定：
+// 独立进程复用 config 轮询通道，不新增传输）。`AUTOOS_DESKTOP_CONFIG`
+// env 在场 = 显式跟随宿主桌面配置——武装位拉起 400ms ServiceTick 订阅，
+// tick 内 poll_external_config 的策略组差异臂（与宿主同一 stage/commit
+// 入口）喂本进程组件的 031 端口。env 缺席 = 零开销零行为差。
+// ---------------------------------------------------------------------------
+
+static STANDALONE_FOLLOW: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+/// standalone 跟随武装（run_file_dynamic_ui_inner 入口调用；幂等）。
+pub fn arm_standalone_follow() {
+    let armed = std::env::var_os("AUTOOS_DESKTOP_CONFIG")
+        .map(|p| !p.is_empty())
+        .unwrap_or(false);
+    if !armed {
+        return;
+    }
+    let diag = init_catalog_from_discovery();
+    // eprintln!("[PLAN-053] standalone follow armed: {diag}");
+    // 落盘策略恢复（宿主重启/崩溃后从磁盘完整快照恢复语义同源）。
+    let cfg = crate::ui::desktop_config::load();
+    if let Err(reason) = boot_from_config(&cfg) {
+        eprintln!("[PLAN-053] standalone boot 恢复拒绝：{reason}");
+    }
+    STANDALONE_FOLLOW.store(true, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// ServiceTick 订阅门（standalone 且已武装才拉 400ms 拍）。
+pub fn standalone_follow_armed() -> bool {
+    STANDALONE_FOLLOW.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+// ---------------------------------------------------------------------------
 // App 级评估结果登记（in-proc/独立进程共用的 applied/rejected 读回面）。
 // eval_app_design 在整帧发布/拒绝路径各记一笔；宿主状态面据此把每 App
 // pending/applied/rejected/unsupported 分列（§5.3），不把发送成功当渲染成功。

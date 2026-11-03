@@ -2864,11 +2864,21 @@ fn execute_set_theme(state: &mut crate::ui::session::DesktopSession, dark: bool)
     let _ = crate::ui::desktop_config::save(&state.desktop.config);
     // Plan 497 G3 同款：全场快照随撤（窗口缩略按旧主题渲染）。
     crate::ui::iced::snapshot::invalidate_all();
+    // PLAN-053 T-02：family 链激活时采纳者的 dark_mode 由已提交策略派生
+    // mode 驱动（同 apply_external_config_diff 差异臂；legacy 词不越权）。
+    let policy_dark = crate::ui::theme_policy::current().and_then(|p| p.resolved_dark());
     for app in state.apps.values_mut() {
-        if app.component.read_state("dark_mode").is_ok() {
-            let _ = app
-                .component
-                .write_state("dark_mode", auto_val::Value::Bool(dark));
+        let effective = if app.component.theme_scope().is_some() {
+            policy_dark
+        } else {
+            Some(dark)
+        };
+        if let Some(d) = effective {
+            if app.component.read_state("dark_mode").is_ok() {
+                let _ = app
+                    .component
+                    .write_state("dark_mode", auto_val::Value::Bool(d));
+            }
         }
         *app.state.view_dirty.borrow_mut() = true;
     }
@@ -3281,9 +3291,9 @@ pub(super) fn apply_external_config_diff(
                 candidate.theme_family_digest = None;
             }
         }
-        match crate::ui::theme_policy::stage_candidate(&mut candidate) {
-            crate::ui::theme_policy::PolicyOutcome::Staged(staged) => {
-                state.desktop.config = candidate.clone();
+    match crate::ui::theme_policy::stage_candidate(&mut candidate) {
+        crate::ui::theme_policy::PolicyOutcome::Staged(staged) => {
+            state.desktop.config = candidate.clone();
                 if crate::ui::desktop_config::save(&state.desktop.config).is_ok() {
                     let mode = candidate.theme_mode.clone().unwrap_or_default();
                     let rev = crate::ui::theme_policy::publish_staged(staged);
@@ -3335,12 +3345,24 @@ pub(super) fn apply_external_config_diff(
         #[cfg(feature = "autodown")]
         crate::ui::autodown_editor::retheme_all_fence_buffers();
         crate::ui::iced::snapshot::invalidate_all();
+        // PLAN-053 T-04：family 链激活时，031 采纳者（有主题 scope）的
+        // `dark_mode` 状态位由**已提交策略的派生 mode**驱动（视图类分支
+        // 读它——rejected 候选的 legacy dark_theme 翻转不得越权改色，
+        // §5.2 拒绝保旧）；legacy 组件沿 cfg.dark_theme（既有语义）。
+        let policy_dark = crate::ui::theme_policy::current().and_then(|p| p.resolved_dark());
         let dark = cfg.dark_theme;
         for app in state.apps.values_mut() {
-            if app.component.read_state("dark_mode").is_ok() {
-                let _ = app
-                    .component
-                    .write_state("dark_mode", auto_val::Value::Bool(dark));
+            let effective = if app.component.theme_scope().is_some() {
+                policy_dark
+            } else {
+                Some(dark)
+            };
+            if let Some(d) = effective {
+                if app.component.read_state("dark_mode").is_ok() {
+                    let _ = app
+                        .component
+                        .write_state("dark_mode", auto_val::Value::Bool(d));
+                }
             }
             *app.state.view_dirty.borrow_mut() = true;
         }

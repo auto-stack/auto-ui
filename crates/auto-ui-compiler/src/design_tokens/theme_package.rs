@@ -207,3 +207,42 @@ pub fn verify_theme_package(
         trees,
     })
 }
+
+/// PLAN-053 T-04：主题包内容摘要——清单列出文件（按路径排序）的聚合
+/// sha256（`path \0 content` 连写）。与绝对根无关（同包移动不变）、内容
+/// 变化即变化。算法唯一实现点（原 auto-ui-tools 同名函数迁入——digest
+/// 是包身份语义的一部分，runtime 侧宿主/standalone 目录注入也要消费，
+/// 不能让 runtime 依赖 tools 反向层）。
+pub fn theme_package_content_digest(dir: &Path) -> Result<String, ThemePackageError> {
+    let manifest = dir.join("theme-package.json");
+    let text = std::fs::read_to_string(&manifest)
+        .map_err(|_| ThemePackageError::MissingManifest(manifest.clone()))?;
+    let v: serde_json::Value = serde_json::from_str(&text)
+        .map_err(|e| ThemePackageError::BadManifest(format!("json: {e}")))?;
+    let files = v
+        .get("files")
+        .and_then(|x| x.as_array())
+        .ok_or_else(|| ThemePackageError::BadManifest("files 必须是非空数组".into()))?;
+    let mut entries: Vec<(String, Vec<u8>)> = Vec::new();
+    for f in files {
+        let rel = f
+            .get("path")
+            .and_then(|x| x.as_str())
+            .unwrap_or("")
+            .to_string();
+        if rel.is_empty() || rel.contains("..") || rel.starts_with('/') || rel.contains('\\') {
+            return Err(ThemePackageError::PathEscape(rel));
+        }
+        let bytes = std::fs::read(dir.join(&rel))
+            .map_err(|_| ThemePackageError::MissingFile(rel.clone()))?;
+        entries.push((rel, bytes));
+    }
+    entries.sort_by(|a, b| a.0.cmp(&b.0));
+    let mut hasher = Sha256::new();
+    for (path, bytes) in entries {
+        hasher.update(path.as_bytes());
+        hasher.update([0u8]);
+        hasher.update(&bytes);
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}

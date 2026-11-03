@@ -5719,6 +5719,13 @@ impl DesktopSession {
         if let Some(policy) = crate::ui::theme_policy::current() {
             if component.theme_scope().is_some() {
                 component.set_host_theme_inputs(policy.snapshot().host_inputs());
+                // 采纳者的 dark_mode 状态位同步策略派生 mode（视图类分支
+                // 读它——与 effect/外写差异臂同一语义，§5.2）。
+                if let Some(dark) = policy.resolved_dark() {
+                    if component.read_state("dark_mode").is_ok() {
+                        let _ = component.write_state("dark_mode", auto_val::Value::Bool(dark));
+                    }
+                }
             }
         }
         self.next_app += 1;
