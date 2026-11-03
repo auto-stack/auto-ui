@@ -1,5 +1,7 @@
 # AG下一阶段：三维查询、完整G3与G05迁移
 
+> 2026-11-03最新核验：UI035交付5903839e、UI039交付8f577a34；AG016/017仍drafting/r1/0-10无树。下一批UI040/AG018/AG019仅规划，见[编辑与同版发行收口](m2-editor-and-release-convergence.md)。下文为本批立约快照；同会话final限制、原预算与合同保持。
+
 2026-11-03 v1，target-state。用户授权继续规划；三份新合同均drafting/r1、0/10，本轮不实施/建树/探针/复制素材/构建/GPU/OS自动化或创建agent。承接[M2总路线](m2-game-first-three-lane-roadmap.md)，公共作者模型仍为Node/use/model/msg/on、Life.Start/Tick及具名资源/事件，声明组织不强迫单文件运行或树形存储。
 
 ## 1. 现场与来源限制
@@ -13,7 +15,7 @@
 
 | 责任线 | 合同 | 可独立准备/实现范围 | 完整接线硬门 |
 |---|---|---|---|
-| auto-ui引擎 | [UI039](../../plans/039-autographics-node3d-queries-and-mixed-markers.md) | 已交付021/024/030之上，三维segment/sweep typed查询、动态group、有限3D＋2D诊断层；不等035 | T-02最多两机制全链先证，准确profile/refs/收费和旧档边界冻结后T-03实现 |
+| auto-ui引擎 | [UI039](../../plans/archived/039-autographics-node3d-queries-and-mixed-markers.md) | 已交付021/024/030之上，三维segment/sweep typed查询、动态group、有限3D＋2D诊断层；不等035 | T-02最多两机制全链先证，准确profile/refs/收费和旧档边界冻结后T-03实现 |
 | ag-examples完整游戏 | [AG016](../../../../ag-examples/docs/plans/016-autographics-complete-3d-platformer.md) | T-01/02原G3八项/资源许可/模块草图/oracle/预算/包准备 | T-03等035实际交付/独立final/Spec/工具及相关034证据核；不等039/AG017 |
 | ag-examples Demo | [AG017](../../../../ag-examples/docs/plans/017-autographics-gallery-node3d-queries.md) | T-01原G05三变体/九义务/GLB/2d冻结/包与政策准备 | T-02等039实际交付/独立final/Spec/工具；不等035/AG016 |
 

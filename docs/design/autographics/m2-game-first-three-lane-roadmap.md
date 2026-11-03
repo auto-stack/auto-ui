@@ -1,47 +1,49 @@
-# M2游戏优先路线：引擎、完整游戏、Gallery三线并行
+# M2游戏优先路线：内容闭环、编辑迁移与统一版本联验
 
-2026-11-03，设计v4。AG用AutoUI式Node声明、局部model/msg/on、view-2d/view-3d、普通use与具名资源/事件表达图形应用。主线为完整2D闭环→3D公共表现/音画→完整3D游戏，Demo并行；当前目标桌面，M2两游戏/编辑/离线发行/Gallery/最终同一版本原分母不变，ACE/AOT/ECS/CPC/跨端不新增为前置。
+2026-11-03，设计v5。AG作者模型仍是AutoUI式Node/use、局部model/msg/on、view-2d/view-3d及具名资源/事件；桌面M2原两游戏/编辑/必要音画/资源离线/Gallery/统一最终引擎版本分母保持。ACE/AOT/ECS/CPC/跨端不新增前置。
 
-## 1. 当前实际状态
+## 1. 当前真实状态
 
-| 事项 | 现场证据和边界 |
+| 事项 | 已核事实及边界 |
 |---|---|
-| 完整2D | [UI032](../../plans/archived/032-autographics-node2d-full-game-composition.md)交付a8c04d22；[AG014](../../../../ag-examples/docs/plans/archived/014-autographics-complete-2d-platformer.md)交付c141df8/独立final/Spec/归档，保其保存关开/SaveAs具名复用边界，不外推新3D豁免 |
-| G11/3d | [AG013](../../../../ag-examples/docs/plans/archived/013-autographics-gallery-g11-3d-node-migration.md)交付b48b304；UI030独立复审证据已补录c29e84cf |
-| 3D纹理/动画与G10 | [UI034](../../plans/archived/034-autographics-node3d-materials-and-animation.md)交付93eaa907，[AG015](../../../../ag-examples/docs/plans/archived/015-autographics-gallery-g10-node-migration.md)交付80e0b65；实际source/生成物/metadata为**19/22**，余g04两维/g05三维。两份复审收据明确同实现会话复核，不称独立上下文final；相关034持名hold未自行关闭 |
-| 3D公共音画/完整G3组合 | [UI035](../../plans/035-autographics-node3d-audio-hud-composition.md)仍在实施，唯一树ui-035/auto-ui、codex/plan-035-dev、观察65f5ce47/主checkout收据e6ca119f；r1任务3/10、T-04实质实施中、元数据仍drafting。T-03先证候选不充最终交付，不接管owner WIP |
-| 本轮新合同 | UI039查询、AG016完整G3、AG017 G05/3d，均drafting/r1/0-10，**仅规划** |
+| 完整2D | [UI032](../../plans/archived/032-autographics-node2d-full-game-composition.md)交付a8c04d22；[AG014](../../../../ag-examples/docs/plans/archived/014-autographics-complete-2d-platformer.md)交付c141df8；其保存复用边界保原收据，不外推新G3豁免 |
+| 3D表现/音画/查询 | [UI034](../../plans/archived/034-autographics-node3d-materials-and-animation.md)93eaa907、[UI035](../../plans/archived/035-autographics-node3d-audio-hud-composition.md)5903839e、[UI039](../../plans/archived/039-autographics-node3d-queries-and-mixed-markers.md)8f577a34已实际落主/有canonical/旧树已清；同实现会话final限制如实记录，不称独立上下文pass |
+| Gallery | [AG015](../../../../ag-examples/docs/plans/archived/015-autographics-gallery-g10-node-migration.md)80e0b65后当前活源**19/22**，余g04/2d、g04/3d、g05/3d；AG013 G11/3d b48b304及其它已迁入口保持固定消费 |
+| 待实施内容 | [AG016完整G3](../../../../ag-examples/docs/plans/016-autographics-complete-3d-platformer.md)、[AG017 G05/3d](../../../../ag-examples/docs/plans/017-autographics-gallery-node3d-queries.md)均drafting/r1/0-10、无实施树；引擎源码/工具已有实交付，完整开工仍核各合同独立证据及相关hold，不改owner合同 |
+| 本批新合同 | UI040编辑工程、AG018 G04、AG019 M2同版联验，均drafting/r1/0-10，只规划 |
 
-权威分母为auto-lang [M2-01..09](../../../../auto-lang/docs/design/autographics/m2-editor-and-public-game-prototypes.md)、[G2-01..09/G3-01..08/原关卡](../../../../auto-lang/docs/design/autographics/m2-game-sample-matrix.md)；Gallery19/22不是M2百分比。旧UI011两候选33/32的no_go保历史，不能抹掉也不能外推成永久语言限制。
+权威分母仍为auto-lang [M2-01..09](../../../../auto-lang/docs/design/autographics/m2-editor-and-public-game-prototypes.md)、[G2-01..09/G3-01..08/原关卡](../../../../auto-lang/docs/design/autographics/m2-game-sample-matrix.md)。Gallery19/22不是M2完成比例，游戏不计Gallery分母。
 
-## 2. 下一批三合同
+## 2. 当前下一批与依赖
 
-详见[查询与完整G3设计](node3d-queries-and-complete-game.md)。
+[共同设计](m2-editor-and-release-convergence.md)承接上一批[三维查询/完整G3设计](node3d-queries-and-complete-game.md)，旧日期快照保历史。
 
-| 线/责任仓 | 合同 | 可独立推进 | 完整实施硬门 |
+| 线/责任仓 | 合同 | 可独立推进 | 完整后续硬门 |
 |---|---|---|---|
-| 引擎/auto-ui | [UI039](../../plans/039-autographics-node3d-queries-and-mixed-markers.md) | 021/024/030已交付基础上的3D segment/sweep、动态组、原2D标记有限组合；不等035 | T-02全链有界先证/冻结后T-03实现 |
-| 完整游戏/ag-examples | [AG016](../../../../ag-examples/docs/plans/016-autographics-complete-3d-platformer.md) | T-01/02原G3八项、固定资源许可、模块/oracle/预算/包准备 | T-03完整接线硬等035实际交付/独立final/canonical/工具及相关034证据/hold核验；不等039/AG017 |
-| Demo/ag-examples | [AG017](../../../../ag-examples/docs/plans/017-autographics-gallery-node3d-queries.md) | T-01原G05/3d三变体/九义务/多part GLB/原2d冻结/包准备 | T-02完整新链硬等039实际交付/独立final/canonical/工具；不等035/AG016 |
+| 引擎/auto-ui | [UI040](../../plans/040-autographics-node-editor-projects.md) | 原G04双维纯声明对象、项目感知编辑/保存副本交接；不等016/017 | T-02最多A/B全链先证；现有039静态路径足够就不新加profile |
+| Demo/ag-examples | [AG018](../../../../ag-examples/docs/plans/018-autographics-gallery-node-editor-tutorials.md) | T-01原G04九义务/2D20与3D34/全部对象/旧锁/政策准备 | T-02完整迁移等040实交付/准确接口/独立证据；不等游戏或017 |
+| 里程碑集成/ag-examples | [AG019](../../../../ag-examples/docs/plans/019-autographics-m2-unified-release-validation.md) | T-01原M2/全部入口变体/oracle/来源债/发行环境盘点 | T-02候选先证等040交付，T-03完整同版消费等016/017/018交付及必需独立证据 |
 
-035继续原owner工作；039可与之独立推进，公用parser/load/translate/assembly短窗单写/核交叠回归。两内容Plan分树固定消费各自实际delivery，不追tip；共享gallery/packager/注册短窗协调，target/材料scope独占。真实GPU/窗口焦点/音频重门机器单实例。准备阶段并行不越依赖门，本轮不自动启动。
+AG016/017可按原合同另行启动，UI040可独立推进，018准备可并行；019完整联验是后置门，不能提前运行后以缺产品删分母。共享gallery/packager/锁注册/引擎公共面owner短窗，各Plan一仓一树、独立target/材料scope；GPU/音频/窗口机器单实例，OS抢焦点自动化暂停不因新计划解除。本轮不自动实施。
 
-## 3. 引擎和内容的边界
+## 3. G04不是简单的单维重写
 
-034实际作者面是typed textured3d/animated3d、公开resource-meta两段生成、具名clip/pose和原模型角色；以实际canonical `gallery-node3d-textures-and-animation.md`为准，不用原提案名假装路径存在。035继续公共audio3d/hud3d与显式有界组合，原G3八项/actor-free服务均应实际证明；字段名/Idle等不成为Rust玩法约定。
+原G04两个项目都含circle/quad与player/mob，2d另2个helper、3d另cylinder helper，都是behavior:null。039代码已有无state/Life时的无用户VM纯声明路径；尚须先证原对象/顺序与ID映射、项目自己的编辑/保存与消费身份。040优先复用，确有缺口才最小公共收口，不造重复渲染器/假角色或空Tick。
 
-039补原G05/3d真实缺口：group目前静态、parser同Node双view无条件拒绝、Node尚无三维typed query。新显式profile允许有限同根view-3d＋view-2d共model/msg/on共同呈现，子Node单维；T-02冻结机制，旧profile原拒绝/产品保持。查询仍真实Auto执行，driver只准备/复验实际all-mesh几何与结果；不换圆柱/删二维marker/强加character/camera。不是任意生产UI视口或环境变体系统。
+Node源/closure/生成基线是可再生初始来源；用户通过公共Open/SaveAs明确创建独立编辑副本，保存的是副本接受态，搬迁重开应保用户变更。拖动不暗改源/生成Ready，再生基线不静默覆盖用户副本；不在本期做反向AST写回。旧默认文档probe保作对照，原九require/20与34阶段及新Node项目自身导航/选择/实际Auto拖动/保存关开/SaveAs必须有真实证据，默认样例绿不代项目绿。未证必需OS项阻止相应AC关闭，不借旧pending豁免。
 
-原32credits/物理写32/8状态Node/8slot/8pair、120base+8reserved128、deep/contact64/mesh512、raw8身份32MiB单件8MiB/CPU-GPU各64MiB与VM/source/time/声HUD/动画预算均保持。多模块共享世界预算，不按Node增池；候选31/32不代正式G3最高分支，不能停输入/漏事件/移物/静音过门。
+## 4. 内容计数、原预算与最后同版门
 
-## 4. 游戏、Demo及独立发行
+AG017贡献+1，AG018贡献+2，净增入口均0：按先后可为19→20→22或19→21→22，只有真实src/generated/metadata与验收完成才重数。AG016完整游戏独立于这些迁移，保原G3八项/关卡/三币/相机/胜败重开/必要模型clip与jump-land-coin/HUD；UI035夹具不能代正式游戏。
 
-examples/保能力Demo，games/platformer-2d持已交付G2，games/platformer-3d由[AG016合同](../../../../ag-examples/docs/plans/016-autographics-complete-3d-platformer.md)/[内容设计](../../../../ag-examples/docs/design/g3-game-contract.md)承接；共用内容仓Plan号，不新建游戏Git仓。各游戏独立源码/关卡/资源manifest/固定引擎锁/公开运行/验收/离线包，不能借其它Demo目录/生产者checkout/cache/网络兜底。
+原32credits/32物理写/8状态Node/8slot/8pair/128行、深度/mesh/原源VM/time、raw8身份32MiB单件8MiB/CPU-GPU64MiB及动画/声音/HUD上限都不抬。多模块同世界共池，运行组织可与声明树不同；原地图最高合法轨迹与容量夹具分开，不能移币/漏声/停移动或Rust业务凑预算。旧异版交付和原UI011 no_go历史保留，不混作同一当前证据。
 
-新G3保原三平台/三币/危险/越界/相机/胜败重开和必要clip/jump-land-coin/HUD，真实Auto/Host/GPU/PCM/native/资源owner及新链保存关开/SaveAs/A→B冷再生/坏件修复再Run齐验；UI035夹具或AG014旧保存报告不代正式游戏。AG017保原G05九义务/三变体/全部GLB part/二维标记与021旧2d链完整单包，迁一入口净增0；交付后预计20/22，须实际重算。
+AG019固定一个实际引擎commit与显式语言/兄弟仓源集合、SDK681/两Cargo图锁/toolchain/runner/lower/resource-meta，所有活入口与两游戏显式同版消费但各自profile不变。原M2-01..09/G2九项/G3八项/全部G项变体oracle在该候选真实Auto/GPU/PCM/native/编辑/owner重验；包A→B无producer/target/cache/网络/其它项目仍运行/修改源码真变化/保存搬迁/坏件修复后下次再读Run。
 
-## 5. 剩余里程碑和维护
+## 5. 里程碑与来源门
 
-本批只取039/016/017，不预取后续编号。之后剩G04两维教程新源迁移/真实编辑与OS准入，以及M2最终两游戏/Gallery统一公共引擎SDK版本、独立消费/资源离线发行/原M2-01..09逐项里程碑核验。游戏可玩/19-20项迁移不等M2完成，不以Plan数估百分比。
+AG019是一次明确的里程碑档，原全AG/性能资源样本按原条件在用户启动后的单独时段单实例跑；不把每次修复/review/merge又变全套。OS/声学/设备证据分层，原必需门未证则候选未就绪。独立上下文final不能被同实现会话重跑替代；相关上游缺证由原owner/合法交接核验，不重开档造pass。034相关hold/旧runner缺失/D-05批门/M1标签映射差异按真实适用性记录，不移动历史标签或假定11911a4a…=679681b3…。内容原保持项可按原收据/保留件直接复验，不要求伪造历史等价。
 
-034/015同会话复核与持名问题如实保留；相关独立复审前置由后继T依赖门核，不改档造证据，不自动建agent。每计划每仓一权威树、同树不同上下文final、merge冻结与实际canonical/来源核验；只测触面，全AG里程碑档pending。临时材料仅plan-artifacts/plan-NNN/<repo>/，merge摘要折Plan/全输出对账后删自有scope/构建物，仅具名未解决问题保留。禁止链接/attachments/派生JSON、清树先fresh guard；不覆盖主题等其他路线WIP，不实施本批Plans。
+M2-ready必须原九项逐条实证、同版独立消费和独立final齐；本地候选/配方不等远端发布，推送/上传/标签另待明确指令。当前只新取040/018/019，不预取更多编号或承诺完成日期；不扩ACE/跨端/生产UI为前置。
+
+每Plan临时材料仅plan-artifacts/plan-NNN/<repo>/，merge摘要折Plan/全部输出对账后删自有scope/构建物，仅具名未解决问题持有；不创建attachments/链接/派生JSON，清树先fresh guard，不覆盖其它路线WIP。

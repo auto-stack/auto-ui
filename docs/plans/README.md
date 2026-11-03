@@ -43,10 +43,11 @@
 | 037 | [B2十二个业务示例主题迁移](037-business-examples-theme-migration.md) | 031/033后继B2，渠道接036 | drafting/r1，0/11；十二例业务/计时/store/路由保持、双端逐例/隔离/恢复；可先核path源码，渠道最终门等U036，暂不实施 |
 | 038 | [B3专用示例主题支持面核验](038-specialized-examples-theme-readiness.md) | 拆分路线B3有界研究 | drafting/r1，0/8；十二例盘点、六类真实链探针、go/blocked/no-go及后继分包；研究不等迁移，不等037整项，暂不实施 |
 | 039 | [3D查询、动态组与二维标记Node接线](archived/039-autographics-node3d-queries-and-mixed-markers.md) | G05/3d新作者前置；021/024/030 | archived/r1，交付8f577a34（含复审finding R-1修复ff5d267d）；SD-01 canonical node3d-queries-and-mixed-markers.md已落。final收据如实记录同实现会话（判定从工件重建、pilot152/dialect103/gates7/flow8/verifier独立重跑全绿）；D-03 OS phase-14探针沿AG009持有、G05逐字OS迁移归AG017。AG017固定消费其实际交付，前置实质解除 |
+| 040 | [Node双维编辑工程与项目化验收](040-autographics-node-editor-projects.md) | G04纯场景/编辑副本与公共验收收口 | drafting/r1，0/10；先证复用039静态路径、确缺才补；不等016/017，AG018固定消费其实交付；原20/34与预算不减，暂不实施 |
 
-当前AG按[三线总路线](../design/autographics/m2-game-first-three-lane-roadmap.md)推进：UI032/AG014/AG013已交付，UI034交付93eaa907、UI035交付5903839e、UI039交付8f577a34，AG015交付80e0b65，当前Gallery19/22。[查询与完整G3设计](../design/autographics/node3d-queries-and-complete-game.md)所立039已交付；AG016正式3D游戏与AG017 G05/3d迁移的引擎前置（035/039实际交付+SD-01 canonical）均已实质解除，两份ag-examples计划仍drafting/r1/0-10待实施；035/039同会话final限制按034先例如实持有，AG016计划内的034证据核验义务不变。本轮仅刷新登记，不实施。
+当前AG按[M2路线](../design/autographics/m2-game-first-three-lane-roadmap.md)推进：UI035/039已实际交付5903839e/8f577a34；AG016/017仍drafting/r1/0-10无树，现有引擎交付不自动替代其合同中的必要独立证据。新批[编辑/发行设计](../design/autographics/m2-editor-and-release-convergence.md)立UI040＋AG018 G04双教程＋AG019同版M2联验，仅规划。040不等016/017，018可先准备且完整迁移等040，019候选等040、完整联验等016/017/018实交付。当前19/22，不提前M2完成。
 
-024/025/027/028/030/032/034/035/039已交付，独立review与持名问题以实际收据为准（034/035/039复审同会话限制如实记录，不称独立上下文pass）；026/029为Reader路线。AG下一能力已由039交付提供，036..038属主题路线保持原owner；各仓号源独占重核，不以外仓历史号跳号。设计与后继见[本仓设计索引](../design/README.md)。
+024/025/027/028/030/032/034/035/039已交付，独立review/具名hold和批门按实际收据；新AG公共编辑收口为040。036..038是主题路线，026/029是Reader路线，本轮不接管。各仓号源独占重核，不以外仓号跳号；设计见[索引](../design/README.md)。
 
 ## 债务/候选
 
