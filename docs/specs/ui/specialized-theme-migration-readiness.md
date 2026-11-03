@@ -1,6 +1,6 @@
 # 专用示例主题迁移支持面（specialized theme migration readiness）
 
-> PLAN-038 交付合同（SD-01 草稿，merge 时随交付落地）。B3 十二专用示例的
+> PLAN-038 交付合同（SD-01）。B3 十二专用示例的
 > **实测**支持面、证据边界、具名前置与后继分包。分类：feature ｜ 状态：active ｜
 > 来源计划：docs/plans/038-specialized-examples-theme-readiness.md
 >
