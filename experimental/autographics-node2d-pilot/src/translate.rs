@@ -1507,6 +1507,17 @@ fn row_place_pair(e: &Expr, ctx: &Ctx) -> Result<Option<Vec<String>>, LowerError
                 let rr = table.get(name.as_str()).ok_or_else(|| {
                     unsupported(format!("unknown query row reference 'refs.{name}'"), e)
                 })?;
+                // PLAN-039：二维标记行 place 的 z 实参必须字面量 0。
+                if rr.dim2d && q.dim3 {
+                    let ztext = {
+                        let mut t = String::new();
+                        if let Some(Arg::Pos(x)) = c.args.args.get(2) {
+                            translate_expr(x, ctx, &mut t)?;
+                        }
+                        t
+                    };
+                    marker_zero_z(&ztext, "place", e)?;
+                }
                 (rr.row.clone(), rr.writable, "refs")
             } else {
                 return Err(unsupported(
