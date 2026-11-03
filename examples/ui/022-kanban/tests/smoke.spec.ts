@@ -108,11 +108,46 @@ test('T9: 拖拽卡片 todo→done (HTML5 drag-and-drop)', async ({ page }) => {
   // Done 列是带 ondrop 的 col 容器 —— 用其标题 "Done" 定位列.
   const src = await cardRow(page, 'Setup CI/CD')
   // Done 列: 含 "Done" 标题文本的最近 col 容器. 用 ondrop 所在的列容器.
-  // 列容器特征: 带 bg-green-50 的 col. 用 getByText('Done') 上溯.
-  const doneCol = page.getByText('Done', { exact: true }).locator('xpath=ancestor::div[contains(@class,"bg-green-50")][1]')
+  // PLAN-037 T-01 修定位（首红透明）：PLAN-684 rev2 把列容器 bg-green-50
+  // 语义化为 bg-muted/50，旧选择器在冻结基线上已必失败；断言语义不变。
+  const doneCol = page.getByText('Done', { exact: true }).locator('xpath=ancestor::div[contains(@class,"bg-muted/50")][1]')
   await src.dragTo(doneCol)
   await page.waitForTimeout(1000)
   const body = await page.locator('body').innerText()
   // Setup CI/CD 仍在页面(现在 Done 列), 拖拽成功
   expect(body).toContain('Setup CI/CD')
+})
+
+// PLAN-037 T-04: 官方主题包 —— 家族/模式 2x2 往返（setupState 模型驱动，
+// 生效包值 oracle；既有 dark-first 显式默认保留；卡片/列业务跨换肤保持）。
+test('T-P037: 主题 2x2 往返 — dark-first 保留 + 卡片业务保持', async ({ page }) => {
+  await waitForBoard(page)
+  const themeRoot = () => page.evaluate(() =>
+    getComputedStyle(document.querySelector('[data-auto-theme-root]')).getPropertyValue('--background').trim())
+  const drive = (t, d) => page.evaluate(([t, d]) => {
+    const st = document.querySelector('#app').__vue_app__._instance.setupState
+    st.theme_name = t
+    st.dark_mode = d
+  }, [t, d])
+
+  // 既有显式默认：App dark_mode = true（暗支外观优先）→ boot 即 Auto/dark。
+  expect(await themeRoot()).toBe('240 10% 4%')
+
+  // 既有 ToggleDarkMode 业务 handler 在 design 绑定下仍真实切换。
+  await page.locator('header button, button').filter({ hasText: /🌙|☀️/ }).first().click()
+  await page.waitForTimeout(400)
+  expect(await themeRoot()).toBe('0 0% 100%')
+
+  // Solarized/dark 下卡片数据保持；2x2 往返回 dark-first 默认。
+  await drive('Solarized', true)
+  await page.waitForTimeout(400)
+  expect(await themeRoot()).toBe('192 100% 11%')
+  expect((await page.locator('body').innerText())).toContain('Design landing page')
+  await page.screenshot({ path: 'test-results/p037_kanban_solarized_dark.png', fullPage: true })
+  for (const [t, d] of [['Solarized', false], ['Auto', true]]) {
+    await drive(t, d)
+    await page.waitForTimeout(350)
+  }
+  expect(await themeRoot()).toBe('240 10% 4%')
+  expect((await page.locator('body').innerText())).toContain('Setup CI/CD')
 })

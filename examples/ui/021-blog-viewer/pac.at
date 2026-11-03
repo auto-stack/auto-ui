@@ -6,8 +6,20 @@ title: "Blog Viewer"
 title_zh: "博客阅读器"
 api: "rust"
 front_port: 3021
-back_port: 8421
+# PLAN-037 T-01：back_port 8421 → 5441——8421 落在 Windows 保留端口段
+# （bind EACCES os error 10013，本仓组内端口实测自由段为 5421-5460，见
+# PLAN-033 T-01 同证）；原 README 启动指令在本机同样无法绑定。端口是宿主
+# 环境参数非业务面；路由/鉴权业务与测试断言不依赖具体值（README 启动示例
+# 同步以 AUTO_HTTP_PORT/AUTO_FRONT_PORT 显式注入）。
+back_port: 5441
 
 dep stylekit {
     path: "../stylekit"
+}
+
+# PLAN-037 T-04：官方主题单源包（不复制配色表进本 app，C-13）。
+# 本例原无主题接线、无显式默认——独立默认官方 Auto/light；多路由 outlet
+# 页共享 App design 绑定（跨路由主题保持），业务/导航零改动。
+dep themes {
+    path: "../../../packages/themes"
 }

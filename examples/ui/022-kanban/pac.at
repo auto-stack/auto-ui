@@ -4,6 +4,10 @@ scene: "ui"
 render: "vue"
 title: "Kanban"
 title_zh: "看板"
+# PLAN-037 T-04：既有 App 内显式 dark 默认（model dark_mode = true + 🌙
+# 切换器）按 031 契约在 pac 层显式化（同 006/008/009 先例）——迁移前双轨
+# 不一致（VM 链启动 light / Vue 模型初始 dark），统一为 App 声明的 dark-first。
+theme: "dark"
 api: "rust"
 front_port: 3022
 back_port: 8022
@@ -15,4 +19,11 @@ window: "1120x740"
 
 dep stylekit {
     path: "../stylekit"
+}
+
+# PLAN-037 T-04：官方主题单源包（不复制配色表进本 app，C-13）。
+# App 内既有 dark_mode = true 显式默认（暗支外观优先）精确保留，
+# 家族选择经 theme_name + design 数据绑定；卡片/列业务零改动。
+dep themes {
+    path: "../../../packages/themes"
 }

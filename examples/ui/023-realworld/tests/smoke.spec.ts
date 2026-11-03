@@ -63,7 +63,11 @@ test('T4: 注册 — 成功后 nav 显示用户名', async ({ page }) => {
 test('T5: 登录 — 已知种子用户成功', async ({ page }) => {
   await page.goto('/#/login')
   await page.waitForLoadState('domcontentloaded')
-  // 默认值已是 sarah@vercel.com / password
+  // PLAN-037 T-01 修定位（首红透明）：表单预填口令为 "password"，而后端
+  // db.at 种子 Cred 为 "sarah-secret"（基线即不一致，冻结基线登录必失败）。
+  // 显式填入真实种子凭据，断言语义（已知种子用户可登录）不变。
+  const pw = page.getByPlaceholder('Password')
+  await pw.fill('sarah-secret')
   await page.locator('button:has-text("Sign in")').click()
   await page.waitForTimeout(1500)
   const body = await page.locator('body').innerText()
@@ -71,9 +75,10 @@ test('T5: 登录 — 已知种子用户成功', async ({ page }) => {
 })
 
 test('T6: 设置页 — 登录后显示资料 + 登出', async ({ page }) => {
-  // 先登录
+  // 先登录（PLAN-037：显式填真实种子口令，见 T5 注）
   await page.goto('/#/login')
   await page.waitForLoadState('domcontentloaded')
+  await page.getByPlaceholder('Password').fill('sarah-secret')
   await page.locator('button:has-text("Sign in")').click()
   await page.waitForTimeout(1500)
   // 进设置
@@ -111,6 +116,13 @@ test('T8: 控制台无实质错误', async ({ page }) => {
 // --- Stage 2 tests (T9-T14) ---
 
 test('T9: 新建文章 — 编辑器填表 → 发布 → 出现在 feed', async ({ page }) => {
+  // PLAN-037 T-01 修定位（首红透明）：CreateArticle/UpdateArticle 随
+  // Bearer token 发送（空 token 后端拒绝），T9/T10 需先以种子用户登录。
+  await page.goto('/#/login')
+  await page.waitForLoadState('domcontentloaded')
+  await page.getByPlaceholder('Password').fill('sarah-secret')
+  await page.locator('button:has-text("Sign in")').click()
+  await page.waitForTimeout(1200)
   await page.goto('/#/editor/new')
   await page.waitForTimeout(800)
   const title = 'Stage2 Test Article ' + Date.now()
@@ -127,6 +139,13 @@ test('T9: 新建文章 — 编辑器填表 → 发布 → 出现在 feed', async
 })
 
 test('T10: 编辑文章 — 改 title → 保存 → 详情更新', async ({ page }) => {
+  // PLAN-037 T-01 修定位（首红透明）：CreateArticle/UpdateArticle 随
+  // Bearer token 发送（空 token 后端拒绝），T9/T10 需先以种子用户登录。
+  await page.goto('/#/login')
+  await page.waitForLoadState('domcontentloaded')
+  await page.getByPlaceholder('Password').fill('sarah-secret')
+  await page.locator('button:has-text("Sign in")').click()
+  await page.waitForTimeout(1200)
   await page.goto('/#/editor/new')
   await page.waitForTimeout(800)
   const slug = 'edit-target-' + Date.now()
@@ -183,4 +202,45 @@ test('T14: 资料页 — 显示用户名 + My Articles', async ({ page }) => {
   const body = await page.locator('body').innerText()
   expect(body).toContain('Sarah Chen')
   expect(body).toContain('My Articles')
+})
+
+// PLAN-037 T-04: 官方主题包 —— 家族/模式 2x2 往返（setupState 模型驱动；
+// 无显式默认 → Auto/light；换肤保登录态与编辑草稿；七路由共享 App 绑定）。
+test('T-P037: 主题 2x2 往返 — 换肤保登录态/草稿 + 跨路由保持', async ({ page }) => {
+  const name = 'ThemeUser' + Date.now()
+  await page.goto('/#/register')
+  await page.getByPlaceholder('Username').fill(name)
+  await page.getByPlaceholder('Email').fill(name + '@test.dev')
+  await page.getByPlaceholder('Password').fill('password')
+  await page.getByRole('button', { name: 'Sign up' }).click()
+  await page.waitForTimeout(1200)
+  expect(await page.locator('body').innerText()).toContain(name)
+
+  const themeRoot = () => page.evaluate(() =>
+    getComputedStyle(document.querySelector('[data-auto-theme-root]')).getPropertyValue('--background').trim())
+  const drive = (t, d) => page.evaluate(([t, d]) => {
+    const st = document.querySelector('#app').__vue_app__._instance.setupState
+    st.theme_name = t
+    st.dark_mode = d
+  }, [t, d])
+
+  expect(await themeRoot()).toBe('0 0% 100%') // 无显式默认 → Auto/light
+
+  // 登录态跨换肤 + 跨路由保持。
+  await drive('Solarized', true)
+  await page.waitForTimeout(400)
+  expect(await themeRoot()).toBe('192 100% 11%')
+  await page.goto('/#/settings')
+  await page.waitForTimeout(800)
+  expect(await themeRoot()).toBe('192 100% 11%') // 跨路由主题保持
+  expect(await page.locator('body').innerText()).toContain(name) // 登录态保持
+  await page.screenshot({ path: 'test-results/p037_settings_solarized_dark.png', fullPage: true })
+
+  // 2x2 其余臂 + 往返回默认；登录态不丢。
+  for (const [t, d] of [['Solarized', false], ['Auto', true], ['Auto', false]]) {
+    await drive(t, d)
+    await page.waitForTimeout(350)
+  }
+  expect(await themeRoot()).toBe('0 0% 100%')
+  expect(await page.locator('body').innerText()).toContain(name)
 })

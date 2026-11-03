@@ -2,6 +2,11 @@
 // Routes (home, detail, editor) + sticky top navbar + outlet.
 use store: BlogStore
 
+// PLAN-037 T-04：接入官方主题包（原无主题接线、无显式默认 → 官方 Auto/light
+// 独立默认）。family 经 theme_name + design 绑定于 App 根——三个 outlet 页
+// 共享同一选择，跨路由保持；鉴权外业务/导航零改动。
+use themes.themes: Auto, Solarized
+
 widget App {
     routes {
         "/" -> use home
@@ -16,6 +21,15 @@ widget App {
     }
 
     model {
+        // PLAN-037：主题族/模式选择态（主题选择，非业务状态）
+        var theme_name str = "Auto"
+        var dark_mode bool = false
+    }
+
+    // 主题/模式选择器（C-14：数据绑定，同帧校验发布；PLAN-037）
+    design {
+        theme: .theme_name
+        mode: if .dark_mode { "dark" } else { "light" }
     }
 
     view {

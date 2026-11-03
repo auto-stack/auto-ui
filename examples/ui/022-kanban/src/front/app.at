@@ -2,6 +2,11 @@
 // + 全高填充链；主题契约 dark_mode/accent_color（Plan 458 变量名勿改）。
 use board_store: BoardStore
 
+// PLAN-037 T-04：接入官方主题包。family 选择经 theme_name + design 绑定；
+// 模式仍由既有 dark_mode 承担（ToggleDarkMode 业务 handler 原样保留）；
+// 卡片/列归属、拖拽与 API 消费零改动。
+use themes.themes: Auto, Solarized
+
 widget App {
     routes {
         "/" -> use board
@@ -13,6 +18,14 @@ widget App {
         // 主题魔法变量：驱动生成器深浅色运行时
         var dark_mode bool = true
         var accent_color str = "indigo"
+        // PLAN-037：主题族选择（默认 Auto；既有暗支外观默认保留）
+        var theme_name str = "Auto"
+    }
+
+    // 主题/模式选择器（C-14：数据绑定，同帧校验发布；PLAN-037）
+    design {
+        theme: .theme_name
+        mode: if .dark_mode { "dark" } else { "light" }
     }
 
     view {

@@ -178,3 +178,44 @@ test('T7: 删除流程 — 详情页删除 → 确认条出现 → 确认 → �
   expect(body).not.toContain('Playwright Test Story')
   expect(body).toContain('6 articles')
 })
+
+// PLAN-037 T-04: 官方主题包 —— 家族/模式 2x2 往返 + 跨路由保持（setupState
+// 模型驱动；生效包值 oracle；outlet 三页共享 App design 绑定）。
+test('T-P037: 主题 2x2 往返 — 跨路由保持 + 业务保持', async ({ page }) => {
+  await waitForHome(page)
+  const themeRoot = () => page.evaluate(() =>
+    getComputedStyle(document.querySelector('[data-auto-theme-root]')).getPropertyValue('--background').trim())
+  const drive = (t: string, d: boolean) => page.evaluate(([t, d]) => {
+    const st = (document.querySelector('#app') as any).__vue_app__._instance.setupState
+    st.theme_name = t
+    st.dark_mode = d
+  }, [t, d] as any)
+
+  expect(await themeRoot()).toBe('0 0% 100%') // 无显式默认 → Auto/light
+
+  // Solarized/dark 下切到详情路由再回来：主题与业务都保持。
+  await drive('Solarized', true)
+  await page.waitForTimeout(400)
+  expect(await themeRoot()).toBe('192 100% 11%')
+  await page.locator('text=Getting Started with Rust').first().click()
+  await page.waitForTimeout(800)
+  expect(page.url()).toContain('/post/')
+  expect(await themeRoot()).toBe('192 100% 11%') // 跨路由主题保持
+  await page.screenshot({ path: 'test-results/p037_detail_solarized_dark.png', fullPage: true })
+  await page.goBack()
+  await page.waitForTimeout(800)
+  expect(await themeRoot()).toBe('192 100% 11%')
+  expect((await page.locator('body').innerText())).toContain('6 articles')
+
+  // 2x2 其余臂 + 往返回默认。
+  await drive('Solarized', false)
+  await page.waitForTimeout(350)
+  expect(await themeRoot()).toBe('44 87% 94%')
+  await drive('Auto', true)
+  await page.waitForTimeout(350)
+  expect(await themeRoot()).toBe('240 10% 4%')
+  await drive('Auto', false)
+  await page.waitForTimeout(350)
+  expect(await themeRoot()).toBe('0 0% 100%')
+  await expect(page.locator('body')).toContainText('My Blog')
+})

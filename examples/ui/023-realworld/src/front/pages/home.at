@@ -97,7 +97,7 @@ widget home {
     }
 
     on {
-        .Init -> { store.Init() }
+        .Init -> { ArticleStore.Init() }  // PLAN-037：A1 限定（双店同名 Init）
         .SetTag(t str) -> { store.SetTag(t) }
         .ClearTag -> { store.ClearTag() }
         .OpenArticle(slug str) -> {

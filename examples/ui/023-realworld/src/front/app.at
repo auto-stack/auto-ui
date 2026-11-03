@@ -8,6 +8,12 @@ use article_store: ArticleStore
 // bg-red-50/text-red-500→destructive 族。text-white ×5 为 brand-green 品牌按钮配对字
 // （品牌绿=本 demo 自定义语义色，整体豁免保留）。表单输入框 ×13 消费 stylekit
 // input_field（D1 家族源 demo）。
+//
+// PLAN-037 T-04：接入官方主题包（原无主题接线、无显式默认 → 官方 Auto/light
+// 独立默认）。family 经 theme_name + design 绑定于 App 根——七个路由页共享
+// 同一选择，跨路由/换肤保持登录与编辑草稿。
+use themes.themes: Auto, Solarized
+
 widget App {
     routes {
         "/" -> use home
@@ -20,6 +26,18 @@ widget App {
     }
 
     msg { Init, Logout, GoProfile(str) }
+
+    model {
+        // PLAN-037：主题族/模式选择态（主题选择，非业务状态）
+        var theme_name str = "Auto"
+        var dark_mode bool = false
+    }
+
+    // 主题/模式选择器（C-14：数据绑定，同帧校验发布；PLAN-037）
+    design {
+        theme: .theme_name
+        mode: if .dark_mode { "dark" } else { "light" }
+    }
 
     view {
         col {
@@ -59,9 +77,13 @@ widget App {
     }
 
     on {
+        // PLAN-037 T-04（有界修定，基础反例=冻结基线 plan-446 A1 fatal）：
+        // App 同时持有 AuthStore/ArticleStore，裸 `store.Init()` 命中两店
+        // 同名 Init → VM 轨引导 fatal（Vue 轨 codegen 恰好按双店展开故未
+        // 暴露）。按 A1 处方限定店名，语义=会话恢复 + feed 加载，双轨一致。
         .Init -> {
-            store.Init()
-            store.LoadFeed()
+            AuthStore.Init()
+            ArticleStore.Init()
         }
         .Logout -> { store.Logout() }
         .GoProfile(username str) -> { router.push("/profile/" + username) }
