@@ -629,6 +629,22 @@ pub(crate) fn collect_module_imports(
     } else {
         auto_lang_core::session::CompilerSession::ui()
     };
+    // PLAN-668 A-02 的致命门控对应面（auto-notes NOTES-004 原生门阻塞实证）：
+    // 本次解析正是 plan-446 C1 登记为 fatal 的那次，而模块自身可携带
+    // `use stylekit.styles: <name>`（PLAN-637 sidebar.at/editor.at 实案）。
+    // A-02 只在子件注册解析前逐模块预注册；其后 register_transitive_widgets
+    // 对每个子模块再 prepare（内部 clear）覆盖了活注册表，走到这里时导入名
+    // 已不在表中 → check_symbol UndefinedVariable → 整模块 fatal。此处以本
+    // 模块自身的 use 集重做预注册（递归到的传递模块同样覆盖）；只对 UI 场景
+    // 模块生效（Core/back 模块无 style 配方）。本模块本地 `style` 声明走
+    // parser 作用域 bind_var，不依赖注册表。失败容忍同 A-02（收集器自身对
+    // 不可解析/解析失败的导入模块已降级为 warn）。
+    if parser_session.is_ui() {
+        let _ = auto_ui_compiler::design_tokens::recipe::prepare_style_recipe_imports(
+            module_path.parent().unwrap_or(std::path::Path::new(".")),
+            &code,
+        );
+    }
     let mut parser = Parser::new_with_type_store(code.as_str(), session.type_store())
         .with_session(parser_session);
     let ast = match parser
@@ -1251,10 +1267,11 @@ fn build_dynamic_component_inner(
                 // PLAN-037: 同上——子模块读点过前缀化 overlay。
                 let module_code = auto_lang_core::back_prefix::apply(&module_path, module_code);
                 // PLAN-668 A-02：逐模块文件 stylekit 预注册（同上，变换后扫等价）。
-                let _ = auto_ui_compiler::design_tokens::recipe::prepare_style_recipe_imports(
-                    module_path.parent().unwrap_or(std::path::Path::new(".")),
-                    &module_code,
-                );
+                let module_recipe_imports =
+                    auto_ui_compiler::design_tokens::recipe::prepare_style_recipe_imports(
+                        module_path.parent().unwrap_or(std::path::Path::new(".")),
+                        &module_code,
+                    );
                 let mod_session = CompilerSession::ui();
                 let mut mod_parser = Parser::from(module_code.as_str()).with_session(mod_session);
                 if let Ok(mod_ast) = mod_parser
@@ -1264,6 +1281,26 @@ fn build_dynamic_component_inner(
                         auto_ui_compiler::ui_ast::lower_ui(&ui).map(|lowered| lowered.ui)
                     })
                 {
+                    // NOTES-004 补齐（与根 1014 / 路由页 1492 对齐）：parse 后
+                    // 以 load_and_validate 把导入 + **本模块本地** style 声明
+                    // 一起注册进活注册表。A-02 只预注册了导入——本地配方名
+                    // （如 sidebar.at 的 chip/chip_on）在抽取期 desugar
+                    // （style: if … { chip_on } else { chip } 分支）与渲染期
+                    // eval 两头都查不到，条件样式落空成空 classes。
+                    // 校验失败仅告警（本解析是投机二次解析，注册表随后每个
+                    // 消费点各自重 prepare，不留脏态）。
+                    if let Ok(imports) = module_recipe_imports.as_ref() {
+                        if let Err(e) = auto_ui_compiler::design_tokens::recipe::load_and_validate_style_recipes_with_imports(
+                            imports,
+                            &mod_ast,
+                        ) {
+                            log::warn!(
+                                "module style recipes: {} validation failed (styles stay unexpanded): {}",
+                                module_path.display(),
+                                e
+                            );
+                        }
+                    }
                     // Plan 367 P2-3: register this module's `view fn` fragments
                     // BEFORE extracting any widget view trees below. A widget in
                     // the same module (e.g. NavTree in sidebar.at) calls a

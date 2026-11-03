@@ -188,6 +188,10 @@ mod plan808_terminal_domain;
 mod plan810_full_ui_grammar;
 #[cfg(test)]
 mod plan814_recipe_extraction_tests;
+// auto-notes NOTES-004：`use` 模块自带 stylekit 命名导入经 collect_module_imports
+// 解析前的预注册（PLAN-668 A-02 的致命门控对应面）。
+#[cfg(test)]
+mod stylekit_module_import_parse_tests;
 #[cfg(test)]
 mod vm_json_float_read_tests;
 
