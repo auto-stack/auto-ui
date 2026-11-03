@@ -12,7 +12,7 @@
 | 004 | [公共图片与2D精灵帧](archived/004-autographics-public-images-and-sprite-frames.md) | AG M2表现 | archived；交付 e0fce13（reviewed 0e6e361），SD/ledger 沉淀 auto-lang v134 |
 | 005 | [3D纹理与UV](archived/005-autographics-textured-models-and-uv.md) | AG M2表现 | archived r3；交付351919c，独立R3通过，SD/ledger v141已同步 |
 | 006 | [节点动画与视觉朝向](archived/006-autographics-node-animation-and-visual-facing.md) | AG M2表现 | archived/r2；R2 pass；交付c681663，ledger143 |
-| 007 | [树状主题、官方系列与示例归位/首批迁移](archived/007-autoui-tree-theme-and-examples.md) | auto-lang未执行草案转交，原号释放 | drafting/r4，0/10；接受014/900/901/018交付，381文件/37目录示例归位仍全量待做；启动核近期Cargo有限出口与906正式组合，当前仅修订、暂不实施 |
+| 007 | [树状主题、官方系列与示例归位/首批迁移](archived/007-autoui-tree-theme-and-examples.md) | auto-lang未执行草案转交 | archived/r4，10/10；示例来源归UI、Theme Lab/002/005交付；后继031/033已交付，OS真实事件沿053，正式包渠道/生成输入沿036 |
 | 008 | [PLAN-004交付身份清单修复](archived/008-plan004-identity-closure.md) | auto-ui/PLAN-004身份闭包 | archived/r1；delivered 0261ae9，原路径verify_source通过；ledger auto-lang v149；清理回执见计划 |
 | 011 | [2D完整玩法整链预算验证](archived/011-autographics-g2-full-loop-budget-feasibility.md) | AG独立研究 | archived/r2；两候选no_go_current_profile（33/32），交付c4143af；知识/ledger v145，完整M2未证实 |
 | 012 | [公共音频与接受后一次播放](archived/012-autographics-public-audio-and-accepted-cues.md) | AG公共服务 | archived/r1；45case与完整fresh通过，公共音频交付；G12a内容另仓 |
@@ -32,13 +32,16 @@
 | 026 | [阅读引擎嵌入与定位回传探针](archived/026-reader-engine-embedding-and-locator-probe.md) | auto-reader/READER-006、coverage v3 后继 | archived/r1、流程10/10；Vue指定样本30/30，原生嵌入/装载/IPC已证，真实输入/IME/无障碍等未闭合；V-08/V-10未单列。研究归档不等于双端全门go，下一阶段先收口原生接缝 |
 | 027 | [3D角色与运行相机Node接线](archived/027-autographics-node3d-character-and-runtime-camera.md) | W3运行能力/G07与G08-3d引擎 | archived/r1，10/10；交付f3dea0d，独立final/冻结/归档清理齐；SD node3d-character-and-runtime-camera.md sha95a86660；原24oracle保持，AG011/012可固定消费，不把引擎绿当内容交付 |
 | 028 | [三维实例/触发/新局Node接线](archived/028-autographics-node3d-instances-triggers-and-rounds.md) | W3/G11-3d有限服务作者接线 | archived/r1，10/10；交付ebac1cd，独立final/冻结/归档清理齐；SD sha be4d9c15；25旧oracle保持，字符串/数值pair/本定义subject仍为有限边界，030补具名参数/跨组件接线 |
-| 029 | [Reader原生输入链与必要接缝收口](029-reader-native-input-and-surface-closure.md) | 026原生GAP与coverage v4后继 | drafting/r1、0/12；真实AutoUI原生VM的选区→.at→保存/冷恢复，IME/几何/系统无障碍、双实例/清理、严格非零汇总与旧门；全部必需门通过后独立上下文review，仅起草、未实施 |
+| 029 | [Reader原生输入链与必要接缝收口](archived/029-reader-native-input-and-surface-closure.md) | 026原生GAP与coverage v4后继 | archived/r1、12/12；双profile冻结exit0（vm 92记录/vue 34记录零非绿，N-01..12全绿+两端旧门28/28、27/27+R-05 22/22）；N-04配对协议、DPI窗口比例oracle、SD-01/02沉淀；独立review pass（AC-11，e7b09ea8），landing 65bb455f；026两项具名GAP闭合，残留边界见归档与native-input spec |
 | 030 | [三维具名引用与跨组件接线收口](archived/030-autographics-node3d-symbolic-component-bindings.md) | 028作者收口/G11-3d前置 | archived/r1，10/10；交付804d7303、Spec SHA6ed0bf07/冻结/清理有记录；review原为同实现会话重建（非独立会话，历史记录保留）；2026-11-02经用户授权补录独立上下文final pass（独立reviewer绑定804d7303：range-diff两行全等/canonical 6ed0bf07三点等/verify --controls 32 checks复跑PASS/gates 5/5/flow 8/8/AC-01..06全pass/自选反例5条具名拒绝，收据在归档§9），AG013 T-02门已开启 |
-| 031 | [主题作用域、原子发布、正式主题包与基础控件收口](archived/031-theme-scope-publication-and-package-closure.md) | 拆分后架构工作包A；接受007/910 | archived/r1，11/11；已交付（评审 pass @ b6c26186，ff-only 落地）；SD-01..05 + packages/themes 生效，003/010 双端迁移完成，余 30 app 与 AutoOS 交接见归档 §11 |
+| 031 | [主题作用域、原子发布、正式主题包与基础控件收口](archived/031-theme-scope-publication-and-package-closure.md) | 拆分后架构工作包A；接受007/910 | archived/r1，11/11；已交付（评审 pass @ b6c26186，ff-only 落地）；SD-01..05 + packages/themes 生效，003/010 双端迁移完成，后继033已交付，B1累计10例，余24应用；发行/生成输入差额接036，宿主接OS053 |
 | 032 | [完整2D游戏组合与预算收口](archived/032-autographics-node2d-full-game-composition.md) | M2游戏优先/引擎线 | archived/r2；交付a8c04d22，独立final/落主/Spec/清理齐；原32内完整G2公共组合，AG014已固定消费并交付 |
 | 033 | [剩余六个基础示例正式主题迁移](archived/033-basic-examples-theme-migration.md) | UI031后继B1六例 | archived/r1，9/9；实际交付d734f1fe、Spec/归档清理齐；复审记录同实现会话重构的来源限制见归档，非AG新计划前置 |
 | 034 | [3D纹理资源与节点动画作者接线](034-autographics-node3d-materials-and-animation.md) | 005/006/030新作者收口 | drafting/r1，0/10；actor-free纹理＋原模型角色动画/局部组件/typed闭包与clip，原G10十七项/预算保持，暂不实施 |
 | 035 | [3D声音/HUD与完整G3组合接线](035-autographics-node3d-audio-hud-composition.md) | 034后继/公共三维音画 | drafting/r1，0/10；T-01/02可准备，T-03硬等034实际交付；原G3八项、原32与音画额度保持，不代正式游戏，暂不实施 |
+| 036 | [正式主题包发行与生成输入收口](036-official-theme-distribution-and-input-closure.md) | 031 F-05及VM/Rust receipt差额，接受033 | drafting/r1，0/10；Full SDK/delivery、Vue/VM/Rust输入/复用与外部恢复；OS053/918互不整项等待，B2采用新渠道验收接U036；仅规划、暂不实施 |
+| 037 | [B2十二个业务示例主题迁移](037-business-examples-theme-migration.md) | 031/033后继B2，渠道接036 | drafting/r1，0/11；十二例业务/计时/store/路由保持、双端逐例/隔离/恢复；可先核path源码，渠道最终门等U036，暂不实施 |
+| 038 | [B3专用示例主题支持面核验](038-specialized-examples-theme-readiness.md) | 拆分路线B3有界研究 | drafting/r1，0/8；十二例盘点、六类真实链探针、go/blocked/no-go及后继分包；研究不等迁移，不等037整项，暂不实施 |
 
 当前AG按[三线总路线](../design/autographics/m2-game-first-three-lane-roadmap.md)推进；032引擎、AG014完整2D游戏、AG013 G11/3d均已实际交付。最新[3D表现/音画与G10设计](../design/autographics/node3d-presentation-audio-and-g10-migration.md)立UI034/035和ag-examples/015；后两者可独立准备、完整接线/迁移固定034实际交付，AG015不等035。当前Gallery17/22，不是M2百分比；完整3D游戏尚未立项，本轮只规划不实施。
 
