@@ -339,7 +339,7 @@ pub fn lower_project_components3d_presentation_entry_ahud(
         });
     }
 
-    let scene = collect_scene_3d_with(project, &w3, &template_rows, presentation)?;
+    let scene = collect_scene_3d_with(project, &w3, &template_rows, presentation, &[])?;
 
     // —— 文档 id 解析（行名 → 1-based；与 027/028 同规则）——
     let doc_id = |row: &str| -> Option<i64> {
@@ -676,6 +676,7 @@ pub fn lower_project_components3d_presentation_entry_ahud(
             },
             behavior_api,
             ahud,
+            queries3: None,
         },
     )
 }

@@ -198,6 +198,18 @@ fn write_components3d_products(
             );
 }
 
+fn queries3d_consumer(product: &str) -> &'static str {
+    match product {
+        "q3-seg" | "q3-sweep" | "q3-changed" | "q3-cross" | "q3-snapshot" | "q3-budget" => {
+            "experimental/autographics-auto-driver/tests/node3d_queries_flow.rs"
+        }
+        "q3-gates" => {
+            "experimental/autographics-node2d-pilot/tests/node3d_queries_gates.rs (fixture-level; no driver flow consumer)"
+        }
+        _ => "unrecorded (this out dir has no registered flow consumer)",
+    }
+}
+
 fn components3d_consumer(product: &str) -> &'static str {
     match product {
         "g02" | "g03" | "g03-parent" | "g03-hidden" | "twin" | "envelope8" | "rows129"
@@ -320,6 +332,7 @@ fn main() {
                 Some("camera-2d") => Profile::Basic2D(BasicProfile::Camera2D),
                 Some("components-2d") => Profile::Components2D,
                 Some("queries-2d") => Profile::Queries2D,
+                Some("queries-3d") => Profile::Queries3D,
                 Some("sprites-2d") => Profile::Sprites2D,
                 Some("components-2d-game") => Profile::Components2DGame,
                 Some("components-3d") => Profile::Components3D,
@@ -351,11 +364,16 @@ fn main() {
         .position(|a| a == "--resources")
         .and_then(|i| args.get(i + 1))
         .map(|s| s.as_str());
-    let project = autographics_node2d_pilot::load_project(std::path::Path::new(entry))
-        .unwrap_or_else(|e| {
+    // PLAN-039：queries-3d 在自己的 arm 内以双 view 解析载入（全局
+    // 预载走默认 dialect，会先拒双 view）。
+    let project = if profile == Profile::Queries3D {
+        autographics_node2d_pilot::Project::default()
+    } else {
+        autographics_node2d_pilot::load_project(std::path::Path::new(entry)).unwrap_or_else(|e| {
             eprintln!("node2d-lower: {e}");
             std::process::exit(2);
-        });
+        })
+    };
     std::fs::create_dir_all(out).expect("out dir");
 
     match profile {
@@ -634,6 +652,41 @@ fn main() {
                 lowered.source_sha256,
                 names.len(),
                 copied.len()
+            );
+        }
+        Profile::Queries3D => {
+            let project = autographics_node2d_pilot::load_project_dual(
+                std::path::Path::new(entry),
+                true,
+            )
+            .unwrap_or_else(|e| {
+                eprintln!("node2d-lower: {e:?}");
+                std::process::exit(2);
+            });
+            let lowered = autographics_node2d_pilot::lower_project_queries3d(&project)
+                .unwrap_or_else(|e| {
+                    eprintln!("node2d-lower: {e}");
+                    std::process::exit(3);
+                });
+            // 身份段 API 从派生结果读回（segment-only → behavior/3；含
+            // sweep → behavior/4）。
+            let behavior_api = if lowered.scene_json.contains("autographics.behavior/4") {
+                autographics_node2d_pilot::BEHAVIOR_API_V4
+            } else {
+                autographics_node2d_pilot::BEHAVIOR_API_V3
+            };
+            write_components3d_products(
+                out,
+                entry,
+                &project,
+                lowered,
+                "autographics-node2d-pilot plan039 queries-3d",
+                behavior_api,
+                queries3d_consumer,
+                None,
+            );
+            println!(
+                "node2d-lower[queries-3d]: wrote world.at + scene.agscene (api {behavior_api}) + identity.json + closure/ + assets/"
             );
         }
         Profile::Components2D | Profile::Queries2D => {

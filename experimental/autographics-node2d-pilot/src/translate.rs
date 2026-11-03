@@ -209,14 +209,31 @@ pub struct RefRow {
     pub writable: bool,
 }
 
+/// PLAN-039：queries-3d 具名行引用（行文本已按 root 字面量 / 实例
+/// `{prefix}_{elem}_rows[i]` 表达式渲染）。is_group = 组行（place/shift/
+/// show/world/local 合法；查询 handle 位置具名拒绝——组不是可查询几何）。
+/// dim2d = 二维标记行（仅 place(x,y,z=0 字面量)/shift(z=0)/show；查询
+/// handle 位置具名拒绝）。
+#[derive(Clone, Debug)]
+pub struct RefRow3 {
+    pub row: String,
+    pub writable: bool,
+    pub is_group: bool,
+    pub dim2d: bool,
+}
+
 /// PLAN-021：queries-2d handler 翻译环境。binds 是本 handler 内
 /// `let q = query2d.…` 的有序绑定（作用域由 handler 边界的
-/// [`translate_handler`] 清理）。
+/// [`translate_handler`] 清理）。PLAN-039：`dim3=true` 时同一环境服务
+/// queries-3d（`refs3` 行文本表；self place/shift 三轴形；query3d 发射
+/// 空间 3）；queries-2d 路径两字段恒默认（false/None），发射字节不变。
 pub struct QueryEnv<'a> {
     pub refs: &'a BTreeMap<String, RefRow>,
     pub self_row: Option<String>,
     pub self_writable: bool,
     pub binds: &'a std::cell::RefCell<Vec<(String, QueryKind)>>,
+    pub dim3: bool,
+    pub refs3: Option<&'a BTreeMap<String, RefRow3>>,
 }
 
 /// handler 边界包装：清空 typed 结果绑定后翻译整个 handler 体。
@@ -232,12 +249,12 @@ pub fn translate_handler(
     translate_stmts(stmts, ctx, out, indent)
 }
 
-/// 语法识别：query2d.segment/sweep 调用（用于 let 绑定分类）。
+/// 语法识别：query2d/query3d segment/sweep 调用（用于 let 绑定分类）。
 pub fn query_call_kind(e: &Expr) -> Option<QueryKind> {
     if let Expr::Call(c) = e {
         if let Expr::Dot(inner, m) = &*c.name {
             if let Expr::Ident(base) = &**inner {
-                if base == "query2d" {
+                if base == "query2d" || base == "query3d" {
                     return match m.as_str() {
                         "segment" => Some(QueryKind::Cast),
                         "sweep" => Some(QueryKind::Sweep),
@@ -337,6 +354,16 @@ fn translate_stmt(s: &Stmt, ctx: &Ctx, out: &mut String, indent: usize) -> Resul
             // PLAN-021：`place(x, y)` 是语句形态（一次作者语句 → 两条
             // ag_set_local）；值位置使用具名拒绝。
             if let Some(texts) = row_place_pair(e, ctx)? {
+                for t in texts {
+                    pad(out, indent);
+                    out.push_str(&t);
+                    out.push('\n');
+                }
+                return Ok(());
+            }
+            // PLAN-039（queries-3d）：refs3 行写语句（place/shift/show；
+            // 二维标记 z=0 字面量规则）。
+            if let Some(texts) = row3_write_stmt(e, ctx)? {
                 for t in texts {
                     pad(out, indent);
                     out.push_str(&t);
@@ -1027,10 +1054,12 @@ fn translate_expr(e: &Expr, ctx: &Ctx, out: &mut String) -> Result<(), LowerErro
                 }
             }
             // PLAN-021（queries-2d）：query2d.segment/sweep 查询调用。
+            // PLAN-039（queries-3d）：query3d.segment/sweep 同型（空间 3、
+            // 真实 z 轴、三轴位移）。
             if let Expr::Dot(inner, m) = &*call.name {
                 if let Expr::Ident(base) = &**inner {
-                    if base == "query2d" {
-                        return translate_query_call(m, e, call, ctx, out);
+                    if base == "query2d" || base == "query3d" {
+                        return translate_query_call(base == "query3d", m, e, call, ctx, out);
                     }
                 }
             }
@@ -1419,6 +1448,11 @@ fn query_handle_arg(
                         if let Some(row) = q.refs.get(name.as_str()) {
                             return Ok(row.row.to_string());
                         }
+                        if let Some(table) = q.refs3 {
+                            if let Some(row) = table.get(name.as_str()) {
+                                return Ok(row.row.clone());
+                            }
+                        }
                     }
                 }
             }
@@ -1467,13 +1501,19 @@ fn row_place_pair(e: &Expr, ctx: &Ctx) -> Result<Option<Vec<String>>, LowerError
                     e,
                 ));
             };
-            let Some(rr) = q.refs.get(name.as_str()) else {
+            if let Some(rr) = q.refs.get(name.as_str()) {
+                (rr.row.to_string(), rr.writable, "refs")
+            } else if let Some(table) = q.refs3 {
+                let rr = table.get(name.as_str()).ok_or_else(|| {
+                    unsupported(format!("unknown query row reference 'refs.{name}'"), e)
+                })?;
+                (rr.row.clone(), rr.writable, "refs")
+            } else {
                 return Err(unsupported(
                     format!("unknown query row reference 'refs.{name}'"),
                     e,
                 ));
-            };
-            (rr.row.to_string(), rr.writable, "refs")
+            }
         }
         Expr::Ident(base) if base == "self" => {
             let Some(q) = &ctx.query else {
@@ -1495,7 +1535,8 @@ fn row_place_pair(e: &Expr, ctx: &Ctx) -> Result<Option<Vec<String>>, LowerError
             e,
         ));
     }
-    if c.args.args.len() != 2 {
+    let dim3 = ctx.query.as_ref().is_some_and(|q| q.dim3);
+    if c.args.args.len() != if dim3 { 3 } else { 2 } {
         return Err(unsupported(
             format!("{what}.place arity {}", c.args.args.len()),
             e,
@@ -1512,10 +1553,131 @@ fn row_place_pair(e: &Expr, ctx: &Ctx) -> Result<Option<Vec<String>>, LowerError
             _ => return Err(unsupported("place arg", e)),
         }
     }
+    if dim3 {
+        return Ok(Some(vec![
+            format!("ag_set_local({row}, 0, {})", parts[0]),
+            format!("ag_set_local({row}, 1, {})", parts[1]),
+            format!("ag_set_local({row}, 2, {})", parts[2]),
+        ]));
+    }
     Ok(Some(vec![
         format!("ag_set_local({row}, 0, {})", parts[0]),
         format!("ag_set_local({row}, 1, {})", parts[1]),
     ]))
+}
+
+/// PLAN-039：queries-3d 行写语句（仅 refs3 行环境；place/shift/show）。
+/// 三维行：三轴自由；二维标记行：z 实参必须字面量 0（VM `ag_set_local`
+/// 二维 axis2 非零 fail 4 的作者侧具名前置）。space3 已知元素不进入本
+/// 路径（space3_stmt 先行展开）；字符行不存在于本 profile（全部可写）。
+fn row3_write_stmt(e: &Expr, ctx: &Ctx) -> Result<Option<Vec<String>>, LowerError> {
+    let Expr::Call(c) = e else {
+        return Ok(None);
+    };
+    let Expr::Dot(inner, m) = &*c.name else {
+        return Ok(None);
+    };
+    if !matches!(m.as_str(), "place" | "shift" | "show") {
+        return Ok(None);
+    }
+    let Expr::Dot(boxed_root, name) = &**inner else {
+        return Ok(None);
+    };
+    if !matches!(&**boxed_root, Expr::Ident(r) if r == "refs") {
+        return Ok(None);
+    }
+    let Some(q) = &ctx.query else {
+        return Ok(None);
+    };
+    let Some(table) = q.refs3 else {
+        return Ok(None);
+    };
+    let Some(space3) = &ctx.space3 else {
+        return Ok(None);
+    };
+    // 双环境已知名归 space3（本 fn 只接回落名）；双未知名由 space3_stmt
+    // 的既有错误报告（unknown view-3d element reference）。
+    if space3.refs.contains_key(name.as_str()) || !table.contains_key(name.as_str()) {
+        return Ok(None);
+    }
+    let rr = &table[name.as_str()];
+    let mut parts = Vec::new();
+    for a in &c.args.args {
+        match a {
+            Arg::Pos(x) => {
+                let mut t = String::new();
+                translate_expr(x, ctx, &mut t)?;
+                parts.push(t);
+            }
+            _ => return Err(unsupported(format!("{m} arg"), e)),
+        }
+    }
+    let row = &rr.row;
+    match (m.as_str(), rr.dim2d) {
+        ("place", false) => {
+            if parts.len() != 3 {
+                return Err(unsupported(format!("place arity {}", parts.len()), e));
+            }
+            Ok(Some(vec![
+                format!("ag_set_local({row}, 0, {})", parts[0]),
+                format!("ag_set_local({row}, 1, {})", parts[1]),
+                format!("ag_set_local({row}, 2, {})", parts[2]),
+            ]))
+        }
+        ("place", true) => {
+            if parts.len() != 3 {
+                return Err(unsupported(format!("place arity {}", parts.len()), e));
+            }
+            marker_zero_z(&parts[2], "place", e)?;
+            Ok(Some(vec![
+                format!("ag_set_local({row}, 0, {})", parts[0]),
+                format!("ag_set_local({row}, 1, {})", parts[1]),
+                format!("ag_set_local({row}, 2, {})", parts[2]),
+            ]))
+        }
+        ("shift", false) => {
+            if parts.len() != 3 {
+                return Err(unsupported(format!("shift arity {}", parts.len()), e));
+            }
+            Ok(Some(vec![format!(
+                "ag_move_local({row}, {}, {}, {})",
+                parts[0], parts[1], parts[2]
+            )]))
+        }
+        ("shift", true) => {
+            if parts.len() != 3 {
+                return Err(unsupported(format!("shift arity {}", parts.len()), e));
+            }
+            marker_zero_z(&parts[2], "shift", e)?;
+            Ok(Some(vec![format!(
+                "ag_move_local({row}, {}, {}, {})",
+                parts[0], parts[1], parts[2]
+            )]))
+        }
+        ("show", _) => {
+            if parts.len() != 1 {
+                return Err(unsupported(format!("show arity {}", parts.len()), e));
+            }
+            Ok(Some(vec![format!("ag_set_visible({row}, {})", parts[0])]))
+        }
+        _ => unreachable!("row3 write op dispatch"),
+    }
+}
+
+/// 二维标记 z 实参必须字面量 0（`0`/`0.0`/`-0.0`/`false` 之外具名拒绝）。
+fn marker_zero_z(text: &str, op: &str, e: &Expr) -> Result<(), LowerError> {
+    let ok = matches!(
+        text,
+        "0" | "0.0" | "-0.0" | "false" | "(0.0 * 1.0)"
+    );
+    if ok {
+        Ok(())
+    } else {
+        Err(unsupported(
+            format!("{op} on a view-2d marker keeps z at the literal 0 (2D rows reject nonzero z at runtime)"),
+            e,
+        ))
+    }
 }
 
 /// PLAN-027：角色服务调用（`refs.<elem>.move3d(dx, dy, dz)` →
@@ -1799,6 +1961,27 @@ fn space3_stmt(e: &Expr, ctx: &Ctx) -> Result<Option<Vec<String>>, LowerError> {
     if ctx.space3.is_none() {
         return Ok(None);
     }
+    // PLAN-039：queries-3d 二维标记 ref 不属 view-3d 空间服务（z 轴受 0
+    // 限定）；仅出现在 queries 行环境时回落到 queries 写路径（typing：
+    // z 实参必须字面量 0）。
+    if is_refs {
+        if let Expr::Dot(outer, name) = &**inner {
+            if matches!(&**outer, Expr::Ident(r) if r == "refs") {
+                let in_space3 = ctx
+                    .space3
+                    .as_ref()
+                    .is_some_and(|s3| s3.refs.contains_key(name.as_str()));
+                let in_queries3 = ctx
+                    .query
+                    .as_ref()
+                    .and_then(|q| q.refs3)
+                    .is_some_and(|t| t.contains_key(name.as_str()));
+                if !in_space3 && in_queries3 {
+                    return Ok(None);
+                }
+            }
+        }
+    }
     let row = space3_row_of(inner, e, ctx)?;
     let mut parts = Vec::new();
     for a in &c.args.args {
@@ -1984,6 +2167,7 @@ fn translate_space3_self(
 /// `ag_sweep_aabb(…, dx, dy, 0.0)`。2D 固定；z=0 隐含。plan 层已验证
 /// 元数/实参形态/引用存在（模块/行/符号诊断），此处为机械映射。
 fn translate_query_call(
+    three_d: bool,
     m: &str,
     e: &Expr,
     call: &auto_parser_api::ast::Call,
@@ -1992,55 +2176,97 @@ fn translate_query_call(
 ) -> Result<(), LowerError> {
     if ctx.query.is_none() {
         return Err(unsupported(
-            "query2d is only available in the queries-2d profile",
+            if three_d {
+                "query3d is only available in the queries-3d profile"
+            } else {
+                "query2d is only available in the queries-2d profile"
+            },
             e,
         ));
     }
+    let service = if three_d { "query3d" } else { "query2d" };
     match m {
         "segment" => {
-            if call.args.args.len() != 6 {
+            let (want, service_name, tail) = if three_d {
+                (
+                    8,
+                    "query3d.segment",
+                    "ax, ay, az, bx, by, bz",
+                )
+            } else {
+                (6, "query2d.segment", "ax, ay, bx, by")
+            };
+            if call.args.args.len() != want {
                 return Err(unsupported(
                     format!(
-                        "query2d.segment arity {} (want ignore, visible_only, ax, ay, bx, by)",
+                        "{service_name} arity {} (want ignore, visible_only, {tail})",
                         call.args.args.len()
                     ),
                     e,
                 ));
             }
             let handle = query_handle_arg(&call.args.args[0], ctx, true, e)?;
-            let nums = query_numeric_args(&call.args.args[2..6], ctx, e)?;
-            out.push_str(&format!(
-                "ag_cast_segment(2, {handle}, {}, {}, {}, 0.0, {}, {}, 0.0)",
-                visible_only_text(&call.args.args[1], e)?,
-                nums[0],
-                nums[1],
-                nums[2],
-                nums[3]
-            ));
+            let nums = query_numeric_args(&call.args.args[2..want], ctx, e)?;
+            if three_d {
+                out.push_str(&format!(
+                    "ag_cast_segment(3, {handle}, {}, {}, {}, {}, {}, {}, {})",
+                    visible_only_text(&call.args.args[1], e)?,
+                    nums[0],
+                    nums[1],
+                    nums[2],
+                    nums[3],
+                    nums[4],
+                    nums[5]
+                ));
+            } else {
+                out.push_str(&format!(
+                    "ag_cast_segment(2, {handle}, {}, {}, {}, 0.0, {}, {}, 0.0)",
+                    visible_only_text(&call.args.args[1], e)?,
+                    nums[0],
+                    nums[1],
+                    nums[2],
+                    nums[3]
+                ));
+            }
             Ok(())
         }
         "sweep" => {
-            if call.args.args.len() != 4 {
+            let (want, service_name, tail) = if three_d {
+                (5, "query3d.sweep", "dx, dy, dz")
+            } else {
+                (4, "query2d.sweep", "dx, dy")
+            };
+            if call.args.args.len() != want {
                 return Err(unsupported(
                     format!(
-                        "query2d.sweep arity {} (want mover, visible_only, dx, dy)",
+                        "{service_name} arity {} (want mover, visible_only, {tail})",
                         call.args.args.len()
                     ),
                     e,
                 ));
             }
             let handle = query_handle_arg(&call.args.args[0], ctx, false, e)?;
-            let nums = query_numeric_args(&call.args.args[2..4], ctx, e)?;
-            out.push_str(&format!(
-                "ag_sweep_aabb({handle}, {}, {}, {}, 0.0)",
-                visible_only_text(&call.args.args[1], e)?,
-                nums[0],
-                nums[1]
-            ));
+            let nums = query_numeric_args(&call.args.args[2..want], ctx, e)?;
+            if three_d {
+                out.push_str(&format!(
+                    "ag_sweep_aabb({handle}, {}, {}, {}, {})",
+                    visible_only_text(&call.args.args[1], e)?,
+                    nums[0],
+                    nums[1],
+                    nums[2]
+                ));
+            } else {
+                out.push_str(&format!(
+                    "ag_sweep_aabb({handle}, {}, {}, {}, 0.0)",
+                    visible_only_text(&call.args.args[1], e)?,
+                    nums[0],
+                    nums[1]
+                ));
+            }
             Ok(())
         }
         other => Err(unsupported(
-            format!("unknown query service 'query2d.{other}' (segment/sweep)"),
+            format!("unknown query service '{service}.{other}' (segment/sweep)"),
             e,
         )),
     }
@@ -2200,8 +2426,16 @@ fn translate_self_row_op(
                     e,
                 ));
             }
-            let a = args(2)?;
-            out.push_str(&format!("ag_move_local({row}, {}, {}, 0.0)", a[0], a[1]));
+            if q.dim3 {
+                let a = args(3)?;
+                out.push_str(&format!(
+                    "ag_move_local({row}, {}, {}, {})",
+                    a[0], a[1], a[2]
+                ));
+            } else {
+                let a = args(2)?;
+                out.push_str(&format!("ag_move_local({row}, {}, {}, 0.0)", a[0], a[1]));
+            }
             Ok(())
         }
         "show" => {

@@ -1,0 +1,81 @@
+// PLAN-039 queries-3d T-02 segment lab (G05/3d-faithful): one dual-exit
+// root — view-3d world (named group + three GLB leaves + hidden door) plus
+// view-2d diagnostic markers on original screen coordinates. The cast chain,
+// fees, and the latest-slot stale read follow the engine v3 conventions;
+// reach lives in the root model (changed variant: 2.0).
+use resources: parts_glb
+
+node QueryLab {
+    model {
+        var reach = 4.0
+    }
+    view-3d {
+        group3d movers {
+            position: (1.0, 0.0, 0.0)
+            visible: true
+        } model3d actor {
+            model: resources.parts_glb
+            position: (-3.0, 0.0, 0.0)
+            scale: (0.4, 0.7, 0.5)
+            yaw: 0.2
+            pitch: 0.15
+        }
+        model3d target {
+            model: resources.parts_glb
+            position: (0.0, 0.0, 0.0)
+            scale: (0.2, 0.8, 0.5)
+            yaw: -0.1
+            pitch: 0.1
+        }
+        cylinder3d door {
+            position: (0.0, 1.0, 2.0)
+            scale: (0.3, 1.0, 0.3)
+            visible: false
+        }
+        model3d far {
+            model: resources.parts_glb
+            position: (6.0, 0.0, 0.0)
+        }
+    }
+    view-2d {
+        shape2d marker {
+            kind: quad
+            position: (-100.0, 50.0)
+            scale: (10.0, 10.0)
+            rgba: (1.0, 1.0, 0.1, 1.0)
+        }
+        shape2d point_marker {
+            kind: quad
+            position: (-150.0, 100.0)
+            scale: (10.0, 10.0)
+            rgba: (0.2, 0.8, 1.0, 1.0)
+        }
+    }
+    on {
+        Life.Start -> {
+        }
+        Life.Tick(dt float) -> {
+        if input.space() == 3 {
+            refs.movers.shift(input.x() * 3.0 * dt, 0, 0 - input.y() * 3.0 * dt)
+        }
+        refs.target.place(0, 0, 0)
+        let ax = refs.actor.world(0)
+        let ay = refs.actor.world(1)
+        let az = refs.actor.world(2)
+        let q = query3d.segment(-1, true, ax, ay, az, ax + .reach, ay, az)
+        let px = q.point(0)
+        refs.target.place(0, 0, 0.5)
+        let stale = q.point(0)
+        let ok = stale == px
+        refs.point_marker.show(ok)
+        let q2 = query3d.segment(-1, true, ax, ay, az, ax + .reach, ay, az)
+        let hit = q2.hit()
+        let node = q2.node()
+        let fraction = q2.t()
+        let nx = q2.normal(0)
+        refs.marker.place(-100 + node * 5, 50 + fraction * 10, 0)
+        refs.point_marker.place(-150 + px, 100 + nx * 5, 0)
+            refs.door.show(hit)
+        }
+    }
+}

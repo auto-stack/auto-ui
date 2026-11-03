@@ -257,7 +257,7 @@ pub fn lower_project_components3d_events(
         });
     }
 
-    let scene = collect_scene_3d_with(project, &w3, &template_rows, None)?;
+    let scene = collect_scene_3d_with(project, &w3, &template_rows, None, &[])?;
 
     // —— 文档 id 解析（行名 → 1-based；与 027 row_document_id 同规则）——
     let doc_id = |row: &str| -> Option<i64> {
@@ -332,6 +332,7 @@ pub fn lower_project_components3d_events(
             regen_note: "tools/verify_plan028.py",
             presentation: None,
             ahud: None,
+        queries3: None,
             behavior_api: EVENTS_API,
         },
     )

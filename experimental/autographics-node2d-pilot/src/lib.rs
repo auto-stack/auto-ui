@@ -11,6 +11,7 @@
 //! 保持 016 最小切片逐字节兼容（verify_plan016 再生控制），不被自动升级。
 pub mod load;
 pub mod lower;
+pub mod lower_queries3d;
 pub mod lower_basic2d;
 pub mod lower_components;
 pub mod lower_components3d;
@@ -81,9 +82,15 @@ pub enum Profile {
     /// 销毁作者面；角色姿态随 bundle 收口；actor-free kind=-1；components3d/1
     /// 装配，T-03 冻结 117/28）。
     Components3DAudioHud,
+    /// PLAN-039 有限三维查询与同根双出口：queries-3d（query3d.segment/
+    /// sweep typed 面、具名叶/组引用、root view-3d＋view-2d 诊断标记；
+    /// segment-only → behavior/3、含 sweep → behavior/4 装配；沿 024
+    /// 共享管线 + 档注入）。
+    Queries3D,
 }
 
-pub use load::{load_project, Project, ProjectError};
+pub use load::{load_project, load_project_dual, Project, ProjectError};
+pub use lower_queries3d::{lower_project_queries3d, BEHAVIOR_API_V3, BEHAVIOR_API_V4};
 pub use lower::{lower_project, LowerOutput};
 pub use lower_basic2d::{lower_project_basic, BasicProfile, LowerOutputBasic2D};
 pub use lower_components::{

@@ -53,7 +53,9 @@
 //!   020 probe_session 曾以绝对盒供参（只影响 CPU 侧触发测试，GPU 门
 //!   不受影响）；T-02 探针与 PLAN-023 t03 门均按相对半边长供参。
 use auto_parser_api::ast::{Expr, Stmt, Type};
-use auto_ui_dialect::node2d::{EventPattern, NodeDecl, Prop, PropValue, View2dElement};
+use auto_ui_dialect::node2d::{
+    EventPattern, NodeDecl, Prop, PropValue, View2dElement, View3dElement,
+};
 
 use crate::load::{node_of, Project};
 use crate::lower::numeric_lit;
@@ -1462,12 +1464,14 @@ pub(crate) enum QEvent {
         method: String,
         line: usize,
     },
-    /// `query2d.segment/sweep(...)`；handle 实参在 walk 层解析形态。
+    /// `query2d/query3d.segment/sweep(...)`；handle 实参在 walk 层解析形态。
     QueryCall {
         name: String,
         argc: usize,
         handle: QHandle,
         vo_ok: bool,
+        /// PLAN-039：query3d 调用（queries-3d 档专用；元数 8/5）。
+        three_d: bool,
         line: usize,
     },
     /// `refs.<inst>` 值读或只读行 op（world/local/show）。
@@ -1546,7 +1550,7 @@ pub(crate) fn walk_expr_q(e: &Expr, line: usize, out: &mut WalkOut, queries: boo
                             .push((ev.to_string(), c.args.args.len(), cline)),
                         // PLAN-027：camera3d 读站点（runtime 档；translator
                         // 降层为受信 ag_cam3_* 读 getter，非子投递）。
-                        "input" | "refs" | "self" | "query2d" | "camera3d" => {}
+                        "input" | "refs" | "self" | "query2d" | "query3d" | "camera3d" => {}
                         // PLAN-025：typed 声音请求站点（pres 档；translator
                         // 降层为生成收集器调用，非子投递）。
                         "sfx" => {}
@@ -1600,7 +1604,11 @@ pub(crate) fn walk_expr_q(e: &Expr, line: usize, out: &mut WalkOut, queries: boo
             // 一致；实参中的 refs 值读随后逐个入列）。
             if let Expr::Dot(inner, m) = &*c.name {
                 if let Expr::Ident(base) = &**inner {
-                    if base == "query2d" && matches!(m.as_str(), "segment" | "sweep") {
+                    // PLAN-039：query3d 同型入列（三维元数/行 typing 在
+                    // plan 层按档裁决）。
+                    if (base == "query2d" || base == "query3d")
+                        && matches!(m.as_str(), "segment" | "sweep")
+                    {
                         let handle = match c.args.args.first() {
                             Some(auto_parser_api::ast::Arg::Pos(Expr::Int(v))) if *v == -1 => {
                                 QHandle::MinusOne
@@ -1642,6 +1650,7 @@ pub(crate) fn walk_expr_q(e: &Expr, line: usize, out: &mut WalkOut, queries: boo
                             argc: c.args.args.len(),
                             handle,
                             vo_ok,
+                            three_d: base == "query3d",
                             line: cline,
                         });
                     }
@@ -1795,6 +1804,92 @@ fn find_child_node3d(
     None
 }
 
+/// PLAN-039：queries-3d 行引用 typing 表（def 域）。(writable, is_group,
+/// dim2d)。域 = 本 def view-3d 全部具名行（叶/组，任意深度；实例行除外）
+/// + root 的 view-2d shape2d 标记 + 全部顶层实例（021 语义：实例须恰一
+/// view-3d 叶，否则具名拒绝）。组行可写（动态父组）但不进查询 handle。
+fn build_refs3_names(
+    project: &Project,
+    world: &WorldIR,
+    edef: &str,
+) -> Result<BTreeMap<String, (bool, bool, bool)>, LowerError> {
+    let mut out: BTreeMap<String, (bool, bool, bool)> = BTreeMap::new();
+    let decl = node_of(project, edef);
+    let is_root = edef == world.root;
+    // view-3d 行（递归；组携带 is_group）。
+    fn walk3(
+        els: &[View3dElement],
+        out: &mut BTreeMap<String, (bool, bool, bool)>,
+    ) {
+        for el in els {
+            match el {
+                View3dElement::Group { name, children, .. } => {
+                    out.insert(name.clone(), (true, true, false));
+                    walk3(children, out);
+                }
+                View3dElement::Instance { .. } => {}
+                other => {
+                    let name = match other {
+                        View3dElement::Primitive { name, .. } => name,
+                        View3dElement::Model { name, .. } => name,
+                        View3dElement::Player { name, .. } => name,
+                        View3dElement::Mob { name, .. } => name,
+                        View3dElement::Group { name, .. } => name,
+                        View3dElement::Instance { name, .. } => name,
+                    };
+                    out.insert(name.clone(), (true, false, false));
+                }
+            }
+        }
+    }
+    if let Some(v3) = &decl.view3d {
+        walk3(&v3.elements, &mut out);
+    }
+    // root 二维标记（shape2d；z 限 0 typing）。
+    if is_root {
+        if let Some(v2) = &decl.view2d {
+            for el in &v2.elements {
+                if let View2dElement::Shape { name, .. } = el {
+                    out.insert(name.clone(), (true, false, true));
+                }
+            }
+        }
+    }
+    // 顶层实例（021 语义；三维版 F-R1-01：实例须恰一 view-3d 叶）。
+    for inst in &world.instances {
+        if inst.path.contains('/') {
+            continue;
+        }
+        let d = &world.defs[&inst.def];
+        let idecl = node_of(project, &inst.def);
+        let leaves = idecl
+            .view3d
+            .as_ref()
+            .map(|v| {
+                v.elements
+                    .iter()
+                    .filter(|e| !matches!(e, View3dElement::Group { .. } | View3dElement::Instance { .. }))
+                    .count()
+            })
+            .unwrap_or(0);
+        if leaves > 1 {
+            return Err(at(
+                &d.module,
+                d.line,
+                &inst.path,
+                &format!(
+                    "instance '{}' has {} view-3d leaves; a named row ref resolves exactly one (make the extra leaves separate instances or split the definition)",
+                    inst.path, leaves
+                ),
+            ));
+        }
+        if leaves == 1 {
+            out.insert(inst.path.clone(), (true, false, false));
+        }
+    }
+    Ok(out)
+}
+
 /// 构建投递计划并验证全部 emit 站点（端口存在 + 元数一致）与 handler 面
 /// （未知成员 / 未知 helper fn）。
 pub(crate) fn plan_dispatch(
@@ -1804,11 +1899,12 @@ pub(crate) fn plan_dispatch(
     sprites: bool,
     pres: bool,
 ) -> Result<Plan, LowerError> {
-    plan_dispatch_events(project, world, queries, sprites, pres, false, false)
+    plan_dispatch_events(project, world, queries, sprites, pres, false, false, false)
 }
 
 /// PLAN-028：`events` = components-3d-events 档（spawn/bind 裸调用是
 /// typed 服务端口，不是模块 helper fn；其余档保持旧拒绝面）。
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn plan_dispatch_events(
     project: &Project,
     world: &WorldIR,
@@ -1817,6 +1913,8 @@ pub(crate) fn plan_dispatch_events(
     pres: bool,
     events: bool,
     bindings: bool,
+    // PLAN-039：queries-3d 档（query3d 面 + 三维行 typing 验证）。
+    queries3d: bool,
 ) -> Result<Plan, LowerError> {
     let mut plan = Plan::default();
     let root_prefix = world.root.to_lowercase();
@@ -1862,6 +1960,14 @@ pub(crate) fn plan_dispatch_events(
         let decl = node_of(project, edef);
         let Some(on) = &decl.on else { continue };
         let is_root = edef == &world.root;
+        // PLAN-039：queries-3d 行引用 typing（def 域）。(writable, is_group,
+        // dim2d)：组行可 place/shift/show/world/local 但不进查询 handle；
+        // 二维标记行（仅 root）z 限 0 且不进查询 handle。
+        let refs3_names: BTreeMap<String, (bool, bool, bool)> = if queries3d {
+            build_refs3_names(project, world, edef)?
+        } else {
+            BTreeMap::new()
+        };
         let model_fields: BTreeSet<String> = def.model.iter().map(|(n, _)| n.clone()).collect();
         for h in &on.handlers {
             let hline = line_at(&project.modules[&def.module].source, h.span.0);
@@ -2017,9 +2123,30 @@ pub(crate) fn plan_dispatch_events(
                         argc,
                         handle,
                         vo_ok,
+                        three_d,
                         line,
                     } => {
                         if !queries {
+                            return Err(at(
+                                &def.module,
+                                *line,
+                                if *three_d { "query3d" } else { "query2d" },
+                                if *three_d {
+                                    "query3d is only available in the queries-3d profile"
+                                } else {
+                                    "query2d is only available in the queries-2d profile"
+                                },
+                            ));
+                        }
+                        if *three_d && !queries3d {
+                            return Err(at(
+                                &def.module,
+                                *line,
+                                "query3d",
+                                "query3d is only available in the queries-3d profile",
+                            ));
+                        }
+                        if !*three_d && queries3d {
                             return Err(at(
                                 &def.module,
                                 *line,
@@ -2032,21 +2159,66 @@ pub(crate) fn plan_dispatch_events(
                                 &def.module,
                                 *line,
                                 name,
-                                "unknown query service (query2d.segment/sweep)",
+                                &format!(
+                                    "unknown query service ({}.segment/sweep)",
+                                    if *three_d { "query3d" } else { "query2d" }
+                                ),
                             ));
                         }
-                        let want = if name == "segment" { 6 } else { 4 };
+                        let want = match (*three_d, name.as_str()) {
+                            (false, "segment") => 6,
+                            (false, "sweep") => 4,
+                            (true, "segment") => 8,
+                            _ => 5,
+                        };
                         if *argc != want {
                             return Err(at(
                                 &def.module,
                                 *line,
                                 name,
-                                &format!("query2d.{name} arity {argc} (want {want} args)"),
+                                &format!(
+                                    "{}.{name} arity {argc} (want {want} args)",
+                                    if *three_d { "query3d" } else { "query2d" }
+                                ),
                             ));
                         }
                         match handle {
                             QHandle::Named(n) => {
-                                if !refs_names.contains_key(n) {
+                                if queries3d {
+                                    match refs3_names.get(n.as_str()) {
+                                        None => {
+                                            return Err(at(
+                                                &def.module,
+                                                *line,
+                                                n,
+                                                &format!(
+                                                    "unknown query row reference 'refs.{n}'"
+                                                ),
+                                            ));
+                                        }
+                                        Some((_, true, _)) => {
+                                            return Err(at(
+                                                &def.module,
+                                                *line,
+                                                n,
+                                                &format!(
+                                                    "'refs.{n}' is a group row; groups are not queryable geometry"
+                                                ),
+                                            ));
+                                        }
+                                        Some((_, _, true)) => {
+                                            return Err(at(
+                                                &def.module,
+                                                *line,
+                                                n,
+                                                &format!(
+                                                    "'refs.{n}' is a view-2d marker row; 3D queries address view-3d leaves"
+                                                ),
+                                            ));
+                                        }
+                                        _ => {}
+                                    }
+                                } else if !refs_names.contains_key(n) {
                                     return Err(at(
                                         &def.module,
                                         *line,
@@ -2071,7 +2243,7 @@ pub(crate) fn plan_dispatch_events(
                                         &def.module,
                                         *line,
                                         "sweep",
-                                        "sweep mover must be a named row (refs.<inst>) or self.row()",
+                                        "sweep mover must be a named row (refs.<leaf>) or self.row()",
                                     ));
                                 }
                             }
@@ -2109,7 +2281,8 @@ pub(crate) fn plan_dispatch_events(
                                 *line,
                                 base,
                                 &format!(
-                                    "unknown query result '{base}' (bind it with a let from query2d)"
+                                    "unknown query result '{base}' (bind it with a let from {})",
+                                    if queries3d { "query3d" } else { "query2d" }
                                 ),
                             ));
                         };
@@ -2147,6 +2320,17 @@ pub(crate) fn plan_dispatch_events(
                     // = 实例路径）；components-3d 的 refs.<elem>.place/shift
                     // 由 space3 行环境在 translate 期校验，这里不再拦截。
                     QEvent::RefRead { name, line } => {
+                        if queries3d {
+                            if !refs3_names.contains_key(name) {
+                                return Err(at(
+                                    &def.module,
+                                    *line,
+                                    name,
+                                    &format!("unknown query row reference 'refs.{name}'"),
+                                ));
+                            }
+                            continue;
+                        }
                         if queries && !refs_names.contains_key(name) {
                             return Err(at(
                                 &def.module,
@@ -2157,6 +2341,17 @@ pub(crate) fn plan_dispatch_events(
                         }
                     }
                     QEvent::RefWrite { name, line } => {
+                        if queries3d {
+                            if !refs3_names.contains_key(name) {
+                                return Err(at(
+                                    &def.module,
+                                    *line,
+                                    name,
+                                    &format!("unknown query row reference 'refs.{name}'"),
+                                ));
+                            }
+                            continue;
+                        }
                         let Some(writable) = refs_names.get(name) else {
                             if !queries {
                                 continue;
@@ -3581,6 +3776,10 @@ pub struct QueryParts<'a> {
     pub self_row: Option<String>,
     pub self_writable: bool,
     pub binds: &'a std::cell::RefCell<Vec<(String, QueryKind)>>,
+    /// PLAN-039：queries-3d 形态（三维 self place/shift、query3d 发射、
+    /// `refs3` 行文本表）；queries-2d 构造恒 (false, None)，字节不变。
+    pub dim3: bool,
+    pub refs3: Option<&'a BTreeMap<String, crate::translate::RefRow3>>,
 }
 
 /// PLAN-022 sprites-2d 场景收集：声明序 = 文档序（作者显式层序），图像
@@ -4688,6 +4887,8 @@ pub(crate) fn instance_ctx<'a>(
         self_row: q.self_row.clone(),
         self_writable: q.self_writable,
         binds: q.binds,
+        dim3: q.dim3,
+        refs3: q.refs3,
     });
     Ok(Ctx {
         target: Target::Instance {
@@ -4792,6 +4993,8 @@ pub(crate) fn root_ctx<'a>(
         self_row: q.self_row.clone(),
         self_writable: q.self_writable,
         binds: q.binds,
+        dim3: q.dim3,
+        refs3: q.refs3,
     });
     Ctx {
         ahud3: None,
@@ -5431,6 +5634,8 @@ var {img}_fh=[{}]
         self_row: None,
         self_writable: false,
         binds: &qbinds,
+        dim3: false,
+        refs3: None,
     });
     let sprite_env = sprites.then(|| crate::translate::SpriteEnv {
         spawns: &scene.spawn_sites,
@@ -5528,6 +5733,8 @@ var {img}_fh=[{}]
             self_row: Some(format!("{prefix}_qrow[i]")),
             self_writable: def.char_elem.is_none(),
             binds: &qbinds,
+            dim3: false,
+            refs3: None,
         });
         let ictx = instance_ctx(
             project,
@@ -5566,6 +5773,8 @@ var {img}_fh=[{}]
             self_row: Some(format!("{prefix}_qrow[j]")),
             self_writable: def.char_elem.is_none(),
             binds: &qbinds,
+            dim3: false,
+            refs3: None,
         });
         for (fname, ev) in mine {
             gen_recv_fn(

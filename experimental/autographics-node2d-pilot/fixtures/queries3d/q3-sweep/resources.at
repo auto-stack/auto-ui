@@ -1,0 +1,3 @@
+// PLAN-039 queries-3d lab resources: the original G05/3d multi-part GLB
+// (sha 42c9da67…, 1528 B) as the only geometry resource.
+let parts_glb = model3d.glb("assets/two-parts.glb")

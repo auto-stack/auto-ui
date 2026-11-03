@@ -1456,6 +1456,8 @@ pub(crate) struct Row3 {
     pub parent: Option<u64>,
     /// model3d 资源解析结果（"sha256:<hex>"）。
     pub resource: Option<String>,
+    /// PLAN-039：二维标记行自定 rgba；None = 三维固定占位（字节不变）。
+    pub rgba: Option<[f64; 4]>,
 }
 
 pub(crate) struct SceneBuild3 {
@@ -1465,6 +1467,8 @@ pub(crate) struct SceneBuild3 {
     pub handles: BTreeMap<String, i64>,
     /// 每定义 → 每元素 → 每实例行名（def_idx 序；root 定义为单行）。
     pub elem_rows: BTreeMap<String, BTreeMap<String, Vec<String>>>,
+    /// PLAN-039：每定义 → 每组 → 每实例行名（def_idx 序；root 单行）。
+    pub group_rows: BTreeMap<String, BTreeMap<String, Vec<String>>>,
     /// 根 view 元素行名。
     pub root_rows: BTreeMap<String, String>,
 }
@@ -1567,6 +1571,7 @@ fn emit_def_rows(
                 visible: g.visible,
                 parent: None,
                 resource: None,
+                rgba: None,
             },
             parent_key,
         });
@@ -1610,6 +1615,7 @@ fn emit_def_rows(
                 visible,
                 parent: None,
                 resource,
+                rgba: None,
             },
             parent_key,
         });
@@ -1685,7 +1691,7 @@ fn resolve_model_3d(
 
 /// 收集三维场景：树先序行 + driver `ordered()` 同规则句柄。
 pub(crate) fn collect_scene_3d(project: &Project, w3: &World3d) -> Result<SceneBuild3, LowerError> {
-    collect_scene_3d_with(project, w3, &[], None)
+    collect_scene_3d_with(project, w3, &[], None, &[])
 }
 
 /// PLAN-028：spawn 模板行输入（events 档；行名 = 模板定义名，值全部
@@ -1702,11 +1708,139 @@ pub(crate) struct TemplateRowIn {
     pub resource: Option<String>,
 }
 
+/// PLAN-039：queries-3d refs3 行文本表构建。root 表 = view-3d 叶/组字面量
+/// + 二维标记字面量（dim2d）+ 顶层实例 primary 叶字面量；def 表 = 本定义
+/// 叶/组行表表达式 + 顶层实例 primary 字面量。
+pub(crate) fn build_queries3_source(
+    w3: &World3d,
+    scene: &SceneBuild3,
+    markers: &[MarkerRow3],
+) -> Queries3Source {
+    let world = &w3.world;
+    let leaf3 = |def_name: &str| -> Option<String> {
+        w3.views[def_name]
+            .elems
+            .first()
+            .map(|e| e.elem.clone())
+    };
+    let inst_primary_row = |inst: &crate::lower_components::InstanceIR| -> Option<String> {
+        let elem = leaf3(&inst.def)?;
+        let rows = scene.elem_rows.get(&inst.def)?.get(&elem)?;
+        let row_name = rows.get(inst.def_idx)?;
+        Some(scene.handles[row_name].to_string())
+    };
+    let mut root_refs3 = BTreeMap::new();
+    let root_def_name = &world.root;
+    for e in &w3.views[root_def_name].elems {
+        let row = &scene.root_rows[&e.elem];
+        root_refs3.insert(
+            e.elem.clone(),
+            crate::translate::RefRow3 {
+                row: scene.handles[row].to_string(),
+                writable: true,
+                is_group: false,
+                dim2d: false,
+            },
+        );
+    }
+    for g in &w3.views[root_def_name].groups {
+        root_refs3.insert(
+            g.name.clone(),
+            crate::translate::RefRow3 {
+                row: scene.handles[&g.name].to_string(),
+                writable: true,
+                is_group: true,
+                dim2d: false,
+            },
+        );
+    }
+    for inst in &world.instances {
+        if inst.path.contains('/') {
+            continue;
+        }
+        if let Some(row) = inst_primary_row(inst) {
+            root_refs3.insert(
+                inst.path.clone(),
+                crate::translate::RefRow3 {
+                    row,
+                    writable: true,
+                    is_group: false,
+                    dim2d: false,
+                },
+            );
+        }
+    }
+    for m in markers {
+        root_refs3.insert(
+            m.name.clone(),
+            crate::translate::RefRow3 {
+                row: scene.handles[&m.name].to_string(),
+                writable: true,
+                is_group: false,
+                dim2d: true,
+            },
+        );
+    }
+    let mut def_refs3: BTreeMap<String, BTreeMap<String, crate::translate::RefRow3>> =
+        BTreeMap::new();
+    for dname in world.defs.keys() {
+        if world.def_len(dname) == 0 {
+            continue;
+        }
+        let prefix = world.defs[dname].prefix();
+        let mut table = BTreeMap::new();
+        for e in &w3.views[dname].elems {
+            table.insert(
+                e.elem.clone(),
+                crate::translate::RefRow3 {
+                    row: format!("{prefix}_{}_rows[i]", e.elem),
+                    writable: true,
+                    is_group: false,
+                    dim2d: false,
+                },
+            );
+        }
+        for g in &w3.views[dname].groups {
+            table.insert(
+                g.name.clone(),
+                crate::translate::RefRow3 {
+                    row: format!("{prefix}_{}_rows[i]", g.name),
+                    writable: true,
+                    is_group: true,
+                    dim2d: false,
+                },
+            );
+        }
+        for inst in &world.instances {
+            if inst.path.contains('/') {
+                continue;
+            }
+            if let Some(row) = inst_primary_row(inst) {
+                table.insert(
+                    inst.path.clone(),
+                    crate::translate::RefRow3 {
+                        row,
+                        writable: true,
+                        is_group: false,
+                        dim2d: false,
+                    },
+                );
+            }
+        }
+        def_refs3.insert(dname.clone(), table);
+    }
+    Queries3Source {
+        root_refs3,
+        def_refs3,
+    }
+}
+
 pub(crate) fn collect_scene_3d_with(
     project: &Project,
     w3: &World3d,
     templates: &[TemplateRowIn],
     presentation: Option<&crate::lower_node3d_presentation::PresentationMeta3>,
+    markers: &[MarkerRow3],
 ) -> Result<SceneBuild3, LowerError> {
     let world = &w3.world;
     let mut pending: Vec<PendingRow> = Vec::new();
@@ -1735,6 +1869,7 @@ pub(crate) fn collect_scene_3d_with(
                     visible: g.visible,
                     parent: None,
                     resource: None,
+                    rgba: None,
                 },
                 parent_key: g.parent_chain.last().cloned(),
             });
@@ -1785,6 +1920,7 @@ pub(crate) fn collect_scene_3d_with(
                     visible,
                     parent: None,
                     resource,
+                    rgba: None,
                 },
                 parent_key: e.groups.last().cloned(),
             });
@@ -1819,6 +1955,29 @@ pub(crate) fn collect_scene_3d_with(
                 visible: t.visible,
                 parent: None,
                 resource: t.resource.clone(),
+                rgba: None,
+            },
+            parent_key: None,
+        });
+    }
+
+    // —— PLAN-039：root view-2d 标记行（父级空 = 顶层；ordered() 中位于
+    // 全部三维行之后；同维父组禁止——标记无 parent）——
+    for m in markers {
+        pending.push(PendingRow {
+            key: m.name.clone(),
+            row: Row3 {
+                is_group: false,
+                name: m.name.clone(),
+                kind: m.kind,
+                translation: m.translation,
+                scale: m.scale,
+                yaw: 0.0,
+                pitch: 0.0,
+                visible: m.visible,
+                parent: None,
+                resource: None,
+                rgba: Some(m.rgba),
             },
             parent_key: None,
         });
@@ -1945,10 +2104,51 @@ pub(crate) fn collect_scene_3d_with(
         }
     }
 
+    // PLAN-039：组行表（每定义 → 每组 → 每实例行名；def_idx 序；root 单行）。
+    let mut group_rows: BTreeMap<String, BTreeMap<String, Vec<String>>> = BTreeMap::new();
+    {
+        let v3 = &w3.views[&root_def_name];
+        for g in &v3.groups {
+            group_rows
+                .entry(root_def_name.clone())
+                .or_default()
+                .insert(g.name.clone(), vec![g.name.clone()]);
+        }
+    }
+    for i in &world.instances {
+        let v3 = &w3.views[&i.def];
+        for g in &v3.groups {
+            let key = format!("{}/{}", i.path, g.name);
+            let list = group_rows
+                .entry(i.def.clone())
+                .or_default()
+                .entry(g.name.clone())
+                .or_default();
+            while list.len() <= i.def_idx {
+                list.push(String::new());
+            }
+            list[i.def_idx] = key;
+        }
+    }
+    for (dname, groups) in &group_rows {
+        for (gname, list) in groups {
+            if list.iter().any(|s| s.is_empty()) {
+                let def = &world.defs[dname];
+                return Err(at(
+                    &def.module,
+                    def.line,
+                    gname,
+                    "group row table has an unregistered instance slot",
+                ));
+            }
+        }
+    }
+
     Ok(SceneBuild3 {
         rows,
         handles,
         elem_rows,
+        group_rows,
         root_rows,
     })
 }
@@ -2042,6 +2242,7 @@ fn stamp_vis3d_env(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn gen_user_source_3d(
     project: &Project,
     w3: &World3d,
@@ -2054,14 +2255,20 @@ pub(crate) fn gen_user_source_3d(
     ahud: Option<&crate::lower_components3d_audio_hud::AhudCfg3>,
     gen_note: &str,
     regen_note: &str,
+    // PLAN-039：queries-3d 生成面（None = 旧档，字节不变）。
+    q3: Option<&Queries3Source>,
+    // PLAN-039：档派生行为 API（None = 旧档 API 常量）。
+    behavior_api: Option<&str>,
 ) -> Result<String, LowerError> {
     let world = &w3.world;
     let mut src = String::new();
     let root_def = &world.defs[&world.root];
     let root_decl = node_of(project, &world.root);
 
+    // PLAN-039：档派生 API 注入头注释（None = 旧档 API 常量，字节不变）。
+    let api_note = behavior_api.unwrap_or(API);
     src.push_str(&format!(
-        "// GENERATED by autographics-node2d-pilot ({gen_note}, {API}).\n"
+        "// GENERATED by autographics-node2d-pilot ({gen_note}, {api_note}).\n"
     ));
     let inst_list = world
         .instances
@@ -2239,7 +2446,8 @@ pub(crate) fn gen_user_source_3d(
             if !def.dyn_elems.contains(&e.elem) {
                 // PLAN-028：events 档静态元素也发行表（Start place 与 bind
                 // 主题按行寻址；常量行表，其余档保持 dyn-only 字节不变）。
-                if let Some(ev) = events {
+                // PLAN-039：queries-3d 档同样发行（refs 具名行寻址）。
+                if events.is_some() || q3.is_some() {
                     let rows = scene
                         .elem_rows
                         .get(&dname)
@@ -2333,6 +2541,32 @@ pub(crate) fn gen_user_source_3d(
                     def.prefix(),
                     e.elem,
                     vv.join(",")
+                ));
+            }
+        }
+    }
+    // PLAN-039：组行表（queries-3d；每实例组行；root 组走字面量 refs3
+    // 无表）。
+    if let Some(_) = q3 {
+        for dname in def_order(world) {
+            if world.def_len(&dname) == 0 {
+                continue;
+            }
+            let def = &world.defs[&dname];
+            for g in &w3.views[&dname].groups {
+                let rows = scene
+                    .group_rows
+                    .get(&dname)
+                    .and_then(|m| m.get(&g.name))
+                    .expect("group rows recorded");
+                src.push_str(&format!(
+                    "var {}_{}_rows=[{}]\n",
+                    def.prefix(),
+                    g.name,
+                    rows.iter()
+                        .map(|r| scene.handles[r].to_string())
+                        .collect::<Vec<_>>()
+                        .join(",")
                 ));
             }
         }
@@ -2431,10 +2665,37 @@ pub(crate) fn gen_user_source_3d(
         .first()
         .map(|e| scene.handles[&scene.root_rows[&e.elem]].to_string());
 
+    // PLAN-039：queries-3d 环境。space3 refs 并入 root 组行（place/shift/
+    // show/world/local 三维 typing）；二维标记只进 refs3（z=0 限定走
+    // queries 写路径）；query3d 面经 QueryParts（dim3=true）→ root_ctx。
+    let empty_refs: BTreeMap<String, crate::translate::RefRow> = BTreeMap::new();
+    let qbinds: std::cell::RefCell<Vec<(String, crate::translate::QueryKind)>> =
+        std::cell::RefCell::new(Vec::new());
+    let root_space3_refs;
+    let root_query_parts;
+    if let Some(src) = q3 {
+        let mut merged = root_refs.clone();
+        for g in &w3.views[&world.root].groups {
+            merged.insert(g.name.clone(), scene.handles[&g.name].to_string());
+        }
+        root_space3_refs = merged;
+        root_query_parts = Some(crate::lower_components::QueryParts {
+            refs: &empty_refs,
+            self_row: None,
+            self_writable: false,
+            binds: &qbinds,
+            dim3: true,
+            refs3: Some(&src.root_refs3),
+        });
+    } else {
+        root_space3_refs = root_refs.clone();
+        root_query_parts = None;
+    }
+
     // root Life/成员/呈现 fns。
-    let mut rctx = root_ctx(project, world, plan, None, None, None);
+    let mut rctx = root_ctx(project, world, plan, root_query_parts.as_ref(), None, None);
     rctx.space3 = Some(SpaceEnv {
-        refs: &root_refs,
+        refs: &root_space3_refs,
         self_row: root_primary.clone(),
     });
     // PLAN-027：runtime 环境盖章（None = 024 档不触碰，字节不变）。
@@ -2524,11 +2785,32 @@ pub(crate) fn gen_user_source_3d(
         for e in &w3.views[&dname].elems {
             inst_refs.insert(e.elem.clone(), format!("{prefix}_{}_rows[i]", e.elem));
         }
+        // PLAN-039：实例组行并入 space3（动态父组写经 refs.<group>）。
+        for g in &w3.views[&dname].groups {
+            inst_refs.insert(g.name.clone(), format!("{prefix}_{}_rows[i]", g.name));
+        }
         let inst_primary = w3.views[&dname]
             .elems
             .first()
             .map(|e| format!("{prefix}_{}_rows[i]", e.elem));
-        let mut ictx = instance_ctx(project, plan, def, &prefix, "i", None, None, None)?;
+        let inst_query = q3.map(|src| crate::lower_components::QueryParts {
+            refs: &empty_refs,
+            self_row: inst_primary.clone(),
+            self_writable: true,
+            binds: &qbinds,
+            dim3: true,
+            refs3: src.def_refs3.get(&dname),
+        });
+        let mut ictx = instance_ctx(
+            project,
+            plan,
+            def,
+            &prefix,
+            "i",
+            inst_query.as_ref(),
+            None,
+            None,
+        )?;
         ictx.space3 = Some(SpaceEnv {
             refs: &inst_refs,
             self_row: inst_primary.clone(),
@@ -3147,8 +3429,19 @@ fn obj_json_3d(r: &Row3, id: u64) -> String {
         None => "null".to_string(),
         Some(s) => format!("\"{s}\""),
     };
+    // PLAN-039：二维标记行携带作者 rgba；三维行保持固定占位字节。
+    let rgba = match r.rgba {
+        None => "    0.9,\n    0.3,\n    0.2,\n    1.0".to_string(),
+        Some(c) => format!(
+            "    {},\n    {},\n    {},\n    {}",
+            fmt_f(c[0]),
+            fmt_f(c[1]),
+            fmt_f(c[2]),
+            fmt_f(c[3])
+        ),
+    };
     format!(
-        "  {{\n   \"id\": {id},\n   \"name\": \"{}\",\n   \"kind\": \"{}\",\n   \"translation\": [\n    {},\n    {},\n    {}\n   ],\n   \"scale\": [\n    {},\n    {},\n    {}\n   ],\n   \"yaw\": {},\n   \"pitch\": {},\n   \"rgba\": [\n    0.9,\n    0.3,\n    0.2,\n    1.0\n   ],\n   \"visible\": {},\n   \"parent\": {},\n   \"resource\": {},\n   \"sprite\": null\n  }}",
+        "  {{\n   \"id\": {id},\n   \"name\": \"{}\",\n   \"kind\": \"{}\",\n   \"translation\": [\n    {},\n    {},\n    {}\n   ],\n   \"scale\": [\n    {},\n    {},\n    {}\n   ],\n   \"yaw\": {},\n   \"pitch\": {},\n   \"rgba\": [\n{rgba}\n   ],\n   \"visible\": {},\n   \"parent\": {},\n   \"resource\": {},\n   \"sprite\": null\n  }}",
         r.name,
         r.kind,
         fmt_f(r.translation[0]),
@@ -3239,6 +3532,7 @@ pub fn lower_project_components3d(project: &Project) -> Result<LowerOutputBasic2
         presentation: None,
         doc_prefix: "plan024-components-3d",
         ahud: None,
+        queries3: None,
         gen_note: "PLAN-024 components-3d",
         regen_note: "tools/verify_plan024.py",
         behavior_api: API,
@@ -3246,6 +3540,29 @@ pub fn lower_project_components3d(project: &Project) -> Result<LowerOutputBasic2
 }
 
 /// PLAN-027：共享降低管线（024 唯一实现 + runtime 注入位）。
+/// PLAN-039：queries-3d 档配置（None = 旧档，字节不变）。
+pub(crate) struct Queries3Cfg {
+    /// root view-2d shape2d 标记行（声明序；root-only；z=0）。
+    pub markers: Vec<MarkerRow3>,
+}
+
+/// PLAN-039：root view-2d 标记行（shape2d quad/circle；屏幕坐标）。
+pub(crate) struct MarkerRow3 {
+    pub name: String,
+    pub kind: &'static str,
+    pub translation: [f64; 3],
+    pub scale: [f64; 3],
+    pub rgba: [f64; 4],
+    pub visible: bool,
+}
+
+/// PLAN-039：queries-3d 生成面环境（refs3 行文本表；root 字面量 / 实例
+/// `{prefix}_{name}_rows[i]` 表达式）。
+pub(crate) struct Queries3Source {
+    pub root_refs3: BTreeMap<String, crate::translate::RefRow3>,
+    pub def_refs3: BTreeMap<String, BTreeMap<String, crate::translate::RefRow3>>,
+}
+
 pub(crate) struct Cfg3<'c> {
     /// runtime 注入配置（None = 024 路径，字节不变）。
     pub runtime: Option<&'c RuntimeCfg3>,
@@ -3269,6 +3586,9 @@ pub(crate) struct Cfg3<'c> {
     /// PLAN-035：components-3d-audio-hud 组合配置（None = 旧档，字节不变；
     /// Some = 声音/HUD/姿态 bundle 收口 + 有界快照/批销毁作者面随档发行）。
     pub ahud: Option<&'c crate::lower_components3d_audio_hud::AhudCfg3>,
+    /// PLAN-039：queries-3d 档配置（None = 旧档，字节不变；Some = 双维
+    /// 根标记行 + query3d 面 + 组/元素行表随档发行）。
+    pub queries3: Option<&'c Queries3Cfg>,
 }
 
 pub(crate) fn lower_project_components3d_cfg(
@@ -3289,11 +3609,12 @@ pub(crate) fn lower_project_components3d_cfg_with(
     let plan = crate::lower_components::plan_dispatch_events(
         project,
         &w3.world,
-        false,
+        cfg.queries3.is_some(),
         false,
         false,
         cfg.events.is_some(),
         cfg.bindings.is_some(),
+        cfg.queries3.is_some(),
     )?;
     // PLAN-028：events 档模板行随 cfg 进共享管线（旧档空切片，字节不变）。
     let no_templates: Vec<TemplateRowIn> = Vec::new();
@@ -3301,8 +3622,15 @@ pub(crate) fn lower_project_components3d_cfg_with(
         Some(ev) => &ev.template_rows,
         None => &no_templates,
     };
-    let scene = collect_scene_3d_with(project, &w3, templates, cfg.presentation)?;
-    let user_source = gen_user_source_3d(project, &w3, &plan, &scene, cfg.runtime, cfg.events, cfg.bindings, cfg.presentation, cfg.ahud, cfg.gen_note, cfg.regen_note)?;
+    let no_markers: Vec<MarkerRow3> = Vec::new();
+    let markers: &[MarkerRow3] = match cfg.queries3 {
+        Some(q) => &q.markers,
+        None => &no_markers,
+    };
+    let scene = collect_scene_3d_with(project, &w3, templates, cfg.presentation, markers)?;
+    // PLAN-039：refs3 行文本表（root 字面量 / 实例行表表达式）。
+    let q3_source = cfg.queries3.map(|_| build_queries3_source(&w3, &scene, markers));
+    let user_source = gen_user_source_3d(project, &w3, &plan, &scene, cfg.runtime, cfg.events, cfg.bindings, cfg.presentation, cfg.ahud, cfg.gen_note, cfg.regen_note, q3_source.as_ref(), if cfg.queries3.is_some() { Some(cfg.behavior_api) } else { None })?;
     let sha = crate::scene::sha256_hex(user_source.as_bytes());
     let bytes = user_source.len();
     let has_behavior =

@@ -1,0 +1,27 @@
+// PLAN-039 queries-3d cross lab: one same-definition query component with
+// two instances (SoA row isolation — each instance casts from its own row
+// and keeps its own result state).
+node QueryBot(px: float, py: float, pz: float) {
+    view-3d {
+        cylinder3d probe {
+            position: (px, py, pz)
+            scale: (0.2, 0.2, 0.2)
+        }
+    }
+    model {
+        var reach = 3.0
+    }
+    on {
+        Life.Start -> {
+        }
+        Life.Tick(dt float) -> {
+        let ax = self.world(0)
+        let ay = self.world(1)
+        let az = self.world(2)
+        let q = query3d.segment(-1, true, ax, ay, az, ax + .reach, ay, az)
+        let hit = q.hit()
+        let node = q.node()
+            self.show(hit)
+        }
+    }
+}

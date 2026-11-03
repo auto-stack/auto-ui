@@ -101,6 +101,7 @@ pub fn lower_project_components3d_runtime(
             regen_note: "tools/verify_plan027.py",
             presentation: None,
             ahud: None,
+        queries3: None,
             behavior_api,
         },
     )

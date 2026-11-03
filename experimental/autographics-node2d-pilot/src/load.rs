@@ -120,6 +120,17 @@ fn line_of(source: &str, offset: usize) -> usize {
 }
 
 fn parse_module_text(file: &str, source: &str, base: &Path) -> Result<LoadedModule, ProjectError> {
+    parse_module_text_dialect(file, source, base, false)
+}
+
+/// PLAN-039：queries-3d 组合 dialect（仅显式查询 profile 放行同 node 双
+/// view 解析；默认路径旧拒绝字节不变）。
+fn parse_module_text_dialect(
+    file: &str,
+    source: &str,
+    base: &Path,
+    allow_dual_view: bool,
+) -> Result<LoadedModule, ProjectError> {
     let err = |message: String, offset: usize| ProjectError {
         file: file.to_string(),
         line: line_of(source, offset),
@@ -129,8 +140,12 @@ fn parse_module_text(file: &str, source: &str, base: &Path) -> Result<LoadedModu
         scenario: Scenario::UI,
         ..Default::default()
     });
-    let code = parser
-        .parse_domain(&auto_ui_dialect::node2d::Node2DDialect)
+    let parsed = if allow_dual_view {
+        parser.parse_domain(&auto_ui_dialect::node2d::Node2DQueriesDialect)
+    } else {
+        parser.parse_domain(&auto_ui_dialect::node2d::Node2DDialect)
+    };
+    let code = parsed
         .map_err(|e| {
             // 解析错误带字节偏移 span；换算行号。
             let text = format!("{e:?}");
@@ -560,6 +575,11 @@ fn png_ihdr_dims(bytes: &[u8]) -> Option<(u32, u32)> {
 
 /// 读入模块工程：`entry` 所在目录为根，`use` 闭包全部解析。
 pub fn load_project(entry: &Path) -> Result<Project, ProjectError> {
+    load_project_dual(entry, false)
+}
+
+/// PLAN-039：queries-3d 双 view 解析载入（默认路径字节不变）。
+pub fn load_project_dual(entry: &Path, allow_dual_view: bool) -> Result<Project, ProjectError> {
     let base = entry
         .parent()
         .ok_or_else(|| ProjectError {
@@ -590,7 +610,7 @@ pub fn load_project(entry: &Path) -> Result<Project, ProjectError> {
             line: 0,
             message: "module not found".into(),
         })?;
-        let module = parse_module_text(&name, &source, &base)?;
+        let module = parse_module_text_dialect(&name, &source, &base, allow_dual_view)?;
         for u in &module.uses {
             if u.module == SERVICES_NAMESPACE || u.module == "store" {
                 continue;
