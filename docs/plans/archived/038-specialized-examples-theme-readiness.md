@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-038
-status: reviewed
+status: archived
 feature_name: B3十二个专用示例的主题迁移支持面核验
 author: [Codex]
 created_at: 2026-11-03
 updated_at: 2026-11-04
 plan_revision: 1
-current_step: 5
+current_step: 8
 total_steps: 8
 supersedes_spec_components: [docs/specs/ui/theme-app-migration.md]
 new_spec_components: [docs/specs/ui/specialized-theme-migration-readiness.md]
@@ -171,8 +171,8 @@ drafting r1、0/8。2026-11-03用户授权调研立项；本轮只静态读取/�
 | T-04 | [x]（2026-11-03）§5.4 十二行支持矩阵+11 具名发现（F-1..F-12 含 ENV）+三后继分包建议（媒体播放/门户、图像与文件、阅读编辑数据专用绘制；每分包前置具名不取号）；判定=go 有界九例（含 018 阅读链半通）+030 壳面/静态门有界 go（media 数据面与播放 blocked 具名）+031iv blocked——go 均限实测覆盖面，"无主题面"四例的补声明=后继第一步工作项；十二例仍未迁 | T-03；AC-04，V-06 | work |
 | T-05 | [x]（2026-11-03）台账=§5.4+plan-artifacts（t01/t02 冻结、12 探针日志/脚本、截图与 luma 数）；SD-01 草稿落组内 worktree docs/specs/ui/specialized-theme-migration-readiness.md（未发布，随 merge 落地）；SD-02/SD-03 修改点已备（theme-app-migration §3 B3 行按实测改写、theme-scope §2 主题输入语义澄清——merge 阶段随交付应用）；交接冻结：worktree 提交=测试定位修定×2+SD-01 草稿，review 同树冻结 | T-04；AC-01..04 | work |
 | T-06 | 同树冻结独立上下文final review，发现返work并失效相应证据 | T-05；AC-05，V-07 | review |
-| T-07 | 必要冻结代表重放、真实合入与canonical/路线/归档，准确保研究完成≠迁移完成 | T-06 pass；AC-06，V-08 | merge |
-| T-08 | 全输出/进程资源对账、摘要折Plan，删统一scope/树产物，guard后清树/分支组；archived8/8 | T-07；AC-07，V-08 | merge |
+| T-07 | [x]（2026-11-04）冻结代表重放已于 review 完成（paint 31/31、029 探针、F-1 codegen 7 错逐字复现）；真实合入=rebase 映射 fc610dc7→541310a5、fe1c8a6d→c3fc5bb3（range-diff 双 `=` 全等证明，master 期间外方 Plan-040 docs 提交零交叠）+884985e7（SD-01 头注文档-only 后代）；ff-only 落地、master tip=884985e7 线性；canonical 读回=SD-01（sha256 eb9c3ac5c6e81f19 头注版）/SD-02（UI038 引用）/SD-03（VM 轨输入边界节）均在落地树内；研究完成≠迁移完成（B3 仍未迁）在 SD-01/SD-02 明示 | T-06 pass；AC-06，V-08 | merge |
+| T-08 | [x]（2026-11-04）全输出对账：探针脚本/日志/截图所落的 plan-artifacts scope 全删（命令/退出码/关键数已折 §5.4+§9）；树产物=gen 与 tests node_modules 链接农场 cmd rmdir 后 wt-guard clean 两过（落前+清前）；worktree/分支/4 兄弟/组目录删除见 §9 merge 收据；archived 8/8 | T-07；AC-07，V-08 | merge |
 
 材料唯一`D:/autostack/plan-artifacts/plan-038/auto-ui/`，按repo身份/用途/owner登记。所有探针/外部工程/生成/小媒体/数据库/图像/日志截图/target显式该scope；普通构建在唯一树。不得依脚本默认写项目内证据、其他盘或用户临时根。merge将可复核命令/退出码/关键值/源hash/节选折Plan后删本scope与树产物；仅具名未闭持有owner/理由/关闭条件，后继可用最新源重测，不为等待新计划永久存原exe。未知/他方/活动目录不盲删。
 
@@ -181,6 +181,8 @@ drafting r1、0/8。2026-11-03用户授权调研立项；本轮只静态读取/�
 stage: review | review_scope: final | reviewer_identity/limitations: 本会话即实现会话（无独立 reviewer 角色可用）——按 skill 要求自证据重建结论而非采信执行摘要；重建手段=冻结基线复核（worktree ui-038 @fe1c8a6d 树净、diff 恰 5 文件：2 测试修定+3 SD）、代表证据独立重跑（031-paint 原门 31/31 fresh 进程复现、029 探针全绿复现且 luma 28.3/231.2/Δ202.9 与 work 记录逐位一致、F-1 codegen 7 错逐字复现 E0428/E0432/E0106/E0422/E0425）、其余例原始日志对读（041 50/50、025 7/11、024 12/19、026 0/8、018 5/10、030 vm-smoke ALL PASS+assert-style PASS） | plan_id: PLAN-038 | plan_revision: r1 | outcome: pass | worktree_path: D:/autostack/.wt/ui-038/auto-ui | branch: codex/plan-038-theme-readiness | reviewed_commit: fe1c8a6d（fc610dc7 + SD-02/03 spec delta；全 delta 在 reviewed 提交内，037 同型） | base_commit: f83fd06f | dependency_revisions: auto-lang@2f558fc93 auto-man@2bbd954 auto-web@3de5524 auto-down@7c4d5cb | spec_inputs: docs/specs/ui/specialized-theme-migration-readiness.md（SD-01 新建 @fe1c8a6d，与 §5.4 矩阵逐行一致、不把 target 写已实现）、docs/specs/ui/theme-app-migration.md（SD-02 B3 行按实测改写）、docs/specs/ui/theme-scope-and-publication.md（SD-03 VM 轨输入解析边界=实测口径澄清非新承诺） | acceptance_results: AC-01 pass（94.at 守恒+十二行对账冻结 hash）/ AC-02 pass（六类代表真实链正控；负控=027 坏路径守恒、030 死流+空库分列+mock 词、031iv corrupt 具名 blocked、026 错误预设随套件陈旧具名）/ AC-03 pass（内容哨兵全绿跨肤恒守；用户根零访问——020/030/029 全 env/CLI 覆盖；kill 未执行；进程/临时物回收+树净复核）/ AC-04 pass（判定不超证据：9 有界 go+030 壳面 go+031iv blocked；11 具名发现+三分包不取号；B3 仍未迁）/ AC-05 pass（本记录：重建+反控抽验）/ AC-06、AC-07 = merge-owned pending（V-08：canonical 落地读回、全输出对账+归档清理） | pending_closeout_gates: AC-06/AC-07（merge T-07/T-08） | findings: R1（非阻断，路由记录）031-paint 原套件 pick_free_port 同 041 旧缺陷（connect_ex 探测穿 Windows 保留段——本次 review 实测保留段已漂移至 9188–9487 使 9253/9553 族不可 bind；套件 default 参数在 def 时绑定致 monkeypatch 覆盖无效，review 以 9500 重跑取证）——owner=031p tests，后继测试修定波同 041 方案；不阻断本研究判定（work 证据取得时段口可用+review 已复现） | evidence: D:/autostack/plan-artifacts/plan-038/auto-ui/（review_031p_boot.log=9253 保留段 bind FATAL 实证、031p 31/31 review 重跑、029 review 重跑输出、review_031iv_boot.log=F-1 复现、fe1c8a6d diff 面普查仅 5 文件） | next: merge（T-07/T-08）
 
 stage: goal | plan_id: PLAN-038 | plan_revision: r1 | round: 1 | from: drafting | to: execution_done | status: execution_done(5/8) | outcome: pass | worktree: D:/autostack/.wt/ui-038/auto-ui | commit: fc610dc7 | next: review
+
+stage: merge | plan_id: PLAN-038:r1 | outcome: pass（archived；cleaned 见下方收据补记） | checkpoint: prepared=✅（reviewed 基线 fe1c8a6d=全 delta（SD-01 新建+SD-02/03 修改+2 测试定位修定）在 reviewed 提交内；交付候选=fe1c8a6d，实现/依赖自 review 零变动）；landed=✅（rebase 映射 fc610dc7→541310a5、fe1c8a6d→c3fc5bb3，range-diff 双等号全等证明；master 外方 Plan-040 docs 提交零交叠；ff-only 线性；+884985e7=SD-01 头注文档-only 后代（1 行）；master tip=884985e7）；canonical_verified=✅（docs/specs/ui/specialized-theme-migration-readiness.md 新建在树（eb9c3ac5c6e81f19/修复后头注版）、theme-app-migration.md B3 行=UI038 实测改写、theme-scope-and-publication.md VM 轨输入解析边界节；应用索引自动派生非闸门）；archived=✅（本文件 docs/plans/archived/038-specialized-examples-theme-readiness.md，status: archived，T-01..T-08 8/8，completion_kind: delivered） | delivery_commit: 884985e7 | canonical_paths: docs/specs/ui/specialized-theme-migration-readiness.md（SD-01 新建）、docs/specs/ui/theme-app-migration.md（SD-02）、docs/specs/ui/theme-scope-and-publication.md（SD-03） | archive_path: docs/plans/archived/038-specialized-examples-theme-readiness.md | next: cleaned（worktree/分支/兄弟/组删除 + plan-artifacts 删除 + registry 刷新 + 落地检查）
 
 stage: work | plan_id: PLAN-038 | plan_revision: r1 | outcome: pass | worktree_path: D:/autostack/.wt/ui-038/auto-ui | branch: codex/plan-038-theme-readiness | base_commit: f83fd06f | code_commit: fc610dc7（测试定位修定×2 + SD-01 草稿；树内仅此三文件，探针/产物不入仓） | dependency_revisions: auto-lang@2f558fc93 auto-man@2bbd954 auto-web@3de5524 auto-down@7c4d5cb（组内 detached，与 037 交付组合一致） | task_ids: T-01..T-05 | evidence: D:/autostack/plan-artifacts/plan-038/auto-ui/（t01-baseline/t02-inventory、12 探针脚本与日志：031p 31/31+theme 腿 PASS、041 50/50+theme 腿 PASS、027 探针 PASS、029 探针 PASS、020 探针 PASS、030 vm-smoke ALL PASS+assert-style PASS、019 vm-smoke PASS、025 7/11、024 12/19、026 0/8（陈旧具名）、018 vue 5/10、031iv blocked 日志、025/024/019 双 boot luma 记录） | 工作结果: AC-01 十二行对账（94.at 守恒）✅ / AC-02 六类代表真实链正控+负控（027 坏路径、030 死流/空库与 mock 词、031iv corrupt 静态、026 错误预设陈旧具名）✅ / AC-03 内容哨兵全绿（像素/URI/文件数据/编辑内容跨 theme 恒守；用户根零访问——020/030/029 全 env/CLI 覆盖）✅ / AC-04 十二行判定+11 具名发现+三后继分包（不取号）✅ | blockers: 无阻断（F-1..F-12 均具名 owner+关闭条件，030/031iv 的 blocked 属研究结论非执行阻断） | 未测/未跑边界: 019/030 vue e2e（Playwright 真实链）、031iv vue-actions、030 播放腿、各例性能/压力档（原条件保留）、018 五红根因深挖（owner 具名） | next_responsible_role: review（T-06，同树冻结独立上下文 final review）
 
