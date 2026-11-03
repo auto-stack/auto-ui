@@ -158,7 +158,9 @@ fn shape_of(project: &Project, node: &str, element: &str) -> (String, f64, f64) 
                             ResourceKind::Color(..) => panic!("mesh is a color"),
                             ResourceKind::Image { .. }
                             | ResourceKind::Frame { .. }
-                            | ResourceKind::Model3D { .. } => {
+                            | ResourceKind::Model3D { .. }
+                            | ResourceKind::Model3DTextured { .. }
+                            | ResourceKind::Model3DAnimated { .. } => {
                                 panic!("mesh is an image/frame/model resource")
                             }
                         };
@@ -311,7 +313,9 @@ fn kind_geometry(
                 ResourceKind::Color(r, g, b, a) => Ok(("color".into(), 0.0, 0.0, (*r, *g, *b, *a))),
                 ResourceKind::Image { .. }
                 | ResourceKind::Frame { .. }
-                | ResourceKind::Model3D { .. } => Err(crate::translate::LowerError::Unsupported {
+                | ResourceKind::Model3D { .. }
+                | ResourceKind::Model3DTextured { .. }
+                | ResourceKind::Model3DAnimated { .. } => Err(crate::translate::LowerError::Unsupported {
                     what: format!("resource '{resource}' is an image/frame/model, not geometry"),
                     line: 0,
                 }),

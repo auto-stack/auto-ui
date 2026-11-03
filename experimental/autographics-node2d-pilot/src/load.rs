@@ -47,6 +47,24 @@ pub enum ResourceKind {
         sha256: String,
         byte_length: usize,
     },
+    /// PLAN-034 components-3d-presentation：textured3d.glb("file.glb")——
+    /// 静态纹理 GLB 资源。身份同 Model3D（原始字节，URI/字节不可重写）；
+    /// 闭包元数据（closure id/图像边）由既有公开导入（resource-meta 工具
+    /// 走 assets::import 同一准入面）产出、pilot 原样绑定；严格闭包/几何
+    /// 准入仍在 driver load_declared/preflight（生成器不解析 GLB 结构，
+    /// 不引入第二套解码器）。
+    Model3DTextured {
+        file: String,
+        sha256: String,
+        byte_length: usize,
+    },
+    /// PLAN-034：animated3d.glb("file.glb")——原节点动画 GLB 资源（身份
+    /// 同上；clip 具名表保原 ordinal/名称，来自既有公开导入元数据）。
+    Model3DAnimated {
+        file: String,
+        sha256: String,
+        byte_length: usize,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -207,6 +225,36 @@ fn resource_from_store(
         Expr::Dot(_, m) => m.to_string(),
         _ => return Ok(None),
     };
+    // PLAN-034：具名纹理/动画资源构造器按完整点路径精确匹配
+    // （textured3d.glb / animated3d.glb）；旧 model3d.glb 静默面不变——
+    // 旧构造器不得偷偷接受纹理/动画档（新档内由元数据交叉核对具名拒绝）。
+    let full_ctor = match &*call.name {
+        Expr::Dot(outer, m) => {
+            let mut segments = vec![m.to_string()];
+            let mut cur: &Expr = outer;
+            while let Expr::Dot(next, seg) = cur {
+                segments.push(seg.to_string());
+                cur = next;
+            }
+            if let Expr::Ident(root) = cur {
+                segments.push(root.to_string());
+                segments.reverse();
+                Some(segments.join("."))
+            } else {
+                None
+            }
+        }
+        _ => None,
+    };
+    match full_ctor.as_deref() {
+        Some("textured3d.glb") => {
+            return resource_from_store_present3d(name, "texture resource", false, &call.args.args, base);
+        }
+        Some("animated3d.glb") => {
+            return resource_from_store_present3d(name, "animation resource", true, &call.args.args, base);
+        }
+        _ => {}
+    }
     // PLAN-022：图像/帧表构造器接受字符串/资源实参，先于数值实参收集。
     // 读不到/坏签名的 PNG 具名拒绝（不静默回退到 generic unsupported）。
     if ctor == "png" {
@@ -267,6 +315,67 @@ fn resource_from_store_glb(
             file,
             sha256: crate::scene::sha256_hex(&bytes),
             byte_length: bytes.len(),
+        },
+        line: 0,
+    }))
+}
+
+/// PLAN-034：`textured3d.glb("file.glb")` / `animated3d.glb("file.glb")` ——
+/// 具名纹理/节点动画 GLB 资源。签名与身份规则同 model3d.glb（单字符串实参、
+/// .glb 后缀、glTF magic、原始字节 SHA 身份）；闭包/clip 元数据由既有公开
+/// 导入产出（T-02 冻结），生成器不解析 GLB 结构。
+fn resource_from_store_present3d(
+    name: &str,
+    label: &str,
+    animated: bool,
+    args: &[auto_parser_api::ast::Arg],
+    base: &Path,
+) -> Result<Option<ResourceDef>, ProjectError> {
+    let err = |message: String| ProjectError {
+        file: "resources".to_string(),
+        line: 0,
+        message,
+    };
+    if args.len() != 1 {
+        return Ok(None);
+    }
+    let file = match &args[0] {
+        auto_parser_api::ast::Arg::Pos(Expr::Str(s)) => s.to_string(),
+        _ => return Ok(None),
+    };
+    if !file.to_ascii_lowercase().ends_with(".glb") {
+        return Err(err(format!(
+            "{label} '{name}': '{}' is not a .glb path",
+            file
+        )));
+    }
+    let path = base.join(&file);
+    let bytes = std::fs::read(&path).map_err(|e| {
+        err(format!(
+            "{label} '{name}': cannot read '{}' ({e})",
+            path.display()
+        ))
+    })?;
+    if bytes.len() < 12 || &bytes[0..4] != b"glTF" {
+        return Err(err(format!(
+            "{label} '{name}': '{}' is not a glTF-binary container",
+            path.display()
+        )));
+    }
+    Ok(Some(ResourceDef {
+        name: name.to_string(),
+        kind: if animated {
+            ResourceKind::Model3DAnimated {
+                file,
+                sha256: crate::scene::sha256_hex(&bytes),
+                byte_length: bytes.len(),
+            }
+        } else {
+            ResourceKind::Model3DTextured {
+                file,
+                sha256: crate::scene::sha256_hex(&bytes),
+                byte_length: bytes.len(),
+            }
         },
         line: 0,
     }))

@@ -479,6 +479,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+ "sha2",
  "thiserror 2.0.21",
  "toml",
  "walkdir",
@@ -535,6 +536,8 @@ dependencies = [
  "auto-parser-api",
  "auto-ui-compiler",
  "auto-ui-dialect",
+ "serde",
+ "serde_json",
  "tempfile",
 ]
 

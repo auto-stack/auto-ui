@@ -99,6 +99,23 @@ pub struct Ctx<'a> {
     /// 行为（裸池名常量/`.actor参数.<元素>`/`.msg参数` 投递保持
     /// unsupported，028 及更旧字节不变）。
     pub bindings3d: Option<BindingsEnv>,
+    /// PLAN-034（components-3d-presentation）：具名视觉姿态环境（本定义
+    /// 可 pose 的动画模型叶 + 各资源原 clip 表）。None 保持旧档行为
+    /// （`refs.<elem>.pose`/`clips.*` 保持 unsupported，旧字节不变）。
+    pub vis3d: Option<Vis3dEnv>,
+}
+
+/// PLAN-034：具名视觉姿态环境（stamp 时已按当前定义过滤；作者面只有
+/// 具名符号，clip ordinal 保原文件序）。
+pub struct Vis3dEnv {
+    /// 元素名 → 资源名（必须 animated3d.glb 声明；参数绑定叶不授 pose）。
+    pub posable: BTreeMap<String, String>,
+    /// 资源名 → clip 名 → 原 ordinal（`base` → -1 在解析层处理）。
+    pub clips: BTreeMap<String, BTreeMap<String, i64>>,
+    /// PLAN-034：动画档输入快照面（生成侧按 handler 前置一次
+    /// `ag_actions_snapshot` 解码，保持原32分支的1-credit输入面；探测由
+    /// 生成侧在翻译前后置位/复位）。
+    pub input_snapshot: std::cell::Cell<bool>,
 }
 
 /// PLAN-030：本定义的具名引用环境（stamp 时已按当前定义过滤）。池/模板/
@@ -415,6 +432,66 @@ fn translate_stmt(s: &Stmt, ctx: &Ctx, out: &mut String, indent: usize) -> Resul
 }
 
 fn translate_expr(e: &Expr, ctx: &Ctx, out: &mut String) -> Result<(), LowerError> {
+    // PLAN-034：具名 clip 值面（`clips.<resource>.<name|base|ordinal>` 可作
+    // 一般 int 表达式——clip 选择经局部 var 间接时同语义；直接 pose 实参仍
+    // 走跨模型核对，间接流由受信 fault 46 域把守）。旧档 vis3d=None 不变。
+    if let Expr::Dot(_, _) = e {
+        if ctx.vis3d.is_some() {
+            let mut path: Vec<String> = Vec::new();
+            let mut cur: &Expr = e;
+            let mut is_path = true;
+            loop {
+                match cur {
+                    Expr::Dot(outer, seg) => {
+                        path.push(seg.to_string());
+                        cur = outer;
+                    }
+                    Expr::Ident(root) => {
+                        path.push(root.to_string());
+                        break;
+                    }
+                    _ => {
+                        is_path = false;
+                        break;
+                    }
+                }
+            }
+            if is_path && path.len() == 3 && path[2] == "clips" {
+                let vis = ctx.vis3d.as_ref().expect("vis3d env");
+                let res = &path[1];
+                let Some(table) = vis.clips.get(res) else {
+                    return Err(unsupported(
+                        format!("clip value 'clips.{res}.{}' references unknown resource '{res}'", path[0]),
+                        e,
+                    ));
+                };
+                let seg = &path[0];
+                let text = if seg == "base" {
+                    "-1".to_string()
+                } else if let Ok(ordinal) = seg.parse::<i64>() {
+                    if ordinal < 0 || ordinal >= table.len() as i64 {
+                        return Err(unsupported(
+                            format!("resource '{res}' has no clip ordinal {seg} (clips: {})", table.len()),
+                            e,
+                        ));
+                    }
+                    format!("{ordinal}")
+                } else {
+                    match table.get(seg.as_str()) {
+                        Some(ordinal) => format!("{ordinal}"),
+                        None => {
+                            return Err(unsupported(
+                                format!("resource '{res}' has no clip named '{seg}' (explicit file ordinals are spelled clips.{res}.<n>)"),
+                                e,
+                            ));
+                        }
+                    }
+                };
+                out.push_str(&text);
+                return Ok(());
+            }
+        }
+    }
     match e {
         Expr::Int(v) => {
             out.push_str(&v.to_string());
@@ -647,6 +724,18 @@ fn translate_expr(e: &Expr, ctx: &Ctx, out: &mut String) -> Result<(), LowerErro
                                 }
                             }
                         };
+                        // PLAN-034：动画档快照面——held 位由 handler 前置的
+                        // ag_actions_snapshot 解码（零额外计费）；旧档逐字
+                        // ag_action_held(n)（计费 1，字节不变）。
+                        if ctx
+                            .vis3d
+                            .as_ref()
+                            .map(|v| v.input_snapshot.get())
+                            .unwrap_or(false)
+                        {
+                            out.push_str(&format!("((held_bits/{})%2)", 1 << action));
+                            return Ok(());
+                        }
                         out.push_str(&format!("ag_action_held({action})"));
                         return Ok(());
                     }
@@ -731,6 +820,17 @@ fn translate_expr(e: &Expr, ctx: &Ctx, out: &mut String) -> Result<(), LowerErro
                                 }
                             }
                         };
+                        // PLAN-034：动画档快照面——pressed 位同上（边沿由
+                        // 快照本身消耗一次，与原直呼语义一致）。
+                        if ctx
+                            .vis3d
+                            .as_ref()
+                            .map(|v| v.input_snapshot.get())
+                            .unwrap_or(false)
+                        {
+                            out.push_str(&format!("((pressed_bits/{})%2)", 1 << action));
+                            return Ok(());
+                        }
                         out.push_str(&format!("ag_action_pressed({action})"));
                         return Ok(());
                     }
@@ -879,6 +979,11 @@ fn translate_expr(e: &Expr, ctx: &Ctx, out: &mut String) -> Result<(), LowerErro
             // refs.<elem> 服务调用（move_and_slide 等）。
             if let Expr::Dot(inner, op) = &*call.name {
                 if let Expr::Dot(boxed_root, mid) = &**inner {
+                    // PLAN-034：具名视觉姿态服务（元素合法性沿 vis3d.posable，
+                    // 先于 refs_any_elem 门；旧档 vis3d=None 保持 unsupported）。
+                    if op.as_str() == "pose" && ctx.vis3d.is_some() {
+                        return translate_vis_pose_call(mid, e, ctx, out);
+                    }
                     if matches!(&**boxed_root, Expr::Ident(r) if r == "refs")
                         && (ctx.refs_any_elem || mid == "body")
                     {
@@ -1383,6 +1488,152 @@ fn translate_char3_call(
         }
         _ => unreachable!("char3 op dispatch"),
     }
+    Ok(())
+}
+
+/// PLAN-034：具名视觉姿态调用（`refs.<elem>.pose(clip, phase, loop, yaw)` →
+/// `ag_visual_pose(0, <行>, <clip>, <phase>, <loop>, <yaw>)`；kind 0 =
+/// 稳定文档 id，行句柄沿 space3.refs）。elem 必须是本定义绑定 animated3d
+/// 资源的模型叶；clip 只接受 `clips.<资源>.<名|base>`（base=-1；跨资源/
+/// 未知名/重名歧义具名拒绝；匿名序数不属本档作者面）。
+fn translate_vis_pose_call(
+    elem: &str,
+    e: &Expr,
+    ctx: &Ctx,
+    out: &mut String,
+) -> Result<(), LowerError> {
+    debug_assert!(ctx.vis3d.is_some(), "pose dispatch requires the env");
+    let vis = ctx.vis3d.as_ref().expect("vis3d env");
+    let Some(env3) = &ctx.space3 else {
+        return Err(unsupported(
+            "visual pose service requires the view-3d row environment",
+            e,
+        ));
+    };
+    let Some(resource) = vis.posable.get(elem) else {
+        return Err(unsupported(
+            format!("visual pose reference 'refs.{elem}' is not a model leaf bound to an animated3d.glb resource in this definition"),
+            e,
+        ));
+    };
+    let Some(row) = env3.refs.get(elem) else {
+        return Err(unsupported(
+            format!("unknown view-3d element reference 'refs.{elem}'"),
+            e,
+        ));
+    };
+    let Expr::Call(c) = e else {
+        return Err(unsupported("visual pose call form", e));
+    };
+    if c.args.args.len() != 4 {
+        return Err(unsupported(
+            format!("pose arity {} (pose(clip, phase, loop, yaw))", c.args.args.len()),
+            e,
+        ));
+    }
+    // clip：直接形 `clips.<resource>.<name|base|ordinal>` 严格具名解析
+    // （数字形段 = 显式文件序；跨模型错配具名拒绝）；间接形（经局部 var
+    // 的文件序 int）走一般表达式翻译，域由受信 fault 46 把守。
+    let direct_clip = matches!(&c.args.args[0],
+        Arg::Pos(Expr::Dot(outer, seg))
+            if matches!(&**outer, Expr::Ident(r) if r == "clips")
+                || matches!(&**outer, Expr::Dot(_, p) if p == "clips")
+    );
+    let clip_text: String = if !direct_clip {
+        let mut t = String::new();
+        match &c.args.args[0] {
+            Arg::Pos(x) => translate_expr(x, ctx, &mut t)?,
+            other => return Err(unsupported(format!("pose clip arg {other:?}"), e)),
+        }
+        t
+    } else {
+    match &c.args.args[0] {
+        Arg::Pos(clip_expr) => {
+            let mut path: Vec<String> = Vec::new();
+            let mut cur: &Expr = clip_expr;
+            loop {
+                match cur {
+                    Expr::Dot(outer, seg) => {
+                        path.push(seg.to_string());
+                        cur = outer;
+                    }
+                    Expr::Ident(root) => {
+                        path.push(root.to_string());
+                        break;
+                    }
+                    other => {
+                        return Err(unsupported(
+                            format!("pose clip must be clips.<resource>.<name|base>, got {other:?}"),
+                            e,
+                        ))
+                    }
+                }
+            }
+            path.reverse();
+            // 段识别：`base` → -1；数字形段 = 显式文件序（关键字名/不可拼
+            // 写名的显式选择；数字形段永不作名解析；越界具名拒绝）；其余按
+            // 具名解析（未知名/重名歧义具名拒绝，重名在元数据侧已拒）。
+            if path.len() != 2 {
+                return Err(unsupported(
+                    "pose clip must be clips.<resource>.<name|base|ordinal>".to_string(),
+                    e,
+                ));
+            }
+            let res = &path[0];
+            if res != resource {
+                return Err(unsupported(
+                    format!("pose clip 'clips.{res}.{}' does not belong to element '{elem}' resource '{resource}'", path[1]),
+                    e,
+                ));
+            }
+            let table = vis.clips.get(resource).expect("posable resource clip table");
+            if path[1] == "base" {
+                "-1".to_string()
+            } else if let Ok(ordinal) = path[1].parse::<i64>() {
+                if ordinal < 0 || ordinal >= table.len() as i64 {
+                    return Err(unsupported(
+                        format!("resource '{resource}' has no clip ordinal {} (clips: {})", path[1], table.len()),
+                        e,
+                    ));
+                }
+                format!("{ordinal}")
+            } else {
+                match table.get(path[1].as_str()) {
+                    Some(ordinal) => format!("{ordinal}"),
+                    None => {
+                        return Err(unsupported(
+                            format!("resource '{resource}' has no clip named '{}' (explicit file ordinals are spelled clips.{resource}.<n>)", path[1]),
+                            e,
+                        ));
+                    }
+                }
+            }
+        }
+        other => {
+            return Err(unsupported(
+                format!("pose clip must be clips.<resource>.<name|base|ordinal>, got {other:?}"),
+                e,
+            ))
+        }
+    }
+    };
+    let mut parts = Vec::new();
+    for a in &c.args.args[1..] {
+        match a {
+            Arg::Pos(x) => {
+                let mut t = String::new();
+                translate_expr(x, ctx, &mut t)?;
+                parts.push(t);
+            }
+            _ => return Err(unsupported("pose arg", e)),
+        }
+    }
+    // 行表是 0 基运行寻址（ag_set_local 面）；visual pose kind-0 是稳定
+    // 文档 id（1 基，与 _ag_vis_map/char3_bind 同面）——按 +1 换算。
+    out.push_str(&format!(
+        "ag_visual_pose(0, ({row}) + 1, {clip_text}, {}, {}, {})",
+        parts[0], parts[1], parts[2]
+    ));
     Ok(())
 }
 
@@ -2262,6 +2513,51 @@ fn translate_events_call(
                     if matches!(&**inner, Expr::Ident(r) if r == "refs") =>
                 {
                     (0i64, subject_text(ctx, env, elem, e)?)
+                }
+                // PLAN-034：跨定义静态叶 `.actor参数.<元素>`：source_kind 0
+                // （目标实例行 id；类别/作用域下降期校验与 subject 同规）。
+                Arg::Pos(Expr::Dot(inner, elem))
+                    if matches!(
+                        &**inner,
+                        Expr::Dot(pinner, p)
+                            if matches!(&**pinner, Expr::Ident(b) if b == "self")
+                    ) =>
+                {
+                    let p = match &**inner {
+                        Expr::Dot(_, p) => p.to_string(),
+                        _ => unreachable!("actor source gate"),
+                    };
+                    let env_b = ctx.bindings3d.as_ref().ok_or_else(|| {
+                        unsupported(
+                            "bind actor sources are only available in the components-3d-bindings/presentation profile",
+                            e,
+                        )
+                    })?;
+                    let (tprefix, tidx) = env_b.actors.get(p.as_str()).ok_or_else(|| {
+                        unsupported(
+                            format!(
+                                "bind source '.{p}.{elem}' base is not a declared ActorRef3D param of this definition"
+                            ),
+                            e,
+                        )
+                    })?;
+                    let subj_ok = ctx
+                        .events3d
+                        .as_ref()
+                        .map(|ev| {
+                            ev.subjects
+                                .contains_key(&(tprefix.clone(), elem.to_string()))
+                        })
+                        .unwrap_or(false);
+                    if !subj_ok {
+                        return Err(unsupported(
+                            format!(
+                                "bind source '.{p}.{elem}' is not a static view-3d leaf of the bound actor"
+                            ),
+                            e,
+                        ));
+                    }
+                    (0i64, format!("{tprefix}_{elem}_subject_ids[{tidx}]"))
                 }
                 // 作者句柄（局部/成员变量）：source_kind 1（全代次 live 绑定）。
                 Arg::Pos(x) => {

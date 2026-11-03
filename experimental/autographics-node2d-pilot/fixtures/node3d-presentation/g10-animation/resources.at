@@ -1,0 +1,6 @@
+// PLAN-034 g10-animation resources: the original G10 animated character GLB
+// (sha 7112f6a0..., 87624 bytes, 8 nodes, static/idle/walk/jump clips, 44
+// LINEAR channels, no skins; external uri:Textures/colormap.png 512x512).
+// Bytes are a read-only copy (Kenney CC0, upstream commit 3fa8a04b...);
+// closure/clip metadata comes from the existing public import.
+let hero_glb = animated3d.glb("assets/character.glb")

@@ -27,6 +27,8 @@ use std::collections::BTreeMap;
 
 /// bindings 档装配身份：与 events 档同一受信组合，不新增运行时版本。
 pub(crate) const BINDINGS_API: &str = "autographics.triggers3d/1";
+/// PLAN-034：动画档装配身份（node_animation3d/1 受信单元超集）。
+pub(crate) const BINDINGS_API_FOR_ANIMATION: &str = "autographics.node_animation3d/1";
 
 /// 每定义每参数的解析后引用绑定（数值 ABI 已就位）。
 #[derive(Debug, Clone)]
@@ -107,7 +109,18 @@ fn entry_of<'a>(
 pub fn lower_project_components3d_bindings(
     project: &Project,
 ) -> Result<LowerOutputBasic2D, LowerError> {
-    let w3 = build_world_3d_with(project, true, true)?;
+    lower_project_components3d_presentation_entry(project, None)
+}
+
+/// PLAN-034：components-3d-presentation 入口 = bindings 载体（池/模板/
+/// 触发/引用/角色/相机收集复用同一实现）+ 具名纹理/动画元数据绑定面。
+/// 动画资源在案时装配 node_animation3d/1（受信单元超集：角色/相机/触发/
+/// 视觉），否则沿 bindings 冻结身份；None = 旧档字节不变。
+pub fn lower_project_components3d_presentation_entry(
+    project: &Project,
+    presentation: Option<&crate::lower_node3d_presentation::PresentationMeta3>,
+) -> Result<LowerOutputBasic2D, LowerError> {
+    let w3 = build_world_3d_with(project, true, true, presentation)?;
     let world = &w3.world;
     let root_name = world.root.clone();
     let root_decl = node_of(project, &root_name);
@@ -315,7 +328,7 @@ pub fn lower_project_components3d_bindings(
         });
     }
 
-    let scene = collect_scene_3d_with(project, &w3, &template_rows)?;
+    let scene = collect_scene_3d_with(project, &w3, &template_rows, presentation)?;
 
     // —— 文档 id 解析（行名 → 1-based；与 027/028 同规则）——
     let doc_id = |row: &str| -> Option<i64> {
@@ -614,8 +627,37 @@ pub fn lower_project_components3d_bindings(
         }
     }
     // —— 装配：复用 027 runtime 收集（角色/相机注入位），身份恒 triggers3d/1 ——
-    let runtime =
-        crate::lower_components3d_runtime::collect_runtime_cfg_pub(project, &w3, &scene)?;
+    let runtime = crate::lower_components3d_runtime::collect_runtime_cfg_pub(
+        project,
+        &w3,
+        &scene,
+        presentation,
+    )?;
+
+    // PLAN-034：动画资源在案 → node_animation3d/1 装配（ag_visual_pose 等
+    // 受信面）。无动画时：角色/相机/池任一在案 → bindings 载体身份
+    // triggers3d/1；纯静态纹理场景（无角色纹理档）→ behavior/1（原 api v1
+    // 面；triggers3d 档恒定 3D 角色装载，纯场景不该被装配成角色 Run）。
+    let behavior_api = match presentation {
+        Some(_) if crate::lower_node3d_presentation::has_animated_resource(project) => {
+            "autographics.node_animation3d/1"
+        }
+        Some(_) => {
+            let pools_present = !events.slot_ids.is_empty()
+                || !events.pair_ids.is_empty()
+                || !events.template_ids.is_empty();
+            let char_or_cam_present = world.defs.keys().any(|dname| {
+                let d = node_of(project, dname);
+                d.character3d.is_some() || d.camera3d.is_some()
+            });
+            if pools_present || char_or_cam_present {
+                BINDINGS_API
+            } else {
+                "autographics.behavior/1"
+            }
+        }
+        _ => BINDINGS_API,
+    };
 
     lower_project_components3d_cfg_cfg(
         project,
@@ -623,10 +665,11 @@ pub fn lower_project_components3d_bindings(
             runtime: Some(&runtime),
             events: Some(&events),
             bindings: Some(&bindings_cfg),
+            presentation,
             doc_prefix: "plan030-components-3d-bindings",
             gen_note: "PLAN-030 components-3d-bindings",
             regen_note: "tools/verify_plan030.py",
-            behavior_api: BINDINGS_API,
+            behavior_api,
         },
     )
 }

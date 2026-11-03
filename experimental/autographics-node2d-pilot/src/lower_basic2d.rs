@@ -260,6 +260,9 @@ pub(crate) fn resource_mesh(
                 ))),
                 ResourceKind::Image { .. }
                 | ResourceKind::Frame { .. }
+                | ResourceKind::Model3D { .. }
+                | ResourceKind::Model3DTextured { .. }
+                | ResourceKind::Model3DAnimated { .. }
                 | ResourceKind::Model3D { .. } => Err(unsupported(format!(
                     "resource '{name}' is not a mesh2d geometry"
                 ))),
@@ -1228,6 +1231,7 @@ fn gen_user_source(
                         cam3: false,
             events3d: None,
             bindings3d: None,
+        vis3d: None,
     };
 
     // ---- app_start：生成绑定（声明序）+ 作者 Life.Start ----

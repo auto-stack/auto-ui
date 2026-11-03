@@ -77,7 +77,7 @@ pub fn lower_project_components3d_runtime(
 ) -> Result<LowerOutputBasic2D, LowerError> {
     let w3 = build_world_3d(project)?;
     let scene = collect_scene_3d(project, &w3)?;
-    let runtime = collect_runtime_cfg(project, &w3, &scene)?;
+    let runtime = collect_runtime_cfg(project, &w3, &scene, None)?;
     // 装配身份：声明 camera3d -> runtime_camera3d/1（主机织入相机候选）；
     // 声明 character3d -> character3d/1（entry 织入角色 freeze/tick 序）；
     // 仅有为行为的其它场景 -> behavior/1（角色/相机单元不进入装配，避免
@@ -99,6 +99,7 @@ pub fn lower_project_components3d_runtime(
             doc_prefix: "plan027-components-3d-runtime",
             gen_note: "PLAN-027 components-3d-runtime",
             regen_note: "tools/verify_plan027.py",
+            presentation: None,
             behavior_api,
         },
     )
@@ -131,13 +132,16 @@ fn view_elems<'a>(w3: &'a World3d, def: &str) -> &'a [crate::lower_components3d:
         .elems
 }
 
-/// events 档复用入口（027 收集逻辑原样；不复制第二份）。
+/// events/bindings 档复用入口（027 收集逻辑原样；不复制第二份）。
+/// PLAN-034：presentation 传入具名纹理/动画元数据（角色体允许 animated3d
+/// 模型叶；world AABB 门仍在 driver `_ag_char3_shape`，生成器不做 AABB 预检）。
 pub(crate) fn collect_runtime_cfg_pub(
     project: &Project,
     w3: &crate::lower_components3d::World3d,
     scene: &crate::lower_components3d::SceneBuild3,
+    presentation: Option<&crate::lower_node3d_presentation::PresentationMeta3>,
 ) -> Result<crate::lower_components3d::RuntimeCfg3, LowerError> {
-    collect_runtime_cfg(project, w3, scene)
+    collect_runtime_cfg(project, w3, scene, presentation)
 }
 
 /// 恰一角色声明收集（(def name, def_idx)；root 为 None 哨兵时另行处理）。
@@ -145,6 +149,7 @@ fn collect_runtime_cfg(
     project: &Project,
     w3: &World3d,
     scene: &SceneBuild3,
+    presentation: Option<&crate::lower_node3d_presentation::PresentationMeta3>,
 ) -> Result<RuntimeCfg3, LowerError> {
     let world = &w3.world;
     let mut cfg = RuntimeCfg3::default();
@@ -222,7 +227,7 @@ fn collect_runtime_cfg(
     let character_body: Option<(String, String)> = match (&character, &root_character_body) {
         (Some((cdef, cidx)), _) => {
             let def = &world.defs[cdef];
-            validate_character_def(def, w3)?;
+            validate_character_def(def, w3, presentation)?;
             let body = character_body_elem(def, w3)?;
             let row = instance_elem_row(scene, cdef, &body, *cidx)
                 .ok_or_else(|| err(def, "character row missing in scene table"))?;
@@ -230,7 +235,7 @@ fn collect_runtime_cfg(
         }
         (None, Some(body)) => {
             let def = &world.defs[&world.root];
-            validate_character_def(def, w3)?;
+            validate_character_def(def, w3, presentation)?;
             let row = scene
                 .root_rows
                 .get(body.as_str())
@@ -280,14 +285,62 @@ fn character_body_elem(def: &DefIR, w3: &World3d) -> Result<String, LowerError> 
     Ok(leaves[0].elem.clone())
 }
 
-/// 角色声明形状预检：cylinder3d 叶、静态 position、冻结 scale、非 solid。
-fn validate_character_def(def: &DefIR, w3: &World3d) -> Result<(), LowerError> {
+/// 角色声明形状预检：cylinder3d 叶（静态 position、冻结 scale、非 solid）
+/// 或——PLAN-034 presentation 档——animated3d 模型叶（原模型即角色 body：
+/// 保原世界 AABB 与绑定参数，0.8×1.0×0.8 门由 driver `_ag_char3_shape`
+/// 独立执行，生成器不解析 GLB、不做 AABB 预检、不以圆柱代原模型）。
+fn validate_character_def(
+    def: &DefIR,
+    w3: &World3d,
+    presentation: Option<&crate::lower_node3d_presentation::PresentationMeta3>,
+) -> Result<(), LowerError> {
     let body = character_body_elem(def, w3)?;
     let leaves = view_elems(w3, &def.name);
     let e = leaves
         .iter()
         .find(|e| e.elem == body)
         .expect("character body elem");
+    if e.kind == "model" {
+        let Some(p) = presentation else {
+            return Err(err(
+                def,
+                "character body model leaf requires the components-3d-presentation profile (cylinder3d keeps the frozen runtime surface)",
+            ));
+        };
+        let Some(crate::lower_components3d::ModelRef::Direct(res)) = &e.model else {
+            return Err(err(
+                def,
+                "character body model leaf must bind resources.<name> (param-bound model bodies are not part of this profile)",
+            ));
+        };
+        let Some(meta) = p.resources.get(res) else {
+            return Err(err(
+                def,
+                &format!("character body model resource '{res}' has no inspected metadata (stale resources.json: rerun resource-meta)"),
+            ));
+        };
+        if !meta.animated {
+            return Err(err(
+                def,
+                &format!("character body model resource '{res}' is not an animated3d.glb declaration (static textures cannot be a character body)"),
+            ));
+        }
+        if e.dyn_pos {
+            return Err(err(
+                def,
+                &format!(
+                    "character body '{body}' position must be static (the Run character position is owned by move3d, not view bindings)"
+                ),
+            ));
+        }
+        if e.solid {
+            return Err(err(
+                def,
+                &format!("character body '{body}' must not also be marked solid"),
+            ));
+        }
+        return Ok(());
+    }
     if e.kind != "cylinder" {
         return Err(err(
             def,

@@ -1,0 +1,10 @@
+// PLAN-034 g10-textures resources: the original G10 Kenney textured GLBs
+// (bytes read-only copies; upstream commit 3fa8a04b1c01ab23db43123d4ce814a34c3fc7f0,
+// CC0 declaration kept in ag-examples licenses/) plus the self-made UV
+// material probe (CC0, recipe sources/generate.py). Textured3d declarations
+// carry raw-byte identity only; closure metadata is produced by the existing
+// public import (resource-meta) and bound verbatim by the generator.
+let platform = textured3d.glb("assets/platform.glb")
+let coin = textured3d.glb("assets/coin.glb")
+let flag = textured3d.glb("assets/flag.glb")
+let uv_probe = textured3d.glb("uv/uv-material-probe.glb")

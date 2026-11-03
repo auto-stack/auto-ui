@@ -802,7 +802,7 @@ fn expr_binds_field(e: &Expr, vctx: &ViewCtx3) -> bool {
 // ------------------------------------------------------------- world build --
 
 pub(crate) fn build_world_3d(project: &Project) -> Result<World3d, LowerError> {
-    build_world_3d_with(project, false, false)
+    build_world_3d_with(project, false, false, None)
 }
 
 /// PLAN-028：`builtin_transform` 只在 components-3d-events 档为真。
@@ -810,6 +810,7 @@ pub(crate) fn build_world_3d_with(
     project: &Project,
     builtin_transform: bool,
     refs: bool,
+    presentation: Option<&crate::lower_node3d_presentation::PresentationMeta3>,
 ) -> Result<World3d, LowerError> {
     let root_name = project.root.clone();
     let root_module = project
@@ -835,27 +836,51 @@ pub(crate) fn build_world_3d_with(
     };
     world.defs.insert(root_name.clone(), root_def);
 
-    // GLB 模型资源（声明序跨 resources 模块；名字唯一）。
+    // GLB 模型资源（声明序跨 resources 模块；名字唯一）。PLAN-034：纹理/
+    // 动画档仅 components-3d-presentation 接受（旧档具名拒绝，不静默升档）。
     for module in project.modules.values() {
         for r in &module.resources {
-            if let ResourceKind::Model3D {
-                sha256,
-                byte_length,
-                ..
-            } = &r.kind
-            {
-                if world.models.contains_key(&r.name) {
+            let (sha256, byte_length, present_kind) = match &r.kind {
+                ResourceKind::Model3D {
+                    sha256,
+                    byte_length,
+                    ..
+                } => (sha256, byte_length, None),
+                ResourceKind::Model3DTextured {
+                    sha256,
+                    byte_length,
+                    ..
+                } => (sha256, byte_length, Some("textured3d.glb")),
+                ResourceKind::Model3DAnimated {
+                    sha256,
+                    byte_length,
+                    ..
+                } => (sha256, byte_length, Some("animated3d.glb")),
+                _ => continue,
+            };
+            if let Some(ctor) = present_kind {
+                if presentation.is_none() {
                     return Err(at(
                         &module.name,
-                        0,
+                        r.line,
                         &r.name,
-                        "duplicate model resource name",
+                        &format!(
+                            "resource '{ctor}' requires the components-3d-presentation profile (this profile keeps the frozen flat-color surface)"
+                        ),
                     ));
                 }
-                world
-                    .models
-                    .insert(r.name.clone(), (sha256.clone(), *byte_length));
             }
+            if world.models.contains_key(&r.name) {
+                return Err(at(
+                    &module.name,
+                    0,
+                    &r.name,
+                    "duplicate model resource name",
+                ));
+            }
+            world
+                .models
+                .insert(r.name.clone(), (sha256.clone(), *byte_length));
         }
     }
 
@@ -1512,6 +1537,7 @@ fn emit_def_rows(
     inst: Option<&InstanceIR>,
     group_key: Option<String>,
     pending: &mut Vec<PendingRow>,
+    presentation: Option<&crate::lower_node3d_presentation::PresentationMeta3>,
 ) -> Result<(), LowerError> {
     let world = &w3.world;
     let def = &world.defs[def_name];
@@ -1565,7 +1591,7 @@ fn emit_def_rows(
             &e.visible,
             &format!("{key}:visible"),
         )? != 0.0;
-        let resource = resolve_model_3d(w3, def, inst, e)?;
+        let resource = resolve_model_3d(w3, def, inst, e, presentation)?;
         let parent_key = e
             .groups
             .last()
@@ -1597,23 +1623,39 @@ fn resolve_model_3d(
     def: &DefIR,
     inst: Option<&InstanceIR>,
     e: &ElemIR3,
+    presentation: Option<&crate::lower_node3d_presentation::PresentationMeta3>,
 ) -> Result<Option<String>, LowerError> {
     let world = &w3.world;
     let Some(m) = &e.model else {
         return Ok(None);
     };
-    match m {
-        ModelRef::Direct(r) => {
-            let (sha, _) = world.models.get(r).ok_or_else(|| {
-                at(
-                    &def.module,
-                    e.line,
-                    &e.elem,
-                    &format!("model binding 'resources.{r}' is not a model3d.glb resource"),
-                )
-            })?;
-            Ok(Some(format!("sha256:{sha}")))
+    // PLAN-034：纹理/动画资源落 closure 键（受检元数据），平色仍为 sha 键。
+    let resource_key = |name: &str, err: LowerError| -> Result<Option<String>, LowerError> {
+        let Some((sha, _)) = world.models.get(name) else {
+            return Err(err);
+        };
+        match presentation.and_then(|p| p.resources.get(name)) {
+            Some(meta) => {
+                let Some(closure) = &meta.closure else {
+                    return Err(at(
+                        &def.module,
+                        e.line,
+                        &e.elem,
+                        &format!("resource '{name}' metadata carries no closure (stale resources.json: rerun resource-meta)"),
+                    ));
+                };
+                Ok(Some(format!("closure:{}", closure.id)))
+            }
+            None => Ok(Some(format!("sha256:{sha}"))),
         }
+    };
+    match m {
+        ModelRef::Direct(r) => resource_key(r, at(
+            &def.module,
+            e.line,
+            &e.elem,
+            &format!("model binding 'resources.{r}' is not a model3d.glb resource"),
+        )),
         ModelRef::Param(p) => {
             let inst = inst.ok_or_else(|| {
                 at(
@@ -1624,17 +1666,12 @@ fn resolve_model_3d(
                 )
             })?;
             match inst.params.iter().find(|(n, _)| n == p).map(|(_, v)| v) {
-                Some(crate::lower_components::ParamVal::Res(r)) => {
-                    let (sha, _) = world.models.get(r).ok_or_else(|| {
-                        at(
-                            &def.module,
-                            e.line,
-                            &e.elem,
-                            &format!("model param '{p}' binds 'resources.{r}' which is not a model3d.glb resource"),
-                        )
-                    })?;
-                    Ok(Some(format!("sha256:{sha}")))
-                }
+                Some(crate::lower_components::ParamVal::Res(r)) => resource_key(r, at(
+                    &def.module,
+                    e.line,
+                    &e.elem,
+                    &format!("model param '{p}' binds 'resources.{r}' which is not a model3d.glb resource"),
+                )),
                 _ => Err(at(
                     &def.module,
                     e.line,
@@ -1648,7 +1685,7 @@ fn resolve_model_3d(
 
 /// 收集三维场景：树先序行 + driver `ordered()` 同规则句柄。
 pub(crate) fn collect_scene_3d(project: &Project, w3: &World3d) -> Result<SceneBuild3, LowerError> {
-    collect_scene_3d_with(project, w3, &[])
+    collect_scene_3d_with(project, w3, &[], None)
 }
 
 /// PLAN-028：spawn 模板行输入（events 档；行名 = 模板定义名，值全部
@@ -1669,6 +1706,7 @@ pub(crate) fn collect_scene_3d_with(
     project: &Project,
     w3: &World3d,
     templates: &[TemplateRowIn],
+    presentation: Option<&crate::lower_node3d_presentation::PresentationMeta3>,
 ) -> Result<SceneBuild3, LowerError> {
     let world = &w3.world;
     let mut pending: Vec<PendingRow> = Vec::new();
@@ -1733,7 +1771,7 @@ pub(crate) fn collect_scene_3d_with(
                     ));
                 }
             }
-            let resource = resolve_model_3d(w3, def, None, e)?;
+            let resource = resolve_model_3d(w3, def, None, e, presentation)?;
             pending.push(PendingRow {
                 key: key.clone(),
                 row: Row3 {
@@ -1762,6 +1800,7 @@ pub(crate) fn collect_scene_3d_with(
             Some(i),
             i.parent_group.clone(),
             &mut pending,
+            presentation,
         )?;
     }
 
@@ -1955,6 +1994,43 @@ fn stamp_runtime_env(
     }
 }
 
+/// PLAN-034：具名视觉姿态环境盖章（本定义可 pose 的动画模型叶 + 原序
+/// clip 表）。None（旧档）不触碰任何字段，字节不变。
+fn stamp_vis3d_env(
+    ctx: &mut crate::translate::Ctx,
+    def_name: &str,
+    w3: &World3d,
+    presentation: Option<&crate::lower_node3d_presentation::PresentationMeta3>,
+) {
+    let Some(p) = presentation else { return };
+    let Some(v3) = w3.views.get(def_name) else { return };
+    let mut posable = std::collections::BTreeMap::new();
+    let mut clips = std::collections::BTreeMap::new();
+    for e in &v3.elems {
+        let Some(m) = &e.model else { continue };
+        let res = match m {
+            ModelRef::Direct(r) => r.clone(),
+            // 参数绑定资源的 pose 属 typed 端口后继面（本档具名拒绝）。
+            ModelRef::Param(_) => continue,
+        };
+        let Some(meta) = p.resources.get(&res) else { continue };
+        if !meta.animated {
+            continue;
+        }
+        let mut table = std::collections::BTreeMap::new();
+        for (ordinal, name) in &meta.clips {
+            table.insert(name.clone(), *ordinal as i64);
+        }
+        clips.insert(res.clone(), table);
+        posable.insert(e.elem.clone(), res);
+    }
+    ctx.vis3d = Some(crate::translate::Vis3dEnv {
+        posable,
+        clips,
+        input_snapshot: std::cell::Cell::new(false),
+    });
+}
+
 pub(crate) fn gen_user_source_3d(
     project: &Project,
     w3: &World3d,
@@ -1963,6 +2039,7 @@ pub(crate) fn gen_user_source_3d(
     runtime: Option<&RuntimeCfg3>,
     events: Option<&crate::lower_components3d_events::EventsCfg3>,
     bindings: Option<&crate::lower_components3d_bindings::BindingsCfg3>,
+    presentation: Option<&crate::lower_node3d_presentation::PresentationMeta3>,
     gen_note: &str,
     regen_note: &str,
 ) -> Result<String, LowerError> {
@@ -2345,6 +2422,8 @@ pub(crate) fn gen_user_source_3d(
     });
     // PLAN-027：runtime 环境盖章（None = 024 档不触碰，字节不变）。
     stamp_runtime_env(&mut rctx, &world.root, runtime, events);
+    // PLAN-034：视觉姿态环境盖章（None = 旧档不触碰，字节不变）。
+    stamp_vis3d_env(&mut rctx, &world.root, w3, presentation);
     // PLAN-030：引用参数环境盖章（None = 旧档不触碰，字节不变）。
     apply_bindings_ctx(
         &mut rctx,
@@ -2362,7 +2441,22 @@ pub(crate) fn gen_user_source_3d(
     src.push_str("}\n");
     src.push_str("fn main_lifetick(dt float) {\n");
     if let Some(h) = life_handler(root_decl, "Tick") {
-        translate_handler(&h.body.stmts, &rctx, &mut src, 1)?;
+        // PLAN-034: 动画档输入快照前置（先探测后翻译；无输入面逐字不变）。
+        if let Some(vis) = rctx.vis3d.as_ref() {
+            vis.input_snapshot.set(false);
+            let mut probe = String::new();
+            translate_handler(&h.body.stmts, &rctx, &mut probe, 1)?;
+            if probe.contains("ag_action_held(") || probe.contains("ag_action_pressed(") {
+                vis.input_snapshot.set(true);
+                src.push_str(" let packet=ag_actions_snapshot()\n let held_bits=packet%64\n let pressed_bits=packet/64\n");
+                translate_handler(&h.body.stmts, &rctx, &mut src, 1)?;
+                vis.input_snapshot.set(false);
+            } else {
+                src.push_str(&probe);
+            }
+        } else {
+            translate_handler(&h.body.stmts, &rctx, &mut src, 1)?;
+        }
     }
     src.push_str("}\n");
     let mut root_recvs: Vec<(&String, &String)> = plan
@@ -2385,6 +2479,8 @@ pub(crate) fn gen_user_source_3d(
             runtime,
             events,
             bindings,
+            w3,
+            presentation,
             &mut src,
         )?;
     }
@@ -2414,12 +2510,30 @@ pub(crate) fn gen_user_source_3d(
             self_row: inst_primary.clone(),
         });
         stamp_runtime_env(&mut ictx, &dname, runtime, events);
+        // PLAN-034：视觉姿态环境盖章（None = 旧档不触碰，字节不变）。
+        stamp_vis3d_env(&mut ictx, &dname, w3, presentation);
         // PLAN-030：引用参数环境盖章 + msg 参数投递覆盖（None = 旧档不变）。
         apply_bindings_ctx(&mut ictx, &dname, &def.module, project, plan, bindings, "i");
         if def.life_tick {
             src.push_str(&format!("fn {prefix}_lifetick(i int, dt float) {{\n"));
             if let Some(h) = life_handler(decl, "Tick") {
-                translate_handler(&h.body.stmts, &ictx, &mut src, 1)?;
+                // PLAN-034: 动画档输入快照前置（先探测后翻译；无输入面逐字
+                // 不变）。
+                if let Some(vis) = ictx.vis3d.as_ref() {
+                    vis.input_snapshot.set(false);
+                    let mut probe = String::new();
+                    translate_handler(&h.body.stmts, &ictx, &mut probe, 1)?;
+                    if probe.contains("ag_action_held(") || probe.contains("ag_action_pressed(") {
+                        vis.input_snapshot.set(true);
+                        src.push_str(" let packet=ag_actions_snapshot()\n let held_bits=packet%64\n let pressed_bits=packet/64\n");
+                        translate_handler(&h.body.stmts, &ictx, &mut src, 1)?;
+                        vis.input_snapshot.set(false);
+                    } else {
+                        src.push_str(&probe);
+                    }
+                } else {
+                    translate_handler(&h.body.stmts, &ictx, &mut src, 1)?;
+                }
             }
             src.push_str("}\n");
         }
@@ -2450,6 +2564,8 @@ pub(crate) fn gen_user_source_3d(
                 runtime,
                 events,
                 bindings,
+                w3,
+                presentation,
                 &mut src,
             )?;
         }
@@ -2874,6 +2990,8 @@ fn gen_recv_fn_3d(
     runtime: Option<&RuntimeCfg3>,
     events: Option<&crate::lower_components3d_events::EventsCfg3>,
     bindings: Option<&crate::lower_components3d_bindings::BindingsCfg3>,
+    w3: &World3d,
+    presentation: Option<&crate::lower_node3d_presentation::PresentationMeta3>,
     src: &mut String,
 ) -> Result<(), LowerError> {
     let def = if recv_def_name.is_empty() {
@@ -2922,6 +3040,12 @@ fn gen_recv_fn_3d(
         if recv_def_name.is_empty() { &world.root } else { recv_def_name },
         runtime,
         events,
+    );
+    stamp_vis3d_env(
+        &mut ctx,
+        if recv_def_name.is_empty() { &world.root } else { recv_def_name },
+        w3,
+        presentation,
     );
     apply_bindings_ctx(
         &mut ctx,
@@ -2990,7 +3114,7 @@ pub(crate) fn scene_json_3d(
     has_behavior: bool,
     sha: &str,
     bytes: usize,
-    assets: &[(String, usize, &str)],
+    asset_rows: &[String],
 ) -> String {
     let groups = scene
         .rows
@@ -3008,15 +3132,7 @@ pub(crate) fn scene_json_3d(
         .map(|(i, r)| obj_json_3d(r, i as u64 + 1))
         .collect::<Vec<_>>()
         .join(",\n");
-    let asset_rows = assets
-        .iter()
-        .map(|(sha, len, name)| {
-            format!(
-                "  {{\n   \"format\": \"glb\",\n   \"sha256\": \"{sha}\",\n   \"byte_length\": {len},\n   \"name\": \"{name}\"\n  }}"
-            )
-        })
-        .collect::<Vec<_>>()
-        .join(",\n");
+    let asset_rows = asset_rows.join(",\n");
     let behavior = if has_behavior {
         format!(
             "{{\n  \"api\": \"{behavior_api}\",\n  \"source\": {{\n   \"format\": \"auto-source\",\n   \"sha256\": \"{sha}\",\n   \"byte_length\": {bytes}\n  }},\n  \"actors\": {{\n   \"two_d\": null,\n   \"three_d\": null\n  }}\n }}"
@@ -3045,6 +3161,7 @@ pub fn lower_project_components3d(project: &Project) -> Result<LowerOutputBasic2
         runtime: None,
         events: None,
         bindings: None,
+        presentation: None,
         doc_prefix: "plan024-components-3d",
         gen_note: "PLAN-024 components-3d",
         regen_note: "tools/verify_plan024.py",
@@ -3061,6 +3178,9 @@ pub(crate) struct Cfg3<'c> {
     /// PLAN-030：components-3d-bindings 引用参数配置（None = 旧档，字节
     /// 不变；Some = 池常量/actor 主题/msg 投递/引用 SoA 列随档发行）。
     pub bindings: Option<&'c crate::lower_components3d_bindings::BindingsCfg3>,
+    /// PLAN-034：components-3d-presentation 具名纹理/动画元数据（None =
+    /// 旧档，字节不变；Some = closure 场景引用/clip 表/pose 服务随档发行）。
+    pub presentation: Option<&'c crate::lower_node3d_presentation::PresentationMeta3>,
     /// scene.agscene document_id 前缀。
     pub doc_prefix: &'static str,
     /// 生成头注释身份段。
@@ -3086,7 +3206,7 @@ pub(crate) fn lower_project_components3d_cfg_with(
     cfg: Cfg3<'_>,
     refs: bool,
 ) -> Result<LowerOutputBasic2D, LowerError> {
-    let w3 = build_world_3d_with(project, false, refs)?;
+    let w3 = build_world_3d_with(project, false, refs, cfg.presentation)?;
     let plan = crate::lower_components::plan_dispatch_events(
         project,
         &w3.world,
@@ -3102,22 +3222,28 @@ pub(crate) fn lower_project_components3d_cfg_with(
         Some(ev) => &ev.template_rows,
         None => &no_templates,
     };
-    let scene = collect_scene_3d_with(project, &w3, templates)?;
-    let user_source = gen_user_source_3d(project, &w3, &plan, &scene, cfg.runtime, cfg.events, cfg.bindings, cfg.gen_note, cfg.regen_note)?;
+    let scene = collect_scene_3d_with(project, &w3, templates, cfg.presentation)?;
+    let user_source = gen_user_source_3d(project, &w3, &plan, &scene, cfg.runtime, cfg.events, cfg.bindings, cfg.presentation, cfg.gen_note, cfg.regen_note)?;
     let sha = crate::scene::sha256_hex(user_source.as_bytes());
     let bytes = user_source.len();
     let has_behavior =
         w3.world.stateful > 0 || w3.world.defs.values().any(|d| d.life_start || d.life_tick);
     let entry = w3.world.root_module.clone();
+    // PLAN-034：资产行按具名元数据渲染（closure 面），平色档走 024 冻结行。
     let mut assets: Vec<(String, usize, String)> = Vec::new();
     for (name, (sha256, len)) in &w3.world.models {
         assets.push((sha256.clone(), *len, name.clone()));
     }
     assets.sort();
     assets.dedup();
-    let asset_refs: Vec<(String, usize, &str)> = assets
+    let asset_rows: Vec<String> = assets
         .iter()
-        .map(|(s, l, n)| (s.clone(), *l, n.as_str()))
+        .map(|(s, l, n)| {
+            let meta = cfg
+                .presentation
+                .and_then(|p| p.resources.get(n));
+            crate::lower_node3d_presentation::asset_ref_row(s, *l, n, meta)
+        })
         .collect();
     let scene_json = scene_json_3d(
         cfg.behavior_api,
@@ -3127,7 +3253,7 @@ pub(crate) fn lower_project_components3d_cfg_with(
         has_behavior,
         &sha,
         bytes,
-        &asset_refs,
+        &asset_rows,
     );
     let roles_json = roles_json_3d(&scene);
     Ok(LowerOutputBasic2D {

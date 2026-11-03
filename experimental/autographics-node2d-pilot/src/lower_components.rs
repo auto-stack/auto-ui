@@ -3359,6 +3359,7 @@ pub(crate) fn collect_scene(
                         cam3: false,
             events3d: None,
             bindings3d: None,
+        vis3d: None,
                     };
                     let pos = prop_of(props, "position").ok_or_else(|| {
                         at(
@@ -4710,6 +4711,7 @@ pub(crate) fn instance_ctx<'a>(
         cam3: false,
             events3d: None,
             bindings3d: None,
+        vis3d: None,
     })
 }
 
@@ -4805,6 +4807,7 @@ pub(crate) fn root_ctx<'a>(
         cam3: false,
             events3d: None,
             bindings3d: None,
+        vis3d: None,
     }
 }
 

@@ -15,6 +15,10 @@ auto-ui-compiler = { path = "../../crates/auto-ui-compiler" }
 auto-ui-dialect = { path = "../../crates/auto-ui-dialect" }
 auto-lang-core = { path = "../../../auto-lang/crates/auto-lang-core" }
 auto-parser-api = { path = "../../../auto-lang/crates/auto-parser-api" }
+# PLAN-034：resources-request/resources-meta JSON 的读写（元数据绑定面）。
+# 不引入任何 GLB 解码依赖；两图锁不变（driver/SDK 仍是另一工作区）。
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 
 [[bin]]
 name = "node2d-lower"

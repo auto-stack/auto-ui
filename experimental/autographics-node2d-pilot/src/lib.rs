@@ -21,6 +21,7 @@ pub mod lower_components3d_runtime;
 pub mod lower_components_game;
 pub mod lower_g11;
 pub mod lower_components2d_runtime;
+pub mod lower_node3d_presentation;
 pub mod lower_presentation;
 pub mod scene;
 pub mod translate;
@@ -69,6 +70,11 @@ pub enum Profile {
     /// 面 + Slot/Template/Pair/Actor/msg 只读名义参数、纯逻辑 Node、根显式
     /// 调度；triggers3d/1 装配；028 档字节不变）。
     Components3DBindings,
+    /// PLAN-034 三维纹理资源/具名动画与组件呈现接线：components-3d-presentation
+    /// （textured3d.glb/animated3d.glb 具名资源、ClipRef 具名 clip、refs 姿态
+    /// 服务、animated3d 模型叶角色 body；bindings 载体 + 既有公开导入产出的
+    /// 受检闭包元数据；动画档 node_animation3d/1 装配）。
+    Components3DPresentation,
 }
 
 pub use load::{load_project, Project, ProjectError};
@@ -78,7 +84,12 @@ pub use lower_components::{
     lower_project_components, lower_project_queries, lower_project_sprites,
 };
 pub use lower_components3d::lower_project_components3d;
-pub use lower_components3d_bindings::lower_project_components3d_bindings;
+pub use lower_components3d_bindings::{
+    lower_project_components3d_bindings, lower_project_components3d_presentation_entry,
+};
+pub use lower_node3d_presentation::{
+    load_resources_meta, lower_project_components3d_presentation, resources_request_json,
+};
 pub use lower_components3d_events::lower_project_components3d_events;
 pub use lower_components3d_runtime::lower_project_components3d_runtime;
 pub use lower_components_game::{lower_project_components_game, LowerOutputGame};

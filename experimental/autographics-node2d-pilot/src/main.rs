@@ -29,6 +29,7 @@ fn write_components3d_products(
     generator: &str,
     behavior_api: &str,
     consumer_for: fn(&str) -> &'static str,
+    presentation: Option<&autographics_node2d_pilot::lower_node3d_presentation::PresentationMeta3>,
 ) {
             if let Some(src) = &lowered.user_source {
                 std::fs::write(format!("{out}/world.at"), src).expect("world.at");
@@ -40,28 +41,70 @@ fn write_components3d_products(
             let mut copied: Vec<(String, String)> = Vec::new();
             for module in project.modules.values() {
                 for r in &module.resources {
-                    if let autographics_node2d_pilot::load::ResourceKind::Model3D {
-                        file,
-                        sha256,
-                        byte_length,
-                    } = &r.kind
-                    {
-                        let bytes = std::fs::read(
-                            std::path::Path::new(entry)
-                                .parent()
-                                .expect("entry parent")
-                                .join(file),
-                        )
-                        .unwrap_or_else(|e| panic!("read model {file}: {e}"));
-                        assert_eq!(bytes.len(), *byte_length, "model byte drift: {file}");
-                        assert_eq!(
-                            autographics_node2d_pilot::scene::sha256_hex(&bytes),
-                            *sha256,
-                            "model sha drift: {file}"
-                        );
-                        let dest = format!("{out}/assets/{sha256}.glb");
-                        std::fs::write(&dest, &bytes).expect("asset copy");
-                        copied.push((sha256.clone(), file.clone()));
+                    let is_model = matches!(
+                        &r.kind,
+                        autographics_node2d_pilot::load::ResourceKind::Model3D { .. }
+                            | autographics_node2d_pilot::load::ResourceKind::Model3DTextured { .. }
+                            | autographics_node2d_pilot::load::ResourceKind::Model3DAnimated { .. }
+                    );
+                    if !is_model {
+                        continue;
+                    }
+                    let (file, sha256, byte_length) = match &r.kind {
+                        autographics_node2d_pilot::load::ResourceKind::Model3D {
+                            file,
+                            sha256,
+                            byte_length,
+                        }
+                        | autographics_node2d_pilot::load::ResourceKind::Model3DTextured {
+                            file,
+                            sha256,
+                            byte_length,
+                        }
+                        | autographics_node2d_pilot::load::ResourceKind::Model3DAnimated {
+                            file,
+                            sha256,
+                            byte_length,
+                        } => (file, sha256, byte_length),
+                        _ => unreachable!("is_model gate"),
+                    };
+                    let bytes = std::fs::read(
+                        std::path::Path::new(entry)
+                            .parent()
+                            .expect("entry parent")
+                            .join(file),
+                    )
+                    .unwrap_or_else(|e| panic!("read model {file}: {e}"));
+                    assert_eq!(bytes.len(), *byte_length, "model byte drift: {file}");
+                    assert_eq!(
+                        autographics_node2d_pilot::scene::sha256_hex(&bytes),
+                        *sha256,
+                        "model sha drift: {file}"
+                    );
+                    let dest = format!("{out}/assets/{sha256}.glb");
+                    std::fs::write(&dest, &bytes).expect("asset copy");
+                    copied.push((sha256.clone(), file.clone()));
+                    // PLAN-034：外部图像边随闭包复制（原 URI/字节不重写）。
+                    if let Some(meta) = presentation {
+                        if let Some(entry_meta) = meta.resources.get(&r.name) {
+                            for image in &entry_meta.images {
+                                let src = std::path::Path::new(entry)
+                                    .parent()
+                                    .expect("entry parent")
+                                    .join(&image.path);
+                                let ibytes = std::fs::read(&src)
+                                    .unwrap_or_else(|e| panic!("read image {}: {e}", src.display()));
+                                assert_eq!(
+                                    autographics_node2d_pilot::scene::sha256_hex(&ibytes),
+                                    image.sha256,
+                                    "image sha drift: {}",
+                                    src.display()
+                                );
+                                let dest = format!("{out}/assets/{}.png", image.sha256);
+                                std::fs::write(&dest, &ibytes).expect("image copy");
+                                copied.push((image.sha256.clone(), image.path.clone()));
+                            }
+                        }
                     }
                 }
             }
@@ -201,6 +244,15 @@ fn components3d_events_consumer(product: &str) -> &'static str {
     }
 }
 
+fn components3d_presentation_consumer(product: &str) -> &'static str {
+    match product {
+        "g10-textures" | "g10-textures-alt" | "g10-animation" | "g10-animation-alt" => {
+            "experimental/autographics-auto-driver/tests/node3d_presentation_flow.rs"
+        }
+        _ => "unrecorded (this out dir has no registered flow consumer)",
+    }
+}
+
 fn components3d_bindings_consumer(product: &str) -> &'static str {
     match product {
         "bg11-main" | "bg11-alt" | "bg11-geometry" | "bg11-oldgen" | "bg11-stale"
@@ -252,6 +304,7 @@ fn main() {
                 Some("components-3d-runtime") => Profile::Components3DRuntime,
                 Some("components-3d-events") => Profile::Components3DEvents,
                 Some("components-3d-bindings") => Profile::Components3DBindings,
+                Some("components-3d-presentation") => Profile::Components3DPresentation,
                 Some("presentation-2d") => Profile::Presentation2D,
                 Some("components-2d-runtime") => Profile::Components2DRuntime,
                 _ => usage(),
@@ -268,6 +321,13 @@ fn main() {
         .position(|a| a == "--out")
         .and_then(|i| args.get(i + 1))
         .unwrap_or_else(|| usage());
+    // PLAN-034：受检资源元数据（resource-meta 产出）。缺省 = 声明面
+    // （resources-request.json）；提供 = 最终产品面。
+    let resources_arg = args
+        .iter()
+        .position(|a| a == "--resources")
+        .and_then(|i| args.get(i + 1))
+        .map(|s| s.as_str());
     let project = autographics_node2d_pilot::load_project(std::path::Path::new(entry))
         .unwrap_or_else(|e| {
             eprintln!("node2d-lower: {e}");
@@ -1025,6 +1085,7 @@ fn main() {
                 "autographics-node2d-pilot plan024 components-3d",
                 "autographics.behavior/1",
                 components3d_consumer,
+                None,
             );
         }
         Profile::Components3DRuntime => {
@@ -1041,6 +1102,7 @@ fn main() {
                 "autographics-node2d-pilot plan027 components-3d-runtime",
                 runtime_behavior_api(&project),
                 components3d_runtime_consumer,
+                None,
             );
         }
         Profile::Components3DEvents => {
@@ -1057,6 +1119,7 @@ fn main() {
                 "autographics-node2d-pilot plan028 components-3d-events",
                 "autographics.triggers3d/1",
                 components3d_events_consumer,
+                None,
             );
         }
         Profile::Components3DBindings => {
@@ -1073,7 +1136,54 @@ fn main() {
                 "autographics-node2d-pilot plan030 components-3d-bindings",
                 "autographics.triggers3d/1",
                 components3d_bindings_consumer,
+                None,
             );
+        }
+        Profile::Components3DPresentation => {
+            match resources_arg {
+                None => {
+                    // pass A（声明面）：声明齐全性与文件身份校验已在
+                    // load_project 内完成；本面只产出受检元数据请求。
+                    let request =
+                        autographics_node2d_pilot::resources_request_json(&project);
+                    std::fs::write(
+                        format!("{out}/resources-request.json"),
+                        &request,
+                    )
+                    .expect("resources-request.json");
+                    let n = request.matches("\"animated\"").count();
+                    println!(
+                        "node2d-lower[components-3d-presentation]: declared {n} texture/animation resources -> resources-request.json; run resource-meta, then rerun with --resources <resources.json>"
+                    );
+                }
+                Some(meta_path) => {
+                    // pass B（产品面）：受检元数据对账 + 全量产品。
+                    let meta = autographics_node2d_pilot::load_resources_meta(
+                        std::path::Path::new(meta_path),
+                        &project,
+                    )
+                    .unwrap_or_else(|e| {
+                        eprintln!("node2d-lower: {e}");
+                        std::process::exit(3);
+                    });
+                    let (lowered, api) = autographics_node2d_pilot::
+                        lower_project_components3d_presentation(&project, &meta)
+                        .unwrap_or_else(|e| {
+                            eprintln!("node2d-lower: {e}");
+                            std::process::exit(3);
+                        });
+                    write_components3d_products(
+                        &out,
+                        &entry,
+                        &project,
+                        lowered,
+                        "autographics-node2d-pilot plan034 components-3d-presentation",
+                        &api,
+                        components3d_presentation_consumer,
+                        Some(&meta),
+                    );
+                }
+            }
         }
         Profile::Basic2D(basic) => {
             let lowered = autographics_node2d_pilot::lower_project_basic(&project, basic)

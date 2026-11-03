@@ -49,7 +49,7 @@ pub(crate) struct EventsCfg3 {
 pub fn lower_project_components3d_events(
     project: &Project,
 ) -> Result<LowerOutputBasic2D, LowerError> {
-    let w3 = build_world_3d_with(project, true, false)?;
+    let w3 = build_world_3d_with(project, true, false, None)?;
     let world = &w3.world;
     let root_name = world.root.clone();
     let root_decl = node_of(project, &root_name);
@@ -257,7 +257,7 @@ pub fn lower_project_components3d_events(
         });
     }
 
-    let scene = collect_scene_3d_with(project, &w3, &template_rows)?;
+    let scene = collect_scene_3d_with(project, &w3, &template_rows, None)?;
 
     // —— 文档 id 解析（行名 → 1-based；与 027 row_document_id 同规则）——
     let doc_id = |row: &str| -> Option<i64> {
@@ -319,7 +319,7 @@ pub fn lower_project_components3d_events(
 
     // —— 装配：复用 027 runtime 收集（角色/相机注入位），身份恒 triggers3d/1 ——
     let runtime =
-        crate::lower_components3d_runtime::collect_runtime_cfg_pub(project, &w3, &scene)?;
+        crate::lower_components3d_runtime::collect_runtime_cfg_pub(project, &w3, &scene, None)?;
 
     lower_project_components3d_cfg(
         project,
@@ -330,6 +330,7 @@ pub fn lower_project_components3d_events(
             doc_prefix: "plan028-components-3d-events",
             gen_note: "PLAN-028 components-3d-events",
             regen_note: "tools/verify_plan028.py",
+            presentation: None,
             behavior_api: EVENTS_API,
         },
     )
