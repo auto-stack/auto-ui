@@ -1,0 +1,135 @@
+// PLAN-034 g10-animation: the original G10 animation entry re-authored on
+// the components-3d-presentation profile. The original Kenney character GLB
+// is the one character3d body (original world AABB 0.8x1.0x0.8 kept by the
+// original scale; the driver's frozen _ag_char3_shape gate runs unchanged);
+// the floor stays the original cylinder solid, owned by a static component
+// the Player receives as a named ActorRef3D param (no numeric IDs). Movement,
+// camera-relative facing, jump/grounded, clip selection (idle 1 / walk 2 /
+// air 3 by named ClipRef), phase seconds, yaw radians and the r40 sphere
+// trigger keep the original values. Start pose uses file clip ordinal 0
+// (named "static" - a keyword, so spelled by explicit ordinal; static clip0
+// is a real clip, not "no animation"). The only main/alt difference is the
+// phase rate (main +dt, alt +2dt). The generated input face is the
+// one-credit ag_actions_snapshot (original 32-branch budget:
+// snapshot1+move26+grounded1+event3+visual1).
+use resources: hero_glb
+
+node Ground {
+    view-3d {
+        cylinder3d floor {
+            position: (0.0, -0.5, 0.0)
+            scale: (10.0, 0.5, 10.0)
+            solid: true
+        }
+    }
+}
+
+node Player(ground_ref: ActorRef3D) {
+    model {
+        var grounded = 1
+        var vy = 0.0
+        var phase = 0.0
+        var yaw = 0.0
+        var last_event = 0
+        var moving = 0
+    }
+    view-3d {
+        model3d body {
+            model: resources.hero_glb
+            position: (0.0, 0.0020000027093020076, 0.0)
+            scale: (0.6666666534211902, 0.9090908967759002, 1.2598424794780512)
+        }
+    }
+    character3d { }
+    on {
+        Life.Start -> {
+            bind(triggers.floor_zone, refs.body, sphere, 40.0, .ground_ref.floor)
+            refs.body.pose(clips.hero_glb.0, 0.0, 1, 0.0)
+        }
+        Life.Tick(dt) -> {
+            let jump = input.pressed(Jump)
+            if jump == 1 {
+                if .grounded == 1 {
+                    .vy = 8.0
+                }
+            }
+            .vy = .vy - 20.0 * dt
+            var mx = input.held(Right) - input.held(Left)
+            var mz = input.held(Forward) - input.held(Back)
+            var speed = 4.0
+            if mx != 0 {
+                if mz != 0 {
+                    speed = 2.82842712
+                }
+            }
+            let fx = camera3d.forward_x()
+            let fz = camera3d.forward_z()
+            let rx = camera3d.right_x()
+            let rz = camera3d.right_z()
+            let q = refs.body.move3d((mx * 1.0 * rx + mz * 1.0 * fx) * speed * dt, .vy * dt, (mx * 1.0 * rz + mz * 1.0 * fz) * speed * dt)
+            .grounded = refs.body.grounded(q)
+            if .grounded == 1 {
+                .vy = 0.0
+            }
+            let ev = event.next()
+            if ev == 1 {
+                .last_event = event.pair() * 10 + event.phase()
+            }
+            var clip = clips.hero_glb.idle
+            .moving = 0
+            if mx != 0 {
+                .moving = 1
+            }
+            if mz != 0 {
+                .moving = 1
+            }
+            if .moving == 1 {
+                clip = clips.hero_glb.walk
+                .yaw = camera3d.yaw() * 0.01745329252
+                if mz > 0 {
+                    .yaw = .yaw + 3.14159265359
+                    if mx > 0 {
+                        .yaw = .yaw - 0.78539816339
+                    }
+                    if mx < 0 {
+                        .yaw = .yaw + 0.78539816339
+                    }
+                }
+                if mz < 0 {
+                    if mx > 0 {
+                        .yaw = .yaw + 0.78539816339
+                    }
+                    if mx < 0 {
+                        .yaw = .yaw - 0.78539816339
+                    }
+                }
+                if mz == 0 {
+                    if mx > 0 {
+                        .yaw = .yaw + 1.57079632679
+                    }
+                    if mx < 0 {
+                        .yaw = .yaw - 1.57079632679
+                    }
+                }
+            }
+            if .grounded == 0 {
+                clip = clips.hero_glb.jump
+            }
+            .phase = .phase + dt
+            refs.body.pose(clips.hero_glb.base, 0.0, 0, 0.0)
+        }
+    }
+}
+
+node Main {
+    view-3d {
+        Player hero {
+            ground_ref: refs.ground
+        }
+        Ground ground { }
+    }
+    camera3d { distance: 6.0
+              pitch: 30.0
+              projection: perspective }
+    triggers { floor_zone }
+}

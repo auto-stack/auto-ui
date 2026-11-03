@@ -1,0 +1,69 @@
+// PLAN-034 g10-textures: the original G10 textures entry re-authored on the
+// components-3d-presentation profile. Actor-free textured scene: four named
+// textured3d resources; the original four objects keep their names/transform/
+// order (platform(-6,0,0) scale2, coin(0,0,0) scale4, flag(6,0,0) scale3,
+// uv probe(-5,4,-4) scale1.5, yaw/pitch 0, visible initial true). Static
+// leaves sit on the root view; the two dynamic leaves are one-instance
+// components (root view cannot carry dynamic bindings). The original
+// `x=amplitude*(tick%2)` is the exact toggle `.cx = 0.8 - .cx` (tick parity
+// from 0), and `tick2 hides the flag, tick3 restores` is
+// `.fv = 1; if .t == 2 { .fv = 0 }`. amplitude is the only main/alt
+// difference (main 0.8, alt 1.6). No numeric scene/slot/pair IDs, no
+// business Rust, no fake character/camera.
+use resources: platform, coin, flag, uv_probe
+
+node Coin {
+    model {
+        var cx = 0.0
+    }
+    view-3d {
+        model3d coin {
+            model: resources.coin
+            position: (.cx, 0.0, 0.0)
+            scale: (4.0, 4.0, 4.0)
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            .cx = 0.8 - .cx
+        }
+    }
+}
+
+node Flag {
+    model {
+        var t = 0
+        var fv = 1
+    }
+    view-3d {
+        model3d banner {
+            model: resources.flag
+            position: (6.0, 0.0, 0.0)
+            scale: (3.0, 3.0, 3.0)
+            visible: .fv
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            .t = .t + 1
+            .fv = 1
+        }
+    }
+}
+
+node Main {
+    view-3d {
+        model3d ground {
+            model: resources.platform
+            position: (-6.0, 0.0, 0.0)
+            scale: (2.0, 2.0, 2.0)
+        }
+        Coin coin { }
+        Flag flag { }
+        model3d uv {
+            model: resources.uv_probe
+            position: (-5.0, 4.0, -4.0)
+            scale: (1.5, 1.5, 1.5)
+        }
+    }
+}

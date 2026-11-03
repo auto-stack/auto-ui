@@ -1,0 +1,29 @@
+{
+ "generator": "autographics-node2d-pilot plan034 components-3d-presentation",
+ "api": "autographics.node_animation3d/1",
+ "user_source_sha256": "f6be3daa5e383bc4398489772342c3c86df611ac66b19becb135bf3b895cc4c6",
+ "user_source_bytes": 3559,
+  "module:main": "84905c6e386e07f0c546842b7c143afc5b875d88fc0ee981174498c56e98c572",
+  "module:resources": "87b259f8a7500e04790874a8d2c1dbf002a0bb8bbe25795e533f82ccfb92200d",
+ "closure": [
+  {"name": "main", "sha256": "84905c6e386e07f0c546842b7c143afc5b875d88fc0ee981174498c56e98c572", "bytes": 4469},
+  {"name": "resources", "sha256": "87b259f8a7500e04790874a8d2c1dbf002a0bb8bbe25795e533f82ccfb92200d", "bytes": 418}
+ ],
+ "roles": {
+ "scene_rows": {
+  "Main/ground/floor": 1,
+  "Main/hero/body": 0
+ }
+},
+ "assets": [
+   {"sha256": "106cf02e0d6dccded6d9f90c2ae6a51eb94c6301645fea159e834c44ed4708a3", "file": "106cf02e0d6dccded6d9f90c2ae6a51eb94c6301645fea159e834c44ed4708a3.glb", "declared": "assets/Textures/colormap.png"}
+   {"sha256": "7112f6a08400914f9da546f3e6029e947cc9eab2b4a6da5eb99776111289efb1", "file": "7112f6a08400914f9da546f3e6029e947cc9eab2b4a6da5eb99776111289efb1.glb", "declared": "assets/character.glb"}
+ ],
+ "provenance": {
+  "product": "g10-animation-frozen",
+  "consumer": "unrecorded (this out dir has no registered flow consumer)",
+  "consumption": "include_str! frozen scene.agscene + world.at + assets/<sha>.glb; the harness writes the project (scene + assets) under target and loads via Storage::load_project; variants feed scripts/<sha>.at where <sha> = scene.behavior.source.sha256",
+  "load_verification": "the load path hash-verifies the behavior source and every assets/<sha>.glb against the scene manifest; GLB geometry admission runs in the driver preflight decoder before allocation",
+  "world_sha256": "f6be3daa5e383bc4398489772342c3c86df611ac66b19becb135bf3b895cc4c6"
+ }
+}

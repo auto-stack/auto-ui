@@ -1,0 +1,214 @@
+{
+ "behavior": {
+  "api": "autographics.behavior/1",
+  "source": {
+   "format": "auto-source",
+   "sha256": "4768ef52cb13e48e972f82c714c9767e4ccde86c358d2609e3aabf8a899237c5",
+   "byte_length": 2230
+  },
+  "actors": {
+   "two_d": null,
+   "three_d": null
+  }
+ },
+ "schema": "autographics.scene/6",
+ "document_id": "plan030-components-3d-bindings-main",
+ "resources": [
+  "circle",
+  "quad",
+  "cylinder",
+  "player",
+  "mob"
+ ],
+ "groups": [
+
+ ],
+ "objects": [
+  {
+   "id": 1,
+   "name": "ground",
+   "kind": "model",
+   "translation": [
+    -6.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    2.0,
+    2.0,
+    2.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": "closure:de6addf2fba4e4c53dc1d0e47669e21f18b41aa432223ad27950c95466ed7960",
+   "sprite": null
+  },
+  {
+   "id": 2,
+   "name": "uv",
+   "kind": "model",
+   "translation": [
+    -5.0,
+    4.0,
+    -4.0
+   ],
+   "scale": [
+    1.5,
+    1.5,
+    1.5
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": "closure:663f848231bb87f7ebe4e05b90f2d8c5651f64ad01a990ebf0dc4c21d0fb7172",
+   "sprite": null
+  },
+  {
+   "id": 3,
+   "name": "Main/coin/coin",
+   "kind": "model",
+   "translation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    4.0,
+    4.0,
+    4.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": "closure:216bc320b60c300fa10d3f071220b6c5ba39a1873cb462b4f9d0e57f969e0e57",
+   "sprite": null
+  },
+  {
+   "id": 4,
+   "name": "Main/flag/banner",
+   "kind": "model",
+   "translation": [
+    6.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    3.0,
+    3.0,
+    3.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": "closure:11993cb607eb7db8181b96081ff40ab67f279f63327362375362e6f79bd5165e",
+   "sprite": null
+  }
+ ],
+ "assets": [
+  {
+   "closure": {
+    "node_animation": false,
+    "id": "11993cb607eb7db8181b96081ff40ab67f279f63327362375362e6f79bd5165e",
+    "images": [
+     {
+      "source": "uri:Textures/colormap.png",
+      "sha256": "c2d2966858cb49ac63177127169fd3681bad943e1c153d4b4a208028830f576a",
+      "byte_length": 279,
+      "width": 8,
+      "height": 8
+     }
+    ]
+   },
+   "format": "glb",
+   "sha256": "0ba84ff43f0fea0a9f0b080cfa1be54ebda36c8c35174d1ac2553ae6da9f65ae",
+   "byte_length": 13276,
+   "name": "flag"
+  },
+  {
+   "closure": {
+    "node_animation": false,
+    "id": "de6addf2fba4e4c53dc1d0e47669e21f18b41aa432223ad27950c95466ed7960",
+    "images": [
+     {
+      "source": "uri:Textures/colormap.png",
+      "sha256": "c2d2966858cb49ac63177127169fd3681bad943e1c153d4b4a208028830f576a",
+      "byte_length": 279,
+      "width": 8,
+      "height": 8
+     }
+    ]
+   },
+   "format": "glb",
+   "sha256": "78c5ed4da30c5a97f0747a54248bc9de05ba1b3fb6b94be527dd48599f5ef44c",
+   "byte_length": 13352,
+   "name": "platform"
+  },
+  {
+   "closure": {
+    "node_animation": false,
+    "id": "216bc320b60c300fa10d3f071220b6c5ba39a1873cb462b4f9d0e57f969e0e57",
+    "images": [
+     {
+      "source": "uri:Textures/colormap.png",
+      "sha256": "c2d2966858cb49ac63177127169fd3681bad943e1c153d4b4a208028830f576a",
+      "byte_length": 279,
+      "width": 8,
+      "height": 8
+     }
+    ]
+   },
+   "format": "glb",
+   "sha256": "a3fb8f779a6af1cd75e5a02da77a87546ca8a59f6fe52f79f25179c4a68fd0e5",
+   "byte_length": 22124,
+   "name": "coin"
+  },
+  {
+   "closure": {
+    "node_animation": false,
+    "id": "663f848231bb87f7ebe4e05b90f2d8c5651f64ad01a990ebf0dc4c21d0fb7172",
+    "images": [
+     {
+      "source": "uri:asymmetric-checker.png",
+      "sha256": "6cc329163c9dadf2e531d5095196cc91631823c5b9ddce69f6e2b6690173dc2f",
+      "byte_length": 332,
+      "width": 8,
+      "height": 8
+     }
+    ]
+   },
+   "format": "glb",
+   "sha256": "f9a8f15627ca0d2060192a429e16dc7145c64a2f2e9315681d42a3f99d99bee3",
+   "byte_length": 3692,
+   "name": "uv_probe"
+  }
+ ]
+}
