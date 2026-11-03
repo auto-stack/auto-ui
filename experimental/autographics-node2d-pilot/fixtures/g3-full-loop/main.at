@@ -284,10 +284,10 @@ node Main {
               projection: perspective }
     on {
         Life.Tick(dt) -> {
+            hero.Move(dt)
             if .status != 0 {
                 return 0
             }
-            hero.Move(dt)
             let n = events.snapshot()
             .bn = 0
             if 0 < n {

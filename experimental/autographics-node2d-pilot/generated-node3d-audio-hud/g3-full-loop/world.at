@@ -85,10 +85,10 @@ fn hudmap_status_text(s int) str {
 fn main_lifestart() {
 }
 fn main_lifetick(dt float) {
+ hero_move(0, dt)
  if (r_status != 0) {
   return 0
  }
- hero_move(0, dt)
  let n = ag_events_snapshot()
  r_bn = 0
  if (0 < n) {

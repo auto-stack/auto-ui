@@ -1,14 +1,14 @@
 {
  "generator": "autographics-node2d-pilot plan035 components-3d-audio-hud",
  "api": "autographics.components3d/1",
- "user_source_sha256": "1d1e9f0045b0659ff9eb3635389521e2552839fd36214cbcad34b4b6ea447f70",
+ "user_source_sha256": "8b614b618f3fae8c1c2a9aed1c610e8289a9afaec6ab785744f7bd872d763710",
  "user_source_bytes": 10270,
   "module:hudmap": "149ccf7c91b691ec23d8a58c44f1e041cfc69e1466ac3dee36d8e56a0cf82faa",
-  "module:main": "c35d9ff0200c2d6a7f31000d62649a0bfa5772131d513335c67f0ea811690f97",
+  "module:main": "83399637a559228e6277b20a10b40f4993b13c34f86f9e409d7c8a9c0a8b8756",
   "module:resources": "94d5818c0d7fb811a6ad036e9b7b4554d05c5128e12cbf32131ee1f3bce8eb7e",
  "closure": [
   {"name": "hudmap", "sha256": "149ccf7c91b691ec23d8a58c44f1e041cfc69e1466ac3dee36d8e56a0cf82faa", "bytes": 391},
-  {"name": "main", "sha256": "c35d9ff0200c2d6a7f31000d62649a0bfa5772131d513335c67f0ea811690f97", "bytes": 13083},
+  {"name": "main", "sha256": "83399637a559228e6277b20a10b40f4993b13c34f86f9e409d7c8a9c0a8b8756", "bytes": 13083},
   {"name": "resources", "sha256": "94d5818c0d7fb811a6ad036e9b7b4554d05c5128e12cbf32131ee1f3bce8eb7e", "bytes": 103}
  ],
  "roles": {
@@ -29,10 +29,10 @@
    {"sha256": "7112f6a08400914f9da546f3e6029e947cc9eab2b4a6da5eb99776111289efb1", "file": "7112f6a08400914f9da546f3e6029e947cc9eab2b4a6da5eb99776111289efb1.glb", "declared": "assets/character.glb"}
  ],
  "provenance": {
-  "product": "g3-full-loop",
-  "consumer": "experimental/autographics-auto-driver/tests/node3d_audio_hud_flow.rs",
+  "product": "out-g3",
+  "consumer": "unrecorded (this out dir has no registered flow consumer)",
   "consumption": "include_str! frozen scene.agscene + world.at + assets/<sha>.glb; the harness writes the project (scene + assets) under target and loads via Storage::load_project; variants feed scripts/<sha>.at where <sha> = scene.behavior.source.sha256",
   "load_verification": "the load path hash-verifies the behavior source and every assets/<sha>.glb against the scene manifest; GLB geometry admission runs in the driver preflight decoder before allocation",
-  "world_sha256": "1d1e9f0045b0659ff9eb3635389521e2552839fd36214cbcad34b4b6ea447f70"
+  "world_sha256": "8b614b618f3fae8c1c2a9aed1c610e8289a9afaec6ab785744f7bd872d763710"
  }
 }
