@@ -7,6 +7,25 @@ var r_taken=0
 var r_h1=0
 var r_h2=0
 var r_h3=0
+// presentation3d scalars (generated: ord/np + bounded request rows)
+var r_ord=0
+var r_np=0
+var r_o0=0
+var r_c0=0
+var r_g0=0.0
+var r_o1=0
+var r_c1=0
+var r_g1=0.0
+var r_o2=0
+var r_c2=0
+var r_g2=0.0
+var r_o3=0
+var r_c3=0
+var r_g3=0.0
+var r_pose_clip=0
+var r_pose_phase=0.0
+var r_pose_loop=1
+var r_pose_yaw=0.0
 // Player SoA (instance Main/hero=0)
 var player_grounded=[1]
 var player_vy=[0.0]
@@ -167,8 +186,8 @@ fn app_start() {
 fn app_update(dt float) {
  main_lifetick(dt)
  player_lifetick(0,dt)
-}
  ok = ok + ag_present3d(0, 1, r_pose_clip, r_pose_phase, r_pose_loop, r_pose_yaw, r_np, r_o0, r_c0, r_g0, r_o1, r_c1, r_g1, r_o2, r_c2, r_g2, r_o3, r_c3, r_g3, 1, hudmap_count_text(r_taken), 0, "", 0, "", 0, "") * 1.0
+ r_np = 0
 // ---- PLAN-035 presentation3d generated closeout (T-03 frozen skeleton)
 fn sfx_play(c int, g float) {
  r_ord = r_ord + 1
@@ -196,13 +215,14 @@ fn sfx_play(c int, g float) {
   r_np = r_np + 1
  }
 }
-fn ah_pose(clip int, phase float, loop int, yaw float) {
+fn ah_pose(clip int, phase float, looping int, yaw float) {
  r_pose_clip=clip
  r_pose_phase=phase
- r_pose_loop=loop
+ r_pose_loop=looping
  r_pose_yaw=yaw
 }
 fn ah_closeout() {
  ok = ok + ag_present3d(0, 1, r_pose_clip, r_pose_phase, r_pose_loop, r_pose_yaw, r_np, r_o0, r_c0, r_g0, r_o1, r_c1, r_g1, r_o2, r_c2, r_g2, r_o3, r_c3, r_g3, 1, hudmap_count_text(r_taken), 0, "", 0, "", 0, "") * 1.0
  r_np = 0
+}
 }

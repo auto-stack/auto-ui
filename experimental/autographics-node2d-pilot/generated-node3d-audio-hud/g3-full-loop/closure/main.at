@@ -1,0 +1,428 @@
+// PLAN-035 full-G3 permanent fixture: the original G3 level (matrix
+// geometry) on the components-3d-audio-hud chain at the original 32-credit
+// budget. Root + Player + three same-def Coins + Hazard + Goal + Void = 8
+// stateful nodes; all motion/clips/cue selection/count/win-fail/fresh
+// restart are author-owned (no business enums, no root state requirement
+// beyond the author's own names). Spawn (2,1,2) half 0.4/0.5/0.4; platforms
+// [0,8]/[10,18]/[20,28] x y[-1,0] x z[0,8]; lower void y[-4,-3]; hazard
+// [14,16]x[0,1]x[3,5]; coins (4,1,4)/(12,1,2)/(24,1,4); goal (26,1,6)
+// sphere 0.5; speed 4, gravity 20, jump 8, clearance 0.002 (the frozen
+// move3d clearance); camera initial distance 8 / pitch 30, drag orbit and
+// wheel zoom ride the host orbit admission [4,12]x[15,75].
+use resources: hero_glb, flag_glb
+use hudmap: count_text, status_text
+
+node Platform(cx: float, cz: float) {
+    view-3d {
+        cylinder3d deck {
+            position: (.cx, -0.5, .cz)
+            scale: (8.0, 1.0, 8.0)
+            solid: true
+        }
+    }
+}
+
+node Shard {
+    object3d { }
+    view-3d {
+        cylinder3d shard {
+            position: (-30.0, 1.0, -30.0)
+            visible: false
+            scale: (0.35, 0.08, 0.35)
+        }
+    }
+}
+
+node Coin(slot: SlotRef3D, template: TemplateRef3D, pair: PairRef3D, target: ActorRef3D, px: float, py: float, pz: float) {
+    model {
+        var h = 0
+        var alive = 1
+    }
+    on {
+        Life.Start -> {
+            .h = spawn(.slot, .template, .px, .py, .pz)
+            bind(.pair, .target.body, sphere, 0.55, .h)
+        }
+    }
+}
+
+node Hazard(target: ActorRef3D) {
+    view-3d {
+        cylinder3d zone {
+            position: (15.0, 0.5, 4.0)
+            scale: (2.0, 1.0, 2.0)
+            visible: false
+        }
+    }
+    on {
+        Life.Start -> {
+            bind(triggers.hazard_hit, .target.body, aabb, 0.0, refs.zone)
+        }
+    }
+}
+
+node Goal(target: ActorRef3D) {
+    view-3d {
+        model3d banner {
+            model: resources.flag_glb
+            position: (26.0, 1.0, 6.0)
+            scale: (1.0, 1.0, 1.0)
+        }
+    }
+    on {
+        Life.Start -> {
+            bind(triggers.goal_hit, .target.body, sphere, 0.5, refs.banner)
+        }
+    }
+}
+
+node Void(target: ActorRef3D) {
+    view-3d {
+        cylinder3d pit {
+            position: (14.0, -3.5, 4.0)
+            scale: (32.0, 1.0, 12.0)
+            visible: false
+        }
+    }
+    on {
+        Life.Start -> {
+            bind(triggers.void_hit, .target.body, aabb, 0.0, refs.pit)
+        }
+    }
+}
+
+node Player {
+    model {
+        var grounded = 1
+        var vy = 0.0
+        var phase = 0.0
+        var yaw = 0.0
+        var moving = 0
+        var was_air = 0
+        var ended = 0
+    }
+    msg {
+        Move(float)
+        Frozen
+        Ended
+    }
+    view-3d {
+        model3d body {
+            model: resources.hero_glb
+            position: (2.0, 1.0, 2.0)
+            scale: (0.6666666534211902, 0.9090908967759002, 1.2598424794780512)
+        }
+    }
+    character3d { }
+    on {
+        .Frozen() -> {
+            .moving = 0
+        }
+        .Ended() -> {
+            .ended = 1
+        }
+        .Move(dt) -> {
+            if .ended == 1 {
+                if input.pressed(Restart) == 1 {
+                    round.request()
+                }
+                return 0
+            }
+            let jump = input.pressed(Jump)
+            if jump == 1 {
+                if .grounded == 1 {
+                    .vy = 8.0
+                    sfx.play("jump", 1.0)
+                }
+            }
+            .vy = .vy - 20.0 * dt
+            var mx = input.held(Right) - input.held(Left)
+            var mz = input.held(Forward) - input.held(Back)
+            let fx = camera3d.forward_x()
+            let fz = camera3d.forward_z()
+            let rx = camera3d.right_x()
+            let rz = camera3d.right_z()
+            var speed = 4.0
+            .moving = 0
+            if mx != 0 {
+                .moving = 1
+            }
+            if mz != 0 {
+                .moving = 1
+            }
+            if mx != 0 {
+                if mz != 0 {
+                    speed = 2.82842712
+                }
+            }
+            let q = refs.body.move3d((mx * 1.0 * rx + mz * 1.0 * fx) * speed * dt, .vy * dt, (mx * 1.0 * rz + mz * 1.0 * fz) * speed * dt)
+            let g = refs.body.grounded(q)
+            if g == 1 {
+                if .was_air == 1 {
+                    sfx.play("land", 1.0)
+                }
+                .vy = 0.0
+                .was_air = 0
+            }
+            if g == 0 {
+                .was_air = 1
+            }
+            .grounded = g
+            var clip = clips.hero_glb.idle
+            if .moving == 1 {
+                clip = clips.hero_glb.walk
+                .yaw = camera3d.yaw() * 0.01745329252
+                if mz > 0 {
+                    .yaw = .yaw + 3.14159265359
+                    if mx > 0 {
+                        .yaw = .yaw - 0.78539816339
+                    }
+                    if mx < 0 {
+                        .yaw = .yaw + 0.78539816339
+                    }
+                }
+                if mz < 0 {
+                    if mx > 0 {
+                        .yaw = .yaw + 1.57079632679
+                    }
+                    if mx < 0 {
+                        .yaw = .yaw - 1.57079632679
+                    }
+                }
+                if mz == 0 {
+                    if mx > 0 {
+                        .yaw = .yaw + 1.57079632679
+                    }
+                    if mx < 0 {
+                        .yaw = .yaw - 1.57079632679
+                    }
+                }
+            }
+            if .grounded == 0 {
+                clip = clips.hero_glb.jump
+            }
+            .phase = .phase + dt
+            refs.body.pose(clip, .phase, 1, .yaw)
+        }
+    }
+}
+
+node Main {
+    model {
+        var taken = 0
+        var status = 0
+        var b1 = 0
+        var b2 = 0
+        var b3 = 0
+        var bn = 0
+    }
+    view-3d {
+        Player hero { }
+        Platform p1 { cx: 4.0, cz: 4.0 }
+        Platform p2 { cx: 14.0, cz: 4.0 }
+        Platform p3 { cx: 24.0, cz: 4.0 }
+        Coin ca { slot: objects3d.ca, template: templates.Shard, pair: triggers.ca_hit, target: refs.hero, px: 4.0, py: 1.0, pz: 4.0 }
+        Coin cb { slot: objects3d.cb, template: templates.Shard, pair: triggers.cb_hit, target: refs.hero, px: 12.0, py: 1.0, pz: 2.0 }
+        Coin cc { slot: objects3d.cc, template: templates.Shard, pair: triggers.cc_hit, target: refs.hero, px: 24.0, py: 1.0, pz: 4.0 }
+        Hazard hazard { target: refs.hero }
+        Goal goal { target: refs.hero }
+        Void voidz { target: refs.hero }
+    }
+    objects3d { ca, cb, cc }
+    triggers { ca_hit, cb_hit, cc_hit, hazard_hit, goal_hit, void_hit }
+    presentation3d {
+        audio {
+            bank: "assets/b0b740dc49e51abefff9bb1af830080fe00f817b468614992040d438d6171c3d.wav"
+            font: "assets/4444c23631884f411aa7f2fee35061b1756a9927940c62d2a5572acf470b3ffa.ttf"
+            license: "assets/license.txt"
+        }
+        cue jump {
+            span: (0, 7403)
+            gain: 1.0
+        }
+        cue coin {
+            span: (7403, 20046)
+            gain: 1.0
+        }
+        cue land {
+            span: (20046, 22504)
+            gain: 1.0
+        }
+        cue win {
+            span: (7403, 20046)
+            gain: 0.75
+        }
+        cue fail {
+            span: (20046, 22504)
+            gain: 0.75
+        }
+        hud {
+            slot 0 {
+                owner: "Main"
+                anchor: 0
+                offset: (8.0, 8.0)
+                size: 32.0
+                rgba: (1.0, 1.0, 1.0, 1.0)
+                text_fn: "count_text"
+                text_field: "taken"
+                init: "0/3"
+            }
+            slot 1 {
+                owner: "Main"
+                anchor: 1
+                offset: (8.0, 8.0)
+                size: 32.0
+                rgba: (1.0, 1.0, 1.0, 1.0)
+                text_fn: "status_text"
+                text_field: "status"
+                init: "Playing"
+            }
+        }
+    }
+    camera3d { distance: 8.0
+              pitch: 30.0
+              projection: perspective }
+    on {
+        Life.Tick(dt) -> {
+            if .status != 0 {
+                return 0
+            }
+            hero.Move(dt)
+            let n = events.snapshot()
+            .bn = 0
+            if 0 < n {
+                let ph = events.phase(0)
+                if ph == 1 {
+                    let pr = events.pair(0)
+                    if pr == 0 {
+                        .b1 = events.source(0)
+                        .bn = .bn + 1
+                        sfx.play("coin", 1.0)
+                    }
+                    if pr == 1 {
+                        .b2 = events.source(0)
+                        .bn = .bn + 1
+                        sfx.play("coin", 1.0)
+                    }
+                    if pr == 2 {
+                        .b3 = events.source(0)
+                        .bn = .bn + 1
+                        sfx.play("coin", 1.0)
+                    }
+                    if pr == 3 {
+                        .status = 2
+                        hero.Frozen()
+                        hero.Ended()
+                        sfx.play("fail", 0.75)
+                    }
+                    if pr == 4 {
+                        if .taken == 3 {
+                            .status = 1
+                            hero.Frozen()
+                            hero.Ended()
+                            sfx.play("win", 0.75)
+                        }
+                    }
+                    if pr == 5 {
+                        .status = 2
+                        hero.Frozen()
+                        hero.Ended()
+                        sfx.play("fail", 0.75)
+                    }
+                }
+            }
+            if 1 < n {
+                let ph = events.phase(1)
+                if ph == 1 {
+                    let pr = events.pair(1)
+                    if pr == 0 {
+                        .b1 = events.source(1)
+                        .bn = .bn + 1
+                        sfx.play("coin", 1.0)
+                    }
+                    if pr == 1 {
+                        .b2 = events.source(1)
+                        .bn = .bn + 1
+                        sfx.play("coin", 1.0)
+                    }
+                    if pr == 2 {
+                        .b3 = events.source(1)
+                        .bn = .bn + 1
+                        sfx.play("coin", 1.0)
+                    }
+                    if pr == 3 {
+                        .status = 2
+                        hero.Frozen()
+                        hero.Ended()
+                        sfx.play("fail", 0.75)
+                    }
+                    if pr == 4 {
+                        if .taken == 3 {
+                            .status = 1
+                            hero.Frozen()
+                            hero.Ended()
+                            sfx.play("win", 0.75)
+                        }
+                    }
+                    if pr == 5 {
+                        .status = 2
+                        hero.Frozen()
+                        hero.Ended()
+                        sfx.play("fail", 0.75)
+                    }
+                }
+            }
+            if 2 < n {
+                let ph = events.phase(2)
+                if ph == 1 {
+                    let pr = events.pair(2)
+                    if pr == 0 {
+                        .b1 = events.source(2)
+                        .bn = .bn + 1
+                        sfx.play("coin", 1.0)
+                    }
+                    if pr == 1 {
+                        .b2 = events.source(2)
+                        .bn = .bn + 1
+                        sfx.play("coin", 1.0)
+                    }
+                    if pr == 2 {
+                        .b3 = events.source(2)
+                        .bn = .bn + 1
+                        sfx.play("coin", 1.0)
+                    }
+                    if pr == 3 {
+                        .status = 2
+                        hero.Frozen()
+                        hero.Ended()
+                        sfx.play("fail", 0.75)
+                    }
+                    if pr == 4 {
+                        if .taken == 3 {
+                            .status = 1
+                            hero.Frozen()
+                            hero.Ended()
+                            sfx.play("win", 0.75)
+                        }
+                    }
+                    if pr == 5 {
+                        .status = 2
+                        hero.Frozen()
+                        hero.Ended()
+                        sfx.play("fail", 0.75)
+                    }
+                }
+            }
+            if .bn == 1 {
+                objects.despawn_batch(.b1)
+            }
+            if .bn == 2 {
+                objects.despawn_batch(.b1, .b2)
+            }
+            if .bn == 3 {
+                objects.despawn_batch(.b1, .b2, .b3)
+            }
+            .taken = .taken + .bn
+        }
+    }
+}

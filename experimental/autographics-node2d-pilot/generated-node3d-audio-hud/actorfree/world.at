@@ -4,6 +4,21 @@
 var ok=0.0
 // root scalars (r_<field>)
 var r_n=0
+// presentation3d scalars (generated: ord/np + bounded request rows)
+var r_ord=0
+var r_np=0
+var r_o0=0
+var r_c0=0
+var r_g0=0.0
+var r_o1=0
+var r_c1=0
+var r_g1=0.0
+var r_o2=0
+var r_c2=0
+var r_g2=0.0
+var r_o3=0
+var r_c3=0
+var r_g3=0.0
 // pooled fn tick_text from hudmap
 fn hudmap_tick_text(n int) str {
     if n == 0 {
@@ -28,8 +43,8 @@ fn app_start() {
 }
 fn app_update(dt float) {
  main_lifetick(dt)
-}
  ok = ok + ag_present3d(-1, 0, 0, 0.0, 0, 0.0, r_np, r_o0, r_c0, r_g0, r_o1, r_c1, r_g1, r_o2, r_c2, r_g2, r_o3, r_c3, r_g3, 1, hudmap_tick_text(r_n), 0, "", 0, "", 0, "") * 1.0
+ r_np = 0
 // ---- PLAN-035 presentation3d generated closeout (T-03 frozen skeleton)
 fn sfx_play(c int, g float) {
  r_ord = r_ord + 1
@@ -60,4 +75,5 @@ fn sfx_play(c int, g float) {
 fn ah_closeout() {
  ok = ok + ag_present3d(-1, 0, 0, 0.0, 0, 0.0, r_np, r_o0, r_c0, r_g0, r_o1, r_c1, r_g1, r_o2, r_c2, r_g2, r_o3, r_c3, r_g3, 1, hudmap_tick_text(r_n), 0, "", 0, "", 0, "") * 1.0
  r_np = 0
+}
 }

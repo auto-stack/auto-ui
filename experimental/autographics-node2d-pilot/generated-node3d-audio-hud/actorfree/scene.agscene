@@ -3,8 +3,8 @@
   "api": "autographics.components3d/1",
   "source": {
    "format": "auto-source",
-   "sha256": "871b1eaa1e10d03da57818e52fa5f397cc8a89a2de4e29bd869d95eb2bc76d5d",
-   "byte_length": 1435
+   "sha256": "1ada90459b50bd4cef4b2cb4a16cefb923d65055bd3f3c0c38e4c92f636b8b0b",
+   "byte_length": 1677
   },
   "actors": {
    "two_d": null,

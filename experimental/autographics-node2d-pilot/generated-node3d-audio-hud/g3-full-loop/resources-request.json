@@ -1,0 +1,6 @@
+{
+ "schema": "autographics.resources-request/1",
+ "resources": [
+   {"name": "hero_glb", "module": "resources", "kind": "animated3d", "file": "assets/character.glb", "sha256": "7112f6a08400914f9da546f3e6029e947cc9eab2b4a6da5eb99776111289efb1", "byte_length": 87624, "animated": true},
+   {"name": "flag_glb", "module": "resources", "kind": "textured3d", "file": "assets/flag.glb", "sha256": "0ba84ff43f0fea0a9f0b080cfa1be54ebda36c8c35174d1ac2553ae6da9f65ae", "byte_length": 13276, "animated": false} ]
+}

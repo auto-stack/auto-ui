@@ -663,9 +663,17 @@ pub fn lower_project_components3d_presentation_entry_ahud(
             events: Some(&events),
             bindings: Some(&bindings_cfg),
             presentation,
-            doc_prefix: "plan035-components-3d-audio-hud",
+            doc_prefix: if ahud.is_some() {
+                "plan035-components-3d-audio-hud"
+            } else {
+                "plan030-components-3d-bindings"
+            },
             gen_note: "PLAN-030 components-3d-bindings",
-            regen_note: "tools/verify_plan035.py",
+            regen_note: if ahud.is_some() {
+                "tools/verify_plan035.py"
+            } else {
+                "tools/verify_plan030.py"
+            },
             behavior_api,
             ahud,
         },

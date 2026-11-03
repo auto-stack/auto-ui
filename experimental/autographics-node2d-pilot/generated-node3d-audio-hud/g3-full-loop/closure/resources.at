@@ -1,0 +1,2 @@
+let hero_glb = animated3d.glb("assets/character.glb")
+let flag_glb = textured3d.glb("assets/flag.glb")

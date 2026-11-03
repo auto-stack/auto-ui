@@ -2113,6 +2113,11 @@ pub(crate) fn gen_user_source_3d(
         }
     }
 
+    // PLAN-035：组合基础设施标量（ord/np 缓冲 + 姿态变量，None = 旧档不变）。
+    if let Some(ahud) = ahud {
+        src.push_str(&crate::lower_components3d_audio_hud::ahud_scalars_src(ahud));
+    }
+
     // 每 SoA：model 数组、运行期参数数组（handler 引用面）、行表与缓存。
     for dname in def_order(world) {
         let def = &world.defs[&dname];
@@ -2674,7 +2679,6 @@ pub(crate) fn gen_user_source_3d(
             src.push_str(&format!(" {}_present({})\n", def.prefix(), inst.def_idx));
         }
     }
-    src.push_str("}\n");
     // PLAN-035：每回调末恰一次组合收口（bundle 整体 1 计费；四 HUD 槽
     // 完整状态 + 角色姿态 + ≤4 声音请求），基础设施 fns 末尾随档发行。
     if let Some(ahud) = ahud {
@@ -2687,7 +2691,10 @@ pub(crate) fn gen_user_source_3d(
         ));
         src.push_str(&crate::lower_components3d_audio_hud::ahud_fns_src(ahud, kind, entity));
     }
-    Ok(src)}
+    src.push_str("}
+");
+    Ok(src)
+}
 
 /// 运行期参数数组（handler 引用到的数值参数；视图静态引用逐实例内联）。
 fn def_runtime_params_3d(project: &Project, def: &DefIR) -> Vec<(String, PType)> {
@@ -3100,6 +3107,30 @@ fn gen_recv_fn_3d(
             has_character: ahud.has_character,
         });
     }
+    // PLAN-035：组合档 recv fn 同享输入快照前奏（一次 packet 读替代逐动作
+    // 计费读）；仅 ahud 档行为，旧档 recv 直读逐字不变。
+    if ahud.is_some() && ctx.vis3d.is_some() {
+        let vis = ctx.vis3d.as_ref().expect("vis3d checked");
+        vis.input_snapshot.set(false);
+        let mut probe = String::new();
+        translate_handler(&h.body.stmts, &ctx, &mut probe, 1)?;
+        if probe.contains("ag_action_held(") || probe.contains("ag_action_pressed(") {
+            vis.input_snapshot.set(true);
+            src.push_str(" let packet=ag_actions_snapshot()
+ let held_bits=packet%64
+ let pressed_bits=packet/64
+");
+            translate_handler(&h.body.stmts, &ctx, src, 1)?;
+            vis.input_snapshot.set(false);
+            src.push_str("}
+");
+            return Ok(());
+        }
+        src.push_str(&probe);
+        src.push_str("}
+");
+        return Ok(());
+    }
     translate_handler(&h.body.stmts, &ctx, src, 1)?;
     src.push_str("}\n");
     Ok(())
@@ -3317,7 +3348,7 @@ pub(crate) fn lower_project_components3d_cfg_with(
         let glb_rows = if asset_rows.is_empty() {
             String::new()
         } else {
-            format!("{}
+            format!("{},
 ", asset_rows.join(",
 "))
         };

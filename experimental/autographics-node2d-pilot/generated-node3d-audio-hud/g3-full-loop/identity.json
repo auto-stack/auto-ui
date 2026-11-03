@@ -1,0 +1,38 @@
+{
+ "generator": "autographics-node2d-pilot plan035 components-3d-audio-hud",
+ "api": "autographics.components3d/1",
+ "user_source_sha256": "1d1e9f0045b0659ff9eb3635389521e2552839fd36214cbcad34b4b6ea447f70",
+ "user_source_bytes": 10270,
+  "module:hudmap": "149ccf7c91b691ec23d8a58c44f1e041cfc69e1466ac3dee36d8e56a0cf82faa",
+  "module:main": "c35d9ff0200c2d6a7f31000d62649a0bfa5772131d513335c67f0ea811690f97",
+  "module:resources": "94d5818c0d7fb811a6ad036e9b7b4554d05c5128e12cbf32131ee1f3bce8eb7e",
+ "closure": [
+  {"name": "hudmap", "sha256": "149ccf7c91b691ec23d8a58c44f1e041cfc69e1466ac3dee36d8e56a0cf82faa", "bytes": 391},
+  {"name": "main", "sha256": "c35d9ff0200c2d6a7f31000d62649a0bfa5772131d513335c67f0ea811690f97", "bytes": 13083},
+  {"name": "resources", "sha256": "94d5818c0d7fb811a6ad036e9b7b4554d05c5128e12cbf32131ee1f3bce8eb7e", "bytes": 103}
+ ],
+ "roles": {
+ "scene_rows": {
+  "Main/goal/banner": 5,
+  "Main/hazard/zone": 4,
+  "Main/hero/body": 0,
+  "Main/p1/deck": 1,
+  "Main/p2/deck": 2,
+  "Main/p3/deck": 3,
+  "Main/voidz/pit": 6,
+  "Shard": 7
+ }
+},
+ "assets": [
+   {"sha256": "0ba84ff43f0fea0a9f0b080cfa1be54ebda36c8c35174d1ac2553ae6da9f65ae", "file": "0ba84ff43f0fea0a9f0b080cfa1be54ebda36c8c35174d1ac2553ae6da9f65ae.glb", "declared": "assets/flag.glb"},
+   {"sha256": "106cf02e0d6dccded6d9f90c2ae6a51eb94c6301645fea159e834c44ed4708a3", "file": "106cf02e0d6dccded6d9f90c2ae6a51eb94c6301645fea159e834c44ed4708a3.png", "declared": "assets/Textures/colormap.png"},
+   {"sha256": "7112f6a08400914f9da546f3e6029e947cc9eab2b4a6da5eb99776111289efb1", "file": "7112f6a08400914f9da546f3e6029e947cc9eab2b4a6da5eb99776111289efb1.glb", "declared": "assets/character.glb"}
+ ],
+ "provenance": {
+  "product": "g3-full-loop",
+  "consumer": "experimental/autographics-auto-driver/tests/node3d_audio_hud_flow.rs",
+  "consumption": "include_str! frozen scene.agscene + world.at + assets/<sha>.glb; the harness writes the project (scene + assets) under target and loads via Storage::load_project; variants feed scripts/<sha>.at where <sha> = scene.behavior.source.sha256",
+  "load_verification": "the load path hash-verifies the behavior source and every assets/<sha>.glb against the scene manifest; GLB geometry admission runs in the driver preflight decoder before allocation",
+  "world_sha256": "1d1e9f0045b0659ff9eb3635389521e2552839fd36214cbcad34b4b6ea447f70"
+ }
+}

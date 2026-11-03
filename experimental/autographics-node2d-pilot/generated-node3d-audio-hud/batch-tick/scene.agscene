@@ -3,8 +3,8 @@
   "api": "autographics.components3d/1",
   "source": {
    "format": "auto-source",
-   "sha256": "b020447be431c836ac685e6f5ac97e346676f63d9b46d73cba7b722c96cb7069",
-   "byte_length": 5493
+   "sha256": "c613172a3fc930a1d43de7474ba6ea70214a01d21c08e571303712295da46f2b",
+   "byte_length": 5817
   },
   "actors": {
    "two_d": null,
@@ -125,7 +125,7 @@
    "sha256": "7112f6a08400914f9da546f3e6029e947cc9eab2b4a6da5eb99776111289efb1",
    "byte_length": 87624,
    "name": "hero_glb"
-  }
+  },
   {"audio": {"rate": 44100, "channels": 2, "frames": 22504}, "format": "wav", "sha256": "b0b740dc49e51abefff9bb1af830080fe00f817b468614992040d438d6171c3d", "byte_length": 90060, "name": "b0b740dc49e51abefff9bb1af830080fe00f817b468614992040d438d6171c3d.wav"},
   {"format": "ttf", "sha256": "4444c23631884f411aa7f2fee35061b1756a9927940c62d2a5572acf470b3ffa", "byte_length": 26828, "name": "4444c23631884f411aa7f2fee35061b1756a9927940c62d2a5572acf470b3ffa.ttf"}
  ],

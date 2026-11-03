@@ -555,8 +555,8 @@ pub(crate) fn ahud_fns_src(ahud: &AhudCfg3, kind: i64, entity: i64) -> String {
     s.push_str(" if r_np < 5 {\n  r_np = r_np + 1\n }\n");
     s.push_str("}\n");
     if ahud.has_character {
-        s.push_str("fn ah_pose(clip int, phase float, loop int, yaw float) {\n");
-        s.push_str(" r_pose_clip=clip\n r_pose_phase=phase\n r_pose_loop=loop\n r_pose_yaw=yaw\n");
+        s.push_str("fn ah_pose(clip int, phase float, looping int, yaw float) {\n");
+        s.push_str(" r_pose_clip=clip\n r_pose_phase=phase\n r_pose_loop=looping\n r_pose_yaw=yaw\n");
         s.push_str("}\n");
     }
     let mut slot_args = Vec::new();
@@ -603,7 +603,8 @@ pub(crate) fn ahud_closeout_call(ahud: &AhudCfg3, kind: i64, entity: i64) -> Str
         "0, 0.0, 0, 0.0".to_string()
     };
     format!(
-        "ok = ok + ag_present3d({kind}, {entity}, {pose_args}, r_np, r_o0, r_c0, r_g0, r_o1, r_c1, r_g1, r_o2, r_c2, r_g2, r_o3, r_c3, r_g3, {}) * 1.0",
+        "ok = ok + ag_present3d({kind}, {entity}, {pose_args}, r_np, r_o0, r_c0, r_g0, r_o1, r_c1, r_g1, r_o2, r_c2, r_g2, r_o3, r_c3, r_g3, {}) * 1.0
+ r_np = 0",
         slot_args.join(", ")
     )
 }
