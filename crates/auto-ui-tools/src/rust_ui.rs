@@ -4477,6 +4477,32 @@ fn delivery_pins(
 }
 
 /// 交付根 workspace manifest（消费根 patch 就位于此，不写在依赖包内）。
+/// PLAN-036 T-03：交付根内主题快照的文件枚举（rel, bytes）——披露计数用。
+fn walk_theme_files(root: &Path) -> Vec<(String, u64)> {
+    let mut out = Vec::new();
+    let mut stack = vec![root.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        let Ok(entries) = fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else if let Ok(meta) = entry.metadata() {
+                let rel = path
+                    .strip_prefix(root)
+                    .unwrap_or(&path)
+                    .to_string_lossy()
+                    .replace('\\', "/");
+                out.push((rel, meta.len()));
+            }
+        }
+    }
+    out.sort();
+    out
+}
+
 fn generate_delivery_root_manifest(
     producer_root: &Path,
     app_member: &str,
@@ -5419,11 +5445,79 @@ def main() -> int:
                 rel = f.relative_to(assets_dir).as_posix()
                 if rel not in listed:
                     problems.append(f"未登记资源: assets/{rel}")
+
+    # PLAN-036：官方主题包节（可选——未声明官方包的交付无此节）。
+    # 校验：快照自描述清单身份与 manifest.theme_package 一致、逐文件 sha256、
+    # 包内未登记文件、content digest 重算（sorted path\0bytes concat sha256，
+    # 与 producer 唯一实现同算法）。
+    theme = manifest.get("theme_package")
+    theme_files = 0
+    if theme is not None:
+        if not isinstance(theme, dict):
+            problems.append("theme_package 节非法（应为对象）")
+        else:
+            tdir = ROOT / str(theme.get("dir", "packages/themes"))
+            tp = tdir / "theme-package.json"
+            tp_json = None
+            if not tp.is_file():
+                problems.append(f"主题包清单缺失: {theme.get('dir')}/theme-package.json")
+            else:
+                try:
+                    tp_json = json.loads(tp.read_text(encoding="utf-8"))
+                except (OSError, ValueError) as e:
+                    problems.append(f"主题包清单不可读: {e}")
+            if isinstance(tp_json, dict):
+                ident = (
+                    str(tp_json.get("owner", "")),
+                    str(tp_json.get("package", "")),
+                    str(tp_json.get("version", "")),
+                )
+                expect_ident = (
+                    str(theme.get("owner", "")),
+                    str(theme.get("name", "")),
+                    str(theme.get("version", "")),
+                )
+                if ident != expect_ident:
+                    problems.append(
+                        f"主题包身份不符: 清单={ident} delivery-manifest={expect_ident}"
+                    )
+                listed_t = set()
+                entries = []
+                for f in tp_json.get("files", []):
+                    rel = str(f.get("path", ""))
+                    listed_t.add(rel)
+                    tf = tdir / rel
+                    if not tf.is_file():
+                        problems.append(f"主题包文件缺失: {rel}")
+                        continue
+                    theme_files += 1
+                    data = tf.read_bytes()
+                    entries.append((rel, data))
+                    actual = hashlib.sha256(data).hexdigest()
+                    if actual != str(f.get("sha256", "")):
+                        problems.append(f"主题包 hash 不符: {rel}")
+                for f in sorted(tdir.rglob("*")):
+                    if f.is_file() and f.name != "theme-package.json":
+                        rel = f.relative_to(tdir).as_posix()
+                        if rel not in listed_t:
+                            problems.append(f"主题包未登记文件: {rel}")
+                entries.sort(key=lambda x: x[0])
+                h = hashlib.sha256()
+                for rel, data in entries:
+                    h.update(rel.encode("utf-8"))
+                    h.update(b"\x00")
+                    h.update(data)
+                if h.hexdigest() != str(theme.get("content_digest", "")):
+                    problems.append("主题包 content digest 重算不符")
+
     for p in problems:
         print(f"[verify-delivery] FAIL {p}")
     if problems:
         return 1
-    print(f"[verify-delivery] PASS {len(listed)} 资源校验一致（SHA-256=清单记录）")
+    theme_note = (
+        f"；主题包 {theme_files} 文件 + digest 重算一致" if theme is not None else ""
+    )
+    print(f"[verify-delivery] PASS {len(listed)} 资源校验一致（SHA-256=清单记录）{theme_note}")
     return 0
 
 
@@ -5779,6 +5873,36 @@ fn generate_rust_ui_delivery_inner(
         total_bytes += r["bytes"].as_u64().unwrap_or(0);
     }
 
+    // PLAN-036 T-03（AC-02/V-03）：官方主题包随交付根发行——App 声明了官方包
+    // 时，把其**已验证解析根**经发布原语快照进交付根 `packages/themes/`
+    // （源校验→仅清单文件→快照复验，失败即整体 Err、旧交付不动）；身份
+    // （含冻结内容摘要 + 语义身份）写入交付清单 `theme_package` 节，verify.py
+    // 重算校验。未声明官方包 = 零主题资产、清单无该节（旧行为）。
+    let theme_section: serde_json::Value =
+        match crate::theme_package::verify_app_theme_inputs(project_dir)? {
+            Some(theme_src_root) => {
+                let theme_dst = delivery_root.join("packages").join("themes");
+                crate::theme_package::publish_theme_package_snapshot(&theme_src_root, &theme_dst)?;
+                let identity = crate::theme_package::verified_theme_input_identity(&theme_dst)?;
+                // 披露计数：主题快照文件并入 disclosure（非 crate/非 assets 独立目录）。
+                for entry in walk_theme_files(&theme_dst) {
+                    total_files += 1;
+                    total_bytes += entry.1 as u64;
+                }
+                serde_json::json!({
+                    "dir": "packages/themes",
+                    "owner": identity.owner,
+                    "name": identity.name,
+                    "version": identity.version,
+                    "schema": identity.schema,
+                    "content_digest": identity.content_digest,
+                    "identity_digest": identity.identity_digest,
+                    "note": "官方主题包固定快照（发布原语复制+复验；不可二次编辑，非第二权威源）",
+                })
+            }
+            None => serde_json::Value::Null,
+        };
+
     // 身份断言 + 交付边界自检（R1-F03：全部 manifest 的 path 越界/绝对
     // 路径扫描——覆盖 sidecar 与任何未来注入源；producer 残留扫描保留）。
     delivery_assert_unique_crates(delivery_root, &app_package)?;
@@ -5842,6 +5966,7 @@ fn generate_rust_ui_delivery_inner(
         },
         "crates": crate_entries,
         "root_inputs": root_input_entries,
+        "theme_package": theme_section,
         "app": {
             "package": app_package,
             "project_name": compiled.project_name,
