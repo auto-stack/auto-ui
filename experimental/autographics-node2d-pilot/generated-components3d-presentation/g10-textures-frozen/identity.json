@@ -18,16 +18,16 @@
  }
 },
  "assets": [
-   {"sha256": "0ba84ff43f0fea0a9f0b080cfa1be54ebda36c8c35174d1ac2553ae6da9f65ae", "file": "0ba84ff43f0fea0a9f0b080cfa1be54ebda36c8c35174d1ac2553ae6da9f65ae.glb", "declared": "assets/flag.glb"}
-   {"sha256": "106cf02e0d6dccded6d9f90c2ae6a51eb94c6301645fea159e834c44ed4708a3", "file": "106cf02e0d6dccded6d9f90c2ae6a51eb94c6301645fea159e834c44ed4708a3.glb", "declared": "assets/Textures/colormap.png"}
-   {"sha256": "6cc329163c9dadf2e531d5095196cc91631823c5b9ddce69f6e2b6690173dc2f", "file": "6cc329163c9dadf2e531d5095196cc91631823c5b9ddce69f6e2b6690173dc2f.glb", "declared": "uv/asymmetric-checker.png"}
-   {"sha256": "78c5ed4da30c5a97f0747a54248bc9de05ba1b3fb6b94be527dd48599f5ef44c", "file": "78c5ed4da30c5a97f0747a54248bc9de05ba1b3fb6b94be527dd48599f5ef44c.glb", "declared": "assets/platform.glb"}
-   {"sha256": "a3fb8f779a6af1cd75e5a02da77a87546ca8a59f6fe52f79f25179c4a68fd0e5", "file": "a3fb8f779a6af1cd75e5a02da77a87546ca8a59f6fe52f79f25179c4a68fd0e5.glb", "declared": "assets/coin.glb"}
+   {"sha256": "0ba84ff43f0fea0a9f0b080cfa1be54ebda36c8c35174d1ac2553ae6da9f65ae", "file": "0ba84ff43f0fea0a9f0b080cfa1be54ebda36c8c35174d1ac2553ae6da9f65ae.glb", "declared": "assets/flag.glb"},
+   {"sha256": "106cf02e0d6dccded6d9f90c2ae6a51eb94c6301645fea159e834c44ed4708a3", "file": "106cf02e0d6dccded6d9f90c2ae6a51eb94c6301645fea159e834c44ed4708a3.png", "declared": "assets/Textures/colormap.png"},
+   {"sha256": "6cc329163c9dadf2e531d5095196cc91631823c5b9ddce69f6e2b6690173dc2f", "file": "6cc329163c9dadf2e531d5095196cc91631823c5b9ddce69f6e2b6690173dc2f.png", "declared": "uv/asymmetric-checker.png"},
+   {"sha256": "78c5ed4da30c5a97f0747a54248bc9de05ba1b3fb6b94be527dd48599f5ef44c", "file": "78c5ed4da30c5a97f0747a54248bc9de05ba1b3fb6b94be527dd48599f5ef44c.glb", "declared": "assets/platform.glb"},
+   {"sha256": "a3fb8f779a6af1cd75e5a02da77a87546ca8a59f6fe52f79f25179c4a68fd0e5", "file": "a3fb8f779a6af1cd75e5a02da77a87546ca8a59f6fe52f79f25179c4a68fd0e5.glb", "declared": "assets/coin.glb"},
    {"sha256": "f9a8f15627ca0d2060192a429e16dc7145c64a2f2e9315681d42a3f99d99bee3", "file": "f9a8f15627ca0d2060192a429e16dc7145c64a2f2e9315681d42a3f99d99bee3.glb", "declared": "uv/uv-material-probe.glb"}
  ],
  "provenance": {
   "product": "g10-textures-frozen",
-  "consumer": "unrecorded (this out dir has no registered flow consumer)",
+  "consumer": "experimental/autographics-auto-driver/tests/node3d_presentation_oracles.rs",
   "consumption": "include_str! frozen scene.agscene + world.at + assets/<sha>.glb; the harness writes the project (scene + assets) under target and loads via Storage::load_project; variants feed scripts/<sha>.at where <sha> = scene.behavior.source.sha256",
   "load_verification": "the load path hash-verifies the behavior source and every assets/<sha>.glb against the scene manifest; GLB geometry admission runs in the driver preflight decoder before allocation",
   "world_sha256": "5870b550bb20a1d423188482903e3fe993a513ac69fc5170aa070e7cce49ff1a"

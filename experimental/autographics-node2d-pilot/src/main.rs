@@ -38,7 +38,7 @@ fn write_components3d_products(
                 .expect("scene.agscene");
             // GLB 资产字节（完整闭包：身份 = 原始字节；字节等值复制）。
             std::fs::create_dir_all(format!("{out}/assets")).expect("assets dir");
-            let mut copied: Vec<(String, String)> = Vec::new();
+            let mut copied: Vec<(String, String, String)> = Vec::new();
             for module in project.modules.values() {
                 for r in &module.resources {
                     let is_model = matches!(
@@ -83,7 +83,7 @@ fn write_components3d_products(
                     );
                     let dest = format!("{out}/assets/{sha256}.glb");
                     std::fs::write(&dest, &bytes).expect("asset copy");
-                    copied.push((sha256.clone(), file.clone()));
+                    copied.push((sha256.clone(), format!("{sha256}.glb"), file.clone()));
                     // PLAN-034：外部图像边随闭包复制（原 URI/字节不重写）。
                     if let Some(meta) = presentation {
                         if let Some(entry_meta) = meta.resources.get(&r.name) {
@@ -102,7 +102,11 @@ fn write_components3d_products(
                                 );
                                 let dest = format!("{out}/assets/{}.png", image.sha256);
                                 std::fs::write(&dest, &ibytes).expect("image copy");
-                                copied.push((image.sha256.clone(), image.path.clone()));
+                                copied.push((
+                                    image.sha256.clone(),
+                                    format!("{}.png", image.sha256),
+                                    image.path.clone(),
+                                ));
                             }
                         }
                     }
@@ -146,13 +150,13 @@ fn write_components3d_products(
             identity.push_str(" \"assets\": [\n");
             let asset_rows = copied
                 .iter()
-                .map(|(sha, declared)| {
+                .map(|(sha, file, declared)| {
                     format!(
-                        "   {{\"sha256\": \"{sha}\", \"file\": \"{sha}.glb\", \"declared\": \"{declared}\"}}"
+                        "   {{\"sha256\": \"{sha}\", \"file\": \"{file}\", \"declared\": \"{declared}\"}}"
                     )
                 })
                 .collect::<Vec<_>>()
-                .join("\n");
+                .join(",\n");
             identity.push_str(&asset_rows);
             identity.push_str("\n ],\n");
             let product = std::path::Path::new(out)
@@ -248,6 +252,12 @@ fn components3d_presentation_consumer(product: &str) -> &'static str {
     match product {
         "g10-textures" | "g10-textures-alt" | "g10-animation" | "g10-animation-alt" => {
             "experimental/autographics-auto-driver/tests/node3d_presentation_flow.rs"
+        }
+        "g10-textures-frozen" | "g10-textures-missvis" | "g10-textures-altimage" => {
+            "experimental/autographics-auto-driver/tests/node3d_presentation_oracles.rs"
+        }
+        "g10-animation-frozen" | "g10-animation-extra-read" | "g10-animation-neutral" => {
+            "experimental/autographics-auto-driver/tests/node3d_presentation_oracles_anim.rs"
         }
         _ => "unrecorded (this out dir has no registered flow consumer)",
     }
