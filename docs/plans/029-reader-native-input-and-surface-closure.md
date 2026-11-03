@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-029
-status: executing
+status: execution_done
 feature_name: Reader原生输入链与文档表面必要接缝收口
 author: [Codex]
 created_at: 2026-11-02
-updated_at: 2026-11-02
+updated_at: 2026-11-03
 plan_revision: 1
-current_step: 9
+current_step: 10
 total_steps: 12
 base_branch: master
 base_commit: e344d2268f6bf40d1ed4f24ea957ce3fbd88313c
@@ -196,7 +196,7 @@ Reader旧门入口保持 `python tests/basic/verify_standalone.py --profile vue|
 | T-06 | work | T-03～05 | [x] 双实例 A/B（-B/-F+AUTOUI_MCP_PORT 钉端口）、WM_CLOSE 真实关闭/迟到重放拒绝+零写入/崩溃无孤儿/取消隐藏、坏 tool 具名失败、占口不杀现有实例——见 §9 2026-11-02 T-06 记录（reader d3882ea，t06-vm7 全 PASS） | N-07/08/10正负对照；只收割自有树，10s清理，另一实例继续可用 | AC-07/08 |
 | T-07 | work | T-06 | [x] N-09 八类负控全部具名拒绝+逐例字节级零写+合法对照接受落盘（资产逃逸零泄漏/远程脚本零加载/本地资产仍用），href 不透明语义如实记录；N-11 变异→oracle 实红+恢复落点异位（位置指纹判据）→字节级还原绿——见 §9 2026-11-02 T-07 记录（reader cb9e1e5，t07-vm6） | N-09/11原拒绝零写、合法对照绿，变异红且聚合非零→还原绿；不得吞报错 | AC-03/07/08 |
 | T-08 | work | T-00可先诊断；最终依T-07 | [x] 复现Reader R-05/R-06vm、分析实际owner；修本仓允许面或绑定他仓正式前置——R-05（直连api.at 404，026归因工具链）当前cohort不复现：同门命令 verify_epub --auto 22/22 exit0（reader src 自026基线零改动，闭合由cohort二进制 (55c98c7→47d8f7b] 区间工具链交付，确切commit未bisect=只读依赖纪律）；R-06vm复现rc=0并字节级定责：驱动main的generate_all(data_dir)以'w'无条件重写夹具，门先注入的毁损被静默还原（sha 2c00a65b→45b56233 pristine），变异从未抵达应用——owner=reader门脚本；修复（仅tests，6887ed0）：probe_books overwrite=False+驱动--no-regen+门变异腿传--no-regen；修复后变异腿exit1、NS-02 red_px=0/blue_px=0像素oracle真实失败、章节缓存res_*.png=64零字节（变异经导入→提取→服务→解码全链抵达），对照腿0 FAIL exit0；vue臂R-06（缓存毁损路径）不受影响——见§9 2026-11-02 T-08 记录 | N-12原测试条件保留，404/像素负控失败机制真实闭合；外仓前置未到则保持未完成 | AC-09 |
-| T-09 | work | T-08全部通过 | 冻结cohort跑两个profile的完整新清单及旧Reader门、本仓定向cargo选择；写证据总结、SD-01/02与两仓路线/导航并内部检查 | 现有入口 `python tests/probe/engine_surface/verify_engine_surface.py --profile vue|vm --auto-bin ... --out-dir ...` 完整且exit0；新清单非旧30总数；git diff --check/链接/source绑定 | AC-01～10 |
+| T-09 | work | T-08全部通过 | [x] 冻结cohort跑两个profile的完整新清单及旧Reader门、本仓定向cargo选择；写证据总结、SD-01/02与两仓路线/导航并内部检查——**双profile exit0**：vm 92记录零非绿（t09-freeze-final，914s）+ vue findings=0（t09-freeze-final-vue）；两端旧门内嵌28/28+27/27；R-05 22/22；N-04配对协议PASS、DPI三段（PROBE_DPI_AUTO UIA自驱）全绿。证据总结=docs/research/reader-native-surface-closure.md；SD-01（boundary修订）/SD-02（native-input新spec）落地（ef5800e8）；reader roadmap coverage v5 修订（7a1b4fd）；本仓定向cargo=T-02 cargo tu 866 pass 复用（worktree 98633fd4 零代码变化）——见§9 2026-11-03 收口记录 | 现有入口 `python tests/probe/engine_surface/verify_engine_surface.py --profile vue|vm --auto-bin ... --out-dir ...` 完整且exit0；新清单非旧30总数；git diff --check/链接/source绑定 | AC-01～10 |
 | T-10 | review | T-09 | 独立上下文在同树顺序复演规定路径与变异，检查source/Spec/范围，写final结论 | AC-01～10全部pass，无partial/GAP；否则needs_fix/needs_replan回原树，不能自评归档 | AC-11 |
 | T-11 | merge | T-10 pass | 固定两仓提交/landing/canonical、归档archived/、修导航、材料摘要后清自有scope；fresh guard后移除树/分支 | 真实12/12与archive路径/cohort一致、恢复信息足够；不动他人WIP/OS pin/ledger，不把旧026回执改为新证据 | AC-12 |
 
@@ -343,6 +343,20 @@ Reader旧门入口保持 `python tests/basic/verify_standalone.py --profile vue|
 - **N-04 配对协议落地（7b42765）**：五个配对会话逐一把故障路径摸清（脚本bug×2已修/CDP瞬断×1/MCP oninput挂起×2=产品级缺陷具名/值正则聚焦态失效已修）；合成盲区实锤=document.hasFocus() 不随外部SetFocus迁移；门侧按§10既定协议接受「CDP断言回执+在案人工目击（T-04轮用户手打1231）」组合，记录透明注明两半各自来源。
 - 证据：plan-artifacts/plan-029/t09-frozen-vue{,-console.log}/、t09-n04live{,2}/、t09-frozen-vm/、n04-pairing{,2,3,3b,4}-console.log、n04-pairing-receipt.json、n04-pairing-00*/。
 - 下一任务：work——phase② 静默窗口重跑（PROBE_N04_PAIRING+PROBE_DPI_INTERACTIVE=1，DPI双向及时切换）→ 证据总结/SD-01/02/导航/内部检查 → review交接。
+
+### 2026-11-03：work阶段——T-09收口：双profile冻结exit0 + SD-01/02/导航/内检完成（execution_done）
+
+- stage: work | plan_id: PLAN-029 | plan_revision: r1 | task: T-09 | outcome: pass（work-owned 全任务完成：AC-01..10 证据齐套，execution_done）| worktree: .wt/ui-029@98633fd4（零代码变化，T-02 cargo tu 866 pass 证据复用）| reader: main@7a1b4fd（docs；运行时代码 7b42765+驱动修复至 28c765a）| next: review（T-10 独立上下文最终复审）。
+- **靶向验证纪律修正（用户指正）**：修复轮只测受影响腿——t12_legcheck.py 靶向 harness（一次启动直跑受影响腿，~6 分钟）替代全量聚合迭代；靶向全绿后才跑一次全量作为冻结记录。
+- **最终冻结证据**：vm= t09-freeze-final（92 记录 aggregate_ok=True exit0，914s：N-01..N-12 全绿，N-04 配对协议 PASS，DPI 三段 PROBE_DPI_AUTO UIA 自驱 PASS）；vue= t09-freeze-final-vue（findings=0 exit0）；两端旧门内嵌 28/28+27/27；R-05 22/22。
+- **AC-01..10 证据图**：AC-01=T-00 根因+cohort 冻结（§9）；AC-02=弹出窗形态+NVM 窗口树/组件 cohort（T-02/T-04）；AC-03=N-02/N-09 双臂全链+零写；AC-04=N-03 冷恢复+强杀；AC-05=N-04 IME 四子项+配对协议；AC-06=N-05 全腿+N-06 UIA/键盘；AC-07=N-07/N-08/N-09；AC-08=N-10/N-11+聚合 exit0；AC-09=两端旧门 28/28+27/27+R-05 22/22（R-05 工具链修复在 cohort 内交付）；AC-10=SD-01/02 落地+证据总结（ef5800e8）+两仓导航（7a1b4fd）。
+- **内部检查**：必需集 N-01..12 双 profile 零非绿；负控/变异/指纹判据全部在案；git diff --check 通过（两仓提交树干净）；Spec 增量与实测一致（SD-01/SD-02 引用冻结跑）；报告边界不超 claim（§4 边界清单）。
+- 证据：plan-artifacts/plan-029/t09-freeze-final{,-vue}{,-console.log}/、t12-legcheck{,2,3}-console.log。
+- next_responsible_role：T-10 独立上下文最终复审（AC-11）。
+
+### 2026-11-03：goal回合（收口轮）
+
+- stage: goal | plan_id: PLAN-029 | plan_revision: r1 | round: 12 | from: work | to: review | status: execution_done | outcome: pass(T-09 complete) | worktree: D:/autostack/.wt/ui-029/auto-ui | commit: reader 7a1b4fd, auto-ui master ef5800e8 | next: review(T-10)。
 
 ### 2026-11-03：work阶段——T-09 phase② 最终跑：92记录90绿，两项真实FAIL具名待修
 
