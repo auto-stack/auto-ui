@@ -12,6 +12,7 @@ composition3d/audio3d/hud3d、SDK681文件数、素材7身份子集、cue权威s
   cargo test --locked --offline --test node3d_audio_hud_flow -- --test-threads=1
   cargo test --locked --offline --test public_3d_composition_api -- --test-threads=1
   cargo test --locked --offline --test plan035_probe -- --test-threads=1
+  cargo test --locked --offline --test node3d_audio_hud_storage -- --test-threads=1
 用法：python -I tools/verify_plan035.py --controls
 """
 import argparse
@@ -254,6 +255,7 @@ def main() -> int:
     print("  cargo test --locked --offline --test node3d_audio_hud_flow -- --test-threads=1")
     print("  cargo test --locked --offline --test public_3d_composition_api -- --test-threads=1")
     print("  cargo test --locked --offline --test plan035_probe -- --test-threads=1")
+    print("  cargo test --locked --offline --test node3d_audio_hud_storage -- --test-threads=1")
     return 0
 
 
