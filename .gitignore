@@ -47,3 +47,4 @@ examples/**/gen/
 examples/**/rust-workspace/
 examples/**/.auto/
 examples/**/.am/
+__pycache__/
