@@ -25,9 +25,17 @@
 - **准入面**：Vue run/build/gen-only/`generate_ui` 工具链、VM 源码运行、
   Rust 生成/构建/复用。声明官方包就必须校验通过；非法（错版/缺件/篡改/解析
   失败）= 具名 `主题包生成准入失败（…）`，中止且不发半成品。
-- **未声明 = 旧行为**：零主题资产、零 receipt、零 front-input 键。
-- 近似名不误命中：`dep mythemes`/`deploy:`/其他 dep 块内 `themes` 字样均不算
-  声明。
+- **声明判定 = 权威解析 dep 集**（R-01/R-02 修正）：任何 dep（名无关，
+  Bare/Quoted、单行/多行同权）其解析目标目录含 `theme-package.json` 即为
+  官方包声明——校验通过→消费，非法→具名拒绝；声明判定不依赖 dep 名。
+  行扫描的「恰名 `themes`」语法窄于模块系统的名无关消费语法，已废弃
+  （曾使 `dep themesX`/`dep "themes"` 声明的非法包被静默消费、产出包值
+  CSS 而零 receipt）。多个 dep 同时指向主题包目录 = 具名歧义错误。
+- **未声明 = 旧行为**：无任何 dep 指向主题包目录时零主题资产、零 receipt、
+  零 front-input 键。
+- **生成期换包（R-03）**：Vue run/build/gen 轨在准入时冻结统一输入身份，
+  receipt 写点与当前重算值比对——漂移 = `receipt 置扣`（具名失败，不签
+  新收据给旧产物），与 Rust 轨 frozen-vs-current 语义同律。
 
 ## 3. 生成输入与复用（inputs & reuse）
 

@@ -3513,6 +3513,11 @@ pub struct VueProject {
     pub root_dir: std::path::PathBuf,
     /// Output directory (dist)
     pub output_dir: std::path::PathBuf,
+    /// PLAN-036 R-03：准入时冻结的官方包统一输入身份（None=未声明/未冻结）。
+    /// receipt 写点与其重算值比对——生成期间合法换包 → 身份漂移 → receipt
+    /// 置扣（并发改源不误签，对齐 Rust 轨 frozen-vs-current 语义）。
+    pub(crate) frozen_theme_identity:
+        Option<crate::theme_package::ThemePackageInputIdentity>,
     /// Project name
     pub name: String,
     /// PLAN-063 Phase B T13 (KD 061 D28): pac.at 可选 `title:` —
@@ -4732,6 +4737,9 @@ export default router
         Ok(Self {
             root_dir: root_dir.to_path_buf(),
             output_dir,
+            // PLAN-036 R-03：准入时注入（set_frozen_theme_identity）；
+            // 构造期未声明/未冻结 = None（receipt 写点仅重算记录）。
+            frozen_theme_identity: None,
             name,
             index_title,
             front_dir,
@@ -5367,8 +5375,22 @@ export default router
     /// 变化并留观测量，供缓存/落地判定新鲜度。
     /// PLAN-036 T-02（V-06）：receipt 写失败 = 消费失败（具名错误中止生成，
     /// 不再警告后继续）；未声明官方包 = Ok(()) 旧行为（零 UI 资产）。
+    /// PLAN-036 R-03：生成期间合法换包 → 当前身份 ≠ 准入冻结身份 → receipt
+    /// 置扣（不签新收据给旧产物；对齐 Rust 轨 frozen-vs-current 语义）。
     pub(crate) fn write_theme_inputs_receipt(&self) -> AutoResult<()> {
         let Some(app_dir) = self.app_dir() else { return Ok(()) };
+        let current = crate::theme_package::resolve_theme_input_identity(&app_dir)
+            .map_err(|e| format!("主题包生成输入解析失败（{}）：{e}", app_dir.display()))?;
+        if let (Some(frozen), Some(cur)) = (&self.frozen_theme_identity, &current) {
+            if frozen != cur {
+                return Err(format!(
+                    "主题包在生成期间发生变化（冻结身份 {}… ≠ 当前 {}…）——receipt 置扣，不签新收据；恢复包内容后重新生成",
+                    &frozen.identity_digest[..12.min(frozen.identity_digest.len())],
+                    &cur.identity_digest[..12.min(cur.identity_digest.len())],
+                )
+                .into());
+            }
+        }
         let before = crate::theme_package::read_theme_inputs_receipt(&self.output_dir);
         match crate::theme_package::write_theme_inputs_receipt(&self.output_dir, &app_dir) {
             Ok(Some(identity)) => {
@@ -5386,6 +5408,15 @@ export default router
             )
             .into()),
         }
+    }
+
+    /// PLAN-036 R-03：准入后注入冻结的官方包统一输入身份（run/build/gen
+    /// 入口的 gate 调用方持有）；receipt 写点与其重算值比对。
+    pub(crate) fn set_frozen_theme_identity(
+        &mut self,
+        frozen: Option<crate::theme_package::ThemePackageInputIdentity>,
+    ) {
+        self.frozen_theme_identity = frozen;
     }
 
     /// App 根：从 front_dir 向上找含 pac.at 的最近祖先（最多 4 级）。
@@ -6758,15 +6789,17 @@ fn prepare_vue_sources(
 
     // Load project context (request path: no legacy main-pac re-read —
     // PLAN-815 R4-04 / F-815-T05-R4-04)
-    let project = match req {
+    let mut project = match req {
         Some(r) => VueProject::from_workspace_with_request(root_dir, r)?,
         None => VueProject::from_workspace(root_dir)?,
     };
 
     // PLAN-036 T-04（AC-01/V-01）：build/gen 生成路径与 run 路径同律前置准入——
     // 声明官方包就必须校验通过，非法具名中止（不发半成品）。
+    // PLAN-036 R-03：冻结准入身份供 receipt 写点比对。
     if let Some(app_dir) = project.app_dir() {
-        crate::theme_package::admit_generation_theme_inputs(&app_dir)?;
+        let frozen = crate::theme_package::admit_generation_theme_inputs(&app_dir)?;
+        project.set_frozen_theme_identity(frozen);
     }
 
     // Plan 351: drain stashed store composable files and write them
@@ -12274,6 +12307,7 @@ styles: ["src/front/autodown-editor.css", "src/front/theme.css"]
 
         let project = VueProject {
             root_dir: root.clone(),
+            frozen_theme_identity: None,
             output_dir: root.join("gen/front/vue"),
             name: "demo".to_string(),
             index_title: None,
@@ -12309,6 +12343,7 @@ styles: ["src/front/autodown-editor.css", "src/front/theme.css"]
 
         let project = VueProject {
             root_dir: root.clone(),
+            frozen_theme_identity: None,
             output_dir: root.join("gen/front/vue"),
             name: "demo".to_string(),
             index_title: None,
@@ -12429,6 +12464,7 @@ widget App {
 
         let project = VueProject {
             root_dir: root.clone(),
+            frozen_theme_identity: None,
             output_dir: root.join("gen/front/vue"),
             name: "demo".to_string(),
             index_title: None,
@@ -12465,6 +12501,7 @@ widget App {
 
         let project = VueProject {
             root_dir: root.clone(),
+            frozen_theme_identity: None,
             output_dir: root.join("gen/front/vue"),
             name: "demo".to_string(),
             index_title: None,
@@ -14911,6 +14948,86 @@ version: \"0.1.0\"
         assert!(
             !out.join(".theme-inputs.json").exists(),
             "未声明官方包 = 零 receipt 文件（旧行为）"
+        );
+    }
+
+    /// R-01 端到端反例闭环：近名声明恶意包 → generate() 必须具名失败
+    /// （旧实现：静默消费产出包值 CSS）。
+    #[test]
+    fn fresh_generate_rejects_evil_package_via_near_name_dep() {
+        let tmp = tempfile::tempdir().unwrap();
+        let pkg_dir = tmp.path().join("evil");
+        crate::theme_package::publish_theme_package_snapshot(&pkg_source(), &pkg_dir)
+            .expect("snapshot publish");
+        let manifest_path = pkg_dir.join("theme-package.json");
+        let mut m: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&manifest_path).unwrap()).unwrap();
+        m["owner"] = serde_json::Value::String("evil-corp".into());
+        fs::write(&manifest_path, serde_json::to_string_pretty(&m).unwrap()).unwrap();
+
+        fs::write(
+            tmp.path().join("pac.at"),
+            "name: \"e36\"
+version: \"0.1.0\"
+dep themesX {
+    path: \"evil\"
+}
+",
+        )
+        .unwrap();
+        let front = tmp.path().join("src").join("front");
+        fs::create_dir_all(&front).unwrap();
+        fs::write(
+            front.join("app.at"),
+            "use themes.themes: Auto
+
+widget App {
+    view { text \"hi\" }
+}
+",
+        )
+        .unwrap();
+
+        let project = VueProject::from_workspace(tmp.path()).expect("load");
+        let err = project
+            .generate()
+            .expect_err("近名声明恶意包必须具名拒绝（R-01 端到端）");
+        assert!(format!("{err}").contains("主题包"), "应具名主题包错误: {err}");
+    }
+
+    /// R-03：准入冻结身份后生成期间合法换包 → receipt 置扣（具名失败，
+    /// 不签新收据给旧产物）；未冻结（旧调用面）保持现行为。
+    #[test]
+    fn receipt_withheld_when_package_changes_after_admission_freeze() {
+        let tmp = tempfile::tempdir().unwrap();
+        let pkg_dir = app_with_dep(tmp.path());
+        let mut project = VueProject::from_workspace(tmp.path()).expect("load");
+        let frozen = crate::theme_package::resolve_theme_input_identity(tmp.path())
+            .expect("resolve")
+            .expect("declared");
+        project.set_frozen_theme_identity(Some(frozen));
+
+        // 生成期间合法换包：改色 + 清单 hash 同步。
+        let themes_at = pkg_dir.join("themes.at");
+        let src = fs::read_to_string(&themes_at).unwrap();
+        fs::write(&themes_at, src.replace("primary: \"#8b5cf6\"", "primary: \"#654321\"")).unwrap();
+        let new_hash = crate::theme_package::theme_file_sha256(&themes_at).unwrap();
+        let manifest_path = pkg_dir.join("theme-package.json");
+        let mut m: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&manifest_path).unwrap()).unwrap();
+        for f in m.get_mut("files").unwrap().as_array_mut().unwrap() {
+            if f.get("path").and_then(|p| p.as_str()) == Some("themes.at") {
+                f["sha256"] = serde_json::Value::String(new_hash.clone());
+            }
+        }
+        fs::write(&manifest_path, serde_json::to_string_pretty(&m).unwrap()).unwrap();
+
+        let err = project
+            .generate()
+            .expect_err("生成期间换包必须 receipt 置扣（R-03）");
+        assert!(
+            format!("{err}").contains("生成期间发生变化"),
+            "应具名置扣错误: {err}"
         );
     }
 }

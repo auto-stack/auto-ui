@@ -115,7 +115,7 @@ pub fn run_vue_flow(
     step(1, "project context");
 
     // Load project context（R1-F02：请求在场则经合同读取，不再回读 pac.at）
-    let project = match req {
+    let mut project = match req {
         Some(r) => VueProject::from_workspace_with_request(root_dir, r)?,
         None => VueProject::from_workspace(root_dir)?,
     };
@@ -124,8 +124,10 @@ pub fn run_vue_flow(
     // 校验 owner/版本/schema/文件 hash 才允许生成；非法（错版/缺件/篡改）
     // 具名中止，不留半成品、不静默回落别的来源。
     // PLAN-036 T-04：准入消息收敛到共享 helper（run/build/gen 三轨同律）。
+    // PLAN-036 R-03：冻结准入身份供 receipt 写点比对（生成期换包置扣）。
     if let Some(app_dir) = project.app_dir() {
-        crate::theme_package::admit_generation_theme_inputs(&app_dir)?;
+        let frozen = crate::theme_package::admit_generation_theme_inputs(&app_dir)?;
+        project.set_frozen_theme_identity(frozen);
     }
 
     let mut current_step = 0u64;

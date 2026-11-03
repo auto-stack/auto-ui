@@ -4,7 +4,7 @@
 use std::path::Path;
 
 use auto_ui_tools::theme_package::{
-    app_theme_dep_path, publish_theme_package_snapshot, read_theme_inputs_identity,
+    publish_theme_package_snapshot, read_theme_inputs_identity,
     read_theme_inputs_receipt, theme_file_sha256, theme_package_content_digest,
     theme_package_identity, verified_theme_input_identity, verify_app_theme_inputs,
     verify_official_theme_package, verify_theme_package, write_theme_inputs_receipt,
@@ -298,14 +298,15 @@ fn identity_is_canonical_and_capability_sensitive() {
     assert_ne!(theme_package_identity(&copy).unwrap(), d0);
 }
 
-/// V-01：dep 名恰为 `themes` 才算官方声明——近似名（`mythemes`）、前缀词
-/// （`deploy:`）、其他 dep 块内 `themes` 字样不误命中；未声明 = 准入 Ok(None)、
-/// receipt 写入 Ok(None) 且零文件写入。
+/// V-01（R-01/R-02 修正后）：**声明判定 = 权威解析 dep 集**——名无关、
+/// Bare/Quoted/单行/多行同权：任何 dep 目标目录含 theme-package.json 即
+/// 为声明（校验通过→Some，非法→具名 Err）；普通目录 = 未声明（Ok(None)、
+/// 零写入）。
 #[test]
-fn dep_scan_matches_exact_name_only_and_undeclared_stays_legacy() {
+fn declaration_is_parser_based_across_name_and_line_forms() {
     let dir = tempfile::tempdir().unwrap();
-    let pkg_dir = dir.path().join("themes");
-    publish_theme_package_snapshot(&pkg(), &pkg_dir).unwrap();
+    let official = dir.path().join("themes");
+    publish_theme_package_snapshot(&pkg(), &official).unwrap();
 
     let mk_app = |name: &str, body: String| {
         let app = dir.path().join(name);
@@ -314,32 +315,95 @@ fn dep_scan_matches_exact_name_only_and_undeclared_stays_legacy() {
         app
     };
 
-    // 近似名：目录就是官方包，但 dep 名不是 `themes` → 不算声明。
+    // 1) 近似名多行：目录是官方包 → **声明**（解析面名无关消费，必须校验）。
     let app = mk_app(
         "near",
-        format!("name: \"n\"\nversion: \"0.1.0\"\ndep mythemes {{\n    path: \"../themes\"\n}}\n"),
+        "name: \"n\"\nversion: \"0.1.0\"\ndep themesX {\n    path: \"../themes\"\n}\n".to_string(),
     );
-    assert!(app_theme_dep_path(&app).is_none(), "近似名不误命中");
-    assert!(verify_app_theme_inputs(&app).unwrap().is_none(), "近似名=未声明");
+    assert!(
+        verify_app_theme_inputs(&app).unwrap().is_some(),
+        "近似名声明官方包目录=已声明（R-01：不得当未声明绕过）"
+    );
+
+    // 2) 引号名多行：同样构成声明。
+    let app_q = mk_app(
+        "quoted",
+        "name: \"q\"\nversion: \"0.1.0\"\ndep \"themes\" {\n    path: \"../themes\"\n}\n"
+            .to_string(),
+    );
+    assert!(
+        verify_app_theme_inputs(&app_q).unwrap().is_some(),
+        "引号名声明=已声明（R-01）"
+    );
+
+    // 3) 恰名单行：同样构成声明（R-02：不得静默忽略）。
+    let app_s = mk_app(
+        "singleline",
+        "name: \"s\"\nversion: \"0.1.0\"\ndep themes { path: \"../themes\" }\n".to_string(),
+    );
+    assert!(
+        verify_app_theme_inputs(&app_s).unwrap().is_some(),
+        "单行 dep 声明=已声明（R-02）"
+    );
+
+    // 4) 未声明（无任何 dep 指向主题包目录）→ Ok(None)、零写入（旧行为）。
+    let app_u = mk_app(
+        "undeclared",
+        "name: \"u\"\nversion: \"0.1.0\"\n# dep themes { path: \"../themes\" }（注释不解析）\n"
+            .to_string(),
+    );
+    assert!(verify_app_theme_inputs(&app_u).unwrap().is_none());
     let out = tempfile::tempdir().unwrap();
-    let r = write_theme_inputs_receipt(out.path(), &app).unwrap();
+    let r = write_theme_inputs_receipt(out.path(), &app_u).unwrap();
     assert!(r.is_none(), "未声明=Ok(None)");
     assert!(!out.path().join(".theme-inputs.json").exists(), "未声明零写入");
 
-    // deploy: 前缀词不误命中；其他 dep 块含 themes 字样不误命中。
-    let app2 = mk_app(
-        "words",
-        "name: \"w\"\nversion: \"0.1.0\"\ndeploy: \"themes-something\"\ndep utils {\n    note: \"themes\"\n}\n"
+    // 5) 多个主题包目录声明 = 具名歧义错误。
+    let second = dir.path().join("themes2");
+    publish_theme_package_snapshot(&pkg(), &second).unwrap();
+    let app_m = mk_app(
+        "multi",
+        "name: \"m\"\nversion: \"0.1.0\"\ndep a { path: \"../themes\" }\ndep b { path: \"../themes2\" }\n"
             .to_string(),
     );
-    assert!(app_theme_dep_path(&app2).is_none(), "deploy:/其他dep块不误命中");
+    let err = verify_app_theme_inputs(&app_m).expect_err("多声明必须歧义拒绝");
+    assert!(matches!(err, ThemePackageError::BadManifest(ref m) if m.contains("多个主题包声明")), "{err:?}");
+}
 
-    // 恰名 `dep themes {` 正常命中（真实 010 已在既有用例覆盖，这里补内联块形式）。
-    let app3 = mk_app(
-        "exact",
-        format!("name: \"e\"\nversion: \"0.1.0\"\ndep themes{{\n    path: \"../themes\"\n}}\n"),
+/// R-01 决定性反例（final review 实证绕过→本测试闭环）：**近名声明恶意包**
+/// ——目录自洽但 owner 非官方——准入必须具名拒绝，绝不静默消费（旧实现
+/// 行扫描视近名为未声明，恶意包被模块系统消费且产出包值 CSS）。
+#[test]
+fn evil_package_via_near_name_dep_is_named_rejected() {
+    let dir = tempfile::tempdir().unwrap();
+    // 恶意包：结构合法（清单与文件 hash 自洽）但身份 owner=evil-corp。
+    let evil = dir.path().join("evil");
+    publish_theme_package_snapshot(&pkg(), &evil).unwrap();
+    let manifest_path = evil.join("theme-package.json");
+    let mut m: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&manifest_path).unwrap()).unwrap();
+    m["owner"] = serde_json::Value::String("evil-corp".into());
+    std::fs::write(&manifest_path, serde_json::to_string_pretty(&m).unwrap()).unwrap();
+
+    let app = dir.path().join("app");
+    std::fs::create_dir_all(app.join("src/front")).unwrap();
+    std::fs::write(
+        app.join("pac.at"),
+        "name: \"e\"\nversion: \"0.1.0\"\ndep themesX {\n    path: \"../evil\"\n}\n",
+    )
+    .unwrap();
+
+    let err = verify_app_theme_inputs(&app)
+        .expect_err("近名声明的恶意包必须具名拒绝（R-01）");
+    assert!(
+        matches!(err, ThemePackageError::FieldMismatch { field: "owner", .. }),
+        "应具名 owner 不符，得到 {err:?}"
     );
-    assert!(app_theme_dep_path(&app3).is_some(), "内联 dep themes 块（同行开括号）应命中");
+    let out = tempfile::tempdir().unwrap();
+    let werr = write_theme_inputs_receipt(out.path(), &app)
+        .expect_err("receipt 写入同样必须拒绝");
+    assert!(matches!(werr, ThemePackageError::FieldMismatch { field: "owner", .. }));
+    assert!(!out.path().join(".theme-inputs.json").exists(), "拒绝时零写入");
 }
 
 /// V-07：发布原语拒绝非空目标——未知内容零破坏、零合并。

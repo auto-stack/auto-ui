@@ -181,17 +181,20 @@ fn generate_profile(
             }
             // PLAN-036 T-04（AC-01/V-01）：generate_ui vue 工具链入口与
             // run/build 同律前置准入——声明官方包非法即具名拒绝。
+            // PLAN-036 R-03：冻结准入身份注入后续 receipt 写点。
             let gate_project = crate::vue::VueProject::from_workspace_with_request(root, request)
                 .map_err(|e| ToolError::internal(format!("project context failed: {e}")))?;
-            if let Some(app_dir) = gate_project.app_dir() {
-                crate::theme_package::admit_generation_theme_inputs(&app_dir)
-                    .map_err(ToolError::internal)?;
-            }
+            let frozen_theme = match gate_project.app_dir() {
+                Some(app_dir) => crate::theme_package::admit_generation_theme_inputs(&app_dir)
+                    .map_err(ToolError::internal)?,
+                None => None,
+            };
             drop(gate_project);
             crate::vue::incremental_compile_changed(root, Some(request))
                 .map_err(|e| ToolError::internal(format!("incremental compile failed: {e}")))?;
-            let project = crate::vue::VueProject::from_workspace_with_request(root, request)
+            let mut project = crate::vue::VueProject::from_workspace_with_request(root, request)
                 .map_err(|e| ToolError::internal(format!("project context failed: {e}")))?;
+            project.set_frozen_theme_identity(frozen_theme);
             if !project.exists() {
                 project
                     .generate()

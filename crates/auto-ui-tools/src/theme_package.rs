@@ -89,62 +89,59 @@ pub fn theme_package_content_digest(
 ) -> Result<String, ThemePackageError> {
     auto_ui_compiler::design_tokens::theme_package::theme_package_content_digest(dir)
 }
-/// PLAN-031 T-04/T-07（V-09）：解析 pac `dep themes { path: … }` 的**原始**路径
-/// （未校验）。None = 该 App 未声明官方包依赖。
-/// PLAN-036 T-02（V-01）：dep 名必须**恰为** `themes`——`mythemes`/`themes-extra`
-/// 等近似名、`deploy:` 等前缀词、其他 dep 块内出现的 `themes` 字样均不误命中；
-/// 近似名声明官方包目录时按「未声明」处理（零 UI 资产，旧行为）。
-pub fn app_theme_dep_path(app_dir: &std::path::Path) -> Option<std::path::PathBuf> {
-    let pac = std::fs::read_to_string(app_dir.join("pac.at")).ok()?;
-    let mut in_dep = false;
-    let mut depth = 0i32;
-    let mut rel: Option<String> = None;
-    for raw in pac.lines() {
-        let line = raw.trim();
-        if line.starts_with('#') || line.is_empty() {
-            continue;
-        }
-        if !in_dep {
-            let is_official_dep = line
-                .strip_prefix("dep")
-                .map(|rest| {
-                    let rest = rest.trim_start();
-                    rest == "themes"
-                        || rest.strip_prefix("themes").is_some_and(|tail| {
-                            tail.starts_with('{') || tail.starts_with(char::is_whitespace)
-                        })
-                })
-                .unwrap_or(false);
-            if is_official_dep {
-                in_dep = true;
-                depth = line.matches('{').count() as i32 - line.matches('}').count() as i32;
-            }
-            continue;
-        }
-        depth += line.matches('{').count() as i32 - line.matches('}').count() as i32;
-        if let Some(rest) = line.strip_prefix("path:") {
-            let v = rest.trim().trim_matches('"').trim_matches('\'').to_string();
-            if !v.is_empty() {
-                rel = Some(v);
-            }
-        }
-        if depth <= 0 {
-            break;
-        }
+/// PLAN-036 R-01/R-02 修正（final review 2026-11-03）：官方包**声明判定改为
+/// 权威解析面**——用 `auto_project_model::parse_file` 解析 pac.at，遍历全部
+/// dep（名无关、Bare/Quoted/单行/多行形态同权）：任何 dep 的解析目标目录含
+/// `theme-package.json` 即为官方包声明（校验通过→消费，失败→具名 Err）。
+/// 行扫描的「恰名 themes」语法窄于模块系统的真实消费语法（dep_roots 名无关
+/// 消费），曾使 `dep themesX`/`dep "themes"` 声明的非法包被静默消费——本函数
+/// 是唯一声明判定入口，不依赖 dep 名。多个 dep 同时指向主题包目录 = 具名
+/// 歧义错误。未声明 = Ok(None)（旧行为：零 UI 资产、零 receipt、零 front-input 键）。
+fn parsed_theme_declaration(
+    app_dir: &std::path::Path,
+) -> Result<Option<std::path::PathBuf>, ThemePackageError> {
+    let pac_path = app_dir.join("pac.at");
+    if !pac_path.is_file() {
+        return Ok(None);
     }
-    let rel = rel?;
-    Some(app_dir.join(rel))
+    let doc = auto_project_model::parse_file(&pac_path).map_err(|e| {
+        ThemePackageError::BadManifest(format!("pac.at 解析失败（{}）：{e}", pac_path.display()))
+    })?;
+    let mut declared: Option<std::path::PathBuf> = None;
+    for dep in &doc.deps {
+        let Some(rel) = &dep.path else {
+            continue; // 无 path 的 dep 无法解析目录，不构成主题包声明
+        };
+        let dir = app_dir.join(rel);
+        if !dir.join("theme-package.json").is_file() {
+            continue; // 普通依赖目录，非主题包声明
+        }
+        if declared.is_some() {
+            return Err(ThemePackageError::BadManifest(
+                "多个主题包声明（多个 dep 指向含 theme-package.json 的目录）——保留恰好一个"
+                    .into(),
+            ));
+        }
+        declared = Some(dir);
+    }
+    Ok(declared)
 }
 
-/// PLAN-031 T-04/T-07（V-09）：从 App 目录解析 pac `dep themes { path: … }`
-/// 并返回**校验通过**的官方包根。未声明 = None（该 App 不消费官方包）；
-/// 声明了但校验失败（错版/缺件/篡改）同样返回 None——调用方据
-/// [`app_theme_dep_path`] 区分「未声明」与「声明但非法」。
+/// PLAN-031 T-04/T-07（V-09）+ PLAN-036 R-01 修正：从 App 目录判定官方包
+/// 声明并返回**校验通过**的包根。未声明 = Ok(None)（该 App 不消费官方包，
+/// 旧行为）；声明了但解析/校验失败（错版/缺件/篡改/不可达）= 具名 Err——
+/// 调用方必须中止生成（C-11），绝不静默回落或当未声明。
 pub fn official_theme_package_root_for_app(
     app_dir: &std::path::Path,
-) -> Option<std::path::PathBuf> {
-    let root = app_theme_dep_path(app_dir)?.canonicalize().ok()?;
-    verify_official_theme_package(&root).ok().map(|_| root)
+) -> Result<Option<std::path::PathBuf>, ThemePackageError> {
+    let Some(dir) = parsed_theme_declaration(app_dir)? else {
+        return Ok(None);
+    };
+    let root = dir.canonicalize().map_err(|_| {
+        ThemePackageError::MissingManifest(dir.join("theme-package.json"))
+    })?;
+    verify_official_theme_package(&root)?;
+    Ok(Some(root))
 }
 
 /// PLAN-036 T-02：统一已验证主题输入身份——所有消费轨（Vue/VM/Rust/delivery）
@@ -187,10 +184,10 @@ pub fn write_theme_inputs_receipt(
     out_dir: &std::path::Path,
     app_dir: &std::path::Path,
 ) -> Result<Option<ThemePackageInputIdentity>, ThemePackageError> {
-    let Some(root) = verify_app_theme_inputs(app_dir)? else {
+    let identity = resolve_theme_input_identity(app_dir)?;
+    let Some(identity) = identity else {
         return Ok(None);
     };
-    let identity = verified_theme_input_identity(&root)?;
     let body = format!(
         "{{\n  \"schema\": 1,\n  \"package\": {{\n    \"owner\": \"{}\",\n    \"name\": \"{}\",\n    \"version\": \"{}\",\n    \"digest\": \"{}\",\n    \"identity\": \"{}\"\n  }}\n}}\n",
         identity.owner,
@@ -203,6 +200,17 @@ pub fn write_theme_inputs_receipt(
     std::fs::write(&path, body)
         .map_err(|_| ThemePackageError::MissingFile(".theme-inputs.json".into()))?;
     Ok(Some(identity))
+}
+
+/// PLAN-036 R-03：解析 App 当前应消费的统一输入身份（不写任何文件）——
+/// 准入冻结与 receipt 写点共用的解析面；未声明 = Ok(None)。
+pub fn resolve_theme_input_identity(
+    app_dir: &std::path::Path,
+) -> Result<Option<ThemePackageInputIdentity>, ThemePackageError> {
+    let Some(root) = verify_app_theme_inputs(app_dir)? else {
+        return Ok(None);
+    };
+    Ok(Some(verified_theme_input_identity(&root)?))
 }
 
 /// 读回生成输入 receipt 的内容摘要（无 receipt = None）。
@@ -225,20 +233,15 @@ pub fn read_theme_inputs_identity(out_dir: &std::path::Path) -> Option<String> {
         .as_str()
         .map(|s| s.to_string())
 }
-/// PLAN-031 T-04/T-07（V-09）：生成准入——App 声明了官方包就必须校验通过；
-/// 未声明返回 Ok(None)；声明但非法（错版/缺件/篡改）返回具名 Err，调用方
-/// 必须中止生成（不发半成品，C-11）。
+/// PLAN-031 T-04/T-07（V-09）+ PLAN-036 R-01 修正：生成准入——App 声明了
+/// 官方包就必须校验通过（声明判定=已解析 dep 集，见
+/// [`official_theme_package_root_for_app`]）；未声明返回 Ok(None)；声明但
+/// 非法（错版/缺件/篡改/不可达/歧义）返回具名 Err，调用方必须中止生成
+/// （不发半成品，C-11）。
 pub fn verify_app_theme_inputs(
     app_dir: &std::path::Path,
 ) -> Result<Option<std::path::PathBuf>, ThemePackageError> {
-    let Some(raw) = app_theme_dep_path(app_dir) else {
-        return Ok(None);
-    };
-    let root = raw
-        .canonicalize()
-        .map_err(|_| ThemePackageError::MissingManifest(raw.join("theme-package.json")))?;
-    verify_official_theme_package(&root)?;
-    Ok(Some(root))
+    official_theme_package_root_for_app(app_dir)
 }
 /// 单文件 sha256（hex）——工具链更新清单/校验时共用。
 pub fn theme_file_sha256(path: &std::path::Path) -> Result<String, ThemePackageError> {
@@ -250,17 +253,26 @@ pub fn theme_file_sha256(path: &std::path::Path) -> Result<String, ThemePackageE
     Ok(format!("{:x}", h.finalize()))
 }
 
-/// PLAN-036 T-04（AC-01/V-01）：全部 Vue 生成/构建/run 入口共用的准入消息——
-/// 声明官方包就必须校验通过；非法具名中止（不发半成品，C-11）。
+/// PLAN-036 T-04（AC-01/V-01）+ R-03：全部 Vue 生成/构建/run 入口共用的准入——
+/// 声明官方包就必须校验通过；非法具名中止（不发半成品，C-11）。返回的
+/// 统一输入身份供 receipt 写点做**冻结-比对**（R-03：生成期间合法换包 →
+/// 身份漂移 → receipt 置扣，不签新收据给旧产物）；未声明 = Ok(None)。
 pub(crate) fn admit_generation_theme_inputs(
     app_dir: &std::path::Path,
-) -> Result<(), String> {
-    verify_app_theme_inputs(app_dir)
-        .map(|_| ())
-        .map_err(|e| {
-            format!(
-                "主题包生成准入失败（{}）：{e}——修正 packages/themes 的清单/hash 后重试",
-                app_dir.display()
-            )
-        })
+) -> Result<Option<ThemePackageInputIdentity>, String> {
+    match verify_app_theme_inputs(app_dir) {
+        Ok(None) => Ok(None),
+        Ok(Some(root)) => verified_theme_input_identity(&root)
+            .map(Some)
+            .map_err(|e| {
+                format!(
+                    "主题包生成准入失败（{}）：{e}——修正 packages/themes 的清单/hash 后重试",
+                    app_dir.display()
+                )
+            }),
+        Err(e) => Err(format!(
+            "主题包生成准入失败（{}）：{e}——修正 packages/themes 的清单/hash 后重试",
+            app_dir.display()
+        )),
+    }
 }
