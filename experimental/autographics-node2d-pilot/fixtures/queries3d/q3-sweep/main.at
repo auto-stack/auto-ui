@@ -12,12 +12,13 @@ node SweepLab {
         group3d movers {
             position: (1.0, 0.0, 0.0)
             visible: true
-        } model3d actor {
-            model: resources.parts_glb
-            position: (-3.0, 0.0, 0.0)
-            scale: (0.4, 0.7, 0.5)
-            yaw: 0.2
-            pitch: 0.15
+            model3d actor {
+                model: resources.parts_glb
+                position: (-3.0, 0.0, 0.0)
+                scale: (0.4, 0.7, 0.5)
+                yaw: 0.2
+                pitch: 0.15
+            }
         }
         model3d target {
             model: resources.parts_glb
@@ -58,7 +59,7 @@ node SweepLab {
         if input.space() == 3 {
             dx = input.x() * .speed * dt
         }
-        let q = query3d.sweep(refs.actor, true, dx, 0, 0)
+        let q = query3d.sweep(refs.actor, true, dx, 0.0, 0.0)
         let hit = q.hit()
         let node = q.node()
         let t = q.t()
@@ -82,10 +83,10 @@ node SweepLab {
                 }
             }
         }
-        refs.actor.shift(move, 0, 0)
+        refs.actor.shift(move, 0.0, 0.0)
         if dx != 0 {
-            refs.marker.place(-100 + node * 5, 50 + t * 10, 0)
-            refs.point_marker.place(-150 + ox, 100 + nx * 5, 0)
+            refs.marker.place(-100.0 + node * 5.0, 50.0 + t * 10.0, 0.0)
+            refs.point_marker.place(-150.0 + ox, 100.0 + nx * 5.0, 0.0)
             refs.door.show(hit)
         }
         }

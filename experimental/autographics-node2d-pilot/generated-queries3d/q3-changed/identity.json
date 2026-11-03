@@ -1,0 +1,33 @@
+{
+ "generator": "autographics-node2d-pilot plan039 queries-3d",
+ "api": "autographics.behavior/3",
+ "user_source_sha256": "eef9ce980bd1d3e4461679bd961782fc49957d4c77eaff864c47401c19c159fc",
+ "user_source_bytes": 1439,
+  "module:main": "f9891a2c1fcfcc8bb27d590a0366290e1bad6a7e4c2b103ccc05eb06deb40894",
+  "module:resources": "98cfe52e43faf2dd1310918d73efc82a904713ee58368ebe23bf8b542c96bb91",
+ "closure": [
+  {"name": "main", "sha256": "f9891a2c1fcfcc8bb27d590a0366290e1bad6a7e4c2b103ccc05eb06deb40894", "bytes": 2489},
+  {"name": "resources", "sha256": "98cfe52e43faf2dd1310918d73efc82a904713ee58368ebe23bf8b542c96bb91", "bytes": 185}
+ ],
+ "roles": {
+ "scene_rows": {
+  "actor": 1,
+  "door": 3,
+  "far": 4,
+  "marker": 5,
+  "movers": 0,
+  "point_marker": 6,
+  "target": 2
+ }
+},
+ "assets": [
+   {"sha256": "42c9da673fc67ccb0c65d4b337608834efd28a499f7e460866dcfc5ff2a0c671", "file": "42c9da673fc67ccb0c65d4b337608834efd28a499f7e460866dcfc5ff2a0c671.glb", "declared": "assets/two-parts.glb"}
+ ],
+ "provenance": {
+  "product": "q3-changed",
+  "consumer": "experimental/autographics-auto-driver/tests/node3d_queries_flow.rs",
+  "consumption": "include_str! frozen scene.agscene + world.at + assets/<sha>.glb; the harness writes the project (scene + assets) under target and loads via Storage::load_project; variants feed scripts/<sha>.at where <sha> = scene.behavior.source.sha256",
+  "load_verification": "the load path hash-verifies the behavior source and every assets/<sha>.glb against the scene manifest; GLB geometry admission runs in the driver preflight decoder before allocation",
+  "world_sha256": "eef9ce980bd1d3e4461679bd961782fc49957d4c77eaff864c47401c19c159fc"
+ }
+}

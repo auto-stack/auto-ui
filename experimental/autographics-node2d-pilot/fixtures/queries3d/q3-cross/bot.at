@@ -18,9 +18,8 @@ node QueryBot(px: float, py: float, pz: float) {
         let ax = self.world(0)
         let ay = self.world(1)
         let az = self.world(2)
-        let q = query3d.segment(-1, true, ax, ay, az, ax + .reach, ay, az)
+        let q = query3d.segment(self.row(), true, ax, ay, az, ax + .reach, ay, az)
         let hit = q.hit()
-        let node = q.node()
             self.show(hit)
         }
     }

@@ -11,12 +11,13 @@ node QueryLab {
         group3d movers {
             position: (1.0, 0.0, 0.0)
             visible: true
-        } model3d actor {
-            model: resources.parts_glb
-            position: (-3.0, 0.0, 0.0)
-            scale: (0.4, 0.7, 0.5)
-            yaw: 0.2
-            pitch: 0.15
+            model3d actor {
+                model: resources.parts_glb
+                position: (-3.0, 0.0, 0.0)
+                scale: (0.4, 0.7, 0.5)
+                yaw: 0.2
+                pitch: 0.15
+            }
         }
         model3d target {
             model: resources.parts_glb
@@ -54,25 +55,28 @@ node QueryLab {
         }
         Life.Tick(dt float) -> {
         if input.space() == 3 {
-            refs.movers.shift(input.x() * 3.0 * dt, 0, 0 - input.y() * 3.0 * dt)
+            refs.movers.shift(input.x() * 3.0 * dt, 0.0, 0.0 - input.y() * 3.0 * dt)
         }
-        refs.target.place(0, 0, 0)
+        refs.target.place(0.0, 0.0, 0.0)
         let ax = refs.actor.world(0)
         let ay = refs.actor.world(1)
         let az = refs.actor.world(2)
-        let q = query3d.segment(-1, true, ax, ay, az, ax + .reach, ay, az)
+        let q = query3d.segment(refs.actor, true, ax, ay, az, ax + .reach, ay, az)
         let px = q.point(0)
-        refs.target.place(0, 0, 0.5)
+        refs.target.place(0.0, 0.0, 0.5)
         let stale = q.point(0)
-        let ok = stale == px
-        refs.point_marker.show(ok)
-        let q2 = query3d.segment(-1, true, ax, ay, az, ax + .reach, ay, az)
+        var okint = 0
+        if stale == px {
+            okint = 1
+        }
+        refs.point_marker.show(okint)
+        let q2 = query3d.segment(refs.actor, true, ax, ay, az, ax + .reach, ay, az)
         let hit = q2.hit()
         let node = q2.node()
         let fraction = q2.t()
         let nx = q2.normal(0)
-        refs.marker.place(-100 + node * 5, 50 + fraction * 20, 0)
-        refs.point_marker.place(-150 + px, 100 + nx * 5, 0)
+        refs.marker.place(-100.0 + node * 5.0, 50.0 + fraction * 20.0, 0.0)
+        refs.point_marker.place(-150.0 + px, 100.0 + nx * 5.0, 0.0)
             refs.door.show(hit)
         }
     }

@@ -1,0 +1,209 @@
+{
+ "behavior": {
+  "api": "autographics.behavior/3",
+  "source": {
+   "format": "auto-source",
+   "sha256": "ec72fed08aa5ae2c93da6d35551dd23fc83d5a47e35ac236c2b9c06cfb1addb1",
+   "byte_length": 1439
+  },
+  "actors": {
+   "two_d": null,
+   "three_d": null
+  }
+ },
+ "schema": "autographics.scene/6",
+ "document_id": "plan039-queries-3d-main",
+ "resources": [
+  "circle",
+  "quad",
+  "cylinder",
+  "player",
+  "mob"
+ ],
+ "groups": [
+  {
+   "id": 1,
+   "name": "movers",
+   "dimension": "3d",
+   "parent": null,
+   "translation": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "visible": true
+  }
+ ],
+ "objects": [
+  {
+   "id": 2,
+   "name": "actor",
+   "kind": "model",
+   "translation": [
+    -3.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.4,
+    0.7,
+    0.5
+   ],
+   "yaw": 0.2,
+   "pitch": 0.15,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": 1,
+   "resource": "sha256:42c9da673fc67ccb0c65d4b337608834efd28a499f7e460866dcfc5ff2a0c671",
+   "sprite": null
+  },
+  {
+   "id": 3,
+   "name": "target",
+   "kind": "model",
+   "translation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.2,
+    0.8,
+    0.5
+   ],
+   "yaw": -0.1,
+   "pitch": 0.1,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": "sha256:42c9da673fc67ccb0c65d4b337608834efd28a499f7e460866dcfc5ff2a0c671",
+   "sprite": null
+  },
+  {
+   "id": 4,
+   "name": "door",
+   "kind": "cylinder",
+   "translation": [
+    0.0,
+    1.0,
+    2.0
+   ],
+   "scale": [
+    0.3,
+    1.0,
+    0.3
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": false,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 5,
+   "name": "far",
+   "kind": "model",
+   "translation": [
+    6.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": "sha256:42c9da673fc67ccb0c65d4b337608834efd28a499f7e460866dcfc5ff2a0c671",
+   "sprite": null
+  },
+  {
+   "id": 6,
+   "name": "marker",
+   "kind": "quad",
+   "translation": [
+    -100.0,
+    50.0,
+    0.0
+   ],
+   "scale": [
+    10.0,
+    10.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    1.0,
+    1.0,
+    0.1,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 7,
+   "name": "point_marker",
+   "kind": "quad",
+   "translation": [
+    -150.0,
+    100.0,
+    0.0
+   ],
+   "scale": [
+    10.0,
+    10.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.2,
+    0.8,
+    1.0,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  }
+ ],
+ "assets": [
+  {
+   "format": "glb",
+   "sha256": "42c9da673fc67ccb0c65d4b337608834efd28a499f7e460866dcfc5ff2a0c671",
+   "byte_length": 1528,
+   "name": "parts_glb"
+  }
+ ]
+}

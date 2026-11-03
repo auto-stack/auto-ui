@@ -8,7 +8,7 @@ use bot: QueryBot
 node CrossLab {
     view-3d {
         QueryBot near {
-            px: 2.0
+            px: -2.0
             py: 0.0
             pz: 0.0
         }
@@ -37,7 +37,7 @@ node CrossLab {
         Life.Start -> {
         }
         Life.Tick(dt float) -> {
-            refs.marker.place(-100, 50, 0)
+            refs.marker.place(-100.0, 50.0, 0.0)
         }
     }
 }

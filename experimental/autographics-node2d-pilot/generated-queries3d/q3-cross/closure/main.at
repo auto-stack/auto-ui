@@ -1,0 +1,43 @@
+// PLAN-039 queries-3d cross lab root: two QueryBot instances at different
+// x (row isolation: the nearer instance's cast hits the shared target, the
+// farther one misses), plus one GLB target leaf. Shared 32-credit pool:
+// 2×(8+1+1) = 20 <= 32 (the over-budget negative lives in the gates).
+use resources: parts_glb
+use bot: QueryBot
+
+node CrossLab {
+    view-3d {
+        QueryBot near {
+            px: -2.0
+            py: 0.0
+            pz: 0.0
+        }
+        model3d target {
+            model: resources.parts_glb
+            position: (0.0, 0.0, 0.0)
+            scale: (0.2, 0.8, 0.5)
+            yaw: -0.1
+            pitch: 0.1
+        }
+        QueryBot farbot {
+            px: 5.0
+            py: 0.0
+            pz: 0.0
+        }
+    }
+    view-2d {
+        shape2d marker {
+            kind: quad
+            position: (-100.0, 50.0)
+            scale: (10.0, 10.0)
+            rgba: (1.0, 1.0, 0.1, 1.0)
+        }
+    }
+    on {
+        Life.Start -> {
+        }
+        Life.Tick(dt float) -> {
+            refs.marker.place(-100.0, 50.0, 0.0)
+        }
+    }
+}

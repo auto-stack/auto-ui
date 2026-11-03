@@ -1,0 +1,94 @@
+// PLAN-039 queries-3d T-02 sweep lab (G05/3d-faithful): fixed-orientation
+// swept-AABB chain on the actor leaf with the stop-with-clearance movement
+// rule, markers driven only on nonzero displacement (engine v4 conventions;
+// behavior api = autographics.behavior/4 by content).
+use resources: parts_glb
+
+node SweepLab {
+    model {
+        var speed = 10.0
+    }
+    view-3d {
+        group3d movers {
+            position: (1.0, 0.0, 0.0)
+            visible: true
+            model3d actor {
+                model: resources.parts_glb
+                position: (-3.0, 0.0, 0.0)
+                scale: (0.4, 0.7, 0.5)
+                yaw: 0.2
+                pitch: 0.15
+            }
+        }
+        model3d target {
+            model: resources.parts_glb
+            position: (0.0, 0.0, 0.0)
+            scale: (0.2, 0.8, 0.5)
+            yaw: -0.1
+            pitch: 0.1
+        }
+        cylinder3d door {
+            position: (0.0, 1.0, 2.0)
+            scale: (0.3, 1.0, 0.3)
+            visible: false
+        }
+        model3d far {
+            model: resources.parts_glb
+            position: (6.0, 0.0, 0.0)
+        }
+    }
+    view-2d {
+        shape2d marker {
+            kind: quad
+            position: (-100.0, 50.0)
+            scale: (10.0, 10.0)
+            rgba: (1.0, 1.0, 0.1, 1.0)
+        }
+        shape2d point_marker {
+            kind: quad
+            position: (-150.0, 100.0)
+            scale: (10.0, 10.0)
+            rgba: (0.2, 0.8, 1.0, 1.0)
+        }
+    }
+    on {
+        Life.Start -> {
+        }
+        Life.Tick(dt float) -> {
+        var dx = 0.0
+        if input.space() == 3 {
+            dx = input.x() * .speed * dt
+        }
+        let q = query3d.sweep(refs.actor, true, dx, 0.0, 0.0)
+        let hit = q.hit()
+        let node = q.node()
+        let t = q.t()
+        let ox = q.origin(0)
+        let nx = q.normal(0)
+        let overlap = q.start_overlap()
+        var move = dx
+        if hit == 1 {
+            move = 0
+            if overlap == 0 {
+                var distance = dx
+                if distance < 0 {
+                    distance = 0 - distance
+                }
+                distance = distance * t - 0.002
+                if distance > 0 {
+                    move = distance
+                    if dx < 0 {
+                        move = 0 - distance
+                    }
+                }
+            }
+        }
+        refs.actor.shift(move, 0.0, 0.0)
+        if dx != 0 {
+            refs.marker.place(-100.0 + node * 5.0, 50.0 + t * 10.0, 0.0)
+            refs.point_marker.place(-150.0 + ox, 100.0 + nx * 5.0, 0.0)
+            refs.door.show(hit)
+        }
+        }
+    }
+}
