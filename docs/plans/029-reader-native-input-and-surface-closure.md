@@ -197,7 +197,7 @@ Reader旧门入口保持 `python tests/basic/verify_standalone.py --profile vue|
 | T-07 | work | T-06 | [x] N-09 八类负控全部具名拒绝+逐例字节级零写+合法对照接受落盘（资产逃逸零泄漏/远程脚本零加载/本地资产仍用），href 不透明语义如实记录；N-11 变异→oracle 实红+恢复落点异位（位置指纹判据）→字节级还原绿——见 §9 2026-11-02 T-07 记录（reader cb9e1e5，t07-vm6） | N-09/11原拒绝零写、合法对照绿，变异红且聚合非零→还原绿；不得吞报错 | AC-03/07/08 |
 | T-08 | work | T-00可先诊断；最终依T-07 | [x] 复现Reader R-05/R-06vm、分析实际owner；修本仓允许面或绑定他仓正式前置——R-05（直连api.at 404，026归因工具链）当前cohort不复现：同门命令 verify_epub --auto 22/22 exit0（reader src 自026基线零改动，闭合由cohort二进制 (55c98c7→47d8f7b] 区间工具链交付，确切commit未bisect=只读依赖纪律）；R-06vm复现rc=0并字节级定责：驱动main的generate_all(data_dir)以'w'无条件重写夹具，门先注入的毁损被静默还原（sha 2c00a65b→45b56233 pristine），变异从未抵达应用——owner=reader门脚本；修复（仅tests，6887ed0）：probe_books overwrite=False+驱动--no-regen+门变异腿传--no-regen；修复后变异腿exit1、NS-02 red_px=0/blue_px=0像素oracle真实失败、章节缓存res_*.png=64零字节（变异经导入→提取→服务→解码全链抵达），对照腿0 FAIL exit0；vue臂R-06（缓存毁损路径）不受影响——见§9 2026-11-02 T-08 记录 | N-12原测试条件保留，404/像素负控失败机制真实闭合；外仓前置未到则保持未完成 | AC-09 |
 | T-09 | work | T-08全部通过 | [x] 冻结cohort跑两个profile的完整新清单及旧Reader门、本仓定向cargo选择；写证据总结、SD-01/02与两仓路线/导航并内部检查——**双profile exit0**：vm 92记录零非绿（t09-freeze-final，914s）+ vue findings=0（t09-freeze-final-vue）；两端旧门内嵌28/28+27/27；R-05 22/22；N-04配对协议PASS、DPI三段（PROBE_DPI_AUTO UIA自驱）全绿。证据总结=docs/research/reader-native-surface-closure.md；SD-01（boundary修订）/SD-02（native-input新spec）落地（ef5800e8）；reader roadmap coverage v5 修订（7a1b4fd）；本仓定向cargo=T-02 cargo tu 866 pass 复用（worktree 98633fd4 零代码变化）——见§9 2026-11-03 收口记录 | 现有入口 `python tests/probe/engine_surface/verify_engine_surface.py --profile vue|vm --auto-bin ... --out-dir ...` 完整且exit0；新清单非旧30总数；git diff --check/链接/source绑定 | AC-01～10 |
-| T-10 | review | T-09 | 独立上下文在同树顺序复演规定路径与变异，检查source/Spec/范围，写final结论 | AC-01～10全部pass，无partial/GAP；否则needs_fix/needs_replan回原树，不能自评归档 | AC-11 |
+| T-10 | review | T-09 | [x] 独立上下文在同树顺序复演规定路径与变异，检查source/Spec/范围，写final结论——见 §9 2026-11-03 T-10 复审记录（outcome: pass；vm 92/92 exit0 + vue 48/48 exit0 独立复演） | AC-01～10全部pass，无partial/GAP；否则needs_fix/needs_replan回原树，不能自评归档 | AC-11 |
 | T-11 | merge | T-10 pass | 固定两仓提交/landing/canonical、归档archived/、修导航、材料摘要后清自有scope；fresh guard后移除树/分支 | 真实12/12与archive路径/cohort一致、恢复信息足够；不动他人WIP/OS pin/ledger，不把旧026回执改为新证据 | AC-12 |
 
 ## 9. 复审记录
@@ -416,6 +416,16 @@ Reader旧门入口保持 `python tests/basic/verify_standalone.py --profile vue|
 ### 2026-11-02：goal回合（T-08轮）
 
 - stage: goal | plan_id: PLAN-029 | plan_revision: r1 | round: 5 | from: work | to: work | status: executing | outcome: pass(T-08) | worktree: D:/autostack/.wt/ui-029/auto-ui | commit: reader 6887ed0 | next: work(T-09)。
+
+### 2026-11-03：review阶段——T-10 独立上下文最终复审（AC-11）
+
+- stage: review | plan_id: PLAN-029 | plan_revision: r1 | task: T-10 | outcome: pass（AC-01..10 全部 pass，无 partial/GAP 残留；独立上下文，与实施会话零共享）| 复核 worktree: .wt/ui-029@98633fd4（git diff 零输出，树干净）| 复核 reader: main@7a1b4fd（树干净；src/ 自起草基线 b6183e07 零变化——18 文件改动全部位于 tests/basic、tests/native、tests/probe/engine_surface/**、docs，均为计划授权面）| cohort 复核: auto g47d8f7b sha256=6f1925ea…、auto-ui-tool、engine-assets、corpus sha d973dad8/88c25a1c 与 manifest 一致。
+- **复演（同树同冻结 cohort，本复审会话独立执行）**：vm 聚合 = plan-artifacts/plan-029/t10-review-vm（**92/92 PASS，aggregate_ok=True findings=0 not_run=0，1067.1s，exit0**）；vue 聚合 = t10-review-vue2（**48/48 PASS，findings=0，753.2s，exit0**）。§6 最低集逐项亲核：N-02/03（真 SendInput 拖选 occ=2 oracle=ch1 para7 offset49 / CFI epubcfi(/6/2!/4/18,/1:50,/1:61) / sidecar 磁盘；冷恢复+强杀数据存活）；N-04/06（IME 组合 'q'→'q你好'、Esc 取消值不变、组合期 Enter 仅提交原文；焦点往返按 §10 既定配对协议——回执 CDP 断言 popup_hasFocus=true、SetFocus 后 os_focus 0x1336==主窗 hwnd 0x1336，结构与人证 prior_sighting 两半齐全；UIA ControlType.Text 命中目标句全文 + UIA SetFocus + 真实 ArrowRight/Left 翻页 cfi 往返）；N-07/10/11（B 实例 -B 17837+钉 MCP 9347 与 A 共存、WM_CLOSE 后旧事件 rejected_bad_document 零写、新 A 不接旧会话、B 续选 occ=2；聚合受控负例 10/10 非零+坏 tool 永不宣告+占口者不被杀；N-11 变异红 oracle=quote_not_found+落点指纹异位（错 cfi 落 /2,/12/1:105 ≠ 真 /12/1:105,/20/1:34）+字节级还原绿）；N-12 原始 oracle（vue-chain 34 记录隔离重跑全绿 + R-05 verify_epub PASS=22 FAIL=0 + 两端旧门 28/28、27/27 + R-06vm 像素判别负控非零）。
+- **抽查区分力**：N-09 九类负控逐例具名拒绝（rejected_bad_document/bad_session/bad_schema/bad_kind/bad_locator:quote_not_found/bad_locator:occurrence_out_of_range/rejected_oversize bytes=40039/rejected_stale_seq last_seq=3）且逐例字节级零写断言全真；资产逃逸 3 路径零泄漏+本地 foliate-view.js 照常+资源原点 external=none——判据均响应/字节级实测，非恒真。
+- **观测（非阻塞，不构成 AC 缺口）**：vue 第一次复演 t10-review-vue 在内嵌旧门 standalone-vm 腿 NS-05「mcp ready after restart」一次超时（exit1；wait_ready 90s PASS 后 60s MCP announce 窗未中）——T-05/T-09 在案的 announce 竞态 flake 族同签名；同腿在本轮 vm 复演、实施冻结两轮与 vue 第二次复演（t10-review-vue2）全绿，判瞬时环境抖动，绑定证据以 exit0 复演为准。
+- **静态核查**：SD-01/02 与实测一致且不超 claim（配对协议/oninput 阻塞/分页器观察边界均如实具名）；研究文档 §4 边界清单完整；master ef5800e8（3 文档）与 2fb61977（计划簿记）纯文档零代码；OS pin 未动；N-04 配对回执 JSON 结构（auto_drag/auto_setfocus/human/prior_sighting）与门侧消费逻辑（driver_vm.py L1437-1460）核对一致。
+- 证据：plan-artifacts/plan-029/t10-review-vm{,-console.log}/、t10-review-vue{,2}{,-console.log}/（attempt1 flake 材料同在）。
+- 结论：T-10 pass，PLAN-029 进入 T-11（merge）。
 
 ## 10. 待澄清事项
 
