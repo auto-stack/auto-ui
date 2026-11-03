@@ -2895,6 +2895,7 @@ pub struct DesktopSession {
                 String,
                 Box<dyn crate::ui::desktop_protocol::transport::Transport + Send>,
                 crate::ui::desktop_protocol::broker::RequestedRender,
+                bool,
             )>,
         >,
     >,
@@ -4338,7 +4339,7 @@ impl DesktopSession {
                             pending
                                 .lock()
                                 .unwrap()
-                                .push((inc.pipe_name, inc.end, inc.render))
+                                .push((inc.pipe_name, inc.end, inc.render, inc.adopt))
                         }
                         Ok(None) => {} // 探测 ping：吞掉重听
                         Err(_) => {
@@ -4399,14 +4400,23 @@ impl DesktopSession {
         }
         let mut clients = std::mem::take(&mut self.broker_clients);
         let mut wids = Vec::new();
-        for (pipe, end, render) in pending {
+        for (pipe, end, render, adopt) in pending {
             let mut client = BrokerClient::new(pipe, end);
+            // PLAN-053 T-05：`adopt` 外部 rqhost 客户端（自持 VM/组件）——
+            // 零装载激活（Hello 凭据即开窗凭据，D1），registry 不查。
+            client.adopt = adopt;
             // Plan 500 步骤 6：孵化记录携带的帧模式定档（auto 降级标记 →
             // 宿主观测行留痕——ui_console 面板 + 控制台双落；app 名在
             // attach 握手后回填，故日志随落地打）。
             client.endpoint.frame_mode = render.mode;
             match Self::broker_attach_one(self, &mut client, budget_per_app_ms) {
                 Some(wid) => {
+                    if client.adopt {
+                        eprintln!(
+                            "[PLAN-053] adopt attach OK: {:?} caps={:?}",
+                            client.app_name, client.theme_caps
+                        );
+                    }
                     wids.push(wid);
                     if render.auto_downgraded {
                         let app = client
@@ -5292,11 +5302,30 @@ impl DesktopSession {
                         continue;
                     }
                     // 注册表解析 → 编译装载（ResolveFailed = 弃连）。
-                    let component = (|| {
-                        let registry = self.desktop.app_resolver.as_ref()?;
-                        let spec = registry(&app_name)?;
-                        crate::build_dynamic_component(&spec.code, spec.source_path.as_deref()).ok()
-                    })();
+                    // PLAN-053 T-05：`adopt` 外部 rqhost 客户端**零装载**
+                    // （D1 客户端权威——组件/VM 在子进程，宿主只要一个
+                    // window/AppSession 簿记壳；Hello 凭据即开窗凭据）。
+                    let component = if client.adopt {
+                        let built = crate::build_dynamic_component(
+                            "widget App {\n    view {\n        col {\n            text \"rqhost-client\" {}\n        }\n    }\n}\n",
+                            None,
+                        );
+                        match &built {
+                            Ok(_) => eprintln!(
+                                "[PLAN-053] adopt zero-load attach: {app_name} (theme-capable={})",
+                                built.as_ref().unwrap().theme_scope().is_some()
+                            ),
+                            Err(e) => eprintln!("[PLAN-053] adopt zero-load build failed: {e}"),
+                        }
+                        built.ok()
+                    } else {
+                        (|| {
+                            let registry = self.desktop.app_resolver.as_ref()?;
+                            let spec = registry(&app_name)?;
+                            crate::build_dynamic_component(&spec.code, spec.source_path.as_deref())
+                                .ok()
+                        })()
+                    };
                     let Some(component) = component else { continue };
                     client.app_name = Some(app_name.clone());
                     let app_id = self.allocate_app(component);

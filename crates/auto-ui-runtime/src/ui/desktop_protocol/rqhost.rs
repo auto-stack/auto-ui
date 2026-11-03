@@ -1141,7 +1141,11 @@ fn rq_update(state: &mut RqDaemon, msg: RqMessage) -> iced::Task<RqMessage> {
             // ① 待定采纳消费（serve 线程生产——队列 drain）。
             let pending: Vec<_> = state.serve.pending.lock().unwrap().drain(..).collect();
             for (name, end) in pending {
-                match adopt_one(name, end, &mut state.ids, 2000) {
+                // PLAN-053 T-05：预算 2000→15000ms——外部 `adopt` 客户端
+                // 冷启动（自建 VM/组件后才握手，步进 ≈ 秒级），2s 惯性预算
+                // 在 Desktop 采纳面系统性弃置（2026-11-03 实测三连弃）；
+                // 对齐 rendezvous 就绪预算先例（本文件 177 行 15s）。
+                match adopt_one(name, end, &mut state.ids, 15_000) {
                     Some((mut client, events)) => {
                         for ev in events {
                             if matches!(ev, RqEvent::Adopted { .. }) {

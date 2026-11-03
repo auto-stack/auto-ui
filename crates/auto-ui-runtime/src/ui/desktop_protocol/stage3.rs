@@ -63,6 +63,9 @@ pub struct BrokerClient {
     /// PLAN-053 T-03：本连接已推送的宿主 revision（结果帧 stale 判定锚：
     /// 低于此值的结果 = 乱序/重复，可读分列不覆盖新状态）。
     pub theme_pushed_rev: u64,
+    /// PLAN-053 T-05：`adopt` 外部 rqhost 客户端（自持 VM/组件——宿主
+    /// 零装载激活，不uring registry 构建）。
+    pub adopt: bool,
 }
 
 impl BrokerClient {
@@ -82,6 +85,7 @@ impl BrokerClient {
             app_name: None,
             theme_caps: Vec::new(),
             theme_pushed_rev: 0,
+            adopt: false,
         }
     }
 

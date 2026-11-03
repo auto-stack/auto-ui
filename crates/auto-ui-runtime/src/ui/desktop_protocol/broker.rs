@@ -132,6 +132,10 @@ impl Broker {
             pipe_name,
             end,
             render,
+            // PLAN-053 T-05：`adopt` = 外部 rqhost 客户端（自持 VM/组件，
+            // D1 客户端权威）——宿主零装载激活；`incubate` = 既有孵化方言
+            //（宿主经注册表装载）。
+            adopt: verb == "adopt",
         }))
     }
 }
@@ -141,6 +145,8 @@ pub struct Incubation {
     pub pipe_name: String,
     pub end: Box<dyn Transport + Send>,
     pub render: RequestedRender,
+    /// PLAN-053 T-05：true = `adopt` 外部 rqhost 客户端（宿主零装载）。
+    pub adopt: bool,
 }
 
 /// 孵化请求的渲染模式字段（`queue` | `pixels` | `pixels:auto`）。
