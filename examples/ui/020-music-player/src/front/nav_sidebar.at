@@ -12,7 +12,11 @@ widget NavSidebar(dark_mode: bool, on_toggle_dark: msg) {
         SelectNav(str),
         SelectStage,
         ToggleLike,
-        ToggleDark
+        // PLAN-045 修复（VM 双发）：子 msg 名与回调 prop 名折叠同键（ToggleDark
+        // vs on_toggle_dark → ontoggledark）会让声明式+体内式双路径同时回送父
+        // handler——ToggleDarkMode 翻转两次回原值。改名为 SwitchTheme 错开折叠键；
+        // Vue emit 名由 prop 名（on_toggle_dark → ToggleDark）决定，双端行为不变。
+        SwitchTheme
     }
 
     view {
@@ -132,7 +136,7 @@ widget NavSidebar(dark_mode: bool, on_toggle_dark: msg) {
                     // 深浅主题切换（PLAN-045 T-03：README 承诺的 dark mode toggle
                     // 接线；icon 随 App 根 dark_mode 翻转，语义类走主题 token）
                     row {
-                        onclick: .ToggleDark
+                        onclick: .SwitchTheme
                         style: "w-full h-10 items-center justify-start gap-3 px-3.5 rounded-xl text-muted-foreground hover:bg-muted/70 hover:text-foreground font-medium text-xs cursor-pointer transition-all"
                         if .dark_mode {
                             icon (name: "sun", size: 16, style: "shrink-0")
@@ -196,7 +200,7 @@ widget NavSidebar(dark_mode: bool, on_toggle_dark: msg) {
         .ToggleLike -> {
             store.ToggleLike()
         }
-        .ToggleDark -> {
+        .SwitchTheme -> {
             on_toggle_dark()
         }
     }

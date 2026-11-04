@@ -4,7 +4,11 @@
 widget SettingsPanel(dark_mode: bool, accent_color: str, on_close: msg, on_toggle_dark: msg, on_set_pink: msg, on_set_indigo: msg, on_set_ocean: msg, on_set_sage: msg, on_set_amber: msg) {
     msg {
         Close,
-        ToggleDark,
+        // PLAN-045 修复（VM 双发）：子 msg 名与回调 prop 名折叠同键（ToggleDark
+        // vs on_toggle_dark → ontoggledark）会让声明式+体内式双路径同时回送父
+        // handler——ToggleDarkMode 翻转两次回原值。改名为 SwitchTheme 错开折叠键；
+        // Vue emit 名由 prop 名（on_toggle_dark → ToggleDark）决定，双端行为不变。
+        SwitchTheme,
         SetPink,
         SetIndigo,
         SetOcean,
@@ -58,20 +62,20 @@ widget SettingsPanel(dark_mode: bool, accent_color: str, on_close: msg, on_toggl
                     style: "gap-1.5 p-0.5 bg-muted/40 rounded-lg"
                     if .dark_mode {
                         button "🌙 Dark" {
-                            onclick: .ToggleDark
+                            onclick: .SwitchTheme
                             style: "flex-1 py-1.5 px-2 text-xs font-medium rounded-md bg-primary text-primary-foreground shadow-sm transition-colors cursor-pointer"
                         }
                         button "☀ Light" {
-                            onclick: .ToggleDark
+                            onclick: .SwitchTheme
                             style: "flex-1 py-1.5 px-2 text-xs font-medium rounded-md text-muted-foreground hover:text-foreground bg-transparent transition-colors cursor-pointer"
                         }
                     } else {
                         button "🌙 Dark" {
-                            onclick: .ToggleDark
+                            onclick: .SwitchTheme
                             style: "flex-1 py-1.5 px-2 text-xs font-medium rounded-md text-muted-foreground hover:text-foreground bg-transparent transition-colors cursor-pointer"
                         }
                         button "☀ Light" {
-                            onclick: .ToggleDark
+                            onclick: .SwitchTheme
                             style: "flex-1 py-1.5 px-2 text-xs font-medium rounded-md bg-primary text-primary-foreground shadow-sm transition-colors cursor-pointer"
                         }
                     }
@@ -137,7 +141,7 @@ widget SettingsPanel(dark_mode: bool, accent_color: str, on_close: msg, on_toggl
 
     on {
         .Close -> { on_close() }
-        .ToggleDark -> { on_toggle_dark() }
+        .SwitchTheme -> { on_toggle_dark() }
         .SetPink -> { on_set_pink() }
         .SetIndigo -> { on_set_indigo() }
         .SetOcean -> { on_set_ocean() }
