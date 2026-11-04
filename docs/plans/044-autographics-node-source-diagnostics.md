@@ -126,9 +126,9 @@ work产证；review同树独立上下文final，从真实compile/Run复核AC/SD/
 | T-05 | work | T-04 | 资源上界/字节步数等价、保存A→B/坏map下次恢复与受影响旧门 | AC-04/05 | [x] 2026-11-04：上界实测重冻结（max(64KiB,4×world)+4MiB+16384 段，worst ratio 3.42）；8KiB 截断 mapped 路径门；debug 有无 world/API 字节等价（verify 控制一）+ VM 步数等价结构性事实（map 只在诊断回调消费、不入 Session、无每 Tick IO）；A→B 搬迁等价消费 + 坏图拒用→修复→下次诊断恢复映射；受影响旧门全绿（components 6/6、3d-audio-hud 26、3d-basic 8、game 3）。 |
 | T-06 | work | T-05 | SD候选/可选消费接口/覆盖精度及限制交接，不加M2前置 | AC-05/06 | [x] 2026-11-04：SD-01 候选 `docs/specs/auto-graphics/node-source-diagnostics.md`（worktree 8dc830d1；范围/精度模型/旁件绑定/双锚消费/分层/SDK681 span 冻结事实/预算等价/入口/§8 origin 接入合同）；M2/ACE 触面零（diff 全量核 0 文件）。 |
 | T-07 | review | T-06 | 同树独立final与finding修复后同员复核 | AC-07 | [x] 2026-11-04：final pass（无 finding，无需修复复核轮）；独立重跑全门 + 行为抽查 + SD 一致性核对，见 §9 review 收据。 |
-| T-08 | merge | T-07 pass | 冻结定向门/来源核后实际落master | AC-08 | [ ] |
-| T-09 | merge | T-08 | canonical/归档/导航与可选固定身份核验 | AC-08 | [ ] |
-| T-10 | merge | T-09 | fresh guard/全输出对账/删scope构建物/摘要hold登记 | AC-09 | [ ] |
+| T-08 | merge | T-07 pass | 冻结定向门/来源核后实际落master | AC-08 | [x] 2026-11-04：rebase 两轮（主检出并发推进；range-diff 13 代码提交全 "="，簿记同步对按内容等价）；ff-only 落 master，tip=delivery 9bf9874a；主检出冒烟 pilot 20/20 + driver 10/10 + verify 5 控制全绿。 |
+| T-09 | merge | T-08 | canonical/归档/导航与可选固定身份核验 | AC-08 | [x] 2026-11-04：canonical docs/specs/auto-graphics/node-source-diagnostics.md 已落 delivery 提交（sha256 e8b561400bcaa46132dbbeec0c1ddcd7d621e5101e5c56ad88d1505991f7dc70）；索引应用派生，无 specs.json/index 写。 |
+| T-10 | merge | T-09 | fresh guard/全输出对账/删scope构建物/摘要hold登记 | AC-09 | [x] 2026-11-04：见 merge 收据 cleaned 行——guard clean、worktree/分支删除、plan-artifacts/plan-044 全删、registry 刷新、零 hold。 |
 
 ## 9. 复审记录
 
