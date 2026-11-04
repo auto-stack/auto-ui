@@ -1,0 +1,146 @@
+---
+plan_id: PLAN-044
+status: drafting
+feature_name: AutoGraphicsNode多模块源码定位与分层诊断
+author: [Codex]
+created_at: 2026-11-04
+updated_at: 2026-11-04
+plan_revision: 1
+current_step: 0
+total_steps: 10
+depends_on: [auto-ui/PLAN-020, auto-ui/PLAN-030, auto-ui/PLAN-035, auto-ui/PLAN-040]
+supersedes_spec_components: []
+new_spec_components: [docs/specs/auto-graphics/node-source-diagnostics.md]
+touched_goals: [GOAL-008]
+affects: [autographics-node2d-pilot, autographics-auto-driver]
+---
+
+# PLAN-044：Node多模块源码定位与分层诊断
+
+## 0. 变更摘要
+
+给Node生成链补显式可选源映射/分层诊断：导入/降层显示原模块/Node/事件；SDK有真实span的编译错误先经受检assembly region，再回到Node源。固定SDK运行错误无结构化span，必须只给可证明上下文或generated坐标，不能编造原行。
+
+043模型模板能力独立，不做本Plan前置；不换SDK/改ACE，不要求AG016/017/018/019跟升。普通use/组件局部性保持，不能为定位合成单作者文件。[共同设计](../design/autographics/node-resource-components-and-source-diagnostics.md)。drafting/r1/0-10，仅规划。
+
+## 1. 目标
+
+1. 原模块/Node/handler/helper与生成用户源有可证明映射，定位精度明确exact/range/context/generated/unmapped；同名helper/同定义多实例/跨use不串文件或实例。
+2. 前端、SDK compile、runtime/API fault、managed内部错误分层，保原stage/code/Run/来源与8KiB截断；有真实span才给精确作者位置。
+3. 映射只解释已有诊断，不加执行trace/服务费/玩法；当前runtime无span保事实，不输出虚构调用栈/源行。
+4. 可选debug消费绑定模块闭包/生成器/world/assembly身份与接受源快照；错/旧映射拒用并明确generated fallback，不污染游戏接受态或谎称mapped成功。
+
+非目标：断点/单步调试器/变量检查/动态trace/HMR、跨仓语言AST或SDK/ACE改造、所有运行栈恢复/机器码映射、反向改源、旧内容批量升级或新增M2前置。
+
+## 2. 架构方案
+
+模块/已有AST span与发射origin→结构化generated-user-source映射旁件→loader受检绑定/接受源快照→原SourceSnapshot region校验→SDK offset或现有错误上下文→只在可证域映到作者文件/Node/事件。managed保持受信区域身份，runtime无span则context/generated/unmapped。
+
+拟唯一树`D:/autostack/.wt/ui-044/auto-ui`、分支`codex/plan-044-dev`，当前不创建。同树不同上下文独立final顺序进行；043可独立实现，公共load/emit/main/identity/Storage短窗单写，按合入交叠选受影响验证。两Cargo图/SDK681不合并，target/材料scope独占，GPU重门单实例。
+
+## 3. 技术栈
+
+已核pilot（experimental/autographics-node2d-pilot）`src/load.rs`有module/line与function span；`translate.rs::LowerError`部分仅line/what，lower_components/3d重组model/msg/on成world.at。driver `src/authoring/behavior.rs::SourceSnapshot::{sdk_diagnostic,diagnostic}`已有SDK offset→user/managed region和8KiB限额，runtime明确`SDK supplied no mapped line`；`behavior_project.rs`按实际snapshot建Session。新能力不能声称当前全无诊断，也不能拿SDK没有的数据承诺精确栈。
+
+拟新增pilot `src/source_map.rs`、`tests/node_source_map_gates.rs`、driver `tests/node_source_diagnostics.rs`、pilot `tools/verify_plan044.py`与故障模块夹具。显式CLI工作名`--diagnostics-map`、旁件`source-map.json`均T-02冻结提案，新target由T-03/04建立。现有stmt无可证span则降精度到handler范围/上下文，不在本Plan跨仓改AST/SDK。
+
+## 4. 需求分析与背景调查
+
+用户2026-11-04要求UI后继规划，允许合同/设计/导航及相关路线簿记，未授权实现/构建/运行/agent。观察UI `92ee2459a1058ddddc3fc3378ecec6585ffe726c`；040交付fc82061c且独立final有记录；AG016 executing3/10固定035，不新增其依赖。041/042为其他UI组件store/重载路线，独占重核后本批使用043/044。
+
+已读UI Specs index、`node3d-symbolic-component-bindings.md`(6ed0bf07…)、`node3d-audio-hud-composition.md`(d7272516…)、`node-editor-projects.md`(1daa7111…)及load/translate/behavior源码。语言仓`docs/specs/auto-graphics/behavior-api.md` SHA256 `02751f0e234633f82bb64d7103ca2656e3b8325182e5ef095f0c0eb8b2011dbf`、`behavior-project.md` SHA `9ed44de2cb0b454cfd440d6a9ff63e2b8470fb1adc5f870e643448bf7f2b02a4`要求region/身份伪造拒绝、真实compile span才映射、runtime无span明确无行。新旁件不得削弱这些边界。
+
+SDK固定7b987ca8…/681内容，pilot当前语言另图。单个生成运行单元不是单作者文件要求；本Plan解决多模块来源解释，不新增“可审计性”产品目标或禁use。
+
+## 5. 详细设计
+
+### 5.1 支持精度与有界先证
+
+T-02最多A/B两机制全链先证：真实作者源→lower→独立loader/assembly→SDK compile error/实际runtime fault→可观察诊断。首批包含020 components-2d、035 components-3d-audio-hud的普通use/局部model/msg/on/helper，040纯声明的lower错误也要定位，但它没有world.at，只覆盖前端原声明诊断、不伪造运行源map或world hash；生成源/assembly绑定规则只适用于真实有world的路径。未知profile显式不启用/无映射，不虚报全支持。
+
+A优先结构化发射片段携带已有AST/function span与Node/handler origin；B仅在span不足时用可证明声明/helper范围并明确精度，不跨仓改AST/SDK。至少须证明跨模块helper真实compile span能回正确原文件/范围，重写handler片段能回正确Node/事件上下文。做不到则needs_replan，不能把所有错误统一贴context当完成。实际支持构造/错误输入/位置精度/CLI/schema/资源上界在T-02冻结，拟fixture不是已执行证据。
+
+### 5.2 映射与接受源所有权
+
+可选debug模式产旁件，默认CLI/旧档及world/API源字节保持；映射段含generated user半开byte区间、原module闭包key/SHA/可证span或声明范围、Node/事件/helper和精度。派发/绑定/循环等合成代码标synthetic/generated，不映到作者不存在的行。一原片段可映多个生成段，每段owner/身份清楚。UTF8 byte区间与展示字符列分开，列沿现有.chars()的Unicode scalar口径（不宣称屏幕字素宽），CRLF/LF/中文/组合字符独立重算；非字符边界offset不得强切。
+
+T-02冻结schema/字段/区间排序不重叠/边界/相对路径规范。绑定实际generator、world hash/长度、各被用module hash/长度和assembly user region。SDK offset先判在user region，才算user offset；managed绝不当用户。无exact span输出range/context/generated；runtime/API fault仅保stage/callback/接受源与可证owner，不从对象ID/最后handler/错误文字猜唯一原行。多实例只在有实际实例身份时标具体实例，否则标同定义/候选上下文。
+
+源内容来自受检closure/接受内存snapshot；Run期间磁盘同名源改变/移除不改错误指向，显示源行和实际执行hash一致。SaveAs/搬迁用相对来源，旧Run不能用新map。拒逃逸/绝对盘符/链接/未知module key，不读任意外部文件。原受信region/namespace/执行身份校验保持，map不是代码准入/权限证明。
+
+### 5.3 坏映射、fallback及预算
+
+缺失/坏hash/错world/module/generator、越界/重叠/旧Run或错误精度标识时拒用映射，明确unmapped/generated fallback；默认程序原准入/原stage/code/last-good不改变。显式“映射验证”工具必须非零失败，不静默写Mapped-ready；world/closure本身坏仍原loader拒绝，旁件不能修复/绕过。禁止默认运行插桩或逐调用trace改变VM步数/服务费。
+
+元数据是实际CPU/包开销，非GPU资产或免费内存。T-02按user256/managed96/combined352KiB、8状态Node/128行及发射段数量推导有界线性存储/加载开销，测最大合法源和重复映射后冻结单位/超限分类；不暗加小语法上限删合法域，必要新硬额度或跨仓实现则needs_replan。无运行插桩时debug有无的world/API字节、VM步数/32credits/时限/帧/音画等价；map IO仅准备/加载，不每Tick读盘。正文仍8KiB截断、UTF8安全，map错误不能覆盖原错误。
+
+### 5.4 保存与固定消费
+
+map及其被用原模块/world身份随可选debug包/SaveAs明确携带；A→B只包内接受闭包仍复现相同位置/精度和原错误；坏map拒用→精确修复→下一次真实诊断恢复映射，不能只当前fallback成功。旧内容/当前AG016..019不升级；043将来发射段通过统一origin接口接入，不按Coin/Player/示例名造表。
+
+### 规范增量
+
+| delta_id | add/modify/retire | docs/specs/... target | before/after rule | rationale | acceptance IDs |
+|---|---|---|---|---|---|
+| SD-01 | add | docs/specs/auto-graphics/node-source-diagnostics.md | 现有lower/SDK region诊断→可选Node原源映射/精度/身份/接受snapshot/坏map fallback及无span边界 | 多模块作者可定位错误，保原SDK/旧档/业务语义 | AC-01..06 |
+
+## 6. 测试设计
+
+T-03/04建立拟入口：`python experimental/autographics-node2d-pilot/tools/verify_plan044.py --controls`；pilot `cargo test --manifest-path experimental/autographics-node2d-pilot/Cargo.toml --test node_source_map_gates`；driver `cargo test --manifest-path experimental/autographics-auto-driver/Cargo.toml --test node_source_diagnostics -- --test-threads=1`。真实改parser/dialect才补对应target；不预设跨仓实现，非默认全AG/根全库，必要GPU正控单实例。
+
+| case | AC | owner_stage | 实际/拟入口与区分oracle | 边界 |
+|---|---|---|---|---|
+| V-S01 | AC-01/02 | work | gates/verifier：跨use同名helper/双实例、model/msg/Life；真实lower错误/SDK compile span指原module/Node/helper，独立重算原行/字符列；误报同一行另一文件的变异红 | exact/range/context按可证精度，不猜行 |
+| V-S02 | AC-02/03 | work | driver真实assembly/SDK错误：user偏移/managed/合成派发/无span runtime及sticky API fault分层，后者明确no mapped line，假行负控红 | 不承诺当前SDK无span运行栈/断点 |
+| V-S03 | AC-03/04 | work | map错world/module/generator hash、越界/重叠/路径逃逸/旧Run/伪精度实际变异拒用、mapped gate失败、原程序错误/fallback仍可读；坏world照旧拒绝 | map不能绕代码准入或恢复受污染VM |
+| V-S04 | AC-01/04/05 | work | UTF8/组合字符/CRLF/半开首尾边界、注释变更旧map失效、新map下次读恢复；接受Run后磁盘源变更/删除仍显示当时hash源 | 不读任意外部文件/错snapshot |
+| V-S05 | AC-04/05 | work | 最大源/重复段线性存储实测、8KiB截断；debug有无world/API字节、VM步数/费用/帧/音画等价，无每Tick map IO | 上界T-02冻结，不能声明零代价 |
+| V-S06 | AC-05/06 | work | 可选debug包A→B冷再生/SaveAs/接受来源迁移，坏map fallback→修复→下次真实错误恢复；原020/030/035/040受影响冻结/诊断门 | 当前内容锁不跟升，043非前置 |
+
+work产证；review同树独立上下文final，从真实compile/Run复核AC/SD/精度及遗漏延期workaround/告警，绑定r1/提交/工具/原输入，finding回work同员复核。无授权不建agent/第二树，同会话自查不代独立final。merge冻审后定向并集，有据复用未变证据。
+
+## 7. 验收标准
+
+| AC | owner_stage | 关闭条件 | 验证 |
+|---|---|---|---|
+| AC-01 | work | 普通多模块原源定位正确，至少helper真实compile span与Node事件上下文成立、精度明示 | V-S01/04 |
+| AC-02 | work | 前端/SDK user/managed/合成/runtime/API分层，原stage/code/来源及8KiB保持 | V-S01/02 |
+| AC-03 | work | 无span不编造行/实例，错map拒用/映射验证失败且原运行错误/generated fallback不变 | V-S02/03 |
+| AC-04 | work | map/原源/world/assembly/接受Run身份互绑，UTF8/边界/磁盘变化/旧Run/修复下次读取正确 | V-S03/04/06 |
+| AC-05 | work | metadata有界/载入与原源VM/费用帧音画无插桩漂移，冷再生/保存迁移及旧触面保持 | V-S05/06 |
+| AC-06 | work | SD候选/准确可选CLI-schema/精度矩阵/无span边界与未来origin接入合同齐 | V-S06 |
+| AC-07 | review | 同树独立上下文final逐AC/SD/真实源位置与变异，finding闭环pass | T-07 |
+| AC-08 | merge | 冻结门/来源核后落主，canonical/归档/可选消费身份及精度限制齐 | T-08/09 |
+| AC-09 | merge | fresh guard清树分支空组、全输出对账/摘要折Plan/删scope/登记hold | T-10 |
+
+## 8. 执行步骤
+
+| T | owner_stage | 依赖 | 写面/结果 | AC | 进度 |
+|---|---|---|---|---|---|
+| T-01 | work | 用户另行启动；020/030/035/040交付 | 核已有AST位置/emit/region/SDK无span事实、profile/命名门/owner，唯一树scope登记 | AC-01/02 | [ ] |
+| T-02 | work | T-01 | 最多A/B真实模块全链先证，冻结profile/精度/schema/CLI/线性上界/fallback；不足needs_replan | AC-01..06 | [ ] |
+| T-03 | work | T-02 go | 可选origin/旁件/loader接受身份/snapshot分层展示/gates，默认字节保持 | AC-01..04 | [ ] |
+| T-04 | work | T-03 | 真实compile/runtime/managed/无span与身份/UTF8/变异，非伪错误文本日志 | AC-01..05 | [ ] |
+| T-05 | work | T-04 | 资源上界/字节步数等价、保存A→B/坏map下次恢复与受影响旧门 | AC-04/05 | [ ] |
+| T-06 | work | T-05 | SD候选/可选消费接口/覆盖精度及限制交接，不加M2前置 | AC-05/06 | [ ] |
+| T-07 | review | T-06 | 同树独立final与finding修复后同员复核 | AC-07 | [ ] |
+| T-08 | merge | T-07 pass | 冻结定向门/来源核后实际落master | AC-08 | [ ] |
+| T-09 | merge | T-08 | canonical/归档/导航与可选固定身份核验 | AC-08 | [ ] |
+| T-10 | merge | T-09 | fresh guard/全输出对账/删scope构建物/摘要hold登记 | AC-09 | [ ] |
+
+## 9. 复审记录
+
+2026-11-04 / stage: new / plan_id: auto-ui/PLAN-044 / plan_revision: 1 / outcome: pass（合同可审阅，用户启动后T-01可进，T-03需T-02真实先证go） / next: work T-01。0/10。已有SDK compile region/runtime无span事实从源码核，不承诺所有运行错误精确映射；旁件/入口/模块fixture未实现。本轮无树/材料scope/源码/探针/canonical Spec/构建/GPU/agent，不改在途内容/SDK。
+
+2026-11-04本批规划预检（非实施/独立final）：043/044均0..10节、drafting/r1/0-10、10T/9AC/6V-S/1SD，work6/review1/merge3，十任务未勾；依赖DAG无环，二者功能独立，当前AG016..019没有新增043/044依赖。首次取号核到041/042已属组件store/重载路线后，独占重核取得043/044，未覆盖；后续他路线又分配045..047，本轮不回退号源，不提交其草案，下一号以中央.next-id实际独占核为准。262个所涉本地引用258可解析，余4为存量非AG主题036/037/038导航断链（共享索引包含他会话WIP），未代写；新增/修改AG引用可解析。按metadata/generated/Node源交叉核验当前19/22，余g04两维/g05三维；`python tools/gallery.py validate --all`退出0，12逻辑项22入口/许可一致。Model底层支持、Node模板builtin-only及SDK compile region/runtime无span事实从源码/Spec核，不代表新模板/新映射先证已跑。UI040实交付/独立final与D-02 OS15项pending分列；AG016在途3/10固定035，内容合同/源码/锁/生成物均未改，本轮没有创建实现树/材料scope/probe/新canonical Spec、构建/GPU/OS自动化/agent/发布。文档白名单空白与结构核验通过。
+
+## 10. 待澄清事项
+
+| ID | 事项 | owner/关闭动作 |
+|---|---|---|
+| D-01 | AST位置/emit重组可证精度及准确profile覆盖 | T-02真实错误链先证，不一律伪精确或一律context充目标 |
+| D-02 | map线性上界/schema/fallback实际接入 | T-02按原源域冻结；新硬额度或跨仓AST/SDK改造需needs_replan |
+| D-03 | runtime/API无span与managed区域 | 原SDK事实保持，仅可证上下文，无唯一位置明确unmapped，不暗加运行插桩 |
+| D-04 | 043公共发射交叠/M2固定消费 | T-01核owner短窗；043非前置，当前内容/AG019候选规则不变 |
+
+开工材料唯一`D:/autostack/plan-artifacts/plan-044/auto-ui/`，登记owner/用途/在途；临时probe/包/原始诊断/外部消费者/外置target全归scope。merge摘要折Plan后全输出对账/删scope构建物，仅具名未解决问题持有owner/理由/关闭条件。禁attachments/第二暂存区/链接，清树先fresh guard，不动其它同号仓scope和在途材料。

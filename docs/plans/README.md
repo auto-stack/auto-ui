@@ -44,10 +44,12 @@
 | 038 | [B3专用示例主题支持面核验](038-specialized-examples-theme-readiness.md) | 拆分路线B3有界研究 | drafting/r1，0/8；十二例盘点、六类真实链探针、go/blocked/no-go及后继分包；研究不等迁移，不等037整项，暂不实施 |
 | 039 | [3D查询、动态组与二维标记Node接线](archived/039-autographics-node3d-queries-and-mixed-markers.md) | G05/3d新作者前置；021/024/030 | archived/r1，交付8f577a34（含复审finding R-1修复ff5d267d）；SD-01 canonical node3d-queries-and-mixed-markers.md已落。final收据如实记录同实现会话（判定从工件重建、pilot152/dialect103/gates7/flow8/verifier独立重跑全绿）；D-03 OS phase-14探针沿AG009持有、G05逐字OS迁移归AG017。AG017固定消费其实际交付，前置实质解除 |
 | 040 | [Node双维编辑工程与项目化验收](archived/040-autographics-node-editor-projects.md) | G04纯场景/编辑副本与公共验收收口 | archived/r1，10/10；已交付fc82061c（ff-only落主；独立subagent上下文final pass绑定fc82061c）；SD-01 canonical node-editor-projects.md sha 1daa7111；editor-projects身份孪生入口（queries-3d同机制）+G04忠实双维夹具/冻结产品+driver项目化7门+verify_plan040全PASS+旧档字节冻结复核；AC-03 OS层15行D-02具名pending保持开放；清理回执见计划；AG018可固定消费实际交付 |
+| 043 | [Node3D模型资源对象模板](043-autographics-node3d-model-object-templates.md) | Node模板builtin限制的后继作者接线 | drafting/r1，0/10；复用已有Model运行能力/034闭包/035组合，静态平色与opaque模型实例生命周期/非solid/owner原额；不改AG016基线，暂不实施 |
+| 044 | [Node源码定位与分层诊断](044-autographics-node-source-diagnostics.md) | 多模块作者体验后继 | drafting/r1，0/10；可选原源映射/可证精度与身份、真实compile定位，无span运行错误如实fallback；不依赖043/不换SDK，暂不实施 |
 
-当前AG按[M2路线](../design/autographics/m2-game-first-three-lane-roadmap.md)推进：UI035/039/040已实际交付5903839e/8f577a34/fc82061c；AG016/017仍drafting/r1/0-10无树，现有引擎交付不自动替代其合同中的必要独立证据。新批[编辑/发行设计](../design/autographics/m2-editor-and-release-convergence.md)三合同：UI040已交付（公共编辑引擎能力，D-02 OS层具名pending），AG018可固定消费其实际交付做G04双教程迁移，AG019同版M2联验后置。018完整迁移等其实际交付；019候选硬门（等040）已满足、完整联验等016/017/018实交付。当前19/22，不提前M2完成。
+当前AG按[M2路线](../design/autographics/m2-game-first-three-lane-roadmap.md)推进：UI040已交付fc82061c/独立final，OS层15项D-02仍pending；AG016现executing/r1/本次核验3-10、唯一ag-016树、固定035；017/018/019仍草案，当前Gallery19/22。新[资源组件与诊断设计](../design/autographics/node-resource-components-and-source-diagnostics.md)立本仓043模型对象模板、044可选源码诊断，均drafting/r1/0-10、仅规划、可独立推进。它们不新增为AG016或AG019当前M2前置，不让在途内容追tip；共享生成器文件按owner短窗，原预算/验收不变。
 
-024/025/027/028/030/032/034/035/039/040已交付，独立review/具名hold和批门按实际收据；新AG公共编辑收口040已交付。036..038是主题路线，026/029是Reader路线，本轮不接管。各仓号源独占重核，不以外仓号跳号；设计见[索引](../design/README.md)。
+024/025/027/028/030/032/034/035/039/040已交付，来源/独立review/持名问题按实际收据；新AG后继043/044为显式可选能力。041/042是其它UI组件store/重载准备路线，本轮不覆盖其合同；各仓号源独占重核，下一号以实际.next-id为准。
 
 ## 债务/候选
 

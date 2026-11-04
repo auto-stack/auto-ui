@@ -1,6 +1,8 @@
 # AG M2下一阶段：编辑教程与统一版本发行收口
 
-2026-11-03 v1，target-state。用户要求提出并规划下一批；[UI040](../../plans/040-autographics-node-editor-projects.md)、[AG018](../../../../ag-examples/docs/plans/018-autographics-gallery-node-editor-tutorials.md)、[AG019](../../../../ag-examples/docs/plans/019-autographics-m2-unified-release-validation.md)均drafting/r1/0-10，本轮不实施/建树/探针/素材/构建/GPU/OS自动化/agent/发布。保原预算/玩法/全部验收，不为凑三份任务另造功能。
+> 2026-11-04现场更新：UI040已交付fc82061c/独立final/canonical/清理齐，原OS层15项仍D-02 pending；AG016已executing3/10固定035，AG017/018/019草案。UI043/044仅为可选引擎后继，不新增本批M2前置，见[资源组件/诊断设计](node-resource-components-and-source-diagnostics.md)。下文保2026-11-03立约快照，实际消费以各合同/交付证据为准。
+
+2026-11-03 v1，target-state。用户要求提出并规划下一批；[UI040](../../plans/archived/040-autographics-node-editor-projects.md)、[AG018](../../../../ag-examples/docs/plans/018-autographics-gallery-node-editor-tutorials.md)、[AG019](../../../../ag-examples/docs/plans/019-autographics-m2-unified-release-validation.md)均drafting/r1/0-10，本轮不实施/建树/探针/素材/构建/GPU/OS自动化/agent/发布。保原预算/玩法/全部验收，不为凑三份任务另造功能。
 
 ## 1. 当前证据与剩余分母
 
