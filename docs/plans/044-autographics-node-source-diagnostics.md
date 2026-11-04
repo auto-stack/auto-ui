@@ -138,6 +138,8 @@ work产证；review同树独立上下文final，从真实compile/Run复核AC/SD/
 
 2026-11-04 / stage: goal | plan_id: PLAN-044 | plan_revision: 1 | round: 1 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-044/auto-ui | commit: d176f85f (base, 尚无代码提交) | next: work T-02。T-01 完成：AST/span/emit/region/SDK无span事实与 profile/命名门/owner 已从源码核实并登记（§8 T-01 行内证据）；授权记录写入 §4；主检出他会话 WIP（043 Plan、045-047 草案、docs/design、crates/auto-ui-runtime/test/）非本 Plan 所有，仅登记不触碰。T-02 起为真实全链先证（A/B 机制、冻结 schema/CLI/上界）。
 
+2026-11-04 / stage: goal | plan_id: PLAN-044 | plan_revision: 1 | round: 2 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-044/auto-ui | commit: 70c9075b | next: work T-02（续）。依赖树 `D:/autostack/.wt/ui-044/auto-lang`（detached @ da884ab2b，只读兄弟检出，pilot `../../../auto-lang` 路径解析）。本轮切片：pilot `src/source_map.rs`（MAP_FORMAT=node-source-map/v1；Precision exact/range/context/generated/unmapped；Segment 半开byte区间+module/node/event/helper+源区间；validate 拒坏hash/逃逸key/越界/重叠乱序/非字符边界/伪精度字段一致；lookup 二分；validate_against_world 载入侧 world/user 字节绑定）+ pooled helper 后置锚定（`// pooled fn {name} from {module}` 唯一锚定，verbatim→exact，行内重命名→range）+ generated 间隙补齐铺瓦。未改默认发射字节。gates `tests/node_source_map_gates.rs` 8/8 绿（`cargo test --test node_source_map_gates`）。T-02 余量：真实 profile 全链（load→lower→map→SDK compile 错 offset→回原模块行）、handler 段（node/event 上下文）、`--diagnostics-map`/`source-map.json` 冻结、driver 侧消费与分层诊断、线性上界实测。
+
 ## 10. 待澄清事项
 
 | ID | 事项 | owner/关闭动作 |
