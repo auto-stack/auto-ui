@@ -76,20 +76,21 @@
   58/0 全绿）。逐例默认/豁免/通道/阻点关闭记录见
   [图像与文件教学示例主题迁移批次](demo-theme-batch-046.md)。
   **B3 已迁 6 例；累计 28 个示例已迁**。
-- 剩余 **6** 个 B3 目录（018/024/025/026/031-paint/041）主题接入 =
-  后继批次。UI038 已交付**有界支持面实测**（真实链探针，非静态盘点）：
-  9 例有界 go（其中 018 阅读链半通）、031-image-viewer blocked（a2r
-  codegen 7 错 + `--server vm` boot 挂起，均具名 owner）；045 已按冻结
-  反例闭合其 019/020/030 三例的具名阻点（links 归属冲突、播放腿、media
-  back contract、死代码接线）；046 已闭合 029/031-image-viewer/027 的
-  F-1/F-2/F-3/photo_root（归属 auto-web api_gen scaffold / auto-man
-  server 臂 / 027 tests+runtime fixture 契约）。实测支持表/具名前置/
-  后继分包（阅读/编辑/数据/专用绘制，不取号）见
-  [专用示例主题迁移支持面](specialized-theme-migration-readiness.md)。
-  **B3 余六例仍未迁**；实测"无主题面"四例（031-paint/024/026/041，未
-  声明 theme 状态/design 绑定，壳不随族/模式输入改变）的补声明 = 后继
-  第一步工作项；三处原测试陈旧（024/025/026；027 已由 PLAN-046 修定
-  全绿）与 018 五红具名 owner。
+- 第七批（PLAN-047）：**B3 阅读编辑数据与专用绘制六例接入**——
+  018-book-reader（038 F-10 五红关闭：main.ts import 拼接/json.from_value
+  /store facade await/as int 截断四生成器缝根修 + 漂移修定，原门 10/10×2；
+  逃生舱 ThemeToggle.vue+index.css 退役、侧栏官方切换承接 README 承诺位）、
+  041-auto-edit（56/56，编辑器深色面字面豁免保留、语法着色 owner=runtime
+  code_editor 不变）、026-database（0/8→23/23，断言修定+MCP 首帧就绪）、
+  025-sys-monitor（VM 20/20，F-4 按现 UI 修定；vue 轨后端 a2r codegen
+  E0432 为与本批无关的存量缺陷具名交接 owner=a2r 谱系）、024-charts
+  （VM 23/23 + vue 首建入口 12/12，F-9 七腿按 484 后现 UI 修定）、
+  031-paint（34/34，px 像素哨兵跨 2×2 换肤逐值恒守）。逐例默认/映射/
+  豁免/双端通道/生成器五缝回归锚见
+  [教学示例主题迁移批次047](demo-theme-batch-047.md)。
+  **B3 收口：12/12 例全部已迁；累计 34 个示例已迁**。实测"无主题面"四例
+  （031-paint/024/026/041）补声明并实际消费；原测试陈旧 024/025/026 已按
+  现 UI 修定；018 五红关闭。
   共享 stylekit、remote-frame-e2e、032 验证例按来源保持义务，不按业务
   app 强套主题；038-minesweeper 属 UI037 谱系不随 B3。
 - **渠道与支持面（PLAN-036 交接，不扩历史交付）**：B1 十例的既有交付

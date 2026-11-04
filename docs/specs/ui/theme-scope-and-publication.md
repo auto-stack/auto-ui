@@ -127,3 +127,22 @@
   + PLAN-041 fixture（同型实例各持业务态，主题经宿主/App scope）为准。
 - store composable 的 accent bootstrap 随厂形迁移为**每 App 实例化时执行**
   （原模块加载一次）；palette/theme runtime 助手仍为模块级无状态函数。
+
+## PLAN-047 增补：Vue 轨族注入与生成发射缝（SD-04）
+
+- **`__AUTO_TREE_THEMES__` 注入全覆盖**：官方包族到达 Vue 运行时的唯一
+  通道是 index.html 注入体；注入必须同时覆盖首脚手架（write_project_files）
+  与 regen 两路（此前仅 regen 注入，fresh gen 恒 None）；主题树收集对
+  `use themes.themes` 的解析必须感知 pac `dep <name> { path: … }` 包根
+  （裸 base_dir 相对探针找不到 dep 包 → 收集静默空 → 官方族 Vue 侧永不
+  上身，016 B2 vue 腿 master 存量红实证）。回归锚：
+  `plan047_collect_resolves_use_via_dep_roots`。
+- **生成发射缝四则**（018 原门关闭过程实录，回归锚单测各一）：
+  main.ts 多 import 必须分行（拼接同行 → esbuild transform 500 应用全挂）；
+  `json.from_value(x)` 恒等映射（Http.post/put 发射层自带 stringify，
+  再 stringify 即双层编码 422）；store facade 方法调用发射 `await`
+  （fire-and-forget 后续语句读旧 state；handler/lifecycle 的 async 化由
+  既有 body.contains("await") 判定承担）；`as <整数>` 截断发射
+  `Math.trunc`（a2ts `Number(...)` 不截断，浮点进 i64 后端被拒 422）。
+- VM 渲染态快照名口径：编辑器渲染后节点=textarea、首帧前 fallback 树
+  =code_editor；SVG 内图例/数据不可文本观测——数据值 oracle 落 vue 轨。

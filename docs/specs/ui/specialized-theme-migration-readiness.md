@@ -8,22 +8,22 @@
 > 本文只记**实测结论**：每例结论仅在其实测覆盖面内成立；"无主题面"=未声明
 > theme 状态/design 绑定，壳不随族/模式输入改变（实测），是后继迁移的第一步
 > 工作项而非缺陷。研究归档 ≠ 迁移完成：B3 十二例在 038 生效时**仍未迁**；
-> 045 已交付其中三例（019/020/030，见 §5），046 已再交付三例（029/031-image-viewer/027，见 §6），余六例仍未迁。
+> 045 已交付其中三例（019/020/030，见 §5），046 已再交付三例（029/031-image-viewer/027，见 §6），047 交付最后六例（018/041/026/025/024/031-paint，见 §7）——**B3 十二例至此全部已迁**。
 
 ## 1. 支持面实测结论（C-01）
 
 | 例 | 原门实测 | 主题面实测 | 结论 |
 |---|---|---|---|
-| 031-paint | 31/31（画/擦/填充/undo/redo/存取；P553-D1 未触发） | 无声明 state；文档像素哨兵跨进程+跨 theme 恒守 | go（有界；无主题面→补声明） |
-| 041-auto-edit | 50/50（含磁盘回读/热重载/keymap/退出） | 无声明 state；语法着色 owner=runtime code_editor | go（有界；无主题面→补声明） |
+| 031-paint | 31/31→34/34（PLAN-047 后：原门全绿 + 主题腿；像素哨兵跨肤恒守实测） | 已补声明并实际消费（fixture 2×2） | 已迁（PLAN-047） |
+| 041-auto-edit | 50/50→56/56（PLAN-047 后：原门全绿 + 主题腿） | 已补声明并实际消费；语法着色 owner=runtime code_editor 保持 | 已迁（PLAN-047） |
 | 027-file-manager | 真实 fs 链+坏路径拒绝（行/cwd 守恒）；套件 T4 触发器漂移具名 | `--theme` CLI Δ234；应用内 toggle 缺席（desktop-host 回写设计） | go（有界） |
 | 029-photo-gallery | 无原 tests；夹具腿 scan 哨兵恒守 | seeding+应用内 toggle live Δ203 | go（有界；photo_root env-first 化） |
 | 020-music-player | `--back-port` 覆盖下真实 scan/stream；原 test 入口 links 冲突具名 | seeding+handler 派发 live Δ216；ToggleDarkMode 无视图绑定（死代码） | go（有界；playback blocked 具名） |
-| 025-sys-monitor | 7/11（退役页/文案陈旧具名；kill 只验对话框+取消） | seeding Δ236 | go（有界） |
+| 025-sys-monitor | 7/11→VM 20/20（PLAN-047 按现 UI 修定 + 主题腿；vue 轨后端 a2r codegen E0432 存量缺陷具名交接 owner=a2r 谱系） | 已补声明并实际消费（dark-first 显式默认保留） | 已迁（PLAN-047；vue 轨交接具名） |
 | 019-video-app | vm-smoke PASS（设置面板交互；mock 词负控内建） | seeding Δ153；5 accent if-链=迁移主战场 | go（门户/VM 轨；vue e2e 未跑） |
-| 024-charts | 12/19（484 后状态契约 7 腿不存在；tick 2.48 在门内） | 无声明 state→无主题面（luma 恒定） | go（有界；测试修定 owner 具名） |
-| 026-database | 0/8 断言全失配（app 本体健康实证） | 无声明 state→无主题面（luma 恒 23.5） | go（主题=后继补声明） |
-| 018-book-reader | 5/10：书卡→详情空渲染+进度回写/添加书/ThemeToggle 挂载失效（具名） | 逃生舱失效；现输入=生成器默认 html.dark | 有界 go（阅读链半通）；5 红具名 |
+| 024-charts | 12/19→VM 23/23 + vue 12/12（PLAN-047：七腿按 484 后现 UI 修定，数据腿落 vue 首建入口） | 已补声明并实际消费 | 已迁（PLAN-047） |
+| 026-database | 0/8→23/23（PLAN-047：断言修定 + MCP 首帧就绪等待；SQL/错误/分页/排序原语义保持） | 已补声明并实际消费 | 已迁（PLAN-047） |
+| 018-book-reader | 5/10→10/10 ×2（PLAN-047 F-10 关闭：main.ts import 拼接/json.from_value/store facade await/as int 截断四生成器缝 + 漂移修定；T9 由官方机制闭、逃生舱退役） | 官方主题接线（dark-first 保留迁移前有效默认；host/CLI 链可覆盖） | 已迁（PLAN-047） |
 | 030-video-player | vm-smoke ALL PASS（诚实降级+mock 词负控）+assert-style 静态门 PASS；两轨均无 media API（无 back contract） | VM 降级面未测 | 有界 go（壳/静态门）；media 数据面与播放 blocked 具名 |
 | 031-image-viewer | a2r 生成后端 7 编译错（该例形状触发；同族 020/025/018 编译 ✅）；`--server vm` 挂起 | 无实际腿 | **blocked**（双具名前置；静态=全 token 0 hex） |
 
@@ -43,8 +43,11 @@
    back contract（media API 两轨不可达）、mpv+合法夹具环境、020 死代码接线。
 2. **图像与文件**（029/031-image-viewer/027）：前置=031iv a2r codegen 7 错
    （唯一硬阻断）；031iv 性能门条件保留（本机冷启未达具名）。
-3. **阅读/编辑/数据/专用绘制**（018/041/026/025/024/031-paint）：前置=018 vue
-   轨组件挂载/路由回渲染五红；四处测试定位修定；四例主题声明补齐。
+3. **阅读/编辑/数据/专用绘制**（018/041/026/025/024/031-paint）：**已由
+   PLAN-047 交付**——018 五红 F-10 关（根因四层生成器缝 + 漂移修定，回归
+   锚单测各一）；测试定位修定 024/025/026 按现 UI 闭（027=046 批）；四例
+   主题声明补齐并实际消费。025 vue 轨后端 a2r codegen E0432（base 同败
+   实证）为存量缺陷具名 owner 交接，不在本批承诺内。
 
 共享资产（stylekit/remote-frame-e2e/032）按来源保持义务，不按业务 app 强套
 主题；038-minesweeper 属 UI037 谱系不随本表。
