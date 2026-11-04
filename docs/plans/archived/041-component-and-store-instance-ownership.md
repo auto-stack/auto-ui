@@ -1,6 +1,6 @@
 ---
 plan_id: PLAN-041
-status: reviewed
+status: archived
 feature_name: 组件与Store实例所有权收口
 author: [Codex]
 created_at: 2026-11-04
