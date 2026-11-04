@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-04
 updated_at: 2026-11-04
 plan_revision: 1
-current_step: 0
+current_step: 2
 total_steps: 4
 depends_on: []
 supersedes_spec_components: []
@@ -93,8 +93,9 @@ Rust（auto-ui-compiler / auto-ui-tools）；cargo t 固定组（`tu`=ui_gen 单
 
 ## 8. 执行步骤
 
-- [ ] T-01（owner_stage=work；AC-01）：store_init_to_js Node 臂 + 单测。
-- [ ] T-02（owner_stage=work；AC-02）：main.ts 分隔修复 + 四组合单测。
+- [x] T-01（owner_stage=work；AC-01）：store_init_to_js Node 臂 + 单测。[✅ 2026-11-04] Expr::Node→对象字面量（Pair/Pos/Name 三形态，loop 保守 null，ts_adapter:2254 同构）；oracle test_plan051_store_struct_default_kept（ref<any>({ id: 0, ... }) 保真）+ non_struct_defaults_unchanged 过。
+- [x] T-02（owner_stage=work；AC-02）：main.ts 分隔修复 + 四组合单测。[✅ 2026-11-04] store_ctx_import 前导 
+；oracle main_ts_imports_newline_separated_four_combinations 过（四组合无拼接 import）。
 - [ ] T-03（owner_stage=work；AC-03）：③a 有界调查决策稿。
 - [ ] T-04（owner_stage=work；依赖T-03；AC-03）：③b 修复（或拆分记录）。
 - [ ] T-05（owner_stage=work；依赖T-01/02/04；AC-04）：组回归 + 新测试。
