@@ -2051,6 +2051,7 @@ impl VmBridge {
         self.instance_seen_cur
             .borrow_mut()
             .insert(identity.to_string());
+        eprintln!("[PLAN051-DIAG] ensure {identity}");
 
         if let Some(rec) = self.child_instances.borrow().get(identity).cloned() {
             // Re-seed props onto the existing instance object.
@@ -2271,7 +2272,14 @@ impl VmBridge {
         let prev = self.instance_seen_prev.borrow().clone();
         let cur = self.instance_seen_cur.borrow().clone();
         let sweep: Vec<String> = prev.difference(&cur).cloned().collect();
+        if !sweep.is_empty() {
+            eprintln!(
+                "[PLAN051-DIAG] sweep prev={:?} cur={:?} sweeping={:?}",
+                prev, cur, sweep
+            );
+        }
         for identity in &sweep {
+            eprintln!("[PLAN051-DIAG] releasing {identity}");
             self.release_child_instance(identity);
         }
         self.instance_seen_prev.borrow_mut().clear();
