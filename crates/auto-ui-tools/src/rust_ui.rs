@@ -4070,6 +4070,12 @@ struct DeliveryProjectionSpec {
     feature_rewrites: &'static [(&'static str, &'static str)],
     // Supported intermediate forms produced by the managed installer.
     installed_rewrites: &'static [(&'static str, &'static str)],
+    /// 依赖行改写（PLAN-930 T-04）：整行精确匹配 producer 原行 → 整行替换
+    /// 为投影行。用于剥除对同包投影像的失效 feature 请求（如 tools 对
+    /// runtime 的 `features=["autodown"]`——runtime 投影已剥 autodown-core，
+    /// bundle 内重开该 feature 会复编 cfg 模块并 E0433）。原形恰一行、
+    /// 投影形恰一行（幂等重交付），缺/双形态判漂移红。
+    dep_rewrites: &'static [(&'static str, &'static str)],
     /// 跨仓 path 前缀改写（PLAN-831 T-06 起源仓分置：UI 仓 manifest 以
     /// `../../../auto-lang/crates/` 指语言基础、语言仓 auto-lang 以
     /// `../../../auto-ui/crates/` 指 UI 包组——拷入交付根后统一改写为
@@ -4087,6 +4093,7 @@ const PROJECTION_AUTO_LANG: DeliveryProjectionSpec = DeliveryProjectionSpec {
     strip_deps: &[],
     feature_rewrites: &[],
     installed_rewrites: &[],
+    dep_rewrites: &[],
     // PLAN-831 T-06：auto-lang 对独立 UI 仓包组的跨仓 path → 交付根包内兄弟。
     // PLAN-901 r2/§5.5：facade 对 web 仓 auto-web 的硬 path 依赖（890 谱系）
     // → 交付根包内兄弟。
@@ -4112,6 +4119,7 @@ const PROJECTION_AUTO_UI_RUNTIME: DeliveryProjectionSpec = DeliveryProjectionSpe
         "autodown = []",
     )],
     installed_rewrites: &[],
+    dep_rewrites: &[],
     path_rewrites: &[
         ("../../../auto-lang/crates/", "../"),
         ("../../../auto-web/crates/", "../"),
@@ -4126,16 +4134,39 @@ const PROJECTION_AUTO_LANG_CORE: DeliveryProjectionSpec = DeliveryProjectionSpec
     strip_deps: &[],
     feature_rewrites: &[],
     installed_rewrites: &[],
+    dep_rewrites: &[],
     path_rewrites: &[("../../../auto-web/crates/", "../")],
 };
 
 /// PLAN-831 T-06 起 UI 仓侧受管 crate 的通用投影：跨仓语言基础 path 前缀
 /// 改写为交付根包内兄弟形态（runtime 另有 autodown 剥除 spec 覆盖）。
 /// PLAN-901 r2/§5.5：补 web 仓前缀（auto-ui-tools 硬依赖 auto-web）。
+/// auto-ui-tools 的 autodown feature 请求剥除另见 PROJECTION_AUTO_UI_TOOLS。
 const PROJECTION_AUTO_UI_CRATE: DeliveryProjectionSpec = DeliveryProjectionSpec {
     strip_deps: &[],
     feature_rewrites: &[],
     installed_rewrites: &[],
+    dep_rewrites: &[],
+    path_rewrites: &[
+        ("../../../auto-lang/crates/", "../"),
+        ("../../../auto-web/crates/", "../"),
+    ],
+};
+
+/// PLAN-930 T-04：auto-ui-tools 专用投影（在通用 PROJECTION_AUTO_UI_CRATE
+/// 之上增依赖行改写）——tools 对 runtime 的 `features=["autodown"]` 请求在
+/// 交付投影后失效（runtime 投影已把 autodown 剥为空 feature，bundle 内
+/// 重开即复编 cfg 模块并 E0433——036 V05a 根因）；依赖行改写剥除该 feature
+/// 请求，文档引擎回退普通编辑器面（与 runtime 不进 SDK 的既有投影语义
+/// 一致）。原形恰一行、投影形恰一行（幂等），漂移判红。
+const PROJECTION_AUTO_UI_TOOLS: DeliveryProjectionSpec = DeliveryProjectionSpec {
+    strip_deps: &[],
+    feature_rewrites: &[],
+    installed_rewrites: &[],
+    dep_rewrites: &[(
+        "auto-ui-runtime = { path = \"../auto-ui-runtime\", features = [\"autodown\"] }",
+        "auto-ui-runtime = { path = \"../auto-ui-runtime\" }",
+    )],
     path_rewrites: &[
         ("../../../auto-lang/crates/", "../"),
         ("../../../auto-web/crates/", "../"),
@@ -4148,6 +4179,7 @@ const PROJECTION_AUTO_API_GEN: DeliveryProjectionSpec = DeliveryProjectionSpec {
     strip_deps: &[],
     feature_rewrites: &[],
     installed_rewrites: &[],
+    dep_rewrites: &[],
     path_rewrites: &[("../../../auto-web/crates/", "../")],
 };
 
@@ -4158,6 +4190,7 @@ const PROJECTION_AUTO_WEB: DeliveryProjectionSpec = DeliveryProjectionSpec {
     strip_deps: &[],
     feature_rewrites: &[],
     installed_rewrites: &[],
+    dep_rewrites: &[],
     path_rewrites: &[("../../../auto-lang/crates/", "../")],
 };
 
@@ -4763,6 +4796,19 @@ fn delivery_apply_projection(
         return Err("delivery: 投影修剪不完整——producer 清单结构漂移，受管判红".into());
     }
 
+    // PLAN-930 T-04：依赖行改写独立于 strip/feature 三态校验——原形
+    // （from 恰一行、to 缺）或投影形（to 恰一行、from 缺）二选一，
+    // 缺/双形态=结构漂移判红（幂等重交付只命中投影形零编辑）。
+    let dep_line_trimmed: Vec<&str> = lines.iter().map(|l| l.trim()).collect();
+    let dep_rewrite_ok = spec.dep_rewrites.iter().all(|(from, to)| {
+        let from_hits = dep_line_trimmed.iter().filter(|l| **l == *from).count();
+        let to_hits = dep_line_trimmed.iter().filter(|l| **l == *to).count();
+        (from_hits == 1 && to_hits == 0) || (from_hits == 0 && to_hits == 1)
+    });
+    if !dep_rewrite_ok {
+        return Err("delivery: 依赖行改写不完整——producer 清单结构漂移，受管判红".into());
+    }
+
     let mut edits = Vec::new();
     let mut out: Vec<String> = Vec::new();
     for (index, line) in lines.iter().enumerate() {
@@ -4792,6 +4838,12 @@ fn delivery_apply_projection(
             if item.is_some_and(|item| line_index(item) == index) && line.trim() == from {
                 line = line.replace(from, to);
                 edits.push(format!("rewrite feature: {from} -> {to}"));
+            }
+        }
+        for &(from, to) in spec.dep_rewrites {
+            if line.trim() == from {
+                line = line.replace(from, to);
+                edits.push(format!("rewrite dep: {from} -> {to}"));
             }
         }
         out.push(line);
@@ -5692,9 +5744,13 @@ fn generate_rust_ui_delivery_inner(
             edits =
                 delivery_apply_projection(&dst.join("Cargo.toml"), &PROJECTION_AUTO_UI_RUNTIME)?;
             projection_edits_runtime = edits.clone();
+        } else if name == "auto-ui-tools" {
+            // PLAN-930 T-04：tools 专用投影（通用前缀改写 + autodown feature
+            // 请求剥除——036 V05a 根因闭合）。
+            edits = delivery_apply_projection(&dst.join("Cargo.toml"), &PROJECTION_AUTO_UI_TOOLS)?;
         } else if matches!(
             name,
-            "auto-ui-dialect" | "auto-ui-compiler" | "auto-ui-tools" | "shell-pack"
+            "auto-ui-dialect" | "auto-ui-compiler" | "shell-pack"
         ) {
             // PLAN-831 T-06：UI 仓侧受管 crate——跨仓语言基础 path 前缀投影
             // （PLAN-901 r2：spec 内补 web 仓前缀改写）。
@@ -8394,8 +8450,29 @@ pub fn list_items() []str {
         let fw_ws_cargo = get_rust_workspace_dir().join("Cargo.toml");
 
         generate_rust_ui(&project, None, false).expect("out-of-repo generation succeeds");
-        // member 落 project-local。
-        let member = project.join("rust-workspace").join("helloworld-out");
+        // PLAN-930 T-04：910 成员身份——成员目录为 `<basename>-<id8>`（路径
+        // 身份、cwd 无关），按受管 member.json 登记定位（role=front 恰一
+        // 个），不以旧 basename 认领、不复制 id8 哈希算法。
+        let ws_dir = project.join("rust-workspace");
+        let members: Vec<_> = fs::read_dir(&ws_dir)
+            .unwrap_or_else(|e| panic!("rust-workspace 缺失: {e}"))
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
+            .filter(|e| e.path().join("member.json").is_file())
+            .filter(|e| {
+                fs::read_to_string(e.path().join("member.json"))
+                    .ok()
+                    .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
+                    .and_then(|v| {
+                        v.get("role")
+                            .and_then(|r| r.as_str())
+                            .map(|s| s == "front")
+                    })
+                    .unwrap_or(false)
+            })
+            .collect();
+        assert_eq!(members.len(), 1, "front 成员恰一（910 id8 登记）: {members:?}");
+        let member = members[0].path();
         assert!(
             member.join("Cargo.toml").exists(),
             "member lands project-local at {}",
@@ -9013,6 +9090,63 @@ auto-val = { path = \"../auto-val\" }
     )
     .unwrap();
     assert!(delivery_apply_projection(&rt_drift, &PROJECTION_AUTO_UI_RUNTIME).is_err());
+}
+
+/// PLAN-930 T-04：tools 投影依赖行改写——producer 原形
+/// `auto-ui-runtime = { path = "../auto-ui-runtime", features = ["autodown"] }`
+/// → 投影形剥 feature 请求（bundle 内 runtime 的 autodown 已投影为空
+/// feature，重开即复编 cfg 模块并 E0433——036 V05a 根因）；幂等、漂移
+/// 判红、合法零影响。
+#[test]
+fn plan930_tools_dep_rewrite_strips_autodown_feature_request() {
+    let dir = tempfile::tempdir().unwrap();
+    let m = dir.path().join("tools.toml");
+    let original = "[dependencies]
+auto-ui-runtime = { path = \"../auto-ui-runtime\", features = [\"autodown\"] }
+";
+    std::fs::write(&m, original).unwrap();
+    let edits = delivery_apply_projection(&m, &PROJECTION_AUTO_UI_TOOLS).unwrap();
+    assert_eq!(edits.len(), 1, "恰一次依赖行改写: {edits:?}");
+    assert!(edits[0].starts_with("rewrite dep: "), "{edits:?}");
+    let text = std::fs::read_to_string(&m).unwrap();
+    assert!(
+        text.contains("auto-ui-runtime = { path = \"../auto-ui-runtime\" }"),
+        "feature 请求剥除: {text}"
+    );
+    assert!(!text.contains("autodown"), "bundle 内不得残留 autodown feature 请求: {text}");
+    // 幂等：已投影形态再投影零编辑、原文不变。
+    let projected_text = std::fs::read_to_string(&m).unwrap();
+    assert!(
+        delivery_apply_projection(&m, &PROJECTION_AUTO_UI_TOOLS)
+            .unwrap()
+            .is_empty(),
+        "投影形幂等"
+    );
+    assert_eq!(std::fs::read_to_string(&m).unwrap(), projected_text);
+    // 漂移（既非原形也非投影形的第三形态）→ 判红。
+    let drift = dir.path().join("tools-drift.toml");
+    std::fs::write(
+        &drift,
+        "[dependencies]
+auto-ui-runtime = { path = \"../auto-ui-runtime\", features = [] }
+",
+    )
+    .unwrap();
+    assert!(delivery_apply_projection(&drift, &PROJECTION_AUTO_UI_TOOLS).is_err());
+    // 无关依赖/其他 feature 请求零影响（合法共存面）。
+    let unrelated = dir.path().join("tools-unrelated.toml");
+    let unrelated_input = "[dependencies]
+auto-ui-runtime = { path = \"../auto-ui-runtime\", features = [\"autodown\"] }
+auto-lang-core = { path = \"../auto-lang-core\", features = [\"code-editor\"] }
+";
+    std::fs::write(&unrelated, unrelated_input).unwrap();
+    let u_edits = delivery_apply_projection(&unrelated, &PROJECTION_AUTO_UI_TOOLS).unwrap();
+    assert_eq!(u_edits.len(), 1, "仅 runtime feature 请求被改写: {u_edits:?}");
+    let u_text = std::fs::read_to_string(&unrelated).unwrap();
+    assert!(
+        u_text.contains("auto-lang-core = { path = \"../auto-lang-core\", features = [\"code-editor\"] }"),
+        "无关依赖原样保留: {u_text}"
+    );
 }
 
     /// PLAN-901：恒等投影合同（原 plan842 installed 状态机退役）。语言仓
