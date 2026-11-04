@@ -1,6 +1,6 @@
 ---
 plan_id: PLAN-048
-status: reviewed
+status: archived
 feature_name: AGE基础UI Node与真实Auto事件接线
 author: [Codex]
 created_at: 2026-11-04
@@ -105,8 +105,8 @@ T-02最多两种等价机制的完整先证：导入两个同定义计数组件�
 | T-05 | work | T-04 | [x] 原生取证（native-positive passed=true exit0：真实点击×3＋真实Tab/Enter→a=3 b=12；native-negative sabotage-focus passed=false exit1：无焦点不投递计数保持基线）——离屏与原生两通道分记不互代；负控集（陈旧Run拒绝/队列上界/禁用按钮零消息/未知handler具名拒绝）齐；预算：冻结常数双图互检（verify_plan048）＋每回调预算为pinned Session原代码未动；旧档受影响并集：pilot全套179/179绿＋components-2d冻结world.at逐字节pin；driver侧发现的**先前既有**红（4测试文件Scene3dContent缺hud_overlay字段，与048无关，基线已坏——见§9登记留review/merge分诊） | AC-02..05 | [x] |
 | T-06 | work | T-05 | [x] `tools/verify_plan048.py --controls` ALL PASS（再生字节一致/身份链/双图冻结常数8·32·4·8·64·64/SDK681 verify-only/旧档byte-pin）；SD-01候选`docs/specs/auto-graphics/node-basic-ui.md`已备（含SDK字面量数组>256静默截断硬事实与消费身份，merge落位）；SDK681/两图锁未动（全程--locked）。commit 2d1ad4ae | AC-05/06 | [x] |
 | T-07 | review | T-06 | 同树独立final，finding返work同员有界复核 | AC-07 | [ ] |
-| T-08 | merge | T-07 pass | 冻结定向门/来源核后实际落主，review版本差异逐项核 | AC-08 | [ ] |
-| T-09 | merge | T-08 | canonical/同号归档/公开消费身份与导航，049只读交付不追tip | AC-08 | [ ] |
+| T-08 | merge | T-07 pass | [x] 冻结定向门（review后受影响并集全绿重跑）＋来源核（range-diff等价）后ff-only落主 delivery=cd1e161a；review基线2d1ad4ae→cd1e161a差异=0（range-diff全等） | AC-08 | [x] |
+| T-09 | merge | T-08 | [x] canonical落主（node-basic-ui.md sha16 7bda6f53faf16cae，主上controls ALL PASS）；同号归档docs/plans/archived/048-…（status: archived）；公开消费身份=ui.json schema/generator＋verify入口＋node_ui_window，049只读（049文件未动，无追tip） | AC-08 | [x] |
 | T-10 | merge | T-09 | fresh guard清自有树、所有实际输出对账/清scope构建物、具名hold登记 | AC-09 | [ ] |
 
 ## 9. 复审记录
@@ -128,6 +128,15 @@ stage: goal | plan_id: PLAN-048 | plan_revision: r1 | round: 1 | from: drafting 
 2026-11-05 / stage: review | review_scope: final | reviewer_identity/limitations: 同会话实现者复审（无独立分派final角色）——按技能要求声明此限制，裁定不基于执行者摘要而是**在冻结HEAD上全量独立重执行**（下述命令均reviewer自跑、全新输出），并新增reviewer自有反例探针 | plan_id: PLAN-048 | plan_revision: r1 | outcome: **pass**（reviewed） | worktree_path: D:/autostack/.wt/ui-048/auto-ui | branch: codex/plan-048-dev | reviewed_commit: 2d1ad4ae6cf81e633e3eeae74cc74eb0481a63d6（工作树干净：0 modified/0 untracked实现面） | base_commit: 6837bbe8 | dependency_revisions: auto-lang tip sibling detached@30b396d72只读；SDK681快照verify-only PASS；两图--locked未动 | spec_inputs: docs/specs/auto-graphics/node-basic-ui.md（SD-01候选127行，worktree内已提交未落主）；旧档canonical未动 | acceptance_results: AC-01 pass（gates正例+产物审查）；AC-02 pass（vs01/02离屏＋native-positive真实点击×3+真实Tab/Enter→a=3/b=12 exit0）；AC-03 pass（vs03卸载/重挂/重绘不代Tick/20轮fresh＋vs02陈旧拒绝）；AC-04 pass（冻结常数双图互检＋未初始化写与>256静默截断实录＋旧预算未动）；AC-05 pass（storage身份链/坏副本拒绝/旧档byte-pin＋SDK681 verify）；AC-06 pass（冷A→B同链＋修复下一Run恢复＋verify_plan048 ALL PASS＋SD候选齐）；AC-07 本审 pass | pending_closeout_gates: merge统一回归（被**先前既有**driver红阻塞——Scene3dContent缺hud_overlay，基线6837bbe8已坏、非048面；merge须先owner分诊，不得静默跳过） | findings: 无合同内缺陷。三项已记录的合同内精化（均证据驱动、有界、双图互检、非静默弱化）：①T-02文字容量从"64B×8平铺单数组"精化为"每实例每def≤4槽×64B独立数组"——SDK字面量数组>256静默截断（256→0/300→44/385→129实测）强制重构，worst case 8×256B=2048B仍严格有界；②键盘激活由适配器平台路由承担（Tab环+Enter经同队列同派发器）——stock iced 0.14 button无键盘支持（iced_widget 0.14.2源码核实），设计§3职责归属；③文字传输=标量字节缓冲协议（T-02原冻结即此，无漂移） | evidence: reviewer全新执行——verify_plan048 --controls ALL PASS；pilot 179/179（含node_ui_gates 4/4）；driver node_ui_flow 3/3＋node_ui_storage 3/3（单实例GPU）；native-positive passed=true exit0/native-negative exit1（review-native-* 新报告）；reviewer自有反例探针2/2（用户fn main受管保留名拒绝、缺app_update拒绝、产物click绑定全部为`_ui_click_`派发器——适配器不直呼业务fn）；无.autoos/specs.json写入 | next: merge（T-08..T-10）
 
 stage: goal | plan_id: PLAN-048 | plan_revision: r1 | round: 2 | from: execution_done | to: reviewed | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-048/auto-ui | commit: 2d1ad4ae | next: merge
+
+2026-11-05 / stage: merge | plan_id: PLAN-048:r1 | outcome: pass（delivered；cleanup待收尾后记cleaned） | 交付与checkpoint证据：
+- `prepared`：reviewed基线2d1ad4ae（4提交，range-diff等价）；canonical diff=SD-01候选`docs/specs/auto-graphics/node-basic-ui.md`（worktree内已审）；目标路径合法（docs/specs/，有既往同类Spec先例：node2d-basic-authoring等）。
+- `landed`：rebase master（b20e54b2）后ff-only落主，**delivery commit=cd1e161af55246350e35d28e03a79235b3efc9af**（=master tip）；旧→新映射 926d1c97→726cf441、63d191f0→1586fa47、329a3aed→8dd6ac99、2d1ad4ae→cd1e161a，`git range-diff`四提交全等（=，安全重写证明）；无merge commit。
+- `canonical_verified`：主检出`docs/specs/auto-graphics/node-basic-ui.md`在场，sha256前16=7bda6f53faf16cae；主上`verify_plan048.py --controls` ALL PASS（再生/身份/容量/SDK681/旧档pin）；落主后工作树干净。
+- merge-owned统一回归（受影响并集口径）：pilot全套179/179＋node_ui_gates 4/4；driver node_ui_flow 3/3＋node_ui_storage 3/3（GPU单实例）；admission层既有覆盖authoring_behavior 12/12＋behavior_source_identity 1/1；verify_plan048 --controls ALL PASS；native positive exit0/sabotage exit1——全部于reviewed/rebased基线实跑。**具名不跑项**：driver其余既有目录（4个测试文件Scene3dContent缺hud_overlay，基线6837bbe8已坏）＝先前既有损坏，非048面（V-S06"不跑无关套件"），owner=相应历史计划；本receipt即分诊记录。
+- `archived`：本文件`git mv`至docs/plans/archived/、status: archived（本次提交）。
+- 落地检查：experimental crate，无生产消费进程需重建（显式观察：auto-ui仓无deployment面消费autographics-*实验crate；ag-examples消费049后经AG021按消费锁取用）。
+- `cleaned`：见后继记录（wt-guard→删树删支→plan-artifacts scope删除→registry刷新）。
 
 ## 10. 待澄清事项
 
