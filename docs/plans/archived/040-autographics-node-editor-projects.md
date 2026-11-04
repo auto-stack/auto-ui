@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-040
-status: drafting
+status: archived
 feature_name: AutoGraphicsNode混合维度编辑工程与项目化验收
 author: [Codex]
 created_at: 2026-11-03
-updated_at: 2026-11-03
+updated_at: 2026-11-04
 plan_revision: 1
-current_step: 0
+current_step: 9
 total_steps: 10
 depends_on: [auto-ui/PLAN-019, auto-ui/PLAN-024, auto-ui/PLAN-039]
 supersedes_spec_components: []
@@ -46,7 +46,7 @@ driver现有`src/authoring/{interaction,storage}.rs`、`host/viewport.rs`与`too
 
 ## 4. 需求分析与背景调查
 
-用户2026-11-03要求继续提出和规划下一批，允许合同/设计/导航/auto-lang路线簿记，未授权实施/建树/构建/GPU/OS自动化/agent。本地取号040（038主题在途、039已交付，不重用号）。观察auto-ui `f83fd06f1b924fce98bd1f821bee9d413dfa8e7f`，ag-examples `139e41d0da3c02af59bbd1009f14eaffe7134cd4`；AG016/017均drafting/r1/0-10且无实施树，当前迁移19/22。
+用户2026-11-03要求继续提出和规划下一批，允许合同/设计/导航/auto-lang路线簿记，未授权实施/建树/构建/GPU/OS自动化/agent。本地取号040（038主题在途、039已交付，不重用号）。观察auto-ui `f83fd06f1b924fce98bd1f821bee9d413dfa8e7f`，ag-examples `139e41d0da3c02af59bbd1009f14eaffe7134cd4`；AG016/017均drafting/r1/0-10且无实施树，当前迁移19/22。2026-11-04用户以`/goal 完成计划040`授权全链交付（work含建树/构建/GPU离屏证据、review、有界修复、merge），后续阶段继承此授权不再重询；OS抢焦点自动化仍按政策暂停。
 
 | 来源 | SHA256 / 交付 |
 |---|---|
@@ -119,15 +119,25 @@ work产证；review同一权威树不同上下文独立final，逐AC/diff/SD/遗
 
 | T | owner_stage | 依赖 | 写面/结果 | AC | 进度 |
 |---|---|---|---|---|---|
-| T-01 | work | 用户另行启动；019/024/039已交付 | 核原场景/对象/九义务/20及34/owner/OS政策和来源；唯一树/scope登记 | AC-01/05 | [ ] |
-| T-02 | work | T-01 | 最多A/B完整项目链先证；复用能满足则不加profile，冻结支持域/CLI/行映射/基线副本/实际验证参数 | AC-01..06 | [ ] |
-| T-03 | work | T-02 go | 最小公共lower/编辑消费收口（仅确有缺口）、永久双维纯场景与gates、旧档边界保持 | AC-01/02/04 | [ ] |
-| T-04 | work | T-03 | 项目化编辑checks/实际Auto+GPU/保存/取消/故障负控和原阶段映射 | AC-02..05 | [ ] |
-| T-05 | work | T-04 | 新根SaveAs/冷A→B/恢复/20轮owner/受影响旧档冻结门，未证OS项具名 | AC-03..05 | [ ] |
-| T-06 | work | T-05 | SD候选/准确固定消费交接/完整证据与待闭项，不以新入口名充能力 | AC-05/06 | [ ] |
-| T-07 | review | T-06 | 同树独立final与finding返work后受影响复核 | AC-07 | [ ] |
-| T-08 | merge | T-07 pass | 冻结定向门/来源核后落master | AC-08 | [ ] |
-| T-09 | merge | T-08 | canonical/归档/消费身份/导航核验，不写派生JSON | AC-08 | [ ] |
+| T-01 | work | 用户另行启动；019/024/039已交付 | 核原场景/对象/九义务/20及34/owner/OS政策和来源；唯一树/scope登记 | AC-01/05 | [x] ✅2026-11-04 树`.wt/ui-040/auto-ui`分支`codex/plan-040-dev`基`577dfd04`（干净建树）；scope`plan-artifacts/plan-040/auto-ui`登记（t01-freeze.md）。§4六Spec哈希逐一相符；G04原两场景11对象逐值冻结（2d=6对象/3d=5对象，均本就双维无behavior）、九require与2D20/3D34阶段逐条提取（viewport2d.rs/viewport3d.rs）、OS暂停政策核明（焦点类OS层具名pending）、引擎=autographics-authoring+SDK681`7b987ca8`（prepare_sdk PASS）。主checkout他session WIP（autoui设计文档/auto-ui-runtime截图/039旧文件残留）与本计划写面不相交，记录未接管。 | 
+| T-02 | work | T-01 | 最多A/B完整项目链先证；复用能满足则不加profile，冻结支持域/CLI/行映射/基线副本/实际验证参数 | AC-01..06 | [x] ✅2026-11-04 选A（039静态双出口复用，零新渲染/新语法）。纯声明双view源（无model/on）→behavior:null全链先证：2d/3d两工程逐值保真（11对象kind/translation/scale/rgba/visible全等原值）、显式ID映射（2d:1→3,2→4,3→1,4→2,5→5,6→6；3d:1→4,2→5,3→1,4→2,5→3）、A→B仅closure冷再生字节等值、坏字节拒绝。冻结：CLI`--profile editor-projects`（身份孪生）、行序=三维行后标记行、二维等alpha序、schema scene/6、Host消息/Auto/离屏GPU三层证据参数。 |
+| T-03 | work | T-02 go | 最小公共lower/编辑消费收口（仅确有缺口）、永久双维纯场景与gates、旧档边界保持 | AC-01/02/04 | [x] ✅2026-11-04 最小收口=身份孪生入口：lib.rs`lower_project_editor_projects`（doc_prefix/生成说明/再生注记参数化）+main.rs`--profile editor-projects`arm+消费者登记，超域具名拒绝（behavior非null拒）。永久夹具`fixtures/editor-projects/`（2d/3d/instances+5负控）+冻结产品`generated-editor-projects/`+`tests/node_editor_gates.rs`5绿（逐值/映射/行序/五类具名拒绝/默认dialect旧拒绝不变）。旧档字节冻结复核：queries-3d产品world.at/scene/identity/closure全等（规范名复验PASS）、pilot全量157绿、verify_plan039 4/4字节等值。 |
+| T-04 | work | T-03 | 项目化编辑checks/实际Auto+GPU/保存/取消/故障负控和原阶段映射 | AC-02..05 | [x] ✅2026-11-04 driver`tests/node_editor_projects.rs`7绿（单线程）：项目identity/非sample正控、2D链（grid+GPU像素/pan+锚点/pick/drag(-35,10)+history1+合成像素/undo/redo/reset/F-focus/Esc-cancel）、3D链（grid-occlusion实例移除/pan/P投影/orbit/wheel/pick/snap/X轴AxisDrag=snap期望/undo/saveas→undo→重开保编辑态/视图复位/F-focus/Esc相机还原/play-run空Builtin→stop还原/Home）、SaveAs副本所有权（基线字节不变/副本编辑态新根重开/不伪基线）、故障负控（stale epoch/revision拒、Fault::Prepare/Write/Flush/BeforeReplace保last-good、修复重开绿）、20轮open/edit/save/reopen uploads零增长+历史零残留+导航不重传mesh、20/34阶段全映射表（auto/os分层）。 |
+| T-05 | work | T-04 | 新根SaveAs/冷A→B/恢复/20轮owner/受影响旧档冻结门，未证OS项具名 | AC-03..05 | [x] ✅2026-11-04 `tools/verify_plan040.py`全PASS：再生2/2字节等值+形状/映射绿、CLI五负控具名拒绝、A→B冷再生两工程字节等值、原生60帧GPU smoke 2/2绿+坏字节拒绝+精确修复重开绿（runner bd3224cdbedea94c…）。未证OS项具名15行（2D：焦点获取/物理滚轮/F·Esc·Home键post/text-focus隔离；3D：焦点获取/物理滚轮/P·F·Esc·Home键post/双按钮跨捕获）=D-02 pending，不删项不标Ready；手工按原阶段绑定新工程/runner可补真实取证。 |
+| T-06 | work | T-05 | SD候选/准确固定消费交接/完整证据与待闭项，不以新入口名充能力 | AC-05/06 | [x] ✅2026-11-04 SD-01候选`docs/specs/auto-graphics/node-editor-projects.md`（status: candidate，五节：机制=身份孪生/生成面/G04映射表/编辑消费与基线副本身份/项目化证据与原域/拒绝域）。018消费交接：入口CLI、两工程夹具+冻结产品路径、显式ID映射表、九require与20/34旧正控归属gallery、D-02 pending集、非目标边界。材料scope登记与证据齐（t01-freeze.md/t02-proof/t03-freeze-check）。 |
+
+2026-11-04 / stage: goal | plan_id: auto-ui/PLAN-040 | plan_revision: r1 | round: 1 | from: (start/drafting) | to: review | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-040/auto-ui | commit: fc82061c | notes: 用户`/goal 完成计划040`授权全链（已记§4）；work阶段T-01..T-06单轮完成，evidence锚fc82061c+verify_plan040 PASS+driver 7绿+pilot 157绿+verify_plan039 4/4；AC-03的OS层15行具名pending（D-02）保持开放不阻塞handoff；无relay竞争、无agent创建、无第二树；主checkout他会话WIP未接管。next: review T-07（同树独立final）。
+
+2026-11-04 / stage: goal | plan_id: auto-ui/PLAN-040 | plan_revision: r1 | round: 2 | from: review | to: merge | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-040/auto-ui | commit: fc82061c | notes: T-07独立final由全新上下文subagent完成（不继承实现对话，从工件重建判定、自行重跑全部验证命令）；§8 T-07勾选；评审收据见下。next: merge T-08..T-10。
+
+2026-11-04 / stage: review | review_scope: final | reviewer_identity: 独立subagent上下文（全新会话/无实现对话记忆；判定全部从工件重建，自行重跑命令，不采信executor摘要；本会话无第二树/未动实现写入） | plan_id: auto-ui/PLAN-040 | plan_revision: r1 | outcome: pass（reviewed） | worktree_path: D:/autostack/.wt/ui-040/auto-ui | branch: codex/plan-040-dev | reviewed_commit: fc82061cd12a77b8422c4d4b47d5862ee9af7b37 | base_commit: 577dfd04（单实现提交、worktree clean、无symlink） | dependency_revisions: auto-lang 2f558fc93（只读sibling）、SDK681 `prepare_sdk --verify-only` PASS（681文件/17本地包）、agp/dialect零改动 | spec_inputs: SD-01候选 docs/specs/auto-graphics/node-editor-projects.md @fc82061c（冻结）；落主Spec哈希 node3d-queries-and-mixed-markers 117bb3da…/node-authoring-consumption f6689bf1…/node3d-foundation 9451cf0f… 核对一致 | acceptance_results: AC-01 pass（pilot 157绿含gates 5：逐值/映射/行序/五类具名拒绝/默认dialect旧拒绝不变；产品behavior:null无world.at）；AC-02 pass（评审者独立逐值比对11对象 vs ag-examples原场景全等、映射自行推导与声明互逆、2D绘制序保持、driver 7/7含GPU合成像素/遮挡/轴拖=snap期望）；AC-03 pass（诚实pending：20/34阶段表全覆盖，os层15行具名pending=15断言、其余消息/Auto/GPU层全绿，AC-03在计划保持开放不伪闭）；AC-04 pass（SaveAs副本所有权/基线字节不变/副本编辑态新根重开/不伪sample、四类保存故障保last-good、stale邮票拒）；AC-05 pass（verify_plan040全PASS：再生2/2字节等值、CLI五负控、A→B冷再生、原生60帧GPU smoke+坏字节拒绝+修复重开；verify_plan039 4/4字节等值）；AC-06 pass（SD-01候选逐条与代码/测试/CLI一致）；AC-07=本评审pass；AC-08/09=merge待做（pending） | pending_closeout_gates: 落主后受影响面并集核对+归档/清理（merge）；AC-03 OS层15行随D-02具名保持（非本评审新增）；D-05批量回归沿035/038先例移交regress owner | findings: R-1（低·文案）实现提交信息写"pilot 162 green"而实测157（计划§9 work收据数字正确）——不修正：改写已评审历史会作废评审且零行为差异，据实记录即可；无其他finding（评审者自选反例4类场景篡改全被捕获、非G04值源按作者值降低证非硬编码、q3-seg旧档5文件cmp全等、范围卫生22文件恰一提交） | evidence: 评审自行重跑pilot 157绿/driver 7绿/verify_plan040 PASS/verify_plan039 4/4+自选反例（篡改捕获/非G04源/映射推导/旧档冻结）；GPU runner sha每次构建不同（bd3224… vs 365fc0…，同源重build，行为等价）；limitation如实记录：OS输入阶段按政策不可自动验证（正确具名pending）、model3d支持沿与queries-3d机制同一性接受（无专属夹具） | next: merge
+
+2026-11-04 / stage: merge | plan_id: auto-ui/PLAN-040:r1 | outcome: pass（归档时点；cleaned待T-10后终收据） | prepared: reviewed基线fc82061c+SD-01候选已在交付树（无增量Spec改动，canonical目标docs/specs/auto-graphics/node-editor-projects.md在本仓有既定先例） | delivery_commit: fc82061cd12a77b8422c4d4b47d5862ee9af7b37（master tip，ff-only线性；reviewed提交即交付提交，零重写） | canonical_verified: docs/specs/auto-graphics/node-editor-projects.md @sha256 1daa7111657a45b6c11fbd9c2f9e4abc01359fa1cf8575536603b42ca510ab4e（landed核验，status: candidate沿仓库既定约定；spec.json/派生索引/legacy ledger零写入） | archive_path: docs/plans/archived/040-autographics-node-editor-projects.md（status: archived，git mv+docs提交入默认分支） | 落地观察（explicit stale-artifact item）：交付面=experimental研究crates（pilot/driver工具链与editor-projects入口）+docs；主checkout载有他会话未提交WIP（§4/T-08声明），主checkout全量构建会测到外来WIP状态而非本交付——定向门（pilot157/driver7/verify040全PASS/verify039 4/4）已在worktree同补丁内容完成且随ff-only绑定fc82061c，落地树与评审树对交付路径字节全等 | batch_regression_due_check: auto-ui仓无`.last-batch-regression.json`批门定义（D-05沿PLAN-035/038具名继续持有，非本Plan新增，移交regress owner） | completion_kind: delivered
+
+2026-11-04 / stage: goal | plan_id: auto-ui/PLAN-040 | plan_revision: r1 | round: 3 | from: merge | to: (cleanup→done) | status: archived | outcome: pass | worktree: D:/autostack/.wt/ui-040/auto-ui | commit: fc82061c | next: T-10清理后终收据
+| T-07 | review | T-06 | 同树独立final与finding返work后受影响复核 | AC-07 | [x] ✅2026-11-04 独立subagent上下文final（全新会话，不继承实现对话；自行重跑全部命令）绑定fc82061c：baseline/单提交/22文件/scope卫生核清；AC-01..06逐项pass（11对象独立逐值比对+映射互逆推导+自选反例4类篡改全捕获+非G04值源证非硬编码+旧档5文件cmp全等）；AC-03诚实pending核验（os=15断言）；finding仅R-1（低·文案：提交信息162 vs 实测157，计划收据正确，据实记录不重写历史）。verdict: pass（reviewed）。 |
+| T-08 | merge | T-07 pass | 冻结定向门/来源核后落master | AC-08 | [x] ✅2026-11-04 master仍在基`577dfd04`（无分叉）→`git merge --ff-only codex/plan-040-dev`直落，master tip=交付提交`fc82061c`（=reviewed提交，零重写零range-diff需要）；wt-guard clean在案；定向门（pilot157/driver7/verify040全PASS/verify039 4/4）绑定同一提交，落地态=评审态字节全等（`git diff fc82061c HEAD`空）。落主观察（explicit stale-artifact item，沿039先例）：主checkout载有他会话WIP（autoui设计文档+README、auto-ui-runtime截图、039旧文件残留删除、029存档小改），本交付面为experimental研究crates+docs，主checkout全量构建会测到外来WIP而非本交付；定向验证已在worktree同补丁内容完成并随ff绑定fc82061c。batch regression due：auto-ui仓无`.last-batch-regression.json`批门定义，D-05沿035/038具名移交regress owner。 |
+| T-09 | merge | T-08 | canonical/归档/消费身份/导航核验，不写派生JSON | AC-08 | [x] ✅2026-11-04 SD-01 canonical `docs/specs/auto-graphics/node-editor-projects.md` landed @sha256 `1daa7111657a45b6c11fbd9c2f9e4abc01359fa1cf8575536603b42ca510ab4e`（status: candidate沿仓库既定约定；spec.json/派生索引/legacy ledger零写入）。归档`docs/plans/archived/040-…`（git mv+status: archived）；README合同行与M2路线段更新为已交付/AG018可固定消费实际交付（入口CLI、夹具/产品路径、ID映射、D-02 pending集、非目标边界）。 |
 | T-10 | merge | T-09 | fresh guard、所有实际输出对账/清理、摘要/具名hold登记 | AC-09 | [ ] |
 
 ## 9. 复审记录
@@ -136,12 +146,14 @@ work产证；review同一权威树不同上下文独立final，逐AC/diff/SD/遗
 
 2026-11-03本批规划预检（非实施/独立final）：UI040/AG018/AG019均0..10节、drafting/r1/0-10、10T/9AC/6V-S/1SD，work6/review1/merge3，十任务未勾；依赖DAG无环，040不等016/017，018完整迁移等040，019候选等040、完整同版消费等016/017/018实际交付及必要独立证据。独占取号后两仓活动/archived/archive本地号唯一，UI next041、AG next020。289个所涉本地引用核验286可解析，余3为存量非AG主题036/037导航断链（含共享索引他会话WIP），不属本批、不代写修复；新增/修改AG引用可解析，历史attachments未作为新证据。原verify_g04九require/2d20与3d34及全部原双维对象逐项承接，明确039既有has_behavior:false静态路径与040尚待全链先证的边界，未把它误判为全无混合能力。按metadata/generated/Node活源实算19/22，余g04两维/g05三维；`python tools/gallery.py validate --all`退出0，12逻辑项/22入口/许可一致。本轮AG016/017合同字节和现有源码/消费锁/生成物保持；未创建新树/材料scope/探针/素材/提案canonical Spec，未构建/GPU/OS自动化/创建agent/发布/打tag。规划文档白名单空白检查通过；以上仅规划结构/现有目录验证，不是新作者编辑、统一候选或M2验收go。
 
+2026-11-04 / stage: work | plan_id: auto-ui/PLAN-040 | plan_revision: r1 | outcome: pass（execution_done；AC-01/02/04/05/06关闭，AC-03的OS层15行具名pending随D-02保持开放，见goal收据） | worktree: D:/autostack/.wt/ui-040/auto-ui | branch: codex/plan-040-dev | base_commit: 577dfd04 | code_commit: fc82061c（单实现提交；pilot lib/lower_queries3d/main + fixtures/editor-projects/ + generated-editor-projects/ + tests/node_editor_gates.rs + driver tests/node_editor_projects.rs + tools/verify_plan040.py + SD-01候选spec） | dependency_revisions: auto-lang 2f558fc9（.wt/ui-040/auto-lang只读sibling检出，未改动）、SDK681快照7b987ca8（prepare_sdk --from-snapshot PASS/--verify-only PASS）、agp/dialect零改动 | task_ids: T-01..T-06 | evidence: pilot全量157绿（含node_editor_gates 5：逐值/ID映射/行序/五类具名拒绝/默认dialect旧拒绝字节不变）；driver node_editor_projects 7绿（项目identity非sample正控、2D/3D阶段链含grid+GPU合成读回、grid-occlusion、snap X轴AxisDrag=snap期望、undo/redo/reset/F-focus/Esc-cancel、saveas副本所有权+基线字节不变+新根重开保编辑态、stale邮票拒、四类保存故障保last-good→修复重开绿、20轮owner uploads零增长、20/34阶段全映射表auto/os分层）；verify_plan040全PASS（再生2/2字节等值、CLI五负控、A→B冷再生字节等值、原生60帧GPU smoke 2/2+坏字节拒绝+修复重开，runner bd3224cdbedea94c…）；verify_plan039 --controls 4/4字节等值（旧档冻结）；旧queries-3d产品world.at/scene/identity/closure规范名复验全等 | blockers: 无实现阻塞；AC-03的OS层15行具名pending（D-02）：焦点获取/物理键·轮·按钮流/text-focus隔离/双按钮跨捕获无法自动取证（OS抢焦点政策保持），关闭动作=手工按原阶段绑定新工程/runner取证、或用户明确解除/授权OS自动化、或沿035/039先例作为具名hold交后续owner；本计划不删项、不标Ready、不伪pass | next_responsible_role: review（T-07 同树独立final）
+
 ## 10. 待澄清事项
 
 | ID | 事项 | owner/关闭动作 |
 |---|---|---|
-| D-01 | 既有039静态混合路径能否保原全部对象/映射和编辑副本消费 | T-02全链先证后选A/B；不在未证前硬规定新profile或宣称已有完整支持 |
-| D-02 | 项目输入/OS20-34阶段准入 | T-01核政策，T-04逐项实际取证；自动化暂停保持，无法取证具名pending不删项 |
-| D-03 | 同会话final历史及批量回归D-05 | T-01核相关独立证据与批门owner；本Plan独立review不可省，旧D-05不在此偷偷认已闭 |
+| D-01 | 既有039静态混合路径能否保原全部对象/映射和编辑副本消费 | **已闭（2026-11-04，T-02先证选A）**：039静态双出口路径逐值保真全部11对象、显式ID映射、副本保存/新根重开全链绿；未新建profile/渲染器，仅身份孪生入口。 |
+| D-02 | 项目输入/OS20-34阶段准入 | T-01核政策（焦点类OS自动化暂停保持）；T-04/05逐项实际取证完成：消息/Auto/离屏GPU三层绿，OS层15行具名pending（2D：焦点获取/物理滚轮/F·Esc·Home键post/text-focus隔离；3D：焦点获取/物理滚轮/P·F·Esc·Home键post/双按钮跨捕获），不删项不标Ready。关闭动作=手工按原阶段绑定新工程/runner取证、或用户明确解除/授权OS自动化、或沿035/039先例具名hold交后续owner（AC-03保持开放至届时）。 |
+| D-03 | 同会话final历史及批量回归D-05 | T-01核相关独立证据：034/035/039 final均同实现会话复核（不称独立），本Plan T-07须同树不同上下文独立final（不省）；批门D-05沿PLAN-035/038具名持有（auto-ui仓无`.last-batch-regression.json`批门定义），非本Plan新增，merge按038先例移交regress owner。 |
 
 材料开工唯一`D:/autostack/plan-artifacts/plan-040/auto-ui/`并登记owner/用途/在途；临时探针/日志/包/外置target/外部消费者归此scope。merge摘要折Plan后全部实际输出对账/删除scope及构建物，具名未解决问题才可持有（owner/理由/关闭条件）。禁止attachments/第二暂存区/链接，清树先fresh `bash D:/autostack/wt-guard.sh <路径>`，不动他仓同号材料和其它WIP。
