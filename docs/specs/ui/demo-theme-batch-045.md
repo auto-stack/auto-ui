@@ -51,9 +51,10 @@ merge 时折叠）。**已迁移 ≠ 全部 B3**：本批仅覆盖上表三例�
 
 ## 5. 来源与既有红交接（AC-04/05）
 
-- 三例 theme 输入同一官方包（worktree `packages/themes`，构建时下载复制到
-  `deps/themes/`）；篡改拒绝/恢复/910 隔离证据见
-  `plan-artifacts/plan-045/auto-ui/t05-source-freeze-and-isolation.md`。
+- 三例 theme 输入同一官方包（worktree `packages/themes`，构建时经
+  junction 链接到各例 `deps/themes/`→本树单源，无外部下载）；篡改拒绝/
+  恢复/910 隔离证据见 `plan-artifacts/plan-045/auto-ui/t05-source-freeze-and-isolation.md`
+  （该 scope 于 merge 清理，核心结论折入本 Plan §9 收据）。
 - **既有红（非 045 引入）**：新工具链对 019 重建触发 auto-ui-tools vue.rs
   `generate_main_ts` 拼接缺陷（plan-041 store_ctx_import 模板缺换行 →
   TS1005），主检出未迁移 019 同复现；owner = 后继生成器修复批次。045
