@@ -142,6 +142,8 @@ work产证；review同树独立上下文final，从真实compile/Run复核AC/SD/
 
 2026-11-04 / stage: goal | plan_id: PLAN-044 | plan_revision: 1 | round: 3 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-044/auto-ui | commit: 52fbfe40 | next: work T-02（续）。关键实证三则：（1）发射器重命名语义核定——pooled helper 声明与调用的 `{name}(` 恒被改写为 `{module}_{name}(`（rename_module_calls，prev_ok 防链式），故 pooled 段冻结为 range 精度，列经 `remap_range_offset` 重放同一改名算法双指针差分（只接受 `{module}_` 纯插入）回算，实证 helpers 夹具 helpera/helperb 同名 bump 各自回正确模块+1.0/+2.0 不互串（V-S01 映射侧）。（2）load.rs 既有缺陷修正：AST fn span 为 (offset,len) 被误存 start..len（区间倒序；既有消费方只用名字，零触面），修为 start..start+len（52fbfe40）。（3）AST declaration_start 与 fn 文本起点实证差 1（parser 关键字口径），映射源区间改锚 slice_fn_source 可证切片（与发射器同源逐字节）。gates 8/8 绿 + 受影响回归 node_components_gates 6/6 绿。T-02 余量：SDK compile 真实 span 全链（driver 侧）、handler node/event 段、`--diagnostics-map`/`source-map.json` CLI 冻结、线性上界实测。
 
+2026-11-04 / stage: goal | plan_id: PLAN-044 | plan_revision: 1 | round: 4 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-044/auto-ui | commit: a1abfd8f | next: work T-02（续：handler 段 + 上界实测后关闭）。**重大冻结发现（SDK681 span 语义）**：undefined-symbol 是唯一易达且带 span 的作者可修 compile 错误类；实证其 span = "call 表达式末尾 + 前置 // 注释行数"口径（探针矩阵：无注释恒 +12，每注释行 +1，与 token 位置/嵌套/函数序无关；±1 级），**不可字节回算**（miette 索引 <script>=combined source，但 Pos 来自 parser 内部漂移）。type/arity/field 错在 SDK681 编译期放行（惰性）。设计裁定（保 AC 不缩水）：driver 映射消费走**双锚受检**——①span 锚：offset 入 range/exact 段 + 重放校验 + 消息符号与 world 该处逐字节一致；②符号锚恢复：span 锚失败且消息含符号时，全 range 段内标识符边界搜唯一出现，唯一才可证映射。junk span 永不误映（防 766→helpera 误报实证）。**T-02 全链阳性先证成立**：diag-fault 夹具（broken.at `absent_helper` 未定义）→ pilot `--diagnostics-map`（T-02 冻结工作名，components-2d/queries-2d 路径，默认无旁件字节不变）→ 冻结 generated-components2d/diag-fault/ → driver SourceSnapshot 受检装配 → SDK compile 真实错误 → 双锚映射 **broken.at:8:16 Range helper=speedup**（列经重命名差分精确回算）→ 不误入 helpera/helperb；坏 world hash/旧 world/缺图/坏闭包全部拒用且回退原诊断（4/4 driver gates 绿，pilot gates 8/8 + components 6/6 + behavior_source_identity 1/1 回归绿）。`.sdk-source` 按 ui-043 惯例自主检出字节复制（15MB，gitignored 物化）。余量：handler node/event 上下文段（T-02 第二半）、线性上界实测（T-05）、verify_plan044.py（T-06 入口）。
+
 ## 10. 待澄清事项
 
 | ID | 事项 | owner/关闭动作 |
@@ -149,6 +151,7 @@ work产证；review同树独立上下文final，从真实compile/Run复核AC/SD/
 | D-01 | AST位置/emit重组可证精度及准确profile覆盖 | T-02真实错误链先证，不一律伪精确或一律context充目标 |
 | D-02 | map线性上界/schema/fallback实际接入 | T-02按原源域冻结；新硬额度或跨仓AST/SDK改造需needs_replan |
 | D-03 | runtime/API无span与managed区域 | 原SDK事实保持，仅可证上下文，无唯一位置明确unmapped，不暗加运行插桩 |
+| D-05 | SDK681 undefined-symbol span 为 call 末尾+注释行数口径，不可字节回算 | T-02 已裁定双锚受检映射（span 锚+符号锚恢复），junk span 永不误映；其它错误类无 span 走原回退。换 SDK 前该口径须重测（round-4 §9 实证） |
 | D-04 | 043公共发射交叠/M2固定消费 | T-01核owner短窗；043非前置，当前内容/AG019候选规则不变 |
 
 开工材料唯一`D:/autostack/plan-artifacts/plan-044/auto-ui/`，登记owner/用途/在途；临时probe/包/原始诊断/外部消费者/外置target全归scope。merge摘要折Plan后全输出对账/删scope构建物，仅具名未解决问题持有owner/理由/关闭条件。禁attachments/第二暂存区/链接，清树先fresh guard，不动其它同号仓scope和在途材料。
