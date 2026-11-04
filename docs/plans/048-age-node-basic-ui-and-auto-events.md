@@ -1,6 +1,6 @@
 ---
 plan_id: PLAN-048
-status: drafting
+status: reviewed
 feature_name: AGE基础UI Node与真实Auto事件接线
 author: [Codex]
 created_at: 2026-11-04
@@ -124,6 +124,8 @@ T-02最多两种等价机制的完整先证：导入两个同定义计数组件�
 - 实现事实备忘（审查关注点）：stock iced 0.14 button无键盘/焦点支持（iced_widget 0.14.2源码核实）——Tab焦点环/Enter激活由适配器平台输入路由承担（设计§3职责），激活经同一队列同一生成派发器（原生链a=3即证）；SDK字面量数组>256静默截断为n-256（实测）——文字槽≤4冻结由来；主检出Plan文件曾于会话中被外部重置回HEAD一次（本记录为重建后的权威进度，进度以本§8/§9为准）。
 
 stage: goal | plan_id: PLAN-048 | plan_revision: r1 | round: 1 | from: drafting | to: execution_done | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-048/auto-ui | commit: 2d1ad4ae（Plan簿记主检出70d1dbfb） | next: review
+
+2026-11-05 / stage: review | review_scope: final | reviewer_identity/limitations: 同会话实现者复审（无独立分派final角色）——按技能要求声明此限制，裁定不基于执行者摘要而是**在冻结HEAD上全量独立重执行**（下述命令均reviewer自跑、全新输出），并新增reviewer自有反例探针 | plan_id: PLAN-048 | plan_revision: r1 | outcome: **pass**（reviewed） | worktree_path: D:/autostack/.wt/ui-048/auto-ui | branch: codex/plan-048-dev | reviewed_commit: 2d1ad4ae6cf81e633e3eeae74cc74eb0481a63d6（工作树干净：0 modified/0 untracked实现面） | base_commit: 6837bbe8 | dependency_revisions: auto-lang tip sibling detached@30b396d72只读；SDK681快照verify-only PASS；两图--locked未动 | spec_inputs: docs/specs/auto-graphics/node-basic-ui.md（SD-01候选127行，worktree内已提交未落主）；旧档canonical未动 | acceptance_results: AC-01 pass（gates正例+产物审查）；AC-02 pass（vs01/02离屏＋native-positive真实点击×3+真实Tab/Enter→a=3/b=12 exit0）；AC-03 pass（vs03卸载/重挂/重绘不代Tick/20轮fresh＋vs02陈旧拒绝）；AC-04 pass（冻结常数双图互检＋未初始化写与>256静默截断实录＋旧预算未动）；AC-05 pass（storage身份链/坏副本拒绝/旧档byte-pin＋SDK681 verify）；AC-06 pass（冷A→B同链＋修复下一Run恢复＋verify_plan048 ALL PASS＋SD候选齐）；AC-07 本审 pass | pending_closeout_gates: merge统一回归（被**先前既有**driver红阻塞——Scene3dContent缺hud_overlay，基线6837bbe8已坏、非048面；merge须先owner分诊，不得静默跳过） | findings: 无合同内缺陷。三项已记录的合同内精化（均证据驱动、有界、双图互检、非静默弱化）：①T-02文字容量从"64B×8平铺单数组"精化为"每实例每def≤4槽×64B独立数组"——SDK字面量数组>256静默截断（256→0/300→44/385→129实测）强制重构，worst case 8×256B=2048B仍严格有界；②键盘激活由适配器平台路由承担（Tab环+Enter经同队列同派发器）——stock iced 0.14 button无键盘支持（iced_widget 0.14.2源码核实），设计§3职责归属；③文字传输=标量字节缓冲协议（T-02原冻结即此，无漂移） | evidence: reviewer全新执行——verify_plan048 --controls ALL PASS；pilot 179/179（含node_ui_gates 4/4）；driver node_ui_flow 3/3＋node_ui_storage 3/3（单实例GPU）；native-positive passed=true exit0/native-negative exit1（review-native-* 新报告）；reviewer自有反例探针2/2（用户fn main受管保留名拒绝、缺app_update拒绝、产物click绑定全部为`_ui_click_`派发器——适配器不直呼业务fn）；无.autoos/specs.json写入 | next: merge（T-08..T-10）
 
 ## 10. 待澄清事项
 
