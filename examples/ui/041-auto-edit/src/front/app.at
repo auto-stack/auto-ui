@@ -23,12 +23,29 @@ use editor_store: EditorStore
 use status_bar: StatusBar
 use console_panel: ConsolePanel
 use ctx_menu: EditorCtxMenu
+// PLAN-047 T-03：接入官方主题包（C-13/C-14 形态）。无主题接线、无显式默认
+// → 官方 Auto/light 独立默认；族/模式选择经根 widget theme_name + design
+// 数据绑定，测试/宿主经 autoui_fixture 写 theme_name/dark_mode（B2 C-03
+// VM 通道），不新增菜单/业务 handler。
+use themes.themes: Auto, Solarized
 
 style warn_label = "text-[12px] text-amber-400 mr-1"
 widget App {
     // PLAN-618 T-06: tree 四件组件拷贝分发(package use 必须在 widget 内,
     // 顶层 parse 报 LBrace 错——027 T-03 同款结论)。
     use { package: official from "./components" }
+
+    // PLAN-047 T-03：主题族/模式选择态（主题选择，非业务状态；B2 038 同律）
+    model {
+        var theme_name str = "Auto"
+        var dark_mode bool = false
+    }
+
+    // 主题/模式选择器（C-14：数据绑定，同帧校验发布）
+    design {
+        theme: .theme_name
+        mode: if .dark_mode { "dark" } else { "light" }
+    }
     // ---- Plan 451: actions 声明块（原 auto-edit.at，DSL 化）----
     // 三源绑定：shortcut（键盘回退层，DSL onkeydown 之下）、menubar/toolbar
     // （view 中占位标签的配置合成）、MCP 自动化同源。enabled_if/checked_if

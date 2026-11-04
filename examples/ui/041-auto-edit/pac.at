@@ -13,6 +13,14 @@ dep stylekit {
     path: "../stylekit"
 }
 
+# PLAN-047 T-03：接入官方主题包（C-13）。041 无主题接线、无显式默认 →
+# 官方 Auto/light 独立默认（B2 012/017/021/023/028/038 同律）；编辑器深色
+# 专属面（激活 tab #1C1D24、右键面板 #16171B）为编辑器主题字面豁免原样保留，
+# 语法着色 owner=runtime code_editor（038 口径）不随本批迁移。
+dep themes {
+    path: "../../../packages/themes"
+}
+
 // PLAN-070 T-01：共享 filetree bp 依赖（tree_util 支撑件跨包直用；L1 零副本）。
 # PLAN-007 T-03 path-neutral fix: corpus moved to auto-ui; blueprints stay a
 # language-repo asset (L1 zero-copy) — resolve the group/flat sibling.

@@ -494,7 +494,7 @@ def run_tests(mcp_url, proc):
         t9_proc = subprocess.Popen(
             [AUTO_BIN, "run", "-r", "vm"],
             cwd=PROJECT,
-            env={**os.environ, "AUTOUI_MCP_PORT": str(t9_port)},
+            env={**os.environ, "AUTOUI_MCP_PORT": str(t9_port), "AUTOUI_TEST_FIXTURES": "1"},
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         t9_url = f"http://127.0.0.1:{t9_port}/mcp"
         if wait_for_server(t9_url, 60):  # PLAN-038: 30s 在负载下不够（主臂 60s 同因）
@@ -614,7 +614,7 @@ def run_tests(mcp_url, proc):
         t10_proc = subprocess.Popen(
             [AUTO_BIN, "run", "-r", "vm"],
             cwd=PROJECT,
-            env={**os.environ, "AUTOUI_MCP_PORT": str(t10_port)},
+            env={**os.environ, "AUTOUI_MCP_PORT": str(t10_port), "AUTOUI_TEST_FIXTURES": "1"},
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         # Plan 451: 动作配置 DSL 化——热重载对象改为 app.at 的 actions 块
         config_file = os.path.join(PROJECT, "src", "front", "app.at")
@@ -742,7 +742,7 @@ def run_tests(mcp_url, proc):
         t11_proc = subprocess.Popen(
             [AUTO_BIN, "run", "-r", "vm"],
             cwd=PROJECT,
-            env={**os.environ, "AUTOUI_MCP_PORT": str(t11_port), "APPDATA": t11_appdata},
+            env={**os.environ, "AUTOUI_MCP_PORT": str(t11_port), "APPDATA": t11_appdata, "AUTOUI_TEST_FIXTURES": "1"},
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         try:
             t11_url = f"http://127.0.0.1:{t11_port}/mcp"
@@ -758,6 +758,36 @@ def run_tests(mcp_url, proc):
         print("  NOTE  AUTO_OPEN_PATH not set; skipping T11")
 
     print()
+    # ── T12: PLAN-047 主题腿（B2 C-03 VM 通道；T8 退出前、主会话内）──────
+    # 两族×明暗 fixture 往返：主题选择态生效 + 编辑业务恒守（tab 计数/
+    # 激活 tab 不因换肤重建；code_editor 语法着色 owner=runtime code_editor，
+    # (theme, dark, accent) 键控主题集由运行时消费）。
+    print("T12: PLAN-047 theme fixture round-trip")
+    try:
+        mcp0 = McpClient(mcp_url)
+        before = mcp0.state("tab_count", "active_key", "tab")
+        for fam in ("Solarized", "Auto"):
+            for dm in (True, False):
+                mcp0.call("autoui_fixture", schema_version=1,
+                          state={"theme_name": fam, "dark_mode": dm})
+                time.sleep(0.4)
+                st = mcp0.state("theme_name", "dark_mode")
+                result.check(f"P47 fixture {fam}/{dm} applied",
+                             f'"{fam}"' in st and str(dm).lower() in st, st[:120])
+        after = mcp0.state("tab_count", "active_key", "tab")
+        result.check("P47 换肤往返编辑业务守恒", before == after,
+                     f"{before} -> {after}")
+        snap = mcp0.snapshot()
+        # 渲染后快照的编辑器节点名为 textarea（T1 头注口径）；
+        # "(rendered)" 哨兵排除首帧前 fallback 树。
+        result.check("P47 编辑器面在换肤后仍在场",
+                     "(rendered)" in snap and "textarea" in snap, snap[:80])
+        mcp0.call("autoui_fixture", schema_version=1,
+                  state={"theme_name": "Auto", "dark_mode": False})
+        time.sleep(0.3)
+    except Exception as e:
+        result.check("P47 theme leg", False, repr(e))
+
     print("T8: ActQuit (menu item)")
     open_menu(mcp, snap_cache, "文件")
     item = find_button_by_text(snap_cache[0], "退出")
@@ -828,6 +858,7 @@ def main():
     t9_env = {
         **os.environ,
         "AUTOUI_MCP_PORT": str(mcp_port),
+        "AUTOUI_TEST_FIXTURES": "1",
     }
     proc = subprocess.Popen(
         [AUTO_BIN, "run", "-r", "vm"],
