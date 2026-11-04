@@ -295,8 +295,8 @@ def find_row_index(mcp, name, count=None):
         count = mcp.state_int("item_count_str")
     for i in range(count):
         mcp.trigger({"booted": True}, "ItemCtx", str(i))
-        # PLAN-046：0.12s 在排序/模态等重活动后不足（T12 偶发未命中），
-        # 放宽到 0.35s 给 VM 队列留出 selected_info 回写窗口。
+        # PLAN-046：0.35s 给 VM 队列留出 selected_info 回写窗口（健壮化；
+        # T12 红为类型化派发根因——Int(i32) 帧标签——非时序，见 Plan §9）。
         time.sleep(0.35)
         if name in mcp.state_str("selected_info"):
             return i
