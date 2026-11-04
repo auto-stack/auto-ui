@@ -1235,8 +1235,9 @@ function applyTheme(name: string, isDark = document.documentElement.classList.co
             // Plan 043 store-codegen: `List<T>.new([])` and similar container
             // constructors parse as a call whose callee ends in `.new`. Treat
             // any `*.new(...)` initializer as an empty array — the common case
-            // is `List<Block>.new([])`. Struct-literal `Type{...}` (Expr::Node)
-            // and None/nil fall back to null.
+            // is `List<Block>.new([])`. (PLAN-051: struct-literal `Type{...}`
+            // no longer falls back here — see the Expr::Node arm below;
+            // None/nil still fall back to null.)
             Expr::Call(call) => {
                 let callee = match call.name.as_ref() {
                     Expr::Dot(_, method) => method.as_str(),

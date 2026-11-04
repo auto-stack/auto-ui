@@ -39,8 +39,12 @@
 - 名字合成派发（`on_with_input_for` / `call_widget_handler`，instance=None）：
   该件名恰有**一个**存活实例 → 路由到它（验收通道真实意图）；0 或 ≥2 个
   存活实例保持 root legacy（歧义不由通道静默裁决）。
-- **迟到事件**：实例已释放（identity→None）→ 事件丢弃 + 诊断，不重定向
-  同名新实例（§5.2 合同 4）。
+- **迟到事件（PLAN-051 修订）**：identity 查找 miss 时，MCP/派发面先按件名做
+  存活解析（恰一个存活实例 → 重定向它——视图携带的 `TypedInst.instance`
+  是页名而 `child_instances` 键为键控身份，格式脱不再丢合法交互）；
+  0 个存活 → 事件丢弃 + 诊断（真迟到）；≥2 个存活 → 丢弃（歧义不静默
+  裁决）。进程内 `Component::on` 面保持严格 identity 合同（不重定向
+  同名新实例，§5.2 合同 4）。
 - 具名边界：parked 在途重入守卫按 `(widget, handler)` fn 名键——同名 handler
   的两个实例不能并发各持一段（pre-existing PLAN-702 语义，未随本包改键；
   需要并发段时另立调度面合同）。

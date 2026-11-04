@@ -3920,7 +3920,9 @@ fn extract_dyn_msg(msg: &DynamicMessage) -> Option<(String, String)> {
         }
         // PLAN-041 T-02: 实例限定事件把身份随 widget 名过 MCP 派发面
         //（U+0001 标记，on_with_input_for 入口剥离——与 IcedMessage 边界
-        // 同约定）。
+        // 同约定）。PLAN-051：携带的 instance 是页名形态，派发面
+        // 在键查找 miss 时先做名字存活解析再重定向（见
+        // dynamic.rs dispatch / component-and-store-instances C-02）。
         DynamicMessage::TypedInst {
             widget_name,
             event_name,
