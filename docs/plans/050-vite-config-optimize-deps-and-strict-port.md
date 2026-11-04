@@ -18,7 +18,7 @@ touched_goals: []
 
 ## 0. 变更摘要
 
-唯一生产 vite 模板 `auto-ui-tools/src/vue.rs::generate_vite_config()` 增发两项：`optimizeDeps.include`（源=最终 package.json dependencies 键集，空集省略键）与 `server.strictPort: true`（恒发射）。两条写入路径（生成期 `write_project_files`、run 期自愈 `run_vue.rs`）同源消费。动机=跨仓消费方 auto-blog BLOG-005 的 F-2 dev 假绿（pac.at npm_deps 动态导入链在 vite dev 冷扫描不可见 → CJS 互操作断裂、作者页白壳），cand5 六轮控制变量已在消费方逐字验证 include 修复全绿（决策稿指针见 §4）。附带 `host` 发射的有界评估（T-05 决策稿），未证实前不发射。
+唯一生产 vite 模板 `auto-ui-tools/src/vue.rs::generate_vite_config()` 增发两项：`optimizeDeps.include`（源=项目 `npm_deps` 中非 `link:` 注册表键集，两路径同字段、过滤在模板内，空集/全 link: 省略键）与 `server` 加固（`host: '127.0.0.1'` + `strictPort: true`，恒发射）。两条写入路径（生成期 `write_project_files`、run 期自愈 `run_vue.rs`）同源消费。动机=跨仓消费方 auto-blog BLOG-005 的 F-2 dev 假绿（pac.at npm_deps 动态导入链在 vite dev 冷扫描不可见 → CJS 互操作断裂、作者页白壳），cand5 六轮控制变量已在消费方逐字验证 include 修复全绿（决策稿指针见 §4）。附带 `host` 发射的有界评估（T-05 决策稿）：探针实证 strictPort 单独不闭 E-4a，host 固定发射。
 
 ## 1. 目标
 
@@ -30,7 +30,7 @@ touched_goals: []
 
 ## 2. 架构方案
 
-- **唯一生产模板**：`crates/auto-ui-tools/src/vue.rs:1012` `pub fn generate_vite_config(npm_dep_keys: &[String])`，调用方仅两处：
+- **唯一生产模板**：`crates/auto-ui-tools/src/vue.rs:1012` `pub fn generate_vite_config(npm_deps: &[(String, String)])`，调用方仅两处：
   1. **生成期**：`vue.rs` `write_project_files` 内（`extra_deps` 参数）。
   2. **run 期自愈**：`run_vue.rs`（`refresh_vite_config` 助手，config 已存在才重写；写失败=具名警告不中断）。
 - **include 源恒一（r2/F-1，r3/F-5）**：两路径传同一字段 `&VueProject::npm_deps`（`write_project_files` 两调用点均显式传 `&self.npm_deps`，自愈路径同字段），`link:` 过滤在 `generate_vite_config` 模板内部实施 → 发射键集逐字一致且与调用点上下文无关。生成路径在 Plan-482 遮蔽**前**捕获原参数（`vite_npm_deps`）——推导的 engine 同级键仅进 package.json。`package.json` 的 `dependencies` = npm_deps ∪ 推导键 ∪ 框架基础集（`generate_package_json` 内部并集）——include 刻意取其中非 link: 注册表子集：框架基础依赖静态可达（include 多余），link: 依赖强制预打包会改变其 watch/更新语义（保持源态加载现状），全量集未经消费方 cand5 验证。
@@ -62,7 +62,7 @@ Rust（auto-ui-tools）；serde_json（已在依赖）；vite 配置模板字符
 
 ## 5. 详细设计
 
-1. **T-01 模板发射（生成路径）**：`generate_vite_config` 签名改为接收 `npm_dep_keys: &[String]`；非空时在 `export default defineConfig({` 后注入 `optimizeDeps: { include: [<键序列>] }`（键为合法 TS 字符串字面量，经 `serde_json::to_string` 序列化防注入）；空集省略整个 `optimizeDeps` 键。`server` 块 `port:` 行后加 `host: '127.0.0.1'` 与 `strictPort: true`（带注释：端口占用=显式失败，禁止静默自增/跨栈改道）。`write_project_files` 传 `extra_deps` 键集（=`&self.npm_deps`，r2/F-1）。
+1. **T-01 模板发射（生成路径）**：`generate_vite_config` 签名改为接收 `npm_deps: &[(String, String)]`，`link:` 过滤（`version.contains("link:")`）在模板内实施；过滤集非空时在 `export default defineConfig({` 后注入 `optimizeDeps: { include: [<键序列>] }`（键为合法 TS 字符串字面量，经 `serde_json::to_string` 序列化防注入）；过滤集为空省略整个 `optimizeDeps` 键。`server` 块 `port:` 行后加 `host: '127.0.0.1'` 与 `strictPort: true`（带注释：端口占用=显式失败，禁止静默自增/跨栈改道）。`write_project_files` 在 Plan-482 遮蔽**前**捕获原参数 `vite_npm_deps` 传入（=`&self.npm_deps`，r2/F-1 + r3/F-5）。
 2. **T-02 自愈路径同源（r2）**：`run_vue.rs` 自愈块提取为 `refresh_vite_config(output_dir, npm_dep_keys)` 助手（流级可测）：`vite.config.ts` 存在才以当前模板重写；写失败=具名警告不中断 run。include 键传 `&project.npm_deps`——与生成路径 `extra_deps` **同一字段逐字同源**（初版 r1 以磁盘 package.json 全量 deps 为源，独立复审 F-1 实证两路径发射不一致（3 vs 8 键）且 link: 依赖强制预打包未验证，已弃用并删除该读取器）。
 3. **T-03 单测**：vue.rs 测试模块新增——(a) 非空键集发射含全部键且字面量合法；(b) 空集省略 `optimizeDeps`；(c) `strictPort: true` 恒存在；(d) 键序确定性（同输入两次输出逐字一致）。run_vue 侧 package.json 解析：正常/损坏/缺字段三分支。
 4. **T-05 host 有界评估**：决策稿（scratch `D:/autostack/plan-artifacts/plan-050/`）实测 strictPort 发射后 127.0.0.1 被占场景 vite 实际绑定行为（是否仍 `::1` 同端口静默就绪）；评估 `host: '127.0.0.1'` 固定发射对 tauri.rs 消费方与 `localhost` 就绪判据的影响；结论=发射或不发射的具名决定 + 证据，写入 §9。
@@ -98,7 +98,7 @@ Rust（auto-ui-tools）；serde_json（已在依赖）；vite 配置模板字符
 
 ## 8. 执行步骤
 
-- [x] T-01（owner_stage=work；依赖无；AC-01）：模板签名与 include/strictPort 发射 + write_project_files 接线；B-01/B-02/B-03 单测。[✅ 已完成 2026-11-04] `generate_vite_config(npm_dep_keys: &[String])`：非空键集发射 `optimizeDeps{include:[…]}`（serde_json 转义），空集整体省略；`host: '127.0.0.1'`+`strictPort: true` 恒发射；write_project_files 传 `extra_deps`（:2520 遮蔽集=package.json 同源）。
+- [x] T-01（owner_stage=work；依赖无；AC-01）：模板签名与 include/server 加固发射 + write_project_files 接线；B-01/B-02/B-03 单测。[✅ 已完成 2026-11-04，r3 修订] `generate_vite_config(npm_deps: &[(String,String)])`：非 `link:` 注册表键发射 `optimizeDeps{include:[…]}`（serde_json 转义，过滤在模板内），过滤集为空整体省略；`host: '127.0.0.1'`+`strictPort: true` 恒发射；write_project_files 在 Plan-482 遮蔽前捕获 `vite_npm_deps` 原参数传入（r3/F-5：推导键仅进 package.json）。
 - [x] T-02（owner_stage=work；依赖T-01；AC-01）：run_vue.rs 自愈接线 + B-04 流分支单测。[✅ r2 完成 2026-11-04] r1 实现为磁盘 package.json 源（`package_json_dep_keys`），独立复审 F-1 实证与生成路径键集不一致（3 vs 8 键）且 link: 强制预打包未验证 → r2 弃用删除，改 `refresh_vite_config(&project.output_dir, &project.npm_deps 键集)`——与生成路径 `extra_deps`（=`&self.npm_deps`）同一字段逐字同源；流级测试覆盖缺失 no-op/重写含 include 两分支，写失败分支代码级核验（与相邻自愈同级语义）。
 - [x] T-03（owner_stage=work；依赖T-01/02；AC-02）：`cargo t -p auto-ui-tools` 全组回归（B-05）+ `-p auto-ui-compiler project_files` 未漂移确认。[✅ 已完成 2026-11-04] 新增 4 单测全绿；全组 `-p auto-ui-tools --lib` 203/203 绿（5 基线红：display_reader_v01_corpus、gallery_demo_row_routable、try_full_parse_018_api、shell_pack_lib_freshness、plan_662_gallery_apps_dir_layouts——均经 stash 回 base 实证同败，与本改动无关）；`-p auto-ui-compiler` test_generate_project_files 1/1 绿（旧副本未动）。
 - [ ] T-04（owner_stage=review；依赖T-03/05；AC-04）：同树独立上下文最终复审。
@@ -123,3 +123,5 @@ stage: work | plan_id: PLAN-050 | plan_revision: r3 | outcome: pass（R2 修复 
 - host（E-4a）发射与否=T-05 决策稿产出，非用户待决；证据支持则随 SD-01 边界记录，不支持则具名不发射并留消费方自愈检测（run 期解析实际绑定 URL）说明。
 - strictPort 的多实例语义变化（第二实例显式失败）为**有意合同**（§2），与消费方 BLOG-005 B-01 故障门一致，不视为回归；若复审发现本仓存在依赖静默自增的测试/文档，按零回归原则报 work 处置。
 - 观察项（不在本计划处置）：compiler `project_files.rs:73` test-only 旧副本与生产模板已漂移（无 server 块）。
+
+stage: review | review_scope: final | reviewer_identity: 独立 general-purpose 子代理上下文 #3（与实现/复审#1#2 无共享记忆） | plan_id: PLAN-050 | plan_revision: r3 | outcome: pass | worktree_path: D:/autostack/.wt/ui-050/auto-ui | branch: codex/plan-050-dev | reviewed_commit: 8638863a | base_commit: da252a98 | dependency_revisions: auto-lang f6b0f918d、auto-web 3de5524、auto-down 7c4d5cb（同 r1） | spec_inputs: SD-01 草案（树内冻结副本，r3 措辞） | acceptance_results: AC-01(r3) **pass**（F-5 closed：独立探针 21/21——editor-link/direct-engine-link/all-link/registry-engine/trio 五类输入两路径输出逐字 byte-equal，include 零 link: 键，捕获点 vue.rs:2563 在遮蔽块 2565-2589 之前实证；附加纵深=遮蔽集渲染与 raw 集相同）；AC-02 pass（209 run/204 绿/失败集恰 5 基线红，5 新测试重跑绿）；AC-03 pass（r3 diff 未触 server 块，host 探针证据复用）；AC-04 pass | findings: F-6（低，文档残留）§0/§2 签名/§5 T-01/§8 注记残留 r1 措辞——纯措辞零行为影响，本 receipt 前已在主检出 Plan 修正（非规范段对齐，不改语义契约，评审 commit 不变） | evidence: D:/autostack/plan-artifacts/plan-050/review3/（REVIEW3.md、probe-run.log） | pending_closeout_gates: merge 所有（SD-01 发布、landing 检查、归档、worktree 清理） | next: merge
