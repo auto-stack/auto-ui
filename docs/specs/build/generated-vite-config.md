@@ -12,20 +12,15 @@
   端口静默自增（可撞后端端口呈 split-brain）与同端口跨协议栈静默绑定
   （127.0.0.1 被占绑 ::1 仍报 ready）。`localhost` URL 经 OS 双栈回落照常
   可达；tauri webview 的 `http://localhost:{port}` 不受影响。
-- `optimizeDeps.include`：pac `npm_deps` 解析键集非空时发射 `optimizeDeps:
-  { include: [...] }`，键 = 该项目 `npm_deps` 解析键集（含依赖包递归合并，
-  即消费方 cand5 控制变量已验证的形态；键为 TS 字符串字面量，JSON 转义）；
-  键集为空时整个 `optimizeDeps` 键省略（不发 `include: []`）。不变式：
-  include 键集 ⊆ 实装依赖（npm_deps 键由同一生成流写入 package.json），
-  零"引用未安装包"失败面；不含框架基础依赖（其静态可达，vite 冷扫描
-  本就预打包）与 link: 引擎依赖（强制预打包会改变其 watch/更新语义）。
+- `optimizeDeps.include`：pac `npm_deps` 解析对中**非 `link:` 的注册表键**非空时发射 `optimizeDeps: { include: [...] }`（键为 TS 字符串字面量，JSON 转义）；过滤集为空（无 npm_deps 或全为 link: 声明）时整个 `optimizeDeps` 键省略（不发 `include: []`）。不变式：include 键集 ⊆ 实装依赖（npm_deps 键由同一生成流写入 package.json），零"引用未安装包"失败面；link: 声明保持 vite 默认源态加载（强制预打包会改变其 watch/更新语义）；Plan-482 推导的 `@autodown/engine` 同级键仅进 package.json、永不进 include；框架基础依赖（静态可达，冷扫描本就预打包）不在内。
 
 ## 2. 两条写入路径（同源同一来源）
 
-- **来源恒一**：include 源 = `VueProject::npm_deps` 解析键集。生成期
-  （`write_project_files` 的 `extra_deps` 参数）与 run 期自愈
-  （`refresh_vite_config(&project.output_dir, …)`）传同一字段
-  （`&self.npm_deps`），两路径发射的 include 键集逐字一致。
+- **来源恒一**：include 源 = `VueProject::npm_deps` 解析对。生成期
+  （`write_project_files` 在 Plan-482 遮蔽**前**捕获的原参数）与 run 期
+  自愈（`refresh_vite_config(&project.output_dir, &project.npm_deps)`）传
+  同一字段；`link:` 过滤在模板函数内部实施——两路径发射逐字一致，与
+  调用点各自上下文无关。
 - **run 期自愈**（`refresh_vite_config`）：仅当 `vite.config.ts` 已存在时
   以当前模板重写（模板确定性自愈，与相邻 index.html/tailwind 刷新同级
   语义）；写失败 = 具名警告不中断 run。
