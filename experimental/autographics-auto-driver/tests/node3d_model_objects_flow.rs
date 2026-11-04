@@ -624,6 +624,157 @@ fn hidden_templates_and_live_instances_are_non_solid_on_the_actor_path() {
     });
 }
 
+
+#[test]
+fn vs04_twenty_rounds_keep_warm_decodes_flat_and_resource_union_bounded() {
+    big_stack(|| {
+        let dir = write_product("vs04");
+        let (doc, registry, code, _) =
+            Storage::load_project(&dir.join("scene.agscene"), &Registry::new()).expect("load");
+        let mut h = Host::with_project(doc, registry, code).expect("host");
+        let doc_bytes_before = serde_json::to_string(&h.editor.document).expect("doc bytes");
+
+        let union = |h: &Host| h.resource_snapshot()["asset_union"].clone();
+        h.start_selected_play().expect("round 0 start");
+        h.pause_play("");
+        settle(&mut h);
+        // 首轮把共享 GLB 解码上传（实例出生触发模板网格上传）。
+        for _ in 0..6 {
+            tick(&mut h);
+        }
+        h.stop_play();
+        settle(&mut h);
+        let warm = h.resource_snapshot()["mesh_count"].as_u64().expect("warm");
+        let decodes_after_first = union(&h)["decode_attempts"].as_u64().expect("decodes");
+        assert!(warm >= 2, "two-part template meshes resident: {warm}");
+
+        for round in 1..20 {
+            h.start_selected_play()
+                .unwrap_or_else(|e| panic!("round {round} start: {e:?}"));
+            h.pause_play("");
+            settle(&mut h);
+            for _ in 0..6 {
+                tick(&mut h);
+            }
+            h.stop_play();
+            settle(&mut h);
+        }
+        let after = h.resource_snapshot()["mesh_count"].as_u64().expect("after");
+        assert_eq!(warm, after, "20 rounds of birth/despawn/reuse/Stop/newRun must keep uploads flat");
+        let decodes_after_twenty = union(&h)["decode_attempts"].as_u64().expect("decodes");
+        assert_eq!(
+            decodes_after_first, decodes_after_twenty,
+            "warm decode/upload must be 0 across reuse rounds (registry shares the GLB identity)"
+        );
+
+        // 资源并集：raw8 身份 / 单件 8MiB / 总 32MiB / CPU+GPU 各 64MiB 原额。
+        let u = union(&h);
+        assert_eq!(u["count"], serde_json::json!(1), "one shared GLB asset");
+        let raw = u["raw_bytes"].as_u64().expect("raw");
+        assert_eq!(raw, 1528, "raw union is the two-parts GLB bytes only");
+        assert!(raw < 8 * 1024 * 1024, "single asset under 8MiB");
+        assert!(u["cpu_geometry_bytes"].as_u64().unwrap() < 64 * 1024 * 1024);
+        assert!(u["gpu_expected_bytes"].as_u64().unwrap() < 64 * 1024 * 1024);
+
+        // 20 轮后文档逐字不变（实例永不进 Document；Stop 释放运行所有权）。
+        let doc_bytes_after = serde_json::to_string(&h.editor.document).expect("doc after");
+        assert_eq!(doc_bytes_before, doc_bytes_after, "document unchanged after 20 rounds");
+    });
+}
+
+
+#[test]
+fn mesh_denominator_512_boundary_counts_hidden_template_rows() {
+    big_stack(|| {
+        // V-S03 512 边界 + hidden denominator 负控：文档三维行（含 invisible
+        // parked 模板行）按 TemplateRules 全部 eligible 叶计入 potential
+        // meshes；8 槽 × 每模板 mesh 数 + base ≤ 512。65 mesh/模板 × 8 + 1
+        // base = 521 > 512 必须在 prepare 期具名拒绝；63 mesh/模板 × 8 + 1
+        // = 505 通过（边界两侧）。
+        use autographics_auto_driver::authoring::document::Object;
+        fn synth_model(meshes: usize, tag: &str) -> agp::assets::ModelData {
+            let tri = |name: String| agp::assets::MeshData {
+                visual: None,
+                name,
+                positions: vec![[0., 0., 0.], [1., 0., 0.], [0., 1., 0.]],
+                normals: vec![[0., 0., 1.]; 3],
+                indices: vec![0, 1, 2],
+                material: agp::assets::MaterialDef {
+                    name: "synth".into(),
+                    base_color: [0.9, 0.3, 0.2, 1.0],
+                    metallic: 0.0,
+                    roughness: 1.0,
+                },
+            };
+            let sha = agp::renderer::capture::sha256_hex(format!("plan043-synth-{tag}-{meshes}").as_bytes());
+            agp::assets::ModelData {
+                source_sha256: sha.clone(),
+                meshes: (0..meshes).map(|i| tri(format!("primitive-{i}"))).collect(),
+            }
+        }
+        let build = |meshes_per_template: usize, tag: &str| -> Result<Host, String> {
+            let model = synth_model(meshes_per_template, tag);
+            let sha = agp::renderer::capture::sha256_hex(
+                format!("plan043-synth-{tag}-{meshes_per_template}").as_bytes(),
+            );
+            let mut d = Document::empty(format!("plan043-denominator-{tag}"));
+            d.objects.push(Object::new(1, Kind::Cylinder));
+            for i in 0..8u64 {
+                let mut o = Object::new(2 + i, Kind::Model);
+                o.name = format!("Tpl{i}");
+                o.visible = false; // parked：隐藏也必须计入 denominator。
+                o.resource = Some(format!("sha256:{sha}"));
+                d.objects.push(o);
+            }
+            let ident = || autographics_auto_driver::authoring::assets::AssetRef {
+                closure: None,
+                audio: None,
+                format: "glb".into(),
+                sha256: sha.clone(),
+                byte_length: 1528,
+                name: Some("tpl".into()),
+                width: None,
+                height: None,
+            };
+            d.assets.push(ident());
+            d.validate().expect("synthetic document valid");
+            let asset = autographics_auto_driver::authoring::assets::Asset {
+                audio: None,
+                model_images: vec![],
+                dependencies: Default::default(),
+                identity: ident(),
+                bytes: std::sync::Arc::from(&b"synth"[..]),
+                model,
+                animation: None,
+                image: None,
+                cpu_bytes: 1528,
+                gpu_bytes: 1528,
+                decode_us: 0,
+            };
+            let registry = autographics_auto_driver::authoring::assets::Registry::from([(
+                format!("sha256:{sha}"),
+                std::sync::Arc::new(asset),
+            )]);
+            Host::with_project(d, registry, None)
+        };
+        // 上界侧：65 meshes × 8 + base = 521 > 512 → 具名拒绝（在
+        // with_project 的首帧 prepare，比 play start 更早）。
+        let err = match build(65, "over") {
+            Ok(_) => panic!("521 potential meshes must exceed 512"),
+            Err(e) => e,
+        };
+        assert!(
+            err.contains("512"),
+            "named 512 rejection, got '{err}'"
+        );
+        // 下界侧：63 meshes × 8 + base = 505 ≤ 512 → 构建成功。
+        let mut h_under = build(63, "under").expect("505 potential meshes must fit the 512 envelope");
+        h_under.pause_play("");
+        settle(&mut h_under);
+        assert_eq!(live(&h_under), 0);
+    });
+}
+
 /// The camera family re-enters the SDK parser per start; give it the same
 /// 64 MiB runway the other runtime tests use.
 fn big_stack(test: impl FnOnce() + Send) {
