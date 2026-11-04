@@ -1,6 +1,6 @@
 ---
 plan_id: PLAN-043
-status: execution_done
+status: reviewed
 feature_name: AutoGraphicsNode三维模型资源对象模板接线
 author: [Codex]
 created_at: 2026-11-04
@@ -144,6 +144,17 @@ T-01 证据（只读核查，全部在 worktree codex/plan-043-dev@2a830d6c 工�
 - AG016 只读：PLAN-016 已归档（docs/plans/archived/016-*.md），.wt 下无 ag-016 树（仅 ag-019、ag-examples/probe），固定 035 交付 5903839e 在历史中，本轮未触碰。
 - 主检出 WIP 观察（非本 Plan，已上报不代管）：master 工作树有 docs/plans/{045,046,047} 新草案、039 计划文件删除、docs/design 改动与 `?? crates/auto-ui-runtime/test/`——疑似他会话在途；master-zero-WIP 在 merge 落主前需其 owner 处理，本 Plan 全程在 ui-043 树内写码不受影响。
 - scope 登记：D:/autostack/plan-artifacts/plan-043/scope-registry.md（sha256 16932afb4d3cfa48af3d1d97166a9d910ca4d9993c786b14542ff22d293e6874），唯一 scratch 根，in-flight: none。
+
+2026-11-04 / stage: goal | plan_id: PLAN-043 | plan_revision: r1 | round: 11 | from: review | to: merge | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-043/auto-ui | commit: 368f4fa1 | next: merge（T-08 冻结定向门/来源核落 master；T-09 归档/导航/身份；T-10 fresh guard/对账/清理）
+
+2026-11-04 / stage: review | auto-ui/PLAN-043 r1 | outcome: pass（final）| review_scope: final | reviewer_identity: goal 会话独立复验（同会话 work/review 分轮；探针全部独立重跑、diff 逐面重核，非照作者摘要）| reviewed_commit: 368f4fa1（review 修复后 HEAD；核 commence 872b8266 + 簿记修复 368f4fa1）| base_commit: 2a830d6c | dependency_revisions: 本仓；auto-lang f4062cca；SDK 681 锁未动（diff 无 sdk/frozen 面）| acceptance_results: AC-01..AC-06 pass（映射见 §9 work readiness；复核摘要如下）| pending_closeout_gates: merge 统一回归门（里程碑档 pending 按 2026-10-28 裁定登记）+ T-08..T-10 merge 任务 + 主检出 master-zero-WIP（045/046/047 他会话 WIP 需其 owner 处理，非本 Plan 债务）| evidence: 下述独立探针 | next: merge。
+
+独立复核摘要：
+- diff 面（2a830d6c..368f4fa1，52 文件 +2729/-28）：核心逻辑增量=events 下降参数化（154 行）+ main.rs 组合臂（55）+ lib.rs 导出（9）+ resolve_model_3d 可见性（1）+ character3d_v1.at（2 行：0→1 + 头注）+ 两份 identity 簿记（plan874 2 行/plan879 2 键）；其余为测试/夹具/生成物/规范候选，零散落面。viewport.rs 无 diff（T-04 调试探针已净移除，artifact 扫描无 eprintln/dbg/TODO 残留）。
+- 独立重跑探针（review 本轮）：pilot gates 4/4 + 028 gates 7/7；verify_plan043.py --controls 6/6 全绿；driver flow 8/8（GPU 单实例）；node3d_runtime_flow 7/7（G07/G08 墙/支撑 oracle——char3 语义改动最大风险面）；character3d_host 9/9；events/basic/bindings/audio-hud flows 与 character3d api/samples、camera_host 于 work 轮已绿，review 抽查一致。
+- AC 映射复核：AC-01 gates+夹具+flow identity 断言；AC-02 GPU 双 part/亮金变异 oracle（despawn 后判别式=0）；AC-03 fault 31/33 + g14 三阶段轨迹逐位对照；AC-04 fault 10/37 + V-S04 20 轮暖账平坦 + 512 denominator 两侧；AC-05 vs04/vs05 + 受影响并集回归 + SDK 锁未动；AC-06 SD-01/SD-02 候选文本在树内、消费交接 controls 绿。
+- 缺口/延后扫描：无未声明 workaround；全量 AG 套件按裁定属里程碑档（已声明非前置）；512 边界用合成 ModelData 走真实 prepare 路径（守卫为生产码）；runtime_camera_host 曾 1 例瞬红复跑绿（AGENTS 原生窗口环境归因规则）；verify_plan874 的 .gitattributes 漂移为 master 既有现象（本 Plan 未引入）。
+- review 发现与处置：F-1（唯一 finding）= plan879-identity.json 的 character3d_v1.at 哈希在工作轮声称已更新实则静默未改（dict 键 sha256_bytes/sha256_normalized 未被当时脚本覆盖）——已在 review 修复（368f4fa1，两键核字节/规范化哈希一致）并复验 diff；其余声明与磁盘一致（含 round-7 收据在修复后成立）。
 
 2026-11-04 / stage: goal | plan_id: PLAN-043 | plan_revision: r1 | round: 10 | from: work | to: review | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-043/auto-ui | commit: 90f5de5e | next: review（同树独立上下文 final，review_scope: final）
 
