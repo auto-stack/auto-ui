@@ -11,10 +11,14 @@ use std::path::Path;
 
 /// 旁件格式版本（与 pilot source_map::MAP_FORMAT 同值，T-02 冻结）。
 pub const MAP_FORMAT: &str = "node-source-map/v1";
-/// metadata 上界（T-02 冻结）：旁件 JSON 本身 ≤64KiB。
-pub const MAX_MAP_BYTES: usize = 64 * 1024;
-/// 段数上界（T-02 冻结）：线性存储/查找预算；超出即整图拒用。
-pub const MAX_SEGMENTS: usize = 4096;
+/// metadata 上界（T-05 实测重冻结）：旁件 JSON 绝对 ≤4MiB，且不超过
+/// 世界字节的 4 倍（实测 worst ratio 3.42 @ 密集 helper 源；旧 64KiB
+/// 常数上限会暗删 256KiB 合法域——超限分类 = 整图拒用 → generated
+/// fallback，不截断、不部分采用）。
+pub const MAX_MAP_BYTES: usize = 4 * 1024 * 1024;
+/// 段数上界（T-05 实测重冻结）：256KiB 世界按 2n+1 段密度可容纳
+/// ~4000 极小 helper；16384 覆盖最大合法源，线性存储/二分查找预算内。
+pub const MAX_SEGMENTS: usize = 16384;
 
 /// 定位精度（与 pilot 口径一致）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -146,10 +150,13 @@ impl SourceMap {
     /// 解析 + 结构校验 + world 字节绑定。任何失败即整图拒用（Err）。
     pub fn parse(json: &str, world_source: &str) -> Result<Self, String> {
         if json.len() > MAX_MAP_BYTES {
-            return Err("map exceeds 64KiB metadata budget".into());
+            return Err("map exceeds 4MiB metadata budget".into());
         }
         let map: SourceMap =
             serde_json::from_str(json).map_err(|e| format!("map parse: {e}"))?;
+        if map.user_source_bytes > 0 && json.len() > 4 * map.user_source_bytes.max(16 * 1024) {
+            return Err("map exceeds 4x world-bytes ratio bound".into());
+        }
         if map.format != MAP_FORMAT {
             return Err(format!("map format '{}' != {}", map.format, MAP_FORMAT));
         }

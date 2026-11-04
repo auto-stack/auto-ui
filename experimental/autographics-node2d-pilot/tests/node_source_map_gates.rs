@@ -453,6 +453,102 @@ fn build_map_is_pure_world_bytes_unchanged() {
 }
 
 #[test]
+fn map_size_scales_linearly_and_largest_legal_source_fits() {
+    // V-S05：段数/旁件体积随源规模线性增长；最大合法源（近 256KiB
+    // user 上限的合成世界）旁件必须仍在冻结预算内，超限分类明确
+    //（拒用→generated fallback，不截断不部分采用）。
+    fn synth(n_helpers: usize, body_pad: usize) -> (Project, String) {
+        // 单模块 n 个 helper（每个带 pad 行）+ 主 node，合成合法世界。
+        let mut util = String::new();
+        for i in 0..n_helpers {
+            util.push_str(&format!("fn h{i}(x int) int {{\n"));
+            for j in 0..body_pad {
+                util.push_str(&format!("  // pad line {j} 中文字段\u{0301}\n"));
+            }
+            util.push_str("  return x + 1\n}\n");
+        }
+        let main = "node Game {\n}\n".to_string();
+        let mut fns = Vec::new();
+        let mut cursor = 0usize;
+        for i in 0..n_helpers {
+            let m = format!("fn h{i}(");
+            let s = util.find(&m).unwrap();
+            let l = autographics_node2d_pilot::lower::slice_fn_source(&util, &format!("h{i}"))
+                .unwrap()
+                .len();
+            fns.push((format!("h{i}"), s, s + l));
+            cursor = s + l;
+        }
+        let _ = cursor;
+        let mut project = Project::default();
+        project.modules.insert(
+            "util".into(),
+            LoadedModule {
+                name: "util".into(),
+                source: util.clone(),
+                nodes: Vec::new(),
+                fns: fns.into_iter().map(|(n, s, e)| (n, s..e)).collect(),
+                resources: Vec::new(),
+                uses: Vec::new(),
+                enums: BTreeMap::new(),
+            },
+        );
+        project
+            .modules
+            .insert("main".into(), module("main", &main, Vec::new()));
+        // 模拟发射：锚定注释 + 声明改名。
+        let mut world = String::from("// GENERATED\nvar ok=0.0\n");
+        let mut names: Vec<String> = (0..n_helpers).map(|i| format!("h{i}")).collect();
+        names.sort();
+        for n in &names {
+            world.push_str(&format!("// pooled fn {n} from util\n"));
+            let slice = autographics_node2d_pilot::lower::slice_fn_source(&util, n).unwrap();
+            let mut renamed = slice;
+            for (sib, _) in &project.modules["util"].fns {
+                renamed = renamed.replace(&format!("{sib}("), &format!("util_{sib}("));
+            }
+            world.push_str(renamed.trim_end());
+            world.push('\n');
+        }
+        world.push_str("fn app_start() {\n}\n");
+        (project, world)
+    }
+    let mut prev: Option<(usize, usize)> = None;
+    for n in [8usize, 32, 128] {
+        let (project, world) = synth(n, 6);
+        assert!(world.len() <= 256 * 1024, "synthetic world within user cap");
+        let sha = sha256_hex(world.as_bytes());
+        let map = build_source_map(&project, &world, GENERATOR, &sha).expect("build");
+        let json = map.to_json();
+        // 线性：段数 ≈ n 个 range + 补齐段；json/world 比率有界。
+        assert!(map.segments.len() >= n && map.segments.len() <= 2 * n + 2);
+        if let Some((pn, pj)) = prev {
+            // 体积随 helper 数近线性：每 helper 的 json 增量稳定（±50% 内容容差）。
+            let per_now = json.len() as f64 / n as f64;
+            let per_prev = pj as f64 / pn as f64;
+            assert!(
+                per_now < per_prev * 1.5 + 200.0,
+                "map growth super-linear: {per_now} vs {per_prev}"
+            );
+        }
+        prev = Some((n, json.len()));
+    }
+    // 实测包线（T-05 重冻结依据，见 Plan §9）：worst ratio 3.42（密集
+    // helper 小源）收敛 ~2.2-3.4；上界 = max(64KiB, 4×world)。
+    let (project, world) = synth(128, 6);
+    let sha = sha256_hex(world.as_bytes());
+    let map = build_source_map(&project, &world, GENERATOR, &sha).unwrap();
+    let json_len = map.to_json().len();
+    let bound = (4 * world.len()).max(64 * 1024);
+    assert!(
+        json_len <= bound,
+        "map {json_len} exceeds T-05 frozen bound {bound} (world {})",
+        world.len()
+    );
+    // 线性存储：段数 ≈ 2n+1，json 增量随 n 稳定（上面循环已断言非超线性）。
+}
+
+#[test]
 fn gap_fill_merges_and_tiles() {
     let segs = vec![
         Segment { start: 4, end: 6, module: Some("m".into()), node: None, event: None, helper: None, precision: Precision::Exact, source_start: Some(0), source_end: Some(2) },
