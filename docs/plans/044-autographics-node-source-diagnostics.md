@@ -146,6 +146,8 @@ work产证；review同树独立上下文final，从真实compile/Run复核AC/SD/
 
 2026-11-04 / stage: goal | plan_id: PLAN-044 | plan_revision: 1 | round: 5 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-044/auto-ui | commit: 0da688fb | next: work T-03。**T-02 关闭（2/10）**：handler context 段落地——发射名 `{snake(node)}_life{event}`/`{snake(node)}_{snake(member)}` 锚定 world 中 handler fn，精度 context（重写体不承诺语句级位置），node/event 身份 + 声明行锚；**源区间纯文本锚定**（node 声明区花括号配平内搜 `Life.{event}`/`.{member}` token）——实证本栈 AST span 起点 +1(fn)/+2(handler) 漂移，凡 AST span 均不可字节信，映射一律文本锚。helpers 夹具 Alpha/Beta 段不互串 gate；driver 冻结旁件上 gamma_lifetick context 起点实证（node=Gamma/event=Life.Tick/锚定行内容含 Life.Tick）。pilot gates 9/9、driver 5/5、components 6/6、behavior_source_identity 1/1 全绿（commit 516b152a 标记 T-02 [x]）。
 
+2026-11-04 / stage: goal | plan_id: PLAN-044 | plan_revision: 1 | round: 6 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-044/auto-ui | commit: a90eebb2 | next: work T-03（续）。T-03 第一切片：①Member/recv 段落地——recv fn 名含子实例绑定名（`meter_add`）非 def 名，后置不可证重建，裁定**唯一属主文本规则**（未覆盖顶层 fn 的 `_{suffix}` 与全工程唯一 Member 事件 snake 匹配且恰好一个 node 属主才归属；多属主/无属主不映；未绑定 handler 无发射 fn 即跳过）。修一扫描器 off-by-one（`start+3`）。②默认字节保持单元门（建图纯函数 world 不变；CLI 对照归 verify_plan044.py）。③driver 分层门（V-S02）：runtime 无 span（AutoError::Msg）映射层不编造行、保持 "SDK supplied no mapped line"；managed 区 span 永不映射（managed 绝不当用户）；dev-dep miette=7.6 与锁定树同版（lock 已含零新下载）。pilot gates 11/11、driver 6/6、回归全绿。T-03 余量：loader 接受身份接线（SaveAs/接受源快照消费面，依赖 behavior_project/Storage 路径）、verify_plan044.py 骨架、UTF8/边界独立重算门（V-S04 映射侧）。
+
 ## 10. 待澄清事项
 
 | ID | 事项 | owner/关闭动作 |
