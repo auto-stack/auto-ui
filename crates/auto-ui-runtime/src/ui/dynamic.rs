@@ -4000,10 +4000,6 @@ mod tests {
     /// PLAN-051 T3 (C2 ①声明式): musk 契约——子 msg `send(str)` 派发后
     /// 宿主 `onsend: .SendInput($event)` 收到 msg 载荷。此前无通用路由
     /// （renderer 只有 PromptBar 特判），SendInput 静默不触发。
-
-    /// PLAN-051 T3 (C2 ①声明式): musk 契约——子 msg `send(str)` 派发后
-    /// 宿主 `onsend: .SendInput($event)` 收到 msg 载荷。此前无通用路由
-    /// （renderer 只有 PromptBar 特判），SendInput 静默不触发。
     #[test]
     fn plan051_emit_msg_variant_routes_to_parent() {
         let src = concat!(
