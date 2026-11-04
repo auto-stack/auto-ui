@@ -1,4 +1,6 @@
-# AutoGraphics：AutoUI 式图形应用声明与组件模型
+# AGE声明、组件、绑定与事件作者模型
+
+> **2026-11-04 AGE命名与当前状态**：正式名Auto Graphics Engine（AGE），品牌AutoGraphics Engine；AG/AutoGraphics为历史别名。见[命名决议](age-naming-and-content-repository.md)。内容仓仍为ag-examples，[020目录更名](../../../../ag-examples/docs/plans/020-age-examples-repository-rename.md)仅规划，默认M2/AG019实际交付后实施；不改作者语义、原预算或历史交付身份。 当前AG016/017/018均已交付，活Node源22/22；AG019同版联验已executing/r1/1-10（原owner实施），旧日期段落保留为快照。
 
 2026-10-30；目标与要求回归 v3。本文承接用户本日对 AG-001 的走读和设计纠偏，恢复最初的作者模型；不是新增实施 Plan，也不声明语法、模块装配或 ACE 集成已实现。新设计归 auto-ui，Gallery 内容归 ag-examples；历史设计与现状 Specs 仍在 auto-lang。
 

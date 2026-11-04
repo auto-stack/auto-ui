@@ -1,16 +1,16 @@
-# Gallery 全量迁入 Node 作者模型
+# AGE Gallery全量迁入Node作者模型
 
 2026-10-31，设计 v1；2026-11-03更新交付进度。作者模型沿[总体设计](declarative-authoring-model.md)，已迁移入口能力分别沿[017 Spec](../../specs/auto-graphics/node2d-g11-authoring.md)与[019 Spec](../../specs/auto-graphics/node2d-basic-authoring.md)。本文件归 auto-ui；Gallery 合同在各自仓管理。
 
-2026-11-03最新核验：UI035交付5903839e、UI039交付8f577a34，均有canonical/旧树已清；UI040已交付fc82061c/独立final/canonical，AG016完整G3现executing/r1/本次核验3-10（固定035），AG017 G05三维仍0/10草案。当前活源**19/22**，剩g04双维/g05三维。034/035/039/AG015同实现会话final限制按收据如实记，相关后继按合同核必需独立证据，归档不自动造pass。
+2026-11-04最新核验：AG016完整G3交付55c39a2，AG017 G05/3d交付273b070、AG018 G04双维交付4cb297d，均已归档/清树。12项22入口活Node源**22/22**，两完整游戏不计Gallery分母；AG019同版/M2联验已executing/r1/1-10。上游034/035/039/AG015同会话final、旧runner及OS/声学具名边界继续按原收据核，不能用迁移完成抹平。
 
-当前优先级见[M2路线](m2-game-first-three-lane-roadmap.md)及[编辑与同版发行设计](m2-editor-and-release-convergence.md)：UI040优先复用039已有静态双维路径补项目化编辑/保存交接；AG018迁G04两入口；AG019后置同版/离线/M2联验。016/017原合同不改，本批三份均只规划。
+当前优先级见[M2路线](m2-game-first-three-lane-roadmap.md)：AG019按原合同核候选与必需证据；UI043/044为可选后继。采用Auto Graphics Engine（AGE），详[命名决议](age-naming-and-content-repository.md)；ag-examples目录仍不变，020更名仅规划、默认M2/019后维护窗口。
 
 ## 目标与现场
 
 所有 Gallery 项目的作者源最终使用 Auto 的 node、model、view-2d/view-3d、on、Life、msg、绑定和普通 use。场景 JSON、句柄与单文件运行源可以继续作为生成产物，不要求它们消失，也不要求执行存储照搬声明树。资源、组件和纯函数应复用；不能为每个示例继续新增一个按示例名识别的专用编译器。
 
-当前核验基线：ag-examples139e41d0、auto-ui f83fd06f；12项22入口，活Node19项清单保持，下游未实施不预加。未迁g04/2d、g04/3d、g05/3d；两完整游戏不计Gallery，纯声明无需用户VM/假角色。
+当前源码核验基线：ag-examples032d0a5；22个入口均有Node作者源与实际生成链，G04为纯声明编辑项目，不要求假角色/用户VM。精确交付/来源与验收边界见各归档Plan/canonical。
 
 auto-ui 017的g11-2d模式仍要求恰一个character2d，solid/camera限根，资源仅程序化二维图元，不能冒称所有二维/三维/资源服务已支持。旧016/017、AG007收据保持历史，后继不重开归档Plan。
 
@@ -22,10 +22,10 @@ auto-ui 017的g11-2d模式仍要求恰一个character2d，solid/camera限根，�
 | g02/main | Node源码，固定027纯静态 | W3 [AG011](../../../../ag-examples/docs/plans/archived/011-autographics-gallery-node3d-basics.md)已交付f35236dc；原GLB/红绿像素/许可/完整包保持，无假角色/用户VM |
 | g03/2d | Node源码，AG008/019；父子group | W1已交付；父平移继承/祖先显隐/深层world坐标与Stop恢复 |
 | g03/3d | Node源码，原Player/Mob与group | W3 AG011已交付；原几何/材质/父移/隐藏保持，固定027，完整G03包保019二维 |
-| g04/2d | JSON，编辑器教程 | W6 [AG018](../../../../ag-examples/docs/plans/018-autographics-gallery-node-editor-tutorials.md)仅规划；等[UI040](../../plans/archived/040-autographics-node-editor-projects.md)实交付（fc82061c来源已具备，OS层原义务仍核），原双维对象/九义务/20阶段与实际项目保存重开保持 |
-| g04/3d | JSON，编辑器教程 | W6 AG018同计划；原双维对象/34阶段/默认文档对照及项目本身编辑保存齐验，类E不改公共游戏指针API；OS政策保持 |
+| g04/2d | Node源码，固定040纯声明编辑工程 | W6 [AG018](../../../../ag-examples/docs/plans/archived/018-autographics-gallery-node-editor-tutorials.md)已交付4cb297d；原九义务/20阶段和实际项目保存重开承接，OS分层D-02保持 |
+| g04/3d | Node源码，固定040纯声明编辑工程 | W6 AG018已交付；原34阶段/默认文档对照/项目编辑保存与完整包，OS分层D-02保持 |
 | g05/2d | Node源码，固定021；segment/sweep/changed | W2a [AG009](../../../../ag-examples/docs/plans/archived/009-autographics-gallery-node2d-queries.md)已交付062081d；九旧义务/39oracle/完整混合维度包，OS阶段具名pending |
-| g05/3d | 旧v3/v4 Auto、GLB/group＋二维标记 | W4a [AG017](../../../../ag-examples/docs/plans/017-autographics-gallery-node3d-queries.md)仅规划，完整迁移硬等[UI039](../../plans/archived/039-autographics-node3d-queries-and-mixed-markers.md)实际交付（8f577a34已落主，独立来源门依合同核）；原三变体/九义务/完整混合包保持 |
+| g05/3d | Node源码，固定039、GLB/group＋二维标记 | W4a [AG017](../../../../ag-examples/docs/plans/archived/017-autographics-gallery-node3d-queries.md)已交付273b070；原三变体/九义务/混合包保持，旧2d021链/runner及AG009 D-03边界保留 |
 | g06/layout-a | Node源码，AG008/019；台阶/跳跃 | W1已交付；输入沿、重力/支撑/碰撞、速度4→5对照、布局A原几何 |
 | g06/layout-b | Node源码，AG008/019；坑道/跳跃 | W1已交付；同输入与A产生原几何差异，保无双跳/无缓冲跳与Stop恢复 |
 | g07/layout-a | Node源码，固定027，AG012已交付 | W3 [AG012](../../../../ag-examples/docs/plans/archived/012-autographics-gallery-node3d-character-and-cameras.md)交付05f1b498；保main/main-fast/原六动作/支撑与完整包 |
@@ -41,7 +41,7 @@ auto-ui 017的g11-2d模式仍要求恰一个character2d，solid/camera限根，�
 | g12/audio | Node源码，固定023有限game档 | W5 AG006已交付e574b58；原两币/八oracle/ordinal/PCM/素材保持，025通用服务亦已交付，不自动重开006 |
 | g12/hud | Node源码，新增入口、固定023有限game档 | W5 [AG006](../../../../ag-examples/docs/plans/archived/006-autographics-gallery-event-hud.md)已交付；三币/字形/PCM/共同接受/完整包，声学等具名gap保留，新增1而非旧项迁移 |
 
-已完成原21中的18个、HUD新增1，当前19/22。AG017贡献+1，AG018贡献+2（入口净增0），按合入先后19→20→22或19→21→22，真实活源/生成物/验收齐后重算；没有提前22/22，亦不据迁移数估M2。
+已完成原21项迁移，加HUD新增1，当前22/22。AG017贡献+1、AG018贡献+2，入口净增0；按活源/生成物/metadata实算，不能据此认领M2完成。
 
 ## 第一轮交付与后继边界
 
@@ -50,7 +50,7 @@ auto-ui 017的g11-2d模式仍要求恰一个character2d，solid/camera限根，�
 
 先引擎交付、再内容；下一波引擎可与上一波固定消费的内容并行，读端不追开发tip。查询、二维图片、三维资源和声音的端口应复用共同领域表示，但共享文件要约定owner短窗，GPU/窗口/音频重型门单实例。当前018、语言901与UI014的真实写面由开工核对，不凭标题加全量串行前置。
 
-2026-11-03下一轮：UI040纯声明双维编辑工程/项目化验收→AG018 G04两教程迁移；AG019同版联验T-01可盘点、候选等040实际交付、完整联验等016/017/018实交付与必要独立证据。所有原预算/玩法/验收不减，本轮不实施。
+2026-11-04后继：040/016/017/018均已交付，AG019候选与同版联验仍按原合同及必需证据核验；020目录更名默认在019实际交付后，不插入当前M2验收。
 
 ## 不变的交付要求
 
@@ -72,6 +72,6 @@ auto-ui 017的g11-2d模式仍要求恰一个character2d，solid/camera限根，�
 
 本设计是长期路线和接口要求，不是临时探针/验收报告。临时材料只在plan-artifacts/plan-NNN/<repo>/，禁止新建attachments（包括md）；merge前摘要折叠进Plan，清理自有scope及构建中间物，具名未解决问题按新政策持有。永久产品源码、必要回归测试/夹具和canonical Spec按所属仓维护。
 
-本次保活源19/22，035/039已交付，规划UI040/AG018/AG019；只改合同/设计/导航，不实施或建树/探针/素材，不构建/跑GPU。游戏已交付不改变Gallery入口分母。
+本次更新命名/当前22/22与既有交付导航，仅规划020；不改源码/锁/原验收，不建实施树/探针/素材、不构建/跑GPU。游戏交付不改变Gallery分母。
 
 2026-11-04可选引擎后继：[UI043模型对象模板](../../plans/043-autographics-node3d-model-object-templates.md)、[UI044源诊断](../../plans/044-autographics-node-source-diagnostics.md)仅规划；不增加当前017/018/019前置、不改活锁/迁移分子，后续内容显式升级另约。

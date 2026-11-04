@@ -1,4 +1,6 @@
-# AG后继：资源对象组件与Node源码诊断
+# AGE模型对象组件与Node源码诊断
+
+> **2026-11-04 AGE命名与当前状态**：正式名Auto Graphics Engine（AGE），品牌AutoGraphics Engine；AG/AutoGraphics为历史别名。见[命名决议](age-naming-and-content-repository.md)。内容仓仍为ag-examples，[020目录更名](../../../../ag-examples/docs/plans/020-age-examples-repository-rename.md)仅规划，默认M2/AG019实际交付后实施；不改作者语义、原预算或历史交付身份。 当前AG016/017/018均已交付，活Node源22/22；AG019同版联验已executing/r1/1-10（原owner实施），旧日期段落保留为快照。
 
 2026-11-04 v1，target-state。用户要求为auto-ui继续规划后继。[UI043](../../plans/043-autographics-node3d-model-object-templates.md)模型对象模板与[UI044](../../plans/044-autographics-node-source-diagnostics.md)源码定位均drafting/r1/0-10，仅规划；不实施/建树/复制资源/探针/构建/GPU/agent。041/042已被其它UI组件store/重载路线占用，本轮独占重取043/044，不覆盖或复用他人号。
 

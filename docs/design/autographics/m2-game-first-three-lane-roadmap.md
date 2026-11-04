@@ -1,6 +1,8 @@
-# M2游戏优先路线：内容闭环、编辑迁移与统一版本联验
+# AGE M2游戏优先路线：内容闭环、编辑迁移与统一版本联验
 
-2026-11-04，设计v6。AG作者模型仍是AutoUI式Node/use、局部model/msg/on、view-2d/view-3d及具名资源/事件；桌面M2原两游戏/编辑/必要音画/资源离线/Gallery/统一最终引擎版本分母保持。ACE/AOT/ECS/CPC/跨端不新增前置。
+2026-11-04，设计v7。AGE作者模型仍是AutoUI式Node/use、局部model/msg/on、view-2d/view-3d及具名资源/事件；桌面M2原两游戏/编辑/必要音画/资源离线/Gallery/统一最终引擎版本分母保持。ACE/AOT/ECS/CPC/跨端不新增前置。
+
+> **命名与物理目录分开**：采用Auto Graphics Engine（AGE），详见[命名决议](age-naming-and-content-repository.md)。[内容仓020](../../../../ag-examples/docs/plans/020-age-examples-repository-rename.md)仅规划ag-examples→age-examples，默认AG019/M2实际交付后维护窗口实施；保历史号与交付身份，不成为019前置。
 
 ## 1. 当前真实状态
 
@@ -8,11 +10,11 @@
 |---|---|
 | 完整2D | [UI032](../../plans/archived/032-autographics-node2d-full-game-composition.md)交付a8c04d22；[AG014](../../../../ag-examples/docs/plans/archived/014-autographics-complete-2d-platformer.md)交付c141df8；其保存复用边界保原收据，不外推新G3豁免 |
 | 3D表现/音画/查询 | [UI034](../../plans/archived/034-autographics-node3d-materials-and-animation.md)93eaa907、[UI035](../../plans/archived/035-autographics-node3d-audio-hud-composition.md)5903839e、[UI039](../../plans/archived/039-autographics-node3d-queries-and-mixed-markers.md)8f577a34已实际落主/有canonical/旧树已清；同实现会话final限制如实记录，不称独立上下文pass |
-| Gallery | [AG015](../../../../ag-examples/docs/plans/archived/015-autographics-gallery-g10-node-migration.md)80e0b65后当前活源**19/22**，余g04/2d、g04/3d、g05/3d；AG013 G11/3d b48b304及其它已迁入口保持固定消费 |
-| 在途与待实施内容 | [AG016完整G3](../../../../ag-examples/docs/plans/016-autographics-complete-3d-platformer.md)executing/r1/本次核验3-10、ag-016唯一树、固定035；[AG017 G05/3d](../../../../ag-examples/docs/plans/017-autographics-gallery-node3d-queries.md)仍0/10草案。新后继不改其合同/基线 |
+| Gallery | [AG017](../../../../ag-examples/docs/plans/archived/017-autographics-gallery-node3d-queries.md)273b070、[AG018](../../../../ag-examples/docs/plans/archived/018-autographics-gallery-node-editor-tutorials.md)4cb297d已交付，当前活Node源**22/22**；12逻辑项/22入口不增，旧锁/来源边界保持 |
+| 完整3D与在途联验 | [AG016完整G3](../../../../ag-examples/docs/plans/archived/016-autographics-complete-3d-platformer.md)55c39a2已交付/归档/清理；[AG019](../../../../ag-examples/docs/plans/019-autographics-m2-unified-release-validation.md)已executing/r1/1-10，未把异版内容交付算同版M2 |
 | 编辑交付及新后继 | UI040交付fc82061c/canonical/独立final/清理齐，D-02 OS层15项仍pending；AG018/019原合同保持。UI043模型模板/UI044源码诊断本轮仅规划 |
 
-权威分母仍为auto-lang [M2-01..09](../../../../auto-lang/docs/design/autographics/m2-editor-and-public-game-prototypes.md)、[G2-01..09/G3-01..08/原关卡](../../../../auto-lang/docs/design/autographics/m2-game-sample-matrix.md)。Gallery19/22不是M2完成比例，游戏不计Gallery分母。
+权威分母仍为auto-lang [M2-01..09](../../../../auto-lang/docs/design/autographics/m2-editor-and-public-game-prototypes.md)、[G2-01..09/G3-01..08/原关卡](../../../../auto-lang/docs/design/autographics/m2-game-sample-matrix.md)。Gallery22/22不是M2完成比例，游戏不计Gallery分母。
 
 ## 2. 当前M2内容线与依赖
 
@@ -21,10 +23,10 @@
 | 线/责任仓 | 合同 | 可独立推进 | 完整后续硬门 |
 |---|---|---|---|
 | 引擎/auto-ui | [UI040](../../plans/archived/040-autographics-node-editor-projects.md)已交付 | editor-projects纯声明身份入口/项目化编辑7门/固定生成物/独立final齐 | AG018可固定消费；原OS层15项仍待真实证据，归档不等M2完成 |
-| Demo/ag-examples | [AG018](../../../../ag-examples/docs/plans/018-autographics-gallery-node-editor-tutorials.md) | 原G04九义务/20-34/场景准备；040实交付来源已具备 | 完整迁移依原合同核实际接口/独立证据和OS原分母；不等043/044 |
-| 里程碑集成/ag-examples | [AG019](../../../../ag-examples/docs/plans/019-autographics-m2-unified-release-validation.md) | T-01盘点/T-02按040实交付门冻结候选可推进 | 完整联验仍等016/017/018实际交付与必需证据；不因UI后继增加043/044依赖或自动改候选 |
+| Demo/ag-examples | [AG018](../../../../ag-examples/docs/plans/archived/018-autographics-gallery-node-editor-tutorials.md)已交付 | G04双维Node源/原教程与包已落主 | 原OS层20/34分层及D-02具名边界按归档收据，不自动抹平 |
+| 里程碑集成/ag-examples | [AG019](../../../../ag-examples/docs/plans/019-autographics-m2-unified-release-validation.md)在途1/10 | 040/016/017/018内容交付门已具备，可按合同盘点/冻结准确候选 | 必需独立证据/具名gap与原M2分母须逐项核，不增加043/044/020前置 |
 
-AG016已有owner在实施，继续固定035；017/018可按原合同启动，019完整联验后置。共享gallery/packager/锁注册短窗，GPU/音频/窗口单实例及OS自动化暂停保持，本轮只规划。
+AG016/017/018均已合并，不再按在途接管或重复建树。019按原合同启动前重新核必需证据；共享gallery/packager/锁注册短窗，GPU/音频/窗口单实例及OS自动化政策保持。本轮只写命名/路线和020规划。
 
 ## 3. auto-ui可独立推进的可选后继
 
@@ -45,7 +47,7 @@ Node源/closure/生成基线是可再生初始来源；用户通过公共Open/Sa
 
 ## 5. 内容计数、原预算与最后同版门
 
-AG017贡献+1，AG018贡献+2，净增入口均0：按先后可为19→20→22或19→21→22，只有真实src/generated/metadata与验收完成才重数。AG016完整游戏独立于这些迁移，保原G3八项/关卡/三币/相机/胜败重开/必要模型clip与jump-land-coin/HUD；UI035夹具不能代正式游戏。
+AG017贡献+1，AG018贡献+2均已实际交付，当前22/22，净增入口0。AG016完整游戏独立于迁移分母，保原G3八项/关卡/三币/相机/胜败重开/必要模型clip与jump-land-coin/HUD；UI035夹具不能代正式游戏。
 
 原32credits/32物理写/8状态Node/8slot/8pair/128行、深度/mesh/原源VM/time、raw8身份32MiB单件8MiB/CPU-GPU64MiB及动画/声音/HUD上限都不抬。多模块同世界共池，运行组织可与声明树不同；原地图最高合法轨迹与容量夹具分开，不能移币/漏声/停移动或Rust业务凑预算。旧异版交付和原UI011 no_go历史保留，不混作同一当前证据。
 

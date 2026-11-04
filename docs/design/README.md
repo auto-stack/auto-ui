@@ -1,17 +1,18 @@
 # auto-ui设计索引
 
-AG实验代码与实现计划已归本仓；旧canonical Specs与历史设计继续按明确跨仓链接引用，以下只登记新增本仓设计。
+AGE（Auto Graphics Engine；旧称AG/AutoGraphics）实验代码与实现计划已归本仓；旧canonical Specs与历史设计继续按明确跨仓链接引用，以下只登记新增本仓设计。
 
 | 专题 | 范围/状态 |
 |---|---|
+| [AGE命名与内容仓目录](autographics/age-naming-and-content-repository.md) | 正式Auto Graphics Engine（AGE）；ag-examples/020仅规划更名，默认M2/019实际交付后，历史号/SHA/schema不变 |
 | [模型对象组件与Node源码诊断](autographics/node-resource-components-and-source-diagnostics.md) | 2026-11-04 v1；UI043资源模板/UI044可选映射，功能独立、原预算保持，仅规划；041/042属其它UI路线 |
 | [M2编辑教程与同版发行收口](autographics/m2-editor-and-release-convergence.md) | UI040已交付fc82061c，OS层15项pending；AG018固定消费，AG019后置同版联验；原分母保持 |
-| [三维查询、完整G3与G05后继](autographics/node3d-queries-and-complete-game.md) | 历史批次；035/039已交付、016/017待实施，准确来源限制见收据，新批接编辑/发行设计 |
+| [三维查询、完整G3与G05后继](autographics/node3d-queries-and-complete-game.md) | 历史批次；035/039/AG016/017已交付，来源限制/原验收保持，当前见M2路线 |
 | [3D表现/音画与G10新作者迁移](autographics/node3d-presentation-audio-and-g10-migration.md) | 历史批次；034/035/AG015已交付，相关独立证据/hold据实保留 |
-| [M2游戏优先三线并行](autographics/m2-game-first-three-lane-roadmap.md) | 2026-11-04 v6；19/22，AG016在途/固定035；UI043/044可选后继并行，不新增M2前置 |
-| [AG声明与组件作者模型](autographics/declarative-authoring-model.md) | 2026-10-30总体目标回归；AutoUI式声明/组件/绑定/事件，AG-A01..09；六项细节为讨论建议，未实施 |
+| [M2游戏优先三线并行](autographics/m2-game-first-three-lane-roadmap.md) | 2026-11-04 v7；22/22，AG016/017/018已交付，AG019同版M2联验在途1/10；UI043/044可选，不追加M2前置 |
+| [AGE声明与组件作者模型](autographics/declarative-authoring-model.md) | AutoUI式声明/组件/绑定/事件，AG-A01..09与历史收据身份保持 |
 | [G11/2d Node完整作者能力](autographics/g11-2d-node-authoring-completion.md) | 017/AG007已实际交付；完整目标草图未全部实现，旧三维及runner裁决边界保留 |
-| [Gallery全量Node作者迁移](autographics/gallery-node-authoring-migration.md) | 当前19/22；AG017贡献+1、AG018贡献+2，均实交付后才能22/22，不把源码迁完等同M2 |
+| [Gallery全量Node作者迁移](autographics/gallery-node-authoring-migration.md) | 当前22/22；AG017+1/AG018+2已落主，源码迁完仍不等M2 |
 | [Node局部组件、二维查询与精灵](autographics/node-components-queries-and-sprites.md) | 2026-11-01规划v1；020补子model/msg/on→021查询/022精灵；AG008已合并并固定019，与下一波能力合同独立 |
 | [UI/Man结构收口](autoui/ui-man-structure-closure.md) | target-state r1；[本仓014](../plans/archived/014-ui-man-structure-closure.md) drafting0/11；U890后收CLI/Vue/Aura/renderer，U014后按007原门推进主题/示例；仅规划 |
 | [AG M2表现与资源](autographics/m2-presentation-and-resources.md) | 004/005/006底层表现已交付；历史拆分保留，当前新作者接线见034/035/G10设计 |

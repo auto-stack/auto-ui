@@ -1,4 +1,6 @@
-# AG M2下一阶段：编辑教程与统一版本发行收口
+# AGE M2编辑教程与同版发行收口
+
+> **2026-11-04 AGE命名与当前状态**：正式名Auto Graphics Engine（AGE），品牌AutoGraphics Engine；AG/AutoGraphics为历史别名。见[命名决议](age-naming-and-content-repository.md)。内容仓仍为ag-examples，[020目录更名](../../../../ag-examples/docs/plans/020-age-examples-repository-rename.md)仅规划，默认M2/AG019实际交付后实施；不改作者语义、原预算或历史交付身份。 当前AG016/017/018均已交付，活Node源22/22；AG019同版联验已executing/r1/1-10（原owner实施），旧日期段落保留为快照。
 
 > 2026-11-04现场更新：UI040已交付fc82061c/独立final/canonical/清理齐，原OS层15项仍D-02 pending；AG016已executing3/10固定035，AG017/018/019草案。UI043/044仅为可选引擎后继，不新增本批M2前置，见[资源组件/诊断设计](node-resource-components-and-source-diagnostics.md)。下文保2026-11-03立约快照，实际消费以各合同/交付证据为准。
 
