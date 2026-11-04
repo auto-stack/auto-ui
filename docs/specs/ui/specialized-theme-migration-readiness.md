@@ -1,12 +1,14 @@
 # 专用示例主题迁移支持面（specialized theme migration readiness）
 
-> PLAN-038 交付合同（SD-01）。B3 十二专用示例的
+> PLAN-038 交付合同（SD-01）；PLAN-045 接续（SD-03，§5）。B3 十二专用示例的
 > **实测**支持面、证据边界、具名前置与后继分包。分类：feature ｜ 状态：active ｜
-> 来源计划：docs/plans/038-specialized-examples-theme-readiness.md
+> 来源计划：docs/plans/038-specialized-examples-theme-readiness.md、
+> docs/plans/045-media-demo-theme-migration.md
 >
 > 本文只记**实测结论**：每例结论仅在其实测覆盖面内成立；"无主题面"=未声明
 > theme 状态/design 绑定，壳不随族/模式输入改变（实测），是后继迁移的第一步
-> 工作项而非缺陷。研究归档 ≠ 迁移完成：B3 十二例在本Spec生效时**仍未迁**。
+> 工作项而非缺陷。研究归档 ≠ 迁移完成：B3 十二例在 038 生效时**仍未迁**；
+> 045 已交付其中三例（019/020/030，见 §5），余九例仍未迁。
 
 ## 1. 支持面实测结论（C-01）
 
@@ -54,3 +56,22 @@
   有/无声明 state 的 luma 响应对（029/020/025/019 vs 031p/024/026/041）。
 - 不变量：文档像素/图像 URI/文件数据/编辑内容哨兵跨 theme 输入恒守（全绿例
   均实测）；原性能/压力条件（031iv 冷启、029 render_cap）不在本包缩样或重跑。
+
+## 5. 045 接续结果（PLAN-045 交付，媒体播放/门户分包已闭合）
+
+> 038 §1 表内 019/020/030 三行与 §3 第 1 项前置为本批按冻结反例
+> 逐项处理后的当前状态；038 研究结论/历史原文保留，不覆盖。
+
+| 例 | 038 具名差额 | 045 处理与结果（证据见 demo-theme-batch-045.md 与 plan-artifacts/plan-045） |
+|---|---|---|
+| 019-video-app | 五 accent if 链=主映射面；vue e2e 未跑 | 迁官方机制（text-primary/ring-primary + 色块字面色内容豁免）；迁移后 Vue e2e 10/10、vmtheme 4 fixtures ALL PASS、冻结工具 build exit 0 + receipt `9fa07742dc68` |
+| 020-music-player | 原 test 入口 links 归属冲突；播放 blocked；ToggleDarkMode 无视图绑定（死代码） | links 冲突=旧测试定位与真实 UI 不符，按真实文案修定位（未删红断言）；播放腿受控 `<video>` + back scan/stream 206 真实播放 ALL PASS；ToggleDarkMode 按 README 承诺接线 NavSidebar「深浅主题」按钮 |
+| 030-video-player | 两轨 media API 无 back contract；播放 blocked | 新增最小 `src/back/api.at` `/api/player/status`；Vue 受控 video 真实播放 + seek/4K/错误文案 e2e 14/14；VM 诚实降级文案保留，降级与真实播放分列 |
+
+- §3 分包 1（媒体播放/门户 020/030/019）**已由本批交付**：links 冲突、030
+  back contract、mpv+合法夹具、020 死代码接线四项前置按冻结反例闭合；
+  无需新格式/新平台。剩余 B3 分包 2（图像与文件 029/031iv/027）与
+  分包 3（阅读/编辑/数据 018/041/026/025/024/031-paint）仍按后继批次合同。
+- 本批既有红交接：新工具链对 019 重建的 TS1005（auto-ui-tools vue.rs
+  store_ctx_import 模板拼接，plan-041 引入，主检出同复现）为非 045
+  生成器缺陷，owner=后继生成器修复批次；不随本批冒称关闭。
