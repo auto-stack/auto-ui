@@ -118,6 +118,10 @@ mod plan804_os_e2e;
 mod plan019_vm_own_module_link_tests;
 #[cfg(test)]
 mod plan042_scan_probe_tests;
+// PLAN-042（reload readiness 研究包；区别于上方旧 ScanProbe 计划）：
+// 单/多文件 reload 入口、schema 迁移与失败保旧探针。
+#[cfg(test)]
+mod plan042_reload_readiness_tests;
 #[cfg(test)]
 mod plan058_engine_gap_tests;
 
