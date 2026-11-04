@@ -6914,7 +6914,8 @@ mod plan841_init_snapshot_tests {
         assert_eq!(report.failed.len(), 1);
         assert!(report.failed[0].1.contains("DivisionByZero"));
         assert_eq!(
-            bridge.init_demand_phase("Root"),
+            // PLAN-041 T-02: records keyed by init identity.
+            bridge.init_demand_phase("Root#a"),
             Some(InitDemandPhase::Failed)
         );
         bridge.vm.reap_all();
@@ -6991,14 +6992,16 @@ mod plan841_init_snapshot_tests {
             "Init slice parked on the CPU budget"
         );
         assert_eq!(
-            bridge.init_demand_phase("Root"),
+            // PLAN-041 T-02: records keyed by init identity.
+            bridge.init_demand_phase("Root#a"),
             Some(InitDemandPhase::InFlight)
         );
         let resume = bridge.resume_cpu_slices(CpuSliceBudget::d2_default());
         assert_eq!(resume.failed.len(), 1);
         assert!(resume.failed[0].1.contains("DivisionByZero"));
         assert_eq!(
-            bridge.init_demand_phase("Root"),
+            // PLAN-041 T-02: records keyed by init identity.
+            bridge.init_demand_phase("Root#a"),
             Some(InitDemandPhase::Failed),
             "resume failure must reach the demand record synchronously"
         );
@@ -7008,7 +7011,8 @@ mod plan841_init_snapshot_tests {
             "terminal Failed must not be silently flipped to Done"
         );
         assert_eq!(
-            bridge.init_demand_phase("Root"),
+            // PLAN-041 T-02: records keyed by init identity.
+            bridge.init_demand_phase("Root#a"),
             Some(InitDemandPhase::Failed)
         );
     }
@@ -7102,7 +7106,13 @@ widget Child(data: List) {{
         let weak = std::sync::Arc::downgrade(&dc.bridge().vm().get_heap_object(source_id).unwrap());
         let _ = dc.view_with_debug_gated(true);
         assert_eq!(
-            dc.bridge().init_demand_phase("Child"),
+            // PLAN-041 T-02: records keyed by instance identity — resolve
+            // the rendered Child instance.
+            dc.bridge()
+                .child_instance_identities()
+                .iter()
+                .find(|id| id.contains("Child"))
+                .and_then(|id| dc.bridge().init_demand_phase(id)),
             Some(InitDemandPhase::Queued)
         );
         assert_eq!(dc.bridge().pending_init_demand_count(), 1);
@@ -7116,13 +7126,39 @@ widget Child(data: List) {{
 
         dc.drive_scheduler_to_quiescence(8);
         assert_eq!(
-            dc.bridge().init_demand_phase("Child"),
+            // PLAN-041 T-02: records keyed by instance identity — resolve
+            // the rendered Child instance.
+            dc.bridge()
+                .child_instance_identities()
+                .iter()
+                .find(|id| id.contains("Child"))
+                .and_then(|id| dc.bridge().init_demand_phase(id)),
             Some(InitDemandPhase::Done)
         );
-        assert_eq!(dc.read_state("done").unwrap(), Value::Bool(true));
+        // PLAN-041 T-02: `done` is the Child instance's model field.
+        let child_id = dc
+            .bridge()
+            .child_instance_identities()
+            .into_iter()
+            .find(|id| id.contains("Child"))
+            .expect("Child instance live");
+        assert_eq!(
+            dc.bridge()
+                .read_instance_state(&child_id, "done")
+                .unwrap(),
+            Value::Bool(true)
+        );
         dc.bridge().vm().reap_all();
         assert!(weak.upgrade().is_some(), "replayed root owns {expression}");
-        let outer = dc.read_state_as_vec("data").unwrap();
+        // PLAN-041 T-02: the replayed prop lives on the Child instance.
+        let child_obj = dc
+            .bridge()
+            .child_instance_state_id(&child_id)
+            .expect("Child state object");
+        let outer = dc
+            .bridge()
+            .read_child_state_as_vec(child_obj, "data")
+            .unwrap();
         match expression {
             "[[.source]]" => {
                 let nested = dc
@@ -7147,7 +7183,9 @@ widget Child(data: List) {{
             dc.bridge().vmref_to_vec(source_id as usize).unwrap(),
             vec![Value::Int(7)]
         );
-        dc.write_state("data", Value::Nil).unwrap();
+        dc.bridge_mut()
+            .write_state_onto(child_obj, "data", Value::Nil)
+            .unwrap();
         dc.bridge().vm().reap_all();
         assert!(
             weak.upgrade().is_none(),
