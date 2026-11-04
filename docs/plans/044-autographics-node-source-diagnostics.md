@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-04
 updated_at: 2026-11-04
 plan_revision: 1
-current_step: 3
+current_step: 4
 total_steps: 10
 depends_on: [auto-ui/PLAN-020, auto-ui/PLAN-030, auto-ui/PLAN-035, auto-ui/PLAN-040]
 supersedes_spec_components: []
@@ -122,7 +122,7 @@ work产证；review同树独立上下文final，从真实compile/Run复核AC/SD/
 | T-01 | work | 用户另行启动；020/030/035/040交付 | 核已有AST位置/emit/region/SDK无span事实、profile/命名门/owner，唯一树scope登记 | AC-01/02 | [x] 2026-11-04：已核 load.rs `NodeDecl.span`/fn `Range<usize>` byte区间、`Project.node_modules`、uses闭包解析；translate.rs `LowerError::Unsupported{what,line}` 仅行号（部分路径line:0）无模块/字节span；main.rs 19 profile门（legacy..components-2d-runtime）与 identity.json（generator/api/user_source_sha256/module:sha/closure/world_sha256/provenance）已核；driver behavior.rs regions[transport/api/user/bridge]、`sdk_diagnostic` offset→region→line:col(chars口径)、runtime `diagnostic` 明确"SDK supplied no mapped line"、8KiB `bounded_diagnostic`、`error_offset` span变体枚举、admit用户parse行列映射；behavior_project.rs CodeRef/Pool(8/2MiB)/load_declared hash核验。树/分支/scope已建并登记（§4授权记录）。下一步T-02真实先证。 |
 | T-02 | work | T-01 | 最多A/B真实模块全链先证，冻结profile/精度/schema/CLI/线性上界/fallback；不足needs_replan | AC-01..06 | [ ] |
 | T-03 | work | T-02 go | 可选origin/旁件/loader接受身份/snapshot分层展示/gates，默认字节保持 | AC-01..04 | [x] 2026-11-04：origin=pooled/helper+Life handler+Member recv 唯一属主段；旁件+CLI 冻结；loader 接受身份接线 `SourceMap::load_for_world`（world+map+closure 三样受检物，缺/坏一律 None 走默认路径）；snapshot 分层展示=sdk_diagnostic_mapped 双锚（span 锚+符号锚）+runtime 无 span/managed 永不映射门；默认字节保持=verify_plan044 控制一（真实进程）+建图纯函数门。pilot gates 12/12、driver 7/7、verify 5 控制全绿。 |
-| T-04 | work | T-03 | 真实compile/runtime/managed/无span与身份/UTF8/变异，非伪错误文本日志 | AC-01..05 | [ ] |
+| T-04 | work | T-03 | 真实compile/runtime/managed/无span与身份/UTF8/变异，非伪错误文本日志 | AC-01..05 | [x] 2026-11-04：真实 compile（符号锚 broken.at:8:16）、runtime 无 span/managed 永不映射/generated 永不映射、假行文本负控（错误文本内嵌行号不信任）、符号多出现不猜、UTF8+组合符+CRLF 列/行独立重算、变异拒用全家、原错误文本保持。pilot 13/13、driver 8/8、verify 5 控制、回归全绿。 |
 | T-05 | work | T-04 | 资源上界/字节步数等价、保存A→B/坏map下次恢复与受影响旧门 | AC-04/05 | [ ] |
 | T-06 | work | T-05 | SD候选/可选消费接口/覆盖精度及限制交接，不加M2前置 | AC-05/06 | [ ] |
 | T-07 | review | T-06 | 同树独立final与finding修复后同员复核 | AC-07 | [ ] |
@@ -151,6 +151,9 @@ work产证；review同树独立上下文final，从真实compile/Run复核AC/SD/
 2026-11-04 / stage: goal | plan_id: PLAN-044 | plan_revision: 1 | round: 7 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-044/auto-ui | commit: ec5c8e6e | next: work T-03（续）。①`tools/verify_plan044.py --controls` 落地并全绿（ec5c8e6e）：真实进程默认 CLI 无旁件 + world 冻结 sha、--diagnostics-map 旁件绑定（format/world+user sha/闭包 sha/段铺瓦/精度域）、再生字节一致（identity.json 按 provenance.product 归一——该字段随 out 目录名变化，属事实非漂移）、检入产品现行性、driver gates 调用（5 控制全过）。②V-S04 映射侧门：中文+组合符（e\u{0301}）helper 源的列按 Unicode scalar 独立重算实证，段边界字符边界由整图 validate 保证。pilot gates 12/12 绿。T-03 余量：loader 接受身份接线（SaveAs/接受源快照消费面）、map 错误不覆盖原错误门（部分已在 driver gates）、T-04 真实 compile/runtime 分层扩展。
 
 2026-11-04 / stage: goal | plan_id: PLAN-044 | plan_revision: 1 | round: 8 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-044/auto-ui | commit: ba2134f8 | next: work T-04。**T-03 关闭（3/10）**：loader 接受身份接线 `SourceMap::load_for_world(world_path)` 落地——目录内 world.at + source-map.json + closure/ 三样受检物全绑定才 Some，缺旁件/坏图/坏闭包/旧世界字节一律 None（默认诊断路径不变，不改准入）；driver 门 4 态（好包 Some、缺 None、坏闭包 None、漂移 None）。verify_plan044 全控制复跑绿。driver gates 7/7 + pilot 12/12 + components 6/6 + behavior_source_identity 1/1。
+
+2026-11-04 / stage: goal | plan_id: PLAN-044 | plan_revision: 1 | round: 9 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-044/auto-ui | commit: 1eb965c8 | next: work T-05。**T-04 关闭（4/10）**：补三负控/边界门——CRLF helper 源逐字节 remap（发射锚注释恒 
+ 约定实证）、错误文本内嵌伪造行号永不信任（映射只认受检 span/符号）、符号多出现不猜（bump 跨 helpera/helperb 双段拒绝，唯一符号对照成立）。T-04 全项覆盖：真实 compile/runtime/managed/无 span 分层、身份绑定、UTF8/组合符/CRLF、变异拒用全家、非伪错误文本。pilot 13/13、driver 8/8、verify 5 控制、components 6/6、behavior_source_identity 1/1 全绿。
 
 ## 10. 待澄清事项
 
