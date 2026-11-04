@@ -5628,7 +5628,20 @@ mod tests {
         .expect("component");
         let _ = comp.view();
         comp.on_with_input_for("Bar576", "Move", None);
-        let got = match comp.read_state("out").expect("out") {
+        // PLAN-041 R-1: `out` is Bar576's instance-owned field.
+        let got = match comp
+            .bridge()
+            .read_instance_state(
+                &comp
+                    .bridge()
+                    .child_instance_identities()
+                    .into_iter()
+                    .find(|id| id.contains("Bar576"))
+                    .expect("Bar576 live"),
+                "out",
+            )
+            .expect("out")
+        {
             auto_val::Value::Float(f) | auto_val::Value::Double(f) => f,
             other => panic!("out 应为 float，实得 {:?}", other),
         };
@@ -6604,23 +6617,31 @@ widget Plain654 {
         let src = format!("{HOST_IF}\n{DEMO_CLOCK}");
         let mut comp = build(&src);
         let _ = comp.view_with_debug_gated(false);
-        let w0 = comp.read_state("w_tick").expect("w_tick").as_int();
+        // PLAN-041 R-1: w_tick 实例自有——经实例身份读取；两个 path 装饰
+        // 派发命中共存的同一实例并各自累加。
+        let r654b = |dc: &DynamicComponent, f: &str| {
+            let identity = dc
+                .bridge()
+                .child_instance_identities()
+                .into_iter()
+                .find(|id| id.contains("DemoClock654"))
+                .expect("DemoClock654 live");
+            dc.bridge().read_instance_state(&identity, f).unwrap()
+        };
+        let w0 = r654b(&comp, "w_tick").as_int();
         comp.on_with_input_for("DemoClock654@0", "Tick", None);
-        let w1 = comp
-            .read_state("w_tick")
-            .expect("w_tick after path Tick")
-            .as_int();
+        let w1 = r654b(&comp, "w_tick").as_int();
         assert_eq!(
             w1,
             w0 + 1,
-            "path-decorated widget name must reach type-level handler"
+            "path-decorated widget name must reach the instance handler"
         );
         comp.on_with_input_for("DemoClock654@1", "Tick", None);
-        let w2 = comp.read_state("w_tick").expect("w_tick after @1").as_int();
+        let w2 = r654b(&comp, "w_tick").as_int();
         assert_eq!(
             w2,
             w1 + 1,
-            "second instance shares type-level state (documented stage-A limit)"
+            "second path dispatch increments the same live instance"
         );
     }
 
@@ -6689,9 +6710,19 @@ widget Helper654 {
         let mut comp = build(&src);
         let _ = comp.view_with_debug_gated(false);
         // self-tick demo 仍可派发
-        let w0 = comp.read_state("w_tick").unwrap().as_int();
+        // PLAN-041 R-1: w_tick 是 DemoClock654 的实例自有字段。
+        let r654 = |dc: &DynamicComponent, f: &str| {
+            let identity = dc
+                .bridge()
+                .child_instance_identities()
+                .into_iter()
+                .find(|id| id.contains("DemoClock654"))
+                .expect("DemoClock654 live");
+            dc.bridge().read_instance_state(&identity, f).unwrap()
+        };
+        let w0 = r654(&comp, "w_tick").as_int();
         comp.on_with_input_for("DemoClock654", "Tick", None);
-        let w1 = comp.read_state("w_tick").unwrap().as_int();
+        let w1 = r654(&comp, "w_tick").as_int();
         assert_eq!(w1, w0 + 1);
         // 该 demo 视图未引用 __clock_ → wants=false
         assert!(!comp.wants_framework_clock());

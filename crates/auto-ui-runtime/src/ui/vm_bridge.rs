@@ -155,19 +155,19 @@ fn instance_token(identity: &str) -> String {
 }
 
 fn install_root_self_ref(vm: &mut AutoVM, state_obj_id: u64) {
+    // PLAN-041 R-1: 槽位在插入堆对象前已随字段名单预置（ Nil 占位，
+    // cached/live 名单对齐）——这里只写自引用 VmRef 值。禁止 append（live
+    // 名单会多出 cached 没有的一位，write_or_insert 的下标整体错位：
+    // clock 读到 __auto_root 的 VmRef 实录）。
     let Some(obj) = vm.get_heap_object(state_obj_id) else {
         return;
     };
-    {
-        let mut guard = obj.write().unwrap();
-        let Some(inst) = guard.as_any_mut().downcast_mut::<GenericInstanceData>() else {
-            return;
-        };
-        if inst.field_names.iter().any(|n| n == "__auto_root") {
-            return;
-        }
-        inst.field_names.push("__auto_root".to_string());
-        inst.fields.push(auto_val::Value::VmRef(auto_val::VmRef {
+    let mut guard = obj.write().unwrap();
+    let Some(inst) = guard.as_any_mut().downcast_mut::<GenericInstanceData>() else {
+        return;
+    };
+    if let Some(idx) = inst.field_names.iter().position(|n| n == "__auto_root") {
+        let _ = inst.set_field(idx, auto_val::Value::VmRef(auto_val::VmRef {
             id: state_obj_id as usize,
         }));
     }
@@ -800,6 +800,11 @@ impl VmBridge {
             field_values.push(eval_expr_to_value(&state_var.initial, &mut vm));
         }
 
+        // PLAN-041 R-1: `__auto_root` 槽位预置进字段名单（ Nil 占位）——
+        // cached/live 名单保持对齐，插入堆对象后由 install_root_self_ref
+        // 写自引用 VmRef。
+        field_names.push("__auto_root".to_string());
+        field_values.push(auto_val::Value::Nil);
         let mono_name = format!("{}_State", widget_name);
         let instance =
             GenericInstanceData::new_with_names(mono_name, field_values, field_names.clone());
@@ -1040,6 +1045,11 @@ impl VmBridge {
             field_values.push(auto_val::Value::Nil);
         }
 
+        // PLAN-041 R-1: `__auto_root` 槽位预置进字段名单（ Nil 占位）——
+        // cached/live 名单保持对齐，插入堆对象后由 install_root_self_ref
+        // 写自引用 VmRef。
+        field_names.push("__auto_root".to_string());
+        field_values.push(auto_val::Value::Nil);
         let mono_name = format!("{}_State", widget_name);
         let instance =
             GenericInstanceData::new_with_names(mono_name, field_values, field_names.clone());
@@ -1766,6 +1776,10 @@ impl VmBridge {
         };
 
         for (i, name) in self.state_field_names.iter().enumerate() {
+            // PLAN-041 R-1: 内部槽（__auto_root 等）不进宿主字段快照。
+            if name.starts_with("__auto") {
+                continue;
+            }
             if let Some(value) = instance.get_field(i) {
                 result.insert(name.clone(), value.clone());
             }
@@ -4047,7 +4061,14 @@ impl VmBridge {
 
     /// Get the state field names.
     pub fn state_fields(&self) -> &[String] {
-        &self.state_field_names
+        // PLAN-041 R-1: 内部槽（`__auto_root` 等 `__auto` 前缀）不进宿主
+        // 字段名单面——返回切到不含内部槽的前缀段（内部槽恒在尾部追加）。
+        let n = self
+            .state_field_names
+            .iter()
+            .position(|n| n.starts_with("__auto"))
+            .unwrap_or(self.state_field_names.len());
+        &self.state_field_names[..n]
     }
 
     /// Get a reference to the underlying AutoVM (for advanced VM integration).
