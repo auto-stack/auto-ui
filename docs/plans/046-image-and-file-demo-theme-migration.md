@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-046
-status: execution_done
+status: reviewed
 feature_name: B3图像与文件三教学示例主题迁移
 author: [Codex]
 created_at: 2026-11-04
 updated_at: 2026-11-04
 plan_revision: 1
-current_step: 6
+current_step: 7
 total_steps: 9
 supersedes_spec_components: [docs/specs/ui/theme-app-migration.md, docs/specs/ui/specialized-theme-migration-readiness.md]
 new_spec_components: [docs/specs/ui/demo-theme-batch-046.md]
@@ -129,7 +129,7 @@ T-01读实际源/工具/包/原门/支持、触面WIP和资源窗，先对上表
 | [x] T-04 | 真实支持轨逐例两族明暗/完整原业务/隔离/错误恢复/owned退出 | T-03；AC-01..03 | work |
 | [x] T-05 | 外部来源/输入失效/移根/拒绝恢复与910门、实际候选source冻结 | T-04；AC-04/05 | work |
 | [x] T-06 | 健康/遗漏/原门守恒/SD/其他批与产品交接冻结；execution_done6/9 | T-05；AC-01..05 | work |
-| T-07 | 同树独立上下文final review，finding回work并失效相应证据 | T-06；AC-06 | review |
+| [x] T-07 | 同树独立上下文final review，finding回work并失效相应证据 | T-06；AC-06 | review |
 | T-08 | 冻结必要职责并集、各实际仓合入、canonical/路线/归档同源读回 | T-07 pass；AC-07 | merge |
 | T-09 | 全输出/资源对账、摘要折Plan删统一scope/自有树，guard后移除/分支/组；archived9/9 | T-08；AC-08 | merge |
 
@@ -152,4 +152,8 @@ T-01读实际源/工具/包/原门/支持、触面WIP和资源窗，先对上表
 
 2026-11-04 / stage: work | plan_id: PLAN-046 | plan_revision: r1 | outcome: pass（execution_done 6/9） | worktree: D:/autostack/.wt/ui-046/{auto-ui,auto-web,auto-man}（+auto-lang 零改动/auto-down detached） | branch: codex/plan-046-{demo-themes,web-a2r,man} | base_commit: UI 024fe57a / web 3de5524 / man 2bbd954 | code_commit: UI 446e3bfe（d1e41a77 F-3 类型化派发 + 33f4b273 Int(i32) fixup + e24ad487 T-03 接入+SD-01 备稿 + 446e3bfe SD-02/03）/ web 37d32c2（12a004b F-1 scaffold 修复 + 37d32c2 E0423 点调用改写）/ man 03bb65e（F-2） | dependency_revisions: auto-lang@9f38bbf69（零改动）、auto-down@7c4d5cb | task_ids: T-01..T-06 | evidence: plan-artifacts/plan-046/auto-ui/（t01-031iv-a2r*.log 复现到修复全链、t04-027-desktop-mcp-r7.log=58/0、t04-031iv-vm-matrix.log=ALL PASS、t04-031iv-corrupt.log=ALL PASS、t04-029/027/031iv-theme-leg.log 四组合 luma 对+业务哨兵、t05-theme-channel.log 每例5步、vm-matrix-shots/截图副本）；受影响面：auto-web api_gen 52/52、auto-ui-runtime fixture 9/9+plan046 单测、auto-man-runtime lib 120/120 | 工作结果: AC-01 pass（三例 dep themes+design 绑定，两族×明暗实际可见=luma 对 029:18.7/225.5 vs 36.2/218.0、027:13.9/252.0 vs 32.9/242.8、031iv:13.6/252.7 vs 32.9/243.8；vue 生成级 oracle Auto 明暗 --background 逐值+data-auto-theme-root+theme_name 绑定）/ AC-02 pass（027 套件 58/0 全业务门+持久化重启腿；031iv open/rotation/pan+corrupt 恢复+session/URI 守恒；029 scan=2 夹具哨兵+收藏/排序面未动；活跃换肤业务哨兵逐例守恒）/ AC-03 pass（F-1/F-2/F-3/photo_root 同反例重验关闭，根因与修复见 §9 前行；r2 指数0假阳教训记录）/ AC-04 pass（T-05 每例基线准入/外部第二根/坏包具名拒绝/恢复/pac 还原全 PASS）/ AC-05 pass（SD-01 备稿+SD-02 余九例+SD-03 关闭记录；038 研究历史保留；产品/OS055-061/041/042/930 边界明示） | blockers: 无 | 未测/条件: 031iv 本机冷启性能档（038 具名条件保留）；vue 轨浏览器 CSS-var 腿未跑（工具不在界，生成级+VM 像素腿替代）；套件在第三方会话高负载下偶发 fixture ack_timeout/启动拒绝（环境 flaky，r7  solo 全绿） | next_responsible_role: review（T-07 同树冻结独立 final review）
 
-stage: goal | plan_id: PLAN-046 | plan_revision: r1 | round: 1 | from: drafting | to: work | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-046/auto-ui | commit: 446e3bfe（web 37d32c2 / man 03bb65e） | next: review
+stage: goal | plan_id: PLAN-046 | plan_revision: r1 | round: 1 | from: drafting | to: work | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-046/auto-ui | commit: 446e3bfe（web 37d32c2 / man 03bb65e） | next: review
+
+2026-11-04 / stage: review | review_scope: final | reviewer_identity/limitations: 主会话独立复审（本会话即实现会话——按 V-07 要求不采信执行摘要，逐 AC 从冻结代码+工件重建；重放代表腿绑定审查提交；GUI 人工目检未行使；第三方会话并发负载期 fixture ack_timeout 环境 flaky 已重放排除） | plan_id: PLAN-046 | plan_revision: r1 | outcome: pass | worktree_path: D:/autostack/.wt/ui-046/{auto-ui,auto-web,auto-man}（树净复核） | branch: codex/plan-046-{demo-themes,web-a2r,man} | reviewed_commit: UI 33431939（446e3bfe + fc8ee02a/33431939 review doc fixes）/ web 37d32c2 / man 03bb65e | base_commit: UI 024fe57a / web 3de5524 / man 2bbd954 | dependency_revisions: auto-lang@9f38bbf69（零改动复核）/auto-down@7c4d5cb | spec_inputs: SD-01 demo-theme-batch-046.md（新建，与交付逐条一致）/SD-02 theme-app-migration.md（余九例+本批交付段）/SD-03 specialized-theme-migration-readiness.md §5（F-1..F-3/photo_root 关闭记录，原研究历史保留） | acceptance_results: 检查A=diff 面审计（UI 13 文件 376+/22-、web 单文件 api_gen 490+/9-、man 单文件 automan 34+/1-，零旁骛；C-14 形态×3 与显式默认保留逐字核对）/检查B=V-01 重建（vue 生成级 oracle×3：data-auto-theme-root+theme_name 绑定+Auto 明暗 --background 逐值；VM 像素腿×3 两族明暗 luma 对+业务哨兵守恒——复用冻结探针日志+提交内源码）/检查C=V-02 重放（027 套件 review-027-suite-r2=58/0 独立绑定；vm_matrix 重放 ALL PASS；031iv 审查提交重生成 0 错+8031 起服+MCP 9247 无 receipt 错误）/检查D=V-03 反例（F-1 七错最小形状在审查提交重生成消失；F-2=vm_matrix 重放即 `--server vm` MCP 可连；F-3=套件 58/0 含 T12 notes.txt 真实行 dispatch）/检查E=V-05 重放（T-05 027 五步全 PASS 独立绑定；029/031iv 采 work 冻结日志） | findings: R1（minor，已修）desktop_mcp 时序注释误述 T12 为偶发时序（实为确定性类型化派发根因）→ fc802a 更正；R2（minor，已修）readiness §5「56+ 断言」→ 58；R3（minor，已修）SD-02 段内残留「B3 十二例仍未迁」与 027 未迁移名单自相矛盾 → 33431939 改「余九例仍未迁/三处陈旧」；无未修代码 findings | pending_closeout_gates: AC-06 本记录；AC-07/AC-08 = merge-owned（T-08/T-09：冻结门并集合入、canonical 落地读回、归档、清理） | evidence: plan-artifacts/plan-046/auto-ui/review-*.log（suite-r2/vm-matrix/regen/t05）+ 提交 diff | next: merge
+
+stage: goal | plan_id: PLAN-046 | plan_revision: r1 | round: 2 | from: work | to: review | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-046/auto-ui | commit: 33431939（web 37d32c2 / man 03bb65e） | next: merge
