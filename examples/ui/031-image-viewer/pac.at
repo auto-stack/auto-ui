@@ -24,3 +24,10 @@ accent: "indigo"
 dep stylekit {
     path: "../stylekit"
 }
+
+# PLAN-046 T-03：官方主题单源包（C-13；不复制配色表进本 app）。
+# family 经 theme_name + design 绑定；pac 显式 theme: "dark" 保留为
+# dark_mode=true 首帧默认（C-14 不暗改显式默认）；媒体/会话/URI 业务零改动。
+dep themes {
+    path: "../../../packages/themes"
+}

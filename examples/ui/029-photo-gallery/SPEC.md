@@ -4,7 +4,9 @@
 > 网格密度工具栏 + 无边框照片流网格 + 悬浮胶囊大图查看器（上一张/下一张/收藏）。
 >
 > **数据源（PLAN-043 Part 1，2026-09-23 起）**：后端 `photo_service` 能力臂
-> 实时扫描——pac `photo_root:` 声明根目录（现 `C:\Users\zhaop\Pictures`），
+> 实时扫描——pac `photo_root:` 声明根目录（PLAN-046 起默认空，env-first：
+> 运行时经 `AUTO_PHOTO_ROOT` 受管 env 入口供给；env 未设 = 诚实空图库
+> `root_missing` 空态，不再硬编码用户绝对目录）。
 > 生成后端原生供给三路端点：
 > - `GET /api/photos/scan`——递归索引（jpg/jpeg/png/webp/gif/bmp），条目含
 >   token id（blake3，绝对路径不出后端）/标题/相册（rel_dir 首段，根文件归

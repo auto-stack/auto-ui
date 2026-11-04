@@ -23,7 +23,11 @@ render: "vue"
 api: "rust"
 front_port: 4029
 back_port: 4429
-photo_root: "C:\\Users\\zhaop\\Pictures"
+// PLAN-046（2026-11-04）：photo_root env-first 化——不再硬编码用户绝对目录
+// （C:\Users\zhaop\Pictures 具名退役，038 F-记录）。pac 声明保留为空默认：
+// 运行时经 AUTO_PHOTO_ROOT env（受管配置入口）供给照片根；env 未设 = 诚实
+// 空图库（root_missing 空态，SPEC「已知边界」）。测试/桌面装载显式 scope。
+photo_root: ""
 icon: "image"
 title: "Photo Gallery"
 title_zh: "照片图库"
@@ -32,4 +36,11 @@ desktop: "true"
 
 dep stylekit {
     path: "../stylekit"
+}
+
+# PLAN-046 T-03：官方主题单源包（C-13；不复制配色表进本 app）。family 经
+# theme_name + design 绑定；既有 dark 首帧默认（dark_mode=true）与
+# accent_color 契约保留（C-14）。
+dep themes {
+    path: "../../../packages/themes"
 }

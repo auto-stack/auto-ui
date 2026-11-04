@@ -4,6 +4,11 @@
 use back.api: open_file, open_directory, current_uri, names, request_view, close_session, image_stats, navigate
 
 use stylekit.styles: caption_text
+
+// PLAN-046 T-03：接入官方主题包（Auto/Solarized 两族经 theme_name + design
+// 绑定；模式由 dark_mode 承担，首帧 true = pac 显式 theme: "dark" 默认保留）。
+// 会话/URI/视图 revision/媒体管线业务零改动——换肤不重建 session。
+use themes.themes: Auto, Solarized
 style ctrl_size = "w-8 h-7"
 style tool_sm = "px-2.5 py-1.5 text-xs"
 style tool_xs = "px-2 text-xs"
@@ -61,9 +66,19 @@ widget App {
         // SettleTick 消费一次；open_consumed 防重放）。
         var auto_open_path str = ""
         var auto_open_consumed str = "__none__"
+        // PLAN-046 T-03：主题族/模式选择态（主题选择，非业务状态；
+        // 显式 dark 默认与 pac theme: "dark" 一致，C-14 保留）。
+        var theme_name str = "Auto"
+        var dark_mode bool = true
         var thumbnails = [
             { id: 0, name: "No images", src: "" }
         ]
+    }
+
+    // PLAN-046 T-03：主题/模式绑定（C-14 数据绑定形态；同帧校验发布）。
+    design {
+        theme: .theme_name
+        mode: if .dark_mode { "dark" } else { "light" }
     }
 
     timer {

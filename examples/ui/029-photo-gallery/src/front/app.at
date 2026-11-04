@@ -17,6 +17,11 @@
 // 重开保留。
 
 use stylekit.styles: caption_text
+
+// PLAN-046 T-03：接入官方主题包（Auto/Solarized 两族；family 经
+// theme_name + design 绑定，dark_mode/accent_color 契约变量与
+// ToggleDark/SetAccent 原 handler 全保留；scan/thumb/full 与收藏业务零改动）。
+use themes.themes: Auto, Solarized
 style label_xs_medium = "text-xs font-medium"
 style emoji_count = "text-[11px] ml-1.5 opacity-60"
 style img_fill = "w-full h-full"
@@ -91,6 +96,16 @@ widget App {
         var next_id str = ""
         var fav_label str = "♡ 收藏"
         var is_cur_fav bool = false
+        // PLAN-046 T-03：主题族选择态（与既有 dark_mode/accent_color 契约
+        // 变量同列；family 经 design 绑定接官方包两族，默认 Auto）。
+        var theme_name str = "Auto"
+    }
+
+    // PLAN-046 T-03：主题/模式绑定（C-14 数据绑定形态；不复制调色板、
+    // 不新增业务菜单；ToggleDark/SetAccent 原 handler 保留）。
+    design {
+        theme: .theme_name
+        mode: if .dark_mode { "dark" } else { "light" }
     }
 
     view {

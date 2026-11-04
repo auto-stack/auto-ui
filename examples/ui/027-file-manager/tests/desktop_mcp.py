@@ -62,20 +62,30 @@ except ImportError:
     print("Please install requests: pip install requests")
     sys.exit(1)
 
-MCP_PORT_DEFAULT = 9427
+MCP_PORT_DEFAULT = 9511
 
-# 带参 trigger 的 payload 分隔符（renderer.rs encode_payload/decode_payload）。
+# 带参 trigger 的 input 载荷（PLAN-046 F-3 修定：具名 widget+event+input，
+# 退役 SEP 载荷事件名 `Name\x1fparam\x1fvalue`——现行注册表按纯名 namespaced
+# 直查（PLAN-659 T-05），SEP 名永不命中）。
 SEP = "\x1f"
 
 
 def pick_free_port(start=MCP_PORT_DEFAULT):
-    """First free port in [start, start+100)."""
+    """First port in [start, start+100) we can actually BIND.
+
+    connect_ex probing misfires across Windows reserved/admin-excluded port
+    ranges (038 review: reserved band drifted to 9188–9487, taking the old
+    9427 default with it); a real bind is the honest check (041 plan fix).
+    """
     import socket
     for port in range(start, start + 100):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            if s.connect_ex(("127.0.0.1", port)) != 0:
-                return port
-    raise RuntimeError(f"No free port in [{start}, start+100)")
+            try:
+                s.bind(("127.0.0.1", port))
+            except OSError:
+                continue
+            return port
+    raise RuntimeError(f"No bindable port in [{start}, {start + 100})")
 
 
 def find_auto_bin():
@@ -132,19 +142,23 @@ class McpClient:
         return content[0]["text"] if content else ""
 
     # fixture 回执（{"status": "applied", ...}）不走 content/text，直接读 result。
-    def fixture(self, state, event=None):
+    def fixture(self, state, event=None, input=None):
         args = {"schema_version": 1, "state": state}
         if event:
-            args["trigger"] = {"widget": "App", "event": event, "input": None}
+            args["trigger"] = {"widget": "App", "event": event, "input": input}
         result = self._post("autoui_fixture", args)
         receipt = result if isinstance(result.get("status"), str) else {}
         if receipt.get("status") != "applied":
             raise RuntimeError(f"fixture not applied: {receipt or result}")
         return receipt
 
-    def trigger(self, state, event):
-        """带参/无参 handler 派发（须伴至少一个 state 字段——fixture 契约）。"""
-        return self.fixture(state, event)
+    def trigger(self, state, event, input=None):
+        """带参/无参 handler 派发（须伴至少一个 state 字段——fixture 契约）。
+
+        PLAN-046 F-3：event 用纯名，参数经 input 字符串载荷（现行
+        namespaced 直查按纯名+input 派发；旧 SEP 载荷名不命中注册表）。
+        """
+        return self.fixture(state, event, input)
 
     def vtree(self):
         return self.call("autoui_vtree", include_box=False, include_style=False,
@@ -280,7 +294,7 @@ def find_row_index(mcp, name, count=None):
     if count is None:
         count = mcp.state_int("item_count_str")
     for i in range(count):
-        mcp.trigger({"booted": True}, f"ItemCtx{SEP}i{SEP}{i}")
+        mcp.trigger({"booted": True}, "ItemCtx", str(i))
         time.sleep(0.12)
         if name in mcp.state_str("selected_info"):
             return i
@@ -392,7 +406,7 @@ def run_suite(mcp, workdir, result):
         time.sleep(1.0)
         result.check("T4 过滤至 1 项", mcp.state_int("item_count_str") == 1,
                      mcp.state("item_count_str").get("item_count_str", ""))
-        mcp.trigger({"search_q": ""}, f"SetSearch{SEP}s{SEP}")
+        mcp.trigger({"search_q": ""}, "SetSearch", "")
         time.sleep(1.0)
         result.check("T4 清空恢复 4 项", mcp.state_int("item_count_str") == 4,
                      mcp.state("item_count_str").get("item_count_str", ""))
@@ -404,7 +418,7 @@ def run_suite(mcp, workdir, result):
     nested_idx = find_row_index(mcp, "nested", 4)
     result.check("T5 nested 行定位", nested_idx >= 0, "probe 未命中")
     if nested_idx >= 0:
-        mcp.trigger({"booted": True}, f"OpenItem{SEP}i{SEP}{nested_idx}")
+        mcp.trigger({"booted": True}, "OpenItem", str(nested_idx))
         time.sleep(1.0)
         cur = mcp.state_str("current_path")
         result.check("T5 路径入 nested", cur.endswith("nested"), cur)
@@ -446,7 +460,7 @@ def run_suite(mcp, workdir, result):
     fr_idx = find_row_index(mcp, "fm-renamed", 5)
     result.check("T8 fm-renamed 行定位", fr_idx >= 0, "probe 未命中")
     if fr_idx >= 0:
-        mcp.trigger({"booted": True}, f"OpenItem{SEP}i{SEP}{fr_idx}")
+        mcp.trigger({"booted": True}, "OpenItem", str(fr_idx))
         time.sleep(1.0)
         want = os.path.join(data, "fm-renamed")
         result.check("T8 进入 fm-renamed", mcp.state_str("current_path") == want,
@@ -510,7 +524,7 @@ def run_suite(mcp, workdir, result):
     n_idx = find_row_index(mcp, "notes.txt", 4)
     result.check("T12 notes.txt 行定位", n_idx >= 0, "probe 未命中")
     if n_idx >= 0:
-        mcp.trigger({"booted": True}, f"ItemCtx{SEP}i{SEP}{n_idx}")
+        mcp.trigger({"booted": True}, "ItemCtx", str(n_idx))
         time.sleep(0.5)
         si = mcp.state_str("selected_info")
         result.check("T12 选定状态", "notes.txt" in si, si)

@@ -24,3 +24,10 @@ theme: "dark"
 dep stylekit {
     path: "../stylekit"
 }
+
+# PLAN-046 T-03：官方主题单源包（C-13；不复制配色表进本 app）。family 经
+# theme_name + design 绑定；pac 显式 theme: "dark" 与 dark_mode=true 首帧
+# 默认保留（C-14）；宿主 SetTheme 回写链不变。
+dep themes {
+    path: "../../../packages/themes"
+}
