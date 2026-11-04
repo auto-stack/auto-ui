@@ -152,8 +152,9 @@ work产证；review同树独立上下文final，从真实compile/Run复核AC/SD/
 
 2026-11-04 / stage: goal | plan_id: PLAN-044 | plan_revision: 1 | round: 8 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-044/auto-ui | commit: ba2134f8 | next: work T-04。**T-03 关闭（3/10）**：loader 接受身份接线 `SourceMap::load_for_world(world_path)` 落地——目录内 world.at + source-map.json + closure/ 三样受检物全绑定才 Some，缺旁件/坏图/坏闭包/旧世界字节一律 None（默认诊断路径不变，不改准入）；driver 门 4 态（好包 Some、缺 None、坏闭包 None、漂移 None）。verify_plan044 全控制复跑绿。driver gates 7/7 + pilot 12/12 + components 6/6 + behavior_source_identity 1/1。
 
-2026-11-04 / stage: goal | plan_id: PLAN-044 | plan_revision: 1 | round: 9 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-044/auto-ui | commit: 1eb965c8 | next: work T-05。**T-04 关闭（4/10）**：补三负控/边界门——CRLF helper 源逐字节 remap（发射锚注释恒 
- 约定实证）、错误文本内嵌伪造行号永不信任（映射只认受检 span/符号）、符号多出现不猜（bump 跨 helpera/helperb 双段拒绝，唯一符号对照成立）。T-04 全项覆盖：真实 compile/runtime/managed/无 span 分层、身份绑定、UTF8/组合符/CRLF、变异拒用全家、非伪错误文本。pilot 13/13、driver 8/8、verify 5 控制、components 6/6、behavior_source_identity 1/1 全绿。
+2026-11-04 / stage: goal | plan_id: PLAN-044 | plan_revision: 1 | round: 9 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-044/auto-ui | commit: 1eb965c8 | next: work T-05。**T-04 关闭（4/10）**：补三负控/边界门——CRLF helper 源逐字节 remap（发射锚注释恒 \n 约定实证）、错误文本内嵌伪造行号永不信任（映射只认受检 span/符号）、符号多出现不猜（bump 跨 helpera/helperb 双段拒绝，唯一符号对照成立）。T-04 全项覆盖：真实 compile/runtime/managed/无 span 分层、身份绑定、UTF8/组合符/CRLF、变异拒用全家、非伪错误文本。pilot 13/13、driver 8/8、verify 5 控制、components 6/6、behavior_source_identity 1/1 全绿。
+
+2026-11-04 / stage: goal | plan_id: PLAN-044 | plan_revision: 1 | round: 10 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-044/auto-ui | commit: 6f3e5922 | next: work T-05（续）。**T-05 实测重冻结（D-02 关闭）**：旁件体积实测 n=32/128/256 helper × pad 6/12/30——map/world ratio 3.42/3.33/1.08/2.22，段数=2n+1，json 增量随 n 稳定（非超线性）。旧 T-02 常数上限 64KiB/4096 段会暗删 256KiB 合法域（worst 映射 ~870KiB），重冻结：driver 载入界 = max(64KiB, 4×world) 比率界 + 4MiB 绝对界 + 16384 段界（6f3e5922 双侧同步）；超限分类=整图拒用→generated fallback，不截断。pilot gates 14/14、driver 8/8、verify 5 控制复跑绿。T-05 余量：8KiB 截断 mapped 路径门、debug 有无 VM 步数等价观察、A→B/坏 map 下次恢复（V-S06）。
 
 ## 10. 待澄清事项
 
