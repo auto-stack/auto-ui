@@ -358,6 +358,50 @@ fn probe_member_event_handler_segment_covers_recv_fn() {
 }
 
 #[test]
+fn utf8_multibyte_columns_recompute_on_scalar_boundaries() {
+    // V-S04 映射侧：多字节字符（中文/组合符）存在于 helper 之前时，
+    // remap 的列必须按 Unicode scalar（.chars() 口径）独立重算，
+    // 且所有段边界落在字符边界上。
+    let util = "fn 评分(x int) int {\n  // 中文注释 + e\u{0301} 组合符\n  return x + 1\n}\n".to_string();
+    let main = "node Game {\n}\n".to_string();
+    let start = util.find("fn 评分").unwrap();
+    let len = autographics_node2d_pilot::lower::slice_fn_source(&util, "评分")
+        .expect("slice")
+        .len();
+    let mut project = Project::default();
+    project.modules.insert(
+        "util".into(),
+        module("util", &util, vec![("评分", start, start + len)]),
+    );
+    project
+        .modules
+        .insert("main".into(), module("main", &main, Vec::new()));
+    // 模拟发射（声明改名 util_评分）。
+    let mut world = String::from("// GENERATED\nvar ok=0.0\n");
+    world.push_str("// pooled fn 评分 from util\n");
+    world.push_str(&util.replace("评分(x int)", "util_评分(x int)").trim_end());
+    world.push('\n');
+    world.push_str("fn app_start() {\n}\n");
+    let world_sha = sha256_hex(world.as_bytes());
+    let map = build_source_map(&project, &world, GENERATOR, &world_sha).expect("build");
+    map.validate_against_world(&world).expect("validate");
+    let seg = map
+        .segments
+        .iter()
+        .find(|s| s.helper.as_deref() == Some("评分"))
+        .expect("helper segment");
+    assert_eq!(seg.precision, Precision::Range);
+    // remap `return` 行内的偏移：列按 chars 口径，world 与源一致。
+    let ret_off_world = world[seg.start..seg.end].find("return").unwrap() + seg.start;
+    let mapped = remap_range_offset(&project, seg, &world, ret_off_world).expect("remap");
+    assert_eq!(&util[mapped..mapped + 6], "return");
+    let col_world = world[..ret_off_world].rsplit('\n').next().unwrap().chars().count() + 1;
+    let col_src = util[..mapped].rsplit('\n').next().unwrap().chars().count() + 1;
+    assert_eq!(col_world, col_src, "列必须按 Unicode scalar 独立重算");
+    // 段边界字符边界性已由 validate 保证；含多字节源的整图校验通过即边界成立。
+}
+
+#[test]
 fn build_map_is_pure_world_bytes_unchanged() {
     // T-03 默认字节保持（单元侧）：建图是纯函数，world 串不被改写；
     // CLI 默认无旁件的对照在 verify_plan044.py（T-06）以真实进程跑。
