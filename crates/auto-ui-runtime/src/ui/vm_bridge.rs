@@ -233,6 +233,12 @@ pub struct VmBridge {
     /// — the "param name as string literal" degradation is forbidden.
     handler_param_names: std::collections::HashMap<(String, String), Vec<String>>,
 
+    /// PLAN-046 F-3: declared msg-variant payload TYPE tags per
+    /// `(widget, event)` (["int"]/["str"]/…). Source = msg-block variant
+    /// declarations, so fixture/typed dispatch can coerce string input
+    /// instead of aborting typed handlers with a Str arg.
+    handler_param_types: std::collections::HashMap<(String, String), Vec<String>>,
+
     /// PLAN-062 F2: 帧域 retain 账本（双缓冲）。cur 收本脏帧经
     /// `retain_heap_result` 拿下的宿主份额；`commit_dirty_frame` 在下一
     /// 脏帧"新缓存写回之后"swap 并整体释放 prev——宿主份额由此获得确定
@@ -599,6 +605,28 @@ fn collect_param_names_from_widget(
     }
 }
 
+/// PLAN-046 F-3: `(widget, event) -> declared payload TYPE tags` from the
+/// widget's msg-block variant declarations (`ItemCtx(int)` → ["int"]).
+/// Fixture/typed dispatch coerces string input by these tags; without them
+/// the input arrives as Str and aborts int/float/bool handlers.
+fn collect_param_types_from_widget(
+    widget: &AuraWidget,
+    out: &mut std::collections::HashMap<(String, String), Vec<String>>,
+) {
+    for msg in &widget.messages {
+        for variant in &msg.variants {
+            out.insert(
+                (widget.name.clone(), variant.name.clone()),
+                variant
+                    .payload
+                    .iter()
+                    .map(|t| t.unique_name().to_string())
+                    .collect(),
+            );
+        }
+    }
+}
+
 /// Audit B12(b): same collection from a WidgetDecl's on-block (decl-based
 /// synthesis path — `new_from_decls`).
 fn collect_param_names_from_decl(
@@ -609,6 +637,25 @@ fn collect_param_names_from_decl(
         for h in &on.handlers {
             let ev = h.pattern.trim_start_matches('.');
             out.insert((decl.name.to_string(), ev.to_string()), h.params.clone());
+        }
+    }
+}
+
+/// PLAN-046 F-3: decl-path counterpart of collect_param_types_from_widget.
+fn collect_param_types_from_decl(
+    decl: &auto_ui_dialect::ast::WidgetDecl,
+    out: &mut std::collections::HashMap<(String, String), Vec<String>>,
+) {
+    for msg in &decl.messages {
+        for variant in &msg.variants {
+            out.insert(
+                (decl.name.to_string(), variant.name.as_str().to_string()),
+                variant
+                    .payload
+                    .iter()
+                    .map(|t| t.unique_name().to_string())
+                    .collect(),
+            );
         }
     }
 }
@@ -657,6 +704,16 @@ impl VmBridge {
     pub fn handler_param_names(&self, widget_name: &str, event_name: &str) -> Option<Vec<String>> {
         let ev = event_name.trim_start_matches('.');
         self.handler_param_names
+            .get(&(widget_name.to_string(), ev.to_string()))
+            .cloned()
+    }
+
+    /// PLAN-046 F-3: declared payload TYPE tags (["int"]/["str"]/…) for one
+    /// `(widget, event)` handler, from the msg-block variant declaration.
+    /// None = no declaration recorded (legacy callers keep Str semantics).
+    pub fn handler_param_types(&self, widget_name: &str, event_name: &str) -> Option<Vec<String>> {
+        let ev = event_name.trim_start_matches('.');
+        self.handler_param_types
             .get(&(widget_name.to_string(), ev.to_string()))
             .cloned()
     }
@@ -828,6 +885,12 @@ impl VmBridge {
         for child in child_widgets {
             collect_param_names_from_widget(child, &mut handler_param_names);
         }
+        // PLAN-046 F-3: payload type tags from msg-block variant declarations.
+        let mut handler_param_types = std::collections::HashMap::new();
+        collect_param_types_from_widget(widget, &mut handler_param_types);
+        for child in child_widgets {
+            collect_param_types_from_widget(child, &mut handler_param_types);
+        }
 
         Ok(Self {
             vm,
@@ -840,6 +903,7 @@ impl VmBridge {
             instance_seen_prev: std::cell::RefCell::new(std::collections::HashSet::new()),
             instance_site_seq: std::cell::RefCell::new(std::collections::HashMap::new()),
             handler_param_names,
+            handler_param_types,
             import_aliases: import_aliases.clone(),
             store_alias_snapshot,
             parked_tasks: std::cell::RefCell::new(Vec::new()),
@@ -1073,6 +1137,12 @@ impl VmBridge {
         for child in child_decls {
             collect_param_names_from_decl(child, &mut handler_param_names);
         }
+        // PLAN-046 F-3: payload type tags from msg-block variant declarations.
+        let mut handler_param_types = std::collections::HashMap::new();
+        collect_param_types_from_decl(decl, &mut handler_param_types);
+        for child in child_decls {
+            collect_param_types_from_decl(child, &mut handler_param_types);
+        }
 
         Ok(Self {
             vm,
@@ -1085,6 +1155,7 @@ impl VmBridge {
             instance_seen_prev: std::cell::RefCell::new(std::collections::HashSet::new()),
             instance_site_seq: std::cell::RefCell::new(std::collections::HashMap::new()),
             handler_param_names,
+            handler_param_types,
             import_aliases: import_aliases.clone(),
             store_alias_snapshot,
             parked_tasks: std::cell::RefCell::new(Vec::new()),
@@ -4460,6 +4531,51 @@ mod tests {
     /// "被字段/父容器持有"的 RC 份额 —— 否则首个链式写(`.tabs[0].x = v`)
     /// 的 receiver stake 死亡即把对象释放到零,字段悬垂,canary UAF panic
     /// (041 ActNew 实测,rc.rs:378)。此测试在修复前会 panic。
+    /// PLAN-046 F-3: msg-block variant payload types are recorded per
+    /// (widget, event) so typed fixture input can be coerced (027's
+    /// ItemCtx(int)/OpenItem(int) probes previously received a Str arg and
+    /// silently aborted). Str-typed variants keep ["str"].
+    #[test]
+    fn plan046_handler_param_types_from_msg_variants() {
+        let mut widget = make_test_widget("TypedRoot", vec![]);
+        widget.messages = vec![auto_ui_compiler::aura::AuraMessage {
+            variants: vec![
+                auto_ui_compiler::aura::AuraMsgVariant {
+                    name: "ItemCtx".to_string(),
+                    quoted: false,
+                    payload: vec![auto_lang_core::ast::Type::Int],
+                    payload_names: vec![None],
+                },
+                auto_ui_compiler::aura::AuraMsgVariant {
+                    name: "SetSearch".to_string(),
+                    quoted: false,
+                    payload: vec![auto_lang_core::ast::Type::StrSlice],
+                    payload_names: vec![None],
+                },
+                auto_ui_compiler::aura::AuraMsgVariant {
+                    name: "AddrGo".to_string(),
+                    quoted: false,
+                    payload: vec![],
+                    payload_names: vec![],
+                },
+            ],
+        }];
+        let mut out = std::collections::HashMap::new();
+        collect_param_types_from_widget(&widget, &mut out);
+        assert_eq!(
+            out.get(&("TypedRoot".to_string(), "ItemCtx".to_string())),
+            Some(&vec!["int".to_string()])
+        );
+        assert_eq!(
+            out.get(&("TypedRoot".to_string(), "SetSearch".to_string())),
+            Some(&vec!["str".to_string()])
+        );
+        assert_eq!(
+            out.get(&("TypedRoot".to_string(), "AddrGo".to_string())),
+            Some(&vec![])
+        );
+    }
+
     #[test]
     fn plan423_p5_state_literal_refs_survive_chained_write() {
         use auto_lang_core::parser::Parser;

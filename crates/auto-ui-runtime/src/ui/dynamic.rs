@@ -3000,7 +3000,34 @@ impl DynamicComponent {
                     }
                 }
                 if declares_param {
-                    args.push(auto_val::Value::Str(text.clone().into()));
+                    // PLAN-046 F-3: coerce the input string by the handler's
+                    // DECLARED payload type (msg-block variant, e.g.
+                    // `ItemCtx(int)`). A raw Str arg aborts typed handlers
+                    // (027 file-manager's fixture-driven ItemCtx/OpenItem
+                    // probes); unknown declarations keep legacy Str.
+                    let coerced = self
+                        .bridge
+                        .handler_param_types(widget_name, &clean_name)
+                        .and_then(|types| types.first().cloned())
+                        .map(|tag| match tag.as_str() {
+                            "int" | "i64" | "uint" | "u64" | "usize" => text
+                                .trim()
+                                .parse::<i64>()
+                                .map(auto_val::Value::I64)
+                                .unwrap_or_else(|_| auto_val::Value::Str(text.clone().into())),
+                            "float" | "double" => text
+                                .trim()
+                                .parse::<f64>()
+                                .map(auto_val::Value::Double)
+                                .unwrap_or_else(|_| auto_val::Value::Str(text.clone().into())),
+                            "bool" => auto_val::Value::Bool(matches!(
+                                text.trim(),
+                                "true" | "1" | "on" | "yes"
+                            )),
+                            _ => auto_val::Value::Str(text.clone().into()),
+                        })
+                        .unwrap_or_else(|| auto_val::Value::Str(text.clone().into()));
+                    args.push(coerced);
                 }
             }
         }
