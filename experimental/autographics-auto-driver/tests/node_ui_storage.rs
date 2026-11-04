@@ -43,7 +43,11 @@ fn cold_consumer_reads_same_artifact_and_identity_chain_holds() {
     );
     assert!(IDENTITY.contains("\"api\": \"autographics.node-ui/1\""));
     assert!(IDENTITY.contains("plan048 node-ui"));
-    for (name, src) in [("main", CLOSURE_MAIN), ("counter", CLOSURE_COUNTER), ("panel", CLOSURE_PANEL)] {
+    for (name, src) in [
+        ("main", CLOSURE_MAIN),
+        ("counter", CLOSURE_COUNTER),
+        ("panel", CLOSURE_PANEL),
+    ] {
         let sha = agp::renderer::capture::sha256_hex(src.as_bytes());
         assert!(
             IDENTITY.contains(&format!("\"module:{name}\": \"{sha}\"")),
@@ -65,7 +69,10 @@ fn artifact_world_sha() -> String {
 fn damaged_world_copy_is_named_rejected_and_repairs_next_run() {
     // damaged world copy: one byte of business state changed -> sha drift
     // -> named rejection at the consumption entry (no Run happens).
-    let damaged = WORLD.replace("var counter_count=[0,10,100]", "var counter_count=[0,10,101]");
+    let damaged = WORLD.replace(
+        "var counter_count=[0,10,100]",
+        "var counter_count=[0,10,101]",
+    );
     assert_ne!(damaged, WORLD);
     let err = match NodeUiApp::new(ARTIFACT, &damaged, "plan048-storage") {
         Err(e) => e,
@@ -99,7 +106,10 @@ fn drifted_closure_module_and_schema_are_named_rejected() {
         Err(e) => e,
         Ok(_) => panic!("schema drift must be rejected"),
     };
-    assert!(err.contains("schema mismatch"), "schema drift rejected: {err}");
+    assert!(
+        err.contains("schema mismatch"),
+        "schema drift rejected: {err}"
+    );
 
     // generator identity is preserved in the artifact (public consumption
     // identity for 049/AG021).

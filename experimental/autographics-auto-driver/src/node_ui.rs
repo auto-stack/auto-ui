@@ -280,11 +280,10 @@ impl NodeUiApp {
             Api::NodeUi,
         )
         .map_err(|e| format!("admission: {e}"))?;
-        let session =
-            Session::new_with_diagnostics(&snapshot.source, |stage, e| {
-                snapshot.sdk_diagnostic(stage, e)
-            })
-            .map_err(|e| format!("compile: {e}"))?;
+        let session = Session::new_with_diagnostics(&snapshot.source, |stage, e| {
+            snapshot.sdk_diagnostic(stage, e)
+        })
+        .map_err(|e| format!("compile: {e}"))?;
         let mut app = Self {
             artifact,
             session,
@@ -315,7 +314,9 @@ impl NodeUiApp {
             .get(&root_def)
             .ok_or("artifact root def missing")?;
         if !root.is_root {
-            return Err(format!("def '{root_def}' is the artifact root but not marked is_root"));
+            return Err(format!(
+                "def '{root_def}' is the artifact root but not marked is_root"
+            ));
         }
         let mut rows = vec![InstanceRow {
             path: root_def.clone(),
@@ -326,7 +327,10 @@ impl NodeUiApp {
         }];
         for inst in &self.artifact.instances {
             let def = self.artifact.defs.get(&inst.node).ok_or_else(|| {
-                format!("instance '{}' references missing def '{}'", inst.path, inst.node)
+                format!(
+                    "instance '{}' references missing def '{}'",
+                    inst.path, inst.node
+                )
             })?;
             rows.push(InstanceRow {
                 path: inst.path.clone(),
@@ -475,17 +479,29 @@ impl NodeUiApp {
                         ArtifactElement::If { then, .. } => {
                             rec(then, path, focus_i, conds, ring);
                         }
-                        ArtifactElement::Button { name, enabled, visible, click, .. } => {
+                        ArtifactElement::Button {
+                            name,
+                            enabled,
+                            visible,
+                            click,
+                            ..
+                        } => {
                             let enabled = enabled
                                 .as_ref()
                                 .map(|_| {
-                                    conds.get(&format!("{path}#{name}#en")).copied().unwrap_or(true)
+                                    conds
+                                        .get(&format!("{path}#{name}#en"))
+                                        .copied()
+                                        .unwrap_or(true)
                                 })
                                 .unwrap_or(true);
                             let visible = visible
                                 .as_ref()
                                 .map(|_| {
-                                    conds.get(&format!("{path}#{name}#vis")).copied().unwrap_or(true)
+                                    conds
+                                        .get(&format!("{path}#{name}#vis"))
+                                        .copied()
+                                        .unwrap_or(true)
                                 })
                                 .unwrap_or(true);
                             if enabled && visible {
@@ -542,7 +558,9 @@ impl NodeUiApp {
 
     /// 当前焦点元素键（测试/诊断/呈现面）。
     pub fn focused_key(&self) -> Option<&str> {
-        self.focus_ring.get(self.focus_index).map(|e| e.key.as_str())
+        self.focus_ring
+            .get(self.focus_index)
+            .map(|e| e.key.as_str())
     }
 
     /// 生成层文字 ABI：i = def 内实例下标（row.def_idx）。
@@ -551,7 +569,10 @@ impl NodeUiApp {
         let i = row.def_idx as i32;
         let len = self
             .session
-            .int(&format!("{pfx}_ui_text_len"), &[Scalar::Int(i), Scalar::Int(slot as i32)])
+            .int(
+                &format!("{pfx}_ui_text_len"),
+                &[Scalar::Int(i), Scalar::Int(slot as i32)],
+            )
             .ok()?;
         let mut bytes = Vec::new();
         for j in 0..len {
@@ -559,11 +580,7 @@ impl NodeUiApp {
                 self.session
                     .int(
                         &format!("{pfx}_ui_text_at"),
-                        &[
-                            Scalar::Int(i),
-                            Scalar::Int(slot as i32),
-                            Scalar::Int(j),
-                        ],
+                        &[Scalar::Int(i), Scalar::Int(slot as i32), Scalar::Int(j)],
                     )
                     .ok()? as u8,
             );
@@ -609,7 +626,7 @@ impl NodeUiApp {
         self.dropped_overflow
     }
 
-/// 条件键（collect_bindings 与呈现构建共用；if 序 = 本实例 def 遍历序）。
+    /// 条件键（collect_bindings 与呈现构建共用；if 序 = 本实例 def 遍历序）。
     fn if_key(path: &str, if_index: usize) -> String {
         format!("{path}#if{if_index}")
     }
@@ -620,7 +637,12 @@ impl NodeUiApp {
         fn rec(path: &str, els: &[ArtifactElement], if_i: &mut usize, keys: &mut Vec<String>) {
             for e in els {
                 match e {
-                    ArtifactElement::Container { name, props, children, .. } => {
+                    ArtifactElement::Container {
+                        name,
+                        props,
+                        children,
+                        ..
+                    } => {
                         for p in props {
                             if matches!(p.value, ArtifactPropValue::Field { .. }) {
                                 keys.push(format!("{path}#{name}#{}", p.name));
@@ -633,7 +655,12 @@ impl NodeUiApp {
                             keys.push(format!("{path}#{name}#vis"));
                         }
                     }
-                    ArtifactElement::Button { name, enabled, visible, .. } => {
+                    ArtifactElement::Button {
+                        name,
+                        enabled,
+                        visible,
+                        ..
+                    } => {
                         if enabled.is_some() {
                             keys.push(format!("{path}#{name}#en"));
                         }
@@ -668,7 +695,9 @@ impl NodeUiApp {
             .iter()
             .map(|e| self.widget_if(e, path, instance, &if_i))
             .collect();
-        let col = iced::widget::Column::<UiMsg, iced::Theme, iced_wgpu::Renderer>::with_children(children);
+        let col = iced::widget::Column::<UiMsg, iced::Theme, iced_wgpu::Renderer>::with_children(
+            children,
+        );
         col.into()
     }
 
@@ -690,9 +719,13 @@ impl NodeUiApp {
                 .map(|c| self.widget_if(c, path, instance, if_i))
                 .collect();
             if visible {
-                iced::widget::Column::<UiMsg, iced::Theme, iced_wgpu::Renderer>::with_children(kids).into()
+                iced::widget::Column::<UiMsg, iced::Theme, iced_wgpu::Renderer>::with_children(kids)
+                    .into()
             } else {
-                iced::widget::Column::<UiMsg, iced::Theme, iced_wgpu::Renderer>::with_children(Vec::new()).into()
+                iced::widget::Column::<UiMsg, iced::Theme, iced_wgpu::Renderer>::with_children(
+                    Vec::new(),
+                )
+                .into()
             }
         } else {
             self.widget(el, path, instance, if_i)
@@ -707,7 +740,12 @@ impl NodeUiApp {
         if_i: &std::cell::Cell<usize>,
     ) -> UiEl<'_> {
         match el {
-            ArtifactElement::Container { name, container, props, children } => {
+            ArtifactElement::Container {
+                name,
+                container,
+                props,
+                children,
+            } => {
                 let kids: Vec<UiEl<'_>> = children
                     .iter()
                     .map(|c| self.widget_if(c, path, instance, if_i))
@@ -716,16 +754,20 @@ impl NodeUiApp {
                 let get_v = |pl: &ArtifactProp| -> Option<f32> {
                     match &pl.value {
                         ArtifactPropValue::LitNum { v } => Some(*v as f32),
-                        ArtifactPropValue::Field { name: f } => {
-                            self.layout.get(&format!("{path}#{name}#{}", pl.name)).copied()
-                        }
+                        ArtifactPropValue::Field { name: f } => self
+                            .layout
+                            .get(&format!("{path}#{name}#{}", pl.name))
+                            .copied(),
                     }
                 };
                 let prop_of = |props: &[ArtifactProp], key: &str| -> Option<f32> {
                     props.iter().find(|pl| pl.name == key).and_then(get_v)
                 };
                 if container.as_str() == "row" {
-                    let mut r = iced::widget::Row::<UiMsg, iced::Theme, iced_wgpu::Renderer>::with_children(kids);
+                    let mut r =
+                        iced::widget::Row::<UiMsg, iced::Theme, iced_wgpu::Renderer>::with_children(
+                            kids,
+                        );
                     if let Some(v) = prop_of(props, "spacing") {
                         r = r.spacing(v);
                     }
@@ -757,27 +799,40 @@ impl NodeUiApp {
                     c.into()
                 }
             }
-            ArtifactElement::Text { name, slot, visible } => {
+            ArtifactElement::Text {
+                name,
+                slot,
+                visible,
+            } => {
                 let content = self
                     .texts
                     .get(instance)
                     .and_then(|v| v.get(*slot))
                     .cloned()
                     .unwrap_or_default();
-                let visible = visible.as_ref().map(|_| {
-                    self.cond(&format!("{path}#{name}#vis"))
-                });
+                let visible = visible
+                    .as_ref()
+                    .map(|_| self.cond(&format!("{path}#{name}#vis")));
                 let t: UiEl<'_> = iced::widget::container(iced::widget::text(content))
                     .id(iced::widget::Id::from(format!("{path}#{name}")))
                     .into();
                 if visible == Some(false) {
                     // 条件不可见 = 本帧不挂载（真实卸载语义）。
-                    iced::widget::Column::<UiMsg, iced::Theme, iced_wgpu::Renderer>::with_children(Vec::new()).into()
+                    iced::widget::Column::<UiMsg, iced::Theme, iced_wgpu::Renderer>::with_children(
+                        Vec::new(),
+                    )
+                    .into()
                 } else {
                     t
                 }
             }
-            ArtifactElement::Button { name, slot, enabled, visible, click } => {
+            ArtifactElement::Button {
+                name,
+                slot,
+                enabled,
+                visible,
+                click,
+            } => {
                 let label = self
                     .texts
                     .get(instance)
@@ -805,10 +860,9 @@ impl NodeUiApp {
                     },
                     origin: format!("{path}#{name}"),
                 };
-                let btn: UiEl<'_> =
-                    iced::widget::button(iced::widget::text(label))
-                        .on_press_maybe(is_enabled.then_some(msg))
-                        .into();
+                let btn: UiEl<'_> = iced::widget::button(iced::widget::text(label))
+                    .on_press_maybe(is_enabled.then_some(msg))
+                    .into();
                 // 容器 id = 元素路径名（真实 bounds 探测面）。
                 iced::widget::container(btn)
                     .id(iced::widget::Id::from(format!("{path}#{name}")))
@@ -826,7 +880,10 @@ impl NodeUiApp {
                     self.widget_tree(&elements, &child_path, idx)
                 } else {
                     let _ = node;
-                    iced::widget::Column::<UiMsg, iced::Theme, iced_wgpu::Renderer>::with_children(Vec::new()).into()
+                    iced::widget::Column::<UiMsg, iced::Theme, iced_wgpu::Renderer>::with_children(
+                        Vec::new(),
+                    )
+                    .into()
                 }
             }
         }
@@ -855,13 +912,14 @@ fn collect_bindings(
         callbacks_cell.set(callbacks_cell.get() + 1);
         session.int(&getter, &[]).ok()
     };
-    let mut eval_cond = |field_get: &mut dyn FnMut(&str) -> Option<i32>, c: &ArtifactCond| -> Option<bool> {
-        match c {
-            ArtifactCond::LitBool { v } => Some(*v),
-            ArtifactCond::BoolField { name } => field_get(name).map(|v| v != 0),
-            ArtifactCond::Field { name } => field_get(name).map(|v| v != 0),
-        }
-    };
+    let mut eval_cond =
+        |field_get: &mut dyn FnMut(&str) -> Option<i32>, c: &ArtifactCond| -> Option<bool> {
+            match c {
+                ArtifactCond::LitBool { v } => Some(*v),
+                ArtifactCond::BoolField { name } => field_get(name).map(|v| v != 0),
+                ArtifactCond::Field { name } => field_get(name).map(|v| v != 0),
+            }
+        };
     fn rec(
         els: &[ArtifactElement],
         path: &str,
@@ -869,11 +927,19 @@ fn collect_bindings(
         conds: &mut std::collections::BTreeMap<String, bool>,
         layout: &mut std::collections::BTreeMap<String, f32>,
         field_get: &mut dyn FnMut(&str) -> Option<i32>,
-        eval_cond: &mut dyn FnMut(&mut dyn FnMut(&str) -> Option<i32>, &ArtifactCond) -> Option<bool>,
+        eval_cond: &mut dyn FnMut(
+            &mut dyn FnMut(&str) -> Option<i32>,
+            &ArtifactCond,
+        ) -> Option<bool>,
     ) {
         for e in els {
             match e {
-                ArtifactElement::Container { name, props, children, .. } => {
+                ArtifactElement::Container {
+                    name,
+                    props,
+                    children,
+                    ..
+                } => {
                     for p in props {
                         if let ArtifactPropValue::Field { name: f } = &p.value {
                             if let Some(v) = field_get(f) {
@@ -890,7 +956,12 @@ fn collect_bindings(
                         }
                     }
                 }
-                ArtifactElement::Button { name, enabled, visible, .. } => {
+                ArtifactElement::Button {
+                    name,
+                    enabled,
+                    visible,
+                    ..
+                } => {
                     if let Some(c) = enabled {
                         if let Some(v) = eval_cond(field_get, c) {
                             conds.insert(format!("{path}#{name}#en"), v);
@@ -914,7 +985,15 @@ fn collect_bindings(
         }
     }
     let mut if_i = 0usize;
-    rec(els, path, &mut if_i, conds, layout, &mut field_get, &mut eval_cond);
+    rec(
+        els,
+        path,
+        &mut if_i,
+        conds,
+        layout,
+        &mut field_get,
+        &mut eval_cond,
+    );
     *callbacks = callbacks_cell.get();
 }
 

@@ -10,22 +10,22 @@
 //! G11/2d 作者入口（声明驱动模板/角色/事件/调度）；`Profile::Legacy`
 //! 保持 016 最小切片逐字节兼容（verify_plan016 再生控制），不被自动升级。
 pub mod load;
-pub mod lower_node_ui;
 pub mod lower;
-pub mod lower_queries3d;
 pub mod lower_basic2d;
 pub mod lower_components;
+pub mod lower_components2d_runtime;
 pub mod lower_components3d;
+pub mod lower_components3d_audio_hud;
 pub mod lower_components3d_bindings;
 pub mod lower_components3d_events;
-pub mod lower_components3d_audio_hud;
-pub mod node3d_binding_refs;
 pub mod lower_components3d_runtime;
 pub mod lower_components_game;
 pub mod lower_g11;
-pub mod lower_components2d_runtime;
 pub mod lower_node3d_presentation;
+pub mod lower_node_ui;
 pub mod lower_presentation;
+pub mod lower_queries3d;
+pub mod node3d_binding_refs;
 pub mod scene;
 pub mod source_map;
 pub mod translate;
@@ -104,31 +104,33 @@ pub enum Profile {
 }
 
 pub use load::{load_project, load_project_dual, Project, ProjectError};
-pub use lower_node_ui::{lower_project_node_ui, LowerOutputNodeUi, NODE_UI_GENERATOR, NODE_UI_SCHEMA};
-pub use lower_queries3d::{
-    lower_project_editor_projects, lower_project_queries3d, BEHAVIOR_API_V3, BEHAVIOR_API_V4,
-};
 pub use lower::{lower_project, LowerOutput};
 pub use lower_basic2d::{lower_project_basic, BasicProfile, LowerOutputBasic2D};
 pub use lower_components::{
     lower_project_components, lower_project_queries, lower_project_sprites,
 };
+pub use lower_components2d_runtime::{
+    lower_project_components2d_runtime, LowerOutputComponents2dRuntime,
+};
 pub use lower_components3d::lower_project_components3d;
+pub use lower_components3d_audio_hud::lower_project_components3d_audio_hud;
 pub use lower_components3d_bindings::{
     lower_project_components3d_bindings, lower_project_components3d_presentation_entry,
 };
-pub use lower_node3d_presentation::{
-    load_resources_meta, lower_project_components3d_presentation, resources_request_json,
-    PresentationMeta3,
-};
-pub use lower_components3d_audio_hud::lower_project_components3d_audio_hud;
 pub use lower_components3d_events::{
     lower_project_components3d_events, lower_project_components3d_model_objects,
 };
 pub use lower_components3d_runtime::lower_project_components3d_runtime;
 pub use lower_components_game::{lower_project_components_game, LowerOutputGame};
-pub use lower_components2d_runtime::{
-    lower_project_components2d_runtime, LowerOutputComponents2dRuntime,
+pub use lower_g11::{lower_project_g112d, LowerOutputG11};
+pub use lower_node3d_presentation::{
+    load_resources_meta, lower_project_components3d_presentation, resources_request_json,
+    PresentationMeta3,
+};
+pub use lower_node_ui::{
+    lower_project_node_ui, LowerOutputNodeUi, NODE_UI_GENERATOR, NODE_UI_SCHEMA,
 };
 pub use lower_presentation::{lower_project_presentation, LowerOutputPresentation};
-pub use lower_g11::{lower_project_g112d, LowerOutputG11};
+pub use lower_queries3d::{
+    lower_project_editor_projects, lower_project_queries3d, BEHAVIOR_API_V3, BEHAVIOR_API_V4,
+};

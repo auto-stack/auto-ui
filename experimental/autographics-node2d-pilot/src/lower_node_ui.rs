@@ -26,8 +26,8 @@
 use crate::load::Project;
 use crate::scene::sha256_hex;
 use crate::translate::{translate_handler, Ctx, LowerError, Target};
-use auto_ui_dialect::node2d::{PropValue, UiContainerKind, UiElement};
 use auto_parser_api::ast::{Expr, Stmt, Type};
+use auto_ui_dialect::node2d::{PropValue, UiContainerKind, UiElement};
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
@@ -151,11 +151,17 @@ enum ArtifactTextValue {
 #[derive(Serialize, Clone)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 enum ArtifactCond {
-    LitBool { v: bool },
+    LitBool {
+        v: bool,
+    },
     /// int 字段（非 0 = 真）。
-    Field { name: String },
+    Field {
+        name: String,
+    },
     /// bool 字段。
-    BoolField { name: String },
+    BoolField {
+        name: String,
+    },
 }
 
 #[derive(Serialize, Clone)]
@@ -563,8 +569,7 @@ fn lower_view(
                         }
                     }
                 }
-                let children =
-                    lower_view(module, def_name, children, fields, events, plan, count)?;
+                let children = lower_view(module, def_name, children, fields, events, plan, count)?;
                 out.push(ArtifactElement::Container {
                     name: name.clone(),
                     container: match kind {
@@ -620,9 +625,7 @@ fn lower_view(
                     err_at(
                         module,
                         (0, 0),
-                        format!(
-                            "node '{def_name}': text element '{name}' requires a 'text' prop"
-                        ),
+                        format!("node '{def_name}': text element '{name}' requires a 'text' prop"),
                     )
                 })?;
                 if plan.texts.len() >= MAX_TEXTS_PER_DEF {
@@ -754,8 +757,7 @@ fn lower_view(
                     }
                 }
                 let prefix = plan.prefix.clone();
-                plan.clicks
-                    .push((name.clone(), ev, child.clone()));
+                plan.clicks.push((name.clone(), ev, child.clone()));
                 let slot = plan.texts.len();
                 plan.texts.push((name.clone(), text.clone()));
                 out.push(ArtifactElement::Button {
@@ -816,7 +818,10 @@ fn collect_ui_instances(
                     return Err(err_at(
                         module,
                         p.span,
-                        format!("instance prop '{}' on '{path}' takes a single value", p.name),
+                        format!(
+                            "instance prop '{}' on '{path}' takes a single value",
+                            p.name
+                        ),
                     ))
                 }
             };
@@ -827,16 +832,14 @@ fn collect_ui_instances(
                 Expr::Float(v, _) | Expr::Double(v, _) => {
                     params.insert(p.name.clone(), *v);
                 }
-                _ => {
-                    return Err(err_at(
-                        module,
-                        p.span,
-                        format!(
-                            "instance prop '{}' on '{path}' must be a numeric literal (basic-UI v1)",
-                            p.name
-                        ),
-                    ))
-                }
+                _ => return Err(err_at(
+                    module,
+                    p.span,
+                    format!(
+                        "instance prop '{}' on '{path}' must be a numeric literal (basic-UI v1)",
+                        p.name
+                    ),
+                )),
             }
         }
         Ok(params)
@@ -933,7 +936,6 @@ fn collect_ui_instances(
     Ok(out)
 }
 
-
 // ---------------------------------------------------------- generation --
 
 fn init_text_of(value: &Init) -> Option<i64> {
@@ -960,7 +962,11 @@ fn gen_text_write_k(
             for (j, b) in v.as_bytes().iter().enumerate() {
                 let _ = writeln!(src, " {p}_ui_text_{k}[({base}+{j})]=0x{b:02X}");
             }
-            let _ = writeln!(src, " {p}_ui_text_len_{k}[{elem_index}]={}", v.as_bytes().len());
+            let _ = writeln!(
+                src,
+                " {p}_ui_text_len_{k}[{elem_index}]={}",
+                v.as_bytes().len()
+            );
         }
         ArtifactTextValue::IntField { name } => {
             let fv = if plan.is_root {
@@ -1040,15 +1046,16 @@ fn gen_digits_fn(prefix: &str, k: usize, src: &mut String) {
     let _ = writeln!(src, "fn {prefix}_ui_digits_mag_{k}(at int, n int) int {{");
     for d in (1..=7).rev() {
         let pow = 10i64.pow(d as u32 - 1);
-        let cond = if d == 1 { "1".to_string() } else { format!("n>={pow}") };
+        let cond = if d == 1 {
+            "1".to_string()
+        } else {
+            format!("n>={pow}")
+        };
         let _ = writeln!(src, " if {cond} {{");
         // MSB-first（自然阅读序）：at+j = 第 (d-1-j) 位数字。
         for j in 0..d {
             let p10 = 10i64.pow(d as u32 - 1 - j as u32);
-            let _ = writeln!(
-                src,
-                "  {prefix}_ui_text_{k}[(at+{j})]=(48+((n/{p10})%10))"
-            );
+            let _ = writeln!(src, "  {prefix}_ui_text_{k}[(at+{j})]=(48+((n/{p10})%10))");
         }
         let _ = writeln!(src, "  return {d}");
         let _ = writeln!(src, " }}");
@@ -1207,7 +1214,9 @@ fn gen_def_handlers(
     src: &mut String,
 ) -> Result<(), String> {
     let p = &plan.prefix;
-    let Some(on) = &plan.node.on else { return Ok(()) };
+    let Some(on) = &plan.node.on else {
+        return Ok(());
+    };
     let indexed = if plan.is_root {
         Target::Root
     } else {
@@ -1217,38 +1226,39 @@ fn gen_def_handlers(
         }
     };
     for h in &on.handlers {
-        let head = match &h.pattern {
-            auto_ui_dialect::node2d::EventPattern::Life { event, .. } => match event.as_str() {
-                "Start" => {
-                    if plan.is_root {
-                        format!("fn {p}_lifestart() {{\n")
-                    } else {
-                        format!("fn {p}_lifestart(i int) {{\n")
+        let head =
+            match &h.pattern {
+                auto_ui_dialect::node2d::EventPattern::Life { event, .. } => match event.as_str() {
+                    "Start" => {
+                        if plan.is_root {
+                            format!("fn {p}_lifestart() {{\n")
+                        } else {
+                            format!("fn {p}_lifestart(i int) {{\n")
+                        }
                     }
-                }
-                "Tick" => {
-                    if plan.is_root {
-                        format!("fn {p}_lifetick(dt float) {{\n")
-                    } else {
-                        format!("fn {p}_lifetick(i int, dt float) {{\n")
+                    "Tick" => {
+                        if plan.is_root {
+                            format!("fn {p}_lifetick(dt float) {{\n")
+                        } else {
+                            format!("fn {p}_lifetick(i int, dt float) {{\n")
+                        }
                     }
-                }
-                other => {
-                    return Err(err_at(
+                    other => return Err(err_at(
                         &plan.module,
                         h.span,
-                        format!("unknown Life event '{other}' (research surface: Life.Start/Life.Tick)"),
-                    ))
+                        format!(
+                            "unknown Life event '{other}' (research surface: Life.Start/Life.Tick)"
+                        ),
+                    )),
+                },
+                auto_ui_dialect::node2d::EventPattern::Member { name, .. } => {
+                    if plan.is_root {
+                        format!("fn {p}_{}() {{\n", name.to_lowercase())
+                    } else {
+                        format!("fn {p}_{}(i int) {{\n", name.to_lowercase())
+                    }
                 }
-            },
-            auto_ui_dialect::node2d::EventPattern::Member { name, .. } => {
-                if plan.is_root {
-                    format!("fn {p}_{}() {{\n", name.to_lowercase())
-                } else {
-                    format!("fn {p}_{}(i int) {{\n", name.to_lowercase())
-                }
-            }
-        };
+            };
         src.push_str(&head);
         let ctx = ui_ctx(indexed.clone(), project, plan, recv_heads);
         translate_handler(&h.body.stmts, &ctx, src, 1).map_err(|e| format!("{e}"))?;
@@ -1472,7 +1482,10 @@ pub fn lower_project_node_ui(project: &Project) -> Result<LowerOutputNodeUi, Str
         src,
         "// GENERATED by autographics-node2d-pilot (PLAN-048 node-ui, T-03/T-04 contract)."
     );
-    let _ = write!(src, "// Root: {root_name}; instances (declaration pre-order): ");
+    let _ = write!(
+        src,
+        "// Root: {root_name}; instances (declaration pre-order): "
+    );
     let _ = writeln!(
         src,
         "{}",
@@ -1529,7 +1542,10 @@ pub fn lower_project_node_ui(project: &Project) -> Result<LowerOutputNodeUi, Str
             let vals = own
                 .iter()
                 .map(|inst| {
-                    format!("{}", inst.params.get(pname.as_str()).copied().unwrap_or(0.0) as i64)
+                    format!(
+                        "{}",
+                        inst.params.get(pname.as_str()).copied().unwrap_or(0.0) as i64
+                    )
                 })
                 .collect::<Vec<_>>()
                 .join(",");

@@ -11,11 +11,11 @@
 //!   --sabotage-focus the same probe while denying window focus; MUST fail
 //!   (default)        plain window (no automation, no report)
 //! GPU/window-focus runs are single-instance.
-use autographics_auto_driver::node_ui::{NodeUiApp, PlatformKey};
 use agp::host::iced_surface::IcedSurface;
 use agp::host::iced_surface_probe as probe;
 use agp::renderer::composition::FullScreenBlit;
 use agp::renderer::{GpuDevice, WindowTarget};
+use autographics_auto_driver::node_ui::{NodeUiApp, PlatformKey};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
@@ -194,17 +194,14 @@ impl ApplicationHandler for App {
             e.create_window(
                 Window::default_attributes()
                     .with_title(TITLE)
-                    .with_inner_size(winit::dpi::LogicalSize::new(
-                        LOGICAL[0], LOGICAL[1],
-                    )),
+                    .with_inner_size(winit::dpi::LogicalSize::new(LOGICAL[0], LOGICAL[1])),
             )
             .unwrap(),
         );
         let gpu = GpuDevice::new().unwrap();
         let size = window.inner_size();
         let target =
-            WindowTarget::new(&gpu, window.clone(), size.width.max(1), size.height.max(1))
-                .unwrap();
+            WindowTarget::new(&gpu, window.clone(), size.width.max(1), size.height.max(1)).unwrap();
         let blit = FullScreenBlit::new(gpu.device(), target.format());
         let scale = window.scale_factor() as f32;
         let iced = IcedSurface::new(
@@ -229,21 +226,16 @@ impl ApplicationHandler for App {
                 self.verify_and_finish(e);
             }
             WindowEvent::Resized(size) => {
-                let (Some(target), Some(iced), Some(gpu)) = (
-                    self.target.as_mut(),
-                    self.iced.as_mut(),
-                    self.gpu.as_ref(),
-                ) else {
+                let (Some(target), Some(iced), Some(gpu)) =
+                    (self.target.as_mut(), self.iced.as_mut(), self.gpu.as_ref())
+                else {
                     return;
                 };
                 let scale = window_scale_of(self.window.as_ref());
                 let logical_w = size.width.max(1) as f32 / scale;
                 let logical_h = size.height.max(1) as f32 / scale;
                 let _ = target.handle_resize(gpu, size.width.max(1), size.height.max(1));
-                let _ = iced.resize(
-                    gpu,
-                    iced_wgpu::core::Size::new(logical_w, logical_h),
-                );
+                let _ = iced.resize(gpu, iced_wgpu::core::Size::new(logical_w, logical_h));
             }
             WindowEvent::CursorMoved { position, .. } => {
                 self.cursor = [position.x as f32, position.y as f32];
@@ -257,11 +249,9 @@ impl ApplicationHandler for App {
                     ElementState::Pressed => iced_wgpu::core::mouse::Event::ButtonPressed(
                         iced_wgpu::core::mouse::Button::Left,
                     ),
-                    ElementState::Released => {
-                        iced_wgpu::core::mouse::Event::ButtonReleased(
-                            iced_wgpu::core::mouse::Button::Left,
-                        )
-                    }
+                    ElementState::Released => iced_wgpu::core::mouse::Event::ButtonReleased(
+                        iced_wgpu::core::mouse::Button::Left,
+                    ),
                     _ => return,
                 };
                 self.events.push(iced_wgpu::core::Event::Mouse(ev));
@@ -293,13 +283,9 @@ impl ApplicationHandler for App {
                 ) else {
                     return;
                 };
-                let scale = window_scale_of(
-                    self.window.as_ref(),
-                );
-                let logical_cursor = iced_wgpu::core::Point::new(
-                    self.cursor[0] / scale,
-                    self.cursor[1] / scale,
-                );
+                let scale = window_scale_of(self.window.as_ref());
+                let logical_cursor =
+                    iced_wgpu::core::Point::new(self.cursor[0] / scale, self.cursor[1] / scale);
                 let cursor = iced_wgpu::core::mouse::Cursor::Available(logical_cursor);
                 // 1) REAL widget pass: events in, messages applied, draw into
                 //    the surface's own target (iced_wgpu Engine + Renderer).
@@ -309,11 +295,9 @@ impl ApplicationHandler for App {
                 app.drain();
                 // 3) blit the accepted frame into the swapchain and present.
                 let _ = target.present_frame(gpu, |view| {
-                    let mut encoder = gpu
-                        .device()
-                        .create_command_encoder(&iced_wgpu::wgpu::CommandEncoderDescriptor {
-                            label: None,
-                        });
+                    let mut encoder = gpu.device().create_command_encoder(
+                        &iced_wgpu::wgpu::CommandEncoderDescriptor { label: None },
+                    );
                     blit.blit(gpu.device(), &mut encoder, view, iced.content());
                     gpu.queue().submit([encoder.finish()]);
                 });

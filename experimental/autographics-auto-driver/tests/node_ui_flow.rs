@@ -35,7 +35,11 @@ fn app_from(world: &str) -> NodeUiApp {
 
 /// click at the REAL widget bounds center via real mouse events (offscreen
 /// row; the native row uses SendInput and is recorded separately).
-fn click(app: &mut NodeUiApp, surface: &mut agp::host::iced_surface::IcedSurface, key: &str) -> usize {
+fn click(
+    app: &mut NodeUiApp,
+    surface: &mut agp::host::iced_surface::IcedSurface,
+    key: &str,
+) -> usize {
     use iced_wgpu::core::{
         mouse::{Button, Event as Mouse},
         Event,
@@ -58,7 +62,6 @@ fn click(app: &mut NodeUiApp, surface: &mut agp::host::iced_surface::IcedSurface
     msgs.len()
 }
 
-
 /// REAL container bounds via a public Operation (containers are not
 /// focusable; the agp helper only visits focusables).
 fn container_bounds(
@@ -71,7 +74,10 @@ fn container_bounds(
         bounds: Option<iced_wgpu::core::Rectangle>,
     }
     impl iced_wgpu::core::widget::Operation<()> for Probe {
-        fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn iced_wgpu::core::widget::Operation<()>)) {
+        fn traverse(
+            &mut self,
+            operate: &mut dyn FnMut(&mut dyn iced_wgpu::core::widget::Operation<()>),
+        ) {
             operate(self)
         }
         fn container(
@@ -89,7 +95,8 @@ fn container_bounds(
         bounds: None,
     };
     surface.operate(app, &mut op);
-    op.bounds.unwrap_or_else(|| panic!("container bounds for {key}"))
+    op.bounds
+        .unwrap_or_else(|| panic!("container bounds for {key}"))
 }
 
 fn text_of(app: &NodeUiApp, instance: usize, slot: usize) -> String {
@@ -112,7 +119,10 @@ fn vs01_two_instances_real_clicks_isolate_and_source_control_replays() {
     // Baseline frame: labels from accepted state (a "0", b "10").
     let _ = surface.frame(&mut app, &[], iced_wgpu::core::mouse::Cursor::Unavailable);
     assert_eq!(text_of(&app, app.instance_index("Main/a").unwrap(), 1), "0");
-    assert_eq!(text_of(&app, app.instance_index("Main/b").unwrap(), 1), "10");
+    assert_eq!(
+        text_of(&app, app.instance_index("Main/b").unwrap(), 1),
+        "10"
+    );
     // Pixel baseline of the two value-label regions (one GPU readback).
     let before = capture_labels(&gpu, &mut surface, &mut app);
 
@@ -122,28 +132,29 @@ fn vs01_two_instances_real_clicks_isolate_and_source_control_replays() {
         + click(&mut app, &mut surface, "Main/b#inc");
     assert_eq!(n, 3, "three real widget messages");
     assert_eq!(text_of(&app, app.instance_index("Main/a").unwrap(), 1), "2");
-    assert_eq!(text_of(&app, app.instance_index("Main/b").unwrap(), 1), "12");
+    assert_eq!(
+        text_of(&app, app.instance_index("Main/b").unwrap(), 1),
+        "12"
+    );
 
     // Pixel evidence: the SAME probe regions now show different label pixels.
     let after = capture_labels(&gpu, &mut surface, &mut app);
     assert_eq!(before.0, after.0, "same probe points");
     assert_ne!(before.1, after.1, "label pixels changed with Auto state");
 
-
     // CONTROL: Auto increment changes (step for a: 1 -> 2) via SOURCE-LEVEL
     // mutation; same clicks now yield 4/2 (a=2*2, b=10+2). No Rust constant
     // participates: dispatch names come from the frozen artifact.
-    let world_alt = WORLD.replacen(
-        "var counter_step=[1,2,5]",
-        "var counter_step=[2,2,5]",
-        1,
-    );
+    let world_alt = WORLD.replacen("var counter_step=[1,2,5]", "var counter_step=[2,2,5]", 1);
     assert_ne!(world_alt, WORLD, "control mutation applied");
     // the re-issued identity binds the mutated source (a source change makes
     // the old artifact stale — the producer regenerates the binding).
     let artifact_alt = ARTIFACT.replacen(
         &format!("\"world_sha256\": \"{}\"", artifact_world_sha_of(WORLD)),
-        &format!("\"world_sha256\": \"{}\"", artifact_world_sha_of(&world_alt)),
+        &format!(
+            "\"world_sha256\": \"{}\"",
+            artifact_world_sha_of(&world_alt)
+        ),
         1,
     );
     assert_ne!(artifact_alt, ARTIFACT, "re-issued binding");
@@ -154,8 +165,14 @@ fn vs01_two_instances_real_clicks_isolate_and_source_control_replays() {
         + click(&mut app2, &mut surface, "Main/a#inc")
         + click(&mut app2, &mut surface, "Main/b#inc");
     assert_eq!(n2, 3);
-    assert_eq!(text_of(&app2, app2.instance_index("Main/a").unwrap(), 1), "4");
-    assert_eq!(text_of(&app2, app2.instance_index("Main/b").unwrap(), 1), "12");
+    assert_eq!(
+        text_of(&app2, app2.instance_index("Main/a").unwrap(), 1),
+        "4"
+    );
+    assert_eq!(
+        text_of(&app2, app2.instance_index("Main/b").unwrap(), 1),
+        "12"
+    );
 }
 
 /// probe the two value-label regions (A/B rows) with one GPU readback each.
@@ -183,7 +200,10 @@ fn capture_labels(
         .map(|p| {
             let x = (p[0] as u32).min(img.width() - 1);
             let y = (p[1] as u32).min(img.height() - 1);
-            { let q = img.get_pixel(x, y); [q[0], q[1], q[2], q[3]] }
+            {
+                let q = img.get_pixel(x, y);
+                [q[0], q[1], q[2], q[3]]
+            }
         })
         .collect();
     (points, px)
@@ -265,7 +285,10 @@ fn vs02_keyboard_disabled_stale_and_queue_bound() {
     // semantics) and clicking yields NO message (controlled refusal).
     let meter_before = text_of(&app, app.instance_index("Main/side/meter").unwrap(), 1);
     click(&mut app, &mut surface, "Main/side#toggle");
-    assert!(!app.cond(&format!("Main/side#reset#en")), "reset disabled after toggle");
+    assert!(
+        !app.cond(&format!("Main/side#reset#en")),
+        "reset disabled after toggle"
+    );
     let msgs = click(&mut app, &mut surface, "Main/side#reset");
     assert_eq!(msgs, 0, "disabled button produces no real message");
     assert_eq!(
@@ -376,14 +399,19 @@ fn vs03_lifecycle_unmount_resize_and_fresh_runs() {
     // correct relayout is an identity — the oracle is that the layout engine
     // still places the real widget after resize (bounds resolve, nonempty),
     // and 049's mixed viewports add the fill-bound resize oracles.
-    surface.resize(&gpu, iced::Size::new(320.0, 900.0)).expect("resize");
+    surface
+        .resize(&gpu, iced::Size::new(320.0, 900.0))
+        .expect("resize");
     {
         let _ = surface.frame(&mut app, &[], iced_wgpu::core::mouse::Cursor::Unavailable);
     }
     let (w, _h) = surface.physical_size();
     assert_eq!(w, 320, "real resize reached the offscreen surface");
     let b = container_bounds(&mut surface, &app, "Main/a#inc");
-    assert!(b.width > 0.0 && b.height > 0.0, "layout re-converged after resize");
+    assert!(
+        b.width > 0.0 && b.height > 0.0,
+        "layout re-converged after resize"
+    );
     let change = surface.last_change.clone();
     let _ = change;
 

@@ -146,21 +146,20 @@ fn parse_module_text_dialect(
     } else {
         parser.parse_domain(&auto_ui_dialect::node2d::Node2DDialect)
     };
-    let code = parsed
-        .map_err(|e| {
-            // 解析错误带字节偏移 span；换算行号。
-            let text = format!("{e:?}");
-            let offset = text
-                .find("offset: SourceOffset(")
-                .and_then(|i| {
-                    text[i + 21..]
-                        .split(')')
-                        .next()
-                        .and_then(|n| n.parse::<usize>().ok())
-                })
-                .unwrap_or(0);
-            err(format!("research parse: {e:?}"), offset)
-        })?;
+    let code = parsed.map_err(|e| {
+        // 解析错误带字节偏移 span；换算行号。
+        let text = format!("{e:?}");
+        let offset = text
+            .find("offset: SourceOffset(")
+            .and_then(|i| {
+                text[i + 21..]
+                    .split(')')
+                    .next()
+                    .and_then(|n| n.parse::<usize>().ok())
+            })
+            .unwrap_or(0);
+        err(format!("research parse: {e:?}"), offset)
+    })?;
 
     let mut module = LoadedModule {
         name: file.to_string(),
@@ -268,10 +267,22 @@ fn resource_from_store(
     };
     match full_ctor.as_deref() {
         Some("textured3d.glb") => {
-            return resource_from_store_present3d(name, "texture resource", false, &call.args.args, base);
+            return resource_from_store_present3d(
+                name,
+                "texture resource",
+                false,
+                &call.args.args,
+                base,
+            );
         }
         Some("animated3d.glb") => {
-            return resource_from_store_present3d(name, "animation resource", true, &call.args.args, base);
+            return resource_from_store_present3d(
+                name,
+                "animation resource",
+                true,
+                &call.args.args,
+                base,
+            );
         }
         _ => {}
     }
@@ -689,10 +700,11 @@ pub fn load_project_dual(entry: &Path, allow_dual_view: bool) -> Result<Project,
         .iter()
         .filter(|d| {
             !instantiated.contains(d)
-                && !project
-                    .modules
-                    .values()
-                    .any(|m| m.nodes.iter().any(|n| &n.name == *d && n.object3d.is_some()))
+                && !project.modules.values().any(|m| {
+                    m.nodes
+                        .iter()
+                        .any(|n| &n.name == *d && n.object3d.is_some())
+                })
         })
         .cloned()
         .collect();
@@ -958,11 +970,7 @@ fn walk_view_ui<'a>(
     for el in elements {
         match el {
             auto_ui_dialect::node2d::UiElement::Instance { node, name, props } => {
-                out.push(InstanceRef {
-                    node,
-                    name,
-                    props,
-                });
+                out.push(InstanceRef { node, name, props });
             }
             auto_ui_dialect::node2d::UiElement::If { then, .. } => walk_view_ui(then, out),
             auto_ui_dialect::node2d::UiElement::Container { children, .. } => {
