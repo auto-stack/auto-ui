@@ -42,3 +42,63 @@ impl VueGenerator {
         self.design_theme_ts().is_some()
     }
 }
+
+#[cfg(test)]
+mod plan059_design_gate_tests {
+    use super::*;
+
+    fn sfc_of(src: &str) -> String {
+        let session = auto_lang_core::session::CompilerSession::ui();
+        let _ = auto_lang_core::Parser::from(src).with_session(session);
+        let ast = crate::parse_ui(src).expect("parse");
+        let decl = ast
+            .domain_stmts()
+            .find_map(|s| match s {
+                auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d),
+                _ => None,
+            })
+            .expect("widget decl");
+        let widget = crate::aura::extract_widget_from_decl(decl).expect("extract");
+        let mut gen = VueGenerator::new_shadcn();
+        gen.generate_sfc(&widget).expect("generate")
+    }
+
+    /// PLAN-059（auto-os）反控：design.theme 投影（031 F-03）在无
+    /// accent_color/theme_name 状态的 App 上必须仍注入主题运行时——
+    /// 此前双臂门控静默截断，vue 轨官方包不上身（reader/todo 同形）。
+    #[test]
+    fn design_only_app_emits_theme_runtime() {
+        let sfc = sfc_of(
+            r#"widget App {
+    msg { Init }
+    design { theme: "Auto" }
+    view { col { text "hi" {} } }
+}
+"#,
+        );
+        assert!(
+            sfc.contains("__designTheme"),
+            "design projection computed must emit:\n{}",
+            sfc
+        );
+        assert!(
+            sfc.contains("__AUTO_TREE_THEMES__"),
+            "official tree palette must be consumable at runtime"
+        );
+    }
+
+    /// 零变化裁定不变：三无 app（无 accent/theme_name/design）维持零注入。
+    #[test]
+    fn plain_app_stays_zero_injection() {
+        let sfc = sfc_of(
+            r#"widget App {
+    msg { Init }
+    view { col { text "hi" {} } }
+}
+"#,
+        );
+        assert!(!sfc.contains("__designTheme"));
+        assert!(!sfc.contains("__AUTO_TREE_THEMES__"));
+        assert!(!sfc.contains("THEME_PALETTES"));
+    }
+}

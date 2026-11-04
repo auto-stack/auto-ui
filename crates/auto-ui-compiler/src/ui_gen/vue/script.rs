@@ -131,7 +131,9 @@ impl VueGenerator {
             }
         }
         // Plan 409 §8: accent bootstrap needs onMounted (applyAccent restore).
-        if self.has_accent_color && !imports.contains(&"onMounted") {
+        // PLAN-059：design.theme 投影（031 F-03）的 mount 恢复块同样需要
+        // onMounted——design-only（无 accent/theme_name 状态）的 App 也要导入。
+        if (self.has_accent_color || self.has_design_theme()) && !imports.contains(&"onMounted") {
             imports.push("onMounted");
         }
         // PLAN-031 F-03：design.theme 投影需要 computed（与 ref/watch 同批收集，
@@ -144,7 +146,9 @@ impl VueGenerator {
         // stylesheet's indigo).
         // N-34：theme_name 热切换 watch 与 accent 同步 watch 都无条件发射，
         // 只有 dark_mode 时也需要 watch——import 不能仅按 has_dark_mode 门控。
-        if (self.has_accent_color || self.has_theme_name) && !imports.contains(&"watch") {
+        if (self.has_accent_color || self.has_theme_name || self.has_design_theme())
+            && !imports.contains(&"watch")
+        {
             imports.push("watch");
         }
         // Lifecycle: .Init → onMounted, .Destroy → onUnmounted
@@ -2205,7 +2209,13 @@ onUnmounted(() => {{ if ({var} !== null) {{ clearInterval({var}); {var} = null }
         // helper used by the store composable path (Plan 360), plus an onMounted
         // bootstrap that restores the saved choice from localStorage. The
         // palette is aligned with auto-forge (indigo/coral/ocean/sage/amber).
-        if self.has_accent_color || self.has_theme_name {
+        // PLAN-059（auto-os）：design.theme 投影面（031 F-03 合同）此前被
+        // accent/theme_name 状态存在性静默截断——无 accent 产品的 App 级
+        // `design { theme }` 不产生任何运行时（官方包不上身，vue 轨停留
+        // scaffold 静态表）。门控扩为三臂：accent_color / theme_name /
+        // design.theme 投影任一在场即注入；三无 app 维持零注入（零变化
+        // 优先裁定不变）。
+        if self.has_accent_color || self.has_theme_name || self.has_design_theme() {
             script.push('\n');
             script.push_str(Self::ACCENT_PALETTE_JS);
             // PLAN-601 T-06: full named-theme runtime rides the same gate —
