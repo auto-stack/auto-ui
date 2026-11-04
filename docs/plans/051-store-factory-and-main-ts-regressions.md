@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-04
 updated_at: 2026-11-04
 plan_revision: 1
-current_step: 2
+current_step: 5
 total_steps: 4
 depends_on: []
 supersedes_spec_components: []
@@ -96,15 +96,17 @@ Rust（auto-ui-compiler / auto-ui-tools）；cargo t 固定组（`tu`=ui_gen 单
 - [x] T-01（owner_stage=work；AC-01）：store_init_to_js Node 臂 + 单测。[✅ 2026-11-04] Expr::Node→对象字面量（Pair/Pos/Name 三形态，loop 保守 null，ts_adapter:2254 同构）；oracle test_plan051_store_struct_default_kept（ref<any>({ id: 0, ... }) 保真）+ non_struct_defaults_unchanged 过。
 - [x] T-02（owner_stage=work；AC-02）：main.ts 分隔修复 + 四组合单测。[✅ 2026-11-04] store_ctx_import 前导 
 ；oracle main_ts_imports_newline_separated_four_combinations 过（四组合无拼接 import）。
-- [ ] T-03（owner_stage=work；AC-03）：③a 有界调查决策稿。
-- [ ] T-04（owner_stage=work；依赖T-03；AC-03）：③b 修复（或拆分记录）。
-- [ ] T-05（owner_stage=work；依赖T-01/02/04；AC-04）：组回归 + 新测试。
+- [x] T-03（owner_stage=work；AC-03）：③a 有界调查决策稿。[✅ 2026-11-04] 根因=VM 视图 `DynamicMessage::TypedInst.instance` 携页名（`author`）而 `child_instances` 键=plan-041 T-04 键控身份（路径/#N 形）→格式脱致合法 press 被 late-event 纪律误丢；消费方实录 `[VM-INSTANCE] author.GoNew dropped: instance released (late event)`（native-first.log；三轮 deterministic）。证据链=mcp_server.rs:3928 TypedInst 编码、dynamic.rs:2928 丢弃点、vm_bridge.rs:2131 键查找。
+- [x] T-04（owner_stage=work；依赖T-03；AC-03）：③b 修复（或拆分记录）。[✅ 2026-11-04] dynamic.rs dispatch：身份查找 miss→name-only 存活解析重定向（恰一存活；0/≥2 保持丢弃=真迟到纪律保留）；下游 input back-write 随解析后实例。runtime lib 2210/2220（10 败全部 base 同败，stash A/B 两批实证）；消费方 native 回放=跨仓 oracle 指针（merge 后 BLOG-005 执行）。
+- [x] T-05（owner_stage=work；依赖T-01/02/04；AC-04）：组回归 + 新测试。[✅ 2026-11-04] compiler lib 268/268、tools lib 205/205（5 既有基线红同集）、runtime lib 2210/2220（10 既有基线红同集）。
 - [ ] T-06（owner_stage=review；依赖T-05；AC-04）：同树独立上下文最终复审。
 - [ ] T-07（owner_stage=merge；依赖T-06 pass；AC-05）：SD-01 落地 + 归档清理。
 
 ## 9. 复审记录
 
 - stage: new | plan_id: PLAN-051 | plan_revision: r1 | outcome: pass（授权已记录 §4：消费方用户 2026-11-04 深夜路线①同构） | next: work（T-01/T-02 立即开工；T-03 调查并行）。
+
+stage: work | plan_id: PLAN-051 | plan_revision: r1 | outcome: pass（T-01..T-05 完成，execution_done 待 T-06 复审） | worktree_path: D:/autostack/.wt/ui-051/auto-ui | branch: codex/plan-051-dev | base_commit: 4e5e6796 | code_commit: 79e1057e（T-01/T-02=b8e23710，T-03/T-04=79e1057e） | dependency_revisions: auto-lang da4c98b51（master detached 同级）、auto-web 37d32c2、auto-down 7c4d5cb | task_ids: T-01..T-05（T-06=review 所有） | evidence: 新 oracle 三枚全绿（struct_default_kept/non_struct_defaults_unchanged/main_ts_imports_newline_separated_four_combinations）；组回归 compiler 268/268、tools 205/205、runtime 2210/2220（15 败全部 base 同败 stash A/B 两批实证）；③根因与修复见 T-03/T-04 行 | blockers: 无 | next_responsible_role: review（T-06 同树独立上下文最终复审；消费方 oracle=native 回放 22/22+B-01 冷 scaffold 在 BLOG-005 簿记执行）
 
 ## 10. 待澄清事项
 
