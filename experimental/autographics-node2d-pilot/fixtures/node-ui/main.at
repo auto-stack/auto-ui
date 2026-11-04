@@ -8,6 +8,7 @@ use panel: Panel
 node Main {
     model {
         var flips = 0
+        var ticks = 0
     }
     msg {
         Flip
@@ -30,11 +31,15 @@ node Main {
                 onclick: .Flip
             }
             text flips { text: .flips }
+            text ticks { text: .ticks }
         }
     }
     on {
         Life.Start -> {
             .flips = 0
+        }
+        Life.Tick(dt) -> {
+            .ticks = .ticks + 1
         }
         .Flip -> {
             .flips = .flips + 1

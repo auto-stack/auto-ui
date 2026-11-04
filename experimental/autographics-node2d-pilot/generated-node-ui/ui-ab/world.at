@@ -3,6 +3,7 @@
 // Regeneration must be byte-identical (tools/verify_plan048.py).
 var ok=0.0
 var r_flips=0
+var r_ticks=0
 var counter_count=[0,10,100]
 var counter_enabled=[1,1,1]
 var counter_start=[0,10,100]
@@ -14,8 +15,8 @@ var counter_ui_text_1=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 var counter_ui_text_len_1=[0,0,0]
 var counter_ui_text_2=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
 var counter_ui_text_len_2=[0,0,0]
-var main_ui_text_0=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
-var main_ui_text_len_0=[0,0]
+var main_ui_text_0=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+var main_ui_text_len_0=[0,0,0]
 var panel_ui_text_0=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
 var panel_ui_text_len_0=[0,0,0]
 var panel_bind_meter_INC=[2]
@@ -359,6 +360,9 @@ fn counter_ui_click_inc(i int) {
 fn main_lifestart() {
  r_flips = 0
 }
+fn main_lifetick(dt float) {
+ r_ticks = (r_ticks + 1)
+}
 fn main_flip() {
  r_flips = (r_flips + 1)
 }
@@ -371,6 +375,7 @@ fn main_ui_refresh_0() {
  main_ui_text_0[((0*64)+5)]=0xAC
  main_ui_text_len_0[0]=6
  main_ui_text_len_0[1]=main_ui_digits_0(1,r_flips)
+ main_ui_text_len_0[2]=main_ui_digits_0(2,r_ticks)
 }
 fn main_ui_refresh(i int) {
  if i==0 {
@@ -439,6 +444,7 @@ fn get_Main_side_meter_count() int {return counter_count[2]}
 fn get_counter_enabled_2() int {return counter_enabled[2]}
 fn get_Main_side_meter_enabled() int {return counter_enabled[2]}
 fn get_r_flips() int {return r_flips}
+fn get_r_ticks() int {return r_ticks}
 fn get_panel_on_0() int {return panel_on[0]}
 fn get_Main_side_on() int {return panel_on[0]}
 fn counter_ui_text_len(i int, e int) int {
@@ -498,6 +504,7 @@ fn app_start() {
  counter_ui_refresh(2)
 }
 fn app_update(dt float) {
+ main_lifetick(dt)
  main_ui_refresh(0)
  counter_ui_refresh(0)
  counter_ui_refresh(1)

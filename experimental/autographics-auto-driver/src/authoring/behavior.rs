@@ -77,9 +77,13 @@ pub const COMPONENTS2_API: &str = include_str!("../../api/public_composition2d_v
 /// version; every earlier profile keeps its exact assembled bytes.
 pub const COMPONENTS3_VERSION: &str = "autographics.components3d/1";
 pub const COMPONENTS3_API: &str = include_str!("../../api/public_composition3d_v1.at");
+/// PLAN-048 基础 UI 档：无 AG 服务传输；受检入口只有 `fn main()`（全局
+/// 数组字面量在此初始化——T-02 冻结的 main-first 消费合同）。
+pub const NODE_UI_VERSION: &str = "autographics.node-ui/1";
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Api {
     V1,
+    NodeUi,
     SpatialV2,
     SegmentV3,
     SweepV4,
@@ -106,6 +110,7 @@ impl Api {
     pub fn parse(value: &str) -> Result<Self, String> {
         match value {
             VERSION => Ok(Self::V1),
+            NODE_UI_VERSION => Ok(Self::NodeUi),
             VERSION2 => Ok(Self::SpatialV2),
             VERSION5 => Ok(Self::MotionV5),
             VERSION4 => Ok(Self::SweepV4),
@@ -133,6 +138,7 @@ impl Api {
     pub fn version(self) -> &'static str {
         match self {
             Self::V1 => VERSION,
+            Self::NodeUi => NODE_UI_VERSION,
             Self::SpatialV2 => VERSION2,
             Self::SegmentV3 => VERSION3,
             Self::SweepV4 => VERSION4,
@@ -154,6 +160,7 @@ impl Api {
             Self::Presentation2V1 => PRESENTATION2_VERSION,
             Self::Components2V1 => COMPONENTS2_VERSION,
             Self::Components3V1 => COMPONENTS3_VERSION,
+            Self::NodeUi => NODE_UI_VERSION,
         }
     }
     pub fn number(self) -> i32 {
@@ -180,11 +187,13 @@ impl Api {
             Self::Presentation2V1 => 115,
             Self::Components2V1 => 116,
             Self::Components3V1 => 117,
+            Self::NodeUi => 118,
         }
     }
     pub fn profile(self) -> i32 {
         match self {
             Self::V1 => 7,
+            Self::NodeUi => 25,
             Self::SpatialV2 => 8,
             Self::SegmentV3 => 9,
             Self::SweepV4 => 10,
@@ -339,6 +348,7 @@ impl Api {
             Self::Presentation2V1 => "presentation2d",
             Self::Components2V1 => "components2d",
             Self::Components3V1 => "components3d",
+            Self::NodeUi => "node-ui",
         }
     }
     /// Parse one `--behavior-api` value; an unknown name is a usage error.

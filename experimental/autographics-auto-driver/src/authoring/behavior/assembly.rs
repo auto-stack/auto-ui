@@ -47,6 +47,19 @@ const INPUTS: Inputs<'static> = Inputs {
     entry: ENTRY,
 };
 pub(super) fn assemble(api: Api) -> Result<Units, String> {
+    if api == Api::NodeUi {
+        // PLAN-048：最小受检装配——无传输/服务 API；入口只提供 `fn main()`
+        // （admission 的保留名守卫 + 全局初始化合同由消费者 main-first 满
+        // 足；app_start/app_update 仍由 admit 强制）。
+        return Ok(Units {
+            transport: String::new(),
+            api: String::new(),
+            entry: "
+fn main() {}
+".to_string(),
+            api_region: "<node-ui-api>",
+        });
+    }
     assemble_from(api, INPUTS)
 }
 fn assemble_from(api: Api, input: Inputs<'_>) -> Result<Units, String> {
@@ -531,10 +544,12 @@ fn assemble_from(api: Api, input: Inputs<'_>) -> Result<Units, String> {
         | Api::Presentation2V1
         | Api::Components2V1
         | Api::Components3V1 => segment_transport(input.transport)?,
+        Api::NodeUi => unreachable!("NodeUi handled by assemble() early return"),
     };
     // The former v5 pre-namespace `_ag_derive` replacement never matched.
     // Preserve those emitted bytes; activating that guard would change behavior.
     let (api_text, api_region) = match api {
+        Api::NodeUi => unreachable!("NodeUi handled by assemble() early return"),
         Api::NodeAnimation3V1 | Api::Audio2V1 | Api::Audio3V1 | Api::Hud2V1 | Api::Hud3V1 | Api::Presentation2V1 | Api::Components2V1 | Api::Components3V1 => unreachable!("derived above"),
         Api::V1 => (input.base.to_owned(), "<behavior_v1.at>"),
         Api::SpatialV2 => (
@@ -740,6 +755,7 @@ fn entry(api: Api, source: &str) -> Result<String, String> {
     )?;
     match api {
         Api::V1 | Api::SpatialV2 => Ok(source),
+        Api::NodeUi => unreachable!("NodeUi handled by assemble() early return"),
         Api::SegmentV3
         | Api::SweepV4
         | Api::MotionV5

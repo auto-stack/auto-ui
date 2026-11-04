@@ -457,5 +457,6 @@ mod terminal_policy_tests {
 pub mod squash;
 
 pub mod authoring;
+pub mod node_ui;
 pub mod research;
 pub mod squash_host;

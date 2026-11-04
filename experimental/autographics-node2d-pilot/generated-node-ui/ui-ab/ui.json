@@ -1,7 +1,7 @@
 {
   "schema": "autographics.node-ui/1",
   "generator": "autographics-node2d-pilot plan048 node-ui",
-  "world_sha256": "d0c6050cb4411520358ec2226eb21a5a1efddb9d585eb46646a268cdfccd2803",
+  "world_sha256": "3c85ca6e27ce24a8ee32f2a049046519afb2b45b3df171d668df730b90c4b615",
   "root": "Main",
   "instances": [
     {
@@ -85,7 +85,7 @@
     "Main": {
       "prefix": "main",
       "is_root": true,
-      "texts": 2,
+      "texts": 3,
       "elements": [
         {
           "kind": "Container",
@@ -139,6 +139,15 @@
               "text": {
                 "kind": "int_field",
                 "name": "flips"
+              }
+            },
+            {
+              "kind": "Text",
+              "name": "ticks",
+              "slot": 2,
+              "text": {
+                "kind": "int_field",
+                "name": "ticks"
               }
             }
           ]
