@@ -3010,15 +3010,20 @@ impl DynamicComponent {
                         .handler_param_types(widget_name, &clean_name)
                         .and_then(|types| types.first().cloned())
                         .map(|tag| match tag.as_str() {
-                            "int" | "i64" | "uint" | "u64" | "usize" => text
+                            // Int width matters: the UI VM pipeline tags
+                            // ints as Value::Int(i32) (decode_payload "i"
+                            // arm) — an I64 arg decodes as 0 inside the
+                            // handler frame (027 ItemCtx probe: ctx_id
+                            // stuck at 0 with args=[I64(n)]).
+                            "int" | "i64" | "uint" | "u64" | "usize" | "byte" => text
                                 .trim()
-                                .parse::<i64>()
-                                .map(auto_val::Value::I64)
+                                .parse::<i32>()
+                                .map(auto_val::Value::Int)
                                 .unwrap_or_else(|_| auto_val::Value::Str(text.clone().into())),
                             "float" | "double" => text
                                 .trim()
                                 .parse::<f64>()
-                                .map(auto_val::Value::Double)
+                                .map(auto_val::Value::Float)
                                 .unwrap_or_else(|_| auto_val::Value::Str(text.clone().into())),
                             "bool" => auto_val::Value::Bool(matches!(
                                 text.trim(),
