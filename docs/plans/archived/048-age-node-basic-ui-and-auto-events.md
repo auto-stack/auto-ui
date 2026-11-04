@@ -129,6 +129,8 @@ stage: goal | plan_id: PLAN-048 | plan_revision: r1 | round: 1 | from: drafting 
 
 stage: goal | plan_id: PLAN-048 | plan_revision: r1 | round: 2 | from: execution_done | to: reviewed | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-048/auto-ui | commit: 2d1ad4ae | next: merge
 
+stage: goal | plan_id: PLAN-048 | plan_revision: r1 | round: 3 | from: reviewed | to: done | status: archived | outcome: pass | worktree: 已移除（wt-guard clean后删） | commit: delivery=cd1e161a（master tip, ff-only）；archive=4a667e91；cleaned=1d2556d7 | spec: docs/specs/auto-graphics/node-basic-ui.md（sha16 7bda6f53faf16cae, 主上controls ALL PASS） | next: done
+
 2026-11-05 / stage: merge | plan_id: PLAN-048:r1 | outcome: pass（delivered；cleanup待收尾后记cleaned） | 交付与checkpoint证据：
 - `prepared`：reviewed基线2d1ad4ae（4提交，range-diff等价）；canonical diff=SD-01候选`docs/specs/auto-graphics/node-basic-ui.md`（worktree内已审）；目标路径合法（docs/specs/，有既往同类Spec先例：node2d-basic-authoring等）。
 - `landed`：rebase master（b20e54b2）后ff-only落主，**delivery commit=cd1e161af55246350e35d28e03a79235b3efc9af**（=master tip）；旧→新映射 926d1c97→726cf441、63d191f0→1586fa47、329a3aed→8dd6ac99、2d1ad4ae→cd1e161a，`git range-diff`四提交全等（=，安全重写证明）；无merge commit。
