@@ -1704,8 +1704,21 @@ mod musk_vm_track_p053_8_corpus {
         seed(&mut dc);
         let _ = dc.view_with_debug_gated(false);
         dc.on_with_input_for("Child53", "Pick\u{1F}s\u{1F}8f20138cab63f0c24832d3fb", None);
+        // PLAN-041 T-02: debug_click_id 是 Child53 的自有 model 字段——实例所有。
+        let child53 = dc
+            .bridge()
+            .child_instance_identities()
+            .into_iter()
+            .find(|id| id.contains("Child53"))
+            .expect("Child53 instance live");
         assert_eq!(
-            str_state(&dc, "debug_click_id"),
+            dc.bridge()
+                .read_instance_state(&child53, "debug_click_id")
+                .map(|v| match v {
+                    auto_val::Value::Str(s) => s.as_str().to_string(),
+                    other => format!("{other:?}"),
+                })
+                .unwrap_or_default(),
             "8f20138cab63f0c24832d3fb",
             "P-053-8: 点击实参漂移成会话名"
         );
@@ -1726,7 +1739,23 @@ mod musk_vm_track_p053_8_corpus {
         seed(&mut dc);
         let _ = dc.view_with_debug_gated(false);
         dc.on_with_input_for("Child53", "Pick\u{1F}s\u{1F}13e16478f80c91da604b87e7", None);
-        assert_eq!(str_state(&dc, "debug_click_id"), "13e16478f80c91da604b87e7");
+        // PLAN-041 T-02: debug_click_id 实例所有。
+        let child53b = dc
+            .bridge()
+            .child_instance_identities()
+            .into_iter()
+            .find(|id| id.contains("Child53"))
+            .expect("Child53 instance live");
+        assert_eq!(
+            dc.bridge()
+                .read_instance_state(&child53b, "debug_click_id")
+                .map(|v| match v {
+                    auto_val::Value::Str(s) => s.as_str().to_string(),
+                    other => format!("{other:?}"),
+                })
+                .unwrap_or_default(),
+            "13e16478f80c91da604b87e7"
+        );
     }
 }
 

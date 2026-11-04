@@ -1287,19 +1287,13 @@ fn synthesize_emit_bridge_fn(
         ))
     };
     let mut stmts = vec![Stmt::Expr(Expr::Bina(
-        Box::new(Expr::Dot(
-            Box::new(Expr::Ident(Name::from(STATE_PARAM))),
-            Name::from("__emit_msg"),
-        )),
+        state_dot("__emit_msg"),
         auto_val::Op::Asn,
         Box::new(Expr::Str(auto_val::AutoStr::from(msg))),
     ))];
     if argc >= 1 {
         stmts.push(Stmt::Expr(Expr::Bina(
-            Box::new(Expr::Dot(
-                Box::new(Expr::Ident(Name::from(STATE_PARAM))),
-                Name::from("__emit_payload"),
-            )),
+            state_dot("__emit_payload"),
             auto_val::Op::Asn,
             Box::new(Expr::Ident(Name::from("v0"))),
         )));

@@ -178,6 +178,15 @@ impl<'a> AuraViewBuilder<'a> {
         let parent_state_id = self
             .override_state_obj_id
             .unwrap_or_else(|| self.bridge.state_obj_id());
+        // PLAN-041 T-02: child_field_names 在 step-2 定格，而 step-3/4/4b
+        // 仍向 resolved_props 追加（父同名同步、model 默认、prop 声明默认）
+        // ——实例布局必须并集，否则 prop 默认字段不落实例对象（Move 守卫
+        // 读 scrollHeight FieldNotFound 实录）。
+        for name in resolved_props.keys() {
+            if !child_field_names.contains(name) {
+                child_field_names.push(name.clone());
+            }
+        }
         let child_state_id = self.bridge.ensure_child_instance(
             &child_widget.name,
             &identity,

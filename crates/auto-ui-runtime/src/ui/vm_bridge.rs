@@ -1971,12 +1971,10 @@ impl VmBridge {
                                 if let Some(old) = inst.get_field(idx) {
                                     self.release_init_value(old);
                                 }
-                                self.stake_state_value(&storable);
                                 let _ = inst.set_field(idx, storable);
                                 self.vm.bump_path(rec.state_obj_id, Some(name));
                             }
                         } else {
-                            self.stake_state_value(&storable);
                             inst.field_names.push(name.clone());
                             inst.fields.push(storable);
                             self.vm.bump_path(rec.state_obj_id, Some(name));
@@ -1992,8 +1990,10 @@ impl VmBridge {
         let mut values: Vec<auto_val::Value> = Vec::with_capacity(field_names.len() + 2);
         for name in field_names {
             let v = props.get(name).cloned().unwrap_or(auto_val::Value::Nil);
+            // materialize_init_value 自带容器 retain（Plan 419 协议）——
+            // 不得再 stake_state_value 叠加（双押 = 卸载后泄漏，plan841
+            // compound 实录 rc=2）。
             let storable = self.materialize_init_value(&v);
-            self.stake_state_value(&storable);
             names.push(name.clone());
             values.push(storable);
         }
@@ -2057,12 +2057,10 @@ impl VmBridge {
                             if let Some(old) = inst.get_field(idx) {
                                 self.release_init_value(old);
                             }
-                            self.stake_state_value(&storable);
                             let _ = inst.set_field(idx, storable);
                             self.vm.bump_path(obj_id, Some(name));
                         }
                     } else {
-                        self.stake_state_value(&storable);
                         inst.field_names.push(name.clone());
                         inst.fields.push(storable);
                         self.vm.bump_path(obj_id, Some(name));
@@ -2175,7 +2173,8 @@ impl VmBridge {
     pub fn end_child_instance_frame(&self) {
         let prev = self.instance_seen_prev.borrow().clone();
         let cur = self.instance_seen_cur.borrow().clone();
-        for identity in prev.difference(&cur) {
+        let sweep: Vec<String> = prev.difference(&cur).cloned().collect();
+        for identity in &sweep {
             self.release_child_instance(identity);
         }
         self.instance_seen_prev.borrow_mut().clear();

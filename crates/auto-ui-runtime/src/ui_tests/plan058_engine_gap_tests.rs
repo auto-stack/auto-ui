@@ -162,7 +162,13 @@ mod plan058_child_emit_computed {
     }
 
     fn f_state(dc: &crate::ui::dynamic::DynamicComponent, field: &str) -> auto_val::Value {
-        dc.read_state(field).expect(field)
+        // PLAN-041 T-02: 子件自有字段实例所有——先查存活实例，回落 root
+        //（父属字段仍走根）。
+        dc.bridge()
+            .child_instance_identities()
+            .into_iter()
+            .find_map(|id| dc.bridge().read_instance_state(&id, field).ok())
+            .unwrap_or_else(|| dc.read_state(field).expect(field))
     }
 
     /// ②-①：use 导入子件 handler 体内的 computed 引用解析出真值
