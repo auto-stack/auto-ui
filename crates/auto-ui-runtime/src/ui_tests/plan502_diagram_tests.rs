@@ -822,7 +822,7 @@ widget App {
     assert!(!dump0.contains("id: start"), "无 hover 时 tooltip 不出现");
 
     // HoverNode(0) → emphasis + tooltip
-    dc.on_with_input_for("FlowDiagram", "HoverNode\u{1F}i\u{1F}0", None);
+    dc.on_with_input_for_instance_type("FlowDiagram", "HoverNode\u{1F}i\u{1F}0", None);
     let dump1 = {
         let (view, _, _) = dc.view_with_debug_gated(true);
         format!("{:?}", view)
@@ -841,7 +841,7 @@ widget App {
     );
 
     // NodeOut → 复原
-    dc.on_with_input_for("FlowDiagram", "NodeOut", None);
+    dc.on_with_input_for_instance_type("FlowDiagram", "NodeOut", None);
     let dump2 = {
         let (view, _, _) = dc.view_with_debug_gated(true);
         format!("{:?}", view)

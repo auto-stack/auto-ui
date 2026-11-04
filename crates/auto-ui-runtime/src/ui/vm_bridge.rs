@@ -2072,6 +2072,12 @@ impl VmBridge {
         }
     }
 
+    /// PLAN-041 T-02 diagnostics: stable address token for this bridge
+    /// (probe only — distinguishes bridge replacement in traces).
+    pub fn bridge_identity(&self) -> usize {
+        self as *const _ as usize
+    }
+
     /// PLAN-041 T-02: all live instance identities (diagnostics/tests/
     /// acceptance oracles; deterministic order for stable assertions).
     pub fn child_instance_identities(&self) -> Vec<String> {
@@ -2825,6 +2831,34 @@ impl VmBridge {
                 }
             }
             None => {
+                // PLAN-041 T-02: per-identity records — the widget-scoped
+                // supersede (A→B cancels A's queued/in-flight) must scan
+                // SIBLING records of the same widget; the old single-record
+                // identity-change arm never fires across distinct keys.
+                // 只收「本帧未再登记」的同件旧身份——真正重挂载（key/route
+                // 变化后旧 key 本帧缺席）；同帧多调用位（bar#0/#1 并存）的
+                // 兄弟身份已在 seen_cur 中，不误杀。
+                let seen = self.instance_seen_cur.borrow();
+                let siblings: Vec<(String, InitDemandPhase)> = records
+                    .iter()
+                    .filter(|(k, rec)| {
+                        rec.widget == widget_name
+                            && k.as_str() != identity
+                            && !seen.contains(k.as_str())
+                    })
+                    .map(|(k, rec)| (k.clone(), rec.phase))
+                    .collect();
+                drop(seen);
+                let mut cancel_queued: Vec<String> = Vec::new();
+                let mut cancel_parked = false;
+                for (key, phase) in siblings.iter() {
+                    match phase {
+                        InitDemandPhase::Queued => cancel_queued.push(key.clone()),
+                        InitDemandPhase::InFlight => cancel_parked = true,
+                        _ => {}
+                    }
+                    records.remove(key);
+                }
                 records.insert(
                     identity.to_string(),
                     InitDemandRecord {
@@ -2835,6 +2869,15 @@ impl VmBridge {
                     },
                 );
                 self.init_generation.set(generation + 1);
+                drop(records);
+                for key in &cancel_queued {
+                    self.cancel_queued_init(key);
+                }
+                if cancel_parked {
+                    let fn_name =
+                        crate::ui::handler_codegen::namespaced_handler_fn_name(widget_name, "Init");
+                    self.cancel_parked_by_fn(&fn_name);
+                }
             }
         }
         self.init_demand_queue.borrow_mut().push_back(InitDemand {

@@ -138,7 +138,7 @@ fn plan711_init_demand_registers_once_per_generation() {
     let report = bridge.dispatch_pending_inits(budget);
     assert_eq!(report.completed, 1, "short init completes inline");
     assert_eq!(
-        bridge.init_demand_phase("Flow"),
+        bridge.init_demand_phase("Flow#k1"),
         Some(InitDemandPhase::Done)
     );
     let inited = bridge.read_state("inited").expect("read state");
@@ -163,8 +163,9 @@ fn plan711_init_demand_identity_change_supersedes_and_cancels() {
     assert_eq!(d, InitDemandDecision::Queued);
     let report = bridge.dispatch_pending_inits(budget);
     assert_eq!(report.in_flight, 1, "long init parks as CpuRunnable");
+    // PLAN-041 T-02: records are keyed by init identity.
     assert_eq!(
-        bridge.init_demand_phase("SlowInit"),
+        bridge.init_demand_phase("Slow"),
         Some(InitDemandPhase::InFlight)
     );
 
@@ -194,7 +195,7 @@ fn plan711_init_demand_identity_change_supersedes_and_cancels() {
     let report = bridge.dispatch_pending_inits(budget);
     assert_eq!(report.dispatched, 0, "queue drained");
     assert_eq!(
-        bridge.init_demand_phase("SlowInit"),
+        bridge.init_demand_phase("Slow"),
         Some(InitDemandPhase::Done)
     );
     // 取消不回滚前缀副作用（M-01 契约）：首个 A 代际的首片前缀写入保留
@@ -235,12 +236,12 @@ fn plan711_init_dependency_order_child_waits_for_parent() {
         "child must NOT dispatch behind a parked parent"
     );
     assert_eq!(
-        bridge.init_demand_phase("SlowInit"),
+        bridge.init_demand_phase("SlowInit#1"),
         Some(InitDemandPhase::InFlight)
     );
     assert_eq!(bridge.pending_init_demand_count(), 1, "child still queued");
     assert_eq!(
-        bridge.init_demand_phase("Tick"),
+        bridge.init_demand_phase("Tick#1"),
         Some(InitDemandPhase::Queued)
     );
 
@@ -256,8 +257,9 @@ fn plan711_init_dependency_order_child_waits_for_parent() {
         report.completed, 1,
         "child dispatches after parent terminal"
     );
+    // PLAN-041 T-02: records keyed by init identity.
     assert_eq!(
-        bridge.init_demand_phase("Tick"),
+        bridge.init_demand_phase("Tick#1"),
         Some(InitDemandPhase::Done)
     );
     assert_eq!(bridge.pending_init_demand_count(), 0);

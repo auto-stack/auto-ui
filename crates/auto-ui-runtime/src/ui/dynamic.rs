@@ -1609,6 +1609,25 @@ impl DynamicComponent {
         handler: &str,
         args: &[auto_val::Value],
     ) -> Result<(), String> {
+        // PLAN-041 T-02: 与 on_with_input_for 同款单实例名字路由——该件名恰
+        // 有一个存活实例时派发到实例（验收通道真实意图；根上已无子件态）。
+        let live = self
+            .bridge
+            .child_instance_identities()
+            .into_iter()
+            .filter(|id| {
+                let tail = id.rsplit('/').next().unwrap_or(id);
+                tail.split('#').next() == Some(widget)
+            })
+            .collect::<Vec<_>>();
+        if let [only] = live.as_slice() {
+            if let Some(sid) = self.bridge.child_instance_state_id(only) {
+                return self
+                    .bridge
+                    .call_handler_for(widget, handler, sid, args)
+                    .map_err(|e| e.to_string());
+            }
+        }
         let sid = self
             .bridge
             .get_child_state_id(widget)
@@ -2858,6 +2877,32 @@ impl DynamicComponent {
         // inputs. A dead (released) instance drops the late event with a
         // diagnostic instead of re-targeting a same-named new instance
         // (plan §5.2 contract 4).
+        // 名字合成派发（instance=None）：该件名恰有一个存活实例时路由到它
+        // （验收/测试通道的真实意图；pre-split 语义=共享根态，实例分裂后
+        // 根上不再有子件 props/model）；0 或 ≥2 个存活实例保持 root legacy
+        // （歧义不由通道静默裁决）。
+        let name_only_instance;
+        let instance: Option<&str> = match instance {
+            Some(i) => Some(i),
+            None => {
+                let live = self
+                    .bridge
+                    .child_instance_identities()
+                    .into_iter()
+                    .filter(|id| {
+                        let tail = id.rsplit('/').next().unwrap_or(id);
+                        tail.split('#').next() == Some(widget_name)
+                    })
+                    .collect::<Vec<_>>();
+                match live.as_slice() {
+                    [only] => {
+                        name_only_instance = only.clone();
+                        Some(name_only_instance.as_str())
+                    }
+                    _ => None,
+                }
+            }
+        };
         let instance_state_id: Option<u64> = match instance {
             Some(identity) => match self.bridge.child_instance_state_id(identity) {
                 Some(id) => Some(id),

@@ -53,6 +53,12 @@ thread_local! {
     // 的并集成分对照——"msg 变体且无同名 handler"即引号 emit 的改写条件，
     // 有同名 handler 的 `.Name()` 仍走 Plan 398 sibling 内联臂）。
     static CURRENT_HANDLER_NAMES: RefCell<HashSet<String>> = RefCell::new(HashSet::new());
+    // PLAN-041 T-02: 当前件的「prop-only」名集（props − model 字段）。回调型
+    // prop（`on_close: msg`）以裸名调用（`on_close()`）——其解析路径是函数
+    // 符号而非状态字段；若被裸名状态改写劫持为 `__state.on_close()`，链接器
+    // 解析出 `<W>_State.on_close` 类型化符号 → link 失败（widgets-gallery
+    // SettingsPanel 实录）。改写器在 CALL 名位跳过 prop-only 名。
+    static CURRENT_PROP_ONLY: RefCell<HashSet<String>> = RefCell::new(HashSet::new());
     // Plan 576 (D3): 改写期收集的引号 emit 桥函数需求 (widget, msg, argc)。
     // 各 widget 的 handler 编译循环结束后 drain 并合成 `__emit_<W>_<msg>`
     // 桥函数（体内写 __emit_msg/__emit_payload 状态对，派发侧收尾路由）。
@@ -64,6 +70,16 @@ thread_local! {
 /// 消歧用——与 set_current_widget 的合并集对照)。
 pub fn set_current_widget_handlers(handler_names: HashSet<String>) {
     CURRENT_HANDLER_NAMES.with(|s| *s.borrow_mut() = handler_names);
+}
+
+/// PLAN-041 T-02: set the current widget's prop-only names (props that are
+/// not model fields — callback props keep bare-call resolution).
+pub fn set_current_prop_only(prop_only: HashSet<String>) {
+    CURRENT_PROP_ONLY.with(|s| *s.borrow_mut() = prop_only);
+}
+
+fn clear_current_prop_only() {
+    CURRENT_PROP_ONLY.with(|s| s.borrow_mut().clear());
 }
 
 /// Plan 576: drain pending quoted-emit bridge requests collected during rewrite.
@@ -83,6 +99,7 @@ pub fn clear_current_widget() {
     CURRENT_WIDGET_NAME.with(|s| s.borrow_mut().clear());
     CURRENT_MSG_VARIANTS.with(|s| s.borrow_mut().clear());
     CURRENT_HANDLER_NAMES.with(|s| s.borrow_mut().clear());
+    clear_current_prop_only();
 }
 
 // PLAN-733: store 名 → 源文件模块名（file stem）。collect_module_imports
@@ -1124,7 +1141,13 @@ fn rewrite_expr_with_locals(
                 c.name.as_ref(),
                 Expr::Ident(n) if computed_fn_for(n.as_str()).is_some()
             );
-            if !name_is_bare_computed {
+            // PLAN-041 T-02: prop-only 名（回调型 prop）作裸调用名不改写——
+            // 保持函数符号解析（pre-split 形状）。
+            let name_is_prop_only = matches!(
+                c.name.as_ref(),
+                Expr::Ident(n) if CURRENT_PROP_ONLY.with(|s| s.borrow().contains(n.as_str()))
+            );
+            if !name_is_bare_computed && !name_is_prop_only {
                 rewrite_expr_with_locals(&mut c.name, state_fields, locals);
             }
             for arg in &mut c.args.args {
@@ -1251,9 +1274,15 @@ fn synthesize_emit_bridge_fn(
     if argc >= 1 {
         params.push(Param::new(Name::from("v0"), Type::StrSlice, None));
     }
+    // PLAN-041 T-02: emit 账面字段写经 `__auto_root` 落 App 级共享态——清算侧
+    // （on_with_input_for 的 read_state）读 root；实例分裂后 bridge 收到的
+    // __state 是子件实例对象。
     let state_dot = |field: &str| {
         Box::new(Expr::Dot(
-            Box::new(Expr::Ident(Name::from(STATE_PARAM))),
+            Box::new(Expr::Dot(
+                Box::new(Expr::Ident(Name::from(STATE_PARAM))),
+                Name::from(INSTANCE_ROOT_FIELD),
+            )),
             Name::from(field),
         ))
     };
@@ -1460,20 +1489,25 @@ fn synthesize_handler_fn(
             .replace('"', "")
             .trim_start_matches('.')
             .to_string();
-        stmts.push(Stmt::Expr(Expr::Bina(
+        // PLAN-041 T-02: emit 账面字段写经 __auto_root 落 App 级共享态
+        //（清算侧读 root；handler 收到的 __state 是子件实例对象）。
+        let emit_root_dot = |field: &str| {
             Box::new(Expr::Dot(
-                Box::new(Expr::Ident(Name::from(STATE_PARAM))),
-                Name::from("__emit_msg"),
-            )),
+                Box::new(Expr::Dot(
+                    Box::new(Expr::Ident(Name::from(STATE_PARAM))),
+                    Name::from(INSTANCE_ROOT_FIELD),
+                )),
+                Name::from(field),
+            ))
+        };
+        stmts.push(Stmt::Expr(Expr::Bina(
+            emit_root_dot("__emit_msg"),
             auto_val::Op::Asn,
             Box::new(Expr::Str(auto_val::AutoStr::from(msg.as_str()))),
         )));
         if let Some(p) = params.get(1) {
             stmts.push(Stmt::Expr(Expr::Bina(
-                Box::new(Expr::Dot(
-                    Box::new(Expr::Ident(Name::from(STATE_PARAM))),
-                    Name::from("__emit_payload"),
-                )),
+                emit_root_dot("__emit_payload"),
                 auto_val::Op::Asn,
                 Box::new(Expr::Ident(Name::from(p.name.as_str()))),
             )));
@@ -1773,9 +1807,16 @@ pub fn synthesize_widget_module(
         // 「直取 __state」与「经 __auto_root 回根态」。
         let mut w_state_fields: HashSet<String> =
             w.state_vars.iter().map(|v| v.name.clone()).collect();
+        let w_prop_only: HashSet<String> = w
+            .props
+            .iter()
+            .map(|p| p.name.clone())
+            .filter(|n| !w_state_fields.contains(n.as_str()))
+            .collect();
         for prop in &w.props {
             w_state_fields.insert(prop.name.clone());
         }
+        set_current_prop_only(w_prop_only);
         let w_state_type = synthesize_state_type(w);
 
         // Plan 056 blocker A (AuraWidget path): set the current-widget context
@@ -2204,20 +2245,25 @@ fn synthesize_handler_fn_from_decl_with_store(
             .replace('"', "")
             .trim_start_matches('.')
             .to_string();
-        stmts.push(Stmt::Expr(Expr::Bina(
+        // PLAN-041 T-02: emit 账面字段写经 __auto_root 落 App 级共享态
+        //（清算侧读 root；handler 收到的 __state 是子件实例对象）。
+        let emit_root_dot = |field: &str| {
             Box::new(Expr::Dot(
-                Box::new(Expr::Ident(Name::from(STATE_PARAM))),
-                Name::from("__emit_msg"),
-            )),
+                Box::new(Expr::Dot(
+                    Box::new(Expr::Ident(Name::from(STATE_PARAM))),
+                    Name::from(INSTANCE_ROOT_FIELD),
+                )),
+                Name::from(field),
+            ))
+        };
+        stmts.push(Stmt::Expr(Expr::Bina(
+            emit_root_dot("__emit_msg"),
             auto_val::Op::Asn,
             Box::new(Expr::Str(auto_val::AutoStr::from(msg.as_str()))),
         )));
         if let Some(p) = params.get(1) {
             stmts.push(Stmt::Expr(Expr::Bina(
-                Box::new(Expr::Dot(
-                    Box::new(Expr::Ident(Name::from(STATE_PARAM))),
-                    Name::from("__emit_payload"),
-                )),
+                emit_root_dot("__emit_payload"),
                 auto_val::Op::Asn,
                 Box::new(Expr::Ident(Name::from(p.name.as_str()))),
             )));
@@ -2522,9 +2568,16 @@ pub fn synthesize_from_decl(
                 .as_ref()
                 .map(|m| m.fields.iter().map(|f| f.name.to_string()).collect())
                 .unwrap_or_default();
+            let prop_only: HashSet<String> = d
+                .props
+                .iter()
+                .map(|p| p.name.to_string())
+                .filter(|n| !s.contains(n.as_str()))
+                .collect();
             for prop in &d.props {
                 s.insert(prop.name.to_string());
             }
+            set_current_prop_only(prop_only);
             if d_tick.is_some() {
                 s.retain(|n| n != "interval");
             }

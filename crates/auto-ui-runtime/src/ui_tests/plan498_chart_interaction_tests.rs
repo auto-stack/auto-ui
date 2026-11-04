@@ -150,6 +150,14 @@ mod plan498_charts {
             eprintln!("plan498 M1: SKIPPED — charts-gallery not found");
             return;
         };
+        // PLAN-041 T-02: 实例态下派发前先物化场景（同 M2/M3 的 dump0 先行
+        // ——build_gallery 只构建组件不渲染视图，图表实例在首个视图构建时
+        // 才挂载；名字合成派发必须落在已挂载实例上）。
+        let dump0 = dump(&mut dc);
+        assert!(
+            dump0.contains("a0") || dump0.contains("path"),
+            "area 常驻几何落图"
+        );
         dc.on_with_input_for_instance_type("AreaChart", "HoverSeries\u{1F}i\u{1F}1", None);
         let dump = dump(&mut dc);
         assert!(
