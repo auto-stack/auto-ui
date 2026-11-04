@@ -20,12 +20,14 @@
 | action_config 热替换 | compiler action_config.rs:680；host.rs:1886；MCP `action_config_reload` | 已支持（独立 DSL 源，与组件 reload 无关） |
 | `hot_reload.rs` HotReloadComponent/UIWatcher | ui/hot_reload.rs | **存根，无能力**：parse_content 恒返回固定节点；无生产调用方。不得引用其声称 HMR |
 | MCP 组件 reload 工具 | ui/mcp_server.rs | **缺口**：仅 action_config_reload；组件热重载无 MCP 直达 |
-| Vue/Vite 轨 | — | 属 web 栈自己的 HMR，与本文 VM/iced 轨无关，不得混同计能力 |
+| Vue/Vite 轨 | — | **不在本文核验范围**：本仓无 Vue/Vite HMR 证据（examples 无 vue 形态、docs/web-integration.md 无 HMR 记载）；不得以其计 VM/iced 轨能力，是否存在属 web 栈自身事项 |
 | Node `hot_reload` | — | 不属于本仓 UI runtime 能力 |
 
 ## 2. 检测语义（mtime，非内容）
 
-- 比较规则 `current_modified > last_modified`；首次检查恒报变化。
+- 比较规则 `current_modified > last_modified`。`set_source_path` 登记成功时
+  基线=当前 mtime，此后首检与基线比较（无变化）；仅当登记时取不到元数据
+  （`last_modified=None`）时首次检查才恒报变化。
 - **同 mtime 修改漏检**（探针 `t02_same_mtime_content_change_missed`：
   `File::set_modified` 拨回基线后改内容 → Ok(None)）。后继如需内容级
   失效，须引入 hash/长度比对，且须保留 mtime 快路径。
