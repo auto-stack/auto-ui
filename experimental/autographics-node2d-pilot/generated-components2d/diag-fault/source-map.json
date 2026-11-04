@@ -95,6 +95,72 @@
     },
     {
       "start": 931,
+      "end": 987,
+      "module": null,
+      "node": null,
+      "event": null,
+      "helper": null,
+      "precision": "generated",
+      "source_start": null,
+      "source_end": null
+    },
+    {
+      "start": 987,
+      "end": 1093,
+      "module": "helpera",
+      "node": "Alpha",
+      "event": "Life.Tick",
+      "helper": null,
+      "precision": "context",
+      "source_start": 414,
+      "source_end": 423
+    },
+    {
+      "start": 1093,
+      "end": 1333,
+      "module": null,
+      "node": null,
+      "event": null,
+      "helper": null,
+      "precision": "generated",
+      "source_start": null,
+      "source_end": null
+    },
+    {
+      "start": 1333,
+      "end": 1435,
+      "module": "helperb",
+      "node": "Beta",
+      "event": "Life.Tick",
+      "helper": null,
+      "precision": "context",
+      "source_start": 525,
+      "source_end": 534
+    },
+    {
+      "start": 1435,
+      "end": 1663,
+      "module": null,
+      "node": null,
+      "event": null,
+      "helper": null,
+      "precision": "generated",
+      "source_start": null,
+      "source_end": null
+    },
+    {
+      "start": 1663,
+      "end": 1771,
+      "module": "broken",
+      "node": "Gamma",
+      "event": "Life.Tick",
+      "helper": null,
+      "precision": "context",
+      "source_start": 643,
+      "source_end": 652
+    },
+    {
+      "start": 1771,
       "end": 2740,
       "module": null,
       "node": null,

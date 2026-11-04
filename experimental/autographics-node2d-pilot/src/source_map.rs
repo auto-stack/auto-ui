@@ -203,6 +203,106 @@ impl SourceMap {
     }
 }
 
+/// PLAN-044 T-02 冻结：on-handler 后置锚定定位（Life/Member 事件）。
+///
+/// components-2d 发射器按 `{snake(node)}_life{event}` /
+/// `{snake(node)}_{snake(member)}` 命名 handler fn（lower.rs emit_handlers
+/// 同源规则）。handler 体被重写，语句级位置不可证，故精度冻结为
+/// `context`：Node + 事件名 + handler 声明区间（LightSpan=(offset,len)，
+/// 锚到声明起点行）。同名 node 全工程唯一（node_modules 注册表拒重复），
+/// 发射名唯一，`fn ` 前缀排除调用点。
+pub fn locate_handler_fns(project: &Project, user_source: &str) -> Result<Vec<Segment>, String> {
+    let mut segments = Vec::new();
+    for module in project.modules.values() {
+        for node in &module.nodes {
+            let Some(on) = &node.on else { continue };
+            for h in &on.handlers {
+                let base = crate::lower::snake(&node.name);
+                let emitted = match &h.pattern {
+                    auto_ui_dialect::node2d::EventPattern::Life { event, .. } => {
+                        format!("{base}_life{}", event.to_lowercase())
+                    }
+                    auto_ui_dialect::node2d::EventPattern::Member { name, .. } => {
+                        format!("{base}_{}", crate::lower::snake(name))
+                    }
+                };
+                let start = user_source
+                    .find(&format!("fn {emitted}("))
+                    .ok_or_else(|| format!("handler fn not found: {emitted}"))?;
+                let end = fn_end_from(user_source, start)
+                    .ok_or_else(|| format!("handler fn end not found: {emitted}"))?;
+                // 源区间纯文本锚定（实证：本栈 AST span 起点有 +1/+2 漂移，
+                // 不可字节信）：node 声明文本区内搜事件 token。
+                let (token, event) = match &h.pattern {
+                    auto_ui_dialect::node2d::EventPattern::Life { event, .. } => {
+                        (format!("Life.{event}"), format!("Life.{event}"))
+                    }
+                    auto_ui_dialect::node2d::EventPattern::Member { name, .. } => {
+                        (format!(".{name}"), name.clone())
+                    }
+                };
+                let (source_start, source_end) =
+                    anchor_handler_decl(&module.source, &node.name, &token)
+                        .ok_or_else(|| {
+                            format!("handler event token not anchored: {}/{}", module.name, token)
+                        })?;
+                segments.push(Segment {
+                    start,
+                    end,
+                    module: Some(module.name.clone()),
+                    node: Some(node.name.clone()),
+                    event: Some(event),
+                    helper: None,
+                    precision: Precision::Context,
+                    source_start: Some(source_start),
+                    source_end: Some(source_end),
+                });
+            }
+        }
+    }
+    Ok(segments)
+}
+
+/// 从已知声明起点按花括号配平找函数结束（fn_end 的变体：起点已知）。
+fn fn_end_from(source: &str, start: usize) -> Option<usize> {    let open = source[start..].find('{')? + start;
+    let mut depth = 0usize;
+    for (i, c) in source[open..].char_indices() {
+        match c {
+            '{' => depth += 1,
+            '}' => {
+                depth = depth.saturating_sub(1);
+                if depth == 0 {
+                    return Some(open + i + 1);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+/// handler 声明的纯文本锚定：`node {name}` 声明区（花括号配平）内搜
+/// 事件 token（Life 用 `Life.{event}`，Member 用 `.{name}` 作者形态），
+/// 返回 token 的半开 byte 区间。找不到即 None（调用方拒建图，fail-closed）。
+fn anchor_handler_decl(source: &str, node_name: &str, token: &str) -> Option<(usize, usize)> {
+    let decl = format!("node {node_name}");
+    let from = source.find(&decl)?;
+    // 声明名后须非标识符延续（防 node AlphaX 误配 node Alpha）。
+    let after = from + decl.len();
+    let boundary = source
+        .as_bytes()
+        .get(after)
+        .map(|b| !(b.is_ascii_alphanumeric() || *b == b'_'))
+        .unwrap_or(true);
+    if !boundary {
+        return None;
+    }
+    let open = source[after..].find('{')? + after;
+    let end = fn_end_from(source, open)?;
+    // node 区 = decl 起点..配平终点；token 须落在区内。
+    let rel = source[from..end].find(token)? + from;
+    Some((rel, rel + token.len()))
+}
+
 /// 模块源内 `fn {name}(` 起，按花括号配平找函数结束（含闭合 `}`）。
 fn fn_end(source: &str, name: &str) -> Option<usize> {
     let marker = format!("fn {name}(");
@@ -407,7 +507,9 @@ pub fn build_source_map(
             },
         );
     }
-    let segments = fill_generated_gaps(locate_pooled_fns(project, user_source)?, user_source.len());
+    let mut mapped = locate_pooled_fns(project, user_source)?;
+    mapped.extend(locate_handler_fns(project, user_source)?);
+    let segments = fill_generated_gaps(mapped, user_source.len());
     let map = SourceMap {
         format: MAP_FORMAT.into(),
         generator: generator.into(),

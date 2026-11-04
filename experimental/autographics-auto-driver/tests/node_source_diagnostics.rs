@@ -160,6 +160,39 @@ fn tampered_closure_rejects_and_fallback_holds() {
 }
 
 #[test]
+fn handler_context_segment_maps_to_node_event_declaration() {
+    // 冻结旁件上的真实 handler context 段：gamma_lifetick 体内偏移 →
+    // broken.at 的 Life.Tick 声明行 + node/event 身份（context 精度不承诺列）。
+    let map = SourceMap::parse(MAP_JSON, WORLD).unwrap();
+    let closure_dir = Path::new(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../autographics-node2d-pilot/generated-components2d/diag-fault/closure"
+    ));
+    let closure = map.closure_sources(closure_dir).unwrap();
+    let seg = map
+        .segments
+        .iter()
+        .find(|s| s.precision == Precision::Context && s.node.as_deref() == Some("Gamma"))
+        .expect("gamma handler context segment");
+    assert_eq!(seg.event.as_deref(), Some("Life.Tick"));
+    assert_eq!(seg.module.as_deref(), Some("broken"));
+    let off = seg.start + 10;
+    let origin = map
+        .diagnose_user_offset(off, WORLD, &closure, None)
+        .expect("handler context origin");
+    assert_eq!(origin.precision, Precision::Context);
+    assert_eq!(origin.node.as_deref(), Some("Gamma"));
+    assert_eq!(origin.event.as_deref(), Some("Life.Tick"));
+    assert_eq!(origin.module, "broken");
+    // 锚定行 = broken.at 的 Life.Tick 声明行（行内容实证）。
+    let line = BROKEN_AT.lines().nth(origin.line - 1).expect("line");
+    assert!(
+        line.contains("Life.Tick"),
+        "context origin anchors the handler declaration line: {line}"
+    );
+}
+
+#[test]
 fn precision_matrix_generated_segments_never_map() {
     // generated 段（SoA/调度）命中时 diagnose 返回 None → 调用方回退。
     let snap = SourceSnapshot::from_bytes_for(

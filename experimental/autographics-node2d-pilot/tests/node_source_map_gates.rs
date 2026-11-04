@@ -245,6 +245,48 @@ fn real_chain_same_name_helpers_do_not_cross_files() {
 }
 
 #[test]
+fn real_chain_handler_context_segments_anchor_node_event() {
+    let (project, world) = lower_helpers_fixture();
+    let world_sha = sha256_hex(world.as_bytes());
+    let map = build_source_map(&project, &world, GENERATOR, &world_sha).expect("build");
+    map.validate_against_world(&world).expect("validate");
+    // Alpha/Beta 的 Life.Tick handler：context 精度 + node/event 身份 +
+    // 声明区间锚（helpera.at / helperb.at 各自的 on 块）。
+    let handlers: Vec<_> = map
+        .segments
+        .iter()
+        .filter(|s| s.precision == Precision::Context)
+        .collect();
+    assert_eq!(handlers.len(), 2, "alpha/beta 各一个 Life.Tick handler");
+    for h in &handlers {
+        assert_eq!(h.event.as_deref(), Some("Life.Tick"));
+        assert!(h.node.as_deref().unwrap() == "Alpha" || h.node.as_deref().unwrap() == "Beta");
+        let (ss, se) = (h.source_start.unwrap(), h.source_end.unwrap());
+        let src = &project.modules[h.module.as_deref().unwrap()].source;
+        assert!(se <= src.len() && ss <= se);
+        // 声明区间锚在事件标识符（dialect Handler.span 实证锚事件名 token，
+        // 如 "Life"），须是 display 事件名的非空前缀。
+        let span_text = &src[ss..se];
+        assert!(!span_text.is_empty());
+        assert!(
+            h.event.as_deref().unwrap().starts_with(span_text),
+            "handler 声明区间须锚事件标识符: {span_text:?} vs {:?}",
+            h.event
+        );
+    }
+    // 不同模块 handler 不互串：Alpha 段锚 helpera.at，Beta 段锚 helperb.at。
+    let a = handlers.iter().find(|h| h.node.as_deref() == Some("Alpha")).unwrap();
+    let b = handlers.iter().find(|h| h.node.as_deref() == Some("Beta")).unwrap();
+    assert_eq!(a.module.as_deref(), Some("helpera"));
+    assert_eq!(b.module.as_deref(), Some("helperb"));
+    // lookup：handler 体内偏移命中 context 段且带事件身份。
+    let in_body = a.start + world[a.start..a.end].find("helpera_bump").map(|p| p + 4).unwrap();
+    let hit = map.lookup(in_body).expect("handler body covered");
+    assert_eq!(hit.precision, Precision::Context);
+    assert_eq!(hit.event.as_deref(), Some("Life.Tick"));
+}
+
+#[test]
 fn gap_fill_merges_and_tiles() {
     let segs = vec![
         Segment { start: 4, end: 6, module: Some("m".into()), node: None, event: None, helper: None, precision: Precision::Exact, source_start: Some(0), source_end: Some(2) },
