@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-04
 updated_at: 2026-11-04
 plan_revision: 1
-current_step: 9
+current_step: 10
 total_steps: 10
 depends_on: [auto-ui/PLAN-030, auto-ui/PLAN-034, auto-ui/PLAN-035]
 supersedes_spec_components: []
@@ -129,7 +129,7 @@ work产证；review同权威树不同上下文独立final，逐AC/diff/SD/遗漏
 | T-07 | review | T-06 | 同树独立final及finding修复后同员复核 | AC-07 | [x] |
 | T-08 | merge | T-07 pass | 冻结定向门/来源核后落master | AC-08 | [x] |
 | T-09 | merge | T-08 | canonical/归档/导航与固定交付身份核验 | AC-08 | [x] |
-| T-10 | merge | T-09 | fresh guard/全输出对账/删scope构建物/摘要与hold登记 | AC-09 | [ ] |
+| T-10 | merge | T-09 | fresh guard/全输出对账/删scope构建物/摘要与hold登记 | AC-09 | [x] |
 
 ## 9. 复审记录
 
@@ -144,6 +144,8 @@ T-01 证据（只读核查，全部在 worktree codex/plan-043-dev@2a830d6c 工�
 - AG016 只读：PLAN-016 已归档（docs/plans/archived/016-*.md），.wt 下无 ag-016 树（仅 ag-019、ag-examples/probe），固定 035 交付 5903839e 在历史中，本轮未触碰。
 - 主检出 WIP 观察（非本 Plan，已上报不代管）：master 工作树有 docs/plans/{045,046,047} 新草案、039 计划文件删除、docs/design 改动与 `?? crates/auto-ui-runtime/test/`——疑似他会话在途；master-zero-WIP 在 merge 落主前需其 owner 处理，本 Plan 全程在 ui-043 树内写码不受影响。
 - scope 登记：D:/autostack/plan-artifacts/plan-043/scope-registry.md（sha256 16932afb4d3cfa48af3d1d97166a9d910ca4d9993c786b14542ff22d293e6874），唯一 scratch 根，in-flight: none。
+
+2026-11-04 / stage: merge | auto-ui/PLAN-043:r1 | archived+cleaned：Plan 移 docs/plans/archived/043-*.md（git mv，980e8063，status archived，链接自父目录可解）；fresh wt-guard 双树 clean（auto-ui + auto-lang 兄弟 clone）→ worktree remove、分支 codex/plan-043-dev 删除（was ba080e27）、组目录 .wt/ui-043 移除（含 auto-lang clone --shared）；plan-artifacts/plan-043 整 scope 删除（证据已折本文 §9）；registry policy.json 刷新（records: scope-deleted-at-merge, delivered, holds: none）；主检出 043 范围净。批量回归：不到期（043%5≠0，auto-lang last-batch-regression 在案 <48h）。completion_kind: delivered。统一回归门（全量 AG 套件）按 2026-10-28 裁定属里程碑档 pending，在此登记；落地≠部署观察见上（backend release binary/web bundle 不消费本实验线面，无需重建）。outcome: pass。
 
 2026-11-04 / stage: merge | auto-ui/PLAN-043:r1 | checkpoints：
 
