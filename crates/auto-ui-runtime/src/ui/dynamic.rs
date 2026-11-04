@@ -1970,6 +1970,19 @@ impl DynamicComponent {
             AuraViewBuilder::with_registry(&self.bridge, &self.widget_name, &self.widget_registry)
                 .with_routes(&self.routes)
                 .with_computed(&self.computed)
+                .with_preview_states(&self.preview_states);
+        // PLAN-051 DIAG (temp): gated build entry + toggle state read.
+        let diag_ue2 = self
+            .bridge
+            .read_all_state()
+            .get("use_engine")
+            .map(|v| format!("{v:?}"))
+            .unwrap_or_else(|| "<absent>".into());
+        eprintln!("[PLAN051-VIEW-GATED] build use_engine={diag_ue2} capture_probe={capture_probe}");
+        let builder =
+            AuraViewBuilder::with_registry(&self.bridge, &self.widget_name, &self.widget_registry)
+                .with_routes(&self.routes)
+                .with_computed(&self.computed)
                 .with_preview_states(&self.preview_states)
                 .with_nav_group_states(&self.nav_group_states)
                 .with_mounted_sink(&self.mounted_types)
@@ -2964,29 +2977,52 @@ impl DynamicComponent {
         // live instance instead of discarding a legitimate interaction
         // (consumer BLOG-005: every MCP press on the author page was
         // dropped as `late event`, freezing the page on the list view).
-        // PLAN-051 (③ final): three-state resolution for the carried
-        // instance. The view's TypedInst.instance is the PAGE-LEVEL name
-        // (`author`), while `child_instances` keys are plan-041 keyed
-        // identities — page-level handlers never register there, so a bare
-        // miss must NOT be read as a late event.
+        // PLAN-051 (③ final): resolution for the carried instance. The
+        // view's TypedInst.instance is the PAGE-LEVEL name (`author`),
+        // while `child_instances` keys are plan-041 keyed identities —
+        // resolution order:
+        //   1. exact live key → dispatch on it;
+        //   2. miss + exactly one live same-name instance → re-target it
+        //      (the view's state copy — writes must land where the view
+        //      reads; consumer BLOG-005: the toggle's root-legacy write
+        //      landed on root while the view read the instance copy →
+        //      frozen view);
+        //   3. miss + tombstoned (WAS mounted, since released) → TRUE late
+        //      event: drop (plan-041 §5.2 contract 4 preserved);
+        //   4. miss + 0 live + not tombstoned → never a child instance →
+        //      root-legacy (pre-041 semantics); ≥2 live → ambiguous, drop.
         let mut late_event = false;
         let instance_state_id: Option<u64> = match instance {
             Some(identity) => match self.bridge.child_instance_state_id(identity) {
                 Some(id) => Some(id),
                 None => {
-                    if self.bridge.child_instance_was_released(identity) {
-                        // (a) a child instance that WAS mounted and has since
-                        // been released: true late event — plan-041 §5.2
-                        // contract 4 (drop, never re-target a same-named new
-                        // instance).
-                        late_event = true;
-                        None
-                    } else {
-                        // (b) never a child instance → page-level name;
-                        // fall back to the pre-041 root-legacy resolution
-                        // (root state + legacy child-page prop sync below).
-                        instance = None;
-                        None
+                    let tombstoned = self.bridge.child_instance_was_released(identity);
+                    let live: Vec<String> = self
+                        .bridge
+                        .child_instance_identities()
+                        .into_iter()
+                        .filter(|id| {
+                            let tail = id.rsplit('/').next().unwrap_or(id);
+                            tail.split('#').next() == Some(widget_name)
+                        })
+                        .collect();
+                    match (tombstoned, live.as_slice()) {
+                        (true, _) => {
+                            eprintln!("[PLAN051-RES] tombstoned -> drop");
+                            late_event = true;
+                            None
+                        }
+                        (false, [only]) => {
+                            eprintln!("[PLAN051-RES] redirect -> {only}");
+                            name_only_instance = only.clone();
+                            instance = Some(name_only_instance.as_str());
+                            self.bridge.child_instance_state_id(name_only_instance.as_str())
+                        }
+                        (false, _) => {
+                            eprintln!("[PLAN051-RES] root-legacy (live={:?})", live);
+                            instance = None;
+                            None
+                        }
                     }
                 }
             },

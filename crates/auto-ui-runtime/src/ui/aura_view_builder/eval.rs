@@ -1053,7 +1053,12 @@ impl<'a> AuraViewBuilder<'a> {
     /// - `.flag` — bare state ref (truthy check)
     pub(super) fn eval_condition_with(&self, condition: &str, bindings: &Bindings) -> bool {
         let cond = condition.trim();
-        self.eval_condition_with_inner(condition, bindings)
+        let r = self.eval_condition_with_inner(condition, bindings);
+        // PLAN-051 DIAG (temp): condition-arm truth probe.
+        if cond.contains("use_engine") || cond.contains("editing_format") {
+            eprintln!("[PLAN051-COND] {cond:?} => {r}");
+        }
+        r
     }
 
     pub(super) fn eval_condition_with_inner(&self, cond: &str, bindings: &Bindings) -> bool {
