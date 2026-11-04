@@ -278,19 +278,10 @@ pub fn run_vue_flow(
         // （env 运行时读取）只在生成器模板里，增量 run 不重写会让老项目
         // 永久缺失该路由（实测：proxy 起了但 vite 无 /apps 转发 → fullstack
         // demo 404）。模板确定性，重写零风险。
-        // PLAN-050 T-02 (r2/F-1): include source = `project.npm_deps` — the
-        // exact set the generation path receives as `extra_deps` (both
-        // write_project_files call sites pass `&self.npm_deps`), so both
-        // write paths emit the identical pac-npm_deps include set (the
-        // consumer-verified cand5 shape, ⊆ installed) instead of diverging.
-        refresh_vite_config(
-            &project.output_dir,
-            &project
-                .npm_deps
-                .iter()
-                .map(|(n, _)| n.clone())
-                .collect::<Vec<String>>(),
-        );
+        // PLAN-050 T-02 (r2/F-1, r3/F-5): include source = `project.npm_deps`
+        // pairs — the exact field the generation path passes as its
+        // `extra_deps` param (link: filtering happens inside the template).
+        refresh_vite_config(&project.output_dir, &project.npm_deps);
     }
 
     // Copy handmade theme assets if available

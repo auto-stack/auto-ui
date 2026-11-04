@@ -1009,21 +1009,31 @@ const on_contextmenu = (e: MouseEvent) => {
     .to_string()
 }
 
-pub fn generate_vite_config(npm_dep_keys: &[String]) -> String {
+pub fn generate_vite_config(npm_deps: &[(String, String)]) -> String {
     // AUTO_HTTP_PORT lets multiple `auto run` instances coexist; default 8080.
     let _proxy_target = format!("http://127.0.0.1:{}", crate::util::http_port());
-    // PLAN-050 T-01: pre-bundle the project's declared dependencies on cold
-    // dev start. Vite's import scan only sees statically reachable bare
-    // imports; lazily imported chains (e.g. an SFC importing mermaid) are
-    // missed, and their CJS interop deps then break at runtime. Emitted keys
-    // are exactly the package.json dependency set both write paths feed in,
-    // so include can never reference an uninstalled package. Empty set = omit
-    // the whole `optimizeDeps` key (standalone projects keep the old shape).
-    let optimize_deps_block = if npm_dep_keys.is_empty() {
+    // PLAN-050 T-01: pre-bundle the project's declared registry dependencies
+    // on cold dev start. Vite's import scan only sees statically reachable
+    // bare imports; lazily imported chains (e.g. an SFC importing mermaid)
+    // are missed, and their CJS interop deps then break at runtime. The
+    // filter drops `link:` declarations (r3/F-5): linked deps keep vite's
+    // default source-mode loading — forcing them into prebundling would
+    // change their watch/update semantics — and the Plan-482 derived
+    // @autodown/engine sibling never reaches this function (the derivation
+    // happens below write_project_files' shadowing, package.json only).
+    // Both write paths pass the same `npm_deps` field, so the emitted
+    // include set is identical either way. Empty set = omit the whole
+    // `optimizeDeps` key (standalone projects keep the old shape).
+    let include_keys: Vec<&String> = npm_deps
+        .iter()
+        .filter(|(_, version)| !version.contains("link:"))
+        .map(|(name, _)| name)
+        .collect();
+    let optimize_deps_block = if include_keys.is_empty() {
         String::new()
     } else {
         let mut entries = String::new();
-        for key in npm_dep_keys {
+        for key in &include_keys {
             let literal = serde_json::to_string(key)
                 .unwrap_or_else(|_| format!("\"{}\"", key.replace('"', "")));
             entries.push_str("    ");
@@ -1098,15 +1108,15 @@ __OPTIMIZE_DEPS__  base: './',
 /// current template — the run-time self-heal for deterministic-template
 /// drift. Missing config = no-op; write failure = named warning, never
 /// fatal (same best-effort semantics as the neighboring index.html /
-/// tailwind refreshes). `npm_dep_keys` must be the SAME source the
-/// generation path passes as `extra_deps` (`VueProject::npm_deps`), so both
+/// tailwind refreshes). `npm_deps` must be the SAME source the generation
+/// path passes as its `extra_deps` param (`VueProject::npm_deps`), so both
 /// write paths emit the identical `optimizeDeps.include` set.
-pub fn refresh_vite_config(output_dir: &std::path::Path, npm_dep_keys: &[String]) {
+pub fn refresh_vite_config(output_dir: &std::path::Path, npm_deps: &[(String, String)]) {
     let vite_cfg_path = output_dir.join("vite.config.ts");
     if !vite_cfg_path.exists() {
         return;
     }
-    if let Err(e) = fs::write(&vite_cfg_path, generate_vite_config(npm_dep_keys)) {
+    if let Err(e) = fs::write(&vite_cfg_path, generate_vite_config(npm_deps)) {
         println!("  ⚠ vite.config.ts refresh skipped: {}", e);
     }
 }
@@ -2544,6 +2554,13 @@ fn write_project_files(
     // PLAN-031 T-06（F-1 续）：App 导入包树驱动的 :root/.dark 初始块。
     tree_index_css: Option<&TreeIndexCss>,
 ) -> Result<(), String> {
+    // PLAN-050 (r3/F-5): the vite include source is captured BEFORE the
+    // Plan-482 shadowing below — the derived @autodown/engine sibling must
+    // land in package.json but never in optimizeDeps.include (link: deps
+    // keep source-mode loading), keeping the emitted set identical to the
+    // run-time self-heal path (raw `npm_deps` field, same filter inside the
+    // template).
+    let vite_npm_deps: &[(String, String)] = extra_deps;
     // Plan 482: uses_autodown 的 main.ts 引 `@autodown/engine/style.css`，但
     // pac npm_deps 通常只链接 editor/core——engine 缺声明导致 vite 解析失败
     // （015-notes 全新安装现场）。从 editor 链接路径推导同级 engine 链接。
@@ -2598,11 +2615,7 @@ fn write_project_files(
     ensure_editor_bridge(output_path, usage)?;
 
     // vite.config.ts
-    // PLAN-050: emit source = the shadowed `extra_deps` (:2520), i.e. the
-    // exact dependency set written to package.json above — include keys stay
-    // ⊆ installed even after the Plan-482 engine derivation.
-    let npm_dep_keys: Vec<String> = extra_deps.iter().map(|(n, _)| n.clone()).collect();
-    let vite_config = generate_vite_config(&npm_dep_keys);
+    let vite_config = generate_vite_config(vite_npm_deps);
     fs::write(output_path.join("vite.config.ts"), vite_config)
         .map_err(|e| format!("Failed to write vite.config.ts: {}", e))?;
 
@@ -11348,21 +11361,21 @@ import { AlertDialogAction } from '@/components/ui/alert-dialog'
         );
     }
 
-    /// PLAN-050 B-01/B-03: non-empty key set emits `optimizeDeps.include`
+    /// PLAN-050 B-01/B-03: registry npm_deps emit `optimizeDeps.include`
     /// with every key as a legal TS string literal, and the server block
     /// always carries `host: '127.0.0.1'` + `strictPort: true`.
     #[test]
     fn vite_config_includes_npm_deps_and_strict_port() {
-        let keys = vec![
-            "mermaid".to_string(),
-            "lowlight".to_string(),
-            "katex".to_string(),
+        let deps = vec![
+            ("mermaid".to_string(), "^11.0.0".to_string()),
+            ("lowlight".to_string(), "^3.0.0".to_string()),
+            ("katex".to_string(), "^0.16.0".to_string()),
         ];
-        let cfg = generate_vite_config(&keys);
+        let cfg = generate_vite_config(&deps);
         assert!(cfg.contains("optimizeDeps: {"));
         assert!(cfg.contains("include: ["));
-        for key in &keys {
-            let literal = serde_json::to_string(key).unwrap();
+        for (name, _) in &deps {
+            let literal = serde_json::to_string(name).unwrap();
             assert!(cfg.contains(&literal), "missing literal {literal}");
         }
         assert!(cfg.contains("host: '127.0.0.1'"));
@@ -11385,10 +11398,34 @@ import { AlertDialogAction } from '@/components/ui/alert-dialog'
     /// keys needing JSON escaping — output stays a legal TS string literal.
     #[test]
     fn vite_config_is_deterministic_and_quotes_safely() {
-        let keys = vec!["@autodown/editor".to_string(), "mermaid".to_string()];
-        assert_eq!(generate_vite_config(&keys), generate_vite_config(&keys));
-        let cfg = generate_vite_config(&["we\"ird".to_string()]);
+        let deps = vec![
+            ("@autodown/editor".to_string(), "^1.0.0".to_string()),
+            ("mermaid".to_string(), "^11.0.0".to_string()),
+        ];
+        assert_eq!(generate_vite_config(&deps), generate_vite_config(&deps));
+        let cfg = generate_vite_config(&[("we\"ird".to_string(), "^1.0.0".to_string())]);
         assert!(cfg.contains("\"we\\\"ird\""));
+    }
+
+    /// PLAN-050 r3/F-5: `link:` declarations never enter
+    /// `optimizeDeps.include` — they keep vite's default source-mode
+    /// loading; the Plan-482 derived engine sibling never reaches this
+    /// function at all. Registry keys in the same declaration still emit.
+    #[test]
+    fn vite_config_excludes_link_deps_from_include() {
+        let deps = vec![
+            ("@autodown/editor".to_string(), "link:D:/p/editor".to_string()),
+            ("@autodown/engine".to_string(), "link:D:/p/engine".to_string()),
+            ("mermaid".to_string(), "^11.0.0".to_string()),
+        ];
+        let cfg = generate_vite_config(&deps);
+        assert!(cfg.contains("\"mermaid\""));
+        assert!(!cfg.contains("\"@autodown/editor\""));
+        assert!(!cfg.contains("\"@autodown/engine\""));
+        // All-link declaration = omit the key entirely
+        let all_link = vec![("@autodown/engine".to_string(), "link:D:/p/e".to_string())];
+        let cfg = generate_vite_config(&all_link);
+        assert!(!cfg.contains("optimizeDeps"));
     }
 
     /// PLAN-050 B-04 (r2): `refresh_vite_config` self-heal flow — missing
@@ -11402,14 +11439,17 @@ import { AlertDialogAction } from '@/components/ui/alert-dialog'
         fs::create_dir_all(&dir).unwrap();
 
         // Missing config = silent no-op
-        refresh_vite_config(&dir, &["mermaid".to_string()]);
+        refresh_vite_config(&dir, &[("mermaid".to_string(), "^11.0.0".to_string())]);
         assert!(!dir.join("vite.config.ts").exists());
 
         // Existing (stale) config is rewritten with the emitted contract
         fs::write(dir.join("vite.config.ts"), "// stale pre-PLAN-050 template\n").unwrap();
         refresh_vite_config(
             &dir,
-            &["mermaid".to_string(), "lowlight".to_string()],
+            &[
+                ("mermaid".to_string(), "^11.0.0".to_string()),
+                ("lowlight".to_string(), "^3.0.0".to_string()),
+            ],
         );
         let cfg = fs::read_to_string(dir.join("vite.config.ts")).unwrap();
         assert!(cfg.contains("\"mermaid\""));
