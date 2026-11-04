@@ -294,6 +294,58 @@ fn loader_acceptance_binds_world_map_closure_or_defaults_out() {
 }
 
 #[test]
+fn fake_line_text_and_multi_occurrence_symbol_never_map() {
+    // V-S03 负控：①错误文本内嵌伪造行号（"main.at:3:1"）不得被当作位置
+    // 证据——映射只认受检 span/符号，文本行号一律不解析；②符号在多段
+    // 出现时不猜（符号锚唯一性）。
+    let snap = SourceSnapshot::from_bytes_for(
+        Path::new("world.at"),
+        WORLD.as_bytes().to_vec(),
+        Api::Objects2V1,
+    )
+    .unwrap();
+    let map = SourceMap::parse(MAP_JSON, WORLD).unwrap();
+    let closure_dir = Path::new(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../autographics-node2d-pilot/generated-components2d/diag-fault/closure"
+    ));
+    let closure = map.closure_sources(closure_dir).unwrap();
+
+    // ① 伪造行号文本 + 无 span → 原样回退，不产生 mapped 前缀。
+    let fake = auto_lang_core::error::AutoError::Msg(
+        "failure at main.at:3:1 (reported by plugin)".into(),
+    );
+    let d = snap.sdk_diagnostic_mapped("runtime", &fake, Some(&map), Some(&closure));
+    assert!(
+        !d.contains("node-source-map"),
+        "text-embedded line numbers must never be trusted: {d}"
+    );
+    assert!(d.contains("failure at main.at:3:1"), "text preserved: {d}");
+
+    // ② "bump" 在 helpera/helperb 两段出现 → 符号锚拒绝（不猜）。
+    assert!(
+        map.diagnose_user_offset(0, WORLD, &closure, Some("bump")).is_none(),
+        "multi-occurrence symbol must not map"
+    );
+    // 唯一符号仍可证（对照）。
+    assert!(
+        map.diagnose_user_offset(0, WORLD, &closure, Some("absent_helper")).is_some(),
+        "unique symbol anchors"
+    );
+    // span 锚伪偏移 + 符号一致时才映射：正确段内偏移 + 符号 → Some。
+    let seg = map
+        .segments
+        .iter()
+        .find(|s| s.module.as_deref() == Some("broken"))
+        .unwrap();
+    let sym = WORLD[seg.start..seg.end].find("absent_helper").unwrap() + seg.start;
+    assert!(
+        map.diagnose_user_offset(sym, WORLD, &closure, Some("absent_helper")).is_some(),
+        "span anchor + symbol agreement maps"
+    );
+}
+
+#[test]
 fn precision_matrix_generated_segments_never_map() {
     // generated 段（SoA/调度）命中时 diagnose 返回 None → 调用方回退。
     let snap = SourceSnapshot::from_bytes_for(

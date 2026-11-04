@@ -402,6 +402,46 @@ fn utf8_multibyte_columns_recompute_on_scalar_boundaries() {
 }
 
 #[test]
+fn crlf_helper_source_remaps_by_bytes() {
+    // V-S04：CRLF 模块源的 helper 逐字节 remap（\r\n 两字节照常参与
+    // 行号/差分计算；列按 chars 口径）。
+    let util = "fn score(x int) int {\r\n  return double(x)\r\n}\r\n".to_string();
+    let main = "node Game {\r\n}\r\n".to_string();
+    let start = util.find("fn score").unwrap();
+    let len = autographics_node2d_pilot::lower::slice_fn_source(&util, "score")
+        .expect("slice")
+        .len();
+    let double_start = util.find("fn double").unwrap_or(util.len()); // 本夹具无 double
+    let _ = double_start;
+    let mut project = Project::default();
+    project
+        .modules
+        .insert("util".into(), module("util", &util, vec![("score", start, start + len)]));
+    project
+        .modules
+        .insert("main".into(), module("main", &main, Vec::new()));
+    let mut world = String::from("// GENERATED\nvar ok=0.0\n");
+    world.push_str("// pooled fn score from util\n");
+    world.push_str(&util.replace("fn score(", "fn util_score(").trim_end());
+    world.push_str("\nfn app_start() {\n}\n");
+    let world_sha = sha256_hex(world.as_bytes());
+    let map = build_source_map(&project, &world, GENERATOR, &world_sha).expect("build");
+    map.validate_against_world(&world).expect("validate");
+    let seg = map
+        .segments
+        .iter()
+        .find(|s| s.helper.as_deref() == Some("score"))
+        .expect("score segment");
+    // 无 sibling 调用 → 声明处仍被 `{module}_` 改写（siblings 含自身）。
+    assert_eq!(seg.precision, Precision::Range);
+    let ret = world[seg.start..seg.end].find("return").unwrap() + seg.start;
+    let mapped = remap_range_offset(&project, seg, &world, ret).expect("remap");
+    assert_eq!(&util[mapped..mapped + 6], "return");
+    let line = util[..mapped].bytes().filter(|b| *b == b'\n').count() + 1;
+    assert_eq!(line, 2, "CRLF 源行号重算");
+}
+
+#[test]
 fn build_map_is_pure_world_bytes_unchanged() {
     // T-03 默认字节保持（单元侧）：建图是纯函数，world 串不被改写；
     // CLI 默认无旁件的对照在 verify_plan044.py（T-06）以真实进程跑。
