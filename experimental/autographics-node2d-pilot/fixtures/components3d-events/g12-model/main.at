@@ -14,7 +14,6 @@ node Main {
     model {
         var h = 0
         var h2 = 0
-        var dir = 1.0
         var seen = 0
     }
     view-3d {
@@ -37,18 +36,23 @@ node Main {
         }
         Life.Tick(dt) -> {
             if .seen == 0 {
-                object.move(.h, 4.0 + .dir, 0.5, 0.0)
+                object.move(.h, 4.0, 0.5, 0.0)
                 object.visible(.h2, 0)
                 let n = event.next()
                 if n == 1 {
                     let p = event.pair()
                     if p == 0 { .seen = 1 }
                 }
-            }
-            if .seen == 1 {
-                object.despawn(.h)
-                .h = spawn("crate_a", "Crate", 2.0, 0.5, 0.0)
-                .seen = 2
+            } else {
+                if .seen == 1 {
+                    object.despawn(.h)
+                    .seen = 2
+                } else {
+                    if .seen == 2 {
+                        .h = spawn("crate_a", "Crate", 2.0, 0.5, 0.0)
+                        .seen = 3
+                    }
+                }
             }
         }
     }

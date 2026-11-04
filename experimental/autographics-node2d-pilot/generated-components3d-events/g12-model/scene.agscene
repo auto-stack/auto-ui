@@ -1,0 +1,117 @@
+{
+ "behavior": {
+  "api": "autographics.triggers3d/1",
+  "source": {
+   "format": "auto-source",
+   "sha256": "7b7d7d2f7ea9b55b02d661dd0facada4c05f7a7f6433b3685162828e6381ce1d",
+   "byte_length": 1221
+  },
+  "actors": {
+   "two_d": null,
+   "three_d": null
+  }
+ },
+ "schema": "autographics.scene/6",
+ "document_id": "plan028-components-3d-events-main",
+ "resources": [
+  "circle",
+  "quad",
+  "cylinder",
+  "player",
+  "mob"
+ ],
+ "groups": [
+
+ ],
+ "objects": [
+  {
+   "id": 1,
+   "name": "pad",
+   "kind": "cylinder",
+   "translation": [
+    4.0,
+    0.5,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    0.5,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 2,
+   "name": "Main/watch/body",
+   "kind": "cylinder",
+   "translation": [
+    0.0,
+    0.5,
+    -4.0
+   ],
+   "scale": [
+    0.4,
+    0.5,
+    0.4
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 3,
+   "name": "Crate",
+   "kind": "model",
+   "translation": [
+    -30.0,
+    0.5,
+    -3.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": false,
+   "parent": null,
+   "resource": "sha256:42c9da673fc67ccb0c65d4b337608834efd28a499f7e460866dcfc5ff2a0c671",
+   "sprite": null
+  }
+ ],
+ "assets": [
+  {
+   "format": "glb",
+   "sha256": "42c9da673fc67ccb0c65d4b337608834efd28a499f7e460866dcfc5ff2a0c671",
+   "byte_length": 1528,
+   "name": "crate_glb"
+  }
+ ]
+}

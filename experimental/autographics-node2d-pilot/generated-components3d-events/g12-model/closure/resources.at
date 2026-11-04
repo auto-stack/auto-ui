@@ -1,0 +1,6 @@
+// PLAN-043 components-3d-events g12-model resources: the G02 two-parts GLB
+// (sha 42c9da67..., 1528 bytes, MIT, PLAN-838 self-authored test geometry,
+// license text at fixtures/node3d/licenses/two-parts.LICENSE) declared as a
+// named model3d.glb resource — the A-candidate chain: named flat-color GLB
+// admitted by the 024/034 public resource surface, no presentation profile.
+let crate_glb = model3d.glb("assets/two-parts.glb")

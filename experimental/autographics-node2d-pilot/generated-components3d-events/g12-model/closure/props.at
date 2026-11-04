@@ -1,0 +1,9 @@
+// PLAN-043 g12-model spawn template: one parked model3d row (declaration
+// values are the template identity; resource = the named two-parts GLB
+// shared by every instance — resource sharing, state isolation).
+node Crate {
+    object3d { }
+    view-3d { model3d crate { model: resources.crate_glb
+                              position: (-30.0, 0.5, -3.0)
+                              visible: false } }
+}
