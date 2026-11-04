@@ -150,6 +150,8 @@ work产证；review同树独立上下文final，从真实compile/Run复核AC/SD/
 
 2026-11-04 / stage: goal | plan_id: PLAN-044 | plan_revision: 1 | round: 7 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-044/auto-ui | commit: ec5c8e6e | next: work T-03（续）。①`tools/verify_plan044.py --controls` 落地并全绿（ec5c8e6e）：真实进程默认 CLI 无旁件 + world 冻结 sha、--diagnostics-map 旁件绑定（format/world+user sha/闭包 sha/段铺瓦/精度域）、再生字节一致（identity.json 按 provenance.product 归一——该字段随 out 目录名变化，属事实非漂移）、检入产品现行性、driver gates 调用（5 控制全过）。②V-S04 映射侧门：中文+组合符（e\u{0301}）helper 源的列按 Unicode scalar 独立重算实证，段边界字符边界由整图 validate 保证。pilot gates 12/12 绿。T-03 余量：loader 接受身份接线（SaveAs/接受源快照消费面）、map 错误不覆盖原错误门（部分已在 driver gates）、T-04 真实 compile/runtime 分层扩展。
 
+2026-11-04 / stage: goal | plan_id: PLAN-044 | plan_revision: 1 | round: 8 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-044/auto-ui | commit: ba2134f8 | next: work T-04。**T-03 关闭（3/10）**：loader 接受身份接线 `SourceMap::load_for_world(world_path)` 落地——目录内 world.at + source-map.json + closure/ 三样受检物全绑定才 Some，缺旁件/坏图/坏闭包/旧世界字节一律 None（默认诊断路径不变，不改准入）；driver 门 4 态（好包 Some、缺 None、坏闭包 None、漂移 None）。verify_plan044 全控制复跑绿。driver gates 7/7 + pilot 12/12 + components 6/6 + behavior_source_identity 1/1。
+
 ## 10. 待澄清事项
 
 | ID | 事项 | owner/关闭动作 |
