@@ -1,6 +1,7 @@
 pub mod assets;
 pub mod behavior;
 pub mod behavior_project;
+pub mod behavior_source_map;
 pub mod document;
 pub mod game_input;
 pub mod hierarchy;

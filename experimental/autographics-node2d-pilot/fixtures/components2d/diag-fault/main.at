@@ -1,0 +1,36 @@
+// PLAN-044 diag-fault entry: helpers fixture + a broken component whose
+// helper fault must map back to broken.at (cross-module provenance).
+use resources: char_orange, gauge_blue, gauge_green
+use helpera: Alpha
+use helperb: Beta
+use broken: Gamma
+
+node Actor {
+    view-2d {
+        character2d body {
+            position: (0.0, 1.0)
+            material: resources.char_orange
+        }
+    }
+}
+
+node Main {
+    view-2d {
+        Actor actor {
+        }
+        Alpha a {
+            rate: 1.0
+        }
+        Beta b {
+            rate: 2.0
+        }
+        Gamma g {
+            rate: 3.0
+        }
+        camera2d cam {
+            target: refs.actor.actor
+            bounds: (-10.0, -4.0, 30.0, 12.0)
+            view_size: (12.0, 8.0)
+        }
+    }
+}

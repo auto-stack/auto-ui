@@ -1,0 +1,28 @@
+// PLAN-044 diag-fault fixture: a cross-module helper whose body calls an
+// undefined function; name resolution fails SDK compile with a real span
+// inside the emitted pooled helper fragment. The source map must map that
+// span back to THIS file (helper `speedup`), not the caller.
+use resources: gauge_green
+
+fn speedup(v float) float {
+    return v + absent_helper(1)
+}
+
+node Gamma(rate: float) {
+    model {
+        var acc = 0.0
+    }
+    view-2d {
+        shape2d dot {
+            kind: circle
+            position: (.acc, 0.0)
+            size: (0.4, 0.4)
+            material: resources.gauge_green
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            .acc = speedup(.acc + .rate * dt)
+        }
+    }
+}

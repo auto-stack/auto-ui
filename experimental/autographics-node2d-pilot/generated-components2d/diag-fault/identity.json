@@ -1,0 +1,32 @@
+{
+ "generator": "autographics-node2d-pilot plan020 components-2d",
+ "api": "autographics.objects2d/1",
+ "user_source_sha256": "4b509064e65ac6b7cd0fdbf75e518e9b325dda2775fbbafad89ebb32ed8f24ff",
+ "user_source_bytes": 2740,
+  "module:broken": "a3d2a073979cfb559d85e876b5aa4d8f4d4cb14991a637f15d13117ea57b2177",
+  "module:helpera": "92180a6c0674f53e9fdd42d8bf0d9c49d39227a8949c4918241f2fd06bc5dc2b",
+  "module:helperb": "c2a0d9e87ff69201296caddc31caf94996b50e9c540bc4f49616d0cb1c0800e1",
+  "module:main": "5771187afdd755aee6846a66c99dd63bdbbd199b375a2551067abc72c33ca42e",
+  "module:resources": "0a766d863477ec188ac92f2a652405be89cf7d83678edfacaf8fdf2a300a180c",
+ "closure": [
+  {"name": "broken", "sha256": "a3d2a073979cfb559d85e876b5aa4d8f4d4cb14991a637f15d13117ea57b2177", "bytes": 726},
+  {"name": "helpera", "sha256": "92180a6c0674f53e9fdd42d8bf0d9c49d39227a8949c4918241f2fd06bc5dc2b", "bytes": 494},
+  {"name": "helperb", "sha256": "c2a0d9e87ff69201296caddc31caf94996b50e9c540bc4f49616d0cb1c0800e1", "bytes": 605},
+  {"name": "main", "sha256": "5771187afdd755aee6846a66c99dd63bdbbd199b375a2551067abc72c33ca42e", "bytes": 767},
+  {"name": "resources", "sha256": "0a766d863477ec188ac92f2a652405be89cf7d83678edfacaf8fdf2a300a180c", "bytes": 529}
+ ],
+ "roles": {
+ "character": 1,
+ "character_name": "actor.body",
+ "solids": [],
+ "camera": 1,
+ "scene_objects": {"actor.body": 1, "a_template": 2, "b_template": 3, "g_template": 4}
+},
+ "provenance": {
+  "product": "diag-fault",
+  "consumer": "unrecorded (this out dir has no registered flow consumer)",
+  "consumption": "include_str! frozen scene.agscene + world.at; the harness writes world.at to scripts/<sha>.at where <sha> = scene.behavior.source.sha256",
+  "load_verification": "the load path hash-verifies the behavior source closure against the scene-bound sha and rejects a damaged world copy at load (observed: 'behavior source closure identity: <scripts/<sha>.at>')",
+  "world_sha256": "4b509064e65ac6b7cd0fdbf75e518e9b325dda2775fbbafad89ebb32ed8f24ff"
+ }
+}

@@ -12,7 +12,7 @@ use autographics_node2d_pilot::{BasicProfile, Profile};
 
 fn usage() -> ! {
     eprintln!(
-        "usage: node2d-lower [--profile legacy|g11-2d|scene-2d|character-2d|camera-2d|components-2d|components-2d-game|queries-2d|queries-3d|editor-projects|sprites-2d|components-3d|components-3d-runtime|components-3d-events|components-3d-bindings|components-3d-presentation|components-3d-audio-hud|presentation-2d|components-2d-runtime] --entry <dir>/main.at --out <dir>"
+        "usage: node2d-lower [--profile legacy|g11-2d|scene-2d|character-2d|camera-2d|components-2d|components-2d-game|queries-2d|queries-3d|editor-projects|sprites-2d|components-3d|components-3d-runtime|components-3d-events|components-3d-bindings|components-3d-presentation|components-3d-audio-hud|presentation-2d|components-2d-runtime] [--diagnostics-map] --entry <dir>/main.at --out <dir>"
     );
     std::process::exit(2);
 }
@@ -358,6 +358,10 @@ fn main() {
             }
         }
     };
+    // PLAN-044：可选源映射旁件（T-02 冻结工作名）。仅 components-2d /
+    // queries-2d 发射路径支持；默认 CLI 无此旗标 = 无旁件，world/API
+    // 源字节与旧档行为不变。
+    let diagnostics_map = args.iter().any(|a| a == "--diagnostics-map");
     let entry = args
         .iter()
         .position(|a| a == "--entry")
@@ -841,6 +845,26 @@ fn main() {
             for name in &names {
                 let bytes = project.modules[*name].source.as_bytes();
                 std::fs::write(format!("{closure_dir}/{name}.at"), bytes).expect("closure file");
+            }
+            if diagnostics_map {
+                let world = std::fs::read_to_string(format!("{out}/world.at")).expect("world.at");
+                let generator = if queries {
+                    "autographics-node2d-pilot plan021 queries-2d"
+                } else {
+                    "autographics-node2d-pilot plan020 components-2d"
+                };
+                let map = autographics_node2d_pilot::source_map::build_source_map(
+                    &project,
+                    &world,
+                    generator,
+                    &lowered.source_sha256,
+                )
+                .unwrap_or_else(|e| {
+                    eprintln!("node2d-lower: diagnostics map: {e}");
+                    std::process::exit(4);
+                });
+                std::fs::write(format!("{out}/source-map.json"), map.to_json())
+                    .expect("source-map.json");
             }
             println!(
                 "node2d-lower[{}]: wrote world.at ({} bytes, sha {}) + scene.agscene + closure/{}",

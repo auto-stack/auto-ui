@@ -1,0 +1,27 @@
+// PLAN-020 same-name-helpers fixture (module B): the SAME helper name with a
+// different body (adds 2.0). Module-scoped resolution must keep the two
+// apart in the generated world.
+use resources: gauge_green
+
+fn bump(v float) float {
+    return v + 2.0
+}
+
+node Beta(rate: float) {
+    model {
+        var acc = 0.0
+    }
+    view-2d {
+        shape2d dot {
+            kind: circle
+            position: (.acc, 0.0)
+            size: (0.4, 0.4)
+            material: resources.gauge_green
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            .acc = bump(.acc + .rate * dt)
+        }
+    }
+}

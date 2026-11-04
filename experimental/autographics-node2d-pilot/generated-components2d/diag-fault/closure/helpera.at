@@ -1,0 +1,25 @@
+// PLAN-020 same-name-helpers fixture (module A): bump adds 1.0 per tick.
+use resources: gauge_blue
+
+fn bump(v float) float {
+    return v + 1.0
+}
+
+node Alpha(rate: float) {
+    model {
+        var acc = 0.0
+    }
+    view-2d {
+        shape2d dot {
+            kind: circle
+            position: (.acc, 0.0)
+            size: (0.4, 0.4)
+            material: resources.gauge_blue
+        }
+    }
+    on {
+        Life.Tick(dt) -> {
+            .acc = bump(.acc + .rate * dt)
+        }
+    }
+}

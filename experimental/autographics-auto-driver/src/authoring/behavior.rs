@@ -602,6 +602,80 @@ impl SourceSnapshot {
         }
         self.diagnostic(stage, "module", &text)
     }
+
+    /// PLAN-044：带可选源映射的 SDK compile 诊断。SDK span 落在受检
+    /// assembly user region 且映射/闭包可证时，给原模块:行:列 + 精度 +
+    /// Node/事件/helper 上下文；任何环节不可证（坏图/坏闭包/generated
+    /// 段/managed 区）一律回退 `sdk_diagnostic` 原行为，map 错误绝不
+    /// 覆盖原错误。
+    pub fn sdk_diagnostic_mapped(
+        &self,
+        stage: &str,
+        error: &auto_lang_core::error::AutoError,
+        map: Option<&super::behavior_source_map::SourceMap>,
+        closure: Option<&std::collections::BTreeMap<String, String>>,
+    ) -> String {
+        let fallback = self.sdk_diagnostic(stage, error);
+        let (Some(map), Some(closure)) = (map, closure) else {
+            return fallback;
+        };
+        let Some(offset) = error_offset(error) else {
+            return fallback;
+        };
+        // 只解释 user region：managed/transport/bridge 的 span 永不映射
+        // 到作者源（managed 绝不当用户）。
+        let user_file = self.path.to_str().unwrap_or("<user.at>");
+        let Some(region) = self
+            .regions
+            .iter()
+            .find(|r| r.file == user_file && offset >= r.start && offset < r.end)
+        else {
+            return fallback;
+        };
+        let user_offset = offset - region.start;
+        // 段区间与世界字节绑定：world 文本 = 受检 user region 原文
+        // （snapshot 的原始用户字节），不是装配后的 combined source。
+        let Ok(world) = std::str::from_utf8(&self.bytes) else {
+            return fallback;
+        };
+        // SDK681 undefined-symbol 消息的符号名（"Undefined symbol: X in
+        // module ..."）作为映射校验锚；其它错误类无符号则纯 span 校验。
+        let text_probe = format!("{error:?}");
+        let symbol = text_probe
+            .split("Undefined symbol: ")
+            .nth(1)
+            .and_then(|rest| rest.split(" in module").next())
+            .map(str::trim)
+            .filter(|s| !s.is_empty());
+        let Some(origin) = map.diagnose_user_offset(user_offset, world, closure, symbol) else {
+            return fallback;
+        };
+        if origin.precision == super::behavior_source_map::Precision::Generated
+            || origin.precision == super::behavior_source_map::Precision::Unmapped
+        {
+            return fallback;
+        }
+        let text = bounded_diagnostic(&format!("{error:?}"));
+        let ctx = [
+            origin.helper.as_deref().map(|h| format!("helper={h}")),
+            origin.node.as_deref().map(|n| format!("node={n}")),
+            origin.event.as_deref().map(|e| format!("event={e}")),
+        ]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>()
+        .join(" ");
+        let ctx = if ctx.is_empty() {
+            String::new()
+        } else {
+            format!(" {ctx}")
+        };
+        format!(
+            "{}.at:{}:{} [{stage}/module; node-source-map {precision:?}{ctx}]: {text}",
+            origin.module, origin.line, origin.column,
+            precision = origin.precision,
+        )
+    }
 }
 fn bounded_diagnostic(text: &str) -> String {
     if text.len() <= 8192 {
