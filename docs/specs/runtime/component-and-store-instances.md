@@ -85,6 +85,11 @@
   t01 控制 / t02 props+model 隔离+store 共享 / t04 keyed 重排身份 / t04 卸载
   释放+存活续作+迟到丢弃+重挂载全新。
 - Vue 厂形契约：`test_plan041_store_factory_and_context_facade`（compiler）。
+- **覆盖边界（如实）**：Vue 轨验收为生成契约级——composable 厂形/context
+  注入/legacy 回落断言 + main.ts/mount 工厂安装字符串；无挂载浏览器运行，
+  跨 App 运行时隔离由 per-createApp context 构造保证而非浏览器实证。
+  双同名 App 的挂载运行隔离验证归后继（需要 Vue e2e 轨道，plan042 研究或
+  gallery e2e 批次可消费）。
 - 兼容面：根桥读面（`read_state`/`read_all_state`）仍 root 锚定；plan370/
   442/622/841/905-8/063/058/musk-p053-8 原义务套件全绿（oracle 更新至实例态
   读取通道，义务本体不变）。
