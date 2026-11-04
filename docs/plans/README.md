@@ -43,11 +43,11 @@
 | 037 | [B2十二个业务示例主题迁移](037-business-examples-theme-migration.md) | 031/033后继B2，渠道接036 | drafting/r1，0/11；十二例业务/计时/store/路由保持、双端逐例/隔离/恢复；可先核path源码，渠道最终门等U036，暂不实施 |
 | 038 | [B3专用示例主题支持面核验](038-specialized-examples-theme-readiness.md) | 拆分路线B3有界研究 | drafting/r1，0/8；十二例盘点、六类真实链探针、go/blocked/no-go及后继分包；研究不等迁移，不等037整项，暂不实施 |
 | 039 | [3D查询、动态组与二维标记Node接线](archived/039-autographics-node3d-queries-and-mixed-markers.md) | G05/3d新作者前置；021/024/030 | archived/r1，交付8f577a34（含复审finding R-1修复ff5d267d）；SD-01 canonical node3d-queries-and-mixed-markers.md已落。final收据如实记录同实现会话（判定从工件重建、pilot152/dialect103/gates7/flow8/verifier独立重跑全绿）；D-03 OS phase-14探针沿AG009持有、G05逐字OS迁移归AG017。AG017固定消费其实际交付，前置实质解除 |
-| 040 | [Node双维编辑工程与项目化验收](040-autographics-node-editor-projects.md) | G04纯场景/编辑副本与公共验收收口 | drafting/r1，0/10；先证复用039静态路径、确缺才补；不等016/017，AG018固定消费其实交付；原20/34与预算不减，暂不实施 |
+| 040 | [Node双维编辑工程与项目化验收](archived/040-autographics-node-editor-projects.md) | G04纯场景/编辑副本与公共验收收口 | archived/r1，10/10；已交付fc82061c（ff-only落主；独立subagent上下文final pass绑定fc82061c）；SD-01 canonical node-editor-projects.md sha 1daa7111；editor-projects身份孪生入口（queries-3d同机制）+G04忠实双维夹具/冻结产品+driver项目化7门+verify_plan040全PASS+旧档字节冻结复核；AC-03 OS层15行D-02具名pending保持开放；清理回执见计划；AG018可固定消费实际交付 |
 
-当前AG按[M2路线](../design/autographics/m2-game-first-three-lane-roadmap.md)推进：UI035/039已实际交付5903839e/8f577a34；AG016/017仍drafting/r1/0-10无树，现有引擎交付不自动替代其合同中的必要独立证据。新批[编辑/发行设计](../design/autographics/m2-editor-and-release-convergence.md)立UI040＋AG018 G04双教程＋AG019同版M2联验，仅规划。040不等016/017，018可先准备且完整迁移等040，019候选等040、完整联验等016/017/018实交付。当前19/22，不提前M2完成。
+当前AG按[M2路线](../design/autographics/m2-game-first-three-lane-roadmap.md)推进：UI035/039/040已实际交付5903839e/8f577a34/fc82061c；AG016/017仍drafting/r1/0-10无树，现有引擎交付不自动替代其合同中的必要独立证据。新批[编辑/发行设计](../design/autographics/m2-editor-and-release-convergence.md)三合同：UI040已交付（公共编辑引擎能力，D-02 OS层具名pending），AG018可固定消费其实际交付做G04双教程迁移，AG019同版M2联验后置。018完整迁移等其实际交付；019候选硬门（等040）已满足、完整联验等016/017/018实交付。当前19/22，不提前M2完成。
 
-024/025/027/028/030/032/034/035/039已交付，独立review/具名hold和批门按实际收据；新AG公共编辑收口为040。036..038是主题路线，026/029是Reader路线，本轮不接管。各仓号源独占重核，不以外仓号跳号；设计见[索引](../design/README.md)。
+024/025/027/028/030/032/034/035/039/040已交付，独立review/具名hold和批门按实际收据；新AG公共编辑收口040已交付。036..038是主题路线，026/029是Reader路线，本轮不接管。各仓号源独占重核，不以外仓号跳号；设计见[索引](../design/README.md)。
 
 ## 债务/候选
 
