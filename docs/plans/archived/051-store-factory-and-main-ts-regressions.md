@@ -1,6 +1,6 @@
 ---
 plan_id: PLAN-051
-status: drafting
+status: archived
 feature_name: 店工厂结构默认值/main.ts 拼接/VM 新建草稿三回归收口（plan-041 窗口）
 author: [Codex]
 created_at: 2026-11-04
@@ -115,3 +115,6 @@ stage: work | plan_id: PLAN-051 | plan_revision: r1 | outcome: pass（T-01..T-05
 
 - ③根因未定位（T-03 有界调查产出）；若调查指向超出本仓（如 auto-lang VM 指令层），具名拆分并回告消费方。
 - worktree：`D:/autostack/.wt/ui-051/auto-ui`，branch `codex/plan-051-dev`（含 auto-lang/auto-web/auto-down 同级，按需 detached）。
+
+stage: work | plan_id: PLAN-051 | plan_revision: r1 | outcome: needs_fix（消费方 native 回放复核：①②修复实证生效（B-01 冷 scaffold main.ts 合法、页面 500 消失）；③ late-event 重定向落地但不足——深层=vm_bridge.rs end_child_instance_frame 帧清扫在 author 实例未重注册的帧上将其释放（僵尸视图：vnode 树仍渲染而 child_instances 已移除），press 恒 late-event） | worktree_path: （已清理，继续修复需重建 ui-051 组或经 owner） | branch: codex/plan-051-dev（已删） | base_commit: 4e5e6796 | code_commit: 3eab1e50（已落 master） | dependency_revisions: 消费对 tool `8354c62b`+CLI `178284dd`（master@b4cfaaf3 构建） | task_ids: T-03/T-04（续） | evidence: native-vm-rust-20261105-003232=13/14 同败；native-first.log `[VM-INSTANCE] author.GoNew dropped` 仍在；vue-dev-rust-20261105-002608=**全冷 16/16 EXIT=0**（①②实证） | blockers: 帧清扫纪律（plan-041 T-02 核心面）vs author 页渲染模式的注册不稳定——修复须 owner 上下文（改清扫策略或场景标记面），不宜由消费方计划在会话尾段冒险 | next_responsible_role: owner（auto-ui plan-041 上下文）/ 或新授权轮重建 ui-051 组继续 T-03 深挖
+stage: merge | PLAN-051:r1 | outcome: pass | delivery_commit: 3eab1e50 | worktree: D:/autostack/.wt/ui-051/auto-ui | checkpoints: landed（master `--ff-only` = 3eab1e50，rebase 老→新映射 b8e23710→8d177907、79e1057e→19950b50、4102d8aa→3eab1e50，range-diff 全等）；canonical_verified（SD-01=docs/specs/ui/vue-store-generation.md 新建、SD-02=C-02 修订，均随 delivery commit）；archived（docs/plans/archived/051-...，completion_kind: delivered）；cleaned（worktree/分支/同级 detached/组目录删除、plan-artifacts/plan-051 删除、registry 刷新） | consumer_pending_gate: auto-blog BLOG-005 B-01 冷 scaffold + native 回放 22/22（授权链下一步） | notes: 无 ledger/index 写入
