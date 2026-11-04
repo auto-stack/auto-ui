@@ -22,8 +22,8 @@ use crate::proc_host::{self, FlowEnd};
 use crate::vue::{
     desktop_mode, gallery_apps_dir, gallery_mode, gallery_rows_via_cache, generate_index_css_with_tree,
     generate_index_html, generate_package_json, generate_select_overlay_ts,
-    generate_tailwind_config, generate_vite_config, incremental_compile_changed, pac_media_root,
-    package_json_dep_keys, package_json_deps_drifted, resolve_front_dir, set_gallery_proxy_root,
+    generate_tailwind_config, incremental_compile_changed, pac_media_root,
+    package_json_deps_drifted, refresh_vite_config, resolve_front_dir, set_gallery_proxy_root,
     write_auto_sources_ts, VueProject,
 };
 
@@ -278,28 +278,19 @@ pub fn run_vue_flow(
         // （env 运行时读取）只在生成器模板里，增量 run 不重写会让老项目
         // 永久缺失该路由（实测：proxy 起了但 vite 无 /apps 转发 → fullstack
         // demo 404）。模板确定性，重写零风险。
-        let vite_cfg_path = project.output_dir.join("vite.config.ts");
-        if vite_cfg_path.exists() {
-            // PLAN-050 T-02: include source = the on-disk package.json
-            // dependency set (single truth for installed deps — hand-edited
-            // or historical projects included). Unreadable package.json keeps
-            // the original config (same best-effort semantics as the write
-            // guard below) instead of emitting an include that references a
-            // package the project may not have installed.
-            match package_json_dep_keys(&project.output_dir) {
-                Some(npm_dep_keys) => {
-                    if let Err(e) = fs::write(&vite_cfg_path, generate_vite_config(&npm_dep_keys))
-                    {
-                        println!("  ⚠ vite.config.ts refresh skipped: {}", e);
-                    }
-                }
-                None => {
-                    println!(
-                        "  ⚠ vite.config.ts refresh skipped: package.json unreadable, kept original"
-                    );
-                }
-            }
-        }
+        // PLAN-050 T-02 (r2/F-1): include source = `project.npm_deps` — the
+        // exact set the generation path receives as `extra_deps` (both
+        // write_project_files call sites pass `&self.npm_deps`), so both
+        // write paths emit the identical pac-npm_deps include set (the
+        // consumer-verified cand5 shape, ⊆ installed) instead of diverging.
+        refresh_vite_config(
+            &project.output_dir,
+            &project
+                .npm_deps
+                .iter()
+                .map(|(n, _)| n.clone())
+                .collect::<Vec<String>>(),
+        );
     }
 
     // Copy handmade theme assets if available

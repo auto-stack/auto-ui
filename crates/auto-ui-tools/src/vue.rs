@@ -1094,16 +1094,21 @@ __OPTIMIZE_DEPS__  base: './',
         .replace("__PROXY_PORT__", &crate::util::http_port().to_string())
 }
 
-/// PLAN-050 T-02: keys of `package.json` `dependencies` — the emit source for
-/// the run-time vite.config.ts self-heal, keeping `optimizeDeps.include`
-/// identical to the installed dependency set (hand-edits and historical
-/// projects included). `None` = file missing, unparsable, or without a
-/// `dependencies` object; the caller then keeps the original config and warns.
-pub fn package_json_dep_keys(project_dir: &std::path::Path) -> Option<Vec<String>> {
-    let raw = fs::read_to_string(project_dir.join("package.json")).ok()?;
-    let value: serde_json::Value = serde_json::from_str(&raw).ok()?;
-    let deps = value.get("dependencies")?.as_object()?;
-    Some(deps.keys().cloned().collect())
+/// PLAN-050 T-02 (r2): rewrite the project's `vite.config.ts` with the
+/// current template — the run-time self-heal for deterministic-template
+/// drift. Missing config = no-op; write failure = named warning, never
+/// fatal (same best-effort semantics as the neighboring index.html /
+/// tailwind refreshes). `npm_dep_keys` must be the SAME source the
+/// generation path passes as `extra_deps` (`VueProject::npm_deps`), so both
+/// write paths emit the identical `optimizeDeps.include` set.
+pub fn refresh_vite_config(output_dir: &std::path::Path, npm_dep_keys: &[String]) {
+    let vite_cfg_path = output_dir.join("vite.config.ts");
+    if !vite_cfg_path.exists() {
+        return;
+    }
+    if let Err(e) = fs::write(&vite_cfg_path, generate_vite_config(npm_dep_keys)) {
+        println!("  ⚠ vite.config.ts refresh skipped: {}", e);
+    }
 }
 
 fn generate_tsconfig() -> String {
@@ -11386,36 +11391,32 @@ import { AlertDialogAction } from '@/components/ui/alert-dialog'
         assert!(cfg.contains("\"we\\\"ird\""));
     }
 
-    /// PLAN-050 B-04: `package_json_dep_keys` reads the `dependencies` keys;
-    /// unparsable JSON, a missing `dependencies` object, and a missing file
-    /// all yield `None` (caller keeps the original config and warns).
+    /// PLAN-050 B-04 (r2): `refresh_vite_config` self-heal flow — missing
+    /// config is a no-op, an existing config is rewritten with the emitted
+    /// template (include keys + server hardening), and the caller's key set
+    /// flows through verbatim.
     #[test]
-    fn package_json_dep_keys_three_branches() {
-        let dir = std::env::temp_dir().join(format!("plan050-dep-keys-{}", std::process::id()));
+    fn refresh_vite_config_flow_branches() {
+        let dir = std::env::temp_dir().join(format!("plan050-refresh-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
 
-        // Missing file
-        assert!(package_json_dep_keys(&dir).is_none());
+        // Missing config = silent no-op
+        refresh_vite_config(&dir, &["mermaid".to_string()]);
+        assert!(!dir.join("vite.config.ts").exists());
 
-        // Corrupt JSON
-        fs::write(dir.join("package.json"), "{ not json").unwrap();
-        assert!(package_json_dep_keys(&dir).is_none());
-
-        // Valid JSON without dependencies
-        fs::write(dir.join("package.json"), r#"{"name":"x"}"#).unwrap();
-        assert!(package_json_dep_keys(&dir).is_none());
-
-        // Normal: keys only, versions ignored
-        fs::write(
-            dir.join("package.json"),
-            r#"{"dependencies":{"mermaid":"^11.0.0","@autodown/editor":"link:D:/p/editor"},"devDependencies":{"vite":"^5.0.0"}}"#,
-        )
-        .unwrap();
-        assert_eq!(
-            package_json_dep_keys(&dir).unwrap(),
-            vec!["mermaid".to_string(), "@autodown/editor".to_string()]
+        // Existing (stale) config is rewritten with the emitted contract
+        fs::write(dir.join("vite.config.ts"), "// stale pre-PLAN-050 template\n").unwrap();
+        refresh_vite_config(
+            &dir,
+            &["mermaid".to_string(), "lowlight".to_string()],
         );
+        let cfg = fs::read_to_string(dir.join("vite.config.ts")).unwrap();
+        assert!(cfg.contains("\"mermaid\""));
+        assert!(cfg.contains("\"lowlight\""));
+        assert!(cfg.contains("host: '127.0.0.1'"));
+        assert!(cfg.contains("strictPort: true"));
+        assert!(!cfg.contains("stale"));
 
         let _ = fs::remove_dir_all(&dir);
     }
