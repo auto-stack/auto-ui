@@ -22,6 +22,11 @@
 // `h<240` 边界式绕开整数除法。拖画：v1 点击画（T1c——无按压门控指针流）。
 
 use stylekit.styles: caption_text
+// PLAN-047 T-03：接入官方主题包。显式默认 dark 保留（pac theme: "dark" →
+// dark_mode=true）；族/模式选择经根 widget theme_name + design 数据绑定，
+// 测试经 autoui_fixture 驱动（B2 C-03）。调色板/画布 hex 类串为文档内容色
+// 字面豁免（颜色词汇表头注口径），换肤不改文档像素。
+use themes.themes: Auto, Solarized
 style tool_btn = "px-3 py-1.5 text-sm rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/80"
 style wrap_row = "items-center gap-2 flex-wrap"
 
@@ -31,7 +36,18 @@ widget App {
         PushUndo, Undo, Redo, ApplySnap(str), Clear, New, Save, Load
     }
 
+    // 主题/模式选择器（C-14：数据绑定，同帧校验发布）
+    design {
+        theme: .theme_name
+        mode: if .dark_mode { "dark" } else { "light" }
+    }
+
     model {
+        // PLAN-047 T-03：主题族/模式选择态（主题选择，非业务/文档状态；
+        // dark-first 保留 pac theme:"dark" 显式默认）
+        var theme_name str = "Auto"
+        var dark_mode bool = true
+
         // ---- 颜色词汇表（17 个字面类；白色 = 橡皮色）----
         var white str = " bg-[#ffffff] "
         var palette = [

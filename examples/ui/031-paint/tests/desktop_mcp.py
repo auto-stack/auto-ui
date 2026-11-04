@@ -338,7 +338,8 @@ def main():
     proc = subprocess.Popen(
         [AUTO_BIN, "run", "-r", "vm"],
         cwd=PAINT_PROJECT,
-        env={**os.environ, "AUTOUI_MCP_PORT": str(mcp_port)},
+        env={**os.environ, "AUTOUI_MCP_PORT": str(mcp_port),
+             "AUTOUI_TEST_FIXTURES": "1"},
         # VM app 首帧前会打大量日志——PIPE 无人读会塞满缓冲导致进程写阻塞、
         # UI 永不渲染（实测）；DEVNULL 丢弃（排障改手动重定向复现）。
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
@@ -354,6 +355,30 @@ def main():
                   "(rerun manually with output redirect to diagnose)")
             sys.exit(2)
         result = run_tests_031(mcp_url)
+        # ---- PLAN-047 主题腿：两族×明暗 fixture 往返 + 文档像素哨兵守恒 ----
+        # （038 像素哨兵口径延续：换肤不改文档像素/历史。B2 C-03 VM 通道。）
+        try:
+            def dump(*fields):
+                return mcp.state(*fields)
+            mcp.call("autoui_fixture", schema_version=1,
+                     state={"theme_name": "Solarized", "dark_mode": False})
+            time.sleep(0.5)
+            st = dump("theme_name", "dark_mode")
+            result.check("fixture Solarized/light applied",
+                         '"Solarized"' in st and "false" in st, st[:120])
+            before = dump("px")
+            for fam, dm in (("Solarized", True), ("Auto", True), ("Auto", False)):
+                mcp.call("autoui_fixture", schema_version=1,
+                         state={"theme_name": fam, "dark_mode": dm})
+                time.sleep(0.4)
+            after = dump("px")
+            result.check("pixel sentinel constant across theme round-trip",
+                         before == after, "px changed")
+            st = dump("theme_name", "dark_mode")
+            result.check("round-trip ends Auto/light",
+                         '"Auto"' in st and "false" in st, st[:120])
+        except Exception as e:
+            result.check("theme leg", False, repr(e))
         print(f"\n===== 031-paint VM MCP: "
               f"{result.passed} passed, {result.failed} failed, "
               f"{result.skipped} skipped =====")

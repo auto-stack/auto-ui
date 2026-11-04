@@ -16,3 +16,11 @@ desktop: "true"
 dep stylekit {
     path: "../stylekit"
 }
+
+# PLAN-047 T-03：接入官方主题包（C-13）。031-paint 既有显式默认 dark/indigo
+# 保留（pac theme/accent 键原样；App dark-first 经 design 绑定接线生效）。
+# 16 色调色板/画布像素 hex 类串为文档内容色豁免——换肤后文档像素/历史
+# 逐值不变（038 像素哨兵口径延续）。
+dep themes {
+    path: "../../../packages/themes"
+}
