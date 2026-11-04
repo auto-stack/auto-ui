@@ -160,6 +160,8 @@ T-01冻结现key/实例识别、App/context的实际入口、VM读写/handler/vi
 
 2026-11-04 / stage:merge / PLAN-041:r1 / checkpoints:prepared(9cac1cf1=reviewed+SD 草案；delivery=da4485b4 rebase 后 ff-only)/landed(master tip=da4485b4，--ff-only 零 merge commit；rebase old→new 12/12 patch-id EQ：0f2f9fa6→bbdc589b ef73c7d4→d3d4268b a428e15d→496a1b26 45ab401d→08b2f2cd dad974dc→d6bf0784 b30c749a→74d581d9 ad163727→2380faff 9cac1cf1→177757dc 277a89d4→e578992b fa769051→cbf38740 02b7c6c1→3823e4db cf087715→da4485b4)/canonical_verified(docs/specs/runtime/component-and-store-instances.md hash 902893ee 主/树一致；SD-02/03 增补随合并落地；dependencies auto-lang 03e9869fb auto-web 3de5524e auto-down 7c4d5cbb)/smoke(main: plan041 4 oracle + plan051/576/652 35 绿) / next:archive→cleanup。
 
+2026-11-04 / stage:merge(closed) / PLAN-041:r1 / checkpoints:cleaned(wt-guard clean ×4 树→auto-ui/auto-lang/auto-web/auto-down worktree 移除；branch codex/plan-041-instance-ownership 删除@da4485b4；组目录 .wt/ui-041 移除；plan-artifacts/plan-041 scope 已删（记录折入本文件）+ registry 刷新) / archive:docs/plans/archived/041-component-and-store-instance-ownership.md status=archived completion_kind=delivered / landing check:master tip=da4485b4 ff-only；lib 层全量红=13 base-red（base 同败实证）+bar_group 一次并行偶发（family 3 连绿）；产物消费方（auto build gen/front、daemon release）非本仓运行面，未涉本包改动文件——无 stale-artifact hold / 批量回归：auto-ui 仓无 .last-batch-regression 到期机制（语言仓规则），不触发。
+
 ## 10. 待澄清事项
 
 1. 本轮暂不实施；默认App context与显式共享的内部机制由T-01冻结，不新增.at语法；现支持/ABI扩大需具体修订。
