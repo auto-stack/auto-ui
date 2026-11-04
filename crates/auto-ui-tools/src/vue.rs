@@ -1558,8 +1558,12 @@ Prism.languages.auto = {{
     let mut store_ctx_import = String::new();
     let mut store_ctx_install = String::new();
     if project_has_stores {
+        // PLAN-051 T-02 (①): leading `\n` — `router_import` has no trailing
+        // newline, so bare concatenation emitted `from './router'import …`
+        // (invalid TS) on every cold scaffold.
         store_ctx_import =
-            "import { installAutoStoreContext } from './stores/__autoStoreContext'\n".to_string();
+            "\nimport { installAutoStoreContext } from './stores/__autoStoreContext'\n"
+                .to_string();
         store_ctx_install = "installAutoStoreContext(app)\n".to_string();
     }
     format!(
@@ -10943,6 +10947,40 @@ onMounted(() => {
 mod tests {
 
     use super::*;
+
+    /// PLAN-051 B-03（①）: four-combination main.ts — adjacent import
+    /// statements must stay newline-separated (regression: cold scaffold
+    /// emitted `from './router'import { … }`, esbuild parse error, page 500).
+    #[test]
+    fn main_ts_imports_newline_separated_four_combinations() {
+        let styles: Vec<String> = Vec::new();
+        for has_routes in [true, false] {
+            for has_stores in [true, false] {
+                let ts = generate_main_ts(
+                    has_routes,
+                    false,
+                    &styles,
+                    &I18nConfig::default(),
+                    &[],
+                    has_stores,
+                );
+                assert!(
+                    !ts.contains("'import"),
+                    "concatenated import at has_routes={has_routes} has_stores={has_stores}:\n{ts}"
+                );
+                for line in ts.lines() {
+                    let t = line.trim_start();
+                    if t.starts_with("import ") {
+                        // an import line must END the statement (no `import x from 'y'import …`)
+                        assert!(
+                            t.matches("import ").count() == 1,
+                            "two imports on one line at {has_routes}/{has_stores}: {t}"
+                        );
+                    }
+                }
+            }
+        }
+    }
 
     /// T-07 子批3 R1（F-815-T07-B2-R1-03 收口）：`toggles.default_classes`
     /// 的**请求臂消费**钉——VueReads::from_request（vue.rs:2783）读

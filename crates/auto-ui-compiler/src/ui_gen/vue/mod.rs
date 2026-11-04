@@ -11145,6 +11145,74 @@ widget Counter {
         );
     }
 
+    /// PLAN-051 B-01（②）: store model struct-literal defaults must survive
+    /// generation — `var me User = User { ... }` emits
+    /// `ref<any>({ id: 0, ... })`, not `ref<any>(null)` (plan-041 window
+    /// regression: null default null-deref'd the first `.field` read on the
+    /// consumer's author page).
+    #[test]
+    fn test_plan051_store_struct_default_kept() {
+        let code = VueGenerator::generate_store_composable(&store_from_src(
+            r#"
+store AuthStore {
+    model {
+        var me User = User { id: 0, email: "", username: "", bio: "", image: "", token: "" }
+    }
+    msg { Init }
+    on {
+        .Init -> {
+            .me = current_user("Bearer " + .me.token)
+        }
+    }
+}
+"#,
+        ));
+        assert!(
+            code.contains("ref<any>({ id: 0, email: '', username: '', bio: '', image: '', token: '' })"),
+            "struct-literal default must be emitted verbatim, got:\n{}",
+            code
+        );
+        assert!(
+            !code.contains("const me = ref<any>(null)"),
+            "struct default must not degrade to null, got:\n{}",
+            code
+        );
+    }
+
+    /// PLAN-051 B-02（②回归护栏）: scalar / map / `*.new` / array initializers
+    /// keep their pre-PLAN-051 emission byte-for-byte.
+    #[test]
+    fn test_plan051_store_non_struct_defaults_unchanged() {
+        let code = VueGenerator::generate_store_composable(&store_from_src(
+            r#"
+store MixedStore {
+    model {
+        var name str = "x"
+        var count int = 3
+        var ok bool = true
+        var tags []str = []
+        var meta map = {}
+    }
+    msg { Init }
+    on {
+        .Init -> {
+        }
+    }
+}
+"#,
+        ));
+        assert!(code.contains("'x'"), "str default: {}", code);
+        assert!(code.contains("3"), "int default: {}", code);
+        assert!(code.contains("true"), "bool default: {}", code);
+        assert!(code.contains("[]"), "array default: {}", code);
+        assert!(code.contains("{}"), "map default: {}", code);
+        assert!(
+            !code.contains("ref<any>(null)"),
+            "no scalar/map default may degrade to null: {}",
+            code
+        );
+    }
+
     /// Plan 043 store-codegen / Plan 012 Batch B (gap 2): the 015-notes-specific
     /// `all_tags` getter auto-inject was removed entirely — a store only gets an
     /// PLAN-041 T-03: per-App store factory + context-aware facade.

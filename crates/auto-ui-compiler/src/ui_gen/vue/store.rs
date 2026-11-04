@@ -1248,6 +1248,40 @@ function applyTheme(name: string, isDark = document.documentElement.classList.co
                     "null".to_string()
                 }
             }
+            // PLAN-051 T-01 (②): `Type{ field: value, ... }` parses as
+            // Expr::Node and previously fell into `_ => null`, so a store
+            // model with a struct-literal default started life as
+            // `ref<any>(null)` — any early `.field` read then threw
+            // "Cannot read properties of null" (consumer BLOG-005 F-2
+            // author-page实录). Mirror the handler-side semantics already
+            // established in ts_adapter.rs (Expr::Node → object literal,
+            // `loop` keeps its special delegate): emit the fields verbatim,
+            // recursing through this same function for nested values.
+            Expr::Node(node) => {
+                if node.name == "loop" {
+                    "null".to_string()
+                } else {
+                    let parts: Vec<String> = node
+                        .args
+                        .args
+                        .iter()
+                        .map(|arg| match arg {
+                            auto_lang_core::ast::Arg::Pair(key, val) => {
+                                format!("{}: {}", key.as_str(), Self::store_init_to_js(val))
+                            }
+                            auto_lang_core::ast::Arg::Pos(val) => Self::store_init_to_js(val),
+                            auto_lang_core::ast::Arg::Name(key) => {
+                                format!("{}: {}", key.as_str(), key.as_str())
+                            }
+                        })
+                        .collect();
+                    if parts.is_empty() {
+                        "{}".to_string()
+                    } else {
+                        format!("{{ {} }}", parts.join(", "))
+                    }
+                }
+            }
             Expr::Nil | Expr::Null => "null".to_string(),
             _ => "null".to_string(),
         }
