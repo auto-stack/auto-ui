@@ -148,6 +148,8 @@ work产证；review同树独立上下文final，从真实compile/Run复核AC/SD/
 
 2026-11-04 / stage: goal | plan_id: PLAN-044 | plan_revision: 1 | round: 6 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-044/auto-ui | commit: a90eebb2 | next: work T-03（续）。T-03 第一切片：①Member/recv 段落地——recv fn 名含子实例绑定名（`meter_add`）非 def 名，后置不可证重建，裁定**唯一属主文本规则**（未覆盖顶层 fn 的 `_{suffix}` 与全工程唯一 Member 事件 snake 匹配且恰好一个 node 属主才归属；多属主/无属主不映；未绑定 handler 无发射 fn 即跳过）。修一扫描器 off-by-one（`start+3`）。②默认字节保持单元门（建图纯函数 world 不变；CLI 对照归 verify_plan044.py）。③driver 分层门（V-S02）：runtime 无 span（AutoError::Msg）映射层不编造行、保持 "SDK supplied no mapped line"；managed 区 span 永不映射（managed 绝不当用户）；dev-dep miette=7.6 与锁定树同版（lock 已含零新下载）。pilot gates 11/11、driver 6/6、回归全绿。T-03 余量：loader 接受身份接线（SaveAs/接受源快照消费面，依赖 behavior_project/Storage 路径）、verify_plan044.py 骨架、UTF8/边界独立重算门（V-S04 映射侧）。
 
+2026-11-04 / stage: goal | plan_id: PLAN-044 | plan_revision: 1 | round: 7 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-044/auto-ui | commit: ec5c8e6e | next: work T-03（续）。①`tools/verify_plan044.py --controls` 落地并全绿（ec5c8e6e）：真实进程默认 CLI 无旁件 + world 冻结 sha、--diagnostics-map 旁件绑定（format/world+user sha/闭包 sha/段铺瓦/精度域）、再生字节一致（identity.json 按 provenance.product 归一——该字段随 out 目录名变化，属事实非漂移）、检入产品现行性、driver gates 调用（5 控制全过）。②V-S04 映射侧门：中文+组合符（e\u{0301}）helper 源的列按 Unicode scalar 独立重算实证，段边界字符边界由整图 validate 保证。pilot gates 12/12 绿。T-03 余量：loader 接受身份接线（SaveAs/接受源快照消费面）、map 错误不覆盖原错误门（部分已在 driver gates）、T-04 真实 compile/runtime 分层扩展。
+
 ## 10. 待澄清事项
 
 | ID | 事项 | owner/关闭动作 |
