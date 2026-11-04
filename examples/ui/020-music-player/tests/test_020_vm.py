@@ -110,44 +110,28 @@ def main():
         client.screenshot("020_player_vm_dark_initial")
         print("[+] Captured 020_player_vm_dark_initial.png")
 
-        # 1. Toggle Settings
-        settings_id = find_vnode_by_text(snap, "⚙ Settings")
-        print(f"[*] Found Settings button: {settings_id}")
-        if settings_id:
-            client.press(settings_id)
+        # 1. Toggle theme (NavSidebar 深浅主题 — PLAN-045 T-03 接线，
+        #    原 "⚙ Settings" 定位属 019 元素，020 实际无此按钮)
+        theme_id = find_vnode_by_text(snap, "深浅主题")
+        print(f"[*] Found theme toggle: {theme_id}")
+        if theme_id:
+            client.press(theme_id)
             time.sleep(0.5)
             snap = client.snapshot()
-            client.screenshot("020_player_vm_settings_open")
-            print("[+] Captured 020_player_vm_settings_open.png")
+            client.screenshot("020_player_vm_theme_toggled")
+            print("[+] Captured 020_player_vm_theme_toggled.png")
 
-            # 2. Click Light mode
-            light_id = find_vnode_by_text(snap, "☀ Light")
-            print(f"[*] Found Light mode button: {light_id}")
-            if light_id:
-                client.press(light_id)
-                time.sleep(0.5)
-                client.screenshot("020_player_vm_light")
-                print("[+] Captured 020_player_vm_light.png")
-
-                # 3. Click Dark mode back
-                snap = client.snapshot()
-                dark_id = find_vnode_by_text(snap, "🌙 Dark")
-                if dark_id:
-                    client.press(dark_id)
-                    time.sleep(0.3)
-
-            # 4. Close settings
-            snap = client.snapshot()
-            close_id = find_vnode_by_text(snap, "✕")
-            if close_id:
-                client.press(close_id)
+            # 2. Toggle back to dark (再次点击同一按钮恢复)
+            theme2_id = find_vnode_by_text(snap, "深浅主题")
+            if theme2_id:
+                client.press(theme2_id)
                 time.sleep(0.3)
 
-        # 5. Test Play/Pause toggle
+        # 5. Test Play/Pause toggle (stage 播放/暂停文本按钮)
         snap = client.snapshot()
-        pause_id = find_vnode_by_text(snap, "⏸ Pause")
+        pause_id = find_vnode_by_text(snap, "暂停")
         if pause_id:
-            print(f"[*] Found Play/Pause button: {pause_id}")
+            print(f"[*] Found Pause button: {pause_id}")
             client.press(pause_id)
             time.sleep(0.3)
             client.screenshot("020_player_vm_paused")
@@ -155,20 +139,21 @@ def main():
 
             # Toggle back to play
             snap = client.snapshot()
-            play_id = find_vnode_by_text(snap, "▶ Play")
+            play_id = find_vnode_by_text(snap, "播放")
             if play_id:
                 client.press(play_id)
                 time.sleep(0.3)
 
-        # 6. Test Next Track button
+        # 6. Test CycleRepeat (controls 顺序播放文本按钮；020 的 Next/Prev
+        #    为 icon-only 按钮，无法文本定位，Vue 探针另行覆盖播放链)
         snap = client.snapshot()
-        next_id = find_vnode_by_text(snap, "Next ⏭")
-        if next_id:
-            print(f"[*] Found Next button: {next_id}")
-            client.press(next_id)
+        repeat_id = find_vnode_by_text(snap, "顺序播放")
+        if repeat_id:
+            print(f"[*] Found CycleRepeat button: {repeat_id}")
+            client.press(repeat_id)
             time.sleep(0.3)
-            client.screenshot("020_player_vm_next_track")
-            print("[+] Captured 020_player_vm_next_track.png")
+            client.screenshot("020_player_vm_repeat_cycled")
+            print("[+] Captured 020_player_vm_repeat_cycled.png")
 
         # 7. Test Playlist Selection (Track 3 Debussy)
         snap = client.snapshot()
@@ -180,9 +165,9 @@ def main():
             client.screenshot("020_player_vm_track3_selected")
             print("[+] Captured 020_player_vm_track3_selected.png")
 
-        # 8. Test Like button toggle
+        # 8. Test Like button toggle (stage 收藏歌曲文本按钮)
         snap = client.snapshot()
-        like_id = find_vnode_by_text(snap, "🤍 Like")
+        like_id = find_vnode_by_text(snap, "收藏歌曲")
         if like_id:
             print(f"[*] Found Like button: {like_id}")
             client.press(like_id)
