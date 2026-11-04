@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-043
-status: reviewed
+status: archived
 feature_name: AutoGraphicsNode三维模型资源对象模板接线
 author: [Codex]
 created_at: 2026-11-04
 updated_at: 2026-11-04
 plan_revision: 1
-current_step: 6
+current_step: 9
 total_steps: 10
 depends_on: [auto-ui/PLAN-030, auto-ui/PLAN-034, auto-ui/PLAN-035]
 supersedes_spec_components: []
@@ -126,9 +126,9 @@ work产证；review同权威树不同上下文独立final，逐AC/diff/SD/遗漏
 | T-04 | work | T-03 | 真Auto/GPU/触发/角色对照/费用资源边界/生命周期/变异负控 | AC-02..05 | [x] |
 | T-05 | work | T-04 | 新根SaveAs/A→B/坏件恢复/20轮owner与真实受影响并集 | AC-04/05 | [x] |
 | T-06 | work | T-05 | SD候选/准确消费交接/源预算与未闭项，不追加M2前置 | AC-05/06 | [x] |
-| T-07 | review | T-06 | 同树独立final及finding修复后同员复核 | AC-07 | [ ] |
-| T-08 | merge | T-07 pass | 冻结定向门/来源核后落master | AC-08 | [ ] |
-| T-09 | merge | T-08 | canonical/归档/导航与固定交付身份核验 | AC-08 | [ ] |
+| T-07 | review | T-06 | 同树独立final及finding修复后同员复核 | AC-07 | [x] |
+| T-08 | merge | T-07 pass | 冻结定向门/来源核后落master | AC-08 | [x] |
+| T-09 | merge | T-08 | canonical/归档/导航与固定交付身份核验 | AC-08 | [x] |
 | T-10 | merge | T-09 | fresh guard/全输出对账/删scope构建物/摘要与hold登记 | AC-09 | [ ] |
 
 ## 9. 复审记录
@@ -144,6 +144,14 @@ T-01 证据（只读核查，全部在 worktree codex/plan-043-dev@2a830d6c 工�
 - AG016 只读：PLAN-016 已归档（docs/plans/archived/016-*.md），.wt 下无 ag-016 树（仅 ag-019、ag-examples/probe），固定 035 交付 5903839e 在历史中，本轮未触碰。
 - 主检出 WIP 观察（非本 Plan，已上报不代管）：master 工作树有 docs/plans/{045,046,047} 新草案、039 计划文件删除、docs/design 改动与 `?? crates/auto-ui-runtime/test/`——疑似他会话在途；master-zero-WIP 在 merge 落主前需其 owner 处理，本 Plan 全程在 ui-043 树内写码不受影响。
 - scope 登记：D:/autostack/plan-artifacts/plan-043/scope-registry.md（sha256 16932afb4d3cfa48af3d1d97166a9d910ca4d9993c786b14542ff22d293e6874），唯一 scratch 根，in-flight: none。
+
+2026-11-04 / stage: merge | auto-ui/PLAN-043:r1 | checkpoints：
+
+- prepared：reviewed baseline pass（round 11，368f4fa1）；diff base 2a830d6c；冻结 delta=SD-01 add + SD-02 modify（候选文本 01a5da27 在树）；源目标 docs/specs/auto-graphics/{node3d-model-object-templates.md（新）, node3d-character-and-runtime-camera.md（改）}。
+- landed：主检出 master 在 rebase 期间被并行 044 会话推进（9bf9874a→ef8bc233→3420d0e8→df37fb4a 全 docs 面）；开发分支三次 rebase 其上，range-diff 各 10/10 patch 等价（最终 old 368f4fa1→new ba080e27）；rebase 后基线复验全绿（043 gates 4/4 + 028 gates 7/7 + verify_plan043 controls 6/6 + driver flow 8/8 + verify_plan044 controls 全绿——044 与 043 共享 main.rs/lib.rs/pilot 面）；`git merge --ff-only codex/plan-043-dev` 落主，无 merge commit，主 tip 一度 = 交付 ba080e27（044 最终收据 df37fb4a 随其后，线性历史 intact）。
+- canonical_verified：master 上两份规范 sha256 与复审树逐字一致（node3d-model-object-templates.md c25e5136…54 36；node3d-character-and-runtime-camera.md bb288532…826d）；main-checkout 冒烟 043 gates 4/4 绿（ landed tip df37fb4a，代码面与已验基线逐字一致=同基线证据复用）。
+- 落地≠部署观察：本交付为 experimental AG 线（pilot/driver 生成器、受信单元一字节、测试/夹具/规范），backend release binary 与 web bundle 不消费该面，无需重建（记录观察项：release binary / web bundle 不受影响，构建日期不变）。
+- 批量回归到期核：auto-lang docs/plans/.last-batch-regression.json 在案（042 收据同日核 <48h；043 不整除 5）→ 不到期，不触发。
 
 2026-11-04 / stage: goal | plan_id: PLAN-043 | plan_revision: r1 | round: 11 | from: review | to: merge | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-043/auto-ui | commit: 368f4fa1 | next: merge（T-08 冻结定向门/来源核落 master；T-09 归档/导航/身份；T-10 fresh guard/对账/清理）
 
