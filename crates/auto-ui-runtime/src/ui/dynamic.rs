@@ -388,6 +388,23 @@ impl fmt::Debug for DynamicComponent {
     }
 }
 
+/// PLAN-041 re-review R-1: resolve a widget's single live instance state id
+/// for oracle reads/writes (instance-owned child fields).
+#[cfg(test)]
+pub(crate) fn r1_instance_obj(dc: &DynamicComponent, widget: &str) -> u64 {
+    let identity = dc
+        .bridge()
+        .child_instance_identities()
+        .into_iter()
+        .find(|id| {
+            id.rsplit('/').next().unwrap_or(id).split('#').next() == Some(widget)
+        })
+        .unwrap_or_else(|| panic!("no live instance of {widget}"));
+    dc.bridge()
+        .child_instance_state_id(&identity)
+        .unwrap_or_else(|| panic!("no state object for {identity}"))
+}
+
 impl DynamicComponent {
     /// Create a new DynamicComponent from an AuraWidget definition.
     ///
@@ -3022,7 +3039,9 @@ impl DynamicComponent {
         let mut stripped_payloads: Vec<(String, auto_val::Value)> =
             Vec::with_capacity(stripped_calls.len());
         for sc in &stripped_calls {
-            let payload = eval_stripped_arg(&self.bridge, sc.arg.as_deref(), &param_bindings);
+            let payload =
+                eval_stripped_arg(&self.bridge, sc.arg.as_deref(), &param_bindings, instance_state_id);
+
             stripped_payloads.push((sc.callback.clone(), payload));
         }
         if !clean_name.starts_with("__") {
@@ -3333,6 +3352,7 @@ fn eval_stripped_arg(
     bridge: &crate::ui::vm_bridge::VmBridge,
     arg: Option<&str>,
     param_bindings: &std::collections::HashMap<String, auto_val::Value>,
+    target_state_obj: Option<u64>,
 ) -> auto_val::Value {
     let Some(t) = arg else {
         return auto_val::Value::Nil;
@@ -3367,6 +3387,13 @@ fn eval_stripped_arg(
     if !state_prefixed && !path.contains('.') {
         if let Some(v) = param_bindings.get(path) {
             return v.clone();
+        }
+    }
+    // PLAN-041 R-1: 派发目标是实例对象时，快照实参先读实例自有字段
+    //（子件 model/props 实例所有），缺失再退 root（父属/共享字段）。
+    if let Some(obj) = target_state_obj {
+        if let Ok(v) = bridge.read_child_state(obj, path) {
+            return v;
         }
     }
     if let Ok(v) = bridge.read_state(path) {
@@ -3948,7 +3975,14 @@ mod tests {
         .expect("component");
         // view() 一次以记录回调路由（render_child_widget → child_emit::ROUTES）。
         let _ = comp.view();
-        comp.write_state("draft", auto_val::Value::str("hello plan051"))
+        // PLAN-041 R-1: `draft` is Composer51a's instance-owned model field.
+        let composer_obj = r1_instance_obj(&comp, "Composer51a");
+        comp.bridge_mut()
+            .write_state_onto(
+                composer_obj,
+                "draft",
+                auto_val::Value::str("hello plan051"),
+            )
             .unwrap();
         comp.on_with_input_for("Composer51a", "DoSend", None);
         assert_eq!(
@@ -3962,6 +3996,10 @@ mod tests {
             "子 handler 照常清空 draft"
         );
     }
+
+    /// PLAN-051 T3 (C2 ①声明式): musk 契约——子 msg `send(str)` 派发后
+    /// 宿主 `onsend: .SendInput($event)` 收到 msg 载荷。此前无通用路由
+    /// （renderer 只有 PromptBar 特判），SendInput 静默不触发。
 
     /// PLAN-051 T3 (C2 ①声明式): musk 契约——子 msg `send(str)` 派发后
     /// 宿主 `onsend: .SendInput($event)` 收到 msg 载荷。此前无通用路由
@@ -4002,7 +4040,10 @@ mod tests {
         )
         .expect("component");
         let _ = comp.view();
-        comp.write_state("text", auto_val::Value::str("musk roundtrip"))
+        // PLAN-041 R-1: `text` is MI51b's instance-owned model field.
+        let mi51b_obj = r1_instance_obj(&comp, "MI51b");
+        comp.bridge_mut()
+            .write_state_onto(mi51b_obj, "text", auto_val::Value::str("musk roundtrip"))
             .unwrap();
         // 模拟按钮/Enter 派发：.send(mention_trim(.text)) → 编码载荷 send␟s␟…
         comp.on_with_input_for("MI51b", "send\u{1F}s\u{1F}musk roundtrip", None);
@@ -4012,9 +4053,19 @@ mod tests {
             "宿主 SendInput($event) 必须收到子 msg 载荷"
         );
         assert_eq!(
-            comp.read_state("text").expect("text 字段"),
+            comp.bridge()
+                .read_instance_state(
+                    &comp
+                        .bridge()
+                        .child_instance_identities()
+                        .into_iter()
+                        .find(|id| id.contains("MI51b"))
+                        .expect("MI51b live"),
+                    "text"
+                )
+                .expect("text 字段"),
             auto_val::Value::str(""),
-            "子 handler 照常清空 text"
+            "子 handler 照常清空 text（实例态）"
         );
     }
 
@@ -5848,6 +5899,7 @@ widget Demo002Counter {
 
 #[cfg(test)]
 mod plan652_timesource {
+    use super::r1_instance_obj;
     use super::{DynamicComponent, TimeSourceKind};
     use auto_lang_core::parser::Parser;
 
@@ -6125,23 +6177,28 @@ widget TimerChild652 {
         let mut comp = build(&src);
         let _ = comp.view_with_debug_gated(false);
 
-        let w0 = comp.read_state("w_tick").expect("w_tick").as_int();
+        // PLAN-041 R-1: child tick state is instance-owned.
+        let r652 = |dc: &DynamicComponent, f: &str| {
+            let identity = dc
+                .bridge()
+                .child_instance_identities()
+                .into_iter()
+                .find(|id| id.contains("DemoClock652"))
+                .expect("DemoClock652 live");
+            dc.bridge()
+                .read_instance_state(&identity, f)
+                .expect(f)
+        };
+        let w0 = r652(&comp, "w_tick").as_int();
         comp.on_with_input_for("DemoClock652", "Tick", None);
-        let w1 = comp
-            .read_state("w_tick")
-            .expect("w_tick after Tick")
-            .as_int();
+        let w1 = r652(&comp, "w_tick").as_int();
         assert!(
             w1 == w0 + 1,
             "child Tick handler must run in single VM ({} -> {})",
             w0,
             w1
         );
-        let local = comp
-            .read_state("w_local")
-            .expect("w_local")
-            .as_str()
-            .to_string();
+        let local = r652(&comp, "w_local").as_str().to_string();
         assert!(
             local.starts_with('T'),
             "w_local updated by Tick; got {:?}",
@@ -6170,6 +6227,7 @@ widget TimerChild652 {
 /// PLAN-654 阶段 B: 框架墙钟 C2 单测同模块。
 #[cfg(test)]
 mod plan654_path_timesource {
+    use super::r1_instance_obj;
     use super::{DynamicComponent, InstancePath, TimeSourceKind};
     use auto_lang_core::parser::Parser;
 

@@ -1186,6 +1186,10 @@ impl VmBridge {
     ) -> Result<()> {
         // Find field index by name — same cached-list-first + live-object
         // fallback as read_state (Plan 049 child model-var defaults).
+        // PLAN-041 R-1: 实例对象的字段序与 root 合并序不同——root 桥字段名单
+        // 只对 root 写有效；实例写必须按目标对象自身 field_names 解析，
+        // 否则按下标错位写坏相邻字段（plan051 inbody 实录：draft 写进
+        // 实例其他槽、draft 保持空）。
         let obj = self.vm.get_heap_object(target_obj_id).ok_or_else(|| {
             VmBridgeError::InvalidState(format!(
                 "state heap object {} not found",
@@ -1202,11 +1206,19 @@ impl VmBridge {
                         "state object is not a GenericInstanceData".to_string(),
                     )
                 })?;
-            self.state_field_names
-                .iter()
-                .position(|name| name == field_name)
-                .or_else(|| instance.field_names.iter().position(|n| n == field_name))
-                .ok_or_else(|| VmBridgeError::FieldNotFound(field_name.to_string()))?
+            if target_obj_id == self.state_obj_id {
+                self.state_field_names
+                    .iter()
+                    .position(|name| name == field_name)
+                    .or_else(|| instance.field_names.iter().position(|n| n == field_name))
+                    .ok_or_else(|| VmBridgeError::FieldNotFound(field_name.to_string()))?
+            } else {
+                instance
+                    .field_names
+                    .iter()
+                    .position(|n| n == field_name)
+                    .ok_or_else(|| VmBridgeError::FieldNotFound(field_name.to_string()))?
+            }
         };
 
         // Access the heap object with write access
