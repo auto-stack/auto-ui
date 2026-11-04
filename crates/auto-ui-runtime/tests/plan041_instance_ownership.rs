@@ -12,6 +12,7 @@
 //!   (T-01 red evidence).
 
 use auto_ui_runtime::ui::dynamic::DynamicComponent;
+use auto_ui_runtime::Component;
 use std::path::Path;
 
 fn build_fixture() -> DynamicComponent {
@@ -58,12 +59,12 @@ fn t01_control_fixture_builds_and_renders_both_children() {
     assert_eq!(total, auto_val::Value::Int(0), "initial store total");
 }
 
-/// Isolation leg — TARGET semantics. Ignored at T-01 (fails on the pre-fix
-/// merged-state reality: both counters render start=20 and one Inc moves
-/// both). T-02 removes the ignore and makes this the permanent AC-01 oracle.
+/// Isolation leg — permanent AC-01 oracle (plan V-01): keyed same-type
+/// children own props/model per instance while the App-level store stays
+/// shared. Pre-fix red evidence (T-01): one Inc moved BOTH counters.
 #[test]
-#[ignore = "T-01 baseline probe: asserts post-T-02 instance semantics; flips in T-02"]
 fn t02_keyed_same_type_children_own_props_model_and_share_store() {
+    use auto_ui_runtime::ui::interpreter::DynamicMessage;
     let mut comp = build_fixture();
     let before = render_debug(&mut comp);
 
@@ -74,15 +75,22 @@ fn t02_keyed_same_type_children_own_props_model_and_share_store() {
         snip(&before)
     );
 
-    // One Inc on the Counter family must move ONE instance (A) and the
-    // shared store, leaving B's model untouched.
-    comp.call_widget_handler("Counter", "Inc", &[]).expect("Inc dispatches");
+    // One Inc on instance A (real event path, instance-bound) must move A
+    // and the SHARED store, leaving B's model untouched.
+    comp.on(DynamicMessage::TypedInst {
+        widget_name: "Counter".into(),
+        event_name: "Inc".into(),
+        args: vec![],
+        instance: "/Counter#a".into(),
+    });
     let after = render_debug(&mut comp);
 
+    // Post-Inc render: A = (10, count=1, total=1), B = (20, count=0, total=1)
+    // → exactly three `content: "1"` nodes (A.count, A.total, B.total).
     let ones = after.matches("content: \"1\"").count();
     assert_eq!(
-        ones, 2,
-        "after one Inc exactly A.count=1 and shared store total=1 render (B.count stays 0): {}",
+        ones, 3,
+        "after one Inc: A.count=1 + shared store total=1 on both instances (B.count stays 0): {}",
         snip(&after)
     );
     assert!(

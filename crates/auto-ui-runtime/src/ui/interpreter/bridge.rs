@@ -49,6 +49,17 @@ pub enum DynamicMessage {
         event_name: String,  // 事件名（如 "Inc"）
         args: Vec<Value>,    // 事件参数
     },
+
+    /// PLAN-041 T-02: 实例限定事件——绑定发生在某个 child 实例子树内
+    /// （builder 带 `instance_identity`）。派发面按 identity 解析实例态
+    /// 对象作为 handler receiver；实例已释放（迟到事件）→ 丢弃并诊断，
+    /// 不重定向同名新实例（plan §5.2 合同 4）。legacy `Typed` 语义零变化。
+    TypedInst {
+        widget_name: String,
+        event_name: String,
+        args: Vec<Value>,
+        instance: String,
+    },
 }
 
 /// 解释器桥梁 - 连接 auto-lang 和 auto-ui

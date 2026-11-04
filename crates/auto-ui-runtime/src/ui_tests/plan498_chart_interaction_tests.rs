@@ -121,7 +121,7 @@ mod plan498_charts {
         assert!(dump0.contains(r#"stroke-width=\"2\""#), "常驻线宽 2 落图");
         assert!(!dump0.contains(r#"r=\"3\""#), "常驻态无转折点圆圈");
 
-        dc.on_with_input_for("LineChart", "HoverSeries\u{1F}i\u{1F}0", None);
+        dc.on_with_input_for_instance_type("LineChart", "HoverSeries\u{1F}i\u{1F}0", None);
         let dump1 = dump(&mut dc);
         assert!(dump1.contains(r#"stroke-width=\"3\""#), "高亮线宽 3 落图");
         assert!(
@@ -134,7 +134,7 @@ mod plan498_charts {
         );
         assert!(dump1.contains(r#"r=\"3\""#), "转折点圆圈浮现(r=3)");
 
-        dc.on_with_input_for("LineChart", "SeriesOut", None);
+        dc.on_with_input_for_instance_type("LineChart", "SeriesOut", None);
         let dump2 = dump(&mut dc);
         assert!(
             dump2.contains(r#"stroke-opacity=\"0.85\""#),
@@ -150,7 +150,7 @@ mod plan498_charts {
             eprintln!("plan498 M1: SKIPPED — charts-gallery not found");
             return;
         };
-        dc.on_with_input_for("AreaChart", "HoverSeries\u{1F}i\u{1F}1", None);
+        dc.on_with_input_for_instance_type("AreaChart", "HoverSeries\u{1F}i\u{1F}1", None);
         let dump = dump(&mut dc);
         assert!(
             dump.contains(r#"fill-opacity=\"0.45\""#),
@@ -181,7 +181,7 @@ mod plan498_charts {
             "常驻态无 downplay"
         );
 
-        dc.on_with_input_for("BarChart", "Hover\u{1F}i\u{1F}0", None);
+        dc.on_with_input_for_instance_type("BarChart", "Hover\u{1F}i\u{1F}0", None);
         let dump1 = dump(&mut dc);
         assert!(
             dump1.contains(r#"stroke-width=\"1.5\""#),
@@ -192,7 +192,7 @@ mod plan498_charts {
             "其余组 downplay 0.3 落图"
         );
 
-        dc.on_with_input_for("BarChart", "HoverOut", None);
+        dc.on_with_input_for_instance_type("BarChart", "HoverOut", None);
         let dump2 = dump(&mut dc);
         assert!(!dump2.contains(r#"stroke-width=\"1.5\""#), "离焦后描边消失");
         assert!(
@@ -213,14 +213,14 @@ mod plan498_charts {
         assert!(dump0.contains("A100 100 0"), "常驻扇区弧落图");
         assert!(!dump0.contains(r##"stroke=\"#ffffff\""##), "常驻态无白描边");
 
-        dc.on_with_input_for("DonutChart", "Hover\u{1F}i\u{1F}1", None);
+        dc.on_with_input_for_instance_type("DonutChart", "Hover\u{1F}i\u{1F}1", None);
         let dump1 = dump(&mut dc);
         assert!(
             dump1.contains(r##"stroke=\"#ffffff\""##),
             "悬停扇区白描边落图"
         );
 
-        dc.on_with_input_for("DonutChart", "HoverOut", None);
+        dc.on_with_input_for_instance_type("DonutChart", "HoverOut", None);
         let dump2 = dump(&mut dc);
         assert!(
             !dump2.contains(r##"stroke=\"#ffffff\""##),
@@ -241,7 +241,7 @@ mod plan498_charts {
         assert!(!dump0.contains("Opacity(40)"), "常驻态无暗图例");
         let paths0 = dump0.matches("stroke-opacity=").count();
 
-        dc.on_with_input_for("LineChart", "Toggle\u{1F}i\u{1F}0", None);
+        dc.on_with_input_for_instance_type("LineChart", "Toggle\u{1F}i\u{1F}0", None);
         let dump1 = dump(&mut dc);
         assert!(dump1.contains("Opacity(40)"), "隐藏系列图例项落 opacity-40");
         let paths1 = dump1.matches("stroke-opacity=").count();
@@ -251,11 +251,11 @@ mod plan498_charts {
         );
 
         // 隐藏优先于悬停:对已隐藏系列 HoverSeries(0) 不浮几何(无转折点)。
-        dc.on_with_input_for("LineChart", "HoverSeries\u{1F}i\u{1F}0", None);
+        dc.on_with_input_for_instance_type("LineChart", "HoverSeries\u{1F}i\u{1F}0", None);
         let dump_h = dump(&mut dc);
         assert!(!dump_h.contains(r#"r=\"3\""#), "隐藏系列悬停不浮现转折点");
 
-        dc.on_with_input_for("LineChart", "Toggle\u{1F}i\u{1F}0", None);
+        dc.on_with_input_for_instance_type("LineChart", "Toggle\u{1F}i\u{1F}0", None);
         let dump2 = dump(&mut dc);
         assert!(!dump2.contains("Opacity(40)"), "再点复原图例");
         let paths2 = dump2.matches("stroke-opacity=").count();

@@ -1867,6 +1867,10 @@ impl DynamicComponent {
         // PLAN-031 T-03：本组件 scope 只在本帧构建期安装，Drop 恢复上一状态。
         let _theme_guard = self.theme_scope_guard();
         let prev = self.view_mount_frame_prepare();
+        // PLAN-041 T-02: instance frame bracket (same as the gated twin) —
+        // every full build entry must reset the occurrence counter and sweep
+        // absent instances.
+        self.bridge.begin_child_instance_frame();
         let builder =
             AuraViewBuilder::with_registry(&self.bridge, &self.widget_name, &self.widget_registry)
                 .with_routes(&self.routes)
@@ -1875,6 +1879,7 @@ impl DynamicComponent {
                 .with_mounted_sink(&self.mounted_types)
                 .with_mount_path_sink(self.mount_path_sink());
         let out = builder.build_with_debug(&self.view_template);
+        self.bridge.end_child_instance_frame();
         self.view_mount_frame_finish(prev);
         out
     }
@@ -1905,6 +1910,10 @@ impl DynamicComponent {
             None
         };
         let prev = self.view_mount_frame_prepare();
+        // PLAN-041 T-02: instance frame bracket — identities registered in
+        // this build; absent-from-previous-frame instances release at the
+        // bracket close (Vue v-if/删除语义; PLAN-654 mount-frame 同型).
+        self.bridge.begin_child_instance_frame();
         let builder =
             AuraViewBuilder::with_registry(&self.bridge, &self.widget_name, &self.widget_registry)
                 .with_routes(&self.routes)
@@ -1914,6 +1923,7 @@ impl DynamicComponent {
                 .with_mounted_sink(&self.mounted_types)
                 .with_mount_path_sink(self.mount_path_sink());
         let out = builder.build_with_debug_gated(&self.view_template, capture_probe);
+        self.bridge.end_child_instance_frame();
         self.view_mount_frame_finish(prev);
         if let Some(t0) = __diag_t0 {
             eprintln!(
@@ -2331,8 +2341,49 @@ impl Component for DynamicComponent {
     fn on(&mut self, msg: Self::Msg) {
         // Extract event name + any payload args the view builder resolved from
         // loop bindings (e.g. the `cell.date` in `onclick: .SelectDay(cell.date)`).
+        // PLAN-041 T-02: instance-bound events dispatch against the
+        // instance's own state object; a released instance (late event)
+        // drops the message with a diagnostic instead of re-targeting a
+        // same-named new instance (plan §5.2 contract 4).
+        if let DynamicMessage::TypedInst {
+            widget_name,
+            event_name,
+            args,
+            instance,
+        } = &msg
+        {
+            match self.bridge.child_instance_state_id(instance) {
+                Some(id) => match self.bridge.call_handler_for(widget_name, event_name, id, args)
+                {
+                    Ok(()) => self.dirty = true,
+                    Err(e) => {
+                        eprintln!(
+                            "[VM-HANDLER] {}<{}>.{} failed: {}",
+                            widget_name, instance, event_name, e
+                        );
+                        if !matches!(
+                            e,
+                            crate::ui::vm_bridge::VmBridgeError::HandlerNotFound(_)
+                        ) {
+                            self.dirty = true;
+                        }
+                    }
+                },
+                None => {
+                    eprintln!(
+                        "[VM-INSTANCE] {}<{}>.{} dropped: instance released (late event)",
+                        widget_name, instance, event_name
+                    );
+                }
+            }
+            return;
+        }
         let (event_name, mut args) = match &msg {
             DynamicMessage::Typed {
+                event_name, args, ..
+            } => (event_name.clone(), args.clone()),
+            // TypedInst returns earlier (instance arm above); kept exhaustive.
+            DynamicMessage::TypedInst {
                 event_name, args, ..
             } => (event_name.clone(), args.clone()),
             DynamicMessage::String(name) => (name.clone(), Vec::new()),
@@ -2447,12 +2498,15 @@ impl Component for DynamicComponent {
         // PLAN-031 T-03：渲染入口同 frame 快照（scope 隔离，Drop 恢复）。
         let _theme_guard = self.theme_scope_guard();
         let prev = self.view_mount_frame_prepare();
+        // PLAN-041 T-02: instance frame bracket (plain view() entry).
+        self.bridge.begin_child_instance_frame();
         let builder =
             AuraViewBuilder::with_registry(&self.bridge, &self.widget_name, &self.widget_registry)
                 .with_routes(&self.routes)
                 .with_mounted_sink(&self.mounted_types)
                 .with_mount_path_sink(self.mount_path_sink());
         let view = builder.build(&self.view_template);
+        self.bridge.end_child_instance_frame();
         self.view_mount_frame_finish(prev);
 
         view
@@ -2664,6 +2718,39 @@ impl DynamicComponent {
         self.on_with_input_for(&widget_name, event_name, input_value);
     }
 
+    /// PLAN-041 T-02: dispatch an event against the first live instance of
+    /// the given widget type (sorted identity — deterministic). Test/
+    /// acceptance convenience for name-synthesized interactions that predate
+    /// instance addressing; returns false when no live instance matches
+    /// (caller decides root fallback).
+    pub fn on_with_input_for_instance_type(
+        &mut self,
+        widget_type: &str,
+        event_name: &str,
+        input_value: Option<String>,
+    ) -> bool {
+        // Sorted identities → LAST match: the most recently minted site is
+        // the one a name-synthesized interaction targets when a gallery hosts
+        // several same-type demos (matches the legacy shared-state semantics
+        // where the last-seeded site owned the visible field).
+        let identity = self
+            .bridge
+            .child_instance_identities()
+            .into_iter()
+            .filter(|id| {
+                let tail = id.rsplit('/').next().unwrap_or(id);
+                tail.split('#').next() == Some(widget_type)
+            })
+            .last();
+        match identity {
+            Some(id) => {
+                self.on_with_input_for_instance(widget_type, event_name, input_value, Some(&id));
+                true
+            }
+            None => false,
+        }
+    }
+
     /// PLAN-095 T-02: declared param count for `(widget, event)` — thin bridge
     /// wrapper so renderer-side synthetic dispatch (media loaded/error notify)
     /// can align arg frames to the handler declaration (plan-576 D4 口径：
@@ -2683,6 +2770,19 @@ impl DynamicComponent {
         event_name: &str,
         input_value: Option<String>,
     ) {
+        self.on_with_input_for_instance(widget_name, event_name, input_value, None);
+    }
+
+    /// PLAN-041 T-02: instance-aware dispatch entry. `instance` = the
+    /// binding-time instance identity (from TypedInst events); `None` keeps
+    /// the legacy root-receiver semantics byte-for-byte.
+    pub fn on_with_input_for_instance(
+        &mut self,
+        widget_name: &str,
+        event_name: &str,
+        input_value: Option<String>,
+        instance: Option<&str>,
+    ) {
         // PLAN-654: path 装饰名 → 类型名（`Widget@seq` / `Widget`）。
         let widget_name_owned;
         let widget_name: &str = match widget_name.split_once('@') {
@@ -2691,6 +2791,20 @@ impl DynamicComponent {
                 &widget_name_owned
             }
             _ => widget_name,
+        };
+        // PLAN-041 T-02: IcedMessage 边界经 widget 名内嵌实例标记
+        //（`Widget` + U+0001 + `<identity>`，与 `@seq` 同款入口剥离约定）。
+        // 同时剥离出干净 widget 名（handler 名空间解析不可见标记）。
+        let instance_owned;
+        let (widget_name, instance): (&str, Option<&str>) = match instance {
+            Some(i) => (widget_name, Some(i)),
+            None => match widget_name.split_once('\u{1}') {
+                Some((w, inst)) if !w.is_empty() && !inst.is_empty() => {
+                    instance_owned = inst.to_string();
+                    (w, Some(instance_owned.as_str()))
+                }
+                _ => (widget_name, None),
+            },
         };
         let (clean_name, mut payload) = decode_payload(event_name);
 
@@ -2739,12 +2853,36 @@ impl DynamicComponent {
             }
         }
 
+        // PLAN-041 T-02: instance-scoped receiver resolution FIRST so the
+        // input back-write below can target the instance for instance-bound
+        // inputs. A dead (released) instance drops the late event with a
+        // diagnostic instead of re-targeting a same-named new instance
+        // (plan §5.2 contract 4).
+        let instance_state_id: Option<u64> = match instance {
+            Some(identity) => match self.bridge.child_instance_state_id(identity) {
+                Some(id) => Some(id),
+                None => {
+                    eprintln!(
+                        "[VM-INSTANCE] {}.{} dropped: instance `{}` released (late event)",
+                        widget_name, clean_name, identity
+                    );
+                    return;
+                }
+            },
+            None => None,
+        };
         // If this event comes from an input, update the bound state field first.
         if let Some(text) = &input_value {
             if let Some(state_field) = self.input_state_map.get(&clean_name) {
                 let value = parse_input_value_for_field(text, state_field, &self.bridge);
-                // Write to the root state (input bindings are root-level).
-                let _ = self.bridge.write_state(state_field, value);
+                // PLAN-041 T-02: instance-bound input back-writes land on the
+                // instance object; the root/legacy channel is unchanged.
+                if let Some(id) = instance_state_id {
+                    let _ = self.bridge.write_state_onto(id, state_field, value);
+                } else {
+                    // Write to the root state (input bindings are root-level).
+                    let _ = self.bridge.write_state(state_field, value);
+                }
                 self.dirty = true;
             }
         }
@@ -2760,8 +2898,8 @@ impl DynamicComponent {
         // doesn't have these props. So before executing the handler, copy the
         // child's prop values into root state as temporary fields. This lets
         // `.edit_title = .note.title` resolve .note from root state.
-        let state_obj_id = self.bridge.state_obj_id();
-        if widget_name != &self.widget_name {
+        let state_obj_id = instance_state_id.unwrap_or_else(|| self.bridge.state_obj_id());
+        if instance_state_id.is_none() && widget_name != &self.widget_name {
             if let Some(child_id) = self.bridge.get_child_state_id(widget_name) {
                 self.bridge.sync_child_props_to_root(child_id);
             }

@@ -108,6 +108,32 @@ widget W {
     /// `f"w-[${slot}px] h-full"`——dollar-brace 插值 + 字面量方括号。
     /// 镜像 plan437_child_init 的内联夹具(同 with_registry_and_imports_from_decls 链)。
     mod child_fstr {
+
+        /// PLAN-041 T-02: child model fields are instance-owned — read a
+        /// field through the child's instance (root no longer carries it).
+        fn child_field(
+            dc: &crate::ui::dynamic::DynamicComponent,
+            widget_type: &str,
+            field: &str,
+        ) -> Result<auto_val::Value, String> {
+            let identity = dc
+                .bridge()
+                .child_instance_identities()
+                .into_iter()
+                .find(|id| {
+                    id.rsplit('/')
+                        .next()
+                        .unwrap_or(id)
+                        .split('#')
+                        .next()
+                        == Some(widget_type)
+                })
+                .ok_or_else(|| format!("no live instance of {widget_type}"))?;
+            dc.bridge()
+                .read_instance_state(&identity, field)
+                .map_err(|e| e.to_string())
+        }
+
         fn build_inline(src: &str) -> crate::ui::dynamic::DynamicComponent {
             use auto_lang_core::ast::Stmt;
             let session = auto_lang_core::session::CompilerSession::ui();
@@ -200,9 +226,8 @@ widget ChildGeo (data: List, field: str = "v") {
             dc.drive_test_to_completion("plan492_tests", std::time::Duration::from_secs(30));
             let (view, _, _) = dc.view_with_debug_gated(true);
             let _ = format!("{view:?}");
-            let s = dc
-                .bridge()
-                .read_state("s")
+            // PLAN-041 T-02: `s` is ChildGeo's instance-owned model field.
+            let s = child_field(&dc, "ChildGeo", "s")
                 .map(|v| v.to_string())
                 .unwrap_or_else(|e| format!("<err {e}>"));
             println!("dollar-brace .s = {s:?}");
@@ -222,9 +247,8 @@ widget ChildGeo (data: List, field: str = "v") {
             dc.drive_test_to_completion("plan492_tests", std::time::Duration::from_secs(30));
             let (view, _, _) = dc.view_with_debug_gated(true);
             let _ = format!("{view:?}");
-            let s = dc
-                .bridge()
-                .read_state("s")
+            // PLAN-041 T-02: `s` is ChildGeo's instance-owned model field.
+            let s = child_field(&dc, "ChildGeo", "s")
                 .map(|v| v.to_string())
                 .unwrap_or_else(|e| format!("<err {e}>"));
             println!("no-bracket .s = {s:?}");
@@ -244,9 +268,8 @@ widget ChildGeo (data: List, field: str = "v") {
             dc.drive_test_to_completion("plan492_tests", std::time::Duration::from_secs(30));
             let (view, _, _) = dc.view_with_debug_gated(true);
             let _ = format!("{view:?}");
-            let s = dc
-                .bridge()
-                .read_state("s")
+            // PLAN-041 T-02: `s` is ChildGeo's instance-owned model field.
+            let s = child_field(&dc, "ChildGeo", "s")
                 .map(|v| v.to_string())
                 .unwrap_or_else(|e| format!("<err {e}>"));
             // 语义锚: {} 花括号形式在 f-string 中是纯字面量,不插值。
@@ -402,9 +425,22 @@ mod m1_pkg_fstr {
     use super::pkg_harness::{build_patched_gallery, prepare_patched_gallery, render_dump};
     use crate::ui::vm_bridge::InitDemandPhase;
 
-    /// dollar-brace 直写(M6 后组件原生形态,无补丁): 几何+band 全存活。
-    #[test]
-    fn pkg_init_fstr_dollar_bracket_keeps_geometry() {
+        /// PLAN-041 T-02: init records are keyed by instance identity —
+        /// resolve a widget type's first live instance's phase.
+        fn instance_phase(dc: &crate::ui::dynamic::DynamicComponent, widget_type: &str) -> Option<crate::ui::vm_bridge::InitDemandPhase> {
+            let identity = dc
+                .bridge()
+                .child_instance_identities()
+                .into_iter()
+                .find(|id| {
+                    id.rsplit('/').next().unwrap_or(id).split('#').next() == Some(widget_type)
+                })?;
+            dc.bridge().init_demand_phase(&identity)
+        }
+
+        /// dollar-brace 直写(M6 后组件原生形态,无补丁): 几何+band 全存活。
+        #[test]
+        fn pkg_init_fstr_dollar_bracket_keeps_geometry() {
         let (mut dc, _) = build_patched_gallery("m1-dollar", &[]);
         let dump = render_dump(&mut dc);
         assert!(
@@ -424,7 +460,7 @@ mod m1_pkg_fstr {
         let (mut healthy_dc, healthy_app) = build_patched_gallery("m1-canary-healthy", &[]);
         let healthy = render_dump(&mut healthy_dc).matches("MouseArea").count();
         assert_eq!(
-            healthy_dc.bridge().init_demand_phase("BarChart"),
+            instance_phase(&healthy_dc, "BarChart"),
             Some(InitDemandPhase::Done)
         );
         let bad_app = prepare_patched_gallery(
@@ -478,19 +514,34 @@ mod m1_pkg_fstr {
             .expect("runtime fault injection must pass the real domain parser");
         let dump = render_dump(&mut dc);
         assert_eq!(
-            dc.bridge().init_demand_phase("BarChart"),
+            instance_phase(&dc, "BarChart"),
             Some(InitDemandPhase::Failed),
             "negative control must reach Init and fail there"
         );
         for sibling in ["LineChart", "AreaChart", "DonutChart"] {
             assert_eq!(
-                dc.bridge().init_demand_phase(sibling),
+                instance_phase(&dc, sibling),
                 Some(InitDemandPhase::Done),
                 "{sibling} Init must remain completed"
             );
         }
+        // PLAN-041 T-02: dispatch through the instance (root re-dispatch no
+        // longer carries child props — the fault lives on the instance path).
+        let bar_identity = dc
+            .bridge()
+            .child_instance_identities()
+            .into_iter()
+            .find(|id| {
+                id.rsplit('/').next().unwrap_or(id).split('#').next() == Some("BarChart")
+            })
+            .expect("BarChart instance live");
+        let bar_obj = dc
+            .bridge()
+            .child_instance_state_id(&bar_identity)
+            .expect("BarChart state object");
         let error = dc
-            .call_widget_handler("BarChart", "Init", &[])
+            .bridge_mut()
+            .call_handler_for("BarChart", "Init", bar_obj, &[])
             .expect_err("the injected handler must fail in the VM");
         assert!(
             format!("{error:?}").contains("DivisionByZero"),

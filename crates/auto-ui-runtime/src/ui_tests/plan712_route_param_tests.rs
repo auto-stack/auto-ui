@@ -76,6 +76,21 @@ widget detail {
     dir.path().join("app.at")
 }
 
+
+/// PLAN-041 T-02: page model fields are instance-owned — read through the
+/// page's outlet instance (root no longer carries child model fields).
+fn page_field(
+    dc: &crate::ui::dynamic::DynamicComponent,
+    field: &str,
+) -> Option<auto_val::Value> {
+    let identity = dc
+        .bridge()
+        .child_instance_identities()
+        .into_iter()
+        .find(|id| id.contains("detail") || id.contains("home"))?;
+    dc.bridge().read_instance_state(&identity, field).ok()
+}
+
 /// push("/book/7") 后 `__route_params` 应含 id="7"，页 Init 的
 /// `router.param("id")` 应取到 "7"。
 #[test]
@@ -111,7 +126,8 @@ fn route_param_survives_push_and_reaches_page_init() {
     }
 
     // detail 页 Init 已被 outlet 挂载 demand 驱动：got 应为 "7"。
-    let got = dc.read_state("got").ok();
+    // PLAN-041 T-02: 页模型字段实例所有，经实例读通道断言。
+    let got = page_field(&dc, "got");
     assert_eq!(
         got,
         Some(auto_val::Value::Str("7".into())),
@@ -184,9 +200,9 @@ widget home {
     dc.drive_scheduler_to_quiescence(10_000);
     let _ = dc.view_with_debug_gated(true);
     assert_eq!(
-        dc.read_state("seeded").ok(),
+        page_field(&dc, "seeded"),
         Some(auto_val::Value::Str("yes".into())),
-        "Init 种子必须已跑"
+        "Init 种子必须已跑（实例态）"
     );
 
     // 构建产物的 Debug 串里检查逐实例烘焙实参。
@@ -227,9 +243,9 @@ fn page_init_reruns_when_route_param_changes() {
     let _ = dc.view_with_debug_gated(true);
     dc.drive_scheduler_to_quiescence(10_000);
     assert_eq!(
-        dc.read_state("got").ok(),
+        page_field(&dc, "got"),
         Some(auto_val::Value::Str("7".into())),
-        "首次装载应取到 7"
+        "首次装载应取到 7（实例态）"
     );
 
     // 二次导航：/book/8 —— fixture 的 home.Go 固定 push 7，这里直写路由
@@ -238,8 +254,8 @@ fn page_init_reruns_when_route_param_changes() {
     let _ = dc.view_with_debug_gated(true);
     dc.drive_scheduler_to_quiescence(10_000);
     assert_eq!(
-        dc.read_state("got").ok(),
+        page_field(&dc, "got"),
         Some(auto_val::Value::Str("8".into())),
-        "参数变化必须重跑页 Init（导航=新装载）；滞留 7 = 同代际不重派复现"
+        "参数变化必须重跑页 Init（导航=新装载）；滞留 7 = 同代际不重派复现（实例态）"
     );
 }

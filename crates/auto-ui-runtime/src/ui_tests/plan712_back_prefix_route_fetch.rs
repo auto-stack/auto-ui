@@ -119,6 +119,21 @@ on {
         crate::build_dynamic_component(&code, app_path.to_str()).expect("routes app 必须能编译")
     };
 
+
+/// PLAN-041 T-02: page model fields are instance-owned — poll/read through
+/// the page's outlet instance (root no longer carries child model fields).
+fn page_field(
+    dc: &crate::ui::dynamic::DynamicComponent,
+    field: &str,
+) -> Option<auto_val::Value> {
+    let identity = dc
+        .bridge()
+        .child_instance_identities()
+        .into_iter()
+        .find(|id| id.contains("detail") || id.contains("home"))?;
+    dc.bridge().read_instance_state(&identity, field).ok()
+}
+
     // ④ 驱动 Init（页 Init 是 demand 制——**先渲染**：outlet 挂载路由页
     //    时才登记页 Init demand（437 同款），再泵驱动；parked fetch 由
     //    async HTTP 执行器就绪，外层轮询等待）。
@@ -129,7 +144,7 @@ on {
     while std::time::Instant::now() < deadline {
         dc.drive_scheduler_to_quiescence(10_000);
         let _ = dc.view_with_debug_gated(true);
-        if matches!(dc.read_state("ok"), Ok(auto_val::Value::Bool(true))) {
+        if matches!(page_field(&dc, "ok"), Some(auto_val::Value::Bool(true))) {
             ok = true;
             break;
         }
@@ -163,8 +178,8 @@ on {
         "请求行应带 /apps/<key>/api 前缀，实际：{paths:?}"
     );
     assert_eq!(
-        dc.read_state("title").ok(),
+        page_field(&dc, "title"),
         Some(auto_val::Value::Str("The Source".into())),
-        "响应体应经 get_json 回灌到页状态"
+        "响应体应经 get_json 回灌到页状态（实例态）"
     );
 }

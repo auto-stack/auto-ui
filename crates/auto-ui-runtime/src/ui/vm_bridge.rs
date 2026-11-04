@@ -124,6 +124,55 @@ pub enum RecordValue {
     Null,
 }
 
+/// PLAN-041 T-02: one same-type child call-site instance. `state_obj_id` is
+/// a dedicated heap object laid out as `<Child>_State` (own model fields +
+/// props + the `__auto_parent`/`__auto_root` instance refs). `generation`
+/// increments across release/remount cycles so a late (parked) dispatch
+/// bound to a dead generation is dropped instead of re-targeting the
+/// same-named new instance (plan §5.2 contract 4).
+#[derive(Debug, Clone)]
+pub struct ChildInstanceRecord {
+    pub state_obj_id: u64,
+    pub generation: u64,
+    /// The `__auto_parent` VmRef stake taken at allocation (released at
+    /// instance release; the root is permanently staked so the retained
+    /// count is bookkeeping, not lifetime).
+    parent_state_id: u64,
+}
+
+
+/// PLAN-041 T-02: push the `__auto_root` self-reference onto a root state
+/// object. See the call sites in `new_with_children` / `new_from_decls`.
+/// PLAN-041 T-02: short deterministic token for an instance identity — used
+/// only as a diagnostic suffix on the heap object name (`<Child>_State@…`).
+fn instance_token(identity: &str) -> String {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for b in identity.as_bytes() {
+        h ^= *b as u64;
+        h = h.wrapping_mul(0x1000_0000_01b3);
+    }
+    format!("{h:08x}")
+}
+
+fn install_root_self_ref(vm: &mut AutoVM, state_obj_id: u64) {
+    let Some(obj) = vm.get_heap_object(state_obj_id) else {
+        return;
+    };
+    {
+        let mut guard = obj.write().unwrap();
+        let Some(inst) = guard.as_any_mut().downcast_mut::<GenericInstanceData>() else {
+            return;
+        };
+        if inst.field_names.iter().any(|n| n == "__auto_root") {
+            return;
+        }
+        inst.field_names.push("__auto_root".to_string());
+        inst.fields.push(auto_val::Value::VmRef(auto_val::VmRef {
+            id: state_obj_id as usize,
+        }));
+    }
+}
+
 pub struct VmBridge {
     /// AutoVM instance (owned, isolated per widget)
     vm: AutoVM,
@@ -144,6 +193,31 @@ pub struct VmBridge {
     /// mutability so AuraViewBuilder (which holds &VmBridge) can create/update
     /// child states during rendering.
     child_state_map: std::cell::RefCell<std::collections::HashMap<String, u64>>,
+
+    /// PLAN-041 T-02: per-call-site child instance records keyed by stable
+    /// instance identity (`<parent_path>/<child>#<key|slot>`). Each record
+    /// owns a dedicated GenericInstanceData heap object holding the child's
+    /// own model fields + props, so same-type siblings stop sharing root
+    /// slots (plan-041 §5.2 contract 1: 相同类型/字段名不是共享理由).
+    /// RefCell for the same render-path interior-mutability reason as
+    /// `child_state_map`.
+    child_instances: std::cell::RefCell<std::collections::HashMap<String, ChildInstanceRecord>>,
+
+    /// PLAN-041 T-02: instance identities seen during the current / previous
+    /// view build frame. An identity registered last frame but absent this
+    /// frame was unmounted (conditional branch closed it / keyed row
+    /// deleted): its state object is released at frame end — same-App
+    /// semantics as the PLAN-654 mount-path frame (Vue v-if unmount; plan
+    /// V-03/V-05: 删除只释放目标, 迟到回调不重定向).
+    instance_seen_cur: std::cell::RefCell<std::collections::HashSet<String>>,
+    instance_seen_prev: std::cell::RefCell<std::collections::HashSet<String>>,
+
+    /// PLAN-041 T-02: per-frame occurrence counters for unkeyed same-name
+    /// call sites (`<parent_identity>|<child_name>` → 0,1,2…). Deterministic
+    /// per frame (depth-first build order); reset in
+    /// [`Self::begin_child_instance_frame`]. Keyed call sites bypass the
+    /// counter (identity = explicit key).
+    instance_site_seq: std::cell::RefCell<std::collections::HashMap<String, usize>>,
 
     /// Audit B12(b): declared parameter count per `(widget, event)` handler,
     /// from the on-blocks the module was synthesized from. Dispatch sites use
@@ -418,6 +492,10 @@ pub enum InitDemandPhase {
 /// 相位，完成与否由派发驱动真实记账。
 #[derive(Debug, Clone)]
 struct InitDemandRecord {
+    /// PLAN-041 T-02: owning widget name (records are keyed by init
+    /// identity now — per-instance Init — so fn-name failure matching needs
+    /// the name here).
+    widget: String,
     identity: String,
     phase: InitDemandPhase,
     generation: u64,
@@ -729,6 +807,12 @@ impl VmBridge {
         // Plan 419: widget state 的永久 stake(bridges 与 VM 同寿命;每次
         // call_handler 的 push/RET-sweep 在此之上配平)。
         vm.rc_retain_id(state_obj_id);
+        // PLAN-041 T-02: root 态对象的 `__auto_root` 自引用（VmRef→root）。
+        // 实例分裂后 child handler 体的 store 字段/方法与父属字段改写统一
+        // 经 `__state.__auto_root.<f>` 指向 App 级共享态；root 自身该字段
+        // 指回自己 → 全件统一码形、root 行为零变化。root 永久 stake 覆盖
+        // 自引用的 retain（root 从不释放，无泄漏面）。
+        install_root_self_ref(&mut vm, state_obj_id);
 
         // Audit B12(b): record declared handler arities (root + children) so
         // dispatch can skip phantom string args at no-param handlers.
@@ -746,6 +830,10 @@ impl VmBridge {
             state_field_names: field_names,
             widget_name,
             child_state_map: std::cell::RefCell::new(std::collections::HashMap::new()),
+            child_instances: std::cell::RefCell::new(std::collections::HashMap::new()),
+            instance_seen_cur: std::cell::RefCell::new(std::collections::HashSet::new()),
+            instance_seen_prev: std::cell::RefCell::new(std::collections::HashSet::new()),
+            instance_site_seq: std::cell::RefCell::new(std::collections::HashMap::new()),
             handler_param_names,
             import_aliases: import_aliases.clone(),
             store_alias_snapshot,
@@ -959,6 +1047,12 @@ impl VmBridge {
         // Plan 419: widget state 的永久 stake(bridges 与 VM 同寿命;每次
         // call_handler 的 push/RET-sweep 在此之上配平)。
         vm.rc_retain_id(state_obj_id);
+        // PLAN-041 T-02: root 态对象的 `__auto_root` 自引用（VmRef→root）。
+        // 实例分裂后 child handler 体的 store 字段/方法与父属字段改写统一
+        // 经 `__state.__auto_root.<f>` 指向 App 级共享态；root 自身该字段
+        // 指回自己 → 全件统一码形、root 行为零变化。root 永久 stake 覆盖
+        // 自引用的 retain（root 从不释放，无泄漏面）。
+        install_root_self_ref(&mut vm, state_obj_id);
 
         // Audit B12(b): record declared handler arities (root + children) so
         // dispatch can skip phantom string args at no-param handlers.
@@ -976,6 +1070,10 @@ impl VmBridge {
             state_field_names: field_names,
             widget_name,
             child_state_map: std::cell::RefCell::new(std::collections::HashMap::new()),
+            child_instances: std::cell::RefCell::new(std::collections::HashMap::new()),
+            instance_seen_cur: std::cell::RefCell::new(std::collections::HashSet::new()),
+            instance_seen_prev: std::cell::RefCell::new(std::collections::HashSet::new()),
+            instance_site_seq: std::cell::RefCell::new(std::collections::HashMap::new()),
             handler_param_names,
             import_aliases: import_aliases.clone(),
             store_alias_snapshot,
@@ -1074,12 +1172,24 @@ impl VmBridge {
     /// * `field_name` - Name of the state field
     /// * `value` - New value for the field
     pub fn write_state(&mut self, field_name: &str, value: Value) -> Result<()> {
+        self.write_state_onto(self.state_obj_id, field_name, value)
+    }
+
+    /// PLAN-041 T-02: write a state field onto an explicit state object
+    /// (root contract unchanged via [`Self::write_state`]; instance-bound
+    /// input back-writes land on the instance object).
+    pub fn write_state_onto(
+        &mut self,
+        target_obj_id: u64,
+        field_name: &str,
+        value: Value,
+    ) -> Result<()> {
         // Find field index by name — same cached-list-first + live-object
         // fallback as read_state (Plan 049 child model-var defaults).
-        let obj = self.vm.get_heap_object(self.state_obj_id).ok_or_else(|| {
+        let obj = self.vm.get_heap_object(target_obj_id).ok_or_else(|| {
             VmBridgeError::InvalidState(format!(
                 "state heap object {} not found",
-                self.state_obj_id
+                target_obj_id
             ))
         })?;
         let field_index = {
@@ -1102,11 +1212,11 @@ impl VmBridge {
         // Access the heap object with write access
         let obj = self
             .vm
-            .get_heap_object_mut(self.state_obj_id)
+            .get_heap_object_mut(target_obj_id)
             .ok_or_else(|| {
                 VmBridgeError::InvalidState(format!(
                     "state heap object {} not found",
-                    self.state_obj_id
+                    target_obj_id
                 ))
             })?;
 
@@ -1134,7 +1244,7 @@ impl VmBridge {
         // 原本不动——`set_route` 等桥写通道因此对 memo 快速路径不可见（陈旧
         // 误命中）。与 engine 突变臂同口径在此补 bump（PLAN-045 决策注记②）。
         // PLAN-047 T-03: A 类定点归因（bump_path 内含全局 bump，语义不变）。
-        self.vm.bump_path(self.state_obj_id, Some(field_name));
+        self.vm.bump_path(target_obj_id, Some(field_name));
         Ok(())
     }
 
@@ -1818,6 +1928,280 @@ impl VmBridge {
         root_id
     }
 
+    // ==========================================================================
+    // PLAN-041 T-02: per-instance child state (instance ownership).
+    // Contract: 同型 child 的 model/props/handler receiver 独立；store 在同
+    // App context 内保既有共享（经 `__auto_root` 端口）；帧缺席 = 卸载释放；
+    // 迟到回调按 (identity, generation) 丢弃，不重定向同名新实例。
+    // ==========================================================================
+
+    /// PLAN-041 T-02: resolve (or lazily allocate) the per-call-site instance
+    /// state object for `identity`. First sighting allocates a
+    /// `<Child>_State` layout seeded from `props` (model defaults + resolved
+    /// props, exactly the seed set the merged path used to write into root)
+    /// plus the `__auto_parent` / `__auto_root` instance refs. Later frames
+    /// re-seed declared PROPS only (value-change-only bump, PLAN-045 T-02
+    /// discipline); model fields stay instance-owned (PLAN-536 T8).
+    pub fn ensure_child_instance(
+        &self,
+        widget_name: &str,
+        identity: &str,
+        parent_state_id: u64,
+        field_names: &[String],
+        prop_names: &std::collections::HashSet<String>,
+        props: &std::collections::HashMap<String, auto_val::Value>,
+    ) -> u64 {
+        self.instance_seen_cur
+            .borrow_mut()
+            .insert(identity.to_string());
+
+        if let Some(rec) = self.child_instances.borrow().get(identity).cloned() {
+            // Re-seed props onto the existing instance object.
+            if let Some(obj) = self.vm.get_heap_object(rec.state_obj_id) {
+                let mut guard = obj.write().unwrap();
+                if let Some(inst) = guard.as_any_mut().downcast_mut::<GenericInstanceData>() {
+                    for (name, val) in props {
+                        if !prop_names.contains(name) {
+                            continue;
+                        }
+                        let storable = self.materialize_init_value(val);
+                        if let Some(idx) = inst.field_names.iter().position(|n| n == name) {
+                            let changed = inst.get_field(idx) != Some(&storable);
+                            if changed {
+                                if let Some(old) = inst.get_field(idx) {
+                                    self.release_init_value(old);
+                                }
+                                self.stake_state_value(&storable);
+                                let _ = inst.set_field(idx, storable);
+                                self.vm.bump_path(rec.state_obj_id, Some(name));
+                            }
+                        } else {
+                            self.stake_state_value(&storable);
+                            inst.field_names.push(name.clone());
+                            inst.fields.push(storable);
+                            self.vm.bump_path(rec.state_obj_id, Some(name));
+                        }
+                    }
+                }
+            }
+            return rec.state_obj_id;
+        }
+
+        // First sighting: allocate the instance object.
+        let mut names: Vec<String> = Vec::with_capacity(field_names.len() + 2);
+        let mut values: Vec<auto_val::Value> = Vec::with_capacity(field_names.len() + 2);
+        for name in field_names {
+            let v = props.get(name).cloned().unwrap_or(auto_val::Value::Nil);
+            let storable = self.materialize_init_value(&v);
+            self.stake_state_value(&storable);
+            names.push(name.clone());
+            values.push(storable);
+        }
+        // Instance refs: parent chain + App root. GET_FIELD follows VmRef, so
+        // the handler-body rewrites (`__state.__auto_root.<f>`) resolve store
+        // and parent-owned fields at the shared App-level state while own
+        // fields stay instance-local. Refs are retained against the parent /
+        // root stakes and released at instance release.
+        names.push("__auto_parent".to_string());
+        values.push(auto_val::Value::VmRef(auto_val::VmRef {
+            id: parent_state_id as usize,
+        }));
+        names.push("__auto_root".to_string());
+        values.push(auto_val::Value::VmRef(auto_val::VmRef {
+            id: self.state_obj_id as usize,
+        }));
+        self.vm.rc_retain_id(parent_state_id);
+        self.vm.rc_retain_id(self.state_obj_id);
+
+        let mono_name = format!("{}_State@{}", widget_name, instance_token(identity));
+        let inst = GenericInstanceData::new_with_names(mono_name, values, names);
+        let obj_id = self.vm.insert_heap_object(inst);
+        // Mounted-lifetime permanent stake (mirrors the root's Plan 419
+        // stake); released at instance release so the heap GC can reap.
+        self.vm.rc_retain_id(obj_id);
+        self.child_instances.borrow_mut().insert(
+            identity.to_string(),
+            ChildInstanceRecord {
+                state_obj_id: obj_id,
+                generation: 0,
+                parent_state_id,
+            },
+        );
+        obj_id
+    }
+
+    /// PLAN-041 T-02: current state object id for an instance identity.
+    pub fn child_instance_state_id(&self, identity: &str) -> Option<u64> {
+        self.child_instances
+            .borrow()
+            .get(identity)
+            .map(|rec| rec.state_obj_id)
+    }
+
+    /// PLAN-041 T-02: re-seed a props snapshot onto a specific state object
+    /// (value-change-only bump; PLAN-045 T-02 discipline). Shared by the
+    /// instance re-seed path and the Init-demand pre-dispatch replay.
+    fn reseed_props_onto(
+        &self,
+        obj_id: u64,
+        props: &std::collections::HashMap<String, auto_val::Value>,
+    ) {
+        if let Some(obj) = self.vm.get_heap_object(obj_id) {
+            let mut guard = obj.write().unwrap();
+            if let Some(inst) = guard.as_any_mut().downcast_mut::<GenericInstanceData>() {
+                for (name, val) in props {
+                    let storable = self.materialize_init_value(val);
+                    if let Some(idx) = inst.field_names.iter().position(|n| n == name) {
+                        let changed = inst.get_field(idx) != Some(&storable);
+                        if changed {
+                            if let Some(old) = inst.get_field(idx) {
+                                self.release_init_value(old);
+                            }
+                            self.stake_state_value(&storable);
+                            let _ = inst.set_field(idx, storable);
+                            self.vm.bump_path(obj_id, Some(name));
+                        }
+                    } else {
+                        self.stake_state_value(&storable);
+                        inst.field_names.push(name.clone());
+                        inst.fields.push(storable);
+                        self.vm.bump_path(obj_id, Some(name));
+                    }
+                }
+            }
+        }
+    }
+
+    /// PLAN-041 T-02: all live instance identities (diagnostics/tests/
+    /// acceptance oracles; deterministic order for stable assertions).
+    pub fn child_instance_identities(&self) -> Vec<String> {
+        let mut ids: Vec<String> = self.child_instances.borrow().keys().cloned().collect();
+        ids.sort();
+        ids
+    }
+
+    /// PLAN-041 T-02: read a field from an instance's own state object
+    /// (oracle channel; no parent-chain fallback — use the root read for
+    /// shared/store fields).
+    pub fn read_instance_state(
+        &self,
+        identity: &str,
+        field_name: &str,
+    ) -> Result<auto_val::Value> {
+        let id = self
+            .child_instance_state_id(identity)
+            .ok_or_else(|| VmBridgeError::InvalidState(format!("no instance `{identity}`")))?;
+        self.read_child_state(id, field_name)
+    }
+
+    /// PLAN-041 T-02: write a field on an instance's own state object
+    /// (mechanism-test / host channel; change-only bump discipline).
+    pub fn write_instance_state(
+        &mut self,
+        identity: &str,
+        field_name: &str,
+        value: auto_val::Value,
+    ) -> Result<()> {
+        let id = self
+            .child_instance_state_id(identity)
+            .ok_or_else(|| VmBridgeError::InvalidState(format!("no instance `{identity}`")))?;
+        self.write_state_onto(id, field_name, value)
+    }
+
+    /// PLAN-041 T-02: instance identity for a state object (dispatch side:
+    /// a late/parked task carries the id it was dispatched with; this
+    /// resolves which live identity — if any — still owns it).
+    pub fn child_instance_identity_of(&self, state_obj_id: u64) -> Option<String> {
+        self.child_instances
+            .borrow()
+            .iter()
+            .find(|(_, rec)| rec.state_obj_id == state_obj_id)
+            .map(|(id, _)| id.clone())
+    }
+
+    /// PLAN-041 T-02: memo-hit liveness replay. A memoized subtree hit skips
+    /// its build traversal, so the instances inside it never re-register this
+    /// frame and the end-of-frame sweep would release live objects. The memo
+    /// key carries the subtree owner's state object (`ctx_state_obj`): mark
+    /// that instance — and every instance nested under its identity prefix —
+    /// as seen for this frame. Conservative by design (over-marking only
+    /// delays a release by the memo entry's lifetime; under-marking would
+    /// release live state).
+    pub fn memo_hit_replay_instances(&self, ctx_state_obj: u64) {
+        let owner = self.child_instance_identity_of(ctx_state_obj);
+        let prefix = match &owner {
+            Some(id) => format!("{}/", id),
+            None => String::new(),
+        };
+        let mut seen = self.instance_seen_cur.borrow_mut();
+        if let Some(id) = &owner {
+            seen.insert(id.clone());
+        }
+        for identity in self.child_instances.borrow().keys() {
+            if identity.starts_with(&prefix) {
+                seen.insert(identity.clone());
+            }
+        }
+    }
+
+    /// PLAN-041 T-02: start a view build frame. Identities seen in the
+    /// previous frame but not registered during this one are unmounted.
+    pub fn begin_child_instance_frame(&self) {
+        let cur = self.instance_seen_cur.borrow().clone();
+        *self.instance_seen_prev.borrow_mut() = cur;
+        self.instance_seen_cur.borrow_mut().clear();
+        self.instance_site_seq.borrow_mut().clear();
+    }
+
+    /// PLAN-041 T-02: next deterministic occurrence index for an unkeyed
+    /// same-name call site within the current build frame.
+    pub fn next_instance_site_seq(&self, parent_identity: &str, child_name: &str) -> usize {
+        let key = format!("{}|{}", parent_identity, child_name);
+        let mut seq = self.instance_site_seq.borrow_mut();
+        let n = seq.entry(key).or_insert(0);
+        let v = *n;
+        *n += 1;
+        v
+    }
+
+    /// PLAN-041 T-02: end a view build frame — release instances that were
+    /// mounted last frame and are absent this frame (Vue v-if/删除语义).
+    pub fn end_child_instance_frame(&self) {
+        let prev = self.instance_seen_prev.borrow().clone();
+        let cur = self.instance_seen_cur.borrow().clone();
+        for identity in prev.difference(&cur) {
+            self.release_child_instance(identity);
+        }
+        self.instance_seen_prev.borrow_mut().clear();
+    }
+
+    /// PLAN-041 T-02: release one instance's state object: drop the mounted
+    /// stake + field stakes + instance-ref stakes, drop any Init demand
+    /// record bound to the identity (remount re-Inits, os-config identity
+    /// semantics), remove the registry entry. The heap object becomes
+    /// garbage collected by the regular RC reaper; its id is never reused.
+    fn release_child_instance(&self, identity: &str) {
+        let Some(rec) = self.child_instances.borrow_mut().remove(identity) else {
+            return;
+        };
+        if let Some(obj) = self.vm.get_heap_object(rec.state_obj_id) {
+            let field_values: Vec<auto_val::Value> = {
+                let guard = obj.read().unwrap();
+                match guard.as_any().downcast_ref::<GenericInstanceData>() {
+                    Some(inst) => inst.fields.clone(),
+                    None => Vec::new(),
+                }
+            };
+            for v in &field_values {
+                self.release_init_value(v);
+            }
+        }
+        self.vm.rc_release_id(rec.parent_state_id);
+        self.vm.rc_release_id(self.state_obj_id);
+        self.vm.rc_release_id(rec.state_obj_id);
+        self.init_demand_records.borrow_mut().remove(identity);
+    }
+
     /// PLAN-536 T3(题2 收敛): 子件 Init 挂载判定——该子件名首次出现返回
     /// true（调用方派发 Init 并记账）,此后每帧重渲染恒 false。挂载语义对齐
     /// vue onMounted（props 响应走 watch/computed,不靠 Init 重放）。
@@ -2360,8 +2744,10 @@ impl VmBridge {
     /// 登记的身份是否与传入身份不同（或从未登记）。供 memo 路径在"身份
     /// 变化才准备 child state + 登记"的旁路判定用；真实登记仍走
     /// [`Self::register_init_demand`]。
-    pub fn init_identity_changed(&self, widget_name: &str, identity: &str) -> bool {
-        match self.init_demand_records.borrow().get(widget_name) {
+    pub fn init_identity_changed(&self, _widget_name: &str, identity: &str) -> bool {
+        // PLAN-041 T-02: records are keyed by init identity (per-instance
+        // Init) — the name parameter is legacy surface.
+        match self.init_demand_records.borrow().get(identity) {
             Some(rec) => rec.identity != identity,
             None => true,
         }
@@ -2369,6 +2755,9 @@ impl VmBridge {
 
     /// PLAN-711 T-03: 某 widget 的 demand 相位（诊断/测试/骨架态查询）。
     pub fn init_demand_phase(&self, widget_name: &str) -> Option<InitDemandPhase> {
+        // PLAN-041 T-02: callers pass the instance init identity (records
+        // keyed per instance); a bare widget name misses → None (no gating),
+        // which keeps legacy single-site semantics intact.
         self.init_demand_records
             .borrow()
             .get(widget_name)
@@ -2397,7 +2786,8 @@ impl VmBridge {
         }
         let mut records = self.init_demand_records.borrow_mut();
         let generation = self.init_generation.get();
-        match records.get_mut(widget_name) {
+        // PLAN-041 T-02: record key = init identity (per-instance Init)。
+        match records.get_mut(identity) {
             Some(rec) if rec.identity == identity => {
                 // 同代际：Queued/InFlight 不重复入队；Done/Failed 终态同样
                 // 不重派（Init 挂载语义每代际一次，PLAN-536 语义保持）。
@@ -2419,6 +2809,7 @@ impl VmBridge {
                 let old_identity = rec.identity.clone();
                 let had_pending = rec.phase == InitDemandPhase::Queued;
                 let had_in_flight = rec.phase == InitDemandPhase::InFlight;
+                rec.widget = widget_name.to_string();
                 rec.identity = identity.to_string();
                 rec.phase = InitDemandPhase::Queued;
                 rec.generation = generation + 1;
@@ -2435,8 +2826,9 @@ impl VmBridge {
             }
             None => {
                 records.insert(
-                    widget_name.to_string(),
+                    identity.to_string(),
                     InitDemandRecord {
+                        widget: widget_name.to_string(),
                         identity: identity.to_string(),
                         phase: InitDemandPhase::Queued,
                         generation: generation + 1,
@@ -2501,9 +2893,11 @@ impl VmBridge {
     /// 否则上面的"已出册=收敛"探测只能看见 InFlight 并把失败静默翻成 Done。
     fn mark_init_demand_failed_by_fn(&self, failed_fn_name: &str) {
         let mut records = self.init_demand_records.borrow_mut();
-        for (widget, rec) in records.iter_mut() {
+        for rec in records.values_mut() {
+            // PLAN-041 T-02: records keyed by init identity; the widget name
+            // rides in the record for fn-name matching.
             if rec.phase == InitDemandPhase::InFlight
-                && crate::ui::handler_codegen::namespaced_handler_fn_name(widget, "Init")
+                && crate::ui::handler_codegen::namespaced_handler_fn_name(&rec.widget, "Init")
                     == failed_fn_name
             {
                 rec.phase = InitDemandPhase::Failed;
@@ -2567,7 +2961,7 @@ impl VmBridge {
                 // Missing：声明了 lifecycle.Init 但未导出——静默（正常程序
                 // 契约；异常导出缺失的显式失败面归 T-05 错误态）。
                 let mut records = self.init_demand_records.borrow_mut();
-                if let Some(rec) = records.get_mut(&demand.widget_name) {
+                if let Some(rec) = records.get_mut(&demand.identity) {
                     rec.phase = InitDemandPhase::Done;
                     // PLAN-712 r2 T-16：Missing 翻转同样入账——「Loading…」
                     // 占位符需要一次重建才能清除（否则未导出 Init 的页面
@@ -2583,10 +2977,25 @@ impl VmBridge {
             // PLAN-711 T-03: 派发前重播种登记时 props 快照（统一根态约束，
             // 见 InitDemand.props 注）——等价复刻旧同步路径"播种后立即派发"
             // 的交错语义；值变化才 bump（ensure_child_state 既有纪律）。
+            // PLAN-041 T-02: 重播种落点改为 demand 自身的 state_obj_id——
+            // 实例分裂后 Init demand 携带注册实例的对象 id（prepare 阶段
+            // ensure_child_instance 的返回值），props 属于该实例而非 root。
             if !demand.props.is_empty() {
                 let props_map: std::collections::HashMap<String, auto_val::Value> =
                     demand.props.iter().cloned().collect();
-                self.ensure_child_state(&demand.widget_name, &[], &props_map);
+                let target = if self
+                    .child_instance_identity_of(state_obj_id)
+                    .is_some()
+                {
+                    state_obj_id
+                } else {
+                    self.ensure_child_state(&demand.widget_name, &[], &props_map)
+                };
+                if target != self.state_obj_id {
+                    self.reseed_props_onto(target, &props_map);
+                } else {
+                    self.ensure_child_state(&demand.widget_name, &[], &props_map);
+                }
             }
             // The root fields now own the replayed values, including failed Init paths.
             for (_, value) in &demand.props {
@@ -2603,21 +3012,21 @@ impl VmBridge {
                     // Ok = 段已接受（同步完成 / park 在册 / 重入忽略）。
                     if self.is_handler_parked(&fn_name) {
                         let mut records = self.init_demand_records.borrow_mut();
-                        if let Some(rec) = records.get_mut(&demand.widget_name) {
+                        if let Some(rec) = records.get_mut(&demand.identity) {
                             rec.phase = InitDemandPhase::InFlight;
                         }
                         report.in_flight += 1;
                         break; // 依赖序：后继 demand 等本段终态
                     }
                     let mut records = self.init_demand_records.borrow_mut();
-                    if let Some(rec) = records.get_mut(&demand.widget_name) {
+                    if let Some(rec) = records.get_mut(&demand.identity) {
                         rec.phase = InitDemandPhase::Done;
                     }
                     report.completed += 1;
                 }
                 Err(e) => {
                     let mut records = self.init_demand_records.borrow_mut();
-                    if let Some(rec) = records.get_mut(&demand.widget_name) {
+                    if let Some(rec) = records.get_mut(&demand.identity) {
                         rec.phase = InitDemandPhase::Failed;
                     }
                     eprintln!(

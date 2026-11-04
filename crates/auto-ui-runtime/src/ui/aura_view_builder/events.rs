@@ -49,10 +49,20 @@ impl<'a> AuraViewBuilder<'a> {
                 args.push(parse_event_param_literal(param));
             }
         }
-        DynamicMessage::Typed {
-            widget_name: self.widget_name.clone(),
-            event_name,
-            args,
+        // PLAN-041 T-02: 实例子树内的事件绑定携带实例身份（TypedInst），
+        // 派发面据此路由到实例态对象；root/legacy 绑定保持 Typed 原样。
+        match &self.instance_identity {
+            Some(identity) => DynamicMessage::TypedInst {
+                widget_name: self.widget_name.clone(),
+                event_name,
+                args,
+                instance: identity.clone(),
+            },
+            None => DynamicMessage::Typed {
+                widget_name: self.widget_name.clone(),
+                event_name,
+                args,
+            },
         }
     }
 
@@ -122,10 +132,19 @@ impl<'a> AuraViewBuilder<'a> {
 
     pub(super) fn event_to_message_impl(&self, handler: &str, _bindings: &Bindings) -> DynamicMessage {
         let handler_name = extract_handler_name(handler);
-        DynamicMessage::Typed {
-            widget_name: self.widget_name.clone(),
-            event_name: handler_name.to_string(),
-            args: vec![],
+        // PLAN-041 T-02: 同 event_to_message_with——实例子树带身份。
+        match &self.instance_identity {
+            Some(identity) => DynamicMessage::TypedInst {
+                widget_name: self.widget_name.clone(),
+                event_name: handler_name.to_string(),
+                args: vec![],
+                instance: identity.clone(),
+            },
+            None => DynamicMessage::Typed {
+                widget_name: self.widget_name.clone(),
+                event_name: handler_name.to_string(),
+                args: vec![],
+            },
         }
     }
 

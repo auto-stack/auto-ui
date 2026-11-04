@@ -126,8 +126,7 @@ mod plan499_axispointer {
         );
 
         // PointerArea 发布形态的 pipe-payload 消息(逻辑坐标 145,100)
-        dc.on_with_input_for(
-            "LineChart",
+        dc.on_with_input_for_instance_type("LineChart",
             "PointerMove\u{1F}f\u{1F}145\u{1F}f\u{1F}100",
             None,
         );
@@ -151,8 +150,7 @@ mod plan499_axispointer {
         );
 
         // 边界钳制:y 超上限钳 260,tooltip left 超上限钳 400
-        dc.on_with_input_for(
-            "LineChart",
+        dc.on_with_input_for_instance_type("LineChart",
             "PointerMove\u{1F}f\u{1F}560\u{1F}f\u{1F}290",
             None,
         );
@@ -168,7 +166,7 @@ mod plan499_axispointer {
         assert!(dump2.contains("Jun"), "x=560 吸附末点 i=5(Jun)");
 
         // PointerOut → 十字线消失
-        dc.on_with_input_for("LineChart", "PointerOut", None);
+        dc.on_with_input_for_instance_type("LineChart", "PointerOut", None);
         let dump3 = dump(&mut dc);
         assert!(
             !dump3.contains(r#"d=\"M 142 20 V 260\""#),
@@ -249,8 +247,7 @@ mod plan499_donut_sector {
         );
 
         // 扇区 0:Desktop
-        dc.on_with_input_for(
-            "DonutChart",
+        dc.on_with_input_for_instance_type("DonutChart",
             "PointerMove\u{1F}f\u{1F}130\u{1F}f\u{1F}210",
             None,
         );
@@ -262,8 +259,7 @@ mod plan499_donut_sector {
         );
 
         // 扇区 1:Mobile(换扇区不残留)
-        dc.on_with_input_for(
-            "DonutChart",
+        dc.on_with_input_for_instance_type("DonutChart",
             "PointerMove\u{1F}f\u{1F}55\u{1F}f\u{1F}157",
             None,
         );
@@ -271,8 +267,7 @@ mod plan499_donut_sector {
         assert!(d2.contains("Mobile"), "命中扇区 1 tooltip 标题 Mobile");
 
         // 内孔:离焦
-        dc.on_with_input_for(
-            "DonutChart",
+        dc.on_with_input_for_instance_type("DonutChart",
             "PointerMove\u{1F}f\u{1F}130\u{1F}f\u{1F}160",
             None,
         );
@@ -280,8 +275,7 @@ mod plan499_donut_sector {
         assert!(!d3.contains("ffffff"), "内孔命中 → 无 emphasis");
 
         // 环外:离焦
-        dc.on_with_input_for(
-            "DonutChart",
+        dc.on_with_input_for_instance_type("DonutChart",
             "PointerMove\u{1F}f\u{1F}130\u{1F}f\u{1F}250",
             None,
         );
@@ -318,12 +312,17 @@ mod plan499_anim {
             "plan499_pointer_stream_tests",
             std::time::Duration::from_secs(30),
         );
+        // PLAN-041 T-02: chart state fields are instance-owned — read via
+        // the owning chart's live instance (field names are chart-unique).
         let read = |dc: &mut crate::ui::dynamic::DynamicComponent, f: &str| {
-            dc.bridge_mut().read_state(f).unwrap()
+            dc.bridge()
+                .child_instance_identities()
+                .into_iter()
+                .find_map(|id| dc.bridge().read_instance_state(&id, f).ok())
+                .unwrap_or_else(|| panic!("field {f} not found on any chart instance"))
         };
         // 入场:边沿启动
-        dc.on_with_input_for(
-            "LineChart",
+        dc.on_with_input_for_instance_type("LineChart",
             "PointerMove\u{1F}f\u{1F}145\u{1F}f\u{1F}100",
             None,
         );
@@ -336,15 +335,14 @@ mod plan499_anim {
             "入场边沿启动插值(animLn=true)"
         );
         // 移动中不重置(hovered 已 true)
-        dc.on_with_input_for(
-            "LineChart",
+        dc.on_with_input_for_instance_type("LineChart",
             "PointerMove\u{1F}f\u{1F}200\u{1F}f\u{1F}100",
             None,
         );
         // 插值步进:4 拍到顶停摆(timer 的 when 门控由 renderer 订阅驱动,
         // 此处直接派发 tick 验证步进语义与到顶收敛)
         for expect in [25, 50, 75, 100] {
-            dc.on_with_input_for("LineChart", "AnimLnTick", None);
+            dc.on_with_input_for_instance_type("LineChart", "AnimLnTick", None);
             assert!(
                 matches!(read(&mut dc, "tipOpLn"), auto_val::Value::Int(v) if v == expect),
                 "AnimLnTick 步进至 {}",
@@ -356,8 +354,7 @@ mod plan499_anim {
             "到顶停摆(animLn=false)"
         );
         // 到顶后移动不重启(hovered 仍 true);离场复位
-        dc.on_with_input_for(
-            "LineChart",
+        dc.on_with_input_for_instance_type("LineChart",
             "PointerMove\u{1F}f\u{1F}145\u{1F}f\u{1F}100",
             None,
         );
@@ -374,7 +371,7 @@ mod plan499_anim {
             "到顶后 tooltip 满透明度落图(vm dump 解析后形态)"
         );
         // 离场复位
-        dc.on_with_input_for("LineChart", "PointerOut", None);
+        dc.on_with_input_for_instance_type("LineChart", "PointerOut", None);
         assert!(
             matches!(read(&mut dc, "tipOpLn"), auto_val::Value::Int(0))
                 && matches!(read(&mut dc, "animLn"), auto_val::Value::Bool(false)),
@@ -399,12 +396,17 @@ mod plan499_anim {
             "plan499_pointer_stream_tests",
             std::time::Duration::from_secs(30),
         );
+        // PLAN-041 T-02: chart state fields are instance-owned — read via
+        // the owning chart's live instance (field names are chart-unique).
         let read = |dc: &mut crate::ui::dynamic::DynamicComponent, f: &str| {
-            dc.bridge_mut().read_state(f).unwrap()
+            dc.bridge()
+                .child_instance_identities()
+                .into_iter()
+                .find_map(|id| dc.bridge().read_instance_state(&id, f).ok())
+                .unwrap_or_else(|| panic!("field {f} not found on any chart instance"))
         };
         // 扇区 0(Desktop)命中:入场边沿启动
-        dc.on_with_input_for(
-            "DonutChart",
+        dc.on_with_input_for_instance_type("DonutChart",
             "PointerMove\u{1F}f\u{1F}130\u{1F}f\u{1F}210",
             None,
         );
@@ -413,7 +415,7 @@ mod plan499_anim {
             "入场边沿启动插值(animDn=true)"
         );
         for expect in [25, 50, 75, 100] {
-            dc.on_with_input_for("DonutChart", "AnimDnTick", None);
+            dc.on_with_input_for_instance_type("DonutChart", "AnimDnTick", None);
             assert!(
                 matches!(read(&mut dc, "tipOpDn"), auto_val::Value::Int(v) if v == expect),
                 "AnimDnTick 步进至 {}",
@@ -432,8 +434,7 @@ mod plan499_anim {
             "到顶后 donut tooltip 满透明度落图"
         );
         // 内孔离焦:复位
-        dc.on_with_input_for(
-            "DonutChart",
+        dc.on_with_input_for_instance_type("DonutChart",
             "PointerMove\u{1F}f\u{1F}130\u{1F}f\u{1F}160",
             None,
         );

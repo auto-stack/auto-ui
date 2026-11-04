@@ -4612,6 +4612,8 @@ pub(crate) fn patch_input_values(
             if let Some(msg) = on_change {
                 let event_name = match msg {
                     DynamicMessage::Typed { event_name, .. } => event_name.clone(),
+                    // PLAN-041 T-02: devtools 回显面与 Typed 同名。
+                    DynamicMessage::TypedInst { event_name, .. } => event_name.clone(),
                     DynamicMessage::String(name) => name.clone(),
                 };
                 let clean_name = {

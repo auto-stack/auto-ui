@@ -475,18 +475,36 @@ impl<'a> AuraViewBuilder<'a> {
         {
             return View::Empty;
         }
+        // PLAN-041 T-02: 页实例身份单源 = 路由装饰的 init 身份——登记、
+        // memo 体 prepare 与渲染 pass 三处共用同一实例对象。
+        let pinned_identity = self.child_init_identity(page_widget, empty_props, bindings);
+        // PLAN-041 T-02: 作用域守卫——memo 体（prepare/fp 重解析/fill）期间
+        // outlet 级读槽解析指向页实例对象；Drop 恢复，全部 return 路径覆盖。
+        struct ScopedSlotOverride<'a> {
+            cell: &'a std::cell::Cell<Option<u64>>,
+        }
+        impl Drop for ScopedSlotOverride<'_> {
+            fn drop(&mut self) {
+                self.cell.set(None);
+            }
+        }
         // PLAN-711 T-03 (M-01): Init 登记化——渲染路径只登记 demand（判定
         // ≠完成，派发由泵驱动）；身份变化帧仍走全量 build（memo 旁路保留：
         // 新页内容必须真构建，Init 完成后的内容刷新由泵侧 dirty 传播承担）。
         let has_init = page_widget.lifecycle.iter().any(|l| l.name == "Init");
         if has_init {
-            let identity = self.child_init_identity(page_widget, empty_props, bindings);
+            let identity = pinned_identity.clone();
             if self
                 .bridge
                 .init_identity_changed(&page_widget.name, &identity)
             {
-                let (child_state_id, init_props) =
-                    self.prepare_child_render_state_snap(page_widget, empty_props, bindings);
+                let (child_state_id, _identity, init_props) = self
+                    .prepare_child_render_state_snap_impl(
+                        page_widget,
+                        empty_props,
+                        bindings,
+                        Some(identity.as_str()),
+                    );
                 let _decision = self.bridge.register_init_demand(
                     &page_widget.name,
                     &identity,
@@ -515,7 +533,16 @@ impl<'a> AuraViewBuilder<'a> {
             empty_props,
             empty_events,
         );
-        let _child_state_id = self.prepare_child_render_state(page_widget, empty_props, bindings);
+        let child_state_id = self.prepare_child_render_state_with_identity(
+            page_widget,
+            empty_props,
+            bindings,
+            &pinned_identity,
+        );
+        let _slot_scope = ScopedSlotOverride {
+            cell: &self.slot_resolution_override,
+        };
+        self.slot_resolution_override.set(Some(child_state_id));
 
         // 静态扫描（含组件模板读槽）+ 骨架键。
         let probe_on = tracked
@@ -595,6 +622,8 @@ impl<'a> AuraViewBuilder<'a> {
         )) = cached
         {
             if seq_at_fill == seq && gfp_entry == gfp {
+                self.bridge
+                    .memo_hit_replay_instances(key.ctx_state_obj);
                 self.bridge.with_memo_cache(|c| {
                     c.note_hit();
                     c.note_seq_fast(Some(SITE_OUTLET_PAGE));
@@ -613,6 +642,7 @@ impl<'a> AuraViewBuilder<'a> {
                 if let Some(pairs) = &dyn_deps {
                     if self.bridge.deps_unchanged(pairs) {
                         self.bridge.with_memo_cache(|c| {
+                            self.bridge.memo_hit_replay_instances(key.ctx_state_obj);
                             c.refresh_seq(&key, seq);
                             c.note_hit();
                             c.note_version_fast(Some(SITE_OUTLET_PAGE));
@@ -644,6 +674,7 @@ impl<'a> AuraViewBuilder<'a> {
                             .collect()
                     });
                     self.bridge.with_memo_cache(|c| {
+                        self.bridge.memo_hit_replay_instances(key.ctx_state_obj);
                         c.refresh_seq(&key, seq);
                         if let Some(pairs) = refreshed {
                             c.refresh_deps(&key, pairs);
@@ -731,7 +762,14 @@ impl<'a> AuraViewBuilder<'a> {
                 tracked.is_some()
             );
         }
-        match tracked {
+        // PLAN-041 T-02: the outlet's registration pass (init demand) and
+        // this render pass both run prepare in one frame — pin the instance
+        // identity to the route-decorated init identity so both passes
+        // resolve the SAME instance object.
+        let pinned_identity = self.child_init_identity(page_widget, empty_props, bindings);
+        self.instance_identity_override
+            .set(Some(pinned_identity.clone()));
+        let out = match tracked {
             Some((path, id_map, probe)) => self.render_child_widget_tracked(
                 page_widget,
                 empty_props,
@@ -745,7 +783,9 @@ impl<'a> AuraViewBuilder<'a> {
             None => {
                 self.render_child_widget(page_widget, empty_props, empty_events, bindings, None)
             }
-        }
+        };
+        self.instance_identity_override.set(None);
+        out
     }
 
     // ─────────────────────────────────────────────────────────────────────

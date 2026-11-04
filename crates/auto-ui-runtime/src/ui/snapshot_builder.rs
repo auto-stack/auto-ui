@@ -957,6 +957,9 @@ impl SnapshotBuilder {
     fn extract_action(action_name: &str, msg: &DynamicMessage) -> UiAction {
         let handler = match msg {
             DynamicMessage::Typed { event_name, .. } => format!(".{}", event_name),
+            // PLAN-041 T-02: snapshot action 面与 Typed 同名（实例身份不进
+            // 快照 handler 文本）。
+            DynamicMessage::TypedInst { event_name, .. } => format!(".{}", event_name),
             DynamicMessage::String(name) => format!(".{}", name),
         };
         UiAction {

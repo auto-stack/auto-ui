@@ -544,6 +544,11 @@ impl RqProjector<crate::ui::dynamic::DynamicComponent> {
                     DynamicMessage::Typed { event_name, .. } => {
                         Some((*rect, format!("button:{event_name}")))
                     }
+                    // PLAN-041 T-02: 实例限定事件的命中面与 Typed 同键（合成
+                    // 点击经 IcedMessage 边界的 U+0001 标记路由到实例）。
+                    DynamicMessage::TypedInst { event_name, .. } => {
+                        Some((*rect, format!("button:{event_name}")))
+                    }
                     DynamicMessage::String(name) => Some((*rect, format!("button:{name}"))),
                 },
                 HitEntry::Input {

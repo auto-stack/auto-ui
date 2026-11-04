@@ -151,6 +151,24 @@ pub struct AuraViewBuilder<'a> {
     /// object instead of the root widget's. None = use root state.
     override_state_obj_id: Option<u64>,
 
+    /// PLAN-041 T-02: this builder's stable instance identity
+    /// (`<parent>/<child>#<key|slot>`). Some = events bound in this subtree
+    /// dispatch against the instance's own state object (TypedInst);
+    /// None = root/legacy semantics (Typed, root receiver).
+    instance_identity: Option<String>,
+
+    /// PLAN-041 T-02: outlet pin — when set, the NEXT prepare resolves this
+    /// identity instead of deriving one (outlet registration + render passes
+    /// share one instance; set/cleared around the outlet render call).
+    pub(crate) instance_identity_override: std::cell::Cell<Option<String>>,
+
+    /// PLAN-041 T-02: scoped slot-resolution state object for the outlet
+    /// memo gate — page model fields live on the page instance, so the
+    /// outlet-level read-slot fingerprints must resolve against it. Set
+    /// around the outlet memo body (drop-guard scoped); the page's own
+    /// builder override takes precedence in its own subtree.
+    pub(crate) slot_resolution_override: std::cell::Cell<Option<u64>>,
+
     /// Plan 401/VM-routing: the root widget's route table (`routes {}` block).
     /// `outlet` reads `__current_route` state and renders the matching page
     /// widget from this table. None = no routes (outlet renders empty).
@@ -327,6 +345,9 @@ impl<'a> AuraViewBuilder<'a> {
             widget_registry: None,
             native_registry: Some(crate::ui::native_widget::global()),
             override_state_obj_id: None,
+            instance_identity: None,
+            instance_identity_override: std::cell::Cell::new(None),
+            slot_resolution_override: std::cell::Cell::new(None),
             routes: None,
             computed: None,
             preview_states: None,
@@ -352,6 +373,9 @@ impl<'a> AuraViewBuilder<'a> {
             widget_registry: Some(registry),
             native_registry: Some(crate::ui::native_widget::global()),
             override_state_obj_id: None,
+            instance_identity: None,
+            instance_identity_override: std::cell::Cell::new(None),
+            slot_resolution_override: std::cell::Cell::new(None),
             routes: None,
             computed: None,
             preview_states: None,
@@ -4974,10 +4998,19 @@ mod tests {
             debug_id: None,
         };
         builder.build(&node);
+        // PLAN-041 T-02 (contract update over Plan 049's merged-root shape):
+        // child model defaults seed into the INSTANCE state object — the
+        // original motivation (first `.collapsed` read must not Err → hidden
+        // content) is preserved through the instance read path.
+        let identity = bridge
+            .child_instance_identities()
+            .into_iter()
+            .find(|id| id.contains("BlockItem"))
+            .expect("BlockItem instance registered on first render");
         assert_eq!(
-            bridge.read_state("collapsed").unwrap(),
+            bridge.read_instance_state(&identity, "collapsed").unwrap(),
             Value::Bool(false),
-            "child model var default must be seeded into root state"
+            "child model var default must be seeded into the instance state"
         );
     }
 
@@ -7288,7 +7321,14 @@ mod tests {
                     }
                 }
                 View::Button { onclick, .. } => {
-                    if let DynamicMessage::Typed { args, .. } = onclick {
+                    // PLAN-041 T-02: instance-bound subtree events carry
+                    // TypedInst (same args shape).
+                    let args = match onclick {
+                        DynamicMessage::Typed { args, .. } => Some(args),
+                        DynamicMessage::TypedInst { args, .. } => Some(args),
+                        _ => None,
+                    };
+                    if let Some(args) = args {
                         for a in args {
                             if let Value::Str(s) = a {
                                 out.push(s.as_str().to_string());

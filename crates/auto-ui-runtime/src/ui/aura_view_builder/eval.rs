@@ -12,7 +12,9 @@ impl<'a> AuraViewBuilder<'a> {
     pub(super) fn read_state(&self, field_name: &str) -> Result<auto_val::Value, String> {
         // Strip "store." prefix for merged store fields
         let name = field_name.strip_prefix("store.").unwrap_or(field_name);
-        if let Some(child_id) = self.override_state_obj_id {
+        // PLAN-041 T-02: outlet memo gate resolves read slots against the
+        // page instance (scoped); the subtree's own override still wins.
+        if let Some(child_id) = self.slot_resolution_override.get().or(self.override_state_obj_id) {
             // Try child state first, fall back to root state for store fields
             match self.bridge.read_child_state(child_id, name) {
                 Ok(v) => Ok(v),
@@ -28,7 +30,7 @@ impl<'a> AuraViewBuilder<'a> {
     /// "store." prefix (store fields are merged into root state as bare names).
     pub(super) fn read_state_as_vec(&self, field_name: &str) -> Result<Vec<auto_val::Value>, String> {
         let name = field_name.strip_prefix("store.").unwrap_or(field_name);
-        if let Some(child_id) = self.override_state_obj_id {
+        if let Some(child_id) = self.slot_resolution_override.get().or(self.override_state_obj_id) {
             // Try child state first, fall back to root state for store fields
             match self.bridge.read_child_state_as_vec(child_id, name) {
                 Ok(v) => Ok(v),

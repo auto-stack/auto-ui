@@ -273,6 +273,7 @@ impl<'a> AuraViewBuilder<'a> {
                 if std::env::var("AUTO_MEMO_DIAG").ok().as_deref() == Some("1") {
                     eprintln!("[MEMO-DIAG] site={site} HIT fast");
                 }
+                self.bridge.memo_hit_replay_instances(key.ctx_state_obj);
                 return MemoGateBegin::Hit {
                     product,
                     probe_replay,
@@ -296,7 +297,8 @@ impl<'a> AuraViewBuilder<'a> {
                         if std::env::var("AUTO_MEMO_DIAG").ok().as_deref() == Some("1") {
                             eprintln!("[MEMO-DIAG] site={site} HIT version-fast");
                         }
-                        return MemoGateBegin::Hit {
+                        self.bridge.memo_hit_replay_instances(key.ctx_state_obj);
+                return MemoGateBegin::Hit {
                             product,
                             probe_replay,
                             idmap_replay,
@@ -331,7 +333,8 @@ impl<'a> AuraViewBuilder<'a> {
                         if std::env::var("AUTO_MEMO_DIAG").ok().as_deref() == Some("1") {
                             eprintln!("[MEMO-DIAG] site={site} HIT slow");
                         }
-                        return MemoGateBegin::Hit {
+                        self.bridge.memo_hit_replay_instances(key.ctx_state_obj);
+                return MemoGateBegin::Hit {
                             product,
                             probe_replay,
                             idmap_replay,
@@ -361,7 +364,8 @@ impl<'a> AuraViewBuilder<'a> {
                             if std::env::var("AUTO_MEMO_DIAG").ok().as_deref() == Some("1") {
                                 eprintln!("[MEMO-DIAG] site={site} HIT slow");
                             }
-                            return MemoGateBegin::Hit {
+                            self.bridge.memo_hit_replay_instances(key.ctx_state_obj);
+                return MemoGateBegin::Hit {
                                 product,
                                 probe_replay,
                                 idmap_replay,
@@ -1945,9 +1949,18 @@ mod plan045_memo_tests {
         }
 
         // 页内读槽字段写（badge.visible）：慢路径 miss → 重求值。
-        bridge
-            .write_state("page_flag", auto_val::Value::Bool(true))
-            .unwrap();
+        // PLAN-041 T-02: page model fields are instance-owned now — the
+        // write goes through the page instance (root no longer carries it).
+        {
+            let page_id = bridge
+                .child_instance_identities()
+                .into_iter()
+                .find(|id| id.contains("RowPage"))
+                .expect("outlet page instance registered");
+            bridge
+                .write_instance_state(&page_id, "page_flag", auto_val::Value::Bool(true))
+                .unwrap();
+        }
         for _ in 0..8 {
             let o0 = mb();
             let _v3 = build_once(&bridge);

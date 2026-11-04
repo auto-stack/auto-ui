@@ -1345,6 +1345,20 @@ impl IcedMessage {
                 event: encode_payload(event_name, args),
                 input_value: None,
             },
+            // PLAN-041 T-02: instance-bound events carry the identity across
+            // the Send boundary embedded in the widget name (U+0001 marker,
+            // stripped at the on_with_input_for entry — same convention as
+            // the `@seq` path decoration).
+            DynamicMessage::TypedInst {
+                widget_name,
+                event_name,
+                args,
+                instance,
+            } => IcedMessage {
+                widget: format!("{}\u{1}{}", widget_name, instance),
+                event: encode_payload(event_name, args),
+                input_value: None,
+            },
             DynamicMessage::String(name) => IcedMessage {
                 widget: String::new(),
                 event: name.clone(),

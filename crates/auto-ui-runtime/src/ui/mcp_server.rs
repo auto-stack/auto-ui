@@ -3918,6 +3918,18 @@ fn extract_dyn_msg(msg: &DynamicMessage) -> Option<(String, String)> {
             let encoded = crate::ui::mcp_types::encode_payload(event_name, args);
             Some((widget_name.clone(), encoded))
         }
+        // PLAN-041 T-02: 实例限定事件把身份随 widget 名过 MCP 派发面
+        //（U+0001 标记，on_with_input_for 入口剥离——与 IcedMessage 边界
+        // 同约定）。
+        DynamicMessage::TypedInst {
+            widget_name,
+            event_name,
+            args,
+            instance,
+        } => {
+            let encoded = crate::ui::mcp_types::encode_payload(event_name, args);
+            Some((format!("{}\u{1}{}", widget_name, instance), encoded))
+        }
         DynamicMessage::String(name) => Some((String::new(), name.clone())),
     }
 }

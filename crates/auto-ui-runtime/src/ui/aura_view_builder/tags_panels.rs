@@ -2035,6 +2035,7 @@ impl<'a> AuraViewBuilder<'a> {
                         let is_default = match onclick {
                             DynamicMessage::String(s) => s.is_empty() || s == "click",
                             DynamicMessage::Typed { event_name, .. } => event_name.is_empty(),
+                            DynamicMessage::TypedInst { event_name, .. } => event_name.is_empty(),
                         };
                         if is_default {
                             *onclick = internal_toggle;

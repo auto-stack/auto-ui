@@ -20,6 +20,26 @@ impl<'a> AuraViewBuilder<'a> {
             .0
     }
 
+    /// PLAN-041 T-02: plain variant with an explicit instance identity —
+    /// used by the outlet bookkeeping pass so its registration and the
+    /// subsequent render pass resolve the SAME instance (double-prepare in
+    /// one frame must not mint two objects).
+    pub(super) fn prepare_child_render_state_with_identity(
+        &self,
+        child_widget: &auto_ui_compiler::aura::AuraWidget,
+        props: &HashMap<String, AuraPropValue>,
+        bindings: &Bindings,
+        identity_override: &str,
+    ) -> u64 {
+        self.prepare_child_render_state_snap_impl(
+            child_widget,
+            props,
+            bindings,
+            Some(identity_override),
+        )
+        .0
+    }
+
     /// PLAN-711 T-03: 同 [`Self::prepare_child_render_state`]，另返回本次
     /// resolve 的 props 快照——Init demand 登记携带（统一根态约束：延迟
     /// 派发前按快照重播种，见 `InitDemand.props` 注）。
@@ -28,7 +48,17 @@ impl<'a> AuraViewBuilder<'a> {
         child_widget: &auto_ui_compiler::aura::AuraWidget,
         props: &HashMap<String, AuraPropValue>,
         bindings: &Bindings,
-    ) -> (u64, Vec<(String, auto_val::Value)>) {
+    ) -> (u64, String, Vec<(String, auto_val::Value)>) {
+        self.prepare_child_render_state_snap_impl(child_widget, props, bindings, None)
+    }
+
+    pub(super) fn prepare_child_render_state_snap_impl(
+        &self,
+        child_widget: &auto_ui_compiler::aura::AuraWidget,
+        props: &HashMap<String, AuraPropValue>,
+        bindings: &Bindings,
+        identity_override: Option<&str>,
+    ) -> (u64, String, Vec<(String, auto_val::Value)>) {
         // 1. Resolve prop values from parent state.
         let mut resolved_props: HashMap<String, Value> = HashMap::new();
         for (prop_name, prop_value) in props {
@@ -108,15 +138,59 @@ impl<'a> AuraViewBuilder<'a> {
             }
         }
 
-        // 5. Ensure child state object exists on the VM heap + write props.
-        let root_id =
-            self.bridge
-                .ensure_child_state(&child_widget.name, &child_field_names, &resolved_props);
+        // 5. Ensure the child's per-instance state object exists on the VM
+        //    heap + write props (PLAN-041 T-02: instance ownership — the
+        //    merged-root path is retired for child call sites).
+        //    Identity = `<parent_path>/<child>#<key|occurrence>`: the
+        //    call-site `key` prop wins (keyed reorder keeps identity,
+        //    V-03); unkeyed sites take the deterministic per-frame
+        //    occurrence index (旧位置语义, plan §10.2 — no arbitrary-move
+        //    identity promise).
+        let identity = match identity_override
+            .map(|s| s.to_string())
+            .or_else(|| self.instance_identity_override.take())
+        {
+            Some(over) => over,
+            None => {
+                let parent_identity = self.instance_identity.clone().unwrap_or_default();
+                let site_key = self
+                    .extract_string_with(props, "key", bindings)
+                    .filter(|k| !k.is_empty())
+                    .unwrap_or_else(|| {
+                        self.bridge
+                            .next_instance_site_seq(&parent_identity, &child_widget.name)
+                            .to_string()
+                    });
+                format!("{}/{}#{}", parent_identity, child_widget.name, site_key)
+            }
+        };
+        // Per-frame re-seed set = declared props ∪ call-site-passed props
+        // (parent-controlled channel). Model vars seed once at allocation
+        // (PLAN-536 T8 extended to instances).
+        let mut prop_names: std::collections::HashSet<String> = child_widget
+            .props
+            .iter()
+            .map(|p| p.name.clone())
+            .collect();
+        for name in props.keys() {
+            prop_names.insert(name.clone());
+        }
+        let parent_state_id = self
+            .override_state_obj_id
+            .unwrap_or_else(|| self.bridge.state_obj_id());
+        let child_state_id = self.bridge.ensure_child_instance(
+            &child_widget.name,
+            &identity,
+            parent_state_id,
+            &child_field_names,
+            &prop_names,
+            &resolved_props,
+        );
         let mut snapshot = resolved_props
             .into_iter()
             .collect::<Vec<(String, auto_val::Value)>>();
         snapshot.extend(snapshot_defaults);
-        (root_id, snapshot)
+        (child_state_id, identity, snapshot)
     }
 
     /// Render a child widget by looking it up in the registry.
@@ -135,6 +209,7 @@ impl<'a> AuraViewBuilder<'a> {
         &self,
         child_widget: &auto_ui_compiler::aura::AuraWidget,
         state_obj_id: u64,
+        instance_identity: &str,
         init_props: Vec<(String, auto_val::Value)>,
         props: &HashMap<String, AuraPropValue>,
         bindings: &Bindings,
@@ -153,12 +228,12 @@ impl<'a> AuraViewBuilder<'a> {
         // ——对齐 vue 的按 key 重挂载语义:同名子件 key 变化(含切回先前
         // key)即重发 Init,否则子件继续渲染上一个 key 的数据体。无 key
         // 调用点身份即组件名,每帧不变,536 防重放语义不变。
-        let init_identity = self.child_init_identity(child_widget, props, bindings);
-        // PLAN-711 T-03 (M-01): 只登记——同代际重复 build 不二次入队（AC-04）；
-        // 派发由泵驱动（FIFO 依赖序：页 demand 在前，本件等前序到终态）。
+        // PLAN-041 T-02: 登记键 = 实例身份（每个调用位实例各自挂载一次
+        // Init；实例释放清记录 → 重挂载重 Init，os-config 语义按实例成立）。
+        // 路由维度由 outlet 的 pin 身份携带（route-decorated）。
         let _decision = self.bridge.register_init_demand(
             &child_widget.name,
-            &init_identity,
+            instance_identity,
             state_obj_id,
             init_props,
         );
@@ -286,7 +361,7 @@ impl<'a> AuraViewBuilder<'a> {
             props,
             events,
         );
-        let (child_state_id, init_props) =
+        let (child_state_id, instance_identity, init_props) =
             self.prepare_child_render_state_snap(child_widget, props, bindings);
         // Plan 437 Phase 2: 子组件 Init 补发 —— 此前 VM 轨只有根 widget 的
         // Init 会触发(fire_init),视图中实例化的子组件 Init 从不运行,
@@ -294,14 +369,21 @@ impl<'a> AuraViewBuilder<'a> {
         // onMounted 正常,跨轨语义缺口)。统一 state 架构下逐实例顺序
         // props → Init → build,每个渲染帧重放:纯派生 Init 幂等;副作用
         // 型子组件 Init 会在每次脏重建时重放(v1 近似,债务在案)。
-        self.fire_child_init_if_any(child_widget, child_state_id, init_props, props, bindings);
+        self.fire_child_init_if_any(
+            child_widget,
+            child_state_id,
+            &instance_identity,
+            init_props,
+            props,
+            bindings,
+        );
         // PLAN-711 T-05 (M-04/Q-01): pending demand → 轻量骨架占位。Init
         // 完成（epoch 失效→重建全量）前不渲染子树产物——pending 占位不成
         // 为可永久命中的 memo 产物（完成 bump epoch 已失效）；嵌套需求按
         // 依赖阶段发现：子件嵌套 child 由完成帧的下一次构建发现（占位不
         // 永久早退）。失败相位给可诊断错误占位（不无限 Loading；reload
         // 换身份即重试）。无 demand/已终态原样全量构建。
-        match self.bridge.init_demand_phase(&child_widget.name) {
+        match self.bridge.init_demand_phase(&instance_identity) {
             Some(crate::ui::vm_bridge::InitDemandPhase::Queued)
             | Some(crate::ui::vm_bridge::InitDemandPhase::InFlight) => {
                 return View::Text {
@@ -333,6 +415,9 @@ impl<'a> AuraViewBuilder<'a> {
             widget_registry: self.widget_registry,
             native_registry: self.native_registry,
             override_state_obj_id: Some(child_state_id),
+            instance_identity: Some(instance_identity.clone()),
+            instance_identity_override: std::cell::Cell::new(None),
+            slot_resolution_override: std::cell::Cell::new(None),
             routes: None,
             computed: Some(&child_widget.computed),
             preview_states: self.preview_states,
@@ -406,18 +491,25 @@ impl<'a> AuraViewBuilder<'a> {
             );
         }
 
-        let (child_state_id, init_props) =
+        let (child_state_id, instance_identity, init_props) =
             self.prepare_child_render_state_snap(child_widget, props, bindings);
         // Plan 437 Phase 2: 同 render_child_widget —— 子组件 Init 补发
         // (tracked 双胎保持同一渲染语义)。
-        self.fire_child_init_if_any(child_widget, child_state_id, init_props, props, bindings);
+        self.fire_child_init_if_any(
+            child_widget,
+            child_state_id,
+            &instance_identity,
+            init_props,
+            props,
+            bindings,
+        );
         // PLAN-711 T-05 (M-04/Q-01): pending demand → 轻量骨架占位。Init
         // 完成（epoch 失效→重建全量）前不渲染子树产物——pending 占位不成
         // 为可永久命中的 memo 产物（完成 bump epoch 已失效）；嵌套需求按
         // 依赖阶段发现：子件嵌套 child 由完成帧的下一次构建发现（占位不
         // 永久早退）。失败相位给可诊断错误占位（不无限 Loading；reload
         // 换身份即重试）。无 demand/已终态原样全量构建。
-        match self.bridge.init_demand_phase(&child_widget.name) {
+        match self.bridge.init_demand_phase(&instance_identity) {
             Some(crate::ui::vm_bridge::InitDemandPhase::Queued)
             | Some(crate::ui::vm_bridge::InitDemandPhase::InFlight) => {
                 return View::Text {
@@ -446,6 +538,9 @@ impl<'a> AuraViewBuilder<'a> {
             widget_registry: self.widget_registry,
             native_registry: self.native_registry,
             override_state_obj_id: Some(child_state_id),
+            instance_identity: Some(instance_identity.clone()),
+            instance_identity_override: std::cell::Cell::new(None),
+            slot_resolution_override: std::cell::Cell::new(None),
             routes: None,
             computed: Some(&child_widget.computed),
             preview_states: self.preview_states,

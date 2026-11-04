@@ -67,6 +67,7 @@ fn has_onclick_event(view: &View<DynamicMessage>, event: &str) -> bool {
         } => {
             let hits = match onclick {
                 DynamicMessage::Typed { event_name, .. } => event_name == event,
+                DynamicMessage::TypedInst { event_name, .. } => event_name == event,
                 DynamicMessage::String(s) => s == event,
             };
             if hits {

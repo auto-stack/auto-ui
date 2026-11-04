@@ -264,6 +264,13 @@ pub(crate) fn drain_synth_failures(widget_name: &str) {
 /// The synthesized receiver parameter name holding the widget-state heap id.
 const STATE_PARAM: &str = "__state";
 
+/// PLAN-041 T-02: hidden instance-ref field carrying the App-level shared
+/// state (root) VmRef. Allocated on every child instance object and as a
+/// self-reference on the root object, so `__state.__auto_root.<f>` resolves
+/// store/parent-owned fields at the shared state from any receiver. Internal
+/// mechanism only — no DSL surface (plan §5.1: 不新增公开语法/ABI).
+pub const INSTANCE_ROOT_FIELD: &str = "__auto_root";
+
 /// Plan 333: the exported fn that initializes imported module-level globals
 /// (`var notes = ...` etc.). VmBridge runs it once before `.Init` so the
 /// globals have defined values when handlers (e.g. db.all_notes → notes) read them.
@@ -655,9 +662,15 @@ fn rewrite_expr_with_locals(
                             _ => None,
                         })
                         .unwrap_or_default();
+                    // PLAN-041 T-02: 经 `__auto_root` 指向 App 级共享态——
+                    // 路由参数由 outlet 写 root，实例分裂后 __state 可能是
+                    // child 实例对象（无路由注入字段）。
                     *e = Expr::Dot(
                         Box::new(Expr::Dot(
-                            Box::new(Expr::Ident(Name::from(STATE_PARAM))),
+                            Box::new(Expr::Dot(
+                                Box::new(Expr::Ident(Name::from(STATE_PARAM))),
+                                Name::from(INSTANCE_ROOT_FIELD),
+                            )),
                             Name::from("__route_params"),
                         )),
                         Name::from(&param_field),
@@ -739,8 +752,14 @@ fn rewrite_expr_with_locals(
                     };
                     let store_name = store_name.unwrap_or_default();
                     let handler_fn = format!("handler_{}_{}", store_name, method);
-                    let mut new_args = vec![auto_lang_core::ast::Arg::Pos(Expr::Ident(
-                        Name::from(STATE_PARAM),
+                    // PLAN-041 T-02: receiver = `__state.__auto_root`（App 级
+                    // 共享态）而非当前 handler 的 __state——实例分裂后 child
+                    // handler 内的 store 方法调用必须命中同一 App store，不得
+                    // 静默落到实例对象上分叉 store。root handler 的 __state
+                    // 即 root，`__auto_root` 自引用 → 语义零变化。
+                    let mut new_args = vec![auto_lang_core::ast::Arg::Pos(Expr::Dot(
+                        Box::new(Expr::Ident(Name::from(STATE_PARAM))),
+                        Name::from(INSTANCE_ROOT_FIELD),
                     ))];
                     // Clone and rewrite each original arg before adding
                     for arg in &call.args.args {
@@ -884,26 +903,33 @@ fn rewrite_expr_with_locals(
             }
         }
     }
-    // store.field → __state.field (store fields merged into root state)
+    // store.field → __state.__auto_root.field (store fields merged into root state)
     // Plan 423 P5 修复:先经 STORE_WIDGET_NAMES 把别名(store)解析成真名
     // (NotesStore)再查 STORE_FIELDS —— 与 store.Method() 路径同型。此前
     // 直接 contains_key(alias),而字段表按真名键控,别名永远查不中 →
     // 裸 `store` 标识符漏进 codegen("Undefined variable: store"),handler
     // 半成品毒化字节码(导出指向非 prolog → 运行时栈失衡/InvalidOpCode 255/
     // 垃圾指令跑满步数预算无界吃内存,实机 20G 内存事故的源头)。
+    // PLAN-041 T-02: receiver 经 `__auto_root` 指向 App 级共享态——实例
+    // 分裂后 __state 可能是 child 实例对象（无 store 字段），store 读写必须
+    // 恒达 root（同 App 共享语义，plan §5.2 合同 3）；root 自身 __auto_root
+    // = 自引用，root handler 行为零变化。
     if let Expr::Dot(obj, _field) = e {
         if let Expr::Ident(alias) = obj.as_ref() {
             let real = STORE_WIDGET_NAMES.with(|s| s.borrow().get(alias.as_str()).cloned());
             let target = real.as_deref().unwrap_or(alias.as_str());
             let is_store = STORE_FIELDS.with(|s| s.borrow().contains_key(target));
             if is_store {
-                *obj = Box::new(Expr::Ident(Name::from(STATE_PARAM)));
+                *obj = Box::new(Expr::Dot(
+                    Box::new(Expr::Ident(Name::from(STATE_PARAM))),
+                    Name::from(INSTANCE_ROOT_FIELD),
+                ));
                 return;
             }
         }
     }
-    // .store.field → __state.field (self.store.X in view bindings or handler body)
-    // This is Dot(Dot(Ident("."), "store"), "field") → Dot(Ident("__state"), "field")
+    // .store.field → __state.__auto_root.field (self.store.X in view bindings or handler body)
+    // This is Dot(Dot(Ident("."), "store"), "field") → Dot(Dot(Ident("__state"), "__auto_root"), "field")
     if let Expr::Dot(inner, field) = e {
         if let Expr::Dot(obj, store_alias) = inner.as_ref() {
             if matches!(obj.as_ref(), Expr::Ident(n) if n.as_str() == "." || n.as_str() == "self") {
@@ -913,7 +939,10 @@ fn rewrite_expr_with_locals(
                 let is_store = STORE_FIELDS.with(|s| s.borrow().contains_key(target));
                 if is_store {
                     *e = Expr::Dot(
-                        Box::new(Expr::Ident(Name::from(STATE_PARAM))),
+                        Box::new(Expr::Dot(
+                            Box::new(Expr::Ident(Name::from(STATE_PARAM))),
+                            Name::from(INSTANCE_ROOT_FIELD),
+                        )),
                         field.clone(),
                     );
                     return;
@@ -988,10 +1017,24 @@ fn rewrite_expr_with_locals(
                 Expr::Ident(n) if n.as_str() == "self" || n.as_str() == "."
             ) =>
         {
-            Some(Expr::Dot(
-                Box::new(Expr::Ident(Name::from(STATE_PARAM))),
-                field.clone(),
-            ))
+            // PLAN-041 T-02: 本件自有字段（model+props，state_fields 已并入
+            // props）直取实例对象；其余（父属/共享/store 已在上方换轨）经
+            // `__auto_root` 指回 App 级共享态。root 自身 __auto_root=自引用
+            // → root handler 语义零变化。
+            if state_fields.contains(field.as_str()) {
+                Some(Expr::Dot(
+                    Box::new(Expr::Ident(Name::from(STATE_PARAM))),
+                    field.clone(),
+                ))
+            } else {
+                Some(Expr::Dot(
+                    Box::new(Expr::Dot(
+                        Box::new(Expr::Ident(Name::from(STATE_PARAM))),
+                        Name::from(INSTANCE_ROOT_FIELD),
+                    )),
+                    field.clone(),
+                ))
+            }
         }
         // A method call whose receiver is a bare state-field ident, e.g.
         // `notes.remove(1)` (parsed as Call { name: Dot(Ident("notes"), "remove") }).
@@ -1725,7 +1768,14 @@ pub fn synthesize_widget_module(
         .collect();
 
     for w in &all_widgets {
-        let w_state_fields: HashSet<String> = w.state_vars.iter().map(|v| v.name.clone()).collect();
+        // PLAN-041 T-02: 本件自有字段集 = model vars + 声明 props——实例
+        // 分裂后两者都落在该件的实例对象上，handler 体改写按此集合区分
+        // 「直取 __state」与「经 __auto_root 回根态」。
+        let mut w_state_fields: HashSet<String> =
+            w.state_vars.iter().map(|v| v.name.clone()).collect();
+        for prop in &w.props {
+            w_state_fields.insert(prop.name.clone());
+        }
         let w_state_type = synthesize_state_type(w);
 
         // Plan 056 blocker A (AuraWidget path): set the current-widget context
@@ -2464,11 +2514,17 @@ pub fn synthesize_from_decl(
     for d in &all_decls {
         let d_tick = extract_tick_interval_from_decl(d);
         let mut d_state_fields: HashSet<String> = {
+            // PLAN-041 T-02: 本件自有字段 = model + 声明 props（实例对象
+            // 布局同集合；handler 体改写按此区分「直取 __state」与
+            // 「经 __auto_root 回根态」）。
             let mut s: HashSet<String> = d
                 .model
                 .as_ref()
                 .map(|m| m.fields.iter().map(|f| f.name.to_string()).collect())
                 .unwrap_or_default();
+            for prop in &d.props {
+                s.insert(prop.name.to_string());
+            }
             if d_tick.is_some() {
                 s.retain(|n| n != "interval");
             }
