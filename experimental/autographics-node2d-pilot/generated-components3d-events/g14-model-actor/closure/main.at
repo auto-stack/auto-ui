@@ -1,0 +1,32 @@
+// PLAN-043 g14-model-actor: a walking character crosses the lane where the
+// Crate model template is parked (hidden) and where a live instance stands
+// until despawned at tick 4. Non-solid control: templates and live instances
+// never enter the collision world; the walk is author-driven move3d.
+use resources: crate_glb
+use props: Crate
+use walker: Walker
+
+node Main {
+    model {
+        var h = 0
+        var t = 0
+    }
+    view-3d {
+        Walker hero { }
+    }
+    camera3d { distance: 8.0
+              pitch: 45.0
+              projection: perspective }
+    objects3d { crate_a }
+    on {
+        Life.Start -> {
+            .h = spawn("crate_a", "Crate", 3.5, 0.5, -3.0)
+        }
+        Life.Tick(dt) -> {
+            .t = .t + 1
+            if .t == 4 {
+                object.despawn(.h)
+            }
+        }
+    }
+}

@@ -1,0 +1,5 @@
+// PLAN-043 model-objects-3d g14-model-actor resources: the G02 two-parts GLB
+// (sha 42c9da67..., 1528 bytes, MIT, PLAN-838 self-authored test geometry,
+// license text at fixtures/node3d/licenses/two-parts.LICENSE) declared as a
+// named model3d.glb resource.
+let crate_glb = model3d.glb("assets/two-parts.glb")

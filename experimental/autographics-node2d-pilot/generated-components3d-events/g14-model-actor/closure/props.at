@@ -1,0 +1,10 @@
+// The spawn template: parked ON the walk lane (x=4.5, z=-3.0) and invisible.
+// V-S03 control: the trajectory of the walking character must be identical
+// with this hidden template on the path and with it parked far away — a
+// template is a presentation row, never a static collision surface.
+node Crate {
+    object3d { }
+    view-3d { model3d crate { model: resources.crate_glb
+                              position: (4.5, 0.5, -3.0)
+                              visible: false } }
+}

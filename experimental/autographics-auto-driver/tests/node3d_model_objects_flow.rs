@@ -35,6 +35,12 @@ const COIN_PNG: &[u8] = include_bytes!(
 const COIN_GLB_SHA: &str = "a3fb8f779a6af1cd75e5a02da77a87546ca8a59f6fe52f79f25179c4a68fd0e5";
 const COIN_PNG_SHA: &str = "106cf02e0d6dccded6d9f90c2ae6a51eb94c6301645fea159e834c44ed4708a3";
 const COIN_CLOSURE: &str = "76657e1367fe78e3aa69585e4a2d6e462f7ca431a4c17d1b59a1e7fca7d3862e";
+const G14_SCENE: &str = include_str!(
+    "../../autographics-node2d-pilot/generated-components3d-events/g14-model-actor/scene.agscene"
+);
+const G14_WORLD: &str = include_str!(
+    "../../autographics-node2d-pilot/generated-components3d-events/g14-model-actor/world.at"
+);
 
 // ---------------------------------------------------------------- harness --
 
@@ -548,6 +554,74 @@ fn model_objects_typed_budget_faults_are_named() {
         }
     }
     assert!(faulted, "stale handle after despawn must fault 33");
+}
+
+
+#[test]
+fn hidden_templates_and_live_instances_are_non_solid_on_the_actor_path() {
+    big_stack(|| {
+        // V-S03 轨迹对照：隐藏模板 parked 在行走车道 x=4.5（variant）vs
+        // parked 在远处 -30（control）。行为源不变，仅场景行字节不同。
+        // 三个阶段：出生前模板在路径（walker 3.0→4.0 经过 x=4.5 之前）、
+        // 有活实例（3.5 处，tick4 销毁）、销毁后（继续走到 ~8）——逐 tick
+        // 角色身体位置必须与对照完全一致（模板/实例永不成为碰撞面）。
+        let control_scene = G14_SCENE.replace(
+            "\"translation\": [\n    4.5,\n    0.5,\n    -3.0\n   ]",
+            "\"translation\": [\n    -30.0,\n    0.5,\n    -3.0\n   ]",
+        );
+        assert_ne!(control_scene, G14_SCENE, "control mutation must apply");
+
+        let run = |scene: &str, tag: &str| -> Vec<[f32; 3]> {
+            let dir = write_product_with(
+                scene,
+                G14_WORLD,
+                &[(&format!("{GLB_SHA}.glb"), GLB)],
+                tag,
+            );
+            let (doc, registry, code, _) =
+                Storage::load_project(&dir.join("scene.agscene"), &Registry::new())
+                    .expect("load");
+            let body = doc
+                .objects
+                .iter()
+                .find(|o| o.name == "Main/hero/body")
+                .expect("walker body row")
+                .id;
+            let mut h = Host::with_project(doc, registry, code).expect("host");
+            h.start_selected_play().expect("start");
+            h.pause_play("");
+            settle(&mut h);
+            let mut traj = Vec::new();
+            for i in 0..10 {
+                if i == 1 {
+                    eprintln!("DBG {tag}: err={:?} tick={:?}", h.play.as_ref().unwrap().error, h.play.as_ref().and_then(|p| p.last.as_ref()).and_then(|f| f.rounds.as_ref()).map(|r| r.tick));
+                }
+                traj.push(
+                    h.play
+                        .as_ref()
+                        .and_then(|p| p.last.as_ref())
+                        .and_then(|f| f.nodes.get(&body))
+                        .map(|d| d.translation)
+                        .expect("walker body in frame"),
+                );
+                tick(&mut h);
+            }
+            traj
+        };
+
+        let variant = run(G14_SCENE, "g14-variant");
+        let control = run(&control_scene, "g14-control");
+        assert_eq!(variant, control, "hidden template on the path must not alter the walk");
+        // 没有被阻挡：walker 从 3.0 出发每 tick +0.5，10 tick 后约 8.0。
+        let last = *variant.last().unwrap();
+        assert!(
+            last[0] > 7.0,
+            "walk must continue unblocked through template and instance spots, got {last:?}"
+        );
+        // 活实例 tick4 已销毁（身份负控同链已证）；此处确认轨迹含销毁前后段。
+        let at_despawn = variant[4];
+        assert!(at_despawn[0] > 4.9, "walker passes the instance spot freely: {at_despawn:?}");
+    });
 }
 
 /// The camera family re-enters the SDK parser per start; give it the same

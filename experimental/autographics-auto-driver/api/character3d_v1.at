@@ -2,6 +2,8 @@
 // motion chain by the character3d assembly; public names are ag_char3_*/ag_action_*.
 // Public move = unchanged v5 ag_move_and_slide plus one fused geometric
 // final-support determination in the same call (contract r1 sections 2/4/6);
+// PLAN-043: the slide skips invisible document rows (visible_only=1) so
+// parked spawn templates and hidden presentation rows never block the walk;
 // the frozen three-axis solid/character translation snapshot enforces the
 // read-only solid surface at each tick begin.
 var _ag_char3_node= -1
@@ -193,7 +195,7 @@ fn ag_char3_move(dx float, dy float, dz float, clearance float) int {
  if _ag_cast_charge(1)==0 {return 0}
  _ag_char3_grounded_state=0
  _ag_char3_support_state= -1
- let token=ag_move_and_slide(_ag_char3_node,0,dx,dy,dz,clearance)
+ let token=ag_move_and_slide(_ag_char3_node,1,dx,dy,dz,clearance)
  if token<=0 {return 0}
  if _ag_motion_state==3 {return token}
  if kinds[_ag_char3_node]==5 {return token}

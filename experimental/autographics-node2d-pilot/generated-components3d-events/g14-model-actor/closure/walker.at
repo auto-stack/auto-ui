@@ -1,0 +1,25 @@
+// PLAN-043 g14-model-actor: the Run character walks the +x lane at z=-3.0
+// (fixed 0.5 units per tick, no input) through the parked template spot and
+// the live instance; the trajectory oracle compares per-tick body positions
+// against the off-path control run.
+node Walker {
+    model {
+        var t = 0
+    }
+    view-3d {
+        cylinder3d body {
+            position: (3.0, 1.0, -3.0)
+            scale: (0.4, 0.5, 0.4)
+        }
+    }
+    character3d { }
+    on {
+        Life.Start -> {
+            refs.body.place(3.0, 0.5, -3.0)
+        }
+        Life.Tick(dt) -> {
+            refs.body.move3d(0.5, 0.0, 0.0)
+            .t = .t + 1
+        }
+    }
+}
