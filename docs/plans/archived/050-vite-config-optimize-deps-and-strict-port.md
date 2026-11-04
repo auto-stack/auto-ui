@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-050
-status: drafting
+status: archived
 feature_name: 生成Vue工程vite配置发射收口（optimizeDeps.include + strictPort）
 author: [Codex]
 created_at: 2026-11-04
 updated_at: 2026-11-04
 plan_revision: 3
-current_step: 4
+current_step: 5
 total_steps: 5
 depends_on: []
 supersedes_spec_components: []
@@ -101,7 +101,7 @@ Rust（auto-ui-tools）；serde_json（已在依赖）；vite 配置模板字符
 - [x] T-01（owner_stage=work；依赖无；AC-01）：模板签名与 include/server 加固发射 + write_project_files 接线；B-01/B-02/B-03 单测。[✅ 已完成 2026-11-04，r3 修订] `generate_vite_config(npm_deps: &[(String,String)])`：非 `link:` 注册表键发射 `optimizeDeps{include:[…]}`（serde_json 转义，过滤在模板内），过滤集为空整体省略；`host: '127.0.0.1'`+`strictPort: true` 恒发射；write_project_files 在 Plan-482 遮蔽前捕获 `vite_npm_deps` 原参数传入（r3/F-5：推导键仅进 package.json）。
 - [x] T-02（owner_stage=work；依赖T-01；AC-01）：run_vue.rs 自愈接线 + B-04 流分支单测。[✅ r2 完成 2026-11-04] r1 实现为磁盘 package.json 源（`package_json_dep_keys`），独立复审 F-1 实证与生成路径键集不一致（3 vs 8 键）且 link: 强制预打包未验证 → r2 弃用删除，改 `refresh_vite_config(&project.output_dir, &project.npm_deps 键集)`——与生成路径 `extra_deps`（=`&self.npm_deps`）同一字段逐字同源；流级测试覆盖缺失 no-op/重写含 include 两分支，写失败分支代码级核验（与相邻自愈同级语义）。
 - [x] T-03（owner_stage=work；依赖T-01/02；AC-02）：`cargo t -p auto-ui-tools` 全组回归（B-05）+ `-p auto-ui-compiler project_files` 未漂移确认。[✅ 已完成 2026-11-04] 新增 4 单测全绿；全组 `-p auto-ui-tools --lib` 203/203 绿（5 基线红：display_reader_v01_corpus、gallery_demo_row_routable、try_full_parse_018_api、shell_pack_lib_freshness、plan_662_gallery_apps_dir_layouts——均经 stash 回 base 实证同败，与本改动无关）；`-p auto-ui-compiler` test_generate_project_files 1/1 绿（旧副本未动）。
-- [ ] T-04（owner_stage=review；依赖T-03/05；AC-04）：同树独立上下文最终复审。
+- [x] T-04（owner_stage=review；依赖T-03/05；AC-04）：同树独立上下文最终复审。[✅ 已完成 2026-11-04] 复审 #3 final **pass**（8638863a）：AC-01(r3) pass（独立探针 21/21，F-5 closed）、AC-02/03/04 pass、零新增回归；F-6 文档残留已在主检出对齐。
 - [x] T-05（owner_stage=work；依赖T-01；AC-03）：host 有界评估决策稿 + §9 具名结论。[✅ 已完成 2026-11-04] 结论=**发射 `host: '127.0.0.1'`**（并入 T-01）。探针 4 组（vite 5.4.21 实测，plan-artifacts/plan-050/host-probe/DECISION.md）：strictPort 单独不闭 E-4a——127.0.0.1 被占仍静默绑 ::1 同端口报 ready（curl ::1→200 实证）；host 固定后占用=具名失败 EXIT=1（CLI 与 config 形双验）、空闲=localhost 经双栈回落 200、tauri webview（localhost: URL）兼容、Local: 行由歧义变明确。
 
 ## 9. 复审记录
@@ -125,3 +125,5 @@ stage: work | plan_id: PLAN-050 | plan_revision: r3 | outcome: pass（R2 修复 
 - 观察项（不在本计划处置）：compiler `project_files.rs:73` test-only 旧副本与生产模板已漂移（无 server 块）。
 
 stage: review | review_scope: final | reviewer_identity: 独立 general-purpose 子代理上下文 #3（与实现/复审#1#2 无共享记忆） | plan_id: PLAN-050 | plan_revision: r3 | outcome: pass | worktree_path: D:/autostack/.wt/ui-050/auto-ui | branch: codex/plan-050-dev | reviewed_commit: 8638863a | base_commit: da252a98 | dependency_revisions: auto-lang f6b0f918d、auto-web 3de5524、auto-down 7c4d5cb（同 r1） | spec_inputs: SD-01 草案（树内冻结副本，r3 措辞） | acceptance_results: AC-01(r3) **pass**（F-5 closed：独立探针 21/21——editor-link/direct-engine-link/all-link/registry-engine/trio 五类输入两路径输出逐字 byte-equal，include 零 link: 键，捕获点 vue.rs:2563 在遮蔽块 2565-2589 之前实证；附加纵深=遮蔽集渲染与 raw 集相同）；AC-02 pass（209 run/204 绿/失败集恰 5 基线红，5 新测试重跑绿）；AC-03 pass（r3 diff 未触 server 块，host 探针证据复用）；AC-04 pass | findings: F-6（低，文档残留）§0/§2 签名/§5 T-01/§8 注记残留 r1 措辞——纯措辞零行为影响，本 receipt 前已在主检出 Plan 修正（非规范段对齐，不改语义契约，评审 commit 不变） | evidence: D:/autostack/plan-artifacts/plan-050/review3/（REVIEW3.md、probe-run.log） | pending_closeout_gates: merge 所有（SD-01 发布、landing 检查、归档、worktree 清理） | next: merge
+
+stage: merge | PLAN-050:r3 | outcome: pass | delivery_commit: a03b4ee0 | worktree: D:/autostack/.wt/ui-050/auto-ui | checkpoints: prepared（reviewed r3 @8638863a；SD-01=docs/specs/build/generated-vite-config.md）；landed（master `--ff-only` = a03b4ee0，零 merge commit；rebase 老→新映射 1a9131fc→0d1210a8、2f280f20→9bcdba1a、c0301533→be837957、8638863a→a03b4ee0，`git range-diff` 四提交全 `=` patch 等价=安全重写证明）；canonical_verified（docs/specs/build/generated-vite-config.md sha256 `055c74b6daf97f2452d8f26f050abc673d5c9887300383d2f593d6ef8d58e3ff` @a03b4ee0；master 冒烟=5 新测试 5/5 绿）；archived（docs/plans/archived/050-vite-config-optimize-deps-and-strict-port.md，status: archived，completion_kind: delivered）；cleaned（wt-guard clean → worktree+分支删除+同级依赖 detached worktree 移除+组目录删除；plan-artifacts/plan-050/ 全域折叠后删除，registry 刷新） | consumer_pending_gate: 消费方 auto-blog BLOG-005 冷缓存重跑 `vue-dev-rust` 至绿（其 T-02/T-03/T-04 闭合）——用户路线①授权内的下一 work 阶段，非本仓 gate | notes: master 落地时存在并行 owner 会话未提交 WIP（docs/design/*、039 删除、029 修改、untracked test/）——与本 delta 零文件交集，未触碰；PLAN-106 合同：无 ledger/index 写入
