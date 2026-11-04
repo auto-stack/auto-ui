@@ -193,6 +193,61 @@ fn handler_context_segment_maps_to_node_event_declaration() {
 }
 
 #[test]
+fn runtime_no_span_and_managed_region_never_map() {
+    // V-S02 边界：runtime/API 错误无 span（AutoError::Msg）→ 明确
+    // "SDK supplied no mapped line"，映射层不编造行；managed 区 span 亦
+    // 永不映射到作者源（managed 绝不当用户）。
+    let snap = SourceSnapshot::from_bytes_for(
+        Path::new("world.at"),
+        WORLD.as_bytes().to_vec(),
+        Api::Objects2V1,
+    )
+    .unwrap();
+    let map = SourceMap::parse(MAP_JSON, WORLD).unwrap();
+    let closure_dir = Path::new(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../autographics-node2d-pilot/generated-components2d/diag-fault/closure"
+    ));
+    let closure = map.closure_sources(closure_dir).unwrap();
+
+    // runtime 无 span 错误：映射层在场也不编造。
+    let no_span = auto_lang_core::error::AutoError::Msg("runtime boom".into());
+    let d = snap.sdk_diagnostic_mapped("runtime", &no_span, Some(&map), Some(&closure));
+    assert!(
+        d.contains("SDK supplied no mapped line"),
+        "runtime errors keep the no-span fact: {d}"
+    );
+    assert!(!d.contains("node-source-map"), "map must not invent lines: {d}");
+
+    // managed 区（transport/api/bridge）span：永不映射，回退原诊断。
+    let api_region = snap
+        .regions
+        .iter()
+        .find(|r| r.file != "world.at")
+        .expect("a managed region exists");
+    let managed = auto_lang_core::error::AutoError::MsgWithSource(
+        auto_lang_core::error::MsgWithSource {
+            source: miette::NamedSource::new("<script>", snap.source.clone()),
+            message: "managed failure".into(),
+            span: miette::SourceSpan::new(
+                (api_region.start + 2).into(),
+                1usize.into(),
+            ),
+            help: None,
+        },
+    );
+    let d = snap.sdk_diagnostic_mapped("compile", &managed, Some(&map), Some(&closure));
+    assert!(
+        !d.contains("node-source-map"),
+        "managed-region spans must never map to author source: {d}"
+    );
+    assert!(
+        d.contains("managed failure"),
+        "original error text preserved: {d}"
+    );
+}
+
+#[test]
 fn precision_matrix_generated_segments_never_map() {
     // generated 段（SoA/调度）命中时 diagnose 返回 None → 调用方回退。
     let snap = SourceSnapshot::from_bytes_for(

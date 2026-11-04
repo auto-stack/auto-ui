@@ -691,6 +691,7 @@ dependencies = [
  "iced",
  "iced_wgpu",
  "kira",
+ "miette",
  "png",
  "serde",
  "serde_json",
