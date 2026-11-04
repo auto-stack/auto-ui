@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-04
 updated_at: 2026-11-04
 plan_revision: 1
-current_step: 4
+current_step: 5
 total_steps: 10
 depends_on: [auto-ui/PLAN-020, auto-ui/PLAN-030, auto-ui/PLAN-035, auto-ui/PLAN-040]
 supersedes_spec_components: []
@@ -123,7 +123,7 @@ work产证；review同树独立上下文final，从真实compile/Run复核AC/SD/
 | T-02 | work | T-01 | 最多A/B真实模块全链先证，冻结profile/精度/schema/CLI/线性上界/fallback；不足needs_replan | AC-01..06 | [ ] |
 | T-03 | work | T-02 go | 可选origin/旁件/loader接受身份/snapshot分层展示/gates，默认字节保持 | AC-01..04 | [x] 2026-11-04：origin=pooled/helper+Life handler+Member recv 唯一属主段；旁件+CLI 冻结；loader 接受身份接线 `SourceMap::load_for_world`（world+map+closure 三样受检物，缺/坏一律 None 走默认路径）；snapshot 分层展示=sdk_diagnostic_mapped 双锚（span 锚+符号锚）+runtime 无 span/managed 永不映射门；默认字节保持=verify_plan044 控制一（真实进程）+建图纯函数门。pilot gates 12/12、driver 7/7、verify 5 控制全绿。 |
 | T-04 | work | T-03 | 真实compile/runtime/managed/无span与身份/UTF8/变异，非伪错误文本日志 | AC-01..05 | [x] 2026-11-04：真实 compile（符号锚 broken.at:8:16）、runtime 无 span/managed 永不映射/generated 永不映射、假行文本负控（错误文本内嵌行号不信任）、符号多出现不猜、UTF8+组合符+CRLF 列/行独立重算、变异拒用全家、原错误文本保持。pilot 13/13、driver 8/8、verify 5 控制、回归全绿。 |
-| T-05 | work | T-04 | 资源上界/字节步数等价、保存A→B/坏map下次恢复与受影响旧门 | AC-04/05 | [ ] |
+| T-05 | work | T-04 | 资源上界/字节步数等价、保存A→B/坏map下次恢复与受影响旧门 | AC-04/05 | [x] 2026-11-04：上界实测重冻结（max(64KiB,4×world)+4MiB+16384 段，worst ratio 3.42）；8KiB 截断 mapped 路径门；debug 有无 world/API 字节等价（verify 控制一）+ VM 步数等价结构性事实（map 只在诊断回调消费、不入 Session、无每 Tick IO）；A→B 搬迁等价消费 + 坏图拒用→修复→下次诊断恢复映射；受影响旧门全绿（components 6/6、3d-audio-hud 26、3d-basic 8、game 3）。 |
 | T-06 | work | T-05 | SD候选/可选消费接口/覆盖精度及限制交接，不加M2前置 | AC-05/06 | [ ] |
 | T-07 | review | T-06 | 同树独立final与finding修复后同员复核 | AC-07 | [ ] |
 | T-08 | merge | T-07 pass | 冻结定向门/来源核后实际落master | AC-08 | [ ] |
@@ -154,7 +154,9 @@ work产证；review同树独立上下文final，从真实compile/Run复核AC/SD/
 
 2026-11-04 / stage: goal | plan_id: PLAN-044 | plan_revision: 1 | round: 9 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-044/auto-ui | commit: 1eb965c8 | next: work T-05。**T-04 关闭（4/10）**：补三负控/边界门——CRLF helper 源逐字节 remap（发射锚注释恒 \n 约定实证）、错误文本内嵌伪造行号永不信任（映射只认受检 span/符号）、符号多出现不猜（bump 跨 helpera/helperb 双段拒绝，唯一符号对照成立）。T-04 全项覆盖：真实 compile/runtime/managed/无 span 分层、身份绑定、UTF8/组合符/CRLF、变异拒用全家、非伪错误文本。pilot 13/13、driver 8/8、verify 5 控制、components 6/6、behavior_source_identity 1/1 全绿。
 
-2026-11-04 / stage: goal | plan_id: PLAN-044 | plan_revision: 1 | round: 10 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-044/auto-ui | commit: 6f3e5922 | next: work T-05（续）。**T-05 实测重冻结（D-02 关闭）**：旁件体积实测 n=32/128/256 helper × pad 6/12/30——map/world ratio 3.42/3.33/1.08/2.22，段数=2n+1，json 增量随 n 稳定（非超线性）。旧 T-02 常数上限 64KiB/4096 段会暗删 256KiB 合法域（worst 映射 ~870KiB），重冻结：driver 载入界 = max(64KiB, 4×world) 比率界 + 4MiB 绝对界 + 16384 段界（6f3e5922 双侧同步）；超限分类=整图拒用→generated fallback，不截断。pilot gates 14/14、driver 8/8、verify 5 控制复跑绿。T-05 余量：8KiB 截断 mapped 路径门、debug 有无 VM 步数等价观察、A→B/坏 map 下次恢复（V-S06）。
+2026-11-04 / stage: goal | plan_id: PLAN-044 | plan_revision: 1 | round: 10 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-044/auto-ui | commit: 6f3e5922 | next: work T-05（续）。**T-05 实测重冻结（D-02 关闭）**：旁件体积实测 n=32/128/256 helper × pad 6/12/30——map/world ratio 3.42/3.33/1.08/2.22，段数=2n+1，json 增量随 n 稳定（非超线性）。旧 T-02 常数上限 64KiB/4096 段会暗删 256KiB 合法域（worst 映射 ~870KiB），重冻结：driver 载入界 = max(64KiB, 4×world) 比率界 + 4MiB 绝对界 + 16384 段界（6f3e5922 双侧同步）；超限分类=整图拒用→generated fallback，不截断。pilot gates 14/14、driver 8/8、verify 5 控制复跑绿。
+
+2026-11-04 / stage: goal | plan_id: PLAN-044 | plan_revision: 1 | round: 11 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-044/auto-ui | commit: 57c7f264 | next: work T-06。**T-05 关闭（5/10）**：①8KiB 截断 mapped 路径门（20KiB 错误消息 → broken.at 前缀保持 + 截断标记 + <9KiB）。②V-S06：坏图拒用→精确修复→下次诊断恢复映射（同包全链路）；A→B 搬迁同字节等价消费（来源无关，相对包结构）。③debug 有无等价：world/API 字节等价=verify 控制一实测；VM 步数/费用/帧等价=结构事实（map 仅在 SDK compile 诊断回调消费，不入 Session 状态、零运行期钩子、无每 Tick IO——sdk_diagnostic_mapped 不改变 VM 路径）；音画等价=无呈现触面改动。④受影响旧门：load.rs 触面 3D 回归（audio-hud 26/26、3d-basic 8/8）+ game 3/3 + components 6/6 全绿。driver gates 10/10、verify 5 控制复跑绿。
 
 ## 10. 待澄清事项
 
