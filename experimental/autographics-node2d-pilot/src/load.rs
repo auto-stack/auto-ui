@@ -184,8 +184,12 @@ fn parse_module_text_dialect(
                     });
                 }
                 Stmt::Fn(f) => {
-                    if let Some((start, end)) = f.span {
-                        module.fns.push((f.name.to_string(), start..end));
+                    // PLAN-044：AST fn span 为 (start_offset, byte_length)
+                    // （auto-lang parser decls.rs 约定），展开成 start..start+len。
+                    // 此前误存 start..len（len<start，区间倒序），既有消费方
+                    // 只取名字未受影响；源映射是第一个真实使用区间的消费方。
+                    if let Some((start, len)) = f.span {
+                        module.fns.push((f.name.to_string(), start..start + len));
                     }
                 }
                 Stmt::EnumDecl(e) => {

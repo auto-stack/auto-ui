@@ -227,10 +227,12 @@ fn fn_end(source: &str, name: &str) -> Option<usize> {
 /// PLAN-044 T-02 冻结：pooled helper 后置锚定定位。
 ///
 /// components-2d 发射器为每个 pooled helper 前置唯一锚定注释
-/// `// pooled fn {name} from {module}`（lower_components.rs）。本函数按
-/// 相同排序（module, fn）从游标顺序定位，片段终点按花括号配平。
-/// 片段字节与 `lower::slice_fn_source` 原文一致 → `exact`；经模块调用
-/// 重命名等行内改写 → `range`（行号可证，列不承诺）。
+/// `// pooled fn {name} from {module}`（lower_components.rs），并把片段经
+/// `rename_module_calls` 重写：声明与调用处的 `{name}(` 变为
+/// `{module}_{name}(`（行内改写，行号不变，列可能偏移）。
+/// 本函数按相同排序（module, fn）从游标顺序定位，片段终点用改写后的
+/// 符号名 `{module}_{fname}` 按花括号配平。精度恒为 `range`（身份+行号
+/// 可证，列经 `remap_range_offset` 在可证时回算）。
 pub fn locate_pooled_fns(project: &Project, user_source: &str) -> Result<Vec<Segment>, String> {
     let mut fn_names: Vec<(String, String)> = Vec::new();
     for module in project.modules.values() {
@@ -249,26 +251,21 @@ pub fn locate_pooled_fns(project: &Project, user_source: &str) -> Result<Vec<Seg
             .ok_or_else(|| format!("pooled fn marker not found: {marker:?}"))?;
         let start = cursor + rel;
         let body_start = start + marker.len();
-        let end = fn_end(user_source, fname)
+        let emitted = format!("{module_name}_{fname}");
+        let end = fn_end(user_source, &emitted)
             .filter(|e| *e > body_start && *e <= user_source.len())
-            .ok_or_else(|| format!("pooled fn end not found: {fname}"))?;
-        let body = &user_source[body_start..end];
-        let verbatim = crate::lower::slice_fn_source(&module.source, fname)
+            .ok_or_else(|| format!("pooled fn end not found: {emitted}"))?;
+        // 源区间锚定可证切片：AST fn span 的 declaration_start 与切片起点
+        // 有实证差 1（parser 关键字口径），映射区间以 slice_fn_source 的
+        // 字节切片为准（与发射器同一来源，逐字节可证）。
+        let slice = crate::lower::slice_fn_source(&module.source, fname)
             .ok_or_else(|| format!("fn source slice: {module_name}/{fname}"))?;
-        let body_trimmed = body.trim_end();
-        let verbatim_trimmed = verbatim.trim_end();
-        let precision = if body_trimmed == verbatim_trimmed {
-            Precision::Exact
-        } else {
-            Precision::Range
-        };
-        let source_range = module
-            .fns
-            .iter()
-            .find(|(n, _)| n == fname)
-            .map(|(_, r)| (r.start, r.end));
-        let (source_start, source_end) =
-            source_range.ok_or_else(|| format!("fn span missing: {module_name}/{fname}"))?;
+        let source_start = module
+            .source
+            .find(slice.as_str())
+            .ok_or_else(|| format!("fn slice not anchored in module source: {module_name}/{fname}"));
+        let source_start = source_start?;
+        let source_end = source_start + slice.len();
         segments.push(Segment {
             start,
             end,
@@ -276,7 +273,7 @@ pub fn locate_pooled_fns(project: &Project, user_source: &str) -> Result<Vec<Seg
             node: None,
             event: None,
             helper: Some(fname.clone()),
-            precision,
+            precision: Precision::Range,
             source_start: Some(source_start),
             source_end: Some(source_end),
         });
@@ -285,9 +282,79 @@ pub fn locate_pooled_fns(project: &Project, user_source: &str) -> Result<Vec<Seg
     Ok(segments)
 }
 
+/// range 段的生成 offset → 原模块源 byte offset 回算。
+///
+/// 先证条件：片段体必须等于对原切片重放同一 `rename_module_calls` 的
+/// 结果（逐字节相等才继续）；差分只接受 `{module}_` 纯插入（重命名语义），
+/// 出现任何其它差异即返回 None（不猜）。offset 落在插入文本内部时映射到
+/// 原标识符起点（可证的最近位置）。
+pub fn remap_range_offset(
+    project: &Project,
+    seg: &Segment,
+    user_source: &str,
+    offset: usize,
+) -> Option<usize> {
+    let (module_name, helper) = (seg.module.as_deref()?, seg.helper.as_deref()?);
+    let module = project.modules.get(module_name)?;
+    let marker = format!("// pooled fn {helper} from {module_name}\n");
+    let body_start = seg.start.checked_add(marker.len())?;
+    if offset < body_start || offset >= seg.end {
+        return None;
+    }
+    let original = crate::lower::slice_fn_source(&module.source, helper)?;
+    let original = original.trim_end();
+    let siblings: Vec<String> = module.fns.iter().map(|(n, _)| n.clone()).collect();
+    let renamed = crate::lower_components::rename_module_calls(original, &siblings, module_name);
+    let frag = user_source.get(body_start..body_start + renamed.len())?;
+    if frag != renamed {
+        return None;
+    }
+    // 双指针差分：original 与 renamed 应仅有 `{module}_` 插入。
+    let ob = original.as_bytes();
+    let rb = renamed.as_bytes();
+    let ins = format!("{module_name}_").into_bytes();
+    let mut oi = 0usize;
+    let mut ri = 0usize;
+    // 插入点表：(renamed 中的位置, 原标识符在 original 中的位置)。
+    let mut insertions: Vec<(usize, usize)> = Vec::new();
+    while oi < ob.len() && ri < rb.len() {
+        if ob[oi] == rb[ri] {
+            oi += 1;
+            ri += 1;
+            continue;
+        }
+        if rb[ri..].starts_with(&ins) {
+            insertions.push((ri, oi));
+            ri += ins.len();
+            continue;
+        }
+        return None;
+    }
+    if ri < rb.len() {
+        return None;
+    }
+    let rel = offset - body_start;
+    let mut shift = 0usize;
+    for &(gpos, opos) in &insertions {
+        if rel < gpos + ins.len() && rel >= gpos {
+            // 落在插入文本内部：映射到原标识符起点。
+            return seg.source_start?.checked_add(opos);
+        }
+        if rel >= gpos + ins.len() {
+            shift += ins.len();
+        } else {
+            break;
+        }
+    }
+    let src_rel = rel.checked_sub(shift)?;
+    if src_rel > original.len() {
+        return None;
+    }
+    seg.source_start?.checked_add(src_rel)
+}
+
 /// 用 generated 段补齐未被映射段覆盖的空隙（相邻空隙合并为一个段）。
-pub fn fill_generated_gaps(mut segments: Vec<Segment>, user_source_len: usize) -> Vec<Segment> {
-    segments.sort_by_key(|s| s.start);
+pub fn fill_generated_gaps(mut segments: Vec<Segment>, user_source_len: usize) -> Vec<Segment> {    segments.sort_by_key(|s| s.start);
     let mut out: Vec<Segment> = Vec::new();
     let mut cursor = 0usize;
     for seg in segments {

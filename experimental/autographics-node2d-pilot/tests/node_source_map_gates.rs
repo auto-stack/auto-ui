@@ -1,20 +1,27 @@
-//! PLAN-044 gates：Node 源映射结构/锚定/变异拒用。
+//! PLAN-044 gates：Node 源映射结构/锚定/变异拒用/真实链。
 //!
-//! 覆盖 V-S01 的映射侧与 V-S03 的拒用侧：pooled helper 跨模块 exact/range
-//! 定位、generated 补齐、lookup、以及坏 hash/越界/重叠/逃逸 key/伪精度/
-//! 非字符边界的变异红。真实 compile 全链先证在 driver
-//! tests/node_source_diagnostics.rs（T-02/T-04）。
+//! 覆盖 V-S01 的映射侧与 V-S03 的拒用侧：pooled helper 跨模块 range
+//! 定位与列回算、generated 补齐、lookup、坏 hash/越界/重叠/逃逸 key/伪
+//! 精度/非字符边界变异红，以及 helpers 夹具真实 load→lower→map 全链。
+//! 真实 SDK compile 全链先证在 driver tests/node_source_diagnostics.rs
+//! （T-02/T-04）。
 
 use std::collections::BTreeMap;
 
-use autographics_node2d_pilot::load::{LoadedModule, Project};
-use autographics_node2d_pilot::source_map::{
-    build_source_map, fill_generated_gaps, locate_pooled_fns, Precision, Segment, SourceMap,
-    MAP_FORMAT,
-};
+use autographics_node2d_pilot::load::{load_project, LoadedModule, Project};
+use autographics_node2d_pilot::lower_project_components;
 use autographics_node2d_pilot::scene::sha256_hex;
+use autographics_node2d_pilot::source_map::{
+    build_source_map, fill_generated_gaps, locate_pooled_fns, remap_range_offset, Precision,
+    Segment, SourceMap, MAP_FORMAT,
+};
 
 const GENERATOR: &str = "node2d-lower[components-2d]";
+
+const HELP_MAIN: &str = include_str!("../fixtures/components2d/helpers/main.at");
+const HELP_A: &str = include_str!("../fixtures/components2d/helpers/helpera.at");
+const HELP_B: &str = include_str!("../fixtures/components2d/helpers/helperb.at");
+const HELP_RES: &str = include_str!("../fixtures/components2d/resources.at");
 
 fn module(name: &str, source: &str, fns: Vec<(&str, usize, usize)>) -> LoadedModule {
     LoadedModule {
@@ -38,101 +45,203 @@ fn fixture_sources() -> (String, String) {
     (util, main)
 }
 
-/// 模拟发射器：header（generated）+ pooled helper 锚定段 + 尾部调度（generated）。
-fn emit_like_pooled(util_source: &str, renamed: bool) -> String {
+/// 模拟真实发射器：header（generated）+ 按 (module, fn) 排序的 pooled
+/// 锚定段（声明与调用处 `{name}(` → `{module}_{name}(`，同 rename_module_calls
+/// 对本夹具的净效果）+ 尾部调度（generated）。
+fn emit_like_pooled(project: &Project) -> String {
     let mut src = String::from("// GENERATED header\nvar ok=0.0\n");
-    // 只发射 score（double 在真实发射器同样有自己的锚定段；本夹具单段足够）。
-    let mut body = util_source[..util_source.find("fn double").unwrap()].to_string();
-    if renamed {
-        // 模块调用重命名模拟：行内 token 替换（行号不变，列可能偏移）。
-        body = body.replace("double(x)", "util_double(x)");
+    let mut fn_names: Vec<(String, String)> = Vec::new();
+    for module in project.modules.values() {
+        for (fname, _) in &module.fns {
+            fn_names.push((module.name.clone(), fname.clone()));
+        }
     }
-    src.push_str("// pooled fn score from util\n");
-    src.push_str(body.trim_end());
-    src.push('\n');
+    fn_names.sort();
+    for (module_name, fname) in &fn_names {
+        let module = &project.modules[module_name];
+        let text = autographics_node2d_pilot::lower::slice_fn_source(&module.source, fname)
+            .expect("slice");
+        let mut renamed = text;
+        for (sib, _) in &module.fns {
+            renamed = renamed.replace(&format!("{sib}("), &format!("{module_name}_{sib}("));
+        }
+        src.push_str(&format!("// pooled fn {fname} from {module_name}\n"));
+        src.push_str(renamed.trim_end());
+        src.push('\n');
+    }
     src.push_str("fn app_start() {\n}\n");
     src
 }
 
-fn project_with_util() -> (Project, String) {
+fn project_with_util() -> Project {
     let (util, main) = fixture_sources();
     let score_start = util.find("fn score").unwrap();
     let score_len = autographics_node2d_pilot::lower::slice_fn_source(&util, "score")
         .expect("score slice")
         .len();
+    let double_start = util.find("fn double").unwrap();
+    let double_len = autographics_node2d_pilot::lower::slice_fn_source(&util, "double")
+        .expect("double slice")
+        .len();
     let mut project = Project::default();
-    project
-        .modules
-        .insert("util".into(), module("util", &util, vec![("score", score_start, score_start + score_len)]));
+    project.modules.insert(
+        "util".into(),
+        module(
+            "util",
+            &util,
+            vec![
+                ("score", score_start, score_start + score_len),
+                ("double", double_start, double_start + double_len),
+            ],
+        ),
+    );
     project
         .modules
         .insert("main".into(), module("main", &main, Vec::new()));
-    (project, util)
+    project
 }
 
 #[test]
-fn pooled_helper_exact_cross_module() {
-    let (project, _util) = project_with_util();
-    let src = emit_like_pooled(&project.modules["util"].source, false);
+fn pooled_helper_range_and_remap() {
+    let project = project_with_util();
+    let src = emit_like_pooled(&project);
     let segments = locate_pooled_fns(&project, &src).expect("locate");
-    assert_eq!(segments.len(), 1);
-    let seg = &segments[0];
-    assert_eq!(seg.precision, Precision::Exact);
-    assert_eq!(seg.module.as_deref(), Some("util"));
-    assert_eq!(seg.helper.as_deref(), Some("score"));
-    // exact：片段字节 == 原模块源切片字节。
-    let slice = &project.modules["util"].source[seg.source_start.unwrap()..seg.source_end.unwrap()];
-    assert_eq!(src[seg.start..seg.end].trim_start_matches("// pooled fn score from util\n"), slice.trim_end());
-}
-
-#[test]
-fn pooled_helper_rename_downgrades_to_range() {
-    let (project, _util) = project_with_util();
-    let src = emit_like_pooled(&project.modules["util"].source, true);
-    let segments = locate_pooled_fns(&project, &src).expect("locate");
-    assert_eq!(segments[0].precision, Precision::Range);
-    // 行号可证：原切片行数 == 片段行数。
-    let slice = &project.modules["util"].source
-        [segments[0].source_start.unwrap()..segments[0].source_end.unwrap()];
-    assert_eq!(slice.lines().count(), src[segments[0].start..segments[0].end].lines().count() - 1);
+    assert_eq!(segments.len(), 2, "double+score 两段（sorted: double 先）");
+    // 恒为 range：声明经 `{module}_` 前缀改写。
+    for seg in &segments {
+        assert_eq!(seg.precision, Precision::Range);
+        assert_eq!(seg.module.as_deref(), Some("util"));
+    }
+    assert_eq!(segments[0].helper.as_deref(), Some("double"));
+    assert_eq!(segments[1].helper.as_deref(), Some("score"));
+    // remap：score 片段内 `util_double` 调用点的列回算到原 `double` 标识符。
+    let score_seg = &segments[1];
+    let util_double_pos = src[score_seg.start..score_seg.end].find("util_double").unwrap() + score_seg.start;
+    assert!(util_double_pos >= score_seg.start && util_double_pos < score_seg.end);
+    let mapped = remap_range_offset(&project, score_seg, &src, util_double_pos).expect("remap");
+    let util = &project.modules["util"].source;
+    assert_eq!(&util[mapped..mapped + "double".len()], "double");
+    // 行号可证：生成片段行号增量 == 原源行号增量（同一相对位置）。
+    let marker = "// pooled fn score from util\n";
+    let body_start = score_seg.start + marker.len();
+    let k = util_double_pos - body_start;
+    let gen_rel = src[body_start..body_start + k].bytes().filter(|b| *b == b'\n').count();
+    let src_rel = util[score_seg.source_start.unwrap()..score_seg.source_start.unwrap() + k - 5]
+        .bytes()
+        .filter(|b| *b == b'\n')
+        .count();
+    assert_eq!(gen_rel, src_rel, "行号增量必须可证（k 含 5 字节插入位移）");
+    // 片段外的 offset 与未锚定内容不回算。
+    assert!(remap_range_offset(&project, score_seg, &src, score_seg.start + 2).is_none());
 }
 
 #[test]
 fn build_map_fills_generated_gaps_and_validates() {
-    let (project, _util) = project_with_util();
-    let src = emit_like_pooled(&project.modules["util"].source, false);
+    let project = project_with_util();
+    let src = emit_like_pooled(&project);
     let world_sha = sha256_hex(src.as_bytes());
     let map = build_source_map(&project, &src, GENERATOR, &world_sha).expect("build");
     map.validate(&src).expect("validate");
     assert_eq!(map.format, MAP_FORMAT);
     assert_eq!(map.user_source_bytes, src.len());
-    // 段连续覆盖、不重叠：header(generated) + helper(exact) + 尾部(generated)。
-    assert!(map.segments.len() >= 3);
+    // 段连续覆盖、不重叠：header(generated) + 2 helper(range) + 尾(generated)。
+    assert!(map.segments.len() >= 4);
     let mut cursor = 0;
     for seg in &map.segments {
         assert_eq!(seg.start, cursor, "segments must tile the source");
         cursor = seg.end;
     }
     assert_eq!(cursor, src.len());
-    // lookup：header 命中 generated，helper 体内命中 exact。
+    // lookup：header 命中 generated，helper 体内命中 range。
     let helper = map
         .segments
         .iter()
-        .find(|s| s.precision == Precision::Exact)
+        .find(|s| s.precision == Precision::Range)
         .unwrap();
-    assert_eq!(map.lookup(helper.start + 1).unwrap().helper.as_deref(), Some("score"));
+    assert_eq!(map.lookup(helper.start + 1).unwrap().helper.as_deref(), Some("double"));
     assert_eq!(map.lookup(0).unwrap().precision, Precision::Generated);
     assert_eq!(map.lookup(src.len()), None);
-    // 字节重算行（exact 证据核心）：片段内相对偏移的行号增量必须等于
-    // 原模块源同相对偏移的行号增量（verbatim 行号可证）。
-    let body_off = helper.start + "// pooled fn score from util\n".len();
-    let k = 8; // "fn score" 体内的相对偏移
-    let gen_rel = src[body_off..body_off + k].bytes().filter(|b| *b == b'\n').count();
-    let src_rel = project.modules["util"].source[helper.source_start.unwrap()..helper.source_start.unwrap() + k]
-        .bytes()
-        .filter(|b| *b == b'\n')
-        .count();
-    assert_eq!(gen_rel, src_rel, "verbatim 片段行号增量必须可证");
+}
+
+// ------------------------------------------------- 真实链：helpers 夹具 --
+
+fn lower_helpers_fixture() -> (Project, String) {
+    let dir = std::env::temp_dir().join(format!(
+        "plan044-help-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&dir).expect("dir");
+    for (name, body) in [
+        ("main", HELP_MAIN),
+        ("helpera", HELP_A),
+        ("helperb", HELP_B),
+        ("resources", HELP_RES),
+    ] {
+        std::fs::write(dir.join(format!("{name}.at")), body).expect("write");
+    }
+    let project = load_project(&dir.join("main.at")).expect("load helpers fixture");
+    let lowered = lower_project_components(&project).expect("lower helpers fixture");
+    let world = lowered.user_source.expect("world.at");
+    std::fs::remove_dir_all(&dir).ok();
+    (project, world)
+}
+
+#[test]
+fn real_chain_same_name_helpers_do_not_cross_files() {
+    let (project, world) = lower_helpers_fixture();
+    let world_sha = sha256_hex(world.as_bytes());
+    let map = build_source_map(&project, &world, GENERATOR, &world_sha).expect("build");
+    map.validate_against_world(&world).expect("validate");
+    // 两个同名 helper 段：各自落在自己的模块，不串文件/实例。
+    let a = map
+        .segments
+        .iter()
+        .find(|s| s.module.as_deref() == Some("helpera"))
+        .expect("helpera segment");
+    let b = map
+        .segments
+        .iter()
+        .find(|s| s.module.as_deref() == Some("helperb"))
+        .expect("helperb segment");
+    assert_eq!(a.helper.as_deref(), Some("bump"));
+    assert_eq!(b.helper.as_deref(), Some("bump"));
+    assert!(a.start < b.start || b.start < a.start);
+    assert!(!(a.start..a.end).contains(&b.start) && !(b.start..b.end).contains(&a.start));
+    // 模块源切片可区分（+1.0 vs +2.0）：身份与内容一致。
+    let sa = &project.modules["helpera"].source[a.source_start.unwrap()..a.source_end.unwrap()];
+    let sb = &project.modules["helperb"].source[b.source_start.unwrap()..b.source_end.unwrap()];
+    assert!(sa.contains("+ 1.0"), "helpera bump adds 1.0");
+    assert!(sb.contains("+ 2.0"), "helperb bump adds 2.0");
+    // remap：helpera 片段内 `1.0` 回算到 helpera 源；helperb 同理（不互串）。
+    let gen_a_1p0 = world[a.start..a.end].find("1.0").unwrap() + a.start;
+    let mapped_a = remap_range_offset(&project, a, &world, gen_a_1p0).expect("remap a");
+    assert_eq!(
+        &project.modules["helpera"].source[mapped_a..mapped_a + 3],
+        "1.0"
+    );
+    let gen_b_2p0 = world[b.start..b.end].find("2.0").unwrap() + b.start;
+    let mapped_b = remap_range_offset(&project, b, &world, gen_b_2p0).expect("remap b");
+    assert_eq!(
+        &project.modules["helperb"].source[mapped_b..mapped_b + 3],
+        "2.0"
+    );
+    // 行号一致：remapped 位置行号 == 生成位置行号（相对片段起点的增量）。
+    let line_delta = |src: &str, from: usize, to: usize| {
+        src[from..to].bytes().filter(|b| *b == b'\n').count()
+    };
+    let marker_a = "// pooled fn bump from helpera\n";
+    assert_eq!(
+        line_delta(&world, a.start + marker_a.len(), gen_a_1p0),
+        line_delta(
+            &project.modules["helpera"].source,
+            a.source_start.unwrap(),
+            mapped_a
+        )
+    );
 }
 
 #[test]
@@ -155,8 +264,8 @@ fn valid_map(project: &Project, src: &str) -> SourceMap {
 
 #[test]
 fn mutation_rejects_bad_world_hash() {
-    let (project, _util) = project_with_util();
-    let src = emit_like_pooled(&project.modules["util"].source, false);
+    let project = project_with_util();
+    let src = emit_like_pooled(&project);
     let mut map = valid_map(&project, &src);
     // 格式合法但与实际 world 内容不符的 hash（旧 Run / 错 world 绑定）：
     // 结构校验可过（无 world 字节可比对），载入侧绑定校验必须拒用。
@@ -173,8 +282,8 @@ fn mutation_rejects_bad_world_hash() {
 
 #[test]
 fn mutation_rejects_source_bytes_drift() {
-    let (project, _util) = project_with_util();
-    let src = emit_like_pooled(&project.modules["util"].source, false);
+    let project = project_with_util();
+    let src = emit_like_pooled(&project);
     let mut map = valid_map(&project, &src);
     map.user_source_bytes += 1;
     assert!(map.validate(&src).is_err());
@@ -186,9 +295,9 @@ fn mutation_rejects_source_bytes_drift() {
 
 #[test]
 fn mutation_rejects_overlap_out_of_bounds_and_char_boundary() {
-    let (project, _util) = project_with_util();
-    let src = emit_like_pooled(&project.modules["util"].source, false);
-    let mut map = valid_map(&project, &src);
+    let project = project_with_util();
+    let src = emit_like_pooled(&project);
+    let map = valid_map(&project, &src);
     // 越界
     let mut m = map.clone();
     m.segments[0].end = src.len() + 1;
@@ -220,8 +329,8 @@ fn mutation_rejects_overlap_out_of_bounds_and_char_boundary() {
 
 #[test]
 fn mutation_rejects_escape_keys_and_fake_precision() {
-    let (project, _util) = project_with_util();
-    let src = emit_like_pooled(&project.modules["util"].source, false);
+    let project = project_with_util();
+    let src = emit_like_pooled(&project);
     for bad in ["../evil", "a/b", "C:\\x", "a:b"] {
         let mut m = valid_map(&project, &src);
         m.modules.insert(bad.into(), m.modules["util"].clone());
@@ -241,7 +350,7 @@ fn mutation_rejects_escape_keys_and_fake_precision() {
     let seg = m
         .segments
         .iter_mut()
-        .find(|s| s.precision == Precision::Exact)
+        .find(|s| s.precision == Precision::Range)
         .unwrap();
     seg.source_end = None;
     assert!(m.validate(&src).is_err());
