@@ -6,6 +6,10 @@
 // (.Tick 追数据点)语义不变:monthly 数据变化 → 子组件 props 重播种 →
 // Init 重放 → 几何自动重算(ADR-19)。
 
+// PLAN-047 T-03：官方主题族（无显式默认 → Auto/light；族/模式选择经
+// theme_name + design 数据绑定，测试经 autoui_fixture 驱动，B2 C-03）
+use themes.themes: Auto, Solarized
+
 style tab_btn = "px-3 py-2 text-sm rounded-md border bg-background hover:bg-accent"
 style tab_btn_primary = "px-3 py-2 text-sm rounded-md bg-primary text-primary-foreground"
 style section_label = "text-xs font-semibold text-muted-foreground uppercase tracking-wide"
@@ -20,6 +24,10 @@ widget App {
     msg { Init, SetLine, SetBar, SetArea, SetDonut, ToggleDesktop, ToggleMobile, ToggleTablet, Play, Pause, Reset, SetWin8, SetWin12, SetWin20 }
 
     model {
+        // PLAN-047 T-03：主题族/模式选择态（主题选择，非业务状态）
+        var theme_name str = "Auto"
+        var dark_mode bool = false
+
         // ---- 状态 ----
         chartType str = "line"
         dVisible bool = true
@@ -50,6 +58,12 @@ widget App {
             { m: "May", desktop: 209, mobile: 130, tablet: 70 },
             { m: "Jun", desktop: 214, mobile: 140, tablet: 85 }
         ]
+    }
+
+    // 主题/模式选择器（C-14：数据绑定，同帧校验发布）
+    design {
+        theme: .theme_name
+        mode: if .dark_mode { "dark" } else { "light" }
     }
 
     on {

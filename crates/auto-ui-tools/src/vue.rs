@@ -2558,6 +2558,11 @@ fn write_project_files(
     composed_theme: Option<&auto_ui_compiler::design_tokens::decl::ComposedTheme>,
     // PLAN-031 T-06（F-1 续）：App 导入包树驱动的 :root/.dark 初始块。
     tree_index_css: Option<&TreeIndexCss>,
+    // PLAN-047 T-03：`__AUTO_TREE_THEMES__` 注入体。此前仅 regen 路径
+    // 注入（Plan 043 M5 块），首脚手架（本 fn）恒传 None——新装项目首
+    // gen 的 index.html 永无官方族 → Solarized 等 Vue 侧零上身（016/018/
+    // 024 实证，021 fresh-gen 同症）。
+    tree_themes_js: Option<&str>,
 ) -> Result<(), String> {
     // PLAN-050 (r3/F-5): the vite include source is captured BEFORE the
     // Plan-482 shadowing below — the derived @autodown/engine sibling must
@@ -2645,7 +2650,7 @@ fn write_project_files(
         .map_err(|e| format!("Failed to write postcss.config.cjs: {}", e))?;
 
     // index.html
-    let index_html = generate_index_html(name, index_title, composed_theme, None);
+    let index_html = generate_index_html(name, index_title, composed_theme, tree_themes_js);
     fs::write(output_path.join("index.html"), index_html)
         .map_err(|e| format!("Failed to write index.html: {}", e))?;
 
@@ -5204,6 +5209,7 @@ export default router
             &locale_copies,
             self.theme.as_ref(),
             self.tree_index_css().as_ref(),
+            self.collect_tree_themes_js().as_deref(),
         )?;
 
         // Generate router files if routes detected
@@ -5391,6 +5397,7 @@ export default router
             &locale_copies,
             self.theme.as_ref(),
             self.tree_index_css().as_ref(),
+            self.collect_tree_themes_js().as_deref(),
         )?;
 
         // Write App.vue (the root component)
@@ -5526,7 +5533,22 @@ export default router
         use auto_ui_compiler::design_tokens::theme_tree as tt;
         let app_at = self.front_dir.join("app.at");
         let code = std::fs::read_to_string(&app_at).ok()?;
-        let trees = match tt::collect_named_themes(&app_at, &code) {
+        // PLAN-047 T-03：dep 根感知收集——裸路径解析找不到 pac `dep themes
+        // { path: … }` 的包根（详见 compiler collect_theme_trees_with_dep_roots
+        // 头注），缺此回落 Solarized 等官方族在 Vue 轨零注入（016/018/024 实证）。
+        let dep_roots: Vec<(String, std::path::PathBuf)> = std::fs::read_to_string(
+            self.root_dir.join("pac.at"),
+        )
+        .map(|pac| {
+            parse_dep_roots_text(&pac)
+                .into_iter()
+                .filter_map(|(name, path)| {
+                    path.map(|p| (name, self.root_dir.join(p)))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+        let trees = match tt::collect_named_themes_with_dep_roots(&app_at, &code, &dep_roots) {
             Ok(trees) => trees,
             Err(e) => panic!("树状主题收集/校验失败：{e}（首次挂载不发布半成品，C-11）"),
         };

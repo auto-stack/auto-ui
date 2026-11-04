@@ -534,6 +534,22 @@ pub fn collect_theme_trees(
     at_path: &std::path::Path,
     code: &str,
 ) -> Result<BTreeMap<String, Tree>, ThemeError> {
+    collect_theme_trees_with_dep_roots(at_path, code, &[])
+}
+
+/// PLAN-047 T-03：dep 根感知的主题树收集。`use themes.themes: …` 的模块
+/// 解析在裸 `resolve_use_module`（base_dir 相对探针 + 父目录回落）下找不到
+/// pac `dep themes { path: "../../../packages/themes" }` 的包根——本应用
+/// 目录树里不存在 `themes/themes.at`，收集静默为空 → Vue 轨
+/// `__AUTO_TREE_THEMES__` 零注入 → 官方包族（Solarized 等）在 Vue 侧永不
+/// 上身（016 B2 vue 腿于 master 实测红、018/024 同症；plan-031/037 期
+/// 通过依赖的是当时代码路径，其后回归，具体引入点未深挖——本修复按
+/// 「dep 名 → 包根 → {rest}.at/mod.at」补全解析序，裸路径行为不变）。
+pub fn collect_theme_trees_with_dep_roots(
+    at_path: &std::path::Path,
+    code: &str,
+    dep_roots: &[(String, std::path::PathBuf)],
+) -> Result<BTreeMap<String, Tree>, ThemeError> {
     let mut known: BTreeMap<String, Tree> = BTreeMap::new();
     let base_dir = at_path.parent().unwrap_or(std::path::Path::new("."));
 
@@ -575,9 +591,28 @@ pub fn collect_theme_trees(
         if use_stmt.is_c_import || use_stmt.is_rust_import || use_stmt.is_python_import {
             continue;
         }
-        if let crate::UseModuleResolution::Module(path) =
-            crate::ui_ast::resolve_use_module(base_dir, &use_stmt)
-        {
+        let resolved = match crate::ui_ast::resolve_use_module(base_dir, &use_stmt) {
+            crate::UseModuleResolution::Module(path) => Some(path),
+            _ => {
+                // PLAN-047 T-03：裸解析失败后按 pac dep 根回落——模块首段
+                // 命中 dep 名 → 在包根下探 {rest}.at / {rest}/mod.at / mod.at。
+                let first = use_stmt.module.split('.').next().unwrap_or("");
+                let rest = use_stmt.module.split_once('.').map(|(_, r)| r);
+                dep_roots
+                    .iter()
+                    .filter(|(name, _)| name == first)
+                    .find_map(|(_, root)| {
+                        let mut cands: Vec<std::path::PathBuf> = Vec::new();
+                        if let Some(r) = rest {
+                            cands.push(root.join(format!("{}.at", r.replace('.', "/"))));
+                            cands.push(root.join(r.replace('.', "/")).join("mod.at"));
+                        }
+                        cands.push(root.join("mod.at"));
+                        cands.into_iter().find(|c| c.exists())
+                    })
+            }
+        };
+        if let Some(path) = resolved {
             let Ok(source) = std::fs::read_to_string(&path) else {
                 continue;
             };
@@ -593,7 +628,16 @@ pub fn collect_named_themes(
     at_path: &std::path::Path,
     code: &str,
 ) -> Result<BTreeMap<String, ThemeTree>, ThemeError> {
-    let known = collect_theme_trees(at_path, code)?;
+    collect_named_themes_with_dep_roots(at_path, code, &[])
+}
+
+/// PLAN-047 T-03：dep 根感知变体（见 [`collect_theme_trees_with_dep_roots`]）。
+pub fn collect_named_themes_with_dep_roots(
+    at_path: &std::path::Path,
+    code: &str,
+    dep_roots: &[(String, std::path::PathBuf)],
+) -> Result<BTreeMap<String, ThemeTree>, ThemeError> {
+    let known = collect_theme_trees_with_dep_roots(at_path, code, dep_roots)?;
     // 从已知键表重建 ThemeTree：仅取裸名键（dotted 键是同一主题的别名）。
     let mut out = BTreeMap::new();
     for (name, tree) in known {
@@ -724,6 +768,45 @@ pub fn resolve_rgb(tree: &Tree, token: TokenName) -> Option<(u8, u8, u8)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// PLAN-047 T-03：pac dep 根感知解析。裸 resolve_use_module 找不到
+    /// `use themes.themes`（包在 dep 根下，不在 app 源树内）——收集曾静默
+    /// 为空 → Vue 轨 __AUTO_TREE_THEMES__ 零注入（016/018/024 实证回归）。
+    #[test]
+    fn plan047_collect_resolves_use_via_dep_roots() {
+        let dir = std::env::temp_dir().join(format!("plan047-themetree-{}", std::process::id()));
+        let pkg = dir.join("packages/themes");
+        std::fs::create_dir_all(&pkg).unwrap();
+        std::fs::write(
+            pkg.join("themes.at"),
+            "pub theme Solarized = {\n    tokens: { colors: { background: \"#002b36\" } }\n}\n",
+        )
+        .unwrap();
+        let app = dir.join("app.at");
+        let code = "use themes.themes: Auto, Solarized\n\nwidget App { view { col { text \"x\" } } }\n";
+        std::fs::write(&app, code).unwrap();
+
+        // 裸解析：0 族（回归前的实证行为）。
+        let bare = collect_named_themes(&app, code).unwrap();
+        assert!(
+            !bare.contains_key("Solarized"),
+            "裸解析不应找到 dep 包（否则本测试前提失效）: {:?}",
+            bare.keys()
+        );
+        // dep 根解析：Solarized 入表。
+        let rooted = collect_named_themes_with_dep_roots(
+            &app,
+            code,
+            &[("themes".to_string(), dir.join("packages/themes"))],
+        )
+        .unwrap();
+        assert!(
+            rooted.contains_key("Solarized"),
+            "dep 根解析必须收录 Solarized: {:?}",
+            rooted.keys()
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     fn obj(pairs: Vec<(&str, Tree)>) -> Tree {
         Tree::Object(

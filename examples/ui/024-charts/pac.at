@@ -17,3 +17,11 @@ desktop: "true"
 dep stylekit {
     path: "../stylekit"
 }
+
+# PLAN-047 T-03：接入官方主题包（C-13）。024 无主题接线、无显式默认 →
+# 官方 Auto/light 独立默认（B2 同律）。series 身份色（#2563eb/#16a34a/
+# #d97706/#dc2626，图例点与四类图组件默认 colors）为数据内容色豁免——
+# 换肤不改 series→颜色映射与几何数据。
+dep themes {
+    path: "../../../packages/themes"
+}
