@@ -48,6 +48,9 @@ widget Stage {
                     style: "w-72 h-72 relative items-center justify-center shrink-0"
 
                     // 黑胶唱盘底座（带多重同心圆光泽）
+                    // PLAN-045 T-03 豁免：盘面 bg-zinc-950 / 唱臂 bg-slate-* = 内容域
+                    // （唱盘本体恒深色，同 030 视口 bg-black 口径），不随主题染色；
+                    // 封面贴纸 emerald 渐变 = 装饰渐变（637 已登记豁免）。
                     col {
                         onclick: .PlayPause
                         style: if .store.is_playing {

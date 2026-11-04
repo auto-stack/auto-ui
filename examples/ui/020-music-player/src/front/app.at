@@ -18,6 +18,12 @@ use viewport: Viewport
 // PLAN-637 B5 Phase B 映射（2026-09-17）：bg-zinc-950→bg-background；轨道 bg-zinc-400/300→
 // bg-muted；ring-zinc-800/border-zinc-900→border 系。豁免：封面渐变叠字 text-white ×4、
 // rose（红心）与 emerald（播放徽章/封面渐变）= 语义状态与装饰渐变（638 重设计后残余）。
+// PLAN-045 T-03：接入官方主题包。族选择经 theme_name + design 数据绑定（006/011
+// 先例）；dark_mode/accent_color 魔法变量已在根 widget（主题运行时契约）。
+// ToggleDarkMode 原为无视图接线死代码（038 具名）——按 README 承诺（NavSidebar
+// "dark mode toggle"特性）在 NavSidebar 补主题切换按钮接线。
+use themes.themes: Auto, Solarized
+
 widget App {
     msg {
         Init,
@@ -28,10 +34,18 @@ widget App {
         // 主题魔法变量：保持在根 widget 以驱动生成器深浅色运行时
         var dark_mode bool = true
         var accent_color str = "emerald"
+        // PLAN-045：主题族选择（默认 Auto；pac `theme: "dark"` 显式默认保留）
+        var theme_name str = "Auto"
         // PLAN-035 T-07：桌面通知上行总线（notify 词面；孵化会话排空段 =
         // 宿主 drain 扩容）+ 空曲库去重旗标（rescan 结果不变不重发）。
         var __desktop_cmd str = ""
         var empty_notified bool = false
+    }
+
+    // 主题/模式选择器（C-06/07：数据绑定，同帧校验发布）
+    design {
+        theme: .theme_name
+        mode: if .dark_mode { "dark" } else { "light" }
     }
 
     view {
@@ -42,7 +56,7 @@ widget App {
             row {
                 style: "w-full flex-1 min-h-0"
 
-                NavSidebar()
+                NavSidebar(dark_mode: .dark_mode, on_toggle_dark: .ToggleDarkMode)
 
                 col {
                     style: "flex-1 min-w-0 min-h-0 bg-background/50 relative overflow-hidden"

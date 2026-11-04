@@ -4,11 +4,15 @@
 
 use player_store: PlayerStore
 
-widget NavSidebar {
+// PLAN-045 T-03：主题切换按钮接线（038 具名 ToggleDarkMode 无视图绑定=死代码；
+// README 承诺 NavSidebar "dark mode toggle"特性）。按钮走 App 根 handler
+// （on_toggle_dark prop → .ToggleDarkMode），亮暗 icon 随根 widget dark_mode。
+widget NavSidebar(dark_mode: bool, on_toggle_dark: msg) {
     msg {
         SelectNav(str),
         SelectStage,
-        ToggleLike
+        ToggleLike,
+        ToggleDark
     }
 
     view {
@@ -124,6 +128,21 @@ widget NavSidebar {
                             style: "flex-1 text-left font-medium"
                         }
                     }
+
+                    // 深浅主题切换（PLAN-045 T-03：README 承诺的 dark mode toggle
+                    // 接线；icon 随 App 根 dark_mode 翻转，语义类走主题 token）
+                    row {
+                        onclick: .ToggleDark
+                        style: "w-full h-10 items-center justify-start gap-3 px-3.5 rounded-xl text-muted-foreground hover:bg-muted/70 hover:text-foreground font-medium text-xs cursor-pointer transition-all"
+                        if .dark_mode {
+                            icon (name: "sun", size: 16, style: "shrink-0")
+                        } else {
+                            icon (name: "moon", size: 16, style: "shrink-0")
+                        }
+                        text "深浅主题" {
+                            style: "flex-1 text-left font-medium"
+                        }
+                    }
                 }
             }
 
@@ -176,6 +195,9 @@ widget NavSidebar {
         }
         .ToggleLike -> {
             store.ToggleLike()
+        }
+        .ToggleDark -> {
+            on_toggle_dark()
         }
     }
 }
