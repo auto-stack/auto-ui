@@ -8,7 +8,7 @@
 //! 运行：cargo test --locked --offline --test node3d_model_objects_flow -- --test-threads=1
 use autographics_auto_driver::authoring::document::{Document, Kind};
 use autographics_auto_driver::authoring::{assets::Registry, host::Host, storage::Storage};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 const G12_SCENE: &str = include_str!(
@@ -461,6 +461,93 @@ fn g13_model_objects_opaque_closure_full_chain_on_gpu() {
         let (g3, _) = gold(&mut h, "g13-t3");
         assert!(g3 > 5, "respawned coin renders from the shared closure: bright gold {g3}");
     });
+}
+
+
+#[test]
+fn model_objects_typed_budget_faults_are_named() {
+    use autographics_auto_driver::authoring::behavior::{Api, SourceSnapshot};
+    let snapshot = |name: &str, src: String| {
+        SourceSnapshot::from_bytes_for(Path::new(name), src.as_bytes().to_vec(), Api::Triggers3V1)
+            .expect("admission")
+    };
+    let start_mutant = |tag: &str, world: String| -> Host {
+        let dir = write_product(tag);
+        let (doc, registry, code, _) =
+            Storage::load_project(&dir.join("scene.agscene"), &Registry::new()).expect("doc");
+        let mut h = Host::with_project(doc, registry, code).expect("host");
+        h.start_user_snapshot(snapshot(&format!("{tag}.at"), world))
+            .expect("start");
+        h.pause_play("");
+        settle(&mut h);
+        h
+    };
+
+    // (V-S03) 33rd credit：tick 内注入 31 个 ag_char3_move（角色 op 计费
+    // 但不占 object 写上限；2 object credit + 31 char3 credit = 33 > 32）
+    // → 共享 32/callback 池超限，fault 10。
+    let mut injected = String::new();
+    for _ in 0..31 {
+        injected.push_str("  ag_char3_move(1.0, 0.0, 0.0, 0.001)
+");
+    }
+    let mutated = G12_WORLD.replace(
+        "  ag_object_visible(r_h2, 0)",
+        &format!("  ag_object_visible(r_h2, 0)
+{injected}"),
+    );
+    assert_ne!(mutated, G12_WORLD, "credit mutation must apply");
+    let mut h = start_mutant("fault-credit", mutated);
+    tick(&mut h);
+    let err = h.play.as_ref().unwrap().error.clone().unwrap_or_default();
+    assert!(err.contains("code=10"), "33rd credit must fault 10, got '{err}'");
+
+    // (V-S03) 第 33 个 lifecycle write：Start 已有 2 spawn（2 写），注入
+    // 31 个 move → 第 33 写恰在最后一个 → fault 37（写上限先于计费检查）。
+    let mut extra = String::new();
+    for _ in 0..31 {
+        extra.push_str(" ag_object_move(r_h, 2.0, 0.5, 0.0)
+");
+    }
+    let mutated = G12_WORLD.replace(
+        " r_h2 = ag_object_spawn(1, 3, 6.0, 0.5, 0.0)",
+        &format!(" r_h2 = ag_object_spawn(1, 3, 6.0, 0.5, 0.0)
+{extra}"),
+    );
+    assert_ne!(mutated, G12_WORLD, "write-cap mutation must apply");
+    let h = start_mutant("fault-write", mutated);
+    let err = h.play.as_ref().unwrap().error.clone().unwrap_or_default();
+    assert!(err.contains("code=37"), "33rd write must fault 37, got '{err}'");
+
+    // (V-S03) spawn 进槽 8 → fault 31（槽域在 Start 回调内拒绝）。
+    let mutated = G12_WORLD.replace(
+        "r_h = ag_object_spawn(0, 3, 2.0, 0.5, 0.0)",
+        "r_h = ag_object_spawn(8, 3, 2.0, 0.5, 0.0)",
+    );
+    assert_ne!(mutated, G12_WORLD, "slot mutation must apply");
+    let h = start_mutant("fault-slot", mutated);
+    let err = h.play.as_ref().unwrap().error.clone().unwrap_or_default();
+    assert!(err.contains("code=31"), "slot 8 spawn must fault 31, got '{err}'");
+
+    // (V-S03) 旧代拒绝：despawn 后持有旧句柄再 move → fault 33（sticky
+    // error；句柄身份 = run*524288+slot*65536+generation，重用必须新代）。
+    let mutated = G12_WORLD.replace(
+        "   ag_object_despawn(r_h)\n   r_seen = 2",
+        "   r_h2 = r_h\n   ag_object_despawn(r_h)\n   ag_object_move(r_h2, 1.0, 0.5, 0.0)\n   r_seen = 2",
+    );
+    assert_ne!(mutated, G12_WORLD, "stale-handle mutation must apply");
+    let mut h = start_mutant("fault-stale", mutated);
+    // 走状态机到 despawn 分支（事件滞后一 tick，等待环）。
+    let mut faulted = false;
+    for _ in 0..6 {
+        tick(&mut h);
+        let err = h.play.as_ref().unwrap().error.clone().unwrap_or_default();
+        if err.contains("code=33") {
+            faulted = true;
+            break;
+        }
+    }
+    assert!(faulted, "stale handle after despawn must fault 33");
 }
 
 /// The camera family re-enters the SDK parser per start; give it the same
