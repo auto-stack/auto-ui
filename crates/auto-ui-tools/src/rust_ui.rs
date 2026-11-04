@@ -5748,10 +5748,7 @@ fn generate_rust_ui_delivery_inner(
             // PLAN-930 T-04：tools 专用投影（通用前缀改写 + autodown feature
             // 请求剥除——036 V05a 根因闭合）。
             edits = delivery_apply_projection(&dst.join("Cargo.toml"), &PROJECTION_AUTO_UI_TOOLS)?;
-        } else if matches!(
-            name,
-            "auto-ui-dialect" | "auto-ui-compiler" | "shell-pack"
-        ) {
+        } else if matches!(name, "auto-ui-dialect" | "auto-ui-compiler" | "shell-pack") {
             // PLAN-831 T-06：UI 仓侧受管 crate——跨仓语言基础 path 前缀投影
             // （PLAN-901 r2：spec 内补 web 仓前缀改写）。
             edits = delivery_apply_projection(&dst.join("Cargo.toml"), &PROJECTION_AUTO_UI_CRATE)?;
