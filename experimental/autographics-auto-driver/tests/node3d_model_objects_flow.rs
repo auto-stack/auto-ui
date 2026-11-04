@@ -775,6 +775,101 @@ fn mesh_denominator_512_boundary_counts_hidden_template_rows() {
     });
 }
 
+
+#[test]
+fn vs05_save_as_relocates_and_broken_assets_repair_to_green() {
+    big_stack(|| {
+        // ---- A：SaveAs 搬迁 —— g12 产品在新根保存，冷打开后同入口真 Run。
+        let dir = write_product("vs05-a");
+        let (doc, registry, code, _) =
+            Storage::load_project(&dir.join("scene.agscene"), &Registry::new()).expect("load");
+        let mut h = Host::with_project(doc, registry, code).expect("host");
+        h.start_selected_play().expect("start");
+        h.pause_play("");
+        settle(&mut h);
+        tick(&mut h);
+        h.stop_play();
+        settle(&mut h);
+        let new_root = dir.parent().expect("parent").join(format!(
+            "{}-saveas",
+            dir.file_name().expect("dir name").to_string_lossy()
+        ));
+        let _ = std::fs::remove_dir_all(&new_root);
+        std::fs::create_dir_all(&new_root).expect("new root");
+        let saved = new_root.join("scene.agscene");
+        command(&mut h, "saveas", serde_json::json!(saved));
+        h.settle().expect("settle saveas");
+        // 冷消费者：新根打开 → 真 Run → 生命周期像素 oracle。
+        let (doc2, registry2, code2, _) =
+            Storage::load_project(&saved, &Registry::new()).expect("cold load at new root");
+        let mut h2 = Host::with_project(doc2, registry2, code2).expect("cold host");
+        h2.start_selected_play().expect("cold start");
+        h2.pause_play("");
+        settle(&mut h2);
+        assert_eq!(live(&h2), 2, "relocated project spawns both instances");
+        let (r2, g2, _) = red_green(&mut h2, "vs05-relocated");
+        assert!(g2 > 20, "relocated project renders the shared GLB: green {g2}");
+        let _ = r2;
+
+        // ---- B：坏件恢复 —— 新根 GLB 单字节损坏：具名拒绝；修复后同入口绿。
+        let glb_path = new_root.join("assets").join(format!("{GLB_SHA}.glb"));
+        let good = std::fs::read(&glb_path).expect("glb");
+        let mut bad = good.clone();
+        bad[25] ^= 0xff;
+        std::fs::write(&glb_path, &bad).expect("corrupt");
+        let err = Storage::load_project(&saved, &Registry::new())
+            .map(|_| ())
+            .expect_err("corrupt GLB must reject at the new root");
+        assert!(err.contains("hash") || err.contains("identity"), "{err}");
+        std::fs::write(&glb_path, &good).expect("repair");
+        let (doc3, registry3, code3, _) =
+            Storage::load_project(&saved, &Registry::new()).expect("repaired load");
+        let mut h3 = Host::with_project(doc3, registry3, code3).expect("repaired host");
+        h3.start_selected_play().expect("repaired start");
+        h3.pause_play("");
+        settle(&mut h3);
+        assert_eq!(live(&h3), 2, "repaired project runs again");
+
+        // ---- C：g13 闭包 PNG 损坏 → 拒绝 → 修复 → 绿（闭包纹理面）。
+        let dir13 = write_product_with(
+            G13_SCENE,
+            G13_WORLD,
+            &[
+                (&format!("{COIN_GLB_SHA}.glb"), COIN_GLB),
+                (&format!("{COIN_PNG_SHA}.png"), COIN_PNG),
+            ],
+            "vs05-c",
+        );
+        let scene13 = dir13.join("scene.agscene");
+        let png_path = dir13.join("assets").join(format!("{COIN_PNG_SHA}.png"));
+        let good_png = std::fs::read(&png_path).expect("png");
+        let mut bad_png = good_png.clone();
+        let mid = bad_png.len() / 2;
+        bad_png[mid] ^= 0xff;
+        std::fs::write(&png_path, &bad_png).expect("corrupt png");
+        let err = Storage::load_project(&scene13, &Registry::new())
+            .map(|_| ())
+            .expect_err("corrupt closure PNG must reject");
+        assert!(err.contains("hash") || err.contains("identity") || err.contains("declared"), "{err}");
+        std::fs::write(&png_path, &good_png).expect("repair png");
+        let (doc4, registry4, code4, _) =
+            Storage::load_project(&scene13, &Registry::new()).expect("repaired closure load");
+        let mut h4 = Host::with_project(doc4, registry4, code4).expect("host");
+        h4.start_selected_play().expect("closure start");
+        h4.pause_play("");
+        settle(&mut h4);
+        assert_eq!(live(&h4), 2, "repaired closure project spawns");
+    });
+}
+
+fn command(h: &mut Host, action: &str, payload: serde_json::Value) {
+    h.dispatch(
+        &serde_json::json!({"epoch":h.editor.stamp.epoch,"revision":h.editor.stamp.revision,"play_token":h.ui().play_token,"action":action,"payload":payload})
+            .to_string(),
+    )
+    .unwrap_or_else(|e| panic!("command {action}: {e}"));
+}
+
 /// The camera family re-enters the SDK parser per start; give it the same
 /// 64 MiB runway the other runtime tests use.
 fn big_stack(test: impl FnOnce() + Send) {
