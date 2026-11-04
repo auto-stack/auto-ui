@@ -113,6 +113,7 @@ pub use lower_components3d_bindings::{
 };
 pub use lower_node3d_presentation::{
     load_resources_meta, lower_project_components3d_presentation, resources_request_json,
+    PresentationMeta3,
 };
 pub use lower_components3d_audio_hud::lower_project_components3d_audio_hud;
 pub use lower_components3d_events::{

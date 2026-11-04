@@ -3,8 +3,8 @@
   "api": "autographics.triggers3d/1",
   "source": {
    "format": "auto-source",
-   "sha256": "7b7d7d2f7ea9b55b02d661dd0facada4c05f7a7f6433b3685162828e6381ce1d",
-   "byte_length": 1221
+   "sha256": "b41f7a90a5ff663faa81ade081036f8cb5df5b028c565bbadecfc24298b0d18a",
+   "byte_length": 1217
   },
   "actors": {
    "two_d": null,
@@ -12,7 +12,7 @@
   }
  },
  "schema": "autographics.scene/6",
- "document_id": "plan028-components-3d-events-main",
+ "document_id": "plan043-model-objects-3d-main",
  "resources": [
   "circle",
   "quad",

@@ -1,8 +1,8 @@
 {
- "generator": "autographics-node2d-pilot plan028 components-3d-events",
+ "generator": "autographics-node2d-pilot plan043 model-objects-3d",
  "api": "autographics.triggers3d/1",
- "user_source_sha256": "7b7d7d2f7ea9b55b02d661dd0facada4c05f7a7f6433b3685162828e6381ce1d",
- "user_source_bytes": 1221,
+ "user_source_sha256": "b41f7a90a5ff663faa81ade081036f8cb5df5b028c565bbadecfc24298b0d18a",
+ "user_source_bytes": 1217,
   "module:main": "6599f5f3f9b706f61a500b55efe575627923a72ffe086eafba31772d92912d01",
   "module:props": "67939183ce53fee87150d19fdccaf4dc754ee5cfceaea148de9a609df1b55097",
   "module:resources": "1d14c56175ea027deadc22f364e589f56e43b98c186468a50469b403244881bd",
@@ -25,9 +25,9 @@
  ],
  "provenance": {
   "product": "g12-model",
-  "consumer": "unrecorded (this out dir has no registered flow consumer)",
+  "consumer": "experimental/autographics-auto-driver/tests/node3d_model_objects_flow.rs",
   "consumption": "include_str! frozen scene.agscene + world.at + assets/<sha>.glb; the harness writes the project (scene + assets) under target and loads via Storage::load_project; variants feed scripts/<sha>.at where <sha> = scene.behavior.source.sha256",
   "load_verification": "the load path hash-verifies the behavior source and every assets/<sha>.glb against the scene manifest; GLB geometry admission runs in the driver preflight decoder before allocation",
-  "world_sha256": "7b7d7d2f7ea9b55b02d661dd0facada4c05f7a7f6433b3685162828e6381ce1d"
+  "world_sha256": "b41f7a90a5ff663faa81ade081036f8cb5df5b028c565bbadecfc24298b0d18a"
  }
 }

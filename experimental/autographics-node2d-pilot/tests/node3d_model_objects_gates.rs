@@ -167,3 +167,69 @@ fn textured_ctor_rejection_domain_is_preserved_in_events_profile() {
         "diagnostic '{err}' misses the profile rejection"
     );
 }
+
+// ---------------------- model-objects-3d 组合入口（B 面负控，T-03 硬化） --
+
+use autographics_node2d_pilot::{
+    lower_project_components3d_model_objects, PresentationMeta3,
+};
+
+fn empty_meta() -> PresentationMeta3 {
+    PresentationMeta3 {
+        resources: std::collections::BTreeMap::new(),
+    }
+}
+
+fn reject_model_objects(files: &[(&str, &str)], needle: &str) {
+    use std::sync::atomic::{AtomicU32, Ordering};
+    static N: AtomicU32 = AtomicU32::new(0);
+    let n = N.fetch_add(1, Ordering::SeqCst);
+    let dir = path::Path::new(env!("CARGO_TARGET_TMPDIR"))
+        .join(format!("n3dmo-{}-{n}", std::process::id()));
+    write_dir(&dir, files);
+    // textured/animated 声明在 load 期验字节身份——给负控提供真实 GLB。
+    let assets = dir.join("assets");
+    fs::create_dir_all(&assets).expect("assets dir");
+    fs::write(
+        assets.join("coin.glb"),
+        &include_bytes!("../fixtures/components3d-events/g13-model-opaque/assets/coin.glb")[..],
+    )
+    .expect("glb");
+    let project = load_project(&dir.join("main.at")).map_err(|e| e.to_string());
+    let err = project
+        .and_then(|p| {
+            lower_project_components3d_model_objects(&p, &empty_meta()).map_err(|e| e.to_string())
+        })
+        .map(|_| ())
+        .expect_err("named rejection expected");
+    assert!(
+        err.contains(needle),
+        "diagnostic '{err}' does not contain '{needle}'"
+    );
+    assert!(
+        err.contains("symbol '") || err.contains(".at") || err.contains("at line "),
+        "diagnostic '{err}' lacks a location anchor"
+    );
+}
+
+#[test]
+fn model_objects_entry_rejections_are_named() {
+    // animated3d.glb 声明在 model-objects-3d 整域具名拒绝（v1 模板是静态
+    // 外观；不删动画轨道伪装静态）。声明扫描先于元数据使用，空 meta 即拒。
+    let main = "use resources: spin\nuse props: Crate\nnode Main {\n    view-3d {\n        cylinder3d pad { position: (4.0, 0.5, 0.0) }\n    }\n    camera3d { distance: 8.0\n              pitch: 45.0\n              projection: perspective }\n    objects3d { crate_a }\n}\n";
+    let resources = "let spin = animated3d.glb(\"assets/coin.glb\")\n";
+    let props = "node Crate {\n    object3d { }\n    view-3d { model3d crate { model: resources.spin\n                              position: (-30.0, 0.5, -3.0)\n                              visible: false } }\n}\n";
+    reject_model_objects(
+        &[("main", main), ("resources", resources), ("props", props)],
+        "animated3d.glb is not a model-objects-3d resource",
+    );
+
+    // 模板定义 model/msg/on 拒绝域在组合入口同样成立（textured 声明合法，
+    // 拒绝来自模板形状检查）。
+    let resources_tex = "let spin = textured3d.glb(\"assets/coin.glb\")\n";
+    let props_model = "node Crate {\n    object3d { }\n    model { var n = 0 }\n    view-3d { model3d crate { model: resources.spin\n                              position: (-30.0, 0.5, -3.0)\n                              visible: false } }\n}\n";
+    reject_model_objects(
+        &[("main", main), ("resources", resources_tex), ("props", props_model)],
+        "must not declare model/msg/on",
+    );
+}

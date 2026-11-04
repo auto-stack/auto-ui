@@ -82,9 +82,18 @@ pub fn lower_project_components3d_model_objects(
             }
         }
     }
+    // 平色 model3d.glb 资源走 sha 键（与 events 档同一公开准入面）：把它们
+    // 从受检元数据中滤出，resolve_model_3d 对无元数据条目回落 sha256: 键；
+    // 纹理/动画条目保留（closure 键 + 动画拒绝双重把守）。这样同一工程可
+    // 混用平色与 opaque 模板，而 034 presentation 档的"元数据在案必须有
+    // closure"冻结语义不变（本过滤只发生在 model-objects-3d 入口）。
+    let mut flat_filtered = meta.clone();
+    flat_filtered
+        .resources
+        .retain(|_, m| m.kind != "model3d");
     lower_events_impl(
         project,
-        Some(meta),
+        Some(&flat_filtered),
         "plan043-model-objects-3d",
         "PLAN-043 model-objects-3d",
         "tools/verify_plan043.py",
