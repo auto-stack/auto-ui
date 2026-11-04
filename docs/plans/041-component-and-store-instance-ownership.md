@@ -1,6 +1,6 @@
 ---
 plan_id: PLAN-041
-status: execution_done
+status: executing
 feature_name: 组件与Store实例所有权收口
 author: [Codex]
 created_at: 2026-11-04
@@ -106,7 +106,7 @@ T-01冻结现key/实例识别、App/context的实际入口、VM读写/handler/vi
 | AC-01 | model/props/view/handler receiver按真实实例一致，keyed身份及嵌套值正确，V-01/03/04 | work |
 | AC-02 | 同App既有store共享、不同App默认隔离与显式共享/legacy边界均真实可验，V-02/08 | work |
 | AC-03 | owner退出/最后共享者/迟到回调/Tick正确，无串目标/提前释放/订阅泄漏，V-03/05/08 | work |
-| AC-04 | 两个永久真实fixture经Vue/VM运行与事件验，不以单元ID替代UI语义，V-06 | work |
+| AC-04 | 两个永久真实fixture经Vue/VM运行与事件验，不以单元ID替代UI语义，V-06（边界注记：VM 腿=真实 build+dispatch+渲染断言；Vue 腿=生成契约级——厂形/context/legacy 断言 + main.ts/mount 安装字符串，无挂载浏览器运行；跨 App 隔离由 per-createApp context 构造保证，SD-01 §5 如实记录） | work |
 | AC-05 | 原store方法路由、RC/memo/共享与消费者原适用义务保持，V-04/07/08 | work |
 | AC-06 | 042正式出口、主题/产品/930边界清楚，无新DSL/全局前置，V-07 | work |
 | AC-07 | 独立final review逐AC/健康/遗漏/SD pass并绑定冻结源，V-09 | review |
@@ -149,6 +149,10 @@ T-01冻结现key/实例识别、App/context的实际入口、VM读写/handler/vi
 2026-11-04 / stage:work(进行中,r2) / auto-ui/PLAN-041 r1 / outcome:（未终局——继续 work） / worktree:D:/autostack/.wt/ui-041/auto-ui / branch:codex/plan-041-instance-ownership / base:3bfbee72 / code:ef73c7d4→a428e15d→45ab401d / task_ids:T-02收口（三条原具名红中两条闭+一条改判基线即红；新增调和 plan499/711/502/841） / evidence:提交信息+§8 行 / 关键新知：①msg 型回调 prop 裸调用须保函数符号（prop-only 集，CURRENT_PROP_ONLY）；②Init 记录键=实例身份，supersede 以「同件旧身份本帧未再登记」为门（多调用位并存不误杀）；③名字合成派发（on_with_input_for/call_widget_handler）单实例时路由实例、歧义保 root；④child-emit 账面三写点已 __auto_root 落根，桥链清算仍具名未闭（plan058②②/plan063/plan841compound） / next: 收口剩余具名红→T-03 Vue→T-04→T-05 并集→T-06。
 
 2026-11-04 / stage:work(pass) / auto-ui/PLAN-041 r1 / outcome:pass→execution_done(6/10) / worktree:D:/autostack/.wt/ui-041/auto-ui / branch:codex/plan-041-instance-ownership / base:3bfbee72 / code:ef73c7d4→a428e15d→45ab401d→dad974dc→b30c749a→ad163727→9cac1cf1 / dependency_pins:auto-lang 03e9869fb, auto-web 3de5524e, auto-down 7c4d5cbb / task_ids:T-01..T-04✅+T-05并集（全库 lib 层零本包回归实证）+T-06（SD-01..04 草案 @worktree docs/specs）✅ / evidence:§8 T-01..T-04 行 + plan041_instance_ownership 4 oracle + tu 869 + lib 全量（余 10 失败全 base 同败） / work AC:AC-01..06 全绿（AC-01/02/05=t02 probe+原义务；AC-03=t04 V-03/V-05+plan654；AC-04=fixture 双端 VM 腿+Vue 厂形契约；AC-06=SD-04 §4 出口） / named_boundary:parked fn 名键重入（§10 追加） / next_responsible_role:T-07 独立上下文 final review（同树冻结验证，review_scope:final）。
+
+2026-11-04 / stage:review(final) / reviewer_identity:独立 subagent 上下文（general-purpose，全新会话，非实现会话） / plan_id:auto-ui/PLAN-041 r1 / outcome:needs_fix / worktree:D:/autostack/.wt/ui-041/auto-ui / branch:codex/plan-041-instance-ownership / reviewed_commit:9cac1cf1 / base:3bfbee72 / findings:R-1(P1,7 个 HEAD 红而 base 绿——plan051×2/576/652/654×3 emit/computed/tick/clock 族 oracle 仍走 legacy 根读通道，同一调和模式可闭；census 勘误 14 base-red 非 10)/R-2(P3,AC-04 Vue 腿=生成契约级非挂载运行,需 SD/措辞如实标注)/R-3(P3,route_memo 三处缩进) / acceptance:AC-01..03 pass,AC-04 partial,AC-05 fail(R-1),AC-06 pass / evidence:独立探针 2/2 过（嵌套 child-of-child 双级 __auto_root 跳、unkeyed 位置身份隔离），树净 / next:work 按 R-1..R-3 修复→复核受影响面→新基线 re-review。
+
+2026-11-04 / stage:work(R-1/R-2/R-3 修复) / outcome:（修复完成，待 reviewer targeted re-review @fa769051） / 批一 277a89d4：write_state_onto 实例字段序错位真修（root 名单先行→实例按根序错写相邻槽）+ eval_stripped_arg 派发目标感知 + plan051/058/063 oracle；批二 fa769051：__auto_root 槽位预置进 ctor 名单（install_root_self_ref 改槽位写——cached/live 名单错位一位→clock 读出 VmRef 实录）+ state_fields()/read_all_state 隐藏内部 __auto 槽 + plan576/652/654 oracle + musk p053-8 oracle。R-2：SD-01 §5 Vue 腿边界标注。R-3：按 reviewer 建议跳过。plan498 bar_group 全跑偶发一次记观察（solo/family 3 连绿+reviewer 全跑绿）。census 勘误：base-red=13（reviewer 计 14 含 t3_examples 变体）/新增红=0。
 
 ## 10. 待澄清事项
 
