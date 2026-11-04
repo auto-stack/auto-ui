@@ -1244,20 +1244,6 @@ impl VmBridge {
             })?;
 
         // PLAN-047 T-01: 读通道录制——成功的具名字段读 = 一条依赖边。
-        // PLAN-051 DIAG (temp): duplicate-slot probe for use_engine.
-        if field_name == "use_engine" {
-            let dupes: Vec<(usize, String)> = instance
-                .field_names
-                .iter()
-                .enumerate()
-                .filter(|(_, n)| n.as_str() == "use_engine")
-                .map(|(i, n)| (i, format!("{:?}", instance.get_field(i))))
-                .collect();
-            eprintln!(
-                "[PLAN051-READ] obj={} idx={field_index} slots={dupes:?}",
-                self.state_obj_id
-            );
-        }
         match instance.get_field(field_index).cloned() {
             Some(v) => {
                 self.record_dep_read(self.state_obj_id, field_name);
@@ -2300,10 +2286,6 @@ impl VmBridge {
         let cur = self.instance_seen_cur.borrow().clone();
         let sweep: Vec<String> = prev.difference(&cur).cloned().collect();
         for identity in &sweep {
-            eprintln!(
-                "[PLAN051-SWEEP] releasing {identity}; cur={:?}",
-                cur
-            );
             self.release_child_instance(identity);
         }
         self.instance_seen_prev.borrow_mut().clear();

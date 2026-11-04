@@ -1907,14 +1907,6 @@ impl DynamicComponent {
         // every full build entry must reset the occurrence counter and sweep
         // absent instances.
         self.bridge.begin_child_instance_frame();
-        // PLAN-051 DIAG (temp): debug-view build entry + toggle state read.
-        let diag_ue = self
-            .bridge
-            .read_all_state()
-            .get("use_engine")
-            .map(|v| format!("{v:?}"))
-            .unwrap_or_else(|| "<absent>".into());
-        eprintln!("[PLAN051-VIEW-DEBUG] build use_engine={diag_ue}");
         let builder =
             AuraViewBuilder::with_registry(&self.bridge, &self.widget_name, &self.widget_registry)
                 .with_routes(&self.routes)
@@ -1958,27 +1950,11 @@ impl DynamicComponent {
         // this build; absent-from-previous-frame instances release at the
         // bracket close (Vue v-if/删除语义; PLAN-654 mount-frame 同型).
         self.bridge.begin_child_instance_frame();
-        // PLAN-051 DIAG (temp): gated build entry + toggle state read.
-        let diag_ue2 = self
-            .bridge
-            .read_all_state()
-            .get("use_engine")
-            .map(|v| format!("{v:?}"))
-            .unwrap_or_else(|| "<absent>".into());
-        eprintln!("[PLAN051-VIEW-GATED] build use_engine={diag_ue2} capture_probe={capture_probe}");
         let builder =
             AuraViewBuilder::with_registry(&self.bridge, &self.widget_name, &self.widget_registry)
                 .with_routes(&self.routes)
                 .with_computed(&self.computed)
                 .with_preview_states(&self.preview_states);
-        // PLAN-051 DIAG (temp): gated build entry + toggle state read.
-        let diag_ue2 = self
-            .bridge
-            .read_all_state()
-            .get("use_engine")
-            .map(|v| format!("{v:?}"))
-            .unwrap_or_else(|| "<absent>".into());
-        eprintln!("[PLAN051-VIEW-GATED] build use_engine={diag_ue2} capture_probe={capture_probe}");
         let builder =
             AuraViewBuilder::with_registry(&self.bridge, &self.widget_name, &self.widget_registry)
                 .with_routes(&self.routes)
@@ -2565,14 +2541,6 @@ impl Component for DynamicComponent {
         let prev = self.view_mount_frame_prepare();
         // PLAN-041 T-02: instance frame bracket (plain view() entry).
         self.bridge.begin_child_instance_frame();
-        // PLAN-051 DIAG (temp): view build + the toggle-relevant state read.
-        let diag_use_engine = self
-            .bridge
-            .read_all_state()
-            .get("use_engine")
-            .map(|v| format!("{v:?}"))
-            .unwrap_or_else(|| "<absent>".into());
-        eprintln!("[PLAN051-VIEW] build use_engine={diag_use_engine}");
         let builder =
             AuraViewBuilder::with_registry(&self.bridge, &self.widget_name, &self.widget_registry)
                 .with_routes(&self.routes)
@@ -2843,11 +2811,6 @@ impl DynamicComponent {
         event_name: &str,
         input_value: Option<String>,
     ) {
-        // PLAN-051 DIAG (temp): non-instance dispatch entry.
-        eprintln!(
-            "[PLAN051-DISP2] widget={:?} event={:?} input={:?}",
-            widget_name, event_name, input_value
-        );
         self.on_with_input_for_instance(widget_name, event_name, input_value, None);
     }
 
@@ -2873,11 +2836,6 @@ impl DynamicComponent {
         // PLAN-041 T-02: IcedMessage 边界经 widget 名内嵌实例标记
         //（`Widget` + U+0001 + `<identity>`，与 `@seq` 同款入口剥离约定）。
         // 同时剥离出干净 widget 名（handler 名空间解析不可见标记）。
-        // PLAN-051 DIAG: trace every dispatch entry (temp).
-        eprintln!(
-            "[PLAN051-DISP] widget={:?} event={:?} input={:?} instance_arg={:?}",
-            widget_name, event_name, input_value, instance
-        );
         let instance_owned;
         let (widget_name, instance): (&str, Option<&str>) = match instance {
             Some(i) => (widget_name, Some(i)),
@@ -3008,18 +2966,15 @@ impl DynamicComponent {
                         .collect();
                     match (tombstoned, live.as_slice()) {
                         (true, _) => {
-                            eprintln!("[PLAN051-RES] tombstoned -> drop");
                             late_event = true;
                             None
                         }
                         (false, [only]) => {
-                            eprintln!("[PLAN051-RES] redirect -> {only}");
                             name_only_instance = only.clone();
                             instance = Some(name_only_instance.as_str());
                             self.bridge.child_instance_state_id(name_only_instance.as_str())
                         }
                         (false, _) => {
-                            eprintln!("[PLAN051-RES] root-legacy (live={:?})", live);
                             instance = None;
                             None
                         }
@@ -3031,8 +2986,8 @@ impl DynamicComponent {
         if late_event {
             if let Some(identity) = instance {
                 eprintln!(
-                    "[VM-INSTANCE] {}.{} dropped: instance `{}` released (late event) dispatch-bridge={:?}",
-                    widget_name, clean_name, identity, self.bridge.bridge_identity()
+                    "[VM-INSTANCE] {}.{} dropped: instance `{}` released (late event)",
+                    widget_name, clean_name, identity
                 );
             } else {
                 eprintln!(
