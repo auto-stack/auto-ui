@@ -1,0 +1,12 @@
+// PLAN-043 g13-model-opaque: the Run character is a stationary sentinel
+// (same role as g12-model; the round business is on the model-object
+// instances).
+node Sentinel {
+    view-3d {
+        cylinder3d body {
+            position: (0.0, 0.5, -4.0)
+            scale: (0.4, 0.5, 0.4)
+        }
+    }
+    character3d { }
+}

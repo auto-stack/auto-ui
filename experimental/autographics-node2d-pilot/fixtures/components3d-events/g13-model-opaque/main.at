@@ -1,0 +1,57 @@
+// PLAN-043 g13-model-opaque: actor-free round on the model-objects-3d entry
+// (events object/trigger/template domain + 034 closure metadata). Two typed
+// spawns of the Coin opaque-textured template; a minimal ladder moves one
+// coin onto the pad (explicit trigger), hides the other, then despawns and
+// respawns it (new generation). Proves the B candidate: closure-keyed model
+// templates drive real spawn/move/visible/despawn instances on GPU.
+use resources: coin_tex
+use props: Coin
+use sentinel: Sentinel
+
+node Main {
+    model {
+        var h = 0
+        var h2 = 0
+        var seen = 0
+    }
+    view-3d {
+        cylinder3d pad {
+            position: (4.0, 0.5, 0.0)
+            scale: (1.0, 0.5, 1.0)
+        }
+        Sentinel watch { }
+    }
+    camera3d { distance: 8.0
+              pitch: 45.0
+              projection: perspective }
+    objects3d { coin_a, coin_b }
+    triggers { sense_a }
+    on {
+        Life.Start -> {
+            .h = spawn("coin_a", "Coin", 2.0, 0.5, 0.0)
+            .h2 = spawn("coin_b", "Coin", 6.0, 0.5, 0.0)
+            bind("sense_a", refs.pad, aabb, 0.0, .h)
+        }
+        Life.Tick(dt) -> {
+            if .seen == 0 {
+                object.move(.h, 4.0, 0.5, 0.0)
+                object.visible(.h2, 0)
+                let n = event.next()
+                if n == 1 {
+                    let p = event.pair()
+                    if p == 0 { .seen = 1 }
+                }
+            } else {
+                if .seen == 1 {
+                    object.despawn(.h)
+                    .seen = 2
+                } else {
+                    if .seen == 2 {
+                        .h = spawn("coin_a", "Coin", 2.0, 0.5, 0.0)
+                        .seen = 3
+                    }
+                }
+            }
+        }
+    }
+}

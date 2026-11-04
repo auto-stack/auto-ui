@@ -83,6 +83,10 @@ pub enum Profile {
     /// 销毁作者面；角色姿态随 bundle 收口；actor-free kind=-1；components3d/1
     /// 装配，T-03 冻结 117/28）。
     Components3DAudioHud,
+    /// PLAN-043 模型对象模板组合入口：model-objects-3d（events 对象/触发
+    /// /模板域 + 034 受检资源元数据；平色 sha 键与 opaque closure 键模板；
+    /// animated 整域拒绝；T-02 冻结的显式 B 组合身份）。
+    ModelObjects3D,
     /// PLAN-039 有限三维查询与同根双出口：queries-3d（query3d.segment/
     /// sweep typed 面、具名叶/组引用、root view-3d＋view-2d 诊断标记；
     /// segment-only → behavior/3、含 sweep → behavior/4 装配；沿 024
@@ -111,7 +115,9 @@ pub use lower_node3d_presentation::{
     load_resources_meta, lower_project_components3d_presentation, resources_request_json,
 };
 pub use lower_components3d_audio_hud::lower_project_components3d_audio_hud;
-pub use lower_components3d_events::lower_project_components3d_events;
+pub use lower_components3d_events::{
+    lower_project_components3d_events, lower_project_components3d_model_objects,
+};
 pub use lower_components3d_runtime::lower_project_components3d_runtime;
 pub use lower_components_game::{lower_project_components_game, LowerOutputGame};
 pub use lower_components2d_runtime::{

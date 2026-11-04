@@ -46,11 +46,59 @@ pub(crate) struct EventsCfg3 {
     pub template_rows: Vec<crate::lower_components3d::TemplateRowIn>,
 }
 
-/// events 档降低入口：声明校验 → 模板行 → 共享管线。
+/// events 档降低入口：声明校验 → 模板行 → 共享管线（冻结 028 面：
+/// 无 presentation 元数据，平色 sha 键）。
 pub fn lower_project_components3d_events(
     project: &Project,
 ) -> Result<LowerOutputBasic2D, LowerError> {
-    let w3 = build_world_3d_with(project, true, false, None)?;
+    lower_events_impl(
+        project,
+        None,
+        "plan028-components-3d-events",
+        "PLAN-028 components-3d-events",
+        "tools/verify_plan028.py",
+    )
+}
+
+/// PLAN-043 model-objects-3d 降低入口（T-02 冻结的 B 组合身份）：
+/// events 档对象/触发/模板域 + 034 受检资源元数据（resource-meta 公开
+/// 导入产出）。具名平色 GLB（sha 键）与 opaque 纹理 GLB（closure 键）
+/// 都可为 object3d 模板叶；animated3d 声明整域具名拒绝（v1 模板是静态
+/// 外观，不删动画轨道伪装静态）。旧 events 档拒绝面不变（本入口是新
+/// 显式组合，不拓宽 components-3d-events）。
+pub fn lower_project_components3d_model_objects(
+    project: &Project,
+    meta: &crate::lower_node3d_presentation::PresentationMeta3,
+) -> Result<LowerOutputBasic2D, LowerError> {
+    for module in project.modules.values() {
+        for r in &module.resources {
+            if matches!(r.kind, crate::load::ResourceKind::Model3DAnimated { .. }) {
+                return Err(at(
+                    &module.name,
+                    r.line,
+                    &r.name,
+                    "animated3d.glb is not a model-objects-3d resource (v1 object3d templates are static; declare textured3d.glb)",
+                ));
+            }
+        }
+    }
+    lower_events_impl(
+        project,
+        Some(meta),
+        "plan043-model-objects-3d",
+        "PLAN-043 model-objects-3d",
+        "tools/verify_plan043.py",
+    )
+}
+
+fn lower_events_impl(
+    project: &Project,
+    presentation: Option<&crate::lower_node3d_presentation::PresentationMeta3>,
+    doc_prefix: &'static str,
+    gen_note: &'static str,
+    regen_note: &'static str,
+) -> Result<LowerOutputBasic2D, LowerError> {
+    let w3 = build_world_3d_with(project, true, false, presentation)?;
     let world = &w3.world;
     let root_name = world.root.clone();
     let root_decl = node_of(project, &root_name);
@@ -207,7 +255,26 @@ pub fn lower_project_components3d_events(
             let resource = match e.kind {
                 "cylinder" | "player" | "mob" => None,
                 "model" => {
-                    let key = resolve_model_3d(&w3, &def, None, e, None).map_err(|err| {
+                    // PLAN-043：受检元数据在案时，动画内容具名拒绝（生成器
+                    // 不解析 GLB；动画身份只来自 resource-meta 公开导入）。
+                    if let (
+                        Some(p),
+                        Some(crate::lower_components3d::ModelRef::Direct(r)),
+                    ) = (presentation, &e.model)
+                    {
+                        if p.resources.get(r).is_some_and(|m| m.animated) {
+                            return Err(at(
+                                &def.module,
+                                e.line,
+                                &e.elem,
+                                &format!(
+                                    "object3d template leaf '{}' resource '{r}' is animated (v1 templates are static appearances)",
+                                    e.elem
+                                ),
+                            ));
+                        }
+                    }
+                    let key = resolve_model_3d(&w3, &def, None, e, presentation).map_err(|err| {
                         at(
                             &def.module,
                             e.line,
@@ -287,7 +354,7 @@ pub fn lower_project_components3d_events(
         });
     }
 
-    let scene = collect_scene_3d_with(project, &w3, &template_rows, None, &[])?;
+    let scene = collect_scene_3d_with(project, &w3, &template_rows, presentation, &[])?;
 
     // —— 文档 id 解析（行名 → 1-based；与 027 row_document_id 同规则）——
     let doc_id = |row: &str| -> Option<i64> {
@@ -357,10 +424,10 @@ pub fn lower_project_components3d_events(
             runtime: Some(&runtime),
             events: Some(&events),
             bindings: None,
-            doc_prefix: "plan028-components-3d-events",
-            gen_note: "PLAN-028 components-3d-events",
-            regen_note: "tools/verify_plan028.py",
-            presentation: None,
+            doc_prefix,
+            gen_note,
+            regen_note,
+            presentation,
             ahud: None,
         queries3: None,
             behavior_api: EVENTS_API,

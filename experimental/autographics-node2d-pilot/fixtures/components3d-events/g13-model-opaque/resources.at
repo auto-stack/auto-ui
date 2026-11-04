@@ -1,0 +1,7 @@
+// PLAN-043 model-objects-3d g13-model-opaque resources: the original G10
+// Kenney coin GLB (opaque textured, relative-URI texture; bytes read-only
+// copy, CC0 declaration kept in ag-examples licenses/ per PLAN-034
+// g10-textures) declared as a typed textured3d.glb resource. Closure
+// metadata is produced by the existing public import (resource-meta) and
+// bound verbatim by the generator.
+let coin_tex = textured3d.glb("assets/coin.glb")

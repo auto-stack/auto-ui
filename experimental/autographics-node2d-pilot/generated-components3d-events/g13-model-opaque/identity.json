@@ -1,0 +1,34 @@
+{
+ "generator": "autographics-node2d-pilot plan043 model-objects-3d",
+ "api": "autographics.triggers3d/1",
+ "user_source_sha256": "b41f7a90a5ff663faa81ade081036f8cb5df5b028c565bbadecfc24298b0d18a",
+ "user_source_bytes": 1217,
+  "module:main": "f3d16dce2b60825a44ecd5e73a1f465de36205bc847502d02385f180ed3af0c4",
+  "module:props": "95c0f1bafe6dfe335b771b790da5c8a5b6d6e35984e5765787e850ad903f8597",
+  "module:resources": "77921be2e94849320559e8e00a92c237601aaf21f346def68a67f334870fa8e2",
+  "module:sentinel": "6679e1b22c7d4139f59e0279b46b239ec2b052ad7f1ac257126c8bc98d2c9f69",
+ "closure": [
+  {"name": "main", "sha256": "f3d16dce2b60825a44ecd5e73a1f465de36205bc847502d02385f180ed3af0c4", "bytes": 1786},
+  {"name": "props", "sha256": "95c0f1bafe6dfe335b771b790da5c8a5b6d6e35984e5765787e850ad903f8597", "bytes": 414},
+  {"name": "resources", "sha256": "77921be2e94849320559e8e00a92c237601aaf21f346def68a67f334870fa8e2", "bytes": 446},
+  {"name": "sentinel", "sha256": "6679e1b22c7d4139f59e0279b46b239ec2b052ad7f1ac257126c8bc98d2c9f69", "bytes": 326}
+ ],
+ "roles": {
+ "scene_rows": {
+  "Coin": 2,
+  "Main/watch/body": 1,
+  "pad": 0
+ }
+},
+ "assets": [
+   {"sha256": "106cf02e0d6dccded6d9f90c2ae6a51eb94c6301645fea159e834c44ed4708a3", "file": "106cf02e0d6dccded6d9f90c2ae6a51eb94c6301645fea159e834c44ed4708a3.png", "declared": "assets/Textures/colormap.png"},
+   {"sha256": "a3fb8f779a6af1cd75e5a02da77a87546ca8a59f6fe52f79f25179c4a68fd0e5", "file": "a3fb8f779a6af1cd75e5a02da77a87546ca8a59f6fe52f79f25179c4a68fd0e5.glb", "declared": "assets/coin.glb"}
+ ],
+ "provenance": {
+  "product": "g13-model-opaque",
+  "consumer": "unrecorded (this out dir has no registered flow consumer)",
+  "consumption": "include_str! frozen scene.agscene + world.at + assets/<sha>.glb; the harness writes the project (scene + assets) under target and loads via Storage::load_project; variants feed scripts/<sha>.at where <sha> = scene.behavior.source.sha256",
+  "load_verification": "the load path hash-verifies the behavior source and every assets/<sha>.glb against the scene manifest; GLB geometry admission runs in the driver preflight decoder before allocation",
+  "world_sha256": "b41f7a90a5ff663faa81ade081036f8cb5df5b028c565bbadecfc24298b0d18a"
+ }
+}

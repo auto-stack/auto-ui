@@ -20,10 +20,30 @@ const G12_WORLD: &str = include_str!(
 const GLB: &[u8] =
     include_bytes!("../../autographics-node2d-pilot/fixtures/node3d/g02/assets/two-parts.glb");
 const GLB_SHA: &str = "42c9da673fc67ccb0c65d4b337608834efd28a499f7e460866dcfc5ff2a0c671";
+const G13_SCENE: &str = include_str!(
+    "../../autographics-node2d-pilot/generated-components3d-events/g13-model-opaque/scene.agscene"
+);
+const G13_WORLD: &str = include_str!(
+    "../../autographics-node2d-pilot/generated-components3d-events/g13-model-opaque/world.at"
+);
+const COIN_GLB: &[u8] = include_bytes!(
+    "../../autographics-node2d-pilot/fixtures/node3d-presentation/g10-textures/assets/coin.glb"
+);
+const COIN_PNG: &[u8] = include_bytes!(
+    "../../autographics-node2d-pilot/fixtures/node3d-presentation/g10-textures/assets/Textures_colormap.png"
+);
+const COIN_GLB_SHA: &str = "a3fb8f779a6af1cd75e5a02da77a87546ca8a59f6fe52f79f25179c4a68fd0e5";
+const COIN_PNG_SHA: &str = "106cf02e0d6dccded6d9f90c2ae6a51eb94c6301645fea159e834c44ed4708a3";
+const COIN_CLOSURE: &str = "76657e1367fe78e3aa69585e4a2d6e462f7ca431a4c17d1b59a1e7fca7d3862e";
 
 // ---------------------------------------------------------------- harness --
 
-fn write_product(tag: &str) -> PathBuf {
+fn write_product_with(
+    scene: &str,
+    world: &str,
+    assets_to_write: &[(&str, &[u8])],
+    tag: &str,
+) -> PathBuf {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("target/plan043-model-objects")
         .join(format!("{}-{tag}", std::process::id()));
@@ -32,20 +52,35 @@ fn write_product(tag: &str) -> PathBuf {
     let scripts = dir.join("scripts");
     std::fs::create_dir_all(&assets).expect("assets dir");
     std::fs::create_dir_all(&scripts).expect("scripts dir");
-    std::fs::write(dir.join("scene.agscene"), G12_SCENE).expect("write scene");
-    std::fs::write(assets.join(format!("{GLB_SHA}.glb")), GLB).expect("write glb");
-    let sha = G12_SCENE
+    std::fs::write(dir.join("scene.agscene"), scene).expect("write scene");
+    for (name, bytes) in assets_to_write {
+        std::fs::write(assets.join(name), bytes).expect("write asset");
+    }
+    let sha = scene
         .split("\"sha256\": \"")
         .nth(1)
         .and_then(|r| r.split('"').next())
         .expect("scene binds a source sha")
         .to_string();
-    std::fs::write(scripts.join(format!("{sha}.at")), G12_WORLD).expect("write script");
+    std::fs::write(scripts.join(format!("{sha}.at")), world).expect("write script");
     dir
 }
 
+fn write_product(tag: &str) -> PathBuf {
+    write_product_with(G12_SCENE, G12_WORLD, &[(&format!("{GLB_SHA}.glb"), GLB)], tag)
+}
+
 fn start(tag: &str) -> (Host, PathBuf) {
-    let dir = write_product(tag);
+    start_with(G12_SCENE, G12_WORLD, &[(&format!("{GLB_SHA}.glb"), GLB)], tag)
+}
+
+fn start_with(
+    scene: &str,
+    world: &str,
+    assets_to_write: &[(&str, &[u8])],
+    tag: &str,
+) -> (Host, PathBuf) {
+    let dir = write_product_with(scene, world, assets_to_write, tag);
     let (doc, registry, code, _) =
         Storage::load_project(&dir.join("scene.agscene"), &Registry::new())
             .unwrap_or_else(|e| panic!("{tag} load: {e:?}"));
@@ -302,6 +337,130 @@ fn model_resource_admission_rejections_are_named() {
         err.contains("hash/length") || err.contains("sha256") || err.contains("identity") || err.contains("declared"),
         "{err}"
     );
+}
+
+
+#[test]
+fn g13_model_objects_opaque_closure_full_chain_on_gpu() {
+    big_stack(|| {
+        // ---- import identity：closure 键模板行 + 纹理闭包资产 ----
+        let dir = write_product_with(
+            G13_SCENE,
+            G13_WORLD,
+            &[
+                (&format!("{COIN_GLB_SHA}.glb"), COIN_GLB),
+                (&format!("{COIN_PNG_SHA}.png"), COIN_PNG),
+            ],
+            "g13-identity",
+        );
+        let (doc, registry, _code, _) =
+            Storage::load_project(&dir.join("scene.agscene"), &Registry::new()).expect("load");
+        let t = doc
+            .objects
+            .iter()
+            .find(|o| o.name == "Coin")
+            .expect("Coin template row");
+        assert_eq!(t.kind, Kind::Model);
+        assert_eq!(
+            t.resource.as_deref(),
+            Some(format!("closure:{COIN_CLOSURE}").as_str()),
+            "opaque template carries the 034 closure key"
+        );
+        assert!(!t.visible, "parked template row");
+        let coin_asset = registry
+            .get(&format!("closure:{COIN_CLOSURE}"))
+            .expect("registry must carry the closure-keyed textured GLB");
+        assert!(
+            coin_asset
+                .identity
+                .closure
+                .as_ref()
+                .is_some_and(|c| c.images.iter().any(|i| i.sha256 == COIN_PNG_SHA)),
+            "closure identity must pin the texture PNG bytes"
+        );
+
+        // ---- 生命周期同 g12：spawn 双实例 → move/hide/触发 → despawn →
+        //      新代重生；纹理像素变异 oracle ----
+        let (mut h, _dir) = start_with(
+            G13_SCENE,
+            G13_WORLD,
+            &[
+                (&format!("{COIN_GLB_SHA}.glb"), COIN_GLB),
+                (&format!("{COIN_PNG_SHA}.png"), COIN_PNG),
+            ],
+            "g13-lifecycle",
+        );
+        assert_eq!(live(&h), 2, "two live textured instances after Start");
+        let s0 = slot(&h, 0).expect("slot 0");
+        assert_eq!((s0.0, s0.1, s0.2), (1, t.id, [2.0, 0.5, 0.0]));
+
+        // 纹理像素：金币为 Kenney colormap 金黄；静态圆柱为红占位——
+        // 金黄类计数作判别（白模/漏纹理变异在此为 0）。
+        let gold = |h: &mut Host, name: &str| -> (usize, Vec<u8>) {
+            let (_, png, w, ht) = h.rt.capture(h.three, name).expect("capture");
+            let (cw, ch) = (w as usize, ht as usize);
+            let step = (cw / 400).max(1);
+            let mut points = Vec::new();
+            for y in (0..ch).step_by(step) {
+                for x in (0..cw).step_by(step) {
+                    points.push([x as f32, y as f32]);
+                }
+            }
+            let px = h.rt.probe_pixels(h.three, &points).expect("probe");
+            let mut gold = 0usize;
+            for c in px.iter() {
+                let (r, g, b) = (c[0] as i32, c[1] as i32, c[2] as i32);
+                // 亮金：coin 的 colormap 金 (r 224-255, g 192-224, b 64-96)；
+                // pad/哨兵圆柱的橙 (g~140) 与红 (g~77) 不在此类。
+                if r > 200 && g > 170 && b < 130 && r > b + 80 {
+                    gold += 1;
+                }
+            }
+            let _ = name;
+            (gold, png)
+        };
+        let (g0, png0) = gold(&mut h, "g13-t0");
+        assert!(g0 > 10, "two visible textured coins: bright gold {g0}");
+
+        let mut fired = None;
+        for t in 0..4 {
+            tick(&mut h);
+            if events(&h).iter().any(|(_, pair)| *pair == 0) {
+                fired = Some(t);
+                break;
+            }
+        }
+        assert!(fired.is_some(), "pad crossing must emit trigger pair 0");
+        // t1：coin_a 移至 pad 正后（相机被 pad 遮挡）——状态断言在 slot 上，
+        // 像素面只要求画面变化。
+        let (_g1, png1) = gold(&mut h, "g13-t1");
+        assert_ne!(png0, png1, "view must change after move+hide");
+
+        let mut despawned = false;
+        for _ in 0..3 {
+            tick(&mut h);
+            if live(&h) == 1 {
+                despawned = true;
+                break;
+            }
+        }
+        assert!(despawned, "despawn stage must complete");
+        eprintln!("DBG play error after despawn: {:?}", h.play.as_ref().unwrap().error);
+        let (g2, _png2) = gold(&mut h, "g13-t2");
+        assert_eq!(g2, 0, "despawned+hidden coins must vanish from GPU (gold {g2})");
+
+        let mut respawned = false;
+        for _ in 0..3 {
+            tick(&mut h);
+            if live(&h) == 2 && slot(&h, 0).is_some_and(|s| s.0 == 2) {
+                respawned = true;
+                break;
+            }
+        }
+        assert!(respawned, "respawn stage must complete");
+        let (g3, _) = gold(&mut h, "g13-t3");
+        assert!(g3 > 5, "respawned coin renders from the shared closure: bright gold {g3}");
+    });
 }
 
 /// The camera family re-enters the SDK parser per start; give it the same

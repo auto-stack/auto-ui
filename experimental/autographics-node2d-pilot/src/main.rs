@@ -270,6 +270,15 @@ fn components3d_events_consumer(product: &str) -> &'static str {
     }
 }
 
+fn components3d_model_objects_consumer(product: &str) -> &'static str {
+    match product {
+        "g12-model" => {
+            "experimental/autographics-auto-driver/tests/node3d_model_objects_flow.rs"
+        }
+        _ => "unrecorded (this out dir has no registered flow consumer)",
+    }
+}
+
 fn components3d_presentation_consumer(product: &str) -> &'static str {
     match product {
         "g10-textures" | "g10-textures-alt" | "g10-animation" | "g10-animation-alt" => {
@@ -351,6 +360,7 @@ fn main() {
                 Some("components-3d-events") => Profile::Components3DEvents,
                 Some("components-3d-bindings") => Profile::Components3DBindings,
                 Some("components-3d-presentation") => Profile::Components3DPresentation,
+                Some("model-objects-3d") => Profile::ModelObjects3D,
                 Some("components-3d-audio-hud") => Profile::Components3DAudioHud,
                 Some("presentation-2d") => Profile::Presentation2D,
                 Some("components-2d-runtime") => Profile::Components2DRuntime,
@@ -1268,6 +1278,51 @@ fn main() {
                 components3d_events_consumer,
                 None,
             );
+        }
+        Profile::ModelObjects3D => {
+            match resources_arg {
+                None => {
+                    // pass A（声明面）：GLB 闭包元数据请求（034 同一公开面）。
+                    let request =
+                        autographics_node2d_pilot::resources_request_json(&project);
+                    std::fs::write(
+                        format!("{out}/resources-request.json"),
+                        &request,
+                    )
+                    .expect("resources-request.json");
+                    let n = request.matches("\"animated\"").count();
+                    println!(
+                        "node2d-lower[model-objects-3d]: declared {n} texture/animation resources -> resources-request.json; run resource-meta, then rerun with --resources <resources.json>"
+                    );
+                }
+                Some(meta_path) => {
+                    // pass B（产品面）：受检元数据对账 + 模板闭包键 + 全量产品。
+                    let meta = autographics_node2d_pilot::load_resources_meta(
+                        std::path::Path::new(meta_path),
+                        &project,
+                    )
+                    .unwrap_or_else(|e| {
+                        eprintln!("node2d-lower: {e}");
+                        std::process::exit(3);
+                    });
+                    let lowered = autographics_node2d_pilot::
+                        lower_project_components3d_model_objects(&project, &meta)
+                        .unwrap_or_else(|e| {
+                            eprintln!("node2d-lower: {e}");
+                            std::process::exit(3);
+                        });
+                    write_components3d_products(
+                        &out,
+                        &entry,
+                        &project,
+                        lowered,
+                        "autographics-node2d-pilot plan043 model-objects-3d",
+                        "autographics.triggers3d/1",
+                        components3d_model_objects_consumer,
+                        Some(&meta),
+                    );
+                }
+            }
         }
         Profile::Components3DBindings => {
             let lowered = autographics_node2d_pilot::lower_project_components3d_bindings(&project)

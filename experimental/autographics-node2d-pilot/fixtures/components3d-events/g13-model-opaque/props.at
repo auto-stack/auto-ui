@@ -1,0 +1,9 @@
+// The spawn template: one parked model3d row bound to the opaque textured
+// GLB via the closure identity (resource sharing across instances; the
+// texture bytes ride the 034 closure admission, not the flat-color path).
+node Coin {
+    object3d { }
+    view-3d { model3d coin { model: resources.coin_tex
+                             position: (-30.0, 0.5, -3.0)
+                             visible: false } }
+}
