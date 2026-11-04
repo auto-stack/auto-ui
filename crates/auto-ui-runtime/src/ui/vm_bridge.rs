@@ -2286,6 +2286,10 @@ impl VmBridge {
         let cur = self.instance_seen_cur.borrow().clone();
         let sweep: Vec<String> = prev.difference(&cur).cloned().collect();
         for identity in &sweep {
+            eprintln!(
+                "[PLAN051-SWEEP] releasing {identity}; cur={:?}",
+                cur
+            );
             self.release_child_instance(identity);
         }
         self.instance_seen_prev.borrow_mut().clear();
