@@ -4,6 +4,7 @@
 //! 020 组件状态/投递面；新增的是声明面与名字表，不是第二套对象管理器：
 //! - `object3d { }`：本定义为 spawn 模板（view-3d 唯一叶；静态
 //!   scale/yaw/pitch 即模板身份；模板行按声明序 park 在实例行后）。
+//!   PLAN-043：叶可为 model3d（具名静态 GLB 资源，资源共享/身份独立）。
 //! - `objects3d { a, b, ... }`（仅 root）：具名对象槽池（声明序 0..8）。
 //! - `triggers { a, b, ... }`（仅 root）：具名触发 pair 池（声明序 0..8）。
 //! - `spawn(<slot>, <template>, x, y, z)` / `bind(<pair>, refs.<elem>,
@@ -21,7 +22,7 @@ use crate::lower_basic2d::LowerOutputBasic2D;
 use crate::lower_components::{at, DefIR};
 use crate::lower_components3d::{
     build_def_3d_with, build_world_3d_with, collect_scene_3d_with, cval_init_value,
-    lower_project_components3d_cfg, Cfg3, TemplateRowIn, View3dIR,
+    lower_project_components3d_cfg, resolve_model_3d, Cfg3, TemplateRowIn, View3dIR,
 };
 use crate::translate::LowerError;
 use std::collections::BTreeMap;
@@ -131,7 +132,8 @@ pub fn lower_project_components3d_events(
     }
 
     // —— 模板定义收集（模块表序 + 文件内声明序；确定性）——
-    let mut template_defs: Vec<(String, DefIR, View3dIR)> = Vec::new();
+    // PLAN-043：第四分量为具名模型资源键（非 model3d 叶为 None）。
+    let mut template_defs: Vec<(String, DefIR, View3dIR, Option<String>)> = Vec::new();
     for module in project.modules.values() {
         for decl in &module.nodes {
             if decl.object3d.is_none() {
@@ -198,17 +200,45 @@ pub fn lower_project_components3d_events(
                 ));
             }
             let e = &view.elems[0];
-            if !matches!(e.kind, "cylinder" | "player" | "mob") {
-                return Err(at(
-                    &def.module,
-                    e.line,
-                    &e.elem,
-                    &format!(
-                        "object3d template leaf '{}' must be cylinder3d/player3d/mob3d (v1 template kinds)",
-                        e.elem
-                    ),
-                ));
-            }
+            // PLAN-043：model3d 叶（具名静态 GLB 资源）接入 spawn 模板域，
+            // 与 cylinder3d/player3d/mob3d 同为"一个静态模板叶"；资源身份
+            // 经 034 公开准入链解析（平色 sha 键；closure 键随 T-02 冻结的
+            // 组合入口）。其余形状仍按 028 拒绝域。
+            let resource = match e.kind {
+                "cylinder" | "player" | "mob" => None,
+                "model" => {
+                    let key = resolve_model_3d(&w3, &def, None, e, None).map_err(|err| {
+                        at(
+                            &def.module,
+                            e.line,
+                            &e.elem,
+                            &format!("object3d template leaf model resource: {err}"),
+                        )
+                    })?;
+                    Some(key.ok_or_else(|| {
+                        at(
+                            &def.module,
+                            e.line,
+                            &e.elem,
+                            &format!(
+                                "object3d template leaf '{}' model3d requires a named resources.<name> model3d.glb binding",
+                                e.elem
+                            ),
+                        )
+                    })?)
+                }
+                _ => {
+                    return Err(at(
+                        &def.module,
+                        e.line,
+                        &e.elem,
+                        &format!(
+                            "object3d template leaf '{}' must be cylinder3d/player3d/mob3d/model3d (v1 template kinds)",
+                            e.elem
+                        ),
+                    ));
+                }
+            };
             if e.dyn_pos || e.dyn_vis {
                 return Err(at(
                     &def.module,
@@ -225,13 +255,13 @@ pub fn lower_project_components3d_events(
                     "object3d template leaf must not be solid (spawn templates are not the static collision surface)",
                 ));
             }
-            template_defs.push((name.clone(), def, view));
+            template_defs.push((name.clone(), def, view, resource));
         }
     }
 
     // —— 模板行（parked 值 = 作者声明；全部为字面量常量）——
     let mut template_rows: Vec<TemplateRowIn> = Vec::new();
-    for (name, def, view) in &template_defs {
+    for (name, def, view, resource) in &template_defs {
         let e = &view.elems[0];
         let mut translation = [0.0f64; 3];
         for (i, v) in e.position.iter().enumerate() {
@@ -253,7 +283,7 @@ pub fn lower_project_components3d_events(
             yaw,
             pitch,
             visible,
-            resource: None,
+            resource: resource.clone(),
         });
     }
 
@@ -265,7 +295,7 @@ pub fn lower_project_components3d_events(
     };
 
     let mut template_ids = BTreeMap::new();
-    for (name, _, _) in &template_defs {
+    for (name, _, _, _) in &template_defs {
         let id = doc_id(name).ok_or_else(|| {
             at(
                 &world.root_module,

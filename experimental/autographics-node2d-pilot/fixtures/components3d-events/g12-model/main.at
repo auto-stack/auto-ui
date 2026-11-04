@@ -1,0 +1,55 @@
+// PLAN-043 g12-model: an actor-free sensing round on the components-3d-events
+// profile with a model3d spawn template (A-candidate full-chain proof, pilot
+// lowering side). A swept visitor object (typed spawn of the Crate model
+// template into the named slot pool) crosses one stationary pad; the pad is
+// an AABB subject bound to the visitor handle (live-instance source). Two
+// same-template slots (crate_a/crate_b) share the GLB resource but hold
+// independent handles/state. The lifecycle ladder (move / hide / despawn /
+// respawn-new-generation) is all author Auto.
+use resources: crate_glb
+use props: Crate
+use sentinel: Sentinel
+
+node Main {
+    model {
+        var h = 0
+        var h2 = 0
+        var dir = 1.0
+        var seen = 0
+    }
+    view-3d {
+        cylinder3d pad {
+            position: (4.0, 0.5, 0.0)
+            scale: (1.0, 0.5, 1.0)
+        }
+        Sentinel watch { }
+    }
+    camera3d { distance: 8.0
+              pitch: 45.0
+              projection: perspective }
+    objects3d { crate_a, crate_b }
+    triggers { sense_a }
+    on {
+        Life.Start -> {
+            .h = spawn("crate_a", "Crate", 2.0, 0.5, 0.0)
+            .h2 = spawn("crate_b", "Crate", 6.0, 0.5, 0.0)
+            bind("sense_a", refs.pad, aabb, 0.0, .h)
+        }
+        Life.Tick(dt) -> {
+            if .seen == 0 {
+                object.move(.h, 4.0 + .dir, 0.5, 0.0)
+                object.visible(.h2, 0)
+                let n = event.next()
+                if n == 1 {
+                    let p = event.pair()
+                    if p == 0 { .seen = 1 }
+                }
+            }
+            if .seen == 1 {
+                object.despawn(.h)
+                .h = spawn("crate_a", "Crate", 2.0, 0.5, 0.0)
+                .seen = 2
+            }
+        }
+    }
+}

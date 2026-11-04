@@ -1624,7 +1624,7 @@ fn emit_def_rows(
 }
 
 /// model3d 引用解析（直连资源或逐实例 Model3D 参数）。
-fn resolve_model_3d(
+pub(crate) fn resolve_model_3d(
     w3: &World3d,
     def: &DefIR,
     inst: Option<&InstanceIR>,
