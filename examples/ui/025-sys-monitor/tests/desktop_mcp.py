@@ -112,6 +112,7 @@ def launch(mcp_port, storage_file, fresh=True):
         os.remove(storage_file)
     env = {**os.environ,
            "AUTOUI_MCP_PORT": str(mcp_port),
+           "AUTOUI_TEST_FIXTURES": "1",
            "AUTO_VM_STORAGE_FILE": storage_file}
     return subprocess.Popen(
         [AUTO_BIN, "run", "-r", "vm"],
@@ -139,13 +140,24 @@ class TestResult:
 def run_suite(mcp):
     result = TestResult()
     snap = mcp.snapshot()
+    # PLAN-047 主题基线：迁移后 dark-first 默认生效（pac theme:"dark"）
+    st0 = mcp.state("theme_name", "dark_mode", "running")
+    result.check("P47 默认 Auto/dark 生效",
+                 '"Auto"' in st0.get("theme_name", "")
+                 and st0.get("dark_mode") == "true", str(st0))
 
     # ── T1 结构 ────────────────────────────────────────────────────────────
+    # PLAN-047 定位修定（038 F-4 关闭：按现 UI 修定，不补退役 feature）：
+    # PLAN-684 用户/详情页退役 → 2 Tab；KPI 文案 磁盘吞吐/网络总吞吐 →
+    # 磁盘/网络；表头状态列退役（5 列）；暂停/继续按钮图标单字（⏸/▶）；
+    # 真实数据面 oracle=「已用 …MB」（sysinfo 真值）。
     result.check("T1 标题", "系统监视器" in snap)
-    result.check("T1 侧边栏 4 Tab", all(k in snap for k in ("进程", "性能", "详细信息", "用户")))
-    result.check("T1 KPI 四卡", all(k in snap for k in ("CPU", "内存", "磁盘吞吐", "网络总吞吐")))
-    result.check("T1 进程表表头", all(k in snap for k in ("名称", "CPU", "内存", "磁盘", "网络", "状态")))
-    result.check("T1 真实进程数据", "MB" in snap and ("运行中" in snap or "running" in snap))
+    result.check("T1 侧边栏 2 Tab", all(k in snap for k in ("进程", "性能")))
+    result.check("T1 退役页负 pin（详细信息/用户不在导航）",
+                 "详细信息" not in snap and "用户视图" not in snap)
+    result.check("T1 KPI 四卡", all(k in snap for k in ("CPU", "内存", "磁盘", "网络")))
+    result.check("T1 进程表表头", all(k in snap for k in ("名称", "CPU", "内存", "磁盘", "网络")))
+    result.check("T1 真实进程数据", "已用" in snap and "MB" in snap)
 
     # ── T2 页面切换 ────────────────────────────────────────────────────────
     perf_btn = find_id(snap, r'#\((vnode_\d+)\).*?性能') or find_id(snap, r'#vnode_\d+.*?"性能"')
@@ -166,7 +178,7 @@ def run_suite(mcp):
 
     # ── T4 暂停 / 恢复 ─────────────────────────────────────────────────────
     snap = mcp.snapshot()
-    pause_btn = find_id(snap, r'button #(vnode_\d+) "⏸ 暂停"')
+    pause_btn = find_id(snap, r'button #(vnode_\d+) "⏸"')
     result.check("T4 找到暂停按钮", pause_btn is not None)
     if pause_btn:
         mcp.press(pause_btn)
@@ -175,12 +187,35 @@ def run_suite(mcp):
         result.check("T4 暂停生效", st.get("running") == '"false"', str(st))
 
         snap = mcp.snapshot()
-        resume_btn = find_id(snap, r'button #(vnode_\d+) "▶ 继续"')
+        resume_btn = find_id(snap, r'button #(vnode_\d+) "▶"')
         if resume_btn:
             mcp.press(resume_btn)
             time.sleep(0.3)
             st = mcp.state("running")
             result.check("T4 恢复播放", st.get("running") == '"true"', str(st))
+
+    # ── PLAN-047 主题腿：活跃态换肤 2×2 往返守恒 ────────────────────────────
+    # 换肤不重建业务：running/active_tab/speedDiv/sortColumn 恒守
+    # （真实刷新数据面 CPU/内存值随系统变化属业务本性，不逐值对比）。
+    m0 = mcp.state("running", "active_tab", "speedDiv", "sortColumn")
+    for fam in ("Solarized", "Auto"):
+        for dm in (True, False):
+            mcp.call("autoui_fixture", schema_version=1,
+                     state={"theme_name": fam, "dark_mode": dm})
+            time.sleep(0.4)
+            st = mcp.state("theme_name", "dark_mode")
+            result.check(f"P47 fixture {fam}/{dm} applied",
+                         st.get("theme_name") == f'"{fam}"'
+                         and st.get("dark_mode") == str(dm).lower(), str(st))
+    m1 = mcp.state("running", "active_tab", "speedDiv", "sortColumn")
+    result.check("P47 换肤往返业务守恒",
+                 all(m0.get(k) == m1.get(k) for k in
+                     ("running", "active_tab", "speedDiv", "sortColumn")),
+                 f"{m0} -> {m1}")
+    # 终态回默认（Auto/dark——本例显式默认），不留跨例污染
+    mcp.call("autoui_fixture", schema_version=1,
+             state={"theme_name": "Auto", "dark_mode": True})
+    time.sleep(0.3)
 
     return result
 
@@ -234,9 +269,13 @@ def main():
         r2 = run_persistence_suite(mcp)
 
         # 重启进程验证持久化
-        proc.kill()
+        # taskkill /T：proc.kill() 只杀 auto.exe 父进程，MCP server 子进程
+        #（auto-ui-tool）会孤儿化并占住端口——同端口重启 bind 失败（PLAN-047
+        # 修复；041 harness taskkill /T 同口径）。
+        subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                       capture_output=True)
         proc.wait(timeout=10)
-        time.sleep(1)
+        time.sleep(2)
         proc = launch(mcp_port, storage_file, fresh=False)
         if not wait_for_server(mcp_url):
             print("ERROR: MCP server did not restart within 30s")
@@ -258,7 +297,8 @@ def main():
                 print(f"  ✗ {e}")
         sys.exit(1 if total.failed else 0)
     finally:
-        proc.kill()
+        subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                       capture_output=True)
         if os.path.exists(storage_file):
             os.remove(storage_file)
 

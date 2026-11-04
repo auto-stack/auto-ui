@@ -3,6 +3,9 @@ use sys_store: SysStore
 use processes: ProcessesView
 use performance: PerformanceView
 use back.api: system_snapshot, kill_process
+// PLAN-047 T-03：接入官方主题包。dark_mode/accent_color 迁移前已声明未读
+// （038 口径）——本批补 theme_name + design 绑定接线生效；显式 dark 默认保留。
+use themes.themes: Auto, Solarized
 
 widget App {
     msg {
@@ -17,6 +20,15 @@ widget App {
         tickN int = 0
         dark_mode bool = true
         accent_color str = "indigo"
+        // PLAN-047 T-03：主题族选择（默认 Auto；pac theme: "dark" 显式默认
+        // 经 dark_mode=true 保留）
+        theme_name str = "Auto"
+    }
+
+    // 主题/模式选择器（C-14：数据绑定，同帧校验发布）
+    design {
+        theme: .theme_name
+        mode: if .dark_mode { "dark" } else { "light" }
     }
 
     on {

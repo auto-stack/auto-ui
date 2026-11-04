@@ -18,3 +18,11 @@ back_port: 8425
 desktop: "true"
 theme: "dark"
 accent: "indigo"
+
+# PLAN-047 T-03：接入官方主题包（C-13）。025 既有显式默认 dark/indigo 保留
+# （pac theme/accent 键原样；App dark_mode=true 迁移前已声明未读，本批接线
+# design 绑定生效）。KPI/图例 hex 点（#2563eb/#16a34a/#8b5cf6/#d97706）与
+# green/red 状态点为数据/状态身份色豁免；sysinfo 后端数据面不随肤变。
+dep themes {
+    path: "../../../packages/themes"
+}
