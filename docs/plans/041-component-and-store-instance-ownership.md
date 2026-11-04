@@ -158,6 +158,8 @@ T-01冻结现key/实例识别、App/context的实际入口、VM读写/handler/vi
 
 2026-11-04 / stage:review(final, re-review) / reviewer_identity:独立 subagent 上下文（同一 reviewer，实施会话之外） / plan_id:auto-ui/PLAN-041 r1 / outcome:pass / worktree:D:/autostack/.wt/ui-041/auto-ui / branch:codex/plan-041-instance-ownership / reviewed_commit:cf087715 / base:3bfbee72 / R-1 closed&verified@fa769051（census 2972 passed/14 base-red，零新增；两真产品缺陷修复经独立探针实证）/ R-4 closed by 02b7c6c1 / R-3/R-5 no-action / R-6 folded cf087715 / acceptance:AC-01..07 pass, AC-08/09 pending merge / next:merge（T-08 ff-only 落主）。
 
+2026-11-04 / stage:merge / PLAN-041:r1 / checkpoints:prepared(9cac1cf1=reviewed+SD 草案；delivery=da4485b4 rebase 后 ff-only)/landed(master tip=da4485b4，--ff-only 零 merge commit；rebase old→new 12/12 patch-id EQ：0f2f9fa6→bbdc589b ef73c7d4→d3d4268b a428e15d→496a1b26 45ab401d→08b2f2cd dad974dc→d6bf0784 b30c749a→74d581d9 ad163727→2380faff 9cac1cf1→177757dc 277a89d4→e578992b fa769051→cbf38740 02b7c6c1→3823e4db cf087715→da4485b4)/canonical_verified(docs/specs/runtime/component-and-store-instances.md hash 902893ee 主/树一致；SD-02/03 增补随合并落地；dependencies auto-lang 03e9869fb auto-web 3de5524e auto-down 7c4d5cbb)/smoke(main: plan041 4 oracle + plan051/576/652 35 绿) / next:archive→cleanup。
+
 ## 10. 待澄清事项
 
 1. 本轮暂不实施；默认App context与显式共享的内部机制由T-01冻结，不新增.at语法；现支持/ABI扩大需具体修订。
