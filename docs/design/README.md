@@ -4,7 +4,7 @@ AGE（Auto Graphics Engine；旧称AG/AutoGraphics）实验代码与实现计划
 
 | 专题 | 范围/状态 |
 |---|---|
-| [M3与现有AutoUI融合](autographics/m3-autoui-integration-roadmap.md) | 2026-11-04用户确认下一阶段主目标：生产组件/状态主题/编译运行与AGE接通；M2后分批立约，仅方向，无新Plan或实施 |
+| [M3与现有AutoUI融合](autographics/m3-autoui-integration-roadmap.md) | v2；等ACE Schema方言成熟且旧编译器替换实际启动后统一接入，再从001逐步跑通UI Demo；当前仅方向/前置，无新Plan或实施 |
 | [M2新语法UI/2D/3D同应用](autographics/m2-mixed-ui-2d-3d-composition.md) | 新M2-10；已核普通Node view/真实UI事件桥缺口，UI048→049→AG021仅规划；019已交旧候选，020 r2后置扩展M2 |
 | [AGE命名与内容仓目录](autographics/age-naming-and-content-repository.md) | 正式Auto Graphics Engine（AGE）；ag-examples/020 r2仅规划更名，默认019＋021/扩展M2收口后，历史号/SHA/schema不变 |
 | [模型对象组件与Node源码诊断](autographics/node-resource-components-and-source-diagnostics.md) | 2026-11-04 v1；UI043资源模板在途/UI044可选映射，功能独立、原预算保持；041/042属其它UI路线 |
