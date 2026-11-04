@@ -2930,39 +2930,47 @@ impl DynamicComponent {
         // live instance instead of discarding a legitimate interaction
         // (consumer BLOG-005: every MCP press on the author page was
         // dropped as `late event`, freezing the page on the list view).
+        // PLAN-051 (③ final): three-state resolution for the carried
+        // instance. The view's TypedInst.instance is the PAGE-LEVEL name
+        // (`author`), while `child_instances` keys are plan-041 keyed
+        // identities — page-level handlers never register there, so a bare
+        // miss must NOT be read as a late event.
+        let mut late_event = false;
         let instance_state_id: Option<u64> = match instance {
             Some(identity) => match self.bridge.child_instance_state_id(identity) {
                 Some(id) => Some(id),
                 None => {
-                    let live = self
-                        .bridge
-                        .child_instance_identities()
-                        .into_iter()
-                        .filter(|id| {
-                            let tail = id.rsplit('/').next().unwrap_or(id);
-                            tail.split('#').next() == Some(widget_name)
-                        })
-                        .collect::<Vec<_>>();
-                    match live.as_slice() {
-                        [only] => {
-                            name_only_instance = only.clone();
-                            instance = Some(name_only_instance.as_str());
-                            self.bridge.child_instance_state_id(name_only_instance.as_str())
-                        }
-                        _ => None,
+                    if self.bridge.child_instance_was_released(identity) {
+                        // (a) a child instance that WAS mounted and has since
+                        // been released: true late event — plan-041 §5.2
+                        // contract 4 (drop, never re-target a same-named new
+                        // instance).
+                        late_event = true;
+                        None
+                    } else {
+                        // (b) never a child instance → page-level name;
+                        // fall back to the pre-041 root-legacy resolution
+                        // (root state + legacy child-page prop sync below).
+                        instance = None;
+                        None
                     }
                 }
             },
             None => None,
         };
-        if instance_state_id.is_none() {
+        if late_event {
             if let Some(identity) = instance {
                 eprintln!(
                     "[VM-INSTANCE] {}.{} dropped: instance `{}` released (late event)",
                     widget_name, clean_name, identity
                 );
-                return;
+            } else {
+                eprintln!(
+                    "[VM-INSTANCE] {}.{} dropped: released instance (late event)",
+                    widget_name, clean_name
+                );
             }
+            return;
         }
         // If this event comes from an input, update the bound state field first.
         if let Some(text) = &input_value {

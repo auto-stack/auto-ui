@@ -212,6 +212,13 @@ pub struct VmBridge {
     instance_seen_cur: std::cell::RefCell<std::collections::HashSet<String>>,
     instance_seen_prev: std::cell::RefCell<std::collections::HashSet<String>>,
 
+    /// PLAN-051: tombstones for released child-instance identities. A
+    /// dispatched event carrying a tombstoned identity is a TRUE late event
+    /// (plan-041 §5.2 contract 4: drop, never re-target); a dispatched
+    /// identity that was never a child instance is a page-level name and
+    /// falls back to the pre-041 root-legacy resolution instead.
+    child_instances_released: std::cell::RefCell<std::collections::HashSet<String>>,
+
     /// PLAN-041 T-02: per-frame occurrence counters for unkeyed same-name
     /// call sites (`<parent_identity>|<child_name>` → 0,1,2…). Deterministic
     /// per frame (depth-first build order); reset in
@@ -901,6 +908,7 @@ impl VmBridge {
             child_instances: std::cell::RefCell::new(std::collections::HashMap::new()),
             instance_seen_cur: std::cell::RefCell::new(std::collections::HashSet::new()),
             instance_seen_prev: std::cell::RefCell::new(std::collections::HashSet::new()),
+            child_instances_released: std::cell::RefCell::new(std::collections::HashSet::new()),
             instance_site_seq: std::cell::RefCell::new(std::collections::HashMap::new()),
             handler_param_names,
             handler_param_types,
@@ -1153,6 +1161,7 @@ impl VmBridge {
             child_instances: std::cell::RefCell::new(std::collections::HashMap::new()),
             instance_seen_cur: std::cell::RefCell::new(std::collections::HashSet::new()),
             instance_seen_prev: std::cell::RefCell::new(std::collections::HashSet::new()),
+            child_instances_released: std::cell::RefCell::new(std::collections::HashSet::new()),
             instance_site_seq: std::cell::RefCell::new(std::collections::HashMap::new()),
             handler_param_names,
             handler_param_types,
@@ -2051,8 +2060,6 @@ impl VmBridge {
         self.instance_seen_cur
             .borrow_mut()
             .insert(identity.to_string());
-        eprintln!("[PLAN051-DIAG] ensure {identity}");
-
         if let Some(rec) = self.child_instances.borrow().get(identity).cloned() {
             // Re-seed props onto the existing instance object.
             if let Some(obj) = self.vm.get_heap_object(rec.state_obj_id) {
@@ -2134,6 +2141,12 @@ impl VmBridge {
             .borrow()
             .get(identity)
             .map(|rec| rec.state_obj_id)
+    }
+
+    /// PLAN-051: was this identity a child instance that has since been
+    /// released? True late-event marker for the dispatch face.
+    pub fn child_instance_was_released(&self, identity: &str) -> bool {
+        self.child_instances_released.borrow().contains(identity)
     }
 
     /// PLAN-041 T-02: re-seed a props snapshot onto a specific state object
@@ -2272,14 +2285,7 @@ impl VmBridge {
         let prev = self.instance_seen_prev.borrow().clone();
         let cur = self.instance_seen_cur.borrow().clone();
         let sweep: Vec<String> = prev.difference(&cur).cloned().collect();
-        if !sweep.is_empty() {
-            eprintln!(
-                "[PLAN051-DIAG] sweep prev={:?} cur={:?} sweeping={:?}",
-                prev, cur, sweep
-            );
-        }
         for identity in &sweep {
-            eprintln!("[PLAN051-DIAG] releasing {identity}");
             self.release_child_instance(identity);
         }
         self.instance_seen_prev.borrow_mut().clear();
@@ -2294,6 +2300,12 @@ impl VmBridge {
         let Some(rec) = self.child_instances.borrow_mut().remove(identity) else {
             return;
         };
+        // PLAN-051: tombstone the identity so a later dispatch carrying it
+        // is recognized as a true late event (drop) while never-registered
+        // page-level names fall back to root-legacy resolution.
+        self.child_instances_released
+            .borrow_mut()
+            .insert(identity.to_string());
         if let Some(obj) = self.vm.get_heap_object(rec.state_obj_id) {
             let field_values: Vec<auto_val::Value> = {
                 let guard = obj.read().unwrap();
