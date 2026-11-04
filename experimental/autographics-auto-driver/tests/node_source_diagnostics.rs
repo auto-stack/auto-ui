@@ -248,6 +248,52 @@ fn runtime_no_span_and_managed_region_never_map() {
 }
 
 #[test]
+fn loader_acceptance_binds_world_map_closure_or_defaults_out() {
+    // T-03 loader 接受身份：好包 → Some 且映射可用；缺旁件/坏图/坏闭包
+    // → None（默认路径不变，不改变准入）。
+    let src = Path::new(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../autographics-node2d-pilot/generated-components2d/diag-fault"
+    ));
+    let dir = std::env::temp_dir().join(format!("plan044-load-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    for f in ["world.at", "scene.agscene", "source-map.json", "identity.json"] {
+        std::fs::copy(src.join(f), dir.join(f)).unwrap();
+    }
+    std::fs::create_dir_all(dir.join("closure")).unwrap();
+    for entry in std::fs::read_dir(src.join("closure")).unwrap() {
+        let entry = entry.unwrap();
+        std::fs::copy(entry.path(), dir.join("closure").join(entry.file_name())).unwrap();
+    }
+    let (map, closure) = SourceMap::load_for_world(&dir.join("world.at"))
+        .expect("good package accepted");
+    assert!(closure.contains_key("broken"));
+    let _ = map;
+
+    // 缺旁件 → None。
+    std::fs::remove_file(dir.join("source-map.json")).unwrap();
+    assert!(SourceMap::load_for_world(&dir.join("world.at")).is_none());
+    std::fs::copy(src.join("source-map.json"), dir.join("source-map.json")).unwrap();
+
+    // 坏闭包 → None。
+    std::fs::write(dir.join("closure").join("broken.at"), "// drift\n").unwrap();
+    assert!(SourceMap::load_for_world(&dir.join("world.at")).is_none());
+    std::fs::copy(
+        src.join("closure").join("broken.at"),
+        dir.join("closure").join("broken.at"),
+    )
+    .unwrap();
+
+    // 旧世界（字节漂移）→ None。
+    let mut w = std::fs::read_to_string(dir.join("world.at")).unwrap();
+    w.push('\n');
+    std::fs::write(dir.join("world.at"), w).unwrap();
+    assert!(SourceMap::load_for_world(&dir.join("world.at")).is_none());
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
 fn precision_matrix_generated_segments_never_map() {
     // generated 段（SoA/调度）命中时 diagnose 返回 None → 调用方回退。
     let snap = SourceSnapshot::from_bytes_for(

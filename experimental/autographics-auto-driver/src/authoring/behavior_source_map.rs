@@ -246,6 +246,21 @@ impl SourceMap {
         Ok(out)
     }
 
+    /// PLAN-044 T-03 loader 接受身份接线：世界目录（world.at + closure/ +
+    /// 可选 source-map.json）→ 受检 (map, closure)。旁件缺失/坏图/坏闭包
+    /// 一律 None（调用方走原默认诊断路径，不改变准入或运行语义）。
+    /// 只读目录内三样受检物，不递归、不读任意外部文件。
+    pub fn load_for_world(world_path: &Path) -> Option<(SourceMap, BTreeMap<String, String>)> {
+        let world = std::fs::read(world_path).ok()?;
+        let world_text = String::from_utf8(world).ok()?;
+        let map_path = world_path.with_file_name("source-map.json");
+        let map_text = std::fs::read_to_string(map_path).ok()?;
+        let map = SourceMap::parse(&map_text, &world_text).ok()?;
+        let closure_dir = world_path.parent()?.join("closure");
+        let closure = map.closure_sources(&closure_dir).ok()?;
+        Some((map, closure))
+    }
+
     fn lookup(&self, offset: usize) -> Option<&Segment> {
         self.segments
             .binary_search_by(|s| {
