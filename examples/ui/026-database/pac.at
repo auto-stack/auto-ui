@@ -13,3 +13,11 @@ title: "Database Studio"
 title_zh: "数据库工作室"
 front_port: 4026
 desktop: "true"
+
+# PLAN-047 T-03：接入官方主题包（C-13）。026 无主题接线、无显式默认 →
+# 官方 Auto/light 独立默认（B2 同律）；全语义 token 面（038 实测零 hex），
+# green/red 状态点为状态身份色豁免。族/模式选择经根 widget theme_name +
+# design 数据绑定，测试经 autoui_fixture 驱动（B2 C-03 VM 通道）。
+dep themes {
+    path: "../../../packages/themes"
+}

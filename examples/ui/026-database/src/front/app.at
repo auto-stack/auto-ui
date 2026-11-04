@@ -4,6 +4,9 @@
 // + 表结构（Schema/DDL）+ SQL 控制台（执行/耗时/错误反馈）+ 事务级编辑与提交。
 
 use components.tree_util: filter_tree, collect_ids, toggle_id
+// PLAN-047 T-03：官方主题族（无显式默认 → Auto/light；族/模式选择经
+// theme_name + design 数据绑定，测试经 autoui_fixture 驱动，B2 C-03）
+use themes.themes: Auto, Solarized
 
 // PLAN-637 B4 注记：本 demo 为 475 组件包形态（widget 内 use { package } 块），
 // 顶层 stylekit use 与之解析互斥（caption_text 判 undefined），caption ×4 暂留
@@ -46,6 +49,10 @@ widget App {
     }
 
     model {
+        // PLAN-047 T-03：主题族/模式选择态（主题选择，非业务状态）
+        var theme_name str = "Auto"
+        var dark_mode bool = false
+
         // ---- 视图与导航状态 ----
         activeTab str = "data"          // "data" | "schema" | "console"
         activeTable str = "customers"   // 当前选中的表名
@@ -867,6 +874,12 @@ widget App {
             .dirtyCount = 0
             .txStatusMsg = "Database reset to initial demo snapshot."
         }
+    }
+
+    // 主题/模式选择器（C-14：数据绑定，同帧校验发布）
+    design {
+        theme: .theme_name
+        mode: if .dark_mode { "dark" } else { "light" }
     }
 
     view {

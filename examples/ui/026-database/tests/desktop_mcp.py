@@ -103,7 +103,8 @@ def find_id(snapshot_text, pattern):
 
 
 def launch(mcp_port):
-    env = {**os.environ, "AUTOUI_MCP_PORT": str(mcp_port)}
+    env = {**os.environ, "AUTOUI_MCP_PORT": str(mcp_port),
+           "AUTOUI_TEST_FIXTURES": "1"}
     return subprocess.Popen(
         [AUTO_BIN, "run", "-r", "vm"],
         cwd=PROJECT, env=env,
@@ -135,11 +136,18 @@ def run_suite(mcp):
     result.check("T1 标题", "Database Studio" in snap)
     result.check("T1 数据库状态", "northwind.db" in snap or "SQLite" in snap)
     result.check("T1 对象树分类", all(k in snap for k in ("Tables", "Views", "Indexes")))
-    result.check("T1 Tab 栏", all(k in snap for k in ("Data Browse", "Table Schema", "SQL Console")))
+    # PLAN-047 定位修定（038 F-8 关闭：按现 UI 修定）：Tab 短名 Data/Schema/
+    # SQL（长名仅存代码注释，不入快照）。
+    result.check("T1 Tab 栏", all(k in snap for k in ("Data", "Schema", "SQL")))
 
     # ── T2 表导航切换 ──────────────────────────────────────────────────────
-    prod_btn = find_id(snap, r'button #(vnode_\d+) ".*?products.*?"')
-    result.check("T2 定位 products 表按钮", prod_btn is not None)
+    # 现 UI 对象树=TreeView 组件：表入口是 row（onclick .SelectTable），
+    # 非 button（038 F-8 定位漂移修定）。
+    prod_btn = None
+    m2 = re.search(r'row #(vnode_\d+) \{\n(?:.*\n){1,3}.*"products"', snap)
+    if m2:
+        prod_btn = m2.group(1)
+    result.check("T2 定位 products 表行", prod_btn is not None)
     if prod_btn:
         mcp.press(prod_btn)
         time.sleep(0.3)
@@ -148,7 +156,7 @@ def run_suite(mcp):
 
     # ── T3 Tab 切换至 Schema / DDL ─────────────────────────────────────────
     snap = mcp.snapshot()
-    schema_tab = find_id(snap, r'button #(vnode_\d+) ".*?Table Schema.*?"')
+    schema_tab = find_id(snap, r'button #(vnode_\d+) "Schema"')
     result.check("T3 定位 Schema Tab 按钮", schema_tab is not None)
     if schema_tab:
         mcp.press(schema_tab)
@@ -160,7 +168,7 @@ def run_suite(mcp):
 
     # ── T4 Tab 切换至 SQL Console 并执行查询 ───────────────────────────────
     snap = mcp.snapshot()
-    console_tab = find_id(snap, r'button #(vnode_\d+) ".*?SQL Console.*?"')
+    console_tab = find_id(snap, r'button #(vnode_\d+) "SQL"')
     result.check("T4 定位 Console Tab 按钮", console_tab is not None)
     if console_tab:
         mcp.press(console_tab)
@@ -196,20 +204,21 @@ def run_suite(mcp):
 
     # ── T6 回到 Data Browse 并测试分页与排序 ───────────────────────────────
     snap = mcp.snapshot()
-    data_tab = find_id(snap, r'button #(vnode_\d+) ".*?Data Browse.*?"')
+    data_tab = find_id(snap, r'button #(vnode_\d+) "Data"')
     if data_tab:
         mcp.press(data_tab)
         time.sleep(0.3)
 
     snap = mcp.snapshot()
-    next_btn = find_id(snap, r'button #(vnode_\d+) ">"')
+    # 现 UI 分页=unicode 细字形 ‹‹/‹/›/››（F-8 定位漂移修定）
+    next_btn = find_id(snap, r'button #(vnode_\d+) "›"')
     if next_btn:
         mcp.press(next_btn)
         time.sleep(0.3)
         st = mcp.state("page")
         result.check("T6 分页后翻至第 2 页", st.get("page") == "2", str(st))
 
-    prev_btn = find_id(snap, r'button #(vnode_\d+) "<"')
+    prev_btn = find_id(snap, r'button #(vnode_\d+) "‹"')
     if prev_btn:
         mcp.press(prev_btn)
         time.sleep(0.3)
@@ -224,6 +233,27 @@ def run_suite(mcp):
         time.sleep(0.3)
         st = mcp.state("sortDir")
         result.check("T7 排序方向切换", st.get("sortDir") in ('"asc"', '"desc"'), str(st))
+
+    # ── PLAN-047 主题腿：两族×明暗 fixture 往返 + 业务守恒 ──────────────────
+    # （B2 C-03 VM 通道；换肤不重建业务——activeTab/activeTable/page/sortDir 恒守）
+    m0 = mcp.state("activeTab", "activeTable", "page", "sortDir")
+    for fam in ("Solarized", "Auto"):
+        for dm in (True, False):
+            mcp.call("autoui_fixture", schema_version=1,
+                     state={"theme_name": fam, "dark_mode": dm})
+            time.sleep(0.4)
+            st = mcp.state("theme_name", "dark_mode")
+            result.check(f"P47 fixture {fam}/{dm} applied",
+                         st.get("theme_name") == f'"{fam}"'
+                         and st.get("dark_mode") == str(dm).lower(), str(st))
+    m1 = mcp.state("activeTab", "activeTable", "page", "sortDir")
+    result.check("P47 换肤往返业务守恒",
+                 all(m0.get(k) == m1.get(k) for k in
+                     ("activeTab", "activeTable", "page", "sortDir")),
+                 f"{m0} -> {m1}")
+    mcp.call("autoui_fixture", schema_version=1,
+             state={"theme_name": "Auto", "dark_mode": False})
+    time.sleep(0.3)
 
     return result
 
@@ -244,6 +274,21 @@ def main():
             sys.exit(1)
 
         mcp = McpClient(url)
+        # PLAN-047：UI 就绪等待——MCP server 先于首帧 view() 起监听
+        #（"first state sync in view()"），立即取快照会竞出空/半树（0/8 全
+        # 失配的次生因素；041/024 harness state warmup 同口径）。
+        ready = False
+        for _ in range(40):
+            time.sleep(1)
+            try:
+                if "activeTab" in mcp.state("activeTab"):
+                    ready = True
+                    break
+            except Exception:
+                pass
+        if not ready:
+            print("[ERROR] UI state never materialized")
+            sys.exit(1)
         res = run_suite(mcp)
         print(f"\nResults: {res.passed} passed, {res.failed} failed.")
         if res.failed > 0:
