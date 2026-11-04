@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-043
-status: drafting
+status: execution_done
 feature_name: AutoGraphicsNode三维模型资源对象模板接线
 author: [Codex]
 created_at: 2026-11-04
 updated_at: 2026-11-04
 plan_revision: 1
-current_step: 0
+current_step: 6
 total_steps: 10
 depends_on: [auto-ui/PLAN-030, auto-ui/PLAN-034, auto-ui/PLAN-035]
 supersedes_spec_components: []
@@ -85,6 +85,7 @@ registry模型/opaque闭包真实共享，20轮出生/销毁/重用/Stop/newRun�
 | delta_id | add/modify/retire | docs/specs/... target | before/after rule | rationale | acceptance IDs |
 |---|---|---|---|---|---|
 | SD-01 | add | docs/specs/auto-graphics/node3d-model-object-templates.md | Node模板builtin-only→显式入口支持具名平色/opaque静态模型、实例生命周期/非solid/owner/资源域 | 补作者接线，复用已有Model运行能力，旧档保持 | AC-01..06 |
+| SD-02 | modify | docs/specs/auto-graphics/node3d-character-and-runtime-camera.md | ag_char3_move滑扫对全部三维行碰撞→跳过不可见文档行（parked模板/隐藏表现行不阻挡行走；已交付内容阻挡行均可见，可观察行为不变，g14轨迹对照实证） | 043 D-02 实证缺口的最小收口（character3d_v1.at visible_only 0→1，受信单元字节随 plan874/879 identity 登记） | AC-03 |
 
 ## 6. 测试设计
 
@@ -119,18 +120,76 @@ work产证；review同权威树不同上下文独立final，逐AC/diff/SD/遗漏
 
 | T | owner_stage | 依赖 | 写面/结果 | AC | 进度 |
 |---|---|---|---|---|---|
-| T-01 | work | 用户另行启动；030/034/035实交付 | 核来源/已有Model/模板拒绝/资源许可/owner，唯一树scope登记，AG016只读 | AC-01/05 | [ ] |
-| T-02 | work | T-01 | 最多A/B全链先证平色/opaque/多实例/actor-free及角色/非solid/预算，冻结CLI装配/支持域/测试 | AC-01..06 | [ ] |
-| T-03 | work | T-02 go | 最小作者模板/元数据/独立准入适配、新显式入口/永久夹具/gates，旧档冻结 | AC-01..04 | [ ] |
-| T-04 | work | T-03 | 真Auto/GPU/触发/角色对照/费用资源边界/生命周期/变异负控 | AC-02..05 | [ ] |
-| T-05 | work | T-04 | 新根SaveAs/A→B/坏件恢复/20轮owner与真实受影响并集 | AC-04/05 | [ ] |
-| T-06 | work | T-05 | SD候选/准确消费交接/源预算与未闭项，不追加M2前置 | AC-05/06 | [ ] |
+| T-01 | work | 用户另行启动；030/034/035实交付 | 核来源/已有Model/模板拒绝/资源许可/owner，唯一树scope登记，AG016只读 | AC-01/05 | [x] |
+| T-02 | work | T-01 | 最多A/B全链先证平色/opaque/多实例/actor-free及角色/非solid/预算，冻结CLI装配/支持域/测试 | AC-01..06 | [x] |
+| T-03 | work | T-02 go | 最小作者模板/元数据/独立准入适配、新显式入口/永久夹具/gates，旧档冻结 | AC-01..04 | [x] |
+| T-04 | work | T-03 | 真Auto/GPU/触发/角色对照/费用资源边界/生命周期/变异负控 | AC-02..05 | [x] |
+| T-05 | work | T-04 | 新根SaveAs/A→B/坏件恢复/20轮owner与真实受影响并集 | AC-04/05 | [x] |
+| T-06 | work | T-05 | SD候选/准确消费交接/源预算与未闭项，不追加M2前置 | AC-05/06 | [x] |
 | T-07 | review | T-06 | 同树独立final及finding修复后同员复核 | AC-07 | [ ] |
 | T-08 | merge | T-07 pass | 冻结定向门/来源核后落master | AC-08 | [ ] |
 | T-09 | merge | T-08 | canonical/归档/导航与固定交付身份核验 | AC-08 | [ ] |
 | T-10 | merge | T-09 | fresh guard/全输出对账/删scope构建物/摘要与hold登记 | AC-09 | [ ] |
 
 ## 9. 复审记录
+
+2026-11-04 / stage: work / plan_id: auto-ui/PLAN-043 / plan_revision: 1 / outcome: pass（T-01 完成，1/10）/ worktree: D:/autostack/.wt/ui-043/auto-ui / branch: codex/plan-043-dev / base_commit: 2a830d6c43210f61d2496b707da293c213febeee / code_commit: 2a830d6c（本轮无代码改动）/ dependency_revisions: 本仓单仓，无跨仓依赖树 / task_ids: T-01 / evidence: 见下 / blockers: 无 / next: work T-02。
+
+T-01 证据（只读核查，全部在 worktree codex/plan-043-dev@2a830d6c 工作树上以行号核实）：
+
+- 已有 Model 运行支持（driver 零改预期成立）：`Dim::ThreeD::supports_kind` 接受 kinds 2..=6 且 !=5（runtime_objects.rs:59-64，Kind::Model=6，document.rs:9-16）；受信单元 spawn 3D 准入 kinds 2..=6 且 !=5（api/runtime_objects_v1.at:94-98）；`TemplateRules::eligible` 仅拒 group(5) 与异维（runtime_objects.rs:134-146）；`instance_object` 已复制 template.resource/sprite（runtime_objects.rs:279-280）；handle 编码/8slot/32写/高水拒绝逻辑与 Plan §5.2/5.3 一致（runtime_objects.rs:16-29,150-254；.at 全文）。既有 Model Host 测试面：driver tests/runtime_objects_host.rs、runtime_objects_api.rs、runtime_objects_samples.rs、textured_model_resources.rs。
+- 唯一作者侧拒绝点：pilot events 下降 builtin-only 检查 `matches!(e.kind, "cylinder"|"player"|"mob")`（lower_components3d_events.rs:201-211），且模板行 `TemplateRowIn.resource` 恒为 None（同文件 :248-257）。model3d 叶作者面已存在：`model = resources.<name>` 直连/Model3D 参数（lower_components3d.rs:376-456，kind="model"）；resolve_model_3d 产 sha256: 平色键 / closure: 034 纹理键（lower_components3d.rs:1627-1690）；模板行 resource 通路已就绪（TemplateRowIn.resource:1708；collect_scene_3d_with:1944-1962 原样拷贝）。→ T-03 改动面收敛为 events 下降一处准入 + 资源解析接线，driver/受信单元零改。
+- 资源准入/闭包链：load.rs model3d.glb(:287-332)/textured3d.glb(:338-) 具名拒绝域（缺文件/非.glb/非glTF magic）；034 presentation 元数据 closure 键（resolve_model_3d:1638-1656）；035 批销毁=behavior.rs 每 callback whole-batch despawn（G2/G3 注释 :63-72），快照原价。
+- 资源许可/夹具（本仓既有，不从 AG016 tip 复制）：fixtures/node3d/g02/assets/two-parts.glb 多 part 平色（licenses/two-parts.LICENSE：PLAN-838 自撰 MIT，红/绿双三角，sha256 42c9da67…，1528B）；fixtures/node3d-presentation/g10-animation/{character.glb,colormap.png} 034 已交付纹理夹具。两同定义 owner/多实例/隐藏 variant 目录范式见 fixtures/node3d/{twin,g03-hidden}。
+- AG016 只读：PLAN-016 已归档（docs/plans/archived/016-*.md），.wt 下无 ag-016 树（仅 ag-019、ag-examples/probe），固定 035 交付 5903839e 在历史中，本轮未触碰。
+- 主检出 WIP 观察（非本 Plan，已上报不代管）：master 工作树有 docs/plans/{045,046,047} 新草案、039 计划文件删除、docs/design 改动与 `?? crates/auto-ui-runtime/test/`——疑似他会话在途；master-zero-WIP 在 merge 落主前需其 owner 处理，本 Plan 全程在 ui-043 树内写码不受影响。
+- scope 登记：D:/autostack/plan-artifacts/plan-043/scope-registry.md（sha256 16932afb4d3cfa48af3d1d97166a9d910ca4d9993c786b14542ff22d293e6874），唯一 scratch 根，in-flight: none。
+
+2026-11-04 / stage: goal | plan_id: PLAN-043 | plan_revision: r1 | round: 10 | from: work | to: review | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-043/auto-ui | commit: 90f5de5e | next: review（同树独立上下文 final，review_scope: final）
+
+2026-11-04 / stage: work | plan_id: auto-ui/PLAN-043 | plan_revision: 1 | outcome: pass（execution_done，6/10）| worktree: D:/autostack/.wt/ui-043/auto-ui | branch: codex/plan-043-dev | base_commit: 2a830d6c43210f61d2496b707da293c213febeee | code_commit: 待 review 前终核（当前 3713e80b + T-06 规范提交）| dependency_revisions: 本仓单仓；.wt/ui-043/auto-lang @ f4062cca（clone --shared）；driver SDK 681 锁 prepare_sdk PASS | task_ids: T-01..T-06 | evidence: §9 各轮 receipts + 下述 readiness 汇总 | blockers: 无 | next_responsible_role: review。
+
+work readiness 汇总（AC-01..AC-06 work 面）：AC-01 普通 use/具名模型/纯模板/局部 owner/拒绝域/无数字 ID——g12/g13/g14 夹具 + gates 4/4 + flow 8/8（V-S01/06）；AC-02 多 part/opaque 外观真实实例驱动、状态事件隔离、无静态补绘——GPU 双 part/亮金像素变异 oracle + despawn 消失 oracle（V-S02）；AC-03 Run/代/触发/显隐销毁正确、非 solid/非角色相机/空间查询——fault 31/33 + g14 三阶段轨迹逐位对照 + SD-02 收口（V-S02/03）；AC-04 credits/写/槽/mesh/资源并集/源 VM 预算边界——fault 10/37、512 denominator 两侧、V-S04 20 轮暖账平坦、union 原额内（V-S03/04）；AC-05 actor-free/有角色（g14 walker）/20 轮 owner/保存搬迁冷消费/坏件恢复/SDK 与旧触面保持——vs05 + 受影响并集回归绿（runtime/events/basic/bindings/audio-hud flows、character3d api/host/samples、camera_host；028 gates 7/7 + verify_plan043 controls 全绿 + SDK 681 PASS）；AC-06 SD-01 add + SD-02 modify 候选文本已备于 worktree（docs/specs/auto-graphics/node3d-model-object-templates.md 新增、node3d-character-and-runtime-camera.md 增量），消费交接=verify_plan043.py --controls + 两测试入口（§6 冻结命令），未闭项=无（D-01..D-03 已闭/登记）；不追加 AG016/AG019 M2 前置（未触碰其代码/锁/生成物）。统一回归门（全量 AG 套件）按 2026-10-28 裁定属里程碑档 pending，非本 work handoff 前置；review/merge 按受影响并集复核。
+
+2026-11-04 / stage: goal | plan_id: PLAN-043 | plan_revision: r1 | round: 9 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-043/auto-ui | commit: 3713e80b | next: work（T-06 SD候选/消费交接/源预算/未闭项 + 受影响并集终核）
+
+T-05 证据（5/10）：①SaveAs 搬迁——g12 运行中 stop 后 `saveas` 新根（场景+资产+脚本闭包随存），冷打开新根 → start → 双实例 + 绿像素 oracle 绿（同入口真 Run）。②坏件恢复闭环——新根 GLB 单字节损坏：load 具名拒绝（hash/identity）；修复原字节 → load+run 绿。③g13 闭包 PNG 中段字节损坏：拒绝 → 修复 → 双实例 spawn 绿（纹理闭包面同验）。④A→B 冷消费由验证器 cold regen（生产侧）+ 各 flow 测试冷载模式（消费侧）双覆盖；20 轮 owner 暖账 T-04 已证。flow 8/8。提交 3713e80b。
+
+2026-11-04 / stage: goal | plan_id: PLAN-043 | plan_revision: r1 | round: 8 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-043/auto-ui | commit: 7a0d6d93 | next: work（T-05 SaveAs/A→B冷消费/坏件恢复/真实受影响并集）
+
+T-04 完成证据（4/10，AC-02..05 work 面收口）：①V-S04 暖账——20 轮 start/6tick/stop：mesh_count 与 decode_attempts 全程平坦（注册表共享 GLB 身份，暖 decode/upload=0）；资源并集=单件 1528B（raw8 身份/单件 8MiB/总 32MiB/CPU/GPU 64MiB 原额内）；20 轮后文档逐字不变。②512 mesh denominator 边界两侧——合成 63/65-mesh 模板×8 槽 + base：521 在 with_project 首帧 prepare 具名拒绝（"resource limit: potential mesh instances 512"，比 play start 更早的收口点）；505 正常启动；invisible parked 模板行计入 denominator（负控语义在案）。③前片已证：fault 10/37/31/33、g14 角色轨迹对照（visible_only 收口）。flow 全文件 7/7。提交 7a0d6d93。
+
+2026-11-04 / stage: goal | plan_id: PLAN-043 | plan_revision: r1 | round: 7 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-043/auto-ui | commit: 6c910e14 | next: work（T-04 续：V-S04 资源并集/20轮owner/暖账 + 512 denominator 负控）
+
+T-04 轨迹对照证据（D-02 关闭，真实缺口实证）：g14-model-actor 夹具/产品（walker 角色 +x 每 tick 0.5 车道 z=-3.0；Crate 模板 parked 在车道 x=4.5 invisible；活实例 3.5 处 tick4 销毁）——variant（模板在路径）vs control（场景字节变异 park -30）首跑 **walker 冻结在 3.0**：定位至 driver `ag_char3_move` 对 `ag_move_and_slide(node, 0=visible_only, …)` 的冻结调用——滑扫对 ALL 3D 文档行（含 invisible parked 模板行）碰撞，模板视觉 AABB x∈[2.3,5.3] 罩住 walker。收口（043 范围内最小且对全部已交付内容可观察行为不变）：character3d_v1.at 滑扫 visible_only 0→1（跳过不可见行；头注记录 PLAN-043 收口）。对照复跑：逐 tick 轨迹逐位相等、走过模板/实例点无阻挡。受影响面回归全绿：runtime_flow 8/8（G07/G08 墙/支撑 oracle）、events_flow 7/7、basic 6/6、bindings 8/8、audio_hud 9/9、character3d api/host/samples 26/26、camera_host 12/12（首轮 1 瞬红复跑绿，环境归因）、043 controls 全绿。簿记：plan874/879 identity 中 character3d_v1.at 哈希外科更新；verify_plan874 在主检出同样因 `.gitattributes`（874 归档后删除）漂移而红——既有现象，非本 Plan 引入。提交 6c910e14。
+
+2026-11-04 / stage: goal | plan_id: PLAN-043 | plan_revision: r1 | round: 6 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-043/auto-ui | commit: c864c134 | next: work（T-04 续：角色轨迹非solid对照 + 资源并集/20轮owner实测）
+
+T-04 首片证据（预算/身份负控）：tests/node3d_model_objects_flow.rs 新增 model_objects_typed_budget_faults_are_named——对 g12 提交产物字节做 typed 变异经 SourceSnapshot 启动：①33rd credit→fault 10（tick 注入 31 个 ag_char3_move：角色 op 计费不占 object 写上限，2 object+31 char3=33>32 共享池）；②33rd lifecycle write→fault 37（Start 2 spawn+31 move=写#33，写上限先于计费——先注入 object.move 32 个会先撞 37，已实证区分）；③slot 8 spawn→fault 31；④despawn 后旧句柄再 move→fault 33（sticky 身份拒绝，等待环走到状态机 despawn 分支）。flow 全文件 4/4。提交 c864c134。
+
+2026-11-04 / stage: goal | plan_id: PLAN-043 | plan_revision: r1 | round: 5 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-043/auto-ui | commit: de7654b6 | next: work（T-04 真Auto/GPU/触发/角色对照/费用资源边界/变异负控）
+
+T-03 证据（3/10）：①平色+opaque 混装修复——model-objects-3d 入口对受检元数据按 kind 过滤（model3d 条目滤出→resolve 回落 sha256: 键；textured/animated 保留→closure 键+动画把守），034 presentation 档"元数据在案必须有 closure"冻结语义不动；g12 重生成于 plan043 身份（document_id/generator 切换，模板行仍 sha256: 键），g13 重生成一致。②gates 4/4（新增 B 面负控：animated3d 声明域拒绝（load 期需真实 GLB 字节）、模板 model/msg/on 在组合入口同样拒绝）。③`tools/verify_plan043.py --controls` 全绿：identity（generator/api/document_id/sha/closure/资源键/资产清单）、冷再生 A→resource-meta→B 双 pass 字节一致（平色也过公开导入面，0-closure 条目回落 sha 键）、突变敏感（pad x 场景行变、world.at 行为源稳定——字节稳定性质实证）、旧档冻结（028 g11-main 从闭包再生成字节一致，events 重构零影响）。④回归：043 gates 4/4 + 028 gates 7/7 + driver flow 3/3（产物身份切换后）。提交 de7654b6。
+
+2026-11-04 / stage: goal | plan_id: PLAN-043 | plan_revision: r1 | round: 4 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-043/auto-ui | commit: 388426d8 | next: work（T-03 永久入口/gates/负控硬化）
+
+T-02 收口证据（A/B 全链先证完成，任务勾 2/10）：
+
+- B 候选冻结为显式组合入口 **model-objects-3d**：pilot `lower_project_components3d_model_objects(project, meta)`（events 对象/触发/模板域 + 034 受检元数据；events 实现重构为 lower_events_impl 参数化 presentation/标签，028 出口传 None 字节不变——028 gates 7/7 复证）。animated3d.glb 声明整域具名拒绝（不删动画轨道伪装静态）；模板叶带 meta 时二次拒动画内容。CLI：`node2d-lower --profile model-objects-3d --entry main.at --out DIR`（pass A 产 resources-request.json）→ driver `resource_meta --entry <dir> --request ... --out resources.json` → `--resources resources.json`（pass B 产最终产品）。拒绝域：events 档 textured3d.glb 保持拒绝（gates 负控）；model-objects 档接受 textured/拒 animated；旧档零影响。
+- B 全链产品 g13-model-opaque：夹具 coin.glb（Kenney CC0，g10-textures 在库许可）+ Textures/colormap.png；生成物 Coin 模板行 resource=`closure:76657e13…`、文档资产带闭包（PNG sha/尺寸）、assets/ 侧车双文件；document_id plan043-model-objects-3d-main。
+- B driver 全链（tests/node3d_model_objects_flow.rs g13 用例）：Storage 准入（闭包 GLB+PNG 字节）→ 亮金像素 oracle（coin colormap 金 r224-255/g192-224/b64-96；pad 橙 g~140 与红 g~77 不在类）→ 双实例 spawn/move/hide/触发/despawn（亮金=0）/gen2 重生再暖。driver 运行时代码零改——instance 适配路径本就支持 closure 模型（探针实证：一次"渲染缺口"疑云最终定位为本测试 g13 生命周期误用 g12 产物之测试缺陷，修正后绿）。
+- 测试入口冻结：pilot gates `node3d_model_objects_gates`（3/3）+ driver flow `node3d_model_objects_flow`（3/3，--test-threads=1）；028 events gates 7/7 回归。提交 388426d8。
+- T-02 范围说明：有角色业务链（g11 式角色行走驱动 spawn）与非 solid 角色轨迹对照、32/33 credit 写预算边界属 T-04（§8 T-04 列"真Auto/GPU/触发/角色对照/费用资源边界"）；T-02 先证目标（A/B 路径可行性 + 入口冻结）已达成，D-01 关闭（opaque 必须走 closure 组合，实证 driver 旧 GLB 准入拒 images/textures）。
+
+2026-11-04 / stage: goal | plan_id: PLAN-043 | plan_revision: r1 | round: 3 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-043/auto-ui | commit: 8b36e0b8 | next: work（T-02 收口：B 候选 closure 组合入口设计冻结 + T-02 任务勾）
+
+T-02 A 候选 driver 全链先证（V-S02/V-S05 首证）：g12-model 生成物（scene.agscene 模板行 kind=model/resource=sha256:42c9…/parked false + assets/<sha>.glb 侧车 + world.at typed 端口）经真实消费链 Storage::load_project（资源字节 sha 准入）→ Host → Triggers3V1 装配 → 真 Auto 生命周期：Start 双实例（同模板 id、gen1、位置 [2,.5,0]/[6,.5,0]）→ move+hide+pad 触发 pair0（事件消费滞后作者一 tick，测试用阶段等待环兼容）→ despawn 后绿像素=0 且红色回落圆柱基线（真销毁/真隐藏变异 oracle：静态圆柱默认红不可改色，绿色作判别式）→ 同槽 gen2 重生资源共享再暖 → Stop/重开新 run 再渲染。负控：剥 resource 键→"model resource reference"；GLB 单字节篡改→"asset hash/length"。测试 tests/node3d_model_objects_flow.rs 2/2（GPU 单实例 --test-threads=1）。SDK 681 锁：prepare_sdk --from-snapshot PASS（verify_source 聚合器内 verify_plan013 历史漂移为在库既有现象，与本 Plan 无关）。回归：043 gates 3/3 + 028 events gates 7/7（fixture 重构后复跑）。提交 8b36e0b8。
+
+2026-11-04 / stage: goal | plan_id: PLAN-043 | plan_revision: r1 | round: 2 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-043/auto-ui | commit: e19bba1f | next: work（T-02 续：driver 全链先证 + B 候选 closure 组合入口冻结）
+
+T-02 中段证据（A 候选先证，pilot 半链）：①B 缺口实证——driver 旧 GLB 准入拒绝 images/textures/animations/skins（assets.rs:513-520），sha256: 平色链物理不可携带 opaque GLB → opaque 必须走 034 closure 组合（D-01 关闭方向）；events 档 textured3d.glb 声明拒绝面保持（gates 负控）。②pilot 接线：lower_components3d_events.rs 模板叶门禁扩 model3d（具名 resources.<name>，resolve_model_3d 平色 sha 键），TemplateRowIn.resource 接通；bindings 档未动。③夹具 g12-model（actor-free 哨兵角色 + Crate 模型模板 + 双槽同模板生命周期梯）+ 新 gates tests/node3d_model_objects_gates.rs 3/3（模板行 kind/resource/parked、typed spawn id 3 双槽、字节稳定、负控：未知资源/solid/参数绑定/model 状态块/textured 档域）。④回归 node3d_events_gates 7/7（028 旧档字节面不变）。提交 e19bba1f；依赖兄弟 .wt/ui-043/auto-lang @ f4062cca（clone --shared，仿 042 组内固定）。
+
+2026-11-04 / stage: goal | plan_id: PLAN-043 | plan_revision: r1 | round: 1 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-043/auto-ui | commit: 2a830d6c | next: work（T-02 A/B 全链先证）
 
 2026-11-04 / stage: new / plan_id: auto-ui/PLAN-043 / plan_revision: 1 / outcome: pass（合同可审阅，用户启动后T-01可进，T-03需T-02全链go） / next: work T-01。0/10。已有Model运行支持与Node builtin-only拒绝从Spec/代码核实，opaque模板完整链未先证。只规划，无树/材料scope/源码/资产/probe/canonical Spec/构建/GPU/agent，不接管AG016或扩大M2。
 
@@ -140,8 +199,8 @@ work产证；review同权威树不同上下文独立final，逐AC/diff/SD/遗漏
 
 | ID | 事项 | owner/关闭动作 |
 |---|---|---|
-| D-01 | 模型模板/opaque闭包跨034/035完整消费机制 | T-02全链先证后冻结，不足needs_replan，不把删拒绝充完成 |
-| D-02 | 静态model3d自动solid与模板非solid的交界 | T-02/04路径正负对照，必要新收口仅改新入口，不改原profile |
-| D-03 | 与044共享发射/元数据和未来内容升级 | T-01核owner短窗；AG016固定035/AG019既定门保持，新内容消费另约 |
+| D-01 | 模型模板/opaque闭包跨034/035完整消费机制 | **已闭**（2026-11-04 T-02/03）：实证 driver 旧 GLB 准入拒 images/textures/animations/skins（assets.rs:513-520），opaque 必须走 034 closure；model-objects-3d 组合入口全链实证（g13 GPU 亮金 oracle），driver 运行时代码零改 |
+| D-02 | 静态model3d自动solid与模板非solid的交界 | **已闭**（2026-11-04 T-04）：正负对照实证——ag_char3_move 滑扫 visible_only=0 时隐藏模板行阻挡行走（walker 冻结实证）；最小收口=滑扫跳过不可见行（SD-02，character3d_v1.at 0→1，已交付内容可观察行为不变，g14 轨迹逐位对照）；未改 028/030/034/035 在库产品语义 |
+| D-03 | 与044共享发射/元数据和未来内容升级 | T-01 已核 owner 短窗：044 为独立草案（docs/plans/044-*.md），本 Plan 不消费/不阻塞其发射面；AG016 固定 035/AG019 既定门保持，新内容消费另约（T-06 复核不变） |
 
 开工材料唯一`D:/autostack/plan-artifacts/plan-043/auto-ui/`，登记owner/用途/在途；临时probe/包/日志/外部消费者/外置target全归scope。merge摘要折Plan/全输出对账后清scope与构建物，仅具名未解决问题持有owner/理由/关闭条件。禁attachments/第二暂存区/链接；清树先fresh `bash D:/autostack/wt-guard.sh <路径>`，他仓同号与在途材料不动。
