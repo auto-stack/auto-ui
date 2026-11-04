@@ -1,0 +1,120 @@
+---
+plan_id: PLAN-048
+status: drafting
+feature_name: AGE基础UI Node与真实Auto事件接线
+author: [Codex]
+created_at: 2026-11-04
+updated_at: 2026-11-04
+plan_revision: 1
+current_step: 0
+total_steps: 10
+depends_on: [auto-ui/PLAN-020, auto-ui/PLAN-040]
+supersedes_spec_components: []
+new_spec_components: [docs/specs/auto-graphics/node-basic-ui.md]
+touched_goals: [GOAL-008]
+affects: [auto-ui-dialect, autographics-node2d-pilot, autographics-auto-driver, autographics-prototype]
+---
+
+# PLAN-048：基础UI Node声明、绑定与真实Auto事件
+
+## 0. 变更摘要
+
+在显式AGE新作者入口补普通`node { model/msg/view/on }`的基础UI：row/column/text/button，普通use/局部状态/事件/绑定/条件呈现；真实原生控件的按钮消息交真实Auto执行，显示绑定结果。先交付可独立运行的UI-only路径，后继049再接2D/3D嵌入。设计见[混合呈现补充设计](../design/autographics/m2-mixed-ui-2d-3d-composition.md)。本轮只规划，drafting/r1/0-10。
+
+## 1. 目标
+
+- 新Node普通view可用基础布局/文字/按钮，与model/msg/on和Life.Start/Tick内聚；导入同定义两个实例时局部状态、事件收件方隔离，重布局不重启逻辑。
+- 渲染真实Iced基础控件，交互→生成/链接的真实Auto on→更新UI绑定；Rust无计数/胜败等业务，禁止复刻PauseUi作为完成品。
+- 公共显式生成/消费/原生启动入口、严格身份/closure和冷消费可核，为049提供稳定UI内容adapter/输入与状态桥。
+
+非目标：混合图形接线本身（049）、生产widget全局退役/所有UI组件和主题、复杂文本编辑/IME、Vue/Web/mobile、Life.Frame、多呈现环境选择、ACE/AOT/HMR、新游戏、原Gallery升级、SDK替换。旧生产UiDialect/widget行为保持。
+
+## 2. 架构方案
+
+解析/模块→共同模型与基础ViewNode/事件表示→版本化UI产物＋闭包＋真实Auto用户逻辑→固定SDK Session与通用UI适配器→AGP/IcedSurface与原生窗口。尽量复用grammar/view/通用控件建造方式和表达式语义，不新造Auto解释器。pilot语言解析图与driver旧SDK图继续以版本化数据/生成源隔离，不把tip语言包和旧SDK塞同一Cargo图；可复用生产UI的纯表示/协议，不能未核依赖就直接链接整个runtime。
+
+拟唯一实施树`D:/autostack/.wt/ui-048/auto-ui`、`codex/plan-048-dev`；确需解析语言源的同组auto-lang只读detached固定已交付版本或明确源覆盖，禁链接。本轮不建。UI043在途，044与其它UI路线独立；共享AST/load/translate/main改动按owner短窗协调，不接管其树/材料。048不等AG019，后者已按原合同交付归档，不重开。
+
+## 3. 技术栈
+
+已存在：`crates/auto-ui-dialect/src/{node2d/{ast,parse}.rs,grammar/view.rs}`、pilot `src/{load,translate,lib,main}.rs`、driver `src/lib.rs::Session`、prototype `host/{iced_surface,surface_runtime}.rs`。新增UI profile/协议/adapter与专属测试（拟`node-ui`；最终拼写T-02冻结），沿真实Iced0.14/wgpu和原固定SDK681，不将HUD ASCII四槽当通用UI。
+
+## 4. 需求分析与背景调查
+
+用户2026-11-04确认M2包含新语法UI＋2D＋3D同应用，授权本轮核查/更新设计/分仓规划，暂不实施，不打断019。本Plan承担基础UI最小可交付切片；049负责组合，AG021负责综合示例/补充验收，非暗中提前所有生产UI融合。
+
+基线auto-ui`2a830d6c`；NodeDecl当前无普通view，Node研究域不入UiCode；grammar/view有生产ViewNode解析，039/040双出口只许二维marker/编辑项目；`SurfaceUi`当前Rust实现业务。Session调用仅Int/Float/Unit，动态文字不可当String返回已支持。Spec来源：`docs/specs/README.md`、`runtime/vm-route-page-loading.md`、`auto-graphics/{stateful-node-components,node2d-basic-authoring,node-authoring-consumption,node3d-queries-and-mixed-markers}.md`及语言仓`docs/specs/auto-graphics/surface-composition.md`（底层现有组合而非新Node支持）。UI无独立Node普通UI Spec，SD-01拟新增。
+
+源SHA256前16：node2d/ast e9bc5b47983674ef、parse 7d348e1dbb1b54c4、grammar/view 65566fc0ba5c3d84、pilot/load ba29abf6e510f471、driver/lib 4db69f9748a97c88、iced_surface 3570f98ed67062d9。旧SDK=`7b987ca8b12f2eec3c076a1bfbf3ff4663aa8467`/681；AG019 delivery3daf2eb固定引擎fc82061c/语言2f558fc9，作为历史对照，不预填048最终工具SHA。
+
+## 5. 详细设计
+
+T-01按上述实际路径盘点现有AST/属性与事件约定、UI renderer/VM可复用纯接口和SDK依赖图；记录旧profile冻结集合、资源owner和窗口/输入政策。
+
+T-02最多两种等价机制的完整先证：导入两个同定义计数组件→真实button鼠标/键盘激活→各自Auto handler改变本实例值→真实Iced文字/可用态更新，外部副本冷读同一产物。至少静态中文标签＋动态整数/布尔格式化。仅标量Session可采用有界getter/字符序列协议等已证明机制；禁止假定String ABI、只解析/静态像素即go。冻结支持语法/属性/事件拼写（优先现有UI约定）、版本化产物/API/profile、可用/拒绝输入、文字与队列容量、错误/恢复和来源链；后续实质接线依此go。机制无法证明则needs_replan，不暗换SDK/写Rust业务。
+
+声明支持row/column/text/button、有限尺寸/间距/边距、文字/可用态与条件绑定、普通use、model基础int/bool/常量UTF-8文字与Auto格式化、msg匿名本地事件和既有`.Event`/子事件绑定；不添加按业务名识别规则。条件卸载执行已定Node实例生命周期并屏蔽旧事件，重新出现是新实例；普通属性/layout更新保本实例状态。Life.Start每实例一次、Tick每逻辑步一次，重绘/layout不得代Tick。无输入不依靠空Tick去刷新虚假按钮状态。
+
+事件由原生控件生成，携owner/实例/Run代次按稳定次序进入有界队列；未知事件、错目标、陈旧消息与超界有受控诊断，不能静默派到同名组件或无限追加。业务只写Auto model/on/helper；UI呈现从一次已接受状态读取，失败保旧可用呈现/明确相关域错误，不扩大到无关世界。
+
+保持原32credits/同owner回调、8有状态Node与旧VM/物理/场景/资源界；新UI结构、文字、事件队列明确记账，T-02给出owner→世界→VM→配额表和可测支持范围，不按导入数/控件/VM复制原预算。容量边界的正例/超界拒绝必须真实；不因基础UI阶段没有物理而抬其它服务预算。旧生产widget与旧AG profile不会自动选新入口、生成/拒绝/计费不漂移。
+
+拟新增验证入口：pilot `tests/node_ui_gates.rs`、driver `tests/{node_ui_flow,node_ui_storage}.rs`、pilot `tools/verify_plan048.py --controls`（均T-03..06使其可运行）。源码/真实ABI/manifest/source-build、UI结构/控件文本与实际点击/键盘、VM状态和GPU画面分别观察；永久夹具在专属fixture目录，临时探针/报告在scope。
+
+### 规范增量
+
+| delta_id | add/modify/retire | docs/specs/... target | before/after rule | rationale | acceptance IDs |
+|---|---|---|---|---|---|
+| SD-01 | add | docs/specs/auto-graphics/node-basic-ui.md | Node无UI出口→显式基础UI Node/真实Auto消息/绑定、边界/身份与恢复；旧生产widget不退役 | M2-10的基础作者/执行链 | AC-01..06 |
+
+## 6. 测试设计
+
+以下均为待实施入口。执行者实现/自检，final为同树独立上下文；不预设model、不在new创建agent。只测真实触面；若动共享ViewNode/UI解析需补受影响生产dialect/UI compiler完整职责测试和现有widget正常/错误对照，不仅跑新夹具。driver测试单进程`--test-threads=1`、GPU/窗口焦点机器单实例。OS自动化现政策保持，真实窗口输入用手工脚本取证或另有明确授权后自动化；离屏注入不得充原生输入证据。
+
+| case | AC | owner_stage | 输入/实际入口与可区分oracle | 边界 |
+|---|---|---|---|---|
+| V-S01 | AC-01/02 | work | 两模块两个同定义组件；node_ui_flow真实点击A两次/B一次→Auto状态2/1且各文字像素改变；对照改Auto增量后变4/2，Rust无业务常量 | 原生控件＋固定SDK，不是Rust View模拟 |
+| V-S02 | AC-02/03 | work | 鼠标/Tab＋Enter、禁用按钮/点击外部、错目标/旧Run/队列界；实际派发至目标一次，未消费者不变化，错误受控 | 手工原生与离屏分别记，未证不pass |
+| V-S03 | AC-03/04 | work | if卸载/新实例、resize重排、Start/Tick计数和Stop/新Run20轮；同实例重绘状态保持，旧消息拒绝，last-owner UI targets/VM释放可核 | 无强制单VM、不以RSS代owner |
+| V-S04 | AC-01/05 | work | node_ui_gates合法/缺use/错属性/事件/非有限size/超界文字或队列＋边界正例；错误定位至模块/Node，旧widget和旧AG档对照不变 | 容量先T-02冻结，不改旧拒绝 |
+| V-S05 | AC-05/06 | work | verify_plan048 --controls＋node_ui_storage：A→B只闭包/固定源重建，改模块旧Ready失效，坏manifest/源码拒绝→精确修复→下一实际Run恢复 | 不借生产者缓存/新SDK |
+| V-S06 | AC-04/06 | work | 冻结source/SDK681/两图锁与原预算，真实glyph/队列/目标和旧档生成对照；SD候选/公共CLI运行配方可复验 | 不跑无关全AG/GPU套件 |
+
+## 7. 验收标准
+
+| AC | owner_stage | 可观察关闭条件 | 验证 |
+|---|---|---|---|
+| AC-01 | work | 基础UI Node、use/绑定/文字/语法和ABI有完整先证与公开入口，非仅AST | V-S01/04 |
+| AC-02 | work | 真实按钮→Auto on→本实例状态/实际控件输出；多实例和键鼠路由正确 | V-S01/02 |
+| AC-03 | work | 条件/布局与Start/Tick/Run寿命正确，输入陈旧隔离和错误策略明确 | V-S02/03 |
+| AC-04 | work | owner/队列/文字/原预算有边界与实测，无Rust业务/无限配额或泄漏 | V-S03/06 |
+| AC-05 | work | 固定SDK/两图/身份/旧生产与AG档兼容，负控真实拒绝 | V-S04/05 |
+| AC-06 | work | 冷消费/源码改变/坏件修复下次Run闭环及SD候选齐，未证新原生门不冒pass | V-S05/06 |
+| AC-07 | review | 同树独立final逐AC/SD/实际反例核验pass，修复同员受影响复核 | T-07 |
+| AC-08 | merge | 冻结门和源核后实际落主、canonical/同号归档与048可供049消费身份齐 | T-08/09 |
+| AC-09 | merge | 全输出对账/摘要折Plan/fresh guard清树/自有scope清理，具名hold登记 | T-10 |
+
+## 8. 执行步骤
+
+| T | owner_stage | 依赖 | 写面/可验证结果 | AC | 进度 |
+|---|---|---|---|---|---|
+| T-01 | work | 用户另行启动；独立于043/044/019 | 真实源/Spec/SDK/owner/旧档/政策盘点，唯一树/scope登记 | AC-01/05 | [ ] |
+| T-02 | work | T-01 | 最多两机制完整按钮→Auto→UI＋冷读先证，冻结语法/ABI/队列文字与费用表；不成立则replan | AC-01..06 | [ ] |
+| T-03 | work | T-02 go | dialect/模块/基础UI表示与入口，保旧档解析/生成/错误 | AC-01/05 | [ ] |
+| T-04 | work | T-03 | 真实Auto事件/实例/绑定/条件寿命和Iced通用adapter，UI-only公共窗口 | AC-02..04 | [ ] |
+| T-05 | work | T-04 | 新命名gates/flow/真实键鼠与负控、owner/原预算及旧档受影响并集 | AC-02..05 | [ ] |
+| T-06 | work | T-05 | closure/版本化消费/冷A→B修复下次Run、verify_plan048、SD候选与源码实例配方 | AC-05/06 | [ ] |
+| T-07 | review | T-06 | 同树独立final，finding返work同员有界复核 | AC-07 | [ ] |
+| T-08 | merge | T-07 pass | 冻结定向门/来源核后实际落主，review版本差异逐项核 | AC-08 | [ ] |
+| T-09 | merge | T-08 | canonical/同号归档/公开消费身份与导航，049只读交付不追tip | AC-08 | [ ] |
+| T-10 | merge | T-09 | fresh guard清自有树、所有实际输出对账/清scope构建物、具名hold登记 | AC-09 | [ ] |
+
+## 9. 复审记录
+
+2026-11-04 / stage: new / PLAN-048:r1 / outcome: pass（执行合同可审阅，未来启动后T-01可进入；T-02决策门在前），next: work T-01，仅待用户后续实施指令。本轮不实施/建树/材料scope/探针、未构建或运行UI/GPU、未改043/044/019合同/SDK/资产/canonical。10任务未勾，0/10；不是独立final或功能已支持的声明。
+
+2026-11-04 / stage: new / planning_validation: pass（仅合同/来源核查）。四份当前合同0..10节、各10T（work6/review1/merge3）/9AC/6V-S/1SD与owner_stage齐、任务全未勾，依赖按仓限定无环（UI048→049→AG021→020），本地号唯一/next UI050、AG022；暂存白名单42个新增/修改本地链接可解析，三仓白名单空白检查通过。现有`python tools/gallery.py validate --all` exit0，12逻辑/22入口/许可保持；019归档SHA前16=1d8e991170ec3969、canonical=601a457ab52edfec逐字节未变。未构建/执行任何新profile/窗口/GPU或故障探针；新UI/混合应用验证均待work，不能当已实现证据。没有新实施树/应用目录/scope/目录迁移/agent；保留其它路线WIP，未改源码/资产/SDK/消费锁或任何归档合同。
+
+## 10. 待澄清事项
+
+D-01：具体基础UI属性/事件拼写、UTF-8/队列容量及标量ABI文字传输由T-02完整链冻结，优先现有约定，不凭草图当已实现；失败replan。D-02：原生键鼠/焦点取证按当时OS政策/手工流程具名核，拿不到不省AC。D-03：共享文件owner按开工核，不接管043或其它树。临时材料唯一`D:/autostack/plan-artifacts/plan-048/auto-ui/`，开工登记owner/用途/在途；外部B/SDK副本/target/探针/日志均scope，不散落项目或attachments。merge摘要折Plan后全部路径对账删scope/构建物，仅具名问题owner/理由/关闭条件可持有；跨仓同号不混。禁止worktree链接，清树先fresh `bash D:/autostack/wt-guard.sh <路径>`。

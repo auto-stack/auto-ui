@@ -1,6 +1,6 @@
 # AGE声明、组件、绑定与事件作者模型
 
-> **2026-11-04 AGE命名与当前状态**：正式名Auto Graphics Engine（AGE），品牌AutoGraphics Engine；AG/AutoGraphics为历史别名。见[命名决议](age-naming-and-content-repository.md)。内容仓仍为ag-examples，[020目录更名](../../../../ag-examples/docs/plans/020-age-examples-repository-rename.md)仅规划，默认M2/AG019实际交付后实施；不改作者语义、原预算或历史交付身份。 当前AG016/017/018均已交付，活Node源22/22；AG019同版联验已executing/r1/1-10（原owner实施），旧日期段落保留为快照。
+> **2026-11-04 当前M2补齐路线**：M2现明确包含新语法基础UI＋2D＋3D同应用组合，新增M2-10；[能力核查/补齐设计](m2-mixed-ui-2d-3d-composition.md)拆为UI048基础UI→049混合引擎→AG021综合示例，均仅规划。AG019已交付3daf2eb并归档，原候选fc82061c/旧合同/holds不改，不据此声称扩展M2完成；043在途、044可选不作本链前置。AGE命名沿[决议](age-naming-and-content-repository.md)，内容目录仍ag-examples；020 r2默认019＋021及扩展M2必需门收口后维护窗口更名，历史号/交付身份保持。
 
 2026-10-30；目标与要求回归 v3。本文承接用户本日对 AG-001 的走读和设计纠偏，恢复最初的作者模型；不是新增实施 Plan，也不声明语法、模块装配或 ACE 集成已实现。新设计归 auto-ui，Gallery 内容归 ag-examples；历史设计与现状 Specs 仍在 auto-lang。
 
@@ -105,3 +105,6 @@ JSON 是当前原型便于保存/验证的选择，没有“可审计所以只�
 [840 §3/4.2/5.2](../../../../auto-lang/docs/plans/archive/840-autographics-public-behavior-api-and-user-scripts.md)将单文件定义为首版切片：SDK 有模块服务，消费者尚未验证其装配/诊断链，因此不读取未快照依赖；没有证明多模块不可验证。[854](../../../../auto-lang/docs/plans/archive/854-autographics-behavior-source-assembly.md)的“可审计”指内部受信装配的来源/顺序/错误可追查，不是新的产品定位，也不能倒推840的禁 use是长期要求。此前外部讨论纪要的“可审计 agent 代码运行时”解释不作为产品需求依据。
 
 本轮仅修订设计/要求/导航，不取 Plan 号，不建实施树、生成源码/资产或运行项目测试，不修改在途实现/合同、旧 profile 数学/预算/故障行为或交付状态。预算抽象单位、完整数值语义仍需在语言/执行合同专题继续收敛；不因本轮纠偏就宣称已解决或修改固定 SDK。
+
+
+2026-11-04 M2验收收敛：普通UI布局嵌入view-2d/view-3d属于M2-10必需组合，不再全部归“生产UI融合等ACE后”的后置项。首期基础UI限row/column/text/button及绑定/事件/布局输入，完整生产组件/主题与跨端仍后置；同Node局部状态、use、多实例和一次Tick沿原AG-A要求，实际能力以048/049交付后验证，不凭目标文档称已实现。

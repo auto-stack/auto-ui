@@ -19,7 +19,7 @@
 
 ## 迁移时机与编号
 
-唯一执行合同为[ag-examples/020](../../../../ag-examples/docs/plans/020-age-examples-repository-rename.md)，内容侧设计见[更名设计](../../../../ag-examples/docs/design/age-examples-rename.md)。默认在**M2统一版本联验AG019实际交付后**选择维护窗口，再按后续执行指令实施；020是019的后继，不能反过来成为019/M2的新前置。旧M1已经有历史交付，不能据此现在自动迁移。若后续明确选择其它里程碑窗口，再修订020的时机。
+唯一目录迁移合同为[ag-examples/020](../../../../ag-examples/docs/plans/020-age-examples-repository-rename.md)，内容侧设计见[更名设计](../../../../ag-examples/docs/design/age-examples-rename.md)。默认在**019＋021实际交付且扩展M2必需门收口后**选择维护窗口，再按后续执行指令实施；020是019/021的后继，不能反过来成为它们的前置。旧M1已经有历史交付，不能据此现在自动迁移。若后续明确选择其它里程碑窗口，再修订020的时机。
 
 迁移保留同一`.git`、refs/交付对象、所有用户工作内容和计划号源。旧`ag-examples/PLAN-NNN`/AG-NNN作为历史身份保留；新责任路径可写`age-examples/PLAN-NNN`，别名指向同一计划，不另建一份合同。本仓001..020不重编号，`.next-id`连续；auto-ui编号独立，互不重置。
 
@@ -33,4 +33,4 @@
 
 ## 当前路线快照
 
-2026-11-04：AG016完整3D（55c39a2）、AG017三维查询（273b070）、AG018双维编辑教程（4cb297d）均已落主/归档，Gallery活Node源22/22；两完整游戏与Gallery仍需AG019（executing/r1/1-10，原owner）的同版/M2原分母联验，OS/旧runner/声学等具名证据边界保持。UI043/044是可选引擎后继，不追加当前M2前置。020 drafting/r1/0-10，本轮无迁移、构建、应用注册或发布动作。
+2026-11-04：016/017/018与019均已交付，Gallery22/22；019只形成原合同边界内本地候选。用户新增明确M2-10：新语法基础UI/2D/3D同应用组合，见[补齐设计](m2-mixed-ui-2d-3d-composition.md)，048/049/AG021仅规划；020已修订r2/0-10，目录仍ag-examples，默认扩展M2收口后的维护窗口。

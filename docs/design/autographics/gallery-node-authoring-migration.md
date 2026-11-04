@@ -2,9 +2,9 @@
 
 2026-10-31，设计 v1；2026-11-03更新交付进度。作者模型沿[总体设计](declarative-authoring-model.md)，已迁移入口能力分别沿[017 Spec](../../specs/auto-graphics/node2d-g11-authoring.md)与[019 Spec](../../specs/auto-graphics/node2d-basic-authoring.md)。本文件归 auto-ui；Gallery 合同在各自仓管理。
 
-2026-11-04最新核验：AG016完整G3交付55c39a2，AG017 G05/3d交付273b070、AG018 G04双维交付4cb297d，均已归档/清树。12项22入口活Node源**22/22**，两完整游戏不计Gallery分母；AG019同版/M2联验已executing/r1/1-10。上游034/035/039/AG015同会话final、旧runner及OS/声学具名边界继续按原收据核，不能用迁移完成抹平。
+2026-11-04最新核验：AG016完整G3交付55c39a2，AG017 G05/3d交付273b070、AG018 G04双维交付4cb297d，均已归档/清树。12项22入口活Node源**22/22**，两完整游戏不计Gallery分母；AG019旧合同候选已交付3daf2eb，不称M2完成。上游034/035/039/AG015同会话final、旧runner及OS/声学具名边界继续按原收据核，不能用迁移完成抹平。
 
-当前优先级见[M2路线](m2-game-first-three-lane-roadmap.md)：AG019按原合同核候选与必需证据；UI043/044为可选后继。采用Auto Graphics Engine（AGE），详[命名决议](age-naming-and-content-repository.md)；ag-examples目录仍不变，020更名仅规划、默认M2/019后维护窗口。
+当前优先级见[M2路线](m2-game-first-three-lane-roadmap.md)：AG019按原合同核候选与必需证据；UI043/044为可选后继。采用Auto Graphics Engine（AGE），详[命名决议](age-naming-and-content-repository.md)；ag-examples目录仍不变，020更名仅规划、默认019＋021及扩展M2必需门收口后维护窗口。
 
 ## 目标与现场
 
@@ -75,3 +75,6 @@ auto-ui 017的g11-2d模式仍要求恰一个character2d，solid/camera限根，�
 本次更新命名/当前22/22与既有交付导航，仅规划020；不改源码/锁/原验收，不建实施树/探针/素材、不构建/跑GPU。游戏交付不改变Gallery分母。
 
 2026-11-04可选引擎后继：[UI043模型对象模板](../../plans/043-autographics-node3d-model-object-templates.md)、[UI044源诊断](../../plans/044-autographics-node-source-diagnostics.md)仅规划；不增加当前017/018/019前置、不改活锁/迁移分子，后续内容显式升级另约。
+
+
+新M2-10混合应用见[补齐设计](m2-mixed-ui-2d-3d-composition.md)：048→049→AG021仅规划，22/22不是基础UI混用证明；新综合例在showcases/，原Gallery分母不变。

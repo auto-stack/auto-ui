@@ -1,10 +1,10 @@
 # AGE M2编辑教程与同版发行收口
 
-> **2026-11-04 AGE命名与当前状态**：正式名Auto Graphics Engine（AGE），品牌AutoGraphics Engine；AG/AutoGraphics为历史别名。见[命名决议](age-naming-and-content-repository.md)。内容仓仍为ag-examples，[020目录更名](../../../../ag-examples/docs/plans/020-age-examples-repository-rename.md)仅规划，默认M2/AG019实际交付后实施；不改作者语义、原预算或历史交付身份。 当前AG016/017/018均已交付，活Node源22/22；AG019同版联验已executing/r1/1-10（原owner实施），旧日期段落保留为快照。
+> **2026-11-04 当前M2补齐路线**：M2现明确包含新语法基础UI＋2D＋3D同应用组合，新增M2-10；[能力核查/补齐设计](m2-mixed-ui-2d-3d-composition.md)拆为UI048基础UI→049混合引擎→AG021综合示例，均仅规划。AG019已交付3daf2eb并归档，原候选fc82061c/旧合同/holds不改，不据此声称扩展M2完成；043在途、044可选不作本链前置。AGE命名沿[决议](age-naming-and-content-repository.md)，内容目录仍ag-examples；020 r2默认019＋021及扩展M2必需门收口后维护窗口更名，历史号/交付身份保持。
 
 > 2026-11-04现场更新：UI040已交付fc82061c/独立final/canonical/清理齐，原OS层15项仍D-02 pending；AG016已executing3/10固定035，AG017/018/019草案。UI043/044仅为可选引擎后继，不新增本批M2前置，见[资源组件/诊断设计](node-resource-components-and-source-diagnostics.md)。下文保2026-11-03立约快照，实际消费以各合同/交付证据为准。
 
-2026-11-03 v1，target-state。用户要求提出并规划下一批；[UI040](../../plans/archived/040-autographics-node-editor-projects.md)、[AG018](../../../../ag-examples/docs/plans/018-autographics-gallery-node-editor-tutorials.md)、[AG019](../../../../ag-examples/docs/plans/019-autographics-m2-unified-release-validation.md)均drafting/r1/0-10，本轮不实施/建树/探针/素材/构建/GPU/OS自动化/agent/发布。保原预算/玩法/全部验收，不为凑三份任务另造功能。
+2026-11-03 v1，target-state。用户要求提出并规划下一批；[UI040](../../plans/archived/040-autographics-node-editor-projects.md)、[AG018](../../../../ag-examples/docs/plans/018-autographics-gallery-node-editor-tutorials.md)、[AG019](../../../../ag-examples/docs/plans/archived/019-autographics-m2-unified-release-validation.md)均drafting/r1/0-10，本轮不实施/建树/探针/素材/构建/GPU/OS自动化/agent/发布。保原预算/玩法/全部验收，不为凑三份任务另造功能。
 
 ## 1. 当前证据与剩余分母
 
