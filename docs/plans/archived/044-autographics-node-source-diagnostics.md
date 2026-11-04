@@ -181,3 +181,6 @@ cleaned（T-10 实证）：wt-guard clean → worktree D:/autostack/.wt/ui-044/a
 | D-04 | 043公共发射交叠/M2固定消费 | T-01核owner短窗；043非前置，当前内容/AG019候选规则不变 |
 
 开工材料唯一`D:/autostack/plan-artifacts/plan-044/auto-ui/`，登记owner/用途/在途；临时probe/包/原始诊断/外部消费者/外置target全归scope。merge摘要折Plan后全输出对账/删scope构建物，仅具名未解决问题持有owner/理由/关闭条件。禁attachments/第二暂存区/链接，清树先fresh guard，不动其它同号仓scope和在途材料。
+
+
+2026-11-04 / stage: goal | plan_id: PLAN-044 | plan_revision: 1 | round: 14 | from: merge | to: done | status: archived | outcome: pass | worktree: removed | commit: 9bf9874a (delivery) / 3420d0e8 (final bookkeeping) | next: done。**最终收据**：Plan PLAN-044 r1 交付完成——delivery 9bf9874a（ff-only，range-diff 13 代码提交全等价）；canonical docs/specs/auto-graphics/node-source-diagnostics.md（sha256 e8b56140…7dc70）；归档 docs/plans/archived/044-autographics-node-source-diagnostics.md（status archived，10/10）；清理：worktree+分支+组目录（含 auto-lang 只读兄弟）全删、wt-guard clean、plan-artifacts/plan-044 全删、registry 记 deletions 零 hold；主检出干净（他会话 WIP 原状保留，误扫已在 ef8bc233 还原）；landing 检查：无生产消费者（显式观察），批次回归 N/A（auto-lang 专属）。关键交付：Node 生成链可选源映射（--diagnostics-map / node-source-map/v1 / 五档精度 / 双锚受检消费 / loader 受检绑定 / verify_plan044 控制），真实全链先证 broken.at:8:16，SDK681 span 语义冻结事实（D-05）。
