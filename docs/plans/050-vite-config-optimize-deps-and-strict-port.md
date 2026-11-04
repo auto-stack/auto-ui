@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-04
 updated_at: 2026-11-04
 plan_revision: 1
-current_step: 0
+current_step: 4
 total_steps: 5
 depends_on: []
 supersedes_spec_components: []
@@ -98,15 +98,17 @@ Rust（auto-ui-tools）；serde_json（已在依赖）；vite 配置模板字符
 
 ## 8. 执行步骤
 
-- [ ] T-01（owner_stage=work；依赖无；AC-01）：模板签名与 include/strictPort 发射 + write_project_files 接线；B-01/B-02/B-03 单测。
-- [ ] T-02（owner_stage=work；依赖T-01；AC-01）：run_vue.rs 自愈路径 package.json 解析接线 + B-04 三分支单测。
-- [ ] T-03（owner_stage=work；依赖T-01/02；AC-02）：`cargo t -p auto-ui-tools` 全组回归（B-05）+ `-p auto-ui-compiler project_files` 未漂移确认。
+- [x] T-01（owner_stage=work；依赖无；AC-01）：模板签名与 include/strictPort 发射 + write_project_files 接线；B-01/B-02/B-03 单测。[✅ 已完成 2026-11-04] `generate_vite_config(npm_dep_keys: &[String])`：非空键集发射 `optimizeDeps{include:[…]}`（serde_json 转义），空集整体省略；`host: '127.0.0.1'`+`strictPort: true` 恒发射；write_project_files 传 `extra_deps`（:2520 遮蔽集=package.json 同源）。
+- [x] T-02（owner_stage=work；依赖T-01；AC-01）：run_vue.rs 自愈路径 package.json 解析接线 + B-04 三分支单测。[✅ 已完成 2026-11-04] `package_json_dep_keys()` 读磁盘 dependencies 键集；解析失败/缺字段=保留原 config+具名警告不中断 run；`Some` 才重写。
+- [x] T-03（owner_stage=work；依赖T-01/02；AC-02）：`cargo t -p auto-ui-tools` 全组回归（B-05）+ `-p auto-ui-compiler project_files` 未漂移确认。[✅ 已完成 2026-11-04] 新增 4 单测全绿；全组 `-p auto-ui-tools --lib` 203/203 绿（5 基线红：display_reader_v01_corpus、gallery_demo_row_routable、try_full_parse_018_api、shell_pack_lib_freshness、plan_662_gallery_apps_dir_layouts——均经 stash 回 base 实证同败，与本改动无关）；`-p auto-ui-compiler` test_generate_project_files 1/1 绿（旧副本未动）。
 - [ ] T-04（owner_stage=review；依赖T-03/05；AC-04）：同树独立上下文最终复审。
-- [ ] T-05（owner_stage=work；依赖T-01；AC-03）：host 有界评估决策稿 + §9 具名结论。
+- [x] T-05（owner_stage=work；依赖T-01；AC-03）：host 有界评估决策稿 + §9 具名结论。[✅ 已完成 2026-11-04] 结论=**发射 `host: '127.0.0.1'`**（并入 T-01）。探针 4 组（vite 5.4.21 实测，plan-artifacts/plan-050/host-probe/DECISION.md）：strictPort 单独不闭 E-4a——127.0.0.1 被占仍静默绑 ::1 同端口报 ready（curl ::1→200 实证）；host 固定后占用=具名失败 EXIT=1（CLI 与 config 形双验）、空闲=localhost 经双栈回落 200、tauri webview（localhost: URL）兼容、Local: 行由歧义变明确。
 
 ## 9. 复审记录
 
 - stage: new | plan_id: PLAN-050 | plan_revision: r1 | outcome: pass（授权已在 §4 记录：消费方用户 2026-11-04 拍板路线①） | next: work（T-01/T-02 可立即开工；T-05 评估可与 T-01 并行）。
+
+stage: work | plan_id: PLAN-050 | plan_revision: r1 | outcome: pass（T-01/T-02/T-03/T-05 完成，execution_done 待 T-04 复审） | worktree_path: D:/autostack/.wt/ui-050/auto-ui | branch: codex/plan-050-dev | base_commit: da252a98 | code_commit: 1a9131fc | dependency_revisions: auto-lang f6b0f918d（master，detached 同级）、auto-web 3de5524（master，detached 同级）、auto-down 7c4d5cb（HEAD，detached 同级） | task_ids: T-01、T-02、T-03、T-05（T-04=review 所有） | evidence: 新增 4 单测全绿（vite_config include/omit/deterministic+quoting、package_json_dep_keys 三态）；全组 nextest `-p auto-ui-tools --lib` 203/203 绿、5 基线红 stash 回 base 实证同败；`-p auto-ui-compiler` test_generate_project_files 1/1 绿；host 探针 4 组（DECISION.md：strictPort 单独 E-4a 复现→host 固定具名失败/localhost 回落兼容）；SD-01 spec 草案在树（docs/specs/build/generated-vite-config.md，merge 时发布） | blockers: 无 | next_responsible_role: review（T-04 同树独立上下文最终复审；统一回归门=复审/merge 按仓档位）
 
 ## 10. 待澄清事项
 
