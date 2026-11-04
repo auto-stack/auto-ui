@@ -11,6 +11,7 @@ dist/
 build/
 examples/
 .am/
+deps/
 tests/node_modules/
 tests/test-results/
 tests/playwright-report/

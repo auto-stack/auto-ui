@@ -93,7 +93,7 @@ widget SettingsPanel(dark_mode: bool, accent_color: str, on_close: msg, on_toggl
                     button "" {
                         onclick: .SetPink
                         style: if .accent_color == "pink" {
-                            "w-6 h-6 p-0 rounded-full bg-pink-500 ring-2 ring-offset-2 ring-offset-zinc-900 ring-pink-500 cursor-pointer shadow-sm"
+                            "w-6 h-6 p-0 rounded-full bg-pink-500 ring-2 ring-offset-2 ring-offset-card ring-pink-500 cursor-pointer shadow-sm"
                         } else {
                             "w-6 h-6 p-0 rounded-full bg-pink-500 hover:scale-110 transition-transform cursor-pointer"
                         }
@@ -101,7 +101,7 @@ widget SettingsPanel(dark_mode: bool, accent_color: str, on_close: msg, on_toggl
                     button "" {
                         onclick: .SetIndigo
                         style: if .accent_color == "indigo" {
-                            "w-6 h-6 p-0 rounded-full bg-indigo-500 ring-2 ring-offset-2 ring-offset-zinc-900 ring-indigo-500 cursor-pointer shadow-sm"
+                            "w-6 h-6 p-0 rounded-full bg-indigo-500 ring-2 ring-offset-2 ring-offset-card ring-indigo-500 cursor-pointer shadow-sm"
                         } else {
                             "w-6 h-6 p-0 rounded-full bg-indigo-500 hover:scale-110 transition-transform cursor-pointer"
                         }
@@ -109,7 +109,7 @@ widget SettingsPanel(dark_mode: bool, accent_color: str, on_close: msg, on_toggl
                     button "" {
                         onclick: .SetOcean
                         style: if .accent_color == "ocean" {
-                            "w-6 h-6 p-0 rounded-full bg-sky-500 ring-2 ring-offset-2 ring-offset-zinc-900 ring-sky-500 cursor-pointer shadow-sm"
+                            "w-6 h-6 p-0 rounded-full bg-sky-500 ring-2 ring-offset-2 ring-offset-card ring-sky-500 cursor-pointer shadow-sm"
                         } else {
                             "w-6 h-6 p-0 rounded-full bg-sky-500 hover:scale-110 transition-transform cursor-pointer"
                         }
@@ -117,7 +117,7 @@ widget SettingsPanel(dark_mode: bool, accent_color: str, on_close: msg, on_toggl
                     button "" {
                         onclick: .SetSage
                         style: if .accent_color == "sage" {
-                            "w-6 h-6 p-0 rounded-full bg-emerald-500 ring-2 ring-offset-2 ring-offset-zinc-900 ring-emerald-500 cursor-pointer shadow-sm"
+                            "w-6 h-6 p-0 rounded-full bg-emerald-500 ring-2 ring-offset-2 ring-offset-card ring-emerald-500 cursor-pointer shadow-sm"
                         } else {
                             "w-6 h-6 p-0 rounded-full bg-emerald-500 hover:scale-110 transition-transform cursor-pointer"
                         }
@@ -125,7 +125,7 @@ widget SettingsPanel(dark_mode: bool, accent_color: str, on_close: msg, on_toggl
                     button "" {
                         onclick: .SetAmber
                         style: if .accent_color == "amber" {
-                            "w-6 h-6 p-0 rounded-full bg-amber-500 ring-2 ring-offset-2 ring-offset-zinc-900 ring-amber-500 cursor-pointer shadow-sm"
+                            "w-6 h-6 p-0 rounded-full bg-amber-500 ring-2 ring-offset-2 ring-offset-card ring-amber-500 cursor-pointer shadow-sm"
                         } else {
                             "w-6 h-6 p-0 rounded-full bg-amber-500 hover:scale-110 transition-transform cursor-pointer"
                         }

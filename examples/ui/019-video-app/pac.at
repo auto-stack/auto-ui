@@ -13,3 +13,10 @@ accent: "pink"
 dep stylekit {
     path: "../stylekit"
 }
+
+# PLAN-045 T-03：接入官方主题包（C-13）。pac 显式 theme/accent 键保留
+# （019 既有默认 dark/pink；pink 属应用自定义 accent 面，官方表外回退 indigo），
+# 族/模式选择经根 widget theme_name + design 数据绑定。
+dep themes {
+    path: "../../../packages/themes"
+}

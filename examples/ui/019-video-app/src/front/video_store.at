@@ -1,6 +1,8 @@
 // video_store.at — VideoApp shared store (k1 pattern).
 // Holds video list, category/tab/search state, loading state,
-// and dual-backend theme states (dark_mode & accent_color).
+// and settings panel visibility.
+// PLAN-045 T-03：dark_mode/accent_color 主题魔法变量已上移根 widget（App model +
+// design 块），store 只留业务状态与设置面板显隐。
 
 use back.api: list_videos, categories, Video
 
@@ -12,8 +14,6 @@ store VideoStore {
         var active_tab str = "recommend"
         var query str = ""
         var loading bool = false
-        var dark_mode bool = true
-        var accent_color str = "pink"
         var show_settings bool = false
     }
 
@@ -22,8 +22,6 @@ store VideoStore {
         SetCategory(str),
         SetTab(str),
         SetQuery(str),
-        ToggleDarkMode,
-        SetAccent(str),
         ToggleSettings,
         CloseSettings,
     }
@@ -50,12 +48,6 @@ store VideoStore {
             .query = q
             let filter_cat = if .active_category == "All" { "" } else { .active_category }
             .videos = list_videos(filter_cat, .active_tab, q)
-        }
-        .ToggleDarkMode -> {
-            .dark_mode = !.dark_mode
-        }
-        .SetAccent(a str) -> {
-            .accent_color = a
         }
         .ToggleSettings -> {
             .show_settings = !.show_settings

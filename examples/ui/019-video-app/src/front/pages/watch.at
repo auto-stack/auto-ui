@@ -109,11 +109,7 @@ widget watch {
 
                                 // Video Description Card
                                 col {
-                                    style: if .store.dark_mode {
-                                        "p-4 rounded-xl bg-card border border-border gap-2 text-sm text-muted-foreground"
-                                    } else {
-                                        "p-4 rounded-xl bg-muted border border-border gap-2 text-sm text-foreground"
-                                    }
+                                    style: "p-4 rounded-xl bg-card border border-border gap-2 text-sm text-muted-foreground"
                                     text "About this video" { style: "text-xs font-bold text-foreground uppercase tracking-wider" }
                                     text .video.desc { style: "leading-relaxed" }
                                 }
@@ -136,11 +132,7 @@ widget watch {
                                     for rel in .related {
                                         row {
                                             onclick: .OpenRelated(rel.id)
-                                            style: if .store.dark_mode {
-                                                "gap-3 p-2 rounded-xl bg-card/80 border border-border/80 hover:border-border transition-colors cursor-pointer group"
-                                            } else {
-                                                "gap-3 p-2 rounded-xl bg-card border border-border/80 hover:border-border transition-colors cursor-pointer group"
-                                            }
+                                            style: "gap-3 p-2 rounded-xl bg-card/80 border border-border/80 hover:border-border transition-colors cursor-pointer group"
 
                                             // Mini thumbnail
                                             col {
