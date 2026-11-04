@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-044
-status: executing
+status: execution_done
 feature_name: AutoGraphicsNode多模块源码定位与分层诊断
 author: [Codex]
 created_at: 2026-11-04
 updated_at: 2026-11-04
 plan_revision: 1
-current_step: 5
+current_step: 6
 total_steps: 10
 depends_on: [auto-ui/PLAN-020, auto-ui/PLAN-030, auto-ui/PLAN-035, auto-ui/PLAN-040]
 supersedes_spec_components: []
@@ -124,7 +124,7 @@ work产证；review同树独立上下文final，从真实compile/Run复核AC/SD/
 | T-03 | work | T-02 go | 可选origin/旁件/loader接受身份/snapshot分层展示/gates，默认字节保持 | AC-01..04 | [x] 2026-11-04：origin=pooled/helper+Life handler+Member recv 唯一属主段；旁件+CLI 冻结；loader 接受身份接线 `SourceMap::load_for_world`（world+map+closure 三样受检物，缺/坏一律 None 走默认路径）；snapshot 分层展示=sdk_diagnostic_mapped 双锚（span 锚+符号锚）+runtime 无 span/managed 永不映射门；默认字节保持=verify_plan044 控制一（真实进程）+建图纯函数门。pilot gates 12/12、driver 7/7、verify 5 控制全绿。 |
 | T-04 | work | T-03 | 真实compile/runtime/managed/无span与身份/UTF8/变异，非伪错误文本日志 | AC-01..05 | [x] 2026-11-04：真实 compile（符号锚 broken.at:8:16）、runtime 无 span/managed 永不映射/generated 永不映射、假行文本负控（错误文本内嵌行号不信任）、符号多出现不猜、UTF8+组合符+CRLF 列/行独立重算、变异拒用全家、原错误文本保持。pilot 13/13、driver 8/8、verify 5 控制、回归全绿。 |
 | T-05 | work | T-04 | 资源上界/字节步数等价、保存A→B/坏map下次恢复与受影响旧门 | AC-04/05 | [x] 2026-11-04：上界实测重冻结（max(64KiB,4×world)+4MiB+16384 段，worst ratio 3.42）；8KiB 截断 mapped 路径门；debug 有无 world/API 字节等价（verify 控制一）+ VM 步数等价结构性事实（map 只在诊断回调消费、不入 Session、无每 Tick IO）；A→B 搬迁等价消费 + 坏图拒用→修复→下次诊断恢复映射；受影响旧门全绿（components 6/6、3d-audio-hud 26、3d-basic 8、game 3）。 |
-| T-06 | work | T-05 | SD候选/可选消费接口/覆盖精度及限制交接，不加M2前置 | AC-05/06 | [ ] |
+| T-06 | work | T-05 | SD候选/可选消费接口/覆盖精度及限制交接，不加M2前置 | AC-05/06 | [x] 2026-11-04：SD-01 候选 `docs/specs/auto-graphics/node-source-diagnostics.md`（worktree 8dc830d1；范围/精度模型/旁件绑定/双锚消费/分层/SDK681 span 冻结事实/预算等价/入口/§8 origin 接入合同）；M2/ACE 触面零（diff 全量核 0 文件）。 |
 | T-07 | review | T-06 | 同树独立final与finding修复后同员复核 | AC-07 | [ ] |
 | T-08 | merge | T-07 pass | 冻结定向门/来源核后实际落master | AC-08 | [ ] |
 | T-09 | merge | T-08 | canonical/归档/导航与可选固定身份核验 | AC-08 | [ ] |
@@ -157,6 +157,8 @@ work产证；review同树独立上下文final，从真实compile/Run复核AC/SD/
 2026-11-04 / stage: goal | plan_id: PLAN-044 | plan_revision: 1 | round: 10 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-044/auto-ui | commit: 6f3e5922 | next: work T-05（续）。**T-05 实测重冻结（D-02 关闭）**：旁件体积实测 n=32/128/256 helper × pad 6/12/30——map/world ratio 3.42/3.33/1.08/2.22，段数=2n+1，json 增量随 n 稳定（非超线性）。旧 T-02 常数上限 64KiB/4096 段会暗删 256KiB 合法域（worst 映射 ~870KiB），重冻结：driver 载入界 = max(64KiB, 4×world) 比率界 + 4MiB 绝对界 + 16384 段界（6f3e5922 双侧同步）；超限分类=整图拒用→generated fallback，不截断。pilot gates 14/14、driver 8/8、verify 5 控制复跑绿。
 
 2026-11-04 / stage: goal | plan_id: PLAN-044 | plan_revision: 1 | round: 11 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-044/auto-ui | commit: 57c7f264 | next: work T-06。**T-05 关闭（5/10）**：①8KiB 截断 mapped 路径门（20KiB 错误消息 → broken.at 前缀保持 + 截断标记 + <9KiB）。②V-S06：坏图拒用→精确修复→下次诊断恢复映射（同包全链路）；A→B 搬迁同字节等价消费（来源无关，相对包结构）。③debug 有无等价：world/API 字节等价=verify 控制一实测；VM 步数/费用/帧等价=结构事实（map 仅在 SDK compile 诊断回调消费，不入 Session 状态、零运行期钩子、无每 Tick IO——sdk_diagnostic_mapped 不改变 VM 路径）；音画等价=无呈现触面改动。④受影响旧门：load.rs 触面 3D 回归（audio-hud 26/26、3d-basic 8/8）+ game 3/3 + components 6/6 全绿。driver gates 10/10、verify 5 控制复跑绿。
+
+2026-11-04 / stage: work | plan_id: PLAN-044 | plan_revision: 1 | outcome: pass | worktree_path: D:/autostack/.wt/ui-044/auto-ui | branch: codex/plan-044-dev | base_commit: d176f85f | code_commit: 8dc830d1 | dependency_revisions: auto-lang 兄弟检出 detached da884ab2b（只读，.sdk-source 自物化） | task_ids: T-01..T-06 | evidence: pilot gates 14/14（node_source_map_gates）、driver gates 10/10（node_source_diagnostics --test-threads=1）、verify_plan044.py --controls 5/5、受影响回归 components 6/6 + 3d-audio-hud 26/26 + 3d-basic 8/8 + game 3/3 + behavior_source_identity 1/1 | blockers: 无 | next_responsible_role: review（同树独立上下文 final；统一回归/里程碑档归 review/merge 并集）。工作侧 AC 结果：AC-01 定位正确+精度明示（helper 符号锚 broken.at:8:16 全链 + handler context 不互串门）；AC-02 分层保原 stage/8KiB（compile/runtime/managed/generated 门）；AC-03 无 span 不编造/错 map 拒用/fallback 不覆盖原错误（负控全家）；AC-04 互绑/UTF8/CRLF/磁盘变化/旧 Run/修复恢复；AC-05 有界重冻结/等价/A→B/旧门绿；AC-06 SD/CLI/schema/精度矩阵/origin 合同齐。未决：无 in-contract gap；统一回归显式 pending（owner=review/merge）。
 
 ## 10. 待澄清事项
 
