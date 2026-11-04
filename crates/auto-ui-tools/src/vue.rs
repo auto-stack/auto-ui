@@ -1009,15 +1009,35 @@ const on_contextmenu = (e: MouseEvent) => {
     .to_string()
 }
 
-pub fn generate_vite_config() -> String {
+pub fn generate_vite_config(npm_dep_keys: &[String]) -> String {
     // AUTO_HTTP_PORT lets multiple `auto run` instances coexist; default 8080.
     let _proxy_target = format!("http://127.0.0.1:{}", crate::util::http_port());
+    // PLAN-050 T-01: pre-bundle the project's declared dependencies on cold
+    // dev start. Vite's import scan only sees statically reachable bare
+    // imports; lazily imported chains (e.g. an SFC importing mermaid) are
+    // missed, and their CJS interop deps then break at runtime. Emitted keys
+    // are exactly the package.json dependency set both write paths feed in,
+    // so include can never reference an uninstalled package. Empty set = omit
+    // the whole `optimizeDeps` key (standalone projects keep the old shape).
+    let optimize_deps_block = if npm_dep_keys.is_empty() {
+        String::new()
+    } else {
+        let mut entries = String::new();
+        for key in npm_dep_keys {
+            let literal = serde_json::to_string(key)
+                .unwrap_or_else(|_| format!("\"{}\"", key.replace('"', "")));
+            entries.push_str("    ");
+            entries.push_str(&literal);
+            entries.push_str(",\n");
+        }
+        format!("  optimizeDeps: {{\n    include: [\n{entries}    ],\n  }},\n")
+    };
     r#"import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { resolve } from 'path'
 
 export default defineConfig({
-  base: './',
+__OPTIMIZE_DEPS__  base: './',
   plugins: [vue()],
   resolve: {
     alias: {
@@ -1036,6 +1056,15 @@ export default defineConfig({
   server: {
     // AUTO_FRONT_PORT (default 3000) lets multiple `auto run` instances coexist.
     port: Number(process.env.AUTO_FRONT_PORT || 3000),
+    // PLAN-050: a taken port must fail loudly (named, nonzero) — never
+    // silently increment (can land on the backend port, split-brain) or
+    // rebind on the other protocol stack while reporting ready. Pinning the
+    // host closes the same-port stack-move (strictPort alone still let vite
+    // bind ::1 and report ready while 127.0.0.1 was taken); localhost URLs
+    // keep working via the OS dual-stack fallback (probe evidence:
+    // plan-artifacts/plan-050/host-probe, vite 5.4.21).
+    host: '127.0.0.1',
+    strictPort: true,
     // Only auto-open browser when NOT running under Tauri
     // Tauri sets TAURI_ENV before running vite
     open: !process.env.TAURI_ENV,
@@ -1061,7 +1090,20 @@ export default defineConfig({
     }
   }
 })
-"#.replace("__PROXY_PORT__", &crate::util::http_port().to_string())
+"#.replace("__OPTIMIZE_DEPS__", &optimize_deps_block)
+        .replace("__PROXY_PORT__", &crate::util::http_port().to_string())
+}
+
+/// PLAN-050 T-02: keys of `package.json` `dependencies` — the emit source for
+/// the run-time vite.config.ts self-heal, keeping `optimizeDeps.include`
+/// identical to the installed dependency set (hand-edits and historical
+/// projects included). `None` = file missing, unparsable, or without a
+/// `dependencies` object; the caller then keeps the original config and warns.
+pub fn package_json_dep_keys(project_dir: &std::path::Path) -> Option<Vec<String>> {
+    let raw = fs::read_to_string(project_dir.join("package.json")).ok()?;
+    let value: serde_json::Value = serde_json::from_str(&raw).ok()?;
+    let deps = value.get("dependencies")?.as_object()?;
+    Some(deps.keys().cloned().collect())
 }
 
 fn generate_tsconfig() -> String {
@@ -2551,7 +2593,11 @@ fn write_project_files(
     ensure_editor_bridge(output_path, usage)?;
 
     // vite.config.ts
-    let vite_config = generate_vite_config();
+    // PLAN-050: emit source = the shadowed `extra_deps` (:2520), i.e. the
+    // exact dependency set written to package.json above — include keys stay
+    // ⊆ installed even after the Plan-482 engine derivation.
+    let npm_dep_keys: Vec<String> = extra_deps.iter().map(|(n, _)| n.clone()).collect();
+    let vite_config = generate_vite_config(&npm_dep_keys);
     fs::write(output_path.join("vite.config.ts"), vite_config)
         .map_err(|e| format!("Failed to write vite.config.ts: {}", e))?;
 
@@ -11295,6 +11341,83 @@ import { AlertDialogAction } from '@/components/ui/alert-dialog'
             parse_npm_deps("npm_deps: [\"marked@^12.0.0\"]"),
             vec![("marked".to_string(), "^12.0.0".to_string())]
         );
+    }
+
+    /// PLAN-050 B-01/B-03: non-empty key set emits `optimizeDeps.include`
+    /// with every key as a legal TS string literal, and the server block
+    /// always carries `host: '127.0.0.1'` + `strictPort: true`.
+    #[test]
+    fn vite_config_includes_npm_deps_and_strict_port() {
+        let keys = vec![
+            "mermaid".to_string(),
+            "lowlight".to_string(),
+            "katex".to_string(),
+        ];
+        let cfg = generate_vite_config(&keys);
+        assert!(cfg.contains("optimizeDeps: {"));
+        assert!(cfg.contains("include: ["));
+        for key in &keys {
+            let literal = serde_json::to_string(key).unwrap();
+            assert!(cfg.contains(&literal), "missing literal {literal}");
+        }
+        assert!(cfg.contains("host: '127.0.0.1'"));
+        assert!(cfg.contains("strictPort: true"));
+    }
+
+    /// PLAN-050 B-02: empty key set omits the whole `optimizeDeps` key
+    /// (standalone projects keep the pre-PLAN-050 shape apart from the
+    /// server hardening) and never emits a bare `include: []`.
+    #[test]
+    fn vite_config_omits_optimize_deps_when_no_npm_deps() {
+        let cfg = generate_vite_config(&[]);
+        assert!(!cfg.contains("optimizeDeps"));
+        assert!(!cfg.contains("include: ["));
+        assert!(cfg.contains("host: '127.0.0.1'"));
+        assert!(cfg.contains("strictPort: true"));
+    }
+
+    /// PLAN-050 B-01 (boundary): emission is deterministic and survives
+    /// keys needing JSON escaping — output stays a legal TS string literal.
+    #[test]
+    fn vite_config_is_deterministic_and_quotes_safely() {
+        let keys = vec!["@autodown/editor".to_string(), "mermaid".to_string()];
+        assert_eq!(generate_vite_config(&keys), generate_vite_config(&keys));
+        let cfg = generate_vite_config(&["we\"ird".to_string()]);
+        assert!(cfg.contains("\"we\\\"ird\""));
+    }
+
+    /// PLAN-050 B-04: `package_json_dep_keys` reads the `dependencies` keys;
+    /// unparsable JSON, a missing `dependencies` object, and a missing file
+    /// all yield `None` (caller keeps the original config and warns).
+    #[test]
+    fn package_json_dep_keys_three_branches() {
+        let dir = std::env::temp_dir().join(format!("plan050-dep-keys-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+
+        // Missing file
+        assert!(package_json_dep_keys(&dir).is_none());
+
+        // Corrupt JSON
+        fs::write(dir.join("package.json"), "{ not json").unwrap();
+        assert!(package_json_dep_keys(&dir).is_none());
+
+        // Valid JSON without dependencies
+        fs::write(dir.join("package.json"), r#"{"name":"x"}"#).unwrap();
+        assert!(package_json_dep_keys(&dir).is_none());
+
+        // Normal: keys only, versions ignored
+        fs::write(
+            dir.join("package.json"),
+            r#"{"dependencies":{"mermaid":"^11.0.0","@autodown/editor":"link:D:/p/editor"},"devDependencies":{"vite":"^5.0.0"}}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            package_json_dep_keys(&dir).unwrap(),
+            vec!["mermaid".to_string(), "@autodown/editor".to_string()]
+        );
+
+        let _ = fs::remove_dir_all(&dir);
     }
 
     /// Plan 465 T3: build-time desktop registry — the render:"vue" filter
