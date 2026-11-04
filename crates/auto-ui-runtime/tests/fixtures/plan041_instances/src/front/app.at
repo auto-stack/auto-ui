@@ -15,18 +15,25 @@ use p041_store: P041Store
 widget P041Host {
     msg {
         Init,
+        ToggleB,
+        SwapKeys,
     }
 
     model {
         var host_marker str = "host-shell"
+        var show_b bool = true
+        var key_a str = "a"
+        var key_b str = "b"
     }
 
     view {
         col {
             style: "w-full gap-2 p-4"
             text "host above counters"
-            Counter (key: "a", start: 10) { }
-            Counter (key: "b", start: 20) { }
+            Counter (key: .key_a, start: 10) { }
+            if .show_b {
+                Counter (key: .key_b, start: 20) { }
+            }
             text "host below counters"
         }
     }
@@ -34,6 +41,12 @@ widget P041Host {
     on {
         Init -> {
             print("[p041] host init")
+        }
+        .ToggleB -> { .show_b = !.show_b }
+        .SwapKeys -> {
+            let tmp = .key_a
+            .key_a = .key_b
+            .key_b = tmp
         }
     }
 }

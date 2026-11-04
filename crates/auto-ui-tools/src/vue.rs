@@ -12177,7 +12177,7 @@ styles: ["src/front/autodown-editor.css", "src/front/theme.css"]
     #[test]
     fn test_generate_main_ts_imports_style_files() {
         let styles = vec!["autodown-editor.css".to_string(), "theme.css".to_string()];
-        let main_ts = generate_main_ts(false, false, &styles, &I18nConfig::default(), &[]);
+        let main_ts = generate_main_ts(false, false, &styles, &I18nConfig::default(), &[], true);
         assert!(
             main_ts.contains("import './styles/autodown-editor.css'"),
             "main.ts:\n{}",
@@ -12190,7 +12190,7 @@ styles: ["src/front/autodown-editor.css", "src/front/theme.css"]
         );
 
         // Without styles: no imports, same as before.
-        let plain = generate_main_ts(false, false, &[], &I18nConfig::default(), &[]);
+        let plain = generate_main_ts(false, false, &[], &I18nConfig::default(), &[], false);
         assert!(!plain.contains("./styles/"), "main.ts:\n{}", plain);
     }
 
@@ -12246,7 +12246,7 @@ styles: ["src/front/autodown-editor.css", "src/front/theme.css"]
             ],
         };
         let locales = vec!["en.json".to_string(), "zh.json".to_string()];
-        let main_ts = generate_main_ts(false, false, &[], &cfg, &locales);
+        let main_ts = generate_main_ts(false, false, &[], &cfg, &locales, false);
         // PLAN-063 Phase B T13b (KD 061 D29): 实例移独立模块,main.ts 只 import。
         assert!(
             main_ts.contains("import { i18n } from './i18n-instance'"),
@@ -12280,13 +12280,13 @@ styles: ["src/front/autodown-editor.css", "src/front/theme.css"]
         assert!(instance.contains("locale: 'en'"), "instance:\n{}", instance);
         // 未启用 i18n:模块空,main.ts 无 import。
         assert!(generate_i18n_instance_ts(&I18nConfig::default(), &[]).is_empty());
-        let plain = generate_main_ts(false, false, &[], &I18nConfig::default(), &[]);
+        let plain = generate_main_ts(false, false, &[], &I18nConfig::default(), &[], false);
         assert!(!plain.contains("i18n-instance"));
     }
 
     #[test]
     fn test_generate_main_ts_no_i18n_when_disabled() {
-        let main_ts = generate_main_ts(false, false, &[], &I18nConfig::default(), &[]);
+        let main_ts = generate_main_ts(false, false, &[], &I18nConfig::default(), &[], false);
         assert!(
             !main_ts.contains("vue-i18n"),
             "main.ts should not mention i18n:\n{}",

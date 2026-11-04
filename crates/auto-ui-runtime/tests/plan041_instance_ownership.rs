@@ -105,6 +105,121 @@ fn t02_keyed_same_type_children_own_props_model_and_share_store() {
     );
 }
 
+/// V-03 (AC-01/03): keyed reorder keeps instance identity — the count lives
+/// with the KEY, not the visual position.
+#[test]
+fn t04_keyed_reorder_keeps_instance_identity() {
+    use auto_ui_runtime::ui::interpreter::DynamicMessage;
+    let mut comp = build_fixture();
+    let _ = render_debug(&mut comp); // frame1: A + B mounted
+
+    comp.on(DynamicMessage::TypedInst {
+        widget_name: "Counter".into(),
+        event_name: "Inc".into(),
+        args: vec![],
+        instance: "/Counter#a".into(),
+    });
+    let id_a = |dc: &auto_ui_runtime::ui::dynamic::DynamicComponent| {
+        dc.bridge()
+            .read_instance_state("/Counter#a", "count")
+            .expect("A live")
+    };
+    assert_eq!(id_a(&comp), auto_val::Value::Int(1));
+
+    // Swap the call-site keys: A and B exchange visual positions.
+    comp.call_widget_handler("P041Host", "SwapKeys", &[]).expect("SwapKeys");
+    let after = render_debug(&mut comp);
+    assert!(
+        after.contains("content: \"10\"") && after.contains("content: \"20\""),
+        "both instances render after reorder: {}",
+        snip(&after)
+    );
+    // The count followed the key: A still owns count=1.
+    assert_eq!(id_a(&comp), auto_val::Value::Int(1), "A identity survives reorder");
+    // B stayed untouched by A's Inc.
+    assert_eq!(
+        comp.bridge()
+            .read_instance_state("/Counter#b", "count")
+            .expect("B live"),
+        auto_val::Value::Int(0)
+    );
+}
+
+/// V-05 (AC-03): unmount releases ONLY the target; the surviving instance
+/// keeps operating; remount is a fresh instance; a late event to the
+/// released identity is dropped (no redirect).
+#[test]
+fn t04_unmount_releases_target_survivor_continues_late_event_dropped() {
+    use auto_ui_runtime::ui::interpreter::DynamicMessage;
+    let mut comp = build_fixture();
+    let _ = render_debug(&mut comp); // A + B live
+
+    comp.on(DynamicMessage::TypedInst {
+        widget_name: "Counter".into(),
+        event_name: "Inc".into(),
+        args: vec![],
+        instance: "/Counter#a".into(),
+    });
+    assert_eq!(
+        comp.bridge().read_instance_state("/Counter#a", "count").unwrap(),
+        auto_val::Value::Int(1)
+    );
+
+    // Close B: its state object is released (identity gone).
+    comp.call_widget_handler("P041Host", "ToggleB", &[]).expect("ToggleB");
+    let _ = render_debug(&mut comp);
+    assert!(
+        comp.bridge().child_instance_state_id("/Counter#b").is_none(),
+        "released B must drop out of the instance registry"
+    );
+    assert!(
+        comp.bridge().child_instance_state_id("/Counter#a").is_some(),
+        "A must survive B's close"
+    );
+
+    // Late event to the released identity: dropped, no redirect.
+    comp.on(DynamicMessage::TypedInst {
+        widget_name: "Counter".into(),
+        event_name: "Inc".into(),
+        args: vec![],
+        instance: "/Counter#b".into(),
+    });
+    assert!(
+        comp.bridge().child_instance_state_id("/Counter#b").is_none(),
+        "late event must not resurrect/re-target the released identity"
+    );
+
+    // Survivor continues operating.
+    comp.on(DynamicMessage::TypedInst {
+        widget_name: "Counter".into(),
+        event_name: "Inc".into(),
+        args: vec![],
+        instance: "/Counter#a".into(),
+    });
+    assert_eq!(
+        comp.bridge().read_instance_state("/Counter#a", "count").unwrap(),
+        auto_val::Value::Int(2)
+    );
+
+    // Remount B: fresh instance (Vue v-if semantics — no state inheritance).
+    comp.call_widget_handler("P041Host", "ToggleB", &[]).expect("ToggleB");
+    let after = render_debug(&mut comp);
+    assert!(
+        comp.bridge().child_instance_state_id("/Counter#b").is_some(),
+        "B remounts as a new instance"
+    );
+    assert!(
+        after.contains("content: \"0\""),
+        "remounted B starts fresh (count=0): {}",
+        snip(&after)
+    );
+    // A unchanged by the remount.
+    assert_eq!(
+        comp.bridge().read_instance_state("/Counter#a", "count").unwrap(),
+        auto_val::Value::Int(2)
+    );
+}
+
 fn snip(s: &str) -> String {
     let mut out = s.chars().take(1600).collect::<String>();
     if out.len() < s.len() {
