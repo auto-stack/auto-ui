@@ -1408,6 +1408,7 @@ fn generate_main_ts(
     style_files: &[String],
     i18n: &I18nConfig,
     locale_files: &[String],
+    project_has_stores: bool,
 ) -> String {
     let autodown_css = if uses_autodown {
         "\nimport '@autodown/engine/style.css'"
@@ -1495,13 +1496,24 @@ Prism.languages.auto = {{
     // PLAN-646: Select Anything overlay — dev-only dynamic import (Vite
     // tree-shakes the DEV=false branch (and this module) from prod builds).
     let select_overlay = "\n// PLAN-646: Select Anything overlay (dev-only; tree-shaken from prod builds).\nif (import.meta.env.DEV) {\n  import('./auto-select/overlay')\n}\n";
+    // PLAN-041 T-03: per-App store context — every createApp mount provides
+    // its own context so same-name Apps never share store module state.
+    let mut store_ctx_import = String::new();
+    let mut store_ctx_install = String::new();
+    if project_has_stores {
+        store_ctx_import =
+            "import { installAutoStoreContext } from './stores/__autoStoreContext'\n".to_string();
+        store_ctx_install = "installAutoStoreContext(app)\n".to_string();
+    }
     format!(
-        "{base}{i18n_setup}{router_import}\n\nconst app = createApp(App)\n{app_use_i18n}{app_use_router}app.mount('#app')\n{select_overlay}\n",
+        "{base}{i18n_setup}{router_import}{store_ctx_import}\nconst app = createApp(App)\n{app_use_i18n}{app_use_router}{store_ctx_install}app.mount('#app')\n{select_overlay}\n",
         base = base,
         i18n_setup = i18n_setup,
         router_import = router_import,
+        store_ctx_import = store_ctx_import,
         app_use_i18n = app_use_i18n,
         app_use_router = app_use_router,
+        store_ctx_install = store_ctx_install,
         select_overlay = select_overlay,
     )
 }
@@ -2572,7 +2584,11 @@ fn write_project_files(
     let uses_autodown = extra_deps
         .iter()
         .any(|(name, _)| name == "@autodown/editor" || name == "@autodown/engine");
-    let main_ts = generate_main_ts(has_routes, uses_autodown, style_files, i18n, locale_files);
+    // PLAN-041 T-03: provide the per-App store context iff the project has
+    // stores (the compiler drain writes src/stores/ before assembly).
+    let project_has_stores = output_path.join("src").join("stores").is_dir();
+    let main_ts =
+        generate_main_ts(has_routes, uses_autodown, style_files, i18n, locale_files, project_has_stores);
     // PLAN-063 Phase B T13b (KD 061 D29): i18n 实例独立模块随 main.ts 落盘。
     let i18n_instance_ts = generate_i18n_instance_ts(i18n, locale_files);
     if !i18n_instance_ts.is_empty() {
@@ -5324,6 +5340,7 @@ export default router
             &style_copies,
             &self.i18n,
             &locale_copies,
+            !self.store_files.is_empty(),
         );
         // PLAN-063 Phase B T13b (KD 061 D29): i18n 实例独立模块。
         let i18n_instance_content = generate_i18n_instance_ts(&self.i18n, &locale_copies);
@@ -5504,6 +5521,7 @@ export default router
             &style_copies,
             &self.i18n,
             &locale_copies,
+            !self.store_files.is_empty(),
         );
         // PLAN-063 Phase B T13b (KD 061 D29): i18n 实例独立模块。
         let i18n_instance_content = generate_i18n_instance_ts(&self.i18n, &locale_copies);
@@ -10288,6 +10306,9 @@ export function createAppRouter() {{
 import { createApp } from 'vue'
 import App from './App.vue'
 import { createAppRouter } from './router'
+// PLAN-041: fresh per-mount store context — two same-name demo Apps never
+// share store module state.
+import { installAutoStoreContext } from './stores/__autoStoreContext'
 
 export default App
 
@@ -10298,6 +10319,7 @@ export function mount(el: HTMLElement) {
     console.error('[DemoEntry] runtime error:', err)
   }
   app.use(createAppRouter())
+  installAutoStoreContext(app)
   app.mount(el)
 }
 export function unmount() {

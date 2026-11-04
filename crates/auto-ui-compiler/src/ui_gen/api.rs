@@ -796,6 +796,46 @@ pub fn generate_component_from_file(
         }
     }
 
+    // PLAN-041 T-03: per-App store context module — emitted once whenever
+    // any store exists. Entry/mount generation imports
+    // `installAutoStoreContext` from here (`stores/__autoStoreContext`).
+    {
+        let has_stores = !store_composables.is_empty();
+        if has_stores {
+            let ctx_path = "stores/__autoStoreContext.ts".to_string();
+            let already = store_composables.iter().any(|(f, _)| *f == ctx_path);
+            if !already {
+                let ctx_src = r#"// PLAN-041: per-App store context — one per createApp mount.
+// Two same-name Apps never share store module state; same-App consumers
+// share their App's single instance per store (plan §5.2 contract 3).
+export interface AutoStoreContext {
+  use(name: string, factory: () => any): any
+}
+
+export const AUTO_STORE_CONTEXT_KEY = '__autoStoreContext'
+
+export function createAutoStoreContext(): AutoStoreContext {
+  const stores = new Map<string, any>()
+  return {
+    use(name: string, factory: () => any) {
+      if (!stores.has(name)) stores.set(name, factory())
+      return stores.get(name)
+    },
+  }
+}
+
+export function installAutoStoreContext(app: { provide(key: string, value: unknown): void }): void {
+  app.provide(AUTO_STORE_CONTEXT_KEY, createAutoStoreContext())
+}
+"#;
+                store_composables.push((ctx_path.clone(), ctx_src.to_string()));
+                auto_lang_core::STORE_EXTRA_FILES.with(|cell| {
+                    cell.borrow_mut().push((ctx_path, ctx_src.to_string()));
+                });
+            }
+        }
+    }
+
     // Register view fn fragments before widget extraction (Plan 367 P2-3)
     crate::aura::extract::clear_view_fragments();
     for stmt in ast.domain_stmts() {
@@ -1832,10 +1872,15 @@ store BetaStore {
             .iter()
             .map(|(f, _)| f.as_str())
             .collect();
+        // PLAN-041 T-03: the per-App store context module rides along.
         assert_eq!(
             names,
-            vec!["stores/useAlphaStore.ts", "stores/useBetaStore.ts"],
-            "both stores must be emitted, got: {:?}",
+            vec![
+                "stores/useAlphaStore.ts",
+                "stores/useBetaStore.ts",
+                "stores/__autoStoreContext.ts"
+            ],
+            "both stores + context module must be emitted, got: {:?}",
             names
         );
 
@@ -1972,7 +2017,8 @@ store NotesLikeStore {
             .expect("store file must generate");
         auto_lang_core::drain_store_extra_files(); // keep thread-local clean for other tests
 
-        assert_eq!(result.store_composables.len(), 1);
+        // PLAN-041 T-03: store file + context module.
+        assert_eq!(result.store_composables.len(), 2);
         let (filename, code) = &result.store_composables[0];
         assert_eq!(filename, "stores/useNotesLikeStore.ts");
         assert!(
@@ -2079,7 +2125,8 @@ store Cart {
             .expect("consumer store must generate");
         auto_lang_core::drain_store_extra_files(); // keep thread-local clean for other tests
 
-        assert_eq!(result.store_composables.len(), 1);
+        // PLAN-041 T-03: store file + context module.
+        assert_eq!(result.store_composables.len(), 2);
         let (_, code) = &result.store_composables[0];
         assert!(
             code.contains("import { useInventoryStore } from './useInventoryStore'"),

@@ -165,10 +165,15 @@ impl VueGenerator {
         use crate::ui_gen::ts_adapter::{transpile_handler_body, AuraTsContext};
 
         let mut code = String::new();
+        // PLAN-041 T-03: context-aware composable — per-App store instances
+        // resolve through the App store context; legacy mounts fall back to
+        // the module singleton (named legacy boundary, SD-02).
         if store.watchers.is_empty() {
-            code.push_str("import { ref } from 'vue'\n");
+            code.push_str("import { ref, getCurrentInstance, inject } from 'vue'\n");
         } else {
-            code.push_str("import { ref, watch } from 'vue'\n");
+            code.push_str(
+                "import { ref, watch, getCurrentInstance, inject } from 'vue'\n",
+            );
         }
         // API functions used in handler bodies (from `use back.api`).
         // Streaming endpoints (~Stream<T>) are consumed via SSE in this composable,
@@ -205,6 +210,22 @@ impl VueGenerator {
                 sibling, sibling
             ));
         }
+        // PLAN-041 T-03: per-App factory — every piece of store STATE
+        // (refs, watchers, sibling facades, SSE/timer guards) is emitted
+        // inside `create{Name}Store()`; `use{Name}Store()` resolves one
+        // instance per App context (same-App sharing preserved, cross-App
+        // isolated). Module-level singleton remains only as the legacy
+        // fallback for mounts that provide no context.
+        let factory_stem = store
+            .name
+            .strip_suffix("Store")
+            .filter(|s| !s.is_empty())
+            .unwrap_or(&store.name);
+        let factory_name = format!("create{}Store", factory_stem);
+        code.push_str(&format!(
+            "// PLAN-041: one instance per App context (createApp mount).\nexport function {}(): any {{\n",
+            factory_name
+        ));
         if !store.sibling_stores.is_empty() {
             code.push_str("import { reactive } from 'vue'\n");
             for sibling in &store.sibling_stores {
@@ -389,7 +410,6 @@ impl VueGenerator {
             }
             code.push('\n');
         }
-        code.push_str(&format!("export function {}(): any {{\n", fn_name));
 
         // Plan 043 cat-3: declare actions as const arrow functions BEFORE the
         // return object, so sibling actions can call each other by bare name.
@@ -654,6 +674,24 @@ impl VueGenerator {
             code.push_str("    }\n");
         }
 
+        // PLAN-041 T-03: per-App bootstrap (was module-level on import —
+        // the accent state now lives in the per-App factory scope).
+        if has_accent {
+            code.push_str("\n// Restore saved accent on store instantiation (per App).\n");
+            // PLAN-601 T-06: restore the active theme first (generator-seeded
+            // declared themes / user choice); scaffold default needs no apply.
+            code.push_str(
+                "(function bootstrapAccent() {\n\
+                 \x20 const __th = getActiveTheme()\n\
+                 \x20 if (__th !== 'scaffold') applyTheme(__th, document.documentElement.classList.contains('dark'))\n\
+                 \x20 const saved = getSavedAccent()\n\
+                 \x20 accent_color.value = saved || 'indigo'\n\
+                 \x20 const isDark = document.documentElement.classList.contains('dark')\n\
+                 \x20 applyAccent(saved || 'indigo', isDark)\n\
+                 })()\n",
+            );
+        }
+
         code.push_str("    return {\n");
 
         // Expose state refs by name.
@@ -755,19 +793,6 @@ impl VueGenerator {
             // Module-level bootstrap: apply saved accent on first import.
             // Also sync the accent_color ref so the store reflects the
             // persisted choice (localStorage may differ from the .at default).
-            code.push_str("\n// Restore saved accent on module load.\n");
-            // PLAN-601 T-06: restore the active theme first (generator-seeded
-            // declared themes / user choice); scaffold default needs no apply.
-            code.push_str(
-                "(function bootstrapAccent() {\n\
-                 \x20 const __th = getActiveTheme()\n\
-                 \x20 if (__th !== 'scaffold') applyTheme(__th, document.documentElement.classList.contains('dark'))\n\
-                 \x20 const saved = getSavedAccent()\n\
-                 \x20 accent_color.value = saved || 'indigo'\n\
-                 \x20 const isDark = document.documentElement.classList.contains('dark')\n\
-                 \x20 applyAccent(saved || 'indigo', isDark)\n\
-                 })()\n",
-            );
         }
 
         // PLAN-671 ③：use 导入 fn 池拉取内联——组件 SFC 的
@@ -930,6 +955,31 @@ impl VueGenerator {
             }
         }
         code.insert_str(state_alias_insert_at, &aliases);
+
+        // PLAN-041 T-03: context-aware composable facade. `use{Name}Store()`
+        // keeps its export signature (SD-02: 方法归属路由不变) but resolves
+        // the instance through the App store context when one is provided
+        // (main.ts / gallery mount factory `installAutoStoreContext(app)`).
+        // Without a context (legacy mounts, plain module consumers) it falls
+        // back to a lazy module singleton — the pre-041 semantics, explicitly
+        // a named legacy boundary (plan §5.2: 不能让新多 App 路径退回
+        // 隐藏 singleton；legacy 适配须明示边界).
+        code.push_str(&format!(
+            "\n// PLAN-041: per-App resolution with explicit legacy fallback.\n\
+             const __legacy{name}Holder: {{ instance: any | null }} = {{ instance: null }}\n\
+             export function {fn_name}(): any {{\n\
+             \x20 const __inst = getCurrentInstance()\n\
+             \x20 if (__inst) {{\n\
+             \x20\x20\x20 const __ctx = inject<any | null>('__autoStoreContext', null)\n\
+             \x20\x20\x20 if (__ctx) return __ctx.use('{name}', {factory_name})\n\
+             \x20 }}\n\
+             \x20 if (!__legacy{name}Holder.instance) __legacy{name}Holder.instance = {factory_name}()\n\
+             \x20 return __legacy{name}Holder.instance\n\
+             }}\n",
+            name = store.name,
+            fn_name = fn_name,
+            factory_name = factory_name,
+        ));
         (code, warnings)
     }
 

@@ -11147,6 +11147,76 @@ widget Counter {
 
     /// Plan 043 store-codegen / Plan 012 Batch B (gap 2): the 015-notes-specific
     /// `all_tags` getter auto-inject was removed entirely — a store only gets an
+    /// PLAN-041 T-03: per-App store factory + context-aware facade.
+    /// - state refs/watchers live inside `create{Name}Store()` (one instance
+    ///   per App context);
+    /// - `use{Name}Store()` keeps its export signature, resolves through the
+    ///   App store context, and falls back to a lazy module singleton only
+    ///   for mounts that provide no context (named legacy boundary).
+    #[test]
+    fn test_plan041_store_factory_and_context_facade() {
+        let code = VueGenerator::generate_store_composable(&store_from_src(
+            r#"
+store TabsStore {
+    model {
+        var active_id str = ""
+        var saved bool = true
+    }
+    watch {
+        .active_id -> { .saved = false }
+    }
+}
+"#,
+        ));
+
+        // Per-App factory wraps the state refs.
+        assert!(
+            code.contains("export function createTabsStore(): any {"),
+            "per-App factory must be emitted, got:\n{}",
+            code
+        );
+        // The factory appears BEFORE the refs (state lives in factory scope).
+        let factory_at = code.find("export function createTabsStore").expect("factory");
+        let refs_at = code.find("const active_id = ref<string>('')").expect("ref");
+        assert!(
+            factory_at < refs_at,
+            "state refs must live inside the factory scope"
+        );
+        // Watchers ride the factory (per-App lifetime).
+        let watch_at = code.find("watch(active_id, () => {").expect("watch");
+        assert!(
+            factory_at < watch_at && watch_at < code.rfind('}').unwrap_or(watch_at),
+            "watchers must be emitted inside the factory scope"
+        );
+
+        // Context-aware facade keeps the export signature.
+        assert!(
+            code.contains("export function useTabsStore(): any {"),
+            "use facade must keep its export signature, got:\n{}",
+            code
+        );
+        let use_at = code.find("export function useTabsStore").expect("use fn");
+        assert!(
+            use_at > factory_at,
+            "use facade must be emitted after the factory"
+        );
+        assert!(
+            code.contains("inject<any | null>('__autoStoreContext', null)"),
+            "context resolution must inject the App store context, got:\n{}",
+            code
+        );
+        assert!(
+            code.contains("__ctx.use('TabsStore', createTabsStore)"),
+            "context hit must resolve via ctx.use with the factory, got:\n{}",
+            code
+        );
+        assert!(
+            code.contains("__legacyTabsStoreHolder.instance = createTabsStore()"),
+            "context miss must fall back to the lazy legacy singleton, got:\n{}",
+            code
+        );
+    }
+
     /// `all_tags` getter when it declares one in its `computed {}` block. This
     /// test pins that a plain store composable contains no `all_tags` (and that
     /// array inits render as `[]`).
@@ -11299,13 +11369,14 @@ store Tabs {
 "#,
         ));
 
+        // PLAN-041 T-03: context-aware imports; watchers live inside the
+        // per-App factory (one watcher instance per App context).
         assert!(
-            code.contains("import { ref, watch } from 'vue'"),
+            code.contains("import { ref, watch, getCurrentInstance, inject } from 'vue'"),
             "watch import, got:\n{}",
             code
         );
-        // Module-level watch calls (store refs are module-level singletons,
-        // so the calls sit outside the composable function).
+        // Watch calls (per-App factory scope — was module-level singleton).
         assert!(
             code.contains("watch(active_id, () => {"),
             "single-source watch, got:\n{}",
