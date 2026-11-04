@@ -123,6 +123,8 @@ T-02最多两种等价机制的完整先证：导入两个同定义计数组件�
 - 统一回归：**pending，owner=review/merge**。driver工作区存在**先前既有**编译红（基线6837bbe8已坏、与本计划无关）：tests/{viewport3d_depth_probe,squash_feasibility,asset_feasibility,authoring_feasibility,...}对Scene3dContent缺`hud_overlay`字段初始化（prototype surface_runtime 加字段后未同步）——048不接管；048自有面（lib+bins+node_ui_flow/storage/已列gates）全绿。merge统一门须先由owner分诊该预存红（修复或具名豁免），不得以048名义静默跳过。
 - 实现事实备忘（审查关注点）：stock iced 0.14 button无键盘/焦点支持（iced_widget 0.14.2源码核实）——Tab焦点环/Enter激活由适配器平台输入路由承担（设计§3职责），激活经同一队列同一生成派发器（原生链a=3即证）；SDK字面量数组>256静默截断为n-256（实测）——文字槽≤4冻结由来；主检出Plan文件曾于会话中被外部重置回HEAD一次（本记录为重建后的权威进度，进度以本§8/§9为准）。
 
+stage: goal | plan_id: PLAN-048 | plan_revision: r1 | round: 1 | from: drafting | to: execution_done | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-048/auto-ui | commit: 2d1ad4ae（Plan簿记主检出70d1dbfb） | next: review
+
 ## 10. 待澄清事项
 
 D-01：具体基础UI属性/事件拼写、UTF-8/队列容量及标量ABI文字传输由T-02完整链冻结，优先现有约定，不凭草图当已实现；失败replan。D-02：原生键鼠/焦点取证按当时OS政策/手工流程具名核，拿不到不省AC。D-03：共享文件owner按开工核，不接管043或其它树。临时材料唯一`D:/autostack/plan-artifacts/plan-048/auto-ui/`，开工登记owner/用途/在途；外部B/SDK副本/target/探针/日志均scope，不散落项目或attachments。merge摘要折Plan后全部路径对账删scope/构建物，仅具名问题owner/理由/关闭条件可持有；跨仓同号不混。禁止worktree链接，清树先fresh `bash D:/autostack/wt-guard.sh <路径>`。
