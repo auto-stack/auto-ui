@@ -110,7 +110,6 @@ JSON 是当前原型便于保存/验证的选择，没有“可审计所以只�
 2026-11-04 M2验收收敛：普通UI布局嵌入view-2d/view-3d属于M2-10必需组合，不再全部归“生产UI融合等ACE后”的后置项。首期基础UI限row/column/text/button及绑定/事件/布局输入，完整生产组件/主题与跨端仍后置；同Node局部状态、use、多实例和一次Tick沿原AG-A要求，实际能力以048/049交付后验证，不凭目标文档称已实现。
 
 
-2026-11-04阶段安排：用户确认M3为AGE与现有AutoUI正式融合，目标见[M3路线](m3-autoui-integration-roadmap.md)。共同作者模型贯穿M2/M3；M2有限入口的成功不代生产UI已接通，M3须保生产组件/状态/主题/输入语义，按兼容合同迁移并核实际ACE/HIR成熟度。本轮不扩大现有Plan。
+2026-11-04阶段安排更新：共同Node/use/model/msg/on与view/view-2d/view-3d作者方向贯穿后续阶段。用户将[M3主目标改为2D/2DHD游戏与复杂3D增强](m3-2d-3d-capability-roadmap.md)，包括俯视角国风种田承载切片、three.js逐项能力覆盖；[AutoUI/ACE正式融合顺延M4](m4-autoui-integration-roadmap.md)，保留Schema能力成熟及旧编译器替换实际启动的前置，届时001起验证全部UI Demo原语义兼容。
 
-
-2026-11-04 M3时序更新：正式AGE/AutoUI合入等待ACE所需Schema方言能力成熟、且旧Auto编译器替换工作实际启动后统一设计，见[M3路线v2](m3-autoui-integration-roadmap.md)。届时从examples/ui/001开始按能力依赖推进现有Demo正常运行与原验收兼容；等待期仅盘点/需求准备，不以旧手写parser扩完整生产UI。M2现有有限验证及048/049/AG021合同不变，不自动停工、改依赖或开始M3实现。
+M2现有有限验证和048/049/AG021合同保持，M3公共能力扩展不等生产UI正式融合；普通模块复用/局部状态/正常Auto业务与声明运行组织分离不变。M3若增容量/执行支持，另按真实场景冻结profile/预算，不把当前实验限额写成永久语言限制或静默抬额；M4不提前以扩完整手写UI parser推进。本轮只改路线，不取号/实现。

@@ -1,6 +1,6 @@
 # AGE M2游戏优先路线：内容闭环、编辑迁移与统一版本联验
 
-2026-11-04，设计v8。AGE作者模型仍是AutoUI式Node/use、局部model/msg/on、view-2d/view-3d及具名资源/事件；桌面M2原两游戏/编辑/必要音画/资源离线/Gallery/统一最终引擎版本分母保持。ACE/AOT/ECS/CPC/跨端不新增前置。
+2026-11-04，设计v9。AGE作者模型仍是AutoUI式Node/use、局部model/msg/on、view-2d/view-3d及具名资源/事件；桌面M2原两游戏/编辑/必要音画/资源离线/Gallery/统一最终引擎版本分母保持。ACE/AOT/ECS/CPC/跨端不新增前置。
 
 > **命名与物理目录分开**：采用Auto Graphics Engine（AGE），详见[命名决议](age-naming-and-content-repository.md)。[内容仓020](../../../../ag-examples/docs/plans/020-age-examples-repository-rename.md)仅规划ag-examples→age-examples，默认019＋021及扩展M2必需门收口后维护窗口实施；保历史号与交付身份，不成为019前置。
 
@@ -70,9 +70,11 @@ AG019是一次明确的里程碑档，原全AG/性能资源样本按原条件在
 未来启动后048可先推进；049 T-01与AG021 T-01/02可并行只读准备，后续分别等实际交付，不追tip。043在途/044可选与本补齐链无强依赖，但同文件写面先核owner短窗。原32credits/8状态Node/128行等预算不抬，原OS政策与GPU/焦点单实例保持，必需真输入未证不充pass。020是019/021后的维护性更名，不成为本链前置。
 
 
-## 8. M2之后：M3与现有AutoUI融合
+## 8. M2之后：M3增强2D/3D，M4正式融合AutoUI
 
-2026-11-04用户确认：**M3主目标为AGE与现有AutoUI正式融合**，见[M3路线](m3-autoui-integration-roadmap.md)。M2交付有限基础UI与2D/3D组合，M3进一步接通现有组件/布局/样式主题/状态Store/事件与生产编译、宿主、资源/输入/生命周期；现有UI兼容和生产公开入口实际消费是验收重点。源码已归同仓，迁目录不代融合，也不作M3必要前置。具体组件/后端覆盖及ACE/HIR接缝按真实成熟度另立合同；本轮不新增Plan/实现，不改048/049/AG021或020的既有边界。
+2026-11-04用户调整里程碑：**M3优先增强AGE的2D/2DHD与复杂3D能力，原AutoUI/ACE正式融合任务顺延M4**。
 
+- [M3能力路线](m3-2d-3d-capability-roadmap.md)：以俯视角2D/2DHD国风种田承载游戏可玩切片，和three.js固定版本逐项能力矩阵驱动引擎/游戏/示例并行准备；具体规则、画面、规模和覆盖分母另立合同冻结，不将完整商业游戏或全部上游目录默认为已交付。
+- [M4融合路线](m4-autoui-integration-roadmap.md)：保留Schema方言成熟且旧Auto编译器替换实际启动的前置，届时统一接入AutoUI/AGE并从examples/ui/001按能力依赖推进全部UI Demo原行为兼容。
 
-2026-11-04 M3时序更新：正式AGE/AutoUI合入等待ACE所需Schema方言能力成熟、且旧Auto编译器替换工作实际启动后统一设计，见[M3路线v2](m3-autoui-integration-roadmap.md)。届时从examples/ui/001开始按能力依赖推进现有Demo正常运行与原验收兼容；等待期仅盘点/需求准备，不以旧手写parser扩完整生产UI。M2现有有限验证及048/049/AG021合同不变，不自动停工、改依赖或开始M3实现。
+M3不因ACE正式集成等待而停在原地；新图形/游戏切片如实际依赖ACE能力则逐项核交付。M2现有048/049/AG021合同、原分母/预算、019历史与020的M2后维护窗口不变，不自动停工、改依赖或将020再推迟至M4。本轮只定新方向，不预取计划号、不建树/实施；不提前把旧手写UI parser扩成完整生产融合。
