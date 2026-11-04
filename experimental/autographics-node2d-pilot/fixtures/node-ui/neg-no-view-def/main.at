@@ -1,0 +1,8 @@
+// neg: instantiated def has no view (graphics embedding is PLAN-049)
+use logic: Pure
+
+node Main {
+    view {
+        Pure p { }
+    }
+}

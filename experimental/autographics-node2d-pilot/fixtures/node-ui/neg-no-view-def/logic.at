@@ -1,0 +1,5 @@
+node Pure {
+    model {
+        var v = 0
+    }
+}

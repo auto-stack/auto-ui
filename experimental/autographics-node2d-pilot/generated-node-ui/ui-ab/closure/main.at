@@ -1,0 +1,43 @@
+// PLAN-048 node-ui fixture: root holds two same-def Counter instances (a, b)
+// from the counter module plus a Panel (side) that owns its own nested
+// Counter (meter) — instance isolation, bool formatting, child-event
+// dispatch and conditional presence are all exercised on one window.
+use counter: Counter
+use panel: Panel
+
+node Main {
+    model {
+        var flips = 0
+    }
+    msg {
+        Flip
+    }
+    view {
+        column root {
+            spacing: 8
+            padding: 12
+            Counter a {
+                start: 0
+                step: 1
+            }
+            Counter b {
+                start: 10
+                step: 2
+            }
+            Panel side { }
+            button flip {
+                text: "翻转"
+                onclick: .Flip
+            }
+            text flips { text: .flips }
+        }
+    }
+    on {
+        Life.Start -> {
+            .flips = 0
+        }
+        .Flip -> {
+            .flips = .flips + 1
+        }
+    }
+}

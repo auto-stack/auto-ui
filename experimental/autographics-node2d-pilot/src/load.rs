@@ -112,6 +112,11 @@ impl std::fmt::Display for ProjectError {
 }
 
 fn line_of(source: &str, offset: usize) -> usize {
+    line_of_pub(source, offset)
+}
+
+/// PLAN-048：跨模块行号换算（降层诊断面）。
+pub fn line_of_pub(source: &str, offset: usize) -> usize {
     source[..offset.min(source.len())]
         .bytes()
         .filter(|b| *b == b'\n')
@@ -656,6 +661,12 @@ pub fn load_project_dual(entry: &Path, allow_dual_view: bool) -> Result<Project,
             if let Some(view) = &node.view3d {
                 collect_instances3d(&view.elements, &mut instantiated);
             }
+            // PLAN-048：基础 UI view 实例同计入实例化面（root 判定一致）。
+            if let Some(view) = &node.view {
+                for el in &view.elements {
+                    collect_instances_ui(el, &mut instantiated);
+                }
+            }
         }
     }
     for name in &instantiated {
@@ -800,6 +811,10 @@ fn validate_closure(project: &Project) -> Result<(), ProjectError> {
             if let Some(view) = &node.view3d {
                 walk_view3d(&view.elements, &mut out);
             }
+            // PLAN-048：基础 UI view 实例同走 prop 校验。
+            if let Some(view) = &node.view {
+                walk_view_ui(&view.elements, &mut out);
+            }
             for inst in &out {
                 if node.name == project.root {
                     root_names.push(inst.name.to_string());
@@ -914,6 +929,47 @@ fn collect_instances(el: &View2dElement, out: &mut Vec<String>) {
             }
         }
         _ => {}
+    }
+}
+
+/// PLAN-048：基础 UI view 实例名收集（容器/if 子树递归）。
+fn collect_instances_ui(el: &auto_ui_dialect::node2d::UiElement, out: &mut Vec<String>) {
+    match el {
+        auto_ui_dialect::node2d::UiElement::Instance { node, .. } => out.push(node.clone()),
+        auto_ui_dialect::node2d::UiElement::If { then, .. } => {
+            for child in then {
+                collect_instances_ui(child, out);
+            }
+        }
+        auto_ui_dialect::node2d::UiElement::Container { children, .. } => {
+            for child in children {
+                collect_instances_ui(child, out);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// PLAN-048：基础 UI view 实例元素引用收集（prop 校验面与 view-2d 一致）。
+fn walk_view_ui<'a>(
+    elements: &'a [auto_ui_dialect::node2d::UiElement],
+    out: &mut Vec<InstanceRef<'a>>,
+) {
+    for el in elements {
+        match el {
+            auto_ui_dialect::node2d::UiElement::Instance { node, name, props } => {
+                out.push(InstanceRef {
+                    node,
+                    name,
+                    props,
+                });
+            }
+            auto_ui_dialect::node2d::UiElement::If { then, .. } => walk_view_ui(then, out),
+            auto_ui_dialect::node2d::UiElement::Container { children, .. } => {
+                walk_view_ui(children, out)
+            }
+            _ => {}
+        }
     }
 }
 

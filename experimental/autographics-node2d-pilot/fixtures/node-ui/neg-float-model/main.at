@@ -1,0 +1,9 @@
+// neg: float model field (basic-UI v1 model is int/bool/constant-text)
+node Main {
+    model {
+        var ratio = 0.5
+    }
+    view {
+        text t { text: "x" }
+    }
+}

@@ -1,0 +1,30 @@
+// PLAN-048 Counter definition: same model shape under every instance,
+// per-instance state via SoA; step is a runtime param (int) referenced by
+// the handler; label is a constant UTF-8 text model field.
+node Counter(start: int, step: int) {
+    model {
+        var count = .start
+        var enabled = 1
+        var label = "计数"
+    }
+    msg {
+        Inc
+    }
+    view {
+        row card {
+            padding: 4
+            text name { text: .label }
+            text value { text: .count }
+            button inc {
+                text: "加一"
+                enabled: .enabled
+                onclick: .Inc
+            }
+        }
+    }
+    on {
+        .Inc -> {
+            .count = .count + .step
+        }
+    }
+}

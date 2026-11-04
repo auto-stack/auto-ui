@@ -1,0 +1,15 @@
+node Item {
+    model {
+        var n = 0
+    }
+    msg {
+        Tap
+    }
+    view {
+        button b { text: "x", onclick: .Tap }
+    }
+    on {
+        .Tap -> {
+        }
+    }
+}

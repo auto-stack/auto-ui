@@ -14,7 +14,8 @@ use auto_parser_api::{CompilerSession, DomainDialect, DomainParseContext, Domain
 
 use super::ast::{
     Camera3dBlock, Character3dBlock, EventPattern, Handler, NameListBlock, Node2DStmt, NodeDecl,
-    Object3dBlock, OnBlock, Prop, PropValue, View2dBlock, View2dElement, View3dBlock, View3dElement,
+    Object3dBlock, OnBlock, Prop, PropValue, UiContainerKind, UiElement, View2dBlock,
+    View2dElement, View3dBlock, View3dElement, ViewUiBlock,
 };
 use crate::declarations::{parse_model_block, parse_msg_decl};
 
@@ -186,6 +187,7 @@ pub fn parse_node_decl_opts(
     cx.expect(TokenKind::LBrace)?;
     let mut model = None;
     let mut msg = None;
+    let mut view = None;
     let mut view2d = None;
     let mut view3d = None;
     let mut on = None;
@@ -206,7 +208,8 @@ pub fn parse_node_decl_opts(
         // view 域标记分派（PLAN-024）：View + Sub + 数字 2/3。'2' 走冻结
         // view-2d 文法（旧路径与旧诊断逐字不变），'3' 走 view-3d；其它
         // 标记保持 view-2d 的既有具名拒绝。投机窥探用 checkpoint/restore
-        // 回滚游标。
+        // 回滚游标。PLAN-048：裸 `view`（无 Sub 标记）= 基础 UI 出口，
+        // 在域标记窥探前拦截，view-2d/view-3d 的旧路径与旧诊断逐字不变。
         if cx.is_kind(TokenKind::View) {
             let marker = {
                 let cp = cx.checkpoint();
@@ -218,6 +221,17 @@ pub fn parse_node_decl_opts(
                 cx.restore(cp)?;
                 m
             };
+            if marker.is_empty() {
+                if view.is_some() {
+                    return Err(SyntaxError::Generic {
+                        message: "duplicate view block in node".to_string(),
+                        span: pos_to_span(cx.cur_pos()),
+                    }
+                    .into());
+                }
+                view = Some(parse_view_ui_block(cx)?);
+                continue;
+            }
             if marker.starts_with('3') {
                 if view3d.is_some() {
                     return Err(SyntaxError::Generic {
@@ -396,7 +410,7 @@ pub fn parse_node_decl_opts(
                 _ => {
                     return Err(SyntaxError::Generic {
                         message: format!(
-                            "unsupported node block '{keyword}' (research surface: model/msg/view-2d/on/game2d/presentation2d/character3d/camera3d/object3d/objects3d/triggers)"
+                            "unsupported node block '{keyword}' (research surface: model/msg/view/view-2d/on/game2d/presentation2d/character3d/camera3d/object3d/objects3d/triggers)"
                         ),
                         span: pos_to_span(cx.cur_pos()),
                     }
@@ -427,11 +441,24 @@ pub fn parse_node_decl_opts(
         .into());
     }
 
+    // PLAN-048：基础 UI `view` 与图形出口互斥（混合嵌入是 PLAN-049；
+    // 双维 profile 的准入不变，本守卫在任何 dialect 下都成立）。
+    if view.is_some() && (view2d.is_some() || view3d.is_some()) {
+        return Err(SyntaxError::Generic {
+            message: format!(
+                "node '{name}' declares view together with view-2d/view-3d (basic UI and graphics embedding are separate exits; composition is PLAN-049)"
+            ),
+            span: pos_to_span(cx.cur_pos()),
+        }
+        .into());
+    }
+
     Ok(NodeDecl {
         name,
         params,
         model,
         msg,
+        view,
         view2d,
         view3d,
         on,
@@ -806,6 +833,225 @@ fn parse_element_children(cx: &mut dyn DomainParseContext) -> AutoResult<Vec<Vie
     }
     cx.expect(TokenKind::RBrace)?;
     Ok(elements)
+}
+
+/// PLAN-048 停止集判定：基础 UI 元素头（props 块在此让位给子元素/块界）。
+/// 小写关键字与属性名可能同形（`text` 既是元素头又是主属性名）——后随
+/// `:` 的按属性名处理（投机窥探 checkpoint/restore 回滚游标）。
+fn is_ui_element_head(cx: &mut dyn DomainParseContext, head: &str) -> bool {
+    if head.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
+        return true;
+    }
+    if !matches!(head, "row" | "column" | "text" | "button" | "if") {
+        return false;
+    }
+    let cp = cx.checkpoint();
+    cx.advance();
+    let is_prop = cx.is_kind(TokenKind::Colon);
+    cx.restore(cp).is_ok() && !is_prop
+}
+
+/// `view { element* }`（PLAN-048）：基础 UI 出口。元素：row/column/text/
+/// button/同定义实例化/if。复用共享 Core 表达式/prop 文法；属性白名单与
+/// 事件拼写（onclick: `.Ev` / `inst.Ev`）由降层具名校验（解析面与
+/// view-2d 同宽容）。
+fn parse_view_ui_block(cx: &mut dyn DomainParseContext) -> AutoResult<ViewUiBlock> {
+    let start = cx.cur_pos();
+    cx.advance(); // View
+    // parse_view_ui_children 消费块界 RBrace（与 view-2d 块循环同责）。
+    let elements = parse_view_ui_children(cx)?;
+    Ok(ViewUiBlock {
+        elements,
+        span: super::ast::span_of(start),
+    })
+}
+
+/// `{ ... }` UI 元素子列表（块体/if 分支体）。
+fn parse_view_ui_children(cx: &mut dyn DomainParseContext) -> AutoResult<Vec<UiElement>> {
+    cx.expect(TokenKind::LBrace)?;
+    let mut elements = Vec::new();
+    loop {
+        cx.skip_empty_lines();
+        if cx.is_kind(TokenKind::RBrace) || cx.is_kind(TokenKind::EOF) {
+            break;
+        }
+        elements.push(parse_view_ui_element(cx)?);
+    }
+    cx.expect(TokenKind::RBrace)?;
+    Ok(elements)
+}
+
+fn parse_view_ui_element(cx: &mut dyn DomainParseContext) -> AutoResult<UiElement> {
+    if cx.is_kind(TokenKind::If) {
+        cx.advance();
+        let cond = cx.parse_expr()?;
+        let then = parse_view_ui_children(cx)?;
+        return Ok(UiElement::If { cond, then });
+    }
+    let head = cx.cur_text();
+    if head.is_empty() {
+        return Err(SyntaxError::Generic {
+            message: "view element expected".to_string(),
+            span: pos_to_span(cx.cur_pos()),
+        }
+        .into());
+    }
+    cx.advance();
+    let elem_name = cx.cur_text();
+    if elem_name.is_empty() {
+        return Err(SyntaxError::Generic {
+            message: "view element name expected".to_string(),
+            span: pos_to_span(cx.cur_pos()),
+        }
+        .into());
+    }
+    cx.advance();
+    match head.as_str() {
+        // 容器：`row/column name { props+children 混合块 }`（group2d 同文）。
+        "row" | "column" => {
+            let kind = if head == "row" {
+                UiContainerKind::Row
+            } else {
+                UiContainerKind::Column
+            };
+            let (props, children) = parse_ui_mixed_block(cx)?;
+            Ok(UiElement::Container {
+                kind,
+                name: elem_name,
+                props,
+                children,
+            })
+        }
+        "text" | "button" => {
+            // 叶子元素无子元素：块内出现元素头/实例化时具名拒绝，不静默
+            // 丢弃（与 view-2d 叶子同语义）。
+            let props = parse_ui_prop_block(
+                cx,
+                &format!("'{head}' element (name '{elem_name}')"),
+            )?;
+            if head == "text" {
+                Ok(UiElement::Text {
+                    name: elem_name,
+                    props,
+                })
+            } else {
+                Ok(UiElement::Button {
+                    name: elem_name,
+                    props,
+                })
+            }
+        }
+        other => {
+            // 约定：UpperCamelCase 头部 = 同定义实例化（组件实例语义）。
+            let first = other.chars().next().unwrap_or('\0');
+            if !first.is_ascii_uppercase() {
+                return Err(SyntaxError::Generic {
+                    message: format!(
+                        "unknown view element '{other}' (expected row/column/text/button or a Node instance)"
+                    ),
+                    span: pos_to_span(cx.cur_pos()),
+                }
+                .into());
+            }
+            let props =
+                parse_ui_prop_block(cx, &format!("instance '{elem_name}' of '{other}'"))?;
+            Ok(UiElement::Instance {
+                node: other.to_string(),
+                name: elem_name,
+                props,
+            })
+        }
+    }
+}
+
+/// `{ name: value ... }` UI 属性行块；空行/逗号宽容。叶子/实例属性块
+/// 遇到 UI 元素头/UpperCamel 实例化 = 子元素出现，具名拒绝（不静默丢
+/// 弃）；容器混合块由 parse_ui_mixed_block 接管（该处元素头让位子元素）。
+fn parse_ui_prop_block(
+    cx: &mut dyn DomainParseContext,
+    owner: &str,
+) -> AutoResult<Vec<Prop>> {
+    cx.expect(TokenKind::LBrace)?;
+    let mut props = Vec::new();
+    loop {
+        cx.skip_empty_lines();
+        if cx.is_kind(TokenKind::RBrace) || cx.is_kind(TokenKind::EOF) {
+            break;
+        }
+        let head = cx.cur_text();
+        if is_ui_element_head(cx, &head) {
+            return Err(SyntaxError::Generic {
+                message: format!("{owner} takes no children"),
+                span: pos_to_span(cx.cur_pos()),
+            }
+            .into());
+        }
+        let start = cx.cur_pos();
+        let pname = cx.cur_text();
+        if pname.is_empty() {
+            return Err(SyntaxError::Generic {
+                message: "property name expected".to_string(),
+                span: pos_to_span(cx.cur_pos()),
+            }
+            .into());
+        }
+        cx.advance();
+        cx.expect(TokenKind::Colon)?;
+        let value = parse_prop_value(cx)?;
+        props.push(Prop {
+            name: pname,
+            value,
+            span: super::ast::span_of(start),
+        });
+        if cx.is_kind(TokenKind::Comma) {
+            cx.advance();
+        }
+    }
+    cx.expect(TokenKind::RBrace)?;
+    Ok(props)
+}
+
+/// row/column 混合块：props（小写名行）与子元素（UI 元素头/UpperCamel）
+/// 按行交错；先 prop 后子元素为推荐书写序，不强制（group2d 同文）。
+fn parse_ui_mixed_block(
+    cx: &mut dyn DomainParseContext,
+) -> AutoResult<(Vec<Prop>, Vec<UiElement>)> {
+    cx.expect(TokenKind::LBrace)?;
+    let mut props = Vec::new();
+    let mut children = Vec::new();
+    loop {
+        cx.skip_empty_lines();
+        if cx.is_kind(TokenKind::RBrace) || cx.is_kind(TokenKind::EOF) {
+            break;
+        }
+        let head = cx.cur_text();
+        if is_ui_element_head(cx, &head) {
+            children.push(parse_view_ui_element(cx)?);
+            continue;
+        }
+        let start = cx.cur_pos();
+        let pname = cx.cur_text();
+        if pname.is_empty() {
+            return Err(SyntaxError::Generic {
+                message: "container property name expected".to_string(),
+                span: pos_to_span(cx.cur_pos()),
+            }
+            .into());
+        }
+        cx.advance();
+        cx.expect(TokenKind::Colon)?;
+        let value = parse_prop_value(cx)?;
+        props.push(Prop {
+            name: pname,
+            value,
+            span: super::ast::span_of(start),
+        });
+        if cx.is_kind(TokenKind::Comma) {
+            cx.advance();
+        }
+    }
+    cx.expect(TokenKind::RBrace)?;
+    Ok((props, children))
 }
 
 /// group2d 混合块：props（小写名行）与子元素（元素头/UpperCamel）按行

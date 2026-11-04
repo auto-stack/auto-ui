@@ -1,0 +1,6 @@
+// neg: text element without a text prop
+node Main {
+    view {
+        text t { visible: 1 }
+    }
+}

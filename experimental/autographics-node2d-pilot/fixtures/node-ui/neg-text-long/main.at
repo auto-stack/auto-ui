@@ -1,0 +1,6 @@
+// neg: literal text exceeds the frozen 63-byte budget
+node Main {
+    view {
+        text t { text: "0123456789012345678901234567890123456789012345678901234567890123456789" }
+    }
+}

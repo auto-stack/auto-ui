@@ -13,7 +13,8 @@ pub mod presentation;
 
 pub use ast::{
     Camera3dBlock, Character3dBlock, EventPattern, Handler, Node2DStmt, NodeDecl, OnBlock, Prop,
-    PropValue, View2dBlock, View2dElement, View3dBlock, View3dElement,
+    PropValue, UiContainerKind, UiElement, View2dBlock, View2dElement, View3dBlock, View3dElement,
+    ViewUiBlock,
 };
 pub use game::{Game2dAudio, Game2dBlock, Game2dCue, Game2dHud, Game2dShape, Game2dSlot,
     Game2dText, Game2dTrigger, Game2dTriggerKind};

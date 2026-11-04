@@ -1,0 +1,13 @@
+// neg: onclick references an unknown instance
+node Main {
+    msg {
+        Go
+    }
+    view {
+        button b { text: "x", onclick: ghost.Go }
+    }
+    on {
+        .Go -> {
+        }
+    }
+}

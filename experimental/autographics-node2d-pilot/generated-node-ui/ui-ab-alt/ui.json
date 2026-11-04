@@ -1,0 +1,227 @@
+{
+  "schema": "autographics.node-ui/1",
+  "generator": "autographics-node2d-pilot plan048 node-ui",
+  "world_sha256": "d0c6050cb4411520358ec2226eb21a5a1efddb9d585eb46646a268cdfccd2803",
+  "root": "Main",
+  "instances": [
+    {
+      "path": "Main/a",
+      "node": "Counter",
+      "def_idx": 0
+    },
+    {
+      "path": "Main/b",
+      "node": "Counter",
+      "def_idx": 1
+    },
+    {
+      "path": "Main/side",
+      "node": "Panel",
+      "def_idx": 0
+    },
+    {
+      "path": "Main/side/meter",
+      "node": "Counter",
+      "def_idx": 2
+    }
+  ],
+  "defs": {
+    "Counter": {
+      "prefix": "counter",
+      "is_root": false,
+      "texts": 3,
+      "elements": [
+        {
+          "kind": "Container",
+          "name": "card",
+          "container": "row",
+          "props": [
+            {
+              "name": "padding",
+              "kind": "lit_num",
+              "v": 4.0
+            }
+          ],
+          "children": [
+            {
+              "kind": "Text",
+              "name": "name",
+              "slot": 0,
+              "text": {
+                "kind": "lit_str",
+                "v": "计数"
+              }
+            },
+            {
+              "kind": "Text",
+              "name": "value",
+              "slot": 1,
+              "text": {
+                "kind": "int_field",
+                "name": "count"
+              }
+            },
+            {
+              "kind": "Button",
+              "name": "inc",
+              "slot": 2,
+              "text": {
+                "kind": "lit_str",
+                "v": "加一"
+              },
+              "enabled": {
+                "kind": "field",
+                "name": "enabled"
+              },
+              "click": {
+                "fn": "counter_ui_click_inc",
+                "arg": "index"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "Main": {
+      "prefix": "main",
+      "is_root": true,
+      "texts": 2,
+      "elements": [
+        {
+          "kind": "Container",
+          "name": "root",
+          "container": "column",
+          "props": [
+            {
+              "name": "spacing",
+              "kind": "lit_num",
+              "v": 8.0
+            },
+            {
+              "name": "padding",
+              "kind": "lit_num",
+              "v": 12.0
+            }
+          ],
+          "children": [
+            {
+              "kind": "Instance",
+              "name": "a",
+              "node": "Counter"
+            },
+            {
+              "kind": "Instance",
+              "name": "b",
+              "node": "Counter"
+            },
+            {
+              "kind": "Instance",
+              "name": "side",
+              "node": "Panel"
+            },
+            {
+              "kind": "Button",
+              "name": "flip",
+              "slot": 0,
+              "text": {
+                "kind": "lit_str",
+                "v": "翻转"
+              },
+              "click": {
+                "fn": "main_ui_click_flip",
+                "arg": "none"
+              }
+            },
+            {
+              "kind": "Text",
+              "name": "flips",
+              "slot": 1,
+              "text": {
+                "kind": "int_field",
+                "name": "flips"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "Panel": {
+      "prefix": "panel",
+      "is_root": false,
+      "texts": 3,
+      "elements": [
+        {
+          "kind": "Container",
+          "name": "box",
+          "container": "column",
+          "props": [
+            {
+              "name": "spacing",
+              "kind": "lit_num",
+              "v": 6.0
+            }
+          ],
+          "children": [
+            {
+              "kind": "Instance",
+              "name": "meter",
+              "node": "Counter"
+            },
+            {
+              "kind": "Button",
+              "name": "toggle",
+              "slot": 0,
+              "text": {
+                "kind": "bool_field",
+                "name": "on"
+              },
+              "enabled": {
+                "kind": "lit_bool",
+                "v": true
+              },
+              "click": {
+                "fn": "panel_ui_click_toggle",
+                "arg": "index"
+              }
+            },
+            {
+              "kind": "Button",
+              "name": "reset",
+              "slot": 1,
+              "text": {
+                "kind": "lit_str",
+                "v": "归零"
+              },
+              "enabled": {
+                "kind": "bool_field",
+                "name": "on"
+              },
+              "click": {
+                "fn": "panel_ui_click_reset",
+                "arg": "index"
+              }
+            },
+            {
+              "kind": "If",
+              "cond": {
+                "kind": "bool_field",
+                "name": "on"
+              },
+              "then": [
+                {
+                  "kind": "Text",
+                  "name": "state",
+                  "slot": 2,
+                  "text": {
+                    "kind": "lit_str",
+                    "v": "开"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

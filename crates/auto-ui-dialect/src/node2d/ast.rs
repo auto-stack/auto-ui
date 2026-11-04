@@ -61,6 +61,10 @@ pub struct NodeDecl {
     /// PLAN-028：`triggers { a, b, ... }` 块——具名触发 pair 池声明（仅
     /// root；名字 → pair 0..8 由降层按声明序分配）。
     pub triggers: Option<NameListBlock>,
+    /// PLAN-048：`view { ... }` 块——基础 UI 出口（row/column/text/button、
+    /// 条件呈现、同定义实例）。与 view-2d/view-3d 互斥（混合嵌入是
+    /// PLAN-049；解析面具名拒绝，单一 UI 出口）。
+    pub view: Option<ViewUiBlock>,
     pub span: LightSpan,
 }
 
@@ -134,6 +138,61 @@ pub enum View2dElement {
     If {
         cond: Expr,
         then: Vec<View2dElement>,
+    },
+}
+
+/// `view { ... }`（PLAN-048）：本 node 实例的基础 UI 呈现（真实 Iced 控件
+/// 由 driver 侧 adapter 呈现；本块只声明结构/绑定/事件端口）。单一 UI
+/// 出口：与 view-2d/view-3d 同块并存具名拒绝。
+#[derive(Debug, Clone)]
+pub struct ViewUiBlock {
+    pub elements: Vec<UiElement>,
+    pub span: LightSpan,
+}
+
+/// 基础 UI 容器种类（PLAN-048 冻结两件：row/column）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UiContainerKind {
+    Row,
+    Column,
+}
+
+impl UiContainerKind {
+    /// 诊断/产物用拼写（"row"/"column"）。
+    pub fn name(&self) -> &'static str {
+        match self {
+            UiContainerKind::Row => "row",
+            UiContainerKind::Column => "column",
+        }
+    }
+}
+
+/// `view` 元素（PLAN-048 冻结面）：容器/文字/按钮/条件/同定义实例。
+/// props 复用共享 Prop/PropValue（表达式语义与 view-2d 同源），属性白
+/// 名单与事件拼写由降层具名校验（解析面与 view-2d 同宽容）。
+#[derive(Debug, Clone)]
+pub enum UiElement {
+    /// `row name { props+children }` / `column name { props+children }`
+    /// —— 混合块（group2d 同文）：props 与子元素按行交错。
+    Container {
+        kind: UiContainerKind,
+        name: String,
+        props: Vec<Prop>,
+        children: Vec<UiElement>,
+    },
+    /// `text name { props }` —— 文字（无子元素；解析面具名拒绝）。
+    Text { name: String, props: Vec<Prop> },
+    /// `button name { props }` —— 按钮（事件端口在 props：onclick）。
+    Button { name: String, props: Vec<Prop> },
+    /// `if cond { elements }` —— 条件分支；分支消失即本实例该子树卸载
+    /// （事件端口一并失效），重现是新子树。
+    If { cond: Expr, then: Vec<UiElement> },
+    /// `NodeName instance_name { props }` —— 同定义多实例实例化点
+    /// （其 view 并入宿主 UI 布局）。
+    Instance {
+        node: String,
+        name: String,
+        props: Vec<Prop>,
     },
 }
 

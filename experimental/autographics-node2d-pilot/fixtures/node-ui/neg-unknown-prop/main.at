@@ -1,0 +1,13 @@
+// neg: unknown button prop
+node Main {
+    msg {
+        Go
+    }
+    view {
+        button b { text: "x", colour: 1, onclick: .Go }
+    }
+    on {
+        .Go -> {
+        }
+    }
+}

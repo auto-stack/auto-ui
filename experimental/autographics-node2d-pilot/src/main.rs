@@ -12,7 +12,7 @@ use autographics_node2d_pilot::{BasicProfile, Profile};
 
 fn usage() -> ! {
     eprintln!(
-        "usage: node2d-lower [--profile legacy|g11-2d|scene-2d|character-2d|camera-2d|components-2d|components-2d-game|queries-2d|queries-3d|editor-projects|sprites-2d|components-3d|components-3d-runtime|components-3d-events|components-3d-bindings|components-3d-presentation|components-3d-audio-hud|presentation-2d|components-2d-runtime] [--diagnostics-map] --entry <dir>/main.at --out <dir>"
+        "usage: node2d-lower [--profile legacy|node-ui|g11-2d|scene-2d|character-2d|camera-2d|components-2d|components-2d-game|queries-2d|queries-3d|editor-projects|sprites-2d|components-3d|components-3d-runtime|components-3d-events|components-3d-bindings|components-3d-presentation|components-3d-audio-hud|presentation-2d|components-2d-runtime] [--diagnostics-map] --entry <dir>/main.at --out <dir>"
     );
     std::process::exit(2);
 }
@@ -364,6 +364,7 @@ fn main() {
                 Some("components-3d-audio-hud") => Profile::Components3DAudioHud,
                 Some("presentation-2d") => Profile::Presentation2D,
                 Some("components-2d-runtime") => Profile::Components2DRuntime,
+                Some("node-ui") => Profile::NodeUi,
                 _ => usage(),
             }
         }
@@ -1444,6 +1445,86 @@ fn main() {
                     }
                 }
             }
+        }
+        Profile::NodeUi => {
+            // PLAN-048 基础 UI：ui.json（autographics.node-ui/1）+ world.at
+            // （真实 Auto 业务源）+ identity.json + closure/（A→B 冷再生）。
+            let lowered = autographics_node2d_pilot::lower_project_node_ui(&project)
+                .unwrap_or_else(|e| {
+                    eprintln!("node2d-lower: {e}");
+                    std::process::exit(3);
+                });
+            std::fs::write(format!("{out}/world.at"), &lowered.user_source).expect("world.at");
+            std::fs::write(format!("{out}/ui.json"), &lowered.ui_json).expect("ui.json");
+            let mut names: Vec<_> = project.modules.keys().collect();
+            names.sort();
+            let mut modules = String::new();
+            let mut closure = String::new();
+            for name in &names {
+                let bytes = project.modules[*name].source.as_bytes();
+                modules.push_str(&format!(
+                    "  \"module:{}\": \"{}\",\n",
+                    name,
+                    autographics_node2d_pilot::scene::sha256_hex(bytes)
+                ));
+                closure.push_str(&format!(
+                    "  {{\"name\": \"{name}\", \"sha256\": \"{}\", \"bytes\": {}}},\n",
+                    autographics_node2d_pilot::scene::sha256_hex(bytes),
+                    bytes.len()
+                ));
+            }
+            let mut identity = String::from("{\n");
+            identity.push_str(&format!(
+                " \"generator\": \"{}\",\n",
+                autographics_node2d_pilot::NODE_UI_GENERATOR
+            ));
+            identity.push_str(" \"api\": \"autographics.node-ui/1\",\n");
+            identity.push_str(&format!(
+                " \"user_source_sha256\": \"{}\",\n \"user_source_bytes\": {},\n \"ui_schema\": \"{}\",\n",
+                lowered.source_sha256,
+                lowered.source_bytes,
+                autographics_node2d_pilot::NODE_UI_SCHEMA
+            ));
+            identity.push_str(&modules);
+            identity.push_str(" \"closure\": [\n");
+            identity.push_str(closure.trim_end_matches(",\n"));
+            identity.push_str("\n ],\n");
+            let product = std::path::Path::new(out)
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("unrecorded")
+                .to_string();
+            let consumer = match product.as_str() {
+                "ui-ab" | "ui-ab-alt" => {
+                    "experimental/autographics-auto-driver/tests/node_ui_flow.rs + node_ui_storage.rs"
+                }
+                _ => "unrecorded (this out dir has no registered flow consumer)",
+            };
+            identity.push_str(" \"provenance\": {\n");
+            identity.push_str(&format!("  \"product\": \"{product}\",\n"));
+            identity.push_str(&format!("  \"consumer\": \"{consumer}\",\n"));
+            identity.push_str(
+                "  \"consumption\": \"include_str! frozen ui.json + world.at; the harness writes world.at to scripts/<sha>.at where <sha> = ui.world_sha256 and loads the behavior via SourceSnapshot (Api::NodeUi); the load path hash-verifies the behavior source; ui.json element/instance tables drive the real Iced adapter\",\n",
+            );
+            identity.push_str(&format!(
+                "  \"world_sha256\": \"{}\"\n",
+                lowered.source_sha256
+            ));
+            identity.push_str(" }\n}\n");
+            std::fs::write(format!("{out}/identity.json"), identity).expect("identity.json");
+            let closure_dir = format!("{out}/closure");
+            std::fs::create_dir_all(&closure_dir).expect("closure dir");
+            for name in &names {
+                let bytes = project.modules[*name].source.as_bytes();
+                std::fs::write(format!("{closure_dir}/{name}.at"), bytes).expect("closure file");
+            }
+            println!(
+                "node2d-lower[node-ui]: wrote ui.json (schema {}) + world.at ({} bytes, sha {}) + closure/{}",
+                autographics_node2d_pilot::NODE_UI_SCHEMA,
+                lowered.source_bytes,
+                lowered.source_sha256,
+                names.len()
+            );
         }
         Profile::Basic2D(basic) => {
             let lowered = autographics_node2d_pilot::lower_project_basic(&project, basic)

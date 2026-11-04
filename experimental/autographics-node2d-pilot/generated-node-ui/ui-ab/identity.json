@@ -1,0 +1,21 @@
+{
+ "generator": "autographics-node2d-pilot plan048 node-ui",
+ "api": "autographics.node-ui/1",
+ "user_source_sha256": "d0c6050cb4411520358ec2226eb21a5a1efddb9d585eb46646a268cdfccd2803",
+ "user_source_bytes": 15602,
+ "ui_schema": "autographics.node-ui/1",
+  "module:counter": "5f360701c429fdf442dca4dbd9143ed8102fdd4bc461b15c93426ad93a04bbd0",
+  "module:main": "5a5cc59eb83e0baaec0094e8ae99ff9481c659b963685c5029da8ced82b61e43",
+  "module:panel": "dbf1cc18181acd0090d9122b5ca95c73b5df4da16fd9eea851d807c39f08fe39",
+ "closure": [
+  {"name": "counter", "sha256": "5f360701c429fdf442dca4dbd9143ed8102fdd4bc461b15c93426ad93a04bbd0", "bytes": 733},
+  {"name": "main", "sha256": "5a5cc59eb83e0baaec0094e8ae99ff9481c659b963685c5029da8ced82b61e43", "bytes": 987},
+  {"name": "panel", "sha256": "dbf1cc18181acd0090d9122b5ca95c73b5df4da16fd9eea851d807c39f08fe39", "bytes": 993}
+ ],
+ "provenance": {
+  "product": "ui-ab",
+  "consumer": "experimental/autographics-auto-driver/tests/node_ui_flow.rs + node_ui_storage.rs",
+  "consumption": "include_str! frozen ui.json + world.at; the harness writes world.at to scripts/<sha>.at where <sha> = ui.world_sha256 and loads the behavior via SourceSnapshot (Api::NodeUi); the load path hash-verifies the behavior source; ui.json element/instance tables drive the real Iced adapter",
+  "world_sha256": "d0c6050cb4411520358ec2226eb21a5a1efddb9d585eb46646a268cdfccd2803"
+ }
+}

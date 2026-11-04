@@ -1,0 +1,6 @@
+// neg: unknown view element kind
+node Main {
+    view {
+        grid g { }
+    }
+}

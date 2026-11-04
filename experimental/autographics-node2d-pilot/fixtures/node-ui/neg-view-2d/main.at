@@ -1,0 +1,11 @@
+// neg: one node declares basic-UI view AND view-2d (mixed embedding is PLAN-049)
+node Main {
+    view {
+        text t { text: "x" }
+    }
+    view-2d {
+        shape2d s {
+            kind: quad
+        }
+    }
+}

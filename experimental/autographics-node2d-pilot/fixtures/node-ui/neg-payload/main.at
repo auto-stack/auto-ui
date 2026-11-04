@@ -1,0 +1,13 @@
+// neg: payload event (basic-UI v1 emits zero-arg events only)
+node Main {
+    msg {
+        Add(int)
+    }
+    view {
+        button b { text: "加", onclick: .Add }
+    }
+    on {
+        .Add -> {
+        }
+    }
+}

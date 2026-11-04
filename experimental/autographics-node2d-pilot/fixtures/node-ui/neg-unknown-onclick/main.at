@@ -1,0 +1,6 @@
+// neg: onclick references an event with no handler
+node Main {
+    view {
+        button b { text: "x", onclick: .Nope }
+    }
+}

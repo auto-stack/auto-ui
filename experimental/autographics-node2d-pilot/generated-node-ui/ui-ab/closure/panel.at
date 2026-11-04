@@ -1,0 +1,42 @@
+// PLAN-048 Panel definition: nested Counter child (meter) whose Reset event
+// is bound from this def's own button (child-event dispatch via the frozen
+// bind-table ABI); bool model field formats to true/false; `if` mounts the
+// state text only while on==1 (unmount = subtree absent).
+use counter: Counter
+
+node Panel {
+    model {
+        var on = true
+    }
+    msg {
+        Toggle
+        ResetMeter
+    }
+    view {
+        column box {
+            spacing: 6
+            Counter meter {
+                start: 100
+                step: 5
+            }
+            button toggle {
+                text: .on
+                enabled: 1
+                onclick: .Toggle
+            }
+            button reset {
+                text: "归零"
+                enabled: .on
+                onclick: meter.Inc
+            }
+            if .on {
+                text state { text: "开" }
+            }
+        }
+    }
+    on {
+        .Toggle -> {
+            .on = 1 - .on
+        }
+    }
+}

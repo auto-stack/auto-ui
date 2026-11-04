@@ -1,0 +1,12 @@
+// neg: five text-bearing elements exceed the frozen 4-slot def budget
+node Main {
+    view {
+        column root {
+            text a { text: "1" }
+            text b { text: "2" }
+            text c { text: "3" }
+            text d { text: "4" }
+            text e { text: "5" }
+        }
+    }
+}

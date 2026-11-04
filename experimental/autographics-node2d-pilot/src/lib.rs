@@ -10,6 +10,7 @@
 //! G11/2d 作者入口（声明驱动模板/角色/事件/调度）；`Profile::Legacy`
 //! 保持 016 最小切片逐字节兼容（verify_plan016 再生控制），不被自动升级。
 pub mod load;
+pub mod lower_node_ui;
 pub mod lower;
 pub mod lower_queries3d;
 pub mod lower_basic2d;
@@ -96,9 +97,14 @@ pub enum Profile {
     /// behavior:null 路径，仅换冻结身份串（document_id 前缀/生成说明/再生
     /// 控制注记/消费者登记）。G04 忠实夹具的消费入口；不为纯场景新增语法。
     EditorProjects,
+    /// PLAN-048 基础 UI Node：node/view（model/msg/on + row/column/text/
+    /// button）→ ui.json（autographics.node-ui/1）+ world.at（真实 Auto
+    /// 业务源；T-02 冻结的文字字节缓冲/事件派发 ABI）。
+    NodeUi,
 }
 
 pub use load::{load_project, load_project_dual, Project, ProjectError};
+pub use lower_node_ui::{lower_project_node_ui, LowerOutputNodeUi, NODE_UI_GENERATOR, NODE_UI_SCHEMA};
 pub use lower_queries3d::{
     lower_project_editor_projects, lower_project_queries3d, BEHAVIOR_API_V3, BEHAVIOR_API_V4,
 };

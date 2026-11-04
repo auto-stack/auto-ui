@@ -1,0 +1,17 @@
+// neg: 9 stateful instances exceed the frozen 8-instance envelope
+use item: Item
+
+node Main {
+    view {
+        column root {
+            Item i1 { }
+            Item i2 { }
+            Item i3 { }
+            Item i4 { }
+            Item i5 { }
+            Item i6 { }
+            Item i7 { }
+            Item i8 { }
+        }
+    }
+}
