@@ -1,7 +1,14 @@
 // app.at — Book Reader shell. Multi-page routes + sidebar nav + outlet.
 // Plan 399 018: first example to fuse routes (auto-read architecture) with a
 // strong-typed rust backend (015/017 CRUD pattern).
+// PLAN-047 T-03：接入官方主题包。族/模式选择经根 widget theme_name + design
+// 数据绑定（B2 021 跨路由共享 App 绑定先例）；dark-first 保留迁移前有效默认
+// （生成器 html.dark + 逃生舱 isDark=true，038 实测口径）。原逃生舱
+// （handmade ThemeToggle.vue + index.css 覆盖）随本批退役——主题单源入
+// packages/themes，切换走本侧栏的官方接线按钮（保留原门 T9 的
+// theme-toggle-btn 挂载点 oracle：点击翻转 html.dark）。
 use book_store: BooksStore
+use themes.themes: Auto, Solarized
 
 style sub_text = "text-sm text-muted-foreground"
 
@@ -13,7 +20,19 @@ widget App {
         "/settings" -> use settings
     }
 
-    msg { Init }
+    msg { Init, ToggleTheme }
+
+    model {
+        // 主题选择态（非业务状态）：dark-first 保留迁移前默认。
+        var theme_name str = "Auto"
+        var dark_mode bool = true
+    }
+
+    // 主题/模式选择器（C-14：数据绑定，同帧校验发布）
+    design {
+        theme: .theme_name
+        mode: if .dark_mode { "dark" } else { "light" }
+    }
 
     view {
         // PLAN-684 F-1 嵌入安全壳层：禁用 viewport-fixed 铬件。
@@ -49,6 +68,21 @@ widget App {
                                 text "Settings" {}
                             }
                         }
+                        // PLAN-047 T-03：README:49 既有承诺的侧栏主题切换挂载点
+                        // （原 theme-toggle 逃生舱从未入 DOM=F-10 具名红之一）。
+                        // theme-toggle-btn 类保留原门 T9 oracle 的选择器；语义
+                        // 走官方 design 绑定（本 handler 翻转根 dark_mode）。
+                        sidebar_menu_item {
+                            button {
+                                onclick: .ToggleTheme
+                                style: "theme-toggle-btn w-full items-center gap-2 px-2 py-1.5 rounded-md text-sm text-muted-foreground hover:bg-accent hover:text-foreground transition-colors cursor-pointer"
+                                if .dark_mode {
+                                    text "☀️ Light" {}
+                                } else {
+                                    text "🌙 Dark" {}
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -71,5 +105,8 @@ widget App {
 
     on {
         .Init -> { store.Init() }
+        // PLAN-047 T-03：官方主题热切换——翻转根 dark_mode，design 绑定同帧
+        // 发布（C-14；不写 localStorage、不经逃生舱）。
+        .ToggleTheme -> { .dark_mode = !.dark_mode }
     }
 }

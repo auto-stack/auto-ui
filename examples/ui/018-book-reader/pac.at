@@ -12,3 +12,11 @@ desktop: "true"
 dep stylekit {
     path: "../stylekit"
 }
+
+# PLAN-047 T-03：接入官方主题包（C-13）。018 无显式 pac theme/accent 键，但
+# 迁移前有效默认=生成器 html.dark + 逃生舱 isDark=true（038 实测口径）——
+# App 声明 dark-first 保留该默认；族/模式选择经根 widget theme_name + design
+# 数据绑定（B2 021 跨路由先例）。
+dep themes {
+    path: "../../../packages/themes"
+}

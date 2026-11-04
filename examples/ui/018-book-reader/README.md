@@ -21,11 +21,13 @@ Kindle) within AutoUI's reach.
   generator delegates every handler to `db.rs` (Plan 399 route B, full cover).
 - **Reading progress persistence** — entering a chapter PUTs `% read`; the
   bookshelf card and detail "Continue Reading" reflect saved progress.
-- **Runtime theme toggle (escape hatch)** — a handmade `vue/src/components/
-  ThemeToggle.vue` toggles `<html class="dark">` at runtime (the `theme-toggle`
-  tag auto-maps to it), backed by a handmade `index.css`. Demonstrates the
-  declarative-DOM + escape-hatch combo (cf.
-  `examples/capability-tests/028-dom-escape`).
+- **Runtime theme toggle (official theme package)** — PLAN-047: the root
+  `App` binds `theme_name`/`dark_mode` via a `design` block to the official
+  `packages/themes` families (Auto/Solarized × light/dark, dark-first default
+  preserved), and the sidebar hosts the theme toggle button (`.ToggleTheme` →
+  root `dark_mode` flip; the `theme-toggle-btn` mount point is asserted by the
+  smoke gate T9). The pre-package escape hatch (handmade `ThemeToggle.vue` +
+  `index.css` override) retired with the migration.
 - **Prev/next chapter navigation** — the reading view fetches the adjacent
   chapter and updates the URL + progress on click.
 
@@ -46,7 +48,7 @@ widget App {
     msg { Init }
     view {
         row {
-            col { /* sidebar: Library / Settings links + theme-toggle */ }
+            col { /* sidebar: Library / Settings links + theme toggle */ }
             col { outlet }
         }
     }
