@@ -1,0 +1,24 @@
+// PLAN-040 negative fixture: a marker bound to a dynamic expression (model
+// state feeding screen coordinates) is outside the pure-declarative editing
+// domain and must be rejected as a non-literal marker prop.
+node MarkerDynamicLab {
+    model {
+        var drift = 4.0
+    }
+    view-3d {
+        cylinder3d post {
+            position: (0.0, 0.0, 0.0)
+        }
+    }
+    view-2d {
+        shape2d tag {
+            kind: quad
+            position: (drift, 0.0)
+        }
+    }
+    on {
+        Life.Tick(dt float) -> {
+            refs.tag.place(0.0, 0.0, 0.0)
+        }
+    }
+}

@@ -1,0 +1,15 @@
+// PLAN-040 negative fixture: two scene rows with the same name (duplicate
+// object identity across dimensions) must be rejected.
+node DuplicateLab {
+    view-3d {
+        cylinder3d clash {
+            position: (0.0, 0.0, 0.0)
+        }
+    }
+    view-2d {
+        shape2d clash {
+            kind: quad
+            position: (0.0, 0.0)
+        }
+    }
+}

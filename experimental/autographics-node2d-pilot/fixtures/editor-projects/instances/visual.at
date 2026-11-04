@@ -1,0 +1,10 @@
+// PLAN-040 instances lab component module: one pure-visual definition with a
+// nominal position parameter; no model, no on — behavior:null by construction.
+node PairVisual(x: float) {
+    view-3d {
+        cylinder3d post {
+            position: (x, 0.0, 0.0)
+            scale: (0.3, 1.0, 0.3)
+        }
+    }
+}

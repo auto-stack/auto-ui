@@ -1,0 +1,25 @@
+// PLAN-040 negative fixture: a stateful/Life project is OUTSIDE the frozen
+// editor-projects support domain (behavior must stay null). The
+// editor-projects entry must reject this with the named diagnostic.
+node BehaviorLab {
+    model {
+        var count = 0
+    }
+    view-3d {
+        cylinder3d post {
+            position: (0.0, 0.0, 0.0)
+        }
+    }
+    view-2d {
+        shape2d tag {
+            kind: quad
+            position: (0.0, 0.0)
+            scale: (10.0, 10.0)
+        }
+    }
+    on {
+        Life.Tick(dt float) -> {
+            refs.tag.place(0.0, 0.0, 0.0)
+        }
+    }
+}

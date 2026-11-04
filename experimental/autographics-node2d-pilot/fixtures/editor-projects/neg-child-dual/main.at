@@ -1,0 +1,22 @@
+// PLAN-040 negative fixture: view-2d on a CHILD node stays rejected (the
+// dual exit is root-only; child nodes belong to one dimension).
+node ChildDualLab {
+    view-3d {
+        Sub duel {
+        }
+    }
+}
+
+node Sub {
+    view-3d {
+        cylinder3d post {
+            position: (0.0, 0.0, 0.0)
+        }
+    }
+    view-2d {
+        shape2d tag {
+            kind: quad
+            position: (0.0, 0.0)
+        }
+    }
+}

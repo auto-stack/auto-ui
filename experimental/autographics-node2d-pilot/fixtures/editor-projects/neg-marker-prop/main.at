@@ -1,0 +1,18 @@
+// PLAN-040 negative fixture: a marker with an unsupported prop (yaw —
+// markers are axis-aligned top-level screen-space leaves; parent/rotation are
+// not marker capabilities, so cross-dimension parenting is equally rejected)
+// must be rejected with the named diagnostic.
+node MarkerPropLab {
+    view-3d {
+        cylinder3d post {
+            position: (0.0, 0.0, 0.0)
+        }
+    }
+    view-2d {
+        shape2d tag {
+            kind: quad
+            position: (0.0, 0.0)
+            yaw: 0.0
+        }
+    }
+}

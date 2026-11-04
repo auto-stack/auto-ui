@@ -12,7 +12,7 @@ use autographics_node2d_pilot::{BasicProfile, Profile};
 
 fn usage() -> ! {
     eprintln!(
-        "usage: node2d-lower [--profile legacy|g11-2d|scene-2d|character-2d|camera-2d|components-2d|components-2d-game] --entry <dir>/main.at --out <dir>"
+        "usage: node2d-lower [--profile legacy|g11-2d|scene-2d|character-2d|camera-2d|components-2d|components-2d-game|queries-2d|queries-3d|editor-projects|sprites-2d|components-3d|components-3d-runtime|components-3d-events|components-3d-bindings|components-3d-presentation|components-3d-audio-hud|presentation-2d|components-2d-runtime] --entry <dir>/main.at --out <dir>"
     );
     std::process::exit(2);
 }
@@ -210,6 +210,16 @@ fn queries3d_consumer(product: &str) -> &'static str {
     }
 }
 
+/// PLAN-040 editor-products consumer registration（受检交接身份）。
+fn editor_projects_consumer(product: &str) -> &'static str {
+    match product {
+        "g04-editor-2d" | "g04-editor-3d" => {
+            "experimental/autographics-auto-driver/tests/node_editor_projects.rs + pilot tests/node_editor_gates.rs"
+        }
+        _ => "unrecorded (this out dir has no registered flow consumer)",
+    }
+}
+
 fn components3d_consumer(product: &str) -> &'static str {
     match product {
         "g02" | "g03" | "g03-parent" | "g03-hidden" | "twin" | "envelope8" | "rows129"
@@ -333,6 +343,7 @@ fn main() {
                 Some("components-2d") => Profile::Components2D,
                 Some("queries-2d") => Profile::Queries2D,
                 Some("queries-3d") => Profile::Queries3D,
+                Some("editor-projects") => Profile::EditorProjects,
                 Some("sprites-2d") => Profile::Sprites2D,
                 Some("components-2d-game") => Profile::Components2DGame,
                 Some("components-3d") => Profile::Components3D,
@@ -365,8 +376,9 @@ fn main() {
         .and_then(|i| args.get(i + 1))
         .map(|s| s.as_str());
     // PLAN-039：queries-3d 在自己的 arm 内以双 view 解析载入（全局
-    // 预载走默认 dialect，会先拒双 view）。
-    let project = if profile == Profile::Queries3D {
+    // 预载走默认 dialect，会先拒双 view）。PLAN-040 editor-projects 沿同一
+    // 双出口准入，在自己的 arm 内载入。
+    let project = if matches!(profile, Profile::Queries3D | Profile::EditorProjects) {
         autographics_node2d_pilot::Project::default()
     } else {
         autographics_node2d_pilot::load_project(std::path::Path::new(entry)).unwrap_or_else(|e| {
@@ -687,6 +699,41 @@ fn main() {
             );
             println!(
                 "node2d-lower[queries-3d]: wrote world.at + scene.agscene (api {behavior_api}) + identity.json + closure/ + assets/"
+            );
+        }
+        Profile::EditorProjects => {
+            // PLAN-040：与 queries-3d 同一机制/准入/产物规则，仅身份串不同
+            // （plan040-editor-projects）；G04 纯声明双维编辑工程入口。
+            let project = autographics_node2d_pilot::load_project_dual(
+                std::path::Path::new(entry),
+                true,
+            )
+            .unwrap_or_else(|e| {
+                eprintln!("node2d-lower: {e:?}");
+                std::process::exit(2);
+            });
+            let lowered = autographics_node2d_pilot::lower_project_editor_projects(&project)
+                .unwrap_or_else(|e| {
+                    eprintln!("node2d-lower: {e}");
+                    std::process::exit(3);
+                });
+            let behavior_api = if lowered.scene_json.contains("autographics.behavior/4") {
+                autographics_node2d_pilot::BEHAVIOR_API_V4
+            } else {
+                autographics_node2d_pilot::BEHAVIOR_API_V3
+            };
+            write_components3d_products(
+                out,
+                entry,
+                &project,
+                lowered,
+                "autographics-node2d-pilot plan040 editor-projects",
+                behavior_api,
+                editor_projects_consumer,
+                None,
+            );
+            println!(
+                "node2d-lower[editor-projects]: wrote scene.agscene + identity.json + closure/ + assets/ (behavior:null when the source is purely declarative)"
             );
         }
         Profile::Components2D | Profile::Queries2D => {

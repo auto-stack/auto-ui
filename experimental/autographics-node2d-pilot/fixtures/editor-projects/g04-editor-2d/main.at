@@ -1,0 +1,44 @@
+// PLAN-040 node editor projects T-02: G04/2d-faithful pure-declarative dual
+// root. The original 2d project (ag-examples examples/g04-editor/g04-2d,
+// schema autographics.scene/4) holds four screen-space 2D-kind objects
+// (circle id1 / quad id2 / helper quad id5 / helper circle id6) plus the
+// calibrated 3D player/mob row (id3/id4) — every object value below is the
+// original byte-for-byte value; IDs map explicitly (original -> author
+// symbol, frozen in identity.json and the gates). No model state, no on
+// handlers: the behavior:null static path (PLAN-027/039 proven), no user VM.
+node G04Editor2d {
+    view-3d {
+        player3d obj3_player {
+            position: (-1.5, 0.0, 0.0)
+        }
+        mob3d obj4_mob {
+            position: (1.5, 0.0, 0.0)
+        }
+    }
+    view-2d {
+        shape2d obj1_circle {
+            kind: circle
+            position: (-55.0, 0.0, 0.0)
+            scale: (50.0, 50.0, 1.0)
+            rgba: (0.9, 0.3, 0.2, 1.0)
+        }
+        shape2d obj2_quad {
+            kind: quad
+            position: (55.0, 0.0, 0.0)
+            scale: (50.0, 50.0, 1.0)
+            rgba: (0.9, 0.3, 0.2, 1.0)
+        }
+        shape2d helper_quad {
+            kind: quad
+            position: (400.0, -300.0, 0.0)
+            scale: (30.0, 30.0, 1.0)
+            rgba: (0.2, 0.3, 0.9, 1.0)
+        }
+        shape2d helper_circle {
+            kind: circle
+            position: (-400.0, 300.0, 0.0)
+            scale: (20.0, 20.0, 1.0)
+            rgba: (0.2, 0.8, 0.3, 1.0)
+        }
+    }
+}

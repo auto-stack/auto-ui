@@ -27,6 +27,44 @@ pub const BEHAVIOR_API_V4: &str = "autographics.behavior/4";
 
 /// queries-3d 档入口：准入 → 桥接共享 3D 管线。
 pub fn lower_project_queries3d(project: &Project) -> Result<LowerOutputBasic2D, LowerError> {
+    lower_project_queries3d_identity(
+        project,
+        "plan039-queries-3d",
+        "PLAN-039 queries-3d",
+        "tools/verify_plan039.py",
+    )
+}
+
+/// PLAN-040 editor-projects：同一静态双出口机制，仅换冻结身份串
+/// （document_id 前缀/生成说明/再生控制注记）。机制、准入与产物字节规则
+/// 与 queries-3d 完全一致；不为纯场景新增语法或渲染。支持域冻结为纯声明
+/// （behavior:null）：stateful/Life 工程属运行档域，具名拒绝不静默扩域。
+pub fn lower_project_editor_projects(
+    project: &Project,
+) -> Result<LowerOutputBasic2D, LowerError> {
+    let lowered = lower_project_queries3d_identity(
+        project,
+        "plan040-editor-projects",
+        "PLAN-040 editor-projects",
+        "tools/verify_plan040.py",
+    )?;
+    if lowered.user_source.is_some() {
+        return Err(crate::lower_components::at(
+            "",
+            0,
+            "editor-projects",
+            "editor-projects accepts pure declarative projects only: behavior must stay null (stateful/Life authoring belongs to the runtime profiles)",
+        ));
+    }
+    Ok(lowered)
+}
+
+fn lower_project_queries3d_identity(
+    project: &Project,
+    doc_prefix: &'static str,
+    gen_note: &'static str,
+    regen_note: &'static str,
+) -> Result<LowerOutputBasic2D, LowerError> {
     // 有限组合：仅 root 允许 view-2d（子 Node 单维；旧档解析期拒绝在
     // 默认 dialect 路径字节不变）。
     for (module_name, module) in &project.modules {
@@ -57,9 +95,9 @@ pub fn lower_project_queries3d(project: &Project) -> Result<LowerOutputBasic2D, 
         events: None,
         bindings: None,
         presentation: None,
-        doc_prefix: "plan039-queries-3d",
-        gen_note: "PLAN-039 queries-3d",
-        regen_note: "tools/verify_plan039.py",
+        doc_prefix,
+        gen_note,
+        regen_note,
         behavior_api,
             ahud: None,
             queries3: Some(&Queries3Cfg { markers }),

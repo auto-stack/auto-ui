@@ -87,10 +87,16 @@ pub enum Profile {
     /// segment-only → behavior/3、含 sweep → behavior/4 装配；沿 024
     /// 共享管线 + 档注入）。
     Queries3D,
+    /// PLAN-040 编辑工程：与 queries-3d 完全相同的静态双出口机制与纯声明
+    /// behavior:null 路径，仅换冻结身份串（document_id 前缀/生成说明/再生
+    /// 控制注记/消费者登记）。G04 忠实夹具的消费入口；不为纯场景新增语法。
+    EditorProjects,
 }
 
 pub use load::{load_project, load_project_dual, Project, ProjectError};
-pub use lower_queries3d::{lower_project_queries3d, BEHAVIOR_API_V3, BEHAVIOR_API_V4};
+pub use lower_queries3d::{
+    lower_project_editor_projects, lower_project_queries3d, BEHAVIOR_API_V3, BEHAVIOR_API_V4,
+};
 pub use lower::{lower_project, LowerOutput};
 pub use lower_basic2d::{lower_project_basic, BasicProfile, LowerOutputBasic2D};
 pub use lower_components::{

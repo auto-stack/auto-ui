@@ -1,0 +1,24 @@
+// PLAN-040 editor-projects instances lab: two same-definition pure-visual
+// component instances (ordinary use, no model/on anywhere — behavior:null)
+// inside one dual-view root. Covers the V-S01 "two same-definition pure
+// visual components" support-domain freeze; child nodes stay single-dimension.
+use visual: PairVisual
+
+node InstanceLab {
+    view-3d {
+        PairVisual left {
+            x: -2.0
+        }
+        PairVisual right {
+            x: 2.0
+        }
+    }
+    view-2d {
+        shape2d tag {
+            kind: quad
+            position: (0.0, 0.0)
+            scale: (10.0, 10.0)
+            rgba: (1.0, 1.0, 0.1, 1.0)
+        }
+    }
+}

@@ -1,0 +1,182 @@
+{
+ "behavior": null,
+ "schema": "autographics.scene/6",
+ "document_id": "plan040-editor-projects-main",
+ "resources": [
+  "circle",
+  "quad",
+  "cylinder",
+  "player",
+  "mob"
+ ],
+ "groups": [
+
+ ],
+ "objects": [
+  {
+   "id": 1,
+   "name": "obj3_player",
+   "kind": "player",
+   "translation": [
+    -1.5,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 2,
+   "name": "obj4_mob",
+   "kind": "mob",
+   "translation": [
+    1.5,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 3,
+   "name": "obj1_circle",
+   "kind": "circle",
+   "translation": [
+    -55.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    50.0,
+    50.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 4,
+   "name": "obj2_quad",
+   "kind": "quad",
+   "translation": [
+    55.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    50.0,
+    50.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 5,
+   "name": "helper_quad",
+   "kind": "quad",
+   "translation": [
+    400.0,
+    -300.0,
+    0.0
+   ],
+   "scale": [
+    30.0,
+    30.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.2,
+    0.3,
+    0.9,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 6,
+   "name": "helper_circle",
+   "kind": "circle",
+   "translation": [
+    -400.0,
+    300.0,
+    0.0
+   ],
+   "scale": [
+    20.0,
+    20.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.2,
+    0.8,
+    0.3,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  }
+ ],
+ "assets": [
+
+ ]
+}
