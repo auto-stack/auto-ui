@@ -40,6 +40,10 @@ docs/specs/auto-graphics/node3d-character-and-runtime-camera.md 的 SD-01
 `.grounded(q)`/`.support(q)`、`camera3d.forward_x/forward_z/right_x/
 right_z/yaw/pitch/distance()`（零空间计费读取）。同一 profile 保持
 024 全部静态能力（cylinder3d/model3d/group3d/020 局部事件）。
+PLAN-043（SD-02）收口：`ag_char3_move` 的滑扫跳过不可见文档行
+（`visible_only=1` 语义）——parked spawn 模板与隐藏表现行永不阻挡
+角色行走；全部已交付内容的阻挡行均可见，可观察行为不变（g14 轨迹
+对照：隐藏模板在路径上 vs 停远处，逐 tick 角色位置逐位相等）。
 
 ## 1. 执行证据（只述实测）
 
