@@ -26,6 +26,7 @@ pub mod lower_components2d_runtime;
 pub mod lower_node3d_presentation;
 pub mod lower_presentation;
 pub mod scene;
+pub mod source_map;
 pub mod translate;
 
 /// 降层 profile（PLAN-017 T-02 冻结；PLAN-020 增补 components-2d；
