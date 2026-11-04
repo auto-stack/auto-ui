@@ -346,6 +346,111 @@ fn fake_line_text_and_multi_occurrence_symbol_never_map() {
 }
 
 #[test]
+fn mapped_diagnostic_truncates_at_8kib() {
+    // V-S05：8KiB 截断在 mapped 路径同样保持（正文截断、UTF8 安全、
+    // map 错误不覆盖原错误）。
+    let snap = SourceSnapshot::from_bytes_for(
+        Path::new("world.at"),
+        WORLD.as_bytes().to_vec(),
+        Api::Objects2V1,
+    )
+    .unwrap();
+    let map = SourceMap::parse(MAP_JSON, WORLD).unwrap();
+    let closure_dir = Path::new(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../autographics-node2d-pilot/generated-components2d/diag-fault/closure"
+    ));
+    let closure = map.closure_sources(closure_dir).unwrap();
+    let region = snap.regions.iter().find(|r| r.file == "world.at").unwrap();
+    let seg = map
+        .segments
+        .iter()
+        .find(|s| s.module.as_deref() == Some("broken"))
+        .unwrap();
+    let sym = WORLD[seg.start..seg.end].find("absent_helper").unwrap() + seg.start;
+    let big = "x".repeat(20 * 1024);
+    let err = auto_lang_core::error::AutoError::MsgWithSource(
+        auto_lang_core::error::MsgWithSource {
+            source: miette::NamedSource::new("<script>", snap.source.clone()),
+            message: format!("Undefined symbol: absent_helper in module <main>: {big}"),
+            span: miette::SourceSpan::new((region.start + sym).into(), 1usize.into()),
+            help: None,
+        },
+    );
+    let d = snap.sdk_diagnostic_mapped("compile", &err, Some(&map), Some(&closure));
+    assert!(
+        d.contains("broken.at:"),
+        "mapped prefix preserved before truncation: {:.80}",
+        d
+    );
+    assert!(
+        d.contains("[diagnostic truncated at 8KiB]"),
+        "mapped path keeps the 8KiB bound: len={}",
+        d.len()
+    );
+    assert!(d.len() < 9 * 1024, "truncated output stays bounded: {}", d.len());
+}
+
+#[test]
+fn bad_map_reject_fix_recover_and_a_to_b_relative_move() {
+    // V-S06：坏 map 拒用 → 精确修复 → 下一次真实诊断恢复映射；
+    // A→B（SaveAs/搬迁）只依赖包内相对结构，同一份字节在新目录等价消费。
+    let src = Path::new(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../autographics-node2d-pilot/generated-components2d/diag-fault"
+    ));
+    let a = std::env::temp_dir().join(format!("plan044-a-{}", std::process::id()));
+    let b = std::env::temp_dir().join(format!("plan044-b-{}", std::process::id()));
+    for d in [&a, &b] {
+        let _ = std::fs::remove_dir_all(d);
+        std::fs::create_dir_all(d.join("closure")).unwrap();
+        for f in ["world.at", "source-map.json"] {
+            std::fs::copy(src.join(f), d.join(f)).unwrap();
+        }
+        for entry in std::fs::read_dir(src.join("closure")).unwrap() {
+            let entry = entry.unwrap();
+            std::fs::copy(entry.path(), d.join("closure").join(entry.file_name())).unwrap();
+        }
+    }
+    // A：好包映射可用。
+    let (map, closure) = SourceMap::load_for_world(&a.join("world.at")).expect("A accepted");
+    let seg = map
+        .segments
+        .iter()
+        .find(|s| s.module.as_deref() == Some("broken"))
+        .unwrap();
+    let sym = WORLD[seg.start..seg.end].find("absent_helper").unwrap() + seg.start;
+    assert!(map
+        .diagnose_user_offset(sym, WORLD, &closure, Some("absent_helper"))
+        .is_some());
+    // A 坏图（sha 变异）→ 拒用。
+    let mut m: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(a.join("source-map.json")).unwrap(),
+    )
+    .unwrap();
+    m["world_sha256"] = serde_json::Value::String("f".repeat(64));
+    std::fs::write(
+        a.join("source-map.json"),
+        serde_json::to_string(&m).unwrap(),
+    )
+    .unwrap();
+    assert!(SourceMap::load_for_world(&a.join("world.at")).is_none(), "bad map rejected");
+    // 精确修复（恢复好图）→ 下一次诊断恢复映射。
+    std::fs::copy(src.join("source-map.json"), a.join("source-map.json")).unwrap();
+    let (map, closure) = SourceMap::load_for_world(&a.join("world.at")).expect("fixed map accepted");
+    assert!(map
+        .diagnose_user_offset(sym, WORLD, &closure, Some("absent_helper"))
+        .is_some());
+    // B（搬迁目录）：同字节等价消费，来源无关。
+    let (map_b, closure_b) = SourceMap::load_for_world(&b.join("world.at")).expect("B accepted");
+    assert!(map_b
+        .diagnose_user_offset(sym, WORLD, &closure_b, Some("absent_helper"))
+        .is_some());
+    std::fs::remove_dir_all(&a).ok();
+    std::fs::remove_dir_all(&b).ok();
+}
+
+#[test]
 fn precision_matrix_generated_segments_never_map() {
     // generated 段（SoA/调度）命中时 diagnose 返回 None → 调用方回退。
     let snap = SourceSnapshot::from_bytes_for(
