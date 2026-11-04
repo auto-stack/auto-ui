@@ -1558,9 +1558,10 @@ Prism.languages.auto = {{
     let mut store_ctx_import = String::new();
     let mut store_ctx_install = String::new();
     if project_has_stores {
-        // PLAN-051 T-02 (①): leading `\n` — `router_import` has no trailing
-        // newline, so bare concatenation emitted `from './router'import …`
-        // (invalid TS) on every cold scaffold.
+        // PLAN-051 T-02 (①) + PLAN-047 T-02（独立复认）：前导 `\n` 必须有——
+        // `router_import` 无尾换行，裸拼接发射 `from './router'import …`
+        //（非法 TS；routes+stores 项目 esbuild transform 直接 500，
+        // 018-book-reader 原门 0/10 实录；非路由项目 base 自带尾换行不受影响）。
         store_ctx_import =
             "\nimport { installAutoStoreContext } from './stores/__autoStoreContext'\n"
                 .to_string();
@@ -12394,6 +12395,25 @@ styles: ["src/front/autodown-editor.css", "src/front/theme.css"]
         // Without styles: no imports, same as before.
         let plain = generate_main_ts(false, false, &[], &I18nConfig::default(), &[], false);
         assert!(!plain.contains("./styles/"), "main.ts:\n{}", plain);
+    }
+
+    /// PLAN-047 T-02：routes+stores 项目 main.ts 两条 import 必须各占一行。
+    /// 回归锚：018-book-reader 原门（74d581d9 起 store_ctx_import 缺前导
+    /// \n，与 router_import 拼接同行 → esbuild transform 500 → 应用全挂）。
+    #[test]
+    fn test_generate_main_ts_router_and_store_ctx_imports_on_separate_lines() {
+        let main_ts = generate_main_ts(true, false, &[], &I18nConfig::default(), &[], true);
+        assert!(
+            main_ts
+                .contains("import router from './router'\nimport { installAutoStoreContext }"),
+            "routes+stores 项目的两条 import 必须分行（PLAN-047 回归锚）：\n{}",
+            main_ts
+        );
+        assert!(
+            !main_ts.contains("'./router'import"),
+            "不允许拼接同行 import：\n{}",
+            main_ts
+        );
     }
 
     // ====================================================================

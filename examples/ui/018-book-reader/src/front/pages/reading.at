@@ -8,7 +8,7 @@
 // ——章节/书目改 Http.get_json 拉（/api/chapters?book_id=&number= 与
 // /api/books/:id(/chapters)，lazy back 随请求孵化）。
 use store: BooksStore
-use fmt: pct1
+use fmt: pct
 
 style page_btn = "inline-flex items-center gap-1 px-3 py-1.5 text-sm text-foreground hover:bg-accent rounded-lg transition-colors disabled:opacity-40"
 
@@ -37,7 +37,7 @@ widget reading {
         var font_size str = "medium"
         var line_height str = "comfy"
         var body_style str = "text-foreground text-base leading-relaxed"
-        var progress_label str = "0.0%"
+        var progress_label str = "0%"
     }
 
     view {
@@ -181,7 +181,7 @@ widget reading {
                 lead_cls = "leading-snug"
             }
             .body_style = "text-foreground " + size_cls + " " + lead_cls
-            .progress_label = pct1(.progress_pct) + "%"
+            .progress_label = pct(.progress_pct) + "%"
             .loaded = true
             store.SetProgress(.book_id, .progress_pct)
         }
@@ -197,7 +197,7 @@ widget reading {
                 if total > 0 {
                     .progress_pct = pct_of(.chapter_num, total)
                 }
-                .progress_label = pct1(.progress_pct) + "%"
+                .progress_label = pct(.progress_pct) + "%"
                 store.SetProgress(.book_id, .progress_pct)
             }
         }
@@ -210,7 +210,7 @@ widget reading {
                 if total > 0 {
                     .progress_pct = pct_of(.chapter_num, total)
                 }
-                .progress_label = pct1(.progress_pct) + "%"
+                .progress_label = pct(.progress_pct) + "%"
                 store.SetProgress(.book_id, .progress_pct)
             }
         }
@@ -223,7 +223,7 @@ widget reading {
                 if total > 0 {
                     .progress_pct = pct_of(.chapter_num, total)
                 }
-                .progress_label = pct1(.progress_pct) + "%"
+                .progress_label = pct(.progress_pct) + "%"
                 store.SetProgress(.book_id, .progress_pct)
             }
         }

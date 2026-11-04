@@ -2,7 +2,7 @@
 // 封面网格 + 新建书对话框。PLAN-684 F-2：对话框遮罩用容器内 absolute
 // （父级 relative），不再 fixed inset-0（嵌入态会穿出视口卡，P675-D1 同族）。
 use store: BooksStore
-use fmt: pct1
+use fmt: pct
 
 style field_label = "text-sm font-medium text-foreground"
 style search_input = "px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground outline-none focus:border-primary"
@@ -204,7 +204,7 @@ widget bookshelf {
             var i int = 0
             while i < .store.books.len() {
                 let b = .store.books[i]
-                .cards.push({ id: b.id, title: b.title, author: b.author, cover_color: b.cover_color, progress: b.progress, progress_label: pct1(b.progress) + "%" })
+                .cards.push({ id: b.id, title: b.title, author: b.author, cover_color: b.cover_color, progress: b.progress, progress_label: pct(b.progress) + "%" })
                 i = i + 1
             }
             .book_count = .cards.len()
@@ -218,7 +218,7 @@ widget bookshelf {
                 .cont_color = .store.books[idx].cover_color
                 .cont_progress = .store.books[idx].progress
                 .cont_chapter_count = .store.books[idx].chapter_count
-                .cont_label = pct1(.cont_progress) + "%"
+                .cont_label = pct(.cont_progress) + "%"
             }
         }
         .OpenBook(id int) -> { router.push("/book/" + id.to_string()) }
@@ -242,7 +242,7 @@ widget bookshelf {
                 var i int = 0
                 while i < .store.books.len() {
                     let b = .store.books[i]
-                    .cards.push({ id: b.id, title: b.title, author: b.author, cover_color: b.cover_color, progress: b.progress, progress_label: pct1(b.progress) + "%" })
+                    .cards.push({ id: b.id, title: b.title, author: b.author, cover_color: b.cover_color, progress: b.progress, progress_label: pct(b.progress) + "%" })
                     i = i + 1
                 }
                 .book_count = .cards.len()
@@ -256,7 +256,7 @@ widget bookshelf {
                     .cont_color = .store.books[idx].cover_color
                     .cont_progress = .store.books[idx].progress
                     .cont_chapter_count = .store.books[idx].chapter_count
-                    .cont_label = pct1(.cont_progress) + "%"
+                    .cont_label = pct(.cont_progress) + "%"
                 }
             }
         }
@@ -266,7 +266,7 @@ widget bookshelf {
             var i int = 0
             while i < .store.books.len() {
                 let b = .store.books[i]
-                .cards.push({ id: b.id, title: b.title, author: b.author, cover_color: b.cover_color, progress: b.progress, progress_label: pct1(b.progress) + "%" })
+                .cards.push({ id: b.id, title: b.title, author: b.author, cover_color: b.cover_color, progress: b.progress, progress_label: pct(b.progress) + "%" })
                 i = i + 1
             }
             .book_count = .cards.len()
@@ -280,7 +280,7 @@ widget bookshelf {
                 .cont_color = .store.books[idx].cover_color
                 .cont_progress = .store.books[idx].progress
                 .cont_chapter_count = .store.books[idx].chapter_count
-                .cont_label = pct1(.cont_progress) + "%"
+                .cont_label = pct(.cont_progress) + "%"
             }
         }
     }

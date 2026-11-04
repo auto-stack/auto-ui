@@ -1,5 +1,5 @@
 // book_detail.at — "/book/:id" 书籍详情 + 章节目录。
-use fmt: pct1
+use fmt: pct
 
 /// progress → 当前章（1-based）；与 bookshelf 的同名 fn 去重（T-15：重名定义毒化链接符号表）。
 fn detail_chapter_from_progress(progress int, chapter_count int) int {
@@ -56,6 +56,12 @@ widget book_detail {
                         text .chapters_label { style: "text-xs text-muted-foreground" }
                         // PLAN-712 r3：章节目录列表——点击进阅读页（此前本页
                         // 只有计数标签，章节入口只能绕 ContinueReading）。
+                        // PLAN-047 T-02：补 "Chapters" 区标题（原门 T3 断言的
+                        // 章节区可见标题；acceptance.atd "见封面/作者/章节列表"
+                        // 的原承诺面，712 r3 重设计时未随迁）。
+                        text "Chapters" {
+                            style: "text-lg font-semibold text-foreground"
+                        }
                         col {
                             style: "gap-1"
                             for ch in .chapters {
@@ -87,7 +93,7 @@ widget book_detail {
             }
             if .has_book == true {
                 .current_ch = detail_chapter_from_progress(.book.progress, .book.chapter_count)
-                .progress_label = pct1(.book.progress) + "%"
+                .progress_label = pct(.book.progress) + "%"
             }
             .loaded = true
         }

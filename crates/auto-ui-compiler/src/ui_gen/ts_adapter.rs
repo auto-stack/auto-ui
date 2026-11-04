@@ -1317,6 +1317,55 @@ fn transpile_expr(expr: &Expr, ctx: &AuraTsContext, out: &mut Vec<u8>) {
                         write!(out, ")").ok();
                         return;
                     }
+                    // PLAN-047 T-02：store facade 方法调用一律 `await`。store
+                    // composable 的方法体含 fetch（async）——fire-and-forget 调用
+                    // 之后的语句读到的是旧 state（018 SubmitAdd 重建 cards 读到
+                    // pre-POST books、T8 添加书不现身实录；Init/onMounted 同族，
+                    // T1 偶发绿=时序竞态）。`await` 同步方法返回值无害；所在
+                    // handler/lifecycle 的 async 化由既有 `body.contains("await")`
+                    // 判定承担（Plan 617 T-06 同机制）。仅拦「facade 头」的方法
+                    // 调用——store 状态访问（`store.books`）与用户自有对象同名
+                    // 场景（无 facade 时 `store.X()`）不受影响。facade 变量解析
+                    // 先于 await（多 store 裸 `store.X` 走 PLAN-010 归属路由）。
+                    let facade_head: Option<String> = match object.as_ref() {
+                        auto_lang_core::ast::Expr::Ident(head) => {
+                            if ctx.store_facade_from.is_some()
+                                && (head.as_str() == "store"
+                                    || Some(head.as_str()) == ctx.store_facade_from.as_deref())
+                            {
+                                Some(head.as_str().to_string())
+                            } else if ctx.store_facades.contains_key(head.as_str()) {
+                                Some(head.as_str().to_string())
+                            } else {
+                                None
+                            }
+                        }
+                        _ => None,
+                    };
+                    if let Some(head) = facade_head {
+                        let var = if head == "store" && ctx.store_facade_from.is_some() {
+                            ctx.bare_store_routing
+                                .get(method.as_str())
+                                .cloned()
+                                .unwrap_or_else(|| "store".to_string())
+                        } else if Some(head.as_str()) == ctx.store_facade_from.as_deref() {
+                            "store".to_string()
+                        } else {
+                            ctx.store_facades
+                                .get(head.as_str())
+                                .cloned()
+                                .unwrap_or_else(|| "store".to_string())
+                        };
+                        write!(out, "await {}.{}(", var, sanitize_ident(method.as_str())).ok();
+                        for (i, arg) in call.args.args.iter().enumerate() {
+                            if i > 0 {
+                                write!(out, ", ").ok();
+                            }
+                            transpile_expr(&arg.get_expr(), ctx, out);
+                        }
+                        write!(out, ")").ok();
+                        return;
+                    }
                     // Plan 559 W2: store-composable self-qualification (vm A1
                     // contract) — `Collection.Select(x)` inside the Collection
                     // store's own bodies emits as a bare local call. Same
@@ -2210,9 +2259,12 @@ fn transpile_expr(expr: &Expr, ctx: &AuraTsContext, out: &mut Vec<u8>) {
             // otherwise the emitted arrow has an await in a non-async fn
             // (TS1308; jade search_panel sink: the debounced run closure's
             // `use back.api: search_pages` call).
+            // PLAN-047 T-02: store facade 方法调用同样发射 `await`（见 Dot-call
+            // 臂）——闭包体含 facade 调用时也必须 async。
             let mut needs_async = false;
             if let Expr::Block(b) = closure.body.as_ref() {
-                needs_async = stmts_contain_api_call_with(&b.stmts, &ctx.api_functions);
+                needs_async = stmts_contain_api_call_with(&b.stmts, &ctx.api_functions)
+                    || stmts_contain_store_facade_call(&b.stmts, ctx);
             }
             if needs_async {
                 write!(out, "async ").ok();
@@ -2272,6 +2324,22 @@ fn transpile_expr(expr: &Expr, ctx: &AuraTsContext, out: &mut Vec<u8>) {
                     }
                 }
                 write!(out, " }}").ok();
+            }
+        }
+
+        // PLAN-047 T-02：`as <整数>` 截断转换必须 emit `Math.trunc(...)`——
+        // 不能落到 a2ts 的 `Number(...)`（JS `/` 本就产 float，Number 不截断；
+        // 018 reading pct_of `(cur*100/total) as int` 曾发射
+        // `Number(1*100/3)`=33.333…，PUT 进度体被后端 i64 拒 422，原门 T10
+        // 控制台实录）。Float/Double 目标语义=数值化非截断，维持 a2ts Number。
+        Expr::Cast { expr: inner, target_type } | Expr::To { expr: inner, target_type } => {
+            match target_type {
+                Type::Int | Type::Uint | Type::USize | Type::I64 | Type::U64 | Type::Byte => {
+                    write!(out, "Math.trunc(").ok();
+                    transpile_expr(inner, ctx, out);
+                    write!(out, ")").ok();
+                }
+                _ => delegate_expr(expr, ctx, out),
             }
         }
 
@@ -2439,6 +2507,23 @@ fn try_transpile_builtin_call(
                         } else {
                             transpile_expr(&a.get_expr().clone(), ctx, out);
                         }
+                        true
+                    }
+                    None => false, // 无参的畸形调用走通用路径（错误照常上报）
+                }
+            } else if method == "from_value" {
+                // PLAN-047 T-02：json.from_value(x) → x（恒等）。VM 侧 from_value
+                // 是「Value → JSON 字符串」原语（Http.post/put 请求体）；Vue 侧
+                // Http.post/put 的发射层已自带 JSON.stringify 包裹（body: 
+                // JSON.stringify(<body>)），from_value 再 stringify 会双层编码
+                // （wire body 变 JSON 字符串的字符串 → axum 422，018 T8 实录）。
+                // 恒等映射与 PLAN-617 的 to_value(x)→x 配方互为镜像：序列化
+                // 职责归 Http 发射层。此前无映射臂走通用路径原样发射
+                // `json.from_value(...)`，运行期 ReferenceError 被 store 的
+                // try/catch 吞掉 → POST/PUT 静默不发（018 原门 T7/T8 双红）。
+                match args.args.first() {
+                    Some(a) => {
+                        transpile_expr(&a.get_expr().clone(), ctx, out);
                         true
                     }
                     None => false, // 无参的畸形调用走通用路径（错误照常上报）
@@ -2702,6 +2787,75 @@ pub fn stmts_contain_api_call(stmts: &[Stmt]) -> bool {
 }
 
 /// Check if any statement in the list contains an API function call (with custom function list).
+/// PLAN-047 T-02：语句序列里是否含 store facade 方法调用（`store.X(...)` /
+/// 限定名 / 多 store facade 头）。供闭包 needs_async 判定——facade 方法调用
+/// 发射 `await`（见 Dot-call 臂），闭包必须随之 async（TS1308）。
+pub fn stmts_contain_store_facade_call(stmts: &[Stmt], ctx: &AuraTsContext) -> bool {
+    fn is_facade_head(head: &str, ctx: &AuraTsContext) -> bool {
+        (ctx.store_facade_from.is_some()
+            && (head == "store" || Some(head) == ctx.store_facade_from.as_deref()))
+            || ctx.store_facades.contains_key(head)
+    }
+    fn walk_expr(expr: &Expr, ctx: &AuraTsContext) -> bool {
+        match expr {
+            Expr::Call(call) => {
+                let head_is_facade = match call.name.as_ref() {
+                    Expr::Dot(obj, _) => {
+                        matches!(obj.as_ref(), Expr::Ident(h) if is_facade_head(h.as_str(), ctx))
+                    }
+                    _ => false,
+                };
+                head_is_facade
+                    || call.args.args.iter().any(|a| walk_expr(&a.get_expr(), ctx))
+            }
+            Expr::Bina(l, _, r) => walk_expr(l, ctx) || walk_expr(r, ctx),
+            Expr::Unary(_, e) => walk_expr(e, ctx),
+            Expr::Dot(obj, _) => walk_expr(obj, ctx),
+            Expr::Array(items) => items.iter().any(|e| walk_expr(e, ctx)),
+            Expr::Index(a, i) => walk_expr(a, ctx) || walk_expr(i, ctx),
+            Expr::NullCoalesce(l, r) => walk_expr(l, ctx) || walk_expr(r, ctx),
+            _ => false,
+        }
+    }
+    fn check_stmts(stmts: &[Stmt], ctx: &AuraTsContext) -> bool {
+        stmts.iter().any(|s| match s {
+            Stmt::Expr(expr) => walk_expr(expr, ctx),
+            Stmt::Store(store) => walk_expr(&store.expr, ctx),
+            Stmt::If(if_stmt) => {
+                if_stmt
+                    .branches
+                    .iter()
+                    .any(|b| walk_expr(&b.cond, ctx) || check_stmts(&b.body.stmts, ctx))
+                    || if_stmt
+                        .else_
+                        .as_ref()
+                        .map(|e| check_stmts(&e.stmts, ctx))
+                        .unwrap_or(false)
+            }
+            Stmt::For(f) => {
+                walk_expr(&f.range, ctx)
+                    || f.init
+                        .as_ref()
+                        .map(|i| check_stmts(std::slice::from_ref(i), ctx))
+                        .unwrap_or(false)
+                    || check_stmts(&f.body.stmts, ctx)
+            }
+            Stmt::Block(b) => check_stmts(&b.stmts, ctx),
+            Stmt::Return(e) => walk_expr(e, ctx),
+            Stmt::Try(t) => {
+                check_stmts(&t.body.stmts, ctx)
+                    || check_stmts(&t.catch_body.stmts, ctx)
+                    || t.finally_body
+                        .as_ref()
+                        .map(|fb| check_stmts(&fb.stmts, ctx))
+                        .unwrap_or(false)
+            }
+            _ => false,
+        })
+    }
+    check_stmts(stmts, ctx)
+}
+
 pub fn stmts_contain_api_call_with(stmts: &[Stmt], api_fns: &[String]) -> bool {
     fn walk_expr(expr: &Expr, api_fns: &[String]) -> bool {
         match expr {
@@ -2906,6 +3060,76 @@ pub fn stmts_have_router_nav(stmts: &[Stmt]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// PLAN-047 T-02：`json.from_value(x)` 必须恒等映射为 `x`（非再 stringify）。
+    /// 回归锚：018-book-reader store 的 `Http.post(..., json.from_value({...}))`
+    /// 此前原样发射 `json.from_value(...)`（无此臂走通用路径）——运行期
+    /// ReferenceError 被 try/catch 吞掉，POST/PUT 静默不发（原门 T7/T8 红）；
+    /// 而 Http.post 的发射层自带 JSON.stringify 包裹，from_value 若映射成
+    /// stringify 则双层编码 → wire body 变「字符串的字符串」→ axum 422。
+    #[test]
+    fn plan047_json_from_value_is_identity() {
+        let ctx = collision_context(&["body"]);
+        let code = collision_body(
+            "fn post_it() { try { Http.post(\"/api/books\", json.from_value({ title: .body })) } catch { } }",
+            &ctx,
+        );
+        assert!(
+            !code.contains("json.from_value"),
+            "不允许残留悬挂 json.from_value 引用：{code}"
+        );
+        assert!(
+            code.contains("JSON.stringify(JSON.stringify(") == false,
+            "禁止双层 JSON.stringify：{code}"
+        );
+        assert!(
+            code.contains("JSON.stringify({ title: body.value })"),
+            "from_value 实参应恒等进入 Http 发射层的单层 stringify：{code}"
+        );
+    }
+
+    /// PLAN-047 T-02：store facade 方法调用必须发射 `await`（handler 的
+    /// async 化由 script.rs 既有 `body.contains("await")` 承担）。回归锚：
+    /// 018 bookshelf SubmitAdd 的 `store.AddBook(...)` fire-and-forget 后
+    /// 同步重建 cards 读到 pre-POST books —— T8 添加书不现身实录。
+    #[test]
+    fn plan047_store_facade_calls_emit_await() {
+        let mut ctx = collision_context(&["probe"]);
+        ctx.store_facade_from = Some("BooksStore".to_string());
+        let code = collision_body(
+            "fn submit() { store.AddBook(.probe, \"PW Author\"); let n int = store.books.len() }",
+            &ctx,
+        );
+        assert!(
+            code.contains("await store.AddBook("),
+            "facade 方法调用必须 await：{code}"
+        );
+        assert!(
+            code.contains("store.books.len()") || code.contains("store.books.length"),
+            "store 状态访问不受影响（不 await）：{code}"
+        );
+    }
+
+    /// PLAN-047 T-02：`as int` 截断必须 emit `Math.trunc(...)`，不得落到
+    /// a2ts 的 `Number(...)`（不截断）。回归锚：018 reading pct_of
+    /// `(cur * 100 / total) as int` 曾发射 `Number(1*100/3)`=33.333…，
+    /// 进度 PUT 体被后端 i64 拒 422（原门 T10 控制台实录）。
+    #[test]
+    fn plan047_as_int_cast_emits_math_trunc() {
+        let ctx = collision_context(&["cur", "total"]);
+        let code = collision_body(
+            "fn pct_of() { return (100 * .cur / .total) as int }",
+            &ctx,
+        );
+        assert!(
+            code.contains("Math.trunc("),
+            "as int 必须 Math.trunc：{code}"
+        );
+        assert!(
+            !code.contains("Number(100") ,
+            "禁止无截断的 Number 包裹：{code}"
+        );
+    }
 
     fn collision_body(source: &str, ctx: &AuraTsContext) -> String {
         let ast = crate::parse_ui(source).expect("collision fixture parses");
