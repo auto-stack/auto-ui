@@ -68,18 +68,28 @@
   Vue 真实播放 14/14）。逐例默认/豁免/原业务/支持轨实证见
   [媒体门户与播放器主题接入](demo-theme-batch-045.md)。**B3 已迁 3 例；
   累计 25 个示例已迁**。
-- 剩余 **9** 个 B3 目录（018/024/025/026/027/029/031-image-viewer/
-  031-paint/041）主题接入 = 后继批次（046/047 等，不取号）。UI038 已交付
-  **有界支持面实测**（真实链探针，非静态盘点）：9 例有界 go（其中 018
-  阅读链半通）、031-image-viewer blocked（a2r codegen 7 错 + `--server vm`
-  boot 挂起，均具名 owner）；045 已按冻结反例闭合其 019/020/030 三例的
-  具名阻点（links 归属冲突、播放腿、media back contract、死代码接线），
-  剩余差额仍在。实测支持表/具名前置/两后继分包（图像与文件、阅读编辑
-  数据专用绘制）见
+- 第六批（PLAN-046）：**B3 图像与文件三例接入**——029-photo-gallery
+  （photo_root env-first 化、ToggleDark/SetAccent 契约变量保留）、
+  031-image-viewer（pac dark/indigo 显式默认保留；038 硬前置 F-1 a2r
+  后端 7 编译错、F-2 `--server vm` UI/MCP 挂起按本批真实修复关闭）、
+  027-file-manager（宿主 SetTheme 回写链不变、套件纯名+input 修定
+  58/0 全绿）。逐例默认/豁免/通道/阻点关闭记录见
+  [图像与文件教学示例主题迁移批次](demo-theme-batch-046.md)。
+  **B3 已迁 6 例；累计 28 个示例已迁**。
+- 剩余 **6** 个 B3 目录（018/024/025/026/031-paint/041）主题接入 =
+  后继批次。UI038 已交付**有界支持面实测**（真实链探针，非静态盘点）：
+  9 例有界 go（其中 018 阅读链半通）、031-image-viewer blocked（a2r
+  codegen 7 错 + `--server vm` boot 挂起，均具名 owner）；045 已按冻结
+  反例闭合其 019/020/030 三例的具名阻点（links 归属冲突、播放腿、media
+  back contract、死代码接线）；046 已闭合 029/031-image-viewer/027 的
+  F-1/F-2/F-3/photo_root（归属 auto-web api_gen scaffold / auto-man
+  server 臂 / 027 tests+runtime fixture 契约）。实测支持表/具名前置/
+  后继分包（阅读/编辑/数据/专用绘制，不取号）见
   [专用示例主题迁移支持面](specialized-theme-migration-readiness.md)。
-  **B3 余九例仍未迁**；实测"无主题面"四例（031-paint/024/026/041，未
+  **B3 余六例仍未迁**；实测"无主题面"四例（031-paint/024/026/041，未
   声明 theme 状态/design 绑定，壳不随族/模式输入改变）的补声明 = 后继
-  第一步工作项；四处原测试陈旧（024/025/026/027）与 018 五红具名 owner。
+  第一步工作项；三处原测试陈旧（024/025/026；027 已由 PLAN-046 修定
+  全绿）与 018 五红具名 owner。
   共享 stylekit、remote-frame-e2e、032 验证例按来源保持义务，不按业务
   app 强套主题；038-minesweeper 属 UI037 谱系不随 B3。
 - **渠道与支持面（PLAN-036 交接，不扩历史交付）**：B1 十例的既有交付

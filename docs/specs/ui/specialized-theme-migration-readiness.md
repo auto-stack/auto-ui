@@ -75,3 +75,16 @@
 - 本批既有红交接：新工具链对 019 重建的 TS1005（auto-ui-tools vue.rs
   store_ctx_import 模板拼接，plan-041 引入，主检出同复现）为非 045
   生成器缺陷，owner=后继生成器修复批次；不随本批冒称关闭。
+
+## 6. 046 接续结果（PLAN-046 交付，图像与文件分包已闭合）
+
+> 038 §1 表内 029/031-image-viewer/027 三行与 §3 第 2 项前置为本批按冻结
+> 反例逐项处理后的当前状态；038 研究结论/历史原文与 §5（045 接续结果）
+> 保留，不覆盖。
+
+| 差额 | 046 处理与结果（证据见 demo-theme-batch-046.md 与 plan-artifacts/plan-046） |
+|---|---|
+| F-1 031iv a2r 后端 7 编译错（E0428/E0432/E0106/E0422/E0425） | 根因在 auto-web api_gen rust 后端 scaffold（types-only types.at 覆盖 scaffold types.rs、mod 双发、auto.image 无模块、点调用非法），a2r 转译器零改动；关闭=`auto run -r vm` 编译+启动：后端 crate 0 错、axum 起服、vm_matrix ALL PASS |
+| F-2 `--server vm` 挂起（UI/MCP 永不启动） | auto-man 对 UI 工程只起 AutoVM HTTP 后 join；修复=委托 VM+VM split；MCP 可连实证（vm_matrix 同跑） |
+| F-3 027 套件 SEP 触发器漂移 | 测试纯名+input（退役 SEP 名）+ pick_free_port 真 bind/9511；runtime 第二病灶=fixture input 裸 Str 中止类型化 handler，按 msg-variant 声明类型强制（int→Int(i32) 帧标签）；027 desktop_mcp 58/0 全绿 |
+| 029 photo_root 用户绝对根 | pac 默认空 + AUTO_PHOTO_ROOT env-first 受管入口；夹具腿实证（scan=2 + 四组合换肤业务守恒） |
