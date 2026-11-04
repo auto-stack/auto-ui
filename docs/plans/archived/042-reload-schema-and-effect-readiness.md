@@ -142,6 +142,10 @@ stage: goal | plan_id: PLAN-042 | plan_revision: r1 | round: 4 | from: review | 
 
 stage: goal | plan_id: PLAN-042 | plan_revision: r1 | round: 5 | from: merge | to: merge | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-042/auto-ui | commit: 00058419 | next: merge(archive+cleanup)
 
+2026-11-04 / stage:merge | auto-ui/PLAN-042:r1 | archived：Plan 移 docs/plans/archived/042-reload-schema-and-effect-readiness.md，status: archived 8/8，归档提交入 master（未跟踪 docs 已补提交，PLAN-104 合规）；归档态核：任务计数 8/8、交付/复审/归档效果与 §11 证据一致、链接自父目录可解 | cleaned：wt-guard 双树 clean（auto-ui/master-probe，exit 0）→ worktree remove×2、分支 codex/plan-042-reload-readiness 删除（was 00058419）、组 .wt/ui-042 移除（含 auto-lang/auto-web/auto-down 兄弟 clone）、plan-artifacts/plan-042 整 scope 删除（证据已折本文 §11/§9）、registry policy.json 刷新（deleted-at-merge 记录 + parser 病理分配具名 hold：owner auto-lang parser）；主检出 042 范围净 | 批量回归到期核：auto-lang docs/plans/.last-batch-regression.json 在案（last_covered 925 @2026-11-03T14:11Z，<48h；042 不整除 5）→ 不到期，不触发 | 落地≠部署观察：本交付仅测试+规范文档，无生产代码面，release binary/web bundle 不受影响、无需重建 | completion_kind: delivered | outcome: pass
+
+stage: goal | plan_id: PLAN-042 | plan_revision: r1 | round: 6 | from: merge | to: done | status: archived | outcome: pass | worktree: removed | commit: 00058419 | next: done
+
 2026-11-04 / stage:new / auto-ui/PLAN-042 r1 / outcome:blocked（仅规划，实施授权待给） / 已核旧字段schema空与多文件guard，避免仅删guard或拼接不同reload入口承诺HMR。定义有界研究正负控制/后继出口，全部未执行。next：授权后T-01；新实例相关腿接041正式结果，不把所有研究提前锁死等待。
 
 静态预检pass（2026-11-04）：0–10章节、8T/7AC/8V/3SD身份唯一连续，任务/AC的owner_stage与引用齐；本号跨活动/归档唯一、号源单调未回退，本地引用/尾空格检查通过。045–047三批恰覆盖B3十二例、无重复/漏项。仅文档一致性，不是新测试/探针或独立final review；全部实现/运行仍待授权work。
