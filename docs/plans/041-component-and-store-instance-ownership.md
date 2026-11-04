@@ -1,6 +1,6 @@
 ---
 plan_id: PLAN-041
-status: executing
+status: reviewed
 feature_name: 组件与Store实例所有权收口
 author: [Codex]
 created_at: 2026-11-04
@@ -155,6 +155,8 @@ T-01冻结现key/实例识别、App/context的实际入口、VM读写/handler/vi
 2026-11-04 / stage:work(R-1/R-2/R-3 修复) / outcome:（修复完成，待 reviewer targeted re-review @fa769051） / 批一 277a89d4：write_state_onto 实例字段序错位真修（root 名单先行→实例按根序错写相邻槽）+ eval_stripped_arg 派发目标感知 + plan051/058/063 oracle；批二 fa769051：__auto_root 槽位预置进 ctor 名单（install_root_self_ref 改槽位写——cached/live 名单错位一位→clock 读出 VmRef 实录）+ state_fields()/read_all_state 隐藏内部 __auto 槽 + plan576/652/654 oracle + musk p053-8 oracle。R-2：SD-01 §5 Vue 腿边界标注。R-3：按 reviewer 建议跳过。plan498 bar_group 全跑偶发一次记观察（solo/family 3 连绿+reviewer 全跑绿）。census 勘误：base-red=13（reviewer 计 14 含 t3_examples 变体）/新增红=0。
 
 2026-11-04 / stage:work(R-4/R-6 收尾) / outcome:（等 reviewer 最终确认 pass @cf087715） / R-4 说明：SD-01 §5 标注已落 02b7c6c1（reviewer 复核 diff 窗口 9cac1cf1..fa769051 截断于该提交之前——其处方文本与 02b7c6c1 内容一致）；R-6 重复 doc comment 已去重 cf087715；R-5 按 reviewer 建议为可选加固不下本包。worktree HEAD=cf087715（reviewer 已验 fa769051 + docs-only/comment-only 增量）。
+
+2026-11-04 / stage:review(final, re-review) / reviewer_identity:独立 subagent 上下文（同一 reviewer，实施会话之外） / plan_id:auto-ui/PLAN-041 r1 / outcome:pass / worktree:D:/autostack/.wt/ui-041/auto-ui / branch:codex/plan-041-instance-ownership / reviewed_commit:cf087715 / base:3bfbee72 / R-1 closed&verified@fa769051（census 2972 passed/14 base-red，零新增；两真产品缺陷修复经独立探针实证）/ R-4 closed by 02b7c6c1 / R-3/R-5 no-action / R-6 folded cf087715 / acceptance:AC-01..07 pass, AC-08/09 pending merge / next:merge（T-08 ff-only 落主）。
 
 ## 10. 待澄清事项
 
