@@ -29,3 +29,10 @@ accent: "indigo"
 dep stylekit {
     path: "../stylekit"
 }
+
+# PLAN-045 T-03：接入官方主题包（C-13）。pac 显式 theme/accent 键保留
+# （030 既有默认 dark/indigo，均为合法值），族/模式选择经根 widget
+# theme_name + design 数据绑定。
+dep themes {
+    path: "../../../packages/themes"
+}

@@ -15,6 +15,12 @@ use viewport: Viewport
 use playlist: Playlist
 use controls: Controls
 
+// PLAN-045 T-03：接入官方主题包。族选择经 theme_name + design 数据绑定
+// （006/011 先例）；dark_mode/accent_color 魔法变量保持根 widget（生成器主题
+// 运行时契约，030 SPEC 坑表）；视口 bg-black / text-white 元信息条为内容域
+// 豁免（画面区恒黑，同 020 黑胶口径）。
+use themes.themes: Auto, Solarized
+
 style theme_toggle = "theme-toggle w-8 h-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer"
 
 widget App {
@@ -36,6 +42,14 @@ widget App {
         // 必须存在于根 widget 才能拿到主题运行时。
         var dark_mode bool = true
         var accent_color str = "indigo"
+        // PLAN-045：主题族选择（默认 Auto；pac `theme: "dark"` 显式默认保留）
+        var theme_name str = "Auto"
+    }
+
+    // 主题/模式选择器（C-06/07：数据绑定，同帧校验发布）
+    design {
+        theme: .theme_name
+        mode: if .dark_mode { "dark" } else { "light" }
     }
 
     view {
