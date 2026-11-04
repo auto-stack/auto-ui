@@ -287,6 +287,88 @@ fn real_chain_handler_context_segments_anchor_node_event() {
 }
 
 #[test]
+fn probe_member_event_handler_segment_covers_recv_fn() {
+    // probe 夹具（Panel→meter 业务事件）：Member handler 的唯一发射
+    // `fn meter_add(j int, n int)` 必须被锚定为 node/event 上下文段。
+    const PROBE_MAIN: &str = include_str!("../fixtures/components2d/main.at");
+    const PROBE_PANEL: &str = include_str!("../fixtures/components2d/panel.at");
+    const PROBE_GAUGE: &str = include_str!("../fixtures/components2d/gauge.at");
+    const PROBE_PLAYER: &str = include_str!("../fixtures/components2d/player.at");
+    const PROBE_RES: &str = include_str!("../fixtures/components2d/resources.at");
+    let dir = std::env::temp_dir().join(format!(
+        "plan044-probe-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&dir).expect("dir");
+    for (name, body) in [
+        ("main", PROBE_MAIN),
+        ("panel", PROBE_PANEL),
+        ("gauge", PROBE_GAUGE),
+        ("player", PROBE_PLAYER),
+        ("resources", PROBE_RES),
+    ] {
+        std::fs::write(dir.join(format!("{name}.at")), body).expect("write");
+    }
+    let project = load_project(&dir.join("main.at")).expect("load probe");
+    let world = lower_project_components(&project)
+        .expect("lower probe")
+        .user_source
+        .expect("world");
+    std::fs::remove_dir_all(&dir).ok();
+    let world_sha = sha256_hex(world.as_bytes());
+    let map = build_source_map(&project, &world, GENERATOR, &world_sha).expect("build");
+    map.validate_against_world(&world).expect("validate");
+    let meter = map
+        .segments
+        .iter()
+        .find(|s| s.event.as_deref() == Some("Add"))
+        .expect("member recv segment (meter_add → Gauge.Add)");
+    assert_eq!(meter.precision, Precision::Context);
+    assert_eq!(meter.node.as_deref(), Some("Gauge"));
+    assert_eq!(meter.module.as_deref(), Some("gauge"));
+    // 片段确为 recv fn 体（世界内唯一 meter_add 定义）。
+    let frag = &world[meter.start..meter.end];
+    assert!(frag.starts_with("fn meter_add("), "fragment is the recv fn: {frag:.40}");
+    // 源锚 = gauge.at 的 `.Add` 事件 token 行。
+    let gauge = &project.modules["gauge"].source;
+    let anchor_line = gauge
+        .lines()
+        .nth(
+            gauge[..gauge.find(".Add").unwrap()]
+                .bytes()
+                .filter(|b| *b == b'\n')
+                .count(),
+        )
+        .unwrap();
+    assert!(
+        anchor_line.contains(".Add"),
+        "anchored at the .Add declaration: {anchor_line}"
+    );
+    // 唯一属主规则负控：gauge 的 Life handler 仍由 Life 规则覆盖（不重复归属）。
+    let life: Vec<_> = map
+        .segments
+        .iter()
+        .filter(|s| s.event.as_deref().map(|e| e.starts_with("Life.")).unwrap_or(false))
+        .collect();
+    assert!(!life.is_empty(), "life handler segments intact");
+}
+
+#[test]
+fn build_map_is_pure_world_bytes_unchanged() {
+    // T-03 默认字节保持（单元侧）：建图是纯函数，world 串不被改写；
+    // CLI 默认无旁件的对照在 verify_plan044.py（T-06）以真实进程跑。
+    let (project, world) = lower_helpers_fixture();
+    let before = world.clone();
+    let world_sha = sha256_hex(world.as_bytes());
+    build_source_map(&project, &world, GENERATOR, &world_sha).expect("build");
+    assert_eq!(world, before, "map build must not mutate the world source");
+}
+
+#[test]
 fn gap_fill_merges_and_tiles() {
     let segs = vec![
         Segment { start: 4, end: 6, module: Some("m".into()), node: None, event: None, helper: None, precision: Precision::Exact, source_start: Some(0), source_end: Some(2) },

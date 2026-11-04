@@ -217,18 +217,19 @@ pub fn locate_handler_fns(project: &Project, user_source: &str) -> Result<Vec<Se
         for node in &module.nodes {
             let Some(on) = &node.on else { continue };
             for h in &on.handlers {
-                let base = crate::lower::snake(&node.name);
-                let emitted = match &h.pattern {
-                    auto_ui_dialect::node2d::EventPattern::Life { event, .. } => {
-                        format!("{base}_life{}", event.to_lowercase())
-                    }
-                    auto_ui_dialect::node2d::EventPattern::Member { name, .. } => {
-                        format!("{base}_{}", crate::lower::snake(name))
-                    }
+                // Member 事件由 locate_member_recv_fns 以唯一属主规则归属
+                // （recv fn 名含子实例绑定名，非 def 名；此处只锚 Life）。
+                let auto_ui_dialect::node2d::EventPattern::Life { event, .. } = &h.pattern else {
+                    continue;
                 };
-                let start = user_source
-                    .find(&format!("fn {emitted}("))
-                    .ok_or_else(|| format!("handler fn not found: {emitted}"))?;
+                let base = crate::lower::snake(&node.name);
+                let emitted = format!("{base}_life{}", event.to_lowercase());
+                // 未绑定（无 emit/投递路径）的 Member handler 不产生发射
+                // fn——world 中无此代码即无可映射物，跳过（缺口留 generated），
+                // 不判建图失败。
+                let Some(start) = user_source.find(&format!("fn {emitted}(")) else {
+                    continue;
+                };
                 let end = fn_end_from(user_source, start)
                     .ok_or_else(|| format!("handler fn end not found: {emitted}"))?;
                 // 源区间纯文本锚定（实证：本栈 AST span 起点有 +1/+2 漂移，
@@ -280,6 +281,95 @@ fn fn_end_from(source: &str, start: usize) -> Option<usize> {    let open = sour
     }
     None
 }
+/// PLAN-044 T-03：Member/recv fn 归属段（唯一属主文本规则）。
+///
+/// recv fn 名由发射期 plan.recv_fns 表生成（含子实例绑定名，如
+/// `meter_add` = meter 子实例 + Add 事件），后置不可证重建命名。可证
+/// 规则：world 中未被其它段覆盖的顶层 `fn {name}(`，若其 `_{suffix}` 与
+/// 全工程唯一的 Member 事件 snake 名匹配（恰好一个 node 声明该事件），
+/// 则归属该 node（context 精度，锚 `. {member}` 声明 token）；多属主或
+/// 无属主一律不映（generated 覆盖），不猜。
+pub fn locate_member_recv_fns(
+    project: &Project,
+    user_source: &str,
+    covered: &[Segment],
+) -> Vec<Segment> {
+    let mut out = Vec::new();
+    // 收集全部 Member 事件及其唯一属主。
+    let mut owners: std::collections::BTreeMap<String, Vec<(String, String, String)>> =
+        std::collections::BTreeMap::new();
+    for module in project.modules.values() {
+        for node in &module.nodes {
+            let Some(on) = &node.on else { continue };
+            for h in &on.handlers {
+                if let auto_ui_dialect::node2d::EventPattern::Member { name, .. } = &h.pattern {
+                    owners
+                        .entry(crate::lower::snake(name))
+                        .or_default()
+                        .push((module.name.clone(), node.name.clone(), name.clone()));
+                }
+            }
+        }
+    }
+    let mut cursor = 0usize;
+    while let Some(rel) = user_source[cursor..].find("\nfn ") {
+        let start = cursor + rel + 1;
+        if covered.iter().any(|s| start >= s.start && start < s.end) {
+            cursor = start + 1;
+            continue;
+        }
+        let name_start = start + 3;
+        let fname: String = user_source[name_start..]
+            .chars()
+            .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+            .collect();
+        if let Some((_, suffix)) = fname.split_once('_') {
+            if let Some(list) = owners.get(suffix) {
+                // 去重同名 node（同名 Member 多 handler 不重复计）。
+                let mut unique: Vec<&(String, String, String)> = Vec::new();
+                for item in list {
+                    if !unique.iter().any(|u| u.1 == item.1) {
+                        unique.push(item);
+                    }
+                }
+                if unique.len() == 1 {
+                    let (module_name, node_name, member) = &unique[0];
+                    let Some(module) = project.modules.get(module_name) else {
+                        cursor = start + 1;
+                        continue;
+                    };
+                    let end = match fn_end(user_source, &fname) {
+                        Some(e) if e > start => e,
+                        _ => {
+                            cursor = start + 1;
+                            continue;
+                        }
+                    };
+                    if let Some((ss, se)) =
+                        anchor_handler_decl(&module.source, node_name, &format!(".{member}"))
+                    {
+                        out.push(Segment {
+                            start,
+                            end,
+                            module: Some(module_name.clone()),
+                            node: Some(node_name.clone()),
+                            event: Some(member.clone()),
+                            helper: None,
+                            precision: Precision::Context,
+                            source_start: Some(ss),
+                            source_end: Some(se),
+                        });
+                        cursor = end;
+                        continue;
+                    }
+                }
+            }
+        }
+        cursor = start + 1;
+    }
+    out
+}
+
 /// handler 声明的纯文本锚定：`node {name}` 声明区（花括号配平）内搜
 /// 事件 token（Life 用 `Life.{event}`，Member 用 `.{name}` 作者形态），
 /// 返回 token 的半开 byte 区间。找不到即 None（调用方拒建图，fail-closed）。
@@ -509,6 +599,9 @@ pub fn build_source_map(
     }
     let mut mapped = locate_pooled_fns(project, user_source)?;
     mapped.extend(locate_handler_fns(project, user_source)?);
+    let mut covered = mapped.clone();
+    covered.sort_by_key(|s| s.start);
+    mapped.extend(locate_member_recv_fns(project, user_source, &covered));
     let segments = fill_generated_gaps(mapped, user_source.len());
     let map = SourceMap {
         format: MAP_FORMAT.into(),
