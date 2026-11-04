@@ -6,11 +6,11 @@ author: [Codex]
 created_at: 2026-11-04
 updated_at: 2026-11-04
 plan_revision: 1
-current_step: 5
+current_step: 7
 total_steps: 4
 depends_on: []
 supersedes_spec_components: []
-new_spec_components: []
+new_spec_components: ["docs/specs/ui/vue-store-generation.md"]
 touched_goals: []
 ---
 
@@ -69,7 +69,8 @@ Rust（auto-ui-compiler / auto-ui-tools）；cargo t 固定组（`tu`=ui_gen 单
 
 | delta_id | add/modify/retire | docs/specs/... target | before/after rule | rationale | acceptance IDs |
 |---|---|---|---|---|---|
-| SD-01 | modify | docs/specs/ui/vue-store-generation.md（如不存在则新建） | 店模型初始化器：结构字面量→对象字面量（不再是 null 回退）；main.ts 相邻 import 恒分隔 | plan-041 窗口两回归的合同化 | AC-01/02 |
+| SD-01 | add | docs/specs/ui/vue-store-generation.md | 店模型初始化器按值发射（结构字面量→对象字面量，不再 null 回退）；main.ts 相邻 import 恒分隔 | plan-041 窗口两回归的合同化（复审 F-01/SD 确认新建） | AC-01/02 |
+| SD-02 | modify | docs/specs/runtime/component-and-store-instances.md | C-02 迟到事件语义修订：MCP/派发面 identity miss 先件名存活解析（恰一存活重定向；0 丢/≥2 丢）；进程内面保持严格 | 视图携页名 vs 键控身份格式脱 → 合法 press 被误丢（复审 F-01） | AC-03 |
 
 ## 6. 测试设计
 
@@ -100,11 +101,13 @@ Rust（auto-ui-compiler / auto-ui-tools）；cargo t 固定组（`tu`=ui_gen 单
 - [x] T-04（owner_stage=work；依赖T-03；AC-03）：③b 修复（或拆分记录）。[✅ 2026-11-04] dynamic.rs dispatch：身份查找 miss→name-only 存活解析重定向（恰一存活；0/≥2 保持丢弃=真迟到纪律保留）；下游 input back-write 随解析后实例。runtime lib 2210/2220（10 败全部 base 同败，stash A/B 两批实证）；消费方 native 回放=跨仓 oracle 指针（merge 后 BLOG-005 执行）。
 - [x] T-05（owner_stage=work；依赖T-01/02/04；AC-04）：组回归 + 新测试。[✅ 2026-11-04] compiler lib 268/268、tools lib 205/205（5 既有基线红同集）、runtime lib 2210/2220（10 既有基线红同集）。
 - [ ] T-06（owner_stage=review；依赖T-05；AC-04）：同树独立上下文最终复审。
-- [ ] T-07（owner_stage=merge；依赖T-06 pass；AC-05）：SD-01 落地 + 归档清理。
+- [x] T-07（owner_stage=merge；依赖T-06 pass；AC-05）：SD-01 落地 + 归档清理。（landing 见 merge receipt）
 
 ## 9. 复审记录
 
 - stage: new | plan_id: PLAN-051 | plan_revision: r1 | outcome: pass（授权已记录 §4：消费方用户 2026-11-04 深夜路线①同构） | next: work（T-01/T-02 立即开工；T-03 调查并行）。
+
+stage: review | review_scope: final | reviewer_identity: 独立 general-purpose 子代理上下文（与实现无共享记忆） | plan_id: PLAN-051 | plan_revision: r1 | outcome: pass | worktree_path: D:/autostack/.wt/ui-051/auto-ui | branch: codex/plan-051-dev | reviewed_commit: 79e1057e | base_commit: 4e5e6796 | spec_inputs: SD-01 新建确认 + SD-02 C-02 修订（F-01 merge 义务，已在 delivery descendant 4102d8aa 落地） | acceptance_results: AC-01 PASS（闭环探针 ref<any>({...}) 保真）、AC-02 PASS（四组合真链路探针，字节级换行复核）、AC-03 PASS（press 链静态实证+契约注释对照；集成 oracle=消费方 native 回放）、AC-04 PASS（compiler 268/268、tools 205/205、runtime 2212/2220——败集均 base 同败 stash 实证，含 reviewer 自发现的 t3_examples_queue_end_to_end 同败） | findings: F-01（中，SD 补齐→已落地 4102d8aa）、F-02/F-03/F-04（低；F-03 注释已刷新、F-04 决策稿内容已内联 Plan）、F-06/F-07 信息 | evidence: D:/autostack/plan-artifacts/plan-051/review/final-review.md | pending_closeout_gates: merge 所有（landing、归档、清理） | next: merge
 
 stage: work | plan_id: PLAN-051 | plan_revision: r1 | outcome: pass（T-01..T-05 完成，execution_done 待 T-06 复审） | worktree_path: D:/autostack/.wt/ui-051/auto-ui | branch: codex/plan-051-dev | base_commit: 4e5e6796 | code_commit: 79e1057e（T-01/T-02=b8e23710，T-03/T-04=79e1057e） | dependency_revisions: auto-lang da4c98b51（master detached 同级）、auto-web 37d32c2、auto-down 7c4d5cb | task_ids: T-01..T-05（T-06=review 所有） | evidence: 新 oracle 三枚全绿（struct_default_kept/non_struct_defaults_unchanged/main_ts_imports_newline_separated_four_combinations）；组回归 compiler 268/268、tools 205/205、runtime 2210/2220（15 败全部 base 同败 stash A/B 两批实证）；③根因与修复见 T-03/T-04 行 | blockers: 无 | next_responsible_role: review（T-06 同树独立上下文最终复审；消费方 oracle=native 回放 22/22+B-01 冷 scaffold 在 BLOG-005 簿记执行）
 
