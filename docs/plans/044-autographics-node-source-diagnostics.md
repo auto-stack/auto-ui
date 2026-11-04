@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-044
-status: drafting
+status: executing
 feature_name: AutoGraphicsNode多模块源码定位与分层诊断
 author: [Codex]
 created_at: 2026-11-04
 updated_at: 2026-11-04
 plan_revision: 1
-current_step: 0
+current_step: 1
 total_steps: 10
 depends_on: [auto-ui/PLAN-020, auto-ui/PLAN-030, auto-ui/PLAN-035, auto-ui/PLAN-040]
 supersedes_spec_components: []
@@ -47,6 +47,8 @@ affects: [autographics-node2d-pilot, autographics-auto-driver]
 ## 4. 需求分析与背景调查
 
 用户2026-11-04要求UI后继规划，允许合同/设计/导航及相关路线簿记，未授权实现/构建/运行/agent。观察UI `92ee2459a1058ddddc3fc3378ecec6585ffe726c`；040交付fc82061c且独立final有记录；AG016 executing3/10固定035，不新增其依赖。041/042为其他UI组件store/重载路线，独占重核后本批使用043/044。
+
+授权（2026-11-04，/goal 完成计划044）：用户以 auto-plan-goal 授权 work→review→有界修复→merge 全链；树 `D:/autostack/.wt/ui-044/auto-ui`、分支 `codex/plan-044-dev`（2026-11-04 建于 master `d176f85f`），材料scope `D:/autostack/plan-artifacts/plan-044/auto-ui/`（owner/用途已登记）。不授权变更目标/验收/范围/预算；merge 前必须有绑定当前 revision+commit 的 final pass。主检出有他会话 WIP（043 Plan、045-047草案、docs/design、crates/auto-ui-runtime/test/ 等），非本 Plan 所有，不编辑不并入。
 
 已读UI Specs index、`node3d-symbolic-component-bindings.md`(6ed0bf07…)、`node3d-audio-hud-composition.md`(d7272516…)、`node-editor-projects.md`(1daa7111…)及load/translate/behavior源码。语言仓`docs/specs/auto-graphics/behavior-api.md` SHA256 `02751f0e234633f82bb64d7103ca2656e3b8325182e5ef095f0c0eb8b2011dbf`、`behavior-project.md` SHA `9ed44de2cb0b454cfd440d6a9ff63e2b8470fb1adc5f870e643448bf7f2b02a4`要求region/身份伪造拒绝、真实compile span才映射、runtime无span明确无行。新旁件不得削弱这些边界。
 
@@ -117,7 +119,7 @@ work产证；review同树独立上下文final，从真实compile/Run复核AC/SD/
 
 | T | owner_stage | 依赖 | 写面/结果 | AC | 进度 |
 |---|---|---|---|---|---|
-| T-01 | work | 用户另行启动；020/030/035/040交付 | 核已有AST位置/emit/region/SDK无span事实、profile/命名门/owner，唯一树scope登记 | AC-01/02 | [ ] |
+| T-01 | work | 用户另行启动；020/030/035/040交付 | 核已有AST位置/emit/region/SDK无span事实、profile/命名门/owner，唯一树scope登记 | AC-01/02 | [x] 2026-11-04：已核 load.rs `NodeDecl.span`/fn `Range<usize>` byte区间、`Project.node_modules`、uses闭包解析；translate.rs `LowerError::Unsupported{what,line}` 仅行号（部分路径line:0）无模块/字节span；main.rs 19 profile门（legacy..components-2d-runtime）与 identity.json（generator/api/user_source_sha256/module:sha/closure/world_sha256/provenance）已核；driver behavior.rs regions[transport/api/user/bridge]、`sdk_diagnostic` offset→region→line:col(chars口径)、runtime `diagnostic` 明确"SDK supplied no mapped line"、8KiB `bounded_diagnostic`、`error_offset` span变体枚举、admit用户parse行列映射；behavior_project.rs CodeRef/Pool(8/2MiB)/load_declared hash核验。树/分支/scope已建并登记（§4授权记录）。下一步T-02真实先证。 |
 | T-02 | work | T-01 | 最多A/B真实模块全链先证，冻结profile/精度/schema/CLI/线性上界/fallback；不足needs_replan | AC-01..06 | [ ] |
 | T-03 | work | T-02 go | 可选origin/旁件/loader接受身份/snapshot分层展示/gates，默认字节保持 | AC-01..04 | [ ] |
 | T-04 | work | T-03 | 真实compile/runtime/managed/无span与身份/UTF8/变异，非伪错误文本日志 | AC-01..05 | [ ] |
@@ -133,6 +135,8 @@ work产证；review同树独立上下文final，从真实compile/Run复核AC/SD/
 2026-11-04 / stage: new / plan_id: auto-ui/PLAN-044 / plan_revision: 1 / outcome: pass（合同可审阅，用户启动后T-01可进，T-03需T-02真实先证go） / next: work T-01。0/10。已有SDK compile region/runtime无span事实从源码核，不承诺所有运行错误精确映射；旁件/入口/模块fixture未实现。本轮无树/材料scope/源码/探针/canonical Spec/构建/GPU/agent，不改在途内容/SDK。
 
 2026-11-04本批规划预检（非实施/独立final）：043/044均0..10节、drafting/r1/0-10、10T/9AC/6V-S/1SD，work6/review1/merge3，十任务未勾；依赖DAG无环，二者功能独立，当前AG016..019没有新增043/044依赖。首次取号核到041/042已属组件store/重载路线后，独占重核取得043/044，未覆盖；后续他路线又分配045..047，本轮不回退号源，不提交其草案，下一号以中央.next-id实际独占核为准。262个所涉本地引用258可解析，余4为存量非AG主题036/037/038导航断链（共享索引包含他会话WIP），未代写；新增/修改AG引用可解析。按metadata/generated/Node源交叉核验当前19/22，余g04两维/g05三维；`python tools/gallery.py validate --all`退出0，12逻辑项22入口/许可一致。Model底层支持、Node模板builtin-only及SDK compile region/runtime无span事实从源码/Spec核，不代表新模板/新映射先证已跑。UI040实交付/独立final与D-02 OS15项pending分列；AG016在途3/10固定035，内容合同/源码/锁/生成物均未改，本轮没有创建实现树/材料scope/probe/新canonical Spec、构建/GPU/OS自动化/agent/发布。文档白名单空白与结构核验通过。
+
+2026-11-04 / stage: goal | plan_id: PLAN-044 | plan_revision: 1 | round: 1 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-044/auto-ui | commit: d176f85f (base, 尚无代码提交) | next: work T-02。T-01 完成：AST/span/emit/region/SDK无span事实与 profile/命名门/owner 已从源码核实并登记（§8 T-01 行内证据）；授权记录写入 §4；主检出他会话 WIP（043 Plan、045-047 草案、docs/design、crates/auto-ui-runtime/test/）非本 Plan 所有，仅登记不触碰。T-02 起为真实全链先证（A/B 机制、冻结 schema/CLI/上界）。
 
 ## 10. 待澄清事项
 
