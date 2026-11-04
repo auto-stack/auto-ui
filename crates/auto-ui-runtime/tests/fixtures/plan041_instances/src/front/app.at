@@ -1,0 +1,64 @@
+// app.at — PLAN-041 T-01 instance-ownership fixture.
+//
+// Contract under test (plan §5.2):
+// - Counter "a" (start 10) and Counter "b" (start 20) are the SAME widget
+//   type with opposite props and same-named model fields. Per-instance
+//   ownership means: distinct rendered values, Inc on one instance leaves
+//   the other untouched, and both instances observe the SHARED store total
+//   (same-App sharing is preserved, not forked per instance).
+// - Pre-fix reality (VM single-state architecture, P320): all child model +
+//   prop fields merge into the root state object — `start`, `count` and
+//   store fields are one shared slot set; the last-seeded child wins and
+//   handler dispatch targets root regardless of instance.
+use p041_store: P041Store
+
+widget P041Host {
+    msg {
+        Init,
+    }
+
+    model {
+        var host_marker str = "host-shell"
+    }
+
+    view {
+        col {
+            style: "w-full gap-2 p-4"
+            text "host above counters"
+            Counter (key: "a", start: 10) { }
+            Counter (key: "b", start: 20) { }
+            text "host below counters"
+        }
+    }
+
+    on {
+        Init -> {
+            print("[p041] host init")
+        }
+    }
+}
+
+widget Counter (start: int = 0) {
+    msg {
+        Inc,
+    }
+
+    model {
+        var count int = 0
+    }
+
+    view {
+        col {
+            text .start
+            text .count
+            text .total
+        }
+    }
+
+    on {
+        Inc -> {
+            count = count + 1
+            store.Bump()
+        }
+    }
+}

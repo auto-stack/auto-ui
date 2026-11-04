@@ -1,0 +1,12 @@
+// pac.at — PLAN-041 T-01 bounded instance-ownership fixture: two same-type
+// keyed Counter children (start 10 / 20), a shared P041Store, and an unkeyed
+// positional control pair. Permanent regression input (plan §5.2); grows with
+// T-02..T-05 legs.
+name: "t-plan041-instances"
+version: "0.1.0"
+scene: "ui"
+render: "vue"
+api: "rust"
+title: "PLAN041 Instances"
+title_zh: "PLAN041 实例归属"
+theme: "dark"

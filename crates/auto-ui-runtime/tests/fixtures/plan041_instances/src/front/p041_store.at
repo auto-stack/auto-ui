@@ -1,0 +1,18 @@
+// p041_store.at — PLAN-041 shared store: App-level owner. Within one App
+// context every consumer (root + both Counter instances) must observe the
+// same `total`; across two App instances the store must NOT be shared.
+store P041Store {
+    msg {
+        Bump,
+    }
+
+    model {
+        var total int = 0
+    }
+
+    on {
+        .Bump -> {
+            .total = .total + 1
+        }
+    }
+}
