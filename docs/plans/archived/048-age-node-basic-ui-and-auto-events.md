@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-04
 updated_at: 2026-11-04
 plan_revision: 1
-current_step: 6
+current_step: 10
 total_steps: 10
 depends_on: [auto-ui/PLAN-020, auto-ui/PLAN-040]
 supersedes_spec_components: []
@@ -107,7 +107,7 @@ T-02最多两种等价机制的完整先证：导入两个同定义计数组件�
 | T-07 | review | T-06 | 同树独立final，finding返work同员有界复核 | AC-07 | [ ] |
 | T-08 | merge | T-07 pass | [x] 冻结定向门（review后受影响并集全绿重跑）＋来源核（range-diff等价）后ff-only落主 delivery=cd1e161a；review基线2d1ad4ae→cd1e161a差异=0（range-diff全等） | AC-08 | [x] |
 | T-09 | merge | T-08 | [x] canonical落主（node-basic-ui.md sha16 7bda6f53faf16cae，主上controls ALL PASS）；同号归档docs/plans/archived/048-…（status: archived）；公开消费身份=ui.json schema/generator＋verify入口＋node_ui_window，049只读（049文件未动，无追tip） | AC-08 | [x] |
-| T-10 | merge | T-09 | fresh guard清自有树、所有实际输出对账/清scope构建物、具名hold登记 | AC-09 | [ ] |
+| T-10 | merge | T-09 | [x] fresh wt-guard clean→删worktree+branch（was cd1e161a）→sibling auto-lang删→组目录空删；plan-artifacts/plan-048 scope摘要折本文件后整删；registry刷新（no holds）；落地检查=显式观察（experimental crate无生产消费进程）；最终计数10/10 | AC-09 | [x] |
 
 ## 9. 复审记录
 
@@ -136,7 +136,7 @@ stage: goal | plan_id: PLAN-048 | plan_revision: r1 | round: 2 | from: execution
 - merge-owned统一回归（受影响并集口径）：pilot全套179/179＋node_ui_gates 4/4；driver node_ui_flow 3/3＋node_ui_storage 3/3（GPU单实例）；admission层既有覆盖authoring_behavior 12/12＋behavior_source_identity 1/1；verify_plan048 --controls ALL PASS；native positive exit0/sabotage exit1——全部于reviewed/rebased基线实跑。**具名不跑项**：driver其余既有目录（4个测试文件Scene3dContent缺hud_overlay，基线6837bbe8已坏）＝先前既有损坏，非048面（V-S06"不跑无关套件"），owner=相应历史计划；本receipt即分诊记录。
 - `archived`：本文件`git mv`至docs/plans/archived/、status: archived（本次提交）。
 - 落地检查：experimental crate，无生产消费进程需重建（显式观察：auto-ui仓无deployment面消费autographics-*实验crate；ag-examples消费049后经AG021按消费锁取用）。
-- `cleaned`：见后继记录（wt-guard→删树删支→plan-artifacts scope删除→registry刷新）。
+- `cleaned`：**PASS**。主检出干净；worktree `git status` 零脏、全部提交已落主（branch tip=cd1e161a=master）；`wt-guard.sh D:/autostack/.wt/ui-048/auto-ui`＝clean（无reparse point）；worktree与`codex/plan-048-dev`分支（was cd1e161a）已删；同组只读sibling auto-lang detached已删；组目录`.wt/ui-048/`已空并移除（`.wt/`无ui-048残留）。plan-artifacts/plan-048/ scope（t01-inventory/t02-frozen-contract/native-{positive,negative}/review-native-*/smoke/min及探针脚本）在摘要折入本文件后**整scope删除**；registry（.retention/policy.json）已刷新（auto-ui/PLAN-048 archived, scope deleted, no holds）。落地检查：experimental crate，无生产消费进程需重建（显式观察：auto-ui仓无deployment面消费autographics-*实验crate；ag-examples经049/AG021消费锁取用）。
 
 ## 10. 待澄清事项
 
