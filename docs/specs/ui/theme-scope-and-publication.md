@@ -117,3 +117,13 @@
   `control_surface_states`（runtime）。
 - 真实腿：theme-lab 双端切换（Auto↔Solarized × light/dark，业务状态保持）、
   010 双端（VM MCP + Vue Playwright）、010 生成产物变量与官方包逐值对齐。
+
+## PLAN-041 增补：与业务实例所有权的组合边界（SD-03）
+
+- 主题 scope（本契约 §1）与业务实例态（PLAN-041，见
+  runtime/component-and-store-instances.md）**分属两套机制**：组件实例分裂
+  不改主题 scope 的键/生命周期；主题 scope 不承载业务字段。业务 receiver 的
+  实例身份与 ThemeScope id 无耦合——组合验收以 plan033_b1/theme_scope 系
+  + PLAN-041 fixture（同型实例各持业务态，主题经宿主/App scope）为准。
+- store composable 的 accent bootstrap 随厂形迁移为**每 App 实例化时执行**
+  （原模块加载一次）；palette/theme runtime 助手仍为模块级无状态函数。
