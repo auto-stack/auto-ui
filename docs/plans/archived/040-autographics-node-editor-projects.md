@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-03
 updated_at: 2026-11-04
 plan_revision: 1
-current_step: 9
+current_step: 10
 total_steps: 10
 depends_on: [auto-ui/PLAN-019, auto-ui/PLAN-024, auto-ui/PLAN-039]
 supersedes_spec_components: []
@@ -135,10 +135,14 @@ work产证；review同一权威树不同上下文独立final，逐AC/diff/SD/遗
 2026-11-04 / stage: merge | plan_id: auto-ui/PLAN-040:r1 | outcome: pass（归档时点；cleaned待T-10后终收据） | prepared: reviewed基线fc82061c+SD-01候选已在交付树（无增量Spec改动，canonical目标docs/specs/auto-graphics/node-editor-projects.md在本仓有既定先例） | delivery_commit: fc82061cd12a77b8422c4d4b47d5862ee9af7b37（master tip，ff-only线性；reviewed提交即交付提交，零重写） | canonical_verified: docs/specs/auto-graphics/node-editor-projects.md @sha256 1daa7111657a45b6c11fbd9c2f9e4abc01359fa1cf8575536603b42ca510ab4e（landed核验，status: candidate沿仓库既定约定；spec.json/派生索引/legacy ledger零写入） | archive_path: docs/plans/archived/040-autographics-node-editor-projects.md（status: archived，git mv+docs提交入默认分支） | 落地观察（explicit stale-artifact item）：交付面=experimental研究crates（pilot/driver工具链与editor-projects入口）+docs；主checkout载有他会话未提交WIP（§4/T-08声明），主checkout全量构建会测到外来WIP状态而非本交付——定向门（pilot157/driver7/verify040全PASS/verify039 4/4）已在worktree同补丁内容完成且随ff-only绑定fc82061c，落地树与评审树对交付路径字节全等 | batch_regression_due_check: auto-ui仓无`.last-batch-regression.json`批门定义（D-05沿PLAN-035/038具名继续持有，非本Plan新增，移交regress owner） | completion_kind: delivered
 
 2026-11-04 / stage: goal | plan_id: auto-ui/PLAN-040 | plan_revision: r1 | round: 3 | from: merge | to: (cleanup→done) | status: archived | outcome: pass | worktree: D:/autostack/.wt/ui-040/auto-ui | commit: fc82061c | next: T-10清理后终收据
+
+2026-11-04 / stage: merge | plan_id: auto-ui/PLAN-040:r1 | outcome: pass | cleaned: fresh wt-guard clean→worktree `.wt/ui-040/auto-ui`删（注册即除名，目录残留经rm清空）→分支`codex/plan-040-dev`删（was fc82061c已并入）→auto-lang sibling clean删→空组目录删→plan-artifacts/plan-040 scope删（37文件/137KB全折本Plan）→registry刷新（deletions/merge_closeouts，holds=D-02 OS 15行+D-05批门移交，均非本scope持有） | final_counts: T-01..T-10 10/10，AC-01..09按§7归档（AC-08/09随merge关闭；AC-03含D-02具名pending保持开放） | delivery_commit: fc82061c（master tip）| archive_path: docs/plans/archived/040-autographics-node-editor-projects.md @1e9abb07 | canonical: node-editor-projects.md @1daa7111 | completion_kind: delivered
+
+2026-11-04 / stage: goal | plan_id: auto-ui/PLAN-040 | plan_revision: r1 | round: 3 | from: merge | to: done | status: archived | outcome: pass | worktree: (removed) | commit: fc82061c（master tip；归档@1e9abb07） | notes: 目标`完成计划040`全链完成——work(6)+review(1)+merge(3)，落主ff-only、canonical核验、归档提交、guard清树/scope删/registry刷，落地观察与D-02/D-05具名移交在案。done.
 | T-07 | review | T-06 | 同树独立final与finding返work后受影响复核 | AC-07 | [x] ✅2026-11-04 独立subagent上下文final（全新会话，不继承实现对话；自行重跑全部命令）绑定fc82061c：baseline/单提交/22文件/scope卫生核清；AC-01..06逐项pass（11对象独立逐值比对+映射互逆推导+自选反例4类篡改全捕获+非G04值源证非硬编码+旧档5文件cmp全等）；AC-03诚实pending核验（os=15断言）；finding仅R-1（低·文案：提交信息162 vs 实测157，计划收据正确，据实记录不重写历史）。verdict: pass（reviewed）。 |
 | T-08 | merge | T-07 pass | 冻结定向门/来源核后落master | AC-08 | [x] ✅2026-11-04 master仍在基`577dfd04`（无分叉）→`git merge --ff-only codex/plan-040-dev`直落，master tip=交付提交`fc82061c`（=reviewed提交，零重写零range-diff需要）；wt-guard clean在案；定向门（pilot157/driver7/verify040全PASS/verify039 4/4）绑定同一提交，落地态=评审态字节全等（`git diff fc82061c HEAD`空）。落主观察（explicit stale-artifact item，沿039先例）：主checkout载有他会话WIP（autoui设计文档+README、auto-ui-runtime截图、039旧文件残留删除、029存档小改），本交付面为experimental研究crates+docs，主checkout全量构建会测到外来WIP而非本交付；定向验证已在worktree同补丁内容完成并随ff绑定fc82061c。batch regression due：auto-ui仓无`.last-batch-regression.json`批门定义，D-05沿035/038具名移交regress owner。 |
 | T-09 | merge | T-08 | canonical/归档/消费身份/导航核验，不写派生JSON | AC-08 | [x] ✅2026-11-04 SD-01 canonical `docs/specs/auto-graphics/node-editor-projects.md` landed @sha256 `1daa7111657a45b6c11fbd9c2f9e4abc01359fa1cf8575536603b42ca510ab4e`（status: candidate沿仓库既定约定；spec.json/派生索引/legacy ledger零写入）。归档`docs/plans/archived/040-…`（git mv+status: archived）；README合同行与M2路线段更新为已交付/AG018可固定消费实际交付（入口CLI、夹具/产品路径、ID映射、D-02 pending集、非目标边界）。 |
-| T-10 | merge | T-09 | fresh guard、所有实际输出对账/清理、摘要/具名hold登记 | AC-09 | [ ] |
+| T-10 | merge | T-09 | fresh guard、所有实际输出对账/清理、摘要/具名hold登记 | AC-09 | [x] ✅2026-11-04 fresh wt-guard clean→删worktree `.wt/ui-040/auto-ui`+分支`codex/plan-040-dev`（was fc82061c，已ff并入master）+auto-lang sibling（`.wt/ui-040/auto-lang`，clean）+空组目录；plan-artifacts/plan-040 scope删除（37文件/137KB，证据已折入本Plan§8/§9）；registry刷新（deletions+merge_closeouts登记，非scope holds=D-02/D-05具名）；主checkout仅余他会话WIP（未接管）。 |
 
 ## 9. 复审记录
 
