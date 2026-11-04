@@ -117,8 +117,8 @@
    "blob": "3d8b28cc118a7fbfcdf40125ad1e2ded8546af80"
   },
   "autographics-auto-driver/api/character3d_v1.at": {
-   "sha256_bytes": "a12c64bb97c7f80d15bd3c0a0817120a751ddeda5b6a1a1db6de804e1e4cea63",
-   "sha256_normalized": "a12c64bb97c7f80d15bd3c0a0817120a751ddeda5b6a1a1db6de804e1e4cea63",
+   "sha256_bytes": "ded33c3c32bb9f1f3e2137e0edd83f628235fdd32538257af5d716b02e09ccd1",
+   "sha256_normalized": "ded33c3c32bb9f1f3e2137e0edd83f628235fdd32538257af5d716b02e09ccd1",
    "blob": "bc3d5a70038f1fb525cdd473e92dd9f621c9c1bb"
   },
   "autographics-auto-driver/api/runtime_camera2d_v1.at": {
