@@ -2898,8 +2898,8 @@ impl DynamicComponent {
         // （验收/测试通道的真实意图；pre-split 语义=共享根态，实例分裂后
         // 根上不再有子件 props/model）；0 或 ≥2 个存活实例保持 root legacy
         // （歧义不由通道静默裁决）。
-        let name_only_instance;
-        let instance: Option<&str> = match instance {
+        let mut name_only_instance;
+        let mut instance: Option<&str> = match instance {
             Some(i) => Some(i),
             None => {
                 let live = self
@@ -2920,19 +2920,50 @@ impl DynamicComponent {
                 }
             }
         };
+        // PLAN-051 T-03 (③): the view's TypedInst carries the page-level
+        // instance NAME (`author`), while `child_instances` keys are the
+        // qualified identities (`…/author#N`) minted by the plan-041 T-04
+        // keyed-identity discipline. When the carried name is not a live
+        // key, resolve it through the same name-only live lookup before
+        // declaring a late event — a REAL late event (no live same-name
+        // instance) still drops; a format/generation desync re-targets the
+        // live instance instead of discarding a legitimate interaction
+        // (consumer BLOG-005: every MCP press on the author page was
+        // dropped as `late event`, freezing the page on the list view).
         let instance_state_id: Option<u64> = match instance {
             Some(identity) => match self.bridge.child_instance_state_id(identity) {
                 Some(id) => Some(id),
                 None => {
-                    eprintln!(
-                        "[VM-INSTANCE] {}.{} dropped: instance `{}` released (late event)",
-                        widget_name, clean_name, identity
-                    );
-                    return;
+                    let live = self
+                        .bridge
+                        .child_instance_identities()
+                        .into_iter()
+                        .filter(|id| {
+                            let tail = id.rsplit('/').next().unwrap_or(id);
+                            tail.split('#').next() == Some(widget_name)
+                        })
+                        .collect::<Vec<_>>();
+                    match live.as_slice() {
+                        [only] => {
+                            name_only_instance = only.clone();
+                            instance = Some(name_only_instance.as_str());
+                            self.bridge.child_instance_state_id(name_only_instance.as_str())
+                        }
+                        _ => None,
+                    }
                 }
             },
             None => None,
         };
+        if instance_state_id.is_none() {
+            if let Some(identity) = instance {
+                eprintln!(
+                    "[VM-INSTANCE] {}.{} dropped: instance `{}` released (late event)",
+                    widget_name, clean_name, identity
+                );
+                return;
+            }
+        }
         // If this event comes from an input, update the bound state field first.
         if let Some(text) = &input_value {
             if let Some(state_field) = self.input_state_map.get(&clean_name) {
