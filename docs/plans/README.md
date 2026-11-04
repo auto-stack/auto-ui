@@ -39,13 +39,18 @@
 | 033 | [剩余六个基础示例正式主题迁移](archived/033-basic-examples-theme-migration.md) | UI031后继B1六例 | archived/r1，9/9；实际交付d734f1fe、Spec/归档清理齐；复审记录同实现会话重构的来源限制见归档，非AG新计划前置 |
 | 034 | [3D纹理资源与节点动画作者接线](archived/034-autographics-node3d-materials-and-animation.md) | 005/006/030新作者收口 | archived/r1，交付93eaa907、Spec gallery-node3d-textures-and-animation.md；AG015已消费。复审收据明确同实现会话复核，相关独立证据/持名hold不据归档视为已闭 |
 | 035 | [3D声音/HUD与完整G3组合接线](archived/035-autographics-node3d-audio-hud-composition.md) | 034后继/公共三维音画 | archived/r1，交付5903839e（ff-only落主、7补丁range-diff等价、主smoke 26/26）；SD-01 canonical node3d-audio-hud-composition.md字节核d7272516。复审收据如实记录同实现会话final（判定从工件重建、五门独立重跑），同034先例不称独立上下文pass；D-04声学/走查hold随归档保留，D-05批量回归被阻具名移交（他会话主checkout WIP+缺批量门定义），不阻塞下游消费。AG016完整接线引擎前置实质解除，034相关证据核验仍归AG016计划内 |
-| 036 | [正式主题包发行与生成输入收口](036-official-theme-distribution-and-input-closure.md) | 031 F-05及VM/Rust receipt差额，接受033 | drafting/r1，0/10；Full SDK/delivery、Vue/VM/Rust输入/复用与外部恢复；OS053/918互不整项等待，B2采用新渠道验收接U036；仅规划、暂不实施 |
-| 037 | [B2十二个业务示例主题迁移](037-business-examples-theme-migration.md) | 031/033后继B2，渠道接036 | drafting/r1，0/11；十二例业务/计时/store/路由保持、双端逐例/隔离/恢复；可先核path源码，渠道最终门等U036，暂不实施 |
-| 038 | [B3专用示例主题支持面核验](038-specialized-examples-theme-readiness.md) | 拆分路线B3有界研究 | drafting/r1，0/8；十二例盘点、六类真实链探针、go/blocked/no-go及后继分包；研究不等迁移，不等037整项，暂不实施 |
+| 036 | [正式主题包发行与生成输入收口](archived/036-official-theme-distribution-and-input-closure.md) | 031/033后继 | archived/r1，10/10；三仓落地/清理齐；原V04×2/V05a归语言930，Tauri R-6与vue-render渠道另归owner，不冒全部发行已绿 |
+| 037 | [B2十二个业务示例主题迁移](archived/037-business-examples-theme-migration.md) | 031/033后继B2 | archived/r1；最终收据11/11、delivery0f90ec1b，头部仍7/11待owner对账；B1+B2累计22，原首红/复审来源及vue-render渠道待办按归档保留 |
+| 038 | [B3专用示例主题支持面核验](archived/038-specialized-examples-theme-readiness.md) | B3有界研究 | archived/r1，8/8；十二例实测/具名前置已落Spec，研究不抵迁移；正式后继045/046/047 |
 | 039 | [3D查询、动态组与二维标记Node接线](archived/039-autographics-node3d-queries-and-mixed-markers.md) | G05/3d新作者前置；021/024/030 | archived/r1，交付8f577a34（含复审finding R-1修复ff5d267d）；SD-01 canonical node3d-queries-and-mixed-markers.md已落。final收据如实记录同实现会话（判定从工件重建、pilot152/dialect103/gates7/flow8/verifier独立重跑全绿）；D-03 OS phase-14探针沿AG009持有、G05逐字OS迁移归AG017。AG017固定消费其实际交付，前置实质解除 |
 | 040 | [Node双维编辑工程与项目化验收](archived/040-autographics-node-editor-projects.md) | G04纯场景/编辑副本与公共验收收口 | archived/r1，10/10；已交付fc82061c（ff-only落主；独立subagent上下文final pass绑定fc82061c）；SD-01 canonical node-editor-projects.md sha 1daa7111；editor-projects身份孪生入口（queries-3d同机制）+G04忠实双维夹具/冻结产品+driver项目化7门+verify_plan040全PASS+旧档字节冻结复核；AC-03 OS层15行D-02具名pending保持开放；清理回执见计划；AG018可固定消费实际交付 |
 | 043 | [Node3D模型资源对象模板](043-autographics-node3d-model-object-templates.md) | Node模板builtin限制的后继作者接线 | drafting/r1，0/10；复用已有Model运行能力/034闭包/035组合，静态平色与opaque模型实例生命周期/非solid/owner原额；不改AG016基线，暂不实施 |
 | 044 | [Node源码定位与分层诊断](044-autographics-node-source-diagnostics.md) | 多模块作者体验后继 | drafting/r1，0/10；可选原源映射/可证精度与身份、真实compile定位，无span运行错误如实fallback；不依赖043/不换SDK，暂不实施 |
+| 041 | [组件与Store实例所有权收口](archived/041-component-and-store-instance-ownership.md) | Design47/S后继 | archived/r1，10/10；delivered da4485b4（ff-only 落主）；独立 final pass @cf087715；SD-01..04 canonical 落地（component-and-store-instances.md）；VM 实例分裂+store 每App context；13 base-red/边界如实记录 |
+| 042 | [Reload/schema/effect有界核验](042-reload-schema-and-effect-readiness.md) | Design47/R后继 | drafting/r1，0/8；多文件/迁移/失败保旧/生命周期研究，相关腿接041正式端口；研究不冒完整HMR |
+| 045 | [媒体三Demo主题迁移](045-media-demo-theme-migration.md) | 038实测后继 | drafting/r1，0/9；019/020/030，前置links/back contract/播放支持具名，不代产品；仅规划 |
+| 046 | [图像文件三Demo主题迁移](046-image-and-file-demo-theme-migration.md) | 038实测后继 | drafting/r1，0/9；029/031iv/027，031iv七编译错/VM挂起先核，保像素/文件/性能条件；仅规划 |
+| 047 | [阅读编辑数据绘制六Demo主题迁移](047-specialized-workbench-demo-theme-migration.md) | 038实测后继 | drafting/r1，0/9；018/041/026/025/024/031-paint，挂载/旧定位/主题声明与内容owner，保原支持；仅规划 |
 
 当前AG按[M2路线](../design/autographics/m2-game-first-three-lane-roadmap.md)推进：UI040已交付fc82061c/独立final，OS层15项D-02仍pending；AG016现executing/r1/本次核验3-10、唯一ag-016树、固定035；017/018/019仍草案，当前Gallery19/22。新[资源组件与诊断设计](../design/autographics/node-resource-components-and-source-diagnostics.md)立本仓043模型对象模板、044可选源码诊断，均drafting/r1/0-10、仅规划、可独立推进。它们不新增为AG016或AG019当前M2前置，不让在途内容追tip；共享生成器文件按owner短窗，原预算/验收不变。
 
