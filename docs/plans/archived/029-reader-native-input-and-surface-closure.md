@@ -1,6 +1,6 @@
 ---
 plan_id: PLAN-029
-status: archived
+status: execution_done
 feature_name: Reader原生输入链与文档表面必要接缝收口
 author: [Codex]
 created_at: 2026-11-02
