@@ -6,10 +6,10 @@ author: [Codex]
 created_at: 2026-11-05
 updated_at: 2026-11-05
 plan_revision: 1
-current_step: 9
+current_step: 10
 total_steps: 10
 completion_kind: delivered
-cleanup_status: pending
+cleanup_status: cleaned
 depends_on: [auto-ui/PLAN-024, auto-ui/PLAN-034, auto-ui/PLAN-043]
 supersedes_spec_components: []
 new_spec_components: [docs/specs/auto-graphics/node3d-lighting-shadow-feasibility.md]
@@ -525,8 +525,10 @@ Named cleanup hold: owner=Codex PLAN-059 closeout / user filesystem operator; sc
 
 2026-11-06 / stage: goal | plan_id: PLAN-059 | plan_revision: r1 | round: 7 | from: user | to: user | status: archived | outcome: blocked | worktree: removed | commit: ab5a2e64b95206be8bd09be28001cfaffb3ba646 | next: user. 前轮分类为no progress（仅重新确认阻碍并记账，无活跃进程可等待）；本轮再次核§10及磁盘，plan-059 scope仍存在，工作树/分支仍已移除，没有外部状态变化或用户清理答复。同一审批清理阻碍连续第3个goal turn，已达host blocked阈值；目标转blocked，停止自动续作。T10/9-of-10与具名hold保留；只待用户清理精确scope或审批条件改变后恢复收口，不重做已通过研究/复审/落地主腿。
 
+2026-11-06 / stage: merge | plan_id: PLAN-059:r1 | outcome: **pass（cleaned，恢复收口）** | delivery_commit: ab5a2e64b95206be8bd09be28001cfaffb3ba646 | archive_commit: fb116b0a21d090e85e3d9c33ac3f9fd6471d7a57 | cleaned: **完成**。用户本轮明确授权完成清理（即round 7等待的外部状态变化）。恢复前重核：`git merge-base --is-ancestor ab5a2e64 HEAD` 通过（master现tip 65aa99ae）；`codex/plan-059-dev`分支不存在；`.wt/ui-059`组目录不存在；scope内仅`auto-ui`子目录（du 16G，与已审计38238文件/18926786672字节一致）。执行`rm -rf /d/autostack/plan-artifacts/plan-059`后`test -e`确证ABSENT；registry `.retention/policy.json`同步更新（plans条目archived-cleanup-pending→archived/completed 2026-11-06/hold released；deletions与log各追加PLAN-059收口条目；holds数组本无059条目）。构建中间物随scope删除，不再回收。具名hold（owner=Codex PLAN-059 closeout）按其记录的closure条件关闭。无未决finding、无遗留scope。landing-not-deployment沿merge记录：纯研究知识交付，无生产二进制要求。T-10完成，10/10，PLAN-059:r1收口。
+
 ## 10. 待澄清事项
 
-C-059-cleanup：请用户手动清理 `D:/autostack/plan-artifacts/plan-059/`（约18.9GB；只有本计划auto-ui子目录），或修复自动审批对此精确自有路径清理的限制，之后继续本goal。不得清理plan-artifacts根或其它编号目录。工具只报告“blocked by policy”，没有更具体理由。研究交付/独立复审/归档均完成；T10待清理核验。
+C-059-cleanup：**已解决（2026-11-06）**。用户授权后删除`D:/autostack/plan-artifacts/plan-059/`（约18.9GB，仅本计划auto-ui子目录），absence核验与registry更新见§9收口记录；未触碰plan-artifacts根或其它编号目录。
 
 D-01：正常作者端口不存在时的两候选由T-02真链裁决，不能因底层有LightDef假定作者已支持。D-02：数学像素容差/投影域在实际环境T-01冻结；GPU计时不可用就明牌。D-03：本研究不绑定尚无结论的three.js首批覆盖，不提前认领PBR。材料唯一`D:/autostack/plan-artifacts/plan-059/auto-ui/`，先核跨仓owner/登记用途在途，研究源/原始结果/SDK副本/target/外部消费均子scope；merge必要源命令和成败摘要折Plan后核所有输出，fresh guard清唯一树/删自有scope与构建物，具名owner/理由/关闭条件hold例外。禁止链接/触碰别仓同号/另建权威树。
