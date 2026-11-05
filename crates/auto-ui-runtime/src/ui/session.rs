@@ -3644,6 +3644,19 @@ impl DesktopSession {
         self.host.as_mut()?.wm.remove_win(wid)
     }
 
+    /// None means an in-process surface; Some always belongs to the broker,
+    /// including unsupported/failed sends, so callers must not invoke the
+    /// placeholder component as a fallback.
+    pub fn broker_named_action(&mut self, app: AppId, name: &str, arg: Option<&str>, widget: Option<&str>) -> Option<Result<(), String>> {
+        let wid = self.host.as_ref()?.wm.wins.iter()
+            .find(|(_, window)| window.app == app).map(|(wid, _)| *wid)?;
+        let client = self.broker_clients.values_mut().find(|client| client.owns_wid(wid))?;
+        if widget.is_some_and(|widget| widget != "App") {
+            return Some(Err("unsupported: named broker actions target the root App".into()));
+        }
+        Some(client.send_named_action(wid, name, arg))
+    }
+
     /// Request shutdown of this window's owning outproc app. Reclamation and
     /// buffer release remain on the normal ExitRequest/EOF pump path.
     pub fn broker_close_window(&mut self, wid: Wid) -> bool {

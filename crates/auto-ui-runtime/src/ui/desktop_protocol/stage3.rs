@@ -107,6 +107,24 @@ impl BrokerClient {
         self.wid == Some(wid) || self.wid_surface.contains_key(&wid.0)
     }
 
+    /// Named root messages are an optional protocol extension. An old peer
+    /// must receive no unknown tag (which would otherwise disconnect it).
+    pub fn send_named_action(&mut self, wid: Wid, name: &str, arg: Option<&str>) -> Result<(), String> {
+        if !self.owns_wid(wid) {
+            return Err("action window is not owned by this client".into());
+        }
+        if !self.theme_caps.iter().any(|cap| cap == "input-action/1") {
+            return Err("unsupported: peer has no input-action/1 capability".into());
+        }
+        self.end.send(&super::message::ProtocolMsg::Input(
+            super::message::InputMsg::Action {
+                wid: wid.0,
+                name: name.to_string(),
+                arg: arg.map(str::to_string),
+            },
+        )).map_err(|error| format!("action transport failed: {error:?}"))
+    }
+
     /// 该 client 的像素前缓冲（v1.3 渲染臂/测试断言口）。
     pub fn composed_pixels(&self) -> Option<&PixelsSurface> {
         let surface = *self.wid_surface.get(&self.wid?.0)?;
@@ -263,6 +281,32 @@ pub fn fused_state_snapshot(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[cfg(windows)]
+    fn p060_named_action_requires_negotiated_capability_and_owned_window() {
+        use crate::ui::desktop_protocol::message::{InputMsg, ProtocolMsg};
+        let pipe = format!("p060-action-{}-{:?}", std::process::id(), std::thread::current().id());
+        let listener = transport::listen(&pipe).unwrap();
+        let mut peer = transport::connect(&pipe, 2000).unwrap();
+        let host = listener.wait_connect().unwrap();
+        let mut client = BrokerClient::new("p060-negotiation".into(), Box::new(host));
+        client.wid = Some(Wid(7));
+        assert!(client.send_named_action(Wid(7), "NextMonth", None).unwrap_err().contains("unsupported"));
+        assert_eq!(peer.pending(), 0, "legacy peer must see no unknown input tag");
+        client.theme_caps.push("input-action/1".into());
+        assert!(client.send_named_action(Wid(8), "NextMonth", None).is_err());
+        assert_eq!(peer.pending(), 0, "a different window cannot receive this action");
+        client.send_named_action(Wid(7), "FormTitle", Some("中文输入")).unwrap();
+        assert_eq!(peer.recv_wait(2000).unwrap().unwrap(), ProtocolMsg::Input(InputMsg::Action {
+            wid: 7, name: "FormTitle".into(), arg: Some("中文输入".into()),
+        }));
+        assert_eq!(peer.pending(), 0);
+        // Refusing the extension must not break old pointer/keyboard traffic.
+        client.theme_caps.clear();
+        assert!(client.send_named_action(Wid(7), "NextMonth", None).is_err());
+        client.end.send(&ProtocolMsg::Input(InputMsg::CharTyped { wid: 7, ch: 'x' })).unwrap();
+        assert_eq!(peer.recv_wait(2000).unwrap().unwrap(), ProtocolMsg::Input(InputMsg::CharTyped { wid: 7, ch: 'x' }));
+    }
     use crate::ui::desktop_protocol::broker;
     use crate::ui::desktop_protocol::client_runtime::{ClientConfig, ReconnectPolicy};
     use crate::ui::desktop_protocol::message::{DrawOp, FrameMode, MouseButton};

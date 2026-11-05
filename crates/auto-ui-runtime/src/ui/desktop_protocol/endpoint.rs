@@ -274,12 +274,16 @@ impl<S: FrameSource> AppEndpoint<S> {
             height: self.height,
             fonts: self.fonts.clone(),
             surfaces: self.surfaces.clone(),
-            // PLAN-053：主题策略能力尾段（031 scope 在场的会话声明
-            // `theme-policy/1`；空 = 旧端线字节等价）。
-            theme_caps: if self.session.theme_capable() {
-                vec!["theme-policy/1".to_string()]
-            } else {
-                Vec::new()
+            // Keep the historical field name for wire compatibility; this
+            // additive capability tail is shared with input extensions.
+            // The existing extensible capability tail also negotiates new
+            // input tags. Never send Action to a pre-060 decoder.
+            theme_caps: {
+                let mut caps = vec!["input-action/1".to_string()];
+                if self.session.theme_capable() {
+                    caps.push("theme-policy/1".to_string());
+                }
+                caps
             },
         }))
     }
@@ -1228,6 +1232,16 @@ mod tests {
         let replies = app.on_message(welcome).unwrap();
         assert_eq!(replies, vec![ProtocolMsg::Handshake(HandshakeMsg::Ready)]);
         replies
+    }
+
+    #[test]
+    fn p060_app_hello_advertises_action_decoder_capability() {
+        let mut app = AppEndpoint::new(StubSource::new(), "counter", "c", 480.0, 320.0);
+        let ProtocolMsg::Handshake(HandshakeMsg::Hello { theme_caps, .. }) = app.connect().unwrap() else {
+            panic!("expected Hello");
+        };
+        assert!(theme_caps.iter().any(|cap| cap == "input-action/1"));
+        assert!(!theme_caps.iter().any(|cap| cap == "theme-policy/1"));
     }
 
     #[test]

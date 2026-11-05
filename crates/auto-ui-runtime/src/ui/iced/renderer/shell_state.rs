@@ -5916,6 +5916,12 @@ pub(crate) fn apply_desktop_injects(state: &mut crate::ui::session::DesktopSessi
                         .or_else(|| state.hatched_mini_of(which)),
                 };
                 let Some(app_id) = app_id else { continue };
+                if let Some(result) = state.broker_named_action(app_id, &handler, arg.as_deref(), widget.as_deref()) {
+                    if let Err(error) = result {
+                        eprintln!("[desktop-input] handler {handler}: {error}");
+                    }
+                    continue;
+                }
                 let Some(sess) = state.apps.get_mut(&app_id) else {
                     continue;
                 };
@@ -5980,32 +5986,11 @@ pub(crate) fn apply_desktop_injects(state: &mut crate::ui::session::DesktopSessi
                         .collect();
                     eprintln!("[plan060] action {msg} app_id={} wins={wins:?} clients={clients:?}", app_id.0);
                 }
-                if let Some(wid) = state.host.as_ref().and_then(|h| {
-                    h.wm.wins
-                        .iter()
-                        .find(|(_, v)| v.app == app_id)
-                        .map(|(w, _)| *w)
-                }) {
-                    let mut delivered = false;
-                    for client in state.broker_clients.values_mut() {
-                        if client.owns_wid(wid) {
-                            let input = crate::ui::desktop_protocol::message::ProtocolMsg::Input(
-                                crate::ui::desktop_protocol::message::InputMsg::Action {
-                                    wid: wid.0,
-                                    name: msg.clone(),
-                                    arg: arg.clone(),
-                                },
-                            );
-                            delivered = client.end.send(&input).is_ok();
-                            if std::env::var_os("AUTO_PLAN060_DIAG").is_some() {
-                                eprintln!("[plan060] action {msg} sent wid={} delivered={delivered}", wid.0);
-                            }
-                            break;
-                        }
+                if let Some(result) = state.broker_named_action(app_id, &msg, arg.as_deref(), None) {
+                    if let Err(error) = result {
+                        eprintln!("[desktop-input] message {msg}: {error}");
                     }
-                    if delivered {
-                        continue;
-                    }
+                    continue;
                 }
                 let Some(sess) = state.apps.get_mut(&app_id) else { continue };
                 let args = arg
