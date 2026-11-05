@@ -346,3 +346,9 @@ back 侧 `auto-notes-...-back` 是完整 axum/DB 实现。故 iced 桌面上任�
   - 但无 `[plan060] child action` 日志：child 的 Surface 是 **HeadlessFrameSource**（client_entry 的 Commands 臂之外的装配），且 calendar 是 **rust profile**（a2r 生成组件，非 VM DynamicComponent）——`Component::dispatch_named` 走默认实现返回 false。
   - 结论：Action 下行协议链路（宿主→child→Surface）已通；缺的是**生成器侧为 a2r 组件生成 dispatch_named**（消息名 → 生成 Msg 变体）。
   - 下一步：在 `crates/auto-ui-tools/src/rust_ui.rs` 生成 `impl Component { fn dispatch_named(...) }`，把 handler 名映射到生成的消息枚举并派发；再复验 calendar `NextMonth`。
+
+- stage: work | plan_id: auto-ui/PLAN-060 | plan_revision: 1 | round: 25 | task_ids: T-07 | outcome: 生成器已加 dispatch_named 发射，但 calendar 生成产物未包含（发射点未命中） | evidence:
+  - `auto-ui-compiler/src/ui_gen/rust.rs::generate_component_impl` 新增 emission（无参/单 str 参变体 → `self.on(Msg::Variant)`），提交 `25b7a805`。
+  - 重建 `auto-ui-tool`（02:30:06）后 `auto build -r rust`：生成产物 `main.rs` **仍无 dispatch_named**，重链接后二进制亦无该串。
+  - 发现旁路问题：`rust-workspace/Cargo.toml` 的 `auto-web` path 指向 `../../../../auto-web`（os-054 兄弟）而非 ui-060 组树——与 auto-lang-core(ui-060) 的 auto-web-contract 冲突（links 重复）；已临时改写该行绕过（生成器每次 build 会重写，需在生成器侧修正路径）。
+  - 下一步：确认 calendar 组件走的是哪个 emitter（是否 `generate_component_impl` 路径、message_variants 是否在发射时已填充）；必要时在同一文件内加诊断打印。
