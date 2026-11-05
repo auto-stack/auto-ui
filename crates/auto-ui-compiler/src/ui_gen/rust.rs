@@ -373,6 +373,62 @@ pub struct BareFnSig {
     pub str_params_owned: bool,
 }
 
+/// PLAN-060：递归收集 input/textarea 的 oninput/onchange 处理器串。
+fn collect_input_event_handlers(node: &crate::aura::AuraNode, out: &mut Vec<String>) {
+    use crate::aura::AuraNode;
+    match node {
+        AuraNode::Element {
+            tag,
+            events,
+            children,
+            ..
+        } => {
+            if tag == "input" || tag == "textarea" {
+                for (ev, h) in events {
+                    if matches!(
+                        ev.as_str(),
+                        "oninput" | "onInput" | "onchange" | "onChange"
+                    ) {
+                        out.push(h.handler.clone());
+                    }
+                }
+            }
+            for c in children {
+                collect_input_event_handlers(c, out);
+            }
+        }
+        AuraNode::ForLoop { body, .. } => {
+            for c in body {
+                collect_input_event_handlers(c, out);
+            }
+        }
+        AuraNode::Conditional {
+            then_body,
+            else_body,
+            ..
+        } => {
+            for c in then_body {
+                collect_input_event_handlers(c, out);
+            }
+            if let Some(eb) = else_body {
+                for c in eb {
+                    collect_input_event_handlers(c, out);
+                }
+            }
+        }
+        AuraNode::Component { children, .. } => {
+            for c in children {
+                collect_input_event_handlers(c, out);
+            }
+        }
+        AuraNode::MemoBlock { body, .. } => {
+            for c in body {
+                collect_input_event_handlers(c, out);
+            }
+        }
+        _ => {}
+    }
+}
 impl RustGenerator {
     /// Create a new Rust generator
     pub fn new() -> Self {
@@ -1607,6 +1663,17 @@ fn collect_local_elems(
         // PLAN-627: 限定名 api.X() 改写门数据（reset 不清——widget 级装载）。
         self.api_imports = widget.api_imports.clone();
         self.reset();
+
+        // PLAN-060：on() 先于 view() 生成——预扫输入节点，登记绑定输入的
+        // on_change 变体（String 载荷在臂内覆盖为 last_input_text）。
+        {
+            let mut handlers: Vec<String> = Vec::new();
+            collect_input_event_handlers(&widget.view_tree, &mut handlers);
+            for h in handlers {
+                let v = self.extract_variant_name(&h);
+                self.input_variants.insert(v);
+            }
+        }
 
         // Plan 436 T1(决策 1-A):setup 前导槽是 a2vue 语义(script setup
         // 顶层,每组件实例同步执行、先于首渲染);Rust 目标的 Elm 架构
@@ -21386,6 +21453,8 @@ pub(crate) fn fix_cast_generic_ambiguity_for_ui(content: &mut String) {
         }
     }
 }
+
+
 
 
 
