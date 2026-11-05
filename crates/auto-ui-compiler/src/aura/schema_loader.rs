@@ -928,6 +928,18 @@ mod tests {
     }
 
     #[test]
+    fn document_surface_declares_host_container_without_claiming_engine_support() {
+        let schema = load_default_schema().unwrap();
+        let element = schema.get_element("doc-surface").unwrap();
+        assert!(element.get_prop("url").is_some());
+        assert!(element.get_prop("height").is_some());
+        assert!(!element.allows_children);
+        let meta = schema.meta.get("doc-surface").unwrap();
+        assert_eq!(meta.backends.web, "component");
+        assert_eq!(meta.backends.iced, "partial");
+    }
+
+    #[test]
     fn test_schema_from_content() {
         let content = r#"
 const TEST_TYPE: str = "test_type"

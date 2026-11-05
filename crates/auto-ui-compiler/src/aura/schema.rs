@@ -5298,6 +5298,20 @@ impl AuraSchema {
         // PLAN-760: 宿主侧远程帧消费 leaf——bridge WS 端点订阅 DisplayList v2,
         // iced 渲染臂直绘(注册表最新帧),帧不进 VM 状态;web 臂 = 透传 div
         // 占位(data-remote-frame 标记,宿主前端接管)。
+        elements.insert("doc-surface", ElementDef {
+            tag: "doc-surface",
+            category: ElementCategory::Display,
+            props: vec![
+                PropDef { name: "url", type_: PropType::String, required: false, default: None,
+                    description: "Native document URL; web adapter mounts into the container" },
+                PropDef { name: "height", type_: PropType::Int, required: false, default: None,
+                    description: "Surface height in logical pixels" },
+                PropDef { name: "class", type_: PropType::Union(vec![PropType::String, PropType::StyleBinding]),
+                    required: false, default: None, description: "Host container classes" },
+            ],
+            allows_children: false,
+            description: "Document host leaf; web div consumed by the application adapter; native Windows surface requires doc-surface feature",
+        });
         elements.insert("remote-frame", ElementDef {
                 tag: "remote-frame",
                 category: ElementCategory::Display,

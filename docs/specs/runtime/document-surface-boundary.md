@@ -63,3 +63,12 @@
   vm 27/27 冻结基线）+ `tests/epub/verify_epub.py --auto`（22/22）。
 - 探针宿主：`experiments/reader-engine-probe`（独立 workspace，非生产
   member；仅诊断对照，非 AC 入口）。
+
+## 5. 严格构建声明（PLAN-956）
+
+既有 `doc-surface` leaf 登记到 AURA schema（url、height、class），供严格
+前端校验使用；Vue 映射为带 `data-auto-tag="doc-surface"` 的 div，应用自身
+adapter 挂载引擎。此登记不增加通用文档引擎，也不开放未登记标签。
+Windows native 表面仍由 `doc-surface` feature 门控；iced 标记 partial，
+queue 不消费，其他后端不据此声称支持。Reader 的默认严格 Vue 构建无需
+以 lenient 绕过该组件。该 schema 与 Rust 元件表、Vue 映射/责任表共同维护。

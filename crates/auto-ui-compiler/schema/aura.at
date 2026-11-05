@@ -1650,6 +1650,22 @@ element workspace_preview {
     description: "Whole-desktop proportional preview (host-composited tiles, PLAN-012 W3)"
 }
 
+// PLAN-956: existing native document host also has a declared strict-build surface.
+element doc-surface {
+    tag: "doc-surface"
+    category: "display"
+    tier: "builtin_widget"
+    backends: { web: "component", iced: "partial", gpui: "unknown" }
+    vue: { component: "div" }
+    props: [
+        { name: "url", type: "string", description: "Native document URL; web host mounts the product adapter into this container" }
+        { name: "height", type: "int", description: "Surface height in logical pixels" }
+        { name: "class", type: "union:string,class_binding", description: "Host container classes" }
+    ]
+    allows_children: false
+    description: "Document host leaf: web emits a div with data-auto-tag=doc-surface for the application adapter; Windows native surface requires the doc-surface feature. This element does not supply a document engine."
+}
+
 element remote-frame {
     tag: "remote-frame"
     category: "display"

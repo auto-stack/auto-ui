@@ -233,7 +233,7 @@ impl VueGenerator {
             "div" => "div".to_string(),
             // PLAN-760: remote-frame 宿主占位 div（shadcn 模式经 carried_vue
             // component "div" 同路;此 fallback 保非 shadcn 形态）。
-            "remote-frame" => "div".to_string(),
+            "remote-frame" | "doc-surface" => "div".to_string(),
             "+" => {
                 if self_closing {
                     "span".to_string()
@@ -527,5 +527,4 @@ impl VueGenerator {
             _ => None,
         }
     }
-
 }
