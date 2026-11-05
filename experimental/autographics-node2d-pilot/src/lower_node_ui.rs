@@ -710,6 +710,15 @@ fn lower_embed_region(
             ),
         ));
     }
+    if !plan.is_root {
+        return Err(err_at(
+            module,
+            (0, 0),
+            format!(
+                "node '{def_name}': region '{name}' in a non-root def requires instance-mount identity (frozen T-02 slice admits root regions only)"
+            ),
+        ));
+    }
     let mut width = None;
     let mut height = None;
     let mut click = None;

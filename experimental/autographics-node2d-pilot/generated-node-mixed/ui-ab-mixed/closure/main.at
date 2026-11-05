@@ -1,0 +1,62 @@
+// PLAN-049 node-mixed fixture: root basic-UI view embeds one view-2d and one
+// view-3d region (mount relation, not a cross-dimension parent). One button
+// drives Auto state -> 2D motion + 3D translation + UI text; each region
+// click feeds back to Auto -> UI text (T-02 frozen ABI: same _ui_click_
+// dispatchers, scene bindings reusing the int getters). Counter is a pure-UI
+// nested instance (regions are a root-def slice in the T-02 freeze).
+use counter: Counter
+
+node Main {
+    model {
+        var count = 0
+        var reg2x = 0
+        var reg3x = 0
+        var clicks2 = 0
+        var clicks3 = 0
+    }
+    view {
+        column root {
+            spacing: 8
+            padding: 12
+            text count_text { text: .count }
+            button inc { text: "inc", onclick: .Inc }
+            text reg2c { text: .clicks2 }
+            text reg3c { text: .clicks3 }
+            Counter a {
+                start: 0
+                step: 1
+            }
+            row regions {
+                view-2d reg2 {
+                    width: 160
+                    height: 90
+                    onclick: .Region2
+                    shape2d mover { kind: quad, x: .reg2x, y: 20, w: 24, h: 24, color: (200, 40, 40) }
+                }
+                view-3d reg3 {
+                    width: 160
+                    height: 90
+                    onclick: .Region3
+                    cylinder3d spin { translation: (.reg3x, 0, 0), color: (90, 200, 90) }
+                }
+            }
+        }
+    }
+    on {
+        Life.Start -> {
+            .count = 0
+        }
+        .Inc -> {
+            .count = .count + 1
+            .reg2x = .reg2x + 8
+            .reg3x = .reg3x + 2
+        }
+        .Region2 -> {
+            .clicks2 = .clicks2 + 1
+        }
+        .Region3 -> {
+            .clicks3 = .clicks3 + 1
+        }
+    }
+}
+fn main() {}

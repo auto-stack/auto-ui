@@ -1,0 +1,18 @@
+{
+ "generator": "autographics-node2d-pilot plan049 node-ui-mixed",
+ "api": "autographics.node-ui-mixed/1",
+ "user_source_sha256": "82d41ad431a2dd0c8c860a16a18275ec42d9ceb4e93c04308bdee29197805279",
+ "user_source_bytes": 11878,
+ "ui_schema": "autographics.node-ui-mixed/1",
+  "module:counter": "5f360701c429fdf442dca4dbd9143ed8102fdd4bc461b15c93426ad93a04bbd0",
+  "module:main": "6e2e7c07fc878acfc469d1b82f173e3e8bb990a2e48d05fd901afe97eb9b7c13",
+ "closure": [
+  {"name": "counter", "sha256": "5f360701c429fdf442dca4dbd9143ed8102fdd4bc461b15c93426ad93a04bbd0", "bytes": 733},
+  {"name": "main", "sha256": "6e2e7c07fc878acfc469d1b82f173e3e8bb990a2e48d05fd901afe97eb9b7c13", "bytes": 1860}
+ ],
+ "provenance": {
+  "product": "generated-node-mixed/ui-ab-mixed",
+  "consumption": "ui.json regions drive per-dimension child surfaces (Game2d/Scene3d) mounted Flat2d into the UI view; scene bindings read the SAME int getter ABI as text/condition/layout; region clicks dispatch through the shared _ui_click_ ABI; one Session owner, one app_start/app_update per explicit step",
+  "world_sha256": "82d41ad431a2dd0c8c860a16a18275ec42d9ceb4e93c04308bdee29197805279"
+ }
+}

@@ -1,0 +1,223 @@
+{
+  "schema": "autographics.node-ui-mixed/1",
+  "generator": "autographics-node2d-pilot plan049 node-ui-mixed",
+  "world_sha256": "82d41ad431a2dd0c8c860a16a18275ec42d9ceb4e93c04308bdee29197805279",
+  "root": "Main",
+  "instances": [
+    {
+      "path": "Main/a",
+      "node": "Counter",
+      "def_idx": 0
+    }
+  ],
+  "defs": {
+    "Counter": {
+      "prefix": "counter",
+      "is_root": false,
+      "texts": 3,
+      "elements": [
+        {
+          "kind": "Container",
+          "name": "card",
+          "container": "row",
+          "props": [
+            {
+              "name": "padding",
+              "kind": "lit_num",
+              "v": 4.0
+            }
+          ],
+          "children": [
+            {
+              "kind": "Text",
+              "name": "name",
+              "slot": 0,
+              "text": {
+                "kind": "lit_str",
+                "v": "计数"
+              }
+            },
+            {
+              "kind": "Text",
+              "name": "value",
+              "slot": 1,
+              "text": {
+                "kind": "int_field",
+                "name": "count"
+              }
+            },
+            {
+              "kind": "Button",
+              "name": "inc",
+              "slot": 2,
+              "text": {
+                "kind": "lit_str",
+                "v": "加一"
+              },
+              "enabled": {
+                "kind": "field",
+                "name": "enabled"
+              },
+              "click": {
+                "fn": "counter_ui_click_inc",
+                "arg": "index"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "Main": {
+      "prefix": "main",
+      "is_root": true,
+      "texts": 4,
+      "elements": [
+        {
+          "kind": "Container",
+          "name": "root",
+          "container": "column",
+          "props": [
+            {
+              "name": "spacing",
+              "kind": "lit_num",
+              "v": 8.0
+            },
+            {
+              "name": "padding",
+              "kind": "lit_num",
+              "v": 12.0
+            }
+          ],
+          "children": [
+            {
+              "kind": "Text",
+              "name": "count_text",
+              "slot": 0,
+              "text": {
+                "kind": "int_field",
+                "name": "count"
+              }
+            },
+            {
+              "kind": "Button",
+              "name": "inc",
+              "slot": 1,
+              "text": {
+                "kind": "lit_str",
+                "v": "inc"
+              },
+              "click": {
+                "fn": "main_ui_click_inc",
+                "arg": "none"
+              }
+            },
+            {
+              "kind": "Text",
+              "name": "reg2c",
+              "slot": 2,
+              "text": {
+                "kind": "int_field",
+                "name": "clicks2"
+              }
+            },
+            {
+              "kind": "Text",
+              "name": "reg3c",
+              "slot": 3,
+              "text": {
+                "kind": "int_field",
+                "name": "clicks3"
+              }
+            },
+            {
+              "kind": "Instance",
+              "name": "a",
+              "node": "Counter"
+            },
+            {
+              "kind": "Container",
+              "name": "regions",
+              "container": "row",
+              "children": [
+                {
+                  "kind": "Embed",
+                  "name": "reg2",
+                  "dim": "2d",
+                  "width": 160,
+                  "height": 90,
+                  "click": {
+                    "fn": "main_ui_click_reg2",
+                    "arg": "none"
+                  },
+                  "scene": [
+                    {
+                      "kind": "quad",
+                      "name": "mover",
+                      "x": {
+                        "kind": "field",
+                        "name": "reg2x"
+                      },
+                      "y": {
+                        "kind": "lit_num",
+                        "v": 20.0
+                      },
+                      "w": {
+                        "kind": "lit_num",
+                        "v": 24.0
+                      },
+                      "h": {
+                        "kind": "lit_num",
+                        "v": 24.0
+                      },
+                      "color": [
+                        200,
+                        40,
+                        40
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "kind": "Embed",
+                  "name": "reg3",
+                  "dim": "3d",
+                  "width": 160,
+                  "height": 90,
+                  "click": {
+                    "fn": "main_ui_click_reg3",
+                    "arg": "none"
+                  },
+                  "scene": [
+                    {
+                      "kind": "cylinder",
+                      "name": "spin",
+                      "translation": [
+                        {
+                          "kind": "field",
+                          "name": "reg3x"
+                        },
+                        {
+                          "kind": "lit_num",
+                          "v": 0.0
+                        },
+                        {
+                          "kind": "lit_num",
+                          "v": 0.0
+                        }
+                      ],
+                      "color": [
+                        90,
+                        200,
+                        90
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
