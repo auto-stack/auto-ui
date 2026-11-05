@@ -82,8 +82,10 @@ debug=0 3m52s，二者不是同优化档的性能对比。
 
 CPU Tick 包含完整回调，不等同 Host 单帧 pump 或 GPU 时间；8×8/12×8 的
 本次完整 CPU Tick 已超过 8000μs 对照线，但仍低于 VM 步数/切片门，不能
-将这一点伪称 VM 已拒绝。Host 可以跨帧 pump。降层端到端命令约 7–26ms，
-与运行 VM compile/load/first-present 分开记录于归档 Plan。
+将这一点伪称 VM 已拒绝。Host 可以跨帧 pump。冻结七条降层命令的端到端
+样本范围为 23.3139–69.7427ms，其中五条接受样本为 38.5543–66.7361ms；
+两条拒绝样本为 23.3139ms（标准角色输入）与 69.7427ms（16×16）。
+这些时间与运行 VM compile/load/first-present 分开记录于归档 Plan。
 
 真实离屏 GPU：同一 Host 20 轮 fresh Run/Stop，每轮斜向变换及橙色对象
 像素中心 x=304→308；暂停呈现不推进状态，Stop 后 VM owner 和 spatial
