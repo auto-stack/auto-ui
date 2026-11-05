@@ -40,10 +40,13 @@ docs/specs/auto-graphics/node3d-character-and-runtime-camera.md 的 SD-01
 `.grounded(q)`/`.support(q)`、`camera3d.forward_x/forward_z/right_x/
 right_z/yaw/pitch/distance()`（零空间计费读取）。同一 profile 保持
 024 全部静态能力（cylinder3d/model3d/group3d/020 局部事件）。
-PLAN-043（SD-02）收口：`ag_char3_move` 的滑扫跳过不可见文档行
-（`visible_only=1` 语义）——parked spawn 模板与隐藏表现行永不阻挡
-角色行走；全部已交付内容的阻挡行均可见，可观察行为不变（g14 轨迹
-对照：隐藏模板在路径上 vs 停远处，逐 tick 角色位置逐位相等）。
+PLAN-043（SD-02）收口 + PLAN-064（SD-01 修订）：`ag_char3_move` 的滑扫
+跳过不可见文档行（`visible_only=1` 语义）——parked spawn 模板与隐藏表现
+行永不阻挡角色行走；但 `ag_char3_solid` 注册的 solid 行在滑扫期间被临时
+视为可见（`effective` 置 1、调用返回前恢复），因此 `solid:true` +
+`visible:false` 的行（如 platformer-3d 的隐形平台板）仍阻挡。043 的“全部
+已交付内容的阻挡行均可见”前提被反例证伪；可见性不再代理 solidity，
+solidity 以 `ag_char3_solid` 注册为准（g14 轨迹对照仍逐 tick 逐位相等）。
 
 ## 1. 执行证据（只述实测）
 

@@ -195,7 +195,20 @@ fn ag_char3_move(dx float, dy float, dz float, clearance float) int {
  if _ag_cast_charge(1)==0 {return 0}
  _ag_char3_grounded_state=0
  _ag_char3_support_state= -1
+ // PLAN-064: the v5 slide skips invisible rows (parked templates/hidden
+ // presentation). Registered solids are momentarily revealed so an invisible
+ // solid (e.g. a platform deck) still blocks; the reveal is restored before
+ // the tick ends, so rendering sees the document visibility unchanged.
+ var _ag_char3_eff=[]
+ for _ag_ei in 0.._ag_char3_solids.len() {
+  let _ag_en=_ag_char3_solids[_ag_ei]
+  _ag_char3_eff.push(effective[_ag_en])
+  effective[_ag_en]=1
+ }
  let token=ag_move_and_slide(_ag_char3_node,1,dx,dy,dz,clearance)
+ for _ag_ei in 0.._ag_char3_solids.len() {
+  effective[_ag_char3_solids[_ag_ei]]=_ag_char3_eff[_ag_ei]
+ }
  if token<=0 {return 0}
  if _ag_motion_state==3 {return token}
  if kinds[_ag_char3_node]==5 {return token}
