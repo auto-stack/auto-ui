@@ -1635,9 +1635,110 @@ fn merged_absorb(project_dir: &Path, _module: &auto_lang_core::api::ApiModule) -
         queue.extend(crate_refs(&rs));
         modules.push((name, rs));
     }
+    let companions_for_rewrite: Vec<(String, String)> = modules
+        .iter()
+        .filter(|(n, _)| n != "db")
+        .cloned()
+        .collect();
+    let mut db_code = db_code;
+    rewrite_companion_str_args(&mut db_code, &companions_for_rewrite);
     let db_fns = parse_db_fn_sigs(&db_code);
     modules.push(("db".to_string(), db_code));
     Some(MergedAbsorb { modules, db_fns })
+}
+
+/// PLAN-060 T-04（workaround）：内嵌 back 模块时，db 代码对 companion
+/// （repository/p2probe…）的调用未带 `&`（a2r 生成 back 时的 import 签名
+/// 解析在 front 侧不可得）；按 companion 转译件的 `&str` 形参位置给实参补
+/// `&`（已是 &/字面量则跳过）。纯机械改写，仅作用于内嵌副本。
+fn rewrite_companion_str_args(db_code: &mut String, companions: &[(String, String)]) {
+    for (name, src) in companions {
+        let sigs = parse_db_fn_sigs(src);
+        let mut out = String::with_capacity(db_code.len());
+        let mut rest = db_code.as_str();
+        while let Some(pos) = rest.find(&format!("{name}::")) {
+            let (head, tail) = rest.split_at(pos);
+            out.push_str(head);
+            let Some(fn_start) = tail.find('(') else {
+                out.push_str(tail);
+                rest = "";
+                break;
+            };
+            let fname = tail[name.len() + 2..fn_start].trim().to_string();
+            out.push_str(&tail[..fn_start + 1]);
+            // 找配对右括号，切参数
+            let after = &tail[fn_start + 1..];
+            let mut depth = 1i32;
+            let mut end = None;
+            for (i, ch) in after.char_indices() {
+                match ch {
+                    '(' => depth += 1,
+                    ')' => {
+                        depth -= 1;
+                        if depth == 0 {
+                            end = Some(i);
+                            break;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            let Some(end) = end else {
+                rest = "";
+                break;
+            };
+            let args_str = &after[..end];
+            let args = split_top_level_args(args_str);
+            let sig = sigs.iter().find(|s| s.name == fname);
+            let rewritten: Vec<String> = args
+                .iter()
+                .enumerate()
+                .map(|(i, a)| {
+                    let wants_ref = sig
+                        .and_then(|s| s.params.get(i))
+                        .map(|(_, ty)| ty == "&str")
+                        .unwrap_or(false);
+                    if wants_ref && !a.trim_start().starts_with('&') && !a.trim_start().starts_with('"') {
+                        format!("&{}", a)
+                    } else {
+                        a.clone()
+                    }
+                })
+                .collect();
+            out.push_str(&rewritten.join(", "));
+            out.push(')');
+            rest = &after[end + 1..];
+        }
+        out.push_str(rest);
+        *db_code = out;
+    }
+}
+
+fn split_top_level_args(s: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut depth = 0i32;
+    let mut cur = String::new();
+    for ch in s.chars() {
+        match ch {
+            '(' | '<' | '[' => {
+                depth += 1;
+                cur.push(ch);
+            }
+            ')' | '>' | ']' => {
+                depth -= 1;
+                cur.push(ch);
+            }
+            ',' if depth == 0 => {
+                out.push(cur.trim().to_string());
+                cur.clear();
+            }
+            _ => cur.push(ch),
+        }
+    }
+    if !cur.trim().is_empty() {
+        out.push(cur.trim().to_string());
+    }
+    out
 }
 
 /// PLAN-060 T-04：跨命名空间类型垫片。db 侧结构字段是 i64（a2r int 宽），
@@ -11417,6 +11518,7 @@ mod plan036_theme_input_tests {
         );
     }
 }
+
 
 
 
