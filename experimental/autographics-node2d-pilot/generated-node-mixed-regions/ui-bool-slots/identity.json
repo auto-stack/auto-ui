@@ -1,0 +1,17 @@
+{
+ "generator": "autographics-node2d-pilot plan054 node-ui-mixed-regions",
+ "api": "autographics.node-ui-mixed-regions/2",
+ "user_source_sha256": "cb8bd328dee7a40b65916c3475a65fb30ca82447052d8a8a27e44666c9ffdc1b",
+ "user_source_bytes": 6424,
+ "ui_schema": "autographics.node-ui-mixed-regions/2",
+  "module:bools": "9f0ee3db0c90ad03e8430e3e01194860f750d99a58ad4efb855649e44d3a00c0",
+ "closure": [
+  {"name": "bools", "sha256": "9f0ee3db0c90ad03e8430e3e01194860f750d99a58ad4efb855649e44d3a00c0", "bytes": 1040}
+ ],
+ "provenance": {
+  "product": "ui-bool-slots",
+  "consumer": "unrecorded (this out dir has no registered flow consumer)",
+  "consumption": "ui.json regions in ANY def drive per-instance child surfaces (Game2d/Scene3d) mounted Flat2d into the UI view with identity {run generation, instance path, region local name, mount epoch}; active regions app-total <= 4; conditional unmount revokes portal+surface (last-owner release) and rejects queued region events by epoch; scene bindings read the SAME int getter ABI; region clicks dispatch through the shared _ui_click_ ABI with the instance index; one Session owner, one app_start/app_update per explicit step",
+  "world_sha256": "cb8bd328dee7a40b65916c3475a65fb30ca82447052d8a8a27e44666c9ffdc1b"
+ }
+}

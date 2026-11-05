@@ -1,0 +1,36 @@
+// PLAN-054 T-05 fixture: bool text fields at slots >= 2 (the AG021
+// counterexample face). Slot order = declaration order: t0 int, t1 const,
+// t2 bool, t3 bool — with the frozen 4-slot budget (button labels share the
+// budget), the flip trigger is a root region click instead of a button.
+// After the T-05 generator fix the half-buffer b-side must carry slots 2/3.
+node Bools {
+    model {
+        var n = 42
+        var flag bool = true
+        var other bool = false
+    }
+    msg {
+        Flip
+    }
+    view {
+        column root {
+            text t0 { text: .n }
+            text t1 { text: "const" }
+            text t2 { text: .flag }
+            text t3 { text: .other }
+            view-2d pad {
+                width: 48
+                height: 32
+                onclick: .Flip
+                shape2d dot { kind: quad, x: 8, y: 8, w: 12, h: 12, color: (60, 60, 200) }
+            }
+        }
+    }
+    on {
+        .Flip -> {
+            .flag = 1 - .flag
+            .other = 1 - .other
+        }
+    }
+}
+fn main() {}

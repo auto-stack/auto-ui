@@ -1,0 +1,21 @@
+{
+ "generator": "autographics-node2d-pilot plan054 node-ui-mixed-regions",
+ "api": "autographics.node-ui-mixed-regions/2",
+ "user_source_sha256": "3e873586308d8c8923855bf8e20a9106035f3c53199d1b65950696e96c22328a",
+ "user_source_bytes": 6656,
+ "ui_schema": "autographics.node-ui-mixed-regions/2",
+  "module:bar": "23a0a9d54804b0a83cf52cd98b7c0e3d3447300da116567176d6b87c3076aee1",
+  "module:dial": "02208011cd6e75ddbe65daf8c9544a182b46691c9ea62fbd3070f0840738707c",
+  "module:panel": "3de585474035183ecbdec3884f0df5bec86d697e73ab0933b24c33e67b11e974",
+ "closure": [
+  {"name": "bar", "sha256": "23a0a9d54804b0a83cf52cd98b7c0e3d3447300da116567176d6b87c3076aee1", "bytes": 616},
+  {"name": "dial", "sha256": "02208011cd6e75ddbe65daf8c9544a182b46691c9ea62fbd3070f0840738707c", "bytes": 566},
+  {"name": "panel", "sha256": "3de585474035183ecbdec3884f0df5bec86d697e73ab0933b24c33e67b11e974", "bytes": 1441}
+ ],
+ "provenance": {
+  "product": "ui-panel-swapped",
+  "consumer": "unrecorded (this out dir has no registered flow consumer)",
+  "consumption": "ui.json regions in ANY def drive per-instance child surfaces (Game2d/Scene3d) mounted Flat2d into the UI view with identity {run generation, instance path, region local name, mount epoch}; active regions app-total <= 4; conditional unmount revokes portal+surface (last-owner release) and rejects queued region events by epoch; scene bindings read the SAME int getter ABI; region clicks dispatch through the shared _ui_click_ ABI with the instance index; one Session owner, one app_start/app_update per explicit step",
+  "world_sha256": "3e873586308d8c8923855bf8e20a9106035f3c53199d1b65950696e96c22328a"
+ }
+}

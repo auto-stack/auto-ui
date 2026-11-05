@@ -1,0 +1,238 @@
+{
+  "schema": "autographics.node-ui-mixed-regions/2",
+  "generator": "autographics-node2d-pilot plan054 node-ui-mixed-regions",
+  "world_sha256": "3e873586308d8c8923855bf8e20a9106035f3c53199d1b65950696e96c22328a",
+  "root": "Panel",
+  "instances": [
+    {
+      "path": "Panel/d1",
+      "node": "Dial",
+      "def_idx": 0
+    },
+    {
+      "path": "Panel/b1",
+      "node": "Bar",
+      "def_idx": 0
+    },
+    {
+      "path": "Panel/b2",
+      "node": "Bar",
+      "def_idx": 1
+    }
+  ],
+  "defs": {
+    "Bar": {
+      "prefix": "bar",
+      "is_root": false,
+      "texts": 0,
+      "elements": [
+        {
+          "kind": "Embed",
+          "name": "band",
+          "dim": "2d",
+          "width": 80,
+          "height": 50,
+          "click": {
+            "fn": "bar_ui_click_band",
+            "arg": "index"
+          },
+          "scene": [
+            {
+              "kind": "quad",
+              "name": "pip",
+              "x": {
+                "kind": "field",
+                "field": "x"
+              },
+              "y": {
+                "kind": "lit_num",
+                "v": 13.0
+              },
+              "w": {
+                "kind": "lit_num",
+                "v": 18.0
+              },
+              "h": {
+                "kind": "lit_num",
+                "v": 18.0
+              },
+              "color": [
+                200,
+                40,
+                40
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "Dial": {
+      "prefix": "dial",
+      "is_root": false,
+      "texts": 0,
+      "elements": [
+        {
+          "kind": "Embed",
+          "name": "ring",
+          "dim": "3d",
+          "width": 70,
+          "height": 70,
+          "click": {
+            "fn": "dial_ui_click_ring",
+            "arg": "index"
+          },
+          "scene": [
+            {
+              "kind": "cylinder",
+              "name": "stem",
+              "translation": [
+                {
+                  "kind": "field",
+                  "field": "tx"
+                },
+                {
+                  "kind": "lit_num",
+                  "v": 0.0
+                },
+                {
+                  "kind": "lit_num",
+                  "v": 0.0
+                }
+              ],
+              "color": [
+                90,
+                200,
+                90
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "Panel": {
+      "prefix": "panel",
+      "is_root": true,
+      "texts": 3,
+      "elements": [
+        {
+          "kind": "Container",
+          "name": "root",
+          "container": "column",
+          "children": [
+            {
+              "kind": "Text",
+              "name": "count_text",
+              "slot": 0,
+              "text": {
+                "kind": "int_field",
+                "name": "count"
+              }
+            },
+            {
+              "kind": "Container",
+              "name": "actions",
+              "container": "row",
+              "children": [
+                {
+                  "kind": "Button",
+                  "name": "bump",
+                  "slot": 1,
+                  "text": {
+                    "kind": "lit_str",
+                    "v": "b"
+                  },
+                  "click": {
+                    "fn": "panel_ui_click_bump",
+                    "arg": "none"
+                  }
+                },
+                {
+                  "kind": "Button",
+                  "name": "toggle",
+                  "slot": 2,
+                  "text": {
+                    "kind": "lit_str",
+                    "v": "t"
+                  },
+                  "click": {
+                    "fn": "panel_ui_click_toggle",
+                    "arg": "none"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "Instance",
+              "name": "d1",
+              "node": "Dial"
+            },
+            {
+              "kind": "If",
+              "cond": {
+                "kind": "field",
+                "name": "show"
+              },
+              "then": [
+                {
+                  "kind": "Instance",
+                  "name": "b1",
+                  "node": "Bar"
+                },
+                {
+                  "kind": "Instance",
+                  "name": "b2",
+                  "node": "Bar"
+                }
+              ]
+            },
+            {
+              "kind": "Container",
+              "name": "shelf_row",
+              "container": "row",
+              "children": [
+                {
+                  "kind": "Embed",
+                  "name": "shelf",
+                  "dim": "2d",
+                  "width": 100,
+                  "height": 40,
+                  "click": {
+                    "fn": "panel_ui_click_shelf",
+                    "arg": "none"
+                  },
+                  "scene": [
+                    {
+                      "kind": "quad",
+                      "name": "chip",
+                      "x": {
+                        "kind": "field",
+                        "field": "shelf_x"
+                      },
+                      "y": {
+                        "kind": "lit_num",
+                        "v": 10.0
+                      },
+                      "w": {
+                        "kind": "lit_num",
+                        "v": 12.0
+                      },
+                      "h": {
+                        "kind": "lit_num",
+                        "v": 12.0
+                      },
+                      "color": [
+                        10,
+                        120,
+                        130
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

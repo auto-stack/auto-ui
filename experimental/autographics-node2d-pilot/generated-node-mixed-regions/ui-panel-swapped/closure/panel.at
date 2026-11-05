@@ -1,0 +1,59 @@
+// PLAN-054 T-05 fixture root: `Panel` — renamed root (no Dash/arc/dial/strip
+// anywhere) with SWAPPED declaration order: the cross-dim component comes
+// FIRST, the conditional same-def pair after (mirror of the probe layout).
+use dial: Dial
+use bar: Bar
+
+node Panel {
+    model {
+        var count = 0
+        var show = 1
+        var shelf_x = 0
+    }
+    msg {
+        Bump
+        ShelfHit
+        Toggle
+    }
+    view {
+        column root {
+            text count_text { text: .count }
+            row actions {
+                button bump { text: "b", onclick: .Bump }
+                button toggle { text: "t", onclick: .Toggle }
+            }
+            Dial d1 {
+            }
+            if .show {
+                Bar b1 {
+                }
+                Bar b2 {
+                }
+            }
+            row shelf_row {
+                view-2d shelf {
+                    width: 100
+                    height: 40
+                    onclick: .ShelfHit
+                    shape2d chip { kind: quad, x: .shelf_x, y: 10, w: 12, h: 12, color: (10, 120, 130) }
+                }
+            }
+        }
+    }
+    on {
+        Life.Start -> {
+            .count = 0
+        }
+        .Bump -> {
+            .count = .count + 1
+            .shelf_x = .shelf_x + 8
+        }
+        .ShelfHit -> {
+            .count = .count + 50
+        }
+        .Toggle -> {
+            .show = 1 - .show
+        }
+    }
+}
+fn main() {}

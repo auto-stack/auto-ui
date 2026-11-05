@@ -1,0 +1,97 @@
+{
+  "schema": "autographics.node-ui-mixed-regions/2",
+  "generator": "autographics-node2d-pilot plan054 node-ui-mixed-regions",
+  "world_sha256": "cb8bd328dee7a40b65916c3475a65fb30ca82447052d8a8a27e44666c9ffdc1b",
+  "root": "Bools",
+  "instances": [],
+  "defs": {
+    "Bools": {
+      "prefix": "bools",
+      "is_root": true,
+      "texts": 4,
+      "elements": [
+        {
+          "kind": "Container",
+          "name": "root",
+          "container": "column",
+          "children": [
+            {
+              "kind": "Text",
+              "name": "t0",
+              "slot": 0,
+              "text": {
+                "kind": "int_field",
+                "name": "n"
+              }
+            },
+            {
+              "kind": "Text",
+              "name": "t1",
+              "slot": 1,
+              "text": {
+                "kind": "lit_str",
+                "v": "const"
+              }
+            },
+            {
+              "kind": "Text",
+              "name": "t2",
+              "slot": 2,
+              "text": {
+                "kind": "bool_field",
+                "name": "flag"
+              }
+            },
+            {
+              "kind": "Text",
+              "name": "t3",
+              "slot": 3,
+              "text": {
+                "kind": "bool_field",
+                "name": "other"
+              }
+            },
+            {
+              "kind": "Embed",
+              "name": "pad",
+              "dim": "2d",
+              "width": 48,
+              "height": 32,
+              "click": {
+                "fn": "bools_ui_click_pad",
+                "arg": "none"
+              },
+              "scene": [
+                {
+                  "kind": "quad",
+                  "name": "dot",
+                  "x": {
+                    "kind": "lit_num",
+                    "v": 8.0
+                  },
+                  "y": {
+                    "kind": "lit_num",
+                    "v": 8.0
+                  },
+                  "w": {
+                    "kind": "lit_num",
+                    "v": 12.0
+                  },
+                  "h": {
+                    "kind": "lit_num",
+                    "v": 12.0
+                  },
+                  "color": [
+                    60,
+                    60,
+                    200
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

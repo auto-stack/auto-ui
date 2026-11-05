@@ -1,0 +1,28 @@
+// PLAN-054 T-05 fixture component: `Bar` — an ordinary component with a
+// view-2d `band` region (renamed counterpart of the probe's Gauge/arc).
+node Bar {
+    model {
+        var x = 0
+        var hits = 0
+    }
+    msg {
+        Nudge
+    }
+    view {
+        view-2d band {
+            width: 80
+            height: 50
+            onclick: .Nudge
+            shape2d pip { kind: quad, x: .x, y: 13, w: 18, h: 18, color: (200, 40, 40) }
+        }
+    }
+    on {
+        .Nudge -> {
+            .x = .x + 9
+            .hits = .hits + 1
+        }
+        Life.Tick -> {
+            .x = .x + 5
+        }
+    }
+}

@@ -1253,6 +1253,20 @@ fn lower_view(
                 }
                 let prefix = plan.prefix.clone();
                 plan.clicks.push((name.clone(), ev, child.clone()));
+                // PLAN-054 T-05 补漏（注明兼容面）：按钮标签同占文字缓冲槽
+                // ——此前仅文字元素检查 ≤4 预算，按钮标签使槽位可到 5，
+                // 产物只在 driver 消费入口被拒（fail-late）。补上同面具名
+                // 拒绝后，合法 app（≤4 含标签）产物字节不变，仅越界源从
+                // 「可生成但消费被拒」改为「生成侧具名拒绝」。
+                if plan.texts.len() >= MAX_TEXTS_PER_DEF {
+                    return Err(err_at(
+                        module,
+                        (0, 0),
+                        format!(
+                            "node '{def_name}': text element count exceeds the frozen {MAX_TEXTS_PER_DEF}-element budget (64-byte buffers must stay within the SDK 256-literal array cap)"
+                        ),
+                    ));
+                }
                 let slot = plan.texts.len();
                 plan.texts.push((name.clone(), text.clone()));
                 out.push(ArtifactElement::Button {
@@ -1550,14 +1564,20 @@ fn gen_text_write_k(
             } else {
                 format!("{p}_{name}[{k}]")
             };
+            // PLAN-054 T-05 修正（AG021 实测反例；注明兼容面）：bool 文字
+            // 曾硬写缓冲 A（`_ui_text_`）而忽略半缓冲寻址——槽 ≥2 时覆盖
+            // 槽 0/1 的字节而 len[] 仍报旧内容（len/字节不一致、显示错文）。
+            // 修正后与 LitStr/IntField 同一面：`{buf}`＋半内偏移。仅
+            // 「bool 恰在槽 ≥2」的生成字节从错写改对写；槽 0/1 与
+            // int/const 文字路径逐字不变。
             let _ = writeln!(src, " if {fv}==1 {{");
             for (j, b) in b"true".iter().enumerate() {
-                let _ = writeln!(src, "  {p}_ui_text_{k}[({base}+{j})]=0x{b:02X}");
+                let _ = writeln!(src, "  {buf}[({base}+{j})]=0x{b:02X}");
             }
             let _ = writeln!(src, "  {p}_ui_text_len_{k}[{elem_index}]=4");
             let _ = writeln!(src, " }} else {{");
             for (j, b) in b"false".iter().enumerate() {
-                let _ = writeln!(src, "  {p}_ui_text_{k}[({base}+{j})]=0x{b:02X}");
+                let _ = writeln!(src, "  {buf}[({base}+{j})]=0x{b:02X}");
             }
             let _ = writeln!(src, "  {p}_ui_text_len_{k}[{elem_index}]=5");
             let _ = writeln!(src, " }}");
