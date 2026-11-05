@@ -2716,7 +2716,8 @@ impl Component for DynamicComponent {
             Some(a) => vec![auto_val::Value::str(a)],
             None => Vec::new(),
         };
-        match self.bridge.call_handler_for("App", name, 0, &args) {
+        // 与 `DynamicMessage::String` 同入口（组件自有 root state 绑定）。
+        match self.bridge.call_handler(name, &args) {
             Ok(()) => {
                 self.dirty = true;
                 true
@@ -7172,4 +7173,5 @@ widget Helper654 {
         assert!(comp.read_state(DynamicComponent::CLOCK_SEC_FIELD).is_ok());
     }
 }
+
 
