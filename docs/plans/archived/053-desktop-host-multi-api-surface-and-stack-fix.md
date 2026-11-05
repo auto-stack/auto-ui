@@ -217,6 +217,10 @@ auto-os/PLAN-054 vue 轨 8 app 嵌载的具名最小前置。
 - cleanup blocked audit / continuation 2：上一 goal turn 分类为 progress（已落地、归档并移除四树两分支，随后遇策略阻塞）；本轮只读复核两个目录仍存在且组为空，UI 主分支 `07ce7670`、lang `61207576b`，Q-053-02 无外部解除证据。未重试已拒绝操作、未改用其它工具绕过，未重跑通过的验收；当前没有可独立推进的剩余实施工作。相同阻塞连续第 2 个 goal turn，未达 host 的 3-turn blocked 阈值，goal 保持 active。
 - stage: goal | plan_id: PLAN-053 | plan_revision: r2 | round: 6 | from: user | to: user | status: archived | outcome: waiting | worktree: removed; empty group and scratch remain | commit: delivery UI 9a94d568 / lang 61207576b; archive recovery 07ce7670 | next: user (Q-053-02 cleanup policy)
 
+
+- cleanup blocked audit / continuation 3：上一 goal turn 分类 no progress（只复核并记录同一状态，没有解除阻塞）；本轮再次只读确认空组与 scratch 均仍存在，Q-053-02 无解除答复或外部变化。相同策略阻塞已连续 3 个 goal turn；不存在已确认 live 的等待进程，也无可独立推进的剩余工作，达到 host blocked 阈值。停止自动重试；恢复目录清理能力后由用户 resume，仅继续已登记 cleanup。
+- stage: goal | plan_id: PLAN-053 | plan_revision: r2 | round: 7 | from: user | to: user | status: archived | outcome: blocked | worktree: removed all four; group/scratch cleanup pending | commit: delivery UI 9a94d568 / lang 61207576b; archive recovery 9e05bab3 | next: user (restore Q-053-02 cleanup capability, then resume goal)
+
 ## 10. 待澄清事项
 
 ### Q-053-01（2026-11-05，已由用户允许最小跨仓根修关闭）
