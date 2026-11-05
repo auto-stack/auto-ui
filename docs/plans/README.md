@@ -53,12 +53,23 @@
 | 047 | [阅读编辑数据绘制六Demo主题迁移](047-specialized-workbench-demo-theme-migration.md) | 038实测后继 | drafting/r1，0/9；018/041/026/025/024/031-paint，挂载/旧定位/主题声明与内容owner，保原支持；仅规划 |
 | 048 | [基础UI Node与Auto事件](archived/048-age-node-basic-ui-and-auto-events.md) | AGE M2-10基础UI | 已交付cd1e161a，归档/清理；四类控件/Auto事件已支持；final为同实现会话，独立上下文复用核验归054/AG021 |
 | 049 | [UI/2D/3D同应用组合](archived/049-age-ui-2d-3d-composition.md) | AGE M2-10混合切片 | 已交付b7f01267，归档/清理；root有限混合档，不支持组件区域/条件挂卸；同会话final限制保留，补齐归054 |
-| 054 | [混合区域组件与生命周期](054-age-mixed-regions-components-and-lifecycle.md) | M2/AG021实际公共接线缺口 | drafting/r1，0/10；普通use区域实例/挂卸代次/metadata装配/原生输入，独立核验新候选与048/049必需复用面；仅规划 |
+| 054 | [混合区域组件与生命周期](054-age-mixed-regions-components-and-lifecycle.md) | M2/AG021公共接线 | 实施中未交付；唯一ui-054树已有1f3be333，头部drafting/current_step未同步任务记录；原owner继续，AG021等实际交付 |
 | 055 | [M3俯视二维与容量可行性](055-age-m3-topdown2d-feasibility-and-capacity.md) | M3首轮研究 | drafting/r1，0/10；固定已交付源、最多两机制三规模、真实Auto链和费用/瓶颈，go/bounded-go/no-go；不实施产品能力 |
 
 当前AGE见[最后缺口与首轮预研](../design/autographics/m2-closure-and-m3-first-wave.md)：048/049已交付，但049的root有限支持不能关闭AG021原组件化/条件挂卸义务。M2主链为**054实际交付/独立核验→AG021 r2最终同版消费与M2-01..10必需门→M2结论**；019旧候选/holds保历史，Gallery22/22不是M2完成比例。020只是M2收口后更名维护，不是功能门。AG021原owner已记T-01/02准备完成、executing/r2/2-10；T-03等054真实交付，不追tip。
 
-043/044均已交付；055与ag-examples/022可并行准备M3输入，AG022最终容量建议等055实际研究结果，正式M3产品能力不倒灌M2。本轮只规划，不建树/运行/接管实现。取号独占核主检出、归档及所有注册worktree的本仓合同：原counter050落后于已存在050..053，取054/055并推进至056；不覆盖UI052/053或外仓同号。未来新号仍重新核现场。
+043/044均已交付；055与ag-examples/022可并行准备M3输入，AG022最终容量建议等055实际研究结果，正式M3产品能力不倒灌M2。本轮只规划，不建树/运行/接管实现。取号独占核主检出、归档及所有注册worktree的本仓合同：原counter050落后于已存在050..053，上批取054/055时推进至056；本批另路线已取056/057，本批取058/059推进060。不覆盖其它合同，未来新号仍重新核现场。
+
+## 下一批及真实执行顺序（2026-11-05）
+
+[全路线逐项状态](../design/autographics/plan-status-and-execution-order-2026-11-05.md)列全部本地AGE合同与交付来源，头部状态不能代真实完成。054已有唯一树/实现提交，头部drafting与执行记录不同步，按实施中未交付；不由本规划会话修改或提交其进度。055/AG022仍草案。
+
+| 本仓号 | 计划 | 状态与硬门 |
+|---|---|---|
+| 058 | [俯视二维控制/查询/精灵组合](058-age-topdown2d-queries-and-sprites.md) | drafting/r1/0-10；T-01可准备，T-02等055/AG022实交付及M2必需门齐，原预算最小链先证失败须replan |
+| 059 | [方向光/阴影作者链研究](059-age-node3d-lighting-and-shadow-feasibility.md) | drafting/r1/0-10；024/034/043已交付，可独立研究；不冒正式Light API/three.js覆盖 |
+
+主链054→AG021→M2结论；研究055与AG022准备、059可并行；M3二维正式链055→AG022＋M2收口→058→ag-examples/023。020仅M2后维护更名。056/057已由其它UI路线占用，本批独占重核取058/059，counter060；后续重新核现场，不覆盖其合同。
 
 ## 债务/候选
 

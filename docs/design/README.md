@@ -4,6 +4,8 @@ AGE（Auto Graphics Engine；旧称AG/AutoGraphics）实验代码与实现计划
 
 | 专题 | 范围/状态 |
 |---|---|
+| [下一批M3组合/研究与执行顺序](autographics/m3-next-wave-execution-order.md) | UI058俯视组合/059方向光研究/AG023二维小例；先行准备与真实交付门分明，仅规划 |
+| [全AGE计划状态快照](autographics/plan-status-and-execution-order-2026-11-05.md) | 迁仓后逐项合同/实际交付与当前8项未完、并行和顺序；不重复计历史映射 |
 | [M2最后缺口与M3首轮预研](autographics/m2-closure-and-m3-first-wave.md) | UI054补公共混合接线；UI055俯视二维研究/AG022种田切片与three.js盘点可并行准备；仅规划 |
 | [M3二维/2DHD与复杂三维增强](autographics/m3-2d-3d-capability-roadmap.md) | 国风种田切片＋three.js固定目录；首轮UI055/AG022研究合同已规划，未实施产品能力 |
 | [M4与现有AutoUI融合](autographics/m4-autoui-integration-roadmap.md) | 原M3融合顺延；等ACE Schema成熟及旧编译器替换实际启动，再从001逐步跑通UI Demo；无新Plan或实施 |
