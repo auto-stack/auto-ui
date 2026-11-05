@@ -213,6 +213,10 @@ auto-os/PLAN-054 vue 轨 8 app 嵌载的具名最小前置。
 - stage: merge | key: PLAN-053:r2 | outcome: blocked (cleanup only) | delivery_commit: UI 9a94d568778793700b2718ec0a949d60a0d38bcf / lang 61207576b7676148499854f9df4b2d019a476972 | checkpoints: prepared/landed/canonical_verified/archived done; cleaned partial | archive_commit: 50dfa8e6 | archive_path: docs/plans/archived/053-desktop-host-multi-api-surface-and-stack-fix.md | pending: empty group + scratch scope | next: restore deletion capability; cleanup recovery only
 - stage: goal | plan_id: PLAN-053 | plan_revision: r2 | round: 5 | from: merge | to: user | status: archived | outcome: blocked | worktree: removed all four; empty group remains | commit: UI 9a94d568 / lang 61207576b / archive 50dfa8e6 | next: user (cleanup tool policy)
 
+
+- cleanup blocked audit / continuation 2：上一 goal turn 分类为 progress（已落地、归档并移除四树两分支，随后遇策略阻塞）；本轮只读复核两个目录仍存在且组为空，UI 主分支 `07ce7670`、lang `61207576b`，Q-053-02 无外部解除证据。未重试已拒绝操作、未改用其它工具绕过，未重跑通过的验收；当前没有可独立推进的剩余实施工作。相同阻塞连续第 2 个 goal turn，未达 host 的 3-turn blocked 阈值，goal 保持 active。
+- stage: goal | plan_id: PLAN-053 | plan_revision: r2 | round: 6 | from: user | to: user | status: archived | outcome: waiting | worktree: removed; empty group and scratch remain | commit: delivery UI 9a94d568 / lang 61207576b; archive recovery 07ce7670 | next: user (Q-053-02 cleanup policy)
+
 ## 10. 待澄清事项
 
 ### Q-053-01（2026-11-05，已由用户允许最小跨仓根修关闭）
