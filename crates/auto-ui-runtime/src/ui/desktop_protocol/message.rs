@@ -2569,6 +2569,36 @@ mod tests {
     }
 
     #[test]
+    fn p060_hello_capability_tail_round_trips_without_extra_surfaces() {
+        for surfaces in [
+            Vec::new(),
+            vec![SurfaceDecl {
+                role: surface_role::WINDOW,
+                width: 480.0,
+                height: 320.0,
+            }],
+        ] {
+            for theme_caps in [
+                Vec::new(),
+                vec!["input-action/1".into()],
+                vec!["input-action/1".into(), "theme-policy/1".into()],
+            ] {
+                round_trip(ProtocolMsg::Handshake(HandshakeMsg::Hello {
+                    version: super::super::PROTOCOL_VERSION,
+                    app_name: "native-notes".into(),
+                    title: "中文笔记".into(),
+                    icon: None,
+                    width: 480.0,
+                    height: 320.0,
+                    fonts: Vec::new(),
+                    surfaces: surfaces.clone(),
+                    theme_caps,
+                }));
+            }
+        }
+    }
+
+    #[test]
     fn handshake_channel_round_trip() {
         round_trip(ProtocolMsg::Handshake(HandshakeMsg::Hello {
             version: super::super::PROTOCOL_VERSION,
