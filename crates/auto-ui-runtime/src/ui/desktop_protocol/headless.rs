@@ -729,11 +729,9 @@ pub(crate) fn input_to_iced_events(
     use crate::ui::desktop_protocol::message::InputMsg;
     use iced::keyboard::{Event as KeyEvent, Key};
     use iced::mouse;
-    if matches!(input, InputMsg::Action { .. }) {
-        // Action 由 surface.on_input 的 dispatch_named 分支消费，不到 iced 事件层。
-        return Vec::new();
-    }
     match input {
+        // PLAN-060：Action 由 surface.on_input 的 dispatch_named 分支消费。
+        InputMsg::Action { .. } => Vec::new(),
         InputMsg::PointerMoved { x, y, .. } => {
             vec![iced::Event::Mouse(mouse::Event::CursorMoved {
                 position: iced::Point::new(*x, *y),
@@ -1915,6 +1913,7 @@ mod tests {
         }
     }
 }
+
 
 
 
