@@ -1225,8 +1225,14 @@ impl RustGenerator {
 
             // Plan 374: Track user-defined type props (like `Note`) that need
             // serde_json::Value bracket access (self.prop["field"]).
-            if matches!(&prop.type_info, auto_lang_core::ast::Type::User(_)) {
-                self.value_prop_names.insert(prop.name.clone());
+            // PLAN-052：back api.at 实体型 prop 已直编 struct——同型名豁免
+            // Value 格（todo `self.item["done"]` 的 E0609 株：typed prop
+            // 走点访问）。
+            if let auto_lang_core::ast::Type::User(td) = &prop.type_info {
+                let is_api_typed = API_TYPE_NAMES.with(|s| s.borrow().contains(td.name.as_str()));
+                if !is_api_typed {
+                    self.value_prop_names.insert(prop.name.clone());
+                }
             }
         }
 
@@ -9543,7 +9549,57 @@ impl RustGenerator {
         // 管线无 AST，按生成形判别 + state_types 类型感知）。
         output = self.normalize_condition_compares(&output);
 
+        // PLAN-052：typed 循环变量的 Value 括号残留（提取期字符串化所
+        // 致）回译为 struct 点访问（todo `item.done` 株）。
+        output = self.retype_condition_value_brackets(&output);
+
         output
+    }
+
+    /// PLAN-052：条件串中 `{v}["{f}"]`/`self.{v}["{f}"]`（v 为 api 实体
+    /// 集合的循环变量）按后缀访问器回译：`as_bool/as_i64` 尾→直读、
+    /// `as_str…to_string` 尾→`.clone()`、`as_str().unwrap_or_default` 尾
+    /// →裸字段；替换为局部变量 `{v}.{f}`（循环变量非 self 字段）。
+    fn retype_condition_value_brackets(&self, cond: &str) -> String {
+        let mut out = cond.to_string();
+        let vars: Vec<String> = self
+            .loop_var_collections
+            .iter()
+            .filter(|(_, c)| self.coll_is_api_typed(c))
+            .map(|(v, _)| v.clone())
+            .collect();
+        const SUFFIXES: &[(&str, &str)] = &[
+            (".as_bool().unwrap_or(false)", ""),
+            (".as_i64().unwrap_or(0) as i32", ""),
+            (".as_i64().unwrap_or(0)", ""),
+            (".as_str().unwrap_or_default().to_string()", ".clone()"),
+            (".as_str().unwrap_or_default()", ""),
+        ];
+        for v in vars {
+            for base in [format!("self.{}[\"", v), format!("{}[\"", v)] {
+                while let Some(pos) = out.find(&base) {
+                    let fstart = pos + base.len();
+                    let Some(fend_rel) = out[fstart..].find('"') else { break };
+                    let field = out[fstart..fstart + fend_rel].to_string();
+                    let after_quote = fstart + fend_rel + 1;
+                    if !out[after_quote..].starts_with(']') {
+                        break;
+                    }
+                    let mut tail = after_quote + 1;
+                    let mut acc_suffix = "";
+                    for (sfx, acc) in SUFFIXES {
+                        if out[tail..].starts_with(sfx) {
+                            tail += sfx.len();
+                            acc_suffix = acc;
+                            break;
+                        }
+                    }
+                    let replacement = format!("{}.{}{}", v, field, acc_suffix);
+                    out.replace_range(pos..tail, &replacement);
+                }
+            }
+        }
+        out
     }
 
     /// PLAN-036 T-02：条件串（convert_condition 产物）的跨型比较降串——
@@ -12866,6 +12922,14 @@ impl RustGenerator {
                     // PLAN-681 T-05（N3/P6）：形状查询经 list_elem_shape
                     // （store list-of-record 字段跨 widget 可见）。
                     if let Some(coll) = self.loop_var_collections.get(resolved) {
+                        // PLAN-052：api 实体集合的循环变量——struct 点访问
+                        // （todo `item.done` 株：形状表 Value 降链误收 typed
+                        // 元素）。
+                        if self.coll_is_api_typed(coll) {
+                            if let Some(elem) = self.api_elem_type_of(coll) {
+                                return self.api_struct_field_access(resolved, &elem, field_str);
+                            }
+                        }
                         if let Some(shape) = self.list_elem_shape(coll) {
                             return self.value_field_access_shaped(
                                 resolved,
