@@ -195,8 +195,25 @@ fn register_api_typed_fns_for(project_dir: &Path) {
             })
             .map(|e| e.fn_name.clone())
             .collect();
+        // PLAN-052：实体型名集 + 字段型表注册（typed 投影判定面消费）。
+        let names: std::collections::HashSet<String> = known.iter().map(|s| s.to_string()).collect();
+        let fields: std::collections::HashMap<String, std::collections::HashMap<String, String>> =
+            module
+                .types
+                .iter()
+                .map(|t| {
+                    (
+                        t.name.to_string(),
+                        t.fields
+                            .iter()
+                            .map(|f| (f.name.to_string(), auto_type_to_rust(&f.ty)))
+                            .collect(),
+                    )
+                })
+                .collect();
         let mut primer = RustGenerator::new();
         primer.register_api_typed_fns(typed_fns);
+        primer.register_api_structs(names, fields);
     }
 }
 

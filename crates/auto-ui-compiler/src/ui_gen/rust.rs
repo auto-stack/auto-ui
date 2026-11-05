@@ -268,6 +268,16 @@ thread_local! {
     /// 局部是 typed（CardsResult 等），scan 收格与类型格判定不得收 Value。
     pub static API_TYPED_FNS: std::cell::RefCell<std::collections::HashSet<String>> =
         std::cell::RefCell::new(std::collections::HashSet::new());
+    /// PLAN-052（E-D5-A 后继）：back api.at 实体型名集——typed 实体
+    /// 元素的字段访问走 struct 点访问（不再 Value 括号降链）。
+    pub static API_TYPE_NAMES: std::cell::RefCell<std::collections::HashSet<String>> =
+        std::cell::RefCell::new(std::collections::HashSet::new());
+    /// PLAN-052：实体型字段型表（型名 → 字段 → Rust 型串）——struct
+    /// 投影的 clone/直读判定（String/Vec/Option/嵌套实体 → .clone()，
+    /// 数值/bool → 直读）。
+    pub static API_STRUCT_FIELDS: std::cell::RefCell<
+        std::collections::HashMap<String, std::collections::HashMap<String, String>>,
+    > = std::cell::RefCell::new(std::collections::HashMap::new());
     /// PLAN-039 T-14（批次 E，组件传型）：子组件 prop 型表（组件名 →
     /// prop → "int"|"str"|"bool"）——构造参数按目标 prop 型强转
     /// （`scard["rank"].as_str()…` 传给 `rank: i32` 的 as_i64 收口 =
@@ -428,6 +438,90 @@ impl RustGenerator {
             m.clear();
             m.extend(fns);
         });
+    }
+
+    /// PLAN-052：注册 back api.at 实体型名集 + 字段型表（rust_ui.rs
+    /// parse_api_module 后调用，与 register_api_typed_fns 同址）。
+    pub fn register_api_structs(
+        &mut self,
+        names: std::collections::HashSet<String>,
+        fields: std::collections::HashMap<String, std::collections::HashMap<String, String>>,
+    ) {
+        API_TYPE_NAMES.with(|m| {
+            let mut m = m.borrow_mut();
+            m.clear();
+            m.extend(names);
+        });
+        API_STRUCT_FIELDS.with(|m| {
+            let mut m = m.borrow_mut();
+            *m = fields;
+        });
+    }
+
+    /// PLAN-052：集合（state/store 字段）的元素实体型——
+    /// state_types/STORE_FIELD_TYPES 的 `Vec<X>` 剥层；点链基座
+    /// （`store.notes` 形）再按末段回退查一次（E0608 残留株：view 侧
+    /// `.store.notes[k].title` 的集合名解析为 "store.notes"）。
+    fn api_elem_type_of(&self, coll: &str) -> Option<String> {
+        let direct = self
+            .state_types
+            .get(coll)
+            .cloned()
+            .or_else(|| self.store_field_rust_type(coll));
+        let ty = direct.or_else(|| {
+            let last = coll.rsplit('.').next()?;
+            if last == coll {
+                return None;
+            }
+            self.state_types
+                .get(last)
+                .cloned()
+                .or_else(|| self.store_field_rust_type(last))
+        })?;
+        ty.strip_prefix("Vec<")
+            .and_then(|s| s.strip_suffix('>'))
+            .map(|s| s.trim().to_string())
+    }
+
+    /// PLAN-052：集合元素是否为 back api.at 实体型。
+    fn coll_is_api_typed(&self, coll: &str) -> bool {
+        self.api_elem_type_of(coll)
+            .map(|e| API_TYPE_NAMES.with(|s| s.borrow().contains(e.as_str())))
+            .unwrap_or(false)
+    }
+
+    /// PLAN-052：struct 投影——按字段型表决定 clone/直读；型表缺席时
+    /// String 型字段保守 .clone()（其余直读），保证可编译优先。
+    fn api_struct_field_access(&self, obj: &str, elem: &str, field: &str) -> String {
+        let ty = API_STRUCT_FIELDS.with(|m| {
+            m.borrow()
+                .get(elem)
+                .and_then(|f| f.get(field))
+                .cloned()
+        });
+        let clone_worthy = match ty.as_deref() {
+            Some(t) => {
+                t.starts_with("String")
+                    || t.starts_with("Vec<")
+                    || t.starts_with("Option<")
+                    || API_TYPE_NAMES.with(|s| s.borrow().contains(t.trim()))
+            }
+            // 型表缺席：String 保守 clone（移动出借用在 E0507 前拦截）。
+            None => field.ends_with("_title")
+                || field.ends_with("_body")
+                || field.ends_with("_name")
+                || field.ends_with("_text")
+                || field == "title"
+                || field == "body"
+                || field == "time"
+                || field == "folder"
+                || field == "tags",
+        };
+        if clone_worthy {
+            format!("{}.{}.clone()", obj, field)
+        } else {
+            format!("{}.{}", obj, field)
+        }
     }
 
     /// PLAN-039 T-12：store 字段（跨 widget 视图）的 Rust 型——查
@@ -12563,6 +12657,32 @@ impl RustGenerator {
                     let (coll_name, is_self_prefixed) = self.resolve_collection_name(target);
                     if let Some(coll_name) = coll_name {
                         let resolved_coll = &coll_name;
+                        // PLAN-052：back api.at 实体型集合（Vec<Note> 族）——
+                        // 元素字段走 struct 点访问（clone/直读按字段型表），
+                        // 不进 Value 括号降链（E0608 株：`.notes[i].pinned`
+                        // 被 Value 化）。
+                        if self.coll_is_api_typed(resolved_coll) {
+                            if let Some(elem) = self.api_elem_type_of(resolved_coll) {
+                                let idx_str = self.ast_expr_to_rust(_idx);
+                                let target_str = if is_self_prefixed {
+                                    format!("self.{}", resolved_coll)
+                                } else {
+                                    resolved_coll.clone()
+                                };
+                                let idx_cast = if idx_str.starts_with("self.")
+                                    || (!idx_str.parse::<usize>().is_ok() && idx_str != "0")
+                                {
+                                    format!("({}) as usize", idx_str)
+                                } else {
+                                    idx_str
+                                };
+                                return self.api_struct_field_access(
+                                    &format!("{}[{}]", target_str, idx_cast),
+                                    &elem,
+                                    field_str,
+                                );
+                            }
+                        }
                         // Check if this is a Vec<Value> collection
                         // PLAN-039 T-13（E-D5-A）：收窄为 Vec<Value> 专属
                         // ——typed Vec（Vec<Card>）元素字段直达，不降链。
@@ -12702,6 +12822,57 @@ impl RustGenerator {
                                 } else {
                                     coll_name
                                 };
+                                // PLAN-052：back api.at 实体型集合的直写——
+                                // struct 字段赋值（clone 按字段型表），不落
+                                // serde_json::json!（E0608 写株：Value 写入
+                                // typed 实体槽位）。
+                                if self.coll_is_api_typed(resolved_coll) {
+                                    if let Some(elem) = self.api_elem_type_of(resolved_coll) {
+                                        let idx_str = self.ast_expr_to_rust(_idx);
+                                        let target_str = if resolved_coll != coll_name {
+                                            format!("self.{}", resolved_coll)
+                                        } else if self.state_types.contains_key(coll_name) {
+                                            format!("self.{}", coll_name)
+                                        } else {
+                                            coll_name.to_string()
+                                        };
+                                        let idx_cast = if idx_str.starts_with("self.")
+                                            || (!idx_str.parse::<usize>().is_ok()
+                                                && idx_str != "0")
+                                        {
+                                            format!("({}) as usize", idx_str)
+                                        } else {
+                                            idx_str
+                                        };
+                                        let value = self.ast_expr_to_rust(right);
+                                        let field_s = field.as_str();
+                                        let ty = API_STRUCT_FIELDS.with(|m| {
+                                            m.borrow()
+                                                .get(&elem)
+                                                .and_then(|f| f.get(field_s))
+                                                .cloned()
+                                        });
+                                        let clone_worthy = match ty.as_deref() {
+                                            Some(t) => {
+                                                t.starts_with("String")
+                                                    || t.starts_with("Vec<")
+                                                    || t.starts_with("Option<")
+                                                    || API_TYPE_NAMES
+                                                        .with(|s| s.borrow().contains(t.trim()))
+                                            }
+                                            None => false,
+                                        };
+                                        let value = if clone_worthy {
+                                            format!("({}).clone()", value)
+                                        } else {
+                                            value
+                                        };
+                                        return format!(
+                                            "{}[{}].{} = {}",
+                                            target_str, idx_cast, field_s, value
+                                        );
+                                    }
+                                }
                                 if self
                                     .state_types
                                     .get(resolved_coll)
