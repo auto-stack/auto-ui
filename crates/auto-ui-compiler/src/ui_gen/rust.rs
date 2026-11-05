@@ -151,6 +151,9 @@ pub struct RustGenerator {
 
     /// Loop variables that iterate over Value-type collections (need ["field"] access)
     value_loop_vars: std::collections::HashSet<String>,
+    /// PLAN-052：按引用绑定的循环变量（for/map over .iter() → &T）——
+    /// 索引强转/数值 payload 需显式解引用（E0606/E0308 &T 株）。
+    ref_loop_vars: std::collections::HashSet<String>,
     /// PLAN-026 T-03 配套: handler 局部 List<int> 变量(db 层惯例发射
     /// Vec<i64>;元素消费统一窄化 as i32,与 i32 模型字段/字面语境对齐)。
     handler_int_list_vars: std::cell::RefCell<std::collections::HashSet<String>>,
@@ -340,6 +343,7 @@ impl RustGenerator {
             computed_names: std::collections::HashSet::new(),
             computed_value_rets: std::collections::HashSet::new(),
             value_loop_vars: std::collections::HashSet::new(),
+            ref_loop_vars: std::collections::HashSet::new(),
             handler_int_list_vars: std::cell::RefCell::new(std::collections::HashSet::new()),
             value_locals: std::collections::HashSet::new(),
             array_locals: std::collections::HashSet::new(),
@@ -922,6 +926,7 @@ impl RustGenerator {
         self.computed_names.clear();
         self.computed_value_rets.clear();
         self.value_loop_vars.clear();
+        self.ref_loop_vars.clear();
         self.value_locals.clear();
         self.array_locals.clear();
         self.local_record_shapes.clear();
@@ -1134,6 +1139,9 @@ impl RustGenerator {
     /// Push loop variables into scope
     fn push_loop_vars(&mut self, var: &str, index: Option<&str>) {
         self.loop_vars.push(var.to_string());
+        // PLAN-052：handler for/map 循环恒经 .iter()/.iter_mut() 发射——
+        // 循环变量按引用绑定（enumerate 的 idx 是 usize 值，不收）。
+        self.ref_loop_vars.insert(var.to_string());
         if let Some(idx) = index {
             self.loop_vars.push(idx.to_string());
         }
@@ -1142,6 +1150,7 @@ impl RustGenerator {
     /// Pop loop variables from scope
     fn pop_loop_vars(&mut self, var: &str, index: Option<&str>) {
         self.loop_vars.retain(|v| v != var);
+        self.ref_loop_vars.remove(var);
         if let Some(idx) = index {
             self.loop_vars.retain(|v| v != idx);
         }
@@ -3217,8 +3226,22 @@ impl RustGenerator {
                     match &for_stmt.iter {
                         auto_lang_core::ast::Iter::Named(name) => {
                             // `for todo in .todos` — check if .todos is Vec<Value>
+                            // PLAN-052：loop_var_collections 无条件登记
+                            // （typed 比较面消费）；value_loop_vars 维持
+                            // Vec<Value> 专属判定。
                             if let auto_lang_core::ast::Expr::Dot(obj, field) = &for_stmt.range {
-                                if let auto_lang_core::ast::Expr::Ident(_) = obj.as_ref() {
+                                if let auto_lang_core::ast::Expr::Ident(obase) = obj.as_ref() {
+                                    // PLAN-052：非 self/. 基座登记完整点链
+                                    // （`for t in n.tags` → "n.tags"——api 链
+                                    // 比较判定消费）。
+                                    let coll_path = match obase.as_str() {
+                                        "." | "self" => field.as_str().to_string(),
+                                        b => format!("{}.{}", b, field.as_str()),
+                                    };
+                                    self.loop_var_collections.insert(
+                                        name.as_str().to_string(),
+                                        coll_path,
+                                    );
                                     if self
                                         .state_types
                                         .get(field.as_str())
@@ -3226,18 +3249,14 @@ impl RustGenerator {
                                         .unwrap_or(false)
                                     {
                                         self.value_loop_vars.insert(name.as_str().to_string());
-                                        // PLAN-039 T-14（E-D2）：循环变量 →
-                                        // 集合映射（元素形状查询面）。
-                                        self.loop_var_collections.insert(
-                                            name.as_str().to_string(),
-                                            field.as_str().to_string(),
-                                        );
                                     }
                                 }
                             } else if let auto_lang_core::ast::Expr::Ident(name_expr) =
                                 &for_stmt.range
                             {
                                 let coll = name_expr.as_str();
+                                self.loop_var_collections
+                                    .insert(name.as_str().to_string(), coll.to_string());
                                 if self
                                     .state_types
                                     .get(coll)
@@ -3245,8 +3264,6 @@ impl RustGenerator {
                                     .unwrap_or(false)
                                 {
                                     self.value_loop_vars.insert(name.as_str().to_string());
-                                    self.loop_var_collections
-                                        .insert(name.as_str().to_string(), coll.to_string());
                                 }
                             }
                         }
@@ -3686,6 +3703,66 @@ impl RustGenerator {
         }
     }
 
+    /// PLAN-052：sidebar 族 a2r 契约映射——sidebar_menu(_item)/
+    /// sidebar_menu_button 三标签 → col 基座类（button 的 active prop
+    /// 消费为 选中态/悬停态 类，与 VM 臂 either/or 约定同源）。
+    fn a2r_sidebar_element(
+        &mut self,
+        tag: &str,
+        props: &std::collections::HashMap<String, crate::aura::AuraPropValue>,
+        events: &std::collections::HashMap<String, crate::aura::AuraEvent>,
+        children: &[AuraNode],
+    ) -> String {
+        use crate::ui_gen::sidebar_contract as sc;
+        let base: &str = match tag {
+            "sidebar_menu" => sc::MENU_BASE,
+            "sidebar_menu_item" => sc::MENU_ITEM,
+            _ => sc::MENU_BUTTON_BASE,
+        };
+        let user_style = props
+            .get("style")
+            .or_else(|| props.get("class"))
+            .and_then(|v| {
+                if let crate::aura::AuraPropValue::Expr(e) = v {
+                    Some(self.ast_expr_to_rust(e))
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_else(|| "\"\"".to_string());
+        let base_expr = format!("({}.to_string() + \" \" + &({}).to_string())", format!("\"{}\"", base), user_style);
+        let class_expr = if tag == "sidebar_menu_button" {
+            let active = props.get("active").and_then(|v| {
+                if let crate::aura::AuraPropValue::Expr(e) = v {
+                    Some(self.ast_expr_to_rust(e))
+                } else {
+                    None
+                }
+            });
+            let state = match active {
+                Some(a) => format!(
+                    "if {} {{ \"{}\".to_string() }} else {{ \"{}\".to_string() }}",
+                    a, sc::MENU_BUTTON_ACTIVE, sc::MENU_BUTTON_HOVER
+                ),
+                None => format!("\"{}\".to_string()", sc::MENU_BUTTON_HOVER),
+            };
+            format!("format!(\"{{}} {{}}\", {}, {})", state, base_expr)
+        } else {
+            base_expr
+        };
+        let mut builder = format!("View::col().style({}.as_str())", class_expr);
+        for c in children {
+            let child_code = self.generate_view_tree(c);
+            builder = format!("{}.child({})", builder, child_code);
+        }
+        let mut evs: Vec<(&String, &crate::aura::AuraEvent)> = events.iter().collect();
+        evs.sort_by(|a, b| a.0.cmp(b.0));
+        for (name, ev) in evs {
+            builder = self.add_event_to_builder(&builder, tag, name, ev);
+        }
+        format!("{}.build()", builder)
+    }
+
     /// PLAN-695 T-06/T-07：menubar 面板子项 a2r 代码发射——item/
     /// checkbox-item/radio 族/label/shortcut/separator/sub（submenu 递归）/
     /// group 全 kind；返回 `.child(...)` 链片段（调用方拼在面板 col
@@ -3934,6 +4011,15 @@ impl RustGenerator {
                 children,
                 ..
             } => {
+                // PLAN-052：sidebar 族 a2r 契约映射（常量同
+                // ui_gen::sidebar_contract；vue 臂 nav_sidebar 先例）。
+                // 三标签 → col 基座类；button 的 active prop 在此消费为
+                // 选中态类，不落入 col 词汇拒绝门（"prop `active` not in
+                // the recognized vocabulary on <col>" 株）。
+                if tag == "sidebar_menu" || tag == "sidebar_menu_item" || tag == "sidebar_menu_button"
+                {
+                    return self.a2r_sidebar_element(tag, props, events, children);
+                }
                 // PLAN-571: button 注入 variant/size preset（单源 ui::style::variants，
                 // 与 VM 臂同表）；preset 前置、user class 后置（后类胜，与 VM 臂同语义）。
                 let props = self.with_button_preset(tag, props);
@@ -7174,14 +7260,12 @@ impl RustGenerator {
 
                 // Push loop vars into scope
                 self.push_loop_vars(&var, index.as_deref());
+                // PLAN-052：循环变量 → 集合名映射无条件登记（typed 比较面
+                // 的 Vec<String> 元素判定同样消费）。
+                self.loop_var_collections
+                    .insert(var.clone(), iter_last_name.to_string());
                 if is_value_iter {
                     self.value_loop_vars.insert(var.clone());
-                    // PLAN-681 T-05（N3/P6）：循环变量 → 集合名映射——
-                    // 元素字段读（r.label/t.dirty）按 list_elem_shape 表型
-                    // 选访问器（bool→as_bool,int→as_i64,str→as_str,
-                    // list→as_array;store 字段跨 widget 可见）。
-                    self.loop_var_collections
-                        .insert(var.clone(), iter_last_name.to_string());
                 }
 
                 // Generate body with loop vars in scope
@@ -10345,6 +10429,19 @@ impl RustGenerator {
                 _ => format!("{}.clone()", param),
             };
         }
+        // PLAN-052：按引用绑定的循环变量（&T）作数值 payload 实参——
+        // 显式解引用（E0308 &i32 株）。
+        if !param.contains('.')
+            && !param.contains('[')
+            && !param.starts_with('"')
+            && self.ref_loop_vars.contains(param)
+            && matches!(
+                payload_ty.as_deref(),
+                Some("i32") | Some("i64") | Some("u32") | Some("u64")
+            )
+        {
+            return format!("(*({}))", param);
+        }
         if !param.starts_with('"')
             && !param.contains('[')
             && param
@@ -12070,6 +12167,128 @@ impl RustGenerator {
         let mut l = left_str.to_string();
         let mut r = right_str.to_string();
         let mut changed = false;
+        // PLAN-052：typed 世界的字符串型比较——state String 字段、
+        // Vec<String> 循环变量、api 实体 String 字段参与 Eq/Neq 时按
+        // 字符串型收编；双侧字符串型则统一 `as &str` 比较（&String vs
+        // String 的 E0277 株；VM 值语义等价）。
+        let side_typed_string = |s: &mut String, e: &Expr| -> bool {
+            if s.contains(".as_str()") || s.starts_with('"') || s.contains("format!(") {
+                return true;
+            }
+            let name_hit = self
+                .resolve_expr_name(e)
+                .map(|n| self.state_types.get(&n).map(|t| t == "String").unwrap_or(false))
+                .unwrap_or(false);
+            let loop_hit = self
+                .resolve_expr_name(e)
+                .and_then(|n| self.loop_var_collections.get(&n).cloned())
+                .map(|coll| {
+                    let last = coll.rsplit('.').next().unwrap_or(&coll).to_string();
+                    let ty = self
+                        .state_types
+                        .get(&coll)
+                        .cloned()
+                        .or_else(|| self.state_types.get(last.as_str()).cloned())
+                        .or_else(|| self.store_field_rust_type(&coll))
+                        .or_else(|| self.store_field_rust_type(&last));
+                    if ty.map(|t| t == "Vec<String>").unwrap_or(false) {
+                        return true;
+                    }
+                    // PLAN-052：api 链形态（`for t in n.tags`，n 是 api 实体
+                    // 循环变量）——字段型表 Vec<String> 判定。
+                    if let Some((base, field)) = coll.split_once('.') {
+                        if let Some(base_coll) = self.loop_var_collections.get(base).cloned() {
+                            if let Some(elem) = self.api_elem_type_of(&base_coll) {
+                                let is_api = API_TYPE_NAMES.with(|s| s.borrow().contains(elem.as_str()));
+                                if is_api {
+                                    let ft = API_STRUCT_FIELDS.with(|m| {
+                                        m.borrow()
+                                            .get(&elem)
+                                            .and_then(|f| f.get(field))
+                                            .cloned()
+                                    });
+                                    if let Some(ft) = ft {
+                                        return ft.starts_with("Vec<String>");
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    false
+                })
+                .unwrap_or(false);
+            let api_field_hit = match e {
+                Expr::Dot(obj, field) => match obj.as_ref() {
+                    Expr::Index(target, _) => {
+                        let (coll, _) = self.resolve_collection_name(target);
+                        coll.as_deref()
+                            .filter(|c| self.coll_is_api_typed(c))
+                            .and_then(|c| self.api_elem_type_of(c))
+                            .and_then(|elem| {
+                                API_STRUCT_FIELDS.with(|m| {
+                                    m.borrow()
+                                        .get(&elem)
+                                        .and_then(|f| f.get(field.as_str()))
+                                        .cloned()
+                                })
+                            })
+                            .map(|t| t.starts_with("String"))
+                            .unwrap_or(false)
+                    }
+                    // PLAN-052：`n.folder` 形态——n 是 api 实体循环变量。
+                    Expr::Ident(base) => self
+                        .loop_var_collections
+                        .get(base.as_str())
+                        .and_then(|c| self.api_elem_type_of(c))
+                        .filter(|elem| {
+                            API_TYPE_NAMES.with(|s| s.borrow().contains(elem.as_str()))
+                        })
+                        .and_then(|elem| {
+                            API_STRUCT_FIELDS.with(|m| {
+                                m.borrow()
+                                    .get(&elem)
+                                    .and_then(|f| f.get(field.as_str()))
+                                    .cloned()
+                            })
+                        })
+                        .map(|t| t.starts_with("String"))
+                        .unwrap_or(false),
+                    _ => false,
+                },
+                _ => false,
+            };
+            if name_hit || loop_hit || api_field_hit {
+                if s.ends_with(".clone()") {
+                    let stripped = s[..s.len() - ".clone()".len()].to_string();
+                    *s = stripped;
+                }
+                true
+            } else {
+                false
+            }
+        };
+        let l_typed_str = side_typed_string(&mut l, left);
+        let r_typed_str = side_typed_string(&mut r, right);
+        if l_typed_str && r_typed_str {
+            // PLAN-052 修正：`String as &str` 为非原始强转（E0605 ×98
+            // 株）——改 .as_str() 方法形态（String/&String 经自动解引用
+            // 均合法）。
+            let lc = if l.contains(".as_str()") { l.clone() } else { format!("({}.as_str())", l) };
+            let rc = if r.contains(".as_str()") { r.clone() } else { format!("({}.as_str())", r) };
+            let op_str = if matches!(op, Op::Eq) { "==" } else { "!=" };
+            return Some(format!("{} {} {}", lc, op_str, rc));
+        }
+        // PLAN-052：单侧 typed-string + 对侧字符串型（字面量/已解型）——
+        // typed 侧 as_str 归一（E0277 &str/String 株；E0599 的
+        // `t.as_str().unwrap_or_default()` 残留链由对侧 typed 化规避）。
+        if l_typed_str && r_stringy {
+            let op_str = if matches!(op, Op::Eq) { "==" } else { "!=" };
+            return Some(format!("({}.as_str()) {} {}", l, op_str, r));
+        }
+        if r_typed_str && l_stringy {
+            let op_str = if matches!(op, Op::Eq) { "==" } else { "!=" };
+            return Some(format!("{} {} ({}.as_str())", l, op_str, r));
+        }
         let num_state = |e: &Expr| -> bool {
             self.resolve_expr_name(e)
                 .and_then(|n| self.state_types.get(&n).map(|t| t.clone()))
@@ -12099,7 +12318,29 @@ impl RustGenerator {
                 changed = true;
             }
         }
+        // PLAN-052：引用循环变量（&T）参与数值比较——显式解引用
+        // （E0277 &i32 vs i32 株：typed 循环变量经 .iter() 绑定）。
+        let deref_ref_side = |side: &str| -> String {
+            let root: String = side
+                .chars()
+                .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+                .collect();
+            if self.ref_loop_vars.contains(&root) {
+                format!("(*({}))", side)
+            } else {
+                side.to_string()
+            }
+        };
         if !changed {
+            let ld = deref_ref_side(&l);
+            let rd = deref_ref_side(&r);
+            if ld != l || rd != r {
+                let op_str = match op {
+                    Op::Eq => "==",
+                    _ => "!=",
+                };
+                return Some(format!("({}) {} ({})", ld, op_str, rd));
+            }
             return None;
         }
         let op_str = match op {
@@ -12669,10 +12910,21 @@ impl RustGenerator {
                                 } else {
                                     resolved_coll.clone()
                                 };
+                                // PLAN-052：按引用绑定的循环变量（&T）
+                                // 索引前显式解引用（E0606 株）。
+                                let idx_root: String = idx_str
+                                    .chars()
+                                    .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+                                    .collect();
+                                let needs_deref = self.ref_loop_vars.contains(&idx_root);
                                 let idx_cast = if idx_str.starts_with("self.")
                                     || (!idx_str.parse::<usize>().is_ok() && idx_str != "0")
                                 {
-                                    format!("({}) as usize", idx_str)
+                                    if needs_deref {
+                                        format!("(*({})) as usize", idx_str)
+                                    } else {
+                                        format!("({}) as usize", idx_str)
+                                    }
                                 } else {
                                     idx_str
                                 };
@@ -12836,11 +13088,22 @@ impl RustGenerator {
                                         } else {
                                             coll_name.to_string()
                                         };
+                                        // PLAN-052：按引用绑定的循环变量
+                                        // （&T）索引前显式解引用。
+                                        let idx_root: String = idx_str
+                                            .chars()
+                                            .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+                                            .collect();
+                                        let needs_deref = self.ref_loop_vars.contains(&idx_root);
                                         let idx_cast = if idx_str.starts_with("self.")
                                             || (!idx_str.parse::<usize>().is_ok()
                                                 && idx_str != "0")
                                         {
-                                            format!("({}) as usize", idx_str)
+                                            if needs_deref {
+                                                format!("(*({})) as usize", idx_str)
+                                            } else {
+                                                format!("({}) as usize", idx_str)
+                                            }
                                         } else {
                                             idx_str
                                         };
