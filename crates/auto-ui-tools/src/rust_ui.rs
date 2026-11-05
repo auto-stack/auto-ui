@@ -2410,13 +2410,27 @@ fn generate_merged_api_client(
                     } else {
                         format!("    let _ = ({});\n", extra_discard)
                     };
-                    code.push_str(&format!(
-                        "fn {}({}) {{\n{}    let mut data = API_DATA.lock().unwrap();\n    data.retain(|n| {});\n}}\n\n",
-                        fn_name,
-                        all_sig.join(", "),
-                        discard,
-                        retain
-                    ));
+                    // PLAN-052 F4 延伸：DELETE 桩按契约返回型收口——声明
+                    // bool（notes delete_note 株）返回"确有删除"，而非恒
+                    // ()（E0308 expected bool found ()）。
+                    let delete_ret = endpoint.return_type.trim();
+                    if delete_ret == "bool" {
+                        code.push_str(&format!(
+                            "fn {}({}) -> bool {{\n{}    let mut data = API_DATA.lock().unwrap();\n    let __before = data.len();\n    data.retain(|n| {});\n    __before != data.len()\n}}\n\n",
+                            fn_name,
+                            all_sig.join(", "),
+                            discard,
+                            retain
+                        ));
+                    } else {
+                        code.push_str(&format!(
+                            "fn {}({}) {{\n{}    let mut data = API_DATA.lock().unwrap();\n    data.retain(|n| {});\n}}\n\n",
+                            fn_name,
+                            all_sig.join(", "),
+                            discard,
+                            retain
+                        ));
+                    }
                 }
             }
             _ => {
