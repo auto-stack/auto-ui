@@ -4,15 +4,16 @@ AGE（Auto Graphics Engine；旧称AG/AutoGraphics）实验代码与实现计划
 
 | 专题 | 范围/状态 |
 |---|---|
-| [M3二维/2DHD与复杂三维增强](autographics/m3-2d-3d-capability-roadmap.md) | 国风种田/俯视游戏可玩切片＋three.js固定目录逐项能力覆盖；引擎内容分仓，具体合同待立，仅方向 |
+| [M2最后缺口与M3首轮预研](autographics/m2-closure-and-m3-first-wave.md) | UI054补公共混合接线；UI055俯视二维研究/AG022种田切片与three.js盘点可并行准备；仅规划 |
+| [M3二维/2DHD与复杂三维增强](autographics/m3-2d-3d-capability-roadmap.md) | 国风种田切片＋three.js固定目录；首轮UI055/AG022研究合同已规划，未实施产品能力 |
 | [M4与现有AutoUI融合](autographics/m4-autoui-integration-roadmap.md) | 原M3融合顺延；等ACE Schema成熟及旧编译器替换实际启动，再从001逐步跑通UI Demo；无新Plan或实施 |
-| [M2新语法UI/2D/3D同应用](autographics/m2-mixed-ui-2d-3d-composition.md) | 新M2-10；已核普通Node view/真实UI事件桥缺口，UI048→049→AG021仅规划；019已交旧候选，020 r2后置扩展M2 |
+| [M2新语法UI/2D/3D同应用](autographics/m2-mixed-ui-2d-3d-composition.md) | M2-10；048/049已交付有限切片，UI054→AG021 r2补公共区域/寿命与最终验收，原分母保持 |
 | [AGE命名与内容仓目录](autographics/age-naming-and-content-repository.md) | 正式Auto Graphics Engine（AGE）；ag-examples/020 r2仅规划更名，默认019＋021/扩展M2收口后，历史号/SHA/schema不变 |
-| [模型对象组件与Node源码诊断](autographics/node-resource-components-and-source-diagnostics.md) | 2026-11-04 v1；UI043资源模板在途/UI044可选映射，功能独立、原预算保持；041/042属其它UI路线 |
+| [模型对象组件与Node源码诊断](autographics/node-resource-components-and-source-diagnostics.md) | UI043/044均已交付，原合同/来源与预算边界保留，不自动升级旧游戏 |
 | [M2编辑教程与同版发行收口](autographics/m2-editor-and-release-convergence.md) | 040/AG018/019均已交付，OS等具名边界保持；新M2-10另接补齐设计，不重开旧合同 |
 | [三维查询、完整G3与G05后继](autographics/node3d-queries-and-complete-game.md) | 历史批次；035/039/AG016/017已交付，来源限制/原验收保持，当前见M2路线 |
 | [3D表现/音画与G10新作者迁移](autographics/node3d-presentation-audio-and-g10-migration.md) | 历史批次；034/035/AG015已交付，相关独立证据/hold据实保留 |
-| [M2游戏优先三线并行](autographics/m2-game-first-three-lane-roadmap.md) | v8；22/22、019旧候选已交3daf2eb；新M2-10由048→049→AG021补齐，043/044可选，预算/原九项保持 |
+| [M2游戏优先三线并行](autographics/m2-game-first-three-lane-roadmap.md) | v10；Gallery22/22、两游戏/019旧候选已交；054→AG021 r2及必需门收M2，055/AG022预研M3 |
 | [AGE声明与组件作者模型](autographics/declarative-authoring-model.md) | AutoUI式声明/组件/绑定/事件，AG-A01..09与历史收据身份保持 |
 | [G11/2d Node完整作者能力](autographics/g11-2d-node-authoring-completion.md) | 017/AG007已实际交付；完整目标草图未全部实现，旧三维及runner裁决边界保留 |
 | [Gallery全量Node作者迁移](autographics/gallery-node-authoring-migration.md) | 当前22/22；AG017+1/AG018+2已落主，源码迁完仍不等M2 |

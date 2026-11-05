@@ -44,19 +44,21 @@
 | 038 | [B3专用示例主题支持面核验](archived/038-specialized-examples-theme-readiness.md) | B3有界研究 | archived/r1，8/8；十二例实测/具名前置已落Spec，研究不抵迁移；正式后继045/046/047 |
 | 039 | [3D查询、动态组与二维标记Node接线](archived/039-autographics-node3d-queries-and-mixed-markers.md) | G05/3d新作者前置；021/024/030 | archived/r1，交付8f577a34（含复审finding R-1修复ff5d267d）；SD-01 canonical node3d-queries-and-mixed-markers.md已落。final收据如实记录同实现会话（判定从工件重建、pilot152/dialect103/gates7/flow8/verifier独立重跑全绿）；D-03 OS phase-14探针沿AG009持有、G05逐字OS迁移归AG017。AG017固定消费其实际交付，前置实质解除 |
 | 040 | [Node双维编辑工程与项目化验收](archived/040-autographics-node-editor-projects.md) | G04纯场景/编辑副本与公共验收收口 | archived/r1，10/10；已交付fc82061c（ff-only落主；独立subagent上下文final pass绑定fc82061c）；SD-01 canonical node-editor-projects.md sha 1daa7111；editor-projects身份孪生入口（queries-3d同机制）+G04忠实双维夹具/冻结产品+driver项目化7门+verify_plan040全PASS+旧档字节冻结复核；AC-03 OS层15行D-02具名pending保持开放；清理回执见计划；AG018可固定消费实际交付 |
-| 043 | [Node3D模型资源对象模板](043-autographics-node3d-model-object-templates.md) | Node模板builtin限制的后继作者接线 | executing/r1，1/10；复用已有Model运行能力/034闭包/035组合，静态平色与opaque模型实例生命周期/非solid/owner原额；不改已交付AG016，原owner在途 |
-| 044 | [Node源码定位与分层诊断](044-autographics-node-source-diagnostics.md) | 多模块作者体验后继 | drafting/r1，0/10；可选原源映射/可证精度与身份、真实compile定位，无span运行错误如实fallback；不依赖043/不换SDK，暂不实施 |
+| 043 | [Node3D模型资源对象模板](archived/043-autographics-node3d-model-object-templates.md) | Node模板builtin限制后继 | 已交付并归档/清理；静态opaque模型模板与非solid/owner边界见实际收据，不自动升级旧游戏锁 |
+| 044 | [Node源码定位与分层诊断](archived/044-autographics-node-source-diagnostics.md) | 多模块作者体验后继 | 已交付9bf9874a，canonical/归档清理齐；固定SDK无span时仍如实fallback |
 | 041 | [组件与Store实例所有权收口](archived/041-component-and-store-instance-ownership.md) | Design47/S后继 | archived/r1，10/10；delivered da4485b4（ff-only 落主）；独立 final pass @cf087715；SD-01..04 canonical 落地（component-and-store-instances.md）；VM 实例分裂+store 每App context；13 base-red/边界如实记录 |
 | 042 | [Reload/schema/effect有界核验](042-reload-schema-and-effect-readiness.md) | Design47/R后继 | drafting/r1，0/8；多文件/迁移/失败保旧/生命周期研究，相关腿接041正式端口；研究不冒完整HMR |
 | 045 | [媒体三Demo主题迁移](045-media-demo-theme-migration.md) | 038实测后继 | drafting/r1，0/9；019/020/030，前置links/back contract/播放支持具名，不代产品；仅规划 |
 | 046 | [图像文件三Demo主题迁移](046-image-and-file-demo-theme-migration.md) | 038实测后继 | drafting/r1，0/9；029/031iv/027，031iv七编译错/VM挂起先核，保像素/文件/性能条件；仅规划 |
 | 047 | [阅读编辑数据绘制六Demo主题迁移](047-specialized-workbench-demo-theme-migration.md) | 038实测后继 | drafting/r1，0/9；018/041/026/025/024/031-paint，挂载/旧定位/主题声明与内容owner，保原支持；仅规划 |
-| 048 | [基础UI Node与Auto事件](048-age-node-basic-ui-and-auto-events.md) | AGE M2-10基础UI缺口 | drafting/r1，0/10；row/column/text/button、局部model/msg/on/use、真实Auto事件/绑定与原生控件；暂不实施 |
-| 049 | [UI/2D/3D同应用组合](049-age-ui-2d-3d-composition.md) | AGE M2-10嵌入与运行组合 | drafting/r1，0/10；UI布局嵌入view-2d/view-3d、状态一次更新/输入焦点/资源owner；完整接线等048实交付；暂不实施 |
+| 048 | [基础UI Node与Auto事件](archived/048-age-node-basic-ui-and-auto-events.md) | AGE M2-10基础UI | 已交付cd1e161a，归档/清理；四类控件/Auto事件已支持；final为同实现会话，独立上下文复用核验归054/AG021 |
+| 049 | [UI/2D/3D同应用组合](archived/049-age-ui-2d-3d-composition.md) | AGE M2-10混合切片 | 已交付b7f01267，归档/清理；root有限混合档，不支持组件区域/条件挂卸；同会话final限制保留，补齐归054 |
+| 054 | [混合区域组件与生命周期](054-age-mixed-regions-components-and-lifecycle.md) | M2/AG021实际公共接线缺口 | drafting/r1，0/10；普通use区域实例/挂卸代次/metadata装配/原生输入，独立核验新候选与048/049必需复用面；仅规划 |
+| 055 | [M3俯视二维与容量可行性](055-age-m3-topdown2d-feasibility-and-capacity.md) | M3首轮研究 | drafting/r1，0/10；固定已交付源、最多两机制三规模、真实Auto链和费用/瓶颈，go/bounded-go/no-go；不实施产品能力 |
 
-当前AGE按[补齐设计](../design/autographics/m2-mixed-ui-2d-3d-composition.md)新增M2-10：048→049→ag-examples/021。019已交付原fc82061c候选3daf2eb，归档不重开/不称M2完成；Gallery22/22不是基础UI混用证明。048未来可先推进；049 T-01和AG021 T-01/02可准备，正式接线等上游实交付。043在途、044可选与本链无强依，原预算/共享owner短窗/OS政策保持；020更名后置扩展M2收口。
+当前AGE见[最后缺口与首轮预研](../design/autographics/m2-closure-and-m3-first-wave.md)：048/049已交付，但049的root有限支持不能关闭AG021原组件化/条件挂卸义务。M2主链为**054实际交付/独立核验→AG021 r2最终同版消费与M2-01..10必需门→M2结论**；019旧候选/holds保历史，Gallery22/22不是M2完成比例。020只是M2收口后更名维护，不是功能门。AG021原owner已记T-01/02准备完成、executing/r2/2-10；T-03等054真实交付，不追tip。
 
-024/025/027/028/030/032/034/035/039/040已交付；043在途/044可选，与M2-10补齐链独立，现有来源和holds不变。048/049仅规划，本地.next-id已独占推进至050，新取号仍核现场；不接管其它路线合同。
+043/044均已交付；055与ag-examples/022可并行准备M3输入，AG022最终容量建议等055实际研究结果，正式M3产品能力不倒灌M2。本轮只规划，不建树/运行/接管实现。取号独占核主检出、归档及所有注册worktree的本仓合同：原counter050落后于已存在050..053，取054/055并推进至056；不覆盖UI052/053或外仓同号。未来新号仍重新核现场。
 
 ## 债务/候选
 

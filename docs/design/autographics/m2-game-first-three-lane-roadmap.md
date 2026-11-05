@@ -1,10 +1,10 @@
 # AGE M2游戏优先路线：内容闭环、编辑迁移与统一版本联验
 
-2026-11-04，设计v9。AGE作者模型仍是AutoUI式Node/use、局部model/msg/on、view-2d/view-3d及具名资源/事件；桌面M2原两游戏/编辑/必要音画/资源离线/Gallery/统一最终引擎版本分母保持。ACE/AOT/ECS/CPC/跨端不新增前置。
+2026-11-05，设计v10。AGE作者模型仍是AutoUI式Node/use、局部model/msg/on、view-2d/view-3d及具名资源/事件；桌面M2原两游戏/编辑/必要音画/资源离线/Gallery/统一最终引擎版本分母保持。ACE/AOT/ECS/CPC/跨端不新增前置。
 
 > **命名与物理目录分开**：采用Auto Graphics Engine（AGE），详见[命名决议](age-naming-and-content-repository.md)。[内容仓020](../../../../ag-examples/docs/plans/020-age-examples-repository-rename.md)仅规划ag-examples→age-examples，默认019＋021及扩展M2必需门收口后维护窗口实施；保历史号与交付身份，不成为019前置。
 
-> **2026-11-04 M2目标补齐**：用户明确基础UI、2D、3D必须在新语法下同应用组合，新增M2-10。核查显示底层合成已具备，Node普通UI view及到真实Auto事件/混合嵌入的桥尚缺。[补充设计与能力差距](m2-mixed-ui-2d-3d-composition.md)按[UI048基础UI](../../plans/048-age-node-basic-ui-and-auto-events.md)→[UI049混合引擎](../../plans/049-age-ui-2d-3d-composition.md)→[AG021综合应用](../../../../ag-examples/docs/plans/021-age-mixed-ui-2d-3d-application.md)规划，三份drafting/r1/0-10，暂不实施。019已完成旧合同，不改其归档/原候选/holds；020目录更名r2后置到扩展M2收口。
+> **2026-11-05 实际交付后的收口路线**：048基础UI（cd1e161a）/049有限root混合（b7f01267）已交付/归档，尚缺AG021原要求的普通use区域组件与条件挂卸/代次，且两份final均记同实现会话。详见[当前缺口与下一批](m2-closure-and-m3-first-wave.md)。本轮规划UI054补公共混合接线并独立核验新候选，AG021修订r2固定消费054实际交付，原G-M01..09/验收分母保持；019历史不改，020仅M2必需门闭合后更名维护。UI055/AG022可并行准备M3研究，不成为M2前置；均暂不实施。
 
 ## 1. 当前真实状态
 
@@ -14,7 +14,7 @@
 | 3D表现/音画/查询 | [UI034](../../plans/archived/034-autographics-node3d-materials-and-animation.md)93eaa907、[UI035](../../plans/archived/035-autographics-node3d-audio-hud-composition.md)5903839e、[UI039](../../plans/archived/039-autographics-node3d-queries-and-mixed-markers.md)8f577a34已实际落主/有canonical/旧树已清；同实现会话final限制如实记录，不称独立上下文pass |
 | Gallery | [AG017](../../../../ag-examples/docs/plans/archived/017-autographics-gallery-node3d-queries.md)273b070、[AG018](../../../../ag-examples/docs/plans/archived/018-autographics-gallery-node-editor-tutorials.md)4cb297d已交付，当前活Node源**22/22**；12逻辑项/22入口不增，旧锁/来源边界保持 |
 | 完整3D与原合同候选 | AG016交付55c39a2；[AG019](../../../../ag-examples/docs/plans/archived/019-autographics-m2-unified-release-validation.md)交付3daf2eb/独立R2/归档清理，原候选fc82061c；最终收据明确“不称M2完成”，原holds保持 |
-| 编辑交付及新后继 | UI040交付fc82061c/canonical/独立final/清理齐，D-02 OS层15项仍pending；AG018/019原合同保持。UI043模型模板/UI044源码诊断本轮仅规划 |
+| 编辑交付及新后继 | UI040交付fc82061c/canonical/独立final/清理齐，D-02 OS层15项仍pending；AG018/019原合同保持。UI043模型模板/UI044源码诊断均已交付归档/清理 |
 
 权威分母仍为auto-lang [M2-01..09](../../../../auto-lang/docs/design/autographics/m2-editor-and-public-game-prototypes.md)、[G2-01..09/G3-01..08/原关卡](../../../../auto-lang/docs/design/autographics/m2-game-sample-matrix.md)。Gallery22/22不是M2完成比例，游戏不计Gallery分母。
 
@@ -26,20 +26,15 @@
 |---|---|---|---|
 | 引擎/auto-ui | [UI040](../../plans/archived/040-autographics-node-editor-projects.md)已交付 | editor-projects纯声明身份入口/项目化编辑7门/固定生成物/独立final齐 | AG018可固定消费；原OS层15项仍待真实证据，归档不等M2完成 |
 | Demo/ag-examples | [AG018](../../../../ag-examples/docs/plans/archived/018-autographics-gallery-node-editor-tutorials.md)已交付 | G04双维Node源/原教程与包已落主 | 原OS层20/34分层及D-02具名边界按归档收据，不自动抹平 |
-| 原合同里程碑集成/ag-examples | [AG019](../../../../ag-examples/docs/plans/archived/019-autographics-m2-unified-release-validation.md)已交付3daf2eb | 原九项/两游戏/22入口47变体在fc82061c候选对账，边界/holds按归档 | 不重开019；新增UI混用由048→049→AG021承担，不向旧合同塞任务 |
+| 原合同里程碑集成/ag-examples | [AG019](../../../../ag-examples/docs/plans/archived/019-autographics-m2-unified-release-validation.md)已交付3daf2eb | 原九项/两游戏/22入口47变体在fc82061c候选对账，边界/holds按归档 | 不重开019；新增UI混用由048/049已交付切片→054→AG021 r2承担，不向旧合同塞任务 |
 
-AG016/017/018/019均已合并，不接管/重开。019交付原合同候选不等扩展M2完成；共享gallery/packager/锁注册短窗，GPU/音频/焦点单实例及OS政策保持。本轮只核查/设计/规划048/049/AG021和020时机修订。
+AG016/017/018/019均已合并，不接管/重开。019交付原合同候选不等扩展M2完成；共享gallery/packager/锁注册短窗，GPU/音频/焦点单实例及OS政策保持。本轮只规划054/055/AG022及AG021 r2前置衔接。
 
-## 3. auto-ui可独立推进的可选后继
+## 3. 已交付可选后继与本轮并行研究
 
-[模型对象组件与源码诊断设计](node-resource-components-and-source-diagnostics.md)新增两份仅规划合同：
+UI043模型模板/UI044源码诊断已交付（044 delivery 9bf9874a），实际支持/来源/预算依各归档和canonical；旧AG016/019不自动升级锁。这两份不再计未完成，041/042与在途052/053属于其它UI路线，不接管或复用其号。
 
-| 合同 | 具体缺口与交付目标 | 与M2/并行关系 |
-|---|---|---|
-| [UI043](../../plans/043-autographics-node3d-model-object-templates.md) | driver已有Model运行实例，Node object3d仍只许builtin；补具名平色/opaque静态模型模板，真实出生运动销毁/多实例/非solid/资源owner原额 | 不等游戏或044；AG016保持035，未来内容显式消费另约 |
-| [UI044](../../plans/044-autographics-node-source-diagnostics.md) | 多模块lower后回原module/Node/事件/helper；可选map/真实compile span/定位精度/接受源身份，无span runtime不造行 | 不等043、不换SDK/ACE；当前内容不升级debug模式 |
-
-两者功能独立，共享load/translate/main/identity/Storage按owner短窗；T-02分别有界全链先证，旧profile字节/预算/原验收保持。不新增为当前M2前置，不把AG019候选自动改成新开发tip。041/042属其它UI组件store/重载路线，已占本地号，不重复编号或拿它们当AG整项前置。
+新[UI055](../../plans/055-age-m3-topdown2d-feasibility-and-capacity.md)固定已交付源研究俯视移动/交互/场景链与容量；[AG022](../../../../ag-examples/docs/plans/022-age-m3-farming-slice-and-threejs-inventory.md)整理国风首切片/素材及固定three.js全目录差距。研究准备可与054/AG021并行，022 T-06等055实际结果；go/bounded-go/no-go均须真实证据，不把研究归档当产品能力。共享源只读，材料/target独占，GPU/原生焦点错峰。
 
 ## 4. G04不是简单的单维重写
 
@@ -59,22 +54,23 @@ AG019固定一个实际引擎commit与显式语言/兄弟仓源集合、SDK681/�
 
 AG019是一次明确的里程碑档，原全AG/性能资源样本按原条件在用户启动后的单独时段单实例跑；不把每次修复/review/merge又变全套。OS/声学/设备证据分层，原必需门未证则候选未就绪。独立上下文final不能被同实现会话重跑替代；相关上游缺证由原owner/合法交接核验，不重开档造pass。034相关hold/旧runner缺失/D-05批门/M1标签映射差异按真实适用性记录，不移动历史标签或假定11911a4a…=679681b3…。内容原保持项可按原收据/保留件直接复验，不要求伪造历史等价。
 
-扩展M2-ready必须原M2-01..09＋新增M2-10逐条实证、必要同版独立消费/独立final齐；019原九项证据按其真实身份保留，不能用旧hash冒充049新候选绿。本地候选不等远端发布，上传/tag另待指令。UI043/044仍可选，不扩ACE/跨端/完整生产UI为前置。
+扩展M2-ready必须原M2-01..09＋新增M2-10逐条实证、必要同版独立消费/独立final齐；019原九项证据按其真实身份保留，不能用旧hash冒充054新候选绿。本地候选不等远端发布，上传/tag另待指令。UI043/044已交付且保持可选，不扩ACE/跨端/完整生产UI为前置。
 
 每Plan临时材料仅plan-artifacts/plan-NNN/<repo>/，merge摘要折Plan/全部输出对账后删自有scope/构建物，仅具名未解决问题持有；不创建attachments/链接/派生JSON，清树先fresh guard，不覆盖其它路线WIP。
 
 ## 7. 基础UI混用补齐与当前可执行边界
 
-048补row/column/text/button的Node view、真实Auto事件与绑定，UI-only独立验证；049完整接线等048实交付，复用AGP单设备/合成/输入桥，补UI布局内view-2d/view-3d同时呈现、实例一次更新与焦点/裁剪；AG021正式接线等049实际交付，内容在新增showcases/ui-2d-3d，原Gallery12/22/47与两游戏分母不变。AG021需新混合应用双向交互/原生窗口/离线包与原九项新候选兼容矩阵；旧证据只有代码/输入/配置等价可证才具名复用。
+048基础UI与049root有限混合已交付；049 canonical明确非root区域/条件区域挂卸不支持，Host还有固定名称/实例0路径。AG021原G-M07/AC-04仍需寿命和另一owner存活，不能删条件操作或改成根展开来绕过。[054](../../plans/054-age-mixed-regions-components-and-lifecycle.md)补metadata驱动区域/组件实例/挂卸代次/原生输入，在独立上下文核验新候选和048/049必需复用面；不倒签旧归档。
 
-未来启动后048可先推进；049 T-01与AG021 T-01/02可并行只读准备，后续分别等实际交付，不追tip。043在途/044可选与本补齐链无强依赖，但同文件写面先核owner短窗。原32credits/8状态Node/128行等预算不抬，原OS政策与GPU/焦点单实例保持，必需真输入未证不充pass。020是019/021后的维护性更名，不成为本链前置。
+AG021原owner已记T-01/02准备完成、executing/r2/2-10，T-03完整接线等054实际交付/独立final/canonical与工具来源。不追tip，showcases/ui-2d-3d独立工程/包不增Gallery分母；最终旧九项、新M2-10、两游戏与22入口47变体逐项对账，真实受影响门重验、可证等价具名复用；任何必需原生/来源/批门未证都不称M2完成。
 
+预算分profile：旧game32credits/物理32/8状态Node/128行保持；048/049 UI为1000 VM steps/回调、累计100k、8实例/32元素每def/4文字槽×64B/队列64；054拟活区域全应用合计≤4。不同单位不互换，不给每模块复制额度。OS政策/机器GPU焦点单实例保持。AG020只是收口后的更名维护，不是功能前置。
 
 ## 8. M2之后：M3增强2D/3D，M4正式融合AutoUI
 
 2026-11-04用户调整里程碑：**M3优先增强AGE的2D/2DHD与复杂3D能力，原AutoUI/ACE正式融合任务顺延M4**。
 
-- [M3能力路线](m3-2d-3d-capability-roadmap.md)：以俯视角2D/2DHD国风种田承载游戏可玩切片，和three.js固定版本逐项能力矩阵驱动引擎/游戏/示例并行准备；具体规则、画面、规模和覆盖分母另立合同冻结，不将完整商业游戏或全部上游目录默认为已交付。
+- [M3能力路线](m3-2d-3d-capability-roadmap.md)：以俯视角2D/2DHD国风种田承载游戏可玩切片，和three.js固定版本逐项能力矩阵驱动引擎/游戏/示例并行准备；首轮由055/AG022研究冻结规则候选、画面选项、规模和固定目录差距，后续产品批次另立合同，不将完整商业游戏或全部上游目录默认为已交付。
 - [M4融合路线](m4-autoui-integration-roadmap.md)：保留Schema方言成熟且旧Auto编译器替换实际启动的前置，届时统一接入AutoUI/AGE并从examples/ui/001按能力依赖推进全部UI Demo原行为兼容。
 
-M3不因ACE正式集成等待而停在原地；新图形/游戏切片如实际依赖ACE能力则逐项核交付。M2现有048/049/AG021合同、原分母/预算、019历史与020的M2后维护窗口不变，不自动停工、改依赖或将020再推迟至M4。本轮只定新方向，不预取计划号、不建树/实施；不提前把旧手写UI parser扩成完整生产融合。
+M3不因ACE正式集成等待而停在原地；055/AG022研究准备可先行，正式产品能力依阶段和具体合同核M2收口/真实前置。M2本轮只新增054和修订AG021 r2，不回改048/049或019归档/原分母。020仍在M2收口后维护窗口，不等M4。当前仅规划三份新合同，未建树/运行/实现/发布。
