@@ -723,6 +723,20 @@ fn vk_to_code(vk: u32) -> Option<iced::keyboard::key::Code> {
 /// `input_method::Event`（text_input 组合态原生消费）；Cancelled →
 /// Closed（组合态清理）。Windows 中文 IME 实机完备性 = T-02 风险面
 ///（待澄清③），残缺则混合方案兜底登记。
+fn vk_to_iced_key(vk: u32) -> Option<iced::keyboard::Key> {
+    if let Some(named) = vk_to_named(vk) {
+        return Some(iced::keyboard::Key::Named(named));
+    }
+    // Character input still arrives through CharTyped. Key events retain
+    // letter/digit identity for shortcuts such as Ctrl+A, with no text payload.
+    if (0x30..=0x39).contains(&vk) || (0x41..=0x5a).contains(&vk) {
+        return Some(iced::keyboard::Key::Character(
+            ((vk as u8).to_ascii_lowercase() as char).to_string().into(),
+        ));
+    }
+    None
+}
+
 pub(crate) fn input_to_iced_events(
     input: &crate::ui::desktop_protocol::message::InputMsg,
 ) -> Vec<iced::Event> {
@@ -771,12 +785,12 @@ pub(crate) fn input_to_iced_events(
         }
         InputMsg::KeyPressed { key, modifiers, .. } => {
             let mods = wire_mods_to_iced(*modifiers);
-            let Some(named) = vk_to_named(*key) else {
-                return Vec::new();
+            let Some(iced_key) = vk_to_iced_key(*key) else {
+                return vec![iced::Event::Keyboard(KeyEvent::ModifiersChanged(mods))];
             };
-            vec![iced::Event::Keyboard(KeyEvent::KeyPressed {
-                key: Key::Named(named),
-                modified_key: Key::Named(named),
+            vec![iced::Event::Keyboard(KeyEvent::ModifiersChanged(mods)), iced::Event::Keyboard(KeyEvent::KeyPressed {
+                key: iced_key.clone(),
+                modified_key: iced_key,
                 physical_key: vk_to_code(*key)
                     .map(iced::keyboard::key::Physical::Code)
                     .unwrap_or(iced::keyboard::key::Physical::Unidentified(
@@ -790,12 +804,12 @@ pub(crate) fn input_to_iced_events(
         }
         InputMsg::KeyReleased { key, modifiers, .. } => {
             let mods = wire_mods_to_iced(*modifiers);
-            let Some(named) = vk_to_named(*key) else {
-                return Vec::new();
+            let Some(iced_key) = vk_to_iced_key(*key) else {
+                return vec![iced::Event::Keyboard(KeyEvent::ModifiersChanged(mods))];
             };
-            vec![iced::Event::Keyboard(KeyEvent::KeyReleased {
-                key: Key::Named(named),
-                modified_key: Key::Named(named),
+            vec![iced::Event::Keyboard(KeyEvent::ModifiersChanged(mods)), iced::Event::Keyboard(KeyEvent::KeyReleased {
+                key: iced_key.clone(),
+                modified_key: iced_key,
                 physical_key: vk_to_code(*key)
                     .map(iced::keyboard::key::Physical::Code)
                     .unwrap_or(iced::keyboard::key::Physical::Unidentified(
@@ -808,7 +822,7 @@ pub(crate) fn input_to_iced_events(
         InputMsg::CharTyped { ch, .. } => {
             let text: String = ch.to_string();
             let key = Key::Character(iced_widget::core::SmolStr::new(&text));
-            vec![iced::Event::Keyboard(KeyEvent::KeyPressed {
+            vec![iced::Event::Keyboard(KeyEvent::ModifiersChanged(iced::keyboard::Modifiers::empty())), iced::Event::Keyboard(KeyEvent::KeyPressed {
                 key: key.clone(),
                 modified_key: key,
                 physical_key: iced::keyboard::key::Physical::Unidentified(
@@ -1588,6 +1602,28 @@ fn decode_image_rgba(bytes: &[u8]) -> Option<(u32, u32, Vec<u8>)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn p060_native_headless_ctrl_a_replaces_existing_input() {
+        use crate::ui::desktop_protocol::{endpoint::FrameSource, message::{InputMsg, MouseButton}};
+        use crate::ui::View;
+        #[derive(Debug)]
+        struct NativeInput(String);
+        impl Component for NativeInput {
+            type Msg = ();
+            fn on(&mut self, _: ()) { self.0 = crate::ui::iced::last_input_text(); }
+            fn view(&self) -> View<()> {
+                View::input("title").value(self.0.clone()).on_change(()).build()
+            }
+        }
+        let mut source = HeadlessFrameSource::new(NativeInput("before".into()), 320.0, 100.0);
+        source.render_frame();
+        source.on_input(&InputMsg::PointerPressed { wid: 1, button: MouseButton::Left, x: 20.0, y: 15.0, modifiers: 0 });
+        source.on_input(&InputMsg::PointerReleased { wid: 1, button: MouseButton::Left, x: 20.0, y: 15.0, modifiers: 0 });
+        source.on_input(&InputMsg::KeyPressed { wid: 1, key: 0x41, modifiers: 2 });
+        source.on_input(&InputMsg::CharTyped { wid: 1, ch: 'x' });
+        assert_eq!(source.component().0, "x");
+    }
 
     #[test]
     fn p060_native_headless_action_updates_component_and_frame_revision() {

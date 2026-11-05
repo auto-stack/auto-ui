@@ -2596,9 +2596,14 @@ fn collect_local_elems(
                         .to_ascii_lowercase()
                         .contains("str")
                 {
+                    let input_text = if self.input_variants.contains(&v.name) {
+                        "auto_ui_runtime::ui::iced::store_input_text(a); "
+                    } else {
+                        ""
+                    };
                     arms.push_str(&format!(
-                        "            {:?} => match arg {{ Some(a) => {{ self.on({}::{}(a.to_string())); true }}, None => false }}\n",
-                        v.name, msg_type, v.name
+                        "            {:?} => match arg {{ Some(a) => {{ {}self.on({}::{}(a.to_string())); true }}, None => false }}\n",
+                        v.name, input_text, msg_type, v.name
                     ));
                 }
             }
@@ -17195,6 +17200,27 @@ widget App {
     fn test_rust_generator_creation() {
         let gen = RustGenerator::new();
         assert!(gen.current_widget.is_none());
+    }
+
+    #[test]
+    fn p060_named_input_dispatch_stages_text_for_input_handler() {
+        let src = r#"widget Form {
+            msg { Edit(str), Rename(str) }
+            model { var title str = "" }
+            view { input { value: .title, oninput: .Edit } }
+            on { .Edit(v) -> { .title = v } .Rename(v) -> { .title = v } }
+        }"#;
+        let ast = crate::parse_ui(src).expect("parse");
+        let decl = ast.domain_stmts().find_map(|s| match s {
+            auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d), _ => None,
+        }).unwrap();
+        let widget = crate::aura::extract::extract_widget_from_decl(decl).unwrap();
+        let code = RustGenerator::new().generate(&widget).unwrap();
+        let dispatch = code.split("fn dispatch_named").nth(1).unwrap().split("fn view").next().unwrap();
+        let edit = dispatch.lines().find(|line| line.contains("\"Edit\" =>")).unwrap();
+        let rename = dispatch.lines().find(|line| line.contains("\"Rename\" =>")).unwrap();
+        assert!(edit.contains("store_input_text(a); self.on("), "{edit}");
+        assert!(!rename.contains("store_input_text"), "ordinary string actions keep their typed payload");
     }
 
     /// Plan 547 Task 22: Rust generator preserves ImageSurface props and all

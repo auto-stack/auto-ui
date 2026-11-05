@@ -292,15 +292,21 @@ fn broker_surface_local(
     ly: f32,
     rw: f32,
     rh: f32,
-) -> (f32, f32) {
+    decorated: bool,
+) -> Option<(f32, f32)> {
+    // Command painters replay in client-area logical coordinates without
+    // scaling. The titlebar belongs to the host, not to the child surface.
+    if client.endpoint.frame_mode == crate::ui::desktop_protocol::message::FrameMode::Commands {
+        return broker_command_pointer_local(lx, ly, rw, rh, decorated);
+    }
     if rw <= 0.0 || rh <= 0.0 {
-        return (lx, ly);
+        return Some((lx, ly));
     }
     let Some(sid) = client.wid_surface.get(&wid.0).copied() else {
-        return (lx, ly);
+        return Some((lx, ly));
     };
     let Some((sw, sh)) = client.surfaces.size(sid) else {
-        return (lx, ly);
+        return Some((lx, ly));
     };
     if std::env::var_os("AUTO_PLAN060_DIAG").is_some() {
         eprintln!(
@@ -311,9 +317,15 @@ fn broker_surface_local(
     }
     let (sx, sy) = (lx * sw / rw, ly * sh / rh);
     if !sx.is_finite() || !sy.is_finite() {
-        return (lx, ly);
+        return Some((lx, ly));
     }
-    (sx, sy)
+    Some((sx, sy))
+}
+
+fn broker_command_pointer_local(lx: f32, ly: f32, rw: f32, rh: f32, decorated: bool) -> Option<(f32, f32)> {
+    let top = if decorated { crate::ui::iced::virtual_window::TITLEBAR_H } else { 0.0 };
+    let cy = ly - top;
+    (lx >= 0.0 && lx < rw && cy >= 0.0 && cy < rh - top).then_some((lx, cy))
 }
 pub struct DesktopState {
     /// PLAN-526 T18：分区切换预览面板 transient 收起时点（热键切换置位；
@@ -4361,8 +4373,7 @@ impl DesktopSession {
                         self.host
                             .as_ref()
                             .and_then(|h| h.wm.wins.get(&w))
-                            .and_then(|v| v.registry_id.as_ref())
-                            .is_none()
+                            .is_some_and(|v| v.registry_id.is_none())
                     })
             })
             .and_then(|c| c.wid)
@@ -4900,7 +4911,8 @@ impl DesktopSession {
                 // PLAN-060 扩展：宿主窗 rect 与 child 表面尺寸不同（投影缩放）
                 // 时按比例把 canvas 局部坐标换算回 child 表面坐标，否则
                 // 指针永远落在错误控件上（calendar「>」delivered=true 但无反应）。
-                let (lx, ly) = broker_surface_local(client, wid, x - rect.x, y - rect.y, rect.width, rect.height);
+                let Some((lx, ly)) = broker_surface_local(client, wid, x - rect.x, y - rect.y, rect.width, rect.height,
+                    !self.desktop.shell_pseudo_wids.contains(&wid)) else { return false };
                 let input = ProtocolMsg::Input(InputMsg::PointerPressed {
                     wid: wid.0,
                     button,
@@ -4939,7 +4951,8 @@ impl DesktopSession {
         };
         for client in self.broker_clients.values_mut() {
             if client.owns_wid(wid) {
-                let (lx, ly) = broker_surface_local(client, wid, x - rect.x, y - rect.y, rect.width, rect.height);
+                let Some((lx, ly)) = broker_surface_local(client, wid, x - rect.x, y - rect.y, rect.width, rect.height,
+                    !self.desktop.shell_pseudo_wids.contains(&wid)) else { return false };
                 let input = ProtocolMsg::Input(InputMsg::PointerReleased {
                     wid: wid.0,
                     button,
@@ -7132,6 +7145,20 @@ impl HostStorage for ShimHostStorage {
 #[cfg(test)]
 mod tests {
 
+    #[test]
+    fn p060_command_pointer_matches_unscaled_client_canvas() {
+        use super::broker_command_pointer_local as map;
+        // The same replayed point stays at (80, 60) when WM resizes the
+        // containing canvas; command painters do not scale their draw ops.
+        for (w, h) in [(480.0, 320.0), (800.0, 1100.0), (682.0, 586.0)] {
+            assert_eq!(map(80.0, 96.0, w, h, true), Some((80.0, 60.0)));
+            assert_eq!(map(80.0, 12.0, w, h, true), None, "host titlebar");
+            assert_eq!(map(w + 1.0, 96.0, w, h, true), None);
+            assert_eq!(map(80.0, h, w, h, true), None);
+            assert_eq!(map(80.0, 12.0, w, h, false), Some((80.0, 12.0)), "shell has no chrome");
+        }
+    }
+
     /// PLAN-039 T-07（D2-A 编译轨优先）：launcher 编译产物发现——
     /// T-05 ⑤ 后 workspace 本地 target 布局（rust-workspace/target/
     /// debug/<pac-name-snake>.exe），pac name 优先/目录名垫底；产物
@@ -9037,6 +9064,13 @@ mod tests {
                 .any(|c| c.app_name.as_deref() == Some("probe")),
             "broker_clients 驻留 probe"
         );
+
+        // A removed WM window can outlive its entry in broker_clients until
+        // the next pump. A subsequent launch must not claim that stale wid.
+        ds.host.as_mut().unwrap().wm.wins.remove(&wid);
+        let reopened = ds.launch_app("probe").expect("reopen lands a live window");
+        assert_ne!(reopened, wid);
+        assert_eq!(ds.host.as_ref().unwrap().wm.wins[&reopened].registry_id.as_deref(), Some("probe"));
 
         // 收尾：kill 子进程 + 停 broker serve 线程（probe 连接唤醒退出）。
         for mut child in ds.desktop.outproc_children.drain(..) {

@@ -1280,13 +1280,18 @@ fn tool_definitions() -> Vec<serde_json::Value> {
                 "properties": {
                     "action": {
                         "type": "string",
-                        "enum": ["bus", "handler", "key", "pointer"],
+                        "enum": ["bus", "handler", "key", "pointer", "msg"],
                         "description": "bus = DesktopBus verb record; handler = privileged app handler call; key = live input routing (PLAN-029); pointer = acceptance pointer injection (PLAN-060)"
                     },
                     "verb": {
                         "type": "string",
                         "description": "DesktopBus record for action=bus (e.g. \"open_settings\", \"layout\\tgrid\")"
                     },
+                    "msg": { "type": "string", "description": "Component message name for action=msg" },
+                    "x": { "type": "number", "description": "Pointer x in desktop logical coordinates" },
+                    "y": { "type": "number", "description": "Pointer y in desktop logical coordinates" },
+                    "phase": { "type": "string", "enum": ["click", "down", "up"] },
+                    "button": { "type": "string", "enum": ["left", "right", "middle"] },
                     "kind": {
                         "type": "string",
                         "enum": ["chars", "key", "ime_commit", "ime_preedit", "ime_cancelled", "wheel"],
@@ -1314,8 +1319,7 @@ fn tool_definitions() -> Vec<serde_json::Value> {
                     },
                     "app": {
                         "type": "string",
-                        "enum": ["shell", "settings", "notification", "launcher", "desktop"],
-                        "description": "Privileged app for action=handler (default shell)"
+                        "description": "Privileged app name or registered app id for handler/msg"
                     },
                     "handler": {
                         "type": "string",
