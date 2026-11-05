@@ -1629,40 +1629,130 @@ fn merged_absorb(project_dir: &Path, _module: &auto_lang_core::api::ApiModule) -
     Some(MergedAbsorb { modules, db_fns })
 }
 
+/// PLAN-060 T-04：跨命名空间类型垫片。db 侧结构字段是 i64（a2r int 宽），
+/// front 侧是 i32；同名结构各存一份（front 根 + `types` 模块），边界按字段
+/// 生成双向转换，避免污染 UI 侧处处 as。
+fn merged_shim_fns(module: &auto_lang_core::api::ApiModule) -> String {
+    let mut code = String::new();
+    let known: std::collections::HashSet<&str> = module.types.iter().map(|t| t.name.as_str()).collect();
+    let field_conv = |tname: &str, field: &str, to_ui: bool, known: &std::collections::HashSet<&str>| -> Option<String> {
+        let ty = ty_of_field(module, tname, field)?;
+        let base = ty.trim().trim_start_matches("[]").trim_start_matches('?');
+        if ty.trim() == "int" {
+            return Some(if to_ui { format!("x.{field} as i32") } else { format!("x.{field} as i64") });
+        }
+        if ty.trim().starts_with("[]") {
+            if known.contains(base) {
+                let f = if to_ui { "__db2ui" } else { "__ui2db" };
+                return Some(format!("x.{field}.into_iter().map({f}_{base}).collect()"));
+            }
+            return Some(format!("x.{field}"));
+        }
+        if known.contains(base) {
+            let f = if to_ui { "__db2ui" } else { "__ui2db" };
+            return Some(format!("{f}_{base}(x.{field})"));
+        }
+        Some(format!("x.{field}"))
+    };
+    for t in &module.types {
+        let mut fwd = Vec::new();
+        let mut rev = Vec::new();
+        let mut ok = true;
+        for fld in &t.fields {
+            match field_conv(&t.name, &fld.name, true, &known) {
+                Some(e) => fwd.push(format!("{}: {}", fld.name, e)),
+                None => ok = false,
+            }
+            match field_conv(&t.name, &fld.name, false, &known) {
+                Some(e) => rev.push(format!("{}: {}", fld.name, e)),
+                None => ok = false,
+            }
+        }
+        if !ok {
+            continue;
+        }
+        code.push_str(&format!(
+            "#[allow(dead_code)]\nfn __db2ui_{}(x: crate::types::{}) -> {} {{\n    {} {{ {} }}\n}}\n",
+            t.name, t.name, t.name, t.name, fwd.join(", ")
+        ));
+        code.push_str(&format!(
+            "#[allow(dead_code)]\nfn __ui2db_{}(x: {}) -> crate::types::{} {{\n    crate::types::{} {{ {} }}\n}}\n\n",
+            t.name, t.name, t.name, t.name, rev.join(", ")
+        ));
+    }
+    code
+}
+
+fn ty_of_field<'a>(module: &'a auto_lang_core::api::ApiModule, tname: &str, field: &str) -> Option<&'a str> {
+    module
+        .types
+        .iter()
+        .find(|t| t.name == tname)?
+        .fields
+        .iter()
+        .find(|f| f.name == field)
+        .map(|f| f.ty.as_str())
+}
+
 /// PLAN-060 T-04：按 db 实际签名把 endpoint 委派到 `db::<fn>`（i32↔i64、
+/// PLAN-060 T-04：按 db 实际签名把 endpoint 委派到 db::<fn>（i32↔i64、
 /// String↔&str 适配；参数个数不一致即放弃，落既有臂）。
 fn merged_db_delegate_typed(
     absorb: &MergedAbsorb,
+    module: &auto_lang_core::api::ApiModule,
     endpoint: &auto_lang_core::api::ApiEndpoint,
 ) -> Option<String> {
     let sig = absorb.db_fns.iter().find(|f| f.name == endpoint.fn_name)?;
     if sig.params.len() != endpoint.params.len() {
         return None;
     }
+    let known: std::collections::HashSet<&str> = module.types.iter().map(|t| t.name.as_str()).collect();
     let mut ui_params = Vec::new();
     let mut call_args = Vec::new();
     for (p, (_, db_ty)) in endpoint.params.iter().zip(sig.params.iter()) {
         let ui_ty = auto_type_to_rust(&p.ty);
-        let arg = match db_ty.as_str() {
-            "i64" => format!("{} as i64", p.name),
-            "&str" => format!("&{}", p.name),
-            _ => p.name.clone(),
+        let base = p.ty.trim().trim_start_matches("[]").trim_start_matches('?');
+        let arg = if known.contains(base) {
+            if p.ty.trim().starts_with("[]") {
+                format!("{}.into_iter().map(__ui2db_{}).collect()", p.name, base)
+            } else {
+                format!("__ui2db_{}({})", base, p.name)
+            }
+        } else {
+            match db_ty.as_str() {
+                "i64" => format!("{} as i64", p.name),
+                "&str" => format!("&{}", p.name),
+                _ => p.name.clone(),
+            }
         };
         ui_params.push(format!("{}: {}", p.name, ui_ty));
         call_args.push(arg);
     }
     let ret_ui = auto_type_to_rust(endpoint.return_type.trim());
+    let rbase = endpoint
+        .return_type
+        .trim()
+        .trim_start_matches("[]")
+        .trim_start_matches('?');
     let db_ret = sig.ret.clone().unwrap_or_else(|| "()".to_string());
+    let call = format!("db::{}({})", sig.name, call_args.join(", "));
     let (ret_clause, call_expr) = if ret_ui == "()" || ret_ui.is_empty() {
-        (String::new(), format!("db::{}({})", sig.name, call_args.join(", ")))
+        (String::new(), call)
+    } else if known.contains(rbase) {
+        let conv = if endpoint.return_type.trim().starts_with("[]") {
+            format!("{}.into_iter().map(__db2ui_{}).collect()", call, rbase)
+        } else if endpoint.return_type.trim().starts_with('?') {
+            format!("{}.map(__db2ui_{})", call, rbase)
+        } else {
+            format!("__db2ui_{}({})", rbase, call)
+        };
+        (format!(" -> {ret_ui}"), conv)
     } else if db_ret == "i64" && ret_ui == "i32" {
-        (format!(" -> {ret_ui}"), format!("db::{}({}) as i32", sig.name, call_args.join(", ")))
+        (format!(" -> {ret_ui}"), format!("{call} as i32"))
     } else if db_ret == "&str" && ret_ui == "String" {
-        (format!(" -> {ret_ui}"), format!("db::{}({}).to_string()", sig.name, call_args.join(", ")))
-    } else if db_ret == ret_ui || db_ret == format!("Option<{}>", ret_ui.trim_start_matches("Option<").trim_end_matches('>')) {
-        (format!(" -> {ret_ui}"), format!("db::{}({})", sig.name, call_args.join(", ")))
+        (format!(" -> {ret_ui}"), format!("{call}.to_string()"))
     } else {
-        (format!(" -> {ret_ui}"), format!("db::{}({})", sig.name, call_args.join(", ")))
+        (format!(" -> {ret_ui}"), call)
     };
     Some(format!(
         "fn {}({}){} {{\n    {}\n}}\n\n",
@@ -1672,7 +1762,6 @@ fn merged_db_delegate_typed(
         call_expr
     ))
 }
-
 fn merged_db_impl(    project_dir: &Path,
     module: &auto_lang_core::api::ApiModule,
 ) -> Option<MergedDbImpl> {
@@ -2351,9 +2440,14 @@ fn generate_merged_api_client(
     // 不可吸收时回退既有单 db 吸收/CRUD 脚手架。
     let absorb = merged_absorb(project_dir, module);
     if let Some(a) = &absorb {
-        code.push_str("// PLAN-060 T-04: merged back modules (types/companions/db)\npub mod types {\n#![allow(unused)]\n");
+        code.push_str("// PLAN-060 T-04: merged back modules (types/companions/db)\n");
         code.push_str(api_type_structs);
-        code.push_str("\n}\n\npub use types::*;\n\n");
+        code.push_str("\n");
+        // back 侧类型面（i64 宽）——db 模块 `crate::types::*` 引用解析处。
+        code.push_str("pub mod types {\n#![allow(unused)]\n");
+        code.push_str(&api_type_structs.replace(": i32", ": i64"));
+        code.push_str("\n}\n\n");
+        code.push_str(&merged_shim_fns(module));
         for (name, src) in &a.modules {
             if name == "db" {
                 continue;
@@ -2434,7 +2528,7 @@ fn generate_merged_api_client(
 
         // PLAN-060 T-04：全量内嵌臂——按 db 签名委派（结构/标量返回通吃）。
         if let Some(a) = &absorb {
-            if let Some(emit) = merged_db_delegate_typed(a, endpoint) {
+            if let Some(emit) = merged_db_delegate_typed(a, module, endpoint) {
                 code.push_str(&emit);
                 continue;
             }
@@ -11312,6 +11406,9 @@ mod plan036_theme_input_tests {
         );
     }
 }
+
+
+
 
 
 
