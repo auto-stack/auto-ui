@@ -11,7 +11,8 @@
   {"name": "main", "sha256": "189628505fe4a3145e3e471612fe8e2369db40828f43ba42f72c1ac715e4c549", "bytes": 2049}
  ],
  "provenance": {
-  "product": "generated-node-mixed/ui-ab-mixed",
+  "product": "ui-ab-mixed",
+  "consumer": "experimental/autographics-auto-driver/tests/node_mixed_views_{flow,storage,host}.rs + bin/mixed_ui_window.rs (AG021 candidate recipe)",
   "consumption": "ui.json regions drive per-dimension child surfaces (Game2d/Scene3d) mounted Flat2d into the UI view; scene bindings read the SAME int getter ABI as text/condition/layout; region clicks dispatch through the shared _ui_click_ ABI; one Session owner, one app_start/app_update per explicit step",
   "world_sha256": "87e67f5abda757af89d2670b77aee164d214734c43091c748ef90172091cc1f8"
  }

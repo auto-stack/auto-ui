@@ -1607,7 +1607,21 @@ fn main() {
             identity.push_str(closure.trim_end_matches(",\n"));
             identity.push_str("\n ],\n");
             identity.push_str(" \"provenance\": {\n");
-            identity.push_str(&format!("  \"product\": \"{}\",\n", out));
+            // 048 同一约定：product 只记目录名（byte-identical 再生成控制
+            // 要求 temp 路径不进产物身份）。
+            let product = std::path::Path::new(out)
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("unrecorded")
+                .to_string();
+            let consumer = match product.as_str() {
+                "ui-ab-mixed" => {
+                    "experimental/autographics-auto-driver/tests/node_mixed_views_{flow,storage,host}.rs + bin/mixed_ui_window.rs (AG021 candidate recipe)"
+                }
+                _ => "unrecorded (this out dir has no registered flow consumer)",
+            };
+            identity.push_str(&format!("  \"product\": \"{product}\",\n"));
+            identity.push_str(&format!("  \"consumer\": \"{consumer}\",\n"));
             identity.push_str(
                 "  \"consumption\": \"ui.json regions drive per-dimension child surfaces (Game2d/Scene3d) mounted Flat2d into the UI view; scene bindings read the SAME int getter ABI as text/condition/layout; region clicks dispatch through the shared _ui_click_ ABI; one Session owner, one app_start/app_update per explicit step\",\n",
             );
