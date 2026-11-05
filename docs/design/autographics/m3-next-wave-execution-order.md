@@ -7,7 +7,7 @@
 | 合同 | 可交付范围 | 前置与先行边界 |
 |---|---|---|
 | [UI058俯视二维组合](../../plans/058-age-topdown2d-queries-and-sprites.md) | 正常Node/use下无重力四/八向、一sweep停墙、最近交互、精灵帧同Tick，原32credits包络 | T-01仅准备可先行；T-02等055/AG022实际结论与AG021对M2必需门真实收口；先证失败或需提预算就replan |
-| [UI059方向光/阴影作者链研究](../../plans/059-age-node3d-lighting-and-shadow-feasibility.md) | 1方向光/1投影物/1受影面，Auto→GPU、独立Lambert/遮挡oracle、容量与go/no-go | 可独立研究，不等054/055/AG022/AG021；GPU/焦点错峰；研究不冒正式Light API或three.js已覆盖 |
+| [UI059方向光/阴影作者链研究](../../plans/archived/059-age-node3d-lighting-and-shadow-feasibility.md) | 1方向光/1投影物/1受影面，Auto→GPU、独立Lambert/遮挡oracle、容量与go/no-go | 已交付bounded-go研究；Auto动态标量桥/20轮研究Run已证；不冒正式Light API或three.js覆盖 |
 | [AG023俯视组合小示例](../../../../ag-examples/docs/plans/023-age-m3-topdown2d-example.md) | 一个Player/两障碍/两个同定义Target，正常模块/具名帧、公开运行/改源/冷包 | T-01/02准备可先行；T-03正式接线等058实际交付/独立final/来源、AG022实交付及M2必需门齐；不追tip |
 
 055和AG022尚未交付，本批不编造研究结果或先定完整国风游戏规模。058只承诺有限最小组合；没有自动滑墙、多角色、tilemap批绘或背包存档。059复用已有LightDef/MeshPipeline底层，源已有固定sample_light、ambient=0.25，不等于Auto作者已有Light。三维正式能力/Gallery映射在研究与AG022目录证据后再立合同；当前不领取未来编号。

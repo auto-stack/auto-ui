@@ -11,7 +11,7 @@
 | [UI054混合区域组件/寿命](../../plans/054-age-mixed-regions-components-and-lifecycle.md) | 实施中、未交付；唯一ui-054树/branch，已有1f3be333实现提交；主头部drafting/current_step与执行记录不一致，T-01/02有实录；不代owner改状态 | 原owner继续后续接线/原生与预算门、独立final/冻结/merge；其交付前AG021不能进入T-03 |
 | [UI055俯视二维容量研究](../../plans/archived/055-age-m3-topdown2d-feasibility-and-capacity.md) | r1研究交付，独立final pass；归档/清理见同号收据 | [canonical结论](../../specs/auto-graphics/topdown2d-feasibility.md)：无地面原型bounded-go；铺地/角色组合no-go，供AG022消费 |
 | [UI058俯视控制/查询/精灵组合](../../plans/058-age-topdown2d-queries-and-sprites.md) | 本批drafting/r1/0-10，无树/实施 | T-01只读准备可先；T-02等055/AG022实际输入及M2必需门真实收口；先证不过或需提预算须replan |
-| [UI059三维方向光/阴影作者链研究](../../plans/059-age-node3d-lighting-and-shadow-feasibility.md) | 本批drafting/r1/0-10，无树/实施 | 024/034/043已交，可独立做有界研究，不等待054/055/AG022/020；正式Light能力另立约 |
+| [UI059三维方向光/阴影作者链研究](../../plans/archived/059-age-node3d-lighting-and-shadow-feasibility.md) | 已交付研究/r1/10-10；bounded-go，独立final pass | Auto动态标量→受检研究桥→GPU已证；正式Light能力另立约，非生产Host/原生输入 |
 | [AG020内容仓更名](../../../../ag-examples/docs/plans/020-age-examples-repository-rename.md) | drafting/r2/0-10，无实现树 | M2所有必需门实际收口后的维护窗口；不是功能门、不是058/059前置 |
 | [AG021混合UI/2D/3D综合应用](../../../../ag-examples/docs/plans/021-age-mixed-ui-2d-3d-application.md) | executing/r2/2-10，原owner已有ag-021唯一树，T-01/02完成记录；工作会话曾标等待/blocked | T-03等054实际交付/独立final/canonical及048/049复用必需面独立核验；保原G-M及M2-01..10/两游戏/22入口47变体 |
 | [AG022国风首切片/three.js盘点](../../../../ag-examples/docs/plans/022-age-m3-farming-slice-and-threejs-inventory.md) | drafting/r1/0-10，无ag-022树或研究结论 | T-01..05可独立准备，T-06等055实际研究交付（含no-go） |

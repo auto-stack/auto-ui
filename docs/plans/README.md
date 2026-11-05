@@ -67,7 +67,7 @@
 | 本仓号 | 计划 | 状态与硬门 |
 |---|---|---|
 | 058 | [俯视二维控制/查询/精灵组合](058-age-topdown2d-queries-and-sprites.md) | drafting/r1/0-10；T-01可准备，T-02等055/AG022实交付及M2必需门齐，原预算最小链先证失败须replan |
-| 059 | [方向光/阴影作者链研究](059-age-node3d-lighting-and-shadow-feasibility.md) | drafting/r1/0-10；024/034/043已交付，可独立研究；不冒正式Light API/three.js覆盖 |
+| 059 | [方向光/阴影作者链研究](archived/059-age-node3d-lighting-and-shadow-feasibility.md) | archived/r1/10-10；研究bounded-go：Auto标量绑定→真GPU；20轮研究Run/Stop及三路恢复；非正式Light API |
 
 主链054→AG021→M2结论；研究055与AG022准备、059可并行；M3二维正式链055→AG022＋M2收口→058→ag-examples/023。020仅M2后维护更名。056/057已由其它UI路线占用，本批独占重核取058/059，counter060；后续重新核现场，不覆盖其合同。
 
