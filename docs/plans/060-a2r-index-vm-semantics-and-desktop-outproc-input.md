@@ -339,3 +339,10 @@ back 侧 `auto-notes-...-back` 是完整 axum/DB 实现。故 iced 桌面上任�
   - client_entry 的 Commands 臂用 `RqProjector` + `client_runtime::run_client_session`；`syslog!` 双写 `eprintln`（syslog.rs:183）——child 诊断只进 stderr。
   - 之前看到的 `[plan060] frame2 …` 来自**桌面进程内的 mini VM**，不是 outproc child；`launch_app(outproc-native)` spawn 的 child stderr 未进入桌面日志 ⇒ "无 child action 日志"不能证明未送达。
   - 下一步：把 outproc-native child 的 stderr 落文件（spawn 侧 pipe→日志文件），再判定 Action 是否被 child 消费；同时用 `SelectDay` 观测高亮变化。
+
+- stage: work | plan_id: auto-ui/PLAN-060 | plan_revision: 1 | round: 24 | task_ids: T-07 | outcome: 决定性定位——child 收到 Action，但 a2r 生成的 Rust 组件未实现 dispatch_named | evidence:
+  - 部署二进制确认含标记（`child endpoint input`/`child action`，02:11:19 重建）。
+  - 运行日志：`[plan060] child endpoint input Discriminant(10)`（= Action 变体）→ 输入**已到达 child 的 HostEndpoint.on_message**，随后 `session.on_input` 分派。
+  - 但无 `[plan060] child action` 日志：child 的 Surface 是 **HeadlessFrameSource**（client_entry 的 Commands 臂之外的装配），且 calendar 是 **rust profile**（a2r 生成组件，非 VM DynamicComponent）——`Component::dispatch_named` 走默认实现返回 false。
+  - 结论：Action 下行协议链路（宿主→child→Surface）已通；缺的是**生成器侧为 a2r 组件生成 dispatch_named**（消息名 → 生成 Msg 变体）。
+  - 下一步：在 `crates/auto-ui-tools/src/rust_ui.rs` 生成 `impl Component { fn dispatch_named(...) }`，把 handler 名映射到生成的消息枚举并派发；再复验 calendar `NextMonth`。
