@@ -278,6 +278,36 @@ mod tests {
         }
     }
 
+    /// 业务状态保持载体（换肤不重置业务——PLAN-055 V-05 载体面语义）。
+    #[derive(Debug)]
+    struct Stateful {
+        elapsed: u64,
+    }
+    impl Component for Stateful {
+        type Msg = DummyMsg;
+        fn on(&mut self, _msg: Self::Msg) {}
+        fn view(&self) -> View<Self::Msg> {
+            View::Empty
+        }
+    }
+
+    #[test]
+    fn carrier_push_preserves_inner_business_state() {
+        let mut c = NativeThemeCarrier::with_package(Stateful { elapsed: 1500 }, pkg())
+            .expect("package");
+        // 推送 + 帧翻 applied——内部业务字段不得被换肤触碰/重置。
+        c.on_theme_policy(&snap(2, "Auto", "0.2.0", "9fa07742dc68aa53", "dark"))
+            .unwrap();
+        let _ = c.view();
+        assert_eq!(c.theme_policy_status().unwrap().0, "applied");
+        assert_eq!(c.inner.elapsed, 1500, "换肤不重置业务状态");
+        // 二次推送（mode 翻转）同样保持。
+        c.on_theme_policy(&snap(3, "Auto", "0.2.0", "9fa07742dc68aa53", "light"))
+            .unwrap();
+        let _ = c.view();
+        assert_eq!(c.inner.elapsed, 1500, "二次换肤仍不重置");
+    }
+
     fn pkg() -> &'static EmbeddedThemePackage {
         // 泄漏静态（测试一次性）——EmbeddedThemePackage 需 'static 引用。
         Box::leak(Box::new(EmbeddedThemePackage {
