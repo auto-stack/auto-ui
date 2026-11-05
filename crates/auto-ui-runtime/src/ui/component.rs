@@ -56,6 +56,12 @@ pub trait Component: Sized + Debug {
     /// PLAN-060 扩展：按名字派发一条组件消息（桌面协议 `InputMsg::Action`
     /// 的 child 侧入口；默认不消费——只有动态组件实现）。
     fn dispatch_named(&mut self, _name: &str, _arg: Option<&str>) -> bool {
+        if std::env::var_os("AUTO_PLAN060_DIAG").is_some() {
+            eprintln!(
+                "[plan060] dispatch_named DEFAULT (not implemented) name={}",
+                _name
+            );
+        }
         false
     }
 
@@ -158,4 +164,5 @@ pub trait Component: Sized + Debug {
         std::collections::HashMap::new()
     }
 }
+
 
