@@ -7830,6 +7830,18 @@ fn __at_upper(v: &serde_json::Value) -> String {
 fn __at_trim(v: &serde_json::Value) -> String {
     v.as_str().unwrap_or_default().trim().to_string()
 }
+// PLAN-060：数组索引的 VM 宽松语义——越界/负索引返回缺省值而不是 panic
+// （VM 轨 `arr[-1]`/`arr[oob]` = undefined；native 轨原发 `arr[i as usize]`
+// 会在负索引回绕成 usize::MAX 时 index out of bounds 崩溃：calendar
+// `dim[(mm - 1) as usize]` 首帧 mm=0 实录）。T: Clone + Default 由调用点
+// 推断；不可 Clone/Default 的元素类型保留原发射（生成文件编译门兜底）。
+#[allow(dead_code)]
+fn __at_idx<T: Clone + Default>(v: &[T], i: i64) -> T {
+    if i < 0 {
+        return T::default();
+    }
+    v.get(i as usize).cloned().unwrap_or_default()
+}
 "#;
 
 /// PLAN-039 T-12（批次 E）：store 文件级自由 fn → Rust 自由 fn。参数/

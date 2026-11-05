@@ -3364,6 +3364,24 @@ pub enum DesktopInject {
     /// 经真实 update 循环（`apply_desktop_injects` 排空点）驱动 = 半真机
     /// 证据口径（OS→iced 事件面由映射单测 + listen_with 既有事实合围）。
     Key(LiveInput),
+    /// PLAN-060：验收通道指针注入——与真实鼠标同一消费臂
+    /// （`broker_pointer_down/up` → owning client 的 PointerPressed/Released）。
+    /// OS 指针在 CI/多窗抢占前台场景不可达；此臂给 iced 桌面上的
+    /// outproc app 一个确定性点击入口（AUTOUI_ACCEPTANCE 门在工具侧）。
+    Pointer {
+        phase: PointerPhase,
+        x: f32,
+        y: f32,
+        button: crate::ui::desktop_protocol::message::MouseButton,
+    },
+}
+
+/// PLAN-060：指针注入相位（click = down + up 同点）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PointerPhase {
+    Down,
+    Up,
+    Click,
 }
 
 static DESKTOP_INJECT_QUEUE: Mutex<Vec<DesktopInject>> = Mutex::new(Vec::new());

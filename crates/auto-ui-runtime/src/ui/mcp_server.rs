@@ -1280,8 +1280,8 @@ fn tool_definitions() -> Vec<serde_json::Value> {
                 "properties": {
                     "action": {
                         "type": "string",
-                        "enum": ["bus", "handler", "key"],
-                        "description": "bus = DesktopBus verb record; handler = privileged app handler call; key = live input routing (PLAN-029)"
+                        "enum": ["bus", "handler", "key", "pointer"],
+                        "description": "bus = DesktopBus verb record; handler = privileged app handler call; key = live input routing (PLAN-029); pointer = acceptance pointer injection (PLAN-060)"
                     },
                     "verb": {
                         "type": "string",
@@ -3107,6 +3107,47 @@ fn tool_desktop(_shared: &SharedStateHandle, args: serde_json::Value) -> serde_j
                 ));
                 text_result(format!("queued live input: {kind}"))
             }
+        }
+        // PLAN-060：验收通道指针注入——与真实鼠标同一消费臂
+        // （broker_pointer_down/up → owning client）。OS 指针在 CI/多窗
+        // 抢占前台场景不可达时的确定性点击入口。
+        "pointer" => {
+            let x = args.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+            let y = args.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+            let phase = match args
+                .get("phase")
+                .and_then(|v| v.as_str())
+                .unwrap_or("click")
+            {
+                "down" => crate::ui::session::PointerPhase::Down,
+                "up" => crate::ui::session::PointerPhase::Up,
+                other => {
+                    if other != "click" {
+                        return error_result(format!(
+                            "Unknown pointer phase: '{other}' (click|down|up)"
+                        ));
+                    }
+                    crate::ui::session::PointerPhase::Click
+                }
+            };
+            let button = match args
+                .get("button")
+                .and_then(|v| v.as_str())
+                .unwrap_or("left")
+            {
+                "right" => crate::ui::desktop_protocol::message::MouseButton::Right,
+                "middle" => crate::ui::desktop_protocol::message::MouseButton::Middle,
+                _ => crate::ui::desktop_protocol::message::MouseButton::Left,
+            };
+            crate::ui::session::desktop_inject_push(
+                crate::ui::session::DesktopInject::Pointer {
+                    phase,
+                    x,
+                    y,
+                    button,
+                },
+            );
+            text_result(format!("queued pointer {phase:?} at ({x},{y})"))
         }
         _ => error_result(format!("Unknown action: '{action}' (bus|handler|key)")),
     }

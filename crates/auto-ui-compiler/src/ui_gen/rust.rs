@@ -16014,6 +16014,21 @@ fn collect_local_elems(
             Expr::Index(target, index) => {
                 let target_str = self.ast_expr_to_rust(target);
                 let index_str = self.ast_expr_to_rust(index);
+                // PLAN-060：VM 宽松语义——越界/负索引返回缺省值，不 panic。
+                // Value 桶目标保持既有链式访问（&[T] 失配面），其余 Vec<T>
+                // 走 __at_idx shim（T 由上下文推断）。
+                if !self.expr_is_value_typed(target) {
+                    let idx_i64 = format!("({}) as i64", index_str);
+                    if let auto_lang_core::ast::Expr::Ident(n) = target.as_ref() {
+                        if self.handler_int_list_vars.borrow().contains(n.as_str()) {
+                            return format!(
+                                "(__at_idx(&({}), {}) as i32)",
+                                target_str, idx_i64
+                            );
+                        }
+                    }
+                    return format!("__at_idx(&({}), {})", target_str, idx_i64);
+                }
                 // Vec<Value> requires usize index — cast non-literal indexes to usize
                 // since handler vars are typically i32 from findIndex or loop counters
                 let index_cast = if index_str.parse::<usize>().is_ok() {

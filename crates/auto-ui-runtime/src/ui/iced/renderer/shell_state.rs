@@ -5942,6 +5942,29 @@ pub(crate) fn apply_desktop_injects(state: &mut crate::ui::session::DesktopSessi
             DesktopInject::Key(input) => {
                 state.route_live_input(&input);
             }
+            // PLAN-060：验收通道指针注入——走真实指针消费臂
+            // （hit_test → wm_focus → owning client PointerPressed/Released）。
+            DesktopInject::Pointer {
+                phase,
+                x,
+                y,
+                button,
+            } => {
+                use crate::ui::session::PointerPhase;
+                match phase {
+                    PointerPhase::Down => {
+                        state.broker_pointer_down(x, y, button);
+                    }
+                    PointerPhase::Up => {
+                        state.broker_pointer_up(x, y, button);
+                    }
+                    PointerPhase::Click => {
+                        if state.broker_pointer_down(x, y, button) {
+                            state.broker_pointer_up(x, y, button);
+                        }
+                    }
+                }
+            }
         }
     }
 }
