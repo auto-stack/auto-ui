@@ -154,6 +154,10 @@ pub struct RustGenerator {
     /// PLAN-052：按引用绑定的循环变量（for/map over .iter() → &T）——
     /// 索引强转/数值 payload 需显式解引用（E0606/E0308 &T 株）。
     ref_loop_vars: std::collections::HashSet<String>,
+    /// PLAN-052：值返回 handler 表（变体名 → (形参名序, 返回型)）——
+    /// 表达式位自消息发送（calendar `.FmtDate(...)` 株）经 `__call_X`
+    /// 型化辅助方法供给真值；on() 臂同委托。
+    value_returning: std::collections::HashMap<String, (Vec<String>, &'static str)>,
     /// PLAN-026 T-03 配套: handler 局部 List<int> 变量(db 层惯例发射
     /// Vec<i64>;元素消费统一窄化 as i32,与 i32 模型字段/字面语境对齐)。
     handler_int_list_vars: std::cell::RefCell<std::collections::HashSet<String>>,
@@ -344,6 +348,7 @@ impl RustGenerator {
             computed_value_rets: std::collections::HashSet::new(),
             value_loop_vars: std::collections::HashSet::new(),
             ref_loop_vars: std::collections::HashSet::new(),
+            value_returning: std::collections::HashMap::new(),
             handler_int_list_vars: std::cell::RefCell::new(std::collections::HashSet::new()),
             value_locals: std::collections::HashSet::new(),
             array_locals: std::collections::HashSet::new(),
@@ -927,6 +932,7 @@ impl RustGenerator {
         self.computed_value_rets.clear();
         self.value_loop_vars.clear();
         self.ref_loop_vars.clear();
+        self.value_returning.clear();
         self.value_locals.clear();
         self.array_locals.clear();
         self.local_record_shapes.clear();
@@ -2286,6 +2292,15 @@ impl RustGenerator {
                     if !body_redundant && !body.trim().is_empty() {
                         code.push_str(&format!("                {}\n", body));
                     }
+                } else if let Some((vr_names, _)) = self.value_returning.get(&variant_name) {
+                    // PLAN-052：值返回 handler 的臂委托 __call_X（unit 上下文，
+                    // 尾部 `;` 收型）。
+                    let call = if vr_names.is_empty() {
+                        format!("self.__call_{}();", variant_name)
+                    } else {
+                        format!("self.__call_{}({});", variant_name, vr_names.join(", "))
+                    };
+                    code.push_str(&format!("                {}\n", call));
                 } else {
                     code.push_str(&format!("                {}\n", body));
                 }
@@ -2536,6 +2551,33 @@ impl RustGenerator {
         }
 
         code.push_str("    }\n");
+
+        // PLAN-052：值返回 handler 的 __call_X 型化辅助方法（on() 臂与
+        // 表达式位调用共用；calendar .FmtDate/.DaysInMonth 株）。
+        for (variant, (names, kind)) in &self.value_returning {
+            let variant_info = self.message_variants.iter().find(|v| v.name == *variant);
+            let types: Vec<String> = variant_info
+                .map(|v| v.payload.iter().map(|t| self.auto_type_to_rust(t)).collect())
+                .unwrap_or_default();
+            let params: Vec<String> = names
+                .iter()
+                .zip(types.iter())
+                .map(|(n, t)| format!("{}: {}", n, t))
+                .collect();
+            let body = widget
+                .handlers
+                .iter()
+                .find(|(p, _)| self.extract_variant_name(p) == *variant)
+                .map(|(_, payload)| self.generate_handler_body(payload))
+                .unwrap_or_default();
+            code.push_str(&format!(
+                "    fn __call_{}(&mut self, {}) -> {} {{\n        {}\n    }}\n\n",
+                variant,
+                params.join(", "),
+                kind,
+                body
+            ));
+        }
 
         code
     }
@@ -13814,6 +13856,15 @@ impl RustGenerator {
                             .any(|v| v.name == method.as_str())
                     {
                         let args_str = self.rust_call_args_with_clone(call).join(", ");
+                        // PLAN-052：值返回 handler 的表达式位调用直发
+                        // __call_X（calendar `.FmtDate(...)` 株；self.on 恒 ()).
+                        if self.value_returning.contains_key(method.as_str()) {
+                            return format!(
+                                "self.__call_{}({})",
+                                method.as_str(),
+                                args_str
+                            );
+                        }
                         let msg = self.current_msg_name();
                         return if args_str.is_empty() {
                             format!("self.on({}::{})", msg, method.as_str())
@@ -14545,13 +14596,92 @@ fn bin_child_needs_parens_side(
 
 impl BackendGenerator for RustGenerator {
     fn generate(&mut self, widget: &AuraWidget) -> GenResult<String> {
+        // PLAN-052：值返回 handler 收集（__call_X 辅助方法与调用点改写
+        // 共用此表）。
+        collect_value_returning(self, widget);
         self.generate_rust(widget)
     }
+
+
 
     fn extension(&self) -> &'static str {
         "rs"
     }
 }
+
+    /// PLAN-052：检出 handler 体含 `return expr`（非 Nil）的变体——
+    /// 返回型按首条 return 表达式推断（Int→i32/Bool→bool/串接→String/
+    /// 默认 String）。
+/// PLAN-052：检出 handler 体含 `return expr`（非 Nil）的变体（自由函数，
+/// 供 generate() 入口收集；自消息发送表达式位供给真值）。
+fn collect_value_returning(gen: &mut RustGenerator, widget: &AuraWidget) {
+    gen.value_returning.clear();
+    for (pattern, payload) in &widget.handlers {
+        let LogicPayload::AstStmts(stmts) = payload else { continue };
+        let Some(kind) = scan_return_kind(stmts) else { continue };
+        let variant_name = gen.extract_variant_name(pattern);
+        let names = gen
+            .message_variants
+            .iter()
+            .find(|v| v.name == variant_name)
+            .map(|v| gen.extract_payload_names(pattern, v))
+            .unwrap_or_default();
+        gen.value_returning.insert(variant_name, (names, kind));
+    }
+}
+
+fn scan_return_kind(stmts: &[auto_lang_core::ast::Stmt]) -> Option<&'static str> {
+        use auto_lang_core::ast::Stmt;
+        for stmt in stmts {
+            match stmt {
+                Stmt::Return(e) if !matches!(e.as_ref(), auto_lang_core::ast::Expr::Nil) => {
+                    return Some(infer_expr_ret_kind(e));
+                }
+                Stmt::If(i) => {
+                    for b in &i.branches {
+                        if let Some(k) = scan_return_kind(&b.body.stmts) {
+                            return Some(k);
+                        }
+                    }
+                    if let Some(eb) = &i.else_ {
+                        if let Some(k) = scan_return_kind(&eb.stmts) {
+                            return Some(k);
+                        }
+                    }
+                }
+                Stmt::Block(b) => {
+                    if let Some(k) = scan_return_kind(&b.stmts) {
+                        return Some(k);
+                    }
+                }
+                Stmt::For(f) => {
+                    if let Some(k) = scan_return_kind(&f.body.stmts) {
+                        return Some(k);
+                    }
+                }
+                _ => {}
+            }
+        }
+        None
+    }
+
+fn infer_expr_ret_kind(e: &auto_lang_core::ast::Expr) -> &'static str {
+        use auto_lang_core::ast::Expr;
+        match e {
+            Expr::Int(_) => "i32",
+            Expr::I64(_) => "i64",
+            Expr::Bool(_) => "bool",
+            Expr::Str(_) | Expr::CStr(_) | Expr::FStr(_) => "String",
+            Expr::Bina(l, op, r) if matches!(op, auto_val::Op::Add) => {
+                let str_side = matches!(l.as_ref(), Expr::Str(_) | Expr::CStr(_) | Expr::FStr(_))
+                    || matches!(r.as_ref(), Expr::Str(_) | Expr::CStr(_) | Expr::FStr(_))
+                    || matches!(l.as_ref(), Expr::Call(_))
+                    || matches!(r.as_ref(), Expr::Call(_));
+                if str_side { "String" } else { "i32" }
+            }
+            _ => "String",
+        }
+    }
 
 impl Default for RustGenerator {
     fn default() -> Self {
