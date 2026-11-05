@@ -211,3 +211,29 @@ fn __at_idx<T: Clone + Default>(v: &[T], i: i64) -> T {
   - 影响：054 T-04 的 8 app 真实任务被此缺陷阻断；060 的输入/索引修复本身正确且已实证。
   - 待用户裁定：是否把「native back API 链接（in-process 合并或 HTTP client）」纳入 060 范围（或另开计划）。
  | next: 等用户裁定（范围扩展）
+
+## 11. 范围扩展（2026-11-05 用户裁定：并入本计划）
+
+**新增根因 R3**：a2r native profile 对 `api: "rust"` 的 app 未生成真实数据层——
+front 生成码里 `list_notes()->Vec::new()`、`create_note()->Note::default()`、
+`update_note_r()->RepoResult::default()`（todo 同型）都是**静默 stub**；而
+back 侧 `auto-notes-...-back` 是完整 axum/DB 实现。故 iced 桌面上任何
+「新建/保存/读取」类用户任务不可能成功（054 T-04 被此阻断）。
+
+**新增任务**（编号续接，原 T-04/T-05 顺延为 T-05/T-06 执行序）：
+
+- T-04（work）：native API 真实链接。T-00 决策二选一：①in-process 链接
+  （back 暴露 lib，front 调 `repository::*`）；②HTTP client（back 以 daemon
+  起，front 按 api.at 生成请求，base URL 走 `<APP>_DAEMON` / pac daemon 声明）。
+  优先②（与 vue 轨同构、与 013 daemon 纪律一致，且不改 back 结构）；①仅在②
+  不可行时启用。生成器落点：`crates/auto-ui-compiler/src/ui_gen/rust.rs`
+  （stub/prototype 发射位 ~2027/2149 起）+ `crates/auto-ui-tools/src/rust_ui.rs`
+  （app 元数据/daemon 注入）+ 需要时 `auto run` 拉起 back 的 launch 协作。
+- T-05（work）：六 app 回归 + os-054 候选桌面实测（notes 建条/按键、todo 建任务、
+  calendar 月视图渲染），证据落 `docs/plans/evidence/060/`。
+- T-06（review/merge）：独立复审、归档、工具链 pin 落地（auto-os/PLAN-054 T-07 消费）。
+
+**新增验收**：
+- AC-07：notes 在 iced 桌面「New note → 输入标题 → 列表出现该条」全链成功。
+- AC-08：todo 在 iced 桌面「点击输入框 → 输入 → Enter → 列表出现任务」成功。
+- AC-09：API 失败面显式（后端不可达时前端报错可见/状态可诊断），不得再静默 stub。
