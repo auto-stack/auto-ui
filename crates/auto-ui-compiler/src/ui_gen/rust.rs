@@ -2036,6 +2036,38 @@ impl RustGenerator {
 
         code.push_str("}\n");
 
+        // PLAN-052：值返回 handler 的 __call_X 型化辅助方法——固有 impl
+        // （trait impl 内不允许额外方法，E0407 株）；on() 臂与表达式位
+        // 调用共用。
+        if !self.value_returning.is_empty() {
+            code.push_str(&format!("impl {} {{\n", widget_name));
+            for (variant, (names, kind)) in &self.value_returning {
+                let variant_info = self.message_variants.iter().find(|v| v.name == *variant);
+                let types: Vec<String> = variant_info
+                    .map(|v| v.payload.iter().map(|t| self.auto_type_to_rust(t)).collect())
+                    .unwrap_or_default();
+                let params: Vec<String> = names
+                    .iter()
+                    .zip(types.iter())
+                    .map(|(n, t)| format!("{}: {}", n, t))
+                    .collect();
+                let body = widget
+                    .handlers
+                    .iter()
+                    .find(|(p, _)| self.extract_variant_name(p) == *variant)
+                    .map(|(_, payload)| self.generate_handler_body(payload))
+                    .unwrap_or_default();
+                code.push_str(&format!(
+                    "    fn __call_{}(&mut self, {}) -> {} {{\n        {}\n    }}\n\n",
+                    variant,
+                    params.join(", "),
+                    kind,
+                    body
+                ));
+            }
+            code.push_str("}\n");
+        }
+
         // Plan 407: ComponentIced is blanket-impl'd in renderer.rs. No explicit
         // impl needed — subscription is built by run_app via tick_msg().
         // The blanket impl provides view_iced() and update().
@@ -2583,7 +2615,6 @@ impl RustGenerator {
 
         code
     }
-
     /// Generate view() method implementation
     fn generate_view_method(&mut self, widget: &AuraWidget) -> String {
         let mut code = String::new();
