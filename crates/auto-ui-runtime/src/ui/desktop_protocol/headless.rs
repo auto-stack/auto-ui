@@ -914,6 +914,15 @@ where
     }
 }
 
+/// PLAN-060 诊断：帧产出计数（env AUTO_PLAN060_DIAG 同路径）。
+#[cfg(debug_assertions)]
+pub(crate) fn plan060_frame_diag(rev: u64) {
+    let Ok(path) = std::env::var("AUTO_PLAN060_DIAG") else { return };
+    use std::io::Write;
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+        let _ = writeln!(f, "FRAME rev={rev}");
+    }
+}
 /// PLAN-060 诊断：输入到 app 侧的坐标/事件/消息产出落文件（env
 /// AUTO_PLAN060_DIAG=路径 时启用；验收排障用，生产缺省零开销一次
 /// env 查找）。
@@ -964,6 +973,7 @@ where
     fn render_frame_v2(&mut self) -> DisplayList {
         let list = self.surface.render_frame_v2();
         self.observations = self.surface.observations().to_vec();
+        plan060_frame_diag(self.rev);
         list
     }
 
@@ -1894,5 +1904,6 @@ mod tests {
         }
     }
 }
+
 
 
