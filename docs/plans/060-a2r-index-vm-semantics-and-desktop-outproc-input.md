@@ -352,3 +352,8 @@ back 侧 `auto-notes-...-back` 是完整 axum/DB 实现。故 iced 桌面上任�
   - 重建 `auto-ui-tool`（02:30:06）后 `auto build -r rust`：生成产物 `main.rs` **仍无 dispatch_named**，重链接后二进制亦无该串。
   - 发现旁路问题：`rust-workspace/Cargo.toml` 的 `auto-web` path 指向 `../../../../auto-web`（os-054 兄弟）而非 ui-060 组树——与 auto-lang-core(ui-060) 的 auto-web-contract 冲突（links 重复）；已临时改写该行绕过（生成器每次 build 会重写，需在生成器侧修正路径）。
   - 下一步：确认 calendar 组件走的是哪个 emitter（是否 `generate_component_impl` 路径、message_variants 是否在发射时已填充）；必要时在同一文件内加诊断打印。
+
+- stage: work | plan_id: auto-ui/PLAN-060 | plan_revision: 1 | round: 28 | task_ids: T-07 | outcome: calendar 重生成成功且含 dispatch_named；child 的 Surface 仍未命中我们的 Action 分支 | evidence:
+  - **关键修复**：`auto build -r rust` 必须统一组树（AUTO_LANG_ROOT/AUTO_UI_ROOT/AUTO_MAN_ROOT 全指 `.wt/os-054/*`），否则 auto-web(兄弟) 与 auto-lang-core(ui-060) 的 auto-web-contract links 双包冲突 → 统一后 `[tool] build rust (Completed)`，生成 `main.rs` 含 `fn dispatch_named`（App: PrevMonth/NextMonth/Today/…；CalendarStore: Init/NextMonth/SelectDay/…）。
+  - 但运行期：`[plan060] child endpoint input Discriminant(10)` 后无 `[plan060] child action`/`child(headless) action` 日志 ⇒ child 的 `endpoint.session` 具体类型不是 RqProjector/HeadlessFrameSource 中我们打过日志的路径（候选：`host.rs:549` 的 Surface 或 broker/demo 变体）。
+  - 下一步：读 `client_entry`/`host.rs` 里实际构造的 Surface，把 Action 分支加进去（或统一到 `Component::dispatch_named` 的单一出口）。
