@@ -523,6 +523,8 @@ Named cleanup hold: owner=Codex PLAN-059 closeout / user filesystem operator; sc
 
 2026-11-06 / stage: goal | plan_id: PLAN-059 | plan_revision: r1 | round: 6 | from: user | to: user | status: archived | outcome: waiting | worktree: removed | commit: ab5a2e64b95206be8bd09be28001cfaffb3ba646 | next: user. 上轮属于实际进展（落主/归档/清树），本轮重新读取§10并核磁盘：plan-059暂存目录仍存在，权威工作树/分支已不存在；未收到清理完成或审批限制变化的答复。同一清理阻碍连续第2个goal turn，未重试已被拒绝的删除、未重复GPU/实现验证。T10仍pending、9/10，goal按host阈值保持active。
 
+2026-11-06 / stage: goal | plan_id: PLAN-059 | plan_revision: r1 | round: 7 | from: user | to: user | status: archived | outcome: blocked | worktree: removed | commit: ab5a2e64b95206be8bd09be28001cfaffb3ba646 | next: user. 前轮分类为no progress（仅重新确认阻碍并记账，无活跃进程可等待）；本轮再次核§10及磁盘，plan-059 scope仍存在，工作树/分支仍已移除，没有外部状态变化或用户清理答复。同一审批清理阻碍连续第3个goal turn，已达host blocked阈值；目标转blocked，停止自动续作。T10/9-of-10与具名hold保留；只待用户清理精确scope或审批条件改变后恢复收口，不重做已通过研究/复审/落地主腿。
+
 ## 10. 待澄清事项
 
 C-059-cleanup：请用户手动清理 `D:/autostack/plan-artifacts/plan-059/`（约18.9GB；只有本计划auto-ui子目录），或修复自动审批对此精确自有路径清理的限制，之后继续本goal。不得清理plan-artifacts根或其它编号目录。工具只报告“blocked by policy”，没有更具体理由。研究交付/独立复审/归档均完成；T10待清理核验。
