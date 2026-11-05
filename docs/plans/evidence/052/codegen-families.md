@@ -24,3 +24,10 @@
 
 - counter（无 store 实体/子组件 msg/Option api）PASS ↔ notes 三族俱全失败：与族表自洽。
 - 不动 app 仓源码；修复只落 auto-ui 生成器；auto-lang 只作 path 依赖消费（Category A 纪律）。
+
+## 执行记录（T-01 进行中）
+
+- **环境事故（2026-11-05）**：D: 盘 100% 满（681G）致 rustc "no space on device"。清理本会话 ui-052 组 target（~18G）后他方并发清理叠加，余量恢复（197G）。教训：清盘前先 du 定位、只清本会话产物。**大象在 main 检出：auto-ui/target 144G、auto-lang/target 75G——疑多为历史陈旧产物，但有在飞会话，未擅动，上报用户处置。**
+- **F4 已修**：rust_ui.rs GET 桩 default_expr 补 `Option<…>→None` 臂。
+- **F2 已修**：`compile_at_file` 增 `api_type_names` 参数；两处 app 编译面由 `parse_api_module(project_dir)` 取 back api.at 型名集合，front TypeDecl 的 Value alias 对同名跳过（shell-pack 面传空集保持原行为）。结构性发现：rust-ui front 生成物是**全 typed** 形态（`Vec<Note>`/`RepoResult.ok/err_code/doc.title` 等完整类型化 repository 协议），api struct 直编是唯一自洽形态——佐证 F2 仲裁方向正确。
+- 待验证：F4+F2 重编 tool 后 notes 重构建量错误族漂移（F1 点访问应随 struct 直编大量消解；F3 子组件 Msg 待看残留）。

@@ -446,6 +446,12 @@ fn regenerate_code_only(project_dir: &Path, rust_dir: &Path, src_: &PacSource) -
     collect_component_prop_orders(&at_files);
     // Plan 371 L1: cross-file component semantics (written props).
     let component_semantics = collect_component_semantics(&at_files);
+    // PLAN-052 F2：api 型名集合（back api.at `pub type` 已由
+    // generate_api_type_structs 直编实体 struct）——front TypeDecl 的
+    // Value alias 对同名跳过，避免双重定义。
+    let api_type_names: std::collections::HashSet<String> = parse_api_module(project_dir)
+        .map(|m| m.types.into_iter().map(|t| t.name).collect())
+        .unwrap_or_default();
 
     let mut all_components = String::new();
     let mut all_api_imports: Vec<String> = Vec::new();
@@ -455,6 +461,8 @@ fn regenerate_code_only(project_dir: &Path, rust_dir: &Path, src_: &PacSource) -
             &all_stores,
             &component_fields,
             &component_semantics,
+            &api_type_names,
+            project_dir,
         ) {
             Ok((code, api_imports)) => {
                 all_components.push_str(&code);
@@ -700,6 +708,10 @@ pub(crate) fn compile_rust_ui_app(
     collect_component_prop_orders(&at_files);
     // Plan 371 L1: cross-file component semantics (written props).
     let component_semantics = collect_component_semantics(&at_files);
+    // PLAN-052 F2：api 型名集合（同 regenerate 面，见该面注释）。
+    let api_type_names: std::collections::HashSet<String> = parse_api_module(project_dir)
+        .map(|m| m.types.into_iter().map(|t| t.name).collect())
+        .unwrap_or_default();
 
     // Compile each .at file and collect generated components
     let mut all_components = String::new();
@@ -713,6 +725,8 @@ pub(crate) fn compile_rust_ui_app(
             &all_stores,
             &component_fields,
             &component_semantics,
+            &api_type_names,
+            project_dir,
         ) {
             Ok((code, api_imports)) => {
                 all_components.push_str(&code);
@@ -834,14 +848,116 @@ fn is_api_use(use_stmt: &auto_lang_core::ast::Use) -> bool {
 
 /// Compile a single .at file to Rust UI code.
 /// Returns (generated_code, api_imports) so callers can deduplicate API stubs.
+/// PLAN-052 F3：pac dep 的 `use <dep>.<mod>: sym` 中 **style 常量**在
+/// 单文件解析面无定义（vue 轨由 dep 编译面内联样式值；rust 轨生成器的
+/// style/class prop 提取只认字符串字面量）——按 use 表从 dep 模块文件
+/// 提取 `pub style <sym> = "<literal>"`，对导入符号做标识符级文本替换为
+/// 带引号字面量（替换后走既有 Str 发射面，生成器零改动）。use 行本身
+/// 保留（解析面容忍）；无 pac/无 dep 文件/无匹配声明时原样返回。
+fn inject_dep_style_constants(code: &str, project_dir: &Path) -> String {
+    let pac_path = project_dir.join("pac.at");
+    if !pac_path.exists() {
+        return code.to_string();
+    }
+    let deps = parse_pac_dep_roots(&pac_path, project_dir);
+    if deps.is_empty() {
+        return code.to_string();
+    }
+    let mut replacements: Vec<(String, String)> = Vec::new();
+    for line in code.lines() {
+        let t = line.trim();
+        if !t.starts_with("use ") {
+            continue;
+        }
+        let Some((path_part, items_part)) = t[4..].split_once(':') else {
+            continue;
+        };
+        let segs: Vec<&str> = path_part.trim().split('.').collect();
+        if segs.len() < 2 {
+            continue;
+        }
+        let Some((dep_name, mod_segs)) = (|| {
+            for (d, _) in &deps {
+                if d == segs[0] {
+                    return Some((d.as_str(), &segs[1..]));
+                }
+            }
+            None
+        })() else {
+            continue;
+        };
+        let _ = dep_name;
+        let rel = mod_segs.iter().collect::<PathBuf>().with_extension("at");
+        let Some((_, root)) = deps.iter().find(|(d, _)| d == segs[0]) else {
+            continue;
+        };
+        let module_file = root.join(&rel);
+        let Ok(module_src) = fs::read_to_string(&module_file) else {
+            continue;
+        };
+        for item in items_part.split(',') {
+            let sym = item.trim().trim_end_matches([';', ',']);
+            if sym.is_empty() || replacements.iter().any(|(s, _)| s == sym) {
+                continue;
+            }
+            for mline in module_src.lines() {
+                let mt = mline.trim();
+                let prefix = format!("pub style {} = ", sym);
+                if let Some(rest) = mt.strip_prefix(&prefix) {
+                    let val = rest.trim().trim_end_matches(';').trim_matches('"');
+                    replacements.push((sym.to_string(), format!("\"{}\"", val)));
+                    break;
+                }
+            }
+        }
+    }
+    if replacements.is_empty() {
+        return code.to_string();
+    }
+    let mut out = code.to_string();
+    for (sym, literal) in replacements {
+        out = replace_identifier(&out, &sym, &literal);
+    }
+    out
+}
+
+/// 标识符级替换：仅当 `name` 前后非 [A-Za-z0-9_] 时替换（防子串误伤）。
+fn replace_identifier(code: &str, name: &str, replacement: &str) -> String {
+    fn is_ident(c: char) -> bool {
+        c.is_ascii_alphanumeric() || c == '_'
+    }
+    let mut out = String::with_capacity(code.len());
+    let mut rest = code;
+    while let Some(pos) = rest.find(name) {
+        let before = rest[..pos].chars().next_back();
+        let after = rest[pos + name.len()..].chars().next();
+        let boundary_before = before.map(|c| !is_ident(c)).unwrap_or(true);
+        let boundary_after = after.map(|c| !is_ident(c)).unwrap_or(true);
+        if boundary_before && boundary_after {
+            out.push_str(&rest[..pos]);
+            out.push_str(replacement);
+            rest = &rest[pos + name.len()..];
+        } else {
+            out.push_str(&rest[..pos + name.len()]);
+            rest = &rest[pos + name.len()..];
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
 fn compile_at_file(
     at_path: &Path,
     stores: &[auto_ui_dialect::ast::StoreDecl],
     component_fields: &std::collections::HashMap<String, Vec<(String, String)>>,
     component_semantics: &std::collections::HashMap<String, ComponentSemantics>,
+    api_type_names: &std::collections::HashSet<String>,
+    project_dir: &Path,
 ) -> AutoResult<(String, Vec<String>)> {
-    let code = fs::read_to_string(at_path)
+    let raw_code = fs::read_to_string(at_path)
         .map_err(|e| format!("Failed to read {}: {}", at_path.display(), e))?;
+    // PLAN-052 F3：dep style 常量注入（见函数头注）。
+    let code = inject_dep_style_constants(&raw_code, project_dir);
 
     // Parse with UI scenario targeting rust backend
     let session = CompilerSession::ui().with_backend("rust");
@@ -954,8 +1070,14 @@ fn compile_at_file(
     // Plan 374: Generate Rust type aliases from Auto type declarations.
     // User-defined types (like Note) are aliased to serde_json::Value since
     // the code generator uses Value-based dynamic field access (["field"]).
+    // PLAN-052 F2：back api.at `pub type` 已由 generate_api_type_structs
+    // 直编为实体 struct（typed store/点访问语义的依赖面）——同名再发
+    // Value alias 会撞 E0428/E0117；api 型名集合内的 TypeDecl 跳过。
     for stmt in ast.core_stmts() {
         if let auto_lang_core::ast::Stmt::TypeDecl(type_decl) = stmt {
+            if api_type_names.contains(type_decl.name.as_str()) {
+                continue;
+            }
             output.push_str(&generate_type_struct(type_decl));
             output.push('\n');
         }
@@ -1991,11 +2113,15 @@ fn generate_merged_api_client(
                 // ——列表面（[]str→Vec<String> 等）此前落 `_` 分支发
                 // `Value::Null`，与签名类型失配、生成物不可编译；补
                 // Vec<…>→Vec::new()（与声明类型臂空态语义同向）。
+                // PLAN-052 F4：`T?`→`Option<T>` 契约（auto_type_to_rust 已
+                // 产 Option<…>）此前同落 `_` 臂发 Null → E0308 expected
+                // Option found Value；补 Option 臂 → None。
                 let default_expr = match ret_ty.as_str() {
                     "String" => "String::new()".to_string(),
                     "bool" => "false".to_string(),
                     "i32" | "i64" | "u32" | "u64" | "f32" | "f64" => "0".to_string(),
                     "()" => String::new(),
+                    _ if ret_ty.starts_with("Option<") => "None".to_string(),
                     _ if ret_ty.starts_with("Vec<") => "Vec::new()".to_string(),
                     _ => "serde_json::Value::Null".to_string(),
                 };
@@ -3821,6 +3947,8 @@ pub fn generate_shell_pack_lib_sources(pack_dir: &Path) -> AutoResult<(String, S
             &all_stores,
             &component_fields,
             &component_semantics,
+            &std::collections::HashSet::new(),
+            pack_dir,
         )?;
         all_components.push_str(&code);
         all_components.push('\n');
