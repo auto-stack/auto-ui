@@ -1655,7 +1655,9 @@ fn merged_absorb(project_dir: &Path, _module: &auto_lang_core::api::ApiModule) -
     )
     .ok()?;
     // db 同款后处理：去掉转译器对结构返回型的 `impl ` 前缀（companion 版不带）。
-    let api_impl_code = auto_api_gen::api_gen::post_process_db_rs(api_impl_rs);
+    // a2r 对 api 接口形态的返回型加 `impl ` 前缀（接口语义）；内嵌实现不需要。
+    let api_impl_code = auto_api_gen::api_gen::post_process_db_rs(api_impl_rs)
+        .replace(" -> impl ", " -> ");
     let api_impl_fns = parse_db_fn_sigs(&api_impl_code);
     modules.push((
         "api_impl".to_string(),
@@ -11592,6 +11594,7 @@ mod plan036_theme_input_tests {
         );
     }
 }
+
 
 
 
