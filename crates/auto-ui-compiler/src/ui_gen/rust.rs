@@ -9932,6 +9932,25 @@ fn collect_local_elems(
                     }
                     if ident_start < ident_end {
                         let var_name = &result[ident_start..ident_end];
+                        // PLAN-052：提取期 ArkTS `this.` 前缀回译成 self. 后，
+                        // `this.c.status` 里的 c 仍是循环变量——整段回收为
+                        // 裸名（self.c.* E0609 的另一来路）。
+                        if var_name == "self" || var_name == "this" {
+                            let mut fend = i + 1;
+                            while fend < bytes.len()
+                                && (bytes[fend].is_ascii_alphanumeric()
+                                    || bytes[fend] == b'_')
+                            {
+                                fend += 1;
+                            }
+                            let field = &result[i + 1..fend];
+                            if self.loop_var_collections.contains_key(field) {
+                                output.truncate(output.len() - var_name.len());
+                                output.push_str(field);
+                                i = fend;
+                                continue;
+                            }
+                        }
                         if self.value_loop_vars.contains(var_name) {
                             // Find the field name after the dot
                             let mut field_end = i + 1;
@@ -10095,6 +10114,23 @@ fn collect_local_elems(
                     }
                     output.push('.');
                 } else {
+                    // PLAN-052：词边界点 `.name` 是态引用形态；若 name 是
+                    // 循环变量（typed 或 Value 格），基座不是态字段——裸名
+                    // 发射（条件位 `if .c.status == …` 恒发 self.c.status
+                    // 的 E0609 族，chat sidebar 64 处）。
+                    let mut ident_end = i + 1;
+                    while ident_end < bytes.len()
+                        && (bytes[ident_end].is_ascii_alphanumeric()
+                            || bytes[ident_end] == b'_')
+                    {
+                        ident_end += 1;
+                    }
+                    let ident = &result[i + 1..ident_end];
+                    if self.loop_var_collections.contains_key(ident) {
+                        output.push_str(ident);
+                        i = ident_end;
+                        continue;
+                    }
                     output.push_str("self.");
                 }
             } else {
@@ -12287,8 +12323,12 @@ fn collect_local_elems(
         match base {
             "Http" | "http" => match method {
                 "post" => {
+                    // PLAN-052：VM 面 body 可为对象字面量（`Http.post(url,
+                    // { token: … })` → ArkTS JSON.stringify 语义），a2r_std
+                    // post_sync 只要 &str——统一串化（Value→JSON 文本，
+                    // String/&str 恒等保形）。
                     return Some(format!(
-                        "::a2r_std::http::post_sync(&({}), &({}), \"\").1",
+                        "::a2r_std::http::post_sync(&({}), &(({}).to_string()), \"\").1",
                         one(0)?,
                         one(1)?
                     ));
@@ -13097,7 +13137,10 @@ fn collect_local_elems(
                 .chars()
                 .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
                 .collect();
-            if self.ref_loop_vars.contains(&root) {
+            // PLAN-052：只对**裸**循环变量解引用——`c.id`/`c["id"]` 是字段
+            // 读（String/Value 投影），`*(c.id)` 不可解引用（chat 比较面
+            // E0308/E0277 株）。
+            if self.ref_loop_vars.contains(&root) && side.trim() == root {
                 format!("(*({}))", side)
             } else {
                 side.to_string()

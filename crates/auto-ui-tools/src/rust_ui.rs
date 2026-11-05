@@ -1115,12 +1115,23 @@ fn compile_at_file(
     for store in stores {
         generator.register_store("store", store.name.as_str());
     }
-    // Check if THIS file contains any StoreDecl — only generate from here.
-    let file_has_store = ast
+    // Check if THIS file contains any StoreDecl — only generate the store(s)
+    // declared here. PLAN-052：此前 file_has_store 为真即发射**全部** stores
+    // ——多 store 文件族（blog 三 store）每份定义按声明文件数重复 N 次
+    // （E0592 duplicate `new` / E0119 conflicting Clone / E0034 multiple
+    // applicable items 共 ~90 错）。Rust 项序无关，单份定义即可。
+    let file_store_names: std::collections::HashSet<String> = ast
         .domain_stmts()
-        .any(|s| matches!(s, auto_ui_dialect::UiStmt::StoreDecl(_)));
-    if file_has_store {
-        for store in stores {
+        .filter_map(|s| match s {
+            auto_ui_dialect::UiStmt::StoreDecl(d) => Some(d.name.to_string()),
+            _ => None,
+        })
+        .collect();
+    if !file_store_names.is_empty() {
+        for store in stores
+            .iter()
+            .filter(|s| file_store_names.contains(s.name.as_str()))
+        {
             let fake_decl = auto_ui_dialect::ast::WidgetDecl {
                 name: store.name.clone(),
                 messages: store.messages.clone(),
