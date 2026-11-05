@@ -3258,6 +3258,27 @@ fn collect_local_elems(
                                 );
                             }
                         }
+                        // PLAN-052：未声明型局部 ← 字符串产生式调用
+                        // （to_string 族）——收 "str" 格：concat 臂的
+                        // __at_str 包装豁免（calendar format_date
+                        // `var ms = mm.to_string()` 被误包 &Value 株）。
+                        if untyped {
+                            if let auto_lang_core::ast::Expr::Call(call) = &store.expr {
+                                if let Some(n) = call.get_name_text_safe() {
+                                    let n = n.as_str();
+                                    if n.ends_with("to_string")
+                                        || n == "format"
+                                        || n.ends_with("trim")
+                                        || n.ends_with("slice")
+                                    {
+                                        self.declared_locals.insert(
+                                            name.trim_start_matches('.').to_string(),
+                                            "str".to_string(),
+                                        );
+                                    }
+                                }
+                            }
+                        }
                         // Check if the value is a function call (likely returns Value).
                         // Plan 547: `names()` is a native `Vec<String>` API result,
                         // so it must retain ordinary Rust field/index syntax.
