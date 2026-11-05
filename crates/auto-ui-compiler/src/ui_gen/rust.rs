@@ -13992,26 +13992,24 @@ fn collect_local_elems(
                             .iter()
                             .any(|v| v.name == method.as_str())
                     {
-                        let args_str = self.rust_call_args_with_clone(call).join(", ");
+                        let args_vec = self.rust_call_args_with_clone(call);
+                        let args_str = args_vec.join(", ");
                         // PLAN-052：值返回 handler 的表达式位调用直发
                         // __call_X（calendar `.FmtDate(...)` 株；self.on 恒 ()).
                         // 参数先提升临时变量——嵌套 __call_ 实参的 &mut self
-                        // 冲突（E0499 双可变借用株）。
+                        // 冲突（E0499 双可变借用株）。注意必须用 AST 实参
+                        // 向量（文本 split 会被嵌套块内的 ", " 切断——
+                        // __vr_a3 株）。
                         if self.value_returning.contains_key(method.as_str()) {
-                            let args: Vec<String> = args_str
-                                .split(", ")
-                                .filter(|a| !a.is_empty())
-                                .map(|a| a.to_string())
-                                .collect();
-                            if args.is_empty() {
+                            if args_vec.is_empty() {
                                 return format!("self.__call_{}()", method.as_str());
                             }
-                            let temps: Vec<String> = args
+                            let temps: Vec<String> = args_vec
                                 .iter()
                                 .enumerate()
                                 .map(|(i, _)| format!("__vr_a{}", i))
                                 .collect();
-                            let binds: Vec<String> = args
+                            let binds: Vec<String> = args_vec
                                 .iter()
                                 .enumerate()
                                 .map(|(i, a)| format!("let {} = {};", temps[i], a))
