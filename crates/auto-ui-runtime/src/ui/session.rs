@@ -5364,6 +5364,7 @@ impl DesktopSession {
                     );
                     let wid = self.wm_add_win(app_id, title, rect);
                     let surface = client.surfaces.alloc(width, height);
+                    eprintln!("[plan060] adopt surface {width}x{height}");
                     client.wid_surface.insert(wid.0, surface);
                     // Plan 500 步骤 5/6：槽尺寸随帧模式定档（Commands = 既有
                     // 16KiB；Pixels = 像素上限——child 侧 pixels_slot_size 同式；
@@ -11103,3 +11104,4 @@ mod live_input_tests {
         assert!(!session.route_live_input(&LiveInput::Chars { text: "y".into() }));
     }
 }
+
