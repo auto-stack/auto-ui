@@ -5951,6 +5951,9 @@ pub(crate) fn apply_desktop_injects(state: &mut crate::ui::session::DesktopSessi
                 button,
             } => {
                 use crate::ui::session::PointerPhase;
+                // PLAN-060 诊断：命中窗与本臂返回（验收通道排障用，稳态保留）。
+                let __hit = state.host.as_ref().and_then(|h| h.wm.hit_test(x, y));
+                eprintln!("[plan060] pointer {:?} ({:.1},{:.1}) hit={:?}", phase, x, y, __hit);
                 match phase {
                     PointerPhase::Down => {
                         state.broker_pointer_down(x, y, button);
@@ -6621,4 +6624,5 @@ pub(super) fn publish_workspace_previews(state: &mut crate::ui::session::Desktop
         wallpaper_src: state.desktop.desktop_wallpaper.clone(),
     });
 }
+
 
