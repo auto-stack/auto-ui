@@ -235,6 +235,18 @@ fn register_api_typed_fns_for(project_dir: &Path) {
         let mut primer = RustGenerator::new();
         primer.register_api_typed_fns(typed_fns);
         primer.register_api_structs(names, fields);
+        // PLAN-052：端点返回型表（typed 槽位 Option 解包/赋值收口）。
+        let ret_types: std::collections::HashMap<String, String> = module
+            .endpoints
+            .iter()
+            .map(|e| {
+                (
+                    e.fn_name.clone(),
+                    auto_type_to_rust(e.return_type.trim()),
+                )
+            })
+            .collect();
+        primer.register_api_fn_ret_types(ret_types);
     }
 }
 

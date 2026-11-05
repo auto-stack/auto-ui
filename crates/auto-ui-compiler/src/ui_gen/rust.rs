@@ -293,6 +293,17 @@ thread_local! {
     pub static CHILD_PROP_TYPES: std::cell::RefCell<
         std::collections::HashMap<String, std::collections::HashMap<String, String>>,
     > = std::cell::RefCell::new(std::collections::HashMap::new());
+    /// PLAN-052：api 端点名 → Rust 返回型（`get_article` →
+    /// `Option<Article>`）——typed 槽位赋值时 Option 解包（`unwrap_or_default`）
+    /// 的查表面。
+    pub static API_FN_RET_TYPES: std::cell::RefCell<
+        std::collections::HashMap<String, String>,
+    > = std::cell::RefCell::new(std::collections::HashMap::new());
+    /// PLAN-052：store 型名 → 声明消息名集——多处 store 调用归属解析
+    /// （`store.SetToken` 在 AuthStore 无变体时回落到声明它的 ArticleStore）。
+    pub static STORE_VARIANTS: std::cell::RefCell<
+        std::collections::HashMap<String, std::collections::HashSet<String>>,
+    > = std::cell::RefCell::new(std::collections::HashMap::new());
     /// PLAN-052：子组件 prop 全型表（组件 → prop → Rust 型串，如
     /// `Vec<Contact>`）——typed prop 收到 Value 桶实参（chat 无类型 store
     /// 字段）时按目标型 `serde_json::from_value` 转换的查表面。
@@ -401,6 +412,150 @@ impl RustGenerator {
         })
     }
 
+    /// PLAN-052：store 是否声明某消息变体。
+    fn store_declares(&self, store: &str, method: &str) -> bool {
+        STORE_VARIANTS.with(|m| {
+            m.borrow()
+                .get(store)
+                .map_or(false, |set| set.contains(method))
+        })
+    }
+
+    /// PLAN-052：为 store 型名确保一个别名字段（已注册则复用；未注册以
+    /// snake_case 别名补注册——`store.SetToken` 归属 ArticleStore 但文件
+    /// 未 use 导入时的按需接线）。
+    pub fn ensure_store_alias(&mut self, store: &str) -> String {
+        let existing = STORE_NAMES.with(|sn| {
+            sn.borrow()
+                .iter()
+                .find(|(_, s)| s.as_str() == store)
+                .map(|(a, _)| a.clone())
+        });
+        if let Some(alias) = existing {
+            return alias;
+        }
+        let alias = store_alias_of(store);
+        self.register_store(&alias, store);
+        alias
+    }
+
+    /// PLAN-052：handler 体内 store 调用的按需别名注册（struct/ctor 生成
+    /// 之前跑——`store.X` 的 owner 在 canonical 无该变体时回落到声明者）。
+    fn pre_register_store_calls(&mut self, widget: &AuraWidget) {
+        let canonical = self.canonical_store_name();
+        let mut owners: Vec<String> = Vec::new();
+        for (_pattern, payload) in &widget.handlers {
+            let stmts = match payload {
+                LogicPayload::AstStmts(s) => s.clone(),
+                _ => continue,
+            };
+            Self::collect_store_call_owners(&stmts, &mut owners);
+        }
+        for owner in owners {
+            let (store, method) = match owner.split_once('.') {
+                Some((s, m)) => (s.to_string(), m.to_string()),
+                None => continue,
+            };
+            if store == "store" {
+                if let Some(canon) = &canonical {
+                    if !self.store_declares(canon, &method) {
+                        let declaring = STORE_VARIANTS.with(|m| {
+                            let m = m.borrow();
+                            let mut names: Vec<String> = m.keys().cloned().collect();
+                            names.sort();
+                            names
+                                .into_iter()
+                                .find(|n| m.get(n).map_or(false, |s| s.contains(&method)))
+                        });
+                        if let Some(d) = declaring {
+                            self.ensure_store_alias(&d);
+                        }
+                    }
+                }
+            } else if STORE_VARIANTS.with(|m| m.borrow().contains_key(store.as_str())) {
+                self.ensure_store_alias(&store);
+            }
+        }
+    }
+
+    /// PLAN-052：递归收集 handler 语句内的 `Dot(Ident, Method)` 调用名
+    /// （`store.X` / `ArticleStore.Y` 形态）。
+    fn collect_store_call_owners(
+        stmts: &[auto_lang_core::ast::Stmt],
+        out: &mut Vec<String>,
+    ) {
+        use auto_lang_core::ast::{Expr, Stmt};
+        fn walk_expr(e: &Expr, out: &mut Vec<String>) {
+            match e {
+                Expr::Call(call) => {
+                    if let Expr::Dot(obj, m) = call.name.as_ref() {
+                        if let Expr::Ident(n) = obj.as_ref() {
+                            let name = n.as_str();
+                            if name == "store"
+                                || STORE_VARIANTS.with(|s| s.borrow().contains_key(name))
+                            {
+                                out.push(format!("{}.{}", name, m.as_str()));
+                            }
+                        }
+                    }
+                    for a in &call.args.args {
+                        walk_expr(&a.get_expr(), out);
+                    }
+                }
+                Expr::Bina(l, _, r) => {
+                    walk_expr(l, out);
+                    walk_expr(r, out);
+                }
+                Expr::Unary(_, i) => walk_expr(i, out),
+                Expr::Index(t, i) => {
+                    walk_expr(t, out);
+                    walk_expr(i, out);
+                }
+                Expr::Dot(inner, _) => walk_expr(inner, out),
+                Expr::Object(pairs) => {
+                    for p in pairs {
+                        walk_expr(&p.value, out);
+                    }
+                }
+                Expr::Array(items) => {
+                    for i in items {
+                        walk_expr(i, out);
+                    }
+                }
+                _ => {}
+            }
+        }
+        for st in stmts {
+            match st {
+                Stmt::Expr(e) => walk_expr(e, out),
+                Stmt::Return(e) => walk_expr(e, out),
+                Stmt::Store(s) => walk_expr(&s.expr, out),
+                Stmt::If(i) => {
+                    for b in &i.branches {
+                        walk_expr(&b.cond, out);
+                        Self::collect_store_call_owners(&b.body.stmts, out);
+                    }
+                    if let Some(e) = &i.else_ {
+                        Self::collect_store_call_owners(&e.stmts, out);
+                    }
+                }
+                Stmt::For(f) => {
+                    walk_expr(&f.range, out);
+                    Self::collect_store_call_owners(&f.body.stmts, out);
+                }
+                Stmt::Try(t) => {
+                    Self::collect_store_call_owners(&t.body.stmts, out);
+                    Self::collect_store_call_owners(&t.catch_body.stmts, out);
+                    if let Some(fb) = &t.finally_body {
+                        Self::collect_store_call_owners(&fb.stmts, out);
+                    }
+                }
+                Stmt::Block(b) => Self::collect_store_call_owners(&b.stmts, out),
+                _ => {}
+            }
+        }
+    }
+
     /// PLAN-052：`.store.<field>` 的承载基座——规范 store 未声明该字段时
     /// 按 STORE_FIELD_TYPES 在其它已注册 store 中定位（多 store 文件族
     /// app.at 的 `.store.me` 归 AuthStore 类）。
@@ -506,6 +661,18 @@ impl RustGenerator {
             m.clear();
             m.extend(fns);
         });
+    }
+
+    /// PLAN-052：注册 api 端点返回型表（名 → Rust 型串）。
+    pub fn register_api_fn_ret_types(&mut self, map: std::collections::HashMap<String, String>) {
+        API_FN_RET_TYPES.with(|m| {
+            *m.borrow_mut() = map;
+        });
+    }
+
+    /// PLAN-052：api 端点返回型查询。
+    fn api_fn_ret_type(&self, name: &str) -> Option<String> {
+        API_FN_RET_TYPES.with(|m| m.borrow().get(name).cloned())
     }
 
     /// PLAN-052：注册 back api.at 实体型名集 + 字段型表（rust_ui.rs
@@ -1550,6 +1717,9 @@ fn collect_local_elems(
         // Pre-scan handlers to find local variables from function calls (likely Value type)
         self.scan_handler_locals(widget);
 
+        // PLAN-052：store 调用归属预扫（struct/ctor 生成前按需补别名）。
+        self.pre_register_store_calls(widget);
+
         // Scan lifecycle handlers (.Init, .Destroy) for local variables and has_init flag
         for lc in &widget.lifecycle {
             if lc.name == "Init" {
@@ -2538,6 +2708,19 @@ fn collect_local_elems(
                 }
                 if is_tick_guarded {
                     code.push_str("                if self.running == \"true\" {\n");
+                }
+
+                // PLAN-052：无载荷变体但 handler 模式声明了形参（blog
+                // `.BodyChanged(v str) -> { .store.BodyEdit(v) }`——msg 块
+                // 漏声明载荷）：按输入文本补绑定，保证体引用可编译
+                //（与 input 事件语义同源：取 last_input_text）。
+                if !has_payload {
+                    for name in self.extract_payload_names(pattern, variant_info.unwrap()) {
+                        code.push_str(&format!(
+                            "                let {} = auto_ui_runtime::ui::iced::last_input_text();\n",
+                            name
+                        ));
+                    }
                 }
 
                 // If this event is from an input, prepend input text parsing
@@ -7757,23 +7940,6 @@ fn collect_local_elems(
                         builder = self.add_event_to_builder(&builder, tag, event, handler);
                     }
 
-                    // Button without onclick — add no-op handler to prevent panic
-                    if tag == "button"
-                        && !events.iter().any(|(e, _)| {
-                            matches!(
-                                e.as_str(),
-                                "onclick"
-                                    | "onClick"
-                                    | "oncontextmenu"
-                                    | "oncontextmenu.prevent"
-                                    | "ondoubleclick"
-                                    | "onDoubleClick"
-                            )
-                        })
-                    {
-                        builder = format!("{}.on_click(|_| ())", builder);
-                    }
-
                     self.wrap_button_double_click(format!("{}.build()", builder), dbl_event)
                 } else if tag == "button" {
                     // Button with children. The View::Button model only has a
@@ -7791,9 +7957,6 @@ fn collect_local_elems(
                     }
                     for (event, handler) in events_sorted.clone() {
                         builder = self.add_event_to_builder(&builder, tag, event, handler);
-                    }
-                    if !events.iter().any(|(e, _)| e == "onclick" || e == "onClick") {
-                        builder = format!("{}.on_click(|_| ())", builder);
                     }
                     self.wrap_button_double_click(format!("{}.build()", builder), dbl_event)
                 } else {
@@ -11512,8 +11675,19 @@ fn collect_local_elems(
         let names = pattern_param_names(pattern);
         if !names.is_empty() {
             // PLAN-052：Rust 关键字形参名转 raw ident（blog `AddAssetRef(
-            // ref, caption)`——`ref` 是关键字，裸绑定 E0308 语法错）。
-            return names.into_iter().map(|n| sanitize_rust_ident(&n)).collect();
+            // ref, caption)`——`ref` 是关键字，裸绑定 E0308 语法错）；
+            // 形参串可能带声明型（`v str`），取首 token 作绑定名。
+            return names
+                .into_iter()
+                .map(|n| {
+                    let first = n
+                        .split_whitespace()
+                        .next()
+                        .unwrap_or(n.as_str())
+                        .to_string();
+                    sanitize_rust_ident(&first)
+                })
+                .collect();
         }
         let from_decl: Vec<String> = variant.payload_names.iter().flatten().cloned().collect();
         if !from_decl.is_empty() {
@@ -12107,6 +12281,23 @@ fn collect_local_elems(
                                 && !value.starts_with('"')
                             {
                                 value = format!("{}.clone()", value);
+                            }
+                            // PLAN-052：typed 槽位 ← Option<T> api 返回
+                            // （blog `self.current_article = get_article(..)`
+                            // 的 Option<Article> E0308）——unwrap_or_default
+                            // 收口（None → Default 结构体）。
+                            if let auto_lang_core::ast::Expr::Call(call) = &store.expr {
+                                if let Some(fname) = call.get_name_text_safe() {
+                                    let ret = self.api_fn_ret_type(fname.as_str());
+                                    let slot = self.state_types.get(resolved).cloned();
+                                    if let (Some(ret), Some(slot)) = (ret, slot) {
+                                        if ret == format!("Option<{}>", slot)
+                                            && !value.contains(".unwrap_or_default()")
+                                        {
+                                            value = format!("{}.unwrap_or_default()", value);
+                                        }
+                                    }
+                                }
                             }
                             // PLAN-052：typed 返回值写入无类型 Value 槽
                             // （blog `self.current_article = get_article(..)`
@@ -13910,6 +14101,8 @@ fn collect_local_elems(
                 }
             }
             Expr::Bool(b) => b.to_string(),
+            // PLAN-052：nil/null 字面量 → Value::Null（blog `x == nil`）。
+            Expr::Nil | Expr::Null => "serde_json::Value::Null".to_string(),
             // PLAN-039 T-13（批次 E，E-D5-A）：用户型构造字面量
             // （`Meta { source_root: "", count_active: 0 }` 解析为
             // Expr::Node——kanban store model 初始式株，此前落 `/* expr */`
@@ -14268,7 +14461,8 @@ fn collect_local_elems(
                 // 判定由内层 id==0 承接，blog `.store.me != nil` 族）。
                 if matches!(op, Op::Eq | Op::Neq) {
                     let is_nil = |e: &auto_lang_core::ast::Expr| {
-                        matches!(e, Expr::Ident(n) if n.as_str() == "nil" || n.as_str() == "null")
+                        matches!(e, Expr::Nil | Expr::Null)
+                            || matches!(e, Expr::Ident(n) if n.as_str() == "nil" || n.as_str() == "null")
                     };
                     let nil_l = is_nil(left);
                     let nil_r = is_nil(right);
@@ -14283,12 +14477,25 @@ fn collect_local_elems(
                                 format!("!({}).is_null()", e)
                             };
                         }
-                        let ty = self.resolve_expr_name(other).and_then(|n| {
-                            self.state_types
-                                .get(&n)
-                                .cloned()
-                                .or_else(|| self.store_field_rust_type(&n))
-                        });
+                        let ty = {
+                            // PLAN-052：字段名直取（`.store.me` 的
+                            // resolve_expr_name 不保证返回末段——Dot 尾段
+                            // 同判；typed 槽位 by name 查表）。
+                            let mut field: Option<String> = self.resolve_expr_name(other);
+                            if field.is_none() {
+                                if let Expr::Dot(_, f) = other {
+                                    field = Some(f.as_str().to_string());
+                                }
+                            }
+                            field
+                                .and_then(|n| {
+                                    let n = n.trim_start_matches('.').to_string();
+                                    self.state_types
+                                        .get(&n)
+                                        .cloned()
+                                        .or_else(|| self.store_field_rust_type(&n))
+                                })
+                        };
                         let typed_non_value = ty
                             .map(|t| {
                                 t != "serde_json::Value"
@@ -14784,6 +14991,33 @@ fn collect_local_elems(
                             value = format!("{}.clone()", value);
                         }
                     }
+                    // PLAN-052：typed 槽位 ← Option<T> api 返回（blog
+                    // `.current_article = get_article(..)` Option<Article>
+                    // E0308）；Value 槽 ← typed 返回按 JSON 收口。
+                    if let (Some(n), Expr::Call(call)) =
+                        (self.resolve_expr_name(left), right.as_ref())
+                    {
+                        if let Some(fname) = call.get_name_text_safe() {
+                            let ret = self.api_fn_ret_type(fname.as_str());
+                            let slot = self.state_types.get(&n).cloned();
+                            if let (Some(ret), Some(slot)) = (ret, slot) {
+                                if ret == format!("Option<{}>", slot)
+                                    && !value.contains(".unwrap_or_default()")
+                                {
+                                    value = format!("{}.unwrap_or_default()", value);
+                                }
+                                if slot == "serde_json::Value"
+                                    && !value.contains("serde_json::to_value")
+                                    && !value.starts_with("serde_json::Value::")
+                                {
+                                    value = format!(
+                                        "serde_json::to_value({}).unwrap_or(serde_json::Value::Null)",
+                                        value
+                                    );
+                                }
+                            }
+                        }
+                    }
                     return format!("{} = {}", target, value);
                 }
                 // Compound assignment: .count += expr → self.count += expr
@@ -15046,21 +15280,43 @@ fn collect_local_elems(
                             .unwrap_or(false)
                     {
                         let args_str = self.rust_call_args_with_clone(call).join(", ");
-                        let store_msg = STORE_NAMES.with(|sn| {
+                        // PLAN-052：owner 归属——canonical 声明该变体则用它；
+                        // 否则按 STORE_VARIANTS 找声明者（blog `store.SetToken`
+                        // → ArticleStore；别名由预扫按需注册）。
+                        let canonical = self.canonical_store_name();
+                        let owner = canonical
+                            .clone()
+                            .filter(|c| self.store_declares(c, method))
+                            .or_else(|| {
+                                STORE_VARIANTS.with(|m| {
+                                    let m = m.borrow();
+                                    let mut names: Vec<String> = m.keys().cloned().collect();
+                                    names.sort();
+                                    names
+                                        .into_iter()
+                                        .find(|n| m.get(n).map_or(false, |s| s.contains(method)))
+                                })
+                            })
+                            .or(canonical.clone())
+                            .unwrap_or_default();
+                        let store_msg = format!("{}Msg", owner);
+                        let alias = STORE_NAMES.with(|sn| {
                             sn.borrow()
-                                .values()
-                                .next()
-                                .cloned()
-                                .map(|name| format!("{}Msg", name))
-                                .unwrap_or_else(|| "StoreMsg".to_string())
+                                .iter()
+                                .find(|(_, s)| s.as_str() == owner)
+                                .map(|(a, _)| a.clone())
+                                .unwrap_or_else(|| "store".to_string())
                         });
                         // Plan 407 R7: when generating a handler INSIDE the store itself,
                         // use self.on(...) instead of self.store.on(...).
-                        let is_in_store = STORE_NAMES.with(|sn| {
-                            let cur = self.current_widget.as_deref();
-                            sn.borrow().values().any(|name| Some(name.as_str()) == cur)
-                        });
-                        let receiver = if is_in_store { "self" } else { "self.store" };
+                        let is_in_store = self.current_widget.as_deref() == Some(owner.as_str());
+                        let receiver = if is_in_store {
+                            "self".to_string()
+                        } else if alias == "store" {
+                            "self.store".to_string()
+                        } else {
+                            format!("self.{}", alias)
+                        };
                         if args_str.is_empty() {
                             return format!("{}.on({}::{})", receiver, store_msg, method);
                         } else {
@@ -15699,6 +15955,37 @@ pub fn register_store_msg_payloads(stores: &[auto_ui_dialect::ast::StoreDecl]) {
             }
         }
     });
+    // PLAN-052：store 型名 → 声明变体集（跨 store 调用归属解析）。
+    STORE_VARIANTS.with(|m| {
+        let mut map = m.borrow_mut();
+        for store in stores {
+            let entry = map
+                .entry(store.name.as_str().to_string())
+                .or_default();
+            for msg in &store.messages {
+                for v in &msg.variants {
+                    entry.insert(v.name.to_string());
+                }
+            }
+        }
+    });
+}
+
+/// PLAN-052：按 store 名推断别名字段名（PascalCase 型名 → snake_case；
+/// 仅用于未 `use` 导入但被调用的 store 的按需注册）。
+fn store_alias_of(store_name: &str) -> String {
+    let mut out = String::new();
+    for (i, ch) in store_name.chars().enumerate() {
+        if ch.is_uppercase() {
+            if i > 0 {
+                out.push('_');
+            }
+            out.extend(ch.to_lowercase());
+        } else {
+            out.push(ch);
+        }
+    }
+    out
 }
 
 /// PLAN-681 T-05：handler 模式参数名序——`.TabActivate(i)` → `["i"]`、
