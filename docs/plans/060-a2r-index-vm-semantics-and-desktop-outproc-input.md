@@ -327,3 +327,9 @@ back 侧 `auto-notes-...-back` 是完整 axum/DB 实现。故 iced 桌面上任�
   - `DynamicComponent::dispatch_named` 改走 `bridge.call_handler(name, args)`（与 `DynamicMessage::String` 同源 root state 绑定）——此前用 `call_handler_for("App", name, 0, …)` 的 state id 0 是错的。
   - calendar 二进制已用新 auto-ui/auto-lang（组树 ui-060）重建并发布；`msg NextMonth` 后窗口存活（协议兼容），但日志无 `[plan060] action`、月份未变 ⇒ 宿主 `Msg` 臂的 broker 转发未命中（疑似 `wm.wins[].app == app_id` 不成立或 owns_wid 不匹配）。
   - 下一步：在宿主 Msg 臂加诊断（app_id/wid/owns），确认为何未转发。
+
+- stage: work | plan_id: auto-ui/PLAN-060 | plan_revision: 1 | round: 22 | task_ids: T-07 | outcome: 宿主发送成功（delivered=true），child 侧未进入 Action 分支 | evidence:
+  - 诊断：`[plan060] action NextMonth sent wid=1 delivered=true` —— 宿主已把 `InputMsg::Action` 写入 broker 传输。
+  - 但 child 侧无 `[plan060] child action …` 日志（该日志位于 `RqProjector::on_input` 的 Action 分支）⇒ child 的输入泵未把 Action 投到该 Surface，或该 app 的 Surface 不是 RqProjector 路径。
+  - 已确认部署的 calendar.exe 含新标记（`child action` 字符串在二进制内、时间 02:00:40）。
+  - 下一步：查 child 侧 Input 消息路由（client_entry/shell_client 的 face→surface 分发表），把 Action 归入与 pointer/key 同一投递面。
