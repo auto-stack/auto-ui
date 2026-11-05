@@ -2,11 +2,9 @@
 
 基于 Auto 语言的跨平台 UI 框架
 
-阅读器跨仓探针：[auto-ui/PLAN-026](docs/plans/archived/026-reader-engine-embedding-and-locator-probe.md)已交付归档（r1、流程10/10）。[报告](docs/research/reader-engine-probe.md)记录Vue指定样本全链30/30；原生独立iced宿主嵌入/引擎/IPC已证，真实输入回传、IME/无障碍等仍有GAP，不能据归档称双端全门通过。下一阶段先收口原生输入链与必要接缝，再做完整EPUB产品化；本仓主导宿主，[AutoReader](https://github.com/auto-stack/auto-reader/blob/main/README.md)负责消费与数据验证。
+阅读器跨仓探针：[PLAN-026](docs/plans/archived/026-reader-engine-embedding-and-locator-probe.md)及[报告](docs/research/reader-engine-probe.md)保留指定样本实验结论与局限；后继[PLAN-029](docs/plans/archived/029-reader-native-input-and-surface-closure.md)已有T-10独立review pass及landing 65bb455f，Reader007 T-00已核实消费。029归档正文头部execution_done/10/12仍有历史元数据滞后，不用计数替代实际交付证据。
 
-后续正式计划：[auto-ui/PLAN-029 原生输入链与必要接缝收口](docs/plans/029-reader-native-input-and-surface-closure.md)（本次核查executing、9/12，最终交付待核）。真实原生VM消费、独立复审与所有必需门均需通过，不能以GAP/有条件完成替代。Reader只留消费指针，不重复取号。
-
-Reader正式产品化后继草案为 [READER-007](https://github.com/auto-stack/auto-reader/blob/main/docs/plans/007-epub-product-reader-and-locator-compatibility.md)（drafting/r1、0/13，主导仓auto-reader）。029所有必需门、独立review与固定版本交付是硬前置；本地029仍executing、9/12时仅可起草，不在此仓重复取号或提前声称产品化已放行。
+[READER-007](https://github.com/auto-stack/auto-reader/blob/main/docs/plans/archive/007-epub-product-reader-and-locator-compatibility.md)已交付正式EPUB与定位兼容，原生工具及部分直接UI证据边界仍按其复审记录保留。下一产品计划为[READER-008：Readest主界面与书库日用能力对齐](https://github.com/auto-stack/auto-reader/blob/main/docs/plans/008-readest-workspace-and-library-parity.md)（drafting/r1、0/12，2026-11-05）：auto-reader主导产品UI/书库/数据与双端验收；本仓仅提供已交付宿主/输入/表面能力。多文件选择/授权、布局或工具能力若不足，Reader T-00/01先核实并明确实际owner最小前置，不在本仓重复登记008，不在此轮实施框架改动。
 
 ## 项目概述
 
