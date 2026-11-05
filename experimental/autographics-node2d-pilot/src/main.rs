@@ -362,6 +362,7 @@ fn main() {
                 Some("components-2d-runtime") => Profile::Components2DRuntime,
                 Some("node-ui") => Profile::NodeUi,
                 Some("mixed-ui-2d-3d") => Profile::MixedUi2d3d,
+                Some("node-ui-mixed-regions") => Profile::MixedRegions,
                 _ => usage(),
             }
         }
@@ -393,7 +394,7 @@ fn main() {
     // dialect 载入（view 内嵌入区域；node 级双出口守卫不放宽）。
     let project = if matches!(
         profile,
-        Profile::Queries3D | Profile::EditorProjects | Profile::MixedUi2d3d
+        Profile::Queries3D | Profile::EditorProjects | Profile::MixedUi2d3d | Profile::MixedRegions
     ) {
         autographics_node2d_pilot::Project::default()
     } else {
@@ -1640,6 +1641,95 @@ fn main() {
             println!(
                 "node2d-lower[mixed-ui-2d-3d]: wrote ui.json (schema {}) + world.at ({} bytes, sha {}) + closure/{}",
                 autographics_node2d_pilot::NODE_UI_MIXED_SCHEMA,
+                lowered.source_bytes,
+                lowered.world_sha256,
+                names.len()
+            );
+        }
+        Profile::MixedRegions => {
+            // PLAN-054 组件/实例活区域：ui.json（node-ui-mixed-regions/2）+
+            // world.at（与 048/049 字节同面）+ identity.json + closure/。
+            // 混合 dialect 载入（view 内嵌入区域放行到任意 def；node 级
+            // 双出口守卫不放宽；v1 身份/诊断逐字不变）。
+            let project =
+                autographics_node2d_pilot::load_project_mixed(std::path::Path::new(entry))
+                    .unwrap_or_else(|e| {
+                        eprintln!("node2d-lower: {e:?}");
+                        std::process::exit(2);
+                    });
+            let lowered =
+                autographics_node2d_pilot::lower_project_node_mixed_regions(&project)
+                    .unwrap_or_else(|e| {
+                        eprintln!("node2d-lower: {e}");
+                        std::process::exit(3);
+                    });
+            std::fs::write(format!("{out}/world.at"), &lowered.user_source).expect("world.at");
+            std::fs::write(format!("{out}/ui.json"), &lowered.ui_json).expect("ui.json");
+            let mut names: Vec<_> = project.modules.keys().collect();
+            names.sort();
+            let mut modules = String::new();
+            let mut closure = String::new();
+            for name in &names {
+                let bytes = project.modules[*name].source.as_bytes();
+                modules.push_str(&format!(
+                    "  \"module:{}\": \"{}\",\n",
+                    name,
+                    autographics_node2d_pilot::scene::sha256_hex(bytes)
+                ));
+                closure.push_str(&format!(
+                    "  {{\"name\": \"{name}\", \"sha256\": \"{}\", \"bytes\": {}}},\n",
+                    autographics_node2d_pilot::scene::sha256_hex(bytes),
+                    bytes.len()
+                ));
+            }
+            let mut identity = String::from("{\n");
+            identity.push_str(&format!(
+                " \"generator\": \"{}\",\n",
+                autographics_node2d_pilot::NODE_UI_MIXED_REGIONS_GENERATOR
+            ));
+            identity.push_str(" \"api\": \"autographics.node-ui-mixed-regions/2\",\n");
+            identity.push_str(&format!(
+                " \"user_source_sha256\": \"{}\",\n \"user_source_bytes\": {},\n \"ui_schema\": \"{}\",\n",
+                lowered.world_sha256,
+                lowered.source_bytes,
+                autographics_node2d_pilot::NODE_UI_MIXED_REGIONS_SCHEMA
+            ));
+            identity.push_str(&modules);
+            identity.push_str(" \"closure\": [\n");
+            identity.push_str(closure.trim_end_matches(",\n"));
+            identity.push_str("\n ],\n");
+            identity.push_str(" \"provenance\": {\n");
+            let product = std::path::Path::new(out)
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("unrecorded")
+                .to_string();
+            let consumer = match product.as_str() {
+                "ui-dash-regions" => {
+                    "experimental/autographics-auto-driver/tests/node_mixed_regions_*.rs (PLAN-054 owner evidence)"
+                }
+                _ => "unrecorded (this out dir has no registered flow consumer)",
+            };
+            identity.push_str(&format!("  \"product\": \"{product}\",\n"));
+            identity.push_str(&format!("  \"consumer\": \"{consumer}\",\n"));
+            identity.push_str(
+                "  \"consumption\": \"ui.json regions in ANY def drive per-instance child surfaces (Game2d/Scene3d) mounted Flat2d into the UI view with identity {run generation, instance path, region local name, mount epoch}; active regions app-total <= 4; conditional unmount revokes portal+surface (last-owner release) and rejects queued region events by epoch; scene bindings read the SAME int getter ABI; region clicks dispatch through the shared _ui_click_ ABI with the instance index; one Session owner, one app_start/app_update per explicit step\",\n",
+            );
+            identity.push_str(&format!(
+                "  \"world_sha256\": \"{}\"\n",
+                lowered.world_sha256
+            ));
+            identity.push_str(" }\n}\n");
+            std::fs::write(format!("{out}/identity.json"), identity).expect("identity.json");
+            let closure_dir = format!("{out}/closure");
+            std::fs::create_dir_all(&closure_dir).expect("closure dir");
+            for name in &names {
+                let bytes = project.modules[*name].source.as_bytes();
+                std::fs::write(format!("{closure_dir}/{name}.at"), bytes).expect("closure file");
+            }
+            println!(
+                "node2d-lower[node-ui-mixed-regions]: wrote ui.json (schema {}) + world.at ({} bytes, sha {}) + closure/{}",
+                autographics_node2d_pilot::NODE_UI_MIXED_REGIONS_SCHEMA,
                 lowered.source_bytes,
                 lowered.world_sha256,
                 names.len()

@@ -1,0 +1,260 @@
+{
+  "schema": "autographics.node-ui-mixed-regions/2",
+  "generator": "autographics-node2d-pilot plan054 node-ui-mixed-regions",
+  "world_sha256": "422b1a5491d374c1ea1d5856a462da4a7e9f67f2a6f50dd75b93888197410a4a",
+  "root": "Dash",
+  "instances": [
+    {
+      "path": "Dash/p1",
+      "node": "Gauge",
+      "def_idx": 0
+    },
+    {
+      "path": "Dash/p2",
+      "node": "Gauge",
+      "def_idx": 1
+    },
+    {
+      "path": "Dash/m3",
+      "node": "Meter",
+      "def_idx": 0
+    },
+    {
+      "path": "Dash/p3",
+      "node": "Gauge",
+      "def_idx": 2
+    }
+  ],
+  "defs": {
+    "Dash": {
+      "prefix": "dash",
+      "is_root": true,
+      "texts": 3,
+      "elements": [
+        {
+          "kind": "Container",
+          "name": "root",
+          "container": "column",
+          "props": [
+            {
+              "name": "spacing",
+              "kind": "lit_num",
+              "v": 8.0
+            },
+            {
+              "name": "padding",
+              "kind": "lit_num",
+              "v": 12.0
+            }
+          ],
+          "children": [
+            {
+              "kind": "Text",
+              "name": "count_text",
+              "slot": 0,
+              "text": {
+                "kind": "int_field",
+                "name": "count"
+              }
+            },
+            {
+              "kind": "Container",
+              "name": "actions",
+              "container": "row",
+              "children": [
+                {
+                  "kind": "Button",
+                  "name": "bump",
+                  "slot": 1,
+                  "text": {
+                    "kind": "lit_str",
+                    "v": "bump"
+                  },
+                  "click": {
+                    "fn": "dash_ui_click_bump",
+                    "arg": "none"
+                  }
+                },
+                {
+                  "kind": "Button",
+                  "name": "toggle",
+                  "slot": 2,
+                  "text": {
+                    "kind": "lit_str",
+                    "v": "toggle"
+                  },
+                  "click": {
+                    "fn": "dash_ui_click_toggle",
+                    "arg": "none"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "If",
+              "cond": {
+                "kind": "field",
+                "name": "show"
+              },
+              "then": [
+                {
+                  "kind": "Instance",
+                  "name": "p1",
+                  "node": "Gauge"
+                },
+                {
+                  "kind": "Instance",
+                  "name": "p2",
+                  "node": "Gauge"
+                }
+              ]
+            },
+            {
+              "kind": "Instance",
+              "name": "m3",
+              "node": "Meter"
+            },
+            {
+              "kind": "Container",
+              "name": "strip_row",
+              "container": "row",
+              "children": [
+                {
+                  "kind": "Embed",
+                  "name": "strip",
+                  "dim": "2d",
+                  "width": 120,
+                  "height": 48,
+                  "click": {
+                    "fn": "dash_ui_click_strip",
+                    "arg": "none"
+                  },
+                  "scene": [
+                    {
+                      "kind": "quad",
+                      "name": "slug",
+                      "x": {
+                        "kind": "field",
+                        "field": "strip_x"
+                      },
+                      "y": {
+                        "kind": "lit_num",
+                        "v": 12.0
+                      },
+                      "w": {
+                        "kind": "lit_num",
+                        "v": 16.0
+                      },
+                      "h": {
+                        "kind": "lit_num",
+                        "v": 16.0
+                      },
+                      "color": [
+                        40,
+                        90,
+                        200
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "kind": "Instance",
+              "name": "p3",
+              "node": "Gauge"
+            }
+          ]
+        }
+      ]
+    },
+    "Gauge": {
+      "prefix": "gauge",
+      "is_root": false,
+      "texts": 0,
+      "elements": [
+        {
+          "kind": "Embed",
+          "name": "arc",
+          "dim": "2d",
+          "width": 96,
+          "height": 64,
+          "click": {
+            "fn": "gauge_ui_click_arc",
+            "arg": "index"
+          },
+          "scene": [
+            {
+              "kind": "quad",
+              "name": "dot",
+              "x": {
+                "kind": "field",
+                "field": "x"
+              },
+              "y": {
+                "kind": "lit_num",
+                "v": 20.0
+              },
+              "w": {
+                "kind": "lit_num",
+                "v": 24.0
+              },
+              "h": {
+                "kind": "lit_num",
+                "v": 24.0
+              },
+              "color": [
+                200,
+                40,
+                40
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "Meter": {
+      "prefix": "meter",
+      "is_root": false,
+      "texts": 0,
+      "elements": [
+        {
+          "kind": "Embed",
+          "name": "dial",
+          "dim": "3d",
+          "width": 80,
+          "height": 80,
+          "click": {
+            "fn": "meter_ui_click_dial",
+            "arg": "index"
+          },
+          "scene": [
+            {
+              "kind": "cylinder",
+              "name": "rod",
+              "translation": [
+                {
+                  "kind": "field",
+                  "field": "tx"
+                },
+                {
+                  "kind": "lit_num",
+                  "v": 0.0
+                },
+                {
+                  "kind": "lit_num",
+                  "v": 0.0
+                }
+              ],
+              "color": [
+                90,
+                200,
+                90
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

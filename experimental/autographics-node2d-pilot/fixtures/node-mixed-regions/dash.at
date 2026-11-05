@@ -1,0 +1,64 @@
+// PLAN-054 probe fixture root: `Dash` (non-default root name — no Main/
+// reg2/reg3 anywhere in the app) declares the component instances. The two
+// same-def `Gauge` instances and the root-owned `strip` region sit under
+// real layout: gauges inside `if .show` (conditional mount/unmount surface).
+use gauge: Gauge
+use meter: Meter
+
+node Dash {
+    model {
+        var count = 0
+        var show = 1
+        var strip_x = 0
+    }
+    msg {
+        Bump
+        StripHit
+        Toggle
+    }
+    view {
+        column root {
+            spacing: 8
+            padding: 12
+            text count_text { text: .count }
+            row actions {
+                button bump { text: "bump", onclick: .Bump }
+                button toggle { text: "toggle", onclick: .Toggle }
+            }
+            if .show {
+                Gauge p1 {
+                }
+                Gauge p2 {
+                }
+            }
+            Meter m3 {
+            }
+            row strip_row {
+                view-2d strip {
+                    width: 120
+                    height: 48
+                    onclick: .StripHit
+                    shape2d slug { kind: quad, x: .strip_x, y: 12, w: 16, h: 16, color: (40, 90, 200) }
+                }
+            }
+            Gauge p3 {
+            }
+        }
+    }
+    on {
+        Life.Start -> {
+            .count = 0
+        }
+        .Bump -> {
+            .count = .count + 1
+            .strip_x = .strip_x + 10
+        }
+        .StripHit -> {
+            .count = .count + 100
+        }
+        .Toggle -> {
+            .show = 1 - .show
+        }
+    }
+}
+fn main() {}

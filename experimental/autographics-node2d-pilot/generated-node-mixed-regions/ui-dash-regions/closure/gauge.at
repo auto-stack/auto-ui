@@ -1,0 +1,30 @@
+// PLAN-054 probe fixture component: `Gauge` is an ordinary component (plain
+// use instantiation) whose view holds a view-2d `arc` REGION inside the
+// component def itself — per-instance state (SoA), per-instance region
+// identity. Life.Tick advances per explicit step (no business in Rust).
+node Gauge {
+    model {
+        var x = 0
+        var hits = 0
+    }
+    msg {
+        Ping
+    }
+    view {
+        view-2d arc {
+            width: 96
+            height: 64
+            onclick: .Ping
+            shape2d dot { kind: quad, x: .x, y: 20, w: 24, h: 24, color: (200, 40, 40) }
+        }
+    }
+    on {
+        .Ping -> {
+            .x = .x + 12
+            .hits = .hits + 1
+        }
+        Life.Tick -> {
+            .x = .x + 4
+        }
+    }
+}

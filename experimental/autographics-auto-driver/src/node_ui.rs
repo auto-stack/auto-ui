@@ -282,6 +282,17 @@ pub struct QueuedEvent {
     pub arg: Option<usize>,
     /// 溯源（诊断/测试证据用）：instance#element。
     pub origin: String,
+    /// PLAN-054 区域事件声明（None = 非区域事件，仅 Run 代次检查）。携带
+    /// 入队时的区域身份与挂载代次；派发时经 host 注册表对账——区域已
+    /// 卸载或代次不同（卸载后重挂）则具名拒绝，不得派发进新代次。
+    pub region: Option<RegionClaim>,
+}
+
+/// PLAN-054 区域事件身份（`{实例路径}#{区域局部名}` ＋ 入队时挂载代次）。
+#[derive(Debug, Clone, PartialEq)]
+pub struct RegionClaim {
+    pub key: String,
+    pub epoch: u64,
 }
 
 /// 派发报告（可观察记账）。
@@ -633,6 +644,9 @@ pub struct NodeUiApp {
     pub callbacks: u64,
     /// 记账：队列满被具名丢弃的事件数。
     pub dropped_overflow: usize,
+    /// PLAN-054 区域挂载代次注册表（host 注入；None = 无区域事件面）。
+    /// 键 `{实例路径}#{区域局部名}` → 当前挂载代次；None = 区域当前未挂载。
+    region_epochs: Option<std::rc::Rc<std::cell::RefCell<std::collections::HashMap<String, u64>>>>,
     /// 键盘焦点环（可见且可用的按钮，树序）。
     focus_ring: Vec<FocusEntry>,
     focus_index: usize,
@@ -688,6 +702,7 @@ impl NodeUiApp {
             error: None,
             callbacks: 0,
             dropped_overflow: 0,
+            region_epochs: None,
             focus_ring: Vec::new(),
             focus_index: 0,
             started: false,
@@ -783,6 +798,18 @@ impl NodeUiApp {
         arg: Option<usize>,
         origin: String,
     ) -> bool {
+        self.enqueue_click_claimed(dispatch, arg, origin, None)
+    }
+
+    /// 入队一次控件事件（可携带区域身份声明；队列语义与 [`Self::enqueue_click`]
+    /// 完全同一有界面）。`claim` 的对账在 drain 派发前进行。
+    pub fn enqueue_click_claimed(
+        &mut self,
+        dispatch: String,
+        arg: Option<usize>,
+        origin: String,
+        claim: Option<RegionClaim>,
+    ) -> bool {
         if self.queue.len() >= QUEUE_CAP {
             self.dropped_overflow += 1;
             return false;
@@ -793,12 +820,21 @@ impl NodeUiApp {
             dispatch,
             arg,
             origin,
+            region: claim,
         });
-        let _ = instance;
         true
     }
 
-    /// 按稳定次序派发队列；陈旧（旧 Run 代次）具名拒绝。
+    /// 注入区域挂载代次注册表（PLAN-054 host 面；v1 路径不调用＝行为不变）。
+    pub fn set_region_epochs(
+        &mut self,
+        epochs: std::rc::Rc<std::cell::RefCell<std::collections::HashMap<String, u64>>>,
+    ) {
+        self.region_epochs = Some(epochs);
+    }
+
+    /// 按稳定次序派发队列；陈旧（旧 Run 代次；或区域已卸载/挂载代次不同）
+    /// 具名拒绝。
     pub fn drain(&mut self) -> DrainReport {
         let mut report = DrainReport::default();
         let generation = self.generation;
@@ -806,6 +842,18 @@ impl NodeUiApp {
             if ev.generation != generation {
                 report.stale_rejected += 1;
                 continue;
+            }
+            if let Some(claim) = &ev.region {
+                let current = self
+                    .region_epochs
+                    .as_ref()
+                    .and_then(|r| r.borrow().get(&claim.key).copied());
+                if current != Some(claim.epoch) {
+                    // 区域未挂载（注册表无此键）或已卸载重挂（代次不同）：
+                    // 旧区域事件不得派发进新代次/新呈现。
+                    report.stale_rejected += 1;
+                    continue;
+                }
             }
             let args: Vec<Scalar> = ev.arg.iter().map(|i| Scalar::Int(*i as i32)).collect();
             match self.call_unit(&ev.dispatch, &args) {
@@ -982,6 +1030,11 @@ impl NodeUiApp {
     /// 实例行下标（root=0；按路径）。
     pub fn instance_index(&self, path: &str) -> Option<usize> {
         self.rows.iter().position(|r| r.path == path)
+    }
+
+    /// 实例行表（root 在 0；PLAN-054 区域目录构建面）。
+    pub fn rows(&self) -> &[InstanceRow] {
+        &self.rows
     }
 
     pub fn instance_path(&self, index: usize) -> &str {

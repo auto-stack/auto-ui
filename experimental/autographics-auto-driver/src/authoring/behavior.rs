@@ -82,11 +82,15 @@ pub const COMPONENTS3_API: &str = include_str!("../../api/public_composition3d_v
 pub const NODE_UI_VERSION: &str = "autographics.node-ui/1";
 /// PLAN-049 混合组合档（消费身份冻结；装配与 NodeUi 同一最小面）。
 pub const NODE_UI_MIXED_VERSION: &str = "autographics.node-ui-mixed/1";
+/// PLAN-054 组件/实例活区域档（消费身份冻结；与 v1 严格隔离的显式新版本：
+/// v1 消费入口拒收本 schema，本档入口拒收 v1）。
+pub const NODE_UI_MIXED_REGIONS_VERSION: &str = "autographics.node-ui-mixed-regions/2";
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Api {
     V1,
     NodeUi,
     MixedUi2d3d,
+    MixedRegions2,
     SpatialV2,
     SegmentV3,
     SweepV4,
@@ -115,6 +119,7 @@ impl Api {
             VERSION => Ok(Self::V1),
             NODE_UI_VERSION => Ok(Self::NodeUi),
             NODE_UI_MIXED_VERSION => Ok(Self::MixedUi2d3d),
+            NODE_UI_MIXED_REGIONS_VERSION => Ok(Self::MixedRegions2),
             VERSION2 => Ok(Self::SpatialV2),
             VERSION5 => Ok(Self::MotionV5),
             VERSION4 => Ok(Self::SweepV4),
@@ -166,6 +171,7 @@ impl Api {
             Self::Components3V1 => COMPONENTS3_VERSION,
             Self::NodeUi => NODE_UI_VERSION,
             Self::MixedUi2d3d => NODE_UI_MIXED_VERSION,
+            Self::MixedRegions2 => NODE_UI_MIXED_REGIONS_VERSION,
         }
     }
     pub fn number(self) -> i32 {
@@ -194,6 +200,7 @@ impl Api {
             Self::Components3V1 => 117,
             Self::NodeUi => 118,
             Self::MixedUi2d3d => 119,
+            Self::MixedRegions2 => 120,
         }
     }
     pub fn profile(self) -> i32 {
@@ -201,6 +208,7 @@ impl Api {
             Self::V1 => 7,
             Self::NodeUi => 25,
             Self::MixedUi2d3d => 26,
+            Self::MixedRegions2 => 29,
             Self::SpatialV2 => 8,
             Self::SegmentV3 => 9,
             Self::SweepV4 => 10,
@@ -357,6 +365,7 @@ impl Api {
             Self::Components3V1 => "components3d",
             Self::NodeUi => "node-ui",
             Self::MixedUi2d3d => "mixed-ui-2d-3d",
+            Self::MixedRegions2 => "node-ui-mixed-regions",
         }
     }
     /// Parse one `--behavior-api` value; an unknown name is a usage error.

@@ -53,6 +53,12 @@ pub const TEXT_SLOTS_PER_BUFFER: usize = 2;
 pub const NODE_UI_MIXED_SCHEMA: &str = "autographics.node-ui-mixed/1";
 /// PLAN-049 生成器身份（identity/产物头冻结）。
 pub const NODE_UI_MIXED_GENERATOR: &str = "autographics-node2d-pilot plan049 node-ui-mixed";
+/// PLAN-054 产物 schema 身份（组件/实例活区域＋条件挂卸；与 v1 严格隔离——
+/// v1 消费入口对新 schema 具名拒绝，v2 入口拒 v1）。
+pub const NODE_UI_MIXED_REGIONS_SCHEMA: &str = "autographics.node-ui-mixed-regions/2";
+/// PLAN-054 生成器身份（identity/产物头冻结）。
+pub const NODE_UI_MIXED_REGIONS_GENERATOR: &str =
+    "autographics-node2d-pilot plan054 node-ui-mixed-regions";
 /// 每 def 嵌入区域上限（T-02 冻结首切片）。
 pub const MAX_REGIONS_PER_DEF: usize = 4;
 /// 每区域场景元素上限（沿容器子元素 8 同界；T-02 冻结）。
@@ -276,6 +282,9 @@ struct DefPlan {
     name: String,
     prefix: String,
     is_root: bool,
+    /// PLAN-054 v2 档：非 root def 允许声明嵌入区域（实例挂载身份由
+    /// 消费侧按实例路径装配）。v1（048/049）恒 false——诊断逐字不变。
+    regions_v2: bool,
     module: String,
     node: auto_ui_dialect::node2d::NodeDecl,
     fields: Vec<FieldPlan>,
@@ -715,7 +724,7 @@ fn lower_embed_region(
             ),
         ));
     }
-    if !plan.is_root {
+    if !plan.is_root && !plan.regions_v2 {
         return Err(err_at(
             module,
             (0, 0),
@@ -791,6 +800,8 @@ fn lower_embed_region(
         def_name: &str,
         region: &str,
     ) -> Result<(), String> {
+        // 检查在 push 之前：`>=` 恰好放行 8 个（canonical「每区域 ≤8」）、
+        // 第 9 个具名拒绝——T-03 门曾疑 off-by-one，门实测证伪后原样保留。
         if len >= MAX_SCENE_ELEMS_PER_REGION {
             return Err(err_at(
                 module,
@@ -1936,7 +1947,11 @@ struct PipelineOut {
 /// 共享降层管线：基础 UI 工程 → world.at（048/049 字节同面；区域点击
 /// 走同一 `_ui_click_` 派发器 ABI）。`mix=false` 即 PLAN-048 路径——
 /// 区域解析头具名拒绝，全部产物字节不变。
-fn lower_node_ui_pipeline(project: &Project, mix: bool) -> Result<PipelineOut, String> {
+fn lower_node_ui_pipeline(
+    project: &Project,
+    mix: bool,
+    regions_v2: bool,
+) -> Result<PipelineOut, String> {
     let root_name = project.root.clone();
     // ---- def 计划 ----
     let mut plans: BTreeMap<String, DefPlan> = BTreeMap::new();
@@ -2019,6 +2034,7 @@ fn lower_node_ui_pipeline(project: &Project, mix: bool) -> Result<PipelineOut, S
                     name: name.clone(),
                     prefix: name.to_lowercase(),
                     is_root,
+                    regions_v2,
                     module: module_name,
                     node: node.clone(),
                     fields,
@@ -2413,7 +2429,7 @@ fn lower_node_ui_pipeline(project: &Project, mix: bool) -> Result<PipelineOut, S
 
 /// 主降层入口（PLAN-048）：基础 UI 工程 → world.at ＋ ui.json。
 pub fn lower_project_node_ui(project: &Project) -> Result<LowerOutputNodeUi, String> {
-    let out = lower_node_ui_pipeline(project, false)?;
+    let out = lower_node_ui_pipeline(project, false, false)?;
     let source_sha256 = out.world_sha256.clone();
     let defs_json: BTreeMap<String, ArtifactDef> = out
         .def_plans
@@ -2450,7 +2466,7 @@ pub fn lower_project_node_ui(project: &Project) -> Result<LowerOutputNodeUi, Str
 /// 主降层入口（PLAN-049 mixed-ui-2d-3d）：同一管线，产物为混合 schema
 /// （def 内嵌 regions；世界源与 048 字节同面——区域点击派发器同一 ABI）。
 pub fn lower_project_node_mixed(project: &Project) -> Result<LowerOutputNodeMixed, String> {
-    let out = lower_node_ui_pipeline(project, true)?;
+    let out = lower_node_ui_pipeline(project, true, false)?;
     let defs_json: BTreeMap<String, ArtifactDef> = out
         .def_plans
         .into_iter()
@@ -2469,6 +2485,46 @@ pub fn lower_project_node_mixed(project: &Project) -> Result<LowerOutputNodeMixe
     let artifact = UiArtifact {
         schema: NODE_UI_MIXED_SCHEMA,
         generator: NODE_UI_MIXED_GENERATOR,
+        world_sha256: out.world_sha256.clone(),
+        root: out.root,
+        instances: out.instances,
+        defs: defs_json,
+    };
+    let ui_json = serde_json::to_string_pretty(&artifact).expect("ui.json");
+    Ok(LowerOutputNodeMixed {
+        source_bytes: out.source_bytes,
+        user_source: out.user_source,
+        world_sha256: out.world_sha256,
+        ui_json,
+    })
+}
+
+/// 主降层入口（PLAN-054 node-ui-mixed-regions）：同一管线，区域声明放行到
+/// 任意 def（组件/实例活区域；实例挂载身份＝实例路径）。世界源与 048/049
+/// 字节同面（区域点击派发器、场景 getter、文字缓冲全部同一 ABI）；v1
+/// schema/generator 常量与诊断逐字不变。
+pub fn lower_project_node_mixed_regions(
+    project: &Project,
+) -> Result<LowerOutputNodeMixed, String> {
+    let out = lower_node_ui_pipeline(project, true, true)?;
+    let defs_json: BTreeMap<String, ArtifactDef> = out
+        .def_plans
+        .into_iter()
+        .map(|(name, (prefix, is_root, texts, elements))| {
+            (
+                name,
+                ArtifactDef {
+                    prefix,
+                    is_root,
+                    texts,
+                    elements,
+                },
+            )
+        })
+        .collect();
+    let artifact = UiArtifact {
+        schema: NODE_UI_MIXED_REGIONS_SCHEMA,
+        generator: NODE_UI_MIXED_REGIONS_GENERATOR,
         world_sha256: out.world_sha256.clone(),
         root: out.root,
         instances: out.instances,

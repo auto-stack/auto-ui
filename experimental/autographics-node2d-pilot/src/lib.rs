@@ -106,6 +106,11 @@ pub enum Profile {
     /// world.at（与 048 字节同面；区域点击同一派发器 ABI）。048 全部
     /// 拒绝与产物身份保持，不扩大 039 的有限 marker 档。
     MixedUi2d3d,
+    /// PLAN-054 组件/实例活区域：区域声明放行到任意 def（普通 use 组件内
+    /// 具名区域可实例化）→ ui.json（autographics.node-ui-mixed-regions/2）+
+    /// world.at（与 048/049 字节同面）。v1 schema/generator 与诊断逐字
+    /// 不变；条件挂卸/代次在消费侧（driver v2 host）。
+    MixedRegions,
 }
 
 pub use load::{load_project, load_project_dual, load_project_mixed, Project, ProjectError};
@@ -133,8 +138,10 @@ pub use lower_node3d_presentation::{
     PresentationMeta3,
 };
 pub use lower_node_ui::{
-    lower_project_node_mixed, lower_project_node_ui, LowerOutputNodeMixed, LowerOutputNodeUi,
-    NODE_UI_GENERATOR, NODE_UI_MIXED_GENERATOR, NODE_UI_MIXED_SCHEMA, NODE_UI_SCHEMA,
+    lower_project_node_mixed, lower_project_node_mixed_regions, lower_project_node_ui,
+    LowerOutputNodeMixed, LowerOutputNodeUi, NODE_UI_GENERATOR, NODE_UI_MIXED_GENERATOR,
+    NODE_UI_MIXED_REGIONS_GENERATOR, NODE_UI_MIXED_REGIONS_SCHEMA, NODE_UI_MIXED_SCHEMA,
+    NODE_UI_SCHEMA,
 };
 pub use lower_presentation::{lower_project_presentation, LowerOutputPresentation};
 pub use lower_queries3d::{

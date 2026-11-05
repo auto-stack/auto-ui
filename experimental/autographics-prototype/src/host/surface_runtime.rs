@@ -734,6 +734,19 @@ impl SurfaceRuntime {
             })
     }
 
+    /// PLAN-054：移除一个 view（其 surface 的门户须已清；最后 owner 释放
+    /// 链 remove_portal → remove_view → drop_surface 的中环）。
+    pub fn remove_view(&mut self, view: ViewId) -> Result<(), CompositionError> {
+        self.graph
+            .submit_one(CompositionChange::RemoveView(view))
+            .map(|_| ())
+            .map_err(|e| {
+                e.into_iter()
+                    .next()
+                    .unwrap_or(CompositionError::UnknownView(view))
+            })
+    }
+
     /// PLAN-049：更新挂载几何（真实 UI layout 驱动；图侧 `SetMount` 同一
     /// 原子校验/脏传播——受影响消费链在下一帧重采样，输出不滞留旧 rect）。
     pub fn set_portal_mount(

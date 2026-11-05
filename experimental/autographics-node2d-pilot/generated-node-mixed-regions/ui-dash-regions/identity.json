@@ -1,0 +1,21 @@
+{
+ "generator": "autographics-node2d-pilot plan054 node-ui-mixed-regions",
+ "api": "autographics.node-ui-mixed-regions/2",
+ "user_source_sha256": "422b1a5491d374c1ea1d5856a462da4a7e9f67f2a6f50dd75b93888197410a4a",
+ "user_source_bytes": 7110,
+ "ui_schema": "autographics.node-ui-mixed-regions/2",
+  "module:dash": "1e4ba3fcad7e666f8c90ee8fdf4b47ff6491bc9bff45c51c10b887ca05b00426",
+  "module:gauge": "3f19e736a7d0915ae2ff200ba582d2570d4384996f84cee3463b0bbd994c32e7",
+  "module:meter": "18a87063762622bf25f97adc10f982a5b418fa9005883f2b68f839f1852dd78c",
+ "closure": [
+  {"name": "dash", "sha256": "1e4ba3fcad7e666f8c90ee8fdf4b47ff6491bc9bff45c51c10b887ca05b00426", "bytes": 1616},
+  {"name": "gauge", "sha256": "3f19e736a7d0915ae2ff200ba582d2570d4384996f84cee3463b0bbd994c32e7", "bytes": 764},
+  {"name": "meter", "sha256": "18a87063762622bf25f97adc10f982a5b418fa9005883f2b68f839f1852dd78c", "bytes": 638}
+ ],
+ "provenance": {
+  "product": "ui-dash-regions",
+  "consumer": "experimental/autographics-auto-driver/tests/node_mixed_regions_*.rs (PLAN-054 owner evidence)",
+  "consumption": "ui.json regions in ANY def drive per-instance child surfaces (Game2d/Scene3d) mounted Flat2d into the UI view with identity {run generation, instance path, region local name, mount epoch}; active regions app-total <= 4; conditional unmount revokes portal+surface (last-owner release) and rejects queued region events by epoch; scene bindings read the SAME int getter ABI; region clicks dispatch through the shared _ui_click_ ABI with the instance index; one Session owner, one app_start/app_update per explicit step",
+  "world_sha256": "422b1a5491d374c1ea1d5856a462da4a7e9f67f2a6f50dd75b93888197410a4a"
+ }
+}

@@ -1,0 +1,27 @@
+// PLAN-054 probe fixture component: `Meter` is a cross-dimension component —
+// its view holds a view-3d `dial` region (cylinder3d) inside the component
+// def. Region click `.Tap` and Life.Tick both move the rod on the x axis.
+node Meter {
+    model {
+        var tx = 0
+    }
+    msg {
+        Tap
+    }
+    view {
+        view-3d dial {
+            width: 80
+            height: 80
+            onclick: .Tap
+            cylinder3d rod { translation: (.tx, 0, 0), color: (90, 200, 90) }
+        }
+    }
+    on {
+        .Tap -> {
+            .tx = .tx + 2
+        }
+        Life.Tick -> {
+            .tx = .tx + 1
+        }
+    }
+}
