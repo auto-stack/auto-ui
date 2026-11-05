@@ -267,3 +267,9 @@ back 侧 `auto-notes-...-back` 是完整 axum/DB 实现。故 iced 桌面上任�
   - 帧侧正常：每字符 `FRAME rev` 前进（rev 4→8），说明组件在更新；问题在 iced text_input 的事件形态（`KeyPressed{key:Character, text:Some}` 未被接受插入）或 headless 事件通道细节。
   - 备注：notes 窗口 surface 480x320，窗口底部 y≈336 之外点击不命中（验收坐标需约束在 surface 内）；桌面窗被最小化时 screenshot 报 zero-size，需先 `ShowWindow(SW_RESTORE)`。
  | next: T-05 续（text_input 插入事件形态定位：对照 iced 0.14 text_input on_event 的 KeyPressed/InputMethod 分支）
+
+- stage: work | plan_id: auto-ui/PLAN-060 | plan_revision: 1 | round: 9 | task_ids: T-05 | outcome: 根因定位（输入文本载荷空） | evidence:
+  - 生成视图层：`.on_change(EditorPanelMsg::EditBody("".to_string()))`——`View::input/textarea` 的 `on_change(msg: M)` 只接收**固定消息值**，文本不入消息；投影层（`renderer/projection.rs:1352`）在 on_input 里写 `INPUT_TEXT` thread-local（`last_input_text()` 读面），供生成 `on()` 读取。
+  - 但 notes 的 `EditorPanelMsg::EditBody(v) => self.store.on(NotesStoreMsg::EditBody(v.clone()))` 用的是载荷 v（恒空串），没有走 `last_input_text()` → 落字恒空。
+  - 修正方向：生成器对「绑定输入的 String 载荷变体」在 `on()` 分支注入 `let v = last_input_text();`（或把该变体载荷变量改写为该读面），使 handler 体拿到真实文本；与 PLAN-052/025 既有的 last_input_text 契约一致。
+ | next: T-05 生成器修正 + 复测键入
