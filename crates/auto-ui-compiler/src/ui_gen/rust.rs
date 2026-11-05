@@ -4882,6 +4882,8 @@ fn collect_local_elems(
                 if self.ast_expr_is_string(e) || r.contains("format!(") || r.contains(".to_string()")
                 {
                     Some(r)
+                } else if self.expr_is_value_typed(e) {
+                    Some(format!("__at_str(&({}))", r))
                 } else {
                     Some(format!("({}).to_string()", r))
                 }
@@ -4926,7 +4928,8 @@ fn collect_local_elems(
             // convert_element:1214 族——table 容器/分区 → col（VM 同款
             // border 基类只挂 table 本体）。
             "table" => "border rounded w-full text-sm".to_string(),
-            "thead" | "tbody" | "tfoot" | "table-header" | "table-body" | "table-footer" => {
+            "thead" | "tbody" | "tfoot" | "table-header" | "table-body" | "table-footer"
+            | "tr" | "table-row" => {
                 String::new()
             }
             // 1247 族——单元格 preset（head 语义含 th/table-head）。
@@ -4955,9 +4958,15 @@ fn collect_local_elems(
         };
         let mut builder = format!("{}.style({}.as_str())", base_fn, style_expr);
         if matches!(tag, "tr" | "table-row") {
-            // 行：children 直挂（VM 无 text-prop 形态）。
-            for cv in child_views(self) {
-                builder = format!("{}.child({})", builder, cv);
+            // A direct loop supplies sibling cells, just as in an ordinary
+            // row. Keeping the loop's column wrapper stacks the cells.
+            for child in children {
+                if matches!(child, AuraNode::ForLoop { .. }) {
+                    let cells = self.generate_for_loop_cells(child);
+                    builder = format!("{}.children({}.collect::<Vec<_>>())", builder, cells);
+                } else {
+                    builder = format!("{}.child({})", builder, self.generate_view_tree(child));
+                }
             }
         } else {
             let mut views = child_views(self);
@@ -17200,6 +17209,37 @@ widget App {
     fn test_rust_generator_creation() {
         let gen = RustGenerator::new();
         assert!(gen.current_widget.is_none());
+    }
+
+    #[test]
+    fn p060_table_row_spreads_cells_and_displays_json_string_values() {
+        let src = r#"widget Cells {
+            model { var rows List = [{ vals: ["中文", "54.25"] }] }
+            view {
+                table {
+                    table-body {
+                        for row in .rows {
+                            table-row {
+                                for cell in row.vals {
+                                    table-cell(text: cell) {}
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }"#;
+        let ast = crate::parse_ui(src).expect("parse table fixture");
+        let decl = ast.domain_stmts().find_map(|s| match s {
+            auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d), _ => None,
+        }).unwrap();
+        let widget = crate::aura::extract::extract_widget_from_decl(decl).unwrap();
+        let code = RustGenerator::new().generate(&widget).unwrap();
+        assert!(code.contains(".children(row[\"vals\"].as_array()"),
+            "table cells must be siblings in the row, not one vertical loop wrapper: {code}");
+        assert!(!code.contains(".child(View::col().children(row[\"vals\"]"));
+        assert!(code.contains("__at_str(&(cell))"),
+            "JSON-backed text cells must display the string value, not JSON quotation marks: {code}");
     }
 
     #[test]
