@@ -1749,6 +1749,13 @@ pub enum InputMsg {
     ImeCancelled {
         wid: u64,
     },
+    /// PLAN-060 扩展：组件消息下行（broker/adopt 应用的 handler 派发——
+    /// 与 in-process `component.on(DynamicMessage::String)` 同语义）。
+    Action {
+        wid: u64,
+        name: String,
+        arg: Option<String>,
+    },
 }
 
 impl InputMsg {
@@ -1763,7 +1770,8 @@ impl InputMsg {
             | Self::Scroll { wid, .. }
             | Self::ImePreedit { wid, .. }
             | Self::ImeCommit { wid, .. }
-            | Self::ImeCancelled { wid } => *wid,
+            | Self::ImeCancelled { wid }
+            | Self::Action { wid, .. } => *wid,
         }
     }
 
@@ -1861,6 +1869,18 @@ impl InputMsg {
                 put_u8(out, 10);
                 put_u64(out, *wid);
             }
+            Self::Action { wid, name, arg } => {
+                put_u8(out, 11);
+                put_u64(out, *wid);
+                put_string(out, name);
+                match arg {
+                    Some(a) => {
+                        put_bool(out, true);
+                        put_string(out, a);
+                    }
+                    None => put_bool(out, false),
+                }
+            }
         }
     }
 
@@ -1949,6 +1969,16 @@ impl InputMsg {
                 Self::ImeCommit { wid, text }
             }
             10 => Self::ImeCancelled { wid: r.u64()? },
+            11 => {
+                let wid = r.u64()?;
+                let name = r.string()?;
+                let arg = if r.bool()? {
+                    Some(r.string()?)
+                } else {
+                    None
+                };
+                Self::Action { wid, name, arg }
+            }
             tag => return Err(CodecError::UnknownTag(tag)),
         })
     }
@@ -3723,3 +3753,5 @@ mod tests {
         assert_eq!(DisplayList::decode(&mut r).unwrap(), lifted);
     }
 }
+
+
