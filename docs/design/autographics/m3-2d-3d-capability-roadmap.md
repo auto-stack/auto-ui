@@ -52,10 +52,12 @@ AGE底层仍wgpu；复现图形/交互能力不自动承诺three.js JavaScript/W
 
 现有M2实验profile与原预算/SDK锁不改。更大地图/对象与复杂3D必然需要先验证容量：每个M3切片应先固定代表性规模/合法最坏轨迹、CPU Tick/加载/生成/绘制分别计量、实际对象/资产owner与内存/帧时、边界反例及恢复；新资源域/费用或上限变化另有显式profile/兼容合同，不把8状态Node/128行/32credits永远当生产语言规则，也不静默抬额、停掉模块或用Rust业务凑绿。旧VM/编译成本是否满足目标必须先证；依赖不足时具名调度/重规划，不假定ACE已替换来掩盖瓶颈。
 
-首轮已立[UI055俯视二维与容量研究](../../plans/055-age-m3-topdown2d-feasibility-and-capacity.md)和[AG022国风切片/three.js全目录盘点](../../../../ag-examples/docs/plans/022-age-m3-farming-slice-and-threejs-inventory.md)，详见[本批设计](m2-closure-and-m3-first-wave.md)。055最多两机制/三规模，给真实Auto链go/bounded-go/no-go；022 T-01..05可并行固定目录/素材/目标源码合同，T-06容量与后继建议消费055实际结论。它们是研究/规划输入，不等于游戏、效果、完整能力或全目录覆盖交付；后续能力包按证据另取号。M2公共接线缺口归054→AG021，不用M3研究代验收。
+首轮已立[UI055俯视二维与容量研究](../../plans/archived/055-age-m3-topdown2d-feasibility-and-capacity.md)和[AG022国风切片/three.js全目录盘点](../../../../ag-examples/docs/plans/022-age-m3-farming-slice-and-threejs-inventory.md)，详见[本批设计](m2-closure-and-m3-first-wave.md)。055最多两机制/三规模，给真实Auto链go/bounded-go/no-go；022 T-01..05可并行固定目录/素材/目标源码合同，T-06容量与后继建议消费055实际结论。它们是研究/规划输入，不等于游戏、效果、完整能力或全目录覆盖交付；后续能力包按证据另取号。M2公共接线缺口归054→AG021，不用M3研究代验收。
 
 ## 5. 阶段完成与当前范围
 
 M3完成需后续明确冻结的2D/2DHD可玩切片、复杂3D能力批次、正常Auto作者与公开运行/资源发行、实际交互/画面与容量性能正反例、独立复审/来源与兼容证据齐；完整商业国风游戏与three.js全目录的最终覆盖不能从本方向文档自动推断完成。覆盖/缺口表持续保留，尚未冻结的条目不是获准删除，必需分母未证不充pass。
 
 旧M3 AutoUI融合路线由本次决议顺延M4，Schema/ACE进入门与001起UI Demo兼容路径全部保留。M2当前计划/验收、019历史交付、020既定M2后维护窗口与计划身份不变；020不因M4等待自动再推迟到M4，也不成为M3/M4引擎能力的前置。本轮已分仓规划055/AG022研究合同及计数，均drafting/r1/0-10；没有工作树/材料scope/构建/GPU/素材/实施/迁移/发布。
+
+2026-11-05 UI055交付更新：本页055链接已指向同号研究归档；[当前可行性与容量结论](../../specs/auto-graphics/topdown2d-feasibility.md)给出通用无地面原型 bounded-go、完整铺地图元/角色同回调交互 no-go，以及数组编码与原预算边界。055的规划状态已由实际研究收据替代；AG022/058及M2依赖仍按各自合同和实交付判断，不将研究当完整产品能力。

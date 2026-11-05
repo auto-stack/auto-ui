@@ -36,7 +36,7 @@ AG016/017/018/019均已合并，不接管/重开。019交付原合同候选不�
 
 UI043模型模板/UI044源码诊断已交付（044 delivery 9bf9874a），实际支持/来源/预算依各归档和canonical；旧AG016/019不自动升级锁。这两份不再计未完成，041/042与在途052/053属于其它UI路线，不接管或复用其号。
 
-新[UI055](../../plans/055-age-m3-topdown2d-feasibility-and-capacity.md)固定已交付源研究俯视移动/交互/场景链与容量；[AG022](../../../../ag-examples/docs/plans/022-age-m3-farming-slice-and-threejs-inventory.md)整理国风首切片/素材及固定three.js全目录差距。研究准备可与054/AG021并行，022 T-06等055实际结果；go/bounded-go/no-go均须真实证据，不把研究归档当产品能力。共享源只读，材料/target独占，GPU/原生焦点错峰。
+新[UI055](../../plans/archived/055-age-m3-topdown2d-feasibility-and-capacity.md)固定已交付源研究俯视移动/交互/场景链与容量；[AG022](../../../../ag-examples/docs/plans/022-age-m3-farming-slice-and-threejs-inventory.md)整理国风首切片/素材及固定three.js全目录差距。研究准备可与054/AG021并行，022 T-06等055实际结果；go/bounded-go/no-go均须真实证据，不把研究归档当产品能力。共享源只读，材料/target独占，GPU/原生焦点错峰。
 
 ## 4. G04不是简单的单维重写
 
@@ -76,3 +76,5 @@ AG021原owner已记T-01/02准备完成、executing/r2/2-10，T-03完整接线等
 - [M4融合路线](m4-autoui-integration-roadmap.md)：保留Schema方言成熟且旧Auto编译器替换实际启动的前置，届时统一接入AutoUI/AGE并从examples/ui/001按能力依赖推进全部UI Demo原行为兼容。
 
 M3不因ACE正式集成等待而停在原地；055/AG022研究准备可先行，正式产品能力依阶段和具体合同核M2收口/真实前置。M2本轮只新增054和修订AG021 r2，不回改048/049或019归档/原分母。020仍在M2收口后维护窗口，不等M4。当前仅规划三份新合同，未建树/运行/实现/发布。
+
+2026-11-05 UI055交付更新：本页055链接已指向同号研究归档；[当前可行性与容量结论](../../specs/auto-graphics/topdown2d-feasibility.md)给出通用无地面原型 bounded-go、完整铺地图元/角色同回调交互 no-go，以及数组编码与原预算边界。055的规划状态已由实际研究收据替代；AG022/058及M2依赖仍按各自合同和实交付判断，不将研究当完整产品能力。

@@ -9,7 +9,7 @@
 | 合同 | 实际状态/证据 | 下一步与硬前置 |
 |---|---|---|
 | [UI054混合区域组件/寿命](../../plans/054-age-mixed-regions-components-and-lifecycle.md) | 实施中、未交付；唯一ui-054树/branch，已有1f3be333实现提交；主头部drafting/current_step与执行记录不一致，T-01/02有实录；不代owner改状态 | 原owner继续后续接线/原生与预算门、独立final/冻结/merge；其交付前AG021不能进入T-03 |
-| [UI055俯视二维容量研究](../../plans/055-age-m3-topdown2d-feasibility-and-capacity.md) | drafting/r1/0-10，未见注册ui-055树/研究交付 | 可独立启动固定源研究；含no-go的真实结论供AG022消费 |
+| [UI055俯视二维容量研究](../../plans/archived/055-age-m3-topdown2d-feasibility-and-capacity.md) | r1研究交付，独立final pass；归档/清理见同号收据 | [canonical结论](../../specs/auto-graphics/topdown2d-feasibility.md)：无地面原型bounded-go；铺地/角色组合no-go，供AG022消费 |
 | [UI058俯视控制/查询/精灵组合](../../plans/058-age-topdown2d-queries-and-sprites.md) | 本批drafting/r1/0-10，无树/实施 | T-01只读准备可先；T-02等055/AG022实际输入及M2必需门真实收口；先证不过或需提预算须replan |
 | [UI059三维方向光/阴影作者链研究](../../plans/059-age-node3d-lighting-and-shadow-feasibility.md) | 本批drafting/r1/0-10，无树/实施 | 024/034/043已交，可独立做有界研究，不等待054/055/AG022/020；正式Light能力另立约 |
 | [AG020内容仓更名](../../../../ag-examples/docs/plans/020-age-examples-repository-rename.md) | drafting/r2/0-10，无实现树 | M2所有必需门实际收口后的维护窗口；不是功能门、不是058/059前置 |
@@ -93,3 +93,5 @@ UI056/057为同时取号的其它AutoUI路线（多文件reload/schema与Vue Sto
 048/049和旧部分计划已交付不等所有独立证据债自动消除；完整M2仍未认领。现有静态核查/归档读取不替代新Plan work/review的真实运行。状态可能随其它会话继续变化；本表为本轮证据快照，最新合同与实际树/提交高于日期旧文字。未修改任何在途合同/归档/canonical/SDK/生成物/实现树，不创建agent。
 
 统计校正：本轮最终逐项检查补入UI008（交付0261ae9为主HEAD祖先），故总数为34个UI AGE身份＋23个内容身份＝57，49交付/8未完。不能只按文件名含autographics/age过滤整条路线；UI008归档/提交/历史身份不改。
+
+2026-11-05 UI055交付更新：本页055链接已指向同号研究归档；[当前可行性与容量结论](../../specs/auto-graphics/topdown2d-feasibility.md)给出通用无地面原型 bounded-go、完整铺地图元/角色同回调交互 no-go，以及数组编码与原预算边界。055的规划状态已由实际研究收据替代；AG022/058及M2依赖仍按各自合同和实交付判断，不将研究当完整产品能力。
