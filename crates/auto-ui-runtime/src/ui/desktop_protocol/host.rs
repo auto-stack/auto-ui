@@ -103,6 +103,11 @@ impl SurfaceStore {
         Some(freed)
     }
 
+    /// PLAN-060 扩展：表面尺寸（指针坐标投影换算用）。
+    pub fn size(&self, surface: u64) -> Option<(f32, f32)> {
+        self.surfaces.get(&surface).map(|s| (s.width, s.height))
+    }
+
     /// 虚拟窗当前合成面（live-iced 渲染器 Stage 2 的取用点）。
     pub fn front(&self, surface: u64) -> Option<&DrawList> {
         self.surfaces.get(&surface)?.slots[self.surfaces[&surface].front as usize].as_ref()
@@ -758,3 +763,4 @@ mod tests {
         assert_eq!(host.observe_inbox.len(), 1);
     }
 }
+

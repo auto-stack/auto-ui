@@ -283,6 +283,31 @@ pub(crate) struct NotificationEntry {
 /// `shell.notes.0..9`，见 renderer `persist_notes`/`restore_notifications`）。
 pub(crate) const NOTES_CAP: usize = 50;
 
+/// PLAN-060 扩展：把宿主 canvas 局部坐标换算到 broker client 的表面坐标
+/// （投影缩放时 rect.w/h ≠ surface w/h）。无表面信息则原样返回。
+fn broker_surface_local(
+    client: &crate::ui::desktop_protocol::stage3::BrokerClient,
+    wid: crate::ui::session::Wid,
+    lx: f32,
+    ly: f32,
+    rw: f32,
+    rh: f32,
+) -> (f32, f32) {
+    if rw <= 0.0 || rh <= 0.0 {
+        return (lx, ly);
+    }
+    let Some(sid) = client.wid_surface.get(&wid.0).copied() else {
+        return (lx, ly);
+    };
+    let Some((sw, sh)) = client.surfaces.size(sid) else {
+        return (lx, ly);
+    };
+    let (sx, sy) = (lx * sw / rw, ly * sh / rh);
+    if !sx.is_finite() || !sy.is_finite() {
+        return (lx, ly);
+    }
+    (sx, sy)
+}
 pub struct DesktopState {
     /// PLAN-526 T18：分区切换预览面板 transient 收起时点（热键切换置位；
     /// ServiceTick 到期写 `switcher_open="0"` 收起。None = 无倒计时）。
@@ -4863,15 +4888,19 @@ impl DesktopSession {
                 None => return false,
             }
         };
-        let input = ProtocolMsg::Input(InputMsg::PointerPressed {
-            wid: wid.0,
-            button,
-            x: x - rect.x,
-            y: y - rect.y,
-            modifiers: 0,
-        });
         for client in self.broker_clients.values_mut() {
             if client.owns_wid(wid) {
+                // PLAN-060 扩展：宿主窗 rect 与 child 表面尺寸不同（投影缩放）
+                // 时按比例把 canvas 局部坐标换算回 child 表面坐标，否则
+                // 指针永远落在错误控件上（calendar「>」delivered=true 但无反应）。
+                let (lx, ly) = broker_surface_local(client, wid, x - rect.x, y - rect.y, rect.w, rect.h);
+                let input = ProtocolMsg::Input(InputMsg::PointerPressed {
+                    wid: wid.0,
+                    button,
+                    x: lx,
+                    y: ly,
+                    modifiers: 0,
+                });
                 return client.end.send(&input).is_ok();
             }
         }
@@ -4901,15 +4930,16 @@ impl DesktopSession {
             };
             (wid, rect)
         };
-        let input = ProtocolMsg::Input(InputMsg::PointerReleased {
-            wid: wid.0,
-            button,
-            x: x - rect.x,
-            y: y - rect.y,
-            modifiers: 0,
-        });
         for client in self.broker_clients.values_mut() {
             if client.owns_wid(wid) {
+                let (lx, ly) = broker_surface_local(client, wid, x - rect.x, y - rect.y, rect.w, rect.h);
+                let input = ProtocolMsg::Input(InputMsg::PointerReleased {
+                    wid: wid.0,
+                    button,
+                    x: lx,
+                    y: ly,
+                    modifiers: 0,
+                });
                 return client.end.send(&input).is_ok();
             }
         }
@@ -11131,6 +11161,8 @@ mod live_input_tests {
         assert!(!session.route_live_input(&LiveInput::Chars { text: "y".into() }));
     }
 }
+
+
 
 
 
