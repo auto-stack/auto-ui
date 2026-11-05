@@ -312,3 +312,8 @@ back 侧 `auto-notes-...-back` 是完整 axum/DB 实现。故 iced 桌面上任�
 - stage: work | plan_id: auto-ui/PLAN-060 | plan_revision: 1 | round: 17 | outcome: waiting（VM 挂起修复转 auto-lang/PLAN-949） | evidence: 用户裁定继续补 VM 异步事件循环 → auto-lang PLAN-949（`6fae9d3c8`，worktree `.wt/lang-949/auto-lang`）；060 的 T-05 AC-08 待 949 交付后复验，其余已完成面保持。
 
 - stage: work | plan_id: auto-ui/PLAN-060 | plan_revision: 1 | round: 18 | outcome: 新缺口（outproc 指针下行） | evidence: 054 date: 2026-11-06 round 101 — 验收指针 canvas=屏幕÷2 标定成功（`hit=Some(Wid(1))`），但 016-calendar（outproc-native）在命中点击后无反应，`[plan060] pointer` 无 delivered/App 反应 ⇒ outproc 协议缺指针下行（现仅键盘/文本面）。下一步：DesktopProtocol 增 Pointer 消息并接线（inproc 已有）。
+
+- stage: work | plan_id: auto-ui/PLAN-060 | plan_revision: 1 | round: 19 | task_ids: T-07 | outcome: Action 线格式已落，child 派发待接线 | evidence:
+  - `message.rs`：新增 `InputMsg::Action { wid, name, arg }`（tag 11，encode+decode 完成，提交见 auto-ui 分支）。
+  - 待接线：child 侧 `headless.rs::on_input` 的泛型 `C: Component` 无法构造 `C::Msg`——需在具体 DynamicComponent 的 Surface 实现处派发 `component.on(DynamicMessage::String(name))`；宿主 `session::Msg` 臂对 broker client 转发 Action（当前只对 in-process 组件 on）。
+  - 复验目标：calendar `NextMonth` 翻月、`SelectDay` 选日。
