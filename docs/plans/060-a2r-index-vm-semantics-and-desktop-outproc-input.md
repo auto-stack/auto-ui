@@ -293,3 +293,8 @@ back 侧 `auto-notes-...-back` 是完整 axum/DB 实现。故 iced 桌面上任�
   - `handler app=013-todo StoreInput arg=alpha` → 界面输入框显示 "alpha"；`AddTodo` → 日志 `[CALL_HANDLER] widget=App event_name=AddTodo fn_name=handler_App_AddTodo args=[]`（真实消费臂）。
   - 数据面：`todos.db` 出现 `(1,'alpha',0)`——任务落库；但 UI 未刷新（input 未清空、列表未出现），与 store 的 `create_todo(...).ok` 响应判定/刷新路径相关（VM 宿主 + back 契约），非输入通道。
   - 结论：inproc（VM）验收走 handler 注入可行（StoreInput/AddTodo 均执行）；AC-08 的「列表出现」取决于 create_todo 响应契约与列表刷新，列为后续。
+
+- stage: work | plan_id: auto-ui/PLAN-060 | plan_revision: 1 | round: 14 | task_ids: T-05 | outcome: back 契约验证通过；VM 端 UI 刷新仍待查 | evidence:
+  - 手动起 todo back（`auto-todo-c1a8adb9-back.exe`，监听 **8080**，非 pac back_port 17815——前端默认 8080）：`GET /api/todos` → `{"ok":true,"err_code":"","todos":[…]}`；`POST /api/todos {"text":"gamma"}` → `{"ok":true,…,"todo":{…}}`。
+  - handler 驱动 `StoreInput("beta")+AddTodo` 后 `todos.db` 增 `(2,'beta',0)`（数据真实写入），但 UI 输入框仍显示 beta、列表未出现/无失败横幅——需查 VM 侧 `create_todo` 响应→`MutationResult.ok` 映射或 handler 后列表刷新（`load_todos`）链。
+  - 结论：todo 数据面已通；VM 端「响应→状态→重渲染」是最后一段，列 T-05 尾项。
