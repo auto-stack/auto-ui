@@ -31,3 +31,9 @@
 - **F4 已修**：rust_ui.rs GET 桩 default_expr 补 `Option<…>→None` 臂。
 - **F2 已修**：`compile_at_file` 增 `api_type_names` 参数；两处 app 编译面由 `parse_api_module(project_dir)` 取 back api.at 型名集合，front TypeDecl 的 Value alias 对同名跳过（shell-pack 面传空集保持原行为）。结构性发现：rust-ui front 生成物是**全 typed** 形态（`Vec<Note>`/`RepoResult.ok/err_code/doc.title` 等完整类型化 repository 协议），api struct 直编是唯一自洽形态——佐证 F2 仲裁方向正确。
 - 待验证：F4+F2 重编 tool 后 notes 重构建量错误族漂移（F1 点访问应随 struct 直编大量消解；F3 子组件 Msg 待看残留）。
+
+## F3 执行实录（三次迭代）
+
+1. 文本替换注入首测：sidebar.at 报 "Expected identifier or *, got Str"——替换命中 use 行自身（导入项必须是标识符）。修：逐行替换跳过 use 行。
+2. 二测：`k`（view-fn 片段引用调用点循环变量，PLAN-681 内联 idiom）UndefinedVariable；溯因中发现真根因——**pipeline.rs（vue 轨）在解析前调 `prepare_style_recipe_imports` 预注册 use-imported 样式配方（PLAN-635 parser 符号检查钩子），rust_ui.rs 的 compile_at_file 缺此步**，caption_text 族在解析期即炸；k 错误为语法错误恢复态的连带（vue 同链解析同文件通过可证）。
+3. 正解实现：compile_at_file 解析前 prepare + 解析后 load_and_validate（与 pipeline 同链）；保留文本替换作为生成器 Str-only style 提取面的兜底。模块定位补 src/front 约定面 + 按文件名递归回退（stylekit 实际路径 vendor/stylekit/src/front/styles.at）。

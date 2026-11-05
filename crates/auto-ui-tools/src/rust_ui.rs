@@ -887,11 +887,32 @@ fn inject_dep_style_constants(code: &str, project_dir: &Path) -> String {
             continue;
         };
         let _ = dep_name;
-        let rel = mod_segs.iter().collect::<PathBuf>().with_extension("at");
+        // 模块定位：dep 根直下与 src/front 约定面；再退化为按文件名
+        // 在 dep 树内递归定位（stylekit 形态：模块实际位于
+        // vendor/<dep>/src/front/<mod>.at，而 use 路径只写模块名）。
         let Some((_, root)) = deps.iter().find(|(d, _)| d == segs[0]) else {
             continue;
         };
-        let module_file = root.join(&rel);
+        let rel = mod_segs.iter().collect::<PathBuf>().with_extension("at");
+        let file_name = rel
+            .file_name()
+            .and_then(|n| n.to_str())
+            .map(|s| s.to_string());
+        let module_file = [
+            root.join(&rel),
+            root.join("src").join("front").join(&rel),
+            root.join("front").join(&rel),
+        ]
+        .into_iter()
+        .find(|p| p.is_file())
+        .or_else(|| {
+            file_name
+                .as_deref()
+                .and_then(|n| find_file_by_name(root, n))
+        });
+        let Some(module_file) = module_file else {
+            continue;
+        };
         let Ok(module_src) = fs::read_to_string(&module_file) else {
             continue;
         };
@@ -914,11 +935,21 @@ fn inject_dep_style_constants(code: &str, project_dir: &Path) -> String {
     if replacements.is_empty() {
         return code.to_string();
     }
-    let mut out = code.to_string();
-    for (sym, literal) in replacements {
-        out = replace_identifier(&out, &sym, &literal);
+    // 逐行替换但跳过 use 行——导入项必须是标识符，替成字符串字面量会
+    // 触发 "Expected identifier or *, got Str"（PLAN-052 F3 首测实证）。
+    let mut out_lines: Vec<String> = Vec::with_capacity(code.lines().count());
+    for line in code.lines() {
+        if line.trim_start().starts_with("use ") {
+            out_lines.push(line.to_string());
+            continue;
+        }
+        let mut l = line.to_string();
+        for (sym, literal) in &replacements {
+            l = replace_identifier(&l, sym, literal);
+        }
+        out_lines.push(l);
     }
-    out
+    out_lines.join("\n")
 }
 
 /// 标识符级替换：仅当 `name` 前后非 [A-Za-z0-9_] 时替换（防子串误伤）。
@@ -946,6 +977,28 @@ fn replace_identifier(code: &str, name: &str, replacement: &str) -> String {
     out
 }
 
+/// 在 dep 目录树内按文件名递归定位模块文件（深度限 6 层，防环/防广域）。
+fn find_file_by_name(root: &Path, name: &str) -> Option<PathBuf> {
+    fn walk(dir: &Path, name: &str, depth: u32) -> Option<PathBuf> {
+        if depth > 6 {
+            return None;
+        }
+        let entries = std::fs::read_dir(dir).ok()?;
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                if let Some(hit) = walk(&path, name, depth + 1) {
+                    return Some(hit);
+                }
+            } else if path.file_name().and_then(|n| n.to_str()) == Some(name) {
+                return Some(path);
+            }
+        }
+        None
+    }
+    walk(root, name, 0)
+}
+
 fn compile_at_file(
     at_path: &Path,
     stores: &[auto_ui_dialect::ast::StoreDecl],
@@ -959,6 +1012,19 @@ fn compile_at_file(
     // PLAN-052 F3：dep style 常量注入（见函数头注）。
     let code = inject_dep_style_constants(&raw_code, project_dir);
 
+    // PLAN-052 F3（正解）：PLAN-635 的 use-imported 样式配方须在解析前
+    // 预注册（parser 符号检查钩子）——pipeline.rs 先例；此前 rust 轨缺
+    // 此步，stylekit 配方名（caption_text 族）在解析期即 UndefinedVariable。
+    // 注：clear+replay 为每文件一轮（pipeline 单文件进程同构）；app 内跨
+    // front 文件的本地配方互引不在此面（当前语料无此形态）。
+    let base_dir = at_path
+        .parent()
+        .unwrap_or_else(|| Path::new("."))
+        .to_path_buf();
+    let recipe_imports =
+        auto_ui_compiler::design_tokens::recipe::prepare_style_recipe_imports(&base_dir, &code)
+            .map_err(|e| format!("Failed to prepare style recipe imports: {e}"))?;
+
     // Parse with UI scenario targeting rust backend
     let session = CompilerSession::ui().with_backend("rust");
     let mut parser = Parser::from(code.as_str());
@@ -968,6 +1034,14 @@ fn compile_at_file(
         .map(auto_ui_dialect::UiCode)
         .and_then(|ui| auto_ui_compiler::ui_ast::lower_ui(&ui).map(|lowered| lowered.ui))
         .map_err(|e| format!("Parse error: {:?}", e))?;
+
+    // PLAN-052 F3：解析后重放配方注册（imported + 本地 + 校验）——与
+    // pipeline.rs load_and_validate 同链，保持 rust 轨配方表不空转。
+    auto_ui_compiler::design_tokens::recipe::load_and_validate_style_recipes_with_imports(
+        &recipe_imports,
+        &ast,
+    )
+    .map_err(|e| e.to_string())?;
 
     let mut output = String::new();
     let mut generator = RustGenerator::new();
