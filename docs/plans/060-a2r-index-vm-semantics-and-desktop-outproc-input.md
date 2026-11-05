@@ -1,12 +1,12 @@
 ---
 plan_id: auto-ui/PLAN-060
-status: drafting
+status: executing
 feature_name: a2r 数组索引 VM 语义与 iced 桌面 outproc 输入/验收投递
 author: [Codex]
 created_at: 2026-11-05
 updated_at: 2026-11-05
 plan_revision: 1
-current_step: 0
+current_step: 2
 total_steps: 6
 base_branch: master
 base_commit: 220115df
@@ -190,3 +190,10 @@ fn __at_idx<T: Clone + Default>(v: &[T], i: i64) -> T {
   已交付 app 的既有行为，旧客户端忽略未知控制消息。
 - 索引 shim 对非 Clone/Default 元素类型保留原发射并在该生成文件注记（编译门兜底）。
 
+
+- stage: work | plan_id: auto-ui/PLAN-060 | plan_revision: 1 | outcome: pass（T-01 完成） | task_ids: T-01 | code_commit: bcefa9b2 | evidence: `__at_idx<T: Clone+Default>(&v,i)` shim 注入 + `Expr::Index` 非 Value 目标改走该 shim（i<0→default，get→cloned/default）；calendar 以 patched 工具重生成（`auto build -r rust` exit 0，生成码含 `__at_idx`），`calendar.exe` 单独启动 exit 前 panic 消失（存活 5s+，仅因无桌面端点退出）；旧生成码 `dim[(mm-1) as usize]` 不再出现。 | next: T-02
+- stage: work | plan_id: auto-ui/PLAN-060 | plan_revision: 1 | outcome: blocked（T-02 部分：投递已达 client，app 无响应） | task_ids: T-02 | code_commit: 4211d1cb（diag） | evidence: `DesktopInject::Pointer{phase,x,y,button}` + MCP `action:"pointer"`（click/down/up）；重建 ui-desktop 后实测：`[plan060] pointer Click (272,49) hit=Some(Wid(1))`、`down delivered=true`、`up delivered=true`——事件已投递给 owning broker client；但 notes app UI 无变化（多组坐标/「Create your first note」均无反应）。app 侧 `headless.rs::on_input` 具备 point_at+input_to_iced_events+surface.update 路径，需 app 侧可观测性（当前 app stderr 未进桌面日志）定位是坐标映射还是事件映射问题。 | blockers: app 侧输入消费需诊断（headless on_input 坐标/事件面）；not 阻塞 index 修复 | next: T-02 续（app 侧日志/回归）
+
+## 9. 复审记录（追加）
+
+- stage: work | plan_id: auto-ui/PLAN-060 | round: 1 | from: new | to: work | status: executing | outcome: pass（T-01）/ partial（T-02） | worktree: D:/autostack/.wt/ui-060/auto-ui | branch: codex/plan-060-dev | commit: 4211d1cb | next: T-02/T-03
