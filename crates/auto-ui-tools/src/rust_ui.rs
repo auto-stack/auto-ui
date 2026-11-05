@@ -1728,68 +1728,90 @@ fn strip_api_types(src: &str) -> String {
 /// 解析在 front 侧不可得）；按 companion 转译件的 `&str` 形参位置给实参补
 /// `&`（已是 &/字面量则跳过）。纯机械改写，仅作用于内嵌副本。
 fn rewrite_companion_str_args(db_code: &mut String, companions: &[(String, String)]) {
-    for (name, src) in companions {
-        let sigs = parse_db_fn_sigs(src);
-        let mut out = String::with_capacity(db_code.len());
-        let mut rest = db_code.as_str();
-        while let Some(pos) = rest.find(&format!("{name}::")) {
-            let (head, tail) = rest.split_at(pos);
-            out.push_str(head);
-            let Some(fn_start) = tail.find('(') else {
-                out.push_str(tail);
-                rest = "";
-                break;
-            };
-            let fname = tail[name.len() + 2..fn_start].trim().to_string();
-            out.push_str(&tail[..fn_start + 1]);
-            // 找配对右括号，切参数
-            let after = &tail[fn_start + 1..];
-            let mut depth = 1i32;
-            let mut end = None;
-            for (i, ch) in after.char_indices() {
-                match ch {
-                    '(' => depth += 1,
-                    ')' => {
-                        depth -= 1;
-                        if depth == 0 {
-                            end = Some(i);
-                            break;
-                        }
-                    }
-                    _ => {}
-                }
-            }
-            let Some(end) = end else {
-                rest = "";
-                break;
-            };
-            let args_str = &after[..end];
-            let args = split_top_level_args(args_str);
-            let sig = sigs.iter().find(|s| s.name == fname);
-            let rewritten: Vec<String> = args
-                .iter()
-                .enumerate()
-                .map(|(i, a)| {
-                    let wants_ref = sig
-                        .and_then(|s| s.params.get(i))
-                        .map(|(_, ty)| ty == "&str")
-                        .unwrap_or(false);
-                    if wants_ref && !a.trim_start().starts_with('&') && !a.trim_start().starts_with('"') {
-                        format!("&{}", a)
-                    } else {
-                        a.clone()
-                    }
-                })
-                .collect();
-            out.push_str(&rewritten.join(", "));
-            out.push(')');
-            rest = &after[end + 1..];
-        }
-        out.push_str(rest);
-        *db_code = out;
-    }
+    let sigs: Vec<DbFnSig> = companions
+        .iter()
+        .flat_map(|(_, src)| parse_db_fn_sigs(src))
+        .collect();
+    let names: Vec<String> = companions.iter().map(|(n, _)| n.clone()).collect();
+    *db_code = rewrite_calls_in(db_code, &names, &sigs, 0);
 }
 
+/// 递归改写 `mod::fn(...)` 调用的 `&str` 实参（含嵌套调用）。
+fn rewrite_calls_in(text: &str, names: &[String], sigs: &[DbFnSig], depth: u8) -> String {
+    if depth > 6 {
+        return text.to_string();
+    }
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    loop {
+        let mut best: Option<(usize, &String)> = None;
+        for n in names {
+            let pat = format!("{n}::");
+            if let Some(p) = rest.find(&pat) {
+                if best.map_or(true, |(bp, _)| p < bp) {
+                    best = Some((p, n));
+                }
+            }
+        }
+        let Some((pos, name)) = best else {
+            out.push_str(rest);
+            break;
+        };
+        let (head, tail) = rest.split_at(pos);
+        out.push_str(head);
+        let Some(fn_start) = tail.find('(') else {
+            out.push_str(tail);
+            break;
+        };
+        let fname = tail[name.len() + 2..fn_start].trim().to_string();
+        out.push_str(&tail[..fn_start + 1]);
+        let after = &tail[fn_start + 1..];
+        let mut level = 1i32;
+        let mut end = None;
+        for (i, ch) in after.char_indices() {
+            match ch {
+                '(' => level += 1,
+                ')' => {
+                    level -= 1;
+                    if level == 0 {
+                        end = Some(i);
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        let Some(end) = end else {
+            out.push_str(after);
+            break;
+        };
+        let args = split_top_level_args(&after[..end]);
+        let sig = sigs.iter().find(|s| s.name == fname);
+        let rewritten: Vec<String> = args
+            .iter()
+            .enumerate()
+            .map(|(i, a)| {
+                let inner = rewrite_calls_in(a, names, sigs, depth + 1);
+                let wants_ref = sig
+                    .and_then(|s| s.params.get(i))
+                    .map(|(_, ty)| ty == "&str")
+                    .unwrap_or(false);
+                if wants_ref
+                    && !inner.trim_start().starts_with('&')
+                    && !inner.trim_start().starts_with('"')
+                {
+                    format!("&{inner}")
+                } else {
+                    inner
+                }
+            })
+            .collect();
+        out.push_str(&rewritten.join(", "));
+        out.push(')');
+        rest = &after[end + 1..];
+    }
+    out
+}
 fn split_top_level_args(s: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut depth = 0i32;
@@ -11594,6 +11616,7 @@ mod plan036_theme_input_tests {
         );
     }
 }
+
 
 
 
