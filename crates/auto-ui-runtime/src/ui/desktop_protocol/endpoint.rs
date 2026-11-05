@@ -513,7 +513,12 @@ impl<S: FrameSource> AppEndpoint<S> {
             // --- Active：四通道日常 ---
             (Active, ProtocolMsg::Input(input)) => {
                 if std::env::var_os("AUTO_PLAN060_DIAG").is_some() {
-                    eprintln!("[plan060] child endpoint input {:?}", std::mem::discriminant(&input));
+                    eprintln!(
+                        "[plan060] child endpoint input {:?} mode={:?} state={:?}",
+                        std::mem::discriminant(&input),
+                        self.frame_mode,
+                        self.state
+                    );
                 }
                 self.session.on_input(&input);
                 Ok(vec![])
@@ -1713,4 +1718,5 @@ mod tests {
         }
     }
 }
+
 
