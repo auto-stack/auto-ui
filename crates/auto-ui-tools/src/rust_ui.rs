@@ -1588,6 +1588,13 @@ fn generate_api_client(project_dir: &Path, api_imports: &[String]) -> String {
 
     // Try to parse api.at to get real endpoint definitions
     let api_module = parse_api_module(project_dir);
+    eprintln!(
+        "[plan060] api_client project_dir={} merged={} module={:?} endpoints={}",
+        project_dir.display(),
+        std::env::var("AUTO_VM_MERGE").as_deref() != Ok("0"),
+        api_module.as_ref().map(|m| m.endpoints.len()),
+        api_module.as_ref().map(|m| m.types.len()).unwrap_or(0)
+    );
 
     // PLAN-039 T-13（批次 E，E-D5-A 类型化株）：back api.at `pub type` →
     // Rust struct 发射（serde derive + Default）——kanban BoardsStore 的
@@ -11097,3 +11104,4 @@ mod plan036_theme_input_tests {
         );
     }
 }
+
