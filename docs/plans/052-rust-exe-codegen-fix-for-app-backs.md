@@ -1,13 +1,13 @@
 ---
 plan_id: auto-ui/PLAN-052
-status: drafting
+status: executing
 feature_name: rust-ui 原生 exe 生成器对应用 back 源的编译修复
 author: [Codex]
 created_at: 2026-11-05
 updated_at: 2026-11-05
 plan_revision: 1
-current_step: 0
-total_steps: 0
+current_step: 1
+total_steps: 5
 base_branch: master
 base_commit: 8ed8a2e1f2dc93bf31d6f730d380f55bdbc9baa1
 depends_on: []
@@ -69,9 +69,8 @@ iced 轨 Rust 六雄 Outproc 嵌载的具名最小前置。
 
 ## 5. 执行步骤（草案，待 work 细化）
 
-- [ ] T-00：以 notes 为最小复现，68 错误分族（Option 返回/中文标识符/
-  重复定义/未解析符号等），逐族定位生成器根因；产出 affected-constructs 表。
-- [ ] T-01：生成器修复 + notes 单 app 构建绿。
+- [x] T-00：以 notes 为最小复现，50 错误（非 68——重测全量日志去重后）分五族，逐族定位生成器根因；产出 affected-constructs 表与修复策略。[✅ 2026-11-05] 证据：docs/plans/evidence/052/codegen-families.md——F1 实体字段点访问×24（E0609，user type 降链 Value 但 store 发点访问）/F2 用户型双重定义（E0428+E0117，alias 通道与 api struct 通道未仲裁）/F3 子组件 Msg 未入编译集×7（E0425 NavTreeMsg/EditorPanelMsg）/F4 api 桩 Option 缺省×3（E0308，default_expr `_` 臂恒 Null）/F5 杂项待复测定档。对照 counter PASS 与族表自洽。
+- [ ] T-01：生成器修复 + notes 单 app 构建绿。（进行中：F4 已修——default_expr 补 `Option<…>→None` 臂；效果实测在飞：构建因 ui-052 组 generated-consumers 冷缓存长编译中。F2 设计输入已备：struct 直编会撞 stub 的 API_DATA Value 桶记录体，F1 方向=实体字段访问器降链或 API 边界 serde 转换，T-01 实现时定档。）
 - [ ] T-02：6 app 全量构建 + counter/旧门回归 + notes 冒烟。
 - [ ] T-03：漂移核对/文档/收据，提交 execution_done。
 - [ ] T-04/T-05：review/merge 按本仓流程。
@@ -85,3 +84,4 @@ iced 轨 Rust 六雄 Outproc 嵌载的具名最小前置。
 
 编号 052 为立项时占用（.next-id 滞后记 050，以本会话冲突检查 052/053
 无在飞分支/树为准）；如与他案撞号，执行前取新号并重命名。
+- stage: work | plan_id: auto-ui/PLAN-052 | plan_revision: r1 | outcome: pass（T-00 完成，T-01 F4 已修实测在飞） | worktree_path: D:/autostack/.wt/ui-052/auto-ui | branch: codex/plan-052-dev | base_commit: 8ed8a2e1 | code_commit: 待提交（F4 编辑在工作树，随验证结果提交） | task_ids: T-00 | evidence: 五族表 docs/plans/evidence/052/codegen-families.md（50 错误全量分族+生成器锚点+修复策略；F2 附加设计输入：api struct 直编与 stub API_DATA Value 桶的边界冲突记录）；组内兄弟 auto-lang/auto-web/auto-down 按 master 补齐（metadata 绿）；tool 已构建 | blockers: 无 | next: work/T-01（F4 实测 → F2/F1/F3 逐族修）
