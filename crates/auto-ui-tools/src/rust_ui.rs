@@ -1594,7 +1594,12 @@ fn crate_refs(code: &str) -> std::collections::BTreeSet<String> {
     out
 }
 
-fn merged_absorb(project_dir: &Path, _module: &auto_lang_core::api::ApiModule) -> Option<MergedAbsorb> {
+fn merged_absorb(project_dir: &Path, module: &auto_lang_core::api::ApiModule) -> Option<MergedAbsorb> {
+    // Full module absorption supplies structural API return types. Scalar-only
+    // contracts retain the established db-first/explicit demo fallback path.
+    if module.types.is_empty() {
+        return None;
+    }
     let back = project_dir.join("src").join("back");
     let db_at = std::fs::read_to_string(back.join("db.at")).ok()?;
     // PLAN-060：带 source_dir 的转译（PLAN-885 G2）——否则导入函数签名缺失，
@@ -1634,19 +1639,22 @@ fn merged_absorb(project_dir: &Path, _module: &auto_lang_core::api::ApiModule) -
             return None;
         };
         let rs = auto_api_gen::api_gen::post_process_companion_rs(rs);
+        let rs = auto_api_gen::api_gen::promote_api_types_in_companion(&rs, &module.types);
         queue.extend(crate_refs(&rs));
         modules.push((name, rs));
     }
-    // PLAN-060：api.at 端点体（去 #[api] 与 pub type）转译为 api_impl——
+    // PLAN-060：api.at 端点体（去 #[api]，保留类型供解析）转译为 api_impl——
     // api 函数体形如 `return db.all_notes()`，是端点真实现（db 里未必同名）。
     let api_at = std::fs::read_to_string(back.join("api.at")).ok()?;
-    let api_body = add_return_arrows(&strip_api_types(
+    // Retain type declarations during parsing: endpoint bodies can construct
+    // them in return expressions. Unify emitted structs with back types below.
+    let api_body = add_return_arrows(
         &api_at
             .lines()
             .filter(|l| !l.trim_start().starts_with("#[api"))
             .collect::<Vec<_>>()
             .join("\n"),
-    ));
+    );
     // 模块名 "db" 触发 a2r 的 db 代码形态（无 `impl ` 前缀的结构返回）；
     // 产物作为 front 的 api_impl 模块内嵌。
     let (api_impl_rs, _) = auto_api_gen::api_gen::transpile_back_module_to_rs_with_proofs(
@@ -1660,6 +1668,7 @@ fn merged_absorb(project_dir: &Path, _module: &auto_lang_core::api::ApiModule) -
     // a2r 对 api 接口形态的返回型加 `impl ` 前缀（接口语义）；内嵌实现不需要。
     let api_impl_code = auto_api_gen::api_gen::post_process_db_rs(api_impl_rs)
         .replace(" -> impl ", " -> ");
+    let api_impl_code = auto_api_gen::api_gen::promote_api_types_in_companion(&api_impl_code, &module.types);
     let api_impl_fns = parse_db_fn_sigs(&api_impl_code);
     modules.push((
         "api_impl".to_string(),
@@ -1696,29 +1705,6 @@ fn add_return_arrows(src: &str) -> String {
                     continue;
                 }
             }
-        }
-        out.push_str(line);
-        out.push('\n');
-    }
-    out
-}
-/// 去掉 api.at 里的 `pub type X = { ... }` 块（api_impl 复用 crate::types）。
-fn strip_api_types(src: &str) -> String {
-    let mut out = String::new();
-    let mut depth = 0i32;
-    let mut in_type = false;
-    for line in src.lines() {
-        let t = line.trim_start();
-        if depth == 0 && t.starts_with("pub type ") {
-            in_type = true;
-        }
-        if in_type {
-            depth += line.chars().filter(|c| *c == '{').count() as i32;
-            depth -= line.chars().filter(|c| *c == '}').count() as i32;
-            if depth <= 0 {
-                in_type = false;
-            }
-            continue;
         }
         out.push_str(line);
         out.push('\n');
@@ -7594,7 +7580,7 @@ pub(crate) fn resolve_managed_front(project_dir: &Path) -> AutoResult<ManagedFro
 /// generator changes without a bump are a recorded boundary.
 // PLAN-060: invalidate unchanged inputs after fixing text click/style emission,
 // in addition to the earlier table-row and named-input corrections.
-const FRONT_LAYOUT_VERSION: &str = "front-layout/v5";
+const FRONT_LAYOUT_VERSION: &str = "front-layout/v6";
 
 fn front_generator_identity(context: &GeneratedBuildContext) -> String {
     format!(
@@ -9536,7 +9522,7 @@ pub fn ping() int {
         )
         .unwrap();
         let module = super::parse_api_module(tmp.path()).expect("api module parses");
-        let code = super::generate_merged_api_client(&module, tmp.path());
+        let code = super::generate_merged_api_client(&module, tmp.path(), &super::generate_api_type_structs(&module));
         assert!(
             code.contains("db::ping"),
             "absorption arm should delegate ping to db::ping, got:\n{}",
@@ -9595,7 +9581,7 @@ pub fn create_item(name str) str {
         )
         .unwrap();
         let module = super::parse_api_module(tmp.path()).expect("api module parses");
-        let code = super::generate_merged_api_client(&module, tmp.path());
+        let code = super::generate_merged_api_client(&module, tmp.path(), &super::generate_api_type_structs(&module));
         assert!(
             code.contains("static API_DATA"),
             "CRUD fallback must keep the API_DATA scaffold, got:\n{}",
@@ -9664,7 +9650,7 @@ pub fn create_item(name str) str {
         )
         .unwrap();
         let module = super::parse_api_module(tmp.path()).expect("api module parses");
-        let code = super::generate_merged_api_client(&module, tmp.path());
+        let code = super::generate_merged_api_client(&module, tmp.path(), &super::generate_api_type_structs(&module));
         assert!(
             code.contains("pub mod api_impl"),
             "route A 内嵌端点体模块在案, got:\n{}",
@@ -9710,7 +9696,7 @@ pub fn list_items() []str {
         .unwrap();
         std::fs::write(back.join("broken.at"), "pub fn broken( {\n").unwrap();
         let module = super::parse_api_module(tmp.path()).expect("api module parses");
-        let code = super::generate_merged_api_client(&module, tmp.path());
+        let code = super::generate_merged_api_client(&module, tmp.path(), &super::generate_api_type_structs(&module));
         assert!(
             code.contains("⚠ route A inactive"),
             "转译失败停用必须在生成物留标记, got:\n{}",
@@ -9726,6 +9712,36 @@ pub fn list_items() []str {
             "兜底端点按契约化 CRUD 桩生成, got:\n{}",
             code
         );
+    }
+
+    #[test]
+    fn p060_merged_endpoint_body_keeps_declared_struct_types() {
+        let tmp = tempfile::tempdir().unwrap();
+        let back = tmp.path().join("src/back");
+        std::fs::create_dir_all(&back).unwrap();
+        std::fs::write(back.join("api.at"), r#"
+pub type Work = {
+    title: str
+}
+use db
+#[api(method = "POST", path = "/api/works")]
+pub fn create_work(title str) Work {
+    if title == "" { return Work { title: "untitled" } }
+    return db.create_work(title)
+}
+"#).unwrap();
+        std::fs::write(back.join("db.at"), r#"
+use api: Work
+pub fn create_work(title str) Work {
+    let result Work = Work { title: title }
+    return result
+}
+"#).unwrap();
+        let module = super::parse_api_module(tmp.path()).unwrap();
+        let code = super::generate_merged_api_client(&module, tmp.path(), &super::generate_api_type_structs(&module));
+        assert!(code.contains("pub mod api_impl"), "typed endpoint bodies must remain real implementations: {code}");
+        assert!(code.contains("__db2ui_Work(api_impl::create_work("), "endpoint must delegate to the real body: {code}");
+        assert!(!code.contains("Work::default()"), "declared return types cannot hide failed backend absorption");
     }
 
     /// Stage B P-2 V4：仓外项目完整生成链——member 落 project-local，框架
