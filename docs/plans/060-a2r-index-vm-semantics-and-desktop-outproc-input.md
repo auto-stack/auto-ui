@@ -357,3 +357,8 @@ back 侧 `auto-notes-...-back` 是完整 axum/DB 实现。故 iced 桌面上任�
   - **关键修复**：`auto build -r rust` 必须统一组树（AUTO_LANG_ROOT/AUTO_UI_ROOT/AUTO_MAN_ROOT 全指 `.wt/os-054/*`），否则 auto-web(兄弟) 与 auto-lang-core(ui-060) 的 auto-web-contract links 双包冲突 → 统一后 `[tool] build rust (Completed)`，生成 `main.rs` 含 `fn dispatch_named`（App: PrevMonth/NextMonth/Today/…；CalendarStore: Init/NextMonth/SelectDay/…）。
   - 但运行期：`[plan060] child endpoint input Discriminant(10)` 后无 `[plan060] child action`/`child(headless) action` 日志 ⇒ child 的 `endpoint.session` 具体类型不是 RqProjector/HeadlessFrameSource 中我们打过日志的路径（候选：`host.rs:549` 的 Surface 或 broker/demo 变体）。
   - 下一步：读 `client_entry`/`host.rs` 里实际构造的 Surface，把 Action 分支加进去（或统一到 `Component::dispatch_named` 的单一出口）。
+
+- stage: work | plan_id: auto-ui/PLAN-060 | plan_revision: 1 | round: 29 | task_ids: T-07 | outcome: 强候选根因——像素臂 `PixelsNoopSource::on_input` 是 no-op | evidence:
+  - `pixels.rs:83`：`impl FrameSource for PixelsNoopSource { fn on_input(&mut self, _input: &InputMsg) {} }` —— v1.3 independent（像素）臂的 child 表面**显式丢弃所有输入**。
+  - 若 calendar 客户端裁决为 Pixels 帧模式，endpoint 的 `session` 即 `PixelsNoopSource`：Action（及 pointer/key）到达 endpoint（日志 Discriminant(10) 已证）后被丢弃，与「无 child action 日志 / 指针无反应」全部吻合。
+  - 下一步：确认 calendar 的 `frame_mode`（Hello/activate 裁决）；若为 Pixels，则要么在该臂把输入转发给真实组件（需 PixelsNoopSource 持有组件/投影器），要么把该 app 裁决为 Commands 档。
