@@ -5996,6 +5996,9 @@ pub(crate) fn apply_desktop_injects(state: &mut crate::ui::session::DesktopSessi
                                 },
                             );
                             delivered = client.end.send(&input).is_ok();
+                            if std::env::var_os("AUTO_PLAN060_DIAG").is_some() {
+                                eprintln!("[plan060] action {msg} sent wid={} delivered={delivered}", wid.0);
+                            }
                             break;
                         }
                     }
@@ -6699,6 +6702,7 @@ pub(super) fn publish_workspace_previews(state: &mut crate::ui::session::Desktop
         wallpaper_src: state.desktop.desktop_wallpaper.clone(),
     });
 }
+
 
 
 
