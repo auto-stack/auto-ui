@@ -102,9 +102,24 @@ fn view_decl_has_pascal_child(node: &auto_ui_dialect::ast::ViewNode) -> bool {
 /// 声明序 → WIDGET_PROP_ORDERS 预注册（app.at 字母序先于 components/
 /// 编译，调用点按声明序重排需要跨文件视图；生成期组件自注册仍在 =
 /// 双保险，幂等）。klondike CardFace 参数错位株的配套面。
-fn collect_component_prop_orders(at_files: &[std::path::PathBuf]) {
+fn collect_component_prop_orders(
+    at_files: &[std::path::PathBuf],
+    stores: &[auto_ui_dialect::ast::StoreDecl],
+    project_dir: &Path,
+) {
     for at_path in at_files {
-        if let Ok(code) = std::fs::read_to_string(at_path) {
+        if let Ok(raw) = std::fs::read_to_string(at_path) {
+            // PLAN-052：与 compile_at_file 同款预处理——dep 样式常量注入 +
+            // 样式配方预注册（否则 `use stylekit.styles: …` 的文件解析失败，
+            // 路由页 canonical store 映射漏登记）。
+            let code = inject_dep_style_constants(&raw, project_dir);
+            let base_dir = at_path
+                .parent()
+                .unwrap_or_else(|| Path::new("."))
+                .to_path_buf();
+            let _ = auto_ui_compiler::design_tokens::recipe::prepare_style_recipe_imports(
+                &base_dir, &code,
+            );
             let session = CompilerSession::ui().with_backend("rust");
             let mut parser = Parser::from(code.as_str()).with_session(session);
             if let Ok(ast) = parser
@@ -112,8 +127,56 @@ fn collect_component_prop_orders(at_files: &[std::path::PathBuf]) {
                 .map(auto_ui_dialect::UiCode)
                 .and_then(|ui| auto_ui_compiler::ui_ast::lower_ui(&ui).map(|lowered| lowered.ui))
             {
+                // PLAN-052：本文件 store 导入序（首导入 = canonical）——
+                // 路由页 store 归属映射（父 App 同步/回写别名字段用）。
+                let mut file_stores: Vec<String> = Vec::new();
+                for stmt in ast.core_stmts() {
+                    if let auto_lang_core::ast::Stmt::Use(u) = stmt {
+                        for item in &u.items {
+                            let name = item.as_str().to_string();
+                            // PLAN-052：`use draft_store: DraftStore` 的 item
+                            // 是别名（snake_case），按 store 型名或蛇形别名
+                            // 双径匹配。
+                            let found = stores.iter().find(|s| {
+                                s.name.as_str() == name
+                                    || auto_ui_compiler::ui_gen::rust::store_alias_of(
+                                        s.name.as_str(),
+                                    ) == name
+                            });
+                            if let Some(store) = found {
+                                let ty = store.name.as_str().to_string();
+                                if !file_stores.contains(&ty) {
+                                    file_stores.push(ty);
+                                }
+                            }
+                        }
+                    }
+                }
                 for stmt in ast.domain_stmts() {
                     if let auto_ui_dialect::UiStmt::WidgetDecl(widget_decl) = stmt {
+                        // PLAN-052：组件 canonical store + Init 处理器登记。
+                        {
+                            let wname = widget_decl.name.as_str().to_string();
+                            if let Some(canon) = file_stores.first() {
+                                auto_ui_compiler::ui_gen::rust::WIDGET_CANONICAL_STORE.with(|m| {
+                                    m.borrow_mut().insert(wname.clone(), canon.clone());
+                                });
+                            }
+                            let has_init = widget_decl
+                                .on
+                                .as_ref()
+                                .map_or(false, |on| {
+                                    on.handlers
+                                        .iter()
+                                        .any(|h| h.pattern.contains("Init"))
+                                })
+                                || widget_decl.lifecycle.iter().any(|l| l.name == "Init");
+                            if has_init {
+                                auto_ui_compiler::ui_gen::rust::WIDGET_HAS_INIT.with(|s| {
+                                    s.borrow_mut().insert(wname);
+                                });
+                            }
+                        }
                         let order: Vec<String> = widget_decl
                             .props
                             .iter()
@@ -493,7 +556,7 @@ fn regenerate_code_only(project_dir: &Path, rust_dir: &Path, src_: &PacSource) -
     // Plan 371 Task 22c: cross-file component state fields.
     let component_fields = collect_component_state_fields(&at_files);
     // PLAN-039 T-14（组件传型）：props 声明序预注册（构造参数重排）。
-    collect_component_prop_orders(&at_files);
+    collect_component_prop_orders(&at_files, &all_stores, project_dir);
     // PLAN-052：项目内模块 fn 的 BARE_FN_SIGS 预注册——此前仅 dep 模块
     // 内嵌路径注册（3333），项目本地模块（calendar_util.at 族）无签名，
     // 消费文件（字母序先编译）的 computed 返回型落空默认 String
@@ -778,7 +841,7 @@ pub(crate) fn compile_rust_ui_app(
     // Plan 371 Task 22c: cross-file component state fields.
     let component_fields = collect_component_state_fields(&at_files);
     // PLAN-039 T-14（组件传型）：props 声明序预注册（构造参数重排）。
-    collect_component_prop_orders(&at_files);
+    collect_component_prop_orders(&at_files, &all_stores, project_dir);
     // PLAN-052：项目内模块 fn 的 BARE_FN_SIGS 预注册——此前仅 dep 模块
     // 内嵌路径注册（3333），项目本地模块（calendar_util.at 族）无签名，
     // 消费文件（字母序先编译）的 computed 返回型落空默认 String
@@ -2382,24 +2445,37 @@ fn generate_merged_api_client(
                     .iter()
                     .map(|p| format!("\"{}\": {}", p.name, merged_param_to_value(&p.ty, &p.name)))
                     .collect();
+                // PLAN-052：POST 桩签名取**契约全参**（path/body 皆列）——
+                // 此前只取 body_params，中段/尾部 path 参数（blog
+                // follow(username) `/profiles/:username/follow`）签名丢参
+                // → 调用点 E0061。
+                let full_params: Vec<(String, String)> = endpoint
+                    .params
+                    .iter()
+                    .map(|p| (p.name.clone(), auto_type_to_rust(&p.ty)))
+                    .collect();
+                let full_sig = full_params
+                    .iter()
+                    .map(|(n, t)| format!("{}: {}", n, t))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let full_discard = if full_params.is_empty() {
+                    String::new()
+                } else {
+                    format!(
+                        "    let _ = ({});\n",
+                        full_params
+                            .iter()
+                            .map(|(n, _)| n.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )
+                };
                 if post_ret == "bool" {
-                    let discard = if body_params.is_empty() {
-                        String::new()
-                    } else {
-                        format!(
-                            "    let _ = ({});\n",
-                            body_params
-                                .iter()
-                                .map(|p| p.name.as_str())
-                                .collect::<Vec<_>>()
-                                .join(", ")
-                        )
-                    };
+                    let discard = &full_discard;
                     code.push_str(&format!(
                         "fn {}({}) -> bool {{\n{}    {{\n        let mut data = API_DATA.lock().unwrap();\n        let id = {{ let mut next = API_NEXT_ID.lock().unwrap(); *next += 1; *next }};\n        data.push(serde_json::json!({{\"id\": id}}));\n    }}\n    false\n}}\n\n",
-                        fn_name,
-                        body_params.iter().map(|p| format!("{}: {}", p.name, auto_type_to_rust(&p.ty))).collect::<Vec<_>>().join(", "),
-                        discard
+                        fn_name, full_sig, discard
                     ));
                 } else if post_ret == "String" {
                     // PLAN-710 D-7：str 契约 POST 桩发 String（记录项序列化
@@ -2408,16 +2484,12 @@ fn generate_merged_api_client(
                     // E0308——regex_replace 株）。
                     code.push_str(&format!(
                         "fn {}({}) -> String {{\n    let mut data = API_DATA.lock().unwrap();\n    let id = {{ let mut next = API_NEXT_ID.lock().unwrap(); *next += 1; *next }};\n    let item = serde_json::json!({{\"id\": id, {}}});\n    data.push(item.clone());\n    serde_json::to_string(&item).unwrap_or_default()\n}}\n\n",
-                        fn_name,
-                        body_params.iter().map(|p| format!("{}: {}", p.name, auto_type_to_rust(&p.ty))).collect::<Vec<_>>().join(", "),
-                        body_fields.join(", ")
+                        fn_name, full_sig, body_fields.join(", ")
                     ));
                 } else {
                     code.push_str(&format!(
                         "fn {}({}) -> Value {{\n    let mut data = API_DATA.lock().unwrap();\n    let id = {{ let mut next = API_NEXT_ID.lock().unwrap(); *next += 1; *next }};\n    let item = serde_json::json!({{\"id\": id, {}}});\n    data.push(item.clone());\n    item\n}}\n\n",
-                        fn_name,
-                        body_params.iter().map(|p| format!("{}: {}", p.name, auto_type_to_rust(&p.ty))).collect::<Vec<_>>().join(", "),
-                        body_fields.join(", ")
+                        fn_name, full_sig, body_fields.join(", ")
                     ));
                 }
             }

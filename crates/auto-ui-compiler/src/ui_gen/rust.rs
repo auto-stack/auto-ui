@@ -197,6 +197,12 @@ pub struct RustGenerator {
     /// PLAN-039 D5（§5.1 定案记录）：outlet 折平策略——generate_rust 读
     /// widget.routes 装配，Outlet 臂消费。
     outlet_route: OutletRoute,
+    /// PLAN-052：多路由根（routes 块非单路由折平）——App 发射路由态/参数表、
+    /// __Navigate 变体与 __apply_route 方法。
+    router_root: bool,
+    /// PLAN-052：页面件（handler 内引用 router.push/param）——发射
+    /// __route_params + __nav_request 字段与 __Navigate 变体。
+    router_page: bool,
 }
 
 /// PLAN-039 D5（§5.1 定案记录）：`routes{"/"->use X}` + `outlet` 三态。
@@ -206,6 +212,8 @@ enum OutletRoute {
     None,
     /// 单路由 "/" 无参——outlet 折平为持久子件 X 直用。
     Fold(String),
+    /// 多路由/带参路由——PLAN-052：静态路由发射（App 路由态 + outlet match）。
+    Multi(Vec<crate::aura::AuraRoute>),
     /// 多路由/带参路由——outlet 位响亮拒（compile_error 带 P039 债指针）。
     Reject,
 }
@@ -299,6 +307,14 @@ thread_local! {
     pub static API_FN_RET_TYPES: std::cell::RefCell<
         std::collections::HashMap<String, String>,
     > = std::cell::RefCell::new(std::collections::HashMap::new());
+    /// PLAN-052：组件名 → 本文件 canonical store 型名（`use` 首导入）——
+    /// 多 store 工程里子件 store 字段同步/回写到父 App 对应别名字段。
+    pub static WIDGET_CANONICAL_STORE: std::cell::RefCell<
+        std::collections::HashMap<String, String>,
+    > = std::cell::RefCell::new(std::collections::HashMap::new());
+    /// PLAN-052：组件名 → 是否声明 Init 处理器（路由页切页重放 Init 门）。
+    pub static WIDGET_HAS_INIT: std::cell::RefCell<std::collections::HashSet<String>> =
+        std::cell::RefCell::new(std::collections::HashSet::new());
     /// PLAN-052：store 型名 → 声明消息名集——多处 store 调用归属解析
     /// （`store.SetToken` 在 AuthStore 无变体时回落到声明它的 ArticleStore）。
     pub static STORE_VARIANTS: std::cell::RefCell<
@@ -382,6 +398,8 @@ impl RustGenerator {
             has_init: false,
             init_api_info: None,
             outlet_route: OutletRoute::None,
+            router_root: false,
+            router_page: false,
         }
     }
 
@@ -409,6 +427,21 @@ impl RustGenerator {
                 names.sort();
                 names.into_iter().next().map(|(_, b)| b)
             })
+        })
+    }
+
+    /// PLAN-052：子件（路由页）canonical store 在父 App 中的别名字段。
+    fn child_store_alias(&self, child: &str) -> String {
+        let store = WIDGET_CANONICAL_STORE.with(|m| m.borrow().get(child).cloned());
+        let Some(store) = store else {
+            return "store".to_string();
+        };
+        STORE_NAMES.with(|sn| {
+            sn.borrow()
+                .iter()
+                .find(|(_, s)| s.as_str() == store)
+                .map(|(a, _)| a.clone())
+                .unwrap_or_else(|| "store".to_string())
         })
     }
 
@@ -1332,6 +1365,8 @@ fn collect_local_elems(
         self.indent = 0;
         self.loop_vars.clear();
         self.outlet_route = OutletRoute::None;
+        self.router_root = false;
+        self.router_page = false;
     }
 
     /// PLAN-052：模块 fn 发射前清场——generator 的局部/态格此前残留最后
@@ -1690,6 +1725,7 @@ fn collect_local_elems(
             code.push_str("use auto_ui_runtime::ui::{Component, View};\n\n");
         }
 
+
         // Pre-scan view tree for child component references (needed for wrapper msg variants)
         self.scan_child_components(&widget.view_tree);
 
@@ -1705,14 +1741,58 @@ fn collect_local_elems(
                     && rb.routes[0].path == "/"
                     && rb.routes[0].params.is_empty() =>
             {
-                let module = rb.routes[0].module.clone();
+                let module = route_child_name(&rb.routes[0]);
                 if !self.child_components.contains(&module) {
                     self.child_components.push(module.clone());
                 }
                 OutletRoute::Fold(module)
             }
-            Some(_) => OutletRoute::Reject,
+            Some(rb) => {
+                // PLAN-052：多路由/带参路由静态发射——页面件全量注册为
+                // 持久子件（msg 包装/字段/构造/转发走既有 child 全链），
+                // App 增路由态与 outlet match。
+                for route in &rb.routes {
+                    let name = route_child_name(route);
+                    if !self.child_components.contains(&name) {
+                        self.child_components.push(name);
+                    }
+                }
+                self.router_root = true;
+                // PLAN-052：页面件 store 别名字段按需补注册（页面 canonical
+                // store 可能是本文件未导入的兄弟 store——同步/回写要用）。
+                for route in &rb.routes {
+                    let child = route_child_name(route);
+                    let store = WIDGET_CANONICAL_STORE.with(|m| m.borrow().get(&child).cloned());
+                    if let Some(store) = store {
+                        self.ensure_store_alias(&store);
+                    }
+                }
+                OutletRoute::Multi(rb.routes.clone())
+            }
         };
+        // PLAN-052：页面件判定——handler 内引用 `router.*`（push/param）。
+        self.router_page = widget.handlers.iter().any(|(_, payload)| match payload {
+            LogicPayload::AstStmts(stmts) => stmts_use_router(stmts),
+            _ => false,
+        });
+
+        // PLAN-052：多路由静态表 + 匹配助手（路径段匹配、:param 抽取）。
+        if self.router_root {
+            if let OutletRoute::Multi(routes) = &self.outlet_route {
+                let mut entries = String::new();
+                for r in routes {
+                    let child = route_child_name(r);
+                    entries.push_str(&format!("({:?}, {:?}), ", r.path, child));
+                }
+                code.push_str(&format!(
+                    "const __ROUTES: &[(&str, &str)] = &[{}];\n\n",
+                    entries
+                ));
+                code.push_str(
+                    "fn __route_match<'a>(\n    routes: &'a [(&'a str, &'a str)],\n    path: &str,\n) -> Option<(&'a str, &'a str, std::collections::HashMap<String, String>)> {\n    let path_segs: Vec<&str> = path\n        .trim_matches('/')\n        .split('/')\n        .filter(|s| !s.is_empty())\n        .collect();\n    for (pattern, page) in routes {\n        let pat_segs: Vec<&str> = pattern\n            .trim_matches('/')\n            .split('/')\n            .filter(|s| !s.is_empty())\n            .collect();\n        if pat_segs.len() != path_segs.len() {\n            continue;\n        }\n        let mut params = std::collections::HashMap::new();\n        let mut ok = true;\n        for (p, a) in pat_segs.iter().zip(path_segs.iter()) {\n            if let Some(name) = p.strip_prefix(':') {\n                params.insert(name.to_string(), a.to_string());\n            } else if p != a {\n                ok = false;\n                break;\n            }\n        }\n        if ok {\n            return Some((*pattern, *page, params));\n        }\n    }\n    None\n}\n\n",
+                );
+            }
+        }
 
         // Pre-scan handlers to find local variables from function calls (likely Value type)
         self.scan_handler_locals(widget);
@@ -1901,6 +1981,12 @@ fn collect_local_elems(
             code.push_str(&format!("    {}({}),\n", child_name, child_msg));
         }
 
+        // PLAN-052：路由导航变体（多路由根与页面件共用——页面件把它折成
+        // __nav_request，根直接 __apply_route）。
+        if self.router_root || self.router_page {
+            code.push_str("    __Navigate(String),\n");
+        }
+
         // If async Init detected, add __InitLoaded variant (injected as raw string
         // because Vec<serde_json::Value> doesn't map to any AST Type variant)
         if self.init_api_info.is_some() {
@@ -2022,6 +2108,19 @@ fn collect_local_elems(
                 code.push_str(&format!("    pub {}: {},\n", field, store_name));
             }
         } // !is_store_itself — skip store field injection for store structs
+        // PLAN-052：路由态字段（根：当前路径 + 参数表；页面件：参数表 +
+        // 导航请求——点击/推送后由父 App 消费）。
+        if self.router_root {
+            code.push_str("    pub __route: String,\n");
+            code.push_str(
+                "    pub __route_params: std::collections::HashMap<String, String>,\n",
+            );
+        } else if self.router_page {
+            code.push_str(
+                "    pub __route_params: std::collections::HashMap<String, String>,\n",
+            );
+            code.push_str("    pub __nav_request: Option<String>,\n");
+        }
         if is_root {
             // Record root state fields for child widgets to pick up.
             ROOT_STATE_FIELDS.with(|rsf| {
@@ -2257,6 +2356,18 @@ fn collect_local_elems(
                 }
             }
         }
+        // PLAN-052：路由态初值（根："/" 起始；页面件：空参数/无请求）。
+        if self.router_root {
+            code.push_str("            __route: \"/\".to_string(),\n");
+            code.push_str(
+                "            __route_params: std::collections::HashMap::new(),\n",
+            );
+        } else if self.router_page {
+            code.push_str(
+                "            __route_params: std::collections::HashMap::new(),\n",
+            );
+            code.push_str("            __nav_request: None,\n");
+        }
 
         // Plan 371 L3: close struct literal. If force_self (sync_init or
         // persistent children), use __self pattern and add post-construct code.
@@ -2299,6 +2410,18 @@ fn collect_local_elems(
                         code.push_str(&format!("        {}\n", stmt));
                     }
                 }
+            }
+            if self.router_root {
+                // PLAN-052：初始路由（首条 routes 声明路径）——页面件
+                // Init 在此拿到路由参数（App Init 已先行）。
+                let first = match &self.outlet_route {
+                    OutletRoute::Multi(routes) => routes
+                        .first()
+                        .map(|r| r.path.clone())
+                        .unwrap_or_else(|| "/".to_string()),
+                    _ => "/".to_string(),
+                };
+                code.push_str(&format!("        __self.__apply_route({:?});\n", first));
             }
             code.push_str("        __self\n");
         } else {
@@ -2447,7 +2570,11 @@ fn collect_local_elems(
 
         code.push_str("}\n");
 
-        // PLAN-052：值返回 handler 的 __call_X 型化辅助方法——固有 impl
+        // PLAN-052：多路由根的路由应用方法（固有 impl）。
+        if self.router_root {
+            code.push_str(&self.generate_apply_route_method());
+        }
+
         // （trait impl 内不允许额外方法，E0407 株）；on() 臂与表达式位
         // 调用共用。
         if !self.value_returning.is_empty() {
@@ -2617,6 +2744,49 @@ fn collect_local_elems(
     }
 
     /// Generate on() method implementation
+    /// PLAN-052：多路由根的路由应用方法（固有 impl）——匹配路径 → 当前
+    /// 路由态/参数表 + 目标页参数与 store 同步 + 重放页 Init。
+    fn generate_apply_route_method(&self) -> String {
+        let widget = self.current_widget.clone().unwrap_or_default();
+        let has_store = STORE_NAMES.with(|sn| !sn.borrow().is_empty());
+        let mut arms = String::new();
+        if let OutletRoute::Multi(routes) = &self.outlet_route {
+            for r in routes {
+                let child = route_child_name(r);
+                let field = Self::child_field_name(&child);
+                let alias = self.child_store_alias(&child);
+                let msg_ty = CHILD_MSG_TYPES.with(|m| m.borrow().get(&child).cloned())
+                    .unwrap_or_else(|| format!("{}Msg", child));
+                let has_init = WIDGET_HAS_INIT.with(|s| s.borrow().contains(&child));
+                let mut body = format!(
+                    "            self.{}.__route_params = self.__route_params.clone();\n",
+                    field
+                );
+                if has_store {
+                    body.push_str(&format!(
+                        "            self.{}.store = self.{}.clone();\n",
+                        field, alias
+                    ));
+                }
+                if msg_ty != "()" && has_init {
+                    body.push_str(&format!(
+                        "            self.{}.on({}::Init);\n",
+                        field, msg_ty
+                    ));
+                }
+                arms.push_str(&format!(
+                    "        {:?} => {{\n{}        }}\n",
+                    child, body
+                ));
+            }
+        }
+        format!(
+            "impl {widget} {{\n    /// PLAN-052：应用路由——匹配路径 → 当前路由态/参数表 + 目标页参数\\n    /// 与 store 同步 + 重放页 Init。\n    pub fn __apply_route(&mut self, __path: &str) {{\n        if let Some((_pat, __page, __params)) = __route_match(__ROUTES, __path) {{\n            self.__route = __path.to_string();\n            self.__route_params = __params;\n            match __page {{\n{arms}                _ => {{}}\n            }}\n        }} else {{\n            self.__route = __path.to_string();\n            self.__route_params.clear();\n        }}\n    }}\n}}\n",
+            widget = widget,
+            arms = arms
+        )
+    }
+
     fn generate_on_method(&mut self, widget: &AuraWidget) -> String {
         let mut code = String::new();
         let msg_name = self.current_msg_name();
@@ -2625,6 +2795,20 @@ fn collect_local_elems(
 
         if !self.message_variants.is_empty() {
             code.push_str("        match msg {\n");
+
+            // PLAN-052：路由导航变体——根直接应用；页面件落 __nav_request
+            // 由父 App 在转发后消费（按钮/link 点击与 router.push 同径）。
+            if self.router_root {
+                code.push_str(&format!(
+                    "            {}::__Navigate(__p) => {{ self.__apply_route(&__p); }}\n",
+                    msg_name
+                ));
+            } else if self.router_page {
+                code.push_str(&format!(
+                    "            {}::__Navigate(__p) => {{ self.__nav_request = Some(__p); }}\n",
+                    msg_name
+                ));
+            }
 
             // PLAN-674 T-03：menubar 合成变体臂（开合态 = action_config
             // 全局面——与 VM 轨 renderer.rs __menubar_toggle/__menubar_close
@@ -2962,12 +3146,35 @@ fn collect_local_elems(
                     // SelectPinned sets store.active_folder). Sync store back so the
                     // parent sees the change. Private state (editing etc.) persists
                     // in the field and needs no sync.
-                    code.push_str(&format!("                self.{}.on(inner);\n", field_name));
-                    // Sync store back if the child has one.
+                    // PLAN-052：路由页的 store 归属可能是非规范兄弟 store——
+                    // 先把父侧对应别名字段灌入子件，再转发，再回写。
                     let has_store = STORE_NAMES.with(|sn| !sn.borrow().is_empty());
+                    let store_alias = self.child_store_alias(child_name);
                     if has_store {
                         code.push_str(&format!(
-                            "                self.store = self.{}.store.clone();\n",
+                            "                self.{}.store = self.{}.clone();\n",
+                            field_name, store_alias
+                        ));
+                    }
+                    code.push_str(&format!("                self.{}.on(inner);\n", field_name));
+                    // Sync store back if the child has one.
+                    if has_store {
+                        if store_alias == "store" {
+                            code.push_str(&format!(
+                                "                self.store = self.{}.store.clone();\n",
+                                field_name
+                            ));
+                        } else {
+                            code.push_str(&format!(
+                                "                self.{} = self.{}.store.clone();\n",
+                                store_alias, field_name
+                            ));
+                        }
+                    }
+                    // PLAN-052：路由页导航请求 → 根路由态。
+                    if self.router_root {
+                        code.push_str(&format!(
+                            "                if let Some(__p) = self.{}.__nav_request.take() {{ self.__apply_route(&__p); }}\n",
                             field_name
                         ));
                     }
@@ -8316,6 +8523,37 @@ fn collect_local_elems(
                         format!("self.{field}.view().map_msg(|m| {msg_name}::{module}(m))")
                     }
                 }
+                OutletRoute::Multi(routes) => {
+                    // PLAN-052：静态路由 outlet——路径匹配 → 对应页面件
+                    // 渲染（参数/兄弟 store 同步后 view + msg 包装）。
+                    let msg_name = self.current_msg_name();
+                    let has_store = STORE_NAMES.with(|sn| !sn.borrow().is_empty());
+                    let mut arms = String::new();
+                    for r in &routes {
+                        let child = route_child_name(r);
+                        let field = Self::child_field_name(&child);
+                        let alias = self.child_store_alias(&child);
+                        let store_sync = if has_store {
+                            format!("__c.store = self.{}.clone(); ", alias)
+                        } else {
+                            String::new()
+                        };
+                        arms.push_str(&format!(
+                            "    {pat:?} => {{ let mut __c = self.{field}.clone(); \
+                             __c.__route_params = self.__route_params.clone(); \
+                             {store_sync}\
+                             __c.view().map_msg(|m| {msg}::{child}(m)) }}\n",
+                            pat = child,
+                            field = field,
+                            store_sync = store_sync,
+                            msg = msg_name,
+                            child = child
+                        ));
+                    }
+                    format!(
+                        "{{ match __route_match(__ROUTES, &self.__route).map(|(_, __p, _)| __p).unwrap_or(\"\") {{\n{arms}    _ => View::empty(),\n}} }}"
+                    )
+                }
                 OutletRoute::Reject => {
                     let msg = "a2r codegen: multi-route/parametric `routes` + `outlet` not yet supported (PLAN-039 D5: single-route folding only; router family tracked as P039 debt)";
                     format!("{{ std::compile_error!(\"{msg}\"); unreachable!() }}")
@@ -8333,6 +8571,45 @@ fn collect_local_elems(
                 children,
                 ..
             } => {
+                // PLAN-052：路由上下文里 link(to:) 发射为可点击按钮——
+                // 点击发 __Navigate（根直接应用；页面件落 __nav_request 由
+                // 父 App 消费）。标签/样式取子 text 件，缺省 to 文本。
+                if (self.router_root || self.router_page) && !to.is_empty() {
+                    let msg = self.current_msg_name();
+                    let mut label = if !text.is_empty() {
+                        text.clone()
+                    } else {
+                        to.clone()
+                    };
+                    let mut style = "text-blue-600 underline cursor-pointer".to_string();
+                    if children.len() == 1 {
+                        if let AuraNode::Element {
+                            tag,
+                            props,
+                            children: tch,
+                            ..
+                        } = &children[0]
+                        {
+                            if tag == "text" {
+                                if let Some(AuraNode::Text(AuraTextContent::Literal(s))) =
+                                    tch.first()
+                                {
+                                    label = s.clone();
+                                }
+                                if let Some(AuraPropValue::Expr(
+                                    auto_lang_core::ast::Expr::Str(s),
+                                )) = props.get("style")
+                                {
+                                    style = s.to_string();
+                                }
+                            }
+                        }
+                    }
+                    return format!(
+                        "View::button({:?}.to_string()).style({:?}).on_click(|_| {}::__Navigate({:?}.to_string())).build()",
+                        label, style, msg, to
+                    );
+                }
                 // Render link as styled text (no routing in compiled Rust).
                 // PLAN-026 T-02：有子件时组合子件（col）——原实现无条件落
                 // to/href 占位标签，`link (to:) { text … }` 主形态子件内容
@@ -15201,6 +15478,32 @@ fn collect_local_elems(
                 format!("{} {} {}", left_wrapped, op_str, right_wrapped)
             }
             Expr::Call(call) => {
+                // PLAN-052：router 内建——push 应用/请求路由，param 读参数表
+                //（多路由静态发射；页面件 push 落 __nav_request）。
+                if let Expr::Dot(obj, method) = call.name.as_ref() {
+                    if matches!(obj.as_ref(), Expr::Ident(n) if n.as_str() == "router") {
+                        let m = method.as_str();
+                        let arg = call
+                            .args
+                            .args
+                            .first()
+                            .map(|a| self.ast_expr_to_rust(&a.get_expr()))
+                            .unwrap_or_else(|| "String::new()".to_string());
+                        if m == "push" {
+                            return if self.router_root {
+                                format!("self.__apply_route(&({}))", arg)
+                            } else {
+                                format!("{{ self.__nav_request = Some({}); }}", arg)
+                            };
+                        }
+                        if m == "param" {
+                            return format!(
+                                "self.__route_params.get(&({})).cloned().unwrap_or_default()",
+                                arg
+                            );
+                        }
+                    }
+                }
                 let fn_name: String = call
                     .get_name_text_safe()
                     .map(|s| s.to_string())
@@ -15973,7 +16276,7 @@ pub fn register_store_msg_payloads(stores: &[auto_ui_dialect::ast::StoreDecl]) {
 
 /// PLAN-052：按 store 名推断别名字段名（PascalCase 型名 → snake_case；
 /// 仅用于未 `use` 导入但被调用的 store 的按需注册）。
-fn store_alias_of(store_name: &str) -> String {
+pub fn store_alias_of(store_name: &str) -> String {
     let mut out = String::new();
     for (i, ch) in store_name.chars().enumerate() {
         if ch.is_uppercase() {
@@ -16056,6 +16359,62 @@ fn scalar_to_auto_value_expr(receiver: &str, field: &str, ty: &str) -> String {
 ///      format, println, String, Vec, ...) → append `_` suffix.
 /// Applied to `for`-loop variables so `for todo in ...` doesn't collide with
 /// the `todo!()` macro.
+/// PLAN-052：路由条目 → 子件名（widget_name 优先：页面组件型名；缺省
+/// module——Vue 轨页面路径名）。
+fn route_child_name(route: &crate::aura::AuraRoute) -> String {
+    // PLAN-052：页面件型名以 module（页面文件名）为准——Fold 先例；
+    // AuraRoute.widget_name 是 capitalize_module 派生，非源文件 widget 名
+    //（blog 页面 widget 名为小写 author/home…）。
+    route.module.clone()
+}
+
+/// PLAN-052：语句树是否引用 `router.*`（push/param）——页面件判定。
+fn stmts_use_router(stmts: &[auto_lang_core::ast::Stmt]) -> bool {
+    use auto_lang_core::ast::{Expr, Stmt};
+    fn walk_expr(e: &Expr) -> bool {
+        match e {
+            Expr::Call(c) => {
+                if let Expr::Dot(obj, _) = c.name.as_ref() {
+                    if matches!(obj.as_ref(), Expr::Ident(n) if n.as_str() == "router") {
+                        return true;
+                    }
+                }
+                c.args.args.iter().any(|a| walk_expr(&a.get_expr()))
+            }
+            Expr::Bina(l, _, r) => walk_expr(l) || walk_expr(r),
+            Expr::Unary(_, i) => walk_expr(i),
+            Expr::Index(t, i) => walk_expr(t) || walk_expr(i),
+            Expr::Dot(inner, _) => walk_expr(inner),
+            Expr::Object(pairs) => pairs.iter().any(|p| walk_expr(&p.value)),
+            Expr::Array(items) => items.iter().any(walk_expr),
+            _ => false,
+        }
+    }
+    stmts.iter().any(|st| match st {
+        Stmt::Expr(e) => walk_expr(e),
+        Stmt::Return(e) => walk_expr(e),
+        Stmt::Store(s) => walk_expr(&s.expr),
+        Stmt::If(i) => {
+            i.branches
+                .iter()
+                .any(|b| walk_expr(&b.cond) || stmts_use_router(&b.body.stmts))
+                || i.else_
+                    .as_ref()
+                    .map_or(false, |e| stmts_use_router(&e.stmts))
+        }
+        Stmt::For(f) => walk_expr(&f.range) || stmts_use_router(&f.body.stmts),
+        Stmt::Try(t) => {
+            stmts_use_router(&t.body.stmts)
+                || stmts_use_router(&t.catch_body.stmts)
+                || t.finally_body
+                    .as_ref()
+                    .map_or(false, |fb| stmts_use_router(&fb.stmts))
+        }
+        Stmt::Block(b) => stmts_use_router(&b.stmts),
+        _ => false,
+    })
+}
+
 fn sanitize_rust_ident(name: &str) -> String {
     // Rust reserved keywords (2021 edition) that can't be bare identifiers.
     const RUST_KEYWORDS: &[&str] = &[
