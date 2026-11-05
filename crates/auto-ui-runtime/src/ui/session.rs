@@ -4893,7 +4893,7 @@ impl DesktopSession {
                 // PLAN-060 扩展：宿主窗 rect 与 child 表面尺寸不同（投影缩放）
                 // 时按比例把 canvas 局部坐标换算回 child 表面坐标，否则
                 // 指针永远落在错误控件上（calendar「>」delivered=true 但无反应）。
-                let (lx, ly) = broker_surface_local(client, wid, x - rect.x, y - rect.y, rect.w, rect.h);
+                let (lx, ly) = broker_surface_local(client, wid, x - rect.x, y - rect.y, rect.width, rect.height);
                 let input = ProtocolMsg::Input(InputMsg::PointerPressed {
                     wid: wid.0,
                     button,
@@ -4932,7 +4932,7 @@ impl DesktopSession {
         };
         for client in self.broker_clients.values_mut() {
             if client.owns_wid(wid) {
-                let (lx, ly) = broker_surface_local(client, wid, x - rect.x, y - rect.y, rect.w, rect.h);
+                let (lx, ly) = broker_surface_local(client, wid, x - rect.x, y - rect.y, rect.width, rect.height);
                 let input = ProtocolMsg::Input(InputMsg::PointerReleased {
                     wid: wid.0,
                     button,
@@ -11161,6 +11161,7 @@ mod live_input_tests {
         assert!(!session.route_live_input(&LiveInput::Chars { text: "y".into() }));
     }
 }
+
 
 
 
