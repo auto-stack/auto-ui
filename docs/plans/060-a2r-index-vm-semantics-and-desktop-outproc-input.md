@@ -261,3 +261,9 @@ back 侧 `auto-notes-...-back` 是完整 axum/DB 实现。故 iced 桌面上任�
   - 实测：notes 重新生成编译通过；iced 桌面点击 `New note` 后窗口渲染 **"Untitled / Saved / Pin note / Delete / Just now / Tag / Start writing..."** 编辑器（截图 `tmp/autoui-screenshot-1793889521044.png`），数据落 `inbox.db`（前轮 n-2 行），帧 dump 同步显示同样文本。**AC-07 达成**（notes 建条 + 编辑面出现）。
   - 附带：桌面窗被最小化时 screenshot 报 zero-size；`ShowWindow(SW_RESTORE)` 可恢复（验收脚本需先恢复窗口）。
  | next: T-05 回归（todo/calendar、键入文本、六 app）
+
+- stage: work | plan_id: auto-ui/PLAN-060 | plan_revision: 1 | round: 8 | task_ids: T-05 | outcome: partial（文本输入未落字） | evidence:
+  - 指针定焦成功：点击编辑器正文后 `CharTyped` 到达 app 并派发 `EditorPanel(EditBody(""))`（说明 text_input 已聚焦、on_input 在跑），但每个字符的值都是空串 → **字符插入没有生效**（`ime_commit "hello"` 同样 `EditBody("")`）。
+  - 帧侧正常：每字符 `FRAME rev` 前进（rev 4→8），说明组件在更新；问题在 iced text_input 的事件形态（`KeyPressed{key:Character, text:Some}` 未被接受插入）或 headless 事件通道细节。
+  - 备注：notes 窗口 surface 480x320，窗口底部 y≈336 之外点击不命中（验收坐标需约束在 surface 内）；桌面窗被最小化时 screenshot 报 zero-size，需先 `ShowWindow(SW_RESTORE)`。
+ | next: T-05 续（text_input 插入事件形态定位：对照 iced 0.14 text_input on_event 的 KeyPressed/InputMethod 分支）
