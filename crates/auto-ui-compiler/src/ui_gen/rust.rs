@@ -154,10 +154,11 @@ pub struct RustGenerator {
     /// PLAN-052：按引用绑定的循环变量（for/map over .iter() → &T）——
     /// 索引强转/数值 payload 需显式解引用（E0606/E0308 &T 株）。
     ref_loop_vars: std::collections::HashSet<String>,
-    /// PLAN-052：值返回 handler 表（变体名 → (形参名序, 返回型)）——
-    /// 表达式位自消息发送（calendar `.FmtDate(...)` 株）经 `__call_X`
-    /// 型化辅助方法供给真值；on() 臂同委托。
-    value_returning: std::collections::HashMap<String, (Vec<String>, &'static str)>,
+    /// PLAN-052：值返回 handler 表（变体名 → 返回型）——表达式位自
+    /// 消息发送（calendar `.FmtDate(...)` 株）经 `__call_X` 型化辅助
+    /// 方法供给真值；on() 臂同委托。形参名/型在发射点惰性解析
+    /// （collect 期 message_variants 未装载——曾致空形参 E0061 株）。
+    value_returning: std::collections::HashMap<String, &'static str>,
     /// PLAN-026 T-03 配套: handler 局部 List<int> 变量(db 层惯例发射
     /// Vec<i64>;元素消费统一窄化 as i32,与 i32 模型字段/字面语境对齐)。
     handler_int_list_vars: std::cell::RefCell<std::collections::HashSet<String>>,
@@ -2041,10 +2042,20 @@ impl RustGenerator {
         // 调用共用。
         if !self.value_returning.is_empty() {
             code.push_str(&format!("impl {} {{\n", widget_name));
-            for (variant, (names, kind)) in &self.value_returning {
+            for (variant, kind) in &self.value_returning {
                 let variant_info = self.message_variants.iter().find(|v| v.name == *variant);
                 let types: Vec<String> = variant_info
                     .map(|v| v.payload.iter().map(|t| self.auto_type_to_rust(t)).collect())
+                    .unwrap_or_default();
+                let names: Vec<String> = variant_info
+                    .map(|v| {
+                        widget
+                            .handlers
+                            .iter()
+                            .find(|(p, _)| self.extract_variant_name(p) == *variant)
+                            .map(|(pattern, _)| self.extract_payload_names(pattern, v))
+                            .unwrap_or_default()
+                    })
                     .unwrap_or_default();
                 let params: Vec<String> = names
                     .iter()
@@ -2326,9 +2337,12 @@ impl RustGenerator {
                     if !body_redundant && !body.trim().is_empty() {
                         code.push_str(&format!("                {}\n", body));
                     }
-                } else if let Some((vr_names, _)) = self.value_returning.get(&variant_name) {
+                } else if self.value_returning.contains_key(&variant_name) {
                     // PLAN-052：值返回 handler 的臂委托 __call_X（unit 上下文，
-                    // 尾部 `;` 收型）。
+                    // 尾部 `;` 收型）。形参名发射点解析（collect 期未装载）。
+                    let vr_names = variant_info
+                        .map(|v| self.extract_payload_names(pattern, v))
+                        .unwrap_or_default();
                     let call = if vr_names.is_empty() {
                         format!("self.__call_{}();", variant_name)
                     } else {
@@ -2586,35 +2600,9 @@ impl RustGenerator {
 
         code.push_str("    }\n");
 
-        // PLAN-052：值返回 handler 的 __call_X 型化辅助方法（on() 臂与
-        // 表达式位调用共用；calendar .FmtDate/.DaysInMonth 株）。
-        for (variant, (names, kind)) in &self.value_returning {
-            let variant_info = self.message_variants.iter().find(|v| v.name == *variant);
-            let types: Vec<String> = variant_info
-                .map(|v| v.payload.iter().map(|t| self.auto_type_to_rust(t)).collect())
-                .unwrap_or_default();
-            let params: Vec<String> = names
-                .iter()
-                .zip(types.iter())
-                .map(|(n, t)| format!("{}: {}", n, t))
-                .collect();
-            let body = widget
-                .handlers
-                .iter()
-                .find(|(p, _)| self.extract_variant_name(p) == *variant)
-                .map(|(_, payload)| self.generate_handler_body(payload))
-                .unwrap_or_default();
-            code.push_str(&format!(
-                "    fn __call_{}(&mut self, {}) -> {} {{\n        {}\n    }}\n\n",
-                variant,
-                params.join(", "),
-                kind,
-                body
-            ));
-        }
-
         code
     }
+
     /// Generate view() method implementation
     fn generate_view_method(&mut self, widget: &AuraWidget) -> String {
         let mut code = String::new();
@@ -14653,13 +14641,7 @@ fn collect_value_returning(gen: &mut RustGenerator, widget: &AuraWidget) {
         let LogicPayload::AstStmts(stmts) = payload else { continue };
         let Some(kind) = scan_return_kind(stmts) else { continue };
         let variant_name = gen.extract_variant_name(pattern);
-        let names = gen
-            .message_variants
-            .iter()
-            .find(|v| v.name == variant_name)
-            .map(|v| gen.extract_payload_names(pattern, v))
-            .unwrap_or_default();
-        gen.value_returning.insert(variant_name, (names, kind));
+        gen.value_returning.insert(variant_name, kind);
     }
 }
 
