@@ -5266,6 +5266,24 @@ fn collect_local_elems(
                 // 与 VM 臂同表）；preset 前置、user class 后置（后类胜，与 VM 臂同语义）。
                 let props = self.with_button_preset(tag, props);
                 let props: &std::collections::HashMap<String, AuraPropValue> = props.as_ref();
+                // A bare Text has no event slot. Keep its appearance and
+                // capture its typed click message in the existing hit-area
+                // primitive instead of dropping the event in a leaf shortcut.
+                if tag == "text" && events.len() == 1 {
+                    if let Some(click) = events.get("onclick") {
+                        let mut display_node = node.clone();
+                        if let AuraNode::Element { events, .. } = &mut display_node {
+                            events.clear();
+                        }
+                        let display = self.generate_view_tree(&display_node);
+                        let message = self.handler_to_rust_direct_msg(&click.handler, &click.params);
+                        return format!(
+                            "View::MouseArea {{ content: Box::new({display}), on_enter: None, on_exit: None, \
+                             on_double_click: None, on_click: Some({message}), on_context_menu: None, \
+                             on_release: None, on_move: None, logical_extent: None, style: None }}"
+                        );
+                    }
+                }
                 // PLAN-036 T-02：prop 迭代序确定化——HashMap RandomState
                 // 进程间随机序曾致再生成漂移（freshness 门字节对拍所需）。
                 let props_sorted: Vec<(&String, &AuraPropValue)> = {
@@ -6099,7 +6117,9 @@ fn collect_local_elems(
 
                 // For text elements with a "text" prop and no extra styling/events,
                 // emit View::text("content") or View::text(format!(...)) directly.
-                if tag == "text" && children.is_empty() && events.is_empty() {
+                let literal_text_style = props.get("style").or_else(|| props.get("class"))
+                    .map_or(true, |style| matches!(style, AuraPropValue::Expr(auto_lang_core::ast::Expr::Str(_))));
+                if tag == "text" && children.is_empty() && events.is_empty() && literal_text_style {
                     let style_count = props.keys().filter(|k| *k != "text").count();
                     if style_count == 0 {
                         if let Some(AuraPropValue::Expr(auto_lang_core::ast::Expr::Str(s))) =
@@ -8143,6 +8163,26 @@ fn collect_local_elems(
                     && (children.is_empty() || child_text_content.is_some())
                     && has_styling
                 {
+                    if let Some(AuraPropValue::Expr(style)) = props.get("style").or_else(|| props.get("class")) {
+                        if !matches!(style, auto_lang_core::ast::Expr::Str(_)) {
+                            let content = if let Some(name) = &text_state_ref {
+                                let reference = if self.is_loop_var(name) { name.to_string() } else { format!("self.{name}") };
+                                Some(format!("format!(\"{{}}\", {reference})"))
+                            } else if let Some(text) = &text_rust_expr {
+                                Some(format!("format!(\"{{}}\", {text})"))
+                            } else {
+                                text_prop.as_ref().map(|label| self.interpolate_str(label))
+                            };
+                            if let Some(content) = content {
+                                let user_style = self.ast_expr_to_rust(style);
+                                let classes = match Self::heading_default_style(tag.as_str()) {
+                                    Some(default) => format!("format!(\"{default} {{}}\", {user_style})"),
+                                    None => user_style,
+                                };
+                                return format!("View::text_styled({content}, ({classes}).as_str())");
+                            }
+                        }
+                    }
                     let user_style = props
                         .get("style")
                         .or_else(|| props.get("class"))
@@ -17209,6 +17249,37 @@ widget App {
     fn test_rust_generator_creation() {
         let gen = RustGenerator::new();
         assert!(gen.current_widget.is_none());
+    }
+
+    #[test]
+    fn p060_clickable_text_preserves_typed_message_and_dynamic_style() {
+        let src = r#"widget ClickText {
+            msg { Select(int) }
+            model {
+                var done bool = false
+                var labels List<str> = ["中文任务"]
+            }
+            view {
+                row {
+                    for i, label in .labels {
+                        text label {
+                            onclick: .Select(i)
+                            style: if .done { "line-through" } else { "cursor-pointer" }
+                        }
+                    }
+                }
+            }
+        }"#;
+        let ast = crate::parse_ui(src).expect("parse clickable text");
+        let decl = ast.domain_stmts().find_map(|s| match s {
+            auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d), _ => None,
+        }).unwrap();
+        let widget = crate::aura::extract::extract_widget_from_decl(decl).unwrap();
+        let code = RustGenerator::new().generate(&widget).unwrap();
+        assert!(code.contains("View::MouseArea"), "text click must have an actual hit target: {code}");
+        assert!(code.contains("on_click: Some(ClickTextMsg::Select(i))"),
+            "the clicked row's integer payload must survive generation: {code}");
+        assert!(code.contains("if self.done"), "conditional text styling must not disappear: {code}");
     }
 
     #[test]

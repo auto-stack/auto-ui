@@ -7590,9 +7590,9 @@ pub(crate) fn resolve_managed_front(project_dir: &Path) -> AutoResult<ManagedFro
 /// files). Content-level manifest drift is additionally caught by
 /// `front_needs_regeneration` recomputing the manifest text; main.rs-level
 /// generator changes without a bump are a recorded boundary.
-// PLAN-060: invalidate unchanged inputs after fixing table-row loop spreading
-// and JSON-backed cell text, in addition to the earlier named-input emission.
-const FRONT_LAYOUT_VERSION: &str = "front-layout/v4";
+// PLAN-060: invalidate unchanged inputs after fixing text click/style emission,
+// in addition to the earlier table-row and named-input corrections.
+const FRONT_LAYOUT_VERSION: &str = "front-layout/v5";
 
 fn front_generator_identity(context: &GeneratedBuildContext) -> String {
     format!(
