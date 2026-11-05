@@ -5502,6 +5502,7 @@ impl DesktopSession {
                     ..
                 } => {
                     // PLAN-683：槽内载荷种类 tag 分派（2 = v2 → v2 槽）。
+                    eprintln!("[plan060] frame compose wid={wid} frame_id={frame_id} slot={slot}");
                     let slot_payload = client
                         .shm
                         .get(&surface)
@@ -11104,4 +11105,5 @@ mod live_input_tests {
         assert!(!session.route_live_input(&LiveInput::Chars { text: "y".into() }));
     }
 }
+
 
