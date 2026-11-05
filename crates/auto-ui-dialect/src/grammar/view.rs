@@ -289,8 +289,49 @@ pub(crate) fn parse_view_root_nodes(cx: &mut dyn DomainParseContext) -> AutoResu
 }
 
 /// Parse a single view node
+/// Parse nested element bodies with a heap frame stack. Control-flow bodies
+/// re-enter this driver, but element depth no longer retains a Rust frame with
+/// every expression/property parser temporary (about 78 KB per level in debug).
 pub(crate) fn parse_view_node(cx: &mut dyn DomainParseContext) -> AutoResult<ViewNode> {
-    let start_pos = cx.cur_pos();
+    let mut parents: Vec<ViewNode> = Vec::new();
+    let mut node = parse_view_start(cx)?;
+    loop {
+        if matches!(node, ViewNode::Element { .. }) && cx.is_kind(TokenKind::LBrace) {
+            cx.advance();
+            parents.push(node);
+        } else if let Some(parent) = parents.last_mut() {
+            let ViewNode::Element { children, .. } = parent else { unreachable!() };
+            children.push(node);
+        } else {
+            return Ok(node);
+        }
+        loop {
+            cx.skip_empty_lines();
+            if cx.is_kind(TokenKind::RBrace) {
+                cx.expect(TokenKind::RBrace)?;
+                if cx.is_kind(TokenKind::LBrace) {
+                    // Consecutive blocks belong to the same element.
+                    cx.advance();
+                    continue;
+                }
+                node = parents.pop().expect("element body owner");
+                if let ViewNode::Element { span: Some((start, len)), .. } = &mut node {
+                    *len = cx.cur_pos().pos - *start;
+                }
+                break;
+            }
+            if cx.is_kind(TokenKind::EOF) {
+                cx.expect(TokenKind::RBrace)?;
+            }
+            if !parse_element_property(cx, parents.last_mut().expect("element body owner"))? {
+                node = parse_view_start(cx)?;
+                break;
+            }
+        }
+    }
+}
+
+fn parse_view_start(cx: &mut dyn DomainParseContext) -> AutoResult<ViewNode> {
     cx.skip_empty_lines();
 
     // Check for "for" keyword: for item in .list { body }
@@ -388,6 +429,11 @@ pub(crate) fn parse_view_node(cx: &mut dyn DomainParseContext) -> AutoResult<Vie
     // aura extractor checks if the tag name matches a registered fragment.
     // This avoids interfering with normal component parsing.
 
+    parse_element_head(cx)
+}
+
+fn parse_element_head(cx: &mut dyn DomainParseContext) -> AutoResult<ViewNode> {
+    let start_pos = cx.cur_pos();
     // Parse element tag
     let tag = cx.cur_text().to_string();
     cx.advance();
@@ -681,22 +727,14 @@ pub(crate) fn parse_view_node(cx: &mut dyn DomainParseContext) -> AutoResult<Vie
         }
     }
 
-    // Parse children or inline props/events in braces
-    // Support syntax: col { child1 child2 style: "..." }
-    // Also supports primary prop shorthand: text "Hello" { style: "..." }
-    // Plan 435 挂账②续:while 支持连写块 `div { style: ".." } { children }`
-    // (gallery 官方组件在用;首个块收 props,后续块收 children/props)
-    while cx.is_kind(TokenKind::LBrace) {
-        cx.advance();
-        cx.skip_empty_lines();
+    Ok(ViewNode::Element {
+        tag, props, events, children,
+        span: Some((start_pos.pos, cx.cur_pos().pos - start_pos.pos)),
+    })
+}
 
-        // Parse children (view nodes) and trailing props/events
-        while !cx.is_kind(TokenKind::RBrace) {
-            cx.skip_empty_lines();
-            if cx.is_kind(TokenKind::RBrace) {
-                break;
-            }
-
+fn parse_element_property(cx: &mut dyn DomainParseContext, node: &mut ViewNode) -> AutoResult<bool> {
+    let ViewNode::Element { props, events, .. } = node else { unreachable!() };
             // Check if this looks like a prop: identifier followed by colon
             // e.g., "class:" or "onclick:"
             // "is" is a keyword token but a legitimate prop key
@@ -726,7 +764,8 @@ pub(crate) fn parse_view_node(cx: &mut dyn DomainParseContext) -> AutoResult<Vie
                 }
             };
 
-            if is_prop_like {
+            if !is_prop_like { return Ok(false); }
+            {
                 // Parse as prop/event
                 let key = cx.cur_text().to_string();
                 cx.advance();
@@ -776,23 +815,8 @@ pub(crate) fn parse_view_node(cx: &mut dyn DomainParseContext) -> AutoResult<Vie
                 if cx.is_kind(TokenKind::Comma) || cx.is_kind(TokenKind::Semi) {
                     cx.advance();
                 }
-            } else {
-                // Parse as child view node
-                let child = parse_view_node(cx)?;
-                children.push(child);
             }
-            cx.skip_empty_lines();
-        }
-        cx.expect(TokenKind::RBrace)?;
-    }
-
-    Ok(ViewNode::Element {
-        tag,
-        props,
-        events,
-        children,
-        span: Some((start_pos.pos, cx.cur_pos().pos - start_pos.pos)),
-    })
+    Ok(true)
 }
 
 /// Parse style binding: { completed: todo.done, editing: todo.editing }
@@ -1134,68 +1158,47 @@ pub(crate) fn parse_view_memo_block(cx: &mut dyn DomainParseContext) -> AutoResu
 
 /// Parse conditional in view: if condition { then_body } else { else_body }
 pub(crate) fn parse_view_conditional(cx: &mut dyn DomainParseContext) -> AutoResult<ViewNode> {
-    let start_pos = cx.cur_pos();
-    cx.expect_ident("if")?;
-
-    // Parse condition expression (until we hit '{')
-    let condition = parse_condition_expr(cx)?;
-
-    // Parse then body
-    cx.expect(TokenKind::LBrace)?;
-    cx.skip_empty_lines();
-
-    let mut then_body = Vec::new();
-    while !cx.is_kind(TokenKind::RBrace) {
-        cx.skip_empty_lines();
-        if cx.is_kind(TokenKind::RBrace) {
-            break;
+    let mut arms = Vec::new();
+    let mut tail = None;
+    loop {
+        let start = cx.cur_pos().pos;
+        cx.expect_ident("if")?;
+        let condition = parse_condition_expr(cx)?;
+        let then_body = parse_control_body(cx)?;
+        arms.push((start, condition, then_body));
+        if cx.cur_text().as_str() != "else" { break; }
+        cx.expect_ident("else")?;
+        if cx.cur_text().as_str() == "if" { continue; }
+        tail = Some(parse_control_body(cx)?);
+        break;
+    }
+    let end = cx.prev_pos().pos + cx.prev_pos().len;
+    let mut result = None;
+    while let Some((start, condition, then_body)) = arms.pop() {
+        let node = ViewNode::Conditional {
+            condition, then_body, else_body: tail.take(),
+            span: Some((start, end - start)),
+        };
+        if arms.is_empty() {
+            result = Some(node);
+        } else {
+            tail = Some(vec![node]);
         }
-        let node = parse_view_node(cx)?;
-        then_body.push(node);
+    }
+    Ok(result.expect("at least one conditional arm"))
+}
+
+fn parse_control_body(cx: &mut dyn DomainParseContext) -> AutoResult<Vec<ViewNode>> {
+    cx.expect(TokenKind::LBrace)?;
+    let mut body = Vec::new();
+    loop {
         cx.skip_empty_lines();
+        if cx.is_kind(TokenKind::RBrace) { break; }
+        if cx.is_kind(TokenKind::EOF) { cx.expect(TokenKind::RBrace)?; }
+        body.push(parse_view_node(cx)?);
     }
     cx.expect(TokenKind::RBrace)?;
-
-    // Check for else clause
-    let else_body = if cx.cur_text().as_str() == "else" {
-        cx.expect_ident("else")?;
-        // Plan 367 P2-1: support "else if" chains by peeking for "if"
-        // after "else". If found, recursively parse the conditional
-        // and wrap it as a single-element else_body. This naturally
-        // handles multi-level "else if ... else if ... else" chains.
-        if cx.cur_text().as_str() == "if" {
-            let nested = parse_view_conditional(cx)?;
-            Some(vec![nested])
-        } else {
-            cx.expect(TokenKind::LBrace)?;
-            cx.skip_empty_lines();
-
-            let mut else_nodes = Vec::new();
-            while !cx.is_kind(TokenKind::RBrace) {
-                cx.skip_empty_lines();
-                if cx.is_kind(TokenKind::RBrace) {
-                    break;
-                }
-                let node = parse_view_node(cx)?;
-                else_nodes.push(node);
-                cx.skip_empty_lines();
-            }
-            cx.expect(TokenKind::RBrace)?;
-            Some(else_nodes)
-        }
-    } else {
-        None
-    };
-
-    Ok(ViewNode::Conditional {
-        condition,
-        then_body,
-        else_body,
-        span: Some((
-            start_pos.pos,
-            cx.prev_pos().pos + cx.prev_pos().len - start_pos.pos,
-        )),
-    })
+    Ok(body)
 }
 
 /// Parse navigation link in view: link (to: "/path") { children } (Plan 105)

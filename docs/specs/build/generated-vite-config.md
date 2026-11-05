@@ -34,3 +34,12 @@
   失败"，与消费方故障门（auto-blog BLOG-005 B-01）一致。
 - `optimizeDeps.include` 只作用于 dev 预打包；build/rollup 输出配置不在
   本合同内。
+
+## 4. 桌面应用集合（PLAN-053）
+
+桌面宿主的依赖来源扩展为宿主与本次获准嵌入应用声明的并集，存于生成的
+`desktop-npm-deps.json`；生成与桌面 run 自愈共用该集合。非桌面仍使用
+`VueProject::npm_deps`。过滤和字符串转义规则不变。仅 `AUTO_DESKTOP=1`
+时读取本次启动写入的 `desktop-proxies.json`，按应用 API 前缀转发到各自
+后端；其他场景保留原单后端 `/api` 及 gallery `/apps` 配置。详见
+[桌面 API 面](desktop-api-surfaces.md)。

@@ -1045,6 +1045,19 @@ pub fn generate_vite_config(npm_deps: &[(String, String)]) -> String {
     r#"import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { resolve } from 'path'
+import { existsSync, readFileSync } from 'fs'
+
+const desktopRoutes = process.env.AUTO_DESKTOP === '1' && existsSync(resolve(__dirname, 'desktop-proxies.json'))
+  ? JSON.parse(readFileSync(resolve(__dirname, 'desktop-proxies.json'), 'utf8')) : []
+const desktopProxy = Object.fromEntries(desktopRoutes.map((route: {id: string, target: string, strip: boolean}) => {
+  const prefix = `/apps/${route.id}`
+  const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return [`^${escaped}/api(?:/|$)`, {
+    target: route.target,
+    changeOrigin: true,
+    rewrite: route.strip ? (path: string) => path.slice(prefix.length) : (path: string) => path,
+  }]
+}))
 
 export default defineConfig({
 __OPTIMIZE_DEPS__  base: './',
@@ -1082,6 +1095,7 @@ __OPTIMIZE_DEPS__  base: './',
     // Read the backend port at RUNTIME from AUTO_HTTP_PORT (set by `auto run -B`),
     // so the proxy target updates without regenerating vite.config.ts.
     proxy: {
+      ...desktopProxy,
       '/api': {
         target: process.env.AUTO_HTTP_PROXY || `http://127.0.0.1:${process.env.AUTO_HTTP_PORT || __PROXY_PORT__}`,
         changeOrigin: true,
@@ -1116,6 +1130,11 @@ pub fn refresh_vite_config(output_dir: &std::path::Path, npm_deps: &[(String, St
     if !vite_cfg_path.exists() {
         return;
     }
+    let desktop_deps: Option<Vec<(String, String)>> = if desktop_mode() {
+        fs::read_to_string(output_dir.join("desktop-npm-deps.json")).ok()
+            .and_then(|text| serde_json::from_str(&text).ok())
+    } else { None };
+    let npm_deps = desktop_deps.as_deref().unwrap_or(npm_deps);
     if let Err(e) = fs::write(&vite_cfg_path, generate_vite_config(npm_deps)) {
         println!("  ⚠ vite.config.ts refresh skipped: {}", e);
     }
@@ -5842,12 +5861,10 @@ export default router
     /// Plan 465 T3: desktop-host mode (`auto run --desktop` -> AUTO_DESKTOP=1).
     /// Full-scans each app dir via `VueProject::from_workspace` (sub-component
     /// widgets + store composables + npm deps, not just the entry file),
-    /// writes shared pieces into the host project (src/apps/<id>/App.vue root,
-    /// src/components/, src/stores/), then emits the build-time registry
+    /// writes app-owned pieces under src/apps/<id>/, then emits the build-time registry
     /// `src/apps-registry.ts` and the host shell `src/App.vue`.
-    /// v1 scope: front-only, single-view apps — apps needing an API client,
-    /// router pages, ext files or i18n locales are skipped with a warning
-    /// (registered limitation; see plan §3.3 known-limits approach).
+    /// PLAN-053 supports independent API clients and API-backed memory routes;
+    /// front-only router pages, ext files and i18n still retain their guards.
     pub fn generate_desktop_host(&self) -> AutoResult<()> {
         let apps_dir = desktop_apps_dir(&self.root_dir)?;
         self.generate_desktop_host_from_roots(apps_dir, desktop_extra_app_roots(&self.root_dir))
@@ -5901,19 +5918,12 @@ export default router
         let src_dir = self.output_dir.join("src");
         let apps_src = src_dir.join("apps");
         fs::create_dir_all(&apps_src).map_err(|e| format!("Failed to create src/apps: {}", e))?;
-        let components_dir = src_dir.join("components");
-        let stores_dir = src_dir.join("stores");
 
         let mut shadcn_needed: Vec<String> = Vec::new();
         let mut registry_rows: Vec<(String, String, String, String, bool)> = Vec::new();
-        let mut npm_merge: Vec<(String, String)> = Vec::new();
-        let mut claimed_stores: HashSet<String> = HashSet::new();
-        let mut claimed_components: HashSet<String> = HashSet::new();
+        let mut npm_merge: Vec<(String, String)> = self.npm_deps.clone();
         let mut app_corpus_total = String::new();
-        // Plan 559 W3: the api glue winner of this run — installed after the
-        // scan so a re-run rewrites src/lib/api.ts from the deterministic
-        // first claimant instead of keeping a stale file.
-        let mut api_glue_source: Option<PathBuf> = None;
+        let mut backend_rows = Vec::new();
 
         for e in &entries {
             let app_root = extra_roots
@@ -5937,19 +5947,14 @@ export default router
             for (_, code) in &vp.store_files {
                 corpus.push_str(code);
             }
-            // Plan 559 W3: the api-client guard class opens when the app
-            // ships an installable glue (src/back/api.ts — the project-provided
-            // web implementation; contract-style projects get theirs generated
-            // by api_gen into their own gen tree, which we copy verbatim).
-            // Apps needing an API client WITHOUT an installable glue still
-            // skip. The glue lands in the shared src/lib/api.ts namespace —
-            // first api-client app of THIS run claims it (deterministic scan
-            // order), the file is rewritten from the winner every run so
-            // stale state can't survive an owner change; later api-client
-            // apps skip with a collision warning (v1: one api surface per
-            // desktop).
-            let needs_api_client = corpus.contains("@/lib/api") || corpus.contains("from '@/api");
-            if needs_api_client {
+            if let Some((_, code)) = &vp.mini_face {
+                corpus.push_str(code);
+            }
+            // PLAN-053: each app retains its own client module. Missing glue
+            // remains a rejection; one app never claims another app's API.
+            let needs_api_client = corpus.contains("@/lib/api")
+                || corpus.contains("'@/api'") || corpus.contains("\"@/api\"");
+            let api_glue = if needs_api_client {
                 let generated = app_root
                     .join("gen")
                     .join("front")
@@ -5970,23 +5975,12 @@ export default router
                     );
                     continue;
                 };
-                match &api_glue_source {
-                    Some(existing) if existing != &source => {
-                        println!(
-                            "  {} app {} skipped: API client namespace claimed by {}",
-                            "⚠".bright_yellow(),
-                            e.id,
-                            existing.display()
-                        );
-                        continue;
-                    }
-                    _ => {}
-                }
-                if api_glue_source.as_ref() != Some(&source) {
-                    api_glue_source = Some(source.clone());
-                }
-            }
-            let skip = if vp.has_routes {
+                Some(fs::read_to_string(&source)?)
+            } else { None };
+            // PLAN-053 bounded route extension: API-backed apps can reuse the
+            // gallery memory-router face. Front-only route guards stay intact.
+            let embedded_routes = vp.has_routes && needs_api_client;
+            let skip = if vp.has_routes && !embedded_routes {
                 Some("has router pages (v1 desktop is single-view)")
             } else if corpus.contains("@/ext/") {
                 Some("needs ext files")
@@ -6000,30 +5994,32 @@ export default router
                 continue;
             }
 
+            let rewrite = |code: &str| desktop_app_code(code, &e.id, &vp);
+            if let Some(backend) = crate::desktop_backends::DesktopBackend::read(&e.id, &app_root)? {
+                backend_rows.push(backend);
+            }
+            let app_dir = apps_src.join(&e.id);
+            let stores_dir = app_dir.join("stores");
+            let components_dir = app_dir.join("components");
+
             app_corpus_total.push_str(&corpus);
 
-            // Store composables into the shared src/stores/ namespace
-            // (first-wins on filename collisions).
+            // Store modules are app-owned, including their API imports.
             for (filename, code) in &vp.store_files {
                 fs::create_dir_all(&stores_dir)?;
                 let clean_name = filename.strip_prefix("stores/").unwrap_or(filename);
-                if claimed_stores.insert(clean_name.to_string()) {
-                    fs::write(stores_dir.join(clean_name), code)?;
-                }
+                fs::write(stores_dir.join(clean_name), rewrite(code))?;
             }
 
-            // Sub-component SFCs into src/components/<Widget>.vue — matches
-            // the generated `@/components/<Widget>.vue` imports (first-wins).
+            // Component modules are app-owned; host UI assets remain shared.
             for (_, _name, code, widget_name) in &vp.components {
                 if widget_name == "app" {
                     continue;
                 }
                 fs::create_dir_all(&components_dir)?;
                 let file = components_dir.join(format!("{}.vue", widget_name));
-                if claimed_components.insert(widget_name.clone()) {
-                    fs::write(&file, code)
+                fs::write(&file, rewrite(code))
                         .map_err(|e| format!("Failed to write {}: {}", file.display(), e))?;
-                }
                 for comp in detect_shadcn_components(code) {
                     if !shadcn_needed.contains(&comp) {
                         shadcn_needed.push(comp);
@@ -6040,22 +6036,34 @@ export default router
             // before the install step of the same run.
             for (name, ver) in &vp.npm_deps {
                 if !npm_merge.iter().any(|(n, _)| n == name) {
-                    npm_merge.push((name.clone(), ver.clone()));
+                    let version = desktop_npm_version(&vp.output_dir, ver)?;
+                    npm_merge.push((name.clone(), version));
                 }
+            }
+            if embedded_routes && !npm_merge.iter().any(|(n, _)| n == "vue-router") {
+                npm_merge.push(("vue-router".into(), "^4.2.0".into()));
             }
 
             // Root SFC per app.
             let app_dir = apps_src.join(&e.id);
             fs::create_dir_all(&app_dir)
                 .map_err(|e| format!("Failed to create {}: {}", app_dir.display(), e))?;
-            fs::write(app_dir.join("App.vue"), &vp.app_vue_code)
+            fs::write(app_dir.join("App.vue"), desktop_window_root(&rewrite(&vp.app_vue_code)))
                 .map_err(|e| format!("Failed to write {}/App.vue: {}", app_dir.display(), e))?;
             // PLAN-015：注册表行展示名走 locale 链（zh=title_zh→title…）。
             // PLAN-024：mini 面旗标 + Mini.vue 落盘（根 widget 的 view mini）。
             if let Some((_, mcode)) = &vp.mini_face {
-                fs::write(app_dir.join("Mini.vue"), mcode).map_err(|e| {
+                fs::write(app_dir.join("Mini.vue"), desktop_window_root(&rewrite(mcode))).map_err(|e| {
                     format!("Failed to write {}/Mini.vue: {}", app_dir.display(), e)
                 })?;
+            }
+            if let Some(code) = api_glue {
+                fs::write(app_dir.join("lib_api.ts"), desktop_api_urls(&code, &e.id))?;
+            }
+            if embedded_routes {
+                emit_demo_route_face(&app_dir, &vp, &e.id, &|code| desktop_window_root(&rewrite(&code)));
+                fs::rename(app_dir.join("App.vue"), app_dir.join("Content.vue"))?;
+                fs::write(app_dir.join("App.vue"), desktop_routed_wrapper(!vp.store_files.is_empty()))?;
             }
             registry_rows.push((
                 e.id.clone(),
@@ -6069,17 +6077,7 @@ export default router
         // App-referenced shadcn components are absent from the host's own
         // detection set — materialize them directly (idempotent, skips
         // existing files).
-        if let Some(source) = &api_glue_source {
-            let lib_dir = src_dir.join("lib");
-            fs::create_dir_all(&lib_dir).map_err(|e| format!("Failed to create src/lib: {}", e))?;
-            let target = lib_dir.join("api.ts");
-            fs::copy(source, &target).map_err(|e| format!("Failed to install api glue: {}", e))?;
-            println!(
-                "  {} api glue installed ← {}",
-                "✓".bright_green(),
-                source.display()
-            );
-        }
+        fs::write(self.output_dir.join("desktop-backends.json"), serde_json::to_string_pretty(&backend_rows)?)?;
         if !shadcn_needed.is_empty() {
             let report = crate::vue_shadcn::materialize(&self.output_dir, &shadcn_needed)?;
             if report.written > 0 {
@@ -6108,6 +6106,8 @@ export default router
         crate::wm_assets::materialize(&self.output_dir)?;
 
         merge_host_npm_deps(&self.output_dir, &npm_merge)?;
+        fs::write(self.output_dir.join("desktop-npm-deps.json"), serde_json::to_string_pretty(&npm_merge)?)?;
+        fs::write(self.output_dir.join("vite.config.ts"), generate_vite_config(&npm_merge))?;
 
         // Plan 516: 远程 App 条目（<apps_dir>/remote-apps.json；缺省空表）。
         let remote_rows = read_remote_apps(&apps_dir);
@@ -10516,6 +10516,222 @@ export function getCategories(): string[] {{
 // Plan 465 T3: desktop host scaffolding free functions
 // =====================================================================
 
+/// Desktop app clients and inline HTTP/SSE literals use the same app key as
+/// the backend router. Already-prefixed URLs remain unchanged.
+fn desktop_api_urls(code: &str, app_id: &str) -> String {
+    let mut rewritten = code.to_string();
+    for quote in ['\'', '"', '`'] {
+        rewritten = rewritten.replace(
+            &format!("{quote}/api/"),
+            &format!("{quote}/apps/{app_id}/api/"),
+        );
+    }
+    rewritten
+}
+
+/// A standalone screen-sized root must fit its desktop client area. Locate the
+/// template root even when optional overlay annotations are disabled.
+fn desktop_window_root(code: &str) -> String {
+    let Some(template) = code.rfind("\n<template>").or_else(|| code.find("<template>")) else { return code.to_string() };
+    let mut cursor = template + code[template..].find('>').unwrap() + 1;
+    let (tag_start, tag_end) = loop {
+        let Some(offset) = code[cursor..].find('<') else { return code.to_string() };
+        let start = cursor + offset;
+        if code[start..].starts_with("<!--") {
+            let Some(end) = code[start..].find("-->") else { return code.to_string() };
+            cursor = start + end + 3;
+            continue;
+        }
+        let mut quote = None;
+        let Some(end) = code[start..].char_indices().find_map(|(i, c)| {
+            if let Some(q) = quote { if c == q { quote = None; } }
+            else if c == '\'' || c == '"' { quote = Some(c); }
+            else if c == '>' { return Some(start + i); }
+            None
+        }) else { return code.to_string() };
+        if code[start..end].starts_with("<template") { cursor = end + 1; continue; }
+        break (start, end);
+    };
+    let Some(class) = code[tag_start..tag_end].find(" class=\"") else { return code.to_string() };
+    let start = tag_start + class + " class=\"".len();
+    let Some(end) = code[start..].find('"').map(|n| start + n) else { return code.to_string() };
+    if end > tag_end { return code.to_string(); }
+    let mut classes: Vec<&str> = code[start..end].split_whitespace().collect();
+    if !classes.iter().any(|c| matches!(*c, "min-h-screen" | "h-screen" | "w-screen")) {
+        return code.to_string();
+    }
+    for class in &mut classes {
+        *class = match *class {
+            "min-h-screen" => "min-h-0", "h-screen" => "h-full", "w-screen" => "w-full",
+            "justify-center" => "justify-start", other => other,
+        };
+    }
+    if !classes.contains(&"h-full") { classes.push("h-full"); }
+    if !classes.iter().any(|c| c.starts_with("overflow-")) { classes.push("overflow-auto"); }
+    format!("{}{}{}", &code[..start], classes.join(" "), &code[end..])
+}
+
+fn desktop_npm_version(app_output: &Path, version: &str) -> AutoResult<String> {
+    for prefix in ["file:", "link:"] {
+        if let Some(relative) = version.strip_prefix(prefix) {
+            let resolved = fs::canonicalize(app_output.join(relative))?;
+            let path = resolved.to_string_lossy().replace('\\', "/");
+            return Ok(format!("{prefix}{}", path.strip_prefix("//?/").unwrap_or(&path)));
+        }
+    }
+    Ok(version.to_string())
+}
+
+fn desktop_routed_wrapper(has_stores: bool) -> String {
+    let context_import = if has_stores { "import { installAutoStoreContext } from './stores/__autoStoreContext'" } else { "" };
+    let context_install = if has_stores { "installAutoStoreContext(app)" } else { "" };
+    format!(r#"<script setup lang="ts">
+import {{ createApp, onMounted, onBeforeUnmount, ref }} from 'vue'
+import Content from './Content.vue'
+import {{ createAppRouter }} from './router'
+{context_import}
+const target = ref<HTMLElement | null>(null)
+let app: ReturnType<typeof createApp> | null = null
+onMounted(() => {{
+  if (!target.value) return
+  app = createApp(Content)
+  app.use(createAppRouter())
+  {context_install}
+  app.mount(target.value)
+}})
+onBeforeUnmount(() => {{ app?.unmount(); app = null }})
+</script>
+<template><div ref="target" class="h-full w-full min-h-0 overflow-auto" /></template>
+"#)
+}
+
+fn desktop_app_code(code: &str, app_id: &str, project: &VueProject) -> String {
+    let mut rewritten = desktop_api_urls(code, app_id);
+    let mut modules = vec![
+        ("@/lib/api".to_string(), format!("@/apps/{app_id}/lib_api")),
+        ("@/api".to_string(), format!("@/apps/{app_id}/lib_api")),
+    ];
+    for (filename, _) in &project.store_files {
+        let filename = filename.strip_prefix("stores/").unwrap_or(filename);
+        let stem = filename.strip_suffix(".ts").unwrap_or(filename);
+        modules.push((format!("@/stores/{stem}"), format!("@/apps/{app_id}/stores/{stem}")));
+    }
+    for (_, _, _, widget) in &project.components {
+        modules.push((format!("@/components/{widget}.vue"), format!("@/apps/{app_id}/components/{widget}.vue")));
+    }
+    // Only modules owned by this app move. Host shadcn/ui/runtime imports stay
+    // shared, and identical store/component names in other apps cannot win.
+    for (source, target) in modules {
+        for quote in ['\'', '"'] {
+            rewritten = rewritten.replace(&format!("{quote}{source}{quote}"), &format!("{quote}{target}{quote}"));
+        }
+    }
+    rewritten
+}
+
+#[cfg(test)]
+mod plan053_probes {
+    use super::*;
+
+    #[test]
+    fn desktop_window_root_clamps_page_not_nested_canvas() {
+        let source = "<template><div class=\"flex flex-col min-h-screen justify-center\" data-auto-id=\"aura_0\"><div class=\"h-screen\">canvas</div></div></template>";
+        let result = desktop_window_root(source);
+        assert!(result.contains("min-h-0 justify-start h-full overflow-auto"));
+        assert!(result.contains("<div class=\"h-screen\">canvas"));
+        assert_eq!(desktop_window_root("<div class=\"h-screen\">unmarked</div>"), "<div class=\"h-screen\">unmarked</div>");
+        let without_overlay = "<template><div :class=\"mode > 0 ? 'x' : 'y'\" class=\"h-screen overflow-hidden\"><div class=\"h-screen\" /></div></template>";
+        let result = desktop_window_root(without_overlay);
+        assert!(result.contains("class=\"h-full overflow-hidden\""));
+        assert!(result.contains("<div class=\"h-screen\" />"));
+    }
+
+    #[test]
+    fn desktop_clients_with_same_store_keep_their_owners() {
+        let tmp = tempfile::tempdir().unwrap();
+        let apps = tmp.path().join("apps");
+        for id in ["alpha", "beta"] {
+            let root = apps.join(id);
+            fs::create_dir_all(root.join("src/front")).unwrap();
+            fs::create_dir_all(root.join("src/back")).unwrap();
+            fs::write(root.join("pac.at"), format!("name: \"{id}\"\nscene: \"ui\"\nrender: \"vue\"\n")).unwrap();
+            fs::write(root.join("src/front/app.at"), "use my_store: MyStore\nwidget App { view { text \"hello\" } }\n").unwrap();
+            fs::write(root.join("src/front/my_store.at"), "use back.api: get_item\nstore MyStore { model { var items []int = [] } }\n").unwrap();
+            fs::write(root.join("src/back/api.at"), "#[api(method = \"GET\", path = \"/api/items\")]\npub fn get_item() []int { return [] }\n").unwrap();
+            fs::write(root.join("src/back/api.ts"), format!("export async function get_item() {{ return fetch(`/api/items?owner={id}`) }}\n")).unwrap();
+        }
+        let mut host = VueProject::from_workspace(&apps.join("alpha")).unwrap();
+        host.output_dir = tmp.path().join("host");
+        host.generate_desktop_host_from_roots(apps.clone(), Vec::new()).unwrap();
+        let src = host.output_dir.join("src");
+        let registry = fs::read_to_string(src.join("apps-registry.ts")).unwrap();
+        for id in ["alpha", "beta"] {
+            assert!(registry.contains(&format!("./apps/{id}/App.vue")));
+            let client = fs::read_to_string(src.join(format!("apps/{id}/lib_api.ts"))).unwrap();
+            assert!(client.contains(&format!("/apps/{id}/api/items?owner={id}")), "{client}");
+            let stores = fs::read_dir(src.join(format!("apps/{id}/stores"))).unwrap();
+            let mut saw_api = false;
+            for store in stores {
+                let text = fs::read_to_string(store.unwrap().path()).unwrap();
+                if text.contains("lib_api") {
+                    saw_api = true;
+                    assert!(text.contains(&format!("@/apps/{id}/lib_api")), "{text}");
+                }
+            }
+            assert!(saw_api, "store must bind its app's client");
+        }
+        assert!(!src.join("lib/api.ts").exists());
+        // Single-client control uses the identical path, without a stale shared
+        // winner being necessary for correctness.
+        host.generate_desktop_host_from_roots(tmp.path().join("empty"), vec![("alpha".into(), apps.join("alpha"))]).unwrap();
+        let registry = fs::read_to_string(src.join("apps-registry.ts")).unwrap();
+        assert!(registry.contains("./apps/alpha/App.vue"));
+        assert!(!registry.contains("./apps/beta/App.vue"));
+    }
+
+    #[test]
+    #[ignore = "requires explicit PLAN053_APPS candidate corpus"]
+    fn candidate_default_stack() {
+        let apps = PathBuf::from(std::env::var_os("PLAN053_APPS").expect("PLAN053_APPS"));
+        std::thread::Builder::new()
+            .name("plan053-default-stack".into())
+            .stack_size(std::env::var("PLAN053_STACK").ok().and_then(|s| s.parse().ok()).unwrap_or(2 * 1024 * 1024))
+            .spawn(move || {
+                if let Some(host_root) = std::env::var_os("PLAN053_HOST") {
+                    let mut host = VueProject::from_workspace(Path::new(&host_root)).unwrap();
+                    let output = tempfile::tempdir().unwrap();
+                    host.output_dir = std::env::var_os("PLAN053_OUTPUT").map(PathBuf::from).unwrap_or_else(|| output.path().to_path_buf());
+                    if std::env::var_os("PLAN053_OUTPUT").is_some() {
+                        host.generate_scaffolding_only().unwrap();
+                    }
+                    let extras = desktop_extra_app_roots(Path::new(&host_root));
+                    eprintln!("PLAN053 extras: {extras:?}");
+                    host.generate_desktop_host_from_roots(apps, extras).unwrap();
+                    if let Ok(expected) = std::env::var("PLAN053_EXPECT_TARGETS") {
+                        let registry = fs::read_to_string(host.output_dir.join("src/apps-registry.ts")).unwrap();
+                        for id in expected.split(',') {
+                            assert!(registry.contains(&format!("./apps/{id}/App.vue")), "missing target app {id}");
+                        }
+                    }
+                    return;
+                }
+                let entries = auto_ui_compiler::app_registry::scan_apps(
+                    &apps,
+                    &auto_ui_compiler::app_registry::ScanOptions { render: Some("vue".into()) },
+                );
+                eprintln!("PLAN053 corpus size {}", entries.len());
+                assert!(!entries.is_empty(), "requires candidate app corpus");
+                for e in entries {
+                    eprintln!("PLAN053 loading {}: {}", e.id, e.app_root().display());
+                    match VueProject::from_workspace(&e.app_root()) {
+                        Ok(_) => eprintln!("PLAN053 loaded {}", e.id),
+                        Err(err) => eprintln!("PLAN053 rejected {}: {}", e.id, err),
+                    }
+                }
+            }).unwrap().join().unwrap();
+    }
+}
+
 /// Desktop-host mode flag (`auto run --desktop` injects AUTO_DESKTOP=1).
 /// Same env-injection idiom as AUTO_UI_THEME / AUTO_VM_WINDOW.
 pub fn desktop_mode() -> bool {
@@ -13601,13 +13817,13 @@ fn test_plan_662_gallery_apps_dir_layouts() {
         solo.join("examples").join("ui")
     );
 
-    // ③ 同层 auto-lang 兄弟：<root>/ui-gallery + <root>/auto-lang/…。
+    // ③ 同层 auto-ui 兄弟：<root>/ui-gallery + <root>/auto-ui/…。
     let peer = t.path().join("peer").join("ui-gallery");
     std::fs::create_dir_all(&peer).unwrap();
     std::fs::create_dir_all(
         t.path()
             .join("peer")
-            .join("auto-lang")
+            .join("auto-ui")
             .join("examples")
             .join("ui"),
     )
@@ -13616,20 +13832,20 @@ fn test_plan_662_gallery_apps_dir_layouts() {
         gallery_apps_dir(&peer).unwrap(),
         t.path()
             .join("peer")
-            .join("auto-lang")
+            .join("auto-ui")
             .join("examples")
             .join("ui")
     );
 
-    // ④ 平铺/worktree 组：<g>/auto-os/ui-gallery + <g>/auto-lang/…
+    // ④ 平铺/worktree 组：<g>/auto-os/ui-gallery + <g>/auto-ui/…
     //    （662 新增祖父级探测——主检出 D:/autostack 与 .wt/lang-NNN 同形）。
     let group = t.path().join("group");
     let gallery = group.join("auto-os").join("ui-gallery");
     std::fs::create_dir_all(&gallery).unwrap();
-    std::fs::create_dir_all(group.join("auto-lang").join("examples").join("ui")).unwrap();
+    std::fs::create_dir_all(group.join("auto-ui").join("examples").join("ui")).unwrap();
     assert_eq!(
         gallery_apps_dir(&gallery).unwrap(),
-        group.join("auto-lang").join("examples").join("ui")
+        group.join("auto-ui").join("examples").join("ui")
     );
 
     // ⑤ 全无 → Err（报错文案含 AUTO_GALLERY_APPS 提示）。
@@ -14257,7 +14473,7 @@ mod gallery_registry_at_tests {
     #[test]
     fn test_gallery_demo_row_routable() {
         let examples = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../../auto-lang/examples")
+            .join("../../examples")
             .join("ui");
         let entries = auto_ui_compiler::app_registry::scan_apps(
             &examples,
@@ -14312,7 +14528,7 @@ mod gallery_registry_at_tests {
     #[test]
     fn test_try_full_parse_018_api() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../../auto-lang/examples")
+            .join("../../examples")
             .join("ui")
             .join("018-book-reader")
             .join("src")

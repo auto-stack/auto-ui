@@ -379,43 +379,36 @@ pub(crate) fn mint_view_inline(
     counter: &mut u32,
     minted: &mut Vec<(String, Vec<Stmt>)>,
 ) -> AutoResult<()> {
-    match node {
-        ViewNode::Element {
-            events, children, ..
-        } => {
-            mint_events_inline(events, counter, minted)?;
-            for c in children.iter_mut() {
-                mint_view_inline(c, counter, minted)?;
+    let mut pending = vec![node];
+    while let Some(node) = pending.pop() {
+        match node {
+            ViewNode::Element {
+                events, children, ..
+            } => {
+                mint_events_inline(events, counter, minted)?;
+                pending.extend(children.iter_mut().rev());
             }
-        }
-        ViewNode::ForLoop { body, .. } => {
-            for c in body.iter_mut() {
-                mint_view_inline(c, counter, minted)?;
+            ViewNode::ForLoop { body, .. } => {
+                pending.extend(body.iter_mut().rev());
             }
-        }
-        ViewNode::Conditional {
-            then_body,
-            else_body,
-            ..
-        } => {
-            for c in then_body.iter_mut() {
-                mint_view_inline(c, counter, minted)?;
-            }
-            if let Some(else_nodes) = else_body {
-                for c in else_nodes.iter_mut() {
-                    mint_view_inline(c, counter, minted)?;
+            ViewNode::Conditional {
+                then_body,
+                else_body,
+                ..
+            } => {
+                if let Some(else_nodes) = else_body {
+                    pending.extend(else_nodes.iter_mut().rev());
                 }
+                pending.extend(then_body.iter_mut().rev());
             }
-        }
-        ViewNode::Component { events, .. } => {
-            mint_events_inline(events, counter, minted)?;
-        }
-        ViewNode::Link { children, .. } => {
-            for c in children.iter_mut() {
-                mint_view_inline(c, counter, minted)?;
+            ViewNode::Component { events, .. } => {
+                mint_events_inline(events, counter, minted)?;
             }
+            ViewNode::Link { children, .. } => {
+                pending.extend(children.iter_mut().rev());
+            }
+            _ => {}
         }
-        _ => {}
     }
     Ok(())
 }
@@ -479,72 +472,65 @@ pub(crate) fn mint_bare_input_sync(
     counter: &mut u32,
     minted: &mut Vec<(String, Vec<Stmt>)>,
 ) -> AutoResult<()> {
-    match node {
-        ViewNode::Element {
-            tag,
-            props,
-            events,
-            children,
-            ..
-        } => {
-            if matches!(tag.as_str(), "input" | "textarea")
-                && direct_state_value_field(props).is_some()
-                && !events.iter().any(|ev| {
-                    let base = ev.name.split('.').next().unwrap_or("");
-                    matches!(base, "oninput" | "onchange" | "input" | "change")
-                })
-            {
-                *counter += 1;
-                // `__bind_` (not `__evt_`) marks an auto-sync mint: the
-                // body is empty by construction and Vue realizes the
-                // sync via its v-model fold, so downstream consumers can
-                // suppress the redundant empty handler wholesale. The
-                // widget name is woven in because the registry-wide
-                // input_state_map is keyed by handler name alone — two
-                // sibling children each minting `__bind_oninput_1` would
-                // collide and the second binding would silently no-op.
-                let owner: String = widget_name
-                    .chars()
-                    .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
-                    .collect();
-                let pattern = format!(".__bind_{}_oninput_{}", owner, counter);
-                events.push(ViewEvent {
-                    name: "oninput".to_string(),
-                    handler: pattern.clone(),
-                    params: Vec::new(),
-                    inline: None,
-                });
-                minted.push((pattern, Vec::new()));
-            }
-            for c in children.iter_mut() {
-                mint_bare_input_sync(widget_name, c, counter, minted)?;
-            }
-        }
-        ViewNode::ForLoop { body, .. } => {
-            for c in body.iter_mut() {
-                mint_bare_input_sync(widget_name, c, counter, minted)?;
-            }
-        }
-        ViewNode::Conditional {
-            then_body,
-            else_body,
-            ..
-        } => {
-            for c in then_body.iter_mut() {
-                mint_bare_input_sync(widget_name, c, counter, minted)?;
-            }
-            if let Some(else_nodes) = else_body {
-                for c in else_nodes.iter_mut() {
-                    mint_bare_input_sync(widget_name, c, counter, minted)?;
+    let mut pending = vec![node];
+    while let Some(node) = pending.pop() {
+        match node {
+            ViewNode::Element {
+                tag,
+                props,
+                events,
+                children,
+                ..
+            } => {
+                if matches!(tag.as_str(), "input" | "textarea")
+                    && direct_state_value_field(props).is_some()
+                    && !events.iter().any(|ev| {
+                        let base = ev.name.split('.').next().unwrap_or("");
+                        matches!(base, "oninput" | "onchange" | "input" | "change")
+                    })
+                {
+                    *counter += 1;
+                    // `__bind_` (not `__evt_`) marks an auto-sync mint: the
+                    // body is empty by construction and Vue realizes the
+                    // sync via its v-model fold, so downstream consumers can
+                    // suppress the redundant empty handler wholesale. The
+                    // widget name is woven in because the registry-wide
+                    // input_state_map is keyed by handler name alone — two
+                    // sibling children each minting `__bind_oninput_1` would
+                    // collide and the second binding would silently no-op.
+                    let owner: String = widget_name
+                        .chars()
+                        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+                        .collect();
+                    let pattern = format!(".__bind_{}_oninput_{}", owner, counter);
+                    events.push(ViewEvent {
+                        name: "oninput".to_string(),
+                        handler: pattern.clone(),
+                        params: Vec::new(),
+                        inline: None,
+                    });
+                    minted.push((pattern, Vec::new()));
                 }
+                pending.extend(children.iter_mut().rev());
             }
-        }
-        ViewNode::Link { children, .. } => {
-            for c in children.iter_mut() {
-                mint_bare_input_sync(widget_name, c, counter, minted)?;
+            ViewNode::ForLoop { body, .. } => {
+                pending.extend(body.iter_mut().rev());
             }
+            ViewNode::Conditional {
+                then_body,
+                else_body,
+                ..
+            } => {
+                if let Some(else_nodes) = else_body {
+                    pending.extend(else_nodes.iter_mut().rev());
+                }
+                pending.extend(then_body.iter_mut().rev());
+            }
+            ViewNode::Link { children, .. } => {
+                pending.extend(children.iter_mut().rev());
+            }
+            _ => {}
         }
-        _ => {}
     }
     Ok(())
 }
@@ -576,185 +562,178 @@ pub(crate) fn mint_modal_dialog_toggle_inner(
     minted: &mut Vec<(String, Vec<Stmt>)>,
     states: &mut Vec<String>,
 ) -> AutoResult<()> {
-    match node {
-        ViewNode::Element {
-            tag,
-            props,
-            events: _,
-            children,
-            ..
-        } => {
-            // PLAN-534 D4: hovercard 根——同一 __dlg_open_N 铸造机器,
-            // 但 trigger 无显式事件时补 hover 进/出（onmouseenter→置
-            // true / onmouseleave→置 false）而非 onclick toggle/close
-            // （非模态即时开合;open/close-delay v1 不消费,KNOWN-DEBT）。
-            // 显式绑定不覆盖（逐事件判定,同 toggle 规则）。事件落
-            // trigger 自身节点——转换臂（convert_hovercard）从 trigger
-            // events 读进 MouseArea,落内层会丢（与 toggle 的包裹规则
-            // 相反,因渲染面是 MouseArea 包转换后的 anchor）。
-            if hover_card_role(tag) == Some("root") && !props.iter().any(|p| p.name == "open") {
-                *counter += 1;
-                let n = *counter;
-                let state_name = format!("__dlg_open_{n}");
-                let enter = format!("__dlg_enter_{n}");
-                let leave = format!("__dlg_leave_{n}");
-                let state_ref = |name: &str| {
-                    Expr::Dot(Box::new(Expr::Ident(Name::from("self"))), Name::from(name))
-                };
-                props.push(ViewProp {
-                    name: "open".to_string(),
-                    value: ViewPropValue::Expr(state_ref(&state_name)),
-                });
-                // enter 体：`.__dlg_open_<n> = true`
-                let enter_body = Stmt::Expr(Expr::Bina(
-                    Box::new(state_ref(&state_name)),
-                    Op::Asn,
-                    Box::new(Expr::Bool(true)),
-                ));
-                // leave 体：`.__dlg_open_<n> = false`
-                let leave_body = Stmt::Expr(Expr::Bina(
-                    Box::new(state_ref(&state_name)),
-                    Op::Asn,
-                    Box::new(Expr::Bool(false)),
-                ));
-                minted.push((format!(".{enter}"), vec![enter_body]));
-                minted.push((format!(".{leave}"), vec![leave_body]));
-                states.push(state_name);
-                for c in children.iter_mut() {
-                    if let ViewNode::Element {
-                        tag: ctag,
-                        events: cev,
-                        ..
-                    } = c
-                    {
-                        if hover_card_role(ctag) == Some("trigger") {
-                            if !cev
-                                .iter()
-                                .any(|e| matches!(e.name.as_str(), "onmouseenter" | "onhover"))
-                            {
-                                cev.push(ViewEvent {
-                                    name: "onmouseenter".to_string(),
-                                    handler: format!(".{enter}"),
-                                    params: Vec::new(),
-                                    inline: None,
-                                });
-                            }
-                            if !cev
-                                .iter()
-                                .any(|e| matches!(e.name.as_str(), "onmouseleave" | "onhoverout"))
-                            {
-                                cev.push(ViewEvent {
-                                    name: "onmouseleave".to_string(),
-                                    handler: format!(".{leave}"),
-                                    params: Vec::new(),
-                                    inline: None,
-                                });
-                            }
-                        }
-                    }
-                }
-            }
-            if modal_dialog_tag_role(tag) == Some("root") && !props.iter().any(|p| p.name == "open")
-            {
-                *counter += 1;
-                let n = *counter;
-                let state_name = format!("__dlg_open_{n}");
-                let toggle = format!("__dlg_toggle_{n}");
-                let close = format!("__dlg_close_{n}");
-                // root 补 open 绑定：与真实 `.state` 解析同形态
-                //（Dot(Ident("self"), field)——见 direct_state_value_field 注）。
-                let state_ref = |name: &str| {
-                    Expr::Dot(Box::new(Expr::Ident(Name::from("self"))), Name::from(name))
-                };
-                props.push(ViewProp {
-                    name: "open".to_string(),
-                    value: ViewPropValue::Expr(state_ref(&state_name)),
-                });
-                // toggle 体：`.__dlg_open_<n> = !.__dlg_open_<n>`
-                let toggle_body = Stmt::Expr(Expr::Bina(
-                    Box::new(state_ref(&state_name)),
-                    Op::Asn,
-                    Box::new(Expr::Unary(Op::Not, Box::new(state_ref(&state_name)))),
-                ));
-                // close 体：`.__dlg_open_<n> = false`
-                let close_body = Stmt::Expr(Expr::Bina(
-                    Box::new(state_ref(&state_name)),
-                    Op::Asn,
-                    Box::new(Expr::Bool(false)),
-                ));
-                minted.push((format!(".{toggle}"), vec![toggle_body]));
-                minted.push((format!(".{close}"), vec![close_body]));
-                states.push(state_name);
-                // 子件接线：trigger（直接子）→ toggle;cancel/action/close
-                // （content 内任意深度）→ close。
-                let is_click = |name: &str| matches!(name, "onclick" | "onClick" | "on_click");
-                for c in children.iter_mut() {
-                    if let ViewNode::Element {
-                        tag: ctag,
-                        events: cev,
-                        children: cch,
-                        ..
-                    } = c
-                    {
-                        if modal_dialog_tag_role(ctag) == Some("trigger") {
-                            // 包裹形态（trigger 内单 Element 子,如包住的
-                            // button）且内层无 onclick → toggle 落内层按钮
-                            // （渲染面只画子件,落 wrapper 会丢）;否则落
-                            // trigger 自身（裸文本形态由转换层读）。
-                            let target: &mut Vec<ViewEvent> = if cch.len() == 1 {
-                                match &mut cch[0] {
-                                    ViewNode::Element {
-                                        events: inner_ev, ..
-                                    } if !inner_ev.iter().any(|e| is_click(e.name.as_str())) => {
-                                        inner_ev
-                                    }
-                                    _ => cev,
+    let mut pending = vec![node];
+    while let Some(node) = pending.pop() {
+        match node {
+            ViewNode::Element {
+                tag,
+                props,
+                events: _,
+                children,
+                ..
+            } => {
+                // PLAN-534 D4: hovercard 根——同一 __dlg_open_N 铸造机器,
+                // 但 trigger 无显式事件时补 hover 进/出（onmouseenter→置
+                // true / onmouseleave→置 false）而非 onclick toggle/close
+                // （非模态即时开合;open/close-delay v1 不消费,KNOWN-DEBT）。
+                // 显式绑定不覆盖（逐事件判定,同 toggle 规则）。事件落
+                // trigger 自身节点——转换臂（convert_hovercard）从 trigger
+                // events 读进 MouseArea,落内层会丢（与 toggle 的包裹规则
+                // 相反,因渲染面是 MouseArea 包转换后的 anchor）。
+                if hover_card_role(tag) == Some("root") && !props.iter().any(|p| p.name == "open") {
+                    *counter += 1;
+                    let n = *counter;
+                    let state_name = format!("__dlg_open_{n}");
+                    let enter = format!("__dlg_enter_{n}");
+                    let leave = format!("__dlg_leave_{n}");
+                    let state_ref = |name: &str| {
+                        Expr::Dot(Box::new(Expr::Ident(Name::from("self"))), Name::from(name))
+                    };
+                    props.push(ViewProp {
+                        name: "open".to_string(),
+                        value: ViewPropValue::Expr(state_ref(&state_name)),
+                    });
+                    // enter 体：`.__dlg_open_<n> = true`
+                    let enter_body = Stmt::Expr(Expr::Bina(
+                        Box::new(state_ref(&state_name)),
+                        Op::Asn,
+                        Box::new(Expr::Bool(true)),
+                    ));
+                    // leave 体：`.__dlg_open_<n> = false`
+                    let leave_body = Stmt::Expr(Expr::Bina(
+                        Box::new(state_ref(&state_name)),
+                        Op::Asn,
+                        Box::new(Expr::Bool(false)),
+                    ));
+                    minted.push((format!(".{enter}"), vec![enter_body]));
+                    minted.push((format!(".{leave}"), vec![leave_body]));
+                    states.push(state_name);
+                    for c in children.iter_mut() {
+                        if let ViewNode::Element {
+                            tag: ctag,
+                            events: cev,
+                            ..
+                        } = c
+                        {
+                            if hover_card_role(ctag) == Some("trigger") {
+                                if !cev
+                                    .iter()
+                                    .any(|e| matches!(e.name.as_str(), "onmouseenter" | "onhover"))
+                                {
+                                    cev.push(ViewEvent {
+                                        name: "onmouseenter".to_string(),
+                                        handler: format!(".{enter}"),
+                                        params: Vec::new(),
+                                        inline: None,
+                                    });
                                 }
-                            } else {
-                                cev
-                            };
-                            if !target.iter().any(|e| is_click(e.name.as_str())) {
-                                target.push(ViewEvent {
-                                    name: "onclick".to_string(),
-                                    handler: format!(".{toggle}"),
-                                    params: Vec::new(),
-                                    inline: None,
-                                });
+                                if !cev
+                                    .iter()
+                                    .any(|e| matches!(e.name.as_str(), "onmouseleave" | "onhoverout"))
+                                {
+                                    cev.push(ViewEvent {
+                                        name: "onmouseleave".to_string(),
+                                        handler: format!(".{leave}"),
+                                        params: Vec::new(),
+                                        inline: None,
+                                    });
+                                }
                             }
                         }
                     }
-                    wire_modal_close_recursive(c, &close);
                 }
-            }
-            for c in children.iter_mut() {
-                mint_modal_dialog_toggle_inner(c, counter, minted, states)?;
-            }
-        }
-        ViewNode::ForLoop { body, .. } => {
-            for c in body.iter_mut() {
-                mint_modal_dialog_toggle_inner(c, counter, minted, states)?;
-            }
-        }
-        ViewNode::Conditional {
-            then_body,
-            else_body,
-            ..
-        } => {
-            for c in then_body.iter_mut() {
-                mint_modal_dialog_toggle_inner(c, counter, minted, states)?;
-            }
-            if let Some(else_nodes) = else_body {
-                for c in else_nodes.iter_mut() {
-                    mint_modal_dialog_toggle_inner(c, counter, minted, states)?;
+                if modal_dialog_tag_role(tag) == Some("root") && !props.iter().any(|p| p.name == "open")
+                {
+                    *counter += 1;
+                    let n = *counter;
+                    let state_name = format!("__dlg_open_{n}");
+                    let toggle = format!("__dlg_toggle_{n}");
+                    let close = format!("__dlg_close_{n}");
+                    // root 补 open 绑定：与真实 `.state` 解析同形态
+                    //（Dot(Ident("self"), field)——见 direct_state_value_field 注）。
+                    let state_ref = |name: &str| {
+                        Expr::Dot(Box::new(Expr::Ident(Name::from("self"))), Name::from(name))
+                    };
+                    props.push(ViewProp {
+                        name: "open".to_string(),
+                        value: ViewPropValue::Expr(state_ref(&state_name)),
+                    });
+                    // toggle 体：`.__dlg_open_<n> = !.__dlg_open_<n>`
+                    let toggle_body = Stmt::Expr(Expr::Bina(
+                        Box::new(state_ref(&state_name)),
+                        Op::Asn,
+                        Box::new(Expr::Unary(Op::Not, Box::new(state_ref(&state_name)))),
+                    ));
+                    // close 体：`.__dlg_open_<n> = false`
+                    let close_body = Stmt::Expr(Expr::Bina(
+                        Box::new(state_ref(&state_name)),
+                        Op::Asn,
+                        Box::new(Expr::Bool(false)),
+                    ));
+                    minted.push((format!(".{toggle}"), vec![toggle_body]));
+                    minted.push((format!(".{close}"), vec![close_body]));
+                    states.push(state_name);
+                    // 子件接线：trigger（直接子）→ toggle;cancel/action/close
+                    // （content 内任意深度）→ close。
+                    let is_click = |name: &str| matches!(name, "onclick" | "onClick" | "on_click");
+                    for c in children.iter_mut() {
+                        if let ViewNode::Element {
+                            tag: ctag,
+                            events: cev,
+                            children: cch,
+                            ..
+                        } = c
+                        {
+                            if modal_dialog_tag_role(ctag) == Some("trigger") {
+                                // 包裹形态（trigger 内单 Element 子,如包住的
+                                // button）且内层无 onclick → toggle 落内层按钮
+                                // （渲染面只画子件,落 wrapper 会丢）;否则落
+                                // trigger 自身（裸文本形态由转换层读）。
+                                let target: &mut Vec<ViewEvent> = if cch.len() == 1 {
+                                    match &mut cch[0] {
+                                        ViewNode::Element {
+                                            events: inner_ev, ..
+                                        } if !inner_ev.iter().any(|e| is_click(e.name.as_str())) => {
+                                            inner_ev
+                                        }
+                                        _ => cev,
+                                    }
+                                } else {
+                                    cev
+                                };
+                                if !target.iter().any(|e| is_click(e.name.as_str())) {
+                                    target.push(ViewEvent {
+                                        name: "onclick".to_string(),
+                                        handler: format!(".{toggle}"),
+                                        params: Vec::new(),
+                                        inline: None,
+                                    });
+                                }
+                            }
+                        }
+                        wire_modal_close_recursive(c, &close);
+                    }
                 }
+                pending.extend(children.iter_mut().rev());
             }
-        }
-        ViewNode::Link { children, .. } => {
-            for c in children.iter_mut() {
-                mint_modal_dialog_toggle_inner(c, counter, minted, states)?;
+            ViewNode::ForLoop { body, .. } => {
+                pending.extend(body.iter_mut().rev());
             }
+            ViewNode::Conditional {
+                then_body,
+                else_body,
+                ..
+            } => {
+                if let Some(else_nodes) = else_body {
+                    pending.extend(else_nodes.iter_mut().rev());
+                }
+                pending.extend(then_body.iter_mut().rev());
+            }
+            ViewNode::Link { children, .. } => {
+                pending.extend(children.iter_mut().rev());
+            }
+            _ => {}
         }
-        _ => {}
     }
     Ok(())
 }

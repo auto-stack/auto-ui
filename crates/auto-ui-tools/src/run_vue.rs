@@ -169,9 +169,6 @@ pub fn run_vue_flow(
 
     // Plan 465: the desktop host shell + app registry must refresh on EVERY
     // run (apps may change) — same reasoning as the index.html rewrite below.
-    if desktop_mode() {
-        flow_step(project.generate_desktop_host())?;
-    }
 
     // PLAN-528 W6: pac.at npm_deps（如 @autodown/* link 依赖）必须每次 run
     // 自愈进 package.json——增量路径不走 regenerate_source_files 的漂移重写，
@@ -203,6 +200,11 @@ pub fn run_vue_flow(
                 }
             }
         }
+    }
+
+    // Desktop dependency union must be the final package writer as well.
+    if desktop_mode() {
+        flow_step(project.generate_desktop_host())?;
     }
 
     // Plan 549: UI gallery host + demos registry refresh on EVERY run
@@ -394,6 +396,9 @@ pub fn run_vue_flow(
     // Plan 346: --server=vm starts AutoVM HTTP server; --server=rust (default)
     // starts the a2r-generated Rust axum server.
     let mut _api_child: Option<std::process::Child> = None;
+    let _desktop_backends = if desktop_mode() {
+        Some(crate::desktop_backends::DesktopBackends::start(&project.output_dir)?)
+    } else { None };
     let backend_impl = std::env::var("AUTO_BACKEND_IMPL").unwrap_or_else(|_| "rust".to_string());
     if backend_impl == "vm" {
         // Vue+VM: AutoVM HTTP server as backend.

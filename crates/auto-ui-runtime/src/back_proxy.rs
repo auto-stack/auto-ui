@@ -1433,14 +1433,14 @@ fn load_back_session(app_id: &str, back_entry: &std::path::Path) -> Result<Sessi
     }
     for stmt in &import_stmts {
         if let Stmt::Store(s) = stmt {
-            if matches!(s.kind, auto_lang_core::ast::StoreKind::Var) {
+            if matches!(s.kind, auto_lang_core::ast::StoreKind::Var | auto_lang_core::ast::StoreKind::Const) {
                 codegen.global_vars.insert(s.name.to_string());
             }
         }
     }
     let store_inits: Vec<Stmt> = import_stmts
         .iter()
-        .filter(|s| matches!(s, Stmt::Store(st) if matches!(st.kind, auto_lang_core::ast::StoreKind::Var)))
+        .filter(|s| matches!(s, Stmt::Store(st) if matches!(st.kind, auto_lang_core::ast::StoreKind::Var | auto_lang_core::ast::StoreKind::Const)))
         .cloned()
         .collect();
     if !store_inits.is_empty() {
@@ -1772,6 +1772,17 @@ impl SessionRuntime {
             if let Some(v) = query_map.get(&sig.name) {
                 bound.push(serde_json::Value::String(v.clone()));
                 arg_srcs.push(ArgSrc::TypedString(sig.clone(), v.clone()));
+                continue;
+            }
+            // Match the standalone single-string whole-body contract after named
+            // sources, before metadata. Preserve the raw JSON/text representation.
+            if param_sigs.len() == 1
+                && matches!(sig.ty.trim(), "str" | "String")
+                && !req.body.is_empty()
+            {
+                let body = String::from_utf8_lossy(&req.body).into_owned();
+                bound.push(serde_json::Value::String(body.clone()));
+                arg_srcs.push(ArgSrc::TypedString(sig.clone(), body));
                 continue;
             }
             // PLAN-734 T-03（D8）：meta 约定名参数从请求头构造 cookies/auth

@@ -414,6 +414,14 @@ pub struct RunIo {
 }
 
 impl RunIo {
+    pub(crate) fn child_mark(&self) -> usize {
+        self.children.lock().unwrap().len()
+    }
+
+    pub(crate) fn kill_children_since(&self, mark: usize) {
+        let children = self.children.lock().unwrap().clone();
+        for child in children.iter().skip(mark) { child.kill(); }
+    }
     fn new() -> Self {
         Self {
             cancelled: AtomicBool::new(false),

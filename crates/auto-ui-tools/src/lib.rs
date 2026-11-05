@@ -32,6 +32,7 @@ pub mod host;
 pub mod proc_host;
 pub mod run_vm;
 pub mod run_vue;
+mod desktop_backends;
 pub mod stdio_split;
 pub mod tool_ops;
 

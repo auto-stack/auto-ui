@@ -6672,11 +6672,21 @@ fn start_api_server_fresh(project_dir: &Path) -> Result<Option<std::process::Chi
 }
 
 pub fn start_api_server(project_dir: &Path) -> Result<Option<std::process::Child>, String> {
+    start_api_server_inner(project_dir, true)
+}
+
+/// Desktop apps never clear a port or reuse an unrelated listener. The
+/// generator and process ownership path is otherwise the single-app launcher.
+pub(crate) fn start_desktop_api_server(project_dir: &Path) -> Result<Option<std::process::Child>, String> {
+    start_api_server_inner(project_dir, false)
+}
+
+fn start_api_server_inner(project_dir: &Path, clear_port: bool) -> Result<Option<std::process::Child>, String> {
     // daemon-ensure 语义（auto-os apps.manifest / pac.at back_port daemon 链）：
     // AUTO_REUSE_BACKEND=1 且端口已有活监听时直接复用——不杀（Plan 354 的
     // kill 会打断产品链先起好的真后端）、不重生成、不再 spawn 生成的
     // axum stub。缺省行为不变（kill + 重生成 + spawn）。
-    if std::env::var("AUTO_REUSE_BACKEND").as_deref() == Ok("1") {
+    if clear_port && std::env::var("AUTO_REUSE_BACKEND").as_deref() == Ok("1") {
         let port = crate::util::http_port();
         let probe_addr: std::net::SocketAddr = format!("127.0.0.1:{}", port).parse().unwrap();
         if std::net::TcpStream::connect_timeout(&probe_addr, std::time::Duration::from_secs(1))
@@ -6743,7 +6753,9 @@ pub fn start_api_server(project_dir: &Path) -> Result<Option<std::process::Child
 
     // Plan 354: Kill any process occupying the backend port before starting.
     let port = crate::util::http_port();
-    crate::util::kill_process_on_port(port);
+    if clear_port {
+        crate::util::kill_process_on_port(port);
+    }
 
     let cargo_toml = api_backend_dir.join("Cargo.toml");
 
