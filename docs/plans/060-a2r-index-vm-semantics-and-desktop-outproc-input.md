@@ -333,3 +333,9 @@ back 侧 `auto-notes-...-back` 是完整 axum/DB 实现。故 iced 桌面上任�
   - 但 child 侧无 `[plan060] child action …` 日志（该日志位于 `RqProjector::on_input` 的 Action 分支）⇒ child 的输入泵未把 Action 投到该 Surface，或该 app 的 Surface 不是 RqProjector 路径。
   - 已确认部署的 calendar.exe 含新标记（`child action` 字符串在二进制内、时间 02:00:40）。
   - 下一步：查 child 侧 Input 消息路由（client_entry/shell_client 的 face→surface 分发表），把 Action 归入与 pointer/key 同一投递面。
+
+- stage: work | plan_id: auto-ui/PLAN-060 | plan_revision: 1 | round: 23 | task_ids: T-07 | outcome: 诊断面修正——child stderr 未归档到桌面日志，之前"无 child action 日志"不构成未送达证据 | evidence:
+  - `endpoint.rs:514`：`(Active, ProtocolMsg::Input(input)) => self.session.on_input(&input)`——Action 与 pointer 同通道同入口，投递路径无疑。
+  - client_entry 的 Commands 臂用 `RqProjector` + `client_runtime::run_client_session`；`syslog!` 双写 `eprintln`（syslog.rs:183）——child 诊断只进 stderr。
+  - 之前看到的 `[plan060] frame2 …` 来自**桌面进程内的 mini VM**，不是 outproc child；`launch_app(outproc-native)` spawn 的 child stderr 未进入桌面日志 ⇒ "无 child action 日志"不能证明未送达。
+  - 下一步：把 outproc-native child 的 stderr 落文件（spawn 侧 pipe→日志文件），再判定 Action 是否被 child 消费；同时用 `SelectDay` 观测高亮变化。
