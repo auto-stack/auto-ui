@@ -5470,6 +5470,8 @@ impl DesktopSession {
                     ..
                 } => {
                     if let Some(freed) = client.surfaces.compose(surface, slot, payload) {
+                        // PLAN-060：帧到达即请求 shell 重绘（否则窗口停留在旧帧）。
+                        crate::ui::theme_policy::mark_shell_dirty();
                         to_app.push(ProtocolMsg::Frame(FrameMsg::FrameAck {
                             wid,
                             frame_id,
@@ -5487,6 +5489,7 @@ impl DesktopSession {
                     ..
                 } => {
                     if let Some(freed) = client.surfaces.compose_v2(surface, slot, payload) {
+                                crate::ui::theme_policy::mark_shell_dirty();
                         to_app.push(ProtocolMsg::Frame(FrameMsg::FrameAck {
                             wid,
                             frame_id,
@@ -5517,6 +5520,7 @@ impl DesktopSession {
                         if let Some(payload) = ready_v2 {
                             if let Some(freed) = client.surfaces.compose_v2(surface, slot, payload)
                             {
+                                crate::ui::theme_policy::mark_shell_dirty();
                                 to_app.push(ProtocolMsg::Frame(FrameMsg::FrameAck {
                                     wid,
                                     frame_id,
@@ -5531,6 +5535,8 @@ impl DesktopSession {
                     });
                     if let Some(payload) = ready {
                         if let Some(freed) = client.surfaces.compose(surface, slot, payload) {
+                        // PLAN-060：帧到达即请求 shell 重绘（否则窗口停留在旧帧）。
+                        crate::ui::theme_policy::mark_shell_dirty();
                             to_app.push(ProtocolMsg::Frame(FrameMsg::FrameAck {
                                 wid,
                                 frame_id,
@@ -11105,5 +11111,6 @@ mod live_input_tests {
         assert!(!session.route_live_input(&LiveInput::Chars { text: "y".into() }));
     }
 }
+
 
 
