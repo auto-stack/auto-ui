@@ -10460,6 +10460,10 @@ impl RustGenerator {
     /// Convert dot access in param expressions for Value-type variables
     /// e.g., "note.id" → "note[\"id\"].as_i64().unwrap_or(0) as i32" for i32 payloads
     fn convert_param_value_access(&self, param: &str, variant_name: &str) -> String {
+        // PLAN-052：提取期 ArkTS 面向 this. 前缀回译为 self.（calendar
+        // 事件实参株；convert_condition 同款）。
+        let param = param.replace("this.", "self.");
+        let param = param.as_str();
         // Check for patterns like "varname.field" or "varname.field.subfield"
         let parts: Vec<&str> = param.split('.').collect();
         if parts.len() >= 2 {

@@ -51,3 +51,17 @@ F3 达成：E0425/E0433（NavTree/EditorPanel 组件缺失族）全消——side
 | E0308 | 3 | 杂项（含 1 处 delete_note 返回型） | 随上述修复后复测定档 |
 
 里程碑：50 → 28；E0609/E0425/E0433/E0117/E0428/E0071 族全消。
+
+## T-02 铺测谱（2026-11-05，当前 tool 复测）
+
+| app | 错误数 | 主族 | 状态 |
+|---|---|---|---|
+| notes | 0 | — | ✅ exe 发布+冒烟 |
+| todo | 0 | — | ✅ exe 构建绿 |
+| counter | 0 | — | ✅ 回归绿 |
+| calendar | 29 | handler-call-return（.FmtDate 表达式位自消息发送返回 ()）+E0599+E0507 | 设计完成待实现（__call_ 辅助 fn + 臂委托 + 调用点改写） |
+| database | 60 | E0609×27（反向：typed 期望落 Value 面）+E0599×8+E0308×7+plain×16 | 待族析 |
+| chat | 147 | E0609×80+E0425×50+E0308×11+E0277×5 | 待族析 |
+| blog | 192 | E0119×48（冲突 impl）+E0609×33+E0034×24（歧义关联项）+E0599×20 | 待族析（疑 alias/struct 双定义另一通道） |
+
+已修通用族（notes/todo 实证）：api prop 豁免 value_prop_names、条件串回译、循环变量 api 分支（含 Checkbox checked 专属臂）、事件实参 this. 回译。
