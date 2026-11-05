@@ -1604,6 +1604,7 @@ fn merged_absorb(project_dir: &Path, _module: &auto_lang_core::api::ApiModule) -
         &db_at,
         Some(back.clone()),
     )
+    .map_err(|error| eprintln!("[merged-back] db transpilation failed: {error}"))
     .ok()?;
     let db_code = auto_api_gen::api_gen::post_process_db_rs(db_rs);
     let mut modules: Vec<(String, String)> = Vec::new();
@@ -1629,7 +1630,7 @@ fn merged_absorb(project_dir: &Path, _module: &auto_lang_core::api::ApiModule) -
             &name,
             &content,
             Some(back.clone()),
-        ) else {
+        ).map_err(|error| eprintln!("[merged-back] companion {name} transpilation failed: {error}")) else {
             return None;
         };
         let rs = auto_api_gen::api_gen::post_process_companion_rs(rs);
@@ -1653,6 +1654,7 @@ fn merged_absorb(project_dir: &Path, _module: &auto_lang_core::api::ApiModule) -
         &api_body,
         Some(back.clone()),
     )
+    .map_err(|error| eprintln!("[merged-back] endpoint transpilation failed: {error}"))
     .ok()?;
     // db 同款后处理：去掉转译器对结构返回型的 `impl ` 前缀（companion 版不带）。
     // a2r 对 api 接口形态的返回型加 `impl ` 前缀（接口语义）；内嵌实现不需要。
