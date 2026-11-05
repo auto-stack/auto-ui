@@ -5942,6 +5942,34 @@ pub(crate) fn apply_desktop_injects(state: &mut crate::ui::session::DesktopSessi
             DesktopInject::Key(input) => {
                 state.route_live_input(&input);
             }
+            // PLAN-060：消息注入（组件事件循环；VM 异步 API 正常挂起续跑）。
+            DesktopInject::Msg { app, msg, arg } => {
+                let app_id = if app == "shell" {
+                    state.desktop.shell_app
+                } else {
+                    state
+                        .host
+                        .as_ref()
+                        .and_then(|h| {
+                            h.wm.wins
+                                .iter()
+                                .find(|(_, v)| v.registry_id.as_deref() == Some(app.as_str()))
+                                .map(|(_, v)| v.app)
+                        })
+                        .or_else(|| state.hatched_mini_of(&app))
+                };
+                let Some(app_id) = app_id else { continue };
+                let Some(sess) = state.apps.get_mut(&app_id) else { continue };
+                let args = arg
+                    .map(|a| vec![auto_val::Value::str(&a)])
+                    .unwrap_or_default();
+                sess.component.on(crate::ui::interpreter::DynamicMessage::Typed {
+                    widget_name: "App".to_string(),
+                    event_name: msg,
+                    args,
+                });
+                *sess.state.view_dirty.borrow_mut() = true;
+            }
             // PLAN-060：验收通道指针注入——走真实指针消费臂
             // （hit_test → wm_focus → owning client PointerPressed/Released）。
             DesktopInject::Pointer {
@@ -6627,6 +6655,7 @@ pub(super) fn publish_workspace_previews(state: &mut crate::ui::session::Desktop
         wallpaper_src: state.desktop.desktop_wallpaper.clone(),
     });
 }
+
 
 
 

@@ -3364,6 +3364,13 @@ pub enum DesktopInject {
     /// 经真实 update 循环（`apply_desktop_injects` 排空点）驱动 = 半真机
     /// 证据口径（OS→iced 事件面由映射单测 + listen_with 既有事实合围）。
     Key(LiveInput),
+    /// PLAN-060：验收通道**消息注入**——走组件正常事件循环（VM 的 HTTP
+    /// API 会挂起续跑）；`Handler` 臂的 call_handler 是同步直调、绕过挂起。
+    Msg {
+        app: String,
+        msg: String,
+        arg: Option<String>,
+    },
     /// PLAN-060：验收通道指针注入——与真实鼠标同一消费臂
     /// （`broker_pointer_down/up` → owning client 的 PointerPressed/Released）。
     /// OS 指针在 CI/多窗抢占前台场景不可达；此臂给 iced 桌面上的
@@ -11124,6 +11131,7 @@ mod live_input_tests {
         assert!(!session.route_live_input(&LiveInput::Chars { text: "y".into() }));
     }
 }
+
 
 
 

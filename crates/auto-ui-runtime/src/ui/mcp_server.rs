@@ -3149,7 +3149,22 @@ fn tool_desktop(_shared: &SharedStateHandle, args: serde_json::Value) -> serde_j
             );
             text_result(format!("queued pointer {phase:?} at ({x},{y})"))
         }
-        _ => error_result(format!("Unknown action: '{action}' (bus|handler|key)")),
+        // PLAN-060：消息注入（组件事件循环；VM 异步 API 正常挂起续跑）。
+        "msg" => {
+            let app = args.get("app").and_then(|v| v.as_str()).unwrap_or_default().to_string();
+            let msg = args.get("msg").and_then(|v| v.as_str()).unwrap_or_default().to_string();
+            if app.is_empty() || msg.is_empty() {
+                return error_result("action=msg requires app and msg".to_string());
+            }
+            let arg = args.get("arg").and_then(|v| v.as_str()).map(|s| s.to_string());
+            crate::ui::session::desktop_inject_push(crate::ui::session::DesktopInject::Msg {
+                app: app.clone(),
+                msg: msg.clone(),
+                arg,
+            });
+            text_result(format!("queued {app} msg: {msg}"))
+        }
+        _ => error_result(format!("Unknown action: '{action}' (bus|handler|key|pointer|msg)")),
     }
 }
 
@@ -7019,3 +7034,4 @@ mod tests_plan781_t11 {
         assert_eq!(res["isError"], true);
     }
 }
+
