@@ -2943,6 +2943,30 @@ fn collect_local_elems(
                     }
                 }
 
+                // PLAN-060：input/textarea 的 on_change 只带**固定消息值**
+                // （生成码 `Msg::Variant("".to_string())`）——真实文本在投影
+                // 层写入 INPUT_TEXT（`last_input_text()`）。带 String 载荷且
+                // 绑定输入的变体，在臂内以读面覆盖载荷变量（shadowing）。
+                if has_payload && self.input_fields.contains_key(&variant_name) {
+                    if let Some(vi) = variant_info {
+                        if matches!(
+                            vi.payload.first(),
+                            Some(
+                                auto_lang_core::ast::Type::StrOwned
+                                    | auto_lang_core::ast::Type::StrSlice
+                                    | auto_lang_core::ast::Type::StrFixed(_)
+                            )
+                        ) {
+                            if let Some(first) = arm_names.first() {
+                                code.push_str(&format!(
+                                    "                let {} = auto_ui_runtime::ui::iced::last_input_text();\n",
+                                    first
+                                ));
+                            }
+                        }
+                    }
+                }
+
                 // If this event is from an input, prepend input text parsing
                 if let Some(field_names) = self.input_fields.get(&variant_name) {
                     // Plan 413: code_editor events read the text via the keyed
@@ -21336,3 +21360,4 @@ pub(crate) fn fix_cast_generic_ambiguity_for_ui(content: &mut String) {
         }
     }
 }
+
