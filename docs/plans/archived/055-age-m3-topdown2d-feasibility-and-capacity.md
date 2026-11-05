@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-05
 updated_at: 2026-11-05
 plan_revision: 1
-current_step: 9
+current_step: 10
 total_steps: 10
 depends_on: [auto-ui/PLAN-021, auto-ui/PLAN-022, auto-ui/PLAN-032]
 supersedes_spec_components: []
@@ -105,7 +105,7 @@ T-05对可接受最小链做坏输入/过期句柄/query token、资源缺失/�
 | T-07 | review | T-06 | 同树独立研究复审，finding返work同员有界复核 | AC-07 | [x] |
 | T-08 | merge | T-07 pass | 核实落地文件仅已审知识/必要资产，不把实验补丁当功能合入 | AC-08 | [x] |
 | T-09 | merge | T-08 | canonical/同号归档/当前导航，注明go边界/失败与未证项 | AC-08 | [x] |
-| T-10 | merge | T-09 | guard/全路径对账/摘要折Plan/清自有scope和构建物，hold登记 | AC-09 | [ ] |
+| T-10 | merge | T-09 | guard/全路径对账/摘要折Plan/清自有scope和构建物，hold登记 | AC-09 | [x] |
 
 ## 9. 复审记录
 
@@ -641,6 +641,20 @@ stage: merge | plan_id: PLAN-055 | plan_revision: r1 | checkpoint: landed,canoni
 
 归档实际状态门首次抓到任务勾选脚本未锚行首、误匹配依赖列T-09而提前勾T-10，current_step=9与10个勾不一致；已在提交和清树之前修正为锚定主任务行、T-10保持pending，重新跑实际门后方可提交归档。此为closeout文档检查错误，不影响已审研究源/SD或运行证据。
 
+### Merge cleaned / final delivery（2026-11-05）
+
+stage: merge | plan_id: PLAN-055 | plan_revision: r1 | outcome: pass | completion_kind: delivered | delivery_commit: 255350a27b989ea5ff1f3fa17e7d0d98b3729fd9 | archive_docs_commit: 5358620643436e62af77426adbd06adeb34bc80f | canonical: docs/specs/auto-graphics/topdown2d-feasibility.md | source_sha256: c185f8f2df252951bb57332c6f8803aa687c02a6acf51e6faa967359d0cbaac8 | tasks: T01..10 / 10/10 | pending_closeout_gates: none | holds: none
+
+- 实际archive门在迁移后重跑pass（9/10、r1、canonical hash精确、15个本次相关链接、六份持久源码、无关README逐字保全、线性历史），归档/055导航53586206已提交master。原spec/documentation交付以ff-only落主，后续均线性书面收据。
+- 四树清理均先核绝对路径严格属于`D:/autostack/.wt/ui-055/<repo>`、git status空、UI开发提交在master祖先；逐树紧接运行显式Git Bash wt-guard.sh exit0 clean，再git worktree remove成功：auto-ui、auto-lang、auto-down、auto-web。仅删除本Plan `codex/plan-055-dev`（was255350a2）；依赖为detached只读，无别仓branch操作。组目录确认空后移除，Test-Path false，git worktree list无ui-055。其它ag-021/os-054/ui-053/ui-060树与所属分支不触碰。
+- 原研究scope外部提前删除情况沿R2/merge prepared保留，不冒认删除数量。重新建立的本次closeout子scope实际只有archive055.py/merge_navigation.py/parallel-readme-before.txt/verify055.py四文件31210 bytes；必要结论/验证方法和输出已折入本Plan。删除前再次archive门pass、对子scope运行wt-guard clean；路径明确核为`D:/autostack/plan-artifacts/plan-055/auto-ui`，用PowerShell LiteralPath原生递归删除。父目录核空后才移除；两路径Test-Path false。没有跨shell串接路径删除，没有强制清未归属内容，没有本地具名hold。
+- registry恢复并更新`auto-ui/PLAN-055`的repo-qualified子scope、外部提前删除原因、实际自有closeout删除与归档/交付路径；保留auto-os/PLAN-055既有parent/11G记录。后续清理必须按仓库身份+子scope核属，不得仅因同号另一仓归档删除父scope。本Plan不新增该流程实现。
+- 最终门：10个T与current/total=10/10、archived路径/身份/真实link一致；无本Plan-owned dirty/source/SDK/研究manifest/产物/branch/tree。main仍有入口时并行README/053/056/057规划和既有PNG，保留且未提交本Plan；不为宣称全局clean去覆盖或收编它们。文档交付无生产二进制重建/重启需求，无部署或语言batch门遗留。
+
+stage: goal | plan_id: PLAN-055 | plan_revision: r1 | round: 5 | from: merge | to: done | status: archived | outcome: pass | worktree: removed D:/autostack/.wt/ui-055/* | commit: 255350a27b989ea5ff1f3fa17e7d0d98b3729fd9 | next: done
+
 ## 10. 待澄清事项
 
 D-01：实际无重力/角色配置和query＋sprite组合以T-01/02代码/真链裁决，不假设接口存在。D-02：2DHD美术/摄像机路线未定，提供选项与依赖不擅自选整套效果；最终内容选择归AG022合同。D-03：容量数字/时间仅真实测量，未证/超界/no-go完整保留。scope唯一`D:/autostack/plan-artifacts/plan-055/auto-ui/`；先核owner避免OS055跨仓材料冲突，登记用途/在途；源码探针/SDK副本/target/外部消费/日志均scope。merge必要源码/命令/失败摘要折Plan并核全部实际输出，guard清自有树/删scope构建物；具名hold可留owner/理由/关闭条件，禁止链接/不触别仓同号。
+
+结案：D-01/D-03已按真实支持/拒绝和单位裁决，见canonical及本Plan证据；D-02保留为AG022选择项，不阻塞本研究交付。本Plan没有待用户判断或未关闭验收项。
