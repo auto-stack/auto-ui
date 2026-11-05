@@ -5959,6 +5959,32 @@ pub(crate) fn apply_desktop_injects(state: &mut crate::ui::session::DesktopSessi
                         .or_else(|| state.hatched_mini_of(&app))
                 };
                 let Some(app_id) = app_id else { continue };
+                // PLAN-060 扩展：broker/adopt 应用（子进程持有组件）→ 走协议
+                // Action 下行；in-process 组件走既有 on() 直派。
+                if let Some(wid) = state.host.as_ref().and_then(|h| {
+                    h.wm.wins
+                        .iter()
+                        .find(|(_, v)| v.app == app_id)
+                        .map(|(w, _)| *w)
+                }) {
+                    let mut delivered = false;
+                    for client in state.broker_clients.values_mut() {
+                        if client.owns_wid(wid) {
+                            let input = crate::ui::desktop_protocol::message::ProtocolMsg::Input(
+                                crate::ui::desktop_protocol::message::InputMsg::Action {
+                                    wid: wid.0,
+                                    name: msg.clone(),
+                                    arg: arg.clone(),
+                                },
+                            );
+                            delivered = client.end.send(&input).is_ok();
+                            break;
+                        }
+                    }
+                    if delivered {
+                        continue;
+                    }
+                }
                 let Some(sess) = state.apps.get_mut(&app_id) else { continue };
                 let args = arg
                     .map(|a| vec![auto_val::Value::str(&a)])
@@ -6655,6 +6681,7 @@ pub(super) fn publish_workspace_previews(state: &mut crate::ui::session::Desktop
         wallpaper_src: state.desktop.desktop_wallpaper.clone(),
     });
 }
+
 
 
 

@@ -169,6 +169,9 @@ impl FrameSource for EditorFrameSource {
     }
 
     fn on_input(&mut self, input: &InputMsg) {
+        if matches!(input, InputMsg::Action { .. }) {
+            return;
+        }
         let editor_input = match input {
             InputMsg::KeyPressed { key, modifiers, .. } => EditorInput::KeyPressed {
                 key: EditorKey::Other(key.to_string()),
@@ -334,3 +337,4 @@ mod tests {
         assert_ne!(s.last_cache_keys, k1, "revision 变 → 键变");
     }
 }
+
