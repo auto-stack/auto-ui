@@ -53,6 +53,12 @@ pub trait Component: Sized + Debug {
         None
     }
 
+    /// PLAN-060 扩展：按名字派发一条组件消息（桌面协议 `InputMsg::Action`
+    /// 的 child 侧入口；默认不消费——只有动态组件实现）。
+    fn dispatch_named(&mut self, _name: &str, _arg: Option<&str>) -> bool {
+        false
+    }
+
     /// Handle messages - Auto's equivalent of `fn on(ev Msg)`
     ///
     /// This is where state mutations happen based on incoming messages.
@@ -152,3 +158,4 @@ pub trait Component: Sized + Debug {
         std::collections::HashMap::new()
     }
 }
+

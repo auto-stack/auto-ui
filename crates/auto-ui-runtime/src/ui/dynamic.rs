@@ -2708,6 +2708,26 @@ impl Component for DynamicComponent {
     ///
     /// After processing, the component is marked as dirty so the next `view()`
     /// call will reflect any state changes.
+    /// PLAN-060 扩展：broker 应用的 `InputMsg::Action` 派发入口——把消息名
+    /// 直接作为 handler 事件（与手工点击 `DynamicMessage::String` 同语义），
+    /// 可选单参数按字符串负载传递。
+    fn dispatch_named(&mut self, name: &str, arg: Option<&str>) -> bool {
+        let args = match arg {
+            Some(a) => vec![auto_val::Value::str(a)],
+            None => Vec::new(),
+        };
+        match self.bridge.call_handler_for("App", name, 0, &args) {
+            Ok(()) => {
+                self.dirty = true;
+                true
+            }
+            Err(e) => {
+                eprintln!("[plan060] action {name} dispatch failed: {e:?}");
+                false
+            }
+        }
+    }
+
     fn on(&mut self, msg: Self::Msg) {
         // Extract event name + any payload args the view builder resolved from
         // loop bindings (e.g. the `cell.date` in `onclick: .SelectDay(cell.date)`).
@@ -7152,3 +7172,4 @@ widget Helper654 {
         assert!(comp.read_state(DynamicComponent::CLOCK_SEC_FIELD).is_ok());
     }
 }
+
