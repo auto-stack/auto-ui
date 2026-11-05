@@ -5518,6 +5518,12 @@ impl DesktopSession {
                             crate::ui::desktop_protocol::shm::display_list_from_slot_payload(p).ok()
                         });
                         if let Some(payload) = ready_v2 {
+                            eprintln!("[plan060] frame2 wid={wid} texts={:?}", {
+                                use crate::ui::desktop_protocol::message::DrawOp;
+                                let mut t: Vec<String> = Vec::new();
+                                for op in &payload.ops { if let DrawOp::Text { text, .. } = op { t.push(text.clone()); } if t.len() >= 6 { break } }
+                                t
+                            });
                             if let Some(freed) = client.surfaces.compose_v2(surface, slot, payload)
                             {
                                 crate::ui::theme_policy::mark_shell_dirty();
@@ -11111,6 +11117,8 @@ mod live_input_tests {
         assert!(!session.route_live_input(&LiveInput::Chars { text: "y".into() }));
     }
 }
+
+
 
 
 
