@@ -261,3 +261,98 @@ impl<C: Component> Component for NativeThemeCarrier<C> {
         self.last.borrow().clone()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Debug, Clone)]
+    struct DummyMsg;
+    #[derive(Debug)]
+    struct Dummy;
+    impl Component for Dummy {
+        type Msg = DummyMsg;
+        fn on(&mut self, _msg: Self::Msg) {}
+        fn view(&self) -> View<Self::Msg> {
+            View::Empty
+        }
+    }
+
+    fn pkg() -> &'static EmbeddedThemePackage {
+        // 泄漏静态（测试一次性）——EmbeddedThemePackage 需 'static 引用。
+        Box::leak(Box::new(EmbeddedThemePackage {
+            owner: "auto-ui",
+            package: "themes",
+            version: "0.2.0",
+            digest: "9fa07742dc68aa53",
+            families: &[("Auto", &["light", "dark"], "light")],
+            themes_source: "pub theme Auto = {\n    tokens: {\n        colors: {\n            background: \"#ffffff\"\n            foreground: \"#09090b\"\n        }\n    }\n}\n",
+        }))
+    }
+
+    fn snap(rev: u64, family: &str, version: &str, digest: &str, mode: &str) -> PolicySnapshot {
+        PolicySnapshot {
+            revision: rev,
+            family: family.into(),
+            version: version.into(),
+            digest: digest.into(),
+            mode: mode.into(),
+        }
+    }
+
+    #[test]
+    fn carrier_rejects_named_and_keeps_old() {
+        let mut c = NativeThemeCarrier::with_package(Dummy, pkg()).expect("package");
+        assert!(c.theme_capable());
+        // 未知 family。
+        c.on_theme_policy(&snap(1, "Solarized", "0.2.0", "9fa07742dc68aa53", "dark"))
+            .unwrap();
+        assert_eq!(
+            c.theme_policy_status(),
+            Some(("rejected".into(), "family Solarized 未在嵌入包 themes 中声明".into()))
+        );
+        // 版本不符。
+        c.on_theme_policy(&snap(2, "Auto", "0.3.0", "9fa07742dc68aa53", "dark"))
+            .unwrap();
+        assert_eq!(
+            c.theme_policy_status().unwrap().0,
+            "rejected",
+            "版本不符拒绝"
+        );
+        // digest 不符。
+        c.on_theme_policy(&snap(3, "Auto", "0.2.0", "000000000000", "dark"))
+            .unwrap();
+        assert_eq!(
+            c.theme_policy_status().unwrap().0,
+            "rejected",
+            "digest 不符拒绝"
+        );
+        // mode 未声明。
+        c.on_theme_policy(&snap(4, "Auto", "0.2.0", "9fa07742dc68aa53", "sepia"))
+            .unwrap();
+        assert_eq!(
+            c.theme_policy_status().unwrap().0,
+            "rejected",
+            "mode 未声明拒绝"
+        );
+    }
+
+    #[test]
+    fn carrier_applies_then_frame_flips_applied() {
+        let mut c = NativeThemeCarrier::with_package(Dummy, pkg()).expect("package");
+        assert_eq!(c.theme_policy_status(), None, "首推前无可读回");
+        c.on_theme_policy(&snap(7, "Auto", "0.2.0", "9fa07742dc68aa53", "dark"))
+            .unwrap();
+        // 帧前 = pending；帧（view）后 = applied。
+        assert_eq!(c.theme_policy_status().unwrap().0, "pending");
+        let _ = c.view();
+        assert_eq!(
+            c.theme_policy_status(),
+            Some(("applied".into(), String::new()))
+        );
+        assert_eq!(c.applied_rev, 7);
+        // 裸包装恒不支持。
+        let bare = NativeThemeCarrier::<Dummy>::bare(Dummy);
+        assert!(!bare.theme_capable());
+    }
+}
