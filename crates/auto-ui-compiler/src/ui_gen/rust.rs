@@ -6140,6 +6140,39 @@ impl RustGenerator {
                             }
                             AuraPropValue::Expr(auto_lang_core::ast::Expr::Dot(object, field)) => {
                                 let field = field.clone();
+                                // PLAN-052：接收者为 api 实体集合循环变量时
+                                // 走 struct 点访问（todo `item.done` 的
+                                // Checkbox 株；此前无条件下落 Value 括号）。
+                                let recv_ident: Option<&str> = match object.as_ref() {
+                                    auto_lang_core::ast::Expr::Ident(name) => {
+                                        Some(if name.as_str().starts_with('.') {
+                                            &name.as_str()[1..]
+                                        } else {
+                                            name.as_str()
+                                        })
+                                    }
+                                    _ => None,
+                                };
+                                if let Some(resolved) = recv_ident {
+                                    let api_coll = self
+                                        .loop_var_collections
+                                        .get(resolved)
+                                        .map(|c| self.coll_is_api_typed(c))
+                                        .unwrap_or(false);
+                                    if api_coll {
+                                        if let Some(coll) =
+                                            self.loop_var_collections.get(resolved).cloned()
+                                        {
+                                            if let Some(elem) = self.api_elem_type_of(&coll) {
+                                                return self.api_struct_field_access(
+                                                    resolved,
+                                                    &elem,
+                                                    field.as_str(),
+                                                );
+                                            }
+                                        }
+                                    }
+                                }
                                 let obj_str = match object.as_ref() {
                                     auto_lang_core::ast::Expr::Ident(name) => {
                                         let resolved = if name.starts_with('.') {
@@ -9313,6 +9346,9 @@ impl RustGenerator {
     /// Convert AURA condition to Rust expression
     fn convert_condition(&self, condition: &str) -> String {
         let result = condition.trim().to_string();
+        // PLAN-052：提取期字符串化的 ArkTS 面向 this. 前缀在 rust 轨回译
+        // 为 self.（calendar `this.active_…` 的 E0425 株）。
+        let result = result.replace("this.", "self.");
 
         // Replace state-ref dots like ".notes" → "self.notes", but NOT method call dots
         // like ".len()" or ".to_string()". A state-ref dot is one where the previous
