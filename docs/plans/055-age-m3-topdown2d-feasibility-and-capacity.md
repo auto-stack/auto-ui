@@ -618,6 +618,16 @@ stage: review | review_scope: final | reviewer_identity: 同独立子上下文 /
 - 原材料可用性限制如实记录：本次尝试复读`D:/autostack/plan-artifacts/plan-055/auto-ui/lower-results.json`返回FileNotFoundError，Test-Path整个auto-ui子scope为false；因此本次不能声称重读当前JSON或重新核SDK681，而是使用R1已亲读并hash的独立结果及本Plan已折摘要完成定向复核。已将scope消失通知merge owner。后续独立检查`D:/autostack/plan-artifacts/.retention/policy.json` lines603–607，实际登记`id=auto-os/PLAN-055, scope=plan-055, deleted=2026-11-05, size=11G, main@720aaa7`，是跨仓同号父scope清理记录；merge owner报告本会话未删除父scope，先前auto-ui子scope的in-flight登记被该写入覆盖。此证据支持同号跨仓父scope清理冲突；不归称本review/root删除11G，不虚构完整文件数。T10须按已知输出类别对账、确认实际不存在并恢复repo-qualified registry条目；实际清理主体/时序的证据边界仍须保留，不从此状态冒认已完整清理，也不影响已冻结且持久可核的文档数字关闭。
 - acceptance_results: AC01..07 pass；findings: none open（F-055-R1-01 closed）；pending_closeout_gates: AC08/09、T08..10，docs-only content/link/format，迁移真实archive并关闭SD未来链接，canonical落主、全实际输出/提前消失scope对账、guard/registry/清理闭环。next: merge skill，仅在实际closeout gates完成后认领交付；本review未merge/归档/清树/修改实现或Spec。当前reviewed7/10。
 
+stage: goal | plan_id: PLAN-055 | plan_revision: r1 | round: 4 | from: review | to: merge | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-055/auto-ui | commit: 6277e50f88a09be3850403356f2e76809f3081d4 | next: merge
+
+### Merge prepared（2026-11-05）
+
+review pass绑定6277e50f/SD SHA256 c185f8f2df252951bb57332c6f8803aa687c02a6acf51e6faa967359d0cbaac8，finding全闭。merge-owned文档导航后裔2870c51e仅改四份设计页的055归档链接和已审结论引用，Spec/runtime/source/依赖不变；主分支并发OS055提交未改本研究pilot/driver源码/API目录（`git diff --stat 220115df..master -- <三目录>`无输出）。主目录他人README/053/056/057文档WIP及四张既有PNG保留，不纳入本Plan。只提交本Plan与已审知识/055导航，不调用ledger或组合merge API。
+
+提前删除对账：本会话先前产生的全部已知类别为inputs/interaction/wrong_target/布尔失败和states8/9源码目录、products和review-products及其world/scene/identity/closure、host-projects受控消费副本、六份源码脚本/拼接研究测试、两套独占cargo targets及exe/PDB/build intermediates、681文件SDK副本、build/lower/CPU/GPU/失败/恢复/review日志。它们均在auto-ui子scope（官方SDK工具的ignored tree默认输出测后已移入该scope），原始子scope及父目录在R2前外部清理后实际均不存在；完整研究源、重建命令、关键结果/失败和hash已先行折Plan并由R1亲验。无法在消失后补造逐文件数量/bytes或重读raw，不声称11G是本会话清理/专属大小。registry实际auto-os/PLAN-055父scope删除记录保留，明确后续只能按repo-qualified子scope清理。
+
+merge阶段仅重新建立`D:/autostack/plan-artifacts/plan-055/auto-ui/`存放本阶段导航/归档检查辅助脚本，不包含恢复的运行材料；最终仍删除这个自有子scope，父目录只在空时移除，任何新出现的其它repo子scope禁止触碰。原研究未留下需要本地raw的具名hold，数组/布尔ABI/地图/预算缺口均是已持久后继输入，不伪称已修产品。T08..10仍待实际落主/归档/guard后关闭。
+
 ## 10. 待澄清事项
 
 D-01：实际无重力/角色配置和query＋sprite组合以T-01/02代码/真链裁决，不假设接口存在。D-02：2DHD美术/摄像机路线未定，提供选项与依赖不擅自选整套效果；最终内容选择归AG022合同。D-03：容量数字/时间仅真实测量，未证/超界/no-go完整保留。scope唯一`D:/autostack/plan-artifacts/plan-055/auto-ui/`；先核owner避免OS055跨仓材料冲突，登记用途/在途；源码探针/SDK副本/target/外部消费/日志均scope。merge必要源码/命令/失败摘要折Plan并核全部实际输出，guard清自有树/删scope构建物；具名hold可留owner/理由/关闭条件，禁止链接/不触别仓同号。
