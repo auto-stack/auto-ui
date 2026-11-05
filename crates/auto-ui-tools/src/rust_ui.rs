@@ -1500,6 +1500,7 @@ struct DbFnSig {
 struct MergedAbsorb {
     modules: Vec<(String, String)>, // (mod name, rust source)
     db_fns: Vec<DbFnSig>,
+    api_impl_fns: Vec<DbFnSig>,
 }
 
 /// 从转译后的 Rust 源码解析 `pub fn name(args) -> ret` 签名（够用即可：
@@ -1635,6 +1636,28 @@ fn merged_absorb(project_dir: &Path, _module: &auto_lang_core::api::ApiModule) -
         queue.extend(crate_refs(&rs));
         modules.push((name, rs));
     }
+    // PLAN-060：api.at 端点体（去 #[api] 与 pub type）转译为 api_impl——
+    // api 函数体形如 `return db.all_notes()`，是端点真实现（db 里未必同名）。
+    let api_at = std::fs::read_to_string(back.join("api.at")).ok()?;
+    let api_body = strip_api_types(
+        &api_at
+            .lines()
+            .filter(|l| !l.trim_start().starts_with("#[api"))
+            .collect::<Vec<_>>()
+            .join("\n"),
+    );
+    let (api_impl_rs, _) = auto_api_gen::api_gen::transpile_back_module_to_rs_with_proofs(
+        "api_impl",
+        &api_body,
+        Some(back.clone()),
+    )
+    .ok()?;
+    let api_impl_code = auto_api_gen::api_gen::post_process_companion_rs(api_impl_rs);
+    let api_impl_fns = parse_db_fn_sigs(&api_impl_code);
+    modules.push((
+        "api_impl".to_string(),
+        format!("use crate::types::*;\n{api_impl_code}"),
+    ));
     let companions_for_rewrite: Vec<(String, String)> = modules
         .iter()
         .filter(|(n, _)| n != "db")
@@ -1644,9 +1667,32 @@ fn merged_absorb(project_dir: &Path, _module: &auto_lang_core::api::ApiModule) -
     rewrite_companion_str_args(&mut db_code, &companions_for_rewrite);
     let db_fns = parse_db_fn_sigs(&db_code);
     modules.push(("db".to_string(), db_code));
-    Some(MergedAbsorb { modules, db_fns })
+    Some(MergedAbsorb { modules, db_fns, api_impl_fns })
 }
 
+/// 去掉 api.at 里的 `pub type X = { ... }` 块（api_impl 复用 crate::types）。
+fn strip_api_types(src: &str) -> String {
+    let mut out = String::new();
+    let mut depth = 0i32;
+    let mut in_type = false;
+    for line in src.lines() {
+        let t = line.trim_start();
+        if depth == 0 && t.starts_with("pub type ") {
+            in_type = true;
+        }
+        if in_type {
+            depth += line.chars().filter(|c| *c == '{').count() as i32;
+            depth -= line.chars().filter(|c| *c == '}').count() as i32;
+            if depth <= 0 {
+                in_type = false;
+            }
+            continue;
+        }
+        out.push_str(line);
+        out.push('\n');
+    }
+    out
+}
 /// PLAN-060 T-04（workaround）：内嵌 back 模块时，db 代码对 companion
 /// （repository/p2probe…）的调用未带 `&`（a2r 生成 back 时的 import 签名
 /// 解析在 front 侧不可得）；按 companion 转译件的 `&str` 形参位置给实参补
@@ -1814,7 +1860,7 @@ fn merged_db_delegate_typed(
     module: &auto_lang_core::api::ApiModule,
     endpoint: &auto_lang_core::api::ApiEndpoint,
 ) -> Option<String> {
-    let sig = absorb.db_fns.iter().find(|f| f.name == endpoint.fn_name)?;
+    let (target_mod, sig) = if let Some(s) = absorb.api_impl_fns.iter().find(|f| f.name == endpoint.fn_name) { ("api_impl", s) } else { ("db", absorb.db_fns.iter().find(|f| f.name == endpoint.fn_name)?) };
     if sig.params.len() != endpoint.params.len() {
         return None;
     }
@@ -1847,7 +1893,7 @@ fn merged_db_delegate_typed(
         .trim_start_matches("[]")
         .trim_start_matches('?');
     let db_ret = sig.ret.clone().unwrap_or_else(|| "()".to_string());
-    let call = format!("db::{}({})", sig.name, call_args.join(", "));
+    let call = format!("{target_mod}::{}({})", sig.name, call_args.join(", "));
     let (ret_clause, call_expr) = if ret_ui == "()" || ret_ui.is_empty() {
         (String::new(), call)
     } else if known.contains(rbase) {
@@ -11518,6 +11564,7 @@ mod plan036_theme_input_tests {
         );
     }
 }
+
 
 
 
