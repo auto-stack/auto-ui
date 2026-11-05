@@ -932,7 +932,9 @@ impl RustGenerator {
         self.computed_value_rets.clear();
         self.value_loop_vars.clear();
         self.ref_loop_vars.clear();
-        self.value_returning.clear();
+        // PLAN-052：value_returning 不在此清——generate() 入口先于
+        // generate_rust 的 reset() 收集；由 collect_value_returning
+        // 自清理（per-widget 隔离）。
         self.value_locals.clear();
         self.array_locals.clear();
         self.local_record_shapes.clear();
