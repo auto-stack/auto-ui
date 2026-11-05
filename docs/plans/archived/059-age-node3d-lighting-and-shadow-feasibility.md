@@ -513,6 +513,16 @@ archive checkpoint：同号Plan移至docs/plans/archived/059-age-node3d-lighting
 
 landing-not-deployment：本交付纯研究知识，无production source/lock/SDK变化；backend/daemon/web bundle均无新增消费二进制要求，未重启现有进程；自动应用索引非阻塞。auto-lang周期全仓batch门不属本仓文档研究落地主腿。
 
+2026-11-05 / merge artifact audit: archive docs committed fb116b0a; scope plan-059 only auto-ui; 38238 files / 18926786672 bytes, no links/junctions. Own paths = fixed/author/driver/sdk/lang archives, prototype/pilot/driver sources+targets, frozen+.sdk-source SDK, author lang-fixed/crates, inputs/products/probes/logs, review-r1/r2 controls, restored README snapshot/stash record. Necessary reconstruction sources and evidence folded above; no unresolved holds. Fresh guards and actual removal still pending.
+
+2026-11-06 / stage: merge | plan_id: PLAN-059:r1 | outcome: blocked (cleanup only) | delivery_commit: ab5a2e64b95206be8bd09be28001cfaffb3ba646 | archive_commit: fb116b0a21d090e85e3d9c33ac3f9fd6471d7a57 | canonical_verified: pass | cleaned: partial. Fresh Git-Bash guard clean for worktree and whole scope; master ancestry passed; worktree and branch removed; empty ui-059 group removed. Automatic approval rejected recursive native PowerShell cleanup of the verified own plan-059 scope twice before execution, reporting only “blocked by policy”. No alternative recursive deletion attempted. Last inventory: 38238 files / 18926786672 bytes. Source/evidence reconstruction and review controls are already folded above. T10 remains pending; no goal completion claim.
+
+Named cleanup hold: owner=Codex PLAN-059 closeout / user filesystem operator; scope=D:/autostack/plan-artifacts/plan-059/auto-ui; reason=automatic approval refuses recursive cleanup; closure=remove verified own plan-059 scope, verify absence, update registry, close T10 and goal. No unresolved implementation finding. Existing unrelated main docs/PNG remain preserved.
+
+2026-11-06 / stage: goal | plan_id: PLAN-059 | plan_revision: r1 | round: 5 | from: merge | to: user | status: archived | outcome: blocked | worktree: removed | commit: ab5a2e64b95206be8bd09be28001cfaffb3ba646 | next: user. First goal turn with this blocker; host goal remains active until its three-consecutive-turn threshold. Resume cleanup only after external state changes, without repeating implementation or GPU gates.
+
 ## 10. 待澄清事项
+
+C-059-cleanup：请用户手动清理 `D:/autostack/plan-artifacts/plan-059/`（约18.9GB；只有本计划auto-ui子目录），或修复自动审批对此精确自有路径清理的限制，之后继续本goal。不得清理plan-artifacts根或其它编号目录。工具只报告“blocked by policy”，没有更具体理由。研究交付/独立复审/归档均完成；T10待清理核验。
 
 D-01：正常作者端口不存在时的两候选由T-02真链裁决，不能因底层有LightDef假定作者已支持。D-02：数学像素容差/投影域在实际环境T-01冻结；GPU计时不可用就明牌。D-03：本研究不绑定尚无结论的three.js首批覆盖，不提前认领PBR。材料唯一`D:/autostack/plan-artifacts/plan-059/auto-ui/`，先核跨仓owner/登记用途在途，研究源/原始结果/SDK副本/target/外部消费均子scope；merge必要源命令和成败摘要折Plan后核所有输出，fresh guard清唯一树/删自有scope与构建物，具名owner/理由/关闭条件hold例外。禁止链接/触碰别仓同号/另建权威树。
