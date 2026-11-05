@@ -302,6 +302,13 @@ fn broker_surface_local(
     let Some((sw, sh)) = client.surfaces.size(sid) else {
         return (lx, ly);
     };
+    if std::env::var_os("AUTO_PLAN060_DIAG").is_some() {
+        eprintln!(
+            "[plan060] broker pointer local ({lx:.1},{ly:.1}) rect {rw:.1}x{rh:.1} surface {sw:.1}x{sh:.1} -> ({:.1},{:.1})",
+            lx * sw / rw,
+            ly * sh / rh
+        );
+    }
     let (sx, sy) = (lx * sw / rw, ly * sh / rh);
     if !sx.is_finite() || !sy.is_finite() {
         return (lx, ly);
@@ -11161,6 +11168,7 @@ mod live_input_tests {
         assert!(!session.route_live_input(&LiveInput::Chars { text: "y".into() }));
     }
 }
+
 
 
 
