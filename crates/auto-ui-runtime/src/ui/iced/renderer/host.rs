@@ -912,8 +912,16 @@ fn run_session(
                 // Plan 480 S3：真桌面壳孵化通道——broker 常驻受理 spawn 孵化
                 // （`auto --autodesk-incubate` 经 `request_incubation` 连入，
                 // ServiceTick 帧泵周期 attach 落 462 会话）。
+                // PLAN-055 T-01（auto-os 055）：pipe 名 env 覆盖——探测/隔离
+                // 环境独占井盖（同名多实例服务端使客户端连入任意桌面，
+                // probe 污染实证株）；无 env = 常量名，零行为差。镜像
+                // rqhost 的 AUTO_RQHOST_WELLKNOWN 先例。
+                let broker_pipe = std::env::var("AUTOOS_BROKER_PIPE")
+                    .ok()
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or_else(|| crate::ui::desktop_protocol::broker::BROKER_PIPE.to_string());
                 session.enable_broker(
-                    crate::ui::desktop_protocol::broker::BROKER_PIPE,
+                    &broker_pipe,
                     std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
                 );
                 // PLAN-030 T-04：outproc 壳孵化——broker 就位后 spawn（boot

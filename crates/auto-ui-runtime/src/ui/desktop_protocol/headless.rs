@@ -907,6 +907,11 @@ where
     pub fn component(&self) -> &C {
         &self.surface.component
     }
+
+    /// PLAN-055 T-03：组件可变访问（调用侧装载/主题策略应用）。
+    pub fn component_mut(&mut self) -> &mut C {
+        &mut self.surface.component
+    }
 }
 
 impl<C: Component> super::endpoint::FrameSource for HeadlessFrameSource<C>
@@ -915,6 +920,24 @@ where
 {
     fn revision(&self) -> u64 {
         self.rev
+    }
+
+    // PLAN-055 T-03（auto-os 055）：主题策略面 = 组件转发——remote/v2 臂
+    // 是 a2r exe 桌面/rq 载体的主产线，缺省 false 会把 NativeThemeCarrier
+    // 的 caps 门压掉（Hello theme_caps=[] 实证株），宿主永不推送。
+    fn theme_capable(&self) -> bool {
+        self.surface.component.theme_capable()
+    }
+
+    fn on_theme_policy(
+        &mut self,
+        snap: &crate::ui::theme_policy::PolicySnapshot,
+    ) -> Result<(), String> {
+        self.surface.component.on_theme_policy(snap)
+    }
+
+    fn theme_policy_status(&self) -> Option<(String, String)> {
+        self.surface.component.theme_policy_status()
     }
 
     fn render_frame(&mut self) -> DrawList {

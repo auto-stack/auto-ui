@@ -4450,22 +4450,56 @@ impl DesktopSession {
         use crate::ui::desktop_protocol::endpoint::HostState;
         let deadline =
             std::time::Instant::now() + std::time::Duration::from_millis(budget_ms as u64);
+        let mut last_probe_log = std::time::Instant::now();
         while std::time::Instant::now() < deadline {
             if client.endpoint.state == HostState::Active {
                 return client.wid;
+            }
+            // PLAN-055 probe：秒级心跳（pending/eof/state——归因空转 vs
+            // 读见帧不过激活）。
+            if last_probe_log.elapsed().as_millis() >= 1000 {
+                last_probe_log = std::time::Instant::now();
+                eprintln!(
+                    "[probe-broker] attach {} pending={} eof={} state={:?}",
+                    client.pipe,
+                    crate::ui::desktop_protocol::transport::Transport::pending(&client.end),
+                    client.end.is_eof(),
+                    client.endpoint.state
+                );
             }
             match client.end.try_recv() {
                 Some(Ok(msg)) => {
                     let actions = match client.endpoint.on_message(msg) {
                         Ok(a) => a,
-                        Err(_) => return None,
+                        Err(e) => {
+                            // PLAN-055 probe：attach 失败归因不再吞（预算行
+                            // 同印两种死法——静默吞错使 G-2 载体排查不可归因）。
+                            eprintln!("[probe-broker] on_message err: {e:?}");
+                            return None;
+                        }
                     };
                     let replies = session.broker_apply_actions(client, actions);
                     for reply in replies {
                         let _ = client.end.send(&reply);
                     }
                 }
-                Some(Err(_)) => return None,
+                Some(Err(e)) => {
+                    // PLAN-055 probe：解码错误不再静默——坏帧字节留痕。
+                    let bad = crate::ui::desktop_protocol::transport::LAST_BAD_FRAME
+                        .lock()
+                        .ok()
+                        .and_then(|g| g.clone());
+                    let head = bad
+                        .as_ref()
+                        .map(|b| {
+                            let hex: String =
+                                b.iter().take(24).map(|x| format!("{x:02x}")).collect();
+                            format!("len={} head={hex}", b.len())
+                        })
+                        .unwrap_or_else(|| "<none>".to_string());
+                    eprintln!("[probe-broker] codec err: {e:?} bad_frame[{head}]");
+                    return None;
+                }
                 None => std::thread::sleep(std::time::Duration::from_millis(5)),
             }
         }
@@ -5397,7 +5431,12 @@ impl DesktopSession {
                                 to_app.push(push.1);
                             }
                         }
-                        Err(_) => continue,
+                        Err(e) => {
+                            // PLAN-055 probe：activate 失败具名留痕（continue
+                            // 静默重试会烧光预算且不可归因）。
+                            eprintln!("[probe-broker] activate err: {e:?}");
+                            continue;
+                        }
                     }
                 }
                 // PLAN-053 T-03：策略结果上行——stale/重复（低于本连接已推

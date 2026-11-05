@@ -2934,6 +2934,22 @@ fn wrap_example(
     let main_widget = extract_main_widget(components);
     let main_msg = format!("{}Msg", main_widget);
 
+    // PLAN-055 T-03（auto-os 055 载体收口）：官方主题包嵌入——App 声明
+    // 官方包且准入通过 → 嵌入身份/族表/themes.at 原文 + rq/desktop 臂
+    // 组件包 NativeThemeCarrier（Hello caps → push 校验应用 → 帧后
+    // applied 读回）。未声明 = 零嵌入零行为差（I1）；准入/读取失败 =
+    // compile_error!（零静默降级——C-11 同哲学）。
+    let (theme_pkg_static, theme_construct) =
+        match embed_theme_package_data(project_dir, &main_widget) {
+            Ok(pair) => pair,
+            Err(e) => (
+                format!(
+                    "compile_error!(\"PLAN-055: 官方主题包嵌入失败: {e}\");"
+                ),
+                format!("{main_widget}::default()"),
+            ),
+        };
+
     // 剥重复 import + computed 属性字段式访问修补（shell-lib 目标同源
     // 提取件——prepare_generated_components）。
     let cleaned = prepare_generated_components(components);
@@ -3057,7 +3073,7 @@ fn wrap_example(
                     }}
                 }}
                 let (__w, __h) = auto_ui_runtime::ui::desktop_protocol::rqhost::vm_window_size();
-                let __component = {main_widget}::default();
+                let __component = {theme_construct};
                 let __opts = auto_ui_runtime::ui::desktop_protocol::client_entry::ClientOpts {{
                     app_name: __app_name.clone(),
                     title: std::env::var("AUTO_VM_TITLE").unwrap_or_else(|_| __app_name.clone()),
@@ -3098,7 +3114,7 @@ fn wrap_example(
                     }}
                 }}
                 let (__w, __h) = auto_ui_runtime::ui::desktop_protocol::rqhost::vm_window_size();
-                let __component = {main_widget}::default();
+                let __component = {theme_construct};
                 let __opts = auto_ui_runtime::ui::desktop_protocol::client_entry::ClientOpts {{
                     app_name: __app_name.clone(),
                     title: std::env::var("AUTO_VM_TITLE").unwrap_or_else(|_| __app_name.clone()),
@@ -3150,7 +3166,7 @@ fn wrap_example(
             );
             // PLAN-026 T-06 翻转：组件先行构造（auto 裁决 = 覆盖扫描制
             // ——queue 优先 + NotCovered 降级 independent 留痕）。
-            let __component = {main_widget}::default();
+            let __component = {theme_construct};
             let (__frame_mode, __downgraded, __log) =
                 auto_ui_runtime::ui::desktop_protocol::client_entry::resolve_native_frame_mode(
                     __mode,
@@ -3193,6 +3209,7 @@ fn wrap_example(
         }}"#,
         main_widget = main_widget,
         project_name_snake = to_snake_case(project_name),
+        theme_construct = theme_construct,
     );
 
     let pac_path = project_dir.join("pac.at");
@@ -3233,6 +3250,7 @@ static GUARD_ALLOC: auto_ui_runtime::ui::mem_guard::GuardAlloc = auto_ui_runtime
 // 一次（per-file 注入会撞多 .at 文件拼接的重复定义）。
 {at_shims}
 
+{theme_pkg_static}
 {cleaned}
 
 // Explicitly connect the SDK to the UI provider owner. The generated app no
@@ -3264,16 +3282,106 @@ fn main() -> auto_ui_runtime::ui::AppResult<()> {{
 "#,
         cleaned = cleaned.trim(),
         at_shims = AT_BUILTIN_METHOD_SHIMS,
+        theme_pkg_static = theme_pkg_static,
         env_inits = env_inits,
         native_client_gate = native_client_gate,
         iced_entry = iced_entry,
     )
 }
 
+/// PLAN-055 T-03：官方主题包嵌入数据收集（wrap_example 生成期）。
+///
+/// `Ok(None)` = App 未声明官方包（零嵌入）；`Ok((static, construct))` =
+/// 生成的 `__EMBEDDED_THEME_PKG` static 源 + rq/desktop 臂组件构造表达；
+/// `Err` = 准入/身份/清单读取失败（调用方 compile_error!，零静默降级）。
+fn embed_theme_package_data(
+    project_dir: &Path,
+    main_widget: &str,
+) -> Result<(String, String), String> {
+    let theme_root = match crate::theme_package::verify_app_theme_inputs(project_dir) {
+        Ok(Some(root)) => root,
+        Ok(None) => {
+            return Ok((String::new(), format!("{main_widget}::default()")));
+        }
+        Err(e) => return Err(format!("theme inputs 准入失败: {e}")),
+    };
+    let identity = crate::theme_package::verified_theme_input_identity(&theme_root)
+        .map_err(|e| format!("theme identity 校验失败: {e}"))?;
+    let manifest_src = std::fs::read_to_string(theme_root.join("theme-package.json"))
+        .map_err(|e| format!("theme-package.json 读取失败: {e}"))?;
+    let manifest: serde_json::Value = serde_json::from_str(&manifest_src)
+        .map_err(|e| format!("theme-package.json 解析失败: {e}"))?;
+    let themes_src = std::fs::read_to_string(theme_root.join("themes.at"))
+        .map_err(|e| format!("themes.at 读取失败: {e}"))?;
+    let families = manifest
+        .get("families")
+        .and_then(|f| f.as_array())
+        .ok_or_else(|| "包清单缺 families 节".to_string())?;
+    if families.is_empty() {
+        return Err("包清单 families 为空".to_string());
+    }
+    let mut fam_parts = Vec::new();
+    for f in families {
+        let name = f
+            .get("name")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| "包清单族缺 name".to_string())?;
+        let modes = f
+            .get("modes")
+            .and_then(|v| v.as_array())
+            .ok_or_else(|| format!("族 {name} 缺 modes"))?;
+        let mode_parts = modes
+            .iter()
+            .map(|m| {
+                m.as_str()
+                    .map(|s| format!("\"{s}\""))
+                    .ok_or_else(|| format!("族 {name} modes 含非串项"))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let def = f
+            .get("default")
+            .and_then(|v| v.as_str())
+            .unwrap_or("light");
+        fam_parts.push(format!(
+            "(\"{name}\", &[{}], \"{def}\")",
+            mode_parts.join(", ")
+        ));
+    }
+    // raw 串井号数：内容含 `"#` 则升级（themes.at 为 token 表，单 # 恒足，
+    // 升级环仅为防御）。
+    let mut hashes = 1;
+    while themes_src.contains(&format!("\"{}", "#".repeat(hashes))) {
+        hashes += 1;
+    }
+    let h = "#".repeat(hashes);
+    let stat = format!(
+        r#"// PLAN-055 T-03：嵌入官方主题包（生成期准入校验后的固定快照——
+// 身份/内容摘要与宿主 catalog 同源同聚合，推拉对账一致）。
+static __EMBEDDED_THEME_PKG: auto_ui_runtime::ui::desktop_protocol::native_theme_carrier::EmbeddedThemePackage =
+    auto_ui_runtime::ui::desktop_protocol::native_theme_carrier::EmbeddedThemePackage {{
+        owner: "{owner}",
+        package: "{pkg}",
+        version: "{version}",
+        digest: "{digest}",
+        families: &[{fams}],
+        themes_source: r{h}"{themes_src}"{h},
+    }};
+"#,
+        owner = identity.owner,
+        pkg = identity.name,
+        version = identity.version,
+        digest = identity.content_digest,
+        fams = fam_parts.join(", "),
+    );
+    let cons = format!(
+        "auto_ui_runtime::ui::desktop_protocol::native_theme_carrier::NativeThemeCarrier::with_package({main_widget}::default(), &__EMBEDDED_THEME_PKG).expect(\"嵌入式主题包注册失败\")"
+    );
+    Ok((stat, cons))
+}
+
 /// Extract the main widget name from generated components.
 /// Looks for "App" struct first, then falls back to the first `pub struct` found.
-fn extract_main_widget(components: &str) -> String {
-    // Look for "pub struct App"
+fn extract_main_widget(components: &str) -> String {    // Look for "pub struct App"
     for line in components.lines() {
         let trimmed = line.trim();
         if trimmed == "pub struct App {" {

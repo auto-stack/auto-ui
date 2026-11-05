@@ -41,6 +41,10 @@ pub mod host;
 pub mod loopback;
 pub mod message;
 pub mod native_projector;
+/// PLAN-055 T-03（auto-os 055）：a2r 静态组件主题策略载体——嵌入官方包
+/// 身份/族表，push 校验（具名拒绝保旧）→ set_theme_tree+set_dark_mode
+/// 应用 → 帧后 applied 读回。补齐 G-2 真载体（a2r exe）的 caps 门。
+pub mod native_theme_carrier;
 pub mod pixels;
 pub mod remote;
 /// PLAN-693 —— a2r exe 三模式 CLI（independent/rq/desktop 底座参数化 +

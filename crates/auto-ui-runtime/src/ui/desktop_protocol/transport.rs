@@ -170,6 +170,11 @@ mod pipe {
 
     /// 常驻 runtime（每端一个；worker 持续驱动 reactor，读线程 block_on
     /// 与孵化连接共用）。
+    /// PLAN-055 probe：最近一次解码失败帧字节（诊断静态——probe 收口随批
+    /// 移除；Mutex<Option<Vec<u8>>>，const 构造）。
+    pub static LAST_BAD_FRAME: std::sync::Mutex<Option<Vec<u8>>> =
+        std::sync::Mutex::new(None);
+
     fn make_rt() -> tokio::runtime::Runtime {
         tokio::runtime::Builder::new_multi_thread()
             .worker_threads(1)
@@ -365,7 +370,18 @@ mod pipe {
 
         fn try_recv(&mut self) -> Option<Result<ProtocolMsg, CodecError>> {
             let mut inbox = self.inbox.lock().unwrap();
-            inbox.frames.pop_front().map(|b| ProtocolMsg::decode(&b))
+            inbox.frames.pop_front().map(|b| {
+                // PLAN-055 probe：解码失败帧字节留痕（TooShort 归因）。
+                match ProtocolMsg::decode(&b) {
+                    Ok(m) => Ok(m),
+                    Err(e) => {
+                        if let Ok(mut g) = LAST_BAD_FRAME.lock() {
+                            *g = Some(b);
+                        }
+                        Err(e)
+                    }
+                }
+            })
         }
 
         fn pending(&self) -> usize {
@@ -393,7 +409,7 @@ mod pipe {
 
 #[cfg(windows)]
 pub use pipe::{
-    connect, listen, try_claim_pipe, PendingServer, PipeClaim, PipeEnd, CLAIM_DENIED_MARKER,
+    connect, listen, try_claim_pipe, PendingServer, PipeClaim, PipeEnd, CLAIM_DENIED_MARKER, LAST_BAD_FRAME,
 };
 
 /// 非 Windows 占位（Plan 509 Linux 编译缺口修补）：接口形状与 pipe 模

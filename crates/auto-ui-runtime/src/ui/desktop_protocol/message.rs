@@ -1006,7 +1006,12 @@ impl HandshakeMsg {
                 }
                 // v1.11 尾部追加：多表面声明（空则不写尾段——既有消息
                 // 字节级不变；旧端线无此段 = 单 window）。
-                if !surfaces.is_empty() {
+                // PLAN-055 T-03 修复：两个"缺席=不写"尾段（surfaces/
+                // theme_caps）并存时，surfaces 空而 caps 非空会把 caps
+                // 段长度前缀被解码端当 surfaces 段读（帧歧义 → TooShort，
+                // a2r 载体 probe 实证）。凡有任一尾段在场，surfaces 段
+                // 恒显式（计数可 0）；双空 = 旧端线字节不变。
+                if !surfaces.is_empty() || !theme_caps.is_empty() {
                     put_u32(out, surfaces.len() as u32);
                     for s in surfaces {
                         s.encode(out);
@@ -2463,6 +2468,74 @@ mod tests {
         let back = ProtocolMsg::decode(&bytes).unwrap_or_else(|e| panic!("decode {msg:?}: {e:?}"));
         assert_eq!(back, msg, "round trip 恒等");
         back
+    }
+
+    /// PLAN-055 T-03：双尾段歧义回归——surfaces 空 + theme_caps 非空时，
+    /// 旧编码跳过 surfaces 段，解码端把 caps 段长度前缀当 surfaces 段读
+    /// （帧歧义 → TooShort，a2r 载体 attach 实证）。修复后：任一尾段
+    /// 在场 ⇒ surfaces 段恒显式（计数可 0）；双空维持旧端线字节。
+    #[test]
+    fn hello_trailing_segments_caps_without_surfaces_round_trip() {
+        // 事发形态：caps 在场、surfaces 空。
+        round_trip(ProtocolMsg::Handshake(HandshakeMsg::Hello {
+            version: super::super::PROTOCOL_VERSION,
+            app_name: "012-clock".into(),
+            title: "012-clock".into(),
+            icon: None,
+            width: 480.0,
+            height: 320.0,
+            fonts: Vec::new(),
+            surfaces: Vec::new(),
+            theme_caps: vec!["theme-policy/1".into()],
+        }));
+        // 双段并存。
+        round_trip(ProtocolMsg::Handshake(HandshakeMsg::Hello {
+            version: super::super::PROTOCOL_VERSION,
+            app_name: "shell".into(),
+            title: "shell".into(),
+            icon: None,
+            width: 1280.0,
+            height: 800.0,
+            fonts: Vec::new(),
+            surfaces: vec![SurfaceDecl {
+                role: surface_role::BACKGROUND,
+                width: 1280.0,
+                height: 800.0,
+            }],
+            theme_caps: vec!["theme-policy/1".into()],
+        }));
+        // 双空 = 旧端线字节（无任何尾段字节——信封载荷恰至 fonts 计数止）。
+        let legacy = ProtocolMsg::Handshake(HandshakeMsg::Hello {
+            version: super::super::PROTOCOL_VERSION,
+            app_name: "legacy".into(),
+            title: "legacy".into(),
+            icon: None,
+            width: 100.0,
+            height: 100.0,
+            fonts: Vec::new(),
+            surfaces: Vec::new(),
+            theme_caps: Vec::new(),
+        });
+        let caps_on = ProtocolMsg::Handshake(HandshakeMsg::Hello {
+            version: super::super::PROTOCOL_VERSION,
+            app_name: "legacy".into(),
+            title: "legacy".into(),
+            icon: None,
+            width: 100.0,
+            height: 100.0,
+            fonts: Vec::new(),
+            surfaces: Vec::new(),
+            theme_caps: vec!["theme-policy/1".into()],
+        });
+        let legacy_len = legacy.encode().len();
+        let caps_len = caps_on.encode().len();
+        // caps 在场增量 = surfaces 计数(4) + caps 计数(4) + 串(4+14)。
+        assert_eq!(
+            caps_len - legacy_len,
+            4 + 4 + 4 + 14,
+            "双空不写任何尾段字节（旧端线字节等价）"
+        );
+        round_trip(legacy);
     }
 
     #[test]
