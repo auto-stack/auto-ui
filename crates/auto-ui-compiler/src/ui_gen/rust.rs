@@ -2578,6 +2578,39 @@ fn collect_local_elems(
         code.push_str(&self.generate_on_method(widget));
         code.push('\n');
 
+        // PLAN-060 T-07：桌面协议 `InputMsg::Action` 的组件侧派发入口——
+        // handler 名 → 生成消息变体（无参 / 单 str 参）→ self.on(...)。
+        if !self.message_variants.is_empty() {
+            let mut arms = String::new();
+            for v in &self.message_variants {
+                if v.name.starts_with("__") {
+                    continue;
+                }
+                if v.payload.is_empty() {
+                    arms.push_str(&format!(
+                        "            {:?} => {{ self.on({}::{}); true }}\n",
+                        v.name, msg_type, v.name
+                    ));
+                } else if v.payload.len() == 1
+                    && format!("{:?}", v.payload[0])
+                        .to_ascii_lowercase()
+                        .contains("str")
+                {
+                    arms.push_str(&format!(
+                        "            {:?} => match arg {{ Some(a) => {{ self.on({}::{}(a.to_string())); true }}, None => false }}\n",
+                        v.name, msg_type, v.name
+                    ));
+                }
+            }
+            if !arms.is_empty() {
+                code.push_str(
+                    "\n    fn dispatch_named(&mut self, name: &str, arg: Option<&str>) -> bool {\n        match name {\n",
+                );
+                code.push_str(&arms);
+                code.push_str("            _ => false,\n        }\n    }\n");
+            }
+        }
+
         // view() method
         code.push_str(&self.generate_view_method(widget));
 
@@ -21453,6 +21486,7 @@ pub(crate) fn fix_cast_generic_ambiguity_for_ui(content: &mut String) {
         }
     }
 }
+
 
 
 
