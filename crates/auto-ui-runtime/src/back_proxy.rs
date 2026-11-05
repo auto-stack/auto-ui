@@ -1775,15 +1775,19 @@ impl SessionRuntime {
                 arg_srcs.push(ArgSrc::TypedString(sig.clone(), v.clone()));
                 continue;
             }
-            // Match the standalone single-string whole-body contract after named
-            // sources, before metadata. Preserve the raw JSON/text representation.
-            if param_sigs.len() == 1
-                && matches!(sig.ty.trim(), "str" | "String")
-                && !req.body.is_empty()
+            // Same legacy single-string body contract as the standalone HTTP
+            // binder: named path/body/query values win, otherwise pass the
+            // complete body, including parseable objects and JSON string shells.
+            if param_sigs.len() == 1 && !req.body.is_empty()
+                && auto_lang_core::api::contract::ParamKind::from_param_string(&sig.ty, &[])
+                    == auto_lang_core::api::contract::ParamKind::Str
             {
-                let body = String::from_utf8_lossy(&req.body).into_owned();
-                bound.push(serde_json::Value::String(body.clone()));
-                arg_srcs.push(ArgSrc::TypedString(sig.clone(), body));
+                let raw = match std::str::from_utf8(&req.body) {
+                    Ok(raw) => raw.to_string(),
+                    Err(_) => return ProxyReply::json(400, error_json("back-proxy: body is not UTF-8")),
+                };
+                bound.push(serde_json::Value::String(raw.clone()));
+                arg_srcs.push(ArgSrc::TypedString(sig.clone(), raw));
                 continue;
             }
             // PLAN-734 T-03（D8）：meta 约定名参数从请求头构造 cookies/auth

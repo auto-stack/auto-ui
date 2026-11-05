@@ -221,6 +221,36 @@ pub fn label() str { return limits.label() }
     }
 }
 
+#[test]
+fn p054_back_proxy_single_string_body_preserves_payload_and_named_precedence() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("api.at"), r#"
+#[api(method = "POST", path = "/api/echo")]
+pub fn echo(payload str) str { return payload }
+#[api(method = "POST", path = "/api/typed")]
+pub fn typed(n int) int { return n }
+"#).unwrap();
+    let proxy = start(BackProxyConfig {
+        lazy_sessions: false, port: ephemeral_port(),
+        sessions: vec![SessionSpec { app_id: "body".into(), back_entry: dir.path().join("api.at") }],
+        native_media: Vec::new(), native_photos: Vec::new(),
+    }).unwrap();
+    for body in [r#"{"path":"中文目录/数据.csv","amount":2.25}"#, r#"["中文",2.25]"#,
+        "中文 + & # %", r#""{\"path\":\"中文.csv\"}""#] {
+        let (status, reply) = http_request(proxy.port, "POST", "/apps/body/api/echo", Some(body));
+        assert_eq!(status, 200, "{reply}");
+        assert_eq!(serde_json::from_str::<String>(&reply).unwrap(), body);
+    }
+    let (status, reply) = http_request(proxy.port, "POST", "/apps/body/api/echo", Some(r#"{"payload":"named"}"#));
+    assert_eq!(status, 200);
+    assert_eq!(serde_json::from_str::<String>(&reply).unwrap(), "named");
+    let (status, reply) = http_request(proxy.port, "POST", "/apps/body/api/echo?payload=query", Some(r#"{"other":1}"#));
+    assert_eq!(status, 200);
+    assert_eq!(serde_json::from_str::<String>(&reply).unwrap(), "query");
+    let (status, _) = http_request(proxy.port, "POST", "/apps/body/api/typed", Some(r#"{"other":1}"#));
+    assert_eq!(status, 400, "non-string parameters do not consume a raw body");
+}
+
 /// PLAN-729 R1 [G-02]：文件端点不经进程内 back-proxy——501 明确拒绝 +
 /// 改走 HTTP URL 指引（不回 opaque id）。
 #[test]
