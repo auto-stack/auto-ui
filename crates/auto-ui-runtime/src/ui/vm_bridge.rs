@@ -4337,8 +4337,8 @@ impl VmBridge {
         };
 
         eprintln!(
-            "[CALL_HANDLER] widget={} event_name={} fn_name={} args={:?}",
-            self.widget_name, event_name, fn_name, args
+            "[CALL_HANDLER] widget={} event_name={} fn_name={} argc={}",
+            self.widget_name, event_name, fn_name, args.len()
         );
 
         // PLAN-702 T-04: parked 段在途的重入默认忽略（同 call_handler_for）。

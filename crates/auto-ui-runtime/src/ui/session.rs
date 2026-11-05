@@ -5607,19 +5607,9 @@ impl DesktopSession {
                             crate::ui::desktop_protocol::shm::display_list_from_slot_payload(p).ok()
                         });
                         if let Some(payload) = ready_v2 {
-                            {
-                                use crate::ui::desktop_protocol::message::DisplayOp;
-                                let texts: Vec<&str> = payload
-                                    .ops
-                                    .iter()
-                                    .filter_map(|o| match o {
-                                        DisplayOp::TextStyled { text, .. } => Some(text.as_str()),
-                                        _ => None,
-                                    })
-                                    .take(8)
-                                    .collect();
-                                eprintln!("[plan060] frame2 wid={wid} nops={} texts={:?}", payload.ops.len(), texts);
-                            }
+                            // Frame text may include credentials or private app content.
+                            // Keep transport diagnostics structural only.
+                            eprintln!("[plan060] frame2 wid={wid} nops={}", payload.ops.len());
                             if let Some(freed) = client.surfaces.compose_v2(surface, slot, payload)
                             {
                                 crate::ui::theme_policy::mark_shell_dirty();
