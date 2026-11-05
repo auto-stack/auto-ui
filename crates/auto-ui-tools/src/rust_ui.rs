@@ -1206,7 +1206,7 @@ fn compile_at_file(
     for stmt in ast.core_stmts() {
         if let auto_lang_core::ast::Stmt::Fn(fn_decl) = stmt {
             if auto_ui_compiler::aura::extract::extract_module_fn(fn_decl).is_some() {
-                output.push_str(&generate_module_fn_rust(&generator, fn_decl));
+                output.push_str(&generate_module_fn_rust(&mut generator, fn_decl));
                 output.push('\n');
             }
         }
@@ -7498,10 +7498,19 @@ fn __at_trim(v: &serde_json::Value) -> String {
 /// 返回按声明型直译（type_to_rust_str）；函数体复用 handler 语句翻译
 /// 链（generate_handler_body：join_stmt_block + postprocess 全含）。
 fn generate_module_fn_rust(
-    generator: &auto_ui_compiler::ui_gen::rust::RustGenerator,
+    generator: &mut auto_ui_compiler::ui_gen::rust::RustGenerator,
     fn_decl: &auto_lang_core::ast::Fn,
 ) -> String {
     use auto_lang_core::ast::{Stmt, Type};
+    // PLAN-052：模块 fn 体局部收格先行——`nd = stack[top]` Value 元素
+    // 局部的 `nd.children/nd.kind/nd.id` 直发字段访问（tree_util
+    // flatten_tree 族 E0609 no-field-on-Value ×22 株）：widget 语境由
+    // scan_handler_locals 收格，模块 fn 路径此前零扫描。逐 fn 重收格
+    // 与 __call_X 同源纪律（模块 fn 在全 widget 后发射，状态覆写安全）。
+    generator.seed_module_fn_params(&fn_decl.params);
+    generator.scan_payload_locals_pub(&auto_ui_compiler::aura::LogicPayload::AstStmts(
+        fn_decl.body.stmts.clone(),
+    ));
     let params: Vec<String> = fn_decl
         .params
         .iter()
