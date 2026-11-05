@@ -45,8 +45,9 @@ PLAN-043（SD-02）收口 + PLAN-064（SD-01 修订）：`ag_char3_move` 的滑�
 行永不阻挡角色行走；但 `ag_char3_solid` 注册的 solid 行在滑扫期间被临时
 视为可见（`effective` 置 1、调用返回前恢复），因此 `solid:true` +
 `visible:false` 的行（如 platformer-3d 的隐形平台板）仍阻挡。043 的“全部
-已交付内容的阻挡行均可见”前提被反例证伪；可见性不再代理 solidity，
-solidity 以 `ag_char3_solid` 注册为准（g14 轨迹对照仍逐 tick 逐位相等）。
+已交付内容的阻挡行均可见”前提被反例证伪；可见的非注册行仍按 043 由
+可见性阻挡，不可见非 solid 行不阻挡，注册 solid 行在滑扫期临时可视
+（g14 轨迹对照仍逐 tick 逐位相等）。
 
 ## 1. 执行证据（只述实测）
 

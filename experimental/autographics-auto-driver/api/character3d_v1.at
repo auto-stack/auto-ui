@@ -2,8 +2,10 @@
 // motion chain by the character3d assembly; public names are ag_char3_*/ag_action_*.
 // Public move = unchanged v5 ag_move_and_slide plus one fused geometric
 // final-support determination in the same call (contract r1 sections 2/4/6);
-// PLAN-043: the slide skips invisible document rows (visible_only=1) so
-// parked spawn templates and hidden presentation rows never block the walk;
+// PLAN-043 + PLAN-064: the slide skips invisible document rows (visible_only=1)
+// so parked spawn templates and hidden presentation rows never block; the
+// solids registered through ag_char3_solid are momentarily revealed around the
+// slide (effective 1 -> slide -> restore) so an invisible solid still blocks;
 // the frozen three-axis solid/character translation snapshot enforces the
 // read-only solid surface at each tick begin.
 var _ag_char3_node= -1

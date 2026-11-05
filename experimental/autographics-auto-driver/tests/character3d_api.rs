@@ -641,15 +641,12 @@ fn hidden_solid_still_collides_and_supports() {
         row(2, 3, [3., 0., -1.], [3.2, 3., 1.]),
     ];
     let user = upd(
-        " ag_set_local(0,1,0.5)\n ok=ok+ag_char3_bind(1)\n ok=ok+ag_char3_solid(2)\n ok=ok+ag_char3_solid(3)\n",
+        " ag_set_local(0,1,0.5)\n ag_set_visible(1,0)\n ag_set_visible(2,0)\n ok=ok+ag_char3_bind(1)\n ok=ok+ag_char3_solid(2)\n ok=ok+ag_char3_solid(3)\n",
         "let q=ag_char3_move(4.0*dt,0.0,0.0,0.002)\ng=ag_char3_grounded(q)\nsup=ag_char3_support(q)\nx=ag_motion_origin(q,0)\n",
     );
     let mut s = session(&user, "hidden.at", &rows).unwrap();
-    // Hide the floor (run index 1) and the wall (run index 2) before the freeze.
-    for i in [1, 2] {
-        s.call("_ag_visibility", &[Int(i)], ResultKind::Unit)
-            .unwrap();
-    }
+    // The floor (stable 2) and the wall (stable 3) are hidden through the real
+    // ag_set_visible path before the freeze; effective[] must be 0 for both.
     assert_eq!(status(&mut s), 0);
     assert_eq!(
         int(&mut s, "ag_char3_grounded", 0),
@@ -668,6 +665,51 @@ fn hidden_solid_still_collides_and_supports() {
     );
 }
 
+#[test]
+fn visible_unregistered_cylinder_still_blocks() {
+    // PLAN-064 A2: the 043 visible-row semantics are unchanged; only registered
+    // solids additionally block while invisible. A visible, unregistered
+    // cylinder therefore still clips the walk.
+    let rows = vec![
+        row(2, 3, [-0.4, -0.5, -0.4], [0.4, 0.5, 0.4]),
+        row(2, 3, [3., 0., -1.], [3.2, 3., 1.]),
+    ];
+    let user = upd(
+        " ag_set_local(0,1,0.5)\n ok=ok+ag_char3_bind(1)\n",
+        "let q=ag_char3_move(4.0*dt,0.0,0.0,0.002)\nx=ag_motion_origin(q,0)\n",
+    );
+    let mut s = session(&user, "visible-wall.at", &rows).unwrap();
+    for step in 1..=200 {
+        tick(&mut s, step);
+        assert_eq!(status(&mut s), 0, "step {step}");
+    }
+    let x = s.float("x_v", &[]).unwrap();
+    assert!(
+        (x - (3.0 - 0.4 - CLEARANCE)).abs() < 1e-3,
+        "visible unregistered row must still clip: x={x}"
+    );
+}
+
+#[test]
+fn hidden_non_solid_model_does_not_block() {
+    // PLAN-064 A2: an invisible row that is not a registered solid is skipped,
+    // so a hidden decorative model never blocks the walk.
+    let rows = vec![
+        row(2, 3, [-0.4, -0.5, -0.4], [0.4, 0.5, 0.4]),
+        row(6, 3, [2., 0., -1.], [4., 2., 1.]),
+    ];
+    let user = upd(
+        " ag_set_local(0,1,0.5)\n ag_set_visible(1,0)\n ok=ok+ag_char3_bind(1)\n",
+        "let q=ag_char3_move(4.0*dt,0.0,0.0,0.002)\nx=ag_motion_origin(q,0)\n",
+    );
+    let mut s = session(&user, "hidden-model.at", &rows).unwrap();
+    for step in 1..=200 {
+        tick(&mut s, step);
+        assert_eq!(status(&mut s), 0, "step {step}");
+    }
+    let x = s.float("x_v", &[]).unwrap();
+    assert!(x > 5.0, "hidden non-solid model must not block: x={x}");
+}
 #[test]
 fn ancestor_group_translation_is_refused_at_the_tick_boundary() {
     // A group translation inside app_update changes the world of every node
