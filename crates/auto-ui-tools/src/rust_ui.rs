@@ -151,6 +151,27 @@ fn collect_component_prop_orders(at_files: &[std::path::PathBuf]) {
                                         .insert(widget_decl.name.as_str().to_string(), prop_tys);
                                 });
                             }
+                            // PLAN-052：prop 全型表（Value 桶 → typed 实体
+                            // 集合的边界转换查表面）。
+                            let prop_rust_tys: std::collections::HashMap<String, String> =
+                                widget_decl
+                                    .props
+                                    .iter()
+                                    .map(|pd| {
+                                        (
+                                            pd.name.as_str().to_string(),
+                                            auto_ui_compiler::ui_gen::rust::rust_type_of(&pd.ty),
+                                        )
+                                    })
+                                    .collect();
+                            if !prop_rust_tys.is_empty() {
+                                auto_ui_compiler::ui_gen::rust::CHILD_PROP_RUST_TYPES.with(|m| {
+                                    m.borrow_mut().insert(
+                                        widget_decl.name.as_str().to_string(),
+                                        prop_rust_tys,
+                                    );
+                                });
+                            }
                         }
                         // PLAN-039 T-14（组件传型）：子组件 Msg 型预注册——
                         // 无 msg 块**且 view 无 PascalCase 子件引用** → "()"；
@@ -530,6 +551,17 @@ fn regenerate_code_only(project_dir: &Path, rust_dir: &Path, src_: &PacSource) -
     if !all_api_imports.is_empty() {
         all_components.push('\n');
         all_components.push_str(&generate_api_client(project_dir, &all_api_imports));
+    } else if let Some(module) = parse_api_module(project_dir) {
+        // PLAN-052：无 `use back.api` 调用的工程（chat 全走 Http.* 直连）
+        // 仍需要 back api.at 的实体型——F2 裁决后 front 同名 TypeDecl 被
+        // 跳过（api struct 为唯一形态），此前随 generate_api_client 一起
+        // 缺席（E0425 Contact/Identity/Message/PendingMsg 族）。此处补发
+        // 类型本体；生成器函数名/端点桩仍按 imports 门控。
+        let api_type_structs = generate_api_type_structs(&module);
+        if !api_type_structs.is_empty() {
+            all_components.push('\n');
+            all_components.push_str(&api_type_structs);
+        }
     }
     // PLAN-681 T-05（F2a）：bps use-fn 依赖模块内嵌。
     if !bps_fn_code.is_empty() {
@@ -801,6 +833,17 @@ pub(crate) fn compile_rust_ui_app(
     if !all_api_imports.is_empty() {
         all_components.push('\n');
         all_components.push_str(&generate_api_client(project_dir, &all_api_imports));
+    } else if let Some(module) = parse_api_module(project_dir) {
+        // PLAN-052：无 `use back.api` 调用的工程（chat 全走 Http.* 直连）
+        // 仍需要 back api.at 的实体型——F2 裁决后 front 同名 TypeDecl 被
+        // 跳过（api struct 为唯一形态），此前随 generate_api_client 一起
+        // 缺席（E0425 Contact/Identity/Message/PendingMsg 族）。此处补发
+        // 类型本体；生成器函数名/端点桩仍按 imports 门控。
+        let api_type_structs = generate_api_type_structs(&module);
+        if !api_type_structs.is_empty() {
+            all_components.push('\n');
+            all_components.push_str(&api_type_structs);
+        }
     }
     // PLAN-681 T-05（F2a）：bps use-fn 依赖模块内嵌。
     if !bps_fn_code.is_empty() {

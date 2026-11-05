@@ -293,6 +293,12 @@ thread_local! {
     pub static CHILD_PROP_TYPES: std::cell::RefCell<
         std::collections::HashMap<String, std::collections::HashMap<String, String>>,
     > = std::cell::RefCell::new(std::collections::HashMap::new());
+    /// PLAN-052：子组件 prop 全型表（组件 → prop → Rust 型串，如
+    /// `Vec<Contact>`）——typed prop 收到 Value 桶实参（chat 无类型 store
+    /// 字段）时按目标型 `serde_json::from_value` 转换的查表面。
+    pub static CHILD_PROP_RUST_TYPES: std::cell::RefCell<
+        std::collections::HashMap<String, std::collections::HashMap<String, String>>,
+    > = std::cell::RefCell::new(std::collections::HashMap::new());
     /// PLAN-039 T-14（批次 E，组件传型）：子组件 Msg 型表（组件名 →
     /// Msg 型名或 "()"）——无 msg 块的子组件（CardSuit/CourtBadge）的
     /// 父包装变体此前恒发 `{Child}Msg` 而该 enum 不存在（E0425 株）。
@@ -477,19 +483,24 @@ impl RustGenerator {
     /// （`store.notes` 形）再按末段回退查一次（E0608 残留株：view 侧
     /// `.store.notes[k].title` 的集合名解析为 "store.notes"）。
     fn api_elem_type_of(&self, coll: &str) -> Option<String> {
+        // PLAN-052：prop 集合（MessageThread `messages: []Message`）也是
+        // 实体集合——prop_types 先于 store 表（同名 store 字段可能是
+        // 无类型 Value 桶，子件自身视角的 prop 型才是权威）。
         let direct = self
-            .state_types
+            .prop_types
             .get(coll)
             .cloned()
+            .or_else(|| self.state_types.get(coll).cloned())
             .or_else(|| self.store_field_rust_type(coll));
         let ty = direct.or_else(|| {
             let last = coll.rsplit('.').next()?;
             if last == coll {
                 return None;
             }
-            self.state_types
+            self.prop_types
                 .get(last)
                 .cloned()
+                .or_else(|| self.state_types.get(last).cloned())
                 .or_else(|| self.store_field_rust_type(last))
         })?;
         ty.strip_prefix("Vec<")
@@ -2359,7 +2370,7 @@ fn collect_local_elems(
     }
 
     /// Generate on() method implementation
-    fn generate_on_method(&self, widget: &AuraWidget) -> String {
+    fn generate_on_method(&mut self, widget: &AuraWidget) -> String {
         let mut code = String::new();
         let msg_name = self.current_msg_name();
 
@@ -2390,7 +2401,6 @@ fn collect_local_elems(
             // Generate match arms from handlers
             for (pattern, payload) in &widget.handlers {
                 let variant_name = self.extract_variant_name(pattern);
-                let body = self.generate_handler_body(payload);
                 // Check if variant has payload — if so, bind it to a variable
                 let variant_info = self
                     .message_variants
@@ -2402,6 +2412,33 @@ fn collect_local_elems(
                 if variant_info.is_none() {
                     continue;
                 }
+                // PLAN-052：载荷形参型先入 declared_locals（str/int/bool）——
+                // 比较面 stringy/numeric 判定与声明型强转的判据（chat
+                // `c.id == id` 的 id 为 str 载荷，反对侧 Value 访问器误选
+                // as_i64 → E0277 i32 vs String 株）。先于体生成落格。
+                let mut arm_names: Vec<String> = Vec::new();
+                if let Some(vi) = variant_info {
+                    if !vi.payload.is_empty() {
+                        arm_names = self.extract_payload_names(pattern, vi);
+                        for (n, ty) in arm_names.iter().zip(vi.payload.iter()) {
+                            let kind = match ty {
+                                auto_lang_core::ast::Type::StrFixed(_)
+                                | auto_lang_core::ast::Type::StrOwned
+                                | auto_lang_core::ast::Type::StrSlice => Some("str"),
+                                auto_lang_core::ast::Type::Int
+                                | auto_lang_core::ast::Type::I64
+                                | auto_lang_core::ast::Type::Uint
+                                | auto_lang_core::ast::Type::U64 => Some("int"),
+                                auto_lang_core::ast::Type::Bool => Some("bool"),
+                                _ => None,
+                            };
+                            if let Some(k) = kind {
+                                self.declared_locals.insert(n.clone(), k.to_string());
+                            }
+                        }
+                    }
+                }
+                let body = self.generate_handler_body(payload);
                 let has_payload = variant_info.map_or(false, |v| !v.payload.is_empty());
                 // Tick handler: guard with running check if "running" field exists
                 let is_tick_guarded =
@@ -2410,12 +2447,11 @@ fn collect_local_elems(
                     // Plan 346: use the source parameter name (e.g., `i` from
                     // `.SelectNote(i)`) as the match binding, not a hardcoded `id`.
                     // PLAN-681 T-05：多参载荷绑定名序（.EditorCtx(x, y) 形）。
-                    let names = self.extract_payload_names(pattern, variant_info.unwrap());
                     code.push_str(&format!(
                         "            {}::{}({}) => {{\n",
                         msg_name,
                         variant_name,
-                        names.join(", ")
+                        arm_names.join(", ")
                     ));
                 } else {
                     code.push_str(&format!(
@@ -3065,6 +3101,17 @@ fn collect_local_elems(
                         self.collect_assign_kinds(&e.stmts, out, declared);
                     }
                 }
+                // PLAN-052：try 体（chat store 登录/发送族）此前不递归——
+                // `var m = []` + try 内 `m = json.to_value(...)` 的 Value
+                // 联合格漏判，局部一直按 Vec 发射（E0609 no-field-on-Vec/
+                // E0308 赋值族）。
+                Stmt::Try(t) => {
+                    self.collect_assign_kinds(&t.body.stmts, out, declared);
+                    self.collect_assign_kinds(&t.catch_body.stmts, out, declared);
+                    if let Some(fb) = &t.finally_body {
+                        self.collect_assign_kinds(&fb.stmts, out, declared);
+                    }
+                }
                 Stmt::Block(b) => self.collect_assign_kinds(&b.stmts, out, declared),
                 _ => {}
             }
@@ -3097,6 +3144,14 @@ fn collect_local_elems(
                     }
                     if let Some(e) = &i.else_ {
                         self.collect_declared_names(&e.stmts, out);
+                    }
+                }
+                // PLAN-052：try 体递归（联合格/声明格同扫描面）。
+                Stmt::Try(t) => {
+                    self.collect_declared_names(&t.body.stmts, out);
+                    self.collect_declared_names(&t.catch_body.stmts, out);
+                    if let Some(fb) = &t.finally_body {
+                        self.collect_declared_names(&fb.stmts, out);
                     }
                 }
                 Stmt::Block(b) => self.collect_declared_names(&b.stmts, out),
@@ -3661,6 +3716,17 @@ fn collect_local_elems(
                     }
                     if let Some(else_body) = &if_stmt.else_ {
                         self.scan_stmts_no_union(&else_body.stmts);
+                    }
+                }
+                // PLAN-052：try 体递归——chat store 的登录/发送 handler 全部
+                // 包在 try 内；此前不扫描致循环变量 Value 格（`for m in
+                // .messages` 的 m.client_msg_id 直发 &Value 字段）与集合
+                // 形状登记整体缺席。
+                auto_lang_core::ast::Stmt::Try(t) => {
+                    self.scan_stmts_no_union(&t.body.stmts);
+                    self.scan_stmts_no_union(&t.catch_body.stmts);
+                    if let Some(fb) = &t.finally_body {
+                        self.scan_stmts_no_union(&fb.stmts);
                     }
                 }
                 // PLAN-039 T-13（批次 E，E-D2）：`arr.push(x)` 数组局部元素
@@ -8957,6 +9023,8 @@ fn collect_local_elems(
             if let crate::aura::AuraPropValue::Expr(expr) = &props[key] {
                 // PLAN-039 T-14：实参按目标 prop 型强转。
                 let raw = self.arg_to_rust(expr);
+                // PLAN-052：Value 桶 → typed 实体集合 prop 的边界转换。
+                let raw = self.coerce_value_to_typed_prop(tag, key, &raw);
                 constructor_args.push(self.coerce_arg_to_prop_type(&raw, tag, key));
             }
         }
@@ -8980,6 +9048,8 @@ fn collect_local_elems(
             for key in &prop_keys {
                 if let crate::aura::AuraPropValue::Expr(expr) = &props[*key] {
                     let prop_val = self.arg_to_rust(expr);
+                    // PLAN-052：持久子件同步同报 Value 桶 → typed 集合转换。
+                    let prop_val = self.coerce_value_to_typed_prop(tag, key, &prop_val);
                     sync_code.push_str(&format!("__c.{} = {}; ", key, prop_val));
                 }
             }
@@ -9271,6 +9341,57 @@ fn collect_local_elems(
     /// PLAN-039 T-14（组件传型）：构造实参按目标 prop 型强转——降链
     /// 形态（as_str/as_i64）与 prop 型不符时重写（`scard["rank"].
     /// as_str()…` 传 `rank: i32` → as_i64）；型相符/无型不动。
+    /// PLAN-052：typed prop（`[]Message` 等实体集合）收到 Value 桶实参
+    /// （无类型 store 字段 `conv_list/messages/pending` 为 Vec<Value>）时
+    /// 按目标型 `serde_json::from_value` 转换——子件内部点访问（typed
+    /// struct 语义）与父侧 Value 数据面的唯一衔接点（chat 构造参数与持久
+    /// 子件同步 E0308 族）。非 Value 源/非实体集合维持原样。
+    fn coerce_value_to_typed_prop(&self, component: &str, prop: &str, raw: &str) -> String {
+        let ty = CHILD_PROP_RUST_TYPES.with(|m| {
+            m.borrow()
+                .get(component)
+                .and_then(|tys| tys.get(prop).cloned())
+        });
+        let Some(ty) = ty else {
+            return raw.to_string();
+        };
+        let inner = ty
+            .strip_prefix("Vec<")
+            .and_then(|s| s.strip_suffix('>'))
+            .map(|s| s.trim().to_string());
+        let Some(inner) = inner else {
+            return raw.to_string();
+        };
+        if !API_TYPE_NAMES.with(|s| s.borrow().contains(inner.as_str())) {
+            return raw.to_string();
+        }
+        let value_bucket = if let Some(rest) = raw.strip_prefix("self.store.") {
+            let field = rest
+                .split(|c: char| c == '.' || c == ' ')
+                .next()
+                .unwrap_or_default();
+            self.store_field_rust_type(field)
+                .map_or(false, |t| t == "Vec<serde_json::Value>")
+        } else if let Some(rest) = raw.strip_prefix("self.") {
+            let field = rest
+                .split(|c: char| c == '.' || c == ' ')
+                .next()
+                .unwrap_or_default();
+            self.state_types
+                .get(field)
+                .map_or(false, |t| t == "Vec<serde_json::Value>")
+        } else {
+            false
+        };
+        if !value_bucket {
+            return raw.to_string();
+        }
+        format!(
+            "serde_json::from_value::<{}>(serde_json::Value::Array({})).unwrap_or_default()",
+            ty, raw
+        )
+    }
+
     fn coerce_arg_to_prop_type(&self, arg: &str, component: &str, prop: &str) -> String {
         let kind = CHILD_PROP_TYPES.with(|m| {
             m.borrow()
@@ -9373,7 +9494,10 @@ fn collect_local_elems(
         keys.iter()
             .filter_map(|k| {
                 if let crate::aura::AuraPropValue::Expr(expr) = &props[*k] {
-                    Some(self.arg_to_rust(expr))
+                    // PLAN-052：构造实参同样过 Value 桶 → typed 集合转换
+                    // （持久子件 App::new 初始化路径）。
+                    let raw = self.arg_to_rust(expr);
+                    Some(self.coerce_value_to_typed_prop(widget_name, k, &raw))
                 } else {
                     None
                 }
@@ -9394,7 +9518,11 @@ fn collect_local_elems(
         let ordered = self.order_component_props_by_decl(entries, widget_name);
         ordered
             .iter()
-            .map(|(_, v)| self.arg_to_rust(v))
+            .map(|(k, v)| {
+                let raw = self.arg_to_rust(v);
+                // PLAN-052：Component 形态构造实参同转换。
+                self.coerce_value_to_typed_prop(widget_name, k, &raw)
+            })
             .collect::<Vec<_>>()
             .join(", ")
     }
@@ -11054,6 +11182,19 @@ fn collect_local_elems(
         // 事件实参株；convert_condition 同款）。
         let param = param.replace("this.", "self.");
         let param = param.as_str();
+        // PLAN-052：`self.<loopvar>.<field>`——基座是循环变量而非态字段，
+        // 剥 self. 前缀（chat sidebar `onclick: .SelectContact(.c.id)` 的
+        // 事件实参经提取成 self.c.id，E0609 no-field-on-ChatSidebar 族）。
+        let param = match param.strip_prefix("self.") {
+            Some(rest)
+                if self
+                    .loop_var_collections
+                    .contains_key(rest.split('.').next().unwrap_or(rest)) =>
+            {
+                rest
+            }
+            _ => param,
+        };
         // Check for patterns like "varname.field" or "varname.field.subfield"
         let parts: Vec<&str> = param.split('.').collect();
         if parts.len() >= 2 {
@@ -11830,7 +11971,17 @@ fn collect_local_elems(
                             // PLAN-039 T-14（E-D3 第二轨）：Value 联合局部
                             // 的标量字面量初始式 json! 化——`var card = 999`
                             // + 后续 Value 赋值（card = items[i]）的联合株。
+                            // PLAN-052：try 内 Value 联合格的空数组初始式
+                            // （`var m = []` + `m = json.to_value(...)`）——
+                            // 显式 Null 起手，后续 Value 赋值同型（此前
+                            // `let mut m = vec![]` 定 Vec，E0609/E0308 族）。
                             let rhs = if self.value_locals.contains(name)
+                                && !self.declared_locals.contains_key(name)
+                                && matches!(&store.expr,
+                                    auto_lang_core::ast::Expr::Array(elems) if elems.is_empty())
+                            {
+                                "serde_json::Value::Null".to_string()
+                            } else if self.value_locals.contains(name)
                                 && !self.declared_locals.contains_key(name)
                                 && matches!(
                                     &store.expr,
@@ -12976,6 +13127,27 @@ fn collect_local_elems(
         };
         let l_stringy = side_is_stringy(left, left_str);
         let r_stringy = side_is_stringy(right, right_str);
+        // PLAN-052：串语义 Value 字段名集——启发式 int 投影（id/_id 等）
+        // 与 String 载荷比较时按串侧修正。
+        let strish_value_field = |e: &Expr| -> bool {
+            if let Expr::Dot(_, f) = e {
+                let n = f.as_str();
+                return n == "id"
+                    || n.ends_with("_id")
+                    || n == "name"
+                    || n.ends_with("_name")
+                    || n == "token"
+                    || n == "text"
+                    || n.ends_with("_text")
+                    || n == "state"
+                    || n == "avatar"
+                    || n == "time"
+                    || n == "message"
+                    || n == "email"
+                    || n == "username";
+            }
+            false
+        };
         let mut l = left_str.to_string();
         let mut r = right_str.to_string();
         let mut changed = false;
@@ -13122,6 +13294,15 @@ fn collect_local_elems(
             if l.contains(".as_bool().unwrap_or(false)") {
                 l = l.replace(
                     ".as_bool().unwrap_or(false)",
+                    ".as_str().unwrap_or_default().to_string()",
+                );
+                changed = true;
+            } else if l.contains(".as_i64().unwrap_or(0) as i32") && strish_value_field(left) {
+                // PLAN-052：串形 id/name/text 字段被启发式投影成 int 后与
+                // String 载荷比较——按串侧收口（chat `c.id == id` 株；
+                // as_i64 兜底会拍成 0，串字段应走 as_str）。
+                l = l.replace(
+                    ".as_i64().unwrap_or(0) as i32",
                     ".as_str().unwrap_or_default().to_string()",
                 );
                 changed = true;
@@ -13669,6 +13850,19 @@ fn collect_local_elems(
                                     field_str,
                                 );
                             }
+                            // PLAN-052：typed 实体集合的循环变量——String 字段
+                            // （avatar/name/time/text…）按字段型表补 clone
+                            //（&T 借位 move 出 E0507 族；Value 名表未含的
+                            // 字段此前落裸直发）。
+                            if let Some(coll) = self.loop_var_collections.get(prop_name).cloned() {
+                                if self.coll_is_api_typed(&coll) {
+                                    if let Some(elem) = self.api_elem_type_of(&coll) {
+                                        return self.api_struct_field_access(
+                                            prop_name, &elem, field_str,
+                                        );
+                                    }
+                                }
+                            }
                             return format!("{}.{}", prop_name, field_str);
                         }
                     }
@@ -13811,6 +14005,15 @@ fn collect_local_elems(
                             );
                         }
                     }
+                }
+                // PLAN-052：Value 基座多级点链（`sr.message.conversation_id`
+                // 族）——先整链括号化再按末段访问器收口；此前 obj 先投影成
+                // String 再取字段（E0609 no-field-on-String ×2 株）。
+                if matches!(obj.as_ref(), Expr::Dot(..) | Expr::Index(..))
+                    && self.expr_is_value_typed(obj)
+                {
+                    let chain = self.value_bracket_chain(obj);
+                    return self.value_field_access(&chain, field_str);
                 }
                 let obj_str = self.ast_expr_to_rust(obj);
                 // Plan 407 R1: wrap Bina objects in parens so `.field` binds to the
@@ -14004,6 +14207,30 @@ fn collect_local_elems(
                     }
                     let target = self.ast_expr_to_rust(left);
                     let mut value = self.ast_expr_to_rust(right);
+                    // PLAN-052：RHS 为非 Copy 态字段直读（String/Vec/Value）
+                    // ——赋值位即 move，&mut self 借位 E0507（chat
+                    // `self.store.login_secret = self.login_secret` 株）。
+                    // 仅裸字段读补 clone（索引/字面量/调用自带所有权）。
+                    if matches!(right.as_ref(), Expr::Ident(_) | Expr::Dot(..))
+                        && !value.contains('[')
+                        && !value.starts_with('"')
+                        && !value.contains('(')
+                        && !value.contains(".clone()")
+                    {
+                        let rhs_name = self.resolve_expr_name(right);
+                        let non_copy = rhs_name
+                            .as_ref()
+                            .and_then(|rn| self.state_types.get(rn))
+                            .map_or(false, |t| {
+                                !matches!(
+                                    t.as_str(),
+                                    "i32" | "i64" | "u32" | "u64" | "f32" | "f64" | "bool"
+                                )
+                            });
+                        if non_copy {
+                            value = format!("{}.clone()", value);
+                        }
+                    }
                     // PLAN-039 T-14（E-D3 第二轨）：局部收 state
                     // Vec<Value>/Value 字段的 clone——`raw_list =
                     // self.col0_cards` move 出 &mut self 字段（klondike
@@ -14741,7 +14968,10 @@ fn collect_local_elems(
                         "auto_lang_core::vm::ffi::stdlib::shim_time_now_sec() as i32".to_string()
                     }
                     "Time.now_ms" | "time.now_ms" | "time_now_ms" => {
-                        "auto_lang_core::vm::ffi::stdlib::shim_time_now_ms()".to_string()
+                        // PLAN-052：int 域统一 i32（与 now_sec 同口径）——
+                        // chat `Time.now_ms() > .typing_until`（i32 态）的
+                        // i64/i32 比较 E0308 株。
+                        "auto_lang_core::vm::ffi::stdlib::shim_time_now_ms() as i32".to_string()
                     }
                     "Time.now" | "time.now" => {
                         "auto_lang_core::vm::ffi::stdlib::shim_time_now()".to_string()
@@ -15103,6 +15333,12 @@ fn collect_local_elems(
             _ => "serde_json::Value".to_string(), // Fallback for unrecognized types
         }
     }
+}
+
+/// PLAN-052：Auto 类型 → Rust 型串的公开映射（跨文件 prop 型注册表
+/// 预扫用——`[]Contact` → `Vec<Contact>`；与生成器内部同源）。
+pub fn rust_type_of(ty: &auto_lang_core::ast::Type) -> String {
+    RustGenerator::new().auto_type_to_rust(ty)
 }
 
 /// PLAN-681 T-05（E0618 收口）：预填 [`STORE_MSG_PAYLOADS`]——store msg
@@ -19738,6 +19974,63 @@ pub(crate) fn fix_contains_string_pattern_for_ui(content: &mut String) {
     if *content != out {
         *content = out;
     }
+    // PLAN-052：`.contains(self.field)`（条件串形态，可能带空格——`c.name.
+    // contains ( self.local_query )`）——String 实参不满足 Pattern，补
+    // as_str（chat sidebar E0277 String:Pattern 族）。
+    let mut out2 = String::new();
+    let mut rest = content.as_str();
+    while let Some(pos) = rest.find(".contains") {
+        let (head, tail) = rest.split_at(pos);
+        out2.push_str(head);
+        let Some(open_rel) = tail.find('(') else {
+            out2.push_str(tail);
+            rest = "";
+            break;
+        };
+        let (pre, post) = tail.split_at(open_rel);
+        out2.push_str(pre);
+        let bytes = post.as_bytes();
+        let mut depth = 0usize;
+        let mut end = None;
+        let mut i = 0;
+        let mut in_str = false;
+        while i < bytes.len() {
+            match bytes[i] {
+                b'"' => in_str = !in_str,
+                b'\\' if in_str => i += 1,
+                b'(' if !in_str => depth += 1,
+                b')' if !in_str => {
+                    depth -= 1;
+                    if depth == 0 {
+                        end = Some(i);
+                        break;
+                    }
+                }
+                _ => {}
+            }
+            i += 1;
+        }
+        let Some(e) = end else {
+            out2.push_str(post);
+            rest = "";
+            break;
+        };
+        let arg = &post[1..e];
+        let trimmed = arg.trim();
+        let simple_self = trimmed.starts_with("self.")
+            && trimmed
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.');
+        if simple_self && !trimmed.contains(".as_str") && !arg.contains("format!(") {
+            out2.push_str(&post[..e]);
+            out2.push_str(".as_str())");
+        } else {
+            out2.push_str(&post[..=e]);
+        }
+        rest = &post[e + 1..];
+    }
+    out2.push_str(rest);
+    *content = out2;
 }
 
 /// PLAN-036 T-02：String 局部变量收 Value 元素赋值降串——`var s str = ""`
