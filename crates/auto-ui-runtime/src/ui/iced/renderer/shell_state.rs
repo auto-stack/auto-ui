@@ -5962,8 +5962,11 @@ pub(crate) fn apply_desktop_injects(state: &mut crate::ui::session::DesktopSessi
                         state.broker_pointer_up(x, y, button);
                     }
                     PointerPhase::Click => {
-                        if state.broker_pointer_down(x, y, button) {
-                            state.broker_pointer_up(x, y, button);
+                        let __d = state.broker_pointer_down(x, y, button);
+                        eprintln!("[plan060] pointer down delivered={__d}");
+                        if __d {
+                            let __u = state.broker_pointer_up(x, y, button);
+                            eprintln!("[plan060] pointer up delivered={__u}");
                         }
                     }
                 }
@@ -6624,5 +6627,6 @@ pub(super) fn publish_workspace_previews(state: &mut crate::ui::session::Desktop
         wallpaper_src: state.desktop.desktop_wallpaper.clone(),
     });
 }
+
 
 
