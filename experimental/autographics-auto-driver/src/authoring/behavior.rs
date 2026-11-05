@@ -80,10 +80,13 @@ pub const COMPONENTS3_API: &str = include_str!("../../api/public_composition3d_v
 /// PLAN-048 基础 UI 档：无 AG 服务传输；受检入口只有 `fn main()`（全局
 /// 数组字面量在此初始化——T-02 冻结的 main-first 消费合同）。
 pub const NODE_UI_VERSION: &str = "autographics.node-ui/1";
+/// PLAN-049 混合组合档（消费身份冻结；装配与 NodeUi 同一最小面）。
+pub const NODE_UI_MIXED_VERSION: &str = "autographics.node-ui-mixed/1";
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Api {
     V1,
     NodeUi,
+    MixedUi2d3d,
     SpatialV2,
     SegmentV3,
     SweepV4,
@@ -111,6 +114,7 @@ impl Api {
         match value {
             VERSION => Ok(Self::V1),
             NODE_UI_VERSION => Ok(Self::NodeUi),
+            NODE_UI_MIXED_VERSION => Ok(Self::MixedUi2d3d),
             VERSION2 => Ok(Self::SpatialV2),
             VERSION5 => Ok(Self::MotionV5),
             VERSION4 => Ok(Self::SweepV4),
@@ -161,6 +165,7 @@ impl Api {
             Self::Components2V1 => COMPONENTS2_VERSION,
             Self::Components3V1 => COMPONENTS3_VERSION,
             Self::NodeUi => NODE_UI_VERSION,
+            Self::MixedUi2d3d => NODE_UI_MIXED_VERSION,
         }
     }
     pub fn number(self) -> i32 {
@@ -188,12 +193,14 @@ impl Api {
             Self::Components2V1 => 116,
             Self::Components3V1 => 117,
             Self::NodeUi => 118,
+            Self::MixedUi2d3d => 119,
         }
     }
     pub fn profile(self) -> i32 {
         match self {
             Self::V1 => 7,
             Self::NodeUi => 25,
+            Self::MixedUi2d3d => 26,
             Self::SpatialV2 => 8,
             Self::SegmentV3 => 9,
             Self::SweepV4 => 10,
@@ -261,10 +268,10 @@ impl Api {
         matches!(
             self,
             Self::Sprites2V1
-            | Self::Audio2V1
-            | Self::Hud2V1
-            | Self::Presentation2V1
-            | Self::Components2V1
+                | Self::Audio2V1
+                | Self::Hud2V1
+                | Self::Presentation2V1
+                | Self::Components2V1
         )
     }
     /// Every shipped profile, in the order the command line lists them.
@@ -349,6 +356,7 @@ impl Api {
             Self::Components2V1 => "components2d",
             Self::Components3V1 => "components3d",
             Self::NodeUi => "node-ui",
+            Self::MixedUi2d3d => "mixed-ui-2d-3d",
         }
     }
     /// Parse one `--behavior-api` value; an unknown name is a usage error.
@@ -682,7 +690,9 @@ impl SourceSnapshot {
         };
         format!(
             "{}.at:{}:{} [{stage}/module; node-source-map {precision:?}{ctx}]: {text}",
-            origin.module, origin.line, origin.column,
+            origin.module,
+            origin.line,
+            origin.column,
             precision = origin.precision,
         )
     }
@@ -1425,4 +1435,3 @@ fn expression(e: &Expr, r: &Rules<'_>, l: &BTreeSet<String>) -> Result<(), Strin
     }
     Ok(())
 }
-

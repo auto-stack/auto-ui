@@ -44,8 +44,21 @@ pub const MAX_ELEMENTS: usize = 32;
 pub const MAX_CHILDREN: usize = 8;
 /// 有状态实例上限（沿 020 envelope，root 计入）。
 pub const MAX_INSTANCES: usize = 8;
-/// 每 def 文字元素上限（T*64 ≤ 256 = SDK 字面量数组硬上限；T-02 冻结）。
+/// 每 def 文字元素上限（T-02 冻结；字节缓冲按半缓冲拆分——SDK 字面量
+/// 数组恰 256 元素静默截断为 0，048 复审实测 + PLAN-049 T-02 复证）。
 pub const MAX_TEXTS_PER_DEF: usize = 4;
+/// 每半缓冲的文字槽数（≤2 槽×64B = 128 < 255，安全界）。
+pub const TEXT_SLOTS_PER_BUFFER: usize = 2;
+/// PLAN-049 产物 schema 身份（混合 UI＋双维嵌入；driver 侧消费准入冻结）。
+pub const NODE_UI_MIXED_SCHEMA: &str = "autographics.node-ui-mixed/1";
+/// PLAN-049 生成器身份（identity/产物头冻结）。
+pub const NODE_UI_MIXED_GENERATOR: &str = "autographics-node2d-pilot plan049 node-ui-mixed";
+/// 每 def 嵌入区域上限（T-02 冻结首切片）。
+pub const MAX_REGIONS_PER_DEF: usize = 4;
+/// 每区域场景元素上限（沿容器子元素 8 同界；T-02 冻结）。
+pub const MAX_SCENE_ELEMS_PER_REGION: usize = 8;
+/// 区域占位 rect 单边上限（UI 逻辑 px；T-02 冻结）。
+pub const MAX_REGION_SIDE: i64 = 640;
 
 /// 降层产物（world.at ＋ ui.json ＋ 身份数）。
 #[derive(Debug)]
@@ -119,6 +132,46 @@ enum ArtifactElement {
     },
     /// 同定义实例引用（实例 identity 在顶层 instances 表按路径解析）。
     Instance { name: String, node: String },
+    /// PLAN-049 嵌入区域（mixed 档专属；UI 占位 rect + 可选点击端口 +
+    /// 有界场景元素。driver 侧同一形状——绑定经 Field getter，点击走
+    /// 同一 `_ui_click_` 派发 ABI）。
+    Embed {
+        name: String,
+        dim: &'static str,
+        width: i64,
+        height: i64,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        click: Option<ArtifactClick>,
+        scene: Vec<ArtifactSceneElem>,
+    },
+}
+
+/// 区域内场景元素（T-02 冻结：quad/circle/cylinder；数值 LitNum/Field）。
+#[derive(Serialize, Clone)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum ArtifactSceneElem {
+    Quad {
+        name: String,
+        x: ArtifactPropValue,
+        y: ArtifactPropValue,
+        w: ArtifactPropValue,
+        h: ArtifactPropValue,
+        /// RGB 0..255 字面量。
+        color: [u8; 3],
+    },
+    Circle {
+        name: String,
+        x: ArtifactPropValue,
+        y: ArtifactPropValue,
+        r: ArtifactPropValue,
+        color: [u8; 3],
+    },
+    Cylinder {
+        name: String,
+        /// (tx, ty, tz)。
+        translation: Vec<ArtifactPropValue>,
+        color: [u8; 3],
+    },
 }
 
 #[derive(Serialize, Clone)]
@@ -171,6 +224,22 @@ struct ArtifactClick {
     fn_name: String,
     /// "index"（def 层派发器带 i）| "none"（root）。
     arg: &'static str,
+}
+
+// ----------------------------------------------- PLAN-049 mixed artifact --
+
+/// PLAN-049 混合产物：与 [`UiArtifact`] 同一实例/def/文字/派发 ABI，
+/// def 内新增 `regions`（嵌入区域；挂载关系，非跨维 parent）。世界源
+/// 与 048 完全同一生成器面（区域点击走同一 `_ui_click_` 派发器 ABI，
+/// 场景绑定复用既有 int getter——不新增世界 ABI 行）。
+/// PLAN-049 降层产物（world.at ＋ ui.json ＋ 身份数；字段与
+/// [`LowerOutputNodeUi`] 同形，world_sha256 即世界源 sha）。
+#[derive(Debug)]
+pub struct LowerOutputNodeMixed {
+    pub user_source: String,
+    pub ui_json: String,
+    pub world_sha256: String,
+    pub source_bytes: usize,
 }
 
 // ----------------------------------------------------------- def plan --
@@ -506,6 +575,403 @@ fn classify_click(
 
 // ------------------------------------------------------ view → artifact
 
+/// PLAN-049：区域占位边长（int 字面量；1..=MAX_REGION_SIDE）。
+fn classify_region_side(
+    module: &str,
+    def_name: &str,
+    region: &str,
+    prop: &str,
+    v: &PropValue,
+) -> Result<i64, String> {
+    let e = one_value(module, def_name, region, prop, v)?;
+    match e {
+        Expr::Int(n) if *n > 0 && (*n as i64) <= MAX_REGION_SIDE => Ok(*n as i64),
+        Expr::Int(n) => Err(err_at(
+            module,
+            (0, 0),
+            format!(
+                "node '{def_name}': {prop} on region '{region}' must be 1..={MAX_REGION_SIDE} (got {n}; frozen T-02 region budget)"
+            ),
+        )),
+        _ => Err(err_at(
+            module,
+            (0, 0),
+            format!(
+                "node '{def_name}': {prop} on region '{region}' must be an int literal (frozen T-02 region sizing)"
+            ),
+        )),
+    }
+}
+
+/// 场景数值（LitNum | 前导点 int 字段绑定；复用既有 int getter 面）。
+fn classify_scene_num(
+    module: &str,
+    def_name: &str,
+    at: &str,
+    prop: &str,
+    e: &Expr,
+    fields: &[FieldPlan],
+) -> Result<ArtifactPropValue, String> {
+    match e {
+        Expr::Int(n) => Ok(ArtifactPropValue::LitNum { v: *n as f64 }),
+        Expr::Float(v, _) | Expr::Double(v, _) => {
+            if v.fract() == 0.0 {
+                Ok(ArtifactPropValue::LitNum { v: *v })
+            } else {
+                Err(err_at(
+                    module,
+                    (0, 0),
+                    format!(
+                        "node '{def_name}': {prop} on '{at}' must be an int or int field (frozen T-02 scene bindings reuse the int getter ABI)"
+                    ),
+                ))
+            }
+        }
+        _ => match self_field(e) {
+            Some(f) => match fields.iter().find(|fd| fd.name == f).map(|fd| fd.kind) {
+                Some(Kind::Int) => Ok(ArtifactPropValue::Field { name: f.to_string() }),
+                _ => Err(err_at(
+                    module,
+                    (0, 0),
+                    format!(
+                        "node '{def_name}': {prop} on '{at}' references unknown int field '{f}'"
+                    ),
+                )),
+            },
+            None => Err(err_at(
+                module,
+                (0, 0),
+                format!(
+                    "node '{def_name}': {prop} on '{at}' must be an int literal or leading-dot int field"
+                ),
+            )),
+        },
+    }
+}
+
+/// 区域内 AST 元素（维度在区域头固定；跨维混排由解析面分离）。
+enum RegionElements<'a> {
+    D2(&'a [auto_ui_dialect::node2d::View2dElement]),
+    D3(&'a [auto_ui_dialect::node2d::View3dElement]),
+}
+
+/// 场景色（`(r, g, b)` 0..255 int 字面量三元组；T-02 首切片不绑定）。
+fn classify_scene_color(
+    module: &str,
+    def_name: &str,
+    at: &str,
+    v: &PropValue,
+) -> Result<[u8; 3], String> {
+    let es = v.exprs();
+    if es.len() != 3 {
+        return Err(err_at(
+            module,
+            (0, 0),
+            format!("node '{def_name}': color on '{at}' must be an (r, g, b) literal triple"),
+        ));
+    }
+    let mut out = [0u8; 3];
+    for (i, e) in es.iter().enumerate() {
+        match e {
+            Expr::Int(n) if (0..=255).contains(n) => out[i] = *n as u8,
+            _ => {
+                return Err(err_at(
+                    module,
+                    (0, 0),
+                    format!("node '{def_name}': color on '{at}' must be 0..=255 int literals"),
+                ))
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// PLAN-049 嵌入区域降层（mix 档专用）：props（width/height/onclick）＋
+/// 有界场景元素集；区域点击并入 plan.clicks（与按钮同一派发器 ABI 生成
+/// 面）。区域内 If/Group/Instance/其余元素在首切片具名拒绝（T-03+ 扩面）。
+#[allow(clippy::too_many_arguments)]
+fn lower_embed_region(
+    module: &str,
+    def_name: &str,
+    name: &str,
+    dim: &'static str,
+    props: &[auto_ui_dialect::node2d::Prop],
+    elements: RegionElements<'_>,
+    fields: &[FieldPlan],
+    plan: &mut DefPlan,
+    region_count: &mut usize,
+) -> Result<ArtifactElement, String> {
+    if *region_count >= MAX_REGIONS_PER_DEF {
+        return Err(err_at(
+            module,
+            (0, 0),
+            format!(
+                "node '{def_name}': region count exceeds the frozen {MAX_REGIONS_PER_DEF}-region budget"
+            ),
+        ));
+    }
+    let mut width = None;
+    let mut height = None;
+    let mut click = None;
+    let mut click_span = (0, 0);
+    for p in props {
+        match p.name.as_str() {
+            "width" => width = Some(classify_region_side(module, def_name, name, "width", &p.value)?),
+            "height" => {
+                height = Some(classify_region_side(module, def_name, name, "height", &p.value)?)
+            }
+            "onclick" => {
+                click_span = p.span;
+                click = Some(classify_click(module, def_name, name, &p.value)?);
+            }
+            other => {
+                return Err(err_at(
+                    module,
+                    p.span,
+                    format!(
+                        "unknown prop '{other}' on region '{name}' of node '{def_name}' (frozen: width/height/onclick)",
+                    ),
+                ))
+            }
+        }
+    }
+    let click = match click {
+        Some((ev, child)) => {
+            match &child {
+                None => {
+                    if !plan.events.iter().any(|e| e == &ev) {
+                        return Err(err_at(
+                            module,
+                            click_span,
+                            format!(
+                                "node '{def_name}': onclick on region '{name}' references event '.{ev}' with no handler"
+                            ),
+                        ));
+                    }
+                }
+                Some(child_name) => {
+                    if !plan.local_instances.contains_key(child_name) {
+                        return Err(err_at(
+                            module,
+                            click_span,
+                            format!(
+                                "node '{def_name}': onclick on region '{name}' references unknown instance '{child_name}'"
+                            ),
+                        ));
+                    }
+                }
+            }
+            plan.clicks.push((name.to_string(), ev, child));
+            Some(ArtifactClick {
+                fn_name: format!("{}_ui_click_{}", plan.prefix, name.to_lowercase()),
+                arg: if plan.is_root { "none" } else { "index" },
+            })
+        }
+        None => None,
+    };
+    // 场景元素（有界；首切片 quad/circle/cylinder）。
+    let mut elems: Vec<ArtifactSceneElem> = Vec::new();
+    fn check_scene_budget(
+        len: usize,
+        module: &str,
+        def_name: &str,
+        region: &str,
+    ) -> Result<(), String> {
+        if len >= MAX_SCENE_ELEMS_PER_REGION {
+            return Err(err_at(
+                module,
+                (0, 0),
+                format!(
+                    "node '{def_name}': region '{region}' exceeds the frozen {MAX_SCENE_ELEMS_PER_REGION}-element budget"
+                ),
+            ));
+        }
+        Ok(())
+    }
+    match elements {
+        RegionElements::D2(els) => {
+            for el in els {
+                match el {
+                    auto_ui_dialect::node2d::View2dElement::Shape {
+                        name: en,
+                        props: eps,
+                    } => {
+                        check_scene_budget(elems.len(), module, def_name, name)?;
+                        let mut kind = String::new();
+                        let mut x = ArtifactPropValue::LitNum { v: 0.0 };
+                        let mut y = ArtifactPropValue::LitNum { v: 0.0 };
+                        let mut w = ArtifactPropValue::LitNum { v: 16.0 };
+                        let mut h = ArtifactPropValue::LitNum { v: 16.0 };
+                        let mut r = ArtifactPropValue::LitNum { v: 8.0 };
+                        let mut color: Option<[u8; 3]> = None;
+                        for p in eps {
+                            let one = || -> Result<&Expr, String> {
+                                match &p.value {
+                                    PropValue::One(e) => Ok(e),
+                                    PropValue::Pair(_) => Err(err_at(
+                                        module,
+                                        p.span,
+                                        format!(
+                                            "node '{def_name}': {} on '{en}' takes a single value",
+                                            p.name
+                                        ),
+                                    )),
+                                }
+                            };
+                            match p.name.as_str() {
+                                "kind" => kind = match one()? {
+                                    Expr::Ident(s) => s.to_string(),
+                                    _ => {
+                                        return Err(err_at(
+                                            module,
+                                            p.span,
+                                            format!(
+                                                "node '{def_name}': kind on '{en}' must be quad|circle"
+                                            ),
+                                        ))
+                                    }
+                                },
+                                "x" => x = classify_scene_num(module, def_name, en, "x", one()?, fields)?,
+                                "y" => y = classify_scene_num(module, def_name, en, "y", one()?, fields)?,
+                                "w" => w = classify_scene_num(module, def_name, en, "w", one()?, fields)?,
+                                "h" => h = classify_scene_num(module, def_name, en, "h", one()?, fields)?,
+                                "r" => r = classify_scene_num(module, def_name, en, "r", one()?, fields)?,
+                                "color" => color = Some(classify_scene_color(module, def_name, en, &p.value)?),
+                                other => {
+                                    return Err(err_at(
+                                        module,
+                                        p.span,
+                                        format!(
+                                            "unknown prop '{other}' on shape2d '{en}' of node '{def_name}' (frozen: kind/x/y/w/h/r/color)",
+                                        ),
+                                    ))
+                                }
+                            }
+                        }
+                        match kind.as_str() {
+                            "quad" => elems.push(ArtifactSceneElem::Quad {
+                                name: en.clone(),
+                                x,
+                                y,
+                                w,
+                                h,
+                                color: color.unwrap_or([200, 40, 40]),
+                            }),
+                            "circle" => elems.push(ArtifactSceneElem::Circle {
+                                name: en.clone(),
+                                x,
+                                y,
+                                r,
+                                color: color.unwrap_or([40, 120, 220]),
+                            }),
+                            other => {
+                                return Err(err_at(
+                                    module,
+                                    (0, 0),
+                                    format!(
+                                        "node '{def_name}': shape2d '{en}' kind '{other}' not in the frozen T-02 set (quad|circle)"
+                                    ),
+                                ))
+                            }
+                        }
+                    }
+                    other => {
+                        return Err(err_at(
+                            module,
+                            (0, 0),
+                            format!(
+                                "node '{def_name}': region '{name}' element '{other:?}' is outside the frozen T-02 2D set (shape2d quad/circle only)"
+                            ),
+                        ))
+                    }
+                }
+            }
+        }
+        RegionElements::D3(els) => {
+            for el in els {
+                match el {
+                    auto_ui_dialect::node2d::View3dElement::Primitive {
+                        name: en,
+                        props: eps,
+                    } => {
+                        check_scene_budget(elems.len(), module, def_name, name)?;
+                        let mut translation: Vec<ArtifactPropValue> = Vec::new();
+                        let mut color: Option<[u8; 3]> = None;
+                        for p in eps {
+                            match p.name.as_str() {
+                                "translation" => {
+                                    let es = p.value.exprs();
+                                    if es.len() != 3 {
+                                        return Err(err_at(
+                                            module,
+                                            p.span,
+                                            format!(
+                                                "node '{def_name}': translation on '{en}' must be an (x, y, z) triple"
+                                            ),
+                                        ));
+                                    }
+                                    translation = es
+                                        .iter()
+                                        .map(|e| {
+                                            classify_scene_num(
+                                                module, def_name, en, "translation", e, fields,
+                                            )
+                                        })
+                                        .collect::<Result<Vec<_>, _>>()?;
+                                }
+                                "color" => {
+                                    color = Some(classify_scene_color(module, def_name, en, &p.value)?)
+                                }
+                                other => {
+                                    return Err(err_at(
+                                        module,
+                                        p.span,
+                                        format!(
+                                            "unknown prop '{other}' on cylinder3d '{en}' of node '{def_name}' (frozen: translation/color)",
+                                        ),
+                                    ))
+                                }
+                            }
+                        }
+                        if translation.len() != 3 {
+                            return Err(err_at(
+                                module,
+                                (0, 0),
+                                format!(
+                                    "node '{def_name}': cylinder3d '{en}' requires a 'translation' triple (frozen T-02 dynamic surface)"
+                                ),
+                            ));
+                        }
+                        elems.push(ArtifactSceneElem::Cylinder {
+                            name: en.clone(),
+                            translation,
+                            color: color.unwrap_or([90, 160, 90]),
+                        });
+                    }
+                    other => {
+                        return Err(err_at(
+                            module,
+                            (0, 0),
+                            format!(
+                                "node '{def_name}': region '{name}' element '{other:?}' is outside the frozen T-02 3D set (cylinder3d only)"
+                            ),
+                        ))
+                    }
+                }
+            }
+        }
+    }
+    *region_count += 1;
+    Ok(ArtifactElement::Embed {
+        name: name.to_string(),
+        dim,
+        width: width.unwrap_or(160),
+        height: height.unwrap_or(120),
+        click,
+        scene: elems,
+    })
+}
+
 #[allow(clippy::too_many_arguments)]
 fn lower_view(
     module: &str,
@@ -515,6 +981,8 @@ fn lower_view(
     events: &[String],
     plan: &mut DefPlan,
     count: &mut usize,
+    mix: bool,
+    regions: &mut usize,
 ) -> Result<Vec<ArtifactElement>, String> {
     let mut out = Vec::new();
     for el in elements {
@@ -569,7 +1037,9 @@ fn lower_view(
                         }
                     }
                 }
-                let children = lower_view(module, def_name, children, fields, events, plan, count)?;
+                let children = lower_view(
+                    module, def_name, children, fields, events, plan, count, mix, regions,
+                )?;
                 out.push(ArtifactElement::Container {
                     name: name.clone(),
                     container: match kind {
@@ -774,7 +1244,9 @@ fn lower_view(
             }
             UiElement::If { cond, then } => {
                 let cond = classify_cond_expr(module, def_name, "if", cond, fields)?;
-                let then = lower_view(module, def_name, then, fields, events, plan, count)?;
+                let then = lower_view(
+                    module, def_name, then, fields, events, plan, count, mix, regions,
+                )?;
                 out.push(ArtifactElement::If { cond, then });
             }
             UiElement::Instance { node, name, .. } => {
@@ -790,6 +1262,62 @@ fn lower_view(
                     name: name.clone(),
                     node: node.clone(),
                 });
+            }
+            UiElement::Embed2d {
+                name,
+                props,
+                elements,
+                span,
+            } => {
+                if !mix {
+                    return Err(err_at(
+                        module,
+                        *span,
+                        format!(
+                            "node '{def_name}': embed region '{name}' is PLAN-049 mixed-profile only (node-ui rejects any view-2d/view-3d surface)"
+                        ),
+                    ));
+                }
+                let embed = lower_embed_region(
+                    module,
+                    def_name,
+                    name,
+                    "2d",
+                    props,
+                    RegionElements::D2(elements),
+                    fields,
+                    plan,
+                    regions,
+                )?;
+                out.push(embed);
+            }
+            UiElement::Embed3d {
+                name,
+                props,
+                elements,
+                span,
+            } => {
+                if !mix {
+                    return Err(err_at(
+                        module,
+                        *span,
+                        format!(
+                            "node '{def_name}': embed region '{name}' is PLAN-049 mixed-profile only (node-ui rejects any view-2d/view-3d surface)"
+                        ),
+                    ));
+                }
+                let embed = lower_embed_region(
+                    module,
+                    def_name,
+                    name,
+                    "3d",
+                    props,
+                    RegionElements::D3(elements),
+                    fields,
+                    plan,
+                    regions,
+                )?;
+                out.push(embed);
             }
         }
     }
@@ -832,14 +1360,16 @@ fn collect_ui_instances(
                 Expr::Float(v, _) | Expr::Double(v, _) => {
                     params.insert(p.name.clone(), *v);
                 }
-                _ => return Err(err_at(
-                    module,
-                    p.span,
-                    format!(
+                _ => {
+                    return Err(err_at(
+                        module,
+                        p.span,
+                        format!(
                         "instance prop '{}' on '{path}' must be a numeric literal (basic-UI v1)",
                         p.name
                     ),
-                )),
+                    ))
+                }
             }
         }
         Ok(params)
@@ -957,10 +1487,15 @@ fn gen_text_write_k(
 ) {
     let p = &plan.prefix;
     let base = format!("({elem_index}*{TEXT_BYTES})");
+    let buf = if elem_index < TEXT_SLOTS_PER_BUFFER {
+        format!("{p}_ui_text_{k}")
+    } else {
+        format!("{p}_ui_text_b_{k}")
+    };
     match value {
         ArtifactTextValue::LitStr { v } => {
             for (j, b) in v.as_bytes().iter().enumerate() {
-                let _ = writeln!(src, " {p}_ui_text_{k}[({base}+{j})]=0x{b:02X}");
+                let _ = writeln!(src, " {buf}[({base}+{j})]=0x{b:02X}");
             }
             let _ = writeln!(
                 src,
@@ -1029,21 +1564,40 @@ fn gen_refresh_dispatch(plan: &DefPlan, n: usize, src: &mut String) {
 /// 数字格式化（每实例；at = e*64）＋有界最小位数十进制（1..=7 位）。
 fn gen_digits_fn(prefix: &str, k: usize, src: &mut String) {
     let _ = writeln!(src, "fn {prefix}_ui_digits_{k}(e int, n int) int {{");
-    let _ = writeln!(src, " let at=(e*{TEXT_BYTES})");
+    // 半缓冲分派：e >= TEXT_SLOTS_PER_BUFFER 写 b 半缓冲（同一 at 公式）。
+    let _ = writeln!(
+        src,
+        " let buf=if e<{SLOTS}{{1}}else{{0}}",
+        SLOTS = TEXT_SLOTS_PER_BUFFER
+    );
+    let _ = writeln!(
+        src,
+        " let at=((e-({SLOTS}*(1-buf)))*{TEXT_BYTES})",
+        SLOTS = TEXT_SLOTS_PER_BUFFER
+    );
     let _ = writeln!(src, " if n>9999999 {{");
     for (j, b) in b"OVER".iter().enumerate() {
-        let _ = writeln!(src, "  {prefix}_ui_text_{k}[(at+{j})]=0x{b:02X}");
+        let _ = writeln!(src, "  if buf==1 {{{prefix}_ui_text_{k}[(at+{j})]=0x{b:02X}}}else{{{prefix}_ui_text_b_{k}[(at+{j})]=0x{b:02X}}}");
     }
     let _ = writeln!(src, "  return 4");
     let _ = writeln!(src, " }}");
     let _ = writeln!(src, " if n<0 {{");
-    let _ = writeln!(src, "  {prefix}_ui_text_{k}[at]=0x2D");
-    let _ = writeln!(src, "  return (1+{prefix}_ui_digits_mag_{k}((at+1),(0-n)))");
+    let _ = writeln!(
+        src,
+        "  if buf==1 {{{prefix}_ui_text_{k}[at]=0x2D}}else{{{prefix}_ui_text_b_{k}[at]=0x2D}}"
+    );
+    let _ = writeln!(
+        src,
+        "  return (1+{prefix}_ui_digits_mag_{k}(buf,(at+1),(0-n)))"
+    );
     let _ = writeln!(src, " }}");
-    let _ = writeln!(src, " return {prefix}_ui_digits_mag_{k}(at,n)");
+    let _ = writeln!(src, " return {prefix}_ui_digits_mag_{k}(buf,at,n)");
     let _ = writeln!(src, "}}");
     // n 的十进制位数 = d（分支自高到低；digit j = (n/10^j)%10）。
-    let _ = writeln!(src, "fn {prefix}_ui_digits_mag_{k}(at int, n int) int {{");
+    let _ = writeln!(
+        src,
+        "fn {prefix}_ui_digits_mag_{k}(buf int, at int, n int) int {{"
+    );
     for d in (1..=7).rev() {
         let pow = 10i64.pow(d as u32 - 1);
         let cond = if d == 1 {
@@ -1055,7 +1609,7 @@ fn gen_digits_fn(prefix: &str, k: usize, src: &mut String) {
         // MSB-first（自然阅读序）：at+j = 第 (d-1-j) 位数字。
         for j in 0..d {
             let p10 = 10i64.pow(d as u32 - 1 - j as u32);
-            let _ = writeln!(src, "  {prefix}_ui_text_{k}[(at+{j})]=(48+((n/{p10})%10))");
+            let _ = writeln!(src, "  if buf==1 {{{prefix}_ui_text_{k}[(at+{j})]=(48+((n/{p10})%10))}}else{{{prefix}_ui_text_b_{k}[(at+{j})]=(48+((n/{p10})%10))}}");
         }
         let _ = writeln!(src, "  return {d}");
         let _ = writeln!(src, " }}");
@@ -1081,7 +1635,11 @@ fn gen_text_getters(plan: &DefPlan, n: usize, src: &mut String) {
     let _ = writeln!(src, "fn {p}_ui_text_at(i int, e int, j int) int {{");
     for k in 0..n {
         let _ = writeln!(src, " if i=={k} {{");
-        let _ = writeln!(src, "  return {p}_ui_text_{k}[((e*{TEXT_BYTES})+j)]");
+        let _ = writeln!(
+            src,
+            "  if e<{SLOTS} {{return {p}_ui_text_{k}[((e*{TEXT_BYTES})+j)]}}else{{return {p}_ui_text_b_{k}[(((e-{SLOTS})*{TEXT_BYTES})+j)]}}",
+            SLOTS = TEXT_SLOTS_PER_BUFFER
+        );
         let _ = writeln!(src, " }}");
     }
     let _ = writeln!(src, " return 0");
@@ -1226,39 +1784,40 @@ fn gen_def_handlers(
         }
     };
     for h in &on.handlers {
-        let head =
-            match &h.pattern {
-                auto_ui_dialect::node2d::EventPattern::Life { event, .. } => match event.as_str() {
-                    "Start" => {
-                        if plan.is_root {
-                            format!("fn {p}_lifestart() {{\n")
-                        } else {
-                            format!("fn {p}_lifestart(i int) {{\n")
-                        }
+        let head = match &h.pattern {
+            auto_ui_dialect::node2d::EventPattern::Life { event, .. } => match event.as_str() {
+                "Start" => {
+                    if plan.is_root {
+                        format!("fn {p}_lifestart() {{\n")
+                    } else {
+                        format!("fn {p}_lifestart(i int) {{\n")
                     }
-                    "Tick" => {
-                        if plan.is_root {
-                            format!("fn {p}_lifetick(dt float) {{\n")
-                        } else {
-                            format!("fn {p}_lifetick(i int, dt float) {{\n")
-                        }
+                }
+                "Tick" => {
+                    if plan.is_root {
+                        format!("fn {p}_lifetick(dt float) {{\n")
+                    } else {
+                        format!("fn {p}_lifetick(i int, dt float) {{\n")
                     }
-                    other => return Err(err_at(
+                }
+                other => {
+                    return Err(err_at(
                         &plan.module,
                         h.span,
                         format!(
                             "unknown Life event '{other}' (research surface: Life.Start/Life.Tick)"
                         ),
-                    )),
-                },
-                auto_ui_dialect::node2d::EventPattern::Member { name, .. } => {
-                    if plan.is_root {
-                        format!("fn {p}_{}() {{\n", name.to_lowercase())
-                    } else {
-                        format!("fn {p}_{}(i int) {{\n", name.to_lowercase())
-                    }
+                    ))
                 }
-            };
+            },
+            auto_ui_dialect::node2d::EventPattern::Member { name, .. } => {
+                if plan.is_root {
+                    format!("fn {p}_{}() {{\n", name.to_lowercase())
+                } else {
+                    format!("fn {p}_{}(i int) {{\n", name.to_lowercase())
+                }
+            }
+        };
         src.push_str(&head);
         let ctx = ui_ctx(indexed.clone(), project, plan, recv_heads);
         translate_handler(&h.body.stmts, &ctx, src, 1).map_err(|e| format!("{e}"))?;
@@ -1345,8 +1904,20 @@ fn gen_click_dispatchers(
     Ok(())
 }
 
-/// 主降层入口：基础 UI 工程 → world.at ＋ ui.json。
-pub fn lower_project_node_ui(project: &Project) -> Result<LowerOutputNodeUi, String> {
+/// 管线产物（048/049 两入口共用的内部面；产物 JSON 由各入口自组装）。
+struct PipelineOut {
+    user_source: String,
+    root: String,
+    instances: Vec<ArtifactInstance>,
+    world_sha256: String,
+    source_bytes: usize,
+    def_plans: BTreeMap<String, (String, bool, usize, Vec<ArtifactElement>)>,
+}
+
+/// 共享降层管线：基础 UI 工程 → world.at（048/049 字节同面；区域点击
+/// 走同一 `_ui_click_` 派发器 ABI）。`mix=false` 即 PLAN-048 路径——
+/// 区域解析头具名拒绝，全部产物字节不变。
+fn lower_node_ui_pipeline(project: &Project, mix: bool) -> Result<PipelineOut, String> {
     let root_name = project.root.clone();
     // ---- def 计划 ----
     let mut plans: BTreeMap<String, DefPlan> = BTreeMap::new();
@@ -1452,6 +2023,7 @@ pub fn lower_project_node_ui(project: &Project) -> Result<LowerOutputNodeUi, Str
             (p.module.clone(), p.fields.clone(), p.events.clone())
         };
         let mut count = 0usize;
+        let mut region_count = 0usize;
         let elements = {
             let plan = plans.get_mut(def_name).unwrap();
             lower_view(
@@ -1462,6 +2034,8 @@ pub fn lower_project_node_ui(project: &Project) -> Result<LowerOutputNodeUi, Str
                 &events,
                 plan,
                 &mut count,
+                mix,
+                &mut region_count,
             )?
         };
         plans.get_mut(def_name).unwrap().elements = elements;
@@ -1552,8 +2126,9 @@ pub fn lower_project_node_ui(project: &Project) -> Result<LowerOutputNodeUi, Str
             let _ = writeln!(src, "var {}_{}=[{vals}]", plan.prefix, pname);
         }
     }
-    // 文字缓冲 + len（每实例一数组；T*64 ≤ 256 是 SDK 字面量数组硬上限，
-    // 超界会被静默截断——T-02 冻结 T ≤ 4 并在降层具名拒绝）。
+    // 文字缓冲 + len（每实例一数组；PLAN-049 T-02 冻结：字节缓冲按半缓冲
+    // 拆分——SDK 字面量数组恰 256 元素静默截断为 0；每半 ≤128。T ≤ 4 在
+    // 降层具名拒绝）。
     for plan in plans.values() {
         if plan.texts.is_empty() {
             continue;
@@ -1564,8 +2139,18 @@ pub fn lower_project_node_ui(project: &Project) -> Result<LowerOutputNodeUi, Str
             instances.iter().filter(|i| i.def == plan.name).count()
         };
         for k in 0..n {
-            let zeros = vec!["0"; plan.texts.len() * TEXT_BYTES].join(",");
+            // PLAN-049 T-02 冻结：SDK 字面量数组恰 256 元素静默截断为 0
+            // （048 复审实测 256→0；4×64 恰在界上）。字节缓冲按半缓冲拆分
+            // （每半 ≤2 槽×64=128）；公开 len/at ABI 不变（getter 内部
+            // 分派）。len 数组 ≤4 元素，不触界。
+            let lo = plan.texts.len().min(TEXT_SLOTS_PER_BUFFER);
+            let hi = plan.texts.len().saturating_sub(TEXT_SLOTS_PER_BUFFER);
+            let zeros = vec!["0"; lo * TEXT_BYTES].join(",");
             let _ = writeln!(src, "var {}_ui_text_{k}=[{zeros}]", plan.prefix);
+            if hi > 0 {
+                let zeros = vec!["0"; hi * TEXT_BYTES].join(",");
+                let _ = writeln!(src, "var {}_ui_text_b_{k}=[{zeros}]", plan.prefix);
+            }
             let zeros = vec!["0"; plan.texts.len()].join(",");
             let _ = writeln!(src, "var {}_ui_text_len_{k}=[{zeros}]", plan.prefix);
         }
@@ -1781,16 +2366,47 @@ pub fn lower_project_node_ui(project: &Project) -> Result<LowerOutputNodeUi, Str
     let _ = writeln!(src, "}}");
     // ---- 产物 ----
     let source_sha256 = sha256_hex(src.as_bytes());
-    let defs_json: BTreeMap<String, ArtifactDef> = plans
-        .iter()
+    let def_plans = plans
+        .into_iter()
         .map(|(name, p)| {
             (
-                name.clone(),
+                name,
+                (p.prefix, p.is_root, p.texts.len(), p.elements.clone()),
+            )
+        })
+        .collect();
+    Ok(PipelineOut {
+        source_bytes: src.len(),
+        user_source: src,
+        root: root_name,
+        instances: instances
+            .into_iter()
+            .map(|i| ArtifactInstance {
+                path: i.path,
+                node: i.def,
+                def_idx: i.def_idx,
+            })
+            .collect(),
+        world_sha256: source_sha256,
+        def_plans,
+    })
+}
+
+/// 主降层入口（PLAN-048）：基础 UI 工程 → world.at ＋ ui.json。
+pub fn lower_project_node_ui(project: &Project) -> Result<LowerOutputNodeUi, String> {
+    let out = lower_node_ui_pipeline(project, false)?;
+    let source_sha256 = out.world_sha256.clone();
+    let defs_json: BTreeMap<String, ArtifactDef> = out
+        .def_plans
+        .into_iter()
+        .map(|(name, (prefix, is_root, texts, elements))| {
+            (
+                name,
                 ArtifactDef {
-                    prefix: p.prefix.clone(),
-                    is_root: p.is_root,
-                    texts: p.texts.len(),
-                    elements: p.elements.clone(),
+                    prefix,
+                    is_root,
+                    texts,
+                    elements,
                 },
             )
         })
@@ -1798,23 +2414,52 @@ pub fn lower_project_node_ui(project: &Project) -> Result<LowerOutputNodeUi, Str
     let artifact = UiArtifact {
         schema: NODE_UI_SCHEMA,
         generator: NODE_UI_GENERATOR,
-        world_sha256: source_sha256.clone(),
-        root: root_name.clone(),
-        instances: instances
-            .iter()
-            .map(|i| ArtifactInstance {
-                path: i.path.clone(),
-                node: i.def.clone(),
-                def_idx: i.def_idx,
-            })
-            .collect(),
+        world_sha256: out.world_sha256,
+        root: out.root,
+        instances: out.instances,
         defs: defs_json,
     };
     let ui_json = serde_json::to_string_pretty(&artifact).expect("ui.json");
     Ok(LowerOutputNodeUi {
-        source_bytes: src.len(),
-        user_source: src,
+        source_bytes: out.source_bytes,
+        user_source: out.user_source,
         source_sha256,
+        ui_json,
+    })
+}
+
+/// 主降层入口（PLAN-049 mixed-ui-2d-3d）：同一管线，产物为混合 schema
+/// （def 内嵌 regions；世界源与 048 字节同面——区域点击派发器同一 ABI）。
+pub fn lower_project_node_mixed(project: &Project) -> Result<LowerOutputNodeMixed, String> {
+    let out = lower_node_ui_pipeline(project, true)?;
+    let defs_json: BTreeMap<String, ArtifactDef> = out
+        .def_plans
+        .into_iter()
+        .map(|(name, (prefix, is_root, texts, elements))| {
+            (
+                name,
+                ArtifactDef {
+                    prefix,
+                    is_root,
+                    texts,
+                    elements,
+                },
+            )
+        })
+        .collect();
+    let artifact = UiArtifact {
+        schema: NODE_UI_MIXED_SCHEMA,
+        generator: NODE_UI_MIXED_GENERATOR,
+        world_sha256: out.world_sha256.clone(),
+        root: out.root,
+        instances: out.instances,
+        defs: defs_json,
+    };
+    let ui_json = serde_json::to_string_pretty(&artifact).expect("ui.json");
+    Ok(LowerOutputNodeMixed {
+        source_bytes: out.source_bytes,
+        user_source: out.user_source,
+        world_sha256: out.world_sha256,
         ui_json,
     })
 }

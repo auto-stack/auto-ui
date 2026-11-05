@@ -6,9 +6,9 @@
 //! 与降层合同见 `docs/plans/attachments/016/work/node2d-contract.md`。
 
 pub mod ast;
+pub mod components2d;
 pub mod game;
 pub mod parse;
-pub mod components2d;
 pub mod presentation;
 
 pub use ast::{
@@ -16,10 +16,10 @@ pub use ast::{
     PropValue, UiContainerKind, UiElement, View2dBlock, View2dElement, View3dBlock, View3dElement,
     ViewUiBlock,
 };
-pub use game::{Game2dAudio, Game2dBlock, Game2dCue, Game2dHud, Game2dShape, Game2dSlot,
-    Game2dText, Game2dTrigger, Game2dTriggerKind};
-pub use parse::{Node2DDialect, Node2DQueriesDialect};
 pub use components2d::{CmpAtlas, CmpPatrol, CmpSpawn, Components2dBlock};
-pub use presentation::{
-    PresHud, PresSlot, PresTrigger, Presentation2dBlock, Presentation3dBlock,
+pub use game::{
+    Game2dAudio, Game2dBlock, Game2dCue, Game2dHud, Game2dShape, Game2dSlot, Game2dText,
+    Game2dTrigger, Game2dTriggerKind,
 };
+pub use parse::{Node2DDialect, Node2DMixedDialect, Node2DQueriesDialect};
+pub use presentation::{PresHud, PresSlot, PresTrigger, Presentation2dBlock, Presentation3dBlock};

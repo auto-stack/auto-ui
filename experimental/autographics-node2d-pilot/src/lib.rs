@@ -101,9 +101,14 @@ pub enum Profile {
     /// button）→ ui.json（autographics.node-ui/1）+ world.at（真实 Auto
     /// 业务源；T-02 冻结的文字字节缓冲/事件派发 ABI）。
     NodeUi,
+    /// PLAN-049 混合组合：基础 UI view 内 view-2d/view-3d 嵌入区域（挂载
+    /// 关系，非跨维 parent）→ ui.json（autographics.node-ui-mixed/1）+
+    /// world.at（与 048 字节同面；区域点击同一派发器 ABI）。048 全部
+    /// 拒绝与产物身份保持，不扩大 039 的有限 marker 档。
+    MixedUi2d3d,
 }
 
-pub use load::{load_project, load_project_dual, Project, ProjectError};
+pub use load::{load_project, load_project_dual, load_project_mixed, Project, ProjectError};
 pub use lower::{lower_project, LowerOutput};
 pub use lower_basic2d::{lower_project_basic, BasicProfile, LowerOutputBasic2D};
 pub use lower_components::{
@@ -128,7 +133,8 @@ pub use lower_node3d_presentation::{
     PresentationMeta3,
 };
 pub use lower_node_ui::{
-    lower_project_node_ui, LowerOutputNodeUi, NODE_UI_GENERATOR, NODE_UI_SCHEMA,
+    lower_project_node_mixed, lower_project_node_ui, LowerOutputNodeMixed, LowerOutputNodeUi,
+    NODE_UI_GENERATOR, NODE_UI_MIXED_GENERATOR, NODE_UI_MIXED_SCHEMA, NODE_UI_SCHEMA,
 };
 pub use lower_presentation::{lower_project_presentation, LowerOutputPresentation};
 pub use lower_queries3d::{

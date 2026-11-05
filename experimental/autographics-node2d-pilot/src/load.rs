@@ -125,12 +125,13 @@ pub fn line_of_pub(source: &str, offset: usize) -> usize {
 }
 
 /// PLAN-039：queries-3d 组合 dialect（仅显式查询 profile 放行同 node 双
-/// view 解析；`allow_dual_view=false` 即旧默认路径，拒绝字节不变）。
+/// view 解析；`Default` 即旧默认路径，拒绝字节不变）。PLAN-049：`Mixed`
+/// 档放行基础 UI view 内嵌入区域。
 fn parse_module_text_dialect(
     file: &str,
     source: &str,
     base: &Path,
-    allow_dual_view: bool,
+    dialect: LoadDialect,
 ) -> Result<LoadedModule, ProjectError> {
     let err = |message: String, offset: usize| ProjectError {
         file: file.to_string(),
@@ -141,10 +142,12 @@ fn parse_module_text_dialect(
         scenario: Scenario::UI,
         ..Default::default()
     });
-    let parsed = if allow_dual_view {
-        parser.parse_domain(&auto_ui_dialect::node2d::Node2DQueriesDialect)
-    } else {
-        parser.parse_domain(&auto_ui_dialect::node2d::Node2DDialect)
+    let parsed = match dialect {
+        LoadDialect::DualView => {
+            parser.parse_domain(&auto_ui_dialect::node2d::Node2DQueriesDialect)
+        }
+        LoadDialect::Mixed => parser.parse_domain(&auto_ui_dialect::node2d::Node2DMixedDialect),
+        LoadDialect::Default => parser.parse_domain(&auto_ui_dialect::node2d::Node2DDialect),
     };
     let code = parsed.map_err(|e| {
         // 解析错误带字节偏移 span；换算行号。
@@ -594,8 +597,33 @@ pub fn load_project(entry: &Path) -> Result<Project, ProjectError> {
     load_project_dual(entry, false)
 }
 
+/// PLAN-049：mixed-ui-2d-3d 组合 dialect 载入（仅混合 profile；基础 UI
+/// `view` 内放行 view-2d/view-3d 嵌入区域，node 级双出口守卫不放宽）。
+pub fn load_project_mixed(entry: &Path) -> Result<Project, ProjectError> {
+    load_project_dialect(entry, LoadDialect::Mixed)
+}
+
+/// 载入期 dialect 档（解析面差异仅此一处；默认档拒绝字节不变）。
+#[derive(Clone, Copy, PartialEq)]
+enum LoadDialect {
+    Default,
+    DualView,
+    Mixed,
+}
+
 /// PLAN-039：queries-3d 双 view 解析载入（默认路径字节不变）。
 pub fn load_project_dual(entry: &Path, allow_dual_view: bool) -> Result<Project, ProjectError> {
+    load_project_dialect(
+        entry,
+        if allow_dual_view {
+            LoadDialect::DualView
+        } else {
+            LoadDialect::Default
+        },
+    )
+}
+
+fn load_project_dialect(entry: &Path, dialect: LoadDialect) -> Result<Project, ProjectError> {
     let base = entry
         .parent()
         .ok_or_else(|| ProjectError {
@@ -626,7 +654,7 @@ pub fn load_project_dual(entry: &Path, allow_dual_view: bool) -> Result<Project,
             line: 0,
             message: "module not found".into(),
         })?;
-        let module = parse_module_text_dialect(&name, &source, &base, allow_dual_view)?;
+        let module = parse_module_text_dialect(&name, &source, &base, dialect)?;
         for u in &module.uses {
             if u.module == SERVICES_NAMESPACE || u.module == "store" {
                 continue;

@@ -13,8 +13,8 @@ use auto_parser_api::token::TokenKind;
 use auto_parser_api::{CompilerSession, DomainDialect, DomainParseContext, DomainStmt, Scenario};
 
 use super::ast::{
-    Camera3dBlock, Character3dBlock, EventPattern, Handler, NameListBlock, Node2DStmt, NodeDecl,
-    Object3dBlock, OnBlock, Prop, PropValue, UiContainerKind, UiElement, View2dBlock,
+    Camera3dBlock, Character3dBlock, EventPattern, Handler, LightSpan, NameListBlock, Node2DStmt,
+    NodeDecl, Object3dBlock, OnBlock, Prop, PropValue, UiContainerKind, UiElement, View2dBlock,
     View2dElement, View3dBlock, View3dElement, ViewUiBlock,
 };
 use crate::declarations::{parse_model_block, parse_msg_decl};
@@ -29,6 +29,7 @@ impl Node2DDialect {
         cx: &mut dyn DomainParseContext,
         keyword: &str,
         allow_dual_view: bool,
+        allow_embed: bool,
     ) -> AutoResult<Option<DomainStmt<Node2DStmt>>> {
         if cx.in_on_body() || cx.in_fn_body() {
             return Ok(None);
@@ -39,9 +40,9 @@ impl Node2DDialect {
         let decl = if allow_dual_view {
             // PLAN-039：仅显式查询 profile 的组合 dialect 在解析期放行
             // 同 node 双 view；有限组合仍由该 profile 降层准入裁决。
-            parse_node_decl_opts(cx, true)?
+            parse_node_decl_opts(cx, true, allow_embed)?
         } else {
-            parse_node_decl(cx)?
+            parse_node_decl_opts(cx, false, allow_embed)?
         };
         Ok(Some(DomainStmt::Domain(Node2DStmt::Node(decl))))
     }
@@ -63,7 +64,7 @@ impl DomainDialect for Node2DDialect {
         cx: &mut dyn DomainParseContext,
         keyword: &str,
     ) -> AutoResult<Option<DomainStmt<Node2DStmt>>> {
-        self.try_parse_stmt_impl(cx, keyword, false)
+        self.try_parse_stmt_impl(cx, keyword, false, false)
     }
 }
 
@@ -90,20 +91,52 @@ impl DomainDialect for Node2DQueriesDialect {
         cx: &mut dyn DomainParseContext,
         keyword: &str,
     ) -> AutoResult<Option<DomainStmt<Node2DStmt>>> {
-        Node2DDialect.try_parse_stmt_impl(cx, keyword, true)
+        Node2DDialect.try_parse_stmt_impl(cx, keyword, true, false)
+    }
+}
+
+/// PLAN-049 mixed-ui-2d-3d 组合 dialect：与 [`Node2DDialect`] 完全同一
+/// 文法，唯一差异是解析期放行基础 UI `view` 元素树内的 `view-2d`/
+/// `view-3d` **嵌入区域**（挂载关系，非 node 级双出口——node 级
+/// view+view-2d/view-3d 互斥守卫在任何 dialect 下字节不变；`allow_dual_view`
+/// 保持 false，039 查询组合的有限 marker 档身份不扩大）。区域内为现有
+/// view-2d/view-3d 图元元素。放行后的组合由 pilot 的 mixed-ui-2d-3d
+/// profile 降层准入具名裁决，不放宽任何旧 profile 行为。
+pub struct Node2DMixedDialect;
+
+impl DomainDialect for Node2DMixedDialect {
+    type Output = Node2DStmt;
+
+    fn matches(&self, session: &CompilerSession) -> bool {
+        session.scenario == Scenario::UI
+    }
+
+    fn keywords(&self) -> &'static [&'static str] {
+        &["node"]
+    }
+
+    fn try_parse_stmt(
+        &self,
+        cx: &mut dyn DomainParseContext,
+        keyword: &str,
+    ) -> AutoResult<Option<DomainStmt<Node2DStmt>>> {
+        Node2DDialect.try_parse_stmt_impl(cx, keyword, false, true)
     }
 }
 
 /// `node Name(param: Type, ...) { model? msg? view-2d? on? }`
 pub fn parse_node_decl(cx: &mut dyn DomainParseContext) -> AutoResult<NodeDecl> {
-    parse_node_decl_opts(cx, false)
+    parse_node_decl_opts(cx, false, false)
 }
 
 /// PLAN-039：`allow_dual_view=true` 时不做单 view 出口解析拒绝；
 /// 有限组合（仅根双出口等）由调用方 profile 降层准入具名裁决。
+/// PLAN-049：`allow_embed=true` 时 view 元素树内放行 view-2d/view-3d
+/// 嵌入区域（Node2DMixedDialect 使用）。
 pub fn parse_node_decl_opts(
     cx: &mut dyn DomainParseContext,
     allow_dual_view: bool,
+    allow_embed: bool,
 ) -> AutoResult<NodeDecl> {
     cx.expect_keyword("node")?;
     let start = cx.cur_pos();
@@ -229,7 +262,7 @@ pub fn parse_node_decl_opts(
                     }
                     .into());
                 }
-                view = Some(parse_view_ui_block(cx)?);
+                view = Some(parse_view_ui_block(cx, allow_embed)?);
                 continue;
             }
             if marker.starts_with('3') {
@@ -710,8 +743,10 @@ fn parse_group3d_block(
             break;
         }
         let head = cx.cur_text();
-        if matches!(head.as_str(), "group3d" | "cylinder3d" | "model3d" | "player3d" | "mob3d")
-            || head.chars().next().is_some_and(|c| c.is_ascii_uppercase())
+        if matches!(
+            head.as_str(),
+            "group3d" | "cylinder3d" | "model3d" | "player3d" | "mob3d"
+        ) || head.chars().next().is_some_and(|c| c.is_ascii_uppercase())
         {
             children.push(parse_view3d_element(cx)?);
             continue;
@@ -837,29 +872,40 @@ fn parse_element_children(cx: &mut dyn DomainParseContext) -> AutoResult<Vec<Vie
 
 /// PLAN-048 停止集判定：基础 UI 元素头（props 块在此让位给子元素/块界）。
 /// 小写关键字与属性名可能同形（`text` 既是元素头又是主属性名）——后随
-/// `:` 的按属性名处理（投机窥探 checkpoint/restore 回滚游标）。
-fn is_ui_element_head(cx: &mut dyn DomainParseContext, head: &str) -> bool {
+/// `:` 的按属性名处理（投机窥探 checkpoint/restore 回滚游标）。PLAN-049：
+/// `allow_embed` 时 `view-2d`/`view-3d`（View+Sub+2/3）也是元素头
+/// （嵌入区域；默认路径不识别，保持 048 拒绝字节）。
+fn is_ui_element_head(cx: &mut dyn DomainParseContext, head: &str, allow_embed: bool) -> bool {
     if head.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
         return true;
     }
-    if !matches!(head, "row" | "column" | "text" | "button" | "if") {
+    if allow_embed && head == "view" {
+        let cp = cx.checkpoint();
+        cx.advance();
+        let is_embed = cx.is_kind(TokenKind::Sub);
+        cx.restore(cp).is_ok() && is_embed
+    } else if !matches!(head, "row" | "column" | "text" | "button" | "if") {
         return false;
+    } else {
+        let cp = cx.checkpoint();
+        cx.advance();
+        let is_prop = cx.is_kind(TokenKind::Colon);
+        cx.restore(cp).is_ok() && !is_prop
     }
-    let cp = cx.checkpoint();
-    cx.advance();
-    let is_prop = cx.is_kind(TokenKind::Colon);
-    cx.restore(cp).is_ok() && !is_prop
 }
 
 /// `view { element* }`（PLAN-048）：基础 UI 出口。元素：row/column/text/
 /// button/同定义实例化/if。复用共享 Core 表达式/prop 文法；属性白名单与
 /// 事件拼写（onclick: `.Ev` / `inst.Ev`）由降层具名校验（解析面与
 /// view-2d 同宽容）。
-fn parse_view_ui_block(cx: &mut dyn DomainParseContext) -> AutoResult<ViewUiBlock> {
+fn parse_view_ui_block(
+    cx: &mut dyn DomainParseContext,
+    allow_embed: bool,
+) -> AutoResult<ViewUiBlock> {
     let start = cx.cur_pos();
     cx.advance(); // View
-    // parse_view_ui_children 消费块界 RBrace（与 view-2d 块循环同责）。
-    let elements = parse_view_ui_children(cx)?;
+                  // parse_view_ui_children 消费块界 RBrace（与 view-2d 块循环同责）。
+    let elements = parse_view_ui_children(cx, allow_embed)?;
     Ok(ViewUiBlock {
         elements,
         span: super::ast::span_of(start),
@@ -867,7 +913,10 @@ fn parse_view_ui_block(cx: &mut dyn DomainParseContext) -> AutoResult<ViewUiBloc
 }
 
 /// `{ ... }` UI 元素子列表（块体/if 分支体）。
-fn parse_view_ui_children(cx: &mut dyn DomainParseContext) -> AutoResult<Vec<UiElement>> {
+fn parse_view_ui_children(
+    cx: &mut dyn DomainParseContext,
+    allow_embed: bool,
+) -> AutoResult<Vec<UiElement>> {
     cx.expect(TokenKind::LBrace)?;
     let mut elements = Vec::new();
     loop {
@@ -875,18 +924,40 @@ fn parse_view_ui_children(cx: &mut dyn DomainParseContext) -> AutoResult<Vec<UiE
         if cx.is_kind(TokenKind::RBrace) || cx.is_kind(TokenKind::EOF) {
             break;
         }
-        elements.push(parse_view_ui_element(cx)?);
+        elements.push(parse_view_ui_element(cx, allow_embed)?);
     }
     cx.expect(TokenKind::RBrace)?;
     Ok(elements)
 }
 
-fn parse_view_ui_element(cx: &mut dyn DomainParseContext) -> AutoResult<UiElement> {
+fn parse_view_ui_element(
+    cx: &mut dyn DomainParseContext,
+    allow_embed: bool,
+) -> AutoResult<UiElement> {
     if cx.is_kind(TokenKind::If) {
         cx.advance();
         let cond = cx.parse_expr()?;
-        let then = parse_view_ui_children(cx)?;
+        let then = parse_view_ui_children(cx, allow_embed)?;
         return Ok(UiElement::If { cond, then });
+    }
+    // PLAN-049：`view-2d`/`view-3d` 嵌入区域头（View+Sub+2/3；仅混合
+    // profile 放行）。在元素位置识别后转入现有 2D/3D 块解析（区域名
+    // 在标记之后）。
+    if allow_embed && cx.is_kind(TokenKind::View) {
+        let marker = {
+            let cp = cx.checkpoint();
+            cx.advance();
+            let m = match cx.expect(TokenKind::Sub) {
+                Ok(()) => cx.cur_text().to_string(),
+                Err(_) => String::new(),
+            };
+            cx.restore(cp)?;
+            m
+        };
+        if marker.starts_with('2') || marker.starts_with('3') {
+            return parse_view_embed_element(cx, &marker);
+        }
+        // 裸 view 头在元素位置：落入下方通用头处理（具名拒绝）。
     }
     let head = cx.cur_text();
     if head.is_empty() {
@@ -914,7 +985,7 @@ fn parse_view_ui_element(cx: &mut dyn DomainParseContext) -> AutoResult<UiElemen
             } else {
                 UiContainerKind::Column
             };
-            let (props, children) = parse_ui_mixed_block(cx)?;
+            let (props, children) = parse_ui_mixed_block(cx, allow_embed)?;
             Ok(UiElement::Container {
                 kind,
                 name: elem_name,
@@ -928,6 +999,7 @@ fn parse_view_ui_element(cx: &mut dyn DomainParseContext) -> AutoResult<UiElemen
             let props = parse_ui_prop_block(
                 cx,
                 &format!("'{head}' element (name '{elem_name}')"),
+                allow_embed,
             )?;
             if head == "text" {
                 Ok(UiElement::Text {
@@ -953,8 +1025,11 @@ fn parse_view_ui_element(cx: &mut dyn DomainParseContext) -> AutoResult<UiElemen
                 }
                 .into());
             }
-            let props =
-                parse_ui_prop_block(cx, &format!("instance '{elem_name}' of '{other}'"))?;
+            let props = parse_ui_prop_block(
+                cx,
+                &format!("instance '{elem_name}' of '{other}'"),
+                allow_embed,
+            )?;
             Ok(UiElement::Instance {
                 node: other.to_string(),
                 name: elem_name,
@@ -964,12 +1039,146 @@ fn parse_view_ui_element(cx: &mut dyn DomainParseContext) -> AutoResult<UiElemen
     }
 }
 
+/// PLAN-049：`view-2d name { props+elements }` / `view-3d name { props+elements }`
+/// 嵌入区域。调用方已窥探 View+Sub+marker（未消费）；本函数消费
+/// View/Sub/marker、区域名与 `{ props+elements }`（属性行与 2D/3D 场景
+/// 元素按行交错；`head:` 为属性行，否则按对应维度元素解析——区域内禁止
+/// 跨维场景 parent，挂载关系由降层裁决）。
+fn parse_view_embed_element(
+    cx: &mut dyn DomainParseContext,
+    marker: &str,
+) -> AutoResult<UiElement> {
+    let start = cx.cur_pos();
+    cx.advance(); // View
+    cx.expect(TokenKind::Sub)?;
+    let m = marker.to_string();
+    cx.advance();
+    let elem_name = cx.cur_text();
+    if elem_name.is_empty() {
+        return Err(SyntaxError::Generic {
+            message: "view element name expected".to_string(),
+            span: pos_to_span(cx.cur_pos()),
+        }
+        .into());
+    }
+    cx.advance();
+    let (props, elements) = if m.starts_with('2') {
+        let (props, elements, _span) = parse_embed_body_2d(cx)?;
+        (props, EmbedBody::D2(elements))
+    } else {
+        let (props, elements, _span) = parse_embed_body_3d(cx)?;
+        (props, EmbedBody::D3(elements))
+    };
+    let span = super::ast::span_of(start);
+    match elements {
+        EmbedBody::D2(elements) => Ok(UiElement::Embed2d {
+            name: elem_name,
+            props,
+            elements,
+            span,
+        }),
+        EmbedBody::D3(elements) => Ok(UiElement::Embed3d {
+            name: elem_name,
+            props,
+            elements,
+            span,
+        }),
+    }
+}
+
+enum EmbedBody {
+    D2(Vec<View2dElement>),
+    D3(Vec<View3dElement>),
+}
+
+/// 区域体内的一行是属性还是元素：`head:`（后随冒号）= 属性。
+fn embed_head_is_prop(cx: &mut dyn DomainParseContext) -> bool {
+    let cp = cx.checkpoint();
+    cx.advance();
+    let is_prop = cx.is_kind(TokenKind::Colon);
+    let ok = cx.restore(cp).is_ok();
+    ok && is_prop
+}
+
+/// `{ view-2d props+elements }`：属性行复用 UI 属性行文法，元素复用
+/// `parse_view2d_element`。
+fn parse_embed_body_2d(
+    cx: &mut dyn DomainParseContext,
+) -> AutoResult<(Vec<Prop>, Vec<View2dElement>, LightSpan)> {
+    let start = cx.cur_pos();
+    cx.expect(TokenKind::LBrace)?;
+    let mut props = Vec::new();
+    let mut elements = Vec::new();
+    loop {
+        cx.skip_empty_lines();
+        if cx.is_kind(TokenKind::RBrace) || cx.is_kind(TokenKind::EOF) {
+            break;
+        }
+        if embed_head_is_prop(cx) {
+            props.push(parse_embed_prop_row(cx)?);
+            continue;
+        }
+        elements.push(parse_view2d_element(cx)?);
+    }
+    cx.expect(TokenKind::RBrace)?;
+    Ok((props, elements, super::ast::span_of(start)))
+}
+
+/// `{ view-3d props+elements }`：同 2D，元素为 `parse_view3d_element`。
+fn parse_embed_body_3d(
+    cx: &mut dyn DomainParseContext,
+) -> AutoResult<(Vec<Prop>, Vec<View3dElement>, LightSpan)> {
+    let start = cx.cur_pos();
+    cx.expect(TokenKind::LBrace)?;
+    let mut props = Vec::new();
+    let mut elements = Vec::new();
+    loop {
+        cx.skip_empty_lines();
+        if cx.is_kind(TokenKind::RBrace) || cx.is_kind(TokenKind::EOF) {
+            break;
+        }
+        if embed_head_is_prop(cx) {
+            props.push(parse_embed_prop_row(cx)?);
+            continue;
+        }
+        elements.push(parse_view3d_element(cx)?);
+    }
+    cx.expect(TokenKind::RBrace)?;
+    Ok((props, elements, super::ast::span_of(start)))
+}
+
+/// 区域内一行属性（`name: value`；空行/逗号宽容——与 UI 属性行同文）。
+fn parse_embed_prop_row(cx: &mut dyn DomainParseContext) -> AutoResult<Prop> {
+    let start = cx.cur_pos();
+    let pname = cx.cur_text();
+    if pname.is_empty() {
+        return Err(SyntaxError::Generic {
+            message: "property name expected".to_string(),
+            span: pos_to_span(cx.cur_pos()),
+        }
+        .into());
+    }
+    cx.advance();
+    cx.expect(TokenKind::Colon)?;
+    let value = parse_prop_value(cx)?;
+    let prop = Prop {
+        name: pname,
+        value,
+        span: super::ast::span_of(start),
+    };
+    if cx.is_kind(TokenKind::Comma) {
+        cx.advance();
+    }
+    Ok(prop)
+}
+
 /// `{ name: value ... }` UI 属性行块；空行/逗号宽容。叶子/实例属性块
 /// 遇到 UI 元素头/UpperCamel 实例化 = 子元素出现，具名拒绝（不静默丢
 /// 弃）；容器混合块由 parse_ui_mixed_block 接管（该处元素头让位子元素）。
 fn parse_ui_prop_block(
     cx: &mut dyn DomainParseContext,
     owner: &str,
+    allow_embed: bool,
 ) -> AutoResult<Vec<Prop>> {
     cx.expect(TokenKind::LBrace)?;
     let mut props = Vec::new();
@@ -979,7 +1188,7 @@ fn parse_ui_prop_block(
             break;
         }
         let head = cx.cur_text();
-        if is_ui_element_head(cx, &head) {
+        if is_ui_element_head(cx, &head, allow_embed) {
             return Err(SyntaxError::Generic {
                 message: format!("{owner} takes no children"),
                 span: pos_to_span(cx.cur_pos()),
@@ -1015,6 +1224,7 @@ fn parse_ui_prop_block(
 /// 按行交错；先 prop 后子元素为推荐书写序，不强制（group2d 同文）。
 fn parse_ui_mixed_block(
     cx: &mut dyn DomainParseContext,
+    allow_embed: bool,
 ) -> AutoResult<(Vec<Prop>, Vec<UiElement>)> {
     cx.expect(TokenKind::LBrace)?;
     let mut props = Vec::new();
@@ -1025,8 +1235,8 @@ fn parse_ui_mixed_block(
             break;
         }
         let head = cx.cur_text();
-        if is_ui_element_head(cx, &head) {
-            children.push(parse_view_ui_element(cx)?);
+        if is_ui_element_head(cx, &head, allow_embed) {
+            children.push(parse_view_ui_element(cx, allow_embed)?);
             continue;
         }
         let start = cx.cur_pos();

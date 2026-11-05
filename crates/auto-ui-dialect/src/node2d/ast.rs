@@ -194,6 +194,27 @@ pub enum UiElement {
         name: String,
         props: Vec<Prop>,
     },
+    /// `view-2d name { props+elements }` —— 平面 UI 布局内的二维嵌入区域
+    /// （PLAN-049：挂载关系，非跨维 parent）。区域内为现有 view-2d 元素
+    /// （纯图元/标记行），由本 def 的 Auto 状态/事件驱动；旧 profile 的
+    /// 互斥拒绝保持，仅混合 profile 放行。props：width/height（UI 占位
+    /// rect，int 字面量）与 onclick（区域事件端口）；属性白名单由降层
+    /// 具名校验（解析面宽容）。
+    Embed2d {
+        name: String,
+        props: Vec<Prop>,
+        elements: Vec<View2dElement>,
+        span: LightSpan,
+    },
+    /// `view-3d name { props+elements }` —— 平面 UI 布局内的三维嵌入区域
+    /// （PLAN-049：挂载关系，非跨维 parent）。区域内为现有 view-3d 元素
+    /// （图元/静态模型），由本 def 的 Auto 状态/事件驱动。props 同 Embed2d。
+    Embed3d {
+        name: String,
+        props: Vec<Prop>,
+        elements: Vec<View3dElement>,
+        span: LightSpan,
+    },
 }
 
 /// `view-3d { ... }`（PLAN-024）：本 node 实例的直属三维呈现。单一出口；

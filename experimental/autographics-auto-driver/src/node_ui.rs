@@ -97,6 +97,46 @@ pub enum ArtifactElement {
         name: String,
         node: String,
     },
+    /// PLAN-049 混合档嵌入区域（`autographics.node-ui-mixed/1` 专属；048
+    /// schema 消费入口在解析后具名拒绝本变体——旧档身份不变）。UI 占位
+    /// rect（width/height）＋可选点击端口 ＋ 有界场景元素；场景 Field 绑定
+    /// 经同一 accept_state getter 面读取（单 owner 一次接受）。
+    Embed {
+        name: String,
+        dim: String,
+        width: i64,
+        height: i64,
+        #[serde(default)]
+        click: Option<ArtifactClick>,
+        #[serde(default)]
+        scene: Vec<ArtifactSceneElem>,
+    },
+}
+
+#[derive(Deserialize, Debug, Clone)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum ArtifactSceneElem {
+    Quad {
+        name: String,
+        x: ArtifactPropValue,
+        y: ArtifactPropValue,
+        w: ArtifactPropValue,
+        h: ArtifactPropValue,
+        color: [u8; 3],
+    },
+    Circle {
+        name: String,
+        x: ArtifactPropValue,
+        y: ArtifactPropValue,
+        r: ArtifactPropValue,
+        color: [u8; 3],
+    },
+    Cylinder {
+        name: String,
+        /// (tx, ty, tz)。
+        translation: Vec<ArtifactPropValue>,
+        color: [u8; 3],
+    },
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -137,12 +177,35 @@ pub struct ArtifactClick {
     pub arg: String,
 }
 
-/// 解析产物＋容量复检（具名、执行前拒绝）。
+/// 解析产物＋容量复检（具名、执行前拒绝）。048 档身份：任何嵌入区域
+/// 变体在解析后具名拒绝（混合 schema 走 `node_mixed::parse_mixed_artifact`）。
 pub fn parse_artifact(json: &str) -> Result<UiArtifact, String> {
+    let a = parse_artifact_common(json, NODE_UI_SCHEMA)?;
+    for (name, def) in &a.defs {
+        if has_embed(&def.elements) {
+            return Err(format!(
+                "def '{name}': embed regions are not part of the {NODE_UI_SCHEMA} identity (mixed profile required)"
+            ));
+        }
+    }
+    Ok(a)
+}
+
+fn has_embed(els: &[ArtifactElement]) -> bool {
+    els.iter().any(|e| match e {
+        ArtifactElement::Embed { .. } => true,
+        ArtifactElement::Container { children, .. } => has_embed(children),
+        ArtifactElement::If { then, .. } => has_embed(then),
+        _ => false,
+    })
+}
+
+/// 共同解析＋容量复检（schema 由调用方冻结；混合档复用同一数字面）。
+pub fn parse_artifact_common(json: &str, schema: &str) -> Result<UiArtifact, String> {
     let a: UiArtifact = serde_json::from_str(json).map_err(|e| format!("ui.json parse: {e}"))?;
-    if a.schema != NODE_UI_SCHEMA {
+    if a.schema != schema {
         return Err(format!(
-            "ui.json schema mismatch: expected {NODE_UI_SCHEMA}, got {}",
+            "ui.json schema mismatch: expected {schema}, got {}",
             a.schema
         ));
     }
@@ -224,12 +287,321 @@ pub struct DrainReport {
 
 /// 实例行（root 在 0；def_idx 是 def 内实例下标 = 生成层 i）。
 #[derive(Debug, Clone)]
-struct InstanceRow {
-    path: String,
-    def: String,
-    def_idx: usize,
-    is_root: bool,
-    elements: Vec<ArtifactElement>,
+pub struct InstanceRow {
+    pub path: String,
+    pub def: String,
+    pub def_idx: usize,
+    pub is_root: bool,
+    pub elements: Vec<ArtifactElement>,
+}
+
+/// 已接受状态的呈现面（PLAN-049 Send 桥：纯数据副本——Session/
+/// auto-lang-core 持 Rc，线程受限；组合内容只携带版本化呈现状态）。
+/// 容量由产物冻结面限定（实例 ≤8、文字 ≤4/def、元素 ≤32），副本有界。
+#[derive(Debug, Clone)]
+pub struct UiPresentation {
+    pub rows: Vec<InstanceRow>,
+    /// 行 × 文字槽。
+    pub texts: Vec<Vec<String>>,
+    /// `{path}#{name}#en|$vis` / `{path}$if{n}`。
+    pub conds: std::collections::BTreeMap<String, bool>,
+    /// `{path}#{name}#{prop}` → f32（UI 与区域场景绑定同面）。
+    pub layout: std::collections::BTreeMap<String, f32>,
+}
+
+impl UiPresentation {
+    pub fn cond(&self, key: &str) -> bool {
+        self.conds.get(key).copied().unwrap_or(true)
+    }
+
+    pub fn instance_index(&self, path: &str) -> Option<usize> {
+        self.rows.iter().position(|r| r.path == path)
+    }
+
+    /// 借用视图（控件树/文字桥以引用工作——Element 借用数据源本身；
+    /// 名避 SurfaceUi::view）。
+    pub fn presentation_view(&self) -> UiPresentationView<'_> {
+        UiPresentationView {
+            rows: &self.rows,
+            texts: &self.texts,
+            conds: &self.conds,
+            layout: &self.layout,
+        }
+    }
+}
+
+/// [`UiPresentation`] 的借用视图：控件树构建只读这些数据，Element 直接
+/// 借用源（048 直连路径借 NodeUiApp 字段；混合镜像借已接受状态副本）。
+pub struct UiPresentationView<'a> {
+    pub rows: &'a [InstanceRow],
+    pub texts: &'a [Vec<String>],
+    pub conds: &'a std::collections::BTreeMap<String, bool>,
+    pub layout: &'a std::collections::BTreeMap<String, f32>,
+}
+
+impl<'a> UiPresentationView<'a> {
+    pub fn cond(&self, key: &str) -> bool {
+        self.conds.get(key).copied().unwrap_or(true)
+    }
+
+    pub fn instance_index(&self, path: &str) -> Option<usize> {
+        self.rows.iter().position(|r| r.path == path)
+    }
+
+    /// 同一控件树以 String 消息呈现（原型 `IcedContent` 统一消息面）。
+    /// 编码 `click	{dispatch}	{arg}	{origin}`——派发器名与路径不含
+    /// 制表符，往返无损。
+    pub fn view_string(&self) -> SurfaceElement<'a, String> {
+        let root = &self.rows[0];
+        self.widget_tree(&root.elements, &root.path, 0)
+            .map(|m| match m {
+                UiMsg::Click {
+                    dispatch,
+                    arg,
+                    origin,
+                    ..
+                } => format!(
+                    "click	{}	{}	{}",
+                    dispatch,
+                    arg.map(|a| a.to_string()).unwrap_or_default(),
+                    origin
+                ),
+            })
+    }
+
+    /// def 元素树 → 真实控件（多根包一列；实例化点展开为子实例路径树）。
+    /// if 序 = 本 def 遍历序（Cell 计数与 collect_bindings 同序同键）。
+    pub fn widget_tree(
+        &self,
+        elements: &[ArtifactElement],
+        path: &str,
+        instance: usize,
+    ) -> SurfaceElement<'a, UiMsg> {
+        let if_i = std::cell::Cell::new(0usize);
+        let children: Vec<UiEl<'a>> = elements
+            .iter()
+            .map(|e| self.widget_if(e, path, instance, &if_i))
+            .collect();
+        let col = iced::widget::Column::<UiMsg, iced::Theme, iced_wgpu::Renderer>::with_children(
+            children,
+        );
+        col.into()
+    }
+
+    #[allow(clippy::only_used_in_recursion)]
+    fn widget_if(
+        &self,
+        el: &ArtifactElement,
+        path: &str,
+        instance: usize,
+        if_i: &std::cell::Cell<usize>,
+    ) -> UiEl<'a> {
+        if let ArtifactElement::If { then, .. } = el {
+            let n = if_i.get();
+            if_i.set(n + 1);
+            let visible = self.cond(&NodeUiApp::if_key(path, n));
+            // 子树恒遍历（if 序对齐 collect_bindings）；不可见时不挂载。
+            let kids: Vec<UiEl<'a>> = then
+                .iter()
+                .map(|c| self.widget_if(c, path, instance, if_i))
+                .collect();
+            if visible {
+                iced::widget::Column::<UiMsg, iced::Theme, iced_wgpu::Renderer>::with_children(kids)
+                    .into()
+            } else {
+                iced::widget::Column::<UiMsg, iced::Theme, iced_wgpu::Renderer>::with_children(
+                    Vec::new(),
+                )
+                .into()
+            }
+        } else {
+            self.widget(el, path, instance, if_i)
+        }
+    }
+
+    fn widget(
+        &self,
+        el: &ArtifactElement,
+        path: &str,
+        instance: usize,
+        if_i: &std::cell::Cell<usize>,
+    ) -> UiEl<'a> {
+        match el {
+            ArtifactElement::Container {
+                name,
+                container,
+                props,
+                children,
+            } => {
+                let kids: Vec<UiEl<'a>> = children
+                    .iter()
+                    .map(|c| self.widget_if(c, path, instance, if_i))
+                    .collect();
+                // 布局值：字面量或已接受字段缓存（accept_state 已缓存）。
+                let get_v = |pl: &ArtifactProp| -> Option<f32> {
+                    match &pl.value {
+                        ArtifactPropValue::LitNum { v } => Some(*v as f32),
+                        ArtifactPropValue::Field { name: f } => self
+                            .layout
+                            .get(&format!("{path}#{name}#{}", pl.name))
+                            .copied(),
+                    }
+                };
+                let prop_of = |props: &[ArtifactProp], key: &str| -> Option<f32> {
+                    props.iter().find(|pl| pl.name == key).and_then(get_v)
+                };
+                if container.as_str() == "row" {
+                    let mut r =
+                        iced::widget::Row::<UiMsg, iced::Theme, iced_wgpu::Renderer>::with_children(
+                            kids,
+                        );
+                    if let Some(v) = prop_of(props, "spacing") {
+                        r = r.spacing(v);
+                    }
+                    if let Some(v) = prop_of(props, "padding") {
+                        r = r.padding(v);
+                    }
+                    if let Some(v) = prop_of(props, "width") {
+                        r = r.width(iced::Length::Fixed(v));
+                    }
+                    if let Some(v) = prop_of(props, "height") {
+                        r = r.height(iced::Length::Fixed(v));
+                    }
+                    r.into()
+                } else {
+                    let mut c =
+                        iced::widget::Column::<UiMsg, iced::Theme, iced_wgpu::Renderer>::with_children(kids);
+                    if let Some(v) = prop_of(props, "spacing") {
+                        c = c.spacing(v);
+                    }
+                    if let Some(v) = prop_of(props, "padding") {
+                        c = c.padding(v);
+                    }
+                    if let Some(v) = prop_of(props, "width") {
+                        c = c.width(iced::Length::Fixed(v));
+                    }
+                    if let Some(v) = prop_of(props, "height") {
+                        c = c.height(iced::Length::Fixed(v));
+                    }
+                    c.into()
+                }
+            }
+            ArtifactElement::Text {
+                name,
+                slot,
+                visible,
+            } => {
+                let content = self
+                    .texts
+                    .get(instance)
+                    .and_then(|v| v.get(*slot))
+                    .cloned()
+                    .unwrap_or_default();
+                let visible = visible
+                    .as_ref()
+                    .map(|_| self.cond(&format!("{path}#{name}#vis")));
+                let t: UiEl<'_> = iced::widget::container(iced::widget::text(content))
+                    .id(iced::widget::Id::from(format!("{path}#{name}")))
+                    .into();
+                if visible == Some(false) {
+                    // 条件不可见 = 本帧不挂载（真实卸载语义）。
+                    iced::widget::Column::<UiMsg, iced::Theme, iced_wgpu::Renderer>::with_children(
+                        Vec::new(),
+                    )
+                    .into()
+                } else {
+                    t
+                }
+            }
+            ArtifactElement::Button {
+                name,
+                slot,
+                enabled,
+                visible,
+                click,
+            } => {
+                let label = self
+                    .texts
+                    .get(instance)
+                    .and_then(|v| v.get(*slot))
+                    .cloned()
+                    .unwrap_or_default();
+                let is_enabled = enabled
+                    .as_ref()
+                    .map(|_| self.cond(&format!("{path}#{name}#en")))
+                    .unwrap_or(true);
+                let is_visible = visible
+                    .as_ref()
+                    .map(|_| self.cond(&format!("{path}#{name}#vis")))
+                    .unwrap_or(true);
+                if !is_visible {
+                    return iced::widget::Column::<UiMsg, iced::Theme, iced_wgpu::Renderer>::with_children(Vec::new()).into();
+                }
+                let msg = UiMsg::Click {
+                    instance,
+                    dispatch: click.fn_name.clone(),
+                    arg: if click.arg == "index" {
+                        Some(self.rows[instance].def_idx)
+                    } else {
+                        None
+                    },
+                    origin: format!("{path}#{name}"),
+                };
+                let btn: UiEl<'_> = iced::widget::button(iced::widget::text(label))
+                    .on_press_maybe(is_enabled.then_some(msg))
+                    .into();
+                // 容器 id = 元素路径名（真实 bounds 探测面）。
+                iced::widget::container(btn)
+                    .id(iced::widget::Id::from(format!("{path}#{name}")))
+                    .into()
+            }
+            ArtifactElement::If { then, .. } => {
+                unreachable!("if handled by widget_if")
+            }
+            // PLAN-049：区域占位（真实布局参与面）。定尺寸容器＋稳定
+            // widget Id（`{path}#{name}`）；宿主经 Operation 读真实 bounds
+            // 驱动挂载几何与输入逆变换——不猜屏幕常量。场景内容不在本树
+            // 渲染（挂载的 Game2d/Scene3d surface 由组合层采样）。
+            ArtifactElement::Embed {
+                name,
+                dim,
+                width,
+                height,
+                ..
+            } => {
+                let placeholder = iced::widget::container(
+                    iced::widget::text(if dim == "3d" { "3D" } else { "2D" }).size(10),
+                )
+                .width(iced::Length::Fixed(*width as f32))
+                .height(iced::Length::Fixed(*height as f32))
+                .style(|_| iced::widget::container::Style {
+                    background: Some(iced::Color::from_rgb8(24, 26, 32).into()),
+                    border: iced::Border {
+                        color: iced::Color::from_rgb8(90, 96, 110),
+                        width: 1.0,
+                        radius: 0.0.into(),
+                    },
+                    ..Default::default()
+                });
+                iced::widget::container(placeholder)
+                    .id(iced::widget::Id::from(format!("{path}#{name}")))
+                    .into()
+            }
+            ArtifactElement::Instance { name, node } => {
+                let child_path = format!("{path}/{name}");
+                if let Some(idx) = self.instance_index(&child_path) {
+                    let elements = self.rows[idx].elements.clone();
+                    self.widget_tree(&elements, &child_path, idx)
+                } else {
+                    let _ = node;
+                    iced::widget::Column::<UiMsg, iced::Theme, iced_wgpu::Renderer>::with_children(
+                        Vec::new(),
+                    )
+                    .into()
+                }
+            }
+        }
+    }
 }
 
 /// 通用基础 UI 应用：固定 SDK Session ＋ 产物驱动的真实控件树。
@@ -265,6 +637,18 @@ impl NodeUiApp {
     /// 任何其它调用前恰一次（全局数组字面量在此初始化）。
     pub fn new(artifact_json: &str, world_at: &str, name: &str) -> Result<Self, String> {
         let artifact = parse_artifact(artifact_json)?;
+        Self::new_with_artifact(artifact, world_at, name, Api::NodeUi)
+    }
+
+    /// 从已解析产物构造（混合档入口：schema/区域档已由调用方解析冻结；
+    /// `api` 冻结消费身份——048 直连 `Api::NodeUi`，混合档
+    /// `Api::MixedUi2d3d`）。
+    pub fn new_with_artifact(
+        artifact: UiArtifact,
+        world_at: &str,
+        name: &str,
+        api: Api,
+    ) -> Result<Self, String> {
         // 存储身份链（V-S05）：行为源 sha 必须与产物绑定一致；损坏副本在
         // 消费入口具名拒绝（修复后下一次实际 Run 恢复）。
         let world_sha = agp::renderer::capture::sha256_hex(world_at.as_bytes());
@@ -277,7 +661,7 @@ impl NodeUiApp {
         let snapshot = SourceSnapshot::from_bytes_for(
             Path::new(&format!("{name}.at")),
             world_at.as_bytes().to_vec(),
-            Api::NodeUi,
+            api,
         )
         .map_err(|e| format!("admission: {e}"))?;
         let session = Session::new_with_diagnostics(&snapshot.source, |stage, e| {
@@ -626,6 +1010,51 @@ impl NodeUiApp {
         self.dropped_overflow
     }
 
+    /// PLAN-049 运行时路径桥：同一控件树以 String 消息呈现（已接受
+    /// 状态副本；Session 不进入组合内容——Send 隔离见 UiPresentation）。
+    pub fn view_string(&self) -> SurfaceElement<'_, String> {
+        self.presentation_view().view_string()
+    }
+
+    /// 借用呈现视图（048 直连路径：Element 借 NodeUiApp 字段本身）。
+    pub fn presentation_view(&self) -> UiPresentationView<'_> {
+        UiPresentationView {
+            rows: &self.rows,
+            texts: &self.texts,
+            conds: &self.conds,
+            layout: &self.layout,
+        }
+    }
+
+    /// 已接受状态的呈现副本（有界；组合内容唯一携带面）。
+    pub fn presentation(&self) -> UiPresentation {
+        UiPresentation {
+            rows: self.rows.clone(),
+            texts: self.texts.clone(),
+            conds: self.conds.clone(),
+            layout: self.layout.clone(),
+        }
+    }
+
+    /// String 消息回注（解析失败静默丢弃＝非本适配器消息）。
+    pub fn handle_string_message(&mut self, message: &str) {
+        let Some(("click", rest)) = message.split_once('\t') else {
+            return;
+        };
+        let Some((dispatch, rest)) = rest.split_once('\t') else {
+            return;
+        };
+        let Some((arg, origin)) = rest.split_once('\t') else {
+            return;
+        };
+        self.update(UiMsg::Click {
+            instance: 0,
+            dispatch: dispatch.to_string(),
+            arg: arg.parse::<usize>().ok(),
+            origin: origin.to_string(),
+        });
+    }
+
     /// 条件键（collect_bindings 与呈现构建共用；if 序 = 本实例 def 遍历序）。
     fn if_key(path: &str, if_index: usize) -> String {
         format!("{path}#if{if_index}")
@@ -673,6 +1102,58 @@ impl NodeUiApp {
                         *if_i += 1;
                         rec(path, then, if_i, keys);
                     }
+                    // PLAN-049：区域场景 Field 绑定键（与 collect_bindings
+                    // 同键同序同判据——仅 Field 分量；cylinder tx/ty/tz）。
+                    ArtifactElement::Embed {
+                        name: rn, scene, ..
+                    } => {
+                        fn push_if_field(
+                            path: &str,
+                            rn: &str,
+                            en: &str,
+                            pn: &str,
+                            v: &ArtifactPropValue,
+                            keys: &mut Vec<String>,
+                        ) {
+                            if matches!(v, ArtifactPropValue::Field { .. }) {
+                                keys.push(format!("{path}#{rn}#{en}#{pn}"));
+                            }
+                        }
+                        for el in scene {
+                            match el {
+                                ArtifactSceneElem::Quad {
+                                    name: en,
+                                    x,
+                                    y,
+                                    w,
+                                    h,
+                                    ..
+                                } => {
+                                    push_if_field(path, rn, en, "x", x, keys);
+                                    push_if_field(path, rn, en, "y", y, keys);
+                                    push_if_field(path, rn, en, "w", w, keys);
+                                    push_if_field(path, rn, en, "h", h, keys);
+                                }
+                                ArtifactSceneElem::Circle {
+                                    name: en, x, y, r, ..
+                                } => {
+                                    push_if_field(path, rn, en, "x", x, keys);
+                                    push_if_field(path, rn, en, "y", y, keys);
+                                    push_if_field(path, rn, en, "r", r, keys);
+                                }
+                                ArtifactSceneElem::Cylinder {
+                                    name: en,
+                                    translation,
+                                    ..
+                                } => {
+                                    for (pn, v) in ["tx", "ty", "tz"].iter().zip(translation.iter())
+                                    {
+                                        push_if_field(path, rn, en, pn, v, keys);
+                                    }
+                                }
+                            }
+                        }
+                    }
                     ArtifactElement::Instance { .. } => {}
                 }
             }
@@ -681,216 +1162,13 @@ impl NodeUiApp {
         rec(path, elements, &mut if_i, &mut keys);
         keys
     }
-
-    /// def 元素树 → 真实控件（多根包一列；实例化点展开为子实例路径树）。
-    /// if 序 = 本 def 遍历序（Cell 计数与 collect_bindings 同序同键）。
-    fn widget_tree(
-        &self,
-        elements: &[ArtifactElement],
-        path: &str,
-        instance: usize,
-    ) -> SurfaceElement<'_, UiMsg> {
-        let if_i = std::cell::Cell::new(0usize);
-        let children: Vec<UiEl<'_>> = elements
-            .iter()
-            .map(|e| self.widget_if(e, path, instance, &if_i))
-            .collect();
-        let col = iced::widget::Column::<UiMsg, iced::Theme, iced_wgpu::Renderer>::with_children(
-            children,
-        );
-        col.into()
-    }
-
-    #[allow(clippy::only_used_in_recursion)]
-    fn widget_if(
-        &self,
-        el: &ArtifactElement,
-        path: &str,
-        instance: usize,
-        if_i: &std::cell::Cell<usize>,
-    ) -> UiEl<'_> {
-        if let ArtifactElement::If { then, .. } = el {
-            let n = if_i.get();
-            if_i.set(n + 1);
-            let visible = self.cond(&Self::if_key(path, n));
-            // 子树恒遍历（if 序对齐 collect_bindings）；不可见时不挂载。
-            let kids: Vec<UiEl<'_>> = then
-                .iter()
-                .map(|c| self.widget_if(c, path, instance, if_i))
-                .collect();
-            if visible {
-                iced::widget::Column::<UiMsg, iced::Theme, iced_wgpu::Renderer>::with_children(kids)
-                    .into()
-            } else {
-                iced::widget::Column::<UiMsg, iced::Theme, iced_wgpu::Renderer>::with_children(
-                    Vec::new(),
-                )
-                .into()
-            }
-        } else {
-            self.widget(el, path, instance, if_i)
-        }
-    }
-
-    fn widget(
-        &self,
-        el: &ArtifactElement,
-        path: &str,
-        instance: usize,
-        if_i: &std::cell::Cell<usize>,
-    ) -> UiEl<'_> {
-        match el {
-            ArtifactElement::Container {
-                name,
-                container,
-                props,
-                children,
-            } => {
-                let kids: Vec<UiEl<'_>> = children
-                    .iter()
-                    .map(|c| self.widget_if(c, path, instance, if_i))
-                    .collect();
-                // 布局值：字面量或已接受字段缓存（accept_state 已缓存）。
-                let get_v = |pl: &ArtifactProp| -> Option<f32> {
-                    match &pl.value {
-                        ArtifactPropValue::LitNum { v } => Some(*v as f32),
-                        ArtifactPropValue::Field { name: f } => self
-                            .layout
-                            .get(&format!("{path}#{name}#{}", pl.name))
-                            .copied(),
-                    }
-                };
-                let prop_of = |props: &[ArtifactProp], key: &str| -> Option<f32> {
-                    props.iter().find(|pl| pl.name == key).and_then(get_v)
-                };
-                if container.as_str() == "row" {
-                    let mut r =
-                        iced::widget::Row::<UiMsg, iced::Theme, iced_wgpu::Renderer>::with_children(
-                            kids,
-                        );
-                    if let Some(v) = prop_of(props, "spacing") {
-                        r = r.spacing(v);
-                    }
-                    if let Some(v) = prop_of(props, "padding") {
-                        r = r.padding(v);
-                    }
-                    if let Some(v) = prop_of(props, "width") {
-                        r = r.width(iced::Length::Fixed(v));
-                    }
-                    if let Some(v) = prop_of(props, "height") {
-                        r = r.height(iced::Length::Fixed(v));
-                    }
-                    r.into()
-                } else {
-                    let mut c =
-                        iced::widget::Column::<UiMsg, iced::Theme, iced_wgpu::Renderer>::with_children(kids);
-                    if let Some(v) = prop_of(props, "spacing") {
-                        c = c.spacing(v);
-                    }
-                    if let Some(v) = prop_of(props, "padding") {
-                        c = c.padding(v);
-                    }
-                    if let Some(v) = prop_of(props, "width") {
-                        c = c.width(iced::Length::Fixed(v));
-                    }
-                    if let Some(v) = prop_of(props, "height") {
-                        c = c.height(iced::Length::Fixed(v));
-                    }
-                    c.into()
-                }
-            }
-            ArtifactElement::Text {
-                name,
-                slot,
-                visible,
-            } => {
-                let content = self
-                    .texts
-                    .get(instance)
-                    .and_then(|v| v.get(*slot))
-                    .cloned()
-                    .unwrap_or_default();
-                let visible = visible
-                    .as_ref()
-                    .map(|_| self.cond(&format!("{path}#{name}#vis")));
-                let t: UiEl<'_> = iced::widget::container(iced::widget::text(content))
-                    .id(iced::widget::Id::from(format!("{path}#{name}")))
-                    .into();
-                if visible == Some(false) {
-                    // 条件不可见 = 本帧不挂载（真实卸载语义）。
-                    iced::widget::Column::<UiMsg, iced::Theme, iced_wgpu::Renderer>::with_children(
-                        Vec::new(),
-                    )
-                    .into()
-                } else {
-                    t
-                }
-            }
-            ArtifactElement::Button {
-                name,
-                slot,
-                enabled,
-                visible,
-                click,
-            } => {
-                let label = self
-                    .texts
-                    .get(instance)
-                    .and_then(|v| v.get(*slot))
-                    .cloned()
-                    .unwrap_or_default();
-                let is_enabled = enabled
-                    .as_ref()
-                    .map(|_| self.cond(&format!("{path}#{name}#en")))
-                    .unwrap_or(true);
-                let is_visible = visible
-                    .as_ref()
-                    .map(|_| self.cond(&format!("{path}#{name}#vis")))
-                    .unwrap_or(true);
-                if !is_visible {
-                    return iced::widget::Column::<UiMsg, iced::Theme, iced_wgpu::Renderer>::with_children(Vec::new()).into();
-                }
-                let msg = UiMsg::Click {
-                    instance,
-                    dispatch: click.fn_name.clone(),
-                    arg: if click.arg == "index" {
-                        Some(self.rows[instance].def_idx)
-                    } else {
-                        None
-                    },
-                    origin: format!("{path}#{name}"),
-                };
-                let btn: UiEl<'_> = iced::widget::button(iced::widget::text(label))
-                    .on_press_maybe(is_enabled.then_some(msg))
-                    .into();
-                // 容器 id = 元素路径名（真实 bounds 探测面）。
-                iced::widget::container(btn)
-                    .id(iced::widget::Id::from(format!("{path}#{name}")))
-                    .into()
-            }
-            ArtifactElement::If { then, .. } => {
-                unreachable!("if handled by widget_if")
-            }
-            ArtifactElement::Instance { name, node } => {
-                let child_path = format!("{path}/{name}");
-                if let Some(idx) = self.instance_index(&child_path) {
-                    let child_def = &self.artifact.defs[&self.rows[idx].def];
-                    let _ = child_def;
-                    let elements = self.rows[idx].elements.clone();
-                    self.widget_tree(&elements, &child_path, idx)
-                } else {
-                    let _ = node;
-                    iced::widget::Column::<UiMsg, iced::Theme, iced_wgpu::Renderer>::with_children(
-                        Vec::new(),
-                    )
-                    .into()
-                }
-            }
-        }
-    }
 }
 
 /// 条件/布局读取（def 元素声明序；与 binding_keys 同序）。
+fn lit0() -> ArtifactPropValue {
+    ArtifactPropValue::LitNum { v: 0.0 }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn collect_bindings(
     els: &[ArtifactElement],
@@ -980,6 +1258,64 @@ fn collect_bindings(
                     *if_i += 1;
                     rec(then, path, if_i, conds, layout, field_get, eval_cond);
                 }
+                // PLAN-049：区域场景绑定走同一 Field getter 面（key
+                // `{path}#{region}#{elem}#{prop}`；cylinder 三分量 #tx/#ty/#tz）。
+                ArtifactElement::Embed { name, scene, .. } => {
+                    let mut num = |e: &ArtifactPropValue,
+                               key: String,
+                               layout: &mut std::collections::BTreeMap<String, f32>| {
+                        if let ArtifactPropValue::Field { name: f } = e {
+                            if let Some(v) = field_get(f) {
+                                layout.insert(key, v as f32);
+                            }
+                        }
+                    };
+                    for el in scene {
+                        match el {
+                            ArtifactSceneElem::Quad {
+                                name: en,
+                                x,
+                                y,
+                                w,
+                                h,
+                                ..
+                            } => {
+                                num(x, format!("{path}#{name}#{en}#x"), layout);
+                                num(y, format!("{path}#{name}#{en}#y"), layout);
+                                num(w, format!("{path}#{name}#{en}#w"), layout);
+                                num(h, format!("{path}#{name}#{en}#h"), layout);
+                            }
+                            ArtifactSceneElem::Circle {
+                                name: en, x, y, r, ..
+                            } => {
+                                num(x, format!("{path}#{name}#{en}#x"), layout);
+                                num(y, format!("{path}#{name}#{en}#y"), layout);
+                                num(r, format!("{path}#{name}#{en}#r"), layout);
+                            }
+                            ArtifactSceneElem::Cylinder {
+                                name: en,
+                                translation,
+                                ..
+                            } => {
+                                num(
+                                    translation.first().unwrap_or(&lit0()),
+                                    format!("{path}#{name}#{en}#tx"),
+                                    layout,
+                                );
+                                num(
+                                    translation.get(1).unwrap_or(&lit0()),
+                                    format!("{path}#{name}#{en}#ty"),
+                                    layout,
+                                );
+                                num(
+                                    translation.get(2).unwrap_or(&lit0()),
+                                    format!("{path}#{name}#{en}#tz"),
+                                    layout,
+                                );
+                            }
+                        }
+                    }
+                }
                 ArtifactElement::Instance { .. } => {}
             }
         }
@@ -1037,7 +1373,8 @@ impl SurfaceUi for NodeUiApp {
     /// 当前已接受状态的控件树（真实 stock widgets；无 VM 访问）。
     fn view(&self) -> SurfaceElement<'_, UiMsg> {
         let root = &self.rows[0];
-        self.widget_tree(&root.elements, &root.path, 0)
+        self.presentation_view()
+            .widget_tree(&root.elements, &root.path, 0)
     }
 
     /// 真实控件交互结果 → 有界队列（派发在 drain）。

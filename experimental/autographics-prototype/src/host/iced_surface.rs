@@ -409,8 +409,10 @@ impl IcedSurface {
     }
 
     /// Real widget bounds in local logical px for the widget with `id`
-    /// (public focusable traversal — used to click/focus the ACTUAL control
-    /// instead of a hard-coded point).
+    /// (public focusable/container traversal — used to click/focus the
+    /// ACTUAL control instead of a hard-coded point). PLAN-049：container
+    /// 匹配补面（嵌入区域占位容器是真实布局的探测面；stock iced 0.14
+    /// button/container 非 focusable——048 窗口侧 Operation 先例）。
     pub fn widget_bounds<M: Clone>(
         &mut self,
         ui: &dyn SurfaceUi<Message = M>,
@@ -432,6 +434,15 @@ impl IcedSurface {
                 id: Option<&iced_wgpu::core::widget::Id>,
                 bounds: iced_wgpu::core::Rectangle,
                 _state: &mut dyn iced_wgpu::core::widget::operation::Focusable,
+            ) {
+                if id == Some(&self.want) {
+                    self.bounds = Some(bounds);
+                }
+            }
+            fn container(
+                &mut self,
+                id: Option<&iced_wgpu::core::widget::Id>,
+                bounds: iced_wgpu::core::Rectangle,
             ) {
                 if id == Some(&self.want) {
                     self.bounds = Some(bounds);

@@ -734,6 +734,23 @@ impl SurfaceRuntime {
             })
     }
 
+    /// PLAN-049：更新挂载几何（真实 UI layout 驱动；图侧 `SetMount` 同一
+    /// 原子校验/脏传播——受影响消费链在下一帧重采样，输出不滞留旧 rect）。
+    pub fn set_portal_mount(
+        &mut self,
+        portal: PortalId,
+        mount: MountKind,
+    ) -> Result<(), CompositionError> {
+        self.graph
+            .submit_one(CompositionChange::SetMount(portal, mount))
+            .map(|_| ())
+            .map_err(|e| {
+                e.into_iter()
+                    .next()
+                    .unwrap_or(CompositionError::UnknownPortal(portal))
+            })
+    }
+
     /// Drop a surface's GPU slot (after the graph allows the removal).
     pub fn drop_surface(&mut self, id: SurfaceId) -> Result<(), CompositionError> {
         self.graph
@@ -1026,6 +1043,62 @@ impl SurfaceRuntime {
             .find(|v| v.desc.presents_to_window)
             .map(|v| v.desc.surface)
             .filter(|s| self.slots.contains_key(s))
+    }
+
+    /// PLAN-049：2D 内容命令面的宿主适配访问（状态呈现者重建命令；
+    /// 访问后标记内容脏——消费链同帧重采样）。非 2D surface 返回 None。
+    pub fn with_game2d_mut<R>(
+        &mut self,
+        id: SurfaceId,
+        f: impl FnOnce(&mut Game2dContent) -> R,
+    ) -> Option<R> {
+        let mut slot = self.slots.remove(&id)?;
+        let out = match &mut slot.content {
+            SurfaceContent::Game2d(game) => Some(f(game)),
+            _ => None,
+        };
+        self.slots.insert(id, slot);
+        if out.is_some() {
+            self.graph.mark_content_dirty(id);
+        }
+        out
+    }
+
+    /// PLAN-049：3D 内容实例/相机面的宿主适配访问（同上；3D 每帧重渲染，
+    /// 指纹差异自动驱动消费链）。闭包同时取得本运行时唯一 GPU（资源上传
+    /// 必须同设备——单设备合同）。
+    pub fn with_scene3d_mut<R>(
+        &mut self,
+        id: SurfaceId,
+        f: impl FnOnce(&mut Scene3dContent, &GpuDevice) -> R,
+    ) -> Option<R> {
+        let mut slot = self.slots.remove(&id)?;
+        let out = match &mut slot.content {
+            // slot 已离开 self：与 self.gpu 的不可变借用不相交。
+            SurfaceContent::Scene3d(scene) => Some(f(scene, &self.gpu)),
+            _ => None,
+        };
+        self.slots.insert(id, slot);
+        if out.is_some() {
+            self.graph.mark_content_dirty(id);
+        }
+        out
+    }
+
+    /// PLAN-049：UI 应用逻辑的宿主适配访问（downcast 前的 trait 面；
+    /// 状态呈现者 drain/场景读取经此进入，UI 始终是运行时的单一持有者）。
+    pub fn with_ui_mut<R>(
+        &mut self,
+        id: SurfaceId,
+        f: impl FnOnce(&mut dyn crate::host::iced_surface::SurfaceUi<Message = UiMessage>) -> R,
+    ) -> Option<R> {
+        let mut slot = self.slots.remove(&id)?;
+        let out = match &mut slot.content {
+            SurfaceContent::Iced(iced) => Some(f(iced.ui.as_mut())),
+            _ => None,
+        };
+        self.slots.insert(id, slot);
+        out
     }
 
     fn render_content(
