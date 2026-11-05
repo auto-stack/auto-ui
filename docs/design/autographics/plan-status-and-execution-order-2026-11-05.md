@@ -1,8 +1,8 @@
 # AGE全计划状态与执行顺序（2026-11-05）
 
-本表范围为迁仓后auto-ui的AGE合同与ag-examples全部内容合同，不把其它AutoUI路线或auto-lang历史号重复计数。历史861/874/875/877/878/879/880及882/883映射仍按原档；本表不重写历史。截止本轮观察，两仓共56份当前身份合同：**48份已交付/归档、8份未完成**；其中研究交付不等于产品能力。没有将源码迁移22/22或Plan总数当M2完成比例。
+本表范围为迁仓后auto-ui的AGE合同与ag-examples全部内容合同，不把其它AutoUI路线或auto-lang历史号重复计数。历史861/874/875/877/878/879/880及882/883映射仍按原档；本表不重写历史。截止本轮观察，两仓共57份当前身份合同：**49份已交付/归档、8份未完成**；其中研究交付不等于产品能力。没有将源码迁移22/22或Plan总数当M2完成比例。
 
-证据口径：本轮读当前合同/归档最终收据和相关canonical，核已列交付提交均为各仓HEAD祖先，并核当前注册树/实现提交。没有重跑48份历史GPU或逐AC重审；独立复审/原生OS/历史来源的已知限制照原收据保留。旧部分frontmatter仍停5/10、6/10或7/10，按最终交付/落地主张与实仓核对，不能据勾选alone推断；也不因此重开归档。UI039主目录旧draft与归档同身份重复，只计已交付一次，不代owner删除旧影子。
+证据口径：本轮读当前合同/归档最终收据和相关canonical，核已列交付提交均为各仓HEAD祖先，并核当前注册树/实现提交。没有重跑49份历史GPU或逐AC重审；独立复审/原生OS/历史来源的已知限制照原收据保留。旧部分frontmatter仍停5/10、6/10或7/10，按最终交付/落地主张与实仓核对，不能据勾选alone推断；也不因此重开归档。UI039主目录旧draft与归档同身份重复，只计已交付一次，不代owner删除旧影子。
 
 ## 1. 当前未完成合同（8份）
 
@@ -17,7 +17,7 @@
 | [AG022国风首切片/three.js盘点](../../../../ag-examples/docs/plans/022-age-m3-farming-slice-and-threejs-inventory.md) | drafting/r1/0-10，无ag-022树或研究结论 | T-01..05可独立准备，T-06等055实际研究交付（含no-go） |
 | [AG023俯视组合小例](../../../../ag-examples/docs/plans/023-age-m3-topdown2d-example.md) | 本批drafting/r1/0-10，无树/实施 | T-01/02准备可先；T-03等058实际交付/独立final/准确来源、AG022实际输入及M2收口 |
 
-## 2. auto-ui已交付AGE合同（29份）
+## 2. auto-ui已交付AGE合同（30份）
 
 | 合同 | 范围 | 交付提交/当前边界 |
 |---|---|---|
@@ -26,6 +26,7 @@
 | [UI004](../../plans/archived/004-autographics-public-images-and-sprite-frames.md) | AutoGraphics公共图片资源与2D精灵帧 | 已交付/归档 `e0fce13`；原支持/预算与清理边界依归档/canonical，非全M2结论 |
 | [UI005](../../plans/archived/005-autographics-textured-models-and-uv.md) | AutoGraphics有限纹理模型与UV资源闭包 | 已交付/归档 `351919c`；原支持/预算与清理边界依归档/canonical，非全M2结论 |
 | [UI006](../../plans/archived/006-autographics-node-animation-and-visual-facing.md) | AutoGraphics无蒙皮节点动画与视觉朝向 | 已交付/归档 `c681663`；原支持/预算与清理边界依归档/canonical，非全M2结论 |
+| [UI008](../../plans/archived/008-plan004-identity-closure.md) | PLAN004交付身份闭包修复 | 已交付/归档 `0261ae9`；固定消费身份修复属于AGE，不因文件名不含autographics而漏计 |
 | [UI011](../../plans/archived/011-autographics-g2-full-loop-budget-feasibility.md) | AutoGraphics二维完整玩法整链预算验证 | 已交付/归档 `c4143af`；研究no_go_current_profile保留，不抵产品可行性 |
 | [UI012](../../plans/archived/012-autographics-public-audio-and-accepted-cues.md) | AutoGraphics公共音频资源与接受后一次播放 | 已交付/归档 `78632af`；32等原包络/native声学边界按收据 |
 | [UI013](../../plans/archived/013-autographics-public-hud-and-presentation-state.md) | AutoGraphics公共HUD与共同呈现状态 | 已交付/归档 `8b1e799`；原支持/预算与清理边界依归档/canonical，非全M2结论 |
@@ -90,3 +91,5 @@
 UI056/057为同时取号的其它AutoUI路线（多文件reload/schema与Vue Store隔离），052/053等也不计AGE；本批锁号核主/归档/所有注册树后取058/059，next060。AG取023，next024。跨仓同号不是共享身份或材料目录owner。
 
 048/049和旧部分计划已交付不等所有独立证据债自动消除；完整M2仍未认领。现有静态核查/归档读取不替代新Plan work/review的真实运行。状态可能随其它会话继续变化；本表为本轮证据快照，最新合同与实际树/提交高于日期旧文字。未修改任何在途合同/归档/canonical/SDK/生成物/实现树，不创建agent。
+
+统计校正：本轮最终逐项检查补入UI008（交付0261ae9为主HEAD祖先），故总数为34个UI AGE身份＋23个内容身份＝57，49交付/8未完。不能只按文件名含autographics/age过滤整条路线；UI008归档/提交/历史身份不改。
