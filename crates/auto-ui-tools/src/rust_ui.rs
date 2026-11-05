@@ -7482,8 +7482,13 @@ fn generate_module_fn_rust(
         .iter()
         .map(|p| format!("{}: {}", p.name.as_str(), type_to_rust_str(&p.ty)))
         .collect();
+    // PLAN-052：未声明返回型但体含 `return expr` 的模块 fn——局部微型
+    // 推断（calendar build_month_grid `return cells` / month_name
+    // `return names[i]` 株；此前恒 () 致调用点 E0308）。
     let ret = match &fn_decl.ret {
-        auto_lang_core::ast::Type::Void => String::new(),
+        auto_lang_core::ast::Type::Void => {
+            infer_module_fn_ret(fn_decl).map(|k| format!(" -> {}", k)).unwrap_or_default()
+        }
         t => format!(" -> {}", type_to_rust_str(t)),
     };
     let body = generator.generate_handler_body(&auto_ui_compiler::aura::LogicPayload::AstStmts(
@@ -7496,6 +7501,103 @@ fn generate_module_fn_rust(
         ret,
         body
     )
+}
+
+
+/// PLAN-052：模块 fn 返回型微型推断——首条 `return expr` 的类型解析：
+/// 字面量直判；标识符/索引查体局部声明表（`var x = []` → Vec<Value>、
+/// `let names [12]str = [...]` → Vec<String>、串接 → String）。
+fn infer_module_fn_ret(fn_decl: &auto_lang_core::ast::Fn) -> Option<String> {
+    use auto_lang_core::ast::{Expr, Stmt};
+    let mut locals: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    for st in &fn_decl.body.stmts {
+        if let Stmt::Store(store) = st {
+            let inferred = match &store.expr {
+                Expr::Array(_) => Some("Vec<serde_json::Value>".to_string()),
+                Expr::Str(_) | Expr::CStr(_) | Expr::FStr(_) => Some("String".to_string()),
+                Expr::Int(_) => Some("i32".to_string()),
+                Expr::Bool(_) => Some("bool".to_string()),
+                _ => None,
+            };
+            let declared = match &store.ty {
+                auto_lang_core::ast::Type::Void => None,
+                t => Some(type_to_rust_str(t)),
+            };
+            if let Some(t) = declared.or(inferred) {
+                locals.insert(store.name.as_str().to_string(), t);
+            }
+        }
+    }
+    let ret_expr = self_find_return(&fn_decl.body.stmts)?;
+    Some(expr_ret_type(&ret_expr, &locals))
+}
+
+fn self_find_return(stmts: &[auto_lang_core::ast::Stmt]) -> Option<auto_lang_core::ast::Expr> {
+    use auto_lang_core::ast::{Expr, Stmt};
+    for st in stmts {
+        match st {
+            Stmt::Return(e) if !matches!(e.as_ref(), Expr::Nil) => return Some((**e).clone()),
+            Stmt::If(i) => {
+                for b in &i.branches {
+                    if let Some(e) = self_find_return(&b.body.stmts) {
+                        return Some(e);
+                    }
+                }
+                if let Some(eb) = &i.else_ {
+                    if let Some(e) = self_find_return(&eb.stmts) {
+                        return Some(e);
+                    }
+                }
+            }
+            Stmt::Block(b) => {
+                if let Some(e) = self_find_return(&b.stmts) {
+                    return Some(e);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+fn expr_ret_type(
+    e: &auto_lang_core::ast::Expr,
+    locals: &std::collections::HashMap<String, String>,
+) -> String {
+    use auto_lang_core::ast::Expr;
+    match e {
+        Expr::Int(_) => "i32".to_string(),
+        Expr::Bool(_) => "bool".to_string(),
+        Expr::Str(_) | Expr::CStr(_) | Expr::FStr(_) => "String".to_string(),
+        Expr::Ident(n) => locals.get(n.as_str()).cloned().unwrap_or_else(|| "String".to_string()),
+        Expr::Index(target, _) => {
+            let t = match target.as_ref() {
+                Expr::Ident(n) => locals.get(n.as_str()).cloned(),
+                _ => None,
+            };
+            t.and_then(|ty| {
+                ty.strip_prefix("Vec<")
+                    .and_then(|x| x.strip_suffix('>'))
+                    .map(|x| x.to_string())
+            })
+            .unwrap_or_else(|| "String".to_string())
+        }
+        Expr::Bina(l, op, r) if matches!(op, auto_val::Op::Add) => {
+            fn stringy(e: &Expr) -> bool {
+                match e {
+                    Expr::Str(_) | Expr::CStr(_) | Expr::FStr(_) | Expr::Call(_) => true,
+                    Expr::Bina(il, _, ir) => stringy(il) || stringy(ir),
+                    _ => false,
+                }
+            }
+            if stringy(l) || stringy(r) {
+                "String".to_string()
+            } else {
+                "i32".to_string()
+            }
+        }
+        _ => "String".to_string(),
+    }
 }
 
 /// Convert an Auto Type to a Rust type string (standalone, mirrors RustGenerator::auto_type_to_rust).

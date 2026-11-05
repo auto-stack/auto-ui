@@ -11416,7 +11416,14 @@ impl RustGenerator {
                 if matches!(expr.as_ref(), auto_lang_core::ast::Expr::Nil) {
                     "return".to_string()
                 } else {
-                    format!("return {}", self.ast_expr_to_rust(expr))
+                    // PLAN-052：Vec 元素索引返回值补 clone（String 元素
+                    // move 出借位 E0507 株；Copy 型 clone 冗余但合法）。
+                    let e = self.ast_expr_to_rust(expr);
+                    if matches!(expr.as_ref(), auto_lang_core::ast::Expr::Index(..)) {
+                        format!("return {}.clone()", e)
+                    } else {
+                        format!("return {}", e)
+                    }
                 }
             }
             auto_lang_core::ast::Stmt::Block(body) => {
@@ -14688,11 +14695,17 @@ fn infer_expr_ret_kind(e: &auto_lang_core::ast::Expr) -> &'static str {
             Expr::Bool(_) => "bool",
             Expr::Str(_) | Expr::CStr(_) | Expr::FStr(_) => "String",
             Expr::Bina(l, op, r) if matches!(op, auto_val::Op::Add) => {
-                let str_side = matches!(l.as_ref(), Expr::Str(_) | Expr::CStr(_) | Expr::FStr(_))
-                    || matches!(r.as_ref(), Expr::Str(_) | Expr::CStr(_) | Expr::FStr(_))
-                    || matches!(l.as_ref(), Expr::Call(_))
-                    || matches!(r.as_ref(), Expr::Call(_));
-                if str_side { "String" } else { "i32" }
+                // PLAN-052 修正：左结合嵌套串接（`a+b+c`）的外层左操作数
+                // 是 Bina 非 Call/Str——递归探字符串性叶（calendar
+                // __call_FmtDate 误推 i32 株）。
+                fn stringy(e: &auto_lang_core::ast::Expr) -> bool {
+                    match e {
+                        Expr::Str(_) | Expr::CStr(_) | Expr::FStr(_) | Expr::Call(_) => true,
+                        Expr::Bina(il, _, ir) => stringy(il) || stringy(ir),
+                        _ => false,
+                    }
+                }
+                if stringy(l) || stringy(r) { "String" } else { "i32" }
             }
             _ => "String",
         }
