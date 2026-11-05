@@ -123,3 +123,63 @@ AUTO_UI_ROOT=<ui-052>/auto-ui
 - `follow(username)` 由 api stub 生成零参（merged client 未覆盖该端点，
   中段路径参数 `/profiles/:username/follow` 解析面在 auto-lang parse_api_module，
   非本仓）——按 G3 边界需要在 auto-ui 侧补 stub 参数或由 054/auto-lang 消费。
+
+## T-02 终态（2026-11-05 19:16，sweep-r8 干净态）
+
+生成器 = ui-052 树 `target/debug/auto-ui-tool.exe`（提交 886a22de + 本轮收尾提交），
+按族修完后**全量再生成**（删除 front member、保留 `*-back`）。
+
+| app | exit | 错误 | 发布 exe（大小/时间） |
+|---|---|---|---|
+| notes | 0 | 0 | notes.exe 84MB 19:13:20 |
+| todo | 0 | 0 | todo.exe 83MB 19:13:46 |
+| calendar | 0 | 0 | calendar.exe 83MB 19:14:34 |
+| database | 0 | 0 | database.exe 84MB 19:14:59 |
+| chat | 0 | 0 | chat.exe 84MB 19:16:16 |
+| blog | 0 | 0 | realworld.exe 85MB 19:15:55 |
+| 002-counter | 0 | 0 | （回归对照） |
+
+### blog 191→0 的 router 族（本轮实现，非禁用）
+
+`routes{}` 多路由/带参路由此前走 Outlet 位 `compile_error!`（P039 D5 拒绝门）。
+本轮在生成器侧做静态路由发射：
+
+1. 路由表：`const __ROUTES: &[(&str,&str)]` + `__route_match`（按 `/` 分段，
+   静态段相等 + `:param` 抽参 → `HashMap<String,String>`）。
+2. App 路由态：`__route: String` / `__route_params`；消息 `__Navigate(String)`
+   → `__apply_route`（设置当前路径/参数表、同步目标页参数与 store、重放页
+   `Init`）。
+3. outlet 渲染：`match __route_match(...)` → 目标页持久子件 clone（同步参数表 +
+   canonical store）→ `view().map_msg(|m| AppMsg::<Page>(m))`。
+4. `router.push(x)`：根 → `self.__apply_route(&x)`；页面件 → `__nav_request`
+   由父 App 转发后消费（`self.<page>.__nav_request.take()`）。
+5. `router.param("slug")` → `self.__route_params.get(...)`。
+6. `link (to:)`：路由上下文发 `View::button(label).style(...).on_click(__Navigate)`；
+   非路由上下文维持原容器渲染（零回归）。
+7. 多 store 页：页面 canonical store 按文件 `use` 首导入映射（`WIDGET_CANONICAL_STORE`
+   文本级预扫），父 App 用对应别名字段双向同步（author→draft_store、
+   login→store(AuthStore)、home/profile/article_detail/editor→article_store）。
+8. `follow(username)` E0061：merged/CRUD POST 桩签名此前只取 body 参数，丢弃
+   path 参数（`/profiles/:username/follow`）——改为按契约全参发签名。
+
+### AC-03 冷启动冒烟（notes）
+
+```
+exe=D:\...\auto-notes-45ee43a7\bin\debug\notes.exe
+alive_after_8s=True            # 进程存活（窗口创建成功）
+has_exited=True  exit_code=0   # CloseMainWindow 后正常退出
+```
+
+### AC-04 diff 范围
+
+`git diff --name-only 8ed8a2e1..HEAD` 仅：
+`crates/auto-ui-compiler/src/ui_gen/rust.rs`、`crates/auto-ui-tools/src/rust_ui.rs`、
+`docs/plans/052-*.md`、`docs/plans/evidence/052/*`、054 计划文档（并行会话交接）。
+auto-lang/auto-web/auto-down 三兄弟树 `dirty=0`。
+
+### 环境噪声（非生成器缺陷，已排除）
+
+`sweep` 删除 `*-back` 目录后首次 `auto build` 的 backend refresh 偶发 exit -1；
+`-back` crate 手工 `cargo build` exit 0，保留 `*-back` 后 sweep 全绿。另一次
+sweep 出现 3 app 瞬时 -1，定位为**上一轮残留 cargo 进程占 target 锁**（4 个
+orphan cargo 存活）——清理后 sweep-r8 全绿。两例均与生成器 diff 无关。

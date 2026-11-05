@@ -102,24 +102,9 @@ fn view_decl_has_pascal_child(node: &auto_ui_dialect::ast::ViewNode) -> bool {
 /// 声明序 → WIDGET_PROP_ORDERS 预注册（app.at 字母序先于 components/
 /// 编译，调用点按声明序重排需要跨文件视图；生成期组件自注册仍在 =
 /// 双保险，幂等）。klondike CardFace 参数错位株的配套面。
-fn collect_component_prop_orders(
-    at_files: &[std::path::PathBuf],
-    stores: &[auto_ui_dialect::ast::StoreDecl],
-    project_dir: &Path,
-) {
+fn collect_component_prop_orders(at_files: &[std::path::PathBuf]) {
     for at_path in at_files {
-        if let Ok(raw) = std::fs::read_to_string(at_path) {
-            // PLAN-052：与 compile_at_file 同款预处理——dep 样式常量注入 +
-            // 样式配方预注册（否则 `use stylekit.styles: …` 的文件解析失败，
-            // 路由页 canonical store 映射漏登记）。
-            let code = inject_dep_style_constants(&raw, project_dir);
-            let base_dir = at_path
-                .parent()
-                .unwrap_or_else(|| Path::new("."))
-                .to_path_buf();
-            let _ = auto_ui_compiler::design_tokens::recipe::prepare_style_recipe_imports(
-                &base_dir, &code,
-            );
+        if let Ok(code) = std::fs::read_to_string(at_path) {
             let session = CompilerSession::ui().with_backend("rust");
             let mut parser = Parser::from(code.as_str()).with_session(session);
             if let Ok(ast) = parser
@@ -127,56 +112,8 @@ fn collect_component_prop_orders(
                 .map(auto_ui_dialect::UiCode)
                 .and_then(|ui| auto_ui_compiler::ui_ast::lower_ui(&ui).map(|lowered| lowered.ui))
             {
-                // PLAN-052：本文件 store 导入序（首导入 = canonical）——
-                // 路由页 store 归属映射（父 App 同步/回写别名字段用）。
-                let mut file_stores: Vec<String> = Vec::new();
-                for stmt in ast.core_stmts() {
-                    if let auto_lang_core::ast::Stmt::Use(u) = stmt {
-                        for item in &u.items {
-                            let name = item.as_str().to_string();
-                            // PLAN-052：`use draft_store: DraftStore` 的 item
-                            // 是别名（snake_case），按 store 型名或蛇形别名
-                            // 双径匹配。
-                            let found = stores.iter().find(|s| {
-                                s.name.as_str() == name
-                                    || auto_ui_compiler::ui_gen::rust::store_alias_of(
-                                        s.name.as_str(),
-                                    ) == name
-                            });
-                            if let Some(store) = found {
-                                let ty = store.name.as_str().to_string();
-                                if !file_stores.contains(&ty) {
-                                    file_stores.push(ty);
-                                }
-                            }
-                        }
-                    }
-                }
                 for stmt in ast.domain_stmts() {
                     if let auto_ui_dialect::UiStmt::WidgetDecl(widget_decl) = stmt {
-                        // PLAN-052：组件 canonical store + Init 处理器登记。
-                        {
-                            let wname = widget_decl.name.as_str().to_string();
-                            if let Some(canon) = file_stores.first() {
-                                auto_ui_compiler::ui_gen::rust::WIDGET_CANONICAL_STORE.with(|m| {
-                                    m.borrow_mut().insert(wname.clone(), canon.clone());
-                                });
-                            }
-                            let has_init = widget_decl
-                                .on
-                                .as_ref()
-                                .map_or(false, |on| {
-                                    on.handlers
-                                        .iter()
-                                        .any(|h| h.pattern.contains("Init"))
-                                })
-                                || widget_decl.lifecycle.iter().any(|l| l.name == "Init");
-                            if has_init {
-                                auto_ui_compiler::ui_gen::rust::WIDGET_HAS_INIT.with(|s| {
-                                    s.borrow_mut().insert(wname);
-                                });
-                            }
-                        }
                         let order: Vec<String> = widget_decl
                             .props
                             .iter()
@@ -256,6 +193,65 @@ fn collect_component_prop_orders(
                         });
                     }
                 }
+            }
+        }
+    }
+}
+
+/// PLAN-052：路由页 canonical store / Init 处理器**文本级**预扫——不解析
+/// AST（app.at 字母序先于 pages 编译，父 App 要在此前拿到页面 store 归属；
+/// 解析全文件需 dep 样式常量注入/配方预注册，配送期会与后台 refresh 步骤
+/// 抢全局注册表并导致进程异常退出）。.at 头部 `use <alias>: <Store>` 与
+/// `widget <name>` 均为行首简单形态，行扫描足够且零副作用。
+fn collect_route_store_bindings(
+    at_files: &[std::path::PathBuf],
+    stores: &[auto_ui_dialect::ast::StoreDecl],
+) {
+    let store_by_name: std::collections::HashMap<&str, &str> = stores
+        .iter()
+        .map(|s| (s.name.as_str(), s.name.as_str()))
+        .collect();
+    for at_path in at_files {
+        let Ok(text) = std::fs::read_to_string(at_path) else {
+            continue;
+        };
+        let mut file_stores: Vec<String> = Vec::new();
+        let mut widget_names: Vec<String> = Vec::new();
+        for line in text.lines() {
+            let t = line.trim();
+            if let Some(rest) = t.strip_prefix("use ") {
+                // use <path>: <Sym1>, <Sym2>
+                let Some((_, syms)) = rest.split_once(':') else {
+                    continue;
+                };
+                for sym in syms.split(',') {
+                    let sym = sym.trim();
+                    if store_by_name.contains_key(sym) && !file_stores.iter().any(|s| s == sym) {
+                        file_stores.push(sym.to_string());
+                    }
+                }
+            } else if let Some(rest) = t.strip_prefix("widget ") {
+                let name: String = rest
+                    .chars()
+                    .take_while(|c| c.is_alphanumeric() || *c == '_')
+                    .collect();
+                if !name.is_empty() {
+                    widget_names.push(name);
+                }
+            }
+        }
+        let canonical = file_stores.first().cloned();
+        let has_init = text.contains("Init ->") || text.contains("Init->");
+        for w in widget_names {
+            if let Some(canon) = &canonical {
+                auto_ui_compiler::ui_gen::rust::WIDGET_CANONICAL_STORE.with(|m| {
+                    m.borrow_mut().insert(w.clone(), canon.clone());
+                });
+            }
+            if has_init {
+                auto_ui_compiler::ui_gen::rust::WIDGET_HAS_INIT.with(|s| {
+                    s.borrow_mut().insert(w);
+                });
             }
         }
     }
@@ -556,7 +552,10 @@ fn regenerate_code_only(project_dir: &Path, rust_dir: &Path, src_: &PacSource) -
     // Plan 371 Task 22c: cross-file component state fields.
     let component_fields = collect_component_state_fields(&at_files);
     // PLAN-039 T-14（组件传型）：props 声明序预注册（构造参数重排）。
-    collect_component_prop_orders(&at_files, &all_stores, project_dir);
+    collect_component_prop_orders(&at_files);
+    // PLAN-052：路由页 canonical store / Init 文本级预扫（父 App 先行生成
+    // 需要跨文件视图；见函数头注）。
+    collect_route_store_bindings(&at_files, &all_stores);
     // PLAN-052：项目内模块 fn 的 BARE_FN_SIGS 预注册——此前仅 dep 模块
     // 内嵌路径注册（3333），项目本地模块（calendar_util.at 族）无签名，
     // 消费文件（字母序先编译）的 computed 返回型落空默认 String
@@ -841,7 +840,10 @@ pub(crate) fn compile_rust_ui_app(
     // Plan 371 Task 22c: cross-file component state fields.
     let component_fields = collect_component_state_fields(&at_files);
     // PLAN-039 T-14（组件传型）：props 声明序预注册（构造参数重排）。
-    collect_component_prop_orders(&at_files, &all_stores, project_dir);
+    collect_component_prop_orders(&at_files);
+    // PLAN-052：路由页 canonical store / Init 文本级预扫（父 App 先行生成
+    // 需要跨文件视图；见函数头注）。
+    collect_route_store_bindings(&at_files, &all_stores);
     // PLAN-052：项目内模块 fn 的 BARE_FN_SIGS 预注册——此前仅 dep 模块
     // 内嵌路径注册（3333），项目本地模块（calendar_util.at 族）无签名，
     // 消费文件（字母序先编译）的 computed 返回型落空默认 String
