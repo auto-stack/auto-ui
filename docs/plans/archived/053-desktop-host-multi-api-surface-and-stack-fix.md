@@ -202,6 +202,17 @@ auto-os/PLAN-054 vue 轨 8 app 嵌载的具名最小前置。
 - batch due check：auto-lang 主检出 `.last-batch-regression.json` timestamp `2026-11-05T12:21:00Z`、last_covered_plan_id=937，当前落地为 UI053 的最小 parser 修复，无新落地 %5 语言计划、距收据不足 48h；not due，不重复 whole catalog。既有批次 known_reds_only 保持原样，与本次 parser 145 PASS 区分。
 - archival intent：`completion_kind: delivered`，从 active 路径移至 `docs/plans/archived/053-desktop-host-multi-api-surface-and-stack-fix.md`；T-00..T-04 5/6 done，T-05 仅 guarded worktree/scratch cleanup pending。archive/docs commit 与 cleanup 回执稍后补齐；没有未解决实施问题或证据 hold。
 
+
+### cleanup recovery checkpoint（已交付，工具策略阻塞收尾）
+
+- archived checkpoint：`50dfa8e6` 已在 master 提交真实归档文件，active Plan 不再存在。实际 gate 核对归档身份、status/completion_kind、5/6 task 状态、两个 delivery ancestry 与无相对坏链均通过。初版 probe 用原始 bytes 比较 Git LF 与 Windows CRLF 导致伪失败；按规范化文本重核后相同，没有文档内容缺失。首条组合命令未传播该 Python 非零码，已停止此类组合并在后续命令显式检查退出码；不得把初版 probe 记成 PASS。
+- 已清理：四个树逐一 fresh `wt-guard.sh` clean、绝对路径/owner/clean status 核对后 `git worktree remove` 成功；UI `codex/plan-053-dev` 与 lang `codex/ui-plan-053-parser-fix` 均经 merged branch 检查删除。四仓 worktree 注册中无 ui-053，对应树已不存在；build intermediates 随树删除，未搬运。
+- 未清理：空组目录 `D:/autostack/.wt/ui-053` 和整个 scratch `D:/autostack/plan-artifacts/plan-053`。工具执行自动审批两次拒绝：第一条为空组校验+清理及 scratch no-follow link 清理；第二条已缩为仅核验并删除显式空组目录。两次均在执行前返回 `Rejected ... blocked by policy`，没有提供更具体理由，不能通过换工具/换语法绕过。前面成功的 worktree 删除不意味着该最终目录删除已成功。
+- 只读 no-follow inventory：scratch 92197 regular files、1145696660 bytes（约1.07GiB，不含链接目标），1446 symlink/junction entries；group_entries=[]。目录原始内容保留，没有盲删链接目标。registry `D:/autostack/plan-artifacts/.retention/policy.json` 记录具名 hold，owner=当前 PLAN-053 goal、reason=自动审批拒绝最终目录清理、closure=恢复该目录清理能力后 no-follow 摘本 scope 链接、全删 scratch 与空组、复核并提交 cleaned 收据。
+- 恢复边界：只继续 cleanup / registry / final docs receipt，不重做实施、复审、145 parser 或八应用验收；若主分支后续前进，保留已交付历史，不重放旧 Spec。T-05 保持未勾选、current_step=5/6；代码与规范已交付，整个 goal 尚未全部完成。
+- stage: merge | key: PLAN-053:r2 | outcome: blocked (cleanup only) | delivery_commit: UI 9a94d568778793700b2718ec0a949d60a0d38bcf / lang 61207576b7676148499854f9df4b2d019a476972 | checkpoints: prepared/landed/canonical_verified/archived done; cleaned partial | archive_commit: 50dfa8e6 | archive_path: docs/plans/archived/053-desktop-host-multi-api-surface-and-stack-fix.md | pending: empty group + scratch scope | next: restore deletion capability; cleanup recovery only
+- stage: goal | plan_id: PLAN-053 | plan_revision: r2 | round: 5 | from: merge | to: user | status: archived | outcome: blocked | worktree: removed all four; empty group remains | commit: UI 9a94d568 / lang 61207576b / archive 50dfa8e6 | next: user (cleanup tool policy)
+
 ## 10. 待澄清事项
 
 ### Q-053-01（2026-11-05，已由用户允许最小跨仓根修关闭）
@@ -218,3 +229,7 @@ auto-os/PLAN-054 vue 轨 8 app 嵌载的具名最小前置。
 
 
 
+
+### Q-053-02（清理工具策略，未关闭）
+
+自动审批拒绝对已核验空组 `D:/autostack/.wt/ui-053` 的删除，返回 `blocked by policy`。代码/Spec/归档已交付，只需恢复最终目录清理能力后继续收尾；不需要再次批准跨仓根修。scratch 含1446目录链接，恢复后须先 no-follow 摘链接，再删除本 scope，不穿透外部目标。
