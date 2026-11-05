@@ -317,3 +317,8 @@ back 侧 `auto-notes-...-back` 是完整 axum/DB 实现。故 iced 桌面上任�
   - `message.rs`：新增 `InputMsg::Action { wid, name, arg }`（tag 11，encode+decode 完成，提交见 auto-ui 分支）。
   - 待接线：child 侧 `headless.rs::on_input` 的泛型 `C: Component` 无法构造 `C::Msg`——需在具体 DynamicComponent 的 Surface 实现处派发 `component.on(DynamicMessage::String(name))`；宿主 `session::Msg` 臂对 broker client 转发 Action（当前只对 in-process 组件 on）。
   - 复验目标：calendar `NextMonth` 翻月、`SelectDay` 选日。
+
+- stage: work | plan_id: auto-ui/PLAN-060 | plan_revision: 1 | round: 20 | task_ids: T-07 | outcome: Action 下行接通（宿主+child）；旧 app 二进制不兼容导致窗口关闭 | evidence:
+  - 实现：`Component::dispatch_named` 默认方法 + `DynamicComponent` 实现（`call_handler_for("App", name, …)`）；`RqProjector::on_input`/`headless::on_input` 消费 `InputMsg::Action`；宿主 `shell_state` 的 `Msg` 臂先对 broker client 发 Action，未命中再走 in-process `on()`。非穷尽 match 已在 editor_frame/input_to_iced_events 补臂。
+  - 实测：`msg 016-calendar NextMonth` 后 **calendar 窗口消失**；日志无 `[plan060] action` 记录。根因：`calendar.exe` 是旧构建（`auto-calendar-85dd4543`），其 auto-ui 不含 tag 11 → 解码失败断链 → 宿主回收窗口。
+  - 下一步：app 侧用新 auto-ui 重建（协议版本升级）；或在握手加 capability，未声明支持时不下发 Action（向后兼容）。
