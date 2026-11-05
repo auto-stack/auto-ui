@@ -1646,8 +1646,10 @@ fn merged_absorb(project_dir: &Path, _module: &auto_lang_core::api::ApiModule) -
             .collect::<Vec<_>>()
             .join("\n"),
     ));
+    // 模块名 "db" 触发 a2r 的 db 代码形态（无 `impl ` 前缀的结构返回）；
+    // 产物作为 front 的 api_impl 模块内嵌。
     let (api_impl_rs, _) = auto_api_gen::api_gen::transpile_back_module_to_rs_with_proofs(
-        "api_impl",
+        "db",
         &api_body,
         Some(back.clone()),
     )
@@ -11590,6 +11592,7 @@ mod plan036_theme_input_tests {
         );
     }
 }
+
 
 
 
