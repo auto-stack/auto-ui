@@ -579,6 +579,11 @@ impl<S: FrameSource> AppEndpoint<S> {
                 Ok(vec![])
             }
             // --- Closing：等回收 ---
+            // Frames sent before Close can still be acknowledged while the
+            // ExitRequest is in flight. They must not turn a clean close into
+            // a disconnect/reconnect before BufferRelease arrives.
+            (Closing, ProtocolMsg::Frame(super::message::FrameMsg::FrameAck { .. }
+                | super::message::FrameMsg::BitmapAck { .. })) => Ok(vec![]),
             (Closing, ProtocolMsg::Frame(super::message::FrameMsg::BufferRelease { .. })) => {
                 self.state = Detached;
                 self.slot_count = 0;
@@ -1363,6 +1368,10 @@ mod tests {
             replies,
             vec![ProtocolMsg::Control(ControlMsg::ExitRequest { wid: 3 })]
         );
+        for ack in [FrameMsg::FrameAck { wid: 3, frame_id: 1, slot: 0 }, FrameMsg::BitmapAck { wid: 3, slot: 0 }] {
+            assert!(app.on_message(ProtocolMsg::Frame(ack)).unwrap().is_empty());
+            assert_eq!(app.state, AppState::Closing);
+        }
 
         // 宿主收 ExitRequest → ReclaimWindow + 回 Listening。
         let actions = host.on_message(replies[0].clone()).unwrap();

@@ -1237,6 +1237,7 @@ fn session_main(app_id: String, back_entry: std::path::PathBuf, rx: mpsc::Receiv
             // 装载失败：session 进 degraded 态——通道保持打开但一律 503，
             // 让前端拿到可诊断的错误而不是连接拒绝。
             log::error!("[back-proxy:{app_id}] session failed to load: {e}");
+            eprintln!("[back-proxy:{app_id}] session failed to load: {e}");
             None
         }
     };

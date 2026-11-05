@@ -2300,6 +2300,7 @@ pub(super) fn execute_desktop_commands(
                 }
                 // Plan 497 G3：关闭失效（窗口回收，缩略随撤）。
                 crate::ui::iced::snapshot::invalidate(wid);
+                state.broker_close_window(wid);
                 if let Some(app) = state.wm_remove_win(wid) {
                     state.apps.remove(&app);
                     // PLAN-037 T-04：后端供给随窗释放（计数归零即卸载）。

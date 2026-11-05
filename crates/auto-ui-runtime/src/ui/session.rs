@@ -3644,6 +3644,18 @@ impl DesktopSession {
         self.host.as_mut()?.wm.remove_win(wid)
     }
 
+    /// Request shutdown of this window's owning outproc app. Reclamation and
+    /// buffer release remain on the normal ExitRequest/EOF pump path.
+    pub fn broker_close_window(&mut self, wid: Wid) -> bool {
+        let Some(client) = self.broker_clients.values_mut().find(|c| c.wid == Some(wid)) else {
+            return false;
+        };
+        match client.endpoint.close() {
+            Ok(close) => client.end.send(&close).is_ok(),
+            Err(_) => false,
+        }
+    }
+
     pub fn wm_focus(&mut self, wid: Wid) {
         if let Some(host) = self.host.as_mut() {
             host.wm.focus(wid);
@@ -9071,6 +9083,20 @@ mod tests {
         let reopened = ds.launch_app("probe").expect("reopen lands a live window");
         assert_ne!(reopened, wid);
         assert_eq!(ds.host.as_ref().unwrap().wm.wins[&reopened].registry_id.as_deref(), Some("probe"));
+
+        assert!(ds.broker_close_window(reopened));
+        ds.wm_remove_win(reopened);
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            ds.pump_broker_clients();
+            if let Some(status) = ds.desktop.outproc_children.last_mut().unwrap().try_wait().unwrap() {
+                assert!(status.success(), "child closes through the protocol");
+                break;
+            }
+            assert!(std::time::Instant::now() < deadline, "closed child did not exit");
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        assert!(ds.desktop.outproc_children[0].try_wait().unwrap().is_none(), "unrelated client stays alive");
 
         // 收尾：kill 子进程 + 停 broker serve 线程（probe 连接唤醒退出）。
         for mut child in ds.desktop.outproc_children.drain(..) {
