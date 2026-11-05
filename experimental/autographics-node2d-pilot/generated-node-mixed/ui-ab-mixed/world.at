@@ -7,6 +7,7 @@ var r_reg2x=0
 var r_reg3x=0
 var r_clicks2=0
 var r_clicks3=0
+var r_spacer=8
 var counter_count=[0]
 var counter_enabled=[1]
 var counter_start=[0]
@@ -165,12 +166,12 @@ fn counter_ui_refresh_0() {
  counter_ui_text_0[((0*64)+5)]=0xB0
  counter_ui_text_len_0[0]=6
  counter_ui_text_len_0[1]=counter_ui_digits_0(1,counter_count[0])
- counter_ui_text_b_0[((2*64)+0)]=0xE5
- counter_ui_text_b_0[((2*64)+1)]=0x8A
- counter_ui_text_b_0[((2*64)+2)]=0xA0
- counter_ui_text_b_0[((2*64)+3)]=0xE4
- counter_ui_text_b_0[((2*64)+4)]=0xB8
- counter_ui_text_b_0[((2*64)+5)]=0x80
+ counter_ui_text_b_0[((0*64)+0)]=0xE5
+ counter_ui_text_b_0[((0*64)+1)]=0x8A
+ counter_ui_text_b_0[((0*64)+2)]=0xA0
+ counter_ui_text_b_0[((0*64)+3)]=0xE4
+ counter_ui_text_b_0[((0*64)+4)]=0xB8
+ counter_ui_text_b_0[((0*64)+5)]=0x80
  counter_ui_text_len_0[2]=6
 }
 fn counter_ui_refresh(i int) {
@@ -192,6 +193,7 @@ fn main_inc() {
 }
 fn main_region2() {
  r_clicks2 = (r_clicks2 + 1)
+ r_spacer = (r_spacer + 40)
 }
 fn main_region3() {
  r_clicks3 = (r_clicks3 + 1)
@@ -231,6 +233,7 @@ fn get_r_reg2x() int {return r_reg2x}
 fn get_r_reg3x() int {return r_reg3x}
 fn get_r_clicks2() int {return r_clicks2}
 fn get_r_clicks3() int {return r_clicks3}
+fn get_r_spacer() int {return r_spacer}
 fn counter_ui_text_len(i int, e int) int {
  if i==0 {
   return counter_ui_text_len_0[e]

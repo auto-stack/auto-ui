@@ -186,8 +186,13 @@ struct ArtifactProp {
 enum ArtifactPropValue {
     /// 数字字面量（width/height/spacing/padding）。
     LitNum { v: f64 },
-    /// int/bool 模型字段绑定（adapter 逐帧 getter 求值）。
-    Field { name: String },
+    /// int/bool 模型字段绑定（adapter 逐帧 getter 求值）。PLAN-049 T-04：
+    /// 序列键 `field`——ArtifactProp 自身有 `name`，flatten 同层会与之
+    /// 冲突（重复键；048 夹具从未用 Field 布局 prop，spacer 首次暴露）。
+    Field {
+        #[serde(rename = "field")]
+        name: String,
+    },
 }
 
 #[derive(Serialize, Clone)]
@@ -1495,12 +1500,17 @@ fn gen_text_write_k(
     src: &mut String,
 ) {
     let p = &plan.prefix;
-    let base = format!("({elem_index}*{TEXT_BYTES})");
-    let buf = if elem_index < TEXT_SLOTS_PER_BUFFER {
-        format!("{p}_ui_text_{k}")
+    // 半缓冲寻址：e >= TEXT_SLOTS_PER_BUFFER 写 b 半缓冲且按半内偏移
+    // （(e-槽)*64）——整槽偏移会越界（门证据：Counter 槽2 标签 128/64）。
+    let (buf, half_index) = if elem_index < TEXT_SLOTS_PER_BUFFER {
+        (format!("{p}_ui_text_{k}"), elem_index)
     } else {
-        format!("{p}_ui_text_b_{k}")
+        (
+            format!("{p}_ui_text_b_{k}"),
+            elem_index - TEXT_SLOTS_PER_BUFFER,
+        )
     };
+    let base = format!("({half_index}*{TEXT_BYTES})");
     match value {
         ArtifactTextValue::LitStr { v } => {
             for (j, b) in v.as_bytes().iter().enumerate() {

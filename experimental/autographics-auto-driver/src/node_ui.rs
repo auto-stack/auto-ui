@@ -149,8 +149,15 @@ pub struct ArtifactProp {
 #[derive(Deserialize, Debug, Clone)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ArtifactPropValue {
-    LitNum { v: f64 },
-    Field { name: String },
+    LitNum {
+        v: f64,
+    },
+    /// 序列键 `field`（与 ArtifactProp 的 `name` flatten 同层不冲突；
+    /// PLAN-049 T-04，见 pilot 侧同注）。
+    Field {
+        #[serde(rename = "field")]
+        name: String,
+    },
 }
 
 #[derive(Deserialize, Debug, Clone)]

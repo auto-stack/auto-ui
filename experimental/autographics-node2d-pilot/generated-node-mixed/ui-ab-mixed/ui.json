@@ -1,7 +1,7 @@
 {
   "schema": "autographics.node-ui-mixed/1",
   "generator": "autographics-node2d-pilot plan049 node-ui-mixed",
-  "world_sha256": "82d41ad431a2dd0c8c860a16a18275ec42d9ceb4e93c04308bdee29197805279",
+  "world_sha256": "522006c5109e8d0cf24e87d8b22c9504a4551cf8de4719a97ae926feba580623",
   "root": "Main",
   "instances": [
     {
@@ -136,6 +136,19 @@
             },
             {
               "kind": "Container",
+              "name": "spacer",
+              "container": "row",
+              "props": [
+                {
+                  "name": "height",
+                  "kind": "field",
+                  "field": "spacer"
+                }
+              ],
+              "children": []
+            },
+            {
+              "kind": "Container",
               "name": "regions",
               "container": "row",
               "children": [
@@ -155,7 +168,7 @@
                       "name": "mover",
                       "x": {
                         "kind": "field",
-                        "name": "reg2x"
+                        "field": "reg2x"
                       },
                       "y": {
                         "kind": "lit_num",
@@ -194,7 +207,7 @@
                       "translation": [
                         {
                           "kind": "field",
-                          "name": "reg3x"
+                          "field": "reg3x"
                         },
                         {
                           "kind": "lit_num",

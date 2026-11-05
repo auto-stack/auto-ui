@@ -458,6 +458,7 @@ pub mod squash;
 
 pub mod authoring;
 pub mod node_mixed;
+pub mod node_mixed_host;
 pub mod node_ui;
 pub mod research;
 pub mod squash_host;

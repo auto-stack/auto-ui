@@ -13,6 +13,7 @@ node Main {
         var reg3x = 0
         var clicks2 = 0
         var clicks3 = 0
+        var spacer = 8
     }
     view {
         column root {
@@ -26,6 +27,7 @@ node Main {
                 start: 0
                 step: 1
             }
+            row spacer { height: .spacer }
             row regions {
                 view-2d reg2 {
                     width: 160
@@ -53,6 +55,7 @@ node Main {
         }
         .Region2 -> {
             .clicks2 = .clicks2 + 1
+            .spacer = .spacer + 40
         }
         .Region3 -> {
             .clicks3 = .clicks3 + 1
