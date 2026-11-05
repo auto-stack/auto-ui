@@ -65,3 +65,61 @@ F3 达成：E0425/E0433（NavTree/EditorPanel 组件缺失族）全消——side
 | blog | 192 | E0119×48（冲突 impl）+E0609×33+E0034×24（歧义关联项）+E0599×20 | 待族析（疑 alias/struct 双定义另一通道） |
 
 已修通用族（notes/todo 实证）：api prop 豁免 value_prop_names、条件串回译、循环变量 api 分支（含 Checkbox checked 专属臂）、事件实参 this. 回译。
+
+## T-02 执行场（2026-11-05，本轮实机 sweep）
+
+环境（组内 ui-052 树，生成器 = `D:/autostack/.wt/ui-052/auto-ui/target/debug/auto-ui-tool.exe`，
+每次删 `rust-workspace/<member>-*` 后全量再生成）：
+
+```
+AUTO_UI_TOOL_BIN=<ui-052>/target/debug/auto-ui-tool.exe
+AUTO_LANG_ROOT=<ui-052>/auto-lang  AUTO_UI_SOURCE_ROOT=<ui-052>/auto-ui
+AUTO_WEB_SOURCE_ROOT=<ui-052>/auto-web  AUTO_WEB_ROOT=<ui-052>/auto-web
+AUTO_UI_ROOT=<ui-052>/auto-ui
+```
+
+| 轮次 | notes | todo | calendar | database | chat | blog | counter |
+|---|---|---|---|---|---|---|---|
+| 进入 T-02 | 0 | 0 | 0 | 0 | 95 | 191 | 0 |
+| 本轮后（2026-11-05 18:0x） | 0 | 0 | 0 | 0 | **0（exe 发布）** | **17** | 0 |
+
+修复族（逐提交）：
+
+1. try 体扫描缺席（chat 95→19）：`collect_assign_kinds`/`collect_declared_names`/
+   `scan_stmts_no_union` 均不递归 `Stmt::Try`——登录/发送 handler 全在 try 内，
+   `var m = []` + `m = json.to_value(..)` 的 Value 联合格、Value 循环变量
+   （`for m in .messages`）整体漏判。补递归 + Value 联合格空数组初始式发
+   `Value::Null`。
+2. 无 `use back.api` 工程缺实体型（chat 8 E0425）：`generate_api_client` 仅在
+   api imports 非空时发射 api 实体 struct，chat 全走 `Http.*` 无 imports——
+   `Contact/Identity/Message/PendingMsg` 缺失。补 else 分支只发类型本体。
+3. typed prop ↔ Value 桶边界（chat E0308/E0061/E0507 + blog）：无类型 store
+   字段（Vec<Value>）传入 `[]Message` 形 prop——新增 `CHILD_PROP_RUST_TYPES`
+   全型表 + `serde_json::from_value::<Vec<T>>(Value::Array(..)).unwrap_or_default()`
+   （构造参数、持久子件同步、组件实参三路）。
+4. 多级 Value 点链（`sr.message.conversation_id`）：整链括号化后末段访问器收口。
+5. store 归属：逐文件注册（仅本文件 use 的 store；首个 canonical "store"，
+   其余按别名），`store.<Msg>`/`<Store>.<Msg>` 按 STORE_VARIANTS 归属解析
+   （blog `store.SetToken` → ArticleStore），`.store.<field>` 按字段归属跨
+   store 解析（blog 三 store 页）。
+6. nil 哨兵：`Expr::Nil` 此前无主臂（blog `x == nil` E0425/User!=Null）；
+   AST 比较 typed 槽 → true/false、Value → is_null；条件串管线补
+   `fix_condition_nil`（view 条件为字符串）。
+7. typed 记录字段 move（blog `self.current.work_id` ×6）：store/态字段型为
+   api 实体时按 API_STRUCT_FIELDS 补 `.clone()`。
+8. typed 返回写槽：`Option<T>` api 返回 → typed 槽 `unwrap_or_default()`；
+   Value 槽 → `serde_json::to_value(...)`（含 Store/Bina 两发射位）。
+9. 无 handler 按钮的 `on_click(|_| ())` 强制 `View<()>`（settings E0308）——
+   移除占位（`button_onclick: Option<M>` 天然允许缺省）。
+10. 原始标识符：`ref` 形参 → `sanitize_rust_ident`（raw ident）；无载荷变体但
+    handler 模式声明形参（blog `BodyChanged(v)`）→ 由 `last_input_text()` 补绑定。
+
+剩余（blog 17 = 15 router + 1 compile_error(多路由) + 1 follow() 零参 stub）：
+
+- **多路由 outlet/router.push 静态发射**（PLAN-039 D5 拒绝门）是唯一实质功能缺口：
+  blog 8 路由 + 4 处路由参数（slug/username）+ 15 处 router.push。需
+  App 路由态/参数表、`__Navigate` 消息、outlet match 渲染、link(to:) 点击、
+  `router.param` 编译映射——下一轮 T-02 继续。
+- `follow(username)` 由 api stub 生成零参（merged client 未覆盖该端点，
+  中段路径参数 `/profiles/:username/follow` 解析面在 auto-lang parse_api_module，
+  非本仓）——按 G3 边界需要在 auto-ui 侧补 stub 参数或由 054/auto-lang 消费。
