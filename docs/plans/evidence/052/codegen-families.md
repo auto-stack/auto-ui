@@ -174,7 +174,7 @@ has_exited=True  exit_code=0   # CloseMainWindow 后正常退出
 
 `git diff --name-only 8ed8a2e1..HEAD` 仅：
 `crates/auto-ui-compiler/src/ui_gen/rust.rs`、`crates/auto-ui-tools/src/rust_ui.rs`、
-`docs/plans/052-*.md`、`docs/plans/evidence/052/*`、054 计划文档（并行会话交接）。
+`docs/plans/052-*.md`、`docs/plans/evidence/052/*`、053 计划文档（并行会话交接的 desktop-host 计划，非本计划实现面）。
 auto-lang/auto-web/auto-down 三兄弟树 `dirty=0`。
 
 ### 环境噪声（非生成器缺陷，已排除）
