@@ -54,7 +54,7 @@
 | 048 | [基础UI Node与Auto事件](archived/048-age-node-basic-ui-and-auto-events.md) | AGE M2-10基础UI | 已交付cd1e161a，归档/清理；四类控件/Auto事件已支持；final为同实现会话，独立上下文复用核验归054/AG021 |
 | 049 | [UI/2D/3D同应用组合](archived/049-age-ui-2d-3d-composition.md) | AGE M2-10混合切片 | 已交付b7f01267，归档/清理；root有限混合档，不支持组件区域/条件挂卸；同会话final限制保留，补齐归054 |
 | 054 | [混合区域组件与生命周期](archived/054-age-mixed-regions-components-and-lifecycle.md) | M2/AG021公共接线 | 已交付2571556e（ff-only落主），归档/清理；v2组件区域/条件挂卸/活区域≤4/bool高槽修正在案；独立final pass（subagent上下文）；AG021按SD-01候选§2配方消费 |
-| 055 | [M3俯视二维与容量可行性](055-age-m3-topdown2d-feasibility-and-capacity.md) | M3首轮研究 | drafting/r1，0/10；固定已交付源、最多两机制三规模、真实Auto链和费用/瓶颈，go/bounded-go/no-go；不实施产品能力 |
+| 055 | [M3俯视二维与容量可行性](archived/055-age-m3-topdown2d-feasibility-and-capacity.md) | M3首轮研究 | archived/r1；独立final pass；无地面原型bounded-go、铺地/角色35-credit组合no-go；canonical与清理见同号收据 |
 
 当前AGE见[最后缺口与首轮预研](../design/autographics/m2-closure-and-m3-first-wave.md)：048/049已交付，但049的root有限支持不能关闭AG021原组件化/条件挂卸义务。M2主链为**054实际交付/独立核验→AG021 r2最终同版消费与M2-01..10必需门→M2结论**；019旧候选/holds保历史，Gallery22/22不是M2完成比例。020只是M2收口后更名维护，不是功能门。AG021原owner已记T-01/02准备完成、executing/r2/2-10；T-03等054真实交付，不追tip。
 
@@ -88,3 +88,6 @@
 r2文档原貌保留于本仓提交`6c7bcdccb08b6320e5920e704990ab6eaa515e41`；r1保留于auto-lang提交`a5d8a4fa8`。编号更正不重写这些历史。
 
 用户批准按仓拆分（2026-10-29）：002仅auto-ui引擎/夹具/消费证据；[ag-examples/001](../../../ag-examples/docs/plans/archived/001-autographics-gallery-runtime-objects.md)独立承接G11，硬等002实际交付。两份分别review/merge，无反向依赖。
+
+
+2026-11-05 UI055研究已交付：当前结论见[canonical可行性与容量](../specs/auto-graphics/topdown2d-feasibility.md)及[同号归档](archived/055-age-m3-topdown2d-feasibility-and-capacity.md)；055的旧规划状态由实际研究收据替代。AG022/058继续按其自身合同和已交付前置推进。

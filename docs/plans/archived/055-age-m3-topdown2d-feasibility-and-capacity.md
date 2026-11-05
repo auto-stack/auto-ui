@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-055
-status: reviewed
+status: archived
 feature_name: AGE M3俯视二维完整链与容量可行性研究
 author: [Codex]
 created_at: 2026-11-05
 updated_at: 2026-11-05
 plan_revision: 1
-current_step: 7
+current_step: 9
 total_steps: 10
 depends_on: [auto-ui/PLAN-021, auto-ui/PLAN-022, auto-ui/PLAN-032]
 supersedes_spec_components: []
@@ -19,7 +19,7 @@ affects: [autographics-research, topdown2d-capacity]
 
 ## 0. 变更摘要
 
-在固定已交付AGE/旧SDK上，以最多两种等价机制验证正常Auto Node/use/model/on俯视移动→碰撞/交互→真实呈现的最小完整链，量化地图/对象/回调/资源瓶颈，给出go/bounded-go/no-go和下一份能力合同输入。是M3有界预研，**不交付完整种田游戏/新tilemap或新物理API**。见[首轮设计](../design/autographics/m2-closure-and-m3-first-wave.md)。本轮已完成有界研究，原额/生产API不变；实际结论和失败见§9。
+在固定已交付AGE/旧SDK上，以最多两种等价机制验证正常Auto Node/use/model/on俯视移动→碰撞/交互→真实呈现的最小完整链，量化地图/对象/回调/资源瓶颈，给出go/bounded-go/no-go和下一份能力合同输入。是M3有界预研，**不交付完整种田游戏/新tilemap或新物理API**。见[首轮设计](../../design/autographics/m2-closure-and-m3-first-wave.md)。本轮已完成有界研究，原额/生产API不变；实际结论和失败见§9。
 
 ## 1. 目标
 
@@ -103,8 +103,8 @@ T-05对可接受最小链做坏输入/过期句柄/query token、资源缺失/�
 | T-05 | work | T-04 | 有效最小链故障/20轮Run/修复下一次消费、旧档身份边界；不可达支路明示 | AC-04/05 | [x] |
 | T-06 | work | T-05 | 结论/SD/命令源摘要/容量支持表/后继建议和AG022消费输入 | AC-06 | [x] |
 | T-07 | review | T-06 | 同树独立研究复审，finding返work同员有界复核 | AC-07 | [x] |
-| T-08 | merge | T-07 pass | 核实落地文件仅已审知识/必要资产，不把实验补丁当功能合入 | AC-08 | [ ] |
-| T-09 | merge | T-08 | canonical/同号归档/当前导航，注明go边界/失败与未证项 | AC-08 | [ ] |
+| T-08 | merge | T-07 pass | 核实落地文件仅已审知识/必要资产，不把实验补丁当功能合入 | AC-08 | [x] |
+| T-09 | merge | T-08 | canonical/同号归档/当前导航，注明go边界/失败与未证项 | AC-08 | [x] |
 | T-10 | merge | T-09 | guard/全路径对账/摘要折Plan/清自有scope和构建物，hold登记 | AC-09 | [ ] |
 
 ## 9. 复审记录
@@ -627,6 +627,19 @@ review pass绑定6277e50f/SD SHA256 c185f8f2df252951bb57332c6f8803aa687c02a6acf5
 提前删除对账：本会话先前产生的全部已知类别为inputs/interaction/wrong_target/布尔失败和states8/9源码目录、products和review-products及其world/scene/identity/closure、host-projects受控消费副本、六份源码脚本/拼接研究测试、两套独占cargo targets及exe/PDB/build intermediates、681文件SDK副本、build/lower/CPU/GPU/失败/恢复/review日志。它们均在auto-ui子scope（官方SDK工具的ignored tree默认输出测后已移入该scope），原始子scope及父目录在R2前外部清理后实际均不存在；完整研究源、重建命令、关键结果/失败和hash已先行折Plan并由R1亲验。无法在消失后补造逐文件数量/bytes或重读raw，不声称11G是本会话清理/专属大小。registry实际auto-os/PLAN-055父scope删除记录保留，明确后续只能按repo-qualified子scope清理。
 
 merge阶段仅重新建立`D:/autostack/plan-artifacts/plan-055/auto-ui/`存放本阶段导航/归档检查辅助脚本，不包含恢复的运行材料；最终仍删除这个自有子scope，父目录只在空时移除，任何新出现的其它repo子scope禁止触碰。原研究未留下需要本地raw的具名hold，数组/布尔ABI/地图/预算缺口均是已持久后继输入，不伪称已修产品。T08..10仍待实际落主/归档/guard后关闭。
+
+
+### Merge landed / canonical_verified / archived（2026-11-05）
+
+stage: merge | plan_id: PLAN-055 | plan_revision: r1 | checkpoint: landed,canonical_verified,archived | completion_kind: delivered | delivery_commit: 255350a27b989ea5ff1f3fa17e7d0d98b3729fd9 | canonical: docs/specs/auto-graphics/topdown2d-feasibility.md | canonical_sha256: c185f8f2df252951bb57332c6f8803aa687c02a6acf51e6faa967359d0cbaac8 | archive: docs/plans/archived/055-age-m3-topdown2d-feasibility-and-capacity.md | cleanup: pending T-10
+
+- R2 final pass6277e50f覆盖完整已修SD；导航后裔仅引用已审知识。rebase onto master3725aaa8068fc5c559f12338ee5f5f76fc75395a：e85f7309→f63a55ce、6277e50f→e9c55e39、2870c51e→255350a2；`git range-diff 220115df..2870c51e master..codex/plan-055-dev`三条均“=”；`git diff --check` exit0。默认master实际`git merge --ff-only`从3725aaa8到255350a2，无merge commit，主Spec SHA与R2冻结文本完全一致。
+- 首次`bash`解析成系统WSL，脚本路径不可达exit127，未执行landing；改为显式`C:/Program Files/Git/bin/bash.exe D:/autostack/wt-guard.sh ...`得到clean后才落主。cleanup前仍须四树fresh guard；不绕门。
+- T-08仅落已审研究知识与四设计页055导航，无研究补丁/测试manifest/SDK或预算代码入库。T-09同号归档并修正首轮设计相对链接；README仅055行/状态更新，使用HEAD派生的专属index blob提交，保留main其余未提交文档/四张既有PNG，不将别人的WIP混入提交。实际archive链接/状态/任务数门在此文件迁移后执行；T10保持pending。
+- landing check：文档交付，pilot/driver/生产API/锁与执行源零修改；主Spec读回hash与已审一致、链接/格式门按实际归档复核。无需本Plan重建或重启现有release二进制/前端bundle；无本Plan引入的部署滞后项。auto-lang依赖仅只读，未实施/合入语言包，无本Plan语言batch回归触发。
+- 输出对账沿Merge prepared全部类别：原运行scratch被auto-os同号父scope提前删除，R1之前已完整折源/结果/失败/hash并亲验，R2只文档复核复用其事实；保留时序/文件数不可重建限制。closeout重新建立的auto-ui子scope只有merge辅助脚本/README保全副本与检查摘要，另作自有删除，不声称恢复raw/复读JSON；无具名hold。
+
+归档实际状态门首次抓到任务勾选脚本未锚行首、误匹配依赖列T-09而提前勾T-10，current_step=9与10个勾不一致；已在提交和清树之前修正为锚定主任务行、T-10保持pending，重新跑实际门后方可提交归档。此为closeout文档检查错误，不影响已审研究源/SD或运行证据。
 
 ## 10. 待澄清事项
 
