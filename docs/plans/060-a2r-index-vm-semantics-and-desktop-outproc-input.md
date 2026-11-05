@@ -283,3 +283,8 @@ back 侧 `auto-notes-...-back` 是完整 axum/DB 实现。故 iced 桌面上任�
   - 关键：`input_variants` 预扫 + `last_input_text()` 覆盖落地后，iced 桌面 notes 正文键入 **"hello"** 真实显示（截图 `tmp/autoui-screenshot-1793891155440.png`：Untitled / Unsaved changes / Save / hello 光标），此前 `EditBody("")` 的空载荷问题消失。
   - 数据面同步（inbox.db 累计 n-3 行）。行内保存按钮坐标仍待校准（点击落到标题输入框），但「建条 + 键入」AC-07 全链已成立。
  | next: T-05 余项（todo 输入/calendar、六 app 回归）→ T-06 review
+
+- stage: work | plan_id: auto-ui/PLAN-060 | plan_revision: 1 | round: 12 | task_ids: T-05 | outcome: 分型发现（inproc 窗不走 broker 指针） | evidence:
+  - todo 在 iced 桌面以 **inproc VM** 宿主（日志 `promote 013-todo app=7 → wid 1`，无 `launch_app(outproc-native)`、无独立进程）；验收指针 inject 走 broker 臂 → `pointer down delivered=false`（无 broker client），窗口由桌面自身 VM 渲染，点击不达。
+  - 分型结论：outproc（notes 等，broker client）用 **pointer inject**；inproc（todo/calendar 等 VM 宿主）应用 **handler inject**（`component.call_handler` 真实消费臂，既有设定即此），或在 shell 侧补 inproc 指针分支。
+  - 本计划 T-05 以 outproc pointer + inproc handler 两路验收；inproc 指针分支列为后续可选增强（不影响 054 T-04 任务可完成性）。
