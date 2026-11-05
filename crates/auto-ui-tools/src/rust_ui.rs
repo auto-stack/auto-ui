@@ -1639,13 +1639,13 @@ fn merged_absorb(project_dir: &Path, _module: &auto_lang_core::api::ApiModule) -
     // PLAN-060：api.at 端点体（去 #[api] 与 pub type）转译为 api_impl——
     // api 函数体形如 `return db.all_notes()`，是端点真实现（db 里未必同名）。
     let api_at = std::fs::read_to_string(back.join("api.at")).ok()?;
-    let api_body = strip_api_types(
+    let api_body = add_return_arrows(&strip_api_types(
         &api_at
             .lines()
             .filter(|l| !l.trim_start().starts_with("#[api"))
             .collect::<Vec<_>>()
             .join("\n"),
-    );
+    ));
     let (api_impl_rs, _) = auto_api_gen::api_gen::transpile_back_module_to_rs_with_proofs(
         "api_impl",
         &api_body,
@@ -1670,6 +1670,31 @@ fn merged_absorb(project_dir: &Path, _module: &auto_lang_core::api::ApiModule) -
     Some(MergedAbsorb { modules, db_fns, api_impl_fns })
 }
 
+/// api.at 的 `pub fn f(args) RetType {` 无 `->`（back 生成器特化语法）；
+/// 通用转译器会把它当 impl 块。给单行签名补 `->`（无返回类型则不动）。
+fn add_return_arrows(src: &str) -> String {
+    let mut out = String::new();
+    for line in src.lines() {
+        let t = line.trim_start();
+        if t.starts_with("pub fn ") && !line.contains("->") {
+            if let Some(close) = line.rfind(')') {
+                let rest = line[close + 1..].trim();
+                if !rest.is_empty() && rest.starts_with('{') == false {
+                    let mut l = String::new();
+                    l.push_str(&line[..close + 1]);
+                    l.push_str(" -> ");
+                    l.push_str(rest);
+                    out.push_str(&l);
+                    out.push('\n');
+                    continue;
+                }
+            }
+        }
+        out.push_str(line);
+        out.push('\n');
+    }
+    out
+}
 /// 去掉 api.at 里的 `pub type X = { ... }` 块（api_impl 复用 crate::types）。
 fn strip_api_types(src: &str) -> String {
     let mut out = String::new();
@@ -11564,6 +11589,7 @@ mod plan036_theme_input_tests {
         );
     }
 }
+
 
 
 
