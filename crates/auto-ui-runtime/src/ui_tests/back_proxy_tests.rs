@@ -187,6 +187,40 @@ fn http_e2e_back_proxy_json_routes_and_session_state() {
     );
 }
 
+#[test]
+fn p054_back_proxy_initializes_imported_constants_and_preserves_vars() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("limits.at"), r#"
+const LIMIT = 37
+const LOW = -2.25
+const LABEL = "stable"
+pub fn number() int { return LIMIT }
+pub fn low() f64 { return LOW }
+pub fn label() str { return LABEL }
+"#).unwrap();
+    std::fs::write(dir.path().join("api.at"), r#"
+use limits
+var hits int = 0
+#[api(method = "GET", path = "/api/count")]
+pub fn count() int { hits = hits + 1; return limits.number() + hits }
+#[api(method = "GET", path = "/api/low")]
+pub fn low() f64 { return limits.low() }
+#[api(method = "GET", path = "/api/label")]
+pub fn label() str { return limits.label() }
+"#).unwrap();
+    let proxy = start(BackProxyConfig {
+        lazy_sessions: false, port: ephemeral_port(),
+        sessions: vec![SessionSpec { app_id: "consts".into(), back_entry: dir.path().join("api.at") }],
+        native_media: Vec::new(), native_photos: Vec::new(),
+    }).unwrap();
+    for (path, expected) in [("count", serde_json::json!(38)), ("count", serde_json::json!(39)),
+        ("low", serde_json::json!(-2.25)), ("label", serde_json::json!("stable"))] {
+        let (status, body) = http_request(proxy.port, "GET", &format!("/apps/consts/api/{path}"), None);
+        assert_eq!(status, 200, "{path}: {body}");
+        assert_eq!(serde_json::from_str::<serde_json::Value>(&body).unwrap(), expected, "{path}");
+    }
+}
+
 /// PLAN-729 R1 [G-02]：文件端点不经进程内 back-proxy——501 明确拒绝 +
 /// 改走 HTTP URL 指引（不回 opaque id）。
 #[test]
