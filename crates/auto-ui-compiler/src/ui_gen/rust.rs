@@ -127,6 +127,9 @@ pub struct RustGenerator {
     /// Maps input event variant name to field names for input text parsing
     /// Multiple inputs can share the same event (e.g., main input + edit input both fire EditInputChanged)
     input_fields: std::collections::HashMap<String, Vec<String>>,
+    /// PLAN-060：绑定输入（input/textarea）的 on_change 变体名（无写回副作用，
+    /// 仅供 String 载荷覆盖为 last_input_text 判定）。
+    input_variants: std::collections::HashSet<String>,
     code_editor_sources: std::collections::HashMap<String, Vec<String>>,
 
     /// State var types for lookup during handler generation
@@ -385,6 +388,7 @@ impl RustGenerator {
             component_semantics: std::collections::HashMap::new(),
             loop_vars: Vec::new(),
             input_fields: std::collections::HashMap::new(),
+            input_variants: std::collections::HashSet::new(),
             code_editor_sources: std::collections::HashMap::new(),
             state_types: std::collections::HashMap::new(),
             prop_names: std::collections::HashSet::new(),
@@ -2947,7 +2951,7 @@ fn collect_local_elems(
                 // （生成码 `Msg::Variant("".to_string())`）——真实文本在投影
                 // 层写入 INPUT_TEXT（`last_input_text()`）。带 String 载荷且
                 // 绑定输入的变体，在臂内以读面覆盖载荷变量（shadowing）。
-                if has_payload && self.input_fields.contains_key(&variant_name) {
+                if has_payload && self.input_variants.contains(&variant_name) {
                     if let Some(vi) = variant_info {
                         if matches!(
                             vi.payload.first(),
@@ -6159,6 +6163,7 @@ fn collect_local_elems(
                                     builder =
                                         format!("{}.on_change({}::{})", builder, msg_name, variant);
                                 }
+                                self.input_variants.insert(variant.clone());
                                 // Record event→field mapping for handler generation
                                 if let Some(name) = &value_field {
                                     self.input_fields
@@ -6224,6 +6229,26 @@ fn collect_local_elems(
                     if let Some(ve) = ta_value_expr {
                         builder = format!("{}.value({})", builder, ve);
                     }
+                    // PLAN-060：textarea 的 value 绑定字段（单级 ident / self.x）
+                    // 登记 input_fields——输入文本回写（last_input_text）与
+                    // 载荷覆盖依赖它；此前只有 input 分支登记。
+                    let ta_value_field: Option<String> = props.get("value").and_then(|v| match v {
+                        AuraPropValue::Expr(auto_lang_core::ast::Expr::Ident(name)) => {
+                            let f = name.as_str().trim_start_matches('.');
+                            (!f.is_empty() && !f.contains('.')).then(|| f.to_string())
+                        }
+                        AuraPropValue::Expr(auto_lang_core::ast::Expr::Dot(obj, field)) => {
+                            match obj.as_ref() {
+                                auto_lang_core::ast::Expr::Ident(base)
+                                    if base.as_str() == "." || base.as_str() == "self" =>
+                                {
+                                    Some(field.as_str().to_string())
+                                }
+                                _ => None,
+                            }
+                        }
+                        _ => None,
+                    });
 
                     // Other props (skip placeholder, value)
                     for (key, value) in props_sorted.clone() {
@@ -6266,6 +6291,7 @@ fn collect_local_elems(
                                     builder =
                                         format!("{}.on_change({}::{})", builder, msg_name, variant);
                                 }
+                                self.input_variants.insert(variant.clone());
                                 if let Some(AuraPropValue::Expr(
                                     auto_lang_core::ast::Expr::Ident(name),
                                 )) = props.get("value")
@@ -21360,4 +21386,7 @@ pub(crate) fn fix_cast_generic_ambiguity_for_ui(content: &mut String) {
         }
     }
 }
+
+
+
 
