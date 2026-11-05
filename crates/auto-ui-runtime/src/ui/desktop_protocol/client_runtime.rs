@@ -521,28 +521,6 @@ impl<S: FrameSource> ClientPump<S> {
                 return;
             }
         };
-        // PLAN-055 probe（AUTO_OUTPROC_STDERR=1 门——053 同款诊断 env）：
-        // Hello 观测（caps 门实证——帧非文本形，只报 caps 形态）。
-        if std::env::var("AUTO_OUTPROC_STDERR").as_deref() == Ok("1") {
-            let caps_desc = match &hello {
-                crate::ui::desktop_protocol::message::ProtocolMsg::Handshake(
-                    crate::ui::desktop_protocol::message::HandshakeMsg::Hello {
-                        theme_caps,
-                        ..
-                    },
-                ) => format!("caps={theme_caps:?}"),
-                other => format!("other={other:?}"),
-            };
-            let encoded = hello.encode();
-            let framed = crate::ui::desktop_protocol::transport::frame_bytes(&encoded);
-            let head: String =
-                framed.iter().take(24).map(|b| format!("{b:02x}")).collect();
-            eprintln!(
-                "[probe-client] hello built: {caps_desc} payload_len={} framed_len={} head={head}",
-                encoded.len(),
-                framed.len()
-            );
-        }
         if self.app_end.send(&hello).is_err() {
             self.projector = Some(app.session);
             self.on_disconnect();

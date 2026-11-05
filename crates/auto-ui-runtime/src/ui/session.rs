@@ -4450,22 +4450,9 @@ impl DesktopSession {
         use crate::ui::desktop_protocol::endpoint::HostState;
         let deadline =
             std::time::Instant::now() + std::time::Duration::from_millis(budget_ms as u64);
-        let mut last_probe_log = std::time::Instant::now();
         while std::time::Instant::now() < deadline {
             if client.endpoint.state == HostState::Active {
                 return client.wid;
-            }
-            // PLAN-055 probe：秒级心跳（pending/eof/state——归因空转 vs
-            // 读见帧不过激活）。
-            if last_probe_log.elapsed().as_millis() >= 1000 {
-                last_probe_log = std::time::Instant::now();
-                eprintln!(
-                    "[probe-broker] attach {} pending={} eof={} state={:?}",
-                    client.pipe,
-                    crate::ui::desktop_protocol::transport::Transport::pending(&client.end),
-                    client.end.is_eof(),
-                    client.endpoint.state
-                );
             }
             match client.end.try_recv() {
                 Some(Ok(msg)) => {
@@ -4474,7 +4461,7 @@ impl DesktopSession {
                         Err(e) => {
                             // PLAN-055 probe：attach 失败归因不再吞（预算行
                             // 同印两种死法——静默吞错使 G-2 载体排查不可归因）。
-                            eprintln!("[probe-broker] on_message err: {e:?}");
+                            eprintln!("[broker] attach on_message err: {e:?}");
                             return None;
                         }
                     };
@@ -4484,20 +4471,9 @@ impl DesktopSession {
                     }
                 }
                 Some(Err(e)) => {
-                    // PLAN-055 probe：解码错误不再静默——坏帧字节留痕。
-                    let bad = crate::ui::desktop_protocol::transport::LAST_BAD_FRAME
-                        .lock()
-                        .ok()
-                        .and_then(|g| g.clone());
-                    let head = bad
-                        .as_ref()
-                        .map(|b| {
-                            let hex: String =
-                                b.iter().take(24).map(|x| format!("{x:02x}")).collect();
-                            format!("len={} head={hex}", b.len())
-                        })
-                        .unwrap_or_else(|| "<none>".to_string());
-                    eprintln!("[probe-broker] codec err: {e:?} bad_frame[{head}]");
+                    // PLAN-055：解码错误不再静默——attach 失败可归因
+                    // （原 `Err(_) => return None` 吞错使载体排查不可归因）。
+                    eprintln!("[broker] attach codec err: {e:?}");
                     return None;
                 }
                 None => std::thread::sleep(std::time::Duration::from_millis(5)),
@@ -5434,7 +5410,7 @@ impl DesktopSession {
                         Err(e) => {
                             // PLAN-055 probe：activate 失败具名留痕（continue
                             // 静默重试会烧光预算且不可归因）。
-                            eprintln!("[probe-broker] activate err: {e:?}");
+                            eprintln!("[broker] attach activate err: {e:?}");
                             continue;
                         }
                     }
