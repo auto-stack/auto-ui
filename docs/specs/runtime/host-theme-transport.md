@@ -27,8 +27,12 @@
 
 ## 线上面（desktop_protocol）
 
-- **能力声明**：`Hello` 尾段追加 `theme_caps`（`theme-policy/1`）——空 =
-  旧端线字节等价；宿主只向声明会话推送（旧客户端零未知帧）。
+- **能力声明**：`Hello` 尾段追加 `theme_caps`（`theme-policy/1`）。**线
+  格式（PLAN-055 修复）**：双尾段全空 = 旧端线字节等价；**任一尾段在场则
+  `theme_surfaces` 段恒显式**（计数可 0）——修复 surfaces 空 + caps 非空
+  时解码端把 caps 段长度前缀当 surfaces 段读的错位（TooShort），回归
+  `hello_trailing_segments_caps_without_surfaces_round_trip`。宿主只向
+  声明会话推送（旧客户端零未知帧）。
 - **帧 17/18**（Control 通道，连接级寻址）：
   `ThemePolicyPush{revision, record}`（五段 FIELD_SEP 快照）→ 客户端
   喂 031 端口（`Component::on_theme_policy` → `set_host_theme_inputs`）→
@@ -51,8 +55,22 @@
 - **状态自续拍**：shell `__theme_status` 含 pending 行时标记刷新脏位，
   eval 落定后下拍复检，落定即停。
 
-## 边界（来源：PLAN-053 review G-1/G-2）
+## 边界（PLAN-053 review G-1/G-2 → PLAN-055 全闭，2026-11-05）
 
-真实 OS 主题事件端到端 = 宿主侧具名 hold（本仓无写路径；`system_prefers_
-dark` 只读消费已实证）；桌面组合式 outproc 推送端到端待载体 app（协议
-两端点单测已闭）。
+- **outproc 真载体腿已闭**：真实载体 = auto-clock a2r 生成 exe
+  （`NativeThemeCarrier` 包裹静态 App：生成期嵌入官方包 owner/package/
+  version/digest/族表 + push 校验具名拒绝保旧 + `set_theme_tree`/
+  `set_dark_mode` 应用 + 帧后 applied 读回）。四腿（attach 推送/变更广播/
+  重连最新/stale 分列）+ 拒绝恢复腿隔离 probe 全绿；a2r 主产线
+  `HeadlessFrameSource` 补主题转发三方法（remote/v2 臂缺省压掉 caps 门
+  的根修）。证据：auto-os PLAN-055 归档页 §9。
+- **真实 OS 主题事件腿已闭**（宿主侧执行）：注册表翻转 → config 轮询
+  差异臂 → revision → 推送/跟随 applied，重启 `theme_source:"system"`
+  穿越，原值精确恢复（本仓 `system_prefers_dark` 只读消费为 provider；
+  写路径归宿主域）。as-built 边界：`HostThemeInputs` 运行时唯一生产者 =
+  策略快照（`app_override` 恒 Unset、`follow_host: true`）——C-03 App
+  override 档 resolver 支持在、输入面未交付；CLI `--theme` 对未声明
+  `dark_mode` 的 VM 采纳者无主题内容面（458 播种只写已声明位，C-03 §3
+  VM 边界）——clock 采纳合同 follow-only。
+- **多实例隔离**：broker 管道 env `AUTOOS_BROKER_PIPE` 覆盖（服务端管道
+  名可注入；无 env 零行为差）——同名多实例防客户端连入任意桌面。
