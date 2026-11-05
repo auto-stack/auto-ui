@@ -1833,7 +1833,7 @@ fn merged_db_delegate_typed(
         } else {
             match db_ty.as_str() {
                 "i64" => format!("{} as i64", p.name),
-                "&str" => format!("&{}", p.name),
+                t if t.starts_with('&') => format!("&{}", p.name),
                 _ => p.name.clone(),
             }
         };
@@ -11518,6 +11518,7 @@ mod plan036_theme_input_tests {
         );
     }
 }
+
 
 
 
