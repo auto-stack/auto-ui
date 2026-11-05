@@ -7590,7 +7590,9 @@ pub(crate) fn resolve_managed_front(project_dir: &Path) -> AutoResult<ManagedFro
 /// files). Content-level manifest drift is additionally caught by
 /// `front_needs_regeneration` recomputing the manifest text; main.rs-level
 /// generator changes without a bump are a recorded boundary.
-const FRONT_LAYOUT_VERSION: &str = "front-layout/v2";
+// PLAN-060: unchanged .at inputs still need the generated dispatch_named and
+// named-input text staging code. Invalidate receipts from the older emitter.
+const FRONT_LAYOUT_VERSION: &str = "front-layout/v3";
 
 fn front_generator_identity(context: &GeneratedBuildContext) -> String {
     format!(
