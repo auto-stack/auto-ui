@@ -1,7 +1,8 @@
 # Node3D 方向光与阴影作者链可行性
 
-PLAN-059，2026-11-05，研究结论：**no-go（固定版本的普通作者全链）**。
-底层 MeshPipeline 单方向光/阴影可用；这不表示普通 Auto Node 已有灯光 API。
+PLAN-059，2026-11-05，研究结论：**bounded-go（静态描述＋Auto 动态标量的研究适配链）**。
+底层 MeshPipeline 单方向光/阴影可用，普通 Node model/Life.Tick 可以驱动
+研究绑定；普通 Auto Node 尚无正式 Light 声明/API。本研究不交付该 API。
 本研究不新增生产代码，不认领 three.js 覆盖，不改变 M2 交付或预算。
 
 研究源码固定为 auto-ui `e02ca9f8452555db2d44e66363ebf5e317b5716f`。
@@ -16,9 +17,9 @@ SDK 冻结输入逐文件核验 681/681；pilot 编译使用历史作者侧 auto
 |---|---|
 | 正常声明 | `light3d` 未知元素；三维叶的 direction/energy/shadow 均具名拒绝 |
 | 局部事件服务 | `refs.receiver.set_energy` 未知服务；已有服务仅位置/显隐/查询 |
-| Auto 状态→光参数 | 尚无受检生产端口，未执行这条 GPU 链；不以 Rust 改光冒称成立 |
+| Auto 状态→光参数 | 一种完整研究候选已成立：普通 Node→既有生成器原生 get_r_*→固定 SDK681 Session 的 main/app_start/app_update→受检静态绑定→LightDef/真实 GPU |
 | Rust→GPU | RTX 4060 Ti/Vulkan 真离屏 GPU 像素通过；无原生窗口/输入证明 |
-| 数值准入 | 原始 LightDef 未拒绝零方向、NaN 方向/能量、Inf 能量、退化投影；观察值不是受支持 fallback |
+| 数值准入 | 原始 LightDef 未拒绝非法值；研究 adapter 在 GPU 前拒绝零/非有限/溢出方向、非法能量、非0/1开关、非法投影/bias/缺绑定。原始观测不是受支持 fallback |
 
 固定微样本为自制受影四边形与一个投影四边形，单光、opaque 平色。
 独立 CPU Lambert 与光线/平面交点选点，sRGB 每通道容差 3/255。
@@ -34,13 +35,26 @@ SDK 冻结输入逐文件核验 681/681；pilot 编译使用历史作者侧 auto
 MeshPipeline 持 uniform、2048² Depth32Float 阴影图与按 target 尺寸重建的深度 view；
 OffscreenTarget 持颜色目标。阴影图名义 16MiB，不等于实测显存驻留。
 
-20 轮底层 pipeline 创建/绘制/64→128 尺寸切换/drop、零尺寸拒绝通过；
-20 轮坏源→修复的新编译进程恢复通过。这些是受控 fixture 层，
-**不是作者灯光的 driver Run/Stop**；该支路因端口缺失不可达。
+20 轮研究 Run 每轮重新从磁盘读取描述/生成源/资源，真实编译 VM、启动、
+执行 Tick、64→128 尺寸切换、零尺寸拒绝、Stop 通过；初始状态每轮重置，
+Stop 后 VM strings/heap 弱引用失活，pipeline owner 弱引用失活，warm mesh
+上传仍为344B。它证明逻辑 owner 生命周期，物理 GPU 显存释放字节未知。
+同一 Run 入口实测坏生成源、缺失 getter 描述、非法 mesh 资源拒绝，
+保留正在运行的 last-good，精确修复后下一次实际 Run 恢复并重新查询/绘制。
+这些是受控研究 runner 层，**不是生产 Host 或原生输入**。
 最后一轮样本：device 创建 703122µs、mesh 上传 389µs、pipeline 创建
 20901µs；双实例阴影帧 CPU 提交 225µs、提交加 wait 395µs。
 它们包含驱动/同步成本，不是 GPU ms 或分离 shader 编译耗时；无 GPU
-timestamp、作者 CPU Tick、credits/steps、物理释放字节实测。
+timestamp、物理释放字节实测。修复后的研究 runner 另有实际 compile/Tick
+CPU 耗时及 SDK callback steps/slices 记录，详见 Plan；这些不是GPU时间，
+也不代表旧game32credits包络。
+
+研究绑定仅使用 x/z 平面光向（z绝对值≥0.01、长度平方有限且非零）、
+energy∈[0,1]、shadow∈{0,1}；投影radius>0、0≤near<far、bias∈[0,.01]，
+输出矩阵必须有限。光向与正交投影射线一致。业务状态变化全部在 Node
+局部事件中；Rust 只做读取、类型/数值检查、通用投影和 GPU 接缝。
+SDK 调用先执行通用空 main 入口以初始化生成 globals，再执行 app_start，
+不会用 Rust 初始化或替换作者业务。此研究接线不冒充稳定生成器/生产协议。
 
 ## 最小后继合同建议
 
@@ -50,5 +64,5 @@ timestamp、作者 CPU Tick、credits/steps、物理释放字节实测。
 同一方向生成投影矩阵，保留现有 culling/bias 与逆转置法线语义；
 非法输入必须在 GPU 写入前具名拒绝且保持 last-good。
 应补真正 driver Run/Stop/resize/坏资源恢复与 owner 释放证明。
-在这些条件实证前，不可将本 no-go 改写为作者灯光支持；本研究不覆盖
+正式作者能力仍须上述完整合同，不能把研究 bounded-go 改写为产品灯光支持；本研究不覆盖
 多灯、点光/聚光、PBR、透明材质、混合 UI 或完整目录容量。
