@@ -65,6 +65,11 @@ pub fn parse_msg_decl(ctx: &mut dyn ParseContext) -> AutoResult<MsgDecl> {
         if ctx.is_kind(TokenKind::RBrace) {
             break;
         }
+        // PLAN-940：EOF 推进不变量——EOF token 文本为空、advance 不越过
+        // EOF，无守卫时空名 variant 被无限收集（UI042 病理族）。受控拒绝。
+        if ctx.is_kind(TokenKind::EOF) {
+            ctx.expect(TokenKind::RBrace)?;
+        }
 
         // Quoted variant names ("update" / "link-click") are
         // contractual emit names — record the quote so the Vue codegen

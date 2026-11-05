@@ -307,7 +307,9 @@ mod plan042_reload_readiness_tests {
 
         // 非法编辑：可解析但无 widget 声明（泵找不到候选，跳过该拍）。
         // 注：截断的 widget 残句曾触发 parser 51GB 病理分配（进程 OOM 中止），
-        // 作为具名缺口记入 §11，探针不采用该类输入。
+        // 作为具名缺口记入 §11——该缺口已由 PLAN-940 的 EOF 推进守卫关闭，
+        // 截断腿由 t02b_truncated_widget_keeps_old_and_next_legal_edit_wins
+        // 直接覆盖。
         std::fs::write(&path, "fn forty_two() -> int { 42 }\n").unwrap();
         f_set_forward(&path);
         assert!(
@@ -325,6 +327,62 @@ mod plan042_reload_readiness_tests {
             comp.read_state("count").unwrap(),
             Value::Int(11),
             "失败拍旧组件完整继续"
+        );
+
+        // 修复（mtime 再次前进）→ 下一次合法编辑成功。
+        std::fs::write(&path, COUNTER_V2).unwrap();
+        f_set_forward(&path);
+        assert!(comp.check_file_changed().unwrap().is_some());
+        let code = std::fs::read_to_string(&path).unwrap();
+        pump_try_reload(&mut comp, &code)
+            .expect("reload ok")
+            .expect("extracted");
+        assert_eq!(comp.read_state("count").unwrap(), Value::Int(11), "恢复后保值");
+        assert_eq!(comp.read_state("step").unwrap(), Value::Int(5));
+    }
+
+    /// PLAN-940 V-03：截断 widget 候选（UI042 51GB 病理形态，真实语法在
+    /// view 块内截断；修复前监督探针 >512MiB/10s resource-stop，修复后
+    /// 受控 Err）——泵不得替换旧组件（count=11 保值，旧 handler 随组件
+    /// 保留），修复文件后下一次合法编辑成功。042 时代"截断输入不采用"的
+    /// 具名缺口由此关闭（方言侧反例族见 auto-ui-dialect
+    /// regression/parser_eof_progress.rs）。
+    #[test]
+    fn t02b_truncated_widget_keeps_old_and_next_legal_edit_wins() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("counter.at");
+        std::fs::write(&path, COUNTER_V1).unwrap();
+
+        let mut comp = build_comp(COUNTER_V1);
+        comp.set_source_path(&path);
+        comp.write_state("count", Value::Int(11)).unwrap();
+
+        // 截断编辑：view 块内截断（EOF 旋转形态）。
+        const TRUNCATED: &str = concat!(
+            "widget Counter {\n",
+            "    model {\n",
+            "        var count int = 0\n",
+            "        var label str = \"n\"\n",
+            "    }\n",
+            "    view {",
+        );
+        std::fs::write(&path, TRUNCATED).unwrap();
+        f_set_forward(&path);
+        assert!(
+            comp.check_file_changed().unwrap().is_some(),
+            "截断编辑仍被检出（last_modified 推进）"
+        );
+        let code = std::fs::read_to_string(&path).unwrap();
+        assert!(
+            pump_try_reload(&mut comp, &code)
+                .map(|r| r.is_none())
+                .unwrap_or(true),
+            "截断候选不得产出 reload"
+        );
+        assert_eq!(
+            comp.read_state("count").unwrap(),
+            Value::Int(11),
+            "截断拍旧组件完整继续"
         );
 
         // 修复（mtime 再次前进）→ 下一次合法编辑成功。

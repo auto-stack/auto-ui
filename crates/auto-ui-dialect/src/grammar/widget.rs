@@ -841,6 +841,10 @@ pub(crate) fn parse_widget_use_block_inner(
             cx.expect(TokenKind::LSquare)?;
             cx.skip_empty_lines();
             while !cx.is_kind(TokenKind::RSquare) {
+                // PLAN-940：EOF 推进不变量——EOF 空字段名无限收集。受控拒绝于 `]`。
+                if cx.is_kind(TokenKind::EOF) {
+                    cx.expect(TokenKind::RSquare)?;
+                }
                 let fname = cx.cur_text();
                 cx.advance();
                 ref_fields.push(fname.into());
@@ -1075,6 +1079,10 @@ pub(crate) fn parse_setup_block_inner(
             cx.expect(TokenKind::LSquare)?;
             let mut fields = Vec::new();
             while !cx.is_kind(TokenKind::RSquare) {
+                // PLAN-940：EOF 推进不变量——EOF 空字段名无限收集。受控拒绝于 `]`。
+                if cx.is_kind(TokenKind::EOF) {
+                    cx.expect(TokenKind::RSquare)?;
+                }
                 fields.push(cx.cur_text().to_string());
                 cx.advance();
                 if cx.is_kind(TokenKind::Comma) {

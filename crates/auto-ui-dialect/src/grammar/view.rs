@@ -64,6 +64,11 @@ pub fn parse_component_fn_decl(cx: &mut dyn DomainParseContext) -> AutoResult<Ui
     if cx.cur_text().as_str() == "(" {
         cx.advance();
         while cx.cur_text().as_str() != ")" {
+            // PLAN-940：EOF 推进不变量——advance 不越过 EOF，无守卫时
+            // 空 token 被无限收集（参数循环病理族）。受控拒绝于 `)`。
+            if cx.is_kind(TokenKind::EOF) {
+                cx.expect(TokenKind::RParen)?;
+            }
             cx.skip_empty_lines();
             let pname = cx.cur_text();
             cx.advance();
@@ -72,6 +77,9 @@ pub fn parse_component_fn_decl(cx: &mut dyn DomainParseContext) -> AutoResult<Ui
                 cx.advance();
                 let mut ty_parts = Vec::new();
                 while !matches!(cx.cur_text().as_str(), "," | ")") {
+                    if cx.is_kind(TokenKind::EOF) {
+                        cx.expect(TokenKind::RParen)?;
+                    }
                     ty_parts.push(cx.cur_text().as_str().to_string());
                     cx.advance();
                 }
@@ -207,6 +215,10 @@ pub(crate) fn parse_fragment_decl_body_tail(cx: &mut dyn DomainParseContext) -> 
     if cx.cur_text().as_str() == "(" {
         cx.advance();
         while cx.cur_text().as_str() != ")" {
+            // PLAN-940：EOF 推进不变量（同 component fn 参数循环）。
+            if cx.is_kind(TokenKind::EOF) {
+                cx.expect(TokenKind::RParen)?;
+            }
             cx.skip_empty_lines();
             let pname = cx.cur_text();
             cx.advance();
@@ -215,6 +227,9 @@ pub(crate) fn parse_fragment_decl_body_tail(cx: &mut dyn DomainParseContext) -> 
                 cx.advance();
                 let mut ty_parts = Vec::new();
                 while !matches!(cx.cur_text().as_str(), "," | ")") {
+                    if cx.is_kind(TokenKind::EOF) {
+                        cx.expect(TokenKind::RParen)?;
+                    }
                     ty_parts.push(cx.cur_text().as_str().to_string());
                     cx.advance();
                 }
@@ -270,6 +285,12 @@ pub(crate) fn parse_view_root_nodes(cx: &mut dyn DomainParseContext) -> AutoResu
         cx.skip_empty_lines();
         if cx.is_kind(TokenKind::RBrace) {
             break;
+        }
+        // PLAN-940：EOF 推进不变量——`parse_view_node` 在 EOF 可 Ok 返回
+        // 空元素且游标不动（advance 不越过 EOF），此循环只看 RBrace 会
+        // 无限 push 根节点（UI042 51GB 病理）。EOF 走 expect 的受控拒绝。
+        if cx.is_kind(TokenKind::EOF) {
+            cx.expect(TokenKind::RBrace)?;
         }
         roots.push(parse_view_node(cx)?);
     }
@@ -978,6 +999,11 @@ pub(crate) fn parse_view_for_loop(cx: &mut dyn DomainParseContext) -> AutoResult
         if cx.is_kind(TokenKind::RBrace) {
             break;
         }
+        // PLAN-940：EOF 推进不变量——`parse_view_node` 在 EOF 可 Ok 返回
+        // 空元素且游标不动，无守卫时子节点被无限收集。受控拒绝于 `}`。
+        if cx.is_kind(TokenKind::EOF) {
+            cx.expect(TokenKind::RBrace)?;
+        }
         let node = parse_view_node(cx)?;
         body.push(node);
         cx.skip_empty_lines();
@@ -1139,6 +1165,11 @@ pub(crate) fn parse_view_memo_block(cx: &mut dyn DomainParseContext) -> AutoResu
         if cx.is_kind(TokenKind::RBrace) {
             break;
         }
+        // PLAN-940：EOF 推进不变量——`parse_view_node` 在 EOF 可 Ok 返回
+        // 空元素且游标不动，无守卫时子节点被无限收集。受控拒绝于 `}`。
+        if cx.is_kind(TokenKind::EOF) {
+            cx.expect(TokenKind::RBrace)?;
+        }
         let node = parse_view_node(cx)?;
         body.push(node);
         cx.skip_empty_lines();
@@ -1264,6 +1295,10 @@ pub(crate) fn parse_view_link(cx: &mut dyn DomainParseContext) -> AutoResult<Vie
             cx.skip_empty_lines();
             if cx.is_kind(TokenKind::RBrace) {
                 break;
+            }
+            // PLAN-940：EOF 推进不变量（同 view/for/memo 子节点循环）。
+            if cx.is_kind(TokenKind::EOF) {
+                cx.expect(TokenKind::RBrace)?;
             }
             let child = parse_view_node(cx)?;
             children.push(child);
@@ -1812,8 +1847,16 @@ pub(crate) fn parse_handler_params(cx: &mut dyn DomainParseContext) -> AutoResul
     cx.advance();
     let mut groups: Vec<Vec<String>> = Vec::new();
     while !cx.is_kind(TokenKind::RParen) {
+        // PLAN-940：EOF 推进不变量——advance 不越过 EOF，内层循环在
+        // EOF 会无限收集空 token。受控拒绝于 `)`。
+        if cx.is_kind(TokenKind::EOF) {
+            cx.expect(TokenKind::RParen)?;
+        }
         let mut group = Vec::new();
         while !cx.is_kind(TokenKind::Comma) && !cx.is_kind(TokenKind::RParen) {
+            if cx.is_kind(TokenKind::EOF) {
+                cx.expect(TokenKind::RParen)?;
+            }
             group.push(cx.cur_text().to_string());
             cx.advance();
         }

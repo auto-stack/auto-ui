@@ -94,6 +94,10 @@ pub fn parse_use_web(cx: &mut dyn DomainParseContext) -> AutoResult<UiStmt> {
         cx.expect(TokenKind::Colon)?;
         cx.expect(TokenKind::LSquare)?;
         while !cx.is_kind(TokenKind::RSquare) {
+            // PLAN-940：EOF 推进不变量——EOF 空字段名无限收集。受控拒绝于 `]`。
+            if cx.is_kind(TokenKind::EOF) {
+                cx.expect(TokenKind::RSquare)?;
+            }
             ref_fields.push(cx.cur_text().into());
             cx.advance();
             if cx.is_kind(TokenKind::Comma) {

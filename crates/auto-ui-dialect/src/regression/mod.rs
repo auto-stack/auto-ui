@@ -7,6 +7,8 @@
 
 #[cfg(test)]
 #[cfg(test)]
+pub mod parser_eof_progress;
+#[cfg(test)]
 pub mod parser_ui_grammar;
 #[cfg(test)]
 pub mod trans_gdscript;
