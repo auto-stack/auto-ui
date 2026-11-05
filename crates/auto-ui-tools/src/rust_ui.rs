@@ -461,6 +461,18 @@ fn regenerate_code_only(project_dir: &Path, rust_dir: &Path, src_: &PacSource) -
     let component_fields = collect_component_state_fields(&at_files);
     // PLAN-039 T-14（组件传型）：props 声明序预注册（构造参数重排）。
     collect_component_prop_orders(&at_files);
+    // PLAN-052：项目内模块 fn 的 BARE_FN_SIGS 预注册——此前仅 dep 模块
+    // 内嵌路径注册（3333），项目本地模块（calendar_util.at 族）无签名，
+    // 消费文件（字母序先编译）的 computed 返回型落空默认 String
+    // （calendar `days => build_month_grid(...)` 的 iter-on-String 株）。
+    {
+        let mut primer = RustGenerator::new();
+        for f in &at_files {
+            if let Ok(content) = fs::read_to_string(f) {
+                primer.register_bare_fn_sigs_from_source(&content);
+            }
+        }
+    }
     // Plan 371 L1: cross-file component semantics (written props).
     let component_semantics = collect_component_semantics(&at_files);
     // PLAN-052 F2：api 型名集合（back api.at `pub type` 已由
@@ -723,6 +735,18 @@ pub(crate) fn compile_rust_ui_app(
     let component_fields = collect_component_state_fields(&at_files);
     // PLAN-039 T-14（组件传型）：props 声明序预注册（构造参数重排）。
     collect_component_prop_orders(&at_files);
+    // PLAN-052：项目内模块 fn 的 BARE_FN_SIGS 预注册——此前仅 dep 模块
+    // 内嵌路径注册（3333），项目本地模块（calendar_util.at 族）无签名，
+    // 消费文件（字母序先编译）的 computed 返回型落空默认 String
+    // （calendar `days => build_month_grid(...)` 的 iter-on-String 株）。
+    {
+        let mut primer = RustGenerator::new();
+        for f in &at_files {
+            if let Ok(content) = fs::read_to_string(f) {
+                primer.register_bare_fn_sigs_from_source(&content);
+            }
+        }
+    }
     // Plan 371 L1: cross-file component semantics (written props).
     let component_semantics = collect_component_semantics(&at_files);
     // PLAN-052 F2：api 型名集合（同 regenerate 面，见该面注释）。
