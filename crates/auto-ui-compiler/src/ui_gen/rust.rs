@@ -8812,6 +8812,31 @@ fn collect_local_elems(
                 }
             }
         }
+        // PLAN-052：同步字段与子结构实际字段求交——此前父 state 全量
+        // 同步进子（VM 统一堆语义的编译等价假设），子未声明的字段写成
+        // __child.<不存在>（database TreeIcon ftExpanded 株 E0609）。
+        // 子字段集 = CHILD_PROP_TYPES（预扫 props）∪ component_state_fields
+        // （子自身 state）；两注册表皆无该子信息时保持原行为（兼容面）。
+        let child_declared: Option<std::collections::HashSet<String>> = {
+            let mut set = std::collections::HashSet::new();
+            let mut any = false;
+            if let Some(props) = CHILD_PROP_TYPES.with(|m| m.borrow().get(child_name).cloned()) {
+                any = true;
+                for k in props.keys() {
+                    set.insert(k.clone());
+                }
+            }
+            if let Some(cf) = self.component_state_fields.get(child_name) {
+                any = true;
+                for (f, _ty) in cf {
+                    set.insert(f.clone());
+                }
+            }
+            if any { Some(set) } else { None }
+        };
+        if let Some(declared) = child_declared {
+            fields.retain(|f| declared.contains(f));
+        }
         fields
     }
 
