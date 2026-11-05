@@ -980,6 +980,14 @@ where
     }
 
     fn on_input(&mut self, input: &crate::ui::desktop_protocol::message::InputMsg) {
+        // Native remote clients use this generic source, while VM clients may
+        // use McpHeadlessSource. Actions have no iced event representation.
+        if let super::message::InputMsg::Action { name, arg, .. } = input {
+            if self.surface.component.dispatch_named(name, arg.as_deref()) {
+                self.rev += 1;
+            }
+            return;
+        }
         // 光标位同步（hover 态渲染依赖——iced Cursor::Available）。
         // PLAN-694：press/release 同步（携带 x,y——任何位置性输入都蕴含
         // 光标在位；桌面会话注入面无 PointerMoved 生产（hover 不上线），
@@ -1580,6 +1588,39 @@ fn decode_image_rgba(bytes: &[u8]) -> Option<(u32, u32, Vec<u8>)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn p060_native_headless_action_updates_component_and_frame_revision() {
+        use crate::ui::desktop_protocol::{endpoint::FrameSource, message::InputMsg};
+        use crate::ui::view::View;
+
+        #[derive(Debug)]
+        struct NativeLabel(String);
+        impl Component for NativeLabel {
+            type Msg = String;
+            fn on(&mut self, msg: String) { self.0 = msg; }
+            fn view(&self) -> View<String> { View::text(self.0.clone()) }
+            fn dispatch_named(&mut self, name: &str, arg: Option<&str>) -> bool {
+                match (name, arg) {
+                    ("SetLabel", Some(value)) => { self.on(value.to_string()); true }
+                    _ => false,
+                }
+            }
+        }
+        let mut source = HeadlessFrameSource::new(NativeLabel("before".into()), 320.0, 200.0);
+        let revision = source.revision();
+        for (name, arg) in [("Unknown", Some("wrong")), ("SetLabel", None)] {
+            source.on_input(&InputMsg::Action { wid: 1, name: name.into(), arg: arg.map(str::to_string) });
+            assert_eq!(source.revision(), revision);
+            assert_eq!(source.surface.component.0, "before");
+        }
+        source.on_input(&InputMsg::Action { wid: 1, name: "SetLabel".into(), arg: Some("after".into()) });
+        assert_eq!(source.revision(), revision + 1);
+        assert_eq!(source.surface.component.0, "after");
+        assert!(source.render_frame().ops.iter().any(|op| matches!(
+            op, DrawOp::Text { text, .. } | DrawOp::TextStyled { text, .. } if text == "after"
+        )));
+    }
 
     fn example_source(dir: &str) -> Option<String> {
         let base = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/ui/");

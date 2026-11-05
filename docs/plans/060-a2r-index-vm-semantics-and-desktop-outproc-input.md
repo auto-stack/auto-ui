@@ -368,3 +368,8 @@ back 侧 `auto-notes-...-back` 是完整 axum/DB 实现。故 iced 桌面上任�
   - ⇒ 本轮及前几轮的「无 child action 日志」不可信：运行的二进制不是最新 auto-ui 编出的。
   - 正确回路：更新组树后必须走 **`auto build -r rust`**（它负责 publish 到 `bin/debug/`），不要手工从 guessed target 目录拷贝；每次验证前先比对二进制标记/时间。
   - 下一步：固定流程（组树→auto build→校验标记→运行），再判定 Action 是否被消费。
+
+- stage: work | plan_id: auto-ui/PLAN-060 | plan_revision: 1 | round: 31 | task_ids: T-07 | outcome: native headless Action root cause fixed, regression red→green | evidence:
+  - 2026-11-06 用户授权继续解决054全部前置。native remote入口确实创建泛型HeadlessFrameSource；此前Action分支只在VM专用McpHeadlessSource，泛型源的input_to_iced_events(Action)=[]导致提前返回。修复在泛型源先dispatch_named，成功时rev+1；未知消息/缺参数不推进。
+  - permanent case `ui::desktop_protocol::headless::tests::p060_native_headless_action_updates_component_and_frame_revision`：真实native Component经FrameSource输入；未知/缺参数对照保持状态与revision，合法SetLabel改变状态并产出包含after的帧。修复前0/1（revision left=0/right=1），修复后 `cargo test -p auto-ui-runtime --lib p060_native_headless_action_updates_component_and_frame_revision` exit=0，1 passed/0 failed/0 ignored，0.12s。日志 D:/autostack/plan-artifacts/plan-054/t04/headless-action-green.log；不把结构测试等同桌面业务通过。
+  - 构建漂移旧结论纠正：源码格式串mode={:?}编译为独立字面量，calendar发布物确含` mode=`/` state=`。published SHA=923f77a304ba26a820aa325b2b7398baa01a73bcc43f763f93b4c2cee9e17b9b与generation.json一致；手建target SHA不同属于未publish，且r65运行早于发布物mtime。下一步消费本修复→auto build→核对artifact/receipt/process identity→实机NextMonth与事件任务。
