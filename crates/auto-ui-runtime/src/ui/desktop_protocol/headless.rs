@@ -918,14 +918,14 @@ where
 /// AUTO_PLAN060_DIAG=路径 时启用；验收排障用，生产缺省零开销一次
 /// env 查找）。
 #[cfg(debug_assertions)]
-pub(crate) fn plan060_diag(
+pub(crate) fn plan060_diag<T: std::fmt::Debug>(
     input: &crate::ui::desktop_protocol::message::InputMsg,
-    messages: usize,
+    messages: &[T],
 ) {
     let Ok(path) = std::env::var("AUTO_PLAN060_DIAG") else { return };
     use std::io::Write;
     if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
-        let _ = writeln!(f, "{input:?} -> {messages} msg");
+        let _ = writeln!(f, "{input:?} -> {messages:?}");
     }
 }
 impl<C: Component> super::endpoint::FrameSource for HeadlessFrameSource<C>
@@ -986,7 +986,7 @@ where
             return;
         }
         let messages = self.surface.update(&events);
-        plan060_diag(input, messages.len());
+        plan060_diag(input, &messages);
         // 消息产出 = 组件状态可能变化 → revision 前进（泵对账产帧）。
         if !messages.is_empty() {
             self.rev += 1;
@@ -1173,7 +1173,7 @@ impl super::endpoint::FrameSource for McpHeadlessSource {
             return;
         }
         let messages = self.surface.update(&events);
-        plan060_diag(input, messages.len());
+        plan060_diag(input, &messages);
         if !messages.is_empty() {
             self.rev += 1;
         }
@@ -1894,4 +1894,5 @@ mod tests {
         }
     }
 }
+
 
