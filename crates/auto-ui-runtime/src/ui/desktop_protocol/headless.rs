@@ -561,6 +561,10 @@ fn buffer_runs(
         } else {
             first.font_size * 1.3
         };
+        // cosmic's run.text is the entire logical line, even after soft wrap.
+        // Glyph cluster offsets select this visual run's UTF-8 source range.
+        let start = run.glyphs.iter().map(|glyph| glyph.start).min().unwrap();
+        let end = run.glyphs.iter().map(|glyph| glyph.end).max().unwrap();
         emit(
             position.x + translation.x + first.x,
             position.y + translation.y + run.line_top,
@@ -568,7 +572,7 @@ fn buffer_runs(
             line_h,
             rgba,
             first.font_weight.0,
-            run.text.to_string(),
+            run.text[start..end].to_string(),
         );
     }
 }
@@ -1602,6 +1606,26 @@ fn decode_image_rgba(bytes: &[u8]) -> Option<(u32, u32, Vec<u8>)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn p060_wrapped_text_emits_only_each_visual_run() {
+        let mut fonts = cosmic_text::FontSystem::new();
+        for content in ["ABCDEFGHIJKLMNO", "中文路径客户数据库", "first\nsecond"] {
+            let mut buffer = cosmic_text::Buffer::new(
+                &mut fonts, cosmic_text::Metrics::new(16.0, 20.0),
+            );
+            buffer.set_size(&mut fonts, Some(45.0), Some(500.0));
+            buffer.set_text(&mut fonts, content, &cosmic_text::Attrs::new(), cosmic_text::Shaping::Advanced, None);
+            buffer.shape_until_scroll(&mut fonts, false);
+            let mut runs = Vec::new();
+            buffer_runs(&buffer, iced::Point::ORIGIN, iced::Color::BLACK, iced::Vector::ZERO,
+                |_, y, _, _, _, _, text| runs.push((y, text)));
+            assert!(runs.len() > 1, "fixture must wrap: {content:?}");
+            assert!(runs.windows(2).all(|pair| pair[0].0 < pair[1].0));
+            assert_eq!(runs.iter().map(|(_, text)| text.as_str()).collect::<String>(), content.replace('\n', ""),
+                "visual runs must partition source rather than repeat the entire logical line");
+        }
+    }
 
     #[test]
     fn p060_native_headless_ctrl_a_replaces_existing_input() {
