@@ -12264,12 +12264,88 @@ fn collect_local_elems(
     /// 接收者走 `__at_*` shim 家族（rust_ui.rs 文件级注入，VM 宽松语义：
     /// len 串按字符/数组按元素、str 数值降串不带引号）。返回 None =
     /// 非内建（或接收者 unknown 且方法不安全），落回默认 Call 路径。
+    /// PLAN-052：VM 命名空间调用面——Http/Env/json（chat 双轨数据
+    /// 配方 PLAN-617 族）。a2r 原生轨取 VM 配方：Env.track() 折叠
+    /// "vm"（比较面 `!= "vue"` 恒真走 Http 臂）；Http.post/get_json
+    /// → a2r_std::http 同步帮手（.1 = body 串，VM Http 同返回形）；
+    /// json.to_value/parse → a2r_std::json::parse（to_value 经
+    /// to_string 往返兼容对象实参——vue 分支恒编译可过）。
+    /// 点式（Dot 基座）与 flat Ident（`Http.post` 单名解析形）双形态
+    /// 共用。
+    fn try_namespace_call(
+        &self,
+        base: &str,
+        method: &str,
+        call: &auto_lang_core::ast::Call,
+    ) -> Option<String> {
+        let one = |i: usize| -> Option<String> {
+            call.args
+                .args
+                .get(i)
+                .map(|a| self.ast_expr_to_rust_no_to_string(&a.get_expr()))
+        };
+        match base {
+            "Http" | "http" => match method {
+                "post" => {
+                    return Some(format!(
+                        "::a2r_std::http::post_sync(&({}), &({}), \"\").1",
+                        one(0)?,
+                        one(1)?
+                    ));
+                }
+                "get_json" | "get" => {
+                    return Some(format!(
+                        "::a2r_std::http::get_sync(&({})).1",
+                        one(0)?
+                    ));
+                }
+                _ => {}
+            },
+            "Env" | "env" => match method {
+                "track" => return Some("\"vm\".to_string()".to_string()),
+                "get" => {
+                    return Some(format!(
+                        "::a2r_std::env::get(&({}))",
+                        one(0)?
+                    ));
+                }
+                _ => {}
+            },
+            "json" => match method {
+                "to_value" => {
+                    return Some(format!(
+                        "auto_lang_core::a2r_std::json::parse(&(({})).to_string())",
+                        one(0)?
+                    ));
+                }
+                "parse" => {
+                    // PLAN-052：parse 实参恒串化往返——VM 面实参既有
+                    // str 也有 Value（`json.parse(Http.post(...))` 值形）
+                    // ——to_string 对两者皆 JSON 文本保形。
+                    return Some(format!(
+                        "auto_lang_core::a2r_std::json::parse(&(({})).to_string())",
+                        one(0)?
+                    ));
+                }
+                _ => {}
+            },
+            _ => {}
+        }
+        None
+    }
+
     fn try_builtin_method_call(
         &self,
         obj: &auto_lang_core::ast::Expr,
         method: &str,
         call: &auto_lang_core::ast::Call,
     ) -> Option<String> {
+        // PLAN-052：命名空间点式形态委托（flat 形态在 Call 发射臂）。
+        if let auto_lang_core::ast::Expr::Ident(base) = obj {
+            if let Some(t) = self.try_namespace_call(base.as_str(), method, call) {
+                return Some(t);
+            }
+        }
         let kind = self.builtin_receiver_kind(obj);
         if kind == "unknown" {
             // unknown 接收者只收 str 安全族（串局部常见面）——len 的
@@ -13536,11 +13612,21 @@ fn collect_local_elems(
                         let prop_name = inner_field.as_str();
                         // Pattern: self.prop_name.field_str
                         if (inner_s == "self" || inner_s.starts_with('.'))
-                            && self.needs_index_access(prop_name)
+                            && self.is_loop_var(prop_name)
                         {
-                            // Reading from Value: self.note["field"] with type-aware accessor
-                            let obj_expr = format!("self.{}", prop_name);
-                            return self.value_field_access(&obj_expr, field_str);
+                            // PLAN-052：循环变量基座（chat sidebar `.c.id` /
+                            // `.p.peer_id` 株——`.c` 拍平 Ident 进 prop_name，
+                            // 基座是循环变量非态字段，self. 前缀 = 不存在字段
+                            // E0609）。Value 格循环变量走括号访问器（裸名基
+                            // 座）；typed 格（元素为实体 struct）走直发字段
+                            //（`.iter()` 借位元素点访问）。
+                            if self.needs_index_access(prop_name) {
+                                return self.value_field_access(
+                                    prop_name,
+                                    field_str,
+                                );
+                            }
+                            return format!("{}.{}", prop_name, field_str);
                         }
                     }
                 }
@@ -14455,6 +14541,18 @@ fn collect_local_elems(
                 // __at_* shim、str/int 直落 Rust 同义方法）。此前方法名落
                 // Dot 字段降链再挂尾巴 `()`（launcher ic1.len() 25 错株：
                 // `ic1["len"].as_str()…()()`）；None 落默认路径不变。
+                // PLAN-052：flat Ident 命名空间调用（`Http.post(...)` 单名
+                // 解析形——name 是含点 Ident，Dot 形态门不达）。
+                if let auto_lang_core::ast::Expr::Ident(flat_name) = call.name.as_ref() {
+                    let fname = flat_name.as_str();
+                    if !fname.starts_with('.') {
+                        if let Some((base, m)) = fname.split_once('.') {
+                            if let Some(translated) = self.try_namespace_call(base, m, call) {
+                                return translated;
+                            }
+                        }
+                    }
+                }
                 if let auto_lang_core::ast::Expr::Dot(obj, method) = call.name.as_ref() {
                     if let Some(translated) =
                         self.try_builtin_method_call(obj, method.as_str(), call)

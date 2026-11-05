@@ -3788,6 +3788,10 @@ default = ["ui-iced"]
 # 成员须直依赖两包（auto-ui-runtime default 含 ui-iced）。
 auto-ui-runtime.workspace = true
 auto-lang-core.workspace = true
+# PLAN-052：VM 命名空间调用面直依（Http/Env/json → ::a2r_std 同步帮手
+# ——auto_lang_core::a2r_std::http 仅 async 面，sync 帮手在独立
+# a2r-std crate；workspace 已带 path 映射）。
+a2r-std.workspace = true
 # PLAN-811：viewer 桥函数直调媒体基础公开入口（auto_media_core::）。
 auto-media-core.workspace = true
 serde_json.workspace = true
