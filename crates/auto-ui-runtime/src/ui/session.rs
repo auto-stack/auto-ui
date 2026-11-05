@@ -3607,6 +3607,13 @@ impl DesktopSession {
     /// 的窗和桌面卡显示/操作同一份 store）。几何/布局语义与 launch_app
     /// 尾段同构（级联初位 + registry 回填 + 布局应用）。
     pub fn open_window_for_session(&mut self, name: &str, app_id: AppId) -> Result<Wid, String> {
+        // A cached mini must not override the app's current launch contract.
+        // Native apps own their component/backend in the child process.
+        let spec = self.desktop.app_resolver.as_ref().and_then(|resolve| resolve(name));
+        let launch = crate::ui::app_registry::manifest_launch_lookup(std::path::Path::new("."), name);
+        if Self::decide_native_launch(launch.as_deref(), spec.as_ref()) != NativeLaunchDecision::Inproc {
+            return self.launch_app(name);
+        }
         let title = self
             .apps
             .get(&app_id)
@@ -6582,8 +6589,13 @@ impl DesktopSession {
         if !spec.code.contains("view mini") {
             return Ok(None);
         }
-        // exe 形态不孵化（outproc 无窗会话不可达——占位卡保留唯一逃逸口）。
-        if spec.exe.is_some() {
+        // Include convention-discovered executables and strict native
+        // declarations, not just an explicit desktop_exe. Otherwise a mini
+        // silently promotes an interpreted copy instead of launching native.
+        let launch = crate::ui::app_registry::manifest_launch_lookup(std::path::Path::new("."), name);
+        if spec.exe.is_some()
+            || Self::decide_native_launch(launch.as_deref(), Some(&spec)) != NativeLaunchDecision::Inproc
+        {
             return Ok(None);
         }
         // 后端供给链与 launch_app 同序同源（daemon → 外部 back → proxy
@@ -7591,6 +7603,48 @@ mod tests {
     /// 随孵化同链供给——media_root（capability 臂）命中时孵化成功 + proxy
     /// 懒启 + 归属绑定在册（face 可独立取数，小组件不依赖 app 窗）；
     /// exe 形态仍占位卡（outproc 无窗不可达）。无后端同形 app 照常孵化。
+    #[test]
+    fn p060_native_mini_never_bypasses_convention_exe_launch() {
+        const SOURCE: &str = "widget App {\n    view {\n        text \"main\"\n    }\n    view mini {\n        text \"mini\"\n    }\n}\n";
+        let root = std::env::temp_dir().join(format!("p060-native-mini-{}", std::process::id()));
+        let app_dir = root.join("p060-mini-probe");
+        let source = app_dir.join("src/front/app.at");
+        let exe = root.join("rust-workspace/p060-mini-probe/target/debug/probe.exe");
+        std::fs::create_dir_all(source.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(exe.parent().unwrap()).unwrap();
+        std::fs::write(&source, SOURCE).unwrap();
+        std::fs::write(&exe, b"MZ-not-an-executable").unwrap();
+        let spec = LaunchSpec {
+            code: SOURCE.into(),
+            source_path: Some(source.to_string_lossy().into()),
+            name: Some("probe".into()),
+            ..Default::default()
+        };
+        assert_eq!(DesktopSession::outproc_native_exe(&spec), Some(exe.clone()));
+        let resolver_source = source.to_string_lossy().into_owned();
+        let mut ds = DesktopSession::__test_session();
+        ds.__test_open_desktop();
+        ds.desktop.app_resolver = Some(std::sync::Arc::new(move |name: &str| {
+            (name == "p060-mini-probe").then(|| LaunchSpec {
+                code: SOURCE.into(),
+                source_path: Some(resolver_source.clone()),
+                name: Some("probe".into()),
+                ..Default::default()
+            })
+        }));
+        assert_eq!(ds.hatch_mini_app("p060-mini-probe").unwrap(), None,
+            "a convention-discovered native app must not acquire an interpreted mini");
+        let stale = ds.allocate_app(DynamicComponent::new(&make_mini_widget("OldMini")).unwrap());
+        assert!(ds.open_window_for_session("p060-mini-probe", stale).is_err(),
+            "native launch must surface the invalid executable instead of promoting an old mini");
+        assert!(ds.host.as_ref().unwrap().wm.wins.is_empty());
+        std::fs::remove_file(&exe).unwrap();
+        let vm = ds.hatch_mini_app("p060-mini-probe").unwrap().expect("a VM-only mini remains supported");
+        ds.open_window_for_session("p060-mini-probe", vm).expect("normal mini promotion");
+        assert_eq!(ds.host.as_ref().unwrap().wm.wins.len(), 1);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     #[test]
     fn hatch_provisions_backend_apps_and_still_refuses_exe() {
         const MINI_SRC: &str = "widget Probe {\n    view {\n        text \"x\"\n    }\n    view mini {\n        text \"m\"\n    }\n}\n";
