@@ -1,13 +1,18 @@
 {
   "schema": "autographics.node-ui-mixed/1",
   "generator": "autographics-node2d-pilot plan049 node-ui-mixed",
-  "world_sha256": "522006c5109e8d0cf24e87d8b22c9504a4551cf8de4719a97ae926feba580623",
+  "world_sha256": "87e67f5abda757af89d2670b77aee164d214734c43091c748ef90172091cc1f8",
   "root": "Main",
   "instances": [
     {
       "path": "Main/a",
       "node": "Counter",
       "def_idx": 0
+    },
+    {
+      "path": "Main/b",
+      "node": "Counter",
+      "def_idx": 1
     }
   ],
   "defs": {
@@ -132,6 +137,11 @@
             {
               "kind": "Instance",
               "name": "a",
+              "node": "Counter"
+            },
+            {
+              "kind": "Instance",
+              "name": "b",
               "node": "Counter"
             },
             {

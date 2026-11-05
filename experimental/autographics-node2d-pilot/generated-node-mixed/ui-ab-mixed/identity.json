@@ -1,18 +1,18 @@
 {
  "generator": "autographics-node2d-pilot plan049 node-ui-mixed",
  "api": "autographics.node-ui-mixed/1",
- "user_source_sha256": "522006c5109e8d0cf24e87d8b22c9504a4551cf8de4719a97ae926feba580623",
- "user_source_bytes": 11961,
+ "user_source_sha256": "87e67f5abda757af89d2670b77aee164d214734c43091c748ef90172091cc1f8",
+ "user_source_bytes": 17476,
  "ui_schema": "autographics.node-ui-mixed/1",
   "module:counter": "5f360701c429fdf442dca4dbd9143ed8102fdd4bc461b15c93426ad93a04bbd0",
-  "module:main": "358a9bee77698bf2d7baa5ed62b3a5138c18420ef7ceacc4a9840dd39a707207",
+  "module:main": "189628505fe4a3145e3e471612fe8e2369db40828f43ba42f72c1ac715e4c549",
  "closure": [
   {"name": "counter", "sha256": "5f360701c429fdf442dca4dbd9143ed8102fdd4bc461b15c93426ad93a04bbd0", "bytes": 733},
-  {"name": "main", "sha256": "358a9bee77698bf2d7baa5ed62b3a5138c18420ef7ceacc4a9840dd39a707207", "bytes": 1961}
+  {"name": "main", "sha256": "189628505fe4a3145e3e471612fe8e2369db40828f43ba42f72c1ac715e4c549", "bytes": 2049}
  ],
  "provenance": {
   "product": "generated-node-mixed/ui-ab-mixed",
   "consumption": "ui.json regions drive per-dimension child surfaces (Game2d/Scene3d) mounted Flat2d into the UI view; scene bindings read the SAME int getter ABI as text/condition/layout; region clicks dispatch through the shared _ui_click_ ABI; one Session owner, one app_start/app_update per explicit step",
-  "world_sha256": "522006c5109e8d0cf24e87d8b22c9504a4551cf8de4719a97ae926feba580623"
+  "world_sha256": "87e67f5abda757af89d2670b77aee164d214734c43091c748ef90172091cc1f8"
  }
 }

@@ -27,6 +27,10 @@ node Main {
                 start: 0
                 step: 1
             }
+            Counter b {
+                start: 10
+                step: 2
+            }
             row spacer { height: .spacer }
             row regions {
                 view-2d reg2 {
