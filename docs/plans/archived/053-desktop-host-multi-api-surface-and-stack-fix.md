@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-05
 updated_at: 2026-11-05
 plan_revision: 2
-current_step: 5
+current_step: 6
 total_steps: 6
 base_branch: master
 base_commit: 8ed8a2e1f2dc93bf31d6f730d380f55bdbc9baa1
@@ -82,7 +82,7 @@ auto-os/PLAN-054 vue 轨 8 app 嵌载的具名最小前置。
 - [x] T-02：候选组合 8 app 实机验证（嵌/开/基本任务）+ 大输入不溢出。
 - [x] T-03：漂移/文档/收据，execution_done。
 - [x] T-04：独立最终 review（owner_stage=review）。
-- [ ] T-05：跨仓 merge / canonical Specs / 归档与清理（owner_stage=merge）。
+- [x] T-05：跨仓 merge / canonical Specs / 归档与清理（owner_stage=merge）。scratch/空组最终清理收尾见下方「cleanup closeout / continuation 4」与 registry 回执。
 
 ## 6. 执行入口与验证合同
 
@@ -221,6 +221,15 @@ auto-os/PLAN-054 vue 轨 8 app 嵌载的具名最小前置。
 - cleanup blocked audit / continuation 3：上一 goal turn 分类 no progress（只复核并记录同一状态，没有解除阻塞）；本轮再次只读确认空组与 scratch 均仍存在，Q-053-02 无解除答复或外部变化。相同策略阻塞已连续 3 个 goal turn；不存在已确认 live 的等待进程，也无可独立推进的剩余工作，达到 host blocked 阈值。停止自动重试；恢复目录清理能力后由用户 resume，仅继续已登记 cleanup。
 - stage: goal | plan_id: PLAN-053 | plan_revision: r2 | round: 7 | from: user | to: user | status: archived | outcome: blocked | worktree: removed all four; group/scratch cleanup pending | commit: delivery UI 9a94d568 / lang 61207576b; archive recovery 9e05bab3 | next: user (restore Q-053-02 cleanup capability, then resume goal)
 
+
+### cleanup closeout / continuation 4（Q-053-02 关闭，6/6 完成）
+
+- 清理执行：本轮以 reparse-tag 感知扫描（Python 3.14.2 `lstat().st_reparse_tag`；注意 `os.path.islink` 对 junction 返回 False，首轮 islink 扫描误报 0 链接并因穿透 junction 重复计数，已在任何删除动作前发现并纠正）复核 scratch，逐项吻合登记 inventory：92197 regular files、1145696660 bytes、1446 目录 junction。pre-delete 链接清单落盘 `.retention/receipts/plan-053-link-manifest-pre-delete.json`。
+- no-follow 核验：`os.readlink` 解析全部 1446 个 junction，目标全部位于 `D:/autostack/plan-artifacts/plan-053` 内部（pnpm `node_modules/.pnpm` 内部链接），零外部目标——结构上排除穿透到任何仓库。随后逐个 `os.rmdir` 摘除 1446 junction（仅删链接本身），复查 reparse point=0，再删除剩余无链接常规树（92197 文件）与空组 `D:/autostack/.wt/ui-053`。
+- 完好验证：plan-artifacts 其余 9 个 plan-* scope 与非 plan scope 在位（抽查 plan-054 内容正常）；auto-ui `git status` 与清理前会话快照一致；删除路径均在各仓之外。
+- 登记/回执：registry `policy.json` plan-053 记录 → `archived` / scope deleted / holds=[] / disposition + inventory.verified / completed 2026-11-05，并追加 deletions、log（92197 files / 1145696660 bytes）、history 条目；closeout 回执 `.retention/receipts/plan-053-closeout-20261105.json`。恢复 hold（restore cleanup capability）由此回合解除；Q-053-02 关闭；T-05 勾选，6/6 done，goal 完成。
+- stage: goal | plan_id: PLAN-053 | plan_revision: r2 | round: 8 | from: user | to: done | status: archived | outcome: completed | worktree: all removed (four trees, two branches, empty group, scratch scope) | commit: delivery UI 9a94d568 / lang 61207576b; archive 50dfa8e6; closeout docs commit this turn | next: none (6/6)
+
 ## 10. 待澄清事项
 
 ### Q-053-01（2026-11-05，已由用户允许最小跨仓根修关闭）
@@ -238,6 +247,8 @@ auto-os/PLAN-054 vue 轨 8 app 嵌载的具名最小前置。
 
 
 
-### Q-053-02（清理工具策略，未关闭）
+### Q-053-02（清理工具策略，已关闭 2026-11-05）
 
 自动审批拒绝对已核验空组 `D:/autostack/.wt/ui-053` 的删除，返回 `blocked by policy`。代码/Spec/归档已交付，只需恢复最终目录清理能力后继续收尾；不需要再次批准跨仓根修。scratch 含1446目录链接，恢复后须先 no-follow 摘链接，再删除本 scope，不穿透外部目标。
+
+关闭记录：本会话以 reparse-tag 感知扫描 + readlink 清单证明 1446 个 junction 全部为 scope 内部 `.pnpm` 链接后，逐个 no-follow 摘除、复查为零，再删除剩余树与空组；回执见 `.retention/receipts/plan-053-closeout-20261105.json` 与上方「cleanup closeout / continuation 4」。
