@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-055
-status: executing
+status: execution_done
 feature_name: AGE M3俯视二维完整链与容量可行性研究
 author: [Codex]
 created_at: 2026-11-05
 updated_at: 2026-11-05
 plan_revision: 1
-current_step: 5
+current_step: 6
 total_steps: 10
 depends_on: [auto-ui/PLAN-021, auto-ui/PLAN-022, auto-ui/PLAN-032]
 supersedes_spec_components: []
@@ -101,7 +101,7 @@ T-05对可接受最小链做坏输入/过期句柄/query token、资源缺失/�
 | T-03 | work | T-02已有机制结果（含no-go） | 独立轨迹/碰撞/交互反例；不能运行则定位不可达条件，禁止制造绿 | AC-02/03 | [x] |
 | T-04 | work | T-03 | ≤3规模容量/费用/VM/加载绘制/资源分项观测，合法/超界与数组隐患 | AC-03/04 | [x] |
 | T-05 | work | T-04 | 有效最小链故障/20轮Run/修复下一次消费、旧档身份边界；不可达支路明示 | AC-04/05 | [x] |
-| T-06 | work | T-05 | 结论/SD/命令源摘要/容量支持表/后继建议和AG022消费输入 | AC-06 | [ ] |
+| T-06 | work | T-05 | 结论/SD/命令源摘要/容量支持表/后继建议和AG022消费输入 | AC-06 | [x] |
 | T-07 | review | T-06 | 同树独立研究复审，finding返work同员有界复核 | AC-07 | [ ] |
 | T-08 | merge | T-07 pass | 核实落地文件仅已审知识/必要资产，不把实验补丁当功能合入 | AC-08 | [ ] |
 | T-09 | merge | T-08 | canonical/同号归档/当前导航，注明go边界/失败与未证项 | AC-08 | [ ] |
@@ -586,6 +586,28 @@ stage: review | review_scope: final | reviewer_identity: 独立子上下文 /roo
 - `review-plan055_cpu_signed_diagonal_wall_and_floor.log` SHA256 `f5da706ea0caa63ed32f0f41e9e0ff2b9b72e6b9d32782aeda5e1e8b4316daa2`。
 
 pending_closeout_gates: docs-only content/link/format；Spec指向未来同号archive链接须merge实际迁移后关闭；全scope输出对账/guard/清理T08..10归merge。next: work仅修F-055-R1-01→提交→同独立reviewer仅复核受影响SD/Plan数字及hash。T06/T07重开，current_step=5/10；不改plan_revision（无语义合同修改）。
+
+stage: goal | plan_id: PLAN-055 | plan_revision: r1 | round: 2 | from: review | to: work | status: executing | outcome: needs_fix | worktree: D:/autostack/.wt/ui-055/auto-ui | commit: e85f730952714cab7e34b646611575f26efe672a | next: work（F-055-R1-01，仅SD数字）
+
+### F-055-R1-01 有界文档修复（2026-11-05）
+
+冻结 `lower-results.json` 的7条原始样本持久摘要如下；记录器本身exit0不等于各产品均接受。
+
+| 样本 | profile | 逐命令exit | 端到端ms | 实际结果 |
+|---|---|---:|---:|---|
+| character | components-2d | 2 | 23.3139 | UndefinedVariable Down |
+| character_query | queries-2d | 0 | 38.5543 | 角色移动+交互源生成成功，VM后续35credits拒绝另计 |
+| control | queries-2d | 0 | 51.2631 | 无地面B生成成功 |
+| changed | queries-2d | 0 | 66.7361 | speed8变体生成成功 |
+| map8 | queries-2d | 0 | 52.4086 | 69行接受，不能遍历地面 |
+| map12 | queries-2d | 0 | 60.2815 | 101行接受，不能遍历地面 |
+| map16 | queries-2d | 3 | 69.7427 | 261行超过128拒绝 |
+
+修复不变量：报告必须对应其冻结样本及退出码分组。仅修canonical的范围为七条23.3139–69.7427ms、五条接受38.5543–66.7361ms、两条拒绝23.3139/69.7427ms；其余源/配置/SDK/测试输入未变。`git diff --check` exit0；逐项与JSON核对，无运行门重跑、无阈值/合同变更。SD新SHA256 `c185f8f2df252951bb57332c6f8803aa687c02a6acf51e6faa967359d0cbaac8`，旧hash181278…仅保留历史审计。F-055-R1-01→完整采样对应不变量→SD量测段/Plan持久摘要→仅4增2删文档修复→同独立reviewer定向复核pending，其他AC01..05已通过证据复用，0其他work缺口。
+
+stage: work | plan_id: PLAN-055 | plan_revision: r1 | outcome: pass | worktree_path: D:/autostack/.wt/ui-055/auto-ui | branch: codex/plan-055-dev | base_commit: e85f730952714cab7e34b646611575f26efe672a | code_commit: 6277e50f88a09be3850403356f2e76809f3081d4 | task_ids: T-06 / F-055-R1-01 | evidence: frozen JSON + seven-case table + doc diff/check; runtime untouched | blockers: none | next_responsible_role: same independent final reviewer, affected SD/hash only; merge docs gate remains pending
+
+stage: goal | plan_id: PLAN-055 | plan_revision: r1 | round: 3 | from: work | to: review | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-055/auto-ui | commit: 6277e50f88a09be3850403356f2e76809f3081d4 | next: review
 
 ## 10. 待澄清事项
 
