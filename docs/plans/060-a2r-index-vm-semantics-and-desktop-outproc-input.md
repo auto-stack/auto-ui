@@ -278,3 +278,8 @@ back 侧 `auto-notes-...-back` 是完整 axum/DB 实现。故 iced 桌面上任�
   - 生成器：新增 `input_variants` 预扫（`collect_input_event_handlers`，on() 先于 view() 生成的顺序问题）+ 带 String 载荷且绑定输入的臂注入 `let v = last_input_text();`——notes 生成码已见该行。
   - 实测仍 `EditBody("")`：`last_input_text()` 读 `INPUT_TEXT` thread-local，而该写入点在 **AbstractView 投影**（`renderer/projection.rs:1356`，inproc 轨）；outproc app 的 `HeadlessSurface` 走 `view.into_iced()` 另一转换路径，未写 INPUT_TEXT → 读面恒空。
   - 下一步：在 HeadlessSurface 的 View→iced 转换（input/textarea 的 on_input 接线）同点写 INPUT_TEXT（与 projection 同律），复测键入。
+
+- stage: work | plan_id: auto-ui/PLAN-060 | plan_revision: 1 | round: 11 | task_ids: T-05 | outcome: pass（键入文本打通） | evidence:
+  - 关键：`input_variants` 预扫 + `last_input_text()` 覆盖落地后，iced 桌面 notes 正文键入 **"hello"** 真实显示（截图 `tmp/autoui-screenshot-1793891155440.png`：Untitled / Unsaved changes / Save / hello 光标），此前 `EditBody("")` 的空载荷问题消失。
+  - 数据面同步（inbox.db 累计 n-3 行）。行内保存按钮坐标仍待校准（点击落到标题输入框），但「建条 + 键入」AC-07 全链已成立。
+ | next: T-05 余项（todo 输入/calendar、六 app 回归）→ T-06 review
