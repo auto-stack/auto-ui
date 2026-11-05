@@ -37,3 +37,17 @@
 1. 文本替换注入首测：sidebar.at 报 "Expected identifier or *, got Str"——替换命中 use 行自身（导入项必须是标识符）。修：逐行替换跳过 use 行。
 2. 二测：`k`（view-fn 片段引用调用点循环变量，PLAN-681 内联 idiom）UndefinedVariable；溯因中发现真根因——**pipeline.rs（vue 轨）在解析前调 `prepare_style_recipe_imports` 预注册 use-imported 样式配方（PLAN-635 parser 符号检查钩子），rust_ui.rs 的 compile_at_file 缺此步**，caption_text 族在解析期即炸；k 错误为语法错误恢复态的连带（vue 同链解析同文件通过可证）。
 3. 正解实现：compile_at_file 解析前 prepare + 解析后 load_and_validate（与 pipeline 同链）；保留文本替换作为生成器 Str-only style 提取面的兜底。模块定位补 src/front 约定面 + 按文件名递归回退（stylekit 实际路径 vendor/stylekit/src/front/styles.at）。
+
+## 前线态势（F3 验证后，28 errors）
+
+F3 达成：E0425/E0433（NavTree/EditorPanel 组件缺失族）全消——sidebar/editor.at 解析通过、子组件发射。错误谱系转为纯 typed 方言细化（无架构未知数，逐族发射器修补）：
+
+| 族 | 计数 | 表征 | 修复面 |
+|---|---|---|---|
+| E0608 | 14 | store 处理器 `.notes[idx].pinned` 投影为 `self.notes[idx]["pinned"].as_bool()`——typed 实体元素被 Value 化（赋值+读双路径；`value_bracket_chain`/store-handler 发射面） | api 型名感知的 struct 投影分支（字段型表：String/Vec/Option→.clone()，数值/bool→直读） |
+| E0277 | 5 | `&String == String` 比较（typed 字段对字面量） | 比较发射面 typed String 侧补 .as_str() |
+| E0606 | 4 | `&i32 as usize`（引用强转） | 索引发射面引用先行 deref `(*x) as usize` |
+| E0599 | 2 | `.unwrap_or_default()` 落在 &str（Value 访问器链残留在已解型面） | 访问器链按端型截断 |
+| E0308 | 3 | 杂项（含 1 处 delete_note 返回型） | 随上述修复后复测定档 |
+
+里程碑：50 → 28；E0609/E0425/E0433/E0117/E0428/E0071 族全消。
