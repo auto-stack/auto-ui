@@ -469,7 +469,7 @@ fn regenerate_code_only(project_dir: &Path, rust_dir: &Path, src_: &PacSource) -
         let mut primer = RustGenerator::new();
         for f in &at_files {
             if let Ok(content) = fs::read_to_string(f) {
-                primer.register_bare_fn_sigs_from_source(&content);
+                primer.register_bare_fn_sigs_from_source(&content, true);
             }
         }
     }
@@ -743,7 +743,7 @@ pub(crate) fn compile_rust_ui_app(
         let mut primer = RustGenerator::new();
         for f in &at_files {
             if let Ok(content) = fs::read_to_string(f) {
-                primer.register_bare_fn_sigs_from_source(&content);
+                primer.register_bare_fn_sigs_from_source(&content, true);
             }
         }
     }
@@ -3354,7 +3354,7 @@ fn resolve_bps_dependencies(
         // 形参 kind/bare List 元素形状）——ui_gen 的 computed 返回型推断、
         // 调用实参收口、view 迭代 Value 判定按表消费（先注册后转译,顺序
         // 无关——registry 是 thread_local 静态表）。
-        RustGenerator::new().register_bare_fn_sigs_from_source(&content);
+        RustGenerator::new().register_bare_fn_sigs_from_source(&content, false);
         match auto_api_gen::api_gen::transpile_back_module_to_rs(&mod_name, &content) {
             Ok(rs) => {
                 let rs = auto_api_gen::api_gen::post_process_companion_rs(rs);
@@ -7501,6 +7501,7 @@ fn generate_module_fn_rust(
     generator: &auto_ui_compiler::ui_gen::rust::RustGenerator,
     fn_decl: &auto_lang_core::ast::Fn,
 ) -> String {
+    use auto_lang_core::ast::{Stmt, Type};
     let params: Vec<String> = fn_decl
         .params
         .iter()
@@ -7509,14 +7510,37 @@ fn generate_module_fn_rust(
     // PLAN-052：未声明返回型但体含 `return expr` 的模块 fn——局部微型
     // 推断（calendar build_month_grid `return cells` / month_name
     // `return names[i]` 株；此前恒 () 致调用点 E0308）。
+    // PLAN-052b：缺省返回注解解析为 Unknown（非 Void）——推断门此前对
+    // 无注解 fn 永不触发（误落通配 serde_json::Value，`return cells`
+    // Vec<Value> E0308 株）。无 return 的 Unknown fn 保持通配 Value
+    // （调用点赋值兼容，行为零变）；显式 Void 维持无注解。
     let ret = match &fn_decl.ret {
-        auto_lang_core::ast::Type::Void => {
-            infer_module_fn_ret(fn_decl).map(|k| format!(" -> {}", k)).unwrap_or_default()
+        t @ (Type::Void | Type::Unknown) => {
+            infer_module_fn_ret(fn_decl)
+                .map(|k| format!(" -> {}", k))
+                .unwrap_or_else(|| {
+                    if matches!(t, Type::Unknown) {
+                        " -> serde_json::Value".to_string()
+                    } else {
+                        String::new()
+                    }
+                })
         }
         t => format!(" -> {}", type_to_rust_str(t)),
     };
+    // PLAN-052b：尾表达式体补 return——is_leap `(a && b) || c` 株：
+    // 非 unit 返回 + 尾裸 Expr 语句按语句位补 `;` → 隐式 ()，E0308；
+    // Auto 具名返回型下尾表达式即返回值（VM 轨同语义）。
+    let mut body_stmts = fn_decl.body.stmts.clone();
+    let ret_is_unit = ret.is_empty() || ret == " -> ()";
+    if !ret_is_unit {
+        if let Some(Stmt::Expr(e)) = body_stmts.last() {
+            let e = e.clone();
+            *body_stmts.last_mut().unwrap() = Stmt::Return(Box::new(e));
+        }
+    }
     let body = generator.generate_handler_body(&auto_ui_compiler::aura::LogicPayload::AstStmts(
-        fn_decl.body.stmts.clone(),
+        body_stmts,
     ));
     format!(
         "#[allow(unused)]\nfn {}({}){} {{\n    {}\n}}\n",
@@ -7544,7 +7568,9 @@ fn infer_module_fn_ret(fn_decl: &auto_lang_core::ast::Fn) -> Option<String> {
                 _ => None,
             };
             let declared = match &store.ty {
-                auto_lang_core::ast::Type::Void => None,
+                // PLAN-052b：Unknown（缺省注解）与 Void 同为无类型——
+                // `var cells = []` 的 Array 字面量推断才有生效位。
+                auto_lang_core::ast::Type::Void | auto_lang_core::ast::Type::Unknown => None,
                 t => Some(type_to_rust_str(t)),
             };
             if let Some(t) = declared.or(inferred) {

@@ -323,6 +323,10 @@ pub struct BareFnSig {
     pub param_kinds: Vec<String>,
     /// bare List 返回的元素形状（None = 非记录列表/不可推）。
     pub list_elem_shape: Option<std::collections::HashMap<String, String>>,
+    /// PLAN-052：str 形参的 Rust ABI——true = owned String（项目内模块 fn
+    /// 经 generate_module_fn_rust 声明型直译），调用点传 String 原形；
+    /// false = &str 借用（dep 模块转译轨），调用点 .as_str() 收口。
+    pub str_params_owned: bool,
 }
 
 impl RustGenerator {
@@ -680,7 +684,7 @@ impl RustGenerator {
     /// （子字段 → int/str/bool/list;动态字段读默认 str——与
     /// object_literal_shape 容错口径一致）。机制通用,零消费方标识符。
 
-    pub fn register_bare_fn_sigs_from_source(&mut self, code: &str) {
+    pub fn register_bare_fn_sigs_from_source(&mut self, code: &str, str_params_owned: bool) {
         let Ok(ast) = crate::parse_validated_ui(code) else {
             return;
         };
@@ -784,7 +788,7 @@ fn collect_local_elems(
             stmts: &[auto_lang_core::ast::Stmt],
             out: &mut std::collections::HashMap<String, String>,
         ) {
-            use auto_lang_core::ast::Stmt;
+            use auto_lang_core::ast::{Expr, Stmt};
             for stmt in stmts {
                 match stmt {
                     Stmt::Store(s) => {
@@ -797,6 +801,15 @@ fn collect_local_elems(
                             auto_lang_core::ast::Type::Bool => "bool",
                             auto_lang_core::ast::Type::List(_)
                             | auto_lang_core::ast::Type::Array(_) => "list",
+                            // PLAN-052b：无类型数组字面量初始（`var cells
+                            // = []`——Unknown 同 Void）→ list 格；缺位时
+                            // `return cells` 推断落 String 兜底（calendar
+                            // build_month_grid → days() iter-on-String 株）。
+                            auto_lang_core::ast::Type::Void | auto_lang_core::ast::Type::Unknown
+                                if matches!(s.expr, Expr::Array(_)) =>
+                            {
+                                "list"
+                            }
                             _ => continue,
                         };
                         out.insert(s.name.as_str().to_string(), k.to_string());
@@ -826,6 +839,26 @@ fn collect_local_elems(
                     .get(n.as_str())
                     .cloned()
                     .unwrap_or_else(|| "str".into()),
+                // PLAN-052b：项目/依赖模块 fn 调用按 BARE_FN_SIGS 返回型判
+                // kind（calendar cells.push({...,"ymd": ymd_of(…)} 株——
+                // 调用默认 str 使 ymd 元素形状误 str → cell.ymd 误 as_str
+                // 访问器 SelectDay(String,i32) E0308）。
+                Expr::Call(c) => {
+                    let fname: Option<String> = match c.name.as_ref() {
+                        Expr::Ident(n) => Some(n.as_str().to_string()),
+                        Expr::Dot(_, m) => Some(m.as_str().to_string()),
+                        _ => None,
+                    };
+                    let ret = fname.and_then(|f| {
+                        BARE_FN_SIGS.with(|m| m.borrow().get(&f).map(|s| s.ret_rust_type.clone()))
+                    });
+                    match ret.as_deref() {
+                        Some("i32") | Some("i64") | Some("u32") | Some("u64") | Some("f32")
+                        | Some("f64") => "int".into(),
+                        Some("bool") => "bool".into(),
+                        _ => "str".into(),
+                    }
+                }
                 Expr::Unary(op, inner) if matches!(op, auto_val::Op::Not) => {
                     let k = value_kind_of(inner, locals);
                     if k == "bool" {
@@ -889,10 +922,11 @@ fn collect_local_elems(
             if let Stmt::Fn(f) = stmt {
                 let param_kinds: Vec<String> = f.params.iter().map(|p| ty_kind(&p.ty)).collect();
                 let ret = ret_rust(&f.ret);
-                // PLAN-052：未声明返回型（Void）但体含 return——微型推断
-                // （calendar build_month_grid `return cells` 株：computed
-                // days 此前按 Void→String 默认误型）。
-                let ret = if matches!(f.ret, Type::Void) {
+                // PLAN-052：未声明返回型（Void/Unknown——缺省注解解析为
+                // Unknown，非 Void）但体含 return——微型推断（calendar
+                // build_month_grid `return cells` 株：computed days 此前按
+                // Void→String 默认误型）。
+                let ret = if matches!(f.ret, Type::Void | Type::Unknown) {
                     let mut lk = std::collections::HashMap::new();
                     collect_local_kinds(&f.body.stmts, &mut lk);
                     let mut le: std::collections::HashMap<String, Option<String>> =
@@ -924,7 +958,15 @@ fn collect_local_elems(
                 } else {
                     ret
                 };
-                let list_elem_shape = if matches!(f.ret, Type::List(_) | Type::Array(_)) {
+                // PLAN-052b：元素形状收集门同宽——推断 Vec（Void/Unknown
+                // 推断轨）也收集 push 记录形状（calendar build_month_grid
+                // cells.push({...}) → days 循环变量 cell.ymd int 访问器；
+                // 门窄于声明 List 时形状缺位 → ymd 误 as_str E0308 株）。
+                let ret_is_vec_inferred =
+                    matches!(f.ret, Type::Void | Type::Unknown) && ret == "Vec<serde_json::Value>";
+                let list_elem_shape = if matches!(f.ret, Type::List(_) | Type::Array(_))
+                    || ret_is_vec_inferred
+                {
                     let mut locals = std::collections::HashMap::new();
                     collect_local_kinds(&f.body.stmts, &mut locals);
                     let mut shape = std::collections::HashMap::new();
@@ -944,6 +986,7 @@ fn collect_local_elems(
                             ret_rust_type: ret,
                             param_kinds,
                             list_elem_shape,
+                            str_params_owned,
                         },
                     );
                 });
@@ -2151,7 +2194,15 @@ fn collect_local_elems(
         // 调用共用。
         if !self.value_returning.is_empty() {
             code.push_str(&format!("impl {} {{\n", widget_name));
-            for (variant, kind) in &self.value_returning {
+            // PLAN-052：循环快照（体内 scan 需 &mut self——value_returning
+            // 迭代借用让位；collect_value_returning 已按 widget 收敛，快照
+            // 等价）。
+            let value_returning: Vec<(String, &'static str)> = self
+                .value_returning
+                .iter()
+                .map(|(v, k)| (v.clone(), *k))
+                .collect();
+            for (variant, kind) in &value_returning {
                 let variant_info = self.message_variants.iter().find(|v| v.name == *variant);
                 let types: Vec<String> = variant_info
                     .map(|v| v.payload.iter().map(|t| self.auto_type_to_rust(t)).collect())
@@ -2171,11 +2222,18 @@ fn collect_local_elems(
                     .zip(types.iter())
                     .map(|(n, t)| format!("{}: {}", n, t))
                     .collect();
+                // PLAN-052：__call_X 体内局部收格先行——__call_FmtDate
+                // `var ms = mm.to_string()` + 串接株：主 match 臂扫描覆盖
+                // 不到此处时序（declared_locals 缺 str 格 → __at_str 误包
+                // E0308）；逐 handler 重收格与 scan_handler_locals 同源。
                 let body = widget
                     .handlers
                     .iter()
                     .find(|(p, _)| self.extract_variant_name(p) == *variant)
-                    .map(|(_, payload)| self.generate_handler_body(payload))
+                    .map(|(_, payload)| {
+                        self.scan_payload_locals(payload);
+                        self.generate_handler_body(payload)
+                    })
                     .unwrap_or_default();
                 code.push_str(&format!(
                     "    fn __call_{}(&mut self, {}) -> {} {{\n        {}\n    }}\n\n",
@@ -3262,20 +3320,35 @@ fn collect_local_elems(
                         // （to_string 族）——收 "str" 格：concat 臂的
                         // __at_str 包装豁免（calendar format_date
                         // `var ms = mm.to_string()` 被误包 &Value 株）。
+                        // PLAN-052b：方法调用（`mm.to_string()`）的 name
+                        // 是 Expr::Dot——get_name_text_safe() 对其恒 None
+                        // （标记此前从不触发；模块 fn 侧仅因 value_locals
+                        // 时序空而侥幸免包）。取 Dot 尾段方法名同判。
                         if untyped {
-                            if let auto_lang_core::ast::Expr::Call(call) = &store.expr {
-                                if let Some(n) = call.get_name_text_safe() {
-                                    let n = n.as_str();
-                                    if n.ends_with("to_string")
-                                        || n == "format"
-                                        || n.ends_with("trim")
-                                        || n.ends_with("slice")
-                                    {
-                                        self.declared_locals.insert(
-                                            name.trim_start_matches('.').to_string(),
-                                            "str".to_string(),
-                                        );
+                            let call_name: Option<String> = match &store.expr {
+                                auto_lang_core::ast::Expr::Call(call) => {
+                                    match call.name.as_ref() {
+                                        auto_lang_core::ast::Expr::Ident(n) => {
+                                            Some(n.as_str().to_string())
+                                        }
+                                        auto_lang_core::ast::Expr::Dot(_, m) => {
+                                            Some(m.as_str().to_string())
+                                        }
+                                        _ => None,
                                     }
+                                }
+                                _ => None,
+                            };
+                            if let Some(n) = call_name {
+                                if n.ends_with("to_string")
+                                    || n == "format"
+                                    || n.ends_with("trim")
+                                    || n.ends_with("slice")
+                                {
+                                    self.declared_locals.insert(
+                                        name.trim_start_matches('.').to_string(),
+                                        "str".to_string(),
+                                    );
                                 }
                             }
                         }
@@ -4691,7 +4764,8 @@ fn collect_local_elems(
                                 let converted: Vec<String> = h
                                     .params
                                     .iter()
-                                    .map(|p| self.convert_param_value_access(p, &variant))
+                                    .enumerate()
+                                    .map(|(i, p)| self.convert_param_value_access(p, &variant, i))
                                     .collect();
                                 format!(
                                     "Some(auto_ui_runtime::ui::view::PointerMoveHandler::new(move |x: f32, y: f32| {{ let _ = (x, y); {msg_name}::{variant}({}) }}))",
@@ -10648,7 +10722,8 @@ fn collect_local_elems(
             // Convert dot access on Value-type vars to index access
             let converted_params: Vec<String> = params
                 .iter()
-                .map(|p| self.convert_param_value_access(p, &variant))
+                .enumerate()
+                .map(|(i, p)| self.convert_param_value_access(p, &variant, i))
                 .collect();
             format!(
                 "|_| {}::{}({})",
@@ -10669,7 +10744,8 @@ fn collect_local_elems(
         } else {
             let converted_params: Vec<String> = params
                 .iter()
-                .map(|p| self.convert_param_value_access(p, &variant))
+                .enumerate()
+                .map(|(i, p)| self.convert_param_value_access(p, &variant, i))
                 .collect();
             format!("{}::{}({})", msg_name, variant, converted_params.join(", "))
         }
@@ -10677,7 +10753,10 @@ fn collect_local_elems(
 
     /// Convert dot access in param expressions for Value-type variables
     /// e.g., "note.id" → "note[\"id\"].as_i64().unwrap_or(0) as i32" for i32 payloads
-    fn convert_param_value_access(&self, param: &str, variant_name: &str) -> String {
+    /// PLAN-052b：多载荷变体按实参位置取 payload 型（calendar
+    /// `SelectDay(cell.date, cell.ymd)` 株——`payload.first()` 使第 2 位
+    /// int 载荷误用首位 str 访问器 → SelectDay(String,i32) E0308）。
+    fn convert_param_value_access(&self, param: &str, variant_name: &str, arg_index: usize) -> String {
         // PLAN-052：提取期 ArkTS 面向 this. 前缀回译为 self.（calendar
         // 事件实参株；convert_condition 同款）。
         let param = param.replace("this.", "self.");
@@ -10693,7 +10772,7 @@ fn collect_local_elems(
                     .message_variants
                     .iter()
                     .find(|v| v.name == variant_name)
-                    .and_then(|v| v.payload.first())
+                    .and_then(|v| v.payload.get(arg_index).or_else(|| v.payload.first()))
                     .map(|t| self.auto_type_to_rust(t));
                 return match payload_ty.as_deref() {
                     Some("i32") => {
@@ -10716,7 +10795,7 @@ fn collect_local_elems(
             .message_variants
             .iter()
             .find(|v| v.name == variant_name)
-            .and_then(|v| v.payload.first())
+            .and_then(|v| v.payload.get(arg_index).or_else(|| v.payload.first()))
             .map(|t| self.auto_type_to_rust(t));
         if payload_ty.as_deref() == Some("String")
             && param.starts_with('"')
@@ -10943,6 +11022,9 @@ fn collect_local_elems(
         // 的 fix_numeric_conversion_methods 只覆盖非 UI 管线,此处对 handler
         // 体补同一 `(expr as i32)` 改写(x.to_int() → (x as i32))。
         fix_numeric_conversion_methods_for_ui(&mut body);
+        // PLAN-052：cast 比较歧义括号化（`cells.len() as i32 < 42` 株，
+        // 转换下降后同一管内即刻消歧）。
+        fix_cast_generic_ambiguity_for_ui(&mut body);
         // PLAN-025 T-07：VM math.* 内建降级（003-converter handler 真源
         // math.round 先例——解释态 VM 直算，a2r 臂需落到 Rust f64 方法）。
         lower_math_builtins_for_ui(&mut body);
@@ -14134,8 +14216,17 @@ fn collect_local_elems(
                             .iter()
                             .enumerate()
                             .map(|(i, a)| match sig.param_kinds.get(i).map(|s| s.as_str()) {
+                                // PLAN-052：str 形参按注册轨 ABI 收口——
+                                // owned String 轨（项目内模块 fn）传原形
+                                //（`self.store.today.clone()` 已是 String，
+                                // `.as_str()` 尾 = E0308 &str≠String 株）；
+                                // &str 借用轨（dep 模块）保持 as_str。
                                 Some("str") if !a.starts_with('"') => {
-                                    format!("{}.as_str()", a)
+                                    if sig.str_params_owned {
+                                        a.clone()
+                                    } else {
+                                        format!("{}.as_str()", a)
+                                    }
                                 }
                                 Some("list") if a.contains("[\"") && a.ends_with(".clone()") => {
                                     format!("{}.as_array().cloned().unwrap_or_default()", a)
@@ -19313,6 +19404,30 @@ pub(crate) fn fix_numeric_conversion_methods_for_ui(content: &mut String) {
             if new != *content {
                 *content = new;
             }
+        }
+    }
+}
+
+/// PLAN-052：cast 比较歧义括号化——`expr as i32 < rhs` 被 Rust 解析为
+/// 泛型实参起点（`<` 跟在 cast 型名后非比较），calendar build_month_grid
+/// `while cells.len() as i32 < 42` 株。cast 侧补括号即恢复比较语义；
+/// 已括号形（`(x) as i32 <`）再包一层无行为差。仅 `<`/`<=` 有歧义
+///（`>` 无泛型起始读法），不动。
+pub(crate) fn fix_cast_generic_ambiguity_for_ui(content: &mut String) {
+    if let Ok(re) = regex::Regex::new(
+        r"([\w.\[\]()]+ as (?:i32|i64|u32|u64|usize|isize|f32|f64))\s*(<=|<)",
+    ) {
+        let new = re
+            .replace_all(content.as_str(), |caps: &regex::Captures| {
+                format!(
+                    "({}) {}",
+                    caps.get(1).unwrap().as_str(),
+                    caps.get(2).unwrap().as_str()
+                )
+            })
+            .to_string();
+        if new != *content {
+            *content = new;
         }
     }
 }
