@@ -163,6 +163,14 @@ pub struct RustGenerator {
     /// Vec<i64>;元素消费统一窄化 as i32,与 i32 模型字段/字面语境对齐)。
     handler_int_list_vars: std::cell::RefCell<std::collections::HashSet<String>>,
 
+    /// PLAN-055 T-01（auto-os 055 载体收口）：当前 match 臂内**已知 Rust 型**
+    /// 的 payload 绑定名（数值/bool——枚举变体按 `msg X(int)` 声明型发射
+    /// 具体 Rust 型）。臂体发射期临时登记、臂毕移除；expr_is_value_typed
+    /// 先查本表——同一 widget 内他臂 `var secs`（无型 Value 局部）不得
+    /// 借同名遮蔽 payload 绑定型（clock `.TQuick(secs)` 被误包
+    /// `__at_num(&(secs))` → E0308 实证）。
+    rust_typed_bindings: std::cell::RefCell<std::collections::HashSet<String>>,
+
     /// Local variables in handler bodies that hold serde_json::Value results
     /// (from API function calls like `let note = create_note(...)`)
     value_locals: std::collections::HashSet<String>,
@@ -388,6 +396,7 @@ impl RustGenerator {
             ref_loop_vars: std::collections::HashSet::new(),
             value_returning: std::collections::HashMap::new(),
             handler_int_list_vars: std::cell::RefCell::new(std::collections::HashSet::new()),
+            rust_typed_bindings: std::cell::RefCell::new(std::collections::HashSet::new()),
             value_locals: std::collections::HashSet::new(),
             array_locals: std::collections::HashSet::new(),
             local_record_shapes: std::collections::HashMap::new(),
@@ -2871,6 +2880,33 @@ fn collect_local_elems(
                 }
                 let body = self.generate_handler_body(payload);
                 let has_payload = variant_info.map_or(false, |v| !v.payload.is_empty());
+                // PLAN-055 T-01：臂体发射前登记本臂 payload 绑定的已知
+                // Rust 型（数值/bool——枚举按声明型发射具体绑定）。同
+                // widget 他臂的无型 Value 局部（如 clock `.Tick` 的
+                // `var secs`）不得借同名遮蔽本臂绑定（E0308 实证）；
+                // 臂毕移除，臂间互不渗透。
+                {
+                    let binding_names = self.extract_payload_names(pattern, variant_info.unwrap());
+                    let payload_tys = &variant_info.unwrap().payload;
+                    let mut typed = self.rust_typed_bindings.borrow_mut();
+                    for (name, ty) in binding_names.iter().zip(payload_tys.iter()) {
+                        if matches!(
+                            ty,
+                            auto_lang_core::ast::Type::Int
+                                | auto_lang_core::ast::Type::Uint
+                                | auto_lang_core::ast::Type::USize
+                                | auto_lang_core::ast::Type::I64
+                                | auto_lang_core::ast::Type::U64
+                                | auto_lang_core::ast::Type::Float
+                                | auto_lang_core::ast::Type::Double
+                                | auto_lang_core::ast::Type::Bool
+                        ) {
+                            typed.insert(name.clone());
+                        }
+                    }
+                }
+                let body = self.generate_handler_body(payload);
+                self.rust_typed_bindings.borrow_mut().clear();
                 // Tick handler: guard with running check if "running" field exists
                 let is_tick_guarded =
                     variant_name == "Tick" && self.state_types.contains_key("running");
@@ -12898,6 +12934,18 @@ fn collect_local_elems(
     /// 变量、Vec<Value> 元素索引、Value 态字段/prop、`.store.<value 字段>`。
     fn expr_is_value_typed(&self, expr: &auto_lang_core::ast::Expr) -> bool {
         use auto_lang_core::ast::Expr;
+        // PLAN-055 T-01：本臂已知 Rust 型 payload 绑定先行——数值/bool
+        // 绑定永不按 Value 降链（同名他臂 Value 局部不遮蔽，clock
+        // `.TQuick(secs)` 误包 `__at_num` → E0308 实证）。
+        if let Expr::Ident(n) = expr {
+            if self
+                .rust_typed_bindings
+                .borrow()
+                .contains(n.as_str())
+            {
+                return false;
+            }
+        }
         // Vec<Value> 元素：Index(target, _)
         if let Expr::Index(target, _) = expr {
             if let Some(coll) = self.resolve_expr_name(target) {
@@ -16900,6 +16948,82 @@ mod tests {
     use crate::aura::{AuraMessage, AuraStateDef};
     use auto_lang_core::ast::Type;
     use std::collections::HashMap;
+
+    /// PLAN-055 T-01（auto-os 055 载体收口）两连回归：
+    /// ① 命名 style 声明经配方注册在 rust 轨展开为字面量（未注册时
+    ///    Ident 原样透传 → 生成码 E0425 cannot find value——clock/calc
+    ///    `style:` 语料实证，rust 轨此前从未注册配方）；
+    /// ② 已知 Rust 型 payload 绑定不按 Value 降链——他臂无型 Value 局部
+    ///    （`var secs = storage.get(..)`）不得借同名遮蔽 `.TQuick(secs)`
+    ///    的 i32 绑定（误包 `__at_num(&(secs))` → E0308 实证）。
+    #[test]
+    fn named_style_and_typed_payload_rust_codegen() {
+        let src = r#"
+style tab_active = "px-4 py-1.5 bg-primary"
+style tab_idle = "px-4 py-1.5 text-muted"
+
+widget App {
+    msg { SelectTab(str), Tick, TQuick(int) }
+    model {
+        var tab str = "clock"
+        var t_set_h int = 0
+    }
+    view {
+        col {
+            button "a" {
+                onclick: .SelectTab("x")
+                style: if .tab == "clock" { tab_active } else { tab_idle }
+            }
+        }
+    }
+    on {
+        .SelectTab(t) -> { .tab = t }
+        .Tick -> {
+            var secs = storage.get("k")
+            .tab = secs
+        }
+        .TQuick(secs) -> { .t_set_h = secs / 3600 }
+    }
+}
+"#;
+        let session = auto_lang_core::session::CompilerSession::ui().with_backend("rust");
+        let mut parser = auto_lang_core::Parser::from(src).with_session(session);
+        let ast = parser
+            .parse_domain(&auto_ui_dialect::UiDialect)
+            .map(auto_ui_dialect::UiCode)
+            .expect("parse");
+        // 与 VM/Vue 轨同一注册路径（pipeline.rs 同型）：本源 style 声明
+        // 注册后 extract 阶段 desugar_style_expr 才展开。
+        crate::design_tokens::recipe::load_and_validate_style_recipes(&ast)
+            .expect("register recipes");
+        let decl = ast
+            .domain_stmts()
+            .find_map(|s| match s {
+                auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d),
+                _ => None,
+            })
+            .expect("widget decl");
+        let widget = crate::aura::extract::extract_widget_from_decl(decl).expect("extract");
+        let code = RustGenerator::new().generate(&widget).expect("generate");
+
+        assert!(
+            !code.contains("tab_active"),
+            "named style must expand to a literal, not emit a bare ident"
+        );
+        assert!(
+            code.contains("\"px-4 py-1.5 bg-primary\""),
+            "style literal must be inlined into .style(...)"
+        );
+        assert!(
+            !code.contains("__at_num(&(secs))"),
+            "typed i32 payload binding must not be Value-coerced"
+        );
+        assert!(
+            code.contains("secs / 3600"),
+            "TQuick body must use the binding directly"
+        );
+        crate::design_tokens::recipe::clear_style_recipes();
+    }
 
     #[test]
     fn test_rust_generator_creation() {
