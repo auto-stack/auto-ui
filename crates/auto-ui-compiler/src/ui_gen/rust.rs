@@ -679,6 +679,7 @@ impl RustGenerator {
     /// List 返回的元素形状从 fn 体内 `X.push({记录字面量})` 按值形态推
     /// （子字段 → int/str/bool/list;动态字段读默认 str——与
     /// object_literal_shape 容错口径一致）。机制通用,零消费方标识符。
+
     pub fn register_bare_fn_sigs_from_source(&mut self, code: &str) {
         let Ok(ast) = crate::parse_validated_ui(code) else {
             return;
@@ -693,6 +694,79 @@ impl RustGenerator {
                 _ => "str".into(),
             }
         };
+/// PLAN-052：模块 fn 体首条 `return expr`（非 Nil）查找。
+fn first_return_expr(stmts: &[auto_lang_core::ast::Stmt]) -> Option<auto_lang_core::ast::Expr> {
+    use auto_lang_core::ast::{Expr, Stmt};
+    for st in stmts {
+        match st {
+            Stmt::Return(e) if !matches!(e.as_ref(), Expr::Nil) => return Some((**e).clone()),
+            Stmt::If(i) => {
+                for b in &i.branches {
+                    if let Some(e) = first_return_expr(&b.body.stmts) {
+                        return Some(e);
+                    }
+                }
+                if let Some(eb) = &i.else_ {
+                    if let Some(e) = first_return_expr(&eb.stmts) {
+                        return Some(e);
+                    }
+                }
+            }
+            Stmt::Block(b) => {
+                if let Some(e) = first_return_expr(&b.stmts) {
+                    return Some(e);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+/// PLAN-052：局部数组声明的元素 Rust 型（`let names [12]str = [...]` →
+/// Some("String")；`var cells = []` → None（动态 Value 桶））。
+fn collect_local_elems(
+    stmts: &[auto_lang_core::ast::Stmt],
+    out: &mut std::collections::HashMap<String, Option<String>>,
+) {
+    use auto_lang_core::ast::{Expr, Stmt, Type};
+    fn ty_to_rust(ty: &Type) -> Option<String> {
+        match ty {
+            Type::StrFixed(_) | Type::StrOwned | Type::StrSlice => Some("String".to_string()),
+            Type::Int | Type::I64 => Some("i64".to_string()),
+            Type::Bool => Some("bool".to_string()),
+            _ => None,
+        }
+    }
+    for stmt in stmts {
+        match stmt {
+            Stmt::Store(s2) => match &s2.ty {
+                Type::Array(arr) => {
+                    out.insert(s2.name.as_str().to_string(), ty_to_rust(&arr.elem));
+                }
+                Type::Void => {
+                    if matches!(s2.expr, Expr::Array(_)) {
+                        out.insert(s2.name.as_str().to_string(), None);
+                    }
+                }
+                _ => {}
+            },
+            Stmt::If(i) => {
+                for b in &i.branches {
+                    collect_local_elems(&b.body.stmts, out);
+                }
+                if let Some(e) = &i.else_ {
+                    collect_local_elems(&e.stmts, out);
+                }
+            }
+            Stmt::For(f) => collect_local_elems(&f.body.stmts, out),
+            Stmt::Block(b) => collect_local_elems(&b.stmts, out),
+            _ => {}
+        }
+    }
+}
+
+
         // Auto 型 → 模块转译同型 Rust 返回名。
         let ret_rust = |ty: &Type| -> String {
             match ty {
@@ -815,6 +889,41 @@ impl RustGenerator {
             if let Stmt::Fn(f) = stmt {
                 let param_kinds: Vec<String> = f.params.iter().map(|p| ty_kind(&p.ty)).collect();
                 let ret = ret_rust(&f.ret);
+                // PLAN-052：未声明返回型（Void）但体含 return——微型推断
+                // （calendar build_month_grid `return cells` 株：computed
+                // days 此前按 Void→String 默认误型）。
+                let ret = if matches!(f.ret, Type::Void) {
+                    let mut lk = std::collections::HashMap::new();
+                    collect_local_kinds(&f.body.stmts, &mut lk);
+                    let mut le: std::collections::HashMap<String, Option<String>> =
+                        std::collections::HashMap::new();
+                    collect_local_elems(&f.body.stmts, &mut le);
+                    first_return_expr(&f.body.stmts)
+                        .map(|re| match &re {
+                            Expr::Ident(n) => match lk.get(n.as_str()).map(|s| s.as_str()) {
+                                Some("list") => le
+                                    .get(n.as_str())
+                                    .and_then(|e| e.clone())
+                                    .unwrap_or_else(|| "Vec<serde_json::Value>".to_string()),
+                                Some("int") => "i64".to_string(),
+                                Some("bool") => "bool".to_string(),
+                                _ => "String".to_string(),
+                            },
+                            Expr::Index(t, _) => match t.as_ref() {
+                                Expr::Ident(n) => le
+                                    .get(n.as_str())
+                                    .and_then(|e| e.clone())
+                                    .unwrap_or_else(|| "serde_json::Value".to_string()),
+                                _ => "serde_json::Value".to_string(),
+                            },
+                            Expr::Int(_) => "i64".to_string(),
+                            Expr::Bool(_) => "bool".to_string(),
+                            _ => "String".to_string(),
+                        })
+                        .unwrap_or(ret)
+                } else {
+                    ret
+                };
                 let list_elem_shape = if matches!(f.ret, Type::List(_) | Type::Array(_)) {
                     let mut locals = std::collections::HashMap::new();
                     collect_local_kinds(&f.body.stmts, &mut locals);
@@ -13886,11 +13995,32 @@ impl RustGenerator {
                         let args_str = self.rust_call_args_with_clone(call).join(", ");
                         // PLAN-052：值返回 handler 的表达式位调用直发
                         // __call_X（calendar `.FmtDate(...)` 株；self.on 恒 ()).
+                        // 参数先提升临时变量——嵌套 __call_ 实参的 &mut self
+                        // 冲突（E0499 双可变借用株）。
                         if self.value_returning.contains_key(method.as_str()) {
+                            let args: Vec<String> = args_str
+                                .split(", ")
+                                .filter(|a| !a.is_empty())
+                                .map(|a| a.to_string())
+                                .collect();
+                            if args.is_empty() {
+                                return format!("self.__call_{}()", method.as_str());
+                            }
+                            let temps: Vec<String> = args
+                                .iter()
+                                .enumerate()
+                                .map(|(i, _)| format!("__vr_a{}", i))
+                                .collect();
+                            let binds: Vec<String> = args
+                                .iter()
+                                .enumerate()
+                                .map(|(i, a)| format!("let {} = {};", temps[i], a))
+                                .collect();
                             return format!(
-                                "self.__call_{}({})",
+                                "{{ {}; self.__call_{}({}) }}",
+                                binds.join(" "),
                                 method.as_str(),
-                                args_str
+                                temps.join(", ")
                             );
                         }
                         let msg = self.current_msg_name();
