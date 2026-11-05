@@ -1174,7 +1174,11 @@ impl super::endpoint::FrameSource for McpHeadlessSource {
     fn on_input(&mut self, input: &super::message::InputMsg) {
         // PLAN-060 扩展：组件消息下行。
         if let super::message::InputMsg::Action { name, arg, .. } = input {
-            if self.surface.component.dispatch_named(name, arg.as_deref()) {
+            let ok = self.surface.component.dispatch_named(name, arg.as_deref());
+            if std::env::var_os("AUTO_PLAN060_DIAG").is_some() {
+                eprintln!("[plan060] child(headless) action {name} ok={ok}");
+            }
+            if ok {
                 self.rev += 1;
             }
             return;
@@ -1913,6 +1917,7 @@ mod tests {
         }
     }
 }
+
 
 
 
