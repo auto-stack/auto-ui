@@ -7860,6 +7860,59 @@ mod tests {
         assert!(!ds.wm_apply_pending_raise());
     }
 
+    /// PLAN-055 T-03：主题策略结果 stale 判定锚——迟到/重复结果
+    /// （rev < 本连接 theme_pushed_rev）可读分列 stale 行不覆盖新状态；
+    /// 同 rev 结果原样落行（受控注入——真载体乱序腿的常驻回归）。
+    #[test]
+    fn theme_policy_result_stale_anchor_rows()
+    {
+        let pipe = format!("autodesk-probe-stale-{}", std::process::id());
+        let listener =
+            crate::ui::desktop_protocol::transport::listen(&pipe).expect("listen");
+        let mut app_end = crate::ui::desktop_protocol::transport::connect(&pipe, 2000)
+            .expect("connect");
+        let _ = &mut app_end;
+        let host_end = listener.wait_connect().expect("accept");
+        let mut ds = desktop_session_with_host();
+        let mut client =
+            crate::ui::desktop_protocol::stage3::BrokerClient::new(pipe.clone(), host_end);
+        client.app_name = Some("012-clock".into());
+        client.theme_pushed_rev = 5;
+        client.endpoint.state =
+            crate::ui::desktop_protocol::endpoint::HostState::Active;
+        let actions = client
+            .endpoint
+            .on_message(crate::ui::desktop_protocol::message::ProtocolMsg::Control(
+                crate::ui::desktop_protocol::message::ControlMsg::ThemePolicyResult {
+                    revision: 3,
+                    status: "applied".into(),
+                    reason: String::new(),
+                },
+            ))
+            .expect("route stale");
+        ds.broker_apply_actions(&mut client, actions);
+        {
+            let rows = ds.theme_outproc_status.borrow();
+            let row = rows.iter().find(|(n, _, _)| n == "012-clock").expect("stale row");
+            assert_eq!(row.1, "stale");
+            assert_eq!(row.2, "ack rev 3 < 推送 rev 5");
+        }
+        let actions = client
+            .endpoint
+            .on_message(crate::ui::desktop_protocol::message::ProtocolMsg::Control(
+                crate::ui::desktop_protocol::message::ControlMsg::ThemePolicyResult {
+                    revision: 5,
+                    status: "applied".into(),
+                    reason: String::new(),
+                },
+            ))
+            .expect("route ok");
+        ds.broker_apply_actions(&mut client, actions);
+        let rows = ds.theme_outproc_status.borrow();
+        let row = rows.iter().find(|(n, _, _)| n == "012-clock").expect("row");
+        assert_eq!((row.1.as_str(), row.2.as_str()), ("applied", ""));
+    }
+
     /// PLAN-526 T20：pending 过期防护——同窗已顶/焦点被改写/窗已关时
     /// `apply_pending_raise` 不重排。
     #[test]
