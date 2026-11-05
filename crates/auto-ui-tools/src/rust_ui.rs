@@ -1596,7 +1596,14 @@ fn crate_refs(code: &str) -> std::collections::BTreeSet<String> {
 fn merged_absorb(project_dir: &Path, _module: &auto_lang_core::api::ApiModule) -> Option<MergedAbsorb> {
     let back = project_dir.join("src").join("back");
     let db_at = std::fs::read_to_string(back.join("db.at")).ok()?;
-    let db_rs = auto_api_gen::api_gen::transpile_db_to_rs(&db_at).ok()?;
+    // PLAN-060：带 source_dir 的转译（PLAN-885 G2）——否则导入函数签名缺失，
+    // db 内 `repository::repo_create(title, ...)` 漏 & 报 E0308。
+    let (db_rs, _proofs) = auto_api_gen::api_gen::transpile_back_module_to_rs_with_proofs(
+        "db",
+        &db_at,
+        Some(back.clone()),
+    )
+    .ok()?;
     let db_code = auto_api_gen::api_gen::post_process_db_rs(db_rs);
     let mut modules: Vec<(String, String)> = Vec::new();
     // 传递闭包：db 引用的 back 模块一并转译；types 由调用方以 api.at 类型面
@@ -1617,7 +1624,11 @@ fn merged_absorb(project_dir: &Path, _module: &auto_lang_core::api::ApiModule) -
         }
         let path = back.join(format!("{name}.at"));
         let Ok(content) = std::fs::read_to_string(&path) else { continue };
-        let Ok(rs) = auto_api_gen::api_gen::transpile_back_module_to_rs(&name, &content) else {
+        let Ok((rs, _)) = auto_api_gen::api_gen::transpile_back_module_to_rs_with_proofs(
+            &name,
+            &content,
+            Some(back.clone()),
+        ) else {
             return None;
         };
         let rs = auto_api_gen::api_gen::post_process_companion_rs(rs);
@@ -11406,6 +11417,7 @@ mod plan036_theme_input_tests {
         );
     }
 }
+
 
 
 
