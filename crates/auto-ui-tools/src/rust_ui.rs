@@ -1486,8 +1486,194 @@ fn merged_route_a_impl(
 /// 载入并转译 src/back/db.at;含「引用工程外类型面」(crate::types /
 /// super:: 依赖,015-notes 类结构型 db)的转译件不可吸收——避免 front
 /// crate 里悬空引用;此时返回 None,endpoint 落回 JSON CRUD 脚手架。
-fn merged_db_impl(
-    project_dir: &Path,
+/// PLAN-060 T-04：db 吸收扩展——types/companions 一并内嵌 + 签名解析。
+/// 既有 `merged_db_impl` 对 `crate::types` 引用直接放弃（015-notes 类结构
+/// 型 db 全中），导入函数因此落空实现；本扩展把 back 侧被引用的模块
+/// （types 由 api.at 类型面生成，其余 `crate::X` 按 back/X.at 转译）与 db
+/// 一起内嵌，并解析 db 函数签名供 endpoint 委派做 i32/i64/&str 适配。
+struct DbFnSig {
+    name: String,
+    params: Vec<(String, String)>,
+    ret: Option<String>,
+}
+
+struct MergedAbsorb {
+    modules: Vec<(String, String)>, // (mod name, rust source)
+    db_fns: Vec<DbFnSig>,
+}
+
+/// 从转译后的 Rust 源码解析 `pub fn name(args) -> ret` 签名（够用即可：
+/// db.at 生成码形态固定，参数类型为标量/&str/Vec/结构名，无泛型嵌套逗号）。
+fn parse_db_fn_sigs(code: &str) -> Vec<DbFnSig> {
+    let mut out = Vec::new();
+    for line in code.lines() {
+        let t = line.trim_start();
+        let Some(rest) = t.strip_prefix("pub fn ") else { continue };
+        let Some(open) = rest.find('(') else { continue };
+        let name = rest[..open].trim().to_string();
+        let mut depth = 0i32;
+        let mut close = None;
+        for (i, ch) in rest[open..].char_indices() {
+            match ch {
+                '(' => depth += 1,
+                ')' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        close = Some(open + i);
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        let Some(close) = close else { continue };
+        let args_str = &rest[open + 1..close];
+        let after = rest[close + 1..].trim();
+        let ret = after
+            .strip_prefix("->")
+            .map(|r| r.trim().trim_end_matches('{').trim().to_string());
+        let mut params = Vec::new();
+        let mut depth2 = 0i32;
+        let mut cur = String::new();
+        for ch in args_str.chars() {
+            match ch {
+                '<' | '(' | '[' => {
+                    depth2 += 1;
+                    cur.push(ch);
+                }
+                '>' | ')' | ']' => {
+                    depth2 -= 1;
+                    cur.push(ch);
+                }
+                ',' if depth2 == 0 => {
+                    if !cur.trim().is_empty() {
+                        params.push(cur.trim().to_string());
+                        cur.clear();
+                    }
+                }
+                _ => cur.push(ch),
+            }
+        }
+        if !cur.trim().is_empty() {
+            params.push(cur.trim().to_string());
+        }
+        let parsed = params
+            .into_iter()
+            .filter_map(|p| {
+                let (n, ty) = p.split_once(':')?;
+                Some((n.trim().trim_start_matches("mut ").to_string(), ty.trim().to_string()))
+            })
+            .collect();
+        out.push(DbFnSig { name, params: parsed, ret });
+    }
+    out
+}
+
+/// 收集源码里的 `crate::<ident>` 引用名。
+fn crate_refs(code: &str) -> std::collections::BTreeSet<String> {
+    let mut out = std::collections::BTreeSet::new();
+    let bytes = code.as_bytes();
+    let needle = b"crate::";
+    let mut i = 0;
+    while i + needle.len() < bytes.len() {
+        if &bytes[i..i + needle.len()] == needle {
+            let mut j = i + needle.len();
+            let start = j;
+            while j < bytes.len() && (bytes[j].is_ascii_alphanumeric() || bytes[j] == b'_') {
+                j += 1;
+            }
+            if j > start {
+                out.insert(code[start..j].to_string());
+            }
+            i = j;
+        } else {
+            i += 1;
+        }
+    }
+    out
+}
+
+fn merged_absorb(project_dir: &Path, _module: &auto_lang_core::api::ApiModule) -> Option<MergedAbsorb> {
+    let back = project_dir.join("src").join("back");
+    let db_at = std::fs::read_to_string(back.join("db.at")).ok()?;
+    let db_rs = auto_api_gen::api_gen::transpile_db_to_rs(&db_at).ok()?;
+    let db_code = auto_api_gen::api_gen::post_process_db_rs(db_rs);
+    let mut modules: Vec<(String, String)> = Vec::new();
+    // 传递闭包：db 引用的 back 模块一并转译；types 由调用方以 api.at 类型面
+    // 生成（back 侧 types.rs 同源），此处不重复。
+    let mut seen: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    let mut queue: Vec<String> = crate_refs(&db_code).into_iter().collect();
+    let mut guard = 0;
+    while let Some(name) = queue.pop() {
+        guard += 1;
+        if guard > 32 {
+            break;
+        }
+        if name == "types" || name == "db" || name == "api" || name == "api_impl" {
+            continue;
+        }
+        if !seen.insert(name.clone()) {
+            continue;
+        }
+        let path = back.join(format!("{name}.at"));
+        let Ok(content) = std::fs::read_to_string(&path) else { continue };
+        let Ok(rs) = auto_api_gen::api_gen::transpile_back_module_to_rs(&name, &content) else {
+            return None;
+        };
+        let rs = auto_api_gen::api_gen::post_process_companion_rs(rs);
+        queue.extend(crate_refs(&rs));
+        modules.push((name, rs));
+    }
+    let db_fns = parse_db_fn_sigs(&db_code);
+    modules.push(("db".to_string(), db_code));
+    Some(MergedAbsorb { modules, db_fns })
+}
+
+/// PLAN-060 T-04：按 db 实际签名把 endpoint 委派到 `db::<fn>`（i32↔i64、
+/// String↔&str 适配；参数个数不一致即放弃，落既有臂）。
+fn merged_db_delegate_typed(
+    absorb: &MergedAbsorb,
+    endpoint: &auto_lang_core::api::ApiEndpoint,
+) -> Option<String> {
+    let sig = absorb.db_fns.iter().find(|f| f.name == endpoint.fn_name)?;
+    if sig.params.len() != endpoint.params.len() {
+        return None;
+    }
+    let mut ui_params = Vec::new();
+    let mut call_args = Vec::new();
+    for (p, (_, db_ty)) in endpoint.params.iter().zip(sig.params.iter()) {
+        let ui_ty = auto_type_to_rust(&p.ty);
+        let arg = match db_ty.as_str() {
+            "i64" => format!("{} as i64", p.name),
+            "&str" => format!("&{}", p.name),
+            _ => p.name.clone(),
+        };
+        ui_params.push(format!("{}: {}", p.name, ui_ty));
+        call_args.push(arg);
+    }
+    let ret_ui = auto_type_to_rust(endpoint.return_type.trim());
+    let db_ret = sig.ret.clone().unwrap_or_else(|| "()".to_string());
+    let (ret_clause, call_expr) = if ret_ui == "()" || ret_ui.is_empty() {
+        (String::new(), format!("db::{}({})", sig.name, call_args.join(", ")))
+    } else if db_ret == "i64" && ret_ui == "i32" {
+        (format!(" -> {ret_ui}"), format!("db::{}({}) as i32", sig.name, call_args.join(", ")))
+    } else if db_ret == "&str" && ret_ui == "String" {
+        (format!(" -> {ret_ui}"), format!("db::{}({}).to_string()", sig.name, call_args.join(", ")))
+    } else if db_ret == ret_ui || db_ret == format!("Option<{}>", ret_ui.trim_start_matches("Option<").trim_end_matches('>')) {
+        (format!(" -> {ret_ui}"), format!("db::{}({})", sig.name, call_args.join(", ")))
+    } else {
+        (format!(" -> {ret_ui}"), format!("db::{}({})", sig.name, call_args.join(", ")))
+    };
+    Some(format!(
+        "fn {}({}){} {{\n    {}\n}}\n\n",
+        endpoint.fn_name,
+        ui_params.join(", "),
+        ret_clause,
+        call_expr
+    ))
+}
+
+fn merged_db_impl(    project_dir: &Path,
     module: &auto_lang_core::api::ApiModule,
 ) -> Option<MergedDbImpl> {
     let db_file = project_dir.join("src").join("back").join("db.at");
@@ -1612,11 +1798,7 @@ fn generate_api_client(project_dir: &Path, api_imports: &[String]) -> String {
 
     if merged_mode {
         if let Some(module) = &api_module {
-            return format!(
-                "{}{}",
-                api_type_structs,
-                generate_merged_api_client(module, project_dir)
-            );
+            return generate_merged_api_client(module, project_dir, &api_type_structs);
         }
         // Fallback to stubs if no api.at found
         return generate_api_stubs(api_imports);
@@ -1630,12 +1812,8 @@ fn generate_api_client(project_dir: &Path, api_imports: &[String]) -> String {
     // 进程内直调:凡 db.at 可吸收(全部端点有同名 db fn 且标量面)一律
     // 优先走 merged 直调;吸收不可用才回落 split-HTTP。
     if let Some(module) = &api_module {
-        if merged_db_impl(project_dir, module).is_some() {
-            return format!(
-                "{}{}",
-                api_type_structs,
-                generate_merged_api_client(module, project_dir)
-            );
+        if merged_db_impl(project_dir, module).is_some() || merged_absorb(project_dir, module).is_some() {
+            return generate_merged_api_client(module, project_dir, &api_type_structs);
         }
     }
     if let Some(module) = &api_module {
@@ -2164,11 +2342,34 @@ fn generate_json_initial_data(module: &auto_lang_core::api::ApiModule) -> String
 fn generate_merged_api_client(
     module: &auto_lang_core::api::ApiModule,
     project_dir: &Path,
+    api_type_structs: &str,
 ) -> String {
     let mut code = String::new();
     code.push_str("// API functions (auto-generated, in-process merged mode — no HTTP)\n\n");
 
-    let db_impl = merged_db_impl(project_dir, module);
+    // PLAN-060 T-04：types + companions + db 全量内嵌（结构型 db 应用的真实现）；
+    // 不可吸收时回退既有单 db 吸收/CRUD 脚手架。
+    let absorb = merged_absorb(project_dir, module);
+    if let Some(a) = &absorb {
+        code.push_str("// PLAN-060 T-04: merged back modules (types/companions/db)\npub mod types {\n#![allow(unused)]\n");
+        code.push_str(api_type_structs);
+        code.push_str("\n}\n\npub use types::*;\n\n");
+        for (name, src) in &a.modules {
+            if name == "db" {
+                continue;
+            }
+            code.push_str(&format!("pub mod {} {{\n#![allow(unused)]\n{}\n}}\n\n", name, src));
+        }
+        if let Some((_, db_src)) = a.modules.iter().find(|(n, _)| n == "db") {
+            code.push_str("pub mod db {\n#![allow(unused)]\n");
+            code.push_str(db_src);
+            code.push_str("\n}\n\n");
+        }
+    } else {
+        code.push_str(api_type_structs);
+    }
+
+    let db_impl = if absorb.is_none() { merged_db_impl(project_dir, module) } else { None };
     if let Some(db) = &db_impl {
         code.push_str(
             "\n// PLAN-013 T2: db.at 吸收(转译嵌入)——merged 模式的后端真实现;勿手改\npub mod db {\n#![allow(unused)]\n",
@@ -2231,6 +2432,13 @@ fn generate_merged_api_client(
             .filter(|p| !endpoint.path().contains(&format!(":{}", p.name)))
             .collect();
 
+        // PLAN-060 T-04：全量内嵌臂——按 db 签名委派（结构/标量返回通吃）。
+        if let Some(a) = &absorb {
+            if let Some(emit) = merged_db_delegate_typed(a, endpoint) {
+                code.push_str(&emit);
+                continue;
+            }
+        }
         // PLAN-013 T2: db 吸收臂——同名 db 实现存在且标量面覆盖 → 委托。
         if let Some(emit) = db_impl
             .as_ref()
@@ -11104,4 +11312,8 @@ mod plan036_theme_input_tests {
         );
     }
 }
+
+
+
+
 
