@@ -1652,7 +1652,8 @@ fn merged_absorb(project_dir: &Path, _module: &auto_lang_core::api::ApiModule) -
         Some(back.clone()),
     )
     .ok()?;
-    let api_impl_code = auto_api_gen::api_gen::post_process_companion_rs(api_impl_rs);
+    // db 同款后处理：去掉转译器对结构返回型的 `impl ` 前缀（companion 版不带）。
+    let api_impl_code = auto_api_gen::api_gen::post_process_db_rs(api_impl_rs);
     let api_impl_fns = parse_db_fn_sigs(&api_impl_code);
     modules.push((
         "api_impl".to_string(),
@@ -11589,6 +11590,7 @@ mod plan036_theme_input_tests {
         );
     }
 }
+
 
 
 
