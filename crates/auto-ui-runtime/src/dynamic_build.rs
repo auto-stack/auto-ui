@@ -2062,10 +2062,14 @@ fn build_dynamic_component_full(
     // enables the rewrite — the VM app then talks to a real backend over HTTP
     // (run/complete/history/prompt_context/jobs), not the in-process mock.
     // emit_api_http_call prefers AUTO_BACKEND as the base URL.
+    // PLAN-949 T-01：本 app 有 back（launch/hatch 已置前缀化 guard）时自动进入
+    // split 模式——api 调用改写为 HTTP（真实 JSON 响应 + 挂起续跑），而非本地
+    // merged 直调（复合返回值在 VM 边界丢失，todo AddTodo ok=false 实证）。
     let api_over_http = std::env::var("AUTO_VM_MERGE").as_deref() == Ok("0")
         || std::env::var("AUTO_BACKEND")
             .map(|v| !v.trim().is_empty())
-            .unwrap_or(false);
+            .unwrap_or(false)
+        || auto_lang_core::back_prefix::current_spec().is_some();
     // PLAN-050 T7 (C5): use.web component 名单注册——builder 图标组件臂的
     // 生产数据源（import_stmts 不含 UseWeb,Plan 442 ext 流单独消费）。每次
     // 装载整体替换。all_child_decls 此处已定型（child 装载循环已收尾）。
@@ -2437,3 +2441,4 @@ mod plan015_route_loading_tests {
         );
     }
 }
+
