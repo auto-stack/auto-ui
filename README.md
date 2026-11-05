@@ -4,7 +4,9 @@
 
 阅读器跨仓探针：[PLAN-026](docs/plans/archived/026-reader-engine-embedding-and-locator-probe.md)及[报告](docs/research/reader-engine-probe.md)保留指定样本实验结论与局限；后继[PLAN-029](docs/plans/archived/029-reader-native-input-and-surface-closure.md)已有T-10独立review pass及landing 65bb455f，Reader007 T-00已核实消费。029归档正文头部execution_done/10/12仍有历史元数据滞后，不用计数替代实际交付证据。
 
-[READER-007](https://github.com/auto-stack/auto-reader/blob/main/docs/plans/archive/007-epub-product-reader-and-locator-compatibility.md)已交付正式EPUB与定位兼容，原生工具及部分直接UI证据边界仍按其复审记录保留。下一产品计划为[READER-008：Readest主界面与书库日用能力对齐](https://github.com/auto-stack/auto-reader/blob/main/docs/plans/008-readest-workspace-and-library-parity.md)（drafting/r1、0/12，2026-11-05）：auto-reader主导产品UI/书库/数据与双端验收；本仓仅提供已交付宿主/输入/表面能力。多文件选择/授权、布局或工具能力若不足，Reader T-00/01先核实并明确实际owner最小前置，不在本仓重复登记008，不在此轮实施框架改动。
+[READER-007](https://github.com/auto-stack/auto-reader/blob/main/docs/plans/archive/007-epub-product-reader-and-locator-compatibility.md)已交付正式EPUB与定位兼容。[READER-008](https://github.com/auto-stack/auto-reader/blob/main/docs/plans/archived/008-readest-workspace-and-library-parity.md)已有书库/工作区实现和归档，但同会话review、完整双端门/原生多选/EPUB web字节链仍需收口，不能按归档认定全PASS。
+
+2026-11-05后继计划见[Reader批次设计](https://github.com/auto-stack/auto-reader/blob/main/docs/design/04-readest-follow-on-program.md)：READER-009交付与导入收口→010排版/图片控制→011标注笔记本→012 PDF（均drafting/r1、0/8，只规划）。auto-reader主导产品UI/数据/核验与双端验收；本仓拥有宿主/输入/布局/生命周期。Reader T-00/01先核公开多选/字节/overlay/worker等真实接缝，缺能力按实际owner匹配/建立最小前置，不在本仓重复登记产品计划，本轮不实施框架改动。
 
 ## 项目概述
 
