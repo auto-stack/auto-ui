@@ -823,6 +823,13 @@ impl<C: Component> FrameSource for RqProjector<C> {
     }
 
     fn on_input(&mut self, input: &InputMsg) {
+        // PLAN-060 扩展：组件消息下行（宿主 `Msg` 注入对 broker 应用的转发）。
+        if let InputMsg::Action { name, arg, .. } = input {
+            if self.component.dispatch_named(name, arg.as_deref()) {
+                self.rev += 1;
+            }
+            return;
+        }
         match input {
             // 最近指针位跟踪（滚轮定位消费——wire Scroll 无坐标，T-01 D5
             // 执行期附注）。
@@ -6863,3 +6870,4 @@ mod tests {
         );
     }
 }
+

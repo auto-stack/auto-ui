@@ -1170,6 +1170,13 @@ impl super::endpoint::FrameSource for McpHeadlessSource {
     }
 
     fn on_input(&mut self, input: &super::message::InputMsg) {
+        // PLAN-060 扩展：组件消息下行。
+        if let super::message::InputMsg::Action { name, arg, .. } = input {
+            if self.surface.component.dispatch_named(name, arg.as_deref()) {
+                self.rev += 1;
+            }
+            return;
+        }
         match input {
             super::message::InputMsg::PointerMoved { x, y, .. }
             | super::message::InputMsg::PointerPressed { x, y, .. }
@@ -1904,6 +1911,7 @@ mod tests {
         }
     }
 }
+
 
 
 
