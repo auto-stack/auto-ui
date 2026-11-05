@@ -2203,19 +2203,10 @@ fn run_session(
 
         // Handle screenshot request from MCP thread (Plan 285 / Task 20)
         if let Some(req) = state.app.devtools.screenshot_request.borrow_mut().take() {
-            // Plan 411: guard zero-size windows (minimized / pre-layout). iced's
-            // offscreen source_texture panics on a 0-dimension wgpu surface
-            // ("Dimension X is zero") — reply an error instead of crashing.
-            {
-                let ws = state.window_size.borrow();
-                if ws.width <= 0.0 || ws.height <= 0.0 {
-                    let _ = req.reply_tx.send(Err(
-                        "Screenshot skipped: window size is zero (minimized or not yet laid out)"
-                            .to_string(),
-                    ));
-                    return iced::Task::none();
-                }
-            }
+            // Desktop virtual-app entries may have no physical window size.
+            // The shared screenshot request can be drained by any such entry;
+            // validate the actual iced window in the size() continuation below
+            // instead of rejecting a healthy host from this app's bookkeeping.
             let reply_tx = std::sync::Arc::new(std::sync::Mutex::new(Some(req.reply_tx)));
             // Clone the optionals into the outer move closure; `name` is cloned
             // again into the inner `then` (the outer closure is FnMut).
