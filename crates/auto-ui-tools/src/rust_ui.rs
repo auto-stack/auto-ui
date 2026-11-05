@@ -7565,6 +7565,10 @@ fn generate_module_fn_rust(
     // flatten_tree 族 E0609 no-field-on-Value ×22 株）：widget 语境由
     // scan_handler_locals 收格，模块 fn 路径此前零扫描。逐 fn 重收格
     // 与 __call_X 同源纪律（模块 fn 在全 widget 后发射，状态覆写安全）。
+    // PLAN-052：模块 fn 逐发前清场——widget 状态格（value_locals/
+    // state_types/declared_locals…）会残留到模块 fn 扫描面，同名形参/局部
+    // 误收 Value 格（calendar offset/prev_dim `__at_num(&i32)` 株）。
+    generator.reset_for_module_fn();
     generator.seed_module_fn_params(&fn_decl.params);
     generator.scan_payload_locals_pub(&auto_ui_compiler::aura::LogicPayload::AstStmts(
         fn_decl.body.stmts.clone(),

@@ -1116,6 +1116,13 @@ fn collect_local_elems(
         self.outlet_route = OutletRoute::None;
     }
 
+    /// PLAN-052：模块 fn 发射前清场——generator 的局部/态格此前残留最后
+    /// 一个 widget 的注册面，模块 fn 形参/局部与 widget 状态同名时误收
+    /// Value 格（calendar `offset`/`prev_dim` 被包 `__at_num(&i32)` 株）。
+    pub fn reset_for_module_fn(&mut self) {
+        self.reset();
+    }
+
     /// Convert a string containing `${.field}` markers to a Rust `format!()` call
     fn interpolate_str(&self, s: &str) -> String {
         let mut format_str = s.to_string();
@@ -3509,7 +3516,38 @@ fn collect_local_elems(
                                         .as_deref()
                                         .map_or(false, |n| m.borrow().contains(n))
                                 });
-                                if !api_typed && call_name.as_deref() != Some("names") {
+                                // PLAN-052：项目内模块 fn 的标量/串返回——
+                                // BARE_FN_SIGS 已注册返回型时不收 Value 格
+                                // （calendar `let prev_dim = days_in_month(..)`
+                                // 的 __at_num(&i32) 株：模块 fn 扫描面误收
+                                // Value，数值使用点错包）。返型同时入
+                                // declared_locals 供比较/拼接判型。
+                                let bare_ret = call_name.as_deref().and_then(|n| {
+                                    BARE_FN_SIGS.with(|m| {
+                                        m.borrow().get(n).map(|s| s.ret_rust_type.clone())
+                                    })
+                                });
+                                let bare_kind = match bare_ret.as_deref() {
+                                    Some("i32") | Some("i64") | Some("u32") | Some("u64") => {
+                                        Some("int")
+                                    }
+                                    Some("String") => Some("str"),
+                                    Some("bool") => Some("bool"),
+                                    _ => None,
+                                };
+                                if let Some(k) = bare_kind {
+                                    self.declared_locals
+                                        .insert(name.trim_start_matches('.').to_string(), k.to_string());
+                                }
+                                let bare_scalar = bare_kind.is_some()
+                                    || matches!(
+                                        bare_ret.as_deref(),
+                                        Some("f32") | Some("f64")
+                                    );
+                                if !api_typed
+                                    && !bare_scalar
+                                    && call_name.as_deref() != Some("names")
+                                {
                                     self.value_locals.insert(name.to_string());
                                 }
                                 // PLAN-039 T-12（批次 E）：内建表方法调用赋值
