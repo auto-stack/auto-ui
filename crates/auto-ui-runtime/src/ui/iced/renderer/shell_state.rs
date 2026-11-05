@@ -5961,6 +5961,24 @@ pub(crate) fn apply_desktop_injects(state: &mut crate::ui::session::DesktopSessi
                 let Some(app_id) = app_id else { continue };
                 // PLAN-060 扩展：broker/adopt 应用（子进程持有组件）→ 走协议
                 // Action 下行；in-process 组件走既有 on() 直派。
+                if std::env::var_os("AUTO_PLAN060_DIAG").is_some() {
+                    let wins: Vec<String> = state
+                        .host
+                        .as_ref()
+                        .map(|h| {
+                            h.wm.wins
+                                .iter()
+                                .map(|(w, v)| format!("{}:app={}:reg={:?}", w.0, v.app.0, v.registry_id))
+                                .collect()
+                        })
+                        .unwrap_or_default();
+                    let clients: Vec<String> = state
+                        .broker_clients
+                        .values()
+                        .map(|c| format!("wid={:?} surfaces={:?} name={:?}", c.wid, c.wid_surface.keys().collect::<Vec<_>>(), c.app_name))
+                        .collect();
+                    eprintln!("[plan060] action {msg} app_id={} wins={wins:?} clients={clients:?}", app_id.0);
+                }
                 if let Some(wid) = state.host.as_ref().and_then(|h| {
                     h.wm.wins
                         .iter()
@@ -6681,6 +6699,7 @@ pub(super) fn publish_workspace_previews(state: &mut crate::ui::session::Desktop
         wallpaper_src: state.desktop.desktop_wallpaper.clone(),
     });
 }
+
 
 
 
