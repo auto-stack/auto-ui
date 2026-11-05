@@ -302,3 +302,9 @@ back 侧 `auto-notes-...-back` 是完整 axum/DB 实现。故 iced 桌面上任�
 - stage: work | plan_id: auto-ui/PLAN-060 | plan_revision: 1 | round: 15 | task_ids: T-05 | outcome: 根因（VM async API vs call_handler 注入） | evidence:
   - 日志：`[VM-PARKED] handler_App_Init parked … resumed to completion (1.9s)`——VM 的 HTTP API 是**异步挂起续跑**模型；而注入的 `AddTodo` 只出现 `[CALL_HANDLER]`，**没有 parked/resume** → `create_todo` 在 handler 内同步返回默认值（r.ok=false），HTTP 随后台完成（行仍写入：todos 4 行 alpha/beta/gamma/delta），所以「数据进库但 UI 不清输入/不刷列表」。
   - 结论：inproc VM app 的验收驱动应注入**消息/事件**（走组件正常事件循环，HTTP 会挂起续跑），而不是 `call_handler`（同步直调，绕过挂起）。下一步：`autoui_desktop` 增加 `action:"msg"`（app + msg 名 + 载荷）→ `component.on(msg)` 或等价事件泵；再验 todo 列表刷新。
+
+- stage: work | plan_id: auto-ui/PLAN-060 | plan_revision: 1 | round: 16 | task_ids: T-05 | outcome: msg 注入已落地；VM 挂起仍只发生在 boot Init | evidence:
+  - 新增 `DesktopInject::Msg` + MCP `action:"msg"`（`component.on(DynamicMessage::Typed{…})`，走组件事件循环）。
+  - 实测 todo：`msg StoreInput("epsilon")` + `msg AddTodo` → 输入框显示 epsilon、`todos.db` 增 `(5,'epsilon',0)`；但日志仍只有 `VM-PARKED handler_App_Init parked/resumed (3.3s)`，**AddTodo 不挂起**、UI 不清输入/不刷列表。
+  - 结论：VM 的 HTTP 挂起续跑仅在 boot Init 的驱动路径生效；后续消息（on/msg 或 call_handler）走同步执行、HTTP 异步旁路。修复需 VM 宿主把**任意** handler 纳入挂起续跑驱动（auto-lang VM 侧集成），超出本计划 060 范围——列为 054 的具名前置（VM inproc 宿主异步事件循环）。
+  - 060 已完成面：索引语义（AC-01）、outproc 指针/键盘（AC-02/07 notes 全链）、native API 层（AC-07 数据链）。VM inproc 任务（AC-08 todo）待该前置。
