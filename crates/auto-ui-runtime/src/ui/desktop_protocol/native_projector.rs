@@ -825,7 +825,11 @@ impl<C: Component> FrameSource for RqProjector<C> {
     fn on_input(&mut self, input: &InputMsg) {
         // PLAN-060 扩展：组件消息下行（宿主 `Msg` 注入对 broker 应用的转发）。
         if let InputMsg::Action { name, arg, .. } = input {
-            if self.component.dispatch_named(name, arg.as_deref()) {
+            let ok = self.component.dispatch_named(name, arg.as_deref());
+            if std::env::var_os("AUTO_PLAN060_DIAG").is_some() {
+                eprintln!("[plan060] child action {name} ok={ok}");
+            }
+            if ok {
                 self.rev += 1;
             }
             return;
@@ -6870,4 +6874,5 @@ mod tests {
         );
     }
 }
+
 
