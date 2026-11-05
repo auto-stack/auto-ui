@@ -362,3 +362,9 @@ back 侧 `auto-notes-...-back` 是完整 axum/DB 实现。故 iced 桌面上任�
   - `pixels.rs:83`：`impl FrameSource for PixelsNoopSource { fn on_input(&mut self, _input: &InputMsg) {} }` —— v1.3 independent（像素）臂的 child 表面**显式丢弃所有输入**。
   - 若 calendar 客户端裁决为 Pixels 帧模式，endpoint 的 `session` 即 `PixelsNoopSource`：Action（及 pointer/key）到达 endpoint（日志 Discriminant(10) 已证）后被丢弃，与「无 child action 日志 / 指针无反应」全部吻合。
   - 下一步：确认 calendar 的 `frame_mode`（Hello/activate 裁决）；若为 Pixels，则要么在该臂把输入转发给真实组件（需 PixelsNoopSource 持有组件/投影器），要么把该 app 裁决为 Commands 档。
+
+- stage: work | plan_id: auto-ui/PLAN-060 | plan_revision: 1 | round: 30 | task_ids: T-07 | outcome: 验证回路被构建产物/publish 漂移污染（必须先钉产物新鲜度） | evidence:
+  - 部署的 `bin/debug/calendar.exe` = 03:09:03；含旧 `child endpoint input` 标记、**不含**最新 `mode={:?} state={:?}`；而 `c2e02416/debug/calendar-85dd4543.exe`（手建 target）也无该标记。
+  - ⇒ 本轮及前几轮的「无 child action 日志」不可信：运行的二进制不是最新 auto-ui 编出的。
+  - 正确回路：更新组树后必须走 **`auto build -r rust`**（它负责 publish 到 `bin/debug/`），不要手工从 guessed target 目录拷贝；每次验证前先比对二进制标记/时间。
+  - 下一步：固定流程（组树→auto build→校验标记→运行），再判定 Action 是否被消费。
