@@ -105,11 +105,17 @@
 
 ## 7. 具名阻断与移交
 
-- **parser 病理分配**：截断的 widget 残句（`widget X { model {...} view {`）
-  触发 ~51GB 分配、进程 OOM 中止（2026-11-04 探针实测）。owner：auto-lang
-  parser；下一动作：语言仓开立 parser 健壮性 issue（输入最小复现见
-  plan042_reload_readiness_tests.rs 注释）；不阻塞本包结论（探针已避开
-  该类输入），但后继候选 bundle 的"坏源保旧"腿依赖 parser 不崩，须先行。
+- **parser 病理分配（已关闭，PLAN-940 2026-11-06）**：截断的 widget 残句
+  （`widget X { model {...} view {`）曾触发 ~51GB 分配、进程 OOM 中止
+  （2026-11-04 探针实测）。归因实证在 **auto-ui 方言文法收集循环**（非
+  auto-lang parser）：EOF 上 `advance` 不越过 EOF、收集臂可 `Ok` 返回且
+  游标不动，只看闭合符的循环无限收集。PLAN-940 为 11 处循环加 EOF 受控
+  拒绝守卫（方言侧反例族 `auto-ui-dialect/src/regression/parser_eof_progress.rs`；
+  语言仓 Core 合同见 auto-lang `docs/specs/auto-parser-api/progress-and-rejection.md`），
+  本文件依赖的"坏源保旧"腿已交付：`plan042_reload_readiness_tests.rs`
+  `t02b_truncated_widget_keeps_old_and_next_legal_edit_wins`（截断候选
+  保旧 count=11，修复文件后合法编辑 reload 成功）。owner：auto-ui
+  dialect grammar。
 - 实例 owner 语义以 component-and-store-instances.md 为正式合同，本文不
   重写（SD-02 仅在其正式存在后记录真实差额——041 已交付，差额为 0，不
   另写）。
