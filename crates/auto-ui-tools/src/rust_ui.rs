@@ -1155,8 +1155,45 @@ fn compile_at_file(
     // PLAN-681 T-05（E0618 收口）：预填 store msg 载荷表——on-only 根
     // handler 的载荷推断源（app.at 字母序先编译，须跨文件预填）。
     auto_ui_compiler::ui_gen::rust::register_store_msg_payloads(stores);
-    for store in stores {
-        generator.register_store("store", store.name.as_str());
+    // PLAN-052：逐文件 store 注册——只注册本文件 `use` 导入的 store；首个
+    // 用 canonical 别名 "store"（历史形态保形），其余按 use 路径别名
+    // （blog app.at 三 store 族：store/article_store/draft_store）。无 store
+    // 导入的文件（纯组件/风格文件）沿用全量 canonical 注册（历史行为——
+    // 组件 .store 引用经父同步面注入）。
+    auto_ui_compiler::ui_gen::rust::RustGenerator::clear_store_names();
+    let mut imported_stores: Vec<(String, String)> = Vec::new();
+    for stmt in ast.core_stmts() {
+        if let auto_lang_core::ast::Stmt::Use(u) = stmt {
+            let alias = u
+                .paths
+                .last()
+                .map(|p| p.as_str().to_string())
+                .or_else(|| {
+                    u.module_path.as_ref().and_then(|mp| {
+                        mp.display()
+                            .rsplit('.')
+                            .next()
+                            .map(|s| s.to_string())
+                    })
+                })
+                .unwrap_or_default();
+            for item in &u.items {
+                if stores.iter().any(|s| s.name.as_str() == item.as_str())
+                    && !imported_stores.iter().any(|(_, n)| n == item.as_str())
+                {
+                    imported_stores.push((alias.clone(), item.to_string()));
+                }
+            }
+        }
+    }
+    if imported_stores.is_empty() {
+        for store in stores {
+            generator.register_store("store", store.name.as_str());
+        }
+    } else {
+        for (idx, (alias, name)) in imported_stores.iter().enumerate() {
+            generator.register_store(if idx == 0 { "store" } else { alias.as_str() }, name);
+        }
     }
     // Check if THIS file contains any StoreDecl — only generate the store(s)
     // declared here. PLAN-052：此前 file_has_store 为真即发射**全部** stores

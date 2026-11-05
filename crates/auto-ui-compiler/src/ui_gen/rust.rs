@@ -382,6 +382,54 @@ impl RustGenerator {
         });
     }
 
+    /// PLAN-052：清空 store 别名表（逐文件重注册的前置——多 store 文件族
+    /// app.at 与单 store 页面文件互不串扰）。
+    pub fn clear_store_names() {
+        STORE_NAMES.with(|sn| sn.borrow_mut().clear());
+    }
+
+    /// PLAN-052：`store` 规范别名对应的 store 型名（无则取排序首项）。
+    fn canonical_store_name(&self) -> Option<String> {
+        STORE_NAMES.with(|sn| {
+            let sn = sn.borrow();
+            sn.get("store").cloned().or_else(|| {
+                let mut names: Vec<(String, String)> =
+                    sn.iter().map(|(a, b)| (a.clone(), b.clone())).collect();
+                names.sort();
+                names.into_iter().next().map(|(_, b)| b)
+            })
+        })
+    }
+
+    /// PLAN-052：`.store.<field>` 的承载基座——规范 store 未声明该字段时
+    /// 按 STORE_FIELD_TYPES 在其它已注册 store 中定位（多 store 文件族
+    /// app.at 的 `.store.me` 归 AuthStore 类）。
+    fn store_field_base(&self, field: &str) -> String {
+        STORE_NAMES.with(|sn| {
+            let mut aliases: Vec<(String, String)> =
+                sn.borrow().iter().map(|(a, b)| (a.clone(), b.clone())).collect();
+            aliases.sort();
+            let declares = |store: &str, f: &str| {
+                STORE_FIELD_TYPES.with(|m| {
+                    m.borrow()
+                        .get(store)
+                        .map_or(false, |fields| fields.contains_key(f))
+                })
+            };
+            if let Some((_, store)) = aliases.iter().find(|(a, _)| a == "store") {
+                if declares(store, field) {
+                    return "self.store".to_string();
+                }
+            }
+            for (alias, store) in &aliases {
+                if alias != "store" && declares(store, field) {
+                    return format!("self.{}", alias);
+                }
+            }
+            "self.store".to_string()
+        })
+    }
+
     /// PLAN-039 T-12（批次 E）：预填 store 字段类型表（build 入口在
     /// collect_store_decls 后、逐文件编译前调用）——推断口径与
     /// generate_rust 的 state_types 填充同型（Unknown 时按初始式
@@ -1054,7 +1102,10 @@ fn collect_local_elems(
             let field = f.as_str();
             if base_is_store && !field.contains('.') && self.store_field_is_value(field) {
                 let shape = self.store_record_shape(field);
-                return Some((format!("self.store.{}", field), shape));
+                return Some((
+                    format!("{}.{}", self.store_field_base(field), field),
+                    shape,
+                ));
             }
         }
         None
@@ -1782,21 +1833,23 @@ fn collect_local_elems(
         let is_store_itself =
             STORE_NAMES.with(|sn| sn.borrow().values().any(|s| s.as_str() == widget.name));
         if !is_store_itself {
-            if is_root {
-                STORE_NAMES.with(|sn| {
-                    for (_alias, store_name) in sn.borrow().iter() {
-                        code.push_str(&format!("    pub store: {},\n", store_name));
-                    }
-                });
-            } else {
-                // Child widgets also need store field (they access self.store.X)
-                STORE_NAMES.with(|sn| {
-                    for (_alias, store_name) in sn.borrow().iter() {
-                        if !own_fields.contains("store") {
-                            code.push_str(&format!("    pub store: {},\n", store_name));
-                        }
-                    }
-                });
+            // PLAN-052：store 字段按别名逐项发射（多 store 文件族——
+            // canonical 别名 "store" 保历史；其余成 `pub <alias>: Store`）。
+            let mut store_fields: Vec<(String, String)> = STORE_NAMES.with(|sn| {
+                sn.borrow()
+                    .iter()
+                    .map(|(a, b)| {
+                        let field = if a == "store" { "store".to_string() } else { a.clone() };
+                        (field, b.clone())
+                    })
+                    .collect()
+            });
+            store_fields.sort_by(|a, b| a.0.cmp(&b.0));
+            for (field, store_name) in store_fields {
+                if own_fields.contains(&field) {
+                    continue;
+                }
+                code.push_str(&format!("    pub {}: {},\n", field, store_name));
             }
         } // !is_store_itself — skip store field injection for store structs
         if is_root {
@@ -2009,14 +2062,31 @@ fn collect_local_elems(
 
         // Plan 374 Task 2: initialize store field for all widgets (except store itself).
         // Must come BEFORE sync_init check so both paths include it.
-        STORE_NAMES.with(|sn| {
-            let has_store = !sn.borrow().is_empty();
-            let is_self = sn.borrow().values().any(|s| s.as_str() == widget.name);
-            if has_store && !is_self {
-                let store_name = sn.borrow().values().next().cloned().unwrap_or_default();
-                code.push_str(&format!("            store: {}::new(),\n", store_name));
+        {
+            let mut store_fields: Vec<(String, String)> = STORE_NAMES.with(|sn| {
+                sn.borrow()
+                    .iter()
+                    .map(|(a, b)| {
+                        let field = if a == "store" { "store".to_string() } else { a.clone() };
+                        (field, b.clone())
+                    })
+                    .collect()
+            });
+            store_fields.sort_by(|a, b| a.0.cmp(&b.0));
+            let is_self = STORE_NAMES.with(|sn| {
+                sn.borrow()
+                    .values()
+                    .any(|s| s.as_str() == widget.name)
+            });
+            if !is_self {
+                for (field, store_name) in store_fields {
+                    code.push_str(&format!(
+                        "            {}: {}::new(),\n",
+                        field, store_name
+                    ));
+                }
             }
-        });
+        }
 
         // Plan 371 L3: close struct literal. If force_self (sync_init or
         // persistent children), use __self pattern and add post-construct code.
@@ -4688,7 +4758,7 @@ fn collect_local_elems(
                 // autodown_editor { content: .note.body }) would otherwise fall
                 // through to an empty View::col(), hiding the content. Render
                 // their `content` prop as styled text so the data is visible.
-                if tag == "autodown_editor" || tag == "markdown" || tag == "editor" {
+                if tag == "autodown_editor" || tag == "autodown" || tag == "markdown" || tag == "editor" {
                     if let Some(AuraPropValue::Expr(expr)) = props.get("content") {
                         let content_expr = self.ast_expr_to_rust(expr);
                         // text_styled takes content by value; clone self-field
@@ -10340,7 +10410,54 @@ fn collect_local_elems(
         // 致）回译为 struct 点访问（todo `item.done` 株）。
         output = self.retype_condition_value_brackets(&output);
 
+        // PLAN-052：条件串 nil 哨兵比较（view 条件是字符串管线，走不到
+        // AST 的 nil 臂——blog `.store.me != nil` 族）。
+        output = self.fix_condition_nil(&output);
+
         output
+    }
+
+    /// PLAN-052：条件串 `{path} (==|!=) nil` 收口——Value 侧 is_null；
+    /// typed 实体侧结构体恒非 nil（true/false 常量，内层 id 判定承接）。
+    fn fix_condition_nil(&self, cond: &str) -> String {
+        if !cond.contains("nil") {
+            return cond.to_string();
+        }
+        let Ok(re) = regex::Regex::new(r"(self\.[A-Za-z0-9_.]+)\s*(==|!=)\s*nil") else {
+            return cond.to_string();
+        };
+        let mut reps: Vec<(usize, usize, String)> = Vec::new();
+        for cap in re.captures_iter(cond) {
+            let Some(full) = cap.get(0) else { continue };
+            let path = cap.get(1).map(|m| m.as_str()).unwrap_or_default();
+            let op = cap.get(2).map(|m| m.as_str()).unwrap_or("==");
+            let field = path.rsplit('.').next().unwrap_or(path);
+            let ty = self
+                .state_types
+                .get(field)
+                .cloned()
+                .or_else(|| self.store_field_rust_type(field));
+            let typed_non_value = ty
+                .map(|t| {
+                    t != "serde_json::Value"
+                        && !t.starts_with("Vec<")
+                        && t != "Option<serde_json::Value>"
+                })
+                .unwrap_or(false);
+            let replacement = if typed_non_value {
+                if op == "==" { "false" } else { "true" }.to_string()
+            } else if op == "==" {
+                format!("({}).is_null()", path)
+            } else {
+                format!("!({}).is_null()", path)
+            };
+            reps.push((full.start(), full.end(), replacement));
+        }
+        let mut out = cond.to_string();
+        for (s, e, r) in reps.into_iter().rev() {
+            out.replace_range(s..e, &r);
+        }
+        out
     }
 
     /// PLAN-052：条件串中 `{v}["{f}"]`/`self.{v}["{f}"]`（v 为 api 实体
@@ -11394,11 +11511,13 @@ fn collect_local_elems(
     fn extract_payload_names(&self, pattern: &str, variant: &AuraMsgVariant) -> Vec<String> {
         let names = pattern_param_names(pattern);
         if !names.is_empty() {
-            return names;
+            // PLAN-052：Rust 关键字形参名转 raw ident（blog `AddAssetRef(
+            // ref, caption)`——`ref` 是关键字，裸绑定 E0308 语法错）。
+            return names.into_iter().map(|n| sanitize_rust_ident(&n)).collect();
         }
         let from_decl: Vec<String> = variant.payload_names.iter().flatten().cloned().collect();
         if !from_decl.is_empty() {
-            return from_decl;
+            return from_decl.into_iter().map(|n| sanitize_rust_ident(&n)).collect();
         }
         (0..variant.payload.len())
             .map(|i| {
@@ -11988,6 +12107,23 @@ fn collect_local_elems(
                                 && !value.starts_with('"')
                             {
                                 value = format!("{}.clone()", value);
+                            }
+                            // PLAN-052：typed 返回值写入无类型 Value 槽
+                            // （blog `self.current_article = get_article(..)`
+                            // 的 Option<Article> E0308）——Value 槽按 JSON
+                            // 序列化收口（Value 直通幂等）。
+                            if self
+                                .state_types
+                                .get(resolved)
+                                .map_or(false, |t| t == "serde_json::Value")
+                                && matches!(store.expr, auto_lang_core::ast::Expr::Call(_))
+                                && !value.contains("serde_json::to_value")
+                                && !value.starts_with("serde_json::Value::")
+                            {
+                                value = format!(
+                                    "serde_json::to_value({}).unwrap_or(serde_json::Value::Null)",
+                                    value
+                                );
                             }
                             format!("self.{} = {}", resolved, value)
                         } else {
@@ -13803,6 +13939,10 @@ fn collect_local_elems(
             }
             Expr::Ident(name) => {
                 let s = name.as_str();
+                // PLAN-052：nil 字面量（blog `x == nil` 家族）→ Value::Null。
+                if s == "nil" || s == "null" {
+                    return "serde_json::Value::Null".to_string();
+                }
                 // Plan 374 Task 2: store composable rewriting
                 if s == "store" || s == ".store" {
                     return "self.store".to_string();
@@ -13822,13 +13962,16 @@ fn collect_local_elems(
                         if !sub.contains('.') && self.store_field_is_value(field) {
                             let shape = self.store_record_shape(field);
                             return self.value_field_access_shaped(
-                                &format!("self.store.{}", field),
+                                &format!("{}.{}", self.store_field_base(field), field),
                                 sub,
                                 shape.as_ref(),
                             );
                         }
                     }
-                    return format!("self.{}", &s[1..]);
+                    // PLAN-052：承载 store 按字段归属解析（多 store 文件族）。
+                    let field = path.split('.').next().unwrap_or(path);
+                    let base = self.store_field_base(field);
+                    return format!("{}.{}", base, path);
                 }
                 if s.starts_with('.') {
                     let path = &s[1..];
@@ -13848,7 +13991,18 @@ fn collect_local_elems(
                 } else if self.state_types.contains_key(s) || self.prop_names.contains(s) {
                     format!("self.{}", s)
                 } else {
-                    s.to_string()
+                    // PLAN-052：Rust 关键字局部名转 raw ident（blog
+                    // `AddAssetRef(ref, caption)` 的 handler 体 `ref` 引用）。
+                    if matches!(
+                        s,
+                        "ref" | "type" | "match" | "move" | "box" | "fn" | "loop" | "impl"
+                            | "trait" | "struct" | "enum" | "static" | "unsafe" | "where"
+                            | "async" | "await" | "dyn" | "mod" | "pub" | "const"
+                    ) {
+                        format!("r#{}", s)
+                    } else {
+                        s.to_string()
+                    }
                 }
             }
             Expr::Dot(obj, field) => {
@@ -13860,10 +14014,21 @@ fn collect_local_elems(
                     || STORE_COMPUTED_NAMES.with(|sn| sn.borrow().contains(field_str));
                 if let Expr::Ident(name) = obj.as_ref() {
                     if name.as_str() == "store" {
+                        // PLAN-052：承载 store 按字段归属解析（多 store 文件族）。
+                        let base = self.store_field_base(field_str);
                         if is_computed {
-                            return format!("self.store.{}()", field_str);
+                            return format!("{}.{}()", base, field_str);
                         }
-                        return format!("self.store.{}", field_str);
+                        return format!("{}.{}", base, field_str);
+                    }
+                    // PLAN-052：`<store_alias>.<field>`（别名直读，如
+                    // `article_store.current_article`）。
+                    let alias = name.as_str();
+                    if STORE_NAMES.with(|sn| sn.borrow().contains_key(alias))
+                        && alias != "store"
+                        && !is_computed
+                    {
+                        return format!("self.{}.{}", alias, field_str);
                     }
                 }
                 // Detect pattern: Dot(Dot(Ident("self"), prop_name), field_name)
@@ -14064,9 +14229,84 @@ fn collect_local_elems(
                 } else {
                     obj_str
                 };
+                // PLAN-052：typed store/态记录字段读——字段型表 String/
+                // Vec/Option/实体 → 补 .clone()（blog `self.current.work_id`
+                // 的 &mut self 借位 move E0507 族）。
+                if let Some(n) = self.resolve_expr_name(obj) {
+                    let ty = self
+                        .state_types
+                        .get(&n)
+                        .cloned()
+                        .or_else(|| self.store_field_rust_type(&n));
+                    if let Some(t) = ty {
+                        let elem = t.trim().to_string();
+                        if API_TYPE_NAMES.with(|s| s.borrow().contains(elem.as_str())) {
+                            let ft = API_STRUCT_FIELDS.with(|m| {
+                                m.borrow()
+                                    .get(&elem)
+                                    .and_then(|f| f.get(field_str))
+                                    .cloned()
+                            });
+                            if let Some(ft) = ft {
+                                let clone_worthy = ft.starts_with("String")
+                                    || ft.starts_with("Vec<")
+                                    || ft.starts_with("Option<")
+                                    || API_TYPE_NAMES
+                                        .with(|s| s.borrow().contains(ft.trim()));
+                                if clone_worthy {
+                                    return format!("{}.{}.clone()", obj_str, field_str);
+                                }
+                            }
+                        }
+                    }
+                }
                 format!("{}.{}", obj_str, field_str)
             }
             Expr::Bina(left, op, right) => {
+                // PLAN-052：`nil` 哨兵比较——Value 侧 is_null；typed 实体侧
+                // 结构体恒非 nil（Default 结构体是"空用户"而非 nil，外层
+                // 判定由内层 id==0 承接，blog `.store.me != nil` 族）。
+                if matches!(op, Op::Eq | Op::Neq) {
+                    let is_nil = |e: &auto_lang_core::ast::Expr| {
+                        matches!(e, Expr::Ident(n) if n.as_str() == "nil" || n.as_str() == "null")
+                    };
+                    let nil_l = is_nil(left);
+                    let nil_r = is_nil(right);
+                    if nil_l != nil_r {
+                        let other = if nil_l { right.as_ref() } else { left.as_ref() };
+                        let eq = matches!(op, Op::Eq);
+                        if self.expr_is_value_typed(other) {
+                            let e = self.ast_expr_to_rust(other);
+                            return if eq {
+                                format!("({}).is_null()", e)
+                            } else {
+                                format!("!({}).is_null()", e)
+                            };
+                        }
+                        let ty = self.resolve_expr_name(other).and_then(|n| {
+                            self.state_types
+                                .get(&n)
+                                .cloned()
+                                .or_else(|| self.store_field_rust_type(&n))
+                        });
+                        let typed_non_value = ty
+                            .map(|t| {
+                                t != "serde_json::Value"
+                                    && !t.starts_with("Vec<")
+                                    && t != "Option<serde_json::Value>"
+                            })
+                            .unwrap_or(false);
+                        if typed_non_value {
+                            return if eq { "false".to_string() } else { "true".to_string() };
+                        }
+                        let e = self.ast_expr_to_rust(other);
+                        return if eq {
+                            format!("({}).is_null()", e)
+                        } else {
+                            format!("!({}).is_null()", e)
+                        };
+                    }
+                }
                 // Assignment: .count = expr → self.count = expr
                 if matches!(op, Op::Asn) {
                     // Check if target is a Value field write like self.note.title = value
@@ -14737,6 +14977,56 @@ fn collect_local_elems(
                 if let Some(host_call) = self.vm_builtin_host_call(call, &fn_name) {
                     return host_call;
                 }
+                // PLAN-052：具名 store 调用 `AuthStore.Init()` /
+                // `ArticleStore.LoadFeed()`——多 store 文件族（blog app.at）。
+                // 按 store 型名定位别名字段，发
+                // `self.<alias>.on(<Store>Msg::Variant(args))`；store 自身
+                // 体内（current_widget == 型名）发 self.on(...)。
+                if let Expr::Dot(obj, method) = call.name.as_ref() {
+                    if let Expr::Ident(owner) = obj.as_ref() {
+                        let owner_s = owner.as_str();
+                        let store_hit = STORE_NAMES.with(|sn| {
+                            sn.borrow()
+                                .values()
+                                .any(|s| s.as_str() == owner_s)
+                        });
+                        let method_s = method.as_str();
+                        let pascal = method_s
+                            .chars()
+                            .next()
+                            .map(|c| c.is_uppercase())
+                            .unwrap_or(false);
+                        if store_hit && !method_s.contains('.') && pascal {
+                            let args_str =
+                                self.rust_call_args_with_clone(call).join(", ");
+                            let field = STORE_NAMES.with(|sn| {
+                                sn.borrow()
+                                    .iter()
+                                    .find(|(_, s)| s.as_str() == owner_s)
+                                    .map(|(a, _)| a.clone())
+                                    .unwrap_or_else(|| "store".to_string())
+                            });
+                            let receiver = if self.current_widget.as_deref() == Some(owner_s) {
+                                "self".to_string()
+                            } else if field == "store" {
+                                "self.store".to_string()
+                            } else {
+                                format!("self.{}", field)
+                            };
+                            let store_msg = format!("{}Msg", owner_s);
+                            if args_str.is_empty() {
+                                return format!(
+                                    "{}.on({}::{})",
+                                    receiver, store_msg, method_s
+                                );
+                            }
+                            return format!(
+                                "{}.on({}::{}({}))",
+                                receiver, store_msg, method_s, args_str
+                            );
+                        }
+                    }
+                }
                 // Plan 374 Task 2: store.Method(args) → self.store.on(StoreMsg::Method(args))
                 // Only match PascalCase methods (store handlers like NewNote, TogglePin).
                 // Don't match `store.notes.len()` or `store.field.lowercase()`.
@@ -15286,6 +15576,10 @@ fn collect_local_elems(
             Expr::Bool(b) => b.to_string(),
             Expr::Ident(name) => {
                 let s = name.as_str();
+                // PLAN-052：nil 字面量（blog `x == nil` 家族）→ Value::Null。
+                if s == "nil" || s == "null" {
+                    return "serde_json::Value::Null".to_string();
+                }
                 // Plan 374 Task 2: store composable rewriting
                 if s == "store" || s == ".store" {
                     return "self.store".to_string();
@@ -15298,7 +15592,18 @@ fn collect_local_elems(
                 } else if self.state_types.contains_key(s) || self.prop_names.contains(s) {
                     format!("self.{}", s)
                 } else {
-                    s.to_string()
+                    // PLAN-052：Rust 关键字局部名转 raw ident（blog
+                    // `AddAssetRef(ref, caption)` 的 handler 体 `ref` 引用）。
+                    if matches!(
+                        s,
+                        "ref" | "type" | "match" | "move" | "box" | "fn" | "loop" | "impl"
+                            | "trait" | "struct" | "enum" | "static" | "unsafe" | "where"
+                            | "async" | "await" | "dyn" | "mod" | "pub" | "const"
+                    ) {
+                        format!("r#{}", s)
+                    } else {
+                        s.to_string()
+                    }
                 }
             }
             Expr::Object(pairs) => {
