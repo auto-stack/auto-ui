@@ -113,13 +113,16 @@ impl App {
                 let idle_ok = mark(&self.marks, "idle_start").is_some()
                     && mark(&self.marks, "idle_start") == mark(&self.marks, "idle_end");
                 let _ = (reg3,);
+                // F-1 修复（review 需求）：活性判据改确定性闭环——四个
+                // posted 点击全部在状态中观测到（＝全部被处理）即为活；
+                // frames 降为诊断记录（节流桌面上帧率与产品正确性无关，
+                // HEAD 实测 26/23 帧时全部状态 oracle 仍绿）。
                 self.passed = !self.probe
                     || (count == "2"
                         && c2 == "1"
                         && c3 == "1"
                         && self.posted_clicks == 4
-                        && idle_ok
-                        && self.frames > 60);
+                        && idle_ok);
                 serde_json::json!({
                     "title": TITLE,
                     "host_chain": "MixedHost (T-04 single production assembly)",
