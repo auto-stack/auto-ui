@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-05
 updated_at: 2026-11-05
 plan_revision: 1
-current_step: 0
+current_step: 1
 total_steps: 10
 depends_on: [auto-ui/PLAN-048, auto-ui/PLAN-049]
 supersedes_spec_components: []
@@ -102,8 +102,8 @@ T-02最多两种等价全链机制先证：导入两份同定义图形组件和�
 
 | T | owner_stage | 依赖 | 写面/可验证结果 | AC | 进度 |
 |---|---|---|---|---|---|
-| T-01 | work | 后续另行启动；048/049已落主 | 原合同/源码/缺口/owner/旧review和原生政策盘点，核AG021所报bool高槽/独立采样反例，唯一树/scope登记 | AC-01/06 | [ ] |
-| T-02 | work | T-01 | 最多两全链机制先证，冻结声明/身份/条件寿命/费用支持表；不成立replan | AC-01..06 | [ ] |
+| T-01 | work | 后续另行启动；048/049已落主 | 原合同/源码/缺口/owner/旧review和原生政策盘点，核AG021所报bool高槽/独立采样反例，唯一树/scope登记 | AC-01/06 | [x] 2026-11-05 树`D:/autostack/.wt/ui-054/auto-ui`分支`codex/plan-054-dev` base 25d4ea5d；auto-lang sibling@30b396d72（049依赖快照，只读）；driver `.sdk-source` prepare_sdk --from-snapshot+verify PASS（681文件/17本地包）；材料scope `plan-artifacts/plan-054/auto-ui/`——父scope已被外仓auto-os PLAN-054占用（delivery-lock/wiring-decision等），按D-03不共用不盲删，merge只清本子目录。SHA核×5过（049 Spec 8967cc6c/048 Spec 7bda6f53/node_mixed d1e73a42/node_mixed_host 5aaf0c44/lower_node_ui 2893bb22）。源码事实复核：parse_mixed_artifact非root具名拒（node_mixed.rs:74-78）；enqueue_region_click固定实例0（:184-194）；MixedHost常量Main/reg2/reg3/160×90（node_mixed_host.rs:82-87）；refresh_mounts只增改不撤（:346-379）；frame内present_on仅dispatched>0（:324）而step()恒present（:316-329）；present_on按("reg2","2d")/("reg3","3d")字面匹配（:386/419）。AG021反例1坐实：lower_node_ui.rs:1536-1553 BoolField分支忽略buf/base半缓冲寻址，槽≥2写缓冲A覆盖槽0/1、len与字节不一致。反例2定位：step已present子surface命令，缺刷新面在UI pass合成采样（子脏而父view未变不重采样）——T-05具名重现。owner/政策：048/049归档canonical在位、final均同会话（非独立）；AG021=ag-examples PLAN-021 r2（材料plan-artifacts/plan-021/ag-examples/，T-03硬等054交付）；原生输入=具名手工取证或另授权，posted/离屏只证机制。主检出未拥有未跟踪面（crates/auto-ui-runtime/test PNG、docs/design/autoui/）已记录不动。 |
+| T-02 | work | T-01 | 最多两全链机制先证，冻结声明/身份/条件寿命/费用支持表；不成立replan | AC-01..06 | [x] 2026-11-05 机制A（组件内具名区域＋实例路径身份）一次先证成立，机制B未动用。垂直切片全链真实代码：pilot 新profile `node-ui-mixed-regions`（schema `autographics.node-ui-mixed-regions/2`，generator `autographics-node2d-pilot plan054 node-ui-mixed-regions`，lib导出+CLI arm+identity/closure，v1路径与诊断逐字未动）；driver `Api::MixedRegions2`（120/29，assembly 早退三处加臂）、`node_mixed_regions.rs`（v2解析+实例寻址区域目录/scene_state/click_at）、`node_mixed_regions_host.rs`（metadata装配，无固定名；激活/卸载=portal+view+surface释放）、prototype 补 `remove_view`（RemoveSurface 要求 views 空——SurfaceInUse 实证后补中环）、node_ui 队列事件加 RegionClaim+代次对账 resolver（v1 不注入行为不变）。探针 `tests/node_mixed_regions_probe.rs` 6/6 pass（--test-threads=1，4.9s）：非默认命名全链（Dash/Gauge/Meter/arc/dial/strip，无Main/reg2/reg3）、两同定义实例 2:1 点击隔离+像素分开、UI按钮→root状态→区域GPU、N步=N Tick 逐实例且3D合成像素随步刷新、活区域≤4（第5个具名拒绝mount_rejected，卸两释放后名额复用）、条件隐藏撤呈现（live_target_slots 5→4、owned bytes降、代次更换、旧代次事件隐藏期drain具名拒绝stale_rejected=1不派发、状态跨挂卸保留x=24、重挂新代次点击生效x=36）、v1/v2/048 schema 互拒。夹具 fixtures/node-mixed-regions/{dash,gauge,meter}.at + 冻结产物 generated-node-mixed-regions/ui-dash-regions/。v1回归与049夹具字节同一性见T-03行。 |
 | T-03 | work | T-02 go | 新版本AST/lower/产物/实例活区域与metadata装配，去固定名分派 | AC-01/02/05 | [ ] |
 | T-04 | work | T-03 | 条件挂卸/代次/布局输入/原生DPI/last-owner，旧档兼容 | AC-02..05 | [ ] |
 | T-05 | work | T-04 | 命名gates/flow负控/20轮寿命/合法超界/必要真输入及bool高槽与UI不重绘时子场景更新，原缺口逐项核 | AC-03..06 | [ ] |
