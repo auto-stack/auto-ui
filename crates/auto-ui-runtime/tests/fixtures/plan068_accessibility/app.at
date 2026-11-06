@@ -1,6 +1,10 @@
 widget P068Accessibility {
-    msg { ToggleB }
-    model { var show_b bool = true }
+    msg { ToggleB, FlipChecked, EditNote(str) }
+    model {
+        var show_b bool = true
+        var checked bool = true
+        var note_value str = "First line\nSecond line"
+    }
     view {
         col {
             style: "p-6 gap-4 w-full h-full bg-background"
@@ -8,9 +12,16 @@ widget P068Accessibility {
             button (onclick: .ToggleB) { text "Toggle second instance" }
             Probe (key: "a", label: "First") { }
             if .show_b { Probe (key: "b", label: "Second") { } }
+            checkbox (text: "Selected fixture", checked: .checked, onclick: .FlipChecked) { }
+            textarea (placeholder: "Multiline fixture", value: .note_value, oninput: .EditNote, height: 48) { }
+            button (disabled: true, onclick: .ToggleB) { text "Disabled action" }
         }
     }
-    on { .ToggleB -> { .show_b = !.show_b } }
+    on {
+        .ToggleB -> { .show_b = !.show_b }
+        .FlipChecked -> { .checked = !.checked }
+        .EditNote(value) -> { .note_value = value }
+    }
 }
 widget Probe (label: str = "") {
     msg { Inc, Edit(str) }
