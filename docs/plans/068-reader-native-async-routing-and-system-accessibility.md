@@ -145,6 +145,15 @@ Rust AutoUI runtime/dialect/handler codegen、VM实例及parked续体、iced/win
 - T02候选AccessKit官方Windows adapter0.35.2（accesskit0.25.2/consumer0.39.2、Rust>=1.87），公开SubclassingAdapter在窗口线程首次show前安装，action可跨线程故只入队，update返回events须在锁外raise。独立scratch winit0.30.13真实小窗零MCP/debug：build exit0，15.34s。Sky读取实际Windows树，按钮7、edit8、text9均出现；系统set_value中文→实际model、显示与AX值/焦点均更新。系统证据t02-system-tree-value.json SHA256=ac01ef670d91d6f4b6a07ed1587de3148d2275465b8f8188c585718d5c21436c。Sky click按钮仍0，不能称按钮操作通过，保留与Reader同形的输入工具疑点。
 - T02下一步：把生产Iced布局、精确实例代际与系统action路由接法冻结，避免复用debug-only包装造成失焦；bounds必须真实布局且按窗口scale映射，stale node须丢弃，wry原生子窗保留自身provider。新库尚未加入生产manifest，无虚假AX Spec。
 
+### 2026-11-06 T02实现接缝冻结（可行核查仍进行）
+
+- Windows原生VM独立窗口先hidden创建，在window::run保证的窗口线程、首次show前安装AccessKit SubclassingAdapter，再恢复原visible意图；原pixels/hidden会话不显示。非Windows/其它宿主不预发新增能力。
+- 生产render_dynamic_view使用恒定结构的零布局委托wrapper采真实bounds/clip/focus；不依赖F12/MCP InspectorCache，不开debug包装。每窗口的语义树随真实转换树建/撤，node id按path+原receiver堆id+事件稳定，移除后不复用；换代即新id。Tree/queue只承载Send数据，不跨线程访问VM。
+- Windows activation从已建树快照返回，未建树时None，后续实际帧发布；action只入队，生产update实际消费时再次核node、原receiver存活及代际，再走原IcedMessage→实例派发或既有Focus operation，禁止直接写业务state。按钮/可点击行、input/textarea、静态/正文文本、checkbox/radio、list/group是首批Reader表面；Select/第三方定制控件不得伪报可操作，先保持具名未覆盖直至Reader消费核查决定是否必要。
+- bounds以真实layout/draw和viewport裁剪为源、每窗口DPI映射；字段值/禁用/checked/selected与实际转换View同源。wry正文保持自身Windows子窗provider，父树合成须在T03/V03实际核对，不用DOM/MCP树替代。
+- 为避免空闲定时泵，新provider使用每窗口有界合并的唤醒通道：实际树/bounds变化或系统动作才通知update，事件raise在快照锁外。关闭窗口清语义和动作，adapter仅在其窗口线程释放；多App/卸载/重挂/resize/焦点/非debug对照永久测试。
+- 尚未将T02打勾：仍需生产接缝的小窗实际整链（含首次show时序、真实bounds/动作）；scope和009验收不变，独立终审仍未启动。
+
 ## 10. 待澄清事项
 
 无待答范围授权。T00须确定真实续体/字段归属原因；T02须先证明Windows provider可行边界，当前无主观选定依赖。Sky输入未达须区分工具与产品；工具限制不授予绕过系统安全或伪造输入的许可。发现范围/兼容/验收必须再变更时按auto-plan:new处理，不能静默扩大。
