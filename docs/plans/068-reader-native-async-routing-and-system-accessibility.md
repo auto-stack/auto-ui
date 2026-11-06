@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-06
 updated_at: 2026-11-06
 plan_revision: 2
-current_step: 3
+current_step: 2
 total_steps: 8
 base_branch: master
 base_commit: 7ac0455bf4cd743248749e4bc4eb9d0aed657266
@@ -108,7 +108,7 @@ Rust AutoUI runtime/dialect/handler codegen、VM实例及parked续体、iced/win
 | ID | owner_stage | 依赖 | 实际动作 / 关闭条件 | AC |
 |---|---|---|---|---|
 | T00 [x] | work | 授权已给 | 主干/pin同因复现、有效最小HTTP routed fixture、真实owner流与R01/02定位；先证明root正控和实际原红，不继续错误prototype盲重试 | AC01/02 |
-| T01 [x] | work | T00 | 最小实例/root续体与结果投影修复、永久V01/02及必要同因合法/失效对照；Reader无特判 | AC01/02/05 |
+| T01 | work | T00 | 最小实例/root续体与结果投影修复、永久V01/02及必要同因合法/失效对照；Reader无特判 | AC01/02/05 |
 | T02 [x] | work | T00；T01可独立推进 | 真实系统可访问整链有界可行核查，冻结角色/事件/实例/失效/布局owner、可用库/feature与拒绝行为；不可行则具名设计阻挡，不先写虚假Spec | AC03/05 |
 | T03 | work | T02 | 实现最小Windows provider/语义发布及真实系统树/焦点/操作V03；按需处理wry正文已有接缝，保原native表面合同 | AC03/05 |
 | T04 | work | T01/T03 | 新tool从独立树实际构建，固定Reader消费V04及受影响V05；源/依赖前后不漂移，补Spec提案，work-owned全通过才execution_done | AC01～05 |
@@ -116,7 +116,7 @@ Rust AutoUI runtime/dialect/handler codegen、VM实例及parked续体、iced/win
 | T06 | merge | T05 pass | 精确落地、冻结受影响并集与canonical核验、归档导航/计数；需要Lang变更则同门成对交付 | AC07 |
 | T07 | merge | T06 | Reader009更新只读消费pin/工具并记录可用交接；原证据不动，guard clean后清本树/分支/自有scope，最终8/8 | AC08 |
 
-当前3/8，T00/T01/T02已闭；T03实施中。T02已证实际生产Iced首次show前安装、真实系统树与中文系统编辑/焦点、同型显示隔离、无debug/MCP捕获条件可用，接法和拒绝边界已冻结。按钮实际输入、其它角色/生命周期/正文接缝仍归T03/V03，真实Reader消费归T04，均不得当已通过。
+当前2/8，T00/T02已闭；T01因实际View绑定carrier发现同合同缺口而重开，T03进行中。旧11项直接instance参数用例仍有效，但未覆盖真实Send消息的U+0001实例串中含@/路由；须补反例后关闭。真实系统壳/正文/选区已有直接证据，批注对话尚未打开，T03/04不计全通过。
 
 ## 9. 复审记录
 
@@ -159,10 +159,21 @@ Rust AutoUI runtime/dialect/handler codegen、VM实例及parked续体、iced/win
 - T02实际生产整链：新增独立example plan068_system_accessibility和双同型Probe夹具，通过真实run_dynamic_iced→hidden open→window::run安装→首次show。第一版build exit0、34.10s，binary SHA256=1ecf1fe00dc80e2223fdde0bea7bb4554b31ffeacaec9ab3bbac3642014e3aae，PID2924（已按完整exe路径确认后停止）。实际Sky系统树有两个按钮/编辑/文本，系统set_value触发正常实例handler；不把internal树当系统树。
 - 发现且保留真实新反例：甲状态/正文已改、乙状态/正文仍initial，但输入显示缓存按Edit事件共用让乙输入也显示甲值。before-cache-fix.json SHA256=5bd600add5588802344bc2e904931bcd7d8cf933a9d5aec3ca30ef9b6a105495。T03对同因缓存改按原receiver堆id+event，retain按基事件/存活receiver清理，patch按实际TypedInst绑定；旧根态裸事件接口保留，不改ADE不覆写合同。
 - T03机制首轮native_accessibility::tests实际**4/4 PASS，0 ignored，exit0，4.41s**；生产Iced headless真实layout/draw/viewport边界及1.5scale、原实例动作、双App拒绝、卸载前/后旧node拒绝与新节点可作、输入缓存隔离/旧代移除。log SHA256=db66dffda1d77e2d224e9a918103b113977edaf931b46fa376bd1e16b9c1b633。此非系统操作成绩，不代替V03。
-- 新版生产例build02 exit0、31.34s，binary SHA256=2e31d0d30f1e30f5f5301875fc724fab99284f90bd4c9f5fbd1643346c8203d1，PID15916/窗口3540340（后续以Sky新返回对象为准，当前新窗口名称P068 Native controls，实际id须再读取）、MCP11595，P530_NOMCP=1/AUTOUI_MCP_DISABLE=1，未启F12、未发MCP读取/action。实际系统set_value中文/引号/反斜杠→甲输入及正文正确、乙输入及正文保持initial、焦点正确。isolated-value.json SHA256=0101fc00cc6c465f56f63b129390c853fbc5348ea7289b2b4146ee04c5bf5987，jpg=387952ece19affcde8c743a4b4bc4592f059bba5e2011dbf36582a78f85038c7。MCP服务器仍由既有宿主启动，关闭的是捕获/轮询，不声称零server进程；新AX全不依赖其数据。
+- 新版生产例build02 exit0、31.34s，binary SHA256=2e31d0d30f1e30f5f5301875fc724fab99284f90bd4c9f5fbd1643346c8203d1，PID15916/窗口3147796（当前新窗口名称P068 Native controls，以Sky新返回对象为准）、MCP11595，P530_NOMCP=1/AUTOUI_MCP_DISABLE=1，未启F12、未发MCP读取/action。实际系统set_value中文/引号/反斜杠→甲输入及正文正确、乙输入及正文保持initial、焦点正确。isolated-value.json SHA256=0101fc00cc6c465f56f63b129390c853fbc5348ea7289b2b4146ee04c5bf5987，jpg=387952ece19affcde8c743a4b4bc4592f059bba5e2011dbf36582a78f85038c7。MCP服务器仍由既有宿主启动，关闭的是捕获/轮询，不声称零server进程；新AX全不依赖其数据。
 - T02选择依赖accesskit=0.25.2/accesskit_windows=0.35.2（Windows target精确pin）；实际consumer0.39.2/windows0.62.2，与既有windows0.58用raw HWND隔离，不改变其它平台。独立external lock更新SHA256=f8e51e1c6587604994b452a63d856b7fa7a821610444f0d32a7b16305e07be5d（后续tool feature可能正常再更新）。无源码/新依赖写入主干，只在权威ui-068树。
 - T03尚未关闭：checkbox/radio/list与disabled/非可见拒绝、focus键控换位、关闭资源、真实wry正文合成、按钮实输入/原Reader均未满证。当前补生产List递归、语义widget位置复用时的owner校验与焦点重取；新tool（autodown+doc-surface）构建中，新的改动尚未重跑机制集。旧输入pin/ADE控制与受影响并集仍待对应阶段。不递交未完成实现给终审裁剪验收。
 - 工具约束：Sky click生产按钮仍无变化；系统set_value可达。首次误向已关闭旧窗发手动请求已立即取消说明，不计成绩。当前另一次明确请求针对已确认可见P068 Native controls，保持PID15916窗口等用户手点First Increment与ToggleB两次，独立代码/构建工作继续；无新授权待答。先前一次example重新link因同名exe仍运行而LNK1104，已确认旧PID/路径并停止后build02通过，未称编译代码红。
+
+### 2026-11-07 T03/Reader诊断与T01真实carrier缺口
+
+- 当前权威代码573c0d460d67e8563a7645982117e1ff3817d267（原路由9cb97226之上，系统provider/持有原owner/按实例缓存/永久例）；仍executing，未独立终审。新增生产首次帧反例先红：完整DesktopSession::empty(None)→allocate/register→dynamic_view、零MCP/debug且不预渲染，AX未绑定子件（0目标，exit101）；根因owner快照取在View分配child之前。移至实际render入口后，连关闭后旧请求不复活registry一并加入，**native_accessibility::tests8/8 PASS、0 ignored、exit0、6.75s**（autodown/doc-surface同消费feature）；基线log SHA256=e5961a1b514126935add1ed78ce3898665d866eef2aecf5361aff8afa68eff6c，修复e1c86dae8a9e9b6d8736f12b5865367d50982281912eefa139c18a446bceab50。此前6/6及真实input pin/ADE旧3/3（无跳过，已核corpus存在）SHA256=45142dc7a4470bd57fade96551168b2b2bd88ef296cbfe5b54a3bf988dc7a65f/13e1cc0f9c49c93f126a0a5a802db957c0ca42559f9b4269ef7210ddc40d718c；未受之后scope放置/registry改面影响，复用不重跑全仓。
+- 用户实际回报First=1，系统树冷读确认甲1、乙0，甲原中文输入和回显不变，乙重挂initial；乙系统元素索引14～18变19～23，甲身份稳定。lifecycle.json为有效系统读回；同名jpg实际抓到遮挡中的Reader，不能当计数窗视觉证据。独立手动回报与AX值可计原生输入对照，非MCP按钮事件。
+- 新tool启autodown+doc-surface已build exit0，2m03s，SHA256=2b5b027f2061599ecb9dde1f3025a01f211235603b0b866d33a7ab062c0655ae；该诊断二进制早于最终573c0d46的首次帧修复/测试，不宣称最终冻结cohort。Reader a78c5cf源码未变，显式根指ui-068，其余依赖仍原pin。诊断01（CLI33068/UI28016+45276）复制数据后managed_path仍指009；已核完整exe/PID子树停止，无验收成绩。02先递归本地化原件/managed路径并全3份hash相等后启动，CLI16544，API7100/front7101/MCP7102，原生窗口18550458、title图书阅读器。data与fixtures全部本068自有，009原证据不改。
+- 隔离夹具曾json.dumps加入空格，触发既有固定meta前缀守卫而目录[]/内容缺失；仅恢复自有3份索引紧凑格式并修启动脚本，接口已返回单章“封面书甲”。未为测试准备错误改Reader源码；当前已开阅读页标题仍旧，待正常重进，不计标题正确。原件/managed字节不改。
+- 按既有NVM-03从真实MCP树发现书卡并press（非直接API写）→真实页面Init HTTP链完成，原缺__current_route异常不再复现；Windows实际树同时有壳button/edit/text与wry子进程Document，标题“封面书甲”和正文“封面提取验证章。”可读。Sky父窗拖选被明确拒绝`point (777,710) is over msedgewebview2.exe Chrome Legacy Window, not target window auto-ui-tool.exe`，激活/刷新后一次重试仍拒绝；子进程未在工具窗口清单可单独选择，未绕过工具限制。
+- 用户已真实拖选整句并回复“正文已选中”；系统selected_text精确相等、独立GET locator found=true，book_id=18e579d2-a510-4fc1-a77b-76b49f829df8/source sha256:c4f323fc.../spine1/c1.xhtml/range start CFI epubcfi(/6/2!/4/4,/1:0,/1:8)/created_at1793980545。保存系统/原生API证据于02/real-selection-*.json。截图在用户回复后抓到遮挡Codex，不能冒称正文选区蓝色画面；以系统selected_text+实际adapter POST/locator冷读为真选区。API提案额外end.cfi="0"值得009后续严格核查，不预报保存/回访通过。
+- 新反例：真实树“批注所选”press返回ok但无对话/无locator出站HTTP。读取生产Send链定位：dynamic::on_with_input_for_instance先split_once('@')再剥U+0001，误把实例内的reading_page@/book/...截断；该形态的live名字回落又不能从路由路径尾段辨件名，遂落root legacy，在root.is_epub=false直接返回。旧11项使用显式instance参数，未覆盖真实TypedInst→Send carrier，不能关闭此分支。T01重开（任务分母8不变，非终审repair轮）；新增真实View绑定HTTP与key含@的双实例永久反例，先跑原码基线，随后只修解析顺序，禁止复制root/改Reader规避。
+- 用户手动两项均已答，不再悬置旧问；下一步由实现继续，暂不要求重复选区。最终新二进制/准确源、必要复演、Spec增量、独立复审/交付/009消费均仍在后续，不降低原门。
 
 ## 10. 待澄清事项
 
