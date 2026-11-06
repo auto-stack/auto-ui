@@ -137,3 +137,9 @@
 - 永久入口 `tests/plan068_routed_continuations.rs` 使用真实延迟 HTTP、实际 CPU
   让出、路由 child 的实例态和 rendered View 作 oracle；包括双同型实例共享
   Store、跨 App 隔离、卸载/重挂迟到控制。原 `(widget, handler)` 在途重入限制不变。
+
+- Send/MCP 消息先按 U+0001 分离件类型与不透明实例地址，再仅在类型段解释
+  `@seq`；实例地址内的 `@`、路由斜杠和 key 数据必须原样保留。显式 instance
+  参数优先于 carrier，但 carrier 的类型段仍先剥离，不能把地址拼入 handler 名。
+  永久反例使用真实 View 绑定产生的路由 HTTP/含@key消息，以及实际 Iced
+  生产转换/系统动作入口；仅手传 instance 参数不能替代该 Send 边界覆盖。

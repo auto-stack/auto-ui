@@ -32,6 +32,7 @@ widget StatusProbe (seed: str = "") {
     view {
         col {
             text .seed
+            button (onclick: .Load) { text "Load probe" }
             text .result
             text .total
         }

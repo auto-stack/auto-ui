@@ -3202,28 +3202,19 @@ impl DynamicComponent {
         input_value: Option<String>,
         instance: Option<&str>,
     ) {
-        // PLAN-654: path 装饰名 → 类型名（`Widget@seq` / `Widget`）。
-        let widget_name_owned;
-        let widget_name: &str = match widget_name.split_once('@') {
-            Some((w, _)) if !w.is_empty() => {
-                widget_name_owned = w.to_string();
-                &widget_name_owned
+        // Split the Send carrier before interpreting the type's @seq suffix.
+        // The opaque instance may itself contain @, route slashes or keyed data.
+        // An explicit instance argument wins, but never becomes part of the type.
+        let (widget_name, carried_instance) = match widget_name.split_once('\u{1}') {
+            Some((widget, identity)) if !widget.is_empty() && !identity.is_empty() => {
+                (widget, Some(identity))
             }
-            _ => widget_name,
+            _ => (widget_name, None),
         };
-        // PLAN-041 T-02: IcedMessage 边界经 widget 名内嵌实例标记
-        //（`Widget` + U+0001 + `<identity>`，与 `@seq` 同款入口剥离约定）。
-        // 同时剥离出干净 widget 名（handler 名空间解析不可见标记）。
-        let instance_owned;
-        let (widget_name, instance): (&str, Option<&str>) = match instance {
-            Some(i) => (widget_name, Some(i)),
-            None => match widget_name.split_once('\u{1}') {
-                Some((w, inst)) if !w.is_empty() && !inst.is_empty() => {
-                    instance_owned = inst.to_string();
-                    (w, Some(instance_owned.as_str()))
-                }
-                _ => (widget_name, None),
-            },
+        let instance = instance.or(carried_instance);
+        let widget_name = match widget_name.split_once('@') {
+            Some((widget, _)) if !widget.is_empty() => widget,
+            _ => widget_name,
         };
         let (clean_name, mut payload) = decode_payload(event_name);
 

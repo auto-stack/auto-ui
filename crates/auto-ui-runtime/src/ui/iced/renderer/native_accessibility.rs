@@ -1459,4 +1459,53 @@ mod tests {
         assert!(!windows().lock().unwrap().contains_key(&window));
         remove(fresh);
     }
+    #[test]
+    fn actual_routed_iced_button_carrier_writes_the_pages_own_model() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/plan068_routes/src/front/app.at");
+        let mut component =
+            crate::build_dynamic_component(&std::fs::read_to_string(&path).unwrap(), path.to_str())
+                .unwrap();
+        component.set_route("/");
+        let window = iced::window::Id::unique();
+        let mut session = crate::ui::session::DesktopSession::empty(None);
+        let app = session.allocate_app(component);
+        session.register_window(window, app, iced::Size::new(800., 600.));
+        prepare(window);
+        {
+            let element = super::super::projection::dynamic_view(
+                session.split_ref_at(app, window).unwrap(),
+                false,
+            );
+            let mut ui = iced_test::simulator(element);
+            let _ = ui.snapshot(&Theme::Dark).unwrap();
+        }
+        let (node, identity) = {
+            let state = shared(window);
+            let state = state.lock().unwrap();
+            let (id, entry) = state
+                .nodes
+                .iter()
+                .find(|(_, entry)| entry.node.label() == Some("Write local"))
+                .unwrap();
+            let identity = entry.owner.identity.clone().unwrap();
+            assert!(identity.contains('@'));
+            (*id, identity)
+        };
+        let component = &mut session.apps.get_mut(&app).unwrap().component;
+        apply(window, component, node, Requested::Click);
+        assert_eq!(
+            component
+                .bridge()
+                .read_instance_state(&identity, "result")
+                .unwrap()
+                .as_str(),
+            "local result"
+        );
+        assert_eq!(
+            component.bridge().read_state("result").unwrap().as_str(),
+            ""
+        );
+        remove(window);
+    }
 }

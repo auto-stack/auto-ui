@@ -64,13 +64,19 @@ impl Drop for ReplyServer {
 }
 
 fn fixture(server: &ReplyServer) -> (tempfile::TempDir, DynamicComponent) {
+    fixture_with_key(server, "a")
+}
+
+fn fixture_with_key(server: &ReplyServer, key: &str) -> (tempfile::TempDir, DynamicComponent) {
     let source = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/plan068_routes/src/front");
     let directory = tempfile::tempdir().unwrap();
     std::fs::create_dir(directory.path().join("pages")).unwrap();
     for relative in ["app.at", "shared_store.at", "pages/status_page.at", "pages/done_page.at"] {
         let text = std::fs::read_to_string(source.join(relative)).unwrap();
-        std::fs::write(directory.path().join(relative), text.replace("__P068_URL__", &server.url)).unwrap();
+        let text = text.replace("__P068_URL__", &server.url)
+            .replace("key: \"a\"", &format!("key: {}", serde_json::to_string(key).unwrap()));
+        std::fs::write(directory.path().join(relative), text).unwrap();
     }
     let app = directory.path().join("app.at");
     let mut component = auto_ui_runtime::build_dynamic_component(
@@ -79,6 +85,59 @@ fn fixture(server: &ReplyServer) -> (tempfile::TempDir, DynamicComponent) {
     render(&mut component);
     component.drive_scheduler_to_quiescence(32);
     (directory, component)
+}
+
+fn bound_carrier(component: &DynamicComponent, label: &str) -> (String, String, String) {
+    use auto_ui_runtime::ui::{view::View, interpreter::DynamicMessage};
+    fn find<'a>(view: &'a View<DynamicMessage>, label: &str) -> Option<&'a DynamicMessage> {
+        match view {
+            View::Button { label: actual, onclick, .. } if actual == label => Some(onclick),
+            View::Column { children, .. } | View::Row { children, .. } => children.iter().find_map(|child|find(child,label)),
+            View::Container { child, .. } | View::Scrollable { child, .. } => find(child,label),
+            _ => None,
+        }
+    }
+    let view=component.view_with_debug_gated(false).0;
+    let Some(DynamicMessage::TypedInst { widget_name, event_name, args, instance }) = find(&view,label) else {panic!("real bound button missing: {label}")};
+    assert!(args.is_empty());
+    // The documented Send carrier; identity comes from the real view binding.
+    (format!("{widget_name}\u{1}{instance}"),event_name.clone(),instance.clone())
+}
+
+#[test]
+fn real_routed_http_button_carrier_updates_its_child_not_the_root_copy() {
+    let server=ReplyServer::start();let (_directory,mut component)=fixture(&server);
+    let (widget,event,instance)=bound_carrier(&component,"Load results");
+    assert!(instance.contains('@'),"must cover the production outlet route identity");
+    component.on_with_input_for(&widget,&event,None);
+    finish_http(&mut component,&server);
+    assert_eq!(component.bridge().read_instance_state(&instance,"result").unwrap().as_str(),"success\nfailure\ncancelled");
+    assert_eq!(component.bridge().read_state("result").unwrap().as_str(),"");
+    assert!(render(&mut component).contains("Result summary"));
+}
+
+#[test]
+fn at_in_a_key_preserves_the_exact_bound_receiver_with_same_type_siblings() {
+    let server=ReplyServer::start();let (_directory,mut component)=fixture_with_key(&server,"a@nested");
+    let (widget,event,instance)=bound_carrier(&component,"Load probe");
+    assert!(instance.ends_with("#a@nested"));
+    component.on_with_input_for(&widget,&event,None);
+    finish_http(&mut component,&server);
+    assert_eq!(component.bridge().read_instance_state(&instance,"result").unwrap().as_str(),"A");
+    assert_eq!(component.bridge().read_instance_state("/StatusProbe#b","result").unwrap().as_str(),"");
+    assert_eq!(component.bridge().read_state("total").unwrap(),auto_val::Value::Int(1));
+}
+
+#[test]
+fn explicit_instance_wins_over_carrier_and_only_type_suffix_is_stripped() {
+    let server=ReplyServer::start();let (_directory,mut component)=fixture(&server);
+    let (carrier,event,_)=bound_carrier(&component,"Load probe");
+    let (widget,identity)=carrier.split_once('\u{1}').unwrap();
+    let decorated=format!("{widget}@99\u{1}{identity}");
+    component.on_with_input_for_instance(&decorated,&event,None,Some("/StatusProbe#b"));
+    finish_http(&mut component,&server);
+    assert_eq!(component.bridge().read_instance_state("/StatusProbe#a","result").unwrap().as_str(),"");
+    assert_eq!(component.bridge().read_instance_state("/StatusProbe#b","result").unwrap().as_str(),"B");
 }
 
 fn render(component: &mut DynamicComponent) -> String {

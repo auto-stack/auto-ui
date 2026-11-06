@@ -1,11 +1,12 @@
 widget StatusPage {
-    msg { Load, Push, PushSync, CpuPush }
+    msg { Load, Push, PushSync, CpuPush, SyncLocal }
     model {
         var result str = ""
     }
     view {
         col {
             button (onclick: .Load) { text "Load results" }
+            button (onclick: .SyncLocal) { text "Write local" }
             button (onclick: .Push) { text "Navigate after request" }
             text .result
             if .result != "" {
@@ -19,6 +20,7 @@ widget StatusPage {
             let response = Http.get_json("__P068_URL__/reply")
             .result = "success\nfailure\ncancelled"
         }
+        .SyncLocal -> { .result = "local result" }
         .Push -> {
             let response = Http.get_json("__P068_URL__/reply")
             router.push("/done/42")
