@@ -1,12 +1,12 @@
 ---
 plan_id: auto-ui/PLAN-068
-status: reviewed
+status: archived
 feature_name: Reader 原生异步路由状态、结果投影与系统无障碍收口
 author: [Codex]
 created_at: 2026-11-06
 updated_at: 2026-11-07
 plan_revision: 2
-current_step: 6
+current_step: 8
 total_steps: 8
 base_branch: master
 base_commit: 7ac0455bf4cd743248749e4bc4eb9d0aed657266
@@ -113,8 +113,8 @@ Rust AutoUI runtime/dialect/handler codegen、VM实例及parked续体、iced/win
 | T03 [x] | work | T02 | 实现最小Windows provider/语义发布及真实系统树/焦点/操作V03；按需处理wry正文已有接缝，保原native表面合同 | AC03/05 |
 | T04 [x] | work | T01/T03 | 新tool从独立树实际构建，固定Reader消费V04及受影响V05；源/依赖前后不漂移，补Spec提案，work-owned全通过才execution_done | AC01～05 |
 | T05 | review | T04 | 同树独立终审，重放高风险原红/合法控制、真实产品与系统树；绑定reviewed_commit/当前revision | AC06 |
-| T06 | merge | T05 pass | 精确落地、冻结受影响并集与canonical核验、归档导航/计数；需要Lang变更则同门成对交付 | AC07 |
-| T07 | merge | T06 | Reader009更新只读消费pin/工具并记录可用交接；原证据不动，guard clean后清本树/分支/自有scope，最终8/8 | AC08 |
+| T06 [x] | merge | T05 pass | 精确落地、冻结受影响并集与canonical核验、归档导航/计数；需要Lang变更则同门成对交付 | AC07 |
+| T07 [x] | merge | T06 | Reader009更新只读消费pin/工具并记录可用交接；原证据不动，guard clean后清本树/分支/自有scope，最终8/8 | AC08 |
 
 当前3/8，T00/T01/T02已闭，T03进行中。T01真实View carrier红绿闭环已补：14路由/9系统机制/11旧路径均通过，旧读回与真实系统选区证据保留。批注对话须用新二进制继续，T03/04仍未完整通过，尚未终审/交付。
 
@@ -255,6 +255,16 @@ Rust AutoUI runtime/dialect/handler codegen、VM实例及parked续体、iced/win
 ### 2026-11-07 T05独立终审：独立上下文复演全绿，pass→reviewed
 
 - stage: review | review_scope: final | reviewer_identity/limitations: **独立新上下文subagent**（无实施历史；同机宿主），按用户“独立上下文终审”指令派出；实施写入自execution_done起保持暂停，reviewer全程对各git树只读，verdict由工件+自查复演重建，不依赖实施者摘要 | plan_id:auto-ui/PLAN-068 | plan_revision:r2 | outcome: **pass** | worktree_path:D:/autostack/.wt/ui-068/auto-ui | branch:codex/plan-068-dev | reviewed_commit: **ca4c8acd6bee902b050e863e926d160826d535b0**（树clean经reviewer复核） | base_commit:7ac0455bf4cd743248749e4bc4eb9d0aed657266 | dependency_revisions:lang37350656/worktree精确、man03bb65ef/down58ea33f6/webbf72baab（reviewer核：其余dep主检出前进但pin均为祖先，worktree pin精确，非漂移） | spec_inputs:SD01～04工作树草案（native-system-accessibility.md新+3处修改） | acceptance_results:**AC01～AC05全PASS**——reviewer自跑V05六组**64/64 PASS、0 ignored、全exit0**（routed14/1.85s、ownership4、native-ax14/31.51s、codegen15、plan015 6、plan654 11；日志t05-review/t05-*.log），与v05-final计数一致；六处改面file:line核验（dynamic.rs:3187-3197 carrier序、1910-1948统一发布、native_accessibility.rs:194-227首show前安装/42-58 owner代际/325-351拒绝路径、handler_codegen app_root_field、aura_view_builder/mod.rs:744-800封顶Shrink+rev().find_map、doc_surface fbb65dc2 lease、Reader json.from_value全body）；证据链hash重算全符；reviewer亲览s10四行结果像素与s11网格像素；**独立live复演**（自建会话端口34001-03，UIA Invoke真实打开OS选择框→对话框无ValuePattern/InvokePattern，按NativeWindowHandle BM_CLICK取消→最短串“已取消文件选择”在渲染树/系统树元素9/真实像素三通道可见；q exit0/0.269s、进程消失、端口冷、数据字节不变；observation④同会话独立复现） | pending_closeout_gates:统一冻结受影响并集与全量回归归T06 merge；SD03示例路径笔误（examples/plan068_system_accessibility.rs→crates/auto-ui-runtime/examples/...）归merge修正；dep主检出前进需T06配对说明 | findings:（Low）dep主检出祖先前进注记；（Low）SD03路径笔误；（Info）OS对话框文件名Edit无UIA ValuePattern——自动多选不可行，四文件腿依s10用户输入证据；（Info）observation④复现，跨通道互证为强制 | evidence:D:/autostack/plan-artifacts/plan-068/auto-ui/t05-review/（6日志+session+截图+UIA dump+start脚本） | next: **T06 merge**（精确落地、冻结并集、canonical核验、归档），随后T07 009消费pin交接。终审修复轮仍0；receipts由实施上下文按本报告代记。
+
+### 2026-11-07 T06/T07 merge：冲突成对交付与精确落地，8/8 archived
+
+- stage: merge | key: PLAN-068:r2 | outcome: **pass**（landed+canonical_verified+T07交接；archived/cleaned见后） | prepared: reviewed ca4c8acd + 文档后代候选ee6d764d（SD03路径笔误修复，1行docs，实现/依赖零变化）；冻结受影响并集在候选上64/64重跑exit0。
+- **rebase冲突与成对交付**：master在分支点后落入PLAN-060线性落地（84d5b7be），其重构已把`split_scroll_visual_classes`/`ensure_full_scroll_dims`从aura_view_builder/mod.rs本地函数移至`ui/view.rs`，且**不带068封顶修复**（无条件Full即原红行为）。rebase在180b98f6/ca4c8acd两提交冲突；按merge规则解决：保留master侧import、删除dev侧本地副本，把**最终封顶语义**（MaxHeight>0→Height::Auto保Shrink合同 + rev().find_map最后cap生效）重新落至ui/view.rs:5547-5596。range-diff（merge/range-diff.txt）：11个dev提交补丁等价重写（7171ac31→ef0d9c17、9cb97226→7d3a73aa、573c0d46→65568833、272c0e1b→8f993ccb、237ebdd9→7f368c95、cd8b0775→84dfe1c4、fbb65dc2→42cde979、9aa7ab73→5c1e9e67、c5a76e62→25029f31、0f3dfbfd→960deff8），两冲突提交重写为6d890c7d/c25ced25（记录偏差：修复位置从aura_view_builder本地函数改为ui/view.rs），ee6d764d→0b3ee62d补丁等价。
+- **依赖成对（T06"需要Lang变更则同门成对交付"）**：rebase后master代码需新版auto-lang（`back_prefix::current_spec`等），原pin 37350656编译失败E0425；ui-068组auto-lang兄弟检出37350656→**92bbf298**（auto-lang master，pin为其祖先，T06配对交付，无068自身lang源改动）。
+- **刷新受影响验证（rebase+配对使原证据失效后重跑）**：冻结并集6组64/64 + p748布局12/12 = **76/76 PASS、0 ignored、全exit0**（delivery-*.log：routed14/1.71s、ownership4、native-ax14/30.75s含3封顶case、codegen15、plan015 6、plan654 11、p748-layout12），绑定0b3ee62d+92bbf298。
+- **landed**：主检出`git merge --ff-only`→**master tip = 0b3ee62d32153bcdaefd71bd59f6abe55a082efc**（无merge提交）；与master他人WIP文件零交集（23文件清单核验）。
+- **canonical_verified**（HEAD源hash）：component-and-store-instances=bded9620...、native-system-accessibility（新）=b463c5d5...、native-vm-app-validation=4e715a92...、vm-route-page-loading=43bcafd9...；master view.rs含封顶修复。
+- **T07交接009**：reader-009组auto-ui兄弟检出02316271→**0b3ee62d**（clean）；plan-009/t02/ui-068-handoff/新增reader-p068-ui.exe=6ce87feb（ca4c8acd行为验证cohort）、reader-ui-tool-0b3ee62d.exe=18194b40（**交付源0b3ee62d+92bbf298新构建**，009后继原生腿固定用此）；ui-minimal.lock=f8e51e1c。部署观察：已安装共享auto-ui-tool非本计划更新物，消费方按pin自行构建——009用18194b40/固定源。
 
 ## 10. 待澄清事项
 
