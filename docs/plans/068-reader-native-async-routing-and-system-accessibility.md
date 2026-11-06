@@ -4,9 +4,9 @@ status: executing
 feature_name: Reader 原生异步路由状态、结果投影与系统无障碍收口
 author: [Codex]
 created_at: 2026-11-06
-updated_at: 2026-11-06
+updated_at: 2026-11-07
 plan_revision: 2
-current_step: 2
+current_step: 3
 total_steps: 8
 base_branch: master
 base_commit: 7ac0455bf4cd743248749e4bc4eb9d0aed657266
@@ -108,7 +108,7 @@ Rust AutoUI runtime/dialect/handler codegen、VM实例及parked续体、iced/win
 | ID | owner_stage | 依赖 | 实际动作 / 关闭条件 | AC |
 |---|---|---|---|---|
 | T00 [x] | work | 授权已给 | 主干/pin同因复现、有效最小HTTP routed fixture、真实owner流与R01/02定位；先证明root正控和实际原红，不继续错误prototype盲重试 | AC01/02 |
-| T01 | work | T00 | 最小实例/root续体与结果投影修复、永久V01/02及必要同因合法/失效对照；Reader无特判 | AC01/02/05 |
+| T01 [x] | work | T00 | 最小实例/root续体与结果投影修复、永久V01/02及必要同因合法/失效对照；Reader无特判 | AC01/02/05 |
 | T02 [x] | work | T00；T01可独立推进 | 真实系统可访问整链有界可行核查，冻结角色/事件/实例/失效/布局owner、可用库/feature与拒绝行为；不可行则具名设计阻挡，不先写虚假Spec | AC03/05 |
 | T03 | work | T02 | 实现最小Windows provider/语义发布及真实系统树/焦点/操作V03；按需处理wry正文已有接缝，保原native表面合同 | AC03/05 |
 | T04 | work | T01/T03 | 新tool从独立树实际构建，固定Reader消费V04及受影响V05；源/依赖前后不漂移，补Spec提案，work-owned全通过才execution_done | AC01～05 |
@@ -116,7 +116,7 @@ Rust AutoUI runtime/dialect/handler codegen、VM实例及parked续体、iced/win
 | T06 | merge | T05 pass | 精确落地、冻结受影响并集与canonical核验、归档导航/计数；需要Lang变更则同门成对交付 | AC07 |
 | T07 | merge | T06 | Reader009更新只读消费pin/工具并记录可用交接；原证据不动，guard clean后清本树/分支/自有scope，最终8/8 | AC08 |
 
-当前2/8，T00/T02已闭；T01因实际View绑定carrier发现同合同缺口而重开，T03进行中。旧11项直接instance参数用例仍有效，但未覆盖真实Send消息的U+0001实例串中含@/路由；须补反例后关闭。真实系统壳/正文/选区已有直接证据，批注对话尚未打开，T03/04不计全通过。
+当前3/8，T00/T01/T02已闭，T03进行中。T01真实View carrier红绿闭环已补：14路由/9系统机制/11旧路径均通过，旧读回与真实系统选区证据保留。批注对话须用新二进制继续，T03/04仍未完整通过，尚未终审/交付。
 
 ## 9. 复审记录
 
@@ -174,6 +174,13 @@ Rust AutoUI runtime/dialect/handler codegen、VM实例及parked续体、iced/win
 - 用户已真实拖选整句并回复“正文已选中”；系统selected_text精确相等、独立GET locator found=true，book_id=18e579d2-a510-4fc1-a77b-76b49f829df8/source sha256:c4f323fc.../spine1/c1.xhtml/range start CFI epubcfi(/6/2!/4/4,/1:0,/1:8)/created_at1793980545。保存系统/原生API证据于02/real-selection-*.json。截图在用户回复后抓到遮挡Codex，不能冒称正文选区蓝色画面；以系统selected_text+实际adapter POST/locator冷读为真选区。API提案额外end.cfi="0"值得009后续严格核查，不预报保存/回访通过。
 - 新反例：真实树“批注所选”press返回ok但无对话/无locator出站HTTP。读取生产Send链定位：dynamic::on_with_input_for_instance先split_once('@')再剥U+0001，误把实例内的reading_page@/book/...截断；该形态的live名字回落又不能从路由路径尾段辨件名，遂落root legacy，在root.is_epub=false直接返回。旧11项使用显式instance参数，未覆盖真实TypedInst→Send carrier，不能关闭此分支。T01重开（任务分母8不变，非终审repair轮）；新增真实View绑定HTTP与key含@的双实例永久反例，先跑原码基线，随后只修解析顺序，禁止复制root/改Reader规避。
 - 用户手动两项均已答，不再悬置旧问；下一步由实现继续，暂不要求重复选区。最终新二进制/准确源、必要复演、Spec增量、独立复审/交付/009消费均仍在后续，不降低原门。
+
+### 2026-11-07 T01真实carrier修复闭环
+
+- 初次carrier基线在正常lib构建暴露本轮cfg(test) legacy patch_input_values的导出未同门，E0432；已把仅测试用再导出一并门控，未把编译失败计原行为反例。随后实际基线02为**11 PASS/2 FAIL、0 ignored、exit101**：路由HTTP确已完成却写root旧副本/child仍空，含@key同型双实例在途未建立；log SHA256=cee736720244c7e30c25f605fb455a7f3724753d8050b0eec4aec31258879279。
+- 代码提交272c0e1b463be2974a801e4e5ae87336a6e50e89：先按U+0001剥件类型/不透明instance，再只在类型段解释@seq；显式instance覆盖carrier但类型仍剥离，完整实例地址不再截断，不加root状态镜像/歧义回落。新增真实View→Send的HTTP/含@key对照、显式instance覆盖+类型@seq正控；另9项系统机制包含完整生产dynamic_view/convert_view_messages实际路由按钮 carrier→系统动作入口→child本态，root旧副本保持空。
+- 最终定向结果（autodown/doc-surface同消费feature）：plan068_routed_continuations **14/14 PASS，0 ignored，exit0，2.00s**，log SHA256=fd5578a78ab4ddf691fa8be1f43eec876f5d7da6e971b87a664a8583aeb14bad；旧plan041实例4/4 PASS（前次修复log，解析相同范围仍绿）；native_accessibility::tests **9/9 PASS，0 ignored，exit0，8.19s**，SHA256=ea994b60faee104ab49c1b6bd1786295deeaabc84df850dd21c23ccb496e6046（去空格）；旧plan654路径/时钟 **11/11 PASS，0 ignored，exit0，0.41s**，SHA256=ac567222f7fdc5f5e3648983c201015580802218da4624953edf7c41634490b0。未重跑全仓；统一冻结并集仍归merge。
+- T01重新关闭3/8；源/Spec仅权威树已提交，当前运行Reader02仍旧2b5b027f诊断binary，必须重建/重开消费解析修复后才继续批注，旧失败不伪称通过。两个用户真实输入都已答且系统读回有效，暂无权限/新范围问题；终审repair轮仍0。
 
 ## 10. 待澄清事项
 
