@@ -172,6 +172,8 @@ tree-sitter-ini = { version = "1.4", optional = true }
 ureq = { version = "2", features = ["json"] }
 
 [target.'cfg(windows)'.dependencies]
+accesskit = "=0.25.2"
+accesskit_windows = "=0.35.2"
 windows = { version = "0.58", features = [
     "Win32_Foundation",
     "Win32_Graphics_Dwm",

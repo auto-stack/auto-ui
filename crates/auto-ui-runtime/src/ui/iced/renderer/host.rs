@@ -993,10 +993,19 @@ fn run_session(
                         // 截图照常，仅不进 OS 桌面 z 序（合成归宿主虚拟窗）。
                         // PLAN-102：AUTO_VM_HIDDEN=1 同语义 boot 隐藏位（无像素
                         // 桥——canvas 内嵌消费走 MCP 截图/动作通道）。
+                        #[cfg(windows)]
+                        visible: false,
+                        #[cfg(not(windows))]
                         visible: !opts.pixels && !startup_window_hidden(),
                         ..Default::default()
                     });
                     session.register_window(win_id, app_id, size);
+                    #[cfg(windows)]
+                    super::native_accessibility::prepare(win_id);
+                    #[cfg(windows)]
+                    let open_task = open_task.then(move |window| {
+                        super::native_accessibility::install_task(window, !opts.pixels && !startup_window_hidden())
+                    });
                     // Plan 504：pac `window: "fit"` —— 标记待测量；主触发是
                     // 首个 __window_resized（初始 Resized 到达即界面已建，
                     // 测量锚点必在树中），见 DM::Window 臂。
@@ -1061,6 +1070,23 @@ fn run_session(
         let mut state = match state.split_mut(app_id) {
             Some(v) => v,
             None => return iced::Task::none(),
+        };
+        #[cfg(windows)]
+        let msg = {
+            if super::native_accessibility::is_tick(&msg) {
+                return super::native_accessibility::tick(state.window);
+            }
+            match super::native_accessibility::resolve(state.window, state.component, &msg) {
+                Some(super::native_accessibility::Dispatch::Message(message)) => message,
+                Some(super::native_accessibility::Dispatch::Focus(id)) => {
+                    return iced::Task::batch([
+                        iced::window::gain_focus(state.window),
+                        iced::widget::operation::focus(id),
+                    ]);
+                }
+                Some(super::native_accessibility::Dispatch::Rejected) => return iced::Task::none(),
+                None => msg,
+            }
         };
         if !msg.event.starts_with("__") {
             if auto_lang_core::is_vm_hot_trace() {
@@ -3118,6 +3144,7 @@ fn run_session(
         }
 
         let event_name = derive_event_name(&msg.event);
+        let input_cache_key = input_cache_key(state.component, &msg.widget, &event_name);
 
         // Save input text BEFORE on_with_input runs .at handler (which clears it for AddTodo)
         let saved_input = state
@@ -3128,7 +3155,9 @@ fn run_session(
 
         // If this message carries input text, track it and update state
         if let Some(text) = &msg.input_value {
-            track_input_text(&mut state.app.input_values, &event_name, text);
+            if let Some(key) = &input_cache_key {
+                track_input_text(&mut state.app.input_values, key, text);
+            }
         }
 
         // Plan 057 (ash-gui 输入焦点): an edit message that originates from a
@@ -3606,7 +3635,7 @@ fn run_session(
         retain_input_values_after_handler(
             &mut state.app.input_values,
             &state.component,
-            &event_name,
+            input_cache_key.as_deref().unwrap_or(&event_name),
         );
 
         // ── Shell bridge:emit 模拟(ash-gui M1) ──────────────────────────
@@ -3734,7 +3763,7 @@ fn run_session(
             *state.app.cached_rendered.borrow_mut() = None; // 强制重建(丢弃旧 widget)
             *state.app.cached_converted_view.borrow_mut() = None;
             *state.app.view_dirty.borrow_mut() = true;
-            state.app.input_values.remove(&event_name);
+            if let Some(key) = &input_cache_key { state.app.input_values.remove(key); }
             // Plan 047:view 重建后恢复 input 焦点(否则 on_submit 第二次不触发)。
             state.app.devtools.needs_prompt_refocus.set(true);
         }
@@ -4580,6 +4609,8 @@ fn run_session(
                         }
                     }
                     DesktopEvent::WindowClosed(id) => {
+                        #[cfg(windows)]
+                        super::native_accessibility::remove(id);
                         // 459 不变式：一窗一 App，App 生命周期随窗（454 引入
                         // VirtualWindow 后由 WM 接管重挂载/续命）。
                         if let Some(entry) = state.windows.remove(&id) {
@@ -6765,6 +6796,12 @@ fn run_session(
             subs.push(crate::ui::session::host_exit_poll_subscription(
                 current_host_exit_since(),
             ));
+            #[cfg(windows)]
+            if !state.is_desktop() {
+                for window in state.windows.keys() {
+                    subs.push(super::native_accessibility::subscription(*window));
+                }
+            }
             for (app_id, app) in state.apps.iter() {
                 let app_id = *app_id;
                 // PLAN-650 E-3：hot_reload 降频/门控——AUTOUI_HOT_RELOAD=0 全关；

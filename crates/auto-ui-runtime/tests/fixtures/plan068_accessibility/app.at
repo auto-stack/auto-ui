@@ -1,0 +1,35 @@
+widget P068Accessibility {
+    msg { ToggleB }
+    model { var show_b bool = true }
+    view {
+        col {
+            style: "p-6 gap-4 w-full h-full bg-background"
+            text "Native accessibility integration"
+            button (onclick: .ToggleB) { text "Toggle second instance" }
+            Probe (key: "a", label: "First") { }
+            if .show_b { Probe (key: "b", label: "Second") { } }
+        }
+    }
+    on { .ToggleB -> { .show_b = !.show_b } }
+}
+widget Probe (label: str = "") {
+    msg { Inc, Edit(str) }
+    model {
+        var count int = 0
+        var text_value str = "initial"
+    }
+    view {
+        col {
+            style: "gap-2"
+            text .label
+            button (onclick: .Inc) { text "Increment" }
+            text .count
+            input (placeholder: .label, value: .text_value, oninput: .Edit)
+            text .text_value
+        }
+    }
+    on {
+        .Inc -> { .count = .count + 1 }
+        .Edit(value) -> { .text_value = value }
+    }
+}

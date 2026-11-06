@@ -1157,6 +1157,8 @@ pub fn store_input_text(text: &str) {
 // 消息序/active 判据/last-owner exit/纹理与 external pin 寿命零改。
 mod style_widgets;
 mod media;
+#[cfg(windows)]
+mod native_accessibility;
 mod projection;
 mod host;
 mod subscriptions;

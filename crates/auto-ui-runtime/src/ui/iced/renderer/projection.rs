@@ -3658,6 +3658,11 @@ fn dynamic_view_impl_inner(
         return match state.component.view_named(face_name) {
             Some(view) => {
                 let converted = convert_view_messages(view);
+                #[cfg(windows)]
+                return super::native_accessibility::with_scope(state.window, state.component, || {
+                    render_dynamic_view(converted, None, &mut path)
+                });
+                #[cfg(not(windows))]
                 render_dynamic_view(converted, None, &mut path)
             }
             None => iced::widget::text(format!("[dashboard] face `{face_name}` missing"))
@@ -4159,7 +4164,7 @@ fn dynamic_view_impl_inner(
         let p725_t_tail = std::time::Instant::now();
         inject_todo_list(&mut view, &state.app.todos, state.component.widget_name());
         if !state.app.input_values.is_empty() {
-            patch_input_values(&mut view, &state.app.input_values);
+            patch_input_values_for_component(&mut view, &state.app.input_values, state.component);
         }
         // PLAN-002 N5：vwin 客户区根节点默认底角圆角（convert 前作用于源
         // 树；缓存帧继承已合并结果，app 与 flag 恒定配对无漂移）。
@@ -4204,7 +4209,7 @@ fn dynamic_view_impl_inner(
             }
             inject_todo_list(&mut view, &state.app.todos, state.component.widget_name());
             if !state.app.input_values.is_empty() {
-                patch_input_values(&mut view, &state.app.input_values);
+                patch_input_values_for_component(&mut view, &state.app.input_values, state.component);
             }
             let converted = convert_view_messages(view);
             *state.app.cached_converted_view.borrow_mut() = Some(converted.clone());
@@ -4287,6 +4292,13 @@ fn dynamic_view_impl_inner(
     let p631_t_render = p631_profile.then(std::time::Instant::now);
     // PLAN-725 T-00：S4 Element 段打点（render_dynamic_view 全树新建）。
     let p725_t_s4 = std::time::Instant::now();
+    // Child receivers are allocated by view building above. Capture ownership
+    // only now; taking it at view entry leaves first-frame controls unbound.
+    #[cfg(windows)]
+    let rendered = super::native_accessibility::with_scope(state.window, state.component, || {
+        render_dynamic_view(converted, debug_ctx.as_ref(), &mut path)
+    });
+    #[cfg(not(windows))]
     let rendered = render_dynamic_view(converted, debug_ctx.as_ref(), &mut path);
     crate::ui::frame_segments::note_s4_element(p725_t_s4.elapsed());
     // PLAN-725 T-00：臂累积表随 s4 发布（勘定钻取面）。

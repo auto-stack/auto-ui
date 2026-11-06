@@ -3362,6 +3362,20 @@ pub(super) fn render_dynamic_view(
     debug_ctx: Option<&DebugRenderCtx>,
     path: &mut Vec<usize>,
 ) -> iced::Element<'static, IcedMessage> {
+    #[cfg(windows)]
+    let ticket = super::native_accessibility::enter(&view, path);
+    let element = render_dynamic_view_inner(view, debug_ctx, path);
+    #[cfg(windows)]
+    return super::native_accessibility::wrap(ticket, element);
+    #[cfg(not(windows))]
+    element
+}
+
+fn render_dynamic_view_inner(
+    view: AbstractView<IcedMessage>,
+    debug_ctx: Option<&DebugRenderCtx>,
+    path: &mut Vec<usize>,
+) -> iced::Element<'static, IcedMessage> {
     // PLAN-663 C1c: 根调用点整树重写视口单位（h-screen 族在定高(px)嵌入边
     // 界内重锚定；递归子调用 path 非空，天然跳过）。重写幂等，缓存帧复用
     // 亦安全。
@@ -4543,6 +4557,19 @@ pub(super) fn render_dynamic_view(
             }
         }
 
+        AbstractView::List { items, spacing, style } => {
+            let eff_spacing = effective_spacing(spacing, style.as_ref(), false);
+            let eff_padding = style.as_ref().and_then(|style| IcedStyle::from_style(style).padding).unwrap_or(0.0);
+            let mut list = iced::widget::column([]).spacing(eff_spacing);
+            if eff_padding > 0.0 { list = list.padding(eff_padding); }
+            for (index, item) in items.into_iter().enumerate() {
+                path.push(index);
+                list = list.push(render_dynamic_view(item, debug_ctx, path));
+                path.pop();
+            }
+            list.into()
+        }
+
         // Everything else delegates to the unified IntoIcedElement renderer
         _ => {
             let kind = view_kind(&view);
@@ -4558,6 +4585,19 @@ pub(super) fn render_dynamic_view(
             }
         }
     }
+}
+
+/// Instance-bound text caches include the original receiver id so same-type
+/// siblings and a later mount with the same key cannot inherit each other's text.
+pub(crate) fn input_cache_key(component: &DynamicComponent, widget: &str, event: &str) -> Option<String> {
+    let Some((widget, identity)) = widget.split_once('\u{1}') else { return Some(event.to_string()); };
+    let receiver = component.bridge().child_instance_state_id(identity).or_else(|| {
+        if component.bridge().child_instance_was_released(identity) { return None; }
+        let candidates = component.bridge().child_instance_identities().into_iter()
+            .filter(|id| id.rsplit('/').next().unwrap_or(id).split('#').next() == Some(widget)).collect::<Vec<_>>();
+        match candidates.as_slice() { [only] => component.bridge().child_instance_state_id(only), _ => None }
+    })?;
+    Some(format!("{receiver}\u{1}{event}"))
 }
 
 /// PLAN-739：update 主链 `input_values` 记账单源（键入消息携带全文时登记）。
@@ -4580,7 +4620,15 @@ pub(crate) fn retain_input_values_after_handler(
     event_name: &str,
 ) {
     let input_map = component.input_state_map().clone();
-    input_values.retain(|ev_name, _| ev_name == event_name || !input_map.contains_key(ev_name));
+    let live = component.bridge().child_instance_identities().into_iter()
+        .filter_map(|id| component.bridge().child_instance_state_id(&id)).collect::<std::collections::HashSet<_>>();
+    input_values.retain(|key, _| {
+        let base = if let Some((receiver, event)) = key.split_once('\u{1}') {
+            if !receiver.parse::<u64>().ok().is_some_and(|receiver| live.contains(&receiver)) { return false; }
+            event
+        } else { key.as_str() };
+        key == event_name || !input_map.contains_key(base)
+    });
 }
 
 /// Recursively patch input View values with tracked user-typed text.
@@ -4595,9 +4643,26 @@ pub(crate) fn retain_input_values_after_handler(
 /// → 每帧重建把模板求值的新页内容覆写回旧页键入全文，编辑器视面被钉死
 /// （jade 键入后换页粘滞冻结实证）。ADE 事件条目对视面零作用由
 /// `plan739_patch_input_values_leaves_autodown_editor` 锚定。
+#[cfg(test)]
 pub(crate) fn patch_input_values(
     view: &mut AbstractView<DynamicMessage>,
     input_values: &std::collections::HashMap<String, String>,
+) {
+    patch_input_values_owned(view, input_values, None);
+}
+
+pub(crate) fn patch_input_values_for_component(
+    view: &mut AbstractView<DynamicMessage>,
+    input_values: &std::collections::HashMap<String, String>,
+    component: &DynamicComponent,
+) {
+    patch_input_values_owned(view, input_values, Some(component));
+}
+
+fn patch_input_values_owned(
+    view: &mut AbstractView<DynamicMessage>,
+    input_values: &std::collections::HashMap<String, String>,
+    component: Option<&DynamicComponent>,
 ) {
     match view {
         AbstractView::Input {
@@ -4624,36 +4689,41 @@ pub(crate) fn patch_input_values(
                         n.to_string()
                     }
                 };
-                if let Some(text) = input_values.get(&clean_name) {
+                let key = match msg {
+                    DynamicMessage::TypedInst { widget_name, instance, .. } => component.and_then(|component|
+                        input_cache_key(component, &format!("{widget_name}\u{1}{instance}"), &clean_name)),
+                    _ => Some(clean_name),
+                };
+                if let Some(text) = key.as_ref().and_then(|key| input_values.get(key)) {
                     *value = text.clone();
                 }
             }
         }
         AbstractView::Column { children, .. } | AbstractView::Row { children, .. } => {
             for child in children.iter_mut() {
-                patch_input_values(child, input_values);
+                patch_input_values_owned(child, input_values, component);
             }
         }
         AbstractView::Container { child, .. } | AbstractView::Scrollable { child, .. } => {
-            patch_input_values(child, input_values);
+            patch_input_values_owned(child, input_values, component);
         }
         AbstractView::Grid { cells, .. } => {
             for cell in cells.iter_mut() {
-                patch_input_values(cell, input_values);
+                patch_input_values_owned(cell, input_values, component);
             }
         }
         AbstractView::List { items, .. } => {
             for item in items.iter_mut() {
-                patch_input_values(item, input_values);
+                patch_input_values_owned(item, input_values, component);
             }
         }
         AbstractView::Table { headers, rows, .. } => {
             for h in headers.iter_mut() {
-                patch_input_values(h, input_values);
+                patch_input_values_owned(h, input_values, component);
             }
             for row in rows.iter_mut() {
                 for cell in row.iter_mut() {
-                    patch_input_values(cell, input_values);
+                    patch_input_values_owned(cell, input_values, component);
                 }
             }
         }
