@@ -191,6 +191,13 @@ Rust AutoUI runtime/dialect/handler codegen、VM实例及parked续体、iced/win
 - 内检额外真实红绿：释放B后只剩同型A，延迟converted显式B被provider bind误回落到A。新增永久实际layout/Click反例baseline **0绿1红，exit101/1.39s**；fix237ebdd9cd43a8502932c0e4e9f967e5fac45168仅禁止已带identity的名字回落、未绑定控制不授Focus。完整机制 **10/10 PASS、0 ignored、exit0/10.29s**，含新反例Click/Focus拒绝与A合法正控。baseline SHA256=9df7d84c7ca758aa1337825e0e78d224d2b6e116d4a571b077ee5b7e64bed067；final16de34e05a22021b85417fc89b2aad6df71340ff12f2311501fd362fe0aa6b75。SD03/04草案仅同权威树提交；此不是独立终审修复轮。
 - 03已核完整自有tool/VM进程后关闭，CLI随断流退出；未递归按PID祖先误杀，Windows PID重用可能把无关旧进程列为子代，实际只按完整exe/命令和自有WebView profile关闭。03真实保存数据继续在04自有副本重开，不能拷贝旧提案假造新会话选区。当前没有待答问题，继续T03发布链诊断，3/8不变。
 
+### 2026-11-07 provider重复刷新闭环与系统SetValue正控
+
+- 04临时trace真实native显示Provider确实构建/发布了当前编辑字段；6,060,049bytes实际记录built8427/tick8424/publish8422，证明静态画面仍自激刷新。trace SHA256=73b6f3a73b549ed1c52bfce5d1364388d52eb765af7ab40a51692ec7f7793c2a。本证据并不能单独把03系统树滞后归因到provider，保留工具缓存/时序未决；没有为猜测重写整个renderer。
+- 新永久unchanged_production_frames...实际baseline **0绿1红、exit101、2.07s**，不变布局/语义仍wake；hash166d7dfa5bc5bca1fbba719ecd7e126a53968a9129f6b598d92dd958228755c0。修复cd8b07756870746748b17cf5affbc497db3eddad：仅结构/角色/值等语义变化重新wake，真实bounds/focus/name变化仍发布；同一帧保更新handler/owner快照，未加空闲timer。永久正控值变→wake、再次不变→settle、卸载→wake。机制完整 **11/11 PASS、0 ignored、exit0/12.43s**，log SHA256=d250012995b38f58d1f09ac67ef73062ff4e58bc1546aff61a477a8bd4ea1f02；随后rustfmt仅格式变化。临时P068_AX_TRACE已全部移除，未交付诊断输出。
+- 04系统Sky SetValue第一次AX-only缓存报element unavailable；重新hydrate/激活并截图+AX观察后一次输入实际成功，立即refresh暂null，重新观察系统值与当前MCP值精确一致。system-edit-value SHA256=245a8fd7f5d17f8314501caf371ccf80724098fa950ca048f70e9d170a8da14a。正常NVM-03保存后，磁盘comment为系统中文编辑核对含引号/反斜杠，annotation_id/created_at/kind/chapter/para/quote/occurrence/tags/完整locator逐字段保留；cold-read SHA256=1051799317aaa140c91a5b97d8279631f37a2a760d56eba88a3fd65ebe349941。保存后系统观察遇窗口已最小化，未当FAIL或PASS；当前04按精确自有tool/VM/profile已停，原数据保留。
+- cd8b0775 clean源tool重新build exit0/38.58s，消费05将从04真实保存数据本地化重开验证当前更新/编辑，不需再次拖选。T03/04仍待实际cohort和角色边界收口；当前3/8、终审repair轮0，无待答用户问题。
+
 ## 10. 待澄清事项
 
 无待答范围授权。T00须确定真实续体/字段归属原因；T02须先证明Windows provider可行边界，当前无主观选定依赖。Sky输入未达须区分工具与产品；工具限制不授予绕过系统安全或伪造输入的许可。发现范围/兼容/验收必须再变更时按auto-plan:new处理，不能静默扩大。
