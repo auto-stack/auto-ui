@@ -1,12 +1,12 @@
 ---
 plan_id: auto-ui/PLAN-068
-status: execution_done
+status: reviewed
 feature_name: Reader 原生异步路由状态、结果投影与系统无障碍收口
 author: [Codex]
 created_at: 2026-11-06
 updated_at: 2026-11-07
 plan_revision: 2
-current_step: 5
+current_step: 6
 total_steps: 8
 base_branch: master
 base_commit: 7ac0455bf4cd743248749e4bc4eb9d0aed657266
@@ -252,8 +252,12 @@ Rust AutoUI runtime/dialect/handler codegen、VM实例及parked续体、iced/win
 - 具名移交观察（非contract缺口，请终审裁量）：①Sky物理点击不可达（外部输入工具限制，系统腿已由真实UIA通道满足，未用合成树）；②OS锁屏期间测试（应用级证明成立，物理前台交互未证）；③关闭端口connect为timeout非connection-refused（07/10/11三会话一致环境行为）；④autoui_state通道在picker park后可脱同步（10会话具名；11会话同通道正常，证据使用须与像素/渲染树/系统树互证）。统一冻结受影响并集与全量回归仍属merge/T05之后门，本handoff不预支。
 - stage:work | plan_id:auto-ui/PLAN-068 | plan_revision:r2 | outcome:pass | worktree_path:D:/autostack/.wt/ui-068/auto-ui | branch:codex/plan-068-dev | base_commit:7ac0455bf4cd743248749e4bc4eb9d0aed657266 | code_commit:ca4c8acd6bee902b050e863e926d160826d535b0 | dependency_revisions:lang3735065684968aad958140250e763ecea9838aa7/man03bb65ef7fb6181caa6a08d9752ac7d57c75516c/down58ea33f699efa5cb1194473a2d45dcec51006842/webbf72baabf28fa865b5a7c680b8a5fa4018a0a63d | task_ids:T00～T04 [x]，5/8，status:execution_done | evidence:v05-final/64项与s10、s11及既有cohort证据 | blockers:无待答问题；上述4项具名观察移交终审 | next_responsible_role:T05独立上下文终审（同树、暂停实施写入），非本实施上下文。终审修复轮累计0。
 
+### 2026-11-07 T05独立终审：独立上下文复演全绿，pass→reviewed
+
+- stage: review | review_scope: final | reviewer_identity/limitations: **独立新上下文subagent**（无实施历史；同机宿主），按用户“独立上下文终审”指令派出；实施写入自execution_done起保持暂停，reviewer全程对各git树只读，verdict由工件+自查复演重建，不依赖实施者摘要 | plan_id:auto-ui/PLAN-068 | plan_revision:r2 | outcome: **pass** | worktree_path:D:/autostack/.wt/ui-068/auto-ui | branch:codex/plan-068-dev | reviewed_commit: **ca4c8acd6bee902b050e863e926d160826d535b0**（树clean经reviewer复核） | base_commit:7ac0455bf4cd743248749e4bc4eb9d0aed657266 | dependency_revisions:lang37350656/worktree精确、man03bb65ef/down58ea33f6/webbf72baab（reviewer核：其余dep主检出前进但pin均为祖先，worktree pin精确，非漂移） | spec_inputs:SD01～04工作树草案（native-system-accessibility.md新+3处修改） | acceptance_results:**AC01～AC05全PASS**——reviewer自跑V05六组**64/64 PASS、0 ignored、全exit0**（routed14/1.85s、ownership4、native-ax14/31.51s、codegen15、plan015 6、plan654 11；日志t05-review/t05-*.log），与v05-final计数一致；六处改面file:line核验（dynamic.rs:3187-3197 carrier序、1910-1948统一发布、native_accessibility.rs:194-227首show前安装/42-58 owner代际/325-351拒绝路径、handler_codegen app_root_field、aura_view_builder/mod.rs:744-800封顶Shrink+rev().find_map、doc_surface fbb65dc2 lease、Reader json.from_value全body）；证据链hash重算全符；reviewer亲览s10四行结果像素与s11网格像素；**独立live复演**（自建会话端口34001-03，UIA Invoke真实打开OS选择框→对话框无ValuePattern/InvokePattern，按NativeWindowHandle BM_CLICK取消→最短串“已取消文件选择”在渲染树/系统树元素9/真实像素三通道可见；q exit0/0.269s、进程消失、端口冷、数据字节不变；observation④同会话独立复现） | pending_closeout_gates:统一冻结受影响并集与全量回归归T06 merge；SD03示例路径笔误（examples/plan068_system_accessibility.rs→crates/auto-ui-runtime/examples/...）归merge修正；dep主检出前进需T06配对说明 | findings:（Low）dep主检出祖先前进注记；（Low）SD03路径笔误；（Info）OS对话框文件名Edit无UIA ValuePattern——自动多选不可行，四文件腿依s10用户输入证据；（Info）observation④复现，跨通道互证为强制 | evidence:D:/autostack/plan-artifacts/plan-068/auto-ui/t05-review/（6日志+session+截图+UIA dump+start脚本） | next: **T06 merge**（精确落地、冻结并集、canonical核验、归档），随后T07 009消费pin交接。终审修复轮仍0；receipts由实施上下文按本报告代记。
+
 ## 10. 待澄清事项
 
-2026-11-07（work收口）：无待答范围、授权或输入问题。work侧T00～T04全部闭合并execution_done；下一步是**T05独立上下文终审**：同权威树（ui-068/auto-ui @ ca4c8acd clean）暂停实施写入后，复演V01～04高风险路径（路由红绿、封顶结果真实像素/系统树、批注保存/系统编辑、真实导入冷读）与本轮V05 64/64并集，核SD01～04提案与4项具名观察，绑定reviewed_commit/revision。终审通过后按T06/T07 merge/交接；009消费pin在T07执行。
+2026-11-07（T05后）：无待答范围、授权或输入问题。T05独立终审已pass（reviewed_commit ca4c8acd，AC01～05全PASS），Plan状态reviewed 6/8。下一步**T06 merge**：精确主干落地、冻结受影响并集回归、canonical Spec核验（SD01～04发布）、归档导航/8-of-8计数、本scope清理（wt-guard后删树/分支/plan-artifacts，保留009所需pin/工具交接）；T07把可消费pin/工具/耐久摘要交009。遗留均为merge项：SD03示例路径笔误、dep主检出祖先前进配对说明、4项具名环境观察随归档保留。
 
 
