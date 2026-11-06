@@ -6805,10 +6805,6 @@ fn start_api_server_inner(project_dir: &Path, clear_port: bool) -> Result<Option
         .map_err(|e| format!("context record write failed: {e}"))?;
     // Keep Cargo's config discovery in the generated workspace, but finish
     // compilation before the service's 120s readiness clock starts.
-    let port = crate::util::http_port();
-    if clear_port {
-        crate::util::kill_process_on_port(port);
-    }
     println!("  Building native API backend...");
     let executable = build_api_executable(&context, &ws_dir, &api_backend_dir)?;
     let lease = TargetLease::acquire(&context.target_root, "api-server")
