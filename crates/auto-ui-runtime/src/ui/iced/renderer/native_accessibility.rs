@@ -1091,8 +1091,16 @@ mod tests {
         component: &mut DynamicComponent,
         cache: &HashMap<String, String>,
     ) {
+        render_with_capture(window, component, cache, false);
+    }
+    fn render_with_capture(
+        window: iced::window::Id,
+        component: &mut DynamicComponent,
+        cache: &HashMap<String, String>,
+        capture: bool,
+    ) {
         prepare(window);
-        let (mut view, _, _) = component.view_with_debug_gated(false);
+        let (mut view, _, _) = component.view_with_debug_gated(capture);
         patch_input_values_for_component(&mut view, cache, component);
         let element = with_scope(window, component, || {
             super::super::devtools::render_dynamic_view(
@@ -1137,6 +1145,46 @@ mod tests {
             panic!("expected an accepted production message")
         };
         component.on_with_input_for(&message.widget, &message.event, message.input_value);
+    }
+    #[test]
+    fn capped_scroll_result_text_has_a_visible_measured_rectangle() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/plan068_result_layout.at");
+        let source = std::fs::read_to_string(path).unwrap();
+        for root_style in [
+            "w-full h-full p-6 gap-5",
+            "p-6 md:p-8 gap-5 max-w-6xl mx-auto w-full",
+        ] {
+            for capture in [false, true] {
+                let source = source.replace("w-full h-full p-6 gap-5", root_style);
+                let mut component = crate::build_dynamic_component(&source, None).unwrap();
+                let window = iced::window::Id::unique();
+                render_with_capture(window, &mut component, &HashMap::new(), capture);
+                let node = *shared(window)
+                    .lock()
+                    .unwrap()
+                    .nodes
+                    .iter()
+                    .find(|(_, entry)| entry.node.label() == Some("Fill result"))
+                    .unwrap()
+                    .0;
+                apply(window, &mut component, node, Requested::Click);
+                render_with_capture(window, &mut component, &HashMap::new(), capture);
+                let state = shared(window);
+                let state = state.lock().unwrap();
+                let result = state
+                    .nodes
+                    .values()
+                    .find(|entry| {
+                        entry.node.value() == Some("success\nduplicate\nfailure\ncancelled")
+                    })
+                    .expect("the production converted tree must contain the result");
+                assert!(result.bounds.is_some_and(|bounds| bounds.height >= 40.0),
+                "four result lines must have visible bounds under {root_style}, capture={capture}, got {:?}", result.bounds);
+                drop(state);
+                remove(window);
+            }
+        }
     }
     #[test]
     fn unchanged_production_frames_do_not_schedule_another_accessibility_tick() {

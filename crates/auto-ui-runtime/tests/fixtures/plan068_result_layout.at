@@ -1,0 +1,36 @@
+widget LayoutApp {
+    view {
+        row {
+            style: "w-full h-full min-h-screen bg-background text-foreground"
+            col {
+                style: "w-60 shrink-0 h-full"
+                text "Sidebar"
+            }
+            col {
+                style: "flex-1 min-w-0 h-full flex flex-col"
+                ResultLayout { }
+            }
+        }
+    }
+}
+widget ResultLayout {
+    msg { Fill }
+    model { var result str = "" }
+    view {
+        col {
+            style: "w-full h-full p-6 gap-5"
+            button (onclick: .Fill) { text "Fill result" }
+            text "Library"
+            if .result != "" {
+                col {
+                    style: "p-3 rounded-lg bg-muted text-sm text-foreground max-h-32 overflow-y-auto shrink-0"
+                    text .result { style: "whitespace-pre-wrap" }
+                }
+            }
+            text "Next controls"
+        }
+    }
+    on {
+        .Fill -> { .result = "success\nduplicate\nfailure\ncancelled" }
+    }
+}
