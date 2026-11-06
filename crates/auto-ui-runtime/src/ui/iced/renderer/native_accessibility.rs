@@ -369,8 +369,14 @@ pub(super) fn with_scope<R>(
     let Some(state) = windows().lock().unwrap().get(&window).cloned() else {
         return f();
     };
-    state.lock().unwrap().name =
-        super::host::window_title(format!("Auto - {}", component.widget_name()));
+    let name = super::host::window_title(format!("Auto - {}", component.widget_name()));
+    {
+        let mut state = state.lock().unwrap();
+        if state.name != name {
+            state.name = name;
+            state.wake();
+        }
+    }
     let owners = component
         .bridge()
         .child_instance_identities()
@@ -798,11 +804,22 @@ pub(super) fn wrap(
         assert_eq!(build.stack.pop(), Some(ticket.id));
         if build.stack.is_empty() {
             let mut state = build.state.lock().unwrap();
+            let changed = !state.ready
+                || state.roots != build.roots
+                || state.nodes.len() != build.nodes.len()
+                || build.nodes.iter().any(|(id, entry)| {
+                    state
+                        .nodes
+                        .get(id)
+                        .map_or(true, |previous| previous.node != entry.node)
+                });
             state.nodes = std::mem::take(&mut build.nodes);
             state.keys = std::mem::take(&mut build.keys);
             state.roots = std::mem::take(&mut build.roots);
             state.ready = true;
-            state.wake();
+            if changed {
+                state.wake();
+            }
         }
     });
     Element::new(SemanticWidget { ticket, child })
@@ -1122,6 +1139,46 @@ mod tests {
         component.on_with_input_for(&message.widget, &message.event, message.input_value);
     }
     #[test]
+    fn unchanged_production_frames_do_not_schedule_another_accessibility_tick() {
+        let window = iced::window::Id::unique();
+        let mut component = fixture();
+        render(window, &mut component, &HashMap::new());
+        let state = shared(window);
+        state.lock().unwrap().wake_pending = false; // the preceding tick was consumed
+        render(window, &mut component, &HashMap::new());
+        assert!(
+            !state.lock().unwrap().wake_pending,
+            "unchanged layout and semantics must not sustain a redraw/wake loop"
+        );
+        let a = find(window, "/Probe#a", Role::TextInput);
+        apply(
+            window,
+            &mut component,
+            a,
+            Requested::Value("changed semantics".into()),
+        );
+        render(window, &mut component, &HashMap::new());
+        assert!(
+            state.lock().unwrap().wake_pending,
+            "changed values must publish"
+        );
+        state.lock().unwrap().wake_pending = false;
+        render(window, &mut component, &HashMap::new());
+        assert!(
+            !state.lock().unwrap().wake_pending,
+            "the changed frame must settle"
+        );
+        component
+            .call_widget_handler("P068Accessibility", "ToggleB", &[])
+            .unwrap();
+        render(window, &mut component, &HashMap::new());
+        assert!(
+            state.lock().unwrap().wake_pending,
+            "removing live controls must publish a changed tree"
+        );
+        remove(window);
+    }
+    #[test]
     fn measured_controls_dispatch_to_one_original_instance_and_scale_bounds() {
         let window = iced::window::Id::unique();
         let mut component = fixture();
@@ -1204,9 +1261,14 @@ mod tests {
         let window = iced::window::Id::unique();
         let mut component = fixture();
         render(window, &mut component, &HashMap::new());
-        component.call_widget_handler("P068Accessibility", "ToggleB", &[]).unwrap();
+        component
+            .call_widget_handler("P068Accessibility", "ToggleB", &[])
+            .unwrap();
         let _ = component.view_with_debug_gated(false);
-        assert!(component.bridge().child_instance_state_id("/Probe#b").is_none());
+        assert!(component
+            .bridge()
+            .child_instance_state_id("/Probe#b")
+            .is_none());
 
         // A delayed converted view still carries B's explicit identity. Only A
         // remains live; a unique-type fallback must not retarget this action.
@@ -1227,19 +1289,40 @@ mod tests {
         });
         let mut ui = iced_test::simulator(element);
         let _ = ui.snapshot(&Theme::Dark).unwrap();
-        let node = *shared(window).lock().unwrap().nodes.iter()
-            .find(|(_, entry)| entry.node.role() == Role::Button).unwrap().0;
-        assert!(matches!(resolve(window, &component, &request(node, Requested::Click)),
-            Some(Dispatch::Rejected)), "a released explicit B must not become A");
-        assert!(matches!(resolve(window, &component, &request(node, Requested::Focus)),
-            Some(Dispatch::Rejected)), "an unresolved owner must not acquire focus");
+        let node = *shared(window)
+            .lock()
+            .unwrap()
+            .nodes
+            .iter()
+            .find(|(_, entry)| entry.node.role() == Role::Button)
+            .unwrap()
+            .0;
+        assert!(
+            matches!(
+                resolve(window, &component, &request(node, Requested::Click)),
+                Some(Dispatch::Rejected)
+            ),
+            "a released explicit B must not become A"
+        );
+        assert!(
+            matches!(
+                resolve(window, &component, &request(node, Requested::Focus)),
+                Some(Dispatch::Rejected)
+            ),
+            "an unresolved owner must not acquire focus"
+        );
 
         // The remaining live instance still has an accepted ordinary control.
         render(window, &mut component, &HashMap::new());
         let a = find(window, "/Probe#a", Role::Button);
         apply(window, &mut component, a, Requested::Click);
-        assert_eq!(component.bridge().read_instance_state("/Probe#a", "count").unwrap(),
-            auto_val::Value::Int(1));
+        assert_eq!(
+            component
+                .bridge()
+                .read_instance_state("/Probe#a", "count")
+                .unwrap(),
+            auto_val::Value::Int(1)
+        );
         remove(window);
     }
     #[test]

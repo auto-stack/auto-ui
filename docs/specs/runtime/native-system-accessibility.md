@@ -19,6 +19,9 @@ thread consumes them; closed windows, released receivers, disabled controls,
 and controls without a visible measured rectangle reject actions. No VM object
 crosses the platform adapter boundary. The queue is bounded at 128 requests;
 overflow is rejected with a diagnostic. Wakeups are event driven.
+Unchanged semantics and measured layout must settle without scheduling another
+accessibility tick. Value, structure, visibility, bounds, focus, and window-name
+changes still publish through the owning window thread.
 
 An instance identity is opaque. In a widget message carrier, split the U+0001
 instance separator before interpreting an optional `@sequence` in the widget
