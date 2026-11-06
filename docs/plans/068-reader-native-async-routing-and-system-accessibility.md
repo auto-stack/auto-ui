@@ -1,6 +1,6 @@
 ---
 plan_id: auto-ui/PLAN-068
-status: drafting
+status: executing
 feature_name: Reader 原生异步路由状态、结果投影与系统无障碍收口
 author: [Codex]
 created_at: 2026-11-06
@@ -116,13 +116,20 @@ Rust AutoUI runtime/dialect/handler codegen、VM实例及parked续体、iced/win
 | T06 | merge | T05 pass | 精确落地、冻结受影响并集与canonical核验、归档导航/计数；需要Lang变更则同门成对交付 | AC07 |
 | T07 | merge | T06 | Reader009更新只读消费pin/工具并记录可用交接；原证据不动，guard clean后清本树/分支/自有scope，最终8/8 | AC08 |
 
-当前0/8，所有探针/新测试/实施均待work；已给授权下下一依赖就绪任务T00/T02。没有以本草案新建worktree或修改实现。
+当前0/8，T00进行中；唯一权威组ui-068已创建，生产原始代码尚未修改，已新增合法路由HTTP永久反例夹具及5个目标case，实际baseline正在独立target构建/执行。T02待T00 owner流核实后继续，不把测试源码当已执行。
 
 ## 9. 复审记录
 
 - stage:new | plan_id:auto-ui/PLAN-068 | plan_revision:r1 | outcome:pass | source:master7ac0455bf4cd743248749e4bc4eb9d0aed657266 | next:work T00/T02 | scope:用户2026-11-06新授权；8任务/8AC/V01～05/SD01～04；不改变009门或终审标准。此为规划交接，不是实现/独立终审成绩。
 
 - stage:new | plan_id:auto-ui/PLAN-068 | plan_revision:r2 | outcome:pass | correction:009是当前可用消费基线，不是本前置的已交付依赖；移除r1误列以消除009↔068依赖环，T00～07顺序/授权/验收与8任务分母不变 | next:work T00/T02。
+
+### 2026-11-06 work入口与T00 baseline
+
+- stage:work | plan_id:auto-ui/PLAN-068 | plan_revision:r2 | outcome:partial | worktree:D:/autostack/.wt/ui-068/auto-ui | branch:codex/plan-068-dev | base/code:05c62e4fd3b6bc0d73985c21346ca420f3bb92f8 | next:T00 baseline实际终态。开发树根/分支已断言；主干原4份terminal_pixel PNG/他人文档保留，未纳入。四依赖只读detached：lang3735065684968aad958140250e763ecea9838aa7/man03bb65ef7fb6181caa6a08d9752ac7d57c75516c/down58ea33f699efa5cb1194473a2d45dcec51006842/webbf72baabf28fa865b5a7c680b8a5fa4018a0a63d。
+- scope为D:/autostack/plan-artifacts/plan-068/auto-ui，已登记唯一全局plan-artifacts/.retention/policy.json scopes字典，未覆盖别owner；第一次按list形态的注册断言失败且未写入，随后按实际dict受锁更新成功。五仓worktree创建均exit0，无junction/symlink。除本Plan外证据均在该scope。
+- 实际源定位：handler_codegen::rewrite_stmt_with_locals将router.push/back及NavCall直接写__state隐藏字段，而既有实例合同要求宿主字段经__auto_root；dynamic::poll_parked_resumes只置dirty，未沿同步完成路径失效memo/处理导航后继，是否造成结果缺失待实际case证实。旧probe的outlet{}与合法plan015的bare outlet不同，新永久fixture沿生产合法形态，不用旧解析失败作原红。
+- 新增tests/plan068_routed_continuations.rs与fixtures/plan068_routes/src/front三文件：真实延迟HTTP root正控、child本态+条件视图、child同步push、HTTP后push/params、HTTP后back/history；均尚未计PASS。baseline命令cargo +nightly -Z unstable-options test --offline --locked --lockfile-path <scope/locks/ui-minimal/Cargo.lock> -p auto-ui-runtime --test plan068_routed_continuations -- --test-threads=1 --nocapture，stable rustc/rustdoc显式固定、独立scope target/TMP；源before清单与log已开始写入，不复用009目标目录或改只读锁。
 
 ## 10. 待澄清事项
 
