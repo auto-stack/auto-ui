@@ -1,6 +1,6 @@
 ---
 plan_id: auto-ui/PLAN-060
-status: execution_done
+status: reviewed
 feature_name: a2r 数组索引 VM 语义与 iced 桌面 outproc 输入/验收投递
 author: [Codex]
 created_at: 2026-11-05
@@ -772,3 +772,58 @@ SD01新段描述既有受支持local/model/store Vec及嵌套JSON的安全coales
   Permanent actual-parent gate verify_basic_app_assembly.py --profile iced --run t06/iced-run-r195.json and --profile vue --run t06/vue-run-r195.json each8required8pass0fail/exit0. Actual195Vue8fresh tasks/production4185modules/14.53s/exit0 and10window trueheaderclose lifecycle alreadyrecorded. Native10windowcloseNotes preserves other9sameWMids/allNotesTodoChatrows/CalendarBlogChartsfiles/PaintKV andClock/Mines surfaces; Minesbusinessstateexact, onlyvolatileupdated_ms normalized. Nativeall6finalchildren0; host38420/backendservice32896/Cargo19116+36652/backend9756/wrapper18292 natural0/reaped, privateRQ3288 controlled1; selected9247/17823absent, originalmanifest2036c398/foreign47236unchanged.
   Work-owned AC01..04 complete and T04closed; no open work finding, no scope reduction. Source repair controls carrier4/4 and freshnessv15 current/rejectv13,v14 retained; original48compiler/runtime and6tools evidence reuse only unchanged inputboundaries. ClarifiedTickWrap localdevtools wrapper is outside actualgeneratedbrokerchain; no futurewrapper claim. Earlyframes before asynchronoussettlement excluded (Calendar firstreopen shot showedNotes); correct secondnormalCalendarclose/reopen retainedev5/absenceev4 frame nowbound. FirstCharts import beforeVMready lostpath; afteractualsurface ready actualimport succeeds. Peerfixture initially asserted error instead ofdocumentederr; finalu8/u9complete. No productfailure hidden or evidence quota replaced. Final bounded compiler4/runtime7/tools6union belongsmerge after independentfinalreview; notclaimedpassedhere.
   Current packet hashes: iced cd232e671e0aa7a3c1e0637a5a98e055eb9343345756faf231ca442e1e2cc042; Vue 348aeaa52a3ca74a987f8e96570cb92d72913ad117c230ec5990c6eb013f3bd0; mixed b0679520d485f3d3379f27cd8be11d7b043533e252788e91381152bfe1867746. Raw single parent scope D:/autostack/plan-artifacts/plan-054; all durable commands/counts above.
+
+
+### r8 正式独立最终复审（2026-11-07；不以early audit代替final）
+
+- stage: review | review_scope: final | reviewer_identity/limitations: 原独立子上下文`/root/review_ui060`持续复审；未实施r7/r8，仅对本Plan有回执写权；本轮只读代码/原始数据/截图，不冒称重新现场驱动 | plan_id: auto-ui/PLAN-060 | plan_revision: 8 | outcome: pass | worktree_path: `D:/autostack/.wt/ui-060/auto-ui` | branch: `codex/plan-060-dev` | reviewed_commit: `314990bd67d1ebd32185a2497ba1edca91a40a19` | source_commit: `9c009f70c5aca4eb0ced80f3b8a0ab2c32432086` | base_commit: `7ac0455bf4cd743248749e4bc4eb9d0aed657266` | findings: none open | next: merge-owned bounded frozen union与最新main等价核对；随后落地/归档，不在review内执行。
+- 原writer/branch与worktree list核实；入口及回执前HEAD/status clean，314相对9c仅Plan变动。consumer UI detached9c，implementation/Specs与writer对应source相同。writer实际Lang `f03226e1063e191af61dd119bc066ec60bf848ca`、Web `c36e5d09b15ee9c8dce0d34fb4b6f9f1b37e26e1`；旧Web37d依赖不再被误当当前闭合。最终SDK195共同8根：Down7c4d5cbb28d2093cc2e5dfb76d3104984a8dfe9c、Langf032、Man2a9b16e50ec60bf8e591fcf5dae14226567ac32c、Muskde92b909171743fc29004eddc617699984cf94f5、OS39d75750478d0cf1a70f8a617f1bc0bb0cd7a4d3、UI9c、Webc36、jade-edit5fb1e9e28e5a7e379317b7dffb400bad6c94606d，按原始SDK root-binding逐项核对。
+
+| acceptance_results / task | outcome | 证据与范围 |
+|---|---|---|
+| AC-01 / T-01 | pass | 原F060-R6-01已闭，local/model/store/Value/mixed安全coalescing正式生成编译运行45组合+索引一次；相关compiler11及字节find适配现SDK956控制保留。r7 WM和r8 carrier不改索引算法，未重复无关测试。 |
+| AC-02 / T-02 | pass | SDK195 Notes真实pointer/key改标题正文并保存、正常close0/reopen/nextSave；原协议/viewport/scroll及paint不变控制保留，实际图/独立DB对应。Vue实际headerclose/drag/resize另按SD05及T04闭合。 |
+| AC-03 / T-03 | pass | SDK195已使用真实NativeThemeCarrier包层：Todo named StoreInput产生可见中文、AddTodo唯一id1且清输入，随后pointer/key编辑/完成；Notes named NewNote、Calendar named NextMonth/Today也有实际状态。新增delegate不改变wire能力门/未知false/可选串；原queued无变化的SDK194失败不计通过。 |
+| AC-04 / T-04 | pass | 同SDK195六native全部正式v15构建成功/三方身份一致；当前native8、公共Vue8实际任务各有可见图、持久化oracle和关闭重开下一次操作。Calendar初始异步误帧排除，采用第二次正常close/reopen ev5保留图；Blog完整title/body图和版本文件一致。Paint/Charts为iced inproc VM，不计入六Rust native数量。 |
+| AC-05 / T-05 review部分 | pass | 本独立最终代码/契约/原始结果/Spec审核绑定r8与314/9c；r6 source-bound pass、r7/r8早期audit只作各自历史，不自动跨版本。 |
+| AC-06 / T-05 merge部分 | pending | 归档/工具链pin/清理/最终bounded union由merge完成；reviewed5/6、末checkbox仍未勾，不声称已落地。 |
+| 历史AC-07/08/09 | pass | Notes/Todo真实业务闭环、HTTP/typedJSON后端与错误区分控制、Chat合法双端/隔离/同意图重试保留；当前实际消费不以旧194/旧app pin替代。 |
+
+**关闭规则与源码边界。**
+
+- r7：WM close button `pointerdown.stop`阻止titlebar捕获，既有click.close继续同步splice/unmount。原实际red保持：同Paint oldDOM点击5秒仍连接，而footer comparator立即detach。SDK195重新正式生成/生产build4185 modules/14.53s、8任务均检查实际old ElementHandle脱离，再重开下一次操作；mixed10关Notes后9个旧siblings DOM与数据保留，close-all10均脱离/pageerrors[]。普通drag/resize实际路径保留。没有生成目录手改、footer-only workaround或以400ms静默等待假装关闭。
+- r8：`NativeThemeCarrier<C>::dispatch_named`直接一次委托inner，保留bool与Option<&str>；bare/package、零参、Unicode、空字符串、unknown/缺串false及调用序列永久测试已核。独立early审计实际重放当前carrier4/4、0ignored/.07s，包含原三theme/state控制，源自9c未改，故此final可复用；work red0/1→green4/4及receipt1/1原始日志同存。v15实际生产freshness对当前receipt接受、同inputs的v13/v14逐个拒绝，替换后恢复当前；非删除缓存规避。全六SDK195 native均v15。没有增加tag/ABI或任意child RPC。
+- 生产包装器审计：当前generated broker入口client_entry→HeadlessFrameSource/RqProjector直接持NativeThemeCarrier；两FrameSource直接调用组件dispatch_named。TickWrap仅本地iced run_app/devtools分支，不在此broker链；DevToolsWrapper不是该Component包层、FaceProjector为ShellSurface。没有把此审计外推为未来所有wrapper已通过。
+- 057范围保持：每createApp/context及最后owner退出，不承诺plain虚拟窗口关闭即注销。Blog routed wrapper确实创建/卸载App/context，fresh Init与下一次操作有实际证明；plain Chat可能保留DesktopVueApp context的B会话，按实际关闭/重开/合法恢复记录，不增“每窗强制fresh login”义务。r8相对r7 Vue assets/generator/store/run_vue字节不变；本轮仍有新的SDK195实际Vue8证据，不靠该等价性把194业务冒称195。
+
+**正式构建与原始证据独立复核。**
+
+- SDK195三个exe SHA实际重算3/3：CLI `a77cb353b5a79d088749e9a29dc382d79a9256ce1331005892b1e39a74f1c01a`；tool `454bf9020fef0f9bcaf22957ed3df3642a8b96c242af1a076aa30060bcff9a30`；host `f9064cfec9ab35d1d19615b406ebd464d81ee7470c57b1c2eba5d9a6aeb2e4a3`。`plan-054/t07/frozen-native-identity-r195.json` SHA `781ce3fa232a2d873aca7242678ec220a7872970fb0419cfd97819fc118da546`：六receipt/published/Cargo target18/18、artifact6/6、67实际源码input哈希独立重算全部吻合，所有generator=v15。Notesbb064ca/ Todoe915894/Calendar7dab8f2/Chat5cdca0f/Blog33df0fd/Databasedee81e0准确pin；对应真实app owner修复未转为UI业务特判。
+- `plan-054/t06/iced-run-r195.json` SHA `cd232e671e0aa7a3c1e0637a5a98e055eb9343345756faf231ca442e1e2cc042`；Vue packet最终SHA `9c91aadc95570bc78e24251bfa44939b99b7c12fed25cd096de55360eb09db1d`。两packet的iced40个/Vue38个path/hash引用独立重算，无丢失/错配。Vue原SHA348aeaa52a3ca74a987f8e96570cb92d72913ad117c230ec5990c6eb013f3bd0仅`recorded_run`误留194文字；review指出后由artifact owner更正为实际195新run，cases/SDK/data/frames未改，validator重新8/8 exit0（vue-gate-metadata-r195.log），不重演也不伪称194续跑。
+- 亲自只读SQLite/file验证：双轨Notes title/body/revision精确（native id9/rev3、Vue id1/rev3）；Todo id1精确中文文本/done1；Blog两轨meta/title/body/current与当前revision版本文件完全一致（native8、Vue4）；Calendar generation/rev符合、删除id全部版本文件及manifest条目缺席、next事件标题/保留正确；Database双fixture查询精确/禁止写入表不存在/文件哈希吻合；Charts两轨rows_frag/列映射一致、SVG可解析；Paint256像素与SVG、nativeKV保存像素完全一致。不是仅相信completed计数。
+- Chat独立DB按目标conversation核对native3条、Vue5条逐字段精确；native全库共14条且14个intent key唯一，并非packet声明全库仅3条。native先前10条和首次peer的另一合法会话与最终u2/u8会话有清晰scope；初peer脚本误用error而非err的失败未冒称产品红/通过。原始peer oracle含同key重试仅一行、C read[]/send not-a-participant；秘密只在RAM worker，不读取或输出凭据。实际桌面发送未API/DB预写。
+- 亲阅关键PNG而非只验SHA：native Todo下一次编辑/完成、Calendar二次reopen next-retained、Blog fulltitle/body、Chat重开后nextsend与peer回复、Charts三根实际高度；Vue Blog rev4、Chat五消息可见，均与对应数据相合。截图边界：Vue Blog next-save位于页面下部，完整正文由DOM精确值与独立版本文件补证；不冒称该图显示所有字段。原生Calendar控件局部拥挤为现存呈现边界，本案所验月视图/事件状态/交互oracle成立，未追加像素布局承诺。
+- 两永久父gate `verify_basic_app_assembly.py --profile iced --run t06/iced-run-r195.json`及`--profile vue --run t06/vue-run-r195.json`原始输出均required8/passed8/failed0/exit0。它们是父054验收证据，本Plan只消费相关框架闭合，不代发054最终pass。原生混合关闭记录SHA `b0679520d485f3d3379f27cd8be11d7b043533e252788e91381152bfe1867746`；Vue mixed `230792ef4259bb1b7a706916eee059eb0503780f5fe30c5263a4a008228c3ab2`、close-all `6a64a3db3d220a943969cf9c0a7a432d3a1002c21a1e0b5bf24780b7fcf98440`。读取normal-stop：六native children正常0；根host/backend/service/Cargo/wrapper正常0/reaped，privateRQ明确controlled1/reaped；manifest恢复、selected listeners absent、foreign47236未处理。未把控制取消当自然0。
+
+**spec_inputs / 六目标完整候选delta通过，review不发布canonical：**
+
+| docs/specs/... target | reviewed SHA256 |
+|---|---|
+| build/desktop-api-surfaces.md | 29eb4ef325ca1321031cb0273fe16865fe16c349813f76eddc692b7cc111e1d1 |
+| build/generated-vite-config.md | dfe637b4eaecfdc9f30ed6d0ea674daa5c44c3bbfaa2d718ec46e64d994acf9f |
+| runtime/component-and-store-instances.md | 8961ae2f95604cfd7cc9937ee9a027f8e932db921515636e104c18fea823d3d9 |
+| runtime/desktop-acceptance-input.md | 782db4447cb581f5a1e3261532d19b179a4eac86f8e8b39cb65fc891da0184a4 |
+| runtime/native-codegen-semantics.md | 9811a2c1f3cddde4eb9a860a5f55ce5a8046751402eeb4484ca4de9095335a38 |
+| runtime/native-command-frame-text.md | 8a0d879fc95cc8094ef4292422fa7523f9274cf423a62f6d23f88e34209f7117 |
+
+完整`git diff 7ac0455b HEAD -- docs/specs` SHA256 `fd05eb2cc1089660d454a5356976f5ca56e66bfb2aa3f74884cd0f538b5e6d2b`。六目标与SD01..06/frontmatter一致：3新增、3修改；desktop-api已在新基线，修改归属/正常close合同而非重复添加，956服务构建/发布/cwd附节全文保留；057 owner与plain边界不削弱；SD01当前v15、956字节find委托、SD02carrier传播、SD03帧变换/有序裁剪、SD04canonical store/活动页单timer均与代码和可辨断言一致。没有用旧JSON账本/手工索引替代规范。
+
+**pending_closeout_gates / merge责任，尚未声称执行或通过：**
+
+1. 冻结完整影响范围仍为compiler rust/Vue store，dialect view/widget，runtime session/protocol/headless/viewport/input/close/mcp/native_http/backproxy/dynamic/vm桥，tools rust_ui/merged_index/vue/run_vue/desktop_backends/proc_host。既有48compiler/runtime原子结果、修复后的tools6、r8carrier4与freshness1按其不变源码/依赖/输入边界保留；r7仅WM资产无镜像unit，已由真实red/green业务闭合。最终缺项仅既已审定的小union，root在本pass后执行，不叠完整workspace/catalog：
+   - **compiler4**：`ui_gen::rust::tests::named_style_and_typed_payload_rust_codegen`；`ui_gen::vue::tests::test_plan041_store_factory_and_context_facade`；`test_plan051_store_struct_default_kept`；`test_plan051_store_non_struct_defaults_unchanged`。
+   - **runtime7**：`ui::desktop_protocol::native_theme_carrier::tests::`完整4项；`endpoint::tests::host_close_then_exit_handshake_then_reclaim`；`host::tests::reclaim_removes_win_app_surface_and_notifies`；`ui_tests::back_proxy_tests::p054_back_proxy_initializes_imported_constants_and_preserves_vars`。
+   - **tools6**：`vue::plan053_probes::{desktop_window_root_clamps_page_not_nested_canvas,desktop_clients_with_same_store_keep_their_owners}`；`desktop_backends::tests::`完整3项；`rust_ui::plan036_theme_input_tests::theme_input_entries_follow_identity_and_reject_tamper`。
+   用原writer实际Webc36/Langf032、`cargo nextest run --locked --target-dir <C2> -p <exact-package> --lib --ignore-default-filter -E <上述精确filter>`，CARGO_TARGET_DIR不继承；按实际枚举结果核对4/7/6，0选择/ignored不得称pass。055 Hello双控制与956 build/publish/cwd已在有效原子证据；057 archived浏览器lower资源oracle及未改生成/owner实现可复用，未重建归档057 scratch或启动其ignored SSE/browser。若新结果失败，返回具体受影响work/复审，不把pending归绿。
+2. 当前main已至c5c6fe05e11d1266e6673a2778761035c1d0430d。本轮额外只读净差异7ac→c5：35文件，集中065/068计划、三个auto-graphics规范、experimental/autographics-node2d-pilot lower_node_ui/fixtures/generated-world/tests；生产`crates/`、Cargo.toml/lock、packages/scripts/WMassets/本Plan六Spec无交叠。未触060生成/输入/主题载体或SDK195实际业务路径。正常rebase若patch/source/config/input等价并无新冲突，则保留本次SDK195实际任务证据，不因commit换名重复任务；merge owner仍须对真实rebase结果做range-diff/六Spec核对，发现意外交叠再受影响复审。本pass不自动批准尚未生成的新commit。
+3. 冻结union通过及合入等价核对后，merge才完成准确canonical落地、工具链/消费者pin、正式归档、证据摘要折入与授权清理。父054剩余步骤/最终复审属于其owner；本review没有merge/push/archive/更新消费者/动进程或foreign47236。T05 merge部分仍pending；本Plan状态reviewed5/6，不冒称目标整体已交付。
