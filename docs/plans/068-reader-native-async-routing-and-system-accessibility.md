@@ -233,8 +233,18 @@ Rust AutoUI runtime/dialect/handler codegen、VM实例及parked续体、iced/win
 - 08管理exec session55280已从本chat历史恢复，当前仍live；CLI3660/conhost44252/UI20528/exec24540的完整exe/父PID/创建时间已在退出前冻结于owned-process-tree-before-close.json。下一步用户取消→观察实际短提示→q正常退出/核冷端口与全树→09同配置真控件/读回及修复消费。再次直接HTTPConnection对07已关闭MCP仍2s TimeoutError（无代理），不是NVM-04要求的connection-refused，保留pending不改门。
 - stage:work | plan_id:auto-ui/PLAN-068 | plan_revision:r2 | outcome:partial/waiting-input | worktree_path:D:/autostack/.wt/ui-068/auto-ui | branch:codex/plan-068-dev | base_commit:7ac0455bf4cd743248749e4bc4eb9d0aed657266 | code_commit:ca4c8acd6bee902b050e863e926d160826d535b0 | dependency_revisions:lang37350656/man03bb65ef/down58ea33f6/webbf72baab | task_ids:T03/T04仍open、3/8 | evidence:上述原红转绿与新精确tool | blockers:08真实picker取消、最终consumer/系统树及NVM关闭负控未满证 | next_responsible_role:work原上下文，非final review。没有启动终审/merge或重置repair轮0。
 
+### 2026-11-07 旧阻挡核销与封顶修复真实消费者消费通过（用户四文件）
+
+- 旧阻挡实况核销：tasklist核08会话CLI3660/conhost44252/UI20528/exec24540与exec55280**全部不存在**，窗口26412464及"打开"框已消失，旧取消问题moot。上轮09（CLI24288，同pin）已实际启动并在宿主会话结束时断流死亡（无normal-exit.json）；其reading-system.json显示阅读页Windows系统树已含壳按钮/正文Document（标题"封面书甲"与正文可读），材料保留。
+- 新**10会话**：start-reader-native-10.py（09脚本改stop.json哨兵，因本宿主无交互stdin）；独立data/fixtures从08本地化并逐本断言managed==original；pin完全一致（reader595eb627/ui ca4c8acd/tool 6ce87feb），端口33981/82/83独占预检通过；CLI34936/backend43276/UI33912，窗口27264432。
+- 初始库基线三通道全绿：MCP渲染树、真实像素library-initial.png（SHA256=0a6ad1549b962b92a5229dc09b0c10e0fe7f71f71a17d296dcf58f0eab1d4ab4）、Windows UIA系统树**52元素**含全部书卡/工具/分页（library-initial-system-uia.txt）——库页系统树表面首次实测可见。
+- 修复消费核心证据（同06/08原红输入）：真实OS picker由用户一次选择四文件（3重复+坏EPUB）；真实4次POST /api/library/import全200（3 duplicate+1 epub_invalid，标签与后端message一致）；渲染树出现结果text节点；真实像素library-after-import.png（SHA256=d2f1a5806d02af44542e3775a792a2621e3e0d615a3b53090cae712cb6404938）显示封顶结果区完整可见4行且书卡列表正常——**封顶视口修复(ca4c8acd)在真实消费者原红转绿**；Windows系统树同时含该结果Text元素（library-results-system-uia.txt）。证据均在plan-068/auto-ui/s10/。
+- 数据身份：library.json/catalog SHA256前后全等（b8441970823d8da4bbe0a12f751461385086f50bf539f0bad3a99a740d962bf2 / 4dcf7c0bd280040556ce46f2e07d79bd9827b2c471cf342aea33235ef40cb0fb），3本managed==original不变；normal q退出**exit0/0.37s**（normal-exit.json），三PID全消失，33981-83无LISTENING。
+- 新具名观察：autoui_state MCP通道在picker长时间park后与live state脱同步（持续报import_results=""/is_importing=false，而渲染树/像素/系统树均为4行）——状态通道证据不得再单独当渲染事实，须与像素/渲染树/系统树互证；33981-83关闭后connect为timeout非connection-refused（与07会话同名观察一致，环境行为，不改门）。
+- stage:work | plan_id:auto-ui/PLAN-068 | plan_revision:r2 | outcome:partial | worktree_path:D:/autostack/.wt/ui-068/auto-ui | branch:codex/plan-068-dev | base_commit:7ac0455bf4cd743248749e4bc4eb9d0aed657266 | code_commit:ca4c8acd6bee902b050e863e926d160826d535b0（本轮无新代码改动，树保持clean） | dependency_revisions:lang37350656/man03bb65ef/down58ea33f6/webbf72baab | task_ids:T03/T04仍open、3/8 | evidence:t04-reader-native-10与s10/三通道证据 | blockers:系统树focus/操作腿、V05定向受影响并集与统一冻结归merge；connection-refused负控环境timeout具名pending | next_responsible_role:work原上下文，非final review。没有启动终审/merge或重置repair轮0。
+
 ## 10. 待澄清事项
 
-2026-11-07：父goal round7～9连续等待同一取消输入，已重新核exec55280/PID完整路径及实际窗口26412464的选择框仍打开；父goal将标blocked，Plan仍executing/3-of-8。ca4c8acd实现和tool6ce87feb、09脚本均保留；不发更多自动输入、不启动终审/merge。解除动作是08“打开”框点取消并回报后恢复goal，非重新索取授权。
+2026-11-07（续）：旧"08打开框点取消"阻挡已核销——08全部进程/窗口经tasklist确认不存在，问题moot，不需用户再取消。"已选四个"已在10会话以真实OS picker重演（3重复+坏EPUB），封顶修复真实消费者消费通过且数据hash不变。当前无待答输入或授权问题。剩余为执行项：系统树focus/操作腿、V05定向受影响并集（归merge冻结）、autoui_state通道脱同步与关闭端口timeout(非refused)两项具名观察。T03/04继续，独立终审未启动。
 
-无待答范围或授权问题。“已选四个”与“已解锁”均已落实；四文件trace为3duplicate+1epub_invalid，磁盘仍3本且原件完整。当前唯一输入请求：08窗口26412464的真实“打开”框请用户点取消并回报，用于最短结果提示观察；不要求重选四文件。独立布局修复/对应控制继续执行，工具缓存失败不得绕过安全边界或伪造输入。T03/04、独立终审和交付尚未完成。
+
