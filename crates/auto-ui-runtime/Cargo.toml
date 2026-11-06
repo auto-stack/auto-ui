@@ -333,6 +333,8 @@ name = "ui_todos"
 required-features = ["ui-iced"]
 
 [dev-dependencies]
+# PLAN-060: exercise the actual WGPU canvas geometry backend without a device.
+iced_wgpu = "0.14"
 # PLAN-018 T-03：iced_test 仅测试工具箱——自 optional+feature 门转 dev 依赖。
 iced_test = { version = "0.14" }
 

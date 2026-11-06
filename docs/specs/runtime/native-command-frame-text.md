@@ -46,3 +46,7 @@ that ignore this existing notification retain that limitation until rebuilt.
 bounded initial geometry, real-pipe delivery and maximize deduplication, with a
 pixel-mode control. The native scroll regression consumes a real endpoint resize
 before checking frame coordinates and clicking the visible bottom button.
+
+### 裁剪区域的画布绘制顺序（PLAN-060 r6）
+
+v1 DrawList与v2 DisplayList的宿主Canvas按原始绘制顺序生成几何。基础clear底色先绘制，裁剪区域不能因WGPU Frame草稿回填而排在未提交的基础缓冲之前。实现按Scissor边界分段，各段保留活动裁剪/变换作用域并平衡闭合；同一裁剪区域中的相邻原语仍批量处理，不逐原语创建几何。无线格式变化。用实际WGPU几何生成后端（无需Device/窗口）检查底色与气泡mesh顺序，另以CPU HeadlessFrameSource检查滚动内容的背景Quad确实产生；两者与真实桌面画面共同构成呈现证据。

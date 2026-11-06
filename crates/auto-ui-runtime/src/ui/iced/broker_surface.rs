@@ -415,15 +415,7 @@ impl<M> iced::widget::canvas::Program<M> for DrawListPainter<M> {
         bounds: iced::Rectangle,
         _cursor: iced::mouse::Cursor,
     ) -> Vec<iced::widget::canvas::Geometry> {
-        use iced::widget::canvas::{Frame, Path, Text};
-        let mut frame = Frame::new(renderer, bounds.size());
-        // clear 底色：整面铺（None = 透明，窗体容器底透出）。
-        if let Some(clear) = self.list.clear {
-            frame.fill_rectangle(iced::Point::ORIGIN, bounds.size(), to_color(clear));
-        }
-        paint_ops(&mut frame, &self.list.ops);
-        let _ = Path::new(|_| {});
-        vec![frame.into_geometry()]
+        paint_draw_list(renderer, &self.list, bounds.size())
     }
 }
 
@@ -606,15 +598,93 @@ impl<M> iced::widget::canvas::Program<M> for DisplayListPainter<M> {
         bounds: iced::Rectangle,
         _cursor: iced::mouse::Cursor,
     ) -> Vec<iced::widget::canvas::Geometry> {
-        use iced::widget::canvas::{Frame, Path};
-        let mut frame = Frame::new(_renderer, bounds.size());
-        if let Some(clear) = self.list.clear {
-            frame.fill_rectangle(iced::Point::ORIGIN, bounds.size(), to_color(clear));
-        }
-        paint_ops_v2(&mut frame, &self.list.ops);
-        let _ = Path::new(|_| {});
-        vec![frame.into_geometry()]
+        paint_display_list(_renderer, &self.list, bounds.size())
     }
+}
+
+// WGPU Frame::paste appends clipped meshes before the parent's unflushed
+// buffers. Keep each clip run in its own geometry so a later base fill cannot
+// cover clipped content. Adjacent primitives still share a batch.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PaintScope { Payload, ClipPush, ClipPop, TransformPush, TransformPop }
+
+fn clipped_paint_runs<T: Clone>(
+    ops: &[T], kind: impl Fn(&T) -> PaintScope, close: impl Fn(&T) -> T,
+) -> Vec<Vec<T>> {
+    let mut scopes: Vec<T> = Vec::new();
+    let mut prefix = Vec::new();
+    let mut run = Vec::new();
+    let mut runs = Vec::new();
+    let flush = |prefix: &[T], run: &mut Vec<T>, scopes: &[T], runs: &mut Vec<Vec<T>>| {
+        if run.iter().any(|op| kind(op) == PaintScope::Payload) {
+            let mut batch = prefix.to_vec();
+            batch.append(run);
+            batch.extend(scopes.iter().rev().map(&close));
+            runs.push(batch);
+        } else { run.clear(); }
+    };
+    for op in ops {
+        match kind(op) {
+            PaintScope::ClipPush | PaintScope::ClipPop => {
+                flush(&prefix, &mut run, &scopes, &mut runs);
+                if kind(op) == PaintScope::ClipPush { scopes.push(op.clone()); }
+                else if let Some(i) = scopes.iter().rposition(|s| kind(s) == PaintScope::ClipPush) { scopes.remove(i); }
+                prefix = scopes.clone();
+            }
+            PaintScope::TransformPush => { scopes.push(op.clone()); run.push(op.clone()); }
+            PaintScope::TransformPop => {
+                if let Some(i) = scopes.iter().rposition(|s| kind(s) == PaintScope::TransformPush) { scopes.remove(i); }
+                run.push(op.clone());
+            }
+            PaintScope::Payload => run.push(op.clone()),
+        }
+    }
+    flush(&prefix, &mut run, &scopes, &mut runs);
+    runs
+}
+
+fn ordered_geometries<R, T>(
+    renderer: &R, clear: Option<Rgba8>, size: iced::Size, runs: Vec<Vec<T>>,
+    paint: impl Fn(&mut iced::widget::canvas::Frame<R>, &[T]),
+) -> Vec<R::Geometry>
+where R: iced::advanced::graphics::geometry::Renderer {
+    let mut geometries = Vec::new();
+    if let Some(clear) = clear {
+        let mut frame = iced::widget::canvas::Frame::<R>::new(renderer, size);
+        frame.fill_rectangle(iced::Point::ORIGIN, size, to_color(clear));
+        geometries.push(frame.into_geometry());
+    }
+    for run in runs {
+        let mut frame = iced::widget::canvas::Frame::<R>::new(renderer, size);
+        paint(&mut frame, &run);
+        geometries.push(frame.into_geometry());
+    }
+    geometries
+}
+
+fn paint_draw_list<R>(renderer: &R, list: &DrawList, size: iced::Size) -> Vec<R::Geometry>
+where R: iced::advanced::graphics::geometry::Renderer {
+    let runs = clipped_paint_runs(&list.ops, |op| match op {
+        DrawOp::Scissor { .. } => PaintScope::ClipPush,
+        DrawOp::ScissorPop => PaintScope::ClipPop,
+        _ => PaintScope::Payload,
+    }, |_| DrawOp::ScissorPop);
+    ordered_geometries(renderer, list.clear, size, runs, paint_ops::<R>)
+}
+
+fn paint_display_list<R>(renderer: &R, list: &DisplayList, size: iced::Size) -> Vec<R::Geometry>
+where R: iced::advanced::graphics::geometry::Renderer {
+    let runs = clipped_paint_runs(&list.ops, |op| match op {
+        DisplayOp::Scissor { .. } => PaintScope::ClipPush,
+        DisplayOp::ScissorPop => PaintScope::ClipPop,
+        DisplayOp::Transform { .. } => PaintScope::TransformPush,
+        DisplayOp::TransformPop => PaintScope::TransformPop,
+        _ => PaintScope::Payload,
+    }, |op| match op {
+        DisplayOp::Transform { .. } => DisplayOp::TransformPop,
+        _ => DisplayOp::ScissorPop,
+    });
+    ordered_geometries(renderer, list.clear, size, runs, paint_ops_v2::<R>)
 }
 
 /// v2 原语 canvas 重放（paint_ops 同构 + v2 原生面）：Quad 全参（渐变
@@ -881,6 +951,73 @@ pub fn broker_client_content(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn p060_native_clip_runs_preserve_scope_and_batch_adjacent_primitives() {
+        let quad = DisplayOp::Quad { rect: crate::ui::desktop_protocol::message::WRect::new(1.0,1.0,2.0,2.0), fill: WireFill::Color(Rgba8::new(255,0,0,255)), radius:[0.0;4], border:None, shadow:None };
+        let clip = DisplayOp::Scissor { rect: crate::ui::desktop_protocol::message::WRect::new(0.0,0.0,10.0,10.0) };
+        let ops = vec![DisplayOp::Transform { matrix:[1.0,0.0,0.0,1.0,5.0,7.0] }, quad.clone(), clip, quad.clone(),quad.clone(),DisplayOp::ScissorPop,quad,DisplayOp::TransformPop];
+        let runs = clipped_paint_runs(&ops, |op| match op {
+            DisplayOp::Scissor {..} => PaintScope::ClipPush, DisplayOp::ScissorPop => PaintScope::ClipPop,
+            DisplayOp::Transform {..} => PaintScope::TransformPush, DisplayOp::TransformPop => PaintScope::TransformPop,
+            _ => PaintScope::Payload,
+        }, |op| if matches!(op,DisplayOp::Transform{..}) { DisplayOp::TransformPop } else { DisplayOp::ScissorPop });
+        assert_eq!(runs.len(),3,"split only at clip boundaries, not each primitive");
+        assert_eq!(runs[1].iter().filter(|op| matches!(op,DisplayOp::Quad{..})).count(),2);
+        assert!(matches!(runs[1][0],DisplayOp::Transform{..}));
+        assert!(matches!(runs[1][1],DisplayOp::Scissor{..}));
+        assert!(matches!(runs[1][runs[1].len()-2],DisplayOp::ScissorPop));
+        assert!(matches!(runs[1].last(),Some(DisplayOp::TransformPop)));
+    }
+
+    #[test]
+    fn p060_native_clipped_quad_order_matches_display_list() {
+        struct Recorder;
+        impl iced::advanced::Renderer for Recorder {
+            fn start_layer(&mut self, _: iced::Rectangle) {}
+            fn end_layer(&mut self) {}
+            fn start_transformation(&mut self, _: iced::Transformation) {}
+            fn end_transformation(&mut self) {}
+            fn fill_quad(&mut self, _: iced::advanced::renderer::Quad, _: impl Into<iced::Background>) {}
+            fn reset(&mut self, _: iced::Rectangle) {}
+            fn allocate_image(&mut self, _: &iced::advanced::image::Handle,
+                _: impl FnOnce(Result<iced::advanced::image::Allocation, iced::advanced::image::Error>) + Send + 'static) {
+                panic!("image allocation outside this geometry case");
+            }
+        }
+        impl iced::advanced::graphics::geometry::Renderer for Recorder {
+            type Geometry = iced_wgpu::geometry::Geometry;
+            type Frame = iced_wgpu::geometry::Frame;
+            fn new_frame(&self, bounds: iced::Rectangle) -> Self::Frame { iced_wgpu::geometry::Frame::new(bounds) }
+            fn draw_geometry(&mut self, _: Self::Geometry) {}
+        }
+        use crate::ui::desktop_protocol::message::{DisplayList, DisplayOp, Fill, Rgba8, WRect};
+        let list = DisplayList { clear: Some(Rgba8::new(0,0,255,255)), ops: vec![
+            DisplayOp::Scissor { rect: WRect::new(10.0,10.0,50.0,50.0) },
+            DisplayOp::Quad { rect: WRect::new(20.0,20.0,10.0,10.0), fill: Fill::Color(Rgba8::new(255,0,0,255)), radius:[0.0;4], border:None, shadow:None },
+            DisplayOp::ScissorPop,
+        ] };
+        let geometries = super::paint_display_list(&Recorder, &list, iced::Size::new(100.0,100.0));
+        let mut clips=Vec::new();
+        for geometry in geometries {
+            let iced_wgpu::geometry::Geometry::Live { meshes, .. } = geometry else { panic!("expected live geometry"); };
+            clips.extend(meshes.iter().map(|m| m.clip_bounds().width));
+        }
+        assert_eq!(clips, vec![100.0,50.0], "canvas must paint base before clipped bubble; later base currently covers bubble");
+        let legacy = DrawList { clear: list.clear, ops: vec![
+            DrawOp::Scissor { rect: WRect::new(10.0,10.0,50.0,50.0) },
+            DrawOp::Quad { rect: WRect::new(20.0,20.0,10.0,10.0), color: Rgba8::new(255,0,0,255) },
+            DrawOp::ScissorPop,
+        ] };
+        let geometries = super::paint_draw_list(&Recorder, &legacy, iced::Size::new(100.0,100.0));
+        let mut legacy_clips = Vec::new();
+        for geometry in geometries {
+            let iced_wgpu::geometry::Geometry::Live { meshes, .. } = geometry else { panic!("expected live geometry"); };
+            legacy_clips.extend(meshes.iter().map(|m| m.clip_bounds().width));
+        }
+        assert_eq!(legacy_clips, clips, "v1/v2 clip paint order differs");
+
+    }
+
     use super::*;
 
     /// PLAN-102 F-RF-3：重放字体钉 Inter family——generic family + Medium

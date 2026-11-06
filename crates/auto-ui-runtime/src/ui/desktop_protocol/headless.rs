@@ -1680,6 +1680,32 @@ mod tests {
         assert_native_scroll_reaches_bottom(true);
     }
 
+    #[test]
+    fn p060_native_scroll_retains_styled_bubble_paint() {
+        #[derive(Debug)] struct Paint(bool);
+        impl Component for Paint {
+            type Msg = ();
+            fn on(&mut self, _: ()) {}
+            fn view(&self) -> crate::ui::View<()> {
+                use crate::ui::View;
+                let content = View::col()
+                    .child(View::text_styled("BUBBLE", "bg-red-500 text-black rounded-xl px-4 py-2"))
+                    .build();
+                if self.0 { View::scrollable(content).style("h-full w-full").build() }
+                else { content }
+            }
+        }
+        for scrolling in [false, true] {
+            let mut surface = HeadlessSurface::new(Paint(scrolling), 240.0, 160.0);
+            let list = surface.render_frame_v2();
+            let red = list.ops.iter().filter(|op| matches!(op,
+                DisplayOp::Quad { fill: Fill::Color(c), .. } if c.r > 200 && c.g < 100 && c.b < 100
+            )).count();
+            println!("scrolling={scrolling} red_quads={red}");
+            assert!(red > 0, "styled bubble background lost: scrolling={scrolling}; {:?}", list.ops);
+        }
+    }
+
     fn assert_native_scroll_reaches_bottom(styled: bool) {
         use crate::ui::View;
         #[derive(Debug)]
