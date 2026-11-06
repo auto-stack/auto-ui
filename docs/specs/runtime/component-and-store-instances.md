@@ -89,6 +89,13 @@
 
 ## 5. 验收锚点
 
+编译到 Rust 的路由根（PLAN-060）：页面 Init 经过根的子消息包装臂派发，
+因此初始化产生的 store 更新与普通页面事件一样回写对应 canonical store。
+根无自身周期定时器时，将当前 outlet 页的单一定时器间隔及包装后的消息
+提供给原生 runner；非活动页不被该入口轮询，无匹配路由返回 None。
+根自身定时器优先、每组件仅暴露首个定时器的既有边界不变；这不扩展为
+父子多定时器调度器，也不改变 VM 的实例时间源。
+
 - 永久 fixture：`crates/auto-ui-runtime/tests/fixtures/plan041_instances/`
   （同型双计数 keyed a/b + 动态 key 交换 + show_b 条件卸载 + 共享 P041Store）。
 - Oracle：`crates/auto-ui-runtime/tests/plan041_instance_ownership.rs` —

@@ -5950,6 +5950,22 @@ pub(crate) fn apply_desktop_injects(state: &mut crate::ui::session::DesktopSessi
                 state.route_live_input(&input);
             }
             // PLAN-060：消息注入（组件事件循环；VM 异步 API 正常挂起续跑）。
+            DesktopInject::MsgValues { app, msg, args } => {
+                let app_id = if app == "shell" {
+                    state.desktop.shell_app
+                } else {
+                    state.host.as_ref().and_then(|host| {
+                        host.wm.wins.values()
+                            .find(|window| window.registry_id.as_deref() == Some(app.as_str()))
+                            .map(|window| window.app)
+                    }).or_else(|| state.hatched_mini_of(&app))
+                };
+                if let Some(app_id) = app_id {
+                    if let Err(error) = state.dispatch_scalar_message(app_id, msg, &args) {
+                        eprintln!("[desktop-input] typed message: {error}");
+                    }
+                }
+            }
             DesktopInject::Msg { app, msg, arg } => {
                 let app_id = if app == "shell" {
                     state.desktop.shell_app

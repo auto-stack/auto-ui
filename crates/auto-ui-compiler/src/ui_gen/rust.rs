@@ -2927,8 +2927,8 @@ fn collect_local_elems(
                 }
                 if msg_ty != "()" && has_init {
                     body.push_str(&format!(
-                        "            self.{}.on({}::Init);\n",
-                        field, msg_ty
+                        "            self.on({}::{}({}::Init));\n",
+                        self.current_msg_name(), child, msg_ty
                     ));
                 }
                 arms.push_str(&format!(
@@ -17554,6 +17554,31 @@ widget App {
         assert!(local.contains("fn tick_interval_ms(&self) -> Option<u32> { Some(80) }"));
         assert!(local.contains("Some(AppMsg::Beat)"));
         assert!(!local.contains("self.author.tick_msg()"), "existing local timer keeps precedence");
+
+        // Route entry must use the same child wrapper as normal events so
+        // mutations from Init are copied back into the canonical root store.
+        gen_first_widget(r#"widget author {
+            msg { Init }
+            model { var ready bool = false }
+            view { text "author" }
+            on { .Init -> { .ready = true } }
+        }"#);
+        // The project generator pre-registers page lifecycle metadata before
+        // generating the root; reproduce that registration in this fixture.
+        let already_registered = WIDGET_HAS_INIT.with(|set| !set.borrow_mut().insert("author".into()));
+        let initialized = gen_first_widget(r#"widget App {
+            msg { Init }
+            routes {
+                "/" -> use author
+                "/other" -> use home
+            }
+            view { outlet }
+        }"#);
+        if !already_registered {
+            WIDGET_HAS_INIT.with(|set| { set.borrow_mut().remove("author"); });
+        }
+        assert!(initialized.contains("self.on(AppMsg::author(authorMsg::Init));"));
+        assert!(!initialized.contains("self.author.on(authorMsg::Init);"));
     }
 
     #[test]

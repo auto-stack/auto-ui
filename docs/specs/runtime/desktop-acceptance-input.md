@@ -15,6 +15,16 @@ or one string. `widget: App` targets the root. Other widget names are explicitly
 unsupported for broker actions; they must not silently target the root.
 In-process handler/widget dispatch keeps its existing semantics.
 
+For an in-process root, `msg` additionally accepts `args`, an array of string,
+boolean, integer or floating-point scalars. It is mutually exclusive with the
+legacy `arg` string. Numbers use the existing VM handler ABI (signed 32-bit Int
+and single-precision Float); integers outside that range, null and nested
+containers are rejected before queueing rather than truncated. The desktop update
+loop delivers these values through `DynamicMessage::Typed`, preserving normal
+asynchronous event handling. Broker-owned targets reject this array form without
+sending a wire message or executing their local placeholder. This adds no
+arbitrary native subwidget RPC or new wire payload.
+
 The Hello capability tail retains its historical `theme_caps` field name and
 advertises `input-action/1` in addition to any theme capability. A host must not
 send tag 11 to a peer missing that exact capability. An unsupported or failed

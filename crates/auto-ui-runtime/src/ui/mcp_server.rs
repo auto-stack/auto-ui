@@ -1329,6 +1329,11 @@ fn tool_definitions() -> Vec<serde_json::Value> {
                         "type": "string",
                         "description": "Optional single string argument for the handler"
                     },
+                    "args": {
+                        "type": "array",
+                        "items": { "type": ["string", "boolean", "number"] },
+                        "description": "action=msg: typed scalar arguments for an in-process root; mutually exclusive with arg. Broker apps support only the legacy single string arg."
+                    },
                     "widget": {
                         "type": "string",
                         "description": "Plan 559 W7: optional sub-widget name for (app, widget) targeting — dispatches into that DynamicComponent's handler context (e.g. widget:\"DesktopPage\" handler:\"Nav\" arg:\"appearance\"; widget:\"WallpaperPicker\" handler:\"Pick\" arg:\"<image path>\")"
@@ -3160,12 +3165,11 @@ fn tool_desktop(_shared: &SharedStateHandle, args: serde_json::Value) -> serde_j
             if app.is_empty() || msg.is_empty() {
                 return error_result("action=msg requires app and msg".to_string());
             }
-            let arg = args.get("arg").and_then(|v| v.as_str()).map(|s| s.to_string());
-            crate::ui::session::desktop_inject_push(crate::ui::session::DesktopInject::Msg {
-                app: app.clone(),
-                msg: msg.clone(),
-                arg,
-            });
+            let injection = match parse_desktop_message_args(&args, app.clone(), msg.clone()) {
+                Ok(injection) => injection,
+                Err(error) => return error_result(error),
+            };
+            crate::ui::session::desktop_inject_push(injection);
             text_result(format!("queued {app} msg: {msg}"))
         }
         _ => error_result(format!("Unknown action: '{action}' (bus|handler|key|pointer|msg)")),
@@ -3173,6 +3177,108 @@ fn tool_desktop(_shared: &SharedStateHandle, args: serde_json::Value) -> serde_j
 }
 
 // ── Tool: autoui_wait (Plan 299 Phase 2) ──
+
+fn parse_desktop_message_args(args: &serde_json::Value, app: String, msg: String) -> Result<crate::ui::session::DesktopInject, String> {
+    use crate::ui::session::{desktop_message_scalar, DesktopInject};
+    if let Some(values) = args.get("args") {
+        if args.get("arg").is_some() {
+            return Err("action=msg accepts either arg or args, not both".into());
+        }
+        let values = values.as_array().ok_or_else(|| "message args must be an array".to_string())?;
+        for value in values { desktop_message_scalar(value)?; }
+        Ok(DesktopInject::MsgValues { app, msg, args: values.clone() })
+    } else {
+        let arg = match args.get("arg") {
+            Some(value) => Some(value.as_str().ok_or_else(|| "message arg must be a string".to_string())?.to_string()),
+            None => None,
+        };
+        Ok(DesktopInject::Msg { app, msg, arg })
+    }
+}
+
+#[cfg(test)]
+mod p060_scalar_message_tests {
+    use super::*;
+    use crate::ui::session::{DesktopInject, DesktopSession, desktop_inject_push, desktop_inject_take};
+
+    #[test]
+    fn p060_scalar_message_parser_rejects_lossy_or_ambiguous_payloads() {
+        for invalid in [
+            json!({"args": [null]}), json!({"args": [[1]]}),
+            json!({"args": [{}]}), json!({"args": [u64::MAX]}),
+            json!({"args": [i64::MAX]}), json!({"args": [i64::MIN]}),
+            json!({"args": [1.0e300]}),
+            json!({"args": "17"}), json!({"args": [], "arg": "legacy"}),
+            json!({"arg": 17}),
+        ] {
+            assert!(parse_desktop_message_args(&invalid, "paint".into(), "Paint".into()).is_err());
+        }
+        assert!(matches!(parse_desktop_message_args(&json!({"arg":"中文"}), "paint".into(), "SetPath".into()).unwrap(), DesktopInject::Msg { arg: Some(value), .. } if value == "中文"));
+        assert!(matches!(crate::ui::session::desktop_message_scalar(&json!(true)).unwrap(), auto_val::Value::Bool(true)));
+    }
+
+    #[test]
+    fn p060_scalar_message_queue_dispatch_preserves_types_and_target() {
+        let source = r#"widget App {
+            msg { Change(int, str, bool, float) }
+            model {
+                var index int = 0
+                var label str = ""
+                var enabled bool = false
+                var amount float = 0.0
+            }
+            view { text .label }
+            on { .Change(i, s, b, f) -> {
+                .index = i
+                .label = s
+                .enabled = b
+                .amount = f
+            } }
+        }"#;
+        let mut session = DesktopSession::__test_session();
+        let selected = session.allocate_app(crate::build_dynamic_component(source, None).expect("selected component"));
+        let other = session.allocate_app(crate::build_dynamic_component(source, None).expect("other component"));
+        let injection = parse_desktop_message_args(&json!({"args":[17,"中文",true,54.25]}), "paint".into(), "Change".into()).unwrap();
+        assert!(desktop_inject_take().is_empty());
+        desktop_inject_push(injection);
+        let mut queue = desktop_inject_take();
+        assert_eq!(queue.len(), 1);
+        match queue.remove(0) {
+            DesktopInject::MsgValues { app, msg, args } => {
+                assert_eq!(app, "paint");
+                session.dispatch_scalar_message(selected, msg, &args).unwrap();
+            }
+            _ => panic!("typed injection lost"),
+        }
+        let target = &session.apps[&selected].component;
+        assert!(matches!(target.read_state("index").unwrap(), auto_val::Value::Int(17)));
+        assert_eq!(target.read_state("label").unwrap().as_str(), "中文");
+        let enabled = target.read_state("enabled").unwrap();
+        // The existing VM handler bridge encodes bool parameters as 0/1.
+        assert!(matches!(enabled, auto_val::Value::Bool(true) | auto_val::Value::Int(1)), "enabled: {enabled:?}");
+        let amount = target.read_state("amount").unwrap();
+        assert!(matches!(amount, auto_val::Value::Float(value) if value == 54.25), "amount: {amount:?}");
+        assert!(matches!(session.apps[&other].component.read_state("index").unwrap(), auto_val::Value::Int(0)));
+
+        // A broker-owned app must not execute its local placeholder or send
+        // an incompatible typed-array wire message, even with a live peer.
+        session.__test_open_desktop();
+        let wid = session.wm_add_win(selected, "paint".into(), iced::Rectangle::new(
+            iced::Point::ORIGIN, iced::Size::new(480.0, 320.0)));
+        use crate::ui::desktop_protocol::{transport, stage3::BrokerClient};
+        let pipe = format!("p060-scalar-isolation-{}", std::process::id());
+        let listener = transport::listen(&pipe).unwrap();
+        let mut peer = transport::connect(&pipe, 2000).unwrap();
+        let mut client = BrokerClient::new(pipe.clone(), listener.wait_connect().unwrap());
+        client.wid = Some(wid);
+        session.broker_clients.insert(pipe, client);
+        assert!(session.dispatch_scalar_message(selected, "Change".into(), &[
+            json!(99), json!("unsupported"), json!(false), json!(1.5),
+        ]).unwrap_err().contains("broker-owned"));
+        assert!(peer.try_recv().is_none());
+        assert!(matches!(session.apps[&selected].component.read_state("index").unwrap(), auto_val::Value::Int(17)));
+    }
+}
 
 fn tool_wait(shared_handle: &SharedStateHandle, args: serde_json::Value) -> serde_json::Value {
     let timeout_ms = args

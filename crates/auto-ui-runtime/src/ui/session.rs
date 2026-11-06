@@ -3415,6 +3415,12 @@ pub enum DesktopInject {
         msg: String,
         arg: Option<String>,
     },
+    /// Typed scalar messages for in-process roots only; no broker wire change.
+    MsgValues {
+        app: String,
+        msg: String,
+        args: Vec<serde_json::Value>,
+    },
     /// PLAN-060：验收通道指针注入——与真实鼠标同一消费臂
     /// （`broker_pointer_down/up` → owning client 的 PointerPressed/Released）。
     /// OS 指针在 CI/多窗抢占前台场景不可达；此臂给 iced 桌面上的
@@ -3433,6 +3439,26 @@ pub enum PointerPhase {
     Down,
     Up,
     Click,
+}
+
+/// Acceptance scalar conversion without integer truncation. Nested containers
+/// and null are intentionally excluded from this input seam.
+pub(crate) fn desktop_message_scalar(value: &serde_json::Value) -> Result<auto_val::Value, String> {
+    use auto_val::Value;
+    match value {
+        serde_json::Value::String(text) => Ok(Value::str(text)),
+        serde_json::Value::Bool(flag) => Ok(Value::Bool(*flag)),
+        serde_json::Value::Number(number) if number.is_i64() => {
+            let integer = number.as_i64().unwrap();
+            i32::try_from(integer).map(Value::Int)
+                .map_err(|_| "message integer exceeds the VM Int range".into())
+        }
+        serde_json::Value::Number(number) if number.is_f64() => {
+            number.as_f64().filter(|value| (*value as f32).is_finite())
+                .map(Value::Float).ok_or_else(|| "message float exceeds the VM Float range".into())
+        }
+        _ => Err("message args require strings, booleans or VM scalar numbers".into()),
+    }
 }
 
 static DESKTOP_INJECT_QUEUE: Mutex<Vec<DesktopInject>> = Mutex::new(Vec::new());
@@ -3662,6 +3688,26 @@ impl DesktopSession {
             return Some(Err("unsupported: named broker actions target the root App".into()));
         }
         Some(client.send_named_action(wid, name, arg))
+    }
+
+    /// Deliver typed acceptance arguments through the normal VM event loop.
+    /// A broker-owned surface is never dispatched into its local placeholder.
+    pub(crate) fn dispatch_scalar_message(&mut self, app: AppId, name: String, args: &[serde_json::Value]) -> Result<(), String> {
+        use crate::ui::Component;
+        let broker_owned = self.host.as_ref().is_some_and(|host| {
+            host.wm.wins.iter().any(|(wid, window)| window.app == app
+                && self.broker_clients.values().any(|client| client.owns_wid(*wid)))
+        });
+        if broker_owned {
+            return Err("typed message arrays are unsupported for broker-owned apps".into());
+        }
+        let values = args.iter().map(desktop_message_scalar).collect::<Result<Vec<_>, _>>()?;
+        let session = self.apps.get_mut(&app).ok_or_else(|| "message target is not live".to_string())?;
+        session.component.on(crate::ui::interpreter::DynamicMessage::Typed {
+            widget_name: "App".into(), event_name: name, args: values,
+        });
+        *session.state.view_dirty.borrow_mut() = true;
+        Ok(())
     }
 
     /// Request shutdown of this window's owning outproc app. Reclamation and
