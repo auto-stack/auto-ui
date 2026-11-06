@@ -22,7 +22,7 @@
 | action_config 热替换 | compiler action_config.rs；host.rs；MCP `action_config_reload` | 已支持（独立 DSL 源 mtime 泵，与组件 reload 无关；候选构建/提交**不**劫持它） |
 | `hot_reload.rs` HotReloadComponent/UIWatcher | ui/hot_reload.rs | **存根，无能力**：parse_content 恒返回固定节点；无生产调用方。不得引用其声称 HMR |
 | MCP 组件 reload 工具 | ui/mcp_server.rs | **缺口**：仅 action_config_reload；组件热重载无 MCP 直达（不随 056 新增公开 API） |
-| Vue/Vite 轨 | — | **不在本包核验范围**：本仓无 Vue/Vite HMR 证据；Vue 浏览器实证归属 PLAN-057 |
+| Vue/Vite 轨 | — | **HMR 不在本包核验范围**：本仓无 Vue/Vite HMR 证据；Vue 浏览器活体实证已由 PLAN-057 交付（vue-app-store-live-isolation.md——冷生成双路径挂载/隔离/owner 退出，非 HMR） |
 | Node `hot_reload` | — | 不属于本仓 UI runtime 能力 |
 
 ## 2. 检测语义（mtime，非内容）
@@ -94,7 +94,7 @@
 | owner/effect 治理（实例/store/Tick/订阅按 041 合同保留或撤销；迟到回调不写新实例；失败保旧可继续操作） | 交付：实例迁移 + tombstone + 繁忙保旧重试 + 订阅表整体替换（§3/§4） |
 | 资源条件（预算）：候选编译在独立 VM 模块试编译（不污染现役桥）；输入规模按 042 T-01 冻结口径 | 交付：候选独立 VM；快照图 ≤128 文件硬界 |
 | 验收反例：t03 guard 探针在真实现之前保持绿；t04 强制 reload 灾害边界探针保持绿 | t03 改写为新行为断言（guard 退役）；t04 保持绿（不得回退部分替换的回归钉） |
-| 明确未实现：多文件/含 store/含 child 工程热重载、内容级失效检测、MCP 组件 reload 工具、Vue/Vite 轨之外的 Node 热重载 | 前三项已交付；MCP 组件 reload API 与 Vue/Vite/Node HMR 保持未交付（057 承接 Vue 浏览器实证） |
+| 明确未实现：多文件/含 store/含 child 工程热重载、内容级失效检测、MCP 组件 reload 工具、Vue/Vite 轨之外的 Node 热重载 | 前三项已交付；MCP 组件 reload API 与 Node 热重载保持未交付（057 交付 Vue 浏览器实证：docs/specs/runtime/vue-app-store-live-isolation.md，e2e 入口在该文 §5）——注意 Vue/Vite **HMR** 仍非本链能力：057 实证的是冷生成双路径 + 041 store 隔离/owner 退出活体语义，与 042 §1 "本仓无 Vue/Vite HMR 证据"不冲突，HMR 缺口继续明列 |
 
 ## 7. 具名阻断与移交
 

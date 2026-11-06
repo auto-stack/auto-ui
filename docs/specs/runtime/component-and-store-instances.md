@@ -76,6 +76,12 @@
   compound 实录 rc=2）。
 - Tick/订阅（PLAN-654 InstanceTimeSource）与主题 scope（PLAN-031 ThemeScope）
   分属既有机制，不随实例分裂改键；组合验收引 plan033_b1/theme_scope 系。
+- **Vue 轨资源 owner（PLAN-057 SD-02 增量）**：store 实例 effect（SSE 连接/
+  timer/watcher）在 factory 内经 `__autoOnCtxDispose` 登记进所属 App store
+  context；context 按 owner App 记账（`own`/`releaseApp`，`app.onUnmounted`
+  钩子与显式 unmount 释放去重），**最后 owner 退出即释放全部 effect 并清
+  实例 memo**。legacy 无 context 消费保持 page-lifetime（不释放）——具名
+  边界不扩权。运行语义细目见 vue-app-store-live-isolation.md §3。
 - 042 正式出口：实例身份串、实例态对象 id、`__auto_parent`/`__auto_root`
   端口、帧登记/释放语义、`child_instance_identities()`/
   `read_instance_state`/`write_instance_state`/`on_with_input_for_instance(_type)`
@@ -89,11 +95,10 @@
   t01 控制 / t02 props+model 隔离+store 共享 / t04 keyed 重排身份 / t04 卸载
   释放+存活续作+迟到丢弃+重挂载全新。
 - Vue 厂形契约：`test_plan041_store_factory_and_context_facade`（compiler）。
-- **覆盖边界（如实）**：Vue 轨验收为生成契约级——composable 厂形/context
-  注入/legacy 回落断言 + main.ts/mount 工厂安装字符串；无挂载浏览器运行，
-  跨 App 运行时隔离由 per-createApp context 构造保证而非浏览器实证。
-  双同名 App 的挂载运行隔离验证归后继（需要 Vue e2e 轨道，plan042 研究或
-  gallery e2e 批次可消费）。
+- **覆盖边界（PLAN-057 更新，如实）**：041 交付时 Vue 轨验收为生成契约级，
+  无挂载浏览器运行——该缺口已由 PLAN-057 关闭：浏览器活体隔离与资源退出
+  为实证合同，见 docs/specs/runtime/vue-app-store-live-isolation.md（e2e
+  入口与其 §5）；本文 Vue 轨生成契约级断言继续有效。
 - 兼容面：根桥读面（`read_state`/`read_all_state`）仍 root 锚定；plan370/
   442/622/841/905-8/063/058/musk-p053-8 原义务套件全绿（oracle 更新至实例态
   读取通道，义务本体不变）。
