@@ -1190,9 +1190,16 @@ mod tests {
     fn capped_result_keeps_intrinsic_height_before_tall_library_content() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("tests/fixtures/plan068_result_layout.at");
-        let fixture = std::fs::read_to_string(path).unwrap()
-            .replace("w-full h-full p-6 gap-5", "p-6 md:p-8 gap-5 max-w-6xl mx-auto w-full")
-            .replace("text \"Next controls\"", "col {\n style: \"h-[800px] shrink-0\"\n text \"Tall library content\"\n }");
+        let fixture = std::fs::read_to_string(path)
+            .unwrap()
+            .replace(
+                "w-full h-full p-6 gap-5",
+                "p-6 md:p-8 gap-5 max-w-6xl mx-auto w-full",
+            )
+            .replace(
+                "text \"Next controls\"",
+                "col {\n style: \"h-[800px] shrink-0\"\n text \"Tall library content\"\n }",
+            );
         for result_style in [
             "p-3 rounded-lg bg-muted text-sm text-foreground max-h-32 overflow-y-auto shrink-0",
             "p-3 text-sm text-foreground max-h-32 overflow-y-auto shrink-0",
