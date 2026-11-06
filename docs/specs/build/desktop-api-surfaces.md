@@ -37,3 +37,17 @@
 下一层前释放；`else if` 链和 widget 的 inline/input/modal mint 遍历使用
 迭代且保持先序。不通过增大生产 worker 栈或增加语法深度拒绝阈值处理
 桌面扫描溢出；验收须覆盖实际主根及自动追加的外部根。
+
+## Rust 服务构建与运行边界（PLAN-956）
+
+Rust API launcher 先在 GeneratedBuildContext 的 workspace cwd/受管 flags/
+目标根内完成 Cargo build，从 Cargo JSON 取得本成员可执行文件并校验/发布。
+编译失败立即返回，保留 compiler-message rendered 诊断；不把既有二进制当新
+成功、不启动服务。构建使用既有取消与构建预算，不消耗服务的 120 秒 ready 窗口。
+随后启动发布的原生镜像，才开始 ready 检查；超时/失败仍中止 UI 初始化并回收
+拥有的子进程。启动子进程失败不能吞成 Ok(None)。
+
+运行 cwd = 应用根，与 VM 路径相同；Cargo cwd 仍是生成工作区，保留 PLAN-910
+的配置隔离。相对资源（如 Reader src/assets/engine-assets）不依赖业务专属
+环境变量补丁。服务生命周期内保留 target lease，托管与 legacy 启动均执行
+同一构建/发布纪律。

@@ -36,6 +36,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "366ffbaa4442f4684d91e2cd7c5ea7c4ed8add41959a31447066e279e432b618"
 
 [[package]]
+name = "ace-semantics-contract"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "addr2line"
 version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -694,6 +703,7 @@ name = "auto-lang-core"
 version = "0.1.0"
 dependencies = [
  "a2r-std",
+ "ace-semantics-contract",
  "ansi_term",
  "auto-ast",
  "auto-atom",

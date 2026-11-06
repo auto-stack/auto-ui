@@ -6790,7 +6790,7 @@ fn start_api_server_inner(project_dir: &Path, clear_port: bool) -> Result<Option
         }
     }
 
-    // PLAN-910: the split-mode backend cargo run gets the same managed
+    // PLAN-910/956: the split-mode backend build gets the same managed
     // context pins (target root + flags + ws cwd) as the UI build paths —
     // previously this spawn pinned neither, so its cwd decided both target
     // and rustflags.
@@ -6803,52 +6803,45 @@ fn start_api_server_inner(project_dir: &Path, clear_port: bool) -> Result<Option
     context
         .write_context_file()
         .map_err(|e| format!("context record write failed: {e}"))?;
-    let context_env = context.cargo_env();
-    // The split backend runs from the target root for as long as this
-    // process lives: hold the lease for the process lifetime.
-    match TargetLease::acquire(&context.target_root, "api-server") {
-        Ok(lease) => hold_lease_for_process(lease),
-        Err(e) => return Err(format!("target lease failed: {e}")),
+    // Keep Cargo's config discovery in the generated workspace, but finish
+    // compilation before the service's 120s readiness clock starts.
+    let port = crate::util::http_port();
+    if clear_port {
+        crate::util::kill_process_on_port(port);
     }
-    println!("  cargo run --manifest-path {}", cargo_toml.display());
-    // PLAN-815 T-05 hosted mode: the cargo api-server child is tracked
-    // (piped stdout forwarded to the host log stream with URL sniffing;
-    // cancel kills it; the registry owns it, so nothing is handed back).
-    // Legacy path: inherit stdio, child returned to the caller as before.
+    println!("  Building native API backend...");
+    let executable = build_api_executable(&context, &ws_dir, &api_backend_dir)?;
+    let lease = TargetLease::acquire(&context.target_root, "api-server")
+        .map_err(|e| format!("target lease failed: {e}"))?;
+    hold_lease_for_process(lease);
+    println!("  Running {}", executable.display());
+
+    // Runtime relative paths belong to the application (as on the VM path),
+    // not the Cargo workspace. In particular Reader serves its engine assets
+    // from src/assets/engine-assets without an application-specific env fix.
     let mut tracked: Option<std::sync::Arc<crate::proc_host::TrackedChild>> = None;
-    let api_server: Result<Option<std::process::Child>, String> =
-        if crate::proc_host::current().is_some() {
-            let mut spec = crate::proc_host::TrackedSpawn::new(
-                "cargo",
-                vec![
-                    "run".to_string(),
-                    "--manifest-path".to_string(),
-                    cargo_toml.to_string_lossy().to_string(),
-                ],
-            )
-            .with_cwd(&ws_dir);
-            for (key, value) in &context_env {
-                spec = spec.with_env(key, value);
+    let api_server: Result<Option<std::process::Child>, String> = if crate::proc_host::current()
+        .is_some()
+    {
+        let spec =
+            crate::proc_host::TrackedSpawn::new(executable.to_string_lossy().to_string(), vec![])
+                .with_cwd(project_dir);
+        match crate::proc_host::spawn_tracked(spec, "api-server") {
+            Ok(child) => {
+                tracked = Some(child);
+                Ok(None)
             }
-            tracked = crate::proc_host::spawn_tracked(spec, "api-server")
-                .map_err(|e| format!("Failed to start API server: {e}"))
-                .ok();
-            Ok(None)
-        } else {
-            let mut command = std::process::Command::new("cargo");
-            command
-                .args(["run", "--manifest-path", cargo_toml.to_str().unwrap_or(".")])
-                .current_dir(&ws_dir)
-                .stdout(std::process::Stdio::inherit())
-                .stderr(std::process::Stdio::inherit());
-            for (key, value) in &context_env {
-                command.env(key, value);
-            }
-            command
-                .spawn()
-                .map(Some)
-                .map_err(|e| format!("Failed to start API server: {e}"))
-        };
+            Err(e) => Err(format!("Failed to start API server: {e}")),
+        }
+    } else {
+        std::process::Command::new(&executable)
+            .current_dir(project_dir)
+            .stdout(std::process::Stdio::inherit())
+            .stderr(std::process::Stdio::inherit())
+            .spawn()
+            .map(Some)
+            .map_err(|e| format!("Failed to start API server: {e}"))
+    };
 
     match api_server {
         Ok(mut child) => {
@@ -7341,6 +7334,15 @@ fn cargo_managed_build(
         let Ok(value) = serde_json::from_str::<serde_json::Value>(line) else {
             return;
         };
+        if value.get("reason").and_then(|r| r.as_str()) == Some("compiler-message") {
+            if let Some(rendered) = value
+                .get("message")
+                .and_then(|m| m.get("rendered"))
+                .and_then(|r| r.as_str())
+            {
+                eprint!("{rendered}");
+            }
+        }
         if value.get("reason").and_then(|r| r.as_str()) != Some("compiler-artifact") {
             return;
         }
@@ -7422,6 +7424,45 @@ fn cargo_managed_build(
             .map_err(|e| format!("cargo wait failed: {e}"))?
     };
     Ok((status, artifact))
+}
+
+/// Build and publish the Cargo-reported, member-owned backend image. This
+/// phase has normal build cancellation/budgets and owns no service listener.
+fn build_api_executable(
+    context: &GeneratedBuildContext,
+    workspace: &Path,
+    member: &Path,
+) -> Result<PathBuf, String> {
+    let manifest = member.join("Cargo.toml");
+    let text = fs::read_to_string(&manifest).map_err(|e| format!("read backend manifest: {e}"))?;
+    let document: toml::Value = text
+        .parse()
+        .map_err(|e| format!("parse backend manifest: {e}"))?;
+    let package = document
+        .get("package")
+        .and_then(|p| p.get("name"))
+        .and_then(|p| p.as_str())
+        .ok_or_else(|| format!("backend package.name missing: {}", manifest.display()))?;
+    let (status, artifact) =
+        cargo_managed_build(context, workspace, &manifest, package, package, "api-build")
+            .map_err(|e| e.to_string())?;
+    if !status.success() {
+        return Err(format!(
+            "API backend build failed: {status}; service was not started"
+        ));
+    }
+    let executable = artifact
+        .exe
+        .ok_or_else(|| format!("Cargo reported no API executable for {package}"))?;
+    verify_publishable_image(&executable).map_err(|e| e.to_string())?;
+    publish_artifact(
+        &executable,
+        artifact.pdb.as_deref(),
+        member,
+        false,
+        &exe_file_name(package),
+    )
+    .map_err(|e| format!("publish API executable failed: {e}"))
 }
 
 /// Stop an API server child process (if running).
@@ -7994,6 +8035,41 @@ fn type_to_rust_str(ty: &auto_lang_core::ast::Type) -> String {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn native_backend_build_publishes_its_image_and_rejects_stale_success() {
+        use super::{build_api_executable, fs, GeneratedBuildContext};
+        let dir = tempfile::tempdir().unwrap();
+        let member = dir.path().join("member");
+        let app = dir.path().join("app");
+        fs::create_dir_all(member.join("src")).unwrap();
+        fs::create_dir_all(&app).unwrap();
+        fs::write(member.join("Cargo.toml"),
+            "[package]\nname=\"api-start-fixture\"\nversion=\"0.1.0\"\nedition=\"2021\"\n[workspace]\n").unwrap();
+        fs::write(member.join("src/main.rs"),
+            "fn main(){ println!(\"{}\",std::fs::read_to_string(\"app.marker\").unwrap()); }").unwrap();
+        fs::write(app.join("app.marker"), "application-root").unwrap();
+        let target = dir.path().join("target");
+        let context = GeneratedBuildContext {
+            mode: auto_api_gen::generated_build::ContextMode::Explicit {
+                root: target.clone(), owner: "PLAN-956-fixture".into(),
+            },
+            producer_root: dir.path().to_path_buf(), target_root: target,
+            context_id: "fixture956".into(), managed_rustflags: None,
+            user_flags_override: None, toolchain: "fixture".into(),
+            producer_origin: "test".into(),
+        };
+        let executable = build_api_executable(&context, &member, &member).unwrap();
+        assert!(executable.starts_with(member.join("bin")));
+        let before = fs::read(&executable).unwrap();
+        let output = std::process::Command::new(&executable).current_dir(&app).output().unwrap();
+        assert!(output.status.success());
+        assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "application-root");
+        fs::write(member.join("src/main.rs"), "compile_error!(\"backend must fail\"); fn main(){}\n").unwrap();
+        let error = build_api_executable(&context, &member, &member).unwrap_err();
+        assert!(error.contains("build failed"), "{error}");
+        assert_eq!(fs::read(&executable).unwrap(), before, "failed build must not publish or return the old image");
+    }
+
     /// T-07 子批3（F-815-T07-B2-R1-03）`external_backend` 字段消费钉：
     /// 请求在场即权威——值**或缺席**都由请求定，不回读磁盘主声明（无第
     /// 二真源）；legacy 臂（无请求）才读 pac.at `back: { project }`。
