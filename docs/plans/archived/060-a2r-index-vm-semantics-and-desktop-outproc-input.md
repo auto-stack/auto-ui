@@ -836,6 +836,6 @@ SD01新段描述既有受支持local/model/store Vec及嵌套JSON的安全coales
     - runtime7：`final-runtime-r8.log` 7 run/7 passed/2436 skipped（native_theme_carrier 全4 + host_close_then_exit_handshake_then_reclaim + reclaim_removes_win_app_surface_and_notifies + p054_back_proxy_initializes_imported_constants_and_preserves_vars）。
     - tools6：`final-tools-r8.log` 5 run/5 passed（plan053_probes 2 + desktop_backends 非 ignore 2 + theme_input 1）+ `final-tools-owned-backend-r8b.log` desktop_rust_backend_roundtrip_and_cleanup **1 run/1 passed/188.492s**（`--run-ignored all`，overlay profile r8b slow-timeout 300s×3；首轮 `final-tools-owned-backend-r8.log` 120s 超时为共享 C2 冷编译时长所致的诚实红，非产品失败，保留原日志）。desktop_backends::tests:: 完整 3 项全过。
   - **rebase 等价**：`final-rebase-range-diff-r8.log` 135 补丁全 `=`（旧 a1db3d79/2f9a8b55/9c009f70/314990bd 线 → 新 a4ea5a75/a568ed78/d1bcb2a7/25283216/cbbe4e69 线）；r8 复审第2项最新 main c5c6fe05e 净差异无生产 `crates/` 交叠。
-  - **landed**：auto-ui master `--ff-only` 至交付提交（commit hash 见主检出 git log，基 c5c6fe05e）。
+  - **landed**：auto-ui master `--ff-only` c5c6fe05e→84d5b7be79cbe96839e28ffe10efa667d7e4d374（37 files, 4760/308）。主检出阻塞项=草稿期遗留 untracked r1 旧副本（11-05 22:10），已移 plan-artifacts/plan-060/stale-main-copy-060-plan-r1.md 保全后落地。
   - **archived/cleaned**：Plan 移入 docs/plans/archived/；wt-guard clean 后移除 .wt/ui-060/auto-ui 工作树与 codex/plan-060-dev 分支；plan-artifacts/plan-060 折叠后全删（上述日志/命令已折叠入本节），registry 刷新。
   - 工具链 pin：SDK195 三件套 CLI a77cb353…/tool 454bf902…/host f9064cfe… 即本交付源码（9c009f70/cbbe4e69 线）的正式构建；父 054 T-07/T-09 按此收口。
