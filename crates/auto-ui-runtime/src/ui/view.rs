@@ -5568,9 +5568,26 @@ pub(crate) fn split_scroll_visual_classes(s: &Style) -> (Option<Style>, Style) {
         classes.push(width_cls.unwrap_or(crate::ui::style::StyleClass::Width(
             crate::ui::style::SizeValue::Full,
         )));
-        classes.push(height_cls.unwrap_or(crate::ui::style::StyleClass::Height(
-            crate::ui::style::SizeValue::Full,
-        )));
+        // A capped scroll viewport already uses intrinsic height in
+        // build_scrollable. Mirroring Fill here makes the paint wrapper a
+        // flex item: later fixed siblings can consume all of its allocation,
+        // hiding even a short result before those siblings. Keep the wrapper
+        // on the same Shrink contract; uncapped panes still stretch as before.
+        // The final effective cap wins: scan classes in reverse so a later
+        // max-height override decides, matching build_scrollable's sizing.
+        let capped = s.classes.iter().rev()
+            .find_map(|c| match c {
+                crate::ui::style::StyleClass::MaxHeight(px) => Some(*px > 0.0),
+                _ => None,
+            })
+            .unwrap_or(false);
+        classes.push(if capped {
+            crate::ui::style::StyleClass::Height(crate::ui::style::SizeValue::Auto)
+        } else {
+            height_cls.unwrap_or(crate::ui::style::StyleClass::Height(
+                crate::ui::style::SizeValue::Full,
+            ))
+        });
         Style {
             classes,
             hover_classes: Vec::new(),

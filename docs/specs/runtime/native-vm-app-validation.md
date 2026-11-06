@@ -87,6 +87,14 @@ evidence under that binary; rebuild and replay affected consumer behavior
 before closing the fix. Deliver the consumer's usable pins and required
 artifacts before removing a prerequisite plan's temporary scope.
 
+For a max-height-capped overflow column, its background/border viewport wrapper
+must preserve the scrollable's intrinsic-height contract. A later tall sibling
+must not turn an earlier short result into a zero-height flex allocation.
+Uncapped panes retain their stretching behavior. The permanent PLAN-068 layout
+controls cover short and overflowing siblings, paint/no-paint wrappers,
+explicit `h-full`, and captured/ordinary views; those measured controls still
+require a real consumer replay before an application result-display gap closes.
+
 ## 原生多文件选择（PLAN-988）
 
 公开 `dialog_open_files(filter)` 由 VM native/provider 与生成 Rust

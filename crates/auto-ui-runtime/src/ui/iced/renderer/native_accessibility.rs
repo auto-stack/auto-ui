@@ -1187,6 +1187,40 @@ mod tests {
         }
     }
     #[test]
+    fn capped_result_keeps_intrinsic_height_before_tall_library_content() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/plan068_result_layout.at");
+        let fixture = std::fs::read_to_string(path).unwrap()
+            .replace("w-full h-full p-6 gap-5", "p-6 md:p-8 gap-5 max-w-6xl mx-auto w-full")
+            .replace("text \"Next controls\"", "col {\n style: \"h-[800px] shrink-0\"\n text \"Tall library content\"\n }");
+        for result_style in [
+            "p-3 rounded-lg bg-muted text-sm text-foreground max-h-32 overflow-y-auto shrink-0",
+            "p-3 text-sm text-foreground max-h-32 overflow-y-auto shrink-0",
+            "h-full p-3 rounded-lg bg-muted text-sm text-foreground max-h-32 overflow-y-auto shrink-0",
+        ] {
+        for capture in [false, true] {
+        let source = fixture.replace(
+            "p-3 rounded-lg bg-muted text-sm text-foreground max-h-32 overflow-y-auto shrink-0", result_style);
+        let mut component = crate::build_dynamic_component(&source, None).unwrap();
+        let window = iced::window::Id::unique();
+        render_with_capture(window, &mut component, &HashMap::new(), capture);
+        let node = *shared(window).lock().unwrap().nodes.iter()
+            .find(|(_, entry)| entry.node.label() == Some("Fill result")).unwrap().0;
+        apply(window, &mut component, node, Requested::Click);
+        render_with_capture(window, &mut component, &HashMap::new(), capture);
+        let state = shared(window);
+        let state = state.lock().unwrap();
+        let result = state.nodes.values()
+            .find(|entry| entry.node.value() == Some(RESULT_LAYOUT_TEXT))
+            .expect("result text remains in the production tree");
+        assert!(result.bounds.is_some_and(|bounds| bounds.width >= 100.0 && bounds.height >= 40.0),
+            "a capped result must keep visible intrinsic height before overflowing siblings, {result_style}, capture={capture}: {:?}", result.bounds);
+        drop(state);
+        remove(window);
+        }
+        }
+    }
+    #[test]
     fn capped_child_result_remains_measurable_through_mcp_session_projection() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("tests/fixtures/plan068_result_layout.at");
