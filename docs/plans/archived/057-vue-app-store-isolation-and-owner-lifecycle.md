@@ -147,6 +147,8 @@ T-01..T-07 全部完成（2026-11-06，r1 交付，completion_kind: delivered）
 - 交接：041 §5 覆盖边界已更新（浏览器缺口关闭指针）；056 SD-03 义务已对账（reload-readiness §6：Vue 浏览器实证已交付、HMR 缺口保持明列）；O-01（存活侧重连 no-op，041 引入）留 §10 供后继计划裁量
 - next: done
 
+2026-11-06 / stage:goal / plan_id: PLAN-057 / plan_revision: r1 / round: 3 / from: merge / to: done / status: archived / outcome: pass / worktree: （已删）/ commit: 28fe202ad8e2e0f0c73970874b8edd024cf33747（delivery，master）+ 1e951d70（archive commit）/ canonical: vue-app-store-live-isolation@8ea163ad, component-and-store-instances@01e7378c, reload-readiness@a3d462c1 / archive: docs/plans/archived/057-vue-app-store-isolation-and-owner-lifecycle.md / cleanup: 工作树+分支+依赖兄弟树+组目录+plan-artifacts scope 全删，registry 已刷新，无具名 hold / done
+
 ## 10. 待澄清事项
 
 - 当前无需用户补充材料即可立约；T-01冻结内部机制、准确入口与实际来源。若改变公开语义、承诺支持或仓责任，给具体修订再进行受影响实施。
