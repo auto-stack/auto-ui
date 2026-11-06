@@ -448,7 +448,7 @@ fn lower_text(
     ops: &mut Vec<DrawOp>,
     observations: &mut Vec<String>,
 ) {
-    let translation = transformation.translation();
+    let translation = (transformation * text_local_transformation(text)).translation();
     match text {
         GfxText::Paragraph {
             paragraph,
@@ -1404,25 +1404,39 @@ fn lower_quad_v2(
 /// v2 文本：项级非恒等变换 → Transform 包络（scale+translate 近似——
 /// iced Transformation 未公开矩阵元，旋转/剪切不可达，观测留痕）；run
 /// 几何在变换局部坐标直落。
+fn text_local_transformation(text: &GfxText) -> iced::Transformation {
+    match text {
+        GfxText::Paragraph { transformation, .. }
+        | GfxText::Editor { transformation, .. }
+        | GfxText::Raw { transformation, .. } => *transformation,
+        GfxText::Cached { .. } => iced::Transformation::IDENTITY,
+    }
+}
+
 fn lower_text_v2(
     texts: &[GfxText],
     transformation: iced::Transformation,
     ops: &mut Vec<DisplayOp>,
     observations: &mut Vec<String>,
 ) {
-    let wrapped = transformation != iced::Transformation::IDENTITY;
-    if wrapped {
-        let translation = transformation.translation();
-        let scale = transformation.scale_factor();
-        ops.push(DisplayOp::Transform {
-            matrix: [scale, 0.0, 0.0, scale, translation.x, translation.y],
-        });
-        if (scale - 1.0).abs() > f32::EPSILON {
-            observations
-                .push("transform scale 近似（旋转/剪切矩阵元 iced 未公开——P683-D2）".to_string());
-        }
-    }
     for text in texts {
+        // Live paragraphs/editors carry their own transform; Item::Live reports
+        // identity. Cached groups additionally carry a parent transform. Compose
+        // both once, otherwise scrolling culls correctly but emits unscrolled text.
+        let transformation = transformation * text_local_transformation(text);
+        let wrapped = transformation != iced::Transformation::IDENTITY;
+        if wrapped {
+            let translation = transformation.translation();
+            let scale = transformation.scale_factor();
+            ops.push(DisplayOp::Transform {
+                matrix: [scale, 0.0, 0.0, scale, translation.x, translation.y],
+            });
+            if (scale - 1.0).abs() > f32::EPSILON {
+                observations.push(
+                    "transform scale 近似（旋转/剪切矩阵元 iced 未公开——P683-D2）".to_string(),
+                );
+            }
+        }
         match text {
             GfxText::Paragraph {
                 paragraph,
@@ -1513,9 +1527,9 @@ fn lower_text_v2(
                     .push("raw text buffer 省略（编辑器组合态——T-02 IME 面承接）".to_string());
             }
         }
-    }
-    if wrapped {
-        ops.push(DisplayOp::TransformPop);
+        if wrapped {
+            ops.push(DisplayOp::TransformPop);
+        }
     }
 }
 
@@ -1625,6 +1639,117 @@ mod tests {
             assert_eq!(runs.iter().map(|(_, text)| text.as_str()).collect::<String>(), content.replace('\n', ""),
                 "visual runs must partition source rather than repeat the entire logical line");
         }
+    }
+
+    #[test]
+    fn p060_native_scroll_reaches_bottom_and_replays_coordinates() {
+        use crate::ui::View;
+        #[derive(Debug)]
+        struct ScrollPage(bool);
+        impl Component for ScrollPage {
+            type Msg = ();
+            fn on(&mut self, _: ()) {
+                self.0 = true;
+            }
+            fn view(&self) -> View<()> {
+                View::scrollable(
+                    View::col()
+                        .children(
+                            (0..40)
+                                .map(|index| View::text(format!("ROW{index}")))
+                                .collect::<Vec<_>>(),
+                        )
+                        .child(View::button("BOTTOM").on_click(|_| ()).build())
+                        .build(),
+                )
+                .style("h-full w-full")
+                .build()
+            }
+        }
+        fn bottom(list: &DisplayList) -> Option<(f32, f32)> {
+            let mut stack = vec![(0.0, 0.0)];
+            for op in &list.ops {
+                match op {
+                    DisplayOp::Transform { matrix } => {
+                        let (x, y) = *stack.last().unwrap();
+                        stack.push((x + matrix[4], y + matrix[5]));
+                    }
+                    DisplayOp::TransformPop => {
+                        stack.pop();
+                    }
+                    DisplayOp::TextStyled { x, y, text, .. } if text == "BOTTOM" => {
+                        let (tx, ty) = *stack.last().unwrap();
+                        return Some((x + tx, y + ty));
+                    }
+                    _ => {}
+                }
+            }
+            None
+        }
+        let mut surface = HeadlessSurface::new(ScrollPage(false), 240.0, 160.0);
+        surface.render_frame_v2();
+        surface.point_at(Some(iced::Point::new(100.0, 80.0)));
+        surface.update(&[iced::Event::Mouse(iced::mouse::Event::WheelScrolled {
+            delta: iced::mouse::ScrollDelta::Pixels {
+                x: 0.0,
+                y: -10000.0,
+            },
+        })]);
+        let scrolled = surface.render_frame_v2();
+        let (x, y) = bottom(&scrolled).expect("bottom text in scrolled frame");
+        assert!(
+            (0.0..160.0).contains(&y),
+            "native bottom outside viewport: {x},{y}; {:?}",
+            scrolled.ops
+        );
+        let legacy = surface.render_frame();
+        let legacy_bottom = legacy
+            .ops
+            .iter()
+            .find_map(|op| match op {
+                DrawOp::TextStyled { x, y, text, .. } if text == "BOTTOM" => Some((*x, *y)),
+                _ => None,
+            })
+            .expect("legacy scrolled text");
+        assert!((legacy_bottom.0 - x).abs() < 0.1 && (legacy_bottom.1 - y).abs() < 0.1);
+
+        // Replay the actual wire list through the same canvas painter used by
+        // the host, then record it again to catch coordinate loss at that seam.
+        use iced::advanced::graphics::geometry::Renderer as _;
+        let mut renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            crate::ui::iced::renderer::INTER_FONT,
+            iced::Pixels(16.0),
+        ));
+        let mut frame = iced::widget::canvas::Frame::new(&renderer, iced::Size::new(240.0, 160.0));
+        crate::ui::iced::broker_surface::paint_ops_v2(&mut frame, &scrolled.ops);
+        iced::advanced::Renderer::start_transformation(
+            &mut renderer,
+            iced::Transformation::translate(5.0, 7.0),
+        );
+        renderer.draw_geometry(frame.into_geometry());
+        iced::advanced::Renderer::end_transformation(&mut renderer);
+        let layers = match &mut renderer {
+            iced::Renderer::Secondary(tiny) => tiny.layers(),
+            _ => unreachable!(),
+        };
+        let replayed = lower_layers_v2(layers, &mut Vec::new(), &mut Vec::new(), &mut 0);
+        let replay = bottom(&replayed).expect("bottom text survives host replay");
+        assert!(
+            (replay.0 - x - 5.0).abs() < 0.1 && (replay.1 - y - 7.0).abs() < 0.1,
+            "host replay lost/doubled parent transform: {:?} -> {replay:?}",
+            (x, y)
+        );
+        surface.point_at(Some(iced::Point::new(x + 2.0, y + 8.0)));
+        surface.update(&[
+            iced::Event::Mouse(iced::mouse::Event::ButtonPressed(iced::mouse::Button::Left)),
+            iced::Event::Mouse(iced::mouse::Event::ButtonReleased(
+                iced::mouse::Button::Left,
+            )),
+        ]);
+        assert!(
+            surface.component.0,
+            "bottom button cannot be clicked after scroll"
+        );
     }
 
     #[test]

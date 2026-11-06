@@ -4,16 +4,16 @@ status: executing
 feature_name: a2r 数组索引 VM 语义与 iced 桌面 outproc 输入/验收投递
 author: [Codex]
 created_at: 2026-11-05
-updated_at: 2026-11-05
-plan_revision: 1
+updated_at: 2026-11-06
+plan_revision: 2
 current_step: 2
 total_steps: 6
 base_branch: master
 base_commit: 220115df
 depends_on: []
-supersedes_spec_components: []
-new_spec_components: []
-touched_goals: []
+supersedes_spec_components: [docs/specs/runtime/component-and-store-instances.md]
+new_spec_components: [docs/specs/runtime/desktop-acceptance-input.md, docs/specs/runtime/native-codegen-semantics.md, docs/specs/runtime/native-command-frame-text.md]
+touched_goals: [auto-os/PLAN-054]
 affects: [a2r-codegen, ui-iced-runtime, mcp-acceptance, auto-os/PLAN-054]
 ---
 
@@ -67,16 +67,21 @@ app。消费方 auto-os/PLAN-054 T-04 在交付后恢复 8 app 真实任务验�
   - 无法判型时保守发射 shim（T 由类型推断，编译期报错即回退该文件既有形态）。
   shim 在 `wrap_example` 文件级注入一次（与 `__at_*` 家族同址）。
 - **输入/验收投递**：`crates/auto-ui-runtime/src/ui/session.rs` 增加
-  `DesktopInject::Pointer { phase, x, y, button }`（down/up/move），
+  `DesktopInject::Pointer { phase, x, y, button }`（click/down/up），
   `apply_desktop_injects` 走 `broker_pointer_down/up`（已有生产路径）；
   `mcp_server.rs` 的 `autoui_desktop` 增加 `action:"pointer"`（x/y/button/
-  phase=click|down|up|move）。键盘沿用 `route_live_input`（已有），但需在
-  指针聚焦输入后验证；handler 对 outproc：在 broker 协议加
-  `ProtocolMsg::Control(ControlMsg::HandlerCall { widget, handler, arg })`
-  并在 rqhost 客户端循环分派（若 app 侧不支持则降级为「指针+键盘」可达，
-  记录边界）。
+  phase=click|down|up）。键盘沿用 `route_live_input`；坐标输入更新hover
+  位置以供后续滚轮命中。outproc根消息通过既有`InputMsg::Action`（tag11）
+  和Hello `input-action/1`能力协商派发，不新增ControlMsg::HandlerCall。
 - 桌面侧 `DesktopInject::Handler` 对 outproc 分支改为「找到 owning client →
-  发 HandlerCall」；inproc 分支保持现行为。
+  发Action」；不支持/发送失败不执行本地占位组件。inproc保留旧字符串参数，
+  并增加经正常事件循环派发的受验证标量args（VM既有i32/f32 ABI）。
+
+r2（同一用户授权）：保持G1..G3、AC-01..06及八app目标，按实际实现校正
+最初协议草图，并收拢054消费中发现的同链缺口：生成后端真实链接/类型边界、
+路由Init的store回写与活动页单定时器、关闭实例的验收快照所有权、原生文字
+自身变换的帧投影。均为既有能力正确传播，不新增router/多定时器调度/语言
+语义或任意原生子件RPC。app业务源码修复由独立owner计划承担（如Blog007）。
 
 ## 3. 技术栈
 
@@ -85,6 +90,12 @@ iced 桌面会话/协议、MCP acceptance 工具。测试：`cargo nextest`（au
 固定组）+ 生成物编译 + iced 桌面实机驱动（os-054 候选）。
 
 ## 4. 需求分析与背景调查
+
+r2授权沿用2026-11-06用户「想办法解决这些问题，并最终完成计划054」及恢复
+Goal的明确指令；仍在auto-ui生成器/运行时/验收工具范围内修复既有链路。
+Windows电脑控制被用户Esc停止后不自动激活，实际输入验收通过本产品已有MCP
+通道；资源清理按已授权自有构建/测试进程处理。不得自动创建代理或新聊天，
+AC-05独立复审要求保留，当前实现上下文检查不能冒充终局独立复审。
 
 **授权（2026-11-05，用户直接指令）**：在 auto-ui 立项并交付上述两处修复，
 允许修改 auto-ui 生成器/运行时/验收工具，允许在 os-054 候选树重建并实测；
@@ -124,19 +135,25 @@ fn __at_idx<T: Clone + Default>(v: &[T], i: i64) -> T {
 
 - `DesktopInject::Pointer { phase: PointerPhase, x: f32, y: f32, button: MouseButton }`
   - `down` → `broker_pointer_down`；`up` → `broker_pointer_up`；`click` = down+up；
-    `move` → hover（broker_scroll 已有 last_cursor；新增 move 仅更新并可选 hover）。
+    坐标更新last_cursor；不承诺独立move动词。
 - MCP `autoui_desktop action:"pointer"` 参数：`x,y`（窗口逻辑坐标）、
-  `button`（left/right）、`phase`（click/down/up/move）。AUTOUI_ACCEPTANCE 门不变。
-- handler 对 outproc：`ProtocolMsg::Control(ControlMsg::HandlerCall { widget: Option<String>, handler: String, arg: Option<String> })`；
-  rqhost 客户端（auto-ui-runtime 客户端循环）收到后调用 `call_handler_for`
-  或 `call_handler`，置 view_dirty。桌面侧按 owning client 投递；inproc 不变。
+  `button`（left/right）、`phase`（click/down/up）。AUTOUI_ACCEPTANCE门不变。
+- outproc：Hello能力门通过后发`InputMsg::Action { wid, name, arg }`，child
+  `Component::dispatch_named`进入真实事件循环；零参数/单字符串与root App
+  为已实现边界。inproc标量args不扩展这个wire边界。
+- 路由页Init经根子消息包装臂回写canonical store。根无自身timer时只转发
+  当前页既有单timer（原本地优先/首timer边界不变）。
+- 原生帧文字先组合item父变换与Paragraph/Editor自身变换，再发v1坐标或
+  v2 Transform；正确滚动/点击通过完整producer→host replay验证。
 
 ### 5.3 规范增量
 
 | delta_id | add/modify/retire | docs/specs/... target | before/after rule | rationale | acceptance IDs |
 |---|---|---|---|---|---|
-| SD-01 | modify | docs/specs/ui/runtime-and-renderer.md（a2r/native 语义节） | 补「数组索引越界/负索引 = 缺省值，不 panic」 | 与 VM 宽松语义对齐 | AC-01/AC-04 |
+| SD-01 | add | docs/specs/runtime/native-codegen-semantics.md | 原占位路径不存在；记录受支持数组的安全读取及实际native生成边界 | 与VM既有语义对齐 | AC-01/AC-04 |
 | SD-02 | new | docs/specs/runtime/desktop-acceptance-input.md | pointer/keyboard、根组件 Action、旧客户端能力门、关闭重开契约（替代原先不存在的路径） | iced 桌面可驱动原生 app | AC-02/AC-03 |
+| SD-03 | add | docs/specs/runtime/native-command-frame-text.md | 文字自身/父项变换组合一次，v1/v2滚动几何一致 | 投递后的真实画面正确 | AC-02/AC-04 |
+| SD-04 | modify | docs/specs/runtime/component-and-store-instances.md | 编译原生路由Init回写/活动页单timer传播 | 同组件事件与store所有权 | AC-02/AC-04 |
 
 （落点文件以仓库现有 Spec 为准，work 时按实际路径修订；若该节不存在则在本
 文件对应 Spec 新增小节。）
@@ -147,7 +164,7 @@ fn __at_idx<T: Clone + Default>(v: &[T], i: i64) -> T {
   `Vec<Value>` 走既有 at_owned；快照型断言与现有 generator 测试同址。
 - 单测（session.rs）：`DesktopInject::Pointer` 经 `apply_desktop_injects` 调用
   broker_pointer_*（mock client 记录 InputMsg）；handler outproc 分支发
-  HandlerCall。
+  协商后的Action，并验证旧客户端不发送、失败不落占位组件。
 - 端到端（os-054 候选，只读消费）：
   - calendar.exe 启动不 panic、窗口可用、渲染月视图；
   - iced 桌面 pointer 点击 notes「New note」→ 编辑器出现；chars 输入标题；
@@ -465,3 +482,12 @@ back 侧 `auto-notes-...-back` 是完整 axum/DB 实现。故 iced 桌面上任�
   Consumerdfa61f39 official tool exit0/40.02s immutable tools/auto-ui-tool-v9-surface-r146.exe SHA2023faf889cf33c44c588938bd4cb77f1411e3d4c097240059dcba0c74f85e33; host exit0/30.62s,39560/SHAe96eb4e74c7a7edc90bb05a784db8d6625a9f193be31c6a98fa0072e5abe1344 owns9247. Blog007 clone native5e54d648... under explicit extra ID blog007-author adopted1280x800/capsinput-action; initial existing3draft list is now visible immediately, genuine pointer opens persisted Chinese body: route Init writeback consumed. No preview/whole Blog pass yet.
   Charts actual VM native task (stable ID024-charts), no sample injection: Chinese CSV path import→typed SetIndexCol[0]/ToggleValueCol[1]→three decimal bars→Save/Export→closewid2. Name snapshot unavailable after close (new retirement code); reopen publishes9:auto-charts vs old8, OpenProject restores mapping/embedded rows, NameChanged/DoSave creates next project. With own CSV temporarily renamed, project export succeeds; source restored byte-equal. Independent SVG threebars/zero-baseline/ratios and diskproject values[10.5,23.75,8.125] match actual chart. Final oracle native-charts-final-oracle-r146.json SHAc804d5476a1ac097f077d284508c90f51efa99625ad613f99967cb4e9137f739; screenshots native-charts-mapped-r146.png SHA7e7c18ea2d84e93bfac349747250655ddcad736a3c35657cc16970b269d56ebe and native-charts-reopen-next-r146.png SHA3deb1fa803c4fde6ec90b5d9022d784ad3a1a7b2e56287c51540226c8857f248. Native Blog remained alive through Charts close; not a full054 mixed/failure gate.
   Blog scroll probe exposed exact acceptance-input gap: broker_pointer_down/up carry explicit coordinates but never update WmState.last_cursor, while route_live_input(Wheel) uses that cursor for hit-test. Real named-pipe regression moved prior cursor outside target, injected click, then asserted hover and subsequent Scroll ownership; red actual cursor700,100 vs100,100 (pointer-hover-red-r146.log). Fix records coordinate-bearing pointer position before hit-test; existing OS path idempotent, no new wire/action. Clarified MCP dy description to existing raw iced positive-up/negative-down convention (no sign reversal in hardware path). Final p060_12passed/0ignored/.27s (pointer-hover-green-r146.log), includes actual pointer/scroll pipe and all11prior cases. Host live replay of this last fix still pending. No final060/054 delivery claimed.
+
+- stage: new | plan_id: auto-ui/PLAN-060 | plan_revision: 2 | outcome: pass | next: work/T-04
+  Consolidates the actual same-goal repairs and replaces the original unimplemented move/ControlMsg::HandlerCall sketch with delivered click/down/up and negotiated InputMsg::Action. G1..G3, AC-01..06, eight-app scope, independent final review and no automatic new-context constraint retained. Canonical SD paths corrected: original ui/runtime-and-renderer.md does not exist; native-codegen-semantics.md and native-command-frame-text.md now document real supported boundaries, with existing desktop input/component ownership Specs. No new app business feature, router/timer scheduler or wire extension authorized by this revision.
+
+- stage: work | plan_id: auto-ui/PLAN-060 | plan_revision: 2 | round: 51 | outcome: live wheel targeting consumed; native text-local transform loss repaired in both frame formats
+  Consumer7c986e8a host rebuild from OS cwd exit0/17.24s, new28824/SHA05a521fa83413e03ed952cd6502f6a66068d64812c83150a4229c608ce2d34a9. Initial mistaken build from UI cwd exited101 package-not-found (host-hover-r147-build.log), corrected command host-hover-r147b-build.log; no source regression. Actual pointer+negative raw wheel now reaches Blog root ScrollArea, but text remained at unscrolled coordinates while culling advanced. Whole Blog preview remains unpassed.
+  Exact root cause confirmed against installed iced_tiny_skia0.14.1 Layer::draw_paragraph and iced_graphics0.14 Text: Paragraph/Editor owns its transformation, while Item::Live.transformation returns identity. Existing lowering read only the item/group transform. New actual native ScrollPage red: bottom label y836.9997 outside160px viewport despite scroll state at bottom (native-scroll-seam-r147c.log). Earlier r147/r147b logs are test fixture compile corrections, not product behavior red.
+  Compose item parent × text-local transform once. v1 translation and v2 per-text Transform envelope both corrected; existing cached-text handling retained. Regression checks native scroll bottom location, v1/v2 equality, host canvas replay with additional parent translation5,7 (detects lost/doubled transforms), and actual bottom-button click. Final p060_13passed/0ignored/.27s in native-scroll-final-r147.log; includes all prior input/capability/closed-surface/typed-args/softwrap controls. Only the changed function/test snippets formatted, unrelated file formatting retained. No change to rotation/shear/raw/mesh support. Live rebuilt Blog child still pending; SDK runtime change is checked by Cargo, no front-layout version bump because emitted source layout unchanged.
+  Blog007 Vue official production build also exit0/14.78s; official auto run --server rust -F3412 -B17829 active session45314 now Vite ready, isolated blog007-web-r147 data. Owner Vue live/375px and native scroll/preview/reopen still pending. Native Paint/Charts task evidence retained; parent054 full gates/review/landing not complete.
