@@ -1,0 +1,38 @@
+// p057_store.at — PLAN-057 shared store: watcher + timer + SSE effects so the
+// browser e2e can observe per-App instance isolation AND owner-side resource
+// exit (unmount A → A's effects stop; last shared owner → bounded release).
+// SSE mock endpoint 127.0.0.1:39579 is a frozen loopback port started by the
+// e2e harness (plan §6: 测试服务仅loopback、独立可用端口).
+store P057Store {
+    msg {
+        Write11,
+        Inc,
+        OnTick,
+    }
+
+    model {
+        var total int = 22
+        var tick_count int = 0
+        var sse_count int = 0
+        var watcher_fires int = 0
+        var last_event str = "none"
+    }
+
+    timer {
+        OnTick (every_ms: 150)
+    }
+
+    watch {
+        .total -> { .watcher_fires = .watcher_fires + 1 }
+    }
+
+    on {
+        .Write11 -> { .total = 11 }
+        .Inc -> { .total = .total + 1 }
+        .OnTick -> { .tick_count = .tick_count + 1 }
+        stream sse("http://127.0.0.1:39579/events") -> {
+            .sse_count = .sse_count + 1
+            .last_event = .ev.kind
+        }
+    }
+}

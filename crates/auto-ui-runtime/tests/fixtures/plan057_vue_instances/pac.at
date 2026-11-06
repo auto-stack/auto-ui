@@ -1,0 +1,13 @@
+// pac.at — PLAN-057 bounded Vue dual-App store isolation & owner-lifecycle
+// fixture: one generated App (P057App + two P057Reader child consumers), one
+// store carrying watcher/timer/SSE effects. Permanent regression input
+// (plan §5); consumed by the real-browser e2e
+// (crates/auto-ui-tools/tests/plan057_vue_instances.rs).
+name: "t-plan057-instances"
+version: "0.1.0"
+scene: "ui"
+render: "vue"
+api: "rust"
+title: "PLAN057 Vue Instances"
+title_zh: "PLAN057 Vue实例隔离"
+theme: "dark"

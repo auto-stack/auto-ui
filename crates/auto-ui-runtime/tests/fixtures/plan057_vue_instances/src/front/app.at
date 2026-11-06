@@ -1,0 +1,41 @@
+// app.at — PLAN-057 app: P057App renders two direct store views plus two
+// P057Reader child consumers (the per-App "two consumers share one instance"
+// oracle), stat lines for timer/SSE/watcher effects, and mutation buttons.
+// First widget in the file becomes the generated App.vue root.
+use p057_store: P057Store
+
+widget P057App {
+    msg {
+        Write11,
+        Inc,
+    }
+
+    view {
+        col {
+            style: "p-4 gap-1"
+            text f"v1:${.store.total}"
+            text f"v2:${.store.total}"
+            P057Reader { }
+            P057Reader { }
+            text f"ticks:${.store.tick_count}"
+            text f"sse:${.store.sse_count}"
+            text f"watch:${.store.watcher_fires}"
+            text f"last:${.store.last_event}"
+            button "w11" { onclick: .Write11 }
+            button "inc" { onclick: .Inc }
+        }
+    }
+
+    on {
+        .Write11 -> { store.Write11() }
+        .Inc -> { store.Inc() }
+    }
+}
+
+widget P057Reader {
+    view {
+        col {
+            text f"r:${.store.total}"
+        }
+    }
+}
