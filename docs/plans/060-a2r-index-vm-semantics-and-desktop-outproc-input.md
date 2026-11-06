@@ -1,12 +1,12 @@
 ---
 plan_id: auto-ui/PLAN-060
-status: executing
+status: execution_done
 feature_name: a2r 数组索引 VM 语义与 iced 桌面 outproc 输入/验收投递
 author: [Codex]
 created_at: 2026-11-05
 updated_at: 2026-11-06
 plan_revision: 6
-current_step: 4
+current_step: 5
 total_steps: 6
 base_branch: master
 base_commit: 220115df
@@ -226,7 +226,7 @@ OS054真实Chat第六条消息已落库但气泡被裁切，滚轮不改变位�
   panic 消失。
 - [x] T-02（work）：`DesktopInject::Pointer` + MCP `action:"pointer"`；notes 点击实测。
 - [x] T-03（work）：outproc handler 协议投递（或降级边界）+ 键盘聚焦实测。
-- [ ] T-04（work）：六 app 回归/桌面实测/证据，提交 execution_done。round67 因完整 Vue 注册表消费发现 sibling-store 导入位置错误重开；既有六原生证据不变边界复用。
+- [x] T-04（work）：六 app 回归/桌面实测/证据，提交 execution_done。round67 sibling-store 导入修复于 round68 完成正式完整 Vue 消费验证；原生生成/runtime 不变边界复用。
 - [ ] T-05（review/merge）：独立复审、归档、工具链 pin 落地。
 
 ## 9. 复审记录
@@ -593,3 +593,7 @@ back 侧 `auto-notes-...-back` 是完整 axum/DB 实现。故 iced 桌面上任�
 - stage: work | plan_id: PLAN-060 | plan_revision: r6 | round: 67 | outcome: Vue sibling import generation repaired; real public consumer pending | next: work/T04
   Parent054 canonical full-registry Vue public entry on UI72bb exposes esbuild Unexpected brace in os-config DesktopCfg/Modules stores. Generator emits static reactive import after createStore function opening. Reopened T04 and status executing4/6; no acceptance or app scope change. Move only reactive import to module declarations, retain sibling reactive instances inside per-App factory. Native generator/runtime source untouched; prior iced common six-consumer evidence remains applicable within this boundary.
   Permanent p060_vue_sibling_imports_remain_at_module_scope exercises zero/one/two siblings through actual store generator, checks every import before factory and every sibling instance after it. Actual old code red1, fixed1pass/0ignored; prior factory/context/watch control1pass/0ignored. cargo test --locked -p auto-ui-compiler --lib scoped filters, logs plan-060/vue-{sibling-red,sibling-final,factory-final}-r67.log. Shared c2e02416 target reused so cleaned UI060 target remains absent. Initial test placement accidentally landed in existing raw Auto fixture and selected0tests; corrected before red replay, zero run not counted. Real canonical Vue generation/load still pending; no execution_done or independent review pass claimed.
+
+- stage: work | plan_id: PLAN-060 | plan_revision: r6 | round: 68 | outcome: pass (execution_done5/6; independent review pending) | code_commit: d2a9ba65668a12a2cb08fc14a12349b4670a1ccf | next: independent final review on same writer
+  Read-only consumer detached d2a9ba65; formal immutable CLI build0/37.84s SHA4925596a5cdc5e626b7ac785b9958ee2745106bf32834f18c4376beda9a70bcc and tool0/33.63s SHA8f7ed783b9a889d282d2c3f8cdc54093746589f520adb20348438911aad358ec. Parent frozen-sdk-r164 retains byte-identical accepted iced host; source diff72bb to d2 affects only Vue store import location/test/Plan. Actual public desktop.ps1 -Track vue -CandidateDir frozen-sdk-r164 regenerates whole registry (no eight-app subset), both os-config generated imports now module-level. Canonical Vue npm run build exit0, 4185modules/13.19s, raw plan-054/t04/canonical-vue-production-build-r164.log. No esbuild parse failures. Actual headless browser public Auto Desktop entry loads with pageerror0, Notes/Todo/Calendar/Database/Paint real launcher user tasks and normal window close/reopen/next operations pass with independent disk/localStorage/SQLite and inspected frames. Initial Vite dependency optimization reload interrupted first launch probe; excluded and rerun after settled reload. Both consumer OS/Lang wt-guard clean after generation/npm. No OS activation.
+  Current six-native iced tasks from round65 remain unchanged source/output/runtime evidence; scoped Vue regression checks round67 plus full generated Vue build cover new finding, not a repeat of unrelated native/GC suites. Parent still executing4/10 with remaining Vue tasks, mixed/failures/permanent gates and final reviews. T05 independent review/frozen affected module union/archive/landing outstanding; source now frozen again on this writer. User compilation cleanup remains complete: no recreated UI060 target (tests reused explicit shared target).
