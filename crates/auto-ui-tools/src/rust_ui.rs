@@ -3147,7 +3147,28 @@ fn generate_merged_api_client(
         }
     }
 
-    code
+    adapt_merged_string_index(&code)
+}
+
+#[path = "merged_string_index.rs"]
+mod merged_string_index;
+
+fn adapt_merged_string_index(code: &str) -> String {
+    const CALL: &str = "auto_lang_core::a2r_std::str_find_from(";
+    let mask = auto_api_gen::api_gen::code_region_mask_text(code);
+    let mut out = String::with_capacity(code.len());
+    let mut cursor = 0;
+    for (offset, _) in code.match_indices(CALL) {
+        if mask[offset..offset + CALL.len()].iter().all(|is_code| *is_code) {
+            out.push_str(&code[cursor..offset]);
+            out.push_str("crate::__merged_str_find_from(");
+            cursor = offset + CALL.len();
+        }
+    }
+    if cursor == 0 { return code.to_string(); }
+    out.push_str(&code[cursor..]);
+    out.push_str(include_str!("merged_string_index.rs"));
+    out
 }
 
 /// Plan 349 step 2 / Plan 388 W2/W3: Generate multipart upload + download
@@ -7580,7 +7601,7 @@ pub(crate) fn resolve_managed_front(project_dir: &Path) -> AutoResult<ManagedFro
 /// generator changes without a bump are a recorded boundary.
 // PLAN-060: invalidate unchanged inputs after fixing text click/style emission,
 // in addition to the earlier table-row and named-input corrections.
-const FRONT_LAYOUT_VERSION: &str = "front-layout/v6";
+const FRONT_LAYOUT_VERSION: &str = "front-layout/v7";
 
 fn front_generator_identity(context: &GeneratedBuildContext) -> String {
     format!(
@@ -9742,6 +9763,26 @@ pub fn create_work(title str) Work {
         assert!(code.contains("pub mod api_impl"), "typed endpoint bodies must remain real implementations: {code}");
         assert!(code.contains("__db2ui_Work(api_impl::create_work("), "endpoint must delegate to the real body: {code}");
         assert!(!code.contains("Work::default()"), "declared return types cannot hide failed backend absorption");
+    }
+
+    #[test]
+    fn p060_merged_find_from_preserves_character_offsets_without_narrowing() {
+        use super::merged_string_index::__merged_str_find_from as find;
+        for text in ["abcabc", "中文路径中文", ""] {
+            for needle in ["a", "文", "", "missing"] {
+                for start in [-2, 0, 1, 4, 100] {
+                    assert_eq!(find(text, needle, i64::from(start)), auto_lang_core::a2r_std::str_find_from(text, needle, start));
+                }
+            }
+        }
+        assert_eq!(find("中文", "中", i64::MIN), 0);
+        assert_eq!(find("中文", "中", i64::MAX), -1);
+        assert_eq!(find("中文", "", i64::MAX), i64::MAX);
+        let source = "// auto_lang_core::a2r_std::str_find_from(\nlet label = \"auto_lang_core::a2r_std::str_find_from(\";\nlet n = auto_lang_core::a2r_std::str_find_from(text, needle, start);\n";
+        let adapted = super::adapt_merged_string_index(source);
+        assert!(adapted.starts_with(source.split("let n = ").next().unwrap()));
+        assert!(adapted.contains("let n = crate::__merged_str_find_from(text, needle, start);"));
+        assert_eq!(adapted.matches("pub(crate) fn __merged_str_find_from").count(), 1);
     }
 
     /// Stage B P-2 V4：仓外项目完整生成链——member 落 project-local，框架
