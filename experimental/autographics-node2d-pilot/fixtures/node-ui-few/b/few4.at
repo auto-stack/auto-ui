@@ -1,0 +1,19 @@
+// PLAN-065 Few4: FOUR text slots — the 4×64B allocation edge. The first
+// literal is exactly 63 multi-byte bytes (21 Han chars × 3) — the legal
+// budget ceiling executed through the real VM; num rides the start param.
+node Few4(start: int) {
+    model {
+        var on = false
+        var num = .start
+    }
+    view {
+        column box {
+            text t1 {
+                text: "二十一字二十一字二十一字二十一字二十一字甲"
+            }
+            text flag { text: .on }
+            text num { text: .num }
+            text t2 { text: "尾" }
+        }
+    }
+}

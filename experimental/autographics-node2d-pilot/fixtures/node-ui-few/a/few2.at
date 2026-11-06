@@ -1,0 +1,25 @@
+// PLAN-065 Few2: exactly TWO text slots (IntField value + button label) —
+// real-click 2:1 isolation on dual instances; the digits fn must exist with
+// the PRUNED single-branch shape (no half-buffer b dispatch).
+node Few2(start: int) {
+    model {
+        var count = .start
+    }
+    msg {
+        Bump
+    }
+    view {
+        column box {
+            text value { text: .count }
+            button bump {
+                text: "加"
+                onclick: .Bump
+            }
+        }
+    }
+    on {
+        .Bump -> {
+            .count = .count + 1
+        }
+    }
+}

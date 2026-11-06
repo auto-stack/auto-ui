@@ -1,0 +1,16 @@
+// PLAN-065 Few1: exactly ONE text slot (IntField count). No room for a
+// button, so per-instance updates ride Life.Tick with the instance-index
+// handler; start param differentiates instances (isolation evidence).
+node Few1(start: int) {
+    model {
+        var count = .start
+    }
+    view {
+        text value { text: .count }
+    }
+    on {
+        Life.Tick -> {
+            .count = .count + 1
+        }
+    }
+}

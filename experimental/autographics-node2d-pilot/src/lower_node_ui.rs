@@ -1612,8 +1612,51 @@ fn gen_refresh_dispatch(plan: &DefPlan, n: usize, src: &mut String) {
 
 /// 数字格式化（每实例；at = e*64）＋有界最小位数十进制。
 /// 数字格式化（每实例；at = e*64）＋有界最小位数十进制（1..=7 位）。
-fn gen_digits_fn(prefix: &str, k: usize, src: &mut String) {
+/// PLAN-065 T-02：`texts ≤ TEXT_SLOTS_PER_BUFFER` 的 def（hi==0，半缓冲
+/// b 从未声明）剪裁 buf 分派——e 恒 < 槽数 ≤ 2，`buf` 恒 1，else 分支
+/// 引用未声明 `_ui_text_b_{k}`（AG021 D-06 真反例：SDK 具名
+/// `Undefined variable: {p}_ui_text_b_0`）。剪裁后单分支直写缓冲 A；
+/// ≥3 槽 def 的生成段逐字不变（V-04 冻结面）。
+fn gen_digits_fn(plan: &DefPlan, k: usize, src: &mut String) {
+    let prefix = &plan.prefix;
+    let has_hi = plan.texts.len() > TEXT_SLOTS_PER_BUFFER;
     let _ = writeln!(src, "fn {prefix}_ui_digits_{k}(e int, n int) int {{");
+    if !has_hi {
+        let _ = writeln!(src, " let at=(e*{TEXT_BYTES})");
+        let _ = writeln!(src, " if n>9999999 {{");
+        for (j, b) in b"OVER".iter().enumerate() {
+            let _ = writeln!(src, "  {prefix}_ui_text_{k}[(at+{j})]=0x{b:02X}");
+        }
+        let _ = writeln!(src, "  return 4");
+        let _ = writeln!(src, " }}");
+        let _ = writeln!(src, " if n<0 {{");
+        let _ = writeln!(src, "  {prefix}_ui_text_{k}[at]=0x2D");
+        let _ = writeln!(src, "  return (1+{prefix}_ui_digits_mag_{k}((at+1),(0-n)))");
+        let _ = writeln!(src, " }}");
+        let _ = writeln!(src, " return {prefix}_ui_digits_mag_{k}(at,n)");
+        let _ = writeln!(src, "}}");
+        // n 的十进制位数 = d（分支自高到低；digit j = (n/10^j)%10）。
+        let _ = writeln!(src, "fn {prefix}_ui_digits_mag_{k}(at int, n int) int {{");
+        for d in (1..=7).rev() {
+            let pow = 10i64.pow(d as u32 - 1);
+            let cond = if d == 1 {
+                "1".to_string()
+            } else {
+                format!("n>={pow}")
+            };
+            let _ = writeln!(src, " if {cond} {{");
+            // MSB-first（自然阅读序）：at+j = 第 (d-1-j) 位数字。
+            for j in 0..d {
+                let p10 = 10i64.pow(d as u32 - 1 - j as u32);
+                let _ = writeln!(src, "  {prefix}_ui_text_{k}[(at+{j})]=(48+((n/{p10})%10))");
+            }
+            let _ = writeln!(src, "  return {d}");
+            let _ = writeln!(src, " }}");
+        }
+        let _ = writeln!(src, " return 1");
+        let _ = writeln!(src, "}}");
+        return;
+    }
     // 半缓冲分派：e >= TEXT_SLOTS_PER_BUFFER 写 b 半缓冲（同一 at 公式）。
     let _ = writeln!(
         src,
@@ -1683,13 +1726,21 @@ fn gen_text_getters(plan: &DefPlan, n: usize, src: &mut String) {
     let _ = writeln!(src, " return 0");
     let _ = writeln!(src, "}}");
     let _ = writeln!(src, "fn {p}_ui_text_at(i int, e int, j int) int {{");
+    // PLAN-065 T-02：texts ≤ 2 槽（hi==0，无 b 半缓冲声明）剪裁高槽分支
+    // ——e 合法域恒 < 2，else 引用未声明 `_ui_text_b_{k}`（D-06 具名反例）。
+    // ≥3 槽 def 逐字不变。
+    let has_hi = plan.texts.len() > TEXT_SLOTS_PER_BUFFER;
     for k in 0..n {
         let _ = writeln!(src, " if i=={k} {{");
-        let _ = writeln!(
-            src,
-            "  if e<{SLOTS} {{return {p}_ui_text_{k}[((e*{TEXT_BYTES})+j)]}}else{{return {p}_ui_text_b_{k}[(((e-{SLOTS})*{TEXT_BYTES})+j)]}}",
-            SLOTS = TEXT_SLOTS_PER_BUFFER
-        );
+        if has_hi {
+            let _ = writeln!(
+                src,
+                "  if e<{SLOTS} {{return {p}_ui_text_{k}[((e*{TEXT_BYTES})+j)]}}else{{return {p}_ui_text_b_{k}[(((e-{SLOTS})*{TEXT_BYTES})+j)]}}",
+                SLOTS = TEXT_SLOTS_PER_BUFFER
+            );
+        } else {
+            let _ = writeln!(src, "  return {p}_ui_text_{k}[((e*{TEXT_BYTES})+j)]");
+        }
         let _ = writeln!(src, " }}");
     }
     let _ = writeln!(src, " return 0");
@@ -2198,6 +2249,9 @@ fn lower_node_ui_pipeline(
             // （048 复审实测 256→0；4×64 恰在界上）。字节缓冲按半缓冲拆分
             // （每半 ≤2 槽×64=128）；公开 len/at ABI 不变（getter 内部
             // 分派）。len 数组 ≤4 元素，不触界。
+            // PLAN-065 T-02：b 半缓冲仅 hi>0 时声明；≤2 槽 def 的
+            // digits/getter 高槽分支同步剪裁（D-06：引用未声明变量
+            // `Undefined variable: {p}_ui_text_b_0` 具名反例）。
             let lo = plan.texts.len().min(TEXT_SLOTS_PER_BUFFER);
             let hi = plan.texts.len().saturating_sub(TEXT_SLOTS_PER_BUFFER);
             let zeros = vec!["0"; lo * TEXT_BYTES].join(",");
@@ -2256,7 +2310,7 @@ fn lower_node_ui_pipeline(
             instances.iter().filter(|i| i.def == plan.name).count()
         };
         for k in 0..n {
-            gen_digits_fn(&plan.prefix, k, &mut src);
+            gen_digits_fn(plan, k, &mut src);
         }
     }
     // 子事件 recv 头（handler 内 `emit child.Ev` 与 onclick 派发共用面）。
@@ -2523,9 +2577,7 @@ pub fn lower_project_node_mixed(project: &Project) -> Result<LowerOutputNodeMixe
 /// 任意 def（组件/实例活区域；实例挂载身份＝实例路径）。世界源与 048/049
 /// 字节同面（区域点击派发器、场景 getter、文字缓冲全部同一 ABI）；v1
 /// schema/generator 常量与诊断逐字不变。
-pub fn lower_project_node_mixed_regions(
-    project: &Project,
-) -> Result<LowerOutputNodeMixed, String> {
+pub fn lower_project_node_mixed_regions(project: &Project) -> Result<LowerOutputNodeMixed, String> {
     let out = lower_node_ui_pipeline(project, true, true)?;
     let defs_json: BTreeMap<String, ArtifactDef> = out
         .def_plans
