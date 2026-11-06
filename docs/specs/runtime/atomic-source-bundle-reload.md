@@ -23,8 +23,9 @@
   `build_reload_candidate` 构建（`candidate` 模式）：
   - **不** fire Init（准备期零外部 effect：Init/Tick/SSE/IO 均不启动）；
   - **不** 安装 action_config DSL（其独立 mtime 泵不受扰，AC-05）；
-  - **不** 注册全局主题树/全局 design/i18n/外接组件名单（提交时由现役链
-    接管；per-component 主题 scope 照常建立）。
+  - **不** 注册全局主题树/全局 design/i18n/外接组件名单（reload 路径不触碰
+    全局注册表，保留初始构建值；per-component 主题 scope 由候选自带并随
+    提交接管）。
 - 候选构建期间来源再变（快照失配）→ 具名拒绝保旧，修复后自动再次尝试。
 - 多文件 guard 已退役：`check_file_changed` 的 import/registry 跳过语义只
   保留在 legacy 单文件 API；泵与永久测试走 `try_reload` 单一入口。
