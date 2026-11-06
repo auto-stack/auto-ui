@@ -175,6 +175,19 @@ impl VueGenerator {
                 "import { ref, watch, getCurrentInstance, inject } from 'vue'\n",
             );
         }
+        // PLAN-057: stores carrying effects (watch/timer/SSE) register their
+        // cleanup with the owning App store context via __autoOnCtxDispose.
+        // The type-driven SSE gate mirrors the active_stream_eps filter below.
+        let needs_dispose = !store.watchers.is_empty()
+            || !store.timers.is_empty()
+            || !store.stream_handlers.is_empty()
+            || store
+                .stream_endpoints
+                .iter()
+                .any(|ep| store.api_imports.iter().any(|imp| imp == &ep.fn_name));
+        if needs_dispose {
+            code.push_str("import { __autoOnCtxDispose } from './__autoStoreContext'\n");
+        }
         // API functions used in handler bodies (from `use back.api`).
         // Streaming endpoints (~Stream<T>) are consumed via SSE in this composable,
         // not via a fetch client, so api.ts does NOT export them — exclude their
@@ -306,6 +319,7 @@ impl VueGenerator {
         // workaround this replaces). Sources are always store state fields
         // (no props in a store), so they are watched directly; multi-source
         // entries emit the array form. Mirrors the widget-side emission.
+        let mut widx = 0usize;
         for watcher in &store.watchers {
             let body = match &watcher.payload {
                 crate::aura::LogicPayload::AstStmts(stmts) => transpile_handler_body(stmts, &ctx),
@@ -330,10 +344,24 @@ impl VueGenerator {
                 }
             };
             let indented = Self::indent_body(&body, "  ");
-            code.push_str(&format!(
-                "watch({}, () => {{\n{}\n}}{})\n\n",
-                source, indented, opts
-            ));
+            // PLAN-057: capture the watcher stop handle and hand it to the
+            // owning App context — last-owner exit stops the watcher (no
+            // cross-App leakage, remount builds a fresh one).
+            if needs_dispose {
+                code.push_str(&format!(
+                    "const __auto_w{idx} = watch({src}, () => {{\n{body}\n}}{opts})\n__autoOnCtxDispose(() => __auto_w{idx}())\n\n",
+                    idx = widx,
+                    src = source,
+                    body = indented,
+                    opts = opts,
+                ));
+                widx += 1;
+            } else {
+                code.push_str(&format!(
+                    "watch({}, () => {{\n{}\n}}{})\n\n",
+                    source, indented, opts
+                ));
+            }
         }
 
         // Plan 360: detect accent_color state so we can inject the palette
@@ -410,6 +438,12 @@ impl VueGenerator {
             }
             code.push('\n');
         }
+        // PLAN-057: per-instance live flag — dispose nulls onerror and
+        // closes every EventSource; the flag stops an already-scheduled
+        // reconnect timer from re-opening a disposed connection.
+        if wire_sse || !store.stream_handlers.is_empty() {
+            code.push_str("let __auto_sse_live = true\n");
+        }
 
         // Plan 043 cat-3: declare actions as const arrow functions BEFORE the
         // return object, so sibling actions can call each other by bare name.
@@ -453,25 +487,34 @@ impl VueGenerator {
 
         // Plan 051 C7: store timer 条目——模块级 started 旗标保证单例
         // composable 多次调用只建一条 interval（沿 stream_guard 先例）；
-        // `when` 门控在回调内对模块级 ref 求值。
+        // `when` 门控在回调内对模块级 ref 求值。PLAN-057: 每条 interval id
+        // 交给 owning App context——最后 owner 退出即 clearInterval。
         if !store.timers.is_empty() {
             code.push_str(
                 "        if (!__t51_timers_started) {
             __t51_timers_started = true
 ",
             );
-            for t in &store.timers {
+            for (tidx, t) in store.timers.iter().enumerate() {
                 let guard = match t.when.as_deref() {
                     Some(c) => Self::timer_condition_to_js(c),
                     None => "true".to_string(),
                 };
                 code.push_str(&format!(
-                    "            setInterval(() => {{ if ({guard}) {{ {ev}() }} }}, {ms})
+                    "            const __auto_t{idx} = setInterval(() => {{ if ({guard}) {{ {ev}() }} }}, {ms})
 ",
+                    idx = tidx,
                     guard = guard,
                     ev = t.event,
                     ms = t.every_ms,
                 ));
+                if needs_dispose {
+                    code.push_str(&format!(
+                        "            __autoOnCtxDispose(() => {{ clearInterval(__auto_t{idx}) }})
+",
+                        idx = tidx,
+                    ));
+                }
             }
             code.push_str(
                 "        }
@@ -509,6 +552,11 @@ impl VueGenerator {
                     "        const es = new EventSource('{}');\n",
                     ep.path
                 ));
+                // PLAN-057: hand the connection to the owning App context —
+                // last-owner exit closes it and disarms auto-reconnect.
+                code.push_str(
+                    "        __autoOnCtxDispose(() => { __auto_sse_live = false; es.onerror = null; es.close() })\n",
+                );
                 code.push_str("        es.onmessage = (ev) => {\n");
                 code.push_str("            try {\n");
                 code.push_str("                const data = JSON.parse(ev.data);\n");
@@ -620,7 +668,9 @@ impl VueGenerator {
                 // 断开时 readyState 变 CLOSED,重置 per-path guard 并延迟重调
                 // composable —— composable 内 `if (!guard)` 会重新 new EventSource。
                 // 此前无 onerror,后端一重启前端就永久失联(需手动刷新页面)。
+                // PLAN-057: 已释放实例不再重连（__auto_sse_live 由 dispose 置否）。
                 code.push_str("        es.onerror = () => {\n");
+                code.push_str("            if (!__auto_sse_live) return\n");
                 code.push_str(&format!(
                     "            if (es.readyState === EventSource.CLOSED) {{ {} = false; setTimeout({}, 2000); }}\n",
                     guard, fn_name
@@ -651,6 +701,11 @@ impl VueGenerator {
                 "        const es = new EventSource('{}');\n",
                 sh.url
             ));
+            // PLAN-057: hand the connection to the owning App context —
+            // last-owner exit closes it and disarms auto-reconnect.
+            code.push_str(
+                "        __autoOnCtxDispose(() => { __auto_sse_live = false; es.onerror = null; es.close() })\n",
+            );
             match &sh.event {
                 None => {
                     code.push_str(&format!(
@@ -666,6 +721,7 @@ impl VueGenerator {
                 }
             }
             code.push_str("        es.onerror = () => {\n");
+            code.push_str("            if (!__auto_sse_live) return\n");
             code.push_str(&format!(
                 "            if (es.readyState === EventSource.CLOSED) {{ {} = false; setTimeout({}, 2000); }}\n",
                 guard, fn_name

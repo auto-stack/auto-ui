@@ -10399,23 +10399,28 @@ import App from './App.vue'
 import { createAppRouter } from './router'
 // PLAN-041: fresh per-mount store context — two same-name demo Apps never
 // share store module state.
+// PLAN-057: the entry OWNS its store context — unmount() releases it, so
+// the last owner exit closes SSE/timers/watchers created by the demo.
 import { installAutoStoreContext } from './stores/__autoStoreContext'
 
 export default App
 
 let app: ReturnType<typeof createApp> | null = null
+let storeCtx: any = null
 export function mount(el: HTMLElement) {
   app = createApp(App)
   app.config.errorHandler = (err: unknown) => {
     console.error('[DemoEntry] runtime error:', err)
   }
   app.use(createAppRouter())
-  installAutoStoreContext(app)
+  storeCtx = installAutoStoreContext(app)
   app.mount(el)
 }
 export function unmount() {
   app?.unmount()
   app = null
+  storeCtx?.release?.()
+  storeCtx = null
 }
 "#;
     let _ = fs::write(app_dir.join("main.ts"), main_ts);
@@ -10584,7 +10589,10 @@ fn desktop_npm_version(app_output: &Path, version: &str) -> AutoResult<String> {
 
 fn desktop_routed_wrapper(has_stores: bool) -> String {
     let context_import = if has_stores { "import { installAutoStoreContext } from './stores/__autoStoreContext'" } else { "" };
-    let context_install = if has_stores { "installAutoStoreContext(app)" } else { "" };
+    // PLAN-057: the wrapper owns its store context — on unmount it releases
+    // the context so the last-owner exit closes SSE/timers/watchers.
+    let context_install = if has_stores { "storeCtx = installAutoStoreContext(app)" } else { "" };
+    let context_release = if has_stores { "storeCtx?.release?.(); storeCtx = null" } else { "" };
     format!(r#"<script setup lang="ts">
 import {{ createApp, onMounted, onBeforeUnmount, ref }} from 'vue'
 import Content from './Content.vue'
@@ -10592,6 +10600,7 @@ import {{ createAppRouter }} from './router'
 {context_import}
 const target = ref<HTMLElement | null>(null)
 let app: ReturnType<typeof createApp> | null = null
+let storeCtx: any = null
 onMounted(() => {{
   if (!target.value) return
   app = createApp(Content)
@@ -10599,7 +10608,7 @@ onMounted(() => {{
   {context_install}
   app.mount(target.value)
 }})
-onBeforeUnmount(() => {{ app?.unmount(); app = null }})
+onBeforeUnmount(() => {{ app?.unmount(); app = null; {context_release} }})
 </script>
 <template><div ref="target" class="h-full w-full min-h-0 overflow-auto" /></template>
 "#)

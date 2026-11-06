@@ -808,24 +808,86 @@ pub fn generate_component_from_file(
                 let ctx_src = r#"// PLAN-041: per-App store context — one per createApp mount.
 // Two same-name Apps never share store module state; same-App consumers
 // share their App's single instance per store (plan §5.2 contract 3).
+// PLAN-057: each context OWNS the store-side resources (SSE connections,
+// timers, watchers) its instances create. `installAutoStoreContext`
+// registers the mounted App as an owner; when the last owner unmounts,
+// `release()` runs every collected cleanup and drops the instance memo so
+// a later remount builds fresh instances (no stale values, no double
+// subscriptions). Mounts without a context keep page-lifetime semantics
+// (never released) — the named 041 legacy boundary.
 export interface AutoStoreContext {
   use(name: string, factory: () => any): any
 }
 
 export const AUTO_STORE_CONTEXT_KEY = '__autoStoreContext'
 
-export function createAutoStoreContext(): AutoStoreContext {
-  const stores = new Map<string, any>()
-  return {
-    use(name: string, factory: () => any) {
-      if (!stores.has(name)) stores.set(name, factory())
-      return stores.get(name)
-    },
-  }
+// PLAN-057: while a store factory runs, cleanups registered through
+// __autoOnCtxDispose are collected by the active context. Outside a
+// context (legacy module consumers) it is a no-op — page lifetime.
+let __autoActiveCtx: { __autoCollect(cb: () => void): void } | null = null
+
+export function __autoOnCtxDispose(cb: () => void): void {
+  if (__autoActiveCtx) __autoActiveCtx.__autoCollect(cb)
 }
 
-export function installAutoStoreContext(app: { provide(key: string, value: unknown): void }): void {
-  app.provide(AUTO_STORE_CONTEXT_KEY, createAutoStoreContext())
+export function createAutoStoreContext(): any {
+  const stores = new Map<string, any>()
+  const cleanups: Array<() => void> = []
+  const owners = new Set<object>()
+  const ctx: any = {
+    use(name: string, factory: () => any) {
+      if (!stores.has(name)) {
+        const prev = __autoActiveCtx
+        __autoActiveCtx = ctx
+        try {
+          stores.set(name, factory())
+        } finally {
+          __autoActiveCtx = prev
+        }
+      }
+      return stores.get(name)
+    },
+    // PLAN-057: register a mounted App as an owner. Vue ≥3.5 fires
+    // app.onUnmounted on app.unmount(); the mount factory additionally
+    // releases explicitly — releaseApp dedupes per App, so the context
+    // disposes exactly when its LAST owner exits.
+    own(app: any): any {
+      const known = owners.has(app)
+      owners.add(app)
+      if (!known && app && typeof app.onUnmounted === 'function') {
+        app.onUnmounted(() => ctx.releaseApp(app))
+      }
+      return ctx
+    },
+    // PLAN-057: drop one owner App; when the last one exits, dispose.
+    releaseApp(app: any): void {
+      if (!owners.delete(app)) return
+      if (owners.size === 0) ctx.release()
+    },
+    // PLAN-057: dispose every instance this context created (close SSE,
+    // clear timers, stop watchers) and clear the memo — a remount builds
+    // fresh instances (no stale values, no double subscriptions).
+    release(): void {
+      while (cleanups.length > 0) {
+        const cb = cleanups.pop()
+        try {
+          cb?.()
+        } catch { }
+      }
+      stores.clear()
+      owners.clear()
+    },
+    __autoCollect(cb: () => void): void {
+      cleanups.push(cb)
+    },
+  }
+  return ctx
+}
+
+export function installAutoStoreContext(app: { provide(key: string, value: unknown): void }, existing?: AutoStoreContext): any {
+  const ctx = (existing as any) ?? createAutoStoreContext()
+  app.provide(AUTO_STORE_CONTEXT_KEY, ctx)
+  return typeof (ctx as any).own === 'function' ? (ctx as any).own(app) : ctx
 }
 "#;
                 store_composables.push((ctx_path.clone(), ctx_src.to_string()));
