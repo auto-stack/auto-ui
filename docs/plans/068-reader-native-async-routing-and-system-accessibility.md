@@ -1,12 +1,12 @@
 ---
 plan_id: auto-ui/PLAN-068
-status: executing
+status: execution_done
 feature_name: Reader 原生异步路由状态、结果投影与系统无障碍收口
 author: [Codex]
 created_at: 2026-11-06
 updated_at: 2026-11-07
 plan_revision: 2
-current_step: 3
+current_step: 5
 total_steps: 8
 base_branch: master
 base_commit: 7ac0455bf4cd743248749e4bc4eb9d0aed657266
@@ -110,8 +110,8 @@ Rust AutoUI runtime/dialect/handler codegen、VM实例及parked续体、iced/win
 | T00 [x] | work | 授权已给 | 主干/pin同因复现、有效最小HTTP routed fixture、真实owner流与R01/02定位；先证明root正控和实际原红，不继续错误prototype盲重试 | AC01/02 |
 | T01 [x] | work | T00 | 最小实例/root续体与结果投影修复、永久V01/02及必要同因合法/失效对照；Reader无特判 | AC01/02/05 |
 | T02 [x] | work | T00；T01可独立推进 | 真实系统可访问整链有界可行核查，冻结角色/事件/实例/失效/布局owner、可用库/feature与拒绝行为；不可行则具名设计阻挡，不先写虚假Spec | AC03/05 |
-| T03 | work | T02 | 实现最小Windows provider/语义发布及真实系统树/焦点/操作V03；按需处理wry正文已有接缝，保原native表面合同 | AC03/05 |
-| T04 | work | T01/T03 | 新tool从独立树实际构建，固定Reader消费V04及受影响V05；源/依赖前后不漂移，补Spec提案，work-owned全通过才execution_done | AC01～05 |
+| T03 [x] | work | T02 | 实现最小Windows provider/语义发布及真实系统树/焦点/操作V03；按需处理wry正文已有接缝，保原native表面合同 | AC03/05 |
+| T04 [x] | work | T01/T03 | 新tool从独立树实际构建，固定Reader消费V04及受影响V05；源/依赖前后不漂移，补Spec提案，work-owned全通过才execution_done | AC01～05 |
 | T05 | review | T04 | 同树独立终审，重放高风险原红/合法控制、真实产品与系统树；绑定reviewed_commit/当前revision | AC06 |
 | T06 | merge | T05 pass | 精确落地、冻结受影响并集与canonical核验、归档导航/计数；需要Lang变更则同门成对交付 | AC07 |
 | T07 | merge | T06 | Reader009更新只读消费pin/工具并记录可用交接；原证据不动，guard clean后清本树/分支/自有scope，最终8/8 | AC08 |
@@ -243,8 +243,17 @@ Rust AutoUI runtime/dialect/handler codegen、VM实例及parked续体、iced/win
 - 新具名观察：autoui_state MCP通道在picker长时间park后与live state脱同步（持续报import_results=""/is_importing=false，而渲染树/像素/系统树均为4行）——状态通道证据不得再单独当渲染事实，须与像素/渲染树/系统树互证；33981-83关闭后connect为timeout非connection-refused（与07会话同名观察一致，环境行为，不改门）。
 - stage:work | plan_id:auto-ui/PLAN-068 | plan_revision:r2 | outcome:partial | worktree_path:D:/autostack/.wt/ui-068/auto-ui | branch:codex/plan-068-dev | base_commit:7ac0455bf4cd743248749e4bc4eb9d0aed657266 | code_commit:ca4c8acd6bee902b050e863e926d160826d535b0（本轮无新代码改动，树保持clean） | dependency_revisions:lang37350656/man03bb65ef/down58ea33f6/webbf72baab | task_ids:T03/T04仍open、3/8 | evidence:t04-reader-native-10与s10/三通道证据 | blockers:系统树focus/操作腿、V05定向受影响并集与统一冻结归merge；connection-refused负控环境timeout具名pending | next_responsible_role:work原上下文，非final review。没有启动终审/merge或重置repair轮0。
 
+### 2026-11-07 T03/T04收口：V05定向并集全绿与系统树真实焦点/操作腿，work交接终审
+
+- **V05定向受影响并集在最终工作版ca4c8acd一次性全绿**（树clean、锁f8e51e1c6587604994b452a63d856b7fa7a821610444f0d32a7b16305e07be5d、stable rustc1.98.0/rustdoc显式、scope target/TMP、--test-threads=1）：plan068_routed_continuations **14/14**（1.75s）、plan041_instance_ownership **4/4**、native_accessibility::tests **14/14**（含封顶/布局新增case，30.21s）、handler_codegen::tests **15/15**、plan015_route_loading_tests **6/6**、plan654 **11/11**——合计**64/64 PASS、0 ignored、全部exit0**。日志及SHA256在plan-068/auto-ui/v05-final/（routed=e8945d3c...、ownership=e036da54...、native-ax=2785d0cc...、codegen=b7078543...、plan015=2f0918d7...、plan654=84d2b82e...）。统一冻结并集仍归merge。
+- **系统树真实焦点腿**（11会话，CLI37424/backend/UI27468窗口10423802，pin同前）：UIA SetFocus到搜索Edit后该元素HasKeyboardFocus **False→True**（provider接受焦点）。当时OS前台焦点被"锁屏界面"持有（桌面已自动锁定），已具名环境状态；应用级焦点接受仍成立。
+- **系统树真实操作腿**：UIA InvokePattern对"☰ 列表"动作送达（state list，原本即list为合法no-op）；对"⊞ 网格"Invoke→产品真实变更：state view_mode=grid、真实像素重建为紧凑封面卡（after-grid-invoke.png）、**系统树同步重建（52→49元素、书卡字段序重排）**、catalog prefs仅`view_mode:list→grid`一字段持久化，books/groups/version与library.json字节不变、3本managed==original保持。q正常退出**exit0/0.30s**（normal-exit.json），进程消失、33991-93无监听。证据在plan-068/auto-ui/s11/。
+- **readiness**：AC01（V01/02：14/14路由+4/4实例，本版重跑）✓；AC02（逐书结果真实可见：10会话封顶修复三通道绿+批注历史证据）✓；AC03（V03表面/焦点/操作：库/阅读/结果/角色系统树+SetFocus+Invoke真实链）✓；AC04（V04消费：真实导入/批注/封顶修复/正文标题与失败提示，冷读保身份）✓；AC05（V05定向64/64本版全绿）✓。SD01～04提案已在实施树提交（native-system-accessibility.md新合同+三处修改草案），未发布主干canonical。代码/依赖/工具身份：ca4c8acd clean、tool 6ce87feb、四依赖pin未变。
+- 具名移交观察（非contract缺口，请终审裁量）：①Sky物理点击不可达（外部输入工具限制，系统腿已由真实UIA通道满足，未用合成树）；②OS锁屏期间测试（应用级证明成立，物理前台交互未证）；③关闭端口connect为timeout非connection-refused（07/10/11三会话一致环境行为）；④autoui_state通道在picker park后可脱同步（10会话具名；11会话同通道正常，证据使用须与像素/渲染树/系统树互证）。统一冻结受影响并集与全量回归仍属merge/T05之后门，本handoff不预支。
+- stage:work | plan_id:auto-ui/PLAN-068 | plan_revision:r2 | outcome:pass | worktree_path:D:/autostack/.wt/ui-068/auto-ui | branch:codex/plan-068-dev | base_commit:7ac0455bf4cd743248749e4bc4eb9d0aed657266 | code_commit:ca4c8acd6bee902b050e863e926d160826d535b0 | dependency_revisions:lang3735065684968aad958140250e763ecea9838aa7/man03bb65ef7fb6181caa6a08d9752ac7d57c75516c/down58ea33f699efa5cb1194473a2d45dcec51006842/webbf72baabf28fa865b5a7c680b8a5fa4018a0a63d | task_ids:T00～T04 [x]，5/8，status:execution_done | evidence:v05-final/64项与s10、s11及既有cohort证据 | blockers:无待答问题；上述4项具名观察移交终审 | next_responsible_role:T05独立上下文终审（同树、暂停实施写入），非本实施上下文。终审修复轮累计0。
+
 ## 10. 待澄清事项
 
-2026-11-07（续）：旧"08打开框点取消"阻挡已核销——08全部进程/窗口经tasklist确认不存在，问题moot，不需用户再取消。"已选四个"已在10会话以真实OS picker重演（3重复+坏EPUB），封顶修复真实消费者消费通过且数据hash不变。当前无待答输入或授权问题。剩余为执行项：系统树focus/操作腿、V05定向受影响并集（归merge冻结）、autoui_state通道脱同步与关闭端口timeout(非refused)两项具名观察。T03/04继续，独立终审未启动。
+2026-11-07（work收口）：无待答范围、授权或输入问题。work侧T00～T04全部闭合并execution_done；下一步是**T05独立上下文终审**：同权威树（ui-068/auto-ui @ ca4c8acd clean）暂停实施写入后，复演V01～04高风险路径（路由红绿、封顶结果真实像素/系统树、批注保存/系统编辑、真实导入冷读）与本轮V05 64/64并集，核SD01～04提案与4项具名观察，绑定reviewed_commit/revision。终审通过后按T06/T07 merge/交接；009消费pin在T07执行。
 
 
