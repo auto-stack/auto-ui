@@ -10006,7 +10006,7 @@ pub fn create_work(title str) Work {
     }
 
     #[test]
-    fn p060_merged_find_from_preserves_character_offsets_without_narrowing() {
+    fn p060_merged_find_from_preserves_sdk_byte_offsets_without_narrowing() {
         use super::merged_string_index::__merged_str_find_from as find;
         for text in ["abcabc", "中文路径中文", ""] {
             for needle in ["a", "文", "", "missing"] {
@@ -10017,7 +10017,11 @@ pub fn create_work(title str) Work {
         }
         assert_eq!(find("中文", "中", i64::MIN), 0);
         assert_eq!(find("中文", "中", i64::MAX), -1);
-        assert_eq!(find("中文", "", i64::MAX), i64::MAX);
+        assert_eq!(find("中文", "", i64::MAX), -1);
+        assert_eq!(find("abc", "", 100i64), -1);
+        assert_eq!(find("中文文", "文", 1i64), 3);
+        assert_eq!(find("中文文", "文", 4i64), 6);
+        assert_eq!(find("😀x😀", "x", 1i64), 4);
         let source = "// auto_lang_core::a2r_std::str_find_from(\nlet label = \"auto_lang_core::a2r_std::str_find_from(\";\nlet n = auto_lang_core::a2r_std::str_find_from(text, needle, start);\n";
         let adapted = super::adapt_merged_string_index(source);
         assert!(adapted.starts_with(source.split("let n = ").next().unwrap()));
