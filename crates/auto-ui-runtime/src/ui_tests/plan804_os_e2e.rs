@@ -412,6 +412,48 @@ mod dialog_e2e {
         norm(a) == norm(b)
     }
 
+    /// Real IFileDialog multi-selection, through VM and generated-app host.
+    #[test]
+    #[ignore = "opens real OS dialogs; run explicitly on an interactive desktop"]
+    fn plan988_real_multiselect_vm_and_rust_host() {
+        use auto_lang_core::vm::{engine::AutoVM, task::AutoTask, virt_memory::VirtualFlash,
+            ffi::VMConvertible, native::shim_dialog_open_files};
+        let dir = unicode_temp_dir();
+        let files = [dir.join("第一本.txt"), dir.join("second.epub")];
+        for path in &files { std::fs::write(path, b"isolated picker fixture").unwrap(); }
+        let owner = shared_own_window();
+        let vm = AutoVM::new(VirtualFlash::new_with_code(vec![]), 1024);
+        vm.set_dialog_host_provider(std::sync::Arc::new(crate::host_adapters::dialog::ParentedOsDialogProvider));
+        for parented in [true, false] {
+            for accept in [true, false] {
+                let (tx, rx) = mpsc::channel();
+                let spec = DriveSpec {
+                    caller_thread: unsafe { GetCurrentThreadId() },
+                    set_path: if accept { Some(files.iter().map(|p| format!("\"{}\"", p.display())).collect::<Vec<_>>().join(" ")) } else { None },
+                    accept, accept_label: "打开", timeout: std::time::Duration::from_secs(10),
+                };
+                let driver = std::thread::spawn(move || drive_dialog(spec, tx));
+                let json = if parented {
+                    let mut task = AutoTask::new(1, 1024, 0);
+                    "txt,epub".to_owned().push_to_stack(&mut task, &vm).unwrap();
+                    shim_dialog_open_files(&mut task, &vm).unwrap();
+                    String::pop_from_stack(&mut task, &vm).unwrap()
+                } else { crate::ui::dialog::open_files("txt,epub") };
+                let (dlg, _, live_owner) = rx.recv_timeout(std::time::Duration::from_secs(20)).unwrap();
+                driver.join().unwrap();
+                assert_ne!(dlg, 0, "real modal was not observed");
+                assert_eq!(live_owner, if parented { owner } else { 0 });
+                assert_ne!(unsafe { IsWindowEnabled(owner) }, 0, "owner not restored");
+                let paths: Vec<String> = serde_json::from_str(&json).unwrap();
+                if accept {
+                    assert_eq!(paths.len(), 2, "multi-selection must return both files: {json}");
+                    for file in &files { assert!(paths.iter().any(|p| same_path(p, &file.to_string_lossy()))); }
+                } else { assert!(paths.is_empty(), "cancel must be []: {json}"); }
+            }
+        }
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
     /// V-04(a) provider 级真模态：open 选真实 Unicode 临时文件（parented
     /// 策略）；save 种子默认名+选目标；open 取消=空串；模态后 owner 窗
     /// 可用（Plan 428 债修语义经迁移保持）。

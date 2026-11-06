@@ -20216,6 +20216,20 @@ mod plan039_a2r_gap_codegen_tests {
         code
     }
 
+    #[test]
+    fn plan988_multiselect_handler_uses_real_rust_host() {
+        let code = gen_first_widget(r#"
+widget Picker {
+    msg { Pick }
+    model { var files str = "[]" }
+    view { button "Pick" { onclick: .Pick } }
+    on { .Pick -> { .files = dialog_open_files("txt,epub") } }
+}
+"#);
+        assert!(code.contains("auto_ui_runtime::ui::dialog::open_files("), "{code}");
+        assert!(!code.contains("self.dialog_open_files"), "builtin must not become a widget stub");
+    }
+
     /// D1-A：button ondblclick 剥离事件流（不落拒绝门）+ 出口 MouseArea
     /// 包裹（on_double_click 直发消息；onclick 保留在按钮本体）。
     #[test]

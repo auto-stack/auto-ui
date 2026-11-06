@@ -64,3 +64,17 @@ identity, current-tree discovery, real input/action result, backend or durable
 readback, negative-control result, owned process/port cleanup, reopen result,
 and local evidence paths with hashes. Raw screenshots and logs remain local;
 the Plan and execution receipt carry the concise results and hashes.
+
+## 原生多文件选择（PLAN-988）
+
+公开 `dialog_open_files(filter)` 由 VM native/provider 与生成 Rust
+`ui::dialog::open_files` 接到共同 rfd.pick_files 实现。一次选择返回 JSON
+路径数组，取消返回 `[]`；filter 解析复用单选，不复制另一套规则。
+VM 默认父窗绑定保持，生成 Rust 沿既有 unparented 门面语义；这不是生成
+应用父窗接线的修复。旧 provider 未实现该能力时明确拒绝。
+
+永久真实宿主测试：`plan988_real_multiselect_vm_and_rust_host`（ignored，
+需明确 `--ignored --test-threads=1` 执行）。它操作自有进程的真实系统
+模态，选择两份隔离文件/取消，检查实际返回路径、在位 owner 与关闭后
+owner enabled；provider 单测与源码生成文本断言不能替代该层证据。
+Reader 的真实按钮→picker→导入与持久化完整验收归 READER-009。
