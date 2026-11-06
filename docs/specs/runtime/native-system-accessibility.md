@@ -72,7 +72,7 @@ and generation checks, routing carriers, disabled rejection, focus-slot reuse,
 first-frame children, closure, cache isolation, and abstract selected roles.
 They do not substitute for a live Windows system-tree or real input check.
 
-The live fixture is `examples/plan068_system_accessibility.rs`. Record source
+The live fixture is `crates/auto-ui-runtime/examples/plan068_system_accessibility.rs`. Record source
 and binary revisions, actual role/value/focus observations, accepted actions,
 and unmount/remount evidence separately from MCP actions. Consumer acceptance
 also follows [native-vm-app-validation](native-vm-app-validation.md); pending
