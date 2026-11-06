@@ -338,6 +338,15 @@ impl SharedState {
         self.app_surfaces.insert(key, surface);
     }
 
+    /// App-id ownership expires with the session, even when rendering is
+    /// suspended. Otherwise a name selector can find a closed instance first.
+    pub(crate) fn retain_live_app_surfaces(&mut self, is_live: impl Fn(u64) -> bool) {
+        self.app_surfaces.retain(|key, _| {
+            key.split_once(':').and_then(|(id, _)| id.parse::<u64>().ok())
+                .is_some_and(&is_live)
+        });
+    }
+
     /// PLAN-721 T-DOCS-1: 选择器查找——精确键、数字 app-id 前缀或 widget
     /// 名匹配（"018" / "bookshelf" / "3:bookshelf" 均可）。
     pub fn find_app_surface(&self, selector: &str) -> Option<(&String, &AppSurface)> {
@@ -3200,6 +3209,36 @@ fn parse_desktop_message_args(args: &serde_json::Value, app: String, msg: String
 mod p060_scalar_message_tests {
     use super::*;
     use crate::ui::session::{DesktopInject, DesktopSession, desktop_inject_push, desktop_inject_take};
+
+    #[test]
+    fn p060_closed_app_surface_cannot_shadow_reopened_instance() {
+        let shared = Arc::new(Mutex::new(SharedState::new("desktop".into())));
+        let mut session = DesktopSession::__test_session();
+        session.desktop.mcp_shared = Some(shared.clone());
+        let source = r#"widget App { view { text "paint" } }"#;
+        let old = session.allocate_app(crate::build_dynamic_component(source, None).unwrap());
+        let observer = session.allocate_app(crate::build_dynamic_component(source, None).unwrap());
+        let publish = |id: u64, label: &str, state: &str| {
+            shared.lock().unwrap().set_app_surface(format!("{id}:{label}"), AppSurface {
+                widget_name: label.into(), state_text: state.into(),
+                template_text: "text".into(), updated_ms: 1,
+            });
+        };
+        publish(old.0, "auto-paint", "old-closed-value");
+        publish(observer.0, "observer", "untouched");
+        session.apps.remove(&old);
+        session.prune_mcp_app_surfaces();
+        assert_eq!(tool_snapshot(&shared, json!({"app":"auto-paint"}))["isError"], true);
+        assert!(shared.lock().unwrap().find_app_surface(&old.0.to_string()).is_none());
+        let reopened = session.allocate_app(crate::build_dynamic_component(source, None).unwrap());
+        publish(reopened.0, "auto-paint", "new-live-value");
+        session.prune_mcp_app_surfaces();
+        let result = tool_snapshot(&shared, json!({"app":"auto-paint"})).to_string();
+        assert!(result.contains("new-live-value"));
+        assert!(!result.contains("old-closed-value"));
+        assert!(result.contains(&format!("{}:auto-paint", reopened.0)));
+        assert!(tool_snapshot(&shared, json!({"app":"observer"})).to_string().contains("untouched"));
+    }
 
     #[test]
     fn p060_scalar_message_parser_rejects_lossy_or_ambiguous_payloads() {

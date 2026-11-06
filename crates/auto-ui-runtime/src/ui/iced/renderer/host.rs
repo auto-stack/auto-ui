@@ -4773,6 +4773,9 @@ fn run_session(
                         apply_desktop_injects(state);
                         let (drain_exit, mut drain_tasks) =
                             drain_and_execute_desktop_commands(state);
+                        // Retire observation ownership after close commands,
+                        // before fit/screenshot early returns (also minimized).
+                        state.prune_mcp_app_surfaces();
                         if drain_exit {
                             // Plan 505 B5（债 P480-R1）：退出前显式
                             // 停机 broker serve 线程。

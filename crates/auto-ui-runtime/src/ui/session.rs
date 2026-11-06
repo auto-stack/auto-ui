@@ -3710,6 +3710,12 @@ impl DesktopSession {
         Ok(())
     }
 
+    pub(crate) fn prune_mcp_app_surfaces(&self) {
+        if let Some(shared) = &self.desktop.mcp_shared {
+            shared.lock().unwrap().retain_live_app_surfaces(|id| self.apps.contains_key(&AppId(id)));
+        }
+    }
+
     /// Request shutdown of this window's owning outproc app. Reclamation and
     /// buffer release remain on the normal ExitRequest/EOF pump path.
     pub fn broker_close_window(&mut self, wid: Wid) -> bool {

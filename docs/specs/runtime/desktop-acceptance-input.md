@@ -43,6 +43,13 @@ or durable-store readback where applicable. A queued input or successful socket
 write alone is not a business-task pass. Unsupported peers and nonexistent
 targets remain failures, not successful no-ops.
 
+Per-app MCP template/state snapshots belong to a live AppId. Closing that
+session retires its published surface on the desktop service tick, before
+fit/screenshot early returns, including while the host is minimized. Reopening
+must publish a new instance before name-based lookup can succeed; an old
+closed surface must not shadow it. These snapshots remain source-template
+observations and do not replace an actual rendered-frame oracle.
+
 Closing a broker window requests the owning endpoint's Close before removing
 the desktop window. The normal exit/buffer-release handshake reclaims the
 child; in-flight frame and bitmap acknowledgements are permitted while closing.
