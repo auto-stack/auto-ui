@@ -198,8 +198,12 @@ fn os_open_files(attach_parent: bool, filter: &str) -> Vec<String> {
     if attach_parent {
         dialog = attach(dialog);
     }
-    dialog.pick_files().unwrap_or_default().into_iter()
-        .map(|p| p.to_string_lossy().into_owned()).collect()
+    dialog
+        .pick_files()
+        .unwrap_or_default()
+        .into_iter()
+        .map(|p| p.to_string_lossy().into_owned())
+        .collect()
 }
 
 /// 单一 OS save 实现：default_name 非空才 set_file_name → 按策略锚定
