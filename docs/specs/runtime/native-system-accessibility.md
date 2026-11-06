@@ -56,6 +56,12 @@ event and are pruned when that receiver is released.
 The WebView2 document surface retains its own Windows provider. Its document
 text and real selection require direct system-tree evidence; parent semantics
 and DOM ARIA are not substitutes.
+Unmounting its canvas hides both the WebView and its owned popup. Mounted
+Iced program state owns this lease; recreating a painter during a normal view
+rebuild does not release it. Rebinding a retained canvas to another key releases
+the old key, and the last canvas using a key hides its surface. The WebView may
+remain allocated for remount, following the existing experimental hide/show
+contract. Explicit surface release also hides the popup before removing it.
 
 ## Verification boundary
 

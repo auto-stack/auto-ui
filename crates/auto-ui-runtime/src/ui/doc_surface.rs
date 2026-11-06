@@ -303,6 +303,78 @@ fn debug_enabled() -> bool {
     std::env::var("AUTO_DOC_SURFACE_DEBUG").as_deref() == Ok("1")
 }
 
+/// Hide both layers when a mounted canvas disappears. Keep the WebView alive,
+/// as for the existing empty-URL hide path, so a later mount can resume it.
+fn hide_surface(key: &str) {
+    let mut map = surfaces().lock().unwrap();
+    if let Some(surface) = map.get_mut(key) {
+        if surface.visible {
+            WEBVIEWS.with(|views| {
+                if let Some(view) = views.borrow_mut().get(key) {
+                    let _ = view.set_visible(false);
+                }
+            });
+            surface.visible = false;
+        }
+        if surface.popup_visible {
+            if surface.hwnd != 0 {
+                set_popup_visible(surface.hwnd, false);
+            }
+            surface.popup_visible = false;
+        }
+    }
+}
+
+thread_local! {
+    static MOUNTED: std::cell::RefCell<HashMap<String, usize>> =
+        std::cell::RefCell::new(HashMap::new());
+}
+
+/// Iced retains program state across ordinary view rebuilds and drops it when
+/// the canvas is removed. The painter itself is recreated on every view, so
+/// its destructor cannot represent an unmount.
+#[derive(Default)]
+pub struct DocSurfaceState {
+    key: std::cell::RefCell<Option<String>>,
+}
+
+impl DocSurfaceState {
+    fn bind(&self, key: &str) {
+        if self.key.borrow().as_deref() == Some(key) {
+            return;
+        }
+        self.unbind();
+        MOUNTED.with(|mounted| {
+            *mounted.borrow_mut().entry(key.to_string()).or_default() += 1;
+        });
+        *self.key.borrow_mut() = Some(key.to_string());
+    }
+
+    fn unbind(&self) {
+        let Some(key) = self.key.borrow_mut().take() else { return };
+        let last = MOUNTED.with(|mounted| {
+            let mut mounted = mounted.borrow_mut();
+            let Some(count) = mounted.get_mut(&key) else { return false };
+            *count -= 1;
+            if *count == 0 {
+                mounted.remove(&key);
+                true
+            } else {
+                false
+            }
+        });
+        if last {
+            hide_surface(&key);
+        }
+    }
+}
+
+impl Drop for DocSurfaceState {
+    fn drop(&mut self) {
+        self.unbind();
+    }
+}
+
 /// 裸 HWND 宿主实现（wry build_as_child 的 HasWindowHandle 入参）。
 struct RawHwndHost(isize);
 
@@ -490,6 +562,7 @@ pub fn sync_surface(key: &str, url: &str, bounds: &Rectangle) {
 
 /// 显式释放（同进程重建路径；会话退出由进程回收兜底）。须在主线程调用。
 pub fn release_surface(key: &str) {
+    hide_surface(key);
     surfaces().lock().unwrap().remove(key);
     WEBVIEWS.with(|w| {
         w.borrow_mut().remove(key);
@@ -513,21 +586,80 @@ impl<M> DocSurfacePainter<M> {
 }
 
 impl<M> canvas::Program<M> for DocSurfacePainter<M> {
-    type State = ();
+    type State = DocSurfaceState;
 
     fn draw(
         &self,
-        _state: &Self::State,
+        state: &Self::State,
         renderer: &iced::Renderer,
         _theme: &iced::Theme,
         bounds: Rectangle,
         _cursor: mouse::Cursor,
     ) -> Vec<Geometry> {
+        state.bind(&self.key);
         sync_surface(&self.key, &self.url, &bounds);
         let mut frame =
             canvas::Frame::new(renderer, Size::new(bounds.width, bounds.height));
         let rect = Path::rectangle(iced::Point::ORIGIN, frame.size());
         frame.fill(&rect, iced::Color::from_rgba8(0xF6, 0xF7, 0xF9, 1.0));
         vec![frame.into_geometry()]
+    }
+}
+
+#[cfg(test)]
+mod plan068_mount_tests {
+    use super::*;
+
+    fn visible(key: &str) {
+        surfaces().lock().unwrap().insert(key.to_string(), SurfaceMeta {
+            visible: true,
+            popup_visible: true,
+            ..Default::default()
+        });
+    }
+
+    fn assert_visibility(key: &str, expected: bool) {
+        let map = surfaces().lock().unwrap();
+        let surface = &map[key];
+        assert_eq!(surface.visible, expected);
+        assert_eq!(surface.popup_visible, expected);
+    }
+
+    #[test]
+    fn canvas_state_unmount_hides_both_layers_and_remount_can_retain_surface() {
+        let key = "p068-mount-drop";
+        let state = <DocSurfacePainter<()> as canvas::Program<()>>::State::default();
+        state.bind(key);
+        visible(key);
+        state.bind(key); // ordinary rebuilt painter must not add another lease
+        drop(state);
+        assert_visibility(key, false);
+        assert!(surfaces().lock().unwrap().contains_key(key), "hide retains the surface");
+        let remount = DocSurfaceState::default();
+        remount.bind(key);
+        visible(key);
+        drop(remount);
+        assert_visibility(key, false);
+        release_surface(key);
+    }
+
+    #[test]
+    fn shared_key_stays_visible_until_last_canvas_and_key_change_releases_old() {
+        let a = "p068-mount-shared";
+        let b = "p068-mount-next";
+        let first = DocSurfaceState::default();
+        let second = DocSurfaceState::default();
+        first.bind(a);
+        second.bind(a);
+        visible(a);
+        drop(first);
+        assert_visibility(a, true);
+        second.bind(b);
+        assert_visibility(a, false);
+        visible(b);
+        release_surface(b); // explicit release also hides the popup before removal
+        assert!(!surfaces().lock().unwrap().contains_key(b));
+        drop(second);
+        release_surface(a);
     }
 }
