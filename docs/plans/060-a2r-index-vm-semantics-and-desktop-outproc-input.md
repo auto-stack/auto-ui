@@ -5,7 +5,7 @@ feature_name: a2r 数组索引 VM 语义与 iced 桌面 outproc 输入/验收投
 author: [Codex]
 created_at: 2026-11-05
 updated_at: 2026-11-06
-plan_revision: 2
+plan_revision: 3
 current_step: 2
 total_steps: 6
 base_branch: master
@@ -146,7 +146,15 @@ fn __at_idx<T: Clone + Default>(v: &[T], i: i64) -> T {
 - 原生帧文字先组合item父变换与Paragraph/Editor自身变换，再发v1坐标或
   v2 Transform；正确滚动/点击通过完整producer→host replay验证。
 
-### 5.3 规范增量
+### 5.3 原生 Http profile 与 JSON 身份字段（r3 有界修订）
+
+OS054 的真实 Chat 反例证明：PLAN052 原生 Http 适配直接把 `/api/register` 交给网络内核，既未解析应用后端地址，也未内嵌后端；不能按其他 `api.*` 应用推断其可用。沿 Chat 既有共享 Rust HTTP profile，服务供给与所有权由 OS054 现有启动接缝及必要 app owner 前置处理，本计划不新增 supervisor 或更换后端。
+
+生成代码的 Http.post/get/get_json 经 native_http 适配接收本 app 生成时选定的后端基址。相对根路径仅附加此地址；绝对 URL 保留自身 origin；不修改宿主全局环境。基址常量与 receipt 的 profile/http-base 输入同源，端口/生成 profile 改变不得复用旧产物。发布布局版本升为 v10；exe 与含 Http 的 shell-library 生成面都提供所需常量。响应体保持 JSON 文本，API HTTP 拒绝不伪作网络断连；transport status0 则进入既有 try/catch 的连接失败路径，诊断不得携带 URL token/请求体。
+
+原生 JSON 属性名启发式不得覆盖已声明 String 状态目标；字符串身份 u-54 保持原值，整数控制只对原始 JSON 读取转换一次，已拼装字符串不重复当 Value。边界是本次状态赋值和既有 Http 命名空间，不承诺新增语言类型/路由器。下一执行入口：compiler Http/ID 两个实际红例→runtime 真实 TCP POST/GET/拒绝控制→tools 生成常量/缓存输入→正式工具/Chat 重建→OS054 实机注册、双客户端和 C 隔离。只完成前段不能关闭 app/OS 验收。
+
+### 5.4 规范增量
 
 | delta_id | add/modify/retire | docs/specs/... target | before/after rule | rationale | acceptance IDs |
 |---|---|---|---|---|---|
@@ -496,3 +504,9 @@ back 侧 `auto-notes-...-back` 是完整 axum/DB 实现。故 iced 桌面上任�
   Native Blog007 consumed text-transform fix6f00f375; wheel moves text but footer remains below actual WM client. Root cause: Hello1280x800 was used as decorated outer size, broker sent no WM resize, endpoint ignored Frame Resize, Headless sources ignored lifecycle resize. Repair uses existing protocol only: bound initial command outer rectangle to usable area including existing chrome; each active non-shell command client receives primary-surface Resize when actual WM-derived client extent changes, metadata updates only after send. Pixel/shell negotiation retained. Endpoint validates primary ownership/positive finite dimensions and deduplicates; headless/MCP/projector sources invalidate frame, retaining component/cache.
   Genuine pre-fix endpoint/native-scroll red: resizing must invalidate the frame (native-resize-red-r149.log, terminal101), not a test compile failure. Initial green attempt had local TransportError Display compile error, corrected to typed Result without message formatting (r149 green log); no behavior result claimed for it. Final native-resize-final-r149.log p06014passed/0ignored/.30s after formatting and explicit component-state7→resize retains7→visible bottom click8. Existing v1/v2 replay controls retained. New real-pipe broker adoption verifies bounded outer geometry, correct client dimensions, maximize notification, repeated-pump deduplication and pixel control. Native Blog build/actual footer task remains pending, not inferred from unit green.
   Current old host28824 and descendants already absent when normal shutdown command attempted (connection refused); not a successful commanded exit or resource-release pass. No forced Windows activation or foreign process cleanup. Next rebuild frozen candidate/child and actual owner007 task, then parent fixed-pin consumer and remaining gates. Specs native-command-frame-text.md records bounded resize contract and old-client limitation, no tag/capability addition.
+
+- stage: new/work | plan_id: auto-ui/PLAN-060 | plan_revision: r3 | round: 53 | outcome: bounded Http-profile/JSON-state repair verified in scoped checks; app consumer pending | next: formal tool/Chat build and OS054 shared Rust service
+  Inherited same OS054 completion authorization, AC01..06/tasks/budgets/repositories unchanged. Parent054r2 withdraws only Chat embedded-backend assumption: native Http.post('/api/register') passed raw relative URL to kernel, no backend/db created, public UI registration rejected. Native Http now consumes generated app base without process-env mutation; absolute URLs preserved; status0 raises static connection failure, API HTTP error body preserved. Baked profile is captured in receipt profile/http-base and layoutv10; normal exe and Http-bearing shell-library generation provide constant. String state target uses raw JSON/VM-compatible string conversion so u-54 is not integer0; integer control consumes raw Value once. Indexed JSON field projection leaves Index to normal emitter, preserving __at_idx instead of raw Vec indexing.
+  Actual baseline native-http-codegen-red-r151.log: two behavior assertions fail (raw Http adapter and string id numeric cast). First green attempt exposed a fixture semicolon parser error, corrected to normal model newlines; next assertion exposed existing double numeric projection, fixed to raw JSON conversion. Supplemental p060_native_http_json_string_projection_keeps_safe_array_indexing red in native-http-index-red-r151.log caught the new string path bypassing index protection. One broad patch initially hit adjacent null-coalesce collection and caused compile E0425/E0433; restored that function and scoped the intended helper change, final diff confirms no null-coalesce edit. These are work checks/fixture corrections, not failed final-review cycles.
+  Final compiler p060_7passed/0ignored/.04s, native-http-codegen-final-r151b.log (14.13s build). Includes prior text/table/route/input controls plus HTTP/profile, string/int/composed-string and out-of-bounds-index cases. Runtime native-http-runtime-r151.log2passed/0ignored/.01s: real TCP POST UTF8 body and idu-54, absolute GET retains origin, HTTP403 JSON denial preserved; transport failure static diagnostic. Tools native-http-profile-r151.log1passed/0ignored/.04s: generated profile constant equals receipt input, differing ports yield distinct identity. New helper module formatted; no broad/full regression yet. Final six native builds and actual Chat/UI/DB/security task still pending; no task completion inferred from scoped green.
+  Existing official CLI auto service --server rust is confirmed server-only (no Vue/Vite/UI), strict generation, no occupant killing, loopback service config/real AUTO_SERVICE_READY and __auto health/shutdown. Existing desktop_backends::DesktopBackends already owns Rust/VM server children for Vue. OS054 bounded probe will reuse these existing service/ownership facilities; no need to assume a new app health endpoint or handwrite a router/secret backend. Production iced provision wiring/last-owner semantics remains OS054 work; no app source/pin changed. No credential acquired in failed Chat attempt; worker exited and temporary private OCR image removed.

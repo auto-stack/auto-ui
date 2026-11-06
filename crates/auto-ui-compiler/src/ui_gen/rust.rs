@@ -13412,14 +13412,14 @@ fn collect_local_elems(
                     // post_sync 只要 &str——统一串化（Value→JSON 文本，
                     // String/&str 恒等保形）。
                     return Some(format!(
-                        "::a2r_std::http::post_sync(&({}), &(({}).to_string()), \"\").1",
+                        "auto_ui_runtime::ui::native_http::post(&({}), &(({}).to_string()), __AT_HTTP_BASE)",
                         one(0)?,
                         one(1)?
                     ));
                 }
                 "get_json" | "get" => {
                     return Some(format!(
-                        "::a2r_std::http::get_sync(&({})).1",
+                        "auto_ui_runtime::ui::native_http::get(&({}), __AT_HTTP_BASE)",
                         one(0)?
                     ));
                 }
@@ -13956,11 +13956,7 @@ fn collect_local_elems(
     fn value_bracket_chain(&self, expr: &auto_lang_core::ast::Expr) -> String {
         use auto_lang_core::ast::Expr;
         // 段收集（外→内）后反转。
-        enum Seg<'a> {
-            Field(String),
-            Index(&'a auto_lang_core::ast::Expr),
-        }
-        let mut segs: Vec<Seg> = Vec::new();
+        let mut fields = Vec::new();
         let mut cur = expr;
         loop {
             match cur {
@@ -13974,26 +13970,20 @@ fn collect_local_elems(
                             break;
                         }
                     }
-                    segs.push(Seg::Field(f.as_str().to_string()));
+                    fields.push(f.as_str().to_string());
                     cur = inner.as_ref();
                 }
-                Expr::Index(target, ix) => {
-                    segs.push(Seg::Index(ix.as_ref()));
-                    cur = target.as_ref();
-                }
+                // Leave indexing to the ordinary expression emitter, which
+                // retains __at_idx for typed vectors. Rebuilding it as a raw
+                // Rust subscript here would reintroduce out-of-range panics.
+                Expr::Index(..) => break,
                 _ => break,
             }
         }
-        segs.reverse();
+        fields.reverse();
         let mut out = self.ast_expr_to_rust(cur);
-        for seg in &segs {
-            match seg {
-                Seg::Field(f) => out = format!("{out}[{f:?}]"),
-                Seg::Index(ix) => {
-                    let idx = self.ast_expr_to_rust(ix);
-                    out = format!("{out}[({idx}) as usize]");
-                }
-            }
+        for field in &fields {
+            out = format!("{out}[{field:?}]");
         }
         out
     }
@@ -15460,7 +15450,14 @@ fn collect_local_elems(
                             }
                             let has_str_accessor =
                                 value.contains(".as_str().unwrap_or_default().to_string()");
-                            if has_str_accessor {
+                            if ty == "String"
+                                && matches!(right.as_ref(), Expr::Ident(..) | Expr::Dot(..) | Expr::Index(..))
+                                && (self.expr_is_value_typed(right) || value.contains("[\"")) {
+                                // JSON field-name guesses (notably `id`) cannot
+                                // override a declared String destination. Keep
+                                // the raw Value until the VM-compatible str shim.
+                                value = format!("__at_str(&({}))", self.value_bracket_chain(right));
+                            } else if has_str_accessor {
                                 match ty.as_str() {
                                     "i32" | "i64" | "u32" | "u64" | "f32" | "f64" => {
                                         value = value.replace(
@@ -15493,7 +15490,7 @@ fn collect_local_elems(
                                 // 裸 Value 局部/元素（card_id / waste_cards[i]）
                                 // → __at_num 收口（selected_card_id 株——
                                 // 此前困在 has_str 分支内不触发）。
-                                value = format!("__at_num(&({}))", value);
+                                value = format!("__at_num(&({}))", self.value_bracket_chain(right));
                             } else if ty == "Vec<serde_json::Value>"
                                 && matches!(right.as_ref(), Expr::Array(_))
                             {
@@ -17350,6 +17347,76 @@ widget App {
         assert!(!code.contains(".child(View::col().children(row[\"vals\"]"));
         assert!(code.contains("__at_str(&(cell))"),
             "JSON-backed text cells must display the string value, not JSON quotation marks: {code}");
+    }
+
+    #[test]
+    fn p060_native_http_calls_use_the_generated_app_profile() {
+        let src = r#"widget HttpProfile {
+            model { var response str = "" }
+            msg { Load }
+            view { text .response }
+            on { .Load -> { .response = Http.post("/api/register", "{}") } }
+        }"#;
+        let ast = crate::parse_ui(src).unwrap();
+        let decl = ast.domain_stmts().find_map(|s| match s {
+            auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d), _ => None,
+        }).unwrap();
+        let widget = crate::aura::extract::extract_widget_from_decl(decl).unwrap();
+        let code = RustGenerator::new().generate(&widget).unwrap();
+        assert!(code.contains("native_http::post"), "Http must use the app-profile adapter: {code}");
+        assert!(code.contains("__AT_HTTP_BASE"), "relative calls need the generated backend profile");
+    }
+
+    #[test]
+    fn p060_native_http_string_identity_uses_the_declared_target_type() {
+        let src = r#"widget StringIdentity {
+            model {
+                var my_id str = ""
+                var numeric_id int = 0
+                var prefixed str = ""
+            }
+            msg { Load }
+            view { text .my_id }
+            on { .Load -> {
+                var m = json.to_value("{\"id\":\"u-54\"}")
+                .my_id = m.id
+                .numeric_id = m.id
+                .prefixed = "user:" + m.name
+            } }
+        }"#;
+        let ast = crate::parse_ui(src).unwrap();
+        let decl = ast.domain_stmts().find_map(|s| match s {
+            auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d), _ => None,
+        }).unwrap();
+        let widget = crate::aura::extract::extract_widget_from_decl(decl).unwrap();
+        let code = RustGenerator::new().generate(&widget).unwrap();
+        let string_assignment = code.split("self.my_id = ").nth(1).unwrap().split(';').next().unwrap();
+        assert!(string_assignment.contains("__at_str(&(m[\"id\"]))"), "declared str identity must retain the raw JSON value: {code}");
+        assert!(!string_assignment.contains("as_i64"));
+        assert!(code.contains("self.numeric_id = __at_num(&(m[\"id\"]))"), "the declared integer control must consume raw JSON once: {code}");
+        assert!(!code.contains("__at_str(&(format!"), "an already composed String must not be treated as raw JSON");
+    }
+
+    #[test]
+    fn p060_native_http_json_string_projection_keeps_safe_array_indexing() {
+        let src = r#"widget IndexedIdentity {
+            model {
+                var selected str = ""
+                var rows List = [{ id: "u-54" }]
+            }
+            msg { Load }
+            view { text .selected }
+            on { .Load -> { .selected = .rows[999].id } }
+        }"#;
+        let ast = crate::parse_ui(src).unwrap();
+        let decl = ast.domain_stmts().find_map(|s| match s {
+            auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d), _ => None,
+        }).unwrap();
+        let widget = crate::aura::extract::extract_widget_from_decl(decl).unwrap();
+        let code = RustGenerator::new().generate(&widget).unwrap();
+        let assignment = code.split("self.selected = ").nth(1).unwrap().split(';').next().unwrap();
+        assert!(assignment.contains("__at_idx"), "string projection must retain safe index lowering: {code}");
+        assert!(!assignment.contains("self.rows["));
     }
 
     #[test]

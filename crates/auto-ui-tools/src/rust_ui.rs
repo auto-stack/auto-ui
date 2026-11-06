@@ -3776,6 +3776,9 @@ static GUARD_ALLOC: auto_ui_runtime::ui::mem_guard::GuardAlloc = auto_ui_runtime
 
 // PLAN-039 T-12（批次 E）：内建方法 shim 家族——main.rs 组装级注入
 // 一次（per-file 注入会撞多 .at 文件拼接的重复定义）。
+#[allow(dead_code)]
+const __AT_HTTP_BASE: &str = {http_base:?};
+
 {at_shims}
 
 {theme_pkg_static}
@@ -3811,6 +3814,7 @@ fn main() -> auto_ui_runtime::ui::AppResult<()> {{
         cleaned = cleaned.trim(),
         at_shims = AT_BUILTIN_METHOD_SHIMS,
         theme_pkg_static = theme_pkg_static,
+        http_base = crate::util::http_base_url(),
         env_inits = env_inits,
         native_client_gate = native_client_gate,
         iced_entry = iced_entry,
@@ -4918,6 +4922,9 @@ pub fn generate_shell_pack_lib_sources(pack_dir: &Path) -> AutoResult<(String, S
     lib.push_str("#![allow(dead_code, non_snake_case, non_camel_case_types, unused_imports, unused_variables, unused_mut, clippy::all)]\n\n");
     lib.push_str("use auto_ui_runtime::ui::{Component, View};\n");
     lib.push_str("use auto_ui_runtime::ui::desktop_protocol::shell_client::{FaceProjector, ShellStateAccess, ShellSurface};\n\n");
+    if cleaned.contains("native_http::") {
+        lib.push_str(&format!("const __AT_HTTP_BASE: &str = {:?};\n", crate::util::http_base_url()));
+    }
     lib.push_str(&cleaned);
     lib.push_str("\n// —— SHELL_MANIFEST（shell_projection 同形装配清单——D5）——\n");
     lib.push_str(
@@ -7601,7 +7608,7 @@ pub(crate) fn resolve_managed_front(project_dir: &Path) -> AutoResult<ManagedFro
 /// generator changes without a bump are a recorded boundary.
 // PLAN-060: invalidate unchanged inputs after fixing text click/style emission,
 // in addition to the earlier table-row and named-input corrections.
-const FRONT_LAYOUT_VERSION: &str = "front-layout/v9";
+const FRONT_LAYOUT_VERSION: &str = "front-layout/v10";
 
 fn front_generator_identity(context: &GeneratedBuildContext) -> String {
     format!(
@@ -7649,7 +7656,14 @@ fn front_input_hashes(
     for (key, digest) in theme_input_entries(project_dir)? {
         inputs.insert(key, digest);
     }
+    let (key, digest) = native_http_profile_input(&crate::util::http_base_url());
+    inputs.insert(key, digest);
     Ok(inputs)
+}
+
+fn native_http_profile_input(base: &str) -> (String, String) {
+    use sha2::{Digest, Sha256};
+    ("profile/http-base".into(), format!("{:x}", Sha256::digest(base.as_bytes())))
 }
 
 /// PLAN-036 T-04：外部官方主题包闭包——统一输入身份作为必需生成输入。
@@ -9153,6 +9167,19 @@ pub fn answer() int { return 42 }
         // 既有直连/broker 臂不回退（I2）。
         assert!(main_rs.contains("ClientTarget::Direct"));
         assert!(main_rs.contains("ClientTarget::Broker"));
+    }
+
+    #[test]
+    fn p060_native_http_profile_is_recorded_and_bound_in_generated_main() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(tmp.path().join("pac.at"), "name: \"http-profile\"\n").unwrap();
+        let base = crate::util::http_base_url();
+        let generated = wrap_example("http-profile", "pub struct App {}", tmp.path(), &PacSource::legacy());
+        assert!(generated.contains(&format!("const __AT_HTTP_BASE: &str = {base:?};")));
+        let inputs = front_input_hashes(tmp.path(), &PacSource::legacy()).unwrap();
+        let (key, digest) = native_http_profile_input(&base);
+        assert_eq!(inputs.get(&key), Some(&digest), "the profile baked into main must participate in cache identity");
+        assert_ne!(native_http_profile_input("http://127.0.0.1:17823"), native_http_profile_input("http://127.0.0.1:17824"), "changing the selected backend must invalidate reuse");
     }
 
     /// PLAN-693 T-01/T-03：生成 main 的三模式 CLI 臂在场——`--render-mode`/

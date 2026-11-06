@@ -32,3 +32,18 @@ Verification includes generator index/route tests, tools' generated merged
 backend regressions, the six native application build gate, and the actual
 Calendar/Notes/Todo/Blog consumer receipts. Their individual scope and source
 revisions remain part of the evidence.
+
+Native `Http.post`, `Http.get` and `Http.get_json` use the backend profile
+selected for that generated app. Root-relative paths resolve against its baked
+base; absolute URLs retain their origin. The resolver does not modify the host
+environment. The generated base and the `profile/http-base` receipt input come
+from the same selected configuration; changing it invalidates artifact reuse.
+Applications using this HTTP facade still require their real backend service;
+API entity structs alone do not embed that service.
+
+The facade preserves JSON response bodies, including API error responses.
+Transport failure is reported through the existing UI catch path with a static
+diagnostic that contains no request URL, token or body. Declared String state
+targets retain JSON string identities rather than applying the field-name
+integer heuristic. Integer state reads convert the original JSON value once;
+already composed string expressions retain their existing string path.
