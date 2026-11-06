@@ -70,9 +70,14 @@ pilot 旧档测试复跑全绿。
   行为源绑定、实例表（路径→def_idx，声明先序）、每 def 元素树（稳定元
   素名；文字槽位 = 声明序）、事件派发器名与实参形态（`index`/`none`）。
 - `world.at`：SoA 实例数组（root 标量 `r_<field>`）、运行时参数数组、
-  绑定表、recv fn `{prefix}_{ev}(i)`、每实例 64B UTF-8 文字缓冲＋len、
-  有界数字/布尔格式化助手（最小位数十进制，负号，>9999999 → OVER；
-  bool → true/false）、refresh fn、click 派发器、getter
+  绑定表、recv fn `{prefix}_{ev}(i)`、每实例 64B UTF-8 文字缓冲＋len
+  （PLAN-049 起字节缓冲按半缓冲拆分：缓冲 A ≤2 槽×64B=128，缓冲 B
+  `text_b` 仅在 def 文字 >2 槽时声明；PLAN-065 起 ≤2 槽 def 的
+  digits/getter 高槽分支同步剪裁——e 合法域恒 < 槽数 ≤ 2，单分支直写
+  缓冲 A，不引用未声明 `text_b`（AG021 D-06 具名反例关闭：曾生成
+  SDK `Undefined variable: {p}_ui_text_b_0`；≥3 槽 def 生成段逐字不
+  变））、有界数字/布尔格式化助手（最小位数十进制，负号，>9999999 →
+  OVER；bool → true/false）、refresh fn、click 派发器、getter
   （`get_{prefix}_{field}_{idx}` / `get_{pathu}_{field}` / `get_r_{field}`
   ＋ `{prefix}_ui_text_len(i,e)` / `_at(i,e,j)`）。
 - 消费入口（驱动侧 `NodeUiApp`）：`main()` 恰一次在任何回调前（全局数
@@ -88,8 +93,8 @@ pilot 旧档测试复跑全绿。
 |---|---|---|
 | 有状态实例 | ≤8（root 计入；沿 020 envelope） | VM SoA |
 | 每 def 元素 | ≤32 | 适配器（产物驱动） |
-| 每 def 文字槽 | ≤4（64B×4=256 = SDK 字面量数组硬上限） | VM 每实例数组 |
-| 文字字节 | 64B/槽；>63 字节字面量具名拒绝 | VM |
+| 每 def 文字槽 | ≤4（64B×4=256 = SDK 字面量数组硬上限；PLAN-049 起按两个 ≤128 半缓冲拆分声明） | VM 每实例数组 |
+| 文字字节 | 64B/槽分配；内容 >63 字节（**按字节计数**，多字节 UTF-8 同界）具名拒绝——63 字节合法、64 字节拒绝，字面量与常量文字字段同界（PLAN-065 边界实证） | VM |
 | 容器子元素 | ≤8 | 适配器 |
 | 事件队列 | ≤64 待处理；满则新事件具名丢弃计数 | 适配器 |
 | 每回调预算 | 不变（1000 steps/slice；cumulative 100k；≤120 slices；250ms） | pinned Session |

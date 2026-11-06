@@ -70,7 +70,10 @@ components-2d probe 冻结 world.at 逐字节 pin；node-ui profile 对嵌入头
   `#tx/#ty/#tz`）——世界 ABI 与 048 完全同面。
 - 文字字节缓冲：半缓冲拆分（每半 ≤2 槽×64B=128）——SDK 字面量数组恰
   256 元素静默截断为 0（048 复审实测＋049 app_start 故障复证）；公开
-  `len(i,e)/at(i,e,j)` ABI 不变。
+  `len(i,e)/at(i,e,j)` ABI 不变。PLAN-065 起 ≤2 槽 def 的 digits/getter
+  高槽分支剪裁为单分支直写缓冲 A（不再引用未声明的 `text_b` 半缓冲；
+  AG021 D-06 关闭）；本档冻结产物无 ≤2 槽 def，再生字节经
+  verify_plan049/054 复证不变。
 
 ## 2. 产物与消费（AG021 配方）
 
