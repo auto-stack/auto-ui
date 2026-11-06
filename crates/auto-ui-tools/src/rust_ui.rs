@@ -8637,6 +8637,153 @@ mod tests {
         assert_eq!(fs::read(&executable).unwrap(), before, "failed build must not publish or return the old image");
     }
 
+    /// Compile and run production-generated coalescing expressions with the
+    /// production shim and JSON helpers, independently of an iced window.
+    #[test]
+    fn p060_coalesced_indices_execute_safe_fallbacks() {
+        use auto_ui_compiler::{aura::extract::extract_widget_from_decl,
+            ui_gen::{BackendGenerator, RustGenerator}};
+        let mut methods = String::new();
+        let mut checks = String::new();
+        let mut count = 0;
+        for root in ["local", "model", "store", "nested", "mixed"] {
+            for (index, expected) in [("0", "u-54"), ("999", "fallback"), ("-1", "fallback")] {
+                for shape in ["present", "empty", "missing"] {
+                    let empty = shape == "empty";
+                    let items = match (root, shape) {
+                        (_, "empty") => "[]", (_, "missing") => "[{ other: 54 }]",
+                        ("mixed", _) => "[{ cells: [{ id: \"u-54\" }] }]",
+                        _ => "[{ id: \"u-54\" }]",
+                    };
+                    let prefix = if root == "store" {
+                        format!("store ProbeStore {{ model {{ var rows List = {items} }} msg {{ Noop }} on {{ .Noop -> {{ }} }} }}")
+                    } else { String::new() };
+                    let model = if root == "model" { format!("var rows List = {items}") } else { String::new() };
+                    let (declarations, base) = match root {
+                        "local" => (format!("var rows List = {items}"), "rows"),
+                        "model" => (String::new(), ".rows"),
+                        "store" => (String::new(), ".store.rows"),
+                        "mixed" => (format!("var rows List = {items}"), "rows[0].cells"),
+                        _ => (format!("var doc = json.to_value({{ rows: {items} }})"), "doc.rows"),
+                    };
+                    let source = format!("{prefix}\nwidget Probe {{ model {{ var text str = \"\"\n{model} }} msg {{ Load }} view {{ text .text }} on {{ .Load -> {{ {declarations}\n.text = {base}[{index}].id ?? \"fallback\" }} }} }}");
+                    let ast = auto_ui_compiler::parse_ui(&source).expect("parse fixture");
+                    RustGenerator::clear_store_names();
+                    let mut generator = RustGenerator::new();
+                    let mut code = String::new();
+                    for stmt in ast.domain_stmts() {
+                        match stmt {
+                            auto_ui_dialect::UiStmt::StoreDecl(store) => {
+                                generator.register_store("store", store.name.as_str());
+                                generator.prime_store_field_types(store);
+                            }
+                            auto_ui_dialect::UiStmt::WidgetDecl(decl) => {
+                                code = generator.generate(&extract_widget_from_decl(decl).unwrap()).unwrap();
+                            }
+                            _ => {}
+                        }
+                    }
+                    let expr = code.split("self.text = ").nth(1).expect("generated assignment")
+                        .split(';').next().unwrap();
+                    // Fail safely before executing an unsafe generated subscript.
+                    if root != "nested" {
+                        assert!(expr.contains("__at_idx"), "{root}/{index}/{empty}: {expr}");
+                    }
+                    let value = match (root, shape) {
+                        (_, "empty") => "vec![]", (_, "missing") => "vec![serde_json::json!({\"other\":54})]",
+                        ("mixed", _) => "vec![serde_json::json!({\"cells\":[{\"id\":\"u-54\"}]})]",
+                        _ => "vec![serde_json::json!({\"id\":\"u-54\"})]",
+                    };
+                    let setup = format!("let rows: Vec<serde_json::Value> = {value}; self.rows=rows.clone(); self.store.rows=rows.clone(); let doc=serde_json::json!({{\"rows\":rows}});");
+                    methods.push_str(&format!("fn case_{count}(&mut self) -> String {{ {setup} ({expr}).to_string() }}\n"));
+                    let expected = if shape != "present" { "fallback" } else { expected };
+                    checks.push_str(&format!("assert_eq!(probe.case_{count}(), {expected:?}, {root:?});\n"));
+                    count += 1;
+                }
+            }
+        }
+        // The index is side-effectful: borrowing a Vec and lowering the index
+        // must not duplicate its evaluation.
+        let source = r#"widget Once { model { var text str = "" } msg { Load }
+            view { text .text } on { .Load -> { var rows List = [{ id: "u-54" }]
+            .text = rows[next_index()].id ?? "fallback" } } }"#;
+        let ast = auto_ui_compiler::parse_ui(source).unwrap();
+        let decl = ast.domain_stmts().find_map(|s| match s {
+            auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d), _ => None,
+        }).unwrap();
+        let code = RustGenerator::new().generate(&extract_widget_from_decl(decl).unwrap()).unwrap();
+        let expr = code.split("self.text = ").nth(1).unwrap().split(';').next().unwrap();
+        assert!(expr.contains("__at_idx"), "{expr}");
+        assert_eq!(expr.matches("next_index()").count(), 1, "{expr}");
+        methods.push_str(&format!("fn once(&self) -> String {{ let rows=vec![serde_json::json!({{\"id\":\"u-54\"}})]; ({expr}).to_string() }}"));
+        let program = format!(r#"
+{shims}
+struct Store {{ rows: Vec<serde_json::Value> }}
+struct Probe {{ rows: Vec<serde_json::Value>, store: Store }}
+impl Probe {{ {methods} }}
+static CALLS: std::sync::atomic::AtomicUsize=std::sync::atomic::AtomicUsize::new(0);
+fn next_index() -> i32 {{ CALLS.fetch_add(1,std::sync::atomic::Ordering::SeqCst); 999 }}
+fn main() {{
+    let mut probe=Probe {{ rows:vec![serde_json::json!({{"id":"u-54"}})], store:Store {{rows:vec![serde_json::json!({{"id":"u-54"}})]}} }};
+    {checks}
+    assert_eq!(probe.once(),"fallback");
+    assert_eq!(CALLS.load(std::sync::atomic::Ordering::SeqCst),1);
+}}
+"#, shims=super::AT_BUILTIN_METHOD_SHIMS);
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("coalesce.rs");
+        std::fs::write(&path, program).unwrap();
+        let test_exe = std::env::current_exe().unwrap();
+        let deps = test_exe.parent().unwrap();
+        let fingerprints = deps.parent().unwrap().join(".fingerprint");
+        let binary = test_exe.file_stem().unwrap().to_str().unwrap();
+        let test_hash = binary.strip_prefix("auto_ui_tools-").expect("Cargo test binary identity");
+        let manifest: serde_json::Value = serde_json::from_slice(&std::fs::read(
+            fingerprints.join(format!("auto-ui-tools-{test_hash}/test-lib-auto_ui_tools.json"))
+        ).expect("current Cargo test fingerprint")).unwrap();
+        let library = |name: &str, package: &str| -> std::path::PathBuf {
+            let identity = manifest["deps"].as_array().unwrap().iter()
+                .find(|d| d[1].as_str() == Some(name)).unwrap()[3].as_u64().unwrap();
+            let identity = identity.to_le_bytes().iter().map(|b| format!("{b:02x}")).collect::<String>();
+            let matches: Vec<_> = std::fs::read_dir(&fingerprints).unwrap().filter_map(Result::ok)
+                .filter(|e| e.file_name().to_string_lossy().starts_with(&format!("{package}-")))
+                .filter(|e| std::fs::read_to_string(e.path().join(format!("lib-{name}")))
+                    .is_ok_and(|s| s.trim() == identity))
+                .map(|e| deps.join(format!("lib{name}-{}.rlib",
+                    e.file_name().to_str().unwrap().strip_prefix(&format!("{package}-")).unwrap())))
+                .filter(|p| p.is_file()).collect();
+            assert_eq!(matches.len(), 1, "resolve exact current dependency: {name}");
+            matches[0].clone()
+        };
+        let core = library("auto_lang_core", "auto-lang-core");
+        let serde = library("serde_json", "serde_json");
+        let exe = tmp.path().join(if cfg!(windows) { "coalesce.exe" } else { "coalesce" });
+        let mut native_paths = Vec::new();
+        if cfg!(windows) {
+            let cargo_home = std::env::var_os("CARGO_HOME").map(std::path::PathBuf::from)
+                .unwrap_or_else(|| std::path::PathBuf::from(std::env::var_os("USERPROFILE").expect("user profile")).join(".cargo"));
+            let registry=cargo_home.join("registry/src");
+            for registry in std::fs::read_dir(registry).expect("Cargo registry").filter_map(Result::ok) {
+                for package in std::fs::read_dir(registry.path()).unwrap().filter_map(Result::ok) {
+                    let prefix=format!("windows_{}_msvc-",std::env::consts::ARCH);
+                    if package.file_name().to_string_lossy().starts_with(&prefix) {
+                        native_paths.push(package.path().join("lib"));
+                    }
+                }
+            }
+        }
+        let mut command=std::process::Command::new("rustc");
+        command.arg("--edition=2021").arg(&path).arg("-o").arg(&exe)
+            .arg("-L").arg(format!("dependency={}",deps.display()))
+            .arg("--extern").arg(format!("auto_lang_core={}",core.display()))
+            .arg("--extern").arg(format!("serde_json={}",serde.display()));
+        for native in &native_paths { command.arg("-L").arg(format!("native={}",native.display())); }
+        let output=command.output().expect("rustc link");
+        assert!(output.status.success(),"{}",String::from_utf8_lossy(&output.stderr));
+        let output=std::process::Command::new(exe).output().unwrap();
+        assert!(output.status.success(),"{}",String::from_utf8_lossy(&output.stderr));
+    }
+
     /// T-07 子批3（F-815-T07-B2-R1-03）`external_backend` 字段消费钉：
     /// 请求在场即权威——值**或缺席**都由请求定，不回读磁盘主声明（无第
     /// 二真源）；legacy 臂（无请求）才读 pac.at `back: { project }`。

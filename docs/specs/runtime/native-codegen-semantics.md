@@ -9,6 +9,13 @@ the selected element. Empty arrays follow the same rule. The returned owned
 element can participate in a subsequent field projection. Existing JSON Value
 array access keeps its established `at_owned`/`get_owned` path.
 
+The same safe read applies before a null-coalescing field projection, including
+local, model and store vectors. The typed receiver stays intact; nested JSON
+paths use the JSON helpers with one field per owned lookup. Negative JSON
+indices convert through a signed integer before the helper's unsigned index.
+Missing fields, empty arrays and invalid indices select the coalescing default.
+The receiver and each index expression are evaluated once.
+
 This rule does not add language types or promise that arbitrary Rust types are
 representable by the generator. The generated program must still compile for
 its selected element type; a successful build of Calendar is one consumer

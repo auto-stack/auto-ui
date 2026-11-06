@@ -35,7 +35,7 @@
 - `optimizeDeps.include` 只作用于 dev 预打包；build/rollup 输出配置不在
   本合同内。
 
-## 4. 桌面应用集合（PLAN-053）
+## 4. 桌面应用集合（PLAN-053 来源，PLAN-060 集成验证）
 
 桌面宿主的依赖来源扩展为宿主与本次获准嵌入应用声明的并集，存于生成的
 `desktop-npm-deps.json`；生成与桌面 run 自愈共用该集合。非桌面仍使用

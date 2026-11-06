@@ -13393,20 +13393,25 @@ fn collect_local_elems(
         }
         // `.store.<field>` 接收者（Dot 真链或拍平 Ident 两形态）。
         if let Expr::Dot(inner, field) = obj {
-            if let Expr::Ident(n) = inner.as_ref() {
-                if n.as_str() == "store" {
-                    return match self
-                        .store_field_rust_type(field.as_str())
-                        .unwrap_or_default()
-                        .as_str()
-                    {
-                        "serde_json::Value" => "value",
-                        t if t.starts_with("Vec<") => "vec",
-                        "String" => "string",
-                        "i32" | "i64" | "u32" | "u64" | "f32" | "f64" => "int",
-                        _ => "unknown",
-                    };
+            let store_receiver = match inner.as_ref() {
+                Expr::Ident(n) => matches!(n.as_str(), "store" | ".store"),
+                Expr::Dot(owner, name) if name.as_str() == "store" => {
+                    matches!(owner.as_ref(), Expr::Ident(n) if matches!(n.as_str(), "." | "self"))
                 }
+                _ => false,
+            };
+            if store_receiver {
+                return match self
+                    .store_field_rust_type(field.as_str())
+                    .unwrap_or_default()
+                    .as_str()
+                {
+                    "serde_json::Value" => "value",
+                    t if t.starts_with("Vec<") => "vec",
+                    "String" => "string",
+                    "i32" | "i64" | "u32" | "u64" | "f32" | "f64" => "int",
+                    _ => "unknown",
+                };
             }
         }
         if let Expr::Ident(name) = obj {
@@ -13835,8 +13840,8 @@ fn collect_local_elems(
     /// PLAN-710 G-A：`v.field ?? default` envelope 成员访问投影——
     /// json.to_value 结果（serde_json::Value）的 NullCoalesce 发射。
     /// 左链 Dot/Index 段逐段组合（成员段聚成 a2r_std::json 路径切片、
-    /// 索引段走 get_owned/at_owned，Vec<Value> 态基座的首索引走原生
-    /// 下标），投影型按 ?? 右值四族（str/int/bool/list——计划 §5 T-03
+    /// 索引段走 get_owned/at_owned，Vec<Value> 态基座的首索引走
+    /// __at_idx），投影型按 ?? 右值四族（str/int/bool/list——计划 §5 T-03
     /// 类型投影表；调用等非字面量缺省走 str-with 计算变体）。
     /// 语义与 VM 轨同源：路径缺段/字段缺席/类型不符 → ?? 右值缺省。
     /// 接收者按 envelope 契约视作 Value（value_local/Value 循环变量/
@@ -13857,8 +13862,18 @@ fn collect_local_elems(
         let mut segs: Vec<Seg> = Vec::new();
         let mut cur = left;
         loop {
+            // Keep typed model/store vector receivers intact. Flattening a
+            // `.rows` receiver into `self` + JSON key loses its Rust type.
+            if self.builtin_receiver_kind(cur) == "vec" {
+                break;
+            }
             match cur {
                 Expr::Dot(inner, f) => {
+                    if let Expr::Ident(n) = inner.as_ref() {
+                        if n.as_str() == "." || n.as_str() == "self" {
+                            break;
+                        }
+                    }
                     segs.push(Seg::Field(f.as_str().to_string()));
                     cur = inner.as_ref();
                 }
@@ -13871,18 +13886,12 @@ fn collect_local_elems(
         }
         segs.reverse();
         let recv = self.ast_expr_to_rust(cur);
-        // 基座 Vec<Value> 族判定（`.coll[i].f ?? d` 首索引走原生下标）。
-        let base_is_vec = (|| {
-            let Expr::Ident(n) = cur else {
-                return false;
-            };
-            let name = n.as_str().strip_prefix('.').unwrap_or(n.as_str());
-            self.state_types
-                .get(name)
-                .map(|t| t.starts_with("Vec<"))
-                .unwrap_or(false)
-                || self.array_locals.contains(name)
-        })();
+        let base_is_vec = self.builtin_receiver_kind(cur) == "vec";
+        let owned_path = |base: &str, keys: &[String]| {
+            keys.iter().fold(base.to_string(), |value, key| {
+                format!("auto_lang_core::a2r_std::json::get_owned(&({value}), {key})")
+            })
+        };
         // 逐段构造 Value 基座：成员段聚路径，索引段切段组合。
         let mut pending: Vec<String> = Vec::new();
         let mut value_expr: Option<String> = None;
@@ -13895,26 +13904,20 @@ fn collect_local_elems(
                         if pending.is_empty() {
                             format!("({ve})")
                         } else {
-                            format!(
-                                "auto_lang_core::a2r_std::json::get_owned(&({ve}), &[{}])",
-                                pending.join(", ")
-                            )
+                            owned_path(ve, &pending)
                         }
                     } else if base_is_vec {
-                        format!("({recv})[{idx_str}].clone()")
+                        format!("__at_idx(&({recv}), ({idx_str}) as i64)")
                     } else if pending.is_empty() {
                         format!("({recv})")
                     } else {
-                        format!(
-                            "auto_lang_core::a2r_std::json::get_owned(&({recv}), &[{}])",
-                            pending.join(", ")
-                        )
+                        owned_path(&recv, &pending)
                     };
                     value_expr = Some(if base_is_vec && value_expr.is_none() {
                         base
                     } else {
                         format!(
-                            "auto_lang_core::a2r_std::json::at_owned(&({base}), ({idx_str}) as usize)"
+                            "auto_lang_core::a2r_std::json::at_owned(&({base}), (({idx_str}) as i64) as usize)"
                         )
                     });
                     pending.clear();

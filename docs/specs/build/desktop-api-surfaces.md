@@ -1,6 +1,7 @@
 # Vue 桌面宿主的应用 API 面
 
-来源：auto-ui/PLAN-053。生产入口为 `VueProject::generate_desktop_host` 与
+实现来源：auto-ui/PLAN-053；本规范由 auto-ui/PLAN-060 为 auto-os/PLAN-054
+集成并验证已有兼容路径，不表示 PLAN-053 已完成。生产入口为 `VueProject::generate_desktop_host` 与
 `run_vue_flow`。
 
 - 每个应用的自包含 API 客户端写入 `src/apps/<id>/lib_api.ts`。源选择保持

@@ -1,18 +1,18 @@
 ---
 plan_id: auto-ui/PLAN-060
-status: executing
+status: execution_done
 feature_name: a2r 数组索引 VM 语义与 iced 桌面 outproc 输入/验收投递
 author: [Codex]
 created_at: 2026-11-05
 updated_at: 2026-11-06
 plan_revision: 6
-current_step: 3
+current_step: 5
 total_steps: 6
 base_branch: master
 base_commit: 220115df
 depends_on: []
-supersedes_spec_components: [docs/specs/runtime/component-and-store-instances.md]
-new_spec_components: [docs/specs/runtime/desktop-acceptance-input.md, docs/specs/runtime/native-codegen-semantics.md, docs/specs/runtime/native-command-frame-text.md]
+supersedes_spec_components: [docs/specs/runtime/component-and-store-instances.md, docs/specs/build/generated-vite-config.md]
+new_spec_components: [docs/specs/runtime/desktop-acceptance-input.md, docs/specs/runtime/native-codegen-semantics.md, docs/specs/runtime/native-command-frame-text.md, docs/specs/build/desktop-api-surfaces.md]
 touched_goals: [auto-os/PLAN-054]
 affects: [a2r-codegen, ui-iced-runtime, mcp-acceptance, auto-os/PLAN-054]
 ---
@@ -37,7 +37,7 @@ auto-os/PLAN-054 的 iced 轨在 052 交付后只剩两个框架级缺陷：
 → 缺省值，不 panic）；②验收通道补指针注入并让 handler/键盘真正投递到 outproc
 app。消费方 auto-os/PLAN-054 T-04 在交付后恢复 8 app 真实任务验收。
 
-非目标：不改 app 源码；不实现 router/多窗口新特性；不做 vue 桌面 host（053）；
+非目标：不改 app 源码；不实现 router/多窗口新特性；不新增 Vue 桌面宿主功能。既有053来源的兼容实现已由060为054集成并验证，范围见 SD-05/06，不代表053计划已完成；
 不扩大 VM 语言语义；不改 auto-lang 编译器。
 
 ## 1. 目标
@@ -99,7 +99,7 @@ AC-05独立复审要求保留，当前实现上下文检查不能冒充终局独
 
 **授权（2026-11-05，用户直接指令）**：在 auto-ui 立项并交付上述两处修复，
 允许修改 auto-ui 生成器/运行时/验收工具，允许在 os-054 候选树重建并实测；
-不含 app 源码修改、不含 vue 桌面 host（053）。
+不含 app 源码修改；Vue 桌面仅收口已集成且实际验证的兼容路径（SD-05/06），不承诺053的其余工作。
 
 现状证据（2026-11-05 实机，auto-os/PLAN-054 T-04）：
 
@@ -178,6 +178,8 @@ Chat原生生成源码仍把失败pending重建中的pp.client_msg_id按字段�
 | SD-02 | new | docs/specs/runtime/desktop-acceptance-input.md | pointer/keyboard、根组件 Action、旧客户端能力门、关闭重开契约（替代原先不存在的路径） | iced 桌面可驱动原生 app | AC-02/AC-03 |
 | SD-03 | add | docs/specs/runtime/native-command-frame-text.md | 文字自身/父项变换组合一次，v1/v2滚动几何一致 | 投递后的真实画面正确 | AC-02/AC-04 |
 | SD-04 | modify | docs/specs/runtime/component-and-store-instances.md | 编译原生路由Init回写/活动页单timer传播 | 同组件事件与store所有权 | AC-02/AC-04 |
+| SD-05 | add | docs/specs/build/desktop-api-surfaces.md | 原无统一桌面API规范；记录各app独立API/store路径、前缀与Rust/VM后端选择、owned生命周期、既有router包装及npm依赖集合 | 053来源兼容实现644d8366由060为054集成；以完整实际Vue消费验证约束已交付行为，不宣称053通过 | AC-04 |
+| SD-06 | modify | docs/specs/build/generated-vite-config.md | 原仅单项目依赖/代理；桌面使用本次获准app依赖并集及分app代理，非桌面规则不变 | 与已验证桌面API隔离与生成/run自愈保持同一来源 | AC-04 |
 
 （落点文件以仓库现有 Spec 为准，work 时按实际路径修订；若该节不存在则在本
 文件对应 Spec 新增小节。）
@@ -222,11 +224,11 @@ OS054真实Chat第六条消息已落库但气泡被裁切，滚轮不改变位�
 
 - [x] T-00（work）：定位 Index 发射全路径与 rqhost 客户端输入消费点，产出
   `docs/plans/evidence/060/decision.md`（边界索引发射策略 + handler 协议可行性）。
-- [ ] T-01（work）：Index 边界安全发射 + shim 注入 + 单测；F060-R6-01 reopened，见末尾独立复审；生成 calendar 验证
+- [x] T-01（work）：Index 安全发射与正式 shim；F060-R6-01修复见round70永久运行控制，原Calendar生成/实机证据保留。
   panic 消失。
 - [x] T-02（work）：`DesktopInject::Pointer` + MCP `action:"pointer"`；notes 点击实测。
 - [x] T-03（work）：outproc handler 协议投递（或降级边界）+ 键盘聚焦实测。
-- [ ] T-04（work）：六 app 回归/桌面实测/证据，提交 execution_done。F060-R6-01/02 reopened：受影响索引生成控制与规范清单待修，既有六app实机成功保留。round67 sibling-store 导入修复于 round68 完成正式完整 Vue 消费验证；原生生成/runtime 不变边界复用。
+- [x] T-04（work）：六 app 回归/桌面实测/证据；F060-R6-01/02修复及准确六目标规范清单见round70。既有六app实机成功保留，最终SDK影响核对仍由merge负责。round67 sibling-store 导入修复于 round68 完成正式完整 Vue 消费验证；原生生成/runtime 不变边界复用。
 - [ ] T-05（review/merge）：独立复审、归档、工具链 pin 落地。
 
 ## 9. 复审记录
@@ -676,3 +678,14 @@ self.text = auto_lang_core::a2r_std::json::get_str_or(&((rows)[999].clone()), &[
 修复并重新最终pass后，merge owner须在新冻结版本核对code/依赖/config/输入并完成本仓受影响union：compiler rust生成及Vue store；dialect view/widget解析与嵌套；runtime session/desktop_protocol/headless/endpoint/message、broker canvas/viewport/input/close生命周期、mcp、native_http、back_proxy/dynamic/vm桥；tools rust_ui/merged_string_index、vue/run_vue/desktop_backends/proc_host。复用同源同配置的有效原子结果，仅补因修复或949依赖变化失效的组及必要集成闭合；此处不是新增全仓测试要求，也不是把auto-lang的cargo-t目录套到UI。最终生成物、所建/所发布/所测身份须一致；若SDK生成输出变化，应重生成/构建受影响正式app并复验受影响真实任务。父054自身完整门由054 owner执行。
 
 其后尚需：完成准确六目标Spec审核与落地、revision-bound独立pass、949前置自身修复/复审、工具链交付提交及os054消费pin更新、正常归档与证据摘要折入Plan、按merge规约清理。没有满足这些步骤前，reviewed不等于已交付；本次明确未reviewed。保留不变面证据，T00/T02/T03完成，T01/T04重开，current_step=3/6。
+
+
+- stage: work | plan_id: auto-ui/PLAN-060 | plan_revision: r6 | round: 70 | outcome: execution_done | findings: F060-R6-01/02 repaired | next: same independent final reviewer
+  F060-R6-01: null_coalesce_rust keeps typed local/model/store Vec receivers intact and uses the existing production __at_idx for the first index. The real `.store.rows` Dot chain is classified by its exact store owner, not an arbitrary same-named JSON field. Remaining JSON segments keep Value semantics: owned lookup takes one actual field key (the old slice argument did not match the production helper), and negative JSON literals convert through signed i64 before usize. Every receiver/index appears once. No VM leniency or input protocol changes.
+  Added permanent tools test p060_coalesced_indices_execute_safe_fallbacks: real parse/extract/generate; 45 generated expressions covering local/model/store/nested JSON/mixed Vec→field→index, each normal0/999/-1 × present/empty/missing-field, then a side-effectful index evaluated exactly once. It compiles and runs the real generated expressions with the production AT_BUILTIN_METHOD_SHIMS and exact current test-binary core/serde dependencies resolved from Cargo fingerprints; no GUI and no duplicated JSON/shim algorithm. Unsafe direct subscript is rejected before execution. Original red1/1fail; successive tests exposed real store traversal and JSON signature/signed-literal gaps, now fixed. One harness attempt used the unrelated standalone a2r_std module; a later harness lacked the Windows native import library search path; neither was counted as product pass. Final exact-dependency harness + mixed chain: actual1pass/0fail, execution2.376s; production-source edits after that run were indentation only.
+  Related compiler controls actual11/11pass, .195s. Initial nextest attempt selected0 under default-filter and exit4, not counted; explicit --ignore-default-filter selected/executed all11 without changing repository filters. Tools5-case suite initially4pass/1fail because inherited foreign CARGO_TARGET_DIR was correctly rejected by the receipt guard; reran the same built test binary with that env removed: actual5pass/0fail/0ignored,2.26s. Final expanded mixed-expression test then1/1pass. Existing21 runtime/protocol/input tests and prior six-native/complete Vue task evidence have unchanged implementations; no repeat solely for this generation repair. Common final SDK/dependency impact and affected merge union remain pending, particularly repaired949 versus SDK167.
+  F060-R6-02: header and §5.6 now exactly enumerate all six canonical Spec targets, adding build/desktop-api-surfaces and modifying build/generated-vite-config. Source053 provenance retained but integration/verification responsibility accurately assigned to060 for054; no claim that053 itself is reviewed or complete. Original runtime SD01..04 unchanged in scope; SD01 clarifies this safe coalescing boundary. T01/T04 closed under unchanged r6 semantics, execution5/6; T05 independent pass/merge/cleanup still open. No landing/push/archive/cleanup.
+  Evidence: D:/autostack/plan-artifacts/plan-060/coalesce-execute-red-r6.log SHA256 78f9796361ec26d959897154863d778b2df35558821ec5b021963260e6108c61.
+  Evidence: D:/autostack/plan-artifacts/plan-060/coalesce-compiler-selected-r6.log SHA256 bcdc85e50d2fd9a7d3f1fb5e69fcf48940cf3b041c17424b34c6500fb8917ac5.
+  Evidence: D:/autostack/plan-artifacts/plan-060/coalesce-tools-clean-env-r6.log SHA256 de7c21a5145cc6fed9bb6f66a116da2d780ab37ce3b5b3968f3def7fe823174b.
+  Evidence: D:/autostack/plan-artifacts/plan-060/coalesce-mixed-final-r6.log SHA256 06aacb56fbaa1402343d1a9977ff8a13efbc649d8888a17bbd09bc43f6fb9b3e.
