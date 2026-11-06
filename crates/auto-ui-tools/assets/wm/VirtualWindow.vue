@@ -100,6 +100,7 @@ function onClose(): void {
         <button
           class="wm-close h-3 w-3 rounded-full bg-[#ff5f57]"
           aria-label="close"
+          @pointerdown.stop
           @click.stop="onClose"
         />
         <span class="h-3 w-3 rounded-full bg-[#febc2e]" aria-hidden="true" />

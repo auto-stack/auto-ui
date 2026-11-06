@@ -5,7 +5,7 @@ feature_name: a2r 数组索引 VM 语义与 iced 桌面 outproc 输入/验收投
 author: [Codex]
 created_at: 2026-11-05
 updated_at: 2026-11-06
-plan_revision: 6
+plan_revision: 7
 current_step: 4
 total_steps: 6
 base_branch: master
@@ -15,7 +15,7 @@ depends_on: []
 supersedes_spec_components: [docs/specs/runtime/component-and-store-instances.md, docs/specs/build/generated-vite-config.md, docs/specs/build/desktop-api-surfaces.md]
 new_spec_components: [docs/specs/runtime/desktop-acceptance-input.md, docs/specs/runtime/native-codegen-semantics.md, docs/specs/runtime/native-command-frame-text.md]
 touched_goals: [auto-os/PLAN-054]
-affects: [a2r-codegen, ui-iced-runtime, mcp-acceptance, auto-os/PLAN-054]
+affects: [a2r-codegen, ui-iced-runtime, mcp-acceptance, vue-wm-close, auto-os/PLAN-054]
 ---
 
 # auto-ui/PLAN-060：a2r 数组索引 VM 语义与 iced 桌面 outproc 输入/验收投递
@@ -179,7 +179,7 @@ Chat原生生成源码仍把失败pending重建中的pp.client_msg_id按字段�
 | SD-02 | new | docs/specs/runtime/desktop-acceptance-input.md | pointer/keyboard、根组件 Action、旧客户端能力门、关闭重开契约（替代原先不存在的路径） | iced 桌面可驱动原生 app | AC-02/AC-03 |
 | SD-03 | add | docs/specs/runtime/native-command-frame-text.md | 文字自身/父项变换组合一次，v1/v2滚动几何一致 | 投递后的真实画面正确 | AC-02/AC-04 |
 | SD-04 | modify | docs/specs/runtime/component-and-store-instances.md | 编译原生路由Init回写/活动页单timer传播 | 同组件事件与store所有权 | AC-02/AC-04 |
-| SD-05 | modify | docs/specs/build/desktop-api-surfaces.md | 原220115df无此文件；新默认基线已有同源API规范及956服务边界，保留全文并准确补060为054集成验证责任 | 053来源兼容实现644d8366已在新main；不重复添加、不删956、不宣称053通过 | AC-04 |
+| SD-05 | modify | docs/specs/build/desktop-api-surfaces.md | 新默认基线已有同源API规范及956服务边界；保留全文并补060为054集成验证责任，以及既有标题栏关闭控件不得进入拖动捕获、实际卸载后重开 | 既有关闭/卸载合同实际可达；053来源兼容实现不被冒称独立交付 | AC-04 |
 | SD-06 | modify | docs/specs/build/generated-vite-config.md | 桌面依赖并集及分app代理现已在新main，保留规则，仅补准确集成验证来源；非桌面不变 | 与已验证桌面API隔离及生成/run自愈同源，不制造第二套规范 | AC-04 |
 
 （落点文件以仓库现有 Spec 为准，work 时按实际路径修订；若该节不存在则在本
