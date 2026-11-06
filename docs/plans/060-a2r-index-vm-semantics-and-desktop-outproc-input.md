@@ -1,6 +1,6 @@
 ---
 plan_id: auto-ui/PLAN-060
-status: execution_done
+status: reviewed
 feature_name: a2r 数组索引 VM 语义与 iced 桌面 outproc 输入/验收投递
 author: [Codex]
 created_at: 2026-11-05
@@ -692,3 +692,47 @@ self.text = auto_lang_core::a2r_std::json::get_str_or(&((rows)[999].clone()), &[
   Evidence: D:/autostack/plan-artifacts/plan-060/coalesce-compiler-selected-r6.log SHA256 bcdc85e50d2fd9a7d3f1fb5e69fcf48940cf3b041c17424b34c6500fb8917ac5.
   Evidence: D:/autostack/plan-artifacts/plan-060/coalesce-tools-clean-env-r6.log SHA256 de7c21a5145cc6fed9bb6f66a116da2d780ab37ce3b5b3968f3def7fe823174b.
   Evidence: D:/autostack/plan-artifacts/plan-060/coalesce-mixed-final-r6.log SHA256 06aacb56fbaa1402343d1a9977ff8a13efbc649d8888a17bbd09bc43f6fb9b3e.
+
+
+### 独立最终复审：F01/F02 修复与 v14 产物失效闭合（2026-11-06）
+
+- stage: review | review_scope: final | reviewer_identity/limitations: 原独立子上下文`/root/review_ui060`，同一原writer续审；未参与实现，仅写本Plan；非GUI重演，复用不变面原始证据 | plan_id: auto-ui/PLAN-060 | plan_revision: 6 | outcome: pass（仅绑定下列冻结源码/依赖；不等于已合入或当前master整合已通过） | worktree_path: `D:/autostack/.wt/ui-060/auto-ui` | branch: `codex/plan-060-dev` | reviewed_commit: `f24dc98374daa55a0a5ee855ff5712f228782bda` | base_commit: `220115df62040f113bc689f0500af80fc11569a3` | dependency_revisions: sibling auto-lang clean detached `408ca8b5096df96d2a91831ea36ef25336781889` | next: merge owner核对最新主干/949整合影响，必要受影响复审及下列冻结联合门；不可凭本pass跳过。
+- 初始/最终核对`git rev-parse HEAD`、`git status --short`、worktree/branch：指定原writer clean；本次修复起点a9afdd9180d2f524757ddd0f26d8877a8798ba22及最终f24均检查，未创建checkout、改实现或变更依赖。UI060 target仍不存在；复用已协调C2，所有本轮编译/测试均终态。主检出旧060与用户WIP未动。
+
+| finding / acceptance_results | result | 独立关闭依据与保留边界 |
+|---|---|---|
+| F060-R6-01；AC-01，T-01/T-04 | closed / pass | null_coalesce_rust对typed Vec基座不再剥为JSON；首索引用正式__at_idx，后继Value字段逐键get_owned、JSON索引经signed i64→usize，保持一次求值。实际parse/extract/generate→编译并运行45个local/model/store/nested JSON/mixed链×正常/越界/负索引×存在/空/缺字段控制及side-effect index一次。原例与同不变式邻面闭合，不降G1。 |
+| F060-R6-02；AC-05知识审核，T-04/T-05 | closed / pass | frontmatter准确列4个new+2个modify目标，SD01..06与实际六文件差异集合一致；新增两build目标before/after/理由/AC归属完整。053保留实现来源，060承担为054集成及实际验证责任；未称053已完成。没有新语义或改验收，r6保持。 |
+| round71 freshness缺口；AC-04/产物身份 | closed / pass（代码与控制） | FRONT_LAYOUT_VERSION现v14；同inputs的正式旧v13 receipt通过生产front_needs_regeneration返回(false,true)，当前receipt返回(false,false)。独立重放receipt mutation用例pass；不能用手删consumer缓存替代。所建/所测v14消费者属于下列强制merge联合门，尚未声称本轮已交付。 |
+| AC-02/03，T-02/T-03 | retained pass | 上轮真实协议能力/owning wid/no-placeholder fallback及native输入/viewport/scroll21控制、原始实际Notes任务均保留；本次没有runtime/协议实现变动，不重复。根零参/单字符串及inproc既有标量边界不扩张。 |
+| AC-04，T-04及历史AC-07/08/09 | pass于本次work/code acceptance边界；新SDK消费仍pending | compiler相关11控制、tools5控制、生成执行及freshness通过。原r161六native真实任务/完整Vue证据作为此前已完成任务保留，不能冒充f24+新949/最新master的新SDK任务；其必要重新生成/构建/受影响真实任务由合入冻结门明确承接。 |
+| AC-05 | pass | 原独立上下文最终源码/断言/原始结果及六Spec审核完成；与初次needs_fix历史同存，不覆盖未来代码。 |
+| AC-06 / T-05剩余归档、pin、清理 | pending merge-owned | 只设reviewed/current_step5/6，T-05仍未勾；没有merge/push/archive、消费者更新或删除证据/缓存。 |
+
+**独立实际复验与断言审查。**
+
+1. `cargo test --locked -p auto-ui-tools --lib p060_coalesced_indices_execute_safe_fallbacks`在a9af冻结实现上exit0，1 passed/0 ignored/2.84s，48.62s构建。该test确实提取本轮生成赋值表达式，用生产AT_BUILTIN_METHOD_SHIMS及当前Cargo fingerprint精确对应core/serde库编译执行；没有重写替代算法或将只含字符串断言当运行通过。审读45项expected矩阵、实际rustc失败传播及程序assert传播。f24相对a9af只改布局版本、receipt控制和注释，不改变这些生成表达式/执行逻辑；因此这次执行对f24有效。log `D:/autostack/plan-artifacts/plan-060/independent-coalesce-repair-r6.log` SHA256 `55657dcb6b1733d51bf2b53ba34ecef4d4932d05346f2af49777ca0fdaacd719`。
+2. 独立选择不同于work45项的同机制生成控制：`doc.outer.rows[first_index()].inner[second_index()].ok ?? <bool/int/str default>`，实际parse/extract/generate三个右值族；断言两索引各只出现一次、三次逐key get_owned、两次at_owned且字段顺序保留，exit0。此项只称生成断言，不称三族额外运行实证。scratch `independent-coalesce-siblings.rs` SHA256 `4e3c4a7b5aee7ba506fc20d97cbef50df251c09920ee03f02c06c666a8cfea08`；log同名前缀`.log` SHA256 `1b2220ca5e57eb26683e02509298e6ae80b9a7532bbe1de818f2b312be9c081b`。首次直接rustc因选错compiler对应dialect导致crate identity冲突，未执行；按当前compiler fingerprint精确解析dialect458c27896599f648后通过；不将环境冲突记产品红。
+3. 当前v14正式已构建test binary仅运行`p060_native_receipt_tracks_embedded_backend_content_and_file_set`（移除外树CARGO_TARGET_DIR），exit0，1 passed/0 ignored/.69s；当前receipt/旧v13同inputs mutation均实际经过生产判断。log `independent-freshness-v14-r6.log` SHA256 `f8700b55d7e32c8b27ed060d09ff8d4e249abe577ee10b78ec84a27e151b815d`。核原始red `freshness-v13-red-r6.log` SHA256 `d315fb10cea3416e565c85181a6aaefe0f2b3c2045f179df0083b81e74daf413`：current=old=v13的identity区别断言确实失败；不是伪造receipt结果。核最终5case日志`freshness-v14-final-r6.log` SHA256 `8871932de60ed3c6e40e9372b3fcc712e6bf98ae6fe0aeb96984066187d9f9ae`，5/5、2.56s实际执行，不把早前0-selection或foreign-target拒绝混入pass。
+4. 本次修复生成器相关compiler11/11既有原子结果复用；上轮runtime21/21、tools相邻profile/backend freshness/merged controls及原始SDK/用户任务结果按未变源码/验证输入边界保留。未重跑runtime/GC/全catalog，无GUI/MCP/OS激活。`git diff --check a9afdd91 f24dc983` exit0；原初提交既有EOF空行非阻断建议保留，不扩大修复。
+
+**spec_inputs / 本次最终审核六目标候选快照（当前树准备diff，非现场发布）：**
+
+| docs/specs/... target | reviewed SHA256 |
+|---|---|
+| docs/specs/runtime/native-codegen-semantics.md | f8422d0ad30a99c6eae430c126d3e5e37bac297fe0e2657e212efa7bb71524b4 |
+| docs/specs/runtime/desktop-acceptance-input.md | df2df27b95062098a136be23d34abcdfed234e2fd810027a2cfa8f079020309d |
+| docs/specs/runtime/native-command-frame-text.md | 570deba3bfe4d676d2249d3226c0e584ceecee374c4f39f5fe48655998f926e7 |
+| docs/specs/runtime/component-and-store-instances.md | 54da3e882677bc8ef1fb2287d15c0033e927106912f6873d0e51e0b7ad74bb94 |
+| docs/specs/build/desktop-api-surfaces.md | f9b305343213713a2101b749c1dca77df56f9639714e2ee7b2073df18b837099 |
+| docs/specs/build/generated-vite-config.md | dfe637b4eaecfdc9f30ed6d0ea674daa5c44c3bbfaa2d718ec46e64d994acf9f |
+
+SD01新段描述既有受支持local/model/store Vec及嵌套JSON的安全coalescing；不扩大任意Rust类型/完整路由器。SD05/06只校准来源/本次验证责任，无从drafting053推导已完成。其余已审核规则未改。规范中overflow的v13叙述是该先前修复的失效版本；本轮coalescing当前生产身份为v14，最终消费必须v14。touched_goals保留真实auto-os/PLAN-054；没有写legacy ledger或派生索引。
+
+**pending_closeout_gates / 冻结影响并集，必须执行后才能落地：**
+
+- 本pass只绑定f24与writer Lang408。最新UI master `7ac0455bf4cd743248749e4bc4eb9d0aed657266`包含056原子reload/057 Vue挂载store等变化，不能把本pass直接搬到rebase结果。merge owner须核patch等价/冲突、canonical六Spec并发差异及store/生命周期/生成行为影响，交受影响整合复审；057可能改变父r164旧Chat保留身份的观察，最终Vue真实消费需重新核实。本review不变基线、不代做该整合。
+- auto-lang/949的新冻结/rebase依赖（父报告f03226e10）尚不属于本次408依赖证据；须消费其有效独立复审与受影响fixed-group联合门，再核UI集成。旧SDK167及其v13 app不是该新组合的通过证据。
+- UI冻结受影响union继续保持：compiler rust生成/Vue store；dialect view/widget解析与嵌套；runtime session、desktop_protocol/headless/endpoint/message、broker canvas/viewport/input/close生命周期、mcp、native_http、back_proxy/dynamic/vm桥；tools rust_ui/merged_string_index、vue/run_vue/desktop_backends/proc_host。针对rebase/依赖/输出变化选择实际完整受影响组及必要集成闭合；保留有效同源同配置原子结果，禁止因换owner重复全仓套件，也不能把known/pending算绿。此为精确模块/路径并集，不把auto-lang gate命令泛套UI。
+- 正式工具/宿主/应用须绑定最终共同源码/依赖/config/输入；生成器v14使现有v13 receipt自动失效，重生成并构建受影响六native/完整Vue消费面，重新核对receipt/target/published三方身份、Calendar/Notes/Todo/Blog/Chat/Database及057影响的真实任务、必要混合/失败控制。父054自己的完整gate由其owner完成，unit/code检查不能代替实际任务。
+- 完成上述整合复审/冻结门后，才由merge处理工具链交付、OS消费pin、准确Spec落地、归档/证据摘要折入及授权清理；本次未做。无剩余已知work-owned finding；本pass未预批后来新增代码，发生语义变化须回work并复审受影响面。
