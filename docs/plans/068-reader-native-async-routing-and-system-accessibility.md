@@ -235,4 +235,6 @@ Rust AutoUI runtime/dialect/handler codegen、VM实例及parked续体、iced/win
 
 ## 10. 待澄清事项
 
+2026-11-07：父goal round7～9连续等待同一取消输入，已重新核exec55280/PID完整路径及实际窗口26412464的选择框仍打开；父goal将标blocked，Plan仍executing/3-of-8。ca4c8acd实现和tool6ce87feb、09脚本均保留；不发更多自动输入、不启动终审/merge。解除动作是08“打开”框点取消并回报后恢复goal，非重新索取授权。
+
 无待答范围或授权问题。“已选四个”与“已解锁”均已落实；四文件trace为3duplicate+1epub_invalid，磁盘仍3本且原件完整。当前唯一输入请求：08窗口26412464的真实“打开”框请用户点取消并回报，用于最短结果提示观察；不要求重选四文件。独立布局修复/对应控制继续执行，工具缓存失败不得绕过安全边界或伪造输入。T03/04、独立终审和交付尚未完成。
