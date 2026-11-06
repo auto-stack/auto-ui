@@ -1,0 +1,14 @@
+// PLAN-065 few-slot product EMPTY: a legal application with ZERO text
+// slots anywhere — no buffers, no getters, no digits fns, no refresh
+// dispatchers; still a runnable window (0-slot must stay legal).
+use few0: Few0
+
+node Main {
+    model {
+    }
+    view {
+        column root {
+            Few0 p { }
+        }
+    }
+}

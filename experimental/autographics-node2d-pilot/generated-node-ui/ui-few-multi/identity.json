@@ -1,0 +1,21 @@
+{
+ "generator": "autographics-node2d-pilot plan048 node-ui",
+ "api": "autographics.node-ui/1",
+ "user_source_sha256": "2a112770843a809e46a22e10fc70ce173fa4db2cd523c834baa4e133c5c4a0c7",
+ "user_source_bytes": 32075,
+ "ui_schema": "autographics.node-ui/1",
+  "module:few3": "528a872352aab62e94595b8b1a4339b3badd3b512f494056cafe869cd982eb71",
+  "module:few4": "9e72fd59af7a873285478830c8d22d5463fc38ad6d0b0af0057d5d8b3bd20035",
+  "module:main": "c20e4364375e2ac964ab1729a4852907e8b9d2dbc0f4d63d00305cfbf1389772",
+ "closure": [
+  {"name": "few3", "sha256": "528a872352aab62e94595b8b1a4339b3badd3b512f494056cafe869cd982eb71", "bytes": 667},
+  {"name": "few4", "sha256": "9e72fd59af7a873285478830c8d22d5463fc38ad6d0b0af0057d5d8b3bd20035", "bytes": 599},
+  {"name": "main", "sha256": "c20e4364375e2ac964ab1729a4852907e8b9d2dbc0f4d63d00305cfbf1389772", "bytes": 1093}
+ ],
+ "provenance": {
+  "product": "ui-few-multi",
+  "consumer": "unrecorded (this out dir has no registered flow consumer)",
+  "consumption": "include_str! frozen ui.json + world.at; the harness writes world.at to scripts/<sha>.at where <sha> = ui.world_sha256 and loads the behavior via SourceSnapshot (Api::NodeUi); the load path hash-verifies the behavior source; ui.json element/instance tables drive the real Iced adapter",
+  "world_sha256": "2a112770843a809e46a22e10fc70ce173fa4db2cd523c834baa4e133c5c4a0c7"
+ }
+}

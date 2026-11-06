@@ -1,0 +1,9 @@
+// PLAN-065 Few0: zero-text def — a legal application element with no text
+// slots at all (no buffers, no getters, no digits fns may be generated).
+node Few0 {
+    view {
+        column box {
+            padding: 2
+        }
+    }
+}

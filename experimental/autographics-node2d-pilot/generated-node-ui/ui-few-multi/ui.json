@@ -1,0 +1,199 @@
+{
+  "schema": "autographics.node-ui/1",
+  "generator": "autographics-node2d-pilot plan048 node-ui",
+  "world_sha256": "2a112770843a809e46a22e10fc70ce173fa4db2cd523c834baa4e133c5c4a0c7",
+  "root": "Main",
+  "instances": [
+    {
+      "path": "Main/e",
+      "node": "Few3",
+      "def_idx": 0
+    },
+    {
+      "path": "Main/f",
+      "node": "Few3",
+      "def_idx": 1
+    },
+    {
+      "path": "Main/g",
+      "node": "Few4",
+      "def_idx": 0
+    },
+    {
+      "path": "Main/h",
+      "node": "Few4",
+      "def_idx": 1
+    }
+  ],
+  "defs": {
+    "Few3": {
+      "prefix": "few3",
+      "is_root": false,
+      "texts": 3,
+      "elements": [
+        {
+          "kind": "Container",
+          "name": "box",
+          "container": "column",
+          "children": [
+            {
+              "kind": "Text",
+              "name": "flag",
+              "slot": 0,
+              "text": {
+                "kind": "bool_field",
+                "name": "on"
+              }
+            },
+            {
+              "kind": "Text",
+              "name": "num",
+              "slot": 1,
+              "text": {
+                "kind": "int_field",
+                "name": "num"
+              }
+            },
+            {
+              "kind": "Button",
+              "name": "bump",
+              "slot": 2,
+              "text": {
+                "kind": "lit_str",
+                "v": "切换"
+              },
+              "click": {
+                "fn": "few3_ui_click_bump",
+                "arg": "index"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "Few4": {
+      "prefix": "few4",
+      "is_root": false,
+      "texts": 4,
+      "elements": [
+        {
+          "kind": "Container",
+          "name": "box",
+          "container": "column",
+          "children": [
+            {
+              "kind": "Text",
+              "name": "t1",
+              "slot": 0,
+              "text": {
+                "kind": "lit_str",
+                "v": "二十一字二十一字二十一字二十一字二十一字甲"
+              }
+            },
+            {
+              "kind": "Text",
+              "name": "flag",
+              "slot": 1,
+              "text": {
+                "kind": "bool_field",
+                "name": "on"
+              }
+            },
+            {
+              "kind": "Text",
+              "name": "num",
+              "slot": 2,
+              "text": {
+                "kind": "int_field",
+                "name": "num"
+              }
+            },
+            {
+              "kind": "Text",
+              "name": "t2",
+              "slot": 3,
+              "text": {
+                "kind": "lit_str",
+                "v": "尾"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "Main": {
+      "prefix": "main",
+      "is_root": true,
+      "texts": 4,
+      "elements": [
+        {
+          "kind": "Container",
+          "name": "root",
+          "container": "column",
+          "children": [
+            {
+              "kind": "Instance",
+              "name": "e",
+              "node": "Few3"
+            },
+            {
+              "kind": "Instance",
+              "name": "f",
+              "node": "Few3"
+            },
+            {
+              "kind": "Instance",
+              "name": "g",
+              "node": "Few4"
+            },
+            {
+              "kind": "Instance",
+              "name": "h",
+              "node": "Few4"
+            },
+            {
+              "kind": "Button",
+              "name": "flip",
+              "slot": 0,
+              "text": {
+                "kind": "lit_str",
+                "v": "翻转"
+              },
+              "click": {
+                "fn": "main_ui_click_flip",
+                "arg": "none"
+              }
+            },
+            {
+              "kind": "Text",
+              "name": "flips",
+              "slot": 1,
+              "text": {
+                "kind": "int_field",
+                "name": "flips"
+              }
+            },
+            {
+              "kind": "Text",
+              "name": "hint",
+              "slot": 2,
+              "text": {
+                "kind": "lit_str",
+                "v": "提示"
+              }
+            },
+            {
+              "kind": "Text",
+              "name": "ticks",
+              "slot": 3,
+              "text": {
+                "kind": "int_field",
+                "name": "ticks"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,44 @@
+// PLAN-065 few-slot product A: ROOT is itself a 2-text def (button label +
+// flips IntField — the D-06 family on the root side); dual same-def Few1
+// (1 slot, tick-driven count via param start) and Few2 (2 slots: value +
+// button, real-click 2:1 isolation c twice / d once); Few0 is the 0-text
+// legal container def. Total instances: root + a,b,c,d,p = 6 ≤ 8.
+use few0: Few0
+use few1: Few1
+use few2: Few2
+
+node Main {
+    model {
+        var flips = 0
+    }
+    msg {
+        Flip
+    }
+    view {
+        column root {
+            Few0 p { }
+            Few1 a {
+                start: 0
+            }
+            Few1 b {
+                start: 100
+            }
+            Few2 c {
+                start: 0
+            }
+            Few2 d {
+                start: 10
+            }
+            button flip {
+                text: "翻转"
+                onclick: .Flip
+            }
+            text flips { text: .flips }
+        }
+    }
+    on {
+        .Flip -> {
+            .flips = .flips + 1
+        }
+    }
+}

@@ -1,0 +1,23 @@
+{
+ "generator": "autographics-node2d-pilot plan048 node-ui",
+ "api": "autographics.node-ui/1",
+ "user_source_sha256": "24def8afff7b5aec4e175d7e92cd3aee593bb7673fb17b6206d223d7f1c99a05",
+ "user_source_bytes": 13545,
+ "ui_schema": "autographics.node-ui/1",
+  "module:few0": "61fede43618c699ce6d4df9982e92c5cdd09ef13d32909aafbf0d293f139e512",
+  "module:few1": "a916e3570b8360cc419bae521daeceac6a50ef632cfe8c4de8c79db23a8d2c51",
+  "module:few2": "ab4265d6e4b6be5f68e4a82a88be86ae4685bc3aab5e98683db81c0499642c11",
+  "module:main": "00da1f3bc41f49aa90fdb5629cd3543f48818b7a9db0944551664abeff7d57c8",
+ "closure": [
+  {"name": "few0", "sha256": "61fede43618c699ce6d4df9982e92c5cdd09ef13d32909aafbf0d293f139e512", "bytes": 236},
+  {"name": "few1", "sha256": "a916e3570b8360cc419bae521daeceac6a50ef632cfe8c4de8c79db23a8d2c51", "bytes": 421},
+  {"name": "few2", "sha256": "ab4265d6e4b6be5f68e4a82a88be86ae4685bc3aab5e98683db81c0499642c11", "bytes": 580},
+  {"name": "main", "sha256": "00da1f3bc41f49aa90fdb5629cd3543f48818b7a9db0944551664abeff7d57c8", "bytes": 1031}
+ ],
+ "provenance": {
+  "product": "ui-few",
+  "consumer": "unrecorded (this out dir has no registered flow consumer)",
+  "consumption": "include_str! frozen ui.json + world.at; the harness writes world.at to scripts/<sha>.at where <sha> = ui.world_sha256 and loads the behavior via SourceSnapshot (Api::NodeUi); the load path hash-verifies the behavior source; ui.json element/instance tables drive the real Iced adapter",
+  "world_sha256": "24def8afff7b5aec4e175d7e92cd3aee593bb7673fb17b6206d223d7f1c99a05"
+ }
+}

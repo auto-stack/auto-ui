@@ -1,0 +1,28 @@
+// PLAN-065 Few3: THREE text slots (BoolField flag + IntField num + button
+// label) — both half-buffers declared (control shape, frozen dual-branch
+// getter); Bump toggles the bool and bumps the int (bool switching + 2:1).
+node Few3(start: int) {
+    model {
+        var on = true
+        var num = .start
+    }
+    msg {
+        Bump
+    }
+    view {
+        column box {
+            text flag { text: .on }
+            text num { text: .num }
+            button bump {
+                text: "切换"
+                onclick: .Bump
+            }
+        }
+    }
+    on {
+        .Bump -> {
+            .on = 1 - .on
+            .num = .num - 5
+        }
+    }
+}

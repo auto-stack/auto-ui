@@ -1,0 +1,47 @@
+// PLAN-065 few-slot product B: ROOT is a 4-text def (button + flips + hint
+// + ticks — the full single-half-buffer edge); dual same-def Few3 (3 slots:
+// bool flag + int num + button, real-click bool switching and 2:1) and
+// Few4 (4 slots incl. a 63-byte multi-byte literal and a param-start int).
+use few3: Few3
+use few4: Few4
+
+node Main {
+    model {
+        var flips = 0
+        var ticks = 0
+    }
+    msg {
+        Flip
+    }
+    view {
+        column root {
+            Few3 e {
+                start: 0
+            }
+            Few3 f {
+                start: 10
+            }
+            Few4 g {
+                start: 7
+            }
+            Few4 h {
+                start: 8
+            }
+            button flip {
+                text: "翻转"
+                onclick: .Flip
+            }
+            text flips { text: .flips }
+            text hint { text: "提示" }
+            text ticks { text: .ticks }
+        }
+    }
+    on {
+        Life.Tick -> {
+            .ticks = .ticks + 1
+        }
+        .Flip -> {
+            .flips = .flips + 1
+        }
+    }
+}

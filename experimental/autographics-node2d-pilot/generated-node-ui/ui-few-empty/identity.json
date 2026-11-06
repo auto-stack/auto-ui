@@ -1,0 +1,19 @@
+{
+ "generator": "autographics-node2d-pilot plan048 node-ui",
+ "api": "autographics.node-ui/1",
+ "user_source_sha256": "77914acf97831ee81daad77e38012cb990795bb3c88add726e7c679fed5241be",
+ "user_source_bytes": 268,
+ "ui_schema": "autographics.node-ui/1",
+  "module:few0": "61fede43618c699ce6d4df9982e92c5cdd09ef13d32909aafbf0d293f139e512",
+  "module:main": "6665c5e6983fff94c9c729e2f9f328f2d32089f41f5fa60c931a36dc98ef05cb",
+ "closure": [
+  {"name": "few0", "sha256": "61fede43618c699ce6d4df9982e92c5cdd09ef13d32909aafbf0d293f139e512", "bytes": 236},
+  {"name": "main", "sha256": "6665c5e6983fff94c9c729e2f9f328f2d32089f41f5fa60c931a36dc98ef05cb", "bytes": 329}
+ ],
+ "provenance": {
+  "product": "ui-few-empty",
+  "consumer": "unrecorded (this out dir has no registered flow consumer)",
+  "consumption": "include_str! frozen ui.json + world.at; the harness writes world.at to scripts/<sha>.at where <sha> = ui.world_sha256 and loads the behavior via SourceSnapshot (Api::NodeUi); the load path hash-verifies the behavior source; ui.json element/instance tables drive the real Iced adapter",
+  "world_sha256": "77914acf97831ee81daad77e38012cb990795bb3c88add726e7c679fed5241be"
+ }
+}

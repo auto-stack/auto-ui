@@ -22,7 +22,7 @@ node Few3(start: int) {
     on {
         .Bump -> {
             .on = 1 - .on
-            .num = .num + 1
+            .num = .num - 5
         }
     }
 }

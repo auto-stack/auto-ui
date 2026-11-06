@@ -1,0 +1,168 @@
+{
+  "schema": "autographics.node-ui/1",
+  "generator": "autographics-node2d-pilot plan048 node-ui",
+  "world_sha256": "24def8afff7b5aec4e175d7e92cd3aee593bb7673fb17b6206d223d7f1c99a05",
+  "root": "Main",
+  "instances": [
+    {
+      "path": "Main/p",
+      "node": "Few0",
+      "def_idx": 0
+    },
+    {
+      "path": "Main/a",
+      "node": "Few1",
+      "def_idx": 0
+    },
+    {
+      "path": "Main/b",
+      "node": "Few1",
+      "def_idx": 1
+    },
+    {
+      "path": "Main/c",
+      "node": "Few2",
+      "def_idx": 0
+    },
+    {
+      "path": "Main/d",
+      "node": "Few2",
+      "def_idx": 1
+    }
+  ],
+  "defs": {
+    "Few0": {
+      "prefix": "few0",
+      "is_root": false,
+      "texts": 0,
+      "elements": [
+        {
+          "kind": "Container",
+          "name": "box",
+          "container": "column",
+          "props": [
+            {
+              "name": "padding",
+              "kind": "lit_num",
+              "v": 2.0
+            }
+          ],
+          "children": []
+        }
+      ]
+    },
+    "Few1": {
+      "prefix": "few1",
+      "is_root": false,
+      "texts": 1,
+      "elements": [
+        {
+          "kind": "Text",
+          "name": "value",
+          "slot": 0,
+          "text": {
+            "kind": "int_field",
+            "name": "count"
+          }
+        }
+      ]
+    },
+    "Few2": {
+      "prefix": "few2",
+      "is_root": false,
+      "texts": 2,
+      "elements": [
+        {
+          "kind": "Container",
+          "name": "box",
+          "container": "column",
+          "children": [
+            {
+              "kind": "Text",
+              "name": "value",
+              "slot": 0,
+              "text": {
+                "kind": "int_field",
+                "name": "count"
+              }
+            },
+            {
+              "kind": "Button",
+              "name": "bump",
+              "slot": 1,
+              "text": {
+                "kind": "lit_str",
+                "v": "加"
+              },
+              "click": {
+                "fn": "few2_ui_click_bump",
+                "arg": "index"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "Main": {
+      "prefix": "main",
+      "is_root": true,
+      "texts": 2,
+      "elements": [
+        {
+          "kind": "Container",
+          "name": "root",
+          "container": "column",
+          "children": [
+            {
+              "kind": "Instance",
+              "name": "p",
+              "node": "Few0"
+            },
+            {
+              "kind": "Instance",
+              "name": "a",
+              "node": "Few1"
+            },
+            {
+              "kind": "Instance",
+              "name": "b",
+              "node": "Few1"
+            },
+            {
+              "kind": "Instance",
+              "name": "c",
+              "node": "Few2"
+            },
+            {
+              "kind": "Instance",
+              "name": "d",
+              "node": "Few2"
+            },
+            {
+              "kind": "Button",
+              "name": "flip",
+              "slot": 0,
+              "text": {
+                "kind": "lit_str",
+                "v": "翻转"
+              },
+              "click": {
+                "fn": "main_ui_click_flip",
+                "arg": "none"
+              }
+            },
+            {
+              "kind": "Text",
+              "name": "flips",
+              "slot": 1,
+              "text": {
+                "kind": "int_field",
+                "name": "flips"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

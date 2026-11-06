@@ -1,0 +1,54 @@
+{
+  "schema": "autographics.node-ui/1",
+  "generator": "autographics-node2d-pilot plan048 node-ui",
+  "world_sha256": "77914acf97831ee81daad77e38012cb990795bb3c88add726e7c679fed5241be",
+  "root": "Main",
+  "instances": [
+    {
+      "path": "Main/p",
+      "node": "Few0",
+      "def_idx": 0
+    }
+  ],
+  "defs": {
+    "Few0": {
+      "prefix": "few0",
+      "is_root": false,
+      "texts": 0,
+      "elements": [
+        {
+          "kind": "Container",
+          "name": "box",
+          "container": "column",
+          "props": [
+            {
+              "name": "padding",
+              "kind": "lit_num",
+              "v": 2.0
+            }
+          ],
+          "children": []
+        }
+      ]
+    },
+    "Main": {
+      "prefix": "main",
+      "is_root": true,
+      "texts": 0,
+      "elements": [
+        {
+          "kind": "Container",
+          "name": "root",
+          "container": "column",
+          "children": [
+            {
+              "kind": "Instance",
+              "name": "p",
+              "node": "Few0"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
