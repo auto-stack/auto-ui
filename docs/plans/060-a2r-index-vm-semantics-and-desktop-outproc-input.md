@@ -1,12 +1,12 @@
 ---
 plan_id: auto-ui/PLAN-060
-status: execution_done
+status: executing
 feature_name: a2r 数组索引 VM 语义与 iced 桌面 outproc 输入/验收投递
 author: [Codex]
 created_at: 2026-11-05
 updated_at: 2026-11-06
 plan_revision: 6
-current_step: 5
+current_step: 4
 total_steps: 6
 base_branch: master
 base_commit: 220115df
@@ -226,7 +226,7 @@ OS054真实Chat第六条消息已落库但气泡被裁切，滚轮不改变位�
   panic 消失。
 - [x] T-02（work）：`DesktopInject::Pointer` + MCP `action:"pointer"`；notes 点击实测。
 - [x] T-03（work）：outproc handler 协议投递（或降级边界）+ 键盘聚焦实测。
-- [x] T-04（work）：六 app 回归/桌面实测/证据，提交 execution_done。
+- [ ] T-04（work）：六 app 回归/桌面实测/证据，提交 execution_done。round67 因完整 Vue 注册表消费发现 sibling-store 导入位置错误重开；既有六原生证据不变边界复用。
 - [ ] T-05（review/merge）：独立复审、归档、工具链 pin 落地。
 
 ## 9. 复审记录
@@ -589,3 +589,7 @@ back 侧 `auto-notes-...-back` 是完整 axum/DB 实现。故 iced 桌面上任�
 
 - stage: work | plan_id: PLAN-060 | plan_revision: r6 | round: 66 | outcome: user-requested compilation cleanup completed; source review tree retained | source_commit: 360ecfb3a740c62b45f0abd0739594c2bb360d24 | next: independent final review
   User asked whether UI060 was complete and could be cleared to recover disk. Explained work execution_done5/6 versus outstanding independent review/merge; preserved authoritative source tree for T05 and cleaned only rebuildable target. Preflight exact repo/branch, target absolute containment under UI060, authentic Cargo CACHEDIR.TAG signature, target reparse0 and active consumers0. Standard cargo clean --target-dir D:/autostack/.wt/ui-060/auto-ui/target exit0: Removed28061 files/38.9GiB. Target absent afterward, source HEAD360ecfb3 and tracked status clean unchanged. D free124105351168 bytes afterward (concurrent other disk changes mean this entire free delta is not attributed solely to cleanup). Raw before/after/log D:/autostack/plan-artifacts/plan-060/compile-clean-{before,after}-r66.json and compile-clean-r66.log. Parent frozen SDK/app copies and prior raw test/visual evidence outside target retained; no worktree removal, archive or final review pass claimed. Later reruns rebuild required binaries normally; cleanup does not waive merge's affected regression gate.
+
+- stage: work | plan_id: PLAN-060 | plan_revision: r6 | round: 67 | outcome: Vue sibling import generation repaired; real public consumer pending | next: work/T04
+  Parent054 canonical full-registry Vue public entry on UI72bb exposes esbuild Unexpected brace in os-config DesktopCfg/Modules stores. Generator emits static reactive import after createStore function opening. Reopened T04 and status executing4/6; no acceptance or app scope change. Move only reactive import to module declarations, retain sibling reactive instances inside per-App factory. Native generator/runtime source untouched; prior iced common six-consumer evidence remains applicable within this boundary.
+  Permanent p060_vue_sibling_imports_remain_at_module_scope exercises zero/one/two siblings through actual store generator, checks every import before factory and every sibling instance after it. Actual old code red1, fixed1pass/0ignored; prior factory/context/watch control1pass/0ignored. cargo test --locked -p auto-ui-compiler --lib scoped filters, logs plan-060/vue-{sibling-red,sibling-final,factory-final}-r67.log. Shared c2e02416 target reused so cleaned UI060 target remains absent. Initial test placement accidentally landed in existing raw Auto fixture and selected0tests; corrected before red replay, zero run not counted. Real canonical Vue generation/load still pending; no execution_done or independent review pass claimed.

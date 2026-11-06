@@ -11230,6 +11230,7 @@ store TabsStore {
         var active_id str = ""
         var saved bool = true
     }
+
     watch {
         .active_id -> { .saved = false }
     }
@@ -11283,6 +11284,24 @@ store TabsStore {
             "context miss must fall back to the lazy legacy singleton, got:\n{}",
             code
         );
+    }
+
+    #[test]
+    fn p060_vue_sibling_imports_remain_at_module_scope() {
+        for siblings in [vec![], vec!["Theme"], vec!["Collection", "DesktopCfg"]] {
+            let mut store = store_from_src("store SettingsStore { model { var ready bool = false } }");
+            store.sibling_stores = siblings.iter().map(|s| s.to_string()).collect();
+            let code = VueGenerator::generate_store_composable(&store);
+            let factory = code.find("export function createSettingsStore").unwrap();
+            for (offset, _) in code.match_indices("import ") {
+                assert!(offset < factory, "ES module imports cannot appear inside a store factory:\n{code}");
+            }
+            assert_eq!(code.matches("import { reactive }").count(), usize::from(!siblings.is_empty()));
+            for sibling in siblings {
+                let facade = format!("reactive(use{sibling}Store())");
+                assert!(code.find(&facade).unwrap() > factory, "sibling state must remain per-App");
+            }
+        }
     }
 
     /// `all_tags` getter when it declares one in its `computed {}` block. This

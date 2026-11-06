@@ -223,6 +223,11 @@ impl VueGenerator {
                 sibling, sibling
             ));
         }
+        // Imports are module declarations; only sibling instances belong in
+        // the per-App factory below.
+        if !store.sibling_stores.is_empty() {
+            code.push_str("import { reactive } from 'vue'\n");
+        }
         // PLAN-041 T-03: per-App factory — every piece of store STATE
         // (refs, watchers, sibling facades, SSE/timer guards) is emitted
         // inside `create{Name}Store()`; `use{Name}Store()` resolves one
@@ -240,7 +245,6 @@ impl VueGenerator {
             factory_name
         ));
         if !store.sibling_stores.is_empty() {
-            code.push_str("import { reactive } from 'vue'\n");
             for sibling in &store.sibling_stores {
                 code.push_str(&format!(
                     "const {} = reactive(use{}Store())\n",
