@@ -14,6 +14,11 @@
 //! 策略差异诚实登记于 shell-a2r-seams。
 
 /// `dialog_open(filter) -> String` — pick one file; `""` on cancel.
+/// Multiple selection, JSON array of paths; "[]" on cancel.
+pub fn open_files(filter: &str) -> String {
+    crate::host_adapters::dialog::unparented_open_files(filter)
+}
+
 pub fn open(filter: &str) -> String {
     crate::host_adapters::dialog::unparented_open(filter)
 }

@@ -14389,6 +14389,7 @@ fn collect_local_elems(
                 "(auto_ui_runtime::ui::code_editor::code_editor_with(&({a0}), |core| core.fold_hidden_count()).unwrap_or(0)) as i64",
                 a0 = arg(0)?
             )),
+            "dialog_open_files" => Some(format!("auto_ui_runtime::ui::dialog::open_files(&({}))", arg(0)?)),
             "dialog_open" => Some(format!("auto_ui_runtime::ui::dialog::open(&({}))", arg(0)?)),
             "dialog_save" => Some(format!("auto_ui_runtime::ui::dialog::save(&({}))", arg(0)?)),
             "Process.exit" => Some(format!("std::process::exit(({}) as i32)", arg(0)?)),

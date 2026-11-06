@@ -188,6 +188,20 @@ fn os_open(attach_parent: bool, filter: &str) -> String {
         .unwrap_or_default()
 }
 
+/// Multi-select shares the same filter and parent policy as single-select.
+fn os_open_files(attach_parent: bool, filter: &str) -> Vec<String> {
+    let exts = filter_exts(filter);
+    let mut dialog = rfd::FileDialog::new();
+    if !exts.is_empty() {
+        dialog = dialog.add_filter("Files", &exts);
+    }
+    if attach_parent {
+        dialog = attach(dialog);
+    }
+    dialog.pick_files().unwrap_or_default().into_iter()
+        .map(|p| p.to_string_lossy().into_owned()).collect()
+}
+
 /// 单一 OS save 实现：default_name 非空才 set_file_name → 按策略锚定
 /// 父窗 → save_file → `to_string_lossy`（取消 = ""）。
 fn os_save(attach_parent: bool, default_name: &str) -> String {
@@ -209,6 +223,10 @@ fn os_save(attach_parent: bool, default_name: &str) -> String {
 pub struct ParentedOsDialogProvider;
 
 impl DialogHostProvider for ParentedOsDialogProvider {
+    fn open_files(&self, filter: &str) -> Result<Vec<String>, String> {
+        Ok(os_open_files(true, filter))
+    }
+
     fn open(&self, filter: &str) -> String {
         os_open(true, filter)
     }
@@ -220,6 +238,11 @@ impl DialogHostProvider for ParentedOsDialogProvider {
 
 /// a2r 高层 open 门面（**unparented** 策略，旧 `ui::dialog::open` 语义——
 /// PLAN-681 §9 F1 缝诚实保留）。`ui::dialog::open` 薄委托本函数。
+pub fn unparented_open_files(filter: &str) -> String {
+    serde_json::to_string(&os_open_files(false, filter))
+        .expect("a vector of paths is JSON serializable")
+}
+
 pub fn unparented_open(filter: &str) -> String {
     os_open(false, filter)
 }
