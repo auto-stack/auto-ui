@@ -1,12 +1,12 @@
 ---
 plan_id: auto-ui/PLAN-060
-status: executing
+status: execution_done
 feature_name: a2r 数组索引 VM 语义与 iced 桌面 outproc 输入/验收投递
 author: [Codex]
 created_at: 2026-11-05
 updated_at: 2026-11-07
 plan_revision: 8
-current_step: 4
+current_step: 5
 total_steps: 6
 base_branch: master
 base_commit: 7ac0455bf4cd743248749e4bc4eb9d0aed657266
@@ -229,7 +229,7 @@ OS054真实Chat第六条消息已落库但气泡被裁切，滚轮不改变位�
   panic 消失。
 - [x] T-02（work）：`DesktopInject::Pointer` + MCP `action:"pointer"`；notes 点击实测。
 - [x] T-03（work）：outproc handler 协议投递（或降级边界）+ 键盘聚焦实测。
-- [ ] T-04（work）：新main/949共同依赖整合验证待闭合；原六 app 回归/桌面实测/证据保留；F060-R6-01/02修复及准确六目标规范清单见round70。既有六app实机成功保留，最终SDK影响核对仍由merge负责。round67 sibling-store 导入修复于 round68 完成正式完整 Vue 消费验证；原生生成/runtime 不变边界复用。
+- [x] T-04（work）：新main/949共同依赖整合验证待闭合；原六 app 回归/桌面实测/证据保留；F060-R6-01/02修复及准确六目标规范清单见round70。既有六app实机成功保留，最终SDK影响核对仍由merge负责。round67 sibling-store 导入修复于 round68 完成正式完整 Vue 消费验证；原生生成/runtime 不变边界复用。
 - [ ] T-05（review/merge）：独立复审、归档、工具链 pin 落地。
 
 ## 9. 复审记录
@@ -765,3 +765,10 @@ SD01新段描述既有受支持local/model/store Vec及嵌套JSON的安全coales
   CurrentwriterdependencyWebhadremained37d whileSDK194actualconsumerc36. VerifiedwriterWebdetachedtrackedclean, safelyalignedexistingdependencytoc36(noextraWT/link), Down7c4/Langf032/UI1dba unchanged; record plan-060/writer-dependency-alignment-r7.json. Allcurrentcarrierred/greenareactualwriterCargo pathdependencies Webc36, notolddefault37d. No competingCargo whiletestsran; rawscope remains plan-060. Othermanifest/profile/core/GUI controls reusedonlywithinunchangedboundaries.
   Parent194currentVue all8actualtasks/trueheaderdetach+reopen+nextop,10mixedheadercloseone/sibling9/dataretention,closeall10+pageerrors[]/browser0; latestpublicfrontgen/assets2f9/1dbasourcebound. Thisnative-onlycarrierrepair doesnotchangeVuegenerator/assets orappfront; exactsource-equivalence willbeprovenfornextSDKinstead ofrelabellingruntimeframes. Native194sixformalbuildsexit0/18published-target-receiptidentities/67inputs verified (identity8890bf78a0973d39979e88a4c8ce1d5810144589310c17bb9a591f29a7a7d21b); NotesandTodo truepointer/keytasks+normalclose0 complete butnotnamedchannelorfinalSDKacceptance. Parentremainingnative4Rust+VM2stillpending. Native194root19420/Chatservice/Cargo/wrappernatural0,privateRQ18172controlled1/reaped; fourNotes/Todofirst/reopenedchildrenallnormal0,manifest2036c398/selectedportsabsent/foreign47236unchanged. NoOSactivation/CUA.
   r8当前最小工作检查已终结：native_theme_carrier::tests4/4exit0（含新增命名转发及原3主题控制），native receipt当前接受+旧v13/v14拒绝/原backend内容和文件集合邻面1/1exit0/.81s，writer实际Webc36。T04仍pending当前SDK live named通道和八native任务，不能用单元结果关闭。本文新增Spec句/缓存标识更新只落实原输入及所建即所测合同。
+
+
+- stage:work | plan_id:auto-ui/PLAN-060 | revision:r8 | round:77 | outcome:execution_done5/6 | source_commit:9c009f70c5aca4eb0ced80f3b8a0ab2c32432086 | next:independent final code/AC/Spec review, merge-owned bounded union pending
+  FrozenSDK195 exact8roots Langf032/UI9c/Webc36/Man2a9/OS39d, CLI a77cb353b5a79d088749e9a29dc382d79a9256ce1331005892b1e39a74f1c01a, tool454bf9020fef0f9bcaf22957ed3df3642a8b96c242af1a076aa30060bcff9a30, hostf9064cfec9ab35d1d19615b406ebd464d81ee7470c57b1c2eba5d9a6aeb2e4a3. All6native v15 formalbuilds0/18artifactbindings/67inputs verified; nativeidentity781ce3fa232a2d873aca7242678ec220a7872970fb0419cfd97819fc118da546. Actual195 named Todo StoreInput renders intendedChinese; AddTodo uniqueDBid1/inputcleared/count1; realedit/complete/close0/reopen/nextedit. Notes namedNewNote plusrealpointer/keySave/close0/reopen/nextSave id9rev3. Calendar namedNextMonth showsDecember, Today/create/edit/save pluspointerEdit/Delete, crossday eventev4deleted and allversionsabsent afterclose0/reopen; next ev5saved/reopened retained, oldev3byteexact. Database actualquery/reject/switch/close0/reopen/filter. Blog fullChinese create/preview/return/Save/close0/reopen/nextSave exacttitle/body/current/revision8. NativeChat realrecoveredA login/send, independentlegitimateB receives/replies, samekeyretryoneDBrow, C read[]/sendnot-a-participant; close0/freshlogin/history/nextsend; prior10exact. Paint256pixel Undo/Redo/Save/close/reopen/nextdraw/SVGexact; Charts CSVChinese3decimals, save/close/reopen/nextsave/sourceofflineexport, actualPNGbarheights+SVG verified. No API/DB prewrites for desktop business tasks.
+  Permanent actual-parent gate verify_basic_app_assembly.py --profile iced --run t06/iced-run-r195.json and --profile vue --run t06/vue-run-r195.json each8required8pass0fail/exit0. Actual195Vue8fresh tasks/production4185modules/14.53s/exit0 and10window trueheaderclose lifecycle alreadyrecorded. Native10windowcloseNotes preserves other9sameWMids/allNotesTodoChatrows/CalendarBlogChartsfiles/PaintKV andClock/Mines surfaces; Minesbusinessstateexact, onlyvolatileupdated_ms normalized. Nativeall6finalchildren0; host38420/backendservice32896/Cargo19116+36652/backend9756/wrapper18292 natural0/reaped, privateRQ3288 controlled1; selected9247/17823absent, originalmanifest2036c398/foreign47236unchanged.
+  Work-owned AC01..04 complete and T04closed; no open work finding, no scope reduction. Source repair controls carrier4/4 and freshnessv15 current/rejectv13,v14 retained; original48compiler/runtime and6tools evidence reuse only unchanged inputboundaries. ClarifiedTickWrap localdevtools wrapper is outside actualgeneratedbrokerchain; no futurewrapper claim. Earlyframes before asynchronoussettlement excluded (Calendar firstreopen shot showedNotes); correct secondnormalCalendarclose/reopen retainedev5/absenceev4 frame nowbound. FirstCharts import beforeVMready lostpath; afteractualsurface ready actualimport succeeds. Peerfixture initially asserted error instead ofdocumentederr; finalu8/u9complete. No productfailure hidden or evidence quota replaced. Final bounded compiler4/runtime7/tools6union belongsmerge after independentfinalreview; notclaimedpassedhere.
+  Current packet hashes: iced cd232e671e0aa7a3c1e0637a5a98e055eb9343345756faf231ca442e1e2cc042; Vue 348aeaa52a3ca74a987f8e96570cb92d72913ad117c230ec5990c6eb013f3bd0; mixed b0679520d485f3d3379f27cd8be11d7b043533e252788e91381152bfe1867746. Raw single parent scope D:/autostack/plan-artifacts/plan-054; all durable commands/counts above.
