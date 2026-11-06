@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-06
 updated_at: 2026-11-06
 plan_revision: 2
-current_step: 0
+current_step: 1
 total_steps: 8
 base_branch: master
 base_commit: 7ac0455bf4cd743248749e4bc4eb9d0aed657266
@@ -107,7 +107,7 @@ Rust AutoUI runtime/dialect/handler codegen、VM实例及parked续体、iced/win
 
 | ID | owner_stage | 依赖 | 实际动作 / 关闭条件 | AC |
 |---|---|---|---|---|
-| T00 | work | 授权已给 | 主干/pin同因复现、有效最小HTTP routed fixture、真实owner流与R01/02定位；先证明root正控和实际原红，不继续错误prototype盲重试 | AC01/02 |
+| T00 [x] | work | 授权已给 | 主干/pin同因复现、有效最小HTTP routed fixture、真实owner流与R01/02定位；先证明root正控和实际原红，不继续错误prototype盲重试 | AC01/02 |
 | T01 | work | T00 | 最小实例/root续体与结果投影修复、永久V01/02及必要同因合法/失效对照；Reader无特判 | AC01/02/05 |
 | T02 | work | T00；T01可独立推进 | 真实系统可访问整链有界可行核查，冻结角色/事件/实例/失效/布局owner、可用库/feature与拒绝行为；不可行则具名设计阻挡，不先写虚假Spec | AC03/05 |
 | T03 | work | T02 | 实现最小Windows provider/语义发布及真实系统树/焦点/操作V03；按需处理wry正文已有接缝，保原native表面合同 | AC03/05 |
@@ -116,7 +116,7 @@ Rust AutoUI runtime/dialect/handler codegen、VM实例及parked续体、iced/win
 | T06 | merge | T05 pass | 精确落地、冻结受影响并集与canonical核验、归档导航/计数；需要Lang变更则同门成对交付 | AC07 |
 | T07 | merge | T06 | Reader009更新只读消费pin/工具并记录可用交接；原证据不动，guard clean后清本树/分支/自有scope，最终8/8 | AC08 |
 
-当前0/8，T00进行中；唯一权威组ui-068已创建，生产原始代码尚未修改，已新增合法路由HTTP永久反例夹具及5个目标case，实际baseline正在独立target构建/执行。T02待T00 owner流核实后继续，不把测试源码当已执行。
+当前1/8，T00已闭、T01进行中；唯一权威组ui-068已创建，生产原始代码尚未修改，已新增合法路由HTTP永久反例夹具及5个目标case，实际baseline正在独立target构建/执行。T02待T00 owner流核实后继续，不把测试源码当已执行。
 
 ## 9. 复审记录
 
@@ -130,6 +130,12 @@ Rust AutoUI runtime/dialect/handler codegen、VM实例及parked续体、iced/win
 - scope为D:/autostack/plan-artifacts/plan-068/auto-ui，已登记唯一全局plan-artifacts/.retention/policy.json scopes字典，未覆盖别owner；第一次按list形态的注册断言失败且未写入，随后按实际dict受锁更新成功。五仓worktree创建均exit0，无junction/symlink。除本Plan外证据均在该scope。
 - 实际源定位：handler_codegen::rewrite_stmt_with_locals将router.push/back及NavCall直接写__state隐藏字段，而既有实例合同要求宿主字段经__auto_root；dynamic::poll_parked_resumes只置dirty，未沿同步完成路径失效memo/处理导航后继，是否造成结果缺失待实际case证实。旧probe的outlet{}与合法plan015的bare outlet不同，新永久fixture沿生产合法形态，不用旧解析失败作原红。
 - 新增tests/plan068_routed_continuations.rs与fixtures/plan068_routes/src/front三文件：真实延迟HTTP root正控、child本态+条件视图、child同步push、HTTP后push/params、HTTP后back/history；均尚未计PASS。baseline命令cargo +nightly -Z unstable-options test --offline --locked --lockfile-path <scope/locks/ui-minimal/Cargo.lock> -p auto-ui-runtime --test plan068_routed_continuations -- --test-threads=1 --nocapture，stable rustc/rustdoc显式固定、独立scope target/TMP；源before清单与log已开始写入，不复用009目标目录或改只读锁。
+
+### 2026-11-06 T00实测完成：root正控1绿、真实路由4红
+
+- T00永久case提交**7171ac31**，生产库仍与05c62e4f相同。首次完整冷构建已产出测试exe；第一次运行中的root HTTP正控因Windows accepted socket继承listener nonblocking而WouldBlock，析构二次panic导致STATUS_STACK_BUFFER_OVERRUN，该为测试夹具错误。显式set_nonblocking(false)、Drop不在unwind中二次panic后，baseline02真实终态**1 PASS/4 FAIL、0 ignored、exit101**，5项全部实际执行0.65s；编译14.22s，log SHA256=212bee8683063ca8fb397932c98eac9b1c9890a91d5976f6e147f1f93323c37f。
+- root HTTP await→可见结果正控PASS。child同步push与HTTP后push分别重现子态缺__current_route；HTTP后back重现缺__nav_back_pending；child多行结果在自己的实例态已精确成功写入，但条件/正文VTree仍空。这与Reader真实已保存而未显示的反例同因，排除接口未返回/字节失败或root字段代理的归因。合法bare outlet夹具已通过实际production builder，旧prototype解析错误不再作依据。
+- 已开始T01最小改面：handler_codegen宿主导航写经__auto_root，dynamic统一完成后继（参数/历史、memo与dirty），初次t01-route-fix-01为**4绿1红**；剩余back已从子态缺槽变为App_State缺__nav_back_pending，明确root宿主槽未注入。正在补root routes专属false槽并重跑同5项；未宣称T01完成或native产品/AX通过。无语言源码改动。
 
 ## 10. 待澄清事项
 
