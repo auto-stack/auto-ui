@@ -1,12 +1,12 @@
 ---
 plan_id: auto-ui/PLAN-060
-status: executing
+status: execution_done
 feature_name: a2r 数组索引 VM 语义与 iced 桌面 outproc 输入/验收投递
 author: [Codex]
 created_at: 2026-11-05
 updated_at: 2026-11-06
 plan_revision: 6
-current_step: 2
+current_step: 5
 total_steps: 6
 base_branch: master
 base_commit: 220115df
@@ -220,13 +220,13 @@ OS054真实Chat第六条消息已落库但气泡被裁切，滚轮不改变位�
 
 ## 8. 执行步骤
 
-- [ ] T-00（work）：定位 Index 发射全路径与 rqhost 客户端输入消费点，产出
+- [x] T-00（work）：定位 Index 发射全路径与 rqhost 客户端输入消费点，产出
   `docs/plans/evidence/060/decision.md`（边界索引发射策略 + handler 协议可行性）。
-- [ ] T-01（work）：Index 边界安全发射 + shim 注入 + 单测；生成 calendar 验证
+- [x] T-01（work）：Index 边界安全发射 + shim 注入 + 单测；生成 calendar 验证
   panic 消失。
-- [ ] T-02（work）：`DesktopInject::Pointer` + MCP `action:"pointer"`；notes 点击实测。
-- [ ] T-03（work）：outproc handler 协议投递（或降级边界）+ 键盘聚焦实测。
-- [ ] T-04（work）：六 app 回归/桌面实测/证据，提交 execution_done。
+- [x] T-02（work）：`DesktopInject::Pointer` + MCP `action:"pointer"`；notes 点击实测。
+- [x] T-03（work）：outproc handler 协议投递（或降级边界）+ 键盘聚焦实测。
+- [x] T-04（work）：六 app 回归/桌面实测/证据，提交 execution_done。
 - [ ] T-05（review/merge）：独立复审、归档、工具链 pin 落地。
 
 ## 9. 复审记录
@@ -579,3 +579,10 @@ back 侧 `auto-notes-...-back` 是完整 axum/DB 实现。故 iced 桌面上任�
   Parent immutable host cargo rustc exit0/35.17s, UI72bbcb04/root643b8c6, exe SHA1645d52a7ed149bdf64e9f1f36139376907acfe1bc81d1eb4177193850385576. Same exact app5cdca0f/SDK43a19133/v13 native9deef22d320c6d366e2c941b5a4e4d84ade628521e03f772a7c3a8be55fc7e14 retained under host-only painter change boundary. Stable017 launchwid1/child46844, true retained A credential UI login, real B contact/history/wheel. Actual bottom frame932b63ef47285f9dd8ea5de0a3627e240c17e12391af9846bd002e43beab41ac shows all final sixth bubble/text/timestamp readable, own primary and incoming muted backgrounds restored, visible scrollbar. This closes clipping + WGPU masking counterexample together, not merely scrolling movement.
   Real composer Enter sends new128.25 message; independent read-only SQLite exact7 rows/senderu2/cvAB and byte-value equality of all previous6 against production owner oracle. After queued new frame arrives, first scroll state was previous max offset; second wheel on observed new content reaches actual final timestamp. Final full bubble/timestamp image512c940bbcc7c51fc78d136eb34f0e88b8d9500d043f85d57249628633de3ebc inspected. No auto-bottom promise, no credential/API prewrite, all credentials remain private workers. Final native-chat-overflow-final-oracle-r159.json SHAb7831479f2ed16bca7584c19a4f5bb713c19b44a6c6aa1729dee258182160156 binds source/artifact/data/images.
   Current scoped host28532 owns official CLI41336/backend19892/17823; native46844 live for subsequent checks. AUTO_DESKTOP_RQHOST=0 explicitly avoids creating a further known private helper leak while checking only scroll/paint; parent T05 remains open. Final common frozen SDK/6-native union, independent framework review and landing still pending. No full054 or finalUI delivery claimed from this scoped pass.
+
+- stage: work | plan_id: PLAN-060 | plan_revision: r6 | round: 65 | outcome: pass (work only, execution_done5/6) | code_commit: 72bbcb045e141233db1380978efdd7d03b2a47af | authoritative_tree: D:/autostack/.wt/ui-060/auto-ui | branch: codex/plan-060-dev | next: independent final review on this same tree
+  Reconciled original T00..03 unchecked task rows against their prior detailed §9 implementation/unit/real-input receipts and current source; current_step2 was stale bookkeeping, not two newly invented feature completions. T00 decision and subsequent bounded designs are durable in this Plan (§5/§9), scratch-only raw evidence policy replaces old promised docs/plans/evidence file. No new decision attachment or source/spec index written.
+  Final common-consumer union now actual: parent054 official public scripts/desktop.ps1 -Track iced -CandidateDir frozen-sdk-r161 starts root916a142 with UI72bbcb04, Lang23f3a031, Man03bb65ef. Producer CLI e6e8afa15adbaf22c32b9d1e9523d8f6cb6a19a7590ae6f6aa93a498a77ef53a/tool e90da49163891bbc811456bf4edeb3d3b1fd722d883ef53da886446807cbd61c/host46596ee20bfc9205e3a1670318a0f4ee4371410dff1cecdccf318f3fe59f6820 formally built0; all six native apps rebuilt0 and receipt source inputs plus actual target/published/receipt exe hash equal6/6. Artifact evidence D:/autostack/plan-artifacts/plan-054/t04/frozen-native-identity-r161.json SHA522513f040aa5afdeb9dee67dd38cd7ace7ce5c59714610f87de83e29029bd5d. Current authoritative238c6765 versus consumer72bb has zero crates/Cargo diff; writer Lang4fdf versus consumer23f has zero crates/Cargo diff (documentation-only successor). Earlier scoped current-code compiler/runtime/tools regression controls remain valid under this checked source equivalence, not a new frozen language source claim.
+  Same host19944 completes all six native real task families with fixed delivered pins: Notes pointer/key Chinese title/body + Save, close0/reopen/next Save; Todo create/check/actual edit+Enter, close0/reopen retained completion/next edit; Calendar cross-day create/edit/delete, close0/reopen stable generation/deletion and next id; Database actual tree/SQL rows/read-only write rejection/switch/close0/reopen next filter and unchanged two SQLite file hashes; Blog actual NewDraft/multiline/Preview/Return/Save, close0/reopen list fields/next multiline explicit Save; Chat actual retained A/B credential UI login, A send256.5/B sees/replies512.25, close0/reopen loginA/history/next1024.125. Independent DB/file oracles and inspected real frames agree; long history final colored bubble/timestamp readable on same final SDK, final image85b19332f6a7a083302d433b9708a00ec4e8b4fcc654a582420c23f1c065b65e. Chat first7 preserved byte-value equal and exact10 final rows. Native Task oracles in parent t04: Notes fc5ec8eee4a36697e1cf0a61720ac97180e43df3d950358c1918f62572f49cc4; Todo825b9230ecd86c3473e82066b18d4cb68ac5c5721144d6d8a733d83db9e6dff8; Calendar cd51ecb7a01f407050564f4b25601734b60d973e60e9c2b15cf63c8f63127354; Database4c3edccc8491260008178e8f90922369215624ca0e52f6c149fee9f3e804fdc9; Blog bc1711d82356281b4982013259f86293f87ad6160171474358759b743743d3a3; Chat b95a61e296d0d62bcd868c6e81863d064d033ec2b3d0850bad90e3eeb1c55f1d. Paint/Charts also complete as iced inproc VM, not counted as native six.
+  Native component Action dispatch remains only its declared root messages/scalar args; Notes child EditorPanel messages not declared at root correctly do not act, actual pointer/key child controls used. No arbitrary child RPC promise, no source-template snapshot as native UI result, no bearer/secret API prewrite or published credential frame. Parent normal close of all ten windows gives six native exit0, normal product host/CLI/Rust service0 and private helper controlled cancellation1; private helper lifetime is parent's separate OS owner, not framework compatibility change.
+  T04 closed by the common SDK six-native build/task union above. Existing affected permanent red/accepted controls documented in rounds31..64 remain bound to unchanged code; final review and merge's frozen affected-module union gate are still required per stage workflow. AC05 independent final review has not run; no reviewed/pass, archive, upstream master merge or OS default pin landing inferred. Parent054 still executing4/10 with Vue/mixed/failure/aggregate/mutation/review/landing outstanding. Framework implementation writes now frozen for independent context on this authoritative tree; generated consumer app outputs and parent-only work may continue.
