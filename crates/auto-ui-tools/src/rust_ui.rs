@@ -7608,7 +7608,7 @@ pub(crate) fn resolve_managed_front(project_dir: &Path) -> AutoResult<ManagedFro
 /// generator changes without a bump are a recorded boundary.
 // PLAN-060: invalidate unchanged inputs after fixing text click/style emission,
 // in addition to the earlier table-row and named-input corrections.
-const FRONT_LAYOUT_VERSION: &str = "front-layout/v12";
+const FRONT_LAYOUT_VERSION: &str = "front-layout/v13";
 
 fn front_generator_identity(context: &GeneratedBuildContext) -> String {
     format!(
@@ -9202,6 +9202,15 @@ pub fn answer() int { return 42 }
         fs::write(managed.member_dir.join("src/main.rs"), "// freshness fixture\n").unwrap();
         write_front_receipt(root, &managed, &PacSource::legacy(), None).unwrap();
         assert_eq!(front_needs_regeneration(root, &managed, &PacSource::legacy()).unwrap(), (false, false), "the unchanged receipt is an accepted control");
+        let receipt_path = managed.member_dir.join("generation.json");
+        let mut old_receipt: serde_json::Value = serde_json::from_str(&fs::read_to_string(&receipt_path).unwrap()).unwrap();
+        let identity = old_receipt["generator"].as_str().unwrap().replace(FRONT_LAYOUT_VERSION, "front-layout/v12");
+        assert_ne!(identity, old_receipt["generator"].as_str().unwrap());
+        old_receipt["generator"] = identity.into();
+        fs::write(&receipt_path, serde_json::to_vec(&old_receipt).unwrap()).unwrap();
+        assert_eq!(front_needs_regeneration(root, &managed, &PacSource::legacy()).unwrap(), (false, true), "old overflow lowering must regenerate even with unchanged source");
+        write_front_receipt(root, &managed, &PacSource::legacy(), None).unwrap();
+
         fs::write(&chosen, "pub fn value() int { 2 }\n").unwrap();
         let changed = front_input_hashes(root, &PacSource::legacy()).unwrap();
         assert_ne!(first, changed, "back-only content changes must invalidate a native artifact");

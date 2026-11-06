@@ -70,3 +70,7 @@ local backend source directory: `src/back` takes precedence over `back`, as in
 the local API parser. Backend-only edits, additions and removals require code
 regeneration; backend input read failures stop receipt publication. This local
 input rule does not extend the separate external backend-project resolver.
+
+### 普通布局样式的滚动转换（PLAN-060 r6）
+
+原生Rust生成的普通row/col在求值实际样式后，将overflow-y-auto/overflow-auto转换为真正的Y轴Scrollable。动态样式同样只求值一次，转换不重放组件消息。无overflow、overflow-hidden与显式scroll保持原有结构；显式scroll不重复包装。背景、边框、圆角等视口视觉与内容布局的拆分复用VM的同一实现，原有列/行子项、间距、padding和点击回调保留。该规则不声称其他尚未接入的标签支持，也不新增自动滚到底或横向滚动合同。生成身份front-layout/v13使旧输出在正式构建时重生成；所建、所发布、所测的输入与产物仍按现有receipt验证。

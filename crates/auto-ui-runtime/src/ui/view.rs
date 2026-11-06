@@ -1882,6 +1882,35 @@ impl<M: Clone + Debug> ViewBuilder<M> {
 }
 
 impl<M: Clone + Debug> View<M> {
+    /// Native generated row/column overflow lowering, after actual style evaluation.
+    pub fn with_overflow_scroll(mut self) -> Self {
+        let original = match &mut self {
+            View::Column { style: Some(style), .. } | View::Row { style: Some(style), .. }
+                if style.classes.iter().any(|c| matches!(c, StyleClass::OverflowYAuto | StyleClass::OverflowAuto)) => {
+                let original = style.clone();
+                let (_, content) = split_scroll_visual_classes(&original);
+                *style = content;
+                original
+            }
+            _ => return self,
+        };
+        let (visual, _) = split_scroll_visual_classes(&original);
+        let scroll_style = if visual.is_some() { ensure_full_scroll_dims(&original) } else { original };
+        let scroll = View::Scrollable {
+            child: Box::new(self), width: None, height: None, style: Some(scroll_style),
+            auto_scroll: false, offset: None, on_scroll: None,
+            axes: crate::ui::scroll::ScrollAxes::Y,
+            scrollbar_policy: crate::ui::scroll::ScrollbarPolicy::Auto, controller: None,
+        };
+        match visual {
+            Some(style) => View::Container {
+                child: Box::new(scroll), padding: 0, width: None, height: None,
+                center_x: false, center_y: false, style: Some(style), onclick: None, on_right_click: None,
+            },
+            None => scroll,
+        }
+    }
+
     /// Create an empty view
     pub fn empty() -> Self {
         View::Empty
@@ -4196,6 +4225,29 @@ mod tests {
     // Type alias for convenience
     type TestView = View<TestMsg>;
 
+    #[test]
+    fn p060_native_overflow_conversion_preserves_controls_and_viewport_paint() {
+        for style in ["h-full", "overflow-hidden"] {
+            let v: View<()> = View::col().style(style).child(View::text("control")).build().with_overflow_scroll();
+            assert!(matches!(v, View::Column { .. }), "plain/hidden column changed kind");
+        }
+        let explicit: View<()> = View::scrollable(View::col().style("overflow-auto").build()).build().with_overflow_scroll();
+        assert!(matches!(explicit, View::Scrollable { child, .. } if matches!(*child, View::Column { .. })), "explicit scroll wrapped twice");
+        for style in ["h-full w-full bg-card rounded-xl overflow-y-auto", "overflow-auto bg-card w-full h-full rounded-xl"] {
+            let view: View<()> = View::col().style(style).spacing(7).padding(3).on_click(|_| ())
+                .child(View::text("content")).build().with_overflow_scroll();
+            let View::Container { child, style: Some(visual), .. } = view else { panic!("paint must stay on viewport"); };
+            assert!(visual.classes.iter().any(|c| c.is_visual_paint()));
+            let View::Scrollable { child, axes, .. } = *child else { panic!("missing scroll viewport"); };
+            assert_eq!(axes, crate::ui::scroll::ScrollAxes::Y);
+            let View::Column { children, style: Some(content), spacing, padding, onclick, .. } = *child else { panic!("lost column content"); };
+            assert_eq!((spacing,padding,children.len()), (7,3,1));
+            assert!(onclick.is_some(), "column handler must survive");
+            assert!(!content.classes.iter().any(|c| c.is_visual_paint()), "paint duplicated in scrolling content");
+        }
+    }
+
+
     // ========== PLAN-641: TabsVariant 词表与 Builder 默认值 ==========
 
     #[test]
@@ -5472,5 +5524,94 @@ mod tests {
             }
             _ => panic!("expected ImageSurface"),
         }
+    }
+}
+
+/// PLAN-748 T-07（jade 件一根修）：滚动转写的视觉类上移。CSS 语义里
+/// `overflow-y-auto` 元素的 bg/border/radius/shadow 属**滚动容器本体**
+/// （视口层，随容器在 stretch/bounded 语境拉伸满高），不属滚动内容
+/// （内容止于内容高）。此前转写把整串 style clone 给内容 col——
+/// `flex-col` 等显式显示类阻断 overflow-y 的 height=Fill 推断时，内容
+/// col 止于内容高，bg/border 随之止步（jade 侧栏 bg 底边=树内容底
+/// 550/786 的根因；视口 Scrollable 本身 Fill 拉伸正常）。
+///
+/// 拆分：`(视口视觉子集, 内容布局余集)`。视口子集为空 → 零包装层
+/// （无视觉类的滚动 col 现行为不变）。hover/variant 类随内容（现状
+/// 保持；纯视觉 hover 上移留后续按需）。
+///
+/// 视口子集附带头寸镜像：拷贝原显式 Width/Height 类，缺省补 Full——
+/// iced 0.14 `Limits::(Shrink)` 置 compression 位，Fill 子件在压缩轴
+/// 解析为内容高（Scrollable 在 Shrink 容器内塌 42px 实证）；视口容器
+/// 须与 Scrollable 同 Length 才能传递拉伸。缺省 Full 与 from_style 对
+/// overflow-y 的 height=Fill 推断、Scrollable 缺省 width=Fill 同口径。
+pub(crate) fn split_scroll_visual_classes(s: &Style) -> (Option<Style>, Style) {
+    let mut visual = Vec::new();
+    let mut rest = Vec::new();
+    let mut width_cls: Option<crate::ui::style::StyleClass> = None;
+    let mut height_cls: Option<crate::ui::style::StyleClass> = None;
+    for c in &s.classes {
+        match c {
+            crate::ui::style::StyleClass::Width(_) => {
+                width_cls = Some(c.clone());
+                rest.push(c.clone());
+            }
+            crate::ui::style::StyleClass::Height(_) => {
+                height_cls = Some(c.clone());
+                rest.push(c.clone());
+            }
+            _ if c.is_visual_paint() => visual.push(c.clone()),
+            _ => rest.push(c.clone()),
+        }
+    }
+    let viewport = (!visual.is_empty()).then(|| {
+        let mut classes = visual;
+        classes.push(width_cls.unwrap_or(crate::ui::style::StyleClass::Width(
+            crate::ui::style::SizeValue::Full,
+        )));
+        classes.push(height_cls.unwrap_or(crate::ui::style::StyleClass::Height(
+            crate::ui::style::SizeValue::Full,
+        )));
+        Style {
+            classes,
+            hover_classes: Vec::new(),
+            variant_classes: Vec::new(),
+        }
+    });
+    (
+        viewport,
+        Style {
+            classes: rest,
+            hover_classes: s.hover_classes.clone(),
+            variant_classes: s.variant_classes.clone(),
+        },
+    )
+}
+
+/// PLAN-748 T-07：视口包装分支的 Scrollable 头寸补全——外部尺寸语义已由
+/// 视口容器镜像承担，Scrollable 在容器内以 Fill×Fill 铺满（无显式
+/// Width/Height 类时补 Full；Shrink 会在容器压缩语境塌内容高，J1 实测
+/// 42px）。显式 w-*/h-* 保留原类（容器已镜像，同值无双关）。
+pub(crate) fn ensure_full_scroll_dims(s: &Style) -> Style {
+    let mut classes = s.classes.clone();
+    if !classes
+        .iter()
+        .any(|c| matches!(c, crate::ui::style::StyleClass::Width(_)))
+    {
+        classes.push(crate::ui::style::StyleClass::Width(
+            crate::ui::style::SizeValue::Full,
+        ));
+    }
+    if !classes
+        .iter()
+        .any(|c| matches!(c, crate::ui::style::StyleClass::Height(_)))
+    {
+        classes.push(crate::ui::style::StyleClass::Height(
+            crate::ui::style::SizeValue::Full,
+        ));
+    }
+    Style {
+        classes,
+        hover_classes: s.hover_classes.clone(),
+        variant_classes: s.variant_classes.clone(),
     }
 }

@@ -8449,7 +8449,11 @@ fn collect_local_elems(
                         builder = self.add_event_to_builder(&builder, tag, event, handler);
                     }
 
-                    self.wrap_button_double_click(format!("{}.build()", builder), dbl_event)
+                    self.wrap_button_double_click(
+                        format!("{}.build(){}", builder,
+                            if matches!(view_fn, "col" | "row") { ".with_overflow_scroll()" } else { "" }),
+                        dbl_event,
+                    )
                 } else if tag == "button" {
                     // Button with children. The View::Button model only has a
                     // `label` (no children field), so `.child()` calls are
@@ -8467,7 +8471,11 @@ fn collect_local_elems(
                     for (event, handler) in events_sorted.clone() {
                         builder = self.add_event_to_builder(&builder, tag, event, handler);
                     }
-                    self.wrap_button_double_click(format!("{}.build()", builder), dbl_event)
+                    self.wrap_button_double_click(
+                        format!("{}.build(){}", builder,
+                            if matches!(view_fn, "col" | "row") { ".with_overflow_scroll()" } else { "" }),
+                        dbl_event,
+                    )
                 } else {
                     // Element with children
                     let mut builder = builder_start;
@@ -8525,7 +8533,11 @@ fn collect_local_elems(
                         builder = format!("{}.on_click(|_| ())", builder);
                     }
 
-                    self.wrap_button_double_click(format!("{}.build()", builder), dbl_event)
+                    self.wrap_button_double_click(
+                        format!("{}.build(){}", builder,
+                            if matches!(view_fn, "col" | "row") { ".with_overflow_scroll()" } else { "" }),
+                        dbl_event,
+                    )
                 }
             }
 
@@ -17390,6 +17402,28 @@ widget App {
     fn test_rust_generator_creation() {
         let gen = RustGenerator::new();
         assert!(gen.current_widget.is_none());
+    }
+
+    #[test]
+    fn p060_native_style_columns_lower_literal_and_dynamic_overflow() {
+        let src = r#"widget Overflow {
+            model { var scroll bool = true }
+            view {
+                col (style: "h-full overflow-y-auto") {
+                    text "history"
+                    col (style: if .scroll { "overflow-auto" } else { "overflow-hidden" }) { text "dynamic" }
+                    col (style: "overflow-y-auto") { }
+                }
+            }
+        }"#;
+        let ast = crate::parse_ui(src).expect("parse overflow columns");
+        let decl = ast.domain_stmts().find_map(|s| match s {
+            auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d), _ => None,
+        }).unwrap();
+        let widget = crate::aura::extract::extract_widget_from_decl(decl).unwrap();
+        let code = RustGenerator::new().generate(&widget).unwrap();
+        assert_eq!(code.matches(".with_overflow_scroll()").count(), 3, "all plain column paths must lower actual overflow style: {code}");
+        assert!(code.contains("if self.scroll"), "dynamic style must survive once");
     }
 
     #[test]

@@ -1672,27 +1672,29 @@ mod tests {
 
     #[test]
     fn p060_native_scroll_reaches_bottom_and_replays_coordinates() {
+        assert_native_scroll_reaches_bottom(false);
+    }
+
+    #[test]
+    fn p060_native_style_overflow_reaches_bottom_and_replays_coordinates() {
+        assert_native_scroll_reaches_bottom(true);
+    }
+
+    fn assert_native_scroll_reaches_bottom(styled: bool) {
         use crate::ui::View;
         #[derive(Debug)]
-        struct ScrollPage(usize);
+        struct ScrollPage(usize, bool);
         impl Component for ScrollPage {
             type Msg = ();
-            fn on(&mut self, _: ()) {
-                self.0 += 1;
-            }
+            fn on(&mut self, _: ()) { self.0 += 1; }
             fn view(&self) -> View<()> {
-                View::scrollable(
-                    View::col()
-                        .children(
-                            (0..40)
-                                .map(|index| View::text(format!("ROW{index}")))
-                                .collect::<Vec<_>>(),
-                        )
-                        .child(View::button("BOTTOM").on_click(|_| ()).build())
-                        .build(),
-                )
-                .style("h-full w-full")
-                .build()
+                let content = View::col()
+                    .style(if self.1 { "h-full w-full overflow-y-auto" } else { "" })
+                    .children((0..40).map(|index| View::text(format!("ROW{index}"))).collect::<Vec<_>>())
+                    .child(View::button("BOTTOM").on_click(|_| ()).build())
+                    .build();
+                if self.1 { content.with_overflow_scroll() }
+                else { View::scrollable(content).style("h-full w-full").build() }
             }
         }
         fn bottom(list: &DisplayList) -> Option<(f32, f32)> {
@@ -1719,7 +1721,7 @@ mod tests {
         // with the actual WM client extent, preserving the component instance.
         use super::super::endpoint::{AppEndpoint, FrameSource, HostEndpoint};
         use super::super::message::{FrameMode, FrameMsg, ProtocolMsg, WRect};
-        let source = HeadlessFrameSource::new(ScrollPage(7), 1280.0, 800.0);
+        let source = HeadlessFrameSource::new(ScrollPage(7, styled), 1280.0, 800.0);
         let mut app = AppEndpoint::new(source, "scroll", "scroll", 1280.0, 800.0);
         let mut host = HostEndpoint::listen();
         host.on_message(app.connect().unwrap()).unwrap();
