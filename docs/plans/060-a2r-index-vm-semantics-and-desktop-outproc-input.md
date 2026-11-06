@@ -1,12 +1,12 @@
 ---
 plan_id: auto-ui/PLAN-060
-status: execution_done
+status: executing
 feature_name: a2r 数组索引 VM 语义与 iced 桌面 outproc 输入/验收投递
 author: [Codex]
 created_at: 2026-11-05
 updated_at: 2026-11-06
 plan_revision: 6
-current_step: 5
+current_step: 3
 total_steps: 6
 base_branch: master
 base_commit: 220115df
@@ -222,11 +222,11 @@ OS054真实Chat第六条消息已落库但气泡被裁切，滚轮不改变位�
 
 - [x] T-00（work）：定位 Index 发射全路径与 rqhost 客户端输入消费点，产出
   `docs/plans/evidence/060/decision.md`（边界索引发射策略 + handler 协议可行性）。
-- [x] T-01（work）：Index 边界安全发射 + shim 注入 + 单测；生成 calendar 验证
+- [ ] T-01（work）：Index 边界安全发射 + shim 注入 + 单测；F060-R6-01 reopened，见末尾独立复审；生成 calendar 验证
   panic 消失。
 - [x] T-02（work）：`DesktopInject::Pointer` + MCP `action:"pointer"`；notes 点击实测。
 - [x] T-03（work）：outproc handler 协议投递（或降级边界）+ 键盘聚焦实测。
-- [x] T-04（work）：六 app 回归/桌面实测/证据，提交 execution_done。round67 sibling-store 导入修复于 round68 完成正式完整 Vue 消费验证；原生生成/runtime 不变边界复用。
+- [ ] T-04（work）：六 app 回归/桌面实测/证据，提交 execution_done。F060-R6-01/02 reopened：受影响索引生成控制与规范清单待修，既有六app实机成功保留。round67 sibling-store 导入修复于 round68 完成正式完整 Vue 消费验证；原生生成/runtime 不变边界复用。
 - [ ] T-05（review/merge）：独立复审、归档、工具链 pin 落地。
 
 ## 9. 复审记录
@@ -597,3 +597,82 @@ back 侧 `auto-notes-...-back` 是完整 axum/DB 实现。故 iced 桌面上任�
 - stage: work | plan_id: PLAN-060 | plan_revision: r6 | round: 68 | outcome: pass (execution_done5/6; independent review pending) | code_commit: d2a9ba65668a12a2cb08fc14a12349b4670a1ccf | next: independent final review on same writer
   Read-only consumer detached d2a9ba65; formal immutable CLI build0/37.84s SHA4925596a5cdc5e626b7ac785b9958ee2745106bf32834f18c4376beda9a70bcc and tool0/33.63s SHA8f7ed783b9a889d282d2c3f8cdc54093746589f520adb20348438911aad358ec. Parent frozen-sdk-r164 retains byte-identical accepted iced host; source diff72bb to d2 affects only Vue store import location/test/Plan. Actual public desktop.ps1 -Track vue -CandidateDir frozen-sdk-r164 regenerates whole registry (no eight-app subset), both os-config generated imports now module-level. Canonical Vue npm run build exit0, 4185modules/13.19s, raw plan-054/t04/canonical-vue-production-build-r164.log. No esbuild parse failures. Actual headless browser public Auto Desktop entry loads with pageerror0, Notes/Todo/Calendar/Database/Paint real launcher user tasks and normal window close/reopen/next operations pass with independent disk/localStorage/SQLite and inspected frames. Initial Vite dependency optimization reload interrupted first launch probe; excluded and rerun after settled reload. Both consumer OS/Lang wt-guard clean after generation/npm. No OS activation.
   Current six-native iced tasks from round65 remain unchanged source/output/runtime evidence; scoped Vue regression checks round67 plus full generated Vue build cover new finding, not a repeat of unrelated native/GC suites. Parent still executing4/10 with remaining Vue tasks, mixed/failures/permanent gates and final reviews. T05 independent review/frozen affected module union/archive/landing outstanding; source now frozen again on this writer. User compilation cleanup remains complete: no recreated UI060 target (tests reused explicit shared target).
+
+
+### 独立最终复审 r6（2026-11-06）
+
+- stage: review | review_scope: final | reviewer_identity: independent child context `/root/review_ui060`（用户明确授权；未参与实现；未声明不可见模型/会话身份） | plan_id: auto-ui/PLAN-060 | plan_revision: 6 | outcome: needs_fix | next: work，同一writer修复以下两项后仅复审受影响不变式；不得merge/push/archive。
+- worktree_path: `D:/autostack/.wt/ui-060/auto-ui` | branch: `codex/plan-060-dev` | reviewed_commit: `286e039744a3ebd6a8e726cbe54f062df2c775fe` | base_commit: `220115df62040f113bc689f0500af80fc11569a3` | dependency_revisions: writer sibling auto-lang clean detached `408ca8b5096df96d2a91831ea36ef25336781889`；consumer UI detached `d2a9ba65668a12a2cb08fc14a12349b4670a1ccf`。`git worktree list --porcelain`核实原树；初始status空，复审结束前再次HEAD相同/status空。HEAD相对d2的crates/Cargo差异为零。
+- Authority: 主检出`D:/autostack/auto-ui`当前master `7ac0455bf4cd743248749e4bc4eb9d0aed657266`，含未跟踪旧060及其他用户WIP；只读确认后按本在途遗留计划指定writer r6为权威。仓根无AGENTS.md；遵守会话给定仓/伞形规则及auto-plan-review技能。没有修改/同步主检出、949树或实现，没有GUI/CUA/MCP/OS激活。此前5/6是末任务含review/merge，不作为遗漏work功能的理由；本次重开仅因具名finding。
+
+| acceptance_results | task | outcome | 独立方法及边界 |
+|---|---|---|---|
+| AC-01 | T-01/T-04 | fail | 普通Expr::Index用__at_idx；但NullCoalesce组合路径仍直接Vec索引，F060-R6-01。此前Calendar真实启动成功保留，不外推全路径安全。 |
+| AC-02 | T-02/T-04 | pass（既有输入范围） | 阅读MCP→DesktopInject→broker→native组件/新帧路径和命中断言；本轮runtime p060_21/21含真实pipe/viewport/scroll/replay/paint；r161 Notes pointer/key/Save/reopen原始oracle哈希吻合，未重演GUI。 |
+| AC-03 | T-03 | pass（根零参/单字符串边界） | 实读Action tag11/Hello input-action/1能力门、owning wid及无本地占位回退；本轮真实pipe测试含旧peer拒绝/错wid拒绝/CJK新peer/旧键盘控制。未承诺任意child RPC或扩wire数值载荷。 |
+| AC-04 | T-04 | partial | r167六app正式build exit0与receipt/published/target实际哈希18/18一致；r161 Calendar与六app真实任务oracle仍适用于未变原生生成/runtime边界。索引全不变式及完整Spec交付清单未闭，不能据六个成功app覆盖F01。 |
+| AC-05 | T-05 | partial | 本独立上下文完成最终复核并绑定r6；两项finding使最终pass不可发。 |
+| AC-06 | T-05 | pending merge-owned | 未执行落地/归档/清理/pin；需修复、复审通过及冻结联合门后交merge。 |
+| 历史扩项AC-07/08/09 | T-04 | pass（所列consumer边界） | Notes/Todo真实任务与独立磁盘oracle，native_http真实TCP/HTTP拒绝和transport区分断言；Chat真实注册/双端/隔离/重试/长历史证据保留；不是所有未来app或所有语言组合的保证。 |
+
+**F060-R6-01 / P1 / 原验收缺口，AC-01、T-01/T-04。**
+
+既有规则G1/§5.1要求受支持数组对任意运行时索引不panic，且`arr[i].field`链保持安全。本轮独立选取已有语法的组合：
+
+```auto
+widget CoalesceIndex {
+    model { var text str = "" }
+    msg { Load }
+    view { text .text }
+    on { .Load -> {
+        var rows List = [{ id: "u-54" }]
+        .text = rows[999].id ?? "fallback"
+    } }
+}
+```
+
+- 生产入口是`parse_ui`→`extract_widget_from_decl`→`RustGenerator::generate`，不是手写替代算法；scratch harness链接正式consumer的compiler rlib，writer/consumer编译器源码已验证无差异。实际生成如下（完整输出保留于scratch）：
+
+```rust
+let mut rows = vec![serde_json::json!({"id": "u-54"})];
+self.text = auto_lang_core::a2r_std::json::get_str_or(&((rows)[999].clone()), &["id"], "fallback").to_string();
+```
+
+- 期望：安全取得缺省Null，再由既有`??`返回`fallback`；实际：先对长度1的Vec直接取999，再调用get_str_or，无法满足边界安全。此结论由真实生成结果及Rust下标语义建立；未运行故意异常退出程序，也没有声称捕获过运行期panic。
+- 已确认原因：`rust.rs::null_coalesce_rust`的`base_is_vec`首索引分支（本冻结版13862行）构造`({recv})[{idx_str}].clone()`，绕过普通`Expr::Index`的__at_idx。不是普通访问shim失败。邻面为局部/声明Vec基座、缺省表达式与字段投影的组合；`.rows`模型字段在试探中生成另一路get_owned(&self)表达式，该分支未做完整编译验证，不单列已证实产品finding。
+- 最小关闭oracle：永久实际parse/extract/generate并执行`rows[i].id ?? "fallback"`，覆盖i=0、越界、负i、空列表及普通安全Index控制；保留字段存在/缺席的`??`原语义。若改链遍历，加入嵌套Value数组/模型与store基座的代表控制，确认不会重复求值。修复后只跑受影响compiler/tools生成执行控制与现有安全索引控制；是否重建消费者由生成输出变化决定，不附全仓/GC矩阵。不得削弱G1来消除反例。
+- 可复验scratch：`D:/autostack/plan-artifacts/plan-060/coalesce-index-probe.rs` SHA256 `1af59209d77b8c96a94b3196575df48be3027146aab165f38ff4ae7f0753b6c9`；生成输出`coalesce-index-generated.rs` SHA256 `d88b96254392ddc08f88e7e27c2bd49970cf7e6caf8c0971981716ce14a932d5`。用rustc edition2021链接C2 deps中的`libauto_ui_compiler-b4417c10966df5fe.rlib`及`libauto_ui_dialect-908bc1e788acc861.rlib`，`-L dependency=<C2>/debug/deps`及安装的windows_x86_64_msvc-0.52.6/lib。初稿缺trait import、直接rustc缺native库路径及输入model分隔符均修正后才计为生成证据；另一次隔离表达式编译遇serde crate identity冲突，不计产品失败/通过。
+
+**F060-R6-02 / P2 / 知识交付清单缺口，AC-05、T-04/T-05。**
+
+`git diff 220115df HEAD -- docs/specs`包含六个目标，而§5.6 SD-01..04及frontmatter只列四个runtime目标。提交`644d8366`还新增`docs/specs/build/desktop-api-surfaces.md`、修改`docs/specs/build/generated-vite-config.md`：包含per-app API/代理profile/进程所有权、路由挂载、npm并集及解析器迭代边界。这些是实际行为规范，不是缓存/索引；其中来源写PLAN-053，但writer中的053仍drafting、0步、未复审，不能把其标签当已批准/交付凭证。r6非目标仍写不做053，未说明这两个准备落地Spec的审核与归属。
+
+最小关闭：work对照已实现/已授权的054兼容整合，补齐准确add/modify目标、before/after/理由/相关AC及影响头清单；明确053关系与实际验证归属，不替053伪造完成。若只是清单/归属补正而不改语义可保留r6；若需改变承诺或边界须按修订规约处理。review不代写语义、不删除已实现合同以规避。复验仅需六目标差异与所有权/既有行为证据核对；无需因此重跑全局用例。
+
+**spec_inputs / 冻结候选delta，尚未通过整体交付审核：**
+
+| target | reviewed SHA256 |
+|---|---|
+| docs/specs/runtime/native-codegen-semantics.md | 8f18b07c8f03dad21a3d9781fba0ed989ff26cc9aa1376037bccf1e23a5c5e54 |
+| docs/specs/runtime/desktop-acceptance-input.md | df2df27b95062098a136be23d34abcdfed234e2fd810027a2cfa8f079020309d |
+| docs/specs/runtime/native-command-frame-text.md | 570deba3bfe4d676d2249d3226c0e584ceecee374c4f39f5fe48655998f926e7 |
+| docs/specs/runtime/component-and-store-instances.md | 54da3e882677bc8ef1fb2287d15c0033e927106912f6873d0e51e0b7ad74bb94 |
+| docs/specs/build/desktop-api-surfaces.md | a92054257fd52e4da0be9059b59c58ec516b88771917602a2de8e40419313adb |
+| docs/specs/build/generated-vite-config.md | c6e7be128ae678fa769b682a2661c177bd23aa16f7b8272080eebb897bdd9e99 |
+
+读取并核对了当前四runtime候选规则：Http基址/JSON身份/动态载荷、实例回调消费与store回写、样式overflow转换、text变换与v1/v2 viewport/裁剪绘制边界均有代码及有区分力断言支持；未发现另一个已证实缺陷，不表示穷举所有类型。SD-01的安全索引承诺受F01影响，整体delta不通过；supersedes/new/touched头清单待F02补全，不写旧JSON ledger或派生索引。
+
+**evidence / 本轮实际结果与复用边界：**
+
+- `cargo test --locked -p auto-ui-compiler --lib p060_` exit0，11 passed/0 ignored/.16s；log `D:/autostack/plan-artifacts/plan-060/independent-compiler-r6.log` SHA256 `1f4893010b9280b28a68f4b718f9c8e596ded893d1369c36e5cf0d1dcd3d5610`。
+- `cargo test --locked -p auto-ui-runtime --lib p060_` exit0，21 passed/0 ignored/.32s；log `independent-runtime-r6.log` SHA256 `387bd823d673d83b7067d801e4915d1acd9b2c6a18c6e52c376df55361e114ae`。含真实pipe能力门、WM client resize、native Action/Ctrl+A、实际HeadlessFrameSource→HostEndpoint滚轮与v1/v2回放/底部点击、实际WGPU mesh顺序、样式转换结构控制、HTTP真实TCP与错误控制。
+- tools同范围首次3pass/1fail是测试继承跨检出CARGO_TARGET_DIR，被既有缓存根守卫拒绝，未计产品缺陷。原编译测试exe `auto_ui_tools-6649610c6339f3e5.exe p060_`在移除该环境变量后exit0，4 passed/0 ignored/.89s，含backend内容/文件集合/read-error及profile常量绑定。log `independent-tools-clean-env-r6.log` SHA256 `e8b116c7e62c09c646f366fe4f44df6630b5746d5076162785d18e44b834e0a4`。构建共享C2、jobs2/incremental0/devdebug0，事先协调；本轮启动的Cargo任务均已完成，未重建UI060 target。
+- 独立重算`plan-054/t06/frozen-native-identity-r167.json`所列六app receipt SHA、published exe SHA、Cargo target exe SHA，18/18与各记录一致。来源提交/输入清单及v13身份与正式日志可核。r161 Notes/Calendar/Chat等oracle的既有SHA重算相符；亲阅`plan-054/t04/screenshots/native-chat-v13-paint-next-settled-r159.png`，最后128.25消息完整有色气泡/时间戳与滚动条可见。图片是原始观察复核，不冒称本轮现场驱动。
+- 最新Vue sibling修复只移动module import，factory内实例保持；本轮11compiler控制包含zero/one/two sibling断言。r164完整4185模块Vue正式build及公开入口浏览器pageerror0/真实任务原始记录可复用，未按每次review身份重复现场任务。父054 mixed/failure/rollback完整验收及949新发现不在本回执冒称通过。
+- `git diff --check 220115df HEAD` exit1仅报14处新增EOF空行；作为非阻断格式清理建议保留，未归为第三个功能finding。无其他实现写入，只有本Plan复审回执及状态/任务重开。
+
+**pending_closeout_gates（仍属merge，不以其尚未执行作为本次needs_fix原因）：**
+
+修复并重新最终pass后，merge owner须在新冻结版本核对code/依赖/config/输入并完成本仓受影响union：compiler rust生成及Vue store；dialect view/widget解析与嵌套；runtime session/desktop_protocol/headless/endpoint/message、broker canvas/viewport/input/close生命周期、mcp、native_http、back_proxy/dynamic/vm桥；tools rust_ui/merged_string_index、vue/run_vue/desktop_backends/proc_host。复用同源同配置的有效原子结果，仅补因修复或949依赖变化失效的组及必要集成闭合；此处不是新增全仓测试要求，也不是把auto-lang的cargo-t目录套到UI。最终生成物、所建/所发布/所测身份须一致；若SDK生成输出变化，应重生成/构建受影响正式app并复验受影响真实任务。父054自身完整门由054 owner执行。
+
+其后尚需：完成准确六目标Spec审核与落地、revision-bound独立pass、949前置自身修复/复审、工具链交付提交及os054消费pin更新、正常归档与证据摘要折入Plan、按merge规约清理。没有满足这些步骤前，reviewed不等于已交付；本次明确未reviewed。保留不变面证据，T00/T02/T03完成，T01/T04重开，current_step=3/6。
