@@ -1,6 +1,6 @@
 ---
 plan_id: auto-ui/PLAN-060
-status: reviewed
+status: archived
 feature_name: a2r 数组索引 VM 语义与 iced 桌面 outproc 输入/验收投递
 author: [Codex]
 created_at: 2026-11-05
@@ -230,7 +230,7 @@ OS054真实Chat第六条消息已落库但气泡被裁切，滚轮不改变位�
 - [x] T-02（work）：`DesktopInject::Pointer` + MCP `action:"pointer"`；notes 点击实测。
 - [x] T-03（work）：outproc handler 协议投递（或降级边界）+ 键盘聚焦实测。
 - [x] T-04（work）：新main/949共同依赖整合验证待闭合；原六 app 回归/桌面实测/证据保留；F060-R6-01/02修复及准确六目标规范清单见round70。既有六app实机成功保留，最终SDK影响核对仍由merge负责。round67 sibling-store 导入修复于 round68 完成正式完整 Vue 消费验证；原生生成/runtime 不变边界复用。
-- [ ] T-05（review/merge）：独立复审、归档、工具链 pin 落地。
+- [x] T-05（review/merge）：独立复审、归档、工具链 pin 落地。
 
 ## 9. 复审记录
 
@@ -827,3 +827,15 @@ SD01新段描述既有受支持local/model/store Vec及嵌套JSON的安全coales
    用原writer实际Webc36/Langf032、`cargo nextest run --locked --target-dir <C2> -p <exact-package> --lib --ignore-default-filter -E <上述精确filter>`，CARGO_TARGET_DIR不继承；按实际枚举结果核对4/7/6，0选择/ignored不得称pass。055 Hello双控制与956 build/publish/cwd已在有效原子证据；057 archived浏览器lower资源oracle及未改生成/owner实现可复用，未重建归档057 scratch或启动其ignored SSE/browser。若新结果失败，返回具体受影响work/复审，不把pending归绿。
 2. 当前main已至c5c6fe05e11d1266e6673a2778761035c1d0430d。本轮额外只读净差异7ac→c5：35文件，集中065/068计划、三个auto-graphics规范、experimental/autographics-node2d-pilot lower_node_ui/fixtures/generated-world/tests；生产`crates/`、Cargo.toml/lock、packages/scripts/WMassets/本Plan六Spec无交叠。未触060生成/输入/主题载体或SDK195实际业务路径。正常rebase若patch/source/config/input等价并无新冲突，则保留本次SDK195实际任务证据，不因commit换名重复任务；merge owner仍须对真实rebase结果做range-diff/六Spec核对，发现意外交叠再受影响复审。本pass不自动批准尚未生成的新commit。
 3. 冻结union通过及合入等价核对后，merge才完成准确canonical落地、工具链/消费者pin、正式归档、证据摘要折入与授权清理。父054剩余步骤/最终复审属于其owner；本review没有merge/push/archive/更新消费者/动进程或foreign47236。T05 merge部分仍pending；本Plan状态reviewed5/6，不冒称目标整体已交付。
+
+### merge 收口（2026-11-07，merge owner=auto-os/PLAN-054 授权链）
+
+- stage: merge | plan_id: auto-ui/PLAN-060 | plan_revision: r8 | outcome: pass | checkpoints: prepared/landed/canonical_verified/archived/cleaned | delivery_commit: 见下
+  - **merge-owned bounded union 全绿**（r8 复审 pending_closeout_gates 第1项，writer 实际 Webc36/Langf032，C2 目标 `D:/autostack/.wt/os-054/auto-lang/target/generated-consumers/c2e02416`，CARGO_BUILD_JOBS=2/INCREMENTAL=0/DEBUG=0/SCCACHE_DISABLE=1）：
+    - compiler4：`final-compiler-r8.log` 4 run/4 passed/1157 skipped（named_style_and_typed_payload_rust_codegen、test_plan041_store_factory_and_context_facade、test_plan051_store_struct_default_kept、test_plan051_store_non_struct_defaults_unchanged）。
+    - runtime7：`final-runtime-r8.log` 7 run/7 passed/2436 skipped（native_theme_carrier 全4 + host_close_then_exit_handshake_then_reclaim + reclaim_removes_win_app_surface_and_notifies + p054_back_proxy_initializes_imported_constants_and_preserves_vars）。
+    - tools6：`final-tools-r8.log` 5 run/5 passed（plan053_probes 2 + desktop_backends 非 ignore 2 + theme_input 1）+ `final-tools-owned-backend-r8b.log` desktop_rust_backend_roundtrip_and_cleanup **1 run/1 passed/188.492s**（`--run-ignored all`，overlay profile r8b slow-timeout 300s×3；首轮 `final-tools-owned-backend-r8.log` 120s 超时为共享 C2 冷编译时长所致的诚实红，非产品失败，保留原日志）。desktop_backends::tests:: 完整 3 项全过。
+  - **rebase 等价**：`final-rebase-range-diff-r8.log` 135 补丁全 `=`（旧 a1db3d79/2f9a8b55/9c009f70/314990bd 线 → 新 a4ea5a75/a568ed78/d1bcb2a7/25283216/cbbe4e69 线）；r8 复审第2项最新 main c5c6fe05e 净差异无生产 `crates/` 交叠。
+  - **landed**：auto-ui master `--ff-only` 至交付提交（commit hash 见主检出 git log，基 c5c6fe05e）。
+  - **archived/cleaned**：Plan 移入 docs/plans/archived/；wt-guard clean 后移除 .wt/ui-060/auto-ui 工作树与 codex/plan-060-dev 分支；plan-artifacts/plan-060 折叠后全删（上述日志/命令已折叠入本节），registry 刷新。
+  - 工具链 pin：SDK195 三件套 CLI a77cb353…/tool 454bf902…/host f9064cfe… 即本交付源码（9c009f70/cbbe4e69 线）的正式构建；父 054 T-07/T-09 按此收口。
