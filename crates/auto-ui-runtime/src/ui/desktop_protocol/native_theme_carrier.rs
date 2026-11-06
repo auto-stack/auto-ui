@@ -124,6 +124,10 @@ impl<C: Component> Component for NativeThemeCarrier<C> {
         self.inner.on(msg);
     }
 
+    fn dispatch_named(&mut self, name: &str, arg: Option<&str>) -> bool {
+        self.inner.dispatch_named(name, arg)
+    }
+
     fn view(&self) -> View<Self::Msg> {
         // 首帧翻转：运行时泵在 on_theme_policy 后 push_frame（render_frame
         // → view()）再读回状态——置 applied 时新全局已进帧（"帧后 applied"）。
@@ -275,6 +279,44 @@ mod tests {
         fn on(&mut self, _msg: Self::Msg) {}
         fn view(&self) -> View<Self::Msg> {
             View::Empty
+        }
+    }
+
+    #[test]
+    fn p060_native_theme_carrier_forwards_named_actions() {
+        #[derive(Debug, Default)]
+        struct Named {
+            calls: Vec<(String, Option<String>)>,
+        }
+        impl Component for Named {
+            type Msg = DummyMsg;
+            fn on(&mut self, _: Self::Msg) {}
+            fn view(&self) -> View<Self::Msg> { View::Empty }
+            fn dispatch_named(&mut self, name: &str, arg: Option<&str>) -> bool {
+                if (name == "NoArg" && arg.is_none()) || (name == "Text" && arg.is_some()) {
+                    self.calls.push((name.to_string(), arg.map(str::to_string)));
+                    true
+                } else {
+                    false
+                }
+            }
+        }
+        let mut direct = Named::default();
+        assert!(direct.dispatch_named("Text", Some("中文😀54.25")));
+        for mut carrier in [
+            NativeThemeCarrier::bare(Named::default()),
+            NativeThemeCarrier::with_package(Named::default(), pkg()).expect("package"),
+        ] {
+            assert!(carrier.dispatch_named("NoArg", None));
+            assert!(carrier.dispatch_named("Text", Some("中文😀54.25")));
+            assert!(carrier.dispatch_named("Text", Some("")));
+            assert!(!carrier.dispatch_named("Unknown", None));
+            assert!(!carrier.dispatch_named("Text", None));
+            assert_eq!(carrier.inner.calls, vec![
+                ("NoArg".into(), None),
+                ("Text".into(), Some("中文😀54.25".into())),
+                ("Text".into(), Some(String::new())),
+            ]);
         }
     }
 

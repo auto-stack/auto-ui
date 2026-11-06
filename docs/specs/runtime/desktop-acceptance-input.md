@@ -41,6 +41,9 @@ into the component event loop so asynchronous handlers can park and resume.
 Handled native actions advance the frame revision. Generated native components
 dispatch zero-argument and single-string variants; input variants first stage
 the supplied string for generated oninput handlers that read input text.
+The generated entry's native theme carrier forwards named dispatch to its inner
+component, including the handled/unhandled result and unchanged optional string.
+Both bare and packaged carriers preserve this route alongside pointer/key input.
 
 Acceptance results require a changed application frame and an independent API
 or durable-store readback where applicable. A queued input or successful socket
