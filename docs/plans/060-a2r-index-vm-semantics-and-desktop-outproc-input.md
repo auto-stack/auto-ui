@@ -1,18 +1,19 @@
 ---
 plan_id: auto-ui/PLAN-060
-status: reviewed
+status: executing
 feature_name: a2r 数组索引 VM 语义与 iced 桌面 outproc 输入/验收投递
 author: [Codex]
 created_at: 2026-11-05
 updated_at: 2026-11-06
 plan_revision: 6
-current_step: 5
+current_step: 4
 total_steps: 6
 base_branch: master
-base_commit: 220115df
+base_commit: 7ac0455bf4cd743248749e4bc4eb9d0aed657266
+original_base_commit: 220115df62040f113bc689f0500af80fc11569a3
 depends_on: []
-supersedes_spec_components: [docs/specs/runtime/component-and-store-instances.md, docs/specs/build/generated-vite-config.md]
-new_spec_components: [docs/specs/runtime/desktop-acceptance-input.md, docs/specs/runtime/native-codegen-semantics.md, docs/specs/runtime/native-command-frame-text.md, docs/specs/build/desktop-api-surfaces.md]
+supersedes_spec_components: [docs/specs/runtime/component-and-store-instances.md, docs/specs/build/generated-vite-config.md, docs/specs/build/desktop-api-surfaces.md]
+new_spec_components: [docs/specs/runtime/desktop-acceptance-input.md, docs/specs/runtime/native-codegen-semantics.md, docs/specs/runtime/native-command-frame-text.md]
 touched_goals: [auto-os/PLAN-054]
 affects: [a2r-codegen, ui-iced-runtime, mcp-acceptance, auto-os/PLAN-054]
 ---
@@ -178,8 +179,8 @@ Chat原生生成源码仍把失败pending重建中的pp.client_msg_id按字段�
 | SD-02 | new | docs/specs/runtime/desktop-acceptance-input.md | pointer/keyboard、根组件 Action、旧客户端能力门、关闭重开契约（替代原先不存在的路径） | iced 桌面可驱动原生 app | AC-02/AC-03 |
 | SD-03 | add | docs/specs/runtime/native-command-frame-text.md | 文字自身/父项变换组合一次，v1/v2滚动几何一致 | 投递后的真实画面正确 | AC-02/AC-04 |
 | SD-04 | modify | docs/specs/runtime/component-and-store-instances.md | 编译原生路由Init回写/活动页单timer传播 | 同组件事件与store所有权 | AC-02/AC-04 |
-| SD-05 | add | docs/specs/build/desktop-api-surfaces.md | 原无统一桌面API规范；记录各app独立API/store路径、前缀与Rust/VM后端选择、owned生命周期、既有router包装及npm依赖集合 | 053来源兼容实现644d8366由060为054集成；以完整实际Vue消费验证约束已交付行为，不宣称053通过 | AC-04 |
-| SD-06 | modify | docs/specs/build/generated-vite-config.md | 原仅单项目依赖/代理；桌面使用本次获准app依赖并集及分app代理，非桌面规则不变 | 与已验证桌面API隔离与生成/run自愈保持同一来源 | AC-04 |
+| SD-05 | modify | docs/specs/build/desktop-api-surfaces.md | 原220115df无此文件；新默认基线已有同源API规范及956服务边界，保留全文并准确补060为054集成验证责任 | 053来源兼容实现644d8366已在新main；不重复添加、不删956、不宣称053通过 | AC-04 |
+| SD-06 | modify | docs/specs/build/generated-vite-config.md | 桌面依赖并集及分app代理现已在新main，保留规则，仅补准确集成验证来源；非桌面不变 | 与已验证桌面API隔离及生成/run自愈同源，不制造第二套规范 | AC-04 |
 
 （落点文件以仓库现有 Spec 为准，work 时按实际路径修订；若该节不存在则在本
 文件对应 Spec 新增小节。）
@@ -228,7 +229,7 @@ OS054真实Chat第六条消息已落库但气泡被裁切，滚轮不改变位�
   panic 消失。
 - [x] T-02（work）：`DesktopInject::Pointer` + MCP `action:"pointer"`；notes 点击实测。
 - [x] T-03（work）：outproc handler 协议投递（或降级边界）+ 键盘聚焦实测。
-- [x] T-04（work）：六 app 回归/桌面实测/证据；F060-R6-01/02修复及准确六目标规范清单见round70。既有六app实机成功保留，最终SDK影响核对仍由merge负责。round67 sibling-store 导入修复于 round68 完成正式完整 Vue 消费验证；原生生成/runtime 不变边界复用。
+- [ ] T-04（work）：新main/949共同依赖整合验证待闭合；原六 app 回归/桌面实测/证据保留；F060-R6-01/02修复及准确六目标规范清单见round70。既有六app实机成功保留，最终SDK影响核对仍由merge负责。round67 sibling-store 导入修复于 round68 完成正式完整 Vue 消费验证；原生生成/runtime 不变边界复用。
 - [ ] T-05（review/merge）：独立复审、归档、工具链 pin 落地。
 
 ## 9. 复审记录
@@ -736,3 +737,8 @@ SD01新段描述既有受支持local/model/store Vec及嵌套JSON的安全coales
 - UI冻结受影响union继续保持：compiler rust生成/Vue store；dialect view/widget解析与嵌套；runtime session、desktop_protocol/headless/endpoint/message、broker canvas/viewport/input/close生命周期、mcp、native_http、back_proxy/dynamic/vm桥；tools rust_ui/merged_string_index、vue/run_vue/desktop_backends/proc_host。针对rebase/依赖/输出变化选择实际完整受影响组及必要集成闭合；保留有效同源同配置原子结果，禁止因换owner重复全仓套件，也不能把known/pending算绿。此为精确模块/路径并集，不把auto-lang gate命令泛套UI。
 - 正式工具/宿主/应用须绑定最终共同源码/依赖/config/输入；生成器v14使现有v13 receipt自动失效，重生成并构建受影响六native/完整Vue消费面，重新核对receipt/target/published三方身份、Calendar/Notes/Todo/Blog/Chat/Database及057影响的真实任务、必要混合/失败控制。父054自己的完整gate由其owner完成，unit/code检查不能代替实际任务。
 - 完成上述整合复审/冻结门后，才由merge处理工具链交付、OS消费pin、准确Spec落地、归档/证据摘要折入及授权清理；本次未做。无剩余已知work-owned finding；本pass未预批后来新增代码，发生语义变化须回work并复审受影响面。
+
+
+- stage: merge -> work | plan_id: auto-ui/PLAN-060 | plan_revision: r6 | round: 73 | outcome: rebase integration pending | next: affected work/independent integration re-review
+  Source-bound independent pass at f24dc983 retained, Plan-only f97c9ec8 saved in refs/plan-recovery/060-reviewed-r6. Normal rebase onto master7ac0455b completed at f04f31bd4af159ad1432a9f2549afaaa007c9366. 130 commits replayed; no automatic landing. Overlaps resolved explicitly: back_proxy whole-body string binding retains reviewed ParamKind and strict UTF8 rejection rather than lossy decoding; Vue routed wrapper keeps main057 owned store context release; existing956 Rust build/publish/cwd Spec retained; session attach diagnostics keep existing055 equivalent diagnostics; Hello optional-tail logic identical, both055/060 tests kept; generated theme_pkg_static and per-app http_base both retained; existing956 backend build test and new060 generated-execution test both retained. No unrelated default feature deletion. Full range-diff retained plan-060/rebase-range-diff-r6.txt; not falsely claimed globally equal because already-landed duplicate behavior and integrations changed context.
+  Canonical delta reconciled to new base: desktop-api-surfaces is now modify (already exists on master), generated-vite behavior already exists and only attribution changes. Six targets remain exact, original base recorded separately; no user-facing requirement/AC/task-count change. T04 reopened solely for new-main057 lifecycle/native-theme, updated949 dependencies and final formal v14 consumer integration; status executing4/6. Old task/atomic evidence retained where unchanged, new baseline must pass affected verification and independent integration review before merge.
