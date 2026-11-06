@@ -198,6 +198,17 @@ Rust AutoUI runtime/dialect/handler codegen、VM实例及parked续体、iced/win
 - 04系统Sky SetValue第一次AX-only缓存报element unavailable；重新hydrate/激活并截图+AX观察后一次输入实际成功，立即refresh暂null，重新观察系统值与当前MCP值精确一致。system-edit-value SHA256=245a8fd7f5d17f8314501caf371ccf80724098fa950ca048f70e9d170a8da14a。正常NVM-03保存后，磁盘comment为系统中文编辑核对含引号/反斜杠，annotation_id/created_at/kind/chapter/para/quote/occurrence/tags/完整locator逐字段保留；cold-read SHA256=1051799317aaa140c91a5b97d8279631f37a2a760d56eba88a3fd65ebe349941。保存后系统观察遇窗口已最小化，未当FAIL或PASS；当前04按精确自有tool/VM/profile已停，原数据保留。
 - cd8b0775 clean源tool重新build exit0/38.58s，消费05将从04真实保存数据本地化重开验证当前更新/编辑，不需再次拖选。T03/04仍待实际cohort和角色边界收口；当前3/8、终审repair轮0，无待答用户问题。
 
+### 2026-11-07 当前consumer06闭环与正文卸载修复检查点
+
+- 05启动在0.0.0.0:2688出现10048，尚无native窗口；不算产品PASS/无障碍FAIL。核CLI31008/tool32496完整路径后停止，未杀端口其他进程。06改用三个预检独占空闲端口33941/33942/33943；CLI44388，窗口50856836，Reader595eb627/UI cd8b0775 clean工具d4b08489ff946642938bf5dbbeda5b119d0cd7ab347c1e46b0048a9e1fd601a5，真实04保存数据全路径本地化。当前06仍在运行，系统文件选择框已开，不能在同名exe运行时重链。
+- 06系统冷重开直接读到已保存comment/quote/章名/正文，reopened-annotation-system SHA256=5cdb86b81dce2434b85c6a134b917a9ecb3aa074938a105b126a23029a628afc。真实NVM-03回访→等待实际HTTP续体完成、未发后续输入→Windows树已出现“已回访：v2锚定位匹配”，SHA256=a92007d41cf1ec605deaf363ba8fdffc8c23f26103649ea83cea857e8450c065；编辑框的当前值/四tags可读，取消后全部编辑控件消失，cancel-edit-system90389beba546caecc9388384a2405a05f87d7ce171cfc340bd01543bca919f3a。此具体异步系统更新/移除腿已通过，不外推全表面/所有时序。
+- 06系统SetValue两次都在工具缓存层报element115 unavailable：第二次已重新hydrate当前窗口、截图+AX重新观察，未继续盲试或把错误归产品。04真实系统SetValue和独立落盘仍为同源action路径正控；06不能伪称新系统输入成功，已用正常控件取消未改数据。
+- 新真实原生红：返回书库后，旧WebView/归属popup依然可见，白块覆盖书卡；系统树也保留旧正文。随后系统picker前景截图仍可直接看到残留，SHA256=ef5c6c64dffc41f2015dae629da7eb4e2e0341bd04f1971bbd7941a4449a1753；对应系统82145f900f05d6e6565a154fad8fb7a93e03d197462c04fb2580ed8c30d868c7。根因为doc_surface只在仍绘制的painter处理空URL/出界，组件消失不再draw，无卸载隐藏。
+- 修复fbb65dc2fbe40de235e0055ace403d0313025fc5：真实Iced canvas State持有挂载lease（painter每帧重建不可作卸载），最后lease卸载同时隐藏webview/popup，key变更释放旧lease，普通重建不重复计数，同key另canvas仍挂时不误隐；显式release先隐藏再移除。保留原有进程内WebView复用语义，无定时器/Readest特判。2项永久机制实际PASS/0ignored/exit0，log SHA256=3440c0779d6f65eaa7b08ef2759f77a3b1aa0a0c483e4f987268beeef87b711a。此是空HWND机制对照；**新tool真实返回书库不残留腿仍pending**。
+- 9aa7ab730a97ac5f81554faf7a169d103e767700扩已有真实生产fixture：checkbox选中态、multiline、disabled控制。新增fixture后完整11项机制PASS/0ignored/exit0/11.70s，log8ffa0ebe9eea41891fe03c3faf6e7b486fda8630d4c9e45583826d566d2d1c48；example build exit0/43.65s，尚未启动新角色窗，不能预报系统角色已证。旧counter15916按完整exe核后停止（其已答真实First=1证据保留），不冒充正常窗口关闭验收。
+- 原生06 NVM-03当前树发现“导入书籍”后press，真实系统打开框出现；filename236的Sky SetValue同样报缓存不可用。已请求用户进入06/fixtures实际选择中文书2/笔记10/w03-cover/坏书4项，验证3重复+1坏书逐书结果；当前待答，选择框保持打开，无新范围/权限问题。用户输入前不改该活动窗口。实现树9aa7ab73 clean；T03/04未满证，仍3/8/终审轮0，下一执行者仍本work上下文。
+- 独立原参考准备只读核验D:/autostack/readest HEAD精确3cc39ad7、无WIP；未启动用户E:/soft/Readest、未复制其profile/cookies、未建reference worktree或执行上游worktree脚本。该脚本会fetch/rebase origin/main、复制.env及创建junction，与本轮固定pin/只读/无junction约束冲突，不能直接运行；独立参考仍归009原门，未计通过。
+
 ## 10. 待澄清事项
 
-无待答范围授权。T00须确定真实续体/字段归属原因；T02须先证明Windows provider可行边界，当前无主观选定依赖。Sky输入未达须区分工具与产品；工具限制不授予绕过系统安全或伪造输入的许可。发现范围/兼容/验收必须再变更时按auto-plan:new处理，不能静默扩大。
+无待答范围授权。当前唯一待答为真实系统picker输入：在06窗口的打开框，进入D:/autostack/plan-artifacts/plan-068/auto-ui/t04-reader-native-06/fixtures/，选择“中文 书2.txt”“笔记10.md”“w03-cover.epub”“坏书.epub”并打开，回复“已选四个”。Sky已报具体缓存不可用，不能绕过工具安全/伪造系统选择。用户答后先核当前实际结果/冷读，再按精确自有PID关闭06、重建9aa7ab73新tool，复验卸载隐藏、角色/焦点与余下T04；不得再要求重复旧正文选区。
