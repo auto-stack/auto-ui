@@ -31,6 +31,11 @@ widget ResultLayout {
         }
     }
     on {
-        .Fill -> { .result = "success\nduplicate\nfailure\ncancelled" }
+        .Fill -> {
+            .result = "w03-cover.epub：书库中已存在"
+            .result = .result + "\n笔记10.md：书库中已存在"
+            .result = .result + "\n坏书.epub：导入失败：缺少 META-INF/container.xml（不是合法 EPUB 容器）"
+            .result = .result + "\n中文 书2.txt：书库中已存在"
+        }
     }
 }

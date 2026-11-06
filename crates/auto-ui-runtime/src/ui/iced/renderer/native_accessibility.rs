@@ -1146,6 +1146,8 @@ mod tests {
         };
         component.on_with_input_for(&message.widget, &message.event, message.input_value);
     }
+    const RESULT_LAYOUT_TEXT: &str = "w03-cover.epub：书库中已存在\n笔记10.md：书库中已存在\n坏书.epub：导入失败：缺少 META-INF/container.xml（不是合法 EPUB 容器）\n中文 书2.txt：书库中已存在";
+
     #[test]
     fn capped_scroll_result_text_has_a_visible_measured_rectangle() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -1175,16 +1177,92 @@ mod tests {
                 let result = state
                     .nodes
                     .values()
-                    .find(|entry| {
-                        entry.node.value() == Some("success\nduplicate\nfailure\ncancelled")
-                    })
+                    .find(|entry| entry.node.value() == Some(RESULT_LAYOUT_TEXT))
                     .expect("the production converted tree must contain the result");
-                assert!(result.bounds.is_some_and(|bounds| bounds.height >= 40.0),
+                assert!(result.bounds.is_some_and(|bounds| bounds.width >= 100.0 && bounds.height >= 40.0),
                 "four result lines must have visible bounds under {root_style}, capture={capture}, got {:?}", result.bounds);
                 drop(state);
                 remove(window);
             }
         }
+    }
+    #[test]
+    fn capped_child_result_remains_measurable_through_mcp_session_projection() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/plan068_result_layout.at");
+        let source = std::fs::read_to_string(path).unwrap().replace(
+            "w-full h-full p-6 gap-5",
+            "p-6 md:p-8 gap-5 max-w-6xl mx-auto w-full",
+        );
+        let component = crate::build_dynamic_component(&source, None).unwrap();
+        let mcp = Arc::new(Mutex::new(crate::ui::mcp_server::SharedState::new(
+            "LayoutApp".into(),
+        )));
+        let mut session = crate::ui::session::DesktopSession::empty(Some(mcp));
+        let app = session.allocate_app(component);
+        let window = iced::window::Id::unique();
+        session.register_window(window, app, iced::Size::new(1200., 800.));
+        prepare(window);
+        {
+            let element = super::super::projection::dynamic_view(
+                session.split_ref_at(app, window).unwrap(),
+                true,
+            );
+            let mut ui = iced_test::simulator(element);
+            let _ = ui.snapshot(&Theme::Light).unwrap();
+        }
+        let (node, identity) = {
+            let state = shared(window);
+            let state = state.lock().unwrap();
+            let (node, entry) = state
+                .nodes
+                .iter()
+                .find(|(_, entry)| entry.node.label() == Some("Fill result"))
+                .unwrap();
+            (*node, entry.owner.identity.clone().unwrap())
+        };
+        apply(
+            window,
+            &mut session.apps.get_mut(&app).unwrap().component,
+            node,
+            Requested::Click,
+        );
+        // The host update tail transfers this dirty bit to its cached-view gate.
+        assert!(session.apps[&app].component.is_dirty());
+        *session.apps[&app].state.view_dirty.borrow_mut() = true;
+        {
+            let element = super::super::projection::dynamic_view(
+                session.split_ref_at(app, window).unwrap(),
+                true,
+            );
+            let mut ui = iced_test::simulator(element);
+            let _ = ui.snapshot(&Theme::Light).unwrap();
+        }
+        assert_eq!(
+            session.apps[&app]
+                .component
+                .bridge()
+                .read_instance_state(&identity, "result")
+                .unwrap()
+                .as_str(),
+            RESULT_LAYOUT_TEXT
+        );
+        let state = shared(window);
+        let state = state.lock().unwrap();
+        let result = state
+            .nodes
+            .values()
+            .find(|entry| entry.node.value() == Some(RESULT_LAYOUT_TEXT))
+            .expect("the MCP-enabled session must render the actual child result");
+        assert!(
+            result
+                .bounds
+                .is_some_and(|bounds| bounds.width >= 100.0 && bounds.height >= 40.0),
+            "MCP capture must not hide the visible result, got {:?}",
+            result.bounds
+        );
+        drop(state);
+        remove(window);
     }
     #[test]
     fn unchanged_production_frames_do_not_schedule_another_accessibility_tick() {
