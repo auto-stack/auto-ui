@@ -58,3 +58,15 @@ The existing per-component child-instance model remains: conflicting bindings
 for one child type and bindings with fixed arguments are rejected during
 generated compilation. This rule covers normal child message dispatch, not a
 new callback protocol for constructor execution.
+
+String concatenation of known JSON reads converts the original value with the
+existing string shim. Field-name integer guesses cannot turn an opaque intent
+key into zero. Pushing a known JSON read into a dynamic Value collection retains
+the original object/array/scalar shape. Typed string/record and numeric contexts
+keep their declared types, and indexed JSON reads retain safe array indexing.
+
+Native frontend receipts also cover the content and file set of the selected
+local backend source directory: `src/back` takes precedence over `back`, as in
+the local API parser. Backend-only edits, additions and removals require code
+regeneration; backend input read failures stop receipt publication. This local
+input rule does not extend the separate external backend-project resolver.

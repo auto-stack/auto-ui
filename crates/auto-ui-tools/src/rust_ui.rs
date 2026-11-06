@@ -7608,7 +7608,7 @@ pub(crate) fn resolve_managed_front(project_dir: &Path) -> AutoResult<ManagedFro
 /// generator changes without a bump are a recorded boundary.
 // PLAN-060: invalidate unchanged inputs after fixing text click/style emission,
 // in addition to the earlier table-row and named-input corrections.
-const FRONT_LAYOUT_VERSION: &str = "front-layout/v11";
+const FRONT_LAYOUT_VERSION: &str = "front-layout/v12";
 
 fn front_generator_identity(context: &GeneratedBuildContext) -> String {
     format!(
@@ -7620,7 +7620,7 @@ fn front_generator_identity(context: &GeneratedBuildContext) -> String {
 }
 
 /// Declared front input set (content identity, never mtime): pac.at + the
-/// .at set under the front dir + rust_sidecar module sources.
+/// .at sets under the front and selected local back dirs + sidecar sources.
 /// PLAN-036 T-04（AC-03/V-04/V-06）：声明了官方主题包的 App 额外登记统一输入
 /// 身份（`theme/content` + `theme/identity`，见 [`theme_input_entries`]）——
 /// 包内容/能力变化必使输入集变化（同 mtime 同样生效），旧 receipt 缺键 =
@@ -7652,6 +7652,21 @@ fn front_input_hashes(
     let sidecar = auto_api_gen::sidecar::load_sidecar(project_dir);
     for (_, rel) in &sidecar.modules {
         record(&project_dir.join(rel));
+    }
+    // Native generation embeds the local API types and backend modules.
+    // Use the same directory precedence as parse_api_module, and content
+    // identity for the entire selected .at set (including add/remove).
+    let back_dir = if project_dir.join("src/back").exists() {
+        project_dir.join("src/back")
+    } else {
+        project_dir.join("back")
+    };
+    for file in collect_at_files(&back_dir)? {
+        let digest = file_sha256(&file)
+            .map_err(|e| format!("native backend input unreadable ({}): {e}", file.display()))?;
+        let key = file.strip_prefix(project_dir).unwrap_or(&file)
+            .to_string_lossy().replace('\\', "/");
+        inputs.insert(key, digest);
     }
     for (key, digest) in theme_input_entries(project_dir)? {
         inputs.insert(key, digest);
@@ -9167,6 +9182,48 @@ pub fn answer() int { return 42 }
         // 既有直连/broker 臂不回退（I2）。
         assert!(main_rs.contains("ClientTarget::Direct"));
         assert!(main_rs.contains("ClientTarget::Broker"));
+    }
+
+    #[test]
+    fn p060_native_receipt_tracks_embedded_backend_content_and_file_set() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        fs::write(root.join("pac.at"), "name: \"backend-inputs\"\n").unwrap();
+        fs::create_dir_all(root.join("src/back")).unwrap();
+        fs::create_dir_all(root.join("back")).unwrap();
+        fs::write(root.join("src/back/api.at"), "type Reply { value int }\n").unwrap();
+        let chosen = root.join("src/back/db.at");
+        fs::write(&chosen, "pub fn value() int { 1 }\n").unwrap();
+        fs::write(root.join("back/db.at"), "ignored fallback\n").unwrap();
+        let first = front_input_hashes(root, &PacSource::legacy()).unwrap();
+        let managed = resolve_managed_front(root).unwrap();
+        fs::create_dir_all(managed.member_dir.join("src")).unwrap();
+        fs::write(managed.member_dir.join("Cargo.toml"), generate_cargo_toml("backend-inputs", root, &PacSource::legacy())).unwrap();
+        fs::write(managed.member_dir.join("src/main.rs"), "// freshness fixture\n").unwrap();
+        write_front_receipt(root, &managed, &PacSource::legacy(), None).unwrap();
+        assert_eq!(front_needs_regeneration(root, &managed, &PacSource::legacy()).unwrap(), (false, false), "the unchanged receipt is an accepted control");
+        fs::write(&chosen, "pub fn value() int { 2 }\n").unwrap();
+        let changed = front_input_hashes(root, &PacSource::legacy()).unwrap();
+        assert_ne!(first, changed, "back-only content changes must invalidate a native artifact");
+        assert_eq!(front_needs_regeneration(root, &managed, &PacSource::legacy()).unwrap(), (false, true), "the actual managed reuse gate must request code regeneration");
+        assert!(!changed.contains_key("back/db.at"), "src/back must win like parse_api_module");
+        fs::write(root.join("README.md"), "unrelated\n").unwrap();
+        assert_eq!(changed, front_input_hashes(root, &PacSource::legacy()).unwrap());
+        let extra = root.join("src/back/companion.at");
+        fs::write(&extra, "pub fn extra() int { 3 }\n").unwrap();
+        assert_ne!(changed, front_input_hashes(root, &PacSource::legacy()).unwrap());
+        fs::remove_file(&extra).unwrap();
+        assert_eq!(changed, front_input_hashes(root, &PacSource::legacy()).unwrap());
+        fs::remove_file(&chosen).unwrap();
+        assert_ne!(changed, front_input_hashes(root, &PacSource::legacy()).unwrap());
+        fs::remove_file(root.join("src/back/api.at")).unwrap();
+        fs::remove_dir(root.join("src/back")).unwrap();
+        let fallback = front_input_hashes(root, &PacSource::legacy()).unwrap();
+        assert!(fallback.contains_key("back/db.at"), "legacy back directory must also be tracked");
+        fs::remove_file(root.join("back/db.at")).unwrap();
+        fs::remove_dir(root.join("back")).unwrap();
+        fs::write(root.join("back"), "not a readable backend directory").unwrap();
+        assert!(front_input_hashes(root, &PacSource::legacy()).is_err(), "backend input read failure cannot issue a reduced receipt");
     }
 
     #[test]

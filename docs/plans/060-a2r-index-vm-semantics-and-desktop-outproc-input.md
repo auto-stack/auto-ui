@@ -5,7 +5,7 @@ feature_name: a2r 数组索引 VM 语义与 iced 桌面 outproc 输入/验收投
 author: [Codex]
 created_at: 2026-11-05
 updated_at: 2026-11-06
-plan_revision: 4
+plan_revision: 5
 current_step: 2
 total_steps: 6
 base_branch: master
@@ -162,7 +162,15 @@ OS054 的真实 Chat 反例证明：PLAN052 原生 Http 适配直接把 `/api/re
 
 实施入口ca754c7e；永久compiler案例覆盖实际解析提取后的事件/prop绑定、不同回调目标、调用顺序与参数保持，执行生成代码验证父态一次性变更及子态清空；实际Chat重建后点击联系人/输入/发送→双端显示/数据库发送者与文本一致。先跑旧码红例，最终生成执行和真实任务都通过才关闭此项。循环子件沿现有临时实例模式，回调也从该实例消费；其私有状态持久化不在本修复新增承诺。
 
-### 5.5 规范增量
+### 5.5 JSON载荷与生成输入完整性（r5有界修订）
+
+Chat原生生成源码仍把失败pending重建中的pp.client_msg_id按字段名转为整数，字符串拼接得到0而非原意图编号；`.messages.push(sr.message)`把对象投影成空字符串。此为r3字段启发式修复的相邻消费者，必须按实际值语境保持动态JSON：字符串串接读取原Value后用既有str垫片，Value集合push保持原JSON形状。仅处理可辨认JSON读（局部/字段/安全索引）；声明String、typed实体和数值算术保持既有类型语义。数组索引仍经__at_idx，不因重建Dot链恢复越界访问。源与fixture在compiler rust.rs，owner T04/05。
+
+原生生成器实际吸收本地src/back/*.at（否则back/*.at），但front_input_hashes未记录它们。沿同一选择序登记该本地目录的.at内容与文件集合；添加/修改/删除均应失效旧receipt，必需后端输入读取失败中止，不能把缺失当已验输入。外部back.project的完整闭包属于既有独立接缝，不在本次扩作通用依赖系统。保留pac/front/sidecar/theme/http-profile输入；发布版本v12。tools永久fixture实际改变后端内容/文件集合，README控制不失效，覆盖src/back优先与back回退。
+
+执行入口42573475（行为bcacacf7）；先执行compiler JSON串接/对象push与tools后端mutation实际红例，再修复/回归相关p060子集、工具重建、Chat003正式重建和真实断连→failed→恢复→点击原失败泡重试，数据库须使用原会话nonce和原序号仅加一行。其他6app冻结构建与父054混合/失败门仍是后续关闭条件；不以Vue重试通过代替native原意图验证。AC/任务总数/认证与协议不变，继承完整目标授权。
+
+### 5.6 规范增量
 
 | delta_id | add/modify/retire | docs/specs/... target | before/after rule | rationale | acceptance IDs |
 |---|---|---|---|---|---|
@@ -527,3 +535,9 @@ back 侧 `auto-notes-...-back` 是完整 axum/DB 实现。故 iced 桌面上任�
 - stage: work | plan_id: auto-ui/PLAN-060 | plan_revision: r4 | round: 56 | outcome: actual callback consumer closed; app reopen invariant routed CHAT003 | next: work/T05 + scoped JSON/freshness follow-up
   bcacacf7 formal v11 tool38.09s SHA6f25fbf88c7fa2219b17c998527ef434a4374f9ef9e889a2b5b5b27a8804bf28; candidate Chat37.33s published/target/receiptfd0b88cdf9c672bb9cd820b750b9713a8833126b6a3a3d1d0e09e1cd8687caae. Real sidebar contact callback selects AB; actual composer pointer Send/Enter forwards through parent/store and persists exactly one intended message per actor, visible on the peer; extra empty Send did not replay. C actual login/read request shows no AB messages; C write rejected/no DB change. Parent054 round151 holds exact screen/oracle receipts. Reopen exposed app-local cm-0 identity reuse, not a callback failure; CHAT003 source5b9725f adds independent CSPRNG session prefix and Vue C01/T5/T9/T10 scoped checks pass. Owner native test in progress on bcacacf7, explicit owner preview distinct from fixed OS pin.
   Two additional source-grounded gaps remain before framework freeze: JSON client_msg_id in string concatenation still uses numeric field-name heuristic (failure pending reconstruction can lose original retry key), and front input hashes omit local embedded back.at changes. Neither is counted closed by eight compiler tests; next bounded design/fixture unit must address them. Six native build union, final lifetime/SDK consumer gate and review/landing still pending.
+
+- stage: new | plan_id: auto-ui/PLAN-060 | plan_revision: r5 | round: 57 | outcome: pass | next: work/T04/T05
+  Bounded semantic correction in§5.5 from actual generated Chat failure-key/JSON-object projection and omitted local backend inputs. Existing AC/6 task envelope unchanged; producer42573475/behaviorbcac, original authorization retained. Local frontend JSON use contexts and local backend closure only; no new language type system, protocol, supervisor or external dependency resolver.
+- stage: work | plan_id: auto-ui/PLAN-060 | plan_revision: r5 | round: 58 | outcome: scoped implementation/checks passed; actual native retry pending | next: work/toolv12→CHAT003 retry
+  Actual pre-fix compiler intent fixture1failed/exit101 (native-json-intent-red-r154.log); tools backend-only mutation1failed/exit101, old/current input maps exactly equal (native-back-input-red-r154.log). raw_json_read preserves known Value bases including typed store Value fields and existing safe indexing; string contexts use __at_str(original Value), Value collection pushes clone original object/array/scalar. Typed/string/numeric controls stay unchanged. Final compiler p0609passed/0ignored/.14s, native-json-intent-final-r154.log; includes actual client_msg_id string context, original object push, numeric state and safe index control plus prior8 regressions.
+  front_input_hashes now includes selected src/back else back .at content+file set, file/dir read errors propagate; v12 invalidates old generation. Tools p060_native2passed/0ignored/.62s (native-inputs-gate-final-r154.log) includes actual managed front_needs_regeneration accepted unchanged receipt(false,false)→backend-only same-size edit(false,true), addition/removal, README unaffected, fallback precedence and read-error rejection. This is the real reuse gate, not just map inequality; initial map-only green2/.10s strengthened with the consumer gate and error oracle before final commitment. No runtime HTTP helper change, its earlier realTCP2pass reused by unchanged source. Actual v12 tool/Chat rebuild and native failure→same-key retry still required, no six-app or whole054 pass inferred.

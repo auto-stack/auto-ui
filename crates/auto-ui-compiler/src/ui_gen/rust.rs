@@ -14059,6 +14059,33 @@ fn collect_local_elems(
         out
     }
 
+    /// A dynamic JSON read before any field-name scalar projection. Typed
+    /// stores/records stay typed; only their known Value fields become bases.
+    /// Indexing remains delegated to the ordinary bounds-safe emitter.
+    fn raw_json_read(&self, expr: &auto_lang_core::ast::Expr) -> Option<String> {
+        use auto_lang_core::ast::Expr;
+        if let Some((base, _)) = self.dot_chain_store_value_base(expr) {
+            return Some(base);
+        }
+        if let Expr::Dot(obj, field) = expr {
+            if let Some(base) = self.raw_json_read(obj) {
+                return Some(format!("{}[{:?}]", base, field.as_str()));
+            }
+        }
+        if let Expr::Ident(name) = expr {
+            if self.declared_locals.get(name.as_str()).map(|t| t.as_str()) == Some("str") {
+                return None;
+            }
+        }
+        if matches!(expr, Expr::Ident(_) | Expr::Dot(..) | Expr::Index(..))
+            && self.expr_is_value_typed(expr)
+        {
+            Some(self.ast_expr_to_rust(expr))
+        } else {
+            None
+        }
+    }
+
     /// 条件位 Value 裸读判定——根名入 needs_index_access 判定集
     /// （value_locals/value_loop_vars/state Value/prop Value——即会发射
     /// 括号访问器的人群）；Index 形走 expr_is_value_typed。
@@ -15738,7 +15765,9 @@ fn collect_local_elems(
                         }
                         _ => false,
                     };
-                    let left_str = if self.expr_is_value_typed(left)
+                    let left_str = if let Some(raw) = self.raw_json_read(left) {
+                        format!("__at_str(&({}))", raw)
+                    } else if self.expr_is_value_typed(left)
                         && !already(&left_str)
                         && !declared_str(left)
                     {
@@ -15746,7 +15775,9 @@ fn collect_local_elems(
                     } else {
                         left_str
                     };
-                    let right_str = if self.expr_is_value_typed(right)
+                    let right_str = if let Some(raw) = self.raw_json_read(right) {
+                        format!("__at_str(&({}))", raw)
+                    } else if self.expr_is_value_typed(right)
                         && !already(&right_str)
                         && !declared_str(right)
                     {
@@ -16097,6 +16128,9 @@ fn collect_local_elems(
                                 .args
                                 .iter()
                                 .map(|a| {
+                                    if let Some(raw) = self.raw_json_read(&a.get_expr()) {
+                                        return format!("serde_json::json!({}.clone())", raw);
+                                    }
                                     let inner = self.ast_expr_to_rust_no_to_string(&a.get_expr());
                                     // PLAN-052：空 vec 字面量 json! 内元素型
                                     // 不可推（`gstack.push([])` E0282 株）——
@@ -17472,6 +17506,36 @@ widget App {
         }
         let invalid_code = RustGenerator::new().generate(&invalid).unwrap();
         assert!(invalid_code.contains("compile_error!(\"native callback binding must name"));
+    }
+
+    #[test]
+    fn p060_native_json_intent_keys_and_objects_keep_their_values() {
+        let src = r#"widget JsonIntent {
+            model {
+                var text str = ""
+                var records List = []
+                var numeric int = 0
+                var rows List = [{ id: "u-54" }]
+            }
+            msg { Load }
+            view { text .text }
+            on { .Load -> {
+                var m = json.to_value("{\"client_msg_id\":\"cm-session-0-u-54\",\"message\":{\"text\":\"中文54.25\"}}")
+                .text = "key:" + m.client_msg_id
+                .records.push(m.message)
+                .numeric = m.count
+                .text = "row:" + .rows[999].id
+            } }
+        }"#;
+        let ast = crate::parse_ui(src).unwrap();
+        let decl = ast.domain_stmts().find_map(|s| match s { auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d), _ => None }).unwrap();
+        let widget = crate::aura::extract::extract_widget_from_decl(decl).unwrap();
+        let code = RustGenerator::new().generate(&widget).unwrap();
+        assert!(code.contains("__at_str(&(m[\"client_msg_id\"]))"), "string intent keys cannot become numeric zero: {code}");
+        assert!(code.contains("push(serde_json::json!(m[\"message\"].clone()))"), "object payload must remain an object: {code}");
+        assert!(code.contains("self.numeric = __at_num(&(m[\"count\"]))"));
+        assert!(code.contains("__at_str(&(__at_idx"), "string context must keep safe indexing: {code}");
+        assert!(!code.contains("self.rows["));
     }
 
     #[test]
