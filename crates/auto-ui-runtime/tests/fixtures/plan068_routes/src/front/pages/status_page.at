@@ -1,5 +1,5 @@
 widget StatusPage {
-    msg { Load, Push, PushSync }
+    msg { Load, Push, PushSync, CpuPush }
     model {
         var result str = ""
     }
@@ -24,6 +24,11 @@ widget StatusPage {
             router.push("/done/42")
         }
         .PushSync -> {
+            router.push("/done/42")
+        }
+        .CpuPush -> {
+            var count = 0
+            while count < 2000 { count = count + 1 }
             router.push("/done/42")
         }
     }

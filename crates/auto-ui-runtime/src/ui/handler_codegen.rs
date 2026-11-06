@@ -288,6 +288,17 @@ const STATE_PARAM: &str = "__state";
 /// mechanism only — no DSL surface (plan §5.1: 不新增公开语法/ABI).
 pub const INSTANCE_ROOT_FIELD: &str = "__auto_root";
 
+/// Router bookkeeping belongs to the App even when a child handler resumes.
+fn app_root_field(field: &str) -> Expr {
+    Expr::Dot(
+        Box::new(Expr::Dot(
+            Box::new(Expr::Ident(Name::from(STATE_PARAM))),
+            Name::from(INSTANCE_ROOT_FIELD),
+        )),
+        Name::from(field),
+    )
+}
+
 /// Plan 333: the exported fn that initializes imported module-level globals
 /// (`var notes = ...` etc.). VmBridge runs it once before `.Init` so the
 /// globals have defined values when handlers (e.g. db.all_notes → notes) read them.
@@ -409,7 +420,7 @@ fn rewrite_stmt_with_locals(
     state_fields: &HashSet<String>,
     locals: &mut HashSet<String>,
 ) {
-    // Plan 401/VM-routing: `router.push(path)` → `__state.__current_route = path`.
+    // Router fields are shared App state, reached through the receiver's root.
     // `router.push(...)` parses as Expr::Call with name Dot(Ident("router"),
     // "push"); we rewrite the whole statement into a state assignment so the
     // outlet renderer (which reads __current_route) re-renders the new page.
@@ -422,10 +433,7 @@ fn rewrite_stmt_with_locals(
             if let Expr::Ident(name) = obj.as_ref() {
                 if name.as_str() == "router" && method.as_str() == "back" {
                     *stmt = Stmt::Expr(Expr::Bina(
-                        Box::new(Expr::Dot(
-                            Box::new(Expr::Ident(Name::from(STATE_PARAM))),
-                            Name::from("__nav_back_pending"),
-                        )),
+                        Box::new(app_root_field("__nav_back_pending")),
                         auto_val::Op::Asn,
                         Box::new(Expr::Bool(true)),
                     ));
@@ -466,10 +474,7 @@ fn rewrite_stmt_with_locals(
     if let Some(mut path_expr) = nav_path {
         rewrite_expr_with_locals(&mut path_expr, state_fields, locals);
         *stmt = Stmt::Expr(Expr::Bina(
-            Box::new(Expr::Dot(
-                Box::new(Expr::Ident(Name::from(STATE_PARAM))),
-                Name::from("__current_route"),
-            )),
+            Box::new(app_root_field("__current_route")),
             auto_val::Op::Asn,
             Box::new(path_expr),
         ));
@@ -2737,7 +2742,7 @@ mod tests {
         names.iter().map(|s| s.to_string()).collect()
     }
 
-    /// Plan 482: `router.back()` → `__state.__nav_back_pending = true`
+    /// `router.back()` targets the owning App root from root or child handlers.
     /// （post-handler 钩子消费该标记弹历史栈）。
     #[test]
     fn rewrites_router_back_to_pending_flag() {
@@ -2757,7 +2762,9 @@ mod tests {
             Stmt::Expr(Expr::Bina(lhs, Op::Asn, rhs)) => {
                 match lhs.as_ref() {
                     Expr::Dot(obj, field) => {
-                        assert!(matches!(obj.as_ref(), Expr::Ident(n) if n.as_str() == "__state"));
+                        assert!(matches!(obj.as_ref(), Expr::Dot(root, name)
+                            if matches!(root.as_ref(), Expr::Ident(n) if n.as_str() == "__state")
+                            && name.as_str() == "__auto_root"));
                         assert_eq!(field.as_str(), "__nav_back_pending");
                     }
                     other => panic!("期望 __state.__nav_back_pending 赋值,得到 {other:?}"),

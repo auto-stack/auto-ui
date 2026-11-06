@@ -1,15 +1,19 @@
+use shared_store: SharedStore
+
 widget App {
     routes {
         "/" -> use status_page
         "/done/:id" -> use done_page
     }
-    msg { RootLoad }
+    msg { RootLoad, RootPush }
     model {
         var root_result str = "initial"
     }
     view {
         col {
             text .root_result
+            StatusProbe (key: "a", seed: "A") { }
+            StatusProbe (key: "b", seed: "B") { }
             outlet
         }
     }
@@ -17,6 +21,26 @@ widget App {
         .RootLoad -> {
             let response = Http.get_json("__P068_URL__/reply")
             .root_result = "root completed"
+        }
+        .RootPush -> { router.push("/done/42") }
+    }
+}
+
+widget StatusProbe (seed: str = "") {
+    msg { Load }
+    model { var result str = "" }
+    view {
+        col {
+            text .seed
+            text .result
+            text .total
+        }
+    }
+    on {
+        .Load -> {
+            let response = Http.get_json("__P068_URL__/reply")
+            .result = .seed
+            store.Bump()
         }
     }
 }

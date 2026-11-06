@@ -546,6 +546,8 @@ pub struct InitDispatchReport {
 
 /// PLAN-702 T-02: one parked handler segment.
 pub struct ParkedTask {
+    /// Original receiver heap id; ids are never reused across remounts.
+    pub owner_state_id: u64,
     /// Mid-execution task — ip/bp/ram/call_stack/闭包上下文原样保留，恢复
     /// 时交还引擎续跑。栈上的 rc 份额随 task 存活（不得中途
     /// rc_release_task_stack——完成/失败时按来源纪律清账）。
@@ -1068,6 +1070,10 @@ impl VmBridge {
         // (populated by the outlet/sync_route_params from the matched route).
         // Only when the root widget declares a routes {} block.
         if decl.routes.is_some() {
+            if !field_names.iter().any(|n| n == "__nav_back_pending") {
+                field_names.push("__nav_back_pending".to_string());
+                field_values.push(auto_val::Value::Bool(false));
+            }
             if !field_names.iter().any(|n| n == "__current_route") {
                 field_names.push("__current_route".to_string());
                 field_values.push(auto_val::Value::str(
@@ -1944,7 +1950,14 @@ impl VmBridge {
                 res.map_err(|e| VmBridgeError::VmError(format!("{:?}", e)))
             }
             SegmentOutcome::Parked { wait, seg } => {
-                self.register_parked(task, seg, wait, "__module_init".to_string(), false);
+                self.register_parked(
+                    task,
+                    seg,
+                    wait,
+                    "__module_init".to_string(),
+                    false,
+                    self.state_obj_id,
+                );
                 Ok(())
             }
             SegmentOutcome::Runnable { .. } => {
@@ -2542,6 +2555,22 @@ impl VmBridge {
         let Some(rec) = self.child_instances.borrow_mut().remove(identity) else {
             return;
         };
+        // Cancel by the original receiver before releasing its fields. A late
+        // HTTP/CPU continuation must never mutate the surviving App root or
+        // a fresh instance with the same textual key.
+        let pending: Vec<String> = self
+            .parked_tasks
+            .borrow()
+            .iter()
+            .filter(|p| p.owner_state_id == rec.state_obj_id)
+            .map(|p| p.fn_name.clone())
+            .collect();
+        for name in pending {
+            self.cancel_parked_by_fn(&name);
+        }
+        self.cpu_write_queue
+            .borrow_mut()
+            .retain(|ev| ev.state_obj_id != rec.state_obj_id);
         // PLAN-051: tombstone the identity so a later dispatch carrying it
         // is recognized as a true late event (drop) while never-registered
         // page-level names fall back to root-legacy resolution.
@@ -2735,6 +2764,7 @@ impl VmBridge {
         use auto_lang_core::vm::engine::ParkedWait;
         let task = auto_lang_core::vm::task::AutoTask::new(0, 4096, 0);
         self.parked_tasks.borrow_mut().push(ParkedTask {
+            owner_state_id: self.state_obj_id,
             task,
             seg: ParkedSegment {
                 fn_name: "__plan056_test_parked".to_string(),
@@ -2872,6 +2902,7 @@ impl VmBridge {
         wait: ParkedWait,
         event_name: String,
         release_stack_on_complete: bool,
+        owner_state_id: u64,
     ) {
         eprintln!(
             "[VM-PARKED] {} parked (event {}, wait {:?}) — UI stays interactive",
@@ -2890,6 +2921,7 @@ impl VmBridge {
         }
         let fn_name = seg.fn_name.clone();
         self.parked_tasks.borrow_mut().push(ParkedTask {
+            owner_state_id,
             task,
             seg,
             wait,
@@ -4047,7 +4079,14 @@ impl VmBridge {
             }
             SegmentOutcome::Parked { wait, seg } => {
                 // parked 段的栈份额随 task 存活——不得中途清账（T-02）。
-                self.register_parked(task, seg, wait, event_name.to_string(), true);
+                self.register_parked(
+                    task,
+                    seg,
+                    wait,
+                    event_name.to_string(),
+                    true,
+                    state_obj_id,
+                );
                 Ok(())
             }
             SegmentOutcome::Runnable { .. } => {
@@ -4095,7 +4134,14 @@ impl VmBridge {
                 })
             }
             SegmentOutcome::Parked { wait, seg } => {
-                self.register_parked(task, seg, wait, event_name.to_string(), true);
+                self.register_parked(
+                    task,
+                    seg,
+                    wait,
+                    event_name.to_string(),
+                    true,
+                    state_obj_id,
+                );
                 Ok(())
             }
             SegmentOutcome::Runnable { seg } => {
@@ -4107,6 +4153,7 @@ impl VmBridge {
                     ParkedWait::CpuRunnable,
                     event_name.to_string(),
                     true,
+                    state_obj_id,
                 );
                 Ok(())
             }
@@ -4277,7 +4324,14 @@ impl VmBridge {
                 VmBridgeError::VmError(format!("{:?} (crash ip=0x{:x} in {})", e, task.ip, fn_name))
             }),
             SegmentOutcome::Parked { wait, seg } => {
-                self.register_parked(task, seg, wait, event_name.to_string(), false);
+                self.register_parked(
+                    task,
+                    seg,
+                    wait,
+                    event_name.to_string(),
+                    false,
+                    self.state_obj_id,
+                );
                 Ok(())
             }
             SegmentOutcome::Runnable { .. } => {
@@ -4403,7 +4457,14 @@ impl VmBridge {
                 VmBridgeError::VmError(format!("{:?} (crash ip=0x{:x} in {})", e, task.ip, fn_name))
             }),
             SegmentOutcome::Parked { wait, seg } => {
-                self.register_parked(task, seg, wait, event_name.to_string(), false);
+                self.register_parked(
+                    task,
+                    seg,
+                    wait,
+                    event_name.to_string(),
+                    false,
+                    self.state_obj_id,
+                );
                 Ok(())
             }
             SegmentOutcome::Runnable { .. } => {

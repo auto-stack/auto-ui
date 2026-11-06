@@ -1,0 +1,5 @@
+store SharedStore {
+    msg { Bump }
+    model { var total int = 0 }
+    on { .Bump -> { .total = .total + 1 } }
+}

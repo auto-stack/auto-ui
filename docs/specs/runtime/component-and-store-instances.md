@@ -123,3 +123,17 @@
 - 实例 model 字段 typed 迁移（同名不同类型 = 整候选拒绝保旧）；prop/seed
   键由父通道每帧重播按名保值；新 model 字段按新定义默认补位。
 - 旧桥 busy（parked/CPU continuation）时提交被拒保旧、下拍重试。
+
+## 7. 异步续体的实例与宿主归属（PLAN-068 SD01）
+
+- HTTP 与 CPU 分帧续体保留派发时的 receiver 堆 id。子件本地 model 仍写
+  自己；`router.push/back` 的隐藏宿主槽经 `__auto_root` 写所属 App，根件
+  通过自引用使用同一路径；没有按件名复制路由字段的回落。
+- 实例卸载在字段引用释放前取消以其原始 receiver 挂起的任务（含等待凭据、
+  栈份额与 busy 镜像），移除该 receiver 的排队写事件；相同文本 key 重挂后
+  使用新堆 id，旧请求不能导航根或改变新实例。已完成的前缀副作用不回滚。
+- 续体成功完成后统一处理路由参数、返回请求和视图 memo 失效；失败后已有
+  可见状态也失效重建。状态已写入不等于完成可见投影。
+- 永久入口 `tests/plan068_routed_continuations.rs` 使用真实延迟 HTTP、实际 CPU
+  让出、路由 child 的实例态和 rendered View 作 oracle；包括双同型实例共享
+  Store、跨 App 隔离、卸载/重挂迟到控制。原 `(widget, handler)` 在途重入限制不变。

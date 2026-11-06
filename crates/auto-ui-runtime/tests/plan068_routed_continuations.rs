@@ -68,7 +68,7 @@ fn fixture(server: &ReplyServer) -> (tempfile::TempDir, DynamicComponent) {
         .join("tests/fixtures/plan068_routes/src/front");
     let directory = tempfile::tempdir().unwrap();
     std::fs::create_dir(directory.path().join("pages")).unwrap();
-    for relative in ["app.at", "pages/status_page.at", "pages/done_page.at"] {
+    for relative in ["app.at", "shared_store.at", "pages/status_page.at", "pages/done_page.at"] {
         let text = std::fs::read_to_string(source.join(relative)).unwrap();
         std::fs::write(directory.path().join(relative), text.replace("__P068_URL__", &server.url)).unwrap();
     }
@@ -110,6 +110,14 @@ fn root_http_result_is_the_accepted_control() {
     component.on_with_input_for_instance("App", "RootLoad", None, None);
     finish_http(&mut component, &server);
     assert!(render(&mut component).contains("root completed"));
+}
+
+#[test]
+fn root_navigation_remains_valid_with_the_self_root_reference() {
+    let server = ReplyServer::start();
+    let (_directory, mut component) = fixture(&server);
+    component.on_with_input_for_instance("App", "RootPush", None, None);
+    assert_destination(&mut component);
 }
 
 #[test]
@@ -167,4 +175,115 @@ fn child_http_back_consumes_the_owning_apps_history() {
     finish_http(&mut component, &server);
     assert_eq!(component.bridge().read_state("__current_route").unwrap().as_str(), "/");
     assert!(render(&mut component).contains("Load results"));
+}
+
+#[test]
+fn child_push_then_http_back_restores_the_previous_page() {
+    let server = ReplyServer::start();
+    let (_directory, mut component) = fixture(&server);
+    let page = identity(&component, "StatusPage");
+    component.on_with_input_for_instance("StatusPage", "PushSync", None, Some(&page));
+    assert_destination(&mut component);
+    let destination = identity(&component, "DonePage");
+    component.on_with_input_for_instance("DonePage", "Back", None, Some(&destination));
+    finish_http(&mut component, &server);
+    assert_eq!(component.bridge().read_state("__current_route").unwrap().as_str(), "/");
+    assert!(render(&mut component).contains("Load results"));
+}
+
+#[test]
+fn unmounted_http_owner_cannot_navigate_after_a_fresh_mount() {
+    let server = ReplyServer::start();
+    let (_directory, mut component) = fixture(&server);
+    let page = identity(&component, "StatusPage");
+    let old_id = component.bridge().child_instance_state_id(&page).unwrap();
+    component.on_with_input_for_instance("StatusPage", "Push", None, Some(&page));
+    assert!(component.bridge().has_parked_io_tasks());
+    // Allow the server to accept the request, then unmount its original receiver.
+    let deadline = Instant::now() + Duration::from_secs(3);
+    while server.requests.load(Ordering::SeqCst) == 0 && Instant::now() < deadline {
+        thread::sleep(Duration::from_millis(1));
+    }
+    assert_eq!(server.requests.load(Ordering::SeqCst), 1);
+    component.set_route("/done/42");
+    render(&mut component);
+    assert!(component.bridge().child_instance_state_id(&page).is_none());
+    component.set_route("/");
+    render(&mut component);
+    let fresh = identity(&component, "StatusPage");
+    assert_ne!(component.bridge().child_instance_state_id(&fresh).unwrap(), old_id);
+    // Poll beyond the genuine response even if unmount cancels the parked task early.
+    let deadline = Instant::now() + Duration::from_millis(160);
+    while Instant::now() < deadline {
+        component.poll_parked_resumes();
+        thread::sleep(Duration::from_millis(3));
+    }
+    assert!(!component.bridge().has_parked_tasks());
+    assert_eq!(component.bridge().read_state("__current_route").unwrap().as_str(), "/");
+    assert_eq!(component.bridge().read_instance_state(&fresh, "result").unwrap().as_str(), "");
+    assert!(render(&mut component).contains("Load results"));
+}
+
+#[test]
+fn http_local_results_and_shared_store_stay_with_their_app_and_instance() {
+    let server = ReplyServer::start();
+    let (_directory, mut component) = fixture(&server);
+    let (_other_directory, mut other) = fixture(&server);
+    let ids = component.bridge().child_instance_identities();
+    let a = ids.iter().find(|id| id.ends_with("StatusProbe#a")).unwrap();
+    let b = ids.iter().find(|id| id.ends_with("StatusProbe#b")).unwrap();
+    component.on_with_input_for_instance("StatusProbe", "Load", None, Some(a));
+    finish_http(&mut component, &server);
+    assert_eq!(component.bridge().read_instance_state(a, "result").unwrap().as_str(), "A");
+    assert_eq!(component.bridge().read_instance_state(b, "result").unwrap().as_str(), "");
+    assert_eq!(component.bridge().read_state("total").unwrap(), auto_val::Value::Int(1));
+    assert_eq!(other.bridge().read_state("total").unwrap(), auto_val::Value::Int(0));
+    for id in other.bridge().child_instance_identities().into_iter().filter(|id| id.contains("StatusProbe")) {
+        assert_eq!(other.bridge().read_instance_state(&id, "result").unwrap().as_str(), "");
+    }
+    assert!(render(&mut component).contains("content: \"A\""));
+    assert!(render(&mut other).contains("Load results"));
+    assert_eq!(other.bridge().read_state("__current_route").unwrap().as_str(), "/");
+    let page = identity(&component, "StatusPage");
+    component.on_with_input_for_instance("StatusPage", "PushSync", None, Some(&page));
+    assert_destination(&mut component);
+    assert_eq!(other.bridge().read_state("__current_route").unwrap().as_str(), "/");
+}
+
+fn park_cpu(component: &mut DynamicComponent) {
+    let page = identity(component, "StatusPage");
+    let state = component.bridge().child_instance_state_id(&page).unwrap();
+    let budget = auto_lang_core::vm::engine::CpuSliceBudget {
+        max_steps: 1,
+        ..auto_lang_core::vm::engine::CpuSliceBudget::d2_default()
+    };
+    component.bridge().call_handler_for_cpu_slice("StatusPage", "CpuPush", state, &[], budget).unwrap();
+    assert!(component.bridge().has_cpu_continuations(), "must exercise a real yielded CPU segment");
+}
+
+#[test]
+fn cpu_continuation_publishes_navigation_through_the_frame_pump() {
+    let server = ReplyServer::start();
+    let (_directory, mut component) = fixture(&server);
+    park_cpu(&mut component);
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while component.bridge().has_cpu_continuations() && Instant::now() < deadline {
+        component.poll_frame_pump();
+    }
+    assert!(!component.bridge().has_cpu_continuations());
+    assert_destination(&mut component);
+}
+
+#[test]
+fn unmount_cancels_cpu_continuation_of_the_old_receiver() {
+    let server = ReplyServer::start();
+    let (_directory, mut component) = fixture(&server);
+    park_cpu(&mut component);
+    component.set_route("/done/42");
+    render(&mut component);
+    component.set_route("/");
+    render(&mut component);
+    component.poll_frame_pump();
+    assert!(!component.bridge().has_parked_tasks());
+    assert_eq!(component.bridge().read_state("__current_route").unwrap().as_str(), "/");
 }

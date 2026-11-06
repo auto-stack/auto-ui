@@ -154,6 +154,8 @@ pub struct DynamicComponent {
     /// Plan 482: VM 路由历史栈(浏览器 back 的对等物)。`set_route` 时压入
     /// 旧路由,`__navigate_back` / `router.back()`(经 __nav_back_pending)弹出。
     route_history: Vec<String>,
+    /// Last route observed by the host, including handler-driven navigation.
+    resolved_route: Option<String>,
 
     /// Plan 051 C7: timer 块条目（root widget + store-as-child decl 三源
     /// 收集；renderer 据此建订阅、update 据此走 fire_timer 门控派发）。
@@ -466,6 +468,7 @@ impl DynamicComponent {
             preview_states: Default::default(),
             nav_group_states: Default::default(),
             route_history: Default::default(),
+            resolved_route: None,
             timers: Vec::new(),
             timesources: Vec::new(),
             timesource_next: Vec::new(),
@@ -600,6 +603,7 @@ impl DynamicComponent {
             preview_states: Default::default(),
             nav_group_states: Default::default(),
             route_history: Default::default(),
+            resolved_route: None,
             timers: Vec::new(),
             timesources: {
                 let mut ts = Vec::new();
@@ -835,6 +839,7 @@ impl DynamicComponent {
             preview_states: Default::default(),
             nav_group_states: Default::default(),
             route_history: Default::default(),
+            resolved_route: None,
             timers,
             timesource_next: vec![None; timesources.len()],
             timesources,
@@ -896,6 +901,7 @@ impl DynamicComponent {
             preview_states: Default::default(),
             nav_group_states: Default::default(),
             route_history: Default::default(),
+            resolved_route: None,
             timers: Vec::new(),
             timesources: {
                 let mut ts = Vec::new();
@@ -1766,9 +1772,9 @@ impl DynamicComponent {
             let cpu = self.bridge.resume_cpu_slices(budget);
             let progressed =
                 init.dispatched > 0 || init.completed > 0 || cpu.completed > 0 || io.completed > 0;
-            if init.completed > 0 || cpu.completed > 0 {
+            if init.completed > 0 || cpu.completed > 0 || io.completed > 0 {
                 // 完成失效 memo（与生产 poll_frame_pump 同语义）。
-                crate::ui::memo_deps::bump_ui_epoch();
+                self.publish_completed_handler_updates();
             }
             let busy = self.bridge.has_pending_init_work() || self.bridge.has_cpu_continuations();
             if !busy {
@@ -1844,7 +1850,7 @@ impl DynamicComponent {
                 || cpu_report.completed > 0
                 || init_report.silent_done_transitions > 0
             {
-                crate::ui::memo_deps::bump_ui_epoch();
+                self.publish_completed_handler_updates();
             }
             self.dirty = true;
         }
@@ -1903,7 +1909,11 @@ impl DynamicComponent {
     /// `parked_wait_ready` 对 CpuRunnable 恒 false，天然只拾取 I/O 凭据。
     pub fn poll_parked_resumes(&mut self) {
         let report = self.bridge.resume_ready_parked();
-        if report.completed > 0 || !report.failed.is_empty() {
+        if report.completed > 0 {
+            self.publish_completed_handler_updates();
+        } else if !report.failed.is_empty() {
+            // A failed handler can have written a visible error before failing.
+            crate::ui::memo_deps::bump_ui_epoch();
             self.dirty = true;
         }
         for (fn_name, err) in &report.failed {
@@ -1927,6 +1937,14 @@ impl DynamicComponent {
                 err
             );
         }
+    }
+
+    /// Apply host-side effects after a suspended segment actually completes.
+    fn publish_completed_handler_updates(&mut self) {
+        self.sync_route_params();
+        self.consume_nav_back_pending();
+        crate::ui::memo_deps::bump_ui_epoch();
+        self.dirty = true;
     }
 
     /// Find the source span for a specific element by kind and occurrence index.
@@ -2073,6 +2091,7 @@ impl DynamicComponent {
         let _ = self
             .bridge
             .write_state("__current_route", auto_val::Value::str(path));
+        self.resolved_route = Some(path.to_string());
         self.sync_route_params();
         self.dirty = true;
     }
@@ -2087,6 +2106,7 @@ impl DynamicComponent {
         let _ = self
             .bridge
             .write_state("__current_route", auto_val::Value::str(&prev));
+        self.resolved_route = Some(prev);
         self.sync_route_params();
         self.dirty = true;
         true
@@ -2105,7 +2125,7 @@ impl DynamicComponent {
     }
 
     /// Plan 482: post-handler hook — `router.back()` in handler code is
-    /// rewritten to `__state.__nav_back_pending = true`; the update loop
+    /// rewritten to `__state.__auto_root.__nav_back_pending = true`; the update loop
     /// calls this after the handler ran. Consuming the flag performs the pop.
     fn consume_nav_back_pending(&mut self) {
         let pending = matches!(
@@ -2138,6 +2158,14 @@ impl DynamicComponent {
                 .map(|r| r.path.clone())
                 .unwrap_or_else(|| "/".to_string()),
         };
+        if let Some(previous) = self.resolved_route.replace(current.clone()) {
+            if previous != current {
+                self.route_history.push(previous);
+                if self.route_history.len() > 50 {
+                    self.route_history.remove(0);
+                }
+            }
+        }
         let cur_segs: Vec<&str> = current
             .trim_matches('/')
             .split('/')

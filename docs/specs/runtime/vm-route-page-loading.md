@@ -55,3 +55,21 @@ negative. The PLAN-003 single-page fixture remains the compatibility control.
 BLOG-004's `native-vm-rust` profile owns application-level creation, saving,
 HTTP/disk identity and durable reopening after normal or forced termination;
 passing an AutoUI fixture alone does not establish that consumer acceptance.
+
+## Suspended navigation and result publication (PLAN-068 SD02)
+
+A page's HTTP or CPU continuation retains its original instance receiver.
+Local result text, including a conditional multiline summary, must reach that
+instance's rendered view after completion. Navigation writes the owning App's
+root route and back-request slots; route parameters and history are published
+by the same completion hook as synchronous handlers. Handler-driven pushes and
+host link transitions both enter the bounded return history; returning consumes
+history without adding the outgoing route again.
+
+Unmount cancels continuations owned by the released receiver before a fresh
+mount can inherit its textual identity. A late HTTP completion or CPU slice
+cannot redirect the surviving root. The permanent
+`plan068_routed_continuations` integration target exercises root controls,
+synchronous/HTTP/CPU navigation, push then back, conditional results, Store and
+App isolation, and unmount/remount. Actual Reader acceptance remains with its
+consumer Plan and is not replaced by these component-level checks.
