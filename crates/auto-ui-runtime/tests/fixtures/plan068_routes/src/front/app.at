@@ -1,0 +1,22 @@
+widget App {
+    routes {
+        "/" -> use status_page
+        "/done/:id" -> use done_page
+    }
+    msg { RootLoad }
+    model {
+        var root_result str = "initial"
+    }
+    view {
+        col {
+            text .root_result
+            outlet
+        }
+    }
+    on {
+        .RootLoad -> {
+            let response = Http.get_json("__P068_URL__/reply")
+            .root_result = "root completed"
+        }
+    }
+}

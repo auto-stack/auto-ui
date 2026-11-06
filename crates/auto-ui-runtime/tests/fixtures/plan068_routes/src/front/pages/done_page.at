@@ -1,0 +1,20 @@
+widget DonePage {
+    msg { Init, Back }
+    model {
+        var seen str = ""
+    }
+    view {
+        col {
+            text "Destination"
+            text .seen
+            button (onclick: .Back) { text "Back after request" }
+        }
+    }
+    on {
+        .Init -> { .seen = router.param("id") }
+        .Back -> {
+            let response = Http.get_json("__P068_URL__/reply")
+            router.back()
+        }
+    }
+}

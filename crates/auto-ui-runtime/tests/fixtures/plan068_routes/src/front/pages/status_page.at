@@ -1,0 +1,30 @@
+widget StatusPage {
+    msg { Load, Push, PushSync }
+    model {
+        var result str = ""
+    }
+    view {
+        col {
+            button (onclick: .Load) { text "Load results" }
+            button (onclick: .Push) { text "Navigate after request" }
+            text .result
+            if .result != "" {
+                text "Result summary"
+                text .result
+            }
+        }
+    }
+    on {
+        .Load -> {
+            let response = Http.get_json("__P068_URL__/reply")
+            .result = "success\nfailure\ncancelled"
+        }
+        .Push -> {
+            let response = Http.get_json("__P068_URL__/reply")
+            router.push("/done/42")
+        }
+        .PushSync -> {
+            router.push("/done/42")
+        }
+    }
+}
