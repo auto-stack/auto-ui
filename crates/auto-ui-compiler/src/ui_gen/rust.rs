@@ -2684,6 +2684,45 @@ fn collect_local_elems(
                 "    fn tick_msg(&self) -> Option<{}> {{ Some({}::{}) }}\n",
                 msg_name, msg_name, event
             ));
+        } else {
+            // The native runner polls the root Component. A routed page's
+            // existing single timer must therefore travel through its root
+            // message wrapper, just like input from that page. Keep local
+            // timer precedence and only poll the currently selected outlet.
+            let msg_name = self.current_msg_name();
+            match self.outlet_route.clone() {
+                OutletRoute::Fold(child) => {
+                    let field = Self::child_field_name(&child);
+                    code.push_str(&format!(
+                        "    fn tick_interval_ms(&self) -> Option<u32> {{ self.{field}.tick_interval_ms() }}\n\
+                         fn tick_msg(&self) -> Option<{msg_name}> {{ self.{field}.tick_msg().map({msg_name}::{child}) }}\n"
+                    ));
+                }
+                OutletRoute::Multi(routes) => {
+                    let mut interval_arms = String::new();
+                    let mut message_arms = String::new();
+                    let mut seen = std::collections::BTreeSet::new();
+                    for route in &routes {
+                        let child = route_child_name(route);
+                        if !seen.insert(child.clone()) {
+                            continue;
+                        }
+                        let field = Self::child_field_name(&child);
+                        interval_arms.push_str(&format!(
+                            "        {child:?} => self.{field}.tick_interval_ms(),\n"
+                        ));
+                        message_arms.push_str(&format!(
+                            "        {child:?} => self.{field}.tick_msg().map({msg_name}::{child}),\n"
+                        ));
+                    }
+                    let selector = "__route_match(__ROUTES, &self.__route).map(|(_, __p, _)| __p).unwrap_or(\"\")";
+                    code.push_str(&format!(
+                        "    fn tick_interval_ms(&self) -> Option<u32> {{ match {selector} {{\n{interval_arms}        _ => None,\n    }} }}\n\
+                         fn tick_msg(&self) -> Option<{msg_name}> {{ match {selector} {{\n{message_arms}        _ => None,\n    }} }}\n"
+                    ));
+                }
+                _ => {}
+            }
         }
 
         code.push_str("}\n");
@@ -17469,6 +17508,55 @@ widget App {
     /// runner. Without this bridge the image viewer remains stuck in loading
     /// because its async media session is never polled for readiness.
     #[test]
+    fn p060_route_root_forwards_active_page_single_timer() {
+        let gen_first_widget = |src: &str| {
+            let ast = crate::parse_ui(src).expect("parse");
+            let decl = ast.domain_stmts().find_map(|stmt| match stmt {
+                auto_ui_dialect::UiStmt::WidgetDecl(decl) => Some(decl),
+                _ => None,
+            }).expect("widget");
+            let widget = crate::aura::extract::extract_widget_from_decl(decl).expect("extract");
+            RustGenerator::new().generate(&widget).expect("generate")
+        };
+        let folded = gen_first_widget(r#"
+widget App {
+    routes { "/" -> use author }
+    msg { Init }
+    view { outlet }
+}
+"#);
+        assert!(folded.contains("self.author.tick_interval_ms()"), "folded page timer must reach the owning root");
+        assert!(folded.contains("self.author.tick_msg().map(AppMsg::author)"));
+        let routed = gen_first_widget(r#"
+widget App {
+    routes {
+        "/" -> use author
+        "/other" -> use home
+    }
+    msg { Init }
+    view { outlet }
+}
+"#);
+        let timer_part = routed.split("fn tick_interval_ms").nth(1).expect("route timer forwarding");
+        assert!(timer_part.contains("__route_match(__ROUTES, &self.__route)"));
+        assert!(timer_part.contains("\"author\" => self.author.tick_interval_ms()"));
+        assert!(timer_part.contains("\"home\" => self.home.tick_interval_ms()"));
+        assert!(timer_part.contains("self.home.tick_msg().map(AppMsg::home)"));
+        assert!(timer_part.contains("_ => None"));
+        let local = gen_first_widget(r#"
+widget App {
+    routes { "/" -> use author }
+    msg { Beat }
+    timer { Beat (every_ms: 80) }
+    view { outlet }
+}
+"#);
+        assert!(local.contains("fn tick_interval_ms(&self) -> Option<u32> { Some(80) }"));
+        assert!(local.contains("Some(AppMsg::Beat)"));
+        assert!(!local.contains("self.author.tick_msg()"), "existing local timer keeps precedence");
+    }
+
+    #[test]
     fn timer_block_rust_codegen_emits_named_tick_subscription() {
         let src = r#"
 widget App {
@@ -20976,9 +21064,9 @@ widget App {
         );
     }
 
-    /// D5 边界：多路由 + outlet → 响亮拒（原 View::empty 静默升级）。
+    /// PLAN-052 superseded the PLAN-039 rejection with persistent routed pages.
     #[test]
-    fn outlet_multi_route_loud_reject() {
+    fn outlet_multi_route_selects_persistent_page() {
         let code = gen_first_widget(
             r#"
 widget App {
@@ -20992,14 +21080,12 @@ widget App {
 }
 "#,
         );
-        assert!(
-            code.contains("std::compile_error!(\"a2r codegen: multi-route/parametric `routes` + `outlet` not yet supported (PLAN-039 D5"),
-            "多路由响亮拒带 P039 指针:\n{code}"
-        );
-        assert!(
-            !code.contains("home(homeMsg)"),
-            "多路由不注册折平子件:\n{code}"
-        );
+        assert!(!code.contains("std::compile_error!"), "supported static routes: {code}");
+        assert!(code.contains("home(homeMsg)"));
+        assert!(code.contains("other(otherMsg)"));
+        assert!(code.contains("__route_match(__ROUTES, &self.__route)"));
+        assert!(code.contains("AppMsg::home(m)"));
+        assert!(code.contains("AppMsg::other(m)"));
     }
 
     /// D3-A：ondragover 家族显式 not-yet 拒绝（带 P039 债指针，区别

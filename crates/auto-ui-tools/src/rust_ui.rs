@@ -7601,7 +7601,7 @@ pub(crate) fn resolve_managed_front(project_dir: &Path) -> AutoResult<ManagedFro
 /// generator changes without a bump are a recorded boundary.
 // PLAN-060: invalidate unchanged inputs after fixing text click/style emission,
 // in addition to the earlier table-row and named-input corrections.
-const FRONT_LAYOUT_VERSION: &str = "front-layout/v7";
+const FRONT_LAYOUT_VERSION: &str = "front-layout/v8";
 
 fn front_generator_identity(context: &GeneratedBuildContext) -> String {
     format!(
