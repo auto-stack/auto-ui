@@ -65,6 +65,28 @@ readback, negative-control result, owned process/port cleanup, reopen result,
 and local evidence paths with hashes. Raw screenshots and logs remain local;
 the Plan and execution receipt carry the concise results and hashes.
 
+## Windows system accessibility and suspended routes
+
+For changes to native semantics, query the actual Windows system tree and
+record role, label, value, focus, visible bounds, and action outcomes on the
+affected controls. MCP tree/action evidence under NVM-03 remains valid for
+that event path, but does not prove a system provider or physical input.
+Record tool refusal and user-performed input separately. See
+[native-system-accessibility](native-system-accessibility.md) for the bounded
+provider contract and supported converted views.
+
+For suspended routed handlers, verify the actual child result is visible
+after HTTP or CPU completion, navigation writes the app root route and
+parameters, and back history works. Include a legal root control and an
+unmount/remount late-completion control. A root state snapshot cannot prove
+that a routed child's local result rendered correctly.
+
+Consumer evidence must identify the exact tool binary hash as well as source
+and dependency revisions. If a diagnostic binary predates a fix, retain its
+evidence under that binary; rebuild and replay affected consumer behavior
+before closing the fix. Deliver the consumer's usable pins and required
+artifacts before removing a prerequisite plan's temporary scope.
+
 ## 原生多文件选择（PLAN-988）
 
 公开 `dialog_open_files(filter)` 由 VM native/provider 与生成 Rust

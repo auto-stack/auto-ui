@@ -428,6 +428,11 @@ fn bind(build: &Build, message: Option<&IcedMessage>) -> (Owner, Option<IcedMess
                 .map(|receiver| (id.to_string(), *receiver))
         })
         .or_else(|| {
+            // An explicit identity is authoritative, including when it has
+            // already been released. Never retarget it to a same-type sibling.
+            if identity.is_some() {
+                return None;
+            }
             let mut matches = build.owners.iter().filter(|(id, _)| {
                 id.rsplit('/').next().unwrap_or(id).split('#').next() == Some(widget)
             });
@@ -662,7 +667,8 @@ pub(super) fn enter(view: &AbstractView<IcedMessage>, path: &[usize]) -> Option<
                 ),
             };
         let primary = click.or(change);
-        let (owner, _) = bind(build, primary);
+        let (owner, bound) = bind(build, primary);
+        let owner_bound = primary.is_none() || bound.is_some();
         let (_, click) = bind(build, click);
         let (_, change) = bind(build, change);
         let event = primary
@@ -706,7 +712,7 @@ pub(super) fn enter(view: &AbstractView<IcedMessage>, path: &[usize]) -> Option<
             }
         };
         build.keys.insert(key, id);
-        let focus = if disabled {
+        let focus = if disabled || !owner_bound {
             None
         } else {
             focus.or_else(|| {
@@ -777,7 +783,7 @@ pub(super) fn enter(view: &AbstractView<IcedMessage>, path: &[usize]) -> Option<
             id,
             focus,
             click: if disabled { None } else { click },
-            button_focus: button_focus && !disabled,
+            button_focus: button_focus && !disabled && owner_bound,
         })
     })
 }
@@ -1191,6 +1197,49 @@ mod tests {
                 .unwrap(),
             auto_val::Value::Int(1)
         );
+        remove(window);
+    }
+    #[test]
+    fn explicit_released_owner_never_rebinds_to_the_remaining_same_type() {
+        let window = iced::window::Id::unique();
+        let mut component = fixture();
+        render(window, &mut component, &HashMap::new());
+        component.call_widget_handler("P068Accessibility", "ToggleB", &[]).unwrap();
+        let _ = component.view_with_debug_gated(false);
+        assert!(component.bridge().child_instance_state_id("/Probe#b").is_none());
+
+        // A delayed converted view still carries B's explicit identity. Only A
+        // remains live; a unique-type fallback must not retarget this action.
+        let stale_view = AbstractView::Button {
+            label: "Released second".into(),
+            onclick: IcedMessage {
+                widget: "Probe\u{1}/Probe#b".into(),
+                event: "Inc".into(),
+                input_value: None,
+            },
+            style: None,
+            on_right_click: None,
+            content: None,
+            disabled: false,
+        };
+        let element = with_scope(window, &component, || {
+            super::super::devtools::render_dynamic_view(stale_view, None, &mut vec![])
+        });
+        let mut ui = iced_test::simulator(element);
+        let _ = ui.snapshot(&Theme::Dark).unwrap();
+        let node = *shared(window).lock().unwrap().nodes.iter()
+            .find(|(_, entry)| entry.node.role() == Role::Button).unwrap().0;
+        assert!(matches!(resolve(window, &component, &request(node, Requested::Click)),
+            Some(Dispatch::Rejected)), "a released explicit B must not become A");
+        assert!(matches!(resolve(window, &component, &request(node, Requested::Focus)),
+            Some(Dispatch::Rejected)), "an unresolved owner must not acquire focus");
+
+        // The remaining live instance still has an accepted ordinary control.
+        render(window, &mut component, &HashMap::new());
+        let a = find(window, "/Probe#a", Role::Button);
+        apply(window, &mut component, a, Requested::Click);
+        assert_eq!(component.bridge().read_instance_state("/Probe#a", "count").unwrap(),
+            auto_val::Value::Int(1));
         remove(window);
     }
     #[test]
