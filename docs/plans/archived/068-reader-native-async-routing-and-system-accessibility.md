@@ -266,6 +266,10 @@ Rust AutoUI runtime/dialect/handler codegen、VM实例及parked续体、iced/win
 - **canonical_verified**（HEAD源hash）：component-and-store-instances=bded9620...、native-system-accessibility（新）=b463c5d5...、native-vm-app-validation=4e715a92...、vm-route-page-loading=43bcafd9...；master view.rs含封顶修复。
 - **T07交接009**：reader-009组auto-ui兄弟检出02316271→**0b3ee62d**（clean）；plan-009/t02/ui-068-handoff/新增reader-p068-ui.exe=6ce87feb（ca4c8acd行为验证cohort）、reader-ui-tool-0b3ee62d.exe=18194b40（**交付源0b3ee62d+92bbf298新构建**，009后继原生腿固定用此）；ui-minimal.lock=f8e51e1c。部署观察：已安装共享auto-ui-tool非本计划更新物，消费方按pin自行构建——009用18194b40/固定源。
 
+- **archived**：主检出`git mv`→docs/plans/archived/068-reader-native-async-routing-and-system-accessibility.md，status: archived、8/8（T00～T07全[x]）；提交cbeb65c5后归档路径在版本控制内（git status确认tracked）。
+- **cleaned**：wt-guard对ui-068组五树（auto-ui/auto-lang/auto-man/auto-down/auto-web）全clean（无reparse point）后逐一`git worktree remove`；分支codex/plan-068-dev删除（was 0b3ee62d）；组目录D:/autostack/.wt/ui-068已删。耐久证据已折叠于本文件各receipt（含hash）；plan-artifacts/plan-068整scope按2026-10-31 delete-at-merge删除，无未决issue保留；registry policy.json该条改deleted_at_merge并注明009 handoff去向。**Landing≠部署观察**：已安装共享auto-ui-tool非本计划更新物（按pin消费原则），009后继原生腿使用plan-009/t02/ui-068-handoff/reader-ui-tool-0b3ee62d.exe（18194b40，交付源+配对lang构建）；master侧spec/codes已为最新交付态。
+- stage: merge | key: PLAN-068:r2 | outcome: **pass** | delivery_commit: 0b3ee62d32153bcdaefd71bd59f6abe55a082efc（master，ff-only） | paired_dependency: auto-lang 92bbf298 | spec_paths+hashes: 见canonical_verified | archive_path: docs/plans/archived/068-reader-native-async-routing-and-system-accessibility.md | cleanup: 五树+分支+组目录+scope全清，registry已刷新 | next: 009消费pin（T02～05）。
+
 ## 10. 待澄清事项
 
 2026-11-07（T05后）：无待答范围、授权或输入问题。T05独立终审已pass（reviewed_commit ca4c8acd，AC01～05全PASS），Plan状态reviewed 6/8。下一步**T06 merge**：精确主干落地、冻结受影响并集回归、canonical Spec核验（SD01～04发布）、归档导航/8-of-8计数、本scope清理（wt-guard后删树/分支/plan-artifacts，保留009所需pin/工具交接）；T07把可消费pin/工具/耐久摘要交009。遗留均为merge项：SD03示例路径笔误、dep主检出祖先前进配对说明、4项具名环境观察随归档保留。
