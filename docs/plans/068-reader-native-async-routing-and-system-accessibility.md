@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-06
 updated_at: 2026-11-06
 plan_revision: 2
-current_step: 1
+current_step: 2
 total_steps: 8
 base_branch: master
 base_commit: 7ac0455bf4cd743248749e4bc4eb9d0aed657266
@@ -108,7 +108,7 @@ Rust AutoUI runtime/dialect/handler codegen、VM实例及parked续体、iced/win
 | ID | owner_stage | 依赖 | 实际动作 / 关闭条件 | AC |
 |---|---|---|---|---|
 | T00 [x] | work | 授权已给 | 主干/pin同因复现、有效最小HTTP routed fixture、真实owner流与R01/02定位；先证明root正控和实际原红，不继续错误prototype盲重试 | AC01/02 |
-| T01 | work | T00 | 最小实例/root续体与结果投影修复、永久V01/02及必要同因合法/失效对照；Reader无特判 | AC01/02/05 |
+| T01 [x] | work | T00 | 最小实例/root续体与结果投影修复、永久V01/02及必要同因合法/失效对照；Reader无特判 | AC01/02/05 |
 | T02 | work | T00；T01可独立推进 | 真实系统可访问整链有界可行核查，冻结角色/事件/实例/失效/布局owner、可用库/feature与拒绝行为；不可行则具名设计阻挡，不先写虚假Spec | AC03/05 |
 | T03 | work | T02 | 实现最小Windows provider/语义发布及真实系统树/焦点/操作V03；按需处理wry正文已有接缝，保原native表面合同 | AC03/05 |
 | T04 | work | T01/T03 | 新tool从独立树实际构建，固定Reader消费V04及受影响V05；源/依赖前后不漂移，补Spec提案，work-owned全通过才execution_done | AC01～05 |
@@ -116,7 +116,7 @@ Rust AutoUI runtime/dialect/handler codegen、VM实例及parked续体、iced/win
 | T06 | merge | T05 pass | 精确落地、冻结受影响并集与canonical核验、归档导航/计数；需要Lang变更则同门成对交付 | AC07 |
 | T07 | merge | T06 | Reader009更新只读消费pin/工具并记录可用交接；原证据不动，guard clean后清本树/分支/自有scope，最终8/8 | AC08 |
 
-当前1/8，T00已闭、T01进行中；唯一权威组ui-068已创建，生产原始代码尚未修改，已新增合法路由HTTP永久反例夹具及5个目标case，实际baseline正在独立target构建/执行。T02待T00 owner流核实后继续，不把测试源码当已执行。
+当前2/8，T00/T01已闭；路由/续体定向证据已形成，真实Reader消费仍归T04。T02整链已证实系统树与系统编辑写入，按钮点击工具未产生动作，未算通过；生产语义、布局/实例生命周期与正文接缝仍须T02冻结/T03实施和V03实证。
 
 ## 9. 复审记录
 
@@ -136,6 +136,14 @@ Rust AutoUI runtime/dialect/handler codegen、VM实例及parked续体、iced/win
 - T00永久case提交**7171ac31**，生产库仍与05c62e4f相同。首次完整冷构建已产出测试exe；第一次运行中的root HTTP正控因Windows accepted socket继承listener nonblocking而WouldBlock，析构二次panic导致STATUS_STACK_BUFFER_OVERRUN，该为测试夹具错误。显式set_nonblocking(false)、Drop不在unwind中二次panic后，baseline02真实终态**1 PASS/4 FAIL、0 ignored、exit101**，5项全部实际执行0.65s；编译14.22s，log SHA256=212bee8683063ca8fb397932c98eac9b1c9890a91d5976f6e147f1f93323c37f。
 - root HTTP await→可见结果正控PASS。child同步push与HTTP后push分别重现子态缺__current_route；HTTP后back重现缺__nav_back_pending；child多行结果在自己的实例态已精确成功写入，但条件/正文VTree仍空。这与Reader真实已保存而未显示的反例同因，排除接口未返回/字节失败或root字段代理的归因。合法bare outlet夹具已通过实际production builder，旧prototype解析错误不再作依据。
 - 已开始T01最小改面：handler_codegen宿主导航写经__auto_root，dynamic统一完成后继（参数/历史、memo与dirty），初次t01-route-fix-01为**4绿1红**；剩余back已从子态缺槽变为App_State缺__nav_back_pending，明确root宿主槽未注入。正在补root routes专属false槽并重跑同5项；未宣称T01完成或native产品/AX通过。无语言源码改动。
+
+### 2026-11-06 T01闭环与T02整链核查
+
+- T01代码提交9cb9722658d2bda61273837844091de3aa895c39（权威树codex/plan-068-dev）；child的导航写经原receiver的__auto_root，routes root补false back槽；HTTP/CPU完成统一发布route params/back/memo/dirty。有效新增边界先红：push→HTTP back仍停done；卸载→同key重挂后旧HTTP仍改root。修复为handler push同样进入50项返回历史、parked task显式绑定派发receiver堆id，卸载前取消其凭据/栈/busy、移除该receiver排队写。未改lang、重入键或阈值。
+- 永久target plan068_routed_continuations最终**11/11 PASS，0 ignored，exit0，1.30s**：root HTTP与root自引用导航正控、child本态多行条件投影、同步/HTTP/CPU导航参数、push再back、双同型+共享Store/跨App、HTTP迟到重挂、CPU卸载；强制真实HTTP延迟与CPU max_steps=1让出。log t01-root-navigation-control.log SHA256=134fafb7d2bb74cebe4245fdb80c6f5ee800ed98d5858e834f53865b97bcbe58。旧实例target4/4 PASS、handler_codegen::tests15/15、plan015_route_loading_tests6/6（均exit0、0 ignored）；分别log SHA256=cd8f57a5f14ca0a51517ffb0eddec19d996495831eddf48d730e0c03ab3943e0/49bf96ff5d86220d3e35a502cf16fb4e2c520a7741ef005348409f191d35d8e4/c63def1b0a8840e2f7f4629c71e198b496391615cee3d575eaeb59a5970148bf。所有log在本scope。代表既有合法/失败/实例路径覆盖本次改面，未跑全仓；冻结并集仍归merge。
+- SD01/02仅在实施树备好，尚未发布主干canonical。真实Reader缺路由/结果反例仍需T04消费新tool实际复演，不能凭组件绿标完整AC01/02通过。
+- T02候选AccessKit官方Windows adapter0.35.2（accesskit0.25.2/consumer0.39.2、Rust>=1.87），公开SubclassingAdapter在窗口线程首次show前安装，action可跨线程故只入队，update返回events须在锁外raise。独立scratch winit0.30.13真实小窗零MCP/debug：build exit0，15.34s。Sky读取实际Windows树，按钮7、edit8、text9均出现；系统set_value中文→实际model、显示与AX值/焦点均更新。系统证据t02-system-tree-value.json SHA256=ac01ef670d91d6f4b6a07ed1587de3148d2275465b8f8188c585718d5c21436c。Sky click按钮仍0，不能称按钮操作通过，保留与Reader同形的输入工具疑点。
+- T02下一步：把生产Iced布局、精确实例代际与系统action路由接法冻结，避免复用debug-only包装造成失焦；bounds必须真实布局且按窗口scale映射，stale node须丢弃，wry原生子窗保留自身provider。新库尚未加入生产manifest，无虚假AX Spec。
 
 ## 10. 待澄清事项
 
