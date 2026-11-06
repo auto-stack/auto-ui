@@ -47,3 +47,14 @@ diagnostic that contains no request URL, token or body. Declared String state
 targets retain JSON string identities rather than applying the field-name
 integer heuristic. Integer state reads convert the original JSON value once;
 already composed string expressions retain their existing string path.
+
+Native child input handlers retain calls to declared `msg` callback props.
+Emissions belong to that child instance and are consumed in call order after
+child dispatch and store writeback, through the parent's declared message
+binding. Parameters are checked against that message's payload types and
+arity; failures use static diagnostics. Unbound optional callbacks are consumed
+without dispatch. Subsequent views and inputs do not replay consumed events.
+The existing per-component child-instance model remains: conflicting bindings
+for one child type and bindings with fixed arguments are rejected during
+generated compilation. This rule covers normal child message dispatch, not a
+new callback protocol for constructor execution.

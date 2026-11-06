@@ -2095,6 +2095,10 @@ fn collect_local_elems(
             code.push_str("#[derive(Debug)]\n");
         }
         code.push_str(&format!("pub struct {} {{\n", widget.name));
+        CHILD_PROP_RUST_TYPES.with(|m| { m.borrow_mut().insert(widget.name.clone(), widget.props.iter().map(|p| (p.name.clone(), self.prop_rust_type(p))).collect()); });
+        if widget.props.iter().any(|p| self.prop_rust_type(p) == "msg") {
+            code.push_str("    pub __callback_events: Vec<(String, Vec<serde_json::Value>)>,\n");
+        }
 
         // Track this widget's own fields (for dedup with root state fields).
         let mut own_fields: std::collections::HashSet<String> = std::collections::HashSet::new();
@@ -2289,6 +2293,9 @@ fn collect_local_elems(
         }
 
         // Initialize props from parameters (skip msg-typed callback props)
+        if widget.props.iter().any(|p| self.prop_rust_type(p) == "msg") {
+            code.push_str("            __callback_events: Vec::new(),\n");
+        }
         for prop in &non_msg_props {
             code.push_str(&format!("            {}: {},\n", prop.name, prop.name));
         }
@@ -3455,6 +3462,22 @@ fn collect_local_elems(
                     }
                 }
 
+                let bindings = Self::child_callback_bindings(&widget.view_tree, child_name);
+                if CHILD_PROP_RUST_TYPES.with(|m| m.borrow().get(child_name).map_or(false, |p| p.values().any(|t| t == "msg"))) {
+                    let owner = if persistent { format!("self.{}", field_name) } else { "__child".to_string() };
+                    code.push_str(&format!("                let __callbacks = std::mem::take(&mut {}.__callback_events);\n                for (__callback, __args) in __callbacks {{\n                    match __callback.as_str() {{\n", owner));
+                    for (callback, target) in bindings {
+                        let target = target.trim_start_matches('.');
+                        if let Some(variant) = self.message_variants.iter().find(|v| v.name == target) {
+                            let args = variant.payload.iter().enumerate().map(|(i, ty)| format!("serde_json::from_value::<{}>(__args[{}].clone()).unwrap_or_else(|_| panic!(\"native callback payload type mismatch\"))", self.auto_type_to_rust(ty), i)).collect::<Vec<_>>();
+                            let message = if args.is_empty() { format!("{}::{}", msg_name, target) } else { format!("{}::{}({})", msg_name, target, args.join(", ")) };
+                            code.push_str(&format!("                        {:?} => {{ assert_eq!(__args.len(), {}, \"native callback payload arity mismatch\"); self.on({}); }},\n", callback, args.len(), message));
+                        } else {
+                            code.push_str("                        _ => { compile_error!(\"native callback binding must name a declared parent message\"); },\n");
+                        }
+                    }
+                    code.push_str("                        _ => {},\n                    }\n                }\n");
+                }
                 code.push_str("            }\n");
             }
 
@@ -10107,6 +10130,54 @@ fn collect_local_elems(
         String::new()
     }
 
+    /// Callback bindings live in Aura events for normal .at widget calls.
+    /// Keep them out of constructor props; consume emissions after child/store writeback.
+    fn child_callback_bindings(node: &AuraNode, child: &str) -> std::collections::BTreeMap<String, String> {
+        let mut result = std::collections::BTreeMap::new();
+        let mut merge = |name: String, target: String| {
+            match result.get(&name) {
+                Some(previous) if previous != &target => { result.insert(name, "<ambiguous callback binding>".to_string()); }
+                _ => { result.insert(name, target); }
+            }
+        };
+        let binding = |event: &AuraEvent| {
+            if event.params.is_empty() { event.handler.clone() } else { "<callback binding with fixed arguments>".to_string() }
+        };
+        let prop_binding = |expr: &auto_lang_core::ast::Expr| {
+            match expr {
+                auto_lang_core::ast::Expr::Ident(name) => name.to_string(),
+                auto_lang_core::ast::Expr::Dot(_, name) => name.to_string(),
+                _ => "<callback binding must be a message reference>".to_string(),
+            }
+        };
+        match node {
+            AuraNode::Element { tag, props, events, children, .. } => {
+                if tag == child {
+                    for (name, prop) in props {
+                        if let AuraPropValue::Expr(expr) = prop { merge(name.clone(), prop_binding(expr)); }
+                    }
+                    for (name, event) in events {
+                        merge(name.clone(), binding(event));
+                    }
+                }
+                for node in children { for (name, target) in Self::child_callback_bindings(node, child) { merge(name, target); } }
+            }
+            AuraNode::Component { name, props, events, .. } if name == child => {
+                for (name, expr) in props { merge(name.clone(), prop_binding(expr)); }
+                for (name, event) in events { merge(name.clone(), binding(event)); }
+            }
+            AuraNode::ForLoop { body, .. } => {
+                for node in body { for (name, target) in Self::child_callback_bindings(node, child) { merge(name, target); } }
+            }
+            AuraNode::Conditional { then_body, else_body, .. } => {
+                for node in then_body.iter().chain(else_body.iter().flatten()) { for (name, target) in Self::child_callback_bindings(node, child) { merge(name, target); } }
+            }
+            _ => {}
+        }
+        result.retain(|name, _| CHILD_PROP_RUST_TYPES.with(|m| m.borrow().get(child).and_then(|p| p.get(name)).map_or(false, |t| t == "msg")));
+        result
+    }
+
     /// Recursively extract child component constructor args from view tree.
     /// Plan 374: Only match the specific child_name to avoid wrong- component args.
     fn extract_child_constructor_args(&self, node: &AuraNode, child_name: &str) -> Option<String> {
@@ -16166,10 +16237,10 @@ fn collect_local_elems(
                         format!("auto_lang_core::vm::ffi::stdlib::shim_storage_remove(({}).to_string())", key)
                     }
                     _ => {
-                        // Plan 374: Callback prop calls (on_delete, on_toggle_pin, etc.)
-                        // are no-ops in Rust — child-to-parent communication uses enum wrapping.
+                        // Store emissions on this instance. The parent drains them
+                        // after normal child dispatch and store writeback.
                         if self.prop_types.get(fn_name.as_str()).map(|t| t == "msg").unwrap_or(false) {
-                            return "()".to_string();
+                            return format!("self.__callback_events.push(({:?}.to_string(), vec![{}]))", fn_name, args.iter().map(|a| format!("serde_json::json!({})", a)).collect::<Vec<_>>().join(", "));
                         }
                         // Plan 374: .contains(x) where x is a String needs .as_str()
                         // because str::contains expects impl Pattern, not String.
@@ -17347,6 +17418,60 @@ widget App {
         assert!(!code.contains(".child(View::col().children(row[\"vals\"]"));
         assert!(code.contains("__at_str(&(cell))"),
             "JSON-backed text cells must display the string value, not JSON quotation marks: {code}");
+    }
+
+    #[test]
+    fn p060_native_child_callbacks_reach_the_bound_parent_message() {
+        let src = r#"widget CallbackChild(on_send: msg, on_typing: msg) {
+            model { var draft str = "中文54.25" }
+            msg { Send, Noop }
+            view { button "发送" { onclick: .Send } }
+            on {
+                .Send -> {
+                    on_typing()
+                    on_send(.draft, 54)
+                    .draft = ""
+                }
+                .Noop -> {}
+            }
+        }
+        widget CallbackParent {
+            model {
+                var text str = ""
+                var count int = 0
+            }
+            msg { Accept(str, int), Typed }
+            view { CallbackChild(on_send: .Accept, on_typing: .Typed) }
+            on {
+                .Accept(text, count) -> { .text = text; .count = count }
+                .Typed -> { .count = .count + 1 }
+            }
+        }"#;
+        let ast = crate::parse_ui(src).unwrap();
+        let widgets = ast.domain_stmts().filter_map(|s| match s {
+            auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(crate::aura::extract::extract_widget_from_decl(d).unwrap()), _ => None,
+        }).collect::<Vec<_>>();
+        let child = RustGenerator::new().generate(&widgets[0]).unwrap();
+        let parent = RustGenerator::new().generate(&widgets[1]).unwrap();
+        assert!(child.contains("self.__callback_events.push((\"on_send\".to_string(), vec![serde_json::json!(self.draft.clone()), serde_json::json!(54)]))"), "callback arguments must survive: {child}");
+        assert!(child.find("push((\"on_typing\"").unwrap() < child.find("push((\"on_send\"").unwrap());
+        assert!(parent.contains("std::mem::take(&mut self.callback_child.__callback_events)"), "consume events once from the actual instance: {parent}");
+        assert!(parent.contains("self.on(CallbackParentMsg::Accept(serde_json::from_value::<String>(__args[0].clone())"), "binding is to Accept, not an assumed Send message: {parent}");
+        assert!(parent.contains("self.on(CallbackParentMsg::Typed)"));
+        assert!(parent.contains("serde_json::from_value::<i32>(__args[1].clone())"));
+        assert!(!parent.contains("native callback binding must name"));
+        let mut unbound = widgets[1].clone();
+        if let AuraNode::Element { events, .. } = &mut unbound.view_tree { events.clear(); }
+        let unbound_code = RustGenerator::new().generate(&unbound).unwrap();
+        assert!(unbound_code.contains("std::mem::take(&mut self.callback_child.__callback_events)"));
+        assert!(!unbound_code.contains("self.on(CallbackParentMsg::Accept("), "unbound callbacks must not dispatch an assumed message");
+
+        let mut invalid = widgets[1].clone();
+        if let AuraNode::Element { events, .. } = &mut invalid.view_tree {
+            events.get_mut("on_send").unwrap().params.push("fixed".into());
+        }
+        let invalid_code = RustGenerator::new().generate(&invalid).unwrap();
+        assert!(invalid_code.contains("compile_error!(\"native callback binding must name"));
     }
 
     #[test]

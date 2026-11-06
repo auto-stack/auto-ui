@@ -5,7 +5,7 @@ feature_name: a2r 数组索引 VM 语义与 iced 桌面 outproc 输入/验收投
 author: [Codex]
 created_at: 2026-11-05
 updated_at: 2026-11-06
-plan_revision: 3
+plan_revision: 4
 current_step: 2
 total_steps: 6
 base_branch: master
@@ -154,7 +154,15 @@ OS054 的真实 Chat 反例证明：PLAN052 原生 Http 适配直接把 `/api/re
 
 原生 JSON 属性名启发式不得覆盖已声明 String 状态目标；字符串身份 u-54 保持原值，整数控制只对原始 JSON 读取转换一次，已拼装字符串不重复当 Value。边界是本次状态赋值和既有 Http 命名空间，不承诺新增语言类型/路由器。下一执行入口：compiler Http/ID 两个实际红例→runtime 真实 TCP POST/GET/拒绝控制→tools 生成常量/缓存输入→正式工具/Chat 重建→OS054 实机注册、双客户端和 C 隔离。只完成前段不能关闭 app/OS 验收。
 
-### 5.4 规范增量
+### 5.4 原生子组件回调闭环（r4 有界修订）
+
+实际 Chat 输入框键入后点击发送，数据库消息仍为零（native-chat-callback-red-r152.json SHA079a13ab3f8066c253a68ce09b9d39e01c3a0376688d867c8329a9900cbf1bbb）；`Composer::DoSend` 中 `on_send(.draft)` 被发射为空操作。父包装枚举只转发输入，不等价于回调。AC与任务数量不变，继承054完整交付授权，修复仍归T04/05。
+
+输入链为 .at `msg` prop调用→子组件处理器→当前实例待转发队列→父组件已声明绑定的消息。队列属于组件实例，单次输入处理后按调用顺序取走；必须先回写子store再调用父消息，保留嵌套回调，不因再次渲染或后续输入重放。支持既有普通消息绑定（含零参、字符串、数值、多参），按父消息声明反序列化实际参数；绑定/形状错误应响亮失败，不能静默默认。没有绑定的可选回调不触发其他父消息；不使用全局队列、网络协议或业务专用分支。
+
+实施入口ca754c7e；永久compiler案例覆盖实际解析提取后的事件/prop绑定、不同回调目标、调用顺序与参数保持，执行生成代码验证父态一次性变更及子态清空；实际Chat重建后点击联系人/输入/发送→双端显示/数据库发送者与文本一致。先跑旧码红例，最终生成执行和真实任务都通过才关闭此项。循环子件沿现有临时实例模式，回调也从该实例消费；其私有状态持久化不在本修复新增承诺。
+
+### 5.5 规范增量
 
 | delta_id | add/modify/retire | docs/specs/... target | before/after rule | rationale | acceptance IDs |
 |---|---|---|---|---|---|
@@ -510,3 +518,8 @@ back 侧 `auto-notes-...-back` 是完整 axum/DB 实现。故 iced 桌面上任�
   Actual baseline native-http-codegen-red-r151.log: two behavior assertions fail (raw Http adapter and string id numeric cast). First green attempt exposed a fixture semicolon parser error, corrected to normal model newlines; next assertion exposed existing double numeric projection, fixed to raw JSON conversion. Supplemental p060_native_http_json_string_projection_keeps_safe_array_indexing red in native-http-index-red-r151.log caught the new string path bypassing index protection. One broad patch initially hit adjacent null-coalesce collection and caused compile E0425/E0433; restored that function and scoped the intended helper change, final diff confirms no null-coalesce edit. These are work checks/fixture corrections, not failed final-review cycles.
   Final compiler p060_7passed/0ignored/.04s, native-http-codegen-final-r151b.log (14.13s build). Includes prior text/table/route/input controls plus HTTP/profile, string/int/composed-string and out-of-bounds-index cases. Runtime native-http-runtime-r151.log2passed/0ignored/.01s: real TCP POST UTF8 body and idu-54, absolute GET retains origin, HTTP403 JSON denial preserved; transport failure static diagnostic. Tools native-http-profile-r151.log1passed/0ignored/.04s: generated profile constant equals receipt input, differing ports yield distinct identity. New helper module formatted; no broad/full regression yet. Final six native builds and actual Chat/UI/DB/security task still pending; no task completion inferred from scoped green.
   Existing official CLI auto service --server rust is confirmed server-only (no Vue/Vite/UI), strict generation, no occupant killing, loopback service config/real AUTO_SERVICE_READY and __auto health/shutdown. Existing desktop_backends::DesktopBackends already owns Rust/VM server children for Vue. OS054 bounded probe will reuse these existing service/ownership facilities; no need to assume a new app health endpoint or handwrite a router/secret backend. Production iced provision wiring/last-owner semantics remains OS054 work; no app source/pin changed. No credential acquired in failed Chat attempt; worker exited and temporary private OCR image removed.
+
+- stage: new | plan_id: auto-ui/PLAN-060 | plan_revision: r4 | round: 54 | outcome: pass | next: work/T04/T05
+  Actual native Chat composer callback red recorded in §5.4. Revised only codegen forwarding design within original native-input/app-task scope; AC01..04/6 original plus prior added tasks unchanged. Source ca754c7e. Ordinary parent-message references supported; existing single child-type instance model means conflicting bindings and fixed-argument bindings are rejected, not guessed. Constructor callback lifecycle is not newly promised. No new context or agent requested.
+- stage: work | plan_id: auto-ui/PLAN-060 | plan_revision: r4 | round: 55 | outcome: scoped codegen repair ready for actual consumer | next: work/Chat rebuild
+  Generated instance queue retains msg-prop calls/typed JSON payloads, parent takes queue after child/store writeback and dispatches its declared message, unbound optional callback drained, invalid binding static compile_error. Compiler p060_8passed/0ignored/.15s (native-callback-codegen-final-r152.log), including actual parsed child→parent zero/string/int/multiarg binding, call order, unbound and fixed-argument rejection controls; prior7 passed unchanged. First fixture attempt had model-semicolon syntax error; next assertion incorrectly omitted existing String clone, corrected fixture/assertion, neither counted as behavioral red. Actual real-input DB-zero counterexample remains the red evidence. Front-layoutv11 invalidates old generated app. Spec updated; generated execution and actual Chat input not yet claimed.
