@@ -209,6 +209,13 @@ Rust AutoUI runtime/dialect/handler codegen、VM实例及parked续体、iced/win
 - 原生06 NVM-03当前树发现“导入书籍”后press，真实系统打开框出现；filename236的Sky SetValue同样报缓存不可用。已请求用户进入06/fixtures实际选择中文书2/笔记10/w03-cover/坏书4项，验证3重复+1坏书逐书结果；当前待答，选择框保持打开，无新范围/权限问题。用户输入前不改该活动窗口。实现树9aa7ab73 clean；T03/04未满证，仍3/8/终审轮0，下一执行者仍本work上下文。
 - 独立原参考准备只读核验D:/autostack/readest HEAD精确3cc39ad7、无WIP；未启动用户E:/soft/Readest、未复制其profile/cookies、未建reference worktree或执行上游worktree脚本。该脚本会fetch/rebase origin/main、复制.env及创建junction，与本轮固定pin/只读/无junction约束冲突，不能直接运行；独立参考仍归009原门，未计通过。
 
+### 2026-11-07 用户四文件已答与结果显示边界
+
+- 用户明确“已选四个”。原生06实际PickFiles续体4次POST200依序w03-cover.epub duplicate / 笔记10.md duplicate / 坏书.epub epub_invalid（缺META-INF/container.xml） / 中文书2.txt duplicate，handler最终644.5785ms恢复。实际选取路径为009/t02/vue-ui-01/fixtures，不是提问中的06副本；已独立断言全部4份字节与06副本相等，输入均自有造书，未改原文件。磁盘书目仍3本，全部受管原件与各自original hash不变。
+- 当前rendered MCP已准确有四行结果，four-picker-result-mcp SHA256=ad38cea5e758fb93fbbd3cebf835d6524082fb23d7411c92b001c13ffb9df359；Windows/真实像素仍未显示结果，并有已知旧doc popup遮书卡。cold-read SHA256=9234361f18c71418aec1e8d7c6691864fe7fb51eabcdbe3e2939aac8ac9f64c7；系统48e8c2cb2612b2ed564b56d4d7103a41e868a111ed106a5c632ce859eeb60379；真实显示差异图ae8c47255549cf3c56e736c785096d49b54802041ce54ecbbaf402c0d628cf1b。ViewList新动作真实改变卡片为列表但仍无逐书提示；Node/Sky会话重建后当前截图同样如此，不能仅归为工具旧缓存。旧06 CLI44388/tool9944/exec14968已按完整exe/命令与自有WebView profile停止，原资料全部保留。
+- 新9aa7ab73角色例已真正启动PID42772/窗口77728396/P068 Native roles，binary e53b8756b4ae49c0827653fb9899bb07b8413e774ef72c14026fcfbea037a04e，capture禁用且未调用MCP。系统树/实际像素可见Checkbox已选、Multiline双行、Disabled action禁用；系统SetValue First中文引号反斜杠→仅甲输入/回显变、乙initial；系统SetValue Multiline→实际两行/系统值及焦点一致。Sky checkbox element点击无效；另坐标对照在正确截图后报failed to activate captured window，重选/激活一次仍失败，进程确认仍live，未继续盲输入或把click算PASS。
+- 结果显示定位先做实际生产layout oracle：单root固定高、自动高+cap四行文本实测均可见，不支持“所有max-h滚动容器都会零高”的泛化。下一最小原生fixture覆盖实际App侧栏/行/子实例、空→事件四行、MCP tracked/no-capture及物理bounds；首次inline style语法探针被parse错误挡住，不计产品红。已换永久.at夹具，当前只改测试、尚未改布局生产实现；T03/04仍pending，3/8/终审轮0。
+
 ## 10. 待澄清事项
 
-无待答范围授权。当前唯一待答为真实系统picker输入：在06窗口的打开框，进入D:/autostack/plan-artifacts/plan-068/auto-ui/t04-reader-native-06/fixtures/，选择“中文 书2.txt”“笔记10.md”“w03-cover.epub”“坏书.epub”并打开，回复“已选四个”。Sky已报具体缓存不可用，不能绕过工具安全/伪造系统选择。用户答后先核当前实际结果/冷读，再按精确自有PID关闭06、重建9aa7ab73新tool，复验卸载隐藏、角色/焦点与余下T04；不得再要求重复旧正文选区。
+无待答范围或输入问题。用户已于本轮回复“已选四个”；真实trace为3duplicate+1epub_invalid，磁盘仍3本且原件完整，实际选取源为009自有fixtures（与06四份逐字节相等），未要求重选。06旧工具进程已核精确PID/命令关闭；当前work继续原生结果物理显示差异、已提交正文卸载修复的真实消费和系统角色/动作剩余腿。工具输入/激活失败不得绕过安全边界或伪造输入；完整T03/04、独立终审和交付均未通过。
