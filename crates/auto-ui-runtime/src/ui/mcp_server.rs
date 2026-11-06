@@ -1324,7 +1324,7 @@ fn tool_definitions() -> Vec<serde_json::Value> {
                     },
                     "dy": {
                         "type": "number",
-                        "description": "Vertical pixel delta for kind=wheel (negative = up)"
+                        "description": "Raw iced vertical wheel delta in pixels (positive = up, negative = down)"
                     },
                     "app": {
                         "type": "string",

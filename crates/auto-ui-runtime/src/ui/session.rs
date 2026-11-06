@@ -4975,6 +4975,9 @@ impl DesktopSession {
             let Some(host) = self.host.as_ref() else {
                 return false;
             };
+            // Coordinate-bearing input is also the latest hover position.
+            // Acceptance clicks may arrive without an OS CursorMoved event.
+            host.wm.last_cursor.set(iced::Point::new(x, y));
             match host.wm.hit_test(x, y) {
                 Some(w) => w,
                 None => return false,
@@ -5025,6 +5028,7 @@ impl DesktopSession {
             let Some(host) = self.host.as_ref() else {
                 return false;
             };
+            host.wm.last_cursor.set(iced::Point::new(x, y));
             let Some(wid) = host.wm.hit_test(x, y) else {
                 return false;
             };
@@ -11244,7 +11248,7 @@ mod live_input_tests {
     /// last_cursor 命中窗——真管道对端落 wire 断言（D1 路由语义零新增，
     /// 与 broker_input_production_routes 同 harness 形态）。
     #[test]
-    fn route_live_input_routes_to_focus_and_hover() {
+    fn p060_route_live_input_routes_to_focus_and_injected_hover() {
         use crate::ui::desktop_protocol::message::{InputMsg, ProtocolMsg};
         use crate::ui::desktop_protocol::transport;
 
@@ -11314,14 +11318,21 @@ mod live_input_tests {
             other => panic!("ImeCommit 未落 wire: {other:?}"),
         }
 
-        // 滚轮 → last_cursor 命中窗（hover 语义）。
+        // A coordinate-bearing injected click must move hover ownership too;
+        // otherwise a following wheel uses the unrelated OS cursor position.
         session
             .host
             .as_mut()
             .unwrap()
             .wm
             .last_cursor
-            .set(iced::Point::new(100.0, 100.0));
+            .set(iced::Point::new(700.0, 100.0));
+        assert!(session.broker_pointer_down(100.0, 100.0, crate::ui::desktop_protocol::message::MouseButton::Left));
+        assert!(matches!(wait_msg(&mut child_end), Some(ProtocolMsg::Input(InputMsg::PointerPressed { wid: w, .. })) if w == wid.0));
+        assert_eq!(session.host.as_ref().unwrap().wm.last_cursor.get(), iced::Point::new(100.0, 100.0));
+        assert!(session.broker_pointer_up(100.0, 100.0, crate::ui::desktop_protocol::message::MouseButton::Left));
+        assert!(matches!(wait_msg(&mut child_end), Some(ProtocolMsg::Input(InputMsg::PointerReleased { wid: w, .. })) if w == wid.0));
+        // 滚轮 → injected last_cursor 命中窗（hover 语义）。
         assert!(session.route_live_input(&LiveInput::Wheel { dx: 0.0, dy: -40.0 }));
         match wait_msg(&mut child_end) {
             Some(ProtocolMsg::Input(InputMsg::Scroll { wid: w, dx, dy })) => {

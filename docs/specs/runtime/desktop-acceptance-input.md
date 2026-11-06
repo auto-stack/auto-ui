@@ -7,6 +7,10 @@ the normal hit-test, focus and owning-client routing; keyboard injection uses
 the normal focused input route. Command-frame coordinates are logical client
 coordinates: subtract the desktop title bar once, without scaling by a window
 resize ratio. Shell surfaces do not have this title bar.
+Coordinate-bearing pointer presses/releases also update the host's latest
+hover position, so a following wheel event targets the clicked surface even
+without an OS cursor-move event. Wheel deltas retain the raw iced convention:
+positive vertical delta scrolls up, negative scrolls down.
 
 For an out-of-process app, `msg` and root `handler` injection send
 `InputMsg::Action { wid, name, arg }` (input tag 11) to the owning broker client.
