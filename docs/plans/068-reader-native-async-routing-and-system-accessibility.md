@@ -5,12 +5,12 @@ feature_name: Reader 原生异步路由状态、结果投影与系统无障碍�
 author: [Codex]
 created_at: 2026-11-06
 updated_at: 2026-11-06
-plan_revision: 1
+plan_revision: 2
 current_step: 0
 total_steps: 8
 base_branch: master
 base_commit: 7ac0455bf4cd743248749e4bc4eb9d0aed657266
-depends_on: [auto-reader/READER-009, PLAN-988]
+depends_on: [PLAN-988]
 supersedes_spec_components: [docs/specs/runtime/component-and-store-instances.md, docs/specs/runtime/vm-route-page-loading.md, docs/specs/runtime/native-vm-app-validation.md]
 new_spec_components: [docs/specs/runtime/native-system-accessibility.md]
 touched_goals: []
@@ -112,7 +112,7 @@ Rust AutoUI runtime/dialect/handler codegen、VM实例及parked续体、iced/win
 | T02 | work | T00；T01可独立推进 | 真实系统可访问整链有界可行核查，冻结角色/事件/实例/失效/布局owner、可用库/feature与拒绝行为；不可行则具名设计阻挡，不先写虚假Spec | AC03/05 |
 | T03 | work | T02 | 实现最小Windows provider/语义发布及真实系统树/焦点/操作V03；按需处理wry正文已有接缝，保原native表面合同 | AC03/05 |
 | T04 | work | T01/T03 | 新tool从独立树实际构建，固定Reader消费V04及受影响V05；源/依赖前后不漂移，补Spec提案，work-owned全通过才execution_done | AC01～05 |
-| T05 | review | T04 | 同树独立终审，重放高风险原红/合法控制、真实产品与系统树；绑定reviewed_commit/r1 | AC06 |
+| T05 | review | T04 | 同树独立终审，重放高风险原红/合法控制、真实产品与系统树；绑定reviewed_commit/当前revision | AC06 |
 | T06 | merge | T05 pass | 精确落地、冻结受影响并集与canonical核验、归档导航/计数；需要Lang变更则同门成对交付 | AC07 |
 | T07 | merge | T06 | Reader009更新只读消费pin/工具并记录可用交接；原证据不动，guard clean后清本树/分支/自有scope，最终8/8 | AC08 |
 
@@ -121,6 +121,8 @@ Rust AutoUI runtime/dialect/handler codegen、VM实例及parked续体、iced/win
 ## 9. 复审记录
 
 - stage:new | plan_id:auto-ui/PLAN-068 | plan_revision:r1 | outcome:pass | source:master7ac0455bf4cd743248749e4bc4eb9d0aed657266 | next:work T00/T02 | scope:用户2026-11-06新授权；8任务/8AC/V01～05/SD01～04；不改变009门或终审标准。此为规划交接，不是实现/独立终审成绩。
+
+- stage:new | plan_id:auto-ui/PLAN-068 | plan_revision:r2 | outcome:pass | correction:009是当前可用消费基线，不是本前置的已交付依赖；移除r1误列以消除009↔068依赖环，T00～07顺序/授权/验收与8任务分母不变 | next:work T00/T02。
 
 ## 10. 待澄清事项
 
