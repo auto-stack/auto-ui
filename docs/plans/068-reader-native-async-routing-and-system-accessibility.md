@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-06
 updated_at: 2026-11-06
 plan_revision: 2
-current_step: 2
+current_step: 3
 total_steps: 8
 base_branch: master
 base_commit: 7ac0455bf4cd743248749e4bc4eb9d0aed657266
@@ -109,14 +109,14 @@ Rust AutoUI runtime/dialect/handler codegen、VM实例及parked续体、iced/win
 |---|---|---|---|---|
 | T00 [x] | work | 授权已给 | 主干/pin同因复现、有效最小HTTP routed fixture、真实owner流与R01/02定位；先证明root正控和实际原红，不继续错误prototype盲重试 | AC01/02 |
 | T01 [x] | work | T00 | 最小实例/root续体与结果投影修复、永久V01/02及必要同因合法/失效对照；Reader无特判 | AC01/02/05 |
-| T02 | work | T00；T01可独立推进 | 真实系统可访问整链有界可行核查，冻结角色/事件/实例/失效/布局owner、可用库/feature与拒绝行为；不可行则具名设计阻挡，不先写虚假Spec | AC03/05 |
+| T02 [x] | work | T00；T01可独立推进 | 真实系统可访问整链有界可行核查，冻结角色/事件/实例/失效/布局owner、可用库/feature与拒绝行为；不可行则具名设计阻挡，不先写虚假Spec | AC03/05 |
 | T03 | work | T02 | 实现最小Windows provider/语义发布及真实系统树/焦点/操作V03；按需处理wry正文已有接缝，保原native表面合同 | AC03/05 |
 | T04 | work | T01/T03 | 新tool从独立树实际构建，固定Reader消费V04及受影响V05；源/依赖前后不漂移，补Spec提案，work-owned全通过才execution_done | AC01～05 |
 | T05 | review | T04 | 同树独立终审，重放高风险原红/合法控制、真实产品与系统树；绑定reviewed_commit/当前revision | AC06 |
 | T06 | merge | T05 pass | 精确落地、冻结受影响并集与canonical核验、归档导航/计数；需要Lang变更则同门成对交付 | AC07 |
 | T07 | merge | T06 | Reader009更新只读消费pin/工具并记录可用交接；原证据不动，guard clean后清本树/分支/自有scope，最终8/8 | AC08 |
 
-当前2/8，T00/T01已闭；路由/续体定向证据已形成，真实Reader消费仍归T04。T02整链已证实系统树与系统编辑写入，按钮点击工具未产生动作，未算通过；生产语义、布局/实例生命周期与正文接缝仍须T02冻结/T03实施和V03实证。
+当前3/8，T00/T01/T02已闭；T03实施中。T02已证实际生产Iced首次show前安装、真实系统树与中文系统编辑/焦点、同型显示隔离、无debug/MCP捕获条件可用，接法和拒绝边界已冻结。按钮实际输入、其它角色/生命周期/正文接缝仍归T03/V03，真实Reader消费归T04，均不得当已通过。
 
 ## 9. 复审记录
 
@@ -153,6 +153,16 @@ Rust AutoUI runtime/dialect/handler codegen、VM实例及parked续体、iced/win
 - bounds以真实layout/draw和viewport裁剪为源、每窗口DPI映射；字段值/禁用/checked/selected与实际转换View同源。wry正文保持自身Windows子窗provider，父树合成须在T03/V03实际核对，不用DOM/MCP树替代。
 - 为避免空闲定时泵，新provider使用每窗口有界合并的唤醒通道：实际树/bounds变化或系统动作才通知update，事件raise在快照锁外。关闭窗口清语义和动作，adapter仅在其窗口线程释放；多App/卸载/重挂/resize/焦点/非debug对照永久测试。
 - 尚未将T02打勾：仍需生产接缝的小窗实际整链（含首次show时序、真实bounds/动作）；scope和009验收不变，独立终审仍未启动。
+
+### 2026-11-06 T02关闭与T03当前检查点（未提交终审）
+
+- T02实际生产整链：新增独立example plan068_system_accessibility和双同型Probe夹具，通过真实run_dynamic_iced→hidden open→window::run安装→首次show。第一版build exit0、34.10s，binary SHA256=1ecf1fe00dc80e2223fdde0bea7bb4554b31ffeacaec9ab3bbac3642014e3aae，PID2924（已按完整exe路径确认后停止）。实际Sky系统树有两个按钮/编辑/文本，系统set_value触发正常实例handler；不把internal树当系统树。
+- 发现且保留真实新反例：甲状态/正文已改、乙状态/正文仍initial，但输入显示缓存按Edit事件共用让乙输入也显示甲值。before-cache-fix.json SHA256=5bd600add5588802344bc2e904931bcd7d8cf933a9d5aec3ca30ef9b6a105495。T03对同因缓存改按原receiver堆id+event，retain按基事件/存活receiver清理，patch按实际TypedInst绑定；旧根态裸事件接口保留，不改ADE不覆写合同。
+- T03机制首轮native_accessibility::tests实际**4/4 PASS，0 ignored，exit0，4.41s**；生产Iced headless真实layout/draw/viewport边界及1.5scale、原实例动作、双App拒绝、卸载前/后旧node拒绝与新节点可作、输入缓存隔离/旧代移除。log SHA256=db66dffda1d77e2d224e9a918103b113977edaf931b46fa376bd1e16b9c1b633。此非系统操作成绩，不代替V03。
+- 新版生产例build02 exit0、31.34s，binary SHA256=2e31d0d30f1e30f5f5301875fc724fab99284f90bd4c9f5fbd1643346c8203d1，PID15916/窗口3540340（后续以Sky新返回对象为准，当前新窗口名称P068 Native controls，实际id须再读取）、MCP11595，P530_NOMCP=1/AUTOUI_MCP_DISABLE=1，未启F12、未发MCP读取/action。实际系统set_value中文/引号/反斜杠→甲输入及正文正确、乙输入及正文保持initial、焦点正确。isolated-value.json SHA256=0101fc00cc6c465f56f63b129390c853fbc5348ea7289b2b4146ee04c5bf5987，jpg=387952ece19affcde8c743a4b4bc4592f059bba5e2011dbf36582a78f85038c7。MCP服务器仍由既有宿主启动，关闭的是捕获/轮询，不声称零server进程；新AX全不依赖其数据。
+- T02选择依赖accesskit=0.25.2/accesskit_windows=0.35.2（Windows target精确pin）；实际consumer0.39.2/windows0.62.2，与既有windows0.58用raw HWND隔离，不改变其它平台。独立external lock更新SHA256=f8e51e1c6587604994b452a63d856b7fa7a821610444f0d32a7b16305e07be5d（后续tool feature可能正常再更新）。无源码/新依赖写入主干，只在权威ui-068树。
+- T03尚未关闭：checkbox/radio/list与disabled/非可见拒绝、focus键控换位、关闭资源、真实wry正文合成、按钮实输入/原Reader均未满证。当前补生产List递归、语义widget位置复用时的owner校验与焦点重取；新tool（autodown+doc-surface）构建中，新的改动尚未重跑机制集。旧输入pin/ADE控制与受影响并集仍待对应阶段。不递交未完成实现给终审裁剪验收。
+- 工具约束：Sky click生产按钮仍无变化；系统set_value可达。首次误向已关闭旧窗发手动请求已立即取消说明，不计成绩。当前另一次明确请求针对已确认可见P068 Native controls，保持PID15916窗口等用户手点First Increment与ToggleB两次，独立代码/构建工作继续；无新授权待答。先前一次example重新link因同名exe仍运行而LNK1104，已确认旧PID/路径并停止后build02通过，未称编译代码红。
 
 ## 10. 待澄清事项
 
