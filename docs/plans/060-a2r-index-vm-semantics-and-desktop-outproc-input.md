@@ -5,7 +5,7 @@ feature_name: a2r 数组索引 VM 语义与 iced 桌面 outproc 输入/验收投
 author: [Codex]
 created_at: 2026-11-05
 updated_at: 2026-11-06
-plan_revision: 5
+plan_revision: 6
 current_step: 2
 total_steps: 6
 base_branch: master
@@ -181,6 +181,14 @@ Chat原生生成源码仍把失败pending重建中的pp.client_msg_id按字段�
 
 （落点文件以仓库现有 Spec 为准，work 时按实际路径修订；若该节不存在则在本
 文件对应 Spec 新增小节。）
+
+### 5.6 原生样式滚动容器同义转写（r6有界修订）
+
+OS054真实Chat第六条消息已落库但气泡被裁切，滚轮不改变位置。定位：RustGenerator普通row/col分支只发射View::col().style(overflow-y-auto).build()；VM tags_container::convert_col既有转换为View::Scrollable。r2的原生滚动测试显式手写View::scrollable，未覆盖样式声明→生成器→真实滚动的前段。修复归既有T04/AC02/04原生呈现消费者，不改变任务数/AC/发布范围；之前compiler9/tools2与JSON/callback证据仅在其不变边界保留，完整最终生成/runtime联合门仍待执行。
+
+原生普通row/col生成在最终实际View上调用有界overflow转换；按求值后的Style检测OverflowYAuto/OverflowAuto，动态style同样只求值一次。无overflow声明与overflow-hidden保持原View；显式scroll标签不重复包裹。共享VM已有split_scroll_visual_classes/ensure_full_scroll_dims拆分规则移到view模块供两端复用，视觉留视口/布局留内容，尺寸与滚动轴保持现有Y合同；不新增横向滚动或自动滚到底功能。只处理普通row/col路径，不将未实现的其他标签兼容声称全覆盖。
+
+关闭条件：编译器旧发射反例红→修复后literal/dynamic style与空/嵌套列控制绿；实际HeadlessFrameSource/HostEndpoint窄视口的样式列长内容，滚轮后底部文字/按钮进入视口，v1/v2及点击命中一致；无滚动列/hidden/显式scroll不额外包装；已有VM视觉拆分与根viewport针对性用例通过。随后正式工具和固定pin Chat重建、真实长会话最后气泡完整可读，并保留原六条数据。测试入口仍compiler rust.rs p060与runtime headless/view针对性测试，具体新测试由work建立，当前未运行。私有rqhost退出归父054T05独立生命周期设计，未混入本r6契约。
 
 ## 6. 测试设计
 
@@ -550,3 +558,6 @@ back 侧 `auto-notes-...-back` 是完整 axum/DB 实现。故 iced 桌面上任�
   New actual T04 viewport finding: after5 original messages, sixth native message renders final bubble clipped midway and two real wheel injections leave it clipped. DB exact6 correct, client callback/raw JSON/transport task valid, but full history rendering is not declared passed. Screenshot D:/autostack/plan-artifacts/plan-054/t04/screenshots/native-chat-single-owner-send-settled-r158.png SHA451629b53fa55538c5153395a725e2b2da53fb96d682966fc1b4188d1aae096c. Reopened history same bounded viewport. Investigate actual message-list flex/overflow/layout producer and wheel routing before repair; do not use DB-only assertion as full UI success.
   Parent T05 private rqhost red reproduced on multiple normal product exits: host18260/backend31956/CLI16052 all0 yet own private rq15528 live; host22164 all0 yet rq29924 live; oldhost24164 normal0 yet rq38512 live; single final host14388 all0 yet rq44260 live. Actual spawn_desktop_daemon drops std Child immediately, and zero-window rqhost remains resident by legacy-q policy. Need explicit minimal owner contract before code: reclaim only own private daemon on normal desktop return, preserve global/manual-q semantics and existing forced-host-death compatibility. Lifetime extension not silently implemented under a stale r5 review. Diagnostic witnesses retained, not force-killed/counting cleanup pass.
   A parallel two-iced probe collided at fixed autodesk-broker (new child adopted by old host; new showed unavailable), excluded from acceptance and rerun with one iced host. Both normalclosed0; no new multi-iced support promise. Product normal shutdown via actual power request/confirm was also verified; first missing acceptance env properly refused privileged bus, no gate bypass. Parent production oracle SHA0c91c3d52c7a6f3c818ce091a4427e911c88fedf10f1d9efbde95c143c3f5400. Current no native host/client/shared17823; parent memory-only credential workers remain for later frozen gates.
+
+- stage: new | plan_id: PLAN-060 | plan_revision: r6 | round: 61 | outcome: pass | next: work/T04 native overflow lowering
+  Current writer0de4007f, consumer8774c1c8; committed actual Chat sixth-bubble red in parent054round156. Code verifies only VM converter creates Scrollable for style overflow, typed ViewBuilder does not, Rust plain col emitter ends build. Existing explicit-scroll headless fixture misses producer gap. Added §5.6 execution contract and scoped controls; inherited original parent054 full-delivery authorization and native semantics goal, AC01..06/six task IDs unchanged. Prior real backend supply/lifetime is parent T03 passed; private daemon lifecycle remains separately scoped parentT05. No implementation/Spec change in this new-stage receipt.
