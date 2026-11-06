@@ -182,6 +182,15 @@ Rust AutoUI runtime/dialect/handler codegen、VM实例及parked续体、iced/win
 - 最终定向结果（autodown/doc-surface同消费feature）：plan068_routed_continuations **14/14 PASS，0 ignored，exit0，2.00s**，log SHA256=fd5578a78ab4ddf691fa8be1f43eec876f5d7da6e971b87a664a8583aeb14bad；旧plan041实例4/4 PASS（前次修复log，解析相同范围仍绿）；native_accessibility::tests **9/9 PASS，0 ignored，exit0，8.19s**，SHA256=ea994b60faee104ab49c1b6bd1786295deeaabc84df850dd21c23ccb496e6046（去空格）；旧plan654路径/时钟 **11/11 PASS，0 ignored，exit0，0.41s**，SHA256=ac567222f7fdc5f5e3648983c201015580802218da4624953edf7c41634490b0。未重跑全仓；统一冻结并集仍归merge。
 - T01重新关闭3/8；源/Spec仅权威树已提交，当前运行Reader02仍旧2b5b027f诊断binary，必须重建/重开消费解析修复后才继续批注，旧失败不伪称通过。两个用户真实输入都已答且系统读回有效，暂无权限/新范围问题；终审repair轮仍0。
 
+### 2026-11-07 新consumer真实批注保存与系统树滞后反例
+
+- tool从272c0e1b精确clean源重新build exit0/44.74s；SHA256=d6261209eb9563d3b2ae68993a79649ec22a420a3f9c750998286bc6cc666e58，build log 7aa65205a93830c5c438caa99c2837d86bb5d61b85a49d8b81989d5137fd655c；锁仍f8e51e1c...。Reader源595eb627（正文标题/失败提示修正）。新03独立data/fixtures，CLI44060/UI30524/exec3576，API13957/front13958/MCP13959，窗口35916452。3份managed/原件本scope内字节相等，cold-read SHA256=a42bc7c714925e51240e7bb109f15970d734fd6dc738e5f9b1335d2b2da7721f。
+- 实际Windows树读到正确章名、阅读正文Document与正文；无选区press真实进入child HTTP并显示未捕获提示。Sky element click先报缺geometry，补真实截图后一次click仍无响应；NVM-03公开MCP发现当前书卡/按钮后press有效，未冒充物理输入。用户新会话再次真实拖选并回复新版正文已选中；系统selected_text精确封面提取验证章。；新SID r7-1793982468725，locator created_at1793982839。系统选区SHA256=04c4fc69f35fb284423182547d5ea3ff5f747c18cdbd8c0dd4747989fe349ced；locator SHA256=6e4fab3d6fd9ba03edb6e3be07eb1c05c95c2a28a749ba8bd6cadb038af28909。
+- 实际批注对话已可见（不是仅MCP状态）：按当前控件NVM-03输入“原生批注：中文 \"引号\" \路径”和四标签并保存。磁盘version2唯一annotation_id18e58207-c9dd-4797-97e3-982c0f2fa068，quote/comment/tags/locator逐字段断言一致、原件身份不变，原文件SHA256=2b5751caf5b0594179161e51d4fa647b44c207d1e3d9716e8d85951d00f080b4；readback c337c445bd802815245d2ce3b5413b40140c402fd60ba76d1ed746a7757176a9；有效实际保存截图1461cd28795afcb885fab4d5cbb3a8e9205c53ef79487f3337541fa2f7a37cfa。回访实际verify-ann anchored/match=true，UI提示v2锚定位匹配；当前Reader仅发goto spine index0，本书短章不足以证明长文CFI精确恢复，留009原门，不外推全W07。
+- 新系统树反例：画面/当前MCP已显示批注框，Windows树仍为前次未捕获选区；保存后画面已显示注释抽屉/新comment，Windows树却还在旧批注框且输入空。after-save-system-lag SHA256=ba26130aee6c37a256bdd2a6efd7be101ba92fad9b0dd1d56404f8f609bad24f，与有效像素/MCP成区分性对照。T03/04仍pending，不把有控件旧树当实时系统通过；开始在自有provider临时trace定位发布时序，尚无最终归因。
+- 内检额外真实红绿：释放B后只剩同型A，延迟converted显式B被provider bind误回落到A。新增永久实际layout/Click反例baseline **0绿1红，exit101/1.39s**；fix237ebdd9cd43a8502932c0e4e9f967e5fac45168仅禁止已带identity的名字回落、未绑定控制不授Focus。完整机制 **10/10 PASS、0 ignored、exit0/10.29s**，含新反例Click/Focus拒绝与A合法正控。baseline SHA256=9df7d84c7ca758aa1337825e0e78d224d2b6e116d4a571b077ee5b7e64bed067；final16de34e05a22021b85417fc89b2aad6df71340ff12f2311501fd362fe0aa6b75。SD03/04草案仅同权威树提交；此不是独立终审修复轮。
+- 03已核完整自有tool/VM进程后关闭，CLI随断流退出；未递归按PID祖先误杀，Windows PID重用可能把无关旧进程列为子代，实际只按完整exe/命令和自有WebView profile关闭。03真实保存数据继续在04自有副本重开，不能拷贝旧提案假造新会话选区。当前没有待答问题，继续T03发布链诊断，3/8不变。
+
 ## 10. 待澄清事项
 
 无待答范围授权。T00须确定真实续体/字段归属原因；T02须先证明Windows provider可行边界，当前无主观选定依赖。Sky输入未达须区分工具与产品；工具限制不授予绕过系统安全或伪造输入的许可。发现范围/兼容/验收必须再变更时按auto-plan:new处理，不能静默扩大。
