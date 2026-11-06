@@ -4857,6 +4857,45 @@ impl DesktopSession {
 
     /// Plan 480 S4：多 client 日常泵——drain 全部在册连接（帧合成/Ack、
     /// 回收、上行）；断连/协议错的连接摘除。ServiceTick 帧泵周期调用。
+    fn sync_broker_client_viewport(
+        &self,
+        client: &mut crate::ui::desktop_protocol::stage3::BrokerClient,
+    ) -> Result<(), crate::ui::desktop_protocol::transport::TransportError> {
+        use crate::ui::desktop_protocol::{
+            endpoint::HostState,
+            message::{FrameMode, FrameMsg, ProtocolMsg},
+        };
+        if client.endpoint.state != HostState::Active
+            || client.endpoint.frame_mode != FrameMode::Commands
+        {
+            return Ok(());
+        }
+        let Some(wid) = client.wid else { return Ok(()) };
+        // Shell projections have independent declared surfaces and no titlebar.
+        if self.desktop.shell_pseudo_wids.contains(&wid) {
+            return Ok(());
+        }
+        let Some(win) = self.host.as_ref().and_then(|h| h.wm.wins.get(&wid)) else {
+            return Ok(());
+        };
+        let Some(surface) = client.wid_surface.get(&wid.0).copied() else {
+            return Ok(());
+        };
+        let size = crate::ui::iced::virtual_window::vwin_content_size(*win.rect.borrow());
+        if !size.width.is_finite() || !size.height.is_finite() {
+            return Ok(());
+        }
+        if client.surfaces.size(surface) != Some((size.width, size.height)) {
+            client.end.send(&ProtocolMsg::Frame(FrameMsg::Resize {
+                surface,
+                width: size.width,
+                height: size.height,
+            }))?;
+            client.surfaces.resize(surface, size.width, size.height);
+        }
+        Ok(())
+    }
+
     pub fn pump_broker_clients(&mut self) {
         if self.broker_clients.is_empty() {
             return;
@@ -4889,6 +4928,9 @@ impl DesktopSession {
                         break;
                     }
                 }
+            }
+            if alive && self.sync_broker_client_viewport(client).is_err() {
+                alive = false;
             }
             // PLAN-053 T-03：主题策略推送排水（提交臂入队 → 此处按连接发出）。
             if alive {
@@ -5503,10 +5545,20 @@ impl DesktopSession {
                     client.app_name = Some(app_name.clone());
                     let app_id = self.allocate_app(component);
                     let title = if title.is_empty() { app_name } else { title };
-                    let rect = iced::Rectangle::new(
-                        iced::Point::new(16.0, 16.0),
-                        iced::Size::new(width, height),
-                    );
+                    let rect = if client.endpoint.frame_mode == crate::ui::desktop_protocol::message::FrameMode::Commands {
+                        use crate::ui::iced::virtual_window::{BORDER, TITLEBAR_H};
+                        let usable = crate::ui::layout::usable_rect(self.host_viewport(), self.desktop.dock_edges);
+                        let margin = 16.0_f32.min((usable.width / 4.0).max(0.0)).min((usable.height / 4.0).max(0.0));
+                        iced::Rectangle::new(
+                            iced::Point::new(usable.x + margin, usable.y + margin),
+                            iced::Size::new(
+                                (width + 2.0 * BORDER).min((usable.width - 2.0 * margin).max(1.0)),
+                                (height + TITLEBAR_H + BORDER).min((usable.height - 2.0 * margin).max(1.0)),
+                            ),
+                        )
+                    } else {
+                        iced::Rectangle::new(iced::Point::new(16.0, 16.0), iced::Size::new(width, height))
+                    };
                     let wid = self.wm_add_win(app_id, title, rect);
                     let surface = client.surfaces.alloc(width, height);
                     eprintln!("[plan060] adopt surface {width}x{height}");
@@ -7227,6 +7279,111 @@ impl HostStorage for ShimHostStorage {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn p060_broker_viewport_follows_actual_wm_client_once() {
+        use super::*;
+        use crate::ui::desktop_protocol::{
+            endpoint::AppEndpoint,
+            headless::HeadlessFrameSource,
+            message::{FrameMode, FrameMsg, ProtocolMsg},
+            stage3::BrokerClient,
+            transport,
+        };
+        let pipe = format!("autodesk-p060-resize-{}", std::process::id());
+        let listener = transport::listen(&pipe).unwrap();
+        let mut child = transport::connect(&pipe, 2000).unwrap();
+        let end = listener.wait_connect().unwrap();
+        let mut session = DesktopSession::__test_session();
+        session.__test_open_desktop();
+        let component =
+            crate::build_dynamic_component(r#"widget t { view { text "observer" } }"#, None).unwrap();
+        let mut app_endpoint = AppEndpoint::new(
+            HeadlessFrameSource::new(component, 1280.0, 800.0),
+            "resize",
+            "resize",
+            1280.0,
+            800.0,
+        );
+        let mut client = BrokerClient::new(pipe.clone(), end);
+        client.adopt = true;
+        let actions = client
+            .endpoint
+            .on_message(app_endpoint.connect().unwrap())
+            .unwrap();
+        for reply in session.broker_apply_actions(&mut client, actions) {
+            app_endpoint.on_message(reply).unwrap();
+        }
+        let app = client.app_id.unwrap();
+        let wid = client.wid.unwrap();
+        let surface = client.wid_surface[&wid.0];
+        let outer = *session.host.as_ref().unwrap().wm.wins[&wid].rect.borrow();
+        let usable =
+            crate::ui::layout::usable_rect(session.host_viewport(), session.desktop.dock_edges);
+        assert!(
+            outer.x >= usable.x
+                && outer.y >= usable.y
+                && outer.x + outer.width <= usable.x + usable.width
+                && outer.y + outer.height <= usable.y + usable.height,
+            "initial decorated window must fit usable desktop: {outer:?}"
+        );
+        let initial = crate::ui::iced::virtual_window::vwin_content_size(outer);
+        session.broker_clients.insert(pipe.clone(), client);
+        fn receive(child: &mut Box<dyn transport::Transport + Send>) -> ProtocolMsg {
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+            loop {
+                if let Some(msg) = child.try_recv() {
+                    return msg.unwrap();
+                }
+                assert!(
+                    std::time::Instant::now() < deadline,
+                    "resize was not delivered"
+                );
+                std::thread::sleep(std::time::Duration::from_millis(5));
+            }
+        }
+        session.pump_broker_clients();
+        let resize = receive(&mut child);
+        assert_eq!(
+            resize,
+            ProtocolMsg::Frame(FrameMsg::Resize {
+                surface,
+                width: initial.width,
+                height: initial.height
+            })
+        );
+        app_endpoint.on_message(resize).unwrap();
+        session.wm_toggle_maximize(wid);
+        let outer = *session.host.as_ref().unwrap().wm.wins[&wid].rect.borrow();
+        let size = crate::ui::iced::virtual_window::vwin_content_size(outer);
+        session.pump_broker_clients();
+        assert_eq!(
+            receive(&mut child),
+            ProtocolMsg::Frame(FrameMsg::Resize {
+                surface,
+                width: size.width,
+                height: size.height
+            })
+        );
+        // No repeated resize, no component replacement, and pixel buffers keep
+        // their independently negotiated extent.
+        for _ in 0..3 {
+            session.pump_broker_clients();
+        }
+        std::thread::sleep(std::time::Duration::from_millis(30));
+        assert!(child.try_recv().is_none());
+        assert_eq!(session.broker_clients[&pipe].app_id, Some(app));
+        session
+            .broker_clients
+            .get_mut(&pipe)
+            .unwrap()
+            .endpoint
+            .frame_mode = FrameMode::Pixels;
+        session.wm_toggle_maximize(wid);
+        session.pump_broker_clients();
+        std::thread::sleep(std::time::Duration::from_millis(30));
+        assert!(child.try_recv().is_none());
+    }
 
     #[test]
     fn p060_command_pointer_matches_unscaled_client_canvas() {

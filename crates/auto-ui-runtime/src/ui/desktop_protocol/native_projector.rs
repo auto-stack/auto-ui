@@ -938,8 +938,12 @@ impl<C: Component> FrameSource for RqProjector<C> {
     fn on_control(&mut self, control: &ControlMsg) {
         match control {
             ControlMsg::Resize { width, height, .. } => {
-                self.width = *width;
-                self.height = *height;
+                if width.is_finite() && height.is_finite() && *width > 0.0 && *height > 0.0
+                    && (self.width, self.height) != (*width, *height) {
+                    self.width = *width;
+                    self.height = *height;
+                    self.rev += 1;
+                }
             }
             // PLAN-033 T-04：L3 v2a 快照注入（AppProjector 退役语义平移）
             // ——经 Component::apply_state_snapshot（VM 组件实现；a2r

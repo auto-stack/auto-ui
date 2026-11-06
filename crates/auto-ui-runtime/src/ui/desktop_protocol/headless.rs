@@ -99,6 +99,21 @@ where
         }
     }
 
+    /// Rebuild layout constraints without replacing the component or widget cache.
+    fn resize(&mut self, width: f32, height: f32) -> bool {
+        if !width.is_finite()
+            || !height.is_finite()
+            || width <= 0.0
+            || height <= 0.0
+            || (self.width, self.height) == (width, height)
+        {
+            return false;
+        }
+        self.width = width;
+        self.height = height;
+        true
+    }
+
     /// 产一帧（v1 wire 降格——legacy/parity 探针面；产线帧走
     /// [`Self::render_frame_v2`]）。
     pub fn render_frame(&mut self) -> DrawList {
@@ -1031,7 +1046,13 @@ where
         }
     }
 
-    fn on_control(&mut self, _control: &crate::ui::desktop_protocol::message::ControlMsg) {}
+    fn on_control(&mut self, control: &crate::ui::desktop_protocol::message::ControlMsg) {
+        if let ControlMsg::Resize { width, height, .. } = control {
+            if self.surface.resize(*width, *height) {
+                self.rev += 1;
+            }
+        }
+    }
 
     fn poll_tick(&mut self) {
         // 双 tick 源（RqProjector 同构）：timesources 到期派发 + 单通道
@@ -1228,7 +1249,15 @@ impl super::endpoint::FrameSource for McpHeadlessSource {
         }
     }
 
-    fn on_control(&mut self, _control: &super::message::ControlMsg) {}
+    fn on_control(&mut self, control: &super::message::ControlMsg) {
+        if let ControlMsg::Resize { width, height, .. } = control {
+            if self.surface.resize(*width, *height) {
+                self.width = *width;
+                self.height = *height;
+                self.rev += 1;
+            }
+        }
+    }
 
     fn poll_tick(&mut self) {
         // 双 tick 源 + MCP action 排水（HeadlessFrameSource 同构 + D-2 扩展）。
@@ -1645,11 +1674,11 @@ mod tests {
     fn p060_native_scroll_reaches_bottom_and_replays_coordinates() {
         use crate::ui::View;
         #[derive(Debug)]
-        struct ScrollPage(bool);
+        struct ScrollPage(usize);
         impl Component for ScrollPage {
             type Msg = ();
             fn on(&mut self, _: ()) {
-                self.0 = true;
+                self.0 += 1;
             }
             fn view(&self) -> View<()> {
                 View::scrollable(
@@ -1686,7 +1715,61 @@ mod tests {
             }
             None
         }
-        let mut surface = HeadlessSurface::new(ScrollPage(false), 240.0, 160.0);
+        // The same production endpoint must replace Hello's requested extent
+        // with the actual WM client extent, preserving the component instance.
+        use super::super::endpoint::{AppEndpoint, FrameSource, HostEndpoint};
+        use super::super::message::{FrameMode, FrameMsg, ProtocolMsg, WRect};
+        let source = HeadlessFrameSource::new(ScrollPage(7), 1280.0, 800.0);
+        let mut app = AppEndpoint::new(source, "scroll", "scroll", 1280.0, 800.0);
+        let mut host = HostEndpoint::listen();
+        host.on_message(app.connect().unwrap()).unwrap();
+        app.on_message(
+            host.activate(
+                1,
+                3,
+                42,
+                WRect::new(0.0, 0.0, 242.0, 197.0),
+                FrameMode::Commands,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        let before = app.session.revision();
+        app.on_message(ProtocolMsg::Frame(FrameMsg::Resize {
+            surface: 42,
+            width: 240.0,
+            height: 160.0,
+        }))
+        .unwrap();
+        assert!(
+            app.session.revision() > before,
+            "resizing must invalidate the frame"
+        );
+        let resized = app.session.revision();
+        for (surface, width, height) in [
+            (42, 240.0, 160.0),
+            (99, 20.0, 20.0),
+            (42, 0.0, 0.0),
+            (42, f32::NAN, 50.0),
+        ] {
+            app.on_message(ProtocolMsg::Frame(FrameMsg::Resize {
+                surface,
+                width,
+                height,
+            }))
+            .unwrap();
+        }
+        assert_eq!(
+            app.session.revision(),
+            resized,
+            "same, foreign and invalid extents are no-ops"
+        );
+        let surface = &mut app.session.surface;
+        assert_eq!((surface.width, surface.height), (240.0, 160.0));
+        assert_eq!(
+            surface.component.0, 7,
+            "resize must retain the component state"
+        );
         surface.render_frame_v2();
         surface.point_at(Some(iced::Point::new(100.0, 80.0)));
         surface.update(&[iced::Event::Mouse(iced::mouse::Event::WheelScrolled {
@@ -1746,8 +1829,8 @@ mod tests {
                 iced::mouse::Button::Left,
             )),
         ]);
-        assert!(
-            surface.component.0,
+        assert_eq!(
+            surface.component.0, 8,
             "bottom button cannot be clicked after scroll"
         );
     }

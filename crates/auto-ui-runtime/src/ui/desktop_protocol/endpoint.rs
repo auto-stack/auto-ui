@@ -565,7 +565,19 @@ impl<S: FrameSource> AppEndpoint<S> {
                 self.slot_count = slots;
                 Ok(vec![])
             }
-            (Active, ProtocolMsg::Frame(super::message::FrameMsg::Resize { .. })) => Ok(vec![]),
+            (Active, ProtocolMsg::Frame(super::message::FrameMsg::Resize { surface, width, height })) => {
+                if self.surface == Some(surface) && width.is_finite() && height.is_finite()
+                    && width > 0.0 && height > 0.0
+                    && (self.width, self.height) != (width, height)
+                {
+                    self.width = width;
+                    self.height = height;
+                    self.session.on_control(&ControlMsg::Resize {
+                        wid: self.wid.expect("Active 即有 wid"), width, height,
+                    });
+                }
+                Ok(vec![])
+            }
             (Active, ProtocolMsg::Frame(super::message::FrameMsg::BufferRelease { .. })) => {
                 // 宿主回收缓冲 = 摘除表面（常见于 detach 前奏）。
                 self.state = Detached;

@@ -27,3 +27,22 @@ and clicks the bottom button. `p060_wrapped_text_emits_only_each_visual_run`
 covers Latin/CJK soft wrapping. Application receipts additionally require a
 real adopted window and its durable data oracle; unit or queued-input success
 alone is not an application task pass.
+
+For an adopted command-frame window, Hello's width and height are the requested
+client extent. The desktop adds its existing chrome and bounds the initial outer
+rectangle to its usable work area. The WM rectangle remains authoritative for
+later layout, resize and maximize changes. Its derived client extent is sent
+over the existing primary-surface `FrameMsg::Resize`, once per changed extent;
+the host records it only after a successful send. Pixel buffers and the shell's
+separately declared projection surfaces retain their existing negotiation.
+
+The app endpoint accepts positive finite extents for its own primary surface,
+then forwards the existing resize lifecycle control to its frame source.
+Headless and projector sources invalidate their frame while retaining the same
+component and widget state. Repeated, invalid or foreign-surface frame resize
+messages have no effect. This adds no protocol tag or capability; older clients
+that ignore this existing notification retain that limitation until rebuilt.
+`p060_broker_viewport_follows_actual_wm_client_once` covers actual broker adoption,
+bounded initial geometry, real-pipe delivery and maximize deduplication, with a
+pixel-mode control. The native scroll regression consumes a real endpoint resize
+before checking frame coordinates and clicking the visible bottom button.
