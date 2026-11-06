@@ -190,6 +190,16 @@ pub struct DynamicComponent {
     framework_clock_wanted: std::cell::Cell<bool>,
     /// 是否已完成 `__clock_` 引用扫描（懒扫一次）。
     framework_clock_scanned: std::cell::Cell<bool>,
+
+    /// PLAN-056: 最近一次提交的 widget schema（root + children + stores，
+    /// 名 → AuraWidget 状态定义），typed 迁移的旧侧类型表。
+    last_schema: std::collections::HashMap<String, auto_ui_compiler::aura::AuraWidget>,
+
+    /// PLAN-056: 现役来源图内容快照（root + use 模块的 blake3 指纹）。
+    source_snapshot: Option<crate::ui::reload_bundle::SourceSnapshot>,
+
+    /// PLAN-056: 繁忙期间的待重试候选标记（Busy → 下拍重试，不丢变更）。
+    reload_pending: std::cell::Cell<bool>,
 }
 
 /// PLAN-652 阶段 1: 时间源种类。
@@ -483,6 +493,12 @@ impl DynamicComponent {
             mount_type_seq: std::cell::RefCell::new(HashMap::new()),
             framework_clock_wanted: std::cell::Cell::new(false),
             framework_clock_scanned: std::cell::Cell::new(false),
+            last_schema: std::collections::HashMap::from([(
+                widget.name.clone(),
+                widget.clone(),
+            )]),
+            source_snapshot: None,
+            reload_pending: std::cell::Cell::new(false),
         })
     }
 
@@ -552,6 +568,14 @@ impl DynamicComponent {
             key_bindings.entry(k).or_insert(v);
         }
 
+        // PLAN-056: last committed schema (root + registry children) for typed
+        // migration.
+        let mut last_schema = std::collections::HashMap::new();
+        last_schema.insert(widget.name.clone(), widget.clone());
+        for w in registry.all() {
+            last_schema.insert(w.name.clone(), w);
+        }
+
         Ok(Self {
             bridge,
             theme_scope: None,
@@ -615,6 +639,9 @@ impl DynamicComponent {
             mount_type_seq: std::cell::RefCell::new(HashMap::new()),
             framework_clock_wanted: std::cell::Cell::new(false),
             framework_clock_scanned: std::cell::Cell::new(false),
+            last_schema,
+            source_snapshot: None,
+            reload_pending: std::cell::Cell::new(false),
         })
     }
 
@@ -773,6 +800,17 @@ impl DynamicComponent {
         let always_mounted_paths = instance_paths_for_types(&always_mounted);
         let mounted_paths_init = always_mounted_paths.clone();
 
+        // PLAN-056: last committed schema — root + children + stores
+        // (store-as-child 已在此前转换为无视图 child WidgetDecl)，typed
+        // 迁移的旧侧类型表。
+        let mut last_schema = std::collections::HashMap::new();
+        last_schema.insert(view_widget.name.clone(), view_widget.clone());
+        for d in child_decls {
+            if let Ok(w) = auto_ui_compiler::aura::extract_widget_from_decl(d) {
+                last_schema.insert(w.name.clone(), w);
+            }
+        }
+
         Ok(Self {
             bridge,
             theme_scope: None,
@@ -808,6 +846,9 @@ impl DynamicComponent {
             mount_type_seq: std::cell::RefCell::new(HashMap::new()),
             framework_clock_wanted: std::cell::Cell::new(false),
             framework_clock_scanned: std::cell::Cell::new(false),
+            last_schema,
+            source_snapshot: None,
+            reload_pending: std::cell::Cell::new(false),
         })
     }
     /// Create a new DynamicComponent with a pre-configured AutoVM instance.
@@ -828,6 +869,8 @@ impl DynamicComponent {
         let view_template = widget.view_tree.clone();
         let widget_name = widget.name.clone();
         let input_state_map = extract_input_state_map(&widget.view_tree);
+        let mut last_schema = std::collections::HashMap::new();
+        last_schema.insert(widget.name.clone(), widget.clone());
 
         Ok(Self {
             bridge,
@@ -892,6 +935,9 @@ impl DynamicComponent {
             mount_type_seq: std::cell::RefCell::new(HashMap::new()),
             framework_clock_wanted: std::cell::Cell::new(false),
             framework_clock_scanned: std::cell::Cell::new(false),
+            last_schema,
+            source_snapshot: None,
+            reload_pending: std::cell::Cell::new(false),
         })
     }
     // ========================================================================
@@ -2170,6 +2216,12 @@ impl DynamicComponent {
         self.last_modified = std::fs::metadata(&path)
             .ok()
             .and_then(|m| m.modified().ok());
+        // PLAN-056: 内容快照基线（root + use 图，blake3 指纹）。失败保持
+        // None —— check_reload 每拍重试收集，缺源 Err 保旧。
+        if let Ok(code) = std::fs::read_to_string(&path) {
+            self.source_snapshot =
+                crate::ui::reload_bundle::collect_source_snapshot(&path, &code).ok();
+        }
         self.source_path = Some(path);
     }
 
@@ -2360,7 +2412,284 @@ impl DynamicComponent {
             Ok(None)
         }
     }
+
+    // ========================================================================
+    // PLAN-056: 候选 bundle 原子 reload（内容快照 + typed 迁移 + 原子提交）
+    // ========================================================================
+
+    /// PLAN-056: 内容级来源变化检测（root + use 图 blake3 指纹；每拍全量
+    /// 内容核对——同 mtime 改内容也检出，mtime 仅存于条目作诊断）。`Ok(true)`
+    /// = 检测到变化且快照基线已前移（并置待提交标记，供 try_reload 消费）；
+    /// `Err` = 缺源等（旧 bundle 继续服役，保持旧快照——恢复后下一次合法
+    /// 编辑成功）。
+    pub fn check_reload(&mut self) -> Result<bool, String> {
+        let path = match &self.source_path {
+            Some(p) => p.clone(),
+            None => return Ok(false),
+        };
+        // 缺源先检：旧快照任一文件已消失 = 具名 Err，旧 bundle 继续服役
+        //（保持旧快照，恢复后下一次合法编辑成功）——绝不静默降级为丢字段
+        // 的候选（AC-01）。
+        if let Some(old) = &self.source_snapshot {
+            for e in &old.entries {
+                if !e.path.exists() {
+                    return Err(format!("source missing: {}", e.path.display()));
+                }
+            }
+        }
+        let code = std::fs::read_to_string(&path).map_err(|e| {
+            format!("cannot read root source {}: {}", path.display(), e)
+        })?;
+        let current = crate::ui::reload_bundle::collect_source_snapshot(&path, &code)?;
+        let changed = match &self.source_snapshot {
+            None => false, // 登记基线拍
+            Some(old) => crate::ui::reload_bundle::snapshot_differs(old, &current),
+        };
+        self.source_snapshot = Some(current);
+        if changed {
+            self.reload_pending.set(true);
+        }
+        Ok(changed)
+    }
+
+    /// PLAN-056: 一轮完整 reload（检测 → 独立候选构建 → typed 迁移 → 原子
+    /// 提交）。真实 host 泵（host.rs __hot_reload）与本轮永久测试的同一入口。
+    pub fn try_reload(&mut self) -> ReloadOutcome {
+        // 待提交标记（繁忙重试或外部已检测）在场时跳过重复检测，保证检测
+        // 与提交不被中间调用吞掉。
+        if !self.reload_pending.get() {
+            match self.check_reload() {
+                Err(e) => return ReloadOutcome::Error(e),
+                Ok(false) => return ReloadOutcome::NoChange,
+                Ok(true) => {}
+            }
+        }
+        // 繁忙：旧桥有在途 parked/CPU continuation 无法安全迁移 → 保旧、
+        // 下拍重试（AC-04 "繁忙拒绝保旧 + parked 候选重试"）。
+        if self.bridge.has_parked_tasks() || self.bridge.cpu_continuation_count() > 0 {
+            self.reload_pending.set(true);
+            return ReloadOutcome::Busy;
+        }
+        self.reload_pending.set(false);
+        let path = match &self.source_path {
+            Some(p) => p.clone(),
+            None => return ReloadOutcome::NoChange,
+        };
+        let code = match std::fs::read_to_string(&path) {
+            Ok(c) => c,
+            Err(e) => return ReloadOutcome::Rejected(format!("cannot read root source: {e}")),
+        };
+        let candidate =
+            match crate::dynamic_build::build_reload_candidate(&code, path.to_str()) {
+                Ok(c) => c,
+                Err(e) => {
+                    return ReloadOutcome::Rejected(format!("candidate build rejected: {e}"))
+                }
+            };
+        // AC-01：候选构建期间来源变化（快照失配）→ 具名拒绝保旧。
+        if let Err(e) = self.verify_snapshot_stable() {
+            return ReloadOutcome::Rejected(e);
+        }
+        match self.commit_candidate(candidate) {
+            Ok(report) => ReloadOutcome::Reloaded(report),
+            Err(e) => ReloadOutcome::Rejected(e),
+        }
+    }
+
+    /// PLAN-056: 是否有待提交/待重试的 reload（繁忙保旧期间的标记）。
+    pub fn reload_pending(&self) -> bool {
+        self.reload_pending.get()
+    }
+
+    /// AC-01：候选构建后再核快照——构建中任一来源变更 = 具名拒绝、旧
+    /// bundle 继续、修复后自动再次尝试。
+    fn verify_snapshot_stable(&self) -> Result<(), String> {
+        let Some(snap) = &self.source_snapshot else {
+            return Ok(());
+        };
+        match crate::ui::reload_bundle::snapshot_changed(snap) {
+            Err(e) => Err(format!("source changed during candidate build: {e}")),
+            Ok(true) => Err(
+                "source changed during candidate build (snapshot mismatch); retry on next legal edit"
+                    .to_string(),
+            ),
+            Ok(false) => Ok(()),
+        }
+    }
+
+    /// PLAN-056: 提交候选——typed 迁移（root/store 平铺根态 + keyed 实例）
+    /// 后原子切换全部 runtime 面；失败具名拒绝保旧，绝不部分替换。
+    fn commit_candidate(
+        &mut self,
+        candidate: DynamicComponent,
+    ) -> Result<crate::ui::state_migration::MigrationReport, String> {
+        use crate::ui::state_migration::{
+            flattened_state_defs, migrate_state_typed, MigrationOutcome,
+        };
+        let old_bridge = &self.bridge;
+        let mut new_bridge = candidate.bridge;
+
+        // 1) root + store（单 VM 统一根态，store 字段平铺）typed 迁移。
+        let old_root = old_bridge.read_all_state();
+        let mut old_root_new = std::collections::HashMap::new();
+        for (k, v) in &old_root {
+            let nv = new_bridge
+                .rematerialize_from_old(v, old_bridge)
+                .map_err(|e| format!("root field `{k}`: {e}"))?;
+            old_root_new.insert(k.clone(), nv);
+        }
+        let old_defs = flattened_state_defs(
+            self.last_schema
+                .values()
+                .flat_map(|w| w.state_vars.iter()),
+        );
+        let new_defs = flattened_state_defs(
+            candidate
+                .last_schema
+                .values()
+                .flat_map(|w| w.state_vars.iter()),
+        );
+        let (migrated, report) = match migrate_state_typed(&old_root_new, &old_defs, &new_defs) {
+            MigrationOutcome::Reject(names) => {
+                return Err(format!(
+                    "schema conflict — candidate rejected (keep old): {}",
+                    names.join(", ")
+                ))
+            }
+            MigrationOutcome::Ok(m, r) => (m, r),
+        };
+        for (name, value) in &migrated {
+            new_bridge
+                .write_state_prestaked(name, value.clone())
+                .map_err(|e| format!("migrate write `{name}`: {e}"))?;
+        }
+
+        // 2) keyed 实例迁移（旧身份读出 → 跨桥重物化 → 预播种进新桥；
+        //    已删除 widget 类型的实例 tombstone，迟到事件丢弃不串新实例）。
+        let old_identities = old_bridge.child_instance_identities();
+        let new_schema = candidate.last_schema.clone();
+        for identity in &old_identities {
+            let widget_type = instance_widget_type(identity);
+            let fields = old_bridge
+                .read_instance_state_all(identity)
+                .map_err(|e| format!("instance `{identity}`: {e}"))?;
+            let mut fields_new = std::collections::HashMap::new();
+            for (k, v) in &fields {
+                let nv = new_bridge
+                    .rematerialize_from_old(v, old_bridge)
+                    .map_err(|e| format!("instance `{identity}` field `{k}`: {e}"))?;
+                fields_new.insert(k.clone(), nv);
+            }
+            if !new_schema.contains_key(&widget_type) {
+                // 删实例只撤销其 owner。
+                new_bridge.tombstone_identity(identity);
+                continue;
+            }
+            // 实例 model 字段 typed 检查（prop/seed 键由父通道每帧重播，
+            // 按名保值即可）；冲突 → 整候选拒绝保旧。迁移结果**必须应用**
+            // （旧实例表中被删除的字段不得残留进新桥实例对象）。
+            if let (Some(ow), Some(nw)) = (
+                self.last_schema.get(&widget_type),
+                new_schema.get(&widget_type),
+            ) {
+                let old_defs = flattened_state_defs(ow.state_vars.iter());
+                let new_defs = flattened_state_defs(nw.state_vars.iter());
+                let (mut migrated, _) = match migrate_state_typed(&fields_new, &old_defs, &new_defs)
+                {
+                    MigrationOutcome::Reject(names) => {
+                        return Err(format!(
+                            "instance `{identity}` schema conflict — candidate rejected (keep old): {}",
+                            names.join(", ")
+                        ))
+                    }
+                    MigrationOutcome::Ok(m, r) => (m, r),
+                };
+                // 新 model 字段按新 schema 默认补位（"新增用默认"；prop 由
+                // 父通道首帧重播）。
+                for def in &nw.state_vars {
+                    if !migrated.contains_key(&def.name) {
+                        let v = crate::ui::state_migration::eval_default(&def.initial);
+                        migrated.insert(def.name.clone(), v);
+                    }
+                }
+                fields_new = migrated;
+            }
+            new_bridge
+                .import_child_instance(
+                    &widget_type,
+                    identity,
+                    &fields_new,
+                    new_bridge.state_obj_id(),
+                )
+                .map_err(|e| format!("import instance `{identity}`: {e}"))?;
+        }
+
+        // 3) 新代次模块级资源建立一次（store `__module_init`；非 Init handler
+        //    ——AC-02 保值语义：Init 不重放，不覆盖迁移后的用户数据）。
+        new_bridge
+            .run_module_init()
+            .map_err(|e| format!("new-generation module init failed: {e:?}"))?;
+
+        // 4) 原子切换全部 runtime 面（view/handler/store/bridge/input/memo/
+        //    source identity 一次性替换；旧桥随 Drop 释放其 VM 堆）。
+        self.bridge = new_bridge;
+        self.view_template = candidate.view_template;
+        self.named_templates = candidate.named_templates;
+        self.widget_name = candidate.widget_name;
+        self.import_stmts = candidate.import_stmts;
+        self.input_state_map = candidate.input_state_map;
+        self.tick_interval = candidate.tick_interval;
+        self.span_map = candidate.span_map;
+        self.key_bindings = candidate.key_bindings;
+        self.widget_registry = candidate.widget_registry;
+        self.routes = candidate.routes;
+        self.computed = candidate.computed;
+        self.timers = candidate.timers;
+        self.timesources = candidate.timesources;
+        self.timesource_next = vec![None; self.timesources.len()];
+        self.always_mounted = candidate.always_mounted;
+        self.always_mounted_paths = candidate.always_mounted_paths;
+        self.mounted_types = candidate.mounted_types;
+        self.mounted_paths = candidate.mounted_paths;
+        self.mount_type_seq = std::cell::RefCell::new(HashMap::new());
+        self.framework_clock_wanted = candidate.framework_clock_wanted;
+        self.framework_clock_scanned = candidate.framework_clock_scanned;
+        self.theme_scope = candidate.theme_scope;
+        self.last_schema = candidate.last_schema;
+        self.dirty = true;
+        self.mounted_changed = std::cell::Cell::new(true);
+        // 模板/热重载替换——epoch 保守失效（跨组件/共享面兜底）。
+        crate::ui::memo_deps::bump_ui_epoch();
+
+        Ok(report)
+    }
 }
+
+/// PLAN-056: 从实例身份串解析 widget 类型（`<父>/<Widget>#<key|序号>`）。
+fn instance_widget_type(identity: &str) -> String {
+    let after_slash = identity.rsplit('/').next().unwrap_or(identity);
+    match after_slash.split_once('#') {
+        Some((w, _)) => w.to_string(),
+        None => after_slash.to_string(),
+    }
+}
+
+/// PLAN-056: `try_reload` 的一轮结果（真实泵/测试共享的判别出口）。
+#[derive(Debug, Clone)]
+pub enum ReloadOutcome {
+    /// 无变化（含首拍基线登记）。
+    NoChange,
+    /// 已原子提交新候选；携带迁移报告。
+    Reloaded(crate::ui::state_migration::MigrationReport),
+    /// 旧桥繁忙（parked/CPU continuation）——保旧，下拍重试。
+    Busy,
+    /// 候选被具名拒绝（构建/快照失配/schema 冲突/不透明值）——旧 bundle
+    /// 完整保旧，下一次合法编辑成功。
+    Rejected(String),
+    /// 检测/读源错误（缺源等）——旧 bundle 继续服役。
+    Error(String),
+}
+
 
 // ============================================================================
 // Component trait implementation

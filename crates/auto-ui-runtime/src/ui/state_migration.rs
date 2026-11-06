@@ -34,6 +34,128 @@ pub struct MigrationReport {
     pub dropped_names: Vec<String>,
 }
 
+/// PLAN-056: typed migration outcome. `Reject` names the same-name fields
+/// whose declared type changed (or that are unknown/opaque on either side) —
+/// the whole candidate bundle is rejected and the old bundle keeps serving.
+#[derive(Debug, Clone)]
+pub enum MigrationOutcome {
+    /// Migration succeeded: migrated state plus the per-field report.
+    Ok(HashMap<String, Value>, MigrationReport),
+    /// The candidate cannot be committed: same-name type conflict / opaque
+    /// value on the named fields. Old state must remain in service.
+    Reject(Vec<String>),
+}
+
+/// PLAN-056: typed field-definition table for migration. `name → declared
+/// type` for root model fields plus every store-as-child / child model field
+/// that participates in the unified root state (VM 轨 store 字段平铺根态).
+pub type StateDefMap = HashMap<String, Type>;
+
+/// Build the unified root-state definition map for a set of widgets
+/// (root + children + stores). Each widget's model `state_vars` contributes
+/// name → type; collisions across widgets resolve to the first entry (the
+/// unified root state holds one slot per name, so the type must agree).
+pub fn flattened_state_defs<'a>(
+    widgets: impl Iterator<Item = &'a AuraStateDef>,
+) -> StateDefMap {
+    let mut map = StateDefMap::new();
+    for def in widgets {
+        map.entry(def.name.clone()).or_insert_with(|| def.type_info.clone());
+    }
+    map
+}
+
+/// PLAN-056: typed migrate-or-reject for a candidate bundle commit.
+///
+/// Unlike the legacy [`migrate_state`] (which falls back to the new default on
+/// a type change), a same-name field whose declared type changed between the
+/// committed source and the candidate rejects the whole candidate — the plan's
+/// "同名不同类型默认拒绝整候选" contract. Unknown/opaque types on either side
+/// also reject (never optimistically write an old `Value` into a field whose
+/// type is not established).
+///
+/// Returns [`MigrationOutcome::Ok`] with the migrated state + report, or
+/// [`MigrationOutcome::Reject`] naming the conflicting fields.
+pub fn migrate_state_typed(
+    old_state: &HashMap<String, Value>,
+    old_defs: &StateDefMap,
+    new_defs: &StateDefMap,
+) -> MigrationOutcome {
+    let mut new_state = HashMap::new();
+    let mut preserved = 0usize;
+    let mut added = 0usize;
+    let mut dropped_names = Vec::new();
+    let mut rejected: Vec<String> = Vec::new();
+
+    for (name, new_ty) in new_defs {
+        if let Some(old_val) = old_state.get(name) {
+            let compatible = match old_defs.get(name) {
+                Some(old_ty) => types_compatible(old_ty, new_ty),
+                // No declared old type: fall back to kind-level matching
+                // against the runtime value (unknown-but-evident); opaque
+                // values still reject (plan §5 "未知/不透明类型亦拒绝").
+                None => value_kind_matches_type(old_val, new_ty),
+            };
+            if compatible {
+                new_state.insert(name.clone(), old_val.clone());
+                preserved += 1;
+            } else {
+                rejected.push(name.clone());
+            }
+        } else {
+            // New field: the new bridge already seeded its default.
+            added += 1;
+        }
+    }
+
+    if !rejected.is_empty() {
+        return MigrationOutcome::Reject(rejected);
+    }
+
+    // Host slots (`__route_params` / `__current_route` / `__auto*`-adjacent)
+    // never migrate and never appear in dropped_names; the new bridge seeds
+    // them lazily (spec §3: 宿主字段不得出现在 dropped_names).
+    for name in old_state.keys() {
+        if name.starts_with("__") {
+            continue;
+        }
+        if !new_defs.contains_key(name.as_str()) {
+            dropped_names.push(name.clone());
+        }
+    }
+    let dropped = dropped_names.len();
+
+    let report = MigrationReport {
+        preserved,
+        added,
+        dropped,
+        dropped_names,
+    };
+
+    MigrationOutcome::Ok(new_state, report)
+}
+
+/// Kind-level compatibility between a runtime `Value` and a declared type —
+/// used only when the old source had no declared type for the field. Opaque
+/// containers / custom types fail closed (reject).
+fn value_kind_matches_type(value: &Value, ty: &Type) -> bool {
+    match ty {
+        Type::Int | Type::Uint | Type::USize | Type::I64 | Type::U64 | Type::Byte => {
+            matches!(value, Value::Int(_) | Value::Uint(_))
+        }
+        Type::Float | Type::Double => matches!(value, Value::Double(_) | Value::Float(_)),
+        Type::Bool => matches!(value, Value::Bool(_)),
+        Type::Char => matches!(value, Value::Int(_)),
+        Type::CStrLit | Type::StrSlice | Type::StrOwned | Type::StrFixed(_) => {
+            matches!(value, Value::Str(_))
+        }
+        // Arrays / objects / custom named types: the runtime value must be a
+        // container we can move across bridges; opaque heap refs reject.
+        Type::Void => false,
+        _ => matches!(value, Value::Array(_) | Value::Obj(_)),
+    }
+}
+
 /// Migrate state from an old widget definition to a new one.
 ///
 /// For each field in the new definition:
@@ -155,8 +277,9 @@ fn types_compatible(a: &Type, b: &Type) -> bool {
 /// Phase 3: this mirrors the `eval_expr_to_value` function in `vm_bridge.rs`,
 /// but operates on the base AST `Expr` (the old `AuraExpr` was eliminated).
 /// Duplicated here to keep the state migration module self-contained and avoid
-/// coupling to the VmBridge internals.
-fn eval_default(expr: &Expr) -> Value {
+/// coupling to the VmBridge internals. `pub(crate)` since PLAN-056's instance
+/// migration uses it to seed new model-field defaults onto migrated instances.
+pub(crate) fn eval_default(expr: &Expr) -> Value {
     match expr {
         Expr::Int(i) => Value::Int(*i),
         Expr::I64(i) => Value::Int(*i as i32),

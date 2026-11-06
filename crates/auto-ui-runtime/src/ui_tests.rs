@@ -122,6 +122,9 @@ mod plan042_scan_probe_tests;
 // 单/多文件 reload 入口、schema 迁移与失败保旧探针。
 #[cfg(test)]
 mod plan042_reload_readiness_tests;
+// PLAN-056：多文件候选 bundle 原子 reload 永久回归（V-01..V-05）。
+#[cfg(test)]
+mod plan056_atomic_reload_tests;
 #[cfg(test)]
 mod plan058_engine_gap_tests;
 

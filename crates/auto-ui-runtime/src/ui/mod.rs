@@ -266,6 +266,9 @@ pub mod doc_surface;
 
 pub mod state_migration;
 
+// PLAN-056: 候选 bundle 来源快照（root+use 图内容 hash）与失效检测。
+pub mod reload_bundle;
+
 pub use auto_ui_compiler::i18n_lookup;
 
 #[cfg(feature = "ui-headless")]

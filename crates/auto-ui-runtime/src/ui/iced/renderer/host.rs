@@ -2827,7 +2827,17 @@ fn run_session(
                     }),
                 ]);
             }
-            if let Ok(Some(_)) = state.component.check_file_changed() {
+            // PLAN-056: 真实候选 bundle 原子 reload 泵——检测 + 独立候选
+            // 构建 + typed 迁移 + 原子提交走 component.try_reload 单一入口；
+            // 繁忙保旧下拍重试；失败具名拒绝保旧（绝不部分替换）。源码
+            // 缓存/高亮/span 索引在"确有变化"时刷新。
+            let reload_outcome = state.component.try_reload();
+            let source_touched = !matches!(
+                reload_outcome,
+                crate::ui::dynamic::ReloadOutcome::NoChange
+                    | crate::ui::dynamic::ReloadOutcome::Busy
+            );
+            if source_touched {
                 if let Some(path) = state.component.source_path() {
                     if let Ok(code) = std::fs::read_to_string(path) {
                         // Refresh cached source code and line offsets for DevTools
@@ -2844,40 +2854,33 @@ fn run_session(
                             *state.app.devtools.cached_highlighted.borrow_mut() =
                                 Some(build_highlight_cache(c));
                         }
-
-                        let session = CompilerSession::ui();
-                        let mut parser = Parser::from(&code).with_session(session);
-                        if let Ok(ast) = parser
-                            .parse_domain(&auto_ui_dialect::UiDialect)
-                            .map(auto_ui_dialect::UiCode)
+                        // Invalidate caches since view_template changed
+                        *state.app.cached_converted_view.borrow_mut() = None;
+                        *state.app.devtools.cached_debug_id_map.borrow_mut() = None;
+                        // Rebuild line → AuraNodeId index after hot-reload
                         {
-                            for stmt in ast.items() {
-                                if let auto_parser_api::DomainStmt::Domain(
-                                    auto_ui_dialect::UiStmt::WidgetDecl(decl),
-                                ) = stmt
-                                {
-                                    if let Ok(widget) =
-                                        auto_ui_compiler::aura::extract_widget_from_decl(decl)
-                                    {
-                                        let _ = state.component.reload(&widget);
-                                        // Invalidate caches since view_template changed
-                                        *state.app.cached_converted_view.borrow_mut() = None;
-                                        *state.app.devtools.cached_debug_id_map.borrow_mut() = None;
-                                        // Rebuild line → AuraNodeId index after hot-reload
-                                        {
-                                            let span_map = state.component.span_map().clone();
-                                            if let Some(ref src) = *state.app.source_code.borrow() {
-                                                *state.app.line_to_aura_ids.borrow_mut() =
-                                                    build_line_to_aura_ids(&span_map, src);
-                                            }
-                                        }
-                                    }
-                                    break;
-                                }
+                            let span_map = state.component.span_map().clone();
+                            if let Some(ref src) = *state.app.source_code.borrow() {
+                                *state.app.line_to_aura_ids.borrow_mut() =
+                                    build_line_to_aura_ids(&span_map, src);
                             }
                         }
                     }
                 }
+            }
+            if let crate::ui::dynamic::ReloadOutcome::Rejected(ref why) = reload_outcome {
+                eprintln!(
+                    "[VM-RELOAD] {} rejected (old bundle keeps serving): {}",
+                    state.component.widget_name(),
+                    why
+                );
+            }
+            if let crate::ui::dynamic::ReloadOutcome::Error(ref why) = reload_outcome {
+                eprintln!(
+                    "[VM-RELOAD] {} error (old bundle keeps serving): {}",
+                    state.component.widget_name(),
+                    why
+                );
             }
             // PLAN-536 T2(题1 兜底桥): 热重载拍是 source_path 在案时的常驻
             // 500ms update 泵。update 间隙落到 state 的脏写(timer handler

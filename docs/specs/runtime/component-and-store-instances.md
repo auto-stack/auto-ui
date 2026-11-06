@@ -97,3 +97,17 @@
 - 兼容面：根桥读面（`read_state`/`read_all_state`）仍 root 锚定；plan370/
   442/622/841/905-8/063/058/musk-p053-8 原义务套件全绿（oracle 更新至实例态
   读取通道，义务本体不变）。
+
+## 6. Reload 提交下的实例迁移（PLAN-056 SD-02 增量）
+
+- 候选提交时旧桥全部存活身份按 `read_instance_state_all` 读出、跨桥重物化
+  （`rematerialize_from_old`，容器深拷进新 VM 防悬垂）、`import_child_instance`
+  预播种进新桥（parent 先指新根，首帧 `ensure_child_instance` 命中既有记录
+  时修正 parent ref 链）。
+- 迁移实例的 Init demand 预置 Done——keyed 重排/提交**不重放 Init**（每身份
+  每代际一次的 536 挂载语义保持）；卸载重挂仍重 Init。
+- 已删除 widget 类型的身份 tombstone：迟到事件丢弃 + 诊断，不重定向/复活。
+  未再挂载身份经常规帧扫释放 + tombstone。
+- 实例 model 字段 typed 迁移（同名不同类型 = 整候选拒绝保旧）；prop/seed
+  键由父通道每帧重播按名保值；新 model 字段按新定义默认补位。
+- 旧桥 busy（parked/CPU continuation）时提交被拒保旧、下拍重试。

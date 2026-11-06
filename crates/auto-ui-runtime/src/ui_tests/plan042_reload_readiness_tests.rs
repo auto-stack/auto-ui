@@ -537,10 +537,11 @@ mod plan042_reload_readiness_tests {
         }
     }
 
-    /// 整源热重载路径对多文件工程（use imports / child registry 非空）
-    /// 恒报"无变化"——根与依赖都不 reload（Plan 451 guard 实测）。
+    /// PLAN-056 实现落地后：多文件工程走内容快照 + 候选 bundle 原子 reload
+    /// （t03 guard 探针为旧反控，已改写为新行为断言——guard 仅保留在 legacy
+    /// `check_file_changed` 单文件入口）。
     #[test]
-    fn t03_multi_file_guard_skips_root_and_deps() {
+    fn t03_multi_file_content_change_detected_and_atomic_reload() {
         let fx = write_multi_file_fixture();
         let code = std::fs::read_to_string(&fx.root).unwrap();
         let mut comp = crate::dynamic_build::build_dynamic_component(&code, Some(
@@ -552,62 +553,62 @@ mod plan042_reload_readiness_tests {
         comp.on_with_input("Bump", None);
         assert_eq!(comp.read_state("count").unwrap(), Value::Int(1));
 
-        // 依赖文件改内容 + mtime 前进 → guard 仍报无变化。
+        // 依赖文件（store）改内容 + mtime 前进 → 内容级检测检出（不再是
+        // guard 跳过），旧桥在提交前继续服役。
+        comp.write_state("count", Value::Int(5)).unwrap();
         std::fs::write(
             &fx.store,
             concat!(
                 "store CountStore {\n",
-                "    model { var total int = 0 var extra int = 1 }\n",
-                "    on { .Add -> { .total = .total + 1 } }\n",
+                "    model {\n",
+                "        var total int = 0\n",
+                "        var notes int = 0\n",
+                "    }\n",
+                "    on {\n",
+                "        .Add -> {\n",
+                "            .total = .total + 1\n",
+                "            .notes = 1\n",
+                "        }\n",
+                "    }\n",
                 "}\n",
             ),
         )
         .unwrap();
         f_set_forward(&fx.store);
         assert!(
-            comp.check_file_changed().unwrap().is_none(),
-            "store 改动不得触发整源 reload（状态/handler 会丢）"
-        );
-
-        std::fs::write(
-            &fx.child,
-            concat!(
-                "widget Badge {\n",
-                "    model { var label str = \"b2\" }\n",
-                "    view { col { text .label text \"!\" } }\n",
-                "}\n",
-            ),
-        )
-        .unwrap();
-        f_set_forward(&fx.child);
-        assert!(
-            comp.check_file_changed().unwrap().is_none(),
-            "child 改动不得触发整源 reload"
-        );
-
-        // 根文件改动同样被 guard 跳过（import_stmts/registry 非空）。
-        std::fs::write(
-            &fx.root,
-            concat!(
-                "use store: CountStore\n",
-                "use widgets: Badge\n",
-                "widget App {\n",
-                "    model { var count int = 0 var hint str = \"h\" }\n",
-                "    view { col { text \"app2\" button \"+\" { onclick: .Bump } Badge() } }\n",
-                "    on { .Bump -> { .count = .count + 1 CountStore.Add() } }\n",
-                "}\n",
-            ),
-        )
-        .unwrap();
-        f_set_forward(&fx.root);
-        assert!(
-            comp.check_file_changed().unwrap().is_none(),
-            "多文件形态下根改动也跳过（不是只 reload 根）"
+            comp.check_reload().unwrap(),
+            "store 内容改动必须被检出（内容级失效，不再依赖 mtime guard）"
         );
         assert_eq!(
             comp.read_state("count").unwrap(),
+            Value::Int(5),
+            "检测拍不提交：旧桥/旧状态原样服役"
+        );
+
+        // 提交：store 新字段 notes 进入根态，旧值保值。
+        match comp.try_reload() {
+            crate::ui::dynamic::ReloadOutcome::Reloaded(report) => {
+                assert!(report.preserved >= 1, "count 保值: {report:?}");
+                assert!(report.added >= 1, "notes 新增默认: {report:?}");
+            }
+            other => panic!("store 改动应原子提交，得到 {other:?}"),
+        }
+        assert_eq!(
+            comp.read_state("count").unwrap(),
+            Value::Int(5),
+            "提交后旧值保值"
+        );
+        assert_eq!(
+            comp.read_state("notes").unwrap(),
+            Value::Int(0),
+            "新字段取默认"
+        );
+        // store handler 新语义即刻生效（新桥持有 CountStore.Add 的 notes 写）。
+        comp.on_with_input("Bump", None);
+        assert_eq!(
+            comp.read_state("notes").unwrap(),
             Value::Int(1),
-            "旧根状态原样保留"
+            "新 store handler 生效，无 field-not-found / 派发失联"
         );
     }
 

@@ -952,6 +952,26 @@ fn build_dynamic_component_inner(
     path: Option<&str>,
     override_scenario: Option<&auto_lang_core::session::CompilerSession>,
 ) -> AutoResult<crate::ui::dynamic::DynamicComponent> {
+    build_dynamic_component_full(code, path, override_scenario, false)
+}
+
+/// PLAN-056: 候选 bundle 构建——真实 build 管线，但**准备期零外部 effect**：
+/// 不 fire_init、不安装 action_config、不注册全局主题/design/i18n/外接组件
+/// 名单（仅保留解析/提取所需注册与 per-component 主题 scope）。候选独立
+/// 构建/验证，旧 bundle 继续服役至提交点；提交时才补全局注册。
+pub fn build_reload_candidate(
+    code: &str,
+    path: Option<&str>,
+) -> AutoResult<crate::ui::dynamic::DynamicComponent> {
+    build_dynamic_component_full(code, path, None, true)
+}
+
+fn build_dynamic_component_full(
+    code: &str,
+    path: Option<&str>,
+    override_scenario: Option<&auto_lang_core::session::CompilerSession>,
+    candidate: bool,
+) -> AutoResult<crate::ui::dynamic::DynamicComponent> {
     use crate::ui::dynamic::DynamicComponent;
     use crate::ui::widget_registry::WidgetRegistry;
     use auto_lang_core::session::CompilerSession;
@@ -990,7 +1010,10 @@ fn build_dynamic_component_inner(
             Ok(trees) => {
                 if !trees.is_empty() {
                     scope_trees = trees.clone();
-                    auto_ui_compiler::style::theme::register_theme_trees(trees);
+                    // PLAN-056: 候选构建不注册全局主题（提交时由现役链接管）。
+                    if !candidate {
+                        auto_ui_compiler::style::theme::register_theme_trees(trees);
+                    }
                 }
             }
             Err(e) => return Err(auto_lang_core::error::AutoError::Msg(e.to_string())),
@@ -1060,14 +1083,20 @@ fn build_dynamic_component_inner(
             .iter()
             .map(|(k, v)| (k.to_string(), v.clone()))
             .collect();
-        auto_ui_compiler::style::theme::set_app_design_entries(scope_design.clone());
+        // PLAN-056: 候选构建不写全局 design 槽（提交时注册）。
+        if !candidate {
+            auto_ui_compiler::style::theme::set_app_design_entries(scope_design.clone());
+        }
     }
 
     // PLAN-050 T9 (C7): VM 轨 t() 插值查表——front 根目录 i18n/{lang}.json
     // 存在则装载（默认 zh, AUTO_LOCALE 可覆）；缺席 = 空表静默。
-    if let Some(file_path) = path {
-        if let Some(base_dir) = std::path::Path::new(file_path).parent() {
-            crate::ui::i18n_lookup::load_from_dir(base_dir);
+    // PLAN-056: 候选构建跳过（提交时装载）。
+    if !candidate {
+        if let Some(file_path) = path {
+            if let Some(base_dir) = std::path::Path::new(file_path).parent() {
+                crate::ui::i18n_lookup::load_from_dir(base_dir);
+            }
         }
     }
 
@@ -1079,9 +1108,13 @@ fn build_dynamic_component_inner(
     // use 引入模块的顶层声明（导入序首个）。顶层声明的 handler 引用此时
     // 才有宿主，不做解析期校验（由 from_actions_block 的引用校验兜底）。
     let mut dsl_actions_installed = false;
-    if let Some(ref acts) = root_decl.actions {
-        crate::ui::action_config::set_dsl_action_config_from_block(acts, path);
-        dsl_actions_installed = true;
+    // PLAN-056: 候选构建不安装 action_config（其 DSL 源独立 mtime 泵，AC-05
+    // 不被劫持）；提交时亦不代装——动作配置热更始终走其独立 reload 端口。
+    if !candidate {
+        if let Some(ref acts) = root_decl.actions {
+            crate::ui::action_config::set_dsl_action_config_from_block(acts, path);
+            dsl_actions_installed = true;
+        }
     }
 
     // 2b. Load child widgets + imported functions/types from `use` imports
@@ -1628,7 +1661,7 @@ fn build_dynamic_component_inner(
     // 3. Create DynamicComponent with registry + imported symbols
     // Plan 451 P3: 顶层 actions 回退链（widget 块未安装时）：本文件顶层
     // 声明 → import_stmts 里首个模块声明（use 传递闭包已在此前收齐）。
-    if !dsl_actions_installed {
+    if !candidate && !dsl_actions_installed {
         let fallback = ast.domain_stmts().find_map(|s| match s {
             auto_ui_dialect::UiStmt::ActionsDecl(b) => Some(b.clone()),
             _ => None,
@@ -2089,7 +2122,10 @@ fn build_dynamic_component_inner(
                 }
             }
         }
-        crate::ui::aura_view_builder::register_imported_components(names);
+        // PLAN-056: 候选构建不写外接组件名单（提交时注册）。
+        if !candidate {
+            crate::ui::aura_view_builder::register_imported_components(names);
+        }
     }
     let mut comp = DynamicComponent::with_registry_and_imports_from_decls(
         &root_decl,
@@ -2111,10 +2147,14 @@ fn build_dynamic_component_inner(
         comp.set_source_path(p);
     }
 
-    // 3c. Fire .Init lifecycle event before starting Iced loop.
-    //     Init is now a regular VM handler (handler_Init), dispatched
-    //     unconditionally via call_handler.
-    comp.fire_init();
+    // PLAN-056: 候选构建不启动任何外部 effect（Init/Tick/SSE/IO）——
+    // 准备期零 effect 合同（AC-04）；提交时才建立新代次资源。
+    if !candidate {
+        // 3c. Fire .Init lifecycle event before starting Iced loop.
+        //     Init is now a regular VM handler (handler_Init), dispatched
+        //     unconditionally via call_handler.
+        comp.fire_init();
+    }
 
     Ok(comp)
 }

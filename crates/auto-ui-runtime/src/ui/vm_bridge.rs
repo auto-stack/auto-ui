@@ -1265,6 +1265,17 @@ impl VmBridge {
         self.write_state_onto(self.state_obj_id, field_name, value)
     }
 
+    /// PLAN-056: write a **pre-staked** value onto the root state object.
+    ///
+    /// Used by the reload commit path: the migrated value was already
+    /// rematerialized into this bridge's VM (its heap refs are +1 held), so
+    /// the normal `write_state` stake would double-count. The replaced
+    /// default's stake is still released — same accounting as
+    /// [`write_state_onto`] minus the new-value stake.
+    pub fn write_state_prestaked(&mut self, field_name: &str, value: Value) -> Result<()> {
+        self.write_state_onto_staked(self.state_obj_id, field_name, value, false)
+    }
+
     /// PLAN-041 T-02: write a state field onto an explicit state object
     /// (root contract unchanged via [`Self::write_state`]; instance-bound
     /// input back-writes land on the instance object).
@@ -1273,6 +1284,16 @@ impl VmBridge {
         target_obj_id: u64,
         field_name: &str,
         value: Value,
+    ) -> Result<()> {
+        self.write_state_onto_staked(target_obj_id, field_name, value, true)
+    }
+
+    fn write_state_onto_staked(
+        &mut self,
+        target_obj_id: u64,
+        field_name: &str,
+        value: Value,
+        stake_new: bool,
     ) -> Result<()> {
         // Find field index by name — same cached-list-first + live-object
         // fallback as read_state (Plan 049 child model-var defaults).
@@ -1338,7 +1359,9 @@ impl VmBridge {
         if let Some(old_v) = old {
             self.release_state_value(&old_v);
         }
-        self.stake_state_value(&value);
+        if stake_new {
+            self.stake_state_value(&value);
+        }
         instance
             .set_field(field_index, value)
             .map_err(|e| VmBridgeError::InvalidState(e))?;
@@ -2085,6 +2108,33 @@ impl VmBridge {
                             self.vm.bump_path(rec.state_obj_id, Some(name));
                         }
                     }
+                    // PLAN-056: a pre-seeded (migrated) instance carries the
+                    // new root as its placeholder parent during the commit
+                    // window; the first real registration fixes the parent
+                    // chain ref so nested keyed instances read the correct
+                    // `__auto_parent` after reload.
+                    if rec.parent_state_id != parent_state_id {
+                        if let Some(idx) =
+                            inst.field_names.iter().position(|n| n == "__auto_parent")
+                        {
+                            if let Some(old) = inst.get_field(idx) {
+                                self.release_init_value(old);
+                            }
+                            let storable =
+                                auto_val::Value::VmRef(auto_val::VmRef {
+                                    id: parent_state_id as usize,
+                                });
+                            let _ = inst.set_field(idx, storable);
+                            self.vm.rc_retain_id(parent_state_id);
+                            self.vm.bump_path(rec.state_obj_id, Some("__auto_parent"));
+                        }
+                    }
+                }
+            }
+            if rec.parent_state_id != parent_state_id {
+                self.vm.rc_release_id(rec.parent_state_id);
+                if let Some(r) = self.child_instances.borrow_mut().get_mut(identity) {
+                    r.parent_state_id = parent_state_id;
                 }
             }
             return rec.state_obj_id;
@@ -2147,6 +2197,15 @@ impl VmBridge {
     /// released? True late-event marker for the dispatch face.
     pub fn child_instance_was_released(&self, identity: &str) -> bool {
         self.child_instances_released.borrow().contains(identity)
+    }
+
+    /// PLAN-056: tombstone an old identity at reload commit so late events
+    /// carrying it are dropped (never re-targeted onto a new-generation
+    /// instance of the same widget type).
+    pub fn tombstone_identity(&self, identity: &str) {
+        self.child_instances_released
+            .borrow_mut()
+            .insert(identity.to_string());
     }
 
     /// PLAN-041 T-02: re-seed a props snapshot onto a specific state object
@@ -2221,6 +2280,189 @@ impl VmBridge {
             .child_instance_state_id(identity)
             .ok_or_else(|| VmBridgeError::InvalidState(format!("no instance `{identity}`")))?;
         self.write_state_onto(id, field_name, value)
+    }
+
+    /// PLAN-056: read ALL non-`__auto*` fields of an instance's own state
+    /// object (migration source). Same shape as [`read_all_state`] but for
+    /// the per-call-site instance object; `__auto_parent`/`__auto_root` refs
+    /// never migrate.
+    pub fn read_instance_state_all(
+        &self,
+        identity: &str,
+    ) -> Result<std::collections::HashMap<String, auto_val::Value>> {
+        use auto_lang_core::vm::generic_registry::GenericInstanceData;
+        let id = self
+            .child_instance_state_id(identity)
+            .ok_or_else(|| VmBridgeError::InvalidState(format!("no instance `{identity}`")))?;
+        let obj = self.vm.get_heap_object(id).ok_or_else(|| {
+            VmBridgeError::InvalidState(format!("instance state heap object {id} not found"))
+        })?;
+        let guard = obj.read().unwrap();
+        let inst = guard
+            .as_any()
+            .downcast_ref::<GenericInstanceData>()
+            .ok_or_else(|| VmBridgeError::InvalidState("not GenericInstanceData".into()))?;
+        let mut result = std::collections::HashMap::new();
+        for (i, name) in inst.field_names.iter().enumerate() {
+            if name.starts_with("__auto") {
+                continue;
+            }
+            if let Some(value) = inst.get_field(i) {
+                result.insert(name.clone(), value.clone());
+            }
+        }
+        Ok(result)
+    }
+
+    /// PLAN-056: pre-seed a migrated child instance into this (fresh,
+    /// candidate) bridge at commit time.
+    ///
+    /// `state` must already be in **this bridge's VM** (values rematerialized
+    /// from the old bridge via [`Self::rematerialize_from_old`]) — the values
+    /// are stored as-is with the standard instance stake accounting. The
+    /// instance is registered as seen for the current frame, its parent ref
+    /// points at `parent_state_id` (the new root during the commit window;
+    /// the first real render fixes it up), and its Init demand is pre-marked
+    /// Done so a keyed reorder never re-fires Init on a migrated instance
+    /// (PLAN-536 mount semantics: one Init per identity per generation).
+    pub fn import_child_instance(
+        &self,
+        widget_name: &str,
+        identity: &str,
+        state: &std::collections::HashMap<String, auto_val::Value>,
+        parent_state_id: u64,
+    ) -> std::result::Result<(), String> {
+        use auto_lang_core::vm::generic_registry::GenericInstanceData;
+        if self.child_instances.borrow().contains_key(identity) {
+            return Ok(());
+        }
+        let mut names: Vec<String> = Vec::with_capacity(state.len() + 2);
+        let mut values: Vec<auto_val::Value> = Vec::with_capacity(state.len() + 2);
+        for (name, v) in state {
+            names.push(name.clone());
+            values.push(v.clone());
+        }
+        names.push("__auto_parent".to_string());
+        values.push(auto_val::Value::VmRef(auto_val::VmRef {
+            id: parent_state_id as usize,
+        }));
+        names.push("__auto_root".to_string());
+        values.push(auto_val::Value::VmRef(auto_val::VmRef {
+            id: self.state_obj_id as usize,
+        }));
+        self.vm.rc_retain_id(parent_state_id);
+        self.vm.rc_retain_id(self.state_obj_id);
+
+        let mono_name = format!("{}_State@{}", widget_name, instance_token(identity));
+        let inst = GenericInstanceData::new_with_names(mono_name, values, names);
+        let obj_id = self.vm.insert_heap_object(inst);
+        // Mounted-lifetime permanent stake (mirrors ensure_child_instance).
+        self.vm.rc_retain_id(obj_id);
+        self.child_instances.borrow_mut().insert(
+            identity.to_string(),
+            ChildInstanceRecord {
+                state_obj_id: obj_id,
+                generation: 0,
+                parent_state_id,
+            },
+        );
+        // Seen-now so the commit→first-render frame transition treats it as
+        // mounted; identities the new view never re-registers get released +
+        // tombstoned by the normal frame sweep (删实例只撤销其 owner).
+        self.instance_seen_cur.borrow_mut().insert(identity.to_string());
+        self.init_demand_records.borrow_mut().insert(
+            identity.to_string(),
+            InitDemandRecord {
+                widget: widget_name.to_string(),
+                identity: identity.to_string(),
+                phase: InitDemandPhase::Done,
+                generation: self.init_generation.get(),
+            },
+        );
+        Ok(())
+    }
+
+    /// PLAN-056: deep-copy a runtime value from another (old) bridge's VM
+    /// heap into this (new) bridge's VM heap. Containers and plain heap ids
+    /// are cloned recursively and re-materialized here; opaque heap types
+    /// reject (fail closed — never write an old-`Value` that dangles into
+    /// the new VM). Scalars pass through.
+    pub fn rematerialize_from_old(
+        &self,
+        value: &auto_val::Value,
+        old: &VmBridge,
+    ) -> std::result::Result<auto_val::Value, String> {
+        use auto_lang_core::vm::types::{ListData, ObjectData};
+        match value {
+            auto_val::Value::Array(arr) => {
+                let mut elems = Vec::with_capacity(arr.len());
+                for el in arr.values.iter() {
+                    elems.push(self.rematerialize_from_old(el, old)?);
+                }
+                Ok(self.materialize_init_value(&auto_val::Value::Array(
+                    auto_val::Array::from(elems),
+                )))
+            }
+            auto_val::Value::Obj(obj) => {
+                let mut pairs: Vec<(auto_val::ValueKey, auto_val::Value)> = Vec::new();
+                for (key, item) in obj.iter() {
+                    pairs.push((key.clone(), self.rematerialize_from_old(item, old)?));
+                }
+                let mut o = auto_val::Obj::new();
+                for (key, v) in pairs {
+                    o.set(key, v);
+                }
+                Ok(self.materialize_init_value(&auto_val::Value::Obj(Box::new(o))))
+            }
+            auto_val::Value::VmRef(r) => {
+                let id = r.id as u64;
+                let heap_obj = old
+                    .vm
+                    .get_heap_object(id)
+                    .ok_or_else(|| format!("opaque heap ref {id}: object not in old VM"))?;
+                let guard = heap_obj.read().unwrap();
+                if let Some(l) = guard.as_any().downcast_ref::<ListData>() {
+                    let elems: Vec<auto_val::Value> = l.elems.clone();
+                    drop(guard);
+                    let mut out = Vec::with_capacity(elems.len());
+                    for el in elems.iter() {
+                        out.push(self.rematerialize_from_old(el, old)?);
+                    }
+                    Ok(self.materialize_init_value(&auto_val::Value::Array(
+                        auto_val::Array::from(out),
+                    )))
+                } else if let Some(o) = guard.as_any().downcast_ref::<ObjectData>() {
+                    let fields: Vec<(auto_val::ValueKey, auto_val::Value)> =
+                        o.fields.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+                    drop(guard);
+                    let mut obj = auto_val::Obj::new();
+                    for (k, v) in fields {
+                        obj.set(k, self.rematerialize_from_old(&v, old)?);
+                    }
+                    Ok(self.materialize_init_value(&auto_val::Value::Obj(Box::new(obj))))
+                } else {
+                    Err(format!("opaque heap object {id}: cannot migrate across bridges"))
+                }
+            }
+            // Plan 289 convention: compiled `[...]` literals store the heap
+            // list id as a plain Int — probe it in the old VM the same way
+            // `read_all_state_materialized` does.
+            auto_val::Value::Int(id) if *id >= 4_000_000 => {
+                match old.vmref_to_vec(*id as usize) {
+                    Ok(elems) => {
+                        let mut out = Vec::with_capacity(elems.len());
+                        for el in elems.iter() {
+                            out.push(self.rematerialize_from_old(el, old)?);
+                        }
+                        Ok(self.materialize_init_value(&auto_val::Value::Array(
+                            auto_val::Array::from(out),
+                        )))
+                    }
+                    Err(_) => Err(format!("opaque int heap id {id}: cannot migrate")),
+                }
+            }
+            _ => Ok(value.clone()),
+        }
     }
 
     /// PLAN-041 T-02: instance identity for a state object (dispatch side:
@@ -2482,6 +2724,36 @@ impl VmBridge {
     /// conditional-subscription family as `has_pending_timers`).
     pub fn has_parked_tasks(&self) -> bool {
         !self.parked_tasks.borrow().is_empty()
+    }
+
+    /// PLAN-056 (test seam): inject a synthetic parked task so the busy-gate
+    /// (`try_reload` → Busy → keep old, retry) is exercisable without a real
+    /// async HTTP/SSE round-trip. Never used outside #[cfg(test)].
+    #[cfg(test)]
+    pub fn inject_parked_task_for_test(&self) {
+        use auto_lang_core::vm::engine::ParkedSegment;
+        use auto_lang_core::vm::engine::ParkedWait;
+        let task = auto_lang_core::vm::task::AutoTask::new(0, 4096, 0);
+        self.parked_tasks.borrow_mut().push(ParkedTask {
+            task,
+            seg: ParkedSegment {
+                fn_name: "__plan056_test_parked".to_string(),
+                saved_bp: 0,
+                saved_fn_n_args: 0,
+            },
+            wait: ParkedWait::Future(0),
+            fn_name: "__plan056_test_parked".to_string(),
+            event_name: "test".to_string(),
+            release_stack_on_complete: false,
+            parked_at: std::time::Instant::now(),
+        });
+    }
+
+    /// PLAN-056 (test seam): clear the injected parked task (busy-gate retry
+    /// leg). Never used outside #[cfg(test)].
+    #[cfg(test)]
+    pub fn clear_parked_for_test(&self) {
+        self.parked_tasks.borrow_mut().clear();
     }
 
     /// PLAN-711 T-04 (D-2): 是否有 **I/O 凭据**的 parked 段——tick 泵的

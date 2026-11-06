@@ -1,26 +1,28 @@
 # 多文件 Reload 就绪与状态 Schema 及 Effect 生命周期
 
-> PLAN-042 交付合同（SD-01/SD-03）。逐实际入口的已支持/保守跳过/需重启/
-> 具名缺口表；单文件状态 schema 迁移与失败保旧合同；owner/effect 边界；
-> 后继完整实施包的候选 bundle 原子发布合同与反例。**本文件是研究核验
-> 结论，不宣称完整 HMR 已实现**。证据：docs/plans/042 节 11 +
-> crates/auto-ui-runtime/src/ui_tests/plan042_reload_readiness_tests.rs（12 例，
-> 2026-11-04 全绿）。分类：feature ｜ 状态：active ｜ 来源计划：
+> PLAN-042 交付合同（SD-01/SD-03）；PLAN-056 对账修订。逐实际入口的已支持/
+> 保守跳过/需重启/具名缺口表；单文件状态 schema 迁移与失败保旧合同；
+> owner/effect 边界；候选 bundle 原子发布合同（已由 PLAN-056 交付，见
+> docs/specs/runtime/atomic-source-bundle-reload.md）。**本文档保留 042 研究
+> 结论与 056 对账差额；现役行为以 056 合同为准**。证据：docs/plans/042
+> 节 11 + docs/plans/056 §9 + crates/auto-ui-runtime/src/ui_tests/
+> plan042_reload_readiness_tests.rs（13 例）+ plan056_atomic_reload_tests.rs
+> （15 例，2026-11-05 全绿）。分类：feature ｜ 状态：active ｜ 来源计划：
 > docs/plans/042-reload-schema-and-effect-readiness.md
 
 ## 1. 实际入口与支持矩阵
 
-| 入口 | 位置（基线 7471b7c4） | 支持状态 |
+| 入口 | 位置（基线 22a925c7） | 支持状态 |
 |---|---|---|
-| 装配登记 `set_source_path` | ui/dynamic.rs:2163；dynamic_build.rs:2111 | 已支持（单/多文件同样登记，仅记录根路径+基线 mtime） |
-| 变更检测 `check_file_changed` | ui/dynamic.rs:2320 | 单文件：mtime 轮询可用；**内容不变、mtime 前进即报变化（误报，无害）**；**同 mtime 改内容漏检（负控实证）** |
-| 变更检测（多文件形态） | ui/dynamic.rs:2327 guard | **保守跳过**：import_stmts 或 registry 非空 → 恒 Ok(None)；root/store/child 改动一律不 reload（不是"只 reload 根"） |
-| reload 执行 | ui/dynamic.rs:2261；iced/renderer/host.rs:2822-2873（`__hot_reload` 500ms/2000ms 泵，`AUTOUI_HOT_RELOAD=0/1` 门控） | 单文件：保值迁移+视图替换可用；reload 失败静默（`let _ =`） |
-| DevTools 回写 `write_source_range` | ui/dynamic.rs:2185 | 已支持；回写自刷 mtime，下一拍不重触发 |
-| action_config 热替换 | compiler action_config.rs:680；host.rs:1886；MCP `action_config_reload` | 已支持（独立 DSL 源，与组件 reload 无关） |
+| 装配登记 `set_source_path` | ui/dynamic.rs；dynamic_build.rs | 已支持（登记根路径 + 内容快照基线，root+use 图） |
+| 变更检测 `check_reload` | ui/dynamic.rs；ui/reload_bundle.rs | **内容级**（blake3）：同 mtime 改内容检出；缺源具名 Err 保旧（PLAN-056 取代 mtime 轮询语义） |
+| 变更检测 `check_file_changed` | ui/dynamic.rs | **legacy 单文件 API**：mtime 轮询 + 多文件 guard 语义仅保留于此（泵不再使用；t03 探针已改写为新行为断言） |
+| reload 执行 `try_reload` | ui/dynamic.rs；iced/renderer/host.rs（`__hot_reload` 500ms/2000ms 泵，`AUTOUI_HOT_RELOAD=0/1` 门控） | 候选 bundle 原子发布（root/import/store/child/handlers/schema/effects 整包）；失败保旧、合法下一编辑成功 |
+| DevTools 回写 `write_source_range` | ui/dynamic.rs | 已支持；回写后下一拍内容级检出并原子提交 |
+| action_config 热替换 | compiler action_config.rs；host.rs；MCP `action_config_reload` | 已支持（独立 DSL 源 mtime 泵，与组件 reload 无关；候选构建/提交**不**劫持它） |
 | `hot_reload.rs` HotReloadComponent/UIWatcher | ui/hot_reload.rs | **存根，无能力**：parse_content 恒返回固定节点；无生产调用方。不得引用其声称 HMR |
-| MCP 组件 reload 工具 | ui/mcp_server.rs | **缺口**：仅 action_config_reload；组件热重载无 MCP 直达 |
-| Vue/Vite 轨 | — | **不在本文核验范围**：本仓无 Vue/Vite HMR 证据（examples 无 vue 形态、docs/web-integration.md 无 HMR 记载）；不得以其计 VM/iced 轨能力，是否存在属 web 栈自身事项 |
+| MCP 组件 reload 工具 | ui/mcp_server.rs | **缺口**：仅 action_config_reload；组件热重载无 MCP 直达（不随 056 新增公开 API） |
+| Vue/Vite 轨 | — | **不在本包核验范围**：本仓无 Vue/Vite HMR 证据；Vue 浏览器实证归属 PLAN-057 |
 | Node `hot_reload` | — | 不属于本仓 UI runtime 能力 |
 
 ## 2. 检测语义（mtime，非内容）
@@ -82,26 +84,17 @@
 - 结论：**不得通过删除 guard 冒多文件 HMR 能力**；guard 是当前唯一防止
   上述灭失的防护。
 
-## 6. 后继完整实施包合同（SD-03；明确未实现）
+## 6. 后继完整实施包合同（SD-03；已由 PLAN-056 交付，逐项对账）
 
-后继 Plan（建议编号 048+，owner：UI runtime）须满足：
-
-- **候选 bundle 原子发布**：candidate = root+imports+store+child+handlers
-  +schema+effects 一次性编译校验；任一环节失败 → 具名拒绝、旧 bundle 完整
-  保旧。禁止部分替换（旧 bridge/template/handler 不得被新候选半途覆盖）。
-- **来源快照一致性**：root 与 import/store/child 绑定同一来源快照（内容
-  hash，非 mtime）；缺源/无效 import 给具名拒绝，修复后下一次合法编辑成功。
-- **schema 判型**：带旧字段 schema 判 保持/迁移/局部重建/拒绝；同名类型
-  变化默认拒绝（不得沿用本文件 §3 的乐观保值缺口）。
-- **owner/effect 治理**：实例/store/Tick/订阅按 041 合同保留或撤销；迟到
-  回调不写新实例；失败保旧可继续操作。
-- **资源条件（预算）**：候选编译在独立 VM 模块试编译（不污染现役桥）；
-  输入规模按 042 T-01 冻结口径（单测级 <20 例/腿；真实 App 泵路径 GUI 腿
-  另列）；不承诺无界性能压力。
-- **验收反例（必须保持红）**：t03 guard 探针在真实现之前保持绿；t04 强制
-  reload 灾害边界探针保持绿（作为"不得回退到部分替换"的回归钉）。
-- **明确未实现（本包不交付）**：多文件/含 store/含 child 工程的热重载、
-  内容级失效检测、MCP 组件 reload 工具、Vue/Vite 轨之外的 Node 热重载。
+| 042 合同项 | 056 落地 |
+|---|---|
+| 候选 bundle 原子发布（root+imports+store+child+handlers+schema+effects 一次性编译校验；任一环节失败 → 具名拒绝、旧 bundle 完整保旧） | 交付：`try_reload` 独立候选 + typed 迁移 + 原子提交（atomic-source-bundle-reload §2/§4）；失败/冲突/失配全具名拒绝保旧 |
+| 来源快照一致性（内容 hash 非 mtime；缺源/无效 import 具名拒绝；修复后下一次合法编辑成功） | 交付：blake3 内容快照 + 构建后复核（§1/§2） |
+| schema 判型（同名类型变化默认拒绝；不得沿用乐观保值缺口） | 交付：`migrate_state_typed` 同名不同类型整候选拒绝（§3） |
+| owner/effect 治理（实例/store/Tick/订阅按 041 合同保留或撤销；迟到回调不写新实例；失败保旧可继续操作） | 交付：实例迁移 + tombstone + 繁忙保旧重试 + 订阅表整体替换（§3/§4） |
+| 资源条件（预算）：候选编译在独立 VM 模块试编译（不污染现役桥）；输入规模按 042 T-01 冻结口径 | 交付：候选独立 VM；快照图 ≤128 文件硬界 |
+| 验收反例：t03 guard 探针在真实现之前保持绿；t04 强制 reload 灾害边界探针保持绿 | t03 改写为新行为断言（guard 退役）；t04 保持绿（不得回退部分替换的回归钉） |
+| 明确未实现：多文件/含 store/含 child 工程热重载、内容级失效检测、MCP 组件 reload 工具、Vue/Vite 轨之外的 Node 热重载 | 前三项已交付；MCP 组件 reload API 与 Vue/Vite/Node HMR 保持未交付（057 承接 Vue 浏览器实证） |
 
 ## 7. 具名阻断与移交
 
@@ -114,8 +107,9 @@
   语言仓 Core 合同见 auto-lang `docs/specs/auto-parser-api/progress-and-rejection.md`），
   本文件依赖的"坏源保旧"腿已交付：`plan042_reload_readiness_tests.rs`
   `t02b_truncated_widget_keeps_old_and_next_legal_edit_wins`（截断候选
-  保旧 count=11，修复文件后合法编辑 reload 成功）。owner：auto-ui
+  保旧 count=11，修复文件后合法编辑 reload 成功）；PLAN-056 的
+  `SOLO_BROKEN` 截断候选同样受控拒绝保旧（V-01/V-03）。owner：auto-ui
   dialect grammar。
 - 实例 owner 语义以 component-and-store-instances.md 为正式合同，本文不
-  重写（SD-02 仅在其正式存在后记录真实差额——041 已交付，差额为 0，不
-  另写）。
+  重写（SD-02 仅记录真实差额——041 已交付，差额为 0；PLAN-056 的实例
+  迁移规则见 component-and-store-instances §6）。
