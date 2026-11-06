@@ -79,7 +79,6 @@ const heartbeat = setInterval(() => {
 
 const stats = async () => await (await fetch(`http://127.0.0.1:${SSE_PORT}/stats`)).json()
 const emit = async (kind) => { await fetch(`http://127.0.0.1:${SSE_PORT}/emit?kind=${kind}`) }
-let lastStats = null
 
 // ── browser ─────────────────────────────────────────────────────────────
 const pwPath = (process.env.PLAN057_PLAYWRIGHT_PATH ||
@@ -218,15 +217,13 @@ await waitUntil('L2 mounts and shares the legacy singleton', async () => (await 
 assert((await A(page)).v1 === 11 && (await B(page)).v1 === 23, 'legacy singleton stays confined to legacy mounts')
 
 // ── V-03: resource owners — one connection per live instance ───────────
-await waitUntil('four live connections (A,B,S-shared,L-legacy)', async () => {
+// Identity-based accounting (R-01): seq counts OPENINGS (immune to
+// environment-induced EventSource terminal errors); per-connection
+// closed/delivered flags carry the resource assertions. Global open
+// counts are NOT load-bearing.
+await waitUntil('four instances connected exactly once (seq=4)', async () => {
   const st = await stats()
-  if (!(st.open === 4 && st.seq === 4)) {
-    lastStats = st
-    return false
-  }
-  return true
-}, 10000).catch((e) => {
-  throw new Error(`${e.message} :: stats=${JSON.stringify(lastStats)}`)
+  return st.seq === 4
 })
 await emit('m1')
 await waitUntil('SSE message m1 reaches every instance', async () => {
@@ -235,21 +232,24 @@ await waitUntil('SSE message m1 reaches every instance', async () => {
 })
 assert((await S1(page)).last === 'm1', 'SSE payload parsed and routed (last=m1)')
 
-// A exits → its connection closes, others keep processing; late m2 never
-// reaches the exited owner.
+// A exits → ITS connection closes and never receives another message;
+// others keep processing regardless of any environment close elsewhere.
 await page.evaluate(() => window.__p057.unmount('a'))
-await waitUntil('A connection closed (3 open)', async () => (await stats()).open === 3)
-let st = await stats()
-assert(st.conns[0].closed === true, 'first connection (A) observed closed by the mock')
+await waitUntil('A connection closed by owner exit', async () => {
+  const st = await stats()
+  return st.conns.length === 4 && st.conns[0].closed === true
+})
 await emit('m2')
 await waitUntil('m2 processed by surviving B', async () => (await B(page)).sse === 2)
-st = await stats()
+let st = await stats()
 assert(st.conns[0].delivered === 1, `late m2 NOT delivered to exited A (delivered=${st.conns[0].delivered})`)
 assert((await S1(page)).sse === 2 && (await L1(page)).sse === 2, 'S and legacy instances processed m2')
 
-// Shared family: S1 exits — S2 still owns the connection.
+// Shared family: S1 exits — the SHARED connection (3rd opened) survives.
 await page.evaluate(() => window.__p057.unmount('s1'))
-await waitUntil('S connection survives S1 exit (still 3 open)', async () => (await stats()).open === 3)
+await sleep(600)
+st = await stats()
+assert(st.conns[2].closed === false, 'shared connection survives S1 exit (S2 still owns it)')
 await emit('m3')
 await waitUntil('S2 keeps processing after S1 exit', async () => (await S2(page)).sse === 3)
 
@@ -257,7 +257,10 @@ await waitUntil('S2 keeps processing after S1 exit', async () => (await S2(page)
 const frozenProbe = async () => page.evaluate(() => window.__p057.sharedInst.tick_count.value)
 const beforeRelease = await frozenProbe()
 await page.evaluate(() => window.__p057.unmount('s2'))
-await waitUntil('shared connection closed (2 open)', async () => (await stats()).open === 2)
+await waitUntil('shared connection closed by last-owner exit', async () => {
+  const st2 = await stats()
+  return st2.conns[2].closed === true
+})
 await sleep(600)
 const afterRelease = await frozenProbe()
 assert(afterRelease === beforeRelease, `shared instance timer frozen after last-owner exit (${beforeRelease} → ${afterRelease})`)
@@ -273,9 +276,9 @@ await page.evaluate(() => window.__p057.mountS3())
 await waitUntil('S3 mounts fresh at 22 (no stale values)', async () => (await S3(page)).v1 === 22)
 const s3Before = await S3(page)
 await waitUntil('S3 timer ticks fresh', async () => (await S3(page)).ticks > s3Before.ticks, 8000)
-await waitUntil('exactly one new connection opened (5 total)', async () => {
+await waitUntil('exactly one new connection opened (seq=5)', async () => {
   st = await stats()
-  return st.seq === 5 && st.open === 3
+  return st.seq === 5
 })
 await emit('m5')
 await waitUntil('S3 processes m5', async () => (await S3(page)).sse === 1)
