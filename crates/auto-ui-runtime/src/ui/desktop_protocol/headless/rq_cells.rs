@@ -135,6 +135,12 @@ fn case_views() -> Vec<(&'static str, View<()>)> {
                 .style("max-h-24")
                 .build(),
         ),
+        (
+            "shadow_only",
+            View::container(View::empty())
+                .style("w-24 h-16 m-8 rounded-xl shadow-lg bg-muted")
+                .build(),
+        ),
         ("progress_bar", View::progress_bar(0.6)),
     ]
 }

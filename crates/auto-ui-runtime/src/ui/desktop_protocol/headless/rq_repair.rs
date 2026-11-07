@@ -41,7 +41,7 @@ fn produce(view: View<()>) -> (super::super::message::DisplayList, f64) {
     let mut obs = Vec::new();
     let mut bms = Vec::new();
     let mut cache = ResourceCache::default();
-    let list = lower_layers_v2(&layers, &mut obs, &mut cache, &mut bms, false);
+    let list = lower_layers_v2(&layers, &mut obs, &mut cache, &mut bms, false, 2.0);
     (list, ms(t.elapsed()))
 }
 

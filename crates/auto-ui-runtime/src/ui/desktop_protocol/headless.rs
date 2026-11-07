@@ -361,12 +361,24 @@ where
         self.pending_bitmaps.clear();
         self.resources.begin_frame();
         let bitmaps = &mut self.pending_bitmaps;
+        // 设备像素/逻辑像素比：根层 bounds 已含 viewport scale。
+        let scale = layers
+            .first()
+            .map(|layer| {
+                if self.width > 0.0 && layer.bounds.width.is_finite() {
+                    (layer.bounds.width / self.width).max(1.0)
+                } else {
+                    1.0
+                }
+            })
+            .unwrap_or(1.0);
         lower_layers_v2(
             &layers,
             &mut self.observations,
             &mut self.resources,
             bitmaps,
             self.glyph_runs,
+            scale,
         )
     }
 
@@ -1634,6 +1646,7 @@ fn lower_layers_v2(
     resources: &mut ResourceCache,
     bitmaps: &mut Vec<super::endpoint::BitmapUpload>,
     glyph_runs: bool,
+    scale: f32,
 ) -> DisplayList {
     let mut ops = Vec::new();
     for (index, layer) in layers.iter().enumerate() {
@@ -1644,7 +1657,15 @@ fn lower_layers_v2(
             });
         }
         for (quad, background) in &layer.quads {
-            lower_quad_v2(quad, background, &mut ops);
+            lower_quad_v2(
+                quad,
+                background,
+                &mut ops,
+                observations,
+                resources,
+                bitmaps,
+                scale,
+            );
         }
         for item in &layer.text {
             lower_text_v2(
@@ -1810,6 +1831,10 @@ fn lower_quad_v2(
     quad: &advanced_renderer::Quad,
     background: &iced::Background,
     ops: &mut Vec<DisplayOp>,
+    observations: &mut Vec<String>,
+    resources: &mut ResourceCache,
+    bitmaps: &mut Vec<super::endpoint::BitmapUpload>,
+    scale: f32,
 ) {
     let rect = to_wrect(quad.bounds);
     let radius = [
@@ -1836,22 +1861,116 @@ fn lower_quad_v2(
         color: to_rgba8(quad.border.color),
         width: quad.border.width,
     });
-    let shadow = (quad.shadow.color.a > 0.0
+    // PLAN-062 T-02：shadow blur 不再靠 Host 垫层近似——生产端按 iced_wgpu
+    // 阴影 shader 的同一 SDF 公式把阴影预栅格化成贴片资源（`scale` = 设备
+    // 像素/逻辑像素），Host 只需合成位图，因此可以逐像素对齐。
+    if quad.shadow.color.a > 0.0
         && (quad.shadow.blur_radius > 0.0
             || quad.shadow.offset.x != 0.0
-            || quad.shadow.offset.y != 0.0))
-        .then(|| ShadowSpec {
-            color: to_rgba8(quad.shadow.color),
-            offset: (quad.shadow.offset.x, quad.shadow.offset.y),
-            blur: quad.shadow.blur_radius,
-        });
+            || quad.shadow.offset.y != 0.0)
+    {
+        if let Some((patch_rect, w, h, rgba)) = rasterize_shadow(quad, scale) {
+            let src = resources.intern(w, h, &rgba, bitmaps);
+            if let Some(src) = src {
+                ops.push(DisplayOp::Image {
+                    rect: patch_rect,
+                    src,
+                    fit: crate::ui::desktop_protocol::message::ImageFit::Stretch,
+                });
+            }
+        } else {
+            observations.push("shadow 贴片栅格化失败（该 quad 阴影不呈现，具名诊断）".to_string());
+        }
+    }
     ops.push(DisplayOp::Quad {
         rect,
         fill,
         radius,
         border,
-        shadow,
+        // 阴影已由贴片承载；Quad 不再要求 Host 画垫层近似。
+        shadow: None,
     });
+}
+
+/// 阴影贴片：按 iced_wgpu `solid.wgsl` 的 SDF/平滑步进公式逐像素求值。
+///
+/// 与 shader 同口径：quad 在设备像素空间，`pos`/`scale` 为 quad 顶左与尺寸，
+/// 半径取 `min(radius, 短边/2)`；阴影矩形 = quad + offset，扩边 =
+/// `|offset| + 2·blur`（shader 的顶点扩边同式）。
+fn rasterize_shadow(
+    quad: &advanced_renderer::Quad,
+    scale: f32,
+) -> Option<(WRect, u32, u32, Vec<u8>)> {
+    let b = quad.bounds;
+    let blur = quad.shadow.blur_radius * scale;
+    let ox = quad.shadow.offset.x * scale;
+    let oy = quad.shadow.offset.y * scale;
+    let r = [
+        quad.border.radius.top_left.min(b.width.min(b.height) / 2.0),
+        quad.border.radius.top_right.min(b.width.min(b.height) / 2.0),
+        quad.border.radius.bottom_right.min(b.width.min(b.height) / 2.0),
+        quad.border.radius.bottom_left.min(b.width.min(b.height) / 2.0),
+    ];
+    // 贴片覆盖 shader 里被扩边的几何（否则模糊外沿会被裁掉）。
+    let x0 = (b.x + ox.min(0.0) - blur).floor();
+    let y0 = (b.y + oy.min(0.0) - blur).floor();
+    let x1 = (b.x + ox.max(0.0) + b.width + blur).ceil();
+    let y1 = (b.y + oy.max(0.0) + b.height + blur).ceil();
+    let w = (x1 - x0).max(1.0) as u32;
+    let h = (y1 - y0).max(1.0) as u32;
+    if w > 4096 || h > 4096 {
+        return None;
+    }
+    let color = to_rgba8(quad.shadow.color);
+    let mut rgba = Vec::with_capacity((w * h * 4) as usize);
+    for py in 0..h {
+        let fy = y0 + py as f32 + 0.5;
+        for px in 0..w {
+            let fx = x0 + px as f32 + 0.5;
+            // shader: rounded_box_sdf(-(frag - pos - offset - size/2) * 2, size, radius*2)/2
+            let sdf = rounded_box_sdf(
+                -((fx - b.x - ox - b.width / 2.0) * 2.0),
+                -((fy - b.y - oy - b.height / 2.0) * 2.0),
+                b.width,
+                b.height,
+                // shader 传 `border_radius * 2.0`（与 p 的 2 倍坐标同尺度）。
+                [r[0] * 2.0, r[1] * 2.0, r[2] * 2.0, r[3] * 2.0],
+            ) / 2.0;
+            let alpha = 1.0 - smoothstep(-blur, blur, sdf.max(0.0));
+            let a = (alpha.clamp(0.0, 1.0) * color.a as f32).round() as u8;
+            // 阴影为纯色（shader 的 premultiply 在合成时做）：这里按 straight
+            // 输出，与其它位图资源同口径。
+            rgba.extend_from_slice(&[color.r, color.g, color.b, a]);
+        }
+    }
+    Some((
+        WRect::new(x0, y0, w as f32, h as f32),
+        w,
+        h,
+        rgba,
+    ))
+}
+
+/// iced_wgpu `rounded_box_sdf`（shader 同式；`p` 已是相对中心的 2 倍坐标）。
+fn rounded_box_sdf(px: f32, py: f32, w: f32, h: f32, radius: [f32; 4]) -> f32 {
+    let box_half = if px > 0.0 {
+        [radius[2], radius[3]]
+    } else {
+        [radius[0], radius[1]]
+    };
+    let corner = if py > 0.0 { box_half[1] } else { box_half[0] };
+    let qx = px.abs() - w + corner;
+    let qy = py.abs() - h + corner;
+    qx.max(qy).min(0.0) + (qx.max(0.0).powi(2) + qy.max(0.0).powi(2)).sqrt() - corner
+}
+
+/// GLSL/WGSL `smoothstep`。
+fn smoothstep(edge0: f32, edge1: f32, x: f32) -> f32 {
+    if (edge1 - edge0).abs() < f32::EPSILON {
+        return if x < edge0 { 0.0 } else { 1.0 };
+    }
+    let t = ((x - edge0) / (edge1 - edge0)).clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
 }
 
 /// 字符串承载（兼容面）：与 `lower_glyph_run` 同一整形结果按行拆 run 过线，
@@ -2578,7 +2697,7 @@ mod tests {
         };
         let mut cache = ResourceCache::default();
         let mut bms = Vec::new();
-        let replayed = lower_layers_v2(layers, &mut Vec::new(), &mut cache, &mut bms, false);
+        let replayed = lower_layers_v2(layers, &mut Vec::new(), &mut cache, &mut bms, false, 2.0);
         let replay = bottom(&replayed).expect("bottom text survives host replay");
         assert!(
             (replay.0 - x - 5.0).abs() < 0.1 && (replay.1 - y - 7.0).abs() < 0.1,
