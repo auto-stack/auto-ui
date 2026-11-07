@@ -108,3 +108,29 @@ VM 默认父窗绑定保持，生成 Rust 沿既有 unparented 门面语义；�
 模态，选择两份隔离文件/取消，检查实际返回路径、在位 owner 与关闭后
 owner enabled；provider 单测与源码生成文本断言不能替代该层证据。
 Reader 的真实按钮→picker→导入与持久化完整验收归 READER-009。
+
+## MCP synthetic text input contract (PLAN-069 SD-03)
+
+- `autoui_type` performs exactly ONE input dispatch carrying the whole typed
+  text. The typed value replaces the bound field (binding writeback precedes
+  the handler); it must not be delivered as a clear dispatch followed by a
+  second dispatch to the same handler. A handler that parked on HTTP between
+  the two dispatches made the second dispatch hit the parked-segment
+  single-flight guard (`re-entry ignored (segment in flight)`), silently
+  dropping the typed value (READER-009 round-19 live evidence: the store query
+  stayed empty and the preferences write persisted an empty query).
+- `clear_first` remains accepted for API compatibility; both values take the
+  single-dispatch path. An explicit empty-value dispatch is requested with
+  `autoui_action` `clear`, which keeps its Clear semantics.
+- The parked-segment re-entry policy is unchanged: a second dispatch to a
+  handler whose segment is in flight is still ignored (one segment per
+  `(widget, handler)` fn name). Callers needing a reset must wait for the
+  segment to settle or use a distinct handler.
+- A consumer gate that previously worked around the double dispatch with
+  `clear_first=false` remains valid (single dispatch either way); the default
+  path must reach the same observable state.
+- Consumption evidence must use the exact tool binary hash and source
+  revisions (see the evidence record above); a fixed runtime is not verified
+  by an older consumer binary.
+- Permanent regressions: `tests_plan069_f2` (dispatch count and value for the
+  default path, explicit false, and explicit `autoui_action clear`).

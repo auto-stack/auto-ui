@@ -73,3 +73,37 @@ cannot redirect the surviving root. The permanent
 synchronous/HTTP/CPU navigation, push then back, conditional results, Store and
 App isolation, and unmount/remount. Actual Reader acceptance remains with its
 consumer Plan and is not replaced by these component-level checks.
+
+## Route-decorated instance identity and dispatch resolution (PLAN-069 SD02)
+
+- An outlet page instance's identity carries its route as a decoration
+  (`Widget@/book/7/chapter/1`; the root route renders as `Widget@/`). Nested
+  child identities keep the ordinary `<parent>/<Child>#<key|slot>` shape and
+  may embed a routed parent prefix.
+- Widget-type resolution for dispatch MUST use the type registered with the
+  instance, never a suffix parse of the identity string. A route tail (`"1"`,
+  or `""` for `/`) is not a widget name: deriving the type from the identity's
+  last path segment made every routed page unresolvable by name, so name-only
+  dispatch and identity-miss retarget fell back to root state — where page
+  model fields (including route-parameter copies such as `.route_id`) do not
+  exist and read empty.
+- Name-only dispatch and identity-miss retarget resolve by exact registered
+  type with the existing cardinality rule (exactly one live instance → that
+  instance; zero or several → root legacy / drop). A released identity is never
+  retargeted. `child_instance_identities_of_type` and
+  `child_instance_widget_name` are the shared resolution surface; diagnostic
+  and auxiliary registries (input cache keys, native accessibility retarget,
+  reload schema lookup) use the same rule.
+- A page's Init writes its route parameters onto the page instance; later
+  handlers of the same page read those fields. A handler that rebuilds a route
+  from them (`router.push("/book/" + .route_id)`) therefore addresses the same
+  book; Back-style chains must not degrade to the bare prefix (`/book/`).
+- Synthetic dispatch (MCP press/action) uses the same instance resolution as
+  real input: a carried instance identity is authoritative; otherwise the
+  type-unique live instance receives the event. Route commits are observable
+  through `__current_route` and the mounted page instance.
+- Permanent fixtures: `plan069_route_dispatch_tests` — loop card click commits
+  the route and the target page reads the same param; name-only dispatch
+  reaches the routed page instance; the Back chain builds the parameterised
+  route and mounts the detail page; an identity-carrying control is unchanged.
+  Pre-fix red proof: all four fail, Back produces exactly `/book/`.

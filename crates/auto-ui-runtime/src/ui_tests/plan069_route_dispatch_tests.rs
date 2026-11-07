@@ -296,3 +296,133 @@ fn f3_instance_carrying_dispatch_unchanged() {
         Some(auto_val::Value::Str("/book/b1".into()))
     );
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// T-05 附带定谳（RC 生命周期）：路由页换代不得释放 App 根态对象。
+//
+// 现场：READER-009 阅读页→详情页换代后 `[RC canary] use-after-free: heap
+// object 4000013 was freed 0.0s ago` + view/update panic（详情页体恒空）。
+// 4000013 = App 根态对象（探针打印 `release_child identity=bookshelf@/
+// state_id=4000016 parent_id=4000013`）。根因：实例 teardown 的字段释放
+// 循环把 `__auto_parent`/`__auto_root`（VmRef→父/根）**连同**其显式 stake
+// 一起释放，随后又显式 `rc_release_id(parent)`/`rc_release_id(root)` →
+// 父/根每次换代净 -1。多次换代后根态 RC 归零被释放，之后每帧读根即 UAF。
+// ─────────────────────────────────────────────────────────────────────────
+
+fn write_cyclic_fixture(dir: &std::path::Path) -> std::path::PathBuf {
+    let pages = dir.join("pages");
+    std::fs::create_dir_all(&pages).expect("pages dir");
+    std::fs::write(
+        dir.join("app.at"),
+        r#"
+widget App {
+    routes {
+        "/" -> use home2
+        "/p/:id" -> use pager
+    }
+    view {
+        outlet
+    }
+}
+"#,
+    )
+    .expect("app.at");
+    std::fs::write(
+        pages.join("home2.at"),
+        r#"
+widget home2 {
+    msg { Go(int) }
+    view {
+        col {
+            button "go" { onclick: .Go(1) }
+        }
+    }
+    on {
+        .Go(i int) -> {
+            router.push("/p/" + i.to_string())
+        }
+    }
+}
+"#,
+    )
+    .expect("home2.at");
+    std::fs::write(
+        pages.join("pager.at"),
+        r#"
+widget pager {
+    msg { Init, Back }
+    model {
+        var route_id str = ""
+    }
+    view {
+        col {
+            button "back" { onclick: .Back }
+            text .route_id {}
+        }
+    }
+    on {
+        .Init -> {
+            .route_id = router.param("id")
+        }
+        .Back -> {
+            router.push("/")
+        }
+    }
+}
+"#,
+    )
+    .expect("pager.at");
+    dir.join("app.at")
+}
+
+/// T-05 RC 生命周期 oracle（定谳版）：实例字段引用归**对象**所有（auto-lang
+/// `free_heap_id` 逐字段递归 release），teardown 只释放挂载 stake。修前
+/// teardown 另外把字段/父/根引用再释放一遍 → 对象真正回收时二次释放 →
+/// 根态 RC 归零被回收 → 详情/任一页每帧读根即 RC canary UAF。
+///
+/// 断言取「根态存活」不变量：每次换代后根态 RC > 0 且可读。修前第 2 次换代
+/// 即归零（实测 rc 3→1→0，canary panic）；修后 8 次换代全程可读。
+#[test]
+fn f3_page_transition_keeps_root_state_alive() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let app = write_cyclic_fixture(dir.path());
+    let code = std::fs::read_to_string(&app).expect("read app.at");
+    let mut dc = build_dynamic_component(&code, Some(&app.to_string_lossy()))
+        .expect("cyclic fixture compiles");
+    dc.fire_init();
+    let _ = dc.view_with_debug_gated(true);
+    dc.drive_scheduler_to_quiescence(10_000);
+
+    let root = dc.bridge().state_obj_id();
+    assert!(
+        dc.bridge().rc_count(root) > 0,
+        "根态初始 RC 必须 > 0"
+    );
+
+    for i in 0..8 {
+        dc.on_with_input_for("home2", "Go\u{1F}i\u{1F}1", None);
+        let _ = dc.view_with_debug_gated(true);
+        dc.drive_scheduler_to_quiescence(10_000);
+        assert!(
+            dc.bridge().rc_count(root) > 0,
+            "第 {i} 次进入页后根态不得被释放（RC>0）"
+        );
+        assert_eq!(
+            dc.read_state("__current_route").ok(),
+            Some(auto_val::Value::Str("/p/1".into())),
+            "第 {i} 次进入页后根态路由槽必须可读（读根=UAF 探测点）"
+        );
+        dc.on_with_input_for("pager", "Back", None);
+        let _ = dc.view_with_debug_gated(true);
+        dc.drive_scheduler_to_quiescence(10_000);
+        assert!(
+            dc.bridge().rc_count(root) > 0,
+            "第 {i} 次返回后根态不得被释放（RC>0）"
+        );
+        assert_eq!(
+            dc.read_state("__current_route").ok(),
+            Some(auto_val::Value::Str("/".into())),
+            "第 {i} 次返回后根态路由槽必须可读"
+        );
+    }
+}

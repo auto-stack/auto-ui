@@ -143,3 +143,18 @@
   参数优先于 carrier，但 carrier 的类型段仍先剥离，不能把地址拼入 handler 名。
   永久反例使用真实 View 绑定产生的路由 HTTP/含@key消息，以及实际 Iced
   生产转换/系统动作入口；仅手传 instance 参数不能替代该 Send 边界覆盖。
+
+## 8. 输入绑定注册与值写投影（PLAN-069 SD-01）
+
+- `input`/`textarea` 的 `value:` 绑定注册键 = **状态字段路径的投影名**，与视图
+  读通道同口径：
+  - 直 field（`.q`、`input`）→ 裸字段名；
+  - 嵌套 store 路径（`.store.q`、`.StoreName.q`——store 字段合并进根态）→
+    展平后的根字段裸名；
+  - 非 store 别名的真嵌套对象（`.note.title`）**不展平**（保持不注册）。
+  绑定事件（oninput/onchange/onenter）首个命中优先，首匹配语义不变。
+- 绑定写回顺序与读通道一致：**实例对象优先，实例无该字段回落根态**。页模型
+  字段（实例所有）写实例；展平 store 字段（根态合并）写根。
+- 一次性键入 = 整体替换该字段值（类型按字段现值保值），不做追加。
+- 永久反例：`crates/auto-ui-runtime/src/ui_tests/plan069_synthetic_input_tests.rs`
+  （嵌套 store 绑定注册/写入、直 field 对照、二次键入替换、handler 读回同值）。

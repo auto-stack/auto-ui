@@ -2132,21 +2132,23 @@ impl VmBridge {
                     // window; the first real registration fixes the parent
                     // chain ref so nested keyed instances read the correct
                     // `__auto_parent` after reload.
+                    //
+                    // PLAN-069 F3（RC 配平）：新 parent ref 的 stake 在此取一次，
+                    // 旧 parent stake 在下方**恰好释放一次**——此前这里还
+                    // `release_init_value(old)`，与外层显式 release 叠成双释放
+                    //（旧 parent 每次重挂净 -1）。
                     if rec.parent_state_id != parent_state_id {
                         if let Some(idx) =
                             inst.field_names.iter().position(|n| n == "__auto_parent")
                         {
-                            if let Some(old) = inst.get_field(idx) {
-                                self.release_init_value(old);
-                            }
                             let storable =
                                 auto_val::Value::VmRef(auto_val::VmRef {
                                     id: parent_state_id as usize,
                                 });
                             let _ = inst.set_field(idx, storable);
-                            self.vm.rc_retain_id(parent_state_id);
                             self.vm.bump_path(rec.state_obj_id, Some("__auto_parent"));
                         }
+                        self.vm.rc_retain_id(parent_state_id);
                     }
                 }
             }
@@ -2287,6 +2289,12 @@ impl VmBridge {
     /// (probe only — distinguishes bridge replacement in traces).
     pub fn bridge_identity(&self) -> usize {
         self as *const _ as usize
+    }
+
+    /// PLAN-069 F3（RC 生命周期诊断）：当前堆对象的引用计数。用于实例
+    /// teardown 的 stake 配平 oracle（根/父态不得因换代净减）。
+    pub fn rc_count(&self, id: u64) -> u32 {
+        self.vm.rc_count(id)
     }
 
     /// PLAN-041 T-02: all live instance identities (diagnostics/tests/
@@ -2607,20 +2615,14 @@ impl VmBridge {
         self.child_instances_released
             .borrow_mut()
             .insert(identity.to_string());
-        if let Some(obj) = self.vm.get_heap_object(rec.state_obj_id) {
-            let field_values: Vec<auto_val::Value> = {
-                let guard = obj.read().unwrap();
-                match guard.as_any().downcast_ref::<GenericInstanceData>() {
-                    Some(inst) => inst.fields.clone(),
-                    None => Vec::new(),
-                }
-            };
-            for v in &field_values {
-                self.release_init_value(v);
-            }
-        }
-        self.vm.rc_release_id(rec.parent_state_id);
-        self.vm.rc_release_id(self.state_obj_id);
+        // PLAN-069 F3（RC 归属定谳）：实例对象的**字段引用归对象所有**——
+        // `materialize_init_value` 造容器时 retain、`__auto_parent`/`__auto_root`
+        // VmRef 在分配处 retain，auto-lang 的 `free_heap_id` 在对象真正回收时
+        // 逐字段递归 release（`child_refs()`）。因此 teardown 只释放**挂载
+        // stake**；此前「字段循环 release + 显式 parent/root release」把这些
+        // 引用再释放一遍，下次对象回收时二次释放父/根 → 根态 RC 归零被回收
+        // → 之后每帧读根即 RC canary UAF（READER-009 阅读页→详情页换代现场：
+        // rc 5→3→0，详情页体恒空）。
         self.vm.rc_release_id(rec.state_obj_id);
         self.init_demand_records.borrow_mut().remove(identity);
     }
