@@ -8,7 +8,7 @@ updated_at: 2026-11-07
 plan_revision: 1
 base_branch: master
 base_commit: ab19ff63
-current_step: 2
+current_step: 5
 total_steps: 8
 depends_on: [auto-ui/PLAN-068, READER-009]
 supersedes_spec_components: [docs/specs/runtime/component-and-store-instances.md, docs/specs/runtime/vm-route-page-loading.md, docs/specs/runtime/native-vm-app-validation.md]
@@ -130,7 +130,11 @@ auto-ui Rust runtime/compiler（crates/auto-ui-runtime、auto-ui-dialect/auto-ui
 - **T-01（完成）** 嵌套 store 路径绑定注册为展平根字段 + 写通道「实例优先、缺字段回退根态」：`dynamic.rs`（`scan_node_for_inputs` 新 store 别名臂；`on_with_input_for_instance` 写回）+ 永久反例 `crates/auto-ui-runtime/src/ui_tests/plan069_synthetic_input_tests.rs`（3 例）。`cargo test -p auto-ui-runtime --lib plan069_synthetic_input_tests -- --test-threads=1` → 3 passed；修前基线（注册臂短路）2 failed/1 passed（直 field 对照绿=正确红绿分离）。
 - **T-02（完成）** `clear_first` 不再重入派发 Clear，单次 TypeText 携带全文（显式 `autoui_action clear` 保留 Clear 单派发；parked guard 语义不变）：`mcp_server.rs` `tool_type` + 工具描述 + 永久反例 `tests_plan069_f2`（3 例）。`cargo test --lib tests_plan069_f2` → 3 passed；修前基线（临时恢复旧双派发）实测 `[Clear(""), TypeText("reader-query")]` 2 条 → 默认路径红。
 - **受影响回归（本轮，均绿）**：plan739_input_pin_tests 1、tests_plan483_d4 4、plan712_route_param_tests 3、plan749_read_semantics_tests 13、plan066_filter_projection_tests 4、plan370_015_behavior_tests 12、plan624_cross_state_tests 5（`--test-threads=1`）。
-- 代码提交：`c283dbcb`（4 files，+379/−45，树内 clean）。
+- **T-00（完成）** 四族机制定案：F1/F2 第 1 轮定谳；F3 第 2 轮定谳；F4 具名分叉（见下）。机制工件 `t00-mechanism-decision.md`（第 2 轮追加段含 F3 探针与 009 runs 25/31 日志引用）。
+- **T-03（完成）** F3 根因=路由页实例身份带 outlet 路由装饰（`Page@/book/7/chapter/1`），名字类解析从身份**后缀**猜类型 → 取到路由尾段（"1"/""）→ 名字合成派发与「身份 miss 重定向」两臂恒 miss → 落根态 → 页 `.route_id` 空 → Back 构建 `/book/`。修复：`ChildInstanceRecord` 记录注册类型名，`VmBridge::child_instance_identities_of_type`/`child_instance_widget_name` 类型精确匹配；7 处身份名过滤点（派发解析/重定向、`call_widget_handler`、instance-type 派发、重载迁移 schema、iced devtools 输入缓存键、native a11y 重定向）统一改用该口径，身份串与 `@route`/`#key` 装饰格式不变。永久反例 `plan069_route_dispatch_tests`（4 例）：修前 4/4 红（Back 实测 `/book/`，与现场逐字符一致），修后 4/4 绿。
+- **T-04（完成，附具名分叉）** F4 卡行（for 内 row 双参 onclick）派发 → 路由提交 + 目标页 Init 读回同一 param：VM 链路修前修后均绿（`f4_loop_card_click_commits_route_and_param`，契约 oracle 非红证）；009 runs 25/31 真实点击已可提交路由。**残留**：runs 25/31 在 阅读页→详情页 换代后出现 `[RC canary] use-after-free: heap object 4000013` + `app view/update panicked`（详情页不落屏）；本 scope 两条最小链路（parked Init 换代取消 / parked UI handler 卸载取消）**未复现**。判定为 VM RC 生命周期域（auto-lang 资产），待 T-05 用本树工具重跑 009 门复核：消失即收口；仍在则具名范围分叉交用户裁定（不静默扩面）。
+- **受影响回归（第 2 轮，全绿）**：plan069 10、plan051_p2 3、plan051_ext 3、plan051_timer 9、plan437 5、plan492 9、plan056 15、plan606 1、plan622 8、plan633 4、plan712_route_param 3、plan712_back_prefix 1、plan739 1、plan624 5、plan370_store_vm 6、plan370_015 12、plan066 4、plan089 1（`--test-threads=1`）；集成档 `--test plan041_instance_ownership` 4。
+- 代码提交：`c283dbcb`（F1/F2，4 files）、`370948d3`（F3/F4，6 files +375/−45）。
 
 
 ## 9. 复审记录
@@ -142,6 +146,10 @@ auto-ui Rust runtime/compiler（crates/auto-ui-runtime、auto-ui-dialect/auto-ui
 - stage: work | plan_id: auto-ui/PLAN-069 | plan_revision: r1 | outcome: pass（T-01/T-02 完成；T-00 部分——F1/F2 定谳，F3/F4 待探针） | worktree: D:/autostack/.wt/ui-069/auto-ui | branch: codex/plan-069-dev | base_commit: 37a7aa43（master tip 重冻结；起草 anchor ab19ff63 后仅 docs 提交） | code_commit: c283dbcb | dependency_revisions: auto-lang 160ed38f / auto-web 2d69841 / auto-down 58ea33f6（组内 detached 只读兄弟树） | task_ids: T-01, T-02（T-00 部分） | evidence: plan-artifacts/plan-069/auto-ui/t00-mechanism-decision.md；cargo test plan069_synthetic_input_tests 3 passed、tests_plan069_f2 3 passed（各自修前红在案）；受影响组 plan739 1/tests_plan483_d4 4/plan712 3/plan749 13/plan066 4/plan370_015 12/plan624 5 全绿 | blockers: 无用户待答；F3/F4 机制未定谳=下一轮 T-00 探针（route param 派发对象/卡点击链路） | next_responsible_role: work（T-00 F3/F4 探针 → T-03/T-04）
 
 - stage: goal | plan_id: auto-ui/PLAN-069 | plan_revision: r1 | round: 2 | from: work | to: work | status: executing | outcome: pass（work 阶段进行中：T-01/T-02 落地，T-00 F3/F4 待续） | worktree: D:/autostack/.wt/ui-069/auto-ui | commit: c283dbcb | next: work T-00（F3/F4 探针）→ T-03/T-04。
+
+- stage: work | plan_id: auto-ui/PLAN-069 | plan_revision: r1 | outcome: pass（T-00 完成、T-03/T-04 完成；F4 具名分叉在案） | worktree: D:/autostack/.wt/ui-069/auto-ui | branch: codex/plan-069-dev | base_commit: 37a7aa43 | code_commit: 370948d3 | dependency_revisions: auto-lang 160ed38f / auto-web 2d69841 / auto-down 58ea33f6 | task_ids: T-00, T-03, T-04 | evidence: plan-artifacts/plan-069/auto-ui/t00-mechanism-decision.md（第 2 轮追加段；探针日志 probe-2/probe-5 与 009 runs 25/28/29/31）；cargo test plan069 10 passed、plan069_route_dispatch_tests 修前 4/4 红（Back=`/book/`）修后 4/4 绿；受影响 18 组 + plan041 集成档全绿 | blockers: 无用户待答；F4 残留 RC canary UAF（heap object 4000013）未在本 scope 复现，属 VM RC 生命周期域，T-05 复核后处置 | next_responsible_role: work（T-05 交付源构建 + 009 消费复核 + pin/hash 交接）
+
+- stage: goal | plan_id: auto-ui/PLAN-069 | plan_revision: r1 | round: 3 | from: work | to: work | status: executing | outcome: pass（T-03/T-04 落地；T-05 待启） | worktree: D:/autostack/.wt/ui-069/auto-ui | commit: 370948d3 | next: work T-05。
 
 ## 10. 待澄清事项
 
