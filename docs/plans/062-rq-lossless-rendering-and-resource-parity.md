@@ -588,3 +588,27 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 
 - stage: user | plan_id: PLAN-062 | plan_revision: r4 | round: 21 | from: user | to: work | status: execution_done | outcome: pass（裁定落地：有界性能任务 + 四项小修一并做） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 63ffebc4 | next: work（replay 尾部性能 + N-01/N-02/N-04/N-05）
 - **用户裁定（2026-11-08）**：①对 F-03 授权**有界性能任务**（不改 AC；先证伪/证实“重放画布每帧重做文字整形”的假设，用 isolated 窗口前后对照，不收敛再回 (b)/(c)）；②N-01/N-02/N-04/N-05 四项小修**现在一起做**。三循环上限的“停止第四次循环”约束由本授权解除（性能任务不属于未经授权的重复修复）。
+
+### 2026-11-08 work 有界性能探测（F-03 尾部根因）+ N-01/N-04/N-05 小修
+
+- stage: work | plan_id: auto-ui/PLAN-062 | plan_revision: r4 | outcome: 进行中（尾部根因已定位到可度量层；修复方案需一次实现选择） / worktree: `D:/autostack/.wt/ui-062/auto-ui` | code_commit: `978ea7da`
+- **小修**：N-01 `BitmapRefs::applied` 改为 FIFO 上限 4096（`remember_applied`，新增 `applied_set_is_bounded` 断言最近记录仍幂等、最老被淘汰后可再驱逐）；N-04 `rqhost` 的 `ReclaimWindow` 补 `refs.forget_surface`（独立宿主回收路径不再永久占住挂起释放）；N-05 Spec §5.3 写明 produce 门的负载跳过（`quiet = direct p95 ≤8ms` → `skipped_loaded`，executor 13/28、reviewer 11/28 触发过；共享窗口绿灯只覆盖稳态与像素，W-C 签收必须在隔离窗口）。
+- **性能探测（`rq_perf_replay_shapes`，隔离标记 + 20 帧预热，40 采样，p50/p95 ms）**：
+  | shape | ops | p50 | p95 |
+  |---|---|---|---|
+  | empty | 0 | 7.14 | 8.40 |
+  | text_1 | 1 | 8.47 | 10.91 |
+  | text_50 | 50 | 18.12 | 25.97 |
+  | image_1（已驻留） | 1 | 7.67 | 9.07 |
+  | image_20 | 20 | 8.64 | 12.86 |
+  | quad_200 | 200 | 10.18 | 11.52 |
+- **结论（数据驱动，不是猜测）**：
+  1. 重放路径有 **≈3ms 的固定开销**（empty 7.14 vs 同机 direct 空树 ~4.1），来自 `displaylist_element` 的 canvas 包装（布局/交互/背景清理），不是文字整形；
+  2. 每段文字 ≈ **0.22ms/帧**（text_50 − empty ≈ 11ms / 50），即“文字整形/绘制”确实是按段计的稳态成本，但**不是** 1–2 段文字用例的尾部来源；
+  3. 冻结公式 `1.25×direct+2ms` 在 direct≈4ms 时给到 ≈7ms 的预算，而重放的空帧基线就是 7.14ms——**公式无法吸收 3ms 固定开销**，这才是 `path_mesh/svg/…` 系列 p95 越界的结构性原因。
+- **修复候选（需一次选择，不属“再改一遍”）**：
+  - **(A) 去掉 canvas 包装**：让 `displaylist_element` 用直接 `Widget::draw` 绘制 DisplayList（自带布局/命中），砍掉 ~3ms 固定开销；风险是需要重做命中/交互接线（宿主侧命中表另存，需核）。
+  - **(B) r5 修订口径**：把该条款改成“重放 p50 设门 + p95 记录”，或给固定开销留出对称常数（例如 `1.25×direct + 4ms`），并在 Spec 写明理由与实测。
+- 两项都不改变 AC 的功能部分；本轮先记录数据，等选择后再动实现（避免再次无授权改口径）。
+
+- stage: goal | plan_id: PLAN-062 | plan_revision: r4 | round: 22 | from: work | to: user | status: execution_done | outcome: waiting（尾部根因已定位；固定开销修复 vs 口径修订需选择） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 978ea7da | next: user
