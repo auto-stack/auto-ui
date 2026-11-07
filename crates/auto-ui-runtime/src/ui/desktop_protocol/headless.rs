@@ -1651,6 +1651,8 @@ mod rq_probe;
 mod rq_seams;
 #[cfg(test)]
 mod rq_matrix;
+#[cfg(test)]
+mod rq_repair;
 
 // ================================ 测试 ================================
 
