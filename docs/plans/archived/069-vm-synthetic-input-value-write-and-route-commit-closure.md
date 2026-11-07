@@ -1,6 +1,6 @@
 ---
 plan_id: auto-ui/PLAN-069
-status: reviewed
+status: archived
 feature_name: VM合成输入值写与路由状态提交缺陷收口（068后续，round-19家族）
 author: [ZCode]
 created_at: 2026-11-07
@@ -177,6 +177,7 @@ auto-ui Rust runtime/compiler（crates/auto-ui-runtime、auto-ui-dialect/auto-ui
 
 - stage: review | review_scope: final | reviewer_identity: deepseek/deepseek-v4.1-flash（独立 agent 上下文、非独立模型；T-06 修复复核子代理，parent session-53f9493e-212e-4c72-9d95-f85e877b0a09；全部结论由 Plan/代码/在盘测试独立推导，未采信执行摘要） | plan_id: auto-ui/PLAN-069 | plan_revision: r1 | outcome: pass | worktree_path: D:/autostack/.wt/ui-069/auto-ui | branch: codex/plan-069-dev | reviewed_commit: 7920d9cc（父 01c0ab2c，base 37a7aa43；工作树 clean：`git status --porcelain` 空，HEAD=7920d9cc044fea1ca778d03454812bee27e9eaac；提交仅 3 文件 +169/−6：vm_bridge.rs 与两个测试文件） | base_commit: 37a7aa43526e0dd576616f87accba340673d0d4a | dependency_revisions: 交付树实测解析 auto-lang `D:/autostack/auto-lang` HEAD=ac77d3cca（原 pin 160ed38f 为其祖先；160ed38f..ac77d3cca 及该树 57 项脏改全为 docs-only，非 docs 改动 0 → 依赖**代码**身份等同 pin 160ed38ff6b2）、auto-web 2d69841（clean）、auto-down 58ea33f（clean）；消费沿用 T-05 的 009 组 pin auto-man 03bb65e / auto-lang 373506568 / auto-web bf72baa / auto-down 58ea33f | spec_inputs: docs/specs/runtime/component-and-store-instances.md 3778A4EE76C4A58486B5215CC8581351FE02C07BB08EB2DC823CC1A3EFBBECEB；docs/specs/runtime/vm-route-page-loading.md C51BDBB06F5A4E1CBD66261B7DAE15676F09DE370BC1DC886B9034C69737EB3E；docs/specs/runtime/native-vm-app-validation.md 5C4B2461019335952F60311A6335B72DE0C09313865BFA37FF0203DC27150324——三者在 7920d9cc 逐一实测同 hash，`git diff 01c0ab2c..7920d9cc -- docs/specs` 为空（修复未动 Spec 草案），SD-01/02/03 语义未变 | acceptance_results: 本轮按 F-01/F-02 受影响面重验，未受影响项沿用前次证据（修复只改 reload 提交后的 seen 集登记 + 文档/测试）。F-01 **closed**：`vm_bridge.rs:2428-2430` 现为独立语句（`self.instance_seen_cur.borrow_mut().insert(identity.to_string());`，不在注释内），与 `ensure_child_instance:2102-2104` 的登记同构；独立红证＝`git archive 01c0ab2c` 抽取修前树 + 打入 7920d9cc 新测试文件、共享 target 编译后 `cargo test -p auto-ui-runtime --lib f3_reload_releases_identity_not_remounted_by_new_view -- --test-threads=1` → **FAILED 0 passed/1 failed**，`left: 2, right: 1`，身份 `["/Counter069#a", "/Counter069#b"]`（与执行记录的“2 身份残留”一致）；修后同命令 **1 passed**。断言充分性独立判定：V1 渲 a+b，V2 同 schema/同类型只渲 a——(a) `child_instance_identities_of_type` 由 2→1 且存活项 `ends_with("#a")`（b 离开注册表、a 未被误杀）；(b) `child_instance_was_released(b)==true`（tombstone 落地）；(c) 携带 b 的迟到 `Inc` 后仍 1 条且全为 #a（不复活）。RC 交互：`import_child_instance` 对迁移身份只取 1 次挂载 stake（2411）+ parent/root 各 1 次（2404-2405），`release_child_instance` 只放挂载 stake（2637，字段引用交 `free_heap_id` 级联——auto-lang rc.rs:578-585 × `GenericInstanceData::child_refs` generic_registry.rs:703-709 逐 VmRef 释放，容器经 `materialize_init_value` 1466/1475 亦以 VmRef 落地）→ 一取一放、无双重记账；无早释：三个帧括号（dynamic.rs:1965/1974、2008/2023、2920/2927）均为整根模板构建且 begin→build→end，新视图渲染的身份先入 cur 再扫 prev−cur，导入身份只在“确实未再挂载”时被释放。F-02 **closed**：`release_child_instance` 文档（2594-2602）与实现（2603-2639：移注册记录/取消 parked 与 cpu 队列/tombstone/仅放挂载 stake/删 Init 记录）一致，旧“field stakes + instance-ref stakes”表述已消除。F1 负例 **meaningful**：`f1_non_store_nested_path_is_not_flattened` 钉住 `scan_node_for_inputs` 的 `store_alias_real_name` 闸门（dynamic.rs:4210-4219）——闸门若被移除，`.note.title` 会注册为 `ApplyNote→title` 而红；同例仍断言 `.store.q→q` 对照在案。AC-01～AC-06 沿用前次 pass 证据（机制与消费链未因本修复改变，见 F-01 影响分析）；AC-07 review-owned：本轮授予 reviewed；AC-08 merge-owned pending | pending_closeout_gates: T-07 merge-owned 全项——精确落地 7920d9cc / 冻结受影响并集回归（本轮复跑 plan069 13、plan041 4、plan068 14、plan056 15、plan437 5、plan051_timer 9、plan492 9；plan712_*/633/622/749 等组沿用执行证据，须在冻结基线统一并集，不跑全仓）/ 三份 canonical Spec 发布（草案仅在分支，main 自 37a7aa43 未改）/ 归档计数 / 清理 worktree+分支+scope / 009 交接：交付 `auto-ui-tool` 需以 7920d9cc 重建并刷新 handoff sha（现 `3204811e…` 构建自 01c0ab2c；F-01 仅影响 reload 提交后帧扫、消费门不触发 reload，故 AC-02～06 消费证据可复用，但 pin 必须绑定落地提交）| findings: F-01 closed（major，独立红→绿）；F-02 closed（low，文档与实现一致）；无新增阻断。残余非阻断观察：迟到事件断言只证“不复活/身份数不变”，未正向观测“handler 未执行”（例如 a 的 count 仍为 0）；因 (b) tombstone=true 已断言且 dynamic.rs:3320-3324→3351 在写回与 handler 前早退，不变式仍成立，后续加固可补断言 | evidence: `plan-artifacts/plan-069/auto-ui/review-f01/rerun-7920d9cc.log`（f3 1 passed、plan069 13 passed、plan041 4、plan068 14、plan056 15、plan437 5、plan051_timer 9、plan492 9，逐条 exit=0）、`green-confirm.log`（scratch 构建后复跑 f3 ok / plan069 13 ok，HEAD=7920d9cc，工作树 clean）、`red-f01/red-prefix-01c0ab2c.log`（修前红证全文，含失败断言原文）；代码锚点 vm_bridge.rs:2421-2430/2594-2639、dynamic.rs:2564-2592/1965-1974/2008-2023/2920-2927/3311-3352；Spec 哈希与空 diff 见 spec_inputs；修前树抽取/临时 tar/junction 复核后已删除，未对评审树做任何写入 | next: T-07 merge（canonical Spec 发布 + 冻结并集回归 + 归档 + 009 交接；交付 tool 绑定 7920d9cc）。
 
+- stage: merge | PLAN-069:r1 | outcome: pass（prepared/landed/canonical_verified/archived；cleaned 见后续回执） | reviewer_gate: T-06 final pass @ 7920d9cc（r1） | worktree: D:/autostack/.wt/ui-069/auto-ui（branch codex/plan-069-dev，落前 clean + wt-guard clean） | prepared: reviewed delta 3 个 canonical Spec + 4 个提交（774 行实现/测试增量）；rebase 至 master 7661816e，range-diff 四对全 `=`、净 patch sha256 前后 `D8079F37…1CEA` → 等价改写；映射 c283dbcb→4fa4673c、370948d3→4214340c、01c0ab2c→bb6eab9a、7920d9cc→d0e1a688 | landed: master tip = **d0e1a688**（`--ff-only`，无 merge commit） | canonical_verified: 三份 Spec 在 HEAD 的 blob（cc0b8206/4a1ada3d/16557ba0）与工作区 CRLF 归一内容逐一相同；SD-01/02/03 语义未变（review 已核） | regression: 冻结受影响并集 20 组 + 2 集成档 = **121 passed / 0 failed** @ d0e1a688 | archived: docs/plans/archived/069-vm-synthetic-input-value-write-and-route-commit-closure.md（本回执随归档提交；status archived） | 009 交接: auto-ui-tool @ d0e1a688 sha256 `0665c47c…77ac`，auto.exe `cb31bc2a…404f`，消费命令与边界见 §12.4/§11 | delivery_artifacts: 落地≠部署观测见 §12.5（消费工具已重建；无本仓后端/web 产物） | batch_gate: 本仓无 `.last-batch-regression.json`，批量门归 auto-lang，不触发 | next: cleaned（守卫后移除实施树/分支/组内依赖兄弟树/组目录，删除 plan-artifacts/plan-069 scope，刷新 registry）
 ## 10. 待澄清事项
 
 无待答范围授权。三项协调注记（非用户待答，责任方明确）：
@@ -191,3 +192,54 @@ auto-ui Rust runtime/compiler（crates/auto-ui-runtime、auto-ui-dialect/auto-ui
 2. READER-009 W-06 批量腿：`全选当前结果` 得 1000（期望 193）、`移除（可恢复）` 出现 503 取消 → **READER-009 W-06/其后端时延**（本轮环境单请求 2–17s，批量 RESTORE 超时）。
 3. READER-009 W-07 `未读` 控件时序（`control not visible in time`）→ **READER-009 W-07**。
 4. OS 三通道（UIA invoke/物理 click/sendclick）在卡行上的投递面仍归 READER-009 门的通道选择；本计划只交付 VM 链路与合成派发的路由提交（不把「物理输入已达」冒充为交付，Sky 外部限制照旧）。
+
+
+## 12. 交付物、消费与合并记录（fold-in，scratch 已清理）
+
+### 12.1 落地
+- 交付 commit：**`d0e1a688`**（`d0e1a68869740a78cc51bf5182d6ca9378d6dc7c`），master tip = 交付 commit（`--ff-only`，线性历史）。
+- rebase 改写映射（rebase 到 master `7661816e`）：`c283dbcb→4fa4673c`、`370948d3→4214340c`、`01c0ab2c→bb6eab9a`、`7920d9cc→d0e1a688`；
+  `git range-diff 37a7aa43..7920d9cc master..HEAD` 四对全部 `=`，净 patch sha256 前后同为 `D8079F37…1CEA` → 等价改写，评审证据可绑定。
+- 落地前基线：`reviewed` + T-06 final `pass`（reviewed_commit `7920d9cc`，plan_revision r1）。
+
+### 12.2 canonical Spec（已发布，随交付 commit）
+| 路径 | HEAD blob |
+|---|---|
+| docs/specs/runtime/component-and-store-instances.md §8 SD-01 | `cc0b8206ed52727ba2fb314660e4fc0c63ff3407` |
+| docs/specs/runtime/vm-route-page-loading.md（route-decorated identity，SD-02） | `4a1ada3d95f01b9423f21a86132c2d81db0b67ef` |
+| docs/specs/runtime/native-vm-app-validation.md（MCP 输入合同，SD-03） | `16557ba0d20cf4dc4266c3f6c2c15127488cd54e` |
+工作区内容与 HEAD blob 逐一比对一致（CRLF 归一后）。未写任何索引/ledger（应用自动派生）。
+
+### 12.3 冻结受影响并集回归（落地基线 `d0e1a688`，`--test-threads=1`）
+plan069 13、plan041_instance_ownership 4、plan068_routed_continuations 14、
+plan051_p2 3、plan051_ext 3、plan051_timer 9、plan056 15、plan066 4、plan089 1、
+plan437 5、plan492 9、plan606 1、plan622 8、plan624 5、plan633 4、
+plan712_route_param 3、plan712_back_prefix 1、plan739 1、plan749 13、
+plan370_store_vm 6、plan370_015 12 —— **合计 121 passed / 0 failed**。
+（review 已在其绑定 commit 复跑核心面；rebase 仅 docs 变更、patch 等价，故并集一次跑清。）
+
+### 12.4 009 消费交接（合并后 pin）
+- 交付源：master `d0e1a688`；`auto-ui-tool` 自该 commit 重建，
+  sha256 **`0665c47c835e49b8deed9f004436e9f52dd67a845d33adff9be529cf2b5877ac`**
+  （构建命令 `cargo build -p auto-ui-tools --bin auto-ui-tool`，auto-ui 树根）。
+- 工具链 CLI：`auto.exe` sha256 `cb31bc2ad7ad04459b4f1c18332a25746c07ed594c5b29a2749a251f418e040f`
+  （009 t01 toolchain 二进制）。
+- 消费命令（009 门，隔离 out-dir）：
+  `python tests/product/verify_workspace_ui_vm.py --auto-bin <auto.exe> --ui-tool <auto-ui-tool.exe> --out-dir <隔离目录>`；
+  环境仅两处重定向：`AUTO_UI_ROOT`=auto-ui 落地树、依赖根 pin 到 009 组
+  （auto-man `03bb65e`/auto-lang `373506568`/auto-web `bf72baa`/auto-down `58ea33f`）；
+  AC-03 默认路径证据另加 `P069_DEFAULT_CLEAR_FIRST=1`（使 warm-query 走 clear_first 默认路径）。
+- 消费结果（01c0ab2c 期的 run-03-final，F-01 只影响 reload 后帧扫、消费门不触发 reload → 证据复用）：
+  warm-query **193/193 0.30s**（默认 clear_first）、grid/list 21 页、
+  group-create-rename/membership PASS（详情页真实装载）、canary=0；
+  `results.json` sha256 `AD131B00…`、`app.log` sha256 `BC5C3A62…`（原文件随 scratch 清理）。
+- 具名边界见 §11。
+
+### 12.5 落地≠部署（显式观测）
+- 本仓交付面是 runtime 库 + 工具；无后端 release 二进制、无生成 web bundle 需要重建。
+- 消费侧工具已在落地 commit 重建（§12.4）。009 的桌面产品二进制由其自仓按其门构建，
+  不属本仓部署面（其 pin 交接见上）。
+
+### 12.6 批回归触发检查
+- 本仓无 `docs/plans/.last-batch-regression.json`；批量全回归门归 auto-lang（PLAN-898），
+  本仓合并不触发。
