@@ -88,13 +88,9 @@ fn handle_order() -> &'static Mutex<std::collections::VecDeque<String>> {
 }
 
 /// 句柄缓存上限（超过即按插入序逐出；不承诺 LRU）。
+/// 例外：`bitmap://` 由 producer 拥有，丢了无法自愈（Host 不会收到重传），
+/// 因此不参与本地淘汰——它们只在 producer 侧驱逐时消失。
 const HANDLE_CACHE_CAP: usize = 512;
-
-/// 已接受的位图 generation（src → seq；小 seq 的迟到更新被拒绝）。
-fn bitmap_generations() -> &'static Mutex<HashMap<String, u64>> {
-    static GENS: OnceLock<Mutex<HashMap<String, u64>>> = OnceLock::new();
-    GENS.get_or_init(|| Mutex::new(HashMap::new()))
-}
 
 /// 入句柄缓存并维持上限（FIFO；同 src 重入不重复排队）。
 fn handle_cache_insert(src: &str, handle: Option<ImageHandle>) -> Option<Option<ImageHandle>> {
@@ -108,18 +104,18 @@ fn handle_cache_insert(src: &str, handle: Option<ImageHandle>) -> Option<Option<
             order.push_back(src.to_string());
         }
         while order.len() > HANDLE_CACHE_CAP {
-            if let Some(oldest) = order.pop_front() {
-                handle_cache().lock().unwrap().remove(&oldest);
+            let Some(oldest) = order.pop_front() else {
+                break;
+            };
+            // producer 拥有的位图句柄不可自愈：保留（容量由 producer 的
+            // 256 MiB 驻留预算约束，Host 侧只做上限提示）。
+            if oldest.starts_with("bitmap://") {
+                continue;
             }
+            handle_cache().lock().unwrap().remove(&oldest);
         }
     }
     previous
-}
-
-/// 从本地 id 里取 generation 序号（`<pid>-rq-img-<seq>-<hash8>`）。
-fn bitmap_generation_of(src: &str) -> Option<u64> {
-    let (_, rest) = src.rsplit_once("rq-img-")?;
-    rest.split('-').next()?.parse::<u64>().ok()
 }
 
 /// http(s) 在途集：后台解码去重（同 src 至多一线程；失败由负缓存止位，
@@ -167,22 +163,9 @@ fn decode_handle(bytes: &[u8]) -> Option<ImageHandle> {
 /// 号，单写者时序由 BitmapAck 槽纪律钉死）。stride 宽于 w×4 时行重排
 /// （`Handle::from_rgba` 要紧排像素）。
 pub(crate) fn bitmap_cache_put(src: &str, w: u32, h: u32, stride: u32, rgba: Vec<u8>) {
-    // PLAN-062 复审 B5：迟到的小 generation 更新必须被拒绝（旧帧不得覆盖
-    // 新内容）；无 generation 的旧词汇照旧接受。
-    if let Some(gen) = bitmap_generation_of(src) {
-        let mut gens = bitmap_generations().lock().unwrap();
-        match gens.get(src) {
-            Some(known) if gen < *known => {
-                observe(&format!(
-                    "bitmap 旧 generation 更新被拒绝: {src} gen={gen} < {known}"
-                ));
-                return;
-            }
-            _ => {
-                gens.insert(src.to_string(), gen);
-            }
-        }
-    }
+    // 注：`src` 已含内容哈希与单调序号，同 src 必然同内容同代号，本地做不了
+    // 有意义的 generation 比较；跨进程 generation 校验需要 wire 上的显式
+    // 字段（Spec §6 具名遗留）。
     let tight = (w as usize) * 4;
     let pixels = if stride as usize == tight {
         // 紧排直用（stride == w×4 主路径）。

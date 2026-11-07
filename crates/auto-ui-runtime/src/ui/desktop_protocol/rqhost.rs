@@ -1698,6 +1698,12 @@ pub fn run_bridge(wellknown: &str, ws_port: u16, token: &str) -> Result<(), Stri
                     let wid = clients[ci].inner.wid.map(|w| w.0).unwrap_or(0);
                     let revision = clients[ci].last_revision;
                     let msg = if let Some(v2) = composed_v2(&clients[ci]) {
+                        // PLAN-062 T-04：镜像转发同样走能力准入（订阅端能力
+                        // 未声明时不得把 v3 帧推给它）。
+                        if let Err(err) = v2.admit(clients[ci].inner.surfaces.capabilities()) {
+                            eprintln!("[rq-admission] 镜像帧被拒绝（{err}）——保旧帧");
+                            continue;
+                        }
                         mirror.seq += 1;
                         ProtocolMsg::Frame(FrameMsg::FrameReadyV2 {
                             wid,

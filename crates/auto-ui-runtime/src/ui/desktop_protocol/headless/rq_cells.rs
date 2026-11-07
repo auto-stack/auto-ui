@@ -389,14 +389,14 @@ fn rq_cells_t05_six_cell_matrix() {
             CellStatus::Runnable | CellStatus::InprocApprox => {
                 let mut cases = Vec::new();
                 for (name, view) in case_views() {
-                  for (mode, glyph_runs) in [("default", false), ("glyph_runs", true)] {
+                  for (mode, glyph_runs) in [("default", false), ("v3_rich", true)] {
                     match measure_case(view.clone(), &out, name, mode, glyph_runs) {
                         Ok(reading) => {
                             if mode == "default" {
                                 // 门只压默认 producer（生产路径）：文字/路径/SVG/滚动
                                 // 必须 ≤0.2%（阈值 2/255）；阴影两例的残差已具名，
                                 // 这里记录不设门。
-                                if matches!(name, "path_mesh" | "svg_icon" | "text_cjk" | "scroll_clip" | "progress_bar") {
+                                if matches!(name, "path_mesh" | "svg_icon" | "text_cjk" | "scroll_clip" | "progress_bar" | "gradient_border_shadow" | "shadow_only") {
                                     assert!(
                                         reading.diff_ratio <= 0.002,
                                         "{name} 默认 producer 的像素差 {:.4} 超 0.2% 门",

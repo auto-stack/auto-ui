@@ -69,6 +69,8 @@ canonical 规范。来源：PLAN-062（r3）的实施与实测。与
   （等价 generation 语义）。内容未变的重复帧**零 payload 重传**，帧只引用同一
   `bitmap://` src；Host 侧按 src 复用已驻留纹理。
 - 驻留上限 256 MiB/App（最早键驱逐）；驱逐后的重引用会重传一次，计数可解释。
+  Host 侧句柄缓存上限 512 条，但 **`bitmap://` 条目不参与本地淘汰**（producer
+  拥有、丢失不可自愈）；超限的其它来源（文件/http/资产）按插入序逐出。
 - **上传预算**：8 MiB/1s 滑动窗口（per-App）。超预算帧**整帧回滚**（撤销本帧
   登记的资源键、复原 uploads/字节/驻留计数），端点返回
   `ProtocolError::Backpressure{resource:"upload"}` 并归还槽位；内容不丢、不得
@@ -83,7 +85,9 @@ canonical 规范。来源：PLAN-062（r3）的实施与实测。与
   （GlyphRun）。
 - 线词汇：`required:<cap>` / `optional:<cap>`；裸串按 optional 解释（旧 tail
   字节兼容）。声明可逆（`CapabilitySet::to_wire` round-trip）。
-- **准入**：Host 合成前校验帧的必需能力，缺一即具名拒绝
+- **握手准入**：App 在 Hello 尾声明 `required:`/`optional:` 能力；Host 解析后若有
+  不支持的必需能力 → `activate()` 返回 `ProtocolError::Admission(cap)` 且**保持
+  Listening**（不半启动）。帧合成前再校验一次：缺必需能力即具名拒绝
   （`AdmissionError::UnknownRequiredCapability`），**不写槽**（保旧帧）并归还
   传输槽。v2 词汇在收窄能力集下仍受。
 - **槽 = 信用**：帧/位图槽按"空闲池优先 → 从未用过的槽"分配；在途（未 ACK）
@@ -97,7 +101,7 @@ canonical 规范。来源：PLAN-062（r3）的实施与实测。与
 为**不可运行格**（owner UI063/OS063，fixture 不冒充真实 producer）。同 source/
 主题/1280×800@scale2，逐例像素差（阈值 2/255）：
 
-| 例 | v3 原语 | 相对 direct 差（矩阵默认 = glyph run 开） | 字符串面（glyph run 关） |
+| 例 | v3 原语 | 默认 producer（字符串 + scrim） | v3 富模式（glyph run + SDF 贴片，opt-in） |
 |---|---|---|---|
 | path_mesh | Path×4（12 段） | 0.095% | 0.095% |
 | svg_icon | Image（16×16 资源） | 0.100% | 0.100% |
@@ -115,18 +119,27 @@ canonical 规范。来源：PLAN-062（r3）的实施与实测。与
 - 因此 v3 glyph run **默认关闭**；打开它需要先解决合成对齐（Host 侧同源管线或
   经 review 同意的具名窄容差）。字符串面保持 0.094% 且 Host 用同一字体栈重排
   （可观测降级）。
-- 性能（p50，standalone-RQ 例）：produce 0.09–0.24ms（SVG 例外 20–32ms，根因是
+- 性能（p50，standalone-RQ 例，默认 producer）：produce 0.17–0.24ms（SVG 例外 ~32.5ms，根因是
   记录路径每帧新建 iced renderer 导致 iced 缓存冷启）、encode 0.005–0.008ms、
-  decode 0.004–0.008ms、replay 3.3–5.9ms，direct 稳态帧 p50 3.3–6.9ms。
+  decode 0.004–0.008ms、replay 5.2–6.5ms（首帧有一次 10.09ms 离群），direct 稳态帧 p50 3.3–6.9ms。
 - M 指标：M-04/M-08 measured；M-01/M-03/M-05 为 proxy（present 与 GPU 驻留未测）；
   M-02/M-06/M-07 unmeasured（真实 deadline、冷热启动、1/4/8 App 归 UI063/OS063）。
 
 ## 6. 具名遗留（不得当作已通过）
 
-1. glyph run 边缘对齐 0.80%（合成路径；见 §5）。
-2. 阴影贴片合成残差 0.74%（同上）。
-3. SVG 记录路径每帧新建 iced renderer → produce 20–32ms（T-02 实现债）。
-4. per-App CPU 预算/公平调度未实现（真实规模归 UI063/OS063）。
-5. 媒体资源族（Video/RemoteFrame）与 wire 上的显式 generation 字段未进本增量。
+1. glyph run 边缘对齐：v3 富模式 0.80%（默认 producer 仍走字符串面，Host 用同一
+   字体栈重排——可观测但**不是** AC-02 要求的“不重排+精确”）。
+2. 阴影贴片合成残差：v3 富模式 0.74%（默认面仍是 scrim 近似 0.0625%）。
+3. SVG 记录路径每帧新建 iced renderer → produce ≈32.5ms，超 061 冻结的 ≤10ms。
+4. per-App CPU 预算/公平调度未实现（真实规模归 UI063/OS063）；上传预算记账目前
+   只有端点产帧路径会调用，探针/新 FrameSource 需自行调用。
+5. 媒体资源族（Video/RemoteFrame）未进本增量。
 6. v2↔v3 双读只做了 tag 语义与拒绝路径，未做两进程实机配对；慢 Host/乱序资源/
    旧 ACK 负控未跑。
+7. Welcome 没有能力尾：producer 只能靠本地开关决定是否发 v3，无法从握手得知宿主
+   支持面（glyph/shadow 是配置项而非协商结果）。
+8. Host 无显式释放路径（`CacheControl` 不携带 bitmap src），最后 owner 释放语义
+   未实现；bitmap 只由 producer 侧驻留预算约束。
+9. wire 无显式 generation 字段：`src` 已含内容哈希+单调序号，本地做不了有意义的
+   “旧代号拒绝”；跨进程乱序只能靠 ACK/槽纪律约束。
+

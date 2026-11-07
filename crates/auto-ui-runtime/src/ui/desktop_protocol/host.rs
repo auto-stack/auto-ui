@@ -39,21 +39,29 @@ pub struct Surface {
 }
 
 /// 表面注册表（surface 句柄分配即 Welcome 回传的句柄）。
-#[derive(Default)]
 pub struct SurfaceStore {
     next_surface: u64,
     surfaces: BTreeMap<u64, Surface>,
     /// 宿主声明支持的能力（PLAN-062 T-04 入帧准入基线）。默认支持全部冻结
-    /// 能力（本仓 v3 重放端齐全）；对端未声明的 required 能力仍按拒绝处理。
+    /// 能力；受限宿主经 [`Self::set_capabilities`] 收窄，ProtocolHost 在
+    /// Hello 落点用端点的 supported 集合覆盖（握手声明来源）。
     capabilities: crate::ui::desktop_protocol::message::CapabilitySet,
+}
+
+impl Default for SurfaceStore {
+    fn default() -> Self {
+        Self {
+            next_surface: 0,
+            surfaces: BTreeMap::new(),
+            // 默认“全能力”而不是空集：空集会让所有 v3 帧被拒（含测试宿主）。
+            capabilities: crate::ui::desktop_protocol::message::CapabilitySet::all_optional(),
+        }
+    }
 }
 
 impl SurfaceStore {
     pub fn new() -> Self {
-        Self {
-            capabilities: crate::ui::desktop_protocol::message::CapabilitySet::all_optional(),
-            ..Self::default()
-        }
+        Self::default()
     }
 
     /// 设置宿主可接受的能力集合（握手声明来源）。
@@ -251,6 +259,10 @@ impl<'a> ProtocolHost<'a> {
                     theme_caps,
                     ..
                 } => {
+                    // PLAN-062 T-04：宿主声明的能力集合落进表面注册表，成为
+                    // 后续入帧准入的真实基线（不再是仅测试可见的 setter）。
+                    self.surfaces
+                        .set_capabilities(self.endpoint.supported.clone());
                     // ① 编译装载（独立模式下这一步 = spawn exe，Stage 2）。
                     let component =
                         (self.resolver)(&app_name).map_err(ProtocolError::ResolveFailed)?;
