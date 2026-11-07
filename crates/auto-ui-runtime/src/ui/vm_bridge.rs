@@ -2420,7 +2420,14 @@ impl VmBridge {
         );
         // Seen-now so the commit→first-render frame transition treats it as
         // mounted; identities the new view never re-registers get released +
-        // tombstoned by the normal frame sweep (删实例只撤销其 owner).        self.instance_seen_cur.borrow_mut().insert(identity.to_string());
+        // tombstoned by the normal frame sweep (删实例只撤销其 owner).
+        // PLAN-069 F-01（终审修复）：本语句必须独立成行——曾并入上一行注释
+        // 成为死代码，导致「reload 迁移后新视图不再挂载」的旧身份永不进入
+        // seen_cur/prev，prev−cur 帧扫无从释放：陈旧身份污染类型基数、
+        // 迟到事件不被 tombstone 丢弃、实例对象与其 ref stake 泄漏。
+        self.instance_seen_cur
+            .borrow_mut()
+            .insert(identity.to_string());
         self.init_demand_records.borrow_mut().insert(
             identity.to_string(),
             InitDemandRecord {
@@ -2584,11 +2591,15 @@ impl VmBridge {
         self.instance_seen_prev.borrow_mut().clear();
     }
 
-    /// PLAN-041 T-02: release one instance's state object: drop the mounted
-    /// stake + field stakes + instance-ref stakes, drop any Init demand
-    /// record bound to the identity (remount re-Inits, os-config identity
-    /// semantics), remove the registry entry. The heap object becomes
-    /// garbage collected by the regular RC reaper; its id is never reused.
+    /// PLAN-041 T-02 / PLAN-069 F3: release one instance's registry record and
+    /// mounted stake; drop its Init demand record (remount re-Inits). The
+    /// instance object's FIELD references (`__auto_parent`/`__auto_root`,
+    /// materialized containers) are owned by the object itself and released
+    /// once by auto-lang's `free_heap_id` reap cascade — this function must
+    /// not release them again (double release frees the parent/root state;
+    /// see PLAN-069 F3 root-state UAF). The identity is tombstoned so late
+    /// events are dropped. The heap object is reclaimed by the regular RC
+    /// reaper; its id is never reused.
     fn release_child_instance(&self, identity: &str) {
         let Some(rec) = self.child_instances.borrow_mut().remove(identity) else {
             return;

@@ -44,6 +44,7 @@ widget App {
         var seen str = ""
         var seen_direct str = ""
         var draft str = ""
+        var note = { title: "" }
     }
 
     view {
@@ -55,6 +56,10 @@ widget App {
             input {
                 value: .draft
                 oninput: .ApplyDirect
+            }
+            input {
+                value: .note.title
+                oninput: .ApplyNote
             }
             text .seen {}
         }
@@ -155,5 +160,24 @@ fn f1_direct_field_binding_write_is_unchanged() {
         read_str(&dc, "seen_direct"),
         "draft-text",
         "直 field handler 读值不回退"
+    );
+}
+
+/// V01(d) 负例（终审 F1 备注）：**非 store 别名**的真嵌套路径（`.note.title`）
+/// 不展平、不注册——展平只对 store 合并字段成立，否则会把任意嵌套对象的
+/// 叶子名误绑定到根态同名字段。
+#[test]
+fn f1_non_store_nested_path_is_not_flattened() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let dc = build(dir.path());
+    let map = dc.input_state_map();
+    assert!(
+        map.get("ApplyNote").is_none(),
+        "非 store 嵌套路径不得注册（展平仅限 store 别名）；实际 map={map:?}"
+    );
+    assert_eq!(
+        map.get("Apply"),
+        Some(&"q".to_string()),
+        "store 展平对照仍须在案"
     );
 }

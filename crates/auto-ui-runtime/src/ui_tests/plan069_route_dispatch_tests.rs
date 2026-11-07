@@ -426,3 +426,131 @@ fn f3_page_transition_keeps_root_state_alive() {
         );
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// T-03 复审修复 F-01（major）：atomic reload 的「已迁移但新视图不再挂载」身份
+// 必须进入 seen 集，否则 prev−cur 帧扫永不释放它（陈旧身份污染 F3 类型基数、
+// 迟到事件不被 tombstone 丢弃、实例对象与 __auto_parent/__auto_root stake 泄漏）。
+// 反例：V1 渲染 a+b，V2 同 schema/同类型但只渲染 a → reload 后 b 必须消失且
+// 被 tombstone，迟到事件 drop。
+// ─────────────────────────────────────────────────────────────────────────
+
+fn write_reload_pair(dir: &std::path::Path, root_src: &str) -> std::path::PathBuf {
+    std::fs::write(
+        dir.join("child069.at"),
+        r#"
+widget Counter069 {
+    msg { Inc }
+    model { var count int = 0 }
+    view { text .count {} }
+    on {
+        .Inc -> {
+            .count = .count + 1
+        }
+    }
+}
+"#,
+    )
+    .expect("child069.at");
+    let root = dir.join("host069.at");
+    std::fs::write(&root, root_src).expect("host069.at");
+    root
+}
+
+const RELOAD_V1: &str = r#"
+use child069: Counter069
+
+widget Host069 {
+    model {
+        var show_b bool = true
+        var note str = "v1"
+    }
+    view {
+        col {
+            Counter069 (key: "a") { }
+            if .show_b { Counter069 (key: "b") { } }
+        }
+    }
+}
+"#;
+
+const RELOAD_V2: &str = r#"
+use child069: Counter069
+
+widget Host069 {
+    model {
+        var show_b bool = true
+        var note str = "v2"
+    }
+    view {
+        col {
+            Counter069 (key: "a") { }
+        }
+    }
+}
+"#;
+
+fn set_forward(path: &std::path::Path) {
+    use std::time::{Duration, SystemTime};
+    let t = SystemTime::now() + Duration::from_secs(2);
+    let f = std::fs::File::options()
+        .read(true)
+        .write(true)
+        .open(path)
+        .expect("open reload source");
+    f.set_modified(t).expect("touch reload source");
+}
+
+#[test]
+fn f3_reload_releases_identity_not_remounted_by_new_view() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = write_reload_pair(dir.path(), RELOAD_V1);
+    let code = std::fs::read_to_string(&root).expect("read v1");
+    let mut dc = build_dynamic_component(&code, Some(&root.to_string_lossy()))
+        .expect("reload fixture v1 compiles");
+    let _ = dc.view_with_debug_gated(true);
+    dc.drive_scheduler_to_quiescence(10_000);
+
+    let ids = dc.bridge().child_instance_identities_of_type("Counter069");
+    assert_eq!(ids.len(), 2, "V1 应挂载 a/b 两个实例：{ids:?}");
+    let id_b = ids
+        .iter()
+        .find(|i| i.ends_with("#b"))
+        .cloned()
+        .expect("key b 实例");
+
+    // 原子重载：同 schema/同类型，但 V2 视图不再渲染 b 站点。
+    std::fs::write(&root, RELOAD_V2).expect("write v2");
+    set_forward(&root);
+    match dc.try_reload() {
+        crate::ui::dynamic::ReloadOutcome::Reloaded(_) => {}
+        other => panic!("合法候选应原子提交，得到 {other:?}"),
+    }
+    let _ = dc.view_with_debug_gated(true);
+    dc.drive_scheduler_to_quiescence(10_000);
+
+    let ids2 = dc.bridge().child_instance_identities_of_type("Counter069");
+    assert_eq!(
+        ids2.len(),
+        1,
+        "V2 只渲染 a：未再挂载的 b 身份必须被帧扫释放（F-01 修前泄漏为 2：{ids2:?}）"
+    );
+    assert!(
+        dc.bridge().child_instance_was_released(&id_b),
+        "b 身份必须被 tombstone（was_released=true）"
+    );
+    // 迟到事件（携带 b 身份）必须被丢弃，不得复活/改写。
+    dc.on_with_input_for_instance("Counter069", "Inc", None, Some(&id_b));
+    let _ = dc.view_with_debug_gated(true);
+    dc.drive_scheduler_to_quiescence(10_000);
+    assert_eq!(
+        dc.bridge().child_instance_identities_of_type("Counter069").len(),
+        1,
+        "迟到事件不得复活已 tombstone 的 b 身份"
+    );
+    let ids3 = dc.bridge().child_instance_identities_of_type("Counter069");
+    assert!(
+        ids3.iter().all(|i| i.ends_with("#a")),
+        "存活身份只能是 a（未再挂载的 b 已释放）；实际 {ids3:?}"
+    );
+}
