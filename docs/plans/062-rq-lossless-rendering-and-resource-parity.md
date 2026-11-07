@@ -358,3 +358,10 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 - 回归：`ui::desktop_protocol::` **257 passed / 4 failed**（基线同组）。
 - **尝试后撤回**：曾加“同 src 异内容即拒绝”的内容指纹守卫，被现有 codec 测试证伪——协议既有语义是“同 id 重上传 = 即时翻新”，因此 generation 乱序保护**必须**有 wire 显式字段，不能靠内容寻址替代。已 revert，Spec §6 继续把该字段列为具名遗留（这一结论现在是实测支撑，而不是猜测）。
 - 仍缺（AC-03/AC-04）：宿主显式释放路径（最后 owner 语义）、两进程 v2↔v3 配对、慢 Host/旧 ACK/乱序资源负控。
+### 2026-11-07 work 资源释放路径（T-04/T-03 收口 AC-03 的释放面）
+
+- stage: work / plan_id: auto-ui/PLAN-062 / plan_revision: r4 / outcome: 进行中 / code_commit: `310d9111`
+- 实现：追加式 `FrameMsg::ResourceRelease { wid, srcs }`（tag 13）——producer 驱逐（最后 owner 归零）时把 `bitmap://` 源通知 Host，Host 丢弃句柄（三处消费点：ProtocolHost / 桌面 session / rqhost 全部接线）；客户端泵在上传排水后立刻发送释放批。
+- 正确性加固：`enforce_limit` 不再驱逐**当前帧刚登记**的资源（剩余候选全是本帧资源时停止驱逐并保留超额），避免帧引用悬空；测试用 1 字节预算验证只释放非本帧项（`released=["bitmap://…rq-img-1-ec3b998d"]`）。
+- 证据：`rq_resource_release_follows_producer_eviction` 通过；`ui::desktop_protocol::` **258 passed / 4 failed**（基线同组，无新增）。
+- AC 状态：AC-03 的“最后 owner → 释放”现已闭环（producer 侧驱逐语义 + Host 释放）；仍缺媒体资源族与 wire 显式 generation 字段。AC-04 仍缺两进程 v2↔v3 配对与慢 Host/旧 ACK/乱序负控。
