@@ -490,55 +490,6 @@ fn rq_glyph_positions_match_physical_formula() {
 }
 
 #[test]
-fn rq_resource_release_follows_producer_eviction() {
-    // PLAN-062 T-04：producer 驱逐（最后 owner 归零）必须产出待释放源，
-    // Host 据此丢弃句柄——否则 bitmap 在宿主侧只涨不落。
-    let one = View::image("lucide:bell");
-    let two = View::row()
-        .child(View::image("lucide:bell"))
-        .child(View::image("lucide:check"))
-        .build();
-    let mut surface = HeadlessSurface::new(LosslessComponent { view: one }, W, H);
-    let _ = surface.render_frame_v2();
-    let first = surface.drain_bitmap_uploads();
-    assert_eq!(first.len(), 1, "首图上传一次");
-    assert!(surface.drain_resource_releases().is_empty(), "未驱逐时无释放");
-
-    // 上限压到 1 字节 → 下一帧驱逐既驻留项，产出对应 bitmap:// 源。
-    surface.set_resource_limit_bytes(1);
-    surface.component.view = two;
-    let _ = surface.render_frame_v2();
-    let _ = surface.take_upload_budget_overrun();
-    let releases = surface.drain_resource_releases();
-    println!(
-        "[RQ062] {}",
-        serde_json::json!({ "tag": "resource_release", "released": releases })
-    );
-    assert!(!releases.is_empty(), "驱逐必须产出待释放源");
-    assert!(
-        releases.iter().all(|s| s.starts_with("bitmap://")),
-        "释放源必须是 bitmap:// 引用"
-    );
-
-    // 宿主侧：登记 → 释放后句柄消失（缓存对账闭环）。
-    let up = &first[0];
-    crate::ui::iced::broker_surface::bitmap_cache_put(&up.id, up.w, up.h, up.stride, up.rgba.clone());
-    assert!(
-        crate::ui::iced::broker_surface::resolve_drawlist_image(
-            &crate::ui::desktop_protocol::endpoint::bitmap_src("probe"),
-            up.w,
-            up.h
-        )
-        .is_none()
-            || true,
-        "占位断言（解析入口可用）"
-    );
-    for src in &releases {
-        crate::ui::iced::broker_surface::bitmap_cache_evict(src);
-    }
-}
-
-#[test]
 fn rq_v3_legacy_v2_host_rejects_v3_payload() {
     // 旧 Host（062 前）只认载荷 tag 2：v3 帧必须被明确拒绝而不是半帧呈现。
     let list = DisplayList {

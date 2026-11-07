@@ -251,12 +251,6 @@ impl<'a> ProtocolHost<'a> {
                 // PLAN-053 T-03：结果落点在桌面会话状态面（broker 臂）；
                 // legacy 单客户端 host 无主题状态面（no-op 收尾）。
                 HostAction::ThemePolicyResult { .. } => {}
-                // PLAN-062 T-04：App 释放资源——丢弃宿主图像缓存里的句柄。
-                HostAction::ResourceRelease { srcs, .. } => {
-                    for src in srcs {
-                        crate::ui::iced::broker_surface::bitmap_cache_evict(&src);
-                    }
-                }
                 HostAction::ResolveAndAttach {
                     app_name,
                     title,

@@ -670,17 +670,6 @@ impl<S: FrameSource> ClientPump<S> {
                 ),
             }
         }
-        // PLAN-062 T-04：producer 驱逐/最后 owner 归零 → 通知 Host 释放句柄。
-        let releases = app.session.drain_resource_releases();
-        if !releases.is_empty() {
-            let wid = app.wid.unwrap_or(0);
-            let _ = self
-                .app_end
-                .send(&ProtocolMsg::Frame(FrameMsg::ResourceRelease {
-                    wid,
-                    srcs: releases,
-                }));
-        }
     }
 
     /// PLAN-033 T-03③（D3）：`__desktop_cmd` 读走上行——输入派发与周期

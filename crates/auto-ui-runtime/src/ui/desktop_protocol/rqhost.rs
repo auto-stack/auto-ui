@@ -475,12 +475,6 @@ fn apply_actions(
             // PLAN-053 T-03：结果落点在桌面会话状态面（broker 臂）；rqhost
             // daemon 侧无主题消费面（no-op 收尾）。
             HostAction::ThemePolicyResult { .. } => {}
-            // PLAN-062 T-04：App 释放资源——丢弃宿主图像缓存里的句柄。
-            HostAction::ResourceRelease { srcs, .. } => {
-                for src in srcs {
-                    crate::ui::iced::broker_surface::bitmap_cache_evict(&src);
-                }
-            }
             HostAction::ResolveAndAttach {
                 app_name,
                 title,

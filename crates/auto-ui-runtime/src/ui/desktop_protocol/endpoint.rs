@@ -144,12 +144,6 @@ pub trait FrameSource {
         Vec::new()
     }
 
-    /// PLAN-062 T-04：producer 驱逐/最后 owner 归零后待通知 Host 释放的
-    /// `bitmap://` 源。缺省空——无资源面的会话零实现负担。
-    fn drain_resource_releases(&mut self) -> Vec<String> {
-        Vec::new()
-    }
-
     /// PLAN-683（remote 模式）：v2 产线帧。缺省 = v1 帧 lift（
     /// [`super::message::DisplayList::from_v1`]——语义保真直搬，legacy
     /// 生产者零改造）；headless 宿主覆写为 tiny_skia 记录层原生降格。
@@ -812,9 +806,6 @@ pub enum HostAction {
         slot: u8,
         len: u32,
     },
-    /// PLAN-062 T-04：App 释放资源——适配层从宿主图像缓存丢弃这些
-    /// `bitmap://` 源（producer 侧驱逐/最后 owner 归零后的对账）。
-    ResourceRelease { wid: u64, srcs: Vec<String> },
     /// app→host 命令上行（v1.11 落地）：`record` = `DesktopCommand` 单记录
     /// 编码串（`verb␟arg`）——适配层 parse_records 单点解析执行；归因按
     /// wid → registry_id。此前在端点丢弃臂中无声消失（desktop.* wire 化
@@ -1065,11 +1056,6 @@ impl HostEndpoint {
             }
             // 握手确认（app 的 Ready）：Active 后的例行收尾，无动作。
             (HostState::Active, ProtocolMsg::Handshake(HandshakeMsg::Ready)) => Ok(vec![]),
-            // PLAN-062 T-04：App 释放资源（producer 驱逐/最后 owner 归零）。
-            (
-                HostState::Active,
-                ProtocolMsg::Frame(super::message::FrameMsg::ResourceRelease { wid, srcs }),
-            ) => Ok(vec![HostAction::ResourceRelease { wid, srcs }]),
             // Plan 508：HitTable 为宿主→远程镜像端变体，宿主端点不产不出、
             // 收到按未知方向拒绝（pipe/loopback 会话不经过此路径）。
             (_, ProtocolMsg::Frame(super::message::FrameMsg::HitTable { .. })) => {
@@ -1280,7 +1266,6 @@ fn msg_name(msg: &ProtocolMsg) -> &'static str {
             super::message::FrameMsg::BitmapReady { .. } => "Frame::BitmapReady",
             super::message::FrameMsg::BitmapAck { .. } => "Frame::BitmapAck",
             super::message::FrameMsg::FrameReadyV2 { .. } => "Frame::FrameReadyV2",
-            super::message::FrameMsg::ResourceRelease { .. } => "Frame::ResourceRelease",
         },
         ProtocolMsg::Input(_) => "Input",
         ProtocolMsg::Control(m) => match m {

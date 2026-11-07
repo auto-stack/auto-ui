@@ -1644,13 +1644,6 @@ pub enum FrameMsg {
         revision: u64,
         payload: DisplayList,
     },
-    /// app→host（PLAN-062 T-04，追加式 tag 13）：释放资源引用。
-    /// `srcs` 是 app 侧不再驻留的 `bitmap://` 源；Host 丢弃对应句柄（最后
-    /// owner 归零语义的生产端实现）。旧宿主收到未知 tag 会明确拒绝。
-    ResourceRelease {
-        wid: u64,
-        srcs: Vec<String>,
-    },
 }
 
 /// `BufferAlloc.bm` 位图段声明（PLAN-034 D3）：专用第二段的段名/槽数/
@@ -1690,9 +1683,6 @@ impl FrameMsg {
     const BITMAP_READY: u8 = 10;
     const BITMAP_ACK: u8 = 11;
     const FRAME_READY_V2: u8 = 12;
-    /// PLAN-062 T-04（追加式 tag 13）：App 释放资源（producer 驱逐/最后 owner
-    /// 归零）。Host 收到后丢弃对应 `bitmap://` 句柄，避免只涨不落。
-    const RESOURCE_RELEASE: u8 = 13;
 
     pub fn encode(&self, out: &mut Vec<u8>) {
         match self {
@@ -1861,14 +1851,6 @@ impl FrameMsg {
                 put_u8(out, Self::BITMAP_ACK);
                 put_u64(out, *wid);
                 put_u8(out, *slot);
-            }
-            Self::ResourceRelease { wid, srcs } => {
-                put_u8(out, Self::RESOURCE_RELEASE);
-                put_u64(out, *wid);
-                put_u32(out, srcs.len() as u32);
-                for s in srcs {
-                    put_string(out, s);
-                }
             }
             Self::FrameReadyV2 {
                 wid,
@@ -2053,15 +2035,6 @@ impl FrameMsg {
                 let wid = r.u64()?;
                 let slot = r.u8()?;
                 Self::BitmapAck { wid, slot }
-            }
-            Self::RESOURCE_RELEASE => {
-                let wid = r.u64()?;
-                let n = r.u32()? as usize;
-                let mut srcs = Vec::with_capacity(n.min(256));
-                for _ in 0..n {
-                    srcs.push(r.string()?);
-                }
-                Self::ResourceRelease { wid, srcs }
             }
             Self::FRAME_READY_V2 => {
                 let wid = r.u64()?;

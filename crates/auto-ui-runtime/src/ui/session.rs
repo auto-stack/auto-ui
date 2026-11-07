@@ -5287,12 +5287,6 @@ impl DesktopSession {
         let mut to_app = Vec::new();
         for action in actions {
             match action {
-                // PLAN-062 T-04：App 释放资源——丢弃宿主图像缓存里的句柄。
-                HostAction::ResourceRelease { srcs, .. } => {
-                    for src in srcs {
-                        crate::ui::iced::broker_surface::bitmap_cache_evict(&src);
-                    }
-                }
                 HostAction::DesktopBus { wid, record } => {
                     // PLAN-030 D4（v1.11）：52 动词上行执行臂——此前该变体
                     // 在端点丢弃臂无声消失（desktop.* wire 化缺口）。记录
