@@ -1153,9 +1153,13 @@ fn glyph_rgba(image: &cosmic_text::SwashImage, color: Rgba8) -> Option<CachedGly
     let mut pixels = Vec::with_capacity((width * height * 4) as usize);
     match image.content {
         cosmic_text::SwashContent::Mask => {
+            // 画布图像管线按**预乘**语义合成（与 tiny-skia 的 PixmapPaint 同
+            // 律）：覆盖率乘进 RGB，否则半透明边缘会被当成不透明色加亮，
+            // 表现为整段文字偏粗。
             for alpha in &image.data {
                 let a = ((*alpha as u16 * color.a as u16) / 255) as u8;
-                pixels.extend_from_slice(&[color.r, color.g, color.b, a]);
+                let premul = |c: u8| ((c as u16 * a as u16) / 255) as u8;
+                pixels.extend_from_slice(&[premul(color.r), premul(color.g), premul(color.b), a]);
             }
         }
         cosmic_text::SwashContent::Color => {

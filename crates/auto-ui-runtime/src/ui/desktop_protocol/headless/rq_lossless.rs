@@ -451,6 +451,45 @@ fn rq_v3_upload_budget_defers_frame_without_partial_registration() {
 }
 
 #[test]
+fn rq_glyph_positions_match_physical_formula() {
+    // 诊断：wire 的 x/y 必须与 cosmic-text `physical()` 完全一致（否则 Host
+    // 按绝对坐标合成会逐字漂移）。
+    use cosmic_text::{Attrs, Buffer, Metrics, Shaping};
+    let mut fs = iced::advanced::graphics::text::font_system()
+        .write()
+        .expect("Write font system");
+    let mut buffer = Buffer::new(fs.raw(), Metrics::new(16.0, 20.0));
+    buffer.set_size(fs.raw(), Some(600.0), Some(200.0));
+    buffer.set_text(fs.raw(), "中文路径客户数据库混排 ABC", &Attrs::new(), Shaping::Advanced, None);
+    buffer.shape_until_scroll(fs.raw(), false);
+    let scale = 2.0f32;
+    let pos = (0.0f32, 0.0f32);
+    let mut rows = Vec::new();
+    for run in buffer.layout_runs() {
+        for glyph in run.glyphs.iter().take(4) {
+            let physical = glyph.physical(pos, scale);
+            let mine_x = (glyph.x + glyph.font_size * glyph.x_offset).mul_add(scale, pos.0);
+            let mine_y = (glyph.y - glyph.font_size * glyph.y_offset).mul_add(scale, pos.1);
+            rows.push(serde_json::json!({
+                "id": glyph.glyph_id,
+                "physical_x": physical.x, "mine_x": mine_x,
+                "physical_y": physical.y, "mine_y": mine_y,
+                "size": glyph.font_size * scale,
+            }));
+        }
+    }
+    println!("[RQ062] {}", serde_json::json!({ "tag": "glyph_positions", "rows": rows }));
+    for row in &rows {
+        let px = row["physical_x"].as_i64().unwrap() as f32;
+        let mx = row["mine_x"].as_f64().unwrap() as f32;
+        assert!(
+            (px - mx.trunc()).abs() < 0.01,
+            "wire x 必须等于 physical().x：{row}"
+        );
+    }
+}
+
+#[test]
 fn rq_v3_legacy_v2_host_rejects_v3_payload() {
     // 旧 Host（062 前）只认载荷 tag 2：v3 帧必须被明确拒绝而不是半帧呈现。
     let list = DisplayList {
